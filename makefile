@@ -117,3 +117,7 @@ boxsize: change_pmd_boxsize.o $(mods)
 #.....Module dependencies
 parallel_md.o: $(mods)
 read_input.o:  $(mods)
+node_conv.o:   $(mods)
+combine_pmd.o: $(mods)
+
+
