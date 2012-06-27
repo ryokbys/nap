@@ -1,0 +1,10 @@
+set parametric
+
+# outfile=sprintf("snap%03d.png",i)
+# set output outfile
+
+infile=sprintf("disl%05d",i)
+plot infile us 1:2 w lp, infile us 3:4 w lp
+
+if( i<nsmpl ) i=i+1; pause interval; reread
+exit

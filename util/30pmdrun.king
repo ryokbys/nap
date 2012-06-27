@@ -1,0 +1,36 @@
+#!/bin/sh
+#PBS -N Al-disl-shear
+#PBS -o out
+#PBS -q batch
+#PBS -j oe
+#PBS -l nodes=8:ppn=2
+#-----------------------------------------------------------------------
+# Usage:
+#   $ qsub 30pmdrun.king
+#-----------------------------------------------------------------------
+
+cd $PBS_O_WORKDIR
+
+NPROCS=`wc -l < $PBS_NODEFILE`
+MPIRUN=/usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpirun
+PMD=/home/kobayashi/2012/06-15_pmd-disl/src/
+
+echo "Num of nodes= $NPROCS"
+echo "Running nodes:"
+cat $PBS_NODEFILE
+pwd
+
+#.....pmd
+echo "$MPIRUN -np $NPROCS ./src/pmd >& out.pmd"
+$MPIRUN -np $NPROCS $PMD/pmd >& out.pmd
+
+#.....combine to make akr files
+echo "./src/40combine >& out.combine"
+$PMD/40combine >& out.combine
+
+#.....cna from akr files
+echo "Processing CNA..."
+for file in akr[01]*
+do
+  $PMD/akr2cna < $file > "`echo $file | sed 's/akr/cna/'`"
+done

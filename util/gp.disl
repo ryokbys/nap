@@ -1,0 +1,11 @@
+nsmpl=100
+unset key
+
+set xrange [0:1]
+set yrange [0:1]
+
+set term x11
+set pointsize +1
+interval=0.01
+i=1
+load "gp.disl.loop"
