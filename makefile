@@ -70,7 +70,8 @@ params= params_EAM_Fe-H.h
 # mkconf= mkconf_2D_edge_disl.o
 # mkconf= mkconf_Al_fcc_nanorod.o
 # mkconf= mkconf_Si111_2lc.o
-mkconf= mkconf_BCC.o
+# mkconf= mkconf_BCC.o
+mkconf= mkconf_BCC_edge-disl.o
 
 #-----------------------------------------------------------------------
 # Post process programs
