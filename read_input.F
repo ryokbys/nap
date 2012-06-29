@@ -61,6 +61,9 @@ c=======================================================================
       elseif( trim(cname).eq.'cutoff_radius' ) then
         call read_r1(ionum,rc)
         return
+      elseif( trim(cname).eq.'cutoff_buffer' ) then
+        call read_r1(ionum,rbuf)
+        return
       elseif( trim(cname).eq.'flag_damping' ) then
         call read_i1(ionum,ifdmp)
         return

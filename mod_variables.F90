@@ -15,7 +15,11 @@
          ,ifpmd,npmd,iftctl,ifdmp,iocntpmd,iocnterg
     integer:: natm,nb,ntot,nis
     real(8):: tcpu,tcpu1,tcpu2,tcom
-    real(8):: dt,rc,dmp,treq,trlx,temp,epot,ekin,epot0
+    real(8):: dt,rc,dmp,treq,trlx,temp,epot,ekin,epot0,vmaxold,vmax
+    real(8):: rbuf= 0d0
+!.....Search time and expiration time
+    real(8):: ts,te
+    integer:: istps,istpe
 !.....parallel-related variables
     integer:: nx,ny,nz,nxyz
     integer:: nn(6),myparity(3),lsrc(6),lsb(0:nbmax,6) &

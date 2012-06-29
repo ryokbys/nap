@@ -23,7 +23,7 @@ c-----------------------------------------------------------------------
 
 #ifdef __DISL__
 c.....Epot threshold for disl core extraction [Hartree]
-      real(8),parameter:: epith = -1.31d-1
+      real(8),parameter:: epith = -1.450d-1
 #endif
 
       integer:: i,j,k,l,m,n,ia,ib,is
@@ -60,6 +60,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(nstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(dt,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(rc,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(rbuf,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(dmp,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(iftctl,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(treq,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
@@ -76,6 +77,7 @@ c-----sec. --> a.u.
       trlx= trlx /aut
 c-----meter --> bohr
       rc= rc /bohr
+      rbuf= rbuf /bohr
 c-----output every these steps, NOUTERG, NOUTPMD
       nouterg = max(nstp/nerg,1)
       noutpmd = max(nstp/npmd,1)
@@ -156,7 +158,7 @@ c-----copy RA of boundary atoms
      &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &     ,mpi_md_world)
 c-----Make pair list
-      call mk_lspr(namax,natm,nbmax,nb,nnmax,tag,ra,rc,h,hi
+      call mk_lspr(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
 c-----calc forces
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom
@@ -174,7 +176,8 @@ c-----calc forces
 
 c-----calc kinetic energy
       call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
-     &     ,mpi_md_world)
+     &     ,vmax,mpi_md_world)
+      vmaxold=vmax
 c-----in case of 3D, <ekin> = 3/2 *NkT
       temp= ekin /ntot/fkb *2d0/3d0
 cc-----in case of 2D, <ekin> = 2/2 *NkT
@@ -186,27 +189,34 @@ c      temp= ekin /ntot/fkb *2d0/2d0
         write(6,'(a,es15.7)') " Temperature     =",temp
       endif
 
+      istp= 0
+      istps= istp
+      ts= istps*dt
+      te= rbuf/(2d0*vmax/dt) +istp*dt
+      istpe= te/dt
+      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
+
 c-----initialize the counter for output
       iocntpmd=0
       iocnterg=0
 c-----output initial configuration
-      write(cnum(1:3),'(i3.3)') iocntpmd
-      open(20,file="pmd"//cnode//"-"//cnum,form='unformatted'
-     &     ,status="replace")
-      write(20) natm
-      write(20) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      write(20) (tag(i),ra(1:3,i)+sorg(1:3),va(1:3,i)/dt
-     &     ,eki(i),epi(i),strs(1:3,1:3,i)*2.94d+4,i=1,natm)
-      close(20)
-
-      istp= 0
+      if( ifpmd ) then
+        write(cnum(1:3),'(i3.3)') iocntpmd
+        open(20,file="pmd"//cnode//"-"//cnum,form='unformatted'
+     &       ,status="replace")
+        write(20) natm
+        write(20) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+        write(20) (tag(i),ra(1:3,i)+sorg(1:3),va(1:3,i)/dt
+     &       ,eki(i),epi(i),strs(1:3,1:3,i)*2.94d+4,i=1,natm)
+        close(20)
+      endif
 
 c-----Energy output
       if(myid_md.eq.0) then
         open(11,file="dat.erg",status='replace')
         write(11,'(a,es15.7)') '# epot0 =',epot0
         write(11,'(i8,3es15.7,f10.2)') istp
-     &     ,ekin+epot0,ekin,epot0,temp
+     &     ,ekin+epot0-epot0,ekin,epot0-epot0,temp
         call flush(11)
       endif
 
@@ -230,18 +240,35 @@ c-------multiply fmv or damping
 c-------update positions
         ra(1:3,1:natm)=ra(1:3,1:natm) +va(1:3,1:natm)
 
-c-------move atoms that cross the boundary
-        if( mod(istp,10).eq.0 ) then
+c.....Update te considering change of vmax
+        te=(te-ts)*vmaxold/vmax +ts
+        istpe= te/dt
+
+c.....Update pair list and boundary atoms
+c.....if making new pair list is needed.
+        if( istp.ge.istpe ) then
+c.....Move atoms that cross the boundary
           call bamove_stress(tcom,namax,nbmax,natm,ra,va,tag,strs
      &         ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world)
+c.....Copy RA of boundary atoms
+          call bacopy(tcom,sgm,volume,lsb,nbmax,ra,namax,natm,nb
+     &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
+     &         ,mpi_md_world)
+c.....Make pair list
+          call mk_lspr(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
+     &         ,anxi,anyi,anzi,lspr)
+          ts= istp*dt
+          te=rbuf/(2d0*vmax/dt) +ts
+          istpe= te/dt
+          if(myid_md.eq.0) write(6,'(a,i10)')
+     &         " Next update step will be ",istpe
+        else
+c.....Copy RA of boundary atoms determined by 'bacopy'
+          call bacopy_fixed(tcom,sgm,volume,lsb,nbmax,ra,namax,natm,nb
+     &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
+     &         ,mpi_md_world)
         endif
-c-------copy RA of boundary atoms
-        call bacopy(tcom,sgm,volume,lsb,nbmax,ra,namax,natm,nb
-     &       ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
-     &       ,mpi_md_world)
-c-------Make pair list
-        call mk_lspr(namax,natm,nbmax,nb,nnmax,tag,ra,rc,h,hi
-     &       ,anxi,anyi,anzi,lspr)
+
 c-------Calc forces
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom
      &       ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
@@ -254,11 +281,13 @@ c-------Calc forces
 c-------second kick of velocities
         va(1:3,1:natm)=va(1:3,1:natm) +aa(1:3,1:natm)
 
+c.....Calc kinetic energy
+        vmaxold= vmax
+        call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
+     &       ,vmax,mpi_md_world)
+
 c-------temperature control by velocity scaling
         if(iftctl.eq.1) then
-c---------calc kinetic energy
-          call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
-     &         ,mpi_md_world)
 c---------in case of 3D, <ekin> = 3/2 *NkT
           temp= ekin /ntot/fkb *2d0/3d0
 cc---------in case of 2D, <ekin> = 2/2 *NkT
@@ -275,18 +304,19 @@ c---------Berendsen thermostat
 c-------output energies
         if(mod(istp,nouterg).eq.0) then
           iocnterg=iocnterg+1
-c---------calc kinetic energy
-          if(iftctl.ne.1) then
-            call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
-     &           ,mpi_md_world)
-          endif
+cc---------calc kinetic energy
+c          if(iftctl.ne.1) then
+c            vmaxold= vmax
+c            call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
+c     &           ,vmax,mpi_md_world)
+c          endif
 c---------in case of 3D, <ekin> = 3/2 *NkT
           temp= ekin /ntot/fkb *2d0/3d0
 cc---------in case of 2D, <ekin> = 2/2 *NkT
 c          temp= ekin /ntot/fkb *2d0/2d0
           if(myid_md.eq.0) then
             write(11,'(i8,3es15.7,f10.2)') istp
-     &           ,ekin+epot,ekin,epot,temp
+     &           ,ekin+epot-epot0,ekin,epot-epot0,temp
             call flush(11)
           endif
 c---------output step, time, and temperature
@@ -448,19 +478,20 @@ c-----set fmv(1:3,ifmv) to be multiplied to the velocities
       end subroutine set_fmv
 c=======================================================================
       subroutine get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
-     &     ,mpi_md_world)
+     &     ,vmax,mpi_md_world)
       implicit none 
       include "mpif.h"
       integer,intent(in):: namax,natm,mpi_md_world,nismax
       real(8),intent(in):: va(3,namax),h(3,3),fack(nismax)
      &     ,tag(namax)
-      real(8),intent(out):: ekin,eki(namax)
+      real(8),intent(out):: ekin,eki(namax),vmax
 c-----locals
       integer:: i,ierr,is
-      real(8):: ekinl,x,y,z,v(3)
+      real(8):: ekinl,x,y,z,v(3),v2,vmaxl
 
       ekinl=0d0
       eki(1:natm)= 0d0
+      vmaxl= 0d0
 
       do i=1,natm
         is= int(tag(i))
@@ -468,13 +499,20 @@ c-----locals
         y= va(2,i)
         z= va(3,i)
         v(1:3)= h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z
-        eki(i)= fack(is)*(v(1)*v(1) +v(2)*v(2) +v(3)*v(3))
+        v2=v(1)*v(1) +v(2)*v(2) +v(3)*v(3)
+        eki(i)= fack(is)*v2
         ekinl=ekinl +eki(i)
+c.....Find max speed
+        vmaxl=max(vmaxl,v2)
       enddo
 
       ekin= 0d0
       call mpi_allreduce(ekinl,ekin,1,MPI_DOUBLE_PRECISION
      &     ,MPI_SUM,mpi_md_world,ierr)
+      vmax= 0d0
+      call mpi_allreduce(vmaxl,vmax,1,mpi_double_precision
+     &     ,MPI_MAX,mpi_md_world,ierr)
+      vmax=sqrt(vmax)
 
       end subroutine get_ekin
 c=======================================================================
@@ -613,6 +651,73 @@ c-----num. of received boundary atoms
       nb=nbnew
 
       end subroutine bacopy
+c=======================================================================
+      subroutine bacopy_fixed(tcom,sgm,volume,lsb,nbmax,ra,namax,natm,nb
+     &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
+     &     ,mpi_md_world)
+c-----------------------------------------------------------------------
+c  Exchanges boundary-atom data among neighbor nodes: tag and ra
+c  This doesnt search using position, just send & recv data of atoms
+c    which were listed by 'bacopy'.
+c-----------------------------------------------------------------------
+      implicit none
+      include 'mpif.h'
+      integer,intent(in):: namax,nbmax,nn(6),natm,nb
+     &     ,myid_md,myparity(3),mpi_md_world
+      integer,intent(inout):: lsb(0:nbmax,6),lsrc(6)
+      real(8),intent(in):: sv(3,6),sgm(3,3),volume,anxi,anyi,anzi,rc
+      real(8),intent(inout):: tag(namax),ra(3,namax),tcom
+
+c      integer:: status(MPI_STATUS_SIZE)
+      integer:: i,j,kd,kdd,ku,ierr
+      integer:: inode,nsd,nrc,nbnew
+      real(8):: tcom1,tcom2
+      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+      logical,save:: l1st=.true.
+
+      if( l1st ) then
+        allocate(dbuf(4,nbmax),dbufr(4,nbmax))
+        l1st=.false.
+      endif
+
+      nbnew= 0
+
+c-----loop over x, y, & z directions
+      do 100 kd=1,3
+
+c-------To calculate the communication time
+        tcom1=MPI_WTIME()
+
+        do 200 kdd= -1,0
+          ku=2*kd+kdd
+          inode=nn(ku)
+          nsd=lsb(0,ku)
+          nrc=lsrc(ku)
+
+c---------Exchange ra and tag
+          do i=1,nsd
+            j= lsb(i,ku)
+            dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
+            dbuf(4,i)  = tag(j)
+          enddo
+          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*4,nrc*4,21
+     &         ,mpi_md_world)
+          do i=1,nrc
+            ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
+            tag(natm+nbnew+i)   = dbufr(4,i)
+          enddo
+
+          call MPI_BARRIER(mpi_md_world,ierr)
+          nbnew=nbnew +nrc
+200     continue
+
+c-------Add the communication time to COMT
+        tcom2=MPI_WTIME()
+        tcom=tcom+tcom2-tcom1
+
+100   continue
+
+      end subroutine bacopy_fixed
 c=======================================================================
       subroutine bamove(tcom,namax,nbmax,natm,ra,va,tag
      &     ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world)
@@ -998,8 +1103,8 @@ c------------------------------------------------------------------------
       return
       end function bmv
 c=======================================================================
-      subroutine mk_lspr(namax,natm,nbmax,nb,nnmax,tag,ra,rc,h,hi
-     &     ,anxi,anyi,anzi,lspr)
+      subroutine mk_lspr(namax,natm,nbmax,nb,nnmax,tag,ra,rc
+     &     ,h,hi,anxi,anyi,anzi,lspr)
       implicit none
       integer,intent(in):: namax,natm,nbmax,nb,nnmax
       integer,intent(out):: lspr(0:nnmax,natm)
