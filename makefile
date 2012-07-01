@@ -17,8 +17,8 @@ MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
 # MPIFC= mpif90
 MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
 
-#CPPFLAGS= -D__SHEAR__ -D__DISL__
-CPPFLAGS=
+CPPFLAGS= -D__SHEAR__ -D__DISL__
+#CPPFLAGS=
 #-----------------------------------------------------------------------
 # # for mp-rk
 # MPIFC= mpif90

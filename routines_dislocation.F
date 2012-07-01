@@ -267,7 +267,7 @@ c
       implicit none
       include 'mpif.h'
       include './params_au.h'
-      include './params_EAM_Al.h'
+      include './params_EAM_Fe-H.h'
       integer,intent(in):: natm,myid_md,mpi_md_world,nodes,iocnt,ionum
 c.....Potential energy threshold
       real(8),intent(in):: epith
@@ -278,15 +278,15 @@ c.....Max num of core atoms
 c.....Max num of core groups
       integer,parameter:: mng= 2
 
-      integer:: i,n,nc,ierr,ndx,ndy,ndz,ndxz,mx,my,mz,m
-     &     ,ig,ng,kx,kz,m1x,m1z,m1,j
+      integer:: i,n,nc,ierr,ndx,ndy,ndz,ndxz,ndxy,mx,my,mz,m
+     &     ,ig,ng,kx,ky,kz,m1x,m1y,m1z,m1,j
       real(8):: al(3),dx,dy,dz,avx
       integer,allocatable:: lscl(:),lshd(:)
       character:: cfname*9
 
 c.....Cutoff radius
       real(8),parameter:: rc   = 10.0d-10/bohr
-      real(8),parameter:: rcy  = ea_re
+      real(8),parameter:: rcz  = rc_vphi
 c.....Num of disl cores to be assumed
       integer,parameter:: ncrs = 2
       logical,save:: l1st=.true.
@@ -305,8 +305,8 @@ c.....Search and list up disl core atoms
       nc=0
       do i=1,natm
         if( epi(i).gt.epith .and.
-     &       ra(3,i)+sorg(3).lt.0.75d0 .and.
-     &       ra(3,i)+sorg(3).gt.0.25d0 ) then
+     &       ra(2,i)+sorg(2).lt.0.75d0 .and.
+     &       ra(2,i)+sorg(2).gt.0.25d0 ) then
           nc=nc+1
           rci(1:3,nc)= ra(1:3,i)+sorg(1:3)
         endif
@@ -339,18 +339,21 @@ c.....  two groups using linked-list-cell technique
         al(2)= h(2,2,0)
         al(3)= h(3,3,0)
         ndx= al(1)/rc
+        ndy= al(2)/rc
         ndz= al(3)/rc
         dx = 1d0/ndx
+        dy = 1d0/ndy
         dz = 1d0/ndz
-        ndxz= ndx*ndz
-        allocate(lscl(nc),lshd(ndxz))
+        ndxy= ndx*ndy
+        allocate(lscl(nc),lshd(ndxy))
 c.....Register atoms to cells
-        lshd(1:ndxz)= 0
+        lshd(1:ndxy)= 0
         
         do i=1,nc
           mx= (rcis(1,i,0)+dx)/dx ! [1:ndx]
-          mz= (rcis(3,i,0)+dz)/dz
-          m= (mx-1)*ndz +mz
+          my= (rcis(2,i,0)+dy)/dy
+c          mz= (rcis(3,i,0)+dz)/dz
+          m= (mx-1)*ndy +my
           lscl(i)=lshd(m)
           lshd(m)= i
         enddo
@@ -359,8 +362,8 @@ c.....Make groups
         ngc(1:mng)= 0
         igc(1:mnc,1:mng)=0
         do 10 mx=1,ndx
-        do 10 mz=1,ndz
-          m= (mx-1)*ndz +mz
+        do 10 my=1,ndy
+          m= (mx-1)*ndy +my
 
           if( lshd(m).eq.0 ) goto 10
           i=lshd(m)
@@ -372,11 +375,11 @@ c.....Make groups
             m1x=mx +kx
             if( m1x.lt.1 ) m1x=m1x +ndx
             if( m1x.gt.ndx ) m1x=m1x -ndx
-            do kz=-1,1
-              m1z= mz +kz
-              if( m1z.lt.1 ) m1z=m1z +ndz
-              if( m1z.gt.ndz ) m1z=m1z -ndz
-              m1= (m1x-1)*ndz +m1z
+            do ky=-1,1
+              m1y= my +ky
+              if( m1y.lt.1 ) m1y=m1y +ndy
+              if( m1y.gt.ndy ) m1y=m1y -ndy
+              m1= (m1x-1)*ndy +m1y
 
               if( lshd(m1).eq.0 ) cycle
 
@@ -410,22 +413,22 @@ c.....Get disl pos at each y-slice
         cfname='disl00000'
         write(cfname(5:9),'(i5.5)') iocnt
         open(ionum,file=cfname,status='replace')
-        ndy= al(2)/rcy
-        dy = 1d0/ndy
-        do my=1,ndy
+        ndz= al(3)/rcz
+        dz = 1d0/ndz
+        do mz=1,ndz
           do ig=1,ng
             avx=0d0
             n=0
             do i=1,ngc(ig)
               j= igc(i,ig)
-              if( rcis(2,j,0).ge.(my-1)*dy .and.
-     &             rcis(2,j,0).lt.my*dy ) then
+              if( rcis(3,j,0).ge.(mz-1)*dz .and.
+     &             rcis(3,j,0).lt.mz*dz ) then
                 avx=avx +rcis(1,j,0)
                 n=n+1
               endif
             enddo
             avx=avx/n
-            write(ionum,'(2es12.4,$)') (my-1d0+0.5d0)*dy,avx
+            write(ionum,'(2es12.4,$)') (mz-1d0+0.5d0)*dz,avx
           enddo
           write(ionum,'(a)') ''
         enddo
@@ -435,6 +438,97 @@ c.....Get disl pos at each y-slice
       endif
       
       end subroutine disl_pos_by_pot
+c=======================================================================
+      subroutine perf_disl_pos_by_pot(epith,natm,ra,h,epi,sorg
+     &     ,nodes,myid_md,mpi_md_world,iocnt,ionum)
+c
+c  Find dislocation core of perfect dislocation by looking at a 
+c  potential energy value of each atom.
+c  Assuming disl line to be z-direction and there are surfaces 
+c  at the top and bottom of y-direction.
+c
+      implicit none
+      include 'mpif.h'
+      include './params_au.h'
+      include './params_EAM_Fe-H.h'
+      integer,intent(in):: natm,myid_md,mpi_md_world,nodes,iocnt,ionum
+c.....Potential energy threshold
+      real(8),intent(in):: epith
+      real(8),intent(in):: ra(3,natm),h(3,3,0:1),epi(natm),sorg(3)
+
+c.....Max num of core atoms
+      integer,parameter:: mnc= 100
+
+      integer:: i,n,nc,ndz,mz,ierr
+      real(8):: avx,dz,xref,xav
+      character:: cfname*9
+
+c.....Cutoff radius
+      real(8),parameter:: rcz  = rc_vphi
+      logical,save:: l1st=.true.
+      integer,allocatable,save:: lnc(:),idisps(:)
+      real(8),allocatable,save:: rci(:,:),rcis(:,:,:)
+
+      if( l1st ) then
+        allocate(lnc(0:nodes-1),idisps(0:nodes-1)
+     &       ,rci(3,mnc),rcis(3,mnc,0:nodes-1))
+        l1st=.false.
+      endif
+
+c.....Search and list up disl core atoms
+      nc=0
+      do i=1,natm
+        if( epi(i).gt.epith .and.
+     &       ra(2,i)+sorg(2).lt.0.75d0 .and.
+     &       ra(2,i)+sorg(2).gt.0.25d0 ) then
+          nc=nc+1
+          rci(1:3,nc)= ra(1:3,i)+sorg(1:3)
+        endif
+      enddo
+
+c.....Gather lsdc from all nodes to node-0
+      lnc(myid_md)= nc
+      call mpi_allgather(nc,1,mpi_integer,lnc,1,mpi_integer
+     &     ,mpi_md_world,ierr)
+
+      rcis(1:3,1:nc,myid_md)= rci(1:3,1:nc)
+      idisps(0)= 0
+      do i=1,nodes-1
+        idisps(i)=idisps(i-1) +lnc(i-1)*3
+      enddo
+      call mpi_gatherv(rci,3*nc,mpi_double_precision
+     &     ,rcis,lnc*3,idisps
+     &     ,mpi_double_precision,0,mpi_md_world,ierr)
+
+      if( myid_md.eq.0 ) then
+        nc= 0
+        do i=0,nodes-1
+          nc=nc +lnc(i)
+        enddo
+
+        cfname='disl00000'
+        write(cfname(5:9),'(i5.5)') iocnt
+        open(ionum,file=cfname,status='replace')
+
+        ndz= h(3,3,0)/rcz
+        dz= 1d0/ndz
+        xref= rcis(1,1,0)
+        do mz=1,ndz
+          n=0
+          do i=1,nc
+            if( rcis(3,i,0).ge.(mz-1)*dz .and.
+     &           rcis(3,i,0).lt.mz*dz ) then
+              xav=xav +rcis(1,i,0) -anint(rcis(1,i,0)-xref)
+              n=n+1
+            endif
+          enddo
+          xav=xav/n
+          write(ionum,'(2es12.4)') (mz-1d0+0.5d0)*dz, xav
+        enddo
+        close(ionum)
+      endif
+      
+      end subroutine perf_disl_pos_by_pot
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"

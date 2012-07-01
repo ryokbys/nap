@@ -170,7 +170,7 @@ c-----calc forces
 #endif
 
 #ifdef __DISL__
-      call disl_pos_by_pot(epith,natm,ra,h,epi,sorg
+      call perf_disl_pos_by_pot(epith,natm,ra,h,epi,sorg
      &     ,nodes_md,myid_md,mpi_md_world,0,21)
 #endif
 
@@ -325,7 +325,7 @@ c---------output step, time, and temperature
      &         ,istp,tcpu,temp
 #ifdef __DISL__
 c.....Output disl core pos
-          call disl_pos_by_pot(epith,natm,ra,h,epi,sorg
+          call perf_disl_pos_by_pot(epith,natm,ra,h,epi,sorg
      &         ,nodes_md,myid_md,mpi_md_world,iocnterg,21)
 #endif
         endif
