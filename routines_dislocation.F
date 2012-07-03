@@ -15,7 +15,7 @@
       do i=1,natm
         l= int(mod(tag(i)*10,10d0))
         if( l.eq.2 ) then
-          if( ra(3,i)+sorg(3).gt.0.5d0 ) then
+          if( ra(2,i)+sorg(2).gt.0.5d0 ) then
             n=n+1
           else
             m=m+1
@@ -29,7 +29,7 @@
       call mpi_allreduce(m,mt,1,mpi_integer,mpi_sum
      &     ,mpi_md_world,ierr)
 
-      area= h(1,1,0)*h(2,2,0)
+      area= h(1,1,0)*h(3,3,0)
 
 c.....Change unit of shear stress (GPa ---> a.u.)
 c.....Shear stress to shear force on each atom
@@ -59,7 +59,7 @@ c.....Shear stress on top and bottom edge
       do i=1,natm
         l= int(mod(tag(i)*10,10d0))
         if( l.eq.2 ) then
-          if( ra(3,i)+sorg(3).gt.0.5d0 ) then
+          if( ra(2,i)+sorg(2).gt.0.5d0 ) then
             aa(1,i)= aa(1,i) +shrfx
           else
             aa(1,i)= aa(1,i) -shrfx
@@ -459,19 +459,23 @@ c.....Potential energy threshold
 c.....Max num of core atoms
       integer,parameter:: mnc= 100
 
-      integer:: i,n,nc,ndz,mz,ierr
-      real(8):: avx,dz,xref,xav
+      integer:: i,n,nc,mz,ierr
+      real(8):: avx,xref,xav
       character:: cfname*9
 
 c.....Cutoff radius
       real(8),parameter:: rcz  = rc_vphi
       logical,save:: l1st=.true.
+      integer,save:: ndz
+      real(8),save:: dz
       integer,allocatable,save:: lnc(:),idisps(:)
       real(8),allocatable,save:: rci(:,:),rcis(:,:,:)
 
       if( l1st ) then
         allocate(lnc(0:nodes-1),idisps(0:nodes-1)
      &       ,rci(3,mnc),rcis(3,mnc,0:nodes-1))
+        ndz= h(3,3,0)/rcz
+        dz= 1d0/ndz
         l1st=.false.
       endif
 
@@ -509,9 +513,6 @@ c.....Gather lsdc from all nodes to node-0
         cfname='disl00000'
         write(cfname(5:9),'(i5.5)') iocnt
         open(ionum,file=cfname,status='replace')
-
-        ndz= h(3,3,0)/rcz
-        dz= 1d0/ndz
         xref= rcis(1,1,0)
         do mz=1,ndz
           n=0
