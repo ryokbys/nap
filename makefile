@@ -6,6 +6,8 @@
 
 # cpp path
 CPP= gcc -E
+#CPPFLAGS= -D__SHEAR__ -D__DISL__
+CPPFLAGS=
 
 #-----------------------------------------------------------------------
 # ifort and linux (pen4)
@@ -17,8 +19,11 @@ MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
 # MPIFC= mpif90
 MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
 
-CPPFLAGS= -D__SHEAR__ -D__DISL__
-#CPPFLAGS=
+#-----------------------------------------------------------------------
+# Fujitsu FX1 @nagoya-u
+# MPIFC=mpifrt
+# MPIFLAGS= -Kprefetch_model=FX1 -Ktl_trt
+
 #-----------------------------------------------------------------------
 # # for mp-rk
 # MPIFC= mpif90
@@ -70,8 +75,8 @@ params= params_EAM_Fe-H.h
 # mkconf= mkconf_2D_edge_disl.o
 # mkconf= mkconf_Al_fcc_nanorod.o
 # mkconf= mkconf_Si111_2lc.o
-# mkconf= mkconf_BCC.o
-mkconf= mkconf_BCC_edge-disl.o
+mkconf= mkconf_BCC.o
+# mkconf= mkconf_BCC_edge-disl.o
 
 #-----------------------------------------------------------------------
 # Post process programs

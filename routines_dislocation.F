@@ -457,7 +457,7 @@ c.....Potential energy threshold
       real(8),intent(in):: ra(3,natm),h(3,3,0:1),epi(natm),sorg(3)
 
 c.....Max num of core atoms
-      integer,parameter:: mnc= 100
+      integer,parameter:: mnc= 1000
 
       integer:: i,n,nc,mz,ierr
       real(8):: avx,xref,xav

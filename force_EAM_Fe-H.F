@@ -224,11 +224,11 @@ c
       real(8),intent(in):: r,rs
       real(8):: fvphi
       integer:: i
-      real(8),external:: fphi
+      real(8),external:: fphi,hvsd
 
       fvphi=0d0
       if( r.le.r1 ) then
-        fvphi=fvphi +z2q2/r*fphi(rij/rs)
+        fvphi=fvphi +z2q2/r*fphi(r/rs)
       else if( r.le.r2 ) then
         fvphi=fvphi +exp(b0 +b1*r +b2*r**2 +b3*r**3) *ev2hrt
       else
@@ -249,7 +249,7 @@ c
       real(8),intent(in):: r,rs
       real(8):: dfvphi
       integer:: i
-      real(8),external:: fphi,dfphi
+      real(8),external:: fphi,dfphi,hvsd
 
       dfvphi= 0d0
       if( r.le.r1 ) then
@@ -276,6 +276,7 @@ c
       real(8),intent(in):: r
       real(8):: fpsi
       integer:: i
+      real(8),external:: hvsd
 
       fpsi=0d0
       do i=1,3
@@ -294,6 +295,7 @@ c
       real(8),intent(in):: r
       real(8):: dfpsi
       integer:: i
+      real(8),external:: hvsd
 
       dfpsi=0d0
       do i=1,3

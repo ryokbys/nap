@@ -4,15 +4,16 @@ c   Node-layout converter program for pmd.
 c     Read:  pmd???-000 (or some other name)
 c     write: pmd???-000
 c-----------------------------------------------------------------------
-      use variables
       implicit none
+      integer,parameter:: namax = 2000000
+
       integer:: nox,noy,noz,nodeso,nnx,nny,nnz,nodesn,i,j,k,l,m,n
-     &     ,nlast,ia,ib
-      real(8):: sxog,syog,szog
-c-----identifier
-      real(8):: tagt(namax)
-c-----positions and vectors
-      real(8)::  rat(3,namax),vat(3,namax)
+     &     ,nlast,ia,ib,myx,myy,myz
+      real(8):: sxog,syog,szog,h(3,3,0:1)
+      real(8):: tag(namax),tagt(namax)
+      real(8):: ra(3,namax),va(3,namax),eki(namax),epi(namax)
+     &     ,strs(3,3,namax)
+      real(8):: rat(3,namax),vat(3,namax)
      &     ,ekit(namax),epit(namax),strst(3,3,namax)
       character:: filename*10,key*1
 

@@ -23,7 +23,7 @@ c-----------------------------------------------------------------------
 
 #ifdef __DISL__
 c.....Epot threshold for disl core extraction [Hartree]
-      real(8),parameter:: epith = -1.450d-1
+      real(8),parameter:: epith = -0.1410d0
 #endif
 
       integer:: i,j,k,l,m,n,ia,ib,is
@@ -194,13 +194,15 @@ c      temp= ekin /ntot/fkb *2d0/2d0
       ts= istps*dt
       te= rbuf/(2d0*vmax/dt) +istp*dt
       istpe= te/dt
+c.....Considering vmax==0d0, make istpe small only for the first step
+      if( istpe.gt.100 ) istpe=100
       if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
 
 c-----initialize the counter for output
       iocntpmd=0
       iocnterg=0
 c-----output initial configuration
-      if( ifpmd ) then
+      if( ifpmd.eq.1 ) then
         write(cnum(1:3),'(i3.3)') iocntpmd
         open(20,file="pmd"//cnode//"-"//cnum,form='unformatted'
      &       ,status="replace")

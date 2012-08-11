@@ -8,11 +8,11 @@ c   - only combine them, not shifting positions
 c-----------------------------------------------------------------------
       use variables
       implicit none
+      integer,parameter:: npmax= 2000000
 c.....Num of auxiliary data for coloring atoms in Akira
       integer,parameter:: nauxdat = 5
       integer:: ipmd,n,ncg,inode,itmp,i,nnodes,nkvs,ia,ib,l
-      integer:: ifmv(namax)
-      real(8):: tmp,tagt(namax),rat(3,namax),vat(3,namax),op(9,namax)
+      real(8):: tmp,tagt(npmax),rat(3,npmax),vat(3,npmax),op(9,npmax)
       character:: fin*10,fout*6
 
       write(6,'(a)') " <<< Utility program combine_pmd >>>"

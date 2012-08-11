@@ -6,7 +6,7 @@ c   - output akr format to STDOUT
 c-----------------------------------------------------------------------
       implicit none
 c.....Threshold potential energy
-      real(8),parameter:: pth = -1.450d-1
+      real(8),parameter:: pth = -0.1410d0
 
       integer:: i,n,itmp,nauxdat,j,ia,ib,l,natm
       real(8):: h(3,3)
