@@ -136,7 +136,7 @@ c-------species of atom-i
 c-----setup
       call setup(nismax,am,acon,fack,dt)
 c-----set HI and SGM
-      call boxmat(h,hi,volume,sgm)
+      call boxmat(h,hi,vol,sgm)
 c-----ntset
       call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
@@ -154,7 +154,7 @@ c-----get total number of particles
       tcom = 0d0
 
 c-----copy RA of boundary atoms
-      call bacopy(tcom,sgm,volume,lsb,nbmax,ra,namax,natm,nb
+      call bacopy(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
      &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &     ,mpi_md_world)
 c-----Make pair list
@@ -182,6 +182,7 @@ c-----in case of 3D, <ekin> = 3/2 *NkT
       temp= ekin /ntot/fkb *2d0/3d0
 cc-----in case of 2D, <ekin> = 2/2 *NkT
 c      temp= ekin /ntot/fkb *2d0/2d0
+
       if(myid_md.eq.0) then
         write(6,'(a)') " Initial values: [Hartree], [K]"
         write(6,'(a,es15.7)') " Kinetic energy  =",ekin
@@ -253,7 +254,7 @@ c.....Move atoms that cross the boundary
           call bamove_stress(tcom,namax,nbmax,natm,ra,va,tag,strs
      &         ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world)
 c.....Copy RA of boundary atoms
-          call bacopy(tcom,sgm,volume,lsb,nbmax,ra,namax,natm,nb
+          call bacopy(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
      &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &         ,mpi_md_world)
 c.....Make pair list
@@ -266,7 +267,7 @@ c.....Make pair list
      &         " Next update step will be ",istpe
         else
 c.....Copy RA of boundary atoms determined by 'bacopy'
-          call bacopy_fixed(tcom,sgm,volume,lsb,nbmax,ra,namax,natm,nb
+          call bacopy_fixed(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
      &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &         ,mpi_md_world)
         endif
@@ -364,7 +365,7 @@ c---------write pmd file for Akira
 
       end program parallel_md
 c=======================================================================
-      subroutine boxmat(h,hi,volume,sgm)
+      subroutine boxmat(h,hi,vol,sgm)
 c-----------------------------------------------------------------------
 c  setup matrices of MD-box
 c    H:   MD-box matrix
@@ -373,7 +374,7 @@ c    SGM: cofactor matrix
 c-----------------------------------------------------------------------
       implicit none
       real(8),intent(in):: h(3,3,0:1)
-      real(8),intent(out):: volume,sgm(3,3),hi(3,3)
+      real(8),intent(out):: vol,sgm(3,3),hi(3,3)
 
       real(8):: hit(3,3)
       integer:: i,j,im,ip,jm,jp
@@ -389,10 +390,10 @@ c-----cofactor matrix, SGM
         enddo
       enddo
 c-----MD-box volume
-      volume=h(1,1,0)*sgm(1,1)+h(2,1,0)*sgm(2,1)+h(3,1,0)*sgm(3,1)
+      vol=h(1,1,0)*sgm(1,1)+h(2,1,0)*sgm(2,1)+h(3,1,0)*sgm(3,1)
       do j=1,3
         do i=1,3
-          hit(i,j)= sgm(i,j)/volume
+          hit(i,j)= sgm(i,j)/vol
         enddo
       enddo
 c-----transpose
@@ -518,7 +519,7 @@ c.....Find max speed
 
       end subroutine get_ekin
 c=======================================================================
-      subroutine bacopy(tcom,sgm,volume,lsb,nbmax,ra,namax,natm,nb
+      subroutine bacopy(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
      &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &     ,mpi_md_world)
 c-----------------------------------------------------------------------
@@ -529,7 +530,7 @@ c-----------------------------------------------------------------------
       integer,intent(in):: namax,nbmax,nn(6)
      &     ,myid_md,myparity(3),mpi_md_world
       integer,intent(inout):: natm,nb,lsb(0:nbmax,6),lsrc(6)
-      real(8),intent(in):: sv(3,6),sgm(3,3),volume,anxi,anyi,anzi,rc
+      real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
       real(8),intent(inout):: tag(namax),ra(3,namax),tcom
 
 c      integer:: status(MPI_STATUS_SIZE)
@@ -549,9 +550,9 @@ c-----reset the num of "received" boundary atoms
       nbnew=0
 
 c-----calculate the cut-off lengths
-      vala=dsqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/volume
-      valb=dsqrt(sgm(1,2)**2+sgm(2,2)**2+sgm(3,2)**2)/volume
-      valc=dsqrt(sgm(1,3)**2+sgm(2,3)**2+sgm(3,3)**2)/volume
+      vala=dsqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/vol
+      valb=dsqrt(sgm(1,2)**2+sgm(2,2)**2+sgm(3,2)**2)/vol
+      valc=dsqrt(sgm(1,3)**2+sgm(2,3)**2+sgm(3,3)**2)/vol
       rca=rc*vala
       rcb=rc*valb
       rcc=rc*valc
@@ -654,7 +655,7 @@ c-----num. of received boundary atoms
 
       end subroutine bacopy
 c=======================================================================
-      subroutine bacopy_fixed(tcom,sgm,volume,lsb,nbmax,ra,namax,natm,nb
+      subroutine bacopy_fixed(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
      &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &     ,mpi_md_world)
 c-----------------------------------------------------------------------
@@ -667,7 +668,7 @@ c-----------------------------------------------------------------------
       integer,intent(in):: namax,nbmax,nn(6),natm,nb
      &     ,myid_md,myparity(3),mpi_md_world
       integer,intent(inout):: lsb(0:nbmax,6),lsrc(6)
-      real(8),intent(in):: sv(3,6),sgm(3,3),volume,anxi,anyi,anzi,rc
+      real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
       real(8),intent(inout):: tag(namax),ra(3,namax),tcom
 
 c      integer:: status(MPI_STATUS_SIZE)

@@ -175,6 +175,7 @@ c=======================================================================
 c
 c  Heaviside's stepwise function
 c
+      implicit none
       real(8),intent(in):: x
       real(8):: hvsd
 
@@ -191,6 +192,7 @@ c=======================================================================
 c
 c  Screening function for r < r1
 c
+      implicit none
       real(8),intent(in):: x
       real(8):: fphi
 
@@ -205,6 +207,7 @@ c=======================================================================
 c
 c  1st derivative of the screening function for r < r1
 c
+      implicit none 
       real(8),intent(in):: x
       real(8):: dfphi
 
@@ -219,6 +222,7 @@ c=======================================================================
 c
 c  varphi function for r > r2
 c
+      implicit none 
       include './params_au.h'
       include './params_EAM_Fe-H.h'
       real(8),intent(in):: r,rs
@@ -244,6 +248,7 @@ c=======================================================================
 c
 c  1st derivative of varphi func for r > r2
 c
+      implicit none 
       include './params_au.h'
       include './params_EAM_Fe-H.h'
       real(8),intent(in):: r,rs
@@ -271,6 +276,7 @@ c=======================================================================
 c
 c  Cubic spline function for calculating rho
 c
+      implicit none 
       include './params_au.h'
       include './params_EAM_Fe-H.h'
       real(8),intent(in):: r
@@ -290,6 +296,7 @@ c=======================================================================
 c
 c  1st derivative of the cubic spline func of calculation of rho
 c
+      implicit none 
       include './params_au.h'
       include './params_EAM_Fe-H.h'
       real(8),intent(in):: r
@@ -310,6 +317,7 @@ c=======================================================================
 c
 c  Embedding function
 c
+      implicit none
       include './params_au.h'
       include './params_EAM_Fe-H.h'
       real(8),intent(in):: rho
@@ -323,6 +331,7 @@ c=======================================================================
 c
 c  1st derivative of the embedding function
 c
+      implicit none 
       include './params_au.h'
       include './params_EAM_Fe-H.h'
       real(8),intent(in):: rho

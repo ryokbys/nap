@@ -9,9 +9,12 @@ c-----------------------------------------------------------------------
       implicit none
 c-----max num of neighbors; 12 is enough
       integer,parameter:: nnmax = 100
-c-----cutoff radius
-c      real(8),parameter:: rc    = 3.36d-10 /0.5291772d-10
-      real(8),parameter:: rc    = 3.5d-10 /0.5291772d-10
+cc.....Cutoff radius for LJ-Ar FCC, halfway between 1st and 2nd N.N.
+cc      real(8),parameter:: rc    = 3.36d-10 /0.5291772d-10
+c      real(8),parameter:: rc    = 3.5d-10 /0.5291772d-10
+c.....Cutoff radius for BCC Fe, halfway between 2nd and 3rd N.N.
+      real(8),parameter:: abcc = 2.8533d-10/0.5291772d-10
+      real(8),parameter:: rc   = 0.5d0*(1d0+sqrt(2d0))*abcc
 
       integer:: i,n,itmp,nauxdat,j
       integer:: natm0,natm,nx,ny,nz,nlsa
@@ -22,11 +25,9 @@ c      real(8),parameter:: rc    = 3.36d-10 /0.5291772d-10
 
 c-----read akr file from STDIN
       read(5,*) natm0,nauxdat
-c      write(6,'(a,i10)') " natm =",natm0
       read(5,*) al(1),tmp,tmp
       read(5,*) tmp,al(2),tmp
       read(5,*) tmp,tmp,al(3)
-c      write(6,'(a,3es12.4)') " al(1:3) =",al(1:3)
       allocate(ra0(3,natm0),ra(3,natm0),auxdat(nauxdat,natm0)
      &     ,auxdat0(nauxdat,natm0),itype(natm0))
       do i=1,natm0
@@ -34,9 +35,9 @@ c      write(6,'(a,3es12.4)') " al(1:3) =",al(1:3)
       enddo
 
 c-----prepare for linked-list
-      nx=int(al(1)/(rc*1.05d0))
-      ny=int(al(2)/(rc*1.05d0))
-      nz=int(al(3)/(rc*1.05d0))
+      nx=int(al(1)/rc)
+      ny=int(al(2)/rc)
+      nz=int(al(3)/rc)
       nlsa= natm0 +nx*ny*nz
 c      write(6,'(a,4i10)') " nx,ny,nz,nlsa=",nx,ny,nz,nlsa
       allocate(lsa(nlsa))
@@ -47,7 +48,7 @@ c-----make 1st nearest neighbor pair-list
       allocate(lspr(0:nnmax,natm0))
       call ll2lspr(nlsa,lsa,nx,ny,nz,natm0,nnmax,lspr,al,ra0,rc)
       deallocate(lsa)
-      
+
 c-----common neighbor analysis
       call cna(natm0,nnmax,lspr,ra0,auxdat0,nauxdat
      &     ,natm,ra,auxdat,itype)
@@ -69,7 +70,7 @@ c     make linked-list
 c-----------------------------------------------------------------------
       implicit none 
       integer,intent(in):: natm,n1,n2,n3,nlist
-      real(8),intent(in):: ra(3,natm)
+      real(8),intent(inout):: ra(3,natm)
       integer,intent(out):: llist(nlist)
       integer:: i,j,n,nr1,nr2,nr3
       real(8):: a1,a2,a3
@@ -82,6 +83,12 @@ c.....To avoid nr?==n?, ra(?,i) has to be under 1.0d0
       a2= 1d0/n2
       a3= 1d0/n3
       do i=1,natm
+        if( ra(1,i).ge.1d0 ) ra(1,i)=ra(1,i) -1d0
+        if( ra(1,i).lt.0d0 ) ra(1,i)=ra(1,i) +1d0
+        if( ra(2,i).ge.1d0 ) ra(2,i)=ra(2,i) -1d0
+        if( ra(2,i).lt.0d0 ) ra(2,i)=ra(2,i) +1d0
+        if( ra(3,i).ge.1d0 ) ra(3,i)=ra(3,i) -1d0
+        if( ra(3,i).lt.0d0 ) ra(3,i)=ra(3,i) +1d0
 c-------region index in order z,y,x
         nr3= int(ra(3,i)*small/a3)+1
         nr2= int(ra(2,i)*small/a2)
@@ -209,10 +216,14 @@ c-----------------------------------------------------------------------
       real(8),intent(out):: ra(3,natm0),auxdat(nauxdat,natm0)
 
       integer:: i,j,l,m,n,ii,iii,ni,jj,nj,il,jl,n1,n2,iil,nn1,im,iim
-     &     ,ib1,ib2,iib1,iib2,n421,n422
+     &     ,ib1,ib2,iib1,iib2,n421,n422,n663,n443
       integer,allocatable:: icommon(:),ibond(:,:),nb(:),idc(:,:,:)
-      integer,parameter:: lmax= 12
-      integer,parameter:: mmax= 12
+cc.....For FCC
+c      integer,parameter:: lmax= 12
+c      integer,parameter:: mmax= 12
+c.....For BCC
+      integer,parameter:: lmax= 14
+      integer,parameter:: mmax= lmax*(lmax-1)/2
 
       allocate(icommon(lmax),ibond(2,mmax),nb(mmax)
      &     ,idc(3,nnmax,natm0))
@@ -312,34 +323,43 @@ c-----reduce atoms
       do i=1,natm0
         n421= 0
         n422= 0
+        n663= 0
+        n443= 0
         do ii=1,lspr(0,i)
           l=idc(1,ii,i)
           m=idc(2,ii,i)
           n=idc(3,ii,i)
+c          if( mod(i,10000).eq.1 ) then
+c            write(6,'(a,4i10)') '  ii,l,m,n=',ii,l,m,n
+c          endif
           if(l.eq.4 .and. m.eq.2 .and. n.eq.1 ) n421=n421 +1
           if(l.eq.4 .and. m.eq.2 .and. n.eq.2 ) n422=n422 +1
+          if(l.eq.6 .and. m.eq.6 .and. n.eq.3 ) n663=n663 +1
+          if(l.eq.4 .and. m.eq.4 .and. n.eq.3 ) n443=n443 +1
         enddo
-c-------if perfect FCC structure, reduce the atom-i
+c.....If perfect FCC structure, reduce the atom-i
         if(n421.eq.12 .and. n422.eq.0) cycle
+c.....If perfect BCC structure, reduce the atom-i
+        if( n663.eq.8 .and. n443.eq.6 ) cycle
         natm=natm +1
-c-------if HCP structure, itype(i)= 2
+c.....If HCP structure, itype(i)= 2
         if(n421.eq.6 .and. n422.eq.6) then
           itype(natm)= 2
-c-------otherwise, itype(i)= 1
+c.....Otherwise, itype(i)= 1
         else
           itype(natm)= 1
         endif
 c-------copy to ra,va
         ra(1:3,natm)= ra0(1:3,i)
         auxdat(1:nauxdat,natm)= auxdat0(1:nauxdat,i)
-        if( natm.eq.2444 ) then
-          do ii=1,lspr(0,i)
-            j=lspr(ii,i)
-            l=idc(1,ii,i)
-            m=idc(2,ii,i)
-            n=idc(3,ii,i)
-          enddo
-        endif
+c        if( natm.eq.2444 ) then
+c          do ii=1,lspr(0,i)
+c            j=lspr(ii,i)
+c            l=idc(1,ii,i)
+c            m=idc(2,ii,i)
+c            n=idc(3,ii,i)
+c          enddo
+c        endif
       enddo
 
       deallocate(icommon,ibond,nb,idc)
