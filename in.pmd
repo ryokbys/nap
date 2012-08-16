@@ -21,3 +21,8 @@
   factor_direction 3 2
     1.000d0  1.000d0  1.000d0
     1.000d0  1.000d0  0.000d0
+
+  flag_isobaric        1
+  pressure_target      0d0
+  vol_mass_coeff       1d0
+  vol_change_damping   1d0

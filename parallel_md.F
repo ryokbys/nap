@@ -27,7 +27,7 @@ c.....Epot threshold for disl core extraction [Hartree]
 #endif
 
       integer:: i,j,k,l,m,n,ia,ib,is
-      real(8):: tmp,vol
+      real(8):: tmp
 c-----output file names
       character:: cnode*3,cnum*3
 
@@ -71,6 +71,9 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(fmv,30,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(shrst,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(ptgt,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(vmcoeff,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(vdmp,1,mpi_double_precision,0,mpi_md_world,ierr)      
 
 c-----sec. --> a.u.
       dt= dt /aut
@@ -109,7 +112,7 @@ c-----natm: num. of particles in this node
       read(20) natm
       read(20) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       read(20) (tag(i),ra(1:3,i),va(1:3,i)
-     &     ,eki(i),epi(i),strs(1:3,1:3,i),i=1,natm)
+     &     ,eki(1,1,i),epi(i),strs(1:3,1:3,i),i=1,natm)
       close(20)
       if( myid_md.eq.0 ) then
         write(6,'(a)') " H-matrix:"
@@ -136,7 +139,7 @@ c-------species of atom-i
 c-----setup
       call setup(nismax,am,acon,fack,dt)
 c-----set HI and SGM
-      call boxmat(h,hi,vol,sgm)
+      call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 c-----ntset
       call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
@@ -183,6 +186,16 @@ c-----in case of 3D, <ekin> = 3/2 *NkT
 cc-----in case of 2D, <ekin> = 2/2 *NkT
 c      temp= ekin /ntot/fkb *2d0/2d0
 
+      if( ifpctrl.eq.1 ) then
+        if(myid_md.eq.0) write(6,'(a,f10.2,a,es12.4,a)')
+     &       ' Target Pressure = ',ptgt,' GPa, ',ptgt/2.94d+4,' a.u.'
+        ptgt= ptgt/2.94d+4
+c.....Parrinello-Rahman Isobaric
+        vm= am(1)*vmcoeff
+        call force_isobaric(ptgt,ah,natm,eki,strs,sgm,vm,vol
+     &       ,ptnsr,mpi_md_world)
+      endif
+
       if(myid_md.eq.0) then
         write(6,'(a)') " Initial values: [Hartree], [K]"
         write(6,'(a,es15.7)') " Kinetic energy  =",ekin
@@ -210,7 +223,8 @@ c-----output initial configuration
         write(20) natm
         write(20) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
         write(20) (tag(i),ra(1:3,i)+sorg(1:3),va(1:3,i)/dt
-     &       ,eki(i),epi(i),strs(1:3,1:3,i)*2.94d+4,i=1,natm)
+     &       ,eki(1,1,i)+eki(2,2,i)+eki(3,3,i)
+     &       ,epi(i),strs(1:3,1:3,i)*2.94d+4,i=1,natm)
         close(20)
       endif
 
@@ -240,8 +254,26 @@ c-------multiply fmv or damping
           va(1:3,i)=va(1:3,i) *fmv(1:3,l)
         enddo
 
+        if( ifpctrl.eq.1 ) then
+          h(1:3,1:3,1)=h(1:3,1:3,1) +ah(1:3,1:3)*dt/2
+          h(1:3,1:3,1)=h(1:3,1:3,1)*vdmp
+c.....Only orthogonal change
+          do i=1,3
+            do j=1,3
+              if( j.eq.i ) cycle
+              h(j,i,1)= 0d0
+            enddo
+          enddo
+        endif
+
 c-------update positions
         ra(1:3,1:natm)=ra(1:3,1:natm) +va(1:3,1:natm)
+
+        if( ifpctrl.eq.1 ) then
+          h(1:3,1:3,0)=h(1:3,1:3,0) +h(1:3,1:3,1)*dt
+c.....Reset matrices
+          call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
+        endif
 
 c.....Update te considering change of vmax
         te=(te-ts)*vmaxold/vmax +ts
@@ -281,13 +313,34 @@ c-------Calc forces
         call add_shear_stress(natm,ra,aa,tag,sorg,shrfx)
 #endif
 
-c-------second kick of velocities
+c.....Second kick of velocities
         va(1:3,1:natm)=va(1:3,1:natm) +aa(1:3,1:natm)
 
 c.....Calc kinetic energy
         vmaxold= vmax
         call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
      &       ,vmax,mpi_md_world)
+
+        if( ifpctrl.eq.1 ) then
+          call force_isobaric(ptgt,ah,natm,eki,strs,sgm
+     &         ,vm,vol,ptnsr,mpi_md_world)
+          h(1:3,1:3,1)=h(1:3,1:3,1) +ah(1:3,1:3)*dt/2
+          gg(1:3,1:3)= 0d0
+          do j=1,3
+            do i=1,3
+              do k=1,3
+                gg(i,j)=gg(i,j) +gi(i,k)*g(k,j,1)
+              enddo
+            enddo
+          enddo
+          do i=1,natm
+            do j=1,3
+              do k=1,3
+                aa(j,i)=aa(j,i) -gg(j,k)*va(k,i)
+              enddo
+            enddo
+          enddo
+        endif
 
 c-------temperature control by velocity scaling
         if(iftctl.eq.1) then
@@ -318,14 +371,17 @@ c---------in case of 3D, <ekin> = 3/2 *NkT
 cc---------in case of 2D, <ekin> = 2/2 *NkT
 c          temp= ekin /ntot/fkb *2d0/2d0
           if(myid_md.eq.0) then
-            write(11,'(i8,3es15.7,f10.2)') istp
-     &           ,ekin+epot-epot0,ekin,epot-epot0,temp
+            write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
+     &           ,ekin+epot-epot0,ekin,epot-epot0,temp,vol
+     &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))*2.94d+4
             call flush(11)
           endif
 c---------output step, time, and temperature
           tcpu= mpi_wtime() -tcpu1
-          if(myid_md.eq.0) write(6,'(a,i8,10f10.2)') " istp,time,temp="
-     &         ,istp,tcpu,temp
+          if(myid_md.eq.0) write(6,'(a,i8,10f10.2)')
+     &         " istp,time,temp,vol,prss="
+     &         ,istp,tcpu,temp,vol
+     &         ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))*2.94d+4
 #ifdef __DISL__
 c.....Output disl core pos
           call perf_disl_pos_by_pot(epith,natm,ra,h,epi,sorg
@@ -344,7 +400,8 @@ c---------write pmd file for Akira
           write(20) natm
           write(20) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
           write(20) (tag(i),ra(1:3,i)+sorg(1:3),va(1:3,i)/dt
-     &         ,eki(i),epi(i),strs(1:3,1:3,i)*2.94d+4,i=1,natm)
+     &         ,eki(1,1,i)+eki(2,2,i)+eki(3,3,i)
+     &         ,epi(i),strs(1:3,1:3,i)*2.94d+4,i=1,natm)
           close(20)
         endif
 
@@ -365,7 +422,7 @@ c---------write pmd file for Akira
 
       end program parallel_md
 c=======================================================================
-      subroutine boxmat(h,hi,vol,sgm)
+      subroutine boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 c-----------------------------------------------------------------------
 c  setup matrices of MD-box
 c    H:   MD-box matrix
@@ -374,10 +431,11 @@ c    SGM: cofactor matrix
 c-----------------------------------------------------------------------
       implicit none
       real(8),intent(in):: h(3,3,0:1)
-      real(8),intent(out):: vol,sgm(3,3),hi(3,3)
+      real(8),intent(out):: vol,sgm(3,3),hi(3,3),ht(3,3,0:1)
+     &     ,g(3,3,0:1),gi(3,3),gt(3,3,0:1)
 
       real(8):: hit(3,3)
-      integer:: i,j,im,ip,jm,jp
+      integer:: i,j,k,im,ip,jm,jp
 
 c-----cofactor matrix, SGM
       do j=1,3
@@ -403,8 +461,35 @@ c-----transpose
         enddo
       enddo
 
+c.....Set transpose
+      do j=1,3
+        do i=1,3
+          ht(i,j,0:1)= h(j,i,0:1)
+        enddo
+      enddo
+
+c.....Set G-matrix
+      g(1:3,1:3,0:1)= 0d0
+      do j=1,3
+        do i=1,3
+          do k=1,3
+            g(i,j,0)=g(i,j,0) +ht(i,k,0)*h(k,j,0)
+            g(i,j,1)=g(i,j,1) +ht(i,k,1)*h(k,j,0)
+     &           +ht(i,k,0)*h(k,j,1)
+          enddo
+        enddo
+      enddo
+c.....Transpose of G
+      do j=1,3
+        do i=1,3
+          gt(i,j,0:1)= g(j,i,0:1)
+        enddo
+      enddo
+c.....Inverse of G
+      call ludc_inv(3,g(1,1,0),gi)
+
       return
-      end
+      end subroutine boxmat
 c=======================================================================
       subroutine ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi
      &     ,anzi)
@@ -487,13 +572,13 @@ c=======================================================================
       integer,intent(in):: namax,natm,mpi_md_world,nismax
       real(8),intent(in):: va(3,namax),h(3,3),fack(nismax)
      &     ,tag(namax)
-      real(8),intent(out):: ekin,eki(namax),vmax
+      real(8),intent(out):: ekin,eki(3,3,namax),vmax
 c-----locals
-      integer:: i,ierr,is
+      integer:: i,ierr,is,ixyz,jxyz
       real(8):: ekinl,x,y,z,v(3),v2,vmaxl
 
       ekinl=0d0
-      eki(1:natm)= 0d0
+      eki(1:3,1:3,1:natm)= 0d0
       vmaxl= 0d0
 
       do i=1,natm
@@ -502,9 +587,15 @@ c-----locals
         y= va(2,i)
         z= va(3,i)
         v(1:3)= h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z
-        v2=v(1)*v(1) +v(2)*v(2) +v(3)*v(3)
-        eki(i)= fack(is)*v2
-        ekinl=ekinl +eki(i)
+c.....Tensor form eki
+        do jxyz=1,3
+          do ixyz=1,3
+            eki(ixyz,jxyz,i)= v(ixyz)*v(jxyz)
+          enddo
+        enddo
+        v2= eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
+        eki(1:3,1:3,i)=eki(1:3,1:3,i)*fack(is)
+        ekinl=ekinl +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
 c.....Find max speed
         vmaxl=max(vmaxl,v2)
       enddo
@@ -1299,6 +1390,56 @@ c-----Exchange information with myself
       return
       end
 c=======================================================================
+      subroutine force_isobaric(ptgt,ah,natm,eki,strs,sgm
+     &     ,vm,vol,ptnsr,mpi_md_world)
+c
+c  Calc. acceralation of h-matrix used in isobaric MD
+c
+      implicit none
+      include "mpif.h"
+      integer,intent(in):: natm,mpi_md_world
+      real(8),intent(in):: ptgt,eki(3,3,natm),strs(3,3,natm)
+     &     ,sgm(3,3),vm,vol
+      real(8),intent(out):: ah(3,3),ptnsr(3,3)
+      
+      integer:: i,ixyz,jxyz,kxyz,ierr
+      real(8):: pt(3,3)
+
+      pt(1:3,1:3)= 0d0
+      do i=1,natm
+        do jxyz=1,3
+          do ixyz=1,3
+            pt(ixyz,jxyz)=pt(ixyz,jxyz)
+     &           +2d0*eki(ixyz,jxyz,i) +strs(ixyz,jxyz,i)
+          enddo
+        enddo
+      enddo
+
+      ptnsr(1:3,1:3)= 0d0
+      call mpi_allreduce(pt,ptnsr,9,mpi_double_precision,mpi_sum
+     &     ,mpi_md_world,ierr)
+      ptnsr(1:3,1:3)=ptnsr(1:3,1:3)/vol
+
+c.....Acceralation of h-matrix
+      ah(1:3,1:3)= 0d0
+      ptnsr(1,1)= ptnsr(1,1)-ptgt
+      ptnsr(2,2)= ptnsr(2,2)-ptgt
+      ptnsr(3,3)= ptnsr(3,3)-ptgt
+      do jxyz=1,3
+        do ixyz=1,3
+          do kxyz=1,3
+            ah(ixyz,jxyz)=ah(ixyz,jxyz)
+     &           +ptnsr(ixyz,kxyz)*sgm(kxyz,jxyz)
+          enddo
+        enddo
+      enddo
+      ah(1:3,1:3)=ah(1:3,1:3)/vm
+c.....Restore ptnsr
+      ptnsr(1,1)= ptnsr(1,1)+ptgt
+      ptnsr(2,2)= ptnsr(2,2)+ptgt
+      ptnsr(3,3)= ptnsr(3,3)+ptgt
+
+      end subroutine force_isobaric
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"

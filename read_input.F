@@ -97,13 +97,27 @@ c=======================================================================
         if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
         call read_rs(ionum,ctmp,3,nrow,fmv(1:3,1:nrow))
         return
+      elseif( trim(cname).eq.'pressure_target' ) then
+        call read_r1(ionum,ptgt)
+        return
+      elseif( trim(cname).eq.'vol_mass_coeff' ) then
+        call read_r1(ionum,vmcoeff)
+        return
+      elseif( trim(cname).eq.'vol_change_damping' ) then
+        call read_r1(ionum,vdmp)
+        return
+      elseif( trim(cname).eq.'flag_isobaric' ) then
+        call read_i1(ionum,ifpctrl)
+        return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return
       endif
       
-      write(6,'(a)') " [Error] No match: "//trim(cname)//" !!!"
-      stop
+c      write(6,'(a)') " [Error] No match: "//trim(cname)//" !!!"
+c      stop
+      write(6,'(a)') ' [Warning] No match: '//trim(cname)//' !!!'
+      return
 
       end subroutine set_variable
 c=======================================================================

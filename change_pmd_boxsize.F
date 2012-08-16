@@ -23,7 +23,7 @@ c.....Read
       read(10) n
       read(10) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       read(10) (tag(i),ra(1:3,i),va(1:3,i)
-     &       ,eki(i),epi(i),strs(1:3,1:3,i),i=1,n)
+     &       ,eki(1,1,i),epi(i),strs(1:3,1:3,i),i=1,n)
       close(10)
 
       write(6,'(a)') ' h-mat before multiplication:'
@@ -62,7 +62,7 @@ c.....Write
       write(11) n
       write(11) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       write(11) (tag(i),ra(1:3,i),va(1:3,i)
-     &       ,eki(i),epi(i),strs(1:3,1:3,i),i=1,n)
+     &       ,eki(1,1,i),epi(i),strs(1:3,1:3,i),i=1,n)
       close(11)
 
       end program modify_pmd_boxsize

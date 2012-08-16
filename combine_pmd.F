@@ -37,13 +37,13 @@ c---------read pmd###-$$$ file
           ncg= ncg +itmp
           read(20) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
           read(20) (tag(i),ra(1:3,i),va(1:3,i)
-     &         ,eki(i),epi(i),strs(1:3,1:3,i),i=1,itmp)
+     &         ,eki(1,1,i),epi(i),strs(1:3,1:3,i),i=1,itmp)
           do i=1,itmp
             n=n+1
             tagt(n)=tag(i)
             rat(1:3,n)=ra(1:3,i)
             vat(1:3,n)=ra(1:3,i)
-            op(1,n)=eki(i)
+            op(1,n)=eki(1,1,i)
             op(2,n)=epi(i)
             op(3,n)=strs(1,1,i)
             op(4,n)=strs(2,2,i)

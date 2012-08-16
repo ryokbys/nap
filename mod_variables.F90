@@ -37,7 +37,7 @@
     real(8):: tag(namax)
     integer:: lspr(0:nnmax,namax)
 !.....potential and kinetic energy per atoms
-    real(8):: epi(namax),eki(namax),stp(3,3,namax)
+    real(8):: epi(namax),eki(3,3,namax),stp(3,3,namax)
 !.....mass, prefactors
     real(8):: am(nismax),acon(nismax),fack(nismax)
 !.....strain
@@ -48,4 +48,12 @@
 !.....Shear stress
     real(8):: shrst,shrfx
 
+!.....Isobaric
+    integer:: ifpctrl= 0 ! 0:no  1:Parrinello-Rahman  2:Andersen
+    real(8):: ptgt   = 0d0
+    real(8):: vmcoeff= 1d0
+    real(8):: vdmp   = 1d0
+    real(8):: phyd,vm,ah(3,3),aht(3,3),ptnsr(3,3) &
+         ,g(3,3,0:1),gt(3,3,0:1),gi(3,3),gg(3,3)
+    
   end module variables
