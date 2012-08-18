@@ -13,7 +13,7 @@ CPPFLAGS=
 # ifort and linux (pen4)
 #FC= ifort
 #FFLAGS= -O3 -ip 
-#MPIFC= /usr/local/gridmpi-2.0/intel/bin/mpif90
+#MPIFC= /usr/local/gridmpi-2.1.1/intel/bin/mpif90
 #MPIFC= /usr/local/mpich-1.2.6/intel/bin/mpif90
 MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
 # MPIFC= mpif90

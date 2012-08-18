@@ -197,3 +197,18 @@ c          write(6,'(a,2i8)') "nbnew,nrc=",nbnew,nrc
       
       deallocate(dbuf,dbufr)
       end subroutine copy_strs_ba
+c=======================================================================
+      subroutine set_avol()
+      use variables
+      implicit none
+      include './params_au.h'
+      include './params_LJ_Ar.h'
+
+      avol= alcar**3 /4
+      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
+      return
+      end subroutine set_avol
+c-----------------------------------------------------------------------
+c     Local Variables:
+c     compile-command: "make pmd"
+c     End:

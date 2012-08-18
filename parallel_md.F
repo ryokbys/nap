@@ -73,7 +73,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(shrst,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(ptgt,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(vmcoeff,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(vdmp,1,mpi_double_precision,0,mpi_md_world,ierr)      
+      call mpi_bcast(voldmp,1,mpi_double_precision,0,mpi_md_world,ierr)      
 
 c-----sec. --> a.u.
       dt= dt /aut
@@ -95,7 +95,7 @@ c-----error trap
         call mpi_finalize(ierr)
         stop
       endif
-
+      
 c-----vector node indices: range [0:nx-1]
       myx=myid_md/(ny*nz)
       myy=mod(myid_md/nz,ny)
@@ -192,7 +192,7 @@ c      temp= ekin /ntot/fkb *2d0/2d0
         ptgt= ptgt/2.94d+4
 c.....Parrinello-Rahman Isobaric
         vm= am(1)*vmcoeff
-        call force_isobaric(ptgt,ah,natm,eki,strs,sgm,vm,vol
+        call force_isobaric(ptgt,ah,natm,eki,strs,sgm,vm,vol,avol
      &       ,ptnsr,mpi_md_world)
       endif
 
@@ -232,8 +232,9 @@ c-----Energy output
       if(myid_md.eq.0) then
         open(11,file="dat.erg",status='replace')
         write(11,'(a,es15.7)') '# epot0 =',epot0
-        write(11,'(i8,3es15.7,f10.2)') istp
-     &     ,ekin+epot0-epot0,ekin,epot0-epot0,temp
+        write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
+     &       ,ekin+epot-epot0,ekin,epot-epot0,temp,vol
+     &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*2.94d+4
         call flush(11)
       endif
 
@@ -256,7 +257,7 @@ c-------multiply fmv or damping
 
         if( ifpctrl.eq.1 ) then
           h(1:3,1:3,1)=h(1:3,1:3,1) +ah(1:3,1:3)*dt/2
-          h(1:3,1:3,1)=h(1:3,1:3,1)*vdmp
+          h(1:3,1:3,1)=h(1:3,1:3,1)*voldmp
 c.....Only orthogonal change
           do i=1,3
             do j=1,3
@@ -323,7 +324,7 @@ c.....Calc kinetic energy
 
         if( ifpctrl.eq.1 ) then
           call force_isobaric(ptgt,ah,natm,eki,strs,sgm
-     &         ,vm,vol,ptnsr,mpi_md_world)
+     &         ,vm,vol,avol,ptnsr,mpi_md_world)
           h(1:3,1:3,1)=h(1:3,1:3,1) +ah(1:3,1:3)*dt/2
           gg(1:3,1:3)= 0d0
           do j=1,3
@@ -373,7 +374,7 @@ c          temp= ekin /ntot/fkb *2d0/2d0
           if(myid_md.eq.0) then
             write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
      &           ,ekin+epot-epot0,ekin,epot-epot0,temp,vol
-     &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))*2.94d+4
+     &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*2.94d+4
             call flush(11)
           endif
 c---------output step, time, and temperature
@@ -487,6 +488,14 @@ c.....Transpose of G
       enddo
 c.....Inverse of G
       call ludc_inv(3,g(1,1,0),gi)
+c      write(6,'(a)') ' g:'
+c      write(6,'(3es12.4)') g(1,1:3,0)
+c      write(6,'(3es12.4)') g(2,1:3,0)
+c      write(6,'(3es12.4)') g(3,1:3,0)
+c      write(6,'(a)') ' gi:'
+c      write(6,'(3es12.4)') gi(1,1:3)
+c      write(6,'(3es12.4)') gi(2,1:3)
+c      write(6,'(3es12.4)') gi(3,1:3)
 
       return
       end subroutine boxmat
@@ -1391,7 +1400,7 @@ c-----Exchange information with myself
       end
 c=======================================================================
       subroutine force_isobaric(ptgt,ah,natm,eki,strs,sgm
-     &     ,vm,vol,ptnsr,mpi_md_world)
+     &     ,vm,vol,avol,ptnsr,mpi_md_world)
 c
 c  Calc. acceralation of h-matrix used in isobaric MD
 c
@@ -1399,7 +1408,7 @@ c
       include "mpif.h"
       integer,intent(in):: natm,mpi_md_world
       real(8),intent(in):: ptgt,eki(3,3,natm),strs(3,3,natm)
-     &     ,sgm(3,3),vm,vol
+     &     ,sgm(3,3),vm,vol,avol
       real(8),intent(out):: ah(3,3),ptnsr(3,3)
       
       integer:: i,ixyz,jxyz,kxyz,ierr
@@ -1410,7 +1419,7 @@ c
         do jxyz=1,3
           do ixyz=1,3
             pt(ixyz,jxyz)=pt(ixyz,jxyz)
-     &           +2d0*eki(ixyz,jxyz,i) +strs(ixyz,jxyz,i)
+     &           +2d0*eki(ixyz,jxyz,i) +strs(ixyz,jxyz,i)*avol
           enddo
         enddo
       enddo

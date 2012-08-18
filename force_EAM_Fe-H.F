@@ -59,6 +59,7 @@ c-----------------------------------------------------------------------
         rs=  a_rs /dsqrt(2d0)/z_fe**(1d0/3)
 c.....assuming fixed (constant) atomic volume (BCC)
         avol= alcfe**3 /2
+        call set_avol()
         l1st=.false.
       endif
 
@@ -475,6 +476,17 @@ c          write(6,'(a,2i8)') "nbnew,nrc=",nbnew,nrc
       endif
       
       end subroutine copy_strs_ba
+c=======================================================================
+      subroutine set_avol()
+      use variables
+      implicit none
+      include './params_au.h'
+      include './params_EAM_Fe-H.h'
+
+      avol= alcfe**3 /2
+      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
+      return
+      end subroutine set_avol
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"

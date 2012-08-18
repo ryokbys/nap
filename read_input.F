@@ -104,7 +104,7 @@ c=======================================================================
         call read_r1(ionum,vmcoeff)
         return
       elseif( trim(cname).eq.'vol_change_damping' ) then
-        call read_r1(ionum,vdmp)
+        call read_r1(ionum,voldmp)
         return
       elseif( trim(cname).eq.'flag_isobaric' ) then
         call read_i1(ionum,ifpctrl)

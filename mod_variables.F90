@@ -26,7 +26,7 @@
          ,myid_md,nodes_md,mpi_md_world,myx,myy,myz,ierr
     real(8):: sv(3,6),sorg(3),anxi,anyi,anzi
 !.....simulation box
-    real(8):: h(3,3,0:1),hi(3,3),vol,sgm(3,3),al(3)
+    real(8):: h(3,3,0:1),hi(3,3),vol,sgm(3,3),al(3),avol
     real(8):: ht(3,3,0:1),hti(3,3),dh
 !.....factors on each moving direction
     real(8):: fmv(3,0:9)
@@ -52,7 +52,7 @@
     integer:: ifpctrl= 0 ! 0:no  1:Parrinello-Rahman  2:Andersen
     real(8):: ptgt   = 0d0
     real(8):: vmcoeff= 1d0
-    real(8):: vdmp   = 1d0
+    real(8):: voldmp = 1d0
     real(8):: phyd,vm,ah(3,3),aht(3,3),ptnsr(3,3) &
          ,g(3,3,0:1),gt(3,3,0:1),gi(3,3),gg(3,3)
     
