@@ -49,7 +49,7 @@
     real(8):: shrst,shrfx
 
 !.....Isobaric
-    integer:: ifpctrl= 0 ! 0:no  1:Parrinello-Rahman  2:Andersen
+    integer:: ifpctl= 0 ! 0:no  1:Parrinello-Rahman  2:Andersen
     real(8):: ptgt   = 0d0
     real(8):: vmcoeff= 1d0
     real(8):: voldmp = 1d0

@@ -71,6 +71,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(fmv,30,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(shrst,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(ifpctl,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(ptgt,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(vmcoeff,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(voldmp,1,mpi_double_precision,0,mpi_md_world,ierr)      
@@ -186,7 +187,7 @@ c-----in case of 3D, <ekin> = 3/2 *NkT
 cc-----in case of 2D, <ekin> = 2/2 *NkT
 c      temp= ekin /ntot/fkb *2d0/2d0
 
-      if( ifpctrl.eq.1 ) then
+      if( ifpctl.eq.1 ) then
         if(myid_md.eq.0) write(6,'(a,f10.2,a,es12.4,a)')
      &       ' Target Pressure = ',ptgt,' GPa, ',ptgt/2.94d+4,' a.u.'
         ptgt= ptgt/2.94d+4
@@ -255,7 +256,8 @@ c-------multiply fmv or damping
           va(1:3,i)=va(1:3,i) *fmv(1:3,l)
         enddo
 
-        if( ifpctrl.eq.1 ) then
+c.....Parrinello-Rahman isobaric
+        if( ifpctl.eq.1 ) then
           h(1:3,1:3,1)=h(1:3,1:3,1) +ah(1:3,1:3)*dt/2
           h(1:3,1:3,1)=h(1:3,1:3,1)*voldmp
 c.....Only orthogonal change
@@ -270,7 +272,7 @@ c.....Only orthogonal change
 c-------update positions
         ra(1:3,1:natm)=ra(1:3,1:natm) +va(1:3,1:natm)
 
-        if( ifpctrl.eq.1 ) then
+        if( ifpctl.eq.1 ) then
           h(1:3,1:3,0)=h(1:3,1:3,0) +h(1:3,1:3,1)*dt
 c.....Reset matrices
           call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
@@ -322,7 +324,7 @@ c.....Calc kinetic energy
         call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
      &       ,vmax,mpi_md_world)
 
-        if( ifpctrl.eq.1 ) then
+        if( ifpctl.eq.1 ) then
           call force_isobaric(ptgt,ah,natm,eki,strs,sgm
      &         ,vm,vol,avol,ptnsr,mpi_md_world)
           h(1:3,1:3,1)=h(1:3,1:3,1) +ah(1:3,1:3)*dt/2
@@ -379,7 +381,7 @@ c          temp= ekin /ntot/fkb *2d0/2d0
           endif
 c---------output step, time, and temperature
           tcpu= mpi_wtime() -tcpu1
-          if(myid_md.eq.0) write(6,'(a,i8,10f10.2)')
+          if(myid_md.eq.0) write(6,'(a,i8,2f10.2,2es11.3)')
      &         " istp,time,temp,vol,prss="
      &         ,istp,tcpu,temp,vol
      &         ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))*2.94d+4

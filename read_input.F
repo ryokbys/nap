@@ -107,7 +107,7 @@ c=======================================================================
         call read_r1(ionum,voldmp)
         return
       elseif( trim(cname).eq.'flag_isobaric' ) then
-        call read_i1(ionum,ifpctrl)
+        call read_i1(ionum,ifpctl)
         return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
