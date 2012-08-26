@@ -117,6 +117,9 @@ akr2csp: akr2csp.o
 akr2pot: akr2pot.o
 	${MPIFC} -o $@ akr2pot.o
 
+cna2disl: cna2disl.o
+	$(MPIFC) -o $@ cna2disl.o
+
 rdpmd: read_pmd.o $(mods)
 	$(MPIFC) -o $@ read_pmd.o $(mods)
 
