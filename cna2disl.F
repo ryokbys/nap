@@ -53,8 +53,10 @@ c.....Search and list up dislocation core atoms
         xav= 0d0
         yav= 0d0
         i= lshd(iz)
-        xref= ra(1,i)
-        yref= ra(2,i)
+        if( iz.eq.1 ) then
+          xref= ra(1,i)
+          yref= ra(2,i)
+        endif
         do
           if(i.eq.0) exit
           xi= ra(1,i)

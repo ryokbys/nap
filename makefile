@@ -6,7 +6,7 @@
 
 # cpp path
 CPP= gcc -E
-CPPFLAGS= -D__SHEAR__ -D__DISL__
+CPPFLAGS= -D__SHEAR__
 #CPPFLAGS=
 
 #-----------------------------------------------------------------------
