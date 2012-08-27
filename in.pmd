@@ -9,20 +9,23 @@
   flag_out_pmd      1
   num_out_pmd       10
 
-  cutoff_radius     7.0d-10
+  cutoff_radius     5.3d-10
+  cutoff_buffer     0.5d-10
 
   flag_damping      0
   damping_coeff     0.95d0
 
   flag_temperature        1
   temperature_target      100d0
-  temperature_relax_time  5d-14
+  temperature_relax_time  1d-13
 
   factor_direction 3 2
     1.000d0  1.000d0  1.000d0
-    1.000d0  1.000d0  0.000d0
+    1.000d0  0.000d0  1.000d0
 
   flag_isobaric        1
   pressure_target      0d0
   vol_mass_coeff       1d-3
   vol_change_damping   1d0
+
+  shear_stress   0.00

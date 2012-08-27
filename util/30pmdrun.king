@@ -13,7 +13,7 @@ cd $PBS_O_WORKDIR
 
 NPROCS=`wc -l < $PBS_NODEFILE`
 MPIRUN=/usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpirun
-PMD=/home/kobayashi/2012/06-15_pmd-disl/src/
+PMD=/home/kobayashi/(your-directory)/src/
 
 echo "Num of nodes= $NPROCS"
 echo "Running nodes:"
@@ -30,7 +30,21 @@ $PMD/40combine >& out.combine
 
 #.....cna from akr files
 echo "Processing CNA..."
-for file in akr[01]*
+for file in akr*
 do
   $PMD/akr2cna < $file > "`echo $file | sed 's/akr/cna/'`"
 done
+
+#.....Extract dislocation position
+echo "CNA ---> DISL"
+for file in cna*
+do
+  $PMD/cna2disl < $file > "`echo $file | sed 's/cna/disl/'`"
+done
+
+#.....Dislocation position for gnuplot
+date
+for file in disl*
+do 
+  awk 'NR==1 {print}' $file
+done > dat.disl
