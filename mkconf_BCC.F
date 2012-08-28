@@ -5,7 +5,7 @@ c    Write: ini000
 c
       implicit real*8(a-h,o-z),integer(i-n)
       include './params_au.h'
-      include './params_EAM_Fe.h'
+      include './params_EAM_Fe-H.h'
 c-----max # of atoms
       integer,parameter::nmax=10000000
 c-----# of unit cells
@@ -94,7 +94,7 @@ c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
       include "./params_au.h"
-      include "./params_EAM_Fe.h"
+      include "./params_EAM_Fe-H.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)

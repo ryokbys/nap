@@ -214,9 +214,9 @@ c-----gather epot
 
       end subroutine get_force
 c=======================================================================
-      subroutine get_force_FeFe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom
-     &     ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &     ,mpi_md_world,myid_md,epi,epot,nismax,acon)
+      subroutine get_force_FeFe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &     ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr,mpi_md_world
+     &     ,myid_md,epi,epot,nismax,acon)
 c-----------------------------------------------------------------------
 c  Parallel implementation of EAM Ackland model for Fe (iron).
 C    - See Philos. Mag. 83(35) (2003) 3977--3994
@@ -770,7 +770,7 @@ c=======================================================================
       
       e1= exp(-2d0*r)
       fc= fcut(r)
-      drho_hh= c_rho_hh *(2d0*r*e1*fc -r**2*e1*fc +r**2*e1*dfcut(r))
+      drho_hh= c_rho_hh *(2d0*r*e1*fc -2d0*r**2*e1*fc +r**2*e1*dfcut(r))
       return
       end function drho_hh
 c=======================================================================
@@ -824,7 +824,7 @@ c=======================================================================
       do i=1,6
         dfh=dfh +a_f(i) *rho**(i-1) *i
       enddo
-
+      return
       end function dfh
 c=======================================================================
       function fvphi_hh(r)
@@ -834,16 +834,23 @@ c=======================================================================
       real(8),intent(in):: r
       real(8):: fvphi_hh
 
-      real(8):: adag,emol,rho
-      real(8),external:: rho_hh,s_hh,fh
+      real(8):: rho,emol,adag,sr,x,ex,exm
+      real(8),external:: rho_hh,fh
 
       fvphi_hh= 0d0
       if( r.gt.rc_phi_hh ) return
-      
+
+      x=a_tanh_hh*(r-r_tanh_hh)
+      ex= exp(x)
+      exm=1d0/ex
+      sr= 0.5d0 *(1d0 -(ex-exm)/(ex+exm))
+c      sr= 0.5d0 *(1d0 -tanh(a_tanh_hh*(r-r_tanh_hh)))
       adag= (r-r0_hh)/(r0_hh*almbd_hh)
-      emol= -2d0*eb_hh*(1d0+adag)*exp(-adag)
+      emol= -2d0 *eb_hh *(1d0+adag) *exp(-adag)
       rho= rho_hh(r)
-      fvphi_hh= s_hh(r) *(emol -2d0*fh(rho))
+
+      fvphi_hh= sr *(emol -2d0*fh(rho))
+c      fvphi_hh= sr *(-2d0*fh(rho))
 
       return
       end function fvphi_hh
@@ -855,21 +862,31 @@ c=======================================================================
       real(8),intent(in):: r
       real(8):: dfvphi_hh
 
-      real(8):: adag,emol,rho
+      real(8):: emol,rho,adag,sr,x,ex,exm
       real(8):: dsr,demolr,dfhr,drhor
       real(8),external:: rho_hh,drho_hh,s_hh,fh,dfh
 
+      dfvphi_hh= 0d0
+      if( r.gt.rc_phi_hh ) return
+
+c      sr= 0.5d0 *(1d0 -tanh(a_tanh_hh*(r-r_tanh_hh)))
+      x=a_tanh_hh*(r-r_tanh_hh)
+      ex=exp(x)
+      exm=1d0/ex
+      sr= 0.5d0 *(1d0 -(ex-exm)/(ex+exm))
       adag= (r-r0_hh)/(r0_hh*almbd_hh)
-      emol= -2d0*eb_hh*(1d0+adag)*exp(-adag)
+      emol= -2d0 *eb_hh *(1d0+adag) *exp(-adag)
       rho= rho_hh(r)
       drhor= drho_hh(r)
 
-c      dsr= -0.5d0 *a_tanh_hh *2d0 /cosh(a_tanh_hh*(r-r_tanh_hh))
-      dsr= -a_tanh_hh /cosh(a_tanh_hh*(r-r_tanh_hh))
-      demolr= 2d0 *eb_hh *adag *exp(-adag) /r0_hh /almbd_hh
+c      dsr= -0.5d0 *a_tanh_hh *2d0 /cosh(a_tanh_hh*(r-r_tanh_hh))**2
+c      dsr= -a_tanh_hh /cosh(a_tanh_hh*(r-r_tanh_hh))**2
+      dsr= -a_tanh_hh *2d0/(ex+exm)**2
+      demolr= 2d0 *eb_hh *adag *exp(-adag) /(r0_hh*almbd_hh)
       dfhr= drhor *dfh(rho)
 
-      dfvphi_hh= dsr*(emol-2d0*fh(rho)) +s_hh(r)*(demolr-2d0*dfhr)
+      dfvphi_hh= dsr*(emol-2d0*fh(rho)) +sr*(demolr-2d0*dfhr)
+c      dfvphi_hh= dsr*(-2d0*fh(rho)) +sr*(-2d0*dfhr)
       return
       end function dfvphi_hh
 c=======================================================================
