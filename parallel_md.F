@@ -147,7 +147,10 @@ c-----ntset
 c-----get total number of particles
       call mpi_allreduce(natm,ntot,1,MPI_INTEGER,MPI_SUM
      &     ,mpi_md_world,ierr)
-      if(myid_md.eq.0) write(6,'(a,i10)') " ntot=",ntot
+      if(myid_md.eq.0) then
+        write(6,'(a,i10)') " ntot=",ntot
+        write(6,'(a,i10)') " nis =",nis
+      endif
 
 #ifdef __SHEAR__
       call init_shear_stress(shrst,shrfx,natm,tag,ra,h,sorg,acon(1)
@@ -234,7 +237,7 @@ c-----Energy output
         open(11,file="dat.erg",status='replace')
         write(11,'(a,es15.7)') '# epot0 =',epot0
         write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
-     &       ,ekin+epot-epot0,ekin,epot-epot0,temp,vol
+     &       ,ekin+epot0-epot0,ekin,epot0-epot0,temp,vol
      &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*2.94d+4
         call flush(11)
       endif
@@ -381,10 +384,19 @@ c          temp= ekin /ntot/fkb *2d0/2d0
           endif
 c---------output step, time, and temperature
           tcpu= mpi_wtime() -tcpu1
-          if(myid_md.eq.0) write(6,'(a,i8,2f10.2,2es11.3)')
-     &         " istp,time,temp,vol,prss="
-     &         ,istp,tcpu,temp,vol
-     &         ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))*2.94d+4
+          if(myid_md.eq.0) then
+            if( ifpctl .eq. 1 ) then
+              write(6,'(a,i8,2f10.2,2es11.3)')
+     &             " istp,time,temp,vol,prss="
+     &             ,istp,tcpu,temp,vol
+     &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))*2.94d+4
+            else
+              write(6,'(a,i8,2f10.2)')
+     &             " istp,time,temp="
+     &             ,istp,tcpu,temp
+            endif
+          endif
+            
 #ifdef __DISL__
 c.....Output disl core pos
           call perf_disl_pos_by_pot(epith,natm,ra,h,epi,sorg
