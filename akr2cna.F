@@ -19,7 +19,7 @@ c.....Cutoff radius for BCC Fe, halfway between 2nd and 3rd N.N.
       integer:: i,n,itmp,nauxdat,j
       integer:: natm0,natm,nx,ny,nz,nlsa
       real(8):: tmp,al(3),xi(3),rij(3),r
-      integer,allocatable:: lsa(:),lspr(:,:),itype(:)
+      integer,allocatable:: lsa(:),lspr(:,:),itype(:),itag(:)
       real(8),allocatable:: ra0(:,:),ra(:,:),auxdat0(:,:)
      &     ,auxdat(:,:)
 
@@ -29,9 +29,9 @@ c-----read akr file from STDIN
       read(5,*) tmp,al(2),tmp
       read(5,*) tmp,tmp,al(3)
       allocate(ra0(3,natm0),ra(3,natm0),auxdat(nauxdat,natm0)
-     &     ,auxdat0(nauxdat,natm0),itype(natm0))
+     &     ,auxdat0(nauxdat,natm0),itype(natm0),itag(natm0))
       do i=1,natm0
-        read(5,*) itmp,ra0(1:3,i),auxdat0(1:nauxdat,i)
+        read(5,*) itag(i),ra0(1:3,i),auxdat0(1:nauxdat,i)
       enddo
 
 c-----prepare for linked-list
@@ -50,7 +50,7 @@ c-----make 1st nearest neighbor pair-list
       deallocate(lsa)
 
 c-----common neighbor analysis
-      call cna(natm0,nnmax,lspr,ra0,auxdat0,nauxdat
+      call cna(natm0,nnmax,lspr,itag,ra0,auxdat0,nauxdat
      &     ,natm,ra,auxdat,itype)
 
 c-----write akr file to STDOUT
@@ -204,13 +204,14 @@ c      stop
 
       end subroutine ll2lspr
 c=======================================================================
-      subroutine cna(natm0,nnmax,lspr,ra0,auxdat0,nauxdat
+      subroutine cna(natm0,nnmax,lspr,itag,ra0,auxdat0,nauxdat
      &     ,natm,ra,auxdat,itype)
 c-----------------------------------------------------------------------
 c Reduce natm0 to natm by using Common Neighbor Analysis
 c-----------------------------------------------------------------------
       implicit none
       integer,intent(in):: natm0,nnmax,lspr(0:nnmax,natm0),nauxdat
+     &     ,itag(natm0)
       real(8),intent(in):: ra0(3,natm0),auxdat0(nauxdat,natm0)
       integer,intent(out):: itype(natm0),natm
       real(8),intent(out):: ra(3,natm0),auxdat(nauxdat,natm0)
@@ -321,6 +322,11 @@ c-----end of atom-i
 c-----reduce atoms
       natm= 0
       do i=1,natm0
+        if( itag(i).eq.2 ) then
+          natm=natm+1
+          itype(natm)=itag(i)
+          goto 10
+        endif
         n421= 0
         n422= 0
         n663= 0
@@ -349,8 +355,11 @@ c.....Otherwise, itype(i)= 1
         else
           itype(natm)= 1
         endif
+
+        itype(natm)= 1
+
 c-------copy to ra,va
-        ra(1:3,natm)= ra0(1:3,i)
+ 10     ra(1:3,natm)= ra0(1:3,i)
         auxdat(1:nauxdat,natm)= auxdat0(1:nauxdat,i)
 c        if( natm.eq.2444 ) then
 c          do ii=1,lspr(0,i)

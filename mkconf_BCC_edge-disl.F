@@ -14,15 +14,18 @@ c-----max # of atoms
       integer,parameter::nmax=10000000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 100, 50, 3 /)
+      integer,parameter:: nuc(1:3)= (/ 50, 25, 5 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 1, 0 /)
+      integer:: ix,iy,iz,inc,nh
       real(8):: ua(3,12)
       real(8):: tag(nmax),ra(3,nmax),va(3,nmax),eki(nmax),epi(nmax)
-     &     ,h(3,3,0:1),strs(3,3,nmax),h0(3,3),s(3),ymax,ymin
+     &     ,h(3,3,0:1),strs(3,3,nmax),h0(3,3),s(3),ymax,ymin,dseed,rnd
 c.....Parameters
-      real(8),parameter:: tempini = 500d0
+      real(8),parameter:: tempini = 300d0
+c.....H density in atomic ppm
+      real(8),parameter:: hppm    = 200d0
 
       small=1d-8
 
@@ -101,8 +104,6 @@ c.....Search top and bottom in y-direction
           enddo
         enddo
       enddo
-      write(6,'(a,i10)') " natm=",inc
-c      write(6,'(a,i10)') " id of inc=",int(mod(tag(inc)*1d14,1d13))
 c.....Set top and bottom atoms to ifmv=2
       do i=1,inc
         if( ra(2,i).lt.ymin+daah ) then
@@ -115,6 +116,33 @@ c.....Set top and bottom atoms to ifmv=2
           tag(i)= 1d0*is +0.1d0*ifmv +1d-14*i
         endif
       enddo
+
+c.....Add H atoms to O-sites
+      dseed=1234589d0
+      nh=0
+      do ix=0,nuc(1)-1
+        do iy=0,nuc(2)-1
+          do iz=0,nuc(3)-1
+            do m=1,12
+              call myrnd(rnd,dseed)
+              if( rnd.le.hppm/1d+6 ) then
+                nh=nh +1
+                inc=inc +1
+                is= 2
+                ifmv=1
+                tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+                ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+                ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+                ra(3,inc)= (1.0d0/3 +dble(iz))/(nuc(3)+nvac(3)) +small
+              endif
+            enddo
+          enddo
+        enddo
+      enddo
+
+      write(6,'(a,i10)') " num of atom=",inc
+      write(6,'(a,i10)') " num of H   =",nh
+c      write(6,'(a,i10)') " id of inc=",int(mod(tag(inc)*1d14,1d13))
 
       call setv(inc,va,tag,tempini)
       
@@ -142,17 +170,19 @@ c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
       include "./params_au.h"
-      include "./params_EAM_Fe.h"
+      include "./params_EAM_Fe-H.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)
 
       integer:: i,l,is
-      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv,am
+      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(2),am(2)
       real(8),parameter:: pi = 3.14159265358979d0
 
-      facv=dsqrt(2d0*tempini*fkb/am_fe)
-      am= am_fe
+      facv(1)=dsqrt(2d0*tempini*fkb/am_fe)
+      facv(2)=dsqrt(2d0*tempini*fkb/am_h)
+      am(1)= am_fe
+      am(2)= am_h
 
 c-----velocities in Maxwell-Boltzmann distribution
       dseed=12345
@@ -161,7 +191,7 @@ c-----velocities in Maxwell-Boltzmann distribution
         do l=1,3
           call myrnd(rnd1,dseed)
           call myrnd(rnd2,dseed)
-          va(l,i)=facv*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
+          va(l,i)=facv(is)*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
         enddo
       enddo
 c-----set center of mass motion to zero
@@ -182,7 +212,7 @@ c-----set center of mass motion to zero
       tmp=0d0
       do i=1,natm
         is= int(tag(i))
-        tmp= tmp +0.5d0*am*(va(1,i)**2 +va(2,i)**2 +va(3,i)**2)
+        tmp= tmp +0.5d0*am(is)*(va(1,i)**2 +va(2,i)**2 +va(3,i)**2)
       enddo
       write(6,'(a,es12.4)') " ekin=",tmp
       write(6,'(a,es12.4)') " temp.=",tmp*2d0/3d0/fkb/natm
