@@ -14,7 +14,7 @@ c-----max # of atoms
       integer,parameter::nmax=10000000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 50, 25, 5 /)
+      integer,parameter:: nuc(1:3)= (/ 50, 25, 20 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 1, 0 /)
@@ -23,7 +23,7 @@ c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       real(8):: tag(nmax),ra(3,nmax),va(3,nmax),eki(nmax),epi(nmax)
      &     ,h(3,3,0:1),strs(3,3,nmax),h0(3,3),s(3),ymax,ymin,dseed,rnd
 c.....Parameters
-      real(8),parameter:: tempini = 300d0
+      real(8),parameter:: tempini = 100d0
 c.....H density in atomic ppm
       real(8),parameter:: hppm    = 200d0
 
@@ -64,6 +64,7 @@ c.....simulation box size
 c.....Width of to-be-removed half plane
       daah= daa/h(1,1,0) +small
       
+      nh= 0
       inc=0 
       ymin=1d0
       ymax=0d0
@@ -79,7 +80,18 @@ c.....Width of to-be-removed half plane
 c.....Remove an atomic plane along yz-plane of bottom half
               if( s(2).lt.0.5d0 .and.
      &             s(1).ge.0.5d0-daah/2 .and.
-     &             s(1).lt.0.5d0+daah/2 ) cycle
+     &             s(1).lt.0.5d0+daah/2 ) then
+c.....Add H at the dislocation core
+                if( s(2).gt.0.49d0 ) then
+                  nh= nh +1
+                  inc=inc+1
+                  is= 2
+                  ifmv= 1
+                  ra(1:3,inc)= s(1:3)
+                  tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+                endif
+                cycle
+              endif
 cc.....Shift to bury removed area
 c              if( s(2).lt.0.5d0 ) then
 c                if( s(1).lt.0.5d0 ) then
@@ -117,28 +129,27 @@ c.....Set top and bottom atoms to ifmv=2
         endif
       enddo
 
-c.....Add H atoms to O-sites
-      dseed=1234589d0
-      nh=0
-      do ix=0,nuc(1)-1
-        do iy=0,nuc(2)-1
-          do iz=0,nuc(3)-1
-            do m=1,12
-              call myrnd(rnd,dseed)
-              if( rnd.le.hppm/1d+6 ) then
-                nh=nh +1
-                inc=inc +1
-                is= 2
-                ifmv=1
-                tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
-                ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-                ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-                ra(3,inc)= (1.0d0/3 +dble(iz))/(nuc(3)+nvac(3)) +small
-              endif
-            enddo
-          enddo
-        enddo
-      enddo
+cc.....Add H atoms to O-sites
+c      dseed=1234589d0
+c      do ix=0,nuc(1)-1
+c        do iy=0,nuc(2)-1
+c          do iz=0,nuc(3)-1
+c            do m=1,12
+c              call myrnd(rnd,dseed)
+c              if( rnd.le.hppm/1d+6 ) then
+c                nh=nh +1
+c                inc=inc +1
+c                is= 2
+c                ifmv=1
+c                tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+c                ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+c                ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+c                ra(3,inc)= (1.0d0/3 +dble(iz))/(nuc(3)+nvac(3)) +small
+c              endif
+c            enddo
+c          enddo
+c        enddo
+c      enddo
 
       write(6,'(a,i10)') " num of atom=",inc
       write(6,'(a,i10)') " num of H   =",nh

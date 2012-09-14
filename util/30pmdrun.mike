@@ -1,0 +1,55 @@
+#!/bin/sh
+#PBS -N 000K-0.00GPa
+#PBS -o out
+#PBS -j oe
+###PBS -l nodes=4:ppn=2
+#PBS -l nodes=cnode008.bw.nitech.ac.jp:ppn=6+cnode009.bw.nitech.ac.jp:ppn=6+cnode010.bw.nitech.ac.jp:ppn=6+cnode011.bw.nitech.ac.jp:ppn=6+cnode012.bw.nitech.ac.jp:ppn=6+cnode013.bw.nitech.ac.jp:ppn=6
+#-----------------------------------------------------------------------
+# Usage:
+#   $ qsub 30pmdrun.king
+#-----------------------------------------------------------------------
+
+cd $PBS_O_WORKDIR
+
+#NPROCS=`wc -l < $PBS_NODEFILE`
+NPROCS=32
+#MPIRUN=/usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpirun
+MPIRUN=mpiexec
+PMD=/home/kobayashi/2012/09-03_pmd_H-core/src/
+
+echo "Num of nodes= $NPROCS"
+echo "Running nodes:"
+cat $PBS_NODEFILE
+pwd
+
+#.....pmd
+echo "$MPIRUN -np $NPROCS $PMD/pmd >& out.pmd"
+$MPIRUN -machinefile $PBS_NODEFILE -n $NPROCS $PMD/pmd >& out.pmd
+
+#.....combine to make akr files
+echo "$PMD/40combine >& out.combine"
+$PMD/40combine >& out.combine
+
+#.....cna from akr files
+echo "Processing CNA..."
+for file in akr*
+do
+  $PMD/akr2cna < $file > "`echo $file | sed 's/akr/cna/'`"
+done
+
+#.....Extract dislocation position
+echo "CNA ---> DISL"
+for file in cna*
+do
+  $PMD/cna2disl < $file > "`echo $file | sed 's/cna/disl/'`"
+done
+
+#.....Dislocation position for gnuplot
+date
+for file in disl*
+do 
+  awk 'NR==1 {print}' $file
+done > dat.disl
+
+rm akr*
+ls pmd* | grep -v '000$' | grep -v '500$' | xargs rm
