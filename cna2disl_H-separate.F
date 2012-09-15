@@ -10,7 +10,7 @@ c-----------------------------------------------------------------------
       real(8),parameter:: rcz  = 2.8553d-10 /bohr
 c.....real(8),parameter:: rcx  = sqrt(3d0)/2 *rcz
       real(8),parameter:: rcx  = rcz
-      integer,parameter:: nnmax= 20
+      integer,parameter:: nnmax= 100
       integer,parameter:: ngmax= 5
 
       integer:: i,j,k,iz,natm,naux,nz,nc,igh,ig,ng

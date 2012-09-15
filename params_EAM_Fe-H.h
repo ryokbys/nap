@@ -4,7 +4,7 @@ c   See Philos. Mag. 83(35), 3977-3994 (2003)
 c  Note that raw values are in AA and eV.
 c-----------------------------------------------------------------------
 c  This will be extended to Fe-H system
-c  See Ramasubramaniam et al. PRB 79, 174101 (2009)
+c  See Ramasubramaniam et al. PRB 79, 174101 (2009), (Potential A)
 c=======================================================================
       real(8),parameter:: am_fe = 55.847d0 *aump/aume
       real(8),parameter:: am_h  =  1.008d0 *aump/aume

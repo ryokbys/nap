@@ -30,7 +30,7 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c  Parallel implementation of EAM Ackland model for Fe (iron) and H.
 C    - See Philos. Mag. 83(35) (2003) 3977--3994
-c    - See also PRB 79, 174101 (2009) for Fe-H
+c    - See also PRB 79, 174101 (2009) for Fe-H (Potential A)
 c    - rho of boundary atoms are sent to the neighbor nodes
 c    - only force on i is calculated, not necessary to send-back
 c-----------------------------------------------------------------------
