@@ -110,7 +110,9 @@ c          read(12,*) tag(j),ra(1:3,j),va(1:3,j)
         enddo
         write(6,'(a,i4,i8)') " node-id, num of atoms =",i,n
 
-        call write_pmd(12,filename,'replace',n,tagt,rat,vat,h
+c        call write_pmd0_bin(12,filename,'replace',n,tagt,rat,vat,h
+c     &       ,ekit,epit,strst)
+        call write_pmd0_ascii(12,filename,'replace',n,tagt,rat,vat,h
      &       ,ekit,epit,strst)
       enddo
 

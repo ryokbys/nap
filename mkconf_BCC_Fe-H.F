@@ -85,7 +85,7 @@ c-----scale velocities to reduced unit
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
 
-      call write_pmd(15,'pmd000-000','replace',inc,tag,ra,va,h
+      call write_pmd0_bin(15,'pmd000-000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
       
 c-----output 'akr000' for Akira visualization
@@ -162,6 +162,7 @@ c=======================================================================
       rnd=dseed/d2p31
       return
       end subroutine myrnd
+c=======================================================================
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make 10mkconf"

@@ -40,7 +40,8 @@ MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
 .F90.o: 
 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
 
-pmd= read_input.o parallel_md.o util_vec.o routines_dislocation.o lasubs.o
+pmd= read_input.o parallel_md.o util_vec.o routines_dislocation.o \
+	lasubs.o util_pmd.o
 mods= mod_variables.o
 
 #-----------------------------------------------------------------------

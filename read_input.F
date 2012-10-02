@@ -109,6 +109,9 @@ c=======================================================================
       elseif( trim(cname).eq.'flag_isobaric' ) then
         call read_i1(ionum,ifpctl)
         return
+      elseif( trim(cname).eq.'io_format' ) then
+        call read_c1(ionum,ciofmt)
+        return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return
@@ -164,3 +167,18 @@ c
       write(6,'(1x,a,i10)') trim(ctmp),ival
 
       end subroutine read_i1
+c=======================================================================
+      subroutine read_c1(ionum,cval)
+c
+c  Read one word from the line
+c
+      integer,intent(in):: ionum
+      character(len=*),intent(out):: cval
+      character(len=128):: ctmp
+
+      backspace(ionum)
+      read(ionum,*) ctmp,cval
+      write(6,'(1x,2a)') trim(ctmp),trim(cval)
+
+      end subroutine read_c1
+

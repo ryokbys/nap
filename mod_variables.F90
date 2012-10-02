@@ -17,6 +17,7 @@
     real(8):: tcpu,tcpu1,tcpu2,tcom
     real(8):: dt,rc,dmp,treq,trlx,temp,epot,ekin,epot0,vmaxold,vmax
     real(8):: rbuf= 0d0
+    character(len=6):: ciofmt='ascii '
 !.....Search time and expiration time
     real(8):: ts,te
     integer:: istps,istpe
