@@ -11,7 +11,7 @@ c-----------------------------------------------------------------------
       integer,parameter:: npmax= 2000000
 c.....Num of auxiliary data for coloring atoms in Akira
       integer,parameter:: nauxdat = 5
-      integer:: ipmd,n,ncg,inode,itmp,i,nnodes,nkvs,ia,ib,l
+      integer:: ipmd,n,inode,itmp,i,nnodes,nkvs,ia,ib,l
       real(8):: tmp,tagt(npmax),rat(3,npmax),vat(3,npmax),op(9,npmax)
       character:: fin*10,fout*6
 
@@ -24,7 +24,6 @@ c.....Num of auxiliary data for coloring atoms in Akira
       
       do ipmd=0,npmd
         n= 0
-        ncg= 0
         do inode=0,nnodes-1
           fin="pmd000-000"
 c---------about node number
@@ -32,12 +31,14 @@ c---------about node number
 c---------about pmd-step number
           write(fin(8:10),'(i3.3)') ipmd
 c---------read pmd###-$$$ file
-          open(20,file=fin,form='unformatted',status="old")
-          read(20) itmp
-          ncg= ncg +itmp
-          read(20) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-          read(20) (tag(i),ra(1:3,i),va(1:3,i)
-     &         ,eki(1,1,i),epi(i),strs(1:3,1:3,i),i=1,itmp)
+          if( trim(ciofmt).eq.'bin'.or.trim(ciofmt).eq.'binary' ) then
+            call read_pmd_bin(20,fin
+     &           ,namax,itmp,h,tag,ra,va,eki,epi,strs)
+          else if( trim(ciofmt).eq.'ascii' ) then
+            call read_pmd_ascii(20,fin
+     &           ,namax,itmp,h,tag,ra,va,eki,epi,strs)
+          endif
+          write(6,'(a,i8)') 'itmp=',itmp
           do i=1,itmp
             n=n+1
             tagt(n)=tag(i)
@@ -49,19 +50,16 @@ c---------read pmd###-$$$ file
             op(4,n)=strs(2,2,i)
             op(5,n)=strs(1,2,i)
           enddo
-          close(20)
         enddo
-c-------check n & ncg
-        if(n.ne.ncg) stop "n.ne.ncg!"
 c-------output file name
         fout="akr000"
         write(fout(4:6),'(i3.3)') ipmd
 c-------output combined mts-file
         open(30,file=fout,status="replace")
-        write(30,'(i10,3i4)') ncg, nauxdat, 0, 0
+        write(30,'(i10,3i4)') n, nauxdat, 0, 0
         write(30,'(3es15.7)') ((h(ia,ib,0),ia=1,3),ib=1,3)
         write(30,'(i3,8es12.4)') (int(tagt(i)),rat(1:3,i)
-     &       ,op(1:nauxdat,i),i=1,ncg)
+     &       ,op(1:nauxdat,i),i=1,n)
         close(30)
         write(6,'(a)') " "//fout//" done."
       enddo

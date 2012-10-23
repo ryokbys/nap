@@ -115,13 +115,6 @@ c.....Each node opens one MD-configuration file
         call read_pmd_ascii(20,"pmd"//cnode//"-000"
      &     ,namax,natm,h,tag,ra,va,eki,epi,strs)
       endif
-c      open(20,file="pmd"//cnode//"-000",form='unformatted',status="old")
-cc-----natm: num. of particles in this node
-c      read(20) natm
-c      read(20) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-c      read(20) (tag(i),ra(1:3,i),va(1:3,i)
-c     &     ,eki(1,1,i),epi(i),strs(1:3,1:3,i),i=1,natm)
-c      close(20)
       if( myid_md.eq.0 ) then
         write(6,'(a)') " H-matrix:"
         write(6,'(3es15.7)') h(1:3,1,0)
@@ -236,14 +229,6 @@ c-----output initial configuration
           call write_pmd_ascii(20,"pmd"//cnode//"-"//cnum
      &         ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
         endif
-c        open(20,file="pmd"//cnode//"-"//cnum,form='unformatted'
-c     &       ,status="replace")
-c        write(20) natm
-c        write(20) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-c        write(20) (tag(i),ra(1:3,i)+sorg(1:3),va(1:3,i)/dt
-c     &       ,eki(1,1,i)+eki(2,2,i)+eki(3,3,i)
-c     &       ,epi(i),strs(1:3,1:3,i)*2.94d+4,i=1,natm)
-c        close(20)
       endif
 
 c-----Energy output
@@ -431,14 +416,6 @@ c---------write pmd file for Akira
             call write_pmd_ascii(20,"pmd"//cnode//"-"//cnum
      &           ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
           endif
-c          open(20,file="pmd"//cnode//"-"//cnum,form='unformatted'
-c     &         ,status="replace")
-c          write(20) natm
-c          write(20) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-c          write(20) (tag(i),ra(1:3,i)+sorg(1:3),va(1:3,i)/dt
-c     &         ,eki(1,1,i)+eki(2,2,i)+eki(3,3,i)
-c     &         ,epi(i),strs(1:3,1:3,i)*2.94d+4,i=1,natm)
-c          close(20)
         endif
 
       enddo

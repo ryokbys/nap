@@ -19,13 +19,20 @@
       call getarg(3,cout)
       
 c.....Read
-      open(10,file=trim(cin),form='unformatted',status='old')
-      read(10) n
-      read(10) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      read(10) (tag(i),ra(1:3,i),va(1:3,i)
-     &       ,eki(1,1,i),epi(i),strs(1:3,1:3,i),i=1,n)
-      close(10)
-
+c      open(10,file=trim(cin),form='unformatted',status='old')
+c      read(10) n
+c      read(10) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+c      read(10) (tag(i),ra(1:3,i),va(1:3,i)
+c     &       ,eki(1,1,i),epi(i),strs(1:3,1:3,i),i=1,n)
+c      close(10)
+      if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
+        call read_pmd_bin(20,trim(cin)
+     &       ,namax,natm,h,tag,ra,va,eki,epi,strs)
+      else if( trim(ciofmt).eq.'ascii' ) then
+        call read_pmd_ascii(20,trim(cin)
+     &     ,namax,natm,h,tag,ra,va,eki,epi,strs)
+      endif
+      
       write(6,'(a)') ' h-mat before multiplication:'
       write(6,'(3es12.4)') h(1,1:3,0)
       write(6,'(3es12.4)') h(2,1:3,0)
@@ -58,12 +65,19 @@ c      h(1:3,1:3,0)= tmat(1:3,1:3)
       write(6,'(3es12.4)') h(3,1:3,0)
 
 c.....Write
-      open(11,file=trim(cout),form='unformatted',status='replace')
-      write(11) n
-      write(11) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      write(11) (tag(i),ra(1:3,i),va(1:3,i)
-     &       ,eki(1,1,i),epi(i),strs(1:3,1:3,i),i=1,n)
-      close(11)
+      if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
+        call write_pmd_bin(20,trim(cout)
+     &       ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
+      elseif( trim(ciofmt).eq.'ascii' ) then
+        call write_pmd_ascii(20,trim(cout)
+     &       ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
+      endif
+c      open(11,file=trim(cout),form='unformatted',status='replace')
+c      write(11) n
+c      write(11) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+c      write(11) (tag(i),ra(1:3,i),va(1:3,i)
+c     &       ,eki(1,1,i),epi(i),strs(1:3,1:3,i),i=1,n)
+c      close(11)
 
       end program modify_pmd_boxsize
 c-----------------------------------------------------------------------

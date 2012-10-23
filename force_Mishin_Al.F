@@ -1,7 +1,7 @@
       subroutine setup(nismax,am,acon,fack,dt)
       implicit none
       include "params_au.h"
-      include "params_EAM_Al.h"
+      include "params_Mishin_Al.h"
       integer,intent(in):: nismax
       real(8),intent(in):: dt
       real(8),intent(out):: am(nismax),acon(nismax),fack(nismax)
@@ -27,19 +27,17 @@ c=======================================================================
      &     ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot,nismax,acon)
 c-----------------------------------------------------------------------
-c  Parallel implementation of EAM force calculation for Al
-c    - smoothing is applied to both 2- and many-body terms
+c  Parallel implementation of force and potential energy calculation
+c  of EAM for Al by Mishin et al.
 c    - rho of boundary atoms are sent to the neighbor nodes
 c    - only force on i is calculated, not necessary to send-back
 c-----------------------------------------------------------------------
-c  See Streitz and Mintmire, PRB 50(16), 11996 (1994).
-c  This is implementation of only Al-Al potential in the literature,
-c  and non-variable charge implementation.
+c  See Mishin et al. PRB 59(5) (1999) 3393--3407.
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
       include "params_au.h"
-      include "params_EAM_Al.h"
+      include "params_Mishin_Al.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
      &     ,nn(6),mpi_md_world,myid_md
@@ -51,22 +49,24 @@ c-----------------------------------------------------------------------
 
       integer:: i,j,k,l,m,n,ierr,is
       real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,dphi,at(3)
-      real(8):: x,y,z,xi(3),epotl,phic,dphic,tmp
+      real(8):: x,y,z,xi(3),epotl,tmp
+c.....Saved variables
       real(8),save:: exrc
       logical,save:: l1st=.true.
-      real(8),allocatable,save:: sqrho(:)
+      real(8),allocatable,save:: rho(:)
+c.....Functions
+      real(8),external:: calc_rho,calc_v,calc_f
+     &     ,calc_drho,calc_dv,calc_df
 
       if( l1st ) then
-        allocate(sqrho(namax+nbmax))
-c-----smoothing embeded term
-        exrc= exp(-ea_bt*(rc-ea_re))
+        allocate(rho(namax+nbmax))
         l1st=.false.
       endif
 
       aa(1:3,1:natm)=0d0
       epi(1:natm)= 0d0
       epotl= 0d0
-      sqrho(1:natm)= 0d0
+      rho(1:natm)= 0d0
       strs(1:3,1:3,natm+nb)= 0d0
 
 c-----rho(i)
@@ -80,27 +80,19 @@ c-----rho(i)
           z= ra(3,j) -xi(3)
           xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
           rij=sqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
-          sqrho(i)=sqrho(i) +exp(-ea_bt*(rij-ea_re))
-     &         -exrc -(rij-rc)*(-ea_bt)*exrc
+          if( rij.gt.rc_eam ) cycle
+          rho(i)= rho(i) +calc_rho(rij*bohr2aa)
         enddo
-        sqrho(i)= dsqrt(sqrho(i))
       enddo
 
 c-----copy rho of boundary atoms
       call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv
-     &     ,mpi_md_world,sqrho)
-
-c-----smoothing 2-body term
-      r= rc -ea_re
-      phic= 2d0*ea_b*exp(-0.5d0*ea_bt*r)
-     &     -ea_c*(1d0+ea_al*r)*exp(-ea_al*r)
-      dphic= -ea_bt*ea_b*exp(-0.5d0*ea_bt*r) 
-     &     +ea_c*ea_al*ea_al*r*exp(-ea_al*r)
+     &     ,mpi_md_world,rho)
 
 c-----dE/dr_i
       do i=1,natm
         xi(1:3)= ra(1:3,i)
-        dfi= -0.5d0*ea_a/sqrho(i)
+        dfi= calc_df(rho(i)) *ev2hrt/aa2bohr
         do k=1,lspr(0,i)
           j=lspr(k,i)
           if(j.eq.0) exit
@@ -110,13 +102,10 @@ c-----dE/dr_i
           z= ra(3,j) -xi(3)
           xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
           rij=sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
+          if( rij.gt.rc_eam ) cycle
           drdxi(1:3)= -xij(1:3)/rij
-c          drdxj(1:3)=  xij(1:3)/rij
-          r= rij -ea_re
-c---------2-body term
-          tmp= 0.5d0 *( 2d0*ea_b*exp(-0.5d0*ea_bt*r)
-     &         -ea_c*(1d0+ea_al*r)*exp(-ea_al*r)
-     &         -phic -(rij-rc)*dphic )
+c.....2-body term
+          tmp= 0.5d0 *calc_v(rij*bohr2aa) *ev2hrt
           epi(i)= epi(i) +tmp
           epi(j)= epi(j) +tmp
           if(j.le.natm) then
@@ -124,22 +113,18 @@ c---------2-body term
           else
             epotl=epotl +tmp
           endif
-c          epi(i)=epi(i) +( 2d0*ea_b*exp(-0.5d0*ea_bt*r)
-c     &         -ea_c*(1d0+ea_al*r)*exp(-ea_al*r)
-c     &         -phic -(rij-rc)*dphic ) *0.5d0
-          dphi= -ea_bt*ea_b*exp(-0.5d0*ea_bt*r) 
-     &         +ea_c*ea_al*ea_al*r*exp(-ea_al*r)
-     &         -dphic
+          dphi= calc_dv(rij*bohr2aa) *ev2hrt/aa2bohr
           aa(1:3,i)=aa(1:3,i) -dphi*drdxi(1:3)
           aa(1:3,j)=aa(1:3,j) +dphi*drdxi(1:3)
-c---------embedded term
-          drhoij= -ea_bt*exp(-ea_bt*r) +ea_bt*exrc
-          dfj= -0.5d0*ea_a/sqrho(j)
+c.....Embeded term
+          drhoij= calc_drho(rij*bohr2aa)
+          dfj= calc_df(rho(j)) *ev2hrt/aa2bohr
           aa(1:3,i)=aa(1:3,i) -(dfi+dfj)*drhoij*drdxi(1:3)
           aa(1:3,j)=aa(1:3,j) +(dfi+dfj)*drhoij*drdxi(1:3)
         enddo
-        epi(i)=epi(i) -ea_a*sqrho(i)
-        epotl=epotl -ea_a*sqrho(i)
+        tmp= calc_f(rho(i)) *ev2hrt
+        epi(i)=epi(i) +tmp
+        epotl=epotl +tmp
       enddo
 
 c-----reduced force
@@ -160,6 +145,170 @@ c-----gather epot
 
 c      deallocate(sqrho)
       end subroutine get_force
+c=======================================================================
+      function calc_rho(r)
+      implicit none
+      include 'params_au.h'
+      include 'params_Mishin_Al.h'
+      real(8),intent(in):: r
+      real(8):: calc_rho
+      
+      integer:: i
+      real(8):: a(4)
+
+      call check_range(r,neamd,rtbl,'calc_rho')
+      if( r.ge.rtbl(neamd) ) then
+        calc_rho= 0d0
+        return
+      endif
+      do i=1,neamd-1
+        if( r.lt.rtbl(i+1) ) then
+          a(1:4)= rhoprm(1:4,i)
+          exit
+        endif
+      enddo
+      
+      calc_rho= a(1) +a(2)*r +a(3)*r*r +a(4)*r*r*r
+      return
+      end function calc_rho
+c=======================================================================
+      function calc_drho(r)
+      implicit none
+      include 'params_au.h'
+      include 'params_Mishin_Al.h'
+      real(8),intent(in):: r
+      real(8):: calc_drho
+      
+      integer:: i
+      real(8):: a(4)
+
+      if( r.ge.rtbl(neamd) ) then
+        calc_drho= 0d0
+        return
+      endif
+      do i=1,neamd-1
+        if( r.lt.rtbl(i+1) ) then
+          a(1:4)= rhoprm(1:4,i)
+          exit
+        endif
+      enddo
+      
+      calc_drho= a(2) +2d0*a(3)*r +3d0*a(4)*r*r
+      return
+      end function calc_drho
+c=======================================================================
+      function calc_v(r)
+      implicit none
+      include 'params_au.h'
+      include 'params_Mishin_Al.h'
+      real(8),intent(in):: r
+      real(8):: calc_v
+      
+      integer:: i
+      real(8):: a(4)
+
+      if( r.ge.rtbl(neamd) ) then
+        calc_v= 0d0
+        return
+      endif
+      do i=1,neamd-1
+        if( r.lt.rtbl(i+1) ) then
+          a(1:4)= vprm(1:4,i)
+          exit
+        endif
+      enddo
+      
+      calc_v= a(1) +a(2)*r +a(3)*r*r +a(4)*r*r*r
+      return
+      end function calc_v
+c=======================================================================
+      function calc_dv(r)
+      implicit none
+      include 'params_au.h'
+      include 'params_Mishin_Al.h'
+      real(8),intent(in):: r
+      real(8):: calc_dv
+      
+      integer:: i
+      real(8):: a(4)
+
+      if( r.ge.rtbl(neamd) ) then
+        calc_dv= 0d0
+        return
+      endif
+      do i=1,neamd-1
+        if( r.lt.rtbl(i+1) ) then
+          a(1:4)= vprm(1:4,i)
+          exit
+        endif
+      enddo
+      
+      calc_dv= a(2) +2d0*a(3)*r +3d0*a(4)*r*r
+      return
+      end function calc_dv
+c=======================================================================
+      function calc_f(rho)
+      implicit none
+      include 'params_au.h'
+      include 'params_Mishin_Al.h'
+      real(8),intent(in):: rho
+      real(8):: calc_f
+
+      integer:: i
+      real(8):: a(4)
+
+      if( rho.ge.rhotbl(neamd) ) then
+        calc_f= 0d0
+        return
+      endif
+      do i=1,neamd-1
+        if( rho.lt.rhotbl(i+1) ) then
+          a(1:4)= fprm(1:4,i)
+          exit
+        endif
+      enddo
+
+      calc_f= a(1) +a(2)*rho +a(3)*rho*rho +a(4)*rho*rho*rho
+      return
+      end function calc_f
+c=======================================================================
+      function calc_df(rho)
+      implicit none
+      include 'params_au.h'
+      include 'params_Mishin_Al.h'
+      real(8),intent(in):: rho
+      real(8):: calc_df
+
+      integer:: i
+      real(8):: a(4)
+
+      if( rho.ge.rhotbl(neamd) ) then
+        calc_df= 0d0
+        return
+      endif
+      do i=1,neamd-1
+        if( rho.lt.rhotbl(i+1) ) then
+          a(1:4)= fprm(1:4,i)
+          exit
+        endif
+      enddo
+
+      calc_df= a(2) +2d0*a(3)*rho +3d0*a(4)*rho*rho
+      return
+      end function calc_df
+c=======================================================================
+      subroutine check_range(x,n,tbl,c)
+      integer,intent(in):: n
+      real(8),intent(in):: x,tbl(n)
+      character(len=*),intent(in):: c
+
+      if( x.lt.tbl(1) ) then
+        write(6,'(2es12.4)') x,tbl(1)
+        write(6,'(a)') ' ['//trim(c)//'] x.lt.tbl(1)'
+        stop
+      endif
+
+      end subroutine check_range
 c=======================================================================
       subroutine copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb
      &     ,lsrc,myparity,nn,sv,mpi_md_world,rho)

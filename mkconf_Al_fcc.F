@@ -16,7 +16,7 @@ c-----vacuum width in unit of cell
       real(8):: ra(3,nmax)
       real(8):: h(3,3,0:1)
       real(8):: va(3,nmax)
-      real(8):: tag(nmax)
+      real(8):: tag(nmax),eki(nmax),epi(nmax),strs(3,3,nmax)
 c-----initial temperature
       real(8),parameter:: tempini= 100d0
 
@@ -70,14 +70,16 @@ c-----scale velocities to reduced unit
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
       
-c-----output 'ini000' for MD program
-      open(15,file='ini000',form='formatted',status='replace')
-      write(15,'(i10)')inc
-      write(15,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      do i=1,inc
-        write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
+      call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va,h
+     &     ,eki,epi,strs)
+cc-----output 'ini000' for MD program
+c      open(15,file='ini000',form='formatted',status='replace')
+c      write(15,'(i10)')inc
+c      write(15,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+c      do i=1,inc
+c        write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
+c      enddo
+c      close(15)
       
 c-----output 'akr000' for KVS visualization
       open(15,file='akr000',form='formatted',status='replace')

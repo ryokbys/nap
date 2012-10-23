@@ -6,7 +6,7 @@
 
 # cpp path
 CPP= gcc -E
-CPPFLAGS= -D__SHEAR__
+CPPFLAGS=
 #CPPFLAGS=
 
 #-----------------------------------------------------------------------
@@ -52,10 +52,12 @@ mods= mod_variables.o
 # params= params_LJ_Ar.h
 # force= force_EAM_Al.o
 # params= params_EAM_Al.h
+force= force_Mishin_Al.o
+params= params_Mishin_Al.h
 # force= force_EAM_Fe.o
 # params= params_EAM_Fe.h
-force= force_EAM_Fe-H.o
-params= params_EAM_Fe-H.h
+# force= force_EAM_Fe-H.o
+# params= params_EAM_Fe-H.h
 # force= force_Brenner.o
 # params= params_Brenner.h
 # force= force_SW_Si.o
@@ -70,20 +72,20 @@ params= params_EAM_Fe-H.h
 # params= params_RK_VLS1.h
 
 #-----mkconf program selection
-# mkconf= mkconf_Al_fcc.F
+mkconf= mkconf_Al_fcc.F
 # mkconf= mkconf_Al_FCC_edge-disl.o
 # mkconf= mkconf_2D_2kind.o
 # mkconf= mkconf_2D_edge_disl.o
 # mkconf= mkconf_Al_fcc_nanorod.o
 # mkconf= mkconf_Si111_2lc.o
-mkconf= mkconf_BCC.o
+# mkconf= mkconf_BCC.o
 # mkconf= mkconf_BCC_Fe-H.o
 # mkconf= mkconf_BCC_edge-disl.o
 
 #-----------------------------------------------------------------------
 # Post process programs
 #
-comb= combine_pmd.o read_input.o
+comb= combine_pmd.o read_input.o util_pmd.o
 
 
 #-----------------------------------------------------------------------
@@ -125,8 +127,8 @@ cna2disl: cna2disl.o
 rdpmd: read_pmd.o $(mods)
 	$(MPIFC) -o $@ read_pmd.o $(mods)
 
-boxsize: change_pmd_boxsize.o $(mods)
-	$(MPIFC) -o $@ change_pmd_boxsize.o $(mods)
+boxsize: change_pmd_boxsize.o $(mods) util_pmd.o
+	$(MPIFC) -o $@ change_pmd_boxsize.o $(mods) util_pmd.o
 
 #.....Module dependencies
 parallel_md.o: $(mods)

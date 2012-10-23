@@ -16,6 +16,7 @@ c-----energy
 c-----Bohr radius
       real(8),parameter:: bohr  = 0.5291772d-10
       real(8),parameter:: aa2bohr= 1d-10 /bohr
+      real(8),parameter:: bohr2aa= 1d0 /aa2bohr
 c-----mass of electron
       real(8),parameter:: aume  = 9.1093897d-31
 c-----mass of proton
