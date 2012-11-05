@@ -7,7 +7,7 @@
 # cpp path
 CPP= gcc -E
 CPPFLAGS=
-#CPPFLAGS=
+#CPPFLAGS= __SHEAR__ __DISL__
 
 #-----------------------------------------------------------------------
 # ifort and linux (pen4)

@@ -9,7 +9,7 @@ c-----------------------------------------------------------------------
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
-      integer,parameter:: nuc(1:3)= (/ 5, 5, 5 /)
+      integer,parameter:: nuc(1:3)= (/ 3,3,3 /)
 c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
       real(8):: ua(3,4)
@@ -22,8 +22,8 @@ c-----initial temperature
 
       small=1d-7
 
-c-----Lattice constant of this potential= 4.0170 AA
-      al= 4.017d-10 /bohr
+c-----Lattice constant of this potential= 4.0425 AA
+      al= 4.0425d-10 /bohr
 
 c-----unit cell, wurtzite structure
 c-----Al

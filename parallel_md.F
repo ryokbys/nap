@@ -42,6 +42,7 @@ c-----my rank in MD-nodes
       call mpi_comm_rank(MPI_COMM_WORLD, myid_md, ierr)
       mpi_md_world= MPI_COMM_WORLD
 
+
 c.....Set fmv as default value before reading 'in.pmd'
       call set_fmv(fmv)
 
@@ -167,7 +168,7 @@ c-----copy RA of boundary atoms
 c-----Make pair list
       call mk_lspr(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
-c-----calc forces
+c.....Calc forces
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom
      &     ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon)
@@ -219,9 +220,11 @@ c.....Considering vmax==0d0, make istpe small only for the first step
 c-----initialize the counter for output
       iocntpmd=0
       iocnterg=0
+      write(cnum(1:3),'(i3.3)') iocntpmd
+      if(myid_md.eq.0) call write_force(21,cnum,natm,h,tag,aa,acon
+     &     ,nismax,epot0)
 c-----output initial configuration
       if( ifpmd.eq.1 ) then
-        write(cnum(1:3),'(i3.3)') iocntpmd
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
           call write_pmd_bin(20,"pmd"//cnode//"-"//cnum
      &         ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
@@ -1241,6 +1244,11 @@ c-----make a linked cell list, LSCL
         lcx=anxi/dsqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rc
         lcy=anyi/dsqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rc
         lcz=anzi/dsqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rc
+c.....In case that system is thinner than rc, modify lc?.
+c.....but notice this modification does not correct results.
+        if( lcx.eq.0 ) lcx=1
+        if( lcy.eq.0 ) lcy=1
+        if( lcz.eq.0 ) lcz=1
         lcx2= lcx +2
         lcy2= lcy +2
         lcz2= lcz +2
@@ -1252,6 +1260,10 @@ c-----make a linked cell list, LSCL
         rcxi=1d0/rcx
         rcyi=1d0/rcy
         rczi=1d0/rcz
+c        write(6,'(a,3i8)') ' lcx,lcy,lcz=',lcx,lcy,lcz
+c        write(6,'(a,3i8)') ' lcx2,lcy2,lcz2=',lcx2,lcy2,lcz2
+c        write(6,'(a,i8)') ' lcxyz2=',lcxyz2
+c        write(6,'(a,3es12.4)') ' rcx,rcy,rcz=',rcx,rcy,rcz
 c-----allocate LSCL & LSHD after obtaining lcxyz2
         allocate(lscl(namax+nbmax),lshd(lcxyz2))
         l1st=.false.
@@ -1461,6 +1473,35 @@ c.....Restore ptnsr
       ptnsr(3,3)= ptnsr(3,3)+ptgt
 
       end subroutine force_isobaric
+c=======================================================================
+      subroutine write_force(ionum,cnum,natm,h,tag,aa,acon,nismax
+     &     ,epot)
+      implicit none
+      integer,intent(in):: natm,nismax,ionum
+      character(len=3),intent(in):: cnum 
+      real(8),intent(in):: h(3,3),acon(nismax),aa(3,natm),tag(natm)
+     &     ,epot
+
+      integer:: i,is
+      real(8):: at(3)
+
+c.....Write out forces
+      open(ionum,file='frc'//cnum,status='replace')
+      write(ionum,'(i10)') natm
+      do i=1,natm
+        is= int(tag(i))
+        at(1:3)= h(1:3,1)*aa(1,i) +h(1:3,2)*aa(2,i) +h(1:3,3)*aa(3,i)
+        at(1:3)= at(1:3)/acon(is)
+        write(ionum,'(3es22.14)') at(1:3)
+      enddo
+      close(ionum)
+
+c.....Write out energy
+      open(ionum+1,file='erg'//cnum,status='replace')
+      write(ionum+1,'(es22.14)') epot
+      close(ionum+1)
+
+      end subroutine write_force
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"
