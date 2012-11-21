@@ -11,9 +11,10 @@ c-----------------------------------------------------------------------
       integer,parameter:: npmax= 2000000
 c.....Num of auxiliary data for coloring atoms in Akira
       integer,parameter:: nauxdat = 5
-      integer:: ipmd,n,inode,itmp,i,nnodes,nkvs,ia,ib,l
-      real(8):: tmp,tagt(npmax),rat(3,npmax),vat(3,npmax),op(9,npmax)
+      integer:: ipmd,n,inode,itmp,i,nnodes,nkvs,ia,ib,l,itag(npmax)
+      real(8):: tmp,dat(18,npmax)
       character:: fin*10,fout*6
+      integer,external:: itot_tag
 
       write(6,'(a)') " <<< Utility program combine_pmd >>>"
 
@@ -41,16 +42,29 @@ c---------read pmd###-$$$ file
           write(6,'(a,i8)') 'itmp=',itmp
           do i=1,itmp
             n=n+1
-            tagt(n)=tag(i)
-            rat(1:3,n)=ra(1:3,i)
-            vat(1:3,n)=ra(1:3,i)
-            op(1,n)=eki(1,1,i)
-            op(2,n)=epi(i)
-            op(3,n)=strs(1,1,i)
-            op(4,n)=strs(2,2,i)
-            op(5,n)=strs(1,2,i)
+            dat(1:3,n)= ra(1:3,i)
+            dat(4:6,n)= va(1:3,i)
+            dat(7,n)= eki(1,1,i)
+            dat(8,n)= epi(i)
+            dat(9:11,n)= strs(1:3,1,i)
+            dat(12:14,n)= strs(1:3,2,i)
+            dat(15:17,n)= strs(1:3,3,i)
+            dat(18,n)= tag(i)
+            itag(n)= itot_tag(tag(i))
+c            tagt(n)=tag(i)
+c            rat(1:3,n)=ra(1:3,i)
+c            vat(1:3,n)=va(1:3,i)
+c            op(1,n)=eki(1,1,i)
+c            op(2,n)=epi(i)
+c            op(3,n)=strs(1,1,i)
+c            op(4,n)=strs(2,2,i)
+c            op(5,n)=strs(1,2,i)
           enddo
         enddo
+
+c.....Sort before output
+        call heapsort_itag(n,npmax,itag,18,dat)
+
 c-------output file name
         fout="akr000"
         write(fout(4:6),'(i3.3)') ipmd
@@ -58,13 +72,45 @@ c-------output combined mts-file
         open(30,file=fout,status="replace")
         write(30,'(i10,3i4)') n, nauxdat, 0, 0
         write(30,'(3es15.7)') ((h(ia,ib,0),ia=1,3),ib=1,3)
-        write(30,'(i3,8es12.4)') (int(tagt(i)),rat(1:3,i)
-     &       ,op(1:nauxdat,i),i=1,n)
+        write(30,'(i3,8es22.14)') (int(dat(18,i)),dat(1:3,i)
+     &       ,dat(7:8,i),dat(9,i),dat(13,i),dat(17,i),i=1,n)
         close(30)
         write(6,'(a)') " "//fout//" done."
       enddo
 
       end program combine_pmd
+c=======================================================================
+      function is_tag(tag)
+      implicit none
+      real(8),intent(in):: tag
+      integer:: is_tag
+      
+      is_tag= int(tag)
+      return
+      end function is_tag
+c=======================================================================
+      function ifmv_tag(tag)
+      implicit none
+      real(8),intent(in):: tag
+      integer:: ifmv_tag
+      
+      ifmv_tag= int((tag -int(tag))*10)
+
+      return
+      end function ifmv_tag
+c=======================================================================
+      function itot_tag(tag)
+      implicit none
+      real(8),intent(in):: tag
+      integer:: itot_tag
+      real(8):: tmp
+      integer,external:: is_tag,ifmv_tag
+
+      tmp= tag -is_tag(tag) -ifmv_tag(tag)*1d-1
+      itot_tag= nint(tmp*1d+14)
+      return
+      end function itot_tag
+c=======================================================================
 c-----for emacs---------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make 40combine"
