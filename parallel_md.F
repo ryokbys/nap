@@ -75,7 +75,8 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(ifpctl,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(ptgt,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(vmcoeff,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(voldmp,1,mpi_double_precision,0,mpi_md_world,ierr)      
+      call mpi_bcast(voldmp,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
 
 c-----sec. --> a.u.
       dt= dt /aut
@@ -215,7 +216,7 @@ c.....Parrinello-Rahman Isobaric
       istpe= te/dt
 c.....Considering vmax==0d0, make istpe small only for the first step
       if( istpe.gt.100 ) istpe=100
-      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
+c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
 
 c-----initialize the counter for output
       iocntpmd=0
@@ -236,12 +237,16 @@ c-----output initial configuration
 
 c-----Energy output
       if(myid_md.eq.0) then
-        open(11,file="dat.erg",status='replace')
+        open(11,file="out.erg",status='replace')
         write(11,'(a,es15.7)') '# epot0 =',epot0
         write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
      &       ,ekin+epot0-epot0,ekin,epot0-epot0,temp,vol
      &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*2.94d+4
         call flush(11)
+#ifdef __KOUKYU__
+        open(80,file='out.stress',status='replace')
+        write(80,'(a)') '#  istp,   strnow,      ftop,     fbot'
+#endif
       endif
 
 c.....Set al
@@ -277,6 +282,11 @@ c.....Only orthogonal change
 c-------update positions
         ra(1:3,1:natm)=ra(1:3,1:natm) +va(1:3,1:natm)
 
+#ifdef __KOUKYU__
+        call tensile_loading(natm,ra,tag,nstp,strfin,strnow
+     &       ,sorg,mpi_md_world)
+#endif
+
         if( ifpctl.eq.1 ) then
           h(1:3,1:3,0)=h(1:3,1:3,0) +h(1:3,1:3,1)*dt
 c.....Reset matrices
@@ -303,8 +313,8 @@ c.....Make pair list
           ts= istp*dt
           te=rbuf/(2d0*vmax/dt) +ts
           istpe= te/dt
-          if(myid_md.eq.0) write(6,'(a,i10)')
-     &         " Next update step will be ",istpe
+c          if(myid_md.eq.0) write(6,'(a,i10)')
+c     &         " Next update step will be ",istpe
         else
 c.....Copy RA of boundary atoms determined by 'bacopy'
           call bacopy_fixed(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
@@ -378,11 +388,19 @@ c---------in case of 3D, <ekin> = 3/2 *NkT
           temp= ekin /ntot/fkb *2d0/3d0
 cc---------in case of 2D, <ekin> = 2/2 *NkT
 c          temp= ekin /ntot/fkb *2d0/2d0
+#ifdef __KOUKYU__
+          call get_stress_on_base(natm,ra,aa,tag,h,acon(1),ftop,fbot
+     &         ,sorg,mpi_md_world)
+#endif
           if(myid_md.eq.0) then
             write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
      &           ,ekin+epot-epot0,ekin,epot-epot0,temp,vol
      &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*2.94d+4
             call flush(11)
+#ifdef __KOUKYU
+            write(80,'(i8,3es15.7)') istp,strnow,ftop,fbot
+            call flush(80)
+#endif
           endif
 c---------output step, time, and temperature
           tcpu= mpi_wtime() -tcpu1
@@ -427,6 +445,9 @@ c---------write pmd file for Akira
 
       if(myid_md.eq.0) then
         close(11)
+#ifdef __KOUKYU__
+        close(12)
+#endif
       endif
 
       tcpu= tcpu2 -tcpu1

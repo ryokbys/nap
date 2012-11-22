@@ -6,7 +6,7 @@ c  OUTPUT
 c  ------
 c    - pmd000-000
 c-----------------------------------------------------------------------
-      implicit real*8(a-h,o-z)
+      implicit none
       include "./params_au.h"
       include "./params_EAM_Fe-H.h"
 c-----max # of atoms
@@ -17,8 +17,13 @@ c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 0, 0, 20 /)
 c.....Radius of base of the cylinder
       real(8),parameter:: rad  = 1.d-9 /bohr
+c.....Hydrogen occupancy
+      real(8),parameter:: hratio = 1.0d-1
+      
 
-      real(8):: ua(3,10)
+      integer:: i,ix,iy,iz,m,inc,is,ifmv,in
+      real(8):: small,al,rad2,rx,ry,rr,rnd,dseed
+      real(8):: ua(3,10),uh(3,2)
       real(8):: ra(3,nmax)
       real(8):: h(3,3,0:1)
       real(8):: va(3,nmax)
@@ -29,6 +34,16 @@ c-----initial temperature
 c.....In this purpose nuc(1)==nuc(2)
       if( nuc(1).ne.nuc(2) )
      &     stop '[Error] nuc(1).ne.nuc(2) !!!'
+
+c.....Selection about Hydrogen inclusion
+ 10   continue
+      write(6,'(a)') '  1: without hydrogens'
+      write(6,'(a)') '  2: hydrogens inside nanorod'
+      write(6,'(a)') '  3: hydrogens at the surface'
+      write(6,'(a)') ' Select one of the above 3:'
+      read(5,*) in
+      if( in.ne.1 .and. in.ne.2 .and. in.ne.3 ) goto 10
+      write(6,'(a,i3)') ' Selected:',in
 
       small=1d-7
 
@@ -43,6 +58,9 @@ c-----simulation box size
 c-----unit cell, BCC
       ua(1:3,1)= (/ 0.00d0, 0.00d0, 0.00d0 /)
       ua(1:3,2)= (/ 0.50d0, 0.50d0, 0.50d0 /)
+c.....Hydrogen position in bcc, 1:T-site, 2:O-site
+      uh(1:3,1)= (/ 0.25d0, 0.50d0, 0.00d0 /)
+      uh(1:3,2)= (/ 0.50d0, 0.50d0, 0.00d0 /)
 
       rad2= rad*rad
       
@@ -82,6 +100,45 @@ c.....Only inside atoms the radius remain to form cylinder
           enddo
         enddo
       enddo
+
+c.....Hydrogens
+      if( in.eq.2 ) then
+        dseed= 11627
+        do ix=0,nuc(1)-1
+          do iy=0,nuc(2)-1
+            do iz=0,nuc(3)-1
+              call myrnd(rnd,dseed)
+              if( rnd.gt.hratio ) cycle
+              inc=inc+1
+              ra(1,inc)= (uh(1,1)+dble(ix))/(nuc(1)+nvac(1)) +small
+              ra(2,inc)= (uh(2,1)+dble(iy))/(nuc(2)+nvac(2)) +small
+              ra(3,inc)= (uh(3,1)+dble(iz)+dble(nvac(3))/2)
+     &             /(nuc(3)+nvac(3)) +small
+c.....Only inside atoms the radius remain to form cylinder
+              rx= (ra(1,inc)-0.5d0)*h(1,1,0)
+              ry= (ra(2,inc)-0.5d0)*h(2,2,0)
+              rr= rx**2 +ry**2
+              if( rr.gt.rad2 ) then
+                inc=inc-1
+                cycle
+              endif
+              is= 2
+              ifmv= 1
+              if( iz.eq.nuc(3)-1 ) then ! top layer
+                ifmv= 2
+              else if( iz.eq.0 ) then ! bottom layer
+                ifmv= 2
+              endif
+              tag(inc)= 1d0  *is
+     &                 +1d-1 *ifmv
+     &                 +1d-14*inc
+            enddo
+          enddo
+        enddo
+      elseif( in.eq.3 ) then
+        
+      endif
+
       write(6,'(a,i10)') " natm=",inc
 
       call setv(inc,va,tag,tempini)

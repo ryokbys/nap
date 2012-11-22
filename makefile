@@ -6,7 +6,7 @@
 
 # cpp path
 CPP= gcc -E
-CPPFLAGS=
+CPPFLAGS= -D__KOUKYU__
 #CPPFLAGS= __SHEAR__ __DISL__
 
 #-----------------------------------------------------------------------
@@ -42,7 +42,7 @@ MPIFLAGS= -g -CB
 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
 
 pmd= read_input.o parallel_md.o util_vec.o routines_dislocation.o \
-	lasubs.o util_pmd.o
+	lasubs.o util_pmd.o tensile_loading.o
 mods= mod_variables.o
 
 #-----------------------------------------------------------------------
@@ -79,9 +79,9 @@ params= params_EAM_Fe-H.h
 # mkconf= mkconf_2D_edge_disl.o
 # mkconf= mkconf_Al_fcc_nanorod.o
 # mkconf= mkconf_Si111_2lc.o
-# mkconf= mkconf_BCC.o
+mkconf= mkconf_BCC_nanorod.o
 # mkconf= mkconf_BCC_Fe-H.o
-mkconf= mkconf_BCC_edge-disl.o
+# mkconf= mkconf_BCC_edge-disl.o
 
 #-----------------------------------------------------------------------
 # Post process programs
@@ -101,8 +101,8 @@ clean:
 install: pmd 10mkconf 20nconv
 	cp pmd 10mkconf 20nconv ../
 
-10mkconf: ${mkconf} util_pmd.o
-	${MPIFC} -o $@ ${mkconf} util_pmd.o
+10mkconf: ${mkconf} util_pmd.o $(mods)
+	${MPIFC} -o $@ $(mods) ${mkconf} util_pmd.o
 
 20nconv: node_conv.o $(mods) read_input.o util_pmd.o
 	${MPIFC} -o $@ $(mods) node_conv.o read_input.o util_pmd.o
