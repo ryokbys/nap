@@ -112,6 +112,9 @@ c=======================================================================
       elseif( trim(cname).eq.'io_format' ) then
         call read_c1(ionum,ciofmt)
         return
+      elseif( trim(cname).eq.'final_strain' ) then
+        call read_r1(ionum,strfin)
+        return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return

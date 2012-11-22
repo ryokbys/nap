@@ -43,17 +43,29 @@ c-----read some info from STDIN
         szog=dble(myz)/dble(noz)
 c-------obtain filename
         write(filename(4:6),'(i3.3)') i
-c-------open file FILENAME
-        open(12,file=trim(filename),form='unformatted',status='old')
-        read(12) n
+cc.....Binary format
+c        open(12,file=trim(filename),form='unformatted',status='old')
+c        read(12) n
+c        if(nlast+n.gt.namax)then
+c          write(6,'(a)')' [Error] n.gt.namax !!'
+c          write(6,'(a,2i10)') ' nlast+n,namax =',nlast+n,namax
+c          stop
+c        endif
+c        read(12) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+c        read(12) (tag(j),ra(1:3,j),va(1:3,j)
+c     &       ,eki(j),epi(j),strs(1:3,1:3,j),j=nlast+1,nlast+n)
+c.....Ascii format
+        open(12,file=trim(filename),form='formatted',status='old')
+        read(12,*) n
         if(nlast+n.gt.namax)then
           write(6,'(a)')' [Error] n.gt.namax !!'
           write(6,'(a,2i10)') ' nlast+n,namax =',nlast+n,namax
           stop
         endif
-        read(12) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-        read(12) (tag(j),ra(1:3,j),va(1:3,j)
+        read(12,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+        read(12,*) (tag(j),ra(1:3,j),va(1:3,j)
      &       ,eki(j),epi(j),strs(1:3,1:3,j),j=nlast+1,nlast+n)
+c.....Some check
         do j=nlast+1,nlast+n
 c          read(12,*) tag(j),ra(1:3,j),va(1:3,j)
           if(  ra(1,j).lt.sxog.or.ra(1,j).ge.sxog+1d0/nox.or.
@@ -89,7 +101,6 @@ c          read(12,*) tag(j),ra(1:3,j),va(1:3,j)
         sxog=dble(myx)/nnx
         syog=dble(myy)/nny
         szog=dble(myz)/nnz
-        write(filename(4:6),'(i3.3)') i
         
         n=0
         do j=1,nlast
@@ -110,6 +121,7 @@ c          read(12,*) tag(j),ra(1:3,j),va(1:3,j)
         enddo
         write(6,'(a,i4,i8)') " node-id, num of atoms =",i,n
 
+        write(filename(4:6),'(i3.3)') i
 c        call write_pmd0_bin(12,filename,'replace',n,tagt,rat,vat,h
 c     &       ,ekit,epit,strst)
         call write_pmd0_ascii(12,filename,'replace',n,tagt,rat,vat,h
