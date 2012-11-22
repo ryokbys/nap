@@ -397,7 +397,7 @@ c          temp= ekin /ntot/fkb *2d0/2d0
      &           ,ekin+epot-epot0,ekin,epot-epot0,temp,vol
      &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*2.94d+4
             call flush(11)
-#ifdef __KOUKYU
+#ifdef __KOUKYU__
             write(80,'(i8,3es15.7)') istp,strnow,ftop,fbot
             call flush(80)
 #endif

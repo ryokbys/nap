@@ -6,9 +6,9 @@ c  OUTPUT
 c  ------
 c    - pmd000-000
 c-----------------------------------------------------------------------
-      implicit real*8(a-h,o-z)
+      implicit none
       include "./params_au.h"
-      include "./params_eam_al.h"
+      include "./params_EAM_Al.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
@@ -18,13 +18,15 @@ c-----vacuum width in unit of cell
 c.....Radius of base of the cylinder
       real(8),parameter:: rad  = 1.d-9 /bohr
 
+      integer:: i,ix,iy,iz,m,inc,is,ifmv
+      real(8):: small,al,rad2,rx,ry,r2
       real(8):: ua(3,10)
       real(8):: ra(3,nmax)
       real(8):: h(3,3,0:1)
       real(8):: va(3,nmax)
-      real(8):: tag(nmax)
+      real(8):: tag(nmax),epi(nmax),eki(nmax),strs(3,3,nmax)
 c-----initial temperature
-      real(8),parameter:: tempini= 0d0
+      real(8),parameter:: tempini= 100d0
 
 c.....In this purpose nuc(1)==nuc(2)
       if( nuc(1).ne.nuc(2) )
@@ -74,10 +76,8 @@ c.....Only inside atoms the radius remain to form cylinder
               is= 1
               ifmv= 1
               if( iz.eq.nuc(3)-1 ) then ! top layer
-                is= 2
                 ifmv= 2
               else if( iz.eq.0 ) then ! bottom layer
-                is= 3
                 ifmv= 2
               endif
               tag(inc)= 1d0  *is
@@ -98,21 +98,23 @@ c-----scale velocities to reduced unit
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
       
-c-----output 'pmd000-000' for pmd run
-      open(15,file='pmd000-000',form='formatted',status='replace')
-      write(15,'(i10)')inc
-      write(15,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      do i=1,inc
-        write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
+cc-----output 'pmd000-000' for pmd run
+c      open(15,file='pmd000-000',form='formatted',status='replace')
+c      write(15,'(i10)')inc
+c      write(15,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+c      do i=1,inc
+c        write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
+c      enddo
+c      close(15)
+      call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va
+     &     ,h,eki,epi,strs)
       
       end program mkconf_Al_nanorod
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
       include "./params_au.h"
-      include "./params_eam_al.h"
+      include "./params_EAM_Al.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)
