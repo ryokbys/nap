@@ -80,6 +80,7 @@ c-----rho(i)
           z= ra(3,j) -xi(3)
           xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
           rij=sqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
+          if( rij.gt.rc ) cycle
           sqrho(i)=sqrho(i) +exp(-ea_bt*(rij-ea_re))
      &         -exrc -(rij-rc)*(-ea_bt)*exrc
         enddo
@@ -110,8 +111,8 @@ c-----dE/dr_i
           z= ra(3,j) -xi(3)
           xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
           rij=sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
+          if( rij.gt.rc ) cycle
           drdxi(1:3)= -xij(1:3)/rij
-c          drdxj(1:3)=  xij(1:3)/rij
           r= rij -ea_re
 c---------2-body term
           tmp= 0.5d0 *( 2d0*ea_b*exp(-0.5d0*ea_bt*r)
@@ -124,9 +125,6 @@ c---------2-body term
           else
             epotl=epotl +tmp
           endif
-c          epi(i)=epi(i) +( 2d0*ea_b*exp(-0.5d0*ea_bt*r)
-c     &         -ea_c*(1d0+ea_al*r)*exp(-ea_al*r)
-c     &         -phic -(rij-rc)*dphic ) *0.5d0
           dphi= -ea_bt*ea_b*exp(-0.5d0*ea_bt*r) 
      &         +ea_c*ea_al*ea_al*r*exp(-ea_al*r)
      &         -dphic
