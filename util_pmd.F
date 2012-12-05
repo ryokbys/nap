@@ -92,7 +92,7 @@ c=======================================================================
       open(ionum,file=cfname,status='replace')
       write(ionum,'(i10)') natm
       write(ionum,'(3es23.14e3)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      write(ionum,'(7es23.14e3,11es12.4)') (tag(i),ra(1:3,i)+sorg(1:3)
+      write(ionum,'(7es23.14e3,11es22.14)') (tag(i),ra(1:3,i)+sorg(1:3)
      &     ,va(1:3,i)/dt
      &     ,eki(1,1,i)+eki(2,2,i)+eki(3,3,i)
      &     ,epi(i),strs(1:3,1:3,i)*2.94d+4,i=1,natm)
