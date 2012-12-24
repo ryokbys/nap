@@ -299,7 +299,8 @@ c.....Update te considering change of vmax
 
 c.....Update pair list and boundary atoms
 c.....if making new pair list is needed.
-        if( istp.ge.istpe ) then
+        if( istp.ge.istpe .or.
+     &       (ifpmd.eq.1.and.mod(istp,noutpmd).eq.0) ) then
 c.....Move atoms that cross the boundary
           call bamove_stress(tcom,namax,nbmax,natm,ra,va,tag,strs
      &         ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world)
@@ -313,8 +314,8 @@ c.....Make pair list
           ts= istp*dt
           te=rbuf/(2d0*vmax/dt) +ts
           istpe= te/dt
-c          if(myid_md.eq.0) write(6,'(a,i10)')
-c     &         " Next update step will be ",istpe
+          if(myid_md.eq.0) write(6,'(a,i10)')
+     &         " Next update step will be ",istpe
         else
 c.....Copy RA of boundary atoms determined by 'bacopy'
           call bacopy_fixed(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb

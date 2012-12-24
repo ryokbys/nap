@@ -6,8 +6,8 @@
 
 # cpp path
 CPP= gcc -E
-CPPFLAGS= -D__KOUKYU__
-#CPPFLAGS= __SHEAR__ __DISL__
+CPPFLAGS= 
+#CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__KOUKYU__
 
 #-----------------------------------------------------------------------
 # ifort and linux (pen4)
@@ -17,8 +17,8 @@ CPPFLAGS= -D__KOUKYU__
 #MPIFC= /usr/local/mpich-1.2.6/intel/bin/mpif90
 MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
 # MPIFC= mpif90
-#MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
-MPIFLAGS= -g -CB
+MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
+#MPIFLAGS= -g -CB
 
 #-----------------------------------------------------------------------
 # Fujitsu FX1 @nagoya-u
@@ -57,8 +57,10 @@ mods= mod_variables.o
 # params= params_Mishin_Al.h
 # force= force_EAM_Fe.o
 # params= params_EAM_Fe.h
-force= force_EAM_Fe-H.o
-params= params_EAM_Fe-H.h
+# force= force_EAM_Fe-H.o
+# params= params_EAM_Fe-H.h
+force= force_RK_Fe-H.o
+params= params_RK_Fe-H.h
 # force= force_Brenner.o
 # params= params_Brenner.h
 # force= force_SW_Si.o
@@ -79,9 +81,10 @@ params= params_EAM_Fe-H.h
 # mkconf= mkconf_2D_edge_disl.o
 # mkconf= mkconf_Al_fcc_nanorod.o
 # mkconf= mkconf_Si111_2lc.o
-mkconf= mkconf_BCC_nanorod.o
+# mkconf= mkconf_BCC_nanorod.o
 # mkconf= mkconf_BCC_Fe-H.o
 # mkconf= mkconf_BCC_edge-disl.o
+mkconf= mkconf_BCC_screw.o
 
 #-----------------------------------------------------------------------
 # Post process programs
@@ -121,6 +124,12 @@ akr2csp: akr2csp.o
 
 akr2pot: akr2pot.o
 	${MPIFC} -o $@ akr2pot.o
+
+akr2ddm: akr2ddm.o
+	${MPIFC} -o $@ akr2ddm.o
+
+akr2ddplot: akr2ddplot.o
+	${MPIFC} -o $@ akr2ddplot.o
 
 cna2disl: cna2disl.o
 	$(MPIFC) -o $@ cna2disl.o

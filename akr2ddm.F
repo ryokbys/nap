@@ -140,7 +140,7 @@ c.....Draw vectors of DDM
         x2= (ra0(1,idst)-anint(ra0(1,idst)-ra0(1,isrc)))*al(1)*sfac +sx
         y2= (ra0(2,idst)-anint(ra0(2,idst)-ra0(2,isrc)))*al(2)*sfac +sy
         scale= vdd(i)/vmax
-c        if( scale.lt.1d0/20 ) cycle
+        if( scale.lt.1d0/20 ) cycle
         call draw_arrow(12,x1,y1,x2,y2,scale,rcrc)
       enddo
       call final_ps(12)

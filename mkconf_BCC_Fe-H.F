@@ -13,7 +13,7 @@ c-----max # of atoms
       integer,parameter::nmax=10000000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 5,5,5 /)
+      integer,parameter:: nuc(1:3)= (/ 3,3,3 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
@@ -26,7 +26,7 @@ c.....Parameters
       small=1d-7
 
 c.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
-      cunit= 2.8553d-10 /bohr
+      cunit= 2.835d-10 /bohr
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
@@ -61,17 +61,17 @@ c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
         enddo
       enddo
 
-c.....Add H atoms to O-site
-      ix= nuc(1)/2
-      iy= nuc(2)/2
-      iz= nuc(3)/2
-      inc=inc+1
-      is= 2
-      ifmv= 1
-      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
-      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+cc.....Add H atoms to O-site
+c      ix= nuc(1)/2
+c      iy= nuc(2)/2
+c      iz= nuc(3)/2
+c      inc=inc+1
+c      is= 2
+c      ifmv= 1
+c      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+c      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+c      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+c      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
 
       write(6,'(a,i10)') " natm=",inc
       write(6,'(a,i10)') " id of inc=",int(mod(tag(inc)*1d14,1d13))
@@ -85,7 +85,7 @@ c-----scale velocities to reduced unit
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
 
-      call write_pmd0_bin(15,'pmd000-000','replace',inc,tag,ra,va,h
+      call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
       
 c-----output 'akr000' for Akira visualization
