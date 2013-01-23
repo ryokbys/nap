@@ -8,7 +8,7 @@ c    - akr000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
       include './params_au.h'
-      include './params_EAM_Fe.h'
+      include './params_RK_Fe-H.h'
 c-----max # of atoms
       integer,parameter::nmax=10000000
 c-----# of unit cells
@@ -54,24 +54,29 @@ c-----unit cell, BCC
 c              ra(1:3,inc)= ra(1:3,inc)
 c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
               is= 1
-              ifmv= 1
+              ifmv= 0
               tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
             enddo
           enddo
         enddo
       enddo
 
-cc.....Add H atoms to O-site
-c      ix= nuc(1)/2
-c      iy= nuc(2)/2
-c      iz= nuc(3)/2
-c      inc=inc+1
-c      is= 2
-c      ifmv= 1
-c      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+c.....Add H atoms
+      ix= nuc(1)/2
+      iy= nuc(2)/2
+      iz= nuc(3)/2
+      inc=inc+1
+      is= 2
+      ifmv= 1
+      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+cc.....O-site
 c      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
 c      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
 c      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+c.....T-site
+      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
 
       write(6,'(a,i10)') " natm=",inc
       write(6,'(a,i10)') " id of inc=",int(mod(tag(inc)*1d14,1d13))
@@ -102,7 +107,7 @@ c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
       include "./params_au.h"
-      include "./params_EAM_Fe-H.h"
+      include "./params_RK_Fe-H.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)

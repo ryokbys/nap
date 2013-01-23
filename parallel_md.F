@@ -154,6 +154,13 @@ c-----get total number of particles
         write(6,'(a,i10)') " nis =",nis
       endif
 
+c.....Set initial temperature if needed
+      if( tinit.gt.1d-5 ) then
+        call setv()
+      elseif( abs(tinit).le.1d-5 ) then
+        va(1:3,1:natm)= 0d0
+      endif
+
 #ifdef __SHEAR__
       call init_shear_stress(shrst,shrfx,natm,tag,ra,h,sorg,acon(1)
      &     ,myid_md,mpi_md_world)
@@ -1524,6 +1531,64 @@ c.....Write out energy
       close(ionum+1)
 
       end subroutine write_force
+c=======================================================================
+      subroutine setv()
+      use variables
+      implicit none
+      include 'params_au.h'
+      integer:: i,l,is
+      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(nismax)
+      real(8),parameter:: pi = 3.14159265358979d0
+
+      facv(1:nismax)=dsqrt(2d0*tinit*fkb/am(1:nismax))
+
+c-----velocities in Maxwell-Boltzmann distribution
+      dseed=12345
+      do i=1,natm
+        is= int(tag(i))
+        do l=1,3
+          call myrnd(rnd1,dseed)
+          call myrnd(rnd2,dseed)
+          va(l,i)=facv(is)*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
+        enddo
+      enddo
+c-----set center of mass motion to zero
+      sumvx=0d0
+      sumvy=0d0
+      sumvz=0d0
+      do i=1,natm
+        sumvx=sumvx+va(1,i)
+        sumvy=sumvy+va(2,i)
+        sumvz=sumvz+va(3,i)
+      enddo
+      do i=1,natm
+        va(1,i)=va(1,i)-sumvx/dble(natm)
+        va(2,i)=va(2,i)-sumvy/dble(natm)
+        va(3,i)=va(3,i)-sumvz/dble(natm)
+      enddo
+
+c-----scale velocities to reduced unit
+      do i=1,natm
+        va(1,i)=va(1,i) /h(1,1,0) *dt
+        va(2,i)=va(2,i) /h(2,2,0) *dt
+        va(3,i)=va(3,i) /h(3,3,0) *dt
+      enddo
+
+      end subroutine setv
+c=======================================================================
+      subroutine myrnd(rnd,dseed)
+      real*8 rnd,dseed
+      real*8 d2p31m,d2p31
+      save d2p31m,d2p31
+      data d2p31m/2147483647d0/
+      data d2p31 /2147483648d0/
+      
+      dseed=dmod(16807d0*dseed,d2p31m)
+      rnd=dseed/d2p31
+      return
+      end subroutine myrnd
+c=======================================================================
+      
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"

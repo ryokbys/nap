@@ -70,6 +70,9 @@ c=======================================================================
       elseif( trim(cname).eq.'damping_coeff' ) then
         call read_r1(ionum,dmp)
         return
+      elseif( trim(cname).eq.'initial_temperature' ) then
+        call read_r1(ionum,tinit)
+        return
       elseif( trim(cname).eq.'flag_temperature' ) then
         call read_i1(ionum,iftctl)
         return

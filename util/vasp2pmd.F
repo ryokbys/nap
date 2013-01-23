@@ -7,7 +7,7 @@
       real(8),allocatable:: tag(:),ra(:,:),va(:,:),eki(:),epi(:)
      &     ,strs(:,:,:)
 
-      integer,parameter:: nis=  2
+      integer,parameter:: nis=  1
       real(8),parameter:: aa2bohr = 1d0/0.5291772d0
       real(8),parameter:: bohr2aa = 1d0/aa2bohr
 

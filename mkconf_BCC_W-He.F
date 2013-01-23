@@ -1,17 +1,19 @@
-      program mkconf_BCC
-c
-c    Create a BCC crystal
-c    Write: ini000
-c
+      program mkconf_BCC_WHe
+c-----------------------------------------------------------------------
+c  Create a BCC crystal with Fe and H atoms
+c-----------------------------------------------------------------------
+c  OUTPUT:
+c    - pmd000-000
+c    - akr000
+c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
       include './params_au.h'
-c      include './params_EAM_Fe-H.h'
       include './params_Ito_W-He.h'
 c-----max # of atoms
       integer,parameter::nmax=10000000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 5,5,5 /)
+      integer,parameter:: nuc(1:3)= (/ 5, 5, 5 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
@@ -21,10 +23,10 @@ c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
 c.....Parameters
       real(8),parameter:: tempini = 100d0
 
-      small=1d-7
+      small = 1d0/4 /nuc(1)
 
 cc.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
-c      cunit= 2.8553d-10 /bohr
+c      cunit= 2.835d-10 /bohr
 c.....Lattice constant of W
       cunit= 3.1652d-10 /bohr
 
@@ -60,6 +62,24 @@ c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
           enddo
         enddo
       enddo
+
+c.....Add H atoms
+      ix= nuc(1)/2
+      iy= nuc(2)/2
+      iz= nuc(3)/2
+      inc=inc+1
+      is= 2
+      ifmv= 1
+      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+cc.....O-site
+c      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+c      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+c      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+c.....T-site
+      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+
       write(6,'(a,i10)') " natm=",inc
       write(6,'(a,i10)') " id of inc=",int(mod(tag(inc)*1d14,1d13))
 
@@ -72,8 +92,6 @@ c-----scale velocities to reduced unit
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
 
-c      call write_pmd0_bin(15,'pmd000-000','replace',inc,tag,ra,va,h
-c     &     ,eki,epi,strs)
       call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
       
@@ -86,23 +104,24 @@ c-----output 'akr000' for Akira visualization
       enddo
       close(15)
       
-      end program mkconf_BCC
+      end program mkconf_BCC_WHe
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
       include "./params_au.h"
-c      include "./params_EAM_Fe-H.h"
       include "./params_Ito_W-He.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)
 
       integer:: i,l,is
-      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv,am
+      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(2),am(2)
       real(8),parameter:: pi = 3.14159265358979d0
 
-      facv=dsqrt(2d0*tempini*fkb/am_W)
-      am= am_W
+      facv(1)=dsqrt(2d0*tempini*fkb/am_W)
+      facv(2)=dsqrt(2d0*tempini*fkb/am_He)
+      am(1)= am_W
+      am(2)= am_He
 
 c-----velocities in Maxwell-Boltzmann distribution
       dseed=12345
@@ -111,7 +130,7 @@ c-----velocities in Maxwell-Boltzmann distribution
         do l=1,3
           call myrnd(rnd1,dseed)
           call myrnd(rnd2,dseed)
-          va(l,i)=facv*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
+          va(l,i)=facv(is)*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
         enddo
       enddo
 c-----set center of mass motion to zero
@@ -132,7 +151,7 @@ c-----set center of mass motion to zero
       tmp=0d0
       do i=1,natm
         is= int(tag(i))
-        tmp= tmp +0.5d0*am*(va(1,i)**2 +va(2,i)**2 +va(3,i)**2)
+        tmp= tmp +0.5d0*am(is)*(va(1,i)**2 +va(2,i)**2 +va(3,i)**2)
       enddo
       write(6,'(a,es12.4)') " ekin=",tmp
       write(6,'(a,es12.4)') " temp.=",tmp*2d0/3d0/fkb/natm
@@ -150,6 +169,7 @@ c=======================================================================
       rnd=dseed/d2p31
       return
       end subroutine myrnd
+c=======================================================================
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make 10mkconf"

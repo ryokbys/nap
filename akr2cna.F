@@ -35,9 +35,9 @@ c-----read akr file from STDIN
       enddo
 
 c-----prepare for linked-list
-      nx=int(al(1)/rc)
-      ny=int(al(2)/rc)
-      nz=int(al(3)/rc)
+      nx=max(1,int(al(1)/rc))
+      ny=max(1,int(al(2)/rc))
+      nz=max(1,int(al(3)/rc))
       nlsa= natm0 +nx*ny*nz
 c      write(6,'(a,4i10)') " nx,ny,nz,nlsa=",nx,ny,nz,nlsa
       allocate(lsa(nlsa))
