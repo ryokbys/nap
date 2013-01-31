@@ -89,7 +89,7 @@ c-----rho(i)
           rij=sqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
           sqrho(i)= sqrho(i) +phi_IWHe(rij,is,js)
         enddo
-        sqrho(i)= dsqrt(sqrho(i))
+        if( is.eq.1 ) sqrho(i)= dsqrt(sqrho(i))
       enddo
 
 c-----copy rho of boundary atoms
@@ -102,7 +102,7 @@ c-----copy rho of boundary atoms
         if( is.eq.1 ) then
           dfi= -0.5d0/sqrho(i)
         elseif( is.eq.2 ) then
-          dfi= 0d0
+          dfi= p_He_A
         endif
         do k=1,lspr(0,i)
           j=lspr(k,i)
@@ -140,14 +140,19 @@ c.....N-body term
           if( js.eq.1 ) then
             dfj= -0.5d0/sqrho(j)
           elseif( js.eq.2 ) then
-            dfj= 0d0
+            dfj= p_He_A
           endif
           aa(1:3,i)=aa(1:3,i) -(dfi+dfj)*dphi*drdxi(1:3)
           aa(1:3,j)=aa(1:3,j) +(dfi+dfj)*dphi*drdxi(1:3)
         enddo
 c        write(6,'(a,3es12.4)') 'sqrho(i)=',sqrho(i)
-        epi(i)=epi(i) -sqrho(i)
-        epotl=epotl -sqrho(i)
+        if( is.eq.1 ) then
+          epi(i)=epi(i) -sqrho(i)
+          epotl=epotl -sqrho(i)
+        elseif( is.eq.2 ) then
+          epi(i)=epi(i) +sqrho(i)*p_He_A
+          epotl=epotl +sqrho(i)*p_He_A
+        endif
       enddo
 
 c-----reduced force
@@ -237,103 +242,104 @@ c          write(6,'(a,2i8)') "nbnew,nrc=",nbnew,nrc
       end subroutine copy_rho_ba
 c=======================================================================
       function v2_IWHe(r,is,js)
+c
+c  Two-body potential energy
+c
       implicit none
       include "params_au.h"
       include "params_Ito_W-He.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js
-      real(8):: v2_IWHe
-      real(8):: v2
+      real(8):: v2_IWHe,x
+      real(8),external:: fc
 
-      v2= 0d0
+      v2_IWHe= 0d0
 
 c.....W-W
       if( is.eq.1 .and. js.eq.1 ) then
-        if( r.le.p_WW_c) then
-          v2= (r-p_WW_c)*(r-p_WW_c)*(p_WW_c0 +p_WW_c1*r
+        if( r.lt.p_WW_c) then
+          v2_IWHe= (r-p_WW_c)*(r-p_WW_c)*(p_WW_c0 +p_WW_c1*r
      &         +p_WW_c2*r*r)
         endif
-        if( r.le.p_WW_b0 ) then
-          v2=v2
+        if( r.lt.p_WW_b0 ) then
+          v2_IWHe=v2_IWHe
      &         +p_WW_B*(p_WW_b0-r)**3 *exp(-p_WW_alpha*r)
         endif
 
 c.....He-He
       elseif( is.eq.2 .and. js.eq.2 ) then
-        if( r.le.p_HeHe_rc ) then
-          v2= p_HeHe_z0*exp(-p_HeHe_e0*r)
-     &         +p_HeHe_z1/r  *exp(-p_HeHe_e1*r)
-     &         +p_HeHe_z2/r/r*exp(-p_HeHe_e2*r)
-     &         +p_HeHe_z3*r  *exp(-p_HeHe_e3*r)
+        if( r.lt.p_HeHe_rc ) then
+          x= (r-p_HeHe_rs)/p_HeHe_cs
+          v2_IWHe= p_HeHe_z1/r *(exp(-p_HeHe_a1*r) +p_HeHe_b0) *fc(x)
         endif
 
 c.....W-He or He-W
       elseif( is.ne.js ) then
-        if( r.le.p_WHe_rc ) then
-          v2= p_WHe_z0*exp(-p_WHe_e0*r)
-     &         +p_WHe_z1/r  *exp(-p_WHe_e1*r)
-     &         +p_WHe_z2/r/r*exp(-p_WHe_e2*r)
-     &         +p_WHe_z3*r  *exp(-p_WHe_e3*r)
+        if( r.lt.p_WHe_rc ) then
+          x= (r-p_WHe_rs)/p_WHe_cs
+          v2_IWHe= p_WHe_z1/r *(exp(-p_WHe_a1*r) +p_WHe_b0) *fc(x)
         endif
       endif
 
-      v2_IWHe= v2
       return
       end function v2_IWHe
 c=======================================================================
       function dv2_IWHe(r,is,js)
+c
+c  Derivative of two-body potential
+c
       implicit none
       include "params_au.h"
       include "params_Ito_W-He.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js
-      real(8):: dv2_IWHe
-      real(8):: dv2,ri
+      real(8):: dv2_IWHe,ri,x,exar
+      real(8),external:: fc,dfc
 
-      dv2= 0d0
+      dv2_IWHe= 0d0
 
 c.....W-W
       if( is.eq.1 .and. js.eq.1 ) then
-        if( r.le.p_WW_c) then
-          dv2= 2d0*(r-p_WW_c)*(p_WW_c0 +p_WW_c1*r +p_WW_c2*r*r)
+        if( r.lt.p_WW_c) then
+          dv2_IWHe= 2d0*(r-p_WW_c)*(p_WW_c0 +p_WW_c1*r +p_WW_c2*r*r)
      &         +(r-p_WW_c)**2*(p_WW_c1 +2d0*p_WW_c2*r)
         endif
-        if( r.le.p_WW_b0 ) then
-          dv2=dv2
+        if( r.lt.p_WW_b0 ) then
+          dv2_IWHe=dv2_IWHe
      &         +p_WW_B*(p_WW_b0-r)**2 *exp(-p_WW_alpha*r)
      &         *(-3d0 -p_WW_alpha*(p_WW_b0-r))
         endif
 
 c.....He-He
       elseif( is.eq.2 .and. js.eq.2 ) then
-        if( r.le.p_HeHe_rc ) then
+        if( r.lt.p_HeHe_rc ) then
+          x= (r-p_HeHe_rs)/p_HeHe_cs
           ri= 1d0/r
-          dv2= -p_HeHe_e0*p_HeHe_z0*exp(-p_HeHe_e0*r)
-     &         -(p_HeHe_z1*ri*ri +p_HeHe_z1*p_HeHe_e1*ri)
-     &         *exp(-p_HeHe_e1*r)
-     &         -(2d0*p_HeHe_z2*ri**3 +p_HeHe_e2*p_HeHe_z2*ri**2)
-     &         *exp(-p_HeHe_e2*r)
-     &         +(p_HeHe_z3 -p_HeHe_e3*p_HeHe_z3*r) *exp(-p_HeHe_e3*r)
+          exar= exp(-p_HeHe_a1*r)
+          dv2_IWHe= -p_HeHe_z1*ri*fc(x)
+     &         *(ri*(exar+p_HeHe_b0) +p_HeHe_a1*exar)
+     &         +p_HeHe_z1*ri*(exar+p_HeHe_b0)*dfc(x)/p_HeHe_cs
         endif
 
 c.....W-He or He-W
       elseif( is.ne.js ) then
-        if( r.le.p_WHe_rc ) then
+        if( r.lt.p_WHe_rc ) then
+          x= (r-p_WHe_rs)/p_WHe_cs
           ri= 1d0/r
-          dv2= -p_WHe_e0*p_WHe_z0*exp(-p_WHe_e0*r)
-     &         -(p_WHe_z1*ri*ri +p_WHe_z1*p_WHe_e1*ri)
-     &         *exp(-p_WHe_e1*r)
-     &         -(2d0*p_WHe_z2*ri**3 +p_WHe_e2*p_WHe_z2*ri**2)
-     &         *exp(-p_WHe_e2*r)
-     &         +(p_WHe_z3 -p_WHe_e3*p_WHe_z3*r) *exp(-p_WHe_e3*r)
+          exar= exp(-p_WHe_a1*r)
+          dv2_IWHe= -p_WHe_z1*ri*fc(x)
+     &         *(ri*(exar+p_WHe_b0) +p_WHe_a1*exar)
+     &         +p_WHe_z1*ri*(exar+p_WHe_b0)*dfc(x)/p_WHe_cs
         endif
       endif
 
-      dv2_IWHe= dv2
       return
       end function dv2_IWHe
 c=======================================================================
       function phi_IWHe(r,is,js)
+c
+c  Phi for many-body potential
+c
       implicit none
       include "params_au.h"
       include "params_Ito_W-He.h"
@@ -343,18 +349,22 @@ c=======================================================================
 
       phi_IWHe= 0d0
 
-c.....W-W
-      if( is.eq.1 .and. js.eq.1 ) then
-        if( r.le.p_WW_d ) then
-          phi_IWHe= p_WW_A**2 *(r-p_WW_d)**2
-     &         *(1d0 +p_WW_beta/p_WW_d*(r-p_WW_d))
+c.....No need to consider, He-He pair
+      if( is.eq.2 .and. js.eq.2 ) return
+
+c.....phi_W
+      if( js.eq.1 ) then
+        if( r.le.p_W_d ) then
+          phi_IWHe= p_W_w**2 *(r-p_W_d)**2
+     &         *(1d0 +p_W_beta/p_W_d*(r-p_W_d))
         endif
         
-c.....W-He
-      elseif( is.eq.1 ) then
-        if( r.le.p_WHe_d ) then
-          phi_IWHe= p_WHe_A**2 *(r-p_WHe_d)**2
+c.....phi_He
+      elseif( js.eq.2 ) then
+        if( r.le.p_He_d ) then
+          phi_IWHe= p_He_w**2 *(r-p_He_d)**2
         endif
+
       endif
 
       return
@@ -370,23 +380,56 @@ c=======================================================================
 
       dphi_IWHe= 0d0
 
-c.....W-W
-      if( is.eq.1 .and. js.eq.1 ) then
-        if( r.le.p_WW_d ) then
-          rd= (r-p_WW_d)
-          dphi_IWHe= 2d0*p_WW_A**2 *rd 
-     &         +3d0 *p_WW_A**2 *rd**2 *p_WW_beta/p_WW_d
+c.....No need to consider, He-He pair
+      if( is.eq.2 .and. js.eq.2 ) return
+
+c.....phi_W
+      if( js.eq.1 ) then
+        if( r.le.p_W_d ) then
+          rd= (r-p_W_d)
+          dphi_IWHe= 2d0*p_W_w**2 *rd 
+     &         +3d0 *p_W_w**2 *rd**2 *p_W_beta/p_W_d
         endif
         
-c.....W-He
-      elseif( is.eq.1 ) then
-        if( r.le.p_WHe_d ) then
-          dphi_IWHe= 2d0*p_WHe_A**2 *(r-p_WHe_d)
+c.....phi_He
+      elseif( js.eq.2 ) then
+        if( r.le.p_He_d ) then
+          dphi_IWHe= 2d0*p_He_w**2 *(r-p_He_d)
         endif
       endif
 
       return
       end function dphi_IWHe
+c=======================================================================
+      function fc(x)
+      implicit none
+      real(8),intent(in):: x
+      real(8):: fc
+
+      if( x.lt.0d0 ) then
+        fc= 1d0
+      elseif( x.ge.0d0 .and. x.lt.1d0 ) then
+        fc= (-6d0*x*x +15d0*x -10d0)*x*x*x +1d0
+      else
+        fc= 0d0
+      endif
+      return
+      end function fc
+c=======================================================================
+      function dfc(x)
+      implicit none
+      real(8),intent(in):: x
+      real(8):: dfc
+
+      if( x.lt.0d0 ) then
+        dfc= 0d0
+      elseif( x.ge.0d0 .and. x.lt.1d0 ) then
+        dfc= -30d0*x*x*(x-1d0)*(x-1d0)
+      else
+        dfc= 0d0
+      endif
+      return
+      end function dfc
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"

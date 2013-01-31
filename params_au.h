@@ -2,14 +2,14 @@ c
 c  Note:
 c    atomic unit of length = 0.5292Angstrom = 5.292e-11 meter
 c    atomic unit of time = 2.418e-17 second
-c    atomic unit of energy = 27.21eV = 4.36e-18 Joule
+c    atomic unit of energy = 27.2114eV = 4.36e-18 Joule
 c    atomic unit of mass = 9.109e-31 kg
 c    atomic unit of force = 27.21eV/0.5292Angstrom
 c
 c-----time
       real(8),parameter:: aut   = 2.41889d-17
 c-----energy
-      real(8),parameter:: ehrt  = 27.2116d0
+      real(8),parameter:: ehrt  = 27.2114d0
       real(8),parameter:: ehrt2j= 4.359744d-18
       real(8),parameter:: j2ehrt= 1d0 /ehrt2j
       real(8),parameter:: ev2hrt= 1d0 /ehrt
