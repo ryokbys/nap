@@ -15,9 +15,13 @@ CPPFLAGS=
 #FFLAGS= -O3 -ip 
 #MPIFC= /usr/local/gridmpi-2.1.1/intel/bin/mpif90
 #MPIFC= /usr/local/mpich-1.2.6/intel/bin/mpif90
-MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
+#.....mike
+MPIFC=/opt/intel/impi/4.0.0.028/intel64/bin/mpif90
+MPIFLAGS= -O3
+#.....king
+# MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
 # MPIFC= mpif90
-MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
+#MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
 #MPIFLAGS= -g -CB
 
 #-----------------------------------------------------------------------
@@ -119,6 +123,9 @@ pmd: $(mods) ${pmd} ${force} ${params}
 
 40combine: $(comb) $(mods)
 	${MPIFC} -o $@  $(mods) $(comb)
+
+pmd2akr: pmd2akr.o
+	$(MPIFC) -o $@ pmd2akr.o
 
 akr2cna: akr2cna.o sort.o
 	${MPIFC} -o $@ akr2cna.o sort.o
