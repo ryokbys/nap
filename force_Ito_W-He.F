@@ -33,7 +33,7 @@ c    - smoothing is applied to 2-body potential for W-He and He-He
 c    - rho of boundary atoms are sent to the neighbor nodes
 c    - only force on i is calculated, not necessary to send-back
 c-----------------------------------------------------------------------
-c  See RK's molecular dynamics memo
+c  See Ito's PowerPoint slide.
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
@@ -107,7 +107,7 @@ c-----copy rho of boundary atoms
         do k=1,lspr(0,i)
           j=lspr(k,i)
           if(j.eq.0) exit
-          if(j.le.i) cycle
+c          if(j.le.i) cycle
           js= int(tag(j))
           x= ra(1,j) -xi(1)
           y= ra(2,j) -xi(2)
@@ -126,26 +126,28 @@ c.....2-body term
             v2= v2 -v2c_WHe -(r-p_WHe_rc)*dv2c_WHe
             dv2=dv2 -dv2c_WHe
           endif
+          v2=v2 !/2
+          dv2=dv2 !/2
           epi(i)= epi(i) +v2
-          epi(j)= epi(j) +v2
-          if(j.le.natm) then
-            epotl=epotl +v2 +v2
-          else
-            epotl=epotl +v2
-          endif
+c          epi(j)= epi(j) +v2
+c          if(j.le.natm) then
+c            epotl=epotl +v2 +v2
+c          else
+c            epotl=epotl +v2
+c          endif
+          epotl=epotl +v2
           aa(1:3,i)=aa(1:3,i) -dv2*drdxi(1:3)
-          aa(1:3,j)=aa(1:3,j) +dv2*drdxi(1:3)
+c          aa(1:3,j)=aa(1:3,j) +dv2*drdxi(1:3)
 c.....N-body term
-          dphi= dphi_IWHe(rij,is,js)
           if( js.eq.1 ) then
             dfj= -0.5d0/sqrho(j)
           elseif( js.eq.2 ) then
             dfj= p_He_A
           endif
+          dphi= dphi_IWHe(rij,js,is) !/2
           aa(1:3,i)=aa(1:3,i) -(dfi+dfj)*dphi*drdxi(1:3)
-          aa(1:3,j)=aa(1:3,j) +(dfi+dfj)*dphi*drdxi(1:3)
+c          aa(1:3,j)=aa(1:3,j) +(dfi+dfj)*dphi*drdxi(1:3)
         enddo
-c        write(6,'(a,3es12.4)') 'sqrho(i)=',sqrho(i)
         if( is.eq.1 ) then
           epi(i)=epi(i) -sqrho(i)
           epotl=epotl -sqrho(i)
@@ -349,6 +351,8 @@ c
 
       phi_IWHe= 0d0
 
+      if( is.eq.2 ) return
+
 c.....No need to consider, He-He pair
       if( is.eq.2 .and. js.eq.2 ) return
 
@@ -359,10 +363,11 @@ c.....phi_W
      &         *(1d0 +p_W_beta/p_W_d*(r-p_W_d))
         endif
         
-c.....phi_He
+c.....phi_He, but beta and d seem to be identical to p_W_beta and p_W_d
       elseif( js.eq.2 ) then
         if( r.le.p_He_d ) then
           phi_IWHe= p_He_w**2 *(r-p_He_d)**2
+     &         *(1d0 +p_He_beta/p_He_d*(r-p_He_d))
         endif
 
       endif
@@ -380,6 +385,8 @@ c=======================================================================
 
       dphi_IWHe= 0d0
 
+      if( is.eq.2 ) return
+
 c.....No need to consider, He-He pair
       if( is.eq.2 .and. js.eq.2 ) return
 
@@ -394,7 +401,9 @@ c.....phi_W
 c.....phi_He
       elseif( js.eq.2 ) then
         if( r.le.p_He_d ) then
-          dphi_IWHe= 2d0*p_He_w**2 *(r-p_He_d)
+          rd=(r-p_He_d)
+          dphi_IWHe= 2d0*p_He_w**2 *rd
+     &         +3d0 *p_He_w**2 *rd**2 *p_He_beta/p_He_d
         endif
       endif
 

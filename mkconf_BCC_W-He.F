@@ -28,7 +28,7 @@ c.....Parameters
 cc.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
 c      cunit= 2.835d-10 /bohr
 c.....Lattice constant of W
-      cunit= 3.5d-10 /bohr
+      cunit= 3.204d-10 /bohr
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
@@ -63,22 +63,22 @@ c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
         enddo
       enddo
 
-cc.....Add H atoms
-c      ix= nuc(1)/2
-c      iy= nuc(2)/2
-c      iz= nuc(3)/2
-c      inc=inc+1
-c      is= 2
-c      ifmv= 1
-c      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
-ccc.....O-site
-cc      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-cc      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-cc      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-cc.....T-site
+c.....Add H atoms
+      ix= nuc(1)/2
+      iy= nuc(2)/2
+      iz= nuc(3)/2
+      inc=inc+1
+      is= 2
+      ifmv= 1
+      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+cc.....O-site
 c      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-c      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+c      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
 c      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+c.....T-site
+      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
 
       write(6,'(a,i10)') " natm=",inc
       write(6,'(a,i10)') " id of inc=",int(mod(tag(inc)*1d14,1d13))

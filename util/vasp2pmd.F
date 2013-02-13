@@ -7,7 +7,7 @@
       real(8),allocatable:: tag(:),ra(:,:),va(:,:),eki(:),epi(:)
      &     ,strs(:,:,:)
 
-      integer,parameter:: nis=  1
+      integer,parameter:: nis=  2
       real(8),parameter:: aa2bohr = 1d0/0.5291772d0
       real(8),parameter:: bohr2aa = 1d0/aa2bohr
 
@@ -29,6 +29,12 @@
         do i=1,mis(n)
           natm=natm+1
           read(5,*) ra(1:3,natm)
+          if( ra(1,natm).lt.0d0 ) ra(1,natm)=ra(1,natm) +1d0
+          if( ra(2,natm).lt.0d0 ) ra(2,natm)=ra(2,natm) +1d0
+          if( ra(3,natm).lt.0d0 ) ra(3,natm)=ra(3,natm) +1d0
+          if( ra(1,natm).ge.1d0 ) ra(1,natm)=ra(1,natm) -1d0
+          if( ra(2,natm).ge.1d0 ) ra(2,natm)=ra(2,natm) -1d0
+          if( ra(3,natm).ge.1d0 ) ra(3,natm)=ra(3,natm) -1d0
           tag(natm)= n
         enddo
       enddo
