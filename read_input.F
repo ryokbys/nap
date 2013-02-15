@@ -36,6 +36,9 @@ c        write(6,'(a)') c1st
 c=======================================================================
       subroutine set_variable(ionum,cname)
       use variables
+#ifdef __WALL__
+      use wall
+#endif
       implicit none
       integer,intent(in):: ionum
       character(len=*),intent(in):: cname
@@ -118,6 +121,23 @@ c=======================================================================
       elseif( trim(cname).eq.'final_strain' ) then
         call read_r1(ionum,strfin)
         return
+#ifdef __WALL__
+      elseif( trim(cname).eq.'wall_pos_top' ) then
+        call read_r1(ionum,wtop)
+        return
+      elseif( trim(cname).eq.'wall_pos_bottom' ) then
+        call read_r1(ionum,wbot)
+        return
+      elseif( trim(cname).eq.'wall_target_pressure' ) then
+        call read_r1(ionum,ptgt_wall)
+        return
+      elseif( trim(cname).eq.'wall_relax_time' ) then
+        call read_r1(ionum,trlx_wall)
+        return
+      elseif( trim(cname).eq.'wall_nout' ) then
+        call read_i1(ionum,nout_wall)
+        return
+#endif
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return

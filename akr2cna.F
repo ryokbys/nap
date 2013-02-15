@@ -12,8 +12,10 @@ c-----max num of neighbors; 12 is enough
 cc.....Cutoff radius for LJ-Ar FCC, halfway between 1st and 2nd N.N.
 cc      real(8),parameter:: rc    = 3.36d-10 /0.5291772d-10
 c      real(8),parameter:: rc    = 3.5d-10 /0.5291772d-10
-c.....Cutoff radius for BCC Fe, halfway between 2nd and 3rd N.N.
-      real(8),parameter:: abcc = 2.8533d-10/0.5291772d-10
+cc.....Cutoff radius for BCC Fe, halfway between 2nd and 3rd N.N.
+c      real(8),parameter:: abcc = 2.8533d-10/0.5291772d-10
+c.....Cutoff radius for BCC W, halfway between 2nd and 3rd N.N.
+      real(8),parameter:: abcc = 3.204d-10/0.5291772d-10
       real(8),parameter:: rc   = 0.5d0*(1d0+sqrt(2d0))*abcc
 
       integer:: i,n,itmp,nauxdat,j
@@ -46,7 +48,7 @@ c-----make linked-list
 
 c-----make 1st nearest neighbor pair-list
       allocate(lspr(0:nnmax,natm0))
-      call ll2lspr(nlsa,lsa,nx,ny,nz,natm0,nnmax,lspr,al,ra0,rc)
+      call ll2lspr(nlsa,lsa,nx,ny,nz,natm0,nnmax,lspr,al,ra0,rc,itag)
       deallocate(lsa)
 
 c-----common neighbor analysis
@@ -101,15 +103,17 @@ c-------region index in order z,y,x
       return
       end subroutine mkllist
 c=======================================================================
-      subroutine ll2lspr(nlls,lls,nx,ny,nz,natm,nnmax,lspr,al,ra,rc)
+      subroutine ll2lspr(nlls,lls,nx,ny,nz,natm,nnmax,lspr,al,ra,rc
+     &     ,itag)
 c-----------------------------------------------------------------------
 c     make Verlet list from linked-list
 c-----------------------------------------------------------------------
       implicit none 
-      integer,intent(in):: nlls,lls(nlls),nx,ny,nz,natm,nnmax
+      integer,intent(in):: nlls,lls(nlls),nx,ny,nz,natm,nnmax,itag(natm)
       real(8),intent(in):: al(3),ra(3,natm),rc
       integer,intent(out):: lspr(0:nnmax,natm)
       integer:: i,j,k,l,m,n,ir,jr,kx,ky,kz,irx,iry,irz,jrx,jry,jrz,ii
+     &     ,is,js
       real(8):: dx,dy,dz,r
 
       real(8),allocatable:: da(:)
@@ -128,6 +132,7 @@ c-------atoms (i) in rgn (ir)
         do
           n=0
           if(i.eq.0) exit
+          is= itag(i)
 c---------region (jr)
           do kx=-1,1
             jrx= irx +kx
@@ -145,13 +150,14 @@ c---------region (jr)
                 j=lls(natm+jr)
                 do
                   if(j.eq.0) exit
+                  js= itag(j)
                   dx=(ra(1,j)-ra(1,i)-anint(ra(1,j)-ra(1,i)))*al(1)
                   dy=(ra(2,j)-ra(2,i)-anint(ra(2,j)-ra(2,i)))*al(2)
                   dz=(ra(3,j)-ra(3,i)-anint(ra(3,j)-ra(3,i)))*al(3)
                   r= dsqrt(dx*dx +dy*dy +dz*dz)
 c                  if(i.eq.1) write(6,'(a,4i4,2es11.3)')
 c     &                 "ir,i,jr,j,r,rc=",ir,i,jr,j,r,rc*1.3d0
-                  if(r.lt.rc .and. j.ne.i) then
+                  if(r.lt.rc .and. j.ne.i .and. is.eq.js) then
 c                    write(6,'(a,2i5,es11.3)') "i,j,r-rc*1.2=",i,j
 c     &                   ,r-rc*1.2d0
                     n=n+1
@@ -223,7 +229,8 @@ cc.....For FCC
 c      integer,parameter:: lmax= 12
 c      integer,parameter:: mmax= 12
 c.....For BCC
-      integer,parameter:: lmax= 14
+c      integer,parameter:: lmax= 14
+      integer,parameter:: lmax= 30
       integer,parameter:: mmax= lmax*(lmax-1)/2
 
       allocate(icommon(lmax),ibond(2,mmax),nb(mmax)
@@ -234,6 +241,7 @@ c-----init three indices
 
 c-----for each atom-i, store three indices (LMN)
       do i=1,natm0
+        if( itag(i).ne.1 ) cycle
 
 c-------for each 1st n.n.
         do ii=1,lspr(0,i)

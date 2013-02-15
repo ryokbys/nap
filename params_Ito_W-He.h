@@ -2,6 +2,10 @@ c.....Mass
       real(8),parameter:: am_W   = 183.84d0 *aump/aume
       real(8),parameter:: am_He  =   4.0026d0 *aump/aume
 
+c.....energy scaling
+      real(8),parameter:: sfac  = 1d0/4
+      real(8),parameter:: ergs  = ev2hrt *sfac
+
 c.....2-body
 c.....W-W
       real(8),parameter:: p_WW_c    = 3.25d0 *aa2bohr
@@ -15,7 +19,8 @@ c.....W-He
       real(8),parameter:: p_WHe_rc = 4.0d0 *aa2bohr
       real(8),parameter:: p_WHe_rs = 2.2d0 *aa2bohr
       real(8),parameter:: p_WHe_cs = p_WHe_rc -p_WHe_rs
-      real(8),parameter:: p_WHe_z1 = 1488.31d0 *ev2hrt *aa2bohr
+c      real(8),parameter:: p_WHe_z1 = 1488.31d0 *ev2hrt *aa2bohr
+      real(8),parameter:: p_WHe_z1 = 1488.31d0 *ergs *aa2bohr
       real(8),parameter:: p_WHe_a1 = 4.129d0 /aa2bohr
       real(8),parameter:: p_WHe_b0 = -0.0033d0
 c.....He-He
@@ -28,12 +33,15 @@ c.....He-He
 
 c.....Many-body
 c.....W
-      real(8),parameter:: p_W_w    = 1.786367d0 *ev2hrt /aa2bohr
+c      real(8),parameter:: p_W_w    = 1.786367d0 *ev2hrt /aa2bohr
+      real(8),parameter:: p_W_w    = 1.786367d0 *ergs /aa2bohr
       real(8),parameter:: p_W_d    = 4.40d0 *aa2bohr
       real(8),parameter:: p_W_beta = -0.23433d0
 c.....He
-      real(8),parameter:: p_He_A = -0.154896d0 /ev2hrt
-      real(8),parameter:: p_He_w = 0.812281d0 *ev2hrt /aa2bohr
+c      real(8),parameter:: p_He_A = -0.154896d0 /ev2hrt
+      real(8),parameter:: p_He_A = -0.154896d0 /ergs
+c      real(8),parameter:: p_He_w = 0.812281d0 *ev2hrt /aa2bohr
+      real(8),parameter:: p_He_w = 0.812281d0 *ergs /aa2bohr
       real(8),parameter:: p_He_d = p_W_d
       real(8),parameter:: p_He_beta = p_W_beta
 

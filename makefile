@@ -6,8 +6,8 @@
 
 # cpp path
 CPP= gcc -E
-CPPFLAGS= 
-#CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__KOUKYU__
+CPPFLAGS=
+#CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__KOUKYU__ -D__WALL__
 
 #-----------------------------------------------------------------------
 # ifort and linux (pen4)
@@ -47,7 +47,7 @@ MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
 
 pmd= read_input.o parallel_md.o util_vec.o routines_dislocation.o \
 	lasubs.o util_pmd.o tensile_loading.o
-mods= mod_variables.o
+mods= mod_variables.o mod_wall.o
 
 #-----------------------------------------------------------------------
 # Uncomment only one force routine
@@ -90,9 +90,10 @@ params= params_Ito_W-He.h
 # mkconf= mkconf_BCC.o
 # mkconf= mkconf_BCC_nanorod.o
 # mkconf= mkconf_BCC_Fe-H.o
-mkconf= mkconf_BCC_W-He.o
 # mkconf= mkconf_BCC_edge-disl.o
 # mkconf= mkconf_BCC_screw.o
+mkconf= mkconf_BCC_W-He.o
+# mkconf= mkconf_W-He-compress.o
 
 #-----------------------------------------------------------------------
 # Post process programs
@@ -159,5 +160,6 @@ parallel_md.o: $(mods)
 read_input.o:  $(mods)
 node_conv.o:   $(mods)
 combine_pmd.o: $(mods)
+force_Ito_W-He.o: $(mods)
 
 

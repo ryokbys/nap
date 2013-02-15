@@ -17,6 +17,9 @@ c   pmd###-???: MD-coordination file of each MD-step,
 c               ### is the node number and ??? is the frame number
 c-----------------------------------------------------------------------
       use variables
+#ifdef __WALL__
+      use wall
+#endif
       implicit none
       include "mpif.h"
       include "./params_au.h"
@@ -63,6 +66,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(rc,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(rbuf,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(dmp,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(tinit,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(iftctl,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(treq,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(trlx,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
@@ -77,6 +81,15 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(vmcoeff,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(voldmp,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
+#ifdef __WALL__
+      call mpi_bcast(wtop,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(wbot,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(ptgt_wall,1,mpi_double_precision,0,mpi_md_world
+     &     ,ierr)
+      call mpi_bcast(trlx_wall,1,mpi_double_precision,0,mpi_md_world
+     &     ,ierr)
+      call mpi_bcast(nout_wall,1,mpi_integer,0,mpi_md_world,ierr)
+#endif
 
 c-----sec. --> a.u.
       dt= dt /aut
@@ -98,6 +111,12 @@ c-----error trap
         call mpi_finalize(ierr)
         stop
       endif
+#ifdef __WALL__
+      trlx_wall= trlx_wall /aut
+      dt_wall= dt*nout_wall
+c.....GPa --> hartree/bohr^3
+      ptgt_wall= ptgt_wall /2.94d+4
+#endif
       
 c-----vector node indices: range [0:nx-1]
       myx=myid_md/(ny*nz)
@@ -202,18 +221,11 @@ c      temp= ekin /ntot/fkb *2d0/2d0
       if( ifpctl.eq.1 ) then
         if(myid_md.eq.0) write(6,'(a,f10.2,a,es12.4,a)')
      &       ' Target Pressure = ',ptgt,' GPa, ',ptgt/2.94d+4,' a.u.'
-        ptgt= ptgt/2.94d+4
+        ptgt= ptgt *gpa2aup
 c.....Parrinello-Rahman Isobaric
         vm= am(1)*vmcoeff
         call force_isobaric(ptgt,ah,natm,eki,strs,sgm,vm,vol,avol
      &       ,ptnsr,mpi_md_world)
-      endif
-
-      if(myid_md.eq.0) then
-        write(6,'(a)') " Initial values: [Hartree], [K]"
-        write(6,'(a,es15.7)') " Kinetic energy  =",ekin
-        write(6,'(a,es15.7)') " Potential energy=",epot0
-        write(6,'(a,es15.7)') " Temperature     =",temp
       endif
 
       istp= 0
@@ -224,6 +236,24 @@ c.....Parrinello-Rahman Isobaric
 c.....Considering vmax==0d0, make istpe small only for the first step
       if( istpe.gt.100 ) istpe=100
 c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
+
+      if(myid_md.eq.0) then
+        write(6,'(a)') " Initial values: [Hartree], [K]"
+        write(6,'(a,es15.7)') " Kinetic energy  =",ekin
+        write(6,'(a,es15.7)') " Potential energy=",epot0
+        write(6,'(a,es15.7)') " Temperature     =",temp
+
+        if( ifpctl .eq. 1 ) then
+          write(6,'(a,i8,2f10.2,2es11.3)')
+     &         " istp,time,temp,vol,prss="
+     &         ,istp,tcpu,temp,vol*bohr2aa**3
+     &         ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*aup2gpa
+        else
+          write(6,'(a,i8,2f10.2)')
+     &         " istp,time,temp="
+     &         ,istp,tcpu,temp
+        endif
+      endif
 
 c-----initialize the counter for output
       iocntpmd=0
@@ -242,17 +272,31 @@ c-----output initial configuration
         endif
       endif
 
+#ifdef __WALL__
+      call update_wall()
+#endif
+
 c-----Energy output
       if(myid_md.eq.0) then
         open(11,file="out.erg",status='replace')
+        write(11,'(a)') '# istp,etot-epot0,ekin,epot-epot0,temp'
+     &       //'vol(A^3),pressure(GPa)'
         write(11,'(a,es15.7)') '# epot0 =',epot0
         write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
-     &       ,ekin+epot0-epot0,ekin,epot0-epot0,temp,vol
-     &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*2.94d+4
+     &       ,ekin+epot0-epot0,ekin,epot0-epot0,temp
+     &       ,vol*bohr2aa**3
+     &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*aup2gpa
         call flush(11)
 #ifdef __KOUKYU__
         open(80,file='out.stress',status='replace')
         write(80,'(a)') '#  istp,   strnow,      ftop,     fbot'
+#endif
+#ifdef __WALL__
+        open(81,file='out.wall',status='replace')
+        write(81,'(a)') '#   istp,nitop,nibot,ptop(GPa),pbot(GPa)'
+     &       //',wtop,wbot'
+        write(81,'(3i8,4es15.7)')
+     &       istp,nitop,nibot,ptop*aup2gpa,pbot*aup2gpa,wtop,wbot
 #endif
       endif
 
@@ -321,8 +365,8 @@ c.....Make pair list
           ts= istp*dt
           te=rbuf/(2d0*vmax/dt) +ts
           istpe= te/dt
-          if(myid_md.eq.0) write(6,'(a,i10)')
-     &         " Next update step will be ",istpe
+c          if(myid_md.eq.0) write(6,'(a,i10)')
+c     &         " Next update step will be ",istpe
         else
 c.....Copy RA of boundary atoms determined by 'bacopy'
           call bacopy_fixed(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
@@ -402,8 +446,9 @@ c          temp= ekin /ntot/fkb *2d0/2d0
 #endif
           if(myid_md.eq.0) then
             write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
-     &           ,ekin+epot-epot0,ekin,epot-epot0,temp,vol
-     &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*2.94d+4
+     &           ,ekin+epot-epot0,ekin,epot-epot0,temp
+     &           ,vol*bohr2aa**3
+     &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*aup2gpa
             call flush(11)
 #ifdef __KOUKYU__
             write(80,'(i8,3es15.7)') istp,strnow,ftop,fbot
@@ -416,8 +461,8 @@ c---------output step, time, and temperature
             if( ifpctl .eq. 1 ) then
               write(6,'(a,i8,2f10.2,2es11.3)')
      &             " istp,time,temp,vol,prss="
-     &             ,istp,tcpu,temp,vol
-     &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))*2.94d+4
+     &             ,istp,tcpu,temp,vol*bohr2aa**3
+     &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*aup2gpa
             else
               write(6,'(a,i8,2f10.2)')
      &             " istp,time,temp="
@@ -447,6 +492,28 @@ c---------write pmd file for Akira
           endif
         endif
 
+#ifdef __WALL__
+        call wall_reflect()
+        if( mod(istp,nout_wall).eq.0 ) then
+          call update_wall()
+          if( myid_md.eq.0 ) then
+            write(81,'(3i8,4es15.7)')
+     &           istp,nitop,nibot,ptop*aup2gpa,pbot*aup2gpa,wtop,wbot
+          endif
+c.....reset pressure
+          ptop= 0d0
+          pbot= 0d0
+          nitop= 0
+          nibot= 0
+        endif
+        wtop=wtop +dwtop
+        wbot=wbot +dwbot
+        wtop= min(wtop,0.99d0)
+        wtop= max(wtop,btop)
+        wbot= max(wbot,0.01d0)
+        wbot= min(wbot,bbot)
+#endif
+
       enddo
 
       tcpu2= mpi_wtime()
@@ -454,7 +521,7 @@ c---------write pmd file for Akira
       if(myid_md.eq.0) then
         close(11)
 #ifdef __KOUKYU__
-        close(12)
+        close(80)
 #endif
       endif
 
@@ -1588,7 +1655,127 @@ c=======================================================================
       return
       end subroutine myrnd
 c=======================================================================
+      subroutine wall_reflect()
+      use variables
+      use wall
+      implicit none
+      include "mpif.h"
+      integer:: i,is
+      real(8):: zi
       
+      do i=1,natm
+        is= int(tag(i))
+        if( is.ne.2 ) cycle
+        zi= (ra(3,i)+sorg(3))
+c.....if atom over wtop (top wall), go downward
+        if( zi.ge.wtop ) then
+          va(3,i)=-abs(va(3,i))
+          va(3,i)= min(va(3,i),dwtop)
+          ptop=ptop +am(is)*2d0*abs(va(3,i))*h(3,3,0)/dt
+          nitop=nitop +1
+        endif
+c.....if atom under wbot (bottom wall), go upward
+        if( zi.le.wbot ) then
+          va(3,i)= abs(va(3,i))
+          va(3,i)= max(va(3,i),dwbot)
+          pbot=pbot +am(is)*2d0*abs(va(3,i))*h(3,3,0)/dt
+          nibot=nibot +1
+        endif
+      enddo
+      end subroutine wall_reflect
+c=======================================================================
+      subroutine update_wall()
+c
+c  Change of wall with relaxation time.
+c  See RK's note on 2013.02.13
+c
+      use variables
+      use wall
+      implicit none
+      include "mpif.h"
+      integer:: i,itmp,is
+      real(8):: zi,tmp,vtop,vbot,dvtop,dvbot
+      logical,save:: l1st=.true.
+
+      if(l1st) then
+        if( wtop.lt.wbot ) stop ' [Error] wtop.lt.wbot !!!'
+c.....btop,bbot: top/bottom of bulk material are fixed
+        btop=0d0
+        bbot=1d0
+        do i=1,natm
+          is= int(tag(i))
+          if( is.ne.1 ) cycle
+          zi= (ra(3,i)+sorg(3))
+          btop= max(btop,zi)
+          bbot= min(bbot,zi)
+        enddo
+        tmp= btop
+        call mpi_allreduce(tmp,btop,1,mpi_double_precision,mpi_max
+     &       ,mpi_md_world,ierr)
+        tmp= bbot
+        call mpi_allreduce(tmp,bbot,1,mpi_double_precision,mpi_min
+     &       ,mpi_md_world,ierr)
+c.....area of wall
+        area_wall= h(2,2,0)*h(1,1,0)
+        if( myid_md.eq.0 ) then
+          write(6,'(a,es12.4)') ' btop =',btop
+          write(6,'(a,es12.4)') ' bbot =',bbot
+          write(6,'(a,es12.4)') ' area =',area_wall
+        endif
+c.....reset pressure
+        ptop= 0d0
+        pbot= 0d0
+        nitop= 0
+        nibot= 0
+        l1st=.false.
+c.....return at 1st call
+        return
+      endif
+
+      itmp= nitop
+      call mpi_reduce(itmp,nitop,1,mpi_integer,mpi_sum,0,
+     &     mpi_md_world,ierr)
+      itmp= nibot
+      call mpi_reduce(itmp,nibot,1,mpi_integer,mpi_sum,0,
+     &     mpi_md_world,ierr)
+      tmp= ptop
+      call mpi_reduce(tmp,ptop,1,mpi_double_precision,mpi_sum,0,
+     &     mpi_md_world,ierr)
+      ptop= ptop /nodes_md
+      tmp= pbot
+      call mpi_reduce(tmp,pbot,1,mpi_double_precision,mpi_sum,0,
+     &     mpi_md_world,ierr)
+      pbot= pbot /nodes_md
+
+      if( myid_md.eq.0 ) then
+        if( nitop.ne.0 ) then
+          ptop= ptop /area_wall /dt_wall
+c.....current volume
+          vtop= abs(wtop-btop)*h(3,3,0) *area_wall
+c.....change of volume
+          dvtop= -vtop*(ptgt_wall -ptop)/ptop *dt_wall/trlx_wall
+c.....speed of wall
+          dwtop= abs(wtop-btop) *dvtop/vtop /nout_wall
+cc.....change of wall position
+c          wtop= btop +abs(wtop-btop)*(1d0+dvtop/vtop)
+c          wtop= min(wtop,0.99d0)
+        endif
+        if( nibot.ne.0 ) then
+          pbot= pbot /area_wall /dt_wall
+          vbot= abs(wbot-bbot)*h(3,3,0) *area_wall
+          dvbot= -vbot*(ptgt_wall -pbot)/pbot *dt_wall/trlx_wall
+          dwbot= -abs(wbot-bbot) *dvbot/vbot /nout_wall
+c          wbot= bbot -abs(wbot-bbot)*(1d0+dvbot/vbot)
+c          wbot= max(wbot,0.01d0)
+        endif
+      endif
+
+c      call mpi_bcast(wtop,1,mpi_double_precision,0,mpi_md_world,ierr)
+c      call mpi_bcast(wbot,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(dwtop,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(dwbot,1,mpi_double_precision,0,mpi_md_world,ierr)
+      
+      end subroutine update_wall
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"

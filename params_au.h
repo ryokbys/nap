@@ -17,6 +17,10 @@ c-----Bohr radius
       real(8),parameter:: bohr  = 0.5291772d-10
       real(8),parameter:: aa2bohr= 1d-10 /bohr
       real(8),parameter:: bohr2aa= 1d0 /aa2bohr
+c.....pressure
+      real(8),parameter:: aup= ehrt2j/bohr**3
+      real(8),parameter:: aup2gpa= 1d-9*aup
+      real(8),parameter:: gpa2aup= 1d0/aup2gpa
 c-----mass of electron
       real(8),parameter:: aume  = 9.1093897d-31
 c-----mass of proton

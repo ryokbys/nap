@@ -24,6 +24,18 @@ c-----prefactors for kinetic energy, FACK
 
       end subroutine setup
 c=======================================================================
+      subroutine set_avol()
+c
+c  Not applicable to parallel calc
+c
+      use variables
+      include 'params_au.h'
+
+      avol= h(1,1,0)*h(2,2,0)*h(3,3,0)/natm
+      write(6,'(a,es12.4)') ' avol=',avol*bohr2aa**3
+
+      end subroutine set_avol
+c=======================================================================
       subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom
      &     ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot,nismax,acon)
@@ -35,6 +47,7 @@ c    - only force on i is calculated, not necessary to send-back
 c-----------------------------------------------------------------------
 c  See Ito's PowerPoint slide.
 c-----------------------------------------------------------------------
+c      use variables,only: avol
       implicit none
       include "mpif.h"
       include "params_au.h"
@@ -48,9 +61,9 @@ c-----------------------------------------------------------------------
       real(8),intent(inout):: tcom
       real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
 
-      integer:: i,j,k,l,m,n,ierr,is,js
-      real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,dphi,at(3)
-      real(8):: x,y,z,xi(3),epotl,v2,dv2
+      integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
+      real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,at(3)
+      real(8):: x,y,z,xi(3),epotl,v2,dv2,dphi,dphj,tmp
       real(8),save:: v2c_WW,v2c_WHe,v2c_HeHe,dv2c_WW,dv2c_WHe,dv2c_HeHe
       logical,save:: l1st=.true.
       real(8),allocatable,save:: sqrho(:)
@@ -65,6 +78,8 @@ c.....Smoothing for 2-body terms
         dv2c_WW  = dv2_IWHe(p_WW_c,1,1)
         dv2c_WHe = dv2_IWHe(p_WHe_rc,1,2)
         dv2c_HeHe= dv2_IWHe(p_HeHe_rc,2,2)
+cc.....set atomic volume
+c        call set_avol()
         l1st=.false.
       endif
 
@@ -73,6 +88,11 @@ c.....Smoothing for 2-body terms
       epotl= 0d0
       sqrho(1:natm)= 0d0
       strs(1:3,1:3,natm+nb)= 0d0
+c      write(6,'(a,2i6)') ' natm,nb=',natm,nb
+c      write(6,'(i5,9es10.2)') 1,aa(1:3,1)
+c      write(6,'(i5,9es10.2)') 1,epi(1)
+c      write(6,'(i5,9es10.2)') 1,sqrho(1)
+c      write(6,'(i5,9es10.2)') 1,strs(1:3,1:3,1)
 
 c-----rho(i)
       do i=1,natm
@@ -102,12 +122,12 @@ c-----copy rho of boundary atoms
         if( is.eq.1 ) then
           dfi= -0.5d0/sqrho(i)
         elseif( is.eq.2 ) then
-          dfi= p_He_A
+          dfi= -p_He_A
         endif
         do k=1,lspr(0,i)
           j=lspr(k,i)
           if(j.eq.0) exit
-c          if(j.le.i) cycle
+          if(j.le.i) cycle
           js= int(tag(j))
           x= ra(1,j) -xi(1)
           y= ra(2,j) -xi(2)
@@ -126,36 +146,64 @@ c.....2-body term
             v2= v2 -v2c_WHe -(r-p_WHe_rc)*dv2c_WHe
             dv2=dv2 -dv2c_WHe
           endif
-          v2=v2 !/2
-          dv2=dv2 !/2
+c          v2=v2 /2
+c          dv2=dv2 /2
           epi(i)= epi(i) +v2
-c          epi(j)= epi(j) +v2
-c          if(j.le.natm) then
-c            epotl=epotl +v2 +v2
-c          else
-c            epotl=epotl +v2
-c          endif
-          epotl=epotl +v2
+          epi(j)= epi(j) +v2
+c          epotl=epotl +v2
+          if(j.le.natm) then
+            epotl=epotl +v2 +v2
+          else
+            epotl=epotl +v2
+          endif
           aa(1:3,i)=aa(1:3,i) -dv2*drdxi(1:3)
-c          aa(1:3,j)=aa(1:3,j) +dv2*drdxi(1:3)
+          aa(1:3,j)=aa(1:3,j) +dv2*drdxi(1:3)
+cc.....atomic stress for 2-body terms
+c          do ixyz=1,3
+c            do jxyz=1,3
+c              strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i)
+c     &             -0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
+c              strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j)
+c     &             -0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
+c            enddo
+c          enddo
 c.....N-body term
           if( js.eq.1 ) then
             dfj= -0.5d0/sqrho(j)
           elseif( js.eq.2 ) then
-            dfj= p_He_A
+            dfj= -p_He_A
           endif
-          dphi= dphi_IWHe(rij,js,is) !/2
-          aa(1:3,i)=aa(1:3,i) -(dfi+dfj)*dphi*drdxi(1:3)
-c          aa(1:3,j)=aa(1:3,j) +(dfi+dfj)*dphi*drdxi(1:3)
+          dphi= dphi_IWHe(rij,is,js) !/2
+          dphj= dphi_IWHe(rij,js,is) !/2
+          tmp= (dfi*dphi+dfj*dphj)
+          aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
+          aa(1:3,j)=aa(1:3,j) +tmp*drdxi(1:3)
+cc.....atomic stress of many-body contributions
+c          do ixyz=1,3
+c            do jxyz=1,3
+c              strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i)
+c     &             -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+c              strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j)
+c     &             -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+c            enddo
+c          enddo
         enddo
         if( is.eq.1 ) then
           epi(i)=epi(i) -sqrho(i)
           epotl=epotl -sqrho(i)
         elseif( is.eq.2 ) then
-          epi(i)=epi(i) +sqrho(i)*p_He_A
-          epotl=epotl +sqrho(i)*p_He_A
+          epi(i)=epi(i) -sqrho(i)*p_He_A
+          epotl=epotl -sqrho(i)*p_He_A
         endif
       enddo
+
+cc-----copy strs of boundary atoms
+c      call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb
+c     &     ,lsrc,myparity,nn,sv,mpi_md_world,strs)
+cc-----atomic level stress in [Hartree/Bohr^3] assuming 1 Bohr thick
+c      do i=1,natm
+c        strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
+c      enddo
 
 c-----reduced force
       do i=1,natm
@@ -242,6 +290,74 @@ c          write(6,'(a,2i8)') "nbnew,nrc=",nbnew,nrc
       endif
       
       end subroutine copy_rho_ba
+c=======================================================================
+      subroutine copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb
+     &     ,lsrc,myparity,nn,sv,mpi_md_world,strs)
+c-----------------------------------------------------------------------
+c  Exchanges boundary-atom data among neighbor nodes
+c-----------------------------------------------------------------------
+      implicit none
+      include "mpif.h"
+      integer:: status(MPI_STATUS_SIZE)
+c-----in
+      integer,intent(in):: namax,natm,nb,nbmax,mpi_md_world
+      integer,intent(in):: lsb(0:nbmax,6),lsrc(6),myparity(3),nn(6)
+      real(8),intent(in):: sv(3,6)
+c-----out
+      real(8),intent(inout):: strs(9,natm+nb),tcom
+
+c-----locals
+      integer:: i,j,k,l,m,n,kd,kdd,ku,inode,nsd,nrc,nbnew,ierr
+      real(8):: tcom1,tcom2
+      
+      logical,save:: l1st=.true.
+      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+
+      if( l1st ) then
+        allocate(dbuf(9,nbmax),dbufr(9,nbmax))
+        l1st=.false.
+      endif
+
+      nbnew= 0
+
+c-----loop over z, y, & x directions
+      do kd=1,3
+        tcom1= mpi_wtime()
+        do kdd=-1,0
+          ku= 2*kd +kdd
+          inode= nn(ku)
+c---------num. of to-be-sent particles
+          nsd= lsb(0,ku)
+c---------num. of to-be-recieved particles
+          nrc= lsrc(ku)
+
+c---------exchange strs
+          do i=1,nsd
+            j=lsb(i,ku)
+            dbuf(1:9,i)= strs(1:9,j)
+          enddo
+          call mespasd(inode,myparity(kd),dbuf,dbufr,9*nsd,9*nrc,21
+     &         ,mpi_md_world)
+          do i=1,nrc
+            strs(1:9,natm+nbnew+i)= dbufr(1:9,i)
+          enddo
+
+c---------mpi barrier
+          call mpi_barrier(mpi_md_world,ierr)
+c---------accumulate num. of boundary particles
+c          write(6,'(a,2i8)') "nbnew,nrc=",nbnew,nrc
+          nbnew=nbnew +nrc
+        enddo
+        tcom2= mpi_wtime()
+        tcom= tcom +tcom2-tcom1
+      enddo
+
+      if(nbnew.ne.nb) then
+        write(6,'(a,2i8)') "nbnew,(natm+nb)=",nbnew,natm+nb
+        stop "error: nbnew.ne.(natm+nb)!!"
+      endif
+      
+      end subroutine copy_strs_ba
 c=======================================================================
       function v2_IWHe(r,is,js)
 c
@@ -351,8 +467,6 @@ c
 
       phi_IWHe= 0d0
 
-      if( is.eq.2 ) return
-
 c.....No need to consider, He-He pair
       if( is.eq.2 .and. js.eq.2 ) return
 
@@ -384,8 +498,6 @@ c=======================================================================
       real(8):: dphi_IWHe,rd
 
       dphi_IWHe= 0d0
-
-      if( is.eq.2 ) return
 
 c.....No need to consider, He-He pair
       if( is.eq.2 .and. js.eq.2 ) return
