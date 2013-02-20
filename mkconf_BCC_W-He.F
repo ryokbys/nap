@@ -1,6 +1,6 @@
       program mkconf_BCC_WHe
 c-----------------------------------------------------------------------
-c  Create a BCC crystal with Fe and H atoms
+c  Create a BCC crystal with W and He atoms
 c-----------------------------------------------------------------------
 c  OUTPUT:
 c    - pmd000-000
@@ -13,22 +13,26 @@ c-----max # of atoms
       integer,parameter::nmax=10000000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 5, 5, 5 /)
+      integer,parameter:: nuc(1:3)= (/ 10, 10, 10 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
       real(8):: ua(3,10)
       real(8):: tag(nmax),ra(3,nmax),va(3,nmax),eki(nmax),epi(nmax)
-     &     ,h(3,3,0:1),strs(3,3,nmax)
+     &     ,h(3,3,0:1),strs(3,3,nmax),dseed,rnd
 c.....Parameters
       real(8),parameter:: tempini = 100d0
+c.....vacancy ratio
+      real(8),parameter:: vratio  = 0.001
+c.....He ratio
+      real(8),parameter:: heratio = 0.01
 
       small = 1d0/4 /nuc(1)
 
 cc.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
 c      cunit= 2.835d-10 /bohr
-c.....Lattice constant of W
-      cunit= 3.204d-10 /bohr
+c.....Lattice constant of W for 1000K
+      cunit= 3.226d-10 /bohr
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
@@ -40,11 +44,14 @@ c-----unit cell, BCC
       ua(1:3,1)= (/ 0.0d0, 0.0d0, 0.0d0 /)
       ua(1:3,2)= (/ 0.5d0, 0.5d0, 0.5d0 /)
       
+      dseed= 123456d0
       inc=0 
       do ix=0,nuc(1)-1
         do iy=0,nuc(2)-1
           do iz=0,nuc(3)-1
             do m=1,2
+              call myrnd(rnd,dseed)
+              if( rnd.lt.vratio ) cycle
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
@@ -59,38 +66,31 @@ c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
               ifmv= 1
               tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
             enddo
+            call myrnd(rnd,dseed)
+            if( rnd.lt.heratio ) then
+c.....Add He atom
+              inc= inc+1
+              if(inc.gt.nmax)then
+                write(*,*)'Error inc>nmax',inc,nmax
+                stop
+              endif
+              is= 2
+              ifmv= 1
+              tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+cc.....O-site
+c              ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+c              ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+c              ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+c.....T-site
+              ra(1,inc)= (0.50d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+              ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+              ra(3,inc)= (0.00d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+            endif
           enddo
         enddo
       enddo
 
-cc.....Add H atoms
-c      ix= nuc(1)/2
-c      iy= nuc(2)/2
-c      iz= nuc(3)/2
-c      inc=inc+1
-c      is= 2
-c      ifmv= 1
-c      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
-ccc.....O-site
-cc      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-cc      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-cc      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-cc.....T-site
-c      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-c      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-c      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-
       write(6,'(a,i10)') " natm=",inc
-      write(6,'(a,i10)') " id of inc=",int(mod(tag(inc)*1d14,1d13))
-
-      call setv(inc,va,tag,tempini)
-      
-c-----scale velocities to reduced unit
-      do i=1,inc
-        va(1,i)=va(1,i) /h(1,1,0)
-        va(2,i)=va(2,i) /h(2,2,0)
-        va(3,i)=va(3,i) /h(3,3,0)
-      enddo
 
       call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
@@ -105,58 +105,6 @@ c-----output 'akr000' for Akira visualization
       close(15)
       
       end program mkconf_BCC_WHe
-c=======================================================================
-      subroutine setv(natm,va,tag,tempini)
-      implicit none
-      include "./params_au.h"
-      include "./params_Ito_W-He.h"
-      integer,intent(in):: natm
-      real(8),intent(in):: tempini,tag(natm)
-      real(8),intent(out):: va(3,natm)
-
-      integer:: i,l,is
-      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(2),am(2)
-      real(8),parameter:: pi = 3.14159265358979d0
-
-      facv(1)=dsqrt(2d0*tempini*fkb/am_W)
-      facv(2)=dsqrt(2d0*tempini*fkb/am_He)
-      am(1)= am_W
-      am(2)= am_He
-
-c-----velocities in Maxwell-Boltzmann distribution
-      dseed=12345
-      do i=1,natm
-        is= int(tag(i))
-        do l=1,3
-          call myrnd(rnd1,dseed)
-          call myrnd(rnd2,dseed)
-          va(l,i)=facv(is)*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
-        enddo
-      enddo
-c-----set center of mass motion to zero
-      sumvx=0d0
-      sumvy=0d0
-      sumvz=0d0
-      do i=1,natm
-        sumvx=sumvx+va(1,i)
-        sumvy=sumvy+va(2,i)
-        sumvz=sumvz+va(3,i)
-      enddo
-      do i=1,natm
-        va(1,i)=va(1,i)-sumvx/dble(natm)
-        va(2,i)=va(2,i)-sumvy/dble(natm)
-        va(3,i)=va(3,i)-sumvz/dble(natm)
-      enddo
-
-      tmp=0d0
-      do i=1,natm
-        is= int(tag(i))
-        tmp= tmp +0.5d0*am(is)*(va(1,i)**2 +va(2,i)**2 +va(3,i)**2)
-      enddo
-      write(6,'(a,es12.4)') " ekin=",tmp
-      write(6,'(a,es12.4)') " temp.=",tmp*2d0/3d0/fkb/natm
-
-      end subroutine setv
 c=======================================================================
       subroutine myrnd(rnd,dseed)
       real*8 rnd,dseed

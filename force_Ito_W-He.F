@@ -47,7 +47,7 @@ c    - only force on i is calculated, not necessary to send-back
 c-----------------------------------------------------------------------
 c  See Ito's PowerPoint slide.
 c-----------------------------------------------------------------------
-c      use variables,only: avol
+      use variables,only: avol
       implicit none
       include "mpif.h"
       include "params_au.h"
@@ -78,8 +78,8 @@ c.....Smoothing for 2-body terms
         dv2c_WW  = dv2_IWHe(p_WW_c,1,1)
         dv2c_WHe = dv2_IWHe(p_WHe_rc,1,2)
         dv2c_HeHe= dv2_IWHe(p_HeHe_rc,2,2)
-cc.....set atomic volume
-c        call set_avol()
+c.....set atomic volume
+        call set_avol()
         l1st=.false.
       endif
 
@@ -87,12 +87,7 @@ c        call set_avol()
       epi(1:natm)= 0d0
       epotl= 0d0
       sqrho(1:natm)= 0d0
-      strs(1:3,1:3,natm+nb)= 0d0
-c      write(6,'(a,2i6)') ' natm,nb=',natm,nb
-c      write(6,'(i5,9es10.2)') 1,aa(1:3,1)
-c      write(6,'(i5,9es10.2)') 1,epi(1)
-c      write(6,'(i5,9es10.2)') 1,sqrho(1)
-c      write(6,'(i5,9es10.2)') 1,strs(1:3,1:3,1)
+      strs(1:3,1:3,1:natm+nb)= 0d0
 
 c-----rho(i)
       do i=1,natm
@@ -107,7 +102,11 @@ c-----rho(i)
           z= ra(3,j) -xi(3)
           xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
           rij=sqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
-          sqrho(i)= sqrho(i) +phi_IWHe(rij,is,js)
+          if( is.ne.js ) then
+            sqrho(i)= sqrho(i) +phi_IWHe(rij,is,js)*sfac
+          else
+            sqrho(i)= sqrho(i) +phi_IWHe(rij,is,js)
+          endif
         enddo
         if( is.eq.1 ) sqrho(i)= dsqrt(sqrho(i))
       enddo
@@ -145,12 +144,11 @@ c.....2-body term
           elseif( is.ne.js ) then
             v2= v2 -v2c_WHe -(r-p_WHe_rc)*dv2c_WHe
             dv2=dv2 -dv2c_WHe
+            v2= v2*sfac
+            dv2= dv2*sfac
           endif
-c          v2=v2 /2
-c          dv2=dv2 /2
           epi(i)= epi(i) +v2
           epi(j)= epi(j) +v2
-c          epotl=epotl +v2
           if(j.le.natm) then
             epotl=epotl +v2 +v2
           else
@@ -158,15 +156,15 @@ c          epotl=epotl +v2
           endif
           aa(1:3,i)=aa(1:3,i) -dv2*drdxi(1:3)
           aa(1:3,j)=aa(1:3,j) +dv2*drdxi(1:3)
-cc.....atomic stress for 2-body terms
-c          do ixyz=1,3
-c            do jxyz=1,3
-c              strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i)
-c     &             -0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
-c              strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j)
-c     &             -0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
-c            enddo
-c          enddo
+c.....atomic stress for 2-body terms
+          do ixyz=1,3
+            do jxyz=1,3
+              strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i)
+     &             -0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
+              strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j)
+     &             -0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
+            enddo
+          enddo
 c.....N-body term
           if( js.eq.1 ) then
             dfj= -0.5d0/sqrho(j)
@@ -176,17 +174,20 @@ c.....N-body term
           dphi= dphi_IWHe(rij,is,js) !/2
           dphj= dphi_IWHe(rij,js,is) !/2
           tmp= (dfi*dphi+dfj*dphj)
+          if( is.ne.js ) then
+            tmp=tmp*sfac
+          endif
           aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
           aa(1:3,j)=aa(1:3,j) +tmp*drdxi(1:3)
-cc.....atomic stress of many-body contributions
-c          do ixyz=1,3
-c            do jxyz=1,3
-c              strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i)
-c     &             -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
-c              strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j)
-c     &             -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
-c            enddo
-c          enddo
+c.....atomic stress of many-body contributions
+          do ixyz=1,3
+            do jxyz=1,3
+              strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i)
+     &             -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+              strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j)
+     &             -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+            enddo
+          enddo
         enddo
         if( is.eq.1 ) then
           epi(i)=epi(i) -sqrho(i)
@@ -197,13 +198,14 @@ c          enddo
         endif
       enddo
 
-cc-----copy strs of boundary atoms
-c      call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb
-c     &     ,lsrc,myparity,nn,sv,mpi_md_world,strs)
-cc-----atomic level stress in [Hartree/Bohr^3] assuming 1 Bohr thick
-c      do i=1,natm
-c        strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
-c      enddo
+c-----copy strs of boundary atoms
+      call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb
+     &     ,lsrc,myparity,nn,sv,mpi_md_world,strs)
+c-----atomic level stress in [Hartree/Bohr^3] assuming 1 Bohr thick
+      do i=1,natm
+        strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
+c        write(6,'(i5,9es10.2)') i,strs(1:3,1:3,i)
+      enddo
 
 c-----reduced force
       do i=1,natm

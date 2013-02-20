@@ -6,8 +6,8 @@
 
 # cpp path
 CPP= gcc -E
-CPPFLAGS=
-#CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__KOUKYU__ -D__WALL__
+CPPFLAGS= -D__WALL__
+#CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__KOUKYU__
 
 #-----------------------------------------------------------------------
 # ifort and linux (pen4)

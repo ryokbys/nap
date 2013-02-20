@@ -15,7 +15,7 @@ c      real(8),parameter:: rc    = 3.5d-10 /0.5291772d-10
 cc.....Cutoff radius for BCC Fe, halfway between 2nd and 3rd N.N.
 c      real(8),parameter:: abcc = 2.8533d-10/0.5291772d-10
 c.....Cutoff radius for BCC W, halfway between 2nd and 3rd N.N.
-      real(8),parameter:: abcc = 3.204d-10/0.5291772d-10
+      real(8),parameter:: abcc = 3.226d-10/0.5291772d-10
       real(8),parameter:: rc   = 0.5d0*(1d0+sqrt(2d0))*abcc
 
       integer:: i,n,itmp,nauxdat,j

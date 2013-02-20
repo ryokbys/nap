@@ -115,7 +115,7 @@ c-----error trap
       trlx_wall= trlx_wall /aut
       dt_wall= dt*nout_wall
 c.....GPa --> hartree/bohr^3
-      ptgt_wall= ptgt_wall /2.94d+4
+      ptgt_wall= ptgt_wall *gpa2aup
 #endif
       
 c-----vector node indices: range [0:nx-1]
@@ -176,6 +176,7 @@ c-----get total number of particles
 c.....Set initial temperature if needed
       if( tinit.gt.1d-5 ) then
         call setv()
+        call rm_trans_motion()
       elseif( abs(tinit).le.1d-5 ) then
         va(1:3,1:natm)= 0d0
       endif
@@ -220,7 +221,7 @@ c      temp= ekin /ntot/fkb *2d0/2d0
 
       if( ifpctl.eq.1 ) then
         if(myid_md.eq.0) write(6,'(a,f10.2,a,es12.4,a)')
-     &       ' Target Pressure = ',ptgt,' GPa, ',ptgt/2.94d+4,' a.u.'
+     &       ' Target Pressure = ',ptgt,' GPa, ',ptgt*gpa2aup,' a.u.'
         ptgt= ptgt *gpa2aup
 c.....Parrinello-Rahman Isobaric
         vm= am(1)*vmcoeff
@@ -427,6 +428,11 @@ c---------Berendsen thermostat
           va(1:3,1:natm)= va(1:3,1:natm) *tmp
         endif
 
+cc.....Eliminate translational motion
+c        if( mod(istp,100).eq.0 ) then
+c          call rm_trans_motion()
+c        endif
+
 c-------output energies
         if(mod(istp,nouterg).eq.0) then
           iocnterg=iocnterg+1
@@ -522,6 +528,9 @@ c.....reset pressure
         close(11)
 #ifdef __KOUKYU__
         close(80)
+#endif
+#ifdef __WALL__
+        close(81)
 #endif
       endif
 
@@ -1602,6 +1611,7 @@ c=======================================================================
       subroutine setv()
       use variables
       implicit none
+      include 'mpif.h'
       include 'params_au.h'
       integer:: i,l,is
       real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(nismax)
@@ -1619,27 +1629,6 @@ c-----velocities in Maxwell-Boltzmann distribution
           va(l,i)=facv(is)*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
         enddo
       enddo
-c-----set center of mass motion to zero
-      sumvx=0d0
-      sumvy=0d0
-      sumvz=0d0
-      do i=1,natm
-        sumvx=sumvx+va(1,i)
-        sumvy=sumvy+va(2,i)
-        sumvz=sumvz+va(3,i)
-      enddo
-      do i=1,natm
-        va(1,i)=va(1,i)-sumvx/dble(natm)
-        va(2,i)=va(2,i)-sumvy/dble(natm)
-        va(3,i)=va(3,i)-sumvz/dble(natm)
-      enddo
-
-c-----scale velocities to reduced unit
-      do i=1,natm
-        va(1,i)=va(1,i) /h(1,1,0) *dt
-        va(2,i)=va(2,i) /h(2,2,0) *dt
-        va(3,i)=va(3,i) /h(3,3,0) *dt
-      enddo
 
       end subroutine setv
 c=======================================================================
@@ -1654,6 +1643,49 @@ c=======================================================================
       rnd=dseed/d2p31
       return
       end subroutine myrnd
+c=======================================================================
+      subroutine rm_trans_motion()
+      use variables
+      implicit none
+      include 'mpif.h'
+      integer:: i,is
+      real(8):: sumpx,sumpy,sumpz,amss,amtot,tmp
+
+c-----set center of mass motion to zero
+      sumpx=0d0
+      sumpy=0d0
+      sumpz=0d0
+      do i=1,natm
+        is= int(tag(i))
+        amss= am(is)
+        sumpx=sumpx+amss*va(1,i)
+        sumpy=sumpy+amss*va(2,i)
+        sumpz=sumpz+amss*va(3,i)
+        amtot= amtot +amss
+      enddo
+      tmp= sumpx
+      call mpi_allreduce(tmp,sumpx,1,mpi_double_precision,mpi_sum
+     &     ,mpi_md_world,ierr)
+      tmp= sumpy
+      call mpi_allreduce(tmp,sumpy,1,mpi_double_precision,mpi_sum
+     &     ,mpi_md_world,ierr)
+      tmp= sumpz
+      call mpi_allreduce(tmp,sumpz,1,mpi_double_precision,mpi_sum
+     &     ,mpi_md_world,ierr)
+      tmp= amtot
+      call mpi_allreduce(tmp,amtot,1,mpi_double_precision,mpi_sum
+     &     ,mpi_md_world,ierr)
+      do i=1,natm
+        va(1,i)=va(1,i)-sumpx/amtot
+        va(2,i)=va(2,i)-sumpy/amtot
+        va(3,i)=va(3,i)-sumpz/amtot
+      enddo
+      if( myid_md.eq.0 ) then
+        write(6,'(a,3es12.4)') ' sumpx,y,z/amtot='
+     &       ,sumpx/amtot,sumpy/amtot,sumpz/amtot
+      endif
+
+      end subroutine rm_trans_motion
 c=======================================================================
       subroutine wall_reflect()
       use variables

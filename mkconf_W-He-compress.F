@@ -12,7 +12,7 @@ c-----------------------------------------------------------------------
 c-----max # of atoms
       integer,parameter::nmax=10000000
 c-----# of unit cells of bcc W crystall
-      integer,parameter:: nuc(1:3)= (/ 10, 10, 20 /)
+      integer,parameter:: nuc(1:3)= (/ 10, 10, 30 /)
 c.....# of unit cells of He gas region per both top and bottom
       integer,parameter:: nhe(1:3)= (/ 0, 0, 5 /)
 c.....# of unit cells for vacuume region per both top and bottom
@@ -28,8 +28,10 @@ c.....Parameters
       small = 1d0/8 /nucs(1)
       write(6,'(a,f10.4)') ' small=',small
 
-c.....Lattice constant of W
-      cunit= 3.204d-10 /bohr
+cc.....Lattice constant of W for 0K
+c      cunit= 3.204d-10 /bohr
+c.....Lattice constant of W for 1000K
+      cunit= 3.226d-10 /bohr
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
@@ -46,8 +48,8 @@ c-----unit cell, BCC
         do iy=0,nuc(2)-1
           do ix=0,nuc(1)-1
             do m=1,2
-              if( iy.eq.nuc(2)/2 .and. ix.eq.nuc(1)/2
-     &             .and. iz.eq.nuc(3)/2 .and. m.eq.1 ) cycle 
+              if( iy.eq.nucs(2)/2 .and. ix.eq.nucs(1)/2
+     &             .and. iz.eq.nucs(3)/2 .and. m.eq.1 ) cycle 
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
@@ -71,8 +73,8 @@ c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
       enddo
       write(6,'(a,i10)') " natm=",inc
 
-      write(6,'(a,es15.7)') ' wtop = ',dble(nvac(3))/nucs(3)
-      write(6,'(a,es15.7)') ' wbot = ',1d0-dble(nvac(3))/nucs(3)
+      write(6,'(a,es15.7)') ' wbot = ',dble(nvac(3))/nucs(3)
+      write(6,'(a,es15.7)') ' wtop = ',1d0-dble(nvac(3))/nucs(3)
 
       va(1:3,1:inc)= 0d0
 
