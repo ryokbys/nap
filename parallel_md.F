@@ -1630,6 +1630,12 @@ c-----velocities in Maxwell-Boltzmann distribution
         enddo
       enddo
 
+      do i=1,natm
+        va(1,i)= va(1,i) /h(1,1,0) *dt
+        va(2,i)= va(2,i) /h(2,2,0) *dt
+        va(3,i)= va(3,i) /h(3,3,0) *dt
+      enddo
+
       end subroutine setv
 c=======================================================================
       subroutine myrnd(rnd,dseed)
