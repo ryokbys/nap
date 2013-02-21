@@ -13,7 +13,7 @@ cc      real(8),parameter:: rc    = 3.36d-10 /0.5291772d-10
 c      real(8),parameter:: rc    = 3.5d-10 /0.5291772d-10
 c.....Cutoff radius for BCC Fe, halfway between 1st and 2nd N.N.
       real(8),parameter:: abcc = 2.8533d-10/0.5291772d-10
-      real(8),parameter:: rc   = 0.5d0*(1d0+sqrt(3d0)/2)*abcc
+      real(8),parameter:: rc   = 0.5d0*(1d0+0.866025d0)*abcc
 
       integer:: i,n,itmp,nauxdat,j
       integer:: natm0,natm,nx,ny,nz,nlsa

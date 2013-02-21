@@ -1687,6 +1687,7 @@ c-----set center of mass motion to zero
 
       end subroutine rm_trans_motion
 c=======================================================================
+#ifdef __WALL__
       subroutine wall_reflect()
       use variables
       use wall
@@ -1808,6 +1809,7 @@ c      call mpi_bcast(wbot,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(dwbot,1,mpi_double_precision,0,mpi_md_world,ierr)
       
       end subroutine update_wall
+#endif
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"
