@@ -3,7 +3,7 @@ c.....Mass
       real(8),parameter:: am_He  =   4.0026d0 *aump/aume
 
 c.....energy scaling
-      real(8),parameter:: sfac  = 1d0 !/4
+      real(8),parameter:: sfac  = 1d0 !/2
 
 c.....2-body
 c.....W-W
