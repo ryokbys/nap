@@ -61,7 +61,8 @@ c-----write akr file to STDOUT
       write(6,'(3es12.4)') 0d0,al(2),0d0
       write(6,'(3es12.4)') 0d0,0d0,al(3)
       do i=1,natm
-        write(6,'(i4,20es22.14)') itype(i),ra(1:3,i),auxdat(1:nauxdat,i)
+        write(6,'(i4,3es15.7,17es10.2)')
+     &       itype(i),ra(1:3,i),auxdat(1:nauxdat,i)
       enddo
 
       end program akr2cna
