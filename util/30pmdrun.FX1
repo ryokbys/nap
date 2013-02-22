@@ -1,0 +1,50 @@
+#!/bin/sh
+# @$-q f256
+# @$-lP 256 -lp 1
+# @$-cp 40:00:00
+# @$-eo -o out.log
+# @$-oi
+#-----------------------------------------------------------------------
+# Usage:
+#   $ qsub 30pmdrun.FX1
+#-----------------------------------------------------------------------
+
+cd $QSUB_WORKDIR
+
+#NPROCS=`wc -l < $PBS_NODEFILE`
+MPIRUN=mpiexec
+PMD=/home/usr1/z48451a/kobayashi/src/pmd
+
+#echo "Num of nodes= $NPROCS"
+#echo "Running nodes:"
+#cat $PBS_NODEFILE
+pwd
+
+#.....pmd
+echo "$MPIRUN -np 256 $PMD/pmd >& out.pmd"
+$MPIRUN -n 256 $PMD/pmd >& out.pmd
+
+#.....combine to make akr files
+echo "$PMD/40combine >& out.combine"
+$PMD/40combine >& out.combine
+
+#.....cna from akr files
+echo "Processing CNA..."
+for file in akr*
+do
+  $PMD/akr2cna < $file > "`echo $file | sed 's/akr/cna/'`"
+done
+
+# #.....Extract dislocation position
+# echo "CNA ---> DISL"
+# for file in cna*
+# do
+#   $PMD/cna2disl < $file > "`echo $file | sed 's/cna/disl/'`"
+# done
+# 
+# #.....Dislocation position for gnuplot
+# date
+# for file in disl*
+# do 
+#   awk 'NR==1 {print}' $file
+# done > dat.disl
