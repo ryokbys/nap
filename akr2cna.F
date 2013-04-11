@@ -13,9 +13,9 @@ cc.....Cutoff radius for LJ-Ar FCC, halfway between 1st and 2nd N.N.
 cc      real(8),parameter:: rc    = 3.36d-10 /0.5291772d-10
 c      real(8),parameter:: rc    = 3.5d-10 /0.5291772d-10
 cc.....Cutoff radius for BCC Fe, halfway between 2nd and 3rd N.N.
-c      real(8),parameter:: abcc = 2.8533d-10/0.5291772d-10
+c      real(8),parameter:: abcc = 2.835d-10/0.5291772d-10
 c.....Cutoff radius for BCC W, halfway between 2nd and 3rd N.N.
-      real(8),parameter:: abcc = 3.226d-10/0.5291772d-10
+      real(8),parameter:: abcc = 3.171d-10/0.5291772d-10
       real(8),parameter:: rc   = 0.5d0*(1d0+1.41421356d0)*abcc
 
       integer:: i,n,itmp,nauxdat,j
@@ -156,11 +156,7 @@ c---------region (jr)
                   dy=(ra(2,j)-ra(2,i)-anint(ra(2,j)-ra(2,i)))*al(2)
                   dz=(ra(3,j)-ra(3,i)-anint(ra(3,j)-ra(3,i)))*al(3)
                   r= dsqrt(dx*dx +dy*dy +dz*dz)
-c                  if(i.eq.1) write(6,'(a,4i4,2es11.3)')
-c     &                 "ir,i,jr,j,r,rc=",ir,i,jr,j,r,rc*1.3d0
                   if(r.lt.rc .and. j.ne.i .and. is.eq.js) then
-c                    write(6,'(a,2i5,es11.3)') "i,j,r-rc*1.2=",i,j
-c     &                   ,r-rc*1.2d0
                     n=n+1
                     if(n.gt.nnmax) then
                       write(6,'(a)') "mklspr: n.gt.nnmax"
@@ -201,9 +197,9 @@ cc        do l=1,lspr(0,i)
 cc          j=lspr(l,i)
 cc          write(6,'(2i10,3es12.4)') i,j,(ra(1:3,j)-ra(1:3,i))*al(1:3)
 cc        enddo
-c        if( lspr(0,i).gt.12 ) then
+c        if( lspr(0,i).gt.14 ) then
 c          n=n+1
-cc          write(6,'(a,2i10)') "i,lspr=",i,lspr(0,i)
+c          write(6,'(a,2i10)') "i,lspr=",i,lspr(0,i)
 c        endif
 c      enddo
 c      write(6,'(a,i10)') " num of non 12..=",n
@@ -344,7 +340,7 @@ c-----reduce atoms
           l=idc(1,ii,i)
           m=idc(2,ii,i)
           n=idc(3,ii,i)
-c          if( mod(i,10000).eq.1 ) then
+c          if( i.eq.41 ) then
 c            write(6,'(a,4i10)') '  ii,l,m,n=',ii,l,m,n
 c          endif
           if(l.eq.4 .and. m.eq.2 .and. n.eq.1 ) n421=n421 +1

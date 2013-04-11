@@ -16,11 +16,10 @@ CPPFLAGS=
 #MPIFC= /usr/local/gridmpi-2.1.1/intel/bin/mpif90
 #MPIFC= /usr/local/mpich-1.2.6/intel/bin/mpif90
 #.....mike
-# MPIFC=/opt/intel/impi/4.0.0.028/intel64/bin/mpif90
-# MPIFLAGS= -O3
+# MPIFC=/opt/intel/impi/4.0.0.028/intel64/bin/mpiifort
+# MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
 #.....king
 MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
-#MPIFC= mpif90
 MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
 #MPIFLAGS= -g -CB
 
