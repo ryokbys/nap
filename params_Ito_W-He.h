@@ -5,15 +5,19 @@ c.....Mass
 c.....energy scaling
       real(8),parameter:: sfac  = 1d0 !/2
 
+c.....length scaling for hybrid QMCL calculation
+      real(8),parameter:: slen  = 1d0/3.204d0 *3.172d0
+      real(8),parameter:: aa2bs = aa2bohr*slen
+
 c.....2-body
 c.....W-W
-      real(8),parameter:: p_WW_c    = 3.25d0 *aa2bohr
-      real(8),parameter:: p_WW_c0   = 47.042512d0 *ev2hrt /aa2bohr**2
-      real(8),parameter:: p_WW_c1   = -33.987390d0 *ev2hrt /aa2bohr**3
-      real(8),parameter:: p_WW_c2   = 6.319348d0 *ev2hrt /aa2bohr**4
-      real(8),parameter:: p_WW_B    = 90.300865d0 *ev2hrt /aa2bohr**3
-      real(8),parameter:: p_WW_alpha= 0.997985d0 /aa2bohr
-      real(8),parameter:: p_WW_b0   = 2.951811d0 *aa2bohr
+      real(8),parameter:: p_WW_c    = 3.25d0 *aa2bs
+      real(8),parameter:: p_WW_c0   = 47.042512d0 *ev2hrt /aa2bs**2
+      real(8),parameter:: p_WW_c1   = -33.987390d0 *ev2hrt /aa2bs**3
+      real(8),parameter:: p_WW_c2   = 6.319348d0 *ev2hrt /aa2bs**4
+      real(8),parameter:: p_WW_B    = 90.300865d0 *ev2hrt /aa2bs**3
+      real(8),parameter:: p_WW_alpha= 0.997985d0 /aa2bs
+      real(8),parameter:: p_WW_b0   = 2.951811d0 *aa2bs
 c.....W-He
       real(8),parameter:: p_WHe_rc = 4.0d0 *aa2bohr
       real(8),parameter:: p_WHe_rs = 2.2d0 *aa2bohr
@@ -31,8 +35,8 @@ c.....He-He
 
 c.....Many-body
 c.....W
-      real(8),parameter:: p_W_w    = 1.786367d0 *ev2hrt /aa2bohr
-      real(8),parameter:: p_W_d    = 4.40d0 *aa2bohr
+      real(8),parameter:: p_W_w    = 1.786367d0 *ev2hrt /aa2bs
+      real(8),parameter:: p_W_d    = 4.40d0 *aa2bs
       real(8),parameter:: p_W_beta = -0.23433d0
 c.....He
       real(8),parameter:: p_He_A = -0.154896d0 /ev2hrt
