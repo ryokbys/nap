@@ -29,13 +29,13 @@ c.....Read qmcl file from standard input
       ncpx=1
       ncpy=1
       ncpz=1
-      if( h(1,1,0).lt.2d0*rc ) then
-        ncpx= 1+int(2d0*rc/h(1,1,0))
-      elseif( h(2,2,0).lt.2d0*rc ) then
-        ncpy= 1+int(2d0*rc/h(2,2,0))
-      elseif( h(3,3,0).lt.2d0*rc ) then
-        ncpz= 1+int(2d0*rc/h(3,3,0))
-      endif
+c      if( h(1,1,0).lt.3d0*rc ) then
+c        ncpx= 1+int(3d0*rc/h(1,1,0))
+c      elseif( h(2,2,0).lt.3d0*rc ) then
+c        ncpy= 1+int(3d0*rc/h(2,2,0))
+c      elseif( h(3,3,0).lt.3d0*rc ) then
+c        ncpz= 1+int(3d0*rc/h(3,3,0))
+c      endif
       natmt= natm*ncpx*ncpy*ncpz
 c      write(6,'(4i10)') natmt,ncpx,ncpy,ncpz
       ht(1:3,1:3,0:1)= 0d0

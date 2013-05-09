@@ -12,10 +12,10 @@ c-----max num of neighbors; 12 is enough
 cc.....Cutoff radius for LJ-Ar FCC, halfway between 1st and 2nd N.N.
 cc      real(8),parameter:: rc    = 3.36d-10 /0.5291772d-10
 c      real(8),parameter:: rc    = 3.5d-10 /0.5291772d-10
-cc.....Cutoff radius for BCC Fe, halfway between 2nd and 3rd N.N.
-c      real(8),parameter:: abcc = 2.8533d-10/0.5291772d-10
-c.....Cutoff radius for BCC W, halfway between 2nd and 3rd N.N.
-      real(8),parameter:: abcc = 3.226d-10/0.5291772d-10
+c.....Cutoff radius for BCC Fe, halfway between 2nd and 3rd N.N.
+      real(8),parameter:: abcc = 2.835d-10/0.5291772d-10
+cc.....Cutoff radius for BCC W, halfway between 2nd and 3rd N.N.
+c      real(8),parameter:: abcc = 3.226d-10/0.5291772d-10
       real(8),parameter:: rc   = 0.5d0*(1d0+1.41421356d0)*abcc
 
       integer:: i,n,itmp,nauxdat,j
@@ -159,8 +159,7 @@ c---------region (jr)
 c                  if(i.eq.1) write(6,'(a,4i4,2es11.3)')
 c     &                 "ir,i,jr,j,r,rc=",ir,i,jr,j,r,rc*1.3d0
                   if(r.lt.rc .and. j.ne.i .and. is.eq.js) then
-c                    write(6,'(a,2i5,es11.3)') "i,j,r-rc*1.2=",i,j
-c     &                   ,r-rc*1.2d0
+c                  if(r.lt.rc .and. j.ne.i) then
                     n=n+1
                     if(n.gt.nnmax) then
                       write(6,'(a)') "mklspr: n.gt.nnmax"

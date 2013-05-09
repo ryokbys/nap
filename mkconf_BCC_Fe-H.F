@@ -69,14 +69,14 @@ c.....Add H atoms
       is= 2
       ifmv= 1
       tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
-cc.....O-site
-c      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-c      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-c      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-c.....T-site
+c.....O-site
       ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
       ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+cc.....T-site
+c      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+c      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+c      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
 
       write(6,'(a,i10)') " natm=",inc
       write(6,'(a,i10)') " id of inc=",int(mod(tag(inc)*1d14,1d13))
