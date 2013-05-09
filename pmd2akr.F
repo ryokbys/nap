@@ -1,83 +1,127 @@
-      program qmcl2akr
+      program pmd2akr
 c-----------------------------------------------------------------------
+c Combine pmd files made by parallel program
+c   - pmd###-$$$  -->  akr$$$
+c     ###: node number
+c     $$$: akira frame number
 c USAGE:
-c   $ ./pmd2akr < pmd??? > akr???
+c   $ ./pmd2akr ###
 c-----------------------------------------------------------------------
+      use variables
       implicit none
-      integer:: natm,i,ia,ib,l,ncpx,ncpy,ncpz,natmt,m,ix,iy,iz
-     &     ,iqm,ic,mis,nac,naqm
-      real(8):: h(3,3,0:1),ht(3,3,0:1),dcpx,dcpy,dcpz
-      real(8),allocatable:: ra(:,:),tag(:),va(:,:),eki(:),epi(:)
-     &     ,strs(:,:,:)
-      real(8),allocatable:: rat(:,:),vat(:,:),tagt(:),ekit(:),epit(:)
-     &     ,strst(:,:,:)
-      real(8),parameter:: bohr =  0.5291772d-10
-      real(8),parameter:: rc   =  5.3d-10 /bohr
+      integer,parameter:: npmax= 2100000
+c.....Num of auxiliary data for coloring atoms in Akira
+      integer,parameter:: nauxdat = 5
+      integer:: ipmd,n,inode,itmp,i,nnodes,nkvs,ia,ib,l,itag(npmax)
+      real(8):: tmp,dat(18,npmax)
+      character:: fin*10,fout*6
+      integer,external:: itot_tag
+      integer nargc
+      integer,external:: iargc
+      character*128:: argv
 
-c.....Read qmcl file from standard input
-      read(5,*) natm
-      allocate(ra(3,natm),tag(natm),va(3,natm),eki(natm),epi(natm)
-     &     ,strs(3,3,natm))
-      read(5,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      mis= 0
-      do i=1,natm
-        read(5,*) tag(i),ra(1:3,i),va(1:3,i)
-     &     ,eki(i),epi(i),strs(1:3,1:3,i)
-        mis= max(mis,int(tag(i)))
-      enddo
+c.....Read an argument, ipmd
+      nargc=iargc()
+      if( nargc.gt.1 ) stop 'Usage: $ ./pmd2akr 10'
+      call getarg(1,argv)
+      read(argv,*) ipmd
 
-      ncpx=1
-      ncpy=1
-      ncpz=1
-c      if( h(1,1,0).lt.3d0*rc ) then
-c        ncpx= 1+int(3d0*rc/h(1,1,0))
-c      elseif( h(2,2,0).lt.3d0*rc ) then
-c        ncpy= 1+int(3d0*rc/h(2,2,0))
-c      elseif( h(3,3,0).lt.3d0*rc ) then
-c        ncpz= 1+int(3d0*rc/h(3,3,0))
-c      endif
-      natmt= natm*ncpx*ncpy*ncpz
-c      write(6,'(4i10)') natmt,ncpx,ncpy,ncpz
-      ht(1:3,1:3,0:1)= 0d0
-      ht(1,1,0)=  h(1,1,0)*ncpx
-      ht(2,2,0)=  h(2,2,0)*ncpy
-      ht(3,3,0)=  h(3,3,0)*ncpz
-      allocate(rat(3,natmt),vat(3,natmt),tagt(natmt)
-     &     ,ekit(natmt),epit(natmt),strst(3,3,natmt))
+      call read_input(10,'in.pmd')
+      nnodes= nx*ny*nz
+c      write(6,'(a,4i5)') " nx,ny,nz,nnodes=",nx,ny,nz,nnodes
+c      write(6,'(a,i5)') " npmd =",npmd
 
-      m=0
-      do iz=1,ncpz
-        dcpz= dble(iz-1)/ncpz
-        do iy=1,ncpy
-          dcpy= dble(iy-1)/ncpy
-          do ix=1,ncpx
-            dcpx= dble(ix-1)/ncpx
-            do i=1,natm
-              m=m+1
-              tagt(m)= tag(i)
-              rat(1,m)= ra(1,i)/ncpx +dcpx
-              rat(2,m)= ra(2,i)/ncpy +dcpy
-              rat(3,m)= ra(3,i)/ncpz +dcpz
-              vat(1:3,m)= va(1:3,i)
-              ekit(m)= eki(i)
-              epit(m)= epi(i)
-              strst(1:3,1:3,m)= strs(1:3,1:3,i)
-            enddo
-          enddo
+      if( ipmd.lt.0 .or. ipmd.gt.npmd ) then
+        write(6,*) ' Error: ipmd should be [0:',npmd,']'
+        stop 
+      endif
+      
+      n= 0
+      do inode=0,nnodes-1
+        fin="pmd000-000"
+c-------about node number
+        write(fin(4:6),'(i3.3)') inode
+c---------about pmd-step number
+        write(fin(8:10),'(i3.3)') ipmd
+c---------read pmd###-$$$ file
+        if( trim(ciofmt).eq.'bin'.or.trim(ciofmt).eq.'binary' ) then
+          call read_pmd_bin(20,fin
+     &         ,namax,itmp,h,tag,ra,va,eki,epi,strs)
+        else if( trim(ciofmt).eq.'ascii' ) then
+          call read_pmd_ascii(20,fin
+     &         ,namax,itmp,h,tag,ra,va,eki,epi,strs)
+        endif
+        write(6,'(a,i8)') 'itmp=',itmp
+        do i=1,itmp
+          n=n+1
+          dat(1:3,n)= ra(1:3,i)
+          dat(4:6,n)= va(1:3,i)
+          dat(7,n)= eki(1,1,i)
+          dat(8,n)= epi(i)
+          dat(9:11,n)= strs(1:3,1,i)
+          dat(12:14,n)= strs(1:3,2,i)
+          dat(15:17,n)= strs(1:3,3,i)
+          dat(18,n)= tag(i)
+          itag(n)= itot_tag(tag(i))
+c            tagt(n)=tag(i)
+c            rat(1:3,n)=ra(1:3,i)
+c            vat(1:3,n)=va(1:3,i)
+c            op(1,n)=eki(1,1,i)
+c            op(2,n)=epi(i)
+c            op(3,n)=strs(1,1,i)
+c            op(4,n)=strs(2,2,i)
+c            op(5,n)=strs(1,2,i)
         enddo
       enddo
 
-      write(6,'(i10,3i4)') natmt, 8, 0, 0
-      write(6,'(3es15.7)') ((ht(ia,ib,0),ia=1,3),ib=1,3)
-      do i=1,natmt
-        write(6,'(i3,3es12.4,10es11.3)') int(tagt(i)),rat(1:3,i)
-     &       ,ekit(i),epit(i)
-     &       ,strst(1,1,i),strst(2,2,i),strst(3,3,i)
-     &       ,strst(2,3,i),strst(3,1,i),strst(1,2,i)
-c     &       ,eki(i),epi(i),va(1:3,i)
-      enddo
+cc.....Sort before output
+c        call heapsort_itag(n,npmax,itag,18,dat)
 
-      end program qmcl2akr
+c-------output file name
+      fout="akr000"
+      write(fout(4:6),'(i3.3)') ipmd
+c-------output combined mts-file
+      open(30,file=fout,status="replace")
+      write(30,'(i10,3i4)') n, nauxdat, 0, 0
+      write(30,'(3es15.7)') ((h(ia,ib,0),ia=1,3),ib=1,3)
+      write(30,'(i3,8es22.14)') (int(dat(18,i)),dat(1:3,i)
+     &     ,dat(7:8,i),dat(9,i),dat(13,i),dat(17,i),i=1,n)
+      close(30)
+      write(6,'(a)') " "//fout//" done."
+
+      end program pmd2akr
+c=======================================================================
+      function is_tag(tag)
+      implicit none
+      real(8),intent(in):: tag
+      integer:: is_tag
+      
+      is_tag= int(tag)
+      return
+      end function is_tag
+c=======================================================================
+      function ifmv_tag(tag)
+      implicit none
+      real(8),intent(in):: tag
+      integer:: ifmv_tag
+      
+      ifmv_tag= int((tag -int(tag))*10)
+
+      return
+      end function ifmv_tag
+c=======================================================================
+      function itot_tag(tag)
+      implicit none
+      real(8),intent(in):: tag
+      integer:: itot_tag
+      real(8):: tmp
+      integer,external:: is_tag,ifmv_tag
+
+      tmp= tag -is_tag(tag) -ifmv_tag(tag)*1d-1
+      itot_tag= nint(tmp*1d+14)
+      return
+      end function itot_tag
+c=======================================================================
 c-----for emacs---------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd2akr"

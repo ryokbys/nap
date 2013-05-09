@@ -16,12 +16,15 @@ CPPFLAGS=
 #MPIFC= /usr/local/gridmpi-2.1.1/intel/bin/mpif90
 #MPIFC= /usr/local/mpich-1.2.6/intel/bin/mpif90
 #.....mike
-# MPIFC=/opt/intel/impi/4.0.0.028/intel64/bin/mpiifort
-# MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
-#.....king
-MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
+MPIFC=/opt/intel/impi/4.0.0.028/intel64/bin/mpiifort
 MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
+# #.....king
+# MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
+# MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
 #MPIFLAGS= -g -CB
+# #.....helios
+# MPIFC= mpiifort
+# MPIFLAGS= -xAVX -O3 -ip -ipo -g -CB
 
 #-----------------------------------------------------------------------
 # Fujitsu FX1 @nagoya-u
@@ -46,7 +49,7 @@ MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
 
 pmd= read_input.o parallel_md.o util_vec.o routines_dislocation.o \
 	lasubs.o util_pmd.o tensile_loading.o
-mods= mod_variables.o mod_wall.o
+mods= mod_variables.o
 
 #-----------------------------------------------------------------------
 # Uncomment only one force routine
@@ -98,7 +101,7 @@ mkconf= mkconf_BCC_W-He.o
 # Post process programs
 #
 comb= combine_pmd.o read_input.o util_pmd.o sort.o
-
+pmd2akr= pmd2akr.o read_input.o util_pmd.o sort.o
 
 #-----------------------------------------------------------------------
 # Make rule entries
@@ -124,8 +127,8 @@ pmd: $(mods) ${pmd} ${force} ${params}
 40combine: $(comb) $(mods)
 	${MPIFC} -o $@  $(mods) $(comb)
 
-pmd2akr: pmd2akr.o
-	$(MPIFC) -o $@ pmd2akr.o
+pmd2akr: $(pmd2akr) $(mods)
+	$(MPIFC) -o $@ $(mods) $(pmd2akr)
 
 akr2cna: akr2cna.o sort.o
 	${MPIFC} -o $@ akr2cna.o sort.o
@@ -159,6 +162,7 @@ parallel_md.o: $(mods)
 read_input.o:  $(mods)
 node_conv.o:   $(mods)
 combine_pmd.o: $(mods)
+pmd2akr.o: $(mods)
 force_Ito_W-He.o: $(mods)
 
 
