@@ -1,29 +1,3 @@
-      subroutine setup(nismax,am,acon,fack,dt)
-      implicit none
-      include "params_au.h"
-      include "params_Ito_W-He.h"
-      integer,intent(in):: nismax
-      real(8),intent(in):: dt
-      real(8),intent(out):: am(nismax),acon(nismax),fack(nismax)
-
-      integer:: i
-
-c-----atomic masses
-      am(1:nismax)= am_W
-      am(2)       = am_He
-
-c-----prefactors for normalized accelerration
-      do i=1,nismax
-        acon(i)= 0.5d0*dt**2/am(i)
-      enddo
-
-c-----prefactors for kinetic energy, FACK
-      do i=1,nismax
-        fack(i)= 0.5d0*am(i)/dt**2
-      enddo
-
-      end subroutine setup
-c=======================================================================
       subroutine set_avol()
 c
 c  Not applicable to parallel calc
@@ -32,7 +6,7 @@ c
       include 'params_au.h'
 
       avol= h(1,1,0)*h(2,2,0)*h(3,3,0)/natm
-      write(6,'(a,es12.4)') ' avol=',avol*bohr2aa**3
+      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol=',avol*bohr2aa**3
 
       end subroutine set_avol
 c=======================================================================

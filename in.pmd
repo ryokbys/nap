@@ -32,3 +32,6 @@
   vol_change_damping   1d0
 
   shear_stress   0.00
+
+  mass  1   55.8
+  mass  2    4.0

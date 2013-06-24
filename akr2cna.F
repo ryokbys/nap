@@ -160,10 +160,7 @@ c---------region (jr)
                   dz=(ra(3,j)-ra(3,i)-anint(ra(3,j)-ra(3,i)))*al(3)
                   r= dsqrt(dx*dx +dy*dy +dz*dz)
                   if(r.lt.rc .and. j.ne.i .and. is.eq.js) then
-<<<<<<< HEAD
 c                  if(r.lt.rc .and. j.ne.i) then
-=======
->>>>>>> 7f2642ee494c131047530769c4a4fd0b797d0a94
                     n=n+1
                     if(n.gt.nnmax) then
                       write(6,'(a)') "mklspr: n.gt.nnmax"

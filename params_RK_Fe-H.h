@@ -8,6 +8,7 @@ c    See Ramasubramaniam et al. PRB 79, 174101 (2009), (Potential A)
 c-----------------------------------------------------------------------
 c  Parameters were modified to fit to lattice constant obtained by VASP
 c  for the hybrid QM-CL calculation.
+c  Cutoff radius should be 5.3 Ang.
 c=======================================================================
       real(8),parameter:: am_fe = 55.847d0 *aump/aume
       real(8),parameter:: am_h  =  1.008d0 *aump/aume

@@ -6,6 +6,7 @@
 #   $ ./POSCAR2akr.rb > akr000
 # Input:
 #   - POSCAR
+#   - OUTCAR
 #
 
 require './MD_classes.rb'

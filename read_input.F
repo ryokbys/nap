@@ -7,6 +7,8 @@ c
       character(len=*),intent(in):: cfname
       character(len=128):: c1st
 
+      write(6,'(a)') ' Start reading '//trim(cfname)
+
       open(ionum,file=trim(cfname))
       do
 c.....Read 1st word in each line
@@ -44,7 +46,7 @@ c=======================================================================
       character(len=*),intent(in):: cname
 
       character(len=128):: ctmp
-      integer:: ndata,nrow
+      integer:: ndata,nrow,is
       
       if( trim(cname).eq.'time_interval' ) then
         call read_r1(ionum,dt)
@@ -100,7 +102,7 @@ c=======================================================================
       elseif( trim(cname).eq.'factor_direction' ) then
         backspace(ionum)
         read(ionum,*) ctmp,ndata,nrow
-        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
+c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
         call read_rs(ionum,ctmp,3,nrow,fmv(1:3,1:nrow))
         return
       elseif( trim(cname).eq.'pressure_target' ) then
@@ -120,6 +122,10 @@ c=======================================================================
         return
       elseif( trim(cname).eq.'final_strain' ) then
         call read_r1(ionum,strfin)
+        return
+      elseif( trim(cname).eq.'mass' ) then
+        backspace(ionum)
+        read(ionum,*) ctmp,is,am(is)
         return
 #ifdef __WALL__
       elseif( trim(cname).eq.'wall_pos_top' ) then
@@ -160,7 +166,7 @@ c
 
       backspace(ionum)
       read(ionum,*) ctmp,rval
-      write(6,'(1x,a,es15.3)') trim(ctmp),rval
+c      write(6,'(1x,a,es15.3)') trim(ctmp),rval
 
       end subroutine read_r1
 c=======================================================================
@@ -172,10 +178,10 @@ c
       real(8),intent(out):: rval(ndata,nrow)
       character(len=*),intent(in):: ctmp
 
-      write(6,'(1x,a,2i8)') trim(ctmp), ndata, nrow
+c      write(6,'(1x,a,2i8)') trim(ctmp), ndata, nrow
       do n=1,nrow
         read(ionum,*) (rval(i,n),i=1,ndata)
-        write(6,'(1x,100es15.3)') (rval(i,n),i=1,ndata)
+c        write(6,'(1x,100es15.3)') (rval(i,n),i=1,ndata)
       enddo
 
       end subroutine read_rs
@@ -190,7 +196,7 @@ c
 
       backspace(ionum)
       read(ionum,*) ctmp,ival
-      write(6,'(1x,a,i10)') trim(ctmp),ival
+c      write(6,'(1x,a,i10)') trim(ctmp),ival
 
       end subroutine read_i1
 c=======================================================================
@@ -204,7 +210,7 @@ c
 
       backspace(ionum)
       read(ionum,*) ctmp,cval
-      write(6,'(1x,2a)') trim(ctmp),trim(cval)
+c      write(6,'(1x,2a)') trim(ctmp),trim(cval)
 
       end subroutine read_c1
 

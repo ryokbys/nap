@@ -51,6 +51,7 @@ c.....Set fmv as default value before reading 'in.pmd'
 
       if( myid_md.eq.0 ) then
         call read_input(10,'in.pmd')
+        call write_initial_setting()
 c.....Multiply damping factor to avoid multiplication of every step
         if( ifdmp.eq.1 ) then
           fmv(1:3,0:9)= fmv(1:3,0:9) *dmp
@@ -108,6 +109,8 @@ c-----parallel configuration
 c-----error trap
       if(nodes_md.ne.nxyz) then
         write(6,'(a)') " error: nodes_md .ne. nxyz!!"
+        write(6,'(a,3i5)') ' myid_md,nodes_md,nxyz='
+     &       ,myid_md,nodes_md,nxyz
         call mpi_finalize(ierr)
         stop
       endif
@@ -542,6 +545,77 @@ c.....reset pressure
       call mpi_finalize(ierr)
 
       end program parallel_md
+c=======================================================================
+      subroutine write_initial_setting()
+      use variables
+      implicit none 
+      integer:: i
+
+      write(6,'(a)') '========== INITIAL SETTING ==========='
+      write(6,'(2x,a25,2x,a)') 'io_format',ciofmt
+      write(6,'(2x,a)') ''
+      write(6,'(2x,a25,i8)')   'num_nodes_x',nx
+      write(6,'(2x,a25,i8)')   'num_nodes_y',ny
+      write(6,'(2x,a25,i8)')   'num_nodes_z',nz
+      write(6,'(2x,a)') ''
+      write(6,'(2x,a25,es11.3)') 'time_interval',dt
+      write(6,'(2x,a25,i8)')   'num_iteration',nstp
+      write(6,'(2x,a25,i8)')   'num_out_energy',nerg
+      write(6,'(2x,a)') ''
+      write(6,'(2x,a25,i8)')   'flag_out_pmd',ifpmd
+      write(6,'(2x,a25,i8)')   'num_out_pmd',npmd
+      write(6,'(2x,a)') ''
+      write(6,'(2x,a25,es11.3)') 'cutoff_radius',rc
+      write(6,'(2x,a25,es11.3)') 'cutoff_buffer',rbuf
+      write(6,'(2x,a)') ''
+      write(6,'(2x,a25,i8)') 'flag_damping',ifdmp
+      write(6,'(2x,a25,es11.3)') 'damping_coeff',dmp
+      write(6,'(2x,a)') ''
+      write(6,'(2x,a25,f12.4)') 'initial_temperature',tinit
+      write(6,'(2x,a25,i8)') 'flag_temperature',iftctl
+      write(6,'(2x,a25,f12.4)') 'temperature_target',treq
+      write(6,'(2x,a25,f12.4)') 'temperature_relax_time',trlx
+      write(6,'(2x,a)') ''
+      write(6,'(2x,a25,i8)') 'flag_isobaric',ifpctl
+      write(6,'(2x,a25,es11.3)') 'pressure_target',ptgt
+      write(6,'(2x,a25,es11.3)') 'vol_mass_coeff',vmcoeff
+      write(6,'(2x,a25,f12.4)') 'vol_change_damping',voldmp
+      write(6,'(2x,a)') ''
+      write(6,'(2x,a)') 'factor_direction'
+      do i=0,9
+        write(6,'(4x,i2,3es11.3)') i,fmv(1:3,i)
+      enddo
+      write(6,'(2x,a)') ''
+      write(6,'(2x,a)') 'mass'
+      do i=1,nismax
+        write(6,'(4x,i2,es11.3)') i,am(i)
+      enddo
+      write(6,'(a)') '======================================'
+
+      end subroutine write_initial_setting
+c=======================================================================
+      subroutine setup(nismax,am,acon,fack,dt)
+      implicit none
+      include "params_au.h"
+      integer,intent(in):: nismax
+      real(8),intent(in):: dt
+      real(8),intent(out):: acon(nismax),fack(nismax),am(nismax)
+
+      integer:: i
+
+      am(1:nismax)= am(1:nismax) *aump/aume
+
+c-----prefactors for normalized accelerration
+      do i=1,nismax
+        acon(i)= 0.5d0*dt**2/am(i)
+      enddo
+
+c-----prefactors for kinetic energy, FACK
+      do i=1,nismax
+        fack(i)= 0.5d0*am(i)/dt**2
+      enddo
+
+      end subroutine setup
 c=======================================================================
       subroutine boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 c-----------------------------------------------------------------------
@@ -1098,12 +1172,12 @@ c-----newim: num. of new immigrants
       mvque(0,1:6)= 0
 
       do 100 kd=1,3
+        kul=2*kd-1
+        kuh=2*kd
 
 c-------num of to-be-moved atoms
         do i=1,natm+newim
           xi(1:3)= ra(1:3,i)
-          kul=2*kd-1
-          kuh=2*kd
           is= int(tag(i))
           if (is.gt.0) then
             if (bmv(xi(1),xi(2),xi(3),kul,anxi,anyi,anzi)) then
@@ -1145,9 +1219,6 @@ c---------move atom positions, RA
             dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
             dbuf(4:6,i)= va(1:3,j)
             dbuf(7,i)  = tag(j)
-c            dbuf(8:10,i) = strs(1:3,1,j)
-c            dbuf(11:12,i)= strs(2:3,2,j)
-c            dbuf(13,i)   = strs(3,3,j)
             dbuf(8:16,i)= strs(1:9,j)
 c-----------Eliminate the record of a moved-out atom
             tag(j)= 0d0
@@ -1159,9 +1230,6 @@ c-----------Eliminate the record of a moved-out atom
             ra(1:3,natm+newim+i)= dbufr(1:3,i)
             va(1:3,natm+newim+i)= dbufr(4:6,i)
             tag(natm+newim+i)   = dbufr(7,i)
-c            strs(1:3,1,natm+newim+i)= dbufr(8:10,i)
-c            strs(2:3,2,natm+newim+i)= dbufr(11:12,i)
-c            strs(3,3,natm+newim+i)= dbufr(13,i)
             strs(1:9,natm+newim+i)= dbufr(8:16,i)
           enddo
 
@@ -1184,7 +1252,6 @@ c-----Compression
           ra(1:3,ipt)= ra(1:3,i)
           va(1:3,ipt)= va(1:3,i)
           tag(ipt)   = tag(i)
-c          strs(1:3,1:3,ipt)= strs(1:3,1:3,i)
           strs(1:9,ipt)= strs(1:9,i)
         endif
       enddo

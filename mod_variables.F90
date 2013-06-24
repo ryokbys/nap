@@ -3,11 +3,11 @@
     save
 
 !.....max. num. of atoms
-    integer,parameter:: namax = 100000
+    integer,parameter:: namax = 1000000
 !.....max. num. of species
     integer,parameter:: nismax= 9
 !.....max. num. of boundary-particles
-    integer,parameter:: nbmax = 100000
+    integer,parameter:: nbmax = 500000
 !.....max. num. of neighbors
     integer,parameter:: nnmax = 200
 
@@ -41,7 +41,8 @@
 !.....potential and kinetic energy per atoms
     real(8):: epi(namax),eki(3,3,namax),stp(3,3,namax)
 !.....mass, prefactors
-    real(8):: am(nismax),acon(nismax),fack(nismax)
+    real(8):: acon(nismax),fack(nismax)
+    real(8):: am(1:nismax)= 12.0d0
 !.....strain
     real(8):: stn(3,3,namax)
 

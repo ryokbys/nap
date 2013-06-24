@@ -10,10 +10,10 @@ c-----------------------------------------------------------------------
       include './params_au.h'
       include './params_RK_Fe-H.h'
 c-----max # of atoms
-      integer,parameter::nmax=10000000
+      integer,parameter::nmax=100000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 3,3,3 /)
+      integer,parameter:: nuc(1:3)= (/ 20,20,3 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
@@ -43,52 +43,57 @@ c-----unit cell, BCC
         do iy=0,nuc(2)-1
           do iz=0,nuc(3)-1
             do m=1,2
+              x=(ua(1,m)+dble(ix))/(nuc(1)+nvac(1)) +small
+              y=(ua(2,m)+dble(iy))/(nuc(2)+nvac(2)) +small
+              z=(ua(3,m)+dble(iz))/(nuc(3)+nvac(3)) +small
+              if( .not. (x.gt.0.2d0 .and. x.lt.0.4d0.and.
+     &             y.gt.0.2d0 .and. y.lt.0.4d0) ) cycle
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
                 stop
               endif
-              ra(1,inc)= (ua(1,m)+dble(ix))/(nuc(1)+nvac(1)) +small
-              ra(2,inc)= (ua(2,m)+dble(iy))/(nuc(2)+nvac(2)) +small
-              ra(3,inc)= (ua(3,m)+dble(iz))/(nuc(3)+nvac(3)) +small
+              ra(1,inc)= x
+              ra(2,inc)= y
+              ra(3,inc)= z
 c              ra(1:3,inc)= ra(1:3,inc)
 c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
               is= 1
-              ifmv= 0
+              ifmv= 1
               tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
             enddo
           enddo
         enddo
       enddo
 
-c.....Add H atoms
-      ix= nuc(1)/2
-      iy= nuc(2)/2
-      iz= nuc(3)/2
-      inc=inc+1
-      is= 2
-      ifmv= 1
-      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
-c.....O-site
-      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-cc.....T-site
+cc.....Add H atoms
+c      ix= nuc(1)/2
+c      iy= nuc(2)/2
+c      iz= nuc(3)/2
+c      inc=inc+1
+c      is= 2
+c      ifmv= 1
+c      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+cc.....O-site
 c      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-c      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+c      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
 c      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+ccc.....T-site
+cc      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+cc      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+cc      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
 
-      write(6,'(a,i10)') " natm=",inc
-      write(6,'(a,i10)') " id of inc=",int(mod(tag(inc)*1d14,1d13))
+      write(6,'(a,i10)') " num of atoms=",inc
+c      write(6,'(a,i10)') " id of inc=",nint(mod(tag(inc)*1d14,1d13))
 
-      call setv(inc,va,tag,tempini)
-      
-c-----scale velocities to reduced unit
-      do i=1,inc
-        va(1,i)=va(1,i) /h(1,1,0)
-        va(2,i)=va(2,i) /h(2,2,0)
-        va(3,i)=va(3,i) /h(3,3,0)
-      enddo
+c      call setv(inc,va,tag,tempini)
+cc-----scale velocities to reduced unit
+c      do i=1,inc
+c        va(1,i)=va(1,i) /h(1,1,0)
+c        va(2,i)=va(2,i) /h(2,2,0)
+c        va(3,i)=va(3,i) /h(3,3,0)
+c      enddo
+      va(1:3,1:inc)= 0d0
 
       call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
