@@ -1,0 +1,7 @@
+f(x)= b*x/c/(c-1.0) *(c*(1.0-a/x) +(a/x)**c -1.0) +d
+a= 22.5
+b= 1.17
+c= 8.0
+d=-16.6
+show func
+show var

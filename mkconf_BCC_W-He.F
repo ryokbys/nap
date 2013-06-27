@@ -10,10 +10,10 @@ c-----------------------------------------------------------------------
       include './params_au.h'
       include './params_Ito_W-He.h'
 c-----max # of atoms
-      integer,parameter::nmax=10000000
+      integer,parameter::nmax=100000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 20, 20, 20 /)
+      integer,parameter:: nuc(1:3)= (/ 3,3,3 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
@@ -32,7 +32,7 @@ c.....He ratio
 cc.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
 c      cunit= 2.835d-10 /bohr
 c.....Lattice constant of W for 1000K
-      cunit= 3.226d-10 /bohr
+      cunit= 3.180d-10 /bohr
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
@@ -50,8 +50,8 @@ c-----unit cell, BCC
         do iy=0,nuc(2)-1
           do iz=0,nuc(3)-1
             do m=1,2
-              call myrnd(rnd,dseed)
-              if( rnd.lt.vratio ) cycle
+c              call myrnd(rnd,dseed)
+c              if( rnd.lt.vratio ) cycle
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
@@ -63,6 +63,7 @@ c-----unit cell, BCC
 c              ra(1:3,inc)= ra(1:3,inc)
 c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
               is= 1
+              if( m.eq.2 ) is= 2
               ifmv= 1
               tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
             enddo

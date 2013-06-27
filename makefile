@@ -17,7 +17,7 @@ CPPFLAGS=
 #MPIFC= /usr/local/mpich-1.2.6/intel/bin/mpif90
 #.....mike
 MPIFC=/opt/intel/impi/4.0.0.028/intel64/bin/mpiifort
-MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
+MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -check all
 # #.....king
 # MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
 # MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
@@ -65,10 +65,12 @@ mods= mod_variables.o
 # params= params_EAM_Fe.h
 # force= force_EAM_Fe-H.o
 # params= params_EAM_Fe-H.h
-force= force_RK_Fe-H.o
-params= params_RK_Fe-H.h
-# force= force_Ito_W-He.o
-# params= params_Ito_W-He.h
+# force= force_RK_Fe-H.o
+# params= params_RK_Fe-H.h
+force= force_Ito2_W-He.o
+params= params_Ito2_W-He.h
+# force= force_AFS_W.o
+# params= params_AFS_W.h
 # force= force_Brenner.o
 # params= params_Brenner.h
 # force= force_SW_Si.o
@@ -91,10 +93,10 @@ params= params_RK_Fe-H.h
 # mkconf= mkconf_Si111_2lc.o
 # mkconf= mkconf_BCC.o
 # mkconf= mkconf_BCC_nanorod.o
-mkconf= mkconf_BCC_Fe-H.o
+# mkconf= mkconf_BCC_Fe-H.o
 # mkconf= mkconf_BCC_edge-disl.o
 # mkconf= mkconf_BCC_screw.o
-# mkconf= mkconf_BCC_W-He.o
+mkconf= mkconf_BCC_W-He.o
 # mkconf= mkconf_W-He-compress.o
 
 #-----------------------------------------------------------------------

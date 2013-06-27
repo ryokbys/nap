@@ -588,7 +588,7 @@ c=======================================================================
       write(6,'(2x,a)') ''
       write(6,'(2x,a)') 'mass'
       do i=1,nismax
-        write(6,'(4x,i2,es11.3)') i,am(i)
+        write(6,'(4x,i2,f10.3)') i,am(i)
       enddo
       write(6,'(a)') '======================================'
 
@@ -1728,6 +1728,7 @@ c-----set center of mass motion to zero
       sumpx=0d0
       sumpy=0d0
       sumpz=0d0
+      amtot=0d0
       do i=1,natm
         is= int(tag(i))
         amss= am(is)
