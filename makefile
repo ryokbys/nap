@@ -17,7 +17,8 @@ CPPFLAGS=
 #MPIFC= /usr/local/mpich-1.2.6/intel/bin/mpif90
 #.....mike
 MPIFC=/opt/intel/impi/4.0.0.028/intel64/bin/mpiifort
-MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -check all
+#MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -check all
+MPIFLAGS= -xHOST -O3 -ip -ipo -no-prec-div
 # #.....king
 # MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
 # MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
@@ -57,8 +58,8 @@ mods= mod_variables.o
 #-----------------------------------------------------------------------
 # force= force_LJ_Ar.o
 # params= params_LJ_Ar.h
-# force= force_EAM_Al.o
-# params= params_EAM_Al.h
+force= force_EAM_Al.o
+params= params_EAM_Al.h
 # force= force_Mishin_Al.o
 # params= params_Mishin_Al.h
 # force= force_EAM_Fe.o
@@ -71,8 +72,8 @@ mods= mod_variables.o
 # params= params_Ito2_W-He.h
 # force= force_AFS_W.o
 # params= params_AFS_W.h
-force= force_Lu_W-He.o
-params= params_Lu_W-He.h
+# force= force_Lu_W-He.o
+# params= params_Lu_W-He.h
 # force= force_Brenner.o
 # params= params_Brenner.h
 # force= force_SW_Si.o
@@ -87,7 +88,7 @@ params= params_Lu_W-He.h
 # params= params_RK_VLS1.h
 
 #-----mkconf program selection
-# mkconf= mkconf_Al_fcc.F
+mkconf= mkconf_Al_fcc.o
 # mkconf= mkconf_Al_FCC_edge-disl.o
 # mkconf= mkconf_2D_2kind.o
 # mkconf= mkconf_2D_edge_disl.o
@@ -98,7 +99,7 @@ params= params_Lu_W-He.h
 # mkconf= mkconf_BCC_Fe-H.o
 # mkconf= mkconf_BCC_edge-disl.o
 # mkconf= mkconf_BCC_screw.o
-mkconf= mkconf_BCC_W-He.o
+# mkconf= mkconf_BCC_W-He.o
 # mkconf= mkconf_W-He-compress.o
 
 #-----------------------------------------------------------------------

@@ -1,28 +1,3 @@
-      subroutine setup(nismax,am,acon,fack,dt)
-      implicit none
-      include "params_au.h"
-      include "params_EDIP_Si.h"
-      integer,intent(in):: nismax
-      real(8),intent(in):: dt
-      real(8),intent(out):: am(nismax),acon(nismax),fack(nismax)
-
-      integer:: i
-
-c-----atomic masses
-      am(1:nismax)= am_si
-
-c-----prefactors for normalized accelerration
-      do i=1,nismax
-        acon(i)= 0.5d0*dt**2/am(i)
-      enddo
-
-c-----prefactors for kinetic energy, FACK
-      do i=1,nismax
-        fack(i)= 0.5d0*am(i)/dt**2
-      enddo
-
-      end subroutine setup
-c=======================================================================
       subroutine get_force(namax,natm,tag,ra,nnmax,aa,h,hi,tcom
      &     ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_world,myid,epi,epot,nismax,acon)

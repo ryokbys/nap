@@ -1,28 +1,3 @@
-      subroutine setup(nismax,am,acon,fack,dt)
-      implicit none
-      include "params_au.h"
-      include "params_EAM_Al.h"
-      integer,intent(in):: nismax
-      real(8),intent(in):: dt
-      real(8),intent(out):: am(nismax),acon(nismax),fack(nismax)
-
-      integer:: i
-
-c-----atomic masses
-      am(1:nismax)= am_al
-
-c-----prefactors for normalized accelerration
-      do i=1,nismax
-        acon(i)= 0.5d0*dt**2/am(i)
-      enddo
-
-c-----prefactors for kinetic energy, FACK
-      do i=1,nismax
-        fack(i)= 0.5d0*am(i)/dt**2
-      enddo
-
-      end subroutine setup
-c=======================================================================
       subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom
      &     ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot,nismax,acon)
@@ -51,15 +26,21 @@ c-----------------------------------------------------------------------
 
       integer:: i,j,k,l,m,n,ierr,is
       real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,dphi,at(3)
-      real(8):: x,y,z,xi(3),epotl,phic,dphic,tmp
-      real(8),save:: exrc
+      real(8):: x,y,z,xi(3),epotl,tmp
       logical,save:: l1st=.true.
       real(8),allocatable,save:: sqrho(:)
+      real(8),save:: exrc,phic,dphic
 
       if( l1st ) then
         allocate(sqrho(namax+nbmax))
 c-----smoothing embeded term
         exrc= exp(-ea_bt*(rc-ea_re))
+c-----smoothing 2-body term
+        r= rc -ea_re
+        phic= 2d0*ea_b*exp(-0.5d0*ea_bt*r)
+     &       -ea_c*(1d0+ea_al*r)*exp(-ea_al*r)
+        dphic= -ea_bt*ea_b*exp(-0.5d0*ea_bt*r) 
+     &       +ea_c*ea_al*ea_al*r*exp(-ea_al*r)
         l1st=.false.
       endif
 
@@ -90,13 +71,6 @@ c-----rho(i)
 c-----copy rho of boundary atoms
       call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv
      &     ,mpi_md_world,sqrho)
-
-c-----smoothing 2-body term
-      r= rc -ea_re
-      phic= 2d0*ea_b*exp(-0.5d0*ea_bt*r)
-     &     -ea_c*(1d0+ea_al*r)*exp(-ea_al*r)
-      dphic= -ea_bt*ea_b*exp(-0.5d0*ea_bt*r) 
-     &     +ea_c*ea_al*ea_al*r*exp(-ea_al*r)
 
 c-----dE/dr_i
       do i=1,natm

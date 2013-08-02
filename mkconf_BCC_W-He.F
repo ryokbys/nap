@@ -13,7 +13,7 @@ c-----max # of atoms
       integer,parameter::nmax=100000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 3,3,3 /)
+      integer,parameter:: nuc(1:3)= (/ 5,5,5 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
@@ -63,30 +63,30 @@ c              if( rnd.lt.vratio ) cycle
 c              ra(1:3,inc)= ra(1:3,inc)
 c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
               is= 1
-              if( m.eq.2 ) is= 2
+c              if( m.eq.2 ) is= 2
               ifmv= 1
               tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
             enddo
-            call myrnd(rnd,dseed)
-            if( rnd.lt.heratio ) then
-c.....Add He atom
-              inc= inc+1
-              if(inc.gt.nmax)then
-                write(*,*)'Error inc>nmax',inc,nmax
-                stop
-              endif
-              is= 2
-              ifmv= 1
-              tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
-cc.....O-site
-c              ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-c              ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-c              ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-c.....T-site
-              ra(1,inc)= (0.50d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-              ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-              ra(3,inc)= (0.00d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-            endif
+c            call myrnd(rnd,dseed)
+c            if( rnd.lt.heratio ) then
+cc.....Add He atom
+c              inc= inc+1
+c              if(inc.gt.nmax)then
+c                write(*,*)'Error inc>nmax',inc,nmax
+c                stop
+c              endif
+c              is= 2
+c              ifmv= 1
+c              tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+ccc.....O-site
+cc              ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+cc              ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+cc              ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+cc.....T-site
+c              ra(1,inc)= (0.50d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+c              ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+c              ra(3,inc)= (0.00d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+c            endif
           enddo
         enddo
       enddo

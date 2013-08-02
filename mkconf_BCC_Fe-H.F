@@ -13,7 +13,7 @@ c-----max # of atoms
       integer,parameter::nmax=100000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 20,20,3 /)
+      integer,parameter:: nuc(1:3)= (/ 20,20,20 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
@@ -46,8 +46,8 @@ c-----unit cell, BCC
               x=(ua(1,m)+dble(ix))/(nuc(1)+nvac(1)) +small
               y=(ua(2,m)+dble(iy))/(nuc(2)+nvac(2)) +small
               z=(ua(3,m)+dble(iz))/(nuc(3)+nvac(3)) +small
-              if( .not. (x.gt.0.2d0 .and. x.lt.0.4d0.and.
-     &             y.gt.0.2d0 .and. y.lt.0.4d0) ) cycle
+c              if( .not. (x.gt.0.2d0 .and. x.lt.0.4d0.and.
+c     &             y.gt.0.2d0 .and. y.lt.0.4d0) ) cycle
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
