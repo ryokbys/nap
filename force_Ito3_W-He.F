@@ -45,8 +45,8 @@ c-----------------------------------------------------------------------
 
       if( l1st ) then
         allocate(rho(namax+nbmax),sqrho(namax+nbmax))
-        write(6,'(a,es12.4)') ' Input cutoff    =',rc
-        write(6,'(a,es12.4)') ' Potential cutoff=',p_rl(2,2)
+c        write(6,'(a,es12.4)') ' Input cutoff    =',rc
+c        write(6,'(a,es12.4)') ' Potential cutoff=',p_rl(2,2)
 c.....set atomic volume
         call set_avol()
         l1st=.false.

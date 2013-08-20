@@ -82,6 +82,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(vmcoeff,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(voldmp,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(am,nismax,mpi_double_precision,0,mpi_md_world,ierr)
 #ifdef __WALL__
       call mpi_bcast(wtop,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(wbot,1,mpi_double_precision,0,mpi_md_world,ierr)
