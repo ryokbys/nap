@@ -6,7 +6,7 @@ c.....energy scaling
       real(8),parameter:: sfac  = 1d0 !/2
 
 c.....length scaling for hybrid QMCL calculation
-      real(8),parameter:: slen  = 1d0!/3.204d0 *3.172d0
+      real(8),parameter:: slen  = 1d0 /3.202d0 *3.172d0
       real(8),parameter:: aa2bs = aa2bohr*slen
 
 c.....2-body
