@@ -58,8 +58,8 @@ mods= mod_variables.o
 #-----------------------------------------------------------------------
 # force= force_LJ_Ar.o
 # params= params_LJ_Ar.h
-force= force_EAM_Al.o
-params= params_EAM_Al.h
+# force= force_EAM_Al.o
+# params= params_EAM_Al.h
 # force= force_Mishin_Al.o
 # params= params_Mishin_Al.h
 # force= force_EAM_Fe.o
@@ -68,8 +68,8 @@ params= params_EAM_Al.h
 # params= params_EAM_Fe-H.h
 # force= force_RK_Fe-H.o
 # params= params_RK_Fe-H.h
-# force= force_Ito2_W-He.o
-# params= params_Ito2_W-He.h
+force= force_Ito3_W-He.o
+params= params_Ito3_W-He.h
 # force= force_AFS_W.o
 # params= params_AFS_W.h
 # force= force_Lu_W-He.o
@@ -88,7 +88,7 @@ params= params_EAM_Al.h
 # params= params_RK_VLS1.h
 
 #-----mkconf program selection
-mkconf= mkconf_Al_fcc.o
+# mkconf= mkconf_Al_fcc.o
 # mkconf= mkconf_Al_FCC_edge-disl.o
 # mkconf= mkconf_2D_2kind.o
 # mkconf= mkconf_2D_edge_disl.o
@@ -99,7 +99,7 @@ mkconf= mkconf_Al_fcc.o
 # mkconf= mkconf_BCC_Fe-H.o
 # mkconf= mkconf_BCC_edge-disl.o
 # mkconf= mkconf_BCC_screw.o
-# mkconf= mkconf_BCC_W-He.o
+mkconf= mkconf_BCC_W-He.o
 # mkconf= mkconf_W-He-compress.o
 
 #-----------------------------------------------------------------------
