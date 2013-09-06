@@ -66,10 +66,10 @@ mods= mod_variables.o
 # params= params_EAM_Fe.h
 # force= force_EAM_Fe-H.o
 # params= params_EAM_Fe-H.h
-# force= force_RK_Fe-H.o
-# params= params_RK_Fe-H.h
-force= force_Ito3_W-He.o
-params= params_Ito3_W-He.h
+force= force_RK_Fe-H.o
+params= params_RK_Fe-H.h
+# force= force_Ito3_W-He.o
+# params= params_Ito3_W-He.h
 # force= force_AFS_W.o
 # params= params_AFS_W.h
 # force= force_Lu_W-He.o
@@ -96,10 +96,10 @@ params= params_Ito3_W-He.h
 # mkconf= mkconf_Si111_2lc.o
 # mkconf= mkconf_BCC.o
 # mkconf= mkconf_BCC_nanorod.o
-# mkconf= mkconf_BCC_Fe-H.o
+mkconf= mkconf_BCC_Fe-H.o
 # mkconf= mkconf_BCC_edge-disl.o
 # mkconf= mkconf_BCC_screw.o
-mkconf= mkconf_BCC_W-He.o
+# mkconf= mkconf_BCC_W-He.o
 # mkconf= mkconf_W-He-compress.o
 
 #-----------------------------------------------------------------------

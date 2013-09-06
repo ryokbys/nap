@@ -18,7 +18,7 @@ cc.....Cutoff radius for BCC W, halfway between 2nd and 3rd N.N.
 cc.....W @1000K = 3.226d-10
 c      real(8),parameter:: abcc = 3.226d-10/0.5291772d-10
 cc.....W @0K = 3.171d-10
-c      real(8),parameter:: abcc = 3.171d-10/0.5291772d-10
+c      real(8),parameter:: abcc = 3.202d-10/0.5291772d-10
       real(8),parameter:: rc   = 0.5d0*(1d0+1.41421356d0)*abcc
 
       integer:: i,n,itmp,nauxdat,j

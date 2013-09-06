@@ -14,7 +14,7 @@ c-----------------------------------------------------------------------
 c-----max num of neighbors; 12 is enough
       integer,parameter:: nnmax = 100
 c.....Lattice constant for BCC Fe
-      real(8),parameter:: abcc = 2.8553d-10/0.5291772d-10
+      real(8),parameter:: abcc = 2.835d-10/0.5291772d-10
 c.....Cutoff radius: halfway between 1st and 2nd N.N.
       real(8),parameter:: rc   = 0.5d0*(1d0+sqrt(3d0)/2)*abcc
 c.....Cutoff radius: halfway between 2nd and 3rd N.N.
@@ -79,15 +79,16 @@ c-----read akrref file
       rlz= abcc*sqrt(3d0)/2
       call get_z_layer(natm,ra0,al,lsza,rlz,ga)
 
+      write(6,'(a,2es12.4)') ' rlz,rlz/al(3)=',rlz,rlz/al(3)
       call get_display_atoms(natm,ra0,ndisp,lsdisp
      &     ,0d0,rlz/al(3))
 
 c-----prepare for linked-list
-      nx=int(al(1)/rc)
-      ny=int(al(2)/rc)
-      nz=int(al(3)/rc)
+      nx=max(int(al(1)/rc),1)
+      ny=max(int(al(2)/rc),1)
+      nz=max(int(al(3)/rc),1)
       nlsa= natm +nx*ny*nz
-c      write(6,'(a,4i10)') " nx,ny,nz,nlsa=",nx,ny,nz,nlsa
+      write(6,'(a,4i10)') " nx,ny,nz,nlsa=",nx,ny,nz,nlsa
       allocate(lsa(nlsa))
 c-----make linked-list
       call mkllist(natm,nx,ny,nz,ra0,nlsa,lsa)
@@ -102,9 +103,9 @@ c-----make 1st nearest neighbor pair-list
 
       sx= (alx-xmax)/2
       sy= (aly-ymax)/2
-c      write(6,'(a,2es12.4)') ' alx ,aly =',alx,aly
-c      write(6,'(a,2es12.4)') ' xmax,ymax=',xmax,ymax
-c      write(6,'(a,2es12.4)') ' sx  ,sy  =',sx,sy
+      write(6,'(a,2es12.4)') ' alx ,aly =',alx,aly
+      write(6,'(a,2es12.4)') ' xmax,ymax=',xmax,ymax
+      write(6,'(a,2es12.4)') ' sx  ,sy  =',sx,sy
 c      stop
 
       cout=cin
@@ -115,11 +116,11 @@ c.....Draw circles at atom positions
       do i=1,ndisp
         j= lsdisp(i)
         if( lsza(j).eq.1 ) then
-          gray= 0.0d0
+          gray= 0.0d0 ! black
         elseif( lsza(j).eq.2 ) then
-          gray= 0.5d0
+          gray= 0.5d0 ! gray
         else
-          gray= 1.0d0
+          gray= 1.0d0 ! white
         endif
         x= ra0(1,j)*al(1)*sfac +sx
         y= ra0(2,j)*al(2)*sfac +sy
@@ -164,13 +165,14 @@ c
       do i=1,natm
         z10= ra(3,i)*al(3)
         ga(i)= (z10-int(z10/rlz)*rlz)/rlz
-        if( ga(i).lt.1d0/3 ) then
-          lsza(i)= 1
-        elseif( ga(i).lt.2d0/3 ) then
-          lsza(i)= 2
-        else
-          lsza(i)= 3
+        if( ga(i).lt.1d0/6 .or. ga(i).gt.5d0/6 ) then
+          lsza(i)= 1 ! to be black
+        elseif( 1d0/6.le.ga(i) .and. ga(i).lt.3d0/6 ) then
+          lsza(i)= 2 ! to be gray
+        elseif( 3d0/6.le.ga(i) .and. ga(i).lt.5d0/6 ) then
+          lsza(i)= 3 ! to be white
         endif
+c        if( i.lt.9762 ) write(6,'(2i10,2es12.4)') i,lsza(i),z10,ga(i)
       enddo
       return
       end subroutine get_z_layer
@@ -184,16 +186,18 @@ c
       integer,intent(in):: natm
       real(8),intent(in):: ra(3,natm),z0,zw
       integer,intent(out):: ndisp,lsdisp(natm)
+      real(8),parameter:: eps= 1d-8
 
       integer:: i
 
       ndisp= 0
       do i=1,natm
-        if( ra(3,i).ge.z0 .and. ra(3,i).lt.z0+zw ) then
+        if( ra(3,i).ge.z0 .and. ra(3,i).lt.z0+zw-eps ) then
           ndisp= ndisp +1
           lsdisp(ndisp)= i
         endif
       enddo
+      write(6,'(a,i10)') ' num of atoms to be displayed=',ndisp
       return
       end subroutine get_display_atoms
 c=======================================================================
@@ -347,12 +351,13 @@ c=======================================================================
 
       integer:: i,j,l
       real(8):: xi0(3),xi(3),ui(3),xj0(3),xj(3),uj(3),du(3)
-      
+
       nvec= 0
       do i=1,natm-1
         xi0(1:3)= ra0(1:3,i)
         xi(1:3)= ra(1:3,i)
         ui(1:3)= (xi(1:3)-xi0(1:3)-anint(xi(1:3)-xi0(1:3)))*al(1:3)
+c        write(6,'(a,2i6)') ' i,lspr(0,i)=',i,lspr(0,i)
         do l=1,lspr(0,i)
           j= lspr(l,i)
           if( j.le.i ) cycle
@@ -362,6 +367,10 @@ c=======================================================================
      &        nint((xi0(2)-xj0(2))*al(2)).eq.0 ) cycle
           uj(1:3)= (xj(1:3)-xj0(1:3)-anint(xj(1:3)-xj0(1:3)))*al(1:3)
           du(1:3)= abs(uj(1:3)-ui(1:3))
+          if( du(3).gt.bv ) then
+            write(6,'(a,2i10,10es12.4)') ' i,j,du(3)='
+     &           ,i,j,xi0(1:2),du(3),du(3)-bv,ui(3)/al(3),uj(3)/al(3)
+          endif
           if( du(3).gt.abs(du(3)-bv) ) du(3)= abs(du(3) -bv)
 c.....neglect vector which achieves full displacement, sqrt(3)*a/2
 c          if( du(3).gt.bv ) cycle
@@ -415,6 +424,38 @@ c=======================================================================
       return
       end subroutine draw_circle
 c=======================================================================
+      subroutine draw_triangle(ionum,x,y,al,cs,sn)
+c
+c  draw triangle of an edge-length 'al', orientation (cs,sn), 
+c  center of mass position (x,y)
+c
+      implicit none
+      integer,intent(in):: ionum
+      real(8),intent(in):: x,y,al,cs,sn
+      real(8),parameter:: pi = 3.14159265358979d0
+      real(8),parameter:: ang= pi*5d0/6
+
+      real(8):: ex,ey,ex1,ey1,ex2,ey2
+
+      ex= cos(ang)
+      ey= sin(ang)
+      ex1= cs*ex -sn*ey
+      ey1= sn*ex +cs*ey
+      ex= cos(-pi/2)
+      ey= sin(-pi/2)
+      ex2= cs*ex -sn*ey
+      ey2= sn*ex +cs*ey
+
+      write(ionum,'(a)') ' newpath'
+      write(ionum,'(2f8.2,a)')  x+cs*al/sqrt(3d0),y+sn*al/sqrt(3d0)
+     &     ,' moveto'
+      write(ionum,'(2f8.2,a)')  ex1*al, ey1*al,' rlineto'
+      write(ionum,'(2f8.2,a)')  ex2*al, ey2*al,' rlineto'
+      write(ionum,'(a)') ' closepath fill'
+
+      return
+      end subroutine draw_triangle
+c=======================================================================
       subroutine draw_arrow(ionum,x1,y1,x2,y2,scale,rcrc)
       implicit none
       integer,intent(in):: ionum
@@ -425,7 +466,7 @@ c=======================================================================
       real(8),parameter:: pi = 3.14159265358979d0
       real(8),parameter:: angv = pi -pi/6
 c.....arrow length, 3 points
-      real(8),parameter:: alen = 1d0
+      real(8),parameter:: alen = 2d0
 
       rx= x2-x1
       ry= y2-y1
@@ -441,25 +482,13 @@ c.....arrow length, 3 points
       dy= dr*sn
       x3= x0+dx
       y3= y0+dy
+      write(ionum,'(a)') ' newpath'
       write(ionum,'(2f8.2,a)') x0,y0,' moveto'
       write(ionum,'(2f8.2,a)') x3,y3,' lineto'
+      write(ionum,'(a)') ' stroke'
 
-c.....arrow decorations, rotated by cs and sn
-      ex= cos(angv)
-      ey= sin(angv)
-      ex1= cs*ex -sn*ey
-      ey1= sn*ex +cs*ey
-      ex= cos(angv)
-      ey=-sin(angv)
-      ex2= cs*ex -sn*ey
-      ey2= sn*ex +cs*ey
-      write(ionum,'(2f8.2,a)') ex1*alen,ey1*alen,' rlineto'
-      write(ionum,'(2f8.2,a)') x3,y3,' moveto'
-      write(ionum,'(2f8.2,a)') ex2*alen,ey2*alen,' rlineto'
-cc.....arrow decorations, circle
-c      write(6,'(3f8.2,2i4,a)') x3,y3,0.5,0,360,' arc'
-
-      write(ionum,'(a)') 'stroke'
+c.....arrow decoration with triangle
+      call draw_triangle(ionum,x3,y3,alen,cs,sn)
 
       return
       end subroutine draw_arrow

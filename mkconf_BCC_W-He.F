@@ -25,7 +25,7 @@ c.....Parameters
 c.....vacancy ratio
       real(8),parameter:: vratio  = 0.0001
 c.....He ratio
-      real(8),parameter:: heratio = 0.002
+      real(8),parameter:: heratio = 0.010
 
       small = 1d0/4 /nuc(1)
 

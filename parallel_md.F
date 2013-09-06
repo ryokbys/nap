@@ -1448,6 +1448,7 @@ c-----reset pair list, LSPR
 c-----reset headers
       lshd(1:lcxyz2)= 0
 
+
 c-----construct a linked-cell list, LSCL, & a header list, LSHD
       do i=1,natm+nb
 c-------assign a vector cell index
@@ -1470,6 +1471,7 @@ c-------copied atoms are either in inner or surface cells
 c-------the last one goes to the header
         lshd(m)= i
       enddo
+      write(6,'(a)') ' lscl,lshd done'
 
 c-----make a pair list, LSPR
 c-----Scan resident cells
