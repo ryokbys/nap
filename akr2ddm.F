@@ -349,7 +349,7 @@ c=======================================================================
       integer,intent(out):: nvec,ijdd(2,8*natm)
       real(8),intent(out):: vdd(8*natm)
 
-      integer:: i,j,l
+      integer:: i,j,l,itmp
       real(8):: xi0(3),xi(3),ui(3),xj0(3),xj(3),uj(3),du(3)
 
       nvec= 0
@@ -367,13 +367,6 @@ c        write(6,'(a,2i6)') ' i,lspr(0,i)=',i,lspr(0,i)
      &        nint((xi0(2)-xj0(2))*al(2)).eq.0 ) cycle
           uj(1:3)= (xj(1:3)-xj0(1:3)-anint(xj(1:3)-xj0(1:3)))*al(1:3)
           du(1:3)= abs(uj(1:3)-ui(1:3))
-          if( du(3).gt.bv ) then
-            write(6,'(a,2i10,10es12.4)') ' i,j,du(3)='
-     &           ,i,j,xi0(1:2),du(3),du(3)-bv,ui(3)/al(3),uj(3)/al(3)
-          endif
-          if( du(3).gt.abs(du(3)-bv) ) du(3)= abs(du(3) -bv)
-c.....neglect vector which achieves full displacement, sqrt(3)*a/2
-c          if( du(3).gt.bv ) cycle
           nvec=nvec +1
           if( nvec.gt.8*natm ) stop ' [Error] nvec.gt.8*natm !!!'
           if( abs(ui(3)).ge.abs(uj(3)) ) then
@@ -382,6 +375,13 @@ c          if( du(3).gt.bv ) cycle
           else
             ijdd(1,nvec)= i
             ijdd(2,nvec)= j
+          endif
+          if( du(3).gt.abs(du(3)-bv) ) then
+            du(3)= abs(du(3) -bv)
+c.....turn around the vector
+            itmp= ijdd(1,nvec)
+            ijdd(1,nvec)= ijdd(2,nvec)
+            ijdd(2,nvec)= itmp
           endif
           vdd(nvec)= du(3)
         enddo
