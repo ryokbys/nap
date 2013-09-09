@@ -13,8 +13,10 @@ c-----------------------------------------------------------------------
       implicit none
 c-----max num of neighbors; 12 is enough
       integer,parameter:: nnmax = 100
-c.....Lattice constant for BCC Fe
-      real(8),parameter:: abcc = 2.835d-10/0.5291772d-10
+c.....Lattice constant for BCC W
+      real(8),parameter:: abcc = 3.171d-10/0.5291772d-10
+cc.....Lattice constant for BCC Fe
+c      real(8),parameter:: abcc = 2.835d-10/0.5291772d-10
 c.....Cutoff radius: halfway between 1st and 2nd N.N.
       real(8),parameter:: rc   = 0.5d0*(1d0+sqrt(3d0)/2)*abcc
 c.....Cutoff radius: halfway between 2nd and 3rd N.N.
@@ -357,6 +359,8 @@ c=======================================================================
         xi0(1:3)= ra0(1:3,i)
         xi(1:3)= ra(1:3,i)
         ui(1:3)= (xi(1:3)-xi0(1:3)-anint(xi(1:3)-xi0(1:3)))*al(1:3)
+c.....make z-displacement positive
+        if( ui(3).lt.0d0 ) ui(3)=ui(3) +bv
 c        write(6,'(a,2i6)') ' i,lspr(0,i)=',i,lspr(0,i)
         do l=1,lspr(0,i)
           j= lspr(l,i)
@@ -366,6 +370,8 @@ c        write(6,'(a,2i6)') ' i,lspr(0,i)=',i,lspr(0,i)
           if( nint((xi0(1)-xj0(1))*al(1)).eq.0 .and.
      &        nint((xi0(2)-xj0(2))*al(2)).eq.0 ) cycle
           uj(1:3)= (xj(1:3)-xj0(1:3)-anint(xj(1:3)-xj0(1:3)))*al(1:3)
+c.....make z-displacement positive
+          if( uj(3).lt.0d0 ) uj(3)=uj(3) +bv
           du(1:3)= abs(uj(1:3)-ui(1:3))
           nvec=nvec +1
           if( nvec.gt.8*natm ) stop ' [Error] nvec.gt.8*natm !!!'
