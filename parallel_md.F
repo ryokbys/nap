@@ -100,8 +100,16 @@ c-----meter --> bohr
       rc= rc /bohr
       rbuf= rbuf /bohr
 c-----output every these steps, NOUTERG, NOUTPMD
-      nouterg = max(nstp/nerg,1)
-      noutpmd = max(nstp/npmd,1)
+      if( nerg.ne.0 ) then
+        nouterg = max(nstp/nerg,1)
+      else
+        nouterg = nstp +1
+      endif
+      if( npmd.ne.0 ) then
+        noutpmd = max(nstp/npmd,1)
+      else
+        noutpmd = nstp +1
+      endif
 c-----parallel configuration
       nxyz= nx*ny*nz
       anxi= 1d0/nx
@@ -243,10 +251,10 @@ c.....Considering vmax==0d0, make istpe small only for the first step
 c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
 
       if(myid_md.eq.0) then
-        write(6,'(a)') " Initial values: [Hartree], [K]"
-        write(6,'(a,es15.7)') " Kinetic energy  =",ekin
-        write(6,'(a,es15.7)') " Potential energy=",epot0
-        write(6,'(a,es15.7)') " Temperature     =",temp
+        write(6,'(1x,a)') "initial values: [Hartree], [K]"
+        write(6,'(1x,a,es15.7)') " kinetic energy  =",ekin
+        write(6,'(1x,a,es15.7)') " potential energy=",epot0
+        write(6,'(1x,a,es15.7)') " temperature     =",temp
 
         if( ifpctl .eq. 1 ) then
           write(6,'(a,i8,2f10.2,2es11.3)')
@@ -540,6 +548,10 @@ c.....reset pressure
 
       tcpu= tcpu2 -tcpu1
       if(myid_md.eq.0) then
+        write(6,'(1x,a)') "final values: [Hartree], [K]"
+        write(6,'(1x,a,es15.7)') " kinetic energy  =",ekin
+        write(6,'(1x,a,es15.7)') " potential energy=",epot
+        write(6,'(1x,a,es15.7)') " temperature     =",temp
         write(6,'(1x,a,2f10.2)') "time cpu & com=",tcpu,tcom
       endif
 
@@ -1471,7 +1483,7 @@ c-------copied atoms are either in inner or surface cells
 c-------the last one goes to the header
         lshd(m)= i
       enddo
-      write(6,'(a)') ' lscl,lshd done'
+c      write(6,'(a)') ' lscl,lshd done'
 
 c-----make a pair list, LSPR
 c-----Scan resident cells

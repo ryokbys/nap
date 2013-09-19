@@ -13,10 +13,10 @@ c-----------------------------------------------------------------------
       implicit none
 c-----max num of neighbors; 12 is enough
       integer,parameter:: nnmax = 100
-c.....Lattice constant for BCC W
-      real(8),parameter:: abcc = 3.171d-10/0.5291772d-10
-cc.....Lattice constant for BCC Fe
-c      real(8),parameter:: abcc = 2.835d-10/0.5291772d-10
+cc.....Lattice constant for BCC W
+c      real(8),parameter:: abcc = 3.171d-10/0.5291772d-10
+c.....Lattice constant for BCC Fe
+      real(8),parameter:: abcc = 2.835d-10/0.5291772d-10
 c.....Cutoff radius: halfway between 1st and 2nd N.N.
       real(8),parameter:: rc   = 0.5d0*(1d0+sqrt(3d0)/2)*abcc
 c.....Cutoff radius: halfway between 2nd and 3rd N.N.
@@ -143,7 +143,7 @@ c.....Draw vectors of DDM
         x2= (ra0(1,idst)-anint(ra0(1,idst)-ra0(1,isrc)))*al(1)*sfac +sx
         y2= (ra0(2,idst)-anint(ra0(2,idst)-ra0(2,isrc)))*al(2)*sfac +sy
         scale= vdd(i)/vmax
-        if( scale.lt.1d0/20 ) cycle
+c        if( scale.lt.1d0/20 ) cycle
         call draw_arrow(12,x1,y1,x2,y2,scale,rcrc)
       enddo
       call final_ps(12)

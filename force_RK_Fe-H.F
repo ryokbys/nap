@@ -41,6 +41,17 @@ c.....assuming fixed (constant) atomic volume (BCC)
         avol= alcfe**3 /2
         call set_avol()
         l1st=.false.
+c.....check cutoff radius
+        if( myid_md.eq.0 ) then
+          write(6,'(a,es22.14)') ' rc of input    =',rc *bohr
+          write(6,'(a,es22.14)') ' rc of this pot =',rc_vphi *bohr
+        endif
+        if( rc.lt.rc_vphi ) then
+          if( myid_md.eq.0 ) write(6,'(a)')
+     &         ' [get_force] rc.lt.rc_vphi !!!'
+          call mpi_finalize(ierr)
+          stop
+        endif
       endif
 
       aa(1:3,1:natm)=0d0
@@ -62,7 +73,6 @@ c.....rho(i)
           z= ra(3,j) -xi(3)
           xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
           rij=dsqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
-          rij=rij *rfaci
           if( rij.gt.rc_rho ) cycle ! Fortunately, rc_rho is common
           if( is.eq.1 .and. js.eq.1 ) then ! Fe-Fe
             rho(i)=rho(i) +fpsi(rij)
@@ -101,9 +111,8 @@ c-----dE/dr_i
           z= ra(3,j) -xi(3)
           xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
           rij=sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
-          rij= rij *rfaci
           if( rij.gt.rc_vphi ) cycle
-          drdxi(1:3)= -xij(1:3)*rfaci/rij
+          drdxi(1:3)= -xij(1:3)/rij
 c.....2-body term
           if( is.eq.1 .and. js.eq.1 ) then ! Fe-Fe
             t1= 0.5d0 *fvphi(rij,rs)
