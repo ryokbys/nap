@@ -35,7 +35,7 @@ contains
     if( l1st ) then
       allocate(rho(namax+nbmax))
       rs= a_rs /dsqrt(2d0)/z_fe**(1d0/3)
-      rs_feh= a_rs /(z_fe**(2d0/3)+z_h**(2d0/3))
+      rs_feh= a_rs /sqrt(z_fe**(2d0/3)+z_h**(2d0/3))
 !.....assuming fixed (constant) atomic volume (BCC)
       avol= alcfe**3 /2
       if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
@@ -147,6 +147,8 @@ contains
         enddo
 !.....Embedded term
         if( rij.gt.rc_rho ) cycle
+        dfj= 0d0
+        tmp= 0d0
         if( is.eq.1 .and. js.eq.1 ) then ! F_{Fe}, Fe-Fe
           dfj= dfemb(rho(j))
           tmp= (dfi+dfj) *dfpsi(rij)
