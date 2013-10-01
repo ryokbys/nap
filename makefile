@@ -86,8 +86,9 @@ mods= mod_variables.o
 # params= params_RK_wurtzite.h
 # force= force_RK_VLS1.o
 # params= params_RK_VLS1.h
-forces= force_Ramas_FeH.o force_RK_FeH.o force_common.o
-params= params_Ramas_FeH.h params_RK_FeH.h
+forces= force_Ramas_FeH.o force_RK_FeH.o force_common.o force_RK_WHe.o \
+	force_Ito3_WHe.o
+params= params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h
 
 #-----mkconf program selection
 # mkconf= mkconf_Al_fcc.o

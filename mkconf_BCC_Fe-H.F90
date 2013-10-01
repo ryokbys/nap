@@ -14,7 +14,7 @@
       integer,parameter::nmax=100000
 !-----# of unit cells
 !      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-     integer,parameter:: nuc(1:3)= (/ 4,4,4 /)
+     integer,parameter:: nuc(1:3)= (/ 5,5,5 /)
 !-----vacuum width in unit of cell
 !      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)

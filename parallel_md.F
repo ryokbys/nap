@@ -1792,6 +1792,8 @@ c=======================================================================
      &     ,cforce)
       use RK_FeH,only:force_RK_FeH
       use Ramas_FeH,only:force_Ramas_FeH,force_Ackland_Fe
+      use RK_WHe,only:force_RK_WHe
+      use Ito3_WHe,only:force_Ito3_WHe
       implicit none
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -1806,6 +1808,14 @@ c=======================================================================
       integer:: ierr
       
       select case (trim(cforce))
+        case ('Ito3_WHe')
+          call force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('RK_WHe')
+          call force_RK_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
         case ('RK_FeH')
           call force_RK_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
