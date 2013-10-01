@@ -1,18 +1,23 @@
 #!/bin/sh
 
 rm out.size-energy
-a0=29.9
+aa2bohr=1.88972616356
+#.....set range
+a0=10.0
+a1=20.0
 
-for i in 0.9 0.92 0.94 0.96 0.98 1.0 1.02 1.04 1.06 1.08 1.1
+#for i in 0.5 0.6 0.7 0.8 0.9 1.0 1.05 1.1 1.15 1.2 1.25 1.3 1.35 1.4 1.45 1.5 1.55 1.6 1.65 1.7
+for i in `seq 0 99`
 do
-a=`echo "scale=4; $a0*$i" | bc`
+r=`echo "scale=4; 1.0/100*($a1-$a0)*$i" | bc` 
+a=`echo "scale=4; ($a0+$r)*$aa2bohr" | bc`
 echo "a= $a"
 
 cat >pmd000-000 <<EOF
-250
+2
 ${a}E+00  0.00E+00  0.00E+00
-0.00E+00  ${a}E+00  0.00E+00
-0.00E+00  0.00E+00  ${a}E+00
+0.00E+00  38.0E+00  0.00E+00
+0.00E+00  0.00E+00  25.0E+00
 0.00E+00  0.00E+00  0.00E+00
 0.00E+00  0.00E+00  0.00E+00
 0.00E+00  0.00E+00  0.00E+00
@@ -20,7 +25,7 @@ EOF
 
 cat pos >> pmd000-000
 ./pmd > out.pmd
-erg=`grep 'Potential energy' out.pmd | awk '{print $3}'`
+erg=`grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'`
 echo $a $erg >> out.size-energy
 done
 

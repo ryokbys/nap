@@ -19,6 +19,7 @@
     real(8):: tinit= -1d0
     real(8):: rbuf= 0d0
     character(len=6):: ciofmt='ascii '
+    character(len=20):: cforce='LJ_Ar'
 !.....Search time and expiration time
     real(8):: ts,te
     integer:: istps,istpe

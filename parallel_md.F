@@ -83,6 +83,8 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(voldmp,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(am,nismax,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
+      call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
 #ifdef __WALL__
       call mpi_bcast(wtop,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(wbot,1,mpi_double_precision,0,mpi_md_world,ierr)
@@ -209,9 +211,10 @@ c-----Make pair list
       call mk_lspr(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
 c.....Calc forces
-      call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom
-     &     ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon)
+      call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &     ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,avol
+     &     ,cforce)
 
 #ifdef __SHEAR__
       call add_shear_stress(natm,ra,aa,tag,sorg,shrfx)
@@ -252,8 +255,8 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
 
       if(myid_md.eq.0) then
         write(6,'(1x,a)') "initial values: [Hartree], [K]"
-        write(6,'(1x,a,es15.7)') " kinetic energy  =",ekin
-        write(6,'(1x,a,es15.7)') " potential energy=",epot0
+        write(6,'(1x,a,es22.14)') " kinetic energy  =",ekin
+        write(6,'(1x,a,es22.14)') " potential energy=",epot0
         write(6,'(1x,a,es15.7)') " temperature     =",temp
 
         if( ifpctl .eq. 1 ) then
@@ -388,9 +391,10 @@ c.....Copy RA of boundary atoms determined by 'bacopy'
         endif
 
 c-------Calc forces
-        call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom
-     &       ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon)
+        call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol
+     &       ,cforce)
 
 #ifdef __SHEAR__
         call add_shear_stress(natm,ra,aa,tag,sorg,shrfx)
@@ -403,6 +407,10 @@ c.....Calc kinetic energy
         vmaxold= vmax
         call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
      &       ,vmax,mpi_md_world)
+
+c        write(6,'(a,10es12.4)') '251,va(1:3),eki(251),epi(251)='
+c     &       ,va(1:3,251),eki(1,1,251)+eki(2,2,251)+eki(3,3,251)
+c     &       ,epi(251)
 
         if( ifpctl.eq.1 ) then
           call force_isobaric(ptgt,ah,natm,eki,strs,sgm
@@ -549,8 +557,8 @@ c.....reset pressure
       tcpu= tcpu2 -tcpu1
       if(myid_md.eq.0) then
         write(6,'(1x,a)') "final values: [Hartree], [K]"
-        write(6,'(1x,a,es15.7)') " kinetic energy  =",ekin
-        write(6,'(1x,a,es15.7)') " potential energy=",epot
+        write(6,'(1x,a,es22.14)') " kinetic energy  =",ekin
+        write(6,'(1x,a,es22.14)') " potential energy=",epot
         write(6,'(1x,a,es15.7)') " temperature     =",temp
         write(6,'(1x,a,2f10.2)') "time cpu & com=",tcpu,tcom
       endif
@@ -578,8 +586,9 @@ c=======================================================================
       write(6,'(2x,a25,i8)')   'flag_out_pmd',ifpmd
       write(6,'(2x,a25,i8)')   'num_out_pmd',npmd
       write(6,'(2x,a)') ''
-      write(6,'(2x,a25,es11.3)') 'cutoff_radius',rc
-      write(6,'(2x,a25,es11.3)') 'cutoff_buffer',rbuf
+      write(6,'(2x,a25,2x,a)') 'force_type',cforce
+      write(6,'(2x,a25,es15.7)') 'cutoff_radius',rc
+      write(6,'(2x,a25,es15.7)') 'cutoff_buffer',rbuf
       write(6,'(2x,a)') ''
       write(6,'(2x,a25,i8)') 'flag_damping',ifdmp
       write(6,'(2x,a25,es11.3)') 'damping_coeff',dmp
@@ -790,7 +799,7 @@ c=======================================================================
      &     ,tag(namax)
       real(8),intent(out):: ekin,eki(3,3,namax),vmax
 c-----locals
-      integer:: i,ierr,is,ixyz,jxyz
+      integer:: i,ierr,is,ixyz,jxyz,imax
       real(8):: ekinl,x,y,z,v(3),v2,vmaxl
 
       ekinl=0d0
@@ -813,6 +822,7 @@ c.....Tensor form eki
         eki(1:3,1:3,i)=eki(1:3,1:3,i)*fack(is)
         ekinl=ekinl +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
 c.....Find max speed
+        if( v2.gt.vmaxl ) imax=i
         vmaxl=max(vmaxl,v2)
       enddo
 
@@ -1775,6 +1785,47 @@ c-----set center of mass motion to zero
       endif
 
       end subroutine rm_trans_motion
+c=======================================================================
+      subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &     ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &     ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol
+     &     ,cforce)
+      use RK_FeH,only:force_RK_FeH
+      use Ramas_FeH,only:force_Ramas_FeH,force_Ackland_Fe
+      implicit none
+      integer,intent(in):: namax,natm,nnmax,nismax
+      integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
+     &   ,nn(6),mpi_md_world,myid_md
+      integer,intent(in):: lspr(0:nnmax,namax)
+      real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6)
+     &     ,acon(nismax),rc,tag(namax)
+      real(8),intent(inout):: tcom,avol
+      real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+      character(len=*),intent(in):: cforce
+      
+      integer:: ierr
+      
+      select case (trim(cforce))
+        case ('RK_FeH')
+          call force_RK_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('Ramas_FeH')
+          call force_Ramas_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('Ackland_Fe')
+          call force_Ackland_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case default
+          write(6,'(a)') ' [get_force] unknown force: '
+     &         //trim(cforce)//' !!'
+          call mpi_finalize(ierr)
+          stop
+      end select
+
+      end subroutine get_force
 c=======================================================================
 #ifdef __WALL__
       subroutine wall_reflect()

@@ -51,7 +51,8 @@ c=======================================================================
       if( trim(cname).eq.'time_interval' ) then
         call read_r1(ionum,dt)
         return
-      elseif( trim(cname).eq.'num_iteration' ) then
+      elseif( trim(cname).eq.'num_iteration' .or.
+     &       trim(cname).eq.'num_steps' ) then
         call read_i1(ionum,nstp)
         return
       elseif( trim(cname).eq.'num_out_energy' ) then
@@ -117,15 +118,18 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
       elseif( trim(cname).eq.'flag_isobaric' ) then
         call read_i1(ionum,ifpctl)
         return
-      elseif( trim(cname).eq.'io_format' ) then
-        call read_c1(ionum,ciofmt)
-        return
       elseif( trim(cname).eq.'final_strain' ) then
         call read_r1(ionum,strfin)
         return
       elseif( trim(cname).eq.'mass' ) then
         backspace(ionum)
         read(ionum,*) ctmp,is,am(is)
+        return
+      elseif( trim(cname).eq.'io_format' ) then
+        call read_c1(ionum,ciofmt)
+        return
+      elseif( trim(cname).eq.'force_type' ) then
+        call read_c1(ionum,cforce)
         return
 #ifdef __WALL__
       elseif( trim(cname).eq.'wall_pos_top' ) then

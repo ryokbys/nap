@@ -1,40 +1,42 @@
       program mkconf_BCC_FeH
-c-----------------------------------------------------------------------
-c  Create a BCC crystal with Fe and H atoms
-c-----------------------------------------------------------------------
-c  OUTPUT:
-c    - pmd000-000
-c    - akr000
-c-----------------------------------------------------------------------
+!-----------------------------------------------------------------------
+!  Create a BCC crystal with Fe and H atoms
+!-----------------------------------------------------------------------
+!  OUTPUT:
+!    - pmd000-000
+!    - akr000
+!-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
       include './params_au.h'
-      include './params_RK_Fe-H.h'
-c-----max # of atoms
+!      include './params_RK_FeH.h'
+      include './params_Ramas_FeH.h'
+!-----max # of atoms
       integer,parameter::nmax=100000
-c-----# of unit cells
-c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 5,5,5 /)
-c-----vacuum width in unit of cell
-c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
+!-----# of unit cells
+!      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
+     integer,parameter:: nuc(1:3)= (/ 4,4,4 /)
+!-----vacuum width in unit of cell
+!      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
       real(8):: ua(3,10)
-      real(8):: tag(nmax),ra(3,nmax),va(3,nmax),eki(nmax),epi(nmax)
-     &     ,h(3,3,0:1),strs(3,3,nmax)
-c.....Parameters
+      real(8):: tag(nmax),ra(3,nmax),va(3,nmax),eki(nmax),epi(nmax) &
+           ,h(3,3,0:1),strs(3,3,nmax)
+!.....Parameters
       real(8),parameter:: tempini = 100d0
 
       small=1d-7
 
-c.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
-      cunit= 2.835d-10 /bohr
+!.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
+!      cunit= 2.835d-10 /bohr
+      cunit= 2.8553d-10 /bohr
 
-c-----simulation box size
+!-----simulation box size
       h(1:3,1:3,0:1)= 0d0
       h(1,1,0)= cunit*(nuc(1)+nvac(1))
       h(2,2,0)= cunit*(nuc(2)+nvac(2))
       h(3,3,0)= cunit*(nuc(3)+nvac(3))
 
-c-----unit cell, BCC
+!-----unit cell, BCC
       ua(1:3,1)= (/ 0.0d0, 0.0d0, 0.0d0 /)
       ua(1:3,2)= (/ 0.5d0, 0.5d0, 0.5d0 /)
       
@@ -46,8 +48,8 @@ c-----unit cell, BCC
               x=(ua(1,m)+dble(ix))/(nuc(1)+nvac(1)) +small
               y=(ua(2,m)+dble(iy))/(nuc(2)+nvac(2)) +small
               z=(ua(3,m)+dble(iz))/(nuc(3)+nvac(3)) +small
-c              if( .not. (x.gt.0.2d0 .and. x.lt.0.4d0.and.
-c     &             y.gt.0.2d0 .and. y.lt.0.4d0) ) cycle
+!              if( .not. (x.gt.0.2d0 .and. x.lt.0.4d0.and.
+!     &             y.gt.0.2d0 .and. y.lt.0.4d0) ) cycle
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
@@ -56,8 +58,8 @@ c     &             y.gt.0.2d0 .and. y.lt.0.4d0) ) cycle
               ra(1,inc)= x
               ra(2,inc)= y
               ra(3,inc)= z
-c              ra(1:3,inc)= ra(1:3,inc)
-c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
+!              ra(1:3,inc)= ra(1:3,inc)
+!     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
               is= 1
               ifmv= 1
               tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
@@ -66,39 +68,39 @@ c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
         enddo
       enddo
 
-cc.....Add H atoms
-c      ix= nuc(1)/2
-c      iy= nuc(2)/2
-c      iz= nuc(3)/2
-c      inc=inc+1
-c      is= 2
-c      ifmv= 1
-c      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
-cc.....O-site
-c      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-c      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-c      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-ccc.....T-site
-cc      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-cc      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-cc      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+!.....Add H atoms
+      ix= nuc(1)/2
+      iy= nuc(2)/2
+      iz= nuc(3)/2
+      inc=inc+1
+      is= 2
+      ifmv= 1
+      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+!.....O-site
+      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+!c.....T-site
+!      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+!      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+!      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
 
       write(6,'(a,i10)') " num of atoms=",inc
-c      write(6,'(a,i10)') " id of inc=",nint(mod(tag(inc)*1d14,1d13))
+!      write(6,'(a,i10)') " id of inc=",nint(mod(tag(inc)*1d14,1d13))
 
-c      call setv(inc,va,tag,tempini)
-cc-----scale velocities to reduced unit
-c      do i=1,inc
-c        va(1,i)=va(1,i) /h(1,1,0)
-c        va(2,i)=va(2,i) /h(2,2,0)
-c        va(3,i)=va(3,i) /h(3,3,0)
-c      enddo
+!      call setv(inc,va,tag,tempini)
+!!-----scale velocities to reduced unit
+!      do i=1,inc
+!        va(1,i)=va(1,i) /h(1,1,0)
+!        va(2,i)=va(2,i) /h(2,2,0)
+!        va(3,i)=va(3,i) /h(3,3,0)
+!      enddo
       va(1:3,1:inc)= 0d0
 
-      call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va,h
-     &     ,eki,epi,strs)
+      call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va,h &
+           ,eki,epi,strs)
       
-c-----output 'akr000' for Akira visualization
+!-----output 'akr000' for Akira visualization
       open(15,file='akr000',form='formatted',status='replace')
       write(15,'(i10,3i5)') inc, 3, 0, 0
       write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
@@ -108,11 +110,11 @@ c-----output 'akr000' for Akira visualization
       close(15)
       
       end program mkconf_BCC_FeH
-c=======================================================================
+!=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
       include "./params_au.h"
-      include "./params_RK_Fe-H.h"
+      include "./params_Ramas_FeH.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)
@@ -126,7 +128,7 @@ c=======================================================================
       am(1)= am_fe
       am(2)= am_h
 
-c-----velocities in Maxwell-Boltzmann distribution
+!-----velocities in Maxwell-Boltzmann distribution
       dseed=12345
       do i=1,natm
         is= int(tag(i))
@@ -136,7 +138,7 @@ c-----velocities in Maxwell-Boltzmann distribution
           va(l,i)=facv(is)*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
         enddo
       enddo
-c-----set center of mass motion to zero
+!-----set center of mass motion to zero
       sumvx=0d0
       sumvy=0d0
       sumvz=0d0
@@ -160,7 +162,7 @@ c-----set center of mass motion to zero
       write(6,'(a,es12.4)') " temp.=",tmp*2d0/3d0/fkb/natm
 
       end subroutine setv
-c=======================================================================
+!=======================================================================
       subroutine myrnd(rnd,dseed)
       real*8 rnd,dseed
       real*8 d2p31m,d2p31
@@ -172,8 +174,8 @@ c=======================================================================
       rnd=dseed/d2p31
       return
       end subroutine myrnd
-c=======================================================================
-c-----------------------------------------------------------------------
-c     Local Variables:
-c     compile-command: "make 10mkconf"
-c     End:
+!=======================================================================
+!-----------------------------------------------------------------------
+!     Local Variables:
+!     compile-command: "make 10mkconf"
+!     End:

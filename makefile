@@ -18,7 +18,7 @@ CPPFLAGS=
 #.....mike
 MPIFC=/opt/intel/impi/4.0.0.028/intel64/bin/mpiifort
 #MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -check all
-MPIFLAGS= -xHOST -O3 -ip -ipo -no-prec-div
+MPIFLAGS= -xHOST -O3 -no-prec-div
 # #.....king
 # MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
 # MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
@@ -48,7 +48,7 @@ MPIFLAGS= -xHOST -O3 -ip -ipo -no-prec-div
 .F90.o: 
 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
 
-pmd= read_input.o parallel_md.o util_vec.o routines_dislocation.o \
+pmd= read_input.o parallel_md.o util_vec.o \
 	lasubs.o util_pmd.o tensile_loading.o
 mods= mod_variables.o
 
@@ -64,10 +64,10 @@ mods= mod_variables.o
 # params= params_Mishin_Al.h
 # force= force_EAM_Fe.o
 # params= params_EAM_Fe.h
-# force= force_EAM_Fe-H.o
-# params= params_EAM_Fe-H.h
-force= force_RK_Fe-H.o
-params= params_RK_Fe-H.h
+# force= force_Ramas_FeH.o
+# params= params_Ramas_FeH.h
+# force= force_RK_Fe-H.o
+# params= params_RK_Fe-H.h
 # force= force_Ito3_W-He.o
 # params= params_Ito3_W-He.h
 # force= force_AFS_W.o
@@ -86,6 +86,8 @@ params= params_RK_Fe-H.h
 # params= params_RK_wurtzite.h
 # force= force_RK_VLS1.o
 # params= params_RK_VLS1.h
+forces= force_Ramas_FeH.o force_RK_FeH.o force_common.o
+params= params_Ramas_FeH.h params_RK_FeH.h
 
 #-----mkconf program selection
 # mkconf= mkconf_Al_fcc.o
@@ -126,8 +128,8 @@ install: pmd 10mkconf 20nconv
 20nconv: node_conv.o $(mods) read_input.o util_pmd.o
 	${MPIFC} -o $@ $(mods) node_conv.o read_input.o util_pmd.o
 
-pmd: $(mods) ${pmd} ${force} ${params}
-	${MPIFC} ${MPIFLAGS} -o $@ $(mods) ${force} ${pmd}
+pmd: $(mods) $(pmd) $(forces) $(params)
+	${MPIFC} ${MPIFLAGS} -o $@ $(mods) $(forces) ${pmd}
 
 40combine: $(comb) $(mods)
 	${MPIFC} -o $@  $(mods) $(comb)
@@ -163,7 +165,7 @@ sortpmd: sort_pmd.o $(mods) util_pmd.o sort.o
 	$(MPIFC) -o $@ sort_pmd.o $(mods) util_pmd.o sort.o
 
 #.....Module dependencies
-parallel_md.o: $(mods)
+parallel_md.o: $(mods) $(forces)
 read_input.o:  $(mods)
 node_conv.o:   $(mods)
 combine_pmd.o: $(mods)
