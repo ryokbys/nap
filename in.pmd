@@ -11,6 +11,7 @@
   flag_out_pmd      1
   num_out_pmd       10
 
+  force_type        RK_FeH
   cutoff_radius     5.3d-10
   cutoff_buffer     0.5d-10
 

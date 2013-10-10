@@ -1,11 +1,11 @@
       program pmd2akr
 c-----------------------------------------------------------------------
 c Combine pmd files made by parallel program
-c   - pmd###-$$$  -->  akr$$$
-c     ###: node number
-c     $$$: akira frame number
+c   - pmd#####-$$$$  -->  akr$$$$
+c     #####: node number
+c     $$$$: akira frame number
 c USAGE:
-c   $ ./pmd2akr ###
+c   $ ./pmd2akr #####
 c-----------------------------------------------------------------------
       use variables
       implicit none
@@ -14,7 +14,7 @@ c.....Num of auxiliary data for coloring atoms in Akira
       integer,parameter:: nauxdat = 5
       integer:: ipmd,n,inode,itmp,i,nnodes,nkvs,ia,ib,l,itag(npmax)
       real(8):: tmp,dat(18,npmax)
-      character:: fin*10,fout*6
+      character:: fin*13,fout*7
       integer,external:: itot_tag
       integer nargc
       integer,external:: iargc
@@ -38,11 +38,11 @@ c      write(6,'(a,i5)') " npmd =",npmd
       
       n= 0
       do inode=0,nnodes-1
-        fin="pmd000-000"
+        fin="pmd00000-0000"
 c-------about node number
-        write(fin(4:6),'(i3.3)') inode
+        write(fin(4:8),'(i5.5)') inode
 c---------about pmd-step number
-        write(fin(8:10),'(i3.3)') ipmd
+        write(fin(10:13),'(i4.4)') ipmd
 c---------read pmd###-$$$ file
         if( trim(ciofmt).eq.'bin'.or.trim(ciofmt).eq.'binary' ) then
           call read_pmd_bin(20,fin
@@ -78,8 +78,8 @@ cc.....Sort before output
 c        call heapsort_itag(n,npmax,itag,18,dat)
 
 c-------output file name
-      fout="akr000"
-      write(fout(4:6),'(i3.3)') ipmd
+      fout="akr0000"
+      write(fout(4:7),'(i4.4)') ipmd
 c-------output combined mts-file
       open(30,file=fout,status="replace")
       write(30,'(i10,3i4)') n, nauxdat, 0, 0

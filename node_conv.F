@@ -1,8 +1,8 @@
       program node_conv
 c-----------------------------------------------------------------------
 c   Node-layout converter program for pmd.
-c     Read:  pmd???-000 (or some other name)
-c     write: pmd???-000
+c     Read:  pmd?????-0000 (or some other name)
+c     write: pmd?????-0000
 c-----------------------------------------------------------------------
       implicit none
       integer,parameter:: namax = 2000000
@@ -15,12 +15,12 @@ c-----------------------------------------------------------------------
      &     ,strs(3,3,namax)
       real(8):: rat(3,namax),vat(3,namax)
      &     ,ekit(namax),epit(namax),strst(3,3,namax)
-      character:: filename*10,key*1
+      character:: filename*13,key*1
 
-      write(6,'(a)') ' This program pmd???-000 files and '
+      write(6,'(a)') ' This program pmd?????-0000 files and '
      &     //'split to different node layout.'
-      write(6,'(a)') ' Then override pmd???-000 files.'
-      filename='pmd000-000'
+      write(6,'(a)') ' Then override pmd?????-0000 files.'
+      filename='pmd00000-0000'
 
 c-----read some info from STDIN
       write(6,'(a)') ' Current node-layout: (nx,ny,nz)=?'
@@ -42,7 +42,7 @@ c-----read some info from STDIN
         syog=dble(myy)/dble(noy)
         szog=dble(myz)/dble(noz)
 c-------obtain filename
-        write(filename(4:6),'(i3.3)') i
+        write(filename(4:8),'(i5.5)') i
 cc.....Binary format
 c        open(12,file=trim(filename),form='unformatted',status='old')
 c        read(12) n
@@ -93,7 +93,7 @@ c          read(12,*) tag(j),ra(1:3,j),va(1:3,j)
         goto 100
       endif
       
-      filename='pmd000-000'
+      filename='pmd00000-0000'
       do i=0,nodesn-1
         myx=i/(nny*nnz)
         myy=mod(i/nnz,nny)
@@ -121,7 +121,7 @@ c          read(12,*) tag(j),ra(1:3,j),va(1:3,j)
         enddo
         write(6,'(a,i4,i8)') " node-id, num of atoms =",i,n
 
-        write(filename(4:6),'(i3.3)') i
+        write(filename(4:8),'(i5.5)') i
 c        call write_pmd0_bin(12,filename,'replace',n,tagt,rat,vat,h
 c     &       ,ekit,epit,strst)
         call write_pmd0_ascii(12,filename,'replace',n,tagt,rat,vat,h

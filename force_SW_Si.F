@@ -180,8 +180,8 @@ c
 c-----send back (3-body)forces and potentials on immigrants
       call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity
      &     ,nn,mpi_world,aa3,3)
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity
-     &     ,nn,mpi_world,epi,1)
+c      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity
+c     &     ,nn,mpi_world,epi,1)
 
 c-----sum
       aa(1:3,1:natm)= -aa2(1:3,1:natm) -aa3(1:3,1:natm)

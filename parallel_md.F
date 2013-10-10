@@ -32,7 +32,7 @@ c.....Epot threshold for disl core extraction [Hartree]
       integer:: i,j,k,l,m,n,ia,ib,is
       real(8):: tmp
 c-----output file names
-      character:: cnode*3,cnum*3
+      character:: cnode*5,cnum*4
 
 c.....For tensile test of Al nanorod
       real(8):: strnow,ftop,fbot
@@ -142,12 +142,12 @@ c-----reduced node origin
       sorg(3)= anzi*myz
 
 c.....Each node opens one MD-configuration file
-      write(cnode(1:3),'(i3.3)') myid_md
+      write(cnode(1:5),'(i5.5)') myid_md
       if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-        call read_pmd_bin(20,"pmd"//cnode//"-000"
+        call read_pmd_bin(20,"pmd"//cnode//"-0000"
      &       ,namax,natm,h,tag,ra,va,eki,epi,strs)
       else if( trim(ciofmt).eq.'ascii' ) then
-        call read_pmd_ascii(20,"pmd"//cnode//"-000"
+        call read_pmd_ascii(20,"pmd"//cnode//"-0000"
      &     ,namax,natm,h,tag,ra,va,eki,epi,strs)
       endif
       if( myid_md.eq.0 ) then
@@ -274,7 +274,7 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
 c-----initialize the counter for output
       iocntpmd=0
       iocnterg=0
-      write(cnum(1:3),'(i3.3)') iocntpmd
+      write(cnum(1:3),'(i4.4)') iocntpmd
       if(myid_md.eq.0) call write_force(21,cnum,natm,h,tag,aa,acon
      &     ,nismax,epot0)
 c-----output initial configuration
@@ -507,7 +507,7 @@ c-------write the particle positions
         if(ifpmd.eq.1.and.mod(istp,noutpmd).eq.0)then
 c---------decide pmd-file name
           iocntpmd=iocntpmd+1
-          write(cnum(1:3),'(i3.3)') iocntpmd
+          write(cnum(1:4),'(i4.4)') iocntpmd
 c---------write pmd file for Akira
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
             call write_pmd_bin(20,"pmd"//cnode//"-"//cnum
@@ -1675,7 +1675,7 @@ c=======================================================================
      &     ,epot)
       implicit none
       integer,intent(in):: natm,nismax,ionum
-      character(len=3),intent(in):: cnum 
+      character(len=4),intent(in):: cnum 
       real(8),intent(in):: h(3,3),acon(nismax),aa(3,natm),tag(natm)
      &     ,epot
 
