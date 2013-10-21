@@ -13,7 +13,7 @@
 
     integer:: nstp,nouterg,noutpmd,istp,nerg &
          ,ifpmd,npmd,iftctl,ifdmp,iocntpmd,iocnterg
-    integer:: natm,nb,ntot,nis
+    integer:: natm,nb,ntot,nis,ndof
     real(8):: tcpu,tcpu1,tcpu2,tcom
     real(8):: dt,rc,dmp,treq,trlx,temp,epot,ekin,epot0,vmaxold,vmax
     real(8):: tinit= -1d0

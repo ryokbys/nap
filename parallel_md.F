@@ -31,6 +31,7 @@ c.....Epot threshold for disl core extraction [Hartree]
 
       integer:: i,j,k,l,m,n,ia,ib,is
       real(8):: tmp
+      integer,external:: num_dof
 c-----output file names
       character:: cnode*5,cnum*4
 
@@ -274,7 +275,7 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
 c-----initialize the counter for output
       iocntpmd=0
       iocnterg=0
-      write(cnum(1:3),'(i4.4)') iocntpmd
+      write(cnum(1:4),'(i4.4)') iocntpmd
       if(myid_md.eq.0) call write_force(21,cnum,natm,h,tag,aa,acon
      &     ,nismax,epot0)
 c-----output initial configuration
@@ -435,17 +436,23 @@ c     &       ,epi(251)
 
 c-------temperature control by velocity scaling
         if(iftctl.eq.1) then
+          ndof= num_dof()
+          if( ndof.ne.0 ) then
+!            write(6,'(a,2i6)') ' myid,ndof=',myid_md,ndof
+c.....for the case that there are fixed atoms..., <ekin>= 1/2 *ndof*kT
+            temp= ekin *2d0 /fkb /ndof
 c---------in case of 3D, <ekin> = 3/2 *NkT
-          temp= ekin /ntot/fkb *2d0/3d0
+c          temp= ekin /ntot/fkb *2d0/3d0
 cc---------in case of 2D, <ekin> = 2/2 *NkT
 c          temp= ekin /ntot/fkb *2d0/2d0
 c---------Berendsen thermostat
-          if( (treq-temp)/temp.gt.100d0 ) then
-            tmp= sqrt(1d0 +dt/trlx*100d0 )
-          else
-            tmp= sqrt(1d0 +dt/trlx*(treq-temp)/temp)
+            if( (treq-temp)/temp.gt.100d0 ) then
+              tmp= sqrt(1d0 +dt/trlx*100d0 )
+            else
+              tmp= sqrt(1d0 +dt/trlx*(treq-temp)/temp)
+            endif
+            va(1:3,1:natm)= va(1:3,1:natm) *tmp
           endif
-          va(1:3,1:natm)= va(1:3,1:natm) *tmp
         endif
 
 cc.....Eliminate translational motion
@@ -462,10 +469,12 @@ c            vmaxold= vmax
 c            call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
 c     &           ,vmax,mpi_md_world)
 c          endif
+          if( iftctl.ne.1 ) then
 c---------in case of 3D, <ekin> = 3/2 *NkT
-          temp= ekin /ntot/fkb *2d0/3d0
+            temp= ekin /ntot/fkb *2d0/3d0
 cc---------in case of 2D, <ekin> = 2/2 *NkT
 c          temp= ekin /ntot/fkb *2d0/2d0
+          endif
 #ifdef __KOUKYU__
           call get_stress_on_base(natm,ra,aa,tag,h,acon(1),ftop,fbot
      &         ,sorg,mpi_md_world)
@@ -835,6 +844,29 @@ c.....Find max speed
       vmax=sqrt(vmax)
 
       end subroutine get_ekin
+c=======================================================================
+      function num_dof()
+      use variables
+      implicit none
+      include 'mpif.h'
+      integer:: num_dof
+      integer:: i,l,k,ndofl
+      real(8),parameter:: deps= 1d-12
+      
+      ndofl= 0
+      do i=1,natm
+        l= int(mod(tag(i)*10,10d0))
+        do k=1,3
+          if( abs(fmv(k,l)).lt.1d-12 ) cycle
+          ndofl= ndofl +1
+        enddo
+      enddo
+      
+      num_dof= 0
+      call mpi_allreduce(ndofl,num_dof,1,mpi_integer,mpi_sum
+     &     ,mpi_md_world,ierr)
+      return
+      end function num_dof
 c=======================================================================
       subroutine bacopy(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
      &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
@@ -1794,6 +1826,7 @@ c=======================================================================
       use Ramas_FeH,only:force_Ramas_FeH,force_Ackland_Fe
       use RK_WHe,only:force_RK_WHe
       use Ito3_WHe,only:force_Ito3_WHe
+      use LJ_Ar,only:force_LJ_Ar
       implicit none
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -1808,6 +1841,10 @@ c=======================================================================
       integer:: ierr
       
       select case (trim(cforce))
+        case ('LJ_Ar')
+          call force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
         case ('Ito3_WHe')
           call force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr

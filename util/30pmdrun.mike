@@ -2,8 +2,7 @@
 #PBS -N 000K-0.00GPa
 #PBS -o out
 #PBS -j oe
-###PBS -l nodes=4:ppn=2
-#PBS -l nodes=cnode008.bw.nitech.ac.jp:ppn=6+cnode009.bw.nitech.ac.jp:ppn=6+cnode010.bw.nitech.ac.jp:ppn=6+cnode011.bw.nitech.ac.jp:ppn=6+cnode012.bw.nitech.ac.jp:ppn=6+cnode013.bw.nitech.ac.jp:ppn=6
+#PBS -l nodes=4:ppn=2
 #-----------------------------------------------------------------------
 # Usage:
 #   $ qsub 30pmdrun.king
@@ -15,7 +14,7 @@ cd $PBS_O_WORKDIR
 NPROCS=32
 #MPIRUN=/usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpirun
 MPIRUN=mpiexec
-PMD=/home/kobayashi/2012/09-03_pmd_H-core/src/
+PMD=./
 
 echo "Num of nodes= $NPROCS"
 echo "Running nodes:"
@@ -24,7 +23,7 @@ pwd
 
 #.....pmd
 echo "$MPIRUN -np $NPROCS $PMD/pmd >& out.pmd"
-$MPIRUN -machinefile $PBS_NODEFILE -n $NPROCS $PMD/pmd >& out.pmd
+$MPIRUN -recvtimeout 100 -machinefile $PBS_NODEFILE -n $NPROCS $PMD/pmd >& out.pmd
 
 #.....combine to make akr files
 echo "$PMD/40combine >& out.combine"

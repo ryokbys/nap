@@ -76,14 +76,14 @@
       is= 2
       ifmv= 1
       tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
-!.....O-site
+!!$!.....O-site
+!!$      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+!!$      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+!!$      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+!.....T-site
       ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
       ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-!c.....T-site
-!      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-!      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-!      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
 
       write(6,'(a,i10)') " num of atoms=",inc
 !      write(6,'(a,i10)') " id of inc=",nint(mod(tag(inc)*1d14,1d13))
@@ -97,11 +97,13 @@
 !      enddo
       va(1:3,1:inc)= 0d0
 
-      call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va,h &
+      call write_pmd0_ascii(15,'pmd00000-0000','replace',inc,tag,ra,va,h &
            ,eki,epi,strs)
+!!$      call write_pmd0_bin(15,'pmd00000-0000','replace',inc,tag,ra,va,h &
+!!$           ,eki,epi,strs)
       
 !-----output 'akr000' for Akira visualization
-      open(15,file='akr000',form='formatted',status='replace')
+      open(15,file='akr0000',form='formatted',status='replace')
       write(15,'(i10,3i5)') inc, 3, 0, 0
       write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
       do i=1,inc

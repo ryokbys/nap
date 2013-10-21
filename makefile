@@ -87,10 +87,12 @@ mods= mod_variables.o
 # force= force_RK_VLS1.o
 # params= params_RK_VLS1.h
 forces= force_Ramas_FeH.o force_RK_FeH.o force_common.o force_RK_WHe.o \
-	force_Ito3_WHe.o
+	force_Ito3_WHe.o force_LJ_Ar.o
 params= params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h
 
 #-----mkconf program selection
+#mkconf= mkconf_fcc.o
+mkconf= mkconf_fcc_droplet.o
 # mkconf= mkconf_Al_fcc.o
 # mkconf= mkconf_Al_FCC_edge-disl.o
 # mkconf= mkconf_2D_2kind.o
@@ -99,7 +101,7 @@ params= params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h
 # mkconf= mkconf_Si111_2lc.o
 # mkconf= mkconf_BCC.o
 # mkconf= mkconf_BCC_nanorod.o
-mkconf= mkconf_BCC_Fe-H.o
+# mkconf= mkconf_BCC_Fe-H.o
 # mkconf= mkconf_BCC_edge-disl.o
 # mkconf= mkconf_BCC_screw.o
 # mkconf= mkconf_BCC_W-He.o

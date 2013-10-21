@@ -13,7 +13,7 @@ r=`echo "scale=4; 1.0/100*($a1-$a0)*$i" | bc`
 a=`echo "scale=4; ($a0+$r)*$aa2bohr" | bc`
 echo "a= $a"
 
-cat >pmd000-000 <<EOF
+cat >pmd00000-0000 <<EOF
 2
 ${a}E+00  0.00E+00  0.00E+00
 0.00E+00  38.0E+00  0.00E+00
@@ -23,7 +23,7 @@ ${a}E+00  0.00E+00  0.00E+00
 0.00E+00  0.00E+00  0.00E+00
 EOF
 
-cat pos >> pmd000-000
+cat pos >> pmd00000-0000
 ./pmd > out.pmd
 erg=`grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'`
 echo $a $erg >> out.size-energy

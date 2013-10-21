@@ -155,17 +155,19 @@ c      enddo
       write(6,'(a,i10)') " num of H   =",nh
 c      write(6,'(a,i10)') " id of inc=",int(mod(tag(inc)*1d14,1d13))
 
-      call setv(inc,va,tag,tempini)
+c      call setv(inc,va,tag,tempini)
       
-c-----scale velocities to reduced unit
-      do i=1,inc
-        va(1,i)=va(1,i) /h(1,1,0)
-        va(2,i)=va(2,i) /h(2,2,0)
-        va(3,i)=va(3,i) /h(3,3,0)
-      enddo
+cc-----scale velocities to reduced unit
+c      do i=1,inc
+c        va(1,i)=va(1,i) /h(1,1,0)
+c        va(2,i)=va(2,i) /h(2,2,0)
+c        va(3,i)=va(3,i) /h(3,3,0)
+c      enddo
 
-      call write_pmd0_bin(15,'pmd000-000','replace',inc,tag,ra,va,h
+      call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
+c      call write_pmd0_bin(15,'pmd000-000','replace',inc,tag,ra,va,h
+c     &     ,eki,epi,strs)
       
 c-----output 'akr000' for Akira visualization
       open(15,file='akr000',form='formatted',status='replace')

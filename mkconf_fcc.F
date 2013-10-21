@@ -6,16 +6,14 @@ c
       implicit real*8(a-h,o-z)
       include "params_au.h"
 c-----max # of atoms
-      integer,parameter::nmax=10000000
+      integer,parameter::nmax=1000000
 c-----# of unit cells
       integer,parameter:: nuc(1:3)= (/ 5, 5, 5 /)
 c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
       real(8):: ua(3,10)
-      real(8):: ra(3,nmax)
-      real(8):: h(3,3,0:1)
-      real(8):: va(3,nmax)
-      real(8):: tag(nmax)
+      real(8):: tag(nmax),ra(3,nmax),va(3,nmax),eki(nmax),epi(nmax)
+     &      ,h(3,3,0:1),strs(3,3,nmax)
       real*8,parameter:: pi=3.141592653589793d0
 c      real*8,parameter:: bohr=0.5291772d0
 c      real*8,parameter:: amu=1822.9d0
@@ -74,67 +72,21 @@ c-----simulation box size
       h(2,2,0)= cunit*(nuc(2)+nvac(2))
       h(3,3,0)= cunit*(nuc(3)+nvac(3))
       
-c-----velocities in Maxwell-Boltzmann distribution
-      dseed=12345
-      do i=1,inc
-        do l=1,3
-          call myrnd(rnd1,dseed)
-          call myrnd(rnd2,dseed)
-          va(l,i)=facv*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
-        enddo
-      enddo
-c-----set center of mass motion to zero
-      sumvx=0d0
-      sumvy=0d0
-      sumvz=0d0
-      do i=1,inc
-        sumvx=sumvx+va(1,i)
-        sumvy=sumvy+va(2,i)
-        sumvz=sumvz+va(3,i)
-      enddo
-      do i=1,inc
-        va(1,i)=va(1,i)-sumvx/dble(inc)
-        va(2,i)=va(2,i)-sumvy/dble(inc)
-        va(3,i)=va(3,i)-sumvz/dble(inc)
-      enddo
-c-----scale velocities to reduced unit
-      do i=1,inc
-        va(1,i)=va(1,i) /h(1,1,0)
-        va(2,i)=va(2,i) /h(2,2,0)
-        va(3,i)=va(3,i) /h(3,3,0)
-      enddo
+      va(1:3,1:inc)= 0d0
+
+      call write_pmd0_ascii(15,'pmd00000-0000','replace',inc,tag
+     &     ,ra,va,h,eki,epi,strs)
       
-c-----output 'ini000' for MD program
-      open(15,file='ini000',form='formatted',status='replace')
+c-----output 'akr0000' for KVS visualization
+      open(15,file='akr0000',form='formatted',status='replace')
       write(15,'(i10)')inc
-      write(15,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      do i=1,inc
-        write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
-      
-c-----output 'kvs000' for KVS visualization
-      open(15,file='kvs000',form='formatted',status='replace')
-      write(15,'(i10)')inc
-      write(15,'(3es11.3)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+      write(15,'(3es11.3)') ((h(ia,ib,l),ia=1,3),ib=1,3)
       do i=1,inc
         write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
       enddo
       close(15)
       
       end program mkconf_fcc
-c=======================================================================
-      subroutine myrnd(rnd,dseed)
-      real*8 rnd,dseed
-      real*8 d2p31m,d2p31
-      save d2p31m,d2p31
-      data d2p31m/2147483647d0/
-      data d2p31 /2147483648d0/
-      
-      dseed=dmod(16807d0*dseed,d2p31m)
-      rnd=dseed/d2p31
-      return
-      end subroutine myrnd
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make 10mkconf"
