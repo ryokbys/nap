@@ -671,8 +671,19 @@ contains
     real(8):: rho,emol,adag,sr,x,ex,exm
 
     fvphi_hh= 0d0
-    if( r.gt.rc_phi_hh ) return
 
+!.....correction term to avoid H-H clustering
+    if( r.ge.r0_hh_corr .and. r.lt.r1_hh_corr ) then
+      x=(r-r0_hh_corr)/lmbd_hh_corr
+      ex= exp( -x**k_hh_corr )
+      fvphi_hh=fvphi_hh +c0_hh_corr*x**(k_hh_corr-1d0)*ex
+    else if( r.ge.r1_hh_corr ) then
+      x=(r-r0_hh_corr)/lmbd_hh_corr
+      ex= exp( -x**k_hh_corr -b0_hh_corr*(r-r0_hh_corr)**2 )
+      fvphi_hh=fvphi_hh +c0_hh_corr*x**(k_hh_corr-1d0)*ex
+    endif
+
+    if( r.gt.rc_phi_hh ) return
     x=a_tanh_hh*(r-r_tanh_hh)
     ex= exp(x)
     exm=1d0/ex
@@ -683,11 +694,7 @@ contains
     rho= rho_hh(r)
 
 !.....because C1,C2 are 0, not calculate their term
-    fvphi_hh= sr *(emol -2d0*fh(rho))
-!      fvphi_hh= sr *(-2d0*fh(rho))
-
-!!$    write(6,'(a,10es12.4)') ' emol,adag       =',emol,adag
-!!$    write(6,'(a,10es12.4)') ' 2d0*fh(rho),rho=',2d0*fh(rho),rho
+    fvphi_hh= fvphi_hh +sr *(emol -2d0*fh(rho))
 
     return
   end function fvphi_hh
@@ -699,12 +706,37 @@ contains
     real(8),intent(in):: r
     real(8):: dfvphi_hh
 
-    real(8):: emol,rho,adag,sr,x,ex,exm
+    real(8):: emol,rho,adag,sr,x,ex,exm,xk1,xk2
     real(8):: dsr,demolr,dfhr,drhor
 
     dfvphi_hh= 0d0
-    if( r.gt.rc_phi_hh ) return
 
+!.....correction term to avoid H-H clustering
+    if( r.ge.r0_hh_corr .and. r.lt.r1_hh_corr ) then
+      x=(r-r0_hh_corr)/lmbd_hh_corr
+      xk1= x**(k_hh_corr-1d0)
+      xk2= x**(k_hh_corr-2d0)
+      ex= exp( -x**k_hh_corr )
+      dfvphi_hh=dfvphi_hh &
+           +c0_hh_corr/lmbd_hh_corr*(k_hh_corr-1d0) &
+            *xk2 *ex &
+           +c0_hh_corr*xk1*ex &
+            *(-k_hh_corr/lmbd_hh_corr *xk1)
+    else if( r.ge.r1_hh_corr ) then
+      x=(r-r0_hh_corr)/lmbd_hh_corr
+      xk1= x**(k_hh_corr-1d0)
+      xk2= x**(k_hh_corr-2d0)
+      ex= exp( -x**k_hh_corr -b0_hh_corr*(r-r0_hh_corr)**2 )
+      dfvphi_hh=dfvphi_hh &
+           +c0_hh_corr/lmbd_hh_corr*(k_hh_corr-1d0) &
+            *xk2 *ex &
+           +c0_hh_corr*xk1*ex &
+            *(-k_hh_corr/lmbd_hh_corr *xk1 &
+            -2d0*b0_hh_corr*(r-r1_hh_corr))
+    endif
+
+
+    if( r.gt.rc_phi_hh ) return
 !      sr= 0.5d0 *(1d0 -tanh(a_tanh_hh*(r-r_tanh_hh)))
     x=a_tanh_hh*(r-r_tanh_hh)
     ex=exp(x)
@@ -721,7 +753,7 @@ contains
     demolr= 2d0 *eb_hh *adag *exp(-adag) /(r0_hh*almbd_hh)
     dfhr= drhor *dfh(rho)
 
-    dfvphi_hh= dsr*(emol-2d0*fh(rho)) +sr*(demolr-2d0*dfhr)
+    dfvphi_hh=dfvphi_hh +dsr*(emol-2d0*fh(rho)) +sr*(demolr-2d0*dfhr)
 !      dfvphi_hh= dsr*(-2d0*fh(rho)) +sr*(-2d0*dfhr)
     return
   end function dfvphi_hh

@@ -176,3 +176,20 @@
      &     /)
 !.....Rho_HH
       real(8),parameter:: c_rho_hh = 1800d0 /aa2bohr**2
+
+!.....correction for H-H potential
+!.....see Song and Curtin, nature materials 3479
+!.....potential A
+      real(8),parameter:: k_hh_corr  = 1.5d0
+      real(8),parameter:: r1_hh_corr  = 3.0d0 *aa2bohr
+      real(8),parameter:: r0_hh_corr  = 0.9d0 *aa2bohr
+      real(8),parameter:: lmbd_hh_corr= 1d0 *aa2bohr
+      real(8),parameter:: b0_hh_corr  = 1.44d0 /aa2bohr**2
+      real(8),parameter:: c0_hh_corr  = 0.19d0 *ev2hrt
+!.....potential B
+!!$      real(8),parameter:: k_hh_corr  = 1.5d0
+!!$      real(8),parameter:: r1_hh_corr  = 2.5d0 *aa2bohr
+!!$      real(8),parameter:: r0_hh_corr  = 0.9d0 *aa2bohr
+!!$      real(8),parameter:: lmbd_hh_corr= 1d0 *aa2bohr
+!!$      real(8),parameter:: b0_hh_corr  = 3.24d0 /aa2bohr**2
+!!$      real(8),parameter:: c0_hh_corr  = 0.239d0 *ev2hrt

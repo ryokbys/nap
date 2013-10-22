@@ -516,8 +516,18 @@ contains
     real(8):: rho,emol,adag,sr,x,ex,exm
 
     fvphi_hh= 0d0
-    if( r.gt.rc_phi_hh ) return
+!.....correction term to avoid H-H clustering
+    if( r.ge.r0_hh_corr .and. r.lt.r1_hh_corr ) then
+      x=(r-r0_hh_corr)/lmbd_hh_corr
+      ex= exp( -x**k_hh_corr )
+      fvphi_hh=fvphi_hh +c0_hh_corr*x**(k_hh_corr-1d0)*ex
+    else if( r.ge.r1_hh_corr ) then
+      x=(r-r0_hh_corr)/lmbd_hh_corr
+      ex= exp( -x**k_hh_corr -b0_hh_corr*(r-r0_hh_corr)**2 )
+      fvphi_hh=fvphi_hh +c0_hh_corr*x**(k_hh_corr-1d0)*ex
+    endif
 
+    if( r.gt.rc_phi_hh ) return
     x=a_tanh_hh*(r-r_tanh_hh)
     ex= exp(x)
     exm=1d0/ex
@@ -540,12 +550,36 @@ contains
     real(8),intent(in):: r
     real(8):: dfvphi_hh
 
-    real(8):: emol,rho,adag,sr,x,ex,exm
+    real(8):: emol,rho,adag,sr,x,ex,exm,xk1,xk2
     real(8):: dsr,demolr,dfhr,drhor
 
     dfvphi_hh= 0d0
-    if( r.gt.rc_phi_hh ) return
 
+!.....correction term to avoid H-H clustering
+    if( r.ge.r0_hh_corr .and. r.lt.r1_hh_corr ) then
+      x=(r-r0_hh_corr)/lmbd_hh_corr
+      xk1= x**(k_hh_corr-1d0)
+      xk2= x**(k_hh_corr-2d0)
+      ex= exp( -x**k_hh_corr )
+      dfvphi_hh=dfvphi_hh &
+           +c0_hh_corr/lmbd_hh_corr*(k_hh_corr-1d0) &
+            *xk2 *ex &
+           +c0_hh_corr*xk1*ex &
+            *(-k_hh_corr/lmbd_hh_corr *xk1)
+    else if( r.ge.r1_hh_corr ) then
+      x=(r-r0_hh_corr)/lmbd_hh_corr
+      xk1= x**(k_hh_corr-1d0)
+      xk2= x**(k_hh_corr-2d0)
+      ex= exp( -x**k_hh_corr -b0_hh_corr*(r-r0_hh_corr)**2 )
+      dfvphi_hh=dfvphi_hh &
+           +c0_hh_corr/lmbd_hh_corr*(k_hh_corr-1d0) &
+            *xk2 *ex &
+           +c0_hh_corr*xk1*ex &
+            *(-k_hh_corr/lmbd_hh_corr *xk1 &
+            -2d0*b0_hh_corr*(r-r1_hh_corr))
+    endif
+
+    if( r.gt.rc_phi_hh ) return
 !      sr= 0.5d0 *(1d0 -tanh(a_tanh_hh*(r-r_tanh_hh)))
     x=a_tanh_hh*(r-r_tanh_hh)
     ex=exp(x)
