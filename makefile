@@ -92,7 +92,7 @@ params= params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h
 
 #-----mkconf program selection
 #mkconf= mkconf_fcc.o
-mkconf= mkconf_fcc_droplet.o
+# mkconf= mkconf_fcc_droplet.o
 # mkconf= mkconf_Al_fcc.o
 # mkconf= mkconf_Al_FCC_edge-disl.o
 # mkconf= mkconf_2D_2kind.o
@@ -104,7 +104,7 @@ mkconf= mkconf_fcc_droplet.o
 # mkconf= mkconf_BCC_Fe-H.o
 # mkconf= mkconf_BCC_edge-disl.o
 # mkconf= mkconf_BCC_screw.o
-# mkconf= mkconf_BCC_W-He.o
+mkconf= mkconf_BCC_W-He.o
 # mkconf= mkconf_W-He-compress.o
 
 #-----------------------------------------------------------------------

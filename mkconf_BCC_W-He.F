@@ -13,7 +13,7 @@ c-----max # of atoms
       integer,parameter::nmax=100000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 10,10,10 /)
+      integer,parameter:: nuc(1:3)= (/ 3,3,3 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
@@ -32,7 +32,7 @@ c.....He ratio
 cc.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
 c      cunit= 2.835d-10 /bohr
 c.....Lattice constant of W for 1000K
-      cunit= 3.180d-10 /bohr
+      cunit= 3.202d-10 /bohr
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
@@ -52,6 +52,8 @@ c-----unit cell, BCC
             do m=1,2
 c              call myrnd(rnd,dseed)
 c              if( rnd.lt.vratio ) cycle
+              if( ix.eq.nuc(1)/2 .and. iy.eq.nuc(2)/2
+     &             .and. iz.eq.nuc(3)/2 .and. m.eq.2 ) cycle
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
@@ -67,26 +69,26 @@ c              if( m.eq.2 ) is= 2
               ifmv= 1
               tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
             enddo
-            call myrnd(rnd,dseed)
-            if( rnd.lt.heratio ) then
-c.....Add He atom
-              inc= inc+1
-              if(inc.gt.nmax)then
-                write(*,*)'Error inc>nmax',inc,nmax
-                stop
-              endif
-              is= 2
-              ifmv= 1
-              tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
-cc.....O-site
-c              ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-c              ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-c              ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-c.....T-site
-              ra(1,inc)= (0.50d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-              ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-              ra(3,inc)= (0.00d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-            endif
+c            call myrnd(rnd,dseed)
+c            if( rnd.lt.heratio ) then
+cc.....Add He atom
+c              inc= inc+1
+c              if(inc.gt.nmax)then
+c                write(*,*)'Error inc>nmax',inc,nmax
+c                stop
+c              endif
+c              is= 2
+c              ifmv= 1
+c              tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+ccc.....O-site
+cc              ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+cc              ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+cc              ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+cc.....T-site
+c              ra(1,inc)= (0.50d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+c              ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+c              ra(3,inc)= (0.00d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+c            endif
           enddo
         enddo
       enddo
@@ -94,11 +96,11 @@ c.....T-site
       write(6,'(a,i10)') " natm=",inc
 
       call setv(inc,tag,va,h,tempini)
-      call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va,h
+      call write_pmd0_ascii(15,'pmd00000-0000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
       
 c-----output 'akr000' for Akira visualization
-      open(15,file='akr000',form='formatted',status='replace')
+      open(15,file='akr0000',form='formatted',status='replace')
       write(15,'(i10,3i5)') inc, 3, 0, 0
       write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
       do i=1,inc

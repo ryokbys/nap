@@ -12,20 +12,20 @@ c-----max num of neighbors; 12 is enough
 cc.....Cutoff radius for LJ-Ar FCC, halfway between 1st and 2nd N.N.
 cc      real(8),parameter:: rc    = 3.36d-10 /0.5291772d-10
 c      real(8),parameter:: rc    = 3.5d-10 /0.5291772d-10
-c.....Cutoff radius for BCC Fe, halfway between 2nd and 3rd N.N.
-      real(8),parameter:: abcc = 2.835d-10/0.5291772d-10
-cc.....Cutoff radius for BCC W, halfway between 2nd and 3rd N.N.
+cc.....Cutoff radius for BCC Fe, halfway between 2nd and 3rd N.N.
+c      real(8),parameter:: abcc = 2.835d-10/0.5291772d-10
+c.....Cutoff radius for BCC W, halfway between 2nd and 3rd N.N.
 cc.....W @1000K = 3.226d-10
 c      real(8),parameter:: abcc = 3.226d-10/0.5291772d-10
-cc.....W @0K = 3.171d-10
-c      real(8),parameter:: abcc = 3.202d-10/0.5291772d-10
+c.....W @0K = 3.171d-10
+      real(8),parameter:: abcc = 3.204d-10/0.5291772d-10
       real(8),parameter:: rc   = 0.5d0*(1d0+1.41421356d0)*abcc
 
-      integer:: i,n,itmp,nauxdat,j
-      integer:: natm0,natm,nx,ny,nz,nlsa
-      real(8):: tmp,al(3),xi(3),rij(3),r
-      integer,allocatable:: lsa(:),lspr(:,:),itype(:),itag(:)
-      real(8),allocatable:: ra0(:,:),ra(:,:),auxdat0(:,:)
+      integer:: i,n,itmp,nauxdat,j,ix,iy,iz,m
+      integer:: natm0,natm1,natm,nx,ny,nz,nlsa,ncpx,ncpy,ncpz
+      real(8):: tmp,al(3),al1(3),xi(3),rij(3),r
+      integer,allocatable:: lsa(:),lspr(:,:),itype(:),itag(:),itag1(:)
+      real(8),allocatable:: ra0(:,:),ra1(:,:),ra(:,:),auxdat0(:,:)
      &     ,auxdat(:,:)
 
 c-----read akr file from STDIN
@@ -33,29 +33,63 @@ c-----read akr file from STDIN
       read(5,*) al(1),tmp,tmp
       read(5,*) tmp,al(2),tmp
       read(5,*) tmp,tmp,al(3)
+      ncpx=1
+      ncpy=1
+      ncpz=1
+      if( al(1).lt.3*rc ) then
+        ncpx= int(3*rc/al(1)+1)
+      endif
+      if( al(2).lt.3*rc ) then
+        ncpy= int(3*rc/al(2)+1)
+      endif
+      if( al(3).lt.3*rc ) then
+        ncpz= int(3*rc/al(3)+1)
+      endif
+      al1(1)= al(1)*ncpx
+      al1(2)= al(2)*ncpy
+      al1(3)= al(3)*ncpz
+      
+c      write(6,'(a,7es12.4)') 'rc,al(1:3),al1(1:3)=',rc,al(1:3),al1(1:3)
+c      write(6,'(a,3i6)') 'ncpx,ncpy,ncpz=',ncpx,ncpy,ncpz
+      natm1= natm0*ncpx*ncpy*ncpz
       allocate(ra0(3,natm0),ra(3,natm0),auxdat(nauxdat,natm0)
-     &     ,auxdat0(nauxdat,natm0),itype(natm0),itag(natm0))
+     &     ,auxdat0(nauxdat,natm0),itype(natm0),itag(natm0)
+     &     ,ra1(3,natm1),itag1(natm1))
       do i=1,natm0
         read(5,*) itag(i),ra0(1:3,i),auxdat0(1:nauxdat,i)
       enddo
+      m=0
+      do ix=0,ncpx-1
+        do iy=0,ncpy-1
+          do iz=0,ncpz-1
+            do i=1,natm0
+              m=m+1
+              ra1(1,m)= (ra0(1,i) +ix)/ncpx
+              ra1(2,m)= (ra0(2,i) +iy)/ncpy
+              ra1(3,m)= (ra0(3,i) +iz)/ncpz
+              itag1(m)= itag(i)
+            enddo
+          enddo
+        enddo
+      enddo
 
 c-----prepare for linked-list
-      nx=max(1,int(al(1)/rc))
-      ny=max(1,int(al(2)/rc))
-      nz=max(1,int(al(3)/rc))
-      nlsa= natm0 +nx*ny*nz
+      nx=max(1,int(al1(1)/rc))
+      ny=max(1,int(al1(2)/rc))
+      nz=max(1,int(al1(3)/rc))
+      nlsa= natm1 +nx*ny*nz
 c      write(6,'(a,4i10)') " nx,ny,nz,nlsa=",nx,ny,nz,nlsa
       allocate(lsa(nlsa))
 c-----make linked-list
-      call mkllist(natm0,nx,ny,nz,ra0,nlsa,lsa)
+      call mkllist(natm1,nx,ny,nz,ra1,nlsa,lsa)
 
 c-----make 1st nearest neighbor pair-list
-      allocate(lspr(0:nnmax,natm0))
-      call ll2lspr(nlsa,lsa,nx,ny,nz,natm0,nnmax,lspr,al,ra0,rc,itag)
+      allocate(lspr(0:nnmax,natm1))
+      call ll2lspr(nlsa,lsa,nx,ny,nz,natm1,nnmax,lspr,al1,ra1,rc,itag1)
       deallocate(lsa)
 
 c-----common neighbor analysis
-      call cna(natm0,nnmax,lspr,itag,ra0,auxdat0,nauxdat
+      call cna(natm0,natm1,nnmax,lspr,itag1,ra0,auxdat0,nauxdat
      &     ,natm,ra,auxdat,itype)
 
 c-----write akr file to STDOUT
@@ -161,11 +195,20 @@ c---------region (jr)
                   r= dsqrt(dx*dx +dy*dy +dz*dz)
                   if(r.lt.rc .and. j.ne.i .and. is.eq.js) then
 c                  if(r.lt.rc .and. j.ne.i) then
+c                    if(r.lt.1d-5) then
+c                      write(6,'(a,3es12.4)') ' al(1:3)=',al(1:3)
+c                      write(6,'(a,i8,3es12.4)') 'i,ra(1:3,i)='
+c     &                     ,i,ra(1:3,i)
+c                      write(6,'(a,i8,3es12.4)') 'j,ra(1:3,j)='
+c     &                     ,j,ra(1:3,j)
+c                      write(6,'(a,es12.4)') ' r=',r
+c                      stop ' r.lt.1d-5 !!!'
+c                    endif
                     n=n+1
                     if(n.gt.nnmax) then
                       write(6,'(a)') "mklspr: n.gt.nnmax"
                       write(6,'(a,2i10)') " n,nnmax=",n,nnmax
-                      write(6,'(a,2i5,2es11.3)') "i,j,r,rc=",i,j,r,rc
+                      write(6,'(a,2i8,2es11.3)') "i,j,r,rc=",i,j,r,rc
                       stop "mklspr: n.gt.nnmax"
                     endif
                     da(n)= r
@@ -211,14 +254,14 @@ c      stop
 
       end subroutine ll2lspr
 c=======================================================================
-      subroutine cna(natm0,nnmax,lspr,itag,ra0,auxdat0,nauxdat
+      subroutine cna(natm0,natm1,nnmax,lspr,itag,ra0,auxdat0,nauxdat
      &     ,natm,ra,auxdat,itype)
 c-----------------------------------------------------------------------
 c Reduce natm0 to natm by using Common Neighbor Analysis
 c-----------------------------------------------------------------------
       implicit none
-      integer,intent(in):: natm0,nnmax,lspr(0:nnmax,natm0),nauxdat
-     &     ,itag(natm0)
+      integer,intent(in):: natm0,natm1,nnmax,lspr(0:nnmax,natm1),nauxdat
+     &     ,itag(natm1)
       real(8),intent(in):: ra0(3,natm0),auxdat0(nauxdat,natm0)
       integer,intent(out):: itype(natm0),natm
       real(8),intent(out):: ra(3,natm0),auxdat(nauxdat,natm0)
@@ -235,13 +278,13 @@ c      integer,parameter:: lmax= 14
       integer,parameter:: mmax= lmax*(lmax-1)/2
 
       allocate(icommon(lmax),ibond(2,mmax),nb(mmax)
-     &     ,idc(3,nnmax,natm0))
+     &     ,idc(3,nnmax,natm1))
 
 c-----init three indices
-      idc(1:3,1:nnmax,1:natm0)= 0
+      idc(1:3,1:nnmax,1:natm1)= 0
 
 c-----for each atom-i, store three indices (LMN)
-      do i=1,natm0
+      do i=1,natm1
         if( itag(i).ne.1 ) cycle
 
 c-------for each 1st n.n.
@@ -260,7 +303,11 @@ c---------count num of common neighbors: L
               nj=lspr(jj,j)
               if(nj.eq.ni) then
                 l=l+1
-                if(l.gt.lmax) stop " l.gt.lmax!!!"
+                if(l.gt.lmax) then
+                  write(6,'(a,2i6)') ' i,lspr(0,i)=',i,lspr(0,i)
+                  write(6,'(a,2i6)') ' j,lspr(0,j)=',j,lspr(0,j)
+                  stop " l.gt.lmax!!!"
+                endif
                 icommon(l)= ni
                 exit
               endif

@@ -1707,7 +1707,7 @@ c=======================================================================
      &     ,epot)
       implicit none
       integer,intent(in):: natm,nismax,ionum
-      character(len=4),intent(in):: cnum 
+      character(len=*),intent(in):: cnum 
       real(8),intent(in):: h(3,3),acon(nismax),aa(3,natm),tag(natm)
      &     ,epot
 
@@ -1715,7 +1715,7 @@ c=======================================================================
       real(8):: at(3)
 
 c.....Write out forces
-      open(ionum,file='frc'//cnum,status='replace')
+      open(ionum,file='frc'//trim(cnum),status='replace')
       write(ionum,'(i10)') natm
       do i=1,natm
         is= int(tag(i))
@@ -1726,7 +1726,7 @@ c.....Write out forces
       close(ionum)
 
 c.....Write out energy
-      open(ionum+1,file='erg'//cnum,status='replace')
+      open(ionum+1,file='erg'//trim(cnum),status='replace')
       write(ionum+1,'(es22.14)') epot
       close(ionum+1)
 
