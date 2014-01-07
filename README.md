@@ -11,29 +11,43 @@ pmd uses spatial decomposition technique for the parallelization, and cell list 
 # Usage
 1. make MD coordination file
   - compile mkconf
-        $ make 10mkconf
+
+    $ make 10mkconf
+
   - run 
-        $ ./10mkconf
+
+    $ ./10mkconf
 
 2. divide the coordination file to num of nodes
   - compile nconv
-        $ make 20nconv
+
+    $ make 20nconv
+
   - run
-        $ ./20nconv
+
+    $ ./20nconv
+
   - some inputs are required
 
 3. make config file of parallel md program
   - name of config file should be 'pmd.in'
   - compile parallel_md.f by using mpif90
-        $ make pmd
+ 
+    $ make pmd
+
   - run with mpirun (e.g., 8 nodes will be used.)
-        $ mpirun -n 8 -machinefile hostfile ./a.out
+
+    $ mpirun -n 8 -machinefile hostfile ./a.out
+
     or
-        $ ./30pmdrun.py
+
+    $ ./30pmdrun.py
 
 4. combine pmd###-??? files to kvs???
+    ```
     $ make 40combine
     $ ./40combine
+    ```
 
 
 # Notes:
