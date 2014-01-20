@@ -9,7 +9,7 @@ contains
 !-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
-    include "params_au.h"
+    include "./params_au.h"
     include "params_LJ_Ar.h"
     integer,intent(in):: namax,natm,nnmax,nismax
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
@@ -111,7 +111,6 @@ contains
     epot= 0d0
     call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
          ,MPI_SUM,mpi_md_world,ierr)
-
   end subroutine force_LJ_Ar
 end module LJ_Ar
 !-----------------------------------------------------------------------

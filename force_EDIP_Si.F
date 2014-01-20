@@ -9,7 +9,7 @@ c    - 2010.03.31 by R.K.
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
-      include "params_au.h"
+      include "./params_au.h"
       include "params_EDIP_Si.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)

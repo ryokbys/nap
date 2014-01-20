@@ -7,7 +7,7 @@ c    - only force on i is considered, no need to send back
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
-      include "params_au.h"
+      include "./params_au.h"
       include "params_RK_VLS1.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -115,7 +115,7 @@ c=======================================================================
       function f2_rk(r,is,js)
 c-----2-body force
       implicit none
-      include "params_au.h"
+      include "./params_au.h"
       include "params_RK_VLS1.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js
@@ -132,7 +132,7 @@ c=======================================================================
       function df2_rk(r,is,js)
 c-----Derivative of 2-body term
       implicit none 
-      include "params_au.h"
+      include "./params_au.h"
       include "params_RK_VLS1.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js

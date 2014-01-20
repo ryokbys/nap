@@ -9,7 +9,7 @@ c    - 2010.04.02 by R.K.
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
-      include "params_au.h"
+      include "./params_au.h"
       include "params_Vashishta_AlN.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -216,7 +216,7 @@ c=======================================================================
       function f2_r(r,is,js)
 c-----2-body force
       implicit none
-      include "params_au.h"
+      include "./params_au.h"
       include "params_Vashishta_AlN.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js
@@ -246,7 +246,7 @@ c=======================================================================
       function df2_r(r,is,js)
 c-----Derivative of 2-body term
       implicit none 
-      include "params_au.h"
+      include "./params_au.h"
       include "params_Vashishta_AlN.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js

@@ -15,7 +15,7 @@ contains
 !-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
-    include "params_au.h"
+    include "./params_au.h"
     include "params_Ito3_WHe.h"
     integer,intent(in):: namax,natm,nnmax,nismax
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
@@ -323,7 +323,7 @@ contains
 !  Two-body potential energy
 !
     implicit none
-    include "params_au.h"
+    include "./params_au.h"
     include "params_Ito3_WHe.h"
     real(8),intent(in):: r
     integer,intent(in):: is,js
@@ -356,7 +356,7 @@ contains
 !  Derivative of two-body potential
 !
     implicit none
-    include "params_au.h"
+    include "./params_au.h"
     include "params_Ito3_WHe.h"
     real(8),intent(in):: r
     integer,intent(in):: is,js
@@ -396,7 +396,7 @@ contains
 !  Phi for many-body potential
 !
     implicit none
-    include "params_au.h"
+    include "./params_au.h"
     include "params_Ito3_WHe.h"
     real(8),intent(in):: r
     integer,intent(in):: is,js
@@ -416,7 +416,7 @@ contains
 !=======================================================================
   function dphi_IWHe(r,is,js)
     implicit none
-    include "params_au.h"
+    include "./params_au.h"
     include "params_Ito3_WHe.h"
     real(8),intent(in):: r
     integer,intent(in):: is,js
@@ -437,7 +437,7 @@ contains
 !=======================================================================
   function fc(x)
     implicit none
-    include "params_au.h"
+    include "./params_au.h"
     include "params_Ito3_WHe.h"
     real(8),intent(in):: x
     real(8):: fc
@@ -454,7 +454,7 @@ contains
 !=======================================================================
   function dfc(x)
     implicit none
-    include "params_au.h"
+    include "./params_au.h"
     include "params_Ito3_WHe.h"
     real(8),intent(in):: x
     real(8):: dfc

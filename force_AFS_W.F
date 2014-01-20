@@ -3,7 +3,7 @@ c
 c  Not applicable to parallel calc
 c
       use variables
-      include 'params_au.h'
+      include './params_au.h'
 
       avol= h(1,1,0)*h(2,2,0)*h(3,3,0)/natm
       if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol=',avol*bohr2aa**3
@@ -27,7 +27,7 @@ c-----------------------------------------------------------------------
       use variables,only: avol
       implicit none
       include "mpif.h"
-      include "params_au.h"
+      include "./params_au.h"
       include "params_AFS_W.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -306,7 +306,7 @@ c
 c  Two-body potential energy
 c
       implicit none
-      include "params_au.h"
+      include "./params_au.h"
       include "params_AFS_W.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js
@@ -332,7 +332,7 @@ c
 c  Derivative of two-body potential
 c
       implicit none
-      include "params_au.h"
+      include "./params_au.h"
       include "params_AFS_W.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js
@@ -359,7 +359,7 @@ c
 c  Phi for many-body potential
 c
       implicit none
-      include "params_au.h"
+      include "./params_au.h"
       include "params_AFS_W.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js
@@ -377,7 +377,7 @@ c.....phi_W
 c=======================================================================
       function dphi_IWHe(r,is,js)
       implicit none
-      include "params_au.h"
+      include "./params_au.h"
       include "params_AFS_W.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js

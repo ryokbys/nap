@@ -16,9 +16,9 @@ CPPFLAGS=
 #MPIFC= /usr/local/gridmpi-2.1.1/intel/bin/mpif90
 #MPIFC= /usr/local/mpich-1.2.6/intel/bin/mpif90
 #.....mike
-MPIFC=/opt/intel/impi/4.0.0.028/intel64/bin/mpiifort
+# MPIFC=/opt/intel/impi/4.0.0.028/intel64/bin/mpiifort
 #MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -check all
-MPIFLAGS= -xHOST -O3 -no-prec-div
+# MPIFLAGS= -xHOST -O3 -no-prec-div
 # #.....king
 # MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
 # MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
@@ -34,61 +34,27 @@ MPIFLAGS= -xHOST -O3 -no-prec-div
 
 #-----------------------------------------------------------------------
 # # for mp-rk
-# MPIFC= mpif90
-# MPIFLAGS= -O4 -g
+MPIFC= openmpif90
+MPIFLAGS= -O4 -g
 #-----------------------------------------------------------------------
 # suffixes
 .SUFFIXES: .o .f .F .f90 .F90
 .f.o: 
-	$(MPIFC) -c $(MPIFLAGS) $<
+	${MPIFC} -c ${MPIFLAGS} $<
 .F.o: 
-	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
+	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 .f90.o: 
-	$(MPIFC) -c $(MPIFLAGS) $<
+	${MPIFC} -c ${MPIFLAGS} $<
 .F90.o: 
-	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
+	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
 pmd= read_input.o parallel_md.o util_vec.o \
 	lasubs.o util_pmd.o tensile_loading.o
 mods= mod_variables.o
 
-#-----------------------------------------------------------------------
-# Uncomment only one force routine
-# (These provide same 'get_force' routines)
-#-----------------------------------------------------------------------
-# force= force_LJ_Ar.o
-# params= params_LJ_Ar.h
-# force= force_EAM_Al.o
-# params= params_EAM_Al.h
-# force= force_Mishin_Al.o
-# params= params_Mishin_Al.h
-# force= force_EAM_Fe.o
-# params= params_EAM_Fe.h
-# force= force_Ramas_FeH.o
-# params= params_Ramas_FeH.h
-# force= force_RK_Fe-H.o
-# params= params_RK_Fe-H.h
-# force= force_Ito3_W-He.o
-# params= params_Ito3_W-He.h
-# force= force_AFS_W.o
-# params= params_AFS_W.h
-# force= force_Lu_W-He.o
-# params= params_Lu_W-He.h
-# force= force_Brenner.o
-# params= params_Brenner.h
-# force= force_SW_Si.o
-# params= params_SW_Si.h
-# force= force_EDIP_Si.o
-# params= params_EDIP_Si.h
-# force= force_Vashishta_AlN.o
-# params= params_Vashishta_AlN.h
-# force= force_RK_wurtzite.o
-# params= params_RK_wurtzite.h
-# force= force_RK_VLS1.o
-# params= params_RK_VLS1.h
 forces= force_Ramas_FeH.o force_RK_FeH.o force_common.o force_RK_WHe.o \
 	force_Ito3_WHe.o force_LJ_Ar.o
-params= params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h
+params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h
 
 #-----mkconf program selection
 #mkconf= mkconf_fcc.o
@@ -125,20 +91,20 @@ clean:
 install: pmd 10mkconf 20nconv
 	cp pmd 10mkconf 20nconv ../
 
-10mkconf: ${mkconf} util_pmd.o $(mods)
-	${MPIFC} -o $@ $(mods) ${mkconf} util_pmd.o
+10mkconf: ${mkconf} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf} util_pmd.o
 
-20nconv: node_conv.o $(mods) read_input.o util_pmd.o
-	${MPIFC} -o $@ $(mods) node_conv.o read_input.o util_pmd.o
+20nconv: node_conv.o ${mods} read_input.o util_pmd.o
+	${MPIFC} -o $@ ${mods} node_conv.o read_input.o util_pmd.o
 
-pmd: $(mods) $(pmd) $(forces) $(params)
-	${MPIFC} ${MPIFLAGS} -o $@ $(mods) $(forces) ${pmd}
+pmd: ${mods} ${pmd} ${forces} ${params}
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmd}
 
-40combine: $(comb) $(mods)
-	${MPIFC} -o $@  $(mods) $(comb)
+40combine: ${comb} ${mods}
+	${MPIFC} -o $@  ${mods} ${comb}
 
-pmd2akr: $(pmd2akr) $(mods)
-	$(MPIFC) -o $@ $(mods) $(pmd2akr)
+pmd2akr: ${pmd2akr} ${mods}
+	${MPIFC} -o $@ ${mods} ${pmd2akr}
 
 akr2cna: akr2cna.o sort.o
 	${MPIFC} -o $@ akr2cna.o sort.o
@@ -156,23 +122,23 @@ akr2ddplot: akr2ddplot.o
 	${MPIFC} -o $@ akr2ddplot.o
 
 cna2disl: cna2disl.o
-	$(MPIFC) -o $@ cna2disl.o
+	${MPIFC} -o $@ cna2disl.o
 
-rdpmd: read_pmd.o $(mods)
-	$(MPIFC) -o $@ read_pmd.o $(mods)
+rdpmd: read_pmd.o ${mods}
+	${MPIFC} -o $@ read_pmd.o ${mods}
 
-boxsize: change_pmd_boxsize.o $(mods) util_pmd.o
-	$(MPIFC) -o $@ change_pmd_boxsize.o $(mods) util_pmd.o
+boxsize: change_pmd_boxsize.o ${mods} util_pmd.o
+	${MPIFC} -o $@ change_pmd_boxsize.o ${mods} util_pmd.o
 
-sortpmd: sort_pmd.o $(mods) util_pmd.o sort.o
-	$(MPIFC) -o $@ sort_pmd.o $(mods) util_pmd.o sort.o
+sortpmd: sort_pmd.o ${mods} util_pmd.o sort.o
+	${MPIFC} -o $@ sort_pmd.o ${mods} util_pmd.o sort.o
 
 #.....Module dependencies
-parallel_md.o: $(mods) $(forces)
-read_input.o:  $(mods)
-node_conv.o:   $(mods)
-combine_pmd.o: $(mods)
-pmd2akr.o: $(mods)
-force_Ito_W-He.o: $(mods)
+parallel_md.o: ${mods} ${forces}
+read_input.o:  ${mods}
+node_conv.o:   ${mods}
+combine_pmd.o: ${mods}
+pmd2akr.o: ${mods}
+force_Ito_W-He.o: ${mods}
 
 

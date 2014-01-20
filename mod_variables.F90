@@ -3,11 +3,11 @@
     save
 
 !.....max. num. of atoms
-    integer,parameter:: namax = 1000000
+    integer,parameter:: namax = 10000
 !.....max. num. of species
     integer,parameter:: nismax= 9
 !.....max. num. of boundary-particles
-    integer,parameter:: nbmax = 500000
+    integer,parameter:: nbmax = 50000
 !.....max. num. of neighbors
     integer,parameter:: nnmax = 200
 

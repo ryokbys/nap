@@ -11,7 +11,7 @@ c  See Mishin et al. PRB 59(5) (1999) 3393--3407.
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
-      include "params_au.h"
+      include "./params_au.h"
       include "params_Mishin_Al.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -123,7 +123,7 @@ c      deallocate(sqrho)
 c=======================================================================
       function calc_rho(r)
       implicit none
-      include 'params_au.h'
+      include './params_au.h'
       include 'params_Mishin_Al.h'
       real(8),intent(in):: r
       real(8):: calc_rho
@@ -149,7 +149,7 @@ c=======================================================================
 c=======================================================================
       function calc_drho(r)
       implicit none
-      include 'params_au.h'
+      include './params_au.h'
       include 'params_Mishin_Al.h'
       real(8),intent(in):: r
       real(8):: calc_drho
@@ -174,7 +174,7 @@ c=======================================================================
 c=======================================================================
       function calc_v(r)
       implicit none
-      include 'params_au.h'
+      include './params_au.h'
       include 'params_Mishin_Al.h'
       real(8),intent(in):: r
       real(8):: calc_v
@@ -199,7 +199,7 @@ c=======================================================================
 c=======================================================================
       function calc_dv(r)
       implicit none
-      include 'params_au.h'
+      include './params_au.h'
       include 'params_Mishin_Al.h'
       real(8),intent(in):: r
       real(8):: calc_dv
@@ -224,7 +224,7 @@ c=======================================================================
 c=======================================================================
       function calc_f(rho)
       implicit none
-      include 'params_au.h'
+      include './params_au.h'
       include 'params_Mishin_Al.h'
       real(8),intent(in):: rho
       real(8):: calc_f
@@ -249,7 +249,7 @@ c=======================================================================
 c=======================================================================
       function calc_df(rho)
       implicit none
-      include 'params_au.h'
+      include './params_au.h'
       include 'params_Mishin_Al.h'
       real(8),intent(in):: rho
       real(8):: calc_df
