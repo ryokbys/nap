@@ -7,7 +7,7 @@ c    - only force on i is considered, no need to send back
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_RK_VLS1.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -34,7 +34,7 @@ c-----only at 1st call
 c-------allocate 2-body force table
         allocate(tf(nd_rk,2,2),tdf(nd_rk,2,2))
 c-------make 2-body (smoothed) force table
-        rmin= 0.5d-10 /bohr
+        rmin= 0.5d0
         rmax= rc
         dr= (rmax-rmin)/(nd_rk-1)
         do is=1,2
@@ -115,7 +115,7 @@ c=======================================================================
       function f2_rk(r,is,js)
 c-----2-body force
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_RK_VLS1.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js
@@ -132,7 +132,7 @@ c=======================================================================
       function df2_rk(r,is,js)
 c-----Derivative of 2-body term
       implicit none 
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_RK_VLS1.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js

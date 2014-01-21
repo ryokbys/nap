@@ -8,7 +8,7 @@ c    * pmd000-000
 c    * akr000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
-      include './params_au.h'
+      include './params_unit.h'
       include './params_EAM_Fe-H.h'
 c-----max # of atoms
       integer,parameter::nmax=10000000
@@ -32,8 +32,8 @@ c.....H density in atomic ppm
 c.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
       cunit= alcfe
       daa = sqrt(3d0)/2 *alcfe
-      write(6,'(a,es12.4,a)') " Lattice constant =",cunit," [Bohr]"
-      write(6,'(a,es12.4,a)') " Fe-Fe bond length=",daa," [Bohr]"
+      write(6,'(a,es12.4,a)') " Lattice constant =",cunit," [Ang]"
+      write(6,'(a,es12.4,a)') " Fe-Fe bond length=",daa," [Ang]"
 
 c.....Unit vectors, h0= (a0,b0,c0) where a0,b0,c0 are column vectors
       h0(1:3,1:3)= 0d0
@@ -182,7 +182,7 @@ c-----output 'akr000' for Akira visualization
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_EAM_Fe-H.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)

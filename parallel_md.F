@@ -22,7 +22,7 @@ c-----------------------------------------------------------------------
 #endif
       implicit none
       include "mpif.h"
-      include "./params_au.h"
+      include "./params_unit.h"
 
 #ifdef __DISL__
 c.....Epot threshold for disl core extraction [Hartree]
@@ -96,12 +96,6 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(nout_wall,1,mpi_integer,0,mpi_md_world,ierr)
 #endif
 
-c-----sec. --> a.u.
-      dt= dt /aut
-      trlx= trlx /aut
-c-----meter --> bohr
-      rc= rc /bohr
-      rbuf= rbuf /bohr
 c-----output every these steps, NOUTERG, NOUTPMD
       if( nerg.ne.0 ) then
         nouterg = max(nstp/nerg,1)
@@ -127,10 +121,10 @@ c-----error trap
         stop
       endif
 #ifdef __WALL__
-      trlx_wall= trlx_wall /aut
+      trlx_wall= trlx_wall
       dt_wall= dt*nout_wall
-c.....GPa --> hartree/bohr^3
-      ptgt_wall= ptgt_wall *gpa2aup
+c.....GPa --> eV/AA^3
+      ptgt_wall= ptgt_wall *gpa2up
 #endif
       
 c-----vector node indices: range [0:nx-1]
@@ -237,8 +231,8 @@ c      temp= ekin /ntot/fkb *2d0/2d0
 
       if( ifpctl.eq.1 ) then
         if(myid_md.eq.0) write(6,'(a,f10.2,a,es12.4,a)')
-     &       ' Target Pressure = ',ptgt,' GPa, ',ptgt*gpa2aup,' a.u.'
-        ptgt= ptgt *gpa2aup
+     &       ' Target Pressure = ',ptgt,' GPa, ',ptgt*gpa2up,' a.u.'
+        ptgt= ptgt *gpa2up
 c.....Parrinello-Rahman Isobaric
         vm= am(1)*vmcoeff
         call force_isobaric(ptgt,ah,natm,eki,strs,sgm,vm,vol,avol
@@ -255,7 +249,7 @@ c.....Considering vmax==0d0, make istpe small only for the first step
 c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
 
       if(myid_md.eq.0) then
-        write(6,'(1x,a)') "initial values: [Hartree], [K]"
+        write(6,'(1x,a)') "initial values: [eV], [K]"
         write(6,'(1x,a,es22.14)') " kinetic energy  =",ekin
         write(6,'(1x,a,es22.14)') " potential energy=",epot0
         write(6,'(1x,a,es15.7)') " temperature     =",temp
@@ -263,8 +257,8 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
         if( ifpctl .eq. 1 ) then
           write(6,'(a,i8,2f10.2,2es11.3)')
      &         " istp,time,temp,vol,prss="
-     &         ,istp,tcpu,temp,vol*bohr2aa**3
-     &         ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*aup2gpa
+     &         ,istp,tcpu,temp,vol
+     &         ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
         else
           write(6,'(a,i8,2f10.2)')
      &         " istp,time,temp="
@@ -301,8 +295,8 @@ c-----Energy output
         write(11,'(a,es15.7)') '# epot0 =',epot0
         write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
      &       ,ekin+epot0-epot0,ekin,epot0-epot0,temp
-     &       ,vol*bohr2aa**3
-     &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*aup2gpa
+     &       ,vol
+     &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
         call flush(11)
 #ifdef __KOUKYU__
         open(80,file='out.stress',status='replace')
@@ -482,8 +476,8 @@ c          temp= ekin /ntot/fkb *2d0/2d0
           if(myid_md.eq.0) then
             write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
      &           ,ekin+epot-epot0,ekin,epot-epot0,temp
-     &           ,vol*bohr2aa**3
-     &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*aup2gpa
+     &           ,vol
+     &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
             call flush(11)
 #ifdef __KOUKYU__
             write(80,'(i8,3es15.7)') istp,strnow,ftop,fbot
@@ -496,8 +490,8 @@ c---------output step, time, and temperature
             if( ifpctl .eq. 1 ) then
               write(6,'(a,i8,2f10.2,2es11.3)')
      &             " istp,time,temp,vol,prss="
-     &             ,istp,tcpu,temp,vol*bohr2aa**3
-     &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*aup2gpa
+     &             ,istp,tcpu,temp,vol
+     &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
             else
               write(6,'(a,i8,2f10.2)')
      &             " istp,time,temp="
@@ -565,7 +559,7 @@ c.....reset pressure
 
       tcpu= tcpu2 -tcpu1
       if(myid_md.eq.0) then
-        write(6,'(1x,a)') "final values: [Hartree], [K]"
+        write(6,'(1x,a)') "final values: [eV], [K]"
         write(6,'(1x,a,es22.14)') " kinetic energy  =",ekin
         write(6,'(1x,a,es22.14)') " potential energy=",epot
         write(6,'(1x,a,es15.7)') " temperature     =",temp
@@ -627,23 +621,29 @@ c=======================================================================
 c=======================================================================
       subroutine setup(nismax,am,acon,fack,dt)
       implicit none
-      include "params_au.h"
+      include "params_unit.h"
       integer,intent(in):: nismax
       real(8),intent(in):: dt
       real(8),intent(out):: acon(nismax),fack(nismax),am(nismax)
 
       integer:: i
+      real(8):: tmp
 
-      am(1:nismax)= am(1:nismax) *aump/aume
+      am(1:nismax)= am(1:nismax)
+
+c.....umass*Ang^2/fs^2 ---> kg*m^2/sec^2 (=Joule)
+      tmp= umass *ang**2 /ut**2
+      write(6,'(a,es12.4,a,es12.4,a)') ' umass*Ang^2/fs^2 ='
+     &     ,tmp,' Joule',tmp*j2ev,' eV'
 
 c-----prefactors for normalized accelerration
       do i=1,nismax
         acon(i)= 0.5d0*dt**2/am(i)
       enddo
 
-c-----prefactors for kinetic energy, FACK
+c-----prefactors for kinetic energy in eV
       do i=1,nismax
-        fack(i)= 0.5d0*am(i)/dt**2
+        fack(i)= 0.5d0*am(i)/dt**2 *tmp*j2ev
       enddo
 
       end subroutine setup
@@ -1736,7 +1736,7 @@ c=======================================================================
       use variables
       implicit none
       include 'mpif.h'
-      include 'params_au.h'
+      include 'params_unit.h'
       integer:: i,l,is
       real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(nismax)
       real(8),parameter:: pi = 3.14159265358979d0

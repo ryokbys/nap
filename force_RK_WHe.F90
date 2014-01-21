@@ -15,7 +15,7 @@ contains
 !-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
-    include "params_au.h"
+    include "params_unit.h"
     include "params_RK_WHe.h"
     integer,intent(in):: namax,natm,nnmax,nismax
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
@@ -43,8 +43,8 @@ contains
       l1st=.false.
 !.....check cutoff radius
       if( myid_md.eq.0 ) then
-        write(6,'(a,es22.14)') ' rc of input    =',rc *bohr
-        write(6,'(a,es22.14)') ' rc of this pot =',rc_pot *bohr
+        write(6,'(a,es22.14)') ' rc of input    =',rc
+        write(6,'(a,es22.14)') ' rc of this pot =',rc_pot
       endif
       if( rc.lt.rc_pot ) then
         if( myid_md.eq.0 ) write(6,'(a)') &
@@ -158,7 +158,7 @@ contains
 !-----copy strs of boundary atoms
     call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
          ,lsrc,myparity,nn,sv,mpi_md_world,strs)
-!-----atomic level stress in [Hartree/Bohr^3] assuming 1 Bohr thick
+!-----atomic level stress in [eV/Ang^3] assuming 1 Ang thick
     do i=1,natm
       strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
 !        write(6,'(i5,9es10.2)') i,strs(1:3,1:3,i)
@@ -323,7 +323,7 @@ contains
 !  Two-body potential energy
 !
     implicit none
-    include "params_au.h"
+    include "params_unit.h"
     include "params_RK_WHe.h"
     real(8),intent(in):: r
     integer,intent(in):: is,js
@@ -356,7 +356,7 @@ contains
 !  Derivative of two-body potential
 !
     implicit none
-    include "params_au.h"
+    include "params_unit.h"
     include "params_RK_WHe.h"
     real(8),intent(in):: r
     integer,intent(in):: is,js
@@ -396,7 +396,7 @@ contains
 !  Phi for many-body potential
 !
     implicit none
-    include "params_au.h"
+    include "params_unit.h"
     include "params_RK_WHe.h"
     real(8),intent(in):: r
     integer,intent(in):: is,js
@@ -416,7 +416,7 @@ contains
 !=======================================================================
   function dphi_IWHe(r,is,js)
     implicit none
-    include "params_au.h"
+    include "params_unit.h"
     include "params_RK_WHe.h"
     real(8),intent(in):: r
     integer,intent(in):: is,js
@@ -437,7 +437,7 @@ contains
 !=======================================================================
   function fc(x)
     implicit none
-    include "params_au.h"
+    include "params_unit.h"
     include "params_RK_WHe.h"
     real(8),intent(in):: x
     real(8):: fc
@@ -454,7 +454,7 @@ contains
 !=======================================================================
   function dfc(x)
     implicit none
-    include "params_au.h"
+    include "params_unit.h"
     include "params_RK_WHe.h"
     real(8),intent(in):: x
     real(8):: dfc

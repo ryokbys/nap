@@ -2,8 +2,8 @@
       implicit none
       character(len=6),parameter:: cref= 'akr000'
       character(len=6),parameter:: cfin= 'akr010'
-      real(8),parameter:: bohr= 0.5291772d-10
-      real(8),parameter:: rcc = 4.9555d-10 /bohr
+      real(8),parameter:: aa  = 1d-10
+      real(8),parameter:: rcc = 4.9555d-10 /aa
       integer:: i,j,na,n,itmp
       real(8):: epot,tmp,h(3,3),x,y
       real(8),allocatable:: ra0(:,:),ra(:,:),epi(:)

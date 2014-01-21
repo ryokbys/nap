@@ -9,7 +9,7 @@ contains
 !-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
-    include "./params_au.h"
+    include "./params_unit.h"
     include "params_LJ_Ar.h"
     integer,intent(in):: namax,natm,nnmax,nismax
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
@@ -91,7 +91,7 @@ contains
 !-----copy strs of boundary atoms
     call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
          ,lsrc,myparity,nn,sv,mpi_md_world,strs)
-!-----atomic level stress in [Hartree/Bohr^3] assuming 1 Bohr thick
+!-----atomic level stress in [eV/Ang^3] assuming 1 Ang thick
     do i=1,natm
       strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
     enddo

@@ -5,13 +5,12 @@ c-----------------------------------------------------------------------
       implicit none
       real(8),parameter:: pi = 3.14159265358979d0
       real(8),parameter:: pi2 = 2d0*pi
-      real(8),parameter:: bohr= 0.5291772d-10
-      real(8),parameter:: amu   = 1822.9d0
+      real(8),parameter:: umass   = 1822.9d0
       real(8),parameter:: tempau= 3.15785d5
 c-----initial temperature
       real(8),parameter:: tini = 300d0 /tempau
 c-----mass of C
-      real(8),parameter:: am   = 12.0107d0 *amu
+      real(8),parameter:: am   = 12.0107d0 *umass
 
       integer:: i,j,k,l,m,n,ii,i00,i0,iz,iy,ix,itemp,inc,ia,ib
       integer:: natm,np(3),ncell(3),nsize1
@@ -30,8 +29,8 @@ c-----set system size
 c      np(3)= 1
       natm= np(1)*np(2)*np(3)*4
 c-----equilibrium length of C-C in graphene
-c      dcc= 1.46d-10 /bohr *0.975615d0
-      dcc= 1.65d-10 /bohr *0.975615d0
+c      dcc= 1.46d0 *0.975615d0
+      dcc= 1.65d0 *0.975615d0
       alc= dcc*sqrt(3d0)
       h(1:3,1:3,0:1)= 0d0
       h(1,1,0)= np(1) *alc

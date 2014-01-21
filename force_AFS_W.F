@@ -3,10 +3,10 @@ c
 c  Not applicable to parallel calc
 c
       use variables
-      include './params_au.h'
+      include './params_unit.h'
 
       avol= h(1,1,0)*h(2,2,0)*h(3,3,0)/natm
-      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol=',avol*bohr2aa**3
+      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol=',avol
 
       end subroutine set_avol
 c=======================================================================
@@ -27,7 +27,7 @@ c-----------------------------------------------------------------------
       use variables,only: avol
       implicit none
       include "mpif.h"
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_AFS_W.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -141,7 +141,7 @@ c.....atomic stress of many-body contributions
 c-----copy strs of boundary atoms
       call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb
      &     ,lsrc,myparity,nn,sv,mpi_md_world,strs)
-c-----atomic level stress in [Hartree/Bohr^3] assuming 1 Bohr thick
+c-----atomic level stress in [eV/AA^3] assuming 1 Ang thick
       do i=1,natm
         strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
 c        write(6,'(i5,9es10.2)') i,strs(1:3,1:3,i)
@@ -306,7 +306,7 @@ c
 c  Two-body potential energy
 c
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_AFS_W.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js
@@ -332,7 +332,7 @@ c
 c  Derivative of two-body potential
 c
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_AFS_W.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js
@@ -359,7 +359,7 @@ c
 c  Phi for many-body potential
 c
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_AFS_W.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js
@@ -377,7 +377,7 @@ c.....phi_W
 c=======================================================================
       function dphi_IWHe(r,is,js)
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_AFS_W.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js

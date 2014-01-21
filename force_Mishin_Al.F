@@ -11,7 +11,7 @@ c  See Mishin et al. PRB 59(5) (1999) 3393--3407.
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_Mishin_Al.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -56,7 +56,7 @@ c-----rho(i)
           xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
           rij=sqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
           if( rij.gt.rc_eam ) cycle
-          rho(i)= rho(i) +calc_rho(rij*bohr2aa)
+          rho(i)= rho(i) +calc_rho(rij)
         enddo
       enddo
 
@@ -67,7 +67,7 @@ c-----copy rho of boundary atoms
 c-----dE/dr_i
       do i=1,natm
         xi(1:3)= ra(1:3,i)
-        dfi= calc_df(rho(i)) *ev2hrt/aa2bohr
+        dfi= calc_df(rho(i))
         do k=1,lspr(0,i)
           j=lspr(k,i)
           if(j.eq.0) exit
@@ -80,7 +80,7 @@ c-----dE/dr_i
           if( rij.gt.rc_eam ) cycle
           drdxi(1:3)= -xij(1:3)/rij
 c.....2-body term
-          tmp= 0.5d0 *calc_v(rij*bohr2aa) *ev2hrt
+          tmp= 0.5d0 *calc_v(rij)
           epi(i)= epi(i) +tmp
           epi(j)= epi(j) +tmp
           if(j.le.natm) then
@@ -88,16 +88,16 @@ c.....2-body term
           else
             epotl=epotl +tmp
           endif
-          dphi= calc_dv(rij*bohr2aa) *ev2hrt/aa2bohr
+          dphi= calc_dv(rij)
           aa(1:3,i)=aa(1:3,i) -dphi*drdxi(1:3)
           aa(1:3,j)=aa(1:3,j) +dphi*drdxi(1:3)
 c.....Embeded term
-          drhoij= calc_drho(rij*bohr2aa)
-          dfj= calc_df(rho(j)) *ev2hrt/aa2bohr
+          drhoij= calc_drho(rij)
+          dfj= calc_df(rho(j))
           aa(1:3,i)=aa(1:3,i) -(dfi+dfj)*drhoij*drdxi(1:3)
           aa(1:3,j)=aa(1:3,j) +(dfi+dfj)*drhoij*drdxi(1:3)
         enddo
-        tmp= calc_f(rho(i)) *ev2hrt
+        tmp= calc_f(rho(i))
         epi(i)=epi(i) +tmp
         epotl=epotl +tmp
       enddo
@@ -123,7 +123,7 @@ c      deallocate(sqrho)
 c=======================================================================
       function calc_rho(r)
       implicit none
-      include './params_au.h'
+      include './params_unit.h'
       include 'params_Mishin_Al.h'
       real(8),intent(in):: r
       real(8):: calc_rho
@@ -149,7 +149,7 @@ c=======================================================================
 c=======================================================================
       function calc_drho(r)
       implicit none
-      include './params_au.h'
+      include './params_unit.h'
       include 'params_Mishin_Al.h'
       real(8),intent(in):: r
       real(8):: calc_drho
@@ -174,7 +174,7 @@ c=======================================================================
 c=======================================================================
       function calc_v(r)
       implicit none
-      include './params_au.h'
+      include './params_unit.h'
       include 'params_Mishin_Al.h'
       real(8),intent(in):: r
       real(8):: calc_v
@@ -199,7 +199,7 @@ c=======================================================================
 c=======================================================================
       function calc_dv(r)
       implicit none
-      include './params_au.h'
+      include './params_unit.h'
       include 'params_Mishin_Al.h'
       real(8),intent(in):: r
       real(8):: calc_dv
@@ -224,7 +224,7 @@ c=======================================================================
 c=======================================================================
       function calc_f(rho)
       implicit none
-      include './params_au.h'
+      include './params_unit.h'
       include 'params_Mishin_Al.h'
       real(8),intent(in):: rho
       real(8):: calc_f
@@ -249,7 +249,7 @@ c=======================================================================
 c=======================================================================
       function calc_df(rho)
       implicit none
-      include './params_au.h'
+      include './params_unit.h'
       include 'params_Mishin_Al.h'
       real(8),intent(in):: rho
       real(8):: calc_df

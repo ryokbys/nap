@@ -94,7 +94,7 @@ c.....Ask the user and get next core position
       dcore(1)= (rcnew(1)-rcore(1)-anint(rcnew(1)-rcore(1)))*h(1,1,0)
       dcore(2)= (rcnew(2)-rcore(2)-anint(rcnew(2)-rcore(2)))*h(2,2,0)
       dr= sqrt(dcore(1)**2+dcore(2)**2)
-      if( dr.gt.2.835d-10*sqrt(2d0)/sqrt(3d0) /bohr *1.3d0 ) then
+      if( dr.gt.2.835d-10*sqrt(2d0)/sqrt(3d0) /aa *1.3d0 ) then
         write(6,'(a)') ' New core seems to be too far.'
         write(6,'(a,es12.4,a)') ' dr =',dr *0.5291772d0,' Ang.'
         goto 30
@@ -147,7 +147,7 @@ c
       real(8),intent(in):: ra(3,natm),h(3,3)
       real(8),intent(inout):: rcore(2)
 
-      real(8),parameter:: a  = 2.835d-10 /bohr
+      real(8),parameter:: a  = 2.835d-10 /aa
       real(8),parameter:: a1 = 1.41421356d0 /1.7320508d0 *a
       real(8),parameter:: a2 = 1.7320508d0 *a1
 c      real(8),parameter:: rc = (a1+a2)/2

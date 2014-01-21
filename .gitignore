@@ -1,0 +1,8 @@
+autoscan.log
+config.log
+config.status
+makefile
+*~
+autom4te.cache
+*.o
+*.mod

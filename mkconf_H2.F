@@ -1,13 +1,13 @@
       program mkconf_H2
       implicit none
-      include './params_au.h'
+      include './params_unit.h'
       include './params_EAM_Fe.h'
       integer:: is,ifmv,natm,i,ia,ib
       real(8):: h(3,3,0:1),ra(3,2),va(3,2),eki(2),epi(2),strs(3,3,2)
      &     ,tag(2),al
       real(8),parameter:: tempini= 100d0
 
-      al= 2.8553d-10 /bohr
+      al= 2.8553d0
       h(1:3,1:3,0)= 0d0
       h(1,1,0)= al*3d0
       h(2,2,0)= al*3d0
@@ -18,7 +18,7 @@
       ra(1:3,1)= 0.5d0
       tag(1)= 1d0*is +0.1d0*ifmv +1d-14*1
       ra(1:3,2)= ra(1:3,1)
-      ra(1,2)= ra(1,2) +0.74d-10 /bohr /h(1,1,0)
+      ra(1,2)= ra(1,2) +0.74d-10 /aa /h(1,1,0)
       tag(2)= 1d0*is +0.1d0*ifmv +1d-14*2
       natm= 2
 
@@ -46,7 +46,7 @@ c-----output 'akr000' for Akira visualization
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_EAM_Fe-H.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)

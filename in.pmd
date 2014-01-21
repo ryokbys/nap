@@ -1,10 +1,15 @@
+!
+!  unit of time  = femto sec
+!  unit of length= Angstrom
+!  unit of mass  = unified atomic mass unit
+!
   num_nodes_x       1
   num_nodes_y       1
   num_nodes_z       1
 
   io_format    ascii
 
-  time_interval     1d-15
+  time_interval     1d0
   num_iteration     1000
   num_out_energy    100
 
@@ -12,8 +17,8 @@
   num_out_pmd       10
 
   force_type        RK_FeH
-  cutoff_radius     5.3d-10
-  cutoff_buffer     0.5d-10
+  cutoff_radius     5.3d0
+  cutoff_buffer     0.5d0
 
   flag_damping      0
   damping_coeff     0.95d0
@@ -21,7 +26,7 @@
   initial_temperature     -2000d0
   flag_temperature        0
   temperature_target      100d0
-  temperature_relax_time  1d-13
+  temperature_relax_time  1d0
 
   factor_direction 3 2
     1.000d0  1.000d0  1.000d0

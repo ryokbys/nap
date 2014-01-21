@@ -4,7 +4,7 @@ c  Create 2D 2-kind system for droplet simulation
 c    Write: ini000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
-      include "params_au.h"
+      include "params_unit.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
@@ -16,12 +16,12 @@ c-----vacuum width in unit of cell
      &     ,h(3,3,0:1),strs(3,3,nmax)
       real*8,parameter:: pi=3.141592653589793d0
 c-----for Ar
-      real*8,parameter:: sgm = 3.41d-10 /bohr
+      real*8,parameter:: sgm = 3.41d0
 
 c-----velocity scaling factor at Temp(K)=50
       tempini=50d0
 c-----mass of Ar
-      am=39.986d0*amu
+      am=39.986d0*umass
       facv=dsqrt(2d0*tempini*fkb/am)
 
       small=1d-7

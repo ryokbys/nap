@@ -4,7 +4,7 @@ c  Make atom configuration file of wurtzite AlN
 c    Output: ini000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_Vashishta_AlN.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
@@ -22,12 +22,12 @@ c-----initial temperature
 
       small=1d-7
 
-c-----box size for Si: 5.4309 AA
-      al= 3.11d-10 /bohr
+c-----box size for Si: 5.4309 Ang
+      al= 3.11d0
       cl= al *2d0*sqrt(2d0/3d0)
-c      cl= 4.98d-10 /bohr
+c      cl= 4.98d0
 cc-----al,cl for RK potential
-c      al= 1.6d-10 *2d0*sqrt(2d0/3) /bohr
+c      al= 1.6d *2d0*sqrt(2d0/3)
 c      cl= al *2d0*sqrt(2d0/3d0)
       write(6,'(a,es12.4)') " al=",al
       write(6,'(a,es12.4)') " cl=",cl
@@ -106,7 +106,7 @@ c-----output 'kvs000' for KVS visualization
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_Vashishta_AlN.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)

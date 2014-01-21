@@ -1,10 +1,10 @@
 c-----------------------------------------------------------------------
 c  Parameters for EAM Al by Mishin et al.
-c  Cutoff radius should be 6.2872 AA.
+c  Cutoff radius should be 6.2872 Ang.
 c  See Mishin et al. PRB 59(5) (1999) 3393--3407.
 c-----------------------------------------------------------------------
-      real(8),parameter:: am_al = 26.9815d0 *aump/aume
-      real(8),parameter:: rc_eam= 6.2872d0 *aa2bohr
+      real(8),parameter:: am_al = 26.9815d0
+      real(8),parameter:: rc_eam= 6.2872d0
 
       integer,parameter:: neamd = 25
       real(8):: rtbl(1:neamd)=(/

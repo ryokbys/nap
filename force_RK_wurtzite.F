@@ -7,7 +7,7 @@ c    - 2010.04.07 by R.K.
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_RK_wurtzite.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -40,7 +40,7 @@ c-----only at 1st call
 c-------allocate 2-body force table at the 1st call (do not deallocate!)
         allocate(tblf2(nd2b,2,2),tbldf2(nd2b,2,2))
 c-------make 2-body (smoothed) force table
-        rmin= 0.5d-10 /bohr
+        rmin= 0.5d0
         rmax= rc
         dr= (rmax-rmin)/(nd2b-1)
         do is=1,2
@@ -57,7 +57,7 @@ c-------make 2-body (smoothed) force table
         enddo
         do i=1,nd2b
           ri= rmin +dr*(i-1)
-          write(90,'(10es12.4)') ri*bohr,tblf2(i,1:2,1:2)
+          write(90,'(10es12.4)') ri,tblf2(i,1:2,1:2)
      &         ,tbldf2(i,1:2,1:2)
         enddo
         write(6,'(a,2es12.4)') " eps =",rk_eps
@@ -225,7 +225,7 @@ c=======================================================================
       function f2_r(r,is,js)
 c-----2-body force
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_RK_wurtzite.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js
@@ -238,7 +238,7 @@ c-----value
      &       -2d0*exp(-(r-rk_sgm)/rk_l1) )
      &     +rk_z(is)*rk_z(js)/r *exp(-r/rk_l2)
 
-      write(91,'(2i6,5es12.4)') is,js,r*bohr
+      write(91,'(2i6,5es12.4)') is,js,r
      &     ,rk_eps*(exp(-2d0*(r-rk_sgm)/rk_l1)
      &       -2d0*exp(-(r-rk_sgm)/rk_l1))
      &     ,rk_z(is)*rk_z(js)/r *exp(-r/rk_l2)
@@ -249,7 +249,7 @@ c=======================================================================
       function df2_r(r,is,js)
 c-----Derivative of 2-body term
       implicit none 
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_RK_wurtzite.h"
       real(8),intent(in):: r
       integer,intent(in):: is,js

@@ -4,7 +4,7 @@ c    Create a FCC crystal
 c    Write: ini000
 c
       implicit real*8(a-h,o-z)
-      include "params_au.h"
+      include "params_unit.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
@@ -15,18 +15,15 @@ c-----vacuum width in unit of cell
       real(8):: tag(nmax),ra(3,nmax),va(3,nmax),eki(nmax),epi(nmax)
      &      ,h(3,3,0:1),strs(3,3,nmax)
       real*8,parameter:: pi=3.141592653589793d0
-c      real*8,parameter:: bohr=0.5291772d0
-c      real*8,parameter:: amu=1822.9d0
-c      real*8,parameter:: tempau=3.15785d5
 c-----for Ar
-      real*8,parameter:: sgmlj = 3.41d-10 /bohr
+      real*8,parameter:: sgmlj = 3.41d0
 
 c-----velocity scaling factor at Temp(K)=100
       tempini=100d0
 c-----mass of Ar
-      am=39.986d0*amu
+      am=39.986d0*umass
 cc-----mass of Al
-c      am=26.9815d0*amu
+c      am=26.9815d0*umass
       facv=dsqrt(2d0*tempini*fkb/am)
 
       small=1d-7
@@ -34,7 +31,7 @@ c      am=26.9815d0*amu
 c-----box size for Ar
       cunit= 2d0**(1d0/6) *sgmlj *dsqrt(2d0)
 cc-----box size for Al
-c      cunit= 4.025d-10 /bohr
+c      cunit= 4.025d-10 /aa
 
 c-----unit cell, FCC
       ua(1:3,1)= (/ 0.0d0, 0.0d0, 0.0d0 /)

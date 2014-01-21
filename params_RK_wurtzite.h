@@ -1,6 +1,6 @@
-c-----Al and N mass (to be multiplied by amu)
-      real(8),parameter:: am_Al = 26.9815d0 *amu
-      real(8),parameter:: am_N  = 14.0067d0 *amu
+c-----Al and N mass (to be multiplied by umass)
+      real(8),parameter:: am_Al = 26.9815d0 *umass
+      real(8),parameter:: am_N  = 14.0067d0 *umass
 c-----RK potential parameters for AlN
       real(8),parameter:: rk_z(1:2)=
      &     (/ 1.d0,

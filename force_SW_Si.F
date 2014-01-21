@@ -11,7 +11,7 @@ c      Species must be 1 and 2.
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_SW_Si.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -50,7 +50,7 @@ c-------check rc
         if( int(rc).ne.int(max(tswrc(1,1),tswrc(2,2))*swl) ) then
           write(6,'(1x,a)') "!!! Cutoff radius is not appropriate !!!"
           write(6,'(1x,a,es12.4)') "rc should be"
-     &         ,max(tswrc(1,1),tswrc(2,2))*swl*bohr
+     &         ,max(tswrc(1,1),tswrc(2,2))*swl
           call mpi_finalize(ierr)
           stop
         endif
@@ -221,7 +221,7 @@ c      Species must be 1 and 2.
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
-      include "./params_au.h"
+      include "./params_unit.h"
       include "params_SW_Si.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -262,7 +262,7 @@ c-------check rc
         if( int(rc).ne.int(max(tswrc(1,1),tswrc(2,2))*swl) ) then
           write(6,'(1x,a)') "!!! Cutoff radius is not appropriate !!!"
           write(6,'(1x,a,es12.4)') "rc should be"
-     &         ,max(tswrc(1,1),tswrc(2,2))*swl*bohr
+     &         ,max(tswrc(1,1),tswrc(2,2))*swl
           call mpi_finalize(ierr)
           stop
         endif

@@ -7,7 +7,7 @@
 !    - akr000
 !-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
-      include './params_au.h'
+      include './params_unit.h'
       include './params_RK_FeH.h'
 !      include './params_Ramas_FeH.h'
 !-----max # of atoms
@@ -27,8 +27,8 @@
       small=1d-7
 
 !.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
-      cunit= 2.835d-10 /bohr
-!      cunit= 2.8553d-10 /bohr
+      cunit= 2.835d0
+!      cunit= 2.8553d0
 
 !-----simulation box size
       h(1:3,1:3,0:1)= 0d0
@@ -115,7 +115,7 @@
 !=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_RK_FeH.h"
 !      include "./params_Ramas_FeH.h"
       integer,intent(in):: natm

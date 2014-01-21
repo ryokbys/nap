@@ -7,7 +7,7 @@ c  ------
 c    - pmd000-000
 c-----------------------------------------------------------------------
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_EAM_Al.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
@@ -16,7 +16,7 @@ c-----# of unit cells
 c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 0, 0, 20 /)
 c.....Radius of base of the cylinder
-      real(8),parameter:: rad  = 1.d-9 /bohr
+      real(8),parameter:: rad  = 10.d0
 
       integer:: i,ix,iy,iz,m,inc,is,ifmv
       real(8):: small,al,rad2,rx,ry,r2
@@ -34,8 +34,8 @@ c.....In this purpose nuc(1)==nuc(2)
 
       small=1d-7
 
-c-----box size for Al: 4.025 AA
-      al= 4.025d-10 /bohr
+c-----box size for Al: 4.025 Ang
+      al= 4.025d0
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
@@ -113,7 +113,7 @@ c      close(15)
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_EAM_Al.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)

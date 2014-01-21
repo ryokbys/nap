@@ -7,7 +7,7 @@ c    - pmd000-000
 c    - akr000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
-      include './params_au.h'
+      include './params_unit.h'
       include './params_Ito_W-He.h'
 c-----max # of atoms
       integer,parameter::nmax=10000000
@@ -29,9 +29,9 @@ c.....Parameters
       write(6,'(a,f10.4)') ' small=',small
 
 cc.....Lattice constant of W for 0K
-c      cunit= 3.204d-10 /bohr
+c      cunit= 3.204d0
 c.....Lattice constant of W for 1000K
-      cunit= 3.226d-10 /bohr
+      cunit= 3.226d0
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0

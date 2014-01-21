@@ -19,18 +19,18 @@ c-----vacuum width in unit of cell
       real(8):: va(3,nmax),strs(3,3,nmax),eki(nmax),epi(nmax)
       real(8):: tag(nmax)
       real*8,parameter:: pi=3.141592653589793d0
-      real*8,parameter:: bohr=0.5291772d0
-      real*8,parameter:: amu=1822.9d0
+      real*8,parameter:: umass=1822.9d0
       real*8,parameter:: tempau=3.15785d5
+      real(8),parameter:: tempev= 11604d0
 c-----for Ar
-      real*8,parameter:: sgmlj = 3.41d0 /bohr
+      real*8,parameter:: sgmlj = 3.41d0
 c.....Variables
       real(8):: wlyr,fct,yfix
 
 c-----velocity scaling factor at Temp(K)=100
-      temp=0d0/tempau
+      temp=0d0/tempev
 c-----mass of Ar
-      am=39.986d0*amu
+      am=39.986d0*umass
 cc-----mass of Al
 c      am=26.9815d0*amu
       facv=dsqrt(2d0*temp/am)
@@ -41,14 +41,14 @@ c-----box size for Ar
       cunit= 2d0**(1d0/6) *sgmlj *0.996d0
 c      cunit= 2d0**(1d0/6) *sgmlj !*1.2d0!*dsqrt(2d0)
 cc-----box size for Al
-cc      cunit= 4.025d0 /bohr
-c      cunit= 2.8461d0 /bohr *0.956d0
+cc      cunit= 4.025d0
+c      cunit= 2.8461d0 *0.956d0
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
       h(1,1,0)= cunit*(nuc(1)+nvac(1))
       h(2,2,0)= sqrt(3d0)* cunit*(nuc(2)+nvac(2))
-      h(3,3,0)= 20d0/bohr *(nuc(3)+nvac(3))
+      h(3,3,0)= 20d0 *(nuc(3)+nvac(3))
       write(6,'(a)') " h-matrix:"
       write(6,'(3es15.7)') h(1:3,1:3,0)
       

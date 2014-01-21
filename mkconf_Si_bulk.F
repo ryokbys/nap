@@ -7,7 +7,7 @@ c ------
 c  * ini000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_SW_Si.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
@@ -31,9 +31,9 @@ c      facv=dsqrt(2d0*temp/am)
 
       small=1d-7
 
-c-----box size for Si: 5.4309 AA
-      cunit= 5.427d-10 /bohr
-c      cunit= 4.07d-10 /bohr
+c-----box size for Si: 5.4309 Ang
+      cunit= 5.427d0
+c      cunit= 4.07d0
 
 c-----unit cell, diamond structure
       ua(1:3,1)= (/ 0.00d0, 0.00d0, 0.00d0 /)

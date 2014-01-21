@@ -8,8 +8,6 @@
      &     ,strs(:,:,:)
 
       integer,parameter:: nis=  2
-      real(8),parameter:: aa2bohr = 1d0/0.5291772d0
-      real(8),parameter:: bohr2aa = 1d0/aa2bohr
 
       read(5,*) ctmp
       read(5,*) al
@@ -41,7 +39,7 @@
       
       h(1:3,1:3,0)= h(1:3,1:3,0)*al
       write(6,'(i6)') natm
-      write(6,'(3es22.14)') (((h(ia,ib,l)*aa2bohr,ia=1,3),ib=1,3),l=0,1)
+      write(6,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       do i=1,natm
         write(6,'(4es22.14,20es11.3)') tag(i),ra(1:3,i),va(1:3,i)
      &       ,eki(i),epi(i),strs(1:3,1:3,i)

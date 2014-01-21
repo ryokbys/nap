@@ -6,14 +6,14 @@ c-----------------------------------------------------------------------
 c  Output: ini000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_EAM_Al.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
       integer,parameter:: nuc(1:3)= (/ 200,3,50 /)
 c.....Cutoff radius of the EAM potential
-      real(8),parameter:: rc = 7.0d-10 /bohr
+      real(8),parameter:: rc = 7.0d0
       real(8):: ua(3,6)
       real(8):: ra(3,nmax)
       real(8):: h(3,3,0:1),h0(3,3),sorg(3)
@@ -24,12 +24,12 @@ c-----initial temperature
 
       small=1d-7
 
-c-----Lattice constant of this potential: 4.0170 AA
-      al= 4.017d-10 /bohr
-      write(6,'(a,es12.4,a)') " Lattice constant  =",al," [Bohr]"
+c-----Lattice constant of this potential: 4.0170 Ang
+      al= 4.017d0
+      write(6,'(a,es12.4,a)') " Lattice constant  =",al," [Ang]"
 c.....Equilibrium distance between nearest neighbor Al atoms
       daa= al/sqrt(2d0)
-      write(6,'(a,es12.4,a)') " Al-Al bond length =",daa," [Bohr]"
+      write(6,'(a,es12.4,a)') " Al-Al bond length =",daa," [Ang]"
 
 c.....Unit vectors, h0= (a0,b0,c0) where a0,b0,c0 are column vectors
       h0(1:3,1)= (/ daa, 0d0,           0d0          /)
@@ -134,7 +134,7 @@ c-----output 'akr000' for Akira visualization
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_EAM_Al.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)

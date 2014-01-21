@@ -6,9 +6,6 @@
       real(8),allocatable:: tag(:),ra(:,:),va(:,:),eki(:),epi(:)
      &     ,strs(:,:,:)
 
-      real(8),parameter:: aa2bohr = 1d0/0.5291772d0
-      real(8),parameter:: bohr2aa = 1d0/aa2bohr
-
       read(5,*) natm
       allocate(tag(natm),ra(3,natm),va(3,natm),eki(natm),epi(natm)
      &     ,strs(3,3,natm))
@@ -41,9 +38,9 @@ c.....Count num of species
 
       write(6,'(a)') ' converted from pmd'
       write(6,'(es11.3)') 1.0d0
-      write(6,'(3es22.14)') h(1,1:3,0) *bohr2aa
-      write(6,'(3es22.14)') h(2,1:3,0) *bohr2aa
-      write(6,'(3es22.14)') h(3,1:3,0) *bohr2aa
+      write(6,'(3es22.14)') h(1,1:3,0)
+      write(6,'(3es22.14)') h(2,1:3,0)
+      write(6,'(3es22.14)') h(3,1:3,0)
       write(6,'(9i4)') (mis(n),n=1,nis)
       write(6,'(a)') ' Direct'
       do n=1,nis

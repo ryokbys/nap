@@ -4,7 +4,7 @@ c    Create a BCC crystal
 c    Write: ini000
 c
       implicit real*8(a-h,o-z),integer(i-n)
-      include './params_au.h'
+      include './params_unit.h'
 c      include './params_EAM_Fe-H.h'
       include './params_Ito_W-He.h'
 c-----max # of atoms
@@ -24,9 +24,9 @@ c.....Parameters
       small=1d-7
 
 cc.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
-c      cunit= 2.8553d-10 /bohr
+c      cunit= 2.8553d0
 c.....Lattice constant of W
-      cunit= 3.1652d-10 /bohr
+      cunit= 3.1652d0
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
@@ -90,7 +90,7 @@ c-----output 'akr000' for Akira visualization
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
 c      include "./params_EAM_Fe-H.h"
       include "./params_Ito_W-He.h"
       integer,intent(in):: natm

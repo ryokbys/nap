@@ -213,7 +213,7 @@ c-------output as pot file
 c=======================================================================
       subroutine setup(nismax,am,acon,fack,dt)
       implicit none
-      include "params_au.h"
+      include "params_unit.h"
       include "params_eam_al.h"
 c      include "params_lj_ar.h"
       integer,intent(in):: nismax

@@ -9,7 +9,7 @@ c ------
 c  * ini000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_SW_Si.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
@@ -33,12 +33,12 @@ c      facv=dsqrt(2d0*temp/am)
 
       small=1d-7
 
-c-----box size for Si: 5.4309 AA
-      cunit= 5.427d-10 /bohr
-c      cunit= 4.07d-10 /bohr
+c-----box size for Si: 5.4309 Ang
+      cunit= 5.427d0
+c      cunit= 4.07d0
 
-c-----Equilibrium bond length of Si-Si: 2.35 AA
-      be= 2.35d-10 /bohr
+c-----Equilibrium bond length of Si-Si: 2.35 Ang
+      be= 2.35d0
       ss2= 4d0*be/sqrt(3d0)
 
 c-----simulation box size

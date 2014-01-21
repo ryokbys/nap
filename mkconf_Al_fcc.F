@@ -4,7 +4,7 @@ c  Make atom configuration file of fcc Al
 c    Output: ini000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_EAM_Al.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
@@ -22,8 +22,8 @@ c-----initial temperature
 
       small=1d-7
 
-c-----Lattice constant of this potential= 4.0425 AA
-      al= 4.0425d-10 /bohr
+c-----Lattice constant of this potential= 4.0425 Ang
+      al= 4.0425d0
 
 c-----unit cell, wurtzite structure
 c-----Al
@@ -94,7 +94,7 @@ c-----output 'akr000' for KVS visualization
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_EAM_Al.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)

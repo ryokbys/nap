@@ -17,18 +17,17 @@ c-----vacuum thickness in Angstrom
       real(8):: va(3,nmax)
       integer:: is(nmax),ifmv(nmax)
       real*8,parameter:: pi=3.141592653589793d0
-      real*8,parameter:: bohr=0.5291772d0
-      real*8,parameter:: amu=1822.9d0
+      real*8,parameter:: umass=1822.9d0
       real*8,parameter:: tempau=3.15785d5
 cc-----for Ar
-c      real*8,parameter:: sgmlj = 3.41d0 /bohr
+c      real*8,parameter:: sgmlj = 3.41d0
 
 c-----velocity scaling factor at Temp(K)=100
       temp=100d0/tempau
 cc-----mass of Ar
-c      am=39.986d0*amu
+c      am=39.986d0*umass
 c-----mass of Al
-      am=26.9815d0*amu
+      am=26.9815d0*umass
       facv=dsqrt(2d0*temp/am)
 
       small=1d-7
@@ -36,7 +35,7 @@ c-----mass of Al
 cc-----box size for Ar
 c      cunit= 2d0**(1d0/6) *sgmlj *dsqrt(2d0)
 c-----box size for Al
-      cunit= 4.025d0 /bohr
+      cunit= 4.025d0
 
 c-----unit cell, FCC
       ua(1:3,1)= (/ 0.0d0, 0.0d0, 0.0d0 /)
@@ -85,16 +84,16 @@ c-----add water-like molecule only for visualization
       ra(3,inc)= h(3,3,0) +5.5d0
       inc= inc+1
       is(inc)= 3
-      ra(1,inc)= 0.5d0 +vacuum/bohr/10 /h(1,1,0)
-      ra(2,inc)= 0.25d0 -vacuum/bohr/10 /h(2,2,0)
+      ra(1,inc)= 0.5d0 +vacuum/10 /h(1,1,0)
+      ra(2,inc)= 0.25d0 -vacuum/10 /h(2,2,0)
       ra(3,inc)= h(3,3,0) +4.d0
       inc= inc+1
       is(inc)= 3
-      ra(1,inc)= 0.5d0 -vacuum/bohr/10 /h(1,1,0)
-      ra(2,inc)= 0.25d0 -vacuum/bohr/10 /h(2,2,0)
+      ra(1,inc)= 0.5d0 -vacuum/10 /h(1,1,0)
+      ra(2,inc)= 0.25d0 -vacuum/10 /h(2,2,0)
       ra(3,inc)= h(3,3,0) +4.d0
 c-----add vacuum
-      h(3,3,0)=h(3,3,0) +vacuum/bohr
+      h(3,3,0)=h(3,3,0) +vacuum
       do i=1,inc
 c        ra(1,i)= ra(1,i)/h(1,1,0)
 c        ra(2,i)= ra(2,i)/h(2,2,0)

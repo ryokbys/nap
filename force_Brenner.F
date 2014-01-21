@@ -9,7 +9,7 @@ c       see, D.W.Brenner, PRB 42 (1990) pp.9458-9471
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_Brenner.h"
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -42,7 +42,7 @@ c-----only at 1st call
 c-------check rc
         if( int(rc).ne.int(br_r2) ) then
           write(6,'(1x,a)') "!!! Cutoff radius is not appropriate !!!"
-          write(6,'(1x,a,es12.4)') "rc should be",br_r2*bohr
+          write(6,'(1x,a,es12.4)') "rc should be",br_r2
           call mpi_finalize(ierr)
           stop
         endif
@@ -302,7 +302,7 @@ c   - Note: this mixed potential returns wrong C-C bond length
 c-----------------------------------------------------------------------
       implicit none
       include "mpif.h"
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_Brenner.h"
       integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax),nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -646,7 +646,7 @@ c Graphene interlayer potential
 c   See, A.J.Heim et.al, cond-mat, (25 Jun 2008)
 c-----------------------------------------------------------------------
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_Brenner.h"
       real(8),intent(in):: r,ri
       real(8):: vvdw
@@ -670,7 +670,7 @@ c-----------------------------------------------------------------------
 c Derivative of the graphene interlayer potential
 c-----------------------------------------------------------------------
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_Brenner.h"
       real(8),intent(in):: r,ri
       real(8):: dvvdw

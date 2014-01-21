@@ -7,7 +7,7 @@ c  ------
 c    - pmd000-000
 c-----------------------------------------------------------------------
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_EAM_Fe-H.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
@@ -16,7 +16,7 @@ c-----# of unit cells
 c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 0, 0, 20 /)
 c.....Radius of base of the cylinder
-      real(8),parameter:: rad  = 1.d-9 /bohr
+      real(8),parameter:: rad  = 10.d0
 c.....Hydrogen occupancy
       real(8),parameter:: hratio = 1.0d-1
       
@@ -177,7 +177,7 @@ c      close(15)
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_EAM_Fe-H.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)

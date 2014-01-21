@@ -8,7 +8,7 @@ c    $ ./sort pmd000
 c-----------------------------------------------------------------------
       use variables
       implicit none
-      include 'params_au.h'
+      include 'params_unit.h'
       integer:: nargc,i
       integer,external:: iargv,itot_tag
       character:: cin*128
@@ -16,7 +16,7 @@ c-----------------------------------------------------------------------
       real(8),allocatable:: opt(:,:)
 
       sorg(1:3)= 0d0
-      dt= 1d-15/aut
+      dt= 1d-15/ut
 
       nargc= iargc()
       if( nargc.ne.1 ) then

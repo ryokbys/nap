@@ -7,7 +7,7 @@ c    - pmd000-000
 c    - akr000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
-      include './params_au.h'
+      include './params_unit.h'
       include './params_Ito_W-He.h'
 c-----max # of atoms
       integer,parameter::nmax=100000
@@ -30,9 +30,9 @@ c.....He ratio
       small = 1d0/4 /nuc(1)
 
 cc.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
-c      cunit= 2.835d-10 /bohr
+c      cunit= 2.835d0
 c.....Lattice constant of W for 1000K
-      cunit= 3.202d-10 /bohr
+      cunit= 3.202d0
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
@@ -113,14 +113,14 @@ c=======================================================================
       subroutine setv(natm,tag,va,h,tinit)
       implicit none
       include 'mpif.h'
-      include 'params_au.h'
+      include 'params_unit.h'
       integer,intent(in):: natm
       real(8),intent(in):: tinit,tag(natm),h(3,3,0:1)
       real(8),intent(out):: va(3,natm) 
       integer:: i,l,is
       real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(2)
       real(8):: sumpx,sumpy,sumpz,amtot,amss
-      real(8),parameter:: am(1:2)=(/ 184.83d0*amu, 4.0d0*amu /)
+      real(8),parameter:: am(1:2)=(/ 184.83d0*umass, 4.0d0*umass /)
       real(8),parameter:: pi = 3.14159265358979d0
 
       facv(1:2)=dsqrt(2d0*tinit*fkb/am(1:2))

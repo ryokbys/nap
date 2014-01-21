@@ -13,7 +13,7 @@ c    * pmd000-000
 c    * akr000
 c-----------------------------------------------------------------------
       implicit none
-      include './params_au.h'
+      include './params_unit.h'
       include './params_RK_Fe-H.h'
 c-----max # of atoms
       integer,parameter::nmax=10000000
@@ -32,8 +32,8 @@ c.....Parameters
 c.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
       cunit= alcfe
       daa = sqrt(3d0)/2 *alcfe
-      write(6,'(a,es12.4,a)') " Lattice constant =",cunit," [Bohr]"
-      write(6,'(a,es12.4,a)') " Fe-Fe bond length=",daa," [Bohr]"
+      write(6,'(a,es12.4,a)') " Lattice constant =",cunit," [Ang]"
+      write(6,'(a,es12.4,a)') " Fe-Fe bond length=",daa," [Ang]"
 
 c.....System size
  10   write(6,'(a)') ' Input system size nx,ny,nz:'
@@ -133,7 +133,7 @@ c.....output 'pmdref'
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_au.h"
+      include "./params_unit.h"
       include "./params_RK_Fe-H.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
@@ -198,7 +198,7 @@ c=======================================================================
       subroutine one_screw_pbc(nmax,natm,tag,ra0,ra,ua,nua,nuc,nvac
      &     ,small,daa,h)
       implicit none
-      include 'params_au.h'
+      include 'params_unit.h'
       integer,intent(in):: nmax,nuc(3),nvac(3),nua
       real(8),intent(in):: ua(3,nua),small,daa,h(3,3,0:1)
       integer,intent(out):: natm
@@ -206,7 +206,7 @@ c=======================================================================
 
       integer:: i,m,inc,ix,iy,iz,is,ifmv
       real(8):: dyl,rcu(3),dmax,ymin,ymax,s(3),rcx,rcy,rx,ry,r,theta
-      real(8),parameter:: radi  = 20d0 *aa2bohr
+      real(8),parameter:: radi  = 20d0
       real(8),parameter:: pi    = 3.1415926535d0
 
 c.....y-unit length

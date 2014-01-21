@@ -77,12 +77,12 @@ c  Results are written to the file #91, 'dat.strs'.
 c-----------------------------------------------------------------------
       implicit none
       include 'mpif.h'
-      include "./params_au.h"
+      include "./params_unit.h"
       integer,intent(in):: namax,natm,myid_md,mpi_md_world,istp
       real(8),intent(in):: ra(3,natm),h(3,3,0:1),rcore(3),strs(3,3,natm)
 
 c.....Cut off distance for average calculation
-      real(8),parameter:: rcutave= 20.0d-10 /bohr
+      real(8),parameter:: rcutave= 20.0d0
       real(8),parameter:: rcutave2= rcutave**2
 
       integer:: ia,ierr,n1,nr1,n2,nr2
@@ -142,7 +142,7 @@ c Note this can be applicable only to 2D triangle lattice.
 c
       implicit none
       include 'mpif.h'
-      include './params_au.h'
+      include './params_unit.h'
       include './params_LJ_Ar.h'
 c.....Arguments
       integer,intent(in):: namax,natm,nb,nnmax,myid_md,mpi_md_world
@@ -266,7 +266,7 @@ c in the system.
 c
       implicit none
       include 'mpif.h'
-      include './params_au.h'
+      include './params_unit.h'
       include './params_EAM_Fe-H.h'
       integer,intent(in):: natm,myid_md,mpi_md_world,nodes,iocnt,ionum
 c.....Potential energy threshold
@@ -285,7 +285,7 @@ c.....Max num of core groups
       character:: cfname*9
 
 c.....Cutoff radius
-      real(8),parameter:: rc   = 10.0d-10/bohr
+      real(8),parameter:: rc   = 10.0d0
       real(8),parameter:: rcz  = rc_vphi
 c.....Num of disl cores to be assumed
       integer,parameter:: ncrs = 2
@@ -449,7 +449,7 @@ c  at the top and bottom of y-direction.
 c
       implicit none
       include 'mpif.h'
-      include './params_au.h'
+      include './params_unit.h'
       include './params_EAM_Fe-H.h'
       integer,intent(in):: natm,myid_md,mpi_md_world,nodes,iocnt,ionum
 c.....Potential energy threshold

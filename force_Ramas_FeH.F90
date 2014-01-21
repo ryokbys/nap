@@ -13,7 +13,7 @@ contains
 !-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
-    include "./params_au.h"
+    include "./params_unit.h"
     include "params_Ramas_FeH.h"
     integer,intent(in):: namax,natm,nnmax,nismax
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
@@ -42,8 +42,8 @@ contains
       l1st=.false.
 !.....check cutoff radius
       if( myid_md.eq.0 ) then
-        write(6,'(a,es22.14)') ' rc of input    =',rc *bohr
-        write(6,'(a,es22.14)') ' rc of this pot =',rc_vphi *bohr
+        write(6,'(a,es22.14)') ' rc of input    =',rc
+        write(6,'(a,es22.14)') ' rc of this pot =',rc_vphi
       endif
       if( rc.lt.rc_vphi ) then
         if( myid_md.eq.0 ) write(6,'(a)') ' [get_force] rc.lt.rc_vphi !!!'
@@ -180,7 +180,7 @@ contains
 !.....copy strs of boundary atoms
     call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
          ,lsrc,myparity,nn,sv,mpi_md_world,strs)
-!.....atomic level stress in [Hartree/Bohr^3] assuming 1 Bohr thick
+!.....atomic level stress in [eV/Ang^3] assuming 1 Ang thick
     do i=1,natm
       strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
     enddo
@@ -214,7 +214,7 @@ contains
 !-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
-    include "./params_au.h"
+    include "./params_unit.h"
     include "params_Ramas_FeH.h"
     integer,intent(in):: namax,natm,nnmax,nismax
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
@@ -242,8 +242,8 @@ contains
       l1st=.false.
 !.....check cutoff radius
       if( myid_md.eq.0 ) then
-        write(6,'(a,es22.14)') ' rc of input    =',rc *bohr
-        write(6,'(a,es22.14)') ' rc of this pot =',rc_vphi *bohr
+        write(6,'(a,es22.14)') ' rc of input    =',rc
+        write(6,'(a,es22.14)') ' rc of this pot =',rc_vphi
       endif
       if( rc.lt.rc_vphi ) then
         if( myid_md.eq.0 ) write(6,'(a)') ' [get_force] rc.lt.rc_vphi !!!'
@@ -338,7 +338,7 @@ contains
 !.....copy strs of boundary atoms
     call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
          ,lsrc,myparity,nn,sv,mpi_md_world,strs)
-!.....atomic level stress in [Hartree/Bohr^3] assuming 1 Bohr thick
+!.....atomic level stress in [eV/Ang^3] assuming 1 Ang thick
     do i=1,natm
       strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
     enddo
@@ -393,7 +393,7 @@ contains
 !=======================================================================
   function fvphi(r,rs)
     implicit none 
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r,rs
     real(8):: fvphi
@@ -404,7 +404,7 @@ contains
     if( r.le.r1 ) then
       fvphi=fvphi +z2q2/r*fphi(r/rs)
     else if( r.le.r2 ) then
-      fvphi=fvphi +exp(b0 +b1*r +b2*r**2 +b3*r**3) *ev2hrt
+      fvphi=fvphi +exp(b0 +b1*r +b2*r**2 +b3*r**3)
     else
       do i=2,14
         fvphi=fvphi +a_vphi(i)*(r_vphi(i)-r)**3 &
@@ -416,7 +416,7 @@ contains
 !=======================================================================
   function dfvphi(r,rs)
     implicit none 
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r,rs
     real(8):: dfvphi
@@ -428,7 +428,7 @@ contains
       dfvphi=dfvphi -z2q2/r**2*fphi(r/rs) +z2q2/r/rs*dfphi(r/rs)
     else if( r.le.r2 ) then
       dfvphi=dfvphi +(b1 +2d0*b2*r +3d0*b3*r**2) &
-           *exp(b0 +b1*r +b2*r**2 +b3*r**3) *ev2hrt
+           *exp(b0 +b1*r +b2*r**2 +b3*r**3)
     else
       do i=2,14
         dfvphi=dfvphi -a_vphi(i)*(r_vphi(i)-r)**2 &
@@ -444,7 +444,7 @@ contains
 !  Cubic spline function for calculating rho
 !
     implicit none 
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: fpsi
@@ -464,7 +464,7 @@ contains
 !  1st derivative of the cubic spline func of calculation of rho
 !
     implicit none 
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: dfpsi
@@ -485,12 +485,12 @@ contains
 !  Embedding function
 !
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: rho
     real(8):: femb
 
-    femb= (-dsqrt(rho) +a_emb*rho*rho)*ev2hrt
+    femb= (-dsqrt(rho) +a_emb*rho*rho)
     return
   end function femb
 !=======================================================================
@@ -499,18 +499,18 @@ contains
 !  1st derivative of the embedding function
 !
     implicit none 
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: rho
     real(8):: dfemb
 
-    dfemb= (-0.5d0/dsqrt(rho)+2d0*a_emb*rho)*ev2hrt
+    dfemb= (-0.5d0/dsqrt(rho)+2d0*a_emb*rho)
     return
   end function dfemb
 !=======================================================================
   function rho_feh(r)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: rho_feh
@@ -528,7 +528,7 @@ contains
 !=======================================================================
   function drho_feh(r)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: drho_feh
@@ -546,7 +546,7 @@ contains
 !=======================================================================
   function rho_hfe(r)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: rho_hfe
@@ -564,7 +564,7 @@ contains
 !=======================================================================
   function drho_hfe(r)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: drho_hfe
@@ -582,7 +582,7 @@ contains
 !=======================================================================
   function rho_hh(r)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: rho_hh
@@ -595,7 +595,7 @@ contains
 !=======================================================================
   function drho_hh(r)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: drho_hh
@@ -612,29 +612,29 @@ contains
 !=======================================================================
   function fcut(r)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: fcut
 
-    fcut= exp(aa2bohr/(r-rc_phi_hh))
+    fcut= exp(1d0/(r-rc_phi_hh))
     return
   end function fcut
 !=======================================================================
   function dfcut(r)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: dfcut
 
-    dfcut= -aa2bohr/(r-rc_phi_hh)**2 *fcut(r)
+    dfcut= -1d0/(r-rc_phi_hh)**2 *fcut(r)
     return
   end function dfcut
 !=======================================================================
   function fh(rho)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: rho
     real(8):: fh
@@ -649,7 +649,7 @@ contains
 !=======================================================================
   function dfh(rho)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: rho
     real(8):: dfh
@@ -664,7 +664,7 @@ contains
 !=======================================================================
   function fvphi_hh(r)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: fvphi_hh
@@ -701,7 +701,7 @@ contains
 !=======================================================================
   function dfvphi_hh(r)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: dfvphi_hh
@@ -760,7 +760,7 @@ contains
 !=======================================================================
   function s_hh(r)
     implicit none
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: s_hh
@@ -771,7 +771,7 @@ contains
 !=======================================================================
   function fvphi_feh(r,rs)
     implicit none 
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r,rs
     real(8):: fvphi_feh
@@ -786,9 +786,9 @@ contains
       rr=r*r
       r4=rr*rr
       fvphi_feh= (b0_feh +b1_feh*r +b2_feh*rr &
-           +b3_feh*rr*r +b4_feh*r4 +b5_feh*r4*r) *ev2hrt
+           +b3_feh*rr*r +b4_feh*r4 +b5_feh*r4*r)
 !!$      fvphi_feh= exp(b0_feh +b1_feh*r +b2_feh*rr &
-!!$           +b3_feh*rr*r +b4_feh*r4 +b5_feh*r4*r) *ev2hrt
+!!$           +b3_feh*rr*r +b4_feh*r4 +b5_feh*r4*r)
     else
       do i=1,7
         fvphi_feh=fvphi_feh +a_phi_feh(i)*(r_phi_feh(i)-r)**3 &
@@ -801,7 +801,7 @@ contains
 !=======================================================================
   function dfvphi_feh(r,rs)
     implicit none 
-    include './params_au.h'
+    include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r,rs
     real(8):: dfvphi_feh
@@ -818,11 +818,11 @@ contains
       r3=rr*r
       r4=r3*r
       dfvphi_feh= (b1_feh +2d0*b2_feh*r +3d0*b3_feh*rr &
-           +4d0*b4_feh*r3 +5d0*b5_feh*r4) *ev2hrt
+           +4d0*b4_feh*r3 +5d0*b5_feh*r4)
 !!$      dfvphi_feh= (b1_feh +2d0*b2_feh*r +3d0*b3_feh*rr &
 !!$           +4d0*b4_feh*r3 +5d0*b5_feh*r4) &
 !!$           *exp(b0_feh +b1_feh*r +b2_feh*rr +b3_feh*r3 &
-!!$           +b4_feh*r4 +b5_feh*r4*r) *ev2hrt
+!!$           +b4_feh*r4 +b5_feh*r4*r)
     else
       do i=1,7
         dfvphi_feh=dfvphi_feh -a_phi_feh(i)*(r_phi_feh(i)-r)**2 &

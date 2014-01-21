@@ -1,5 +1,5 @@
-c-----Si mass (to be multiplied by amu)
-      real(8),parameter:: am_si = 28.0855d0 *aump/aume
+c-----Si mass (to be multiplied by umass)
+      real(8),parameter:: am_si = 28.0855d0 *umass
 c-----SW unit energy in a.u.
       real(8),parameter:: swe   = 7.978d-2
 c-----SW unit length in a.u.
