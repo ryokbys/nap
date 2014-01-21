@@ -249,10 +249,10 @@ c.....Considering vmax==0d0, make istpe small only for the first step
 c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
 
       if(myid_md.eq.0) then
-        write(6,'(1x,a)') "initial values: [eV], [K]"
-        write(6,'(1x,a,es22.14)') " kinetic energy  =",ekin
-        write(6,'(1x,a,es22.14)') " potential energy=",epot0
-        write(6,'(1x,a,es15.7)') " temperature     =",temp
+        write(6,'(1x,a)') "initial values:"
+        write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
+        write(6,'(1x,a,es22.14,a)') " potential energy=",epot0,' eV'
+        write(6,'(1x,a,es15.7,a)') " temperature     =",temp,' K'
 
         if( ifpctl .eq. 1 ) then
           write(6,'(a,i8,2f10.2,2es11.3)')
@@ -290,9 +290,9 @@ c-----output initial configuration
 c-----Energy output
       if(myid_md.eq.0) then
         open(11,file="out.erg",status='replace')
-        write(11,'(a)') '# istp,etot-epot0,ekin,epot-epot0,temp'
-     &       //'vol(A^3),pressure(GPa)'
-        write(11,'(a,es15.7)') '# epot0 =',epot0
+        write(11,'(a)') '# istp,etot-epot0[eV],ekin,epot-epot0,temp[K]'
+     &       //'vol[Ang^3],pressure[GPa]'
+        write(11,'(a,es15.7,a)') '# epot0 =',epot0,' [eV]'
         write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
      &       ,ekin+epot0-epot0,ekin,epot0-epot0,temp
      &       ,vol
@@ -559,10 +559,10 @@ c.....reset pressure
 
       tcpu= tcpu2 -tcpu1
       if(myid_md.eq.0) then
-        write(6,'(1x,a)') "final values: [eV], [K]"
-        write(6,'(1x,a,es22.14)') " kinetic energy  =",ekin
-        write(6,'(1x,a,es22.14)') " potential energy=",epot
-        write(6,'(1x,a,es15.7)') " temperature     =",temp
+        write(6,'(1x,a)') "final values:"
+        write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
+        write(6,'(1x,a,es22.14,a)') " potential energy=",epot,' eV'
+        write(6,'(1x,a,es15.7,a)') " temperature     =",temp,' K'
         write(6,'(1x,a,2f10.2)') "time cpu & com=",tcpu,tcom
       endif
 
@@ -632,18 +632,18 @@ c=======================================================================
       am(1:nismax)= am(1:nismax)
 
 c.....umass*Ang^2/fs^2 ---> kg*m^2/sec^2 (=Joule)
-      tmp= umass *ang**2 /ut**2
+      tmp= amu2kg *ang2m**2 /fs2s**2
       write(6,'(a,es12.4,a,es12.4,a)') ' umass*Ang^2/fs^2 ='
-     &     ,tmp,' Joule',tmp*j2ev,' eV'
+     &     ,tmp,' Joule =',tmp*j2ev,' eV'
 
 c-----prefactors for normalized accelerration
       do i=1,nismax
-        acon(i)= 0.5d0*dt**2/am(i)
+        acon(i)=  ev2j/ang2m *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg) *m2ang
       enddo
 
 c-----prefactors for kinetic energy in eV
       do i=1,nismax
-        fack(i)= 0.5d0*am(i)/dt**2 *tmp*j2ev
+        fack(i)= 0.5d0*(am(i)*amu2kg)/(dt*fs2s)**2 *ang2m**2 *j2ev
       enddo
 
       end subroutine setup
@@ -1741,7 +1741,8 @@ c=======================================================================
       real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(nismax)
       real(8),parameter:: pi = 3.14159265358979d0
 
-      facv(1:nismax)=dsqrt(2d0*tinit*fkb/am(1:nismax))
+      facv(1:nismax)=dsqrt(2d0*tinit*fkb*ev2j /(am(1:nismax)*amu2kg))
+     &     *m2ang /s2fs
 
 c-----velocities in Maxwell-Boltzmann distribution
       dseed=12345

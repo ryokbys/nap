@@ -14,6 +14,9 @@ pmd uses spatial decomposition technique for the parallelization, and cell list 
 
          $ ./configure FCFLAGS="-O4 -g"
 
+    FCFLAGS will be added as an option to every compilation.
+    So please change the FCFLAGS value according to your system.
+
   - Make all the executable files
 
          $ make all

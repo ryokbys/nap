@@ -58,11 +58,12 @@ pmd2akr= pmd2akr.o read_input.o util_pmd.o sort.o
 #-----------------------------------------------------------------------
 # Make rule entries
 #
-all: 10mkconf 20nconv pmd 40combine akr2cna akr2pot akr2csp boxsize rdpmd
+execs=10mkconf 20nconv pmd 40combine pmd2akr akr2cna sortpmd
+
+all: ${execs}
 
 clean:
-	rm -f *.o *.mod *~ 10mkconf 20nconv pmd 40combine akr2cna \
-		akr2pot boxsize rdpmd
+	rm -f *.o *.mod *~ ${execs}
 
 install: pmd 10mkconf 20nconv
 	cp pmd 10mkconf 20nconv ../

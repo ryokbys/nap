@@ -18,14 +18,6 @@ c-----vacuum width in unit of cell
 c-----for Ar
       real*8,parameter:: sgmlj = 3.41d0
 
-c-----velocity scaling factor at Temp(K)=100
-      tempini=100d0
-c-----mass of Ar
-      am=39.986d0*umass
-cc-----mass of Al
-c      am=26.9815d0*umass
-      facv=dsqrt(2d0*tempini*fkb/am)
-
       small=1d-7
 
 c-----box size for Ar
