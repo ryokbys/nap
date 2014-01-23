@@ -13,19 +13,17 @@ c-----max # of atoms
       integer,parameter::nmax=100000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 3,3,3 /)
+      integer,parameter:: nuc(1:3)= (/ 5,5,5 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
       real(8):: ua(3,10)
       real(8):: tag(nmax),ra(3,nmax),va(3,nmax),eki(nmax),epi(nmax)
      &     ,h(3,3,0:1),strs(3,3,nmax),dseed,rnd
-c.....Parameters
-      real(8),parameter:: tempini = 100d0
 c.....vacancy ratio
       real(8),parameter:: vratio  = 0.0001
 c.....He ratio
-      real(8),parameter:: heratio = 0.010
+      real(8),parameter:: heratio = 0.050
 
       small = 1d0/4 /nuc(1)
 
@@ -69,33 +67,32 @@ c              if( m.eq.2 ) is= 2
               ifmv= 1
               tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
             enddo
-c            call myrnd(rnd,dseed)
-c            if( rnd.lt.heratio ) then
-cc.....Add He atom
-c              inc= inc+1
-c              if(inc.gt.nmax)then
-c                write(*,*)'Error inc>nmax',inc,nmax
-c                stop
-c              endif
-c              is= 2
-c              ifmv= 1
-c              tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
-ccc.....O-site
-cc              ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-cc              ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-cc              ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-cc.....T-site
-c              ra(1,inc)= (0.50d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-c              ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-c              ra(3,inc)= (0.00d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-c            endif
+            call myrnd(rnd,dseed)
+            if( rnd.lt.heratio ) then
+c.....Add He atom
+              inc= inc+1
+              if(inc.gt.nmax)then
+                write(*,*)'Error inc>nmax',inc,nmax
+                stop
+              endif
+              is= 2
+              ifmv= 1
+              tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+cc.....O-site
+c              ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+c              ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+c              ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+c.....T-site
+              ra(1,inc)= (0.50d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+              ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+              ra(3,inc)= (0.00d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+            endif
           enddo
         enddo
       enddo
 
       write(6,'(a,i10)') " natm=",inc
 
-      call setv(inc,tag,va,h,tempini)
       call write_pmd0_ascii(15,'pmd00000-0000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
       
@@ -109,60 +106,6 @@ c-----output 'akr000' for Akira visualization
       close(15)
       
       end program mkconf_BCC_WHe
-c=======================================================================
-      subroutine setv(natm,tag,va,h,tinit)
-      implicit none
-      include 'mpif.h'
-      include 'params_unit.h'
-      integer,intent(in):: natm
-      real(8),intent(in):: tinit,tag(natm),h(3,3,0:1)
-      real(8),intent(out):: va(3,natm) 
-      integer:: i,l,is
-      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(2)
-      real(8):: sumpx,sumpy,sumpz,amtot,amss
-      real(8),parameter:: am(1:2)=(/ 184.83d0*umass, 4.0d0*umass /)
-      real(8),parameter:: pi = 3.14159265358979d0
-
-      facv(1:2)=dsqrt(2d0*tinit*fkb/am(1:2))
-
-c-----velocities in Maxwell-Boltzmann distribution
-      dseed=12345
-      do i=1,natm
-        is= int(tag(i))
-        do l=1,3
-          call myrnd(rnd1,dseed)
-          call myrnd(rnd2,dseed)
-          va(l,i)=facv(is)*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
-        enddo
-      enddo
-
-      do i=1,natm
-        va(1,i)= va(1,i) /h(1,1,0)
-        va(2,i)= va(2,i) /h(2,2,0)
-        va(3,i)= va(3,i) /h(3,3,0)
-      enddo
-
-c-----set center of mass motion to zero
-      sumpx=0d0
-      sumpy=0d0
-      sumpz=0d0
-      amtot=0d0
-      do i=1,natm
-        is= int(tag(i))
-        amss= am(is)
-        sumpx=sumpx+amss*va(1,i)
-        sumpy=sumpy+amss*va(2,i)
-        sumpz=sumpz+amss*va(3,i)
-        amtot= amtot +amss
-      enddo
-      do i=1,natm
-        va(1,i)=va(1,i)-sumpx/amtot
-        va(2,i)=va(2,i)-sumpy/amtot
-        va(3,i)=va(3,i)-sumpz/amtot
-      enddo
-
-
-      end subroutine setv
 c=======================================================================
       subroutine myrnd(rnd,dseed)
       real*8 rnd,dseed

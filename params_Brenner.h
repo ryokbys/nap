@@ -1,10 +1,10 @@
-c-----C
+!-----C
       real(8),parameter:: am_c  = 12.0107
-c-----interatomic length in graphene
+!-----interatomic length in graphene
       real(8),parameter:: dcc   = 1.44d-10 /ang
-cc-----interatomic length in diamond
-c      real(8),parameter:: dcc   = 1.605d-10 /ang
-c-----Brenner Carbon (in eV,Ang)
+!c-----interatomic length in diamond
+!      real(8),parameter:: dcc   = 1.605d-10 /ang
+!-----Brenner Carbon (in eV,Ang)
       real(8),parameter:: br_dd = 6.325d0
       real(8),parameter:: br_s  = 1.29d0
       real(8),parameter:: br_bet= 1.5d+10 *ang 
@@ -15,13 +15,13 @@ c-----Brenner Carbon (in eV,Ang)
       real(8),parameter:: br_a0 = 0.011304d0
       real(8),parameter:: br_c0 = 19.d0
       real(8),parameter:: br_d0 = 2.5d0
-c-----interlayer potential by A.J.Heim et.al
+!-----interlayer potential by A.J.Heim et.al
       real(8),parameter:: evdw  = 5d-3
       real(8),parameter:: cvdw  = 200d0
       real(8),parameter:: p3vdw =-2290.707325617024d0
       real(8),parameter:: p4vdw = 3603.929410034915d0
       real(8),parameter:: p5vdw =-1513.930039501751d0
-      real(8),parameter:: sgmvdw= 2.988d-10 *2d0**(1d0/6d0) /ang
+      real(8),parameter:: sgmvdw= 2.988d0 *2d0**(1d0/6d0)
       real(8),parameter:: r2vdw = 2d0**(-1d0/6d0) *sgmvdw
       real(8),parameter:: r1vdw = 0.683d0 *r2vdw
       real(8),parameter:: r3vdw = (13d0/7d0)**(1d0/6d0) *sgmvdw

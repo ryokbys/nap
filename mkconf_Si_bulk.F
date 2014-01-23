@@ -12,22 +12,14 @@ c-----------------------------------------------------------------------
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
-      integer,parameter:: nuc(1:3)= (/ 5, 5, 5 /)
+      integer,parameter:: nuc(1:3)= (/ 4,4,4 /)
 c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
       real(8):: ua(3,10)
       real(8):: ra(3,nmax)
       real(8):: h(3,3,0:1)
       real(8):: va(3,nmax)
-      real(8):: tag(nmax)
-c-----initial temperature
-      real(8),parameter:: tempini= 300d0
-
-c-----Si mass
-      am= am_si
-c-----factor to be multiplied to velocity
-c      facv=dsqrt(2d0*temp/am)
-      facv=dsqrt(2d0*tempini*fkb/am)
+      real(8):: tag(nmax),eki(nmax),epi(nmax),strs(3,3,nmax)
 
       small=1d-7
 
@@ -74,32 +66,13 @@ c-----simulation box size
       h(2,2,0)= cunit*(nuc(2)+nvac(2))
       h(3,3,0)= cunit*(nuc(3)+nvac(3))
 
-      call setv(inc,va,facv)
-      tmp=0d0
-      do i=1,inc
-        tmp= tmp +0.5d0*am*(va(1,i)**2 +va(2,i)**2 +va(3,i)**2)
-      enddo
-      write(6,'(a,es12.4)') " ekin=",tmp
-      write(6,'(a,es12.4)') " temp.=",tmp*2d0/3d0/fkb/inc
+      va(1:3,1:inc)= 0d0
 
-c-----scale velocities to reduced unit
-      do i=1,inc
-        va(1,i)=va(1,i) /h(1,1,0)
-        va(2,i)=va(2,i) /h(2,2,0)
-        va(3,i)=va(3,i) /h(3,3,0)
-      enddo
+      call write_pmd0_ascii(15,'pmd00000-0000','replace',inc,tag
+     &     ,ra,va,h,eki,epi,strs)
       
-c-----output 'ini000' for MD program
-      open(15,file='ini000',form='formatted',status='replace')
-      write(15,'(i10)')inc
-      write(15,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      do i=1,inc
-        write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
-      
-c-----output 'kvs000' for KVS visualization
-      open(15,file='kvs000',form='formatted',status='replace')
+c-----output for Akira
+      open(15,file='akr0000',form='formatted',status='replace')
       write(15,'(i10)')inc
       write(15,'(3es11.3)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       do i=1,inc
@@ -108,42 +81,6 @@ c-----output 'kvs000' for KVS visualization
       close(15)
       
       end program mkconf_Si_bulk
-c=======================================================================
-      subroutine setv(natm,va,facv)
-      implicit none
-      integer,intent(in):: natm
-      real(8),intent(in):: facv
-      real(8),intent(out):: va(3,natm)
-
-      integer:: i,l
-      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2
-      real(8),parameter:: pi = 3.14159265358979d0
-      
-c-----velocities in Maxwell-Boltzmann distribution
-      dseed=12345
-      do i=1,natm
-        do l=1,3
-          call myrnd(rnd1,dseed)
-          call myrnd(rnd2,dseed)
-          va(l,i)=facv*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
-        enddo
-      enddo
-c-----set center of mass motion to zero
-      sumvx=0d0
-      sumvy=0d0
-      sumvz=0d0
-      do i=1,natm
-        sumvx=sumvx+va(1,i)
-        sumvy=sumvy+va(2,i)
-        sumvz=sumvz+va(3,i)
-      enddo
-      do i=1,natm
-        va(1,i)=va(1,i)-sumvx/dble(natm)
-        va(2,i)=va(2,i)-sumvy/dble(natm)
-        va(3,i)=va(3,i)-sumvz/dble(natm)
-      enddo
-
-      end subroutine setv
 c=======================================================================
       subroutine myrnd(rnd,dseed)
       real*8 rnd,dseed

@@ -43,8 +43,8 @@ contains
       l1st=.false.
 !.....check cutoff radius
       if( myid_md.eq.0 ) then
-        write(6,'(a,es22.14)') ' rc of input    =',rc *aa
-        write(6,'(a,es22.14)') ' rc of this pot =',rc_pot *aa
+        write(6,'(a,es12.4)') ' rc of input    =',rc
+        write(6,'(a,es12.4)') ' rc of this pot =',rc_pot
       endif
       if( rc.lt.rc_pot ) then
         if( myid_md.eq.0 ) write(6,'(a)') &

@@ -1,6 +1,6 @@
-c-----Si mass (to be multiplied by umass)
-      real(8),parameter:: am_si = 28.0855d0 *umass
-c-----EDIP Si
+!-----Si mass (to be multiplied by umass)
+      real(8),parameter:: am_si = 28.0855d0
+!-----EDIP Si
       real(8),parameter:: ed_aa = 7.9821730d0
       real(8),parameter:: ed_bb = 1.5075463d-10 /ang
       real(8),parameter:: ed_rho= 1.2085196d0
@@ -18,6 +18,6 @@ c-----EDIP Si
       real(8),parameter:: ed_u2 = 32.557d0
       real(8),parameter:: ed_u3 = 0.286198d0
       real(8),parameter:: ed_u4 = 0.66d0
-c-----2 lattice parameters
+!-----2 lattice parameters
       real(8),parameter:: ratio = 0.94d0
 

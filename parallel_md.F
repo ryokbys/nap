@@ -1828,6 +1828,15 @@ c=======================================================================
       use RK_WHe,only:force_RK_WHe
       use Ito3_WHe,only:force_Ito3_WHe
       use LJ_Ar,only:force_LJ_Ar
+      use SW_Si,only:force_SW_Si
+      use EDIP_Si,only:force_EDIP_Si
+      use Brenner,only:force_brenner,force_brenner_vdW
+      use Lu_WHe,only:force_Lu_WHe
+      use Branicio_AlN,only:force_Branicio_AlN
+      use Mishin_Al,only:force_Mishin_Al
+      use AFS_W,only:force_AFS_W
+      use SC_Fe,only:force_SC_Fe
+      use SM_Al,only:force_SM_Al
       implicit none
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -1864,6 +1873,46 @@ c=======================================================================
      &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
         case ('Ackland_Fe')
           call force_Ackland_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('SW_Si')
+          call force_SW_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('EDIP_Si')
+          call force_EDIP_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('Brenner')
+          call force_Brenner(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('Brenner_vdW')
+          call force_Brenner_vdW(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('Lu_WHe')
+          call force_Lu_Whe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('Branicio_AlN')
+          call force_Branicio_AlN(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('Mishin_Al')
+          call force_Mishin_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('AFS_W')
+          call force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('SC_Fe')
+          call force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('SM_Al')
+          call force_SM_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
         case default
