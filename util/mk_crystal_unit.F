@@ -7,8 +7,10 @@ c-----------------------------------------------------------------------
       integer:: i,j,k,l,m,n,istrct,ixyz,ncell,nua,i1,i2,i3,inc,natm
       character:: clattice*10
       integer:: ib1(3),ib2(3),ib3(3),imax(3),imin(3)
-      real(8):: a1(3),a2(3),a3(3),h0(3,3),ua(3,10)
+      real(8):: a1(3),a2(3),a3(3),h0(3,3),ua(3,10),al
      &     ,b1(3),b2(3),b3(3),ra(3,nmax),s(3),bb1,bb2,bb3,rb(3,nmax)
+
+      real(8),parameter:: small= 1d-8
       
 c.....Choose Bravais lattice
  1    write(6,'(a)') "Choose a Bravais lattice from the list below:"
@@ -19,8 +21,12 @@ c.....Choose Bravais lattice
       write(6,'(a)') " 5: Wultzite"
       read(5,*) istrct
 
+c.....Lattice constant
+      write(6,'(a)') "Input lattice constant in Angstrom:"
+      read(5,*) al
+
 c.....Decide new lattice vectors
- 2    write(6,'(a)') "Input lattice vectors (e.g., [-121]= -1 2 1):"
+ 3    write(6,'(a)') "Input lattice vectors (e.g., [-121]= -1 2 1):"
       write(6,'(a)',advance='no') "  b1: "
       read(5,*) ib1(1:3)
       write(6,'(a)',advance='no') "  b2: "
@@ -28,19 +34,27 @@ c.....Decide new lattice vectors
       write(6,'(a)',advance='no') "  b3: "
       read(5,*) ib3(1:3)
 
+      imax(1:3)= 0
+      imin(1:3)= 0
       do ixyz=1,3
         imax(ixyz)= max(0,ib1(ixyz))
         imax(ixyz)= max(imax(ixyz),ib2(ixyz))
         imax(ixyz)= max(imax(ixyz),ib3(ixyz))
+        imax(ixyz)= max(imax(ixyz),ib1(ixyz)+ib2(ixyz))
+        imax(ixyz)= max(imax(ixyz),ib1(ixyz)+ib3(ixyz))
+        imax(ixyz)= max(imax(ixyz),ib2(ixyz)+ib3(ixyz))
         imax(ixyz)= max(imax(ixyz),ib1(ixyz)+ib2(ixyz)+ib3(ixyz))
         imin(ixyz)= min(0,ib1(ixyz))
         imin(ixyz)= min(imin(ixyz),ib2(ixyz))
         imin(ixyz)= min(imin(ixyz),ib3(ixyz))
+        imin(ixyz)= min(imin(ixyz),ib1(ixyz)+ib2(ixyz))
+        imin(ixyz)= min(imin(ixyz),ib1(ixyz)+ib3(ixyz))
+        imin(ixyz)= min(imin(ixyz),ib2(ixyz)+ib3(ixyz))
         imin(ixyz)= min(imin(ixyz),ib1(ixyz)+ib2(ixyz)+ib3(ixyz))
       enddo
       write(6,'(a,3i3)') " imax(1:3)=",imax(1:3)
       write(6,'(a,3i3)') " imin(1:3)=",imin(1:3)
-      ncell=(imax(1)-imin(1))*(imax(2)-imin(2))*(imax(3)-imin(3))
+      ncell=(imax(1)-imin(1)+1)*(imax(2)-imin(2)+1)*(imax(3)-imin(3)+1)
       write(6,'(a,i4)')  " ncell    =",ncell
 
 c.....Make large enough crystal to be extracted unit cell
@@ -53,6 +67,35 @@ c.....Make large enough crystal to be extracted unit cell
         nua=2
         ua(1:3,1)=(/ 0.0d0, 0.0d0, 0.0d0 /)
         ua(1:3,2)=(/ 0.5d0, 0.5d0, 0.5d0 /)
+      elseif( istrct.eq.2 ) then
+        write(6,'(a)') " Making FCC..."
+        a1(1:3) =(/ 1.0d0, 0.0d0, 0.0d0 /)
+        a2(1:3) =(/ 0.0d0, 1.0d0, 0.0d0 /)
+        a3(1:3) =(/ 0.0d0, 0.0d0, 1.0d0 /)
+
+        nua=4
+        ua(1:3,1)=(/ 0.0d0, 0.0d0, 0.0d0 /)
+        ua(1:3,2)=(/ 0.5d0, 0.5d0, 0.0d0 /)
+        ua(1:3,1)=(/ 0.5d0, 0.0d0, 0.5d0 /)
+        ua(1:3,2)=(/ 0.0d0, 0.5d0, 0.5d0 /)
+      elseif( istrct.eq.4 ) then
+        write(6,'(a)') " Making diamond structure..."
+        a1(1:3) =(/ 1.0d0, 0.0d0, 0.0d0 /)
+        a2(1:3) =(/ 0.0d0, 1.0d0, 0.0d0 /)
+        a3(1:3) =(/ 0.0d0, 0.0d0, 1.0d0 /)
+
+        nua=8
+        ua(1:3,1)=(/ 0.00d0, 0.00d0, 0.00d0 /)
+        ua(1:3,2)=(/ 0.50d0, 0.50d0, 0.00d0 /)
+        ua(1:3,3)=(/ 0.50d0, 0.00d0, 0.50d0 /)
+        ua(1:3,4)=(/ 0.00d0, 0.50d0, 0.50d0 /)
+        ua(1:3,5)=(/ 0.25d0, 0.25d0, 0.25d0 /)
+        ua(1:3,6)=(/ 0.75d0, 0.75d0, 0.25d0 /)
+        ua(1:3,7)=(/ 0.75d0, 0.25d0, 0.75d0 /)
+        ua(1:3,8)=(/ 0.25d0, 0.75d0, 0.75d0 /)
+      else
+        write(6,'(a)') ' Sorry, the structure is not available...'
+        stop
       endif
 
 c.....Get absolute atom positions
@@ -98,7 +141,7 @@ c      write(6,'(a,es12.4)') " bb3=",bb3
         s(1)= (ra(1,i)*b1(1) +ra(2,i)*b1(2) +ra(3,i)*b1(3))/bb1
         s(2)= (ra(1,i)*b2(1) +ra(2,i)*b2(2) +ra(3,i)*b2(3))/bb2
         s(3)= (ra(1,i)*b3(1) +ra(2,i)*b3(2) +ra(3,i)*b3(3))/bb3
-c        write(6,'(a,i5,3es12.4)') " i,s(1:3)=",i,s(1:3)
+        write(6,'(a,i5,3es12.4)') " i,s(1:3)=",i,s(1:3)
         if(  s(1).ge.0d0 .and. s(1).lt.1d0 .and.
      &       s(2).ge.0d0 .and. s(2).lt.1d0 .and.
      &       s(3).ge.0d0 .and. s(3).lt.1d0 ) then
@@ -110,6 +153,11 @@ c        write(6,'(a,i5,3es12.4)') " i,s(1:3)=",i,s(1:3)
         endif
       enddo
 
+c.....scaling
+      b1(1:3)= al*b1(1:3)
+      b2(1:3)= al*b2(1:3)
+      b3(1:3)= al*b3(1:3)
+
 c.....Output unit cell information
       write(6,'(a)') ''
       write(6,'(a)') " Write following data in your code..."
@@ -118,9 +166,9 @@ c.....Output unit cell information
       write(6,'(3es22.14)') b1(1),b2(1),b3(1)
       write(6,'(3es22.14)') b1(2),b2(2),b3(2)
       write(6,'(3es22.14)') b1(3),b2(3),b3(3)
-      write(6,'(a,es22.14)') " |b1|=",sqrt(bb1)
-      write(6,'(a,es22.14)') " |b2|=",sqrt(bb2)
-      write(6,'(a,es22.14)') " |b3|=",sqrt(bb3)
+      write(6,'(a,es22.14)') " |b1|=",sqrt(bb1)*al
+      write(6,'(a,es22.14)') " |b2|=",sqrt(bb2)*al
+      write(6,'(a,es22.14)') " |b3|=",sqrt(bb3)*al
       do i=1,inc
         write(6,'(i5,3es22.14)') i,rb(1:3,i)
       enddo
