@@ -1,9 +1,9 @@
       program combine_pmd
 c-----------------------------------------------------------------------
 c Combine pmd files made by parallel program
-c   - pmd###-$$$  -->  akr$$$
-c     ###: node number
-c     $$$: akira frame number
+c   - pmd#####-$$$$  -->  akr$$$$
+c     #####: node number
+c     $$$$: akira frame number
 c   - only combine them, not shifting positions
 c-----------------------------------------------------------------------
       use variables
@@ -72,7 +72,7 @@ c-------output combined mts-file
         open(30,file=fout,status="replace")
         write(30,'(i10,3i4)') n, nauxdat, 0, 0
         write(30,'(3es15.7)') ((h(ia,ib,0),ia=1,3),ib=1,3)
-        write(30,'(i3,8es22.14)') (int(dat(18,i)),dat(1:3,i)
+        write(30,'(i3,8es12.4)') (int(dat(18,i)),dat(1:3,i)
      &       ,dat(7:8,i),dat(9,i),dat(13,i),dat(17,i),i=1,n)
         close(30)
         write(6,'(a)') " "//fout//" done."

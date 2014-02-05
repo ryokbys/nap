@@ -141,7 +141,7 @@ c      write(6,'(a,es12.4)') " bb3=",bb3
         s(1)= (ra(1,i)*b1(1) +ra(2,i)*b1(2) +ra(3,i)*b1(3))/bb1
         s(2)= (ra(1,i)*b2(1) +ra(2,i)*b2(2) +ra(3,i)*b2(3))/bb2
         s(3)= (ra(1,i)*b3(1) +ra(2,i)*b3(2) +ra(3,i)*b3(3))/bb3
-        write(6,'(a,i5,3es12.4)') " i,s(1:3)=",i,s(1:3)
+c        write(6,'(a,i5,3es12.4)') " i,s(1:3)=",i,s(1:3)
         if(  s(1).ge.0d0 .and. s(1).lt.1d0 .and.
      &       s(2).ge.0d0 .and. s(2).lt.1d0 .and.
      &       s(3).ge.0d0 .and. s(3).lt.1d0 ) then

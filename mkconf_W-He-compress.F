@@ -12,11 +12,11 @@ c-----------------------------------------------------------------------
 c-----max # of atoms
       integer,parameter::nmax=10000000
 c-----# of unit cells of bcc W crystall
-      integer,parameter:: nuc(1:3)= (/ 10, 10, 30 /)
+      integer,parameter:: nuc(1:3)= (/ 5, 5, 3 /)
 c.....# of unit cells of He gas region per both top and bottom
-      integer,parameter:: nhe(1:3)= (/ 0, 0, 5 /)
+      integer,parameter:: nhe(1:3)= (/ 0, 0, 0 /)
 c.....# of unit cells for vacuume region per both top and bottom
-      integer,parameter:: nvac(1:3)= (/ 0, 0, 1 /)
+      integer,parameter:: nvac(1:3)= (/ 0, 0, 2 /)
 c.....# of unit cells
       integer,parameter:: nucs(1:3)= nuc(1:3) +2*nhe(1:3) +2*nvac(1:3)
       real(8):: ua(3,10)
@@ -44,12 +44,14 @@ c-----unit cell, BCC
       ua(1:3,2)= (/ 0.5d0, 0.5d0, 0.5d0 /)
       
       inc=0 
-      do iz=nvac(3),nucs(3)-nvac(3)-1
+c      do iz=nvac(3),nucs(3)-nvac(3)-1
+      do iz=0,nucs(3)-1
         do iy=0,nuc(2)-1
           do ix=0,nuc(1)-1
             do m=1,2
-              if( iy.eq.nucs(2)/2 .and. ix.eq.nucs(1)/2
-     &             .and. iz.eq.nucs(3)/2 .and. m.eq.1 ) cycle 
+cc.....Vacancy?
+c              if( iy.eq.nucs(2)/2 .and. ix.eq.nucs(1)/2
+c     &             .and. iz.eq.nucs(3)/2 .and. m.eq.1 ) cycle 
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
@@ -57,15 +59,16 @@ c-----unit cell, BCC
               endif
               ra(1,inc)= (ua(1,m)+dble(ix))/nucs(1) +small
               ra(2,inc)= (ua(2,m)+dble(iy))/nucs(2) +small
-              ra(3,inc)= (ua(3,m)+dble(iz))/nucs(3)
+              ra(3,inc)= (ua(3,m)+dble(iz))/nucs(3) +small
 c              ra(1:3,inc)= ra(1:3,inc)
 c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
               is= 1
-              if( iz.le.nvac(3)+nhe(3)-1 ) is= 2
-              if( iz.ge.nvac(3)+nhe(3)+nuc(3) ) is= 2
+c              if( iz.le.nvac(3)+nhe(3)-1 ) is= 2
+c              if( iz.ge.nvac(3)+nhe(3)+nuc(3) ) is= 2
               ifmv= 1
-              if( iz.eq.nvac(3)+nhe(3) ) ifmv=2
-              if( iz.eq.nvac(3)+nhe(3)+nuc(3)-1 ) ifmv=2
+c              if( iz.eq.nvac(3)+nhe(3) ) ifmv=2
+c              if( iz.eq.nvac(3)+nhe(3)+nuc(3)-1 ) ifmv=2
+              
               tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
             enddo
           enddo
@@ -78,11 +81,11 @@ c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
 
       va(1:3,1:inc)= 0d0
 
-      call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va,h
+      call write_pmd0_ascii(15,'pmd00000-0000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
       
 c-----output 'akr000' for Akira visualization
-      open(15,file='akr000',form='formatted',status='replace')
+      open(15,file='akr0000',form='formatted',status='replace')
       write(15,'(i10,3i5)') inc, 4, 0, 0
       write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
       do i=1,inc
