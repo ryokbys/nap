@@ -4,7 +4,7 @@ c  This program sorts pmd??? file ascending order of itot
 c  in TAG variable.
 c-----------------------------------------------------------------------
 c  USAGE:
-c    $ ./sort pmd000
+c    $ ./sort pmd00000
 c-----------------------------------------------------------------------
       use variables
       implicit none

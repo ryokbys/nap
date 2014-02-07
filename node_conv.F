@@ -1,8 +1,11 @@
       program node_conv
 c-----------------------------------------------------------------------
-c   Node-layout converter program for pmd.
-c     Read:  pmd?????-0000 (or some other name)
-c     write: pmd?????-0000
+c Node-layout converter program for pmd.
+c   Read:  pmd?????-0000 (or some other name)
+c   write: pmd?????-0000
+c-----------------------------------------------------------------------
+c USAGE: in case of (1,1,1)-division to (2,2,2)-division
+c   $ ./20nconv 1 1 1 2 2 2
 c-----------------------------------------------------------------------
       implicit none
       integer,parameter:: namax = 2000000
@@ -15,24 +18,40 @@ c-----------------------------------------------------------------------
      &     ,strs(3,3,namax)
       real(8):: rat(3,namax),vat(3,namax)
      &     ,ekit(namax),epit(namax),strst(3,3,namax)
-      character:: filename*13,key*1
+      character:: filename*8,key*1
 
-      write(6,'(a)') ' This program pmd?????-0000 files and '
-     &     //'split to different node layout.'
-      write(6,'(a)') ' Then override pmd?????-0000 files.'
-      filename='pmd00000-0000'
+      integer,external:: iargc
+      integer:: nargc
+      character*128:: cin,cout
 
-c-----read some info from STDIN
-      write(6,'(a)') ' Current node-layout: (nx,ny,nz)=?'
-      read(5,*)nox,noy,noz
-      nodeso=nox*noy*noz
-      write(6,'(a)')' New node-layout: (nx,ny,nz)=?'
-      read(5,*)nnx,nny,nnz
-      nodesn=nnx*nny*nnz
+c.....check arguments
+      nargc= iargc()
+      if( nargc.ne.6 ) then
+        write(6,'(a)') ' [Error] Wrong number of arguments !!!'
+        write(6,'(a)') ' Usage:'
+        write(6,'(a)') '   $ ./20nconv 1 1 1 2 2 2'
+        stop 
+      endif
+      call getarg(1,cin)
+      read(cin,*) nox
+      call getarg(2,cin)
+      read(cin,*) noy
+      call getarg(3,cin)
+      read(cin,*) noz
+      call getarg(4,cin)
+      read(cin,*) nnx
+      call getarg(5,cin)
+      read(cin,*) nny
+      call getarg(6,cin)
+      read(cin,*) nnz
 
-      write(6,'(a,3i3,a,3i3,a)') 'Converts ( ',nox,noy,noz
+      nodeso= nox*noy*noz
+      nodesn= nnx*nny*nnz
+
+      write(6,'(a,3i3,a,3i3,a)') ' Converts ( ',nox,noy,noz
      &     ,' ) to ( ',nnx,nny,nnz,' )'
 
+      filename='pmd00000'
       nlast=0
       do i=0,nodeso-1
         myx=i/(noy*noz)
@@ -57,6 +76,7 @@ c     &       ,eki(j),epi(j),strs(1:3,1:3,j),j=nlast+1,nlast+n)
 c.....Ascii format
         open(12,file=trim(filename),form='formatted',status='old')
         read(12,*) n
+        write(6,'(a,i10)') " n=",n
         if(nlast+n.gt.namax)then
           write(6,'(a)')' [Error] n.gt.namax !!'
           write(6,'(a,2i10)') ' nlast+n,namax =',nlast+n,namax
@@ -67,7 +87,6 @@ c.....Ascii format
      &       ,eki(j),epi(j),strs(1:3,1:3,j),j=nlast+1,nlast+n)
 c.....Some check
         do j=nlast+1,nlast+n
-c          read(12,*) tag(j),ra(1:3,j),va(1:3,j)
           if(  ra(1,j).lt.sxog.or.ra(1,j).ge.sxog+1d0/nox.or.
      &         ra(2,j).lt.syog.or.ra(2,j).ge.syog+1d0/noy.or.
      &         ra(3,j).lt.szog.or.ra(3,j).ge.szog+1d0/noz)then
@@ -84,16 +103,8 @@ c          read(12,*) tag(j),ra(1:3,j),va(1:3,j)
       enddo
       write(*,*)' Total number of atoms =',nlast
 
-
-100   write(*,*)' Overwrite pmd###-000 files? (y/n)'
-      read(*,*) key
-      if(key.eq.'n')then
-        stop
-      elseif(key.ne.'y')then
-        goto 100
-      endif
       
-      filename='pmd00000-0000'
+      filename='pmd00000'
       do i=0,nodesn-1
         myx=i/(nny*nnz)
         myy=mod(i/nnz,nny)

@@ -167,7 +167,7 @@ c.....Compress bvx/2 along x
 
       va(1:3,1:inc)= 0d0
 
-      call write_pmd0_ascii(15,'pmd00000-0000','replace',inc,tag
+      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag
      &     ,ra,va,h,eki,epi,strs)
       
 c-----output 'kvs000' for KVS visualization

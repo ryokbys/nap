@@ -4,7 +4,7 @@ c  Make atom configuration file of bcc-Fe nanorod
 c-----------------------------------------------------------------------
 c  OUTPUT
 c  ------
-c    - pmd000-000
+c    - pmd00000
 c-----------------------------------------------------------------------
       implicit none
       include "./params_unit.h"
@@ -150,18 +150,10 @@ c-----scale velocities to reduced unit
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
       
-cc-----output 'pmd000-000' for pmd run
-c      open(15,file='pmd000-000',form='formatted',status='replace')
-c      write(15,'(i10)')inc
-c      write(15,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-c      do i=1,inc
-c        write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
-c      enddo
-c      close(15)
-      call write_pmd0_ascii(15,'pmd000-000','replace',inc,tag,ra,va
+      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va
      &     ,h,eki,epi,strs)
 
-      open(20,file='akr000',status='replace')
+      open(20,file='akr0000',status='replace')
       write(20,'(4i8)') inc, 5, 0, 0
       write(20,'(3es15.7)') h(1,1:3,0)
       write(20,'(3es15.7)') h(2,1:3,0)

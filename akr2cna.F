@@ -10,15 +10,15 @@ c-----------------------------------------------------------------------
 c-----max num of neighbors; 12 is enough
       integer,parameter:: nnmax = 100
 cc.....Cutoff radius for LJ-Ar FCC, halfway between 1st and 2nd N.N.
-cc      real(8),parameter:: rc    = 3.36d-10 /0.5291772d-10
-c      real(8),parameter:: rc    = 3.5d-10 /0.5291772d-10
+cc      real(8),parameter:: rc    = 3.36d0
+c      real(8),parameter:: rc    = 3.5d0
 cc.....Cutoff radius for BCC Fe, halfway between 2nd and 3rd N.N.
-c      real(8),parameter:: abcc = 2.835d-10/0.5291772d-10
+c      real(8),parameter:: abcc = 2.835d0
 c.....Cutoff radius for BCC W, halfway between 2nd and 3rd N.N.
 cc.....W @1000K = 3.226d-10
-c      real(8),parameter:: abcc = 3.226d-10/0.5291772d-10
+c      real(8),parameter:: abcc = 3.226d0
 c.....W @0K = 3.171d-10
-      real(8),parameter:: abcc = 3.204d-10/0.5291772d-10
+      real(8),parameter:: abcc = 3.204d0
       real(8),parameter:: rc   = 0.5d0*(1d0+1.41421356d0)*abcc
 
       integer:: i,n,itmp,nauxdat,j,ix,iy,iz,m
@@ -27,12 +27,24 @@ c.....W @0K = 3.171d-10
       integer,allocatable:: lsa(:),lspr(:,:),itype(:),itag(:),itag1(:)
       real(8),allocatable:: ra0(:,:),ra1(:,:),ra(:,:),auxdat0(:,:)
      &     ,auxdat(:,:)
+      integer nargc
+      integer,external:: iargc
+      character*128:: ciname,coname
+
+c.....Read an argument, ipmd
+      nargc=iargc()
+      if( nargc.ne.2 ) then
+        stop 'Usage: $ ./akr2cna akr0000 cna0000'
+      endif
+      call getarg(1,ciname)
+      call getarg(2,coname)
 
 c-----read akr file from STDIN
-      read(5,*) natm0,nauxdat
-      read(5,*) al(1),tmp,tmp
-      read(5,*) tmp,al(2),tmp
-      read(5,*) tmp,tmp,al(3)
+      open(10,file=trim(ciname),status="old")
+      read(10,*) natm0,nauxdat
+      read(10,*) al(1),tmp,tmp
+      read(10,*) tmp,al(2),tmp
+      read(10,*) tmp,tmp,al(3)
       ncpx=1
       ncpy=1
       ncpz=1
@@ -56,8 +68,9 @@ c      write(6,'(a,3i6)') 'ncpx,ncpy,ncpz=',ncpx,ncpy,ncpz
      &     ,auxdat0(nauxdat,natm0),itype(natm0),itag(natm0)
      &     ,ra1(3,natm1),itag1(natm1))
       do i=1,natm0
-        read(5,*) itag(i),ra0(1:3,i),auxdat0(1:nauxdat,i)
+        read(10,*) itag(i),ra0(1:3,i),auxdat0(1:nauxdat,i)
       enddo
+      close(10)
       m=0
       do ix=0,ncpx-1
         do iy=0,ncpy-1
@@ -72,6 +85,7 @@ c      write(6,'(a,3i6)') 'ncpx,ncpy,ncpz=',ncpx,ncpy,ncpz
           enddo
         enddo
       enddo
+      
 
 c-----prepare for linked-list
       nx=max(1,int(al1(1)/rc))
@@ -92,15 +106,17 @@ c-----common neighbor analysis
       call cna(natm0,natm1,nnmax,lspr,itag1,ra0,auxdat0,nauxdat
      &     ,natm,ra,auxdat,itype)
 
-c-----write akr file to STDOUT
-      write(6,'(i10,3i4)') natm,nauxdat,0,0
-      write(6,'(3es12.4)') al(1),0d0,0d0
-      write(6,'(3es12.4)') 0d0,al(2),0d0
-      write(6,'(3es12.4)') 0d0,0d0,al(3)
+c-----write cna file 
+      open(11,file=trim(coname),status="replace")
+      write(11,'(i10,3i4)') natm,nauxdat,0,0
+      write(11,'(3es12.4)') al(1),0d0,0d0
+      write(11,'(3es12.4)') 0d0,al(2),0d0
+      write(11,'(3es12.4)') 0d0,0d0,al(3)
       do i=1,natm
-        write(6,'(i4,3es15.7,17es10.2)')
+        write(11,'(i4,3es15.7,17es10.2)')
      &       itype(i),ra(1:3,i),auxdat(1:nauxdat,i)
       enddo
+      close(11)
 
       end program akr2cna
 c=======================================================================

@@ -3,8 +3,8 @@ c-----------------------------------------------------------------------
 c  Create a BCC crystal with W and He atoms
 c-----------------------------------------------------------------------
 c  OUTPUT:
-c    - pmd000-000
-c    - akr000
+c    - pmd00000
+c    - akr0000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
       include './params_unit.h'
@@ -93,7 +93,7 @@ c.....T-site
 
       write(6,'(a,i10)') " natm=",inc
 
-      call write_pmd0_ascii(15,'pmd00000-0000','replace',inc,tag,ra,va,h
+      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
       
 c-----output 'akr000' for Akira visualization

@@ -3,8 +3,8 @@
 !  Create a BCC crystal with Fe and H atoms
 !-----------------------------------------------------------------------
 !  OUTPUT:
-!    - pmd000-000
-!    - akr000
+!    - pmd00000
+!    - akr0000
 !-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
       include './params_unit.h'
@@ -88,9 +88,9 @@
 
       va(1:3,1:inc)= 0d0
 
-      call write_pmd0_ascii(15,'pmd00000-0000','replace',inc,tag,ra,va,h &
+      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va,h &
            ,eki,epi,strs)
-!!$      call write_pmd0_bin(15,'pmd00000-0000','replace',inc,tag,ra,va,h &
+!!$      call write_pmd0_bin(15,'pmd00000','replace',inc,tag,ra,va,h &
 !!$           ,eki,epi,strs)
       
 !-----output 'akr000' for Akira visualization

@@ -26,11 +26,11 @@ c.....Num of auxiliary data for coloring atoms in Akira
       do ipmd=0,npmd
         n= 0
         do inode=0,nnodes-1
-          fin="pmd00000-0000"
+          fin="0000/pmd00000"
 c---------about node number
-          write(fin(4:8),'(i5.5)') inode
+          write(fin(9:13),'(i5.5)') inode
 c---------about pmd-step number
-          write(fin(10:13),'(i4.4)') ipmd
+          write(fin(1:4),'(i4.4)') ipmd
 c---------read pmd###-$$$ file
           if( trim(ciofmt).eq.'bin'.or.trim(ciofmt).eq.'binary' ) then
             call read_pmd_bin(20,fin

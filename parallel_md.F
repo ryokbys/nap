@@ -139,10 +139,10 @@ c-----reduced node origin
 c.....Each node opens one MD-configuration file
       write(cnode(1:5),'(i5.5)') myid_md
       if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-        call read_pmd_bin(20,"pmd"//cnode//"-0000"
+        call read_pmd_bin(20,"0000/pmd"//cnode
      &       ,namax,natm,h,tag,ra,va,eki,epi,strs)
       else if( trim(ciofmt).eq.'ascii' ) then
-        call read_pmd_ascii(20,"pmd"//cnode//"-0000"
+        call read_pmd_ascii(20,"0000/pmd"//cnode
      &     ,namax,natm,h,tag,ra,va,eki,epi,strs)
       endif
       if( myid_md.eq.0 ) then
@@ -274,11 +274,12 @@ c-----initialize the counter for output
      &     ,nismax,epot0)
 c-----output initial configuration
       if( ifpmd.eq.1 ) then
+        call system("mkdir -p "//cnum)
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-          call write_pmd_bin(20,"pmd"//cnode//"-"//cnum
+          call write_pmd_bin(20,cnum//"/pmd"//cnode
      &         ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
         elseif( trim(ciofmt).eq.'ascii' ) then
-          call write_pmd_ascii(20,"pmd"//cnode//"-"//cnum
+          call write_pmd_ascii(20,cnum//"/pmd"//cnode
      &         ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
         endif
       endif
@@ -511,12 +512,13 @@ c-------write the particle positions
 c---------decide pmd-file name
           iocntpmd=iocntpmd+1
           write(cnum(1:4),'(i4.4)') iocntpmd
+          call system("mkdir -p "//cnum)
 c---------write pmd file for Akira
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-            call write_pmd_bin(20,"pmd"//cnode//"-"//cnum
+            call write_pmd_bin(20,cnum//"/pmd"//cnode
      &           ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
           elseif( trim(ciofmt).eq.'ascii' ) then
-            call write_pmd_ascii(20,"pmd"//cnode//"-"//cnum
+            call write_pmd_ascii(20,cnum//"/pmd"//cnode
      &           ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
           endif
         endif

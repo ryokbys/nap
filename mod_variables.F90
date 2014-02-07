@@ -2,6 +2,9 @@
     implicit none
     save
 
+!=======================================================================
+! PARAMETERS
+!=======================================================================
 !.....max. num. of atoms
     integer,parameter:: namax = 100000
 !.....max. num. of species
@@ -11,6 +14,9 @@
 !.....max. num. of neighbors
     integer,parameter:: nnmax = 200
 
+!=======================================================================
+! VARIABLES
+!=======================================================================
     integer:: nstp,nouterg,noutpmd,istp,nerg &
          ,ifpmd,npmd,iftctl,ifdmp,iocntpmd,iocnterg
     integer:: natm,nb,ntot,nis,ndof

@@ -38,6 +38,7 @@ c=======================================================================
       subroutine write_pmd_bin(ionum,cfname
      &     ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
       implicit none
+      include './params_unit.h'
       integer,intent(in):: ionum
       character(len=*),intent(in) :: cfname
       integer,intent(in):: natm
@@ -52,7 +53,7 @@ c=======================================================================
       write(ionum) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       write(ionum) (tag(i),ra(1:3,i)+sorg(1:3),va(1:3,i)/dt
      &     ,eki(1,1,i)+eki(2,2,i)+eki(3,3,i)
-     &     ,epi(i),strs(1:3,1:3,i)*2.94d+4,i=1,natm)
+     &     ,epi(i),strs(1:3,1:3,i)*up2gpa,i=1,natm)
       close(ionum)
 
       end subroutine write_pmd_bin
@@ -81,6 +82,7 @@ c=======================================================================
       subroutine write_pmd_ascii(ionum,cfname
      &     ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
       implicit none
+      include './params_unit.h'
       integer,intent(in):: ionum
       character(len=*),intent(in) :: cfname
       integer,intent(in):: natm
@@ -95,7 +97,7 @@ c=======================================================================
       write(ionum,'(7es23.14e3,11es22.14)') (tag(i),ra(1:3,i)+sorg(1:3)
      &     ,va(1:3,i)/dt
      &     ,eki(1,1,i)+eki(2,2,i)+eki(3,3,i)
-     &     ,epi(i),strs(1:3,1:3,i)*2.94d+4,i=1,natm)
+     &     ,epi(i),strs(1:3,1:3,i)*up2gpa,i=1,natm)
       close(ionum)
 
       end subroutine write_pmd_ascii

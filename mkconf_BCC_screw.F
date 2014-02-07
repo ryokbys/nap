@@ -9,8 +9,8 @@ c  wrong boundary condition rather than dislocation dipole config.
 c-----------------------------------------------------------------------
 c  Output
 c  ------
-c    * pmd000-000
-c    * akr000
+c    * pmd00000
+c    * akr0000
 c-----------------------------------------------------------------------
       implicit none
       include './params_unit.h'
@@ -98,7 +98,7 @@ c-----scale velocities to reduced unit
       enddo
 
 c.....output 'akr000' for Akira visualization
-      open(15,file='akr000',form='formatted',status='replace')
+      open(15,file='akr0000',form='formatted',status='replace')
       write(15,'(i10,3i5)') natm, 3, 0, 0
       write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
       do i=1,natm
@@ -125,7 +125,7 @@ c.....output 'pmdref'
         if( ra(3,i).lt.0d0 ) ra(3,i)=ra(3,i)+1d0
       enddo
 
-      call write_pmd0_ascii(15,'pmd000-000','replace',natm,tag,ra,va,h
+      call write_pmd0_ascii(15,'pmd00000','replace',natm,tag,ra,va,h
      &     ,eki,epi,strs)
       
       

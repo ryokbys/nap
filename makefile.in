@@ -27,6 +27,7 @@ MPIFLAGS= @FCFLAGS@
 pmd= read_input.o parallel_md.o util_vec.o \
 	lasubs.o util_pmd.o tensile_loading.o
 mods= mod_variables.o
+args= iargc.o getarg.o
 
 forces= force_Ramas_FeH.o force_RK_FeH.o force_common.o force_RK_WHe.o \
 	  force_Ito3_WHe.o force_LJ_Ar.o force_SW_Si.o force_EDIP_Si.o \

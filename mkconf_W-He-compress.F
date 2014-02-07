@@ -3,8 +3,8 @@ c-----------------------------------------------------------------------
 c  Create a BCC tungsten(W) crystal, He gas and vacuum region.
 c-----------------------------------------------------------------------
 c  OUTPUT:
-c    - pmd000-000
-c    - akr000
+c    - pmd00000
+c    - akr0000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
       include './params_unit.h'
@@ -81,7 +81,7 @@ c              if( iz.eq.nvac(3)+nhe(3)+nuc(3)-1 ) ifmv=2
 
       va(1:3,1:inc)= 0d0
 
-      call write_pmd0_ascii(15,'pmd00000-0000','replace',inc,tag,ra,va,h
+      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
       
 c-----output 'akr000' for Akira visualization

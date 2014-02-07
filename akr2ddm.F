@@ -14,9 +14,9 @@ c-----------------------------------------------------------------------
 c-----max num of neighbors; 12 is enough
       integer,parameter:: nnmax = 100
 cc.....Lattice constant for BCC W
-c      real(8),parameter:: abcc = 3.171d-10/0.5291772d-10
+c      real(8),parameter:: abcc = 3.171d0
 c.....Lattice constant for BCC Fe
-      real(8),parameter:: abcc = 2.835d-10/0.5291772d-10
+      real(8),parameter:: abcc = 2.835d0
 c.....Cutoff radius: halfway between 1st and 2nd N.N.
       real(8),parameter:: rc   = 0.5d0*(1d0+sqrt(3d0)/2)*abcc
 c.....Cutoff radius: halfway between 2nd and 3rd N.N.
@@ -43,7 +43,7 @@ c.....width,height of the paper
       character*128:: cin,cout
 
       nargc= iargc()
-      if( nargc.ne.1 ) stop ' [Usage] ./ark2ddm akr000'
+      if( nargc.ne.1 ) stop ' [Usage] ./ark2ddm akr0000'
       call getarg(1,cin)
 
 

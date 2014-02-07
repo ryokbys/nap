@@ -9,10 +9,10 @@ c-----------------------------------------------------------------------
 c-----max num of neighbors; 12 is enough
       integer,parameter:: nnmax = 20
 cc.....Cutoff radius for LJ-Ar FCC, halfway between 1st and 2nd N.N.
-cc      real(8),parameter:: rc    = 3.36d-10 /0.5291772d-10
-c      real(8),parameter:: rc    = 3.5d-10 /0.5291772d-10
+cc      real(8),parameter:: rc    = 3.36d0
+c      real(8),parameter:: rc    = 3.5d0
 c.....Cutoff radius for BCC Fe, halfway between 1st and 2nd N.N.
-      real(8),parameter:: abcc = 2.8533d-10/0.5291772d-10
+      real(8),parameter:: abcc = 2.8533d0
       real(8),parameter:: rc   = 0.5d0*(1d0+0.866025d0)*abcc
 
       integer:: i,n,itmp,nauxdat,j
@@ -21,17 +21,30 @@ c.....Cutoff radius for BCC Fe, halfway between 1st and 2nd N.N.
       integer,allocatable:: lsa(:),lspr(:,:)
       real(8),allocatable:: ra0(:,:),ra(:,:),auxdat0(:,:)
      &     ,auxdat(:,:),cspi(:)
+      integer nargc
+      integer,external:: iargc
+      character*128:: ciname,coname
 
-c-----read akr file from STDIN
-      read(5,*) natm0,nauxdat
-      read(5,*) h(1,1:3)
-      read(5,*) h(2,1:3)
-      read(5,*) h(3,1:3)
+c.....Read an argument, ipmd
+      nargc=iargc()
+      if( nargc.ne.2 ) then
+        stop 'Usage: $ ./akr2csp akr0000 csp0000'
+      endif
+      call getarg(1,ciname)
+      call getarg(2,coname)
+
+c-----read akr file
+      open(10,file=trim(ciname),status="old")
+      read(10,*) natm0,nauxdat
+      read(10,*) h(1,1:3)
+      read(10,*) h(2,1:3)
+      read(10,*) h(3,1:3)
       allocate(ra0(3,natm0),ra(3,natm0),auxdat(nauxdat,natm0)
      &     ,auxdat0(nauxdat,natm0),cspi(natm0))
       do i=1,natm0
-        read(5,*) itmp,ra0(1:3,i),auxdat0(1:nauxdat,i)
+        read(10,*) itmp,ra0(1:3,i),auxdat0(1:nauxdat,i)
       enddo
+      close(10)
 
 c-----prepare for linked-list
       nx=int(h(1,1)/rc)
@@ -52,15 +65,17 @@ c-----common neighbor analysis
       call csp(natm0,nnmax,lspr,h,ra0,auxdat0,nauxdat
      &     ,natm,ra,auxdat,cspi)
 
-c-----write akr file to STDOUT
-      write(6,'(i10,3i4)') natm,nauxdat+1,0,0
-      write(6,'(3es15.7)') h(1,1:3)
-      write(6,'(3es15.7)') h(2,1:3)
-      write(6,'(3es15.7)') h(3,1:3)
+c-----write csp file
+      open(11,file=trim(coname),status="replace")
+      write(11,'(i10,3i4)') natm,nauxdat+1,0,0
+      write(11,'(3es15.7)') h(1,1:3)
+      write(11,'(3es15.7)') h(2,1:3)
+      write(11,'(3es15.7)') h(3,1:3)
       do i=1,natm
-        write(6,'(i4,20es11.3)') 1,ra(1:3,i)
+        write(11,'(i4,20es11.3)') 1,ra(1:3,i)
      &       ,auxdat(1:nauxdat,i),cspi(i)
       enddo
+      close(11)
 
       end program akr2csp
 c=======================================================================

@@ -110,19 +110,19 @@ c-----scale velocities to reduced unit
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
       
-cc-----output 'pmd000-000' for MD program
-c      open(15,file='pmd000-000',form='unformatted',status='replace')
+cc-----output 'pmd00000' for MD program
+c      open(15,file='pmd00000',form='unformatted',status='replace')
 c      write(15,'(i10)') inc
 c      write(15,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
 c      do i=1,inc
 c        write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
 c      enddo
 c      close(15)
-      call write_pmd(15,'pmd000-000','replace',inc,tag,ra,va,h
+      call write_pmd(15,'pmd00000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
 
-c-----output 'akr000' for Akira visualization
-      open(15,file='akr000',form='formatted',status='replace')
+c-----output 'akr0000' for Akira visualization
+      open(15,file='akr0000',form='formatted',status='replace')
       write(15,'(i10,3i5)') inc, 3, 0, 0
       write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
       do i=1,inc
