@@ -67,7 +67,7 @@ contains
       teds(1,2)= (teds(1,1)+teds(2,2))*0.5d0
       teds(2,1)= (teds(1,1)+teds(2,2))*0.5d0
 !-------check rc
-      if( int(rc).ne.int(max(teda(1,1),teda(2,2))) ) then
+      if( int(rc*100d0).ne.int(max(teda(1,1),teda(2,2))*100d0) ) then
         if(myid.eq.0) then
           write(6,'(1x,a)') "!!! Cutoff radius is not appropriate !!!"
           write(6,'(1x,a,es12.4)') "rc should be" &

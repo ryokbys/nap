@@ -210,6 +210,7 @@ c.....Calc forces
      &     ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,avol
      &     ,cforce)
+      epot= epot0
 
 #ifdef __SHEAR__
       call add_shear_stress(natm,ra,aa,tag,sorg,shrfx)

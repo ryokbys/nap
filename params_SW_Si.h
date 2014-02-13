@@ -2,8 +2,10 @@
       real(8),parameter:: am_si = 28.0855d0
 !-----SW unit energy in eV
       real(8),parameter:: swe   = 2.17d0
+!.....length scaling factor for matching this potential to VASP
+      real(8),parameter:: sfac  = 1.0062662d0
 !-----SW unit length in Ang
-      real(8),parameter:: swl   = 2.0951d0
+      real(8),parameter:: swl   = 2.0951d0*sfac
 !-----si-si
       real(8),parameter:: swa   = 7.049556277d0
       real(8),parameter:: swb   = 0.6022245584d0
