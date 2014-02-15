@@ -230,11 +230,11 @@ contains
 
 !-----send back (3-body)forces, stresses, and potentials on immigrants
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+         ,nn,mpi_world,strs,9)
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
          ,nn,mpi_world,aa3,3)
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
          ,nn,mpi_world,epi,1)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,strs,9)
 
 !-----sum
     aa(1:3,1:natm)= -aa2(1:3,1:natm) -aa3(1:3,1:natm)
