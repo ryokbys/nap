@@ -41,21 +41,24 @@ params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
     params_SM_Al.h
 
 #-----mkconf program selection
-#mkconf= mkconf_fcc.o
-# mkconf= mkconf_fcc_droplet.o
-# mkconf= mkconf_Al_fcc.o
-# mkconf= mkconf_Al_FCC_edge-disl.o
-# mkconf= mkconf_2D_2kind.o
-# mkconf= mkconf_2D_edge_disl.o
-# mkconf= mkconf_Al_fcc_nanorod.o
-# mkconf= mkconf_Si111_2lc.o
-# mkconf= mkconf_BCC.o
-# mkconf= mkconf_BCC_nanorod.o
-# mkconf= mkconf_BCC_Fe-H.o
-# mkconf= mkconf_BCC_edge-disl.o
-# mkconf= mkconf_BCC_screw.o
-mkconf= mkconf_BCC_W-He.o
-# mkconf= mkconf_W-He-compress.o
+mkconf_fcc= mkconf_fcc.o
+mkconf_fcc_droplet= mkconf_fcc_droplet.o
+mkconf_Al_fcc= mkconf_Al_fcc.o
+mkconf_Al_FCC_edge= mkconf_Al_FCC_edge-disl.o
+mkconf_2D_2kind= mkconf_2D_2kind.o
+mkconf_2D_edge_disl= mkconf_2D_edge_disl.o
+mkconf_Al_fcc_nanorod= mkconf_Al_fcc_nanorod.o
+mkconf_Si111_2lc= mkconf_Si111_2lc.o
+mkconf_Si_bulk= mkconf_Si_bulk.o
+mkconf_Si_disl_screw_60= mkconf_Si_disl_screw_60.o
+mkconf_BCC= mkconf_BCC.o
+mkconf_BCC_nanorod= mkconf_BCC_nanorod.o
+mkconf_BCC_FeH= mkconf_BCC_Fe-H.o
+mkconf_BCC_edge= mkconf_BCC_edge-disl.o
+mkconf_BCC_screw= mkconf_BCC_screw.o
+mkconf_BCC_WHe= mkconf_BCC_W-He.o
+mkconf_WHe_compress= mkconf_W-He-compress.o
+mkconf_W_surface_migrate= mkconf_W_surface_migrate.o
 
 #-----------------------------------------------------------------------
 # Post process programs
@@ -66,26 +69,20 @@ pmd2akr= pmd2akr.o read_input.o util_pmd.o sort.o
 #-----------------------------------------------------------------------
 # Make rule entries
 #
-execs=10mkconf 20nconv pmd 40combine pmd2akr akr2cna sortpmd
+execs=nconv pmd combine pmd2akr akr2cna sortpmd
 
 all: ${execs}
 
 clean:
 	rm -f *.o *.mod *~ ${execs}
 
-install: pmd 10mkconf 20nconv
-	cp pmd 10mkconf 20nconv ../
-
-10mkconf: ${mkconf} util_pmd.o ${mods}
-	${MPIFC} -o $@ ${mods} ${mkconf} util_pmd.o
-
-20nconv: node_conv.o ${mods} read_input.o util_pmd.o
+nconv: node_conv.o ${mods} read_input.o util_pmd.o
 	${MPIFC} -o $@ ${mods} node_conv.o read_input.o util_pmd.o
 
 pmd: ${mods} ${pmd} ${forces} ${params}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmd}
 
-40combine: ${comb} ${mods}
+combine: ${comb} ${mods}
 	${MPIFC} -o $@  ${mods} ${comb}
 
 pmd2akr: ${pmd2akr} ${mods}
@@ -117,6 +114,44 @@ boxsize: change_pmd_boxsize.o ${mods} util_pmd.o
 
 sortpmd: sort_pmd.o ${mods} util_pmd.o sort.o
 	${MPIFC} -o $@ sort_pmd.o ${mods} util_pmd.o sort.o
+
+#.....mkconfs
+mkconf_fcc: ${mkconf_fcc} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_fcc} util_pmd.o
+
+mkconf_Al_fcc: ${mkconf_Al_fcc} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_Al_fcc} util_pmd.o
+
+mkconf_Al_FCC_edge: ${mkconf_Al_FCC_edge} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_Al_FCC_edge} util_pmd.o
+
+mkconf_2D_edge_disl: ${mkconf_2D_edge_disl} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_2D_edge_disl} util_pmd.o
+
+mkconf_Al_fcc_nanorod: ${mkconf_Al_fcc_nanorod} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_Al_fcc_nanorod} util_pmd.o
+
+mkconf_Si_bulk: ${mkconf_Si_bulk} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_Si_bulk} util_pmd.o
+
+mkconf_Si_disl_screw_60: ${mkconf_Si_disl_screw_60} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_Si_disl_screw_60} util_pmd.o
+
+mkconf_BCC: ${mkconf_BCC} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_BCC} util_pmd.o
+
+mkconf_BCC_FeH: ${mkconf_BCC_FeH} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_BCC_FeH} util_pmd.o
+
+mkconf_BCC_edge: ${mkconf_BCC_edge} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_BCC_edge} util_pmd.o
+
+mkconf_BCC_screw: ${mkconf_BCC_screw} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_BCC_screw} util_pmd.o
+
+mkconf_BCC_WHe: ${mkconf_BCC_WHe} util_pmd.o ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_BCC_WHe} util_pmd.o
+
 
 #.....Dependencies
 parallel_md.o: ${mods} ${forces}
