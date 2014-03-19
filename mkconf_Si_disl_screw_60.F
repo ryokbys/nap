@@ -9,7 +9,7 @@ c  This configuration allows us to make screw or 60 dislocation.
 c-----------------------------------------------------------------------
 c  OUTPUT
 c  ------
-c    * pm00000-0000
+c    * pm00000
 c    * akr0000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
@@ -43,6 +43,24 @@ c.....outfile
  2    write(6,'(a)') ' Input cylinder radius in Angstrom:'
       read(5,*) radius
 
+c-----be: equilibrium bond length: 2.35 Ang
+      be= 2.35d0
+c.....al: length of an edge of conventional cubic cell
+      al= 4d0*be/sqrt(3d0)
+c-----simulation box size
+      h(1:3,1:3,0:1)= 0d0
+      h(1,1,0)= nuc(1) *al *sqrt(6d0)/2
+      h(2,2,0)= nuc(2) *al *sqrt(3d0)
+      h(3,3,0)= nuc(3) *al *sqrt(2d0)/2
+      
+      if( h(1,1,0).lt.2*radius .or. h(2,2,0).lt.2*radius )then
+        write(6,'(a)') ' [Error] h(1,1,0) or h(2,2,0) is too small !!!'
+        write(6,'(a,es12.4)') '  h(1,1,0) =',h(1,1,0)
+        write(6,'(a,es12.4)') '  h(2,2,0) =',h(2,2,0)
+        write(6,'(a,es12.4)') '  2*radius =',2*radius
+        goto 1
+      endif
+
  10   write(6,'(a)') ' Choose (1) shuffle or (2) glide:'
       read(5,*) ifshffl
       if( ifshffl.eq.1 ) then ! shuffl
@@ -59,12 +77,7 @@ c.....Center position in normalized unit
         goto 10
       endif
 
-c-----be: equilibrium bond length: 2.35 Ang
-      be= 2.35d0
-c.....al: length of an edge of conventional cubic cell
-      al= 4d0*be/sqrt(3d0)
-
- 20   write(6,'(a)') ' Choose (1) screw or (2) 60 degree:'
+ 20   write(6,'(a)') ' Choose (0) bulk, (1) screw or (2) 60 degree:'
       read(5,*) iangle
 c.....Burgers vector
       bv= al *sqrt(2d0)/2
@@ -75,6 +88,9 @@ c.....screw or 60 dislocation
       else if( iangle .eq. 2 ) then ! 60 degree
         bvx= bv *sqrt(3d0)/2
         bvz= bv /2
+      else if( iangle .eq. 0 ) then
+        bvx= 0d0
+        bvz= 0d0
       else
         write(6,'(a)') ' [Error] iangle must be (1) screw or (2) 60 !!'
         goto 20
@@ -89,11 +105,6 @@ c.....screw or 60 dislocation
       write(10,'(a,3es12.4)') ' cubic diamond edge length=',al
 
 
-c-----simulation box size
-      h(1:3,1:3,0:1)= 0d0
-      h(1,1,0)= nuc(1) *al *sqrt(6d0)/2
-      h(2,2,0)= nuc(2) *al *sqrt(3d0)
-      h(3,3,0)= nuc(3) *al *sqrt(2d0)/2
       write(6,'(a)') ' h-matrix:'
       write(6,'(2x,3es12.4)') h(1,1:3,0)
       write(6,'(2x,3es12.4)') h(2,1:3,0)
@@ -150,7 +161,8 @@ c.....Normalized Burgers vector in x- and z-direction
 c.....Introduce dislocation by subtracting one atomic layer from
 c.....lower half of the system.
               if( xi(2).lt.yc .and.
-     &             xi(1).gt.xc-bvxn/2 .and. xi(1).lt.xc+bvxn/2 ) cycle
+c     &             xi(1).gt.xc-bvxn/2 .and. xi(1).lt.xc+bvxn/2 ) cycle
+     &             xi(1).gt.xc .and. xi(1).lt.xc+bvxn ) cycle
 c.....Displace only bottom half atoms to remove the space where atoms
 c.....are eliminated. (See, my note on 2014-01-30)
               if( xi(2).lt.yc ) then
@@ -167,18 +179,10 @@ c.....are eliminated. (See, my note on 2014-01-30)
 c.....Displace atoms according to dislocation theory,
 c.....only atoms far from the core
               du(1:3)= 0d0
-c                du(1)= bvx/twopi *(atan(y/x)
-c     &               +x*y/2/(1d0-anu)/(x**2+y**2)
-c     &               )
-c                du(2)= bvx/twopi
-c     &               *((1d0-2d0*anu)/4/(1d0-anu)*log(x**2+y**2)
-c     &               +(x**2-y**2)/2/(1-anu)/(x**2+y**2))
-c              theta= asin(y/r) +twopi
-c              if( x.lt.0d0 ) theta= theta -pi
               theta= get_theta(x,y,r)
+              if( theta .ge. twopi*0.75d0 ) theta=theta-twopi
               du(3)= bvzn/twopi *theta
      &             *atan(r/2/bv*(-tan04pi))/(pi/2)
-              write(10,'(5es12.4)') x,y,r,theta,du(3)
               xi(3)= xi(3) +du(3)
 c.....Store xmin and xmax
               xmin= min(xmin,xi(1))

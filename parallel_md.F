@@ -1337,10 +1337,10 @@ c-----------------------------------------------------------------------
       real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
       logical,save:: l1st=.true.
 
-      if( l1st ) then
+c      if( l1st ) then
         allocate(dbuf(ndim,nbmax),dbufr(ndim,nbmax))
-        l1st=.false.
-      endif
+c        l1st=.false.
+c      endif
 
 c-----natmx
       natmx= natm +nb
@@ -1398,7 +1398,8 @@ c-----check
         write(6,'(a,2i8)') "nsdbk,nb=",nsdbk,nb
         stop "error: nsdbk.ne.nb!!"
       endif
-      
+
+      deallocate(dbuf,dbufr)
       end subroutine copy_dba_bk
 c=======================================================================
       function bbd(xv,yv,zv,rcav,rcbv,rccv,ku,anxi,anyi,anzi)

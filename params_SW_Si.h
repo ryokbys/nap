@@ -1,7 +1,7 @@
 !-----Si mass (to be multiplied by umass)
       real(8),parameter:: am_si = 28.0855d0
 !-----SW unit energy in eV
-      real(8),parameter:: swe   = 2.17d0
+      real(8),parameter:: swe   = 2.1678d0
 !.....length scaling factor for matching this potential to VASP
       real(8),parameter:: sfac  = 1.0062662d0
 !-----SW unit length in Ang

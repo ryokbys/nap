@@ -12,7 +12,7 @@ c-----------------------------------------------------------------------
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
-      integer,parameter:: nuc(1:3)= (/ 3, 3, 3 /)
+      integer,parameter:: nuc(1:3)= (/ 3,3,3 /)
 c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
       real(8):: ua(3,10)
@@ -62,10 +62,10 @@ c-----simulation box size
               si(3)= (ua(3,m)+dble(iz))/(nuc(3)+nvac(3)) +small
               si(1:3)= si(1:3)
      &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
-              si(2)= si(2)+0.5d0/h(1,1,0)*exp(-(si(1)-0.5d0)**2/0.005d0)
-c     &             *sin(q*(si(1)-0.5d0)*h(1,1,0))
-              write(10,'(2es12.4)') si(1)
-     &             ,0.5d0/h(1,1,0) *exp(-(si(1)-0.5d0)**2/0.005d0)
+c              si(2)= si(2)+0.5d0/h(1,1,0)*exp(-(si(1)-0.5d0)**2/0.005d0)
+cc     &             *sin(q*(si(1)-0.5d0)*h(1,1,0))
+c              write(10,'(2es12.4)') si(1)
+c     &             ,0.5d0/h(1,1,0) *exp(-(si(1)-0.5d0)**2/0.005d0)
               ra(1:3,inc)= si(1:3)
               is= 1
               ifmv= 1
@@ -105,5 +105,5 @@ c=======================================================================
       end subroutine myrnd
 c-----------------------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make 10mkconf"
+c     compile-command: "make mkconf_Si_bulk"
 c     End:

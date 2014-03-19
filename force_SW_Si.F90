@@ -56,7 +56,8 @@ contains
         write(6,'(a,es12.4)') ' rc of this potential='&
              ,max(tswrc(1,1),tswrc(2,2))*swl
       endif
-      if( int(rc).ne.int(max(tswrc(1,1),tswrc(2,2))*swl) ) then
+      if( int(rc*100d0) &
+           .ne.int(max(tswrc(1,1),tswrc(2,2))*swl*100d0) ) then
         if( myid.eq.0 ) then
           write(6,'(1x,a)') "!!! Cutoff radius is not appropriate !!!"
           write(6,'(1x,a,es12.4)') "rc should be" &
@@ -199,7 +200,7 @@ contains
 !-----------force
           dhrij= -sws *swt *vexp *tcsn2 *drijc*drijc
           dhrik= -sws *swt *vexp *tcsn2 *drikc*drikc
-          dhcsn= 2d0 *sws *tcsn *vexp
+          dhcsn= 2d0 *sws *vexp *tcsn 
           do l=1,3
             drij= -xij(l)*riji
             drik= -xik(l)*riki
