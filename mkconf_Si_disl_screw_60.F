@@ -1,9 +1,14 @@
       program mkconf_Si_disl_scew_60
 c-----------------------------------------------------------------------
 c  Make atomic configuration of diamond structure with:
+c  (in case of screw or 60-degree)
 c    x: [-1, 2,-1]
 c    y: [ 1, 1, 1]
 c    z: [-1, 0, 1]
+c  (in case of 30-degree)
+c    x: [-1, 0, 1]
+c    y: [ 1, 1, 1]
+c    z: [ 1,-2, 1]
 c  and create dislocation at the center of the xy plane (z-direction).
 c  This configuration allows us to make screw or 60 dislocation.
 c-----------------------------------------------------------------------
@@ -21,9 +26,11 @@ c.....2*pi
       real(8),parameter:: twopi= 2d0 *pi
 c.....Poisson ratio
       real(8),parameter:: anu = 0.25d0
+c.....num of atoms in a unit cell
+      integer,parameter:: nacell = 24
 c.....outfile
       character:: cfout*10='out.mkconf'
-      real(8):: ua(3,12)
+      real(8):: ua(3,nacell)
       real(8):: ra(3,nmax)
       real(8):: h(3,3,0:1)
       real(8):: va(3,nmax)
@@ -47,11 +54,44 @@ c-----be: equilibrium bond length: 2.35 Ang
       be= 2.35d0
 c.....al: length of an edge of conventional cubic cell
       al= 4d0*be/sqrt(3d0)
-c-----simulation box size
+
+
+ 20   write(6,'(a)') ' Choose (0) bulk, (1) screw, (2) 60 degree,'
+     &     //' or (3) 30 degree:'
+      read(5,*) iangle
+c.....Burgers vector
+      bv= al *sqrt(2d0)/2
+c.....screw or 60 dislocation
+      if( iangle .eq. 1 ) then  ! screw
+        bvx= 0d0
+        bvz= bv
+      else if( iangle .eq. 2 ) then ! 60 degree
+        bvx= bv *sqrt(3d0)/2
+        bvz= bv /2
+      else if( iangle .eq. 3 ) then
+        bvx= bv /2
+        bvz= bv *sqrt(3d0)/2
+c        bvx= 0d0
+c        bvz= 0d0
+      else if( iangle .eq. 0 ) then
+        bvx= 0d0
+        bvz= 0d0
+      else
+        write(6,'(a)') ' [Error] iangle must be (1) screw or (2) 60 !!'
+        goto 20
+      endif
+
+c.....Simulation box size
       h(1:3,1:3,0:1)= 0d0
-      h(1,1,0)= nuc(1) *al *sqrt(6d0)/2
-      h(2,2,0)= nuc(2) *al *sqrt(3d0)
-      h(3,3,0)= nuc(3) *al *sqrt(2d0)/2
+      if( iangle.eq.3 ) then ! 30-degree
+        h(1,1,0)= nuc(1) *al *sqrt(2d0)
+        h(2,2,0)= nuc(2) *al *sqrt(3d0)
+        h(3,3,0)= nuc(3) *al *sqrt(6d0)/2
+      else
+        h(1,1,0)= nuc(1) *al *sqrt(6d0)/2
+        h(2,2,0)= nuc(2) *al *sqrt(3d0)
+        h(3,3,0)= nuc(3) *al *sqrt(2d0)/2
+      endif
       
       if( h(1,1,0).lt.2*radius .or. h(2,2,0).lt.2*radius )then
         write(6,'(a)') ' [Error] h(1,1,0) or h(2,2,0) is too small !!!'
@@ -63,37 +103,34 @@ c-----simulation box size
 
  10   write(6,'(a)') ' Choose (1) shuffle or (2) glide:'
       read(5,*) ifshffl
-      if( ifshffl.eq.1 ) then ! shuffl
+      if( iangle.eq.3 ) then
+        if( ifshffl.eq.1 ) then ! shuffl
 c.....Center position in normalized unit
-        xc= (5d0/12 +nuc(1)/2)/nuc(1)
-        yc= (11d0/24 +nuc(2)/2)/nuc(2)
-      else if( ifshffl.eq.2 ) then ! glide
+          xc= (1d0/8 +nuc(1)/2)/nuc(1)
+          yc= (5.5d0/12 +nuc(2)/2)/nuc(2)
+        else if( ifshffl.eq.2 ) then ! glide
 c.....Center position in normalized unit
-        xc= (0.5d0 +nuc(1)/2)/nuc(1)
-        yc= (15d0/24 +nuc(2)/2)/nuc(2)
+          xc= (1d0/8 +nuc(1)/2)/nuc(1)
+          yc= (3.5d0/12 +nuc(2)/2)/nuc(2)
+        else
+          write(6,'(a)') ' [Error] ifshffl must be (1) shuffle'
+     &         //' or (2) glide !!!'
+          goto 10
+        endif
       else
-        write(6,'(a)') ' [Error] ifshffl must be (1) shuffle'
-     &       //' or (2) glide !!!'
-        goto 10
-      endif
-
- 20   write(6,'(a)') ' Choose (0) bulk, (1) screw or (2) 60 degree:'
-      read(5,*) iangle
-c.....Burgers vector
-      bv= al *sqrt(2d0)/2
-c.....screw or 60 dislocation
-      if( iangle .eq. 1 ) then  ! screw
-        bvx= 0d0
-        bvz= bv
-      else if( iangle .eq. 2 ) then ! 60 degree
-        bvx= bv *sqrt(3d0)/2
-        bvz= bv /2
-      else if( iangle .eq. 0 ) then
-        bvx= 0d0
-        bvz= 0d0
-      else
-        write(6,'(a)') ' [Error] iangle must be (1) screw or (2) 60 !!'
-        goto 20
+        if( ifshffl.eq.1 ) then ! shuffl
+c.....Center position in normalized unit
+          xc= (5d0/12 +nuc(1)/2)/nuc(1)
+          yc= (11d0/24 +nuc(2)/2)/nuc(2)
+        else if( ifshffl.eq.2 ) then ! glide
+c.....Center position in normalized unit
+          xc= (0.5d0 +nuc(1)/2)/nuc(1)
+          yc= (15d0/24 +nuc(2)/2)/nuc(2)
+        else
+          write(6,'(a)') ' [Error] ifshffl must be (1) shuffle'
+     &         //' or (2) glide !!!'
+          goto 10
+        endif
       endif
 
       write(6,'(a,3es12.4)') ' bond length=',be
@@ -114,19 +151,46 @@ c.....screw or 60 dislocation
       write(10,'(2x,3es12.4)') h(2,1:3,0)
       write(10,'(2x,3es12.4)') h(3,1:3,0)
 
+      if( iangle.eq.3 ) then ! 30-degree
+        ua(1:3,1 )=(/2.50E-01, 0.000000E+00, 2.50000E-01 *2/)
+        ua(1:3,2 )=(/2.50E-01, 2.500000E-01, 2.50000E-01 *2/)
+        ua(1:3,3 )=(/5.00E-01, 0.000000E+00, 0.00000E+00 *2/)
+        ua(1:3,4 )=(/5.00E-01, 2.500000E-01, 0.00000E+00 *2/)
+        ua(1:3,5 )=(/0.00E+00, 0.000000E+00, 0.00000E+00 *2/)
+        ua(1:3,6 )=(/0.00E+00, 3.333333E-01, 1.66667E-01 *2/)
+        ua(1:3,7 )=(/0.00E+00, 2.500000E-01, 0.00000E+00 *2/)
+        ua(1:3,8 )=(/0.00E+00, 5.833333E-01, 1.66667E-01 *2/)
+        ua(1:3,9 )=(/7.50E-01, 0.000000E+00, 2.50000E-01 *2/)
+        ua(1:3,10)=(/7.50E-01, 2.500000E-01, 2.50000E-01 *2/)
+        ua(1:3,11)=(/2.50E-01, 3.333333E-01, 4.16667E-01 *2/)
+        ua(1:3,12)=(/7.50E-01, 3.333333E-01, 4.16667E-01 *2/)
+        ua(1:3,13)=(/2.50E-01, 5.833333E-01, 4.16667E-01 *2/)
+        ua(1:3,14)=(/7.50E-01, 5.833333E-01, 4.16667E-01 *2/)
+        ua(1:3,15)=(/5.00E-01, 3.333333E-01, 1.66667E-01 *2/)
+        ua(1:3,16)=(/2.50E-01, 6.666667E-01, 8.33333E-02 *2/)
+        ua(1:3,17)=(/5.00E-01, 6.666667E-01, 3.33333E-01 *2/)
+        ua(1:3,18)=(/7.50E-01, 6.666667E-01, 8.33333E-02 *2/)
+        ua(1:3,19)=(/5.00E-01, 5.833333E-01, 1.66667E-01 *2/)
+        ua(1:3,20)=(/2.50E-01, 9.166667E-01, 8.33333E-02 *2/)
+        ua(1:3,21)=(/5.00E-01, 9.166667E-01, 3.33333E-01 *2/)
+        ua(1:3,22)=(/7.50E-01, 9.166667E-01, 8.33333E-02 *2/)
+        ua(1:3,23)=(/0.00E+00, 6.666667E-01, 3.33333E-01 *2/)
+        ua(1:3,24)=(/0.00E+00, 9.166667E-01, 3.33333E-01 *2/)
+      else
 c-----Unit cell of diamond structure with z-axis towrads (111): type2
-      ua(1:3, 1)= (/ 0.00d0, 0.00d0, 0.00d0 /)
-      ua(1:3, 2)= (/ 0.00d0, 1d0/4,  0.00d0 /)
-      ua(1:3, 3)= (/ 1d0/6,  1d0/3,  1d0/2  /)
-      ua(1:3, 4)= (/ 1d0/6,  7d0/12, 1d0/2  /)
-      ua(1:3, 5)= (/ 1d0/3,  2d0/3,  0.00d0 /)
-      ua(1:3, 6)= (/ 1d0/3, 11d0/12, 0.00d0 /)
-      ua(1:3, 7)= (/ 1d0/2,  0.00d0, 1d0/2  /)
-      ua(1:3, 8)= (/ 1d0/2,  1d0/4,  1d0/2  /)
-      ua(1:3, 9)= (/ 2d0/3,  1d0/3,  0.00d0 /)
-      ua(1:3,10)= (/ 2d0/3,  7d0/12, 0.00d0 /)
-      ua(1:3,11)= (/ 5d0/6,  2d0/3,  1d0/2  /)
-      ua(1:3,12)= (/ 5d0/6, 11d0/12, 1d0/2  /)
+        ua(1:3, 1)= (/ 0.00d0, 0.00d0, 0.00d0 /)
+        ua(1:3, 2)= (/ 0.00d0, 1d0/4,  0.00d0 /)
+        ua(1:3, 3)= (/ 1d0/6,  1d0/3,  1d0/2  /)
+        ua(1:3, 4)= (/ 1d0/6,  7d0/12, 1d0/2  /)
+        ua(1:3, 5)= (/ 1d0/3,  2d0/3,  0.00d0 /)
+        ua(1:3, 6)= (/ 1d0/3, 11d0/12, 0.00d0 /)
+        ua(1:3, 7)= (/ 1d0/2,  0.00d0, 1d0/2  /)
+        ua(1:3, 8)= (/ 1d0/2,  1d0/4,  1d0/2  /)
+        ua(1:3, 9)= (/ 2d0/3,  1d0/3,  0.00d0 /)
+        ua(1:3,10)= (/ 2d0/3,  7d0/12, 0.00d0 /)
+        ua(1:3,11)= (/ 5d0/6,  2d0/3,  1d0/2  /)
+        ua(1:3,12)= (/ 5d0/6, 11d0/12, 1d0/2  /)
+      endif
 
 
 c.....Normalized Burgers vector in x- and z-direction
@@ -150,13 +214,14 @@ c.....Normalized Burgers vector in x- and z-direction
       do ix=0,nuc(1)-1
         do iy=0,nuc(2)-1
           do iz=0,nuc(3)-1
-            do m=1,12
+            do m=1,nacell
               xi(1)= (ua(1,m)+dble(ix))/nuc(1) +small
               xi(2)= (ua(2,m)+dble(iy))/nuc(2) +small
               xi(3)= (ua(3,m)+dble(iz))/nuc(3) +small
               x= (xi(1)-xc)*h(1,1,0)
               y= (xi(2)-yc)*h(2,2,0)
               r= sqrt(x**2+y**2)
+c.....Cut atoms outside the radius
               if( r.gt.radius ) cycle
 c.....Introduce dislocation by subtracting one atomic layer from
 c.....lower half of the system.
