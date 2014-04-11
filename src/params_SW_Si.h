@@ -16,5 +16,3 @@
 !-----si-si-si
       real(8),parameter:: sws   = 21.d0
       real(8),parameter:: swt   = 1.2d0
-!-----For 2-lattice-constant
-      real(8),parameter:: ratio = 1.0d0

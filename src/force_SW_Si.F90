@@ -1,20 +1,41 @@
 module SW_Si
+!-----Si mass (to be multiplied by umass)
+  real(8),parameter:: am_si = 28.0855d0
+!.....length scaling factor for matching this potential to VASP
+  real(8),parameter:: sfac  = 1.0062662d0
+!.....number of parameters
+  integer,parameter:: nprms = 10
+
+!-----SW unit energy in eV
+  real(8):: swe   = 2.1678d0
+!-----SW unit length in Ang
+  real(8):: swl   = 2.0951d0*sfac
+!-----si-si
+  real(8):: swa   = 7.049556277d0
+  real(8):: swb   = 0.6022245584d0
+  real(8):: swp   = 4.d0
+  real(8):: swq   = 0.d0
+  real(8):: swc   = 1.d0
+  real(8):: swrc  = 1.8d0
+!-----si-si-si
+  real(8):: sws   = 21.d0
+  real(8):: swt   = 1.2d0
+
 contains
   subroutine force_SW_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,acon,avol)
 !-----------------------------------------------------------------------
 !  Parallel implementation of SW(Si) force calculation for pmd
+!    - 2014.04.07 by R.K.
+!      Parameters are loaded at the first call.
 !    - 2010.03.29 by R.K.
-!      Made 1st version.
-!    - 2011.04.15 by R.K.
-!      Modified to 2 species with differet bond lengthes.
-!      Species must be 1 and 2.
+!      1st version.
 !-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
     include "./params_unit.h"
-    include "params_SW_Si.h"
+!    include "params_SW_Si.h"
     integer,intent(in):: namax,natm,nnmax,nismax
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax)
@@ -32,36 +53,24 @@ contains
     real(8),save:: swli,a8d3r3
     real(8),save,allocatable:: aa2(:,:),aa3(:,:)
     real(8),save,allocatable,dimension(:):: xi,xj,xk,xij,xik,at,bli
-!-----For 2-lattice-constant system
-    real(8),save,allocatable:: tswrc(:,:),tswt(:,:)
 !-----1st call
     logical,save:: l1st=.true.
 
 !-----only at 1st call
     if( l1st ) then
+      call read_params(myid,mpi_world)
       allocate(aa2(3,namax),aa3(3,namax))
       allocate(xi(3),xj(3),xk(3),xij(3),xik(3),at(3),bli(namax))
-      allocate(tswrc(2,2),tswt(2,2))
-      tswrc(1,1)= swrc
-      tswrc(2,2)= swrc*ratio
-      tswrc(1,2)= (tswrc(1,1)+tswrc(2,2))*0.5d0
-      tswrc(2,1)= (tswrc(1,1)+tswrc(2,2))*0.5d0
-      tswt(1,1)= swt
-      tswt(2,2)= swt*ratio
-      tswt(1,2)= (tswt(1,1)+tswt(2,2))*0.5d0
-      tswt(2,1)= (tswt(1,1)+tswt(2,2))*0.5d0
 !-------check rc
       if( myid.eq.0 ) then
         write(6,'(a,es12.4)') ' rc of input         =',rc
-        write(6,'(a,es12.4)') ' rc of this potential='&
-             ,max(tswrc(1,1),tswrc(2,2))*swl
+        write(6,'(a,es12.4)') ' rc of this potential=',swrc*swl
       endif
       if( int(rc*100d0) &
-           .ne.int(max(tswrc(1,1),tswrc(2,2))*swl*100d0) ) then
+           .ne.int(swrc*swl*100d0) ) then
         if( myid.eq.0 ) then
           write(6,'(1x,a)') "!!! Cutoff radius is not appropriate !!!"
-          write(6,'(1x,a,es12.4)') "rc should be" &
-               ,max(tswrc(1,1),tswrc(2,2))*swl
+          write(6,'(1x,a,es12.4)') "rc should be", swrc*swl
         endif
         call mpi_finalize(ierr)
         stop
@@ -93,7 +102,7 @@ contains
         xij(1:3)= ( h(1:3,1)*xj(1) +h(1:3,2)*xj(2) &
              +h(1:3,3)*xj(3) )*swli
         rij2= xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
-        src= tswrc(is,js)
+        src= swrc
         src2= src*src
         if( rij2.ge.src2 ) cycle
         rij= dsqrt(rij2)
@@ -161,7 +170,7 @@ contains
         xij(1:3)= ( h(1:3,1)*xj(1) +h(1:3,2)*xj(2) &
              +h(1:3,3)*xj(3) )*swli
         rij2= xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
-        src= tswrc(is,js)
+        src= swrc
         src2= src*src
         if( rij2.ge.src2 ) cycle
         rij= dsqrt(rij2)
@@ -179,7 +188,7 @@ contains
           xik(1:3)= ( h(1:3,1)*xk(1) +h(1:3,2)*xk(2) &
                +h(1:3,3)*xk(3) )*swli
           rik2= xik(1)*xik(1)+xik(2)*xik(2)+xik(3)*xik(3)
-          src= tswrc(is,ks)
+          src= swrc
           src2= src*src
           if( rik2.ge.src2 ) cycle
           rik=dsqrt(rik2)
@@ -257,9 +266,57 @@ contains
     epotl= epotl2 +epotl3
     call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
          ,MPI_SUM,mpi_world,ierr)
+    return
 
   end subroutine force_SW_Si
 !=======================================================================
+  subroutine read_params(myid,mpi_world)
+    implicit none
+    include 'mpif.h'
+
+    integer,intent(in):: myid,mpi_world
+    integer:: itmp,ierr,rctmp
+    logical:: lexist
+
+!.....read parameters at the 1st call
+    if( myid.eq.0 ) then
+      inquire(file='in.params.SW_Si',exist=lexist)
+      if( .not. lexist ) then
+        write(6,'(a)') ' [Error] in.params.SW_Si does not exist !!!.'
+        stop
+      endif
+      open(50,file='in.params.SW_Si',status='old')
+      read(50) itmp,rctmp
+      if( itmp.ne.nprms ) then
+        write(6,'(a)') ' [Error] itmp.ne.nprms'
+        write(6,'(a,i3)') '  itmp =',itmp
+        stop
+      endif
+      read(50) swe
+      read(50) swl
+      read(50) swa
+      read(50) swb
+      read(50) swp
+      read(50) swq
+      read(50) swc
+      read(50) swrc
+      read(50) sws
+      read(50) swt
+      close(50)
+    endif
+
+    call mpi_bcast(swe,1,mpi_double_precision,0,mpi_world,ierr)
+    call mpi_bcast(swl,1,mpi_double_precision,0,mpi_world,ierr)
+    call mpi_bcast(swa,1,mpi_double_precision,0,mpi_world,ierr)
+    call mpi_bcast(swb,1,mpi_double_precision,0,mpi_world,ierr)
+    call mpi_bcast(swp,1,mpi_double_precision,0,mpi_world,ierr)
+    call mpi_bcast(swq,1,mpi_double_precision,0,mpi_world,ierr)
+    call mpi_bcast(swc,1,mpi_double_precision,0,mpi_world,ierr)
+    call mpi_bcast(swrc,1,mpi_double_precision,0,mpi_world,ierr)
+    call mpi_bcast(sws,1,mpi_double_precision,0,mpi_world,ierr)
+    call mpi_bcast(swt,1,mpi_double_precision,0,mpi_world,ierr)
+    return
+  end subroutine read_params
 end module SW_Si
 !-----------------------------------------------------------------------
 !     Local Variables:

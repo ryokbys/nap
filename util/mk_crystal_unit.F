@@ -3,14 +3,18 @@ c-----------------------------------------------------------------------
 c  Create arbitrary unit cell from Bravais lattice.
 c-----------------------------------------------------------------------
       implicit none
-      integer,parameter:: nmax= 1000
+      integer,parameter:: nmax= 10000
       integer:: i,j,k,l,m,n,istrct,ixyz,ncell,nua,i1,i2,i3,inc,natm
       character:: clattice*10
       integer:: ib1(3),ib2(3),ib3(3),imax(3),imin(3)
       real(8):: a1(3),a2(3),a3(3),h0(3,3),ua(3,10),al
      &     ,b1(3),b2(3),b3(3),ra(3,nmax),s(3),bb1,bb2,bb3,rb(3,nmax)
+     &     ,ab1,ab2,ab3
+      logical:: lb1,lb2,lb3
 
       real(8),parameter:: small= 1d-8
+
+      open(10,file='out.mkxtlunit',status='replace')
       
 c.....Choose Bravais lattice
  1    write(6,'(a)') "Choose a Bravais lattice from the list below:"
@@ -33,6 +37,14 @@ c.....Decide new lattice vectors
       read(5,*) ib2(1:3)
       write(6,'(a)',advance='no') "  b3: "
       read(5,*) ib3(1:3)
+c.....Multiplying factors
+ 4    write(6,'(a)') "Input coefficient for these vectors:"
+      write(6,'(a)',advance='no') "  c1: "
+      read(5,*) ab1
+      write(6,'(a)',advance='no') "  c2: "
+      read(5,*) ab2
+      write(6,'(a)',advance='no') "  c3: "
+      read(5,*) ab3
 
       imax(1:3)= 0
       imin(1:3)= 0
@@ -120,21 +132,43 @@ c          write(6,'(a,i5,3es12.4)') " inc,ra=",inc,ra(1:3,inc)
       natm= inc
 
 c.....New unit vectors
-      b1(1)= a1(1)*ib1(1) +a2(1)*ib1(2) +a3(1)*ib1(3)
-      b1(2)= a1(2)*ib1(1) +a2(2)*ib1(2) +a3(2)*ib1(3)
-      b1(3)= a1(3)*ib1(1) +a2(3)*ib1(2) +a3(3)*ib1(3)
-      b2(1)= a1(1)*ib2(1) +a2(1)*ib2(2) +a3(1)*ib2(3)
-      b2(2)= a1(2)*ib2(1) +a2(2)*ib2(2) +a3(2)*ib2(3)
-      b2(3)= a1(3)*ib2(1) +a2(3)*ib2(2) +a3(3)*ib2(3)
-      b3(1)= a1(1)*ib3(1) +a2(1)*ib3(2) +a3(1)*ib3(3)
-      b3(2)= a1(2)*ib3(1) +a2(2)*ib3(2) +a3(2)*ib3(3)
-      b3(3)= a1(3)*ib3(1) +a2(3)*ib3(2) +a3(3)*ib3(3)
+      b1(1)= (a1(1)*ib1(1) +a2(1)*ib1(2) +a3(1)*ib1(3))*ab1
+      b1(2)= (a1(2)*ib1(1) +a2(2)*ib1(2) +a3(2)*ib1(3))*ab1
+      b1(3)= (a1(3)*ib1(1) +a2(3)*ib1(2) +a3(3)*ib1(3))*ab1
+      b2(1)= (a1(1)*ib2(1) +a2(1)*ib2(2) +a3(1)*ib2(3))*ab2
+      b2(2)= (a1(2)*ib2(1) +a2(2)*ib2(2) +a3(2)*ib2(3))*ab2
+      b2(3)= (a1(3)*ib2(1) +a2(3)*ib2(2) +a3(3)*ib2(3))*ab2
+      b3(1)= (a1(1)*ib3(1) +a2(1)*ib3(2) +a3(1)*ib3(3))*ab3
+      b3(2)= (a1(2)*ib3(1) +a2(2)*ib3(2) +a3(2)*ib3(3))*ab3
+      b3(3)= (a1(3)*ib3(1) +a2(3)*ib3(2) +a3(3)*ib3(3))*ab3
       bb1= b1(1)**2 +b1(2)**2 +b1(3)**2
       bb2= b2(1)**2 +b2(2)**2 +b2(3)**2
       bb3= b3(1)**2 +b3(2)**2 +b3(3)**2
 c      write(6,'(a,es12.4)') " bb1=",bb1
 c      write(6,'(a,es12.4)') " bb2=",bb2
 c      write(6,'(a,es12.4)') " bb3=",bb3
+
+c.....Check if there is an atom at the point of the new unit vectors
+      lb1=.false.
+      lb2=.false.
+      lb3=.false.
+      do i=1,natm
+        s(1)= (ra(1,i)*b1(1) +ra(2,i)*b1(2) +ra(3,i)*b1(3))/bb1
+        s(2)= (ra(1,i)*b2(1) +ra(2,i)*b2(2) +ra(3,i)*b2(3))/bb2
+        s(3)= (ra(1,i)*b3(1) +ra(2,i)*b3(2) +ra(3,i)*b3(3))/bb3
+        if( ( nint(s(1)*100).eq.100 .and. nint(s(2)*100).eq.0 .and.
+     &        nint(s(3)*100).eq.0 ) ) lb1=.true.
+        if( ( nint(s(1)*100).eq.0 .and. nint(s(2)*100).eq.100 .and.
+     &        nint(s(3)*100).eq.0 ) ) lb2=.true.
+        if( ( nint(s(1)*100).eq.0 .and. nint(s(2)*100).eq.0 .and.
+     &        nint(s(3)*100).eq.100 ) ) lb3=.true.
+      enddo
+      if( .not.lb1 .or. .not.lb2 .or. .not.lb3 ) then
+        write(6,'(a)') ' There is no atom at the apex of '//
+     &       'the unit cell.'
+        write(6,*) '  lb1,lb2,lb3=',lb1,lb2,lb3
+        goto 3
+      endif
 
       inc=0
       do i=1,natm
@@ -172,6 +206,17 @@ c.....Output unit cell information
       do i=1,inc
         write(6,'(i5,3es22.14)') i,rb(1:3,i)
       enddo
+
+c.....Output this configuration in akr format
+      open(10,file='akr0000',status='replace')
+      write(10,'(i10,3i4)') inc,0,0,0
+      write(10,'(3es15.7)') sqrt(bb1)*al, 0d0, 0d0
+      write(10,'(3es15.7)') 0d0, sqrt(bb2)*al, 0d0
+      write(10,'(3es15.7)') 0d0, 0d0, sqrt(bb3)*al
+      do i=1,inc
+        write(10,'(4es22.14)') 1d0+i*1d-14,rb(1:3,i)
+      enddo
+      close(10)
 
       end program mk_crystal_unit
 c=======================================================================

@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([pmd], [1.0.0], [kobayashi.ryo@nitech.ac.jp])
-AC_CONFIG_SRCDIR([parallel_md.F])
+AC_INIT([pmd], [2.0.0], [kobayashi.ryo@nitech.ac.jp])
+AC_CONFIG_SRCDIR([LICENSE])
 #AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
