@@ -1,6 +1,6 @@
       program mkconf_H2
       implicit none
-      include './params_unit.h'
+      include '../src/params_unit.h'
       include './params_EAM_Fe.h'
       integer:: is,ifmv,natm,i,ia,ib
       real(8):: h(3,3,0:1),ra(3,2),va(3,2),eki(2),epi(2),strs(3,3,2)
@@ -46,8 +46,8 @@ c-----output 'akr000' for Akira visualization
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_unit.h"
-      include "./params_EAM_Fe-H.h"
+      include "../src/params_unit.h"
+      include "../src/params_EAM_Fe-H.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)

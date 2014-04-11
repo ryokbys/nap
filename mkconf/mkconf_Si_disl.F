@@ -22,7 +22,7 @@ c    * pm00000
 c    * akr0000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
-      include "./params_unit.h"
+      include "../src/params_unit.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c.....2*pi

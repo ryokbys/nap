@@ -1,11 +1,11 @@
-      program mkconf_AlN_r
+      program mkconf_AlN_bcc
 c-----------------------------------------------------------------------
-c  Make atom configuration file of rocksalt AlN
+c  Make atom configuration file of bcc AlN
 c    Output: ini000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
-      include "./params_unit.h"
-      include "./params_Vashishta_AlN.h"
+      include "../src/params_unit.h"
+      include "../src/params_Vashishta_AlN.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
@@ -26,26 +26,20 @@ c-----box size for Si: 5.4309 Ang
 c      al= 3.11d0
 c      cl= 4.98d0
 c-----al,cl for RK potential
-      al= 3.8d0
+      al= 2.6d0
       cl= al *2d0*sqrt(2d0/3d0)
 
 c-----unit cell, wurtzite structure
 c-----Al
       ua(1:3,1)= (/ 0.00d0, 0.00d0, 0.00d0 /)
-      ua(1:3,2)= (/ 0.50d0, 0.50d0, 0.00d0 /)
-      ua(1:3,3)= (/ 0.50d0, 0.00d0, 0.50d0 /)
-      ua(1:3,4)= (/ 0.00d0, 0.50d0, 0.50d0 /)
 c-----N
-      ua(1:3,5)= (/ 0.50d0, 0.00d0, 0.00d0 /)
-      ua(1:3,6)= (/ 0.00d0, 0.50d0, 0.00d0 /)
-      ua(1:3,7)= (/ 0.00d0, 0.00d0, 0.50d0 /)
-      ua(1:3,8)= (/ 0.50d0, 0.50d0, 0.50d0 /)
+      ua(1:3,2)= (/ 0.50d0, 0.50d0, 0.50d0 /)
       
       inc=0 
       do ix=0,nuc(1)-1
         do iy=0,nuc(2)-1
           do iz=0,nuc(3)-1
-            do m=1,8
+            do m=1,2
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
@@ -56,9 +50,8 @@ c-----N
               ra(3,inc)= (ua(3,m)+dble(iz))/(nuc(3)+nvac(3)) +small
               ra(1:3,inc)= ra(1:3,inc)
      &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
-c              is=1
-              if(m.le.4) is= 1
-              if(m.ge.5) is= 2
+              is=1
+              if(m.eq.2) is= 2
               ifmv= 1
               tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
             enddo
@@ -99,12 +92,12 @@ c-----output 'kvs000' for KVS visualization
       enddo
       close(15)
       
-      end program mkconf_AlN_r
+      end program mkconf_AlN_bcc
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_unit.h"
-      include "./params_Vashishta_AlN.h"
+      include "../src/params_unit.h"
+      include "../src/params_Vashishta_AlN.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)
@@ -170,5 +163,5 @@ c=======================================================================
       end subroutine myrnd
 c-----------------------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make 10mkconf_AlN_r"
+c     compile-command: "make 10mkconf_AlN_b"
 c     End:

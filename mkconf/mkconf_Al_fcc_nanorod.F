@@ -1,48 +1,61 @@
-      program mkconf_BCC
-c
-c    Create a BCC crystal
-c    Write: ini000
-c
-      implicit real*8(a-h,o-z),integer(i-n)
-      include './params_unit.h'
-c      include './params_EAM_Fe-H.h'
-      include './params_Ito_W-He.h'
+      program mkconf_Al_nanorod
+c-----------------------------------------------------------------------
+c  Make atom configuration file of fcc Al nanorod
+c-----------------------------------------------------------------------
+c  OUTPUT
+c  ------
+c    - pmd00000
+c-----------------------------------------------------------------------
+      implicit none
+      include "../src/params_unit.h"
+      include "../src/params_EAM_Al.h"
 c-----max # of atoms
-      integer,parameter::nmax=10000000
+      integer,parameter::nmax=1000000
 c-----# of unit cells
-c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 5,5,5 /)
+      integer,parameter:: nuc(1:3)= (/ 15, 15, 20 /)
 c-----vacuum width in unit of cell
-c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
-      integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
+      integer,parameter:: nvac(1:3)= (/ 0, 0, 20 /)
+c.....Radius of base of the cylinder
+      real(8),parameter:: rad  = 10.d0
+
+      integer:: i,ix,iy,iz,m,inc,is,ifmv
+      real(8):: small,al,rad2,rx,ry,r2
       real(8):: ua(3,10)
-      real(8):: tag(nmax),ra(3,nmax),va(3,nmax),eki(nmax),epi(nmax)
-     &     ,h(3,3,0:1),strs(3,3,nmax)
-c.....Parameters
-      real(8),parameter:: tempini = 100d0
+      real(8):: ra(3,nmax)
+      real(8):: h(3,3,0:1)
+      real(8):: va(3,nmax)
+      real(8):: tag(nmax),epi(nmax),eki(nmax),strs(3,3,nmax)
+c-----initial temperature
+      real(8),parameter:: tempini= 100d0
+
+c.....In this purpose nuc(1)==nuc(2)
+      if( nuc(1).ne.nuc(2) )
+     &     stop '[Error] nuc(1).ne.nuc(2) !!!'
 
       small=1d-7
 
-cc.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
-c      cunit= 2.8553d0
-c.....Lattice constant of W
-      cunit= 3.1652d0
+c-----box size for Al: 4.025 Ang
+      al= 4.025d0
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
-      h(1,1,0)= cunit*(nuc(1)+nvac(1))
-      h(2,2,0)= cunit*(nuc(2)+nvac(2))
-      h(3,3,0)= cunit*(nuc(3)+nvac(3))
+      h(1,1,0)= (nuc(1)+nvac(1)) *al
+      h(2,2,0)= (nuc(2)+nvac(2)) *al
+      h(3,3,0)= (nuc(3)+nvac(3)) *al
+c-----unit cell, FCC
+c-----Al
+      ua(1:3,1)= (/ 0.00d0, 0.00d0, 0.00d0 /)
+      ua(1:3,2)= (/ 0.50d0, 0.50d0, 0.00d0 /)
+      ua(1:3,3)= (/ 0.50d0, 0.00d0, 0.50d0 /)
+      ua(1:3,4)= (/ 0.00d0, 0.50d0, 0.50d0 /)
 
-c-----unit cell, BCC
-      ua(1:3,1)= (/ 0.0d0, 0.0d0, 0.0d0 /)
-      ua(1:3,2)= (/ 0.5d0, 0.5d0, 0.5d0 /)
+      rad2= rad*rad
       
       inc=0 
       do ix=0,nuc(1)-1
         do iy=0,nuc(2)-1
           do iz=0,nuc(3)-1
-            do m=1,2
+            do m=1,4
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
@@ -50,59 +63,61 @@ c-----unit cell, BCC
               endif
               ra(1,inc)= (ua(1,m)+dble(ix))/(nuc(1)+nvac(1)) +small
               ra(2,inc)= (ua(2,m)+dble(iy))/(nuc(2)+nvac(2)) +small
-              ra(3,inc)= (ua(3,m)+dble(iz))/(nuc(3)+nvac(3)) +small
-c              ra(1:3,inc)= ra(1:3,inc)
-c     &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
+              ra(3,inc)= (ua(3,m)+dble(iz)+dble(nvac(3))/2)
+     &             /(nuc(3)+nvac(3)) +small
+c.....Only inside atoms the radius remain to form cylinder
+              rx= (ra(1,inc)-0.5d0)*h(1,1,0)
+              ry= (ra(2,inc)-0.5d0)*h(2,2,0)
+              r2= rx**2 +ry**2
+              if( r2.gt.rad2 ) then
+                inc=inc-1
+                cycle
+              endif
               is= 1
               ifmv= 1
-              tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+              if( iz.eq.nuc(3)-1 ) then ! top layer
+                ifmv= 2
+              else if( iz.eq.0 ) then ! bottom layer
+                ifmv= 2
+              endif
+              tag(inc)= 1d0  *is
+     &                 +1d-1 *ifmv
+     &                 +1d-14*inc
             enddo
           enddo
         enddo
       enddo
       write(6,'(a,i10)') " natm=",inc
-      write(6,'(a,i10)') " id of inc=",int(mod(tag(inc)*1d14,1d13))
 
       call setv(inc,va,tag,tempini)
-      
+
 c-----scale velocities to reduced unit
       do i=1,inc
         va(1,i)=va(1,i) /h(1,1,0)
         va(2,i)=va(2,i) /h(2,2,0)
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
-
-c      call write_pmd0_bin(15,'pmd00000','replace',inc,tag,ra,va,h
-c     &     ,eki,epi,strs)
-      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va,h
-     &     ,eki,epi,strs)
       
-c-----output 'akr0000' for Akira visualization
-      open(15,file='akr0000',form='formatted',status='replace')
-      write(15,'(i10,3i5)') inc, 3, 0, 0
-      write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
-      do i=1,inc
-        write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
+      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va
+     &     ,h,eki,epi,strs)
       
-      end program mkconf_BCC
+      end program mkconf_Al_nanorod
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_unit.h"
-c      include "./params_EAM_Fe-H.h"
-      include "./params_Ito_W-He.h"
+      include "../src/params_unit.h"
+      include "../src/params_EAM_Al.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)
 
       integer:: i,l,is
-      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv,am
+      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp
       real(8),parameter:: pi = 3.14159265358979d0
+      real(8):: facv,am
 
-      facv=dsqrt(2d0*tempini*fkb/am_W)
-      am= am_W
+      facv=dsqrt(2d0*tempini*fkb/am_al)
+      am= am_al
 
 c-----velocities in Maxwell-Boltzmann distribution
       dseed=12345

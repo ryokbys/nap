@@ -13,7 +13,7 @@ c    * pmd00000
 c    * akr0000
 c-----------------------------------------------------------------------
       implicit none
-      include './params_unit.h'
+      include '../src/params_unit.h'
       include './params_RK_Fe-H.h'
 c-----max # of atoms
       integer,parameter::nmax=10000000
@@ -133,8 +133,8 @@ c.....output 'pmdref'
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_unit.h"
-      include "./params_RK_Fe-H.h"
+      include "../src/params_unit.h"
+      include "../src/params_RK_Fe-H.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)

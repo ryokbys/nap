@@ -12,23 +12,15 @@ CPPFLAGS= @CPPFLAGS@
 #CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__KOUKYU__ -D__WALL__
 MPIFC= @FC@
 MPIFLAGS= @FCFLAGS@
-#-----------------------------------------------------------------------
-# suffixes
-.SUFFIXES: .o .f .F .f90 .F90
-.f.o: 
-	${MPIFC} -c ${MPIFLAGS} $<
-.F.o: 
-	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
-.f90.o: 
-	${MPIFC} -c ${MPIFLAGS} $<
-.F90.o: 
-	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
 all:
-	cd src; make all "MPIFC=${MPIFC} MPIFLAGS=${MPIFLAGS} CPPFLAGS=${CPPFLAGS}"
+	cd src; make all
+	cp src/{pmd,nconv,combine,pmd2akr,akr2cna} .
 
 clean:
 	cd src; make clean
 
 pmd:
-	cd src; make pmd "MPIFC=${MPIFC} MPIFLAGS=${MPIFLAGS} CPPFLAGS=${CPPFLAGS}"
+	cd src; make pmd
+	cp src/pmd .
+

@@ -584,7 +584,7 @@ PACKAGE_STRING='pmd 2.0.0'
 PACKAGE_BUGREPORT='kobayashi.ryo@nitech.ac.jp'
 PACKAGE_URL=''
 
-ac_unique_file="LICENSE"
+ac_unique_file="src/parallel_md.F"
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 CPP
@@ -2944,7 +2944,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 # Checks for library functions.
 
-ac_config_files="$ac_config_files makefile"
+ac_config_files="$ac_config_files makefile src/makefile mkconf/makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -3652,6 +3652,8 @@ for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
     "makefile") CONFIG_FILES="$CONFIG_FILES makefile" ;;
+    "src/makefile") CONFIG_FILES="$CONFIG_FILES src/makefile" ;;
+    "mkconf/makefile") CONFIG_FILES="$CONFIG_FILES mkconf/makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

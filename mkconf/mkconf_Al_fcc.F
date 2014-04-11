@@ -1,54 +1,42 @@
-      program mkconf_AlN_w
+      program mkconf_Al_fcc
 c-----------------------------------------------------------------------
-c  Make atom configuration file of wurtzite AlN
+c  Make atom configuration file of fcc Al
 c    Output: ini000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
-      include "./params_unit.h"
-      include "./params_Vashishta_AlN.h"
+      include "../src/params_unit.h"
+      include "../src/params_EAM_Al.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
-      integer,parameter:: nuc(1:3)= (/ 5, 5, 5 /)
+      integer,parameter:: nuc(1:3)= (/ 3,3,3 /)
 c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
-      real(8):: ua(3,10)
+      real(8):: ua(3,4)
       real(8):: ra(3,nmax)
       real(8):: h(3,3,0:1)
       real(8):: va(3,nmax)
-      real(8):: tag(nmax)
+      real(8):: tag(nmax),eki(nmax),epi(nmax),strs(3,3,nmax)
 c-----initial temperature
       real(8),parameter:: tempini= 100d0
 
       small=1d-7
 
-c-----box size for Si: 5.4309 Ang
-      al= 3.11d0
-      cl= al *2d0*sqrt(2d0/3d0)
-c      cl= 4.98d0
-cc-----al,cl for RK potential
-c      al= 1.6d *2d0*sqrt(2d0/3)
-c      cl= al *2d0*sqrt(2d0/3d0)
-      write(6,'(a,es12.4)') " al=",al
-      write(6,'(a,es12.4)') " cl=",cl
+c-----Lattice constant of this potential= 4.0425 Ang
+      al= 4.0425d0
 
 c-----unit cell, wurtzite structure
 c-----Al
       ua(1:3,1)= (/ 0.00d0, 0.00d0, 0.00d0 /)
       ua(1:3,2)= (/ 0.50d0, 0.50d0, 0.00d0 /)
-      ua(1:3,3)= (/ 0.50d0, 1d0/6,  0.50d0 /)
-      ua(1:3,4)= (/ 0.00d0, 4d0/6,  0.50d0 /)
-c-----N
-      ua(1:3,5)= (/ 0.50d0, 1d0/6,  1d0/8  /)
-      ua(1:3,6)= (/ 0.00d0, 4d0/6,  1d0/8  /)
-      ua(1:3,7)= (/ 0.00d0, 0.00d0, 5d0/8  /)
-      ua(1:3,8)= (/ 0.50d0, 0.50d0, 5d0/8  /)
+      ua(1:3,3)= (/ 0.50d0, 0.00d0, 0.50d0 /)
+      ua(1:3,4)= (/ 0.00d0, 0.50d0, 0.50d0 /)
       
       inc=0 
       do ix=0,nuc(1)-1
         do iy=0,nuc(2)-1
           do iz=0,nuc(3)-1
-            do m=1,8
+            do m=1,4
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
@@ -59,9 +47,7 @@ c-----N
               ra(3,inc)= (ua(3,m)+dble(iz))/(nuc(3)+nvac(3)) +small
               ra(1:3,inc)= ra(1:3,inc)
      &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
-c              is=1
-              if(m.le.4) is= 1
-              if(m.ge.5) is= 2
+              is=1
               ifmv= 1
               tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
             enddo
@@ -72,8 +58,8 @@ c              is=1
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
       h(1,1,0)= (nuc(1)+nvac(1)) *al
-      h(2,2,0)= (nuc(2)+nvac(2)) *al*sqrt(3d0)
-      h(3,3,0)= (nuc(3)+nvac(3)) *cl
+      h(2,2,0)= (nuc(2)+nvac(2)) *al
+      h(3,3,0)= (nuc(3)+nvac(3)) *al
 
       call setv(inc,va,tag,tempini)
 
@@ -84,17 +70,11 @@ c-----scale velocities to reduced unit
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
       
-c-----output 'ini000' for MD program
-      open(15,file='ini000',form='formatted',status='replace')
-      write(15,'(i10)')inc
-      write(15,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      do i=1,inc
-        write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
+      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va,h
+     &     ,eki,epi,strs)
       
-c-----output 'kvs000' for KVS visualization
-      open(15,file='kvs000',form='formatted',status='replace')
+c-----output 'akr0000' for KVS visualization
+      open(15,file='akr0000',form='formatted',status='replace')
       write(15,'(i10)')inc
       write(15,'(3es11.3)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       do i=1,inc
@@ -102,27 +82,22 @@ c-----output 'kvs000' for KVS visualization
       enddo
       close(15)
       
-      end program mkconf_AlN_w
+      end program mkconf_Al_fcc
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "./params_unit.h"
-      include "./params_Vashishta_AlN.h"
+      include "../src/params_unit.h"
+      include "../src/params_EAM_Al.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)
 
       integer:: i,l,is
-      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp
+      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv,am
       real(8),parameter:: pi = 3.14159265358979d0
-      real(8),allocatable:: facv(:),am(:)
 
-      allocate(facv(2),am(2))
-      
-      facv(1)=dsqrt(2d0*tempini*fkb/am_Al)
-      facv(2)=dsqrt(2d0*tempini*fkb/am_N)
-      am(1)= am_Al
-      am(2)= am_N
+      facv=dsqrt(2d0*tempini*fkb/am_al)
+      am= am_al
 
 c-----velocities in Maxwell-Boltzmann distribution
       dseed=12345
@@ -131,7 +106,7 @@ c-----velocities in Maxwell-Boltzmann distribution
         do l=1,3
           call myrnd(rnd1,dseed)
           call myrnd(rnd2,dseed)
-          va(l,i)=facv(is)*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
+          va(l,i)=facv*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
         enddo
       enddo
 c-----set center of mass motion to zero
@@ -152,12 +127,11 @@ c-----set center of mass motion to zero
       tmp=0d0
       do i=1,natm
         is= int(tag(i))
-        tmp= tmp +0.5d0*am(is)*(va(1,i)**2 +va(2,i)**2 +va(3,i)**2)
+        tmp= tmp +0.5d0*am*(va(1,i)**2 +va(2,i)**2 +va(3,i)**2)
       enddo
       write(6,'(a,es12.4)') " ekin=",tmp
       write(6,'(a,es12.4)') " temp.=",tmp*2d0/3d0/fkb/natm
 
-      deallocate(facv)
       end subroutine setv
 c=======================================================================
       subroutine myrnd(rnd,dseed)
@@ -173,5 +147,5 @@ c=======================================================================
       end subroutine myrnd
 c-----------------------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make 10mkconf_AlN_w"
+c     compile-command: "make 10mkconf"
 c     End:
