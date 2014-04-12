@@ -13,14 +13,14 @@ CPPFLAGS= @CPPFLAGS@
 MPIFC= @FC@
 MPIFLAGS= @FCFLAGS@
 
-all:
+all: 
 	cd src; make all
 	cp src/{pmd,nconv,combine,pmd2akr,akr2cna} .
 
 clean:
 	cd src; make clean
+	cd mkconf; make clean
 
 pmd:
 	cd src; make pmd
-	cp src/pmd .
 

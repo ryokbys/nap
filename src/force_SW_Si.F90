@@ -275,33 +275,35 @@ contains
     include 'mpif.h'
 
     integer,intent(in):: myid,mpi_world
-    integer:: itmp,ierr,rctmp
+    integer:: itmp,ierr
+    real(8):: rctmp
     logical:: lexist
 
 !.....read parameters at the 1st call
     if( myid.eq.0 ) then
       inquire(file='in.params.SW_Si',exist=lexist)
       if( .not. lexist ) then
-        write(6,'(a)') ' [Error] in.params.SW_Si does not exist !!!.'
-        stop
+        write(6,'(a)') ' [Warning] in.params.SW_Si does not exist !!!.'
+        write(6,'(a)') '           Default parameters will be used.'
+        return
       endif
       open(50,file='in.params.SW_Si',status='old')
-      read(50) itmp,rctmp
+      read(50,*) itmp,rctmp
       if( itmp.ne.nprms ) then
         write(6,'(a)') ' [Error] itmp.ne.nprms'
         write(6,'(a,i3)') '  itmp =',itmp
         stop
       endif
-      read(50) swe
-      read(50) swl
-      read(50) swa
-      read(50) swb
-      read(50) swp
-      read(50) swq
-      read(50) swc
-      read(50) swrc
-      read(50) sws
-      read(50) swt
+      read(50,*) swe
+      read(50,*) swl
+      read(50,*) swa
+      read(50,*) swb
+      read(50,*) swp
+      read(50,*) swq
+      read(50,*) swc
+      read(50,*) swrc
+      read(50,*) sws
+      read(50,*) swt
       close(50)
     endif
 
