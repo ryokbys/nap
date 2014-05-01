@@ -2944,7 +2944,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 # Checks for library functions.
 
-ac_config_files="$ac_config_files makefile src/makefile mkconf/makefile"
+ac_config_files="$ac_config_files makefile src/makefile mkconf/makefile fitpot/makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -3654,6 +3654,7 @@ do
     "makefile") CONFIG_FILES="$CONFIG_FILES makefile" ;;
     "src/makefile") CONFIG_FILES="$CONFIG_FILES src/makefile" ;;
     "mkconf/makefile") CONFIG_FILES="$CONFIG_FILES mkconf/makefile" ;;
+    "fitpot/makefile") CONFIG_FILES="$CONFIG_FILES fitpot/makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

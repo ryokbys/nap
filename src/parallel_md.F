@@ -1725,13 +1725,13 @@ c.....Write out forces
         is= int(tag(i))
         at(1:3)= h(1:3,1)*aa(1,i) +h(1:3,2)*aa(2,i) +h(1:3,3)*aa(3,i)
         at(1:3)= at(1:3)/acon(is)
-        write(ionum,'(3es22.14)') at(1:3)
+        write(ionum,'(3f20.7)') at(1:3)
       enddo
       close(ionum)
 
 c.....Write out energy
       open(ionum+1,file='erg'//trim(cnum),status='replace')
-      write(ionum+1,'(es22.14)') epot
+      write(ionum+1,'(f20.7)') epot
       close(ionum+1)
 
       end subroutine write_force
