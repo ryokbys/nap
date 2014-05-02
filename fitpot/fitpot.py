@@ -28,12 +28,23 @@ nprms= 0
 rcut= 0.0
 vars= []
 
+#.....input parameters
+nsmpl= 1
+niter= 1
+fmethod= 'test'
+maindir= 'learning_set'
+parfile= 'in.params.SW_Si'
+runmode= 'serial'
+xtol= 1e-5
+gtol= 1e-5
+ftol= 1e-5
+eps = 1e-8
+
 #.....constants
 large= 1.0e+30
 tiny = 1.0e-8
 
 def get_sample_dirs():
-    maindir= inputs['main_directory']
     if not os.path.exists(maindir):
         print "{:*>20}: {} does not exist !!!".format(' Error',maindir)
         exit()
@@ -47,7 +58,6 @@ def read_pos():
     """
     global sample_dirs
     global samples
-    maindir= inputs['main_directory']
     #.....for each directory written in dir-list.txt file...
     for dir in sample_dirs:
         sys= MD_system()
@@ -124,6 +134,29 @@ def vars_to_params(x):
             params[i]= x[j]
             j += 1
 
+def set_input_params(dict):
+    global nsmpl,niter,fmethod,maindir,parfile,runmode,eps,xtol,gtol,ftol
+    if 'num_samples' in dict:
+        nsmpl= dict['num_samples']
+    if 'num_iteration' in dict:
+        niter= dict['num_iteration']
+    if 'fitting_method' in dict:
+        fmethod= dict['fitting_method']
+    if 'main_directory' in dict:
+        maindir= dict['main_directory']
+    if 'param_file' in dict:
+        parfile= dict['param_file']
+    if 'run_mode' in dict:
+        runmode= dict['run_mode']
+    if 'eps' in dict:
+        eps= dict['eps']
+    if 'xtol' in dict:
+        xtol= dict['xtol']
+    if 'gtol' in dict:
+        gtol= dict['gtol']
+    if 'ftol' in dict:
+        ftol= dict['ftol']
+    
 def show_input_params(input_params):
     print '>>>>> input parameters:'
     for key,value in input_params.items():
@@ -131,7 +164,6 @@ def show_input_params(input_params):
 
 def gather_pmd_data():
     global ergpmds,frcpmds
-    maindir= inputs['main_directory']
     #.....initialize variables
     ergpmds=np.zeros(len(samples))
     for smpl in samples:
@@ -155,7 +187,6 @@ def gather_pmd_data():
 
 def gather_ref_data():
     global ergrefs,frcrefs
-    maindir= inputs['main_directory']
     #.....initialize variables
     ergrefs=np.zeros(len(samples))
     for smpl in samples:
@@ -186,16 +217,17 @@ def func(x,*args):
     The 1st argument x should be 1-D array of variables.
     """
     #.....write parameters to in.params.????? file
-    write_params(inputs['main_directory']+'/'+inputs['param_file'],x)
+    dir= args[0]
+    write_params(dir+'/'+parfile,x)
     
     #.....run pmd in all sample directories
-    os.chdir(inputs['main_directory'])
-    if inputs['run_mode'] in {'serial','Serial','SERIAL'}:
-        os.system('./serial_run_pmd.sh '+inputs['param_file'])
-    elif inputs['run_mode'] in {'parallel','Parallel','PARALLEL'}:
-        os.system('./parallel_run_pmd.py '+inputs['param_file'])
+    os.chdir(dir)
+    if runmode in {'serial','Serial','SERIAL'}:
+        os.system('./serial_run_pmd.sh '+parfile)
+    elif runmode in {'parallel','Parallel','PARALLEL'}:
+        os.system('./parallel_run_pmd.py '+parfile)
     else:
-        print "{:*>20}: no such run_mode !!!".format(' Error', inputs['run_mode'])
+        print "{:*>20}: no such run_mode !!!".format(' Error', runmode)
         exit()
     os.chdir(cwd)
 
@@ -252,15 +284,16 @@ if __name__ == '__main__':
     cwd= os.getcwd()
     #.....inputs: parameters in in.fitpot as a dictionary
     inputs= read_input('in.fitpot')
+    set_input_params(inputs)
     show_input_params(inputs)
     #.....params: parameters in in.params.?????
-    read_params(inputs['main_directory']+'/'+inputs['param_file'])
-    write_params(inputs['main_directory']+'/'+inputs['param_file']
+    read_params(maindir+'/'+parfile)
+    write_params(maindir+'/'+parfile
                  +'.{:03d}'.format(0),vars)
     
     #.....get samples from ##### directories
     sample_dirs= get_sample_dirs()
-    if inputs['num_samples'] != len(sample_dirs):
+    if nsmpl != len(sample_dirs):
         print '{:*>20}: num_samples in in.fitpot is wrong.'.format(' Error')
         exit()
     read_pos()
@@ -276,27 +309,25 @@ if __name__ == '__main__':
     output_energy_relation(fname='out.pmd-vs-dft.ini')
     # plot_energy_relation(fname='graph_initial.eps')
 
-    maxiter= inputs['num_iteration']
-
-    if inputs['fitting_method'] in {'cg','CG','conjugate-gradient'}:
+    if fmethod in {'cg','CG','conjugate-gradient'}:
         print '>>>>> conjugate-gradient was selected.'
-        solution= opt.fmin_cg(func,vars,maxiter=maxiter,disp=True
-                              ,epsilon=1e-3)
+        solution= opt.fmin_cg(func,vars,args=(maindir,),maxiter=niter,disp=True
+                              ,epsilon=eps,gtol=gtol)
         print ' CG solution:',solution
-    elif inputs['fitting_method'] in {'qn','quasi-Newtown','QN','bfgs','BFGS'}:
+    elif fmethod in {'qn','quasi-Newtown','QN','bfgs','BFGS'}:
         print '>>>>> quasi-Newton was selected.'
-        solution= opt.fmin_bfgs(func,vars,maxiter=maxiter,disp=True
-                                ,epsilon=1e-4,gtol=1e-1)
+        solution= opt.fmin_bfgs(func,vars,args=(maindir,),maxiter=niter,disp=True
+                                ,epsilon=eps,gtol=gtol)
         print ' QN solution:',solution
-    elif inputs['fitting_method'] in {'NM','Nelder-Mead','downhill-simplex'}:
+    elif fmethod in {'NM','Nelder-Mead','downhill-simplex'}:
         print '>>>>> Nelder-Mead was selected.'
-        solution= opt.fmin(func,vars,maxiter=maxiter,disp=True)
+        solution= opt.fmin(func,vars,args=(maindir,),maxiter=niter,disp=True)
         print ' NM solution:',solution
-    elif inputs['fitting_method'] in {'ga','GA','genetic-algorithm'}:
+    elif fmethod in {'ga','GA','genetic-algorithm'}:
         print '>>>>> genetic algorithm was selected.'
-    elif inputs['fitting_method'] in {'test','TEST'}:
+    elif fmethod in {'test','TEST'}:
         print '>>>>> TEST was selected.'
-        func(vars)
+        func(vars,(maindir))
 
     output_energy_relation(fname='out.pmd-vs-dft.fin')
     #plot_energy_relation(fname='graph_final.eps')

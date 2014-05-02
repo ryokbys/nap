@@ -24,6 +24,14 @@ def read_input(fname='in.fitpot'):
         dict['num_samples']= int(dict['num_samples'])
     if 'num_iteration' in dict:
         dict['num_iteration']= int(dict['num_iteration'])
+    if 'eps' in dict:
+        dict['eps']= float(dict['eps'])
+    if 'xtol' in dict:
+        dict['xtol']= float(dict['xtol'])
+    if 'gtol' in dict:
+        dict['gtol']= float(dict['gtol'])
+    if 'ftol' in dict:
+        dict['ftol']= float(dict['ftol'])
     return dict
 
 
