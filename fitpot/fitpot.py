@@ -190,7 +190,13 @@ def func(x,*args):
     
     #.....run pmd in all sample directories
     os.chdir(inputs['main_directory'])
-    os.system('./successively_run_pmd.sh')
+    if inputs['run_mode'] in {'serial','Serial','SERIAL'}:
+        os.system('./serial_run_pmd.sh '+inputs['param_file'])
+    elif inputs['run_mode'] in {'parallel','Parallel','PARALLEL'}:
+        os.system('./parallel_run_pmd.py '+inputs['param_file'])
+    else:
+        print "{:*>20}: no such run_mode !!!".format(' Error', inputs['run_mode'])
+        exit()
     os.chdir(cwd)
 
     #.....gather pmd results
@@ -214,7 +220,13 @@ def func(x,*args):
     print ' x, val=',x,val
     return val
 
-#================================================== plotting functions
+#================================================== output data
+def output_energy_relation(fname='out.pmd-vs-dft'):
+    f= open(fname,'w')
+    for i in range(len(ergrefs)):
+        f.write(' {:15.7e} {:15.7e}\n'.format(ergrefs[i],ergpmds[i]))
+    f.close()
+
 def plot_energy_relation(fname='graph.eps'):
     x=ergrefs
     y=ergpmds
@@ -233,9 +245,6 @@ def plot_energy_relation(fname='graph.eps'):
     plt.savefig(fname)
     #plt.show()
     
-
-#============================================= minimization methods
-
 #============================================= main routine hereafter
 if __name__ == '__main__':
     print "{:=^72}".format(' FITPOT ')
@@ -255,16 +264,17 @@ if __name__ == '__main__':
         print '{:*>20}: num_samples in in.fitpot is wrong.'.format(' Error')
         exit()
     read_pos()
-#     for smpl in samples:
-#         print smpl.id, smpl.natm
+    # for smpl in samples:
+    #     print smpl.id, smpl.natm
 
     #.....initial data
     gather_ref_data()
     gather_pmd_data()
-#     print ergrefs
-#     print ergpmds
+    #     print ergrefs
+    #     print ergpmds
 
-    plot_energy_relation(fname='graph_initial.eps')
+    output_energy_relation(fname='out.pmd-vs-dft.ini')
+    # plot_energy_relation(fname='graph_initial.eps')
 
     maxiter= inputs['num_iteration']
 
@@ -286,9 +296,10 @@ if __name__ == '__main__':
         print '>>>>> genetic algorithm was selected.'
     elif inputs['fitting_method'] in {'test','TEST'}:
         print '>>>>> TEST was selected.'
-        #func(vars)
+        func(vars)
 
-    plot_energy_relation(fname='graph_final.eps')
+    output_energy_relation(fname='out.pmd-vs-dft.fin')
+    #plot_energy_relation(fname='graph_final.eps')
 
     print '{:=^72}'.format(' FITPOT finished correctly ')
     print '   Elapsed time = {:12.2f}'.format(time.time()-t0)
