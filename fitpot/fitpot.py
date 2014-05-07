@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 #.....import from local modules
 from parse_input import read_input
 from MD_system import MD_system
+from ga import GA
 
 #.....global variables
 samples= []
@@ -27,6 +28,7 @@ prange=[]
 nprms= 0
 rcut= 0.0
 vars= []
+vranges=[]
 
 #.....input parameters
 nsmpl= 1
@@ -39,6 +41,10 @@ xtol= 1e-5
 gtol= 1e-5
 ftol= 1e-5
 eps = 1e-8
+#.....GA parameters
+ga_nindv= 10
+ga_nbit= 16
+ga_temp= 1.0
 
 #.....constants
 large= 1.0e+30
@@ -72,7 +78,7 @@ def read_params(fname):
     The in.params.???? can have the range of each parameter.
     And for the parameters to be fixed can be also set.
     """
-    global nprms,rcut,params,pmax,pmin,prange
+    global nprms,rcut,params,prange
     f=open(fname,'r')
     data=f.readline().split()
     nprms= int(data[0])
@@ -94,7 +100,7 @@ def read_params(fname):
             prange[i,0]=  float(data[1])
             prange[i,1]=  float(data[2])
     f.close()
-    params_to_vars(params)
+    params_to_vars(params,prange)
     print ' number of variables to be fitted=',len(vars)
 
 def write_params(fname,x):
@@ -113,17 +119,20 @@ def write_params(fname,x):
                                                           prange[i,1]))
     f.close()
 
-def params_to_vars(x):
+def params_to_vars(x,xrange):
     global vars
     nvars= 0
     for i in range(nprms):
-        if prange[i,0] != prange[i,1]:
+        if xrange[i,0] != xrange[i,1]:
             nvars += 1
     vars= np.zeros(nvars)
+    vranges np.zeros(nvars,2)
     j=0
     for i in range(nprms):
-        if prange[i,0] != prange[i,1]:
+        if xrange[i,0] != xrange[i,1]:
             vars[j]= x[i]
+            vranges[j,0]= xrange[i,0]
+            vranges[j,1]= xrange[i,1]
             j += 1
 
 def vars_to_params(x):
@@ -156,6 +165,14 @@ def set_input_params(dict):
         gtol= dict['gtol']
     if 'ftol' in dict:
         ftol= dict['ftol']
+    #.....GA parameters
+    if 'ga_num_individuals' in dict:
+        ga_nindv= dict['ga_num_individuals']
+    if 'ga_num_bit' in dict:
+        ga_nbit= dict['ga_num_bit']
+    if 'ga_temperature' in dict:
+        ga_temp= dict['ga_temperature']
+
     
 def show_input_params(input_params):
     print '>>>>> input parameters:'
@@ -239,6 +256,7 @@ def func(x,*args):
     nval= 0
     for i in range(len(samples)):
         val += ((ergpmds[i]-ergrefs[i])/ergrefs[i])**2
+        nval += 1
         natm= samples[i].natm
         for j in range(natm):
             for k in range(3):
@@ -276,6 +294,28 @@ def plot_energy_relation(fname='graph.eps'):
     plt.ylim(xmin,xmax)
     plt.savefig(fname)
     #plt.show()
+
+#================================================== GA wrapper
+def fitfunc(val):
+    return exp(-val/ga_temp)
+
+def ga_wrapper():
+    ga_check_range()
+    ga= GA(ga_nindv,ga_nbit,vars,vranges,fitfunc,args=(maindir,))
+    return ga.run(niter)
+
+def ga_check_range():
+    wrong=False
+    for i in range(len(vars)):
+        min= vranges[i,0]
+        max= vranges[i,1]
+        if abs(max-min) > 2.0**ga_nbit:
+            wrong= True
+            print ' A range seems to be too wide [{},{}]'.format(min,max)
+    if wrong:
+        print '{:*>20}: Some ranges are too wide.'.format(' Error')
+        print '  Hoping you know what you are doing...'
+        exit()
     
 #============================================= main routine hereafter
 if __name__ == '__main__':
@@ -297,17 +337,12 @@ if __name__ == '__main__':
         print '{:*>20}: num_samples in in.fitpot is wrong.'.format(' Error')
         exit()
     read_pos()
-    # for smpl in samples:
-    #     print smpl.id, smpl.natm
 
     #.....initial data
     gather_ref_data()
     gather_pmd_data()
-    #     print ergrefs
-    #     print ergpmds
 
     output_energy_relation(fname='out.pmd-vs-dft.ini')
-    # plot_energy_relation(fname='graph_initial.eps')
 
     if fmethod in {'cg','CG','conjugate-gradient'}:
         print '>>>>> conjugate-gradient was selected.'
@@ -325,12 +360,15 @@ if __name__ == '__main__':
         print ' NM solution:',solution
     elif fmethod in {'ga','GA','genetic-algorithm'}:
         print '>>>>> genetic algorithm was selected.'
+        solution= ga_wrapper()
     elif fmethod in {'test','TEST'}:
         print '>>>>> TEST was selected.'
         func(vars,(maindir))
+        solution= vars
 
+    write_params(maindir+'/'+parfile+'.fin',solution)
+    
     output_energy_relation(fname='out.pmd-vs-dft.fin')
-    #plot_energy_relation(fname='graph_final.eps')
 
     print '{:=^72}'.format(' FITPOT finished correctly ')
     print '   Elapsed time = {:12.2f}'.format(time.time()-t0)

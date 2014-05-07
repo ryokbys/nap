@@ -5,3 +5,7 @@ fitting_method  test
 main_directory  learning_set
 param_file     in.params.SW_Si
 run_mode       serial
+
+ga_num_individuals  5
+ga_num_bit          16
+
