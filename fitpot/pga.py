@@ -210,14 +210,12 @@ class GA:
         prob= []
         for ind in self.population:
             prob.append(self.fitfunc(ind.value))
-        print prob
 
         self.keep_best_individual()
 
         istore=[]
         for i in range(len(self.population)):
             istore.append(0)
-        print istore
 
         for i in range(self.nindv):
             ptot= 0.0
@@ -225,6 +223,7 @@ class GA:
                 if istore[ii] == 1: continue
                 ptot += prob[ii]
             prnd= random()*ptot
+            print i,ptot
             ptot= 0.0
             for ii in range(len(self.population)):
                 if istore[ii] == 1: continue
@@ -233,7 +232,6 @@ class GA:
                 if prnd < ptot:
                     istore[ii]= 1
                     break
-        print istore
 
         while istore.count(0) > 0:
             idx= istore.index(0)
@@ -255,13 +253,15 @@ class GA:
         for i in range(self.nindv):
             qs.append(Queue())
             prcs.append(Process(target=self.population[i].calc_func_value,
-                                args=(i,qs[i])))
+                                args=(i+1,qs[i])))
         for p in prcs:
             p.start()
         for p in prcs:
             p.join()
         for i in range(self.nindv):
             self.population[i].value= qs[i].get()
+
+        self.keep_best_individual()
 
         for it in range(maxiter):
             print ' step= {:8d}'.format(it+1)
@@ -281,9 +281,9 @@ class GA:
             qs= []
             for i in range(self.nindv,len(self.population)):
                 j= i -self.nindv
-                qs.append(QUeue())
+                qs.append(Queue())
                 prcs.append(Process(target=self.population[i].calc_func_value,
-                                    args=(j,qs[j])))
+                                    args=(j+1,qs[j])))
             for p in prcs:
                 p.start()
             for p in prcs:
@@ -291,6 +291,8 @@ class GA:
             for i in range(self.nindv,len(self.population)):
                 j= i -self.nindv
                 self.population[i].value= qs[j].get()
+            for pop in self.population:
+                print pop.value
             #.....selection
             self.roulette_selection()
             #.....output the current best if needed
@@ -300,7 +302,7 @@ class GA:
         print '  ID= {:05d}'.format(best.id)
         print '  value= {:15.7f}'.format(best.value)
         print '  variables= ',best.get_variables()
-        return best.value
+        return best.get_variables()
 
     def out_current_best(self):
         best= self.best_individual

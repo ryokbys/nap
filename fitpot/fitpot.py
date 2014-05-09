@@ -9,11 +9,12 @@ import glob
 import numpy as np
 import scipy.optimize as opt
 import matplotlib.pyplot as plt
+import math
 
 #.....import from local modules
 from parse_input import read_input
 from MD_system import MD_system
-from ga import GA
+from pga import GA
 
 #.....global variables
 samples= []
@@ -119,20 +120,20 @@ def write_params(fname,x):
                                                           prange[i,1]))
     f.close()
 
-def params_to_vars(x,xrange):
-    global vars
+def params_to_vars(x,xr):
+    global vars,vranges
     nvars= 0
     for i in range(nprms):
-        if xrange[i,0] != xrange[i,1]:
+        if xr[i,0] != xr[i,1]:
             nvars += 1
     vars= np.zeros(nvars)
-    vranges np.zeros(nvars,2)
+    vranges= np.zeros([nvars,2])
     j=0
     for i in range(nprms):
-        if xrange[i,0] != xrange[i,1]:
+        if xr[i,0] != xr[i,1]:
             vars[j]= x[i]
-            vranges[j,0]= xrange[i,0]
-            vranges[j,1]= xrange[i,1]
+            vranges[j,0]= xr[i,0]
+            vranges[j,1]= xr[i,1]
             j += 1
 
 def vars_to_params(x):
@@ -144,7 +145,8 @@ def vars_to_params(x):
             j += 1
 
 def set_input_params(dict):
-    global nsmpl,niter,fmethod,maindir,parfile,runmode,eps,xtol,gtol,ftol
+    global nsmpl,niter,fmethod,maindir,parfile,runmode,eps,xtol,gtol,ftol \
+           ,ga_nindv,ga_nbit,ga_temp
     if 'num_samples' in dict:
         nsmpl= dict['num_samples']
     if 'num_iteration' in dict:
@@ -179,7 +181,7 @@ def show_input_params(input_params):
     for key,value in input_params.items():
         print ' {:>20}: '.format(key), value
 
-def gather_pmd_data():
+def gather_pmd_data(basedir):
     global ergpmds,frcpmds
     #.....initialize variables
     ergpmds=np.zeros(len(samples))
@@ -190,10 +192,10 @@ def gather_pmd_data():
         dir= sample_dirs[i]
         smpl= samples[i]
         #.....force
-        ff=open(maindir+'/'+dir+'/frc.pmd','r')
+        ff=open(basedir+'/'+dir+'/frc.pmd','r')
         natm= int(ff.readline().split()[0])
         #.....energy
-        f=open(maindir+'/'+dir+'/erg.pmd','r')
+        f=open(basedir+'/'+dir+'/erg.pmd','r')
         ergpmds[i]= float(f.readline().split()[0])/natm
         f.close()
         for j in range(natm):
@@ -202,7 +204,7 @@ def gather_pmd_data():
                 frcpmds[i][j,k]= float(data[k])
         ff.close()
 
-def gather_ref_data():
+def gather_ref_data(basedir):
     global ergrefs,frcrefs
     #.....initialize variables
     ergrefs=np.zeros(len(samples))
@@ -213,10 +215,10 @@ def gather_ref_data():
         dir= sample_dirs[i]
         smpl= samples[i]
         #.....force
-        ff=open(maindir+'/'+dir+'/frc.ref','r')
+        ff=open(basedir+'/'+dir+'/frc.ref','r')
         natm= int(ff.readline().split()[0])
         #.....energy
-        f=open(maindir+'/'+dir+'/erg.ref','r')
+        f=open(basedir+'/'+dir+'/erg.ref','r')
         ergrefs[i]= float(f.readline().split()[0])/natm
         f.close()
         #.....read forces
@@ -239,6 +241,7 @@ def func(x,*args):
     
     #.....run pmd in all sample directories
     os.chdir(dir)
+    #print os.getcwd(),dir
     if runmode in {'serial','Serial','SERIAL'}:
         os.system('./serial_run_pmd.sh '+parfile)
     elif runmode in {'parallel','Parallel','PARALLEL'}:
@@ -247,9 +250,10 @@ def func(x,*args):
         print "{:*>20}: no such run_mode !!!".format(' Error', runmode)
         exit()
     os.chdir(cwd)
+    print ' running pmd done.'
 
     #.....gather pmd results
-    gather_pmd_data()
+    gather_pmd_data(dir)
 
     #.....calc function value of L
     val= 0.0
@@ -297,11 +301,11 @@ def plot_energy_relation(fname='graph.eps'):
 
 #================================================== GA wrapper
 def fitfunc(val):
-    return exp(-val/ga_temp)
+    return math.exp(-val/ga_temp)
 
 def ga_wrapper():
     ga_check_range()
-    ga= GA(ga_nindv,ga_nbit,vars,vranges,fitfunc,args=(maindir,))
+    ga= GA(ga_nindv,ga_nbit,func,vars,vranges,fitfunc,args=(maindir,))
     return ga.run(niter)
 
 def ga_check_range():
@@ -339,8 +343,8 @@ if __name__ == '__main__':
     read_pos()
 
     #.....initial data
-    gather_ref_data()
-    gather_pmd_data()
+    gather_ref_data(maindir)
+    gather_pmd_data(maindir)
 
     output_energy_relation(fname='out.pmd-vs-dft.ini')
 

@@ -1,13 +1,4 @@
 #!/usr/local/bin/python
-#PBS -N fitpot_pmd
-#PBS -o out
-#PBS -q batch
-#PBS -j oe
-#PBS -l nodes=4:ppn=2
-#-----------------------------------------------------------------------
-# Usage:
-#   $ qsub parallel_run_pmd.py
-#-----------------------------------------------------------------------
 
 import os,sys,glob,subprocess
 
@@ -18,52 +9,58 @@ if len(sys.argv) != 2:
 
 fparam= sys.argv[1]
 
-#os.system('hostname')
-#os.chdir(os.environ.get('PBS_O_WORKDIR'))
-
 dirs= glob.glob('0????')
 dirs.sort()
 #print dirs
 
-#nodefname= os.environ.get('PBS_NODEFILE')
 nodefname= 'nodelist.txt'
+if not os.path.exists(nodefname):
+    print ' [Error] {} does not exist !!!'.format(nodefname)
+    sys.exit()
 nodefile=open(nodefname,'r')
 nodes=[]
 for line in nodefile.readlines():
     nodes.append(line.split()[0])
 nodefile.close()
-#print nodes
 
-pmdsrc= os.environ.get('HOME')+'/src/pmd'
-expand_pmd= pmdsrc+'/util/expand_pmd.rb'
-pmd= pmdsrc+'/src/pmd'
-reduce= pmdsrc+'/fitpot/reduce_erg_frc.py'
-
+#...assign to-be-computed directories to each node
+dir_per_node= []
+ndir_per_node= len(dirs)/len(nodes) +1
 idir= 0
 done= False
-while True:
-    procs=[]
-    nproc=0
-    for node in nodes:
+for node in nodes:
+    arr= []
+    for i in range(ndir_per_node):
         if idir >= len(dirs):
             done= True
             break
-        dir= dirs[idir]
-        #.....create node file for pmd run
-        fname='/tmp/node_for_{}'.format(dir)
-        f= open(fname,'w')
-        f.write(node+'\n')
-        f.close()
-        cmd='mpiexec -recvtimeout 100 -machinefile {}'.format(fname) \
-             + ' -np 1 ./run_pmd.sh {} {}'.format(dir,fparam)
-        arg= cmd.split()
-        procs.append(subprocess.Popen(arg))
-        nproc += 1
+        arr.append(dirs[idir])
         idir += 1
-    for i in range(nproc):
-        procs[i].wait()
+    if len(arr) != 0:
+        dir_per_node.append(arr)
     if done:
         break
-    
-    
+
+procs= []
+for inode in range(len(nodes)):
+    node= nodes[inode]
+    dir_list= dir_per_node[inode]
+    str= ""
+    for dir in dir_list:
+        str += " "+dir
+    #...create node file for pmd run
+    fname='/tmp/nodefile_{}'.format(node)
+    f= open(fname,'w')
+    f.write(node+'\n')
+    f.close()
+    #...run run_pmd.sh on the remote node
+    # cmd='mpirun --hostfile {}'.format(fname) \
+    #      + ' -np 1 ./run_pmd.sh {} {}'.format(fparam,str)
+    cmd='rsh {} "cd {} && ./run_pmd.sh {} {}"'.format(node,os.getcwd(),fparam,str)
+    #arg= cmd.split()
+    #procs.append(subprocess.Popen(arg))
+    procs.append(subprocess.Popen(cmd,shell=True))
+for i in range(len(procs)):
+    procs[i].wait()
+
 print " running pmd done."

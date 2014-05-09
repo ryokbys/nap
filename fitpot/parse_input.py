@@ -32,6 +32,13 @@ def read_input(fname='in.fitpot'):
         dict['gtol']= float(dict['gtol'])
     if 'ftol' in dict:
         dict['ftol']= float(dict['ftol'])
+    # ga parameters
+    if 'ga_num_individuals' in dict:
+        dict['ga_num_individuals']= int(dict['ga_num_individuals'])
+    if 'ga_num_bit' in dict:
+        dict['ga_num_bit']= int(dict['ga_num_bit'])
+    if 'ga_temperature' in dict:
+        dict['ga_temperature']= float(dict['ga_temperature'])
     return dict
 
 
