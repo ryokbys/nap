@@ -8,24 +8,9 @@
 CPP= @CPP@
 CPPFLAGS= @CPPFLAGS@
 #CPPFLAGS= __SHEAR__ __DISL__
-FC= @F77@
-FFLAGS= @FFLAGS@
+FC= @FC@
+FFLAGS= @FCFLAGS@
 
-#-----------------------------------------------------------------------
-# ifort and linux (pen4)
-# FC= ifort
-# FFLAGS= -xHOST -O2 -no-prec-div -g -CB
-#FFLAGS= -xAVX -O3 -ip -ipo -g -CB
-
-#-----------------------------------------------------------------------
-# Fujitsu FX1 @nagoya-u
-# MPIFC=mpifrt
-# MPIFLAGS= -Kprefetch_model=FX1 -Ktl_trt
-
-#-----------------------------------------------------------------------
-# # for mp-rk
-# MPIFC= mpif90
-# MPIFLAGS= -O4 -g
 #-----------------------------------------------------------------------
 # suffixes
 .SUFFIXES: .o .f .F .f90 .F90

@@ -1,5 +1,9 @@
 2014-05-22    <kobayashi@mike.bw.nitech.ac.jp>
 
+	* configure scripts in some directories were unified to nap/configure.
+
+	* NAP/util was moved to NAP/pmd/util.
+
 	* NAP took qmcl and neb into its package.
 
 	* .git/config: package name was changed to NAP (Nagoya Atomistic simulation Package ;).

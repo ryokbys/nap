@@ -13,14 +13,22 @@ CPPFLAGS= @CPPFLAGS@
 MPIFC= @FC@
 MPIFLAGS= @FCFLAGS@
 
-all: 
-	cd src; make all
-	cp src/{pmd,nconv,combine,pmd2akr,akr2cna} .
+all: pmd qmcl neb
+# 	cd pmd; make all
+# 	cp pmd/{pmd,nconv,combine,pmd2akr,akr2cna} .
 
 clean:
-	cd src; make clean
-	cd mkconf; make clean
+	$(cd pmd; make clean)
+	$(cd mkconf; make clean)
+	$(cd qmcl; make clean)
+	$(cd neb; make clean)
 
-pmd:
-	cd src; make pmd
+pmd: pmd/parallel_md.F
+	$(cd pmd; make pmd nconv combine pmd2akr akr2cna)
+
+qmcl: qmcl/qmcl.F
+	$(cd qmcl; make qmcl)
+
+neb: neb/neb.F
+	$(cd neb; make neb)
 

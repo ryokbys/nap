@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.59])
-AC_INIT([pmd], [2.0.0], [kobayashi.ryo@nitech.ac.jp])
-AC_CONFIG_SRCDIR([src/parallel_md.F])
+AC_INIT([nap], [2.0.0], [kobayashi.ryo@nitech.ac.jp])
+AC_CONFIG_SRCDIR([pmd/parallel_md.F])
 #AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
@@ -19,5 +19,5 @@ AC_PATH_PROG([PYTHON],[python])
 
 # Checks for library functions.
 
-AC_CONFIG_FILES([makefile src/makefile mkconf/makefile fitpot/run_pmd.sh])
+AC_CONFIG_FILES([pmd/makefile mkconf/makefile fitpot/run_pmd.sh qmcl/makefile neb/makefile])
 AC_OUTPUT

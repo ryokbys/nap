@@ -7,34 +7,8 @@
 # cpp path
 CPP= @CPP@
 CPPFLAGS= @CPPFLAGS@
-FC= @F77@
-FFLAGS= @FFLAGS@
-
-#-----------------------------------------------------------------------
-# ifort and linux (pen4)
-#FC= /opt/intel/Compiler/11.0/081/bin/intel64/ifort
-#FC= /opt/intel/Compiler/11.1/073/bin/intel64/ifort
-#FFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB -check all
-#MPIFC= /usr/local/gridmpi-2.1.1/intel/bin/mpif90
-#MPIFC= /usr/local/mpich-1.2.6/intel/bin/mpif90
-#MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
-# MPIFC= mpif90
-#MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
-
-#-----------------------------------------------------------------------
-# helios @Rokkasho
-# FC= ifort
-# FFLAGS= -xAVX -O3 -ip -ipo -g -CB
-
-#-----------------------------------------------------------------------
-# Fujitsu FX1 @nagoya-u
-# MPIFC=mpifrt
-# MPIFLAGS= -Kprefetch_model=FX1 -Ktl_trt
-
-#-----------------------------------------------------------------------
-# # for mp-rk
-# MPIFC= mpif90
-# MPIFLAGS= -O4 -g
+FC= @FC@
+FFLAGS= @FCFLAGS@
 
 #-----------------------------------------------------------------------
 # suffixes
