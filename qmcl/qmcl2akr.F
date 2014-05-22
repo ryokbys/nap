@@ -7,7 +7,7 @@ c-----------------------------------------------------------------------
       integer:: natm,i,ia,ib,l,ncpx,ncpy,ncpz,natmt,m,ix,iy,iz
      &     ,iqm,ic,mis,nac,naqm
       integer,allocatable:: idqm(:),idclst(:)
-      real(8):: h(3,3,0:1),ht(3,3,0:1),dcpx,dcpy,dcpz
+      real(8):: h(3,3,0:1),ht(3,3,0:1),dcpx,dcpy,dcpz,hunit
       real(8),allocatable:: ra(:,:),tag(:),va(:,:),eki(:),epi(:)
      &     ,strs(:,:,:)
       real(8),allocatable:: rat(:,:),vat(:,:),tagt(:),ekit(:),epit(:)
@@ -32,10 +32,12 @@ c.....Read out.idclst and out.idqm
       close(11)
 
 c.....Read qmcl file from standard input
+      read(5,*) hunit
+      read(5,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+      h(1:3,1:3,0:1)= h(1:3,1:3,0:1) *hunit
       read(5,*) natm
       allocate(ra(3,natm),tag(natm),va(3,natm),eki(natm),epi(natm)
      &     ,strs(3,3,natm))
-      read(5,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       mis= 0
       do i=1,natm
         read(5,*) tag(i),ra(1:3,i),va(1:3,i)
@@ -92,8 +94,9 @@ c      stop
         enddo
       enddo
 
+      write(6,'(es15.7)') hunit
+      write(6,'(3es15.7)') ((ht(ia,ib,0)/hunit,ia=1,3),ib=1,3)
       write(6,'(i10,3i4)') natmt, 8, 0, 0
-      write(6,'(3es15.7)') ((ht(ia,ib,0),ia=1,3),ib=1,3)
       do i=1,natmt
         write(6,'(i3,3es12.4,10es11.3)') int(tagt(i)),rat(1:3,i)
      &       ,ekit(i),epit(i)

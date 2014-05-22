@@ -98,27 +98,14 @@ c-----scale velocities to reduced unit
       enddo
 
 c.....output 'akr000' for Akira visualization
-      open(15,file='akr0000',form='formatted',status='replace')
-      write(15,'(i10,3i5)') natm, 3, 0, 0
-      write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
-      do i=1,natm
-        write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
+      call write_akr(15,'akr0000',natm,h,cunit,tag,ra,va)
 
 c.....output 'akrref' for Akira visualization
-      open(16,file='akrref',form='formatted',status='replace')
-      write(16,'(i10,3i5)') natm, 3, 0, 0
-      write(16,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
-      do i=1,natm
-        write(16,'(i3,6es11.3)') int(tag(i)),ra0(1:3,i)
-     &       ,ra(1:3,i)-ra0(1:3,i)
-      enddo
-      close(16)
+      call write_akr(15,'akrref',natm,h,cunit,tag,ra0,va)
 
 c.....output 'pmdref'
       call write_pmd0_ascii(15,'pmdref','replace',natm,tag,ra0,va,h
-     &     ,eki,epi,strs)
+     &     ,cunit,eki,epi,strs)
 
       do i=1,natm
         if( ra(3,i).ge.1d0 ) ra(3,i)=ra(3,i)-1d0
@@ -126,7 +113,7 @@ c.....output 'pmdref'
       enddo
 
       call write_pmd0_ascii(15,'pmd00000','replace',natm,tag,ra,va,h
-     &     ,eki,epi,strs)
+     &     ,cunit,eki,epi,strs)
       
       
       end program mkconf_BCC

@@ -12,7 +12,7 @@ c-----------------------------------------------------------------------
 
       integer:: nox,noy,noz,nodeso,nnx,nny,nnz,nodesn,i,j,k,l,m,n
      &     ,nlast,ia,ib,myx,myy,myz
-      real(8):: sxog,syog,szog,h(3,3,0:1)
+      real(8):: sxog,syog,szog,h(3,3,0:1),hunit
       real(8):: tag(namax),tagt(namax)
       real(8):: ra(3,namax),va(3,namax),eki(namax),epi(namax)
      &     ,strs(3,3,namax)
@@ -75,6 +75,8 @@ c        read(12) (tag(j),ra(1:3,j),va(1:3,j)
 c     &       ,eki(j),epi(j),strs(1:3,1:3,j),j=nlast+1,nlast+n)
 c.....Ascii format
         open(12,file=trim(filename),form='formatted',status='old')
+        read(12,*) hunit
+        read(12,*) (((h(ia,ib,l)*hunit,ia=1,3),ib=1,3),l=0,1)
         read(12,*) n
         write(6,'(a,i10)') " n=",n
         if(nlast+n.gt.namax)then
@@ -82,7 +84,6 @@ c.....Ascii format
           write(6,'(a,2i10)') ' nlast+n,namax =',nlast+n,namax
           stop
         endif
-        read(12,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
         read(12,*) (tag(j),ra(1:3,j),va(1:3,j)
      &       ,eki(j),epi(j),strs(1:3,1:3,j),j=nlast+1,nlast+n)
 c.....Some check
@@ -136,7 +137,7 @@ c.....Some check
 c        call write_pmd0_bin(12,filename,'replace',n,tagt,rat,vat,h
 c     &       ,ekit,epit,strst)
         call write_pmd0_ascii(12,filename,'replace',n,tagt,rat,vat,h
-     &       ,ekit,epit,strst)
+     &       ,hunit,ekit,epit,strst)
       enddo
 
       write(6,'(a)') ' You must replace num_nodes_? values in in.pmd'

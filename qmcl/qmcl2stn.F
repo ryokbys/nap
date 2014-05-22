@@ -34,9 +34,9 @@ c-----------------------------------------------------------------------
  1    continue
 
       call read_pmd_ascii(10,trim(cref)
-     &     ,namax,natm,h0,tag,ra0,va,eki,epi,strs)
+     &     ,namax,natm,h0,hunit,tag,ra0,va,eki,epi,strs)
       call read_pmd_ascii(11,trim(cin)
-     &     ,namax,natm,h,tag,ra,va,eki,epi,strs)
+     &     ,namax,natm,h,hunit,tag,ra,va,eki,epi,strs)
 
 c.....Some conversions
       do i=1,natm
@@ -54,8 +54,9 @@ c.....Calc atomic strain
       call get_atomic_strain()
 
       open(12,file=trim(cout),status='replace')
+      write(12,'(es15.7)') hunit
+      write(12,'(3es15.7)') ((h(ia,ib,0)/hunit,ia=1,3),ib=1,3)
       write(12,'(i10,3i4)') natm, 8, 0, 0
-      write(12,'(3es15.7)') ((h(ia,ib,0),ia=1,3),ib=1,3)
       do i=1,natm
         write(12,'(i3,3es12.4,10es11.3)') int(tag(i)),ra(1:3,i)
      &       ,eki(i),epi(i)

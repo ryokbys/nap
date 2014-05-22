@@ -22,7 +22,7 @@
 !      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 2, 0 /)
       integer:: ix,iy,iz,inc,nh
-      real(8):: ua(3,nuamax),uh(3)
+      real(8):: ua(3,nuamax),uh(3),hunit
       real(8):: tag(nmax),ra(3,nmax),va(3,nmax),eki(nmax),epi(nmax) &
            ,h(3,3,0:1),strs(3,3,nmax),h0(3,3),s(3),ymax,ymin,dseed,rnd
 !.....H density in atomic ppm
@@ -49,9 +49,10 @@
       daa = sqrt(3d0)/2 *alcfe
       write(6,'(a,es12.4,a)') " Lattice constant =",alc," [Bohr]"
       write(6,'(a,es12.4,a)') " Fe-Fe bond length=",daa," [Bohr]"
+      hunit= alc
 
-      call set_system_1(h0,nuamax,ua,alc,uh)
-!      call set_system_2(h0,nuamax,ua,alc,uh)
+      call set_system_1(h0,nuamax,ua,hunit,uh)
+!      call set_system_2(h0,nuamax,ua,hunit,uh)
 
 !.....simulation box size
       h(1:3,1:3,0:1)= 0d0
@@ -148,13 +149,14 @@
 
       va(1:3,1:inc)= 0d0
 
-      call write_pmd_ascii(15,'pmd000-000',inc,h,tag,ra,va &
+      call write_pmd_ascii(15,'pmd000-000',inc,h,hunit,tag,ra,va &
            ,eki,epi,strs)
       
 !-----output 'akr000' for Akira visualization
       open(15,file='akr000',form='formatted',status='replace')
+      write(15,'(es15.7)') hunit
+      write(15,'(3es11.3)') ((h(ia,ib,0)/hunit,ia=1,3),ib=1,3)
       write(15,'(i10,3i5)') inc, 3, 0, 0
-      write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
       do i=1,inc
         write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
       enddo

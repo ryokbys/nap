@@ -9,6 +9,7 @@ c-----------------------------------------------------------------------
       integer:: naini,nafin,i,j,ia,ib,nslc,natm
       real(8):: raini(3,namax),rafin(3,namax)
      &     ,tagini(namax),tagfin(namax),hini(3,3,0:1),hfin(3,3,0:1)
+     &     ,hunit
       real(8):: rd(3,namax),h(3,3,0:1),tag(namax),va(3,namax)
       character:: cnum*3,argv*128
       integer:: nargc
@@ -30,8 +31,10 @@ c.....Read tempini if there is
       endif
 
 c.....Get initial and final atom configurations
-      call read_atom_conf(10,'nebini',namax,naini,hini,raini,tagini)
-      call read_atom_conf(10,'nebfin',namax,nafin,hfin,rafin,tagfin)
+      call read_atom_conf(10,'nebini',namax,naini,hini,hunit
+     &     ,raini,tagini)
+      call read_atom_conf(10,'nebfin',namax,nafin,hfin,hunit
+     &     ,rafin,tagfin)
 c.....Check some
       if( naini.ne.nafin ) stop ' [Error] naini .ne. nafin !!!'
       natm= naini
@@ -45,12 +48,13 @@ c.....Make slices
         call setv(natm,va,tag,tempini)
         write(cnum(1:3),'(i3.3)') i
         write(6,'(a)') ' writing neb'//cnum//'...'
-        call write_atom_conf(20,'neb'//cnum,natm,h
+        call write_atom_conf(20,'neb'//cnum,natm,h,hunit
      &       ,raini(1:3,1:natm)+rd(1:3,1:natm)*(i-1),va,tag)
 c.....Write akr file
         open(21,file='akr'//cnum,status='replace')
+        write(21,'(es15.7)') hunit
+        write(21,'(3es11.3)') ((h(ia,ib,0)/hunit,ia=1,3),ib=1,3)
         write(21,'(i10,3i5)') natm, 3, 0, 0
-        write(21,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
         do j=1,natm
           write(21,'(i3,6es11.3)') int(tag(j))
      &         ,raini(1:3,j)+rd(1:3,j)*(i-1)
@@ -61,18 +65,20 @@ c.....Write akr file
 
       end program make_slices
 c=======================================================================
-      subroutine read_atom_conf(ionum,cfname,namax,natm,h,ra,tag)
+      subroutine read_atom_conf(ionum,cfname,namax,natm,h,hunit,ra,tag)
       implicit none
       integer,intent(in):: namax,ionum
       character(len=*),intent(in):: cfname
-      real(8),intent(out):: ra(3,namax),tag(namax),h(3,3,0:1)
+      real(8),intent(out):: ra(3,namax),tag(namax),h(3,3,0:1),hunit
       integer,intent(out):: natm
 
       integer:: ia,ib,l,i
 
       open(ionum,file=trim(cfname),status='old')
-      read(ionum,*) natm
+      read(ionum,*) hunit
       read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+      h(1:3,1:3,0:1)= h(1:3,1:3,0:1) *hunit
+      read(ionum,*) natm
       do i=1,natm
         read(ionum,*) tag(i),ra(1:3,i)
       enddo
@@ -80,18 +86,21 @@ c=======================================================================
       
       end subroutine read_atom_conf
 c=======================================================================
-      subroutine write_atom_conf(ionum,cfname,natm,h,ra,va,tag)
+      subroutine write_atom_conf(ionum,cfname,natm,h,hunit,ra,va,tag)
       implicit none
       integer,intent(in):: natm,ionum
       character(len=*),intent(in):: cfname
       real(8),intent(in):: h(3,3,0:1),ra(3,natm),va(3,natm),tag(natm)
+     &     ,hunit
 
       integer:: ia,ib,l,i
       real(8):: ri(3)
 
       open(ionum,file=trim(cfname),status='replace')
+      write(ionum,'(es23.14e3)') hunit
+      write(ionum,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3)
+     &     ,ib=1,3),l=0,1)
       write(ionum,'(i10)') natm
-      write(ionum,'(3es23.14e3)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       do i=1,natm
         ri(1:3)= ra(1:3,i)
         if( ri(1).lt.0d0 ) ri(1)=ri(1) +1d0

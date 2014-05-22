@@ -35,7 +35,7 @@
          ,myid_md,nodes_md,mpi_md_world,myx,myy,myz,ierr
     real(8):: sv(3,6),sorg(3),anxi,anyi,anzi
 !.....simulation box
-    real(8):: h(3,3,0:1),hi(3,3),vol,sgm(3,3),al(3),avol
+    real(8):: hunit,h(3,3,0:1),hi(3,3),vol,sgm(3,3),al(3),avol
     real(8):: ht(3,3,0:1),hti(3,3),dh
 !.....factors on each moving direction
     real(8):: fmv(3,0:9)

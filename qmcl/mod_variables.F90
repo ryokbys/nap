@@ -52,7 +52,7 @@
     real(8):: deps    = 1d-2
 
 !.....simulation box
-    real(8):: h(3,3,0:1),hi(3,3),vol,sgm(3,3),al(3),avol
+    real(8):: hunit,h(3,3,0:1),hi(3,3),vol,sgm(3,3),al(3),avol
 !.....factors on each moving direction
     real(8):: fmv(3,0:9)=reshape([ &
          0d0, 0d0, 0d0, & ! 0: fixed

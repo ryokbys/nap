@@ -118,18 +118,12 @@ c      do i=1,inc
 c        write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
 c      enddo
 c      close(15)
-      call write_pmd(15,'pmd00000','replace',inc,tag,ra,va,h
-     &     ,eki,epi,strs)
+      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va,h
+     &     ,cunit,eki,epi,strs)
 
 c-----output 'akr0000' for Akira visualization
-      open(15,file='akr0000',form='formatted',status='replace')
-      write(15,'(i10,3i5)') inc, 3, 0, 0
-      write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
-      do i=1,inc
-        write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
-      
+      call write_akr(15,'akr0000',inc,h,cunit,tag,ra,va)
+
       end program mkconf_Al_fcc
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)

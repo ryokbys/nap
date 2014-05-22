@@ -7,7 +7,7 @@ c    <#-old>, <#-new>: old and new numbers of slices
 c-----------------------------------------------------------------------
       implicit none
       integer:: i,j,ia,ib,islc,nslc,natm,inew,iold,nnew,nold
-      real(8):: rd(3),h(3,3,0:1),pnew,pold,dnew,dold
+      real(8):: rd(3),h(3,3,0:1),pnew,pold,dnew,dold,hunit
       character:: cnum*3,argv*128,cslc*3
       integer:: nargc
       integer,external:: iargc
@@ -36,8 +36,8 @@ c.....Get slices of (from) configuration
       do islc=1,nold
         cslc='000'
         write(cslc,'(i3.3)') islc
-        call read_atom_conf(10+islc,'neb'//cslc,natm,h,ra0(1,1,islc)
-     &       ,va0(1,1,islc),tag0(1,islc))
+        call read_atom_conf(10+islc,'neb'//cslc,natm,h,hunit
+     &       ,ra0(1,1,islc),va0(1,1,islc),tag0(1,islc))
         call system('mv neb'//cslc//' neb'//cslc//'.old')
       enddo
 
@@ -65,11 +65,12 @@ c.....Make slices by interpolating from old slices
         enddo
         write(cnum(1:3),'(i3.3)') inew
         write(6,'(a)') ' writing neb'//cnum//'...'
-        call write_atom_conf(20,'neb'//cnum,natm,h,ra,va,tag)
+        call write_atom_conf(20,'neb'//cnum,natm,h,hunit,ra,va,tag)
 c.....Write akr file
         open(21,file='akr'//cnum,status='replace')
+        write(21,'(es15.7)') hunit
+        write(21,'(3es11.3)') ((h(ia,ib,0)/hunit,ia=1,3),ib=1,3)
         write(21,'(i10,3i5)') natm, 3, 0, 0
-        write(21,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
         do j=1,natm
           write(21,'(i3,6es11.3)') int(tag(j)),ra(1:3,j),va(1:3,j)
         enddo
@@ -79,18 +80,21 @@ c.....Write akr file
 
       end program convert_slices
 c=======================================================================
-      subroutine read_atom_conf(ionum,cfname,natm,h,ra,va,tag)
+      subroutine read_atom_conf(ionum,cfname,natm,h,hunit,ra,va,tag)
       implicit none
       integer,intent(in):: natm,ionum
       character(len=*),intent(in):: cfname
       real(8),intent(out):: ra(3,natm),va(3,natm),tag(natm),h(3,3,0:1)
+     &     ,hunit
 
       integer:: ia,ib,l,i,itmp
 
       open(ionum,file=trim(cfname),status='old')
+      read(ionum,*) hunit
+      read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+      h(1:3,1:3,0:1)= h(1:3,1:3,0:1) *hunit
       read(ionum,*) itmp
       if( itmp.ne.natm ) stop ' [Error] itmp.ne.natm !!!'
-      read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       do i=1,natm
         read(ionum,*) tag(i),ra(1:3,i),va(1:3,i)
       enddo
@@ -98,18 +102,21 @@ c=======================================================================
       
       end subroutine read_atom_conf
 c=======================================================================
-      subroutine write_atom_conf(ionum,cfname,natm,h,ra,va,tag)
+      subroutine write_atom_conf(ionum,cfname,natm,h,hunit,ra,va,tag)
       implicit none
       integer,intent(in):: natm,ionum
       character(len=*),intent(in):: cfname
       real(8),intent(in):: h(3,3,0:1),ra(3,natm),va(3,natm),tag(natm)
+     &     ,hunit
 
       integer:: ia,ib,l,i
       real(8):: ri(3)
 
       open(ionum,file=trim(cfname),status='replace')
+      write(ionum,'(es23.14)') hunit
+      write(ionum,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3)
+     &     ,ib=1,3),l=0,1)
       write(ionum,'(i10)') natm
-      write(ionum,'(3es23.14e3)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       do i=1,natm
         ri(1:3)= ra(1:3,i)
         if( ri(1).lt.0d0 ) ri(1)=ri(1) +1d0

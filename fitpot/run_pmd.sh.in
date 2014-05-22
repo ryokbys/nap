@@ -2,8 +2,8 @@
 #
 
 pmdsrc="@prefix@"
-expand_pmd="${pmdsrc}/util/expand_pmd.rb"
-pmd="${pmdsrc}/src/pmd"
+expand_pmd="${pmdsrc}/pmd/util/expand_pmd.rb"
+pmd="${pmdsrc}/pmd/pmd"
 reduce="${pmdsrc}/fitpot/reduce_erg_frc.py"
 
 python="@PYTHON@"

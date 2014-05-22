@@ -82,12 +82,13 @@ c              if( iz.eq.nvac(3)+nhe(3)+nuc(3)-1 ) ifmv=2
       va(1:3,1:inc)= 0d0
 
       call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va,h
-     &     ,eki,epi,strs)
+     &     ,cunit,eki,epi,strs)
       
 c-----output 'akr000' for Akira visualization
       open(15,file='akr0000',form='formatted',status='replace')
+      write(15,'(es15.7)') cunit
+      write(15,'(3es11.3)') ((h(ia,ib,0)/cunit,ia=1,3),ib=1,3)
       write(15,'(i10,3i5)') inc, 4, 0, 0
-      write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
       do i=1,inc
         write(15,'(i3,7es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
      &       ,dble(int((tag(i)-int(tag(i)))*10d0))

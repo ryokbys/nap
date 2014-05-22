@@ -23,7 +23,7 @@ c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       real(8):: ua(3,12)
       real(8):: tag(nmax),ra(3,nmax),va(3,nmax),eki(nmax),epi(nmax)
      &     ,h(3,3,0:1),strs(3,3,nmax),h0(3,3),s(3),ymax,ymin,dseed,rnd
-     &     ,ra0(3,nmax),rcx,rcy,rcu(3),dmax,cunit,daa,dyl
+     &     ,ra0(3,nmax),rcx,rcy,rcu(3),dmax,daa,dyl,hunit
 c.....Parameters
       real(8),parameter:: tempini = 1d0
       real(8),parameter:: small   = 1d-8
@@ -33,9 +33,9 @@ c.....lattice constant of bcc-Fe
       real(8),parameter:: alcfe   = 2.835d0
 
 c.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
-      cunit= alcfe
+      hunit= alcfe
       daa = sqrt(3d0)/2 *alcfe
-      write(6,'(a,es12.4,a)') " Lattice constant =",cunit," [Ang]"
+      write(6,'(a,es12.4,a)') " Lattice constant =",hunit," [Ang]"
       write(6,'(a,es12.4,a)') " Fe-Fe bond length=",daa," [Ang]"
 
 c.....System size
@@ -55,9 +55,9 @@ c      write(6,'(a,i2)') ' Selected: ',itmp
 
 c.....Unit vectors, h0= (a0,b0,c0) where a0,b0,c0 are column vectors
       h0(1:3,1:3)= 0d0
-      h0(1,1)=  2.44948974278318d0 *cunit
-      h0(2,2)=  1.41421356237310d0 *cunit
-      h0(3,3)=  1.73205080756888d0/2 *cunit
+      h0(1,1)=  2.44948974278318d0 *hunit
+      h0(2,2)=  1.41421356237310d0 *hunit
+      h0(3,3)=  1.73205080756888d0/2 *hunit
 
 c.....Atom positions in the unit cell
       ua(1:3,1) =(/ 0.00000000000d+00, 0.000d+00, 0.0000000000d+00 /)
@@ -87,8 +87,9 @@ c.....simulation box size
 
 c.....output 'akr000' for Akira visualization
       open(15,file='akr000',form='formatted',status='replace')
+      write(15,'(es15.7)') hunit
+      write(15,'(3es11.3)') ((h(ia,ib,0)/hunit,ia=1,3),ib=1,3)
       write(15,'(i10,3i5)') natm, 3, 0, 0
-      write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
       do i=1,natm
         write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
       enddo
@@ -96,8 +97,9 @@ c.....output 'akr000' for Akira visualization
 
 c.....output 'akrref' for Akira visualization
       open(16,file='akrref',form='formatted',status='replace')
+      write(16,'(es15.7)') hunit
+      write(16,'(3es11.3)') ((h(ia,ib,0)/hunit,ia=1,3),ib=1,3)
       write(16,'(i10,3i5)') natm, 3, 0, 0
-      write(16,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
       do i=1,natm
         write(16,'(i3,6es11.3)') int(tag(i)),ra0(1:3,i)
      &       ,ra(1:3,i)-ra0(1:3,i)
@@ -105,7 +107,7 @@ c.....output 'akrref' for Akira visualization
       close(16)
 
 c.....output 'pmdref'
-      call write_pmd_ascii(17,'pmdref',natm,h,tag,ra0,va
+      call write_pmd_ascii(17,'pmdref',natm,h,hunit,tag,ra0,va
      &     ,eki,epi,strs)
 
       do i=1,natm
@@ -113,7 +115,7 @@ c.....output 'pmdref'
         if( ra(3,i).lt.0d0 ) ra(3,i)=ra(3,i)+1d0
       enddo
 
-      call write_pmd_ascii(18,'pmd000-000',natm,h,tag,ra,va
+      call write_pmd_ascii(18,'pmd000-000',natm,h,hunit,tag,ra,va
      &     ,eki,epi,strs)
       
       

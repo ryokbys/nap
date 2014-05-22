@@ -23,7 +23,7 @@ c.....W @0K = 3.171d-10
 
       integer:: i,n,itmp,nauxdat,j,ix,iy,iz,m
       integer:: natm0,natm1,natm,nx,ny,nz,nlsa,ncpx,ncpy,ncpz
-      real(8):: tmp,al(3),al1(3),xi(3),rij(3),r
+      real(8):: tmp,al(3),al1(3),xi(3),rij(3),r,hunit
       integer,allocatable:: lsa(:),lspr(:,:),itype(:),itag(:),itag1(:)
       real(8),allocatable:: ra0(:,:),ra1(:,:),ra(:,:),auxdat0(:,:)
      &     ,auxdat(:,:)
@@ -41,10 +41,10 @@ c.....Read an argument, ipmd
 
 c-----read akr file from STDIN
       open(10,file=trim(ciname),status="old")
-      read(10,*) natm0,nauxdat
-      read(10,*) al(1),tmp,tmp
-      read(10,*) tmp,al(2),tmp
-      read(10,*) tmp,tmp,al(3)
+      read(10,*) hunit
+      read(10,*) al(1)*hunit,tmp,tmp
+      read(10,*) tmp,al(2)*hunit,tmp
+      read(10,*) tmp,tmp,al(3)*hunit
       ncpx=1
       ncpy=1
       ncpz=1
@@ -63,6 +63,7 @@ c-----read akr file from STDIN
       
 c      write(6,'(a,7es12.4)') 'rc,al(1:3),al1(1:3)=',rc,al(1:3),al1(1:3)
 c      write(6,'(a,3i6)') 'ncpx,ncpy,ncpz=',ncpx,ncpy,ncpz
+      read(10,*) natm0,nauxdat
       natm1= natm0*ncpx*ncpy*ncpz
       allocate(ra0(3,natm0),ra(3,natm0),auxdat(nauxdat,natm0)
      &     ,auxdat0(nauxdat,natm0),itype(natm0),itag(natm0)
@@ -108,10 +109,11 @@ c-----common neighbor analysis
 
 c-----write cna file 
       open(11,file=trim(coname),status="replace")
+      write(11,'(es15.7)') hunit
+      write(11,'(3es12.4)') al(1)/hunit,0d0,0d0
+      write(11,'(3es12.4)') 0d0,al(2)/hunit,0d0
+      write(11,'(3es12.4)') 0d0,0d0,al(3)/hunit
       write(11,'(i10,3i4)') natm,nauxdat,0,0
-      write(11,'(3es12.4)') al(1),0d0,0d0
-      write(11,'(3es12.4)') 0d0,al(2),0d0
-      write(11,'(3es12.4)') 0d0,0d0,al(3)
       do i=1,natm
         write(11,'(i4,3es15.7,17es10.2)')
      &       itype(i),ra(1:3,i),auxdat(1:nauxdat,i)

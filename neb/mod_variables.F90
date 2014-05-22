@@ -54,7 +54,7 @@
 !  natm: num of atoms
 !  nis: num of species
     integer:: natm,nis
-    real(8):: h(3,3,0:1)
+    real(8):: h(3,3,0:1),hunit
     real(8):: am(1:nismax)= 1d0
     real(8),allocatable:: ra(:,:,:),va(:,:,:),fa(:,:,:),tag(:,:)
 

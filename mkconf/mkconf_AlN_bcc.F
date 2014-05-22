@@ -75,23 +75,12 @@ c-----scale velocities to reduced unit
       enddo
       
 c-----output 'ini000' for MD program
-      open(15,file='ini000',form='formatted',status='replace')
-      write(15,'(i10)')inc
-      write(15,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      do i=1,inc
-        write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
-      
+      call write_pmd0_ascii(15,'pmdref','replace',inc,tag,ra0,va,h
+     &     ,al,eki,epi,strs)
+
 c-----output 'kvs000' for KVS visualization
-      open(15,file='kvs000',form='formatted',status='replace')
-      write(15,'(i10)')inc
-      write(15,'(3es11.3)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      do i=1,inc
-        write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
-      
+      call write_akr(15,'akr0000',inc,h,cunit,tag,ra,va)
+
       end program mkconf_AlN_bcc
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)

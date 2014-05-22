@@ -62,7 +62,7 @@ c.....check run_type
 c      call read_pmd_ascii(20,"qmclref"
 c     &     ,namax,natm,h0,tag,ra0,va,eki,epi,strs)
       call read_pmd_ascii(20,"qmcl000"
-     &     ,namax,natm,h,tag,ra,va,eki,epi,strs)
+     &     ,namax,natm,h,hunit,tag,ra,va,eki,epi,strs)
 c.....Some conversions
       do i=1,natm
 c.....Species of atom-i
@@ -225,7 +225,7 @@ c.....output initial configuration
       if( lpmd ) then
         write(cnum(1:3),'(i3.3)') iocntpmd
         call write_pmd_ascii(30,"qmcl"//cnum
-     &       ,natm,h,tag,ra,va,eki,epi,stn)
+     &       ,natm,h,hunit,tag,ra,va,eki,epi,stn)
       endif
 
 c.....Energy output
@@ -356,7 +356,7 @@ cc.....Calc atomic strain
 c          call get_atomic_strain(namax,natm,h,ra,stn)
 c.....write qmcl file for Akira
           call write_pmd_ascii(30,"qmcl"//cnum
-     &         ,natm,h,tag,ra,va,eki,epi,stn)
+     &         ,natm,h,hunit,tag,ra,va,eki,epi,stn)
           if( lconst ) then
             call write_frcav(21,'frcav'//cnum)
           endif
@@ -398,7 +398,7 @@ c=======================================================================
       subroutine get_force(natm,h,ra,tag,va,fa,epi,eki,erg,istp)
       use variables, only:nacmax,nac,hc,rac,tagc,xc,rclst,rcqm,wvac
      &     ,idclst,fac,naqm,idqm,strs,nis,is_tag,rcut,cfrct,lterm,nhc
-     &     ,nhcmax,rhc,crtype
+     &     ,nhcmax,rhc,crtype,hunit
       implicit none
       integer,intent(in):: natm,istp
       real(8),intent(in):: h(3,3,0:1),ra(3,natm)
@@ -490,7 +490,7 @@ c.....If the system is thinner than 2*rcut, enlarge it for pmd
       enddo
 
 c.....Write atom config file for pmd
-      call write_pmd_ascii(20,'CL_input',natmt,ht,tagt,rat,vat
+      call write_pmd_ascii(20,'CL_input',natmt,ht,hunit,tagt,rat,vat
      &     ,ekit,epit,strst)
 c.....Write atom config file for vasp
       call write_vasp(21,'QM_input',nac+nhc,hc,rac,tagc)
@@ -856,14 +856,14 @@ c=======================================================================
       return
       end function exists_in_cluster
 c=======================================================================
-      subroutine write_vasp(ionum,cfname,nac,hc,rac,tagc)
+      subroutine write_vasp(ionum,cfname,nac,hc,hunit,rac,tagc)
 c
 c  Write POSCAR file for VASP run
 c
       implicit none
       include 'params_unit.h'
       integer,intent(in):: ionum,nac
-      real(8),intent(in):: hc(3,3),rac(3,nac),tagc(nac)
+      real(8),intent(in):: hunit,hc(3,3),rac(3,nac),tagc(nac)
       character(len=*),intent(in):: cfname
 
       integer:: i,j,is
@@ -904,10 +904,10 @@ c.....check ns
       
       open(ionum,file=trim(cfname),status='replace')
       write(ionum,'(a)') ' QM atoms created by QMCL' ! comment line
-      write(ionum,'(f10.2)') 1.0
-      write(ionum,'(3f12.5)') hc(1,1:3)
-      write(ionum,'(3f12.5)') hc(2,1:3)
-      write(ionum,'(3f12.5)') hc(3,1:3)
+      write(ionum,'(f10.2)') hunit
+      write(ionum,'(3f12.5)') hc(1,1:3)/hunit
+      write(ionum,'(3f12.5)') hc(2,1:3)/hunit
+      write(ionum,'(3f12.5)') hc(3,1:3)/hunit
       write(ionum,'(10i4)') (nis(i),i=1,ns)
 c      write(ionum,'(2i6)') nac-1,1
       write(ionum,'(a)') 'direct'

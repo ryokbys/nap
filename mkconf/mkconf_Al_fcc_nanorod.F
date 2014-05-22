@@ -99,7 +99,7 @@ c-----scale velocities to reduced unit
       enddo
       
       call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va
-     &     ,h,eki,epi,strs)
+     &     ,h,al,eki,epi,strs)
       
       end program mkconf_Al_nanorod
 c=======================================================================

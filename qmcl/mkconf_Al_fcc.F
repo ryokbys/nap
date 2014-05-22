@@ -11,7 +11,7 @@ c-----# of unit cells
       integer,parameter:: nuc(1:3)= (/ 20,20,1 /)
 c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
-      real(8):: x,y,z,r
+      real(8):: x,y,z,r,hunit
       real(8):: ua(3,4)
       real(8):: ra(3,nmax)
       real(8):: h(3,3,0:1)
@@ -23,7 +23,7 @@ c.....Radius
       small= 0.1d0 /nuc(1)
 
 c-----Lattice constant of this potential= 4.0425 AA
-      al= 4.0425d0
+      hunit= 4.0425d0
 
 c-----unit cell, wurtzite structure
 c-----Al
@@ -34,9 +34,9 @@ c-----Al
       
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
-      h(1,1,0)= (nuc(1)+nvac(1)) *al
-      h(2,2,0)= (nuc(2)+nvac(2)) *al
-      h(3,3,0)= (nuc(3)+nvac(3)) *al
+      h(1,1,0)= (nuc(1)+nvac(1)) *hunit
+      h(2,2,0)= (nuc(2)+nvac(2)) *hunit
+      h(3,3,0)= (nuc(3)+nvac(3)) *hunit
 
       inc=0 
       do ix=0,nuc(1)-1
@@ -72,15 +72,16 @@ c              if( r.gt.rc ) cycle
       
       va(1:3,1:inc)= 0d0
 
-      call write_pmd_ascii(15,'qmcl000',inc,h,tag,ra,va
+      call write_pmd_ascii(15,'qmcl000',inc,h,hunit,tag,ra,va
      &     ,eki,epi,strs)
-      call write_pmd_ascii(15,'qmclref',inc,h,tag,ra,va
+      call write_pmd_ascii(15,'qmclref',inc,h,hunit,tag,ra,va
      &     ,eki,epi,strs)
       
 c-----output 'akr000' for KVS visualization
       open(15,file='akr000',form='formatted',status='replace')
+      write(15,'(es15.7)') hunit
+      write(15,'(3es11.3)') ((h(ia,ib,0)/hunit,ia=1,3),ib=1,3)
       write(15,'(i10,3i4)') inc, 3, 0, 0
-      write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
       do i=1,inc
         write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
       enddo

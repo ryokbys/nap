@@ -17,7 +17,7 @@ c.....Cutoff radius for BCC Fe, halfway between 1st and 2nd N.N.
 
       integer:: i,n,itmp,nauxdat,j
       integer:: natm0,natm,nx,ny,nz,nlsa
-      real(8):: tmp,h(3,3),xi(3),rij(3),r
+      real(8):: tmp,h(3,3),xi(3),rij(3),r,hunit
       integer,allocatable:: lsa(:),lspr(:,:)
       real(8),allocatable:: ra0(:,:),ra(:,:),auxdat0(:,:)
      &     ,auxdat(:,:),cspi(:)
@@ -35,10 +35,11 @@ c.....Read an argument, ipmd
 
 c-----read akr file
       open(10,file=trim(ciname),status="old")
+      read(10,*) hunit
+      read(10,*) h(1,1:3)*hunit
+      read(10,*) h(2,1:3)*hunit
+      read(10,*) h(3,1:3)*hunit
       read(10,*) natm0,nauxdat
-      read(10,*) h(1,1:3)
-      read(10,*) h(2,1:3)
-      read(10,*) h(3,1:3)
       allocate(ra0(3,natm0),ra(3,natm0),auxdat(nauxdat,natm0)
      &     ,auxdat0(nauxdat,natm0),cspi(natm0))
       do i=1,natm0
@@ -67,10 +68,11 @@ c-----common neighbor analysis
 
 c-----write csp file
       open(11,file=trim(coname),status="replace")
+      write(11,'(es15.7)') hunit
+      write(11,'(3es15.7)') h(1,1:3)/hunit
+      write(11,'(3es15.7)') h(2,1:3)/hunit
+      write(11,'(3es15.7)') h(3,1:3)/hunit
       write(11,'(i10,3i4)') natm,nauxdat+1,0,0
-      write(11,'(3es15.7)') h(1,1:3)
-      write(11,'(3es15.7)') h(2,1:3)
-      write(11,'(3es15.7)') h(3,1:3)
       do i=1,natm
         write(11,'(i4,20es11.3)') 1,ra(1:3,i)
      &       ,auxdat(1:nauxdat,i),cspi(i)

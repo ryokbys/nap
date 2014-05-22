@@ -7,7 +7,7 @@ c    $ ./neb2akr < akr??? > neb???
 c-----------------------------------------------------------------------
       implicit none
       integer:: i,natm,ia,ib,l,ix,iy,iz,ncpx,ncpy,ncpz,natmt,m
-      real(8):: h(3,3,0:1),ht(3,3,0:1),dcpx,dcpy,dcpz
+      real(8):: h(3,3,0:1),ht(3,3,0:1),dcpx,dcpy,dcpz,hunit
       real(8),allocatable:: tag(:),ra(:,:),va(:,:),eki(:),epi(:)
      &     ,strs(:,:,:)
       real(8),allocatable:: rat(:,:),vat(:,:),tagt(:),ekit(:),epit(:)
@@ -15,10 +15,12 @@ c-----------------------------------------------------------------------
       real(8),parameter:: bohr =  0.5291772d-10
       real(8),parameter:: rc   =  4.3d-10 /bohr
       
+      read(5,*) hunit
+      read(5,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+      h(1:3,1:3,0:1)= h(1:3,1:3,0:1)*hunit
       read(5,*) natm
       allocate(tag(natm),ra(3,natm),va(3,natm),eki(natm),epi(natm)
      &     ,strs(3,3,natm))
-      read(5,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       do i=1,natm
         read(5,*) tag(i),ra(1:3,i),va(1:3,i),eki(i),epi(i)
      &       ,strs(1:3,1:3,i)
@@ -65,10 +67,11 @@ c      write(6,'(4i10)') natmt,ncpx,ncpy,ncpz
         enddo
       enddo
 
+      write(6,'(es15.7)') hunit
+      write(6,'(3es15.7)') ht(1,1:3,0)/hunit
+      write(6,'(3es15.7)') ht(2,1:3,0)/hunit
+      write(6,'(3es15.7)') ht(3,1:3,0)/hunit
       write(6,'(i8,3i3)') natmt, 5, 0, 0
-      write(6,'(3es15.7)') ht(1,1:3,0)
-      write(6,'(3es15.7)') ht(2,1:3,0)
-      write(6,'(3es15.7)') ht(3,1:3,0)
       do i=1,natmt
         write(6,'(i3,3es15.7,10es12.4)') int(tagt(i))
      &       ,rat(1:3,i),ekit(i),epit(i)

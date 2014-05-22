@@ -32,7 +32,7 @@ c.....width,height of the paper
       integer:: i,n,itmp,nauxdat,j
       integer:: natm,nx,ny,nz,nlsa,ndisp,nvec,isrc,idst
       real(8):: tmp,al(3),xi(3),rij(3),r,rlz,gray,x,y
-     &     ,x1,y1,x2,y2,vmax,scale,xmax,ymax,sx,sy
+     &     ,x1,y1,x2,y2,vmax,scale,xmax,ymax,sx,sy,hunit
       integer,allocatable:: lsa(:),lspr(:,:),itype(:),itag(:)
      &     ,lsza(:),lsdisp(:),ijdd(:,:)
       real(8),allocatable:: ra0(:,:),ra(:,:),auxdat0(:,:)
@@ -49,10 +49,11 @@ c.....width,height of the paper
 
 c-----read akr file from STDIN
       open(11,file=trim(cin),status='old')
+      read(11,*) hunit
+      read(11,*) al(1)*hunit,tmp,tmp
+      read(11,*) tmp,al(2)*hunit,tmp
+      read(11,*) tmp,tmp,al(3)*hunit
       read(11,*) natm,nauxdat
-      read(11,*) al(1),tmp,tmp
-      read(11,*) tmp,al(2),tmp
-      read(11,*) tmp,tmp,al(3)
       allocate(ra0(3,natm),ra(3,natm),auxdat(nauxdat,natm)
      &     ,auxdat0(nauxdat,natm),itype(natm),itag(natm)
      &     ,lsza(natm),lsdisp(natm),ga(natm)
@@ -64,11 +65,12 @@ c-----read akr file from STDIN
 
 c-----read akrref file
       open(10,file='akrref',status='old')
+      read(10,*) hunit
+      read(10,*) al(1)*hunit,tmp,tmp
+      read(10,*) tmp,al(2)*hunit,tmp
+      read(10,*) tmp,tmp,al(3)*hunit
       read(10,*) itmp
       if( itmp.ne.natm ) stop ' [Error] itmp.ne.natm !!!'
-      read(10,*) al(1),tmp,tmp
-      read(10,*) tmp,al(2),tmp
-      read(10,*) tmp,tmp,al(3)
       xmax= 0d0
       ymax= 0d0
       do i=1,natm

@@ -79,12 +79,13 @@ c     &             ,0.5d0/h(1,1,0) *exp(-(si(1)-0.5d0)**2/0.005d0)
       va(1:3,1:inc)= 0d0
 
       call write_pmd0_ascii(15,'pmd00000','replace',inc,tag
-     &     ,ra,va,h,eki,epi,strs)
+     &     ,ra,va,h,cunit,eki,epi,strs)
       
 c-----output for Akira
       open(15,file='akr0000',form='formatted',status='replace')
+      write(15,'(es15.7)') cunit
+      write(15,'(3es11.3)') ((h(ia,ib,l)/cunit,ia=1,3),ib=1,3)
       write(15,'(i10,3i5)')inc,3,0,0
-      write(15,'(3es11.3)') ((h(ia,ib,l),ia=1,3),ib=1,3)
       do i=1,inc
         write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
       enddo

@@ -27,18 +27,20 @@ class MD_system:
 
     def read_pmd(self,fname='pmd0000'):
         f=open(fname,'r')
-        # 1st: num of atoms
-        self.natm= int(f.readline().split()[0])
-        self.initialize_arrays()
+        # 1st: lattice constant
+        self.alc= float(f.readline().split()[0])
         # 2nd-4th: cell vectors
-        self.a1= [float(x) for x in f.readline().split()]
-        self.a2= [float(x) for x in f.readline().split()]
-        self.a3= [float(x) for x in f.readline().split()]
+        self.a1= [float(x)*self.alc for x in f.readline().split()]
+        self.a2= [float(x)*self.alc for x in f.readline().split()]
+        self.a3= [float(x)*self.alc for x in f.readline().split()]
         # 5th-7th: velocity of cell vectors
         tmp= f.readline().split()
         tmp= f.readline().split()
         tmp= f.readline().split()
-        # 8th-: atom positions
+        # 8st: num of atoms
+        self.natm= int(f.readline().split()[0])
+        self.initialize_arrays()
+        # 9th-: atom positions
         for i in range(self.natm):
             data= [float(x) for x in f.readline().split()]
             self.tag[i]= data[0]
@@ -47,8 +49,8 @@ class MD_system:
 
     def write_pmd(self,fname='pmd0000'):
         f=open(fname,'w')
-        # num of atoms
-        f.write(" {0:10d}\n".format(self.natm))
+        # lattice constant
+        f.write(" {0:15.7f}\n".format(self.alc))
         # cell vectors
         f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a1[0],\
                                                           self.a1[1],\
@@ -63,6 +65,8 @@ class MD_system:
         f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(0.0, 0.0, 0.0))
         f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(0.0, 0.0, 0.0))
         f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(0.0, 0.0, 0.0))
+        # num of atoms
+        f.write(" {0:10d}\n".format(self.natm))
         # atom positions
         for i in range(self.natm):
             f.write(" {} {:11.7f} {:11.7f} {:11.7f}".format(self.tag[i], \

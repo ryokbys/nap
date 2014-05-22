@@ -151,19 +151,10 @@ c-----scale velocities to reduced unit
       enddo
       
       call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va
-     &     ,h,eki,epi,strs)
+     &     ,h,cunit,eki,epi,strs)
 
-      open(20,file='akr0000',status='replace')
-      write(20,'(4i8)') inc, 5, 0, 0
-      write(20,'(3es15.7)') h(1,1:3,0)
-      write(20,'(3es15.7)') h(2,1:3,0)
-      write(20,'(3es15.7)') h(3,1:3,0)
-      do i=1,inc
-        write(20,'(i4,3es22.14,5es12.4)') int(tag(i)),ra(1:3,i)
-     &       ,va(1:3,i),eki(i),epi(i)
-      enddo
-      close(20)
-      
+c.....output 'akr0000' for Akira visualization
+      call write_akr(15,'akr0000',natm,h,cunit,tag,ra,va)
       
       end program mkconf_bcc_nanorod
 c=======================================================================

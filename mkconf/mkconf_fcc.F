@@ -13,7 +13,7 @@ c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
       real(8):: ua(3,10)
       real(8):: tag(nmax),ra(3,nmax),va(3,nmax),eki(nmax),epi(nmax)
-     &      ,h(3,3,0:1),strs(3,3,nmax)
+     &      ,h(3,3,0:1),strs(3,3,nmax),hunit
       real*8,parameter:: pi=3.141592653589793d0
 c-----for Ar
       real*8,parameter:: sgmlj = 3.41d0
@@ -21,7 +21,7 @@ c-----for Ar
       small=1d-7
 
 c-----box size for Ar
-      cunit= 2d0**(1d0/6) *sgmlj *dsqrt(2d0)
+      hunit= 2d0**(1d0/6) *sgmlj *dsqrt(2d0)
 cc-----box size for Al
 c      cunit= 4.025d-10 /aa
 
@@ -57,19 +57,20 @@ c-----unit cell, FCC
       write(6,'(a,i10)') " id of inc=",int(mod(tag(inc)*1d14,1d13))
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
-      h(1,1,0)= cunit*(nuc(1)+nvac(1))
-      h(2,2,0)= cunit*(nuc(2)+nvac(2))
-      h(3,3,0)= cunit*(nuc(3)+nvac(3))
+      h(1,1,0)= hunit*(nuc(1)+nvac(1))
+      h(2,2,0)= hunit*(nuc(2)+nvac(2))
+      h(3,3,0)= hunit*(nuc(3)+nvac(3))
       
       va(1:3,1:inc)= 0d0
 
       call write_pmd0_ascii(15,'pmd00000','replace',inc,tag
-     &     ,ra,va,h,eki,epi,strs)
+     &     ,ra,va,h,hunit,eki,epi,strs)
       
 c-----output 'akr0000' for KVS visualization
       open(15,file='akr0000',form='formatted',status='replace')
-      write(15,'(i10)')inc
-      write(15,'(3es11.3)') ((h(ia,ib,l),ia=1,3),ib=1,3)
+      write(15,'(es15.7)') hunit
+      write(15,'(3es11.3)') ((h(ia,ib,l)/hunit,ia=1,3),ib=1,3)
+      write(15,'(i10,3i5)')inc,3,0,0
       do i=1,inc
         write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
       enddo

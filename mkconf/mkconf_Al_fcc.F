@@ -71,16 +71,10 @@ c-----scale velocities to reduced unit
       enddo
       
       call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va,h
-     &     ,eki,epi,strs)
+     &     ,al,eki,epi,strs)
       
 c-----output 'akr0000' for KVS visualization
-      open(15,file='akr0000',form='formatted',status='replace')
-      write(15,'(i10)')inc
-      write(15,'(3es11.3)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      do i=1,inc
-        write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
+      call write_akr(15,'akr0000',inc,h,cunit,tag,ra,va)
       
       end program mkconf_Al_fcc
 c=======================================================================

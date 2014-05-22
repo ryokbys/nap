@@ -40,7 +40,7 @@ c-----parallel-related variables
      &     ,myid_md,nodes_md,mpi_md_world,myx,myy,myz,ierr,idis
       real(8):: sv(3,6),anxi,anyi,anzi,sorg(3)
 c-----simulation box
-      real(8):: h(3,3,0:1),hi(3,3),volume,sgm(3,3)
+      real(8):: hunit,h(3,3,0:1),hi(3,3),volume,sgm(3,3)
 c-----positions, velocities, and accelerations
       integer:: itype(namax)
       real(8):: ra(3,namax),va(3,namax),op(2,namax)
@@ -119,8 +119,9 @@ c-------each node opens one MD-configuration file
         open(20,file="pmd"//cnode//"-"//cnum,status="old")
 c        open(20,file="fin"//cnode,status="old")
 c-------natm: num. of particles in this node
+        read(20,*) hunit
+        read(20,*) (((h(ia,ib,l)*hunit,ia=1,3),ib=1,3),l=0,1)
         read(20,*) natm
-        read(20,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
         nis= 0
         do i=1,natm
 c---------species, positions, velocities, index of motion
@@ -198,8 +199,10 @@ c-------output as pot file
         if(myid_md.eq.0) then
           write(6,'(a)') " writing file pot"//cnum//"..."
           open(21,file="pot"//cnum,status="replace")
+          write(21,'(es15.7)') hunit
+          write(21,'(3es12.4)') (((h(ia,ib,l)/hunit,ia=1,3)
+     &         ,ib=1,3),l=0,1)
           write(21,'(i10)') npottot
-          write(21,'(3es12.4)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
           do i=1,npottot
             write(21,'(i4,8es13.4e3)') ipot(i),xpot(1:8,i)
           enddo

@@ -13,7 +13,7 @@ c-----vacuum thickness in Angstrom
 
       real(8):: ua(3,10)
       real(8):: ra(3,nmax)
-      real(8):: h(3,3,0:1)
+      real(8):: h(3,3,0:1),hunit
       real(8):: va(3,nmax)
       integer:: is(nmax),ifmv(nmax)
       real*8,parameter:: pi=3.141592653589793d0
@@ -35,7 +35,7 @@ c-----mass of Al
 cc-----box size for Ar
 c      cunit= 2d0**(1d0/6) *sgmlj *dsqrt(2d0)
 c-----box size for Al
-      cunit= 4.025d0
+      hunit= 4.025d0
 
 c-----unit cell, FCC
       ua(1:3,1)= (/ 0.0d0, 0.0d0, 0.0d0 /)
@@ -66,9 +66,9 @@ c-------------fix bottom atoms
       enddo
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
-      h(1,1,0)= cunit*nuc(1)
-      h(2,2,0)= cunit*nuc(2)
-      h(3,3,0)= cunit*nuc(3)
+      h(1,1,0)= hunit*nuc(1)
+      h(2,2,0)= hunit*nuc(2)
+      h(3,3,0)= hunit*nuc(3)
 
 c-----absolute coordinate only for z
       do i=1,inc
@@ -132,18 +132,20 @@ c-----scale velocities to reduced unit
       enddo
       
 c-----output 'ini000' for MD program
-      open(15,file='ini000',form='formatted',status='replace')
+      open(15,file='pmd00000',form='formatted',status='replace')
+      write(15,'(es15.7)') hunit
+      write(15,'(3es22.14)') (((h(ia,ib,l)/hunit,ia=1,3),ib=1,3),l=0,1)
       write(15,'(i10)')inc
-      write(15,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       do i=1,inc
         write(15,'(2i3,6es22.14)') is(i),ifmv(i),ra(1:3,i),va(1:3,i)
       enddo
       close(15)
       
-c-----output 'kvs000' for KVS visualization
-      open(15,file='kvs000',form='formatted',status='replace')
-      write(15,'(i10)')inc
-      write(15,'(3es11.3)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+c-----output 'akr0000' for KVS visualization
+      open(15,file='akr0000',form='formatted',status='replace')
+      write(15,'(es15.7)') hunit
+      write(15,'(3es11.3)') (((h(ia,ib,l)/hunit,ia=1,3),ib=1,3),l=0,1)
+      write(15,'(i10,3i5)')inc, 3, 0, 0
       do i=1,inc
         write(15,'(i3,6es11.3)') is(i),ra(1:3,i),va(1:3,i)
       enddo

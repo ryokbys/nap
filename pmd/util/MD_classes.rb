@@ -15,12 +15,13 @@ class MD_atom
 end
 
 class MD_system
-  attr_reader :atoms, :natm, :a1, :a2, :a3, :species
+  attr_reader :atoms, :natm, :a1, :a2, :a3, :hunit, :species
   
-  def initialize(a1,a2,a3)
+  def initialize(a1,a2,a3,hunit)
     @a1=[]
     @a2=[]
     @a3=[]
+    @hunit=hunit
     @a1[0]= a1[0]
     @a1[1]= a1[1]
     @a1[2]= a1[2]

@@ -140,10 +140,10 @@ c.....Each node opens one MD-configuration file
       write(cnode(1:5),'(i5.5)') myid_md
       if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
         call read_pmd_bin(20,"0000/pmd"//cnode
-     &       ,namax,natm,h,tag,ra,va,eki,epi,strs)
+     &       ,namax,natm,h,hunit,tag,ra,va,eki,epi,strs)
       else if( trim(ciofmt).eq.'ascii' ) then
         call read_pmd_ascii(20,"0000/pmd"//cnode
-     &     ,namax,natm,h,tag,ra,va,eki,epi,strs)
+     &     ,namax,natm,h,hunit,tag,ra,va,eki,epi,strs)
       endif
       if( myid_md.eq.0 ) then
         write(6,'(a)') " H-matrix:"
@@ -278,10 +278,10 @@ c-----output initial configuration
         call system("mkdir -p "//cnum)
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
           call write_pmd_bin(20,cnum//"/pmd"//cnode
-     &         ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
+     &         ,natm,h,hunit,tag,ra,va,eki,epi,strs,sorg,dt)
         elseif( trim(ciofmt).eq.'ascii' ) then
           call write_pmd_ascii(20,cnum//"/pmd"//cnode
-     &         ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
+     &         ,natm,h,hunit,tag,ra,va,eki,epi,strs,sorg,dt)
         endif
       endif
 
@@ -517,10 +517,10 @@ c---------decide pmd-file name
 c---------write pmd file for Akira
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
             call write_pmd_bin(20,cnum//"/pmd"//cnode
-     &           ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
+     &           ,natm,h,hunit,tag,ra,va,eki,epi,strs,sorg,dt)
           elseif( trim(ciofmt).eq.'ascii' ) then
             call write_pmd_ascii(20,cnum//"/pmd"//cnode
-     &           ,natm,h,tag,ra,va,eki,epi,strs,sorg,dt)
+     &           ,natm,h,hunit,tag,ra,va,eki,epi,strs,sorg,dt)
           endif
         endif
 

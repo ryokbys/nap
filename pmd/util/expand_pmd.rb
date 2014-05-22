@@ -12,33 +12,35 @@ require 'MD_classes.rb'
 ################################################## subroutines #########
 def read_pmd(filename='pmd00000')
   file= open(filename)
-  # 1st: num of atoms
-  natm= file.gets.to_i
+  # 1st: hunit
+  hunit= file.gets.to_f
   # 2nd-4th: cell vectors
   a1=[]
   a2=[]
   a3=[]
   i=0
   (file.gets.split).each do |a|
-    a1[i]= a.to_f
+    a1[i]= a.to_f*hunit
     i += 1
   end
   i=0
   (file.gets.split).each do |a|
-    a2[i]= a.to_f
+    a2[i]= a.to_f*hunit
     i += 1
   end
   i=0
   (file.gets.split).each do |a|
-    a3[i]= a.to_f
+    a3[i]= a.to_f*hunit
     i += 1
   end
-  sys= MD_system.new(a1,a2,a3)
+  sys= MD_system.new(a1,a2,a3,hunit)
   # 5th-7th: skip 3 other lines
   tmp=file.gets
   tmp=file.gets
   tmp=file.gets
-  # 8th-: atoms positions from here
+  # 8th: num of atoms
+  natm= file.gets.to_i
+  # 9th-: atoms positions from here
   (0..natm-1).each do |i|
     data= file.gets.split
     sid= data[0].to_i
@@ -80,7 +82,7 @@ def expand_system(sys0,rcut)
     at3[i]= a3[i]*m3
   end
   #.....create new system
-  sys1= MD_system.new(at1,at2,at3)
+  sys1= MD_system.new(at1,at2,at3,sys0.hunit)
   m1.times do |i1|
     m2.times do |i2|
       m3.times do |i3|
@@ -111,16 +113,23 @@ def dot_product(v1,v2)
 end
 
 def write_pmd(sys)
-  printf("%8d\n" % sys.natm)
+  hunit= sys.hunit
   a1= sys.a1
   a2= sys.a2
   a3= sys.a3
+  3.times do |i|
+    a1[i]=a1[i]/hunit
+    a2[i]=a2[i]/hunit
+    a3[i]=a3[i]/hunit
+  end
+  printf("%15.7f\n" % hunit)
   printf(" %12.7f %12.7f %12.7f\n" % [a1[0],a1[1],a1[2]])
   printf(" %12.7f %12.7f %12.7f\n" % [a2[0],a2[1],a2[2]])
   printf(" %12.7f %12.7f %12.7f\n" % [a3[0],a3[1],a3[2]])
   printf(" %12.7f %12.7f %12.7f\n" % [0.0,0.0,0.0])
   printf(" %12.7f %12.7f %12.7f\n" % [0.0,0.0,0.0])
   printf(" %12.7f %12.7f %12.7f\n" % [0.0,0.0,0.0])
+  printf("%8d\n" % sys.natm)
   i=0
   (sys.atoms).each do |atom|
     i += 1

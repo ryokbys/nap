@@ -1,5 +1,7 @@
 2014-05-22    <kobayashi@mike.bw.nitech.ac.jp>
 
+	* pmd format was changed.
+
 	* configure scripts in some directories were unified to nap/configure.
 
 	* NAP/util was moved to NAP/pmd/util.

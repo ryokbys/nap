@@ -14,7 +14,7 @@ c
       integer:: islc,ism,isp,i,ionum
       real(8),external:: sprod
       real(8),allocatable:: vn(:,:)
-      real(8):: tmp
+      real(8):: tmp,hunit
       character(len=3):: cslc,cnum 
       
       call read_input(10,'in.neb')
@@ -32,7 +32,7 @@ c.....Read atom configuration of each slice
         ionum= 10+islc
         write(cslc(1:3),'(i3.3)') islc
         call read_atom_conf(ionum,'neb'//cslc,natm
-     &       ,h,ra(1,1,islc),va(1,1,islc),tag(1,islc))
+     &       ,h,hunit,ra(1,1,islc),va(1,1,islc),tag(1,islc))
       enddo
 
       do islc=1,nslc
@@ -87,22 +87,25 @@ c=======================================================================
       return
       end function sprod
 c=======================================================================
-      subroutine read_atom_conf(ionum,cfname,natm,h,ra,va,tag)
+      subroutine read_atom_conf(ionum,cfname,natm,h,hunit,ra,va,tag)
       implicit none
       integer,intent(in):: ionum,natm
       character(len=*),intent(in):: cfname
       real(8),intent(out):: ra(3,natm),tag(natm),h(3,3,0:1),va(3,natm)
+     &     ,hunit
 
       integer:: ia,ib,l,i,itmp
 
       open(ionum,file=trim(cfname),status='old')
+      read(ionum,*) hunit
+      read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+      h(1:3,1:3,0:1)=h(1:3,1:3,0:1)*hunit
       read(ionum,*) itmp
       if( itmp.ne.natm) then
         write(6,'(a)') ' [Error] itmp.ne.natm !!!'
         write(6,'(a,2i6)') '  itmp,natm=',itmp,natm
         stop
       endif
-      read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       do i=1,natm
         read(ionum,*) tag(i),ra(1:3,i),va(1:3,i)
       enddo

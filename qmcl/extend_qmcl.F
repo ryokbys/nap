@@ -2,7 +2,7 @@
       implicit none
       integer,parameter:: namax = 1000000
       integer:: natm,inc,ix,iy,iz,nex,ney,nez,m,is,ifmv
-      real(8):: h(3,3,0:1),tag(namax),ra(3,namax),va(3,namax)
+      real(8):: hunit,h(3,3,0:1),tag(namax),ra(3,namax),va(3,namax)
      &     ,eki(namax),epi(namax),strs(3,3,namax),rat(3,namax)
       character:: cifname*128,cofname*128
 
@@ -14,7 +14,7 @@ c.....ask num of extension
       write(6,'(a)') 'type output-file-name'
       read(5,*) cofname
 
-      call read_pmd_ascii(10,trim(cifname),namax,natm,h,tag,ra,va
+      call read_pmd_ascii(10,trim(cifname),namax,natm,h,hunit,tag,ra,va
      &     ,eki,epi,strs)
 
       if( natm*nex*ney*nez .gt. namax ) then
@@ -55,7 +55,7 @@ c.....ask num of extension
         enddo
       enddo
       
-      call write_pmd_ascii(11,trim(cofname),inc,h,tag,ra,va
+      call write_pmd_ascii(11,trim(cofname),inc,h,hunit,tag,ra,va
      &     ,eki,epi,strs)
 
       write(6,'(a)') 'program done.'

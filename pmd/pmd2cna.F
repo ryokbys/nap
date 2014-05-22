@@ -43,7 +43,7 @@ c-----parallel-related variables
      &     ,myid_md,nodes_md,mpi_md_world,myx,myy,myz,ierr,idis
       real(8):: sv(3,6),anxi,anyi,anzi,sorg(3)
 c-----simulation box
-      real(8):: h(3,3,0:1),hi(3,3),volume,sgm(3,3)
+      real(8):: hunit,h(3,3,0:1),hi(3,3),volume,sgm(3,3)
 c-----positions, velocities, and accelerations
       integer:: itype(namax)
       real(8):: ra(3,namax),va(3,namax),op(10,namax),tag(namax)
@@ -122,8 +122,9 @@ c-------each node opens one MD-configuration file
         open(20,file="pmd"//cnode//"-"//cnum,status="old")
 c        open(20,file="fin"//cnode,status="old")
 c-------natm: num. of particles in this node
+        read(20,*) hunit
+        read(20,*) (((h(ia,ib,l)*hunit,ia=1,3),ib=1,3),l=0,1)
         read(20,*) natm
-        read(20,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
         nis= 0
         do i=1,natm
 c---------species, positions, velocities, index of motion
@@ -192,8 +193,9 @@ c-------output as cna file
         if(myid_md.eq.0) then
           write(6,'(a)') " writing file cna"//cnum//"..."
           open(21,file="cna"//cnum,status="replace")
+          write(21,'(es15.7)') hunit
+          write(21,'(3es12.4)') ((h(ia,ib,0)/hunit,ia=1,3),ib=1,3)
           write(21,'(i10,3i5)') ncnatot, 8,0,0
-          write(21,'(3es12.4)') ((h(ia,ib,0),ia=1,3),ib=1,3)
           do i=1,ncnatot
             write(21,'(i4,20es12.4)') int(xcna(1,i)),xcna(2:12,i)
           enddo

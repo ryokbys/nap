@@ -36,7 +36,7 @@ c.....Read atom configuration of each slice
         ionum= 10+islc
         write(cslc(1:3),'(i3.3)') islc
         call read_atom_conf(ionum,'neb'//cslc,natm
-     &       ,h,ra(1,1,islc),va(1,1,islc),tag(1,islc))
+     &       ,h,hunit,ra(1,1,islc),va(1,1,islc),tag(1,islc))
       enddo
 
       if( trim(cminimize).eq.'velocity_damping' ) then
@@ -54,29 +54,32 @@ c.....Write final atom configuration
         ionum= 10+islc
         write(cslc(1:3),'(i3.3)') islc
         call write_atom_conf(ionum,'neb'//cslc,natm
-     &       ,h,ra(1,1,islc),va(1,1,islc),tag(1,islc))
+     &       ,h,hunit,ra(1,1,islc),va(1,1,islc),tag(1,islc))
       enddo
       
       write(6,'(a,f10.1)') ' Total elapsed time=',get_etime()
 
       end program neb
 c=======================================================================
-      subroutine read_atom_conf(ionum,cfname,natm,h,ra,va,tag)
+      subroutine read_atom_conf(ionum,cfname,natm,h,hunit,ra,va,tag)
       implicit none
       integer,intent(in):: ionum,natm
       character(len=*),intent(in):: cfname
       real(8),intent(out):: ra(3,natm),tag(natm),h(3,3,0:1),va(3,natm)
+     &     ,hunit
 
       integer:: ia,ib,l,i,itmp
 
       open(ionum,file=trim(cfname),status='old')
+      read(ionum,*) hunit
+      read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+      h(1:3,1:3,0:1)= h(1:3,1:3,0:1) *hunit
       read(ionum,*) itmp
       if( itmp.ne.natm) then
         write(6,'(a)') ' [Error] itmp.ne.natm !!!'
         write(6,'(a,2i6)') '  itmp,natm=',itmp,natm
         stop
       endif
-      read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       do i=1,natm
         read(ionum,*) tag(i),ra(1:3,i),va(1:3,i)
       enddo
@@ -84,17 +87,20 @@ c=======================================================================
       
       end subroutine read_atom_conf
 c=======================================================================
-      subroutine write_atom_conf(ionum,cfname,natm,h,ra,va,tag)
+      subroutine write_atom_conf(ionum,cfname,natm,h,hunit,ra,va,tag)
       implicit none
       integer,intent(in):: natm,ionum
       character(len=*),intent(in):: cfname
       real(8),intent(in):: h(3,3,0:1),ra(3,natm),tag(natm),va(3,natm)
+     &     ,hunit
 
       integer:: ia,ib,l,i
 
       open(ionum,file=trim(cfname),status='replace')
+      write(ionum,'(es23.14e3)') hunit
+      write(ionum,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3)
+     &     ,ib=1,3),l=0,1)
       write(ionum,'(i10)') natm
-      write(ionum,'(3es23.14e3)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       do i=1,natm
         write(ionum,'(7es23.14e3,11es12.4)') tag(i),ra(1:3,i)
      &       ,va(1:3,i)
@@ -165,7 +171,7 @@ c.....First calc of forces
         write(cslc,'(i3.3)') islc
         write(cstp,'(i4.4)') istp
         call write_atom_conf(ionum,'neb'//cslc//'-'//cstp,natm,h
-     &       ,ra(1,1,islc),va(1,1,islc),tag(1,islc))
+     &       ,hunit,ra(1,1,islc),va(1,1,islc),tag(1,islc))
       enddo
 
 c.....Check force convergence
@@ -273,7 +279,7 @@ c---------Berendsen thermostat
           write(cslc,'(i3.3)') islc
           write(cstp,'(i4.4)') istp
           call write_atom_conf(ionum,'neb'//cslc//'-'//cstp,natm,h
-     &         ,ra(1,1,islc),va(1,1,islc),tag(1,islc))
+     &         ,hunit,ra(1,1,islc),va(1,1,islc),tag(1,islc))
         enddo
 
 c.....Check convergence
@@ -301,7 +307,7 @@ c.....Write minimum atom configuration
               ionum= 30+islc
               write(cslc(1:3),'(i3.3)') islc
               call write_atom_conf(ionum,'min'//cslc,natm
-     &             ,h,ra(1,1,islc),va(1,1,islc),tag(1,islc))
+     &             ,h,hunit,ra(1,1,islc),va(1,1,islc),tag(1,islc))
             enddo
           endif
         endif
@@ -352,7 +358,7 @@ c
 c  Calculate forces of the current atomic configuration
 c  using an external program.
 c  
-      use variables, only : cmethod, ev2hrt, aa2bohr
+      use variables, only : cmethod, ev2hrt, aa2bohr, hunit
       implicit none
       integer,intent(in):: nslc,natm,iclmb
       real(8),intent(in):: h(3,3),ra(3,natm,nslc),tag(natm,nslc)
@@ -387,7 +393,7 @@ c.....Write atom config file
         ionum=10+islc
         write(cslc,'(i3.3)') islc
         call write_atom_conf(ionum,'neb'//cslc,natm,h
-     &       ,ra(1,1,islc),va(1,1,islc),tag(1,islc))
+     &       ,hunit,ra(1,1,islc),va(1,1,islc),tag(1,islc))
       enddo
 c.....write(6,'(a)') ' wrote files...'
 
@@ -667,8 +673,8 @@ c      write(6,'(a,2i8)') ' natm,nfix=',natm,nfix
  9999 l1st=.false.
       end subroutine get_force
 c=======================================================================
-      function lconverged(nslc,natm,h,tag,ra,rat,va,fa,deps,feps,istp
-     &     ,scnst,iclmb,erg)
+      function lconverged(nslc,natm,h,tag,ra,rat,va,fa,deps,feps
+     &     ,istp,scnst,iclmb,erg)
       use variables, only: cminimize,fmv
       implicit none
       integer,intent(in):: nslc,natm,istp,iclmb

@@ -131,23 +131,18 @@ c-----scale velocities to reduced unit
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
       
-c-----output 'ini000' for MD program
-      open(15,file='ini000',form='formatted',status='replace')
-      write(15,'(i10)')inc
-      write(15,'(3es22.14)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+c-----output 'pmd00000' for MD program
+      open(15,file='pmd00000',form='formatted',status='replace')
+      write(15,'(es15.7)') cunit
+      write(15,'(3es22.14)') (((h(ia,ib,l)/cunit,ia=1,3),ib=1,3),l=0,1)
+      write(15,'(i10)') inc
       do i=1,inc
         write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
       enddo
       close(15)
       
-c-----output 'kvs000' for KVS visualization
-      open(15,file='kvs000',form='formatted',status='replace')
-      write(15,'(i10)')inc
-      write(15,'(3es11.3)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
-      do i=1,inc
-        write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
+c-----output 'akr0000' for visualization
+      call write_akr(15,'akr0000',inc,h,cunit,tag,ra,va)
       
       end program mkconf_Si111_2lc
 c=======================================================================
