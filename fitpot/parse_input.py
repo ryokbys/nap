@@ -39,6 +39,8 @@ def read_input(fname='in.fitpot'):
         dict['ga_num_bit']= int(dict['ga_num_bit'])
     if 'ga_temperature' in dict:
         dict['ga_temperature']= float(dict['ga_temperature'])
+    if 'ga_murate' in dict:
+        dict['ga_murate']= float(dict['ga_murate'])
     return dict
 
 

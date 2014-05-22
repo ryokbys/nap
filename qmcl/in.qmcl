@@ -1,0 +1,53 @@
+#-----------------------------------------------------------------------
+# Input file for QMCL program
+#-----------------------------------------------------------------------
+# Units:
+#   Time   = sec
+#   Length = meter
+#   Weight = kg
+#
+
+  force_type  QMCL
+  mass     1   55.847d0
+  mass     2   5.00d0
+
+  time_interval      1.0d0
+  num_iteration      10
+  num_out_energy     10
+  
+  flag_out_qmcl      T
+  num_out_qmcl       10
+  io_format          ascii
+  
+  flag_cosine_damping F
+  flag_damping       F
+  damping_coeff      0.99
+  
+  flag_temperature        F
+  temperature_target      300d0
+  temperature_relax_time  100d0
+  
+  flag_convergence    F
+  convergence_force   1d-2
+  
+  factor_direction   3 2
+     1.0d0    1.0d0   1.0d0
+     1.0d0    1.0d0   1.0d0
+
+  cluster_termination   F
+  cluster_shape     rect  
+  cluster_center_x   0.50
+  cluster_center_y   0.50
+  cluster_center_z  -1.00
+!  cluster_radius     8d0
+  cluster_lx        10d0
+  cluster_ly         8d0
+  cluster_lz        -1d0
+!  qm_region_radius   5d0 
+  qm_region_lx         6d0
+  qm_region_ly         4d0
+  qm_region_lz        -1d0
+  cluster_vacuum_x   1d0
+  cluster_vacuum_y   1d0
+  cluster_vacuum_z   0d0
+

@@ -1,0 +1,89 @@
+#!/usr/sh
+########################################################################
+# Makefile for NEB program
+#     by R.K. @ 2012.10.09
+########################################################################
+
+# cpp path
+CPP= @CPP@
+CPPFLAGS= @CPPFLAGS@
+FC= @F77@
+FFLAGS= @FFLAGS@
+
+#-----------------------------------------------------------------------
+# ifort and linux (pen4)
+#FC= /opt/intel/Compiler/11.0/081/bin/intel64/ifort
+#FC= /opt/intel/Compiler/11.1/073/bin/intel64/ifort
+#FFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB -check all
+#MPIFC= /usr/local/gridmpi-2.1.1/intel/bin/mpif90
+#MPIFC= /usr/local/mpich-1.2.6/intel/bin/mpif90
+#MPIFC= /usr/local/openmpi-1.2.8-intel64-v11.0.081/bin/mpif90
+# MPIFC= mpif90
+#MPIFLAGS= -xHOST -O3 -ip -no-prec-div -g -CB
+
+#-----------------------------------------------------------------------
+# helios @Rokkasho
+# FC= ifort
+# FFLAGS= -xAVX -O3 -ip -ipo -g -CB
+
+#-----------------------------------------------------------------------
+# Fujitsu FX1 @nagoya-u
+# MPIFC=mpifrt
+# MPIFLAGS= -Kprefetch_model=FX1 -Ktl_trt
+
+#-----------------------------------------------------------------------
+# # for mp-rk
+# MPIFC= mpif90
+# MPIFLAGS= -O4 -g
+
+#-----------------------------------------------------------------------
+# suffixes
+.SUFFIXES: .o .f .F .f90 .F90
+.f.o: 
+	$(FC) -c $(FFLAGS) $<
+.F.o: 
+	$(FC) -c $(FFLAGS) $(CPPFLAGS) $<
+.f90.o: 
+	$(FC) -c $(FFLAGS) $<
+.F90.o: 
+	$(FC) -c $(FFLAGS) $(CPPFLAGS) $<
+
+neb= neb.o read_input.o
+mods= mod_variables.o
+mkslice= make_slices.o
+conv= convert_slices.o
+calc_dE= calc_dE.o read_input.o
+
+#-----------------------------------------------------------------------
+# Make rule entries
+#
+all: 10mkslice neb calc_dE neb2akr
+
+clean:
+	rm -f *.o *.mod *~ 10mkslice neb
+
+10mkslice: $(mkslice) $(mods)
+	$(FC) -o $@ $(mkslice) $(mods)
+
+20conv: $(conv) $(mods)
+	$(FC) -o $@ $(conv) $(mods)
+
+neb: $(neb)
+	$(FC) -o $@ $(neb) $(mods)
+
+neb2akr: neb2akr.o
+	$(FC) -o $@ neb2akr.o
+
+calc_dE: $(calc_dE)
+	$(FC) -o $@ $(calc_dE) $(mods)
+
+slc2vnrm: slice2vnorm.o $(mods) read_input.o
+	$(FC) -o $@ $(mods) slice2vnorm.o read_input.o
+
+#.....Module dependencies
+read_input.o:  $(mods)
+neb.o: $(mods)
+calc_dE.o: $(mods)
+make_slices.o: $(mods)
+convert_slices.o: $(mods)
+

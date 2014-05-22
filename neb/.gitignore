@@ -6,4 +6,3 @@ makefile
 autom4te.cache
 *.o
 *.mod
-fitpot/run_pmd.sh

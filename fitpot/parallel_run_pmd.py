@@ -63,4 +63,4 @@ for inode in range(len(nodes)):
 for i in range(len(procs)):
     procs[i].wait()
 
-print " running pmd done."
+# print " running pmd done."

@@ -9,7 +9,6 @@ from math import exp,cos,sin,log
 
 large= 1e+10
 tiny = 1e-10
-init_murate= 0.06
 maxid= 0
 
 def test_rosen(var,*args):
@@ -149,7 +148,7 @@ class GA:
     u""" Genetic Algorithm class.
     """
 
-    def __init__(self,nindv,nbitlen,func,vars,vranges,fitfunc,args=()):
+    def __init__(self,nindv,nbitlen,murate,func,vars,vranges,fitfunc,args=()):
         u"""Constructor of GA class.
 
         func
@@ -161,26 +160,32 @@ class GA:
         self.nindv= nindv
         self.ngene= len(vars)
         self.nbitlen= nbitlen
+        self.murate= murate
         self.func= func
         self.vars= vars
         self.vranges= vranges
         self.fitfunc= fitfunc
         self.args= args
         self.create_population()
+        self.bestvalue= 1e+30
+        self.logf= open('log.ga','w')
 
     def keep_best_individual(self):
         vals= []
         for i in range(len(self.population)):
             vals.append(self.population[i].value)
-        idx= vals.index(min(vals))
-        self.best_individual= copy.deepcopy(self.population[idx])
+        minval= min(vals)
+        if minval < self.bestvalue:
+            idx= vals.index(minval)
+            self.best_individual= copy.deepcopy(self.population[idx])
+            self.bestvalue = minval
 
     def create_population(self):
         u"""creates *nindv* individuals around the initial guess."""
         global maxid
         self.population= []
         #.....0th individual is the initial guess if there is
-        ind= Individual(0,self.ngene,init_murate,self.func,self.args)
+        ind= Individual(0,self.ngene,self.murate,self.func,self.args)
         genes=[]
         for ig in range(self.ngene):
             g= Gene(self.nbitlen,self.vars[ig]
@@ -190,7 +195,7 @@ class GA:
         self.population.append(ind)
         #.....other individuals whose genes are randomly distributed
         for i in range(self.nindv-1):
-            ind= Individual(i+1,self.ngene,init_murate,self.func,self.args)
+            ind= Individual(i+1,self.ngene,self.murate,self.func,self.args)
             maxid= i+1
             genes= []
             for ig in range(self.ngene):
@@ -211,8 +216,6 @@ class GA:
         for ind in self.population:
             prob.append(self.fitfunc(ind.value))
 
-        self.keep_best_individual()
-
         istore=[]
         for i in range(len(self.population)):
             istore.append(0)
@@ -223,7 +226,7 @@ class GA:
                 if istore[ii] == 1: continue
                 ptot += prob[ii]
             prnd= random()*ptot
-            print i,ptot
+            #print i,ptot
             ptot= 0.0
             for ii in range(len(self.population)):
                 if istore[ii] == 1: continue
@@ -262,6 +265,7 @@ class GA:
             self.population[i].value= qs[i].get()
 
         self.keep_best_individual()
+        self.out_log(0)
 
         for it in range(maxiter):
             print ' step= {:8d}'.format(it+1)
@@ -291,8 +295,10 @@ class GA:
             for i in range(self.nindv,len(self.population)):
                 j= i -self.nindv
                 self.population[i].value= qs[j].get()
-            for pop in self.population:
-                print pop.value
+            # for pop in self.population:
+            #     print pop.value
+            self.keep_best_individual()
+            self.out_log(it+1)
             #.....selection
             self.roulette_selection()
             #.....output the current best if needed
@@ -316,6 +322,11 @@ class GA:
         for var in vars:
             f.write('{:15.7e}\n'.format(var))
         f.close()
+
+    def out_log(self,istp):
+        for ind in self.population:
+            self.logf.write('{:6d} {:05d} {:15.7f}\n'.format(istp,ind.id,ind.value))
+        self.logf.write('\n')
 
 if __name__ == '__main__':
     vars= np.array([0.1,0.2])

@@ -170,8 +170,10 @@ class GA:
         vals= []
         for i in range(len(self.population)):
             vals.append(self.population[i].value)
-        idx= vals.index(min(vals))
-        self.best_individual= copy.deepcopy(self.population[idx])
+        minval= min(vals)
+        if minval < self.best_individual.value:
+            idx= vals.index(minval)
+            self.best_individual= copy.deepcopy(self.population[idx])
 
     def create_population(self):
         u"""creates *nindv* individuals around the initial guess."""

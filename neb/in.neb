@@ -1,0 +1,35 @@
+#   energy unit [eV]
+#   force unit [eV/A]
+#   time  unit [s]
+  num_atom      3
+  num_slice     5
+  num_iteration 10
+
+  io_format        ascii
+  method           nudged
+
+  minimization     velocity_damping
+!  minimization     conjugate_gradient
+
+  flag_cosine_damping  F
+  damping_coefficient  0.8d0
+  time_interval    5d-15
+
+  initial_temperature  0d0
+  flag_temperature     F
+  temperature_target   300d0
+  temperature_relax    0.5d-13
+
+  flag_convergence     T
+  convergence_force    1.0d-2
+  convergence_displace 1.0d-5
+
+  spring_constant   1.0d-2
+!  climbing_image    13
+
+  factor_direction  3 2
+    1.0d0  1.0d0  1.0d0
+    1.0d0  1.0d0  1.0d0
+
+  mass     1   55.847d0
+  mass     2   5.00d0

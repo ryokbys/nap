@@ -1,0 +1,94 @@
+#!/usr/sh
+########################################################################
+# Makefile for parallel MD
+#     by Ryo Kobayashi
+########################################################################
+
+# cpp path
+CPP= @CPP@
+CPPFLAGS= @CPPFLAGS@
+#CPPFLAGS= __SHEAR__ __DISL__
+FC= @F77@
+FFLAGS= @FFLAGS@
+
+#-----------------------------------------------------------------------
+# ifort and linux (pen4)
+# FC= ifort
+# FFLAGS= -xHOST -O2 -no-prec-div -g -CB
+#FFLAGS= -xAVX -O3 -ip -ipo -g -CB
+
+#-----------------------------------------------------------------------
+# Fujitsu FX1 @nagoya-u
+# MPIFC=mpifrt
+# MPIFLAGS= -Kprefetch_model=FX1 -Ktl_trt
+
+#-----------------------------------------------------------------------
+# # for mp-rk
+# MPIFC= mpif90
+# MPIFLAGS= -O4 -g
+#-----------------------------------------------------------------------
+# suffixes
+.SUFFIXES: .o .f .F .f90 .F90
+.f.o: 
+	$(FC) -c $(FFLAGS) $<
+.F.o: 
+	$(FC) -c $(FFLAGS) $(CPPFLAGS) $<
+.f90.o: 
+	$(FC) -c $(FFLAGS) $<
+.F90.o: 
+	$(FC) -c $(FFLAGS) $(CPPFLAGS) $<
+
+qmcl= qmcl.o read_input.o util_pmd.o lasubs.o
+selcl= select_cluster.o read_input.o util_pmd.o
+mods= mod_variables.o
+qmcl2stn= qmcl2stn.o util_pmd.o lasubs.o
+sort= sort_qmcl.o sort.o util_pmd.o $(mods)
+extqmcl= extend_qmcl.o util_pmd.o
+
+#-----mkconf program selection
+#mkconf= mkconf_Al_fcc.o
+#mkconf= mkconf_BCC_screw.o
+mkconf= mkconf_BCC_edge.o
+
+#-----------------------------------------------------------------------
+# Make rule entries
+#
+all: 10mkconf qmcl qmcl2akr selcl
+
+clean:
+	rm -f *.o *.mod *~ 10mkconf qmcl qmcl2akr selcl
+
+10mkconf: $(mkconf) util_pmd.o
+	$(FC) -o $@ $(mkconf) util_pmd.o
+
+qmcl: $(mods) $(qmcl)
+	$(FC) $(FFLAGS) -o $@ $(mods) $(qmcl)
+
+selcl: $(mods) $(selcl)
+	$(FC) $(FFLAGS) -o $@ $(mods) $(selcl)
+
+poscar2akr: poscar2akr.o
+	$(FC) $(FFLAGS) -o $@ poscar2akr.o
+
+qmcl2akr: qmcl2akr.o
+	$(FC) $(FFLAGS) -o $@ qmcl2akr.o
+
+qmcl2stn: $(qmcl2stn) $(mods)
+	$(FC) $(FFLAGS) -o $@ $(mods) $(qmcl2stn)
+
+sort: $(sort)
+	$(FC) $(FFLAGS) -o $@ $(sort)
+
+sfrcav: $(mods) sum_frcav.o
+	$(FC) $(FFLAGS) -o $@ $(mods) sum_frcav.o
+
+extqmcl: $(extqmcl)
+	$(FC) $(FFLAGS) -o $@ $(extqmcl)
+
+#.....Module dependencies
+qmcl.o: $(mods)
+select_cluster.o: $(mods)
+read_input.o:  $(mods)
+qmcl2stn.o: $(mods)
+
+

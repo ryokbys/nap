@@ -46,6 +46,7 @@ eps = 1e-8
 ga_nindv= 10
 ga_nbit= 16
 ga_temp= 1.0
+ga_murate= 0.01
 
 #.....constants
 large= 1.0e+30
@@ -174,6 +175,8 @@ def set_input_params(dict):
         ga_nbit= dict['ga_num_bit']
     if 'ga_temperature' in dict:
         ga_temp= dict['ga_temperature']
+    if 'ga_murate' in dict:
+        ga_murate= dict['ga_murate']
 
     
 def show_input_params(input_params):
@@ -182,11 +185,11 @@ def show_input_params(input_params):
         print ' {:>20}: '.format(key), value
 
 def gather_pmd_data(basedir):
-    global ergpmds,frcpmds
     #.....initialize variables
-    ergpmds=np.zeros(len(samples))
+    ergs=np.zeros(len(samples))
+    frcs= []
     for smpl in samples:
-        frcpmds.append(np.zeros((smpl.natm,3)))
+        frcs.append(np.zeros((smpl.natm,3)))
     #.....read data
     for i in range(len(sample_dirs)):
         dir= sample_dirs[i]
@@ -196,13 +199,14 @@ def gather_pmd_data(basedir):
         natm= int(ff.readline().split()[0])
         #.....energy
         f=open(basedir+'/'+dir+'/erg.pmd','r')
-        ergpmds[i]= float(f.readline().split()[0])/natm
+        ergs[i]= float(f.readline().split()[0])/natm
         f.close()
         for j in range(natm):
             data= ff.readline().split()
             for k in range(3):
-                frcpmds[i][j,k]= float(data[k])
+                frcs[i][j,k]= float(data[k])
         ff.close()
+    return (ergs,frcs)
 
 def gather_ref_data(basedir):
     global ergrefs,frcrefs
@@ -250,40 +254,76 @@ def func(x,*args):
         print "{:*>20}: no such run_mode !!!".format(' Error', runmode)
         exit()
     os.chdir(cwd)
-    print ' running pmd done.'
 
     #.....gather pmd results
-    gather_pmd_data(dir)
+    ergs,frcs=gather_pmd_data(dir)
 
     #.....calc function value of L
+    val= eval_L3(ergs,frcs,ergrefs,frcrefs,samples)
+    #print ' x, val=',x,val
+    return val
+
+def eval_L1(cergs,cfrcs,rergs,rfrcs,samples):
     val= 0.0
     nval= 0
     for i in range(len(samples)):
-        val += ((ergpmds[i]-ergrefs[i])/ergrefs[i])**2
+        val += ((cergs[i]-rergs[i])/rergs[i])**2
         nval += 1
-        natm= samples[i].natm
-        for j in range(natm):
+        for j in range(samples[i].natm):
             for k in range(3):
-                if abs(frcrefs[i][j,k]) > tiny:
-                    val += ((frcpmds[i][j,k]-frcrefs[i][j,k])
-                            /frcrefs[i][j,k])**2
+                if abs(rfrcs[i][j,k]) > tiny:
+                    val += ((cfrcs[i][j,k]-rfrcs[i][j,k])
+                            /rfrcs[i][j,k])**2
                 else:
-                    val += ((frcpmds[i][j,k]-frcrefs[i][j,k]))**2
+                    val += ((cfrcs[i][j,k]-rfrcs[i][j,k]))**2
                 nval += 1
     val /= nval
-    print ' x, val=',x,val
+    return val
+
+def eval_L2(cergs,cfrcs,rergs,rfrcs,samples):
+    val= 0.0
+    nval= 0
+    for i in range(len(samples)):
+        val += ((cergs[i]-rergs[i]))**2 *samples[i].natm
+        nval += 1
+        for j in range(samples[i].natm):
+            for k in range(3):
+                val += ((cfrcs[i][j,k]-rfrcs[i][j,k]))**2
+                nval += 1
+    val /= nval
+    return val
+
+def eval_L3(cergs,cfrcs,rergs,rfrcs,samples):
+    val= 0.0
+    nval= 0
+    for i in range(len(samples)):
+        val += math.log(1.0 +10.0*((cergs[i]-rergs[i]))**2)
+        nval += 1
+        for j in range(samples[i].natm):
+            for k in range(3):
+                val += math.log(1.0 +((cfrcs[i][j,k]-rfrcs[i][j,k]))**2)
+                nval += 1
+    val /= nval
     return val
 
 #================================================== output data
-def output_energy_relation(fname='out.pmd-vs-dft'):
+def output_energy_relation(ergs,fname='out.erg.pmd-vs-dft'):
     f= open(fname,'w')
     for i in range(len(ergrefs)):
-        f.write(' {:15.7e} {:15.7e}\n'.format(ergrefs[i],ergpmds[i]))
+        f.write(' {:15.7e} {:15.7e}\n'.format(ergrefs[i],ergs[i]))
     f.close()
 
-def plot_energy_relation(fname='graph.eps'):
+def output_force_relation(frcs,fname='out.frc.pmd-vs-dft'):
+    f= open(fname,'w')
+    for i in range(len(samples)):
+        for j in range(samples[i].natm):
+            for k in range(3):
+                f.write(' {:15.7e} {:15.7e}\n'.format(frcrefs[i][j,k],frcs[i][j,k]))
+    f.close()
+
+def plot_energy_relation(ergs,fname='graph.eps'):
     x=ergrefs
-    y=ergpmds
+    y=ergs
     plt.scatter(x,y)
     xmin,xmax= plt.xlim()
     ymin,ymax= plt.ylim()
@@ -305,7 +345,7 @@ def fitfunc(val):
 
 def ga_wrapper():
     ga_check_range()
-    ga= GA(ga_nindv,ga_nbit,func,vars,vranges,fitfunc,args=(maindir,))
+    ga= GA(ga_nindv,ga_nbit,ga_murate,func,vars,vranges,fitfunc,args=(maindir,))
     return ga.run(niter)
 
 def ga_check_range():
@@ -332,8 +372,7 @@ if __name__ == '__main__':
     show_input_params(inputs)
     #.....params: parameters in in.params.?????
     read_params(maindir+'/'+parfile)
-    write_params(maindir+'/'+parfile
-                 +'.{:03d}'.format(0),vars)
+    write_params(maindir+'/'+parfile+'.ini',vars)
     
     #.....get samples from ##### directories
     sample_dirs= get_sample_dirs()
@@ -344,9 +383,10 @@ if __name__ == '__main__':
 
     #.....initial data
     gather_ref_data(maindir)
-    gather_pmd_data(maindir)
+    ergs,frcs= gather_pmd_data(maindir)
 
-    output_energy_relation(fname='out.pmd-vs-dft.ini')
+    output_energy_relation(ergs,fname='out.erg.pmd-vs-dft.ini')
+    output_force_relation(frcs,fname='out.frc.pmd-vs-dft.ini')
 
     if fmethod in {'cg','CG','conjugate-gradient'}:
         print '>>>>> conjugate-gradient was selected.'
@@ -365,14 +405,18 @@ if __name__ == '__main__':
     elif fmethod in {'ga','GA','genetic-algorithm'}:
         print '>>>>> genetic algorithm was selected.'
         solution= ga_wrapper()
+        #...calc best one again
+        func(solution,maindir)
+        ergs,frcs= gather_pmd_data(maindir)
     elif fmethod in {'test','TEST'}:
         print '>>>>> TEST was selected.'
-        func(vars,(maindir))
+        func(vars,maindir)
         solution= vars
 
     write_params(maindir+'/'+parfile+'.fin',solution)
     
-    output_energy_relation(fname='out.pmd-vs-dft.fin')
+    output_energy_relation(ergs,fname='out.erg.pmd-vs-dft.fin')
+    output_force_relation(frcs,fname='out.frc.pmd-vs-dft.fin')
 
     print '{:=^72}'.format(' FITPOT finished correctly ')
     print '   Elapsed time = {:12.2f}'.format(time.time()-t0)
