@@ -1,0 +1,168 @@
+import numpy as np
+import math
+from math import cos,sin,sqrt
+from random import random
+
+from AtomSystem import AtomSystem
+from Atom import Atom
+from UnitCellMaker import bccBravaisCell
+
+class Grain(object):
+    
+    def __init__(self,point,angle):
+        self.point= point
+        self.angle= angle
+        self.rmat= self.get_rotation_matrix(self.angle)
+        
+    def get_rotation_matrix(self,angle):
+        a= angle[0]
+        b= angle[1]
+        c= angle[2]
+        rmat= np.zeros((3,3))
+#         rmat[0,0]= cos(a)*cos(b)*cos(c) -sin(a)*sin(c)
+#         rmat[0,1]=-cos(a)*cos(b)*sin(c) -sin(a)*cos(c)
+#         rmat[0,2]= cos(a)*sin(b)
+#         rmat[1,0]= sin(a)*cos(b)*cos(c) +cos(a)*sin(c)
+#         rmat[1,1]=-sin(a)*cos(b)*sin(c) +sin(a)*cos(c)
+#         rmat[1,2]= sin(a)*sin(b)
+#         rmat[2,0]= -sin(b)*cos(c)
+#         rmat[2,1]= sin(b)*sin(c)
+#         rmat[2,2]= cos(b)
+        rmat[0,0]= cos(a)*cos(b)
+        rmat[0,1]= cos(a)*sin(b)*sin(c) -sin(a)*cos(c)
+        rmat[0,2]= cos(a)*sin(b)*cos(c) +sin(a)*sin(c)
+        rmat[1,0]= sin(a)*cos(b)
+        rmat[1,1]= sin(a)*sin(b)*sin(c) +cos(a)*cos(c)
+        rmat[1,2]= sin(a)*sin(b)*cos(c) -cos(a)*sin(c)
+        rmat[2,0]=-sin(b)
+        rmat[2,1]= cos(b)*sin(c)
+        rmat[2,2]= cos(b)*cos(c)
+        return rmat
+
+def anint(x):
+    if x >= 0.5:
+        x = 1.0
+    elif x < -0.5:
+        x =-1.0
+    else:
+        x = 0.0
+    return x
+
+def distance(p1,p2):
+    a0= p1[0]-p2[0] -anint(p1[0]-p2[0])
+    a1= p1[1]-p2[1] -anint(p1[1]-p2[1])
+    a2= p1[2]-p2[2] -anint(p1[2]-p2[2])
+    return sqrt( a0**2 +a1**2 +a2**2 )
+
+def pbc(x):
+    if x >= 1.0:
+        x -= 1.0
+    elif x < 0.0:
+        x += 1.0
+    return x
+
+def shift_vector():
+    sv= np.zeros((27,3))
+    n=0
+    for i in range(-1,2):
+        for j in range(-1,2):
+            for k in range(-1,2):
+                sv[n,0]= float(i)
+                sv[n,1]= float(j)
+                sv[n,2]= float(k)
+                n += 1
+    return sv
+
+def make_polycrystal(grns,uc,n1,n2,n3):
+    u"""
+    This routine is not that universal.
+    Each grain has to have neighboring grains within a supercell,
+    otherwise there will be some unexpecting grain boundries.
+    In order to do so, the system should be large enough and
+    the number of grains should be large enough.
+    """
+    sv= shift_vector()
+    system= AtomSystem()
+    system.set_lattice(uc.alc,uc.a1*n1,uc.a2*n2,uc.a3*n3)
+    hmat= np.zeros((3,3))
+    hmat[0]= system.a1 *system.alc
+    hmat[1]= system.a2 *system.alc
+    hmat[2]= system.a3 *system.alc
+    hmati= np.linalg.inv(hmat)
+    for ig in range(len(grns)):
+        grain= grns[ig]
+        rmat= grain.rmat
+        pi= grain.point
+        api= np.dot(hmat,pi)
+        for ix in range(-n1/2-1,n1/2+2):
+            print 'ix=',ix
+            for iy in range(-n2/2-1,n2/2+2):
+                for iz in range(-n3/2-1,n3/2+2):
+                    for m in range(len(uc.atoms)):
+                        rt= np.zeros((3,))
+                        rt[0]= (uc.atoms[m].pos[0]+ix)/n1
+                        rt[1]= (uc.atoms[m].pos[1]+iy)/n2
+                        rt[2]= (uc.atoms[m].pos[2]+iz)/n3
+                        #...rt to absolute position
+                        art= np.dot(hmat,rt)
+                        #...rotate
+                        ari= np.dot(rmat,art)
+                        ari[0]= ari[0]+api[0]
+                        ari[1]= ari[1]+api[1]
+                        ari[2]= ari[2]+api[2]
+                        #...check distance from all the grain points
+                        di= distance(ari,api)
+                        isOutside= False
+                        for jg in range(len(grns)):
+                            gj= grns[jg]
+                            for isv in range(27):
+                                pj= gj.point
+                                if jg == ig and isv == 13:
+                                    continue
+                                svi= sv[isv]
+                                pj= pj +svi
+                                apj= np.dot(hmat,pj)
+                                dj= distance(ari,apj)
+                                if dj < di:
+                                    isOutside= True
+                                    break
+                            if isOutside:
+                                break
+                        if isOutside:
+                            break
+                        #...here ri is inside this grain, register it
+                        atom= Atom()
+                        ri= np.dot(hmati,ari)
+                        ri[0]= pbc(ri[0])
+                        ri[1]= pbc(ri[1])
+                        ri[2]= pbc(ri[2])
+                        atom.set_pos(ri[0],ri[1],ri[2])
+                        atom.set_sid(uc.atoms[m].sid)
+                        system.add_atom(atom)
+    return system
+
+if __name__ == '__main__':
+    n1= 20
+    n2= 20
+    n3= 20
+    ngrain= 3
+    grains= []
+    for i in range(ngrain):
+        pi= np.zeros((3,))
+        ai= np.zeros((3,))
+        pi[0]= random()
+        pi[1]= random()
+        pi[2]= random()
+        ai[0]= random()*math.pi*2 -math.pi
+        ai[1]= random()*(math.pi/2) -math.pi/2
+        ai[2]= random()*math.pi*2 -math.pi
+        print 'point=',pi
+        print 'angle=',ai
+        gi= Grain(pi,ai)
+        grains.append(gi)
+    uc= bccBravaisCell()
+    uc.alc= 3.204
+    # uc.write_pmd('uc0000')
+    system= make_polycrystal(grains,uc,n1,n2,n3)
+    system.write_akr('akr0000')
+    

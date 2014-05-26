@@ -20,12 +20,12 @@ c
       call read_input(10,'in.neb')
       allocate(ra(3,natm,nslc),va(3,natm,nslc),fa(3,natm,nslc)
      &     ,tag(natm,nslc),vn(3,natm))
-c.....eV/A^2 ---> Hartree/Bohr^2
-      scnst=scnst *ev2hrt /aa2bohr**2
-c.....eV/A ---> Hartree/Bohr
-      feps= feps *ev2hrt /aa2bohr
-c.....A ---> Bohr
-      deps= deps *aa2bohr
+cc.....eV/A^2 ---> Hartree/Bohr^2
+c      scnst=scnst *ev2hrt /aa2bohr**2
+cc.....eV/A ---> Hartree/Bohr
+c      feps= feps *ev2hrt /aa2bohr
+cc.....A ---> Bohr
+c      deps= deps *aa2bohr
 
 c.....Read atom configuration of each slice
       do islc=1,nslc

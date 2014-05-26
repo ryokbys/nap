@@ -24,12 +24,12 @@ c-----------------------------------------------------------------------
       call read_input(10,'in.neb')
       allocate(ra(3,natm,nslc),va(3,natm,nslc),fa(3,natm,nslc)
      &     ,tag(natm,nslc))
-c.....eV/A^2 ---> Hartree/Bohr^2
-      scnst=scnst *ev2hrt /aa2bohr**2
-c.....eV/A ---> Hartree/Bohr
-      feps= feps *ev2hrt /aa2bohr
-c.....A ---> Bohr
-      deps= deps *aa2bohr
+cc.....eV/A^2 ---> Hartree/Bohr^2
+c      scnst=scnst *ev2hrt /aa2bohr**2
+cc.....eV/A ---> Hartree/Bohr
+c      feps= feps *ev2hrt /aa2bohr
+cc.....A ---> Bohr
+c      deps= deps *aa2bohr
 
 c.....Read atom configuration of each slice
       do islc=1,nslc
@@ -414,7 +414,8 @@ c.....Read forces given by the external program
         do i=1,natm
           read(ionum,*) fa(1:3,i,islc)
 c.....In case of vasp, we need to convert from eV/A to Ht/Bohr
-          fa(1:3,i,islc)=fa(1:3,i,islc) *ev2hrt /aa2bohr
+c          fa(1:3,i,islc)=fa(1:3,i,islc) *ev2hrt /aa2bohr
+          fa(1:3,i,islc)=fa(1:3,i,islc)
         enddo
         close(ionum)
 c.....Energies, too
@@ -866,7 +867,8 @@ c          fmax= max(fi,fmax)
         enddo
       enddo
 c.....First step distance: 0.1 AA
-      ds= 0.01d0 *aa2bohr  /fmax
+c      ds= 0.01d0 *aa2bohr  /fmax
+      ds= 0.01d0 /fmax
       hmax= max(h(1,1),h(2,2))
       hmax= max(hmax,h(3,3))
       ds= ds/hmax

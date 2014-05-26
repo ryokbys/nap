@@ -1,3 +1,11 @@
+2014-05-27    <kobayashi@mike.bw.nitech.ac.jp>
+
+	* mkconf_python was added. At this time, only poly-crystal maker is available.
+
+2014-05-25    <kobayashi@mike.bw.nitech.ac.jp>
+
+	* README.md: License was change from GPL2 to MIT.
+
 2014-05-22    <kobayashi@mike.bw.nitech.ac.jp>
 
 	* pmd format was changed.

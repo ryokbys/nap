@@ -12,3 +12,6 @@ and uses spatial decomposition technique for the parallelization, and cell-list 
 # Compilation and usage
 See the manual web site below (but Japanese only),
 http://locs.bw.nitech.ac.jp/~kobayashi/pmd_manual
+
+# LICENSE
+This software is released under the MIT License, see LICENSE.

@@ -42,9 +42,10 @@ c.....Read an argument, ipmd
 c-----read akr file from STDIN
       open(10,file=trim(ciname),status="old")
       read(10,*) hunit
-      read(10,*) al(1)*hunit,tmp,tmp
-      read(10,*) tmp,al(2)*hunit,tmp
-      read(10,*) tmp,tmp,al(3)*hunit
+      read(10,*) al(1),tmp,tmp
+      read(10,*) tmp,al(2),tmp
+      read(10,*) tmp,tmp,al(3)
+      al(1:3)= al(1:3) *hunit
       ncpx=1
       ncpy=1
       ncpz=1
