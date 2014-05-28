@@ -85,7 +85,7 @@ c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
       include "../pmd/params_unit.h"
-c      include "../src/params_EAM_Fe-H.h"
+c      include "../pmd/params_EAM_Fe-H.h"
       include "../pmd/params_Ito_W-He.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)

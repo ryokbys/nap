@@ -7,8 +7,8 @@ c  ------
 c    - pmd00000
 c-----------------------------------------------------------------------
       implicit none
-      include "../src/params_unit.h"
-      include "../src/params_EAM_Al.h"
+      include "../pmd/params_unit.h"
+      include "../pmd/params_EAM_Al.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
@@ -105,8 +105,8 @@ c-----scale velocities to reduced unit
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "../src/params_unit.h"
-      include "../src/params_EAM_Al.h"
+      include "../pmd/params_unit.h"
+      include "../pmd/params_EAM_Al.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)

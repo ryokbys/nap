@@ -7,7 +7,7 @@ c    - pmd00000
 c    - akr0000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
-      include '../src/params_unit.h'
+      include '../pmd/params_unit.h'
       include './params_Ito_W-He.h'
 c-----max # of atoms
       integer,parameter::nmax=100000

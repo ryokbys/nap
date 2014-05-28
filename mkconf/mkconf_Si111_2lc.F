@@ -9,8 +9,8 @@ c ------
 c  * ini000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
-      include "../src/params_unit.h"
-      include "../src/params_SW_Si.h"
+      include "../pmd/params_unit.h"
+      include "../pmd/params_SW_Si.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells

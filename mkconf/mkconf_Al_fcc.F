@@ -4,8 +4,8 @@ c  Make atom configuration file of fcc Al
 c    Output: ini000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
-      include "../src/params_unit.h"
-      include "../src/params_EAM_Al.h"
+      include "../pmd/params_unit.h"
+      include "../pmd/params_EAM_Al.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
@@ -80,8 +80,8 @@ c-----output 'akr0000' for KVS visualization
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "../src/params_unit.h"
-      include "../src/params_EAM_Al.h"
+      include "../pmd/params_unit.h"
+      include "../pmd/params_EAM_Al.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)

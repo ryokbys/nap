@@ -4,8 +4,8 @@ c  Make atom configuration file of wurtzite AlN
 c    Output: ini000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
-      include "../src/params_unit.h"
-      include "../src/params_Vashishta_AlN.h"
+      include "../pmd/params_unit.h"
+      include "../pmd/params_Vashishta_AlN.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
@@ -95,8 +95,8 @@ c-----output 'kvs000' for KVS visualization
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "../src/params_unit.h"
-      include "../src/params_Vashishta_AlN.h"
+      include "../pmd/params_unit.h"
+      include "../pmd/params_Vashishta_AlN.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)
