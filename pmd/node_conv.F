@@ -76,7 +76,8 @@ c     &       ,eki(j),epi(j),strs(1:3,1:3,j),j=nlast+1,nlast+n)
 c.....Ascii format
         open(12,file=trim(filename),form='formatted',status='old')
         read(12,*) hunit
-        read(12,*) (((h(ia,ib,l)*hunit,ia=1,3),ib=1,3),l=0,1)
+        read(12,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+        h(1:3,1:3,0:1)= h(1:3,1:3,0:1)*hunit
         read(12,*) n
         write(6,'(a,i10)') " n=",n
         if(nlast+n.gt.namax)then

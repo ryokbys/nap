@@ -1,4 +1,8 @@
 import numpy as np
+import math
+import sys
+
+from Atom import Atom
 
 class AtomSystem(object):
     u"""
@@ -25,14 +29,17 @@ class AtomSystem(object):
             ai= self.atoms[i]
             ai.set_id(i+1)
 
+    def num_atoms(self):
+        return len(self.atoms)
+
     def read_pmd(self,fname='pmd0000'):
         f=open(fname,'r')
         # 1st: lattice constant
         self.alc= float(f.readline().split()[0])
         # 2nd-4th: cell vectors
-        self.a1= np.array([float(x)*self.alc for x in f.readline().split()])
-        self.a2= np.array([float(x)*self.alc for x in f.readline().split()])
-        self.a3= np.array([float(x)*self.alc for x in f.readline().split()])
+        self.a1= np.array([float(x) for x in f.readline().split()])
+        self.a2= np.array([float(x) for x in f.readline().split()])
+        self.a3= np.array([float(x) for x in f.readline().split()])
         # 5th-7th: velocity of cell vectors
         tmp= f.readline().split()
         tmp= f.readline().split()
@@ -85,6 +92,26 @@ class AtomSystem(object):
                     +"\n")
         f.close()
 
+    def read_akr(self,fname='akr0000'):
+        f=open(fname,'r')
+        # 1st: lattice constant
+        self.alc= float(f.readline().split()[0])
+        # 2nd-4th: cell vectors
+        self.a1= np.array([float(x) for x in f.readline().split()])
+        self.a2= np.array([float(x) for x in f.readline().split()])
+        self.a3= np.array([float(x) for x in f.readline().split()])
+        # 5th: num of atoms
+        natm= int(f.readline().split()[0])
+        # 9th-: atom positions
+        self.atoms= []
+        for i in range(natm):
+            data= [float(x) for x in f.readline().split()]
+            ai= Atom()
+            ai.set_sid(data[0])
+            ai.set_pos(data[1],data[2],data[3])
+            self.atoms.append(ai)
+        f.close()
+
     def write_akr(self,fname='akr0000'):
         f=open(fname,'w')
         # lattice constant
@@ -113,3 +140,101 @@ class AtomSystem(object):
                     +"\n")
         f.close()
 
+    def make_pair_list(self,rcut=3.0):
+        rc2= rcut**2
+        h= np.zeros((3,3))
+        h[0]= self.a1 *self.alc
+        h[1]= self.a2 *self.alc
+        h[2]= self.a3 *self.alc
+        hi= np.linalg.inv(h)
+        print h
+        print hi
+        lcx= int(1.0/math.sqrt(hi[0,0]**2 +hi[0,1]**2 +hi[0,2]**2)/rcut)
+        lcy= int(1.0/math.sqrt(hi[1,0]**2 +hi[1,1]**2 +hi[1,2]**2)/rcut)
+        lcz= int(1.0/math.sqrt(hi[2,0]**2 +hi[2,1]**2 +hi[2,2]**2)/rcut)
+        if lcx == 0: lcx= 1
+        if lcy == 0: lcy= 1
+        if lcz == 0: lcz= 1
+        lcyz= lcy*lcz
+        lcxyz= lcx*lcy*lcz
+        rcx= 1.0/lcx
+        rcy= 1.0/lcy
+        rcz= 1.0/lcz
+        rcxi= 1.0/rcx
+        rcyi= 1.0/rcy
+        rczi= 1.0/rcz
+        lscl= np.full((len(self.atoms),),-1,dtype=int)
+        lshd= np.full((lcxyz,),-1,dtype=int)
+        print 'lcx,lcy,lcz=',lcx,lcy,lcz
+        print 'rcx,rcy,rcz=',rcx,rcy,rcz
+
+        #...make a linked-cell list
+        for i in range(len(self.atoms)):
+            pi= self.atoms[i].pos
+            #...assign a vector cell index
+            mx= int(pi[0]*rcxi)
+            my= int(pi[1]*rcyi)
+            mz= int(pi[2]*rczi)
+            m= mx*lcyz +my*lcz +mz
+            # print i,mx,my,mz,m
+            lscl[i]= lshd[m]
+            lshd[m]= i
+
+        #...make a pair list
+        self.lspr= []
+        for i in range(len(self.atoms)):
+            self.lspr.append([])
+
+        for ia in range(len(self.atoms)):
+            ai= self.atoms[ia]
+            pi= ai.pos
+            mx= int(pi[0]*rcxi)
+            my= int(pi[1]*rcyi)
+            mz= int(pi[2]*rczi)
+            m= mx*lcyz +my*lcz +mz
+            #print 'ia,pi,mx,my,mz,m=',ia,pi[0:3],mx,my,mz,m
+            for kuz in range(-1,2):
+                m1z= mz +kuz
+                if m1z < 0: m1z += lcz
+                if m1z >= lcz: m1z -= lcz
+                for kuy in range(-1,2):
+                    m1y= my +kuy
+                    if m1y < 0: m1y += lcy
+                    if m1y >= lcy: m1y -= lcy
+                    for kux in range(-1,2):
+                        m1x= mx +kux
+                        if m1x < 0: m1x += lcx
+                        if m1x >= lcx: m1x -= lcx
+                        m1= m1x*lcyz +m1y*lcz +m1z
+                        ja= lshd[m1]
+                        if ja== -1: continue
+                        self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2)
+        #...after makeing lspr
+        # for ia in range(len(self.atoms)):
+        #     print ia,self.lspr[ia]
+
+    def scan_j_in_cell(self,ia,pi,ja,lscl,h,rc2):
+        if ja == ia: ja = lscl[ja]
+        if ja == -1: return 0
+        aj= self.atoms[ja]
+        pj= aj.pos
+        xij= pj-pi
+        xij[0] =self.pbc(xij[0])
+        xij[1] =self.pbc(xij[1])
+        xij[2] =self.pbc(xij[2])
+        rij= np.dot(h,xij)
+        rij2= rij[0]**2 +rij[1]**2 +rij[2]**2
+        if rij2 < rc2:
+            self.lspr[ia].append(ja)
+        ja= lscl[ja]
+        self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2)
+
+    def pbc(self,x):
+        if x <= -0.5:
+            return x +1.0
+        elif x >   0.5:
+            return x -1.0
+        else:
+            return x
+
+        

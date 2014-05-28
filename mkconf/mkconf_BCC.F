@@ -4,14 +4,14 @@ c    Create a BCC crystal
 c    Write: ini000
 c
       implicit real*8(a-h,o-z),integer(i-n)
-      include '../src/params_unit.h'
+      include '../pmd/params_unit.h'
 c      include './params_EAM_Fe-H.h'
-      include './params_Ito_W-He.h'
+      include '../pmd/params_Ito_W-He.h'
 c-----max # of atoms
       integer,parameter::nmax=10000000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 5,5,5 /)
+      integer,parameter:: nuc(1:3)= (/ 3,3,3 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
@@ -84,9 +84,9 @@ c-----output 'akr0000' for Akira visualization
 c=======================================================================
       subroutine setv(natm,va,tag,tempini)
       implicit none
-      include "../src/params_unit.h"
+      include "../pmd/params_unit.h"
 c      include "../src/params_EAM_Fe-H.h"
-      include "../src/params_Ito_W-He.h"
+      include "../pmd/params_Ito_W-He.h"
       integer,intent(in):: natm
       real(8),intent(in):: tempini,tag(natm)
       real(8),intent(out):: va(3,natm)

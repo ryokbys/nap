@@ -1,11 +1,16 @@
 import numpy as np
-import math
+import math,copy
 from math import cos,sin,sqrt
 from random import random
 
 from AtomSystem import AtomSystem
 from Atom import Atom
 from UnitCellMaker import bccBravaisCell
+
+#...constants
+rcut= 3.0
+dmin= 2.0
+
 
 class Grain(object):
     
@@ -19,6 +24,7 @@ class Grain(object):
         b= angle[1]
         c= angle[2]
         rmat= np.zeros((3,3))
+        #...Eular angle?
 #         rmat[0,0]= cos(a)*cos(b)*cos(c) -sin(a)*sin(c)
 #         rmat[0,1]=-cos(a)*cos(b)*sin(c) -sin(a)*cos(c)
 #         rmat[0,2]= cos(a)*sin(b)
@@ -28,6 +34,7 @@ class Grain(object):
 #         rmat[2,0]= -sin(b)*cos(c)
 #         rmat[2,1]= sin(b)*sin(c)
 #         rmat[2,2]= cos(b)
+        #...what kind of operation?
         rmat[0,0]= cos(a)*cos(b)
         rmat[0,1]= cos(a)*sin(b)*sin(c) -sin(a)*cos(c)
         rmat[0,2]= cos(a)*sin(b)*cos(c) +sin(a)*sin(c)
@@ -139,12 +146,51 @@ def make_polycrystal(grns,uc,n1,n2,n3):
                         atom.set_pos(ri[0],ri[1],ri[2])
                         atom.set_sid(uc.atoms[m].sid)
                         system.add_atom(atom)
+    #...remove too-close atoms at the grain boundaries
+    system.make_pair_list(rcut)
+    ls_remove= []
+    dmin2= dmin**2
+    xij= np.zeros((3,))
+    for ia in range(system.num_atoms()):
+        ai= system.atoms[ia]
+        pi= ai.pos
+        lst= system.lspr[ia]
+        for ja in lst:
+            aj= system.atoms[ja]
+            pj= aj.pos
+            xij[0]= pj[0]-pi[0] -anint(pj[0]-pi[0])
+            xij[1]= pj[1]-pi[1] -anint(pj[1]-pi[1])
+            xij[2]= pj[2]-pi[2] -anint(pj[2]-pi[2])
+            xij= np.dot(hmat,xij)
+            d2= xij[0]**2 +xij[1]**2 +xij[2]**2
+            if d2 < dmin2:
+                ls_remove.append(ia)
+                ls_remove.append(ja)
+    #...one of two will survive
+    #print ls_remove
+    count= [ ls_remove.count(ls_remove[i]) for i in range(len(ls_remove))]
+    #print count
+    for i in range(0,len(ls_remove),2):
+        if count[i] > count[i+1]:
+            ls_remove[i+1]= -1
+        elif count[i] < count[i+1]:
+            ls_remove[i]= -1
+        else:
+            n= int(random()*2.0) # 0 or 1
+            ls_remove[i+n]= -1
+    ls_remove.sort()
+    for ia in range(len(ls_remove)-1,-1,-1):
+        n= ls_remove[ia]
+        if ia != len(ls_remove)-1:
+            if n == nprev: continue
+        system.atoms.pop(n)
+        nprev= n
     return system
 
 if __name__ == '__main__':
-    n1= 20
-    n2= 20
-    n3= 20
+    n1= 10
+    n2= 10
+    n3= 10
     ngrain= 3
     grains= []
     for i in range(ngrain):
@@ -164,5 +210,5 @@ if __name__ == '__main__':
     uc.alc= 3.204
     # uc.write_pmd('uc0000')
     system= make_polycrystal(grains,uc,n1,n2,n3)
+    system.write_pmd('pmd00000')
     system.write_akr('akr0000')
-    
