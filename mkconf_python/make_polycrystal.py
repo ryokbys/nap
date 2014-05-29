@@ -1,8 +1,11 @@
+import sys,os
 import numpy as np
 import math,copy
 from math import cos,sin,sqrt
 from random import random
 
+sys.path.append(os.path.dirname(os.path.abspath(__file__))
+                +'/../nappy')
 from AtomSystem import AtomSystem
 from Atom import Atom
 from UnitCellMaker import bccBravaisCell
