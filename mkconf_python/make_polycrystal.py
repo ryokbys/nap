@@ -157,8 +157,10 @@ def make_polycrystal(grns,uc,n1,n2,n3):
     for ia in range(system.num_atoms()):
         ai= system.atoms[ia]
         pi= ai.pos
+        nlst= system.nlspr[ia]
         lst= system.lspr[ia]
-        for ja in lst:
+        for j in range(nlst):
+            ja= lst[j]
             aj= system.atoms[ja]
             pj= aj.pos
             xij[0]= pj[0]-pi[0] -anint(pj[0]-pi[0])

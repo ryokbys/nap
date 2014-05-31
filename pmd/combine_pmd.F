@@ -62,8 +62,8 @@ c            op(5,n)=strs(1,2,i)
           enddo
         enddo
 
-cc.....Sort before output
-c        call heapsort_itag(n,npmax,itag,18,dat)
+c.....Sort before output
+        call heapsort_itag(n,npmax,itag,18,dat)
 
 c-------output file name
         fout="akr0000"
@@ -114,5 +114,5 @@ c=======================================================================
 c=======================================================================
 c-----for emacs---------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make 40combine"
+c     compile-command: "make combine"
 c     End:

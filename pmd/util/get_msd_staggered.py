@@ -5,6 +5,8 @@ Get mean square displacements (MSDs) of given atoms (see ids below)
 from the akr files in the arguments.
 
 This utility assumes that the cell is fixed during the simulation.
+
+Staggered measuring of MSD for for the statistical purpose.
 """
 
 import os,sys,glob
@@ -16,6 +18,10 @@ from AtomSystem import AtomSystem
 
 #...atom IDs whose trajectories are tracked.
 ids=(7,164,225,)
+#...num of measuring lane, in case of 1, it is identical to non-staggered measuring
+nmeasure= 10
+#...shift of each staggered lane
+nshift= 20
 
 def anint(x):
     if x >= 0.5:
@@ -41,17 +47,24 @@ for i in range(len(sys.argv)):
             infiles.append(f)
     infiles.append(sys.argv[i])
 
+#...compute sampling time-window from nmeasure and nshift
+ntwindow= len(infiles) -(nmeasure-1)*nshift
+if ntwindow <= 0:
+    print ' [Error] ntwindow <= 0 !!!'
+    print '  Chech the parameters nmeasure and nshift, and input files.'
+    sys.exit()
+
+
 #...make output data files
 outfiles= []
 for l in ids:
     file= open('dat.msd-{}'.format(l),'w')
     outfiles.append(file)
 
-p0= np.zeros((len(ids),3))
+p0= np.zeros((nmeasure,len(ids),3))
 pp= np.zeros((len(ids),3))
-msd= np.zeros((len(ids),3))
+msd= np.zeros((len(infiles),nmeasure,len(ids),3))
 npbc= np.zeros((len(ids),3),dtype=int)
-pit= np.zeros((3,))
 hmat= np.zeros((3,3))
 for ifile in range(len(infiles)):
     file= infiles[ifile]
@@ -67,10 +80,6 @@ for ifile in range(len(infiles)):
         pi= ai.pos
         if ifile == 0:
             pp[l]= pi
-            p0[l]= pi
-            outfiles[l].write(' {:10d}'.format(ifile)
-                              +' {:15.7f} {:15.7f}'.format(0.0,0.0)
-                              +' {:15.7f} {:15.7f}\n'.format(0.0,0.0))
         else:
             #...correct periodic motion
             dev= pi -pp[l]
@@ -87,30 +96,39 @@ for ifile in range(len(infiles)):
             elif dev[2] < -0.5:
                 npbc[l,2] += 1
             # print npbc
-            # pit[0]= pi[0] -anint(dev[0])
-            # pit[1]= pi[1] -anint(dev[1])
-            # pit[2]= pi[2] -anint(dev[2])
-            #...normalized to absolute
-            #dev= pit -pp[l]
-            dev[0]= pi[0] -p0[l,0] +float(npbc[l,0])
-            dev[1]= pi[1] -p0[l,1] +float(npbc[l,1])
-            dev[2]= pi[2] -p0[l,2] +float(npbc[l,2])
-            dev= np.dot(hmat,dev)
-            # msd[l,0] += dev[0]**2 
-            # msd[l,1] += dev[1]**2 
-            # msd[l,2] += dev[2]**2 
-            msd[l,0] = dev[0]**2 
-            msd[l,1] = dev[1]**2 
-            msd[l,2] = dev[2]**2 
-            
-            outfiles[l].write(' {:10d}'.format(ifile)
-                              +' {:15.7f}'.format(msd[l,0])
-                              +' {:15.7f}'.format(msd[l,1])
-                              +' {:15.7f}'.format(msd[l,2])
-                              +' {:15.7f}'.format((msd[l,0]
-                                                   +msd[l,1]
-                                                   +msd[l,2])/3)
-                              +' \n')
             #...store current position
             pp[l]= pi
-            
+                        
+        for nm in range(nmeasure):
+            if ifile == nm*nshift:
+                p0[nm,l,0]= pi[0] +float(npbc[l,0])
+                p0[nm,l,1]= pi[1] +float(npbc[l,1])
+                p0[nm,l,2]= pi[2] +float(npbc[l,2])
+            if nm*nshift < ifile:
+                #...normalized to absolute
+                dev[0]= pi[0] -p0[nm,l,0] +float(npbc[l,0])
+                dev[1]= pi[1] -p0[nm,l,1] +float(npbc[l,1])
+                dev[2]= pi[2] -p0[nm,l,2] +float(npbc[l,2])
+                dev= np.dot(hmat.T,dev)
+                msd[ifile-nm*nshift,nm,l,0] = dev[0]**2 
+                msd[ifile-nm*nshift,nm,l,1] = dev[1]**2 
+                msd[ifile-nm*nshift,nm,l,2] = dev[2]**2 
+                
+
+for ifile in range(len(infiles)-(nmeasure-1)*nshift):
+    for l in range(len(ids)):
+        if ifile == 0:
+            outfiles[l].write(' {:10d}'.format(ifile)
+                              +' {:15.7f} {:15.7f}'.format(0.0,0.0)
+                              +' {:15.7f} {:15.7f}\n'.format(0.0,0.0))
+        else:
+            dev= np.zeros((3,))
+            for nm in range(nmeasure):
+                dev += msd[ifile,nm,l]
+            dev /= nmeasure
+            outfiles[l].write(' {:10d}'.format(ifile)
+                              +' {:15.7f}'.format(dev[0])
+                              +' {:15.7f}'.format(dev[1])
+                              +' {:15.7f}'.format(dev[2])
+                              +' {:15.7f}'.format((dev[0]+dev[1]+dev[2])/3)
+                              +' \n')

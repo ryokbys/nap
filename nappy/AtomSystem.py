@@ -4,6 +4,9 @@ import sys
 
 from Atom import Atom
 
+#...constants
+maxnn= 20
+
 class AtomSystem(object):
     u"""
     AtomSystem has cell information and atoms.
@@ -181,10 +184,12 @@ class AtomSystem(object):
             lshd[m]= i
 
         #...make a pair list
-        self.lspr= []
-        for i in range(len(self.atoms)):
-            self.lspr.append([])
-
+        self.nlspr= np.zeros((self.num_atoms(),),dtype=int)
+        self.lspr= np.full((self.num_atoms(),maxnn),-1,dtype=int)
+        # self.lspr= []
+        # for i in range(len(self.atoms)):
+        #     self.lspr.append([])
+            
         for ia in range(len(self.atoms)):
             ai= self.atoms[ia]
             pi= ai.pos
@@ -225,7 +230,12 @@ class AtomSystem(object):
         rij= np.dot(h,xij)
         rij2= rij[0]**2 +rij[1]**2 +rij[2]**2
         if rij2 < rc2:
-            self.lspr[ia].append(ja)
+            n= self.nlspr[ia]
+            self.lspr[ia,n]= ja
+            self.nlspr[ia] += 1
+            if self.nlspr[ia] >= maxnn:
+                print ' [Error] self.nlspr[{}] >= maxnn !!!'.format(ia)
+                sys.exit()
         ja= lscl[ja]
         self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2)
 

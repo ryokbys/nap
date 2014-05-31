@@ -8,7 +8,7 @@ c    - akr0000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
       include '../pmd/params_unit.h'
-      include './params_Ito_W-He.h'
+      include '../pmd/params_Ito_W-He.h'
 c-----max # of atoms
       integer,parameter::nmax=100000
 c-----# of unit cells
@@ -23,7 +23,7 @@ c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
 c.....vacancy ratio
       real(8),parameter:: vratio  = 0.0001
 c.....He ratio
-      real(8),parameter:: heratio = 0.050
+      real(8),parameter:: heratio = 0.020
 
       small = 1d0/4 /nuc(1)
 
@@ -50,8 +50,8 @@ c-----unit cell, BCC
             do m=1,2
 c              call myrnd(rnd,dseed)
 c              if( rnd.lt.vratio ) cycle
-              if( ix.eq.nuc(1)/2 .and. iy.eq.nuc(2)/2
-     &             .and. iz.eq.nuc(3)/2 .and. m.eq.2 ) cycle
+c              if( ix.eq.nuc(1)/2 .and. iy.eq.nuc(2)/2
+c     &             .and. iz.eq.nuc(3)/2 .and. m.eq.2 ) cycle
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
@@ -115,5 +115,5 @@ c=======================================================================
 c=======================================================================
 c-----------------------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make 10mkconf"
+c     compile-command: "make mkconf_BCC_WHe"
 c     End:

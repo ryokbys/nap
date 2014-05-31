@@ -21,9 +21,9 @@ c.....W @0K = 3.171d-10
       real(8),parameter:: abcc = 3.204d0
       real(8),parameter:: rc   = 0.5d0*(1d0+1.41421356d0)*abcc
 
-      integer:: i,n,itmp,nauxdat,j,ix,iy,iz,m
+      integer:: i,n,itmp,nauxdat,j,ix,iy,iz,m,ia,ib
       integer:: natm0,natm1,natm,nx,ny,nz,nlsa,ncpx,ncpy,ncpz
-      real(8):: tmp,al(3),al1(3),xi(3),rij(3),r,hunit
+      real(8):: tmp,al(3),al1(3),xi(3),rij(3),r,hunit,h(3,3)
       integer,allocatable:: lsa(:),lspr(:,:),itype(:),itag(:),itag1(:)
       real(8),allocatable:: ra0(:,:),ra1(:,:),ra(:,:),auxdat0(:,:)
      &     ,auxdat(:,:)
@@ -42,10 +42,15 @@ c.....Read an argument, ipmd
 c-----read akr file from STDIN
       open(10,file=trim(ciname),status="old")
       read(10,*) hunit
-      read(10,*) al(1),tmp,tmp
-      read(10,*) tmp,al(2),tmp
-      read(10,*) tmp,tmp,al(3)
-      al(1:3)= al(1:3) *hunit
+      read(10,*) ((h(ia,ib),ia=1,3),ib=1,3)
+c      read(10,*) al(1),tmp,tmp
+c      read(10,*) tmp,al(2),tmp
+c      read(10,*) tmp,tmp,al(3)
+c      al(1:3)= al(1:3) *hunit
+      h(1:3,1:3)= h(1:3,1:3)*hunit
+      al(1)= h(1,1)
+      al(2)= h(2,2)
+      al(3)= h(3,3)
       ncpx=1
       ncpy=1
       ncpz=1
@@ -111,9 +116,10 @@ c-----common neighbor analysis
 c-----write cna file 
       open(11,file=trim(coname),status="replace")
       write(11,'(es15.7)') hunit
-      write(11,'(3es12.4)') al(1)/hunit,0d0,0d0
-      write(11,'(3es12.4)') 0d0,al(2)/hunit,0d0
-      write(11,'(3es12.4)') 0d0,0d0,al(3)/hunit
+      write(11,'(3es12.4)') ((h(ia,ib)/hunit,ia=1,3),ib=1,3)
+c      write(11,'(3es12.4)') al(1)/hunit,0d0,0d0
+c      write(11,'(3es12.4)') 0d0,al(2)/hunit,0d0
+c      write(11,'(3es12.4)') 0d0,0d0,al(3)/hunit
       write(11,'(i10,3i4)') natm,nauxdat,0,0
       do i=1,natm
         write(11,'(i4,3es15.7,17es10.2)')
