@@ -9,7 +9,7 @@ This utility assumes that the cell is fixed during the simulation.
 Staggered measuring of MSD for for the statistical purpose.
 """
 
-import os,sys,glob
+import os,sys,glob,time
 import numpy as np
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__))
@@ -33,7 +33,7 @@ def anint(x):
 
 if len(sys.argv) < 2:
     print ' [Error] number of arguments wrong.'
-    print '  Usage: ./calc_msd.py akr0001 akr0002 akr0003 ...'
+    print '  Usage: ./get_msd_staggered.py akr0001 akr0002 akr0003 ...'
     sys.exit()
 
 #...parse arguments

@@ -7,9 +7,9 @@
 !    - akr0000
 !-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
-      include './params_unit.h'
-      include './params_RK_FeH.h'
-!      include './params_Ramas_FeH.h'
+      include '../pmd/params_unit.h'
+      include '../pmd/params_RK_FeH.h'
+!      include '../pmd/params_Ramas_FeH.h'
 !-----max # of atoms
       integer,parameter::nmax=100000
 !-----# of unit cells

@@ -175,7 +175,7 @@ c.....Nearest neighbor search
       idisps(0:nodes_md-1)= 0
 
 c.....Count num of nearest neighbors
-      call mk_lspr(namax,natm,nb,nnmax,tag,ra,rcnn,h,hi
+      call mk_lspr_para(namax,natm,nb,nnmax,tag,ra,rcnn,h,hi
      &     ,anxi,anyi,anzi,lsnn)
 c.....Extract disl-core atoms according to num of nearest neighbors
       nc=0

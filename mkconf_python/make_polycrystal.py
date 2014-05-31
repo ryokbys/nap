@@ -1,4 +1,4 @@
-import sys,os
+import sys,os,time
 import numpy as np
 import math,copy
 from math import cos,sin,sqrt
@@ -193,6 +193,8 @@ def make_polycrystal(grns,uc,n1,n2,n3):
     return system
 
 if __name__ == '__main__':
+    print '{0:=^72}'.format(' make_polycrystal_py ')
+    t0= time.time()
     n1= 10
     n2= 10
     n3= 10
@@ -217,3 +219,6 @@ if __name__ == '__main__':
     system= make_polycrystal(grains,uc,n1,n2,n3)
     system.write_pmd('pmd00000')
     system.write_akr('akr0000')
+
+    print '{0:=^72}'.format(' finished correctly ')
+    print '   Elapsed time = {0:12.2f}'.format(time.time()-t0)

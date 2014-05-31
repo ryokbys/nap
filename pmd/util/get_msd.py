@@ -27,7 +27,7 @@ def anint(x):
 
 if len(sys.argv) < 2:
     print ' [Error] number of arguments wrong.'
-    print '  Usage: ./calc_msd.py akr0001 akr0002 akr0003 ...'
+    print '  Usage: ./get_msd.py akr0001 akr0002 akr0003 ...'
     sys.exit()
 
 #...parse arguments

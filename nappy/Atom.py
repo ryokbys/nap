@@ -26,6 +26,6 @@ class Atom(object):
 
     def decode_tag(self,tag):
         self.sid= int(tag)
-        self.ifmv= int((tag-sid)*10)
-        self.id= int(((tag-sid)*10 -ifmv)*1e+14)
+        self.ifmv= int((tag-self.sid)*10)
+        self.id= int(((tag-self.sid)*10 -self.ifmv)*1e+14)
 

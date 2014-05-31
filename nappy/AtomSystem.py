@@ -191,6 +191,8 @@ class AtomSystem(object):
         #     self.lspr.append([])
             
         for ia in range(len(self.atoms)):
+            if ia % 10000 == 0:
+                print 'ia=',ia
             ai= self.atoms[ia]
             pi= ai.pos
             mx= int(pi[0]*rcxi)

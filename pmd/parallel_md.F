@@ -203,7 +203,7 @@ c-----copy RA of boundary atoms
      &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &     ,mpi_md_world)
 c-----Make pair list
-      call mk_lspr(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
+      call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
 c.....Calc forces
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
@@ -373,8 +373,8 @@ c.....Copy RA of boundary atoms
      &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &         ,mpi_md_world)
 c.....Make pair list
-          call mk_lspr(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
-     &         ,anxi,anyi,anzi,lspr)
+          call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h
+     &         ,hi,anxi,anyi,anzi,lspr)
           ts= istp*dt
           te=rbuf/(2d0*vmax/dt) +ts
           istpe= te/dt
@@ -1451,145 +1451,6 @@ c------------------------------------------------------------------------
       endif
       return
       end function bmv
-c=======================================================================
-      subroutine mk_lspr(namax,natm,nbmax,nb,nnmax,tag,ra,rc
-     &     ,h,hi,anxi,anyi,anzi,lspr)
-      implicit none
-      integer,intent(in):: namax,natm,nbmax,nb,nnmax
-      integer,intent(out):: lspr(0:nnmax,natm)
-      real(8),intent(in):: ra(3,namax),rc,anxi,anyi,anzi
-     &     ,hi(3,3),h(3,3),tag(namax)
-
-      integer:: i,j,k,l,m,n
-      integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr
-      real(8):: xi(3),xij(3),rij(3),rij2
-      
-      logical,save:: l1st=.true.
-      integer,allocatable,save:: lscl(:),lshd(:)
-      real(8),save:: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi
-      integer,save:: lcx,lcy,lcz,lcx2,lcy2,lcz2,lcyz2,lcxyz2
-
-      if( l1st ) then
-        rc2= rc**2
-c-----make a linked cell list, LSCL
-        lcx=anxi/dsqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rc
-        lcy=anyi/dsqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rc
-        lcz=anzi/dsqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rc
-c.....In case that system is thinner than rc, modify lc?.
-c.....but notice this modification does not correct results.
-        if( lcx.eq.0 ) lcx=1
-        if( lcy.eq.0 ) lcy=1
-        if( lcz.eq.0 ) lcz=1
-        lcx2= lcx +2
-        lcy2= lcy +2
-        lcz2= lcz +2
-        lcyz2=lcy2*lcz2
-        lcxyz2=lcx2*lcyz2
-        rcx= anxi/lcx
-        rcy= anyi/lcy
-        rcz= anzi/lcz
-        rcxi=1d0/rcx
-        rcyi=1d0/rcy
-        rczi=1d0/rcz
-c        write(6,'(a,3i8)') ' lcx,lcy,lcz=',lcx,lcy,lcz
-c        write(6,'(a,3i8)') ' lcx2,lcy2,lcz2=',lcx2,lcy2,lcz2
-c        write(6,'(a,i8)') ' lcxyz2=',lcxyz2
-c        write(6,'(a,3es12.4)') ' rcx,rcy,rcz=',rcx,rcy,rcz
-c-----allocate LSCL & LSHD after obtaining lcxyz2
-        allocate(lscl(namax+nbmax),lshd(lcxyz2))
-        l1st=.false.
-      endif
-
-c-----reset pair list, LSPR
-      lspr(0,1:natm)= 0
-
-c-----reset headers
-      lshd(1:lcxyz2)= 0
-
-
-c-----construct a linked-cell list, LSCL, & a header list, LSHD
-      do i=1,natm+nb
-c-------assign a vector cell index
-        mx=(ra(1,i)+rcx)*rcxi
-        my=(ra(2,i)+rcy)*rcyi
-        mz=(ra(3,i)+rcz)*rczi
-c-------classify residents in inner cells even if they are not
-        if(i.le.natm) then
-          mx= min(max(mx,1),lcx)
-          my= min(max(my,1),lcy)
-          mz= min(max(mz,1),lcz)
-c-------copied atoms are either in inner or surface cells
-        else
-          mx= min(max(mx,0),lcx+1)
-          my= min(max(my,0),lcy+1)
-          mz= min(max(mz,0),lcz+1)
-        endif
-        m= mx*lcyz2 +my*lcz2 +mz +1
-        lscl(i)= lshd(m)
-c-------the last one goes to the header
-        lshd(m)= i
-      enddo
-c      write(6,'(a)') ' lscl,lshd done'
-
-c-----make a pair list, LSPR
-c-----Scan resident cells
-      do 100 mz=1,lcz
-      do 100 my=1,lcy
-      do 100 mx=1,lcx
-        m= mx*lcyz2 +my*lcz2 +mz +1
-        if (lshd(m).eq.0) goto 100
-        do 102 kuz= -1,1
-        do 102 kuy= -1,1
-        do 102 kux= -1,1
-          m1x= mx +kux
-          m1y= my +kuy
-          m1z= mz +kuz
-          m1=m1x*lcyz2 +m1y*lcz2 +m1z +1
-          if (lshd(m1).eq.0) goto 102
-
-          i=lshd(m)
-1         continue
-          if (natm.lt.i) goto 4
-
-c          ic=is(i)
-          ic= int(tag(i))
-          xi(1:3)= ra(1:3,i)
-
-          j=lshd(m1)
-
-2         continue
-          if (j.eq.i) goto 3
-c          jc=is(j)
-          jc= int(tag(i))
-          xij(1:3)= ra(1:3,j) -xi(1:3)
-          rij(1)= h(1,1)*xij(1) +h(1,2)*xij(2) +h(1,3)*xij(3)
-          rij(2)= h(2,1)*xij(1) +h(2,2)*xij(2) +h(2,3)*xij(3)
-          rij(3)= h(3,1)*xij(1) +h(3,2)*xij(2) +h(3,3)*xij(3)
-          rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
-
-c          if (rij2.lt.rcij2(ic,jc)) then
-          if(rij2.lt.rc2) then
-            lspr(0,i)=lspr(0,i)+1
-            if(lspr(0,i).gt.nnmax) then
-              write(6,'(a)') " !!!lspr(0,i).gt.nnmax"
-              call mpi_finalize(ierr)
-              stop
-            endif
-            lspr(lspr(0,i),i)=j
-          endif
-
-c---------Continue until j= 0
-3         j=lscl(j)
-          if (j.gt.0) goto 2
-
-c---------Continue until i= 0
-4         i=lscl(i)
-          if (i.gt.0) goto 1
-
-102     continue
-100   continue
-
-      end subroutine mk_lspr
 c=======================================================================
       subroutine mespasi(inode,parity,ibufs,ibufr,nsd,nrc,tag,
      &     mpi_md_world)
