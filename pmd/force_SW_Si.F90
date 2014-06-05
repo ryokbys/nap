@@ -77,6 +77,7 @@ contains
       endif
       swli= 1d0/swl
       a8d3r3= 8d0/(3d0*sqrt(3d0))
+      avol= 5.427d0**3/8
 !-------finally set l1st
       l1st=.false.
     endif
@@ -139,8 +140,11 @@ contains
                    -xij(jxyz)*tmp*voli
               strs(ixyz,jxyz,j)= strs(ixyz,jxyz,j) &
                    -xij(jxyz)*tmp*voli
+!!$              write(6,'(a,3i5,2es12.4)') 'i,ixyz,jxyz,vol,val='&
+!!$                   ,i,ixyz,jxyz,vol,-xij(jxyz)*tmp*voli
             enddo
           enddo
+!!$          write(6,'(i6,9f10.3)') i,strs(1:3,1:3,i)
         else
           do ixyz=1,3
             tmp= 0.5d0*(-df2*drij)
@@ -245,6 +249,11 @@ contains
          ,nn,mpi_world,aa3,3)
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
          ,nn,mpi_world,epi,1)
+
+!!$    write(6,'(a)') 'stresses:'
+!!$    do i=1,natm
+!!$      write(6,'(i6,9f10.3)') i,strs(1:3,1:3,i)
+!!$    enddo
 
 !-----sum
     aa(1:3,1:natm)= -aa2(1:3,1:natm) -aa3(1:3,1:natm)

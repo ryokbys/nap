@@ -158,7 +158,7 @@ contains
 !-----copy strs of boundary atoms
     call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
          ,lsrc,myparity,nn,sv,mpi_md_world,strs)
-!-----atomic level stress in [eV/Ang^3] assuming 1 Ang thick
+!-----atomic level stress in [eV/Ang^3]
     do i=1,natm
       strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
 !        write(6,'(i5,9es10.2)') i,strs(1:3,1:3,i)

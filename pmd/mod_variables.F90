@@ -63,6 +63,7 @@
     real(8):: ptgt   = 0d0
     real(8):: vmcoeff= 1d0
     real(8):: voldmp = 1d0
+    real(8):: stgt(1:3,1:3)= 0d0
     real(8):: phyd,vm,ah(3,3),aht(3,3),ptnsr(3,3) &
          ,g(3,3,0:1),gt(3,3,0:1),gi(3,3),gg(3,3)
     

@@ -109,6 +109,9 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
       elseif( trim(cname).eq.'pressure_target' ) then
         call read_r1(ionum,ptgt)
         return
+      elseif( trim(cname).eq.'stress_target' ) then
+        call read_rs(ionum,ctmp,3,3,stgt(1:3,1:3))
+        return
       elseif( trim(cname).eq.'vol_mass_coeff' ) then
         call read_r1(ionum,vmcoeff)
         return

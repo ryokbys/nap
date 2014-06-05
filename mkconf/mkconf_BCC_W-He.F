@@ -13,7 +13,7 @@ c-----max # of atoms
       integer,parameter::nmax=100000
 c-----# of unit cells
 c      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-      integer,parameter:: nuc(1:3)= (/ 5,5,5 /)
+      integer,parameter:: nuc(1:3)= (/ 3,3,3 /)
 c-----vacuum width in unit of cell
 c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
@@ -23,7 +23,7 @@ c      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
 c.....vacancy ratio
       real(8),parameter:: vratio  = 0.0001
 c.....He ratio
-      real(8),parameter:: heratio = 0.020
+      real(8),parameter:: heratio = 0.0002
 
       small = 1d0/4 /nuc(1)
 
