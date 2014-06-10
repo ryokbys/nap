@@ -6,15 +6,15 @@ c-----------------------------------------------------------------------
 c INPUT FILES:
 c ------------
 c   in.pmd:     Main input file
-c   pmd###-000: MD-coordination files, ### is the node number
+c   0000/pmd#####: MD-coordination files, ##### is a node number
 c
 c OUTPUT FILES:
 c -------------
 c   out.erg:    Total, kinetic, and potential energy
 c   out.stress: Stress component normal to z-upper surface of nanorod,
 c               and z-strain of the nanorod.
-c   pmd###-???: MD-coordination file of each MD-step,
-c               ### is the node number and ??? is the frame number
+c   ????/pmd#####: MD-coordination file of each MD-step,
+c               ##### is a node number and ???? is a frame number
 c-----------------------------------------------------------------------
       use variables
 #ifdef __WALL__
@@ -243,7 +243,7 @@ c      temp= ekin /ntot/fkb *2d0/2d0
       if( ifpctl.ne.0 ) then
         if( ifpctl.eq.1 ) then
           if(myid_md.eq.0) write(6,'(a,f10.2,a,es12.4,a)')
-     &         ' Target Pressure = ',ptgt,' GPa, ',ptgt*gpa2up,' eV/A^3'
+     &         ' target pressure = ',ptgt,' GPa, ',ptgt*gpa2up,' eV/A^3'
           stgt(1:3,1:3)= 0d0
           stgt(1,1)= ptgt
           stgt(2,2)= ptgt
@@ -251,7 +251,7 @@ c      temp= ekin /ntot/fkb *2d0/2d0
         elseif( ifpctl.eq.2 ) then
           if(myid_md.eq.0) then
             write(6,'(a,f10.2,a,es12.4,a)')
-     &           ' Target Stress in GPa:'
+     &           ' target stress in GPa:'
             write(6,'(5x,3es14.4)') stgt(1,1:3)
             write(6,'(5x,3es14.4)') stgt(2,1:3)
             write(6,'(5x,3es14.4)') stgt(3,1:3)
@@ -260,13 +260,11 @@ c      temp= ekin /ntot/fkb *2d0/2d0
         stgt(1:3,1:3)= stgt(1:3,1:3) *gpa2up
 c.....Parrinello-Rahman Isobaric
         vm= am(1)*vmcoeff
-        call force_isobaric(stgt,ah,natm,eki,strs,sgm,vm,vol,avol
-     &       ,ptnsr,mpi_md_world)
-        write(6,'(a)') 'ah in eV/A^3:'
-        write(6,'(9f10.5)') ah(1:3,1:3)
-        write(6,'(a)') 'ptnsr in eV/A^3:'
-        write(6,'(9f10.5)') ptnsr(1:3,1:3)
       endif
+      call force_isobaric(stgt,ah,natm,eki,strs,sgm,vm,vol,avol
+     &     ,ptnsr,mpi_md_world)
+      write(6,'(a)') ' ptnsr in GPa:'
+      write(6,'(9f10.5)') ptnsr(1:3,1:3) *up2gpa
 
       istp= 0
       istps= istp
@@ -293,6 +291,8 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
      &         " istp,time,temp="
      &         ,istp,tcpu,temp
         endif
+        write(6,'(a)') ' stress tensor in GPa:'
+        write(6,'(3f15.7)') ptnsr(1:3,1:3) *up2gpa
       endif
 
 c-----initialize the counter for output
@@ -516,8 +516,10 @@ c---------output step, time, and temperature
      &             " istp,time,temp,vol,prss="
      &             ,istp,tcpu,temp,vol
      &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
-              write(6,'(a)') ' h-mat:'
+              write(6,'(a)') ' H-matrix:'
               write(6,'(3f15.7)') h(1:3,1:3,0)
+              write(6,'(a)') ' Stress tensor in GPa:'
+              write(6,'(3f15.7)') ptnsr(1:3,1:3) *up2gpa
             else
               write(6,'(a,i8,2f10.2)')
      &             " istp,time,temp="
@@ -669,8 +671,8 @@ c=======================================================================
 
 c.....umass*Ang^2/fs^2 ---> kg*m^2/sec^2 (=Joule)
       tmp= amu2kg *ang2m**2 /fs2s**2
-      write(6,'(a,es12.4,a,es12.4,a)') ' umass*Ang^2/fs^2 ='
-     &     ,tmp,' Joule =',tmp*j2ev,' eV'
+c      write(6,'(a,es12.4,a,es12.4,a)') ' umass*Ang^2/fs^2 ='
+c     &     ,tmp,' Joule =',tmp*j2ev,' eV'
 
 c-----prefactors for normalized accelerration
       do i=1,nismax

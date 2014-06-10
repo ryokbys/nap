@@ -73,8 +73,9 @@ if __name__ == '__main__':
         print ' [Warning] min and max maybe wrong.'
         print '   hoping you know what you are doing.'
         print '   al_min, al_orig, al_max=',al_min, al_orig, al_max
-        sys.exit()
+        #sys.exit()
 
+    logfile= open('log.Ecoh-vs-size','w')
     outfile1= open('out.Ecoh-vs-size','w')
     dl= (al_max -al_min)/niter
     for iter in range(niter+1):
@@ -85,6 +86,7 @@ if __name__ == '__main__':
         vol= get_vol(al,hmat)
         print ' {0:10.4f} {1:10.4f} {2:15.7f}'.format(al,vol,erg)
         outfile1.write(' {0:10.4f} {1:10.4f} {2:15.7f}\n'.format(al,vol,erg))
+        logfile.write(' {0:10.4f} {1:10.4f} {2:15.7f}\n'.format(al,vol,erg))
     outfile1.close()
 
     #...revert 0000/pmd00000
@@ -112,6 +114,7 @@ if __name__ == '__main__':
     #...output results
     print ' plsq=',plsq[0]
     print '{0:=^72}'.format(' RESULTS ')
+    logfile.write('{0:=^72}\n'.format(' RESULTS '))
     a1= hmat[0:3,0]
     a2= hmat[0:3,1]
     a3= hmat[0:3,2]
@@ -120,6 +123,9 @@ if __name__ == '__main__':
     print ' Lattice constant = {0:10.4f} Ang.'.format(lc)
     print ' Cohesive energy  = {0:10.3f} eV'.format(plsq[0][3]/natm)
     print ' Bulk modulus     = {0:10.2f} GPa'.format(plsq[0][0]*1.602e+2)
+    logfile.write(' Lattice constant = {0:10.4f} Ang.\n'.format(lc))
+    logfile.write(' Cohesive energy  = {0:10.3f} eV\n'.format(plsq[0][3]/natm))
+    logfile.write(' Bulk modulus     = {0:10.2f} GPa\n'.format(plsq[0][0]*1.602e+2))
     plt.plot(xarr,peval(xarr,plsq[0]),xarr,yarr,'o')
     plt.title('Data fitted with Murnaghan eq.')
     plt.legend(['fitted','data'])
@@ -130,4 +136,5 @@ if __name__ == '__main__':
 
     print '{0:=^72}'.format(' OUTPUT ')
     print ' * out.Ecoh-vs-size'
+    print ' * log.Ecoh-vs-size'
     print ' * graph.Ecoh-vs-size.eps'
