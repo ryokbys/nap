@@ -165,7 +165,7 @@ c-------species of atom-i
           stop
         endif
       enddo
-      write(6,'(a,2i8)') " myid,natm=",myid_md,natm
+      !write(6,'(a,2i8)') " myid,natm=",myid_md,natm
 
 
 c-----setup
@@ -263,8 +263,10 @@ c.....Parrinello-Rahman Isobaric
       endif
       call force_isobaric(stgt,ah,natm,eki,strs,sgm,vm,vol,avol
      &     ,ptnsr,mpi_md_world)
-      write(6,'(a)') ' ptnsr in GPa:'
-      write(6,'(9f10.5)') ptnsr(1:3,1:3) *up2gpa
+      if( myid_md.eq.0 ) then
+        write(6,'(a)') ' ptnsr in GPa:'
+        write(6,'(9f10.5)') ptnsr(1:3,1:3) *up2gpa
+      endif
 
       istp= 0
       istps= istp
@@ -358,7 +360,7 @@ c-------multiply fmv or damping
           va(1:3,i)=va(1:3,i) *fmv(1:3,l)
         enddo
 
-c.....Parrinello-Rahman isobaric
+c.....isobaric
         if( ifpctl.ne.0 ) then
           h(1:3,1:3,1)=h(1:3,1:3,1) +ah(1:3,1:3)*dt/2
           h(1:3,1:3,1)=h(1:3,1:3,1)*voldmp
@@ -1590,7 +1592,7 @@ c.....Acceralation of h-matrix
         do ixyz=1,3
           do kxyz=1,3
             ah(ixyz,jxyz)=ah(ixyz,jxyz)
-     &           +ptnsr(ixyz,kxyz)*sgm(kxyz,jxyz)
+     &           -ptnsr(ixyz,kxyz)*sgm(kxyz,jxyz)
           enddo
         enddo
       enddo
