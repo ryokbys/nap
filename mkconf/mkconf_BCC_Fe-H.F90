@@ -14,7 +14,7 @@
       integer,parameter::nmax=100000
 !-----# of unit cells
 !      integer,parameter:: nuc(1:3)= (/ 1, 1, 1 /)
-     integer,parameter:: nuc(1:3)= (/ 5,5,5 /)
+     integer,parameter:: nuc(1:3)= (/ 3,3,3 /)
 !-----vacuum width in unit of cell
 !      integer,parameter:: nvac(1:3)= (/ 5, 5, 5 /)
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
@@ -25,8 +25,8 @@
       small=1d-7
 
 !.....Lattice constant of Fe, see Philos. Mag. 83 (2003) 3977
-      cunit= 2.835d0
-!      cunit= 2.8553d0
+!      cunit= 2.835d0
+      cunit= 2.8553d0
 
 !-----simulation box size
       h(1:3,1:3,0:1)= 0d0
@@ -66,41 +66,36 @@
         enddo
       enddo
 
-!!$!.....Add H atoms
-!!$      ix= nuc(1)/2
-!!$      iy= nuc(2)/2
-!!$      iz= nuc(3)/2
-!!$      inc=inc+1
-!!$      is= 2
-!!$      ifmv= 1
-!!$      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
+!.....Add H atoms
+      ix= nuc(1)/2
+      iy= nuc(2)/2
+      iz= nuc(3)/2
+      inc=inc+1
+      is= 2
+      ifmv= 1
+      tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
 !!$!.....O-site
 !!$      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
 !!$      ra(2,inc)= (0.5d0 +dble(iy))/(nuc(2)+nvac(2)) +small
 !!$      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
-!!$!.....T-site
-!!$      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
-!!$      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
-!!$      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
+!.....T-site
+      ra(1,inc)= (0.5d0 +dble(ix))/(nuc(1)+nvac(1)) +small
+      ra(2,inc)= (0.25d0 +dble(iy))/(nuc(2)+nvac(2)) +small
+      ra(3,inc)= (0.0d0 +dble(iz))/(nuc(3)+nvac(3)) +small
 
       write(6,'(a,i10)') " num of atoms=",inc
 !      write(6,'(a,i10)') " id of inc=",nint(mod(tag(inc)*1d14,1d13))
 
       va(1:3,1:inc)= 0d0
 
-      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va,h &
-           ,eki,epi,strs)
+      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag&
+           ,ra,va,h,cunit,eki,epi,strs)
 !!$      call write_pmd0_bin(15,'pmd00000','replace',inc,tag,ra,va,h &
 !!$           ,eki,epi,strs)
       
 !-----output 'akr000' for Akira visualization
-      open(15,file='akr0000',form='formatted',status='replace')
-      write(15,'(i10,3i5)') inc, 3, 0, 0
-      write(15,'(3es11.3)') ((h(ia,ib,0),ia=1,3),ib=1,3)
-      do i=1,inc
-        write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
-      enddo
-      close(15)
+      call write_akr(15,'akr0000',inc,h,cunit,tag,ra,va)
+
       
       end program mkconf_BCC_FeH
 !=======================================================================
@@ -118,5 +113,5 @@
 !=======================================================================
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make 10mkconf"
+!     compile-command: "make mkconf_BCC_FeH"
 !     End:

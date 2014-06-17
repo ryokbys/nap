@@ -9,15 +9,15 @@
 
   io_format    ascii
 
-  time_interval     2d0
-  num_iteration     100
+  time_interval     0.2d0
+  num_iteration     1000
   num_out_energy    1000
 
   flag_out_pmd      1
   num_out_pmd       10
 
-  force_type        SW_Si
-  cutoff_radius     3.7948d0
+  force_type        Ramas_FeH
+  cutoff_radius     5.3d0
   cutoff_buffer     0.2d0
 
   flag_damping      0
@@ -30,7 +30,7 @@
 
   factor_direction 3 2
     1.000d0  1.000d0  1.000d0
-    1.000d0  0.000d0  1.000d0
+    1.000d0  1.000d0  1.000d0
 
   flag_isobaric        0
   pressure_target      0d0
@@ -39,5 +39,5 @@
 
   shear_stress   0.00
 
-  mass  1    28.0855
-  mass  2     4.0
+  mass  1    55.845
+  mass  2     1.008

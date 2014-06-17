@@ -83,15 +83,15 @@ class AtomSystem(object):
         for i in range(len(self.atoms)):
             ai= self.atoms[i]
             ai.set_id(i+1)
-            f.write(" {:22.14e} {:11.7f} {:11.7f} {:11.7f}".format(ai.tag(), \
+            f.write(" {0:22.14e} {1:11.7f} {2:11.7f} {3:11.7f}".format(ai.tag(), \
                                                             ai.pos[0],\
                                                             ai.pos[1],\
                                                             ai.pos[2])
-                    +"  {:.1f}  {:.1f}  {:.1f}".format(0.0, 0.0, 0.0)
-                    +"  {:.1f}  {:.1f}".format(0.0, 0.0)
-                    +"  {:.1f}  {:.1f}  {:.1f}".format(0.0, 0.0, 0.0)
-                    +"  {:.1f}  {:.1f}  {:.1f}".format(0.0, 0.0, 0.0)
-                    +"  {:.1f}  {:.1f}  {:.1f}".format(0.0, 0.0, 0.0)
+                    +"  {0:.1f}  {1:.1f}  {2:.1f}".format(0.0, 0.0, 0.0)
+                    +"  {0:.1f}  {1:.1f}".format(0.0, 0.0)
+                    +"  {0:.1f}  {1:.1f}  {2:.1f}".format(0.0, 0.0, 0.0)
+                    +"  {0:.1f}  {1:.1f}  {2:.1f}".format(0.0, 0.0, 0.0)
+                    +"  {0:.1f}  {1:.1f}  {2:.1f}".format(0.0, 0.0, 0.0)
                     +"\n")
         f.close()
 
@@ -135,11 +135,11 @@ class AtomSystem(object):
         for i in range(len(self.atoms)):
             ai= self.atoms[i]
             ai.set_id(i+1)
-            f.write(" {:4d} {:10.5f} {:10.5f} {:10.5f}".format(ai.sid, \
+            f.write(" {0:4d} {1:10.5f} {2:10.5f} {3:10.5f}".format(ai.sid, \
                                                             ai.pos[0],\
                                                             ai.pos[1],\
                                                             ai.pos[2])
-                    +"  {:.1f}  {:.1f}  {:.1f}".format(0.0, 0.0, 0.0)
+                    +"  {0:.1f}  {1:.1f}  {2:.1f}".format(0.0, 0.0, 0.0)
                     +"\n")
         f.close()
 
@@ -166,8 +166,10 @@ class AtomSystem(object):
         rcxi= 1.0/rcx
         rcyi= 1.0/rcy
         rczi= 1.0/rcz
-        lscl= np.full((len(self.atoms),),-1,dtype=int)
-        lshd= np.full((lcxyz,),-1,dtype=int)
+        lscl= np.zeros((len(self.atoms),),dtype=int)
+        lshd= np.zeros((lcxyz,),dtype=int)
+        lscl[:]= -1
+        lshd[:]= -1
         print 'lcx,lcy,lcz=',lcx,lcy,lcz
         print 'rcx,rcy,rcz=',rcx,rcy,rcz
 
@@ -185,7 +187,8 @@ class AtomSystem(object):
 
         #...make a pair list
         self.nlspr= np.zeros((self.num_atoms(),),dtype=int)
-        self.lspr= np.full((self.num_atoms(),maxnn),-1,dtype=int)
+        self.lspr= np.zeros((self.num_atoms(),maxnn),dtype=int)
+        self.lspr[:]= -1
         # self.lspr= []
         # for i in range(len(self.atoms)):
         #     self.lspr.append([])
@@ -236,7 +239,7 @@ class AtomSystem(object):
             self.lspr[ia,n]= ja
             self.nlspr[ia] += 1
             if self.nlspr[ia] >= maxnn:
-                print ' [Error] self.nlspr[{}] >= maxnn !!!'.format(ia)
+                print ' [Error] self.nlspr[{0}] >= maxnn !!!'.format(ia)
                 sys.exit()
         ja= lscl[ja]
         self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2)

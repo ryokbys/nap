@@ -132,20 +132,24 @@ if __name__ == '__main__':
     popt44,pcov44= curve_fit(quad_func,dlts,e44s,p0=p0)
 
     c11= popt11[0]/vol*2 *160.2
-    c12= c11 -popt12[0]/vol *160.2
+    c11_c12= popt12[0]/vol *160.2
+    c12= c11 -c11_c12
     c44= popt44[0]/vol*2 *160.2
 
     #...output results
     print '{0:=^72}'.format(' RESULTS ')
-    print ' C11 = {0:10.3f} GPa'.format(c11)
-    print ' C12 = {0:10.3f} GPa'.format(c12)
-    print ' C44 = {0:10.3f} GPa'.format(c44)
+    print ' C11     = {0:10.3f} GPa'.format(c11)
+    print ' C11-C12 = {0:10.3f} GPa'.format(c11_c12)
+    print ' C12     = {0:10.3f} GPa'.format(c12)
+    print ' C44     = {0:10.3f} GPa'.format(c44)
     ymod= c44*(2.0*c44+3.0*c12)/(c11+c44)
     prto= c12/2.0/(c11+c44)
     smod= ymod/2.0/(1.0+prto)
+    print ' Following values maybe only valid for isotropic materials...'
     print ' Young\'s modulus = {0:10.3f} GPa'.format(ymod)
     print ' Poisson\'s ratio = {0:10.3f}'.format(prto)
     print ' shear modulus   = {0:10.3f} GPa'.format(smod)
+    
     plt.plot(dlts,quad_func(dlts,*popt11),dlts,e11s,'o')
     plt.plot(dlts,quad_func(dlts,*popt12),dlts,e12s,'o')
     plt.plot(dlts,quad_func(dlts,*popt44),dlts,e44s,'o')

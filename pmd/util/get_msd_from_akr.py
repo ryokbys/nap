@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/opt/local/bin/python
 #
 u"""
 Get mean square displacements (MSDs) of given atoms (see ids below)
@@ -17,9 +17,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__))
 from AtomSystem import AtomSystem
 
 #...atom IDs whose trajectories are tracked.
-ids=(7,164,225,)
+ids=(55,)
 #...num of measuring lane, in case of 1, it is identical to non-staggered measuring
-nmeasure= 10
+nmeasure= 1
 #...shift of each staggered lane
 nshift= 20
 
@@ -33,7 +33,7 @@ def anint(x):
 
 if len(sys.argv) < 2:
     print ' [Error] number of arguments wrong.'
-    print '  Usage: ./get_msd_staggered.py akr0001 akr0002 akr0003 ...'
+    print '  Usage: ./get_msd_from_akr.py akr0001 akr0002 akr0003 ...'
     sys.exit()
 
 #...parse arguments

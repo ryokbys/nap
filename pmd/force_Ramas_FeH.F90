@@ -139,9 +139,9 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
-                 -0.5d0*t2*xij(ixyz)*(-drdxi(jxyz))
+                 +0.5d0*t2*xij(ixyz)*(-drdxi(jxyz))
             strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
-                 -0.5d0*t2*xij(ixyz)*(-drdxi(jxyz))
+                 +0.5d0*t2*xij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
 !.....Embedded term
@@ -167,9 +167,9 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
-                 -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                 +0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
             strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
-                 -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                 +0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
       enddo
