@@ -11,6 +11,9 @@ outerg='erg.pmd'
 outfrc='frc.pmd'
 
 fpos=open(inpos,'r')
+alc= fpos.readline().split()[0]
+for l in range(6):
+    tmp= fpos.readline()
 natm=int(fpos.readline().split()[0])
 fpos.close()
 

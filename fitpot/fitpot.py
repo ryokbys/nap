@@ -1,3 +1,5 @@
+#!/opt/local/bin/python
+
 u"""Fit parameters of a certain potential to DFT data.
 
 The potential must be specified in pmd input file, in.pmd.
@@ -12,9 +14,13 @@ import matplotlib.pyplot as plt
 import math
 
 #.....import from local modules
-from parse_input import read_input
 from MD_system import MD_system
 from pga import GA
+
+#.....constants
+large= 1.0e+30
+tiny = 1.0e-8
+max_species= 10
 
 #.....global variables
 samples= []
@@ -42,21 +48,18 @@ xtol= 1e-5
 gtol= 1e-5
 ftol= 1e-5
 eps = 1e-8
+eatom= np.zeros(max_species)
 #.....GA parameters
 ga_nindv= 10
 ga_nbit= 16
 ga_temp= 1.0
 ga_murate= 0.01
 
-#.....constants
-large= 1.0e+30
-tiny = 1.0e-8
-
 def get_sample_dirs():
     if not os.path.exists(maindir):
         print "{:*>20}: {} does not exist !!!".format(' Error',maindir)
         exit()
-    lst= glob.glob(maindir+'/0*')
+    lst= glob.glob(maindir+'/[0-9]*')
     for i in range(len(lst)):
         lst[i]= lst[i][len(maindir):]
     return lst
@@ -145,44 +148,105 @@ def vars_to_params(x):
             params[i]= x[j]
             j += 1
 
+def read_input(fname='in.fitpot'):
+    global nsmpl,niter,fmethod,maindir,parfile,runmode,eps,xtol,gtol,ftol
+    global eatom,ga_nindv,ga_nbit,ga_temp
+    dict={}
+    f= open(fname,'r')
+    for line in f.readlines():
+        data= line.split()
+        # skip if the line is empty or comment line
+        if len(data)==0 or \
+                line[0]=='#' or \
+                line[0]=='!' or \
+                line[0]=='%':
+            continue
+        else:
+            if data[0] == 'num_samples':
+                nsmpl= int(data[1])
+            elif data[0] == 'num_iteration':
+                niter= int(data[1])
+            elif data[0] == 'fitting_method':
+                fmethod= data[1]
+            elif data[0] == 'main_directory':
+                maindir= data[1]
+            elif data[0] == 'param_file':
+                parfile= data[1]
+            elif data[0] == 'run_mode':
+                runmode= data[1]
+            elif data[0] == 'eps':
+                eps= float(data[1])
+            elif data[0] == 'xtol':
+                xto= float(data[1])
+            elif data[0] == 'gtol':
+                gtol= float(data[1])
+            elif data[0] == 'ftol':
+                ftol= float(data[1])
+            elif data[0] == 'atom_energy':
+                eatom[int(data[1])]= float(data[2])
+            #.....GA parameters
+            elif data[0] == 'ga_num_individuals':
+                ga_nindv= int(data[1])
+            elif data[0] == 'ga_num_bit':
+                ga_nbit= int(data[1])
+            elif data[0] == 'ga_temperature':
+                ga_temp= float(data[1])
+            elif data[0] == 'ga_murate':
+                ga_murate= float(data[1])
+    f.close()
+
 def set_input_params(dict):
     global nsmpl,niter,fmethod,maindir,parfile,runmode,eps,xtol,gtol,ftol \
-           ,ga_nindv,ga_nbit,ga_temp
+        ,eatom,ga_nindv,ga_nbit,ga_temp
     if 'num_samples' in dict:
-        nsmpl= dict['num_samples']
+        nsmpl= dict['num_samples'][0]
     if 'num_iteration' in dict:
-        niter= dict['num_iteration']
+        niter= dict['num_iteration'][0]
     if 'fitting_method' in dict:
-        fmethod= dict['fitting_method']
+        fmethod= dict['fitting_method'][0]
     if 'main_directory' in dict:
-        maindir= dict['main_directory']
+        maindir= dict['main_directory'][0]
     if 'param_file' in dict:
-        parfile= dict['param_file']
+        parfile= dict['param_file'][0]
     if 'run_mode' in dict:
-        runmode= dict['run_mode']
+        runmode= dict['run_mode'][0]
     if 'eps' in dict:
-        eps= dict['eps']
+        eps= dict['eps'][0]
     if 'xtol' in dict:
-        xtol= dict['xtol']
+        xtol= dict['xtol'][0]
     if 'gtol' in dict:
-        gtol= dict['gtol']
+        gtol= dict['gtol'][0]
     if 'ftol' in dict:
-        ftol= dict['ftol']
+        ftol= dict['ftol'][0]
+    if 'atom_energy' in dict:
+        eatom[dict['atom_energy'][0]]= dict['atom_energy'][1]
     #.....GA parameters
     if 'ga_num_individuals' in dict:
-        ga_nindv= dict['ga_num_individuals']
+        ga_nindv= dict['ga_num_individuals'][0]
     if 'ga_num_bit' in dict:
-        ga_nbit= dict['ga_num_bit']
+        ga_nbit= dict['ga_num_bit'][0]
     if 'ga_temperature' in dict:
-        ga_temp= dict['ga_temperature']
+        ga_temp= dict['ga_temperature'][0]
     if 'ga_murate' in dict:
-        ga_murate= dict['ga_murate']
+        ga_murate= dict['ga_murate'][0]
 
     
-def show_input_params(input_params):
+def show_input_params(fname='in.fitpot'):
     print '>>>>> input parameters:'
-    for key,value in input_params.items():
-        print ' {:>20}: '.format(key), value
+    # for key,value in input_params.items():
+    #     print ' {:>20}: '.format(key), value
+    f= open(fname,'r')
+    for line in f.readlines():
+        data= line.split()
+        # skip if the line is empty or comment line
+        if len(data)==0 or \
+                line[0]=='#' or \
+                line[0]=='!' or \
+                line[0]=='%':
+            continue
+        else:
+            print '  '+line.rstrip()
+    f.close()
 
 def gather_pmd_data(basedir):
     #.....initialize variables
@@ -199,7 +263,7 @@ def gather_pmd_data(basedir):
         natm= int(ff.readline().split()[0])
         #.....energy
         f=open(basedir+'/'+dir+'/erg.pmd','r')
-        ergs[i]= float(f.readline().split()[0])/natm
+        ergs[i]= float(f.readline().split()[0])
         f.close()
         for j in range(natm):
             data= ff.readline().split()
@@ -218,12 +282,19 @@ def gather_ref_data(basedir):
     for i in range(len(sample_dirs)):
         dir= sample_dirs[i]
         smpl= samples[i]
+        print dir
         #.....force
         ff=open(basedir+'/'+dir+'/frc.ref','r')
         natm= int(ff.readline().split()[0])
         #.....energy
         f=open(basedir+'/'+dir+'/erg.ref','r')
-        ergrefs[i]= float(f.readline().split()[0])/natm
+        ergrefs[i]= float(f.readline().split()[0])
+        #.....need to subtract atomic energies from total energy
+        #.....to get the cohesive energy
+        for isp in range(1,max_species):
+            num= smpl.num_of_species(isp)
+            if num != 0:
+                ergrefs[i] -= eatom[isp]*num
         f.close()
         #.....read forces
         for j in range(natm):
@@ -284,7 +355,7 @@ def eval_L2(cergs,cfrcs,rergs,rfrcs,samples):
     val= 0.0
     nval= 0
     for i in range(len(samples)):
-        val += ((cergs[i]-rergs[i]))**2 *samples[i].natm
+        val += ((cergs[i]-rergs[i]))**2
         nval += 1
         for j in range(samples[i].natm):
             for k in range(3):
@@ -310,7 +381,9 @@ def eval_L3(cergs,cfrcs,rergs,rfrcs,samples):
 def output_energy_relation(ergs,fname='out.erg.pmd-vs-dft'):
     f= open(fname,'w')
     for i in range(len(ergrefs)):
-        f.write(' {:15.7e} {:15.7e}\n'.format(ergrefs[i],ergs[i]))
+        smpl= samples[i]
+        f.write(' {:15.7e} {:15.7e}\n'.format(ergrefs[i]/smpl.natm \
+                                              ,ergs[i]/smpl.natm ))
     f.close()
 
 def output_force_relation(frcs,fname='out.frc.pmd-vs-dft'):
@@ -368,8 +441,8 @@ if __name__ == '__main__':
     cwd= os.getcwd()
     #.....inputs: parameters in in.fitpot as a dictionary
     inputs= read_input('in.fitpot')
-    set_input_params(inputs)
-    show_input_params(inputs)
+    #set_input_params(inputs)
+    show_input_params('in.fitpot')
     #.....params: parameters in in.params.?????
     read_params(maindir+'/'+parfile)
     write_params(maindir+'/'+parfile+'.ini',vars)

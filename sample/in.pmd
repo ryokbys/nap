@@ -11,7 +11,7 @@
 
   time_interval     0.2d0
   num_iteration     1000
-  num_out_energy    1000
+  num_out_energy    100
 
   flag_out_pmd      1
   num_out_pmd       10

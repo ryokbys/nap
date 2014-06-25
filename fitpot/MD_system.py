@@ -25,6 +25,13 @@ class MD_system:
         self.natm= natm
         self.initialize_arrays()
 
+    def num_of_species(self,species):
+        num= 0
+        for i in range(self.natm):
+            if int(self.tag[i]) == species:
+                num += 1
+        return num
+
     def read_pmd(self,fname='pmd0000'):
         f=open(fname,'r')
         # 1st: lattice constant

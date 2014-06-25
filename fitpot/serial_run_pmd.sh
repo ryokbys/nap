@@ -11,6 +11,6 @@ fi
 
 for dir in 0????
 do
-  ./run_pmd.sh $dir $1
+  ./run_pmd.sh $1 $dir 
 done
 echo " running pmd done."

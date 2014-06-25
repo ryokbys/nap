@@ -1620,13 +1620,13 @@ c.....Write out forces
         is= int(tag(i))
         at(1:3)= h(1:3,1)*aa(1,i) +h(1:3,2)*aa(2,i) +h(1:3,3)*aa(3,i)
         at(1:3)= at(1:3)/acon(is)
-        write(ionum,'(3f20.7)') at(1:3)
+        write(ionum,'(3es22.14)') at(1:3)
       enddo
       close(ionum)
 
 c.....Write out energy
       open(ionum+1,file='erg'//trim(cnum),status='replace')
-      write(ionum+1,'(f20.7)') epot
+      write(ionum+1,'(es22.14)') epot
       close(ionum+1)
 
       end subroutine write_force
@@ -1736,14 +1736,15 @@ c=======================================================================
       use AFS_W,only:force_AFS_W
       use SC_Fe,only:force_SC_Fe
       use SM_Al,only:force_SM_Al
+      use linreg,only:force_linreg
       implicit none
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
      &   ,nn(6),mpi_md_world,myid_md
       integer,intent(in):: lspr(0:nnmax,namax)
       real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6)
-     &     ,acon(nismax),rc,tag(namax)
-      real(8),intent(inout):: tcom,avol
+     &     ,acon(nismax),tag(namax)
+      real(8),intent(inout):: tcom,avol,rc
       real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
       character(len=*),intent(in):: cforce
       
@@ -1812,6 +1813,10 @@ c=======================================================================
      &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
         case ('SM_Al')
           call force_SM_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('linreg')
+          call force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
         case default

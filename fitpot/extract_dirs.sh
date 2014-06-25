@@ -11,6 +11,6 @@ do
     n=$(expr $n + 1)
     distname=$(printf "%05d\n" $n)
     echo "making $distname"
-    mkdir "$distname"
-    cp -r "$dirname" "./$distname/vasp"
+    mkdir -p "$distname/vasp"
+    cp -r $dirname/{INCAR,POSCAR,KPOINTS,POTCAR,OUTCAR,OSZICAR} ./$distname/vasp/
 done
