@@ -111,6 +111,7 @@ contains
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         rij=sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
+        write(90,'(es12.4)') rij
         if( rij.gt.rc_vphi ) cycle
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term

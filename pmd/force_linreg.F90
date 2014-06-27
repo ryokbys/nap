@@ -14,7 +14,7 @@ module linreg
   integer,parameter:: ncnst_type(1:3)= &
        (/ 2, &  ! Gaussian
           1, &  ! cosine
-          5 /)  ! polynomial
+          4 /)  ! polynomial
 !.....max exponent of the basis function
   integer:: max_nexp
   
@@ -39,8 +39,9 @@ contains
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
 
 !.....local
-    integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,nexp,ielem
-    real(8):: rcin,b_na,at(3),epotl
+    integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,nexp,ielem &
+         ,iwgt
+    real(8):: rcin,b_na,at(3),epotl,wgt
     real(8),allocatable:: fat(:,:)
 !.....1st call
     logical,save:: l1st=.true.
@@ -65,15 +66,18 @@ contains
     aa(1:3,1:namax)= 0d0
 
     do ia=1,natm
+      iwgt= 0
       do nexp=1,max_nexp
         do ielem=1,nelem
+          iwgt= iwgt +1
+          wgt= coeff(iwgt)
           b_na= 0d0
           fat(1:3,1:natm+nb)= 0d0
           call bfunc(ia,natm,namax,nnmax,ra,lspr,h,tag,fat,rc &
                ,ielem,nexp,b_na)
-          epotl=epotl +b_na
-          epi(ia)= epi(ia) +b_na
-          aa(1:3,1:natm+nb)= aa(1:3,1:natm+nb) +fat(1:3,1:natm+nb)
+          epotl=epotl +b_na*wgt
+          epi(ia)= epi(ia) +b_na*wgt
+          aa(1:3,1:natm+nb)= aa(1:3,1:natm+nb) +fat(1:3,1:natm+nb)*wgt
         enddo
       enddo
     enddo
@@ -116,23 +120,24 @@ contains
     return
   end function dgauss
 !=======================================================================
-  function poly(r,a0,a1,a2,a3,a4)
+  function poly(r,a0,a2,a6,a10)
     implicit none
-    real(8),intent(in):: r,a0,a1,a2,a3,a4
-    real(8):: poly,r2
+    real(8),intent(in):: r,a0,a2,a6,a10
+    real(8):: poly,r2i
 
-    r2= r*r
-    poly= a0 +a1*r +a2*r2 +a3*r*r2 +a4*r2*r2
+    r2i= 1d0/r*r
+    poly= a0 +a2*r2i +a6*r2i**3 +a10*r2i**5
     return
   end function poly
 !=======================================================================
-  function dpoly(r,a0,a1,a2,a3,a4)
+  function dpoly(r,a0,a2,a6,a10)
     implicit none
-    real(8),intent(in):: r,a0,a1,a2,a3,a4
-    real(8):: dpoly,r2
+    real(8),intent(in):: r,a0,a2,a6,a10
+    real(8):: dpoly,r2i,ri
 
-    r2=r*r
-    dpoly= a1 +2d0*a2*r +3d0*a3*r2 +4d0*a4*r*r2
+    ri= 1d0/r
+    r2i= 1d0/r*r
+    dpoly= -2d0*a2*r2i*ri -6d0*a6*ri*r2i**3 -10d0*a10*ri*r2i**5
     return
   end function dpoly
 !=======================================================================
@@ -174,9 +179,10 @@ contains
     nn= lspr(0,ia)
     do n=1,nn
       ja= lspr(n,ia)
+      if( ja.eq.ia ) cycle
       xj(1:3)= ra(1:3,ja)
       xij(1:3)= xj(1:3)-xi(1:3)
-      rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) *h(1:3,3)*xij(3)
+      rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
       r= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
       b_na= b_na +func(r,ielem)*fc(r,rc)
     enddo
@@ -184,9 +190,10 @@ contains
     !.....Therefore these two loops cannot be merged.
     do n=1,nn
       ja= lspr(n,ia)
+      if( ja.eq.ia ) cycle
       xj(1:3)= ra(1:3,ja)
       xij(1:3)= xj(1:3)-xi(1:3)
-      rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) *h(1:3,3)*xij(3)
+      rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
       r= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
       dirij(1:3)= -rij(1:3)/r
       djrij(1:3)= -dirij(1:3)
@@ -219,7 +226,7 @@ contains
 
     elseif( itype(ielem).eq.3 ) then ! polynomial
       func= poly(rij,cnst(ielem,1),cnst(ielem,2) &
-           ,cnst(ielem,3),cnst(ielem,4),cnst(ielem,5))
+           ,cnst(ielem,3),cnst(ielem,4))
 
     endif
     
@@ -229,7 +236,7 @@ contains
     implicit none
     integer,intent(in):: ielem
     real(8),intent(in):: rij
-    real(8):: dfunc
+    real(8):: dfunc,tmp
 
     dfunc= 0d0
     if( itype(ielem).eq.1 ) then ! Gaussian-type
@@ -240,7 +247,7 @@ contains
 
     elseif( itype(ielem).eq.3 ) then ! polynomial
       dfunc= dpoly(rij,cnst(ielem,1),cnst(ielem,2) &
-           ,cnst(ielem,3),cnst(ielem,4),cnst(ielem,5))
+           ,cnst(ielem,3),cnst(ielem,4))
 
     endif
     

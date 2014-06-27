@@ -277,6 +277,12 @@ class GA:
                 maxid += 1
                 new_ind.id= maxid
                 self.population.append(new_ind)
+                #.....two children for each pair
+                new_ind= crossover(self.population[pair[0]],
+                                   self.population[pair[1]])
+                maxid += 1
+                new_ind.id= maxid
+                self.population.append(new_ind)
             #.....mutation of new born offsprings
             for i in range(self.nindv,len(self.population)):
                 self.population[i].mutate()

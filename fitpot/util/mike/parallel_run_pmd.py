@@ -57,8 +57,6 @@ for inode in range(len(nodes)):
     # cmd='mpirun --hostfile {}'.format(fname) \
     #      + ' -np 1 ./run_pmd.sh {} {}'.format(fparam,str)
     cmd='rsh {} "cd {} && ./run_pmd.sh {} {}"'.format(node,os.getcwd(),fparam,str)
-    #arg= cmd.split()
-    #procs.append(subprocess.Popen(arg))
     procs.append(subprocess.Popen(cmd,shell=True))
 for i in range(len(procs)):
     procs[i].wait()

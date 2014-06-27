@@ -8,7 +8,7 @@ import sys,os
 
 constfname='in.const.linreg'
 
-max_nexp= 3
+max_nexp= 2
 #.....Gaussian
 max_exp_gauss= 5.0
 num_exp_gauss= 10
@@ -20,23 +20,20 @@ num_q_cos= 100
 #.....polynomial
 a0_max= 1.0
 a0_min=-1.0
-a1_max= 1.0
-a1_min=-1.0
 a2_max= 1.0
 a2_min=-1.0
-a3_max= 1.0
-a3_min=-1.0
-a4_max= 1.0
-a4_min=-1.0
+a6_max= 1.0
+a6_min=-1.0
+a10_max= 1.0
+a10_min=-1.0
 num_a0= 3
-num_a1= 3
-num_a2= 3
-num_a3= 3
-num_a4= 3
+num_a2= 5
+num_a6= 5
+num_a10= 5
 
 f=open(constfname,'w')
 nelem= num_exp_gauss *num_len_gauss +num_q_cos \
-    +num_a0 *num_a1 *num_a2 *num_a3 *num_a4
+    +num_a0 *num_a2 *num_a6 *num_a10
 #.....1st line
 f.write(' {0:10d} {1:4d}\n'.format(nelem,max_nexp))
 #.....Gaussian
@@ -51,19 +48,16 @@ for i1 in range(1,num_q_cos+1):
     f.write(' {0:3d} {1:10.4f}\n'.format(2,i1*dq))
 #.....polynomial
 d0= (a0_max-a0_min)/(num_a0-1)
-d1= (a1_max-a1_min)/(num_a1-1)
 d2= (a2_max-a2_min)/(num_a2-1)
-d3= (a3_max-a3_min)/(num_a3-1)
-d4= (a4_max-a4_min)/(num_a4-1)
+d6= (a6_max-a6_min)/(num_a6-1)
+d10= (a10_max-a10_min)/(num_a10-1)
 for i0 in range(num_a0):
-    for i1 in range(num_a1):
-        for i2 in range(num_a2):
-            for i3 in range(num_a3):
-                for i4 in range(num_a4):
-                    f.write(' {0:3d} {1:10.4f}'.format(3,i0*d0+a0_min))
-                    f.write(' {0:10.4f}'.format(i1*d1+a1_min))
-                    f.write(' {0:10.4f}'.format(i2*d1+a2_min))
-                    f.write(' {0:10.4f}'.format(i3*d1+a3_min))
-                    f.write(' {0:10.4f}'.format(i4*d1+a4_min))
-                    f.write('\n')
+    for i2 in range(num_a2):
+        for i6 in range(num_a6):
+            for i10 in range(num_a10):
+                f.write(' {0:3d} {1:10.4f}'.format(3,i0*d0+a0_min))
+                f.write(' {0:10.4f}'.format(i2*d2+a2_min))
+                f.write(' {0:10.4f}'.format(i6*d6+a6_min))
+                f.write(' {0:10.4f}'.format(i10*d10+a10_min))
+                f.write('\n')
 f.close()

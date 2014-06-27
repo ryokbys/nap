@@ -1,4 +1,5 @@
 #!/opt/local/bin/python
+# -*- coding: utf-8 -*-
 
 u"""Fit parameters of a certain potential to DFT data.
 
@@ -317,9 +318,9 @@ def func(x,*args):
     #.....run pmd in all sample directories
     os.chdir(dir)
     #print os.getcwd(),dir
-    if runmode in {'serial','Serial','SERIAL'}:
+    if runmode in ('serial','Serial','SERIAL'):
         os.system('./serial_run_pmd.sh '+parfile)
-    elif runmode in {'parallel','Parallel','PARALLEL'}:
+    elif runmode in ('parallel','Parallel','PARALLEL'):
         os.system('./parallel_run_pmd.py '+parfile)
     else:
         print "{:*>20}: no such run_mode !!!".format(' Error', runmode)
@@ -461,27 +462,27 @@ if __name__ == '__main__':
     output_energy_relation(ergs,fname='out.erg.pmd-vs-dft.ini')
     output_force_relation(frcs,fname='out.frc.pmd-vs-dft.ini')
 
-    if fmethod in {'cg','CG','conjugate-gradient'}:
+    if fmethod in ('cg','CG','conjugate-gradient'):
         print '>>>>> conjugate-gradient was selected.'
         solution= opt.fmin_cg(func,vars,args=(maindir,),maxiter=niter,disp=True
                               ,epsilon=eps,gtol=gtol)
         print ' CG solution:',solution
-    elif fmethod in {'qn','quasi-Newtown','QN','bfgs','BFGS'}:
+    elif fmethod in ('qn','quasi-Newtown','QN','bfgs','BFGS'):
         print '>>>>> quasi-Newton was selected.'
         solution= opt.fmin_bfgs(func,vars,args=(maindir,),maxiter=niter,disp=True
                                 ,epsilon=eps,gtol=gtol)
         print ' QN solution:',solution
-    elif fmethod in {'NM','Nelder-Mead','downhill-simplex'}:
+    elif fmethod in ('NM','Nelder-Mead','downhill-simplex'):
         print '>>>>> Nelder-Mead was selected.'
         solution= opt.fmin(func,vars,args=(maindir,),maxiter=niter,disp=True)
         print ' NM solution:',solution
-    elif fmethod in {'ga','GA','genetic-algorithm'}:
+    elif fmethod in ('ga','GA','genetic-algorithm'):
         print '>>>>> genetic algorithm was selected.'
         solution= ga_wrapper()
         #...calc best one again
         func(solution,maindir)
         ergs,frcs= gather_pmd_data(maindir)
-    elif fmethod in {'test','TEST'}:
+    elif fmethod in ('test','TEST'):
         print '>>>>> TEST was selected.'
         func(vars,maindir)
         solution= vars
