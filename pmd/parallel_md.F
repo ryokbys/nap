@@ -324,8 +324,8 @@ c-----Energy output
         open(11,file="out.erg",status='replace')
         write(11,'(a)') '# istp,etot-epot0[eV],ekin,epot-epot0,temp[K]'
      &       //',vol[Ang^3],pressure[GPa]'
-        write(11,'(a,es15.7,a)') '# epot0 =',epot0,' [eV]'
-        write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
+        write(11,'(a,es16.7e3,a)') '# epot0 =',epot0,' [eV]'
+        write(11,'(i8,3es16.7e3,f10.2,2es16.7e3)') istp
      &       ,ekin+epot0-epot0,ekin,epot0-epot0,temp
      &       ,vol
      &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
@@ -500,7 +500,7 @@ c          temp= ekin /ntot/fkb *2d0/2d0
      &         ,sorg,mpi_md_world)
 #endif
           if(myid_md.eq.0) then
-            write(11,'(i8,3es15.7,f10.2,2es15.7)') istp
+            write(11,'(i8,3es16.7e3,f10.2,2es16.7e3)') istp
      &           ,ekin+epot-epot0,ekin,epot-epot0,temp
      &           ,vol
      &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa

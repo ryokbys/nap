@@ -34,8 +34,8 @@ contains
 
     if( l1st ) then
       allocate(rho(namax+nbmax))
-      rs= a_rs /dsqrt(2d0)/z_fe**(1d0/3)
-      rs_feh= a_rs /sqrt(z_fe**(2d0/3)+z_h**(2d0/3)) 
+      rs    = a_rs*a0 /(z_fe**(2d0/3) +z_fe**(2d0/3))
+      rs_feh= a_rs*a0 /(z_fe**(2d0/3) +z_h**(2d0/3))
 !.....assuming fixed (constant) atomic volume (BCC)
       avol= alcfe**3 /2
       if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
@@ -53,12 +53,13 @@ contains
     endif
 
     aa(1:3,1:natm)=0d0
-    epi(1:natm)= 0d0
+    epi(1:natm+nb)= 0d0
     epotl= 0d0
-    rho(1:natm)= 0d0
+    rho(1:natm+nb)= 0d0
     strs(1:3,1:3,1:natm+nb)= 0d0
 
 !.....rho(i)
+
     do i=1,natm
       is= int(tag(i))
       xi(1:3)= ra(1:3,i)
@@ -111,7 +112,6 @@ contains
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         rij=sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
-        write(90,'(es12.4)') rij
         if( rij.gt.rc_vphi ) cycle
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
@@ -590,7 +590,7 @@ contains
 
     rho_hh= 0d0
     if( r.ge.rc_phi_hh ) return
-    rho_hh= c_rho_hh *r**2 *exp(-2d0*r) *fcut(r)
+    rho_hh= c_rho_hh *r**2 *exp(-2d0*r/a0) *fcut(r)
     return
   end function rho_hh
 !=======================================================================
@@ -605,9 +605,11 @@ contains
 
     drho_hh= 0d0
     if( r.ge.rc_phi_hh ) return
-    e1= exp(-2d0*r)
+    e1= exp(-2d0*r/a0)
     fc= fcut(r)
-    drho_hh= c_rho_hh *(2d0*r*e1*fc -2d0*r**2*e1*fc +r**2*e1*dfcut(r))
+    drho_hh= c_rho_hh *(2d0*r*e1*fc &
+         -2d0/a0*r**2*e1*fc &
+         +r**2*e1*dfcut(r))
     return
   end function drho_hh
 !=======================================================================
@@ -673,16 +675,16 @@ contains
 
     fvphi_hh= 0d0
 
-!.....correction term to avoid H-H clustering
-    if( r.ge.r0_hh_corr .and. r.lt.r1_hh_corr ) then
-      x=(r-r0_hh_corr)/lmbd_hh_corr
-      ex= exp( -x**k_hh_corr )
-      fvphi_hh=fvphi_hh +c0_hh_corr*x**(k_hh_corr-1d0)*ex
-    else if( r.ge.r1_hh_corr ) then
-      x=(r-r0_hh_corr)/lmbd_hh_corr
-      ex= exp( -x**k_hh_corr -b0_hh_corr*(r-r0_hh_corr)**2 )
-      fvphi_hh=fvphi_hh +c0_hh_corr*x**(k_hh_corr-1d0)*ex
-    endif
+!!$!.....correction term to avoid H-H clustering
+!!$    if( r.ge.r0_hh_corr .and. r.lt.r1_hh_corr ) then
+!!$      x=(r-r0_hh_corr)/lmbd_hh_corr
+!!$      ex= exp( -x**k_hh_corr )
+!!$      fvphi_hh=fvphi_hh +c0_hh_corr*x**(k_hh_corr-1d0)*ex
+!!$    else if( r.ge.r1_hh_corr ) then
+!!$      x=(r-r0_hh_corr)/lmbd_hh_corr
+!!$      ex= exp( -x**k_hh_corr -b0_hh_corr*(r-r0_hh_corr)**2 )
+!!$      fvphi_hh=fvphi_hh +c0_hh_corr*x**(k_hh_corr-1d0)*ex
+!!$    endif
 
     if( r.gt.rc_phi_hh ) return
     x=a_tanh_hh*(r-r_tanh_hh)
@@ -712,29 +714,29 @@ contains
 
     dfvphi_hh= 0d0
 
-!.....correction term to avoid H-H clustering
-    if( r.ge.r0_hh_corr .and. r.lt.r1_hh_corr ) then
-      x=(r-r0_hh_corr)/lmbd_hh_corr
-      xk1= x**(k_hh_corr-1d0)
-      xk2= x**(k_hh_corr-2d0)
-      ex= exp( -x**k_hh_corr )
-      dfvphi_hh=dfvphi_hh &
-           +c0_hh_corr/lmbd_hh_corr*(k_hh_corr-1d0) &
-            *xk2 *ex &
-           +c0_hh_corr*xk1*ex &
-            *(-k_hh_corr/lmbd_hh_corr *xk1)
-    else if( r.ge.r1_hh_corr ) then
-      x=(r-r0_hh_corr)/lmbd_hh_corr
-      xk1= x**(k_hh_corr-1d0)
-      xk2= x**(k_hh_corr-2d0)
-      ex= exp( -x**k_hh_corr -b0_hh_corr*(r-r0_hh_corr)**2 )
-      dfvphi_hh=dfvphi_hh &
-           +c0_hh_corr/lmbd_hh_corr*(k_hh_corr-1d0) &
-            *xk2 *ex &
-           +c0_hh_corr*xk1*ex &
-            *(-k_hh_corr/lmbd_hh_corr *xk1 &
-            -2d0*b0_hh_corr*(r-r1_hh_corr))
-    endif
+!!$!.....correction term to avoid H-H clustering
+!!$    if( r.ge.r0_hh_corr .and. r.lt.r1_hh_corr ) then
+!!$      x=(r-r0_hh_corr)/lmbd_hh_corr
+!!$      xk1= x**(k_hh_corr-1d0)
+!!$      xk2= x**(k_hh_corr-2d0)
+!!$      ex= exp( -x**k_hh_corr )
+!!$      dfvphi_hh=dfvphi_hh &
+!!$           +c0_hh_corr/lmbd_hh_corr*(k_hh_corr-1d0) &
+!!$            *xk2 *ex &
+!!$           +c0_hh_corr*xk1*ex &
+!!$            *(-k_hh_corr/lmbd_hh_corr *xk1)
+!!$    else if( r.ge.r1_hh_corr ) then
+!!$      x=(r-r0_hh_corr)/lmbd_hh_corr
+!!$      xk1= x**(k_hh_corr-1d0)
+!!$      xk2= x**(k_hh_corr-2d0)
+!!$      ex= exp( -x**k_hh_corr -b0_hh_corr*(r-r0_hh_corr)**2 )
+!!$      dfvphi_hh=dfvphi_hh &
+!!$           +c0_hh_corr/lmbd_hh_corr*(k_hh_corr-1d0) &
+!!$            *xk2 *ex &
+!!$           +c0_hh_corr*xk1*ex &
+!!$            *(-k_hh_corr/lmbd_hh_corr *xk1 &
+!!$            -2d0*b0_hh_corr*(r-r1_hh_corr))
+!!$    endif
 
 
     if( r.gt.rc_phi_hh ) return

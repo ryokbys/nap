@@ -12,6 +12,7 @@
       real(8),parameter:: alcfe = 2.8553d0
       real(8),parameter:: z_fe  = 26d0
       real(8),parameter:: z_h   = 1d0
+      real(8),parameter:: a0    = 0.5291772d0 ! Bohr radius
 !.....prefactor for rs
       real(8),parameter:: a_rs  = 0.88534d0
 !.....prefactor for varphi r < r1
