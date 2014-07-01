@@ -11,7 +11,7 @@ import time
 import glob
 import numpy as np
 import scipy.optimize as opt
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import math
 
 #.....import from local modules
@@ -50,6 +50,7 @@ gtol= 1e-5
 ftol= 1e-5
 eps = 1e-8
 eatom= np.zeros(max_species)
+fmatch= True
 #.....GA parameters
 ga_nindv= 10
 ga_nbit= 16
@@ -58,7 +59,7 @@ ga_murate= 0.01
 
 def get_sample_dirs():
     if not os.path.exists(maindir):
-        print "{:*>20}: {} does not exist !!!".format(' Error',maindir)
+        print "{0:*>20}: {1} does not exist !!!".format(' Error',maindir)
         exit()
     lst= glob.glob(maindir+'/[0-9]*')
     for i in range(len(lst)):
@@ -113,14 +114,14 @@ def write_params(fname,x):
     global nprms,rcut
     vars_to_params(x)
     f=open(fname,'w')
-    f.write(' {:6d} {:10.4f}\n'.format(nprms,rcut))
+    f.write(' {0:6d} {1:10.4f}\n'.format(nprms,rcut))
     for i in range(nprms):
         if abs(prange[i,0]) >= large and abs(prange[i,1]) >= large:
-            f.write('{:14.6e} \n'.format(params[i]))
+            f.write('{0:14.6e} \n'.format(params[i]))
         elif prange[i,0] == prange[i,1]:
-            f.write('{:14.6e} {:14.6e}\n'.format(params[i],prange[i,0]))
+            f.write('{0:14.6e} {1:14.6e}\n'.format(params[i],prange[i,0]))
         else:
-            f.write('{:14.6e} {:14.6e} {:14.6e}\n'.format(params[i],
+            f.write('{0:14.6e} {1:14.6e} {2:14.6e}\n'.format(params[i],
                                                           prange[i,0],
                                                           prange[i,1]))
     f.close()
@@ -185,6 +186,9 @@ def read_input(fname='in.fitpot'):
                 ftol= float(data[1])
             elif data[0] == 'atom_energy':
                 eatom[int(data[1])]= float(data[2])
+            elif data[0] == 'force_match':
+                if data[1] in ('false','False','no','No','0'):
+                    fmatch= False
             #.....GA parameters
             elif data[0] == 'ga_num_individuals':
                 ga_nindv= int(data[1])
@@ -196,46 +200,10 @@ def read_input(fname='in.fitpot'):
                 ga_murate= float(data[1])
     f.close()
 
-def set_input_params(dict):
-    global nsmpl,niter,fmethod,maindir,parfile,runmode,eps,xtol,gtol,ftol \
-        ,eatom,ga_nindv,ga_nbit,ga_temp
-    if 'num_samples' in dict:
-        nsmpl= dict['num_samples'][0]
-    if 'num_iteration' in dict:
-        niter= dict['num_iteration'][0]
-    if 'fitting_method' in dict:
-        fmethod= dict['fitting_method'][0]
-    if 'main_directory' in dict:
-        maindir= dict['main_directory'][0]
-    if 'param_file' in dict:
-        parfile= dict['param_file'][0]
-    if 'run_mode' in dict:
-        runmode= dict['run_mode'][0]
-    if 'eps' in dict:
-        eps= dict['eps'][0]
-    if 'xtol' in dict:
-        xtol= dict['xtol'][0]
-    if 'gtol' in dict:
-        gtol= dict['gtol'][0]
-    if 'ftol' in dict:
-        ftol= dict['ftol'][0]
-    if 'atom_energy' in dict:
-        eatom[dict['atom_energy'][0]]= dict['atom_energy'][1]
-    #.....GA parameters
-    if 'ga_num_individuals' in dict:
-        ga_nindv= dict['ga_num_individuals'][0]
-    if 'ga_num_bit' in dict:
-        ga_nbit= dict['ga_num_bit'][0]
-    if 'ga_temperature' in dict:
-        ga_temp= dict['ga_temperature'][0]
-    if 'ga_murate' in dict:
-        ga_murate= dict['ga_murate'][0]
-
-    
 def show_input_params(fname='in.fitpot'):
     print '>>>>> input parameters:'
     # for key,value in input_params.items():
-    #     print ' {:>20}: '.format(key), value
+    #     print ' {0:>20}: '.format(key), value
     f= open(fname,'r')
     for line in f.readlines():
         data= line.split()
@@ -323,7 +291,7 @@ def func(x,*args):
     elif runmode in ('parallel','Parallel','PARALLEL'):
         os.system('./parallel_run_pmd.py '+parfile)
     else:
-        print "{:*>20}: no such run_mode !!!".format(' Error', runmode)
+        print "{0:*>20}: no such run_mode !!!".format(' Error', runmode)
         exit()
     os.chdir(cwd)
 
@@ -341,6 +309,8 @@ def eval_L1(cergs,cfrcs,rergs,rfrcs,samples):
     for i in range(len(samples)):
         val += ((cergs[i]-rergs[i])/rergs[i])**2
         nval += 1
+        if not fmatch:
+            continue
         for j in range(samples[i].natm):
             for k in range(3):
                 if abs(rfrcs[i][j,k]) > tiny:
@@ -358,6 +328,8 @@ def eval_L2(cergs,cfrcs,rergs,rfrcs,samples):
     for i in range(len(samples)):
         val += ((cergs[i]-rergs[i]))**2
         nval += 1
+        if not fmatch:
+            continue
         for j in range(samples[i].natm):
             for k in range(3):
                 val += ((cfrcs[i][j,k]-rfrcs[i][j,k]))**2
@@ -371,6 +343,8 @@ def eval_L3(cergs,cfrcs,rergs,rfrcs,samples):
     for i in range(len(samples)):
         val += math.log(1.0 +10.0*((cergs[i]-rergs[i]))**2)
         nval += 1
+        if not fmatch:
+            continue
         for j in range(samples[i].natm):
             for k in range(3):
                 val += math.log(1.0 +((cfrcs[i][j,k]-rfrcs[i][j,k]))**2)
@@ -383,7 +357,7 @@ def output_energy_relation(ergs,fname='out.erg.pmd-vs-dft'):
     f= open(fname,'w')
     for i in range(len(ergrefs)):
         smpl= samples[i]
-        f.write(' {:15.7e} {:15.7e}\n'.format(ergrefs[i]/smpl.natm \
+        f.write(' {0:15.7e} {1:15.7e}\n'.format(ergrefs[i]/smpl.natm \
                                               ,ergs[i]/smpl.natm ))
     f.close()
 
@@ -392,34 +366,38 @@ def output_force_relation(frcs,fname='out.frc.pmd-vs-dft'):
     for i in range(len(samples)):
         for j in range(samples[i].natm):
             for k in range(3):
-                f.write(' {:15.7e} {:15.7e}\n'.format(frcrefs[i][j,k],frcs[i][j,k]))
+                f.write(' {0:15.7e} {1:15.7e}\n'.format(frcrefs[i][j,k],frcs[i][j,k]))
     f.close()
 
-def plot_energy_relation(ergs,fname='graph.eps'):
-    x=ergrefs
-    y=ergs
-    plt.scatter(x,y)
-    xmin,xmax= plt.xlim()
-    ymin,ymax= plt.ylim()
-    xmax= max(xmax,ymax)
-    xmin= min(xmin,ymin)
-    dat= np.arange(xmin,xmax,50.0)
-    plt.plot(dat,dat,'b--')
-    plt.xlabel('DFT energy (eV)')
-    plt.ylabel('pmd energy (eV)')
-    plt.title('DFT and pmd energy relation')
-    plt.xlim(xmin,xmax)
-    plt.ylim(xmin,xmax)
-    plt.savefig(fname)
-    #plt.show()
+# def plot_energy_relation(ergs,fname='graph.eps'):
+#     x=ergrefs
+#     y=ergs
+#     plt.scatter(x,y)
+#     xmin,xmax= plt.xlim()
+#     ymin,ymax= plt.ylim()
+#     xmax= max(xmax,ymax)
+#     xmin= min(xmin,ymin)
+#     dat= np.arange(xmin,xmax,50.0)
+#     plt.plot(dat,dat,'b--')
+#     plt.xlabel('DFT energy (eV)')
+#     plt.ylabel('pmd energy (eV)')
+#     plt.title('DFT and pmd energy relation')
+#     plt.xlim(xmin,xmax)
+#     plt.ylim(xmin,xmax)
+#     plt.savefig(fname)
+#     #plt.show()
 
 #================================================== GA wrapper
-def fitfunc(val):
+def fitfunc1(val):
     return math.exp(-val/ga_temp)
+
+def fitfunc2(val):
+    return math.log(1.0 +val)
 
 def ga_wrapper():
     ga_check_range()
-    ga= GA(ga_nindv,ga_nbit,ga_murate,func,vars,vranges,fitfunc,args=(maindir,))
+    ga= GA(ga_nindv,ga_nbit,ga_murate,func,vars,vranges \
+               ,fitfunc1,args=(maindir,))
     return ga.run(niter)
 
 def ga_check_range():
@@ -429,20 +407,19 @@ def ga_check_range():
         max= vranges[i,1]
         if abs(max-min) > 2.0**ga_nbit:
             wrong= True
-            print ' A range seems to be too wide [{},{}]'.format(min,max)
+            print ' A range seems to be too wide [{0},{1}]'.format(min,max)
     if wrong:
-        print '{:*>20}: Some ranges are too wide.'.format(' Error')
+        print '{0:*>20}: Some ranges are too wide.'.format(' Error')
         print '  Hoping you know what you are doing...'
         exit()
     
 #============================================= main routine hereafter
 if __name__ == '__main__':
-    print "{:=^72}".format(' FITPOT ')
+    print "{0:=^72}".format(' FITPOT ')
     t0= time.time()
     cwd= os.getcwd()
     #.....inputs: parameters in in.fitpot as a dictionary
     inputs= read_input('in.fitpot')
-    #set_input_params(inputs)
     show_input_params('in.fitpot')
     #.....params: parameters in in.params.?????
     read_params(maindir+'/'+parfile)
@@ -451,7 +428,7 @@ if __name__ == '__main__':
     #.....get samples from ##### directories
     sample_dirs= get_sample_dirs()
     if nsmpl != len(sample_dirs):
-        print '{:*>20}: num_samples in in.fitpot is wrong.'.format(' Error')
+        print '{0:*>20}: num_samples in in.fitpot is wrong.'.format(' Error')
         exit()
     read_pos()
 
@@ -492,5 +469,5 @@ if __name__ == '__main__':
     output_energy_relation(ergs,fname='out.erg.pmd-vs-dft.fin')
     output_force_relation(frcs,fname='out.frc.pmd-vs-dft.fin')
 
-    print '{:=^72}'.format(' FITPOT finished correctly ')
-    print '   Elapsed time = {:12.2f}'.format(time.time()-t0)
+    print '{0:=^72}'.format(' FITPOT finished correctly ')
+    print '   Elapsed time = {0:12.2f}'.format(time.time()-t0)

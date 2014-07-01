@@ -18,6 +18,9 @@ fi
 
 fparam=$1
 
+#.....for helios, uncomment following line
+# module load intel intelmpi
+
 for dir in $*
 do
   #...1st argument is not directory
@@ -32,6 +35,7 @@ do
   #.....run pmd
   echo -n "."
   #echo " running pmd on $dir/pmd ..."
+  #mpirun -np 1 $pmd > out.pmd
   $pmd > out.pmd
   cd ../
   $python $reduce

@@ -69,7 +69,7 @@ def divide_nodefile_for_GA(nodefile):
         #.....node-info file will be used by parallel_run_pmd.py
         g=open(dirname+'/node-info','w')
         g.write(' offset    {0:10d}\n'.format(offset))
-        g.write(' num_nodes {0:10d}\n'.format(nnode))
+        g.write(' num_tasks {0:10d}\n'.format(nnode))
         for node in nodes_for_indiv:
             g.write(' {0}\n'.format(node))
         g.close()
@@ -79,6 +79,8 @@ if __name__ == '__main__':
     print "{0:=^72}".format(' FITPOT ')
     t0= time.time()
 
+    os.system("module load intel intelmpi scipy")
+
     os.system("srun -l /bin/hostname | sort -n | awk '{print $2}' > nodelist.txt")
     nodefile='nodelist.txt'
     os.system("cp {0:} {1:}/".format(nodefile,maindir))
@@ -87,14 +89,15 @@ if __name__ == '__main__':
                                    +r" | awk '{print $1}'"))
     f= open(maindir+'/node-info','w')
     f.write(' offset    {0:10d}\n'.format(0))
-    f.write(' num_nodes {0:10d}\n'.format(nnodes))
+    f.write(' num_tasks {0:10d}\n'.format(nnodes))
     f.close()
     os.system("cat {0} >> {1}".format(nodefile,maindir+'/node-info'))
 
     if check_if_GA():
         divide_nodefile_for_GA(nodefile)
 
-    os.system("python {0} > out.fitpot 2>&1".format(fitpot))
+    os.system("module load intel intelmpi scipy; " \
+                  +"python {0} > out.fitpot 2>&1".format(fitpot))
     
     print '{0:=^72}'.format(' FITPOT finished correctly ')
     print '   Elapsed time = {0:12.2f}'.format(time.time()-t0)
