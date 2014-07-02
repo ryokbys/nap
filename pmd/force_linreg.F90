@@ -11,10 +11,11 @@ module linreg
   real(8),allocatable:: cnst(:,:)
 !.....function types and num of constatns for types
   integer,parameter:: max_ncnst= 10
-  integer,parameter:: ncnst_type(1:3)= &
+  integer,parameter:: ncnst_type(1:4)= &
        (/ 2, &  ! Gaussian
-          1, &  ! cosine
-          4 /)  ! polynomial
+          2, &  ! cosine
+          4, &  ! polynomial
+          1 /)  ! angular
 !.....max exponent of the basis function
   integer:: max_nexp
   
@@ -102,45 +103,6 @@ contains
     return
   end subroutine force_linreg
 !=======================================================================
-  function gauss(r,b,a)
-    implicit none
-    real(8),intent(in):: a,b,r
-    real(8):: gauss
-
-    gauss= r**b *exp(-a*r*r)
-    return
-  end function gauss
-!=======================================================================
-  function dgauss(r,b,a)
-    implicit none
-    real(8),intent(in):: a,b,r
-    real(8):: dgauss
-
-    dgauss= (b-2d0*a*r*r) *r**(b-1) *exp(-a*r*r)
-    return
-  end function dgauss
-!=======================================================================
-  function poly(r,a0,a2,a6,a10)
-    implicit none
-    real(8),intent(in):: r,a0,a2,a6,a10
-    real(8):: poly,r2i
-
-    r2i= 1d0/r*r
-    poly= a0 +a2*r2i +a6*r2i**3 +a10*r2i**5
-    return
-  end function poly
-!=======================================================================
-  function dpoly(r,a0,a2,a6,a10)
-    implicit none
-    real(8),intent(in):: r,a0,a2,a6,a10
-    real(8):: dpoly,r2i,ri
-
-    ri= 1d0/r
-    r2i= 1d0/r*r
-    dpoly= -2d0*a2*r2i*ri -6d0*a6*ri*r2i**3 -10d0*a10*ri*r2i**5
-    return
-  end function dpoly
-!=======================================================================
   function fc(r,rc)
     implicit none
     real(8),intent(in):: r,rc
@@ -172,40 +134,81 @@ contains
     real(8),intent(in):: ra(3,namax),h(3,3),tag(namax),rc
     real(8),intent(out):: b_na,fat(3,namax)
 
-    integer:: ja,n,nn
-    real(8):: xi(3),xj(3),xij(3),rij(3),r,dirij(3),djrij(3),tmp
+    integer:: ja,jj,ka,kk
+    real(8):: xi(3),xj(3),xij(3),rij(3),r,dirij(3),djrij(3),tmp &
+         ,fcij,xk(3),xik(3),rik(3),rj,rk,fcik
 
     xi(1:3)= ra(1:3,ia)
-    nn= lspr(0,ia)
-    do n=1,nn
-      ja= lspr(n,ia)
-      if( ja.eq.ia ) cycle
-      xj(1:3)= ra(1:3,ja)
-      xij(1:3)= xj(1:3)-xi(1:3)
-      rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-      r= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-      b_na= b_na +func(r,ielem)*fc(r,rc)
-    enddo
-    !.....b_na will be used in the following loop.
-    !.....Therefore these two loops cannot be merged.
-    do n=1,nn
-      ja= lspr(n,ia)
-      if( ja.eq.ia ) cycle
-      xj(1:3)= ra(1:3,ja)
-      xij(1:3)= xj(1:3)-xi(1:3)
-      rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-      r= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-      dirij(1:3)= -rij(1:3)/r
-      djrij(1:3)= -dirij(1:3)
-      tmp= dfunc(r,ielem)*fc(r,rc) +func(r,ielem)*dfc(r,rc)
-      fat(1:3,ia)= fat(1:3,ia) -dirij(1:3)*tmp *nexp*b_na**(nexp-1)
-      fat(1:3,ja)= fat(1:3,ja) -djrij(1:3)*tmp *nexp*b_na**(nexp-1)
-    enddo
+    if( itype(ielem).eq.4 ) then ! angular (3-body) basis
+      do jj=1,lspr(0,ia)
+        ja= lspr(jj,ia)
+        if( ja.eq.ia ) cycle
+        xj(1:3)= ra(1:3,ja)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        rj= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        fcij= fc(rj,rc)
+        !.....another loop on neighbors for angular basis
+        do kk=1,lspr(0,ia)
+          ka= lspr(kk,ia)
+          if( ka.le.ja ) cycle
+          xk(1:3)= ra(1:3,ka)
+          xik(1:3)= xk(1:3)-xi(1:3)
+          rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
+          rk= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
+          fcik= fc(rk,rc)
+          b_na= b_na +func3(rij,rj,rik,rk,ielem) *fcij *fcik
+        enddo
+      enddo
+      !.....b_na will be used in the following loop.
+      !.....Therefore these two loops cannot be merged.
+      do jj=1,lspr(0,ia)
+        ja= lspr(jj,ia)
+        if( ja.eq.ia ) cycle
+        xj(1:3)= ra(1:3,ja)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        r= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        dirij(1:3)= -rij(1:3)/r
+        djrij(1:3)= -dirij(1:3)
+        tmp= dfunc2(r,ielem)*fc(r,rc) +func2(r,ielem)*dfc(r,rc)
+        fat(1:3,ia)= fat(1:3,ia) -dirij(1:3)*tmp *nexp*b_na**(nexp-1)
+        fat(1:3,ja)= fat(1:3,ja) -djrij(1:3)*tmp *nexp*b_na**(nexp-1)
+        !!!! you have to write the force code here !!!!
+      enddo
+      
+    else ! 2-body basis
+      do jj=1,lspr(0,ia)
+        ja= lspr(jj,ia)
+        if( ja.eq.ia ) cycle
+        xj(1:3)= ra(1:3,ja)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        rj= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        fcij= fc(rj,rc)
+        b_na= b_na +func2(rj,ielem)*fcij
+      enddo
+      !.....b_na will be used in the following loop.
+      !.....Therefore these two loops cannot be merged.
+      do jj=1,lspr(0,ia)
+        ja= lspr(jj,ia)
+        if( ja.eq.ia ) cycle
+        xj(1:3)= ra(1:3,ja)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        r= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        dirij(1:3)= -rij(1:3)/r
+        djrij(1:3)= -dirij(1:3)
+        tmp= dfunc2(r,ielem)*fc(r,rc) +func2(r,ielem)*dfc(r,rc)
+        fat(1:3,ia)= fat(1:3,ia) -dirij(1:3)*tmp *nexp*b_na**(nexp-1)
+        fat(1:3,ja)= fat(1:3,ja) -djrij(1:3)*tmp *nexp*b_na**(nexp-1)
+      enddo
+    endif
     b_na= b_na**nexp
-    
+
   end subroutine bfunc
 !=======================================================================
-  function func(rij,ielem)
+  function func2(rij,ielem)
 !
 !  Calculate selected basis function specified by ielem.
 !
@@ -215,43 +218,69 @@ contains
     implicit none
     integer,intent(in):: ielem
     real(8),intent(in):: rij
-    real(8):: func
+    real(8):: func2
+    real(8):: a(max_ncnst),r2i
 
-    func= 0d0
+    func2= 0d0
     if( itype(ielem).eq.1 ) then ! Gaussian-type
-      func= gauss(rij,cnst(ielem,1),cnst(ielem,2))
+      a(1:2)= cnst(1:2,ielem)
+      func2= rij**a(1) *exp(-a(2)*rij*rij)
 
     elseif( itype(ielem).eq.2 ) then ! cosine-type
-      func= cos(rij*cnst(ielem,1))
+      a(1:2)= cnst(1:2,ielem)
+      func2= cos(rij*a(1)) *rij**nint(a(2))
 
     elseif( itype(ielem).eq.3 ) then ! polynomial
-      func= poly(rij,cnst(ielem,1),cnst(ielem,2) &
-           ,cnst(ielem,3),cnst(ielem,4))
-
+      a(1:4)= cnst(1:4,ielem)
+      r2i= 1d0/rij/rij
+      func2= a(1) +a(2)*r2i +a(3)*r2i**3 +a(4)*r2i**5
     endif
-    
-  end function func
+    return
+  end function func2
 !=======================================================================
-  function dfunc(rij,ielem)
+  function dfunc2(rij,ielem)
     implicit none
     integer,intent(in):: ielem
     real(8),intent(in):: rij
-    real(8):: dfunc,tmp
+    real(8):: dfunc2,tmp,a(max_ncnst),ri,r2i
 
-    dfunc= 0d0
+    dfunc2= 0d0
     if( itype(ielem).eq.1 ) then ! Gaussian-type
-      dfunc= dgauss(rij,cnst(ielem,1),cnst(ielem,2))
+      a(1:2)= cnst(1:2,ielem)
+      dfunc2= (a(1) -2d0*a(2)*rij*rij) *rij**(a(1)-1d0) &
+           *exp(-a(2)*rij*rij)
 
     elseif( itype(ielem).eq.2 ) then ! cosine-type
-      dfunc= -cnst(ielem,1)*sin(rij*cnst(ielem,1))
+      a(1:2)= cnst(1:2,ielem)
+      dfunc2= -a(1)*sin(rij*a(1)) *rij**a(2) &
+           +a(2)*rij**nint(a(2)-1d0) *cos(rij*a(1))
 
     elseif( itype(ielem).eq.3 ) then ! polynomial
-      dfunc= dpoly(rij,cnst(ielem,1),cnst(ielem,2) &
-           ,cnst(ielem,3),cnst(ielem,4))
-
+      a(1:4)= cnst(1:4,ielem)
+      ri= 1d0/rij
+      r2i= 1d0/rij/rij
+      dfunc2= -2d0*a(2)*r2i*ri &
+           -6d0*a(3)*ri*r2i**3 &
+           -10d0*a(4)*ri*r2i**5
     endif
-    
-  end function dfunc
+    return
+  end function dfunc2
+!=======================================================================
+  function func3(rij,rj,rik,rk,ielem)
+    implicit none
+    integer,intent(in):: ielem
+    real(8),intent(in):: rij(3),rj,rik(3),rk
+    real(8):: func3,cs,a(max_ncnst)
+    real(8),external:: sprod 
+
+    func3= 0d0
+    if( itype(ielem).eq.4 ) then ! angular
+      a(1)= cnst(1,ielem) 
+      cs= sprod(rij,rik)/rj/rk
+      func3= (a(1)+cs)**2/(abs(a(1))+1d0)**2
+    endif
+
+  end function func3
 !=======================================================================
   subroutine read_params(myid,mpi_world,rcin)
     implicit none
@@ -291,9 +320,9 @@ contains
     endif
     open(51,file=trim(ccfname),status='old')
     read(51,*) nelem,max_nexp
-    allocate(itype(nelem),cnst(nelem,max_ncnst))
+    allocate(itype(nelem),cnst(max_ncnst,nelem))
     do i=1,nelem
-      read(51,*) itype(i),(cnst(i,j),j=1,ncnst_type(itype(i)))
+      read(51,*) itype(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
     enddo
     close(51)
 !.....check whether the num of parameters is correct

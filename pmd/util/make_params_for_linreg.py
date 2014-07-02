@@ -14,7 +14,7 @@ constfname='in.const.linreg'
 pmax= 1.0
 pmin=-1.0
 
-usage='Usage: $ python {0} <rc>'
+usage='Usage: $ python {0} rcut'.format(sys.argv[0])
 
 if len(sys.argv) != 2:
     print ' [Error] num of arguments is wrong !!!'
