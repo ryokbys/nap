@@ -63,7 +63,7 @@ for inode in range(len(nodes)):
     #...run run_pmd.sh on the remote node
     # cmd='mpirun --hostfile {}'.format(fname) \
     #      + ' -np 1 ./run_pmd.sh {} {}'.format(fparam,str)
-    cmd='ssh {0} "cd {1} && ./run_pmd.sh {2} {3}"'.format(node,os.getcwd(),fparam,str)
+    cmd='ssh -q {0} "cd {1} && ./run_pmd.sh {2} {3}"'.format(node,os.getcwd(),fparam,str)
     procs.append(subprocess.Popen(cmd,shell=True))
 for i in range(len(procs)):
     procs[i].wait()

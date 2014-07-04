@@ -33,7 +33,7 @@ do
   cd $dir/pmd
   $expand_pmd ../pos $(head -n1 $fparam | awk '{print $2}') > 0000/pmd00000
   #.....run pmd
-  echo -n "."
+  #echo -n "."
   #echo " running pmd on $dir/pmd ..."
   #mpirun -np 1 $pmd > out.pmd
   $pmd > out.pmd

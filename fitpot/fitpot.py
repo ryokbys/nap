@@ -51,6 +51,8 @@ ftol= 1e-5
 eps = 1e-8
 eatom= np.zeros(max_species)
 fmatch= True
+penalty= 'no'
+pweight= 1.0
 #.....GA parameters
 ga_nindv= 10
 ga_nbit= 16
@@ -151,7 +153,8 @@ def vars_to_params(x):
             j += 1
 
 def read_input(fname='in.fitpot'):
-    global nsmpl,niter,fmethod,maindir,parfile,runmode,eps,xtol,gtol,ftol
+    global nsmpl,niter,fmethod,maindir,parfile,runmode,eps \
+           ,xtol,gtol,ftol,fmatch,penalty,pweight
     global eatom,ga_nindv,ga_nbit,ga_temp
     dict={}
     f= open(fname,'r')
@@ -189,6 +192,10 @@ def read_input(fname='in.fitpot'):
             elif data[0] == 'force_match':
                 if data[1] in ('false','False','no','No','0'):
                     fmatch= False
+            elif data[0] == 'penalty':
+                penalty= data[1]
+            elif data[0] == 'penalty_weight':
+                pweight= float(data[1])
             #.....GA parameters
             elif data[0] == 'ga_num_individuals':
                 ga_nindv= int(data[1])
@@ -251,7 +258,7 @@ def gather_ref_data(basedir):
     for i in range(len(sample_dirs)):
         dir= sample_dirs[i]
         smpl= samples[i]
-        print dir
+        #print dir
         #.....force
         ff=open(basedir+'/'+dir+'/frc.ref','r')
         natm= int(ff.readline().split()[0])
@@ -299,8 +306,24 @@ def func(x,*args):
     ergs,frcs=gather_pmd_data(dir)
 
     #.....calc function value of L
-    val= eval_L3(ergs,frcs,ergrefs,frcrefs,samples)
-    #print ' x, val=',x,val
+    val= eval_L2(ergs,frcs,ergrefs,frcrefs,samples)
+    print ' val=',val
+
+    if penalty in ('ridge','Ridge','RIDGE'):
+        p= 0.0
+        lx= len(x)
+        for n in range(lx):
+            p += math.sqrt(x[n]**2) /lx
+        print ' penalty value=',p*pweight
+        val += p*pweight
+
+    elif penalty in ('lasso','LASSO'):
+        p= 0.0
+        lx= len(x)
+        for n in range(lx):
+            p += math.abs(x[n]) /lx
+        print ' penalty value=',p*pweight
+        val += p*pweight
     return val
 
 def eval_L1(cergs,cfrcs,rergs,rfrcs,samples):
@@ -326,13 +349,13 @@ def eval_L2(cergs,cfrcs,rergs,rfrcs,samples):
     val= 0.0
     nval= 0
     for i in range(len(samples)):
-        val += ((cergs[i]-rergs[i]))**2
+        val += math.sqrt((cergs[i]-rergs[i])**2)
         nval += 1
         if not fmatch:
             continue
         for j in range(samples[i].natm):
             for k in range(3):
-                val += ((cfrcs[i][j,k]-rfrcs[i][j,k]))**2
+                val += math.sqrt((cfrcs[i][j,k]-rfrcs[i][j,k])**2)
                 nval += 1
     val /= nval
     return val
