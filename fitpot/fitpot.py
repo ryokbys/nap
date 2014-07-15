@@ -296,7 +296,7 @@ def func(x,*args):
     if runmode in ('serial','Serial','SERIAL'):
         os.system('./serial_run_pmd.sh '+parfile)
     elif runmode in ('parallel','Parallel','PARALLEL'):
-        os.system('./parallel_run_pmd.py '+parfile)
+        os.system('python ./parallel_run_pmd.py '+parfile)
     else:
         print "{0:*>20}: no such run_mode !!!".format(' Error', runmode)
         exit()
@@ -306,7 +306,7 @@ def func(x,*args):
     ergs,frcs=gather_pmd_data(dir)
 
     #.....calc function value of L
-    val= eval_L2(ergs,frcs,ergrefs,frcrefs,samples)
+    val= eval_L(ergs,frcs,ergrefs,frcrefs,samples)
     print ' val=',val
 
     if penalty in ('ridge','Ridge','RIDGE'):
@@ -321,61 +321,50 @@ def func(x,*args):
         p= 0.0
         lx= len(x)
         for n in range(lx):
-            p += math.abs(x[n]) /lx
+            p += abs(x[n]) /lx
         print ' penalty value=',p*pweight
         val += p*pweight
     return val
 
-def eval_L1(cergs,cfrcs,rergs,rfrcs,samples):
+def eval_L(cergs,cfrcs,rergs,rfrcs,samples):
     val= 0.0
     nval= 0
     for i in range(len(samples)):
-        val += ((cergs[i]-rergs[i])/rergs[i])**2
+        val += (cergs[i]-rergs[i])**2
         nval += 1
         if not fmatch:
             continue
         for j in range(samples[i].natm):
             for k in range(3):
-                if abs(rfrcs[i][j,k]) > tiny:
-                    val += ((cfrcs[i][j,k]-rfrcs[i][j,k])
-                            /rfrcs[i][j,k])**2
-                else:
-                    val += ((cfrcs[i][j,k]-rfrcs[i][j,k]))**2
+                val += (cfrcs[i][j,k]-rfrcs[i][j,k])**2
                 nval += 1
     val /= nval
     return val
 
-def eval_L2(cergs,cfrcs,rergs,rfrcs,samples):
-    val= 0.0
-    nval= 0
-    for i in range(len(samples)):
-        val += math.sqrt((cergs[i]-rergs[i])**2)
-        nval += 1
-        if not fmatch:
-            continue
-        for j in range(samples[i].natm):
-            for k in range(3):
-                val += math.sqrt((cfrcs[i][j,k]-rfrcs[i][j,k])**2)
-                nval += 1
-    val /= nval
-    return val
+#================================= routines for derivative calculations
+def derivative_linreg(x,*args):
+    dir= args[0]
 
-def eval_L3(cergs,cfrcs,rergs,rfrcs,samples):
-    val= 0.0
-    nval= 0
-    for i in range(len(samples)):
-        val += math.log(1.0 +10.0*((cergs[i]-rergs[i]))**2)
-        nval += 1
-        if not fmatch:
-            continue
-        for j in range(samples[i].natm):
-            for k in range(3):
-                val += math.log(1.0 +((cfrcs[i][j,k]-rfrcs[i][j,k]))**2)
-                nval += 1
-    val /= nval
-    return val
+    #.....gather basis data
+    bdata= gather_basis_data(dir)
 
-#================================================== output data
+    #.....gather pmd results
+    ergs,frcs=gather_pmd_data(dir)
+
+def gather_basis_linreg(basedir):
+    bdata= []
+    for smpl in samples:
+        bdata.append(np.zeros((smpl.natm,len(params))))
+    #.....read basis data
+    for i in range(len(sample_dirs)):
+        dir= sample_dirs[i]
+        smpl= samples[i]
+        f=open(basedir+'/'+dir+'/pmd/out.basis.linreg')
+        for ia in range(smpl.natm):
+            
+
+
+#========================================================== output data
 def output_energy_relation(ergs,fname='out.erg.pmd-vs-dft'):
     f= open(fname,'w')
     for i in range(len(ergrefs)):

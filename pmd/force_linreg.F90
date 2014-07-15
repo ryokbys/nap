@@ -43,7 +43,7 @@ contains
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,nexp,ielem &
          ,iwgt
     real(8):: rcin,b_na,at(3),epotl,wgt
-    real(8),allocatable:: fat(:,:)
+    real(8),save,allocatable:: fat(:,:)
 !.....1st call
     logical,save:: l1st=.true.
 
@@ -61,6 +61,11 @@ contains
       l1st= .false.
     endif
 
+#ifdef __FITPOT__
+    open(80,file='out.basis.linreg',status='replace')
+    write(80,'(3i10)') natm,max_nexp,nelem
+#endif
+
     epotl= 0d0
     epi(1:natm+nb)= 0d0
     strs(1:3,1:3,1:namax)= 0d0
@@ -76,12 +81,19 @@ contains
           fat(1:3,1:natm+nb)= 0d0
           call bfunc(ia,natm,namax,nnmax,ra,lspr,h,tag,fat,rc &
                ,ielem,nexp,b_na)
+#ifdef __FITPOT__
+          write(80,'(3i10,es23.14e3)') ia,nexp,ielem,b_na
+#endif
           epotl=epotl +b_na*wgt
           epi(ia)= epi(ia) +b_na*wgt
           aa(1:3,1:natm+nb)= aa(1:3,1:natm+nb) +fat(1:3,1:natm+nb)*wgt
         enddo
       enddo
     enddo
+
+#ifdef __FITPOT__
+    close(80)
+#endif
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
          ,nn,mpi_world,aa,3)

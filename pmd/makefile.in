@@ -8,7 +8,7 @@
 #-----------------------------------------------------------------------
 CPP= @CPP@
 CPPFLAGS= @CPPFLAGS@
-#CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__KOUKYU__ -D__WALL__
+#CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__TENSILE__ -D__WALL__ -D__FITPOT__
 MPIFC= @FC@
 MPIFLAGS= @FCFLAGS@
 #-----------------------------------------------------------------------

@@ -11,12 +11,12 @@ import sys,os,random
 paramfname='in.params.linreg'
 constfname='in.const.linreg'
 
-pmax= 1.0
-pmin=-1.0
+pmax= 10.0
+pmin=-10.0
 
-usage='Usage: $ python {0} rcut'.format(sys.argv[0])
+usage='Usage: $ python {0} rcut [min, max]'.format(sys.argv[0])
 
-if len(sys.argv) != 2:
+if not len(sys.argv) in (2,4) :
     print ' [Error] num of arguments is wrong !!!'
     print usage
     sys.exit()
@@ -26,6 +26,16 @@ if not os.path.isfile(constfname):
     sys.exit()
 
 rcin= float(sys.argv[1])
+
+if len(sys.argv) == 4:
+    pmin= float(sys.argv[2])
+    pmax= float(sys.argv[3])
+
+if pmin >= pmax:
+    print ' [Error] min >= max !!!'
+    print usage
+    sys.exit()
+
 
 f=open(constfname,'r')
 data= f.readline().split()
