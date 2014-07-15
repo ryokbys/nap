@@ -53,6 +53,8 @@
 !.....strain
     real(8):: stn(3,3,namax)
 
+!.....zload type
+    character(len=5):: czload_type= 'atoms'
 !.....Final strain value
     real(8):: strfin
 !.....Shear stress

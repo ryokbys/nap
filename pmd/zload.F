@@ -1,8 +1,8 @@
-      subroutine tensile_loading(natm,ra,tag,nstp,strfin,strnow
+      subroutine zload_atoms(natm,ra,tag,nstp,strfin,strnow
      &     ,sorg,myid,mpi_md_world)
 c
-c  To apply tensile loading, move atoms of top and
-c  bottom layers of z-axis in opposite directions.
+c  To apply z-loading, move atoms of top and
+c  bottom layers in opposite directions.
 c
 c  ifmv of top and bottom atoms should be 2.
 c
@@ -52,7 +52,7 @@ c.....Get z-length
       strnow= (zl-zl0)/zl0 *100d0
 c      write(6,'(a,2es12.3e3)') ' zl,strnow=',zl,strnow
       
-      end subroutine tensile_loading
+      end subroutine zload_atoms
 c=======================================================================
       subroutine get_stress_on_base(natm,ra,aa,tag,h,acon,ftop,fbot
      &     ,sorg,myid,mpi_md_world)
@@ -92,3 +92,39 @@ c.....force on top/bottom in eV/A
       fbot= fbot /acon *h(3,3,0)
       
       end subroutine get_stress_on_base
+c=======================================================================
+      subroutine zload_box(natm,nstp,istp,dt,strfin,strnow,h,myid)
+c
+c  To apply tensile loading, rescale z-length of h-matrix.
+c
+      implicit none
+      integer,intent(in):: natm,nstp,istp,myid
+      real(8),intent(in):: strfin,dt
+      real(8),intent(inout):: strnow,h(1:3,1:3,0:1)
+
+      logical,save:: l1st= .true.
+      real(8),save:: zl0,dzlfin,dzl,zl,zv0(3)
+
+c.....at first call, determine velocity of top and bottom layers
+      if( l1st ) then
+c.....get z-length
+        zv0(1:3)= h(1:3,3,0)
+        zl0= sqrt(zv0(1)**2 +zv0(2)**2 +zv0(3)**2)
+        if( myid.eq.0 ) then
+          write(6,'(a)') ' z-loading parameters:'
+          write(6,'(a,i5,3es12.4)') '   zv0= ',zv0(1:3)
+          write(6,'(a,es12.4,a)') '   strain rate='
+     &         ,strfin/100/(nstp*dt*1d-15),' /s'
+        endif
+        l1st=.false.
+      endif
+      
+      h(1:3,3,0)= zv0(1:3) *(1d0 +strfin/100/nstp*istp)
+      strnow= strfin /nstp *istp
+      return
+      end subroutine zload_box
+c=======================================================================
+c-----------------------------------------------------------------------
+c     Local Variables:
+c     compile-command: "make pmd"
+c     End:

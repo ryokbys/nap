@@ -83,6 +83,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(stgt,9,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(vmcoeff,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(voldmp,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(czload_type,1,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(am,nismax,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
@@ -330,7 +331,7 @@ c-----Energy output
      &       ,vol
      &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
         call flush(11)
-#ifdef __TENSILE__
+#ifdef __ZLOAD__
         open(80,file='out.stress',status='replace')
         write(80,'(a)') '#  istp,   strnow,      ftop,     fbot'
 #endif
@@ -369,9 +370,13 @@ c.....isobaric
 c-------update positions
         ra(1:3,1:natm)=ra(1:3,1:natm) +va(1:3,1:natm)
 
-#ifdef __TENSILE__
-        call tensile_loading(natm,ra,tag,nstp,strfin,strnow
-     &       ,sorg,myid_md,mpi_md_world)
+#ifdef __ZLOAD__
+        if( czload_type.eq.'atoms' ) then
+          call zload_atoms(natm,ra,tag,nstp,strfin,strnow
+     &         ,sorg,myid_md,mpi_md_world)
+        else if( czload_type.eq.'box' ) then
+          call zload_box(natm,nstp,istp,dt,strfin,strnow,h,myid_md)
+        endif
 #endif
 
         if( ifpctl.ne.0 ) then
@@ -495,7 +500,7 @@ c---------in case of 3D, <ekin> = 3/2 *NkT
 cc---------in case of 2D, <ekin> = 2/2 *NkT
 c          temp= ekin /ntot/fkb *2d0/2d0
           endif
-#ifdef __TENSILE__
+#ifdef __ZLOAD__
           call get_stress_on_base(natm,ra,aa,tag,h,acon(1),ftop,fbot
      &         ,sorg,myid_md,mpi_md_world)
 #endif
@@ -505,7 +510,7 @@ c          temp= ekin /ntot/fkb *2d0/2d0
      &           ,vol
      &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
             call flush(11)
-#ifdef __TENSILE__
+#ifdef __ZLOAD__
             write(80,'(i8,3es15.7)') istp,strnow,ftop,fbot
             call flush(80)
 #endif
@@ -580,7 +585,7 @@ c.....reset pressure
 
       if(myid_md.eq.0) then
         close(11)
-#ifdef __TENSILE__
+#ifdef __ZLOAD__
         close(80)
 #endif
 #ifdef __WALL__

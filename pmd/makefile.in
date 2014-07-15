@@ -8,7 +8,7 @@
 #-----------------------------------------------------------------------
 CPP= @CPP@
 CPPFLAGS= @CPPFLAGS@
-#CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__TENSILE__ -D__WALL__ -D__FITPOT__
+#CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__ZLOAD__ -D__WALL__ -D__FITPOT__
 MPIFC= @FC@
 MPIFLAGS= @FCFLAGS@
 #-----------------------------------------------------------------------
@@ -24,7 +24,7 @@ MPIFLAGS= @FCFLAGS@
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
 pmd= read_input.o parallel_md.o util_vec.o \
-	lasubs.o util_pmd.o tensile_loading.o mk_lspr.o
+	lasubs.o util_pmd.o zload.o mk_lspr.o
 mods= mod_variables.o
 args= iargc.o getarg.o
 
