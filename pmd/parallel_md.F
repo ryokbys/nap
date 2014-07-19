@@ -1744,6 +1744,7 @@ c=======================================================================
       use SC_Fe,only:force_SC_Fe
       use SM_Al,only:force_SM_Al
       use linreg,only:force_linreg
+      use NN1,only:force_NN1
       implicit none
       integer,intent(in):: namax,natm,nnmax,nismax
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -1823,6 +1824,10 @@ c=======================================================================
      &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
         case ('linreg')
+          call force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
+     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+        case ('NN1')
           call force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
