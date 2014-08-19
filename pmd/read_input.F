@@ -83,7 +83,7 @@ c=======================================================================
         call read_i1(ionum,iftctl)
         return
       elseif( trim(cname).eq.'temperature_target' ) then
-        call read_r1(ionum,treq)
+        call read_r1(ionum,ttgt)
         return
       elseif( trim(cname).eq.'temperature_relax_time' ) then
         call read_r1(ionum,trlx)

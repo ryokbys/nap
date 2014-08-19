@@ -25,7 +25,8 @@ c-----------------------------------------------------------------------
       character*128:: cin,cout
 
 c.....check arguments
-      nargc= iargc()
+c      nargc= iargc()
+      nargc= command_argument_count()
       if( nargc.ne.6 ) then
         write(6,'(a)') ' [Error] Wrong number of arguments !!!'
         write(6,'(a)') ' Usage:'

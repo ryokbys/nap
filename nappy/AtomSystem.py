@@ -5,7 +5,7 @@ import sys
 from Atom import Atom
 
 #...constants
-maxnn= 20
+maxnn= 40
 
 class AtomSystem(object):
     u"""

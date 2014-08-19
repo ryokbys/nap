@@ -1,4 +1,4 @@
-import sys,os,time
+import sys,os,time,optparse
 import numpy as np
 import math,copy
 from math import cos,sin,sqrt
@@ -10,9 +10,10 @@ from AtomSystem import AtomSystem
 from Atom import Atom
 from UnitCellMaker import bccBravaisCell
 
+
 #...constants
-rcut= 3.0
-dmin= 2.0
+rcut= 2.8553
+dmin= 1.5
 
 
 class Grain(object):
@@ -28,25 +29,30 @@ class Grain(object):
         c= angle[2]
         rmat= np.zeros((3,3))
         #...Eular angle?
-#         rmat[0,0]= cos(a)*cos(b)*cos(c) -sin(a)*sin(c)
-#         rmat[0,1]=-cos(a)*cos(b)*sin(c) -sin(a)*cos(c)
-#         rmat[0,2]= cos(a)*sin(b)
-#         rmat[1,0]= sin(a)*cos(b)*cos(c) +cos(a)*sin(c)
-#         rmat[1,1]=-sin(a)*cos(b)*sin(c) +sin(a)*cos(c)
-#         rmat[1,2]= sin(a)*sin(b)
-#         rmat[2,0]= -sin(b)*cos(c)
-#         rmat[2,1]= sin(b)*sin(c)
-#         rmat[2,2]= cos(b)
-        #...what kind of operation?
-        rmat[0,0]= cos(a)*cos(b)
-        rmat[0,1]= cos(a)*sin(b)*sin(c) -sin(a)*cos(c)
-        rmat[0,2]= cos(a)*sin(b)*cos(c) +sin(a)*sin(c)
-        rmat[1,0]= sin(a)*cos(b)
-        rmat[1,1]= sin(a)*sin(b)*sin(c) +cos(a)*cos(c)
-        rmat[1,2]= sin(a)*sin(b)*cos(c) -cos(a)*sin(c)
-        rmat[2,0]=-sin(b)
-        rmat[2,1]= cos(b)*sin(c)
-        rmat[2,2]= cos(b)*cos(c)
+        # rmat[0,0]= cos(a)*cos(b)*cos(c) -sin(a)*sin(c)
+        # rmat[0,1]=-cos(a)*cos(b)*sin(c) -sin(a)*cos(c)
+        # rmat[0,2]= cos(a)*sin(b)
+        # rmat[1,0]= sin(a)*cos(b)*cos(c) +cos(a)*sin(c)
+        # rmat[1,1]=-sin(a)*cos(b)*sin(c) +cos(a)*sin(c)
+        # rmat[1,2]= sin(a)*sin(b)
+        # rmat[2,0]= -sin(b)*cos(c)
+        # rmat[2,1]= sin(b)*sin(c)
+        # rmat[2,2]= cos(b)
+        #...yaw-pitch-rolling rotation
+        rmx= np.zeros((3,3))
+        rmy= np.zeros((3,3))
+        rmz= np.zeros((3,3))
+        rmx[0,:]= [ 1.0, 0.0,     0.0 ]
+        rmx[1,:]= [ 0.0, cos(a), -sin(a) ]
+        rmx[2,:]= [ 0.0, sin(a),  cos(a) ]
+        rmy[0,:]= [ cos(b), 0.0, sin(b) ]
+        rmy[1,:]= [ 0.0,    1.0,  0.0 ]
+        rmy[2,:]= [-sin(b), 0.0, cos(b) ]
+        rmz[0,:]= [ cos(c), -sin(c), 0.0 ]
+        rmz[1,:]= [ sin(c),  cos(c), 0.0 ]
+        rmz[2,:]= [ 0.0,     0.0,    1.0 ]
+        rmat= np.dot(rmx,rmy)
+        rmat= np.dot(rmat,rmz)
         return rmat
 
 def anint(x):
@@ -120,6 +126,12 @@ def make_polycrystal(grns,uc,n1,n2,n3):
                         ari[0]= ari[0]+api[0]
                         ari[1]= ari[1]+api[1]
                         ari[2]= ari[2]+api[2]
+                        # #...reduce into the supercell
+                        # ri= np.dot(hmati,ari)
+                        # ri[0]= pbc(ri[0])
+                        # ri[1]= pbc(ri[1])
+                        # ri[2]= pbc(ri[2])
+                        # ari= np.dot(hmat,ri)
                         #...check distance from all the grain points
                         di= distance(ari,api)
                         isOutside= False
@@ -193,28 +205,48 @@ def make_polycrystal(grns,uc,n1,n2,n3):
     return system
 
 if __name__ == '__main__':
+    usage= '%prog [options] nx ny nz'
+    parser= optparse.OptionParser(usage=usage)
+    parser.add_option("-n",dest="ng",type="int",default=3,
+                      help="number of grains in the system.")
+    (options,args)= parser.parse_args()
+
     print '{0:=^72}'.format(' make_polycrystal_py ')
     t0= time.time()
-    n1= 10
-    n2= 10
-    n3= 10
-    ngrain= 3
+
+    n1= int(args[0])
+    n2= int(args[1])
+    n3= int(args[2])
+    ngrain= options.ng
+    
+    print "number of grains= {0:3d}".format(ngrain)
+    print "number of unit cells= {0:3d} {1:3d} {2:3d}".format(n1,n2,n3)
+
+#     n1= 10
+#     n2= 10
+#     n3= 10
+#     ngrain= 3
     grains= []
     for i in range(ngrain):
         pi= np.zeros((3,))
         ai= np.zeros((3,))
         pi[0]= random()
-        pi[1]= random()
+        #pi[1]= random()
+        pi[1]= 0.5
         pi[2]= random()
-        ai[0]= random()*math.pi*2 -math.pi
-        ai[1]= random()*(math.pi/2) -math.pi/2
-        ai[2]= random()*math.pi*2 -math.pi
+        # ai[0]= random()*math.pi*2 -math.pi
+        # ai[1]= random()*(math.pi/2) -math.pi/2
+        # ai[2]= random()*math.pi*2 -math.pi
+        ai[0]= 0.0
+        ai[1]= random()*math.pi*2 -math.pi
+        ai[2]= 0.0
         print 'point=',pi
         print 'angle=',ai
         gi= Grain(pi,ai)
         grains.append(gi)
     uc= bccBravaisCell()
-    uc.alc= 3.204
+    #uc.alc= 3.204
+    uc.alc= 2.8553
     # uc.write_pmd('uc0000')
     system= make_polycrystal(grains,uc,n1,n2,n3)
     system.write_pmd('pmd00000')

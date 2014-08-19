@@ -6,9 +6,9 @@ module linreg
   integer:: ncoeff
   real(8),allocatable:: coeff(:)
 !.....constants
-  integer:: nelem
+  integer:: nelem,nexp
   integer,allocatable:: itype(:)
-  real(8),allocatable:: cnst(:,:)
+  real(8),allocatable:: cnst(:,:),exps(:)
 !.....function types and num of constatns for types
   integer,parameter:: max_ncnst= 10
   integer,parameter:: ncnst_type(1:4)= &
@@ -16,8 +16,6 @@ module linreg
           2, &  ! cosine
           4, &  ! polynomial
           1 /)  ! angular
-!.....max exponent of the basis function
-  integer:: max_nexp
   
 contains
   subroutine force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -40,9 +38,9 @@ contains
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
 
 !.....local
-    integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,nexp,ielem &
+    integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ielem &
          ,iwgt
-    real(8):: rcin,b_na,at(3),epotl,wgt
+    real(8):: rcin,b_na,at(3),epotl,wgt,aexp
     real(8),save,allocatable:: fat(:,:)
 !.....1st call
     logical,save:: l1st=.true.
@@ -63,7 +61,7 @@ contains
 
 #ifdef __FITPOT__
     open(80,file='out.basis.linreg',status='replace')
-    write(80,'(3i10)') natm,max_nexp,nelem
+    write(80,'(3i10)') natm,nelem
 #endif
 
     epotl= 0d0
@@ -73,21 +71,19 @@ contains
 
     do ia=1,natm
       iwgt= 0
-      do nexp=1,max_nexp
-        do ielem=1,nelem
-          iwgt= iwgt +1
-          wgt= coeff(iwgt)
-          b_na= 0d0
-          fat(1:3,1:natm+nb)= 0d0
-          call bfunc(ia,natm,namax,nnmax,ra,lspr,h,tag,fat,rc &
-               ,ielem,nexp,b_na)
+      do ielem=1,nelem
+        iwgt= iwgt +1
+        wgt= coeff(iwgt)
+        fat(1:3,1:natm+nb)= 0d0
+        aexp= exps(ielem)
+        call bfunc(ia,natm,namax,nnmax,ra,lspr,h,tag,fat,rc &
+             ,ielem,aexp,b_na)
 #ifdef __FITPOT__
-          write(80,'(3i10,es23.14e3)') ia,nexp,ielem,b_na
+        write(80,'(2i10,f5.1,es23.14e3)') ia,ielem,aexp,b_na
 #endif
-          epotl=epotl +b_na*wgt
-          epi(ia)= epi(ia) +b_na*wgt
-          aa(1:3,1:natm+nb)= aa(1:3,1:natm+nb) +fat(1:3,1:natm+nb)*wgt
-        enddo
+        epotl=epotl +b_na*wgt
+        epi(ia)= epi(ia) +b_na*wgt
+        aa(1:3,1:natm+nb)= aa(1:3,1:natm+nb) +fat(1:3,1:natm+nb)*wgt
       enddo
     enddo
 
@@ -136,20 +132,23 @@ contains
   end function dfc
 !=======================================================================
   subroutine bfunc(ia,natm,namax,nnmax,ra,lspr,h,tag,fat,rc &
-       ,ielem,nexp,b_na)
+       ,ielem,aexp,b_na)
 !
 !  basis function in the linear regression potetnial
 !
     implicit none
     integer,intent(in):: ia,natm,namax,nnmax,lspr(0:nnmax,natm) &
-         ,ielem,nexp
-    real(8),intent(in):: ra(3,namax),h(3,3),tag(namax),rc
+         ,ielem
+    real(8),intent(in):: ra(3,namax),h(3,3),tag(namax),rc,aexp
     real(8),intent(out):: b_na,fat(3,namax)
 
     integer:: ja,jj,ka,kk
     real(8):: xi(3),xj(3),xij(3),rij(3),r,dirij(3),djrij(3),tmp &
-         ,fcij,xk(3),xik(3),rik(3),rj,rk,fcik
+         ,fcij,xk(3),xik(3),rik(3),rj,rk,fcik,dkrik(3),dirik(3) &
+         ,f3,dfcj,dfck,tmp2,cs,acnst,dcosi(3),dcosj(3),dcosk(3)
+    real(8),external:: sprod
 
+    b_na= 0d0
     xi(1:3)= ra(1:3,ia)
     if( itype(ielem).eq.4 ) then ! angular (3-body) basis
       do jj=1,lspr(0,ia)
@@ -159,6 +158,7 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         rj= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        if( rj.gt.rc ) cycle
         fcij= fc(rj,rc)
         !.....another loop on neighbors for angular basis
         do kk=1,lspr(0,ia)
@@ -168,25 +168,61 @@ contains
           xik(1:3)= xk(1:3)-xi(1:3)
           rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           rk= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
+          if( rk.gt.rc ) cycle
           fcik= fc(rk,rc)
-          b_na= b_na +func3(rij,rj,rik,rk,ielem) *fcij *fcik
+          b_na= b_na + func3(rij,rj,rik,rk,ielem) *fcij *fcik 
         enddo
       enddo
       !.....b_na will be used in the following loop.
       !.....Therefore these two loops cannot be merged.
+      tmp= aexp *b_na**(aexp-1)
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        r= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-        dirij(1:3)= -rij(1:3)/r
+        rj= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        if( rj.gt.rc ) cycle
+        fcij= fc(rj,rc)
+        dfcj= dfc(rj,rc)
+        dirij(1:3)= -rij(1:3)/rj
         djrij(1:3)= -dirij(1:3)
-        tmp= dfunc2(r,ielem)*fc(r,rc) +func2(r,ielem)*dfc(r,rc)
-        fat(1:3,ia)= fat(1:3,ia) -dirij(1:3)*tmp *nexp*b_na**(nexp-1)
-        fat(1:3,ja)= fat(1:3,ja) -djrij(1:3)*tmp *nexp*b_na**(nexp-1)
-        !!!! you have to write the force code here !!!!
+        do kk=1,lspr(0,ia)
+          ka= lspr(kk,ia)
+          if( ka.le.ja ) cycle
+          xk(1:3)= ra(1:3,ka)
+          xik(1:3)= xk(1:3)-xi(1:3)
+          rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
+          rk= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
+          if( rk.gt.rc ) cycle
+          fcik= fc(rk,rc)
+          dfck= dfc(rk,rc)
+          dirik(1:3)= -rik(1:3)/rk
+          dkrik(1:3)= -dirik(1:3)
+          if( itype(ielem).eq.4 ) then
+            acnst= cnst(1,ielem)
+            cs= sprod(rij,rik)/rj/rk
+            f3= func3(rij,rj,rik,rk,ielem)
+            fat(1:3,ia)= fat(1:3,ia) &
+                 -f3*fcik *dfcj*dirij(1:3) *tmp &
+                 -f3*fcij *dfck*dirik(1:3) *tmp
+            fat(1:3,ja)= fat(1:3,ja) &
+                 -f3*fcik *dfcj*djrij(1:3) *tmp
+            fat(1:3,ka)= fat(1:3,ka) &
+                 -f3*fcij *dfck*dkrik(1:3) *tmp
+            dcosj(1:3)= rik(1:3)/rj/rk -rij(1:3)/rj*cs/rj
+            dcosk(1:3)= rij(1:3)/rj/rk -rik(1:3)/rk*cs/rk
+            dcosi(1:3)= -dcosj(1:3) -dcosk(1:3)
+            tmp2= 2d0*(acnst+cs)/(abs(acnst)+1d0)**2
+            fat(1:3,ia)= fat(1:3,ia) &
+                 -dcosi(1:3)*tmp2*fcij*fcik *tmp
+            fat(1:3,ja)= fat(1:3,ja) &
+                 -dcosj(1:3)*tmp2*fcij*fcik *tmp
+            fat(1:3,ka)= fat(1:3,ka) &
+                 -dcosk(1:3)*tmp2*fcij*fcik *tmp
+          endif
+        enddo
       enddo
       
     else ! 2-body basis
@@ -196,9 +232,10 @@ contains
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        rj= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-        fcij= fc(rj,rc)
-        b_na= b_na +func2(rj,ielem)*fcij
+        r= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        if( r.gt.rc ) cycle
+        fcij= fc(r,rc)
+        b_na= b_na +func2(r,ielem)*fcij
       enddo
       !.....b_na will be used in the following loop.
       !.....Therefore these two loops cannot be merged.
@@ -209,14 +246,15 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         r= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        if( r.gt.rc ) cycle
         dirij(1:3)= -rij(1:3)/r
         djrij(1:3)= -dirij(1:3)
         tmp= dfunc2(r,ielem)*fc(r,rc) +func2(r,ielem)*dfc(r,rc)
-        fat(1:3,ia)= fat(1:3,ia) -dirij(1:3)*tmp *nexp*b_na**(nexp-1)
-        fat(1:3,ja)= fat(1:3,ja) -djrij(1:3)*tmp *nexp*b_na**(nexp-1)
+        fat(1:3,ia)= fat(1:3,ia) -dirij(1:3)*tmp *aexp*b_na**(aexp-1)
+        fat(1:3,ja)= fat(1:3,ja) -djrij(1:3)*tmp *aexp*b_na**(aexp-1)
       enddo
     endif
-    b_na= b_na**nexp
+    b_na= b_na**aexp
 
   end subroutine bfunc
 !=======================================================================
@@ -246,6 +284,7 @@ contains
       a(1:4)= cnst(1:4,ielem)
       r2i= 1d0/rij/rij
       func2= a(1) +a(2)*r2i +a(3)*r2i**3 +a(4)*r2i**5
+
     endif
     return
   end function func2
@@ -331,20 +370,13 @@ contains
       stop
     endif
     open(51,file=trim(ccfname),status='old')
-    read(51,*) nelem,max_nexp
-    allocate(itype(nelem),cnst(max_ncnst,nelem))
+    read(51,*) nelem,nexp
+    allocate(itype(nelem),cnst(max_ncnst,nelem),exps(nelem))
     do i=1,nelem
-      read(51,*) itype(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
+      read(51,*) itype(i),exps(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
     enddo
     close(51)
-!.....check whether the num of parameters is correct
-    if( .not. ncoeff .eq. nelem*max_nexp) then
-      write(6,'(a)') ' [Error] num of parameters is not correct !!!'
-      write(6,'(a,i10)') ' ncoeff=',ncoeff
-      write(6,'(a,2i10)') ' nelem,max_nexp=',nelem,max_nexp
-      write(6,'(a,i10)') ' ncoeff should be ',nelem*max_nexp
-      stop
-    endif
+
     return
   end subroutine read_params
 

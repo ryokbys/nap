@@ -6,7 +6,7 @@ u"""Fit parameters of a certain potential to DFT data.
 The potential must be specified in pmd input file, in.pmd.
 """
 
-import os
+import os,sys
 import time
 import glob
 import numpy as np
@@ -45,6 +45,7 @@ fmethod= 'test'
 maindir= 'learning_set'
 parfile= 'in.params.SW_Si'
 runmode= 'serial'
+gradient= 'numerial'
 xtol= 1e-5
 gtol= 1e-5
 ftol= 1e-5
@@ -154,7 +155,7 @@ def vars_to_params(x):
 
 def read_input(fname='in.fitpot'):
     global nsmpl,niter,fmethod,maindir,parfile,runmode,eps \
-           ,xtol,gtol,ftol,fmatch,penalty,pweight
+           ,xtol,gtol,ftol,fmatch,penalty,pweight,gradient
     global eatom,ga_nindv,ga_nbit,ga_temp
     dict={}
     f= open(fname,'r')
@@ -196,6 +197,8 @@ def read_input(fname='in.fitpot'):
                 penalty= data[1]
             elif data[0] == 'penalty_weight':
                 pweight= float(data[1])
+            elif data[0] == 'gradient':
+                gradient= data[1]
             #.....GA parameters
             elif data[0] == 'ga_num_individuals':
                 ga_nindv= int(data[1])
@@ -262,6 +265,7 @@ def gather_ref_data(basedir):
         #.....force
         ff=open(basedir+'/'+dir+'/frc.ref','r')
         natm= int(ff.readline().split()[0])
+        #print 'ismpl,natm=',i,natm
         #.....energy
         f=open(basedir+'/'+dir+'/erg.ref','r')
         ergrefs[i]= float(f.readline().split()[0])
@@ -293,7 +297,7 @@ def func(x,*args):
     #.....run pmd in all sample directories
     os.chdir(dir)
     #print os.getcwd(),dir
-    if runmode in ('serial','Serial','SERIAL'):
+    if runmode in ('serial','Serial','SERIAL','sequential','single'):
         os.system('./serial_run_pmd.sh '+parfile)
     elif runmode in ('parallel','Parallel','PARALLEL'):
         os.system('python ./parallel_run_pmd.py '+parfile)
@@ -307,13 +311,14 @@ def func(x,*args):
 
     #.....calc function value of L
     val= eval_L(ergs,frcs,ergrefs,frcrefs,samples)
+    print
     print ' val=',val
 
     if penalty in ('ridge','Ridge','RIDGE'):
         p= 0.0
         lx= len(x)
         for n in range(lx):
-            p += math.sqrt(x[n]**2) /lx
+            p += math.sqrt(x[n]**2)
         print ' penalty value=',p*pweight
         val += p*pweight
 
@@ -321,9 +326,10 @@ def func(x,*args):
         p= 0.0
         lx= len(x)
         for n in range(lx):
-            p += abs(x[n]) /lx
+            p += abs(x[n])
         print ' penalty value=',p*pweight
         val += p*pweight
+    sys.stdout.flush()
     return val
 
 def eval_L(cergs,cfrcs,rergs,rfrcs,samples):
@@ -341,28 +347,92 @@ def eval_L(cergs,cfrcs,rergs,rfrcs,samples):
     val /= nval
     return val
 
-#================================= routines for derivative calculations
-def derivative_linreg(x,*args):
+#======================================== derivative of linreg potential
+def grad_linreg(x,*args):
     dir= args[0]
-
     #.....gather basis data
-    bdata= gather_basis_data(dir)
-
+    bdata= gather_basis_linreg(dir)
     #.....gather pmd results
     ergs,frcs=gather_pmd_data(dir)
+    
+    grad= np.zeros(len(params))
+    for iprm in range(len(params)):
+        for ismpl in range(len(samples)):
+            smpl= samples[ismpl]
+            ediff= ergs[ismpl] -ergrefs[ismpl]
+            bs= 0.0
+            for ia in range(smpl.natm):
+                bs += bdata[ismpl][ia,iprm]
+            grad[iprm] += ediff*bs
+
+    if penalty in ('ridge','Ridge','RIDGE'):
+        p= 0.0
+        lx= len(x)
+        for n in range(lx):
+            grad[n] += 2.0*x[n] *pweight
+
+    elif penalty in ('lasso','LASSO'):
+        p= 0.0
+        lx= len(x)
+        for n in range(lx):
+            grad[n] += pweight *np.sign(x[n])
+            
+    return grad
 
 def gather_basis_linreg(basedir):
     bdata= []
-    for smpl in samples:
-        bdata.append(np.zeros((smpl.natm,len(params))))
     #.....read basis data
     for i in range(len(sample_dirs)):
         dir= sample_dirs[i]
         smpl= samples[i]
-        f=open(basedir+'/'+dir+'/pmd/out.basis.linreg')
+        f=open(basedir+'/'+dir+'/pmd/out.basis.linreg','r')
+        data= f.readline().split()
+        natm= int(data[0])
+        if natm != smpl.natm:
+            print ' [Error] natm != smpl.natm'
+            print '   sample #   = ',i
+            print '   sample dir = ',dir
+            exit()
+        nelem=  int(data[1])
+        basis= np.zeros((smpl.natm,len(params)))
         for ia in range(smpl.natm):
+            for ip in range(len(params)):
+                data= f.readline().split()
+                basis[ia,ip]= float(data[3])
+        bdata.append(basis)
+    return bdata
             
+#=========================================== derivative of NN1 potential
+def grad_NN1(x,*args):
+    dir= args[0]
+    #.....gather basis data
+    bdata= gather_basis_data(dir)
+    #.....gather pmd results
+    ergs,frcs= gather_pmd_data(dir)
 
+
+def gather_basis_NN1(basedir):
+    bdata= []
+    #...read basis data
+    for i in range(len(sample_dirs)):
+        dir= sample_dirs[i]
+        smpl= samples[i]
+        f= open(basedir+'/'+dir+'/pmd/out.gsf-hl1','r')
+        data= f.readline().split()
+        nsf= int(data[0])
+        nhl1=int(data[1])
+        gsf= np.zeros((smpl.natm,nsf))
+        hl1= np.zeros((smpl.natm,nhl1))
+        for ia in range(smpl.natm):
+            for isf in range(nsf):
+                data= f.readline().split()
+                gsf[ia,isf]= float(data[2])
+        for ia in range(smpl.natm):
+            for ihl1 in range(nhl1):
+                data= f.readline().split()
+                hl1[ia,ihl1]= float(data[2])
+        bdata.append([gsf,hl1])
+    return bdata
 
 #========================================================== output data
 def output_energy_relation(ergs,fname='out.erg.pmd-vs-dft'):
@@ -424,6 +494,43 @@ def ga_check_range():
         print '{0:*>20}: Some ranges are too wide.'.format(' Error')
         print '  Hoping you know what you are doing...'
         exit()
+
+#============================================= steepest descent dynamics
+def sd_dynamics(f,x,args=(),fprime=None,maxiter=10):
+    u"""
+    Steepest descent dynamics is peformed with using function, f,
+    variables, x, and arguments, args.
+    """
+
+    #...maximum displacement of weight
+    maxdisp= 2.0e-3
+
+    if fprime is None:
+        print ' [Error] fprime should be specified in sd_dynamics !'
+        exit()
+
+    print '>>>>> sd_dynamics'
+    print ' maxiter=',maxiter
+    print ' args   =',args
+    
+    val= f(x,args[0])
+    print ' initial value= {0:20.7f}'.format(val)
+    grad= fprime(x,args[0])
+    maxgrad= np.max(grad)
+    alpha= maxdisp /maxgrad
+    print " maxgrad,alpha=",maxgrad,alpha
+
+    for it in range(maxiter):
+        grad= fprime(x,args[0])
+        maxgrad= np.max(grad)
+        alpha= maxdisp /maxgrad
+        print " maxgrad,alpha=",maxgrad,alpha
+        x += -alpha *grad
+        val=f(x,args[0])
+    print ' final value= {0:20.7f}'.format(val)
+    #print ' final variabls:'
+    #print x
+    return x
     
 #============================================= main routine hereafter
 if __name__ == '__main__':
@@ -453,31 +560,53 @@ if __name__ == '__main__':
 
     if fmethod in ('cg','CG','conjugate-gradient'):
         print '>>>>> conjugate-gradient was selected.'
-        solution= opt.fmin_cg(func,vars,args=(maindir,),maxiter=niter,disp=True
-                              ,epsilon=eps,gtol=gtol)
+        if  gradient in ('grad_linreg','linreg'):
+            solution= opt.fmin_cg(func,vars,args=(maindir,)
+                                  ,fprime=grad_linreg
+                                  ,maxiter=niter,disp=True
+                                  ,epsilon=eps,gtol=gtol)
+        else:
+            solution= opt.fmin_cg(func,vars,args=(maindir,)
+                                  ,maxiter=niter,disp=True
+                                  ,epsilon=eps,gtol=gtol)
         print ' CG solution:',solution
     elif fmethod in ('qn','quasi-Newtown','QN','bfgs','BFGS'):
         print '>>>>> quasi-Newton was selected.'
-        solution= opt.fmin_bfgs(func,vars,args=(maindir,),maxiter=niter,disp=True
-                                ,epsilon=eps,gtol=gtol)
+        if gradient in ('grad_linreg','linreg'):
+            solution= opt.fmin_bfgs(func,vars,args=(maindir,)
+                                    ,fprime=grad_linreg
+                                    ,maxiter=niter,disp=True
+                                    ,epsilon=eps,gtol=gtol)
+        else:
+            solution= opt.fmin_bfgs(func,vars,args=(maindir,)
+                                    ,maxiter=niter,disp=True
+                                    ,epsilon=eps,gtol=gtol)
+
         print ' QN solution:',solution
     elif fmethod in ('NM','Nelder-Mead','downhill-simplex'):
         print '>>>>> Nelder-Mead was selected.'
-        solution= opt.fmin(func,vars,args=(maindir,),maxiter=niter,disp=True)
+        solution= opt.fmin(func,vars,args=(maindir,)
+                           ,maxiter=niter,disp=True)
         print ' NM solution:',solution
     elif fmethod in ('ga','GA','genetic-algorithm'):
         print '>>>>> genetic algorithm was selected.'
         solution= ga_wrapper()
         #...calc best one again
         func(solution,maindir)
-        ergs,frcs= gather_pmd_data(maindir)
+    elif fmethod in ('sd_dynamics','SD_dynamics','SD'):
+        print '>>>>> SD_dynamics was selected.'
+        solution= sd_dynamics(func,vars,args=(maindir,)
+                    ,fprime=grad_linreg
+                    ,maxiter=niter)
     elif fmethod in ('test','TEST'):
         print '>>>>> TEST was selected.'
         func(vars,maindir)
+        grad_linreg(vars,maindir)
         solution= vars
 
     write_params(maindir+'/'+parfile+'.fin',solution)
     
+    ergs,frcs= gather_pmd_data(maindir)
     output_energy_relation(ergs,fname='out.erg.pmd-vs-dft.fin')
     output_force_relation(frcs,fname='out.frc.pmd-vs-dft.fin')
 

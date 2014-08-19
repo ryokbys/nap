@@ -38,6 +38,7 @@ mkconf_Si_disl= mkconf_Si_disl.o
 mkconf_BCC= mkconf_BCC.o
 mkconf_BCC_nanorod= mkconf_BCC_nanorod.o
 mkconf_BCC_FeH= mkconf_BCC_Fe-H.o
+mkconf_BCC_FeH_crack= mkconf_BCC_FeH_crack.o
 mkconf_BCC_edge= mkconf_BCC_edge-disl.o
 mkconf_BCC_screw= mkconf_BCC_screw.o
 mkconf_BCC_WHe= mkconf_BCC_W-He.o
@@ -81,6 +82,9 @@ mkconf_BCC: ${mkconf_BCC} ${util} ${mods}
 
 mkconf_BCC_FeH: ${mkconf_BCC_FeH} ${util} ${mods}
 	${MPIFC} -o $@ ${mods} ${mkconf_BCC_FeH} ${util}
+
+mkconf_BCC_FeH_crack: ${mkconf_BCC_FeH_crack} ${util} ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_BCC_FeH_crack} ${util}
 
 mkconf_BCC_edge: ${mkconf_BCC_edge} ${util} ${mods}
 	${MPIFC} -o $@ ${mods} ${mkconf_BCC_edge} ${util}

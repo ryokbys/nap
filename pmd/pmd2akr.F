@@ -17,11 +17,12 @@ c.....Num of auxiliary data for coloring atoms in Akira
       character:: fin*13,fout*7
       integer,external:: itot_tag
       integer nargc
-      integer,external:: iargc
+c      integer,external:: iargc
       character*128:: argv
 
 c.....Read an argument, ipmd
-      nargc=iargc()
+c      nargc=iargc()
+      nargc= command_argument_count()
       if( nargc.gt.1 ) stop 'Usage: $ ./pmd2akr 10'
       call getarg(1,argv)
       read(argv,*) ipmd

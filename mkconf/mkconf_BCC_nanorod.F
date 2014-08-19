@@ -8,28 +8,27 @@ c    - pmd00000
 c-----------------------------------------------------------------------
       implicit none
       include "../pmd/params_unit.h"
-      include "../pmd/params_EAM_Fe-H.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
-      integer,parameter:: nuc(1:3)= (/ 15, 15, 20 /)
+      integer,parameter:: nuc(1:3)= (/ 30, 30, 50 /)
 c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 0, 0, 20 /)
 c.....Radius of base of the cylinder
-      real(8),parameter:: rad  = 10.d0
+      real(8),parameter:: rad  = 30.d0
 c.....Hydrogen occupancy
-      real(8),parameter:: hratio = 1.0d-1
+      real(8),parameter:: hratio = 0.01d0
+c.....bcc-Fe lattice constant
+      real(8),parameter:: alcfe= 2.8553d0
       
 
       integer:: i,ix,iy,iz,m,inc,is,ifmv,in
-      real(8):: small,al,rad2,rx,ry,rr,rnd,dseed
+      real(8):: small,al,rad2,rx,ry,rr,rnd,dseed,x,y,z,rad2plus,hunit
       real(8):: ua(3,10),uh(3,2)
       real(8):: ra(3,nmax)
       real(8):: h(3,3,0:1)
       real(8):: va(3,nmax)
       real(8):: tag(nmax),epi(nmax),eki(nmax),strs(3,3,nmax)
-c-----initial temperature
-      real(8),parameter:: tempini= 300d0
 
 c.....In this purpose nuc(1)==nuc(2)
       if( nuc(1).ne.nuc(2) )
@@ -48,13 +47,13 @@ c.....Selection about Hydrogen inclusion
       small=1d-7
 
 c-----box size for Fe: alcfe= 2.8553 A
-      al= alcfe
+      hunit= alcfe
 
 c-----simulation box size
       h(1:3,1:3,0:1)= 0d0
-      h(1,1,0)= (nuc(1)+nvac(1)) *al
-      h(2,2,0)= (nuc(2)+nvac(2)) *al
-      h(3,3,0)= (nuc(3)+nvac(3)) *al
+      h(1,1,0)= (nuc(1)+nvac(1)) *hunit
+      h(2,2,0)= (nuc(2)+nvac(2)) *hunit
+      h(3,3,0)= (nuc(3)+nvac(3)) *hunit
 c-----unit cell, BCC
       ua(1:3,1)= (/ 0.00d0, 0.00d0, 0.00d0 /)
       ua(1:3,2)= (/ 0.50d0, 0.50d0, 0.50d0 /)
@@ -69,23 +68,23 @@ c.....Hydrogen position in bcc, 1:T-site, 2:O-site
         do iy=0,nuc(2)-1
           do iz=0,nuc(3)-1
             do m=1,2
+              x= (ua(1,m)+dble(ix))/(nuc(1)+nvac(1)) +small
+              y= (ua(2,m)+dble(iy))/(nuc(2)+nvac(2)) +small
+              z= (ua(3,m)+dble(iz)+dble(nvac(3))/2)
+     &             /(nuc(3)+nvac(3)) +small
+c.....Only atoms inside the radius remain to form cylinder
+              rx= (x-0.5d0)*h(1,1,0)
+              ry= (y-0.5d0)*h(2,2,0)
+              rr= rx**2 +ry**2
+              if( rr.gt.rad2 ) cycle
               inc=inc+1
               if(inc.gt.nmax)then
                 write(*,*)'Error inc>nmax',inc,nmax
                 stop
               endif
-              ra(1,inc)= (ua(1,m)+dble(ix))/(nuc(1)+nvac(1)) +small
-              ra(2,inc)= (ua(2,m)+dble(iy))/(nuc(2)+nvac(2)) +small
-              ra(3,inc)= (ua(3,m)+dble(iz)+dble(nvac(3))/2)
-     &             /(nuc(3)+nvac(3)) +small
-c.....Only inside atoms the radius remain to form cylinder
-              rx= (ra(1,inc)-0.5d0)*h(1,1,0)
-              ry= (ra(2,inc)-0.5d0)*h(2,2,0)
-              rr= rx**2 +ry**2
-              if( rr.gt.rad2 ) then
-                inc=inc-1
-                cycle
-              endif
+              ra(1,inc)= x
+              ra(2,inc)= y
+              ra(3,inc)= z
               is= 1
               ifmv= 1
               if( iz.eq.nuc(3)-1 ) then ! top layer
@@ -109,26 +108,21 @@ c.....Hydrogens
             do iz=0,nuc(3)-1
               call myrnd(rnd,dseed)
               if( rnd.gt.hratio ) cycle
-              inc=inc+1
-              ra(1,inc)= (uh(1,1)+dble(ix))/(nuc(1)+nvac(1)) +small
-              ra(2,inc)= (uh(2,1)+dble(iy))/(nuc(2)+nvac(2)) +small
-              ra(3,inc)= (uh(3,1)+dble(iz)+dble(nvac(3))/2)
+              x= (uh(1,1)+dble(ix))/(nuc(1)+nvac(1)) +small
+              y= (uh(2,1)+dble(iy))/(nuc(2)+nvac(2)) +small
+              z= (uh(3,1)+dble(iz)+dble(nvac(3))/2)
      &             /(nuc(3)+nvac(3)) +small
 c.....Only inside atoms the radius remain to form cylinder
-              rx= (ra(1,inc)-0.5d0)*h(1,1,0)
-              ry= (ra(2,inc)-0.5d0)*h(2,2,0)
+              rx= (x-0.5d0)*h(1,1,0)
+              ry= (y-0.5d0)*h(2,2,0)
               rr= rx**2 +ry**2
-              if( rr.gt.rad2 ) then
-                inc=inc-1
-                cycle
-              endif
+              if( rr.gt.rad2 ) cycle
+              inc=inc+1
+              ra(1,inc)= x
+              ra(2,inc)= y
+              ra(3,inc)= z
               is= 2
               ifmv= 1
-              if( iz.eq.nuc(3)-1 ) then ! top layer
-                ifmv= 2
-              else if( iz.eq.0 ) then ! bottom layer
-                ifmv= 2
-              endif
               tag(inc)= 1d0  *is
      &                 +1d-1 *ifmv
      &                 +1d-14*inc
@@ -136,78 +130,47 @@ c.....Only inside atoms the radius remain to form cylinder
           enddo
         enddo
       elseif( in.eq.3 ) then
-        
+        rad2plus= (rad+2d0)**2
+        dseed= 11627
+        do ix=0,nuc(1)-1
+          do iy=0,nuc(2)-1
+            do iz=0,nuc(3)-1
+              call myrnd(rnd,dseed)
+              if( rnd.gt.hratio ) cycle
+              x= (uh(1,1)+dble(ix))/(nuc(1)+nvac(1)) +small
+              y= (uh(2,1)+dble(iy))/(nuc(2)+nvac(2)) +small
+              z= (uh(3,1)+dble(iz)+dble(nvac(3))/2)
+     &             /(nuc(3)+nvac(3)) +small
+c.....Only inside atoms the radius remain to form cylinder
+              rx= (x-0.5d0)*h(1,1,0)
+              ry= (y-0.5d0)*h(2,2,0)
+              rr= rx**2 +ry**2
+              if( rr.le.rad2 .or. rr.gt.rad2plus) cycle
+              inc=inc+1
+              ra(1,inc)= x
+              ra(2,inc)= y
+              ra(3,inc)= z
+              is= 2
+              ifmv= 1
+              tag(inc)= 1d0  *is
+     &                 +1d-1 *ifmv
+     &                 +1d-14*inc
+            enddo
+          enddo
+        enddo
       endif
 
       write(6,'(a,i10)') " natm=",inc
 
-      call setv(inc,va,tag,tempini)
+      va(1:3,1:inc)= 0d0
 
-c-----scale velocities to reduced unit
-      do i=1,inc
-        va(1,i)=va(1,i) /h(1,1,0)
-        va(2,i)=va(2,i) /h(2,2,0)
-        va(3,i)=va(3,i) /h(3,3,0)
-      enddo
-      
       call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va
-     &     ,h,cunit,eki,epi,strs)
+     &     ,h,hunit,eki,epi,strs)
 
 c.....output 'akr0000' for Akira visualization
-      call write_akr(15,'akr0000',natm,h,cunit,tag,ra,va)
+      call write_akr(15,'akr0000',inc,h,hunit,tag,ra,va)
       
       end program mkconf_bcc_nanorod
-c=======================================================================
-      subroutine setv(natm,va,tag,tempini)
-      implicit none
-      include "../pmd/params_unit.h"
-      include "../pmd/params_EAM_Fe-H.h"
-      integer,intent(in):: natm
-      real(8),intent(in):: tempini,tag(natm)
-      real(8),intent(out):: va(3,natm)
-
-      integer:: i,l,is
-      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp
-      real(8),parameter:: pi = 3.14159265358979d0
-      real(8):: facv,am
-
-      facv=dsqrt(2d0*tempini*fkb/am_fe)
-      am= am_fe
-
-c-----velocities in Maxwell-Boltzmann distribution
-      dseed=12345
-      do i=1,natm
-        is= int(tag(i))
-        do l=1,3
-          call myrnd(rnd1,dseed)
-          call myrnd(rnd2,dseed)
-          va(l,i)=facv*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
-        enddo
-      enddo
-c-----set center of mass motion to zero
-      sumvx=0d0
-      sumvy=0d0
-      sumvz=0d0
-      do i=1,natm
-        sumvx=sumvx+va(1,i)
-        sumvy=sumvy+va(2,i)
-        sumvz=sumvz+va(3,i)
-      enddo
-      do i=1,natm
-        va(1,i)=va(1,i)-sumvx/dble(natm)
-        va(2,i)=va(2,i)-sumvy/dble(natm)
-        va(3,i)=va(3,i)-sumvz/dble(natm)
-      enddo
-
-      tmp=0d0
-      do i=1,natm
-        is= int(tag(i))
-        tmp= tmp +0.5d0*am*(va(1,i)**2 +va(2,i)**2 +va(3,i)**2)
-      enddo
-      write(6,'(a,es12.4)') " ekin=",tmp
-      write(6,'(a,es12.4)') " temp.=",tmp*2d0/3d0/fkb/natm
-
-      end subroutine setv
 c=======================================================================
       subroutine myrnd(rnd,dseed)
       real*8 rnd,dseed
@@ -222,5 +185,5 @@ c=======================================================================
       end subroutine myrnd
 c-----------------------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make 10mkconf"
+c     compile-command: "make mkconf_BCC_nanorod"
 c     End:

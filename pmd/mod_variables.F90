@@ -17,28 +17,55 @@
 !=======================================================================
 ! VARIABLES
 !=======================================================================
-    integer:: nstp,nouterg,noutpmd,istp,nerg &
-         ,ifpmd,npmd,iftctl,ifdmp,iocntpmd,iocnterg
+    integer:: nouterg,noutpmd,istp &
+         ,iocntpmd,iocnterg
     integer:: natm,nb,ntot,nis,ndof
     real(8):: tcpu,tcpu1,tcpu2,tcom
-    real(8):: dt,rc,dmp,treq,trlx,temp,epot,ekin,epot0,vmaxold,vmax
-    real(8):: tinit= -1d0
+    real(8):: temp,epot,ekin,epot0,vmaxold,vmax
+    integer:: nstp = 0
+    integer:: nerg = 1000
+    integer:: ifpmd= 1
+    integer:: npmd = 10
+    integer:: ifdmp= 0
+    real(8):: dmp  = 0.9d0
+    real(8):: dt = 1d0
+    real(8):: rc = 5.0d0
     real(8):: rbuf= 0d0
     character(len=6):: ciofmt='ascii '
     character(len=20):: cforce='LJ_Ar'
+!.....temperature
+    integer:: iftctl= 0
+    real(8):: tinit= -1d0
+    real(8):: ttgt = 300d0
+    real(8):: trlx = 100d0
 !.....Search time and expiration time
     real(8):: ts,te
     integer:: istps,istpe
 !.....parallel-related variables
-    integer:: nx,ny,nz,nxyz
+    integer:: nxyz
     integer:: nn(6),myparity(3),lsrc(6),lsb(0:nbmax,6) &
          ,myid_md,nodes_md,mpi_md_world,myx,myy,myz,ierr
     real(8):: sv(3,6),sorg(3),anxi,anyi,anzi
+    integer:: nx = 1
+    integer:: ny = 1
+    integer:: nz = 1
 !.....simulation box
     real(8):: hunit,h(3,3,0:1),hi(3,3),vol,sgm(3,3),al(3),avol
     real(8):: ht(3,3,0:1),hti(3,3),dh
 !.....factors on each moving direction
     real(8):: fmv(3,0:9)
+    data fmv &
+         / 0d0, 0d0, 0d0, &
+           1d0, 1d0, 1d0, &
+           1d0, 1d0, 1d0, &
+           1d0, 1d0, 1d0, &
+           1d0, 1d0, 1d0, &
+           1d0, 1d0, 1d0, &
+           1d0, 1d0, 1d0, &
+           1d0, 1d0, 1d0, &
+           1d0, 1d0, 1d0, &
+           1d0, 1d0, 1d0 &
+         /
 !.....positions, velocities, and accelerations
     real(8):: ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax) &
          ,strs(3,3,namax),stt(3,3,namax)
@@ -54,11 +81,12 @@
     real(8):: stn(3,3,namax)
 
 !.....zload type
-    character(len=5):: czload_type= 'atoms'
-!.....Final strain value
-    real(8):: strfin
+    character(len=5):: czload_type= 'no'
+    real(8):: strfin = 0.0d0
 !.....Shear stress
-    real(8):: shrst,shrfx
+    real(8):: shrst = 0.0d0
+    real(8):: shrfx
+
 
 !.....Isobaric
     integer:: ifpctl= 0 ! 0:no  1:Parrinello-Rahman  2:Andersen

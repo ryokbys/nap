@@ -13,8 +13,6 @@ import os,sys,glob,time
 import numpy as np
 import optparse
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__))
-                +'/../../nappy')
 from AtomSystem import AtomSystem
 
 usage= '%prog [options] akr0001 akr0002 akr0003 ...'

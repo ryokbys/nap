@@ -70,7 +70,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(dmp,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(tinit,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(iftctl,1,MPI_INTEGER,0,mpi_md_world,ierr)
-      call mpi_bcast(treq,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(ttgt,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(trlx,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(nerg,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(ifpmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
@@ -331,10 +331,10 @@ c-----Energy output
      &       ,vol
      &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
         call flush(11)
-#ifdef __ZLOAD__
-        open(80,file='out.stress',status='replace')
-        write(80,'(a)') '#  istp,   strnow,      ftop,     fbot'
-#endif
+        if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
+          open(80,file='out.stress',status='replace')
+          write(80,'(a)') '#  istp,   strnow,      ftop,     fbot'
+        endif
 #ifdef __WALL__
         open(81,file='out.wall',status='replace')
         write(81,'(a)') '#   istp,nitop,nibot,ptop(GPa),pbot(GPa)'
@@ -370,14 +370,12 @@ c.....isobaric
 c-------update positions
         ra(1:3,1:natm)=ra(1:3,1:natm) +va(1:3,1:natm)
 
-#ifdef __ZLOAD__
         if( czload_type.eq.'atoms' ) then
           call zload_atoms(natm,ra,tag,nstp,strfin,strnow
      &         ,sorg,myid_md,mpi_md_world)
         else if( czload_type.eq.'box' ) then
           call zload_box(natm,nstp,istp,dt,strfin,strnow,h,myid_md)
         endif
-#endif
 
         if( ifpctl.ne.0 ) then
 c          write(6,'(a,9f10.3)') ' h(1:3,1:3,1)=',h(1:3,1:3,1)*dt
@@ -466,15 +464,15 @@ c-------temperature control by velocity scaling
 !            write(6,'(a,2i6)') ' myid,ndof=',myid_md,ndof
 c.....for the case that there are fixed atoms..., <ekin>= 1/2 *ndof*kT
             temp= ekin *2d0 /fkb /ndof
-c---------in case of 3D, <ekin> = 3/2 *NkT
-c          temp= ekin /ntot/fkb *2d0/3d0
+cc---------in case of 3D, <ekin> = 3/2 *NkT
+c            temp= ekin /ntot/fkb *2d0/3d0
 cc---------in case of 2D, <ekin> = 2/2 *NkT
 c          temp= ekin /ntot/fkb *2d0/2d0
 c---------Berendsen thermostat
-            if( (treq-temp)/temp.gt.100d0 ) then
+            if( (ttgt-temp)/temp.gt.100d0 ) then
               tmp= sqrt(1d0 +dt/trlx*100d0 )
             else
-              tmp= sqrt(1d0 +dt/trlx*(treq-temp)/temp)
+              tmp= sqrt(1d0 +dt/trlx*(ttgt-temp)/temp)
             endif
             va(1:3,1:natm)= va(1:3,1:natm) *tmp
           endif
@@ -500,20 +498,24 @@ c---------in case of 3D, <ekin> = 3/2 *NkT
 cc---------in case of 2D, <ekin> = 2/2 *NkT
 c          temp= ekin /ntot/fkb *2d0/2d0
           endif
-#ifdef __ZLOAD__
-          call get_stress_on_base(natm,ra,aa,tag,h,acon(1),ftop,fbot
-     &         ,sorg,myid_md,mpi_md_world)
-#endif
+
+          if(czload_type.eq.'atoms') then
+            call get_stress_on_base(natm,ra,aa,tag,h,acon(1),ftop,fbot
+     &           ,sorg,myid_md,mpi_md_world)
+          endif
+
           if(myid_md.eq.0) then
             write(11,'(i8,3es16.7e3,f10.2,2es16.7e3)') istp
      &           ,ekin+epot-epot0,ekin,epot-epot0,temp
      &           ,vol
      &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
             call flush(11)
-#ifdef __ZLOAD__
-            write(80,'(i8,3es15.7)') istp,strnow,ftop,fbot
-            call flush(80)
-#endif
+
+            if(czload_type.eq.'atoms') then
+              write(80,'(i8,3es15.7)') istp,strnow,ftop,fbot
+              call flush(80)
+            endif
+
           endif
 c---------output step, time, and temperature
           tcpu= mpi_wtime() -tcpu1
@@ -585,9 +587,9 @@ c.....reset pressure
 
       if(myid_md.eq.0) then
         close(11)
-#ifdef __ZLOAD__
-        close(80)
-#endif
+        if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
+          close(80)
+        endif
 #ifdef __WALL__
         close(81)
 #endif
@@ -634,7 +636,7 @@ c=======================================================================
       write(6,'(2x,a)') ''
       write(6,'(2x,a25,f12.4)') 'initial_temperature',tinit
       write(6,'(2x,a25,i8)') 'flag_temperature',iftctl
-      write(6,'(2x,a25,f12.4)') 'temperature_target',treq
+      write(6,'(2x,a25,f12.4)') 'temperature_target',ttgt
       write(6,'(2x,a25,f12.4)') 'temperature_relax_time',trlx
       write(6,'(2x,a)') ''
       if( ifpctl.ne.0 ) then

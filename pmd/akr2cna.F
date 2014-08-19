@@ -28,11 +28,12 @@ c.....W @0K = 3.171d-10
       real(8),allocatable:: ra0(:,:),ra1(:,:),ra(:,:),auxdat0(:,:)
      &     ,auxdat(:,:)
       integer nargc
-      integer,external:: iargc
+c      integer,external:: iargc
       character*128:: ciname,coname
 
 c.....Read an argument, ipmd
-      nargc=iargc()
+c      nargc=iargc()
+      nargc= command_argument_count()
       if( nargc.ne.2 ) then
         stop 'Usage: $ ./akr2cna akr0000 cna0000'
       endif
