@@ -10,7 +10,7 @@ c-----------------------------------------------------------------------
       implicit none
       include 'params_unit.h'
       integer:: nargc,i
-      integer,external:: iargv,itot_tag
+      integer,external:: itot_tag
       character:: cin*128
       integer,allocatable,dimension(:):: itag
       real(8),allocatable:: opt(:,:)
@@ -18,7 +18,7 @@ c-----------------------------------------------------------------------
       sorg(1:3)= 0d0
       dt= 1d-15/ut
 
-      nargc= iargc()
+      nargc= command_argument_count()
       if( nargc.ne.1 ) then
         write(6,'(a)') ' [Error] Num of arguments is wrong !!!'
         write(6,'(a)') '   Usage: $ ./sort pmd000'
