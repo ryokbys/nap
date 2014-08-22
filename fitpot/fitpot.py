@@ -388,11 +388,12 @@ def gather_basis_linreg(basedir):
         f=open(basedir+'/'+dir+'/pmd/out.basis.linreg','r')
         data= f.readline().split()
         natm= int(data[0])
-        if natm != smpl.natm:
-            print ' [Error] natm != smpl.natm'
-            print '   sample #   = ',i
-            print '   sample dir = ',dir
-            exit()
+#         if natm != smpl.natm:
+#             print ' [Error] natm != smpl.natm'
+#             print '   sample #   = ',i
+#             print '   sample dir = ',dir
+#             print '   natm,smpl.natm = ',natm,smpl.natm
+#             exit()
         nelem=  int(data[1])
         basis= np.zeros((smpl.natm,len(params)))
         for ia in range(smpl.natm):

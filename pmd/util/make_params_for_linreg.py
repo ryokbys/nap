@@ -39,11 +39,9 @@ if pmin >= pmax:
 
 f=open(constfname,'r')
 data= f.readline().split()
-nelin= int(data[0])
+nelem= int(data[0])
 nexp= int(data[1])
 f.close()
-
-nelem= nelin *nexp
 
 f=open(paramfname,'w')
 f.write(' {0:10d} {1:10.4f}\n'.format(nelem,rcin))

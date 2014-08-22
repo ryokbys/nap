@@ -3,7 +3,6 @@ module linreg
   character(128),parameter:: cpfname= 'in.params.linreg'
   character(128),parameter:: ccfname='in.const.linreg'
 !.....parameters
-  integer:: ncoeff
   real(8),allocatable:: coeff(:)
 !.....constants
   integer:: nelem,nexp
@@ -353,9 +352,9 @@ contains
       stop
     endif
     open(50,file=trim(cpfname),status='old')
-    read(50,*) ncoeff,rcin
-    allocate(coeff(ncoeff))
-    do i=1,ncoeff
+    read(50,*) nelem,rcin
+    allocate(coeff(nelem))
+    do i=1,nelem
       read(50,*) coeff(i)
     enddo
     close(50)
@@ -370,7 +369,14 @@ contains
       stop
     endif
     open(51,file=trim(ccfname),status='old')
-    read(51,*) nelem,nexp
+    read(51,*) itmp,nexp
+    if( itmp.ne.nelem ) then
+      if(myid.eq.0) then
+        write(6,'(a)') ' [Error] nelems in consts and params are inconsistent.'
+      endif
+      call mpi_finalize(ierr)
+      stop
+    endif
     allocate(itype(nelem),cnst(max_ncnst,nelem),exps(nelem))
     do i=1,nelem
       read(51,*) itype(i),exps(i),(cnst(j,i),j=1,ncnst_type(itype(i)))

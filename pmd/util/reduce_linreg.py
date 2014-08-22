@@ -1,5 +1,4 @@
 #!/opt/local/bin/python
-
 u"""
 Reduce params and constants of linreg potential, and write
 new in.params.linreg and in.const.linreg.
@@ -25,7 +24,7 @@ if not os.path.isfile(constfname):
     print ' [Error] There must be in.const.linreg in the directory !!!'
     sys.exit()
 
-if not os.path.isfile(parmfname):
+if not os.path.isfile(paramfname):
     print ' [Error] There must be in.params.linreg in the directory !!!'
     sys.exit()
 
@@ -47,7 +46,7 @@ data= f.readline().split()
 nelem0= int(data[0])
 rcin0= float(data[1])
 params= []
-for line in f.readline():
+for line in f.readlines():
     params.append(line.split())
 f.close()
 
@@ -75,14 +74,25 @@ g2.write(' {0:10d} {1:10.4f}\n'.format(nelem,rcin0))
 for i in range(len(params)):
     if to_be_reduced[i]:
         continue
-    g1.write(' {0:3d} {1:5.1f}\n'.format())
+    #...in.consts.linreg
+    g1.write(' {0} {1}'.format(consts[i][0],consts[i][1]))
+    if int(consts[i][0]) == 1: # Gaussian
+        g1.write(' {0} {1}\n'.format(consts[i][2],
+                                     consts[i][3]))
+    elif int(consts[i][0]) == 2: # cosine
+        g1.write(' {0} {1}\n'.format(consts[i][2],
+                                     consts[i][3]))
+    elif int(consts[i][0]) == 3: # polynomial
+        g1.write(' {0} {1} {2} {3}\n'.format(consts[i][2],
+                                             consts[i][3],
+                                             consts[i][4],
+                                             consts[i][5]))
+    elif int(consts[i][0]) == 4: # angular
+        g1.write(' {0}\n'.format(consts[i][2]))
+    #...in.params.linreg
+    g2.write(' {0} {1} {2}\n'.format(params[i][0],
+                                     params[i][1],
+                                     params[i][2]))
 g1.close()
 g2.close()
 
-
-
-f.write(' {0:10d} {1:10.4f}\n'.format(nelem,rcin))
-for i in range(nelem):
-    f.write(' {0:10.6f}'.format(random.uniform(pmin,pmax)))
-    f.write(' {0:10.4f} {1:10.4f}\n'.format(pmin,pmax))
-f.close()

@@ -37,7 +37,7 @@ f=open(constfname,'w')
 nelem= num_exp_gauss *num_len_gauss +num_q_cos*num_exp_cos \
     +num_a0 *num_a2 *num_a6 *num_a10 +num_angle
 #.....1st line
-f.write(' {0:10d} {1:4d}\n'.format(nelem,nexp))
+f.write(' {0:10d} {1:4d}\n'.format(nelem*nexp,nexp))
 #.....repeat max_nexp times
 for iexp in range(nexp):
     aexp= exps[iexp]
