@@ -619,6 +619,11 @@ if __name__ == '__main__':
                                   ,fprime=grad_linreg
                                   ,maxiter=niter,disp=True
                                   ,epsilon=eps,gtol=gtol)
+        elif  gradient in ('grad_NN1','NN1'):
+            solution= opt.fmin_cg(func,vars,args=(maindir,)
+                                  ,fprime=grad_NN1
+                                  ,maxiter=niter,disp=True
+                                  ,epsilon=eps,gtol=gtol)
         else:
             solution= opt.fmin_cg(func,vars,args=(maindir,)
                                   ,maxiter=niter,disp=True
@@ -629,6 +634,11 @@ if __name__ == '__main__':
         if gradient in ('grad_linreg','linreg'):
             solution= opt.fmin_bfgs(func,vars,args=(maindir,)
                                     ,fprime=grad_linreg
+                                    ,maxiter=niter,disp=True
+                                    ,epsilon=eps,gtol=gtol)
+        elif gradient in ('grad_NN1','NN1'):
+            solution= opt.fmin_bfgs(func,vars,args=(maindir,)
+                                    ,fprime=grad_NN1
                                     ,maxiter=niter,disp=True
                                     ,epsilon=eps,gtol=gtol)
         else:
@@ -652,6 +662,14 @@ if __name__ == '__main__':
         solution= sd_dynamics(func,vars,args=(maindir,)
                     ,fprime=grad_linreg
                     ,maxiter=niter)
+    elif fmethod in ('check_grad'):
+        print '>>>>> check_grad was selected.'
+        if gradient in ('grad_linreg','linreg'):
+            check_value= opt.check_grad(func,grad_linreg,vars,maindir)
+        elif gradient in ('grad_NN1','NN1'):
+            check_value= opt.check_grad(func,grad_NN1,vars,maindir)
+        print ' check_grad=',check_value
+        solution= vars
     elif fmethod in ('test','TEST'):
         print '>>>>> TEST was selected.'
         func(vars,maindir)
