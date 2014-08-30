@@ -47,7 +47,7 @@ for iexp in range(nexp):
     for i1 in range(1,num_exp_gauss+1):
         for i2 in range(1,num_len_gauss+1):
             egauss= range_exp_gauss[0] +i1*dexp 
-            lgauss= range_len_gauss[0] +i1*dlen
+            lgauss= range_len_gauss[0] +i2*dlen
             f.write(' {0:3d} {1:5.1f} {2:10.4f} {3:10.4f}\n'.format(1,
                                                                     aexp,
                                                                     egauss,

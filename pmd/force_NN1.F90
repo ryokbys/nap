@@ -1,7 +1,7 @@
 module NN1
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN1'
-  character(128),parameter:: ccfname='in.const.NN2'
+  character(128),parameter:: ccfname='in.const.NN1'
 !.....parameters
   integer:: nwgt1,nwgt2
   real(8),allocatable:: wgt1(:,:),wgt2(:)
@@ -47,7 +47,7 @@ contains
     logical,save:: l1st=.true.
 
     if( l1st ) then
-!.....read in.params.linreg
+!.....read in.params.NN1
       call read_params(myid,mpi_world,rcin)
 !.....reset rc
       if( myid.eq.0 ) then
@@ -56,7 +56,7 @@ contains
              ,rc,' to ',rcin
       endif
       rc= rcin
-      allocate(fat(3,namax),gsf(nsf,natm),dgsf(3,natm+nb,nsf))
+      allocate(fat(3,namax),gsf(0:nsf,natm),dgsf(3,natm+nb,0:nsf))
       l1st= .false.
     endif
 
@@ -70,13 +70,16 @@ contains
     call eval_sf(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr,gsf,dgsf,rc)
 
 #ifdef __FITPOT__
-    open(80,file='out.gsf-hl1',status='replace')
-    write(80,'(2i10)') nsf,nhl1
+    open(80,file='out.gsf',status='replace')
+    write(80,'(2i10)') nsf
     do ia=1,natm
-      do isf=1,nsf
+      do isf=0,nsf
         write(80,'(2i8,es22.14)') ia,isf,gsf(isf,ia)
       enddo
     enddo
+    close(80)
+    open(81,file='out.hl1')
+    write(81,'(2i10)') nhl1
 #endif
 
     do ia=1,natm
@@ -84,23 +87,26 @@ contains
       epotl= epotl +wgt2(0)
       epi(ia)= epi(ia) + wgt2(0)
       tmp= wgt2(0)
+#ifdef __FITPOT__
+        write(81,'(2i8,es22.14)') ia,0,1d0
+#endif
       do ihl1=1,nhl1
-        hl1i= wgt1(ihl1,0)
-        do isf=1,nsf
+        hl1i= 0d0
+        do isf=0,nsf
           hl1i= hl1i +wgt1(ihl1,isf)*gsf(isf,ia)
         enddo
 #ifdef __FITPOT__
-        write(80,'(2i8,es22.14)') ia,ihl1,hl1i
+        write(81,'(2i8,es22.14)') ia,ihl1,hl1i
 #endif
-        tmp2= tmp +wgt2(0)*sigmoid(hl1i)
+        tmp= tmp +wgt2(ihl1)*sigmoid(hl1i)
       enddo
-      epotl=epotl +tmp2
-      epi(ia)= epi(ia) +tmp2
+      epotl=epotl +tmp
+      epi(ia)= epi(ia) +tmp
       aa(1:3,1:natm+nb)= aa(1:3,1:natm+nb) +fat(1:3,1:natm+nb)
     enddo
 
 #ifdef __FITPOT__
-    close(80)
+    close(81)
 #endif
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
@@ -130,7 +136,7 @@ contains
     implicit none
     integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
-    real(8),intent(out):: gsf(nsf,natm),dgsf(3,natm+nb,nsf)
+    real(8),intent(out):: gsf(0:nsf,natm),dgsf(3,natm+nb,0:nsf)
 
     integer:: isf,ia,jj,ja,kk,ka
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
@@ -139,6 +145,8 @@ contains
          dcsdj(3),dcsdk(3),dcsdi(3)
 
     real(8),external:: sprod
+
+    gsf(0,1:natm)= 1d0
 
     do isf=1,nsf
       if( itype(isf).eq.1 ) then ! Gaussian (2-body)
@@ -291,7 +299,7 @@ contains
     enddo
     close(51)
 
-!.....calc number of weights taking basis node into account
+!.....calc number of weights taking into account the bias nodes
     nwgt1= (nsf+1)*nhl1
     nwgt2= (nhl1+1)
 

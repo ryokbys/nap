@@ -1830,7 +1830,7 @@ c=======================================================================
      &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
         case ('NN1')
-          call force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+          call force_NN1(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
         case default

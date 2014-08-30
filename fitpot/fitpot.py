@@ -363,7 +363,7 @@ def grad_linreg(x,*args):
             bs= 0.0
             for ia in range(smpl.natm):
                 bs += bdata[ismpl][ia,iprm]
-            grad[iprm] += ediff*bs
+            grad[iprm] += 2.0*ediff*bs
 
     if penalty in ('ridge','Ridge','RIDGE'):
         p= 0.0
@@ -406,34 +406,87 @@ def gather_basis_linreg(basedir):
 #=========================================== derivative of NN1 potential
 def grad_NN1(x,*args):
     dir= args[0]
+    #.....read num of symmetry functions and nodes
+    nsf,nhl1,wgt1,wgt2= read_const_NN1(dir)
+    #.....check
+    if len(params) != (nsf+1)*nhl1 +(nhl1+1):
+        print ' [Error] len(params) != (nsf+1)*nhl1 +(nhl1+1)'
+        print '   len(params)          = ',len(params)
+        print '   nsf                  = ',nsf
+        print '   nhl1                 = ',nhl1
+        print '   (nsf+1)*nhl1+(nhl1+1)= ',(nsf+1)*nhl1 +(nhl1+1)
+        exit()
     #.....gather basis data
-    bdata= gather_basis_data(dir)
+    gsf,hl1= gather_basis_NN1(dir,nsf,nhl1)
     #.....gather pmd results
     ergs,frcs= gather_pmd_data(dir)
 
+    grad= np.zeros(len(params))
+    iprm= 0
+    for isf in range(nsf+1):
+        for ihl1 in range(1,nhl1+1):
+            iprm += 1
+            for ismpl in range(len(samples)):
+                smpl= samples[ismpl]
+                ediff= ergs[ismpl] -ergrefs[ismpl]
+                tmp= 0.0
+                for ia in range(smpl.natm):
+                    tmp += wgt(ihl1)*hl1[ismpl][ia,ihl1] \
+                        *(1.0-hl1[ismpl][ia,ihl1]) *gsf[ismpl][ia,isf]
+                grad[iprm] += 2.0*ediff*tmp
+    for ihl1 in range(nhl1+1):
+        ipm += 1
+        for ismpl in range(len(samples)):
+            smpl= samples[ismpl]
+            ediff= ergs[ismpl] -ergrefs[ismpl]
+            tmp= 0.0
+            for ia in range(smpl.natm):
+                tmp += hl1[ismpl][ia,ihl1]
+            grad[iprm] += 2.0*ediff*tmp
+    return grad
 
-def gather_basis_NN1(basedir):
-    bdata= []
+def gather_basis_NN1(basedir,nsf,nhl1):
+    gsf= []
+    hl1= []
     #...read basis data
     for i in range(len(sample_dirs)):
         dir= sample_dirs[i]
         smpl= samples[i]
-        f= open(basedir+'/'+dir+'/pmd/out.gsf-hl1','r')
+        f= open(basedir+'/'+dir+'/pmd/out.gsf','r')
+        g= open(basedir+'/'+dir+'/pmd/out.hl1','r')
+        #.....skip 1st line
+        dataf= f.readline().split()
+        datag= g.readline().split()
+        gsfs= np.zeros((smpl.natm,nsf+1))
+        hl1s= np.zeros((smpl.natm,nhl1+1))
+        for ia in range(smpl.natm):
+            for isf in range(nsf+1):
+                dataf= f.readline().split()
+                gsfs[ia,isf]= float(dataf[2])
+        for ia in range(smpl.natm):
+            for ihl1 in range(nhl1+1):
+                datag= g.readline().split()
+                hl1s[ia,ihl1]= float(datag[2])
+        gsf.append(gsfs)
+        hl1.append(hl1s)
+    return gsf,hl1
+
+def read_const_NN1(basedir):
+    f= open(basedir+'/'+'in.const.NN1')
+    data= f.readline().split()
+    nsf=  int(data[0])
+    nhl1= int(data[1])
+    wgt1= np.zeros(nsf+1,nhl1)
+    wgt2= np.zeros(nhl1+1)
+    for isf in range(nsf+1):
+        for ihl1 in range(1,nhl1+1):
+            data= f.readline().split()
+            wgt1[isf,ihl1]= float(data[0])
+    for ihl1 in range(nhl1+1):
         data= f.readline().split()
-        nsf= int(data[0])
-        nhl1=int(data[1])
-        gsf= np.zeros((smpl.natm,nsf))
-        hl1= np.zeros((smpl.natm,nhl1))
-        for ia in range(smpl.natm):
-            for isf in range(nsf):
-                data= f.readline().split()
-                gsf[ia,isf]= float(data[2])
-        for ia in range(smpl.natm):
-            for ihl1 in range(nhl1):
-                data= f.readline().split()
-                hl1[ia,ihl1]= float(data[2])
-        bdata.append([gsf,hl1])
-    return bdata
+        wgt2[ihl1]= float(data[0])
+    f.close()
+    return nsf,nhl1,wgt1,wgt2
 
 #========================================================== output data
 def output_energy_relation(ergs,fname='out.erg.pmd-vs-dft'):
