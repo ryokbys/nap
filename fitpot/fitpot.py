@@ -334,17 +334,17 @@ def func(x,*args):
 
 def eval_L(cergs,cfrcs,rergs,rfrcs,samples):
     val= 0.0
-    nval= 0
+    #nval= 0
     for i in range(len(samples)):
         val += (cergs[i]-rergs[i])**2
-        nval += 1
+        #nval += 1
         if not fmatch:
             continue
         for j in range(samples[i].natm):
             for k in range(3):
                 val += (cfrcs[i][j,k]-rfrcs[i][j,k])**2
-                nval += 1
-    val /= nval
+                #nval += 1
+    #val /= nval
     return val
 
 #======================================== derivative of linreg potential
@@ -388,12 +388,6 @@ def gather_basis_linreg(basedir):
         f=open(basedir+'/'+dir+'/pmd/out.basis.linreg','r')
         data= f.readline().split()
         natm= int(data[0])
-#         if natm != smpl.natm:
-#             print ' [Error] natm != smpl.natm'
-#             print '   sample #   = ',i
-#             print '   sample dir = ',dir
-#             print '   natm,smpl.natm = ',natm,smpl.natm
-#             exit()
         nelem=  int(data[1])
         basis= np.zeros((smpl.natm,len(params)))
         for ia in range(smpl.natm):
@@ -407,7 +401,7 @@ def gather_basis_linreg(basedir):
 def grad_NN1(x,*args):
     dir= args[0]
     #.....read num of symmetry functions and nodes
-    nsf,nhl1,wgt1,wgt2= read_const_NN1(dir)
+    nsf,nhl1,wgt1,wgt2= read_NN1(dir)
     #.....check
     if len(params) != (nsf+1)*nhl1 +(nhl1+1):
         print ' [Error] len(params) != (nsf+1)*nhl1 +(nhl1+1)'
@@ -425,24 +419,28 @@ def grad_NN1(x,*args):
     iprm= 0
     for isf in range(nsf+1):
         for ihl1 in range(1,nhl1+1):
-            iprm += 1
             for ismpl in range(len(samples)):
                 smpl= samples[ismpl]
                 ediff= ergs[ismpl] -ergrefs[ismpl]
                 tmp= 0.0
                 for ia in range(smpl.natm):
-                    tmp += wgt(ihl1)*hl1[ismpl][ia,ihl1] \
-                        *(1.0-hl1[ismpl][ia,ihl1]) *gsf[ismpl][ia,isf]
+                    gsfs= gsf[ismpl]
+                    hl1s= hl1[ismpl]
+                    tmp += wgt2[ihl1] *hl1s[ia,ihl1] \
+                           *(1.0-hl1s[ia,ihl1]) *gsfs[ia,isf]
                 grad[iprm] += 2.0*ediff*tmp
+            iprm += 1
     for ihl1 in range(nhl1+1):
-        ipm += 1
         for ismpl in range(len(samples)):
             smpl= samples[ismpl]
             ediff= ergs[ismpl] -ergrefs[ismpl]
             tmp= 0.0
             for ia in range(smpl.natm):
                 tmp += hl1[ismpl][ia,ihl1]
+            #print 'ihl1,ismpl,ediff,tmp=',ihl1,ismpl,ediff,tmp
             grad[iprm] += 2.0*ediff*tmp
+        iprm += 1
+    #print grad
     return grad
 
 def gather_basis_NN1(basedir,nsf,nhl1):
@@ -471,21 +469,24 @@ def gather_basis_NN1(basedir,nsf,nhl1):
         hl1.append(hl1s)
     return gsf,hl1
 
-def read_const_NN1(basedir):
+def read_NN1(basedir):
     f= open(basedir+'/'+'in.const.NN1')
+    g= open(basedir+'/'+'in.params.NN1')
     data= f.readline().split()
     nsf=  int(data[0])
     nhl1= int(data[1])
-    wgt1= np.zeros(nsf+1,nhl1)
+    data= g.readline().split()
+    wgt1= np.zeros((nsf+1,nhl1))
     wgt2= np.zeros(nhl1+1)
     for isf in range(nsf+1):
-        for ihl1 in range(1,nhl1+1):
-            data= f.readline().split()
+        for ihl1 in range(nhl1):
+            data= g.readline().split()
             wgt1[isf,ihl1]= float(data[0])
     for ihl1 in range(nhl1+1):
-        data= f.readline().split()
+        data= g.readline().split()
         wgt2[ihl1]= float(data[0])
     f.close()
+    g.close()
     return nsf,nhl1,wgt1,wgt2
 
 #========================================================== output data

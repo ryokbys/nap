@@ -1,12 +1,13 @@
-module NN1
+module NN2
 !.....parameter file name
-  character(128),parameter:: cpfname= 'in.params.NN1'
-  character(128),parameter:: ccfname='in.const.NN1'
+  character(128),parameter:: cpfname= 'in.params.NN2'
+  character(128),parameter:: ccfname='in.const.NN2'
 !.....parameters
-  integer:: nwgt1,nwgt2
-  real(8),allocatable:: wgt1(:,:),wgt2(:)
+  integer:: nwgt1,nwgt2,nwgt3
+  real(8),allocatable:: wgt1(:,:),wgt2(:,:),wgt3(:)
+  real(8),allocatable:: hl1(:,:),hl2(:,:)
 !.....constants
-  integer:: nsf,nhl1
+  integer:: nsf,nhl1,nhl2
   integer,allocatable:: itype(:)
   real(8),allocatable:: cnst(:,:)
 !.....function types and num of constatns for types
@@ -18,13 +19,13 @@ module NN1
   integer:: max_nexp
   
 contains
-  subroutine force_NN1(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,acon,avol)
 !-----------------------------------------------------------------------
-!  Parallel implementation of neural-network potential of only one
-!  hidden layer.
-!    - 2014.07.01 by R.K.
+!  Parallel implementation of neural-network potential of 
+!  two hidden layers.
+!    - 2014.08.31 by R.K.
 !      start coding
 !-----------------------------------------------------------------------
     implicit none
@@ -40,14 +41,14 @@ contains
 
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,nexp,isf &
-         ,icoeff,ihl1
+         ,icoeff,ihl1,ihl2
     real(8):: rcin,b_na,at(3),epotl,wgt,hl1i,tmp2,tmp
     real(8),save,allocatable:: fat(:,:),gsf(:,:),dgsf(:,:,:)
 !.....1st call
     logical,save:: l1st=.true.
 
     if( l1st ) then
-!.....read in.params.NN1
+!.....read in.params.NN2
       call read_params(myid,mpi_world,rcin)
 !.....reset rc
       if( myid.eq.0 ) then
@@ -57,6 +58,7 @@ contains
       endif
       rc= rcin
       allocate(fat(3,namax),gsf(0:nsf,natm),dgsf(3,natm+nb,0:nsf))
+      allocate(hl1(nhl1,namax),hl2(nhl2,namax))
       l1st= .false.
     endif
 
@@ -80,34 +82,60 @@ contains
     close(80)
     open(81,file='out.hl1')
     write(81,'(2i10)') nhl1
+    open(82,file='out.hl2')
+    write(82,'(2i10)') nhl2
 #endif
 
+!.....make hl1
+    hl1(0:nhl1,1:natm)= 0d0
+    hl1(0,1:natm)= 1d0
     do ia=1,natm
-!.....second, sum up according to NN with one hidden layer
-      epotl= epotl +wgt2(0)
-      epi(ia)= epi(ia) + wgt2(0)
-      tmp= wgt2(0)
 #ifdef __FITPOT__
-        write(81,'(2i8,es23.14e3)') ia,0,1d0
+      write(81,'(2i8,es23.14e3)') ia,0,1d0
 #endif
       do ihl1=1,nhl1
-        hl1i= 0d0
+        tmp= 0d0
         do isf=0,nsf
-          hl1i= hl1i +wgt1(ihl1,isf)*gsf(isf,ia)
+          tmp= tmp +wgt1(ihl1,isf)*gsf(isf,ia)
         enddo
-        hl1i= sigmoid(hl1i)
+        hl1(ihl1,ia)= sigmoid(tmp)
 #ifdef __FITPOT__
-        write(81,'(2i8,es23.14e3)') ia,ihl1,hl1i
+        write(81,'(2i8,es23.14e3)') ia,ihl1,hl1(ihl1,ia)
 #endif
-        tmp= tmp +wgt2(ihl1)*hl1i
       enddo
-      epotl=epotl +tmp
-      epi(ia)= epi(ia) +tmp
-      aa(1:3,1:natm+nb)= aa(1:3,1:natm+nb) +fat(1:3,1:natm+nb)
     enddo
+
+!.....make hl2
+    hl2(0:nhl2,1:natm)= 0d0
+    hl2(0,1:natm)= 1d0
+    do ia=1,natm
+#ifdef __FITPOT__
+      write(82,'(2i8,es23.14e3)') ia,0,1d0
+#endif
+      do ihl2=1,nhl2
+        tmp= 0d0
+        do ihl1=1,nhl1
+          tmp= tmp +wgt2(ihl2,ihl1)*hl1(ihl1,ia)
+        enddo
+        hl2(ihl2,ia)= sigmoid(tmp)
+#ifdef __FITPOT__
+        write(82,'(2i8,es23.14e3)') ia,ihl2,hl2(ihl2,ia)
+#endif
+      enddo
+    enddo
+
+!.....calc E_i
+    do ia=1,natm
+      do ihl2=0,nhl2
+        epi(ia)= epi(ia) +wgt3(ihl2)*hl2(ihl2,ia)
+      enddo
+      epotl= epotl +epi(ia)
+    enddo
+
 
 #ifdef __FITPOT__
     close(81)
+    close(82)
 #endif
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
@@ -128,7 +156,7 @@ contains
     call mpi_allreduce(epotl,epot,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
     return
-  end subroutine force_NN1
+  end subroutine force_NN2
 !=======================================================================
   subroutine eval_sf(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr,gsf,dgsf,rc)
 !
@@ -279,7 +307,7 @@ contains
 
     integer,intent(in):: myid,mpi_world
     real(8),intent(out):: rcin
-    integer:: itmp,ierr,i,j,nc,ncoeff,isf,ihl1
+    integer:: itmp,ierr,i,j,nc,ncoeff,isf,ihl1,ihl2
     logical:: lexist
 
 !.....read constants at the 1st call
@@ -287,14 +315,14 @@ contains
     if( .not. lexist ) then
       if( myid.eq.0 ) then
         write(6,'(a)') ' [Error] '//ccfname//' does not exist !!!.'
-        write(6,'(a)') '   The NN1 potential needs '//ccfname//'.'
+        write(6,'(a)') '   The NN2 potential needs '//ccfname//'.'
       endif
       call mpi_finalize(ierr)
       stop
     endif
     open(51,file=trim(ccfname),status='old')
 !.....num of symmetry functions, num of node in 1st hidden layer
-    read(51,*) nsf,nhl1
+    read(51,*) nsf,nhl1,nhl2
     allocate(itype(nsf),cnst(max_ncnst,nsf))
     do i=1,nsf
       read(51,*) itype(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
@@ -303,14 +331,15 @@ contains
 
 !.....calc number of weights taking into account the bias nodes
     nwgt1= (nsf+1)*nhl1
-    nwgt2= (nhl1+1)
+    nwgt2= (nhl1+1)*nhl2
+    nwgt3= (nhl2+1)
 
 !.....read parameters at the 1st call
     inquire(file=trim(cpfname),exist=lexist)
     if( .not. lexist ) then
       if( myid.eq.0 ) then
         write(6,'(a)') ' [Error] '//cpfname//' does not exist !!!.'
-        write(6,'(a)') '   The NN1 potential needs '//cpfname//'.'
+        write(6,'(a)') '   The NN2 potential needs '//cpfname//'.'
       endif
       call mpi_finalize(ierr)
       stop
@@ -318,7 +347,7 @@ contains
     open(50,file=trim(cpfname),status='old')
     read(50,*) ncoeff,rcin
 !.....check whether the num of parameters is correct
-    nc= nwgt1 +nwgt2
+    nc= nwgt1 +nwgt2 +nwgt3
     if( ncoeff .ne. nc ) then
       write(6,'(a)') ' [Error] num of parameters is not correct !!!'
       write(6,'(a,i10)') ' ncoeff=',ncoeff
@@ -326,14 +355,19 @@ contains
       write(6,'(a,i10)') ' ncoeff should be ',nc
       stop
     endif
-    allocate(wgt1(nhl1,0:nsf),wgt2(0:nhl1))
+    allocate(wgt1(nhl1,0:nsf),wgt2(nhl2,0:nhl1),wgt3(0:nhl2))
     do isf=0,nsf
       do ihl1=1,nhl1
         read(50,*) wgt1(ihl1,isf)
       enddo
     enddo
     do ihl1=0,nhl1
-      read(50,*) wgt2(ihl1)
+      do ihl2=1,nhl2
+        read(50,*) wgt2(ihl2,ihl1)
+      enddo
+    enddo
+    do ihl2=0,nhl2
+      read(50,*) wgt3(ihl2)
     enddo
     close(50)
 
@@ -341,7 +375,7 @@ contains
     return
   end subroutine read_params
 
-end module NN1
+end module NN2
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"
