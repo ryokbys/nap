@@ -1,8 +1,8 @@
 # What's NAP
-Nagoya Atomistic-simulation Package (NAP) consists of several programs that perform parallel molecular dynamics simulation (pmd),
-hybrid quantum-mechanical/classical-mechanical simulation (qmcl), nudged elastic band method (neb),
-and potential parameter fitting (fitpot).
-The program, pmd, includes various interatomic potentials for metals and semiconductors,
+**Nagoya Atomistic-simulation Package (NAP)** consists of several programs that perform parallel molecular dynamics simulation ( *pmd* ),
+hybrid quantum-mechanical/classical-mechanical simulation ( *qmcl* ), nudged elastic band method ( *neb* ),
+and potential parameter fitting ( *fitpot* ).
+The program, *pmd* , includes various interatomic potentials for metals and semiconductors,
 and uses spatial decomposition technique for the parallelization, and cell-list method for efficient neighbor search.
 
 # Who made this?
@@ -10,7 +10,7 @@ and uses spatial decomposition technique for the parallelization, and cell-list 
 * Assistant Professor in the department of mechanical engineering, Nagoya Institute of Technology. (2014-01-07)
 
 # Compilation and usage
-See the manual web site below (but Japanese only),
+See the manual web site below (but some parts are written in Japanese...),
 http://locs.bw.nitech.ac.jp/~kobayashi/pmd_manual
 
 For the short test, whether or not you can use this program in your environment,
