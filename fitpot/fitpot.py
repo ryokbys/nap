@@ -841,7 +841,10 @@ if __name__ == '__main__':
     gather_ref_data(maindir)
     #.....1st call of func
     func(vars,maindir)
-    ergs,frcs= gather_pmd_data(maindir)
+    if potential in ('linreg'):
+        ergs,frcs= calc_ef_from_bases(vars,maindir)
+    else:
+        ergs,frcs= gather_pmd_data(maindir)
 
     output_energy_relation(ergs,fname='out.erg.pmd-vs-dft.ini')
     output_force_relation(frcs,fname='out.frc.pmd-vs-dft.ini')
@@ -940,8 +943,11 @@ if __name__ == '__main__':
         solution= vars
 
     write_params(maindir+'/'+parfile+'.fin',solution)
-    
-    ergs,frcs= gather_pmd_data(maindir)
+
+    if potential in ('linreg'):
+        ergs,frcs= calc_ef_from_bases(vars,maindir)
+    else:
+        ergs,frcs= gather_pmd_data(maindir)
     output_energy_relation(ergs,fname='out.erg.pmd-vs-dft.fin')
     output_force_relation(frcs,fname='out.frc.pmd-vs-dft.fin')
 
