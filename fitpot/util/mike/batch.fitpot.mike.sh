@@ -1,9 +1,9 @@
 #!/bin/bash
-#PBS -N fitpot-GA
+#PBS -N fitpot
 #PBS -o out
 #PBS -q batch
 #PBS -j oe
-#PBS -l nodes=4:ppn=2
+#PBS -l nodes=12:ppn=6
 #-----------------------------------------------------------------------
 # Usage:
 #   $ qsub run_vasp.sh

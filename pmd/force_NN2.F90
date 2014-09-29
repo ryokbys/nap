@@ -90,6 +90,7 @@ contains
     hl1(0:nhl1,1:natm)= 0d0
     hl1(0,1:natm)= 1d0
     do ia=1,natm
+      hl1(0,ia)= 1d0
 #ifdef __FITPOT__
       write(81,'(2i8,es23.14e3)') ia,0,1d0
 #endif
@@ -109,12 +110,13 @@ contains
     hl2(0:nhl2,1:natm)= 0d0
     hl2(0,1:natm)= 1d0
     do ia=1,natm
+      hl2(0,ia)= 1d0
 #ifdef __FITPOT__
       write(82,'(2i8,es23.14e3)') ia,0,1d0
 #endif
       do ihl2=1,nhl2
         tmp= 0d0
-        do ihl1=1,nhl1
+        do ihl1=0,nhl1
           tmp= tmp +wgt2(ihl2,ihl1)*hl1(ihl1,ia)
         enddo
         hl2(ihl2,ia)= sigmoid(tmp)

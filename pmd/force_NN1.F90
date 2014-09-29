@@ -39,10 +39,10 @@ contains
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
 
 !.....local
-    integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,nexp,isf &
+    integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ja,nexp,isf &
          ,icoeff,ihl1
     real(8):: rcin,b_na,at(3),epotl,wgt,hl1i,tmp2,tmp
-    real(8),save,allocatable:: fat(:,:),gsf(:,:),dgsf(:,:,:)
+    real(8),save,allocatable:: gsf(:,:),dgsf(:,:,:,:),hl1(:,:)
 !.....1st call
     logical,save:: l1st=.true.
 
@@ -56,15 +56,10 @@ contains
              ,rc,' to ',rcin
       endif
       rc= rcin
-      allocate(fat(3,namax),gsf(0:nsf,natm),dgsf(3,natm+nb,0:nsf))
+      allocate(gsf(0:nsf,natm),dgsf(3,namax,namax,nsf)&
+           ,hl1(0:nhl1,natm))
       l1st= .false.
     endif
-
-    epotl= 0d0
-    epi(1:natm+nb)= 0d0
-    strs(1:3,1:3,1:namax)= 0d0
-    aa(1:3,1:namax)= 0d0
-    fat(1:3,1:natm+nb)= 0d0
 
 !.....first, calculate all the symmetry functions
     call eval_sf(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr,gsf,dgsf,rc)
@@ -82,28 +77,53 @@ contains
     write(81,'(2i10)') nhl1
 #endif
 
+!.....2nd, calculate the node values by summing contributions from
+!.....  symmetry functions
+    hl1(0:nhl1,1:natm)= 0d0
     do ia=1,natm
-!.....second, sum up according to NN with one hidden layer
-      epotl= epotl +wgt2(0)
-      epi(ia)= epi(ia) + wgt2(0)
-      tmp= wgt2(0)
-#ifdef __FITPOT__
-        write(81,'(2i8,es23.14e3)') ia,0,1d0
-#endif
+      hl1(0,ia)= 1d0
       do ihl1=1,nhl1
-        hl1i= 0d0
+        tmp= 0d0
         do isf=0,nsf
-          hl1i= hl1i +wgt1(ihl1,isf)*gsf(isf,ia)
+          tmp= tmp +wgt1(ihl1,isf) *gsf(isf,ia)
         enddo
-        hl1i= sigmoid(hl1i)
-#ifdef __FITPOT__
-        write(81,'(2i8,es23.14e3)') ia,ihl1,hl1i
-#endif
-        tmp= tmp +wgt2(ihl1)*hl1i
+        hl1(ihl1,ia)= sigmoid(tmp)
       enddo
-      epotl=epotl +tmp
-      epi(ia)= epi(ia) +tmp
-      aa(1:3,1:natm+nb)= aa(1:3,1:natm+nb) +fat(1:3,1:natm+nb)
+    enddo
+
+#ifdef __FITPOT__
+    do ia=1,natm
+      do ihl1=0,nhl1
+        write(81,'(2i8,es23.14e3)') ia,ihl1,hl1(ihl1,ia)
+      enddo
+    enddo
+#endif
+
+!.....then calculate the energy of atom by summing up the node values
+    epotl= 0d0
+    do ia=1,natm
+      epi(ia)= 0d0
+      do ihl1=0,nhl1
+        hl1i= hl1(ihl1,ia)
+        epi(ia)= epi(ia) +wgt2(ihl1)*hl1i
+      enddo
+      epotl=epotl +epi(ia)
+    enddo
+
+!.....sum up for forces
+    strs(1:3,1:3,1:natm)= 0d0
+    aa(1:3,1:natm+nb)= 0d0
+    do ia=1,natm+nb
+      do isf=1,nsf ! there is no longer a bias node, 0
+        do ja=1,natm
+          do ihl1=1,nhl1 ! there is no longer a bias node, 0
+            hl1i= hl1(ihl1,ja)
+            tmp= wgt2(ihl1)*hl1i*(1d0-hl1i)
+            aa(1:3,ia)=aa(1:3,ia) &
+                 -tmp*wgt1(ihl1,isf)*dgsf(1:3,ia,ja,isf)
+          enddo
+        enddo
+      enddo
     enddo
 
 #ifdef __FITPOT__
@@ -137,7 +157,7 @@ contains
     implicit none
     integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
-    real(8),intent(out):: gsf(0:nsf,natm),dgsf(3,natm+nb,0:nsf)
+    real(8),intent(out):: gsf(0:nsf,natm),dgsf(3,namax,namax,nsf)
 
     integer:: isf,ia,jj,ja,kk,ka
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
@@ -149,6 +169,7 @@ contains
 
     gsf(0:nsf,1:natm)= 0d0
     gsf(0,1:natm)= 1d0
+    dgsf(1:3,1:natm+nb,1:natm,1:nsf)= 0d0
 
     do isf=1,nsf
       if( itype(isf).eq.1 ) then ! Gaussian (2-body)
@@ -172,8 +193,8 @@ contains
             driji(1:3)= -rij(1:3)/dij
             drijj(1:3)= -driji(1:3)
             dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfc(dij,rc)
-            dgsf(1:3,ia,isf)= dgsf(1:3,ia,isf) +driji(1:3)*dgdr
-            dgsf(1:3,ja,isf)= dgsf(1:3,ja,isf) +drijj(1:3)*dgdr
+            dgsf(1:3,ia,ia,isf)= dgsf(1:3,ia,ia,isf) +driji(1:3)*dgdr
+            dgsf(1:3,ja,ia,isf)= dgsf(1:3,ja,ia,isf) +drijj(1:3)*dgdr
           enddo
         enddo
 
@@ -210,21 +231,21 @@ contains
               cs= spijk/dij/dik
               t1= (almbd +cs)**2
               t2= (abs(almbd)+1d0)**2
-              gsf(isf,ia)= gsf(isf,ia) +1d0/t2*t1*fcij*fcik
+              gsf(isf,ia)= gsf(isf,ia) +1d0/t2 *t1 *fcij*fcik
               !.....derivative
-              dgdij= t1/t2 *dfcij*fcik
-              dgdik= t1/t2 *fcij*dfcik
+              dgdij= t1/t2 *dfcij *fcik
+              dgdik= t1/t2 *fcij *dfcik
               dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik
-              dgsf(1:3,ia,isf)= dgsf(1:3,ia,isf) +dgdij*driji(1:3) &
-                   +dgdik*driki(1:3)
-              dgsf(1:3,ja,isf)= dgsf(1:3,ja,isf) +dgdij*drijj(1:3)
-              dgsf(1:3,ka,isf)= dgsf(1:3,ka,isf) +dgdik*drikk(1:3)
+              dgsf(1:3,ia,ia,isf)= dgsf(1:3,ia,ia,isf) &
+                   +dgdij*driji(1:3) +dgdik*driki(1:3)
+              dgsf(1:3,ja,ia,isf)= dgsf(1:3,ja,ia,isf) +dgdij*drijj(1:3)
+              dgsf(1:3,ka,ia,isf)= dgsf(1:3,ka,ia,isf) +dgdik*drikk(1:3)
               dcsdj(1:3)= rij(1:3)*(1d0-spijk/dij/dij)/dij/dik
               dcsdk(1:3)= rik(1:3)*(1d0-spijk/dik/dik)/dij/dik
               dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
-              dgsf(1:3,ia,isf)= dgsf(1:3,ia,isf) +dgcs*dcsdi(1:3)
-              dgsf(1:3,ja,isf)= dgsf(1:3,ja,isf) +dgcs*dcsdj(1:3)
-              dgsf(1:3,ka,isf)= dgsf(1:3,ka,isf) +dgcs*dcsdk(1:3)
+              dgsf(1:3,ia,ia,isf)= dgsf(1:3,ia,ia,isf) +dgcs*dcsdi(1:3)
+              dgsf(1:3,ja,ia,isf)= dgsf(1:3,ja,ia,isf) +dgcs*dcsdj(1:3)
+              dgsf(1:3,ka,ia,isf)= dgsf(1:3,ka,ia,isf) +dgcs*dcsdk(1:3)
             enddo
           enddo
         enddo

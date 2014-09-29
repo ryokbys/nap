@@ -9,7 +9,7 @@ import sys,os
 constfname='in.const.linreg'
 
 nexp= 2 # which includes [0.5, 1]
-exps=[1.0, 2.0, 0.5]
+exps=[0.5, 1.0]
 #.....Gaussian
 range_exp_gauss=[0.0,5.0]
 num_exp_gauss= 5

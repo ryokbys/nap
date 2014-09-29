@@ -1,7 +1,8 @@
 !-----Si mass (to be multiplied by umass)
       real(8),parameter:: am_si = 28.0855d0
-!.....scaling factor for matching this pot to VASP
-      real(8),parameter:: sfac  = 1.0116386d0
+!!.....scaling factor for matching this pot to VASP
+!      real(8),parameter:: sfac  = 1.0116386d0
+      real(8),parameter:: sfac  = 1d0
 !-----EDIP Si
       real(8),parameter:: ed_aa = 7.9821730d0
       real(8),parameter:: ed_bb = 1.5075463d-10 /ang *sfac

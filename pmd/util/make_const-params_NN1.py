@@ -15,30 +15,31 @@ rcut= 7.0
 pmin= -1.0
 pmax=  1.0
 #.....num of eta in 2-body symmetry function
-neta= 5
-reta=[0.01, 0.05, 0.1, 0.2, 0.4, 1.0]
+#reta=[0.01, 0.05, 0.1, 0.2, 0.4, 1.0]
+reta=[0.05]
 #.....num of Rs in 2-body symmetry function
-nrs= 3
-rrs=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+rrs=[2.0]
 #.....num of 3-body angular symmetry functions
-nsf3= 5
-rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 1.0]
+#rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 1.0]
+rsf3=[1.0/3]
 #.....num of nodes in a layer
-nhl1= 10
+#nhl1= 10
+nhl1= 3
 
 #.....num of 2-body Gaussian-type symmetry functions
-nsf2= neta*nrs
+nsf2= len(reta)*len(rrs)
+nsf3= len(rsf3)
 
 f= open(constfname,'w')
 nsf= nsf2+nsf3
 f.write(' {0:5d} {1:5d}\n'.format(nsf,nhl1))
 #.....2-body Gaussian-type
-for ieta in range(neta):
-    for irs in range(nrs):
-        f.write(' 1 {0:10.4f} {1:10.4f}\n'.format(reta[ieta],rrs[irs]))
+for eta in reta:
+    for rs in rrs:
+        f.write(' 1 {0:10.4f} {1:10.4f}\n'.format(eta,rs))
 #.....3-body
-for isf3 in range(nsf3):
-    f.write(' 2 {0:10.4f}\n'.format(rsf3[isf3]))
+for sf3 in rsf3:
+    f.write(' 2 {0:10.4f}\n'.format(sf3))
 f.close()
 
 g= open(paramfname,'w')
