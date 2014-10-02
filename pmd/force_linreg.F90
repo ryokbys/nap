@@ -225,7 +225,7 @@ contains
           dfck= dfc(rk,rc)
           dirik(1:3)= -rik(1:3)/rk
           dkrik(1:3)= -dirik(1:3)
-          if( itype(ielem).eq.4 ) then
+          if( itype(ielem).eq.3 ) then
             acnst= cnst(1,ielem)
             cs= sprod(rij,rik)/rj/rk
             f3= func3(rij,rj,rik,rk,ielem)
@@ -422,7 +422,7 @@ contains
     real(8),external:: sprod 
 
     func3= 0d0
-    if( itype(ielem).eq.4 ) then ! angular
+    if( itype(ielem).eq.3 ) then ! angular
       a(1)= cnst(1,ielem) 
       cs= sprod(rij,rik)/rj/rk
       func3= (a(1)+cs)**2/(abs(a(1))+1d0)**2

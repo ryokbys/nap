@@ -1,7 +1,7 @@
 #!/opt/local/bin/python
 # -*- coding: utf-8 -*-
 
-u"""Fit parameters of a certain potential to DFT data.
+"""Fit parameters of a certain potential to DFT data.
 
 The potential must be specified in pmd input file, in.pmd.
 """
@@ -38,7 +38,8 @@ rcut= 0.0
 vars= []
 vranges=[]
 l1st_call= True
-bases= []
+bases= []  # bases in linreg that can be recycled during fitting
+bmax= []
 
 #.....input parameters
 nsmpl= 1
@@ -55,8 +56,12 @@ ftol= 1e-5
 eps = 1e-8
 eatom= np.zeros(max_species)
 fmatch= True
+regularize= False
 penalty= 'no'
 pweight= 1.0
+lswgt= False
+swgt= []
+swbeta= 1.0
 #.....GA parameters
 ga_nindv= 10
 ga_nbit= 16
@@ -121,15 +126,28 @@ def write_params(fname,x):
     vars_to_params(x)
     f=open(fname,'w')
     f.write(' {0:6d} {1:10.4f}\n'.format(nprms,rcut))
-    for i in range(nprms):
-        if abs(prange[i,0]) >= large and abs(prange[i,1]) >= large:
-            f.write('{0:22.14e} \n'.format(params[i]))
-        elif prange[i,0] == prange[i,1]:
-            f.write('{0:22.14e} {1:22.14e}\n'.format(params[i],prange[i,0]))
-        else:
-            f.write('{0:22.14e} {1:22.14e} {2:22.14e}\n'.format(params[i],
-                                                                prange[i,0],
-                                                                prange[i,1]))
+    #if potential in ('linreg') and not fmethod in ('test','TEST'):
+    if potential in ('linreg') and regularize:
+        print '>>>>> writing params by multiplying bmax...'
+        for i in range(nprms):
+            if abs(prange[i,0]) >= large and abs(prange[i,1]) >= large:
+                f.write('{0:22.14e} \n'.format(params[i]/bmax[i]))
+            elif prange[i,0] == prange[i,1]:
+                f.write('{0:22.14e} {1:22.14e}\n'.format(params[i]/bmax[i],prange[i,0]))
+            else:
+                f.write('{0:22.14e} {1:22.14e} {2:22.14e}\n'.format(params[i]/bmax[i],
+                                                                    prange[i,0],
+                                                                    prange[i,1]))
+    else:
+        for i in range(nprms):
+            if abs(prange[i,0]) >= large and abs(prange[i,1]) >= large:
+                f.write('{0:22.14e} \n'.format(params[i]))
+            elif prange[i,0] == prange[i,1]:
+                f.write('{0:22.14e} {1:22.14e}\n'.format(params[i],prange[i,0]))
+            else:
+                f.write('{0:22.14e} {1:22.14e} {2:22.14e}\n'.format(params[i],
+                                                                    prange[i,0],
+                                                                    prange[i,1]))
     f.close()
 
 def params_to_vars(x,xr):
@@ -158,7 +176,9 @@ def vars_to_params(x):
 
 def read_input(fname='in.fitpot'):
     global nsmpl,niter,fmethod,maindir,parfile,runmode,eps \
-           ,xtol,gtol,ftol,fmatch,penalty,pweight,gradient,potential
+           ,xtol,gtol,ftol,fmatch,penalty,pweight,gradient,potential \
+           ,regularize
+    global lswgt,swbeta
     global eatom,ga_nindv,ga_nbit,ga_temp
     dict={}
     f= open(fname,'r')
@@ -204,6 +224,12 @@ def read_input(fname='in.fitpot'):
                 potential= data[1]
             elif data[0] == 'gradient':
                 gradient= data[1]
+            elif data[0] == 'regularize':
+                regularize= data[1]
+            elif data[0] == 'sample_weight':
+                lswgt= data[1]
+            elif data[0] == 'sample_weight_beta':
+                swbeta= float(data[1])
             #.....GA parameters
             elif data[0] == 'ga_num_individuals':
                 ga_nindv= int(data[1])
@@ -258,6 +284,8 @@ def gather_pmd_data(basedir):
 
 def gather_ref_data(basedir):
     global ergrefs,frcrefs
+    global swgt
+    
     #.....initialize variables
     ergrefs=np.zeros(len(samples))
     for smpl in samples:
@@ -287,6 +315,19 @@ def gather_ref_data(basedir):
             for k in range(3):
                 frcrefs[i][j,k]= float(data[k])
         ff.close()
+
+    #.....calc sample weight if required
+    swgt= np.array([ 1.0 for i in range(len(samples))])
+    if lswgt:
+        #.....get minimum energy
+        emin= 1.0e+30
+        for ismpl in range(len(samples)):
+            natm= samples[ismpl].natm
+            emin= min(emin,ergrefs[ismpl]/natm)
+        #.....compute sample weight
+        for ismpl in range(len(samples)):
+            swgt[ismpl]= math.exp(-swbeta*(ergrefs[ismpl]/natm \
+                                           -emin))
 
 #============================================= function evaluation
 def func(x,*args):
@@ -353,13 +394,19 @@ def func(x,*args):
 def eval_L(cergs,cfrcs,rergs,rfrcs,samples):
     val= 0.0
     for i in range(len(samples)):
-        val += (cergs[i]-rergs[i])**2
+        natm= samples[i].natm
+        sw= 1.0
+        if lswgt:
+            sw= swgt[i]
+        vi= ((cergs[i]-rergs[i])/natm)**2
+        vi *= sw
+        val += vi
         if not fmatch:
             continue
-        for j in range(samples[i].natm):
+        for j in range(natm):
             for k in range(3):
                 val += (cfrcs[i][j,k]-rfrcs[i][j,k])**2  \
-                       /(3*samples[i].natm)
+                       /(3*natm) *sw
     return val
 
 def calc_ef_from_bases(x,dir):
@@ -403,9 +450,20 @@ def read_bases(dir):
     if l1st_call:
         if potential in ('linreg'):
             bases= gather_basis_linreg(dir)
+            if regularize:
+                regularize_bases_linreg(bases)
         elif potential in ('NN1'):
             bases= gather_basis_NN1(dir)
         l1st_call= False
+
+def scale_vars(x,fac):
+    if len(x) != len(fac):
+        print ' [Error] len(x) != len(fac) !!!'
+        exit()
+    newx= np.zeros(len(x))
+    for i in range(len(x)):
+        newx[i]= x[i]*fac[i]
+    return newx
 
 #======================================== derivative of linreg potential
 def grad_linreg(x,*args):
@@ -422,17 +480,23 @@ def grad_linreg(x,*args):
     for iprm in range(len(params)):
         for ismpl in range(len(samples)):
             smpl= samples[ismpl]
-            ediff= ergs[ismpl] -ergrefs[ismpl]
+            sw= 1.0
+            if lswgt:
+                sw= swgt[ismpl]
+            ediff= (ergs[ismpl]-ergrefs[ismpl])/smpl.natm *sw
             bs= 0.0
             for ia in range(smpl.natm):
                 bs += bases[ismpl][ia,iprm]
-            grad[iprm] += 2.0*ediff*bs
+            grad[iprm] += 2.0*ediff*bs/smpl.natm
             
     if fmatch:
         for iprm in range(len(params)):
             dlprm= 0.0
             for ismpl in range(len(samples)):
                 smpl= samples[ismpl]
+                sw= 1.0
+                if lswgt:
+                    sw= swgt[ismpl]
                 dbs= np.zeros(3)
                 fdiff= np.zeros(3)
                 for ia in range(smpl.natm):
@@ -441,7 +505,7 @@ def grad_linreg(x,*args):
                     dlprm -= 2.0*( fdiff[0]*dbs[0] \
                                        +fdiff[1]*dbs[1] \
                                        +fdiff[2]*dbs[2] ) \
-                                       /(smpl.natm*3)
+                                       /(smpl.natm*3) *sw
             grad[iprm] += dlprm
 
     if penalty in ('ridge','Ridge','RIDGE'):
@@ -496,7 +560,40 @@ def gather_basis_linreg(basedir):
         bdata.append(dbasis)
         g.close()
     return bdata
-            
+
+def regularize_bases_linreg(bases):
+    """Regularize bases linearly.
+    """
+    global bmax
+
+    #.....compute max of each basis
+    #print ' Max value of each basis:'
+    bmax= np.zeros(len(params))
+    for ip in range(len(params)):
+        for ismpl in range(len(samples)):
+            smpl= samples[ismpl]
+            basis= bases[ismpl]
+            for ia in range(smpl.natm):
+                bmax[ip]= max(bmax[ip],basis[ia,ip])
+        #print '   ip,bmax[ip]=',ip,bmax[ip]
+
+    #.....regularize bases
+    for ip in range(len(params)):
+        for ismpl in range(len(samples)):
+            smpl= samples[ismpl]
+            for ia in range(smpl.natm):
+                bases[ismpl][ia,ip] /= bmax[ip]
+    if fmatch:
+        for ip in range(len(params)):
+            for ismpl in range(len(samples)):
+                smpl= samples[ismpl]
+                basis= bases[len(samples)+ismpl]
+                for ia in range(smpl.natm):
+                    basis[ia,ip,0] /= bmax[ip]
+                    basis[ia,ip,1] /= bmax[ip]
+                    basis[ia,ip,2] /= bmax[ip]
+    
+    
 #=========================================== derivative of NN1 potential
 def grad_NN1(x,*args):
     dir= args[0]
@@ -727,32 +824,47 @@ def output_energy_relation(ergs,fname='out.erg.pmd-vs-dft'):
         f.write(' {0:15.7e} {1:15.7e}\n'.format(ergrefs[i]/smpl.natm \
                                               ,ergs[i]/smpl.natm ))
     f.close()
-
+    
 def output_force_relation(frcs,fname='out.frc.pmd-vs-dft'):
     f= open(fname,'w')
     for i in range(len(samples)):
         for j in range(samples[i].natm):
             for k in range(3):
-                f.write(' {0:15.7e} {1:15.7e}\n'.format(frcrefs[i][j,k],frcs[i][j,k]))
+                f.write(' {0:15.7e} {1:15.7e}\n'.format(frcrefs[i][j,k], \
+                                                        frcs[i][j,k]))
     f.close()
 
-# def plot_energy_relation(ergs,fname='graph.eps'):
-#     x=ergrefs
-#     y=ergs
-#     plt.scatter(x,y)
-#     xmin,xmax= plt.xlim()
-#     ymin,ymax= plt.ylim()
-#     xmax= max(xmax,ymax)
-#     xmin= min(xmin,ymin)
-#     dat= np.arange(xmin,xmax,50.0)
-#     plt.plot(dat,dat,'b--')
-#     plt.xlabel('DFT energy (eV)')
-#     plt.ylabel('pmd energy (eV)')
-#     plt.title('DFT and pmd energy relation')
-#     plt.xlim(xmin,xmax)
-#     plt.ylim(xmin,xmax)
-#     plt.savefig(fname)
-#     #plt.show()
+def output_statistics(ergs,frcs):
+    print '>>>>> statistics:'
+    #.....statistics of energies
+    demax= 0.0
+    desum= 0.0
+    for i in range(len(samples)):
+        smpl= samples[i]
+        de= abs(ergs[i]-ergrefs[i])/smpl.natm
+        demax= max(demax,de)
+        desum += de**2/len(samples)
+    rmse= math.sqrt(desum)
+    print '  RMSE of energies        = {0:12.3f} eV/atom'.format(rmse)
+    print '  Max residual of energies= {0:12.3f} eV/atom'.format(demax)
+
+    #.....statistics of forces
+    dfmax= 0.0
+    dfsum= 0.0
+    n= 0
+    for i in range(len(samples)):
+        smpl= samples[i]
+        for j in range(smpl.natm):
+            for k in range(3):
+                df= abs(frcs[i][j,k]-frcrefs[i][j,k])
+                dfmax= max(dfmax,df)
+                dfsum += df**2
+                n += 1
+    rmse= math.sqrt(dfsum/n)
+    print '  RMSE of forces          = {0:12.3f} eV/A'.format(rmse)
+    print '  Max residual of forces  = {0:12.3f} eV/A'.format(dfmax)
+    
+
 
 #================================================== GA wrapper
 def fitfunc1(val):
@@ -813,8 +925,6 @@ def sd_dynamics(f,x,args=(),fprime=None,maxiter=10):
         x += -alpha *grad
         val=f(x,args[0])
     print ' final value= {0:20.7f}'.format(val)
-    #print ' final variabls:'
-    #print x
     return x
     
 #============================================= main routine hereafter
@@ -827,7 +937,8 @@ if __name__ == '__main__':
     show_input_params('in.fitpot')
     #.....params: parameters in in.params.?????
     read_params(maindir+'/'+parfile)
-    write_params(maindir+'/'+parfile+'.ini',vars)
+    os.system('cp '+maindir+'/'+parfile+' '+maindir+'/'+parfile+'.ini')
+    #write_params(maindir+'/'+parfile+'.ini',vars)
     
     #.....get samples from ##### directories
     sample_dirs= get_sample_dirs()
@@ -839,9 +950,14 @@ if __name__ == '__main__':
 
     #.....initial data
     gather_ref_data(maindir)
+    #.....read bases data if needed
+    if potential in ('linreg') and not fmethod in ('test','TEST'):
+        read_bases(maindir)
+        if regularize:
+            vars= scale_vars(vars,bmax)
     #.....1st call of func
     func(vars,maindir)
-    if potential in ('linreg'):
+    if potential in ('linreg') and not fmethod in ('test','TEST'):
         ergs,frcs= calc_ef_from_bases(vars,maindir)
     else:
         ergs,frcs= gather_pmd_data(maindir)
@@ -925,14 +1041,18 @@ if __name__ == '__main__':
             elif potential == 'NN2':
                 grad= grad_NN2(vars,maindir)
             agrad= opt.approx_fprime(vars,func,eps,maindir)
+            print ''
+            print '>>>>> check_grad report:'
             print ' diff =',np.sqrt(np.sum((grad-agrad)**2))
-            print ' grad       aprrox_grad'
+            print '                grad           aprrox_grad        error (%)'
             for i in range(len(grad)):
-                print ' {0:12.6f} {1:12.6f}'.format(grad[i],agrad[i])
+                print ' {0:20.6f} {1:20.6f} {2:12.2f}'.format(grad[i],\
+                                                             agrad[i],\
+                                                             abs(grad[i]-agrad[i])/abs(grad[i])*100)
         solution= vars
     elif fmethod in ('test','TEST'):
         print '>>>>> TEST was selected.'
-        func(vars,maindir)
+        #func(vars,maindir) # func is already evaluated before 
         if gradient != 'numerical':
             if potential in ('linreg'):
                 grad_linreg(vars,maindir)
@@ -945,11 +1065,12 @@ if __name__ == '__main__':
     write_params(maindir+'/'+parfile+'.fin',solution)
 
     if potential in ('linreg'):
-        ergs,frcs= calc_ef_from_bases(vars,maindir)
+        ergs,frcs= calc_ef_from_bases(solution,maindir)
     else:
         ergs,frcs= gather_pmd_data(maindir)
     output_energy_relation(ergs,fname='out.erg.pmd-vs-dft.fin')
     output_force_relation(frcs,fname='out.frc.pmd-vs-dft.fin')
+    output_statistics(ergs,frcs)
 
     print '{0:=^72}'.format(' FITPOT finished correctly ')
     print '   Elapsed time = {0:12.2f}'.format(time.time()-t0)
