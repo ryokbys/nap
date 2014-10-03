@@ -448,31 +448,33 @@ def calc_ef_from_bases(x,dir):
         #                 fs[ismpl][ia,2] -= x[iprm] *dbs[2]
         if nprcs == 1:
             for ismpl in range(len(samples)):
-                est,fst= calc_ef_linreg(x,ismpl)
+                smpl= samples[ismpl]
+                est,fst= calc_ef_linreg(ismpl,x)
                 es[ismpl]= est
                 for ia in range(smpl.natm):
-                    fs[ismpl][ia,0]= fst[ia,0]
-                    fs[ismpl][ia,1]= fst[ia,1]
-                    fs[ismpl][ia,2]= fst[ia,2]
+                    fs[ismpl][ia,0] += fst[ia,0]
+                    fs[ismpl][ia,1] += fst[ia,1]
+                    fs[ismpl][ia,2] += fst[ia,2]
         else:
             func_args=[]
             for ismpl in range(len(samples)):
-                func_args.append( (calc_ef_linreg,x,ismpl) )
+                func_args.append( (calc_ef_linreg,ismpl,x) )
             results= p.map(arg_wrapper,func_args)
             for ismpl in range(len(samples)):
+                smpl= samples[ismpl]
                 est,fst= results[ismpl]
                 es[ismpl]= est
                 for ia in range(smpl.natm):
-                    fs[ismpl][ia,0]= fst[ia,0]
-                    fs[ismpl][ia,1]= fst[ia,1]
-                    fs[ismpl][ia,2]= fst[ia,2]
+                    fs[ismpl][ia,0] += fst[ia,0]
+                    fs[ismpl][ia,1] += fst[ia,1]
+                    fs[ismpl][ia,2] += fst[ia,2]
 
     elif potential in ('NN1'):
         print " NN1 is not yet implemented..."
 
     return (es,fs)
 
-def calc_ef_linreg(x,ismpl):
+def calc_ef_linreg(ismpl,x):
     smpl= samples[ismpl]
     es= 0.0
     fs= np.zeros((smpl.natm,3))
@@ -482,9 +484,10 @@ def calc_ef_linreg(x,ismpl):
             es += x[iprm] *bases[ismpl][ia,iprm]
     #.....calc forces
     if fmatch:
+        basis= bases[len(samples)+ismpl]
         for ia in range(smpl.natm):
             for iprm in range(len(params)):
-                dbs=bases[len(samples)+ismpl][ia,iprm]
+                dbs=basis[ia,iprm]
                 fs[ia,0] -= x[iprm] *dbs[0]
                 fs[ia,1] -= x[iprm] *dbs[1]
                 fs[ia,2] -= x[iprm] *dbs[2]
