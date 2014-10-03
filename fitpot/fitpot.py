@@ -13,6 +13,7 @@ import numpy as np
 import scipy.optimize as opt
 # import matplotlib.pyplot as plt
 import math
+import multiprocessing as mp
 
 #.....import from local modules
 from MD_system import MD_system
@@ -62,6 +63,7 @@ pweight= 1.0
 lswgt= False
 swgt= []
 swbeta= 1.0
+nprcs= 1
 #.....GA parameters
 ga_nindv= 10
 ga_nbit= 16
@@ -178,7 +180,7 @@ def read_input(fname='in.fitpot'):
     global nsmpl,niter,fmethod,maindir,parfile,runmode,eps \
            ,xtol,gtol,ftol,fmatch,penalty,pweight,gradient,potential \
            ,regularize
-    global lswgt,swbeta
+    global lswgt,swbeta,nprcs
     global eatom,ga_nindv,ga_nbit,ga_temp
     dict={}
     f= open(fname,'r')
@@ -225,11 +227,15 @@ def read_input(fname='in.fitpot'):
             elif data[0] == 'gradient':
                 gradient= data[1]
             elif data[0] == 'regularize':
-                regularize= data[1]
+                if data[1] in ('true','True','yes','YES','y','Y','1'):
+                    regularize= True
             elif data[0] == 'sample_weight':
-                lswgt= data[1]
+                if data[1] in ('true','True','yes','YES','y','Y','1'):
+                    lswgt= True
             elif data[0] == 'sample_weight_beta':
                 swbeta= float(data[1])
+            elif data[0] == 'num_multiprocess':
+                nprcs= int(data[1])
             #.....GA parameters
             elif data[0] == 'ga_num_individuals':
                 ga_nindv= int(data[1])
@@ -336,7 +342,7 @@ def func(x,*args):
     This will be called from scipy.optimize.fmin_cg().
     The 1st argument x should be 1-D array of variables.
     """
-
+    t0= time.time()
     #.....write parameters to in.params.????? file
     dir= args[0]
 
@@ -389,6 +395,7 @@ def func(x,*args):
         val += p*pweight
         print ' total L value=',val
     sys.stdout.flush()
+    print ' ===> time func: {0:12.3f} sec'.format(time.time()-t0)
     return val
 
 def eval_L(cergs,cfrcs,rergs,rfrcs,samples):
@@ -418,30 +425,73 @@ def calc_ef_from_bases(x,dir):
     fs= []
     for smpl in samples:
         fs.append(np.zeros((smpl.natm,3)))
+
+    p= mp.Pool(nprcs)
     
     if potential in ('linreg'):
-        #.....calc energies
-        for ismpl in range(len(samples)):
-            smpl= samples[ismpl]
-            for ia in range(smpl.natm):
-                for iprm in range(len(params)):
-                    es[ismpl] += x[iprm] *bases[ismpl][ia,iprm]
-
-        #.....calc forces
-        if fmatch:
+        # #.....calc energies
+        # for ismpl in range(len(samples)):
+        #     smpl= samples[ismpl]
+        #     for ia in range(smpl.natm):
+        #         for iprm in range(len(params)):
+        #             es[ismpl] += x[iprm] *bases[ismpl][ia,iprm]
+        # 
+        # #.....calc forces
+        # if fmatch:
+        #     for ismpl in range(len(samples)):
+        #         smpl= samples[ismpl]
+        #         for ia in range(smpl.natm):
+        #             for iprm in range(len(params)):
+        #                 dbs=bases[len(samples)+ismpl][ia,iprm]
+        #                 fs[ismpl][ia,0] -= x[iprm] *dbs[0]
+        #                 fs[ismpl][ia,1] -= x[iprm] *dbs[1]
+        #                 fs[ismpl][ia,2] -= x[iprm] *dbs[2]
+        if nprcs == 1:
             for ismpl in range(len(samples)):
-                smpl= samples[ismpl]
+                est,fst= calc_ef_linreg(x,ismpl)
+                es[ismpl]= est
                 for ia in range(smpl.natm):
-                    for iprm in range(len(params)):
-                        dbs=bases[len(samples)+ismpl][ia,iprm]
-                        fs[ismpl][ia,0] -= x[iprm] *dbs[0]
-                        fs[ismpl][ia,1] -= x[iprm] *dbs[1]
-                        fs[ismpl][ia,2] -= x[iprm] *dbs[2]
+                    fs[ismpl][ia,0]= fst[ia,0]
+                    fs[ismpl][ia,1]= fst[ia,1]
+                    fs[ismpl][ia,2]= fst[ia,2]
+        else:
+            func_args=[]
+            for ismpl in range(len(samples)):
+                func_args.append( (calc_ef_linreg,x,ismpl) )
+            results= p.map(arg_wrapper,func_args)
+            for ismpl in range(len(samples)):
+                est,fst= results[ismpl]
+                es[ismpl]= est
+                for ia in range(smpl.natm):
+                    fs[ismpl][ia,0]= fst[ia,0]
+                    fs[ismpl][ia,1]= fst[ia,1]
+                    fs[ismpl][ia,2]= fst[ia,2]
 
     elif potential in ('NN1'):
         print " NN1 is not yet implemented..."
 
     return (es,fs)
+
+def calc_ef_linreg(x,ismpl):
+    smpl= samples[ismpl]
+    es= 0.0
+    fs= np.zeros((smpl.natm,3))
+    #.....calc energy
+    for ia in range(smpl.natm):
+        for iprm in range(len(params)):
+            es += x[iprm] *bases[ismpl][ia,iprm]
+    #.....calc forces
+    if fmatch:
+        for ia in range(smpl.natm):
+            for iprm in range(len(params)):
+                dbs=bases[len(samples)+ismpl][ia,iprm]
+                fs[ia,0] -= x[iprm] *dbs[0]
+                fs[ia,1] -= x[iprm] *dbs[1]
+                fs[ia,2] -= x[iprm] *dbs[2]
+    return (es,fs)
+
+def arg_wrapper(args):
+    return args[0](*args[1:])
 
 def read_bases(dir):
     global bases,l1st_call
@@ -468,6 +518,7 @@ def scale_vars(x,fac):
 #======================================== derivative of linreg potential
 def grad_linreg(x,*args):
     global bases
+    t0= time.time()
     dir= args[0]
 
     read_bases(dir)
@@ -475,38 +526,54 @@ def grad_linreg(x,*args):
     #.....gather pmd results
     ergs,frcs= calc_ef_from_bases(x,dir)
     # ergs,frcs= gather_pmd_data(dir)
+
+    p=mp.Pool(nprcs)
     
     grad= np.zeros(len(params))
-    for iprm in range(len(params)):
+    # for ismpl in range(len(samples)):
+    #     smpl= samples[ismpl]
+    #     sw= 1.0
+    #     if lswgt:
+    #         sw= swgt[ismpl]
+    #     ediff= (ergs[ismpl]-ergrefs[ismpl])/smpl.natm *sw
+    #     for iprm in range(len(params)):
+    #         bs= 0.0
+    #         for ia in range(smpl.natm):
+    #             bs += bases[ismpl][ia,iprm]
+    #         grad[iprm] += 2.0*ediff*bs/smpl.natm
+    #         
+    # if fmatch:
+    #     for ismpl in range(len(samples)):
+    #         smpl= samples[ismpl]
+    #         sw= 1.0
+    #         if lswgt:
+    #             sw= swgt[ismpl]
+    #         for iprm in range(len(params)):
+    #             dlprm= 0.0
+    #             dbs= np.zeros(3)
+    #             fdiff= np.zeros(3)
+    #             for ia in range(smpl.natm):
+    #                 fdiff= frcs[ismpl][ia] -frcrefs[ismpl][ia]
+    #                 dbs= bases[len(samples)+ismpl][ia,iprm]
+    #                 dlprm -= 2.0*( fdiff[0]*dbs[0] \
+    #                                    +fdiff[1]*dbs[1] \
+    #                                    +fdiff[2]*dbs[2] ) \
+    #                                    /(smpl.natm*3) *sw
+    #             grad[iprm] += dlprm
+    if nprcs == 1:
         for ismpl in range(len(samples)):
-            smpl= samples[ismpl]
-            sw= 1.0
-            if lswgt:
-                sw= swgt[ismpl]
-            ediff= (ergs[ismpl]-ergrefs[ismpl])/smpl.natm *sw
-            bs= 0.0
-            for ia in range(smpl.natm):
-                bs += bases[ismpl][ia,iprm]
-            grad[iprm] += 2.0*ediff*bs/smpl.natm
-            
-    if fmatch:
-        for iprm in range(len(params)):
-            dlprm= 0.0
-            for ismpl in range(len(samples)):
-                smpl= samples[ismpl]
-                sw= 1.0
-                if lswgt:
-                    sw= swgt[ismpl]
-                dbs= np.zeros(3)
-                fdiff= np.zeros(3)
-                for ia in range(smpl.natm):
-                    fdiff= frcs[ismpl][ia] -frcrefs[ismpl][ia]
-                    dbs= bases[len(samples)+ismpl][ia,iprm]
-                    dlprm -= 2.0*( fdiff[0]*dbs[0] \
-                                       +fdiff[1]*dbs[1] \
-                                       +fdiff[2]*dbs[2] ) \
-                                       /(smpl.natm*3) *sw
-            grad[iprm] += dlprm
+            gs= grad_linreg_core(ismpl,ergs,frcs)
+            for iprm in range(len(params)):
+                grad[iprm] += gs[iprm]
+    else:
+        func_args=[]
+        for ismpl in range(len(samples)):
+            func_args.append( (grad_linreg_core,ismpl,ergs,frcs) )
+        results= p.map(arg_wrapper,func_args)
+        for ismpl in range(len(samples)):
+            gs= results[ismpl]
+            for iprm in range(len(params)):
+                grad[iprm] += gs[iprm]
 
     if penalty in ('ridge','Ridge','RIDGE'):
         p= 0.0
@@ -519,8 +586,38 @@ def grad_linreg(x,*args):
         lx= len(x)
         for n in range(lx):
             grad[n] += pweight *np.sign(x[n])
-            
+    print ' ===> time grad_linreg: {0:12.3f} sec'.format(time.time()-t0)
     return grad
+
+def grad_linreg_core(ismpl,ergs,frcs):
+    gs= np.zeros(len(params))
+    smpl= samples[ismpl]
+    sw= 1.0
+    if lswgt:
+        sw= swgt[ismpl]
+    ediff= (ergs[ismpl]-ergrefs[ismpl])/smpl.natm *sw
+    basis= bases[ismpl]
+    for iprm in range(len(params)):
+        bs= 0.0
+        for ia in range(smpl.natm):
+            bs += basis[ia,iprm]
+        gs[iprm] += 2.0*ediff*bs/smpl.natm
+            
+    if fmatch:
+        basis= bases[len(samples)+ismpl]
+        for iprm in range(len(params)):
+            dlprm= 0.0
+            dbs= np.zeros(3)
+            fdiff= np.zeros(3)
+            for ia in range(smpl.natm):
+                fdiff= frcs[ismpl][ia] -frcrefs[ismpl][ia]
+                dbs= basis[ia,iprm]
+                dlprm -= 2.0*( fdiff[0]*dbs[0] \
+                               +fdiff[1]*dbs[1] \
+                               +fdiff[2]*dbs[2] ) \
+                               /(smpl.natm*3) *sw
+            gs[iprm] += dlprm
+    return gs
 
 def gather_basis_linreg(basedir):
     bdata= []
