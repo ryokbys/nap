@@ -25,7 +25,7 @@ contains
 !  Parallel implementation of neural-network potential of only one
 !  hidden layer.
 !    - 2014.07.01 by R.K.
-!      start coding
+!      started coding
 !-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
@@ -56,7 +56,7 @@ contains
              ,rc,' to ',rcin
       endif
       rc= rcin
-      allocate(gsf(0:nsf,natm),dgsf(3,namax,namax,nsf)&
+      allocate(gsf(0:nsf,natm),dgsf(3,nsf,namax,namax) &
            ,hl1(0:nhl1,natm))
       l1st= .false.
     endif
@@ -113,14 +113,14 @@ contains
 !.....sum up for forces
     strs(1:3,1:3,1:natm)= 0d0
     aa(1:3,1:natm+nb)= 0d0
-    do ia=1,natm+nb
-      do isf=1,nsf ! there is no longer a bias node, 0
-        do ja=1,natm
-          do ihl1=1,nhl1 ! there is no longer a bias node, 0
-            hl1i= hl1(ihl1,ja)
-            tmp= wgt2(ihl1)*hl1i*(1d0-hl1i)
+    do ja=1,natm
+      do ihl1=1,nhl1 ! there is no longer a bias node, 0
+        hl1i= hl1(ihl1,ja)
+        tmp= wgt2(ihl1)*hl1i*(1d0-hl1i)
+        do ia=1,natm+nb
+          do isf=1,nsf ! there is no longer a bias node, 0
             aa(1:3,ia)=aa(1:3,ia) &
-                 -tmp*wgt1(ihl1,isf)*dgsf(1:3,ia,ja,isf)
+                 -tmp*wgt1(ihl1,isf)*dgsf(1:3,isf,ia,ja)
           enddo
         enddo
       enddo
@@ -157,7 +157,7 @@ contains
     implicit none
     integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
-    real(8),intent(out):: gsf(0:nsf,natm),dgsf(3,namax,namax,nsf)
+    real(8),intent(out):: gsf(0:nsf,natm),dgsf(3,nsf,namax,namax)
 
     integer:: isf,ia,jj,ja,kk,ka
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
@@ -169,7 +169,7 @@ contains
 
     gsf(0:nsf,1:natm)= 0d0
     gsf(0,1:natm)= 1d0
-    dgsf(1:3,1:natm+nb,1:natm,1:nsf)= 0d0
+    dgsf(1:3,1:nsf,1:natm+nb,1:natm)= 0d0
 
     do isf=1,nsf
       if( itype(isf).eq.1 ) then ! Gaussian (2-body)
@@ -193,12 +193,14 @@ contains
             driji(1:3)= -rij(1:3)/dij
             drijj(1:3)= -driji(1:3)
             dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfc(dij,rc)
-            dgsf(1:3,ia,ia,isf)= dgsf(1:3,ia,ia,isf) +driji(1:3)*dgdr
-            dgsf(1:3,ja,ia,isf)= dgsf(1:3,ja,ia,isf) +drijj(1:3)*dgdr
+            dgsf(1:3,isf,ia,ia)= dgsf(1:3,isf,ia,ia) +driji(1:3)*dgdr
+            dgsf(1:3,isf,ja,ia)= dgsf(1:3,isf,ja,ia) +drijj(1:3)*dgdr
           enddo
         enddo
 
       else if( itype(isf).eq.2 ) then ! angular (3-body)
+        almbd= cnst(1,isf)
+        t2= (abs(almbd)+1d0)**2
         do ia=1,natm
           xi(1:3)= ra(1:3,ia)
           do jj=1,lspr(0,ia)
@@ -225,27 +227,25 @@ contains
               dfcik= dfc(dik,rc)
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
-              almbd= cnst(1,isf)
               !.....function value
-              spijk= sprod(rij,rik)
+              spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
               cs= spijk/dij/dik
               t1= (almbd +cs)**2
-              t2= (abs(almbd)+1d0)**2
-              gsf(isf,ia)= gsf(isf,ia) +1d0/t2 *t1 *fcij*fcik
+              gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik 
               !.....derivative
-              dgdij= t1/t2 *dfcij *fcik
-              dgdik= t1/t2 *fcij *dfcik
-              dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik
-              dgsf(1:3,ia,ia,isf)= dgsf(1:3,ia,ia,isf) &
+              dgdij= dfcij *fcik *t1/t2
+              dgdik= fcij *dfcik *t1/t2
+              dgsf(1:3,isf,ia,ia)= dgsf(1:3,isf,ia,ia) &
                    +dgdij*driji(1:3) +dgdik*driki(1:3)
-              dgsf(1:3,ja,ia,isf)= dgsf(1:3,ja,ia,isf) +dgdij*drijj(1:3)
-              dgsf(1:3,ka,ia,isf)= dgsf(1:3,ka,ia,isf) +dgdik*drikk(1:3)
-              dcsdj(1:3)= rij(1:3)*(1d0-spijk/dij/dij)/dij/dik
-              dcsdk(1:3)= rik(1:3)*(1d0-spijk/dik/dik)/dij/dik
+              dgsf(1:3,isf,ja,ia)= dgsf(1:3,isf,ja,ia) +dgdij*drijj(1:3)
+              dgsf(1:3,isf,ka,ia)= dgsf(1:3,isf,ka,ia) +dgdik*drikk(1:3)
+              dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik
+              dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*spijk/dij**3/dik
+              dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*spijk/dik**3/dij
               dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
-              dgsf(1:3,ia,ia,isf)= dgsf(1:3,ia,ia,isf) +dgcs*dcsdi(1:3)
-              dgsf(1:3,ja,ia,isf)= dgsf(1:3,ja,ia,isf) +dgcs*dcsdj(1:3)
-              dgsf(1:3,ka,ia,isf)= dgsf(1:3,ka,ia,isf) +dgcs*dcsdk(1:3)
+              dgsf(1:3,isf,ia,ia)= dgsf(1:3,isf,ia,ia) +dgcs*dcsdi(1:3)
+              dgsf(1:3,isf,ja,ia)= dgsf(1:3,isf,ja,ia) +dgcs*dcsdj(1:3)
+              dgsf(1:3,isf,ka,ia)= dgsf(1:3,isf,ka,ia) +dgcs*dcsdk(1:3)
             enddo
           enddo
         enddo
@@ -325,6 +325,10 @@ contains
 !.....calc number of weights taking into account the bias nodes
     nwgt1= (nsf+1)*nhl1
     nwgt2= (nhl1+1)
+    if( myid.eq.0 ) then
+      write(6,'(a,4i6)') ' nfs, nhl1, nwgt1, nwgt2 =', &
+           nsf,nhl1,nwgt1,nwgt2
+    endif
 
 !.....read parameters at the 1st call
     inquire(file=trim(cpfname),exist=lexist)
