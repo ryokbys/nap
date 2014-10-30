@@ -40,9 +40,10 @@ contains
 
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ja,nexp,isf &
-         ,icoeff,ihl1
+         ,icoeff,ihl1,jj
     real(8):: rcin,b_na,at(3),epotl,wgt,hl1i,tmp2,tmp
     real(8),save,allocatable:: gsf(:,:),dgsf(:,:,:,:),hl1(:,:)
+    real(8),allocatable:: amsl(:,:,:,:)
 !.....1st call
     logical,save:: l1st=.true.
 
@@ -56,7 +57,7 @@ contains
              ,rc,' to ',rcin
       endif
       rc= rcin
-      allocate(gsf(0:nsf,natm),dgsf(3,nsf,namax,namax) &
+      allocate(gsf(0:nsf,natm),dgsf(3,nsf,0:nnmax,namax) &
            ,hl1(0:nhl1,natm))
       l1st= .false.
     endif
@@ -65,7 +66,7 @@ contains
     call eval_sf(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr,gsf,dgsf,rc)
 
 #ifdef __FITPOT__
-    open(80,file='out.gsf',status='replace')
+    open(80,file='out.NN1.gsf',status='replace')
     write(80,'(2i10)') nsf
     do ia=1,natm
       do isf=0,nsf
@@ -73,7 +74,7 @@ contains
       enddo
     enddo
     close(80)
-    open(81,file='out.hl1')
+    open(81,file='out.NN1.hl1')
     write(81,'(2i10)') nhl1
 #endif
 
@@ -113,21 +114,58 @@ contains
 !.....sum up for forces
     strs(1:3,1:3,1:natm)= 0d0
     aa(1:3,1:natm+nb)= 0d0
-    do ja=1,natm
+    do ia=1,natm
       do ihl1=1,nhl1 ! there is no longer a bias node, 0
-        hl1i= hl1(ihl1,ja)
+        hl1i= hl1(ihl1,ia)
         tmp= wgt2(ihl1)*hl1i*(1d0-hl1i)
-        do ia=1,natm+nb
+        do jj=1,lspr(0,ia)
+          ja= lspr(jj,ia)
           do isf=1,nsf ! there is no longer a bias node, 0
-            aa(1:3,ia)=aa(1:3,ia) &
-                 -tmp*wgt1(ihl1,isf)*dgsf(1:3,isf,ia,ja)
+            aa(1:3,ja)=aa(1:3,ja) &
+                 -tmp*wgt1(ihl1,isf)*dgsf(1:3,isf,jj,ia)
           enddo
+        enddo
+        !.....atom ia
+        do isf= 1,nsf
+          aa(1:3,ia)=aa(1:3,ia) &
+               -tmp*wgt1(ihl1,isf)*dgsf(1:3,isf,0,ia)
         enddo
       enddo
     enddo
 
 #ifdef __FITPOT__
     close(81)
+    allocate(amsl(3,nsf,nhl1,natm+nb))
+!.....make M from hl1 and dgsf
+    do ia=1,natm
+      do jj=1,lspr(0,ia)
+        ja= lspr(jj,ia)
+        do ihl1=1,nhl1 ! no need of a bias node, 0
+          hl1i= hl1(ihl1,ia)
+          tmp= hl1i*(1d0-hl1i)
+          do isf=1,nsf ! no need of a bias node, 0
+            amsl(1:3,isf,ihl1,ja)= amsl(1:3,isf,ihl1,ja) &
+                 +tmp*dgsf(1:3,isf,jj,ia)
+          enddo
+        enddo
+      enddo
+    enddo
+!.....copy back Ms of buffer atoms
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+         ,nn,mpi_world,amsl,3*nsf*nhl1)
+!.....write out Ms
+    open(82,file='out.NN1.amsl')
+    write(82,'(3i10)') natm, nsf, nhl1
+    do ia=1,natm
+      do ihl1=1,nhl1
+        do isf=1,nsf
+          write(82,'(i6,2i4,3es23.14e3)') ia,ihl1,isf &
+               ,amsl(1:3,isf,ihl1,ia)
+        enddo
+      enddo
+    enddo
+    close(82)
+    deallocate(amsl)
 #endif
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
@@ -157,7 +195,7 @@ contains
     implicit none
     integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
-    real(8),intent(out):: gsf(0:nsf,natm),dgsf(3,nsf,namax,namax)
+    real(8),intent(out):: gsf(0:nsf,natm),dgsf(3,nsf,0:nnmax,namax)
 
     integer:: isf,ia,jj,ja,kk,ka
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
@@ -169,7 +207,7 @@ contains
 
     gsf(0:nsf,1:natm)= 0d0
     gsf(0,1:natm)= 1d0
-    dgsf(1:3,1:nsf,1:natm+nb,1:natm)= 0d0
+    dgsf(1:3,1:nsf,0:nnmax,1:natm)= 0d0
 
     do isf=1,nsf
       if( itype(isf).eq.1 ) then ! Gaussian (2-body)
@@ -193,8 +231,8 @@ contains
             driji(1:3)= -rij(1:3)/dij
             drijj(1:3)= -driji(1:3)
             dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfc(dij,rc)
-            dgsf(1:3,isf,ia,ia)= dgsf(1:3,isf,ia,ia) +driji(1:3)*dgdr
-            dgsf(1:3,isf,ja,ia)= dgsf(1:3,isf,ja,ia) +drijj(1:3)*dgdr
+            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
+            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
           enddo
         enddo
 
@@ -235,17 +273,17 @@ contains
               !.....derivative
               dgdij= dfcij *fcik *t1/t2
               dgdik= fcij *dfcik *t1/t2
-              dgsf(1:3,isf,ia,ia)= dgsf(1:3,isf,ia,ia) &
+              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) &
                    +dgdij*driji(1:3) +dgdik*driki(1:3)
-              dgsf(1:3,isf,ja,ia)= dgsf(1:3,isf,ja,ia) +dgdij*drijj(1:3)
-              dgsf(1:3,isf,ka,ia)= dgsf(1:3,isf,ka,ia) +dgdik*drikk(1:3)
+              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
+              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
               dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik
               dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*spijk/dij**3/dik
               dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*spijk/dik**3/dij
               dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
-              dgsf(1:3,isf,ia,ia)= dgsf(1:3,isf,ia,ia) +dgcs*dcsdi(1:3)
-              dgsf(1:3,isf,ja,ia)= dgsf(1:3,isf,ja,ia) +dgcs*dcsdj(1:3)
-              dgsf(1:3,isf,ka,ia)= dgsf(1:3,isf,ka,ia) +dgcs*dcsdk(1:3)
+              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
+              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
+              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
             enddo
           enddo
         enddo
