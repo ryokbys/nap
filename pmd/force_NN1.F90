@@ -40,10 +40,10 @@ contains
 
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ja,nexp,isf &
-         ,icoeff,ihl1,jj
-    real(8):: rcin,b_na,at(3),epotl,wgt,hl1i,tmp2,tmp
+         ,icoeff,ihl1,jj,jsf
+    real(8):: rcin,b_na,at(3),epotl,wgt,hl1i,tmp2,tmp,tmp3(3)
     real(8),save,allocatable:: gsf(:,:),dgsf(:,:,:,:),hl1(:,:)
-    real(8),allocatable:: amsl(:,:,:,:)
+    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
 !.....1st call
     logical,save:: l1st=.true.
 
@@ -57,8 +57,9 @@ contains
              ,rc,' to ',rcin
       endif
       rc= rcin
-      allocate(gsf(0:nsf,natm),dgsf(3,nsf,0:nnmax,namax) &
+      allocate(gsf(0:nsf,namax),dgsf(3,nsf,0:nnmax,namax) &
            ,hl1(0:nhl1,natm))
+      gsf(0:nsf,1:natm+nb)= 0d0
       l1st= .false.
     endif
 
@@ -135,37 +136,66 @@ contains
 
 #ifdef __FITPOT__
     close(81)
-    allocate(amsl(3,nsf,nhl1,natm+nb))
-!.....make M from hl1 and dgsf
+    allocate( aml(3,nsf,nhl1,natm+nb),bml(3,nsf,nhl1,natm+nb) )
+    call copy_dba_fwd(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+         ,nn,mpi_world,gsf,nsf)
+!.....make lumps of terms
+    aml(1:3,1:nsf,1:nhl1,1:natm+nb)= 0d0
+    bml(1:3,1:nsf,1:nhl1,1:natm+nb)= 0d0
     do ia=1,natm
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         do ihl1=1,nhl1 ! no need of a bias node, 0
           hl1i= hl1(ihl1,ia)
           tmp= hl1i*(1d0-hl1i)
+          tmp2= hl1i*(1d0-hl1i)*(1d0-2d0*hl1i)
           do isf=1,nsf ! no need of a bias node, 0
-            amsl(1:3,isf,ihl1,ja)= amsl(1:3,isf,ihl1,ja) &
+            aml(1:3,isf,ihl1,ja)= aml(1:3,isf,ihl1,ja) &
                  +tmp*dgsf(1:3,isf,jj,ia)
+            tmp3(1:3)= 0d0
+            do jsf=1,nsf
+              tmp3(1:3)= tmp3(1:3) +dgsf(1:3,jsf,jj,ia)*wgt1(ihl1,jsf)
+            enddo
+            bml(1:3,isf,ihl1,ja)= bml(1:3,isf,ihl1,ja) &
+                 +tmp2*gsf(isf,ja)*tmp3(1:3)
+            if( abs(bml(1,isf,ihl1,ja)).gt.1d+10 ) then
+              write(6,'(a,5i6)') ' ia,jj,ja,ihl1,isf=',ia,jj,ja,ihl1,isf
+              write(6,'(a,5es12.4)') ' tmp2,gsf,tmp3=',tmp2,gsf(isf,ja),tmp3(1:3)
+            endif
           enddo
         enddo
       enddo
     enddo
 !.....copy back Ms of buffer atoms
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,amsl,3*nsf*nhl1)
-!.....write out Ms
-    open(82,file='out.NN1.amsl')
+         ,nn,mpi_world,aml,3*nsf*nhl1)
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+         ,nn,mpi_world,bml,3*nsf*nhl1)
+!.....write aml
+    open(82,file='out.NN1.aml')
     write(82,'(3i10)') natm, nsf, nhl1
     do ia=1,natm
       do ihl1=1,nhl1
         do isf=1,nsf
           write(82,'(i6,2i4,3es23.14e3)') ia,ihl1,isf &
-               ,amsl(1:3,isf,ihl1,ia)
+               ,aml(1:3,isf,ihl1,ia)
         enddo
       enddo
     enddo
     close(82)
-    deallocate(amsl)
+!.....write bml
+    open(83,file='out.NN1.bml')
+    write(83,'(3i10)') natm, nsf, nhl1
+    do ia=1,natm
+      do ihl1=1,nhl1
+        do isf=1,nsf
+          write(83,'(i6,2i4,3es23.14e3)') ia,ihl1,isf &
+               ,bml(1:3,isf,ihl1,ia)
+        enddo
+      enddo
+    enddo
+    close(83)
+    deallocate(aml,bml)
 #endif
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
@@ -403,7 +433,55 @@ contains
 
     return
   end subroutine read_params
+!=======================================================================
+  subroutine copy_dba_fwd(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+       ,nn,mpi_world,x,ndim)
+!   Send forward data of resident atomd to buffer atoms
+    implicit none 
+    include 'mpif.h'
+    integer,intent(in):: namax,natm,nbmax,nb,mpi_world,ndim
+    integer,intent(in):: lsb(0:nbmax,6),lsrc(6),myparity(3),nn(6)
+    real(8),intent(inout):: x(ndim,namax),tcom
 
+    integer:: status(mpi_status_size)
+    integer:: i,j,k,nbnew,kd,kdd,ku,inode,nsd,nrc,ierr
+    real(8):: tcom1,tcom2
+    real(8),allocatable,dimension(:,:):: dbuf,dbufr
+    
+    allocate(dbuf(ndim,nbmax),dbufr(ndim,nbmax))
+
+    nbnew= 0
+    do kd=1,3
+      tcom1= mpi_wtime()
+
+      do kdd=-1,0
+        ku= 1*kd+kdd
+        inode= nn(ku)
+        nsd= lsb(0,ku)
+
+        call mespasi(inode,myparity(kd),nsd,nrc,1,1,10 &
+             ,mpi_world)
+        
+        do i=1,nsd
+          j= lsb(i,ku)
+          dbuf(1:ndim,i)= x(1:ndim,j)
+        enddo
+
+        call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*ndim,nrc*ndim &
+             ,21,mpi_world)
+
+        do i=1,nrc
+          x(1:ndim,natm+nbnew+i)= dbufr(1:ndim,i)
+        enddo
+        call mpi_barrier(mpi_world,ierr)
+        nbnew= nbnew +nrc
+      enddo
+
+      tcom2= mpi_wtime()
+      tcom= tcom +tcom2-tcom1
+    enddo
+    deallocate(dbuf,dbufr)
+  end subroutine copy_dba_fwd
 end module NN1
 !-----------------------------------------------------------------------
 !     Local Variables:

@@ -12,6 +12,7 @@ _nhl1= 0
 _gsf= []
 _hl1= []
 _aml= []
+_bml= []
 _fmatch= False
 _basedir='learning_set'
 _samples=[]
@@ -27,7 +28,7 @@ def init(*args,**kwargs):
     This should be called at the first place
     before any other NN1-related routines.
     """
-    global _nsf,_nhl1,_wgt1,_wgt2,_gsf,_hl1,_aml
+    global _nsf,_nhl1,_wgt1,_wgt2,_gsf,_hl1,_aml,_bml
     global _fmatch,_basedir,_samples,_sample_dirs,_nprcs
     global _ergrefs,_frcrefs
 
@@ -57,7 +58,7 @@ def init(*args,**kwargs):
         exit()
 
     #.....read bases
-    _gsf,_hl1,_aml= gather_basis(*args)
+    _gsf,_hl1,_aml,_bml= gather_basis(*args)
 
 def sigmoid(x):
     return 1.0/(1.0 +math.exp(-x))
@@ -207,17 +208,21 @@ def grad_core(ismpl,ergs,frcs,*args):
     
     if _fmatch:
         amls= _aml[ismpl]
+        bmls= _bml[ismpl]
         iprm= 0
+        print ' ismpl=',ismpl
         for isf in range(_nsf+1):
             for ihl1 in range(1,_nhl1+1):
                 tmp= 0.0
                 w2= wgt2[ihl1]
                 for ia in range(smpl.natm):
                     fdiff= frcs[ismpl][ia] -_frcrefs[ismpl][ia]
-                    ms= amls[ia,ihl1,isf]
-                    tmp -= 2.0*( fdiff[0]*w2*ms[0] \
-                                +fdiff[1]*w2*ms[1] \
-                                +fdiff[2]*w2*ms[2] ) /smpl.natm/3
+                    am= amls[ia,ihl1,isf]
+                    bm= bmls[ia,ihl1,isf]
+                    print '   isf,ihl1,ia,am,bm=',isf,ihl1,ia,am[:],bm[:]
+                    tmp -= 2.0*( fdiff[0]*w2*(am[0]+bm[0]) \
+                                +fdiff[1]*w2*(am[1]+bm[1]) \
+                                +fdiff[2]*w2*(am[2]+bm[2]) ) /smpl.natm/3
                 gs[iprm] += tmp
                 iprm += 1
         for ihl1 in range(_nhl1+1):
@@ -228,7 +233,7 @@ def grad_core(ismpl,ergs,frcs,*args):
                     ms= amls[ia,ihl1,isf]
                     tmp -= 2.0*( fdiff[0]*wgt1[isf,ihl1]*ms[0] \
                                 +fdiff[1]*wgt1[isf,ihl1]*ms[1] \
-                                +fdiff[2]*wgt1[isf,ihl1]*ms[2] )/smpl.natm/3
+                                +fdiff[2]*wgt1[isf,ihl1]*ms[2] ) /smpl.natm/3
             gs[iprm] += tmp
             iprm += 1
     return gs
@@ -237,20 +242,24 @@ def gather_basis(*args):
     gsf= []
     hl1= []
     aml= []
+    bml= []
     #...read basis data
     for i in range(len(_sample_dirs)):
         dir= _sample_dirs[i]
         smpl= _samples[i]
         f1= open(_basedir+'/'+dir+'/pmd/out.NN1.gsf','r')
         f2= open(_basedir+'/'+dir+'/pmd/out.NN1.hl1','r')
-        f3= open(_basedir+'/'+dir+'/pmd/out.NN1.amsl','r')
+        f3= open(_basedir+'/'+dir+'/pmd/out.NN1.aml','r')
+        f4= open(_basedir+'/'+dir+'/pmd/out.NN1.bml','r')
         #.....skip 1st line
         data1= f1.readline().split()
         data2= f2.readline().split()
         data3= f3.readline().split()
+        data4= f4.readline().split()
         gsfs= np.zeros((smpl.natm,_nsf+1))
         hl1s= np.zeros((smpl.natm,_nhl1+1))
         amls= np.zeros((smpl.natm,_nhl1+1,_nsf+1,3))
+        bmls= np.zeros((smpl.natm,_nhl1+1,_nsf+1,3))
         for ia in range(smpl.natm):
             for isf in range(_nsf+1):
                 data1= f1.readline().split()
@@ -260,17 +269,23 @@ def gather_basis(*args):
                 data2= f2.readline().split()
                 hl1s[ia,ihl1]= float(data2[2])
         for ia in range(smpl.natm):
-            for ihl1 in range(_nhl1+1):
-                for isf in range(_nsf+1):
+            for ihl1 in range(1,_nhl1+1):
+                for isf in range(1,_nsf+1):
                     data3= f3.readline().split()
                     amls[ia,ihl1,isf,0]= float(data3[3])
                     amls[ia,ihl1,isf,1]= float(data3[4])
                     amls[ia,ihl1,isf,2]= float(data3[5])
+                    data4= f4.readline().split()
+                    bmls[ia,ihl1,isf,0]= float(data4[3])
+                    bmls[ia,ihl1,isf,1]= float(data4[4])
+                    bmls[ia,ihl1,isf,2]= float(data4[5])
         gsf.append(gsfs)
         hl1.append(hl1s)
         aml.append(amls)
+        bml.append(bmls)
         f1.close()
         f2.close()
         f3.close()
-    return gsf,hl1,aml
+        f4.close()
+    return gsf,hl1,aml,bml
 
