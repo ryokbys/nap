@@ -80,6 +80,10 @@ def init(*args,**kwargs):
     _gsf,_hl1,_aml,_bml= gather_basis(*args)
 
 def sigmoid(x):
+    if x < -10.0:
+        return 0.0
+    elif x > 10.0:
+        return 1.0
     return 1.0/(1.0 +math.exp(-x))
 
 def vars2wgts(x):
