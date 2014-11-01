@@ -1013,7 +1013,7 @@ if __name__ == '__main__':
             elif potential in ('NN1'):
                 solution= opt.fmin_cg(func,vars \
                                       ,args=(maindir,) \
-                                      ,fprime=NN1.grad_NN1 \
+                                      ,fprime=NN1.grad \
                                       ,maxiter=niter,disp=True \
                                       ,gtol=gtol)
             elif potential in ('NN2'):
@@ -1038,7 +1038,7 @@ if __name__ == '__main__':
             elif potential in ('NN1'):
                 solution= opt.fmin_bfgs(func,vars \
                                         ,args=(maindir,)
-                                        ,fprime=NN1.grad_NN1
+                                        ,fprime=NN1.grad
                                         ,maxiter=niter,disp=True
                                         ,gtol=gtol)
             elif potential in ('NN2'):

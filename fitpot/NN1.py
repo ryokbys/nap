@@ -199,6 +199,8 @@ def calc_ef_from_bases(x,*args):
 
     return (es,fs)
 
+def arg_wrapper(args):
+    return args[0](*args[1:])
 
 def calc_ef(ismpl,x,*args):
     global _wgt1,_wgt2
