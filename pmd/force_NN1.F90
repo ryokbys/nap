@@ -57,7 +57,7 @@ contains
              ,rc,' to ',rcin
       endif
       rc= rcin
-      allocate(gsf(0:nsf,namax),dgsf(3,nsf,0:nnmax,namax) &
+      allocate(gsf(0:nsf,namax),dgsf(3,0:nsf,0:nnmax,namax) &
            ,hl1(0:nhl1,natm))
       gsf(0:nsf,1:natm+nb)= 0d0
       l1st= .false.
@@ -136,9 +136,9 @@ contains
 
 #ifdef __FITPOT__
     close(81)
-    allocate( aml(3,nsf,nhl1,natm+nb),bml(3,nsf,nhl1,natm+nb) )
+    allocate( aml(3,0:nsf,nhl1,natm+nb),bml(3,0:nsf,nhl1,natm+nb) )
     call copy_dba_fwd(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,gsf,nsf)
+         ,nn,mpi_world,gsf,nsf+1)
 !.....make lumps of terms
     aml(1:3,1:nsf,1:nhl1,1:natm+nb)= 0d0
     bml(1:3,1:nsf,1:nhl1,1:natm+nb)= 0d0
@@ -149,34 +149,30 @@ contains
           hl1i= hl1(ihl1,ia)
           tmp= hl1i*(1d0-hl1i)
           tmp2= hl1i*(1d0-hl1i)*(1d0-2d0*hl1i)
-          do isf=1,nsf ! no need of a bias node, 0
+          do isf=0,nsf
             aml(1:3,isf,ihl1,ja)= aml(1:3,isf,ihl1,ja) &
                  +tmp*dgsf(1:3,isf,jj,ia)
             tmp3(1:3)= 0d0
-            do jsf=1,nsf
+            do jsf=1,nsf ! no need of a bias node, 0
               tmp3(1:3)= tmp3(1:3) +dgsf(1:3,jsf,jj,ia)*wgt1(ihl1,jsf)
             enddo
             bml(1:3,isf,ihl1,ja)= bml(1:3,isf,ihl1,ja) &
                  +tmp2*gsf(isf,ja)*tmp3(1:3)
-            if( abs(bml(1,isf,ihl1,ja)).gt.1d+10 ) then
-              write(6,'(a,5i6)') ' ia,jj,ja,ihl1,isf=',ia,jj,ja,ihl1,isf
-              write(6,'(a,5es12.4)') ' tmp2,gsf,tmp3=',tmp2,gsf(isf,ja),tmp3(1:3)
-            endif
           enddo
         enddo
       enddo
     enddo
 !.....copy back Ms of buffer atoms
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,aml,3*nsf*nhl1)
+         ,nn,mpi_world,aml,3*(nsf+1)*nhl1)
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,bml,3*nsf*nhl1)
+         ,nn,mpi_world,bml,3*(nsf+1)*nhl1)
 !.....write aml
     open(82,file='out.NN1.aml')
     write(82,'(3i10)') natm, nsf, nhl1
     do ia=1,natm
       do ihl1=1,nhl1
-        do isf=1,nsf
+        do isf=0,nsf
           write(82,'(i6,2i4,3es23.14e3)') ia,ihl1,isf &
                ,aml(1:3,isf,ihl1,ia)
         enddo
@@ -188,7 +184,7 @@ contains
     write(83,'(3i10)') natm, nsf, nhl1
     do ia=1,natm
       do ihl1=1,nhl1
-        do isf=1,nsf
+        do isf=0,nsf
           write(83,'(i6,2i4,3es23.14e3)') ia,ihl1,isf &
                ,bml(1:3,isf,ihl1,ia)
         enddo
@@ -225,7 +221,7 @@ contains
     implicit none
     integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
-    real(8),intent(out):: gsf(0:nsf,natm),dgsf(3,nsf,0:nnmax,namax)
+    real(8),intent(out):: gsf(0:nsf,natm),dgsf(3,0:nsf,0:nnmax,namax)
 
     integer:: isf,ia,jj,ja,kk,ka
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
@@ -237,7 +233,7 @@ contains
 
     gsf(0:nsf,1:natm)= 0d0
     gsf(0,1:natm)= 1d0
-    dgsf(1:3,1:nsf,0:nnmax,1:natm)= 0d0
+    dgsf(1:3,0:nsf,0:nnmax,1:natm)= 0d0
 
     do isf=1,nsf
       if( itype(isf).eq.1 ) then ! Gaussian (2-body)

@@ -21,8 +21,8 @@ import NN1
 from pga import GA
 
 #.....constants
-large= 1.0e+30
-tiny = 1.0e-8
+_large= 1.0e+30
+_tiny = 1.0e-8
 max_species= 10
 
 #.....global variables
@@ -34,7 +34,7 @@ ergpmds= []
 frcpmds= []
 inputs={}
 params=[]
-prange=[]
+pranges=[]
 nprms= 0
 rcut= 0.0
 vars= []
@@ -99,93 +99,105 @@ def read_params(fname):
     The in.params.???? can have the range of each parameter.
     And for the parameters to be fixed can be also set.
     """
-    global nprms,rcut,params,prange
+    global nprms,rcut,params,pranges,vars,vranges
     f=open(fname,'r')
     data=f.readline().split()
     nprms= int(data[0])
     rcut= float(data[1])
     params= np.zeros(nprms)
-    prange= np.zeros([nprms,2])
+    pranges= np.zeros([nprms,2])
     for i in range(nprms):
         data= f.readline().split()
         #.....depending the num of columns, the range or constraint
         #.....  of the parameter is set
         params[i]= float(data[0])
         if len(data) == 1: # no contraint for the range
-            prange[i,0]= -large
-            prange[i,1]=  large
+            pranges[i,0]= -_large
+            pranges[i,1]=  _large
         elif len(data) == 2:
-            prange[i,0]=  float(data[1])
-            prange[i,1]=  float(data[1])
+            pranges[i,0]=  float(data[1])
+            pranges[i,1]=  float(data[1])
         elif len(data) == 3:
-            prange[i,0]=  float(data[1])
-            prange[i,1]=  float(data[2])
+            pranges[i,0]=  float(data[1])
+            pranges[i,1]=  float(data[2])
     f.close()
-    params_to_vars(params,prange)
+    vars,vranges= params_to_vars(params,pranges)
     print ' number of variables to be fitted=',len(vars)
 
 def write_params(fname,x):
-    global nprms,rcut
-    vars_to_params(x)
+    global params,pranges
+    
+    params,pranges= vars_to_params(x,vranges,params,pranges)
     f=open(fname,'w')
-    f.write(' {0:6d} {1:10.4f}\n'.format(nprms,rcut))
+    f.write(' {0:6d} {1:10.4f}\n'.format(len(params),rcut))
     #if potential in ('linreg') and not fmethod in ('test','TEST'):
     if potential in ('linreg') and regularize:
         print '>>>>> writing params by multiplying bmax...'
         print ' potential =',potential
         print ' regularize=',regularize
         for i in range(nprms):
-            if abs(prange[i,0]) >= large and abs(prange[i,1]) >= large:
+            if abs(pranges[i,0]) >= _large and abs(pranges[i,1]) >= _large:
                 f.write('{0:22.14e} \n'.format(params[i]/bmax[i]))
-            elif prange[i,0] == prange[i,1]:
-                f.write('{0:22.14e} {1:22.14e}\n'.format(params[i]/bmax[i],prange[i,0]))
+            elif pranges[i,0] == pranges[i,1]:
+                f.write('{0:22.14e} {1:22.14e}\n'.format(params[i]/bmax[i],pranges[i,0]))
             else:
                 f.write('{0:22.14e} {1:22.14e} {2:22.14e}\n'.format(params[i]/bmax[i],
-                                                                    prange[i,0],
-                                                                    prange[i,1]))
+                                                                    pranges[i,0],
+                                                                    pranges[i,1]))
     else:
         for i in range(nprms):
-            if abs(prange[i,0]) >= large and abs(prange[i,1]) >= large:
+            if abs(pranges[i,0]) >= _large and abs(pranges[i,1]) >= _large:
                 f.write('{0:22.14e} \n'.format(params[i]))
-            elif prange[i,0] == prange[i,1]:
-                f.write('{0:22.14e} {1:22.14e}\n'.format(params[i],prange[i,0]))
+            elif pranges[i,0] == pranges[i,1]:
+                f.write('{0:22.14e} {1:22.14e}\n'.format(params[i],pranges[i,0]))
             else:
                 f.write('{0:22.14e} {1:22.14e} {2:22.14e}\n'.format(params[i],
-                                                                    prange[i,0],
-                                                                    prange[i,1]))
+                                                                    pranges[i,0],
+                                                                    pranges[i,1]))
     f.close()
 
-def params_to_vars(x,xr):
-    global vars,vranges
+def params_to_vars(params,pranges):
+    """
+    Converts params to vars.
+    Params and pranges have richer information than vars and vranges.
+    Thus the information will be reduced to vars.
+    """
     nvars= 0
-    for i in range(nprms):
-        if xr[i,0] != xr[i,1]:
+    for i in range(len(params)):
+        if pranges[i,0] != pranges[i,1]:
             nvars += 1
     vars= np.zeros(nvars)
     vranges= np.zeros([nvars,2])
     j=0
-    for i in range(nprms):
-        if xr[i,0] != xr[i,1]:
-            vars[j]= x[i]
-            vranges[j,0]= xr[i,0]
-            vranges[j,1]= xr[i,1]
+    for i in range(len(params)):
+        if pranges[i,0] != pranges[i,1]:
+            vars[j]= params[i]
+            vranges[j,0]= pranges[i,0]
+            vranges[j,1]= pranges[i,1]
             j += 1
+    return (vars,vranges)
 
-def vars_to_params(x):
-    global params
+def vars_to_params(vars,vranges,params,pranges):
+    """
+    Converts vars to params.
+    Length of vars should be less or equal to length of params.
+    Thus vars and vranges do not have enough information of params and pranges.
+    """
     j=0
-    for i in range(nprms):
-        if prange[i,0] != prange[i,1]:
-            params[i]= x[j]
+    for i in range(len(params)):
+        if pranges[i,0] != pranges[i,1]:
+            params[i]= vars[j]
             j += 1
+    return (params,pranges)
 
 def read_input(fname='in.fitpot'):
+    global _conf
     global nsmpl,niter,fmethod,maindir,parfile,runmode,eps \
            ,xtol,gtol,ftol,fmatch,penalty,pweight,gradient,potential \
            ,regularize
     global lswgt,swbeta,nprcs
     global eatom,ga_nindv,ga_nbit,ga_temp
-    dict={}
+
     f= open(fname,'r')
     for line in f.readlines():
         data= line.split()
@@ -250,8 +262,8 @@ def read_input(fname='in.fitpot'):
                 ga_murate= float(data[1])
     f.close()
 
-def show_input_params(fname='in.fitpot'):
-    print '>>>>> input parameters:'
+def show_inputs(fname='in.fitpot'):
+    print '>>>>> configuration:'
     # for key,value in input_params.items():
     #     print ' {0:>20}: '.format(key), value
     f= open(fname,'r')
@@ -268,6 +280,10 @@ def show_input_params(fname='in.fitpot'):
     f.close()
 
 def gather_pmd_data(basedir):
+    global samples,sample_dirs
+    # print ' basedir=',basedir
+    # print ' len(samples)=',len(samples)
+    # print ' len(sample_dirs)=',len(sample_dirs)
     #.....initialize variables
     ergs=np.zeros(len(samples))
     frcs= []
@@ -289,6 +305,8 @@ def gather_pmd_data(basedir):
             for k in range(3):
                 frcs[i][j,k]= float(data[k])
         ff.close()
+    # print 'ergs:',ergs
+    # print 'frcs:',frcs
     return (ergs,frcs)
 
 def gather_ref_data(basedir):
@@ -942,7 +960,7 @@ if __name__ == '__main__':
     cwd= os.getcwd()
     #.....inputs: parameters in in.fitpot as a dictionary
     inputs= read_input('in.fitpot')
-    show_input_params('in.fitpot')
+    show_inputs('in.fitpot')
     #.....params: parameters in in.params.?????
     read_params(maindir+'/'+parfile)
     os.system('cp '+maindir+'/'+parfile+' '+maindir+'/'+parfile+'.ini')
@@ -965,7 +983,8 @@ if __name__ == '__main__':
             vars= scale_vars(vars,bmax)
     elif potential in ('NN1'):
         NN1.init(maindir,params,sample_dirs,samples,nprcs,fmatch \
-                 ,ergrefs,frcrefs)
+                 ,ergrefs,frcrefs,fmethod,parfile,runmode,rcut,pranges \
+                 ,vranges)
 
     #.....1st call of func
     func(vars,maindir)

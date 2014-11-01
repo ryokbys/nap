@@ -2,9 +2,15 @@
 Routines related to neural network with one hidden layer.
 """
 
-import math,time
+import math,time,os
 import numpy as np
 import multiprocessing as mp
+
+#.....import from local modules
+import fitpot
+
+#.....constants which may be different from those in fitpot.py
+_large= 1.0e+30
 
 #.....global variables
 _nsf=  0
@@ -20,6 +26,12 @@ _sample_dirs=[]
 _nprcs= 1
 _ergrefs= []
 _frcrefs= []
+_fmethod= 'test'
+_parfile= 'in.params.NN1'
+_runmode= 'serial'
+_rcut  = 5.0
+_params= []
+_pranges= []
 
 #============================================================ routines
 def init(*args,**kwargs):
@@ -30,16 +42,23 @@ def init(*args,**kwargs):
     """
     global _nsf,_nhl1,_wgt1,_wgt2,_gsf,_hl1,_aml,_bml
     global _fmatch,_basedir,_samples,_sample_dirs,_nprcs
-    global _ergrefs,_frcrefs
+    global _ergrefs,_frcrefs,_fmethod,_parfile,_runmode,_rcut
+    global _params,_pranges,_vranges
 
     _basedir = args[0]
-    params   = args[1]
+    _params   = args[1]
     _sample_dirs= args[2]
     _samples = args[3]
     _nprcs   = args[4]
     _fmatch  = args[5]
     _ergrefs = args[6]
     _frcrefs = args[7]
+    _fmethod = args[8]
+    _parfile = args[9]
+    _runmode = args[10]
+    _rcut    = args[11]
+    _pranges = args[12]
+    _vranges = args[13]
 
     #.....read NN1 parameters
     f= open(_basedir+'/'+'in.const.NN1')
@@ -49,9 +68,9 @@ def init(*args,**kwargs):
     f.close()
 
     # check
-    if len(params) != (_nsf+1)*_nhl1 +(_nhl1+1):
+    if len(_params) != (_nsf+1)*_nhl1 +(_nhl1+1):
         print ' [Error] len(params) != (nsf+1)*nhl1 +(nhl1+1)'
-        print '   len(params)          = ',len(params)
+        print '   len(params)          = ',len(_params)
         print '   nsf                  = ',_nsf
         print '   nhl1                 = ',_nhl1
         print '   (nsf+1)*nhl1+(nhl1+1)= ',(_nsf+1)*_nhl1 +(_nhl1+1)
@@ -75,6 +94,72 @@ def vars2wgts(x):
         wgt2[ihl1]= x[ix]
         ix += 1
     return (wgt1,wgt2)
+
+def calc_ef_from_pmd(x,*args):
+    dir= args[0]
+    cwd= os.getcwd()
+    # print ' cwd=',cwd
+    # print ' dir=',dir
+    #.....store original file
+    os.system('cp '+dir+'/'+_parfile+' '+dir+'/'+_parfile+'.tmp')
+    write_params(dir+'/'+_parfile,x)
+    #.....run pmd in all sample directories
+    os.chdir(dir)
+    #print os.getcwd(),dir
+    if _runmode in ('serial','Serial','SERIAL','sequential','single'):
+        os.system('./serial_run_pmd.sh '+_parfile)
+    elif _runmode in ('parallel','Parallel','PARALLEL'):
+        os.system('python ./parallel_run_pmd.py '+_parfile)
+    else:
+        print "{0:*>20}: no such run_mode !!!".format(' Error', _runmode)
+        exit()
+    os.chdir(cwd)
+    #.....restore original file
+    os.system('cp '+dir+'/'+_parfile+'.tmp'+' '+dir+'/'+_parfile)
+    #.....gather pmd results
+    ergs,frcs= gather_pmd_data(dir)
+    return (ergs,frcs)
+
+def write_params(fname,x):
+    
+    params,pranges= fitpot.vars_to_params(x,_vranges,_params,_pranges)
+    f=open(fname,'w')
+    f.write(' {0:6d} {1:10.4f}\n'.format(len(params),_rcut))
+    for i in range(len(params)):
+        if abs(pranges[i,0]) >= _large and abs(pranges[i,1]) >= _large:
+            f.write('{0:22.14e} \n'.format(params[i]))
+        elif pranges[i,0] == pranges[i,1]:
+            f.write('{0:22.14e} {1:22.14e}\n'.format(params[i],pranges[i,0]))
+        else:
+            f.write('{0:22.14e} {1:22.14e} {2:22.14e}\n'.format(params[i],
+                                                                pranges[i,0],
+                                                                pranges[i,1]))
+    f.close()
+
+def gather_pmd_data(basedir):
+    #.....initialize variables
+    ergs=np.zeros(len(_samples))
+    frcs= []
+    for smpl in _samples:
+        frcs.append(np.zeros((smpl.natm,3)))
+    #.....read data
+    for i in range(len(_sample_dirs)):
+        dir= _sample_dirs[i]
+        smpl= _samples[i]
+        #.....force
+        ff=open(basedir+'/'+dir+'/frc.pmd','r')
+        natm= int(ff.readline().split()[0])
+        #.....energy
+        f=open(basedir+'/'+dir+'/erg.pmd','r')
+        ergs[i]= float(f.readline().split()[0])
+        f.close()
+        for j in range(natm):
+            data= ff.readline().split()
+            for k in range(3):
+                frcs[i][j,k]= float(data[k])
+        ff.close()
+    return (ergs,frcs)
+
 
 def calc_ef_from_bases(x,*args):
     """
@@ -158,6 +243,7 @@ def grad(x,*args):
     dir= args[0]
     #.....get energies and forces
     ergs,frcs= calc_ef_from_bases(x,*args)
+    #ergs,frcs= calc_ef_from_pmd(x,*args)
 
     p= mp.Pool(_nprcs)
     grad= np.zeros(len(x))
@@ -210,7 +296,7 @@ def grad_core(ismpl,ergs,frcs,*args):
         amls= _aml[ismpl]
         bmls= _bml[ismpl]
         iprm= 0
-        print ' ismpl=',ismpl
+        #print ' ismpl=',ismpl
         for isf in range(_nsf+1):
             for ihl1 in range(1,_nhl1+1):
                 tmp= 0.0
@@ -219,21 +305,22 @@ def grad_core(ismpl,ergs,frcs,*args):
                     fdiff= frcs[ismpl][ia] -_frcrefs[ismpl][ia]
                     am= amls[ia,ihl1,isf]
                     bm= bmls[ia,ihl1,isf]
-                    print '   isf,ihl1,ia,am,bm=',isf,ihl1,ia,am[:],bm[:]
-                    tmp -= 2.0*( fdiff[0]*w2*(am[0]+bm[0]) \
-                                +fdiff[1]*w2*(am[1]+bm[1]) \
-                                +fdiff[2]*w2*(am[2]+bm[2]) ) /smpl.natm/3
+                    #print '   isf,ihl1,ia,am,bm=',isf,ihl1,ia,am[:],bm[:]
+                    tmp -= 2.0*w2*( fdiff[0]*(am[0]+bm[0]) \
+                                    +fdiff[1]*(am[1]+bm[1]) \
+                                    +fdiff[2]*(am[2]+bm[2]) ) /smpl.natm/3
                 gs[iprm] += tmp
                 iprm += 1
         for ihl1 in range(_nhl1+1):
             tmp= 0.0
             for ia in range(smpl.natm):
                 fdiff= frcs[ismpl][ia] -_frcrefs[ismpl][ia]
-                for isf in range(_nsf+1):
-                    ms= amls[ia,ihl1,isf]
-                    tmp -= 2.0*( fdiff[0]*wgt1[isf,ihl1]*ms[0] \
-                                +fdiff[1]*wgt1[isf,ihl1]*ms[1] \
-                                +fdiff[2]*wgt1[isf,ihl1]*ms[2] ) /smpl.natm/3
+                for isf in range(1,_nsf+1):
+                    am= amls[ia,ihl1,isf]
+                    w1= wgt1[isf,ihl1]
+                    tmp -= 2.0*w1*( fdiff[0]*am[0] \
+                                    +fdiff[1]*am[1] \
+                                    +fdiff[2]*am[2] ) /smpl.natm/3
             gs[iprm] += tmp
             iprm += 1
     return gs
@@ -270,7 +357,7 @@ def gather_basis(*args):
                 hl1s[ia,ihl1]= float(data2[2])
         for ia in range(smpl.natm):
             for ihl1 in range(1,_nhl1+1):
-                for isf in range(1,_nsf+1):
+                for isf in range(_nsf+1):
                     data3= f3.readline().split()
                     amls[ia,ihl1,isf,0]= float(data3[3])
                     amls[ia,ihl1,isf,1]= float(data3[4])
@@ -288,4 +375,3 @@ def gather_basis(*args):
         f3.close()
         f4.close()
     return gsf,hl1,aml,bml
-
