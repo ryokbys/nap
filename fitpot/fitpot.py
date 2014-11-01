@@ -1101,6 +1101,8 @@ if __name__ == '__main__':
 
     if potential in ('linreg'):
         ergs,frcs= calc_ef_from_bases(solution,maindir)
+    elif potential in ('NN1'):
+        ergs,frcs= NN1.calc_ef_from_bases(solution)
     else:
         ergs,frcs= gather_pmd_data(maindir)
     output_energy_relation(ergs,fname='out.erg.pmd-vs-dft.fin')
