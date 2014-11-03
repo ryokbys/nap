@@ -18,7 +18,7 @@ pmax=  1.0
 reta=[0.01, 0.05, 0.1, 0.2, 0.4, 1.0]
 #reta=[0.05]
 #.....num of Rs in 2-body symmetry function
-rrs=[2.0]
+rrs=[1.0, 1.5, 2.0, 2.5, 3.0]
 #.....num of 3-body angular symmetry functions
 rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 1.0]
 #rsf3=[1.0/3]

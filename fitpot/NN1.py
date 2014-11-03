@@ -192,6 +192,8 @@ def calc_ef_from_bases(x,*args):
         for ismpl in range(len(_samples)):
             func_args.append( (calc_ef,ismpl,x) )
         results= p.map(arg_wrapper,func_args)
+        p.close()
+        p.join()
         for ismpl in range(len(_samples)):
             smpl= _samples[ismpl]
             est,fst= results[ismpl]
@@ -250,6 +252,9 @@ def grad(x,*args):
     #.....get energies and forces
     ergs,frcs= calc_ef_from_bases(x,*args)
     #ergs,frcs= calc_ef_from_pmd(x,*args)
+    for ismpl in range(len(_samples)):
+        print ' ismpl,ergs,_ergrefs:',ismpl,ergs[ismpl],_ergrefs[ismpl]
+    
 
     p= mp.Pool(_nprcs)
     grad= np.zeros(len(x))

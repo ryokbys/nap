@@ -367,6 +367,7 @@ def func(x,*args):
     #.....write parameters to in.params.????? file
     dir= args[0]
 
+#    if fmethod in ('test','TEST','check_grad') or \
     if fmethod in ('test','TEST') or \
             not potential in ('linreg','NN1','NN2'):
         #.....store original file
@@ -428,7 +429,7 @@ def eval_L(cergs,cfrcs,rergs,rfrcs,samples):
         sw= 1.0
         if lswgt:
             sw= swgt[i]
-        vi= ((cergs[i]-rergs[i]))**2 /natm
+        vi= (cergs[i]-rergs[i])**2 /natm
         vi *= sw
         val += vi
         if not fmatch:
