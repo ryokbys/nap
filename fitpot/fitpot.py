@@ -484,6 +484,8 @@ def calc_ef_from_bases(x,*args):
             for ismpl in range(len(samples)):
                 func_args.append( (calc_ef_linreg,ismpl,x) )
             results= p.map(arg_wrapper,func_args)
+            p.close()
+            p.join()
             for ismpl in range(len(samples)):
                 smpl= samples[ismpl]
                 est,fst= results[ismpl]
