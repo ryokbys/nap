@@ -367,8 +367,8 @@ def func(x,*args):
     #.....write parameters to in.params.????? file
     dir= args[0]
 
-#    if fmethod in ('test','TEST','check_grad') or \
-    if fmethod in ('test','TEST') or \
+#    if fmethod in ('test','TEST') or \
+    if fmethod in ('test','TEST','check_grad') or \
             not potential in ('linreg','NN1','NN2'):
         #.....store original file
         os.system('cp '+dir+'/'+parfile+' '+dir+'/'+parfile+'.tmp')
@@ -393,7 +393,8 @@ def func(x,*args):
         read_bases(dir)
         ergs,frcs=calc_ef_from_bases(x,*args)
     elif potential in ('NN1'):
-        ergs,frcs=NN1.calc_ef_from_bases(x,*args)
+        #ergs,frcs=NN1.calc_ef_from_bases(x,*args)
+        ergs,frcs=NN1.calc_ef_from_pmd(x,*args)
 
     #.....calc function value of L
     val= eval_L(ergs,frcs,ergrefs,frcrefs,samples)
@@ -1100,7 +1101,8 @@ if __name__ == '__main__':
                 grad_NN2(vars,maindir)
         solution= vars
 
-    write_params(maindir+'/'+parfile+'.fin',solution)
+    if not fmethod in ('test','TEST','check_grad'):
+        write_params(maindir+'/'+parfile+'.fin',solution)
 
     if potential in ('linreg'):
         ergs,frcs= calc_ef_from_bases(solution,maindir)

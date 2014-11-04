@@ -203,6 +203,8 @@ def calc_ef_from_bases(x,*args):
                 fs[ismpl][ia,1] += fst[ia,1]
                 fs[ismpl][ia,2] += fst[ia,2]
 
+    # print ' es:'
+    # print es
     return (es,fs)
 
 def arg_wrapper(args):
@@ -245,16 +247,18 @@ def calc_ef(ismpl,x,*args):
     return (es,fs)
 
 def grad(x,*args):
-    global _wgt1,_wgt2
+    global _wgt1,_wgt2,_gsf,_hl1,_aml,_bml
     
     t0= time.time()
     dir= args[0]
     #.....get energies and forces
-    ergs,frcs= calc_ef_from_bases(x,*args)
-    #ergs,frcs= calc_ef_from_pmd(x,*args)
-    for ismpl in range(len(_samples)):
-        print ' ismpl,ergs,_ergrefs:',ismpl,ergs[ismpl],_ergrefs[ismpl]
+    #ergs,frcs= calc_ef_from_bases(x,*args)
+    ergs,frcs= calc_ef_from_pmd(x,*args)
+    # for ismpl in range(len(_samples)):
+    #     print ' ismpl,ergs,_ergrefs:',ismpl,ergs[ismpl],_ergrefs[ismpl]
     
+    _gsf,_hl1,_aml,_bml= gather_basis(*args)
+    _wgt1,_wgt2= vars2wgts(x)
 
     p= mp.Pool(_nprcs)
     grad= np.zeros(len(x))
@@ -275,24 +279,24 @@ def grad(x,*args):
                 grad[iprm] += gs[iprm]
 
     print ' ===> time NN1.grad: {0:12.3f} sec'.format(time.time()-t0)
+    #print ' grad=',grad
     return grad
 
 def grad_core(ismpl,ergs,frcs,*args):
     x      = args[0]
 
-    wgt1,wgt2= vars2wgts(x)
-    
     gs= np.zeros(len(x))
     smpl= _samples[ismpl]
     ediff= (ergs[ismpl] -_ergrefs[ismpl]) /smpl.natm
     gsfs= _gsf[ismpl]
     hl1s= _hl1[ismpl]
     iprm= 0
+    #print ' ismpl=',ismpl
     for isf in range(_nsf+1):
         for ihl1 in range(1,_nhl1+1):
             tmp= 0.0
             for ia in range(smpl.natm):
-                tmp += wgt2[ihl1] *hl1s[ia,ihl1] \
+                tmp += _wgt2[ihl1] *hl1s[ia,ihl1] \
                          *(1.0 -hl1s[ia,ihl1]) *gsfs[ia,isf]
             gs[iprm] += 2.0*ediff*tmp 
             iprm += 1
@@ -302,7 +306,10 @@ def grad_core(ismpl,ergs,frcs,*args):
             tmp += hl1s[ia,ihl1]
         gs[iprm] += 2.0*ediff*tmp
         iprm += 1
-    
+#     for ia in range(smpl.natm):
+#         for ihl1 in range(_nhl1+1):
+#             print '   ia,ihl1,hl1s=',ia,ihl1,hl1s[ia,ihl1]
+
     if _fmatch:
         amls= _aml[ismpl]
         bmls= _bml[ismpl]
@@ -311,7 +318,7 @@ def grad_core(ismpl,ergs,frcs,*args):
         for isf in range(_nsf+1):
             for ihl1 in range(1,_nhl1+1):
                 tmp= 0.0
-                w2= wgt2[ihl1]
+                w2= _wgt2[ihl1]
                 for ia in range(smpl.natm):
                     fdiff= frcs[ismpl][ia] -_frcrefs[ismpl][ia]
                     am= amls[ia,ihl1,isf]
@@ -328,7 +335,7 @@ def grad_core(ismpl,ergs,frcs,*args):
                 fdiff= frcs[ismpl][ia] -_frcrefs[ismpl][ia]
                 for isf in range(1,_nsf+1):
                     am= amls[ia,ihl1,isf]
-                    w1= wgt1[isf,ihl1]
+                    w1= _wgt1[isf,ihl1]
                     tmp -= 2.0*w1*( fdiff[0]*am[0] \
                                     +fdiff[1]*am[1] \
                                     +fdiff[2]*am[2] ) /smpl.natm/3
