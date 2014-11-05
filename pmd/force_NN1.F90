@@ -58,7 +58,7 @@ contains
       endif
       rc= rcin
       allocate(gsf(0:nsf,namax),dgsf(3,0:nsf,0:nnmax,namax) &
-           ,hl1(0:nhl1,natm))
+           ,hl1(0:nhl1,namax))
       gsf(0:nsf,1:natm+nb)= 0d0
       l1st= .false.
     endif
@@ -81,7 +81,7 @@ contains
 
 !.....2nd, calculate the node values by summing contributions from
 !.....  symmetry functions
-    hl1(0:nhl1,1:natm)= 0d0
+    hl1(0:nhl1,1:natm+nb)= 0d0
     do ia=1,natm
       hl1(0,ia)= 1d0
       do ihl1=1,nhl1
@@ -137,14 +137,27 @@ contains
 #ifdef __FITPOT__
     close(81)
     allocate( aml(3,0:nsf,nhl1,natm+nb),bml(3,0:nsf,nhl1,natm+nb) )
-    call copy_dba_fwd(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,gsf,nsf+1)
+!!$    call copy_dba_fwd(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$         ,nn,mpi_world,gsf,nsf+1)
+!!$    call copy_dba_fwd(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$         ,nn,mpi_world,hl1,nhl1+1)
+!!$    open(90,file='tmp.hl1')
+!!$    do ia=1,natm+nb
+!!$      do ihl1=0,nhl1
+!!$        write(90,'(2i6,es12.4)') ia,ihl1,hl1(ihl1,ia)
+!!$      enddo
+!!$    enddo
+!!$    close(90)
 !.....make lumps of terms
-    aml(1:3,1:nsf,1:nhl1,1:natm+nb)= 0d0
-    bml(1:3,1:nsf,1:nhl1,1:natm+nb)= 0d0
+    aml(1:3,0:nsf,1:nhl1,1:natm+nb)= 0d0
+    bml(1:3,0:nsf,1:nhl1,1:natm+nb)= 0d0
     do ia=1,natm
-      do jj=1,lspr(0,ia)
-        ja= lspr(jj,ia)
+      do jj=0,lspr(0,ia)
+        if( jj.eq.0 ) then
+          ja= ia
+        else
+          ja= lspr(jj,ia)
+        endif
         do ihl1=1,nhl1 ! no need of a bias node, 0
           hl1i= hl1(ihl1,ia)
           tmp= hl1i*(1d0-hl1i)
@@ -157,15 +170,15 @@ contains
               tmp3(1:3)= tmp3(1:3) +dgsf(1:3,jsf,jj,ia)*wgt1(ihl1,jsf)
             enddo
             bml(1:3,isf,ihl1,ja)= bml(1:3,isf,ihl1,ja) &
-                 +tmp2*gsf(isf,ja)*tmp3(1:3)
+                 +tmp2*gsf(isf,ia)*tmp3(1:3)
           enddo
         enddo
       enddo
     enddo
 !.....copy back Ms of buffer atoms
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+    call copy_dba_bk(tcom,natm+nb,natm,nbmax,nb,lsb,lsrc,myparity &
          ,nn,mpi_world,aml,3*(nsf+1)*nhl1)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+    call copy_dba_bk(tcom,natm+nb,natm,nbmax,nb,lsb,lsrc,myparity &
          ,nn,mpi_world,bml,3*(nsf+1)*nhl1)
 !.....write aml
     open(82,file='out.NN1.aml')
@@ -451,7 +464,7 @@ contains
       tcom1= mpi_wtime()
 
       do kdd=-1,0
-        ku= 1*kd+kdd
+        ku= 2*kd+kdd
         inode= nn(ku)
         nsd= lsb(0,ku)
 
@@ -476,6 +489,7 @@ contains
       tcom2= mpi_wtime()
       tcom= tcom +tcom2-tcom1
     enddo
+
     deallocate(dbuf,dbufr)
   end subroutine copy_dba_fwd
 end module NN1

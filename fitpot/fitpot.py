@@ -393,7 +393,7 @@ def func(x,*args):
         read_bases(dir)
         ergs,frcs=calc_ef_from_bases(x,*args)
     elif potential in ('NN1'):
-        #ergs,frcs=NN1.calc_ef_from_bases(x,*args)
+        #.....forces must be computed from pmd results !!!
         ergs,frcs=NN1.calc_ef_from_pmd(x,*args)
 
     #.....calc function value of L

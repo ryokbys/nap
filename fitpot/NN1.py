@@ -253,7 +253,8 @@ def grad(x,*args):
     dir= args[0]
     #.....get energies and forces
     #ergs,frcs= calc_ef_from_bases(x,*args)
-    ergs,frcs= calc_ef_from_pmd(x,*args)
+    #ergs,frcs= calc_ef_from_pmd(x,*args)
+    ergs,frcs= gather_pmd_data(dir)
     # for ismpl in range(len(_samples)):
     #     print ' ismpl,ergs,_ergrefs:',ismpl,ergs[ismpl],_ergrefs[ismpl]
     
@@ -286,6 +287,7 @@ def grad_core(ismpl,ergs,frcs,*args):
     x      = args[0]
 
     gs= np.zeros(len(x))
+    dgs=np.zeros(len(x))
     smpl= _samples[ismpl]
     ediff= (ergs[ismpl] -_ergrefs[ismpl]) /smpl.natm
     gsfs= _gsf[ismpl]
@@ -327,7 +329,7 @@ def grad_core(ismpl,ergs,frcs,*args):
                     tmp -= 2.0*w2*( fdiff[0]*(am[0]+bm[0]) \
                                     +fdiff[1]*(am[1]+bm[1]) \
                                     +fdiff[2]*(am[2]+bm[2]) ) /smpl.natm/3
-                gs[iprm] += tmp
+                dgs[iprm] += tmp
                 iprm += 1
         for ihl1 in range(_nhl1+1):
             tmp= 0.0
@@ -339,8 +341,12 @@ def grad_core(ismpl,ergs,frcs,*args):
                     tmp -= 2.0*w1*( fdiff[0]*am[0] \
                                     +fdiff[1]*am[1] \
                                     +fdiff[2]*am[2] ) /smpl.natm/3
-            gs[iprm] += tmp
+            dgs[iprm] += tmp
             iprm += 1
+    # print ' gs,dgs,gs+dgs:'
+    # for iprm in range(len(x)):
+    #     print ' {0:15.7f} {1:15.7f} {2:15.7f}'.format(gs[iprm],dgs[iprm],gs[iprm]+dgs[iprm])
+    gs= gs +dgs
     return gs
                     
 def gather_basis(*args):
@@ -392,4 +398,13 @@ def gather_basis(*args):
         f2.close()
         f3.close()
         f4.close()
+
+    # print ' hl1:'
+    # for ismpl in range(len(_samples)):
+    #     smpl= _samples[ismpl]
+    #     for ia in range(smpl.natm):
+    #         for ihl1 in range(_nhl1+1):
+    #             print ' ismpl,ia,ihl1,hl1=',ismpl,ia,ihl1,hl1[ismpl][ia,ihl1]
+
+    
     return gsf,hl1,aml,bml
