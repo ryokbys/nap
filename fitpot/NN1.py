@@ -274,6 +274,8 @@ def grad(x,*args):
         for ismpl in range(len(_samples)):
             func_args.append( (grad_core,ismpl,ergs,frcs,x))
         results= p.map(arg_wrapper,func_args)
+        p.close()
+        p.join()
         for ismpl in range(len(_samples)):
             gs= results[ismpl]
             for iprm in range(len(x)):

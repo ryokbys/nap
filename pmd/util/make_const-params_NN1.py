@@ -15,17 +15,17 @@ rcut= 5.0
 pmin= -1.0
 pmax=  1.0
 #.....num of eta in 2-body symmetry function
-#reta=[0.01, 0.05, 0.1, 0.2, 0.4, 1.0]
-reta=[1.0]
+reta=[0.01, 0.05, 0.1, 0.2, 0.4, 1.0]
+#reta=[1.0]
 #reta=[0.05]
 #.....num of Rs in 2-body symmetry function
-#rrs=[1.0, 1.5, 2.0, 2.5, 3.0]
-rrs=[1.0, 2.0, 3.0]
+rrs=[1.0, 1.5, 2.0, 2.5, 3.0]
+#rrs=[1.0, 2.0, 3.0]
 #.....num of 3-body angular symmetry functions
-#rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2]
-rsf3=[1.0/5, 1.0/3]
+rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2]
+#rsf3=[1.0/5, 1.0/3]
 #.....num of nodes in a layer
-nhl1= 3
+nhl1= 5
 #nhl1= 3
 
 #.....num of 2-body Gaussian-type symmetry functions

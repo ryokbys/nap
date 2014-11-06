@@ -595,6 +595,8 @@ def grad_linreg(x,*args):
         for ismpl in range(len(samples)):
             func_args.append( (grad_linreg_core,ismpl,ergs,frcs) )
         results= p.map(arg_wrapper,func_args)
+        p.close()
+        p.join()
         for ismpl in range(len(samples)):
             gs= results[ismpl]
             for iprm in range(len(params)):
@@ -872,6 +874,7 @@ def output_statistics(ergs,frcs):
     for i in range(len(samples)):
         smpl= samples[i]
         de= abs(ergs[i]-ergrefs[i])/smpl.natm
+        #print ' ismpl,natm,erg,ergref,de=',i,smpl.natm,ergs[i],ergrefs[i],de
         demax= max(demax,de)
         desum += de**2/len(samples)
     rmse= math.sqrt(desum)
@@ -1107,7 +1110,7 @@ if __name__ == '__main__':
     if potential in ('linreg'):
         ergs,frcs= calc_ef_from_bases(solution,maindir)
     elif potential in ('NN1'):
-        ergs,frcs= NN1.calc_ef_from_bases(solution)
+        ergs,frcs= NN1.calc_ef_from_bases(solution,maindir)
     else:
         ergs,frcs= gather_pmd_data(maindir)
     output_energy_relation(ergs,fname='out.erg.pmd-vs-dft.fin')
