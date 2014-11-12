@@ -25,7 +25,7 @@ rrs=[1.0, 1.5, 2.0, 2.5, 3.0]
 rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2]
 #rsf3=[1.0/5, 1.0/3]
 #.....num of nodes in a layer
-nhl1= 5
+nhl1= 2
 #nhl1= 3
 
 #.....num of 2-body Gaussian-type symmetry functions

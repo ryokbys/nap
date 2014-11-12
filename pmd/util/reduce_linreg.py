@@ -78,16 +78,14 @@ for i in range(len(params)):
     g1.write(' {0} {1}'.format(consts[i][0],consts[i][1]))
     if int(consts[i][0]) == 1: # Gaussian
         g1.write(' {0} {1}\n'.format(consts[i][2],
-                                     consts[i][3]))
+                                     consts[i][3],
+                                     consts[i][4]))
     elif int(consts[i][0]) == 2: # cosine
         g1.write(' {0} {1}\n'.format(consts[i][2],
                                      consts[i][3]))
-    elif int(consts[i][0]) == 3: # polynomial
-        g1.write(' {0} {1} {2} {3}\n'.format(consts[i][2],
-                                             consts[i][3],
-                                             consts[i][4],
-                                             consts[i][5]))
-    elif int(consts[i][0]) == 4: # angular
+    elif int(consts[i][0]) == 3: # angular
+        g1.write(' {0}\n'.format(consts[i][2]))
+    elif int(consts[i][0]) >= 4: # polynomial
         g1.write(' {0}\n'.format(consts[i][2]))
     #...in.params.linreg
     g2.write(' {0} {1} {2}\n'.format(params[i][0],
