@@ -34,10 +34,12 @@
     character(len=6):: ciofmt='ascii '
     character(len=20):: cforce='LJ_Ar'
 !.....temperature
+    character(len=20):: ctctl='none'
     integer:: iftctl= 0
     real(8):: tinit= -1d0
     real(8):: ttgt = 300d0
     real(8):: trlx = 100d0
+    real(8):: tgmm,tfac
 !.....Search time and expiration time
     real(8):: ts,te
     integer:: istps,istpe

@@ -24,7 +24,7 @@ MPIFLAGS= @FCFLAGS@
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
 pmd= read_input.o parallel_md.o util_vec.o \
-	lasubs.o util_pmd.o zload.o mk_lspr.o
+	lasubs.o util_pmd.o zload.o mk_lspr.o util_rnd.o
 mods= mod_variables.o
 args= iargc.o getarg.o
 

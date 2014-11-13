@@ -30,8 +30,9 @@ c.....Epot threshold for disl core extraction [Hartree]
 #endif
 
       integer:: i,j,k,l,m,n,ia,ib,is
-      real(8):: tmp
+      real(8):: tmp,hscl(3),aai(3),ami,dt2
       integer,external:: num_dof
+      real(8),external:: box_muller
 c-----output file names
       character:: cnode*5,cnum*4
 
@@ -69,7 +70,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(rbuf,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(dmp,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(tinit,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(iftctl,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(ctctl,1,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(ttgt,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(trlx,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(nerg,1,MPI_INTEGER,0,mpi_md_world,ierr)
@@ -190,6 +191,12 @@ c.....Set initial temperature if needed
         call rm_trans_motion()
       elseif( abs(tinit).le.1d-5 ) then
         va(1:3,1:natm)= 0d0
+      endif
+
+      if( ctctl.eq.'Langevin' ) then
+        dt2= dt/2
+        tgmm= 1d0/trlx
+        tfac= sqrt(tgmm*dt*(fkb*ev2j)*ttgt)*m2ang/s2fs
       endif
 
 #ifdef __SHEAR__
@@ -420,6 +427,29 @@ c-------Calc forces
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol
      &       ,cforce)
 
+        if( ctctl.eq.'Langevin' ) then
+          ndof= num_dof()
+          if( ndof.ne.0 ) then
+c.....for the case that there are fixed atoms..., <ekin>= 1/2 *ndof*kT
+            temp= ekin *2d0 /fkb /ndof
+c.....Langevin thermostat with Mannella integrator
+            hscl(1:3)= 0d0
+            do l=1,3
+              hscl(l)= sqrt(h(1,l,0)**2 +h(2,l,0)**2 +h(3,l,0)**2)
+            enddo
+            do i=1,natm
+              is= int(tag(i))
+              ami= am(is)
+              aai(1:3)= 0d0
+              tmp= tfac /sqrt(2d0*ami*amu2kg)*dt
+              do l=1,3
+                aai(l)= -va(l,i)*tgmm*dt2 +tmp*box_muller()/hscl(l)
+              enddo
+              aa(1:3,i)= aa(1:3,i) +aai(1:3)
+            enddo
+          endif
+        endif
+
 #ifdef __SHEAR__
         call add_shear_stress(natm,ra,aa,tag,sorg,shrfx)
 #endif
@@ -458,17 +488,12 @@ c     &       ,epi(251)
         endif
 
 c-------temperature control by velocity scaling
-        if(iftctl.eq.1) then
+        if( trim(ctctl).eq.'Berendsen' ) then
           ndof= num_dof()
           if( ndof.ne.0 ) then
 !            write(6,'(a,2i6)') ' myid,ndof=',myid_md,ndof
 c.....for the case that there are fixed atoms..., <ekin>= 1/2 *ndof*kT
             temp= ekin *2d0 /fkb /ndof
-cc---------in case of 3D, <ekin> = 3/2 *NkT
-c            temp= ekin /ntot/fkb *2d0/3d0
-cc---------in case of 2D, <ekin> = 2/2 *NkT
-c          temp= ekin /ntot/fkb *2d0/2d0
-c---------Berendsen thermostat
             if( (ttgt-temp)/temp.gt.100d0 ) then
               tmp= sqrt(1d0 +dt/trlx*100d0 )
             else
@@ -486,18 +511,10 @@ c        endif
 c-------output energies
         if(mod(istp,nouterg).eq.0) then
           iocnterg=iocnterg+1
-cc---------calc kinetic energy
-c          if(iftctl.ne.1) then
-c            vmaxold= vmax
-c            call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
-c     &           ,vmax,mpi_md_world)
-c          endif
-          if( iftctl.ne.1 ) then
 c---------in case of 3D, <ekin> = 3/2 *NkT
-            temp= ekin /ntot/fkb *2d0/3d0
+          temp= ekin /ntot/fkb *2d0/3d0
 cc---------in case of 2D, <ekin> = 2/2 *NkT
 c          temp= ekin /ntot/fkb *2d0/2d0
-          endif
 
           if(czload_type.eq.'atoms') then
             call get_stress_on_base(natm,ra,aa,tag,h,acon(1),ftop,fbot
@@ -635,7 +652,7 @@ c=======================================================================
       write(6,'(2x,a25,es11.3)') 'damping_coeff',dmp
       write(6,'(2x,a)') ''
       write(6,'(2x,a25,f12.4)') 'initial_temperature',tinit
-      write(6,'(2x,a25,i8)') 'flag_temperature',iftctl
+      write(6,'(2x,a25,2x,a)') 'temperature_control',ctctl
       write(6,'(2x,a25,f12.4)') 'temperature_target',ttgt
       write(6,'(2x,a25,f12.4)') 'temperature_relax_time',trlx
       write(6,'(2x,a)') ''
@@ -1646,20 +1663,18 @@ c=======================================================================
       include 'mpif.h'
       include 'params_unit.h'
       integer:: i,l,is
-      real(8):: dseed,sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(nismax)
+      real(8):: dseed,sumvx,sumvy,sumvz,tmp,facv(nismax)
       real(8),parameter:: pi = 3.14159265358979d0
+      real(8),external:: box_muller
 
-      facv(1:nismax)=dsqrt(2d0*tinit*fkb*ev2j /(am(1:nismax)*amu2kg))
+      facv(1:nismax)=dsqrt(tinit*fkb*ev2j /(am(1:nismax)*amu2kg))
      &     *m2ang /s2fs
 
 c-----velocities in Maxwell-Boltzmann distribution
-      dseed=12345
       do i=1,natm
         is= int(tag(i))
         do l=1,3
-          call myrnd(rnd1,dseed)
-          call myrnd(rnd2,dseed)
-          va(l,i)=facv(is)*dsqrt(-dlog(rnd1))*dcos(2d0*pi*rnd2)
+          va(l,i)=facv(is) *box_muller()
         enddo
       enddo
 
@@ -1670,18 +1685,6 @@ c-----velocities in Maxwell-Boltzmann distribution
       enddo
 
       end subroutine setv
-c=======================================================================
-      subroutine myrnd(rnd,dseed)
-      real*8 rnd,dseed
-      real*8 d2p31m,d2p31
-      save d2p31m,d2p31
-      data d2p31m/2147483647d0/
-      data d2p31 /2147483648d0/
-      
-      dseed=dmod(16807d0*dseed,d2p31m)
-      rnd=dseed/d2p31
-      return
-      end subroutine myrnd
 c=======================================================================
       subroutine rm_trans_motion()
       use variables
