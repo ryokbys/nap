@@ -73,7 +73,7 @@ if __name__ == '__main__':
     erg0= float(commands.getoutput("grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'"))
     print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(0.0,erg0,erg0,erg0)
     outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
-    ddlt= dltmax/10
+    ddlt= dltmax/niter
     for iter in range(niter):
         dlt= (ddlt*(iter+1))
         dh= hmax*dlt
