@@ -7,12 +7,16 @@ class Atom(object):
 
     def __init__(self):
         self.pos= np.zeros((3,))
+        self.vel= np.zeros((3,))
         self.id= 0
         self.ifmv= 1
         self.sid= 1
 
     def set_pos(self,x,y,z):
         self.pos= np.array([x,y,z])
+
+    def set_vel(self,x,y,z):
+        self.vel= np.array([x,y,z])
 
     def set_sid(self,sid):
         self.sid= sid

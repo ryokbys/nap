@@ -10,7 +10,7 @@ c-----------------------------------------------------------------------
       implicit none
       integer,parameter:: npmax= 2000000
 c.....Num of auxiliary data for coloring atoms in Akira
-      integer,parameter:: nauxdat = 5
+      integer,parameter:: nauxdat = 8
       integer:: ipmd,n,inode,itmp,i,nnodes,nkvs,ia,ib,l,itag(npmax)
       real(8):: tmp,dat(18,npmax)
       character:: fin*13,fout*7
@@ -73,8 +73,11 @@ c-------output combined mts-file
         write(30,'(es15.7)') hunit
         write(30,'(3es15.7)') ((h(ia,ib,0)/hunit,ia=1,3),ib=1,3)
         write(30,'(i10,3i4)') n, nauxdat, 0, 0
-        write(30,'(i3,8es12.4)') (int(dat(18,i)),dat(1:3,i)
-     &       ,dat(7:8,i),dat(9,i),dat(13,i),dat(17,i),i=1,n)
+        do i=1,n
+          write(30,'(i3,30es12.4)') int(dat(18,i)),dat(1:3,i)
+     &         ,dat(4:6,i)
+     &         ,dat(7:8,i),dat(9,i),dat(13,i),dat(17,i)
+        enddo
         close(30)
         write(6,'(a)') " "//fout//" done."
       enddo
