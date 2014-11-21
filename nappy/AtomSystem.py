@@ -35,6 +35,7 @@ class AtomSystem(object):
     def num_atoms(self):
         return len(self.atoms)
 
+
     def read_pmd(self,fname='pmd0000'):
         f=open(fname,'r')
         # 1st: lattice constant
@@ -96,6 +97,32 @@ class AtomSystem(object):
                     +"  {0:.1f}  {1:.1f}  {2:.1f}".format(0.0, 0.0, 0.0)
                     +"  {0:.1f}  {1:.1f}  {2:.1f}".format(0.0, 0.0, 0.0)
                     +"\n")
+        f.close()
+
+    def write_POSCAR(self,fname='POSCAR'):
+        f=open(fname,'w')
+        f.write(' created by AtomSystem.py\n')
+        # lattice vector
+        f.write(' {0:15.7f}\n'.format(self.alc))
+        # cell vectors
+        f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a1[0],\
+                                                          self.a2[0],\
+                                                          self.a3[0]))
+        f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a1[1],\
+                                                          self.a2[1],\
+                                                          self.a3[1]))
+        f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a1[2],\
+                                                          self.a2[2],\
+                                                          self.a3[2]))
+        # num of atoms
+        f.write(' {0:5d}\n'.format(self.num_atoms()))
+        # comments
+        f.write('Selective dynamics\n')
+        f.write('Direct\n')
+        # atom positions
+        for ai in self.atoms:
+            f.write(' {0:15.7f} {1:15.7f} {2:15.7f} T T T\n'.format(
+                ai.pos[0],ai.pos[1],ai.pos[2]))
         f.close()
 
     def read_akr(self,fname='akr0000'):
