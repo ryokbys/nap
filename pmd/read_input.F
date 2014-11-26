@@ -46,7 +46,7 @@ c=======================================================================
       character(len=*),intent(in):: cname
 
       character(len=128):: ctmp
-      integer:: ndata,nrow,is
+      integer:: ndata,nrow,is,itmp
       
       if( trim(cname).eq.'time_interval' ) then
         call read_r1(ionum,dt)
@@ -83,7 +83,9 @@ c=======================================================================
         call read_c1(ionum,ctctl)
         return
       elseif( trim(cname).eq.'temperature_target' ) then
-        call read_r1(ionum,ttgt)
+        backspace(ionum)
+        read(ionum,*) ctmp,itmp,ttgt(itmp)
+c        call read_r1(ionum,ttgt)
         return
       elseif( trim(cname).eq.'temperature_relax_time' ) then
         call read_r1(ionum,trlx)

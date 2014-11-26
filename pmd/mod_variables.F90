@@ -14,14 +14,19 @@
 !.....max. num. of neighbors
     integer,parameter:: nnmax = 200
 
+!.....output #
+    integer,parameter:: ioerg = 11
+    integer,parameter:: iotemp= 12
+    integer,parameter:: iostrs= 13
+
 !=======================================================================
 ! VARIABLES
 !=======================================================================
     integer:: nouterg,noutpmd,istp &
          ,iocntpmd,iocnterg
-    integer:: natm,nb,ntot,nis,ndof
+    integer:: natm,nb,ntot,nis
     real(8):: tcpu,tcpu1,tcpu2,tcom
-    real(8):: temp,epot,ekin,epot0,vmaxold,vmax
+    real(8):: epot,ekin,epot0,vmaxold,vmax
     integer:: nstp = 0
     integer:: nerg = 1000
     integer:: ifpmd= 1
@@ -37,9 +42,12 @@
     character(len=20):: ctctl='none'
     integer:: iftctl= 0
     real(8):: tinit= -1d0
-    real(8):: ttgt = 300d0
+    real(8):: ttgt(9)
+    data ttgt / 300d0, 300d0, 300d0, 300d0, 300d0, 300d0, &
+         300d0, 300d0, 300d0 /
     real(8):: trlx = 100d0
-    real(8):: tgmm,tfac
+    real(8):: tgmm,tfac(9),temp(9),ekl(9)
+    integer:: ndof(9)
 !.....Search time and expiration time
     real(8):: ts,te
     integer:: istps,istpe

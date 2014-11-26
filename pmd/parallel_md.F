@@ -29,8 +29,8 @@ c.....Epot threshold for disl core extraction [Hartree]
       real(8),parameter:: epith = -0.1410d0
 #endif
 
-      integer:: i,j,k,l,m,n,ia,ib,is
-      real(8):: tmp,hscl(3),aai(3),ami,dt2
+      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave
+      real(8):: tmp,hscl(3),aai(3),ami,dt2,tave
       integer,external:: num_dof
       real(8),external:: box_muller
 c-----output file names
@@ -71,7 +71,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(dmp,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(tinit,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(ctctl,1,mpi_character,0,mpi_md_world,ierr)
-      call mpi_bcast(ttgt,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(ttgt,9,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(trlx,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(nerg,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(ifpmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
@@ -196,7 +196,9 @@ c.....Set initial temperature if needed
       if( ctctl.eq.'Langevin' ) then
         dt2= dt/2
         tgmm= 1d0/trlx
-        tfac= sqrt(tgmm*dt*(fkb*ev2j)*ttgt)*m2ang/s2fs
+        do ifmv=1,9
+          tfac(ifmv)= sqrt(tgmm*dt*(fkb*ev2j)*ttgt(ifmv))*m2ang/s2fs
+        enddo
       endif
 
 #ifdef __SHEAR__
@@ -240,13 +242,14 @@ c      enddo
 #endif
 
 c-----calc kinetic energy
-      call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
+      call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki,ekl
      &     ,vmax,mpi_md_world)
       vmaxold=vmax
-c-----in case of 3D, <ekin> = 3/2 *NkT
-      temp= ekin /ntot/fkb *2d0/3d0
-cc-----in case of 2D, <ekin> = 2/2 *NkT
-c      temp= ekin /ntot/fkb *2d0/2d0
+c.....get_num_dof is called once in a MD run
+      call get_num_dof()
+      do ifmv=1,9
+        temp(ifmv)= ekl(ifmv) /ndof(ifmv) /fkb *2d0
+      enddo
 
       if( ifpctl.ne.0 ) then
         if( ifpctl.eq.1 ) then
@@ -289,17 +292,27 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
         write(6,'(1x,a)') "initial values:"
         write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
         write(6,'(1x,a,es22.14,a)') " potential energy=",epot0,' eV'
-        write(6,'(1x,a,es15.7,a)') " temperature     =",temp,' K'
+        nave= 0
+        tave= 0d0
+        do ifmv=1,9
+          if( ndof(ifmv).eq.0 ) cycle
+          nave= nave +ndof(ifmv)
+          write(6,'(1x,a,i1,a,es15.7,a)') " temperature ",ifmv
+     &         ,"   =",temp(ifmv),' K'
+          tave= tave +temp(ifmv)*ndof(ifmv)
+        enddo
+        tave= tave/nave
+        write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
 
         if( ifpctl.ne.0 ) then
           write(6,'(a,i8,2f10.2,2es11.3)')
      &         " istp,time,temp,vol,prss="
-     &         ,istp,tcpu,temp,vol
+     &         ,istp,tcpu,tave,vol
      &         ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
         else
           write(6,'(a,i8,2f10.2)')
      &         " istp,time,temp="
-     &         ,istp,tcpu,temp
+     &         ,istp,tcpu,tave
         endif
         write(6,'(a)') ' stress tensor in GPa:'
         write(6,'(3f15.7)') ptnsr(1:3,1:3) *up2gpa
@@ -327,20 +340,26 @@ c-----output initial configuration
       call update_wall()
 #endif
 
-c-----Energy output
       if(myid_md.eq.0) then
-        open(11,file="out.erg",status='replace')
-        write(11,'(a)') '# istp,etot-epot0[eV],ekin,epot-epot0,temp[K]'
-     &       //',vol[Ang^3],pressure[GPa]'
-        write(11,'(a,es16.7e3,a)') '# epot0 =',epot0,' [eV]'
-        write(11,'(i8,3es16.7e3,f10.2,2es16.7e3)') istp
-     &       ,ekin+epot0-epot0,ekin,epot0-epot0,temp
+c.....write out energies
+        open(ioerg,file="out.erg",status='replace')
+        write(ioerg,'(a)') '# istp,etot-epot0[eV],ekin,epot-epot0'
+     &       //',temp[K],vol[Ang^3],pressure[GPa]'
+        write(ioerg,'(a,es16.7e3,a)') '# epot0 =',epot0,' [eV]'
+        write(ioerg,'(i10,3es16.7e3,f10.2,2es16.7e3)') istp
+     &       ,ekin+epot0-epot0,ekin,epot0-epot0,tave
      &       ,vol
      &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
-        call flush(11)
+        call flush(ioerg)
+c.....write out temperatures
+        open(iotemp,file='out.temperature',status='replace')
+        write(iotemp,'(a)') '# istp, temperature[0-9]'
+        write(iotemp,'(i10,9es16.7e3)') istp,temp(1:9)
+        call flush(iotemp)
+c.....write out stresses
         if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
-          open(80,file='out.stress',status='replace')
-          write(80,'(a)') '#  istp,   strnow,      ftop,     fbot'
+          open(iostrs,file='out.stress',status='replace')
+          write(iostrs,'(a)') '#  istp,   strnow,      ftop,     fbot'
         endif
 #ifdef __WALL__
         open(81,file='out.wall',status='replace')
@@ -428,26 +447,22 @@ c-------Calc forces
      &       ,cforce)
 
         if( ctctl.eq.'Langevin' ) then
-          ndof= num_dof()
-          if( ndof.ne.0 ) then
-c.....for the case that there are fixed atoms..., <ekin>= 1/2 *ndof*kT
-            temp= ekin *2d0 /fkb /ndof
 c.....Langevin thermostat with Mannella integrator
-            hscl(1:3)= 0d0
+          hscl(1:3)= 0d0
+          do l=1,3
+            hscl(l)= sqrt(h(1,l,0)**2 +h(2,l,0)**2 +h(3,l,0)**2)
+          enddo
+          do i=1,natm
+            is= int(tag(i))
+            ifmv= int(mod(tag(i)*10,10d0))
+            ami= am(is)
+            aai(1:3)= 0d0
+            tmp= tfac(ifmv) /sqrt(2d0*ami*amu2kg)*dt
             do l=1,3
-              hscl(l)= sqrt(h(1,l,0)**2 +h(2,l,0)**2 +h(3,l,0)**2)
+              aai(l)= -va(l,i)*tgmm*dt2 +tmp*box_muller()/hscl(l)
             enddo
-            do i=1,natm
-              is= int(tag(i))
-              ami= am(is)
-              aai(1:3)= 0d0
-              tmp= tfac /sqrt(2d0*ami*amu2kg)*dt
-              do l=1,3
-                aai(l)= -va(l,i)*tgmm*dt2 +tmp*box_muller()/hscl(l)
-              enddo
-              aa(1:3,i)= aa(1:3,i) +aai(1:3)
-            enddo
-          endif
+            aa(1:3,i)= aa(1:3,i) +aai(1:3)
+          enddo
         endif
 
 #ifdef __SHEAR__
@@ -459,7 +474,7 @@ c.....Second kick of velocities
 
 c.....Calc kinetic energy
         vmaxold= vmax
-        call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
+        call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki,ekl
      &       ,vmax,mpi_md_world)
 
 c        write(6,'(a,10es12.4)') '251,va(1:3),eki(251),epi(251)='
@@ -489,18 +504,20 @@ c     &       ,epi(251)
 
 c-------temperature control by velocity scaling
         if( trim(ctctl).eq.'Berendsen' ) then
-          ndof= num_dof()
-          if( ndof.ne.0 ) then
 !            write(6,'(a,2i6)') ' myid,ndof=',myid_md,ndof
 c.....for the case that there are fixed atoms..., <ekin>= 1/2 *ndof*kT
-            temp= ekin *2d0 /fkb /ndof
-            if( (ttgt-temp)/temp.gt.100d0 ) then
+          do ifmv=1,9
+            temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
+          enddo
+          do i=1,natm
+            ifmv= int(mod(tag(i)*10,10d0))
+            if( (ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
               tmp= sqrt(1d0 +dt/trlx*100d0 )
             else
-              tmp= sqrt(1d0 +dt/trlx*(ttgt-temp)/temp)
+              tmp= sqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv))/temp(ifmv))
             endif
-            va(1:3,1:natm)= va(1:3,1:natm) *tmp
-          endif
+            va(1:3,i)= va(1:3,i) *tmp
+          enddo
         endif
 
 cc.....Eliminate translational motion
@@ -511,10 +528,15 @@ c        endif
 c-------output energies
         if(mod(istp,nouterg).eq.0) then
           iocnterg=iocnterg+1
-c---------in case of 3D, <ekin> = 3/2 *NkT
-          temp= ekin /ntot/fkb *2d0/3d0
-cc---------in case of 2D, <ekin> = 2/2 *NkT
-c          temp= ekin /ntot/fkb *2d0/2d0
+          nave= 0
+          tave= 0d0
+          do ifmv=1,9
+            temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
+            if( ndof(ifmv).eq.0 ) cycle
+            nave= nave +ndof(ifmv)
+            tave= tave +temp(ifmv)*ndof(ifmv)
+          enddo
+          tave= tave/nave
 
           if(czload_type.eq.'atoms') then
             call get_stress_on_base(natm,ra,aa,tag,h,acon(1),ftop,fbot
@@ -522,15 +544,19 @@ c          temp= ekin /ntot/fkb *2d0/2d0
           endif
 
           if(myid_md.eq.0) then
-            write(11,'(i8,3es16.7e3,f10.2,2es16.7e3)') istp
-     &           ,ekin+epot-epot0,ekin,epot-epot0,temp
+c.....write energies
+            write(ioerg,'(i10,3es16.7e3,f10.2,2es16.7e3)') istp
+     &           ,ekin+epot-epot0,ekin,epot-epot0,tave
      &           ,vol
      &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
-            call flush(11)
+            call flush(ioerg)
+c.....write temperature
+            write(iotemp,'(i10,9es16.7e3)') istp,temp(1:9)
+            call flush(iotemp)
 
             if(czload_type.eq.'atoms') then
-              write(80,'(i8,3es15.7)') istp,strnow,ftop,fbot
-              call flush(80)
+              write(iostrs,'(i8,3es15.7)') istp,strnow,ftop,fbot
+              call flush(iostrs)
             endif
 
           endif
@@ -540,7 +566,7 @@ c---------output step, time, and temperature
             if( ifpctl.ne.0 ) then
               write(6,'(a,i8,2f10.2,2es11.3)')
      &             " istp,time,temp,vol,prss="
-     &             ,istp,tcpu,temp,vol
+     &             ,istp,tcpu,tave,vol
      &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
               write(6,'(a)') ' H-matrix:'
               write(6,'(3f15.7)') h(1:3,1:3,0)
@@ -549,7 +575,7 @@ c---------output step, time, and temperature
             else
               write(6,'(a,i8,2f10.2)')
      &             " istp,time,temp="
-     &             ,istp,tcpu,temp
+     &             ,istp,tcpu,tave
             endif
           endif
             
@@ -603,9 +629,10 @@ c.....reset pressure
       tcpu2= mpi_wtime()
 
       if(myid_md.eq.0) then
-        close(11)
+        close(ioerg)
+        close(iotemp)
         if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
-          close(80)
+          close(iostrs)
         endif
 #ifdef __WALL__
         close(81)
@@ -617,7 +644,17 @@ c.....reset pressure
         write(6,'(1x,a)') "final values:"
         write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
         write(6,'(1x,a,es22.14,a)') " potential energy=",epot,' eV'
-        write(6,'(1x,a,es15.7,a)') " temperature     =",temp,' K'
+        nave= 0
+        tave= 0d0
+        do ifmv=1,9
+          if( ndof(ifmv).eq.0 ) cycle
+          nave= nave +ndof(ifmv)
+          write(6,'(1x,a,i1,a,es15.7,a)') " temperature ",ifmv
+     &         ,"   =",temp(ifmv),' K'
+          tave= tave +temp(ifmv)*ndof(ifmv)
+        enddo
+        tave= tave/nave
+        write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
         write(6,'(1x,a,2f10.2)') "time cpu & com=",tcpu,tcom
       endif
 
@@ -653,7 +690,9 @@ c=======================================================================
       write(6,'(2x,a)') ''
       write(6,'(2x,a25,f12.4)') 'initial_temperature',tinit
       write(6,'(2x,a25,2x,a)') 'temperature_control',ctctl
-      write(6,'(2x,a25,f12.4)') 'temperature_target',ttgt
+      do i=1,9
+        write(6,'(2x,a25,i3,f12.4)') 'temperature_target',i,ttgt(i)
+      enddo
       write(6,'(2x,a25,f12.4)') 'temperature_relax_time',trlx
       write(6,'(2x,a)') ''
       if( ifpctl.ne.0 ) then
@@ -865,24 +904,26 @@ c-----set fmv(1:3,ifmv) to be multiplied to the velocities
 
       end subroutine set_fmv
 c=======================================================================
-      subroutine get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki
+      subroutine get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki,ekl
      &     ,vmax,mpi_md_world)
       implicit none 
       include "mpif.h"
       integer,intent(in):: namax,natm,mpi_md_world,nismax
       real(8),intent(in):: va(3,namax),h(3,3),fack(nismax)
      &     ,tag(namax)
-      real(8),intent(out):: ekin,eki(3,3,namax),vmax
+      real(8),intent(out):: ekin,eki(3,3,namax),vmax,ekl(9)
 c-----locals
-      integer:: i,ierr,is,ixyz,jxyz,imax
-      real(8):: ekinl,x,y,z,v(3),v2,vmaxl
+      integer:: i,ierr,is,ixyz,jxyz,imax,ifmv
+      real(8):: ekinl,x,y,z,v(3),v2,vmaxl,ekll(9)
 
       ekinl=0d0
       eki(1:3,1:3,1:natm)= 0d0
+      ekll(1:9)= 0d0
       vmaxl= 0d0
 
       do i=1,natm
         is= int(tag(i))
+        ifmv= int(mod(tag(i)*10,10d0))
         x= va(1,i)
         y= va(2,i)
         z= va(3,i)
@@ -896,6 +937,8 @@ c.....Tensor form eki
         v2= eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
         eki(1:3,1:3,i)=eki(1:3,1:3,i)*fack(is)
         ekinl=ekinl +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
+c.....Temperature of each ifmv
+        ekll(ifmv)= ekll(ifmv) +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
 c.....Find max speed
         if( v2.gt.vmaxl ) imax=i
         vmaxl=max(vmaxl,v2)
@@ -904,6 +947,9 @@ c.....Find max speed
       ekin= 0d0
       call mpi_allreduce(ekinl,ekin,1,MPI_DOUBLE_PRECISION
      &     ,MPI_SUM,mpi_md_world,ierr)
+      ekl(1:9)= 0d0
+      call mpi_allreduce(ekll,ekl,9,MPI_DOUBLE_PRECISION
+     &     ,MPI_SUM,mpi_md_world,ierr)
       vmax= 0d0
       call mpi_allreduce(vmaxl,vmax,1,mpi_double_precision
      &     ,MPI_MAX,mpi_md_world,ierr)
@@ -911,28 +957,28 @@ c.....Find max speed
 
       end subroutine get_ekin
 c=======================================================================
-      function num_dof()
+      subroutine get_num_dof()
       use variables
       implicit none
       include 'mpif.h'
-      integer:: num_dof
-      integer:: i,l,k,ndofl
+      integer:: i,l,k,ndofl(9)
       real(8),parameter:: deps= 1d-12
-      
-      ndofl= 0
+
+      ndofl(1:9)= 0d0
       do i=1,natm
         l= int(mod(tag(i)*10,10d0))
         do k=1,3
-          if( abs(fmv(k,l)).lt.1d-12 ) cycle
-          ndofl= ndofl +1
+          if( abs(fmv(k,l)).lt.0.5d0 ) cycle
+          ndofl(l)= ndofl(l) +1
         enddo
       enddo
       
-      num_dof= 0
-      call mpi_allreduce(ndofl,num_dof,1,mpi_integer,mpi_sum
+      ndof(1:9)= 0
+      call mpi_allreduce(ndofl,ndof,9,mpi_integer,mpi_sum
      &     ,mpi_md_world,ierr)
+      write(6,'(a,9i9)') ' ndof=',ndof(1:9)
       return
-      end function num_dof
+      end subroutine get_num_dof
 c=======================================================================
       subroutine bacopy(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
      &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv

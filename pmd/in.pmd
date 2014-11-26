@@ -25,7 +25,8 @@
 
   initial_temperature     -2000d0
   temperature_control     None
-  temperature_target      100d0
+  temperature_target   1  300d0
+  temperature_target   2  100d0
   temperature_relax_time  100d0
 
   factor_direction 3 2
