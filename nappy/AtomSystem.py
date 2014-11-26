@@ -41,9 +41,14 @@ class AtomSystem(object):
         # 1st: lattice constant
         self.alc= float(f.readline().split()[0])
         # 2nd-4th: cell vectors
-        self.a1= np.array([float(x) for x in f.readline().split()])
-        self.a2= np.array([float(x) for x in f.readline().split()])
-        self.a3= np.array([float(x) for x in f.readline().split()])
+        for i in range(3):
+            data= f.readline().split()
+            self.a1[i]= float(data[0])
+            self.a2[i]= float(data[1])
+            self.a3[i]= float(data[2])
+        # self.a1= np.array([float(x) for x in f.readline().split()])
+        # self.a2= np.array([float(x) for x in f.readline().split()])
+        # self.a3= np.array([float(x) for x in f.readline().split()])
         # 5th-7th: velocity of cell vectors
         tmp= f.readline().split()
         tmp= f.readline().split()
@@ -67,13 +72,13 @@ class AtomSystem(object):
         f.write(" {0:15.7f}\n".format(self.alc))
         # cell vectors
         f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a1[0],\
-                                                          self.a1[1],\
-                                                          self.a1[2]))
-        f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a2[0],\
+                                                          self.a2[0],\
+                                                          self.a3[0]))
+        f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a1[1],\
                                                           self.a2[1],\
-                                                          self.a2[2]))
-        f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a3[0],\
-                                                          self.a3[1],\
+                                                          self.a3[1]))
+        f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a1[2],\
+                                                          self.a2[2],\
                                                           self.a3[2]))
         # velocities of cell vectors
         f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(0.0, 0.0, 0.0))
@@ -106,13 +111,13 @@ class AtomSystem(object):
         f.write(' {0:15.7f}\n'.format(self.alc))
         # cell vectors
         f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a1[0],\
-                                                          self.a2[0],\
-                                                          self.a3[0]))
-        f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a1[1],\
+                                                          self.a1[1],\
+                                                          self.a1[2]))
+        f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a2[0],\
                                                           self.a2[1],\
-                                                          self.a3[1]))
-        f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a1[2],\
-                                                          self.a2[2],\
+                                                          self.a2[2]))
+        f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a3[0],\
+                                                          self.a3[1],\
                                                           self.a3[2]))
         # num of atoms
         f.write(' {0:5d}\n'.format(self.num_atoms()))
@@ -130,9 +135,11 @@ class AtomSystem(object):
         # 1st: lattice constant
         self.alc= float(f.readline().split()[0])
         # 2nd-4th: cell vectors
-        self.a1= np.array([float(x) for x in f.readline().split()])
-        self.a2= np.array([float(x) for x in f.readline().split()])
-        self.a3= np.array([float(x) for x in f.readline().split()])
+        for i in range(3):
+            data= f.readline().split()
+            self.a1[i]= float(data[0])
+            self.a2[i]= float(data[1])
+            self.a3[i]= float(data[2])
         # 5th: num of atoms
         natm= int(f.readline().split()[0])
         # 9th-: atom positions
@@ -152,13 +159,13 @@ class AtomSystem(object):
         f.write(" {0:12.4f}\n".format(self.alc))
         # cell vectors
         f.write(" {0:12.4f} {1:12.4f} {2:12.4f}\n".format(self.a1[0],\
-                                                          self.a1[1],\
-                                                          self.a1[2]))
-        f.write(" {0:12.4f} {1:12.4f} {2:12.4f}\n".format(self.a2[0],\
+                                                          self.a2[0],\
+                                                          self.a3[0]))
+        f.write(" {0:12.4f} {1:12.4f} {2:12.4f}\n".format(self.a1[1],\
                                                           self.a2[1],\
-                                                          self.a2[2]))
-        f.write(" {0:12.4f} {1:12.4f} {2:12.4f}\n".format(self.a3[0],\
-                                                          self.a3[1],\
+                                                          self.a3[1]))
+        f.write(" {0:12.4f} {1:12.4f} {2:12.4f}\n".format(self.a1[2],\
+                                                          self.a2[2],\
                                                           self.a3[2]))
         # num of atoms
         f.write(" {0:10d} {1:4d} {2:4d} {3:4d}\n".format(len(self.atoms),3,0,0))

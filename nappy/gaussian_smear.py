@@ -63,7 +63,8 @@ for il in range(nline):
     outfile.write(' {0:15.2f} {1:15.7f}\n'.format(gdat[il][0],gdat[il][1]))
 outfile.close()
 
-print ' Check '+infname+'.smeared !!!'
+print ' write '+infname+'.smeared'
+print ' GAUSSIAN_SMEAR done '
 
 # dtotal= 0.0
 # gtotal= 0.0

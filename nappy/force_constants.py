@@ -1,6 +1,13 @@
 #!/bin/env python
 """
-Compute force constant matrix of pmd00000 file.
+Compute force constants for the calculation of phonopy.
+pmd00000 should be passed to the program as input and
+the system will be extended to include all the interaction within
+the cutoff range specified.
+
+OUTPUT:
+  * POSCAR
+  * FORCE_CONSTANTS
 """
 
 import os,sys,math,copy

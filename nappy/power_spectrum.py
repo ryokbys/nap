@@ -176,7 +176,7 @@ print ' writing dat.power...'
 psfname='dat.power'
 psfile= open(psfname,'w')
 mmax= ntwindow/2
-psfile.write('# w[cm^-1], Ix(w), Iy(w), Iz(w)\n')
+psfile.write('#     w[cm^-1],      Ix(w),     Iy(w),     Iz(w),     I(w)\n')
 speed= 299792458.0*100 /1.0e+15 # cm/fs
 for mw in range(mmax):
     ps = np.zeros(3)
