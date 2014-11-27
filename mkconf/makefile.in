@@ -34,6 +34,7 @@ mkconf_2D_edge_disl= mkconf_2D_edge_disl.o
 mkconf_Al_fcc_nanorod= mkconf_Al_fcc_nanorod.o
 mkconf_Si111_2lc= mkconf_Si111_2lc.o
 mkconf_Si_bulk= mkconf_Si_bulk.o
+mkconf_Si_NEMD= mkconf_Si_NEMD.o
 mkconf_Si_disl= mkconf_Si_disl.o
 mkconf_BCC= mkconf_BCC.o
 mkconf_BCC_nanorod= mkconf_BCC_nanorod.o
@@ -73,6 +74,9 @@ mkconf_Al_fcc_nanorod: ${mkconf_Al_fcc_nanorod} ${util} ${mods}
 
 mkconf_Si_bulk: ${mkconf_Si_bulk} ${util} ${mods}
 	${MPIFC} -o $@ ${mods} ${mkconf_Si_bulk} ${util}
+
+mkconf_Si_NEMD: ${mkconf_Si_NEMD} ${util} ${mods}
+	${MPIFC} -o $@ ${mods} ${mkconf_Si_NEMD} ${util}
 
 mkconf_Si_disl_screw_60: ${mkconf_Si_disl_screw_60} ${util} ${mods}
 	${MPIFC} -o $@ ${mods} ${mkconf_Si_disl_screw_60} ${util}

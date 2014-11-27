@@ -1,6 +1,9 @@
-      program mkconf_Si_bulk
+      program mkconf_Si_NEMD
 c-----------------------------------------------------------------------
-c Make atom configuration file of Si bulk of diamond structure.
+c Make atom configuration file of crystalline Si system
+c to perform the non-equilibrium MD for thermal conductance calculation.
+c The system is long in x-direction which is to be the thermal flow
+c direction. Vacuum region is added in x-direction.
 c-----------------------------------------------------------------------
 c OUTPUT
 c ------
@@ -11,9 +14,9 @@ c-----------------------------------------------------------------------
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
-      integer,parameter:: nuc(1:3)= (/ 1,1,1 /)
+      integer,parameter:: nuc(1:3)= (/ 10,2,2 /)
 c-----vacuum width in unit of cell
-      integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
+      integer,parameter:: nvac(1:3)= (/ 1, 0, 0 /)
       real(8):: ua(3,10)
       real(8):: ra(3,nmax)
       real(8):: h(3,3,0:1)
@@ -45,7 +48,6 @@ c-----simulation box size
       h(2,2,0)= cunit*(nuc(2)+nvac(2))
       h(3,3,0)= cunit*(nuc(3)+nvac(3))
 
-      q= pi/cunit 
       inc=0 
       do ix=0,nuc(1)-1
         do iy=0,nuc(2)-1
@@ -61,13 +63,23 @@ c-----simulation box size
               si(3)= (ua(3,m)+dble(iz))/(nuc(3)+nvac(3)) +small
               si(1:3)= si(1:3)
      &             +dble(nvac(1:3))/(nuc(1:3)+nvac(1:3))/2
-c              si(2)= si(2)+0.5d0/h(1,1,0)*exp(-(si(1)-0.5d0)**2/0.005d0)
-cc     &             *sin(q*(si(1)-0.5d0)*h(1,1,0))
-c              write(10,'(2es12.4)') si(1)
-c     &             ,0.5d0/h(1,1,0) *exp(-(si(1)-0.5d0)**2/0.005d0)
               ra(1:3,inc)= si(1:3)
               is= 1
               ifmv= 1
+c.....change ifmv of atoms at temperature control region
+              if( ix.le.1 ) then
+                ifmv= 2
+              elseif ( ix.ge.nuc(1)-2 ) then
+                ifmv= 3
+              endif
+c.....fix atoms at leftmost and rightmost face
+              if( ix.eq.0 .and.
+     &             (m.eq.1 .or. m.eq.3 .or. m.eq.5 .or. m.eq.7) ) then
+                ifmv= 0
+              else if( ix.eq.nuc(1)-1 .and.
+     &               (m.eq.2 .or. m.eq.4 .or. m.eq.6 .or. m.eq.8) ) then
+                ifmv= 0
+              endif
               tag(inc)= 1d0*is +0.1d0*ifmv +1d-14*inc
             enddo
           enddo
@@ -84,14 +96,14 @@ c-----output for Akira
       open(15,file='akr0000',form='formatted',status='replace')
       write(15,'(es15.7)') cunit
       write(15,'(3es11.3)') ((h(ia,ib,l)/cunit,ia=1,3),ib=1,3)
-      write(15,'(i10,3i5)')inc,3,0,0
+      write(15,'(i10,3i5)') inc,3,0,0
       do i=1,inc
         write(15,'(i3,6es11.3)') int(tag(i)),ra(1:3,i),va(1:3,i)
       enddo
       close(15)
       
-      end program mkconf_Si_bulk
+      end program mkconf_Si_NEMD
 c-----------------------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make mkconf_Si_bulk"
+c     compile-command: "make mkconf_Si_NEMD"
 c     End:

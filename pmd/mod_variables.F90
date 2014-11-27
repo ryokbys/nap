@@ -18,6 +18,7 @@
     integer,parameter:: ioerg = 11
     integer,parameter:: iotemp= 12
     integer,parameter:: iostrs= 13
+    integer,parameter:: iotdst= 14
 
 !=======================================================================
 ! VARIABLES
@@ -48,6 +49,12 @@
     real(8):: trlx = 100d0
     real(8):: tgmm,tfac(9),temp(9),ekl(9)
     integer:: ndof(9)
+!.....temperature distribution on x-direction
+    logical:: ltdst= .false.
+    integer:: ntdst= 1
+    integer:: nxmlt
+    real(8),allocatable:: tdst(:)
+    integer,allocatable:: nadst(:)
 !.....Search time and expiration time
     real(8):: ts,te
     integer:: istps,istpe

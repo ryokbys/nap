@@ -151,5 +151,5 @@ c     &       ,ekit,epit,strst)
       end program node_conv
 c-----------------------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make 20nconv"
+c     compile-command: "make nconv"
 c     End:

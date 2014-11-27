@@ -60,44 +60,7 @@ c.....Multiply damping factor to avoid multiplication of every step
         endif
       endif
 
-c-----Broadcast input parameters to all nodes
-      call mpi_bcast(nx,1,MPI_INTEGER,0,mpi_md_world,ierr)
-      call mpi_bcast(ny,1,MPI_INTEGER,0,mpi_md_world,ierr)
-      call mpi_bcast(nz,1,MPI_INTEGER,0,mpi_md_world,ierr)
-      call mpi_bcast(nstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
-      call mpi_bcast(dt,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(rc,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(rbuf,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(dmp,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(tinit,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(ctctl,1,mpi_character,0,mpi_md_world,ierr)
-      call mpi_bcast(ttgt,9,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(trlx,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(nerg,1,MPI_INTEGER,0,mpi_md_world,ierr)
-      call mpi_bcast(ifpmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
-      call mpi_bcast(npmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
-      call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpi_md_world,ierr)
-      call mpi_bcast(fmv,30,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(shrst,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(ifpctl,1,MPI_INTEGER,0,mpi_md_world,ierr)
-      call mpi_bcast(ptgt,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(stgt,9,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(vmcoeff,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(voldmp,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(czload_type,5,mpi_character,0,mpi_md_world,ierr)
-      call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(am,nismax,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
-      call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
-#ifdef __WALL__
-      call mpi_bcast(wtop,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(wbot,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(ptgt_wall,1,mpi_double_precision,0,mpi_md_world
-     &     ,ierr)
-      call mpi_bcast(trlx_wall,1,mpi_double_precision,0,mpi_md_world
-     &     ,ierr)
-      call mpi_bcast(nout_wall,1,mpi_integer,0,mpi_md_world,ierr)
-#endif
+      call bcast_params()
 
 c-----output every these steps, NOUTERG, NOUTPMD
       if( nerg.ne.0 ) then
@@ -197,7 +160,11 @@ c.....Set initial temperature if needed
         dt2= dt/2
         tgmm= 1d0/trlx
         do ifmv=1,9
-          tfac(ifmv)= sqrt(tgmm*dt*(fkb*ev2j)*ttgt(ifmv))*m2ang/s2fs
+          if( ttgt(ifmv).lt.0d0 ) then
+            tfac(ifmv)= -1d0
+          else
+            tfac(ifmv)= sqrt(tgmm*dt*(fkb*ev2j)*ttgt(ifmv))*m2ang/s2fs
+          endif
         enddo
       endif
 
@@ -248,7 +215,7 @@ c-----calc kinetic energy
 c.....get_num_dof is called once in a MD run
       call get_num_dof()
       do ifmv=1,9
-        temp(ifmv)= ekl(ifmv) /ndof(ifmv) /fkb *2d0
+        if(ndof(ifmv).ne.0) temp(ifmv)= ekl(ifmv) /ndof(ifmv) /fkb *2d0
       enddo
 
       if( ifpctl.ne.0 ) then
@@ -370,6 +337,15 @@ c.....write out stresses
 #endif
       endif
 
+c.....temperature distribution along x
+      if( ltdst ) then
+        if( myid_md.eq.0 ) then
+          open(iotdst,file='out.temp-dist')
+          write(iotdst,'(a)') '#   x-pos,   temp   '
+        endif
+        call calc_temp_dist()
+      endif
+
 c.....Set al
       al(1)= h(1,1,0)
       al(2)= h(2,2,0)
@@ -455,6 +431,7 @@ c.....Langevin thermostat with Mannella integrator
           do i=1,natm
             is= int(tag(i))
             ifmv= int(mod(tag(i)*10,10d0))
+            if( tfac(ifmv).lt.0d0 ) cycle
             ami= am(is)
             aai(1:3)= 0d0
             tmp= tfac(ifmv) /sqrt(2d0*ami*amu2kg)*dt
@@ -476,10 +453,6 @@ c.....Calc kinetic energy
         vmaxold= vmax
         call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki,ekl
      &       ,vmax,mpi_md_world)
-
-c        write(6,'(a,10es12.4)') '251,va(1:3),eki(251),epi(251)='
-c     &       ,va(1:3,251),eki(1,1,251)+eki(2,2,251)+eki(3,3,251)
-c     &       ,epi(251)
 
         if( ifpctl.ne.0 ) then
           call force_isobaric(stgt,ah,natm,eki,strs,sgm
@@ -511,6 +484,7 @@ c.....for the case that there are fixed atoms..., <ekin>= 1/2 *ndof*kT
           enddo
           do i=1,natm
             ifmv= int(mod(tag(i)*10,10d0))
+            if( ttgt(ifmv).lt.0d0 ) cycle
             if( (ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
               tmp= sqrt(1d0 +dt/trlx*100d0 )
             else
@@ -519,6 +493,9 @@ c.....for the case that there are fixed atoms..., <ekin>= 1/2 *ndof*kT
             va(1:3,i)= va(1:3,i) *tmp
           enddo
         endif
+
+c.....temperature distribution along x
+        if( ltdst ) call calc_temp_dist()
 
 cc.....Eliminate translational motion
 c        if( mod(istp,100).eq.0 ) then
@@ -634,6 +611,7 @@ c.....reset pressure
         if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
           close(iostrs)
         endif
+        if( ltdst ) close(iotdst)
 #ifdef __WALL__
         close(81)
 #endif
@@ -688,6 +666,7 @@ c=======================================================================
       write(6,'(2x,a25,i8)') 'flag_damping',ifdmp
       write(6,'(2x,a25,es11.3)') 'damping_coeff',dmp
       write(6,'(2x,a)') ''
+c.....temperature control
       write(6,'(2x,a25,f12.4)') 'initial_temperature',tinit
       write(6,'(2x,a25,2x,a)') 'temperature_control',ctctl
       do i=1,9
@@ -695,6 +674,11 @@ c=======================================================================
       enddo
       write(6,'(2x,a25,f12.4)') 'temperature_relax_time',trlx
       write(6,'(2x,a)') ''
+c.....temperature distribution
+      write(6,'(2x,a25,l8)') 'flag_temp_dist',ltdst
+      write(6,'(2x,a25,i8)') 'num_temp_dist',ntdst
+      write(6,'(2x,a)') ''
+c.....pressure control
       if( ifpctl.ne.0 ) then
         write(6,'(2x,a25,i8)') 'flag_isobaric',ifpctl
         write(6,'(2x,a25,es11.3)') 'vol_mass_coeff',vmcoeff
@@ -707,10 +691,12 @@ c=======================================================================
           write(6,'(5x,3es11.3)') stgt(2,1:3)
           write(6,'(5x,3es11.3)') stgt(3,1:3)
         endif
+        write(6,'(2x,a)') ''
       endif
-      write(6,'(2x,a)') ''
+c.....strain control
       write(6,'(2x,a25,f12.4)') 'final_strain',strfin
       write(6,'(2x,a)') ''
+c.....velocity multiplying factor
       write(6,'(2x,a)') 'factor_direction'
       do i=0,9
         write(6,'(4x,i2,3es11.3)') i,fmv(1:3,i)
@@ -723,6 +709,77 @@ c=======================================================================
       write(6,'(a)') '======================================'
 
       end subroutine write_initial_setting
+c=======================================================================
+      subroutine bcast_params()
+      use variables
+      implicit none
+      include 'mpif.h'
+
+c-----Broadcast input parameters to all nodes
+      call mpi_bcast(nx,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(ny,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(nz,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(nstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(dt,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(rc,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(rbuf,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(dmp,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(tinit,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(ctctl,1,mpi_character,0,mpi_md_world,ierr)
+      call mpi_bcast(ttgt,9,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(trlx,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(nerg,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(ifpmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(npmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(fmv,30,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(shrst,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(ifpctl,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(ptgt,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(stgt,9,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(vmcoeff,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(voldmp,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(czload_type,5,mpi_character,0,mpi_md_world,ierr)
+      call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(am,nismax,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
+      call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
+c.....NEMD
+      call mpi_bcast(ltdst,1,mpi_logical,0,mpi_md_world,ierr)
+      if( ltdst ) then
+        call mpi_bcast(ntdst,1,mpi_integer,0,mpi_md_world,ierr)
+        if( mod(ntdst,nx).ne.0 )
+     &       call error_mpi_stop('mod(ntdst,nx).ne.0')
+        allocate(tdst(ntdst),nadst(ntdst))
+      endif
+#ifdef __WALL__
+      call mpi_bcast(wtop,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(wbot,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(ptgt_wall,1,mpi_double_precision,0,mpi_md_world
+     &     ,ierr)
+      call mpi_bcast(trlx_wall,1,mpi_double_precision,0,mpi_md_world
+     &     ,ierr)
+      call mpi_bcast(nout_wall,1,mpi_integer,0,mpi_md_world,ierr)
+#endif
+
+      end subroutine bcast_params
+c=======================================================================
+      subroutine error_mpi_stop(cerrmsg)
+      use variables
+      implicit none
+      character(len=*):: cerrmsg
+      if(myid_md.eq.0) then
+        write(6,'(a)')
+     &       '=================================================='
+        write(6,'(a)') ' !!! ERROR !!!'
+        write(6,'(a)') '   '
+     &       //trim(cerrmsg)
+        write(6,'(a)')
+     &       '=================================================='
+      endif
+      call mpi_finalize(ierr)
+      stop
+      end subroutine error_mpi_stop
 c=======================================================================
       subroutine setup(nismax,am,acon,fack,dt)
       implicit none
@@ -937,7 +994,7 @@ c.....Tensor form eki
         v2= eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
         eki(1:3,1:3,i)=eki(1:3,1:3,i)*fack(is)
         ekinl=ekinl +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
-c.....Temperature of each ifmv
+c.....ekin of each ifmv
         ekll(ifmv)= ekll(ifmv) +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
 c.....Find max speed
         if( v2.gt.vmaxl ) imax=i
@@ -956,6 +1013,56 @@ c.....Find max speed
       vmax=sqrt(vmax)
 
       end subroutine get_ekin
+c=======================================================================
+      subroutine calc_temp_dist()
+      use variables
+      implicit none
+      include 'mpif.h'
+      include './params_unit.h'
+      integer:: i,ix,itmp
+      real(8):: dx,xi,tmp
+      real(8),allocatable,save:: tdl(:)
+      integer,allocatable,save:: ndl(:)
+      logical,save:: l1st=.true.
+      
+      if( l1st ) then
+        allocate(tdl(ntdst),ndl(ntdst))
+        l1st= .false.
+        tdst(1:ntdst)= 0d0
+        nadst(1:ntdst)= 0
+      endif
+
+      dx= 1d0/ntdst
+      do i=1,natm
+        xi= ra(1,i)+sorg(1)
+        ix= int(xi/dx)+1
+        if( ix.le.0 ) ix= 1
+        if( ix.gt.ntdst ) ix= ntdst
+        tdst(ix)= tdst(ix) +(eki(1,1,i)+eki(2,2,i)+eki(3,3,i))
+        nadst(ix)= nadst(ix) +1
+      enddo
+      
+      if( mod(istp,nouterg).eq.0 ) then
+c.....before writing to file, accumurate data of other nodes
+        tdl(1:ntdst)= 0d0
+        ndl(1:ntdst)= 0
+        call mpi_reduce(nadst,ndl,ntdst
+     &       ,mpi_integer,mpi_sum,0,mpi_md_world,ierr)
+        call mpi_reduce(tdst,tdl,ntdst
+     &       ,mpi_double_precision,mpi_sum,0,mpi_md_world,ierr)
+        do i=1,ntdst
+          if( ndl(i).ne.0 ) tdl(i)= tdl(i)*2d0/ndl(i)/fkb
+          if( myid_md.eq.0 ) then
+            write(iotdst,'(f10.5,f15.3)') (i-1)+0.5/ntdst, tdl(i)
+          endif
+        enddo
+        if( myid_md.eq.0 ) write(iotdst,*) ''
+c.....initialize tdst
+        tdst(1:ntdst)= 0d0
+        nadst(1:ntdst)= 0
+      endif
+
+      end subroutine calc_temp_dist
 c=======================================================================
       subroutine get_num_dof()
       use variables
@@ -976,7 +1083,7 @@ c=======================================================================
       ndof(1:9)= 0
       call mpi_allreduce(ndofl,ndof,9,mpi_integer,mpi_sum
      &     ,mpi_md_world,ierr)
-      write(6,'(a,9i9)') ' ndof=',ndof(1:9)
+      if(myid_md.eq.0) write(6,'(a,9i9)') ' ndof=',ndof(1:9)
       return
       end subroutine get_num_dof
 c=======================================================================

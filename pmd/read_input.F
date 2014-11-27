@@ -90,6 +90,13 @@ c        call read_r1(ionum,ttgt)
       elseif( trim(cname).eq.'temperature_relax_time' ) then
         call read_r1(ionum,trlx)
         return
+c.....temperature distribution along x
+      elseif( trim(cname).eq.'flag_temp_dist' ) then
+        call read_l1(ionum,ltdst)
+        return
+      elseif( trim(cname).eq.'num_temp_dist' ) then
+        call read_i1(ionum,ntdst)
+        return
       elseif( trim(cname).eq.'num_nodes_x' ) then
         call read_i1(ionum,nx)
         return
@@ -225,4 +232,18 @@ c
 c      write(6,'(1x,2a)') trim(ctmp),trim(cval)
 
       end subroutine read_c1
+c=======================================================================
+      subroutine read_l1(ionum,lval)
+c
+c  Read logical variable
+c
+      integer,intent(in):: ionum
+      logical,intent(out):: lval
+      character(len=128):: ctmp
+
+      backspace(ionum)
+      read(ionum,*) ctmp,lval
+      write(6,'(1x,a,5x,l1)') trim(ctmp),lval
+
+      end subroutine read_l1
 
