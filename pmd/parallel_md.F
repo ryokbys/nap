@@ -419,9 +419,9 @@ c.....Langevin thermostat with Mannella integrator
             hscl(l)= sqrt(h(1,l,0)**2 +h(2,l,0)**2 +h(3,l,0)**2)
           enddo
           do i=1,natm
-            is= int(tag(i))
             ifmv= int(mod(tag(i)*10,10d0))
             if( ifmv.eq.0 .or. tfac(ifmv).lt.0d0 ) cycle
+            is= int(tag(i))
             ami= am(is)
             aai(1:3)= 0d0
             tmp= tfac(ifmv) /sqrt(2d0*ami*amu2kg)*dt
@@ -475,16 +475,16 @@ c.....Calc kinetic energy
 
 c-------temperature control by velocity scaling
         if( trim(ctctl).eq.'Berendsen' ) then
-!            write(6,'(a,2i6)') ' myid,ndof=',myid_md,ndof
-c.....for the case that there are fixed atoms..., <ekin>= 1/2 *ndof*kT
           do ifmv=1,9
             if(ndof(ifmv).gt.0)
      &           temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
           enddo
           do i=1,natm
             ifmv= int(mod(tag(i)*10,10d0))
-            if( ifmv.eq.0 .or. ttgt(ifmv).lt.0d0 ) cycle
-            if( (ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
+c            if( ifmv.eq.3 ) write(6,*) ' i,temp,ttgt,tmp='
+c     &           ,i,temp(ifmv),ttgt(ifmv),tmp
+            if( ifmv.le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
+            if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
               tmp= sqrt(1d0 +dt/trlx*100d0 )
             else
               tmp= sqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv))/temp(ifmv))
@@ -725,7 +725,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(rbuf,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(dmp,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(tinit,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(ctctl,1,mpi_character,0,mpi_md_world,ierr)
+      call mpi_bcast(ctctl,20,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(ttgt,9,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(trlx,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(nerg,1,MPI_INTEGER,0,mpi_md_world,ierr)
