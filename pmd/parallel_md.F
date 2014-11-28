@@ -156,7 +156,7 @@ c.....Set initial temperature if needed
         va(1:3,1:natm)= 0d0
       endif
 
-      if( ctctl.eq.'Langevin' ) then
+      if( trim(ctctl).eq.'Langevin' ) then
         dt2= dt/2
         tgmm= 1d0/trlx
         do ifmv=1,9
@@ -190,14 +190,6 @@ c.....Calc forces
      &     ,cforce)
       epot= epot0
 
-c      write(6,'(a)') 'stress in GPa:'
-c      do i=1,natm
-c        write(6,'(i6,9f10.3)') i,strs(1:3,1:3,i)*up2gpa
-c      enddo
-c      write(6,'(a)') 'stress in eV/A^3:'
-c      do i=1,natm
-c        write(6,'(i6,9f10.5)') i,strs(1:3,1:3,i)
-c      enddo
 
 #ifdef __SHEAR__
       call add_shear_stress(natm,ra,aa,tag,sorg,shrfx)
@@ -214,9 +206,6 @@ c-----calc kinetic energy
       vmaxold=vmax
 c.....get_num_dof is called once in a MD run
       call get_num_dof()
-      do ifmv=1,9
-        if(ndof(ifmv).ne.0) temp(ifmv)= ekl(ifmv) /ndof(ifmv) /fkb *2d0
-      enddo
 
       if( ifpctl.ne.0 ) then
         if( ifpctl.eq.1 ) then
@@ -263,6 +252,7 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
         tave= 0d0
         do ifmv=1,9
           if( ndof(ifmv).eq.0 ) cycle
+          temp(ifmv)= ekl(ifmv) /ndof(ifmv) /fkb *2d0
           nave= nave +ndof(ifmv)
           write(6,'(1x,a,i1,a,es15.7,a)') " temperature ",ifmv
      &         ,"   =",temp(ifmv),' K'
@@ -431,7 +421,7 @@ c.....Langevin thermostat with Mannella integrator
           do i=1,natm
             is= int(tag(i))
             ifmv= int(mod(tag(i)*10,10d0))
-            if( tfac(ifmv).lt.0d0 ) cycle
+            if( ifmv.eq.0 .or. tfac(ifmv).lt.0d0 ) cycle
             ami= am(is)
             aai(1:3)= 0d0
             tmp= tfac(ifmv) /sqrt(2d0*ami*amu2kg)*dt
@@ -447,6 +437,14 @@ c.....Langevin thermostat with Mannella integrator
 #endif
 
 c.....Second kick of velocities
+c        do i=1,natm
+c          ifmv= int(mod(tag(i)*10,10d0))
+c          if( ifmv.eq.0 ) then
+c            va(1:3,i)= 0d0
+c          else
+c            va(1:3,i)=va(1:3,i) +aa(1:3,i)
+c          endif
+c        enddo
         va(1:3,1:natm)=va(1:3,1:natm) +aa(1:3,1:natm)
 
 c.....Calc kinetic energy
@@ -480,11 +478,12 @@ c-------temperature control by velocity scaling
 !            write(6,'(a,2i6)') ' myid,ndof=',myid_md,ndof
 c.....for the case that there are fixed atoms..., <ekin>= 1/2 *ndof*kT
           do ifmv=1,9
-            temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
+            if(ndof(ifmv).gt.0)
+     &           temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
           enddo
           do i=1,natm
             ifmv= int(mod(tag(i)*10,10d0))
-            if( ttgt(ifmv).lt.0d0 ) cycle
+            if( ifmv.eq.0 .or. ttgt(ifmv).lt.0d0 ) cycle
             if( (ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
               tmp= sqrt(1d0 +dt/trlx*100d0 )
             else
@@ -508,8 +507,8 @@ c-------output energies
           nave= 0
           tave= 0d0
           do ifmv=1,9
+            if( ndof(ifmv).le.0 ) cycle
             temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
-            if( ndof(ifmv).eq.0 ) cycle
             nave= nave +ndof(ifmv)
             tave= tave +temp(ifmv)*ndof(ifmv)
           enddo
@@ -625,7 +624,8 @@ c.....reset pressure
         nave= 0
         tave= 0d0
         do ifmv=1,9
-          if( ndof(ifmv).eq.0 ) cycle
+          if( ndof(ifmv).le.0 ) cycle
+          temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
           nave= nave +ndof(ifmv)
           write(6,'(1x,a,i1,a,es15.7,a)') " temperature ",ifmv
      &         ,"   =",temp(ifmv),' K'
@@ -981,6 +981,7 @@ c-----locals
       do i=1,natm
         is= int(tag(i))
         ifmv= int(mod(tag(i)*10,10d0))
+        if( ifmv.eq.0 ) cycle
         x= va(1,i)
         y= va(2,i)
         z= va(3,i)
@@ -1005,11 +1006,11 @@ c.....Find max speed
       call mpi_allreduce(ekinl,ekin,1,MPI_DOUBLE_PRECISION
      &     ,MPI_SUM,mpi_md_world,ierr)
       ekl(1:9)= 0d0
-      call mpi_allreduce(ekll,ekl,9,MPI_DOUBLE_PRECISION
-     &     ,MPI_SUM,mpi_md_world,ierr)
+      call mpi_allreduce(ekll,ekl,9,mpi_double_precision
+     &     ,mpi_sum,mpi_md_world,ierr)
       vmax= 0d0
       call mpi_allreduce(vmaxl,vmax,1,mpi_double_precision
-     &     ,MPI_MAX,mpi_md_world,ierr)
+     &     ,mpi_max,mpi_md_world,ierr)
       vmax=sqrt(vmax)
 
       end subroutine get_ekin
@@ -1084,6 +1085,7 @@ c=======================================================================
       call mpi_allreduce(ndofl,ndof,9,mpi_integer,mpi_sum
      &     ,mpi_md_world,ierr)
       if(myid_md.eq.0) write(6,'(a,9i9)') ' ndof=',ndof(1:9)
+c      write(6,'(a,i3,a,9i6)') ' myid=',myid_md,': ndof=',ndof(1:9)
       return
       end subroutine get_num_dof
 c=======================================================================
