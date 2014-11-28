@@ -14,7 +14,7 @@ c-----------------------------------------------------------------------
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
-      integer,parameter:: nuc(1:3)= (/ 10,2,2 /)
+      integer,parameter:: nuc(1:3)= (/ 100,5,5 /)
 c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 1, 0, 0 /)
       real(8):: ua(3,10)

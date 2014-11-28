@@ -290,13 +290,15 @@ contains
     logical:: lexist
 
 !.....read parameters at the 1st call
-    if( myid.eq.0 ) then
-      inquire(file='in.params.SW_Si',exist=lexist)
-      if( .not. lexist ) then
+    inquire(file='in.params.SW_Si',exist=lexist)
+    if( .not. lexist ) then
+      if( myid.eq.0 ) then
         write(6,'(a)') ' [Warning] in.params.SW_Si does not exist !!!.'
         write(6,'(a)') '           Default parameters will be used.'
-        return
       endif
+      return
+    endif
+    if( myid.eq.0 ) then
       open(50,file='in.params.SW_Si',status='old')
       read(50,*) itmp,rctmp
       if( itmp.ne.nprms ) then

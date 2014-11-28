@@ -1552,11 +1552,19 @@ c-----------------------------------------------------------------------
       real(8):: tcom1,tcom2
       real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
       logical,save:: l1st=.true.
+      integer,save:: mdim
 
-c      if( l1st ) then
-        allocate(dbuf(ndim,nbmax),dbufr(ndim,nbmax))
-c        l1st=.false.
-c      endif
+      if( l1st ) then
+        mdim= ndim
+        allocate(dbuf(mdim,nbmax),dbufr(mdim,nbmax))
+        l1st=.false.
+      endif
+
+      if( ndim.gt.mdim ) then
+        deallocate(dbuf,dbufr)
+        mdim= ndim
+        allocate(dbuf(mdim,nbmax),dbufr(mdim,nbmax))
+      endif
 
 c-----natmx
       natmx= natm +nb
@@ -1581,10 +1589,12 @@ c-------higher & lower directions
           ibkwd= nn(kuc)
 c---------num. of to-be-sent particles
           nsd= lsrc(ku)
-          nsd3= ndim*nsd
+c          nsd3= ndim*nsd
+          nsd3= mdim*nsd
 c---------num. of to-be-recieved particles
           nrc= lsb(0,ku)
-          nrc3= ndim*nrc
+c          nrc3= ndim*nrc
+          nrc3= mdim*nrc
 
 c---------to-be-sent-back particles
           do i=1,nsd
@@ -1615,7 +1625,7 @@ c-----check
         stop "error: nsdbk.ne.nb!!"
       endif
 
-      deallocate(dbuf,dbufr)
+c      deallocate(dbuf,dbufr)
       end subroutine copy_dba_bk
 c=======================================================================
       function bbd(xv,yv,zv,rcav,rcbv,rccv,ku,anxi,anyi,anzi)
