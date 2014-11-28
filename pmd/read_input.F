@@ -243,7 +243,7 @@ c
 
       backspace(ionum)
       read(ionum,*) ctmp,lval
-      write(6,'(1x,a,5x,l1)') trim(ctmp),lval
+c      write(6,'(1x,a,5x,l1)') trim(ctmp),lval
 
       end subroutine read_l1
 

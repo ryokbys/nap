@@ -1052,7 +1052,7 @@ c.....before writing to file, accumurate data of other nodes
         call mpi_reduce(tdst,tdl,ntdst
      &       ,mpi_double_precision,mpi_sum,0,mpi_md_world,ierr)
         do i=1,ntdst
-          if( ndl(i).ne.0 ) tdl(i)= tdl(i)*2d0/ndl(i)/fkb
+          if( ndl(i).ne.0 ) tdl(i)= tdl(i)*2d0/3/ndl(i)/fkb
           if( myid_md.eq.0 ) then
             write(iotdst,'(f10.5,f15.3)') (i-1)+0.5/ntdst, tdl(i)
           endif
