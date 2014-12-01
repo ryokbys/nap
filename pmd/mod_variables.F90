@@ -47,7 +47,7 @@
     data ttgt / 300d0, 300d0, 300d0, 300d0, 300d0, 300d0, &
          300d0, 300d0, 300d0 /
     real(8):: trlx = 100d0
-    real(8):: tgmm,tfac(9),temp(9),ekl(9)
+    real(8):: tgmm,tfac(9),temp(9),ekl(9),ediff(9),ediff0(9)
     integer:: ndof(9)
 !.....temperature distribution on x-direction
     logical:: ltdst= .false.

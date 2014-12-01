@@ -311,8 +311,10 @@ c.....write out energies
 c.....write out temperatures
         open(iotemp,file='out.temperature',status='replace')
         write(iotemp,'(a)') '# istp, temperature[0-9]'
-        write(iotemp,'(i10,9es16.7e3)') istp,temp(1:9)
+        ediff(1:9)= 0d0
+        write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff(1:9)
         call flush(iotemp)
+        
 c.....write out stresses
         if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
           open(iostrs,file='out.stress',status='replace')
@@ -475,21 +477,31 @@ c.....Calc kinetic energy
 
 c-------temperature control by velocity scaling
         if( trim(ctctl).eq.'Berendsen' ) then
+          tfac(1:9)= 0d0
           do ifmv=1,9
-            if(ndof(ifmv).gt.0)
-     &           temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
+            if(ndof(ifmv).le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
+            temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
+            if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
+              tfac(ifmv)= sqrt(1d0 +dt/trlx*100d0 )
+            else
+              tfac(ifmv)= sqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv))
+     &             /temp(ifmv))
+            endif
           enddo
           do i=1,natm
             ifmv= int(mod(tag(i)*10,10d0))
 c            if( ifmv.eq.3 ) write(6,*) ' i,temp,ttgt,tmp='
 c     &           ,i,temp(ifmv),ttgt(ifmv),tmp
             if( ifmv.le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
-            if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
-              tmp= sqrt(1d0 +dt/trlx*100d0 )
-            else
-              tmp= sqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv))/temp(ifmv))
-            endif
-            va(1:3,i)= va(1:3,i) *tmp
+c            if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
+c              tmp= sqrt(1d0 +dt/trlx*100d0 )
+c            else
+c              tmp= sqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv))/temp(ifmv))
+c            endif
+            va(1:3,i)= va(1:3,i) *tfac(ifmv)
+c.....accumulate energy difference
+            is= int(tag(i))
+            ediff(ifmv)= ediff(ifmv) +(tfac(ifmv)**2-1d0)*fack(is)
           enddo
         endif
 
@@ -519,6 +531,11 @@ c-------output energies
      &           ,sorg,myid_md,mpi_md_world)
           endif
 
+          ediff(1:9)= ediff(1:9) /nouterg
+          ediff0(1:9)= 0d0
+          call mpi_reduce(ediff,ediff0,9
+     &         ,mpi_double_precision,mpi_sum,0,mpi_md_world,ierr)
+          
           if(myid_md.eq.0) then
 c.....write energies
             write(ioerg,'(i10,3es16.7e3,f10.2,2es16.7e3)') istp
@@ -527,8 +544,9 @@ c.....write energies
      &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
             call flush(ioerg)
 c.....write temperature
-            write(iotemp,'(i10,9es16.7e3)') istp,temp(1:9)
+            write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff0(1:9)
             call flush(iotemp)
+            ediff(1:9)= 0d0
 
             if(czload_type.eq.'atoms') then
               write(iostrs,'(i8,3es15.7)') istp,strnow,ftop,fbot
