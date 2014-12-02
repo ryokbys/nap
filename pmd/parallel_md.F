@@ -30,9 +30,9 @@ c.....Epot threshold for disl core extraction [Hartree]
 #endif
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave
-      real(8):: tmp,hscl(3),aai(3),ami,dt2,tave
+      real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3)
       integer,external:: num_dof
-      real(8),external:: box_muller
+      real(8),external:: box_muller,sprod
 c-----output file names
       character:: cnode*5,cnum*4
 
@@ -163,7 +163,8 @@ c.....Set initial temperature if needed
           if( ttgt(ifmv).lt.0d0 ) then
             tfac(ifmv)= -1d0
           else
-            tfac(ifmv)= sqrt(tgmm*dt*(fkb*ev2j)*ttgt(ifmv))*m2ang/s2fs
+            tfac(ifmv)= sqrt(2d0*tgmm*dt*(fkb*ev2j)*ttgt(ifmv))
+     &           *m2ang/s2fs
           endif
         enddo
       endif
@@ -414,6 +415,11 @@ c-------Calc forces
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol
      &       ,cforce)
 
+#ifdef __SHEAR__
+        call add_shear_stress(natm,ra,aa,tag,sorg,shrfx)
+#endif
+
+c.....Second kick of velocities
         if( ctctl.eq.'Langevin' ) then
 c.....Langevin thermostat with Mannella integrator
           hscl(1:3)= 0d0
@@ -422,32 +428,36 @@ c.....Langevin thermostat with Mannella integrator
           enddo
           do i=1,natm
             ifmv= int(mod(tag(i)*10,10d0))
-            if( ifmv.eq.0 .or. tfac(ifmv).lt.0d0 ) cycle
-            is= int(tag(i))
-            ami= am(is)
-            aai(1:3)= 0d0
-            tmp= tfac(ifmv) /sqrt(2d0*ami*amu2kg)*dt
-            do l=1,3
-              aai(l)= -va(l,i)*tgmm*dt2 +tmp*box_muller()/hscl(l)
-            enddo
-            aa(1:3,i)= aa(1:3,i) +aai(1:3)
+            if( ifmv.eq.0 .or. tfac(ifmv).lt.0d0 ) then
+              va(1:3,i)=va(1:3,i) +aa(1:3,i)
+              cycle
+            else
+              is= int(tag(i))
+              ami= am(is)
+              aai(1:3)= 0d0
+              tmp= tfac(ifmv) /sqrt(2d0*ami*amu2kg)*dt
+              do l=1,3
+                aai(l)= -va(l,i)*tgmm*dt2 +tmp*box_muller()/hscl(l)
+              enddo
+              va(1:3,i)=va(1:3,i) +aa(1:3,i)
+c              aa(1:3,i)= aa(1:3,i) +aai(1:3)
+c.....accumulate energy difference
+              vi(1:3)= h(1:3,1,0)*va(1,i)
+     &             +h(1:3,2,0)*va(2,i)
+     &             +h(1:3,3,0)*va(3,i)
+              vl(1:3)= h(1:3,1,0)*aai(1)
+     &             +h(1:3,2,0)*aai(2)
+     &             +h(1:3,3,0)*aai(3)
+              ediff(ifmv)= ediff(ifmv) +fack(is)
+     &             *(2d0*sprod(vi,vl)+sprod(vl,vl))
+              va(1:3,i)= va(1:3,i) +aai(1:3)
+            endif
           enddo
+        else
+          va(1:3,1:natm)=va(1:3,1:natm) +aa(1:3,1:natm)
         endif
 
-#ifdef __SHEAR__
-        call add_shear_stress(natm,ra,aa,tag,sorg,shrfx)
-#endif
-
-c.....Second kick of velocities
-c        do i=1,natm
-c          ifmv= int(mod(tag(i)*10,10d0))
-c          if( ifmv.eq.0 ) then
-c            va(1:3,i)= 0d0
-c          else
-c            va(1:3,i)=va(1:3,i) +aa(1:3,i)
-c          endif
-c        enddo
-        va(1:3,1:natm)=va(1:3,1:natm) +aa(1:3,1:natm)
+        
 
 c.....Calc kinetic energy
         vmaxold= vmax
@@ -490,14 +500,7 @@ c-------temperature control by velocity scaling
           enddo
           do i=1,natm
             ifmv= int(mod(tag(i)*10,10d0))
-c            if( ifmv.eq.3 ) write(6,*) ' i,temp,ttgt,tmp='
-c     &           ,i,temp(ifmv),ttgt(ifmv),tmp
             if( ifmv.le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
-c            if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
-c              tmp= sqrt(1d0 +dt/trlx*100d0 )
-c            else
-c              tmp= sqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv))/temp(ifmv))
-c            endif
             va(1:3,i)= va(1:3,i) *tfac(ifmv)
 c.....accumulate energy difference
             is= int(tag(i))
@@ -1072,7 +1075,7 @@ c.....before writing to file, accumurate data of other nodes
         do i=1,ntdst
           if( ndl(i).ne.0 ) tdl(i)= tdl(i)*2d0/3/ndl(i)/fkb
           if( myid_md.eq.0 ) then
-            write(iotdst,'(f10.5,f15.3)') (i-1)+0.5/ntdst, tdl(i)
+            write(iotdst,'(f10.5,f15.3)') ((i-1)+0.5)/ntdst, tdl(i)
           endif
         enddo
         if( myid_md.eq.0 ) write(iotdst,*) ''
