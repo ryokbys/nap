@@ -110,6 +110,9 @@ contains
         epi(ia)= epi(ia) +wgt2(ihl1)*hl1i
       enddo
       epotl=epotl +epi(ia)
+#ifdef __3BODY__
+      write(6,'(a,i8,es22.14)') ' 3-body term:',ia,epi(ia)
+#endif
     enddo
 
 !.....sum up for forces
@@ -250,6 +253,9 @@ contains
 
     do isf=1,nsf
       if( itype(isf).eq.1 ) then ! Gaussian (2-body)
+#ifdef __3BODY__
+        cycle
+#endif        
         do ia=1,natm
           xi(1:3)= ra(1:3,ia)
           do jj=1,lspr(0,ia)

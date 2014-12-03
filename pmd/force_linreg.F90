@@ -46,7 +46,7 @@ contains
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ielem &
          ,iwgt
-    real(8):: rcin,b_na,at(3),epotl,wgt,aexp,bnai
+    real(8):: rcin,b_na,at(3),epotl,wgt,aexp,bnai,apot
     real(8),save,allocatable:: fat(:,:),dbna(:,:,:)
 !.....1st call
     logical,save:: l1st=.true.
@@ -80,6 +80,9 @@ contains
     dbna(1:3,1:nelem,1:natm+nb)= 0d0
     do ia=1,natm
       iwgt= 0
+#ifdef __3BODY__
+      apot= 0d0
+#endif
       do ielem=1,nelem
         iwgt= iwgt +1
         wgt= coeff(iwgt)
@@ -92,7 +95,15 @@ contains
 #endif
         epotl=epotl +bnai*wgt
         epi(ia)= epi(ia) +bnai*wgt
+#ifdef __3BODY__
+        if( itype(ielem).eq.3 ) then
+          apot= apot +bnai*wgt
+        endif
+#endif
       enddo
+#ifdef __3BODY__
+      write(6,'(a,i8,es22.14)') ' 3-body term:',ia,apot
+#endif
     enddo
 
 !.....sum up forces

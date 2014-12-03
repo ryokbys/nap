@@ -3,7 +3,7 @@
 Compute 2-body potential energy from 2 atom system.
 
 OUTPUT:
-  * out.2-body
+  * out.2body
 """
 
 import os,sys,math,copy
@@ -83,7 +83,7 @@ asys.add_atom(atom2)
 hmin= rmin/(2*rcut)
 hd  = (0.5-hmin)/nsmpl
 
-fout= open('out.2body-pot','w')
+fout= open('out.2body','w')
 for ip in range(nsmpl+1):
     print '.',
     d= hmin +hd*ip
