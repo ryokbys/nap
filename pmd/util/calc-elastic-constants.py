@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 #...constants
 pmddir='~/src/nap/pmd/'
 niter= 10
-dltmax= 0.1
+dltmax= 0.01
 outfname='out.elastic-constants'
 graphname='graph.elastic-constants.eps'
 

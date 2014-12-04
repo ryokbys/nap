@@ -10,7 +10,7 @@ constfname='in.const.NN1'
 paramfname='in.params.NN1'
 
 #.....cutoff radius in Angstrom
-rcut= 5.0
+rcut= 3.0
 #.....min,max of parameters
 pmin= -1.0
 pmax=  1.0
@@ -45,7 +45,8 @@ for sf3 in rsf3:
 f.close()
 
 g= open(paramfname,'w')
-nc= (nsf+1)*nhl1 +(nhl1+1)
+#nc= (nsf+1)*nhl1 +(nhl1+1)
+nc= nsf*nhl1 +nhl1
 g.write(' {0:6d} {1:10.4f}\n'.format(nc,rcut))
 for ic in range(nc):
     g.write(' {0:10.6f}'.format(random.uniform(pmin,pmax)))

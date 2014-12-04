@@ -68,12 +68,12 @@ def init(*args,**kwargs):
     f.close()
 
     # check
-    if len(_params) != (_nsf+1)*_nhl1 +(_nhl1+1):
+    if len(_params) != _nsf*_nhl1 +_nhl1:
         print ' [Error] len(params) != (nsf+1)*nhl1 +(nhl1+1)'
         print '   len(params)          = ',len(_params)
         print '   nsf                  = ',_nsf
         print '   nhl1                 = ',_nhl1
-        print '   (nsf+1)*nhl1+(nhl1+1)= ',(_nsf+1)*_nhl1 +(_nhl1+1)
+        print '   nsf*nhl1 +nhl1       = ',_nsf*_nhl1 +nhl1
         exit()
 
     #.....read bases
@@ -90,11 +90,11 @@ def vars2wgts(x):
     wgt1= np.zeros((_nsf+1,_nhl1+1))
     wgt2= np.zeros(_nhl1+1)
     ix= 0
-    for isf in range(_nsf+1):
+    for isf in range(1,_nsf+1):
         for ihl1 in range(1,_nhl1+1):
             wgt1[isf,ihl1]= x[ix]
             ix += 1
-    for ihl1 in range(_nhl1+1):
+    for ihl1 in range(1,_nhl1+1):
         wgt2[ihl1]= x[ix]
         ix += 1
     return (wgt1,wgt2)
@@ -229,11 +229,11 @@ def calc_ef(ismpl,x,*args):
         hl1s= np.zeros(_nhl1+1)
         hl1s[0]= 1.0
         for ihl1 in range(1,_nhl1+1):
-            for isf in range(_nsf+1):
+            for isf in range(1,_nsf+1):
                 hl1s[ihl1]+= _wgt1[isf,ihl1] *gsfs[ia,isf]
             hl1s[ihl1]= sigmoid(hl1s[ihl1])
-        for ihl1 in range(_nhl1+1):
-            es += _wgt2[ihl1] *hl1s[ihl1]
+        for ihl1 in range(1,_nhl1+1):
+            es += _wgt2[ihl1] *(hl1s[ihl1]-0.5)
 
     #.....forces
     if _fmatch:
@@ -296,7 +296,7 @@ def grad_core(ismpl,ergs,frcs,*args):
     hl1s= _hl1[ismpl]
     iprm= 0
     #print ' ismpl=',ismpl
-    for isf in range(_nsf+1):
+    for isf in range(1,_nsf+1):
         for ihl1 in range(1,_nhl1+1):
             tmp= 0.0
             for ia in range(smpl.natm):
@@ -304,10 +304,10 @@ def grad_core(ismpl,ergs,frcs,*args):
                          *(1.0 -hl1s[ia,ihl1]) *gsfs[ia,isf]
             gs[iprm] += 2.0*ediff*tmp 
             iprm += 1
-    for ihl1 in range(_nhl1+1):
+    for ihl1 in range(1,_nhl1+1):
         tmp= 0.0
         for ia in range(smpl.natm):
-            tmp += hl1s[ia,ihl1]
+            tmp += (hl1s[ia,ihl1] -0.5)
         gs[iprm] += 2.0*ediff*tmp
         iprm += 1
 #     for ia in range(smpl.natm):
@@ -319,7 +319,7 @@ def grad_core(ismpl,ergs,frcs,*args):
         bmls= _bml[ismpl]
         iprm= 0
         #print ' ismpl=',ismpl
-        for isf in range(_nsf+1):
+        for isf in range(1,_nsf+1):
             for ihl1 in range(1,_nhl1+1):
                 tmp= 0.0
                 w2= _wgt2[ihl1]
@@ -333,7 +333,7 @@ def grad_core(ismpl,ergs,frcs,*args):
                                     +fdiff[2]*(am[2]+bm[2]) ) /smpl.natm/3
                 dgs[iprm] += tmp
                 iprm += 1
-        for ihl1 in range(_nhl1+1):
+        for ihl1 in range(1,_nhl1+1):
             tmp= 0.0
             for ia in range(smpl.natm):
                 fdiff= frcs[ismpl][ia] -_frcrefs[ismpl][ia]
@@ -374,16 +374,16 @@ def gather_basis(*args):
         amls= np.zeros((smpl.natm,_nhl1+1,_nsf+1,3))
         bmls= np.zeros((smpl.natm,_nhl1+1,_nsf+1,3))
         for ia in range(smpl.natm):
-            for isf in range(_nsf+1):
+            for isf in range(1,_nsf+1):
                 data1= f1.readline().split()
                 gsfs[ia,isf]= float(data1[2])
         for ia in range(smpl.natm):
-            for ihl1 in range(_nhl1+1):
+            for ihl1 in range(1,_nhl1+1):
                 data2= f2.readline().split()
                 hl1s[ia,ihl1]= float(data2[2])
         for ia in range(smpl.natm):
             for ihl1 in range(1,_nhl1+1):
-                for isf in range(_nsf+1):
+                for isf in range(1,_nsf+1):
                     data3= f3.readline().split()
                     amls[ia,ihl1,isf,0]= float(data3[3])
                     amls[ia,ihl1,isf,1]= float(data3[4])
