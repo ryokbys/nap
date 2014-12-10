@@ -24,6 +24,8 @@ from pga import GA
 _large= 1.0e+30
 _tiny = 1.0e-8
 max_species= 10
+_valmax= 1.0e+30
+
 
 #.....global variables
 samples= []
@@ -42,6 +44,8 @@ vranges=[]
 l1st_call= True
 bases= []  # bases in linreg that can be recycled during fitting
 bmax= []
+_valmin= _valmax
+_init_time= 0.0
 
 #.....input parameters
 nsmpl= 1
@@ -363,6 +367,8 @@ def func(x,*args):
     This will be called from scipy.optimize.fmin_cg().
     The 1st argument x should be 1-D array of variables.
     """
+    global _valmin
+    
     t0= time.time()
     #.....write parameters to in.params.????? file
     dir= args[0]
@@ -385,6 +391,7 @@ def func(x,*args):
             exit()
         os.chdir(cwd)
         #.....restore original file
+        os.system('cp '+dir+'/'+parfile+' '+dir+'/'+parfile+'.current')
         os.system('cp '+dir+'/'+parfile+'.tmp'+' '+dir+'/'+parfile)
         #.....gather pmd results
         ergs,frcs=gather_pmd_data(dir)
@@ -423,7 +430,15 @@ def func(x,*args):
         val += p*pweight
         print ' total L value=',val
     sys.stdout.flush()
-    print ' ===> time func: {0:12.3f} sec'.format(time.time()-t0)
+
+    #.....if L value is minimum ever, store this parameter file
+    if val < _valmin:
+        _valmin= val
+        os.system('cp '+dir+'/'+parfile+'.current' \
+                  +' '+dir+'/'+parfile+'.min')
+        
+    print ' ===> time func: {0:12.3f} sec'.format(time.time()-t0) \
+          +', {0:12.3f} sec'.format(time.time()-_init_time)
     return val
 
 def eval_L(cergs,cfrcs,rergs,rfrcs,samples):
@@ -616,7 +631,8 @@ def grad_linreg(x,*args):
         lx= len(x)
         for n in range(lx):
             grad[n] += pweight *np.sign(x[n])
-    print ' ===> time grad_linreg: {0:12.3f} sec'.format(time.time()-t0)
+    print ' ===> time grad_linreg: {0:12.3f} sec'.format(time.time()-t0) \
+          +', {0:12.3f} sec'.format(time.time()-_init_time)
     return grad
 
 def grad_linreg_core(ismpl,ergs,frcs):
@@ -966,7 +982,7 @@ def sd_dynamics(f,x,args=(),fprime=None,maxiter=10):
 #============================================= main routine hereafter
 if __name__ == '__main__':
     print "{0:=^72}".format(' FITPOT ')
-    t0= time.time()
+    _init_time= time.time()
     cwd= os.getcwd()
     #.....inputs: parameters in in.fitpot as a dictionary
     inputs= read_input('in.fitpot')
@@ -1121,4 +1137,4 @@ if __name__ == '__main__':
     output_statistics(ergs,frcs)
 
     print '{0:=^72}'.format(' FITPOT finished correctly ')
-    print '   Elapsed time = {0:12.2f}'.format(time.time()-t0)
+    print '   Elapsed time = {0:12.2f}'.format(time.time()-_init_time)

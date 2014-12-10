@@ -119,6 +119,7 @@ def calc_ef_from_pmd(x,*args):
         exit()
     os.chdir(cwd)
     #.....restore original file
+    os.system('cp '+dir+'/'+_parfile+' '+dir+'/'+_parfile+'.current')
     os.system('cp '+dir+'/'+_parfile+'.tmp'+' '+dir+'/'+_parfile)
     #.....gather pmd results
     ergs,frcs= gather_pmd_data(dir)
