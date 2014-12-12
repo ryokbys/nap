@@ -31,7 +31,6 @@ c.....Epot threshold for disl core extraction [Hartree]
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3)
-      integer,external:: num_dof
       real(8),external:: box_muller,sprod
 c-----output file names
       character:: cnode*5,cnum*4
