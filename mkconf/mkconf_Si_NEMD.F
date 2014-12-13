@@ -67,9 +67,9 @@ c-----simulation box size
               is= 1
               ifmv= 1
 c.....change ifmv of atoms at temperature control region
-              if( ix.le.1 ) then
+              if( ix.le.3 ) then
                 ifmv= 2
-              elseif ( ix.ge.nuc(1)-2 ) then
+              elseif ( ix.ge.nuc(1)-4 ) then
                 ifmv= 3
               endif
 c.....fix atoms at leftmost and rightmost face
