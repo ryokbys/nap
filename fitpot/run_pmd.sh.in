@@ -8,12 +8,30 @@ reduce="${pmdsrc}/fitpot/reduce_erg_frc.py"
 
 python="@PYTHON@"
 
-usage=" Usage: $ ./run_pmd.sh [in.params.????] 00001 00002..."
+para_id=-1
+
+usage_exit(){
+    echo "Usage: $ ./run_pmd.sh [-p parallel-id] in.params.PTYPE 00001 00002..." 1>&2
+    exit 1
+}
+
+while getopts p:h: opt
+do
+    case $opt in
+	p) para_id=$OPTARG
+	    ;;
+	h) usage_exit
+	    ;;
+	\?) usage_exit
+	    ;;
+    esac
+done
+
+shift $((OPTIND - 1))
 
 if [ $# -lt 2 ]; then
     echo "[Error] Number of arguments was wrong."
-    echo $usage
-    exit 1
+    usage_exit
 fi
 
 fparam=$1
@@ -36,7 +54,11 @@ do
   echo -n "."
   #echo " running pmd on $dir/pmd ..."
   #mpirun -np 1 $pmd > out.pmd
-  $pmd > out.pmd
+  if [ $para_id -lt 0 ]; then
+      $pmd > out.pmd
+  else
+      mpiexec --vnodefile rankfile$para_id -n 1 --std out.pmd $pmd
+  fi
   cd ../
   $python $reduce
   cd ../
