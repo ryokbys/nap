@@ -10,7 +10,7 @@ module NN1
   integer:: nsfc,nsf,nhl1,nsp
   integer,allocatable:: itype(:)
   real(8),allocatable:: cnst(:,:)
-  integer,allocatable:: icmb2(:,:),icmb3(:,:)
+  integer,allocatable:: icmb2(:,:),icmb3(:,:,:)
 !.....function types and num of constatns for types
   integer,parameter:: max_ncnst= 2
   integer,parameter:: ncnst_type(1:2)= &
@@ -335,7 +335,7 @@ contains
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
     real(8),intent(out):: gsf(nsf,natm),dgsf(3,nsf,0:nnmax,namax)
 
-    integer:: isf,ia,jj,ja,kk,ka
+    integer:: isf,isfc,ia,jj,ja,kk,ka
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
@@ -349,6 +349,7 @@ contains
 
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
+      is= int(tag(ia))
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
@@ -357,9 +358,11 @@ contains
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
         if( dij.ge.rc ) cycle
-        do isf=1,nsf
+        js= int(tag(ja))
+        do isfc=1,nsfc
 !.............................................in case of 2-body function
           if( itype(isf).eq.1 ) then ! Gaussian (2-body)
+            isf= (icmb2(is,js)-1)*nsfc +isfc
             fcij= fc(dij,rc)
             eta= cnst(1,isf)
             rs=  cnst(2,isf)
@@ -374,8 +377,6 @@ contains
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
 !.............................................in case of angular function
           else if( itype(isf).eq.2 ) then ! angular (3-body)
-            almbd= cnst(1,isf)
-            t2= (abs(almbd)+1d0)**2
             fcij= fc(dij,rc)
             dfcij= dfc(dij,rc)
             driji(1:3)= -rij(1:3)/dij
@@ -388,6 +389,9 @@ contains
               rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
               dik= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
               if( dik.ge.rc ) cycle
+              isf= (icmb3(is,js,ks)-1)*nfsc +isfc
+              almbd= cnst(1,isf)
+              t2= (abs(almbd)+1d0)**2
               fcik= fc(dik,rc)
               dfcik= dfc(dik,rc)
               driki(1:3)= -rik(1:3)/dik
@@ -536,7 +540,7 @@ contains
     close(50)
 
 !.....read in.comb.NN1
-    allocate(icmb2(n1*m1,2),icmb3(n2*m2,3))
+    allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
     inquire(file=trim(cmbfname),exist=lexist)
     if( nsp.ne.1 .and. .not.lexist ) then
       if( myid.eq.0 ) then
@@ -548,13 +552,14 @@ contains
     elseif( nsp.ne.1 ) then
       open(52,file=trim(cmbfname),status='old')
 !.....read pairs
-      n= 0
-      do i=1,n1*m1
-        read(52,*) n,icmb2(n,1),icmb2(n,2)
+      do n=1,n1*m1
+        read(52,*) i,j,icmb2(i,j)
+        icmb2(j,i)= icmb2(i,j)
       enddo
 !.....read triplets
-      do i=1,n2*m2
-        read(52,*) n,icmb3(n,1),icmb3(n,2),icmb3(n,3)
+      do n=1,n2*m2
+        read(52,*) i,j,k,icmb3(i,j,k)
+        icmb3(i,k,j)= icmb3(i,j,k)
       enddo
       close(52)
     endif

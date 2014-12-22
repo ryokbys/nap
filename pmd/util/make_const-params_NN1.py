@@ -27,16 +27,16 @@ def make_combination(nsp,fname='in.comb.NN1'):
         for j in range(i,nsp+1):
             pairs.append([i,j])
             n += 1
-            f.write(' {0:4d} {1:3d} {2:3d}\n'.format(n,i,j))
+            f.write(' {0:3d} {1:3d} {2:4d}\n'.format(i,j,n))
     
     #.....3-body
     n= 0
     for i in range(1,nsp+1):
         for pair in pairs:
             n += 1
-            f.write(' {0:4d} {1:3d} {2:3d} {3:3d}\n'.format(n,i, \
+            f.write(' {0:3d} {1:3d} {2:3d} {3:4d}\n'.format(i, \
                                                             pair[0], \
-                                                            pair[1] ))
+                                                            pair[1],n ))
     f.close()
 
 #=========================================================== Constants
