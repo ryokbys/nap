@@ -10,23 +10,19 @@ constfname='in.const.NN1'
 paramfname='in.params.NN1'
 
 #.....cutoff radius in Angstrom
-rcut= 3.0
+rcut= 5.0
 #.....min,max of parameters
-pmin= -1.0
-pmax=  1.0
+pmin= -0.01
+pmax=  0.01
 #.....num of eta in 2-body symmetry function
-reta=[0.01, 0.05, 0.1, 0.2, 0.4, 1.0]
-#reta=[1.0]
-#reta=[0.05]
+reta=[0.5, 1.0]
 #.....num of Rs in 2-body symmetry function
-rrs=[1.0, 1.5, 2.0, 2.5, 3.0]
-#rrs=[1.0, 2.0, 3.0]
-#.....num of 3-body angular symmetry functions
-rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2]
-#rsf3=[1.0/5, 1.0/3]
+rrs=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5]
+#.....num of 3-body angular symmetry functions (cosine value)
+rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 2.0/3, 3.0/5]
 #.....num of nodes in a layer
 nhl1= 2
-#nhl1= 3
+
 
 #.....num of 2-body Gaussian-type symmetry functions
 nsf2= len(reta)*len(rrs)

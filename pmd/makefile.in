@@ -8,7 +8,7 @@
 #-----------------------------------------------------------------------
 CPP= @CPP@
 CPPFLAGS= @CPPFLAGS@
-#CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__WALL__ -D__FITPOT__ -D__3BODY__
+#CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__WALL__ -D__FITPOT__ -D__3body__
 MPIFC= @FC@
 MPIFLAGS= @FCFLAGS@
 #-----------------------------------------------------------------------
@@ -23,8 +23,8 @@ MPIFLAGS= @FCFLAGS@
 .F90.o: 
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
-pmd= read_input.o parallel_md.o util_vec.o \
-	lasubs.o util_pmd.o zload.o mk_lspr.o util_rnd.o
+pmd= read_input.o parallel_md.o util_vec.o util_rnd.o \
+	lasubs.o util_pmd.o zload.o mk_lspr.o
 mods= mod_variables.o
 args= iargc.o getarg.o
 
@@ -56,46 +56,46 @@ clean:
 	rm -f *.o *.mod *~ ${execs}
 
 nconv: node_conv.o ${mods} read_input.o util_pmd.o
-	${MPIFC} -o $@ ${mods} node_conv.o read_input.o util_pmd.o
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} node_conv.o read_input.o util_pmd.o
 
 pmd: ${mods} ${pmd} ${forces} ${params}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmd}
 
 combine: ${comb} ${mods}
-	${MPIFC} -o $@  ${mods} ${comb}
+	${MPIFC} ${MPIFLAGS} -o $@  ${mods} ${comb}
 
 pmd2akr: ${pmd2akr} ${mods}
-	${MPIFC} -o $@ ${mods} ${pmd2akr}
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${pmd2akr}
 
 akr2cna: akr2cna.o sort.o
-	${MPIFC} -o $@ akr2cna.o sort.o
+	${MPIFC} ${MPIFLAGS} -o $@ akr2cna.o sort.o
 
 akr2csp: akr2csp.o
-	${MPIFC} -o $@ akr2csp.o
+	${MPIFC} ${MPIFLAGS} -o $@ akr2csp.o
 
 akr2pot: akr2pot.o
-	${MPIFC} -o $@ akr2pot.o
+	${MPIFC} ${MPIFLAGS} -o $@ akr2pot.o
 
 akr2ddm: akr2ddm.o
-	${MPIFC} -o $@ akr2ddm.o
+	${MPIFC} ${MPIFLAGS} -o $@ akr2ddm.o
 
 akr2ddplot: akr2ddplot.o
-	${MPIFC} -o $@ akr2ddplot.o
+	${MPIFC} ${MPIFLAGS} -o $@ akr2ddplot.o
 
 cna2disl: cna2disl.o
-	${MPIFC} -o $@ cna2disl.o
+	${MPIFC} ${MPIFLAGS} -o $@ cna2disl.o
 
 rdpmd: read_pmd.o ${mods}
-	${MPIFC} -o $@ read_pmd.o ${mods}
+	${MPIFC} ${MPIFLAGS} -o $@ read_pmd.o ${mods}
 
 boxsize: change_pmd_boxsize.o ${mods} util_pmd.o
-	${MPIFC} -o $@ change_pmd_boxsize.o ${mods} util_pmd.o
+	${MPIFC} ${MPIFLAGS} -o $@ change_pmd_boxsize.o ${mods} util_pmd.o
 
 sortpmd: sort_pmd.o ${mods} util_pmd.o sort.o
-	${MPIFC} -o $@ sort_pmd.o ${mods} util_pmd.o sort.o
+	${MPIFC} ${MPIFLAGS} -o $@ sort_pmd.o ${mods} util_pmd.o sort.o
 
 intstl: put_interstitials.o ${mod} util_pmd.o mk_lspr.o 
-	${MPIFC} -o $@ ${mods} util_pmd.o mk_lspr.o put_interstitials.o
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} util_pmd.o mk_lspr.o put_interstitials.o
 
 
 #.....Dependencies
