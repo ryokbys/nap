@@ -2,13 +2,15 @@ module NN1
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN1'
   character(128),parameter:: ccfname='in.const.NN1'
+  character(128),parameter:: cmbfname='in.comb.NN1'
 !.....parameters
   integer:: nwgt1,nwgt2
   real(8),allocatable:: wgt1(:,:),wgt2(:)
 !.....constants
-  integer:: nsf,nhl1
+  integer:: nsfc,nsf,nhl1,nsp
   integer,allocatable:: itype(:)
   real(8),allocatable:: cnst(:,:)
+  integer,allocatable:: icmb2(:,:),icmb3(:,:,:)
 !.....function types and num of constatns for types
   integer,parameter:: max_ncnst= 2
   integer,parameter:: ncnst_type(1:2)= &
@@ -64,7 +66,7 @@ contains
     endif
 
 !.....first, calculate all the symmetry functions
-    call eval_sf(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr,gsf,dgsf,rc)
+    call eval_sf_2sp(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr,gsf,dgsf,rc)
 
 #ifdef __FITPOT__
     open(80,file='out.NN1.gsf',status='replace')
@@ -140,17 +142,6 @@ contains
 #ifdef __FITPOT__
     close(81)
     allocate( aml(3,nsf,nhl1,natm+nb),bml(3,nsf,nhl1,natm+nb) )
-!!$    call copy_dba_fwd(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-!!$         ,nn,mpi_world,gsf,nsf+1)
-!!$    call copy_dba_fwd(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-!!$         ,nn,mpi_world,hl1,nhl1+1)
-!!$    open(90,file='tmp.hl1')
-!!$    do ia=1,natm+nb
-!!$      do ihl1=0,nhl1
-!!$        write(90,'(2i6,es12.4)') ia,ihl1,hl1(ihl1,ia)
-!!$      enddo
-!!$    enddo
-!!$    close(90)
 !.....make lumps of terms
     aml(1:3,1:nsf,1:nhl1,1:natm+nb)= 0d0
     bml(1:3,1:nsf,1:nhl1,1:natm+nb)= 0d0
@@ -334,6 +325,104 @@ contains
 
   end subroutine eval_sf
 !=======================================================================
+  subroutine eval_sf_2sp(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr &
+       ,gsf,dgsf,rc)
+!
+!  Evaluate symmetry functions and derivatives for 2-species system.
+!
+    implicit none
+    integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
+    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    real(8),intent(out):: gsf(nsf,natm),dgsf(3,nsf,0:nnmax,namax)
+
+    integer:: isf,isfc,ia,jj,ja,kk,ka
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
+         dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
+         driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
+         dcsdj(3),dcsdk(3),dcsdi(3)
+
+    real(8),external:: sprod
+
+    gsf(1:nsf,1:natm)= 0d0
+!    gsf(0,1:natm)= 1d0
+    dgsf(1:3,1:nsf,0:nnmax,1:natm)= 0d0
+
+    do ia=1,natm
+      xi(1:3)= ra(1:3,ia)
+      is= int(tag(ia))
+      do jj=1,lspr(0,ia)
+        ja= lspr(jj,ia)
+        if( ja.eq.ia ) cycle
+        xj(1:3)= ra(1:3,ja)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        if( dij.ge.rc ) cycle
+        js= int(tag(ja))
+        do isfc=1,nsfc
+!.............................................in case of 2-body function
+          if( itype(isf).eq.1 ) then ! Gaussian (2-body)
+            isf= (icmb2(is,js)-1)*nsfc +isfc
+            fcij= fc(dij,rc)
+            eta= cnst(1,isf)
+            rs=  cnst(2,isf)
+            !.....function value
+            texp= exp(-eta*(dij-rs)**2)
+            gsf(isf,ia)= gsf(isf,ia) +texp*fcij
+            !.....derivative
+            driji(1:3)= -rij(1:3)/dij
+            drijj(1:3)= -driji(1:3)
+            dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfc(dij,rc)
+            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
+            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+!.............................................in case of angular function
+          else if( itype(isf).eq.2 ) then ! angular (3-body)
+            fcij= fc(dij,rc)
+            dfcij= dfc(dij,rc)
+            driji(1:3)= -rij(1:3)/dij
+            drijj(1:3)= -driji(1:3)
+            do kk=1,lspr(0,ia)
+              ka= lspr(kk,ia)
+              if( ka.eq.ia .or. ka.le.ja ) cycle
+              xk(1:3)= ra(1:3,ka)
+              xik(1:3)= xk(1:3)-xi(1:3)
+              rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
+              dik= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
+              if( dik.ge.rc ) cycle
+              isf= (icmb3(is,js,ks)-1)*nfsc +isfc
+              almbd= cnst(1,isf)
+              t2= (abs(almbd)+1d0)**2
+              fcik= fc(dik,rc)
+              dfcik= dfc(dik,rc)
+              driki(1:3)= -rik(1:3)/dik
+              drikk(1:3)= -driki(1:3)
+              !.....function value
+              spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
+              cs= spijk/dij/dik
+              t1= (almbd +cs)**2
+              gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik 
+              !.....derivative
+              dgdij= dfcij *fcik *t1/t2
+              dgdik= fcij *dfcik *t1/t2
+              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) &
+                   +dgdij*driji(1:3) +dgdik*driki(1:3)
+              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
+              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
+              dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik
+              dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*spijk/dij**3/dik
+              dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*spijk/dik**3/dij
+              dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
+              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
+              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
+              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
+            enddo
+          endif
+        enddo
+      enddo
+    enddo
+
+  end subroutine eval_sf_2sp
+!=======================================================================
   function fc(r,rc)
     implicit none
     real(8),intent(in):: r,rc
@@ -395,19 +484,25 @@ contains
     endif
     open(51,file=trim(ccfname),status='old')
 !.....num of symmetry functions, num of node in 1st hidden layer
-    read(51,*) nsf,nhl1
-    allocate(itype(nsf),cnst(max_ncnst,nsf))
-    do i=1,nsf
+    read(51,*) nsfc,nhl1,nsp
+    allocate(itype(nsfc),cnst(max_ncnst,nsfc))
+    n1= 0
+    n2= 0
+    do i=1,nsfc
       read(51,*) itype(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
+      if( itype(i).eq.1 ) n1= n1 +1
+      if( itype(i).eq.2 ) n2= n2 +1
     enddo
     close(51)
 
 !.....calc number of weights taking into account the bias nodes
-!!$    nwgt1= (nsf+1)*nhl1
-!!$    nwgt2= (nhl1+1)
+    m1= nsp +factorial(nsp)/2
+    m2= nsp*m1
+    nsf= n1*m1 +n2*m2
     nwgt1= nsf*nhl1
     nwgt2= nhl1
     if( myid.eq.0 ) then
+      write(6,'(a,4i6)') ' n1, m1, n2, m2          =',n1,m1,n2,m2
       write(6,'(a,4i6)') ' nfs, nhl1, nwgt1, nwgt2 =', &
            nsf,nhl1,nwgt1,nwgt2
     endif
@@ -444,9 +539,47 @@ contains
     enddo
     close(50)
 
+!.....read in.comb.NN1
+    allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
+    inquire(file=trim(cmbfname),exist=lexist)
+    if( nsp.ne.1 .and. .not.lexist ) then
+      if( myid.eq.0 ) then
+        write(6,'(a)') ' [Error] '//cmbfname//' does not exist !!!.'
+        write(6,'(a)') '   The NN1 potential needs '//cmbfname//'.'
+      endif
+      call mpi_finalize(ierr)
+      stop
+    elseif( nsp.ne.1 ) then
+      open(52,file=trim(cmbfname),status='old')
+!.....read pairs
+      do n=1,n1*m1
+        read(52,*) i,j,icmb2(i,j)
+        icmb2(j,i)= icmb2(i,j)
+      enddo
+!.....read triplets
+      do n=1,n2*m2
+        read(52,*) i,j,k,icmb3(i,j,k)
+        icmb3(i,k,j)= icmb3(i,j,k)
+      enddo
+      close(52)
+    endif
 
     return
   end subroutine read_params
+!=======================================================================
+  function factorial(n)
+    implicit none
+    integer,intent(in):: n
+    real(8):: factorial
+
+    integer:: i
+
+    factorial= 1
+    do i=1,n
+      factorial= factorial*i
+    enddo
+    return
+  end function factorial
 !=======================================================================
   subroutine copy_dba_fwd(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
        ,nn,mpi_world,x,ndim)
