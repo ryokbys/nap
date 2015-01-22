@@ -2,15 +2,51 @@
 
 u"""
 Make in.const.NN1 and in.params.NN1 to be used in NN1 potential.
+And the file storing combination information, 
+in.comb.NN1, is also written.
 """
 
-import sys,os,random
+import sys,os,random,math
 
+#=========================================================== Functions
+def comb(n,m):
+    '''
+    Calculate nCm.
+    '''
+    return math.factorial(n)/math.factorial(m)
+
+def make_combination(nsp,fname='in.comb.NN1'):
+    '''
+    Make combinations and write them into file, in.comb.NN1.
+    '''
+    f= open(fname,'w')
+    #.....2-body
+    n=0
+    pairs=[]
+    for i in range(1,nsp+1):
+        for j in range(i,nsp+1):
+            pairs.append([i,j])
+            n += 1
+            f.write(' {0:3d} {1:3d} {2:4d}\n'.format(i,j,n))
+    
+    #.....3-body
+    n= 0
+    for i in range(1,nsp+1):
+        for pair in pairs:
+            n += 1
+            f.write(' {0:3d} {1:3d} {2:3d} {3:4d}\n'.format(i, \
+                                                            pair[0], \
+                                                            pair[1],n ))
+    f.close()
+
+#=========================================================== Constants
 constfname='in.const.NN1'
 paramfname='in.params.NN1'
 
 #.....cutoff radius in Angstrom
 rcut= 5.0
+#.....number of species
+nsp= 2
 #.....min,max of parameters
 pmin= -0.01
 pmax=  0.01
@@ -23,6 +59,13 @@ rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 2.0/3, 3.0/5]
 #.....num of nodes in a layer
 nhl1= 2
 
+#=========================================================== Routines
+
+#..........................................compute num of combinations
+ncmb2= nsp+ comb(nsp,2)
+ncmb3= ncmb2*nsp
+
+make_combination(nsp)
 
 #.....num of 2-body Gaussian-type symmetry functions
 nsf2= len(reta)*len(rrs)
@@ -42,6 +85,7 @@ f.close()
 
 g= open(paramfname,'w')
 #nc= (nsf+1)*nhl1 +(nhl1+1)
+nsf= nsf2*ncmb2 +nsf3*ncmb3
 nc= nsf*nhl1 +nhl1
 g.write(' {0:6d} {1:10.4f}\n'.format(nc,rcut))
 for ic in range(nc):
