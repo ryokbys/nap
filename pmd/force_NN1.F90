@@ -1,4 +1,10 @@
 module NN1
+!-----------------------------------------------------------------------
+!                        Time-stamp: <2015-01-27 21:42:48 Ryo KOBAYASHI>
+!-----------------------------------------------------------------------
+!  Parallel implementation of neural-network potential with 1 hidden
+!  layer. It is available for plural number of species.
+!-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN1'
   character(128),parameter:: ccfname='in.const.NN1'
@@ -23,14 +29,6 @@ contains
   subroutine force_NN1(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,acon,avol)
-!-----------------------------------------------------------------------
-!  Parallel implementation of neural-network potential of only one
-!  hidden layer.
-!    - 2014.07.01 by R.K.
-!      started coding.
-!    - 2014.12.?? by R.K.
-!      extended to 2 species.
-!-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -113,6 +111,7 @@ contains
         hl1i= hl1(ihl1,ia)
         epi(ia)= epi(ia) +wgt2(ihl1)*(hl1i-0.5d0)
       enddo
+!      write(6,*) ' ia,is,epi =',ia,int(tag(ia)),epi(ia)
       epotl=epotl +epi(ia)
 #ifdef __3BODY__
       write(6,'(a,i8,es22.14)') ' 3-body term:',ia,epi(ia)
@@ -209,6 +208,7 @@ contains
     do i=1,natm
       at(1:3)= aa(1:3,i)
       aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
+!      write(6,*) ' i,aa(1:3)=',i,aa(1:3,i)
     enddo
 !-----multiply 0.5d0*dt**2/am(i)
     do i=1,natm
@@ -346,7 +346,6 @@ contains
     real(8),external:: sprod
 
     gsf(1:nsf,1:natm)= 0d0
-!    gsf(0,1:natm)= 1d0
     dgsf(1:3,1:nsf,0:nnmax,1:natm)= 0d0
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
@@ -366,8 +365,8 @@ contains
           if( itype(isfc).eq.1 ) then ! Gaussian (2-body)
             isf= (icmb2(is,js)-1)*nsfc +isfc
             fcij= fc(dij,rc)
-            eta= cnst(1,isf)
-            rs=  cnst(2,isf)
+            eta= cnst(1,isfc)
+            rs=  cnst(2,isfc)
             !.....function value
             texp= exp(-eta*(dij-rs)**2)
             gsf(isf,ia)= gsf(isf,ia) +texp*fcij
@@ -393,7 +392,7 @@ contains
               if( dik.ge.rc ) cycle
               ks= int(tag(ka))
               isf= (icmb3(is,js,ks)-1)*nsfc +isfc
-              almbd= cnst(1,isf)
+              almbd= cnst(1,isfc)
               t2= (abs(almbd)+1d0)**2
               fcik= fc(dik,rc)
               dfcik= dfc(dik,rc)
@@ -565,6 +564,19 @@ contains
         icmb3(i,k,j)= icmb3(i,j,k)
       enddo
       close(52)
+!!$!.....check icmb2 and icmb3
+!!$      do i=1,nsp
+!!$        do j=1,nsp
+!!$          write(6,*) 'i,j,icmb2(i,j)=',i,j,icmb2(i,j)
+!!$        enddo
+!!$      enddo
+!!$      do i=1,nsp
+!!$        do j=1,nsp
+!!$          do k=1,nsp
+!!$            write(6,*) 'i,j,k,icmb3(i,j,k)=',i,j,k,icmb3(i,j,k)
+!!$          enddo
+!!$        enddo
+!!$      enddo
     endif
 
     return
