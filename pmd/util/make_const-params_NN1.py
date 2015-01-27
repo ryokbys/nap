@@ -48,14 +48,16 @@ rcut= 5.0
 #.....number of species
 nsp= 2
 #.....min,max of parameters
-pmin= -0.01
-pmax=  0.01
+pmin= -0.1
+pmax=  0.1
 #.....num of eta in 2-body symmetry function
 reta=[0.5, 1.0]
 #.....num of Rs in 2-body symmetry function
-rrs=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5]
+#rrs=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5]
+rrs=[2.0, 3.0, 4.0]
 #.....num of 3-body angular symmetry functions (cosine value)
-rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 2.0/3, 3.0/5]
+#rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 2.0/3, 3.0/5]
+rsf3=[1.0/3, 1.0/2]
 #.....num of nodes in a layer
 nhl1= 2
 
@@ -73,7 +75,7 @@ nsf3= len(rsf3)
 
 f= open(constfname,'w')
 nsf= nsf2+nsf3
-f.write(' {0:5d} {1:5d}\n'.format(nsf,nhl1))
+f.write(' {0:5d} {1:5d} {2:5d}\n'.format(nsf,nhl1,nsp))
 #.....2-body Gaussian-type
 for eta in reta:
     for rs in rrs:

@@ -1,4 +1,10 @@
 module NN1
+!-----------------------------------------------------------------------
+!                        Time-stamp: <2015-01-27 21:42:48 Ryo KOBAYASHI>
+!-----------------------------------------------------------------------
+!  Parallel implementation of neural-network potential with 1 hidden
+!  layer. It is available for plural number of species.
+!-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN1'
   character(128),parameter:: ccfname='in.const.NN1'
@@ -23,12 +29,6 @@ contains
   subroutine force_NN1(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,acon,avol)
-!-----------------------------------------------------------------------
-!  Parallel implementation of neural-network potential of only one
-!  hidden layer.
-!    - 2014.07.01 by R.K.
-!      started coding
-!-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -111,6 +111,7 @@ contains
         hl1i= hl1(ihl1,ia)
         epi(ia)= epi(ia) +wgt2(ihl1)*(hl1i-0.5d0)
       enddo
+!      write(6,*) ' ia,is,epi =',ia,int(tag(ia)),epi(ia)
       epotl=epotl +epi(ia)
 #ifdef __3BODY__
       write(6,'(a,i8,es22.14)') ' 3-body term:',ia,epi(ia)
@@ -207,6 +208,7 @@ contains
     do i=1,natm
       at(1:3)= aa(1:3,i)
       aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
+!      write(6,*) ' i,aa(1:3)=',i,aa(1:3,i)
     enddo
 !-----multiply 0.5d0*dt**2/am(i)
     do i=1,natm
@@ -335,7 +337,7 @@ contains
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
     real(8),intent(out):: gsf(nsf,natm),dgsf(3,nsf,0:nnmax,namax)
 
-    integer:: isf,isfc,ia,jj,ja,kk,ka
+    integer:: isf,isfc,ia,jj,ja,kk,ka,is,js,ks
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
@@ -344,9 +346,7 @@ contains
     real(8),external:: sprod
 
     gsf(1:nsf,1:natm)= 0d0
-!    gsf(0,1:natm)= 1d0
     dgsf(1:3,1:nsf,0:nnmax,1:natm)= 0d0
-
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
       is= int(tag(ia))
@@ -360,12 +360,13 @@ contains
         if( dij.ge.rc ) cycle
         js= int(tag(ja))
         do isfc=1,nsfc
+!          write(6,*) 'ia,is,ja,js,isfc=',ia,is,ja,js,isfc
 !.............................................in case of 2-body function
-          if( itype(isf).eq.1 ) then ! Gaussian (2-body)
+          if( itype(isfc).eq.1 ) then ! Gaussian (2-body)
             isf= (icmb2(is,js)-1)*nsfc +isfc
             fcij= fc(dij,rc)
-            eta= cnst(1,isf)
-            rs=  cnst(2,isf)
+            eta= cnst(1,isfc)
+            rs=  cnst(2,isfc)
             !.....function value
             texp= exp(-eta*(dij-rs)**2)
             gsf(isf,ia)= gsf(isf,ia) +texp*fcij
@@ -376,7 +377,7 @@ contains
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
 !.............................................in case of angular function
-          else if( itype(isf).eq.2 ) then ! angular (3-body)
+          else if( itype(isfc).eq.2 ) then ! angular (3-body)
             fcij= fc(dij,rc)
             dfcij= dfc(dij,rc)
             driji(1:3)= -rij(1:3)/dij
@@ -389,8 +390,9 @@ contains
               rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
               dik= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
               if( dik.ge.rc ) cycle
-              isf= (icmb3(is,js,ks)-1)*nfsc +isfc
-              almbd= cnst(1,isf)
+              ks= int(tag(ka))
+              isf= (icmb3(is,js,ks)-1)*nsfc +isfc
+              almbd= cnst(1,isfc)
               t2= (abs(almbd)+1d0)**2
               fcik= fc(dik,rc)
               dfcik= dfc(dik,rc)
@@ -469,7 +471,7 @@ contains
 
     integer,intent(in):: myid,mpi_world
     real(8),intent(out):: rcin
-    integer:: itmp,ierr,i,j,nc,ncoeff,isf,ihl1
+    integer:: itmp,ierr,i,j,k,nc,ncoeff,isf,ihl1,m1,m2,n1,n2,is,js,ks,n
     logical:: lexist
 
 !.....read constants at the 1st call
@@ -495,15 +497,15 @@ contains
     enddo
     close(51)
 
-!.....calc number of weights taking into account the bias nodes
-    m1= nsp +factorial(nsp)/2
+!.....calc number of weights
+    m1= nsp +factorial(nsp,2)/2
     m2= nsp*m1
     nsf= n1*m1 +n2*m2
     nwgt1= nsf*nhl1
     nwgt2= nhl1
     if( myid.eq.0 ) then
       write(6,'(a,4i6)') ' n1, m1, n2, m2          =',n1,m1,n2,m2
-      write(6,'(a,4i6)') ' nfs, nhl1, nwgt1, nwgt2 =', &
+      write(6,'(a,4i6)') ' nsf, nhl1, nwgt1, nwgt2 =', &
            nsf,nhl1,nwgt1,nwgt2
     endif
 
@@ -523,9 +525,9 @@ contains
     nc= nwgt1 +nwgt2
     if( ncoeff .ne. nc ) then
       write(6,'(a)') ' [Error] num of parameters is not correct !!!'
-      write(6,'(a,i10)') ' ncoeff=',ncoeff
-      write(6,'(a,2i10)') ' nsf,nhl1=',nsf,nhl1
-      write(6,'(a,i10)') ' ncoeff should be ',nc
+      write(6,'(a,i10)')  '   ncoeff=',ncoeff
+      write(6,'(a,2i10)') '   nsf,nhl1=',nsf,nhl1
+      write(6,'(a,i10)')  '   ncoeff should be ',nc
       stop
     endif
     allocate(wgt1(nhl1,nsf),wgt2(nhl1))
@@ -552,31 +554,45 @@ contains
     elseif( nsp.ne.1 ) then
       open(52,file=trim(cmbfname),status='old')
 !.....read pairs
-      do n=1,n1*m1
+      do n=1,m1
         read(52,*) i,j,icmb2(i,j)
         icmb2(j,i)= icmb2(i,j)
       enddo
 !.....read triplets
-      do n=1,n2*m2
+      do n=1,m2
         read(52,*) i,j,k,icmb3(i,j,k)
         icmb3(i,k,j)= icmb3(i,j,k)
       enddo
       close(52)
+!!$!.....check icmb2 and icmb3
+!!$      do i=1,nsp
+!!$        do j=1,nsp
+!!$          write(6,*) 'i,j,icmb2(i,j)=',i,j,icmb2(i,j)
+!!$        enddo
+!!$      enddo
+!!$      do i=1,nsp
+!!$        do j=1,nsp
+!!$          do k=1,nsp
+!!$            write(6,*) 'i,j,k,icmb3(i,j,k)=',i,j,k,icmb3(i,j,k)
+!!$          enddo
+!!$        enddo
+!!$      enddo
     endif
 
     return
   end subroutine read_params
 !=======================================================================
-  function factorial(n)
+  function factorial(n,m)
+!  compute factorial of n, m-times.
     implicit none
-    integer,intent(in):: n
+    integer,intent(in):: n,m
     real(8):: factorial
 
     integer:: i
 
     factorial= 1
-    do i=1,n
-      factorial= factorial*i
+    do i=0,m-1
+      factorial= factorial*(n-i)
     enddo
     return
   end function factorial

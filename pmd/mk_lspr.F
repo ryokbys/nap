@@ -40,10 +40,10 @@ c.....but notice this modification does not correct results.
         rcxi=1d0/rcx
         rcyi=1d0/rcy
         rczi=1d0/rcz
-c        write(6,'(a,3i8)') ' lcx,lcy,lcz=',lcx,lcy,lcz
-c        write(6,'(a,3i8)') ' lcx2,lcy2,lcz2=',lcx2,lcy2,lcz2
-c        write(6,'(a,i8)') ' lcxyz2=',lcxyz2
-c        write(6,'(a,3es12.4)') ' rcx,rcy,rcz=',rcx,rcy,rcz
+        write(6,'(a,3i8)') ' lcx,lcy,lcz=',lcx,lcy,lcz
+        write(6,'(a,3i8)') ' lcx2,lcy2,lcz2=',lcx2,lcy2,lcz2
+        write(6,'(a,i8)') ' lcxyz2=',lcxyz2
+        write(6,'(a,3es12.4)') ' rcx,rcy,rcz=',rcx,rcy,rcz
 c-----allocate LSCL & LSHD after obtaining lcxyz2
         allocate(lscl(namax+nbmax),lshd(lcxyz2))
         l1st=.false.
