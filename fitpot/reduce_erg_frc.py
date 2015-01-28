@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# Time-stamp: <2015-01-28 14:21:32 Ryo KOBAYASHI>
 #
 # Reduce pmd/{erg,frc}0000 by using number of atoms in ./pos file.
 #
@@ -27,13 +28,13 @@ ffrc=open(infrc,'r')
 natmf=int(ffrc.readline().split()[0])
 
 fouterg=open(outerg,'w')
-fouterg.write(" {:22.14e}\n".format(erg/natmf*natm))
+fouterg.write(" {0:22.14e}\n".format(erg/natmf*natm))
 fouterg.close()
 
 foutfrc=open(outfrc,'w')
 
 frc= []
-foutfrc.write(" {:10d}\n".format(natm))
+foutfrc.write(" {0:10d}\n".format(natm))
 for i in range(natm):
     foutfrc.write(ffrc.readline())
 ffrc.close()
