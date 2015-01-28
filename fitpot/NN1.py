@@ -1,3 +1,4 @@
+#  Time-stamp: <2015-01-28 15:32:55 Ryo KOBAYASHI>
 """
 Routines related to neural network with one hidden layer.
 """
@@ -13,6 +14,7 @@ import fitpot
 _large= 1.0e+30
 
 #.....global variables
+_nsp=  1
 _nsf=  0
 _nhl1= 0
 _gsf= []
@@ -63,21 +65,45 @@ def init(*args,**kwargs):
     #.....read NN1 parameters
     f= open(_basedir+'/'+'in.const.NN1')
     data= f.readline().split()
-    _nsf = int(data[0])
+    _nsfc= int(data[0])
     _nhl1= int(data[1])
+    _nsp = int(data[2])
+    n2= 0
+    n3= 0
+    for line in f.readlines():
+        if int(line.split()[0]) == 1:
+            n2 += 1
+        elif int(line.split()[0]) == 2:
+            n3 += 1
     f.close()
-
+    print ' Number of nodes in hidden-layer-1   =',_nhl1
+    print ' Number of species                   =',_nsp
+    print ' Number of 2-body symmetry functions =',n2
+    print ' Number of 3-body symmetry functions =',n3
+    
     # check
+    ncmb2= _nsp +factorial(_nsp,2)/2
+    ncmb3= _nsp *ncmb2
+    _nsf= n2*ncmb2 +n3*ncmb3
+    print ' Number of symmetry functions        =',_nsf
     if len(_params) != _nsf*_nhl1 +_nhl1:
         print ' [Error] len(params) != (nsf+1)*nhl1 +(nhl1+1)'
         print '   len(params)          = ',len(_params)
         print '   nsf                  = ',_nsf
         print '   nhl1                 = ',_nhl1
-        print '   nsf*nhl1 +nhl1       = ',_nsf*_nhl1 +nhl1
+        print '   nsf*nhl1 +nhl1       = ',_nsf*_nhl1 +_nhl1
         exit()
 
     #.....read bases
     _gsf,_hl1,_aml,_bml= gather_basis(*args)
+
+def factorial(n,m):
+    """
+    Returns factorial of n by m-times.
+    """
+    if m <= 0:
+        return 1
+    return n*factorial(n-1,m-1)
 
 def sigmoid(x):
     if x < -10.0:
