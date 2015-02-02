@@ -1,4 +1,7 @@
 module linreg
+!-----------------------------------------------------------------------
+!                        Time-stamp: <2015-02-02 11:23:56 Ryo KOBAYASHI>
+!-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.linreg'
   character(128),parameter:: ccfname='in.const.linreg'

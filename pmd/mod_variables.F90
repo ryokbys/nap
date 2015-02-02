@@ -1,4 +1,7 @@
   module variables
+!-----------------------------------------------------------------------
+!                        Time-stamp: <2015-02-02 11:22:48 Ryo KOBAYASHI>
+!-----------------------------------------------------------------------
     implicit none
     save
 
@@ -6,7 +9,7 @@
 ! PARAMETERS
 !=======================================================================
 !.....max. num. of atoms
-    integer,parameter:: namax = 100000
+    integer,parameter:: namax = 1000
 !.....max. num. of species
     integer,parameter:: nismax= 9
 !.....max. num. of boundary-particles
