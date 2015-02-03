@@ -4,16 +4,20 @@ u"""
 Make in.const.linreg and in.params.linreg to be used in linreg potential.
 """
 
-import sys,os,random
+import sys,os,random,math
 
+
+#============================================================ Parameters
 constfname='in.const.linreg'
 paramfname='in.params.linreg'
 
+#.....number of species
+nsp = 2
 #.....cutoff radius in Angstrom
 rcut= 3.0
 #.....min,max of parameters
-pmin= -0.00001
-pmax=  0.00001
+pmin= -0.01
+pmax=  0.01
 #.....exponent of the basis func
 rexp=[0.5, 1.0]
 nexp=len(rexp)
@@ -50,44 +54,125 @@ na12= len(ra12_poly)
 rangle=[0.25, 1.0/3, 0.5, 0.75]
 nangle= len(rangle)
 
+#============================================================= Functions
+
+def comb(n,m):
+    '''
+    Calculate nCm.
+    '''
+    return math.factorial(n)/math.factorial(m)
+
+def make_comb(nsp,fname='in.comb.linreg'):
+    '''
+    Make combinations and write them into file, in.comb.linreg.
+    '''
+    f= open(fname,'w')
+    #.....2-body
+    n=0
+    pairs=[]
+    for i in range(1,nsp+1):
+        for j in range(i,nsp+1):
+            pairs.append([i,j])
+            n += 1
+            f.write(' {0:3d} {1:3d} {2:4d}\n'.format(i,j,n))
+    
+    #.....3-body
+    n= 0
+    triplets=[]
+    for i in range(1,nsp+1):
+        for pair in pairs:
+            n += 1
+            triplets.append([i,pair[0],pair[1]])
+            f.write(' {0:3d} {1:3d} {2:3d} {3:4d}\n'.format(i, \
+                                                            pair[0], \
+                                                            pair[1],n ))
+    f.close()
+    return pairs,triplets
+
+#============================================================== Routines
+
+#.....num of combinations of pairs and triplets
+ncmb2= nsp +comb(nsp,2)
+ncmb3= ncmb2 *nsp
+print ' num of combination of pairs    =',ncmb2
+print ' num of combination of triplets =',ncmb3
+pairs,triplets= make_comb(nsp)
+
+nelem= nexp_gauss*nlen_gauss*nsft_gauss *ncmb2 \
+       +nq_cos*nexp_cos *ncmb2 \
+       +nangle *ncmb3 \
+       +(na1 +na2 +na4 +na6 +na8 +na10 +na12) *ncmb2
+print ' num of bases:'
+print '   Gaussian   =',nexp_gauss*nlen_gauss*nsft_gauss *ncmb2
+print '   cosine     =',nq_cos*nexp_cos *ncmb2
+print '   angular    =',nangle *ncmb3
+print '   polynomial =',(na1 +na2 +na4 +na6 +na8 +na10 +na12) *ncmb2
+print '   total      =',nelem
+print ''
+print ' multiplied by nexp... =',nelem*nexp
+
 f=open(constfname,'w')
-nelem= nexp_gauss*nlen_gauss*nsft_gauss \
-    +nq_cos*nexp_cos \
-     +nangle \
-     +na1 +na2 +na4 +na6 +na8 +na10 +na12
 #.....1st line
-f.write(' {0:10d} {1:5d}\n'.format(nelem*nexp,nexp))
-#.....repeat max_nexp times
-for iexp in range(nexp):
-    aexp= rexp[iexp]
-    #.....Gaussian
-    for egauss in rexp_gauss:
-        for lgauss in rlen_gauss:
-            for sgauss in rsft_gauss:
-                f.write(' {0:3d} {1:5.1f} '.format(1,aexp))
-                f.write('{0:10.4} {1:10.4f} {2:10.4f}\n'.format(egauss,
-                                                                lgauss,
-                                                                sgauss))
-    #.....cosine
-    for ecs in rexp_cos:
-        for qcs in rq_cos:
-            f.write(' {0:3d} {1:5.1f} {2:10.4f} {3:10.4f}\n'.format(2,
-                                                                    aexp,
-                                                                    qcs,
-                                                                    ecs))
-    #.....angular
-    for ang in rangle:
-        f.write(' {0:3d} {1:5.1f} {2:10.4f}\n'.format(3,
-                                                    aexp,
-                                                    ang))
-    #.....polynomial
-    f.write(' {0:3d} {1:5.1f} {2:10.4f}\n'.format(4,aexp,ra1_poly[0]))
-    f.write(' {0:3d} {1:5.1f} {2:10.4f}\n'.format(5,aexp,ra2_poly[0]))
-    f.write(' {0:3d} {1:5.1f} {2:10.4f}\n'.format(6,aexp,ra4_poly[0]))
-    f.write(' {0:3d} {1:5.1f} {2:10.4f}\n'.format(7,aexp,ra6_poly[0]))
-    f.write(' {0:3d} {1:5.1f} {2:10.4f}\n'.format(8,aexp,ra8_poly[0]))
-    f.write(' {0:3d} {1:5.1f} {2:10.4f}\n'.format(9,aexp,ra10_poly[0]))
-    f.write(' {0:3d} {1:5.1f} {2:10.4f}\n'.format(10,aexp,ra12_poly[0]))
+f.write(' {0:10d} {1:3d} {2:3d}\n'.format(nelem*nexp,nexp,nsp))
+
+for pair in pairs:
+    #.....repeat max_nexp times
+    for iexp in range(nexp):
+        aexp= rexp[iexp]
+        #.....Gaussian
+        for egauss in rexp_gauss:
+            for lgauss in rlen_gauss:
+                for sgauss in rsft_gauss:
+                    f.write(' {0:3d} {1:5.1f} '.format(1,aexp))
+                    f.write(' {0:3d} {1:3d}'.format(pair[0],pair[1]))
+                    f.write(' {0:10.4} {1:10.4f} {2:10.4f}\n'.format(egauss,
+                                                                     lgauss,
+                                                                    sgauss))
+        #.....cosine
+        for ecs in rexp_cos:
+            for qcs in rq_cos:
+                f.write(' {0:3d} {1:5.1f}'.format(2,aexp))
+                f.write(' {0:3d} {1:3d}'.format(pair[0],pair[1]))
+                f.write(' {0:10.4f} {1:10.4f}\n'.format(qcs,ecs))
+                                                                        
+        #.....polynomial
+        f.write(' {0:3d} {1:5.1f}'.format(4,aexp))
+        f.write(' {0:3d} {1:3d}'.format(pair[0],pair[1]))
+        f.write(' {0:10.4f}\n'.format(ra1_poly[0]))
+
+        f.write(' {0:3d} {1:5.1f}'.format(5,aexp))
+        f.write(' {0:3d} {1:3d}'.format(pair[0],pair[1]))
+        f.write(' {0:10.4f}\n'.format(ra2_poly[0]))
+
+        f.write(' {0:3d} {1:5.1f}'.format(6,aexp))
+        f.write(' {0:3d} {1:3d}'.format(pair[0],pair[1]))
+        f.write(' {0:10.4f}\n'.format(ra4_poly[0]))
+
+        f.write(' {0:3d} {1:5.1f}'.format(7,aexp))
+        f.write(' {0:3d} {1:3d}'.format(pair[0],pair[1]))
+        f.write(' {0:10.4f}\n'.format(ra6_poly[0]))
+
+        f.write(' {0:3d} {1:5.1f}'.format(8,aexp))
+        f.write(' {0:3d} {1:3d}'.format(pair[0],pair[1]))
+        f.write(' {0:10.4f}\n'.format(ra8_poly[0]))
+
+        f.write(' {0:3d} {1:5.1f}'.format(9,aexp))
+        f.write(' {0:3d} {1:3d}'.format(pair[0],pair[1]))
+        f.write(' {0:10.4f}\n'.format(ra10_poly[0]))
+
+        f.write(' {0:3d} {1:5.1f}'.format(10,aexp))
+        f.write(' {0:3d} {1:3d}'.format(pair[0],pair[1]))
+        f.write(' {0:10.4f}\n'.format(ra12_poly[0]))
+
+for tri in triplets:
+    #.....repeat max_nexp times
+    for iexp in range(nexp):
+        aexp= rexp[iexp]
+        #.....angular
+        for ang in rangle:
+            f.write(' {0:3d} {1:5.1f}'.format(3,aexp))
+            f.write(' {0:3d} {1:3d} {2:3d}'.format(tri[0],tri[1],tri[2]))
+            f.write(' {0:10.4f}\n'.format(ang))
 
 f.close()
 
