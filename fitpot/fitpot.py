@@ -56,6 +56,7 @@ parfile= 'in.params.SW_Si'
 runmode= 'serial'
 potential= 'none'
 gradient= 'none'
+grad_scale= False
 xtol= 1e-5
 gtol= 1e-5
 ftol= 1e-5
@@ -245,6 +246,9 @@ def read_input(fname='in.fitpot'):
                 potential= data[1]
             elif data[0] == 'gradient':
                 gradient= data[1]
+            elif data[0] == 'grad_scale':
+                if data[1] in ('true','True','yes','YES','y','Y','1'):
+                    grad_scale= True
             elif data[0] == 'regularize':
                 if data[1] in ('true','True','yes','YES','y','Y','1'):
                     regularize= True
@@ -434,8 +438,11 @@ def func(x,*args):
     #.....if L value is minimum ever, store this parameter file
     if val < _valmin:
         _valmin= val
-        os.system('cp '+dir+'/'+parfile+'.current' \
-                  +' '+dir+'/'+parfile+'.min')
+        if potential in ('linreg'):
+            write_params(dir+'/'+parfile+'.min',x)
+        else:            
+            os.system('cp '+dir+'/'+parfile+'.current' \
+                          +' '+dir+'/'+parfile+'.min')
         
     print ' ===> time func: {0:12.3f} sec'.format(time.time()-t0) \
           +', {0:12.3f} sec'.format(time.time()-_init_time)
@@ -633,6 +640,13 @@ def grad_linreg(x,*args):
             grad[n] += pweight *np.sign(x[n])
     print ' ===> time grad_linreg: {0:12.3f} sec'.format(time.time()-t0) \
           +', {0:12.3f} sec'.format(time.time()-_init_time)
+    if grad_scale:
+        maxgrad= np.max(np.abs(grad))
+        maxx= np.max(np.abs(x))
+        print ' maxgrad,maxx=',maxgrad,maxx
+        for i in range(len(grad)):
+            grad[i]= grad[i] /maxgrad *maxx/10
+    #print ' grad after: ',grad
     return grad
 
 def grad_linreg_core(ismpl,ergs,frcs):
