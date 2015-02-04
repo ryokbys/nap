@@ -410,8 +410,10 @@ def func(x,*args):
     #.....calc function value of L
     val= eval_L(ergs,frcs,ergrefs,frcrefs,samples)
     #.....output temporal results
-    output_energy_relation(ergs,ergrefs,samples,fname='out.erg.pmd-vs-dft.tmp')
-    output_force_relation(frcs,frcrefs,samples,fname='out.frc.pmd-vs-dft.tmp')
+    output_energy_relation(ergs,ergrefs,samples,sample_dirs, \
+                               fname='out.erg.pmd-vs-dft.tmp')
+    output_force_relation(frcs,frcrefs,samples,sample_dirs, \
+                              fname='out.frc.pmd-vs-dft.tmp')
 
     print
     print ' L value=',val
@@ -882,21 +884,27 @@ def read_NN2(basedir):
     return nsf,nhl1,nhl2,wgt1,wgt2,wgt3
 
 #========================================================== output data
-def output_energy_relation(es,erefs,samples,fname='out.erg.pmd-vs-dft'):
+def output_energy_relation(es,erefs,samples,sdirs, \
+                               fname='out.erg.pmd-vs-dft'):
     f= open(fname,'w')
     for i in range(len(erefs)):
         smpl= samples[i]
-        f.write(' {0:15.7e} {1:15.7e}\n'.format(erefs[i]/smpl.natm \
-                                              ,es[i]/smpl.natm ))
+        sdir= sdirs[i]
+        f.write(' {0:15.7e} {1:15.7e} {2:s}\n'.format(erefs[i]/smpl.natm \
+                                                    ,es[i]/smpl.natm \
+                                                    ,sdir))
     f.close()
     
-def output_force_relation(fs,frefs,samples,fname='out.frc.pmd-vs-dft'):
+def output_force_relation(fs,frefs,samples,sdirs, \
+                              fname='out.frc.pmd-vs-dft'):
     f= open(fname,'w')
     for i in range(len(samples)):
+        sdir= sdirs[i]
         for j in range(samples[i].natm):
             for k in range(3):
-                f.write(' {0:15.7e} {1:15.7e}\n'.format(frefs[i][j,k], \
-                                                        fs[i][j,k]))
+                f.write(' {0:15.7e} {1:15.7e} {2:s}\n'.format(frefs[i][j,k] \
+                                                                  ,fs[i][j,k] \
+                                                                  ,sdir))
     f.close()
 
 def output_statistics(ergs,frcs):
@@ -1035,8 +1043,8 @@ if __name__ == '__main__':
     else:
         ergs,frcs= gather_pmd_data(maindir)
 
-    output_energy_relation(ergs,ergrefs,samples,fname='out.erg.pmd-vs-dft.ini')
-    output_force_relation(frcs,frcrefs,samples,fname='out.frc.pmd-vs-dft.ini')
+    output_energy_relation(ergs,ergrefs,samples,sample_dirs,fname='out.erg.pmd-vs-dft.ini')
+    output_force_relation(frcs,frcrefs,samples,sample_dirs,fname='out.frc.pmd-vs-dft.ini')
 
     if fmethod in ('cg','CG','conjugate-gradient'):
         print '>>>>> conjugate-gradient was selected.'
@@ -1146,8 +1154,8 @@ if __name__ == '__main__':
         ergs,frcs= NN1.calc_ef_from_pmd(solution,maindir)
     else:
         ergs,frcs= gather_pmd_data(maindir)
-    output_energy_relation(ergs,ergrefs,samples,fname='out.erg.pmd-vs-dft.fin')
-    output_force_relation(frcs,frcrefs,samples,fname='out.frc.pmd-vs-dft.fin')
+    output_energy_relation(ergs,ergrefs,samples,sample_dirs,fname='out.erg.pmd-vs-dft.fin')
+    output_force_relation(frcs,frcrefs,samples,sample_dirs,fname='out.frc.pmd-vs-dft.fin')
     output_statistics(ergs,frcs)
 
     print '{0:=^72}'.format(' FITPOT finished correctly ')
