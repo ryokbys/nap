@@ -288,20 +288,29 @@ c
 
       if( l1st ) then
         rc2= rc**2
+        print *, ' rc,rc2=',rc,rc2
+        print *, ' h(1:3,1:3): '
+        print *, h(1:3,1)
+        print *, h(1:3,2)
+        print *, h(1:3,3)
         do i=1,3
           tmp= sqrt(h(1,i)**2+h(2,i)**2+h(3,i)**2)
-          nex(i)= int(tmp/rc)
-          if( nex(i).le.0 ) nex(i)= 1
+          nex(i)= int(rc/tmp)
+          if( nex(i).eq.0 ) nex(i)= 1
         enddo
 c.....to guarantee the extended system is larger than 2*rc...
-        nex(1:3)= nex(1:3) +1
+c        nex(1:3)= nex(1:3) +1
         naex= natm *(2*nex(1)+1) *(2*nex(2)+1) *(2*nex(3)+1)
+        print *, ' nex(1:3),naex=',nex(1:3),naex
         if( naex.gt.namax ) then
           write(6,'(a)') ' [Error] naex.gt.namax !!!'
           write(6,'(a,4i6)') ' nex(1:3),naex =',nex(1:3),naex
+          print *, ' naex =',naex
+          print *, ' namax=',namax
           stop
         endif
       endif
+
 
 c.....Expand system to take into account the image atoms.
       inc= 0
@@ -341,11 +350,11 @@ c.....Search neighbor atoms and make the list
         enddo
       enddo
 
-      if( l1st ) then
-        do ia=1,natm
-          write(6,'(i3,a,50i3)') ia,": ",(lspr(i,ia),i=1,lspr(0,ia))
-        enddo
-      endif
+c      if( l1st ) then
+c        do ia=1,natm
+c          write(6,'(i3,a,50i6)') ia,": ",(lspr(i,ia),i=1,lspr(0,ia))
+c        enddo
+c      endif
 
       l1st=.false.
       end subroutine mk_lspr_brute

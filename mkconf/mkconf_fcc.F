@@ -4,7 +4,7 @@ c    Create a FCC crystal
 c    Write: ini000
 c
       implicit real*8(a-h,o-z)
-      include "params_unit.h"
+      include "../pmd/params_unit.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
@@ -79,5 +79,5 @@ c-----output 'akr0000' for KVS visualization
       end program mkconf_fcc
 c-----------------------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make 10mkconf"
+c     compile-command: "make mkconf_fcc"
 c     End:

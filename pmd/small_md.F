@@ -1,6 +1,6 @@
       program small_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2015-02-06 22:41:16 Ryo KOBAYASHI>
+c                        Time-stamp: <2015-02-08 19:01:53 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics program for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -9,8 +9,12 @@ c-----------------------------------------------------------------------
       implicit none
       include "./params_unit.h"
 
+      integer:: i
       real(8):: tmp
       character:: cnum*4 
+
+c.....set myid to indicate that it is not a parallel computation
+      myid_md= -1
 
       call read_input(10,'in.smd')
       call write_initial_setting()
@@ -20,8 +24,26 @@ c-----------------------------------------------------------------------
         write(6,*) ' [Error] io_format must be ascii !!!'
         stop
       endif
-      call read_pmd_ascii(20,"smd000",namax,natm,h,tag,ra,va
+      call read_pmd_ascii(20,"smd0000",namax,natm,h,hunit,tag,ra,va
      &     ,eki,epi,strs)
+      ntot= natm
+      print *, ' ntot =',ntot
+      write(6,'(a)') " H-matrix:"
+      write(6,'(3es15.7)') h(1:3,1,0)
+      write(6,'(3es15.7)') h(1:3,2,0)
+      write(6,'(3es15.7)') h(1:3,3,0)
+      nis= 0
+      do i=1,natm
+c        ra(1:3,i)= ra(1:3,i) -sorg(1:3)
+c-------scaling
+        va(1:3,i)= va(1:3,i) *dt
+c-------species of atom-i
+        nis= max(int(tag(i)),nis)
+        if(nis.gt.nismax) then
+          write(6,'(a)') " nis.gt.nismax!!"
+          stop
+        endif
+      enddo
 
 c-----setup
       call setup(nismax,am,acon,fack,dt)
@@ -36,12 +58,15 @@ c.....Set initial temperature if needed
         va(1:3,1:natm)= 0d0
       endif
 
-      call mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
+      call mk_lspr_brute(namax,natm,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,lspr)
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &     ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &     ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol
+     &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,avol
      &     ,cforce)
+      do i=1,10
+        print *,' i,aa=',i,aa(1:3,i)
+      enddo
 
       call write_force(12)
       call write_energy(13,epot0)
@@ -49,7 +74,7 @@ c.....Set initial temperature if needed
 c-----calc kinetic energy
       call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki)
 c-----in case of 3D, <ekin> = 3/2 *NkT
-      temp= ekin /ntot/fkb *2d0/3d0
+      temp(1)= ekin /ntot/fkb *2d0/3d0
 cc-----in case of 2D, <ekin> = 2/2 *NkT
 c      temp= ekin /ntot/fkb *2d0/2d0
 
@@ -58,7 +83,7 @@ c      temp= ekin /ntot/fkb *2d0/2d0
      &     ,ekin," eV"
       write(6,'(1x,a,es22.14,a)') " potential energy="
      &     ,epot0," eV"
-      write(6,'(1x,a,es15.7,a)') " temperature     =",temp," K"
+      write(6,'(1x,a,es15.7,a)') " temperature     =",temp(1)," K"
 
       open(ioerg,file="out.erg",status='replace')
       write(ioerg,'(a)') '# istp,etot-epot0,ekin,epot-epot0,temp'
@@ -66,17 +91,18 @@ c      temp= ekin /ntot/fkb *2d0/2d0
       write(ioerg,'(a,es15.7)') '# epot0 =',epot0
       write(ioerg,'(i8,3es15.7,f10.2,2es15.7)') istp
      &     ,(ekin+epot0-epot0),ekin,(epot0-epot0)
-     &     ,temp
+     &     ,temp(1)
      &     ,vol
      &     ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
       call flush(ioerg)
+
 
 c.....make MD loop starts
       do istp=1,nstp
         va(1:3,1:natm)= va(1:3,1:natm) +aa(1:3,1:natm)
         ra(1:3,1:natm)= ra(1:3,1:natm) +va(1:3,1:natm)
 
-        call mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
+        call mk_lspr_brute(namax,natm,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,lspr)
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &       ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
@@ -97,10 +123,11 @@ c            tmp= sqrt(1d0 +dt/trlx*(treq-temp)/temp)
 c          endif
 c          va(1:3,1:natm)= va(1:3,1:natm) *tmp
 c        endif
-
+        temp(1)= ekin /ntot/fkb *2d0/3d0
+        write(6,'(a,i8,f10.2)') ' istp,temp = ',istp,temp(1)
         write(ioerg,'(i8,3es15.7,f10.2,2es15.7)') istp
      &       ,(ekin+epot-epot0),ekin,(epot-epot0)
-     &       ,temp
+     &       ,temp(1)
      &       ,vol
      &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
         call flush(ioerg)
@@ -111,19 +138,19 @@ c---------decide pmd-file name
           iocntpmd=iocntpmd+1
           write(cnum(1:4),'(i4.4)') iocntpmd
 c---------write pmd file for Akira
-          call write_pmd_ascii(20,"smd"//cnum,namax,natm,h,tag,ra,va
-     &         ,eki,epi,strs)
+          call write_pmd_ascii(20,"smd"//cnum,natm,h,hunit
+     &         ,tag,ra,va,eki,epi,strs,sorg,dt)
         endif
 
       enddo ! end of istp=1,nstp
 
       write(6,'(1x,a)') "final values:"
-      write(6,'(1x,a,es22.14)') " kinetic energy  ="
+      write(6,'(1x,a,es22.14,a)') " kinetic energy  ="
      &     ,ekin," eV"
-      write(6,'(1x,a,es22.14)') " potential energy="
+      write(6,'(1x,a,es22.14,a)') " potential energy="
      &     ,epot," eV"
-      write(6,'(1x,a,es15.7)') " temperature     ="
-     &     ,temp," K"
+      write(6,'(1x,a,es15.7,a)') " temperature     ="
+     &     ,temp(1)," K"
       write(6,'(a)') " program finished correctly."
 
       end program small_md
@@ -305,7 +332,8 @@ c=======================================================================
       real(8),parameter:: pi = 3.14159265358979d0
       real(8),external:: box_muller
 
-      facv(1:nismax)=dsqrt(2d0*tinit*fkb/am(1:nismax))
+      facv(1:nismax)=dsqrt(tinit*fkb*ev2j/(am(1:nismax)*amu2kg))
+     &     *m2ang /s2fs
 
 c-----velocities in Maxwell-Boltzmann distribution
       do i=1,natm
