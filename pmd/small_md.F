@@ -1,6 +1,6 @@
       program small_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2015-02-08 19:01:53 Ryo KOBAYASHI>
+c                        Time-stamp: <2015-02-08 20:02:42 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics program for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -64,9 +64,6 @@ c.....Set initial temperature if needed
      &     ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,avol
      &     ,cforce)
-      do i=1,10
-        print *,' i,aa=',i,aa(1:3,i)
-      enddo
 
       call write_force(12)
       call write_energy(13,epot0)
@@ -448,37 +445,6 @@ c.....Write out energy
       close(ionum)
 
       end subroutine write_energy
-c=======================================================================
-      subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &     ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &     ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol
-     &     ,cforce)
-      use LJ_Ar,only:force_LJ_Ar
-      implicit none
-      integer,intent(in):: namax,natm,nnmax,nismax
-      integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
-     &   ,nn(6),mpi_md_world,myid_md
-      integer,intent(in):: lspr(0:nnmax,namax)
-      real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6)
-     &     ,acon(nismax),rc,tag(namax)
-      real(8),intent(inout):: tcom,avol
-      real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-      character(len=*),intent(in):: cforce
-      
-      integer:: ierr
-      
-      select case (trim(cforce))
-        case ('LJ_Ar')
-          call force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case default
-          write(6,'(a)') ' [get_force] unknown force: '
-     &         //trim(cforce)//' !!'
-          stop
-      end select
-
-      end subroutine get_force
 c=======================================================================
 c-----------------------------------------------------------------------
 c     Local Variables:

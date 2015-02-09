@@ -1,6 +1,6 @@
 module NN1
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-01-27 21:42:48 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-02-08 20:05:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -218,8 +218,12 @@ contains
 
 !-----gather epot
     epot= 0d0
-    call mpi_allreduce(epotl,epot,1,mpi_double_precision &
-         ,mpi_sum,mpi_world,ierr)
+    if( myid_md.ge.0 ) then
+      call mpi_allreduce(epotl,epot,1,mpi_double_precision &
+           ,mpi_sum,mpi_world,ierr)
+    else
+      epot= epotl
+    endif
     return
   end subroutine force_NN1
 !=======================================================================
