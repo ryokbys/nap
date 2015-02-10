@@ -1,5 +1,7 @@
       program parallel_md
 c-----------------------------------------------------------------------
+c                        Time-stamp: <2015-02-09 18:01:12 Ryo KOBAYASHI>
+c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
 c-----------------------------------------------------------------------
@@ -31,6 +33,7 @@ c.....Epot threshold for disl core extraction [Hartree]
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3)
+      integer,external:: ispOf,ifmvOf,itotOf
       real(8),external:: box_muller,sprod
 c-----output file names
       character:: cnode*5,cnum*4
@@ -131,6 +134,17 @@ c-------species of atom-i
       enddo
       !write(6,'(a,2i8)') " myid,natm=",myid_md,natm
 
+#ifdef __FITPOT__
+c.....check whether order of atoms and total-id of atoms match
+      do ia=1,natm
+        if( itotOf(tag(ia)).ne.ia ) then
+          print *, '[Error] itotOf(tag(ia)).ne.ia !!!'
+          print *, '  In case of FITPOT mode, the order of atom'//
+     &         ' must be the same of itot of the atom-tag.'
+          stop
+        endif
+      enddo
+#endif
 
 c-----setup
       call setup(nismax,am,acon,fack,dt)
@@ -1242,6 +1256,8 @@ c-------Error trap
 
 c-----num. of received boundary atoms
       nb=nbnew
+
+c      print *, 'bacopy: nb=',nb
 
       end subroutine bacopy
 c=======================================================================

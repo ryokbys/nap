@@ -1,6 +1,6 @@
       program small_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2015-02-08 20:02:42 Ryo KOBAYASHI>
+c                        Time-stamp: <2015-02-10 11:02:07 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics program for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -9,9 +9,10 @@ c-----------------------------------------------------------------------
       implicit none
       include "./params_unit.h"
 
-      integer:: i
+      integer:: i,ia
       real(8):: tmp
       character:: cnum*4 
+      integer,external:: itotOf
 
 c.....set myid to indicate that it is not a parallel computation
       myid_md= -1
@@ -45,6 +46,18 @@ c-------species of atom-i
         endif
       enddo
 
+#ifdef __FITPOT__
+c.....check whether order of atoms and total-id of atoms match
+      do ia=1,natm
+        if( itotOf(tag(ia)).ne.ia ) then
+          print *, '[Error] itotOf(tag(ia)).ne.ia !!!'
+          print *, '  In case of FITPOT mode, the order of atom'//
+     &         ' must be the same of itot of the atom-tag.'
+          stop
+        endif
+      enddo
+#endif
+
 c-----setup
       call setup(nismax,am,acon,fack,dt)
 c-----set HI and SGM
@@ -58,12 +71,13 @@ c.....Set initial temperature if needed
         va(1:3,1:natm)= 0d0
       endif
 
-      call mk_lspr_brute(namax,natm,nnmax,tag,ra,rc+rbuf,h,hi
-     &     ,lspr)
+      call mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf
+     &     ,h,hi,sgm,lspr)
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &     ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,avol
      &     ,cforce)
+      epot= epot0
 
       call write_force(12)
       call write_energy(13,epot0)
@@ -99,8 +113,8 @@ c.....make MD loop starts
         va(1:3,1:natm)= va(1:3,1:natm) +aa(1:3,1:natm)
         ra(1:3,1:natm)= ra(1:3,1:natm) +va(1:3,1:natm)
 
-        call mk_lspr_brute(namax,natm,nnmax,tag,ra,rc+rbuf,h,hi
-     &     ,lspr)
+        call mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf
+     &       ,h,hi,sgm,lspr)
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &       ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol
@@ -175,8 +189,10 @@ c=======================================================================
       write(6,'(2x,a25,es11.3)') 'damping_coeff',dmp
       write(6,'(2x,a)') ''
       write(6,'(2x,a25,f12.4)') 'initial_temperature',tinit
-      write(6,'(2x,a25,i8)') 'flag_temperature',iftctl
-      write(6,'(2x,a25,f12.4)') 'temperature_target',ttgt
+      write(6,'(2x,a25,2x,a)') 'temperature_control',ctctl
+      do i=1,9
+        write(6,'(2x,a25,i3,f12.4)') 'temperature_target',i,ttgt(i)
+      enddo
       write(6,'(2x,a25,f12.4)') 'temperature_relax_time',trlx
       write(6,'(2x,a)') ''
       write(6,'(2x,a25,i8)') 'flag_isobaric',ifpctl
@@ -385,7 +401,7 @@ c=======================================================================
       real(8),intent(out):: ekin,eki(3,3,namax)
 c.....locals
       integer:: i,ierr,is,ixyz,jxyz,imax
-      real(8):: x,y,z,v(3),v2
+      real(8):: x,y,z,v(3)
 
       ekin=0d0
       eki(1:3,1:3,1:natm)= 0d0
@@ -402,7 +418,6 @@ c.....Tensor form eki
             eki(ixyz,jxyz,i)= v(ixyz)*v(jxyz)
           enddo
         enddo
-        v2= eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
         eki(1:3,1:3,i)=eki(1:3,1:3,i)*fack(is)
         ekin=ekin +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
       enddo

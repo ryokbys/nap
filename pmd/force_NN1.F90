@@ -1,6 +1,6 @@
 module NN1
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-02-08 20:05:05 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-02-10 11:06:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -53,7 +53,7 @@ contains
 !.....read in.params.NN1
       call read_params(myid,mpi_world,rcin)
 !.....reset rc
-      if( myid.eq.0 ) then
+      if( myid.le.0 ) then
         write(6,'(a,f10.5,a,f10.5)') &
              ' Cutoff radius rc may have been changed from '&
              ,rc,' to ',rcin
@@ -61,12 +61,13 @@ contains
       rc= rcin
       allocate(gsf(nsf,namax),dgsf(3,nsf,0:nnmax,namax) &
            ,hl1(nhl1,namax))
-      gsf(nsf,1:natm+nb)= 0d0
+!      gsf(nsf,1:natm+nb)= 0d0
+      gsf(nsf,1:namax)= 0d0
       l1st= .false.
     endif
 
 !.....first, calculate all the symmetry functions
-    call eval_sf_2sp(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr,gsf,dgsf,rc)
+    call eval_sf_msp(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr,gsf,dgsf,rc)
 
 #ifdef __FITPOT__
     open(80,file='out.NN1.gsf',status='replace')
@@ -77,6 +78,7 @@ contains
       enddo
     enddo
     close(80)
+    call write_dgsf(natm,namax,nnmax,lspr,tag,nsf,dgsf)
     open(81,file='out.NN1.hl1')
     write(81,'(2i10)') nhl1
 #endif
@@ -170,11 +172,13 @@ contains
         enddo
       enddo
     enddo
+    if( myid.ge.0 ) then
 !.....copy back Ms of buffer atoms
-    call copy_dba_bk(tcom,natm+nb,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,aml,3*nsf*nhl1)
-    call copy_dba_bk(tcom,natm+nb,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,bml,3*nsf*nhl1)
+      call copy_dba_bk(tcom,natm+nb,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_world,aml,3*nsf*nhl1)
+      call copy_dba_bk(tcom,natm+nb,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_world,bml,3*nsf*nhl1)
+    endif
 !.....write aml
     open(82,file='out.NN1.aml')
     write(82,'(3i10)') natm, nsf, nhl1
@@ -202,8 +206,12 @@ contains
     deallocate(aml,bml)
 #endif
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,aa,3)
+    if( myid.ge.0 ) then
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_world,aa,3)
+    else
+      call reduce_dba_bk(natm,namax,tag,aa,3)
+    endif
 !-----reduced force
     do i=1,natm
       at(1:3)= aa(1:3,i)
@@ -218,7 +226,7 @@ contains
 
 !-----gather epot
     epot= 0d0
-    if( myid_md.ge.0 ) then
+    if( myid.ge.0 ) then
       call mpi_allreduce(epotl,epot,1,mpi_double_precision &
            ,mpi_sum,mpi_world,ierr)
     else
@@ -331,10 +339,10 @@ contains
 
   end subroutine eval_sf
 !=======================================================================
-  subroutine eval_sf_2sp(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr &
+  subroutine eval_sf_msp(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr &
        ,gsf,dgsf,rc)
 !
-!  Evaluate symmetry functions and derivatives for 2-species system.
+!  Evaluate symmetry functions and derivatives for multi-species system.
 !
     implicit none
     integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
@@ -427,7 +435,7 @@ contains
       enddo
     enddo
 
-  end subroutine eval_sf_2sp
+  end subroutine eval_sf_msp
 !=======================================================================
   function fc(r,rc)
     implicit none
@@ -481,12 +489,18 @@ contains
 !.....read constants at the 1st call
     inquire(file=trim(ccfname),exist=lexist)
     if( .not. lexist ) then
-      if( myid.eq.0 ) then
+      if( myid.ge.0 ) then
+        if( myid.eq.0 ) then
+          write(6,'(a)') ' [Error] '//ccfname//' does not exist !!!.'
+          write(6,'(a)') '   The NN1 potential needs '//ccfname//'.'
+        endif
+        call mpi_finalize(ierr)
+        stop
+      else
         write(6,'(a)') ' [Error] '//ccfname//' does not exist !!!.'
         write(6,'(a)') '   The NN1 potential needs '//ccfname//'.'
+        stop
       endif
-      call mpi_finalize(ierr)
-      stop
     endif
     open(51,file=trim(ccfname),status='old')
 !.....num of symmetry functions, num of node in 1st hidden layer
@@ -516,12 +530,18 @@ contains
 !.....read parameters at the 1st call
     inquire(file=trim(cpfname),exist=lexist)
     if( .not. lexist ) then
-      if( myid.eq.0 ) then
+      if( myid.ge.0 ) then
+        if( myid.eq.0 ) then
+          write(6,'(a)') ' [Error] '//cpfname//' does not exist !!!.'
+          write(6,'(a)') '   The NN1 potential needs '//cpfname//'.'
+        endif
+        call mpi_finalize(ierr)
+        stop
+      else
         write(6,'(a)') ' [Error] '//cpfname//' does not exist !!!.'
         write(6,'(a)') '   The NN1 potential needs '//cpfname//'.'
+        stop
       endif
-      call mpi_finalize(ierr)
-      stop
     endif
     open(50,file=trim(cpfname),status='old')
     read(50,*) ncoeff,rcin
@@ -549,12 +569,18 @@ contains
     allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
     inquire(file=trim(cmbfname),exist=lexist)
     if( nsp.ne.1 .and. .not.lexist ) then
-      if( myid.eq.0 ) then
+      if( myid.ge.0 ) then
+        if( myid.eq.0 ) then
+          write(6,'(a)') ' [Error] '//cmbfname//' does not exist !!!.'
+          write(6,'(a)') '   The NN1 potential needs '//cmbfname//'.'
+        endif
+        call mpi_finalize(ierr)
+        stop
+      else
         write(6,'(a)') ' [Error] '//cmbfname//' does not exist !!!.'
         write(6,'(a)') '   The NN1 potential needs '//cmbfname//'.'
+        stop
       endif
-      call mpi_finalize(ierr)
-      stop
     elseif( nsp.ne.1 ) then
       open(52,file=trim(cmbfname),status='old')
 !.....read pairs
@@ -600,6 +626,47 @@ contains
     enddo
     return
   end function factorial
+!=======================================================================
+  subroutine write_dgsf(natm,namax,nnmax,lspr,tag,nsf,dgsf)
+!   Write out dgsf data.
+!   Buffer atom indices are replaced to resident atom ones.
+    implicit none
+    integer,intent(in):: natm,namax,nnmax,nsf,lspr(0:nnmax,namax)
+    real(8),intent(in):: dgsf(3,nsf,0:nnmax,namax),tag(namax)
+    integer:: ia,jj,ja,jra,isf
+    real(8),allocatable:: dgsfo(:,:,:,:)
+    integer,external:: itotOf
+
+    allocate(dgsfo(3,natm,nsf,natm))
+!.....reduce dgsf data of buffer atoms to those of resident atoms
+    dgsfo(1:3,1:natm,1:nsf,1:natm)= 0d0
+    do ia=1,natm
+      do jj=0,lspr(0,ia)
+        if( jj.eq.0 ) then
+          ja= ia
+        else
+          ja= lspr(jj,ia)
+        endif
+        jra= itotOf(tag(ja))
+        do isf=1,nsf
+          dgsfo(1:3,jra,isf,ia)= dgsfo(1:3,jra,isf,ia) &
+               +dgsf(1:3,isf,jj,ia)
+        enddo
+      enddo
+    enddo
+!.....write
+    open(84,file='out.NN1.dgsf',status='replace')
+    do ia=1,natm
+      do isf=1,nsf
+        do jra=1,natm
+          write(84,'(3i6,3es22.14)') ia,isf,jra,dgsfo(1:3,jra,isf,ia)
+        enddo
+      enddo
+    enddo
+    close(84)
+
+    deallocate(dgsfo)
+  end subroutine write_dgsf
 !=======================================================================
   subroutine copy_dba_fwd(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
        ,nn,mpi_world,x,ndim)
