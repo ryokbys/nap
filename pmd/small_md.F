@@ -1,9 +1,12 @@
       program small_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2015-02-10 11:02:07 Ryo KOBAYASHI>
+c                        Time-stamp: <2015-02-10 11:11:46 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics program for systems small enough not to use 
 c  cell-list method and parallelization.
+c  Brute-force searching is used to make a neighbor list with copying
+c  the original cell to make image cells. Thus it requires 26 times
+c  large number of atoms than the original cell.
 c-----------------------------------------------------------------------
       use variables
       implicit none
