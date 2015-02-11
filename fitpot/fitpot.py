@@ -405,7 +405,9 @@ def func(x,*args):
         ergs,frcs=calc_ef_from_bases(x,*args)
     elif potential in ('NN1'):
         #.....forces must be computed from pmd results !!!
-        ergs,frcs=NN1.calc_ef_from_pmd(x,*args)
+        #ergs,frcs=NN1.calc_ef_from_pmd(x,*args)
+        #.....now it is possible to compute only from bases
+        ergs,frcs= NN1.calc_ef_from_bases(x,*args)
 
     #.....calc function value of L
     val= eval_L(ergs,frcs,ergrefs,frcrefs,samples)
@@ -1151,7 +1153,7 @@ if __name__ == '__main__':
     if potential in ('linreg'):
         ergs,frcs= calc_ef_from_bases(solution,maindir)
     elif potential in ('NN1'):
-        ergs,frcs= NN1.calc_ef_from_pmd(solution,maindir)
+        ergs,frcs= NN1.calc_ef_from_bases(solution)
     else:
         ergs,frcs= gather_pmd_data(maindir)
     output_energy_relation(ergs,ergrefs,samples,sample_dirs,fname='out.erg.pmd-vs-dft.fin')

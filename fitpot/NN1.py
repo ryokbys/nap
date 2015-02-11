@@ -1,4 +1,4 @@
-#  Time-stamp: <2015-02-10 16:40:10 Ryo KOBAYASHI>
+#  Time-stamp: <2015-02-11 15:53:54 Ryo KOBAYASHI>
 """
 Routines related to neural network with one hidden layer.
 """
@@ -18,6 +18,8 @@ _l1st= True
 _nsp=  1
 _nsf=  0
 _nhl1= 0
+_ergs= []
+_frcs= []
 _gsf= []
 _dgsf=[]
 _hl1= []
@@ -45,7 +47,7 @@ def init(*args,**kwargs):
     before any other NN1-related routines.
     """
 
-    global _nsf,_nhl1,_wgt1,_wgt2,_gsf,_hl1,_aml,_bml
+    global _nsf,_nhl1,_wgt1,_wgt2,_gsf,_dgsf,_hl1,_aml,_bml
     global _fmatch,_basedir,_samples,_sample_dirs,_nprcs
     global _ergrefs,_frcrefs,_fmethod,_parfile,_runmode,_rcut
     global _params,_pranges,_vranges
@@ -98,7 +100,8 @@ def init(*args,**kwargs):
         exit()
 
     #.....read bases
-    _gsf,_hl1,_aml,_bml= gather_basis(*args)
+    #_gsf,_hl1,_aml,_bml= gather_basis(*args)
+    _gsf,_dgsf= gather_bases_new(*args)
 
 def factorial(n,m):
     """
@@ -249,18 +252,19 @@ def calc_ef_from_bases(x,*args):
     """
     Calculate energies and forces of every samples using bases data.
     """
-    global _hl1,_l1st,_gsf,_dgsf
+    global _hl1,_l1st,_gsf,_dgsf,_ergs,_frcs,_wgt1,_wgt2
 
     #.....initialize variables
+    _wgt1,_wgt2= vars2wgts(x)
     es=np.zeros(len(_samples))
     fs= []
     for smpl in _samples:
         fs.append(np.zeros((smpl.natm,3)))
 
-    #.....gather bases from file if this is 1st call
-    if _l1st:
-        _gsf,_dgsf= gather_bases_new()
-        _l1st = False
+    # #.....gather bases from file if this is 1st call
+    # if _l1st:
+    #     _gsf,_dgsf= gather_bases_new()
+    #     _l1st = False
 
     p= mp.Pool(_nprcs)
     _hl1= []
@@ -293,6 +297,8 @@ def calc_ef_from_bases(x,*args):
 
     # print ' es:'
     # print es
+    _ergs= es
+    _frcs= fs
     return (es,fs)
 
 def arg_wrapper(args):
@@ -306,16 +312,13 @@ def calc_ef(ismpl,x,*args):
     dgsfs= _dgsf[ismpl]
     es= 0.0
     fs= np.zeros((smpl.natm,3))
-    _wgt1,_wgt2= vars2wgts(x)
     #.....energy
     iprm= 0
     #print ' ismpl=',ismpl
-    hl1s= np.zeros(_nhl1+1,smpl.natm)
+    hl1s= np.zeros((_nhl1+1,smpl.natm))
     for ia in range(smpl.natm):
         #.....calc hidden-layer value using sigmoid function
         tmp= 0.0
-        #hl1s= np.zeros(_nhl1+1)
-        #hl1s[0]= 1.0
         for ihl1 in range(1,_nhl1+1):
             for isf in range(1,_nsf+1):
                 hl1s[ihl1,ia]+= _wgt1[isf,ihl1] *gsfs[ia,isf]
@@ -328,7 +331,7 @@ def calc_ef(ismpl,x,*args):
         dhdg= np.zeros(3)
         for ihl1 in range(1,_nhl1+1):
             w2= _wgt2[ihl1]
-            for ja in range(sampl.natm):
+            for ja in range(smpl.natm):
                 dh=hl1s[ihl1,ja]*(1.0-hl1s[ihl1,ja])
                 for isf in range(1,_nsf+1):
                     w1= _wgt1[isf,ihl1]
@@ -345,25 +348,25 @@ def grad(x,*args):
     #.....get energies and forces
     #ergs,frcs= calc_ef_from_bases(x,*args)
     #ergs,frcs= calc_ef_from_pmd(x,*args)
-    ergs,frcs= gather_pmd_data(dir)
+    #ergs,frcs= gather_pmd_data(dir)
     # for ismpl in range(len(_samples)):
     #     print ' ismpl,ergs,_ergrefs:',ismpl,ergs[ismpl],_ergrefs[ismpl]
     
-    _gsf,_hl1,_aml,_bml= gather_basis(*args)
-    _wgt1,_wgt2= vars2wgts(x)
+    #_gsf,_hl1,_aml,_bml= gather_basis(*args)
+    #_wgt1,_wgt2= vars2wgts(x)
 
     p= mp.Pool(_nprcs)
     grad= np.zeros(len(x))
     
     if _nprcs == 1:
         for ismpl in range(len(_samples)):
-            gs= grad_core(ismpl,ergs,frcs,x)
+            gs= grad_core_new(ismpl,x)
             for iprm in range(len(x)):
                 grad[iprm] += gs[iprm]
     else:
         func_args=[]
         for ismpl in range(len(_samples)):
-            func_args.append( (grad_core,ismpl,ergs,frcs,x))
+            func_args.append( (grad_core_new,ismpl,x))
         results= p.map(arg_wrapper,func_args)
         p.close()
         p.join()
@@ -442,72 +445,70 @@ def grad_core(ismpl,ergs,frcs,*args):
     gs= gs +dgs
     return gs
                     
-def grad_core_new(ismpl,ergs,frcs,*args):
+def grad_core_new(ismpl,*args):
     x      = args[0]
 
     gs= np.zeros(len(x))
     dgs=np.zeros(len(x))
     smpl= _samples[ismpl]
-    ediff= (ergs[ismpl] -_ergrefs[ismpl]) /smpl.natm
+    ediff= (_ergs[ismpl] -_ergrefs[ismpl]) /smpl.natm
     gsfs= _gsf[ismpl]
     dgsfs= _dgsf[ismpl]
     hl1s= _hl1[ismpl]
-    iprm= 0
+    iprm= _nsf*_nhl1 +_nhl1
     #print ' ismpl=',ismpl
-    for isf in range(1,_nsf+1):
-        for ihl1 in range(1,_nhl1+1):
-            tmp= 0.0
-            for ia in range(smpl.natm):
-                tmp += _wgt2[ihl1] *hl1s[ihl1,ia] \
-                         *(1.0 -hl1s[ihl1,ia]) *gsfs[ia,isf]
-            gs[iprm] += 2.0*ediff*tmp 
-            iprm += 1
-    for ihl1 in range(1,_nhl1+1):
+    for ihl1 in range(_nhl1,0,-1):
         tmp= 0.0
         for ia in range(smpl.natm):
             tmp += (hl1s[ihl1,ia] -0.5)
+        iprm -= 1
         gs[iprm] += 2.0*ediff*tmp
-        iprm += 1
+    for isf in range(_nsf,0,-1):
+        for ihl1 in range(_nhl1,0,-1):
+            tmp= 0.0
+            for ia in range(smpl.natm):
+                h= hl1s[ihl1,ia]
+                tmp += _wgt2[ihl1] *h*(1.0-h) *gsfs[ia,isf]
+            iprm -= 1
+            gs[iprm] += 2.0*ediff*tmp 
 
     if _fmatch:
-        am= np.zeros(3)
-        bm= np.zeros(3)
-        iprm= 0
-        for isf in range(1,_nsf+1):
-            for ihl1 in range(1,_nhl1+1):
-                tmp= 0.0
-                w2= _wgt2[ihl1]
-                for ja in range(smpl.natm):
-                    h= hl1s[ihl1s,ja]
-                    for ia in range(smpl.natm):
-                        fdiff= (frcs[ismpl][ia] -_frcrefs[ismpl][ia]) \
-                               *2 /smpl.natm/3
-                        am[:]= h*(1.0-h)*(1.0-2*h)*gsfs[ja,isf] \
-                               *dgsfs[ja,isf,ia,:]
-                        bm[:]= h*(1.0-h)*dgsfs[ja,isf,ia,:]
-                        tmp -= w2*( fdiff[0]*(am[0]+bm[0]) \
-                                    +fdiff[1]*(am[1]+bm[1]) \
-                                    +fdiff[2]*(am[2]+bm[2]) )
-                dgs[iprm] += tmp
-                iprm += 1
-        for ihl1 in range(1,_nhl1+1):
+        am= np.zeros((_nsf+1,_nhl1+1,smpl.natm,3))
+        bm= np.zeros((_nsf+1,_nhl1+1,smpl.natm,3))
+        cm= np.zeros(3)
+        iprm= _nsf*_nhl1 +_nhl1
+        for ihl1 in range(_nhl1,0,-1):
             tmp= 0.0
             for ja in range(smpl.natm):
                 h= hl1s[ihl1,ja]
+                dh= h*(1.0-h)
+                ddh= h*(1.0-h)*(1.0-2.0*h)
                 for isf in range(1,_nsf+1):
                     w1= _wgt1[isf,ihl1]
+                    ddhg= ddh*gsfs[ja,isf]
                     for ia in range(smpl.natm):
-                        fdiff= (frcs[ismpl][ia] -_frcrefs[ismpl][ia]) \
+                        fdiff= (_frcs[ismpl][ia] -_frcrefs[ismpl][ia]) \
                                *2/smpl.natm/3
-                        am[:]= h*(1.0-h)*dgsfs[ja,isf,ia,:]
-                        tmp -= w1*( fdiff[0]*am[0] \
-                                    +fdiff[1]*am[1] \
-                                    +fdiff[2]*am[2] )
+                        am[isf,ihl1,ia,:]+= dh*dgsfs[ja,isf,ia,:]
+                        bm[isf,ihl1,ia,:]+= ddhg*dgsfs[ja,isf,ia,:]
+                        tmp -= w1*( fdiff[0]*dh*dgsfs[ja,isf,ia,0] \
+                                    +fdiff[1]*dh*dgsfs[ja,isf,ia,1] \
+                                    +fdiff[2]*dh*dgsfs[ja,isf,ia,2] )
+            iprm -= 1
             dgs[iprm] += tmp
-            iprm += 1
-    # print ' gs,dgs,gs+dgs:'
-    # for iprm in range(len(x)):
-    #     print ' {0:15.7f} {1:15.7f} {2:15.7f}'.format(gs[iprm],dgs[iprm],gs[iprm]+dgs[iprm])
+        for isf in range(_nsf,0,-1):
+            for ihl1 in range(_nhl1,0,-1):
+                tmp= 0.0
+                w2= _wgt2[ihl1]
+                for ia in range(smpl.natm):
+                    fdiff= (_frcs[ismpl][ia] -_frcrefs[ismpl][ia]) \
+                        *2 /smpl.natm/3
+                    cm[:]= am[isf,ihl1,ia,:] +bm[isf,ihl1,ia,:]
+                    tmp -= w2*( fdiff[0]*(cm[0]) \
+                                    +fdiff[1]*(cm[1]) \
+                                    +fdiff[2]*(cm[2]) )
+                iprm -= 1
+                dgs[iprm] += tmp
     gs[:]= gs[:] +dgs[:]
     return gs
                     
@@ -578,11 +579,11 @@ def gather_bases_new(*args):
     for i in range(len(_sample_dirs)):
         dir= _sample_dirs[i]
         smpl= _samples[i]
-        f1= open(_basedir+'/'+dir+'/pmd/out.NN1.gsf','r')
-        f2= open(_basedir+'/'+dir+'/pmd/out.NN1.dgsf','r')
+        f1= open(_basedir+'/'+dir+'/smd/out.NN1.gsf','r')
+        f2= open(_basedir+'/'+dir+'/smd/out.NN1.dgsf','r')
         #.....skip 1st line
         data1= f1.readline().split()
-        data2= f2.readline().split()
+        #data2= f2.readline().split()
         gsfs= np.zeros((smpl.natm,_nsf+1))
         dgsfs=np.zeros((smpl.natm,_nsf+1,smpl.natm,3))
         for ia in range(smpl.natm):
