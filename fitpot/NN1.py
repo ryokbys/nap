@@ -1,4 +1,4 @@
-#  Time-stamp: <2015-02-11 15:53:54 Ryo KOBAYASHI>
+#  Time-stamp: <2015-02-12 17:46:35 Ryo KOBAYASHI>
 """
 Routines related to neural network with one hidden layer.
 """
@@ -456,7 +456,6 @@ def grad_core_new(ismpl,*args):
     dgsfs= _dgsf[ismpl]
     hl1s= _hl1[ismpl]
     iprm= _nsf*_nhl1 +_nhl1
-    #print ' ismpl=',ismpl
     for ihl1 in range(_nhl1,0,-1):
         tmp= 0.0
         for ia in range(smpl.natm):

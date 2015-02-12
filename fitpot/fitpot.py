@@ -1073,6 +1073,11 @@ if __name__ == '__main__':
     else:
         ergs,frcs= gather_pmd_data(maindir)
 
+    if fmethod in ('test','TEST') and potential in ('NN1'):
+        NN1.init(maindir,params,sample_dirs,samples,nprcs,fmatch \
+                     ,ergrefs,frcrefs,fmethod,parfile,runmode \
+                     ,rcut,pranges,vranges)
+
     output_energy_relation(ergs,ergrefs,samples,sample_dirs,fname='out.erg.pmd-vs-dft.ini')
     output_force_relation(frcs,frcrefs,samples,sample_dirs,fname='out.frc.pmd-vs-dft.ini')
 
