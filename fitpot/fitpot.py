@@ -470,9 +470,9 @@ def func(x,*args):
     #.....if L value is minimum ever, store this parameter file
     if val < _valmin:
         _valmin= val
-        if potential in ('linreg'):
+        if potential in ('linreg','NN1'):
             write_params(dir+'/'+parfile+'.min',x)
-        else:            
+        else:
             os.system('cp '+dir+'/'+parfile+'.current' \
                           +' '+dir+'/'+parfile+'.min')
         

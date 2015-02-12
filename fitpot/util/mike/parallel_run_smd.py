@@ -46,8 +46,10 @@ for inode in range(len(nodes)):
     if done:
         break
 
+#print ' len(dir_per_node)=',len(dir_per_node)
+
 procs= []
-for inode in range(len(nodes)):
+for inode in range(len(dir_per_node)):
     node= nodes[inode]
     dir_list= dir_per_node[inode]
     str= ""

@@ -1,6 +1,6 @@
       program small_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2015-02-10 11:11:46 Ryo KOBAYASHI>
+c                        Time-stamp: <2015-02-12 10:44:04 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics program for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -445,7 +445,7 @@ c.....Write out forces
      &       +h(1:3,2,0)*aa(2,i)
      &       +h(1:3,3,0)*aa(3,i)
         at(1:3)= at(1:3)/acon(is)
-        write(ionum,'(3es22.14)') at(1:3)
+        write(ionum,'(3es23.14e3)') at(1:3)
       enddo
       close(ionum)
 
@@ -459,7 +459,7 @@ c=======================================================================
       
 c.....Write out energy
       open(ionum,file='erg.smd',status='replace')
-      write(ionum,'(es22.14)') erg
+      write(ionum,'(es23.14e3)') erg
       close(ionum)
 
       end subroutine write_energy
