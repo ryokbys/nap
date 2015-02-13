@@ -1,4 +1,4 @@
-#  Time-stamp: <2015-02-12 22:08:14 Ryo KOBAYASHI>
+#  Time-stamp: <2015-02-13 16:58:01 Ryo KOBAYASHI>
 """
 Routines related to neural network with one hidden layer.
 """

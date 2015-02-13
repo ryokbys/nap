@@ -268,6 +268,11 @@ def read_input(fname='in.fitpot'):
                 ga_temp= float(data[1])
             elif data[0] == 'ga_murate':
                 ga_murate= float(data[1])
+            else:
+                print '{0:*^72}'.format('*')
+                print '* There is no keyword like: ',data[0]
+                print '* Please confirm the keyword again...'
+                print '{0:*^72}'.format('*')
     f.close()
 
 def show_inputs(fname='in.fitpot'):
