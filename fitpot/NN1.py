@@ -1,4 +1,4 @@
-#  Time-stamp: <2015-02-12 17:46:35 Ryo KOBAYASHI>
+#  Time-stamp: <2015-02-12 22:08:14 Ryo KOBAYASHI>
 """
 Routines related to neural network with one hidden layer.
 """
@@ -446,6 +446,72 @@ def grad_core(ismpl,ergs,frcs,*args):
     return gs
                     
 def grad_core_new(ismpl,*args):
+    x      = args[0]
+
+    gs= np.zeros(len(x))
+    dgs=np.zeros(len(x))
+    smpl= _samples[ismpl]
+    ediff= (_ergs[ismpl] -_ergrefs[ismpl]) /smpl.natm
+    gsfs= _gsf[ismpl]
+    dgsfs= _dgsf[ismpl]
+    hl1s= _hl1[ismpl]
+    iprm= _nsf*_nhl1 +_nhl1
+    for ihl1 in range(_nhl1,0,-1):
+        tmp= 0.0
+        for ia in range(smpl.natm):
+            tmp += (hl1s[ihl1,ia] -0.5)
+        iprm -= 1
+        gs[iprm] += 2.0*ediff*tmp
+    for isf in range(_nsf,0,-1):
+        for ihl1 in range(_nhl1,0,-1):
+            tmp= 0.0
+            for ia in range(smpl.natm):
+                h= hl1s[ihl1,ia]
+                tmp += _wgt2[ihl1] *h*(1.0-h) *gsfs[ia,isf]
+            iprm -= 1
+            gs[iprm] += 2.0*ediff*tmp 
+
+    if _fmatch:
+        am= np.zeros((_nsf+1,_nhl1+1,smpl.natm,3))
+        bm= np.zeros((_nsf+1,_nhl1+1,smpl.natm,3))
+        cm= np.zeros(3)
+        iprm= _nsf*_nhl1 +_nhl1
+        for ihl1 in range(_nhl1,0,-1):
+            tmp= 0.0
+            for ja in range(smpl.natm):
+                h= hl1s[ihl1,ja]
+                dh= h*(1.0-h)
+                ddh= h*(1.0-h)*(1.0-2.0*h)
+                for isf in range(1,_nsf+1):
+                    w1= _wgt1[isf,ihl1]
+                    ddhg= ddh*gsfs[ja,isf]
+                    for ia in range(smpl.natm):
+                        fdiff= (_frcs[ismpl][ia] -_frcrefs[ismpl][ia]) \
+                               *2/smpl.natm/3
+                        am[isf,ihl1,ia,:]+= dh*dgsfs[ja,isf,ia,:]
+                        bm[isf,ihl1,ia,:]+= ddhg*dgsfs[ja,isf,ia,:]
+                        tmp -= w1*( fdiff[0]*dh*dgsfs[ja,isf,ia,0] \
+                                    +fdiff[1]*dh*dgsfs[ja,isf,ia,1] \
+                                    +fdiff[2]*dh*dgsfs[ja,isf,ia,2] )
+            iprm -= 1
+            dgs[iprm] += tmp
+        for isf in range(_nsf,0,-1):
+            for ihl1 in range(_nhl1,0,-1):
+                tmp= 0.0
+                w2= _wgt2[ihl1]
+                for ia in range(smpl.natm):
+                    fdiff= (_frcs[ismpl][ia] -_frcrefs[ismpl][ia]) \
+                        *2 /smpl.natm/3
+                    cm[:]= am[isf,ihl1,ia,:] +bm[isf,ihl1,ia,:]
+                    tmp -= w2*( fdiff[0]*(cm[0]) \
+                                    +fdiff[1]*(cm[1]) \
+                                    +fdiff[2]*(cm[2]) )
+                iprm -= 1
+                dgs[iprm] += tmp
+    gs[:]= gs[:] +dgs[:]
+    return gs
+                    
+def grad_core_new2(ismpl,*args):
     x      = args[0]
 
     gs= np.zeros(len(x))
