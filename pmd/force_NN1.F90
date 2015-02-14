@@ -1,6 +1,6 @@
 module NN1
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-02-10 11:06:07 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-02-14 11:25:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -78,7 +78,7 @@ contains
       enddo
     enddo
     close(80)
-    call write_dgsf(natm,namax,nnmax,lspr,tag,nsf,dgsf)
+    call write_dgsf(84,natm,namax,nnmax,lspr,tag,nsf,dgsf)
     open(81,file='out.NN1.hl1')
     write(81,'(2i10)') nhl1
 #endif
@@ -627,10 +627,11 @@ contains
     return
   end function factorial
 !=======================================================================
-  subroutine write_dgsf(natm,namax,nnmax,lspr,tag,nsf,dgsf)
+  subroutine write_dgsf(ionum,natm,namax,nnmax,lspr,tag,nsf,dgsf)
 !   Write out dgsf data.
 !   Buffer atom indices are replaced to resident atom ones.
     implicit none
+    integer,intent(in):: ionum
     integer,intent(in):: natm,namax,nnmax,nsf,lspr(0:nnmax,namax)
     real(8),intent(in):: dgsf(3,nsf,0:nnmax,namax),tag(namax)
     integer:: ia,jj,ja,jra,isf
@@ -655,15 +656,15 @@ contains
       enddo
     enddo
 !.....write
-    open(84,file='out.NN1.dgsf',status='replace')
+    open(ionum,file='out.NN1.dgsf',status='replace')
     do ia=1,natm
       do isf=1,nsf
         do jra=1,natm
-          write(84,'(3i6,3es22.14)') ia,isf,jra,dgsfo(1:3,jra,isf,ia)
+          write(ionum,'(3i6,3es22.14)') ia,isf,jra,dgsfo(1:3,jra,isf,ia)
         enddo
       enddo
     enddo
-    close(84)
+    close(ionum)
 
     deallocate(dgsfo)
   end subroutine write_dgsf
