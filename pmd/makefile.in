@@ -23,18 +23,18 @@ MPIFLAGS= @FCFLAGS@
 .F90.o: 
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
-pmd= read_input.o parallel_md.o util_vec.o util_rnd.o \
+pmd= read_input.o parallel_md.o util_vec.o util_rnd.o util_tag.o \
 	lasubs.o util_pmd.o zload.o mk_lspr.o common_parallel.o
-smd= read_input.o small_md.o util_vec.o util_rnd.o \
+smd= read_input.o small_md.o util_vec.o util_rnd.o util_tag.o \
 	lasubs.o util_pmd.o mk_lspr.o common_parallel.o
 mods= mod_variables.o
 args= iargc.o getarg.o
 
-forces= force_Ramas_FeH.o force_RK_FeH.o force_common.o force_RK_WHe.o \
+forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
 	  force_Ito3_WHe.o force_LJ_Ar.o force_SW_Si.o force_EDIP_Si.o \
     force_Brenner.o force_Lu_WHe.o force_Branicio_AlN.o \
     force_Mishin_Al.o force_AFS_W.o force_SC_Fe.o \
-    force_SM_Al.o force_linreg.o force_NN1.o force_NN2.o
+    force_SM_Al.o force_linreg.o force_NN1.o force_NN2.o force_common.o 
 params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
     params_LJ_Ar.h params_SW_Si.h params_EDIP_Si.h \
     params_Brenner.h params_Lu_WHe.h params_Branicio_AlN.h \
@@ -50,7 +50,7 @@ pmd2akr= pmd2akr.o read_input.o util_pmd.o sort.o
 #-----------------------------------------------------------------------
 # Make rule entries
 #
-execs=nconv pmd combine pmd2akr akr2cna sortpmd
+execs=nconv pmd smd combine pmd2akr akr2cna sortpmd
 
 all: ${execs}
 
@@ -121,5 +121,5 @@ force_EDIP_Si.o: params_EDIP_Si.h
 force_Brenner.o: params_Brenner.h
 force_Lu_WHe.o: params_Lu_WHe.h
 force_Branicio_AlN.o: params_Branicio_AlN.h
-force_Mishin_Al.o: params_Mishin_Al.h force_common.o
+force_Mishin_Al.o: params_Mishin_Al.h
 

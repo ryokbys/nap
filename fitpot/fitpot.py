@@ -268,6 +268,11 @@ def read_input(fname='in.fitpot'):
                 ga_temp= float(data[1])
             elif data[0] == 'ga_murate':
                 ga_murate= float(data[1])
+            else:
+                print '{0:*^72}'.format('*')
+                print '* There is no keyword like: ',data[0]
+                print '* Please confirm the keyword again...'
+                print '{0:*^72}'.format('*')
     f.close()
 
 def show_inputs(fname='in.fitpot'):
@@ -306,6 +311,36 @@ def gather_pmd_data(basedir):
         natm= int(ff.readline().split()[0])
         #.....energy
         f=open(basedir+'/'+dir+'/erg.pmd','r')
+        ergs[i]= float(f.readline().split()[0])
+        f.close()
+        for j in range(natm):
+            data= ff.readline().split()
+            for k in range(3):
+                frcs[i][j,k]= float(data[k])
+        ff.close()
+    # print 'ergs:',ergs
+    # print 'frcs:',frcs
+    return (ergs,frcs)
+
+def gather_smd_data(basedir):
+    global samples,sample_dirs
+    # print ' basedir=',basedir
+    # print ' len(samples)=',len(samples)
+    # print ' len(sample_dirs)=',len(sample_dirs)
+    #.....initialize variables
+    ergs=np.zeros(len(samples))
+    frcs= []
+    for smpl in samples:
+        frcs.append(np.zeros((smpl.natm,3)))
+    #.....read data
+    for i in range(len(sample_dirs)):
+        dir= sample_dirs[i]
+        smpl= samples[i]
+        #.....force
+        ff=open(basedir+'/'+dir+'/frc.smd','r')
+        natm= int(ff.readline().split()[0])
+        #.....energy
+        f=open(basedir+'/'+dir+'/erg.smd','r')
         ergs[i]= float(f.readline().split()[0])
         f.close()
         for j in range(natm):
@@ -383,13 +418,13 @@ def func(x,*args):
         #.....store original file
         os.system('cp '+dir+'/'+parfile+' '+dir+'/'+parfile+'.tmp')
         write_params(dir+'/'+parfile,x)
-        #.....run pmd in all sample directories
+        #.....run smd in all sample directories
         os.chdir(dir)
         #print os.getcwd(),dir
         if runmode in ('serial','Serial','SERIAL','sequential','single'):
-            os.system('./serial_run_pmd.sh '+parfile)
+            os.system('./serial_run_smd.sh '+parfile)
         elif runmode in ('parallel','Parallel','PARALLEL'):
-            os.system('python ./parallel_run_pmd.py '+parfile)
+            os.system('python ./parallel_run_smd.py '+parfile)
         else:
             print "{0:*>20}: no such run_mode !!!".format(' Error', runmode)
             exit()
@@ -397,15 +432,15 @@ def func(x,*args):
         #.....restore original file
         os.system('cp '+dir+'/'+parfile+' '+dir+'/'+parfile+'.current')
         os.system('cp '+dir+'/'+parfile+'.tmp'+' '+dir+'/'+parfile)
-        #.....gather pmd results
-        ergs,frcs=gather_pmd_data(dir)
+        #.....gather smd results
+        ergs,frcs=gather_smd_data(dir)
     elif potential in ('linreg'):
         #.....calc ergs and frcs from bases data and x (variables)
         read_bases(dir)
         ergs,frcs=calc_ef_from_bases(x,*args)
     elif potential in ('NN1'):
-        #.....forces must be computed from pmd results !!!
-        ergs,frcs=NN1.calc_ef_from_pmd(x,*args)
+        #.....now it is possible to compute only from bases
+        ergs,frcs= NN1.calc_ef_from_bases(x,*args)
 
     #.....calc function value of L
     val= eval_L(ergs,frcs,ergrefs,frcrefs,samples)
@@ -440,9 +475,9 @@ def func(x,*args):
     #.....if L value is minimum ever, store this parameter file
     if val < _valmin:
         _valmin= val
-        if potential in ('linreg'):
+        if potential in ('linreg','NN1'):
             write_params(dir+'/'+parfile+'.min',x)
-        else:            
+        else:
             os.system('cp '+dir+'/'+parfile+'.current' \
                           +' '+dir+'/'+parfile+'.min')
         
@@ -1029,7 +1064,7 @@ if __name__ == '__main__':
         read_bases(maindir)
         if regularize:
             vars= scale_vars(vars,bmax)
-    elif potential in ('NN1'):
+    elif potential in ('NN1') and not fmethod in ('test','TEST'):
         NN1.init(maindir,params,sample_dirs,samples,nprcs,fmatch \
                  ,ergrefs,frcrefs,fmethod,parfile,runmode,rcut,pranges \
                  ,vranges)
@@ -1042,6 +1077,11 @@ if __name__ == '__main__':
         ergs,frcs= NN1.calc_ef_from_bases(vars)
     else:
         ergs,frcs= gather_pmd_data(maindir)
+
+    if fmethod in ('test','TEST') and potential in ('NN1'):
+        NN1.init(maindir,params,sample_dirs,samples,nprcs,fmatch \
+                     ,ergrefs,frcrefs,fmethod,parfile,runmode \
+                     ,rcut,pranges,vranges)
 
     output_energy_relation(ergs,ergrefs,samples,sample_dirs,fname='out.erg.pmd-vs-dft.ini')
     output_force_relation(frcs,frcrefs,samples,sample_dirs,fname='out.frc.pmd-vs-dft.ini')
@@ -1151,7 +1191,7 @@ if __name__ == '__main__':
     if potential in ('linreg'):
         ergs,frcs= calc_ef_from_bases(solution,maindir)
     elif potential in ('NN1'):
-        ergs,frcs= NN1.calc_ef_from_pmd(solution,maindir)
+        ergs,frcs= NN1.calc_ef_from_bases(solution)
     else:
         ergs,frcs= gather_pmd_data(maindir)
     output_energy_relation(ergs,ergrefs,samples,sample_dirs,fname='out.erg.pmd-vs-dft.fin')
