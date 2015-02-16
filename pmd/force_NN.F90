@@ -1,6 +1,6 @@
-module NN1
+module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-02-16 16:20:37 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-02-16 16:26:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -52,7 +52,7 @@ contains
     logical,save:: l1st=.true.
 
     if( l1st ) then
-!.....read in.params.NN1
+!.....read in.params.NN
       call read_params(myid,mpi_world,rcin)
 !.....reset rc
       if( myid.le.0 ) then
@@ -77,7 +77,7 @@ contains
          ,lspr,gsf,dgsf,rc)
 
 #ifdef __FITPOT__
-    open(80,file='out.NN1.gsf',status='replace')
+    open(80,file='out.NN.gsf',status='replace')
     write(80,'(2i10)') nhl(0)
     do ia=1,natm
       do ihl0=1,nhl(0)
@@ -485,13 +485,13 @@ contains
       if( myid.ge.0 ) then
         if( myid.eq.0 ) then
           write(6,'(a)') ' [Error] '//ccfname//' does not exist !!!.'
-          write(6,'(a)') '   The NN1 potential needs '//ccfname//'.'
+          write(6,'(a)') '   The NN potential needs '//ccfname//'.'
         endif
         call mpi_finalize(ierr)
         stop
       else
         write(6,'(a)') ' [Error] '//ccfname//' does not exist !!!.'
-        write(6,'(a)') '   The NN1 potential needs '//ccfname//'.'
+        write(6,'(a)') '   The NN potential needs '//ccfname//'.'
         stop
       endif
     endif
@@ -555,13 +555,13 @@ contains
       if( myid.ge.0 ) then
         if( myid.eq.0 ) then
           write(6,'(a)') ' [Error] '//cpfname//' does not exist !!!.'
-          write(6,'(a)') '   The NN1 potential needs '//cpfname//'.'
+          write(6,'(a)') '   The NN potential needs '//cpfname//'.'
         endif
         call mpi_finalize(ierr)
         stop
       else
         write(6,'(a)') ' [Error] '//cpfname//' does not exist !!!.'
-        write(6,'(a)') '   The NN1 potential needs '//cpfname//'.'
+        write(6,'(a)') '   The NN potential needs '//cpfname//'.'
         stop
       endif
     endif
@@ -611,20 +611,20 @@ contains
     endif
     close(50)
 
-!.....read in.comb.NN1
+!.....read in.comb.NN
     allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
     inquire(file=trim(cmbfname),exist=lexist)
     if( nsp.ne.1 .and. .not.lexist ) then
       if( myid.ge.0 ) then
         if( myid.eq.0 ) then
           write(6,'(a)') ' [Error] '//cmbfname//' does not exist !!!.'
-          write(6,'(a)') '   The NN1 potential needs '//cmbfname//'.'
+          write(6,'(a)') '   The NN potential needs '//cmbfname//'.'
         endif
         call mpi_finalize(ierr)
         stop
       else
         write(6,'(a)') ' [Error] '//cmbfname//' does not exist !!!.'
-        write(6,'(a)') '   The NN1 potential needs '//cmbfname//'.'
+        write(6,'(a)') '   The NN potential needs '//cmbfname//'.'
         stop
       endif
     elseif( nsp.ne.1 ) then
@@ -703,7 +703,7 @@ contains
       enddo
     enddo
 !.....write
-    open(ionum,file='out.NN1.dgsf',status='replace')
+    open(ionum,file='out.NN.dgsf',status='replace')
     do ia=1,natm
       do isf=1,nsf
         do jra=1,natm
@@ -765,7 +765,7 @@ contains
 
     deallocate(dbuf,dbufr)
   end subroutine copy_dba_fwd
-end module NN1
+end module NN
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"

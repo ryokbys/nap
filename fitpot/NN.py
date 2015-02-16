@@ -1,6 +1,6 @@
-#  Time-stamp: <2015-02-14 01:28:55 Ryo KOBAYASHI>
+#  Time-stamp: <2015-02-16 16:27:23 Ryo KOBAYASHI>
 """
-Routines related to neural network with one hidden layer.
+Routines related to neural network.
 """
 
 import math,time,os
@@ -33,7 +33,7 @@ _nprcs= 1
 _ergrefs= []
 _frcrefs= []
 _fmethod= 'test'
-_parfile= 'in.params.NN1'
+_parfile= 'in.params.NN'
 _runmode= 'serial'
 _rcut  = 5.0
 _params= []
@@ -42,9 +42,9 @@ _pranges= []
 #============================================================ routines
 def init(*args,**kwargs):
     """
-    Initialize variables for the calculation of NN1 parameters.
+    Initialize variables for the calculation of NN parameters.
     This should be called at the first place
-    before any other NN1-related routines.
+    before any other NN-related routines.
     """
 
     global _nsf,_nhl1,_wgt1,_wgt2,_gsf,_dgsf,_hl1,_aml,_bml
@@ -67,8 +67,8 @@ def init(*args,**kwargs):
     _pranges = args[12]
     _vranges = args[13]
 
-    #.....read NN1 parameters
-    f= open(_basedir+'/'+'in.const.NN1')
+    #.....read NN parameters
+    f= open(_basedir+'/'+'in.const.NN')
     data= f.readline().split()
     _nsfc= int(data[0])
     _nhl1= int(data[1])
@@ -419,7 +419,7 @@ def grad(x,*args):
             for iprm in range(len(x)):
                 grad[iprm] += gs[iprm]
 
-    print ' ===> time NN1.grad: {0:12.3f} sec'.format(time.time()-t0)
+    print ' ===> time NN.grad: {0:12.3f} sec'.format(time.time()-t0)
     #print ' grad=',grad
     return grad
 
@@ -622,10 +622,10 @@ def gather_basis(*args):
     for i in range(len(_sample_dirs)):
         dir= _sample_dirs[i]
         smpl= _samples[i]
-        f1= open(_basedir+'/'+dir+'/pmd/out.NN1.gsf','r')
-        f2= open(_basedir+'/'+dir+'/pmd/out.NN1.hl1','r')
-        f3= open(_basedir+'/'+dir+'/pmd/out.NN1.aml','r')
-        f4= open(_basedir+'/'+dir+'/pmd/out.NN1.bml','r')
+        f1= open(_basedir+'/'+dir+'/pmd/out.NN.gsf','r')
+        f2= open(_basedir+'/'+dir+'/pmd/out.NN.hl1','r')
+        f3= open(_basedir+'/'+dir+'/pmd/out.NN.aml','r')
+        f4= open(_basedir+'/'+dir+'/pmd/out.NN.bml','r')
         #.....skip 1st line
         data1= f1.readline().split()
         data2= f2.readline().split()
@@ -680,8 +680,8 @@ def gather_bases_new(*args):
     for i in range(len(_sample_dirs)):
         dir= _sample_dirs[i]
         smpl= _samples[i]
-        f1= open(_basedir+'/'+dir+'/smd/out.NN1.gsf','r')
-        f2= open(_basedir+'/'+dir+'/smd/out.NN1.dgsf','r')
+        f1= open(_basedir+'/'+dir+'/smd/out.NN.gsf','r')
+        f2= open(_basedir+'/'+dir+'/smd/out.NN.dgsf','r')
         #.....skip 1st line
         data1= f1.readline().split()
         #data2= f2.readline().split()

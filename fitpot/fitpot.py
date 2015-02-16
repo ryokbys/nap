@@ -17,7 +17,7 @@ import multiprocessing as mp
 
 #.....import from local modules
 from MD_system import MD_system
-import NN1
+import NN
 from pga import GA
 
 #.....constants
@@ -414,7 +414,7 @@ def func(x,*args):
 
 #    if fmethod in ('test','TEST') or \
     if fmethod in ('test','TEST','check_grad') or \
-            not potential in ('linreg','NN1','NN2'):
+            not potential in ('linreg','NN'):
         #.....store original file
         os.system('cp '+dir+'/'+parfile+' '+dir+'/'+parfile+'.tmp')
         write_params(dir+'/'+parfile,x)
@@ -438,9 +438,9 @@ def func(x,*args):
         #.....calc ergs and frcs from bases data and x (variables)
         read_bases(dir)
         ergs,frcs=calc_ef_from_bases(x,*args)
-    elif potential in ('NN1'):
+    elif potential in ('NN'):
         #.....now it is possible to compute only from bases
-        ergs,frcs= NN1.calc_ef_from_bases(x,*args)
+        ergs,frcs= NN.calc_ef_from_bases(x,*args)
 
     #.....calc function value of L
     val= eval_L(ergs,frcs,ergrefs,frcrefs,samples)
@@ -475,7 +475,7 @@ def func(x,*args):
     #.....if L value is minimum ever, store this parameter file
     if val < _valmin:
         _valmin= val
-        if potential in ('linreg','NN1'):
+        if potential in ('linreg','NN'):
             write_params(dir+'/'+parfile+'.min',x)
         else:
             os.system('cp '+dir+'/'+parfile+'.current' \
@@ -789,136 +789,6 @@ def regularize_bases_linreg(bases):
     
     
 
-#========================================================== NN2
-def grad_NN2(x,*args):
-    dir= args[0]
-    #.....read num of symmetry functions and nodes
-    nsf,nhl1,nhl2,wgt1,wgt2,wgt3= read_NN2(dir)
-    #.....check
-    if len(params) != (nsf+1)*nhl1 +(nhl1+1)*nhl2 +(nhl2+1):
-        print ' [Error] len(params) != (nsf+1)*nhl1 +(nhl1+1)*nhl2 +(nhl2+1)'
-        print '   len(params) = ',len(params)
-        print '   nsf         = ',nsf
-        print '   nhl1        = ',nhl1
-        print '   nhl2        = ',nhl2
-        print '   nparams     = ',(nsf+1)*nhl1 +(nhl1+1)*nhl2 +(nhl2+1)
-        exit()
-    #.....gather basis data
-    gsf,hl1,hl2= gather_basis_NN2(dir)
-    #.....gather pmd results
-    ergs,frcs= gather_pmd_data(dir)
-
-    grad= np.zeros(len(params))
-    iprm= 0
-    for isf in range(nsf+1):
-        for ihl1 in range(1,nhl1+1):
-            for ismpl in range(len(samples)):
-                smpl= samples[ismpl]
-                ediff= ergs[ismpl] -ergrefs[ismpl]
-                tmp= 0.0
-                gsfs= gsf[ismpl]
-                hl1s= hl1[ismpl]
-                hl2s= hl2[ismpl]
-                for ia in range(smpl.natm):
-                    hl1i= hl1s[ia,ihl1]
-                    tmp2= hl1i*(1.0-hl1i) *gsfs[ia,isf]
-                    for ihl2 in range(1,nhl2+1):
-                        hl2i= hl2s[ia,ihl2]
-                        tmp += wgt3[ihl2] *hl2i *(1.0-hl2i) \
-                            *wgt2[ihl1,ihl2] *tmp2
-                grad[iprm] += 2.0*ediff*tmp
-            iprm += 1
-    for ihl1 in range(nhl1+1):
-        for ihl2 in range(1,nhl2+1):
-            for ismpl in range(len(samples)):
-                smpl= samples[ismpl]
-                ediff= ergs[ismpl] -ergrefs[ismpl]
-                tmp= 0.0
-                hl1s= hl1[ismpl]
-                hl2s= hl2[ismpl]
-                for ia in range(smpl.natm):
-                    hl1i= hl1s[ia,ihl1]
-                    hl2i= hl2s[ia,ihl2]
-                    tmp += wgt3[ihl2] *hl2i *(1.0-hl2i) *hl1i
-            #print 'ihl1,ismpl,ediff,tmp=',ihl1,ismpl,ediff,tmp
-                grad[iprm] += 2.0*ediff*tmp
-            iprm += 1
-    for ihl2 in range(nhl2+1):
-        for ismpl in range(len(samples)):
-            smpl= samples[ismpl]
-            ediff= ergs[ismpl] -ergrefs[ismpl]
-            tmp= 0.0
-            hl2s= hl2[ismpl]
-            for ia in range(smpl.natm):
-                hl2i= hl2s[ia,ihl2]
-                tmp += hl2i
-            grad[iprm] += 2.0*ediff*tmp
-        iprm += 1
-    #print grad
-    return grad
-
-def gather_basis_NN2(basedir):
-    gsf= []
-    hl1= []
-    hl2= []
-    #...read basis data
-    for i in range(len(sample_dirs)):
-        dir= sample_dirs[i]
-        smpl= samples[i]
-        f= open(basedir+'/'+dir+'/pmd/out.gsf','r')
-        g= open(basedir+'/'+dir+'/pmd/out.hl1','r')
-        h= open(basedir+'/'+dir+'/pmd/out.hl2','r')
-        #.....skip 1st line
-        dataf= f.readline().split()
-        datag= g.readline().split()
-        datah= h.readline().split()
-        gsfs= np.zeros((smpl.natm,nsf+1))
-        hl1s= np.zeros((smpl.natm,nhl1+1))
-        hl2s= np.zeros((smpl.natm,nhl2+1))
-        for ia in range(smpl.natm):
-            for isf in range(nsf+1):
-                dataf= f.readline().split()
-                gsfs[ia,isf]= float(dataf[2])
-        for ia in range(smpl.natm):
-            for ihl1 in range(nhl1+1):
-                datag= g.readline().split()
-                hl1s[ia,ihl1]= float(datag[2])
-        for ia in range(smpl.natm):
-            for ihl2 in range(nhl2+1):
-                datah= h.readline().split()
-                hl2s[ia,ihl2]= float(datah[2])
-        gsf.append(gsfs)
-        hl1.append(hl1s)
-        hl2.append(hl2s)
-    return gsf,hl1,hl2
-
-def read_NN2(basedir):
-    f= open(basedir+'/'+'in.const.NN2')
-    g= open(basedir+'/'+'in.params.NN2')
-    data= f.readline().split()
-    nsf=  int(data[0])
-    nhl1= int(data[1])
-    nhl2= int(data[2])
-    data= g.readline().split()
-    wgt1= np.zeros((nsf+1,nhl1))
-    wgt2= np.zeros((nhl1+1,nhl2+1))
-    wgt3= np.zeros(nhl2+1)
-    for isf in range(nsf+1):
-        for ihl1 in range(nhl1):
-            data= g.readline().split()
-            wgt1[isf,ihl1]= float(data[0])
-    for ihl1 in range(nhl1+1):
-        for ihl2 in range(1,nhl2+1):
-            data= g.readline().split()
-            wgt2[ihl1,ihl2]= float(data[0])
-    for ihl2 in range(nhl2+1):
-        data= g.readline().split()
-        wgt3[ihl2]= float(data[0])
-    f.close()
-    g.close()
-    return nsf,nhl1,nhl2,wgt1,wgt2,wgt3
-
-#========================================================== output data
 def output_energy_relation(es,erefs,samples,sdirs, \
                                fname='out.erg.pmd-vs-dft'):
     f= open(fname,'w')
@@ -1064,24 +934,24 @@ if __name__ == '__main__':
         read_bases(maindir)
         if regularize:
             vars= scale_vars(vars,bmax)
-    elif potential in ('NN1') and not fmethod in ('test','TEST'):
-        NN1.init(maindir,params,sample_dirs,samples,nprcs,fmatch \
-                 ,ergrefs,frcrefs,fmethod,parfile,runmode,rcut,pranges \
-                 ,vranges)
+    elif potential in ('NN') and not fmethod in ('test','TEST'):
+        NN.init(maindir,params,sample_dirs,samples,nprcs,fmatch \
+                ,ergrefs,frcrefs,fmethod,parfile,runmode,rcut,pranges \
+                ,vranges)
 
     #.....1st call of func
     func(vars,maindir)
     if potential in ('linreg') and not fmethod in ('test','TEST'):
         ergs,frcs= calc_ef_from_bases(vars,maindir)
-    elif potential in ('NN1') and not fmethod in ('test','TEST'):
-        ergs,frcs= NN1.calc_ef_from_bases(vars)
+    elif potential in ('NN') and not fmethod in ('test','TEST'):
+        ergs,frcs= NN.calc_ef_from_bases(vars)
     else:
         ergs,frcs= gather_pmd_data(maindir)
 
-    if fmethod in ('test','TEST') and potential in ('NN1'):
-        NN1.init(maindir,params,sample_dirs,samples,nprcs,fmatch \
-                     ,ergrefs,frcrefs,fmethod,parfile,runmode \
-                     ,rcut,pranges,vranges)
+    if fmethod in ('test','TEST') and potential in ('NN'):
+        NN.init(maindir,params,sample_dirs,samples,nprcs,fmatch \
+                ,ergrefs,frcrefs,fmethod,parfile,runmode \
+                ,rcut,pranges,vranges)
 
     output_energy_relation(ergs,ergrefs,samples,sample_dirs,fname='out.erg.pmd-vs-dft.ini')
     output_force_relation(frcs,frcrefs,samples,sample_dirs,fname='out.frc.pmd-vs-dft.ini')
@@ -1098,16 +968,11 @@ if __name__ == '__main__':
                                       ,fprime=grad_linreg
                                       ,maxiter=niter,disp=True
                                       ,gtol=gtol)
-            elif potential in ('NN1'):
+            elif potential in ('NN'):
                 solution= opt.fmin_cg(func,vars \
                                       ,args=(maindir,) \
-                                      ,fprime=NN1.grad \
+                                      ,fprime=NN.grad \
                                       ,maxiter=niter,disp=True \
-                                      ,gtol=gtol)
-            elif potential in ('NN2'):
-                solution= opt.fmin_cg(func,vars,args=(maindir,)
-                                      ,fprime=grad_NN2
-                                      ,maxiter=niter,disp=True
                                       ,gtol=gtol)
         print ' CG solution:',solution
 
@@ -1123,15 +988,10 @@ if __name__ == '__main__':
                                         ,fprime=grad_linreg
                                         ,maxiter=niter,disp=True
                                         ,gtol=gtol)
-            elif potential in ('NN1'):
+            elif potential in ('NN'):
                 solution= opt.fmin_bfgs(func,vars \
                                         ,args=(maindir,)
-                                        ,fprime=NN1.grad
-                                        ,maxiter=niter,disp=True
-                                        ,gtol=gtol)
-            elif potential in ('NN2'):
-                solution= opt.fmin_bfgs(func,vars,args=(maindir,)
-                                        ,fprime=grad_NN2
+                                        ,fprime=NN.grad
                                         ,maxiter=niter,disp=True
                                         ,gtol=gtol)
 
@@ -1159,10 +1019,8 @@ if __name__ == '__main__':
         else:
             if potential == 'linreg':
                 grad= grad_linreg(vars,maindir)
-            elif potential == 'NN1':
-                grad= NN1.grad(vars,maindir,)
-            elif potential == 'NN2':
-                grad= grad_NN2(vars,maindir)
+            elif potential == 'NN':
+                grad= NN.grad(vars,maindir,)
             agrad= opt.approx_fprime(vars,func,eps,maindir)
             print ''
             print '>>>>> check_grad report:'
@@ -1179,10 +1037,8 @@ if __name__ == '__main__':
         if gradient != 'numerical':
             if potential in ('linreg'):
                 grad_linreg(vars,maindir)
-            elif potential in ('NN1'):
-                NN1.grad(vars,maindir)
-            elif potential in ('NN2'):
-                grad_NN2(vars,maindir)
+            elif potential in ('NN'):
+                NN.grad(vars,maindir)
         solution= vars
 
     if not fmethod in ('test','TEST','check_grad'):
@@ -1190,8 +1046,8 @@ if __name__ == '__main__':
 
     if potential in ('linreg'):
         ergs,frcs= calc_ef_from_bases(solution,maindir)
-    elif potential in ('NN1'):
-        ergs,frcs= NN1.calc_ef_from_bases(solution)
+    elif potential in ('NN'):
+        ergs,frcs= NN.calc_ef_from_bases(solution)
     else:
         ergs,frcs= gather_pmd_data(maindir)
     output_energy_relation(ergs,ergrefs,samples,sample_dirs,fname='out.erg.pmd-vs-dft.fin')
