@@ -1,6 +1,6 @@
       program small_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2015-02-12 10:44:04 Ryo KOBAYASHI>
+c                        Time-stamp: <2015-02-16 16:02:10 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics program for systems small enough not to use 
 c  cell-list method and parallelization.

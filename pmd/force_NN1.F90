@@ -1,19 +1,21 @@
 module NN1
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-02-14 11:25:52 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-02-16 16:20:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
 !-----------------------------------------------------------------------
 !.....parameter file name
-  character(128),parameter:: cpfname= 'in.params.NN1'
-  character(128),parameter:: ccfname='in.const.NN1'
-  character(128),parameter:: cmbfname='in.comb.NN1'
+  character(128),parameter:: cpfname= 'in.params.NN'
+  character(128),parameter:: ccfname='in.const.NN'
+  character(128),parameter:: cmbfname='in.comb.NN'
 !.....parameters
   integer:: nwgt1,nwgt2
-  real(8),allocatable:: wgt1(:,:),wgt2(:)
+  real(8),allocatable:: wgt11(:,:),wgt12(:)
+  real(8),allocatable:: wgt21(:,:),wgt22(:,:),wgt23(:)
 !.....constants
-  integer:: nsfc,nsf,nhl1,nsp
+  integer,parameter:: nlmax= 2
+  integer:: nsfc,nsp,nl,nhl(0:nlmax+1)
   integer,allocatable:: itype(:)
   real(8),allocatable:: cnst(:,:)
   integer,allocatable:: icmb2(:,:),icmb3(:,:,:)
@@ -26,7 +28,7 @@ module NN1
   integer:: max_nexp
   
 contains
-  subroutine force_NN1(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,acon,avol)
     implicit none
@@ -42,9 +44,9 @@ contains
 
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ja,nexp,isf &
-         ,icoeff,ihl1,jj,jsf
-    real(8):: rcin,b_na,at(3),epotl,wgt,hl1i,tmp2,tmp,tmp3(3)
-    real(8),save,allocatable:: gsf(:,:),dgsf(:,:,:,:),hl1(:,:)
+         ,icoeff,ihl0,ihl1,ihl2,jj,jsf
+    real(8):: rcin,b_na,at(3),epotl,wgt,hl1i,hl2i,tmp2,tmp1,tmp,tmp3(3)
+    real(8),save,allocatable:: gsf(:,:),dgsf(:,:,:,:),hl1(:,:),hl2(:,:)
     real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
 !.....1st call
     logical,save:: l1st=.true.
@@ -59,152 +61,142 @@ contains
              ,rc,' to ',rcin
       endif
       rc= rcin
-      allocate(gsf(nsf,namax),dgsf(3,nsf,0:nnmax,namax) &
-           ,hl1(nhl1,namax))
+      allocate( gsf(nhl(0),namax),dgsf(3,nhl(0),0:nnmax,namax) )
+      if( nl.eq.1 ) then
+        allocate( hl1(nhl(1),namax) )
+      else if( nl.eq.2 ) then
+        allocate( hl1(nhl(1),namax), hl2(nhl(2),namax) )
+      endif
 !      gsf(nsf,1:natm+nb)= 0d0
-      gsf(nsf,1:namax)= 0d0
+      gsf(nhl(0),1:namax)= 0d0
       l1st= .false.
     endif
 
 !.....first, calculate all the symmetry functions
-    call eval_sf_msp(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr,gsf,dgsf,rc)
+    call eval_sf_msp(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
+         ,lspr,gsf,dgsf,rc)
 
 #ifdef __FITPOT__
     open(80,file='out.NN1.gsf',status='replace')
-    write(80,'(2i10)') nsf
+    write(80,'(2i10)') nhl(0)
     do ia=1,natm
-      do isf=1,nsf
-        write(80,'(2i8,es23.14e3)') ia,isf,gsf(isf,ia)
+      do ihl0=1,nhl(0)
+        write(80,'(2i8,es23.14e3)') ia,ihl0,gsf(ihl0,ia)
       enddo
     enddo
     close(80)
-    call write_dgsf(84,natm,namax,nnmax,lspr,tag,nsf,dgsf)
-    open(81,file='out.NN1.hl1')
-    write(81,'(2i10)') nhl1
+    call write_dgsf(84,natm,namax,nnmax,lspr,tag,nhl(0),dgsf)
 #endif
 
 !.....2nd, calculate the node values by summing contributions from
 !.....  symmetry functions
-    hl1(1:nhl1,1:natm+nb)= 0d0
-    do ia=1,natm
-!      hl1(0,ia)= 1d0
-      do ihl1=1,nhl1
-        tmp= 0d0
-        do isf=1,nsf
-          tmp= tmp +wgt1(ihl1,isf) *gsf(isf,ia)
+    if( nl.eq.1 ) then
+      hl1(1:nhl(1),1:natm+nb)= 0d0
+      do ia=1,natm
+        do ihl1=1,nhl(1)
+          tmp= 0d0
+          do ihl0=1,nhl(0)
+            tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
+          enddo
+          hl1(ihl1,ia)= sigmoid(tmp)
         enddo
-        hl1(ihl1,ia)= sigmoid(tmp)
       enddo
-    enddo
+    else if( nl.eq.2 ) then
+      hl1(1:nhl(1),1:natm+nb)= 0d0
+      hl2(1:nhl(2),1:natm+nb)= 0d0
+      do ia=1,natm
+        do ihl1=1,nhl(1)
+          tmp= 0d0
+          do ihl0=1,nhl(0)
+            tmp= tmp +wgt21(ihl0,ihl1) *gsf(ihl0,ia)
+          enddo
+          hl1(ihl1,ia)= sigmoid(tmp)
+        enddo
+        do ihl2=1,nhl(2)
+          tmp= 0d0
+          do ihl1=1,nhl(1)
+            tmp= tmp +wgt22(ihl1,ihl2) *(hl1(ihl1,ia)-0.5d0)
+          enddo
+          hl2(ihl2,ia)= sigmoid(tmp)
+        enddo
+      enddo
 
-#ifdef __FITPOT__
-    do ia=1,natm
-      do ihl1=1,nhl1
-        write(81,'(2i8,es23.14e3)') ia,ihl1,hl1(ihl1,ia)
-      enddo
-    enddo
-#endif
+    endif
 
 !.....then calculate the energy of atom by summing up the node values
     epotl= 0d0
-    do ia=1,natm
-      epi(ia)= 0d0
-      do ihl1=1,nhl1
-        hl1i= hl1(ihl1,ia)
-        epi(ia)= epi(ia) +wgt2(ihl1)*(hl1i-0.5d0)
-      enddo
+    if( nl.eq.1 ) then
+      do ia=1,natm
+        epi(ia)= 0d0
+        do ihl1=1,nhl(1)
+          epi(ia)= epi(ia) +wgt12(ihl1) *(hl1(ihl1,ia)-0.5d0)
+        enddo
 !      write(6,*) ' ia,is,epi =',ia,int(tag(ia)),epi(ia)
-      epotl=epotl +epi(ia)
+        epotl=epotl +epi(ia)
 #ifdef __3BODY__
-      write(6,'(a,i8,es22.14)') ' 3-body term:',ia,epi(ia)
+        write(6,'(a,i8,es22.14)') ' 3-body term:',ia,epi(ia)
 #endif
-    enddo
+      enddo
+    else if( nl.eq.2 ) then
+      do ia=1,natm
+        epi(ia)= 0d0
+        do ihl2=1,nhl(2)
+          epi(ia)= epi(ia) +wgt23(ihl2) *(hl2(ihl2,ia)-0.5d0)
+        enddo
+        epotl=epotl +epi(ia)
+#ifdef __3BODY__
+        write(6,'(a,i8,es22.14)') ' 3-body term:',ia,epi(ia)
+#endif
+      enddo
+    endif
 
 !.....sum up for forces
     strs(1:3,1:3,1:natm)= 0d0
     aa(1:3,1:natm+nb)= 0d0
-    do ia=1,natm
-      do ihl1=1,nhl1 ! there is no longer a bias node, 0
-        hl1i= hl1(ihl1,ia)
-        tmp= wgt2(ihl1)*hl1i*(1d0-hl1i)
-        do jj=1,lspr(0,ia)
-          ja= lspr(jj,ia)
-          do isf=1,nsf ! there is no longer a bias node, 0
-            aa(1:3,ja)=aa(1:3,ja) &
-                 -tmp*wgt1(ihl1,isf)*dgsf(1:3,isf,jj,ia)
-          enddo
-        enddo
-        !.....atom ia
-        do isf= 1,nsf
-          aa(1:3,ia)=aa(1:3,ia) &
-               -tmp*wgt1(ihl1,isf)*dgsf(1:3,isf,0,ia)
-        enddo
-      enddo
-    enddo
-
-#ifdef __FITPOT__
-    close(81)
-    allocate( aml(3,nsf,nhl1,natm+nb),bml(3,nsf,nhl1,natm+nb) )
-!.....make lumps of terms
-    aml(1:3,1:nsf,1:nhl1,1:natm+nb)= 0d0
-    bml(1:3,1:nsf,1:nhl1,1:natm+nb)= 0d0
-    do ia=1,natm
-      do jj=0,lspr(0,ia)
-        if( jj.eq.0 ) then
-          ja= ia
-        else
-          ja= lspr(jj,ia)
-        endif
-        do ihl1=1,nhl1 ! no need of a bias node, 0
+    if( nl.eq.1 ) then
+      do ia=1,natm
+        do ihl1=1,nhl(1)
           hl1i= hl1(ihl1,ia)
-          tmp= hl1i*(1d0-hl1i)
-          tmp2= hl1i*(1d0-hl1i)*(1d0-2d0*hl1i)
-          do isf=1,nsf
-            aml(1:3,isf,ihl1,ja)= aml(1:3,isf,ihl1,ja) &
-                 +tmp*dgsf(1:3,isf,jj,ia)
-            tmp3(1:3)= 0d0
-            do jsf=1,nsf ! no need of a bias node, 0
-              tmp3(1:3)= tmp3(1:3) +dgsf(1:3,jsf,jj,ia)*wgt1(ihl1,jsf)
+          tmp= wgt12(ihl1)*hl1i*(1d0-hl1i)
+          do jj=1,lspr(0,ia)
+            ja= lspr(jj,ia)
+            do ihl0=1,nhl(0)
+              aa(1:3,ja)=aa(1:3,ja) &
+                   -tmp*wgt11(ihl0,ihl1)*dgsf(1:3,ihl0,jj,ia)
             enddo
-            bml(1:3,isf,ihl1,ja)= bml(1:3,isf,ihl1,ja) &
-                 +tmp2*gsf(isf,ia)*tmp3(1:3)
+          enddo
+          !.....atom ia
+          do ihl0= 1,nhl(0)
+            aa(1:3,ia)=aa(1:3,ia) &
+                 -tmp*wgt11(ihl0,ihl1)*dgsf(1:3,ihl0,0,ia)
           enddo
         enddo
       enddo
-    enddo
-    if( myid.ge.0 ) then
-!.....copy back Ms of buffer atoms
-      call copy_dba_bk(tcom,natm+nb,natm,nbmax,nb,lsb,lsrc,myparity &
-           ,nn,mpi_world,aml,3*nsf*nhl1)
-      call copy_dba_bk(tcom,natm+nb,natm,nbmax,nb,lsb,lsrc,myparity &
-           ,nn,mpi_world,bml,3*nsf*nhl1)
+    else if( nl.eq.2 ) then
+      do ia=1,natm
+        do ihl2=1,nhl(2)
+          hl2i= hl2(ihl2,ia)
+          tmp2= wgt23(ihl2) *hl2i*(1d0-hl2i)
+          do ihl1=1,nhl(1)
+            hl1i= hl1(ihl1,ia)
+            tmp1= wgt22(ihl1,ihl2) *hl1i*(1d0-hl1i)
+            do jj=1,lspr(0,ia)
+              ja= lspr(jj,ia)
+              do ihl0=1,nhl(0)
+                aa(1:3,ja)=aa(1:3,ja) &
+                     -tmp2 *tmp1 &
+                     *wgt21(ihl0,ihl1)*dgsf(1:3,ihl0,jj,ia)
+              enddo
+            enddo
+!.....atom ia
+            do ihl0= 1,nhl(0)
+              aa(1:3,ia)=aa(1:3,ia) &
+                   -tmp2*tmp1*wgt21(ihl0,ihl1)*dgsf(1:3,ihl0,0,ia)
+            enddo
+          enddo
+        enddo
+      enddo
     endif
-!.....write aml
-    open(82,file='out.NN1.aml')
-    write(82,'(3i10)') natm, nsf, nhl1
-    do ia=1,natm
-      do ihl1=1,nhl1
-        do isf=1,nsf
-          write(82,'(i6,2i4,3es23.14e3)') ia,ihl1,isf &
-               ,aml(1:3,isf,ihl1,ia)
-        enddo
-      enddo
-    enddo
-    close(82)
-!.....write bml
-    open(83,file='out.NN1.bml')
-    write(83,'(3i10)') natm, nsf, nhl1
-    do ia=1,natm
-      do ihl1=1,nhl1
-        do isf=1,nsf
-          write(83,'(i6,2i4,3es23.14e3)') ia,ihl1,isf &
-               ,bml(1:3,isf,ihl1,ia)
-        enddo
-      enddo
-    enddo
-    close(83)
-    deallocate(aml,bml)
-#endif
 
     if( myid.ge.0 ) then
       call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
@@ -216,7 +208,6 @@ contains
     do i=1,natm
       at(1:3)= aa(1:3,i)
       aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-!      write(6,*) ' i,aa(1:3)=',i,aa(1:3,i)
     enddo
 !-----multiply 0.5d0*dt**2/am(i)
     do i=1,natm
@@ -233,7 +224,7 @@ contains
       epot= epotl
     endif
     return
-  end subroutine force_NN1
+  end subroutine force_NN
 !=======================================================================
   subroutine eval_sf(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr,gsf,dgsf,rc)
 !
@@ -483,7 +474,9 @@ contains
 
     integer,intent(in):: myid,mpi_world
     real(8),intent(out):: rcin
-    integer:: itmp,ierr,i,j,k,nc,ncoeff,isf,ihl1,m1,m2,n1,n2,is,js,ks,n
+    integer:: itmp,ierr,i,j,k,nc,ncoeff,m1,m2,n1,n2,is,js,ks&
+         ,n,ihl0,ihl1,ihl2
+    integer,allocatable:: nwgt(:)
     logical:: lexist
 
 !.....read constants at the 1st call
@@ -504,7 +497,24 @@ contains
     endif
     open(51,file=trim(ccfname),status='old')
 !.....num of symmetry functions, num of node in 1st hidden layer
-    read(51,*) nsfc,nhl1,nsp
+    read(51,*) nl,nsp,(nhl(i),i=0,nl)
+    print *,' nl,nsp,(nhl(i),i=0,nl)=',nl,nsp,(nhl(i),i=0,nl)
+    if( nl.gt.nlmax ) then
+      if( myid.ge.0 ) then
+        if( myid.eq.0 ) then
+          print *, '[Error] nl.gt.nlmax '
+          print *, '  nl,nlmax=',nl,nlmax
+        endif
+        call mpi_finalize(ierr)
+        stop
+      else
+        print *, '[Error] nl.gt.nlmax '
+        print *, '  nl,nlmax=',nl,nlmax
+        stop
+      endif
+    endif
+    nsfc= nhl(0)
+    nhl(nl+1)= 1
     allocate(itype(nsfc),cnst(max_ncnst,nsfc))
     n1= 0
     n2= 0
@@ -518,13 +528,25 @@ contains
 !.....calc number of weights
     m1= nsp +factorial(nsp,2)/2
     m2= nsp*m1
-    nsf= n1*m1 +n2*m2
-    nwgt1= nsf*nhl1
-    nwgt2= nhl1
-    if( myid.eq.0 ) then
-      write(6,'(a,4i6)') ' n1, m1, n2, m2          =',n1,m1,n2,m2
-      write(6,'(a,4i6)') ' nsf, nhl1, nwgt1, nwgt2 =', &
-           nsf,nhl1,nwgt1,nwgt2
+!!$    nsf= n1*m1 +n2*m2
+    nhl(0)= n1*m1 +n2*m2
+!!$    nwgt1= nsf*nhl1
+!!$    nwgt2= nhl1
+    allocate(nwgt(nl+1))
+    do i=1,nl+1
+      nwgt(i)= nhl(i-1)*nhl(i)
+!      print *,' i,nhl(i-1),nhl(i),nwgt(i)=',i,nhl(i-1),nhl(i),nwgt(i)
+    enddo
+    if( myid.le.0 ) then
+      print *, 'n1, m1, n2, m2 =',n1,m1,n2,m2
+      print *, 'nsfc           =',nsfc
+      print *, 'nsf            =',nhl(0)
+      do i=1,nl
+        print *, 'ihl, nhl(ihl)  =',i,nhl(i)
+      enddo
+      do i=1,nl+1
+        print *, 'ihl, nwgt(ihl)  =',i,nwgt(i)
+      enddo
     endif
 
 !.....read parameters at the 1st call
@@ -546,23 +568,47 @@ contains
     open(50,file=trim(cpfname),status='old')
     read(50,*) ncoeff,rcin
 !.....check whether the num of parameters is correct
-    nc= nwgt1 +nwgt2
+    
+    nc= 0
+    do i=1,nl+1
+      nc= nc +nwgt(i)
+    enddo
     if( ncoeff .ne. nc ) then
       write(6,'(a)') ' [Error] num of parameters is not correct !!!'
       write(6,'(a,i10)')  '   ncoeff=',ncoeff
-      write(6,'(a,2i10)') '   nsf,nhl1=',nsf,nhl1
       write(6,'(a,i10)')  '   ncoeff should be ',nc
       stop
     endif
-    allocate(wgt1(nhl1,nsf),wgt2(nhl1))
-    do isf=1,nsf
-      do ihl1=1,nhl1
-        read(50,*) wgt1(ihl1,isf)
+!.....different number of weights for different number of layers
+    if( nl.eq.1 ) then
+      allocate(wgt11(nhl(0),nhl(1)),wgt12(nhl(1)))
+    else if( nl.eq.2 ) then
+      allocate(wgt21(nhl(0),nhl(1)),wgt22(nhl(1),nhl(2)),wgt23(nhl(2)))
+    endif
+    if( nl.eq.1 ) then
+      do ihl0=1,nhl(0)
+        do ihl1=1,nhl(1)
+          read(50,*) wgt11(ihl0,ihl1)
+        enddo
       enddo
-    enddo
-    do ihl1=1,nhl1
-      read(50,*) wgt2(ihl1)
-    enddo
+      do ihl1=1,nhl(1)
+        read(50,*) wgt12(ihl1)
+      enddo
+    else if( nl.eq.2 ) then
+      do ihl0=1,nhl(0)
+        do ihl1=1,nhl(1)
+          read(50,*) wgt21(ihl0,ihl1)
+        enddo
+      enddo
+      do ihl1=1,nhl(1)
+        do ihl2=1,nhl(2)
+          read(50,*) wgt22(ihl1,ihl2)
+        enddo
+      enddo
+      do ihl2=1,nhl(2)
+        read(50,*) wgt23(ihl2)
+      enddo
+    endif
     close(50)
 
 !.....read in.comb.NN1
@@ -609,6 +655,7 @@ contains
 !!$      enddo
     endif
 
+    deallocate(nwgt)
     return
   end subroutine read_params
 !=======================================================================
