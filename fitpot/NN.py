@@ -1,4 +1,4 @@
-#  Time-stamp: <2015-02-16 16:27:23 Ryo KOBAYASHI>
+#  Time-stamp: <2015-02-18 19:07:53 Ryo KOBAYASHI>
 """
 Routines related to neural network.
 """
@@ -15,9 +15,11 @@ _large= 1.0e+30
 
 #.....global variables
 _l1st= True
+_nl =  1
 _nsp=  1
 _nsf=  0
 _nhl1= 0
+_nhl2= 0
 _ergs= []
 _frcs= []
 _gsf= []
@@ -47,7 +49,7 @@ def init(*args,**kwargs):
     before any other NN-related routines.
     """
 
-    global _nsf,_nhl1,_wgt1,_wgt2,_gsf,_dgsf,_hl1,_aml,_bml
+    global _nl,_nsf,_nhl1,_nhl2,_gsf,_dgsf
     global _fmatch,_basedir,_samples,_sample_dirs,_nprcs
     global _ergrefs,_frcrefs,_fmethod,_parfile,_runmode,_rcut
     global _params,_pranges,_vranges
@@ -70,9 +72,12 @@ def init(*args,**kwargs):
     #.....read NN parameters
     f= open(_basedir+'/'+'in.const.NN')
     data= f.readline().split()
-    _nsfc= int(data[0])
-    _nhl1= int(data[1])
-    _nsp = int(data[2])
+    _nl  = int(data[0])
+    _nsp = int(data[1])
+    _nsfc= int(data[2])
+    _nhl1= int(data[3])
+    if _nl == 2:
+        _nhl2= int(data[4])
     n2= 0
     n3= 0
     for line in f.readlines():
@@ -81,7 +86,10 @@ def init(*args,**kwargs):
         elif int(line.split()[0]) == 2:
             n3 += 1
     f.close()
+    print ' Number of hidden layers             =',_nl
     print ' Number of nodes in hidden-layer-1   =',_nhl1
+    if _nl == 2:
+        print ' Number of nodes in hidden-layer-2   =',_nhl2
     print ' Number of species                   =',_nsp
     print ' Number of 2-body symmetry functions =',n2
     print ' Number of 3-body symmetry functions =',n3
@@ -91,12 +99,18 @@ def init(*args,**kwargs):
     ncmb3= _nsp *ncmb2
     _nsf= n2*ncmb2 +n3*ncmb3
     print ' Number of symmetry functions        =',_nsf
-    if len(_params) != _nsf*_nhl1 +_nhl1:
-        print ' [Error] len(params) != (nsf+1)*nhl1 +(nhl1+1)'
-        print '   len(params)          = ',len(_params)
-        print '   nsf                  = ',_nsf
-        print '   nhl1                 = ',_nhl1
-        print '   nsf*nhl1 +nhl1       = ',_nsf*_nhl1 +_nhl1
+    if _nl == 1:
+        nw= _nsf*_nhl1 +_nhl1
+    elif _nl == 2:
+        nw= _nsf*_nhl1 +_nhl1*_nhl2 +_nhl2
+    if len(_params) != nw:
+        print ' [Error] len(params) !=  nw'
+        print '   len(params)        = ',len(_params)
+        print '   nsf                = ',_nsf
+        print '   nhl1               = ',_nhl1
+        if _nl == 2:
+            print '   nhl2               = ',_nhl2
+        print '   nw                 = ',nw
         exit()
 
     #.....read bases
@@ -119,17 +133,35 @@ def sigmoid(x):
     return 1.0/(1.0 +math.exp(-x))
 
 def vars2wgts(x):
-    wgt1= np.zeros((_nsf+1,_nhl1+1))
-    wgt2= np.zeros(_nhl1+1)
-    ix= 0
-    for isf in range(1,_nsf+1):
+    if _nl == 1:
+        wgt1= np.zeros((_nhl1+1,_nsf+1))
+        wgt2= np.zeros(_nhl1+1)
+        ix= 0
+        for isf in range(1,_nsf+1):
+            for ihl1 in range(1,_nhl1+1):
+                wgt1[ihl1,isf]= x[ix]
+                ix += 1
         for ihl1 in range(1,_nhl1+1):
-            wgt1[isf,ihl1]= x[ix]
+            wgt2[ihl1]= x[ix]
             ix += 1
-    for ihl1 in range(1,_nhl1+1):
-        wgt2[ihl1]= x[ix]
-        ix += 1
-    return (wgt1,wgt2)
+        return (wgt1,wgt2)
+    elif _nl == 2:
+        wgt1= np.zeros((_nhl1+1,_isf+1))
+        wgt2= np.zeros((_nhl2+1,_nhl1+1))
+        wgt3= np.zeros(_nhl2+1)
+        ix= 0
+        for isf in range(1,_nsf+1):
+            for ihl1 in range(1,_nhl1+1):
+                wgt1[ihl1,isf]= x[ix]
+                ix += 1
+        for ihl1 in range(1,_nhl1+1):
+            for ihl2 in range(1,_nhl2+1):
+                wgt2[ihl2,ihl1]= x[ix]
+                ix += 1
+        for ihl2 in range(1,_nhl2+1):
+            wgt3[ihl2]= x[ix]
+            ix += 1
+        return (wgt1,wgt2,wgt3)
 
 def calc_ef_from_pmd(x,*args):
     dir= args[0]
@@ -252,19 +284,17 @@ def calc_ef_from_bases(x,*args):
     """
     Calculate energies and forces of every samples using bases data.
     """
-    global _hl1,_l1st,_gsf,_dgsf,_ergs,_frcs,_wgt1,_wgt2,_aml,_bml
+    global _hl1,_ergs,_frcs,_wgt1,_wgt2,_wgt3,_aml,_bml
 
     #.....initialize variables
-    _wgt1,_wgt2= vars2wgts(x)
+    if _nl == 1:
+        _wgt1,_wgt2= vars2wgts(x)
+    elif _nl == 2:
+        _wgt1,_wgt2,_wgt3= vars2wgts(x)
     es=np.zeros(len(_samples))
     fs= []
     for smpl in _samples:
         fs.append(np.zeros((smpl.natm,3)))
-
-    # #.....gather bases from file if this is 1st call
-    # if _l1st:
-    #     _gsf,_dgsf= gather_bases_new()
-    #     _l1st = False
 
     p= mp.Pool(_nprcs)
     _hl1= []
@@ -273,10 +303,16 @@ def calc_ef_from_bases(x,*args):
     if _nprcs == 1:
         for ismpl in range(len(_samples)):
             smpl= _samples[ismpl]
-            est,fst,hl1s,ams,bms= calc_ef2(ismpl,x,*args)
-            _hl1.append(hl1s)
-            _aml.append(ams)
-            _bml.append(bms)
+            if _nl == 1:
+                est,fst,hl1s,ams,bms= calc_ef1(ismpl,x,*args)
+                _hl1.append(hl1s)
+                _aml.append(ams)
+                _bml.append(bms)
+            elif _nl == 2:
+                est,fst,hl1s,ams,bms= calc_ef2(ismpl,x,*args)
+                _hl1.append(hl1s)
+                _aml.append(ams)
+                _bml.append(bms)
             es[ismpl]= est
             for ia in range(smpl.natm):
                 fs[ismpl][ia,0] += fst[ia,0]
@@ -284,17 +320,27 @@ def calc_ef_from_bases(x,*args):
                 fs[ismpl][ia,2] += fst[ia,2]
     else:
         func_args=[]
-        for ismpl in range(len(_samples)):
-            func_args.append( (calc_ef2,ismpl,x) )
+        if _nl == 1:
+            for ismpl in range(len(_samples)):
+                func_args.append( (calc_ef1,ismpl,x) )
+        elif _nl == 2:
+            for ismpl in range(len(_samples)):
+                func_args.append( (calc_ef2,ismpl,x) )
         results= p.map(arg_wrapper,func_args)
         p.close()
         p.join()
         for ismpl in range(len(_samples)):
             smpl= _samples[ismpl]
-            est,fst,hl1s,ams,bms= results[ismpl]
-            _hl1.append(hl1s)
-            _aml.append(ams)
-            _bml.append(bms)
+            if _nl == 1:
+                est,fst,hl1s,ams,bms= results[ismpl]
+                _hl1.append(hl1s)
+                _aml.append(ams)
+                _bml.append(bms)
+            elif _nl == 2:
+                est,fst,hl1s,ams,bms= results[ismpl]
+                _hl1.append(hl1s)
+                _aml.append(ams)
+                _bml.append(bms)
             es[ismpl]= est
             for ia in range(smpl.natm):
                 fs[ismpl][ia,0] += fst[ia,0]
@@ -327,7 +373,7 @@ def calc_ef(ismpl,x,*args):
         tmp= 0.0
         for ihl1 in range(1,_nhl1+1):
             for isf in range(1,_nsf+1):
-                hl1s[ihl1,ia]+= _wgt1[isf,ihl1] *gsfs[ia,isf]
+                hl1s[ihl1,ia]+= _wgt1[ihl1,isf] *gsfs[ia,isf]
             hl1s[ihl1,ia]= sigmoid(hl1s[ihl1,ia])
         for ihl1 in range(1,_nhl1+1):
             es += _wgt2[ihl1] *(hl1s[ihl1,ia]-0.5)
@@ -339,13 +385,15 @@ def calc_ef(ismpl,x,*args):
             for ja in range(smpl.natm):
                 dh=hl1s[ihl1,ja]*(1.0-hl1s[ihl1,ja])
                 for isf in range(1,_nsf+1):
-                    w1= _wgt1[isf,ihl1]
+                    w1= _wgt1[ihl1,isf]
                     for ia in range(smpl.natm):
                         fs[ia,:] -= w1*w2*dh*dgsfs[isf,ja,ia,:]
     return (es,fs,hl1s)
 
-def calc_ef2(ismpl,x,*args):
-    global _wgt1,_wgt2
+def calc_ef1(ismpl,x,*args):
+"""
+Calculate energy and forces of sample-i in the case of 1 hidden layers.
+"""
 
     smpl= _samples[ismpl]
     gsfs= _gsf[ismpl]
@@ -361,7 +409,7 @@ def calc_ef2(ismpl,x,*args):
         tmp= 0.0
         for ihl1 in range(1,_nhl1+1):
             for isf in range(1,_nsf+1):
-                hl1s[ihl1,ia]+= _wgt1[isf,ihl1] *gsfs[ia,isf]
+                hl1s[ihl1,ia]+= _wgt1[ihl1,isf] *gsfs[ia,isf]
             hl1s[ihl1,ia]= sigmoid(hl1s[ihl1,ia])
         for ihl1 in range(1,_nhl1+1):
             es += _wgt2[ihl1] *(hl1s[ihl1,ia]-0.5)
@@ -374,7 +422,53 @@ def calc_ef2(ismpl,x,*args):
         for ihl1 in range(1,_nhl1+1):
             w2= _wgt2[ihl1]
             for isf in range(1,_nsf+1):
-                w1= _wgt1[isf,ihl1]
+                w1= _wgt1[ihl1,isf]
+                for ja in range(smpl.natm):
+                    h= hl1s[ihl1,ja]
+                    dh= h*(1.0-h)
+                    ddhg= dh*(1.0-2.0*h)*gsfs[ja,isf]
+                    for ia in range(smpl.natm):
+                        fs[ia,:] -= w1*w2*dh*dgsfs[isf,ja,ia,:]
+                        ams[isf,ihl1,ia,:] += dh*dgsfs[isf,ja,ia,:]
+                        bms[isf,ihl1,ia,:] += ddhg*dgsfs[isf,ja,ia,:]
+    return (es,fs,hl1s,ams,bms)
+
+def calc_ef2(ismpl,x,*args):
+"""
+Calculate energy and forces of sample-i in the case of 2 hidden layers.
+"""
+    smpl= _samples[ismpl]
+    gsfs= _gsf[ismpl]
+    dgsfs= _dgsf[ismpl]
+    es= 0.0
+    fs= np.zeros((smpl.natm,3))
+    #.....energy
+    iprm= 0
+    #print ' ismpl=',ismpl
+    hl1s= np.zeros((_nhl1+1,smpl.natm))
+    for ia in range(smpl.natm):
+        #.....calc hidden-layer value using sigmoid function
+        tmp= 0.0
+        for ihl1 in range(1,_nhl1+1):
+            for isf in range(1,_nsf+1):
+                hl1s[ihl1,ia] += _wgt1[ihl1,isf] *gsfs[ia,isf]
+            hl1s[ihl1,ia]= sigmoid(hl1s[ihl1,ia])
+        for ihl2 in range(1,_nhl2+1):
+            for ihl1 in range(1,_nhl1+1):
+                hl2s[ihl2,ia] += _wgt2[ihl2,ihl1] *(hl1s[ihl1,ia]-0.5)
+            hl2s[ihl2,ia]= sigmoid(hl2s[ihl2,ia])
+        for ihl2 in range(1,_nhl2+1):
+            es += _wgt3[ihl2] *(hl2s[ihl2,ia]-0.5)
+
+    #.....forces
+    ams= np.zeros((_nsf+1,_nhl1+1,smpl.natm,3))
+    bms= np.zeros((_nsf+1,_nhl1+1,smpl.natm,3))
+    if _fmatch:
+        dg= np.zeros(3)
+        for ihl1 in range(1,_nhl1+1):
+            w2= _wgt2[ihl1]
+            for isf in range(1,_nsf+1):
+                w1= _wgt1[ihl1,isf]
                 for ja in range(smpl.natm):
                     h= hl1s[ihl1,ja]
                     dh= h*(1.0-h)
@@ -389,28 +483,26 @@ def grad(x,*args):
     
     t0= time.time()
     dir= args[0]
-    #.....get energies and forces
-    #ergs,frcs= calc_ef_from_bases(x,*args)
-    #ergs,frcs= calc_ef_from_pmd(x,*args)
-    #ergs,frcs= gather_pmd_data(dir)
-    # for ismpl in range(len(_samples)):
-    #     print ' ismpl,ergs,_ergrefs:',ismpl,ergs[ismpl],_ergrefs[ismpl]
-    
-    #_gsf,_hl1,_aml,_bml= gather_basis(*args)
-    #_wgt1,_wgt2= vars2wgts(x)
 
     p= mp.Pool(_nprcs)
     grad= np.zeros(len(x))
     
     if _nprcs == 1:
         for ismpl in range(len(_samples)):
-            gs= grad_core_new2(ismpl,x)
+            if _nl == 1:
+                gs= grad_core_new1(ismpl,x)
+            elif _nl == 2:
+                gs= grad_core_new2(ismpl,x)
             for iprm in range(len(x)):
                 grad[iprm] += gs[iprm]
     else:
         func_args=[]
-        for ismpl in range(len(_samples)):
-            func_args.append( (grad_core_new2,ismpl,x))
+        if _nl == 1:
+            for ismpl in range(len(_samples)):
+                func_args.append( (grad_core_new1,ismpl,x))
+        elif _nl == 2:
+            for ismpl in range(len(_samples)):
+                func_args.append( (grad_core_new2,ismpl,x))
         results= p.map(arg_wrapper,func_args)
         p.close()
         p.join()
@@ -477,7 +569,7 @@ def grad_core(ismpl,ergs,frcs,*args):
                 fdiff= frcs[ismpl][ia] -_frcrefs[ismpl][ia]
                 for isf in range(1,_nsf+1):
                     am= amls[ia,ihl1,isf]
-                    w1= _wgt1[isf,ihl1]
+                    w1= _wgt1[ihl1,isf]
                     tmp -= 2.0*w1*( fdiff[0]*am[0] \
                                     +fdiff[1]*am[1] \
                                     +fdiff[2]*am[2] ) /smpl.natm/3
@@ -527,7 +619,7 @@ def grad_core_new(ismpl,*args):
                 dh= h*(1.0-h)
                 ddh= h*(1.0-h)*(1.0-2.0*h)
                 for isf in range(1,_nsf+1):
-                    w1= _wgt1[isf,ihl1]
+                    w1= _wgt1[ihl1,isf]
                     ddhg= ddh*gsfs[ja,isf]
                     for ia in range(smpl.natm):
                         fdiff= (_frcs[ismpl][ia] -_frcrefs[ismpl][ia]) \
@@ -550,6 +642,64 @@ def grad_core_new(ismpl,*args):
                     tmp -= w2*( fdiff[0]*(cm[0]) \
                                     +fdiff[1]*(cm[1]) \
                                     +fdiff[2]*(cm[2]) )
+                iprm -= 1
+                dgs[iprm] += tmp
+    gs[:]= gs[:] +dgs[:]
+    return gs
+                    
+def grad_core_new1(ismpl,*args):
+    x      = args[0]
+
+    gs= np.zeros(len(x))
+    dgs=np.zeros(len(x))
+    smpl= _samples[ismpl]
+    ediff= (_ergs[ismpl] -_ergrefs[ismpl]) /smpl.natm
+    fdiff= (_frcs[ismpl][:,:] -_frcrefs[ismpl][:,:])*2/smpl.natm/3
+    gsfs= _gsf[ismpl]
+    dgsfs= _dgsf[ismpl]
+    hl1s= _hl1[ismpl]
+    iprm= _nsf*_nhl1 +_nhl1
+    for ihl1 in range(_nhl1,0,-1):
+        tmp= 0.0
+        for ia in range(smpl.natm):
+            tmp += (hl1s[ihl1,ia] -0.5)
+        iprm -= 1
+        gs[iprm] += 2.0*ediff*tmp
+    for isf in range(_nsf,0,-1):
+        for ihl1 in range(_nhl1,0,-1):
+            tmp= 0.0
+            for ia in range(smpl.natm):
+                h= hl1s[ihl1,ia]
+                tmp += _wgt2[ihl1] *h*(1.0-h) *gsfs[ia,isf]
+            iprm -= 1
+            gs[iprm] += 2.0*ediff*tmp 
+
+    if _fmatch:
+        # am= np.zeros((_nsf+1,_nhl1+1,smpl.natm,3))
+        # bm= np.zeros((_nsf+1,_nhl1+1,smpl.natm,3))
+        ams= _aml[ismpl]
+        bms= _bml[ismpl]
+        cm= np.zeros(3)
+        iprm= _nsf*_nhl1 +_nhl1
+        for ihl1 in range(_nhl1,0,-1):
+            tmp= 0.0
+            for isf in range(1,_nsf+1):
+                w1= _wgt1[ihl1,isf]
+                for ia in range(smpl.natm):
+                    tmp -= w1*( fdiff[ia,0]*ams[isf,ihl1,ia,0] \
+                                    +fdiff[ia,1]*ams[isf,ihl1,ia,1] \
+                                    +fdiff[ia,2]*ams[isf,ihl1,ia,2] )
+            iprm -= 1
+            dgs[iprm] += tmp
+        for isf in range(_nsf,0,-1):
+            for ihl1 in range(_nhl1,0,-1):
+                tmp= 0.0
+                w2= _wgt2[ihl1]
+                for ia in range(smpl.natm):
+                    cm[:]= ams[isf,ihl1,ia,:] +bms[isf,ihl1,ia,:]
+                    tmp -= w2*( fdiff[ia,0]*cm[0] \
+                                    +fdiff[ia,1]*cm[1] \
+                                    +fdiff[ia,2]*cm[2] )
                 iprm -= 1
                 dgs[iprm] += tmp
     gs[:]= gs[:] +dgs[:]
@@ -592,7 +742,7 @@ def grad_core_new2(ismpl,*args):
         for ihl1 in range(_nhl1,0,-1):
             tmp= 0.0
             for isf in range(1,_nsf+1):
-                w1= _wgt1[isf,ihl1]
+                w1= _wgt1[ihl1,isf]
                 for ia in range(smpl.natm):
                     tmp -= w1*( fdiff[ia,0]*ams[isf,ihl1,ia,0] \
                                     +fdiff[ia,1]*ams[isf,ihl1,ia,1] \
