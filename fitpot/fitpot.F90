@@ -8,10 +8,10 @@ program fitpot
   call write_initial_setting()
   call get_dir_list(11)
 
-  call get_samples()
-  call get_ref_data()
+  call read_samples()
+  call read_ref_data()
 
-  call get_vars()
+  call read_vars()
 
   select case (trim(cfmethod))
     case ('bfgs','BFGS')
@@ -23,6 +23,12 @@ program fitpot
       stop
   end select
   
+  call write_vars('fin')
+  call write_energy_relation('fin')
+  call write_force_relation('fin')
+  
+  write(6,'(a,f15.3,a)') ' time function =', timef,' sec'
+  write(6,'(a,f15.3,a)') ' time gradient =', timeg,' sec'
 
 end program fitpot
 !=======================================================================
@@ -40,17 +46,18 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,a)') 'run_mode',trim(crunmode)
   write(6,'(2x,a25,2x,es12.3)') 'eps',eps
   write(6,'(2x,a25,2x,es12.3)') 'xtol',xtol
-  write(6,'(2x,a25,2x,es12.3)') 'xtol',xtol
   do i=1,maxnsp
     write(6,'(2x,a25,2x,i2,es15.7)') 'atom_energy',i,eatom(i)
   enddo
   write(6,'(2x,a25,2x,l3)') 'force_match',lfmatch
   write(6,'(2x,a25,2x,l3)') 'penalty',lpena
   write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',pwgt
-  write(6,'(2x,a25,2x,a)') 'potential',cpot
+  write(6,'(2x,a25,2x,a)') 'potential',trim(cpot)
   write(6,'(2x,a25,2x,l3)') 'gradient',lgrad
   write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
+  write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
   write(6,'(2x,a25,2x,l3)') 'regularize',lreg
+  write(6,'(2x,a25,2x,l3)') 'force_scale',lfscale
   write(6,'(2x,a25,2x,l3)') 'sample_weight',lswgt
   write(6,'(2x,a25,2x,es12.3)') 'sample_weight_beta',swbeta
   write(6,'(a)') '------------------------------------------------'
@@ -83,7 +90,7 @@ subroutine get_dir_list(ionum)
 
 end subroutine get_dir_list
 !=======================================================================
-subroutine get_samples()
+subroutine read_samples()
   use variables
   implicit none
   integer:: ismpl
@@ -98,7 +105,7 @@ subroutine get_samples()
 
   print *,'get_samples done.'
 
-end subroutine get_samples
+end subroutine read_samples
 !=======================================================================
 subroutine read_pos(ionum,fname,ismpl)
   use variables
@@ -130,7 +137,7 @@ subroutine read_pos(ionum,fname,ismpl)
   close(ionum)
 end subroutine read_pos
 !=======================================================================
-subroutine get_ref_data()
+subroutine read_ref_data()
   use variables
   integer:: ismpl,i
 
@@ -156,9 +163,9 @@ subroutine get_ref_data()
 
   print *,'get_ref_data done.'
   
-end subroutine get_ref_data
+end subroutine read_ref_data
 !=======================================================================
-subroutine get_vars()
+subroutine read_vars()
   use variables
   implicit none
 
@@ -173,14 +180,35 @@ subroutine get_vars()
   enddo
 
   close(15)
-end subroutine get_vars
+end subroutine read_vars
+!=======================================================================
+subroutine write_vars(cadd)
+  use variables
+  implicit none
+  character(len=*),intent(in),optional:: cadd
+  integer:: i
+  character(len=128):: cfname
+
+  cfname= trim(cmaindir)//'/'//trim(cparfile)
+  if( present(cadd) ) cfname= trim(cfname)//'.'//trim(cadd)
+  
+
+  open(15,file=trim(cfname),status='replace')
+  write(15,'(i10,es15.4)') nvars,rcut
+  do i=1,nvars
+    write(15,'(es23.14e3,2es12.4)') vars(i),vranges(1:2,i)
+  enddo
+  close(15)
+!!$  print *, 'vars written.'
+
+end subroutine write_vars
 !=======================================================================
 subroutine bfgs_wrapper()
   use variables
   use NN,only:NN_init,NN_get_f,NN_get_g
   implicit none
   integer:: i,m
-  real(8):: fval
+  real(8):: fval,fmin
   real(8),allocatable:: gval(:),w(:),diag(:)
 
   !.....for lbfgs library
@@ -188,11 +216,11 @@ subroutine bfgs_wrapper()
   integer:: mp,lp,iprint(2),iflag,istp,nwork
   real(8):: bgtol,bstpmin,bstpmax
   logical:: ldiagco
-  external:: lb2
+!  external:: lb2
   common /lb3/mp,lp,bgtol,bstpmin,bstpmax
   
   nwork= nvars*(2*msave+1) +2*msave
-  allocate(gval(nvars),w(nvars),diag(nwork))
+  allocate(gval(nvars),w(nwork),diag(nvars))
 
   !.....NN specific code hereafter
   call NN_init()
@@ -205,6 +233,7 @@ subroutine bfgs_wrapper()
   enddo
 
   !.....bfgs wrapper
+  fmin= 1d+20
   m= 5
   ldiagco= .false.
   iprint(1)= 1
@@ -212,21 +241,22 @@ subroutine bfgs_wrapper()
   istp= 0
   iflag= 0
 10 continue
-  print *, 'istp=',istp
   call NN_get_f(fval)
-  print *, 'fval=',fval
   call NN_get_g(gval)
-  print *, 'calling lbfgs'
   call lbfgs(nvars,m,vars,fval,gval,ldiagco,diag,iprint,eps,xtol &
        ,w,iflag)
-  print *, 'backed from lbfgs'
+!!$  print *, 'istp,fval,iflag=',istp,fval,iflag
+!!$  if( fmin.gt.fval ) then
+!!$    fmin= fval
+!!$    call write_vars()
+!!$  endif
   if( iflag.le.0 ) goto 999
   istp= istp +1
   if( istp.gt.nstp ) goto 999
   goto 10
 
 999 continue
-
+  return
 end subroutine bfgs_wrapper
 !=======================================================================
 subroutine check_grad()
@@ -245,10 +275,10 @@ subroutine check_grad()
   vars0(1:nvars)= vars(1:nvars)
   do iv=1,nvars
     vars(1:nvars)= vars0(1:nvars)
-    dv= vars(iv) *1d-5
+    dv= vars(iv) *1d-3
     vars(iv)= vars(iv) +dv
     call NN_get_f(ftmp)
-    print *,' iv,dv,f0,ftmp=',iv,dv,f0,ftmp
+!!$    print *,' iv,dv,f0,ftmp=',iv,dv,f0,ftmp
     gnumer(iv)= (ftmp-f0)/dv
   enddo
 
@@ -263,3 +293,52 @@ subroutine check_grad()
   write(6,'(a)') '-----------------------------------------------------'
   print *, 'check_grad done.'
 end subroutine check_grad
+!=======================================================================
+subroutine write_energy_relation(cadd)
+  use variables
+  implicit none
+  character(len=*),intent(in),optional:: cadd
+  character(len=128):: cfname
+  
+  integer:: ismpl
+  type(mdsys):: smpl
+  
+  cfname='out.erg.smd-vs-dft'
+  if( present(cadd) ) cfname= trim(cfname)//'.'//trim(cadd)
+
+  open(90,file=trim(cfname),status='replace')
+  do ismpl=1,nsmpl
+    smpl= samples(ismpl)
+    write(90,'(2es15.7,2x,a)') smpl%eref/smpl%natm &
+         ,smpl%epot/smpl%natm,smpl%cdirname
+  enddo
+  close(90)
+  
+end subroutine write_energy_relation
+!=======================================================================
+subroutine write_force_relation(cadd)
+  use variables
+  implicit none
+  character(len=*),intent(in),optional:: cadd
+  character(len=128):: cfname
+
+  integer:: ismpl,ia,ixyz
+  type(mdsys):: smpl
+  
+  cfname= 'out.frc.smd-vs-dft'
+  if( present(cadd) ) cfname= trim(cfname)//'.'//trim(cadd)
+
+  open(91,file=trim(cfname),status='replace')
+  do ismpl=1,nsmpl
+    smpl= samples(ismpl)
+    do ia=1,smpl%natm
+      do ixyz=1,3
+        write(91,'(2es15.7,2x,a)') smpl%fref(ixyz,ia)/smpl%natm &
+             ,smpl%fa(ixyz,ia)/smpl%natm,smpl%cdirname
+      enddo
+    enddo
+  enddo
+  close(91)
+  
+end subroutine write_force_relation
+!=======================================================================

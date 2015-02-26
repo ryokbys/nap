@@ -90,6 +90,9 @@ c=======================================================================
       elseif( trim(cname).eq.'grad_scale' ) then
         call read_l1(ionum,lgscale)
         return
+      elseif( trim(cname).eq.'gscale_factor' ) then
+        call read_r1(ionum,gscl)
+        return
       elseif( trim(cname).eq.'regularize' ) then
         call read_l1(ionum,lreg)
         return

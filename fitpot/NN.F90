@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-02-25 23:19:06 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-02-26 17:13:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -30,6 +30,9 @@ contains
     use variables
     implicit none 
     integer:: itmp,i,nw,natm,ismpl
+
+    timef= 0.0
+    timeg= 0.0
 
     !.....read in.const.NN to get nl,nsp,nhl(:)
     open(20,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
@@ -89,10 +92,10 @@ contains
     implicit none
     real(8),intent(out):: fval
     integer:: ismpl,natm,ia,ixyz
-    real(4):: tarr0(2),t0,tarr1(2),t1
+    real(4):: t0,t1
     real(8):: dn3i,ediff
 
-    call etime(tarr0,t0)
+    call cpu_time(t0)
     call vars2wgts(nvars,vars)
     
     if( nprcs.eq.1 ) then
@@ -130,8 +133,9 @@ contains
       enddo
     enddo
     
-    call etime(tarr1,t1)
-    write(6,'(a,f15.3)')  '===> time NN_get_f =',t1-t0
+    call cpu_time(t1)
+!!$    write(6,'(a,f15.3)')  '>>> time NN_get_f =',t1-t0
+    timef= timef +t1-t0
     return
   end subroutine NN_get_f
 !=======================================================================
@@ -167,6 +171,8 @@ contains
            sds(ismpl)%bms1(3,natm,nhl(1),nhl(0)))
     endif
     samples(ismpl)%fa(1:3,1:natm)= 0d0
+    sds(ismpl)%ams1(1:3,1:natm,1:nhl(1),1:nhl(0))= 0d0
+    sds(ismpl)%bms1(1:3,1:natm,1:nhl(1),1:nhl(0))= 0d0
     do ihl1=1,nhl(1)
       w2= wgt12(ihl1)
       do ihl0=1,nhl(0)
@@ -174,7 +180,7 @@ contains
         do ja=1,natm
           h= sds(ismpl)%hl1(ja,ihl1)
           dh= h*(1d0-h)
-          ddhg= dh*(1d0-2d0*h) *sds(ismpl)%gsf(ja,ihl0)
+          ddhg= w1 *dh*(1d0-2d0*h) *sds(ismpl)%gsf(ja,ihl0)
           t= w1*w2*dh
           do ia=1,natm
             samples(ismpl)%fa(1:3,ia)= samples(ismpl)%fa(1:3,ia) &
@@ -202,13 +208,14 @@ contains
     use variables
     implicit none
     real(8),intent(out):: gval(nvars)
-    integer:: ismpl
-    real(4):: tarr0(2),t0,tarr1(2),t1
+    integer:: ismpl,i
+    real(4):: t0,t1
     real(8),save,allocatable:: gs(:)
+    real(8):: gmax,vmax
 
     if( .not.allocated(gs) ) allocate(gs(nvars))
 
-    call etime(tarr0,t0)
+    call cpu_time(t0)
 
     gval(1:nvars)= 0d0
 
@@ -226,9 +233,19 @@ contains
       stop
     endif
 
-    call etime(tarr1,t1)
-    write(6,'(a,f15.3)')  '===> time NN_get_g =',t1-t0
+    if( lgscale ) then
+      gmax= 0d0
+      vmax= 0d0
+      do i=1,nvars
+        vmax= max(vmax,abs(vars(i)))
+        gmax= max(gmax,abs(gval(i)))
+      enddo
+      gval(1:nvars)= gval(1:nvars)/gmax *gscl*vmax
+    endif
 
+    call cpu_time(t1)
+!!$    write(6,'(a,f15.3)')  '>>> time NN_get_g =',t1-t0
+    timeg= timeg +t1-t0
     return
   end subroutine NN_get_g
 !=======================================================================
@@ -238,7 +255,7 @@ contains
     integer,intent(in):: ismpl
     real(8),intent(inout):: gs(nvars)
     integer:: iv,ihl1,ia,ihl0,natm
-    real(8):: ediff,tmp,h1,w1,w2,dgs(nvars)
+    real(8):: ediff,tmp,h1,w1,w2,dgs(nvars),ab(3)
 
     natm= samples(ismpl)%natm
     ediff= (samples(ismpl)%epot -samples(ismpl)%eref) /natm
@@ -277,14 +294,30 @@ contains
       do ihl0=1,nhl(0)
         w1= wgt11(ihl0,ihl1)
         do ia=1,natm
-          tmp = tmp -w1 *( &
+          tmp = tmp +w1 *( &
                fdiff(1,ia) *sds(ismpl)%ams1(1,ia,ihl1,ihl0) &
                +fdiff(2,ia)*sds(ismpl)%ams1(2,ia,ihl1,ihl0) &
                +fdiff(3,ia)*sds(ismpl)%ams1(3,ia,ihl1,ihl0) )
         enddo
       enddo
-      dgs(iv)= dgs(iv) +tmp
+      dgs(iv)= dgs(iv) -tmp
       iv= iv -1
+    enddo
+    do ihl0=nhl(0),1,-1
+      do ihl1=nhl(1),1,-1
+        tmp= 0d0
+        w2= wgt12(ihl1)
+        do ia=1,natm
+          ab(1:3)= sds(ismpl)%ams1(1:3,ia,ihl1,ihl0) &
+               +sds(ismpl)%bms1(1:3,ia,ihl1,ihl0)
+          tmp= tmp +w2*( &
+               fdiff(1,ia) *ab(1) &
+               +fdiff(2,ia)*ab(2) &
+               +fdiff(3,ia)*ab(3) )
+        enddo
+        dgs(iv)= dgs(iv) -tmp
+        iv= iv -1
+      enddo
     enddo
 
     gs(1:nvars)= gs(1:nvars) +dgs(1:nvars)
@@ -303,17 +336,17 @@ contains
     integer,intent(in):: nvars
     real(8),intent(in):: vars(nvars)
     
-    integer:: iv,isf,ihl1,ihl2
+    integer:: iv,ihl0,ihl1,ihl2
 
     if( nl.eq.1 ) then
       if( .not. allocated(wgt11) ) then
         allocate(wgt11(nhl(0),nhl(1)),wgt12(nhl(1)))
       endif
       iv= 0
-      do isf=1,nhl(0)
+      do ihl0=1,nhl(0)
         do ihl1=1,nhl(1)
           iv= iv +1
-          wgt11(isf,ihl1)= vars(iv)
+          wgt11(ihl0,ihl1)= vars(iv)
         enddo
       enddo
       do ihl1=1,nhl(1)
@@ -326,10 +359,10 @@ contains
              ,wgt23(nhl(2)))
       endif
       iv= 0
-      do isf=1,nhl(0)
+      do ihl0=1,nhl(0)
         do ihl1=1,nhl(1)
           iv=iv+1
-          wgt21(isf,ihl1)= vars(iv)
+          wgt21(ihl0,ihl1)= vars(iv)
         enddo
       enddo
       do ihl1=1,nhl(1)

@@ -15,7 +15,8 @@ module variables
   logical:: lreg   = .false.
   character(len=128):: cpot= 'NN'
   logical:: lgrad  = .true.
-  logical:: lgscale= .true.
+  logical:: lgscale= .false.
+  real(8):: gscl   = 0.1d0
   logical:: lfscale= .false.
   real(8):: fscl   = 1d0
   logical:: lswgt  = .false.
@@ -37,5 +38,7 @@ module variables
   integer:: nvars
   real(8),allocatable:: vars(:),vranges(:,:)
   real(8):: rcut
+
+  real(4),save:: timef,timeg
 
 end module variables
