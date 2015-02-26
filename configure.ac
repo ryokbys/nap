@@ -20,5 +20,6 @@ AC_PATH_PROG([PYTHON],[python])
 # Checks for library functions.
 
 AC_CONFIG_FILES([pmd/makefile mkconf/makefile fitpot/run_pmd.sh
-                 fitpot/run_smd.sh qmcl/makefile neb/makefile])
+                 fitpot/run_smd.sh qmcl/makefile neb/makefile
+                 fitpot/makefile])
 AC_OUTPUT

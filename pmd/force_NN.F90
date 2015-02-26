@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-02-16 16:26:19 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-02-24 13:49:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -614,7 +614,7 @@ contains
 !.....read in.comb.NN
     allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
     inquire(file=trim(cmbfname),exist=lexist)
-    if( nsp.ne.1 .and. .not.lexist ) then
+    if( .not.lexist ) then
       if( myid.ge.0 ) then
         if( myid.eq.0 ) then
           write(6,'(a)') ' [Error] '//cmbfname//' does not exist !!!.'
@@ -627,7 +627,7 @@ contains
         write(6,'(a)') '   The NN potential needs '//cmbfname//'.'
         stop
       endif
-    elseif( nsp.ne.1 ) then
+    else
       open(52,file=trim(cmbfname),status='old')
 !.....read pairs
       do n=1,m1

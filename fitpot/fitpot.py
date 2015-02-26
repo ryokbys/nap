@@ -3,7 +3,7 @@
 
 """Fit parameters of a certain potential to DFT data.
 
-The potential must be specified in pmd input file, in.pmd.
+The potential must be specified in smd input file, in.smd.
 """
 
 import os,sys
@@ -722,7 +722,7 @@ def gather_basis_linreg(basedir):
     for i in range(len(sample_dirs)):
         dir= sample_dirs[i]
         smpl= samples[i]
-        f=open(basedir+'/'+dir+'/pmd/out.basis.linreg','r')
+        f=open(basedir+'/'+dir+'/smd/out.basis.linreg','r')
         data= f.readline().split()
         natm= int(data[0])
         nelem=  int(data[1])
@@ -740,7 +740,7 @@ def gather_basis_linreg(basedir):
     for i in range(len(sample_dirs)):
         dir= sample_dirs[i]
         smpl= samples[i]
-        g=open(basedir+'/'+dir+'/pmd/out.dbasis.linreg','r')
+        g=open(basedir+'/'+dir+'/smd/out.dbasis.linreg','r')
         data= g.readline().split()
         natm2= int(data[0])
         nelem2=int(data[1])
@@ -946,7 +946,7 @@ if __name__ == '__main__':
     elif potential in ('NN') and not fmethod in ('test','TEST'):
         ergs,frcs= NN.calc_ef_from_bases(vars)
     else:
-        ergs,frcs= gather_pmd_data(maindir)
+        ergs,frcs= gather_smd_data(maindir)
 
     if fmethod in ('test','TEST') and potential in ('NN'):
         NN.init(maindir,params,sample_dirs,samples,nprcs,fmatch \
@@ -1049,7 +1049,7 @@ if __name__ == '__main__':
     elif potential in ('NN'):
         ergs,frcs= NN.calc_ef_from_bases(solution)
     else:
-        ergs,frcs= gather_pmd_data(maindir)
+        ergs,frcs= gather_smd_data(maindir)
     output_energy_relation(ergs,ergrefs,samples,sample_dirs,fname='out.erg.pmd-vs-dft.fin')
     output_force_relation(frcs,frcrefs,samples,sample_dirs,fname='out.frc.pmd-vs-dft.fin')
     output_statistics(ergs,frcs)

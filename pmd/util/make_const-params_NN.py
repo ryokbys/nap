@@ -15,7 +15,7 @@ rcut= 3.5
 #.....number of species
 nsp= 2
 #.....number of hidden layers
-nl = 2
+nl = 1
 #.....num of nodes in a layer
 nhl= [0,2,2]
 #.....min,max of parameters
