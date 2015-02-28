@@ -1,14 +1,14 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-02-26 17:13:21 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-02-28 23:09:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
   character(128),parameter:: ccfname='in.const.NN'
   character(128),parameter:: cmbfname='in.comb.NN'
   integer,parameter:: maxnl= 2
-  integer:: nl,nsp,nsfc,nsf2,nsf3,ncmb2,ncmb3
-  integer:: nhl(0:maxnl+1)
+  integer,save:: nl,nsp,nsfc,nsf2,nsf3,ncmb2,ncmb3
+  integer,save:: nhl(0:maxnl+1)
   integer,save,allocatable:: nwgt(:)
   real(8),save,allocatable:: wgt11(:,:),wgt12(:)
   real(8),save,allocatable:: wgt21(:,:),wgt22(:,:),wgt23(:)
@@ -21,7 +21,7 @@ module NN
 
   type(smpldata),save,allocatable:: sds(:)
 
-  integer:: maxna
+  integer,save:: maxna
   real(8),save,allocatable:: fdiff(:,:)
 
 contains
@@ -82,6 +82,7 @@ contains
       if( maxna.lt.samples(ismpl)%natm )  &
            maxna= samples(ismpl)%natm
     enddo
+    print *,'maxna =',maxna
     allocate(fdiff(3,maxna))
 
     print *, 'NN_init done.'
@@ -92,10 +93,10 @@ contains
     implicit none
     real(8),intent(out):: fval
     integer:: ismpl,natm,ia,ixyz
-    real(4):: t0,t1
+    integer:: ic0,ic1,icr
     real(8):: dn3i,ediff
 
-    call cpu_time(t0)
+    call system_clock(ic0,icr)
     call vars2wgts(nvars,vars)
     
     if( nprcs.eq.1 ) then
@@ -115,11 +116,16 @@ contains
     do ismpl=1,nsmpl
       natm= samples(ismpl)%natm
       ediff= (samples(ismpl)%epot -samples(ismpl)%eref)
+!!$      print *,'ediff=',ediff
       ediff= ediff*ediff /natm
-      fval= fval +ediff
+!!$      fval= fval +ediff
       if( .not. lfmatch ) cycle
       fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
            -samples(ismpl)%fref(1:3,1:natm))
+!!$      print *,'fdiff in get_f'
+!!$      do ia=1,natm
+!!$        write(6,'(i6,3es12.4)') ia,fdiff(1:3,ia)
+!!$      enddo
       dn3i= 1d0 /(3*natm)
       fscl= 1d0
       !.....force-scale makes force contribution same order to energy
@@ -133,9 +139,9 @@ contains
       enddo
     enddo
     
-    call cpu_time(t1)
+    call system_clock(ic1)
 !!$    write(6,'(a,f15.3)')  '>>> time NN_get_f =',t1-t0
-    timef= timef +t1-t0
+    timef= timef +dble(ic1-ic0)/icr
     return
   end subroutine NN_get_f
 !=======================================================================
@@ -144,7 +150,7 @@ contains
     implicit none
     integer,intent(in):: ismpl
     integer:: natm,ia,ja,ihl0,ihl1
-    real(8):: tmp,w1,w2,h,dh,ddhg,t
+    real(8):: tmp,w1,w2,h1,dh1,ddhg,t,dg(3)
     
     natm= samples(ismpl)%natm
     sds(ismpl)%hl1(1:natm,1:nhl(1))= 0d0
@@ -178,24 +184,27 @@ contains
       do ihl0=1,nhl(0)
         w1= wgt11(ihl0,ihl1)
         do ja=1,natm
-          h= sds(ismpl)%hl1(ja,ihl1)
-          dh= h*(1d0-h)
-          ddhg= w1 *dh*(1d0-2d0*h) *sds(ismpl)%gsf(ja,ihl0)
-          t= w1*w2*dh
+          h1= sds(ismpl)%hl1(ja,ihl1)
+          dh1= h1*(1d0-h1)
+          t= w1*w2 *dh1
+          ddhg= w1 *dh1 *(1d0-2d0*h1) *sds(ismpl)%gsf(ja,ihl0)
+!!$          dh1= 1d0 *h1
+!!$          t= w1*w2 *h1
+!!$          ddhg= h1*(1d0-h1) *w1 *sds(ismpl)%gsf(ja,ihl0)
+!!$          print *,'h1,dh1,t,ddhg=',h1,dh1,t,ddhg
           do ia=1,natm
+            dg(1:3)=sds(ismpl)%dgsf(1:3,ia,ja,ihl0)
             samples(ismpl)%fa(1:3,ia)= samples(ismpl)%fa(1:3,ia) &
-                 -t *sds(ismpl)%dgsf(1:3,ia,ja,ihl0)
-            sds(ismpl)%ams1(1:3,ia,ihl1,ihl0)= &
-                 sds(ismpl)%ams1(1:3,ia,ihl1,ihl0) &
-                 +dh *sds(ismpl)%dgsf(1:3,ia,ja,ihl0)
-            sds(ismpl)%bms1(1:3,ia,ihl1,ihl0)= &
-                 sds(ismpl)%bms1(1:3,ia,ihl1,ihl0) &
-                 +ddhg *sds(ismpl)%dgsf(1:3,ia,ja,ihl0)
+                 -t *dg(1:3)
+!!$            sds(ismpl)%ams1(1:3,ia,ihl1,ihl0)= &
+!!$                 sds(ismpl)%ams1(1:3,ia,ihl1,ihl0) +dh1 *dg(1:3)
+!!$            sds(ismpl)%bms1(1:3,ia,ihl1,ihl0)= &
+!!$                 sds(ismpl)%bms1(1:3,ia,ihl1,ihl0) +ddhg *dg(1:3)
           enddo
         enddo
       enddo
     enddo
-    
+
   end subroutine calc_ef1
 !=======================================================================
   subroutine calc_ef2(ismpl)
@@ -209,13 +218,13 @@ contains
     implicit none
     real(8),intent(out):: gval(nvars)
     integer:: ismpl,i
-    real(4):: t0,t1
+    integer:: ic0,ic1,icr
     real(8),save,allocatable:: gs(:)
     real(8):: gmax,vmax
 
     if( .not.allocated(gs) ) allocate(gs(nvars))
 
-    call cpu_time(t0)
+    call system_clock(ic0,icr)
 
     gval(1:nvars)= 0d0
 
@@ -233,19 +242,19 @@ contains
       stop
     endif
 
-    if( lgscale ) then
-      gmax= 0d0
-      vmax= 0d0
-      do i=1,nvars
-        vmax= max(vmax,abs(vars(i)))
-        gmax= max(gmax,abs(gval(i)))
-      enddo
-      gval(1:nvars)= gval(1:nvars)/gmax *gscl*vmax
-    endif
+!!$    if( lgscale ) then
+!!$      gmax= 0d0
+!!$      vmax= 0d0
+!!$      do i=1,nvars
+!!$        vmax= max(vmax,abs(vars(i)))
+!!$        gmax= max(gmax,abs(gval(i)))
+!!$      enddo
+!!$      gval(1:nvars)= gval(1:nvars)/gmax *gscl*vmax
+!!$    endif
 
-    call cpu_time(t1)
+    call system_clock(ic1)
 !!$    write(6,'(a,f15.3)')  '>>> time NN_get_g =',t1-t0
-    timeg= timeg +t1-t0
+    timeg= timeg +dble(ic1-ic0)/icr
     return
   end subroutine NN_get_g
 !=======================================================================
@@ -254,50 +263,73 @@ contains
     implicit none
     integer,intent(in):: ismpl
     real(8),intent(inout):: gs(nvars)
-    integer:: iv,ihl1,ia,ihl0,natm
-    real(8):: ediff,tmp,h1,w1,w2,dgs(nvars),ab(3)
+    integer:: iv,ihl1,ia,ja,ihl0,natm
+    real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg
+    real(8),save,allocatable:: dgs(:),ab(:)
+
+    if( .not. allocated(dgs) ) then
+      allocate(dgs(nvars),ab(3))
+    endif
 
     natm= samples(ismpl)%natm
-    ediff= (samples(ismpl)%epot -samples(ismpl)%eref) /natm
+    ediff= (samples(ismpl)%epot -samples(ismpl)%eref)*2 /natm
+!!$    print *,'ediff=',ediff*natm
 
     gs(1:nvars)= 0d0
-    iv= nhl(0)*nhl(1) +nhl(1)
-    do ihl1=nhl(1),1,-1
-      tmp= 0d0
-      do ia=1,natm
-        h1= sds(ismpl)%hl1(ia,ihl1)
-        tmp= tmp +(h1-0.5d0)
-      enddo
-      gs(iv)= gs(iv) +2d0*ediff*tmp
-      iv= iv -1
-    enddo
-    do ihl0=nhl(0),1,-1
-      do ihl1=nhl(1),1,-1
-        tmp= 0d0
-        w2= wgt12(ihl1)
-        do ia=1,natm
-          h1= sds(ismpl)%hl1(ia,ihl1)
-          tmp= tmp +w2 *h1*(1d0-h1) *sds(ismpl)%gsf(ia,ihl0)
-        enddo
-        gs(iv)= gs(iv) +2d0*ediff*tmp
-        iv= iv -1
-      enddo
-    enddo
+!!$    iv= nhl(0)*nhl(1) +nhl(1)
+!!$    do ihl1=nhl(1),1,-1
+!!$      tmp= 0d0
+!!$      do ia=1,natm
+!!$        h1= sds(ismpl)%hl1(ia,ihl1)
+!!$        tmp= tmp +(h1-0.5d0)
+!!$      enddo
+!!$      gs(iv)= gs(iv) +ediff*tmp
+!!$      iv= iv -1
+!!$    enddo
+!!$    do ihl0=nhl(0),1,-1
+!!$      do ihl1=nhl(1),1,-1
+!!$        tmp= 0d0
+!!$        w2= wgt12(ihl1)
+!!$        do ia=1,natm
+!!$          h1= sds(ismpl)%hl1(ia,ihl1)
+!!$          tmp= tmp +w2 *h1*(1d0-h1) *sds(ismpl)%gsf(ia,ihl0)
+!!$        enddo
+!!$        gs(iv)= gs(iv) +ediff*tmp
+!!$        iv= iv -1
+!!$      enddo
+!!$    enddo
 
     if( .not. lfmatch ) return
     dgs(1:nvars)= 0d0
     fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
-         -samples(ismpl)%fref(1:3,1:natm))*2/natm/3
+         -samples(ismpl)%fref(1:3,1:natm))
+!!$    print *,'fdiff in grad1'
+!!$    do ia=1,natm
+!!$      write(6,'(i6,3es12.4)') ia,fdiff(1:3,ia)
+!!$    enddo
+    dn3i= 1d0/(3*natm)
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i
     iv= nhl(0)*nhl(1) +nhl(1)
     do ihl1=nhl(1),1,-1
       tmp= 0d0
       do ihl0=1,nhl(0)
         w1= wgt11(ihl0,ihl1)
-        do ia=1,natm
-          tmp = tmp +w1 *( &
-               fdiff(1,ia) *sds(ismpl)%ams1(1,ia,ihl1,ihl0) &
-               +fdiff(2,ia)*sds(ismpl)%ams1(2,ia,ihl1,ihl0) &
-               +fdiff(3,ia)*sds(ismpl)%ams1(3,ia,ihl1,ihl0) )
+!!$        do ia=1,natm
+!!$          tmp = tmp +w1 *( &
+!!$               fdiff(1,ia) *sds(ismpl)%ams1(1,ia,ihl1,ihl0) &
+!!$               +fdiff(2,ia)*sds(ismpl)%ams1(2,ia,ihl1,ihl0) &
+!!$               +fdiff(3,ia)*sds(ismpl)%ams1(3,ia,ihl1,ihl0) )
+!!$        enddo
+        do ja=1,natm
+          h1= sds(ismpl)%hl1(ja,ihl1)
+          dh1= h1*(1d0-h1)
+          do ia=1,natm
+            tmp= tmp +w1 *dh1*( &
+                 fdiff(1,ia)  *sds(ismpl)%dgsf(1,ia,ja,ihl0) &
+                 +fdiff(2,ia) *sds(ismpl)%dgsf(2,ia,ja,ihl0) &
+                 +fdiff(3,ia) *sds(ismpl)%dgsf(3,ia,ja,ihl0) &
+                 )
+          enddo
         enddo
       enddo
       dgs(iv)= dgs(iv) -tmp
@@ -307,15 +339,31 @@ contains
       do ihl1=nhl(1),1,-1
         tmp= 0d0
         w2= wgt12(ihl1)
-        do ia=1,natm
-          ab(1:3)= sds(ismpl)%ams1(1:3,ia,ihl1,ihl0) &
-               +sds(ismpl)%bms1(1:3,ia,ihl1,ihl0)
-          tmp= tmp +w2*( &
-               fdiff(1,ia) *ab(1) &
-               +fdiff(2,ia)*ab(2) &
-               +fdiff(3,ia)*ab(3) )
+!!$        do ia=1,natm
+!!$          ab(1:3)= sds(ismpl)%ams1(1:3,ia,ihl1,ihl0) &
+!!$               +sds(ismpl)%bms1(1:3,ia,ihl1,ihl0)
+!!$          tmp= tmp +w2 *( &
+!!$               fdiff(1,ia) *ab(1) &
+!!$               +fdiff(2,ia)*ab(2) &
+!!$               +fdiff(3,ia)*ab(3) )
+!!$        enddo
+        w1= wgt11(ihl0,ihl1)
+        do ja=1,natm
+          h1= sds(ismpl)%hl1(ja,ihl1)
+          ddhg= h1*(1d0-h1)*( (1d0-2d0*h1)*w1*sds(ismpl)%gsf(ja,ihl0) &
+               +1d0 )
+!!$          ddhg= h1*( (1d0-h1)*w1*sds(ismpl)%gsf(ja,ihl0) &
+!!$               +1d0 )
+          do ia=1,natm
+            tmp= tmp +w2 *ddhg *( &
+                 fdiff(1,ia)  *sds(ismpl)%dgsf(1,ia,ja,ihl0) &
+                 +fdiff(2,ia) *sds(ismpl)%dgsf(2,ia,ja,ihl0) &
+                 +fdiff(3,ia) *sds(ismpl)%dgsf(3,ia,ja,ihl0) &
+                 )
+          enddo
         enddo
         dgs(iv)= dgs(iv) -tmp
+!!$        print *, 'iv,dgs(iv)=',iv,dgs(iv)
         iv= iv -1
       enddo
     enddo
@@ -420,6 +468,8 @@ contains
       do ia=1,natm
         do ihl0=1,nhl(0)
           read(21,*) itmp, itmp, sds(ismpl)%gsf(ia,ihl0)
+!!$          write(6,'(a,2i6,es12.4)') 'ia,ihl0,gsf=',ia,ihl0 &
+!!$               ,sds(ismpl)%gsf(ia,ihl0)
         enddo
       enddo
       close(21)
@@ -430,6 +480,8 @@ contains
         do ihl0=1,nhl(0)
           do ja=1,natm
             read(22,*) itmp,itmp,itmp ,sds(ismpl)%dgsf(1:3,ja,ia,ihl0)
+!!$            write(6,'(a,3i6,3es12.4)') 'ia,ihl0,ja,dgsf=',ia,ihl0,ja &
+!!$                 ,sds(ismpl)%dgsf(1:3,ja,ia,ihl0)
           enddo
         enddo
       enddo

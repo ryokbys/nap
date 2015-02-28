@@ -29,7 +29,7 @@ reta=[0.5, 1.0]
 rrs=[0.0]
 #.....num of 3-body angular symmetry functions (cosine value)
 #rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 2.0/3, 3.0/5]
-rsf3=[1.0/3]
+rsf3=[1.1/3]
 
 constfname='in.const.NN'
 paramfname='in.params.NN'

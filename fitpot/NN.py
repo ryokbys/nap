@@ -1,4 +1,4 @@
-#  Time-stamp: <2015-02-24 14:45:02 Ryo KOBAYASHI>
+#  Time-stamp: <2015-03-01 05:55:18 Ryo KOBAYASHI>
 """
 Routines related to neural network.
 """

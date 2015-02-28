@@ -24,7 +24,7 @@ module variables
   logical:: lpena  = .false.
   real(8):: pwgt   = 1d0
 
-  character(len=5),allocatable:: cdirlist(:)
+!!$  character(len=5),allocatable:: cdirlist(:)
 
   type mdsys
     character(len=5):: cdirname
@@ -35,9 +35,9 @@ module variables
   end type mdsys
 
   type(mdsys),save,allocatable:: samples(:)
-  integer:: nvars
-  real(8),allocatable:: vars(:),vranges(:,:)
-  real(8):: rcut
+  integer,save:: nvars
+  real(8),save,allocatable:: vars(:),vranges(:,:)
+  real(8),save:: rcut
 
   real(4),save:: timef,timeg
 

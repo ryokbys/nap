@@ -1,7 +1,18 @@
 program fitpot
   use variables
   implicit none
-  
+
+  interface
+    subroutine write_vars(cadd)
+      character(len=*),intent(in),optional:: cadd
+    end subroutine write_vars
+    subroutine write_energy_relation(cadd)
+      character(len=*),intent(in),optional:: cadd
+    end subroutine write_energy_relation
+    subroutine write_force_relation(cadd)
+      character(len=*),intent(in),optional:: cadd
+    end subroutine write_force_relation
+  end interface
 
   call read_input(10,'in.fitpot')
   allocate(samples(nsmpl))
@@ -18,6 +29,8 @@ program fitpot
       call bfgs_wrapper()
     case ('check_grad')
       call check_grad()
+    case ('test','TEST')
+      call test()
     case default
       print *,'unknown fitting_method:',trim(cfmethod)
       stop
@@ -103,7 +116,7 @@ subroutine read_samples()
          //'/pos',ismpl)
   enddo
 
-  print *,'get_samples done.'
+  print *,'read_samples done.'
 
 end subroutine read_samples
 !=======================================================================
@@ -161,7 +174,7 @@ subroutine read_ref_data()
     close(14)
   enddo
 
-  print *,'get_ref_data done.'
+  print *,'read_ref_data done.'
   
 end subroutine read_ref_data
 !=======================================================================
@@ -226,11 +239,11 @@ subroutine bfgs_wrapper()
   call NN_init()
   call NN_get_f(fval)
   call NN_get_g(gval)
-  print *, 'fval=',fval
-  print *, 'gval:'
-  do i=1,nvars
-    print *, 'i,g=',i,gval(i)
-  enddo
+!!$  print *, 'fval=',fval
+!!$  print *, 'gval:'
+!!$  do i=1,nvars
+!!$    print *, 'i,g=',i,gval(i)
+!!$  enddo
 
   !.....bfgs wrapper
   fmin= 1d+20
@@ -264,7 +277,7 @@ subroutine check_grad()
   use NN,only:NN_init,NN_get_f,NN_get_g
   implicit none
   integer:: iv
-  real(8):: f0,ftmp,dv
+  real(8):: f0,ftmp,dv,vmax
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
@@ -273,26 +286,53 @@ subroutine check_grad()
   call NN_get_g(ganal)
 
   vars0(1:nvars)= vars(1:nvars)
+  vmax= 0d0
+  do iv=1,nvars
+    vmax= max(vmax,abs(vars0(iv)))
+    write(6,'(a,i6,es12.4)') ' iv,vars(iv)=',iv,vars0(iv)
+  enddo
+  dv= vmax *1d-8
   do iv=1,nvars
     vars(1:nvars)= vars0(1:nvars)
-    dv= vars(iv) *1d-3
+!!$    dv= vars(iv) *1d-3
     vars(iv)= vars(iv) +dv
     call NN_get_f(ftmp)
-!!$    print *,' iv,dv,f0,ftmp=',iv,dv,f0,ftmp
     gnumer(iv)= (ftmp-f0)/dv
   enddo
 
   write(6,'(a)') '----------------- check_grad ------------------------'
-  write(6,'(a)') '     analytical,'// &
+  write(6,'(a)') '     #,    analytical,'// &
        '     numerical,'// &
-       '       error [%]'
+       '      error [%]'
   do iv=1,nvars
-    write(6,'(2es15.4,f15.3)') ganal(iv),gnumer(iv), &
+    write(6,'(i6,2es15.4,f15.3)') iv,ganal(iv),gnumer(iv), &
          abs((ganal(iv)-gnumer(iv))/gnumer(iv))*100
   enddo
   write(6,'(a)') '-----------------------------------------------------'
   print *, 'check_grad done.'
 end subroutine check_grad
+!=======================================================================
+subroutine test()
+  use variables
+  use NN,only:NN_init,NN_get_f,NN_get_g
+  implicit none 
+  integer:: iv
+  real(8):: ft
+  real(8),allocatable:: gt(:)
+
+  allocate(gt(nvars))
+
+  call NN_init()
+  call NN_get_f(ft)
+  call NN_get_g(gt)
+  
+  print *,'func value=',ft
+  print *,'grad values:'
+  do iv=1,nvars
+    print *,'iv,grad(iv)=',iv,gt(iv)
+  enddo
+  print *,'test done.'
+end subroutine test
 !=======================================================================
 subroutine write_energy_relation(cadd)
   use variables
