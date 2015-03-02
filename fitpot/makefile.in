@@ -38,6 +38,8 @@ nconv: node_conv.o ${mods} read_input.o util_pmd.o
 fitpot: ${mods} ${fitpot} ${lbfgs}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${lbfgs} ${fitpot} 
 
+lbfgs_um/lbfgs.o: lbfgs_um/lbfgs.f
+	${MPIFC} ${MPIFLAGS} -c $< -o $@
 
 #.....Dependencies
 read_input.o: ${mods}
