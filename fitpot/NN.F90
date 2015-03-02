@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-02-28 23:09:10 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-03-03 07:32:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -118,7 +118,7 @@ contains
       ediff= (samples(ismpl)%epot -samples(ismpl)%eref)
 !!$      print *,'ediff=',ediff
       ediff= ediff*ediff /natm
-!!$      fval= fval +ediff
+      fval= fval +ediff
       if( .not. lfmatch ) cycle
       fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
            -samples(ismpl)%fref(1:3,1:natm))
@@ -263,8 +263,8 @@ contains
     implicit none
     integer,intent(in):: ismpl
     real(8),intent(inout):: gs(nvars)
-    integer:: iv,ihl1,ia,ja,ihl0,natm
-    real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg
+    integer:: iv,ihl1,ia,ja,ihl0,jhl0,natm
+    real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddh
     real(8),save,allocatable:: dgs(:),ab(:)
 
     if( .not. allocated(dgs) ) then
@@ -276,28 +276,28 @@ contains
 !!$    print *,'ediff=',ediff*natm
 
     gs(1:nvars)= 0d0
-!!$    iv= nhl(0)*nhl(1) +nhl(1)
-!!$    do ihl1=nhl(1),1,-1
-!!$      tmp= 0d0
-!!$      do ia=1,natm
-!!$        h1= sds(ismpl)%hl1(ia,ihl1)
-!!$        tmp= tmp +(h1-0.5d0)
-!!$      enddo
-!!$      gs(iv)= gs(iv) +ediff*tmp
-!!$      iv= iv -1
-!!$    enddo
-!!$    do ihl0=nhl(0),1,-1
-!!$      do ihl1=nhl(1),1,-1
-!!$        tmp= 0d0
-!!$        w2= wgt12(ihl1)
-!!$        do ia=1,natm
-!!$          h1= sds(ismpl)%hl1(ia,ihl1)
-!!$          tmp= tmp +w2 *h1*(1d0-h1) *sds(ismpl)%gsf(ia,ihl0)
-!!$        enddo
-!!$        gs(iv)= gs(iv) +ediff*tmp
-!!$        iv= iv -1
-!!$      enddo
-!!$    enddo
+    iv= nhl(0)*nhl(1) +nhl(1)
+    do ihl1=nhl(1),1,-1
+      tmp= 0d0
+      do ia=1,natm
+        h1= sds(ismpl)%hl1(ia,ihl1)
+        tmp= tmp +(h1-0.5d0)
+      enddo
+      gs(iv)= gs(iv) +ediff*tmp
+      iv= iv -1
+    enddo
+    do ihl0=nhl(0),1,-1
+      do ihl1=nhl(1),1,-1
+        tmp= 0d0
+        w2= wgt12(ihl1)
+        do ia=1,natm
+          h1= sds(ismpl)%hl1(ia,ihl1)
+          tmp= tmp +w2 *h1*(1d0-h1) *sds(ismpl)%gsf(ia,ihl0)
+        enddo
+        gs(iv)= gs(iv) +ediff*tmp
+        iv= iv -1
+      enddo
+    enddo
 
     if( .not. lfmatch ) return
     dgs(1:nvars)= 0d0
@@ -332,7 +332,7 @@ contains
           enddo
         enddo
       enddo
-      dgs(iv)= dgs(iv) -tmp
+      dgs(iv)= -tmp
       iv= iv -1
     enddo
     do ihl0=nhl(0),1,-1
@@ -347,22 +347,27 @@ contains
 !!$               +fdiff(2,ia)*ab(2) &
 !!$               +fdiff(3,ia)*ab(3) )
 !!$        enddo
-        w1= wgt11(ihl0,ihl1)
         do ja=1,natm
           h1= sds(ismpl)%hl1(ja,ihl1)
-          ddhg= h1*(1d0-h1)*( (1d0-2d0*h1)*w1*sds(ismpl)%gsf(ja,ihl0) &
-               +1d0 )
-!!$          ddhg= h1*( (1d0-h1)*w1*sds(ismpl)%gsf(ja,ihl0) &
-!!$               +1d0 )
+          dh1= h1*(1d0-h1)
+          ddh= dh1*(1d0-2d0*h1)*sds(ismpl)%gsf(ja,ihl0)
           do ia=1,natm
-            tmp= tmp +w2 *ddhg *( &
+            tmp= tmp +w2 *dh1 *( &
                  fdiff(1,ia)  *sds(ismpl)%dgsf(1,ia,ja,ihl0) &
                  +fdiff(2,ia) *sds(ismpl)%dgsf(2,ia,ja,ihl0) &
                  +fdiff(3,ia) *sds(ismpl)%dgsf(3,ia,ja,ihl0) &
                  )
+            do jhl0=1,nhl(0)
+              w1= wgt11(jhl0,ihl1)
+              tmp= tmp +w2*w1 *ddh *( &
+                   fdiff(1,ia)  *sds(ismpl)%dgsf(1,ia,ja,jhl0) &
+                   +fdiff(2,ia) *sds(ismpl)%dgsf(2,ia,ja,jhl0) &
+                   +fdiff(3,ia) *sds(ismpl)%dgsf(3,ia,ja,jhl0) &
+                   )
+            enddo
           enddo
         enddo
-        dgs(iv)= dgs(iv) -tmp
+        dgs(iv)= -tmp
 !!$        print *, 'iv,dgs(iv)=',iv,dgs(iv)
         iv= iv -1
       enddo
@@ -450,6 +455,25 @@ contains
     sigmoid= 1d0/(1d0 +exp(-x))
     return
   end function sigmoid
+!=======================================================================
+  function dsgmd(x)
+    implicit none
+    real(8),intent(in):: x
+    real(8):: dsgmd,ex
+    ex= exp(-x)
+    dsgmd= ex/((1d0+ex)*(1d0*ex))
+    return
+  end function dsgmd
+!=======================================================================
+  function d2sgmd(x)
+    implicit none
+    real(8),intent(in):: x
+    real(8):: d2sgmd,ex,exi
+    ex= exp(-x)
+    exi= 1d0/(1d0+ex)
+    d2sgmd= exi*exi*exi*exi *(-ex)*ex*(2d0+ex)
+    return
+  end function d2sgmd
 !=======================================================================
   subroutine get_bases()
     use variables

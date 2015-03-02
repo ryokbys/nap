@@ -412,9 +412,8 @@ def func(x,*args):
     #.....write parameters to in.params.????? file
     dir= args[0]
 
-#    if fmethod in ('test','TEST') or \
     if fmethod in ('test','TEST','check_grad') or \
-            not potential in ('linreg','NN'):
+       not potential in ('linreg','NN'):
         #.....store original file
         os.system('cp '+dir+'/'+parfile+' '+dir+'/'+parfile+'.tmp')
         write_params(dir+'/'+parfile,x)
