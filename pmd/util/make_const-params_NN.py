@@ -17,19 +17,19 @@ nsp= 2
 #.....number of hidden layers
 nl = 1
 #.....num of nodes in a layer
-nhl= [0,2,2]
+nhl= [0,2]
 #.....min,max of parameters
 pmin= -1.0
 pmax=  1.0
 #.....num of eta in 2-body symmetry function
-reta=[0.5, 1.0]
+reta=[0.5, 1.0, 1.5, 2.0, 2.5]
 #.....num of Rs in 2-body symmetry function
 #rrs=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5]
 #rrs=[0.5, 1.0, 1.5, 2.0, 2.5]
 rrs=[0.0]
 #.....num of 3-body angular symmetry functions (cosine value)
 #rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 2.0/3, 3.0/5]
-rsf3=[1.1/3]
+rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2]
 
 constfname='in.const.NN'
 paramfname='in.params.NN'
