@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-03-03 10:51:30 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-03-03 17:36:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -122,10 +122,6 @@ contains
       if( .not. lfmatch ) cycle
       fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
            -samples(ismpl)%fref(1:3,1:natm))
-!!$      print *,'fdiff in get_f'
-!!$      do ia=1,natm
-!!$        write(6,'(i6,3es12.4)') ia,fdiff(1:3,ia)
-!!$      enddo
       dn3i= 1d0 /(3*natm)
       fscl= 1d0
       !.....force-scale makes force contribution same order to energy
@@ -272,7 +268,6 @@ contains
     natm= samples(ismpl)%natm
     ediff= (samples(ismpl)%epot -samples(ismpl)%eref)*2 /natm
 !!$    print *,'ediff=',ediff*natm
-
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)
     do ihl1=nhl(1),1,-1
@@ -306,7 +301,9 @@ contains
 !!$      write(6,'(i6,3es12.4)') ia,fdiff(1:3,ia)
 !!$    enddo
     dn3i= 1d0/(3*natm)
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i
+    fscl= 1d0
+    if( lfscale ) fscl= 1d0/(3*natm)
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscl
     iv= nhl(0)*nhl(1) +nhl(1)
     do ihl1=nhl(1),1,-1
       tmp= 0d0
