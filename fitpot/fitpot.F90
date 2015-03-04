@@ -39,6 +39,8 @@ program fitpot
   call write_vars('fin')
   call write_energy_relation('fin')
   call write_force_relation('fin')
+
+  call write_statistics()
   
   write(6,'(a,f15.3,a)') ' time function =', timef,' sec'
   write(6,'(a,f15.3,a)') ' time gradient =', timeg,' sec'
@@ -291,7 +293,9 @@ subroutine check_grad()
     vmax= max(vmax,abs(vars0(iv)))
     write(6,'(a,i6,es12.4)') ' iv,vars(iv)=',iv,vars0(iv)
   enddo
-  dv= vmax *1d-8
+  dv= vmax *1d-5
+  print *,''
+  print *,'deviation [dv] =',dv
   do iv=1,nvars
     vars(1:nvars)= vars0(1:nvars)
 !!$    dv= vars(iv) *1d-3
@@ -382,3 +386,43 @@ subroutine write_force_relation(cadd)
   
 end subroutine write_force_relation
 !=======================================================================
+subroutine write_statistics()
+  use variables
+  implicit none
+  integer:: ismpl,ia,l,n,natm
+  real(8):: demax,desum,de,rmse,dfmax,dfsum,df
+  
+  write(6,'(/,a)') '>>>>> statistics:'
+  !.....energies
+  demax= 0d0
+  desum= 0d0
+  do ismpl=1,nsmpl
+    natm= samples(ismpl)%natm
+    de= abs(samples(ismpl)%epot -samples(ismpl)%eref)/natm
+    demax= max(demax,de)
+    desum=desum +de*de/nsmpl
+  enddo
+  rmse= sqrt(desum)
+  write(6,'(a,f12.3,a)') '  RMSE of energies         =',rmse,' eV/atom'
+  write(6,'(a,f12.3,a)') '  Max residual of energies =',demax,' eV/atom'
+
+  !.....forces
+  dfmax= 0d0
+  dfsum= 0d0
+  n= 0
+  do ismpl=1,nsmpl
+    natm= samples(ismpl)%natm
+    do ia=1,natm
+      do l=1,3
+        df= abs(samples(ismpl)%fa(l,ia)-samples(ismpl)%fref(l,ia))
+        dfmax= max(dfmax,df)
+        dfsum=dfsum +df*df
+        n=n +1
+      enddo
+    enddo
+  enddo
+  rmse= sqrt(dfsum/2)
+  write(6,'(a,f12.3,a)') '  RMSE of forces           =',rmse,' eV/atom'
+  write(6,'(a,f12.3,a)') '  Max residual of forces   =',dfmax,' eV/atom'
+  print *,''
+end subroutine write_statistics
