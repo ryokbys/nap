@@ -1,5 +1,6 @@
 program fitpot
   use variables
+  use parallel
   implicit none
 
   interface
@@ -13,14 +14,39 @@ program fitpot
       character(len=*),intent(in),optional:: cadd
     end subroutine write_force_relation
   end interface
+  
+  call mpi_init(ierr)
+  call mpi_comm_size(mpi_comm_world,nnode,ierr)
+  call mpi_comm_rank(mpi_comm_world,myid,ierr)
+  mpi_world= mpi_comm_world
 
-  call read_input(10,'in.fitpot')
+  if( myid.eq.0 ) then
+    call read_input(10,'in.fitpot')
+    call write_initial_setting()
+  endif
+  call sync_input()
   allocate(samples(nsmpl))
-  call write_initial_setting()
+  if( nnode.gt.nsmpl ) then
+    if( myid.eq.0 ) then
+      print *,'[Error] nnode.gt.nsmpl'
+      print *,'  nnode,nspml=',nnode,nsmpl
+      print *,'you should use less number of node than nsmpl.'
+    endif
+    call mpi_finalize(ierr)
+    stop
+  endif
+
+  if( myid.eq.0 ) then
+    print *,' nsmpl,nnode=',nsmpl,nnode
+  endif
+  call get_node2sample()
+
   call get_dir_list(11)
 
   call read_samples()
   call read_ref_data()
+
+  call scatter_samples()
 
   call read_vars()
 
@@ -35,13 +61,15 @@ program fitpot
       print *,'unknown fitting_method:',trim(cfmethod)
       stop
   end select
-  
-  call write_vars('fin')
-  call write_energy_relation('fin')
-  call write_force_relation('fin')
 
-  call write_statistics()
-  
+  if( myid.eq.0 ) then
+    call write_vars('fin')
+    call write_energy_relation('fin')
+    call write_force_relation('fin')
+    call write_statistics()
+  endif
+  call mpi_finalize(ierr)
+
   write(6,'(a,f15.3,a)') ' time function =', timef,' sec'
   write(6,'(a,f15.3,a)') ' time gradient =', timeg,' sec'
 
@@ -81,44 +109,61 @@ end subroutine write_initial_setting
 !=======================================================================
 subroutine get_dir_list(ionum)
   use variables
+  use parallel
   implicit none
   integer,intent(in):: ionum
-  integer:: i
+  character(len=128),allocatable:: cdname(:)
+  integer:: is
 
-  call system('ls '//trim(cmaindir) &
-       //' | grep "^[0-9]...." > dir_list.txt')
+  allocate(cdname(nsmple))
+  
+  if( myid.eq.0 ) then
+    call system('ls '//trim(cmaindir) &
+         //' | grep "^[0-9]...." > dir_list.txt')
+    open(ionum,file='dir_list.txt',status='old')
+    do is=1,nsmpl
+      !read(ionum,*,end=999) samples(i)%cdirname
+      read(ionum,*,end=999) cdname(is)
+    enddo
+    close(ionum)
+  endif
+  
+  call mpi_bcast(cdname,128,mpi_character,0,mpi_world,ierr)
 
-  open(ionum,file='dir_list.txt',status='old')
-  do i=1,nsmpl
-    read(ionum,*,end=999) samples(i)%cdirname
+  do is=1,nsmpl
+    samples(is)%cdirname= cdname(is)
   enddo
-  close(ionum)
 
 !!$  do i=1,nsmpl
 !!$    print *,' i,cdirlist(i)=',i,cdirlist(i)
 !!$  enddo
+  deallocate(cdname)
   return
 
 999 continue
   print *,' Error: num_samples may be wrong.'
+  call mpi_finalize(ierr)
   stop
 
 end subroutine get_dir_list
 !=======================================================================
 subroutine read_samples()
   use variables
+  use parallel
   implicit none
-  integer:: ismpl
+  integer:: is
   character*5:: cdir
 
-  do ismpl=1,nsmpl
-!    print *,' ismpl=',ismpl,cdirlist(ismpl)
-    cdir= samples(ismpl)%cdirname
-    call read_pos(12,trim(cmaindir)//'/'//trim(cdir) &
-         //'/pos',ismpl)
-  enddo
+  if( myid.eq.0 ) then
+    do is=1,nsmpl
+!    print *,' is=',is,cdirlist(is)
+      cdir= samples(is)%cdirname
+      call read_pos(12,trim(cmaindir)//'/'//trim(cdir) &
+           //'/pos',is)
+    enddo
+  endif
 
-  print *,'read_samples done.'
+  !if( myid.eq.0 ) print *,'read_samples done.'
 
 end subroutine read_samples
 !=======================================================================
@@ -154,45 +199,57 @@ end subroutine read_pos
 !=======================================================================
 subroutine read_ref_data()
   use variables
+  use parallel
   integer:: ismpl,i
 
-  do ismpl=1,nsmpl
-    open(13,file=trim(cmaindir)//'/'//samples(ismpl)%cdirname &
-         //'/erg.ref',status='old')
-    read(13,*) samples(ismpl)%eref
-    close(13)
+  if( myid.eq.0 ) then
+    do ismpl=1,nsmpl
+      open(13,file=trim(cmaindir)//'/'//samples(ismpl)%cdirname &
+           //'/erg.ref',status='old')
+      read(13,*) samples(ismpl)%eref
+      close(13)
 
-    open(14,file=trim(cmaindir)//'/'//samples(ismpl)%cdirname &
-         //'/frc.ref',status='old')
-    read(14,*) natm
-    if( natm.ne.samples(ismpl)%natm ) then
-      print *,'Error: natm in sample is not same as smpl%natm'
-      print *,' natm,smpl%natm=',natm,samples(ismpl)%natm
-      stop
-    endif
-    do i=1,natm
-      read(14,*) samples(ismpl)%fref(1:3,i)
+      open(14,file=trim(cmaindir)//'/'//samples(ismpl)%cdirname &
+           //'/frc.ref',status='old')
+      read(14,*) natm
+      if( natm.ne.samples(ismpl)%natm ) then
+        print *,'Error: natm in sample is not same as smpl%natm'
+        print *,' natm,smpl%natm=',natm,samples(ismpl)%natm
+        stop
+      endif
+      do i=1,natm
+        read(14,*) samples(ismpl)%fref(1:3,i)
+      enddo
+      close(14)
     enddo
-    close(14)
-  enddo
+  endif
 
-  print *,'read_ref_data done.'
-  
+!!$  print *,'read_ref_data done.'
+
 end subroutine read_ref_data
 !=======================================================================
 subroutine read_vars()
   use variables
+  use parallel
   implicit none
 
   integer:: i
 
-  open(15,file=trim(cmaindir)//'/'//cparfile,status='old')
-  read(15,*) nvars, rcut
+  if( myid.eq.0 ) then
+    open(15,file=trim(cmaindir)//'/'//cparfile,status='old')
+    read(15,*) nvars, rcut
+  endif
+  call mpi_bcast(nvars,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(rcut,1,mpi_double_precision,0,mpi_world,ierr)
   allocate(vars(nvars),vranges(2,nvars))
-  do i=1,nvars
-    read(15,*) vars(i),vranges(1:2,i)
+  if( myid.eq.0 ) then
+    do i=1,nvars
+      read(15,*) vars(i),vranges(1:2,i)
 !    print *, vars(i),vranges(1:2,i)
-  enddo
+    enddo
+  endif
+
+  call mpi_bcast(vars,nvars,mpi_double_precision,0,mpi_world,ierr)
 
   close(15)
 end subroutine read_vars
@@ -421,8 +478,78 @@ subroutine write_statistics()
       enddo
     enddo
   enddo
-  rmse= sqrt(dfsum/2)
+  rmse= sqrt(dfsum/n)
   write(6,'(a,f12.3,a)') '  RMSE of forces           =',rmse,' eV/atom'
   write(6,'(a,f12.3,a)') '  Max residual of forces   =',dfmax,' eV/atom'
   print *,''
 end subroutine write_statistics
+!=======================================================================
+subroutine sync_input()
+  use variables
+  use parallel
+  implicit none
+  
+  call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nstp,1,mpi_integer,0,mpi_world,ierr)
+
+  call mpi_bcast(cfmethod,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cmaindir,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cparfile,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(crunmode,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cpot,128,mpi_character,0,mpi_world,ierr)
+
+  call mpi_bcast(eps,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(xtol,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(eatom,maxnsp,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(gscl,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(fscl,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(swbeta,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(pwgt,1,mpi_double_precision,0,mpi_world,ierr)
+  
+  call mpi_bcast(lfmatch,1,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(lreg,1,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(lfscale,1,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(lswgt,1,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(lpena,1,mpi_logical,0,mpi_world,ierr)
+end subroutine sync_input
+!=======================================================================
+subroutine get_node2sample()
+  use variables
+  use parallel
+  implicit none
+  integer:: n,m,ip
+
+  n= nsmpl/nnode
+  m= nsmpl -n*nnode
+  allocate(nspn(nnode))
+  do ip=1,nnode
+    nspn(ip)= n
+    if( ip.le.m ) nspn(ip)= nspn(ip) +1
+  enddo
+
+  !.....compute start and end of sample-id of this process
+  isid0= 0
+  isid1= 0
+  do ip=1,nnode
+    isid1= isid1 +nspn(ip)
+    if( ip.eq.myid+1 ) then
+      isid0= isid1 -nspn(ip) +1
+      exit
+    endif
+  enddo
+
+  if( myid.eq.0 ) print *,'get_node2sample done.'
+  return
+end subroutine get_node2sample
+!=======================================================================
+subroutine scatter_samples()
+  use variables
+  use parallel
+  implicit none
+
+  do is=isid0,isid1
+    
+  enddo
+end subroutine scatter_samples
