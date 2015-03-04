@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-03-04 13:01:36 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-03-04 13:05:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -117,7 +117,7 @@ contains
       natm= samples(ismpl)%natm
       ediff= (samples(ismpl)%epot -samples(ismpl)%eref)
       ediff= ediff*ediff /natm
-!!$      fval= fval +ediff
+      fval= fval +ediff
       if( .not. lfmatch ) cycle
       fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
            -samples(ismpl)%fref(1:3,1:natm))
@@ -458,47 +458,47 @@ contains
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 
-!!$    do ihl2=nhl(2),1,-1
-!!$      tmp= 0d0
-!!$      do ia=1,natm
-!!$        h2= sds(ismpl)%hl2(ia,ihl2)
-!!$        tmp= tmp +(h2-0.5d0)
-!!$      enddo
-!!$      gs(iv)=gs(iv) +ediff*tmp
-!!$      iv=iv -1
-!!$    enddo
-!!$    do ihl1=nhl(1),1,-1
-!!$      do ihl2=nhl(2),1,-1
-!!$        tmp= 0d0
-!!$        w3= wgt23(ihl2)
-!!$        do ia=1,natm
-!!$          h2= sds(ismpl)%hl2(ia,ihl2)
-!!$          h1= sds(ismpl)%hl1(ia,ihl1)
-!!$          tmp= tmp +w3 *h2*(1d0-h2) *(h1-0.5d0)
-!!$        enddo
-!!$        gs(iv)=gs(iv) +ediff*tmp
-!!$        iv=iv -1
-!!$      enddo
-!!$    enddo
-!!$    do ihl0=nhl(0),1,-1
-!!$      do ihl1=nhl(1),1,-1
-!!$        tmp= 0d0
-!!$        do ia=1,natm
-!!$          h1= sds(ismpl)%hl1(ia,ihl1)
-!!$          dh1= h1*(1d0-h1)
-!!$          dh1gsf= dh1*sds(ismpl)%gsf(ia,ihl0)
-!!$          do ihl2=1,nhl(2)
-!!$            h2= sds(ismpl)%hl2(ia,ihl2)
-!!$            dh2= h2*(1d0-h2)
-!!$            w2= wgt22(ihl1,ihl2)
-!!$            w3= wgt23(ihl2)
-!!$            tmp=tmp +w3*w2 *dh2 *dh1gsf
-!!$          enddo
-!!$        enddo
-!!$        gs(iv)=gs(iv) +ediff*tmp
-!!$        iv=iv -1
-!!$      enddo
-!!$    enddo
+    do ihl2=nhl(2),1,-1
+      tmp= 0d0
+      do ia=1,natm
+        h2= sds(ismpl)%hl2(ia,ihl2)
+        tmp= tmp +(h2-0.5d0)
+      enddo
+      gs(iv)=gs(iv) +ediff*tmp
+      iv=iv -1
+    enddo
+    do ihl1=nhl(1),1,-1
+      do ihl2=nhl(2),1,-1
+        tmp= 0d0
+        w3= wgt23(ihl2)
+        do ia=1,natm
+          h2= sds(ismpl)%hl2(ia,ihl2)
+          h1= sds(ismpl)%hl1(ia,ihl1)
+          tmp= tmp +w3 *h2*(1d0-h2) *(h1-0.5d0)
+        enddo
+        gs(iv)=gs(iv) +ediff*tmp
+        iv=iv -1
+      enddo
+    enddo
+    do ihl0=nhl(0),1,-1
+      do ihl1=nhl(1),1,-1
+        tmp= 0d0
+        do ia=1,natm
+          h1= sds(ismpl)%hl1(ia,ihl1)
+          dh1= h1*(1d0-h1)
+          dh1gsf= dh1*sds(ismpl)%gsf(ia,ihl0)
+          do ihl2=1,nhl(2)
+            h2= sds(ismpl)%hl2(ia,ihl2)
+            dh2= h2*(1d0-h2)
+            w2= wgt22(ihl1,ihl2)
+            w3= wgt23(ihl2)
+            tmp=tmp +w3*w2 *dh2 *dh1gsf
+          enddo
+        enddo
+        gs(iv)=gs(iv) +ediff*tmp
+        iv=iv -1
+      enddo
+    enddo
 
     if( .not. lfmatch ) return
     dgs(1:nvars)= 0d0
