@@ -86,7 +86,7 @@ subroutine get_dir_list(ionum)
   integer:: i
 
   call system('ls '//trim(cmaindir) &
-       //' | grep "[0-9]...." > dir_list.txt')
+       //' | grep "^[0-9]...." > dir_list.txt')
 
   open(ionum,file='dir_list.txt',status='old')
   do i=1,nsmpl
