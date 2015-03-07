@@ -466,7 +466,7 @@ subroutine write_statistics()
       enddo
     enddo
   enddo
-  rmse= sqrt(dfsum/2)
+  rmse= sqrt(dfsum/n)
   write(6,'(a,f12.3,a)') '  RMSE of forces           =',rmse,' eV/atom'
   write(6,'(a,f12.3,a)') '  Max residual of forces   =',dfmax,' eV/atom'
   print *,''

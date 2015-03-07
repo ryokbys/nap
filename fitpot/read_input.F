@@ -62,11 +62,14 @@ c=======================================================================
       elseif( trim(cname).eq.'run_mode' ) then
         call read_c1(ionum,crunmode)
         return
-      elseif( trim(cname).eq.'eps' ) then
-        call read_r1(ionum,eps)
-        return
       elseif( trim(cname).eq.'xtol' ) then
         call read_r1(ionum,xtol)
+        return
+      elseif( trim(cname).eq.'ftol' ) then
+        call read_r1(ionum,ftol)
+        return
+      elseif( trim(cname).eq.'gtol' ) then
+        call read_r1(ionum,gtol)
         return
       elseif( trim(cname).eq.'atom_energy' ) then
         backspace(ionum)
