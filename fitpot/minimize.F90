@@ -1,7 +1,8 @@
 !=======================================================================
-  subroutine steepest_descent(ndim,x,f,xtol,gtol,ftol,maxiter,func,grad)
+  subroutine steepest_descent(ndim,x,f,xtol,gtol,ftol,maxiter &
+       ,iprint,func,grad)
     implicit none
-    integer,intent(in):: ndim,maxiter
+    integer,intent(in):: ndim,maxiter,iprint
     real(8),intent(in):: xtol,gtol,ftol
     real(8),intent(inout):: f,x(ndim)
 !!$    real(8):: func,grad
@@ -28,29 +29,43 @@
     iter= 0
     f= func(ndim,x)
     g= grad(ndim,x)
-    gnorm= sprod(ndim,g,g)/ndim
-    write(6,'(a,i8,10es12.4)') ' iter,x,f,gnorm=' &
-         ,iter,x(1:ndim),f,gnorm
+    gnorm= sprod(ndim,g,g)
+    g(1:ndim)= g(1:ndim)/sqrt(gnorm)
+    gnorm= gnorm/ndim
+    if( iprint.eq.1 ) then
+      write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
+           ,iter,f,gnorm
+    else if( iprint.ge.2 ) then
+      write(6,'(a,i8,10es15.7)') ' iter,x,f,gnorm=' &
+           ,iter,x(1:ndim),f,gnorm
+    endif
 
     do iter=1,maxiter
 !.....line minimization
-!      call quad_interpolate(ndim,x,g,f,xtol,gtol,ftol,alpha,func)
-      call golden_section(ndim,x,g,f,xtol,gtol,ftol,alpha,func)
+      call quad_interpolate(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint,func)
+!!$      call golden_section(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint,func)
       x(1:ndim)= x(1:ndim) +alpha*g(1:ndim)
       f= func(ndim,x)
       g= grad(ndim,x)
-      gnorm= sprod(ndim,g,g)/ndim
-      write(6,'(a,i8,10es12.4)') ' iter,x,f,gnorm=' &
-           ,iter,x(1:ndim),f,gnorm
+      gnorm= sprod(ndim,g,g)
+      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
+      gnorm= gnorm/ndim
+      if( iprint.eq.1 ) then
+        write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
+             ,iter,f,gnorm
+      else if( iprint.ge.2 ) then
+        write(6,'(a,i8,10es15.7)') ' iter,x,f,gnorm=' &
+             ,iter,x(1:ndim),f,gnorm
+      endif
 !.....check convergence 
       if( abs(alpha).lt.xtol ) then
-        print *,'bfgs converged wrt xtol'
+        print *,'>>> SD converged wrt xtol'
         return
       else if( gnorm.lt.gtol ) then
-        print *,'bfgs converged wrt gtol'
+        print *,'>>> SD converged wrt gtol'
         return
       else if( abs(f-fp).lt.ftol ) then
-        print *,'bfgs converged wrt ftol'
+        print *,'>>> Sd converged wrt ftol'
         return
       endif
     enddo
@@ -60,12 +75,90 @@
 
   end subroutine steepest_descent
 !=======================================================================
-  subroutine bfgs(ndim,x0,f,xtol,gtol,ftol,maxiter,func,grad)
+  subroutine cg(ndim,x,f,xtol,gtol,ftol,maxiter,iprint,func,grad)
+!
+!  Conjugate gradient minimization
+!
+    implicit none
+    integer,intent(in):: ndim,maxiter,iprint
+    real(8),intent(in):: xtol,gtol,ftol
+    real(8),intent(inout):: f,x(ndim)
+    interface
+      function func(n,x)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8):: func
+      end function func
+      function grad(n,x)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8):: grad(n)
+      end function grad
+    end interface
+
+    integer:: iter
+    real(8):: alpha,fp,gnorm
+    real(8),external:: sprod
+    real(8),save,allocatable:: g(:)
+
+    if( .not. allocated(g) ) allocate(g(ndim))
+
+    iter= 0
+    f= func(ndim,x)
+    g= grad(ndim,x)
+    gnorm= sprod(ndim,g,g)
+    g(1:ndim)= g(1:ndim)/sqrt(gnorm)
+    gnorm= gnorm/ndim
+    if( iprint.eq.1 ) then
+      write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
+           ,iter,f,gnorm
+    else if( iprint.ge.2 ) then
+      write(6,'(a,i8,10es15.7)') ' iter,x,f,gnorm=' &
+           ,iter,x(1:ndim),f,gnorm
+    endif
+
+    do iter=1,maxiter
+!.....line minimization
+      call quad_interpolate(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint,func)
+!!$      call golden_section(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint,func)
+      x(1:ndim)= x(1:ndim) +alpha*g(1:ndim)
+      f= func(ndim,x)
+      g= grad(ndim,x)
+      gnorm= sprod(ndim,g,g)
+      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
+      gnorm= gnorm/ndim
+      if( iprint.eq.1 ) then
+        write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
+             ,iter,f,gnorm
+      else if( iprint.ge.2 ) then
+        write(6,'(a,i8,10es15.7)') ' iter,x,f,gnorm=' &
+             ,iter,x(1:ndim),f,gnorm
+      endif
+!.....check convergence 
+      if( abs(alpha).lt.xtol ) then
+        print *,'>>> SD converged wrt xtol'
+        return
+      else if( gnorm.lt.gtol ) then
+        print *,'>>> SD converged wrt gtol'
+        return
+      else if( abs(f-fp).lt.ftol ) then
+        print *,'>>> Sd converged wrt ftol'
+        return
+      endif
+    enddo
+    
+    print *,'*** maxiter exceeded ***'
+    print *,'steepest_descent done.'
+
+  end subroutine cg
+!=======================================================================
+  subroutine bfgs(ndim,x0,f,xtol,gtol,ftol,maxiter &
+       ,iprint,func,grad)
 !
 !  Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
 !
     implicit none
-    integer,intent(in):: ndim,maxiter
+    integer,intent(in):: ndim,maxiter,iprint
     real(8),intent(in):: xtol,gtol,ftol
     real(8),intent(inout):: f,x0(ndim)
 !!$    real(8):: func,grad
@@ -99,11 +192,18 @@
     enddo
     f= func(ndim,x0)
     g= grad(ndim,x0)
+    gnorm= sprod(ndim,g,g)
+!!$    g(1:ndim)= g(1:ndim)/sqrt(gnorm)
     x(1:ndim)= x0(1:ndim)
 
     iter= 0
-    gnorm= sprod(ndim,g,g)/ndim
-    write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+    gnorm= gnorm/ndim
+    if( iprint.eq.1 ) then
+      write(6,'(a,i8,100es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+    else if( iprint.ge.2 ) then
+      write(6,'(a,i8,100es15.7)') ' iter,x,f,gnorm=' &
+           ,iter,x(1:ndim),f,gnorm
+    endif
 
 10  continue
     do istp=1,ndim
@@ -121,35 +221,40 @@
       fp= f
       gp(1:ndim)= g(1:ndim)
 !.....line minimization
-      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,func)
+      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
+           ,iprint,func)
       x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       g= grad(ndim,x)
-      gnorm= sprod(ndim,g,g)/ndim
-      write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+      gnorm= sprod(ndim,g,g)
+!!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
+      gnorm= gnorm/ndim
+      if( iprint.eq.1 ) then
+        write(6,'(a,i8,100es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+      else if( iprint.ge.2 ) then
+        write(6,'(a,i8,100es15.7)') ' iter,x,f,gnorm=' &
+             ,iter,x(1:ndim),f,gnorm
+      endif
 !.....check convergence 
       if( abs(alpha).lt.xtol ) then
-        print *,'bfgs converged wrt xtol'
+        print *,'>>> bfgs converged wrt xtol'
         x0(1:ndim)= x(1:ndim)
         return
       else if( gnorm.lt.gtol ) then
-        print *,'bfgs converged wrt gtol'
+        print *,'>>> bfgs converged wrt gtol'
         x0(1:ndim)= x(1:ndim)
         return
       else if( abs(f-fp).lt.ftol ) then
-        print *,'bfgs converged wrt ftol'
+        print *,'>>> bfgs converged wrt ftol'
         x0(1:ndim)= x(1:ndim)
         return
       endif
       
       v(1:ndim)= alpha *u(1:ndim)
       y(1:ndim)= g(1:ndim) -gp(1:ndim)
-!!$      write(6,'(a,2es12.4)') ' v(1:ndim)=',v(1:ndim)
-!!$      write(6,'(a,2es12.4)') ' y(1:ndim)=',y(1:ndim)
 
 !.....update G matrix, gg, according to BFGS
       svy= sprod(ndim,v,y)
       svyi= 1d0/svy
-!!$      write(6,'(a,2es12.4)') ' svyi=',svyi
       do i=1,ndim
         tmp1= 0d0
         tmp2= 0d0
@@ -180,9 +285,9 @@
     
   end subroutine bfgs
 !=======================================================================
-  subroutine get_bracket(ndim,x0,d,a,b,c,fa,fb,fc,func)
+  subroutine get_bracket(ndim,x0,d,a,b,c,fa,fb,fc,iprint,func)
     implicit none
-    integer,intent(in):: ndim
+    integer,intent(in):: ndim,iprint
     real(8),intent(in):: x0(ndim),d(ndim)
     real(8),intent(inout):: a,b,fa,fb
     real(8),intent(out):: c,fc
@@ -203,12 +308,12 @@
     iter= iter +1
     if( iter.gt.MAXITER ) then
       print *,'[Error] iter.gt.MAXITER in get_bracket'
-      print *,'  Search direction could not be a descent direction.'
+      print *,'  Search direction may not be a descent direction.'
       stop
     endif
     if( abs(b-a).lt.1d-12) then
       print *,'[Error] a and b is too close in get_bracket'
-      print *,'  Search direction could not be a descent direction.'
+      print *,'  Search direction may not be a descent direction.'
       stop
     endif
     if( fa.lt.fb ) then
@@ -216,7 +321,9 @@
       fc= func(ndim,x0+c*d)
       call exchange(c,b)
       call exchange(fc,fb)
-!!$      write(6,'(a,2(1x,3es12.4))') ' a,b,c,fa,fb,fc=',a,b,c,fa,fb,fc
+      if( iprint.eq.3 ) then
+        write(6,'(a,2(1x,3es12.4))') ' a,b,c,fa,fb,fc=',a,b,c,fa,fb,fc
+      endif
       goto 10
     else
       c= a +RATIO*(b-a)
@@ -226,7 +333,9 @@
         fb= func(ndim,x0+b*d)
         call exchange(b,c)
         call exchange(fb,fc)
-!!$        write(6,'(a,2(1x,3es12.4))') ' a,b,c,fa,fb,fc=',a,b,c,fa,fb,fc
+        if( iprint.eq.3 ) then
+          write(6,'(a,2(1x,3es12.4))') ' a,b,c,fa,fb,fc=',a,b,c,fa,fb,fc
+        endif
         goto 10
       endif
 !!$      write(6,'(a,2(1x,3es12.4))') ' a,b,c,fa,fb,fc=',a,b,c,fa,fb,fc
@@ -245,9 +354,9 @@
     return
   end subroutine exchange
 !=======================================================================
-  subroutine quad_interpolate(ndim,x0,g,f,xtol,gtol,ftol,a,func)
+  subroutine quad_interpolate(ndim,x0,g,f,xtol,gtol,ftol,a,iprint,func)
     implicit none
-    integer,intent(in):: ndim
+    integer,intent(in):: ndim,iprint
     real(8),intent(in):: x0(ndim),xtol,gtol,ftol
     real(8),intent(out):: f,g(ndim),a
 
@@ -270,26 +379,19 @@
 
     if( .not. allocated(xi) ) allocate(xi(4),fi(4))
     
-!!$    print *,'quad_interpolate started.'
     xi(1)= 0d0
-    xi(2)= STP0
+    xi(2)= xi(1) +STP0
     call get_bracket(ndim,x0,g,xi(1),xi(2),xi(3),fi(1),fi(2),fi(3)&
-         ,func)
-!!$
-!!$    xi(1)= 0d0
-!!$    fi(1)= func(ndim,x0+xi(1)*g)
-!!$    xi(2)= xi(2) +STP0
-!!$    fi(2)= func(ndim,x0+xi(2)*g)
-!!$    
-!!$    if( fi(2).gt.fi(1) ) then
-!!$      xi(3)= xi(1) -STP0
-!!$    else
-!!$      xi(3)= xi(1) +2*STP0
-!!$    endif
-!!$    fi(3)= func(ndim,x0+xi(3)*g)
-
-!!$    write(6,'(a,3es12.4,1x,3es12.4)') ' xi(1:3),fi(1:3) =',xi(1:3),fi(1:3)
-!!$    print *,' g=',g(1:ndim)
+         ,iprint,func)
+    fi(1)= func(ndim,x0+xi(1)*g)
+    fi(2)= func(ndim,x0+xi(2)*g)
+    if( fi(1).gt.fi(2) ) then
+      xi(3)= xi(1) +2*STP0
+      fi(3)= func(ndim,x0+xi(3)*g)
+    else
+      xi(3)= xi(1) -STP0
+      fi(3)= func(ndim,x0+xi(3)*g)
+    endif
     
     iter= 0
 10  continue
@@ -304,7 +406,6 @@
     xi(4)= xi(2) -((xi(2)-xi(3))*q -(xi(2)-xi(1))*r) &
          /(2d0*sign(max(abs(q-r),TINY),q-r))
     fi(4)= func(ndim,x0+xi(4)*g)
-!!$    write(6,'(a,4es12.4,1x,4es12.4)') ' xi(1:4),fi(1:4) =',xi(1:4),fi(1:4)
 
     !.....step4
     fmin= min(fi(1),fi(2),fi(3))
@@ -364,7 +465,6 @@
       goto 10
     endif
 
-!!$    print *,' 004-5'
     !.....step 5: check convergence
     if( dmin.lt.xtol ) then
       imin= 0
@@ -374,20 +474,11 @@
           imin= ix
           fmin= fi(ix)
         endif
-!!$        print *,' ix,fi(ix),fmin=',ix,fi(ix),fmin
       enddo
-!!$      print *,' xi(1:4),fmin=',xi(1:4)
-!!$      print *,' fi(1:4),fmin=',fi(1:4)
-!!$      print *,' imin=',imin
       f= fi(imin)
-!!$      g(1:ndim)= g(1:ndim)*xi(imin)
       a= xi(imin)
-!!$      print *,' xi(1:4),fmin=',xi(1:4)
-!!$      print *,'quad_interpolate converged.'
-!!$      print *,xi(imin),fi(imin),g(1:ndim)
       return
     endif
-!!$    print *,' 004-6'
 
 !.....step 6: discard point of highest f value and replace it by xi(4)
     imax= 0
@@ -404,9 +495,9 @@
 
   end subroutine quad_interpolate
 !=======================================================================
-  subroutine golden_section(ndim,x0,g,f,xtol,gtol,ftol,alpha,func)
+  subroutine golden_section(ndim,x0,g,f,xtol,gtol,ftol,alpha,iprint,func)
     implicit none
-    integer,intent(in):: ndim
+    integer,intent(in):: ndim,iprint
     real(8),intent(in):: xtol,gtol,ftol,x0(ndim),g(ndim)
     real(8),intent(inout):: f,alpha
     real(8):: func
@@ -421,7 +512,7 @@
 
     a= 0d0
     b1= STP0
-    call get_bracket(ndim,x0,g,a,b1,c,fa,fb1,fc,func)
+    call get_bracket(ndim,x0,g,a,b1,c,fa,fb1,fc,iprint,func)
     xl= (c-a)
     b1= a +GR2*xl
     b2= a +GR *xl

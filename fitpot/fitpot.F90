@@ -25,6 +25,10 @@ program fitpot
   call read_vars()
 
   select case (trim(cfmethod))
+    case ('sd','SD')
+      call sd_wrapper()
+    case ('cg','CG')
+      call cg_wrapper()
     case ('bfgs','BFGS')
       call bfgs_wrapper()
     case ('sequential')
@@ -224,15 +228,52 @@ subroutine bfgs_wrapper()
   use variables
   use NN,only:NN_init,NN_func,NN_grad
   implicit none
+  integer,parameter:: iprint = 1
   integer:: i,m
   real(8):: fval
 
   !.....NN specific code hereafter
   call NN_init()
-  call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp,NN_func,NN_grad)
+  call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp &
+       ,iprint,NN_func,NN_grad)
 
   return
 end subroutine bfgs_wrapper
+!=======================================================================
+subroutine sd_wrapper()
+!
+!  Steepest descent minimization
+!
+  use variables
+  use NN,only:NN_init,NN_func,NN_grad
+  implicit none
+  integer,parameter:: iprint = 1
+  integer:: i,m
+  real(8):: fval
+
+  !.....NN specific code hereafter
+  call NN_init()
+  call steepest_descent(nvars,vars,fval,xtol,gtol,ftol,nstp&
+       ,iprint,NN_func,NN_grad)
+
+  return
+end subroutine sd_wrapper
+!=======================================================================
+subroutine cg_wrapper()
+  use variables
+  use NN,only:NN_init,NN_func,NN_grad
+  implicit none
+  integer,parameter:: iprint = 1
+  integer:: i,m
+  real(8):: fval
+
+  !.....NN specific code hereafter
+  call NN_init()
+  call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp &
+       ,iprint,NN_func,NN_grad)
+
+  return
+end subroutine cg_wrapper
 !=======================================================================
 subroutine sequential_update()
   use variables
