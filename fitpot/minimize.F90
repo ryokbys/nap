@@ -83,8 +83,8 @@
     end interface
 
     real(8),external:: sprod
-    real(8),allocatable:: gg(:,:),x(:),u(:),v(:),y(:),gp(:),ggy(:)&
-         ,ygg(:),aa(:,:),cc(:,:),g(:)
+    real(8),save,allocatable:: gg(:,:),x(:),u(:),v(:),y(:),gp(:) &
+         ,ggy(:),ygg(:),aa(:,:),cc(:,:),g(:)
     real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm
     integer:: i,j,iter,istp
 
@@ -100,14 +100,10 @@
     f= func(ndim,x0)
     g= grad(ndim,x0)
     x(1:ndim)= x0(1:ndim)
-!!$    print *,' x0=',x0(1:2)
-!!$    print *,' f =',f
-    print *,' g =',g(1:2)
 
     iter= 0
     gnorm= sprod(ndim,g,g)/ndim
-    write(6,'(a,i4,10es12.4)') ' iter,x,f,gnorm=' &
-         ,iter,x(1:ndim),f,gnorm
+    write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
 
 10  continue
     do istp=1,ndim
@@ -129,8 +125,7 @@
       x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       g= grad(ndim,x)
       gnorm= sprod(ndim,g,g)/ndim
-      write(6,'(a,i4,10es12.4)') ' iter,x,f,gnorm=' &
-           ,iter,x(1:ndim),f,gnorm
+      write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
 !.....check convergence 
       if( abs(alpha).lt.xtol ) then
         print *,'bfgs converged wrt xtol'
@@ -270,7 +265,10 @@
     end interface
 
     integer:: iter,imin,imax,ix
-    real(8):: xi(4),fi(4),r,q,fmin,fmax,dmin,dmax,d
+    real(8):: r,q,fmin,fmax,dmin,dmax,d
+    real(8),save,allocatable:: xi(:),fi(:)
+
+    if( .not. allocated(xi) ) allocate(xi(4),fi(4))
     
 !!$    print *,'quad_interpolate started.'
     xi(1)= 0d0
@@ -366,6 +364,7 @@
       goto 10
     endif
 
+!!$    print *,' 004-5'
     !.....step 5: check convergence
     if( dmin.lt.xtol ) then
       imin= 0
@@ -375,14 +374,20 @@
           imin= ix
           fmin= fi(ix)
         endif
+!!$        print *,' ix,fi(ix),fmin=',ix,fi(ix),fmin
       enddo
+!!$      print *,' xi(1:4),fmin=',xi(1:4)
+!!$      print *,' fi(1:4),fmin=',fi(1:4)
+!!$      print *,' imin=',imin
       f= fi(imin)
 !!$      g(1:ndim)= g(1:ndim)*xi(imin)
       a= xi(imin)
+!!$      print *,' xi(1:4),fmin=',xi(1:4)
 !!$      print *,'quad_interpolate converged.'
 !!$      print *,xi(imin),fi(imin),g(1:ndim)
       return
     endif
+!!$    print *,' 004-6'
 
 !.....step 6: discard point of highest f value and replace it by xi(4)
     imax= 0

@@ -222,63 +222,21 @@ end subroutine write_vars
 !=======================================================================
 subroutine bfgs_wrapper()
   use variables
-  use NN,only:NN_init,NN_get_f,NN_get_g
+  use NN,only:NN_init,NN_func,NN_grad
   implicit none
   integer:: i,m
-  real(8):: fval,fmin
-  real(8),allocatable:: gval(:),w(:),diag(:)
-
-  !.....for lbfgs library
-  integer,parameter:: msave= 7
-  integer:: mp,lp,iprint(2),iflag,istp,nwork
-  real(8):: bgtol,bstpmin,bstpmax
-  logical:: ldiagco
-!  external:: lb2
-  common /lb3/mp,lp,bgtol,bstpmin,bstpmax
-  
-  nwork= nvars*(2*msave+1) +2*msave
-  allocate(gval(nvars),w(nwork),diag(nvars))
+  real(8):: fval
 
   !.....NN specific code hereafter
   call NN_init()
-  call NN_get_f(fval)
-  call NN_get_g(gval)
-!!$  print *, 'fval=',fval
-!!$  print *, 'gval:'
-!!$  do i=1,nvars
-!!$    print *, 'i,g=',i,gval(i)
-!!$  enddo
+  call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp,NN_func,NN_grad)
 
-  !.....bfgs wrapper
-  fmin= 1d+20
-  m= 5
-  ldiagco= .false.
-  iprint(1)= 1
-  iprint(2)= 0
-  istp= 0
-  iflag= 0
-10 continue
-  call NN_get_f(fval)
-  call NN_get_g(gval)
-  call lbfgs(nvars,m,vars,fval,gval,ldiagco,diag,iprint,eps,xtol &
-       ,w,iflag)
-!!$  print *, 'istp,fval,iflag=',istp,fval,iflag
-!!$  if( fmin.gt.fval ) then
-!!$    fmin= fval
-!!$    call write_vars()
-!!$  endif
-  if( iflag.le.0 ) goto 999
-  istp= istp +1
-  if( istp.gt.nstp ) goto 999
-  goto 10
-
-999 continue
   return
 end subroutine bfgs_wrapper
 !=======================================================================
 subroutine sequential_update()
   use variables
-  use NN,only:NN_init,NN_get_fs,NN_get_gs,NN_get_f,NN_get_g
+  use NN,only:NN_init,NN_get_fs,NN_get_gs,NN_func,NN_grad
   implicit none
   real(8),allocatable:: gval(:)
   integer:: istp,ismpl,iv
@@ -309,8 +267,8 @@ subroutine sequential_update()
 !!$      write(6,'(a,2i6,2es15.7)') ' istp,ismpl,f,gnorm='&
 !!$           ,istp,ismpl,fval,gnorm
     enddo
-    call NN_get_f(fval)
-    call NN_get_g(gval)
+    fval= NN_func(nvars,vars)
+    gval= NN_grad(nvars,vars)
     gnorm= 0d0
     do iv=1,nvars
       gnorm= gnorm +gval(iv)*gval(iv)
@@ -322,7 +280,7 @@ end subroutine sequential_update
 !=======================================================================
 subroutine check_grad()
   use variables
-  use NN,only:NN_init,NN_get_f,NN_get_g
+  use NN,only:NN_init,NN_func,NN_grad
   implicit none
   integer:: iv
   real(8):: f0,ftmp,dv,vmax
@@ -330,8 +288,8 @@ subroutine check_grad()
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
   call NN_init()
-  call NN_get_f(f0)
-  call NN_get_g(ganal)
+  f0= NN_func(nvars,vars)
+  ganal= NN_grad(nvars,vars)
 
   vars0(1:nvars)= vars(1:nvars)
   vmax= 0d0
@@ -346,7 +304,7 @@ subroutine check_grad()
     vars(1:nvars)= vars0(1:nvars)
 !!$    dv= vars(iv) *1d-3
     vars(iv)= vars(iv) +dv
-    call NN_get_f(ftmp)
+    ftmp= NN_func(nvars,vars)
     gnumer(iv)= (ftmp-f0)/dv
   enddo
 
@@ -364,7 +322,7 @@ end subroutine check_grad
 !=======================================================================
 subroutine test()
   use variables
-  use NN,only:NN_init,NN_get_f,NN_get_g
+  use NN,only:NN_init,NN_func,NN_grad
   implicit none 
   integer:: iv
   real(8):: ft
@@ -373,8 +331,8 @@ subroutine test()
   allocate(gt(nvars))
 
   call NN_init()
-  call NN_get_f(ft)
-  call NN_get_g(gt)
+  ft= NN_func(nvars,vars)
+  gt= NN_grad(nvars,vars)
   
   print *,'func value=',ft
   print *,'grad values:'

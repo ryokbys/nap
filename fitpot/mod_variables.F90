@@ -8,7 +8,9 @@ module variables
   character(len=128):: crunmode= 'serial'
   integer:: nprcs= 1
   real(8):: eps= 1d-8
-  real(8):: xtol= 1d-5
+  real(8):: xtol= 1d-3
+  real(8):: gtol= 1d-3
+  real(8):: ftol= 1d-3
   integer,parameter:: maxnsp= 3
   real(8):: eatom(maxnsp)
   logical:: lfmatch= .true.

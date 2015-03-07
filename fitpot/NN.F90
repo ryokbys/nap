@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-03-05 07:46:46 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-03-07 14:31:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -88,16 +88,20 @@ contains
     print *, 'NN_init done.'
   end subroutine NN_init
 !=======================================================================
-  subroutine NN_get_f(fval)
-    use variables
+  function NN_func(ndim,x)
+    use variables, only:nsmpl,nprcs,timef,samples,lfmatch,lfscale &
+         ,fscl
     implicit none
-    real(8),intent(out):: fval
+    integer,intent(in):: ndim
+    real(8),intent(in):: x(ndim)
+    real(8):: NN_func
+
     integer:: ismpl,natm,ia,ixyz
     integer:: ic0,ic1,icr
     real(8):: dn3i,ediff
 
     call system_clock(ic0,icr)
-    call vars2wgts(nvars,vars)
+    call vars2wgts(ndim,x)
     
     if( nprcs.eq.1 ) then
       do ismpl=1,nsmpl
@@ -112,12 +116,12 @@ contains
       stop
     endif
 
-    fval= 0d0
+    NN_func= 0d0
     do ismpl=1,nsmpl
       natm= samples(ismpl)%natm
       ediff= (samples(ismpl)%epot -samples(ismpl)%eref)
       ediff= ediff*ediff /natm
-      fval= fval +ediff
+      NN_func= NN_func +ediff
       if( .not. lfmatch ) cycle
       fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
            -samples(ismpl)%fref(1:3,1:natm))
@@ -129,7 +133,7 @@ contains
            *dn3i *fscl
       do ia=1,natm
         do ixyz=1,3
-          fval= fval +fdiff(ixyz,ia)
+          NN_func= NN_func +fdiff(ixyz,ia)
         enddo
       enddo
     enddo
@@ -138,7 +142,7 @@ contains
 !!$    write(6,'(a,f15.3)')  '>>> time NN_get_f =',t1-t0
     timef= timef +dble(ic1-ic0)/icr
     return
-  end subroutine NN_get_f
+  end function NN_func
 !=======================================================================
   subroutine NN_get_fs(ismpl,fval)
     use variables
@@ -299,20 +303,23 @@ contains
     
   end subroutine calc_ef2
 !=======================================================================
-  subroutine NN_get_g(gval)
-    use variables
+  function NN_grad(ndim,x)
+    use variables,only: nsmpl,nprcs,timeg
     implicit none
-    real(8),intent(out):: gval(nvars)
+    integer,intent(in):: ndim
+    real(8),intent(in):: x(ndim)
+    real(8):: NN_grad(ndim)
+    
     integer:: ismpl,i
     integer:: ic0,ic1,icr
     real(8),save,allocatable:: gs(:)
     real(8):: gmax,vmax
 
-    if( .not.allocated(gs) ) allocate(gs(nvars))
+    if( .not.allocated(gs) ) allocate(gs(ndim))
 
     call system_clock(ic0,icr)
 
-    gval(1:nvars)= 0d0
+    NN_grad(1:ndim)= 0d0
 
     if( nprcs.eq.1 ) then
       do ismpl=1,nsmpl
@@ -321,7 +328,7 @@ contains
         else if( nl.eq.2 ) then
           call grad2(ismpl,gs)
         endif
-        gval(1:nvars)= gval(1:nvars) +gs(1:nvars)
+        NN_grad(1:ndim)= NN_grad(1:ndim) +gs(1:ndim)
       enddo
     else
       print *,'[nprcs.ne.1] is not implemented yet in NN_get_g.'
@@ -331,18 +338,18 @@ contains
 !!$    if( lgscale ) then
 !!$      gmax= 0d0
 !!$      vmax= 0d0
-!!$      do i=1,nvars
+!!$      do i=1,ndim
 !!$        vmax= max(vmax,abs(vars(i)))
 !!$        gmax= max(gmax,abs(gval(i)))
 !!$      enddo
-!!$      gval(1:nvars)= gval(1:nvars)/gmax *gscl*vmax
+!!$      gval(1:ndim)= gval(1:ndim)/gmax *gscl*vmax
 !!$    endif
 
     call system_clock(ic1)
 !!$    write(6,'(a,f15.3)')  '>>> time NN_get_g =',t1-t0
     timeg= timeg +dble(ic1-ic0)/icr
     return
-  end subroutine NN_get_g
+  end function NN_grad
 !=======================================================================
   subroutine NN_get_gs(ismpl,gval)
     use variables
