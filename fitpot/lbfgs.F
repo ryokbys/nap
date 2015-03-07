@@ -821,7 +821,6 @@ C
 C
 C        FORCE THE STEP TO BE WITHIN THE BOUNDS STPMAX AND STPMIN.
 C
-c         print *,' stp=',stp
          STP = MAX(STP,STPMIN)
          STP = MIN(STP,STPMAX)
 C
@@ -845,6 +844,7 @@ C
    45    INFO=0
          NFEV = NFEV + 1
          DG = ZERO
+         print *,' stp,f=',stp,f
          DO 50 J = 1, N
             DG = DG + G(J)*S(J)
    50       CONTINUE

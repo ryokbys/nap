@@ -27,6 +27,8 @@ program fitpot
   select case (trim(cfmethod))
     case ('bfgs','BFGS')
       call bfgs_wrapper()
+    case ('sequential')
+      call sequential_update()
     case ('check_grad')
       call check_grad()
     case ('test','TEST')
@@ -273,6 +275,50 @@ subroutine bfgs_wrapper()
 999 continue
   return
 end subroutine bfgs_wrapper
+!=======================================================================
+subroutine sequential_update()
+  use variables
+  use NN,only:NN_init,NN_get_fs,NN_get_gs,NN_get_f,NN_get_g
+  implicit none
+  real(8),allocatable:: gval(:)
+  integer:: istp,ismpl,iv
+  real(8):: gnorm,dsc,gmax,vmax,fval
+
+  allocate(gval(nvars))
+
+  call NN_init()
+
+  do istp=1,nstp
+    do ismpl=1,nsmpl
+      call NN_get_fs(ismpl,fval)
+      call NN_get_gs(ismpl,gval)
+      gmax= 0d0
+      vmax= 0d0
+      do iv=1,nvars
+        gmax= max(gmax,abs(gval(iv)))
+        vmax= max(vmax,abs(vars(iv)))
+      enddo
+      dsc= min(vmax/gmax,seqcoef)
+      vars(1:nvars)=vars(1:nvars) -dsc*gval(1:nvars)
+!!$      call NN_get_f(fval)
+!!$      call NN_get_g(gval)
+!!$      gnorm= 0d0
+!!$      do iv=1,nvars
+!!$        gnorm= gnorm +gval(iv)*gval(iv)
+!!$      enddo
+!!$      write(6,'(a,2i6,2es15.7)') ' istp,ismpl,f,gnorm='&
+!!$           ,istp,ismpl,fval,gnorm
+    enddo
+    call NN_get_f(fval)
+    call NN_get_g(gval)
+    gnorm= 0d0
+    do iv=1,nvars
+      gnorm= gnorm +gval(iv)*gval(iv)
+    enddo
+    write(6,'(a,i6,2es15.7)') ' istp,f,gnorm=',istp,fval,gnorm
+  enddo
+
+end subroutine sequential_update
 !=======================================================================
 subroutine check_grad()
   use variables

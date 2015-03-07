@@ -23,6 +23,7 @@ module variables
   real(8):: swbeta = 1d0
   logical:: lpena  = .false.
   real(8):: pwgt   = 1d0
+  real(8):: seqcoef= 1d-2
 
 !!$  character(len=5),allocatable:: cdirlist(:)
 

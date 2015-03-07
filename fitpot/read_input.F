@@ -108,6 +108,9 @@ c=======================================================================
       elseif( trim(cname).eq.'num_multiprocess' ) then
         call read_i1(ionum,nprcs)
         return
+      elseif( trim(cname).eq.'coeff_sequential' ) then
+        call read_r1(ionum,seqcoef)
+        return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return
