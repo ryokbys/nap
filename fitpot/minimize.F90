@@ -30,7 +30,7 @@
     f= func(ndim,x)
     g= grad(ndim,x)
     gnorm= sprod(ndim,g,g)
-    g(1:ndim)= g(1:ndim)/sqrt(gnorm)
+    g(1:ndim)= -g(1:ndim)/sqrt(gnorm)
     gnorm= gnorm/ndim
     if( iprint.eq.1 ) then
       write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
@@ -48,7 +48,7 @@
       f= func(ndim,x)
       g= grad(ndim,x)
       gnorm= sprod(ndim,g,g)
-      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
+      g(1:ndim)= -g(1:ndim)/sqrt(gnorm)
       gnorm= gnorm/ndim
       if( iprint.eq.1 ) then
         write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
@@ -60,12 +60,15 @@
 !.....check convergence 
       if( abs(alpha).lt.xtol ) then
         print *,'>>> SD converged wrt xtol'
+        write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
         return
       else if( gnorm.lt.gtol ) then
         print *,'>>> SD converged wrt gtol'
+        write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
         return
       else if( abs(f-fp).lt.ftol ) then
         print *,'>>> Sd converged wrt ftol'
+        write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp),ftol
         return
       endif
     enddo
@@ -97,17 +100,17 @@
     end interface
 
     integer:: iter
-    real(8):: alpha,fp,gnorm
+    real(8):: alpha,fp,gnorm,gnormp
     real(8),external:: sprod
-    real(8),save,allocatable:: g(:)
+    real(8),save,allocatable:: g(:),u(:)
 
-    if( .not. allocated(g) ) allocate(g(ndim))
+    if( .not. allocated(g) ) allocate(g(ndim),u(ndim))
 
     iter= 0
     f= func(ndim,x)
     g= grad(ndim,x)
     gnorm= sprod(ndim,g,g)
-    g(1:ndim)= g(1:ndim)/sqrt(gnorm)
+!!$    g(1:ndim)= g(1:ndim)/sqrt(gnorm)
     gnorm= gnorm/ndim
     if( iprint.eq.1 ) then
       write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
@@ -116,17 +119,21 @@
       write(6,'(a,i8,10es15.7)') ' iter,x,f,gnorm=' &
            ,iter,x(1:ndim),f,gnorm
     endif
+    u(1:ndim)= -g(1:ndim)
 
     do iter=1,maxiter
 !.....line minimization
-      call quad_interpolate(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint,func)
-!!$      call golden_section(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint,func)
-      x(1:ndim)= x(1:ndim) +alpha*g(1:ndim)
+      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint,func)
+!!$      call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint,func)
+      x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       f= func(ndim,x)
       g= grad(ndim,x)
+!.....store previous gnorm
+      gnormp= gnorm
       gnorm= sprod(ndim,g,g)
-      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
+!!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
       gnorm= gnorm/ndim
+      u(1:ndim)= -g(1:ndim) +gnorm/gnormp *u(1:ndim)
       if( iprint.eq.1 ) then
         write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
              ,iter,f,gnorm
@@ -136,13 +143,16 @@
       endif
 !.....check convergence 
       if( abs(alpha).lt.xtol ) then
-        print *,'>>> SD converged wrt xtol'
+        print *,'>>> CG converged wrt xtol'
+        write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
         return
       else if( gnorm.lt.gtol ) then
-        print *,'>>> SD converged wrt gtol'
+        print *,'>>> CG converged wrt gtol'
+        write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
         return
       else if( abs(f-fp).lt.ftol ) then
-        print *,'>>> Sd converged wrt ftol'
+        print *,'>>> CG converged wrt ftol'
+        write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp),ftol
         return
       endif
     enddo
@@ -236,16 +246,19 @@
       endif
 !.....check convergence 
       if( abs(alpha).lt.xtol ) then
-        print *,'>>> bfgs converged wrt xtol'
+        print *,'>>> BFGS converged wrt xtol'
+        write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
         x0(1:ndim)= x(1:ndim)
         return
       else if( gnorm.lt.gtol ) then
-        print *,'>>> bfgs converged wrt gtol'
+        print *,'>>> BFGS converged wrt gtol'
         x0(1:ndim)= x(1:ndim)
+        write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
         return
       else if( abs(f-fp).lt.ftol ) then
-        print *,'>>> bfgs converged wrt ftol'
+        print *,'>>> BFGS converged wrt ftol'
         x0(1:ndim)= x(1:ndim)
+        write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp),ftol
         return
       endif
       
@@ -383,15 +396,15 @@
     xi(2)= xi(1) +STP0
     call get_bracket(ndim,x0,g,xi(1),xi(2),xi(3),fi(1),fi(2),fi(3)&
          ,iprint,func)
-    fi(1)= func(ndim,x0+xi(1)*g)
-    fi(2)= func(ndim,x0+xi(2)*g)
-    if( fi(1).gt.fi(2) ) then
-      xi(3)= xi(1) +2*STP0
-      fi(3)= func(ndim,x0+xi(3)*g)
-    else
-      xi(3)= xi(1) -STP0
-      fi(3)= func(ndim,x0+xi(3)*g)
-    endif
+!!$    fi(1)= func(ndim,x0+xi(1)*g)
+!!$    fi(2)= func(ndim,x0+xi(2)*g)
+!!$    if( fi(1).gt.fi(2) ) then
+!!$      xi(3)= xi(1) +2*STP0
+!!$      fi(3)= func(ndim,x0+xi(3)*g)
+!!$    else
+!!$      xi(3)= xi(1) -STP0
+!!$      fi(3)= func(ndim,x0+xi(3)*g)
+!!$    endif
     
     iter= 0
 10  continue
