@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-03-04 13:05:30 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-03-05 07:46:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -139,6 +139,50 @@ contains
     timef= timef +dble(ic1-ic0)/icr
     return
   end subroutine NN_get_f
+!=======================================================================
+  subroutine NN_get_fs(ismpl,fval)
+    use variables
+    implicit none
+    integer,intent(in):: ismpl
+    real(8),intent(out):: fval
+    integer:: natm,ia,ixyz
+    integer:: ic0,ic1,icr
+    real(8):: dn3i,ediff
+
+    call system_clock(ic0,icr)
+    call vars2wgts(nvars,vars)
+
+    if( nl.eq.1 ) then
+      call calc_ef1(ismpl)
+    else if( nl.eq.2 ) then
+      call calc_ef2(ismpl)
+    endif
+
+    fval= 0d0
+    natm= samples(ismpl)%natm
+    ediff= (samples(ismpl)%epot -samples(ismpl)%eref)
+    ediff= ediff*ediff /natm
+    fval= fval +ediff
+    if( .not. lfmatch ) goto 999
+    fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
+         -samples(ismpl)%fref(1:3,1:natm))
+    dn3i= 1d0 /(3*natm)
+    fscl= 1d0
+!.....force-scale makes force contribution same order to energy
+    if( lfscale ) fscl= 1d0/(3*natm)
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
+         *dn3i *fscl
+    do ia=1,natm
+      do ixyz=1,3
+        fval= fval +fdiff(ixyz,ia)
+      enddo
+    enddo
+
+999 continue
+    call system_clock(ic1)
+    timef= timef +dble(ic1-ic0)/icr
+    return
+  end subroutine NN_get_fs
 !=======================================================================
   subroutine calc_ef1(ismpl)
     use variables
@@ -299,6 +343,43 @@ contains
     timeg= timeg +dble(ic1-ic0)/icr
     return
   end subroutine NN_get_g
+!=======================================================================
+  subroutine NN_get_gs(ismpl,gval)
+    use variables
+    implicit none
+    integer,intent(in):: ismpl
+    real(8),intent(out):: gval(nvars)
+    integer:: i
+    integer:: ic0,ic1,icr
+    real(8),save,allocatable:: gs(:)
+    real(8):: gmax,vmax
+
+    if( .not.allocated(gs) ) allocate(gs(nvars))
+
+    call system_clock(ic0,icr)
+
+    gval(1:nvars)= 0d0
+    if( nl.eq.1 ) then
+      call grad1(ismpl,gs)
+    else if( nl.eq.2 ) then
+      call grad2(ismpl,gs)
+    endif
+    gval(1:nvars)= gval(1:nvars) +gs(1:nvars)
+
+!!$    if( lgscale ) then
+!!$      gmax= 0d0
+!!$      vmax= 0d0
+!!$      do i=1,nvars
+!!$        vmax= max(vmax,abs(vars(i)))
+!!$        gmax= max(gmax,abs(gval(i)))
+!!$      enddo
+!!$      gval(1:nvars)= gval(1:nvars)/gmax *gscl*vmax
+!!$    endif
+
+    call system_clock(ic1)
+    timeg= timeg +dble(ic1-ic0)/icr
+    return
+  end subroutine NN_get_gs
 !=======================================================================
   subroutine grad1(ismpl,gs)
     use variables
