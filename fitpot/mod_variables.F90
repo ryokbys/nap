@@ -43,6 +43,7 @@ module variables
   real(8),save:: rcut
 
   real(4),save:: timef,timeg
+  integer,save:: nfunc,ngrad
   integer,save:: iflag
 
 end module variables

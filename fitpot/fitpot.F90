@@ -14,6 +14,7 @@ program fitpot
     end subroutine write_force_relation
   end interface
 
+
   call read_input(10,'in.fitpot')
   allocate(samples(nsmpl))
   call write_initial_setting()
@@ -55,7 +56,9 @@ program fitpot
   call write_force_relation('fin')
 
   call write_statistics()
-  
+
+  write(6,'(a,i8)') ' num of function calls=',nfunc
+  write(6,'(a,i8)') ' num of gradient calls=',ngrad
   write(6,'(a,f15.3,a)') ' time function =', timef,' sec'
   write(6,'(a,f15.3,a)') ' time gradient =', timeg,' sec'
 

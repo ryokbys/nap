@@ -238,6 +238,7 @@
       if( iter.gt.maxiter ) then
         print *,'***** maxiter exceeded *****'
         iflag= iflag +10
+        x0(1:ndim)= x(1:ndim)
         return
       endif
       u(1:ndim)= 0d0
@@ -251,7 +252,10 @@
 !.....line minimization
       call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
            ,iprint,iflag,func)
-      if( iflag/100.ne.0 ) return
+      if( iflag/100.ne.0 ) then
+        x0(1:ndim)= x(1:ndim)
+        return
+      endif
       x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       g= grad(ndim,x)
       gnorm= sprod(ndim,g,g)

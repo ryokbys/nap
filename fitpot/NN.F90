@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-03-07 14:31:46 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-03-10 18:22:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -33,6 +33,8 @@ contains
 
     timef= 0.0
     timeg= 0.0
+    nfunc= 0
+    ngrad= 0
 
     !.....read in.const.NN to get nl,nsp,nhl(:)
     open(20,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
@@ -90,7 +92,7 @@ contains
 !=======================================================================
   function NN_func(ndim,x)
     use variables, only:nsmpl,nprcs,timef,samples,lfmatch,lfscale &
-         ,fscl
+         ,fscl,nfunc
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -99,6 +101,8 @@ contains
     integer:: ismpl,natm,ia,ixyz
     integer:: ic0,ic1,icr
     real(8):: dn3i,ediff
+
+    nfunc= nfunc +1
 
     call system_clock(ic0,icr)
     call vars2wgts(ndim,x)
@@ -304,7 +308,7 @@ contains
   end subroutine calc_ef2
 !=======================================================================
   function NN_grad(ndim,x)
-    use variables,only: nsmpl,nprcs,timeg
+    use variables,only: nsmpl,nprcs,timeg,ngrad
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -316,6 +320,8 @@ contains
     real(8):: gmax,vmax
 
     if( .not.allocated(gs) ) allocate(gs(ndim))
+
+    ngrad= ngrad +1
 
     call system_clock(ic0,icr)
 
@@ -672,13 +678,15 @@ contains
           h2= sds(ismpl)%hl2(ja,ihl2)
           dh2= h2*(1d0-h2)
           ddh2= dh2*(1d0-2d0*h2)
+          t1= w3*ddh2*(h1-0.5d0)
+          t2= w3*dh1*dh2
           do ia=1,natm
-            tmp=tmp +w3 *ddh2*h1*( &
+            tmp=tmp +t1*( &
                  fdiff(1,ia) *w2sw1dg(1,ia,ja,ihl2) &
                  +fdiff(2,ia)*w2sw1dg(2,ia,ja,ihl2) &
                  +fdiff(3,ia)*w2sw1dg(3,ia,ja,ihl2) &
                  )
-            tmp=tmp +w3 *dh1*dh2*( &
+            tmp=tmp +t2*( &
                  fdiff(1,ia) *w1dg(1,ia,ja,ihl1) &
                  +fdiff(2,ia)*w1dg(2,ia,ja,ihl1) &
                  +fdiff(3,ia)*w1dg(3,ia,ja,ihl1) &
