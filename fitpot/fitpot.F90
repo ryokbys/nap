@@ -41,6 +41,14 @@ program fitpot
       print *,'unknown fitting_method:',trim(cfmethod)
       stop
   end select
+
+  if( iflag/1000.ne.0 ) then
+    print *,'something wrong with 1D line search.'
+    print *,'  iflag=',iflag
+  else if( iflag/100.ne.0 ) then
+    print *,'something wrong with minimization.'
+    print *,'  iflag=',iflag
+  endif
   
   call write_vars('fin')
   call write_energy_relation('fin')
@@ -240,7 +248,7 @@ subroutine bfgs_wrapper()
   !.....NN specific code hereafter
   call NN_init()
   call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp &
-       ,iprint,NN_func,NN_grad)
+       ,iprint,iflag,NN_func,NN_grad)
 
   return
 end subroutine bfgs_wrapper
@@ -259,7 +267,7 @@ subroutine sd_wrapper()
   !.....NN specific code hereafter
   call NN_init()
   call steepest_descent(nvars,vars,fval,xtol,gtol,ftol,nstp&
-       ,iprint,NN_func,NN_grad)
+       ,iprint,iflag,NN_func,NN_grad)
 
   return
 end subroutine sd_wrapper
@@ -275,7 +283,7 @@ subroutine cg_wrapper()
   !.....NN specific code hereafter
   call NN_init()
   call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp &
-       ,iprint,NN_func,NN_grad)
+       ,iprint,iflag,NN_func,NN_grad)
 
   return
 end subroutine cg_wrapper

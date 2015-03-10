@@ -1,8 +1,9 @@
 !=======================================================================
   subroutine steepest_descent(ndim,x,f,xtol,gtol,ftol,maxiter &
-       ,iprint,func,grad)
+       ,iprint,iflag,func,grad)
     implicit none
     integer,intent(in):: ndim,maxiter,iprint
+    integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
     real(8),intent(inout):: f,x(ndim)
 !!$    real(8):: func,grad
@@ -42,8 +43,11 @@
 
     do iter=1,maxiter
 !.....line minimization
-      call quad_interpolate(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint,func)
-!!$      call golden_section(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint,func)
+      call quad_interpolate(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint &
+           ,iflag,func)
+!!$      call golden_section(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint
+!!              ,iflag,func)
+      if( iflag/100.ne.0 ) return
       x(1:ndim)= x(1:ndim) +alpha*g(1:ndim)
       f= func(ndim,x)
       g= grad(ndim,x)
@@ -61,29 +65,34 @@
       if( abs(alpha).lt.xtol ) then
         print *,'>>> SD converged wrt xtol'
         write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
+        iflag= iflag +1
         return
       else if( gnorm.lt.gtol ) then
         print *,'>>> SD converged wrt gtol'
         write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+        iflag= iflag +2
         return
       else if( abs(f-fp).lt.ftol ) then
         print *,'>>> Sd converged wrt ftol'
         write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp),ftol
+        iflag= iflag +3
         return
       endif
     enddo
     
     print *,'*** maxiter exceeded ***'
+    iflag= iflag +10
     print *,'steepest_descent done.'
 
   end subroutine steepest_descent
 !=======================================================================
-  subroutine cg(ndim,x,f,xtol,gtol,ftol,maxiter,iprint,func,grad)
+  subroutine cg(ndim,x,f,xtol,gtol,ftol,maxiter,iprint,iflag,func,grad)
 !
 !  Conjugate gradient minimization
 !
     implicit none
     integer,intent(in):: ndim,maxiter,iprint
+    integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
     real(8),intent(inout):: f,x(ndim)
     interface
@@ -123,8 +132,11 @@
 
     do iter=1,maxiter
 !.....line minimization
-      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint,func)
-!!$      call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint,func)
+      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint &
+           ,iflag,func)
+!!$      call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint
+!!              ,iflag,func)
+      if( iflag/100.ne.0 ) return
       x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       f= func(ndim,x)
       g= grad(ndim,x)
@@ -145,30 +157,35 @@
       if( abs(alpha).lt.xtol ) then
         print *,'>>> CG converged wrt xtol'
         write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
+        iflag= iflag +1
         return
       else if( gnorm.lt.gtol ) then
         print *,'>>> CG converged wrt gtol'
         write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+        iflag= iflag +2
         return
       else if( abs(f-fp).lt.ftol ) then
         print *,'>>> CG converged wrt ftol'
         write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp),ftol
+        iflag= iflag +3
         return
       endif
     enddo
     
     print *,'*** maxiter exceeded ***'
+    iflag= iflag +10
     print *,'steepest_descent done.'
 
   end subroutine cg
 !=======================================================================
   subroutine bfgs(ndim,x0,f,xtol,gtol,ftol,maxiter &
-       ,iprint,func,grad)
+       ,iprint,iflag,func,grad)
 !
 !  Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
 !
     implicit none
     integer,intent(in):: ndim,maxiter,iprint
+    integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
     real(8),intent(inout):: f,x0(ndim)
 !!$    real(8):: func,grad
@@ -220,6 +237,7 @@
       iter= iter +1
       if( iter.gt.maxiter ) then
         print *,'***** maxiter exceeded *****'
+        iflag= iflag +10
         return
       endif
       u(1:ndim)= 0d0
@@ -232,7 +250,8 @@
       gp(1:ndim)= g(1:ndim)
 !.....line minimization
       call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
-           ,iprint,func)
+           ,iprint,iflag,func)
+      if( iflag/100.ne.0 ) return
       x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       g= grad(ndim,x)
       gnorm= sprod(ndim,g,g)
@@ -249,16 +268,19 @@
         print *,'>>> BFGS converged wrt xtol'
         write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
         x0(1:ndim)= x(1:ndim)
+        iflag= iflag +1
         return
       else if( gnorm.lt.gtol ) then
         print *,'>>> BFGS converged wrt gtol'
         x0(1:ndim)= x(1:ndim)
         write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+        iflag= iflag +2
         return
       else if( abs(f-fp).lt.ftol ) then
         print *,'>>> BFGS converged wrt ftol'
         x0(1:ndim)= x(1:ndim)
         write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp),ftol
+        iflag= iflag +3
         return
       endif
       
@@ -298,9 +320,10 @@
     
   end subroutine bfgs
 !=======================================================================
-  subroutine get_bracket(ndim,x0,d,a,b,c,fa,fb,fc,iprint,func)
+  subroutine get_bracket(ndim,x0,d,a,b,c,fa,fb,fc,iprint,iflag,func)
     implicit none
     integer,intent(in):: ndim,iprint
+    integer,intent(inout):: iflag
     real(8),intent(in):: x0(ndim),d(ndim)
     real(8),intent(inout):: a,b,fa,fb
     real(8),intent(out):: c,fc
@@ -322,12 +345,16 @@
     if( iter.gt.MAXITER ) then
       print *,'[Error] iter.gt.MAXITER in get_bracket'
       print *,'  Search direction may not be a descent direction.'
-      stop
+      iflag= iflag +1000
+      return
+!!$      stop
     endif
     if( abs(b-a).lt.1d-12) then
       print *,'[Error] a and b is too close in get_bracket'
       print *,'  Search direction may not be a descent direction.'
-      stop
+      iflag= iflag +2000
+      return
+!!$      stop
     endif
     if( fa.lt.fb ) then
       c= a +RATIOI*(b-a)
@@ -367,16 +394,18 @@
     return
   end subroutine exchange
 !=======================================================================
-  subroutine quad_interpolate(ndim,x0,g,f,xtol,gtol,ftol,a,iprint,func)
+  subroutine quad_interpolate(ndim,x0,g,f,xtol,gtol,ftol,a,iprint &
+       ,iflag,func)
     implicit none
     integer,intent(in):: ndim,iprint
+    integer,intent(inout):: iflag
     real(8),intent(in):: x0(ndim),xtol,gtol,ftol
     real(8),intent(out):: f,g(ndim),a
 
     real(8),parameter:: STP0    = 1d-1
     real(8),parameter:: STPMAX  = 1d+1
     real(8),parameter:: TINY    = 1d-15
-    integer,parameter:: MAXITER = 20
+    integer,parameter:: MAXITER = 100
 
     interface
       function func(n,x)
@@ -395,7 +424,8 @@
     xi(1)= 0d0
     xi(2)= xi(1) +STP0
     call get_bracket(ndim,x0,g,xi(1),xi(2),xi(3),fi(1),fi(2),fi(3)&
-         ,iprint,func)
+         ,iprint,iflag,func)
+    if( iflag/1000.ne.0 ) return
 !!$    fi(1)= func(ndim,x0+xi(1)*g)
 !!$    fi(2)= func(ndim,x0+xi(2)*g)
 !!$    if( fi(1).gt.fi(2) ) then
@@ -411,7 +441,10 @@
     iter= iter +1
     if( iter.gt.MAXITER ) then
       print *,' [Error] iter.gt.MAXITER in quad_interpolate !!!'
-      stop
+      print *,'   iter,MAXITER= ',iter,MAXITER
+      iflag= iflag +100
+      return
+!!$      stop
     endif
     !.....step 3; compute turning point
     r= (xi(2)-xi(1))*(fi(2)-fi(3))
@@ -508,9 +541,11 @@
 
   end subroutine quad_interpolate
 !=======================================================================
-  subroutine golden_section(ndim,x0,g,f,xtol,gtol,ftol,alpha,iprint,func)
+  subroutine golden_section(ndim,x0,g,f,xtol,gtol,ftol,alpha,iprint &
+       ,iflag,func)
     implicit none
     integer,intent(in):: ndim,iprint
+    integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol,x0(ndim),g(ndim)
     real(8),intent(inout):: f,alpha
     real(8):: func
@@ -525,7 +560,8 @@
 
     a= 0d0
     b1= STP0
-    call get_bracket(ndim,x0,g,a,b1,c,fa,fb1,fc,iprint,func)
+    call get_bracket(ndim,x0,g,a,b1,c,fa,fb1,fc,iprint,iflag,func)
+    if( iflag/1000.ne.0 ) return
     xl= (c-a)
     b1= a +GR2*xl
     b2= a +GR *xl
@@ -535,7 +571,10 @@
     iter= iter +1
     if( iter.gt.MAXITER ) then
       print *,'[Error] iter.gt.MAXITER in golden_section.'
-      stop
+      print *,'  iter,MAXITER = ',iter,MAXITER
+      iflag= iflag +100
+      return
+!!$      stop
     endif
     fb1= func(ndim,x0+b1*g)
     fb2= func(ndim,x0+b2*g)
