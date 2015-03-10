@@ -160,13 +160,18 @@ end subroutine read_pos
 !=======================================================================
 subroutine read_ref_data()
   use variables
-  integer:: ismpl,i
+  integer:: ismpl,i,is
 
   do ismpl=1,nsmpl
     open(13,file=trim(cmaindir)//'/'//samples(ismpl)%cdirname &
          //'/erg.ref',status='old')
     read(13,*) samples(ismpl)%eref
     close(13)
+!.....reduce atomic energy from eref
+    do i=1,samples(ismpl)%natm
+      is= samples(ismpl)%tag(i)
+      eref= eref -eatom(is)
+    enddo
 
     open(14,file=trim(cmaindir)//'/'//samples(ismpl)%cdirname &
          //'/frc.ref',status='old')
