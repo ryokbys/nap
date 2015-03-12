@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-03-04 13:05:30 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-03-12 18:02:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -28,28 +28,39 @@ contains
 !=======================================================================
   subroutine NN_init()
     use variables
+    use parallel
     implicit none 
     integer:: itmp,i,nw,natm,ismpl
 
     timef= 0.0
     timeg= 0.0
+    nfunc= 0
+    ngrad= 0
 
     !.....read in.const.NN to get nl,nsp,nhl(:)
-    open(20,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
-    read(20,*) nl,nsp,nhl(0:nl)
-    nsf2= 0
-    nsf3= 0
-    do while(.true.)
-      read(20,*,end=10) itmp
-      if( itmp.eq.1 ) then
-        nsf2=nsf2+1
-      else if( itmp.eq.2 ) then
-        nsf3=nsf3+1
-      endif
-    enddo
-10  close(20)
-    nsfc= nhl(0)
-    nhl(nl+1)= 1
+    if( myid.eq.0 ) then
+      open(20,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
+      read(20,*) nl,nsp,nhl(0:nl)
+      nsf2= 0
+      nsf3= 0
+      do while(.true.)
+        read(20,*,end=10) itmp
+        if( itmp.eq.1 ) then
+          nsf2=nsf2+1
+        else if( itmp.eq.2 ) then
+          nsf3=nsf3+1
+        endif
+      enddo
+10    close(20)
+      nsfc= nhl(0)
+      nhl(nl+1)= 1
+    endif
+    call mpi_bcast(nl,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(nsp,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(nhl,nl+1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(nsf2,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(nsfc,1,mpi_integer,0,mpi_world,ierr)
 
 !.....calc number of weights
     ncmb2= nsp +factorial(nsp,2)/2
@@ -63,8 +74,8 @@ contains
     enddo
 !!$    print *, 'nvars,nw=',nvars,nw
 
-    allocate(sds(nsmpl))
-    do ismpl=1,nsmpl
+    allocate(sds(isid0:isid1))
+    do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
       allocate( sds(ismpl)%gsf(natm,nhl(0)) &
            ,sds(ismpl)%dgsf(3,natm,natm,nhl(0)) )
@@ -78,46 +89,52 @@ contains
     call get_bases()
 
     maxna= 0
-    do ismpl=1,nsmpl
+    do ismpl=isid0,isid1
       if( maxna.lt.samples(ismpl)%natm )  &
            maxna= samples(ismpl)%natm
     enddo
-    print *,'Max num of atoms [maxna] =',maxna
+!!$    print *,' myid, max num of atoms [maxna] =',myid,maxna
     allocate(fdiff(3,maxna))
 
-    print *, 'NN_init done.'
+    if( myid.eq.0 ) print *, 'NN_init done.'
   end subroutine NN_init
 !=======================================================================
-  subroutine NN_get_f(fval)
-    use variables
+  function NN_func(ndim,x)
+    use variables, only:nsmpl,nprcs,timef,samples,lfmatch,lfscale &
+         ,fscl,nfunc
+    use parallel
     implicit none
-    real(8),intent(out):: fval
+    integer,intent(in):: ndim
+    real(8),intent(in):: x(ndim)
+    real(8):: NN_func
+
     integer:: ismpl,natm,ia,ixyz
     integer:: ic0,ic1,icr
     real(8):: dn3i,ediff
+    real(8):: flocal
+
+    nfunc= nfunc +1
 
     call system_clock(ic0,icr)
-    call vars2wgts(nvars,vars)
+    call mpi_bcast(x,ndim,mpi_double_precision,0,mpi_world,ierr)
+    call vars2wgts(ndim,x)
     
-    if( nprcs.eq.1 ) then
-      do ismpl=1,nsmpl
-        if( nl.eq.1 ) then
-          call calc_ef1(ismpl)
-        else if( nl.eq.2 ) then
-          call calc_ef2(ismpl)
-        endif
-      enddo
-    else
-      print *,'[nprcs.ne.1] is not implemented yet in NN_get_f.'
-      stop
-    endif
+    do ismpl=isid0,isid1
+      if( nl.eq.1 ) then
+        call calc_ef1(ismpl)
+      else if( nl.eq.2 ) then
+        call calc_ef2(ismpl)
+      endif
+    enddo
 
-    fval= 0d0
-    do ismpl=1,nsmpl
+!!$    NN_func= 0d0
+    flocal= 0d0
+    do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
       ediff= (samples(ismpl)%epot -samples(ismpl)%eref)
       ediff= ediff*ediff /natm
-      fval= fval +ediff
+!!$      NN_func= NN_func +ediff
+      flocal= flocal +ediff
       if( .not. lfmatch ) cycle
       fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
            -samples(ismpl)%fref(1:3,1:natm))
@@ -129,16 +146,64 @@ contains
            *dn3i *fscl
       do ia=1,natm
         do ixyz=1,3
-          fval= fval +fdiff(ixyz,ia)
+!!$          NN_func= NN_func +fdiff(ixyz,ia)
+          flocal= flocal +fdiff(ixyz,ia)
         enddo
       enddo
     enddo
+
+    call mpi_allreduce(flocal,NN_func,1,mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
     
     call system_clock(ic1)
 !!$    write(6,'(a,f15.3)')  '>>> time NN_get_f =',t1-t0
     timef= timef +dble(ic1-ic0)/icr
     return
-  end subroutine NN_get_f
+  end function NN_func
+!=======================================================================
+  subroutine NN_get_fs(ismpl,fval)
+    use variables
+    implicit none
+    integer,intent(in):: ismpl
+    real(8),intent(out):: fval
+    integer:: natm,ia,ixyz
+    integer:: ic0,ic1,icr
+    real(8):: dn3i,ediff
+
+    call system_clock(ic0,icr)
+    call vars2wgts(nvars,vars)
+
+    if( nl.eq.1 ) then
+      call calc_ef1(ismpl)
+    else if( nl.eq.2 ) then
+      call calc_ef2(ismpl)
+    endif
+
+    fval= 0d0
+    natm= samples(ismpl)%natm
+    ediff= (samples(ismpl)%epot -samples(ismpl)%eref)
+    ediff= ediff*ediff /natm
+    fval= fval +ediff
+    if( .not. lfmatch ) goto 999
+    fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
+         -samples(ismpl)%fref(1:3,1:natm))
+    dn3i= 1d0 /(3*natm)
+    fscl= 1d0
+!.....force-scale makes force contribution same order to energy
+    if( lfscale ) fscl= 1d0/(3*natm)
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
+         *dn3i *fscl
+    do ia=1,natm
+      do ixyz=1,3
+        fval= fval +fdiff(ixyz,ia)
+      enddo
+    enddo
+
+999 continue
+    call system_clock(ic1)
+    timef= timef +dble(ic1-ic0)/icr
+    return
+  end subroutine NN_get_fs
 !=======================================================================
   subroutine calc_ef1(ismpl)
     use variables
@@ -255,11 +320,63 @@ contains
     
   end subroutine calc_ef2
 !=======================================================================
-  subroutine NN_get_g(gval)
+  function NN_grad(ndim,x)
+    use variables,only: nsmpl,nprcs,timeg,ngrad
+    use parallel
+    implicit none
+    integer,intent(in):: ndim
+    real(8),intent(in):: x(ndim)
+    real(8):: NN_grad(ndim)
+    
+    integer:: ismpl,i
+    integer:: ic0,ic1,icr
+    real(8),save,allocatable:: gs(:),glocal(:)
+    real(8):: gmax,vmax
+
+    if( .not.allocated(gs) ) allocate(gs(ndim),glocal(ndim))
+
+    ngrad= ngrad +1
+
+    call system_clock(ic0,icr)
+
+!!$    NN_grad(1:ndim)= 0d0
+    glocal(1:ndim)= 0d0
+
+    do ismpl=isid0,isid1
+      if( nl.eq.1 ) then
+        call grad1(ismpl,gs)
+      else if( nl.eq.2 ) then
+        call grad2(ismpl,gs)
+      endif
+!!$      NN_grad(1:ndim)= NN_grad(1:ndim) +gs(1:ndim)
+      glocal(1:ndim)= glocal(1:ndim) +gs(1:ndim)
+    enddo
+
+    call mpi_allreduce(glocal,NN_grad,ndim,mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
+
+!!$    if( lgscale ) then
+!!$      gmax= 0d0
+!!$      vmax= 0d0
+!!$      do i=1,ndim
+!!$        vmax= max(vmax,abs(vars(i)))
+!!$        gmax= max(gmax,abs(gval(i)))
+!!$      enddo
+!!$      gval(1:ndim)= gval(1:ndim)/gmax *gscl*vmax
+!!$    endif
+
+    call system_clock(ic1)
+!!$    write(6,'(a,f15.3)')  '>>> time NN_get_g =',t1-t0
+    timeg= timeg +dble(ic1-ic0)/icr
+    return
+  end function NN_grad
+!=======================================================================
+  subroutine NN_get_gs(ismpl,gval)
     use variables
     implicit none
+    integer,intent(in):: ismpl
     real(8),intent(out):: gval(nvars)
-    integer:: ismpl,i
+    integer:: i
     integer:: ic0,ic1,icr
     real(8),save,allocatable:: gs(:)
     real(8):: gmax,vmax
@@ -269,20 +386,12 @@ contains
     call system_clock(ic0,icr)
 
     gval(1:nvars)= 0d0
-
-    if( nprcs.eq.1 ) then
-      do ismpl=1,nsmpl
-        if( nl.eq.1 ) then
-          call grad1(ismpl,gs)
-        else if( nl.eq.2 ) then
-          call grad2(ismpl,gs)
-        endif
-        gval(1:nvars)= gval(1:nvars) +gs(1:nvars)
-      enddo
-    else
-      print *,'[nprcs.ne.1] is not implemented yet in NN_get_g.'
-      stop
+    if( nl.eq.1 ) then
+      call grad1(ismpl,gs)
+    else if( nl.eq.2 ) then
+      call grad2(ismpl,gs)
     endif
+    gval(1:nvars)= gval(1:nvars) +gs(1:nvars)
 
 !!$    if( lgscale ) then
 !!$      gmax= 0d0
@@ -295,10 +404,9 @@ contains
 !!$    endif
 
     call system_clock(ic1)
-!!$    write(6,'(a,f15.3)')  '>>> time NN_get_g =',t1-t0
     timeg= timeg +dble(ic1-ic0)/icr
     return
-  end subroutine NN_get_g
+  end subroutine NN_get_gs
 !=======================================================================
   subroutine grad1(ismpl,gs)
     use variables
@@ -584,13 +692,15 @@ contains
           h2= sds(ismpl)%hl2(ja,ihl2)
           dh2= h2*(1d0-h2)
           ddh2= dh2*(1d0-2d0*h2)
+          t1= w3*ddh2*(h1-0.5d0)
+          t2= w3*dh1*dh2
           do ia=1,natm
-            tmp=tmp +w3 *ddh2*h1*( &
+            tmp=tmp +t1*( &
                  fdiff(1,ia) *w2sw1dg(1,ia,ja,ihl2) &
                  +fdiff(2,ia)*w2sw1dg(2,ia,ja,ihl2) &
                  +fdiff(3,ia)*w2sw1dg(3,ia,ja,ihl2) &
                  )
-            tmp=tmp +w3 *dh1*dh2*( &
+            tmp=tmp +t2*( &
                  fdiff(1,ia) *w1dg(1,ia,ja,ihl1) &
                  +fdiff(2,ia)*w1dg(2,ia,ja,ihl1) &
                  +fdiff(3,ia)*w1dg(3,ia,ja,ihl1) &
@@ -720,12 +830,13 @@ contains
 !=======================================================================
   subroutine get_bases()
     use variables
+    use parallel
     implicit none
 
     integer:: itmp,ismpl,natm,ia,ihl0,ja
     character*5:: cdir
     
-    do ismpl=1,nsmpl
+    do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
       cdir= samples(ismpl)%cdirname
       !.....gsf
@@ -754,6 +865,6 @@ contains
       enddo
       close(22)
     enddo
-    print *, 'get_bases done.'
+    if(myid.eq.0) print *, 'get_bases done.'
   end subroutine get_bases
 end module NN

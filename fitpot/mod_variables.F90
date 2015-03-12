@@ -9,6 +9,8 @@ module variables
   integer:: nprcs= 1
   real(8):: eps= 1d-8
   real(8):: xtol= 1d-5
+  real(8):: gtol= 1d-5
+  real(8):: ftol= 1d-5
   integer,parameter:: maxnsp= 3
   real(8):: eatom(maxnsp)
   logical:: lfmatch= .true.
@@ -23,9 +25,11 @@ module variables
   real(8):: swbeta = 1d0
   logical:: lpena  = .false.
   real(8):: pwgt   = 1d0
+  real(8):: seqcoef= 1d-2
 
-!!$  character(len=5),allocatable:: cdirlist(:)
-
+  character(len=5),allocatable,save:: cdirlist(:)
+  integer,allocatable,save:: nalist(:)
+  
   type mdsys
     character(len=5):: cdirname
     integer:: natm
@@ -40,5 +44,12 @@ module variables
   real(8),save:: rcut
 
   real(4),save:: timef,timeg
+  real(8),save:: time0
+  integer,save:: nfunc,ngrad
+  integer,save:: iflag
+
+  real(8),allocatable,save:: erefl(:),erefg(:),epotl(:),epotg(:)
+  real(8),allocatable,save:: frefl(:,:,:),frefg(:,:,:),fal(:,:,:)&
+       ,fag(:,:,:)
 
 end module variables
