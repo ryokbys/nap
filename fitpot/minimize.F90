@@ -45,10 +45,10 @@
 
     do iter=1,maxiter
 !.....line minimization
-      call quad_interpolate(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint &
-           ,iflag,myid,func)
-!!$      call golden_section(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint
-!!              ,iflag,func)
+!!$      call quad_interpolate(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint &
+!!$           ,iflag,myid,func)
+      call golden_section(ndim,x,g,f,xtol,gtol,ftol,alpha &
+           ,iprint,iflag,myid,func)
       if( iflag/100.ne.0 ) return
       x(1:ndim)= x(1:ndim) +alpha*g(1:ndim)
       f= func(ndim,x)
@@ -147,10 +147,10 @@
 
     do iter=1,maxiter
 !.....line minimization
-      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint &
-           ,iflag,myid,func)
-!!$      call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint
-!!              ,iflag,func)
+!!$      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint &
+!!$           ,iflag,myid,func)
+      call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+           ,iprint,iflag,myid,func)
       if( iflag/100.ne.0 ) return
       x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       f= func(ndim,x)
@@ -269,7 +269,9 @@
       fp= f
       gp(1:ndim)= g(1:ndim)
 !.....line minimization
-      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
+!!$      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
+!!$           ,iprint,iflag,myid,func)
+      call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
            ,iprint,iflag,myid,func)
       if( iflag/100.ne.0 ) then
         x0(1:ndim)= x(1:ndim)
@@ -442,7 +444,7 @@
     real(8),parameter:: STP0    = 1d-1
     real(8),parameter:: STPMAX  = 1d+1
     real(8),parameter:: TINY    = 1d-15
-    integer,parameter:: MAXITER = 100
+    integer,parameter:: MAXITER = 10
 
     interface
       function func(n,x)
@@ -491,12 +493,14 @@
     xi(4)= xi(2) -((xi(2)-xi(3))*q -(xi(2)-xi(1))*r) &
          /(2d0*sign(max(abs(q-r),TINY),q-r))
     fi(4)= func(ndim,x0+xi(4)*g)
+    write(6,'(a,2(2x,4es11.3))') ' xi,fi=',xi(1:4),fi(1:4)
 
     !.....step4
     fmin= min(fi(1),fi(2),fi(3))
     fmax= max(fi(1),fi(2),fi(3))
     dmin= min(abs(xi(4)-xi(1)),abs(xi(4)-xi(2)),abs(xi(4)-xi(3)))
     if( fi(4).lt.fmin .and. dmin.gt.STPMAX ) then
+      print *,' 01'
       imax= 0
       dmax= 0d0
       do ix=1,3
@@ -527,8 +531,9 @@
       fi(3)= func(ndim,x0+xi(3)*g)
       goto 10
     else if( fi(4).gt.fmax ) then ! fi(4) is upper convex
+      print *,' 02'
       imin= 0
-      dmin= 0d0
+      dmin= 1d+30
       do ix=1,3
         d= abs(xi(4)-xi(ix))
         if( dmin.gt.d ) then
@@ -542,9 +547,9 @@
         fi(ix-1)= fi(ix)
       enddo
       if( fi(2).gt.fi(1) ) then
-        xi(3)= xi(1) +STP0
+        xi(3)= xi(1) +STPMAX
       else
-        xi(3)= xi(2) +STP0
+        xi(3)= xi(2) +STPMAX
       endif
       fi(3)= func(ndim,x0+xi(3)*g)
       goto 10
@@ -566,6 +571,7 @@
     endif
 
 !.....step 6: discard point of highest f value and replace it by xi(4)
+    print *,' 03'
     imax= 0
     fmax= -1d+30
     do ix=1,3
@@ -604,6 +610,8 @@
     xl= (c-a)
     b1= a +GR2*xl
     b2= a +GR *xl
+    fb1= func(ndim,x0+b1*g)
+    fb2= func(ndim,x0+b2*g)
 
     iter= 0
 10  continue
@@ -617,21 +625,34 @@
       return
 !!$      stop
     endif
-    fb1= func(ndim,x0+b1*g)
-    fb2= func(ndim,x0+b2*g)
+!!$    write(6,'(a,2(2x,4es11.3))') ' a,b1,b2,c,fa,fb1,fb2,fc=' &
+!!$         ,a,b1,b2,c,fa,fb1,fb2,fc
     if( fb1.gt.fb2 ) then
       a= b1
+      fa= fb1
       b1= b2
+      fb1= fb2
       xl= (c-a)
       b2= a +GR*xl
+      fb2= func(ndim,x0+b2*g)
     else
       c= b2
+      fc= fb2
       b2= b1
+      fb2= fb1
       xl= (c-a)
       b1= a +GR2*xl
+      fb1= func(ndim,x0+b1*g)
     endif
-    if( xl.gt.xtol ) then
-      alpha= (c+a)*0.5d0
+!!$    print *,' xl,c,a,xtol=',xl,c,a,xtol
+    if( xl.lt.xtol ) then
+      if( fb1.gt.fb2 ) then
+        alpha= b2
+        f= fb2
+      else
+        alpha= b1
+        f= fb1
+      endif
       return
     endif
     goto 10

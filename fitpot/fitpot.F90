@@ -317,6 +317,7 @@ end subroutine write_vars
 subroutine bfgs_wrapper()
   use variables
   use NN,only:NN_init,NN_func,NN_grad
+  use parallel
   implicit none
   integer,parameter:: iprint = 1
   integer:: i,m
@@ -325,7 +326,7 @@ subroutine bfgs_wrapper()
   !.....NN specific code hereafter
   call NN_init()
   call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp &
-       ,iprint,iflag,NN_func,NN_grad)
+       ,iprint,iflag,myid,NN_func,NN_grad)
 
   return
 end subroutine bfgs_wrapper
@@ -336,6 +337,7 @@ subroutine sd_wrapper()
 !
   use variables
   use NN,only:NN_init,NN_func,NN_grad
+  use parallel
   implicit none
   integer,parameter:: iprint = 1
   integer:: i,m
@@ -344,7 +346,7 @@ subroutine sd_wrapper()
   !.....NN specific code hereafter
   call NN_init()
   call steepest_descent(nvars,vars,fval,xtol,gtol,ftol,nstp&
-       ,iprint,iflag,NN_func,NN_grad)
+       ,iprint,iflag,myid,NN_func,NN_grad)
 
   return
 end subroutine sd_wrapper
@@ -352,6 +354,7 @@ end subroutine sd_wrapper
 subroutine cg_wrapper()
   use variables
   use NN,only:NN_init,NN_func,NN_grad
+  use parallel
   implicit none
   integer,parameter:: iprint = 1
   integer:: i,m
@@ -360,7 +363,7 @@ subroutine cg_wrapper()
   !.....NN specific code hereafter
   call NN_init()
   call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp &
-       ,iprint,iflag,NN_func,NN_grad)
+       ,iprint,iflag,myid,NN_func,NN_grad)
 
   return
 end subroutine cg_wrapper
@@ -536,7 +539,7 @@ subroutine write_force_relation(cadd)
   do ismpl=1,nsmpl
     nmaxl= max(nmaxl,nalist(ismpl))
   enddo
-  call mpi_allreduce(nmaxl,nmax,1,mpi_double_precision,mpi_max &
+  call mpi_allreduce(nmaxl,nmax,1,mpi_integer,mpi_max &
        ,mpi_world,ierr)
 
   if( .not. allocated(frefl) ) allocate(frefl(3,nmax,nsmpl)&
