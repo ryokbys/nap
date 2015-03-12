@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-03-12 18:02:20 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-03-13 00:24:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -32,8 +32,8 @@ contains
     implicit none 
     integer:: itmp,i,nw,natm,ismpl
 
-    timef= 0.0
-    timeg= 0.0
+    tfunc= 0d0
+    tgrad= 0d0
     nfunc= 0
     ngrad= 0
 
@@ -100,8 +100,8 @@ contains
   end subroutine NN_init
 !=======================================================================
   function NN_func(ndim,x)
-    use variables, only:nsmpl,nprcs,timef,samples,lfmatch,lfscale &
-         ,fscl,nfunc
+    use variables, only:nsmpl,nprcs,tfunc,samples,lfmatch,lfscale &
+         ,fscl,nfunc,tcomm
     use parallel
     implicit none
     integer,intent(in):: ndim
@@ -109,14 +109,13 @@ contains
     real(8):: NN_func
 
     integer:: ismpl,natm,ia,ixyz
-    integer:: ic0,ic1,icr
-    real(8):: dn3i,ediff
+    real(8):: dn3i,ediff,tf0,tc0
     real(8):: flocal
 
     nfunc= nfunc +1
 
-    call system_clock(ic0,icr)
     call mpi_bcast(x,ndim,mpi_double_precision,0,mpi_world,ierr)
+    tf0= mpi_wtime()
     call vars2wgts(ndim,x)
     
     do ismpl=isid0,isid1
@@ -152,12 +151,12 @@ contains
       enddo
     enddo
 
+    tc0= mpi_wtime()
     call mpi_allreduce(flocal,NN_func,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
-    
-    call system_clock(ic1)
-!!$    write(6,'(a,f15.3)')  '>>> time NN_get_f =',t1-t0
-    timef= timef +dble(ic1-ic0)/icr
+    tcomm= tcomm +mpi_wtime() -tc0
+
+    tfunc= tfunc +mpi_wtime() -tf0
     return
   end function NN_func
 !=======================================================================
@@ -201,7 +200,7 @@ contains
 
 999 continue
     call system_clock(ic1)
-    timef= timef +dble(ic1-ic0)/icr
+    tfunc= tfunc +dble(ic1-ic0)/icr
     return
   end subroutine NN_get_fs
 !=======================================================================
@@ -321,7 +320,7 @@ contains
   end subroutine calc_ef2
 !=======================================================================
   function NN_grad(ndim,x)
-    use variables,only: nsmpl,nprcs,timeg,ngrad
+    use variables,only: nsmpl,nprcs,tgrad,ngrad,tcomm
     use parallel
     implicit none
     integer,intent(in):: ndim
@@ -329,15 +328,13 @@ contains
     real(8):: NN_grad(ndim)
     
     integer:: ismpl,i
-    integer:: ic0,ic1,icr
     real(8),save,allocatable:: gs(:),glocal(:)
-    real(8):: gmax,vmax
+    real(8):: gmax,vmax,tc0,tg0
 
     if( .not.allocated(gs) ) allocate(gs(ndim),glocal(ndim))
 
     ngrad= ngrad +1
-
-    call system_clock(ic0,icr)
+    tg0= mpi_wtime()
 
 !!$    NN_grad(1:ndim)= 0d0
     glocal(1:ndim)= 0d0
@@ -352,8 +349,10 @@ contains
       glocal(1:ndim)= glocal(1:ndim) +gs(1:ndim)
     enddo
 
+    tc0= mpi_wtime()
     call mpi_allreduce(glocal,NN_grad,ndim,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
+    tcomm= tcomm +mpi_wtime() -tc0
 
 !!$    if( lgscale ) then
 !!$      gmax= 0d0
@@ -365,9 +364,7 @@ contains
 !!$      gval(1:ndim)= gval(1:ndim)/gmax *gscl*vmax
 !!$    endif
 
-    call system_clock(ic1)
-!!$    write(6,'(a,f15.3)')  '>>> time NN_get_g =',t1-t0
-    timeg= timeg +dble(ic1-ic0)/icr
+    tgrad= tgrad +mpi_wtime() -tg0
     return
   end function NN_grad
 !=======================================================================
@@ -377,13 +374,11 @@ contains
     integer,intent(in):: ismpl
     real(8),intent(out):: gval(nvars)
     integer:: i
-    integer:: ic0,ic1,icr
     real(8),save,allocatable:: gs(:)
     real(8):: gmax,vmax
 
     if( .not.allocated(gs) ) allocate(gs(nvars))
 
-    call system_clock(ic0,icr)
 
     gval(1:nvars)= 0d0
     if( nl.eq.1 ) then
@@ -403,8 +398,6 @@ contains
 !!$      gval(1:nvars)= gval(1:nvars)/gmax *gscl*vmax
 !!$    endif
 
-    call system_clock(ic1)
-    timeg= timeg +dble(ic1-ic0)/icr
     return
   end subroutine NN_get_gs
 !=======================================================================

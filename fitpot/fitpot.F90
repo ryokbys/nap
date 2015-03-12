@@ -2,6 +2,7 @@ program fitpot
   use variables
   use parallel
   implicit none
+  real(8):: tmp
 
   interface
     subroutine write_vars(cadd)
@@ -14,12 +15,13 @@ program fitpot
       character(len=*),intent(in),optional:: cadd
     end subroutine write_force_relation
   end interface
-  
+
   call mpi_init(ierr)
   time0= mpi_wtime()
   call mpi_comm_size(mpi_comm_world,nnode,ierr)
   call mpi_comm_rank(mpi_comm_world,myid,ierr)
   mpi_world= mpi_comm_world
+  tcomm= 0d0
 
   if( myid.eq.0 ) then
     call read_input(10,'in.fitpot')
@@ -83,12 +85,24 @@ program fitpot
   call write_energy_relation('fin')
   call write_force_relation('fin')
   call write_statistics()
+  write(6,'(a,i4,3f15.3)') ' myid,tfunc,tgrad,tcom=' &
+       ,myid,tfunc,tgrad,tcomm
+  tmp= tfunc
+  call mpi_reduce(tmp,tfunc,1,mpi_double_precision,mpi_max &
+       ,0,mpi_world,ierr)
+  tmp= tgrad
+  call mpi_reduce(tmp,tgrad,1,mpi_double_precision,mpi_max &
+       ,0,mpi_world,ierr)
+  tmp= tcomm
+  call mpi_reduce(tmp,tcomm,1,mpi_double_precision,mpi_max &
+       ,0,mpi_world,ierr)
   if( myid.eq.0 ) then
-    write(6,'(a,i8)') ' num of function calls=',nfunc
-    write(6,'(a,i8)') ' num of gradient calls=',ngrad
-    write(6,'(a,f15.3,a)') ' time function =', timef,' sec'
-    write(6,'(a,f15.3,a)') ' time gradient =', timeg,' sec'
-    write(6,'(a,f15.3,a)') ' time          =', mpi_wtime() -time0, ' sec'
+    write(6,'(a,i8)') ' num of func calls=',nfunc
+    write(6,'(a,i8)') ' num of grad calls=',ngrad
+    write(6,'(a,f15.3,a)') ' time func =', tfunc,' sec'
+    write(6,'(a,f15.3,a)') ' time grad =', tgrad,' sec'
+    write(6,'(a,f15.3,a)') ' time comm =', tcomm,' sec'
+    write(6,'(a,f15.3,a)') ' time      =', mpi_wtime() -time0, ' sec'
   endif
   call mpi_finalize(ierr)
 

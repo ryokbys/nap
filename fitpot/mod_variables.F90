@@ -43,8 +43,7 @@ module variables
   real(8),save,allocatable:: vars(:),vranges(:,:)
   real(8),save:: rcut
 
-  real(4),save:: timef,timeg
-  real(8),save:: time0
+  real(8),save:: time0,tcomm,tfunc,tgrad
   integer,save:: nfunc,ngrad
   integer,save:: iflag
 

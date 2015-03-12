@@ -269,10 +269,10 @@
       fp= f
       gp(1:ndim)= g(1:ndim)
 !.....line minimization
-!!$      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
-!!$           ,iprint,iflag,myid,func)
-      call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
            ,iprint,iflag,myid,func)
+!!$      call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+!!$           ,iprint,iflag,myid,func)
       if( iflag/100.ne.0 ) then
         x0(1:ndim)= x(1:ndim)
         return
@@ -455,7 +455,7 @@
     end interface
 
     integer:: iter,imin,imax,ix
-    real(8):: r,q,fmin,fmax,dmin,dmax,d
+    real(8):: r,q,fmin,fmax,dmin,dmax,d,xmin
     real(8),save,allocatable:: xi(:),fi(:)
 
     if( .not. allocated(xi) ) allocate(xi(4),fi(4))
@@ -493,7 +493,7 @@
     xi(4)= xi(2) -((xi(2)-xi(3))*q -(xi(2)-xi(1))*r) &
          /(2d0*sign(max(abs(q-r),TINY),q-r))
     fi(4)= func(ndim,x0+xi(4)*g)
-    write(6,'(a,2(2x,4es11.3))') ' xi,fi=',xi(1:4),fi(1:4)
+!!$    write(6,'(a,2(2x,4f11.2))') ' xi,fi=',xi(1:4),fi(1:4)
 
     !.....step4
     fmin= min(fi(1),fi(2),fi(3))
@@ -530,7 +530,7 @@
       endif
       fi(3)= func(ndim,x0+xi(3)*g)
       goto 10
-    else if( fi(4).gt.fmax ) then ! fi(4) is upper convex
+    else if( fi(4).gt.fmax ) then ! fi(4) is maximum
       print *,' 02'
       imin= 0
       dmin= 1d+30
@@ -538,6 +538,7 @@
         d= abs(xi(4)-xi(ix))
         if( dmin.gt.d ) then
           dmin= d
+          xmin= xi(ix)
           imin= ix
         endif
       enddo
@@ -546,11 +547,12 @@
         xi(ix-1)= xi(ix)
         fi(ix-1)= fi(ix)
       enddo
-      if( fi(2).gt.fi(1) ) then
-        xi(3)= xi(1) +STPMAX
-      else
-        xi(3)= xi(2) +STPMAX
-      endif
+!!$      if( fi(2).gt.fi(1) ) then
+!!$        xi(3)= xi(1) +STPMAX
+!!$      else
+!!$        xi(3)= xi(2) +STPMAX
+!!$      endif
+      xi(3)= (xmin +xi(4))*0.5
       fi(3)= func(ndim,x0+xi(3)*g)
       goto 10
     endif
