@@ -23,7 +23,7 @@ MPIFLAGS= @FCFLAGS@
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
 fitpot= NN.o read_input.o fitpot.o 
-mods= mod_variables.o
+mods= mod_variables.o mod_parallel.o
 args= iargc.o getarg.o
 lbfgs= lbfgs.o
 minimize= minimize.o
