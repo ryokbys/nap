@@ -45,10 +45,14 @@
 
     do iter=1,maxiter
 !.....line minimization
-!!$      call quad_interpolate(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint &
-!!$           ,iflag,myid,func)
-      call golden_section(ndim,x,g,f,xtol,gtol,ftol,alpha &
-           ,iprint,iflag,myid,func)
+      call quad_interpolate(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint &
+           ,iflag,myid,func)
+!.....if quad interpolation failed, perform golden section
+      if( iflag/100.ne.0 ) then
+        iflag= iflag -(iflag/100)*100
+        call golden_section(ndim,x,g,f,xtol,gtol,ftol,alpha &
+             ,iprint,iflag,myid,func)
+      endif
       if( iflag/100.ne.0 ) return
       x(1:ndim)= x(1:ndim) +alpha*g(1:ndim)
       f= func(ndim,x)
@@ -147,10 +151,14 @@
 
     do iter=1,maxiter
 !.....line minimization
-!!$      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint &
-!!$           ,iflag,myid,func)
-      call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
-           ,iprint,iflag,myid,func)
+      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint &
+           ,iflag,myid,func)
+!.....if quad interpolation failed, perform golden section
+      if( iflag/100.ne.0 ) then
+        iflag= iflag -(iflag/100)*100
+        call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+             ,iprint,iflag,myid,func)
+      endif
       if( iflag/100.ne.0 ) return
       x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       f= func(ndim,x)
@@ -271,8 +279,12 @@
 !.....line minimization
       call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
            ,iprint,iflag,myid,func)
-!!$      call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
-!!$           ,iprint,iflag,myid,func)
+!.....if quad interpolation failed, perform golden section
+      if( iflag/100.ne.0 ) then
+        iflag= iflag -(iflag/100)*100
+        call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+             ,iprint,iflag,myid,func)
+      endif
       if( iflag/100.ne.0 ) then
         x0(1:ndim)= x(1:ndim)
         return
@@ -444,7 +456,7 @@
     real(8),parameter:: STP0    = 1d-1
     real(8),parameter:: STPMAX  = 1d+1
     real(8),parameter:: TINY    = 1d-15
-    integer,parameter:: MAXITER = 10
+    integer,parameter:: MAXITER = 100
 
     interface
       function func(n,x)
@@ -500,7 +512,7 @@
     fmax= max(fi(1),fi(2),fi(3))
     dmin= min(abs(xi(4)-xi(1)),abs(xi(4)-xi(2)),abs(xi(4)-xi(3)))
     if( fi(4).lt.fmin .and. dmin.gt.STPMAX ) then
-      print *,' 01'
+!!$      print *,' 01'
       imax= 0
       dmax= 0d0
       do ix=1,3
@@ -531,7 +543,7 @@
       fi(3)= func(ndim,x0+xi(3)*g)
       goto 10
     else if( fi(4).gt.fmax ) then ! fi(4) is maximum
-      print *,' 02'
+!!$      print *,' 02'
       imin= 0
       dmin= 1d+30
       do ix=1,3
@@ -573,7 +585,7 @@
     endif
 
 !.....step 6: discard point of highest f value and replace it by xi(4)
-    print *,' 03'
+!!$    print *,' 03'
     imax= 0
     fmax= -1d+30
     do ix=1,3
