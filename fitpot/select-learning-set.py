@@ -43,6 +43,6 @@ for dir in dirs:
     else:
         dest= dir_test_set
     print ' {0} ---> {1}'.format(dir,dest)
-    os.system('cp -r {0} {1}/'.format(dir,dest))
+    os.system('mv {0} {1}/'.format(dir,dest))
 
 print ' num of samples in learning set =',num
