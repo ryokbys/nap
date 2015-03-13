@@ -44,6 +44,7 @@
     endif
 
     do iter=1,maxiter
+      fp= f
 !.....line minimization
       call quad_interpolate(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint &
            ,iflag,myid,func)
@@ -70,24 +71,24 @@
         endif
       endif
 !.....check convergence 
-      if( abs(alpha).lt.xtol ) then
-        if( myid.eq.0 ) then
-          print *,'>>> SD converged wrt xtol'
-          write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
-        endif
-        iflag= iflag +1
-        return
-      else if( gnorm.lt.gtol ) then
+!!$      if( abs(alpha).lt.xtol ) then
+!!$        if( myid.eq.0 ) then
+!!$          print *,'>>> SD converged wrt xtol'
+!!$          write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
+!!$        endif
+!!$        iflag= iflag +1
+!!$        return
+      if( gnorm.lt.gtol ) then
         if( myid.eq.0 ) then
           print *,'>>> SD converged wrt gtol'
           write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
         endif
         iflag= iflag +2
         return
-      else if( abs(f-fp).lt.ftol ) then
+      else if( abs(f-fp)/abs(fp).lt.ftol ) then
         if( myid.eq.0 ) then
           print *,'>>> Sd converged wrt ftol'
-          write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp),ftol
+          write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp)/abs(fp),ftol
         endif
         iflag= iflag +3
         return
@@ -150,6 +151,7 @@
     u(1:ndim)= -g(1:ndim)
 
     do iter=1,maxiter
+      fp= f
 !.....line minimization
       call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint &
            ,iflag,myid,func)
@@ -179,24 +181,25 @@
         endif
       endif
 !.....check convergence 
-      if( abs(alpha).lt.xtol ) then
-        if( myid.eq.0 ) then
-          print *,'>>> CG converged wrt xtol'
-          write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
-        endif
-        iflag= iflag +1
-        return
-      else if( gnorm.lt.gtol ) then
+!!$      if( abs(alpha).lt.xtol ) then
+!!$        if( myid.eq.0 ) then
+!!$          print *,'>>> CG converged wrt xtol'
+!!$          write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
+!!$        endif
+!!$        iflag= iflag +1
+!!$        return
+      if( gnorm.lt.gtol ) then
         if( myid.eq.0 ) then
           print *,'>>> CG converged wrt gtol'
           write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
         endif
         iflag= iflag +2
         return
-      else if( abs(f-fp).lt.ftol ) then
+      else if( abs(f-fp)/abs(fp).lt.ftol ) then
         if( myid.eq.0 ) then
           print *,'>>> CG converged wrt ftol'
-          write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp),ftol
+          write(6,'(a,2es15.7)') '   f-fp,ftol=' &
+               ,abs(f-fp)/abs(fp),ftol
         endif
         iflag= iflag +3
         return
@@ -303,15 +306,15 @@
         endif
       endif
 !.....check convergence 
-      if( abs(alpha).lt.xtol ) then
-        if(myid.eq.0) then
-          print *,'>>> BFGS converged wrt xtol'
-          write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
-        endif
-        x0(1:ndim)= x(1:ndim)
-        iflag= iflag +1
-        return
-      else if( gnorm.lt.gtol ) then
+!!$      if( abs(alpha).lt.xtol ) then
+!!$        if(myid.eq.0) then
+!!$          print *,'>>> BFGS converged wrt xtol'
+!!$          write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
+!!$        endif
+!!$        x0(1:ndim)= x(1:ndim)
+!!$        iflag= iflag +1
+!!$        return
+      if( gnorm.lt.gtol ) then
         if( myid.eq.0 ) then
           print *,'>>> BFGS converged wrt gtol'
           write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
@@ -319,10 +322,11 @@
         x0(1:ndim)= x(1:ndim)
         iflag= iflag +2
         return
-      else if( abs(f-fp).lt.ftol ) then
+      else if( abs(f-fp)/abs(fp).lt.ftol ) then
         if( myid.eq.0 ) then
           print *,'>>> BFGS converged wrt ftol'
-          write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp),ftol
+          write(6,'(a,2es15.7)') '   f-fp/fp,ftol=' &
+               ,abs(f-fp)/abs(fp),ftol
         endif
         x0(1:ndim)= x(1:ndim)
         iflag= iflag +3

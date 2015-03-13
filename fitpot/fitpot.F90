@@ -637,8 +637,8 @@ subroutine write_statistics()
   enddo
   rmse= sqrt(dfsum/n)
   if(myid.eq.0) then
-    write(6,'(a,f12.3,a)') '  RMSE of forces           =',rmse,' eV/atom'
-    write(6,'(a,f12.3,a)') '  Max residual of forces   =',dfmax,' eV/atom'
+    write(6,'(a,f12.3,a)') '  RMSE of forces           =',rmse,' eV/A'
+    write(6,'(a,f12.3,a)') '  Max residual of forces   =',dfmax,' eV/A'
     print *,''
   endif
 end subroutine write_statistics
