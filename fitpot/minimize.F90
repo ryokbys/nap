@@ -285,7 +285,9 @@
 !.....if quad interpolation failed, perform golden section
       if( iflag/100.ne.0 ) then
         iflag= iflag -(iflag/100)*100
-        print *,'since quad_interpolate failed, call golden_section.'
+        if(myid.eq.0) then
+          print *,'since quad_interpolate failed, call golden_section.'
+        endif
         call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       endif
