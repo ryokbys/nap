@@ -659,6 +659,8 @@ subroutine sync_input()
 
   call mpi_bcast(eps,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(xtol,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(ftol,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(gtol,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(eatom,maxnsp,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(gscl,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(fscl,1,mpi_double_precision,0,mpi_world,ierr)

@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-03-13 00:24:20 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-03-14 11:04:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -151,7 +151,9 @@ contains
       enddo
     enddo
 
+!!$    if(myid.eq.0) print *,'NN_func: call allreduce'
     tc0= mpi_wtime()
+    NN_func= 0d0
     call mpi_allreduce(flocal,NN_func,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
     tcomm= tcomm +mpi_wtime() -tc0
@@ -350,6 +352,7 @@ contains
     enddo
 
     tc0= mpi_wtime()
+    NN_grad= 0d0
     call mpi_allreduce(glocal,NN_grad,ndim,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
     tcomm= tcomm +mpi_wtime() -tc0

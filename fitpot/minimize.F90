@@ -263,10 +263,10 @@
     gnorm= gnorm/ndim
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
-        write(6,'(a,i8,100es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+        write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
       else if( iprint.ge.2 ) then
-        write(6,'(a,i8,100es15.7)') ' iter,x,f,gnorm=' &
-             ,iter,x(1:ndim),f,gnorm
+        write(6,'(a,i8,12es15.7)') ' iter,x(1:5),f,gnorm=' &
+             ,iter,x(1:5),f,gnorm
       endif
     endif
 
@@ -285,6 +285,7 @@
 !.....if quad interpolation failed, perform golden section
       if( iflag/100.ne.0 ) then
         iflag= iflag -(iflag/100)*100
+        print *,'since quad_interpolate failed, call golden_section.'
         call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       endif
@@ -299,10 +300,10 @@
       gnorm= gnorm/ndim
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
-          write(6,'(a,i8,100es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+          write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
         else if( iprint.ge.2 ) then
-          write(6,'(a,i8,100es15.7)') ' iter,x,f,gnorm=' &
-               ,iter,x(1:ndim),f,gnorm
+          write(6,'(a,i8,12es15.7)') ' iter,x(1:5),f,gnorm=' &
+               ,iter,x(1:5),f,gnorm
         endif
       endif
 !.....check convergence 
