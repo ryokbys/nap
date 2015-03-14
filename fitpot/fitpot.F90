@@ -242,7 +242,8 @@ end subroutine read_pos
 subroutine read_ref_data()
   use variables
   use parallel
-  integer:: ismpl,i,is,jflag
+  implicit none 
+  integer:: ismpl,i,is,jflag,natm
 
   jflag= 0
   do ismpl=isid0,isid1
@@ -253,7 +254,7 @@ subroutine read_ref_data()
 !.....reduce atomic energy from eref
     do i=1,samples(ismpl)%natm
       is= samples(ismpl)%tag(i)
-      eref= eref -eatom(is)
+      samples(ismpl)%eref= samples(ismpl)%eref -eatom(is)
     enddo
 
     open(14,file=trim(cmaindir)//'/'//samples(ismpl)%cdirname &
