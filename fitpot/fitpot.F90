@@ -120,8 +120,9 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,a)') 'main_directory',trim(cmaindir)
   write(6,'(2x,a25,2x,a)') 'param_file',trim(cparfile)
   write(6,'(2x,a25,2x,a)') 'run_mode',trim(crunmode)
-  write(6,'(2x,a25,2x,es12.3)') 'eps',eps
   write(6,'(2x,a25,2x,es12.3)') 'xtol',xtol
+  write(6,'(2x,a25,2x,es12.3)') 'ftol',ftol
+  write(6,'(2x,a25,2x,es12.3)') 'gtol',gtol
   do i=1,maxnsp
     write(6,'(2x,a25,2x,i2,es15.7)') 'atom_energy',i,eatom(i)
   enddo
@@ -136,6 +137,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,l3)') 'force_scale',lfscale
   write(6,'(2x,a25,2x,l3)') 'sample_weight',lswgt
   write(6,'(2x,a25,2x,es12.3)') 'sample_weight_beta',swbeta
+  write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
   write(6,'(a)') '------------------------------------------------'
 
 end subroutine write_initial_setting
