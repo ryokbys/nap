@@ -16,6 +16,7 @@ pmddir='~/src/nap/pmd/'
 niter= 10
 dltmax= 0.01
 outfname='out.elastic-constants'
+logfname='log.elastic-constants'
 graphname='graph.elastic-constants.eps'
 
 def read_pmd():
@@ -67,12 +68,14 @@ if __name__ == '__main__':
     al,hmat0,natm= read_pmd()
     hmax= np.max(hmat0)
 
+    logfile= open(logfname,'w')
     outfile1= open(outfname,'w')
     #...get reference energy
     os.system(pmddir+'pmd > out.pmd')
     erg0= float(commands.getoutput("grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'"))
     print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(0.0,erg0,erg0,erg0)
     outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
+    logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
     ddlt= dltmax/niter
     for iter in range(niter):
         dlt= (ddlt*(iter+1))
@@ -101,6 +104,7 @@ if __name__ == '__main__':
         erg44= float(commands.getoutput("grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'"))        
         print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(dlt,erg11,erg12,erg44)
         outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlt,erg11,erg12,erg44))
+        logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlt,erg11,erg12,erg44))
     outfile1.close()
 
     #...revert 0000/pmd00000
@@ -138,17 +142,27 @@ if __name__ == '__main__':
 
     #...output results
     print '{0:=^72}'.format(' RESULTS ')
+    logfile.write('{0:=^72}\n'.format(' RESULTS '))
     print ' C11     = {0:10.3f} GPa'.format(c11)
     print ' C11-C12 = {0:10.3f} GPa'.format(c11_c12)
     print ' C12     = {0:10.3f} GPa'.format(c12)
     print ' C44     = {0:10.3f} GPa'.format(c44)
+    logfile.write(' C11     = {0:10.3f} GPa\n'.format(c11))
+    logfile.write(' C11-C12 = {0:10.3f} GPa\n'.format(c11_c12))
+    logfile.write(' C12     = {0:10.3f} GPa\n'.format(c12))
+    logfile.write(' C44     = {0:10.3f} GPa\n'.format(c44))
     ymod= c44*(2.0*c44+3.0*c12)/(c11+c44)
     prto= c12/2.0/(c11+c44)
     smod= ymod/2.0/(1.0+prto)
     print ' Following values maybe only valid for isotropic materials...'
     print ' Young\'s modulus = {0:10.3f} GPa'.format(ymod)
-    print ' Poisson\'s ratio = {0:10.3f}'.format(prto)
     print ' shear modulus   = {0:10.3f} GPa'.format(smod)
+    print ' Poisson\'s ratio = {0:10.3f}'.format(prto)
+    logfile.write(' Following values maybe only valid for isotropic materials...\n')
+    logfile.write(' Young\'s modulus = {0:10.3f} GPa\n'.format(ymod))
+    logfile.write(' shear modulus   = {0:10.3f} GPa\n'.format(smod))
+    logfile.write(' Poisson\'s ratio = {0:10.3f}\n'.format(prto))
+    logfile.close()
     
     plt.plot(dlts,quad_func(dlts,*popt11),dlts,e11s,'o')
     plt.plot(dlts,quad_func(dlts,*popt12),dlts,e12s,'o')

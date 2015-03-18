@@ -162,17 +162,21 @@ contains
     return
   end function NN_func
 !=======================================================================
-  subroutine NN_get_fs(ismpl,fval)
+  function NN_fs(ndim,x)
     use variables
+    use parallel
     implicit none
-    integer,intent(in):: ismpl
-    real(8),intent(out):: fval
+    integer,intent(in):: ndim
+    real(8),intent(in):: x(ndim)
+    real(8):: NN_fs
+    integer:: ismpl
+    common /samplei/ ismpl
     integer:: natm,ia,ixyz
-    integer:: ic0,ic1,icr
-    real(8):: dn3i,ediff
+    real(8):: dn3i,ediff,tf0
 
-    call system_clock(ic0,icr)
-    call vars2wgts(nvars,vars)
+    nfunc=nfunc +1
+    tf0= mpi_wtime()
+    call vars2wgts(ndim,x)
 
     if( nl.eq.1 ) then
       call calc_ef1(ismpl)
@@ -180,11 +184,11 @@ contains
       call calc_ef2(ismpl)
     endif
 
-    fval= 0d0
+    NN_fs= 0d0
     natm= samples(ismpl)%natm
     ediff= (samples(ismpl)%epot -samples(ismpl)%eref)
     ediff= ediff*ediff /natm
-    fval= fval +ediff
+    NN_fs= NN_fs +ediff
     if( .not. lfmatch ) goto 999
     fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
          -samples(ismpl)%fref(1:3,1:natm))
@@ -196,15 +200,14 @@ contains
          *dn3i *fscl
     do ia=1,natm
       do ixyz=1,3
-        fval= fval +fdiff(ixyz,ia)
+        NN_fs= NN_fs +fdiff(ixyz,ia)
       enddo
     enddo
 
 999 continue
-    call system_clock(ic1)
-    tfunc= tfunc +dble(ic1-ic0)/icr
+    tfunc= tfunc +mpi_wtime() -tf0
     return
-  end subroutine NN_get_fs
+  end function NN_fs
 !=======================================================================
   subroutine calc_ef1(ismpl)
     use variables
@@ -371,25 +374,31 @@ contains
     return
   end function NN_grad
 !=======================================================================
-  subroutine NN_get_gs(ismpl,gval)
+  function NN_gs(ndim,x)
     use variables
+    use parallel
     implicit none
-    integer,intent(in):: ismpl
-    real(8),intent(out):: gval(nvars)
+    integer,intent(in):: ndim
+    real(8),intent(in):: x(ndim)
+    real(8):: NN_gs(ndim)
+    integer:: ismpl
+    common /samplei/ ismpl
     integer:: i
     real(8),save,allocatable:: gs(:)
-    real(8):: gmax,vmax
+    real(8):: gmax,vmax,tg0
 
     if( .not.allocated(gs) ) allocate(gs(nvars))
 
+    ngrad= ngrad +1
+    tg0= mpi_wtime()
 
-    gval(1:nvars)= 0d0
+    NN_gs(1:nvars)= 0d0
     if( nl.eq.1 ) then
       call grad1(ismpl,gs)
     else if( nl.eq.2 ) then
       call grad2(ismpl,gs)
     endif
-    gval(1:nvars)= gval(1:nvars) +gs(1:nvars)
+    NN_gs(1:nvars)= NN_gs(1:nvars) +gs(1:nvars)
 
 !!$    if( lgscale ) then
 !!$      gmax= 0d0
@@ -401,8 +410,9 @@ contains
 !!$      gval(1:nvars)= gval(1:nvars)/gmax *gscl*vmax
 !!$    endif
 
+    tgrad= tgrad +mpi_wtime() -tg0
     return
-  end subroutine NN_get_gs
+  end function NN_gs
 !=======================================================================
   subroutine grad1(ismpl,gs)
     use variables

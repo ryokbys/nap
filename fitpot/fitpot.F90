@@ -385,12 +385,18 @@ end subroutine cg_wrapper
 !=======================================================================
 subroutine sequential_update()
   use variables
-  use NN,only:NN_init,NN_get_fs,NN_get_gs,NN_func,NN_grad
+  use NN,only:NN_init,NN_fs,NN_gs,NN_func,NN_grad
   use parallel
   implicit none
+  integer,parameter:: iprint = 1
+  integer,parameter:: nstp_eval= 10
+  integer,parameter:: nstp_time= 10
   real(8),allocatable:: gval(:)
-  integer:: istp,ismpl,iv
-  real(8):: gnorm,dsc,gmax,vmax,fval,gg
+  integer:: istp,iv
+  real(8):: gnorm,alpha,gmax,vmax,fval,gg
+  integer:: ismpl
+  common /samplei/ ismpl
+  real(8),external:: sprod
 
   allocate(gval(nvars))
 
@@ -404,7 +410,7 @@ subroutine sequential_update()
   call NN_init()
 
   do istp=1,nstp
-    if(mod(istp,100).eq.1) then
+    if(mod(istp,nstp_eval).eq.1) then
       fval= NN_func(nvars,vars)
       gval= NN_grad(nvars,vars)
       gnorm= 0d0
@@ -414,24 +420,23 @@ subroutine sequential_update()
       write(6,'(a,i6,2f20.7,f10.3)') ' istp,f,gnorm,time=',istp,fval &
            ,gnorm ,mpi_wtime()-time0
       call write_vars('tmp')
-    else if(mod(istp,100).eq.1) then
+    else if(mod(istp,nstp_time).eq.1) then
       write(6,'(a,i6,f10.3)') ' istp,time=',istp,mpi_wtime()-time0
     endif
     do ismpl=1,nsmpl
-      call NN_get_fs(ismpl,fval)
-      call NN_get_gs(ismpl,gval)
-      gmax= 0d0
-      vmax= 0d0
-      gnorm= 0d0
-      do iv=1,nvars
-        gg= gval(iv)*gval(iv)
-        gmax= max(gmax,gg)
-        vmax= max(vmax,vars(iv)*vars(iv))
-      enddo
-      gmax= sqrt(gmax)
-      vmaX= sqrt(vmax)
-      dsc= min(vmax/gmax,seqcoef)
-      vars(1:nvars)=vars(1:nvars) -dsc*gval(1:nvars)
+      fval= NN_fs(nvars,vars)
+      gval= NN_gs(nvars,vars)
+      gnorm= sprod(nvars,gval,gval)
+      gval(1:nvars)= -gval(1:nvars)/sqrt(gnorm)
+      call quad_interpolate(nvars,vars,gval,fval,xtol,gtol,ftol,alpha &
+           ,iprint,iflag,myid,NN_fs)
+      if( iflag/100.ne.0 ) then
+        iflag= iflag -(iflag/100)*100
+        print*,'since quad_interpolate failed, call golden_section.'
+        call golden_section(nvars,vars,gval,fval,xtol,gtol,ftol,alpha &
+           ,iprint,iflag,myid,NN_fs)
+      endif
+      vars(1:nvars)=vars(1:nvars) +alpha*gval(1:nvars)
 !!$      call NN_get_f(fval)
 !!$      call NN_get_g(gval)
 !!$      gnorm= 0d0
