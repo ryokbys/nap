@@ -5,7 +5,7 @@
 #
 
 n=0
-for dir in $(find . -name "OUTCAR")
+for dir in $(find $* -name "OUTCAR")
 do 
     dirname=$(echo $dir | sed 's/\/OUTCAR//')
     n=$(expr $n + 1)
