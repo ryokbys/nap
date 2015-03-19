@@ -81,8 +81,8 @@ if __name__ == '__main__':
     pmdexec= options.pmdexec
 
     al_orig,hmat,natm= read_pmd()
-    al_min = float(sys.argv[1])
-    al_max = float(sys.argv[2])
+    al_min = float(args[0])
+    al_max = float(args[1])
 
     if al_orig < al_min or al_orig > al_max:
         print ' [Warning] min and max maybe wrong.'
