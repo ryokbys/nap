@@ -53,10 +53,13 @@ gdat= [ [0.0,0.0] for i in range(nline) ]
 
 for ix in range(nline):
     gdat[ix][0]= data[ix][0]
-    for jx in range(-nline,nline):
-        if ix+jx < 0 or ix+jx >= nline:
-            continue
-        gdat[ix][1] += data[ix+jx][1]*pref*math.exp(-(dx*(jx))**2/sgm**2)*dx
+    for jx in range(-nline+1,nline-1):
+        kx= ix+jx
+        if kx < 0:
+            kx = -kx
+        elif kx >= nline:
+            kx = nline -(kx-(nline-1))
+        gdat[ix][1] += data[kx][1]*pref*math.exp(-(dx*(jx))**2/sgm**2)*dx
 
 outfile= open(infname+'.smeared','w')
 for il in range(nline):
