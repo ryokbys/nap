@@ -605,7 +605,9 @@ subroutine write_force_relation(cadd)
       natm= nalist(ismpl)
       do ia=1,natm
         do ixyz=1,3
-          write(91,'(2es15.7)') frefg(ixyz,ia,ismpl),fag(ixyz,ia,ismpl)
+          write(91,'(2es15.7,2x,a,i6,i3)') frefg(ixyz,ia,ismpl) &
+               ,fag(ixyz,ia,ismpl) &
+               ,cdirlist(ismpl),ia,ixyz
         enddo
       enddo
     enddo

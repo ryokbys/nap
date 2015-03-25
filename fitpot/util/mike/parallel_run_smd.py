@@ -9,7 +9,8 @@ if len(sys.argv) != 2:
 
 fparam= sys.argv[1]
 
-dirs= glob.glob('[0-9]????')
+#dirs= glob.glob('[0-9]????')
+dirs= glob.glob('0????')
 dirs.sort()
 #print dirs
 
