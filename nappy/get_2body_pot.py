@@ -49,8 +49,14 @@ parser.add_option("-r",dest="rcut",type="float",
 parser.add_option("--rmin",dest="rmin",type="float",
                   default=0.5,
                   help="minimum distance in Angstrom.")
+parser.add_option("--sid1",dest="sid1",type="int",
+                  default=1,
+                  help="species ID of atom-1.")
+parser.add_option("--sid2",dest="sid2",type="int",
+                  default=1,
+                  help="species ID of atom-2.")
 parser.add_option("--pmdexec",dest="pmdexec",type="string",
-                  default='../pmd/pmd',
+                  default='~/src/nap/pmd/pmd',
                   help="path to the pmd executable.")
 (options,args)= parser.parse_args()
 
@@ -62,6 +68,10 @@ rcut= options.rcut
 print ' rcut          = ',rcut,' Ang.'
 rmin= options.rmin
 print ' rmin          = ',rmin,' Ang.'
+sid1= options.sid1
+print ' sid1          = ',sid1
+sid2= options.sid2
+print ' sid2          = ',sid2
 pmdexec= options.pmdexec
 
 asys= AtomSystem()
@@ -75,9 +85,11 @@ atom1= Atom()
 atom2= Atom()
 atom1.set_pos(0.0,0.0,0.0)
 atom1.set_id(1)
+atom1.set_sid(sid1)
 asys.add_atom(atom1)
 atom2.set_pos(0.5,0.0,0.0)
 atom2.set_id(2)
+atom2.set_sid(sid2)
 asys.add_atom(atom2)
 
 hmin= rmin/(2*rcut)
