@@ -109,7 +109,7 @@ contains
     real(8):: NN_func
 
     integer:: ismpl,natm,ia,ixyz
-    real(8):: dn3i,ediff,tf0,tc0
+    real(8):: dn3i,ediff,tf0,tc0,fscale
     real(8):: flocal
 
     nfunc= nfunc +1
@@ -138,11 +138,11 @@ contains
       fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
            -samples(ismpl)%fref(1:3,1:natm))
       dn3i= 1d0 /(3*natm)
-      fscl= 1d0
+      fscale= 1d0
       !.....force-scale makes force contribution same order to energy
-      if( lfscale ) fscl= 1d0/(3*natm)
+      if( lfscale ) fscale= fscl
       fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
-           *dn3i *fscl
+           *dn3i *fscale
       do ia=1,natm
         do ixyz=1,3
 !!$          NN_func= NN_func +fdiff(ixyz,ia)
@@ -172,7 +172,7 @@ contains
     integer:: ismpl
     common /samplei/ ismpl
     integer:: natm,ia,ixyz
-    real(8):: dn3i,ediff,tf0
+    real(8):: dn3i,ediff,tf0,fscale
 
     nfunc=nfunc +1
     tf0= mpi_wtime()
@@ -193,11 +193,11 @@ contains
     fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
          -samples(ismpl)%fref(1:3,1:natm))
     dn3i= 1d0 /(3*natm)
-    fscl= 1d0
+    fscale= 1d0
 !.....force-scale makes force contribution same order to energy
-    if( lfscale ) fscl= 1d0/(3*natm)
+    if( lfscale ) fscale= fscl
     fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
-         *dn3i *fscl
+         *dn3i *fscale
     do ia=1,natm
       do ixyz=1,3
         NN_fs= NN_fs +fdiff(ixyz,ia)
@@ -420,7 +420,7 @@ contains
     integer,intent(in):: ismpl
     real(8),intent(inout):: gs(nvars)
     integer:: iv,ihl1,ia,ja,ihl0,jhl0,natm
-    real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg
+    real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale
     real(8),save,allocatable:: dgs(:),ab(:),wdg(:,:,:),bms(:,:,:,:)
 
     if( .not. allocated(dgs) ) then
@@ -460,9 +460,9 @@ contains
     fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
          -samples(ismpl)%fref(1:3,1:natm))
     dn3i= 1d0/(3*natm)
-    fscl= 1d0
-    if( lfscale ) fscl= 1d0/(3*natm)
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscl
+    fscale= 1d0
+    if( lfscale ) fscale= fscl
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscale
     iv= nhl(0)*nhl(1) +nhl(1)
     do ihl1=nhl(1),1,-1
       tmp= 0d0
@@ -559,7 +559,7 @@ contains
     real(8),intent(inout):: gs(nvars)
     integer:: iv,ihl0,ihl1,ihl2,ia,ja,natm
     real(8):: ediff,tmp,tmp1,tmp2,h1,h2,w1,w2,w3,dn3i,dh1,dh2,t1,t2,t3&
-         ,ddh1,ddh2,dh1gsf
+         ,ddh1,ddh2,dh1gsf,fscale
     real(8),save,allocatable:: dgs(:),w1dg(:,:,:,:),w2sw1dg(:,:,:,:)
 
     if( .not. allocated(dgs) ) then
@@ -619,9 +619,9 @@ contains
     fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
          -samples(ismpl)%fref(1:3,1:natm))
     dn3i= 1d0/(3*natm)
-    fscl= 1d0
-    if( lfscale ) fscl= 1d0/(3*natm)
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscl
+    fscale= 1d0
+    if( lfscale ) fscale= fscl
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscale
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 !.....make w1dg
     w1dg(1:3,1:natm,1:natm,1:nhl(1))= 0d0
