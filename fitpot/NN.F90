@@ -54,6 +54,7 @@ contains
 10    close(20)
       nsfc= nhl(0)
       nhl(nl+1)= 1
+      print *,' nhl(0:nl+1)=',nhl(0:nl+1)
     endif
     call mpi_bcast(nl,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsp,1,mpi_integer,0,mpi_world,ierr)
@@ -72,6 +73,10 @@ contains
       nwgt(i)= nhl(i-1)*nhl(i)
       nw= nw +nwgt(i)
     enddo
+    if(myid.eq.0) then
+      print *,'nsf2,nsf3,ncmb2,ncmb3=',nsf2,nsf3,ncmb2,ncmb3
+      print *,'nhl(0:nl+1),nw=',nhl(0:nl+1),nw
+    endif
 !!$    print *, 'nvars,nw=',nvars,nw
 
     allocate(sds(isid0:isid1))
