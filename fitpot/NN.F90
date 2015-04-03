@@ -400,11 +400,13 @@ contains
 !.....penalty term
     if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
       do idim=1,ndim
-        NN_grad(idim)= NN_grad(idim) -pwgt*sign(1d0,x(idim))
+        NN_grad(idim)= NN_grad(idim) +pwgt*sign(1d0,x(idim))
+!        print *,idim,-pwgt*sign(1d0,x(idim)),NN_grad(idim)
       enddo
     else if( trim(cpena).eq.'ridge' ) then
       do idim=1,ndim
-        NN_grad(idim)= NN_grad(idim) -2d0*pwgt*x(idim)
+        NN_grad(idim)= NN_grad(idim) +2d0*pwgt*x(idim)
+!        print *,idim,-2d0*pwgt*x(idim),NN_grad(idim)
       enddo
     endif
 
