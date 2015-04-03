@@ -75,6 +75,7 @@ print ' sid2          = ',sid2
 pmdexec= options.pmdexec
 
 asys= AtomSystem()
+# system size is bigger than 2*rcut
 a1= np.array([2.0, 0.0, 0.0])
 a2= np.array([0.0, 1.0, 0.0])
 a3= np.array([0.0, 0.0, 1.0])

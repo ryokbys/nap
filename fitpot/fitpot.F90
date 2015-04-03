@@ -127,7 +127,7 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,i2,es15.7)') 'atom_energy',i,eatom(i)
   enddo
   write(6,'(2x,a25,2x,l3)') 'force_match',lfmatch
-  write(6,'(2x,a25,2x,l3)') 'penalty',lpena
+  write(6,'(2x,a25,2x,a)') 'penalty',cpena
   write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',pwgt
   write(6,'(2x,a25,2x,a)') 'potential',trim(cpot)
   write(6,'(2x,a25,2x,l3)') 'gradient',lgrad
@@ -336,7 +336,6 @@ subroutine bfgs_wrapper()
   use NN,only:NN_init,NN_func,NN_grad
   use parallel
   implicit none
-  integer,parameter:: iprint = 1
   integer:: i,m
   real(8):: fval
 
@@ -356,7 +355,6 @@ subroutine sd_wrapper()
   use NN,only:NN_init,NN_func,NN_grad
   use parallel
   implicit none
-  integer,parameter:: iprint = 1
   integer:: i,m
   real(8):: fval
 
@@ -373,7 +371,6 @@ subroutine cg_wrapper()
   use NN,only:NN_init,NN_func,NN_grad
   use parallel
   implicit none
-  integer,parameter:: iprint = 1
   integer:: i,m
   real(8):: fval
 
@@ -390,9 +387,8 @@ subroutine sequential_update()
   use NN,only:NN_init,NN_fs,NN_gs,NN_func,NN_grad
   use parallel
   implicit none
-  integer,parameter:: iprint = 1
-  integer,parameter:: nstp_eval= 10
-  integer,parameter:: nstp_time= 10
+  integer,parameter:: nstp_eval= 1
+  integer,parameter:: nstp_time= 1
   real(8),allocatable:: gval(:)
   integer:: istp,iv
   real(8):: gnorm,alpha,gmax,vmax,fval,gg
@@ -412,7 +408,7 @@ subroutine sequential_update()
   call NN_init()
 
   do istp=1,nstp
-    if(mod(istp,nstp_eval).eq.1) then
+    if(mod(istp,nstp_eval).eq.0) then
       fval= NN_func(nvars,vars)
       gval= NN_grad(nvars,vars)
       gnorm= 0d0
@@ -422,7 +418,7 @@ subroutine sequential_update()
       write(6,'(a,i6,2f20.7,f10.3)') ' istp,f,gnorm,time=',istp,fval &
            ,gnorm ,mpi_wtime()-time0
       call write_vars('tmp')
-    else if(mod(istp,nstp_time).eq.1) then
+    else if(mod(istp,nstp_time).eq.0) then
       write(6,'(a,i6,f10.3)') ' istp,time=',istp,mpi_wtime()-time0
     endif
     do ismpl=1,nsmpl
@@ -678,12 +674,14 @@ subroutine sync_input()
   
   call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(nstp,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(iprint,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(cfmethod,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cmaindir,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cparfile,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(crunmode,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cpot,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cpena,128,mpi_character,0,mpi_world,ierr)
 
   call mpi_bcast(eps,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(xtol,1,mpi_double_precision,0,mpi_world,ierr)
@@ -701,7 +699,6 @@ subroutine sync_input()
   call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lfscale,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lswgt,1,mpi_logical,0,mpi_world,ierr)
-  call mpi_bcast(lpena,1,mpi_logical,0,mpi_world,ierr)
 end subroutine sync_input
 !=======================================================================
 subroutine get_node2sample()

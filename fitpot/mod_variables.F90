@@ -23,9 +23,10 @@ module variables
   real(8):: fscl   = 1d0
   logical:: lswgt  = .false.
   real(8):: swbeta = 1d0
-  logical:: lpena  = .false.
+  character(len=128):: cpena= 'none'
   real(8):: pwgt   = 1d0
   real(8):: seqcoef= 1d-2
+  integer:: iprint = 1
 
   character(len=5),allocatable,save:: cdirlist(:)
   integer,allocatable,save:: nalist(:)

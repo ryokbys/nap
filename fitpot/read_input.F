@@ -79,7 +79,7 @@ c=======================================================================
         call read_l1(ionum,lfmatch)
         return
       elseif( trim(cname).eq.'penalty' ) then
-        call read_l1(ionum,lpena)
+        call read_c1(ionum,cpena)
         return
       elseif( trim(cname).eq.'penalty_weight' ) then
         call read_r1(ionum,pwgt)
@@ -116,6 +116,9 @@ c=======================================================================
         return
       elseif( trim(cname).eq.'coeff_sequential' ) then
         call read_r1(ionum,seqcoef)
+        return
+      elseif( trim(cname).eq.'print_level' ) then
+        call read_i1(ionum,iprint)
         return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)

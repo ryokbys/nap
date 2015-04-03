@@ -266,11 +266,11 @@
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
         write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
-        flush(6)
+        call flush(6)
       else if( iprint.ge.2 ) then
         write(6,'(a,i8,12es15.7)') ' iter,x(1:5),f,gnorm=' &
              ,iter,x(1:5),f,gnorm
-        flush(6)
+        call flush(6)
       endif
     endif
 
@@ -307,9 +307,11 @@
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
           write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+          call flush(6)
         else if( iprint.ge.2 ) then
           write(6,'(a,i8,12es15.7)') ' iter,x(1:5),f,gnorm=' &
                ,iter,x(1:5),f,gnorm
+          call flush(6)
         endif
       endif
 !.....check convergence 

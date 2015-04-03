@@ -106,14 +106,14 @@ contains
 !=======================================================================
   function NN_func(ndim,x)
     use variables, only:nsmpl,nprcs,tfunc,samples,lfmatch,lfscale &
-         ,fscl,nfunc,tcomm
+         ,fscl,nfunc,tcomm,cpena,pwgt
     use parallel
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8):: NN_func
 
-    integer:: ismpl,natm,ia,ixyz
+    integer:: ismpl,natm,ia,ixyz,idim
     real(8):: dn3i,ediff,tf0,tc0,fscale
     real(8):: flocal
 
@@ -163,6 +163,17 @@ contains
          ,mpi_sum,mpi_world,ierr)
     tcomm= tcomm +mpi_wtime() -tc0
 
+!.....penalty term
+    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
+      do idim=1,ndim
+        NN_func= NN_func +pwgt*abs(x(idim))
+      enddo
+    else if( trim(cpena).eq.'ridge' ) then
+      do idim=1,ndim
+        NN_func= NN_func +pwgt*x(idim)*x(idim)
+      enddo
+    endif
+
     tfunc= tfunc +mpi_wtime() -tf0
     return
   end function NN_func
@@ -176,7 +187,7 @@ contains
     real(8):: NN_fs
     integer:: ismpl
     common /samplei/ ismpl
-    integer:: natm,ia,ixyz
+    integer:: natm,ia,ixyz,idim
     real(8):: dn3i,ediff,tf0,fscale
 
     nfunc=nfunc +1
@@ -210,6 +221,17 @@ contains
     enddo
 
 999 continue
+!.....penalty term
+    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
+      do idim=1,ndim
+        NN_fs= NN_fs +pwgt*abs(x(idim))
+      enddo
+    else if( trim(cpena).eq.'ridge' ) then
+      do idim=1,ndim
+        NN_fs= NN_fs +pwgt*x(idim)*x(idim)
+      enddo
+    endif
+
     tfunc= tfunc +mpi_wtime() -tf0
     return
   end function NN_fs
@@ -330,14 +352,14 @@ contains
   end subroutine calc_ef2
 !=======================================================================
   function NN_grad(ndim,x)
-    use variables,only: nsmpl,nprcs,tgrad,ngrad,tcomm
+    use variables,only: nsmpl,nprcs,tgrad,ngrad,tcomm,cpena,pwgt
     use parallel
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8):: NN_grad(ndim)
     
-    integer:: ismpl,i
+    integer:: ismpl,i,idim
     real(8),save,allocatable:: gs(:),glocal(:)
     real(8):: gmax,vmax,tc0,tg0
 
@@ -360,7 +382,7 @@ contains
     enddo
 
     tc0= mpi_wtime()
-    NN_grad= 0d0
+    NN_grad(1:ndim)= 0d0
     call mpi_allreduce(glocal,NN_grad,ndim,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
     tcomm= tcomm +mpi_wtime() -tc0
@@ -375,6 +397,17 @@ contains
 !!$      gval(1:ndim)= gval(1:ndim)/gmax *gscl*vmax
 !!$    endif
 
+!.....penalty term
+    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
+      do idim=1,ndim
+        NN_grad(idim)= NN_grad(idim) -pwgt*sign(1d0,x(idim))
+      enddo
+    else if( trim(cpena).eq.'ridge' ) then
+      do idim=1,ndim
+        NN_grad(idim)= NN_grad(idim) -2d0*pwgt*x(idim)
+      enddo
+    endif
+
     tgrad= tgrad +mpi_wtime() -tg0
     return
   end function NN_grad
@@ -388,7 +421,7 @@ contains
     real(8):: NN_gs(ndim)
     integer:: ismpl
     common /samplei/ ismpl
-    integer:: i
+    integer:: i,idim
     real(8),save,allocatable:: gs(:)
     real(8):: gmax,vmax,tg0
 
@@ -414,6 +447,17 @@ contains
 !!$      enddo
 !!$      gval(1:nvars)= gval(1:nvars)/gmax *gscl*vmax
 !!$    endif
+
+!.....penalty term
+    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
+      do idim=1,ndim
+        NN_gs(idim)= NN_gs(idim) -pwgt*sign(1d0,x(idim))
+      enddo
+    else if( trim(cpena).eq.'ridge' ) then
+      do idim=1,ndim
+        NN_gs(idim)= NN_gs(idim) -2d0*pwgt*x(idim)
+      enddo
+    endif
 
     tgrad= tgrad +mpi_wtime() -tg0
     return
