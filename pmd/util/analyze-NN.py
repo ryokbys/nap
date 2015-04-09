@@ -4,6 +4,7 @@ import math
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+import optparse
 
 cnstfname= 'in.const.NN'
 combfname= 'in.comb.NN'
@@ -88,6 +89,16 @@ def read_NN():
     return nl,nsp,nhl,n2,n3,wgt11,wgt12,cmb2,cmb3
 
 if __name__ == '__main__':
+
+    usage= '%prog [options]'
+
+    parser= optparse.OptionParser(usage=usage)
+    parser.add_option("-w",action="store_true",
+                      dest="weight",default=False,
+                      help="Show weight values.")
+    (options,args)= parser.parse_args()
+
+    flag_weight= options.weight
 
     nl,nsp,nhl,n2,n3,wgt11,wgt12,cmb2,cmb3= read_NN()
     
@@ -175,12 +186,12 @@ if __name__ == '__main__':
     #nx.draw_networkx_edges(g,pos)
     nodes= nx.draw_networkx_nodes(g,pos,node_size=30,node_color='b')
     edges= nx.draw_networkx_edges(g,pos,edge_color=colors,edge_cmap=plt.get_cmap('jet'))
-    # nx.draw_networkx_edge_labels(g,pos,alpha=1.0,edge_labels=elabels,label_pos=0.5)
+    if flag_weight:
+        nx.draw_networkx_edge_labels(g,pos,alpha=1.0,edge_labels=elabels,label_pos=0.5)
     for key in pos:
         pos[key][0] -= 0.2
     nx.draw_networkx_labels(g,pos,nlabel,font_size=8)
     
-    #plt.savefig("NN.png")
     plt.colorbar(edges)
     plt.tick_params(axis='x',bottom='off',top='off',labelbottom='off')
     plt.tick_params(axis='y',bottom='off',top='off',labelleft='off')
