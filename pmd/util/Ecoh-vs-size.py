@@ -1,7 +1,7 @@
 #!/opt/local/bin/python
 u"""
 Calculate the cohesive energy as a function of lattice constant,
-by altering the lattice constant in pmd00000 file.
+by altering the lattice constant in 0000/pmd00000 or smd0000 file.
 
 And if possible, calculate equilibrium lattice size and
 bulk modulus, too.
@@ -14,8 +14,8 @@ from scipy.optimize import leastsq
 import matplotlib.pyplot as plt
 
 
-def read_pmd():
-    f=open('0000/pmd00000','r')
+def read_pmd(fname="0000/pmd00000"):
+    f=open(fname,'r')
     #...read 1st line and get current lattice size
     al= float(f.readline().split()[0])
     hmat= np.zeros((3,3))
@@ -35,11 +35,11 @@ def get_vol(al,hmat):
     a3= hmat[0:3,2] *al
     return np.dot(a1,np.cross(a2,a3))
 
-def replace_1st_line(x):
-    f=open('0000/pmd00000','r')
+def replace_1st_line(x,fname="0000/pmd00000"):
+    f=open(fname,'r')
     ini= f.readlines()
     f.close()
-    g=open('0000/pmd00000','w')
+    g=open(fname,'w')
     for l in range(len(ini)):
         if l == 0:
             g.write(' {0:10.4f}\n'.format(x))
@@ -66,9 +66,12 @@ if __name__ == '__main__':
     parser.add_option("-p",action="store_true",
                       dest="plot",default=False,
                       help="Plot a graph on the screen.")
-    parser.add_option("--pmdexec",dest="pmdexec",type="string",
+    parser.add_option("--mdexec",dest="mdexec",type="string",
                       default='~/src/nap/pmd/pmd',
-                      help="path to the pmd executable.")
+                      help="path to the pmd/smd executable.")
+    parser.add_option("--smd",action="store_true",dest="usesmd",
+                      default=False,
+                      help="use smd instead of pmd.")
     (options,args)= parser.parse_args()
 
     if len(args) != 2:
@@ -78,9 +81,14 @@ if __name__ == '__main__':
 
     niter= options.niter
     shows_graph= options.plot
-    pmdexec= options.pmdexec
+    mdexec= options.mdexec
+    usesmd= options.usesmd
 
-    al_orig,hmat,natm= read_pmd()
+    if usesmd:
+        fname= "smd0000"
+    else:
+        fname= "0000/pmd00000"
+    al_orig,hmat,natm= read_pmd(fname)
     al_min = float(args[0])
     al_max = float(args[1])
 
@@ -95,9 +103,9 @@ if __name__ == '__main__':
     dl= (al_max -al_min)/niter
     for iter in range(niter+1):
         al= al_min +dl*iter
-        replace_1st_line(al)
-        os.system(pmdexec +' > out.pmd')
-        erg= float(commands.getoutput("grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'"))
+        replace_1st_line(al,fname)
+        os.system(mdexec +' > out.md')
+        erg= float(commands.getoutput("grep 'potential energy' out.md | head -n1 | awk '{print $3}'"))
         vol= get_vol(al,hmat)
         print ' {0:10.4f} {1:10.4f} {2:15.7f}'.format(al,vol,erg)
         outfile1.write(' {0:10.4f} {1:10.4f} {2:15.7f}\n'.format(al,vol,erg))
@@ -105,7 +113,7 @@ if __name__ == '__main__':
     outfile1.close()
 
     #...revert 0000/pmd00000
-    replace_1st_line(al_orig)
+    replace_1st_line(al_orig,fname)
 
     #...prepare for Murnaghan fitting
     f= open('out.Ecoh-vs-size','r')
