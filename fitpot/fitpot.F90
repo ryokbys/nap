@@ -127,7 +127,7 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,i2,es15.7)') 'atom_energy',i,eatom(i)
   enddo
   write(6,'(2x,a25,2x,l3)') 'force_match',lfmatch
-  write(6,'(2x,a25,2x,a)') 'penalty',cpena
+  write(6,'(2x,a25,2x,a)') 'penalty',trim(cpena)
   write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',pwgt
   write(6,'(2x,a25,2x,a)') 'potential',trim(cpot)
   write(6,'(2x,a25,2x,l3)') 'gradient',lgrad

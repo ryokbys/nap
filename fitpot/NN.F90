@@ -162,6 +162,7 @@ contains
     call mpi_allreduce(flocal,NN_func,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
     tcomm= tcomm +mpi_wtime() -tc0
+    NN_func= NN_func/nsmpl
 
 !.....penalty term
     if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
@@ -390,6 +391,8 @@ contains
     call mpi_allreduce(glocal,NN_grad,ndim,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
     tcomm= tcomm +mpi_wtime() -tc0
+
+    NN_grad(1:ndim)= NN_grad(1:ndim)/nsmpl
 
 !!$    if( lgscale ) then
 !!$      gmax= 0d0
