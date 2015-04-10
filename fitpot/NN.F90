@@ -45,9 +45,9 @@ contains
       nsf3= 0
       do while(.true.)
         read(20,*,end=10) itmp
-        if( itmp.eq.1 ) then
+        if( itmp.le.100 ) then
           nsf2=nsf2+1
-        else if( itmp.eq.2 ) then
+        else if( itmp.le.200 ) then
           nsf3=nsf3+1
         endif
       enddo
