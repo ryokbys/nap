@@ -165,11 +165,13 @@ contains
 
 !.....penalty term
     if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
-      do idim=1,ndim
+!!$      do idim=1,ndim
+      do idim=1,nhl(0)*nhl(1)
         NN_func= NN_func +pwgt*abs(x(idim))
       enddo
     else if( trim(cpena).eq.'ridge' ) then
-      do idim=1,ndim
+!!$      do idim=1,ndim
+      do idim=1,nhl(0)*nhl(1)
         NN_func= NN_func +pwgt*x(idim)*x(idim)
       enddo
     endif
@@ -223,11 +225,13 @@ contains
 999 continue
 !.....penalty term
     if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
-      do idim=1,ndim
+!!$      do idim=1,ndim
+      do idim=1,nhl(0)*nhl(1)
         NN_fs= NN_fs +pwgt*abs(x(idim))
       enddo
     else if( trim(cpena).eq.'ridge' ) then
-      do idim=1,ndim
+!!$      do idim=1,ndim
+      do idim=1,nhl(0)*nhl(1)
         NN_fs= NN_fs +pwgt*x(idim)*x(idim)
       enddo
     endif
@@ -399,12 +403,14 @@ contains
 
 !.....penalty term
     if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
-      do idim=1,ndim
+!!$      do idim=1,ndim
+      do idim=1,nhl(0)*nhl(1)
         NN_grad(idim)= NN_grad(idim) +pwgt*sign(1d0,x(idim))
 !        print *,idim,-pwgt*sign(1d0,x(idim)),NN_grad(idim)
       enddo
     else if( trim(cpena).eq.'ridge' ) then
-      do idim=1,ndim
+!!$      do idim=1,ndim
+      do idim=1,nhl(0)*nhl(1)
         NN_grad(idim)= NN_grad(idim) +2d0*pwgt*x(idim)
 !        print *,idim,-2d0*pwgt*x(idim),NN_grad(idim)
       enddo
@@ -452,11 +458,13 @@ contains
 
 !.....penalty term
     if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
-      do idim=1,ndim
+!!$      do idim=1,ndim
+      do idim=1,nhl(0)*nhl(1)
         NN_gs(idim)= NN_gs(idim) -pwgt*sign(1d0,x(idim))
       enddo
     else if( trim(cpena).eq.'ridge' ) then
-      do idim=1,ndim
+!!$      do idim=1,ndim
+      do idim=1,nhl(0)*nhl(1)
         NN_gs(idim)= NN_gs(idim) -2d0*pwgt*x(idim)
       enddo
     endif
