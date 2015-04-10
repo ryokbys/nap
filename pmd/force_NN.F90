@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-02-24 13:49:46 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-04-10 13:08:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -21,9 +21,8 @@ module NN
   integer,allocatable:: icmb2(:,:),icmb3(:,:,:)
 !.....function types and num of constatns for types
   integer,parameter:: max_ncnst= 2
-  integer,parameter:: ncnst_type(1:2)= &
-       (/ 2, &  ! Gaussian
-          1 /) ! angular
+  integer:: ncnst_type(200)
+
 !.....max exponent of the basis function
   integer:: max_nexp
   
@@ -344,7 +343,7 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
-         dcsdj(3),dcsdk(3),dcsdi(3)
+         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1
 
     real(8),external:: sprod
 
@@ -363,21 +362,41 @@ contains
         if( dij.ge.rc ) cycle
         js= int(tag(ja))
         isfc=0
+        driji(1:3)= -rij(1:3)/dij
+        drijj(1:3)= -driji(1:3)
         do isfc1=1,nsfc1
           isfc= isfc+1
           isf= (icmb2(is,js)-1)*nsfc1 +isfc1
           fcij= fc(dij,rc)
-          eta= cnst(1,isfc)
-          rs=  cnst(2,isfc)
-          !.....function value
-          texp= exp(-eta*(dij-rs)**2)
-          gsf(isf,ia)= gsf(isf,ia) +texp*fcij
-          !.....derivative
-          driji(1:3)= -rij(1:3)/dij
-          drijj(1:3)= -driji(1:3)
-          dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfc(dij,rc)
-          dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
-          dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+          if( itype(isfc1).eq.1 ) then ! Gaussian
+            eta= cnst(1,isfc)
+            rs=  cnst(2,isfc)
+            !.....function value
+            texp= exp(-eta*(dij-rs)**2)
+            gsf(isf,ia)= gsf(isf,ia) +texp*fcij
+            !.....derivative
+            dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfc(dij,rc)
+            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
+            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+          else if( itype(isfc1).eq.2 ) then ! cosine
+            a1= cnst(1,isfc)
+            !.....func value
+            tcos= (1d0+cos(dij*a1))
+            gsf(isf,ia)= gsf(isf,ia) +tcos*fcij
+            !.....derivative
+            dgdr= -a1*sin(dij*a1)*fcij +tcos*dfc(dij,rc)
+            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
+            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+          else if( itype(isfc1).eq.3 ) then ! polynomial
+            a1= cnst(1,isfc)
+            !.....func value
+            tpoly= 1d0*dij**(-a1)
+            gsf(isf,ia)= gsf(isf,ia) +tpoly*fcij
+            !.....derivative
+            dgdr= -a1*dij**(-a1-1d0)*fcij +tpoly*dfc(dij,rc)
+            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
+            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+          endif
         enddo
         do isfc2=1,nsfc2
           isfc= isfc +1
@@ -478,6 +497,12 @@ contains
     integer,allocatable:: nwgt(:)
     logical:: lexist
 
+!.....initialize some
+    ncnst_type(1)= 2   ! Gaussian
+    ncnst_type(2)= 1   ! cosine
+    ncnst_type(3)= 1   ! polynomial
+    ncnst_type(101)= 1 ! angular
+
 !.....read constants at the 1st call
     inquire(file=trim(ccfname),exist=lexist)
     if( .not. lexist ) then
@@ -519,8 +544,11 @@ contains
     nsfc2= 0
     do i=1,nsfc
       read(51,*) itype(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
-      if( itype(i).eq.1 ) nsfc1= nsfc1 +1
-      if( itype(i).eq.2 ) nsfc2= nsfc2 +1
+      if( itype(i).le.100 ) then
+        nsfc1= nsfc1 +1
+      else if( itype(i).le.200 ) then
+        nsfc2= nsfc2 +1
+      endif
     enddo
     if( nsfc.ne.nsfc1+nsfc2 ) then
       if(myid.eq.0) then

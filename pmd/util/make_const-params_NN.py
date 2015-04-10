@@ -21,13 +21,22 @@ nhl= [0,2]
 #.....min,max of parameters
 pmin= -1.0
 pmax=  1.0
-#.....num of eta in 2-body symmetry function
+#.....num of eta in Gaussian symmetry function, f(r)=exp(-eta*(dij-rs)**2)
+type_gauss= 1
 reta=[0.5, 1.0, 1.5, 2.0, 2.5]
 #.....num of Rs in 2-body symmetry function
 #rrs=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5]
 #rrs=[0.5, 1.0, 1.5, 2.0, 2.5]
 rrs=[0.0]
+#.....num of k in cosine func, f(r)= (1d0+cos(k*r))
+type_cos= 2
+r2pi= 2.0*math.pi/rcut
+rk= [r2pi, r2pi*1.5]
+#.....num of a in polynomial func, f(r)= 1.0/r**a
+type_poly= 3
+rpoly= [1.0, 2.0, 3.0, 6.0, 9.0, 12.0]
 #.....num of 3-body angular symmetry functions (cosine value)
+type_angle= 101
 #rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 2.0/3, 3.0/5]
 rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2]
 
@@ -81,7 +90,9 @@ if __name__ == "__main__":
     make_combination(nsp,combfname)
 
     #.....num of 2-body Gaussian-type symmetry functions
-    nsf2= len(reta)*len(rrs)
+    nsf2 = len(reta)*len(rrs)
+    nsf2+= len(rk)
+    nsf2+= len(rpoly)
     nsf3= len(rsf3)
     
     f= open(constfname,'w')
@@ -95,10 +106,16 @@ if __name__ == "__main__":
     #.....2-body Gaussian-type
     for eta in reta:
         for rs in rrs:
-            f.write(' 1 {0:10.4f} {1:10.4f}\n'.format(eta,rs))
+            f.write(' {0:3d} {1:10.4f} {2:10.4f}\n'.format(type_gauss,eta,rs))
+    #.....cosine
+    for k in rk:
+        f.write(' {0:3d} {1:10.4f}\n'.format(type_cos,k))
+    #.....polynomial
+    for p in rpoly:
+        f.write(' {0:3d} {1:10.4f}\n'.format(type_poly,p))
     #.....3-body
     for sf3 in rsf3:
-        f.write(' 2 {0:10.4f}\n'.format(sf3))
+        f.write(' {0:3d} {1:10.4f}\n'.format(type_angle,sf3))
     f.close()
     
     g= open(paramfname,'w')
