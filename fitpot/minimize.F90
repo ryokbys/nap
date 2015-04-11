@@ -701,8 +701,8 @@
 
   real(8),external:: sprod
   real(8),parameter:: alpha0 = 1d0
-  real(8),parameter:: xi     = 0.5d0
-  real(8),parameter:: tau    = 0.8d0
+  real(8),parameter:: xi     = 0.3d0
+  real(8),parameter:: tau    = 0.9d0
   integer,parameter:: MAXITER= 100
   integer:: iter
   real(8):: alphai,xigd,f0,fi
