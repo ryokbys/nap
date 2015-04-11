@@ -120,6 +120,9 @@ c=======================================================================
       elseif( trim(cname).eq.'print_level' ) then
         call read_i1(ionum,iprint)
         return
+      elseif( trim(cname).eq.'line_minimization' ) then
+        call read_c1(ionum,clinmin)
+        return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return

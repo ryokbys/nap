@@ -85,8 +85,8 @@ program fitpot
   call write_energy_relation('fin')
   call write_force_relation('fin')
   call write_statistics()
-  write(6,'(a,i4,3f15.3)') ' myid,tfunc,tgrad,tcom=' &
-       ,myid,tfunc,tgrad,tcomm
+!!$  write(6,'(a,i4,3f15.3)') ' myid,tfunc,tgrad,tcom=' &
+!!$       ,myid,tfunc,tgrad,tcomm
   tmp= tfunc
   call mpi_reduce(tmp,tfunc,1,mpi_double_precision,mpi_max &
        ,0,mpi_world,ierr)
@@ -138,6 +138,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,l3)') 'sample_weight',lswgt
   write(6,'(2x,a25,2x,es12.3)') 'sample_weight_beta',swbeta
   write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
+  write(6,'(2x,a25,2x,a)') 'line_minimization',trim(clinmin)
   write(6,'(a)') '------------------------------------------------'
 
 end subroutine write_initial_setting
@@ -342,7 +343,7 @@ subroutine bfgs_wrapper()
   !.....NN specific code hereafter
   call NN_init()
   call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp &
-       ,iprint,iflag,myid,NN_func,NN_grad)
+       ,iprint,iflag,myid,NN_func,NN_grad,cpena,clinmin)
 
   return
 end subroutine bfgs_wrapper
@@ -688,6 +689,7 @@ subroutine sync_input()
   call mpi_bcast(crunmode,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cpot,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cpena,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(clinmin,128,mpi_character,0,mpi_world,ierr)
 
   call mpi_bcast(eps,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(xtol,1,mpi_double_precision,0,mpi_world,ierr)

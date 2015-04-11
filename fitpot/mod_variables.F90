@@ -27,6 +27,7 @@ module variables
   real(8):: pwgt   = 1d0
   real(8):: seqcoef= 1d-2
   integer:: iprint = 1
+  character(len=128):: clinmin= 'armijo'
 
   character(len=5),allocatable,save:: cdirlist(:)
   integer,allocatable,save:: nalist(:)

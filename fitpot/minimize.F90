@@ -32,7 +32,7 @@
     g= grad(ndim,x)
     gnorm= sprod(ndim,g,g)
     g(1:ndim)= -g(1:ndim)/sqrt(gnorm)
-    gnorm= gnorm/ndim
+!!$    gnorm= gnorm/ndim
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
         write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
@@ -62,7 +62,7 @@
       g= grad(ndim,x)
       gnorm= sprod(ndim,g,g)
       g(1:ndim)= -g(1:ndim)/sqrt(gnorm)
-      gnorm= gnorm/ndim
+!!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
           write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
@@ -140,7 +140,7 @@
     g= grad(ndim,x)
     gnorm= sprod(ndim,g,g)
 !!$    g(1:ndim)= g(1:ndim)/sqrt(gnorm)
-    gnorm= gnorm/ndim
+!!$    gnorm= gnorm/ndim
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
         write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
@@ -171,7 +171,7 @@
       gnormp= gnorm
       gnorm= sprod(ndim,g,g)
 !!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
-      gnorm= gnorm/ndim
+!!$      gnorm= gnorm/ndim
       u(1:ndim)= -g(1:ndim) +gnorm/gnormp *u(1:ndim)
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
@@ -217,7 +217,7 @@
   end subroutine cg
 !=======================================================================
   subroutine bfgs(ndim,x0,f,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,grad,cpena)
+       ,iprint,iflag,myid,func,grad,cpena,clinmin)
 !
 !  Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
 !
@@ -226,7 +226,7 @@
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
     real(8),intent(inout):: f,x0(ndim)
-    character(len=128):: cpena
+    character(len=128):: cpena,clinmin
 !!$    real(8):: func,grad
     interface
       function func(n,x)
@@ -263,7 +263,7 @@
     x(1:ndim)= x0(1:ndim)
 
     iter= 0
-    gnorm= gnorm/ndim
+!!$    gnorm= gnorm/ndim
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
         write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
@@ -285,18 +285,24 @@
       fp= f
       gp(1:ndim)= g(1:ndim)
 !.....line minimization
-      call armijo_search(ndim,x,u,f,g,alpha,iprint,iflag,myid,func)
-!!$      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
-!!$           ,iprint,iflag,myid,func)
-!!$!.....if quad interpolation failed, perform golden section
-!!$      if( iflag/100.ne.0 ) then
-!!$        iflag= iflag -(iflag/100)*100
-!!$        if(myid.eq.0) then
-!!$          print *,'since quad_interpolate failed, call golden_section.'
-!!$        endif
-!!$        call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
-!!$             ,iprint,iflag,myid,func)
-!!$      endif
+      if( trim(clinmin).eq.'quadratic' ) then
+        call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
+             ,iprint,iflag,myid,func)
+!.....if quad interpolation failed, perform golden section
+        if( iflag/100.ne.0 ) then
+          iflag= iflag -(iflag/100)*100
+          if(myid.eq.0) then
+            print *,'since quad_interpolate failed, call golden_section.'
+          endif
+          call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+               ,iprint,iflag,myid,func)
+        endif
+      else if ( trim(clinmin).eq.'golden') then
+        call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+             ,iprint,iflag,myid,func)
+      else ! armijo (default)
+        call armijo_search(ndim,x,u,f,g,alpha,iprint,iflag,myid,func)
+      endif
       if( iflag/100.ne.0 ) then
         x0(1:ndim)= x(1:ndim)
         return
@@ -305,7 +311,7 @@
       g= grad(ndim,x)
       gnorm= sprod(ndim,g,g)
 !!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
-      gnorm= gnorm/ndim
+!!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
           write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
@@ -701,9 +707,9 @@
 
   real(8),external:: sprod
   real(8),parameter:: alpha0 = 1d0
-  real(8),parameter:: xi     = 0.3d0
+  real(8),parameter:: xi     = 0.5d0
   real(8),parameter:: tau    = 0.9d0
-  integer,parameter:: MAXITER= 100
+  integer,parameter:: MAXITER= 200
   integer:: iter
   real(8):: alphai,xigd,f0,fi
 
