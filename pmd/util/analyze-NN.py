@@ -31,12 +31,25 @@ def read_NN_config():
         print 'num of neurons-{0:d} ='.format(2),nhl[2]
     n2=0
     n3=0
+    ngauss= 0
+    ncos= 0
+    npoly= 0
+    nangle= 0
     for line in fcnst.readlines():
         buff= line.split()
-        if buff[0] == '1':
+        itype= int(buff[0])
+        if itype <= 100:
             n2 += 1
-        elif buff[0] == '2':
+            itype2= itype % 100
+            if itype2 == 1:
+                ngauss += 1
+            elif itype2 == 2:
+                ncos += 1
+            elif itype2 == 3:
+                npoly += 1
+        elif itype <= 200:
             n3 += 1
+            nangle += 1
     fcnst.close()
     print 'read in.const.NN'
     print 'num of 2body terms=',n2
@@ -71,7 +84,7 @@ def read_NN_config():
         print '  ',i3,':', \
             ' {0:1d}-{1:1d}-{2:1d}'.format(cmb3[i3,0],cmb3[i3,1],cmb3[i3,2])
     fcmb.close()
-    return nl,nsp,nhl,n2,n3,cmb2,cmb3
+    return nl,nsp,nhl,n2,n3,cmb2,cmb3,ngauss,ncos,npoly,nangle
     
 def read_NN_params(nl,nhl):
     #.....read in.params.NN
@@ -130,7 +143,7 @@ if __name__ == '__main__':
     flag_weight= options.weight
     threshold= options.threshold
 
-    nl,nsp,nhl,n2,n3,cmb2,cmb3= read_NN_config()
+    nl,nsp,nhl,n2,n3,cmb2,cmb3,ngauss,ncos,npoly,nagnle= read_NN_config()
     if nl == 1:
         wgt11,wgt12= read_NN_params(nl,nhl)
     elif nl == 2:

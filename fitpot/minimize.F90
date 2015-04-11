@@ -217,7 +217,7 @@
   end subroutine cg
 !=======================================================================
   subroutine bfgs(ndim,x0,f,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,grad)
+       ,iprint,iflag,myid,func,grad,cpena)
 !
 !  Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
 !
@@ -226,6 +226,7 @@
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
     real(8),intent(inout):: f,x0(ndim)
+    character(len=128):: cpena
 !!$    real(8):: func,grad
     interface
       function func(n,x)
@@ -284,17 +285,18 @@
       fp= f
       gp(1:ndim)= g(1:ndim)
 !.....line minimization
-      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
-           ,iprint,iflag,myid,func)
-!.....if quad interpolation failed, perform golden section
-      if( iflag/100.ne.0 ) then
-        iflag= iflag -(iflag/100)*100
-        if(myid.eq.0) then
-          print *,'since quad_interpolate failed, call golden_section.'
-        endif
-        call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
-             ,iprint,iflag,myid,func)
-      endif
+      call armijo_search(ndim,x,u,f,g,alpha,iprint,iflag,myid,func)
+!!$      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
+!!$           ,iprint,iflag,myid,func)
+!!$!.....if quad interpolation failed, perform golden section
+!!$      if( iflag/100.ne.0 ) then
+!!$        iflag= iflag -(iflag/100)*100
+!!$        if(myid.eq.0) then
+!!$          print *,'since quad_interpolate failed, call golden_section.'
+!!$        endif
+!!$        call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+!!$             ,iprint,iflag,myid,func)
+!!$      endif
       if( iflag/100.ne.0 ) then
         x0(1:ndim)= x(1:ndim)
         return
@@ -685,6 +687,45 @@
     goto 10
 
   end subroutine golden_section
+!=======================================================================
+  subroutine armijo_search(ndim,x0,d,f,g,alpha,iprint,iflag,myid,func)
+!  
+!  1D search using Armijo rule.
+!    
+    implicit none
+    integer,intent(in):: ndim,iprint,myid
+    integer,intent(inout):: iflag
+    real(8),intent(in):: x0(ndim),g(ndim),d(ndim)
+    real(8),intent(inout):: f,alpha
+    real(8):: func
+
+  real(8),external:: sprod
+  real(8),parameter:: alpha0 = 1d0
+  real(8),parameter:: xi     = 0.5d0
+  real(8),parameter:: tau    = 0.8d0
+  integer,parameter:: MAXITER= 100
+  integer:: iter
+  real(8):: alphai,xigd,f0,fi
+
+  alphai= alpha0
+  xigd= sprod(ndim,g,d)*xi
+
+  f0= f
+  do iter=1,MAXITER
+    fi= func(ndim,x0+alphai*d)
+    if( fi.le.f0 +xigd*alphai ) then
+      f= fi
+      alpha= alphai
+      return
+    endif
+    alphai= alphai*tau
+  enddo
+
+  if(myid.eq.0) print *,'[Error] iter.gt.MAXITER in armijo_search.'
+  iflag= iflag +100
+  return
+    
+  end subroutine armijo_search
 !=======================================================================
   function sprod(n,a,b)
     implicit none

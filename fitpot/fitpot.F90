@@ -396,6 +396,12 @@ subroutine sequential_update()
   common /samplei/ ismpl
   real(8),external:: sprod
 
+  interface
+    subroutine write_vars(cadd)
+      character(len=*),intent(in),optional:: cadd
+    end subroutine write_vars
+  end interface
+
   allocate(gval(nvars))
 
   if( nnode.ne.1 ) then
