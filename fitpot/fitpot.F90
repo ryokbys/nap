@@ -110,6 +110,7 @@ end program fitpot
 !=======================================================================
 subroutine write_initial_setting()
   use variables
+  use minimize
   implicit none 
   integer:: i
 
@@ -336,6 +337,7 @@ subroutine bfgs_wrapper()
   use variables
   use NN,only:NN_init,NN_func,NN_grad
   use parallel
+  use minimize
   implicit none
   integer:: i,m
   real(8):: fval
@@ -343,7 +345,7 @@ subroutine bfgs_wrapper()
   !.....NN specific code hereafter
   call NN_init()
   call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp &
-       ,iprint,iflag,myid,NN_func,NN_grad,cpena,clinmin)
+       ,iprint,iflag,myid,NN_func,NN_grad)
 
   return
 end subroutine bfgs_wrapper
@@ -355,6 +357,7 @@ subroutine sd_wrapper()
   use variables
   use NN,only:NN_init,NN_func,NN_grad
   use parallel
+  use minimize
   implicit none
   integer:: i,m
   real(8):: fval
@@ -371,13 +374,14 @@ subroutine cg_wrapper()
   use variables
   use NN,only:NN_init,NN_func,NN_grad
   use parallel
+  use minimize
   implicit none
   integer:: i,m
   real(8):: fval
 
   !.....NN specific code hereafter
   call NN_init()
-  call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp &
+  call cg(nvars,vars,fval,xtol,gtol,ftol,nstp &
        ,iprint,iflag,myid,NN_func,NN_grad)
 
   return
@@ -387,6 +391,7 @@ subroutine sequential_update()
   use variables
   use NN,only:NN_init,NN_fs,NN_gs,NN_func,NN_grad
   use parallel
+  use minimize
   implicit none
   integer,parameter:: nstp_eval= 1
   integer,parameter:: nstp_time= 1
@@ -395,7 +400,6 @@ subroutine sequential_update()
   real(8):: gnorm,alpha,gmax,vmax,fval,gg
   integer:: ismpl
   common /samplei/ ismpl
-  real(8),external:: sprod
 
   interface
     subroutine write_vars(cadd)
@@ -677,6 +681,7 @@ end subroutine write_statistics
 subroutine sync_input()
   use variables
   use parallel
+  use minimize
   implicit none
   
   call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)

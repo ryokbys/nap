@@ -1,3 +1,10 @@
+module minimize
+!.....penalty: lasso or ridge
+  character(len=128):: cpena= 'none'
+  character(len=128):: clinmin= 'armijo'
+  real(8):: pwgt
+
+contains
 !=======================================================================
   subroutine steepest_descent(ndim,x,f,xtol,gtol,ftol,maxiter &
        ,iprint,iflag,myid,func,grad)
@@ -22,7 +29,7 @@
 
     integer:: iter
     real(8):: alpha,fp,gnorm
-    real(8),external:: sprod
+!!$    real(8),external:: sprod
     real(8),save,allocatable:: g(:)
 
     if( .not. allocated(g) ) allocate(g(ndim))
@@ -87,13 +94,13 @@
         endif
         iflag= iflag +2
         return
-      else if( abs(f-fp)/abs(fp).lt.ftol ) then
-        if( myid.eq.0 ) then
-          print *,'>>> Sd converged wrt ftol'
-          write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp)/abs(fp),ftol
-        endif
-        iflag= iflag +3
-        return
+!!$      else if( abs(f-fp)/abs(fp).lt.ftol ) then
+!!$        if( myid.eq.0 ) then
+!!$          print *,'>>> Sd converged wrt ftol'
+!!$          write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp)/abs(fp),ftol
+!!$        endif
+!!$        iflag= iflag +3
+!!$        return
       endif
     enddo
     
@@ -130,7 +137,7 @@
 
     integer:: iter
     real(8):: alpha,fp,gnorm,gnormp
-    real(8),external:: sprod
+!!$    real(8),external:: sprod
     real(8),save,allocatable:: g(:),u(:)
 
     if( .not. allocated(g) ) allocate(g(ndim),u(ndim))
@@ -197,14 +204,14 @@
         endif
         iflag= iflag +2
         return
-      else if( abs(f-fp)/abs(fp).lt.ftol ) then
-        if( myid.eq.0 ) then
-          print *,'>>> CG converged wrt ftol'
-          write(6,'(a,2es15.7)') '   f-fp,ftol=' &
-               ,abs(f-fp)/abs(fp),ftol
-        endif
-        iflag= iflag +3
-        return
+!!$      else if( abs(f-fp)/abs(fp).lt.ftol ) then
+!!$        if( myid.eq.0 ) then
+!!$          print *,'>>> CG converged wrt ftol'
+!!$          write(6,'(a,2es15.7)') '   f-fp,ftol=' &
+!!$               ,abs(f-fp)/abs(fp),ftol
+!!$        endif
+!!$        iflag= iflag +3
+!!$        return
       endif
     enddo
     
@@ -217,7 +224,7 @@
   end subroutine cg
 !=======================================================================
   subroutine bfgs(ndim,x0,f,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,grad,cpena,clinmin)
+       ,iprint,iflag,myid,func,grad)
 !
 !  Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
 !
@@ -226,7 +233,6 @@
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
     real(8),intent(inout):: f,x0(ndim)
-    character(len=128):: cpena,clinmin
 !!$    real(8):: func,grad
     interface
       function func(n,x)
@@ -241,15 +247,15 @@
       end function grad
     end interface
 
-    real(8),external:: sprod
+!!$    real(8),external:: sprod
     real(8),save,allocatable:: gg(:,:),x(:),u(:),v(:),y(:),gp(:) &
-         ,ggy(:),ygg(:),aa(:,:),cc(:,:),g(:)
+         ,ggy(:),ygg(:),aa(:,:),cc(:,:),g(:),gpena(:)
     real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm
     integer:: i,j,iter
 
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim),x(ndim),u(ndim)&
          ,v(ndim),y(ndim),g(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
-         ,aa(ndim,ndim),cc(ndim,ndim))
+         ,aa(ndim,ndim),cc(ndim,ndim),gpena(ndim))
 
 !.....initial G = I
     gg(1:ndim,1:ndim)= 0d0
@@ -258,12 +264,19 @@
     enddo
     f= func(ndim,x0)
     g= grad(ndim,x0)
+    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
+      do i=1,ndim
+        f= f +pwgt*abs(x0(i))
+      enddo
+    else if( trim(cpena).eq.'ridge' ) then
+      do i=1,ndim
+        f= f +pwgt*x0(i)*x0(i)
+      enddo
+    endif
     gnorm= sprod(ndim,g,g)
-!!$    g(1:ndim)= g(1:ndim)/sqrt(gnorm)
     x(1:ndim)= x0(1:ndim)
 
     iter= 0
-!!$    gnorm= gnorm/ndim
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
         write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
@@ -301,14 +314,30 @@
         call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else ! armijo (default)
-        call armijo_search(ndim,x,u,f,g,alpha,iprint,iflag,myid,func)
+        call armijo_search(ndim,x,u,f,g,alpha,iprint &
+             ,iflag,myid,func)
       endif
+!!$      if(myid.eq.0) print *,'alpha=',alpha
       if( iflag/100.ne.0 ) then
         x0(1:ndim)= x(1:ndim)
         return
       endif
-      x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+      if( cpena.eq.'lasso' .or. cpena.eq.'LASSO' ) then
+        call soft_threshold(ndim,x,u,alpha)
+      else
+        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+      endif
+      
       g= grad(ndim,x)
+      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
+        do i=1,ndim
+          f= f +pwgt*abs(x0(i))
+        enddo
+      else if( trim(cpena).eq.'ridge' ) then
+        do i=1,ndim
+          f= f +pwgt*x0(i)*x0(i)
+        enddo
+      endif
       gnorm= sprod(ndim,g,g)
 !!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$      gnorm= gnorm/ndim
@@ -339,15 +368,15 @@
         x0(1:ndim)= x(1:ndim)
         iflag= iflag +2
         return
-      else if( abs(f-fp)/abs(fp).lt.ftol ) then
-        if( myid.eq.0 ) then
-          print *,'>>> BFGS converged wrt ftol'
-          write(6,'(a,2es15.7)') '   f-fp/fp,ftol=' &
-               ,abs(f-fp)/abs(fp),ftol
-        endif
-        x0(1:ndim)= x(1:ndim)
-        iflag= iflag +3
-        return
+!!$      else if( abs(f-fp)/abs(fp).lt.ftol ) then
+!!$        if( myid.eq.0 ) then
+!!$          print *,'>>> BFGS converged wrt ftol'
+!!$          write(6,'(a,2es15.7)') '   f-fp/fp,ftol=' &
+!!$               ,abs(f-fp)/abs(fp),ftol
+!!$        endif
+!!$        x0(1:ndim)= x(1:ndim)
+!!$        iflag= iflag +3
+!!$        return
       endif
       
       v(1:ndim)= alpha *u(1:ndim)
@@ -395,8 +424,15 @@
     real(8),intent(in):: x0(ndim),d(ndim)
     real(8),intent(inout):: a,b,fa,fb
     real(8),intent(out):: c,fc
-    real(8):: func
     
+    interface
+      function func(n,x)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8):: func
+      end function func
+    end interface
+
     real(8),parameter:: RATIO = 1.61803398875d0
     real(8),parameter:: RATIOI= 1d0/RATIO
     real(8),parameter:: TINY= 1d-12
@@ -471,8 +507,9 @@
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag
-    real(8),intent(in):: x0(ndim),xtol,gtol,ftol
-    real(8),intent(out):: f,g(ndim),a
+
+    real(8),intent(in):: x0(ndim),xtol,gtol,ftol,g(ndim)
+    real(8),intent(out):: f,a
 
     real(8),parameter:: STP0    = 1d-1
     real(8),parameter:: STPMAX  = 1d+1
@@ -628,7 +665,13 @@
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol,x0(ndim),g(ndim)
     real(8),intent(inout):: f,alpha
-    real(8):: func
+    interface
+      function func(n,x)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8):: func
+      end function func
+    end interface
 
     real(8),parameter:: STP0 = 1d-1
     real(8),parameter:: GR   = 0.61803398875d0
@@ -694,7 +737,8 @@
 
   end subroutine golden_section
 !=======================================================================
-  subroutine armijo_search(ndim,x0,d,f,g,alpha,iprint,iflag,myid,func)
+  subroutine armijo_search(ndim,x0,d,f,g,alpha,iprint &
+       ,iflag,myid,func)
 !  
 !  1D search using Armijo rule.
 !    
@@ -705,20 +749,29 @@
     real(8),intent(inout):: f,alpha
     real(8):: func
 
-  real(8),external:: sprod
+!!$  real(8),external:: sprod
   real(8),parameter:: alpha0 = 1d0
   real(8),parameter:: xi     = 0.5d0
-  real(8),parameter:: tau    = 0.9d0
+  real(8),parameter:: tau    = 0.5d0
   integer,parameter:: MAXITER= 200
-  integer:: iter
+  integer:: iter,i
   real(8):: alphai,xigd,f0,fi
+  real(8),allocatable,dimension(:):: x1(:)
+
+  if( .not. allocated(x1)) allocate(x1(ndim))
 
   alphai= alpha0
   xigd= sprod(ndim,g,d)*xi
 
   f0= f
   do iter=1,MAXITER
-    fi= func(ndim,x0+alphai*d)
+    x1(1:ndim)= x0(1:ndim)
+    if( cpena.eq.'lasso' .or. cpena.eq.'LASSO' ) then
+      call soft_threshold(ndim,x1,d,alphai)
+    else
+      x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
+    endif
+    fi= func(ndim,x1)
     if( fi.le.f0 +xigd*alphai ) then
       f= fi
       alpha= alphai
@@ -746,3 +799,25 @@
     enddo
     return
   end function sprod
+!=======================================================================
+  subroutine soft_threshold(ndim,x,d,alpha)
+!
+!  Estimate next weight value using soft threshold
+!
+    implicit none
+    integer,intent(in):: ndim
+    real(8),intent(in):: d(ndim),alpha
+    real(8),intent(inout):: x(ndim)
+
+    integer:: i
+    real(8):: xad,sgn,val,xt
+
+    do i=1,ndim
+      xad= x(i) +alpha*d(i)
+      sgn=sign(1d0,xad) 
+      val= max(abs(xad)-alpha*pwgt,0d0)
+      x(i)= sgn*val
+    enddo
+    return
+  end subroutine soft_threshold
+end module

@@ -106,8 +106,9 @@ contains
 !=======================================================================
   function NN_func(ndim,x)
     use variables, only:nsmpl,nprcs,tfunc,samples,lfmatch,lfscale &
-         ,fscl,nfunc,tcomm,cpena,pwgt
+         ,fscl,nfunc,tcomm
     use parallel
+    use minimize
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -164,19 +165,6 @@ contains
     tcomm= tcomm +mpi_wtime() -tc0
     NN_func= NN_func/nsmpl
 
-!.....penalty term
-    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
-!!$      do idim=1,ndim
-      do idim=1,nhl(0)*nhl(1)
-        NN_func= NN_func +pwgt*abs(x(idim))
-      enddo
-    else if( trim(cpena).eq.'ridge' ) then
-!!$      do idim=1,ndim
-      do idim=1,nhl(0)*nhl(1)
-        NN_func= NN_func +pwgt*x(idim)*x(idim)
-      enddo
-    endif
-
     tfunc= tfunc +mpi_wtime() -tf0
     return
   end function NN_func
@@ -184,6 +172,7 @@ contains
   function NN_fs(ndim,x)
     use variables
     use parallel
+    use minimize
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -224,18 +213,6 @@ contains
     enddo
 
 999 continue
-!.....penalty term
-    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
-!!$      do idim=1,ndim
-      do idim=1,nhl(0)*nhl(1)
-        NN_fs= NN_fs +pwgt*abs(x(idim))
-      enddo
-    else if( trim(cpena).eq.'ridge' ) then
-!!$      do idim=1,ndim
-      do idim=1,nhl(0)*nhl(1)
-        NN_fs= NN_fs +pwgt*x(idim)*x(idim)
-      enddo
-    endif
 
     tfunc= tfunc +mpi_wtime() -tf0
     return
@@ -357,8 +334,9 @@ contains
   end subroutine calc_ef2
 !=======================================================================
   function NN_grad(ndim,x)
-    use variables,only: nsmpl,nprcs,tgrad,ngrad,tcomm,cpena,pwgt
+    use variables,only: nsmpl,nprcs,tgrad,ngrad,tcomm
     use parallel
+    use minimize
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -404,21 +382,6 @@ contains
 !!$      gval(1:ndim)= gval(1:ndim)/gmax *gscl*vmax
 !!$    endif
 
-!.....penalty term
-    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
-!!$      do idim=1,ndim
-      do idim=1,nhl(0)*nhl(1)
-        NN_grad(idim)= NN_grad(idim) +pwgt*sign(1d0,x(idim))
-!        print *,idim,-pwgt*sign(1d0,x(idim)),NN_grad(idim)
-      enddo
-    else if( trim(cpena).eq.'ridge' ) then
-!!$      do idim=1,ndim
-      do idim=1,nhl(0)*nhl(1)
-        NN_grad(idim)= NN_grad(idim) +2d0*pwgt*x(idim)
-!        print *,idim,-2d0*pwgt*x(idim),NN_grad(idim)
-      enddo
-    endif
-
     tgrad= tgrad +mpi_wtime() -tg0
     return
   end function NN_grad
@@ -426,6 +389,7 @@ contains
   function NN_gs(ndim,x)
     use variables
     use parallel
+    use minimize
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -458,19 +422,6 @@ contains
 !!$      enddo
 !!$      gval(1:nvars)= gval(1:nvars)/gmax *gscl*vmax
 !!$    endif
-
-!.....penalty term
-    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO') then
-!!$      do idim=1,ndim
-      do idim=1,nhl(0)*nhl(1)
-        NN_gs(idim)= NN_gs(idim) -pwgt*sign(1d0,x(idim))
-      enddo
-    else if( trim(cpena).eq.'ridge' ) then
-!!$      do idim=1,ndim
-      do idim=1,nhl(0)*nhl(1)
-        NN_gs(idim)= NN_gs(idim) -2d0*pwgt*x(idim)
-      enddo
-    endif
 
     tgrad= tgrad +mpi_wtime() -tg0
     return

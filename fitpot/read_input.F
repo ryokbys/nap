@@ -36,6 +36,7 @@ c.....Skip lines starting from digits or sign
 c=======================================================================
       subroutine set_variable(ionum,cname)
       use variables
+      use minimize
       implicit none
       integer,intent(in):: ionum
       character(len=*),intent(in):: cname
