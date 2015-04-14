@@ -756,22 +756,33 @@ contains
   integer,parameter:: MAXITER= 200
   integer:: iter,i
   real(8):: alphai,xigd,f0,fi
-  real(8),allocatable,dimension(:):: x1(:)
+  real(8),allocatable,dimension(:):: x1(:),g1(:),d1(:)
 
-  if( .not. allocated(x1)) allocate(x1(ndim))
+  if( .not. allocated(x1)) allocate(x1(ndim),g1(ndim),d1(ndim))
 
   alphai= alpha0
-  xigd= sprod(ndim,g,d)*xi
+  g1(1:ndim)= g(1:ndim)
+  d1(1:ndim)= d(1:ndim)
+  xigd= sprod(ndim,g1,d1)*xi
 
   f0= f
   do iter=1,MAXITER
     x1(1:ndim)= x0(1:ndim)
-    if( cpena.eq.'lasso' .or. cpena.eq.'LASSO' ) then
+    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
       call soft_threshold(ndim,x1,d,alphai)
     else
       x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
     endif
     fi= func(ndim,x1)
+    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
+      do i=1,ndim
+        fi= fi +pwgt*abs(x1(i))
+      enddo
+    else if( trim(cpena).eq.'ridge' ) then
+      do i=1,ndim
+        fi= fi +pwgt*x1(i)*x1(i)
+      enddo
+    endif
     if( fi.le.f0 +xigd*alphai ) then
       f= fi
       alpha= alphai

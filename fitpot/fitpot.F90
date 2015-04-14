@@ -479,14 +479,14 @@ subroutine check_grad()
     vmax= max(vmax,abs(vars0(iv)))
     if( myid.eq.0) write(6,'(a,i6,es12.4)') ' iv,vars(iv)=',iv,vars0(iv)
   enddo
-  dv= vmax *1d-5
+  dv= vmax *1d-4
   if( myid.eq.0 ) then
     print *,''
     print *,'deviation [dv] =',dv
   endif
   do iv=1,nvars
     vars(1:nvars)= vars0(1:nvars)
-!!$    dv= vars(iv) *1d-3
+!!$    dv= abs(vars(iv)) *1d-6
     vars(iv)= vars(iv) +dv
     ftmp= NN_func(nvars,vars)
     gnumer(iv)= (ftmp-f0)/dv
