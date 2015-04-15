@@ -37,8 +37,8 @@ contains
     iter= 0
     f= func(ndim,x)
     g= grad(ndim,x)
-    gnorm= sprod(ndim,g,g)
-    g(1:ndim)= -g(1:ndim)/sqrt(gnorm)
+    gnorm= sqrt(sprod(ndim,g,g))
+    g(1:ndim)= -g(1:ndim)/gnorm
 !!$    gnorm= gnorm/ndim
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
@@ -67,8 +67,8 @@ contains
       x(1:ndim)= x(1:ndim) +alpha*g(1:ndim)
       f= func(ndim,x)
       g= grad(ndim,x)
-      gnorm= sprod(ndim,g,g)
-      g(1:ndim)= -g(1:ndim)/sqrt(gnorm)
+      gnorm= sqrt(sprod(ndim,g,g))
+      g(1:ndim)= -g(1:ndim)/gnorm
 !!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
@@ -145,7 +145,7 @@ contains
     iter= 0
     f= func(ndim,x)
     g= grad(ndim,x)
-    gnorm= sprod(ndim,g,g)
+    gnorm= sqrt(sprod(ndim,g,g))
 !!$    g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$    gnorm= gnorm/ndim
     if( myid.eq.0 ) then
@@ -176,7 +176,7 @@ contains
       g= grad(ndim,x)
 !.....store previous gnorm
       gnormp= gnorm
-      gnorm= sprod(ndim,g,g)
+      gnorm= sqrt(sprod(ndim,g,g))
 !!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$      gnorm= gnorm/ndim
       u(1:ndim)= -g(1:ndim) +gnorm/gnormp *u(1:ndim)
@@ -273,7 +273,7 @@ contains
         f= f +pwgt*x0(i)*x0(i)
       enddo
     endif
-    gnorm= sprod(ndim,g,g)
+    gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
 
     iter= 0
@@ -329,7 +329,7 @@ contains
       endif
       
       g= grad(ndim,x)
-      gnorm= sprod(ndim,g,g)
+      gnorm= sqrt(sprod(ndim,g,g))
 !!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
@@ -822,4 +822,32 @@ contains
     enddo
     return
   end subroutine soft_threshold
+!=======================================================================
+  subroutine forward_stagewise(ndim,x,f,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,grad)
+    implicit none
+    integer,intent(in):: ndim,maxiter,iprint,myid
+    integer,intent(inout):: iflag
+    real(8),intent(in):: xtol,gtol,ftol
+    real(8),intent(inout):: f,x(ndim)
+!!$    real(8):: func,grad
+    interface
+      function func(n,x)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8):: func
+      end function func
+      function grad(n,x)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8):: grad(n)
+      end function grad
+    end interface
+
+    integer:: iter
+    real(8):: alpha,fp,gnorm
+
+    
+    
+  end subroutine forward_stagewise
 end module
