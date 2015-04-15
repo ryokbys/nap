@@ -17,18 +17,21 @@ module NN
     real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
     real(8),allocatable:: hl1(:,:),hl2(:,:)
     real(8),allocatable:: ams1(:,:,:,:),bms1(:,:,:,:)
+    real(8),allocatable:: gsfo(:,:)
   end type smpldata
 
   type(smpldata),save,allocatable:: sds(:)
 
   integer,save:: maxna
   real(8),save,allocatable:: fdiff(:,:)
+  real(8),save,allocatable:: gmax(:),gmin(:)
 
 contains
 !=======================================================================
   subroutine NN_init()
     use variables
     use parallel
+    use minimize
     implicit none 
     integer:: itmp,i,nw,natm,ismpl
 
@@ -100,6 +103,10 @@ contains
     enddo
 !!$    print *,' myid, max num of atoms [maxna] =',myid,maxna
     allocate(fdiff(3,maxna))
+
+    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'ridge' ) then
+      call standardize()
+    endif
 
     if( myid.eq.0 ) print *, 'NN_init done.'
   end subroutine NN_init
@@ -886,4 +893,88 @@ contains
     enddo
     if(myid.eq.0) print *, 'get_bases done.'
   end subroutine get_bases
+!=======================================================================
+  subroutine standardize()
+!
+!  Standardize of inputs is requied when you use lasso or ridge.
+!
+    use variables, only: nsmpl,samples,nvars,nalist,vars
+    use parallel
+    implicit none
+    integer:: nsuml,nsumg,ismpl,ia,natm,ihl0,ihl1,iv
+    real(8),allocatable:: gmaxl(:),gminl(:)
+
+    allocate(gmax(nhl(0)),gmin(nhl(0)) &
+         ,gmaxl(nhl(0)),gminl(nhl(0)))
+
+    gmaxl(1:nhl(0))= 0d0
+    gminl(1:nhl(0))= 1d+30
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      !.....sum up gsf
+      do ihl0=1,nhl(0)
+        do ia=1,natm
+          gmaxl(ihl0)= max(gmaxl(ihl0),sds(ismpl)%gsf(ia,ihl0))
+          gminl(ihl0)= min(gminl(ihl0),sds(ismpl)%gsf(ia,ihl0))
+        enddo
+      enddo
+    enddo
+
+    gmax(1:nhl(0))= 0d0
+    gmin(1:nhl(0))= 1d+30
+    call mpi_allreduce(gmaxl,gmax,nhl(0),mpi_double_precision &
+         ,mpi_max,mpi_world,ierr)
+    call mpi_allreduce(gminl,gmin,nhl(0),mpi_double_precision &
+         ,mpi_min,mpi_world,ierr)
+
+!!$    if( myid.eq.0 ) then
+!!$      print *,'Max and min of G:'
+!!$      do ihl0=1,nhl(0)
+!!$        write(6,'(i5,2es12.4)') ihl0,gmax(ihl0),gmin(ihl0)
+!!$      enddo
+!!$    endif
+
+!.....standardize G values
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      allocate(sds(ismpl)%gsfo(natm,nhl(0)))
+      do ihl0=1,nhl(0)
+        do ia=1,natm
+          sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
+          sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
+        enddo
+      enddo
+    enddo
+
+    iv=0
+    do ihl0=1,nhl(0)
+      do ihl1=1,nhl(1)
+        iv=iv+1
+        vars(iv)= vars(iv)*gmax(ihl0)
+      enddo
+    enddo
+
+    deallocate(gmaxl,gminl)
+    if(myid.eq.0) print *,'standardize done.'
+  end subroutine standardize
+!=======================================================================
+  subroutine NN_restore_standard()
+!
+!  Restore weights by inverse standardization
+!
+    use variables
+    use parallel
+    implicit none
+    integer:: iv,ihl0,ihl1
+
+    iv= 0
+    do ihl0=1,nhl(0)
+      do ihl1=1,nhl(1)
+        iv=iv+1
+        vars(iv)= vars(iv)/gmax(ihl0)
+      enddo
+    enddo
+    if(myid.eq.0) print *,'NN_restore_standard done.'
+
+  end subroutine NN_restore_standard
 end module NN

@@ -69,6 +69,7 @@ program fitpot
       call test()
     case default
       if(myid.eq.0) print *,'unknown fitting_method:',trim(cfmethod)
+      call mpi_finalize(ierr)
       stop
   end select
 
@@ -335,7 +336,7 @@ end subroutine write_vars
 !=======================================================================
 subroutine bfgs_wrapper()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad
+  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard
   use parallel
   use minimize
   implicit none
@@ -346,6 +347,10 @@ subroutine bfgs_wrapper()
   call NN_init()
   call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp &
        ,iprint,iflag,myid,NN_func,NN_grad)
+
+  if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'ridge' ) then
+    call NN_restore_standard()
+  endif
 
   return
 end subroutine bfgs_wrapper

@@ -329,15 +329,6 @@ contains
       endif
       
       g= grad(ndim,x)
-      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
-        do i=1,ndim
-          f= f +pwgt*abs(x0(i))
-        enddo
-      else if( trim(cpena).eq.'ridge' ) then
-        do i=1,ndim
-          f= f +pwgt*x0(i)*x0(i)
-        enddo
-      endif
       gnorm= sprod(ndim,g,g)
 !!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$      gnorm= gnorm/ndim
