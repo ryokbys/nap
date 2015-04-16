@@ -1,6 +1,7 @@
 program fitpot
   use variables
   use parallel
+  use minimize
   implicit none
   real(8):: tmp
 
@@ -88,6 +89,8 @@ program fitpot
   call write_energy_relation('fin')
   call write_force_relation('fin')
   call write_statistics()
+  if(trim(cpena).eq.'lasso'.or.trim(cpena).eq.'ridge') &
+       call write_lasso_results()
 !!$  write(6,'(a,i4,3f15.3)') ' myid,tfunc,tgrad,tcom=' &
 !!$       ,myid,tfunc,tgrad,tcomm
   tmp= tfunc
@@ -699,6 +702,21 @@ subroutine write_statistics()
     print *,''
   endif
 end subroutine write_statistics
+!=======================================================================
+subroutine write_lasso_results()
+  use variables
+  use parallel
+  implicit none
+  integer:: i,i0
+
+  i0= 0
+  do i=1,nvars
+    if( abs(vars(i)).lt.1d-8 ) then
+      i0=i0+1
+    endif
+  enddo
+  if(myid.eq.0) write(6,'(a,i6,a,i6)') ' var of 0 = ',i0,'/',nvars
+end subroutine write_lasso_results
 !=======================================================================
 subroutine sync_input()
   use variables

@@ -300,13 +300,14 @@ contains
 !!$    real(8),external:: sprod
     real(8),save,allocatable:: gg(:,:),x(:),u(:),v(:),y(:),gp(:) &
          ,ggy(:),ygg(:),aa(:,:),cc(:,:),g(:),gpena(:)
-    real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm,ynorm,pval
-    integer:: i,j,iter
+    real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm,ynorm,pval,sgnx
+    integer:: i,j,iter,nftol
 
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim),x(ndim),u(ndim)&
          ,v(ndim),y(ndim),g(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
          ,aa(ndim,ndim),cc(ndim,ndim),gpena(ndim))
 
+    nftol= 0
 !.....initial G = I
     gg(1:ndim,1:ndim)= 0d0
     do i=1,ndim
@@ -319,13 +320,17 @@ contains
 
 !.....penalty
     pval= 0d0
+    gpena(1:ndim)= 0d0
     if( trim(cpena).eq.'lasso' ) then
       do i=1,ndim
         pval= pval +pwgt*abs(x0(i))
+        sgnx= sign(1d0,x0(i))
+        gpena(i)= pwgt*sgnx
       enddo
     else if( trim(cpena).eq.'ridge' ) then
       do i=1,ndim
         pval= pval +pwgt*x0(i)*x0(i)
+        gpena(i)= 2d0*pwgt*x0(i)
       enddo
     endif
 
@@ -383,21 +388,25 @@ contains
         call armijo_search(ndim,x,u,f,g,alpha,iprint &
              ,iflag,myid,func)
       endif
-      if(myid.eq.0) print *,'alpha=',alpha
+!!$      if(myid.eq.0) print *,'alpha=',alpha
       if( iflag/100.ne.0 ) then
         x0(1:ndim)= x(1:ndim)
         return
       endif
       pval= 0d0
+      gpena(1:ndim)= 0d0
       if( trim(cpena).eq.'lasso' ) then
         call soft_threshold(ndim,x,u,alpha)
         do i=1,ndim
           pval= pval +pwgt*abs(x(i))
+          sgnx= sign(1d0,x(i))
+          gpena(i)= pwgt*sgnx
         enddo
       else if( trim(cpena).eq.'ridge' ) then
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
         do i=1,ndim
           pval= pval +pwgt*x(i)*x(i)
+          gpena(i)= 2d0*pwgt*x(i)
         enddo
       else
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
@@ -428,14 +437,6 @@ contains
         endif
       endif
 !.....check convergence 
-!!$      if( abs(alpha).lt.xtol ) then
-!!$        if(myid.eq.0) then
-!!$          print *,'>>> BFGS converged wrt xtol'
-!!$          write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
-!!$        endif
-!!$        x0(1:ndim)= x(1:ndim)
-!!$        iflag= iflag +1
-!!$        return
       if( gnorm.lt.gtol ) then
         if( myid.eq.0 ) then
           print *,'>>> QN converged wrt gtol'
@@ -444,15 +445,19 @@ contains
         x0(1:ndim)= x(1:ndim)
         iflag= iflag +2
         return
-!!$      else if( abs(f-fp)/abs(fp).lt.ftol ) then
-!!$        if( myid.eq.0 ) then
-!!$          print *,'>>> BFGS converged wrt ftol'
-!!$          write(6,'(a,2es15.7)') '   f-fp/fp,ftol=' &
-!!$               ,abs(f-fp)/abs(fp),ftol
-!!$        endif
-!!$        x0(1:ndim)= x(1:ndim)
-!!$        iflag= iflag +3
-!!$        return
+      else if( abs(f-fp)/abs(fp).lt.ftol) then
+        nftol= nftol +1
+        if( nftol.gt.10 ) then
+          if( myid.eq.0 ) then
+            print *,'>>> QN may be converged because of ftol ' // &
+                 'over 10 times.'
+!!$            write(6,'(a,2es15.7)') '   f-fp/fp,ftol=' &
+!!$                 ,abs(f-fp)/abs(fp),ftol
+          endif
+          x0(1:ndim)= x(1:ndim)
+          iflag= iflag +3
+          return
+        endif
       endif
       
       v(1:ndim)= alpha *u(1:ndim)
@@ -460,12 +465,13 @@ contains
       ynorm= sprod(ndim,y,y)
       if( ynorm.lt.1d-14 ) then
         if(myid.eq.0) then
-          print *,'>>> QN: y*y < 1d-14'
-          write(6,'(a,2es15.7)') '   y*y=',ynorm
+          print *,'>>> gg initialized because y*y < 1d-14'
         endif
-        x0(1:ndim)= x(1:ndim)
-        iflag= iflag +10
-        return
+        gg(1:ndim,1:ndim)= 0d0
+        do i=1,ndim
+          gg(i,i)= 1d0
+        enddo
+        cycle
       endif
 
 !.....update G matrix, gg, according to BFGS
@@ -860,23 +866,23 @@ contains
   real(8),parameter:: tau    = 0.5d0
   integer,parameter:: MAXITER= 200
   integer:: iter,i
-  real(8):: alphai,xigd,f0,fi,sgnx,pval
+  real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0
   real(8),allocatable,dimension(:):: x1(:),g1(:),d1(:),gp(:)
 
   if( .not. allocated(x1)) allocate(x1(ndim),g1(ndim),d1(ndim) &
        ,gp(ndim))
   alphai= alpha0
-  pval= 0d0
+  pval0= 0d0
   gp(1:ndim)= 0d0
   if( trim(cpena).eq.'lasso'.or.trim(cpena).eq.'LASSO' ) then
     do i=1,ndim
       sgnx= sign(1d0,x0(i))
       gp(i)= pwgt*sgnx
-      pval= pval +pwgt*abs(x0(i))
+      pval0= pval0 +pwgt*abs(x0(i))
     enddo
   else if( trim(cpena).eq.'ridge' ) then
     do i=1,ndim
-      pval= pval +pwgt*x0(i)*x0(i)
+      pval0= pval0 +pwgt*x0(i)*x0(i)
       gp(i)= 2d0*pwgt*x0(i)
     enddo
   endif
@@ -903,7 +909,10 @@ contains
         pval= pval +pwgt*x1(i)*x1(i)
       enddo
     endif
-    if( fi.le.f0 +xigd*alphai ) then
+!!$    if(myid.eq.0)write(6,'(a,i5,5es15.7)') &
+!!$         'iter,alphai,fi,pval,fi-f0,xigd*alphai=' &
+!!$         ,iter,alphai,fi,pval,fi-f0,xigd*alphai
+    if( fi+pval.le.f0+pval0 +xigd*alphai ) then
       f= fi
       alpha= alphai
       return
