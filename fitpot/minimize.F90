@@ -27,18 +27,28 @@ contains
       end function grad
     end interface
 
-    integer:: iter
+    integer:: iter,i
     real(8):: alpha,fp,gnorm
 !!$    real(8),external:: sprod
-    real(8),save,allocatable:: g(:)
+    real(8),save,allocatable:: g(:),d(:)
 
-    if( .not. allocated(g) ) allocate(g(ndim))
+    if( .not. allocated(g) ) allocate(g(ndim),d(ndim))
 
     iter= 0
     f= func(ndim,x)
+    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
+      do i=1,ndim
+        f= f +pwgt*abs(x(i))
+      enddo
+    else if( trim(cpena).eq.'ridge' ) then
+      do i=1,ndim
+        f= f +pwgt*x(i)*x(i)
+      enddo
+    endif
     g= grad(ndim,x)
     gnorm= sqrt(sprod(ndim,g,g))
-    g(1:ndim)= -g(1:ndim)/gnorm
+    d(1:ndim)= -g(1:ndim)
+!!$    g(1:ndim)= -g(1:ndim)/gnorm
 !!$    gnorm= gnorm/ndim
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
@@ -55,20 +65,41 @@ contains
     do iter=1,maxiter
       fp= f
 !.....line minimization
-      call quad_interpolate(ndim,x,g,f,xtol,gtol,ftol,alpha,iprint &
-           ,iflag,myid,func)
-!.....if quad interpolation failed, perform golden section
-      if( iflag/100.ne.0 ) then
-        iflag= iflag -(iflag/100)*100
-        call golden_section(ndim,x,g,f,xtol,gtol,ftol,alpha &
+      if( trim(clinmin).eq.'quadratic' ) then
+        call quad_interpolate(ndim,x,d,f,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
+!.....if quad interpolation failed, perform golden section
+        if( iflag/100.ne.0 ) then
+          iflag= iflag -(iflag/100)*100
+          if(myid.eq.0) then
+            print *,'since quad_interpolate failed, call golden_section.'
+          endif
+          call golden_section(ndim,x,d,f,xtol,gtol,ftol,alpha &
+               ,iprint,iflag,myid,func)
+        endif
+      else if ( trim(clinmin).eq.'golden') then
+        call golden_section(ndim,x,d,f,xtol,gtol,ftol,alpha &
+             ,iprint,iflag,myid,func)
+      else ! armijo (default)
+        call armijo_search(ndim,x,d,f,g,alpha,iprint &
+             ,iflag,myid,func)
       endif
       if( iflag/100.ne.0 ) return
-      x(1:ndim)= x(1:ndim) +alpha*g(1:ndim)
+      x(1:ndim)= x(1:ndim) +alpha*d(1:ndim)
       f= func(ndim,x)
+      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
+        do i=1,ndim
+          f= f +pwgt*abs(x(i))
+        enddo
+      else if( trim(cpena).eq.'ridge' ) then
+        do i=1,ndim
+          f= f +pwgt*x(i)*x(i)
+        enddo
+      endif
       g= grad(ndim,x)
       gnorm= sqrt(sprod(ndim,g,g))
-      g(1:ndim)= -g(1:ndim)/gnorm
+      d(1:ndim)= -g(1:ndim)
+!!$      g(1:ndim)= -g(1:ndim)/gnorm
 !!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
@@ -136,7 +167,7 @@ contains
     end interface
 
     integer:: iter
-    real(8):: alpha,fp,gnorm,gnormp
+    real(8):: alpha,fp,gnorm,gnormp,beta
 !!$    real(8),external:: sprod
     real(8),save,allocatable:: g(:),u(:)
 
@@ -162,16 +193,31 @@ contains
     do iter=1,maxiter
       fp= f
 !.....line minimization
-      call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint &
-           ,iflag,myid,func)
+      if( trim(clinmin).eq.'quadratic' ) then
+        call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint &
+             ,iflag,myid,func)
 !.....if quad interpolation failed, perform golden section
-      if( iflag/100.ne.0 ) then
-        iflag= iflag -(iflag/100)*100
+        if( iflag/100.ne.0 ) then
+          iflag= iflag -(iflag/100)*100
+          if(myid.eq.0) then
+            print *,'since quad_interpolate failed, call golden_section.'
+          endif
+          call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+               ,iprint,iflag,myid,func)
+        endif
+      else if ( trim(clinmin).eq.'golden') then
         call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
+      else ! armijo (default)
+        call armijo_search(ndim,x,u,f,g,alpha,iprint &
+             ,iflag,myid,func)
       endif
       if( iflag/100.ne.0 ) return
-      x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
+        call soft_threshold(ndim,x,u,alpha)
+      else
+        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+      endif
       f= func(ndim,x)
       g= grad(ndim,x)
 !.....store previous gnorm
@@ -179,7 +225,11 @@ contains
       gnorm= sqrt(sprod(ndim,g,g))
 !!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$      gnorm= gnorm/ndim
-      u(1:ndim)= -g(1:ndim) +gnorm/gnormp *u(1:ndim)
+!.....Fletcher-Reeves
+      beta= gnorm/gnormp
+!!$!.....Polak-Ribiere      
+!!$      beta= 
+      u(1:ndim)= -g(1:ndim) +beta*u(1:ndim)
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
           write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
@@ -223,8 +273,8 @@ contains
     return
   end subroutine cg
 !=======================================================================
-  subroutine bfgs(ndim,x0,f,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,grad)
+  subroutine qn(ndim,x0,f,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,grad,cfmethod)
 !
 !  Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
 !
@@ -233,7 +283,7 @@ contains
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
     real(8),intent(inout):: f,x0(ndim)
-!!$    real(8):: func,grad
+    character(len=*),intent(in):: cfmethod
     interface
       function func(n,x)
         integer,intent(in):: n
@@ -250,7 +300,7 @@ contains
 !!$    real(8),external:: sprod
     real(8),save,allocatable:: gg(:,:),x(:),u(:),v(:),y(:),gp(:) &
          ,ggy(:),ygg(:),aa(:,:),cc(:,:),g(:),gpena(:)
-    real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm
+    real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm,ynorm,pval
     integer:: i,j,iter
 
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim),x(ndim),u(ndim)&
@@ -264,26 +314,40 @@ contains
     enddo
     f= func(ndim,x0)
     g= grad(ndim,x0)
-    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
+    gnorm= sqrt(sprod(ndim,g,g))
+    x(1:ndim)= x0(1:ndim)
+
+!.....penalty
+    pval= 0d0
+    if( trim(cpena).eq.'lasso' ) then
       do i=1,ndim
-        f= f +pwgt*abs(x0(i))
+        pval= pval +pwgt*abs(x0(i))
       enddo
     else if( trim(cpena).eq.'ridge' ) then
       do i=1,ndim
-        f= f +pwgt*x0(i)*x0(i)
+        pval= pval +pwgt*x0(i)*x0(i)
       enddo
     endif
-    gnorm= sqrt(sprod(ndim,g,g))
-    x(1:ndim)= x0(1:ndim)
+
 
     iter= 0
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
-        write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+        if( trim(cpena).eq.'lasso' ) then
+          write(6,'(a,i8,3es15.7)') ' iter,f,p,gnorm=',iter,f &
+               ,pval,gnorm
+        else
+          write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+        endif
         call flush(6)
       else if( iprint.ge.2 ) then
-        write(6,'(a,i8,12es15.7)') ' iter,x(1:5),f,gnorm=' &
-             ,iter,x(1:5),f,gnorm
+        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'ridge' ) then
+          write(6,'(a,i8,12es15.7)') ' iter,f,p,gnorm,x(1:5)=' &
+               ,iter,f,pval,gnorm,x(1:5)
+        else
+          write(6,'(a,i8,12es15.7)') ' iter,f,gnorm,x(1:5)=' &
+               ,iter,f,gnorm,x(1:5)
+        endif
         call flush(6)
       endif
     endif
@@ -293,7 +357,9 @@ contains
       do i=1,ndim
         u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
       enddo
-!!$      print *,' u =',u(1:2)
+!!$      print *,' u =',u(1:10)
+!!$      print *,' g =',g(1:10)
+!!$      print *,' gg=',gg(1:5,1:5)
 !.....store previous func and grad values
       fp= f
       gp(1:ndim)= g(1:ndim)
@@ -317,13 +383,22 @@ contains
         call armijo_search(ndim,x,u,f,g,alpha,iprint &
              ,iflag,myid,func)
       endif
-!!$      if(myid.eq.0) print *,'alpha=',alpha
+      if(myid.eq.0) print *,'alpha=',alpha
       if( iflag/100.ne.0 ) then
         x0(1:ndim)= x(1:ndim)
         return
       endif
-      if( cpena.eq.'lasso' .or. cpena.eq.'LASSO' ) then
+      pval= 0d0
+      if( trim(cpena).eq.'lasso' ) then
         call soft_threshold(ndim,x,u,alpha)
+        do i=1,ndim
+          pval= pval +pwgt*abs(x(i))
+        enddo
+      else if( trim(cpena).eq.'ridge' ) then
+        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+        do i=1,ndim
+          pval= pval +pwgt*x(i)*x(i)
+        enddo
       else
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       endif
@@ -334,11 +409,21 @@ contains
 !!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
-          write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+          if( trim(cpena).eq.'lasso' ) then
+            write(6,'(a,i8,3es15.7)') ' iter,f,p,gnorm=',iter,f &
+                 ,pval,gnorm
+          else
+            write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+          endif
           call flush(6)
         else if( iprint.ge.2 ) then
-          write(6,'(a,i8,12es15.7)') ' iter,x(1:5),f,gnorm=' &
-               ,iter,x(1:5),f,gnorm
+          if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'ridge' ) then
+            write(6,'(a,i8,12es15.7)') ' iter,f,p,gnorm,x(1:5)=' &
+                 ,iter,f,pval,gnorm,x(1:5)
+          else
+            write(6,'(a,i8,12es15.7)') ' iter,f,gnorm,x(1:5)=' &
+                 ,iter,f,gnorm,x(1:5)
+          endif
           call flush(6)
         endif
       endif
@@ -353,7 +438,7 @@ contains
 !!$        return
       if( gnorm.lt.gtol ) then
         if( myid.eq.0 ) then
-          print *,'>>> BFGS converged wrt gtol'
+          print *,'>>> QN converged wrt gtol'
           write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
         endif
         x0(1:ndim)= x(1:ndim)
@@ -372,6 +457,16 @@ contains
       
       v(1:ndim)= alpha *u(1:ndim)
       y(1:ndim)= g(1:ndim) -gp(1:ndim)
+      ynorm= sprod(ndim,y,y)
+      if( ynorm.lt.1d-14 ) then
+        if(myid.eq.0) then
+          print *,'>>> QN: y*y < 1d-14'
+          write(6,'(a,2es15.7)') '   y*y=',ynorm
+        endif
+        x0(1:ndim)= x(1:ndim)
+        iflag= iflag +10
+        return
+      endif
 
 !.....update G matrix, gg, according to BFGS
       svy= sprod(ndim,v,y)
@@ -387,26 +482,39 @@ contains
         ggy(i)= tmp1
         ygg(i)= tmp2
       enddo
-      b= 1d0
-      do i=1,ndim
-        b=b +y(i)*ggy(i) *svyi
-      enddo
-      aa(1:ndim,1:ndim)= aa(1:ndim,1:ndim) *b
-      cc(1:ndim,1:ndim)= 0d0
-      do j=1,ndim
-        do i=1,ndim
-          cc(i,j)=cc(i,j) +(v(i)*ygg(j) +ggy(i)*v(j)) *svyi
+      if( trim(cfmethod).eq.'bfgs' .or. trim(cfmethod).eq.'BFGS' ) then
+        cc(1:ndim,1:ndim)= 0d0
+        do j=1,ndim
+          do i=1,ndim
+            cc(i,j)=cc(i,j) +(v(i)*ygg(j) +ggy(i)*v(j)) *svyi
+          enddo
         enddo
-      enddo
-      gg(1:ndim,1:ndim)=gg(1:ndim,1:ndim) +aa(1:ndim,1:ndim) &
-           -cc(1:ndim,1:ndim)
+        b= 1d0
+        do i=1,ndim
+          b=b +y(i)*ggy(i) *svyi
+        enddo
+        aa(1:ndim,1:ndim)= aa(1:ndim,1:ndim) *b
+        gg(1:ndim,1:ndim)=gg(1:ndim,1:ndim) +aa(1:ndim,1:ndim) &
+             -cc(1:ndim,1:ndim)
+      else if( trim(cfmethod).eq.'dfp'.or.trim(cfmethod).eq.'DFP') then
+        b= 0d0
+        cc(1:ndim,1:ndim)= 0d0
+        do i=1,ndim
+          b= b+ y(i)*ggy(i)
+          do j=1,ndim
+            cc(j,i)= -ggy(j)*ggy(i)
+          enddo
+        enddo
+        gg(1:ndim,1:ndim)=gg(1:ndim,1:ndim) +aa(1:ndim,1:ndim) &
+             +cc(1:ndim,1:ndim)
+      endif
     enddo
     
-    if( myid.eq.0 ) print *,'maxiter exceeded in bfgs'
+    if( myid.eq.0 ) print *,'maxiter exceeded in qn'
     iflag= iflag +10
     x0(1:ndim)= x(1:ndim)
     return
-  end subroutine bfgs
+  end subroutine qn
 !=======================================================================
   subroutine get_bracket(ndim,x0,d,a,b,c,fa,fb,fc,iprint,iflag,myid,func)
     implicit none
@@ -738,7 +846,13 @@ contains
     integer,intent(inout):: iflag
     real(8),intent(in):: x0(ndim),g(ndim),d(ndim)
     real(8),intent(inout):: f,alpha
-    real(8):: func
+    interface
+      function func(n,x)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8):: func
+      end function func
+    end interface
 
 !!$  real(8),external:: sprod
   real(8),parameter:: alpha0 = 1d0
@@ -746,14 +860,28 @@ contains
   real(8),parameter:: tau    = 0.5d0
   integer,parameter:: MAXITER= 200
   integer:: iter,i
-  real(8):: alphai,xigd,f0,fi
-  real(8),allocatable,dimension(:):: x1(:),g1(:),d1(:)
+  real(8):: alphai,xigd,f0,fi,sgnx,pval
+  real(8),allocatable,dimension(:):: x1(:),g1(:),d1(:),gp(:)
 
-  if( .not. allocated(x1)) allocate(x1(ndim),g1(ndim),d1(ndim))
-
+  if( .not. allocated(x1)) allocate(x1(ndim),g1(ndim),d1(ndim) &
+       ,gp(ndim))
   alphai= alpha0
-  g1(1:ndim)= g(1:ndim)
-  d1(1:ndim)= d(1:ndim)
+  pval= 0d0
+  gp(1:ndim)= 0d0
+  if( trim(cpena).eq.'lasso'.or.trim(cpena).eq.'LASSO' ) then
+    do i=1,ndim
+      sgnx= sign(1d0,x0(i))
+      gp(i)= pwgt*sgnx
+      pval= pval +pwgt*abs(x0(i))
+    enddo
+  else if( trim(cpena).eq.'ridge' ) then
+    do i=1,ndim
+      pval= pval +pwgt*x0(i)*x0(i)
+      gp(i)= 2d0*pwgt*x0(i)
+    enddo
+  endif
+  g1(1:ndim)= g(1:ndim) +gp(1:ndim)
+  d1(1:ndim)= d(1:ndim) -gp(1:ndim)
   xigd= sprod(ndim,g1,d1)*xi
 
   f0= f
@@ -765,13 +893,14 @@ contains
       x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
     endif
     fi= func(ndim,x1)
+    pval= 0d0
     if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
       do i=1,ndim
-        fi= fi +pwgt*abs(x1(i))
+        pval= pval +pwgt*abs(x1(i))
       enddo
     else if( trim(cpena).eq.'ridge' ) then
       do i=1,ndim
-        fi= fi +pwgt*x1(i)*x1(i)
+        pval= pval +pwgt*x1(i)*x1(i)
       enddo
     endif
     if( fi.le.f0 +xigd*alphai ) then
@@ -823,8 +952,11 @@ contains
     return
   end subroutine soft_threshold
 !=======================================================================
-  subroutine forward_stagewise(ndim,x,f,xtol,gtol,ftol,maxiter &
+  subroutine fs(ndim,x,f,xtol,gtol,ftol,maxiter &
        ,iprint,iflag,myid,func,grad)
+!
+!  Forward Stagewise (FS) regression
+!
     implicit none
     integer,intent(in):: ndim,maxiter,iprint,myid
     integer,intent(inout):: iflag
@@ -844,10 +976,74 @@ contains
       end function grad
     end interface
 
-    integer:: iter
-    real(8):: alpha,fp,gnorm
+    real(8),parameter:: eps = 1d-1
+    integer:: iter,i,imax
+    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val
+    real(8),allocatable,dimension(:):: xt,g,d
 
+    if( .not.allocated(xt) ) allocate(xt(ndim),g(ndim),d(ndim))
+
+    xt(1:ndim)= x(1:ndim)
+!!$    xt(1:ndim)= 1d-6
+
+    do iter=1,maxiter
+!.....find maximum contribution in g
+      f= func(ndim,xt)
+      g= grad(ndim,xt)
+      do i=1,ndim
+        sgnx= sign(1d0,xt(i))
+        f= f +pwgt*sgnx
+!!$        g(i)= g(i) +pwgt*sgnx
+      enddo
+      gnorm= sqrt(sprod(ndim,g,g))
+      if( myid.eq.0 ) then
+!!$        if( iprint.eq.1 .and. mod(iter,ndim).eq.1 ) then
+        if( iprint.eq.1 ) then
+          write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+          call flush(6)
+        else if( iprint.ge.2 ) then
+          write(6,'(a,i8,12es15.7)') ' iter,x(1:5),f,gnorm=' &
+               ,iter,x(1:5),f,gnorm
+          call flush(6)
+        endif
+      endif
+      if( gnorm.lt.gtol ) then
+        if( myid.eq.0 ) then
+          print *,'>>> FS converged wrt gtol'
+          write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+        endif
+        x(1:ndim)= xt(1:ndim)
+        iflag= iflag +2
+        return
+      endif
     
+!.....set 0 except the maximum contribution
+      imax= 0
+      gmax= 0d0
+      do i=1,ndim
+        absg= abs(g(i))
+        if( gmax.lt.absg ) then
+          gmax= absg
+          imax= i
+        endif
+      enddo
+
+!!$!.....find alpha by line minimization
+!!$      call armijo_search(ndim,x,d,f,g,alpha,iprint &
+!!$           ,iflag,myid,func)
+!!$      print *,'alpha=',alpha
+
+!!$      xt(1:ndim)= xt(1:ndim) +eps*d(1:ndim)
+      xad= xt(imax) -eps*g(imax)
+      sgnx= sign(1d0,xad)
+      val= max(abs(xad)-alpha*pwgt,0d0)
+      xt(imax)= sgnx*val
+    enddo
+
+    if( myid.eq.0 ) print *,'maxiter exceeded in fs'
+    iflag= iflag +10
+    x(1:ndim)= xt(1:ndim)
+    return
     
-  end subroutine forward_stagewise
+  end subroutine fs
 end module

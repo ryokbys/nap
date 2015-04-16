@@ -26,6 +26,8 @@ module NN
   real(8),save,allocatable:: fdiff(:,:)
   real(8),save,allocatable:: gmax(:),gmin(:)
 
+  logical,save:: lstandard= .false.
+
 contains
 !=======================================================================
   subroutine NN_init()
@@ -104,9 +106,7 @@ contains
 !!$    print *,' myid, max num of atoms [maxna] =',myid,maxna
     allocate(fdiff(3,maxna))
 
-    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'ridge' ) then
-      call standardize()
-    endif
+    call standardize()
 
     if( myid.eq.0 ) print *, 'NN_init done.'
   end subroutine NN_init
@@ -954,6 +954,7 @@ contains
       enddo
     enddo
 
+    lstandard= .true.
     deallocate(gmaxl,gminl)
     if(myid.eq.0) print *,'standardize done.'
   end subroutine standardize
@@ -966,6 +967,11 @@ contains
     use parallel
     implicit none
     integer:: iv,ihl0,ihl1
+
+    if( .not. lstandard ) then
+      if(myid.eq.0) print *,'NN_restore_standard not needed.'
+      return
+    endif
 
     iv= 0
     do ihl0=1,nhl(0)

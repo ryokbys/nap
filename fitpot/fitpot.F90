@@ -59,8 +59,10 @@ program fitpot
       call sd_wrapper()
     case ('cg','CG')
       call cg_wrapper()
-    case ('bfgs','BFGS')
-      call bfgs_wrapper()
+    case ('bfgs','BFGS','dfp','DFP')
+      call qn_wrapper()
+    case ('fs','FS')
+      call fs_wrapper()
     case ('sequential')
       call sequential_update()
     case ('check_grad')
@@ -117,7 +119,7 @@ subroutine write_initial_setting()
 
   write(6,'(a)') '---------------- INITIAL SETTING -----------------'
   write(6,'(2x,a25,2x,i5)') 'num_samples',nsmpl
-  write(6,'(2x,a25,2x,i5)') 'num_iteration',nstp
+  write(6,'(2x,a25,2x,i10)') 'num_iteration',nstp
   write(6,'(2x,a25,2x,a)') 'fitting_method',trim(cfmethod)
   write(6,'(2x,a25,2x,a)') 'main_directory',trim(cmaindir)
   write(6,'(2x,a25,2x,a)') 'param_file',trim(cparfile)
@@ -334,7 +336,7 @@ subroutine write_vars(cadd)
 
 end subroutine write_vars
 !=======================================================================
-subroutine bfgs_wrapper()
+subroutine qn_wrapper()
   use variables
   use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard
   use parallel
@@ -345,15 +347,12 @@ subroutine bfgs_wrapper()
 
   !.....NN specific code hereafter
   call NN_init()
-  call bfgs(nvars,vars,fval,xtol,gtol,ftol,nstp &
-       ,iprint,iflag,myid,NN_func,NN_grad)
-
-  if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'ridge' ) then
-    call NN_restore_standard()
-  endif
+  call qn(nvars,vars,fval,xtol,gtol,ftol,nstp &
+       ,iprint,iflag,myid,NN_func,NN_grad,cfmethod)
+  call NN_restore_standard()
 
   return
-end subroutine bfgs_wrapper
+end subroutine qn_wrapper
 !=======================================================================
 subroutine sd_wrapper()
 !
@@ -463,6 +462,24 @@ subroutine sequential_update()
   enddo
 
 end subroutine sequential_update
+!=======================================================================
+subroutine fs_wrapper()
+  use variables
+  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard
+  use parallel
+  use minimize
+  implicit none
+  integer:: i,m
+  real(8):: fval
+
+  !.....NN specific code hereafter
+  call NN_init()
+  call fs(nvars,vars,fval,xtol,gtol,ftol,nstp &
+       ,iprint,iflag,myid,NN_func,NN_grad)
+  call NN_restore_standard()
+
+  return
+end subroutine fs_wrapper
 !=======================================================================
 subroutine check_grad()
   use variables
