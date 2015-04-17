@@ -297,6 +297,7 @@ contains
       end function grad
     end interface
     real(8),parameter:: xtiny  = 1d-14
+    logical:: ltwice = .false.
 !!$    real(8),external:: sprod
     real(8),save,allocatable:: gg(:,:),x(:),u(:),v(:),y(:),gp(:) &
          ,ggy(:),ygg(:),aa(:,:),cc(:,:),g(:),gpena(:)
@@ -392,8 +393,27 @@ contains
       endif
 !!$      if(myid.eq.0) print *,'alpha=',alpha
       if( iflag/100.ne.0 ) then
-        x0(1:ndim)= x(1:ndim)
-        return
+        if( ltwice ) then
+          x0(1:ndim)= x(1:ndim)
+          if(myid.eq.0) then
+            print *,'>>> armijo_search failed twice continuously...'
+          endif
+          return
+        else
+          ltwice= .true.
+          if(myid.eq.0) then
+            print *,'>>> gg initialized because alpha was not found.'
+          endif
+          gg(1:ndim,1:ndim)= 0d0
+          do i=1,ndim
+            gg(i,i)= 1d0
+          enddo
+          f= fp
+          iflag= iflag -100*(iflag/100)
+          cycle
+        endif
+      else
+        ltwice=.false.
       endif
       pval= 0d0
       gpena(1:ndim)= 0d0
@@ -871,8 +891,8 @@ contains
   real(8),parameter:: alpha0 = 1d0
   real(8),parameter:: xi     = 0.5d0
   real(8),parameter:: tau    = 0.5d0
+  integer,parameter:: MAXITER= 30
   real(8),parameter:: xtiny  = 1d-14
-  integer,parameter:: MAXITER= 200
   integer:: iter,i
   real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx
   real(8),allocatable,dimension(:):: x1(:),gpena(:)
