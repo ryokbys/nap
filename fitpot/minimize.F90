@@ -296,16 +296,16 @@ contains
         real(8):: grad(n)
       end function grad
     end interface
-
+    real(8),parameter:: xtiny  = 1d-14
 !!$    real(8),external:: sprod
     real(8),save,allocatable:: gg(:,:),x(:),u(:),v(:),y(:),gp(:) &
-         ,ggy(:),ygg(:),aa(:,:),cc(:,:),g(:),gpena(:),gt(:)
-    real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm,ynorm,pval,sgnx
+         ,ggy(:),ygg(:),aa(:,:),cc(:,:),g(:),gpena(:)
+    real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm,ynorm,pval,sgnx,absx
     integer:: i,j,iter,nftol
 
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim),x(ndim),u(ndim)&
          ,v(ndim),y(ndim),g(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
-         ,aa(ndim,ndim),cc(ndim,ndim),gpena(ndim),gt(ndim))
+         ,aa(ndim,ndim),cc(ndim,ndim),gpena(ndim))
 
     nftol= 0
 !.....initial G = I
@@ -315,23 +315,26 @@ contains
     enddo
     f= func(ndim,x0)
     g= grad(ndim,x0)
+    if( trim(cpena).eq.'lasso'.or.trim(cpena).eq.'ridge' ) then
 !.....penalty
-    pval= 0d0
-    gpena(1:ndim)= 0d0
-    if( trim(cpena).eq.'lasso' ) then
-      do i=1,ndim
-        pval= pval +pwgt*abs(x0(i))
-        sgnx= sign(1d0,x0(i))
-        gpena(i)= pwgt*sgnx
-      enddo
-    else if( trim(cpena).eq.'ridge' ) then
-      do i=1,ndim
-        pval= pval +pwgt*x0(i)*x0(i)
-        gpena(i)= 2d0*pwgt*x0(i)
-      enddo
+      pval= 0d0
+      gpena(1:ndim)= 0d0
+      if( trim(cpena).eq.'lasso' ) then
+        do i=1,ndim
+          absx= abs(x0(i))
+          pval= pval +pwgt*absx
+          sgnx= sign(1d0,x0(i))
+          if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
+        enddo
+      else if( trim(cpena).eq.'ridge' ) then
+        do i=1,ndim
+          pval= pval +pwgt*x0(i)*x0(i)
+          gpena(i)= 2d0*pwgt*x0(i)
+        enddo
+      endif
+      g(1:ndim)= g(1:ndim) +gpena(1:ndim)
     endif
-    gt(1:ndim)= g(1:ndim) +gpena(1:ndim)
-    gnorm= sqrt(sprod(ndim,gt,gt))
+    gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
 
     iter= 0
@@ -358,25 +361,15 @@ contains
 
     do iter=1,maxiter
       u(1:ndim)= 0d0
-      if( trim(cpena).eq.'lasso' ) then
-        do i=1,ndim
-          u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
-        enddo
-      else
-        do i=1,ndim
-          u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*gt(i)
-        enddo
-      endif
+      do i=1,ndim
+        u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
+      enddo
 !!$      print *,' u =',u(1:10)
 !!$      print *,' g =',g(1:10)
 !!$      print *,' gg=',gg(1:5,1:5)
 !.....store previous func and grad values
       fp= f
-      if( trim(cpena).eq.'lasso' ) then
-        gp(1:ndim)= g(1:ndim)
-      else
-        gp(1:ndim)= gt(1:ndim)
-      endif
+      gp(1:ndim)= g(1:ndim)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
         call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
@@ -394,13 +387,8 @@ contains
         call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else ! armijo (default)
-        if( trim(cpena).eq.'lasso' ) then
-          call armijo_search(ndim,x,u,f,g,alpha,iprint &
-               ,iflag,myid,func)
-        else
-          call armijo_search(ndim,x,u,f,gt,alpha,iprint &
-               ,iflag,myid,func)
-        endif
+        call armijo_search(ndim,x,u,f,g,alpha,iprint &
+             ,iflag,myid,func)
       endif
 !!$      if(myid.eq.0) print *,'alpha=',alpha
       if( iflag/100.ne.0 ) then
@@ -412,9 +400,10 @@ contains
       if( trim(cpena).eq.'lasso' ) then
         call soft_threshold(ndim,x,u,alpha)
         do i=1,ndim
-          pval= pval +pwgt*abs(x(i))
+          absx= abs(x(i))
+          pval= pval +pwgt*absx
           sgnx= sign(1d0,x(i))
-          gpena(i)= pwgt*sgnx
+          if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
         enddo
       else if( trim(cpena).eq.'ridge' ) then
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
@@ -426,8 +415,8 @@ contains
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       endif
       g= grad(ndim,x)
-      gt(1:ndim)= g(1:ndim) +gpena(1:ndim)
-      gnorm= sqrt(sprod(ndim,gt,gt))
+      g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+      gnorm= sqrt(sprod(ndim,g,g))
 !!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
@@ -478,7 +467,7 @@ contains
       if( trim(cpena).eq.'lasso' ) then
         y(1:ndim)= g(1:ndim) -gp(1:ndim)
       else
-        y(1:ndim)= gt(1:ndim) -gp(1:ndim)
+        y(1:ndim)= g(1:ndim) -gp(1:ndim)
       endif
       ynorm= sprod(ndim,y,y)
       if( ynorm.lt.1d-14 ) then
@@ -882,31 +871,30 @@ contains
   real(8),parameter:: alpha0 = 1d0
   real(8),parameter:: xi     = 0.5d0
   real(8),parameter:: tau    = 0.5d0
+  real(8),parameter:: xtiny  = 1d-14
   integer,parameter:: MAXITER= 200
   integer:: iter,i
-  real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0
-  real(8),allocatable,dimension(:):: x1(:),g1(:),d1(:),gp(:)
+  real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx
+  real(8),allocatable,dimension(:):: x1(:),gpena(:)
 
-  if( .not. allocated(x1)) allocate(x1(ndim),g1(ndim),d1(ndim) &
-       ,gp(ndim))
+  if( .not. allocated(x1)) allocate(x1(ndim),gpena(ndim))
   alphai= alpha0
   pval0= 0d0
-  gp(1:ndim)= 0d0
+  gpena(1:ndim)= 0d0
   if( trim(cpena).eq.'lasso' ) then
     do i=1,ndim
+      absx= abs(x0(i))
       sgnx= sign(1d0,x0(i))
-      gp(i)= pwgt*sgnx
-      pval0= pval0 +pwgt*abs(x0(i))
+      if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
+      pval0= pval0 +pwgt*absx
     enddo
-    g1(1:ndim)= g(1:ndim) +gp(1:ndim)
   else if( trim(cpena).eq.'ridge' ) then
     do i=1,ndim
       pval0= pval0 +pwgt*x0(i)*x0(i)
-      gp(i)= 2d0*pwgt*x0(i)
+      gpena(i)= 2d0*pwgt*x0(i)
     enddo
   endif
-  d1(1:ndim)= d(1:ndim) ! d already includes gp contribution
-  xigd= sprod(ndim,g1,d1)*xi
+  xigd= sprod(ndim,g,d)*xi
 
   f0= f
   do iter=1,MAXITER

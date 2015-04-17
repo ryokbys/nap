@@ -167,8 +167,10 @@ contains
 !!$    if(myid.eq.0) print *,'NN_func: call allreduce'
     tc0= mpi_wtime()
     NN_func= 0d0
+!!$    print *,'here01,myid,flocal=',myid,flocal
     call mpi_allreduce(flocal,NN_func,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
+!!$    print *,'here02,myid,NN_func=',myid,NN_func
     tcomm= tcomm +mpi_wtime() -tc0
     NN_func= NN_func/nsmpl
 
