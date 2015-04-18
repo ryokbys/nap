@@ -341,7 +341,7 @@ end subroutine write_vars
 !=======================================================================
 subroutine qn_wrapper()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard
+  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
@@ -352,6 +352,7 @@ subroutine qn_wrapper()
   call NN_init()
   call qn(nvars,vars,fval,xtol,gtol,ftol,nstp &
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod)
+  call NN_analyze()
   call NN_restore_standard()
 
   return

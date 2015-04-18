@@ -985,4 +985,89 @@ contains
     if(myid.eq.0) print *,'NN_restore_standard done.'
 
   end subroutine NN_restore_standard
+!=======================================================================
+  subroutine NN_analyze()
+!
+!  Get which input nodes are more/less important.
+!
+    use variables
+    use parallel
+    implicit none
+    character(len=14),parameter:: cfname= 'out.NN_analyze'
+    integer,parameter:: ionum=  30
+    integer,allocatable:: icmb2(:,:),icmb3(:,:,:),itype(:),nctype(:)
+    real(8),allocatable:: sumv(:),cnst(:,:)
+    integer:: i,j,k,l,i2,i3,isf,iv,ic,ihl0,ihl1,itmp
+
+    if( myid.eq.0 ) then
+!.....read in.comb.NN file
+      allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
+      open(ionum,file=trim(cmaindir)//'/'//trim(cmbfname),status='old')
+      do i2=1,ncmb2
+        read(ionum,*) i,j,icmb2(i,j)
+        icmb2(j,i)= icmb2(i,j)
+      enddo
+      do i3=1,ncmb3
+        read(ionum,*) i,j,k,icmb3(i,j,k)
+        icmb3(i,k,j)= icmb3(i,j,k)
+      enddo
+      close(ionum)
+!.....read in.const.NN file
+      allocate(itype(nsfc),cnst(2,nsfc),nctype(200))
+      nctype(1)= 2   ! Gaussian
+      nctype(2)= 1   ! cosine
+      nctype(3)= 1   ! polynomial
+      nctype(101)= 1 ! angular
+      open(ionum,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
+      read(ionum,*) itmp
+      do isf=1,nsfc
+        read(ionum,*) itype(isf),(cnst(j,isf),j=1,nctype(itype(isf)))
+      enddo
+      close(ionum)
+
+      open(ionum+1,file=cfname,status='replace')
+      iv=0
+      allocate(sumv(nhl(0)))
+      do ihl0=1,nhl(0)
+        sumv(ihl0)= 0d0
+        do ihl1=1,nhl(1)
+          iv=iv+1
+          sumv(ihl0)=sumv(ihl0) +vars(iv)
+        enddo
+      enddo
+!.....about 2body terms
+      do ihl0=1,nsf2*ncmb2
+        isf= mod(ihl0-1,nsf2)+1
+        ic = (ihl0-1)/nsf2 +1
+        do i=1,nsp
+          do j=1,nsp
+            if(ic.eq.icmb2(i,j)) goto 10
+          enddo
+        enddo
+10      continue
+        write(ionum+1,'(f24.14,2x,i1,"-",i1,":",i5,1es12.4,2i8)') &
+             sumv(ihl0),i,j,itype(isf),cnst(1,isf),ihl0,ic
+      enddo
+!.....about 3body terms
+      do ihl0=nsf2*ncmb2+1,nsf2*ncmb2+nsf3*ncmb3
+        isf= nsf2+mod(ihl0-nsf2*ncmb2-1,nsf3)+1
+        ic = (ihl0-nsf2*ncmb2-1)/nsf3 +1
+        do i=1,nsp
+          do j=1,nsp
+            do k=1,nsp
+              if(ic.eq.icmb3(i,j,k)) goto 20
+            enddo
+          enddo
+        enddo
+20      continue
+        write(ionum+1,'(f24.14,2x,i1,"-",i1,"-",i1,":",i5,1es12.4,2i8)') &
+             sumv(ihl0),i,j,k,itype(isf),cnst(1,isf),ihl0,ic
+      enddo
+      close(ionum+1)
+      deallocate(icmb2,icmb3)
+    endif
+
+    call mpi_barrier(mpi_world,ierr)
+    return
+  end subroutine NN_analyze
 end module NN

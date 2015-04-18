@@ -1012,8 +1012,9 @@ contains
     end interface
 
     real(8),parameter:: eps = 1d-1
+    real(8),parameter:: xtiny= 1d-14
     integer:: iter,i,imax
-    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val
+    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx
     real(8),allocatable,dimension(:):: xt,g,d
 
     if( .not.allocated(xt) ) allocate(xt(ndim),g(ndim),d(ndim))
@@ -1027,13 +1028,14 @@ contains
       g= grad(ndim,xt)
       do i=1,ndim
         sgnx= sign(1d0,xt(i))
-        f= f +pwgt*sgnx
-!!$        g(i)= g(i) +pwgt*sgnx
+        absx= abs(xt(i))
+        f= f +pwgt*absx
+        if(absx.gt.xtiny) g(i)= g(i) +pwgt*sgnx
       enddo
       gnorm= sqrt(sprod(ndim,g,g))
       if( myid.eq.0 ) then
-!!$        if( iprint.eq.1 .and. mod(iter,ndim).eq.1 ) then
-        if( iprint.eq.1 ) then
+        if( iprint.eq.1 .and. mod(iter,ndim).eq.1 ) then
+!!$        if( iprint.eq.1 ) then
           write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
           call flush(6)
         else if( iprint.ge.2 ) then
@@ -1063,13 +1065,17 @@ contains
         endif
       enddo
 
-!!$!.....find alpha by line minimization
+!!$!.....if possible line minimization
+!!$      d(1:ndim)= 0d0
+!!$      d(imax)= -g(imax)
 !!$      call armijo_search(ndim,x,d,f,g,alpha,iprint &
 !!$           ,iflag,myid,func)
-!!$      print *,'alpha=',alpha
-
-!!$      xt(1:ndim)= xt(1:ndim) +eps*d(1:ndim)
-      xad= xt(imax) -eps*g(imax)
+!!$      if( iflag/100.ne.0 ) then
+!!$        alpha= eps
+!!$      endif
+!.....usually armijo_search does not work for FS
+      alpha= eps
+      xad= xt(imax) -alpha*g(imax)
       sgnx= sign(1d0,xad)
       val= max(abs(xad)-alpha*pwgt,0d0)
       xt(imax)= sgnx*val
