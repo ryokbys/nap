@@ -113,7 +113,7 @@ contains
 !=======================================================================
   function NN_func(ndim,x)
     use variables, only:nsmpl,nprcs,tfunc,samples,lfmatch,lfscale &
-         ,fscl,nfunc,tcomm
+         ,fscl,nfunc,tcomm,lswgt,swbeta
     use parallel
     use minimize
     implicit none
@@ -122,7 +122,7 @@ contains
     real(8):: NN_func
 
     integer:: ismpl,natm,ia,ixyz,idim
-    real(8):: dn3i,ediff,tf0,tc0,fscale
+    real(8):: dn3i,ediff,tf0,tc0,fscale,eref,swgt
     real(8):: flocal
 
     nfunc= nfunc +1
@@ -143,10 +143,15 @@ contains
     flocal= 0d0
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
-      ediff= (samples(ismpl)%epot -samples(ismpl)%eref)
-      ediff= ediff*ediff /natm
+      eref= samples(ismpl)%eref
+      ediff= (samples(ismpl)%epot -eref)/natm
+      ediff= ediff*ediff
 !!$      NN_func= NN_func +ediff
-      flocal= flocal +ediff
+      swgt= 1d0
+      if( lswgt ) then
+        swgt= exp(-eref/natm*swbeta)
+      endif
+      flocal= flocal +ediff*swgt
       if( .not. lfmatch ) cycle
       fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
            -samples(ismpl)%fref(1:3,1:natm))
@@ -155,7 +160,7 @@ contains
       !.....force-scale makes force contribution same order to energy
       if( lfscale ) fscale= fscl
       fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
-           *dn3i *fscale
+           *dn3i *fscale *swgt
       do ia=1,natm
         do ixyz=1,3
 !!$          NN_func= NN_func +fdiff(ixyz,ia)
@@ -189,7 +194,7 @@ contains
     integer:: ismpl
     common /samplei/ ismpl
     integer:: natm,ia,ixyz,idim
-    real(8):: dn3i,ediff,tf0,fscale
+    real(8):: dn3i,ediff,tf0,fscale,eref,swgt
 
     nfunc=nfunc +1
     tf0= mpi_wtime()
@@ -203,9 +208,14 @@ contains
 
     NN_fs= 0d0
     natm= samples(ismpl)%natm
-    ediff= (samples(ismpl)%epot -samples(ismpl)%eref)
-    ediff= ediff*ediff /natm
-    NN_fs= NN_fs +ediff
+    eref= samples(ismpl)%eref
+    ediff= (samples(ismpl)%epot -eref)/natm
+    ediff= ediff*ediff
+    swgt= 1d0
+    if( lswgt ) then
+      swgt= exp(-eref/natm*swbeta)
+    endif
+    NN_fs= NN_fs +ediff*swgt
     if( .not. lfmatch ) goto 999
     fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
          -samples(ismpl)%fref(1:3,1:natm))
@@ -214,7 +224,7 @@ contains
 !.....force-scale makes force contribution same order to energy
     if( lfscale ) fscale= fscl
     fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
-         *dn3i *fscale
+         *dn3i *fscale *swgt
     do ia=1,natm
       do ixyz=1,3
         NN_fs= NN_fs +fdiff(ixyz,ia)
@@ -442,7 +452,7 @@ contains
     integer,intent(in):: ismpl
     real(8),intent(inout):: gs(nvars)
     integer:: iv,ihl1,ia,ja,ihl0,jhl0,natm
-    real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale
+    real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale,eref,swgt
     real(8),save,allocatable:: dgs(:),ab(:),wdg(:,:,:),bms(:,:,:,:)
 
     if( .not. allocated(dgs) ) then
@@ -451,7 +461,12 @@ contains
     endif
 
     natm= samples(ismpl)%natm
-    ediff= (samples(ismpl)%epot -samples(ismpl)%eref)*2 /natm
+    eref= samples(ismpl)%eref
+    swgt= 1d0
+    if( lswgt ) then
+      swgt= exp(-eref/natm*swbeta)
+    endif
+    ediff= (samples(ismpl)%epot -eref)*2 /natm/natm *swgt
 !!$    print *,'ediff=',ediff*natm
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)
@@ -484,7 +499,7 @@ contains
     dn3i= 1d0/(3*natm)
     fscale= 1d0
     if( lfscale ) fscale= fscl
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscale
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscale *swgt
     iv= nhl(0)*nhl(1) +nhl(1)
     do ihl1=nhl(1),1,-1
       tmp= 0d0
@@ -581,7 +596,7 @@ contains
     real(8),intent(inout):: gs(nvars)
     integer:: iv,ihl0,ihl1,ihl2,ia,ja,natm
     real(8):: ediff,tmp,tmp1,tmp2,h1,h2,w1,w2,w3,dn3i,dh1,dh2,t1,t2,t3&
-         ,ddh1,ddh2,dh1gsf,fscale
+         ,ddh1,ddh2,dh1gsf,fscale,eref,swgt
     real(8),save,allocatable:: dgs(:),w1dg(:,:,:,:),w2sw1dg(:,:,:,:)
 
     if( .not. allocated(dgs) ) then
@@ -590,7 +605,12 @@ contains
     endif
 
     natm= samples(ismpl)%natm
-    ediff= (samples(ismpl)%epot -samples(ismpl)%eref)*2 /natm
+    eref= samples(ismpl)%eref
+    swgt= 1d0
+    if( lswgt ) then
+      swgt= exp(-eref/natm*swbeta)
+    endif
+    ediff= (samples(ismpl)%epot -eref)*2 /natm/natm *swgt
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 
@@ -643,7 +663,7 @@ contains
     dn3i= 1d0/(3*natm)
     fscale= 1d0
     if( lfscale ) fscale= fscl
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscale
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscale *swgt
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 !.....make w1dg
     w1dg(1:3,1:natm,1:natm,1:nhl(1))= 0d0
