@@ -994,9 +994,10 @@ contains
     use parallel
     implicit none
     character(len=14),parameter:: cfname= 'out.NN_analyze'
+    character(len=14),parameter:: cfsum = 'out.NN_summary'
     integer,parameter:: ionum=  30
     integer,allocatable:: icmb2(:,:),icmb3(:,:,:),itype(:),nctype(:)
-    real(8),allocatable:: sumv(:),cnst(:,:)
+    real(8),allocatable:: sumv(:),cnst(:,:),sumvv(:)
     integer:: i,j,k,l,i2,i3,isf,iv,ic,ihl0,ihl1,itmp
 
     if( myid.eq.0 ) then
@@ -1027,12 +1028,12 @@ contains
 
       open(ionum+1,file=cfname,status='replace')
       iv=0
-      allocate(sumv(nhl(0)))
+      allocate(sumv(nhl(0)),sumvv(nsfc))
       do ihl0=1,nhl(0)
         sumv(ihl0)= 0d0
         do ihl1=1,nhl(1)
           iv=iv+1
-          sumv(ihl0)=sumv(ihl0) +vars(iv)
+          sumv(ihl0)=sumv(ihl0) +abs(vars(iv))
         enddo
       enddo
 !.....about 2body terms
@@ -1064,7 +1065,31 @@ contains
              sumv(ihl0),i,j,k,itype(isf),cnst(1,isf),ihl0,ic
       enddo
       close(ionum+1)
-      deallocate(icmb2,icmb3)
+
+!.....summary
+      open(ionum+2,file=cfsum,status='replace')
+      sumvv(1:nsfc)= 0d0
+      do ihl0=1,nsf2*ncmb2
+        isf= mod(ihl0-1,nsf2)+1
+        ic = (ihl0-1)/nsf2 +1
+        sumvv(isf)= sumvv(isf) +sumv(ihl0)
+      enddo
+      do ihl0=nsf2*ncmb2+1,nsf2*ncmb2+nsf3*ncmb3
+        isf= nsf2+mod(ihl0-nsf2*ncmb2-1,nsf3)+1
+        ic = (ihl0-nsf2*ncmb2-1)/nsf3 +1
+        sumvv(isf)= sumvv(isf) +sumv(ihl0)
+      enddo
+      do isf=1,nsfc
+        if( isf.le.nsf2 ) then
+          write(ionum+2,'(f24.14,2x,"2body:",i5,1es12.4)') &
+               sumvv(isf),itype(isf),cnst(1,isf)
+        else
+          write(ionum+2,'(f24.14,2x,"3body:",i5,1es12.4)') &
+               sumvv(isf),itype(isf),cnst(1,isf)
+        endif
+      enddo
+      close(ionum+2)
+      deallocate(icmb2,icmb3,sumv,sumvv)
     endif
 
     call mpi_barrier(mpi_world,ierr)
