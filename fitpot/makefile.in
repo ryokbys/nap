@@ -23,10 +23,8 @@ MPIFLAGS= @FCFLAGS@
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
 fitpot= NN.o read_input.o fitpot.o 
-mods= mod_variables.o mod_parallel.o minimize.o
+mods= mod_variables.o mod_parallel.o mod_minimize.o
 args= iargc.o getarg.o
-lbfgs= lbfgs.o
-testmin= test_minimize.o minimize.o
 
 all: fitpot
 
@@ -37,10 +35,7 @@ nconv: node_conv.o ${mods} read_input.o util_pmd.o
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} node_conv.o read_input.o util_pmd.o
 
 fitpot: ${mods} ${fitpot}
-	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${fitpot} 
-
-testmin: ${testmin}
-	${MPIFC} ${MPIFLAGS} -o $@ ${testmin}
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${fitpot}
 
 #.....Dependencies
 read_input.o: ${mods}
