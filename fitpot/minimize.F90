@@ -3,6 +3,10 @@ module minimize
   character(len=128):: cpena= 'none'
   character(len=128):: clinmin= 'armijo'
   real(8):: pwgt
+!.....group lasso
+  integer:: ngl
+  integer,allocatable,save:: iglid(:)
+  real(8),allocatable,save:: glval(:)
 
 contains
 !=======================================================================
@@ -302,7 +306,7 @@ contains
     real(8),save,allocatable:: gg(:,:),x(:),u(:),v(:),y(:),gp(:) &
          ,ggy(:),ygg(:),aa(:,:),cc(:,:),g(:),gpena(:)
     real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm,ynorm,pval,sgnx,absx
-    integer:: i,j,iter,nftol
+    integer:: i,j,iter,nftol,ig
 
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim),x(ndim),u(ndim)&
          ,v(ndim),y(ndim),g(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
@@ -316,32 +320,53 @@ contains
     enddo
     f= func(ndim,x0)
     g= grad(ndim,x0)
-    if( trim(cpena).eq.'lasso'.or.trim(cpena).eq.'ridge' ) then
 !.....penalty
-      pval= 0d0
-      gpena(1:ndim)= 0d0
-      if( trim(cpena).eq.'lasso' ) then
-        do i=1,ndim
+    pval= 0d0
+    gpena(1:ndim)= 0d0
+    if( trim(cpena).eq.'lasso' ) then
+      do i=1,ndim
+        absx= abs(x0(i))
+        pval= pval +pwgt*absx
+        sgnx= sign(1d0,x0(i))
+        if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
+      enddo
+    else if( trim(cpena).eq.'glasso' ) then
+      glval(0:ngl)= 0d0
+      do i=1,ndim
+        ig= iglid(i)
+        glval(ig)= glval(ig) +x0(i)*x0(i)
+      enddo
+      glval(0)= 1d0
+      do ig=1,ngl
+        glval(ig)= sqrt(glval(ig))
+        pval= pval +pwgt*glval(ig)
+      enddo
+      do i=1,ndim
+        ig= iglid(i)
+        if( ig.eq.0 ) then ! i is not in a group
           absx= abs(x0(i))
-          pval= pval +pwgt*absx
           sgnx= sign(1d0,x0(i))
           if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
-        enddo
-      else if( trim(cpena).eq.'ridge' ) then
-        do i=1,ndim
-          pval= pval +pwgt*x0(i)*x0(i)
-          gpena(i)= 2d0*pwgt*x0(i)
-        enddo
-      endif
-      g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+          pval= pval +pwgt*absx
+        else ! i is in a group
+          if( glval(ig).gt.xtiny) gpena(i)= pwgt*x0(i)/glval(ig)
+        endif
+      enddo
+    else if( trim(cpena).eq.'ridge' ) then
+      do i=1,ndim
+        pval= pval +pwgt*x0(i)*x0(i)
+        gpena(i)= 2d0*pwgt*x0(i)
+      enddo
     endif
+    g(1:ndim)= g(1:ndim) +gpena(1:ndim)
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
 
     iter= 0
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
-        if( trim(cpena).eq.'lasso'.or.trim(cpena).eq.'ridge' ) then
+        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
+             .or. trim(cpena).eq.'ridge' ) then
           write(6,'(a,i8,3es15.7)') ' iter,f,p,gnorm=',iter,f &
                ,pval,gnorm
         else
@@ -349,7 +374,8 @@ contains
         endif
         call flush(6)
       else if( iprint.ge.2 ) then
-        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'ridge' ) then
+        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
+             .or. trim(cpena).eq.'ridge' ) then
           write(6,'(a,i8,12es15.7)') ' iter,f,p,gnorm,x(1:5)=' &
                ,iter,f,pval,gnorm,x(1:5)
         else
@@ -425,6 +451,29 @@ contains
           sgnx= sign(1d0,x(i))
           if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
         enddo
+      else if( trim(cpena).eq.'glasso' ) then
+        call soft_threshold(ndim,x,u,alpha)
+        glval(0:ngl)= 0d0
+        do i=1,ndim
+          ig= iglid(i)
+          glval(ig)= glval(ig) +x(i)*x(i)
+        enddo
+        glval(0)= 1d0
+        do ig=1,ngl
+          glval(ig)= sqrt(glval(ig))
+          pval= pval +pwgt*glval(ig)
+        enddo
+        do i=1,ndim
+          ig= iglid(i)
+          if( ig.eq.0 ) then ! i is not in a group
+            absx= abs(x(i))
+            sgnx= sign(1d0,x(i))
+            if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
+            pval= pval +pwgt*absx
+          else ! i is in a group
+            if( glval(ig).gt.xtiny) gpena(i)= pwgt*x(i)/glval(ig)
+          endif
+        enddo
       else if( trim(cpena).eq.'ridge' ) then
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
         do i=1,ndim
@@ -441,7 +490,8 @@ contains
 !!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
-          if( trim(cpena).eq.'lasso'.or.trim(cpena).eq.'ridge' ) then
+          if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
+               .or.trim(cpena).eq.'ridge' ) then
             write(6,'(a,i8,4es15.7)') ' iter,f,p,gnorm,f-fp=',iter,f &
                  ,pval,gnorm,f-fp
           else
@@ -450,7 +500,8 @@ contains
           endif
           call flush(6)
         else if( iprint.ge.2 ) then
-          if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'ridge' ) then
+          if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
+               .or. trim(cpena).eq.'ridge' ) then
             write(6,'(a,i8,13es15.7)') ' iter,f,p,gnorm,f-fp,x(1:5)=' &
                  ,iter,f,pval,gnorm,f-fp,x(1:5)
           else
@@ -485,11 +536,7 @@ contains
       endif
       
       v(1:ndim)= alpha *u(1:ndim)
-      if( trim(cpena).eq.'lasso' ) then
-        y(1:ndim)= g(1:ndim) -gp(1:ndim)
-      else
-        y(1:ndim)= g(1:ndim) -gp(1:ndim)
-      endif
+      y(1:ndim)= g(1:ndim) -gp(1:ndim)
       ynorm= sprod(ndim,y,y)
       if( ynorm.lt.1d-14 ) then
         if(myid.eq.0) then
@@ -894,7 +941,7 @@ contains
   real(8),parameter:: tau    = 0.5d0
   integer,parameter:: MAXITER= 30
   real(8),parameter:: xtiny  = 1d-14
-  integer:: iter,i
+  integer:: iter,i,ig
   real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx
   real(8),allocatable,dimension(:):: x1(:),gpena(:)
 
@@ -909,6 +956,28 @@ contains
       if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
       pval0= pval0 +pwgt*absx
     enddo
+  else if( trim(cpena).eq.'glasso' ) then
+    glval(0:ngl)= 0d0
+    do i=1,ndim
+      ig= iglid(i)
+      glval(ig)= glval(ig) +x0(i)*x0(i)
+    enddo
+    glval(0)= 1d0
+    do ig=1,ngl
+      glval(ig)= sqrt(glval(ig))
+      pval0= pval0 +pwgt*glval(ig)
+    enddo
+    do i=1,ndim
+      ig= iglid(i)
+      if( ig.eq.0 ) then ! i is not in a group
+        absx= abs(x0(i))
+        sgnx= sign(1d0,x0(i))
+        if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
+        pval0= pval0 +pwgt*absx
+      else ! i is in a group
+        if( glval(ig).gt.xtiny) gpena(i)= pwgt*x0(i)/glval(ig)
+      endif
+    enddo
   else if( trim(cpena).eq.'ridge' ) then
     do i=1,ndim
       pval0= pval0 +pwgt*x0(i)*x0(i)
@@ -920,7 +989,7 @@ contains
   f0= f
   do iter=1,MAXITER
     x1(1:ndim)= x0(1:ndim)
-    if( trim(cpena).eq.'lasso' ) then
+    if( trim(cpena).eq.'lasso' .or.trim(cpena).eq.'glasso') then
       call soft_threshold(ndim,x1,d,alphai)
     else
       x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
@@ -930,6 +999,18 @@ contains
     if( trim(cpena).eq.'lasso' ) then
       do i=1,ndim
         pval= pval +pwgt*abs(x1(i))
+      enddo
+    else if( trim(cpena).eq.'glasso' ) then
+      pval= 0d0
+      glval(0:ngl)= 0d0
+      do i=1,ndim
+        ig= iglid(i)
+        glval(ig)= glval(ig) +x1(i)*x1(i)
+        if( ig.eq.0 ) pval= pval +pwgt*abs(x1(i))
+      enddo
+      do ig=1,ngl
+        glval(ig)= sqrt(glval(ig))
+        pval= pval +pwgt*glval(ig)
       enddo
     else if( trim(cpena).eq.'ridge' ) then
       do i=1,ndim

@@ -35,7 +35,7 @@ contains
     use parallel
     use minimize
     implicit none 
-    integer:: itmp,i,nw,natm,ismpl
+    integer:: itmp,i,nw,natm,ismpl,ihl0,ihl1
 
     tfunc= 0d0
     tgrad= 0d0
@@ -59,11 +59,11 @@ contains
 10    close(20)
       nsfc= nhl(0)
       nhl(nl+1)= 1
-      print *,' nhl(0:nl+1)=',nhl(0:nl+1)
+      write(6,'(a,5i5)') 'nhl(0:nl+1)=',nhl(0:nl+1)
     endif
     call mpi_bcast(nl,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsp,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(nhl,nl+1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(nhl,nl+2,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf2,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsfc,1,mpi_integer,0,mpi_world,ierr)
@@ -82,7 +82,6 @@ contains
       print *,'nsf2,nsf3,ncmb2,ncmb3=',nsf2,nsf3,ncmb2,ncmb3
       print *,'nhl(0:nl+1),nw=',nhl(0:nl+1),nw
     endif
-!!$    print *, 'nvars,nw=',nvars,nw
 
     allocate(sds(isid0:isid1))
     do ismpl=isid0,isid1
@@ -107,6 +106,20 @@ contains
     allocate(fdiff(3,maxna))
 
     call standardize()
+
+!.....make groups for group lasso
+    if( trim(cpena).eq.'glasso' ) then
+      ngl= nhl(0)
+      allocate(iglid(nw),glval(0:ngl))
+      iglid(1:nw)= 0
+      i= 0
+      do ihl0=1,nhl(0)
+        do ihl1=1,nhl(1)
+          i= i +1
+          iglid(i)= ihl0
+        enddo
+      enddo
+    endif
 
     if( myid.eq.0 ) print *, 'NN_init done.'
   end subroutine NN_init

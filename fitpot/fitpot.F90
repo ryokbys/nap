@@ -89,7 +89,8 @@ program fitpot
   call write_energy_relation('fin')
   call write_force_relation('fin')
   call write_statistics()
-  if(trim(cpena).eq.'lasso'.or.trim(cpena).eq.'ridge') &
+  if(trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
+       .or.trim(cpena).eq.'ridge') &
        call write_eliminated_vars()
 !!$  write(6,'(a,i4,3f15.3)') ' myid,tfunc,tgrad,tcom=' &
 !!$       ,myid,tfunc,tgrad,tcomm
