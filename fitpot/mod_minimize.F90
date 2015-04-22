@@ -1096,7 +1096,7 @@ contains
     real(8),parameter:: eps = 1d-2
     real(8),parameter:: xtiny= 1d-14
     integer:: iter,i,imax,ig
-    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval
+    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp
     real(8),allocatable,dimension(:):: xt,g,d,gpena,grpg
 
     if( trim(cpena).ne.'lasso' .and. trim(cpena).ne.'glasso' ) then
@@ -1114,6 +1114,7 @@ contains
 !!$    xt(1:ndim)= 1d-6
 
     do iter=1,maxiter
+      fp= f
 !.....find maximum contribution in g
       f= func(ndim,xt)
       g= grad(ndim,xt)
@@ -1149,18 +1150,17 @@ contains
           endif
         enddo
       endif
-      f= f +pval
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
       if( myid.eq.0 ) then
 !!$        if( iprint.eq.1 .and. mod(iter,ndim).eq.1 ) then
         if( iprint.eq.1 ) then
-          write(6,'(a,i8,3es15.7)') ' iter,f,p,gnorm=',iter,f &
-               ,pval,gnorm
+          write(6,'(a,i8,4es15.7)') ' iter,f,p,gnorm,f-fp=',iter,f &
+               ,pval,gnorm,f-fp
           call flush(6)
         else if( iprint.ge.2 ) then
-          write(6,'(a,i8,12es15.7)') ' iter,f,p,gnorm,x(1:5)=' &
-               ,iter,f,pval,gnorm,x(1:5)
+          write(6,'(a,i8,12es15.7)') ' iter,f,p,gnorm,f-fp,x(1:5)=' &
+               ,iter,f,pval,gnorm,f-fp,x(1:5)
           call flush(6)
         endif
       endif
