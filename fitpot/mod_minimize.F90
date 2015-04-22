@@ -1093,13 +1093,22 @@ contains
       end function grad
     end interface
 
-    real(8),parameter:: eps = 1d-1
+    real(8),parameter:: eps = 1d-2
     real(8),parameter:: xtiny= 1d-14
-    integer:: iter,i,imax
-    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx
-    real(8),allocatable,dimension(:):: xt,g,d
+    integer:: iter,i,imax,ig
+    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval
+    real(8),allocatable,dimension(:):: xt,g,d,gpena,grpg
 
-    if( .not.allocated(xt) ) allocate(xt(ndim),g(ndim),d(ndim))
+    if( trim(cpena).ne.'lasso' .and. trim(cpena).ne.'glasso' ) then
+      if(myid.eq.0) then
+        print *,'>>> fs works only with lasso or glasso.'
+      endif
+      iflag= iflag +100
+      return
+    endif
+
+    if( .not.allocated(xt) ) allocate(xt(ndim),g(ndim),d(ndim) &
+         ,gpena(ndim),grpg(0:ngl))
 
     xt(1:ndim)= x(1:ndim)
 !!$    xt(1:ndim)= 1d-6
@@ -1108,21 +1117,50 @@ contains
 !.....find maximum contribution in g
       f= func(ndim,xt)
       g= grad(ndim,xt)
-      do i=1,ndim
-        sgnx= sign(1d0,xt(i))
-        absx= abs(xt(i))
-        f= f +pwgt*absx
-        if(absx.gt.xtiny) g(i)= g(i) +pwgt*sgnx
-      enddo
+      pval= 0d0
+      gpena(1:ndim)= 0d0
+      if( trim(cpena).eq.'lasso' ) then
+        do i=1,ndim
+          sgnx= sign(1d0,xt(i))
+          absx= abs(xt(i))
+          pval= pval +pwgt*absx
+          if(absx.gt.xtiny) g(i)= g(i) +pwgt*sgnx
+        enddo
+      else if( trim(cpena).eq.'glasso' ) then
+        glval(0:ngl)= 0d0
+        do i=1,ndim
+          ig= iglid(i)
+          glval(ig)= glval(ig) +xt(i)*xt(i)
+        enddo
+        glval(0)= 1d0
+        do ig=1,ngl
+          glval(ig)= sqrt(glval(ig))
+          pval= pval +pwgt*glval(ig)
+        enddo
+        do i=1,ndim
+          ig= iglid(i)
+          if( ig.eq.0 ) then ! i is not in a group
+            absx= abs(xt(i))
+            sgnx= sign(1d0,xt(i))
+            if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
+            pval= pval +pwgt*absx
+          else ! i is in a group
+            if( glval(ig).gt.xtiny) gpena(i)= pwgt*xt(i)/glval(ig)
+          endif
+        enddo
+      endif
+      f= f +pval
+      g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
       if( myid.eq.0 ) then
-        if( iprint.eq.1 .and. mod(iter,ndim).eq.1 ) then
-!!$        if( iprint.eq.1 ) then
-          write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+!!$        if( iprint.eq.1 .and. mod(iter,ndim).eq.1 ) then
+        if( iprint.eq.1 ) then
+          write(6,'(a,i8,3es15.7)') ' iter,f,p,gnorm=',iter,f &
+               ,pval,gnorm
           call flush(6)
         else if( iprint.ge.2 ) then
-          write(6,'(a,i8,12es15.7)') ' iter,x(1:5),f,gnorm=' &
-               ,iter,x(1:5),f,gnorm
+          write(6,'(a,i8,12es15.7)') ' iter,f,p,gnorm,x(1:5)=' &
+               ,iter,f,pval,gnorm,x(1:5)
           call flush(6)
         endif
       endif
@@ -1135,32 +1173,49 @@ contains
         iflag= iflag +2
         return
       endif
-    
-!.....set 0 except the maximum contribution
-      imax= 0
-      gmax= 0d0
-      do i=1,ndim
-        absg= abs(g(i))
-        if( gmax.lt.absg ) then
-          gmax= absg
-          imax= i
-        endif
-      enddo
 
-!!$!.....if possible line minimization
-!!$      d(1:ndim)= 0d0
-!!$      d(imax)= -g(imax)
-!!$      call armijo_search(ndim,x,d,f,g,alpha,iprint &
-!!$           ,iflag,myid,func)
-!!$      if( iflag/100.ne.0 ) then
-!!$        alpha= eps
-!!$      endif
-!.....usually armijo_search does not work for FS
-      alpha= eps
-      xad= xt(imax) -alpha*g(imax)
-      sgnx= sign(1d0,xad)
-      val= max(abs(xad)-alpha*pwgt,0d0)
-      xt(imax)= sgnx*val
+      if( trim(cpena).eq.'lasso' ) then
+!.....set 0 except the maximum contribution
+        imax= 0
+        gmax= 0d0
+        do i=1,ndim
+          absg= abs(g(i))
+          if( gmax.lt.absg ) then
+            gmax= absg
+            imax= i
+          endif
+        enddo
+        alpha= eps
+        xad= xt(imax) -alpha*g(imax)
+        sgnx= sign(1d0,xad)
+        val= max(abs(xad)-alpha*pwgt,0d0)
+        xt(imax)= sgnx*val
+      else if( trim(cpena).eq.'glasso' ) then
+        grpg(0:ngl)= 0d0
+        do i=1,ndim
+          ig= iglid(i)
+          grpg(ig)= grpg(ig) +g(i)*g(i)
+        enddo
+        imax= 0
+        gmax= 0d0
+        do ig=1,ngl
+          if( gmax.lt.grpg(ig) ) then
+            gmax= grpg(ig)
+            imax= ig
+          endif
+        enddo
+!!$        print *,'myid,imax,gmax=',myid,imax,gmax
+        alpha= eps
+        do i=1,ndim
+          ig= iglid(i)
+          if( ig.eq.0 .or. ig.eq.imax ) then
+            xad= xt(i) -alpha*g(i)
+            sgnx= sign(1d0,xad)
+            val= max(abs(xad)-alpha*pwgt,0d0)
+            xt(i)= sgnx*val
+          endif
+        enddo
+      endif
     enddo
 
     if( myid.eq.0 ) print *,'maxiter exceeded in fs'
