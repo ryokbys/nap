@@ -105,7 +105,7 @@ contains
 !!$    print *,' myid, max num of atoms [maxna] =',myid,maxna
     allocate(fdiff(3,maxna))
 
-    call standardize()
+    call standardize_var()
 
 !.....make groups for group lasso
     if( trim(cpena).eq.'glasso' ) then
@@ -118,6 +118,9 @@ contains
           i= i +1
           iglid(i)= ihl0
         enddo
+      enddo
+      do i=nhl(0)*nhl(1)+1,nw
+        iglid(i)= -1
       enddo
     endif
 
@@ -929,7 +932,7 @@ contains
     if(myid.eq.0) print *, 'get_bases done.'
   end subroutine get_bases
 !=======================================================================
-  subroutine standardize()
+  subroutine standardize_max()
 !
 !  Standardize of inputs is requied when you use lasso or ridge.
 !
@@ -992,7 +995,89 @@ contains
     lstandard= .true.
     deallocate(gmaxl,gminl)
     if(myid.eq.0) print *,'standardize done.'
-  end subroutine standardize
+  end subroutine standardize_max
+!=======================================================================
+  subroutine standardize_var()
+!
+!  Standardize of inputs is requied when you use lasso or ridge.
+!
+    use variables, only: nsmpl,samples,nvars,nalist,vars
+    use parallel
+    implicit none
+    integer:: ismpl,ia,natm,ihl0,ihl1,iv
+    real(8),allocatable:: gmaxl(:),gminl(:),gmeanl(:),gmean(:)
+    integer,allocatable:: nsum(:),nsuml(:)
+
+    allocate(gmax(nhl(0)),gmin(nhl(0)) &
+         ,gmaxl(nhl(0)),gminl(nhl(0)) &
+         ,gmean(nhl(0)),gmeanl(nhl(0)),nsum(nhl(0)),nsuml(nhl(0)))
+
+    !.....compute mean value
+    gmeanl(1:nhl(0))= 0d0
+    nsuml(1:nhl(0))= 0
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      !.....sum up gsf
+      do ihl0=1,nhl(0)
+        do ia=1,natm
+          gmeanl(ihl0)= gmeanl(ihl0) +sds(ismpl)%gsf(ia,ihl0)
+          nsuml(ihl0)= nsuml(ihl0) +1
+        enddo
+      enddo
+    enddo
+    gmean(1:nhl(0))= 0d0
+    nsum(1:nhl(0))= 0
+    call mpi_allreduce(gmeanl,gmean,nhl(0),mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(nsuml,nsum,nhl(0),mpi_integer &
+         ,mpi_sum,mpi_world,ierr)
+    gmean(1:nhl(0))= gmean(1:nhl(0))/nsum(1:nhl(0))
+
+    !.....compute variance
+    gmaxl(1:nhl(0))= 0d0
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      !.....sum up gsf
+      do ihl0=1,nhl(0)
+        do ia=1,natm
+          gmaxl(ihl0)= gmaxl(ihl0) +(gmean(ihl0)-sds(ismpl)%gsf(ia,ihl0))&
+               *(gmean(ihl0)-sds(ismpl)%gsf(ia,ihl0))
+        enddo
+      enddo
+    enddo
+    gmax(1:nhl(0))= 0d0
+    call mpi_allreduce(gmaxl,gmax,nhl(0),mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
+    !.....get standard deviation
+    do ihl0=1,nhl(0)
+      gmax(ihl0)= sqrt(gmax(ihl0)/nsum(ihl0))
+      if( gmax(ihl0).lt.1d-14 ) gmax(ihl0)=1d0
+    enddo
+
+!.....standardize G values
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      allocate(sds(ismpl)%gsfo(natm,nhl(0)))
+      do ihl0=1,nhl(0)
+        do ia=1,natm
+          sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
+          sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
+        enddo
+      enddo
+    enddo
+
+    iv=0
+    do ihl0=1,nhl(0)
+      do ihl1=1,nhl(1)
+        iv=iv+1
+        vars(iv)= vars(iv)*gmax(ihl0)
+      enddo
+    enddo
+
+    lstandard= .true.
+    deallocate(gmaxl,gminl,gmeanl,gmean,nsuml,nsum)
+    if(myid.eq.0) print *,'standardize done.'
+  end subroutine standardize_var
 !=======================================================================
   subroutine NN_restore_standard()
 !
@@ -1114,8 +1199,13 @@ contains
       enddo
       do isf=1,nsfc
         if( isf.le.nsf2 ) then
-          write(ionum+2,'(f24.14,2x,"2body:",i5,1es12.4)') &
-               sumvv(isf),itype(isf),cnst(1,isf)
+          if( itype(isf).eq.1 ) then
+            write(ionum+2,'(f24.14,2x,"2body:",i5,2es12.4)') &
+                 sumvv(isf),itype(isf),cnst(1:2,isf)
+          else if( itype(isf).eq.2 ) then
+            write(ionum+2,'(f24.14,2x,"2body:",i5,1es12.4)') &
+                 sumvv(isf),itype(isf),cnst(1,isf)
+          endif
         else
           write(ionum+2,'(f24.14,2x,"3body:",i5,1es12.4)') &
                sumvv(isf),itype(isf),cnst(1,isf)

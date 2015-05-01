@@ -334,7 +334,7 @@ contains
       glval(0:ngl)= 0d0
       do i=1,ndim
         ig= iglid(i)
-        glval(ig)= glval(ig) +x0(i)*x0(i)
+        if(ig.gt.0) glval(ig)= glval(ig) +x0(i)*x0(i)
       enddo
       glval(0)= 1d0
       do ig=1,ngl
@@ -348,7 +348,7 @@ contains
           sgnx= sign(1d0,x0(i))
           if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
           pval= pval +pwgt*absx
-        else ! i is in a group
+        else if( ig.gt.0 ) then ! i is in a group
           if( glval(ig).gt.xtiny) gpena(i)= pwgt*x0(i)/glval(ig)
         endif
       enddo
@@ -456,7 +456,7 @@ contains
         glval(0:ngl)= 0d0
         do i=1,ndim
           ig= iglid(i)
-          glval(ig)= glval(ig) +x(i)*x(i)
+          if( ig.gt.0 ) glval(ig)= glval(ig) +x(i)*x(i)
         enddo
         glval(0)= 1d0
         do ig=1,ngl
@@ -470,7 +470,7 @@ contains
             sgnx= sign(1d0,x(i))
             if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
             pval= pval +pwgt*absx
-          else ! i is in a group
+          else if( ig.gt.0 ) then ! i is in a group
             if( glval(ig).gt.xtiny) gpena(i)= pwgt*x(i)/glval(ig)
           endif
         enddo
@@ -960,7 +960,7 @@ contains
     glval(0:ngl)= 0d0
     do i=1,ndim
       ig= iglid(i)
-      glval(ig)= glval(ig) +x0(i)*x0(i)
+      if( ig.gt.0 ) glval(ig)= glval(ig) +x0(i)*x0(i)
     enddo
     glval(0)= 1d0
     do ig=1,ngl
@@ -974,7 +974,7 @@ contains
         sgnx= sign(1d0,x0(i))
         if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
         pval0= pval0 +pwgt*absx
-      else ! i is in a group
+      else if( ig.gt.0 ) then ! i is in a group
         if( glval(ig).gt.xtiny) gpena(i)= pwgt*x0(i)/glval(ig)
       endif
     enddo
@@ -1005,7 +1005,7 @@ contains
       glval(0:ngl)= 0d0
       do i=1,ndim
         ig= iglid(i)
-        glval(ig)= glval(ig) +x1(i)*x1(i)
+        if( ig.gt.0 ) glval(ig)= glval(ig) +x1(i)*x1(i)
         if( ig.eq.0 ) pval= pval +pwgt*abs(x1(i))
       enddo
       do ig=1,ngl
@@ -1093,7 +1093,7 @@ contains
       end function grad
     end interface
 
-    real(8),parameter:: eps = 1d-2
+    real(8),parameter:: eps = 1d-1
     real(8),parameter:: xtiny= 1d-14
     integer:: iter,i,imax,ig
     real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp
@@ -1131,7 +1131,7 @@ contains
         glval(0:ngl)= 0d0
         do i=1,ndim
           ig= iglid(i)
-          glval(ig)= glval(ig) +xt(i)*xt(i)
+          if( ig.gt.0 ) glval(ig)= glval(ig) +xt(i)*xt(i)
         enddo
         glval(0)= 1d0
         do ig=1,ngl
@@ -1145,7 +1145,7 @@ contains
             sgnx= sign(1d0,xt(i))
             if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
             pval= pval +pwgt*absx
-          else ! i is in a group
+          else if( ig.gt.0 ) then ! i is in a group
             if( glval(ig).gt.xtiny) gpena(i)= pwgt*xt(i)/glval(ig)
           endif
         enddo
@@ -1194,7 +1194,7 @@ contains
         grpg(0:ngl)= 0d0
         do i=1,ndim
           ig= iglid(i)
-          grpg(ig)= grpg(ig) +g(i)*g(i)
+          if( ig.gt.0 ) grpg(ig)= grpg(ig) +g(i)*g(i)
         enddo
         imax= 0
         gmax= 0d0
