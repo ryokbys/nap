@@ -1093,7 +1093,7 @@ contains
       end function grad
     end interface
 
-    real(8),parameter:: eps = 1d-1
+    real(8),parameter:: eps = 1d0
     real(8),parameter:: xtiny= 1d-14
     integer:: iter,i,imax,ig
     real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp

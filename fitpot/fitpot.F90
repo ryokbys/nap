@@ -143,6 +143,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
   write(6,'(2x,a25,2x,l3)') 'regularize',lreg
   write(6,'(2x,a25,2x,l3)') 'force_scale',lfscale
+  write(6,'(2x,a25,2x,es12.3)') 'fscale_factor',fscl
   write(6,'(2x,a25,2x,l3)') 'sample_weight',lswgt
   write(6,'(2x,a25,2x,es12.3)') 'sample_weight_beta',swbeta
   write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
