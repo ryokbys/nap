@@ -207,10 +207,11 @@ contains
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8):: NN_fs
+    integer:: natm,ia,ixyz,idim
+    real(8):: dn3i,ediff,tf0,fscale,eref,swgt,flocal,tc0
     integer:: ismpl
     common /samplei/ ismpl
-    integer:: natm,ia,ixyz,idim
-    real(8):: dn3i,ediff,tf0,fscale,eref,swgt
+    
 
     nfunc=nfunc +1
     tf0= mpi_wtime()
@@ -222,7 +223,7 @@ contains
       call calc_ef2(ismpl)
     endif
 
-    NN_fs= 0d0
+    flocal= 0d0
     natm= samples(ismpl)%natm
     eref= samples(ismpl)%eref
     ediff= (samples(ismpl)%epot -eref)/natm
@@ -231,7 +232,7 @@ contains
     if( lswgt ) then
       swgt= exp(-eref/natm*swbeta)
     endif
-    NN_fs= NN_fs +ediff*swgt
+    flocal= flocal +ediff*swgt
     if( .not. lfmatch ) goto 999
     fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
          -samples(ismpl)%fref(1:3,1:natm))
@@ -243,11 +244,20 @@ contains
          *dn3i *fscale *swgt
     do ia=1,natm
       do ixyz=1,3
-        NN_fs= NN_fs +fdiff(ixyz,ia)
+        flocal= flocal +fdiff(ixyz,ia)
       enddo
     enddo
 
 999 continue
+
+    tc0= mpi_wtime()
+    NN_fs= 0d0
+!!$    print *,'here01,myid,flocal=',myid,flocal
+    call mpi_allreduce(flocal,NN_fs,1,mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
+!!$    print *,'here02,myid,NN_func=',myid,NN_func
+    tcomm= tcomm +mpi_wtime() -tc0
+    NN_fs= NN_fs/nnode
 
     tfunc= tfunc +mpi_wtime() -tf0
     return
@@ -429,34 +439,30 @@ contains
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8):: NN_gs(ndim)
+    integer:: i,idim
+    real(8),save,allocatable:: gsl(:)
+    real(8):: gmax,vmax,tg0,tc0
     integer:: ismpl
     common /samplei/ ismpl
-    integer:: i,idim
-    real(8),save,allocatable:: gs(:)
-    real(8):: gmax,vmax,tg0
 
-    if( .not.allocated(gs) ) allocate(gs(nvars))
+    if( .not.allocated(gsl) ) allocate(gsl(nvars))
 
     ngrad= ngrad +1
     tg0= mpi_wtime()
 
-    NN_gs(1:nvars)= 0d0
+    gsl(1:nvars)= 0d0
     if( nl.eq.1 ) then
-      call grad1(ismpl,gs)
+      call grad1(ismpl,gsl)
     else if( nl.eq.2 ) then
-      call grad2(ismpl,gs)
+      call grad2(ismpl,gsl)
     endif
-    NN_gs(1:nvars)= NN_gs(1:nvars) +gs(1:nvars)
 
-!!$    if( lgscale ) then
-!!$      gmax= 0d0
-!!$      vmax= 0d0
-!!$      do i=1,nvars
-!!$        vmax= max(vmax,abs(vars(i)))
-!!$        gmax= max(gmax,abs(gval(i)))
-!!$      enddo
-!!$      gval(1:nvars)= gval(1:nvars)/gmax *gscl*vmax
-!!$    endif
+    tc0= mpi_wtime()
+    NN_gs(1:ndim)= 0d0
+    call mpi_allreduce(gsl,NN_gs,ndim,mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
+    tcomm= tcomm +mpi_wtime() -tc0
+    NN_gs(1:ndim)= NN_gs(1:ndim)/nnode
 
     tgrad= tgrad +mpi_wtime() -tg0
     return

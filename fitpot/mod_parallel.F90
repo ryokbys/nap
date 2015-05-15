@@ -3,5 +3,5 @@
     integer,save:: myid,mpi_world,ierr
     integer,save:: nnode,isid0,isid1
     integer,allocatable,save:: nspn(:),ispn(:)
-    integer,save:: mynsmpl
+    integer,save:: mynsmpl,maxmynsmpl
   end module parallel
