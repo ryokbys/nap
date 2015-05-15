@@ -407,13 +407,10 @@ subroutine sgd()
   use parallel
   use minimize
   implicit none
-  integer,parameter:: nstp_eval= 1
+  integer,parameter:: nstp_eval= 10
   integer,parameter:: nstp_time= 1
-  real(8),parameter:: alpha0   = 1d0
-  real(8),parameter:: dalpha   = 0.01d0
-  real(8),parameter:: alphamin = 1d-5
   real(8),allocatable:: gval(:),u(:)
-  integer:: istp,jstp,iv
+  integer:: iter,istp,iv
   real(8):: gnorm,alpha,gmax,vmax,fval,gg
   integer:: ismpl
   common /samplei/ ismpl
@@ -434,10 +431,9 @@ subroutine sgd()
 !!$    stop
 !!$  endif
 
-  alpha= alpha0
   call NN_init()
-  do istp=1,nstp
-    if(mod(istp,nstp_eval).eq.0) then
+  do iter=1,nstp
+    if(mod(iter,nstp_eval).eq.0) then
       fval= NN_func(nvars,vars)
       gval= NN_grad(nvars,vars)
       gnorm= 0d0
@@ -445,16 +441,16 @@ subroutine sgd()
         gnorm= gnorm +gval(iv)*gval(iv)
       enddo
       if( myid.eq.0 ) then
-        write(6,'(a,i6,2f20.7,f10.3)') ' istp,f,gnorm,time=',istp,fval &
+        write(6,'(a,i6,2f20.7,f10.3)') ' iter,f,gnorm,time=',iter,fval &
              ,gnorm ,mpi_wtime()-time0
         call write_vars('tmp')
       endif
-    else if(mod(istp,nstp_time).eq.0) then
+    else if(mod(iter,nstp_time).eq.0) then
       if( myid.eq.0 ) then
-        write(6,'(a,i6,f10.3)') ' istp,time=',istp,mpi_wtime()-time0
+        write(6,'(a,i6,f10.3)') ' iter,time=',iter,mpi_wtime()-time0
       endif
     endif
-    do jstp=1,maxmynsmpl
+    do istp=1,maxmynsmpl
       ismpl= isid0 +mynsmpl*urnd()
       fval= NN_fs(nvars,vars)
       gval= NN_gs(nvars,vars)
@@ -471,11 +467,6 @@ subroutine sgd()
   do iv=1,nvars
     gnorm= gnorm +gval(iv)*gval(iv)
   enddo
-  if( myid.eq.0 ) then
-    write(6,'(a,i6,2f20.7,f10.3)') ' istp,f,gnorm,time=',istp,fval &
-         ,gnorm ,mpi_wtime()-time0
-    call write_vars('tmp')
-  endif
 
   call NN_analyze()
   call NN_restore_standard()
