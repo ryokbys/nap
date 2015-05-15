@@ -409,9 +409,11 @@ subroutine sgd()
   implicit none
   integer,parameter:: nstp_eval= 10
   integer,parameter:: nstp_time= 1
+  real(8),parameter:: alpha0  = 1d0
+  real(8),parameter:: dalpha  = 0.0001d0
   real(8),allocatable:: gval(:),u(:)
   integer:: iter,istp,iv
-  real(8):: gnorm,alpha,gmax,vmax,fval,gg
+  real(8):: gnorm,alpha,alpha1,gmax,vmax,fval,gg
   integer:: ismpl
   common /samplei/ ismpl
   real(8),external:: urnd
@@ -431,6 +433,8 @@ subroutine sgd()
 !!$    stop
 !!$  endif
 
+  alpha1= alpha0
+
   call NN_init()
   do iter=1,nstp
     if(mod(iter,nstp_eval).eq.0) then
@@ -441,7 +445,7 @@ subroutine sgd()
         gnorm= gnorm +gval(iv)*gval(iv)
       enddo
       if( myid.eq.0 ) then
-        write(6,'(a,i6,2f20.7,f10.3)') ' iter,f,gnorm,time=',iter,fval &
+        write(6,'(a,i6,2es15.7,f10.3)') ' iter,f,gnorm,time=',iter,fval &
              ,gnorm ,mpi_wtime()-time0
         call write_vars('tmp')
       endif
@@ -455,10 +459,19 @@ subroutine sgd()
       fval= NN_fs(nvars,vars)
       gval= NN_gs(nvars,vars)
       u(1:nvars)= -gval(1:nvars)
+      alpha= alpha1
       call armijo_search(nvars,vars,u,fval,gval,alpha,iprint &
            ,iflag,myid,NN_fs)
+      gnorm= 0d0
+      do iv=1,nvars
+        gnorm= gnorm +gval(iv)*gval(iv)
+      enddo
+!!$      if( myid.eq.0 ) then
+!!$        write(6,'(a,3es12.4)') 'alpha1,alpha,gnorm=',alpha1,alpha,gnorm
+!!$      endif
       vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
     enddo
+    alpha1= alpha1*(1d0-dalpha)
   enddo
 
   fval= NN_func(nvars,vars)
