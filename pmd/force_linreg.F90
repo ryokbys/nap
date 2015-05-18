@@ -1,12 +1,20 @@
 module linreg
+!-----------------------------------------------------------------------
+!                        Time-stamp: <2015-02-03 18:12:05 Ryo KOBAYASHI>
+!-----------------------------------------------------------------------
+!  Parallel implementation of linear regression potential for pmd
+!    - 2014.06.11 by R.K. 1st implementation
+!    - 2015.02.03 by R.K. extended to multiple species
+!-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.linreg'
   character(128),parameter:: ccfname='in.const.linreg'
+  character(128),parameter:: cmbfname='in.comb.linreg'
 !.....parameters
   real(8),allocatable:: coeff(:)
 !.....constants
-  integer:: nelem,nexp
-  integer,allocatable:: itype(:)
+  integer:: nelem,nexp,nsp
+  integer,allocatable:: itype(:),icmb(:,:)
   real(8),allocatable:: cnst(:,:),exps(:)
 !.....function types and num of constatns for types
   integer,parameter:: max_ncnst= 3
@@ -21,17 +29,26 @@ module linreg
           1, &  ! poly-8
           1, &  ! poly-10
           1  &  ! poly-12
-          /)  
-  
+          /)
+!.....pairs (2) or triplets (3)
+  integer,parameter:: max_natm= 3
+  integer,parameter:: natm_type(1:10)= &
+       (/ 2, &  ! Gaussian
+          2, &  ! cosine
+          3, &  ! angular
+          2, &  ! poly-1
+          2, &  ! poly-2
+          2, &  ! poly-4
+          2, &  ! poly-6
+          2, &  ! poly-8
+          2, &  ! poly-10
+          2  &  ! poly-12
+          /)
+
 contains
   subroutine force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,acon,avol)
-!-----------------------------------------------------------------------
-!  Parallel implementation of linear regression potential for pmd
-!    - 2014.06.11 by R.K.
-!      1st implementation
-!-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -93,6 +110,7 @@ contains
         write(80,'(2i10,f5.1,es23.14e3)') ia,ielem,aexp,bnai
 !        write(81,'(2i10,f5.1,3es23.14e3)') ia,ielem,aexp,fat(1:3,ia)
 #endif
+!        write(6,*) ' ia,ielem,bnai,wgt=',ia,ielem,bnai,wgt
         epotl=epotl +bnai*wgt
         epi(ia)= epi(ia) +bnai*wgt
 #ifdef __3BODY__
@@ -178,7 +196,7 @@ contains
     real(8),intent(in):: ra(3,namax),h(3,3),tag(namax),rc,aexp
     real(8),intent(out):: bnai,dbna(3,nelem,namax)
 
-    integer:: ja,jj,ka,kk
+    integer:: ja,jj,ka,kk,is,js,ks
     real(8):: xi(3),xj(3),xij(3),rij(3),r,dirij(3),djrij(3),tmp &
          ,fcij,xk(3),xik(3),rik(3),rj,rk,fcik,dkrik(3),dirik(3) &
          ,f3,dfcj,dfck,tmp2,cs,acnst,dcosi(3),dcosj(3),dcosk(3)
@@ -186,10 +204,14 @@ contains
 
     bnai= 0d0
     xi(1:3)= ra(1:3,ia)
+    is= int(tag(ia))
     if( itype(ielem).eq.3 ) then ! angular (3-body) basis
+      if( is.ne.icmb(1,ielem) ) return
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
+        js= int(tag(ja))
+        if( js.ne.icmb(2,ielem) .and. js.ne.icmb(3,ielem) ) cycle
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -200,13 +222,16 @@ contains
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           if( ka.le.ja ) cycle
+          ks= int(tag(ka))
+          if( .not.( (js.eq.icmb(2,ielem).and.ks.eq.icmb(3,ielem)) .or. &
+               (js.eq.icmb(3,ielem).and.ks.eq.icmb(2,ielem))) ) cycle
           xk(1:3)= ra(1:3,ka)
           xik(1:3)= xk(1:3)-xi(1:3)
           rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           rk= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
           if( rk.gt.rc ) cycle
           fcik= fc(rk,rc)
-          bnai= bnai + func3(rij,rj,rik,rk,ielem) *fcij *fcik 
+          bnai= bnai + func3(rij,rj,rik,rk,ielem,is,js,ks) *fcij *fcik 
         enddo
       enddo
       !.....bnai will be used in the following loop.
@@ -215,6 +240,8 @@ contains
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
+        js=int(tag(ja))
+        if( js.ne.icmb(2,ielem) .and. js.ne.icmb(3,ielem) ) cycle
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -228,6 +255,9 @@ contains
           ka= lspr(kk,ia)
           if( ka.le.ja ) cycle
           xk(1:3)= ra(1:3,ka)
+          ks= int(tag(ka))
+          if( .not.( (js.eq.icmb(2,ielem).and.ks.eq.icmb(3,ielem)) .or. &
+               (js.eq.icmb(3,ielem).and.ks.eq.icmb(2,ielem))) ) cycle
           xik(1:3)= xk(1:3)-xi(1:3)
           rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           rk= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
@@ -239,7 +269,7 @@ contains
           if( itype(ielem).eq.3 ) then
             acnst= cnst(1,ielem)
             cs= sprod(rij,rik)/rj/rk
-            f3= func3(rij,rj,rik,rk,ielem)
+            f3= func3(rij,rj,rik,rk,ielem,is,js,ks)
             dbna(1:3,ielem,ia)= dbna(1:3,ielem,ia) &
                  +f3*fcik *dfcj*dirij(1:3) *tmp &
                  +f3*fcij *dfck*dirik(1:3) *tmp
@@ -275,22 +305,29 @@ contains
       enddo
       
     else ! 2-body basis
+      if( is.ne.icmb(1,ielem) .and. is.ne.icmb(2,ielem) ) return
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
+        js= int(tag(ja))
+        if( .not. ((is.eq.icmb(1,ielem).and.js.eq.icmb(2,ielem)) .or. &
+             (is.eq.icmb(2,ielem).and.js.eq.icmb(1,ielem))) ) cycle
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         r= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
         if( r.gt.rc ) cycle
         fcij= fc(r,rc)
-        bnai= bnai +func2(r,ielem)*fcij
+        bnai= bnai +func2(r,ielem,is,js)*fcij
       enddo
       !.....bnai will be used in the following loop.
       !.....Therefore these two loops cannot be merged.
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
+        js= int(tag(ja))
+        if( .not. ((is.eq.icmb(1,ielem).and.js.eq.icmb(2,ielem)) .or. &
+             (is.eq.icmb(2,ielem).and.js.eq.icmb(1,ielem))) ) cycle
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -298,7 +335,8 @@ contains
         if( r.gt.rc ) cycle
         dirij(1:3)= -rij(1:3)/r
         djrij(1:3)= -dirij(1:3)
-        tmp= dfunc2(r,ielem)*fc(r,rc) +func2(r,ielem)*dfc(r,rc)
+        tmp= dfunc2(r,ielem,is,js)*fc(r,rc) &
+             +func2(r,ielem,is,js)*dfc(r,rc)
         dbna(1:3,ielem,ia)= dbna(1:3,ielem,ia) &
              +dirij(1:3)*tmp *aexp*bnai**(aexp-1)
         dbna(1:3,ielem,ja)= dbna(1:3,ielem,ja) &
@@ -313,7 +351,7 @@ contains
 
   end subroutine bfunc
 !=======================================================================
-  function func2(rij,ielem)
+  function func2(rij,ielem,is,js)
 !
 !  Calculate selected basis function specified by ielem.
 !
@@ -321,7 +359,7 @@ contains
 !     in this module header.
 !
     implicit none
-    integer,intent(in):: ielem
+    integer,intent(in):: ielem,is,js
     real(8),intent(in):: rij
     real(8):: func2
     real(8):: a(max_ncnst),r2i,r4i
@@ -369,9 +407,9 @@ contains
     return
   end function func2
 !=======================================================================
-  function dfunc2(rij,ielem)
+  function dfunc2(rij,ielem,is,js)
     implicit none
-    integer,intent(in):: ielem
+    integer,intent(in):: ielem,is,js
     real(8),intent(in):: rij
     real(8):: dfunc2,tmp,a(max_ncnst),ri,r2i,r4i
     integer:: ia2
@@ -425,16 +463,16 @@ contains
     return
   end function dfunc2
 !=======================================================================
-  function func3(rij,rj,rik,rk,ielem)
+  function func3(rij,rj,rik,rk,ielem,is,js,ks)
     implicit none
-    integer,intent(in):: ielem
+    integer,intent(in):: ielem,is,js,ks
     real(8),intent(in):: rij(3),rj,rik(3),rk
     real(8):: func3,cs,a(max_ncnst)
     real(8),external:: sprod 
 
     func3= 0d0
     if( itype(ielem).eq.3 ) then ! angular
-      a(1)= cnst(1,ielem) 
+      a(1)= cnst(1,ielem)
       cs= sprod(rij,rik)/rj/rk
       func3= (a(1)+cs)**2/(abs(a(1))+1d0)**2
     endif
@@ -450,23 +488,7 @@ contains
     integer:: itmp,ierr,i,j
     logical:: lexist
 
-!.....read parameters at the 1st call
-    inquire(file=trim(cpfname),exist=lexist)
-    if( .not. lexist ) then
-      if( myid.eq.0 ) then
-        write(6,'(a)') ' [Error] '//cpfname//' does not exist !!!.'
-        write(6,'(a)') '   The linreg potential needs '//cpfname//'.'
-      endif
-      call mpi_finalize(ierr)
-      stop
-    endif
-    open(50,file=trim(cpfname),status='old')
-    read(50,*) nelem,rcin
-    allocate(coeff(nelem))
-    do i=1,nelem
-      read(50,*) coeff(i)
-    enddo
-    close(50)
+    
 !.....read constants at the 1st call
     inquire(file=trim(ccfname),exist=lexist)
     if( .not. lexist ) then
@@ -478,22 +500,60 @@ contains
       stop
     endif
     open(51,file=trim(ccfname),status='old')
-    read(51,*) itmp,nexp
-    if( itmp.ne.nelem ) then
-      if(myid.eq.0) then
-        write(6,'(a)') ' [Error] nelems in consts and params are inconsistent.'
+    read(51,*) nelem,nexp,nsp
+    allocate(itype(nelem),cnst(max_ncnst,nelem),exps(nelem) &
+         ,icmb(max_natm,nelem))
+    do i=1,nelem
+      read(51,*) itype(i),exps(i), &
+           (icmb(j,i),j=1,natm_type(itype(i))), &
+           (cnst(j,i),j=1,ncnst_type(itype(i)))
+    enddo
+    close(51)
+
+!.....read parameters at the 1st call
+    inquire(file=trim(cpfname),exist=lexist)
+    if( .not. lexist ) then
+      if( myid.eq.0 ) then
+        write(6,'(a)') ' [Error] '//cpfname//' does not exist !!!.'
+        write(6,'(a)') '   The linreg potential needs '//cpfname//'.'
       endif
       call mpi_finalize(ierr)
       stop
     endif
-    allocate(itype(nelem),cnst(max_ncnst,nelem),exps(nelem))
+    open(50,file=trim(cpfname),status='old')
+    read(50,*) itmp,rcin
+    if( itmp.ne.nelem ) then
+      if(myid.eq.0) then
+        write(6,'(a)') ' [Error] nelems in in.const.linreg ' // &
+             'and in.paramlinreg are inconsistent.'
+      endif
+      call mpi_finalize(ierr)
+      stop
+    endif
+    allocate(coeff(nelem))
     do i=1,nelem
-      read(51,*) itype(i),exps(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
+      read(50,*) coeff(i)
     enddo
-    close(51)
+    close(50)
+
 
     return
   end subroutine read_params
+!=======================================================================
+  function factorial(n,m)
+!  compute factorial of n, m-times.
+    implicit none
+    integer,intent(in):: n,m
+    real(8):: factorial
+
+    integer:: i
+
+    factorial= 1
+    do i=0,m-1
+      factorial= factorial*(n-i)
+    enddo
+    return
+  end function factorial
 
 end module linreg
 !-----------------------------------------------------------------------

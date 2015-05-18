@@ -113,7 +113,7 @@ class Individual:
 
     def set_genes(self,genes):
         if len(genes) != self.ngene:
-            print "{:*>20}: len(genes) != ngene !!!".format(' Error')
+            print "{0:*>20}: len(genes) != ngene !!!".format(' Error')
             exit()
         self.genes= genes
 
@@ -127,7 +127,7 @@ class Individual:
         val= self.func(vars,self.args)
         q.put(val)
         #self.value= self.func(vars,self.args)
-        print ' ID{:05d}: value= {:15.7f}'.format(self.id,val)
+        print ' ID{0:05d}: value= {1:15.7f}'.format(self.id,val)
 
     def mutate(self):
         for gene in self.genes:
@@ -241,7 +241,7 @@ class GA:
             del istore[idx]
 
         if len(self.population) != self.nindv:
-            print "{:*>20}: len(self.population != self.nindv) !!!".format(' Error')
+            print "{0:*>20}: len(self.population != self.nindv) !!!".format(' Error')
             print len(self.population), self.nindv
             exit()
 
@@ -264,7 +264,7 @@ class GA:
             self.population[i].value= qs[i].get()
 
         for it in range(maxiter):
-            print ' step= {:8d}'.format(it+1)
+            print ' step= {0:8d}'.format(it+1)
             #.....give birth to some offsprings by crossover
             pairs= make_pairs(self.nindv)
             for pair in pairs:
@@ -299,21 +299,21 @@ class GA:
             self.out_current_best()
         print ' Best record:'
         best= self.best_individual
-        print '  ID= {:05d}'.format(best.id)
-        print '  value= {:15.7f}'.format(best.value)
+        print '  ID= {0:05d}'.format(best.id)
+        print '  value= {0:15.7f}'.format(best.value)
         print '  variables= ',best.get_variables()
 
     def out_current_best(self):
         best= self.best_individual
-        print ' current best ID{:05d}, '.format(best.id) \
-            +'value= {:15.7f}'.format(best.value)
+        print ' current best ID{0:05d}, '.format(best.id) \
+            +'value= {0:15.7f}'.format(best.value)
         f=open('out.current_best','w')
-        f.write('ID= {:05d}\n'.format(best.id))
-        f.write('value= {:15.7f}\n'.format(best.value))
+        f.write('ID= {0:05d}\n'.format(best.id))
+        f.write('value= {0:15.7f}\n'.format(best.value))
         f.write('variables:\n')
         vars= best.get_variables()
         for var in vars:
-            f.write('{:15.7e}\n'.format(var))
+            f.write('{0:15.7e}\n'.format(var))
         f.close()
 
 if __name__ == '__main__':

@@ -13,7 +13,8 @@ contains
     include "params_LJ_Ar.h"
     integer,intent(in):: namax,natm,nnmax,nismax
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_md_world,myid_md,lspr(0:nnmax,namax)
+         ,nn(6),lspr(0:nnmax,namax)
+    integer,intent(in):: mpi_md_world,myid_md
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
          ,acon(nismax),tag(namax),sv(3,6)
     real(8),intent(inout):: tcom,avol
@@ -43,6 +44,7 @@ contains
     epi(1:namax)= 0d0
     epotl= 0d0
     strs(1:3,1:3,1:natm+nb)= 0d0
+!    print *, ' force_LJ_Ar 1'
 
 !-----loop over resident atoms
     do i=1,natm
@@ -88,9 +90,11 @@ contains
       enddo
     enddo
 
+    if( myid_md.ge.0 ) then
 !-----copy strs of boundary atoms
-    call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
-         ,lsrc,myparity,nn,sv,mpi_md_world,strs)
+      call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
+           ,lsrc,myparity,nn,sv,mpi_md_world,strs)
+    endif
 !-----atomic level stress in [eV/Ang^3] assuming 1 Ang thick
     do i=1,natm
       strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
@@ -107,10 +111,15 @@ contains
       aa(1:3,i)= acon(is)*aa(1:3,i)
     enddo
 
+!    print *, ' force_LJ_Ar 2'
 !-----gather epot
-    epot= 0d0
-    call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
-         ,MPI_SUM,mpi_md_world,ierr)
+    if( myid_md.ge.0 ) then
+      epot= 0d0
+      call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+           ,MPI_SUM,mpi_md_world,ierr)
+    else
+      epot= epotl
+    endif
   end subroutine force_LJ_Ar
 end module LJ_Ar
 !-----------------------------------------------------------------------

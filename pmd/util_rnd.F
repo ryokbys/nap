@@ -27,6 +27,6 @@ c
 
       r1= urnd()
       r2= urnd()
-      box_muller= sqrt(-2d0*dlog(r1)) *cos(2d0*pi*r2)
+      box_muller= sqrt(-2d0*dlog(1d0-r1)) *cos(2d0*pi*r2)
       return
       end function box_muller

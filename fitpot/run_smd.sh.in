@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+
+pmdsrc="@prefix@"
+smd="${pmdsrc}/pmd/smd"
+
+para_id=-1
+
+usage_exit(){
+    echo "Usage: $ ./run_smd.sh [-p parallel-id] in.params.PTYPE 00001 00002..." 1>&2
+    exit 1
+}
+
+while getopts p:h: opt
+do
+    case $opt in
+	p) para_id=$OPTARG
+	    ;;
+	h) usage_exit
+	    ;;
+	\?) usage_exit
+	    ;;
+    esac
+done
+
+shift $((OPTIND - 1))
+
+if [ $# -lt 2 ]; then
+    echo "[Error] Number of arguments was wrong."
+    usage_exit
+fi
+
+fparam=$1
+
+#.....for helios, uncomment following line
+# module load intel intelmpi
+
+for dir in $*
+do
+  #...1st argument is not directory
+  if [ $dir = $1 ]; then
+      continue
+  fi
+  mkdir -p $dir/smd
+  sed "s/cutoff_radius.*/cutoff_radius   $(head -n1 $fparam | awk '{print $2}')/" in.smd > $dir/smd/in.smd
+  cp $fparam $dir/smd/
+  cd $dir/smd
+  cp ../pos ./smd0000
+  #.....run pmd
+  echo -n "."
+  #echo " running pmd on $dir/pmd ..."
+  #mpirun -np 1 $pmd > out.pmd
+  if [ $para_id -lt 0 ]; then
+      $smd > out.smd
+  else
+      mpiexec --vnodefile rankfile$para_id -n 1 --std out.smd $smd
+  fi
+  cd ../
+  cp smd/erg.smd ./
+  cp smd/frc.smd ./
+  cd ../
+done
+
+

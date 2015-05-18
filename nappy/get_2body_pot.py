@@ -49,8 +49,14 @@ parser.add_option("-r",dest="rcut",type="float",
 parser.add_option("--rmin",dest="rmin",type="float",
                   default=0.5,
                   help="minimum distance in Angstrom.")
+parser.add_option("--sid1",dest="sid1",type="int",
+                  default=1,
+                  help="species ID of atom-1.")
+parser.add_option("--sid2",dest="sid2",type="int",
+                  default=1,
+                  help="species ID of atom-2.")
 parser.add_option("--pmdexec",dest="pmdexec",type="string",
-                  default='../pmd/pmd',
+                  default='~/src/nap/pmd/pmd',
                   help="path to the pmd executable.")
 (options,args)= parser.parse_args()
 
@@ -62,9 +68,14 @@ rcut= options.rcut
 print ' rcut          = ',rcut,' Ang.'
 rmin= options.rmin
 print ' rmin          = ',rmin,' Ang.'
+sid1= options.sid1
+print ' sid1          = ',sid1
+sid2= options.sid2
+print ' sid2          = ',sid2
 pmdexec= options.pmdexec
 
 asys= AtomSystem()
+# system size is bigger than 2*rcut
 a1= np.array([2.0, 0.0, 0.0])
 a2= np.array([0.0, 1.0, 0.0])
 a3= np.array([0.0, 0.0, 1.0])
@@ -75,13 +86,17 @@ atom1= Atom()
 atom2= Atom()
 atom1.set_pos(0.0,0.0,0.0)
 atom1.set_id(1)
+atom1.set_sid(sid1)
 asys.add_atom(atom1)
 atom2.set_pos(0.5,0.0,0.0)
 atom2.set_id(2)
+atom2.set_sid(sid2)
 asys.add_atom(atom2)
 
 hmin= rmin/(2*rcut)
 hd  = (0.5-hmin)/nsmpl
+
+os.system('cp 0000/pmd00000 pmd00000.tmp')
 
 fout= open('out.2body','w')
 for ip in range(nsmpl+1):
@@ -94,4 +109,6 @@ for ip in range(nsmpl+1):
     fout.write(' {0:12.3f} {1:22.14e}\n'.format(d*2*rcut,epot))
 
 fout.close()
+#....restore 0000/pmd00000
+os.system('cp pmd00000.tmp 0000/pmd00000')
 print ' program done.'

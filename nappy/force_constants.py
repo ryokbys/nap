@@ -119,6 +119,7 @@ print ' sysext.num_atoms()=',natme
 # for ai in sysext.atoms:
 #     print ai.pos
 
+os.system('cp 0000/pmd00000 pmd00000.tmp')
 
 #...loop for all atoms in the extended system
 fcmat= np.zeros((natme,natme,3,3))
@@ -175,4 +176,5 @@ for ja in range(natme):
             ,fcmat[ia,ja,2,1]
             ,fcmat[ia,ja,2,2]))
 fcfile.close()
+os.system('cp pmd00000.tmp 0000/pmd00000')
 

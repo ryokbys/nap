@@ -1,6 +1,6 @@
 #!/bin/env python
 """
-Compute 3-body potential energy from 2 atom system.
+Compute 3-body potential energy from 3 atom system.
 pmd must be compiled with '-D__PCHECK__'.
 
 OUTPUT:

@@ -266,21 +266,21 @@ c---------Continue until i= 0
 
       end subroutine mk_lspr_sngl
 c=======================================================================
-      subroutine mk_lspr_brute(namax,natm,nnmax,tag,ra,rc,h,hi
-     &     ,lspr)
+      subroutine mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc
+     &     ,h,hi,sgm,lspr)
 c
 c  Make pair list, lspr, by brute force approach, because the system
 c  is supposed to be small. Expand the system to take all the atoms 
 c  within given cutoff radius into account.
 c
       implicit none
-      integer,intent(in):: namax,natm,nnmax
-      integer,intent(out):: lspr(0:nnmax,natm)
-      real(8),intent(in):: rc,hi(3,3),h(3,3)
+      integer,intent(in):: namax,natm,nnmax,nbmax
+      integer,intent(out):: lspr(0:nnmax,natm),nb
+      real(8),intent(in):: rc,hi(3,3),h(3,3),sgm(3,3)
       real(8),intent(out):: ra(3,namax),tag(namax)
 
       integer:: i,j,k,l,m,n,ia,ja,inc,ix,iy,iz
-      real(8):: tmp,xi(3),sij(3),xij(3),rij
+      real(8):: tmp,xi(3),sij(3),xij(3),rij,vol,asgm
 
       logical,save:: l1st=.true.
       integer,save:: naex,nex(3)
@@ -288,20 +288,31 @@ c
 
       if( l1st ) then
         rc2= rc**2
+        print *, ' rc,rc2=',rc,rc2
+        print *, ' h(1:3,1:3): '
+        print *, h(1:3,1)
+        print *, h(1:3,2)
+        print *, h(1:3,3)
+        vol= h(1,1)*sgm(1,1) +h(2,1)*sgm(2,1) +h(3,1)*sgm(3,1)
         do i=1,3
-          tmp= sqrt(h(1,i)**2+h(2,i)**2+h(3,i)**2)
-          nex(i)= int(tmp/rc)
-          if( nex(i).le.0 ) nex(i)= 1
+          asgm= dsqrt(sgm(1,i)**2 +sgm(2,i)**2 +sgm(3,i)**2)
+          nex(i)= int(rc/(vol/asgm))
+          print *, ' rc,vol,asgm,nex=',rc,vol,asgm,nex(i)
+c          nex(i)= int(1d0/dsqrt(hi(1,i)**2+hi(2,i)**2+hi(3,i)**2)/rc)
+c          if( nex(i).lt.1 ) nex(i)= 1
+          nex(i)= nex(i) +1
         enddo
-c.....to guarantee the extended system is larger than 2*rc...
-        nex(1:3)= nex(1:3) +1
         naex= natm *(2*nex(1)+1) *(2*nex(2)+1) *(2*nex(3)+1)
+        print *, ' nex(1:3),naex=',nex(1:3),naex
         if( naex.gt.namax ) then
           write(6,'(a)') ' [Error] naex.gt.namax !!!'
           write(6,'(a,4i6)') ' nex(1:3),naex =',nex(1:3),naex
+          print *, ' naex =',naex
+          print *, ' namax=',namax
           stop
         endif
       endif
+
 
 c.....Expand system to take into account the image atoms.
       inc= 0
@@ -319,7 +330,17 @@ c.....Expand system to take into account the image atoms.
       enddo
       enddo
       enddo
-      if( natm+inc.ne.naex ) stop ' [Error] natm+inc .ne. naex !!!'
+      if( natm+inc.ne.naex ) then
+        print *, '[Error] natm+inc .ne. naex !!!'
+        print *, '   natm,inc,naex=',natm,inc,naex
+        stop 
+      endif
+      if( inc.gt.nbmax ) then
+        print *, '[Error] inc.gt.nbmax !!!'
+        print *, '  inc,nbmax =',inc,nbmax
+        stop 
+      endif
+      nb= inc
 
 c.....Search neighbor atoms and make the list
       lspr(0:nnmax,1:natm)= 0
@@ -341,11 +362,11 @@ c.....Search neighbor atoms and make the list
         enddo
       enddo
 
-      if( l1st ) then
-        do ia=1,natm
-          write(6,'(i3,a,50i3)') ia,": ",(lspr(i,ia),i=1,lspr(0,ia))
-        enddo
-      endif
+c      if( l1st ) then
+c        do ia=1,natm
+c          write(6,'(i3,a,50i6)') ia,": ",(lspr(i,ia),i=1,lspr(0,ia))
+c        enddo
+c      endif
 
       l1st=.false.
       end subroutine mk_lspr_brute

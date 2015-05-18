@@ -4,11 +4,11 @@ c    Create a FCC crystal
 c    Write: ini000
 c
       implicit real*8(a-h,o-z)
-      include "params_unit.h"
+      include "../pmd/params_unit.h"
 c-----max # of atoms
       integer,parameter::nmax=1000000
 c-----# of unit cells
-      integer,parameter:: nuc(1:3)= (/ 5, 5, 5 /)
+      integer,parameter:: nuc(1:3)= (/ 1,1,1 /)
 c-----vacuum width in unit of cell
       integer,parameter:: nvac(1:3)= (/ 0, 0, 0 /)
       real(8):: ua(3,10)
@@ -79,5 +79,5 @@ c-----output 'akr0000' for KVS visualization
       end program mkconf_fcc
 c-----------------------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make 10mkconf"
+c     compile-command: "make mkconf_fcc"
 c     End:

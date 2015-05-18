@@ -1,5 +1,7 @@
       program parallel_md
 c-----------------------------------------------------------------------
+c                        Time-stamp: <2015-02-09 18:01:12 Ryo KOBAYASHI>
+c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
 c-----------------------------------------------------------------------
@@ -31,6 +33,7 @@ c.....Epot threshold for disl core extraction [Hartree]
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3)
+      integer,external:: ispOf,ifmvOf,itotOf
       real(8),external:: box_muller,sprod
 c-----output file names
       character:: cnode*5,cnum*4
@@ -131,6 +134,17 @@ c-------species of atom-i
       enddo
       !write(6,'(a,2i8)') " myid,natm=",myid_md,natm
 
+#ifdef __FITPOT__
+c.....check whether order of atoms and total-id of atoms match
+      do ia=1,natm
+        if( itotOf(tag(ia)).ne.ia ) then
+          print *, '[Error] itotOf(tag(ia)).ne.ia !!!'
+          print *, '  In case of FITPOT mode, the order of atom'//
+     &         ' must be the same of itot of the atom-tag.'
+          stop
+        endif
+      enddo
+#endif
 
 c-----setup
       call setup(nismax,am,acon,fack,dt)
@@ -1243,6 +1257,8 @@ c-------Error trap
 c-----num. of received boundary atoms
       nb=nbnew
 
+c      print *, 'bacopy: nb=',nb
+
       end subroutine bacopy
 c=======================================================================
       subroutine bacopy_fixed(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
@@ -1557,99 +1573,6 @@ c-----Update # of resident atoms
       return
       end subroutine bamove_stress
 c=======================================================================
-      subroutine copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb
-     &     ,lsrc,myparity,nn,mpi_md_world,x,ndim)
-c-----------------------------------------------------------------------
-c     Send-back & receive reaction on cached-atoms
-c-----------------------------------------------------------------------
-      implicit none
-      include "mpif.h"
-      integer,intent(in):: namax,natm,nbmax,nb,mpi_md_world,ndim
-      integer,intent(in):: lsb(0:nbmax,6),lsrc(6),myparity(3),nn(6)
-      real(8),intent(inout):: x(ndim,namax),tcom
-
-      integer:: status(MPI_STATUS_SIZE)
-      integer:: i,j,k,l,m,n,kd,kdd,ku,kuc,ibkwd,nsd,nsd3,nrc,nrc3,nsdbk
-     &     ,ierr,natmx
-      real(8):: tcom1,tcom2
-      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
-      logical,save:: l1st=.true.
-      integer,save:: mdim
-
-      if( l1st ) then
-        mdim= ndim
-        allocate(dbuf(mdim,nbmax),dbufr(mdim,nbmax))
-        l1st=.false.
-      endif
-
-      if( ndim.gt.mdim ) then
-        deallocate(dbuf,dbufr)
-        mdim= ndim
-        allocate(dbuf(mdim,nbmax),dbufr(mdim,nbmax))
-      endif
-
-c-----natmx
-      natmx= natm +nb
-
-c-----num. of sent-back reactions
-      nsdbk= 0
-
-c-----send-back reactions in the reverse orer, z, y, & x
-      do kd=3,1,-1
-
-c-------To calculate the communication time
-        tcom1=MPI_WTIME()
-
-c-------higher & lower directions
-        do kdd=0,-1,-1
-          ku= 2*kd +kdd
-          if(mod(ku,2).eq.0) then
-            kuc= ku-1
-          else
-            kuc= ku+1
-          endif
-          ibkwd= nn(kuc)
-c---------num. of to-be-sent particles
-          nsd= lsrc(ku)
-c          nsd3= ndim*nsd
-          nsd3= mdim*nsd
-c---------num. of to-be-recieved particles
-          nrc= lsb(0,ku)
-c          nrc3= ndim*nrc
-          nrc3= mdim*nrc
-
-c---------to-be-sent-back particles
-          do i=1,nsd
-            dbuf(1:ndim,i)= x(1:ndim,natmx-nsdbk-nsd+i)
-          enddo
-          call mespasd(ibkwd,myparity(kd),dbuf,dbufr,nsd3,nrc3,500
-     &         ,mpi_md_world)
-          do k=1,nrc
-            i=lsb(k,ku)
-            x(1:ndim,i)= x(1:ndim,i) +dbufr(1:ndim,k)
-          enddo
-
-c---------mpi barrier
-          call mpi_barrier(mpi_md_world,ierr)
-c---------accumulate num. of already sent-back-particles
-          nsdbk=nsdbk +nsd
-        enddo
-
-c-------Add the communication time to COMT
-        tcom2=MPI_WTIME()
-        tcom=tcom+tcom2-tcom1
-
-      enddo
-
-c-----check
-      if(nsdbk.ne.nb) then
-        write(6,'(a,2i8)') "nsdbk,nb=",nsdbk,nb
-        stop "error: nsdbk.ne.nb!!"
-      endif
-
-c      deallocate(dbuf,dbufr)
-      end subroutine copy_dba_bk
-c=======================================================================
       function bbd(xv,yv,zv,rcav,rcbv,rccv,ku,anxi,anyi,anzi)
 c-----------------------------------------------------------------------
 c  BBD = .true. if the coordinates are in the boundary to neighbor ku
@@ -1699,71 +1622,6 @@ c------------------------------------------------------------------------
       endif
       return
       end function bmv
-c=======================================================================
-      subroutine mespasi(inode,parity,ibufs,ibufr,nsd,nrc,tag,
-     &     mpi_md_world)
-c-----------------------------------------------------------------------
-c     Integer message passing.  
-c-----------------------------------------------------------------------
-      include 'mpif.h'
-      integer,intent(in):: inode,parity,nsd,nrc,tag
-      integer,intent(in):: ibufs(nsd)
-      integer,intent(out):: ibufr(nrc)
-c-----locals
-      integer status(MPI_STATUS_SIZE),ierr
-
-c-----Even: send & recv
-      if (parity.eq.0) then
-        call MPI_SEND(ibufs,nsd,MPI_INTEGER,inode,tag,
-     &       mpi_md_world,ierr)
-        call MPI_RECV(ibufr,nrc,MPI_INTEGER,MPI_ANY_SOURCE,tag,
-     &       mpi_md_world,status,ierr)
-c-----Odd: recv & send
-      else if (parity.eq.1) then
-        call MPI_RECV(ibufr,nrc,MPI_INTEGER,MPI_ANY_SOURCE,tag,
-     &       mpi_md_world,status,ierr)
-        call MPI_SEND(ibufs,nsd,MPI_INTEGER,inode,tag,
-     &       mpi_md_world,ierr)
-c-----Exchange information with myself
-      else
-        do i=1,nrc
-          ibufr(i)=ibufs(i)
-        enddo
-      endif
-      return
-      end
-ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-      subroutine mespasd(inode,parity,bufs,bufr,nsd,nrc,tag,
-     & mpi_md_world)
-c-----------------------------------------------------------------------
-c     Real*8 message passing.
-c-----------------------------------------------------------------------
-      include 'mpif.h'
-      integer,intent(in):: inode,parity,nsd,nrc,tag
-      real(8),intent(in):: bufs(nsd)
-      real(8),intent(out):: bufr(nrc)
-      integer:: status(MPI_STATUS_SIZE),ierr
-
-c-----Even: send & recv
-      if (parity.eq.0) then
-        call MPI_SEND(bufs,nsd,MPI_DOUBLE_PRECISION,inode,tag,
-     &       mpi_md_world,ierr) 
-        call MPI_RECV(bufr,nrc,MPI_DOUBLE_PRECISION,MPI_ANY_SOURCE,tag,
-     &       mpi_md_world,status,ierr) 
-c-----Odd: recv & send
-      else if (parity.eq.1) then
-        call MPI_RECV(bufr,nrc,MPI_DOUBLE_PRECISION,MPI_ANY_SOURCE,tag,
-     &       mpi_md_world,status,ierr) 
-        call MPI_SEND(bufs,nsd,MPI_DOUBLE_PRECISION,inode,tag,
-     &       mpi_md_world,ierr)
-c-----Exchange information with myself
-      else
-        do i=1,nrc
-          bufr(i)=bufs(i)
-        enddo
-      endif
-      return
-      end
 c=======================================================================
       subroutine force_isobaric(stgt,ah,natm,eki,strs,sgm
      &     ,vm,vol,avol,ptnsr,mpi_md_world)
@@ -1914,126 +1772,6 @@ c-----set center of mass motion to zero
       endif
 
       end subroutine rm_trans_motion
-c=======================================================================
-      subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &     ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &     ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol
-     &     ,cforce)
-      use RK_FeH,only:force_RK_FeH
-      use Ramas_FeH,only:force_Ramas_FeH,force_Ackland_Fe
-      use RK_WHe,only:force_RK_WHe
-      use Ito3_WHe,only:force_Ito3_WHe
-      use LJ_Ar,only:force_LJ_Ar
-      use SW_Si,only:force_SW_Si
-      use EDIP_Si,only:force_EDIP_Si
-      use Brenner,only:force_brenner,force_brenner_vdW
-      use Lu_WHe,only:force_Lu_WHe
-      use Branicio_AlN,only:force_Branicio_AlN
-      use Mishin_Al,only:force_Mishin_Al
-      use AFS_W,only:force_AFS_W
-      use SC_Fe,only:force_SC_Fe
-      use SM_Al,only:force_SM_Al
-      use linreg,only:force_linreg
-      use NN1,only:force_NN1
-      use NN2,only:force_NN2
-      implicit none
-      integer,intent(in):: namax,natm,nnmax,nismax
-      integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
-     &   ,nn(6),mpi_md_world,myid_md
-      integer,intent(in):: lspr(0:nnmax,namax)
-      real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6)
-     &     ,acon(nismax),tag(namax)
-      real(8),intent(inout):: tcom,avol,rc
-      real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-      character(len=*),intent(in):: cforce
-      
-      integer:: ierr
-      
-      select case (trim(cforce))
-        case ('LJ_Ar')
-          call force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('Ito3_WHe')
-          call force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('RK_WHe')
-          call force_RK_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('RK_FeH')
-          call force_RK_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('Ramas_FeH')
-          call force_Ramas_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('Ackland_Fe')
-          call force_Ackland_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('SW_Si')
-          call force_SW_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('EDIP_Si')
-          call force_EDIP_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('Brenner')
-          call force_Brenner(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('Brenner_vdW')
-          call force_Brenner_vdW(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('Lu_WHe')
-          call force_Lu_Whe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('Branicio_AlN')
-          call force_Branicio_AlN(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('Mishin_Al')
-          call force_Mishin_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('AFS_W')
-          call force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('SC_Fe')
-          call force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('SM_Al')
-          call force_SM_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('linreg')
-          call force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('NN1')
-          call force_NN1(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case ('NN2')
-          call force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
-        case default
-          write(6,'(a)') ' [get_force] unknown force: '
-     &         //trim(cforce)//' !!'
-          call mpi_finalize(ierr)
-          stop
-      end select
-
-      end subroutine get_force
 c=======================================================================
 #ifdef __WALL__
       subroutine wall_reflect()
