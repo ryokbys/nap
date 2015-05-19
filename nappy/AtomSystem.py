@@ -1,6 +1,6 @@
 import numpy as np
 import math
-import sys
+import sys,copy
 
 from Atom import Atom
 
@@ -292,4 +292,32 @@ class AtomSystem(object):
         else:
             return x
 
+    def expand(self,n1,n2,n3):
+        #...expand unit vectors
+        self.a1= self.a1*n1
+        self.a2= self.a2*n2
+        self.a3= self.a3*n3
+        n123= n1*n2*n3
+        nsid= 0
+        for ai in self.atoms:
+            nsid= max(nsid,ai.sid)
+        natm0= self.num_atoms()
+        atoms0= copy.copy(self.atoms)
+        self.atoms= []
+        aid= 0
+        for i1 in range(n1):
+            for i2 in range(n2):
+                for i3 in range(n3):
+                    for ai0 in atoms0:
+                        aid += 1
+                        ai= Atom()
+                        ai.sid= ai0.sid
+                        ai.ifmv= ai0.ifmv
+                        x= ai0.pos[0]/n1 +1.0/n1*i1
+                        y= ai0.pos[1]/n2 +1.0/n2*i2
+                        z= ai0.pos[2]/n3 +1.0/n3*i3
+                        ai.set_pos(x,y,z)
+                        ai.set_vel(ai0.vel[0],ai0.vel[1],ai0.vel[2])
+                        ai.set_id(aid)
+                        self.atoms.append(ai)
         
