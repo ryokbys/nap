@@ -124,6 +124,9 @@ c=======================================================================
       elseif( trim(cname).eq.'line_minimization' ) then
         call read_c1(ionum,clinmin)
         return
+      elseif( trim(cname).eq.'test_ratio' ) then
+        call read_r1(ionum,ratio_test)
+        return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return

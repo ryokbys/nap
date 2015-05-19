@@ -1,8 +1,12 @@
 program fitpot
+!-----------------------------------------------------------------------
+!                        Time-stamp: <2015-03-14 11:04:41 Ryo KOBAYASHI>
+!-----------------------------------------------------------------------
   use variables
   use parallel
   use minimize
   implicit none
+  integer:: ismpl
   real(8):: tmp
 
   interface
@@ -30,28 +34,39 @@ program fitpot
   endif
   call sync_input()
 
-  if( nnode.gt.nsmpl ) then
+  !.....divide samples to traning and test sets
+  if( myid.eq.0 ) nsmpl_tst= nsmpl*ratio_test
+  call mpi_bcast(nsmpl_tst,1,mpi_integer,0,mpi_world,ierr)
+  nsmpl_trn= nsmpl -nsmpl_tst
+  if( myid.eq.0 ) then
+    print *,'nsmpl,train,test=',nsmpl,nsmpl_trn,nsmpl_tst
+  endif
+
+  if( nnode.gt.min(nsmpl_trn,nsmpl_tst) ) then
     if( myid.eq.0 ) then
-      print *,'[Error] nnode.gt.nsmpl'
-      print *,'  nnode,nspml=',nnode,nsmpl
-      print *,'you should use less number of node than nsmpl.'
+      print *,'[Error] nnode.gt.min(nsmpl_trn,nsmpl_tst)'
+      print *,'  nnode,nspml_trn,nsmpl_tst=' &
+           ,nnode,nsmpl_trn,nsmpl_tst
+      print *,'you should use less number of nodes than nsmpl.'
     endif
     call mpi_finalize(ierr)
     stop
   endif
-  if( myid.eq.0 ) then
-    print *,' nsmpl,nnode=',nsmpl,nnode
-  endif
   call get_node2sample()
 
-  allocate(samples(isid0:isid1))
+  allocate(smpl_trn(isid0_trn:isid1_trn),smpl_tst(isid0_tst:isid1_tst))
 
   call get_dir_list(11)
+!.....store dirname
+  do ismpl=isid0_trn,isid1_trn
+    smpl_trn(ismpl)%cdirname= cdirlist(ismpl)
+  enddo
+  do ismpl=isid0_tst,isid1_tst
+    smpl_tst(ismpl)%cdirname= cdirlist(ismpl)
+  enddo
 
   call read_samples()
   call read_ref_data()
-
-!!$  call scatter_samples()
 
   call read_vars()
 
@@ -169,15 +184,11 @@ subroutine get_dir_list(ionum)
       read(ionum,*,end=999) cdirlist(is)
     enddo
     close(ionum)
+    call shuffle_dirlist(nsmpl,cdirlist)
   endif
   call mpi_barrier(mpi_world,ierr)
   call mpi_bcast(cdirlist,5*nsmpl,mpi_character,0,mpi_world,ierr)
   
-  do is=isid0,isid1
-    samples(is)%cdirname= cdirlist(is)
-!!$    write(6,'(a,2i4,a)') ' myid,ismpl,cdirname=',myid,is,cdirlist(is)
-  enddo
-
   if(myid.eq.0) print*,'get_dir_list done.'
   return
 
@@ -201,12 +212,21 @@ subroutine read_samples()
   nalist(1:nsmpl)= 0
   nal(1:nsmpl)= 0
 
-  do is=isid0,isid1
+!.....training set
+  do is=isid0_trn,isid1_trn
 !    print *,' is=',is,cdirlist(is)
-    cdir= samples(is)%cdirname
+    cdir= smpl_trn(is)%cdirname
     call read_pos(12,trim(cmaindir)//'/'//trim(cdir) &
-         //'/pos',is)
-    nal(is)= samples(is)%natm
+         //'/pos',is,smpl_trn(is))
+    nal(is)= smpl_trn(is)%natm
+  enddo
+!.....test set
+  do is=isid0_tst,isid1_tst
+!    print *,' is=',is,cdirlist(is)
+    cdir= smpl_tst(is)%cdirname
+    call read_pos(12,trim(cmaindir)//'/'//trim(cdir) &
+         //'/pos',is,smpl_tst(is))
+    nal(is)= smpl_tst(is)%natm
   enddo
   call mpi_reduce(nal,nalist,nsmpl,mpi_integer,mpi_sum &
        ,0,mpi_world,ierr)
@@ -221,30 +241,31 @@ subroutine read_samples()
   return
 end subroutine read_samples
 !=======================================================================
-subroutine read_pos(ionum,fname,ismpl)
+subroutine read_pos(ionum,fname,ismpl,smpl)
   use variables
   implicit none 
   integer,intent(in):: ionum,ismpl
   character(len=*),intent(in):: fname
+  type(mdsys),intent(out):: smpl
 
   integer:: i,natm
   real(8):: tmp
 
   open(ionum,file=trim(fname),status='old')
-  read(ionum,*) samples(ismpl)%h0
-  read(ionum,*) samples(ismpl)%h(1,1:3)
-  read(ionum,*) samples(ismpl)%h(2,1:3)
-  read(ionum,*) samples(ismpl)%h(3,1:3)
+  read(ionum,*) smpl%h0
+  read(ionum,*) smpl%h(1,1:3)
+  read(ionum,*) smpl%h(2,1:3)
+  read(ionum,*) smpl%h(3,1:3)
   read(ionum,*) tmp,tmp,tmp
   read(ionum,*) tmp,tmp,tmp
   read(ionum,*) tmp,tmp,tmp
   read(ionum,*) natm
-  samples(ismpl)%natm= natm
-  allocate(samples(ismpl)%ra(3,natm),samples(ismpl)%fa(3,natm) &
-       ,samples(ismpl)%tag(natm) &
-       ,samples(ismpl)%fref(3,natm))
-  do i=1,samples(ismpl)%natm
-    read(ionum,*) samples(ismpl)%tag(i),samples(ismpl)%ra(1:3,i), &
+  smpl%natm= natm
+  allocate(smpl%ra(3,natm),smpl%fa(3,natm) &
+       ,smpl%tag(natm) &
+       ,smpl%fref(3,natm))
+  do i=1,smpl%natm
+    read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), &
          tmp,tmp,tmp
 !    write(6,'(4es22.14)')  smpl%tag(i),smpl%ra(1:3,i)
   enddo
@@ -258,28 +279,56 @@ subroutine read_ref_data()
   integer:: ismpl,i,is,jflag,natm
 
   jflag= 0
-  do ismpl=isid0,isid1
-    open(13,file=trim(cmaindir)//'/'//samples(ismpl)%cdirname &
+!.....training set
+  do ismpl=isid0_trn,isid1_trn
+    open(13,file=trim(cmaindir)//'/'//smpl_trn(ismpl)%cdirname &
          //'/erg.ref',status='old')
-    read(13,*) samples(ismpl)%eref
+    read(13,*) smpl_trn(ismpl)%eref
     close(13)
 !.....reduce atomic energy from eref
-    do i=1,samples(ismpl)%natm
-      is= samples(ismpl)%tag(i)
-      samples(ismpl)%eref= samples(ismpl)%eref -eatom(is)
+    do i=1,smpl_trn(ismpl)%natm
+      is= smpl_trn(ismpl)%tag(i)
+      smpl_trn(ismpl)%eref= smpl_trn(ismpl)%eref -eatom(is)
     enddo
 
-    open(14,file=trim(cmaindir)//'/'//samples(ismpl)%cdirname &
+    open(14,file=trim(cmaindir)//'/'//smpl_trn(ismpl)%cdirname &
          //'/frc.ref',status='old')
     read(14,*) natm
-    if( natm.ne.samples(ismpl)%natm ) then
+    if( natm.ne.smpl_trn(ismpl)%natm ) then
       print *,'Error: natm in sample is not same as smpl%natm'
       print *,' myid,ismpl,natm,smpl%natm=',myid,ismpl &
-           ,natm,samples(ismpl)%natm
+           ,natm,smpl_trn(ismpl)%natm
       jflag= jflag +1
     endif
     do i=1,natm
-      read(14,*) samples(ismpl)%fref(1:3,i)
+      read(14,*) smpl_trn(ismpl)%fref(1:3,i)
+    enddo
+    close(14)
+  enddo
+
+!.....test set
+  do ismpl=isid0_tst,isid1_tst
+    open(13,file=trim(cmaindir)//'/'//smpl_tst(ismpl)%cdirname &
+         //'/erg.ref',status='old')
+    read(13,*) smpl_tst(ismpl)%eref
+    close(13)
+!.....reduce atomic energy from eref
+    do i=1,smpl_tst(ismpl)%natm
+      is= smpl_tst(ismpl)%tag(i)
+      smpl_tst(ismpl)%eref= smpl_tst(ismpl)%eref -eatom(is)
+    enddo
+
+    open(14,file=trim(cmaindir)//'/'//smpl_tst(ismpl)%cdirname &
+         //'/frc.ref',status='old')
+    read(14,*) natm
+    if( natm.ne.smpl_tst(ismpl)%natm ) then
+      print *,'Error: natm in sample is not same as smpl%natm'
+      print *,' myid,ismpl,natm,smpl%natm=',myid,ismpl &
+           ,natm,smpl_tst(ismpl)%natm
+      jflag= jflag +1
+    endif
+    do i=1,natm
+      read(14,*) smpl_tst(ismpl)%fref(1:3,i)
     enddo
     close(14)
   enddo
@@ -407,7 +456,6 @@ subroutine sgd()
   use parallel
   use minimize
   implicit none
-  integer,parameter:: nstp_eval= 10
   integer,parameter:: nstp_time= 1
   real(8),parameter:: alpha0  = 1d0
   real(8),parameter:: dalpha  = 0.0001d0
@@ -454,8 +502,8 @@ subroutine sgd()
         write(6,'(a,i6,f10.3)') ' iter,time=',iter,mpi_wtime()-time0
       endif
     endif
-    do istp=1,maxmynsmpl
-      ismpl= isid0 +mynsmpl*urnd()
+    do istp=1,maxmynsmpl_trn
+      ismpl= isid0_trn +mynsmpl_trn*urnd()
       fval= NN_fs(nvars,vars)
       gval= NN_gs(nvars,vars)
       u(1:nvars)= -gval(1:nvars)
@@ -587,7 +635,7 @@ subroutine write_energy_relation(cadd)
   
   integer:: ismpl
   
-  cfname='out.erg.smd-vs-dft'
+  cfname='out.erg'
   if( present(cadd) ) cfname= trim(cfname)//'.'//trim(cadd)
 
   if( .not. allocated(erefl) ) allocate(erefl(nsmpl),erefg(nsmpl) &
@@ -595,9 +643,13 @@ subroutine write_energy_relation(cadd)
 
   erefl(1:nsmpl)= 0d0
   epotl(1:nsmpl)= 0d0
-  do ismpl=isid0,isid1
-    erefl(ismpl)= samples(ismpl)%eref
-    epotl(ismpl)= samples(ismpl)%epot
+  do ismpl=isid0_trn,isid1_trn
+    erefl(ismpl)= smpl_trn(ismpl)%eref
+    epotl(ismpl)= smpl_trn(ismpl)%epot
+  enddo
+  do ismpl=isid0_tst,isid1_tst
+    erefl(ismpl)= smpl_tst(ismpl)%eref
+    epotl(ismpl)= smpl_tst(ismpl)%epot
   enddo
   erefg(1:nsmpl)= 0d0
   epotg(1:nsmpl)= 0d0
@@ -608,7 +660,7 @@ subroutine write_energy_relation(cadd)
 
   if( myid.eq.0 ) then
     open(90,file=trim(cfname),status='replace')
-    do ismpl=1,nsmpl
+    do ismpl=1,nsmpl_trn
       write(90,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
            ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)
     enddo
@@ -626,7 +678,7 @@ subroutine write_force_relation(cadd)
 
   integer:: ismpl,ia,ixyz,natm,nmax,nmaxl
   
-  cfname= 'out.frc.smd-vs-dft'
+  cfname= 'out.frc'
   if( present(cadd) ) cfname= trim(cfname)//'.'//trim(cadd)
 
   nmaxl= 0
@@ -641,10 +693,15 @@ subroutine write_force_relation(cadd)
 
   frefl(1:3,1:nmax,1:nsmpl)= 0d0
   fal(1:3,1:nmax,1:nsmpl)= 0d0
-  do ismpl=isid0,isid1
-    natm= samples(ismpl)%natm
-    frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm)
-    fal(1:3,1:natm,ismpl)= samples(ismpl)%fa(1:3,1:natm)
+  do ismpl=isid0_trn,isid1_trn
+    natm= smpl_trn(ismpl)%natm
+    frefl(1:3,1:natm,ismpl)= smpl_trn(ismpl)%fref(1:3,1:natm)
+    fal(1:3,1:natm,ismpl)= smpl_trn(ismpl)%fa(1:3,1:natm)
+  enddo
+  do ismpl=isid0_tst,isid1_tst
+    natm= smpl_tst(ismpl)%natm
+    frefl(1:3,1:natm,ismpl)= smpl_tst(ismpl)%fref(1:3,1:natm)
+    fal(1:3,1:natm,ismpl)= smpl_tst(ismpl)%fa(1:3,1:natm)
   enddo
   frefg(1:3,1:nmax,1:nsmpl)= 0d0
   fag(1:3,1:nmax,1:nsmpl)= 0d0
@@ -655,7 +712,7 @@ subroutine write_force_relation(cadd)
 
   if( myid.eq.0 ) then
     open(91,file=trim(cfname),status='replace')
-    do ismpl=1,nsmpl
+    do ismpl=1,nsmpl_trn
       natm= nalist(ismpl)
       do ia=1,natm
         do ixyz=1,3
@@ -676,6 +733,8 @@ subroutine write_statistics()
   implicit none
   integer:: ismpl,ia,l,n,natm
   real(8):: demax,desum,de,rmse,dfmax,dfsum,df
+  real(8):: demax2,desum2,de2,rmse2,dfmax2,dfsum2,df2
+  logical,save:: l1st=.true.
 
   if( .not.allocated(erefg) ) then
     if(myid.eq.0) then
@@ -686,27 +745,43 @@ subroutine write_statistics()
     stop
   endif
 
-  if(myid.eq.0) write(6,'(/,a)') '>>>>> statistics:'
-  !.....energies
+  if(myid.eq.0) write(6,'(a)') '>>>>> statistics:'
+  !.....energies of training set
   demax= 0d0
   desum= 0d0
-  do ismpl=1,nsmpl
+  do ismpl=1,nsmpl_trn
     natm= nalist(ismpl)
     de= abs(epotg(ismpl) -erefg(ismpl))/natm
     demax= max(demax,de)
-    desum=desum +de*de/nsmpl
+    desum=desum +de*de/nsmpl_trn
   enddo
   rmse= sqrt(desum)
+  !.....energies of test set
+  demax2= 0d0
+  desum2= 0d0
+  do ismpl=nsmpl_trn+1,nsmpl
+    natm= nalist(ismpl)
+    de2= abs(epotg(ismpl) -erefg(ismpl))/natm
+    demax2= max(demax2,de2)
+    desum2=desum2 +de2*de2/nsmpl_tst
+  enddo
+  rmse2= sqrt(desum2)
   if( myid.eq.0 ) then
+    write(6,'(a)') ' Training set,'
     write(6,'(a,f12.3,a)') '  RMSE of energies         =',rmse,' eV/atom'
     write(6,'(a,f12.3,a)') '  Max residual of energies =',demax,' eV/atom'
+    write(6,'(a)') ' Test set,'
+    write(6,'(a,f12.3,a)') '  RMSE of energies         =',rmse2,' eV/atom'
+    write(6,'(a,f12.3,a)') '  Max residual of energies =',demax2,' eV/atom'
+    write(6,'(a,4f15.7)') '  energy: training(rmse,max),test(rmse,max) =' &
+         ,rmse,demax,rmse2,demax2
   endif
 
-  !.....forces
+  !.....forces of training set
   dfmax= 0d0
   dfsum= 0d0
   n= 0
-  do ismpl=1,nsmpl
+  do ismpl=1,nsmpl_trn
     natm= nalist(ismpl)
     do ia=1,natm
       do l=1,3
@@ -718,9 +793,31 @@ subroutine write_statistics()
     enddo
   enddo
   rmse= sqrt(dfsum/n)
+  !.....forces of test set
+  dfmax2= 0d0
+  dfsum2= 0d0
+  n= 0
+  do ismpl=nsmpl_trn+1,nsmpl
+    natm= nalist(ismpl)
+    do ia=1,natm
+      do l=1,3
+        df2= abs(fag(l,ia,ismpl)-frefg(l,ia,ismpl))
+        dfmax2= max(dfmax2,df2)
+        dfsum2=dfsum2 +df2*df2
+        n=n +1
+      enddo
+    enddo
+  enddo
+  rmse2= sqrt(dfsum2/n)
   if(myid.eq.0) then
+    write(6,'(a)') ' Training set,'
     write(6,'(a,f12.3,a)') '  RMSE of forces           =',rmse,' eV/A'
     write(6,'(a,f12.3,a)') '  Max residual of forces   =',dfmax,' eV/A'
+    write(6,'(a)') ' Test set,'
+    write(6,'(a,f12.3,a)') '  RMSE of forces           =',rmse2,' eV/A'
+    write(6,'(a,f12.3,a)') '  Max residual of forces   =',dfmax2,' eV/A'
+    write(6,'(a,4f15.7)') '  force: training(rmse,max),test(rmse,max) =' &
+         ,rmse,dfmax,rmse2,dfmax2
     print *,''
   endif
 end subroutine write_statistics
@@ -782,225 +879,59 @@ subroutine get_node2sample()
   implicit none
   integer:: n,m,ip
 
-!.....compute num samples per node (nspn)
-  n= nsmpl/nnode
-  m= nsmpl -n*nnode
-  allocate(nspn(nnode),ispn(nnode))
+!.....compute num samples for training per node (nspn)
+  n= nsmpl_trn/nnode
+  m= nsmpl_trn -n*nnode
+  allocate(nspn_trn(nnode),ispn_trn(nnode))
   do ip=1,nnode
-    nspn(ip)= n
-    if( ip.le.m ) nspn(ip)= nspn(ip) +1
+    nspn_trn(ip)= n
+    if( ip.le.m ) nspn_trn(ip)= nspn_trn(ip) +1
   enddo
-  mynsmpl= nspn(myid+1)
-  call mpi_allreduce(mynsmpl,maxmynsmpl,1,mpi_integer,mpi_max &
+  mynsmpl_trn= nspn_trn(myid+1)
+  call mpi_allreduce(mynsmpl_trn,maxmynsmpl_trn,1,mpi_integer,mpi_max &
        ,mpi_world,ierr)
-  if( myid.eq.0 ) print *,'maxmynsmpl=',maxmynsmpl
+  if( myid.eq.0 ) print *,'maxmynsmpl_trn=',maxmynsmpl_trn
 
   !.....compute start and end of sample-id of this process
-  isid0= 0
-  isid1= 0
+  isid0_trn= 0
+  isid1_trn= 0
   do ip=1,nnode
-    isid1= isid1 +nspn(ip)
-    ispn(ip)= isid1 -nspn(ip) +1
+    isid1_trn= isid1_trn +nspn_trn(ip)
+    ispn_trn(ip)= isid1_trn -nspn_trn(ip) +1
   enddo
-  isid0= ispn(myid+1)
-  isid1= ispn(myid+1) +nspn(myid+1) -1
+  isid0_trn= ispn_trn(myid+1)
+  isid1_trn= ispn_trn(myid+1) +nspn_trn(myid+1) -1
 
 !!$  write(6,'(a,20i3)') ' myid,isid0,isid1,nspn(:),ispn(:)=' &
 !!$       ,myid,isid0,isid1,nspn(1:nnode),ispn(1:nnode)
 
+!.....compute num samples for test per node (nspn)
+  n= nsmpl_tst/nnode
+  m= nsmpl_tst -n*nnode
+  allocate(nspn_tst(nnode),ispn_tst(nnode))
+  do ip=1,nnode
+    nspn_tst(ip)= n
+    if( ip.le.m ) nspn_tst(ip)= nspn_tst(ip) +1
+  enddo
+  mynsmpl_tst= nspn_tst(myid+1)
+  call mpi_allreduce(mynsmpl_tst,maxmynsmpl_tst,1,mpi_integer,mpi_max &
+       ,mpi_world,ierr)
+  if( myid.eq.0 ) print *,'maxmynsmpl_tst=',maxmynsmpl_tst
+
+  !.....compute start and end of sample-id of this process
+  isid0_tst= nsmpl_trn
+  isid1_tst= nsmpl_trn
+  do ip=1,nnode
+    isid1_tst= isid1_tst +nspn_tst(ip)
+    ispn_tst(ip)= isid1_tst -nspn_tst(ip) +1
+  enddo
+  isid0_tst= ispn_tst(myid+1)
+  isid1_tst= ispn_tst(myid+1) +nspn_tst(myid+1) -1
+
+
   if( myid.eq.0 ) print *,'get_node2sample done.'
   return
 end subroutine get_node2sample
-!=======================================================================
-subroutine scatter_samples()
-  use variables
-  use parallel
-  implicit none
-  integer:: i,idst,ismpl,itag,natm
-
-  integer,allocatable,save:: istat(:)
-
-  if( nnode.eq.1 ) return
-
-  if( .not. allocated(istat) ) allocate(istat(mpi_status_size))
-  
-  if( myid.eq.0 ) then ! send from node-0 (root)
-    do ismpl=ispn(2),nsmpl
-!.....get node-id to which data will be sent
-      do i=1,nnode-1
-        if( ismpl.lt.ispn(i+1) ) then
-          idst= i-1
-          exit
-        endif
-      enddo
-      natm= samples(ismpl)%natm
-      call mpi_send(samples(ismpl)%natm,1,mpi_integer &
-           ,idst,itag,mpi_world,ierr)
-      call mpi_send(samples(ismpl)%cdirname,5,mpi_character &
-           ,idst,itag,mpi_world,ierr)
-      call mpi_send(samples(ismpl)%h0,1,mpi_double_precision &
-           ,idst,itag,mpi_world,ierr)
-      call mpi_send(samples(ismpl)%h,9,mpi_double_precision &
-           ,idst,itag,mpi_world,ierr)
-      call mpi_send(samples(ismpl)%epot,1,mpi_double_precision &
-           ,idst,itag,mpi_world,ierr)
-      call mpi_send(samples(ismpl)%eref,1,mpi_double_precision &
-           ,idst,itag,mpi_world,ierr)
-      call mpi_send(samples(ismpl)%tag,natm,mpi_double_precision &
-           ,idst,itag,mpi_world,ierr)
-      call mpi_send(samples(ismpl)%ra,3*natm,mpi_double_precision &
-           ,idst,itag,mpi_world,ierr)
-      call mpi_send(samples(ismpl)%fa,3*natm,mpi_double_precision &
-           ,idst,itag,mpi_world,ierr)
-      call mpi_send(samples(ismpl)%fref,3*natm,mpi_double_precision &
-           ,idst,itag,mpi_world,ierr)
-    enddo
-  else ! receive at nodes except root
-    do ismpl=isid0,isid1
-      call mpi_recv(samples(ismpl)%natm,1,mpi_integer &
-           ,mpi_any_source,itag,mpi_world,istat,ierr)
-      natm= samples(ismpl)%natm
-      call mpi_recv(samples(ismpl)%cdirname,5,mpi_character &
-           ,mpi_any_source,itag,mpi_world,istat,ierr)
-      call mpi_recv(samples(ismpl)%h0,1,mpi_double_precision &
-           ,mpi_any_source,itag,mpi_world,istat,ierr)
-      call mpi_recv(samples(ismpl)%h,9,mpi_double_precision &
-           ,mpi_any_source,itag,mpi_world,istat,ierr)
-      call mpi_recv(samples(ismpl)%epot,1,mpi_double_precision &
-           ,mpi_any_source,itag,mpi_world,istat,ierr)
-      call mpi_recv(samples(ismpl)%eref,1,mpi_double_precision &
-           ,mpi_any_source,itag,mpi_world,istat,ierr)
-      call mpi_recv(samples(ismpl)%tag,natm,mpi_double_precision &
-           ,mpi_any_source,itag,mpi_world,istat,ierr)
-      call mpi_recv(samples(ismpl)%ra,3*natm,mpi_double_precision &
-           ,mpi_any_source,itag,mpi_world,istat,ierr)
-      call mpi_recv(samples(ismpl)%fa,3*natm,mpi_double_precision &
-           ,mpi_any_source,itag,mpi_world,istat,ierr)
-      call mpi_recv(samples(ismpl)%fref,3*natm,mpi_double_precision &
-           ,mpi_any_source,itag,mpi_world,istat,ierr)
-    enddo
-  endif
-  if( myid.eq.0 ) then
-    print *,'scatter_samples done.'
-  endif
-end subroutine scatter_samples
-!=======================================================================
-subroutine gather_samples()
-  use variables
-  use parallel
-  implicit none
-  integer:: i,isrc,idst,nmpi,ismpl,itag,natm
-  integer,allocatable,save:: istat(:,:),ireq(:)
-
-  if( nnode.eq.1 ) return
-
-  if( .not. allocated(ireq) ) allocate(ireq(nsmpl*2))
-  if( .not. allocated(istat) ) allocate(istat(mpi_status_size,nsmpl*2))
-
-  if( myid.eq.0 ) then ! send from node-0 (root)
-    nmpi= 0
-    do ismpl=ispn(2),nsmpl
-!.....get node-id to which data will be sent
-      do i=1,nnode-1
-        if( ismpl.lt.ispn(i+1) ) then
-          isrc= i-1
-          exit
-        endif
-      enddo
-      natm= samples(ismpl)%natm
-      call mpi_irecv(samples(ismpl)%epot,1,mpi_double_precision &
-           ,isrc,itag,mpi_world,ireq,ierr)
-      call mpi_irecv(samples(ismpl)%fa,3*natm,mpi_double_precision &
-           ,isrc,itag,mpi_world,ireq,ierr)
-      nmpi= nmpi +2
-    enddo
-    call mpi_waitall(nmpi,ireq,istat,ierr)
-  else ! receive at nodes except root
-    nmpi= 0
-    idst= 0
-    do ismpl=isid0,isid1
-      natm= samples(ismpl)%natm
-      call mpi_isend(samples(ismpl)%epot,1,mpi_double_precision &
-           ,idst,itag,mpi_world,ireq,ierr)
-      call mpi_isend(samples(ismpl)%fa,3*natm,mpi_double_precision &
-           ,idst,itag,mpi_world,ireq,ierr)
-      nmpi= nmpi +2
-    enddo
-    call mpi_waitall(nmpi,ireq,istat,ierr)
-  endif
-
-end subroutine gather_samples
-!=======================================================================
-subroutine gather_idata(ibufs,ibufr,ndim)
-  use parallel
-  implicit none
-  integer,intent(in):: ndim,ibufs(ndim)
-  integer,intent(inout):: ibufr(ndim)
-  integer:: i,isrc,idst,nmpi,ismpl,itag,natm
-  integer,allocatable,save:: istat(:,:),ireq(:)
-
-  if( nnode.eq.1 ) then
-    ibufr(1:ndim)= ibufs(1:ndim)
-    return
-  endif
-
-  if( .not. allocated(ireq) ) allocate(ireq(nnode))
-  if( .not. allocated(istat) ) allocate(istat(mpi_status_size,nnode))
-
-  if( myid.eq.0 ) then ! send from node-0 (root)
-    nmpi= 0
-    do isrc=1,nnode-1
-      call mpi_irecv(ibufr,ndim,mpi_integer &
-           ,isrc,itag,mpi_world,ireq,ierr)
-      nmpi= nmpi +1
-    enddo
-    call mpi_waitall(nmpi,ireq,istat,ierr)
-  else ! receive at nodes except root
-    nmpi= 0
-    idst= 0
-    call mpi_isend(ibufs,ndim,mpi_integer &
-         ,idst,itag,mpi_world,ireq,ierr)
-    nmpi= nmpi +1
-    call mpi_waitall(nmpi,ireq,istat,ierr)
-  endif
-  
-end subroutine gather_idata
-!=======================================================================
-subroutine gather_rdata(bufs,bufr,ndim)
-  use parallel
-  implicit none
-  integer,intent(in):: ndim
-  real(8),intent(in):: bufs(ndim)
-  real(8),intent(inout):: bufr(ndim)
-  integer:: i,isrc,idst,nmpi,ismpl,itag,natm
-  integer,allocatable,save:: istat(:,:),ireq(:)
-
-  if( nnode.eq.1 ) then
-    bufr(1:ndim)= bufs(1:ndim)
-    return
-  endif
-
-  if( .not. allocated(ireq) ) allocate(ireq(nnode))
-  if( .not. allocated(istat) ) allocate(istat(mpi_status_size,nnode))
-
-  if( myid.eq.0 ) then ! send from node-0 (root)
-    nmpi= 0
-    do isrc=1,nnode-1
-      call mpi_irecv(bufr,ndim,mpi_double_precision &
-           ,isrc,itag,mpi_world,ireq,ierr)
-      nmpi= nmpi +1
-    enddo
-    call mpi_waitall(nmpi,ireq,istat,ierr)
-  else ! receive at nodes except root
-    nmpi= 0
-    idst= 0
-    call mpi_isend(bufs,ndim,mpi_double_precision &
-         ,idst,itag,mpi_world,ireq,ierr)
-    nmpi= nmpi +1
-    call mpi_waitall(nmpi,ireq,istat,ierr)
-  endif
-  
-end subroutine gather_rdata
 !=======================================================================
 function urnd()
 !
@@ -1017,4 +948,26 @@ function urnd()
   urnd=dseed/d2p31
   return
 end function urnd
+!=======================================================================
+subroutine shuffle_dirlist(nsmpl,cdirlist)
+!
+!  Randomize the order of the cdirlist
+!
+  implicit none
+  integer,intent(in):: nsmpl
+  character(len=5):: cdirlist(nsmpl)
+  real(8),external:: urnd
+  integer:: i,j,n
+  character(len=5),allocatable:: cdltmp(:)
+  
+  allocate(cdltmp(nsmpl))
+  cdltmp(1:n)= cdirlist(1:n)
+  n=nsmpl
+  do i=1,nsmpl
+    j= n*urnd()+1
+    cdirlist(i)= cdltmp(j)
+    n= n -1
+  enddo
+  deallocate(cdltmp)
+end subroutine shuffle_dirlist
 
