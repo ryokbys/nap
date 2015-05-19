@@ -188,6 +188,12 @@ subroutine get_dir_list(ionum)
   endif
   call mpi_barrier(mpi_world,ierr)
   call mpi_bcast(cdirlist,5*nsmpl,mpi_character,0,mpi_world,ierr)
+
+  if( myid.eq.0 ) then
+    do is=1,nsmpl
+      print *,' is,dirlist=',is,cdirlist(is)
+    enddo
+  endif
   
   if(myid.eq.0) print*,'get_dir_list done.'
   return
@@ -603,27 +609,30 @@ end subroutine check_grad
 !=======================================================================
 subroutine test()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad
+  use NN,only:NN_init,NN_func,NN_grad,NN_func_tst
   use parallel
   implicit none 
   integer:: iv
-  real(8):: ft
+  real(8):: ft,ftest
   real(8),allocatable:: gt(:)
 
   allocate(gt(nvars))
 
   call NN_init()
   ft= NN_func(nvars,vars)
+  ftest= NN_func_tst(nvars,vars)
   gt= NN_grad(nvars,vars)
 
   if( myid.eq.0 ) then
-    print *,'func value=',ft
+    print *,'func value     =',ft
+    print *,'func_test value=',ftest
     print *,'grad values:'
     do iv=1,nvars
       print *,'iv,grad(iv)=',iv,gt(iv)
     enddo
     print *,'test done.'
   endif
+
 end subroutine test
 !=======================================================================
 subroutine write_energy_relation(cadd)
@@ -955,13 +964,13 @@ subroutine shuffle_dirlist(nsmpl,cdirlist)
 !
   implicit none
   integer,intent(in):: nsmpl
-  character(len=5):: cdirlist(nsmpl)
+  character(len=*):: cdirlist(nsmpl)
   real(8),external:: urnd
   integer:: i,j,n
   character(len=5),allocatable:: cdltmp(:)
   
   allocate(cdltmp(nsmpl))
-  cdltmp(1:n)= cdirlist(1:n)
+  cdltmp(1:nsmpl)= cdirlist(1:nsmpl)
   n=nsmpl
   do i=1,nsmpl
     j= n*urnd()+1
