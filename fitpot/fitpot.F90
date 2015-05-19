@@ -64,8 +64,8 @@ program fitpot
       call qn_wrapper()
     case ('fs','FS')
       call fs_wrapper()
-    case ('sequential')
-      call sequential_update()
+    case ('sgd','SGD')
+      call sgd()
     case ('check_grad')
       call check_grad()
     case ('test','TEST')
@@ -397,19 +397,26 @@ subroutine cg_wrapper()
   return
 end subroutine cg_wrapper
 !=======================================================================
-subroutine sequential_update()
+subroutine sgd()
+!
+! Stochastic gradient decent (SGD)
+!
   use variables
-  use NN,only:NN_init,NN_fs,NN_gs,NN_func,NN_grad
+  use NN,only:NN_init,NN_fs,NN_gs,NN_func,NN_grad,NN_analyze &
+       ,NN_restore_standard
   use parallel
   use minimize
   implicit none
-  integer,parameter:: nstp_eval= 1
+  integer,parameter:: nstp_eval= 10
   integer,parameter:: nstp_time= 1
-  real(8),allocatable:: gval(:)
-  integer:: istp,iv
-  real(8):: gnorm,alpha,gmax,vmax,fval,gg
+  real(8),parameter:: alpha0  = 1d0
+  real(8),parameter:: dalpha  = 0.0001d0
+  real(8),allocatable:: gval(:),u(:)
+  integer:: iter,istp,iv
+  real(8):: gnorm,alpha,alpha1,gmax,vmax,fval,gg
   integer:: ismpl
   common /samplei/ ismpl
+  real(8),external:: urnd
 
   interface
     subroutine write_vars(cadd)
@@ -417,57 +424,68 @@ subroutine sequential_update()
     end subroutine write_vars
   end interface
 
-  allocate(gval(nvars))
+  allocate(gval(nvars),u(nvars))
 
-  if( nnode.ne.1 ) then
-    if(myid.eq.0) print *,'[Error] sequential mode only works '// &
-         'with single process.'
-    call mpi_finalize(ierr)
-    stop
-  endif
+!!$  if( nnode.ne.1 ) then
+!!$    if(myid.eq.0) print *,'[Error] SGD mode only works '// &
+!!$         'with single process.'
+!!$    call mpi_finalize(ierr)
+!!$    stop
+!!$  endif
+
+  alpha1= alpha0
 
   call NN_init()
-
-  do istp=1,nstp
-    if(mod(istp,nstp_eval).eq.0) then
+  do iter=1,nstp
+    if(mod(iter,nstp_eval).eq.0) then
       fval= NN_func(nvars,vars)
       gval= NN_grad(nvars,vars)
       gnorm= 0d0
       do iv=1,nvars
         gnorm= gnorm +gval(iv)*gval(iv)
       enddo
-      write(6,'(a,i6,2f20.7,f10.3)') ' istp,f,gnorm,time=',istp,fval &
-           ,gnorm ,mpi_wtime()-time0
-      call write_vars('tmp')
-    else if(mod(istp,nstp_time).eq.0) then
-      write(6,'(a,i6,f10.3)') ' istp,time=',istp,mpi_wtime()-time0
+      if( myid.eq.0 ) then
+        write(6,'(a,i6,2es15.7,f10.3)') ' iter,f,gnorm,time=',iter,fval &
+             ,gnorm ,mpi_wtime()-time0
+        call write_vars('tmp')
+      endif
+    else if(mod(iter,nstp_time).eq.0) then
+      if( myid.eq.0 ) then
+        write(6,'(a,i6,f10.3)') ' iter,time=',iter,mpi_wtime()-time0
+      endif
     endif
-    do ismpl=1,nsmpl
+    do istp=1,maxmynsmpl
+      ismpl= isid0 +mynsmpl*urnd()
       fval= NN_fs(nvars,vars)
       gval= NN_gs(nvars,vars)
-      gnorm= sprod(nvars,gval,gval)
-      gval(1:nvars)= -gval(1:nvars)/sqrt(gnorm)
-      call quad_interpolate(nvars,vars,gval,fval,xtol,gtol,ftol,alpha &
-           ,iprint,iflag,myid,NN_fs)
-      if( iflag/100.ne.0 ) then
-        iflag= iflag -(iflag/100)*100
-        print*,'since quad_interpolate failed, call golden_section.'
-        call golden_section(nvars,vars,gval,fval,xtol,gtol,ftol,alpha &
-           ,iprint,iflag,myid,NN_fs)
-      endif
-      vars(1:nvars)=vars(1:nvars) +alpha*gval(1:nvars)
-!!$      call NN_get_f(fval)
-!!$      call NN_get_g(gval)
-!!$      gnorm= 0d0
-!!$      do iv=1,nvars
-!!$        gnorm= gnorm +gval(iv)*gval(iv)
-!!$      enddo
-!!$      write(6,'(a,2i6,2es15.7)') ' istp,ismpl,f,gnorm='&
-!!$           ,istp,ismpl,fval,gnorm
+      u(1:nvars)= -gval(1:nvars)
+      alpha= alpha1
+      call armijo_search(nvars,vars,u,fval,gval,alpha,iprint &
+           ,iflag,myid,NN_fs)
+      gnorm= 0d0
+      do iv=1,nvars
+        gnorm= gnorm +gval(iv)*gval(iv)
+      enddo
+!!$      if( myid.eq.0 ) then
+!!$        write(6,'(a,3es12.4)') 'alpha1,alpha,gnorm=',alpha1,alpha,gnorm
+!!$      endif
+      vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
     enddo
+    alpha1= alpha1*(1d0-dalpha)
   enddo
 
-end subroutine sequential_update
+  fval= NN_func(nvars,vars)
+  gval= NN_grad(nvars,vars)
+  gnorm= 0d0
+  do iv=1,nvars
+    gnorm= gnorm +gval(iv)*gval(iv)
+  enddo
+
+  call NN_analyze()
+  call NN_restore_standard()
+
+
+end subroutine sgd
 !=======================================================================
 subroutine fs_wrapper()
   use variables
@@ -772,7 +790,10 @@ subroutine get_node2sample()
     nspn(ip)= n
     if( ip.le.m ) nspn(ip)= nspn(ip) +1
   enddo
-  mynsmpl= nspn(myid-1)
+  mynsmpl= nspn(myid+1)
+  call mpi_allreduce(mynsmpl,maxmynsmpl,1,mpi_integer,mpi_max &
+       ,mpi_world,ierr)
+  if( myid.eq.0 ) print *,'maxmynsmpl=',maxmynsmpl
 
   !.....compute start and end of sample-id of this process
   isid0= 0
@@ -980,3 +1001,20 @@ subroutine gather_rdata(bufs,bufr,ndim)
   endif
   
 end subroutine gather_rdata
+!=======================================================================
+function urnd()
+!
+!  Uniform random number generator
+!      
+  implicit none 
+  real(8):: urnd
+  real(8),save:: dseed= 12345d0
+  real(8),save:: d2p31m,d2p31
+  data d2p31m/2147483647d0/
+  data d2p31 /2147483648d0/
+
+  dseed=dmod(16807d0*dseed,d2p31m)
+  urnd=dseed/d2p31
+  return
+end function urnd
+

@@ -85,6 +85,7 @@ contains
         call golden_section(ndim,x,d,f,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else ! armijo (default)
+        alpha= 1d0
         call armijo_search(ndim,x,d,f,g,alpha,iprint &
              ,iflag,myid,func)
       endif
@@ -213,6 +214,7 @@ contains
         call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else ! armijo (default)
+        alpha= 1d0
         call armijo_search(ndim,x,u,f,g,alpha,iprint &
              ,iflag,myid,func)
       endif
@@ -414,6 +416,7 @@ contains
         call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else ! armijo (default)
+        alpha= 1d0
         call armijo_search(ndim,x,u,f,g,alpha,iprint &
              ,iflag,myid,func)
       endif
@@ -936,7 +939,6 @@ contains
     end interface
 
 !!$  real(8),external:: sprod
-  real(8),parameter:: alpha0 = 1d0
   real(8),parameter:: xi     = 0.5d0
   real(8),parameter:: tau    = 0.5d0
   integer,parameter:: MAXITER= 30
@@ -946,7 +948,7 @@ contains
   real(8),allocatable,dimension(:):: x1(:),gpena(:)
 
   if( .not. allocated(x1)) allocate(x1(ndim),gpena(ndim))
-  alphai= alpha0
+  alphai= alpha
   pval0= 0d0
   gpena(1:ndim)= 0d0
   if( trim(cpena).eq.'lasso' ) then
