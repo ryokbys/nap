@@ -885,6 +885,7 @@ subroutine sync_input()
   call mpi_bcast(fscl,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(swbeta,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(pwgt,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(ratio_test,1,mpi_double_precision,0,mpi_world,ierr)
   
   call mpi_bcast(lfmatch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lreg,1,mpi_logical,0,mpi_world,ierr)
