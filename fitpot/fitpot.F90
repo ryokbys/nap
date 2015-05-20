@@ -90,8 +90,8 @@ program fitpot
     endif
   endif
   call write_vars('fin')
-  call write_energy_relation('fin')
-  call write_force_relation('fin')
+  call write_energy_relation('fin',.true.)
+  call write_force_relation('fin',.true.)
   call write_statistics()
   if(trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
        .or.trim(cpena).eq.'ridge') &
@@ -178,11 +178,11 @@ subroutine get_dir_list(ionum)
   call mpi_barrier(mpi_world,ierr)
   call mpi_bcast(cdirlist,5*nsmpl,mpi_character,0,mpi_world,ierr)
 
-  if( myid.eq.0 ) then
-    do is=1,nsmpl
-      print *,' is,dirlist=',is,cdirlist(is)
-    enddo
-  endif
+!!$  if( myid.eq.0 ) then
+!!$    do is=1,nsmpl
+!!$      print *,' is,dirlist=',is,cdirlist(is)
+!!$    enddo
+!!$  endif
   
   if(myid.eq.0) print*,'get_dir_list done.'
   return
@@ -642,17 +642,18 @@ subroutine eval_testset(iter,fv,gv)
   ft= NN_func_tst(nvars,vars)
   write(cnum,'(i5.5)') iter
   call write_vars(cnum)
-  call write_energy_relation(cnum)
-  call write_force_relation(cnum)
+  call write_energy_relation(cnum,.false.)
+  call write_force_relation(cnum,.false.)
   call write_statistics()
   
 end subroutine eval_testset
 !=======================================================================
-subroutine write_energy_relation(cadd)
+subroutine write_energy_relation(cadd,lwrite)
   use variables
   use parallel
   implicit none
   character(len=*),intent(in):: cadd
+  logical,intent(in):: lwrite 
   character(len=128):: cfname
   
   integer:: ismpl
@@ -679,7 +680,7 @@ subroutine write_energy_relation(cadd)
   call mpi_reduce(erefl,erefg,nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
 
-  if( myid.eq.0 ) then
+  if( lwrite .and. myid.eq.0 ) then
     open(90,file=trim(cfname),status='replace')
     do ismpl=1,nsmpl_trn
       write(90,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
@@ -690,11 +691,12 @@ subroutine write_energy_relation(cadd)
   
 end subroutine write_energy_relation
 !=======================================================================
-subroutine write_force_relation(cadd)
+subroutine write_force_relation(cadd,lwrite)
   use variables
   use parallel
   implicit none
   character(len=*),intent(in):: cadd
+  logical,intent(in):: lwrite 
   character(len=128):: cfname
 
   integer:: ismpl,ia,ixyz,natm,nmax,nmaxl
@@ -730,7 +732,7 @@ subroutine write_force_relation(cadd)
   call mpi_reduce(frefl,frefg,3*nmax*nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
 
-  if( myid.eq.0 ) then
+  if( lwrite .and. myid.eq.0 ) then
     open(91,file=trim(cfname),status='replace')
     do ismpl=1,nsmpl_trn
       natm= nalist(ismpl)
