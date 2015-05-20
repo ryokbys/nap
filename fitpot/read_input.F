@@ -47,9 +47,11 @@ c=======================================================================
       if( trim(cname).eq.'num_samples' ) then
         call read_i1(ionum,nsmpl)
         return
-      elseif( trim(cname).eq.'num_iteration' .or.
-     &       trim(cname).eq.'num_steps' ) then
-        call read_i1(ionum,nstp)
+      elseif( trim(cname).eq.'num_iteration' ) then
+        call read_i1(ionum,niter)
+        return
+      elseif( trim(cname).eq.'num_iter_eval' ) then
+        call read_i1(ionum,niter_eval)
         return
       elseif( trim(cname).eq.'fitting_method' ) then
         call read_c1(ionum,cfmethod)

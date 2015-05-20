@@ -9,18 +9,6 @@ program fitpot
   integer:: ismpl
   real(8):: tmp
 
-  interface
-    subroutine write_vars(cadd)
-      character(len=*),intent(in),optional:: cadd
-    end subroutine write_vars
-    subroutine write_energy_relation(cadd)
-      character(len=*),intent(in),optional:: cadd
-    end subroutine write_energy_relation
-    subroutine write_force_relation(cadd)
-      character(len=*),intent(in),optional:: cadd
-    end subroutine write_force_relation
-  end interface
-
   call mpi_init(ierr)
   time0= mpi_wtime()
   call mpi_comm_size(mpi_comm_world,nnode,ierr)
@@ -69,6 +57,7 @@ program fitpot
   call read_ref_data()
 
   call read_vars()
+  allocate(gvar(nvars),dvar(nvars))
 
   select case (trim(cfmethod))
     case ('sd','SD')
@@ -138,7 +127,7 @@ subroutine write_initial_setting()
 
   write(6,'(a)') '---------------- INITIAL SETTING -----------------'
   write(6,'(2x,a25,2x,i5)') 'num_samples',nsmpl
-  write(6,'(2x,a25,2x,i10)') 'num_iteration',nstp
+  write(6,'(2x,a25,2x,i10)') 'num_iteration',niter
   write(6,'(2x,a25,2x,a)') 'fitting_method',trim(cfmethod)
   write(6,'(2x,a25,2x,a)') 'main_directory',trim(cmaindir)
   write(6,'(2x,a25,2x,a)') 'param_file',trim(cparfile)
@@ -211,7 +200,7 @@ subroutine read_samples()
   implicit none
   integer:: is
   character*5:: cdir
-  integer,allocatable,save:: nal(:)
+  integer,allocatable:: nal(:)
 
   if( .not. allocated(nalist) ) allocate(nalist(nsmpl))
   allocate(nal(nsmpl))
@@ -220,7 +209,7 @@ subroutine read_samples()
 
 !.....training set
   do is=isid0_trn,isid1_trn
-!    print *,' is=',is,cdirlist(is)
+!!$    print *,' is=',is,smpl_trn(is)%cdirname
     cdir= smpl_trn(is)%cdirname
     call read_pos(12,trim(cmaindir)//'/'//trim(cdir) &
          //'/pos',is,smpl_trn(is))
@@ -228,7 +217,7 @@ subroutine read_samples()
   enddo
 !.....test set
   do is=isid0_tst,isid1_tst
-!    print *,' is=',is,cdirlist(is)
+!!$    print *,' is=',is,smpl_tst(is)%cdirname
     cdir= smpl_tst(is)%cdirname
     call read_pos(12,trim(cmaindir)//'/'//trim(cdir) &
          //'/pos',is,smpl_tst(is))
@@ -244,6 +233,7 @@ subroutine read_samples()
   
   if( myid.eq.0 ) print *,'read_samples done.'
   call mpi_barrier(mpi_world,ierr)
+  deallocate(nal)
   return
 end subroutine read_samples
 !=======================================================================
@@ -252,7 +242,7 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
   implicit none 
   integer,intent(in):: ionum,ismpl
   character(len=*),intent(in):: fname
-  type(mdsys),intent(out):: smpl
+  type(mdsys),intent(inout):: smpl
 
   integer:: i,natm
   real(8):: tmp
@@ -273,7 +263,6 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
   do i=1,smpl%natm
     read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), &
          tmp,tmp,tmp
-!    write(6,'(4es22.14)')  smpl%tag(i),smpl%ra(1:3,i)
   enddo
   close(ionum)
 end subroutine read_pos
@@ -283,11 +272,14 @@ subroutine read_ref_data()
   use parallel
   implicit none 
   integer:: ismpl,i,is,jflag,natm
+  character(len=5):: cdir
 
   jflag= 0
 !.....training set
   do ismpl=isid0_trn,isid1_trn
-    open(13,file=trim(cmaindir)//'/'//smpl_trn(ismpl)%cdirname &
+!!$    print *,' ismpl=',ismpl,smpl_trn(ismpl)%cdirname
+    cdir=smpl_trn(ismpl)%cdirname
+    open(13,file=trim(cmaindir)//'/'//trim(cdir) &
          //'/erg.ref',status='old')
     read(13,*) smpl_trn(ismpl)%eref
     close(13)
@@ -297,7 +289,7 @@ subroutine read_ref_data()
       smpl_trn(ismpl)%eref= smpl_trn(ismpl)%eref -eatom(is)
     enddo
 
-    open(14,file=trim(cmaindir)//'/'//smpl_trn(ismpl)%cdirname &
+    open(14,file=trim(cmaindir)//'/'//trim(cdir) &
          //'/frc.ref',status='old')
     read(14,*) natm
     if( natm.ne.smpl_trn(ismpl)%natm ) then
@@ -311,10 +303,13 @@ subroutine read_ref_data()
     enddo
     close(14)
   enddo
+!!$  print *,' reading ref data of training set done.'
 
 !.....test set
   do ismpl=isid0_tst,isid1_tst
-    open(13,file=trim(cmaindir)//'/'//smpl_tst(ismpl)%cdirname &
+!!$    print *,' ismpl=',ismpl,smpl_tst(ismpl)%cdirname
+    cdir= smpl_tst(ismpl)%cdirname
+    open(13,file=trim(cmaindir)//'/'//trim(cdir) &
          //'/erg.ref',status='old')
     read(13,*) smpl_tst(ismpl)%eref
     close(13)
@@ -324,7 +319,7 @@ subroutine read_ref_data()
       smpl_tst(ismpl)%eref= smpl_tst(ismpl)%eref -eatom(is)
     enddo
 
-    open(14,file=trim(cmaindir)//'/'//smpl_tst(ismpl)%cdirname &
+    open(14,file=trim(cmaindir)//'/'//trim(cdir) &
          //'/frc.ref',status='old')
     read(14,*) natm
     if( natm.ne.smpl_tst(ismpl)%natm ) then
@@ -338,6 +333,8 @@ subroutine read_ref_data()
     enddo
     close(14)
   enddo
+
+!!$  print *,' reading ref data of test set done.'
 
   if( jflag.gt.0 ) then
     call mpi_finalize(ierr)
@@ -377,12 +374,11 @@ subroutine write_vars(cadd)
   use variables
   use parallel
   implicit none
-  character(len=*),intent(in),optional:: cadd
+  character(len=*),intent(in):: cadd
   integer:: i
   character(len=128):: cfname
 
-  cfname= trim(cmaindir)//'/'//trim(cparfile)
-  if( present(cadd) ) cfname= trim(cfname)//'.'//trim(cadd)
+  cfname= trim(cmaindir)//'/'//trim(cparfile)//'.'//trim(cadd)
 
   if( myid.eq.0 ) then
     open(15,file=trim(cfname),status='replace')
@@ -407,8 +403,11 @@ subroutine qn_wrapper()
 
   !.....NN specific code hereafter
   call NN_init()
-  call qn(nvars,vars,fval,xtol,gtol,ftol,nstp &
-       ,iprint,iflag,myid,NN_func,NN_grad,cfmethod)
+  do i=1,niter,niter_eval
+    call qn(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,i,i+niter_eval-1 &
+         ,iprint,iflag,myid,NN_func,NN_grad,cfmethod)
+    call eval_testset(i+niter_eval-1,fval,gvar)
+  enddo
   call NN_analyze()
   call NN_restore_standard()
 
@@ -429,7 +428,7 @@ subroutine sd_wrapper()
 
   !.....NN specific code hereafter
   call NN_init()
-  call steepest_descent(nvars,vars,fval,xtol,gtol,ftol,nstp&
+  call steepest_descent(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad)
 
   return
@@ -446,7 +445,7 @@ subroutine cg_wrapper()
 
   !.....NN specific code hereafter
   call NN_init()
-  call cg(nvars,vars,fval,xtol,gtol,ftol,nstp &
+  call cg(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad)
 
   return
@@ -462,7 +461,7 @@ subroutine sgd()
   use parallel
   use minimize
   implicit none
-  integer,parameter:: nstp_time= 1
+  integer,parameter:: niter_time= 1
   real(8),parameter:: alpha0  = 1d0
   real(8),parameter:: dalpha  = 0.0001d0
   real(8),allocatable:: gval(:),u(:)
@@ -471,12 +470,6 @@ subroutine sgd()
   integer:: ismpl
   common /samplei/ ismpl
   real(8),external:: urnd
-
-  interface
-    subroutine write_vars(cadd)
-      character(len=*),intent(in),optional:: cadd
-    end subroutine write_vars
-  end interface
 
   allocate(gval(nvars),u(nvars))
 
@@ -490,8 +483,8 @@ subroutine sgd()
   alpha1= alpha0
 
   call NN_init()
-  do iter=1,nstp
-    if(mod(iter,nstp_eval).eq.0) then
+  do iter=1,niter
+    if(mod(iter,niter_eval).eq.0) then
       fval= NN_func(nvars,vars)
       gval= NN_grad(nvars,vars)
       gnorm= 0d0
@@ -503,7 +496,7 @@ subroutine sgd()
              ,gnorm ,mpi_wtime()-time0
         call write_vars('tmp')
       endif
-    else if(mod(iter,nstp_time).eq.0) then
+    else if(mod(iter,niter_time).eq.0) then
       if( myid.eq.0 ) then
         write(6,'(a,i6,f10.3)') ' iter,time=',iter,mpi_wtime()-time0
       endif
@@ -552,7 +545,7 @@ subroutine fs_wrapper()
 
   !.....NN specific code hereafter
   call NN_init()
-  call fs(nvars,vars,fval,xtol,gtol,ftol,nstp &
+  call fs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad)
   call NN_analyze()
   call NN_restore_standard()
@@ -635,17 +628,36 @@ subroutine test()
 
 end subroutine test
 !=======================================================================
+subroutine eval_testset(iter,fv,gv)
+  use variables
+  use parallel
+  use NN, only: NN_func_tst
+  implicit none
+  integer,intent(in):: iter
+  real(8):: fv,gv(nvars)
+  
+  real(8):: ft
+  character(len=5):: cnum
+
+  ft= NN_func_tst(nvars,vars)
+  write(cnum,'(i5.5)') iter
+  call write_vars(cnum)
+  call write_energy_relation(cnum)
+  call write_force_relation(cnum)
+  call write_statistics()
+  
+end subroutine eval_testset
+!=======================================================================
 subroutine write_energy_relation(cadd)
   use variables
   use parallel
   implicit none
-  character(len=*),intent(in),optional:: cadd
+  character(len=*),intent(in):: cadd
   character(len=128):: cfname
   
   integer:: ismpl
   
-  cfname='out.erg'
-  if( present(cadd) ) cfname= trim(cfname)//'.'//trim(cadd)
+  cfname='out.erg.'//trim(cadd)
 
   if( .not. allocated(erefl) ) allocate(erefl(nsmpl),erefg(nsmpl) &
        ,epotl(nsmpl),epotg(nsmpl))
@@ -682,13 +694,12 @@ subroutine write_force_relation(cadd)
   use variables
   use parallel
   implicit none
-  character(len=*),intent(in),optional:: cadd
+  character(len=*),intent(in):: cadd
   character(len=128):: cfname
 
   integer:: ismpl,ia,ixyz,natm,nmax,nmaxl
   
-  cfname= 'out.frc'
-  if( present(cadd) ) cfname= trim(cfname)//'.'//trim(cadd)
+  cfname= 'out.frc.'//trim(cadd)
 
   nmaxl= 0
   do ismpl=1,nsmpl
@@ -782,7 +793,7 @@ subroutine write_statistics()
     write(6,'(a)') ' Test set,'
     write(6,'(a,f12.3,a)') '  RMSE of energies         =',rmse2,' eV/atom'
     write(6,'(a,f12.3,a)') '  Max residual of energies =',demax2,' eV/atom'
-    write(6,'(a,4f15.7)') '  energy: training(rmse,max),test(rmse,max) =' &
+    write(6,'(a,4f15.7)') '  energy:training(rmse,max),test(rmse,max)=' &
          ,rmse,demax,rmse2,demax2
   endif
 
@@ -825,7 +836,7 @@ subroutine write_statistics()
     write(6,'(a)') ' Test set,'
     write(6,'(a,f12.3,a)') '  RMSE of forces           =',rmse2,' eV/A'
     write(6,'(a,f12.3,a)') '  Max residual of forces   =',dfmax2,' eV/A'
-    write(6,'(a,4f15.7)') '  force: training(rmse,max),test(rmse,max) =' &
+    write(6,'(a,4f15.7)') '  force:training(rmse,max),test(rmse,max)=' &
          ,rmse,dfmax,rmse2,dfmax2
     print *,''
   endif
@@ -853,7 +864,8 @@ subroutine sync_input()
   implicit none
   
   call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(nstp,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(niter,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(niter_eval,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(iprint,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(cfmethod,128,mpi_character,0,mpi_world,ierr)
@@ -899,6 +911,8 @@ subroutine get_node2sample()
   mynsmpl_trn= nspn_trn(myid+1)
   call mpi_allreduce(mynsmpl_trn,maxmynsmpl_trn,1,mpi_integer,mpi_max &
        ,mpi_world,ierr)
+!!$  print *,' myid,mynsmpl_trn,maxmynsmpl_trn=' &
+!!$       ,myid,mynsmpl_trn,maxmynsmpl_trn
   if( myid.eq.0 ) print *,'maxmynsmpl_trn=',maxmynsmpl_trn
 
   !.....compute start and end of sample-id of this process
@@ -925,6 +939,8 @@ subroutine get_node2sample()
   mynsmpl_tst= nspn_tst(myid+1)
   call mpi_allreduce(mynsmpl_tst,maxmynsmpl_tst,1,mpi_integer,mpi_max &
        ,mpi_world,ierr)
+!!$  print *,' myid,mynsmpl_tst,maxmynsmpl_tst=' &
+!!$       ,myid,mynsmpl_tst,maxmynsmpl_tst
   if( myid.eq.0 ) print *,'maxmynsmpl_tst=',maxmynsmpl_tst
 
   !.....compute start and end of sample-id of this process
@@ -966,7 +982,7 @@ subroutine shuffle_dirlist(nsmpl,cdirlist)
   integer,intent(in):: nsmpl
   character(len=*):: cdirlist(nsmpl)
   real(8),external:: urnd
-  integer:: i,j,n
+  integer:: i,j,k,n
   character(len=5),allocatable:: cdltmp(:)
   
   allocate(cdltmp(nsmpl))
@@ -975,6 +991,9 @@ subroutine shuffle_dirlist(nsmpl,cdirlist)
   do i=1,nsmpl
     j= n*urnd()+1
     cdirlist(i)= cdltmp(j)
+    do k=j,n-1
+      cdltmp(k)= cdltmp(k+1)
+    enddo
     n= n -1
   enddo
   deallocate(cdltmp)

@@ -1,7 +1,8 @@
 module variables
 
   integer:: nsmpl
-  integer:: nstp= 1
+  integer:: niter= 1
+  integer:: niter_eval= 1
   character(len=128):: cfmethod= 'BFGS'
   character(len=128):: cmaindir= 'learning_set'
   character(len=128):: cparfile= 'in.params.NN'
@@ -27,7 +28,6 @@ module variables
   integer:: iprint = 1
 !.....training or test
   real(8):: ratio_test= 0.1d0
-  integer:: nstp_eval= 10
 
   character(len=5),allocatable,save:: cdirlist(:)
   integer,allocatable,save:: nalist(:)
@@ -43,7 +43,7 @@ module variables
   integer:: nsmpl_trn,nsmpl_tst
   type(mdsys),save,allocatable:: smpl_trn(:),smpl_tst(:)
   integer,save:: nvars
-  real(8),save,allocatable:: vars(:),vranges(:,:)
+  real(8),save,allocatable:: vars(:),vranges(:,:),gvar(:),dvar(:)
   real(8),save:: rcut
 
   real(8),save:: time0,tcomm,tfunc,tgrad
