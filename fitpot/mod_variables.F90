@@ -30,7 +30,7 @@ module variables
   real(8):: ratio_test= 0.1d0
 
   character(len=5),allocatable,save:: cdirlist(:)
-  integer,allocatable,save:: nalist(:)
+  integer,allocatable,save:: nalist(:),iclist(:)
   
   type mdsys
     character(len=5):: cdirname
@@ -38,10 +38,11 @@ module variables
     real(8):: h0,h(3,3),epot,eref
     real(8),allocatable:: tag(:)
     real(8),allocatable:: ra(:,:),fa(:,:),fref(:,:)
+    integer:: iclass
   end type mdsys
 
   integer:: nsmpl_trn,nsmpl_tst
-  type(mdsys),save,allocatable:: smpl_trn(:),smpl_tst(:)
+  type(mdsys),save,allocatable:: samples(:)
   integer,save:: nvars
   real(8),save,allocatable:: vars(:),vranges(:,:),gvar(:),dvar(:)
   real(8),save:: rcut

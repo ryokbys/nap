@@ -271,13 +271,13 @@ contains
     return
   end subroutine cg
 !=======================================================================
-  subroutine qn(ndim,x0,f,g,u,xtol,gtol,ftol,iter0,iter1 &
-       ,iprint,iflag,myid,func,grad,cfmethod)
+  subroutine qn(ndim,x0,f,g,u,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
 !
 !  Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
 !
     implicit none
-    integer,intent(in):: ndim,iprint,myid,iter0,iter1
+    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
     real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
@@ -293,6 +293,9 @@ contains
         real(8),intent(in):: x(n)
         real(8):: grad(n)
       end function grad
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
     end interface
     real(8),parameter:: xtiny  = 1d-14
     logical:: ltwice = .false.
@@ -306,7 +309,6 @@ contains
          ,v(ndim),y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
          ,aa(ndim,ndim),cc(ndim,ndim),gpena(ndim))
 
-    if( iter0.ne.1 ) goto 10
     nftol= 0
 !.....initial G = I
     gg(1:ndim,1:ndim)= 0d0
@@ -355,7 +357,6 @@ contains
     endif
     g(1:ndim)= g(1:ndim) +gpena(1:ndim)
 
-10  continue
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
 
@@ -383,7 +384,7 @@ contains
       endif
     endif
 
-    do iter=iter0,iter1
+    do iter=1,maxiter
       u(1:ndim)= 0d0
       do i=1,ndim
         u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
@@ -394,6 +395,9 @@ contains
 !.....store previous func and grad values
       fp= f
       gp(1:ndim)= g(1:ndim)
+!.....evaluate statistics at every niter_eval
+      if( mod(iter,niter_eval).eq.0 ) &
+           call write_stats(iter)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
         call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &

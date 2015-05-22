@@ -22,19 +22,10 @@ program fitpot
   endif
   call sync_input()
 
-  !.....divide samples to traning and test sets
-  if( myid.eq.0 ) nsmpl_tst= nsmpl*ratio_test
-  call mpi_bcast(nsmpl_tst,1,mpi_integer,0,mpi_world,ierr)
-  nsmpl_trn= nsmpl -nsmpl_tst
-  if( myid.eq.0 ) then
-    print *,'nsmpl,train,test=',nsmpl,nsmpl_trn,nsmpl_tst
-  endif
-
-  if( nnode.gt.min(nsmpl_trn,nsmpl_tst) ) then
+  if( nnode.gt.nsmpl ) then
     if( myid.eq.0 ) then
-      print *,'[Error] nnode.gt.min(nsmpl_trn,nsmpl_tst)'
-      print *,'  nnode,nspml_trn,nsmpl_tst=' &
-           ,nnode,nsmpl_trn,nsmpl_tst
+      print *,'[Error] nnode.gt.nsmpl'
+      print *,'  nnode,nspml=',nnode,nsmpl
       print *,'you should use less number of nodes than nsmpl.'
     endif
     call mpi_finalize(ierr)
@@ -42,16 +33,14 @@ program fitpot
   endif
   call get_node2sample()
 
-  allocate(smpl_trn(isid0_trn:isid1_trn),smpl_tst(isid0_tst:isid1_tst))
+  allocate(samples(isid0:isid1))
 
   call get_dir_list(11)
 !.....store dirname
-  do ismpl=isid0_trn,isid1_trn
-    smpl_trn(ismpl)%cdirname= cdirlist(ismpl)
+  do ismpl=isid0,isid1
+    samples(ismpl)%cdirname= cdirlist(ismpl)
   enddo
-  do ismpl=isid0_tst,isid1_tst
-    smpl_tst(ismpl)%cdirname= cdirlist(ismpl)
-  enddo
+  call set_training_test()
 
   call read_samples()
   call read_ref_data()
@@ -90,9 +79,9 @@ program fitpot
     endif
   endif
   call write_vars('fin')
-  call write_energy_relation('fin',.true.)
-  call write_force_relation('fin',.true.)
-  call write_statistics()
+  call write_energy_relation('fin')
+  call write_force_relation('fin')
+  call write_stats(niter)
   if(trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
        .or.trim(cpena).eq.'ridge') &
        call write_eliminated_vars()
@@ -194,6 +183,47 @@ subroutine get_dir_list(ionum)
 
 end subroutine get_dir_list
 !=======================================================================
+subroutine set_training_test()
+  use variables
+  use parallel
+  implicit none
+  integer:: ismpl,n
+  integer,allocatable,dimension(:):: icll
+
+  allocate(icll(nsmpl),iclist(nsmpl))
+
+  myntst= mynsmpl*ratio_test
+  myntrn= mynsmpl -myntst
+  print *,' myid,myntrn,myntst=',myid,myntrn,myntst
+  n=0
+  do ismpl=isid0,isid1
+    n=n+1
+    if( n.le.myntrn ) then
+      samples(ismpl)%iclass= 1   ! training data
+    else
+      samples(ismpl)%iclass= 2   ! test data
+    endif
+    icll(ismpl)= samples(ismpl)%iclass
+  enddo
+
+  nsmpl_trn= 0
+  nsmpl_tst= 0
+  call mpi_allreduce(myntrn,nsmpl_trn,1,mpi_integer,mpi_sum &
+       ,mpi_world,ierr)
+  call mpi_allreduce(myntst,nsmpl_tst,1,mpi_integer,mpi_sum &
+       ,mpi_world,ierr)
+  iclist(1:nsmpl)= 0
+  call mpi_allreduce(icll,iclist,nsmpl,mpi_integer,mpi_max &
+       ,mpi_world,ierr)
+  
+  if( myid.eq.0 ) then
+    print *,'nsmpl, training, test=',nsmpl,nsmpl_trn,nsmpl_tst
+    print *,'set_training_test done.'
+  endif
+  deallocate(icll)
+  return
+end subroutine set_training_test
+!=======================================================================
 subroutine read_samples()
   use variables
   use parallel
@@ -207,29 +237,14 @@ subroutine read_samples()
   nalist(1:nsmpl)= 0
   nal(1:nsmpl)= 0
 
-!.....training set
-  do is=isid0_trn,isid1_trn
-!!$    print *,' is=',is,smpl_trn(is)%cdirname
-    cdir= smpl_trn(is)%cdirname
+  do is=isid0,isid1
+    cdir= samples(is)%cdirname
     call read_pos(12,trim(cmaindir)//'/'//trim(cdir) &
-         //'/pos',is,smpl_trn(is))
-    nal(is)= smpl_trn(is)%natm
-  enddo
-!.....test set
-  do is=isid0_tst,isid1_tst
-!!$    print *,' is=',is,smpl_tst(is)%cdirname
-    cdir= smpl_tst(is)%cdirname
-    call read_pos(12,trim(cmaindir)//'/'//trim(cdir) &
-         //'/pos',is,smpl_tst(is))
-    nal(is)= smpl_tst(is)%natm
+         //'/pos',is,samples(is))
+    nal(is)= samples(is)%natm
   enddo
   call mpi_reduce(nal,nalist,nsmpl,mpi_integer,mpi_sum &
        ,0,mpi_world,ierr)
-!!$  if( myid.eq.0 ) then
-!!$    do is=1,nsmpl
-!!$      print *,' ismpl,natm=',is,nalist(is)
-!!$    enddo
-!!$  endif
   
   if( myid.eq.0 ) print *,'read_samples done.'
   call mpi_barrier(mpi_world,ierr)
@@ -275,66 +290,32 @@ subroutine read_ref_data()
   character(len=5):: cdir
 
   jflag= 0
-!.....training set
-  do ismpl=isid0_trn,isid1_trn
-!!$    print *,' ismpl=',ismpl,smpl_trn(ismpl)%cdirname
-    cdir=smpl_trn(ismpl)%cdirname
+  do ismpl=isid0,isid1
+    cdir=samples(ismpl)%cdirname
     open(13,file=trim(cmaindir)//'/'//trim(cdir) &
          //'/erg.ref',status='old')
-    read(13,*) smpl_trn(ismpl)%eref
+    read(13,*) samples(ismpl)%eref
     close(13)
 !.....reduce atomic energy from eref
-    do i=1,smpl_trn(ismpl)%natm
-      is= smpl_trn(ismpl)%tag(i)
-      smpl_trn(ismpl)%eref= smpl_trn(ismpl)%eref -eatom(is)
+    do i=1,samples(ismpl)%natm
+      is= samples(ismpl)%tag(i)
+      samples(ismpl)%eref= samples(ismpl)%eref -eatom(is)
     enddo
 
     open(14,file=trim(cmaindir)//'/'//trim(cdir) &
          //'/frc.ref',status='old')
     read(14,*) natm
-    if( natm.ne.smpl_trn(ismpl)%natm ) then
+    if( natm.ne.samples(ismpl)%natm ) then
       print *,'Error: natm in sample is not same as smpl%natm'
       print *,' myid,ismpl,natm,smpl%natm=',myid,ismpl &
-           ,natm,smpl_trn(ismpl)%natm
+           ,natm,samples(ismpl)%natm
       jflag= jflag +1
     endif
     do i=1,natm
-      read(14,*) smpl_trn(ismpl)%fref(1:3,i)
+      read(14,*) samples(ismpl)%fref(1:3,i)
     enddo
     close(14)
   enddo
-!!$  print *,' reading ref data of training set done.'
-
-!.....test set
-  do ismpl=isid0_tst,isid1_tst
-!!$    print *,' ismpl=',ismpl,smpl_tst(ismpl)%cdirname
-    cdir= smpl_tst(ismpl)%cdirname
-    open(13,file=trim(cmaindir)//'/'//trim(cdir) &
-         //'/erg.ref',status='old')
-    read(13,*) smpl_tst(ismpl)%eref
-    close(13)
-!.....reduce atomic energy from eref
-    do i=1,smpl_tst(ismpl)%natm
-      is= smpl_tst(ismpl)%tag(i)
-      smpl_tst(ismpl)%eref= smpl_tst(ismpl)%eref -eatom(is)
-    enddo
-
-    open(14,file=trim(cmaindir)//'/'//trim(cdir) &
-         //'/frc.ref',status='old')
-    read(14,*) natm
-    if( natm.ne.smpl_tst(ismpl)%natm ) then
-      print *,'Error: natm in sample is not same as smpl%natm'
-      print *,' myid,ismpl,natm,smpl%natm=',myid,ismpl &
-           ,natm,smpl_tst(ismpl)%natm
-      jflag= jflag +1
-    endif
-    do i=1,natm
-      read(14,*) smpl_tst(ismpl)%fref(1:3,i)
-    enddo
-    close(14)
-  enddo
-
-!!$  print *,' reading ref data of test set done.'
 
   if( jflag.gt.0 ) then
     call mpi_finalize(ierr)
@@ -400,14 +381,13 @@ subroutine qn_wrapper()
   implicit none
   integer:: i,m
   real(8):: fval
+  external:: write_stats
 
   !.....NN specific code hereafter
   call NN_init()
-  do i=1,niter,niter_eval
-    call qn(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,i,i+niter_eval-1 &
-         ,iprint,iflag,myid,NN_func,NN_grad,cfmethod)
-    call eval_testset(i+niter_eval-1,fval,gvar)
-  enddo
+  call qn(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
+       ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
+       ,niter_eval,write_stats)
   call NN_analyze()
   call NN_restore_standard()
 
@@ -473,13 +453,6 @@ subroutine sgd()
 
   allocate(gval(nvars),u(nvars))
 
-!!$  if( nnode.ne.1 ) then
-!!$    if(myid.eq.0) print *,'[Error] SGD mode only works '// &
-!!$         'with single process.'
-!!$    call mpi_finalize(ierr)
-!!$    stop
-!!$  endif
-
   alpha1= alpha0
 
   call NN_init()
@@ -501,8 +474,8 @@ subroutine sgd()
         write(6,'(a,i6,f10.3)') ' iter,time=',iter,mpi_wtime()-time0
       endif
     endif
-    do istp=1,maxmynsmpl_trn
-      ismpl= isid0_trn +mynsmpl_trn*urnd()
+    do istp=1,maxmynsmpl
+      ismpl= isid0 +mynsmpl*urnd()
       fval= NN_fs(nvars,vars)
       gval= NN_gs(nvars,vars)
       u(1:nvars)= -gval(1:nvars)
@@ -513,9 +486,6 @@ subroutine sgd()
       do iv=1,nvars
         gnorm= gnorm +gval(iv)*gval(iv)
       enddo
-!!$      if( myid.eq.0 ) then
-!!$        write(6,'(a,3es12.4)') 'alpha1,alpha,gnorm=',alpha1,alpha,gnorm
-!!$      endif
       vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
     enddo
     alpha1= alpha1*(1d0-dalpha)
@@ -602,23 +572,23 @@ end subroutine check_grad
 !=======================================================================
 subroutine test()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad,NN_func_tst
+  use NN,only:NN_init,NN_func,NN_grad
   use parallel
   implicit none 
   integer:: iv
-  real(8):: ft,ftest
+  real(8):: ft
   real(8),allocatable:: gt(:)
 
   allocate(gt(nvars))
 
   call NN_init()
   ft= NN_func(nvars,vars)
-  ftest= NN_func_tst(nvars,vars)
   gt= NN_grad(nvars,vars)
+
+  call write_stats(0)
 
   if( myid.eq.0 ) then
     print *,'func value     =',ft
-    print *,'func_test value=',ftest
     print *,'grad values:'
     do iv=1,nvars
       print *,'iv,grad(iv)=',iv,gt(iv)
@@ -631,32 +601,28 @@ end subroutine test
 subroutine eval_testset(iter,fv,gv)
   use variables
   use parallel
-  use NN, only: NN_func_tst
   implicit none
   integer,intent(in):: iter
   real(8):: fv,gv(nvars)
   
-  real(8):: ft
   character(len=5):: cnum
 
-  ft= NN_func_tst(nvars,vars)
   write(cnum,'(i5.5)') iter
   call write_vars(cnum)
   call write_energy_relation(cnum,.false.)
   call write_force_relation(cnum,.false.)
-  call write_statistics()
+  call write_stats()
   
 end subroutine eval_testset
 !=======================================================================
-subroutine write_energy_relation(cadd,lwrite)
+subroutine write_energy_relation(cadd)
   use variables
   use parallel
   implicit none
   character(len=*),intent(in):: cadd
-  logical,intent(in):: lwrite 
   character(len=128):: cfname
   
-  integer:: ismpl
+  integer:: ismpl,n
   
   cfname='out.erg.'//trim(cadd)
 
@@ -665,13 +631,9 @@ subroutine write_energy_relation(cadd,lwrite)
 
   erefl(1:nsmpl)= 0d0
   epotl(1:nsmpl)= 0d0
-  do ismpl=isid0_trn,isid1_trn
-    erefl(ismpl)= smpl_trn(ismpl)%eref
-    epotl(ismpl)= smpl_trn(ismpl)%epot
-  enddo
-  do ismpl=isid0_tst,isid1_tst
-    erefl(ismpl)= smpl_tst(ismpl)%eref
-    epotl(ismpl)= smpl_tst(ismpl)%epot
+  do ismpl=isid0,isid1
+    erefl(ismpl)= samples(ismpl)%eref
+    epotl(ismpl)= samples(ismpl)%epot
   enddo
   erefg(1:nsmpl)= 0d0
   epotg(1:nsmpl)= 0d0
@@ -680,23 +642,29 @@ subroutine write_energy_relation(cadd,lwrite)
   call mpi_reduce(erefl,erefg,nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
 
-  if( lwrite .and. myid.eq.0 ) then
-    open(90,file=trim(cfname),status='replace')
-    do ismpl=1,nsmpl_trn
-      write(90,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
-           ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)
+  if( myid.eq.0 ) then
+    open(90,file=trim(cfname)//'.1',status='replace')
+    open(91,file=trim(cfname)//'.2',status='replace')
+    do ismpl=1,nsmpl
+      if( iclist(ismpl).eq.1 ) then
+        write(90,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
+             ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)
+      else if( iclist(ismpl).eq.2 ) then
+        write(91,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
+             ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)
+      endif
     enddo
     close(90)
+    close(91)
   endif
   
 end subroutine write_energy_relation
 !=======================================================================
-subroutine write_force_relation(cadd,lwrite)
+subroutine write_force_relation(cadd)
   use variables
   use parallel
   implicit none
   character(len=*),intent(in):: cadd
-  logical,intent(in):: lwrite 
   character(len=128):: cfname
 
   integer:: ismpl,ia,ixyz,natm,nmax,nmaxl
@@ -715,15 +683,10 @@ subroutine write_force_relation(cadd,lwrite)
 
   frefl(1:3,1:nmax,1:nsmpl)= 0d0
   fal(1:3,1:nmax,1:nsmpl)= 0d0
-  do ismpl=isid0_trn,isid1_trn
-    natm= smpl_trn(ismpl)%natm
-    frefl(1:3,1:natm,ismpl)= smpl_trn(ismpl)%fref(1:3,1:natm)
-    fal(1:3,1:natm,ismpl)= smpl_trn(ismpl)%fa(1:3,1:natm)
-  enddo
-  do ismpl=isid0_tst,isid1_tst
-    natm= smpl_tst(ismpl)%natm
-    frefl(1:3,1:natm,ismpl)= smpl_tst(ismpl)%fref(1:3,1:natm)
-    fal(1:3,1:natm,ismpl)= smpl_tst(ismpl)%fa(1:3,1:natm)
+  do ismpl=isid0,isid1
+    natm= samples(ismpl)%natm
+    frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm)
+    fal(1:3,1:natm,ismpl)= samples(ismpl)%fa(1:3,1:natm)
   enddo
   frefg(1:3,1:nmax,1:nsmpl)= 0d0
   fag(1:3,1:nmax,1:nsmpl)= 0d0
@@ -732,117 +695,133 @@ subroutine write_force_relation(cadd,lwrite)
   call mpi_reduce(frefl,frefg,3*nmax*nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
 
-  if( lwrite .and. myid.eq.0 ) then
-    open(91,file=trim(cfname),status='replace')
-    do ismpl=1,nsmpl_trn
-      natm= nalist(ismpl)
-      do ia=1,natm
-        do ixyz=1,3
-          write(91,'(2es15.7,2x,a,i6,i3)') frefg(ixyz,ia,ismpl) &
-               ,fag(ixyz,ia,ismpl) &
-               ,cdirlist(ismpl),ia,ixyz
+  if( myid.eq.0 ) then
+    open(92,file=trim(cfname)//'.1',status='replace')
+    open(93,file=trim(cfname)//'.2',status='replace')
+    do ismpl=1,nsmpl
+      if( iclist(ismpl).eq.1 ) then
+        natm= nalist(ismpl)
+        do ia=1,natm
+          do ixyz=1,3
+            write(92,'(2es15.7,2x,a,i6,i3)') frefg(ixyz,ia,ismpl) &
+                 ,fag(ixyz,ia,ismpl) &
+                 ,cdirlist(ismpl),ia,ixyz
+          enddo
         enddo
-      enddo
+      else if( iclist(ismpl).eq.2 ) then
+        natm= nalist(ismpl)
+        do ia=1,natm
+          do ixyz=1,3
+            write(93,'(2es15.7,2x,a,i6,i3)') frefg(ixyz,ia,ismpl) &
+                 ,fag(ixyz,ia,ismpl) &
+                 ,cdirlist(ismpl),ia,ixyz
+          enddo
+        enddo
+      endif
     enddo
-    close(91)
+    close(92)
+    close(93)
   endif
   
 end subroutine write_force_relation
 !=======================================================================
-subroutine write_statistics()
+subroutine write_stats(iter)
   use variables
   use parallel
+  use NN
   implicit none
-  integer:: ismpl,ia,l,n,natm
-  real(8):: demax,desum,de,rmse,dfmax,dfsum,df
-  real(8):: demax2,desum2,de2,rmse2,dfmax2,dfsum2,df2
-  logical,save:: l1st=.true.
+  integer,intent(in):: iter
+  integer:: ismpl,natm,ntrn,ntst,ia,l
+  type(mdsys)::smpl
+  real(8):: de,df
+  real(8):: demaxl_trn,demax_trn,desuml_trn,desum_trn,rmse_trn
+  real(8):: demaxl_tst,demax_tst,desuml_tst,desum_tst,rmse_tst
+  real(8):: dfmaxl_trn,dfmax_trn,dfsuml_trn,dfsum_trn
+  real(8):: dfmaxl_tst,dfmax_tst,dfsuml_tst,dfsum_tst
 
-  if( .not.allocated(erefg) ) then
-    if(myid.eq.0) then
-      print *,'[Error] write_statistics should be called'// &
-           ' after calling write_???_relation.'
+  demaxl_trn= 0d0
+  desuml_trn= 0d0
+  demaxl_tst= 0d0
+  desuml_tst= 0d0
+  do ismpl=isid0,isid1
+    smpl= samples(ismpl)
+    natm= smpl%natm
+    de= abs(smpl%epot -smpl%eref)/natm
+    if( smpl%iclass.eq.1 ) then
+      demaxl_trn= max(demaxl_trn,de)
+      desuml_trn=desuml_trn +de*de
+    else if( smpl%iclass.eq.2 ) then
+      demaxl_tst= max(demaxl_tst,de)
+      desuml_tst=desuml_tst +de*de
     endif
-    call mpi_finalize(ierr)
-    stop
-  endif
-
-  if(myid.eq.0) write(6,'(a)') '>>>>> statistics:'
-  !.....energies of training set
-  demax= 0d0
-  desum= 0d0
-  do ismpl=1,nsmpl_trn
-    natm= nalist(ismpl)
-    de= abs(epotg(ismpl) -erefg(ismpl))/natm
-    demax= max(demax,de)
-    desum=desum +de*de/nsmpl_trn
   enddo
-  rmse= sqrt(desum)
-  !.....energies of test set
-  demax2= 0d0
-  desum2= 0d0
-  do ismpl=nsmpl_trn+1,nsmpl
-    natm= nalist(ismpl)
-    de2= abs(epotg(ismpl) -erefg(ismpl))/natm
-    demax2= max(demax2,de2)
-    desum2=desum2 +de2*de2/nsmpl_tst
-  enddo
-  rmse2= sqrt(desum2)
+  desum_trn= 0d0
+  desum_tst= 0d0
+  call mpi_reduce(desuml_trn,desum_trn,1 &
+       ,mpi_double_precision,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(desuml_tst,desum_tst,1 &
+       ,mpi_double_precision,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(demaxl_trn,demax_trn,1 &
+       ,mpi_double_precision,mpi_max,0,mpi_world,ierr)
+  call mpi_reduce(demaxl_tst,demax_tst,1 &
+       ,mpi_double_precision,mpi_max,0,mpi_world,ierr)
+  rmse_trn= sqrt(desum_trn/nsmpl_trn)
+  rmse_tst= sqrt(desum_tst/nsmpl_tst)
   if( myid.eq.0 ) then
-    write(6,'(a)') ' Training set,'
-    write(6,'(a,f12.3,a)') '  RMSE of energies         =',rmse,' eV/atom'
-    write(6,'(a,f12.3,a)') '  Max residual of energies =',demax,' eV/atom'
-    write(6,'(a)') ' Test set,'
-    write(6,'(a,f12.3,a)') '  RMSE of energies         =',rmse2,' eV/atom'
-    write(6,'(a,f12.3,a)') '  Max residual of energies =',demax2,' eV/atom'
-    write(6,'(a,4f15.7)') '  energy:training(rmse,max),test(rmse,max)=' &
-         ,rmse,demax,rmse2,demax2
+    write(6,'(a,i8,4f15.7)') '  energy:training(rmse,max)' &
+         //',test(rmse,max)=',iter &
+         ,rmse_trn,demax_trn,rmse_tst,demax_tst
   endif
 
-  !.....forces of training set
-  dfmax= 0d0
-  dfsum= 0d0
-  n= 0
-  do ismpl=1,nsmpl_trn
-    natm= nalist(ismpl)
-    do ia=1,natm
-      do l=1,3
-        df= abs(fag(l,ia,ismpl)-frefg(l,ia,ismpl))
-        dfmax= max(dfmax,df)
-        dfsum=dfsum +df*df
-        n=n +1
+!.....force
+  dfmaxl_trn= 0d0
+  dfsuml_trn= 0d0
+  dfmaxl_tst= 0d0
+  dfsuml_tst= 0d0
+  ntrn= 0
+  ntst= 0
+  do ismpl=isid0,isid1
+    smpl= samples(ismpl)
+    natm= smpl%natm
+    if( smpl%iclass.eq.1 ) then
+      do ia=1,natm
+        do l=1,3
+          df= abs(smpl%fa(l,ia)-smpl%fref(l,ia))
+          dfmaxl_trn= max(dfmaxl_trn,df)
+          dfsuml_trn=dfsuml_trn +df*df
+          ntrn=ntrn +1
+        enddo
       enddo
-    enddo
-  enddo
-  rmse= sqrt(dfsum/n)
-  !.....forces of test set
-  dfmax2= 0d0
-  dfsum2= 0d0
-  n= 0
-  do ismpl=nsmpl_trn+1,nsmpl
-    natm= nalist(ismpl)
-    do ia=1,natm
-      do l=1,3
-        df2= abs(fag(l,ia,ismpl)-frefg(l,ia,ismpl))
-        dfmax2= max(dfmax2,df2)
-        dfsum2=dfsum2 +df2*df2
-        n=n +1
+    else if( smpl%iclass.eq.2 ) then
+      do ia=1,natm
+        do l=1,3
+          df= abs(smpl%fa(l,ia)-smpl%fref(l,ia))
+          dfmaxl_tst= max(dfmaxl_tst,df)
+          dfsuml_tst=dfsuml_tst +df*df
+          ntst=ntst +1
+        enddo
       enddo
-    enddo
+    endif
   enddo
-  rmse2= sqrt(dfsum2/n)
-  if(myid.eq.0) then
-    write(6,'(a)') ' Training set,'
-    write(6,'(a,f12.3,a)') '  RMSE of forces           =',rmse,' eV/A'
-    write(6,'(a,f12.3,a)') '  Max residual of forces   =',dfmax,' eV/A'
-    write(6,'(a)') ' Test set,'
-    write(6,'(a,f12.3,a)') '  RMSE of forces           =',rmse2,' eV/A'
-    write(6,'(a,f12.3,a)') '  Max residual of forces   =',dfmax2,' eV/A'
-    write(6,'(a,4f15.7)') '  force:training(rmse,max),test(rmse,max)=' &
-         ,rmse,dfmax,rmse2,dfmax2
-    print *,''
+  dfsum_trn= 0d0
+  dfsum_tst= 0d0
+  call mpi_reduce(dfsuml_trn,dfsum_trn,1 &
+       ,mpi_double_precision,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(dfsuml_tst,dfsum_tst,1 &
+       ,mpi_double_precision,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(dfmaxl_trn,dfmax_trn,1 &
+       ,mpi_double_precision,mpi_max,0,mpi_world,ierr)
+  call mpi_reduce(dfmaxl_tst,dfmax_tst,1 &
+       ,mpi_double_precision,mpi_max,0,mpi_world,ierr)
+  rmse_trn= sqrt(dfsum_trn/ntrn)
+  rmse_tst= sqrt(dfsum_tst/ntrn)
+  if( myid.eq.0 ) then
+    write(6,'(a,i8,4f15.7)') '  force:training(rmse,max)' &
+         //',test(rmse,max)=',iter &
+         ,rmse_trn,dfmax_trn,rmse_tst,dfmax_tst
   endif
-end subroutine write_statistics
+
+end subroutine write_stats
 !=======================================================================
 subroutine write_eliminated_vars()
   use variables
@@ -904,58 +883,27 @@ subroutine get_node2sample()
   integer:: n,m,ip
 
 !.....compute num samples for training per node (nspn)
-  n= nsmpl_trn/nnode
-  m= nsmpl_trn -n*nnode
-  allocate(nspn_trn(nnode),ispn_trn(nnode))
+  n= nsmpl/nnode
+  m= nsmpl -n*nnode
+  allocate(nspn(nnode),ispn(nnode))
   do ip=1,nnode
-    nspn_trn(ip)= n
-    if( ip.le.m ) nspn_trn(ip)= nspn_trn(ip) +1
+    nspn(ip)= n
+    if( ip.le.m ) nspn(ip)= nspn(ip) +1
   enddo
-  mynsmpl_trn= nspn_trn(myid+1)
-  call mpi_allreduce(mynsmpl_trn,maxmynsmpl_trn,1,mpi_integer,mpi_max &
+  mynsmpl= nspn(myid+1)
+  call mpi_allreduce(mynsmpl,maxmynsmpl,1,mpi_integer,mpi_max &
        ,mpi_world,ierr)
-!!$  print *,' myid,mynsmpl_trn,maxmynsmpl_trn=' &
-!!$       ,myid,mynsmpl_trn,maxmynsmpl_trn
-  if( myid.eq.0 ) print *,'maxmynsmpl_trn=',maxmynsmpl_trn
+  if( myid.eq.0 ) print *,'maxmynsmpl=',maxmynsmpl
 
   !.....compute start and end of sample-id of this process
-  isid0_trn= 0
-  isid1_trn= 0
+  isid0= 0
+  isid1= 0
   do ip=1,nnode
-    isid1_trn= isid1_trn +nspn_trn(ip)
-    ispn_trn(ip)= isid1_trn -nspn_trn(ip) +1
+    isid1= isid1 +nspn(ip)
+    ispn(ip)= isid1 -nspn(ip) +1
   enddo
-  isid0_trn= ispn_trn(myid+1)
-  isid1_trn= ispn_trn(myid+1) +nspn_trn(myid+1) -1
-
-!!$  write(6,'(a,20i3)') ' myid,isid0,isid1,nspn(:),ispn(:)=' &
-!!$       ,myid,isid0,isid1,nspn(1:nnode),ispn(1:nnode)
-
-!.....compute num samples for test per node (nspn)
-  n= nsmpl_tst/nnode
-  m= nsmpl_tst -n*nnode
-  allocate(nspn_tst(nnode),ispn_tst(nnode))
-  do ip=1,nnode
-    nspn_tst(ip)= n
-    if( ip.le.m ) nspn_tst(ip)= nspn_tst(ip) +1
-  enddo
-  mynsmpl_tst= nspn_tst(myid+1)
-  call mpi_allreduce(mynsmpl_tst,maxmynsmpl_tst,1,mpi_integer,mpi_max &
-       ,mpi_world,ierr)
-!!$  print *,' myid,mynsmpl_tst,maxmynsmpl_tst=' &
-!!$       ,myid,mynsmpl_tst,maxmynsmpl_tst
-  if( myid.eq.0 ) print *,'maxmynsmpl_tst=',maxmynsmpl_tst
-
-  !.....compute start and end of sample-id of this process
-  isid0_tst= nsmpl_trn
-  isid1_tst= nsmpl_trn
-  do ip=1,nnode
-    isid1_tst= isid1_tst +nspn_tst(ip)
-    ispn_tst(ip)= isid1_tst -nspn_tst(ip) +1
-  enddo
-  isid0_tst= ispn_tst(myid+1)
-  isid1_tst= ispn_tst(myid+1) +nspn_tst(myid+1) -1
-
+  isid0= ispn(myid+1)
+  isid1= ispn(myid+1) +nspn(myid+1) -1
 
   if( myid.eq.0 ) print *,'get_node2sample done.'
   return
