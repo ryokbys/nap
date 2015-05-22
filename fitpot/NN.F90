@@ -19,7 +19,7 @@ module NN
     real(8),allocatable:: gsfo(:,:)
   end type smpldata
 
-  type(smpldata),save,allocatable:: sds_trn(:),sds_tst(:)
+  type(smpldata),save,allocatable:: sds(:)
 
   integer,save:: maxna
   real(8),save,allocatable:: fdiff(:,:)
@@ -83,41 +83,24 @@ contains
     endif
 
 !.....training set
-    allocate(sds_trn(isid0_trn:isid1_trn))
-    do ismpl=isid0_trn,isid1_trn
-      natm= smpl_trn(ismpl)%natm
-      allocate( sds_trn(ismpl)%gsf(natm,nhl(0)) &
-           ,sds_trn(ismpl)%dgsf(3,natm,natm,nhl(0)) )
+    allocate(sds(isid0:isid1))
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      allocate( sds(ismpl)%gsf(natm,nhl(0)) &
+           ,sds(ismpl)%dgsf(3,natm,natm,nhl(0)) )
       if( nl.eq.1 ) then
-        allocate(sds_trn(ismpl)%hl1(natm,nhl(1)))
+        allocate(sds(ismpl)%hl1(natm,nhl(1)))
       else if( nl.eq.2 ) then
-        allocate(sds_trn(ismpl)%hl1(natm,nhl(1)),&
-             sds_trn(ismpl)%hl2(natm,nhl(2)))
-      endif
-    enddo
-!.....test set
-    allocate(sds_tst(isid0_tst:isid1_tst))
-    do ismpl=isid0_tst,isid1_tst
-      natm= smpl_tst(ismpl)%natm
-      allocate( sds_tst(ismpl)%gsf(natm,nhl(0)) &
-           ,sds_tst(ismpl)%dgsf(3,natm,natm,nhl(0)) )
-      if( nl.eq.1 ) then
-        allocate(sds_tst(ismpl)%hl1(natm,nhl(1)))
-      else if( nl.eq.2 ) then
-        allocate(sds_tst(ismpl)%hl1(natm,nhl(1)),&
-             sds_tst(ismpl)%hl2(natm,nhl(2)))
+        allocate(sds(ismpl)%hl1(natm,nhl(1)),&
+             sds(ismpl)%hl2(natm,nhl(2)))
       endif
     enddo
     call get_bases()
 
     maxna= 0
-    do ismpl=isid0_trn,isid1_trn
-      if( maxna.lt.smpl_trn(ismpl)%natm )  &
-           maxna= smpl_trn(ismpl)%natm
-    enddo
-    do ismpl=isid0_tst,isid1_tst
-      if( maxna.lt.smpl_tst(ismpl)%natm )  &
-           maxna= smpl_tst(ismpl)%natm
+    do ismpl=isid0,isid1
+      if( maxna.lt.samples(ismpl)%natm )  &
+           maxna= samples(ismpl)%natm
     enddo
 !!$    print *,' myid, max num of atoms [maxna] =',myid,maxna
     allocate(fdiff(3,maxna))
@@ -145,8 +128,8 @@ contains
   end subroutine NN_init
 !=======================================================================
   function NN_func(ndim,x)
-    use variables, only:nsmpl_trn,nprcs,tfunc,smpl_trn &
-         ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta
+    use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
+         ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta,mdsys
     use parallel
     use minimize
     implicit none
@@ -157,6 +140,7 @@ contains
     integer:: ismpl,natm,ia,ixyz,idim
     real(8):: dn3i,ediff,tf0,tc0,fscale,eref,swgt
     real(8):: flocal
+    type(mdsys):: smpl
 
     nfunc= nfunc +1
 
@@ -164,30 +148,31 @@ contains
     tf0= mpi_wtime()
     call vars2wgts(ndim,x)
     
-    do ismpl=isid0_trn,isid1_trn
+    do ismpl=isid0,isid1
       if( nl.eq.1 ) then
-        call calc_ef1(smpl_trn(ismpl),sds_trn(ismpl))
+        call calc_ef1(samples(ismpl),sds(ismpl))
       else if( nl.eq.2 ) then
-        call calc_ef2(smpl_trn(ismpl),sds_trn(ismpl))
+        call calc_ef2(samples(ismpl),sds(ismpl))
       endif
     enddo
 
 !!$    NN_func= 0d0
     flocal= 0d0
-    do ismpl=isid0_trn,isid1_trn
-      natm= smpl_trn(ismpl)%natm
-      eref= smpl_trn(ismpl)%eref
-      ediff= (smpl_trn(ismpl)%epot -eref)/natm
+    do ismpl=isid0,isid1
+      smpl= samples(ismpl)
+      if( smpl%iclass.ne.1 ) cycle
+      natm= smpl%natm
+      eref= smpl%eref
+      ediff= (smpl%epot -eref)/natm
       ediff= ediff*ediff
-!!$      NN_func= NN_func +ediff
       swgt= 1d0
       if( lswgt ) then
         swgt= exp(-eref/natm*swbeta)
       endif
       flocal= flocal +ediff*swgt
       if( .not. lfmatch ) cycle
-      fdiff(1:3,1:natm)= (smpl_trn(ismpl)%fa(1:3,1:natm) &
-           -smpl_trn(ismpl)%fref(1:3,1:natm))
+      fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
+           -smpl%fref(1:3,1:natm))
       dn3i= 1d0 /(3*natm)
       fscale= 1d0
       !.....force-scale makes force contribution same order to energy
@@ -196,19 +181,15 @@ contains
            *dn3i *fscale *swgt
       do ia=1,natm
         do ixyz=1,3
-!!$          NN_func= NN_func +fdiff(ixyz,ia)
           flocal= flocal +fdiff(ixyz,ia)
         enddo
       enddo
     enddo
 
-!!$    if(myid.eq.0) print *,'NN_func: call allreduce'
     tc0= mpi_wtime()
     NN_func= 0d0
-!!$    print *,'here01,myid,flocal=',myid,flocal
     call mpi_allreduce(flocal,NN_func,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
-!!$    print *,'here02,myid,NN_func=',myid,NN_func
     tcomm= tcomm +mpi_wtime() -tc0
     NN_func= NN_func/nsmpl_trn
 
@@ -216,78 +197,72 @@ contains
     return
   end function NN_func
 !=======================================================================
-  function NN_func_tst(ndim,x)
-    use variables, only:nsmpl_tst,nprcs,tfunc,smpl_tst &
-         ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta
-    use parallel
-    use minimize
-    implicit none
-    integer,intent(in):: ndim
-    real(8),intent(in):: x(ndim)
-    real(8):: NN_func_tst
-
-    integer:: ismpl,natm,ia,ixyz,idim
-    real(8):: dn3i,ediff,tf0,tc0,fscale,eref,swgt
-    real(8):: flocal
-
-    nfunc= nfunc +1
-
-    call mpi_bcast(x,ndim,mpi_double_precision,0,mpi_world,ierr)
-    tf0= mpi_wtime()
-    call vars2wgts(ndim,x)
-    
-    do ismpl=isid0_tst,isid1_tst
-      if( nl.eq.1 ) then
-        call calc_ef1(smpl_tst(ismpl),sds_tst(ismpl))
-      else if( nl.eq.2 ) then
-        call calc_ef2(smpl_tst(ismpl),sds_tst(ismpl))
-      endif
-    enddo
-
-!!$    NN_func= 0d0
-    flocal= 0d0
-    do ismpl=isid0_tst,isid1_tst
-      natm= smpl_tst(ismpl)%natm
-      eref= smpl_tst(ismpl)%eref
-      ediff= (smpl_tst(ismpl)%epot -eref)/natm
-      ediff= ediff*ediff
-!!$      NN_func= NN_func +ediff
-      swgt= 1d0
-      if( lswgt ) then
-        swgt= exp(-eref/natm*swbeta)
-      endif
-      flocal= flocal +ediff*swgt
-      if( .not. lfmatch ) cycle
-      fdiff(1:3,1:natm)= (smpl_tst(ismpl)%fa(1:3,1:natm) &
-           -smpl_tst(ismpl)%fref(1:3,1:natm))
-      dn3i= 1d0 /(3*natm)
-      fscale= 1d0
-      !.....force-scale makes force contribution same order to energy
-      if( lfscale ) fscale= fscl
-      fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
-           *dn3i *fscale *swgt
-      do ia=1,natm
-        do ixyz=1,3
-!!$          NN_func= NN_func +fdiff(ixyz,ia)
-          flocal= flocal +fdiff(ixyz,ia)
-        enddo
-      enddo
-    enddo
-
-!!$    if(myid.eq.0) print *,'NN_func: call allreduce'
-    tc0= mpi_wtime()
-    NN_func_tst= 0d0
-!!$    print *,'here01,myid,flocal=',myid,flocal
-    call mpi_allreduce(flocal,NN_func_tst,1,mpi_double_precision &
-         ,mpi_sum,mpi_world,ierr)
-!!$    print *,'here02,myid,NN_func=',myid,NN_func
-    tcomm= tcomm +mpi_wtime() -tc0
-    NN_func_tst= NN_func_tst/nsmpl_tst
-
-    tfunc= tfunc +mpi_wtime() -tf0
-    return
-  end function NN_func_tst
-!=======================================================================
+!!$  function NN_func_tst(ndim,x)
+!!$    use variables, only:nsmpl_tst,nprcs,tfunc,smpl_tst &
+!!$         ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta
+!!$    use parallel
+!!$    use minimize
+!!$    implicit none
+!!$    integer,intent(in):: ndim
+!!$    real(8),intent(in):: x(ndim)
+!!$    real(8):: NN_func_tst
+!!$
+!!$    integer:: ismpl,natm,ia,ixyz,idim
+!!$    real(8):: dn3i,ediff,tf0,tc0,fscale,eref,swgt
+!!$    real(8):: flocal
+!!$
+!!$    nfunc= nfunc +1
+!!$
+!!$    call mpi_bcast(x,ndim,mpi_double_precision,0,mpi_world,ierr)
+!!$    tf0= mpi_wtime()
+!!$    call vars2wgts(ndim,x)
+!!$    
+!!$    do ismpl=isid0_tst,isid1_tst
+!!$      if( nl.eq.1 ) then
+!!$        call calc_ef1(smpl_tst(ismpl),sds_tst(ismpl))
+!!$      else if( nl.eq.2 ) then
+!!$        call calc_ef2(smpl_tst(ismpl),sds_tst(ismpl))
+!!$      endif
+!!$    enddo
+!!$
+!!$    flocal= 0d0
+!!$    do ismpl=isid0_tst,isid1_tst
+!!$      natm= smpl_tst(ismpl)%natm
+!!$      eref= smpl_tst(ismpl)%eref
+!!$      ediff= (smpl_tst(ismpl)%epot -eref)/natm
+!!$      ediff= ediff*ediff
+!!$      swgt= 1d0
+!!$      if( lswgt ) then
+!!$        swgt= exp(-eref/natm*swbeta)
+!!$      endif
+!!$      flocal= flocal +ediff*swgt
+!!$      if( .not. lfmatch ) cycle
+!!$      fdiff(1:3,1:natm)= (smpl_tst(ismpl)%fa(1:3,1:natm) &
+!!$           -smpl_tst(ismpl)%fref(1:3,1:natm))
+!!$      dn3i= 1d0 /(3*natm)
+!!$      fscale= 1d0
+!!$      !.....force-scale makes force contribution same order to energy
+!!$      if( lfscale ) fscale= fscl
+!!$      fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
+!!$           *dn3i *fscale *swgt
+!!$      do ia=1,natm
+!!$        do ixyz=1,3
+!!$          flocal= flocal +fdiff(ixyz,ia)
+!!$        enddo
+!!$      enddo
+!!$    enddo
+!!$
+!!$    tc0= mpi_wtime()
+!!$    NN_func_tst= 0d0
+!!$    call mpi_allreduce(flocal,NN_func_tst,1,mpi_double_precision &
+!!$         ,mpi_sum,mpi_world,ierr)
+!!$    tcomm= tcomm +mpi_wtime() -tc0
+!!$    NN_func_tst= NN_func_tst/nsmpl_tst
+!!$
+!!$    tfunc= tfunc +mpi_wtime() -tf0
+!!$    return
+!!$  end function NN_func_tst
+!!$!=======================================================================
   function NN_fs(ndim,x)
     use variables
     use parallel
@@ -300,22 +275,23 @@ contains
     real(8):: dn3i,ediff,tf0,fscale,eref,swgt,flocal,tc0
     integer:: ismpl
     common /samplei/ ismpl
-    
+    type(mdsys):: smpl
 
     nfunc=nfunc +1
     tf0= mpi_wtime()
     call vars2wgts(ndim,x)
 
+    smpl= samples(ismpl)
     if( nl.eq.1 ) then
-      call calc_ef1(smpl_trn(ismpl),sds_trn(ismpl))
+      call calc_ef1(smpl,sds(ismpl))
     else if( nl.eq.2 ) then
-      call calc_ef2(smpl_trn(ismpl),sds_trn(ismpl))
+      call calc_ef2(smpl,sds(ismpl))
     endif
 
     flocal= 0d0
-    natm= smpl_trn(ismpl)%natm
-    eref= smpl_trn(ismpl)%eref
-    ediff= (smpl_trn(ismpl)%epot -eref)/natm
+    natm= smpl%natm
+    eref= smpl%eref
+    ediff= (smpl%epot -eref)/natm
     ediff= ediff*ediff
     swgt= 1d0
     if( lswgt ) then
@@ -323,8 +299,8 @@ contains
     endif
     flocal= flocal +ediff*swgt
     if( .not. lfmatch ) goto 999
-    fdiff(1:3,1:natm)= (smpl_trn(ismpl)%fa(1:3,1:natm) &
-         -smpl_trn(ismpl)%fref(1:3,1:natm))
+    fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
+         -smpl%fref(1:3,1:natm))
     dn3i= 1d0 /(3*natm)
     fscale= 1d0
 !.....force-scale makes force contribution same order to energy
@@ -458,7 +434,7 @@ contains
   end subroutine calc_ef2
 !=======================================================================
   function NN_grad(ndim,x)
-    use variables,only: nsmpl_trn,nprcs,tgrad,ngrad,tcomm,smpl_trn
+    use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm,samples,mdsys
     use parallel
     use minimize
     implicit none
@@ -469,6 +445,7 @@ contains
     integer:: ismpl,i,idim
     real(8),save,allocatable:: gs(:),glocal(:)
     real(8):: gmax,vmax,tc0,tg0
+    type(mdsys):: smpl
 
     if( .not.allocated(gs) ) allocate(gs(ndim),glocal(ndim))
 
@@ -478,11 +455,12 @@ contains
 !!$    NN_grad(1:ndim)= 0d0
     glocal(1:ndim)= 0d0
 
-    do ismpl=isid0_trn,isid1_trn
+    do ismpl=isid0,isid1
+      if( samples(ismpl)%iclass.ne.1 ) cycle
       if( nl.eq.1 ) then
-        call grad1(smpl_trn(ismpl),sds_trn(ismpl),gs)
+        call grad1(samples(ismpl),sds(ismpl),gs)
       else if( nl.eq.2 ) then
-        call grad2(smpl_trn(ismpl),sds_trn(ismpl),gs)
+        call grad2(samples(ismpl),sds(ismpl),gs)
       endif
 !!$      NN_grad(1:ndim)= NN_grad(1:ndim) +gs(1:ndim)
       glocal(1:ndim)= glocal(1:ndim) +gs(1:ndim)
@@ -531,9 +509,9 @@ contains
 
     gsl(1:nvars)= 0d0
     if( nl.eq.1 ) then
-      call grad1(smpl_trn(ismpl),sds_trn(ismpl),gsl)
+      call grad1(samples(ismpl),sds(ismpl),gsl)
     else if( nl.eq.2 ) then
-      call grad2(smpl_trn(ismpl),sds_trn(ismpl),gsl)
+      call grad2(samples(ismpl),sds(ismpl),gsl)
     endif
 
     tc0= mpi_wtime()
@@ -940,17 +918,16 @@ contains
     integer:: itmp,ismpl,natm,ia,ihl0,ja
     character*5:: cdir
 
-!.....training set
-    do ismpl=isid0_trn,isid1_trn
-      natm= smpl_trn(ismpl)%natm
-      cdir= smpl_trn(ismpl)%cdirname
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      cdir= samples(ismpl)%cdirname
       !.....gsf
       open(21,file=trim(cmaindir)//'/'//cdir//'/smd/out.NN.gsf'&
            ,status='old')
       read(21,*) itmp
       do ia=1,natm
         do ihl0=1,nhl(0)
-          read(21,*) itmp, itmp, sds_trn(ismpl)%gsf(ia,ihl0)
+          read(21,*) itmp, itmp, sds(ismpl)%gsf(ia,ihl0)
         enddo
       enddo
       close(21)
@@ -960,39 +937,13 @@ contains
       do ia=1,natm
         do ihl0=1,nhl(0)
           do ja=1,natm
-            read(22,*) itmp,itmp,itmp ,sds_trn(ismpl)%dgsf(1:3,ja,ia,ihl0)
+            read(22,*) itmp,itmp,itmp ,sds(ismpl)%dgsf(1:3,ja,ia,ihl0)
           enddo
         enddo
       enddo
       close(22)
     enddo
 
-!.....test set
-    do ismpl=isid0_tst,isid1_tst
-      natm= smpl_tst(ismpl)%natm
-      cdir= smpl_tst(ismpl)%cdirname
-      !.....gsf
-      open(21,file=trim(cmaindir)//'/'//cdir//'/smd/out.NN.gsf'&
-           ,status='old')
-      read(21,*) itmp
-      do ia=1,natm
-        do ihl0=1,nhl(0)
-          read(21,*) itmp, itmp, sds_tst(ismpl)%gsf(ia,ihl0)
-        enddo
-      enddo
-      close(21)
-      !.....dgsf
-      open(22,file=trim(cmaindir)//'/'//cdir//'/smd/out.NN.dgsf'&
-           ,status='old')
-      do ia=1,natm
-        do ihl0=1,nhl(0)
-          do ja=1,natm
-            read(22,*) itmp,itmp,itmp ,sds_tst(ismpl)%dgsf(1:3,ja,ia,ihl0)
-          enddo
-        enddo
-      enddo
-      close(22)
-    enddo
 
     if(myid.eq.0) print *, 'get_bases done.'
   end subroutine get_bases
@@ -1001,7 +952,7 @@ contains
 !
 !  Standardize of inputs is requied when you use lasso or ridge.
 !
-    use variables, only: nsmpl_trn,smpl_trn,nvars,nalist,vars
+    use variables, only: nsmpl,samples,nvars,nalist,vars
     use parallel
     implicit none
     integer:: nsuml,nsumg,ismpl,ia,natm,ihl0,ihl1,iv
@@ -1012,13 +963,13 @@ contains
 
     gmaxl(1:nhl(0))= 0d0
     gminl(1:nhl(0))= 1d+30
-    do ismpl=isid0_trn,isid1_trn
-      natm= smpl_trn(ismpl)%natm
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
       !.....sum up gsf
       do ihl0=1,nhl(0)
         do ia=1,natm
-          gmaxl(ihl0)= max(gmaxl(ihl0),sds_trn(ismpl)%gsf(ia,ihl0))
-          gminl(ihl0)= min(gminl(ihl0),sds_trn(ismpl)%gsf(ia,ihl0))
+          gmaxl(ihl0)= max(gmaxl(ihl0),sds(ismpl)%gsf(ia,ihl0))
+          gminl(ihl0)= min(gminl(ihl0),sds(ismpl)%gsf(ia,ihl0))
         enddo
       enddo
     enddo
@@ -1038,13 +989,13 @@ contains
 !!$    endif
 
 !.....standardize G values
-    do ismpl=isid0_trn,isid1_trn
-      natm= smpl_trn(ismpl)%natm
-      allocate(sds_trn(ismpl)%gsfo(natm,nhl(0)))
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      allocate(sds(ismpl)%gsfo(natm,nhl(0)))
       do ihl0=1,nhl(0)
         do ia=1,natm
-          sds_trn(ismpl)%gsfo(ia,ihl0)= sds_trn(ismpl)%gsf(ia,ihl0)
-          sds_trn(ismpl)%gsf(ia,ihl0)= sds_trn(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
+          sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
+          sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
         enddo
       enddo
     enddo
@@ -1066,7 +1017,7 @@ contains
 !
 !  Standardize of inputs is requied when you use lasso or ridge.
 !
-    use variables, only: nsmpl,smpl_trn,nvars,nalist,vars
+    use variables, only: nsmpl,samples,nvars,nalist,vars
     use parallel
     implicit none
     integer:: ismpl,ia,natm,ihl0,ihl1,iv
@@ -1080,12 +1031,12 @@ contains
     !.....compute mean value
     gmeanl(1:nhl(0))= 0d0
     nsuml(1:nhl(0))= 0
-    do ismpl=isid0_trn,isid1_trn
-      natm= smpl_trn(ismpl)%natm
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
       !.....sum up gsf
       do ihl0=1,nhl(0)
         do ia=1,natm
-          gmeanl(ihl0)= gmeanl(ihl0) +sds_trn(ismpl)%gsf(ia,ihl0)
+          gmeanl(ihl0)= gmeanl(ihl0) +sds(ismpl)%gsf(ia,ihl0)
           nsuml(ihl0)= nsuml(ihl0) +1
         enddo
       enddo
@@ -1100,13 +1051,13 @@ contains
 
     !.....compute variance
     gmaxl(1:nhl(0))= 0d0
-    do ismpl=isid0_trn,isid1_trn
-      natm= smpl_trn(ismpl)%natm
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
       !.....sum up gsf
       do ihl0=1,nhl(0)
         do ia=1,natm
-          gmaxl(ihl0)= gmaxl(ihl0) +(gmean(ihl0)-sds_trn(ismpl)%gsf(ia,ihl0))&
-               *(gmean(ihl0)-sds_trn(ismpl)%gsf(ia,ihl0))
+          gmaxl(ihl0)= gmaxl(ihl0) +(gmean(ihl0)-sds(ismpl)%gsf(ia,ihl0))&
+               *(gmean(ihl0)-sds(ismpl)%gsf(ia,ihl0))
         enddo
       enddo
     enddo
@@ -1120,13 +1071,13 @@ contains
     enddo
 
 !.....standardize G values
-    do ismpl=isid0_trn,isid1_trn
-      natm= smpl_trn(ismpl)%natm
-      allocate(sds_trn(ismpl)%gsfo(natm,nhl(0)))
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      allocate(sds(ismpl)%gsfo(natm,nhl(0)))
       do ihl0=1,nhl(0)
         do ia=1,natm
-          sds_trn(ismpl)%gsfo(ia,ihl0)= sds_trn(ismpl)%gsf(ia,ihl0)
-          sds_trn(ismpl)%gsf(ia,ihl0)= sds_trn(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
+          sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
+          sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
         enddo
       enddo
     enddo
@@ -1283,4 +1234,5 @@ contains
     call mpi_barrier(mpi_world,ierr)
     return
   end subroutine NN_analyze
+!=======================================================================
 end module NN
