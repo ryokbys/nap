@@ -191,6 +191,7 @@ subroutine set_training_test()
   integer,allocatable,dimension(:):: icll
 
   allocate(icll(nsmpl),iclist(nsmpl))
+  icll(1:nsmpl)= 0
 
   nsmpl_tst= nsmpl*ratio_test
   nsmpl_trn= nsmpl -nsmpl_tst
@@ -203,7 +204,7 @@ subroutine set_training_test()
     myntst= nsmpl_tst/nnode
   endif
   myntrn= mynsmpl -myntst
-  print *,' myid,myntrn,myntst=',myid,myntrn,myntst
+!!$  print *,' myid,myntrn,myntst=',myid,myntrn,myntst
   n=0
   do ismpl=isid0,isid1
     n=n+1
@@ -220,6 +221,9 @@ subroutine set_training_test()
        ,mpi_world,ierr)
   
   if( myid.eq.0 ) then
+!!$    do ismpl=1,nsmpl
+!!$      print *,'ismpl,iclist=',ismpl,iclist(ismpl)
+!!$    enddo
     print *,'nsmpl, training, test=',nsmpl,nsmpl_trn,nsmpl_tst
     print *,'set_training_test done.'
   endif
@@ -362,7 +366,8 @@ subroutine write_vars(cadd)
   integer:: i
   character(len=128):: cfname
 
-  cfname= trim(cmaindir)//'/'//trim(cparfile)//'.'//trim(cadd)
+!!$  cfname= trim(cmaindir)//'/'//trim(cparfile)//'.'//trim(cadd)
+  cfname= trim(cparfile)//'.'//trim(cadd)
 
   if( myid.eq.0 ) then
     open(15,file=trim(cfname),status='replace')
@@ -601,23 +606,6 @@ subroutine test()
 
 end subroutine test
 !=======================================================================
-subroutine eval_testset(iter,fv,gv)
-  use variables
-  use parallel
-  implicit none
-  integer,intent(in):: iter
-  real(8):: fv,gv(nvars)
-  
-  character(len=5):: cnum
-
-  write(cnum,'(i5.5)') iter
-  call write_vars(cnum)
-  call write_energy_relation(cnum,.false.)
-  call write_force_relation(cnum,.false.)
-  call write_stats()
-  
-end subroutine eval_testset
-!=======================================================================
 subroutine write_energy_relation(cadd)
   use variables
   use parallel
@@ -734,7 +722,7 @@ subroutine write_stats(iter)
   use NN
   implicit none
   integer,intent(in):: iter
-  integer:: ismpl,natm,ntrn,ntst,ia,l
+  integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst
   type(mdsys)::smpl
   real(8):: de,df
   real(8):: demaxl_trn,demax_trn,desuml_trn,desum_trn,rmse_trn
@@ -781,8 +769,8 @@ subroutine write_stats(iter)
   dfsuml_trn= 0d0
   dfmaxl_tst= 0d0
   dfsuml_tst= 0d0
-  ntrn= 0
-  ntst= 0
+  ntrnl= 0
+  ntstl= 0
   do ismpl=isid0,isid1
     smpl= samples(ismpl)
     natm= smpl%natm
@@ -792,7 +780,7 @@ subroutine write_stats(iter)
           df= abs(smpl%fa(l,ia)-smpl%fref(l,ia))
           dfmaxl_trn= max(dfmaxl_trn,df)
           dfsuml_trn=dfsuml_trn +df*df
-          ntrn=ntrn +1
+          ntrnl=ntrnl +1
         enddo
       enddo
     else if( smpl%iclass.eq.2 ) then
@@ -801,7 +789,7 @@ subroutine write_stats(iter)
           df= abs(smpl%fa(l,ia)-smpl%fref(l,ia))
           dfmaxl_tst= max(dfmaxl_tst,df)
           dfsuml_tst=dfsuml_tst +df*df
-          ntst=ntst +1
+          ntstl=ntstl +1
         enddo
       enddo
     endif
@@ -816,8 +804,14 @@ subroutine write_stats(iter)
        ,mpi_double_precision,mpi_max,0,mpi_world,ierr)
   call mpi_reduce(dfmaxl_tst,dfmax_tst,1 &
        ,mpi_double_precision,mpi_max,0,mpi_world,ierr)
+  ntrn= 0
+  ntst= 0
+  call mpi_reduce(ntrnl,ntrn,1 &
+       ,mpi_integer,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(ntstl,ntst,1 &
+       ,mpi_integer,mpi_sum,0,mpi_world,ierr)
   rmse_trn= sqrt(dfsum_trn/ntrn)
-  rmse_tst= sqrt(dfsum_tst/ntrn)
+  rmse_tst= sqrt(dfsum_tst/ntst)
   if( myid.eq.0 ) then
     write(6,'(a,i8,4f15.7)') '  force:training(rmse,max)' &
          //',test(rmse,max)=',iter &
@@ -907,6 +901,8 @@ subroutine get_node2sample()
   enddo
   isid0= ispn(myid+1)
   isid1= ispn(myid+1) +nspn(myid+1) -1
+
+!!$  print *,'myid,isid0,isid1=',myid,isid0,isid1
 
   if( myid.eq.0 ) print *,'get_node2sample done.'
   return
