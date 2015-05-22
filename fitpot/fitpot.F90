@@ -192,7 +192,16 @@ subroutine set_training_test()
 
   allocate(icll(nsmpl),iclist(nsmpl))
 
-  myntst= mynsmpl*ratio_test
+  nsmpl_tst= nsmpl*ratio_test
+  nsmpl_trn= nsmpl -nsmpl_tst
+  call mpi_bcast(nsmpl_trn,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nsmpl_tst,1,mpi_integer,0,mpi_world,ierr)
+
+  if( myid.lt.mod(nsmpl_tst,nnode) ) then
+    myntst= nsmpl_tst/nnode +1
+  else
+    myntst= nsmpl_tst/nnode
+  endif
   myntrn= mynsmpl -myntst
   print *,' myid,myntrn,myntst=',myid,myntrn,myntst
   n=0
@@ -206,12 +215,6 @@ subroutine set_training_test()
     icll(ismpl)= samples(ismpl)%iclass
   enddo
 
-  nsmpl_trn= 0
-  nsmpl_tst= 0
-  call mpi_allreduce(myntrn,nsmpl_trn,1,mpi_integer,mpi_sum &
-       ,mpi_world,ierr)
-  call mpi_allreduce(myntst,nsmpl_tst,1,mpi_integer,mpi_sum &
-       ,mpi_world,ierr)
   iclist(1:nsmpl)= 0
   call mpi_allreduce(icll,iclist,nsmpl,mpi_integer,mpi_max &
        ,mpi_world,ierr)
