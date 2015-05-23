@@ -204,6 +204,9 @@ subroutine set_training_test()
     myntst= nsmpl_tst/nnode
   endif
   myntrn= mynsmpl -myntst
+  call mpi_allreduce(myntrn,maxmyntrn,1,mpi_integer,mpi_max &
+       ,mpi_world,ierr)
+
 !!$  print *,' myid,myntrn,myntst=',myid,myntrn,myntst
   n=0
   do ismpl=isid0,isid1
@@ -452,6 +455,7 @@ subroutine sgd()
   integer,parameter:: niter_time= 1
   real(8),parameter:: alpha0  = 1d0
   real(8),parameter:: dalpha  = 0.0001d0
+!!$  real(8),parameter:: dalpha  = 0.d0
   real(8),allocatable:: gval(:),u(:)
   integer:: iter,istp,iv
   real(8):: gnorm,alpha,alpha1,gmax,vmax,fval,gg
@@ -477,6 +481,7 @@ subroutine sgd()
              ,gnorm ,mpi_wtime()-time0
         call write_vars('tmp')
       endif
+      call write_stats(iter)
     else if(mod(iter,niter_time).eq.0) then
       if( myid.eq.0 ) then
         write(6,'(a,i6,f10.3)') ' iter,time=',iter,mpi_wtime()-time0
@@ -487,6 +492,7 @@ subroutine sgd()
       fval= NN_fs(nvars,vars)
       gval= NN_gs(nvars,vars)
       u(1:nvars)= -gval(1:nvars)
+!!$      print '(a,3i5,es12.4)',' istp,ismpl,myid,fval=',istp,ismpl,myid,fval
       alpha= alpha1
       call armijo_search(nvars,vars,u,fval,gval,alpha,iprint &
            ,iflag,myid,NN_fs)
@@ -494,6 +500,7 @@ subroutine sgd()
       do iv=1,nvars
         gnorm= gnorm +gval(iv)*gval(iv)
       enddo
+!!$      if(myid.eq.0) print '(a,i5,3es12.4)',' istp,fval,gnorm,alpha=',istp,fval,gnorm,alpha
       vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
     enddo
     alpha1= alpha1*(1d0-dalpha)

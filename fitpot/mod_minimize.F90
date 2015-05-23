@@ -1031,6 +1031,7 @@ contains
 
   if(myid.eq.0) print *,'[Error] iter.gt.MAXITER in armijo_search.'
   iflag= iflag +100
+  alpha=alphai
   return
     
   end subroutine armijo_search

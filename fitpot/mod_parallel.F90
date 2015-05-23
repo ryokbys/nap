@@ -4,5 +4,5 @@
     integer,save:: nnode
     integer,save:: isid0,isid1
     integer,allocatable,save:: nspn(:),ispn(:)
-    integer,save:: mynsmpl,myntrn,myntst,maxmynsmpl
+    integer,save:: mynsmpl,myntrn,myntst,maxmynsmpl,maxmyntrn
   end module parallel

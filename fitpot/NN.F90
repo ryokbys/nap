@@ -289,6 +289,7 @@ contains
     endif
 
     flocal= 0d0
+    if( smpl%iclass.ne.1 ) goto 888
     natm= smpl%natm
     eref= smpl%eref
     ediff= (smpl%epot -eref)/natm
@@ -298,7 +299,7 @@ contains
       swgt= exp(-eref/natm*swbeta)
     endif
     flocal= flocal +ediff*swgt
-    if( .not. lfmatch ) goto 999
+    if( .not. lfmatch ) goto 888
     fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
          -smpl%fref(1:3,1:natm))
     dn3i= 1d0 /(3*natm)
@@ -313,7 +314,7 @@ contains
       enddo
     enddo
 
-999 continue
+888 continue
 
     tc0= mpi_wtime()
     NN_fs= 0d0
@@ -324,7 +325,7 @@ contains
     tcomm= tcomm +mpi_wtime() -tc0
     NN_fs= NN_fs/nnode
 
-    tfunc= tfunc +mpi_wtime() -tf0
+999 tfunc= tfunc +mpi_wtime() -tf0
     return
   end function NN_fs
 !=======================================================================
@@ -508,12 +509,14 @@ contains
     tg0= mpi_wtime()
 
     gsl(1:nvars)= 0d0
+    if( samples(ismpl)%iclass.ne.1 ) goto 888
     if( nl.eq.1 ) then
       call grad1(samples(ismpl),sds(ismpl),gsl)
     else if( nl.eq.2 ) then
       call grad2(samples(ismpl),sds(ismpl),gsl)
     endif
 
+888 continue
     tc0= mpi_wtime()
     NN_gs(1:ndim)= 0d0
     call mpi_allreduce(gsl,NN_gs,ndim,mpi_double_precision &
