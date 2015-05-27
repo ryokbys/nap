@@ -10,13 +10,13 @@ module minimize
 
 contains
 !=======================================================================
-  subroutine steepest_descent(ndim,x,f,xtol,gtol,ftol,maxiter &
+  subroutine steepest_descent(ndim,x,f,g,d,xtol,gtol,ftol,maxiter &
        ,iprint,iflag,myid,func,grad)
     implicit none
     integer,intent(in):: ndim,maxiter,iprint,myid
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
-    real(8),intent(inout):: f,x(ndim)
+    real(8),intent(inout):: f,x(ndim),g(ndim),d(ndim)
 !!$    real(8):: func,grad
     interface
       function func(n,x)
@@ -33,10 +33,6 @@ contains
 
     integer:: iter,i
     real(8):: alpha,fp,gnorm
-!!$    real(8),external:: sprod
-    real(8),save,allocatable:: g(:),d(:)
-
-    if( .not. allocated(g) ) allocate(g(ndim),d(ndim))
 
     iter= 0
     f= func(ndim,x)
@@ -148,7 +144,7 @@ contains
     return
   end subroutine steepest_descent
 !=======================================================================
-  subroutine cg(ndim,x,f,xtol,gtol,ftol,maxiter,iprint,iflag,myid &
+  subroutine cg(ndim,x,f,g,u,xtol,gtol,ftol,maxiter,iprint,iflag,myid &
        ,func,grad)
 !
 !  Conjugate gradient minimization
@@ -157,7 +153,7 @@ contains
     integer,intent(in):: ndim,maxiter,iprint,myid
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
-    real(8),intent(inout):: f,x(ndim)
+    real(8),intent(inout):: f,x(ndim),g(ndim),u(ndim)
     interface
       function func(n,x)
         integer,intent(in):: n
@@ -173,10 +169,6 @@ contains
 
     integer:: iter
     real(8):: alpha,fp,gnorm,gnormp,beta
-!!$    real(8),external:: sprod
-    real(8),save,allocatable:: g(:),u(:)
-
-    if( .not. allocated(g) ) allocate(g(ndim),u(ndim))
 
     iter= 0
     f= func(ndim,x)
@@ -279,16 +271,16 @@ contains
     return
   end subroutine cg
 !=======================================================================
-  subroutine qn(ndim,x0,f,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,grad,cfmethod)
+  subroutine qn(ndim,x0,f,g,u,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
 !
 !  Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
 !
     implicit none
-    integer,intent(in):: ndim,maxiter,iprint,myid
+    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
-    real(8),intent(inout):: f,x0(ndim)
+    real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
     character(len=*),intent(in):: cfmethod
     interface
       function func(n,x)
@@ -301,17 +293,20 @@ contains
         real(8),intent(in):: x(n)
         real(8):: grad(n)
       end function grad
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
     end interface
     real(8),parameter:: xtiny  = 1d-14
     logical:: ltwice = .false.
 !!$    real(8),external:: sprod
-    real(8),save,allocatable:: gg(:,:),x(:),u(:),v(:),y(:),gp(:) &
-         ,ggy(:),ygg(:),aa(:,:),cc(:,:),g(:),gpena(:)
+    real(8),save,allocatable:: gg(:,:),x(:),v(:),y(:),gp(:) &
+         ,ggy(:),ygg(:),aa(:,:),cc(:,:),gpena(:)
     real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm,ynorm,pval,sgnx,absx
     integer:: i,j,iter,nftol,ig
 
-    if( .not.allocated(gg) ) allocate(gg(ndim,ndim),x(ndim),u(ndim)&
-         ,v(ndim),y(ndim),g(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
+    if( .not.allocated(gg) ) allocate(gg(ndim,ndim),x(ndim) &
+         ,v(ndim),y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
          ,aa(ndim,ndim),cc(ndim,ndim),gpena(ndim))
 
     nftol= 0
@@ -361,6 +356,7 @@ contains
       enddo
     endif
     g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
 
@@ -399,6 +395,9 @@ contains
 !.....store previous func and grad values
       fp= f
       gp(1:ndim)= g(1:ndim)
+!.....evaluate statistics at every niter_eval
+      if( mod(iter,niter_eval).eq.0 ) &
+           call write_stats(iter)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
         call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
@@ -594,8 +593,8 @@ contains
       endif
     enddo
     
-    if( myid.eq.0 ) print *,'maxiter exceeded in qn'
-    iflag= iflag +10
+!!$    if( myid.eq.0 ) print *,'maxiter exceeded in qn'
+!!$    iflag= iflag +10
     x0(1:ndim)= x(1:ndim)
     return
   end subroutine qn
@@ -1032,6 +1031,7 @@ contains
 
   if(myid.eq.0) print *,'[Error] iter.gt.MAXITER in armijo_search.'
   iflag= iflag +100
+  alpha=alphai
   return
     
   end subroutine armijo_search
@@ -1071,7 +1071,7 @@ contains
     return
   end subroutine soft_threshold
 !=======================================================================
-  subroutine fs(ndim,x,f,xtol,gtol,ftol,maxiter &
+  subroutine fs(ndim,x,f,g,d,xtol,gtol,ftol,maxiter &
        ,iprint,iflag,myid,func,grad)
 !
 !  Forward Stagewise (FS) regression
@@ -1080,7 +1080,7 @@ contains
     integer,intent(in):: ndim,maxiter,iprint,myid
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
-    real(8),intent(inout):: f,x(ndim)
+    real(8),intent(inout):: f,x(ndim),g(ndim),d(ndim)
 !!$    real(8):: func,grad
     interface
       function func(n,x)
@@ -1099,7 +1099,7 @@ contains
     real(8),parameter:: xtiny= 1d-14
     integer:: iter,i,imax,ig
     real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp
-    real(8),allocatable,dimension(:):: xt,g,d,gpena,grpg
+    real(8),allocatable,dimension(:):: xt,gpena,grpg
 
     if( trim(cpena).ne.'lasso' .and. trim(cpena).ne.'glasso' ) then
       if(myid.eq.0) then
@@ -1109,7 +1109,7 @@ contains
       return
     endif
 
-    if( .not.allocated(xt) ) allocate(xt(ndim),g(ndim),d(ndim) &
+    if( .not.allocated(xt) ) allocate(xt(ndim) &
          ,gpena(ndim),grpg(0:ngl))
 
     xt(1:ndim)= x(1:ndim)

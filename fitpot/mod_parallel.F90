@@ -1,7 +1,8 @@
   module parallel
     include 'mpif.h'
     integer,save:: myid,mpi_world,ierr
-    integer,save:: nnode,isid0,isid1
+    integer,save:: nnode
+    integer,save:: isid0,isid1
     integer,allocatable,save:: nspn(:),ispn(:)
-    integer,save:: mynsmpl,maxmynsmpl
+    integer,save:: mynsmpl,myntrn,myntst,maxmynsmpl,maxmyntrn
   end module parallel

@@ -16,7 +16,6 @@ module NN
   type smpldata
     real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
     real(8),allocatable:: hl1(:,:),hl2(:,:)
-    real(8),allocatable:: ams1(:,:,:,:),bms1(:,:,:,:)
     real(8),allocatable:: gsfo(:,:)
   end type smpldata
 
@@ -83,6 +82,7 @@ contains
       print *,'nhl(0:nl+1),nw=',nhl(0:nl+1),nw
     endif
 
+!.....training set
     allocate(sds(isid0:isid1))
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
@@ -128,8 +128,8 @@ contains
   end subroutine NN_init
 !=======================================================================
   function NN_func(ndim,x)
-    use variables, only:nsmpl,nprcs,tfunc,samples,lfmatch,lfscale &
-         ,fscl,nfunc,tcomm,lswgt,swbeta
+    use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
+         ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta,mdsys
     use parallel
     use minimize
     implicit none
@@ -140,6 +140,7 @@ contains
     integer:: ismpl,natm,ia,ixyz,idim
     real(8):: dn3i,ediff,tf0,tc0,fscale,eref,swgt
     real(8):: flocal
+    type(mdsys):: smpl
 
     nfunc= nfunc +1
 
@@ -149,28 +150,29 @@ contains
     
     do ismpl=isid0,isid1
       if( nl.eq.1 ) then
-        call calc_ef1(ismpl)
+        call calc_ef1(samples(ismpl),sds(ismpl))
       else if( nl.eq.2 ) then
-        call calc_ef2(ismpl)
+        call calc_ef2(samples(ismpl),sds(ismpl))
       endif
     enddo
 
 !!$    NN_func= 0d0
     flocal= 0d0
     do ismpl=isid0,isid1
-      natm= samples(ismpl)%natm
-      eref= samples(ismpl)%eref
-      ediff= (samples(ismpl)%epot -eref)/natm
+      smpl= samples(ismpl)
+      if( smpl%iclass.ne.1 ) cycle
+      natm= smpl%natm
+      eref= smpl%eref
+      ediff= (smpl%epot -eref)/natm
       ediff= ediff*ediff
-!!$      NN_func= NN_func +ediff
       swgt= 1d0
       if( lswgt ) then
         swgt= exp(-eref/natm*swbeta)
       endif
       flocal= flocal +ediff*swgt
       if( .not. lfmatch ) cycle
-      fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
-           -samples(ismpl)%fref(1:3,1:natm))
+      fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
+           -smpl%fref(1:3,1:natm))
       dn3i= 1d0 /(3*natm)
       fscale= 1d0
       !.....force-scale makes force contribution same order to energy
@@ -179,26 +181,88 @@ contains
            *dn3i *fscale *swgt
       do ia=1,natm
         do ixyz=1,3
-!!$          NN_func= NN_func +fdiff(ixyz,ia)
           flocal= flocal +fdiff(ixyz,ia)
         enddo
       enddo
     enddo
 
-!!$    if(myid.eq.0) print *,'NN_func: call allreduce'
     tc0= mpi_wtime()
     NN_func= 0d0
-!!$    print *,'here01,myid,flocal=',myid,flocal
     call mpi_allreduce(flocal,NN_func,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
-!!$    print *,'here02,myid,NN_func=',myid,NN_func
     tcomm= tcomm +mpi_wtime() -tc0
-    NN_func= NN_func/nsmpl
+    NN_func= NN_func/nsmpl_trn
 
     tfunc= tfunc +mpi_wtime() -tf0
     return
   end function NN_func
 !=======================================================================
+!!$  function NN_func_tst(ndim,x)
+!!$    use variables, only:nsmpl_tst,nprcs,tfunc,smpl_tst &
+!!$         ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta
+!!$    use parallel
+!!$    use minimize
+!!$    implicit none
+!!$    integer,intent(in):: ndim
+!!$    real(8),intent(in):: x(ndim)
+!!$    real(8):: NN_func_tst
+!!$
+!!$    integer:: ismpl,natm,ia,ixyz,idim
+!!$    real(8):: dn3i,ediff,tf0,tc0,fscale,eref,swgt
+!!$    real(8):: flocal
+!!$
+!!$    nfunc= nfunc +1
+!!$
+!!$    call mpi_bcast(x,ndim,mpi_double_precision,0,mpi_world,ierr)
+!!$    tf0= mpi_wtime()
+!!$    call vars2wgts(ndim,x)
+!!$    
+!!$    do ismpl=isid0_tst,isid1_tst
+!!$      if( nl.eq.1 ) then
+!!$        call calc_ef1(smpl_tst(ismpl),sds_tst(ismpl))
+!!$      else if( nl.eq.2 ) then
+!!$        call calc_ef2(smpl_tst(ismpl),sds_tst(ismpl))
+!!$      endif
+!!$    enddo
+!!$
+!!$    flocal= 0d0
+!!$    do ismpl=isid0_tst,isid1_tst
+!!$      natm= smpl_tst(ismpl)%natm
+!!$      eref= smpl_tst(ismpl)%eref
+!!$      ediff= (smpl_tst(ismpl)%epot -eref)/natm
+!!$      ediff= ediff*ediff
+!!$      swgt= 1d0
+!!$      if( lswgt ) then
+!!$        swgt= exp(-eref/natm*swbeta)
+!!$      endif
+!!$      flocal= flocal +ediff*swgt
+!!$      if( .not. lfmatch ) cycle
+!!$      fdiff(1:3,1:natm)= (smpl_tst(ismpl)%fa(1:3,1:natm) &
+!!$           -smpl_tst(ismpl)%fref(1:3,1:natm))
+!!$      dn3i= 1d0 /(3*natm)
+!!$      fscale= 1d0
+!!$      !.....force-scale makes force contribution same order to energy
+!!$      if( lfscale ) fscale= fscl
+!!$      fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
+!!$           *dn3i *fscale *swgt
+!!$      do ia=1,natm
+!!$        do ixyz=1,3
+!!$          flocal= flocal +fdiff(ixyz,ia)
+!!$        enddo
+!!$      enddo
+!!$    enddo
+!!$
+!!$    tc0= mpi_wtime()
+!!$    NN_func_tst= 0d0
+!!$    call mpi_allreduce(flocal,NN_func_tst,1,mpi_double_precision &
+!!$         ,mpi_sum,mpi_world,ierr)
+!!$    tcomm= tcomm +mpi_wtime() -tc0
+!!$    NN_func_tst= NN_func_tst/nsmpl_tst
+!!$
+!!$    tfunc= tfunc +mpi_wtime() -tf0
+!!$    return
+!!$  end function NN_func_tst
+!!$!=======================================================================
   function NN_fs(ndim,x)
     use variables
     use parallel
@@ -211,31 +275,33 @@ contains
     real(8):: dn3i,ediff,tf0,fscale,eref,swgt,flocal,tc0
     integer:: ismpl
     common /samplei/ ismpl
-    
+    type(mdsys):: smpl
 
     nfunc=nfunc +1
     tf0= mpi_wtime()
     call vars2wgts(ndim,x)
 
+    smpl= samples(ismpl)
     if( nl.eq.1 ) then
-      call calc_ef1(ismpl)
+      call calc_ef1(smpl,sds(ismpl))
     else if( nl.eq.2 ) then
-      call calc_ef2(ismpl)
+      call calc_ef2(smpl,sds(ismpl))
     endif
 
     flocal= 0d0
-    natm= samples(ismpl)%natm
-    eref= samples(ismpl)%eref
-    ediff= (samples(ismpl)%epot -eref)/natm
+    if( smpl%iclass.ne.1 ) goto 888
+    natm= smpl%natm
+    eref= smpl%eref
+    ediff= (smpl%epot -eref)/natm
     ediff= ediff*ediff
     swgt= 1d0
     if( lswgt ) then
       swgt= exp(-eref/natm*swbeta)
     endif
     flocal= flocal +ediff*swgt
-    if( .not. lfmatch ) goto 999
-    fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
-         -samples(ismpl)%fref(1:3,1:natm))
+    if( .not. lfmatch ) goto 888
+    fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
+         -smpl%fref(1:3,1:natm))
     dn3i= 1d0 /(3*natm)
     fscale= 1d0
 !.....force-scale makes force contribution same order to energy
@@ -248,7 +314,7 @@ contains
       enddo
     enddo
 
-999 continue
+888 continue
 
     tc0= mpi_wtime()
     NN_fs= 0d0
@@ -259,62 +325,51 @@ contains
     tcomm= tcomm +mpi_wtime() -tc0
     NN_fs= NN_fs/nnode
 
-    tfunc= tfunc +mpi_wtime() -tf0
+999 tfunc= tfunc +mpi_wtime() -tf0
     return
   end function NN_fs
 !=======================================================================
-  subroutine calc_ef1(ismpl)
+  subroutine calc_ef1(smpl,sds)
     use variables
     implicit none
-    integer,intent(in):: ismpl
+    type(mdsys),intent(inout):: smpl
+    type(smpldata),intent(inout):: sds
     integer:: natm,ia,ja,ihl0,ihl1
     real(8):: tmp,w1,w2,h1,dh1,ddh,t,dg(3)
     
-    natm= samples(ismpl)%natm
-    sds(ismpl)%hl1(1:natm,1:nhl(1))= 0d0
-    samples(ismpl)%epot =0d0
+    natm= smpl%natm
+    sds%hl1(1:natm,1:nhl(1))= 0d0
+    smpl%epot =0d0
     !.....energy
     do ia=1,natm
       do ihl1=1,nhl(1)
         tmp= 0d0
         do ihl0=1,nhl(0)
-          tmp= tmp +wgt11(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0)
+          tmp= tmp +wgt11(ihl0,ihl1) *sds%gsf(ia,ihl0)
         enddo
-        sds(ismpl)%hl1(ia,ihl1)= sigmoid(tmp)
+        sds%hl1(ia,ihl1)= sigmoid(tmp)
       enddo
       do ihl1=1,nhl(1)
-        samples(ismpl)%epot= samples(ismpl)%epot &
-             +wgt12(ihl1)*(sds(ismpl)%hl1(ia,ihl1)-0.5d0)
+        smpl%epot= smpl%epot &
+             +wgt12(ihl1)*(sds%hl1(ia,ihl1)-0.5d0)
       enddo
     enddo
 
     !.....forces
     if( .not.lfmatch ) return
-    if( .not. allocated(sds(ismpl)%ams1) ) then
-      allocate(sds(ismpl)%ams1(3,natm,nhl(1),nhl(0)), &
-           sds(ismpl)%bms1(3,natm,nhl(1),nhl(0)))
-    endif
-    samples(ismpl)%fa(1:3,1:natm)= 0d0
-!!$    sds(ismpl)%ams1(1:3,1:natm,1:nhl(1),1:nhl(0))= 0d0
-!!$    sds(ismpl)%bms1(1:3,1:natm,1:nhl(1),1:nhl(0))= 0d0
+    smpl%fa(1:3,1:natm)= 0d0
     do ihl1=1,nhl(1)
       w2= wgt12(ihl1)
       do ihl0=1,nhl(0)
         w1= wgt11(ihl0,ihl1)
         do ja=1,natm
-          h1= sds(ismpl)%hl1(ja,ihl1)
+          h1= sds%hl1(ja,ihl1)
           dh1= h1*(1d0-h1)
           t= w1*w2 *dh1
-!!$          ddh= dh1 *(1d0-2d0*h1)
           do ia=1,natm
-            dg(1:3)=sds(ismpl)%dgsf(1:3,ia,ja,ihl0)
-            samples(ismpl)%fa(1:3,ia)= samples(ismpl)%fa(1:3,ia) &
+            dg(1:3)=sds%dgsf(1:3,ia,ja,ihl0)
+            smpl%fa(1:3,ia)= smpl%fa(1:3,ia) &
                  -t *dg(1:3)
-!!$            !.....make ams1
-!!$            sds(ismpl)%ams1(1:3,ia,ihl1,ihl0)= &
-!!$                 sds(ismpl)%ams1(1:3,ia,ihl1,ihl0) +dh1 *dg(1:3)
-!!$            sds(ismpl)%bms1(1:3,ia,ihl1,ihl0)= &
-!!$                 sds(ismpl)%bms1(1:3,ia,ihl1,ihl0) +ddh *dg(1:3)
           enddo
         enddo
       enddo
@@ -322,17 +377,18 @@ contains
 
   end subroutine calc_ef1
 !=======================================================================
-  subroutine calc_ef2(ismpl)
+  subroutine calc_ef2(smpl,sds)
     use variables
     implicit none
-    integer,intent(in):: ismpl
+    type(mdsys),intent(inout):: smpl
+    type(smpldata),intent(inout):: sds
     integer:: natm,ia,ja,ihl0,ihl1,ihl2
     real(8):: tmp1,tmp2,w1,w2,w3,h1,h2,dh1,dh2,t
 
-    natm= samples(ismpl)%natm
-    sds(ismpl)%hl1(1:natm,1:nhl(1))= 0d0
-    sds(ismpl)%hl2(1:natm,1:nhl(2))= 0d0
-    samples(ismpl)%epot= 0d0
+    natm= smpl%natm
+    sds%hl1(1:natm,1:nhl(1))= 0d0
+    sds%hl2(1:natm,1:nhl(2))= 0d0
+    smpl%epot= 0d0
 
     !.....energy term
     do ia=1,natm
@@ -341,20 +397,20 @@ contains
         do ihl1=1,nhl(1)
           tmp1= 0d0
           do ihl0=1,nhl(0)
-            tmp1=tmp1 +wgt21(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0)
+            tmp1=tmp1 +wgt21(ihl0,ihl1) *sds%gsf(ia,ihl0)
           enddo
-          sds(ismpl)%hl1(ia,ihl1)= sigmoid(tmp1)
-          tmp2=tmp2 +wgt22(ihl1,ihl2) *(sds(ismpl)%hl1(ia,ihl1)-0.5d0)
+          sds%hl1(ia,ihl1)= sigmoid(tmp1)
+          tmp2=tmp2 +wgt22(ihl1,ihl2) *(sds%hl1(ia,ihl1)-0.5d0)
         enddo
-        sds(ismpl)%hl2(ia,ihl2)= sigmoid(tmp2)
-        samples(ismpl)%epot= samples(ismpl)%epot &
-             +wgt23(ihl2) *(sds(ismpl)%hl2(ia,ihl2)-0.5d0)
+        sds%hl2(ia,ihl2)= sigmoid(tmp2)
+        smpl%epot= smpl%epot &
+             +wgt23(ihl2) *(sds%hl2(ia,ihl2)-0.5d0)
       enddo
     enddo
     
     !.....force term
     if( .not.lfmatch ) return
-    samples(ismpl)%fa(1:3,1:natm)= 0d0
+    smpl%fa(1:3,1:natm)= 0d0
     do ihl2=1,nhl(2)
       w3= wgt23(ihl2)
       do ihl1=1,nhl(1)
@@ -362,14 +418,14 @@ contains
         do ihl0=1,nhl(0)
           w1= wgt21(ihl0,ihl1)
           do ja=1,natm
-            h1= sds(ismpl)%hl1(ja,ihl1)
-            h2= sds(ismpl)%hl2(ja,ihl2)
+            h1= sds%hl1(ja,ihl1)
+            h2= sds%hl2(ja,ihl2)
             dh1= h1*(1d0-h1)
             dh2= h2*(1d0-h2)
             t= w3*dh2 *w2*dh1 *w1
             do ia=1,natm
-              samples(ismpl)%fa(1:3,ia)= samples(ismpl)%fa(1:3,ia) &
-                   -t *sds(ismpl)%dgsf(1:3,ia,ja,ihl0)
+              smpl%fa(1:3,ia)= smpl%fa(1:3,ia) &
+                   -t *sds%dgsf(1:3,ia,ja,ihl0)
             enddo
           enddo
         enddo
@@ -379,7 +435,7 @@ contains
   end subroutine calc_ef2
 !=======================================================================
   function NN_grad(ndim,x)
-    use variables,only: nsmpl,nprcs,tgrad,ngrad,tcomm
+    use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm,samples,mdsys
     use parallel
     use minimize
     implicit none
@@ -390,6 +446,7 @@ contains
     integer:: ismpl,i,idim
     real(8),save,allocatable:: gs(:),glocal(:)
     real(8):: gmax,vmax,tc0,tg0
+    type(mdsys):: smpl
 
     if( .not.allocated(gs) ) allocate(gs(ndim),glocal(ndim))
 
@@ -400,10 +457,11 @@ contains
     glocal(1:ndim)= 0d0
 
     do ismpl=isid0,isid1
+      if( samples(ismpl)%iclass.ne.1 ) cycle
       if( nl.eq.1 ) then
-        call grad1(ismpl,gs)
+        call grad1(samples(ismpl),sds(ismpl),gs)
       else if( nl.eq.2 ) then
-        call grad2(ismpl,gs)
+        call grad2(samples(ismpl),sds(ismpl),gs)
       endif
 !!$      NN_grad(1:ndim)= NN_grad(1:ndim) +gs(1:ndim)
       glocal(1:ndim)= glocal(1:ndim) +gs(1:ndim)
@@ -415,7 +473,7 @@ contains
          ,mpi_sum,mpi_world,ierr)
     tcomm= tcomm +mpi_wtime() -tc0
 
-    NN_grad(1:ndim)= NN_grad(1:ndim)/nsmpl
+    NN_grad(1:ndim)= NN_grad(1:ndim)/nsmpl_trn
 
 !!$    if( lgscale ) then
 !!$      gmax= 0d0
@@ -451,12 +509,14 @@ contains
     tg0= mpi_wtime()
 
     gsl(1:nvars)= 0d0
+    if( samples(ismpl)%iclass.ne.1 ) goto 888
     if( nl.eq.1 ) then
-      call grad1(ismpl,gsl)
+      call grad1(samples(ismpl),sds(ismpl),gsl)
     else if( nl.eq.2 ) then
-      call grad2(ismpl,gsl)
+      call grad2(samples(ismpl),sds(ismpl),gsl)
     endif
 
+888 continue
     tc0= mpi_wtime()
     NN_gs(1:ndim)= 0d0
     call mpi_allreduce(gsl,NN_gs,ndim,mpi_double_precision &
@@ -468,10 +528,11 @@ contains
     return
   end function NN_gs
 !=======================================================================
-  subroutine grad1(ismpl,gs)
+  subroutine grad1(smpl,sds,gs)
     use variables
     implicit none
-    integer,intent(in):: ismpl
+    type(mdsys),intent(inout):: smpl
+    type(smpldata),intent(inout):: sds
     real(8),intent(inout):: gs(nvars)
     integer:: iv,ihl1,ia,ja,ihl0,jhl0,natm
     real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale,eref,swgt
@@ -482,20 +543,20 @@ contains
            ,bms(3,maxna,maxna,nhl(1)))
     endif
 
-    natm= samples(ismpl)%natm
-    eref= samples(ismpl)%eref
+    natm= smpl%natm
+    eref= smpl%eref
     swgt= 1d0
     if( lswgt ) then
       swgt= exp(-eref/natm*swbeta)
     endif
-    ediff= (samples(ismpl)%epot -eref)*2 /natm/natm *swgt
+    ediff= (smpl%epot -eref)*2 /natm/natm *swgt
 !!$    print *,'ediff=',ediff*natm
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)
     do ihl1=nhl(1),1,-1
       tmp= 0d0
       do ia=1,natm
-        h1= sds(ismpl)%hl1(ia,ihl1)
+        h1= sds%hl1(ia,ihl1)
         tmp= tmp +(h1-0.5d0)
       enddo
       gs(iv)= gs(iv) +ediff*tmp
@@ -506,8 +567,8 @@ contains
         tmp= 0d0
         w2= wgt12(ihl1)
         do ia=1,natm
-          h1= sds(ismpl)%hl1(ia,ihl1)
-          tmp= tmp +w2 *h1*(1d0-h1) *sds(ismpl)%gsf(ia,ihl0)
+          h1= sds%hl1(ia,ihl1)
+          tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
         enddo
         gs(iv)= gs(iv) +ediff*tmp
         iv= iv -1
@@ -516,8 +577,8 @@ contains
 
     if( .not. lfmatch ) return
     dgs(1:nvars)= 0d0
-    fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
-         -samples(ismpl)%fref(1:3,1:natm))
+    fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
+         -smpl%fref(1:3,1:natm))
     dn3i= 1d0/(3*natm)
     fscale= 1d0
     if( lfscale ) fscale= fscl
@@ -527,20 +588,14 @@ contains
       tmp= 0d0
       do ihl0=1,nhl(0)
         w1= wgt11(ihl0,ihl1)
-!!$        do ia=1,natm
-!!$          tmp = tmp +w1 *( &
-!!$               fdiff(1,ia) *sds(ismpl)%ams1(1,ia,ihl1,ihl0) &
-!!$               +fdiff(2,ia)*sds(ismpl)%ams1(2,ia,ihl1,ihl0) &
-!!$               +fdiff(3,ia)*sds(ismpl)%ams1(3,ia,ihl1,ihl0) )
-!!$        enddo
         do ja=1,natm
-          h1= sds(ismpl)%hl1(ja,ihl1)
+          h1= sds%hl1(ja,ihl1)
           dh1= h1*(1d0-h1)
           do ia=1,natm
             tmp= tmp +w1 *dh1*( &
-                 fdiff(1,ia)  *sds(ismpl)%dgsf(1,ia,ja,ihl0) &
-                 +fdiff(2,ia) *sds(ismpl)%dgsf(2,ia,ja,ihl0) &
-                 +fdiff(3,ia) *sds(ismpl)%dgsf(3,ia,ja,ihl0) &
+                 fdiff(1,ia)  *sds%dgsf(1,ia,ja,ihl0) &
+                 +fdiff(2,ia) *sds%dgsf(2,ia,ja,ihl0) &
+                 +fdiff(3,ia) *sds%dgsf(3,ia,ja,ihl0) &
                  )
           enddo
         enddo
@@ -556,7 +611,7 @@ contains
         do ja=1,natm
           do ia=1,natm
             bms(1:3,ia,ja,ihl1)= bms(1:3,ia,ja,ihl1) &
-                 +w1*sds(ismpl)%dgsf(1:3,ia,ja,ihl0)
+                 +w1*sds%dgsf(1:3,ia,ja,ihl0)
           enddo
         enddo
       enddo
@@ -566,43 +621,21 @@ contains
       do ihl1=nhl(1),1,-1
         tmp= 0d0
         w2= wgt12(ihl1)
-!!$        do ia=1,natm
-!!$          ab(1:3)= sds(ismpl)%ams1(1:3,ia,ihl1,ihl0) &
-!!$               +sds(ismpl)%bms1(1:3,ia,ihl1,ihl0)
-!!$          tmp= tmp +w2 *( &
-!!$               fdiff(1,ia) *ab(1) &
-!!$               +fdiff(2,ia)*ab(2) &
-!!$               +fdiff(3,ia)*ab(3) )
-!!$        enddo
         do ja=1,natm
-          h1= sds(ismpl)%hl1(ja,ihl1)
+          h1= sds%hl1(ja,ihl1)
           dh1= h1*(1d0-h1)
-          ddhg= dh1*(1d0-2d0*h1)*sds(ismpl)%gsf(ja,ihl0)
+          ddhg= dh1*(1d0-2d0*h1)*sds%gsf(ja,ihl0)
           do ia=1,natm
-            ab(1:3)= dh1*sds(ismpl)%dgsf(1:3,ia,ja,ihl0) &
+            ab(1:3)= dh1*sds%dgsf(1:3,ia,ja,ihl0) &
                  +ddhg*bms(1:3,ia,ja,ihl1)
             tmp= tmp +w2 *( &
                  fdiff(1,ia) *ab(1) &
                  +fdiff(2,ia) *ab(2) &
                  +fdiff(3,ia) *ab(3) &
                  )
-!!$            tmp= tmp +w2 *dh1 *( &
-!!$                 fdiff(1,ia)  *sds(ismpl)%dgsf(1,ia,ja,ihl0) &
-!!$                 +fdiff(2,ia) *sds(ismpl)%dgsf(2,ia,ja,ihl0) &
-!!$                 +fdiff(3,ia) *sds(ismpl)%dgsf(3,ia,ja,ihl0) &
-!!$                 )
-!!$            do jhl0=1,nhl(0)
-!!$              w1= wgt11(jhl0,ihl1)
-!!$              tmp= tmp +w2*w1 *ddhg *( &
-!!$                   fdiff(1,ia)  *sds(ismpl)%dgsf(1,ia,ja,jhl0) &
-!!$                   +fdiff(2,ia) *sds(ismpl)%dgsf(2,ia,ja,jhl0) &
-!!$                   +fdiff(3,ia) *sds(ismpl)%dgsf(3,ia,ja,jhl0) &
-!!$                   )
-!!$            enddo
           enddo
         enddo
         dgs(iv)= -tmp
-!!$        print *, 'iv,dgs(iv)=',iv,dgs(iv)
         iv= iv -1
       enddo
     enddo
@@ -611,10 +644,11 @@ contains
     return
   end subroutine grad1
 !=======================================================================
-  subroutine grad2(ismpl,gs)
+  subroutine grad2(smpl,sds,gs)
     use variables
     implicit none
-    integer,intent(in):: ismpl
+    type(mdsys),intent(inout):: smpl
+    type(smpldata),intent(inout):: sds
     real(8),intent(inout):: gs(nvars)
     integer:: iv,ihl0,ihl1,ihl2,ia,ja,natm
     real(8):: ediff,tmp,tmp1,tmp2,h1,h2,w1,w2,w3,dn3i,dh1,dh2,t1,t2,t3&
@@ -626,20 +660,20 @@ contains
            ,w2sw1dg(3,maxna,maxna,nhl(2)) )
     endif
 
-    natm= samples(ismpl)%natm
-    eref= samples(ismpl)%eref
+    natm= smpl%natm
+    eref= smpl%eref
     swgt= 1d0
     if( lswgt ) then
       swgt= exp(-eref/natm*swbeta)
     endif
-    ediff= (samples(ismpl)%epot -eref)*2 /natm/natm *swgt
+    ediff= (smpl%epot -eref)*2 /natm/natm *swgt
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 
     do ihl2=nhl(2),1,-1
       tmp= 0d0
       do ia=1,natm
-        h2= sds(ismpl)%hl2(ia,ihl2)
+        h2= sds%hl2(ia,ihl2)
         tmp= tmp +(h2-0.5d0)
       enddo
       gs(iv)=gs(iv) +ediff*tmp
@@ -650,8 +684,8 @@ contains
         tmp= 0d0
         w3= wgt23(ihl2)
         do ia=1,natm
-          h2= sds(ismpl)%hl2(ia,ihl2)
-          h1= sds(ismpl)%hl1(ia,ihl1)
+          h2= sds%hl2(ia,ihl2)
+          h1= sds%hl1(ia,ihl1)
           tmp= tmp +w3 *h2*(1d0-h2) *(h1-0.5d0)
         enddo
         gs(iv)=gs(iv) +ediff*tmp
@@ -662,11 +696,11 @@ contains
       do ihl1=nhl(1),1,-1
         tmp= 0d0
         do ia=1,natm
-          h1= sds(ismpl)%hl1(ia,ihl1)
+          h1= sds%hl1(ia,ihl1)
           dh1= h1*(1d0-h1)
-          dh1gsf= dh1*sds(ismpl)%gsf(ia,ihl0)
+          dh1gsf= dh1*sds%gsf(ia,ihl0)
           do ihl2=1,nhl(2)
-            h2= sds(ismpl)%hl2(ia,ihl2)
+            h2= sds%hl2(ia,ihl2)
             dh2= h2*(1d0-h2)
             w2= wgt22(ihl1,ihl2)
             w3= wgt23(ihl2)
@@ -680,8 +714,8 @@ contains
 
     if( .not. lfmatch ) return
     dgs(1:nvars)= 0d0
-    fdiff(1:3,1:natm)= (samples(ismpl)%fa(1:3,1:natm) &
-         -samples(ismpl)%fref(1:3,1:natm))
+    fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
+         -smpl%fref(1:3,1:natm))
     dn3i= 1d0/(3*natm)
     fscale= 1d0
     if( lfscale ) fscale= fscl
@@ -695,7 +729,7 @@ contains
         do ja=1,natm
           do ia=1,natm
             w1dg(1:3,ia,ja,ihl1)= w1dg(1:3,ia,ja,ihl1) &
-                 +w1*sds(ismpl)%dgsf(1:3,ia,ja,ihl0)
+                 +w1*sds%dgsf(1:3,ia,ja,ihl0)
           enddo
         enddo
       enddo
@@ -706,7 +740,7 @@ contains
       do ihl1=1,nhl(1)
         w2= wgt22(ihl1,ihl2)
         do ja=1,natm
-          h1= sds(ismpl)%hl1(ja,ihl1)
+          h1= sds%hl1(ja,ihl1)
           dh1= h1*(1d0-h1)
           do ia=1,natm
             w2sw1dg(1:3,ia,ja,ihl2)= w2sw1dg(1:3,ia,ja,ihl2) &
@@ -719,7 +753,7 @@ contains
     do ihl2=nhl(2),1,-1
       tmp= 0d0
       do ja=1,natm
-        h2= sds(ismpl)%hl2(ja,ihl2)
+        h2= sds%hl2(ja,ihl2)
         dh2= h2*(1d0-h2)
         do ia=1,natm
           tmp=tmp +dh2 *( &
@@ -729,25 +763,6 @@ contains
                )
         enddo
       enddo
-!!$      do ihl1=1,nhl(1)
-!!$        w2= wgt22(ihl1,ihl2)
-!!$        do ihl0=1,nhl(0)
-!!$          w1= wgt21(ihl0,ihl1)
-!!$          do ja=1,natm
-!!$            h1= sds(ismpl)%hl1(ja,ihl1)
-!!$            dh1= h1*(1d0-h1)
-!!$            h2= sds(ismpl)%hl2(ja,ihl2)
-!!$            dh2= h2*(1d0-h2)
-!!$            do ia=1,natm
-!!$              tmp= tmp +dh2*w2*dh1*w1 *( &
-!!$                   fdiff(1,ia) *sds(ismpl)%dgsf(1,ia,ja,ihl0) &
-!!$                   +fdiff(2,ia) *sds(ismpl)%dgsf(2,ia,ja,ihl0) &
-!!$                   +fdiff(3,ia) *sds(ismpl)%dgsf(3,ia,ja,ihl0) &
-!!$                   )
-!!$            enddo
-!!$          enddo
-!!$        enddo
-!!$      enddo
       dgs(iv)= -tmp
       iv= iv -1
     enddo
@@ -757,9 +772,9 @@ contains
         tmp= 0d0
         w3= wgt23(ihl2)
         do ja=1,natm
-          h1= sds(ismpl)%hl1(ja,ihl1)
+          h1= sds%hl1(ja,ihl1)
           dh1= h1*(1d0-h1)
-          h2= sds(ismpl)%hl2(ja,ihl2)
+          h2= sds%hl2(ja,ihl2)
           dh2= h2*(1d0-h2)
           ddh2= dh2*(1d0-2d0*h2)
           t1= w3*ddh2*(h1-0.5d0)
@@ -789,14 +804,14 @@ contains
           w3= wgt23(ihl2)
           w2= wgt22(ihl1,ihl2)
           do ja=1,natm
-            h1= sds(ismpl)%hl1(ja,ihl1)
+            h1= sds%hl1(ja,ihl1)
             dh1= h1*(1d0-h1)
             ddh1= dh1*(1d0-2d0*h1)
-            h2= sds(ismpl)%hl2(ja,ihl2)
+            h2= sds%hl2(ja,ihl2)
             dh2= h2*(1d0-h2)
             ddh2= dh2*(1d0-2d0*h2)
-            t1= w3 *ddh2*w2*dh1*sds(ismpl)%gsf(ja,ihl0)
-            t2= w3 *dh2*w2*ddh1*sds(ismpl)%gsf(ja,ihl0)
+            t1= w3 *ddh2*w2*dh1*sds%gsf(ja,ihl0)
+            t2= w3 *dh2*w2*ddh1*sds%gsf(ja,ihl0)
             t3= w3 *dh2 *w2 *dh1
             do ia=1,natm
               tmp=tmp +t1 *( &
@@ -810,9 +825,9 @@ contains
                    +fdiff(3,ia) *w1dg(3,ia,ja,ihl1) &
                    )
               tmp=tmp +t3 *( &
-                   fdiff(1,ia)  *sds(ismpl)%dgsf(1,ia,ja,ihl0) &
-                   +fdiff(2,ia) *sds(ismpl)%dgsf(2,ia,ja,ihl0) &
-                   +fdiff(3,ia) *sds(ismpl)%dgsf(3,ia,ja,ihl0) &
+                   fdiff(1,ia)  *sds%dgsf(1,ia,ja,ihl0) &
+                   +fdiff(2,ia) *sds%dgsf(2,ia,ja,ihl0) &
+                   +fdiff(3,ia) *sds%dgsf(3,ia,ja,ihl0) &
                    )
             enddo
           enddo
@@ -905,7 +920,7 @@ contains
 
     integer:: itmp,ismpl,natm,ia,ihl0,ja
     character*5:: cdir
-    
+
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
       cdir= samples(ismpl)%cdirname
@@ -916,8 +931,6 @@ contains
       do ia=1,natm
         do ihl0=1,nhl(0)
           read(21,*) itmp, itmp, sds(ismpl)%gsf(ia,ihl0)
-!!$          write(6,'(a,2i6,es12.4)') 'ia,ihl0,gsf=',ia,ihl0 &
-!!$               ,sds(ismpl)%gsf(ia,ihl0)
         enddo
       enddo
       close(21)
@@ -928,13 +941,13 @@ contains
         do ihl0=1,nhl(0)
           do ja=1,natm
             read(22,*) itmp,itmp,itmp ,sds(ismpl)%dgsf(1:3,ja,ia,ihl0)
-!!$            write(6,'(a,3i6,3es12.4)') 'ia,ihl0,ja,dgsf=',ia,ihl0,ja &
-!!$                 ,sds(ismpl)%dgsf(1:3,ja,ia,ihl0)
           enddo
         enddo
       enddo
       close(22)
     enddo
+
+
     if(myid.eq.0) print *, 'get_bases done.'
   end subroutine get_bases
 !=======================================================================
@@ -1224,4 +1237,5 @@ contains
     call mpi_barrier(mpi_world,ierr)
     return
   end subroutine NN_analyze
+!=======================================================================
 end module NN
