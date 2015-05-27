@@ -97,8 +97,8 @@ program fitpot
   call mpi_reduce(tmp,tcomm,1,mpi_double_precision,mpi_max &
        ,0,mpi_world,ierr)
   if( myid.eq.0 ) then
-    write(6,'(a,i8)') ' num of func calls=',nfunc
-    write(6,'(a,i8)') ' num of grad calls=',ngrad
+    write(6,'(a,i10)') ' num of func calls=',nfunc
+    write(6,'(a,i10)') ' num of grad calls=',ngrad
     write(6,'(a,f15.3,a)') ' time func =', tfunc,' sec'
     write(6,'(a,f15.3,a)') ' time grad =', tgrad,' sec'
     write(6,'(a,f15.3,a)') ' time comm =', tcomm,' sec'
@@ -454,7 +454,7 @@ subroutine sgd()
   implicit none
   integer,parameter:: niter_time= 1
   real(8),parameter:: alpha0  = 1d0
-  real(8),parameter:: dalpha  = 0.0001d0
+  real(8),parameter:: dalpha  = 0.00001d0
 !!$  real(8),parameter:: dalpha  = 0.d0
   real(8),allocatable:: gval(:),u(:)
   integer:: iter,istp,iv
