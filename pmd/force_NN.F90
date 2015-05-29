@@ -130,7 +130,6 @@ contains
         do ihl1=1,nhl(1)
           epi(ia)= epi(ia) +wgt12(ihl1) *(hl1(ihl1,ia)-0.5d0)
         enddo
-!      write(6,*) ' ia,is,epi =',ia,int(tag(ia)),epi(ia)
         epotl=epotl +epi(ia)
 #ifdef __3BODY__
         write(6,'(a,i8,es22.14)') ' 3-body term:',ia,epi(ia)

@@ -400,7 +400,7 @@ subroutine qn_wrapper()
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
        ,niter_eval,write_stats)
   call NN_analyze()
-  call NN_restore_standard()
+!!$  call NN_restore_standard()
 
   return
 end subroutine qn_wrapper
@@ -766,8 +766,8 @@ subroutine write_stats(iter)
   rmse_trn= sqrt(desum_trn/nsmpl_trn)
   rmse_tst= sqrt(desum_tst/nsmpl_tst)
   if( myid.eq.0 ) then
-    write(6,'(a,i8,4f15.7)') '  energy:training(rmse,max)' &
-         //',test(rmse,max)=',iter &
+    write(6,'(a,i8,f15.2,4f15.7)') '  energy:training(rmse,max)' &
+         //',test(rmse,max)=',iter,mpi_wtime()-time0 &
          ,rmse_trn,demax_trn,rmse_tst,demax_tst
   endif
 
@@ -820,8 +820,8 @@ subroutine write_stats(iter)
   rmse_trn= sqrt(dfsum_trn/ntrn)
   rmse_tst= sqrt(dfsum_tst/ntst)
   if( myid.eq.0 ) then
-    write(6,'(a,i8,4f15.7)') '  force:training(rmse,max)' &
-         //',test(rmse,max)=',iter &
+    write(6,'(a,i8,f15.2,4f15.7)') '  force:training(rmse,max)' &
+         //',test(rmse,max)=',iter,mpi_wtime()-time0 &
          ,rmse_trn,dfmax_trn,rmse_tst,dfmax_tst
   endif
 

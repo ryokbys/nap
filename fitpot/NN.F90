@@ -105,7 +105,7 @@ contains
 !!$    print *,' myid, max num of atoms [maxna] =',myid,maxna
     allocate(fdiff(3,maxna))
 
-    call standardize_var()
+!!$    call standardize_var()
 
 !.....make groups for group lasso
     if( trim(cpena).eq.'glasso' ) then
@@ -197,72 +197,6 @@ contains
     return
   end function NN_func
 !=======================================================================
-!!$  function NN_func_tst(ndim,x)
-!!$    use variables, only:nsmpl_tst,nprcs,tfunc,smpl_tst &
-!!$         ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta
-!!$    use parallel
-!!$    use minimize
-!!$    implicit none
-!!$    integer,intent(in):: ndim
-!!$    real(8),intent(in):: x(ndim)
-!!$    real(8):: NN_func_tst
-!!$
-!!$    integer:: ismpl,natm,ia,ixyz,idim
-!!$    real(8):: dn3i,ediff,tf0,tc0,fscale,eref,swgt
-!!$    real(8):: flocal
-!!$
-!!$    nfunc= nfunc +1
-!!$
-!!$    call mpi_bcast(x,ndim,mpi_double_precision,0,mpi_world,ierr)
-!!$    tf0= mpi_wtime()
-!!$    call vars2wgts(ndim,x)
-!!$    
-!!$    do ismpl=isid0_tst,isid1_tst
-!!$      if( nl.eq.1 ) then
-!!$        call calc_ef1(smpl_tst(ismpl),sds_tst(ismpl))
-!!$      else if( nl.eq.2 ) then
-!!$        call calc_ef2(smpl_tst(ismpl),sds_tst(ismpl))
-!!$      endif
-!!$    enddo
-!!$
-!!$    flocal= 0d0
-!!$    do ismpl=isid0_tst,isid1_tst
-!!$      natm= smpl_tst(ismpl)%natm
-!!$      eref= smpl_tst(ismpl)%eref
-!!$      ediff= (smpl_tst(ismpl)%epot -eref)/natm
-!!$      ediff= ediff*ediff
-!!$      swgt= 1d0
-!!$      if( lswgt ) then
-!!$        swgt= exp(-eref/natm*swbeta)
-!!$      endif
-!!$      flocal= flocal +ediff*swgt
-!!$      if( .not. lfmatch ) cycle
-!!$      fdiff(1:3,1:natm)= (smpl_tst(ismpl)%fa(1:3,1:natm) &
-!!$           -smpl_tst(ismpl)%fref(1:3,1:natm))
-!!$      dn3i= 1d0 /(3*natm)
-!!$      fscale= 1d0
-!!$      !.....force-scale makes force contribution same order to energy
-!!$      if( lfscale ) fscale= fscl
-!!$      fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
-!!$           *dn3i *fscale *swgt
-!!$      do ia=1,natm
-!!$        do ixyz=1,3
-!!$          flocal= flocal +fdiff(ixyz,ia)
-!!$        enddo
-!!$      enddo
-!!$    enddo
-!!$
-!!$    tc0= mpi_wtime()
-!!$    NN_func_tst= 0d0
-!!$    call mpi_allreduce(flocal,NN_func_tst,1,mpi_double_precision &
-!!$         ,mpi_sum,mpi_world,ierr)
-!!$    tcomm= tcomm +mpi_wtime() -tc0
-!!$    NN_func_tst= NN_func_tst/nsmpl_tst
-!!$
-!!$    tfunc= tfunc +mpi_wtime() -tf0
-!!$    return
-!!$  end function NN_func_tst
-!!$!=======================================================================
   function NN_fs(ndim,x)
     use variables
     use parallel
