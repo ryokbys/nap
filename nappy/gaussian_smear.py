@@ -59,7 +59,7 @@ for ix in range(nline):
             kx = -kx
         elif kx >= nline:
             kx = nline -(kx-(nline-1))
-        gdat[ix][1] += data[kx][1]*pref*math.exp(-(dx*(jx))**2/sgm**2)*dx
+        gdat[ix][1] += data[kx][1]*pref*math.exp(-(dx*(jx))**2/sgm**2/2)*dx
 
 outfile= open(infname+'.smeared','w')
 for il in range(nline):

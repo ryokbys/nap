@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 from AtomSystem import AtomSystem
 
-usage= '%prog [options] akr0000'
+usage= '%prog [options] akr0000 akr0001...'
 
 def norm(vector):
     norm= 0.0
