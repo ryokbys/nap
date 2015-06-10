@@ -40,6 +40,7 @@ module variables
     real(8),allocatable:: ra(:,:),fa(:,:),fref(:,:)
     integer:: iclass
   end type mdsys
+  real(8):: erefmin
 
   integer:: nsmpl_trn,nsmpl_tst
   type(mdsys),save,allocatable:: samples(:)

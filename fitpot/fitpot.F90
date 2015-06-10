@@ -298,8 +298,10 @@ subroutine read_ref_data()
   implicit none 
   integer:: ismpl,i,is,jflag,natm
   character(len=5):: cdir
+  real(8):: erefminl
 
   jflag= 0
+  erefminl= 0d0
   do ismpl=isid0,isid1
     cdir=samples(ismpl)%cdirname
     open(13,file=trim(cmaindir)//'/'//trim(cdir) &
@@ -311,6 +313,7 @@ subroutine read_ref_data()
       is= samples(ismpl)%tag(i)
       samples(ismpl)%eref= samples(ismpl)%eref -eatom(is)
     enddo
+    erefminl= min(erefminl,samples(ismpl)%eref/samples(ismpl)%natm)
 
     open(14,file=trim(cmaindir)//'/'//trim(cdir) &
          //'/frc.ref',status='old')
@@ -331,6 +334,10 @@ subroutine read_ref_data()
     call mpi_finalize(ierr)
     stop
   endif
+
+  erefmin= 0d0
+  call mpi_allreduce(erefminl,erefmin,1,mpi_double_precision,mpi_min &
+       ,mpi_world,ierr)
 
   if(myid.eq.0) print *,'read_ref_data done.'
 

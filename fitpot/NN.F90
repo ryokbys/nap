@@ -129,7 +129,7 @@ contains
 !=======================================================================
   function NN_func(ndim,x)
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
-         ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta,mdsys
+         ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta,mdsys,erefmin
     use parallel
     use minimize
     implicit none
@@ -167,7 +167,7 @@ contains
       ediff= ediff*ediff
       swgt= 1d0
       if( lswgt ) then
-        swgt= exp(-eref/natm*swbeta)
+        swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
       endif
       flocal= flocal +ediff*swgt
       if( .not. lfmatch ) cycle
@@ -230,7 +230,8 @@ contains
     ediff= ediff*ediff
     swgt= 1d0
     if( lswgt ) then
-      swgt= exp(-eref/natm*swbeta)
+      swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
+!!$      swgt= exp(-eref/natm*swbeta)
     endif
     flocal= flocal +ediff*swgt
     if( .not. lfmatch ) goto 888
@@ -481,7 +482,8 @@ contains
     eref= smpl%eref
     swgt= 1d0
     if( lswgt ) then
-      swgt= exp(-eref/natm*swbeta)
+      swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
+!!$      swgt= exp(-eref/natm*swbeta)
     endif
     ediff= (smpl%epot -eref)*2 /natm/natm *swgt
 !!$    print *,'ediff=',ediff*natm
@@ -598,7 +600,8 @@ contains
     eref= smpl%eref
     swgt= 1d0
     if( lswgt ) then
-      swgt= exp(-eref/natm*swbeta)
+      swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
+!!$      swgt= exp(-eref/natm*swbeta)
     endif
     ediff= (smpl%epot -eref)*2 /natm/natm *swgt
     gs(1:nvars)= 0d0
