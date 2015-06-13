@@ -11,34 +11,44 @@ import optparse
 
 #=========================================================== Constants
 #.....cutoff radius in Angstrom
-rcut= 3.5
+rcut= 4.0
 #.....number of species
 nsp= 2
 #.....number of hidden layers
 nl = 1
 #.....num of nodes in a layer
-nhl= [0,2]
+nhl= [0,10]
 #.....min,max of parameters
 pmin= -1.0
 pmax=  1.0
 #.....num of eta in Gaussian symmetry function, f(r)=exp(-eta*(dij-rs)**2)
 type_gauss= 1
-reta=[0.5, 1.0, 1.5, 2.0, 2.5]
+nr= 5
+dr= (rcut-0.1)/(nr-1)
+reta=[ 0.1+dr*i for i in range(nr) ]
+#reta=[0.5, 1.0, 1.5, 2.0, 2.5]
 #.....num of Rs in 2-body symmetry function
 #rrs=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5]
 #rrs=[0.5, 1.0, 1.5, 2.0, 2.5]
 rrs=[0.0]
 #.....num of k in cosine func, f(r)= (1d0+cos(k*r))
 type_cos= 2
-r2pi= 2.0*math.pi/rcut
-rk= [r2pi, r2pi*1.5]
+nk= 5
+drk= (rcut-1.0)*math.pi/rcut/(nk-1)
+rk= [ math.pi/rcut +drk*i for i in range(nk) ]
+# r2pi= 2.0*math.pi/rcut
+# rk= [r2pi, r2pi*1.5]
 #.....num of a in polynomial func, f(r)= 1.0/r**a
 type_poly= 3
-rpoly= [1.0, 2.0, 3.0, 6.0, 9.0, 12.0]
+#rpoly= [1.0, 2.0, 3.0, 6.0, 9.0, 12.0]
+rpoly= []
 #.....num of 3-body angular symmetry functions (cosine value)
 type_angle= 101
+nang= 5
+dang= 1.0/(nang-1)
+rsf3= [ dang*i for i in range(nang) ]
 #rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 2.0/3, 3.0/5]
-rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2]
+#rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2]
 
 constfname='in.const.NN'
 paramfname='in.params.NN'
