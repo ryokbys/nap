@@ -119,6 +119,7 @@ contains
           iglid(i)= ihl0
         enddo
       enddo
+!.....weights between hidden nodes are not penalized in g-lasso
       do i=nhl(0)*nhl(1)+1,nw
         iglid(i)= -1
       enddo
@@ -1074,6 +1075,9 @@ contains
     real(8),allocatable:: sumv(:),cnst(:,:),sumvv(:)
     integer:: i,j,k,l,i2,i3,isf,iv,ic,ihl0,ihl1,itmp
 
+    allocate(sumv(nhl(0)),sumvv(nsfc))
+    call eval_1st_layer(sumv)
+
     if( myid.eq.0 ) then
 !.....read in.comb.NN file
       allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
@@ -1102,14 +1106,13 @@ contains
 
       open(ionum+1,file=cfname,status='replace')
       iv=0
-      allocate(sumv(nhl(0)),sumvv(nsfc))
-      do ihl0=1,nhl(0)
-        sumv(ihl0)= 0d0
-        do ihl1=1,nhl(1)
-          iv=iv+1
-          sumv(ihl0)=sumv(ihl0) +abs(vars(iv))
-        enddo
-      enddo
+!!$      do ihl0=1,nhl(0)
+!!$        sumv(ihl0)= 0d0
+!!$        do ihl1=1,nhl(1)
+!!$          iv=iv+1
+!!$          sumv(ihl0)=sumv(ihl0) +abs(vars(iv))
+!!$        enddo
+!!$      enddo
 !.....about 2body terms
       do ihl0=1,nsf2*ncmb2
         isf= mod(ihl0-1,nsf2)+1
@@ -1175,4 +1178,47 @@ contains
     return
   end subroutine NN_analyze
 !=======================================================================
+  subroutine eval_1st_layer(sumv)
+    use variables
+    use parallel
+    implicit none
+    real(8),intent(out):: sumv(nhl(0))
+    real(8),allocatable:: sumvl(:)
+
+    integer:: ismpl,ia,ihl0,ihl1,natm
+    
+    allocate(sumvl(nhl(0)))
+    sumvl(1:nhl(0))= 0d0
+    if( nl.eq.1 ) then ! 1-layer NN
+      do ismpl=isid0,isid1
+        natm= samples(ismpl)%natm
+        do ia=1,natm
+          do ihl0=1,nhl(0)
+            do ihl1=1,nhl(1)
+              sumvl(ihl0)= sumvl(ihl0) &
+                   +wgt11(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0)
+            enddo
+          enddo
+        enddo
+      enddo
+    else if( nl.eq.2 ) then ! 2-layer NN
+      do ismpl=isid0,isid1
+        natm= samples(ismpl)%natm
+        do ia=1,natm
+          do ihl0=1,nhl(0)
+            do ihl1=1,nhl(1)
+              sumvl(ihl0)= sumvl(ihl0) &
+                   +wgt21(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0)
+            enddo
+          enddo
+        enddo
+      enddo
+    endif
+
+    sumv(1:nhl(0))= 0d0
+    call mpi_reduce(sumvl,sumv,nhl(0),mpi_double_precision &
+         ,mpi_sum,0,mpi_world,ierr)
+    
+    deallocate(sumvl)
+  end subroutine eval_1st_layer
 end module NN
