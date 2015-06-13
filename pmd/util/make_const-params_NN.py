@@ -46,7 +46,7 @@ combfname='in.comb.NN'
 
 
 #=========================================================== Functions
-def comb(n,m):
+def ncomb(n,m):
     '''
     Calculate nCm.
     '''
@@ -76,6 +76,22 @@ def make_combination(nsp,fname):
                                                             pair[1],n ))
     f.close()
 
+def get_comb(nsp):
+    """
+    Make combinations.
+    """
+    pairs= []
+    for i in range(1,nsp+1):
+        for j in range(i,nsp+1):
+            pairs.append([i,j])
+    triplets= []
+    for i in range(1,nsp+1):
+        tmp= [i]
+        for pair in pairs:
+            triplets.append(tmp+pair)
+    return pairs,triplets
+    
+
 #========================================================= main routine
 if __name__ == "__main__":
 
@@ -84,44 +100,70 @@ if __name__ == "__main__":
         exit()
 
     #....compute num of combinations
-    ncmb2= nsp+ comb(nsp,2)
+    ncmb2= nsp+ ncomb(nsp,2)
     ncmb3= ncmb2*nsp
 
-    make_combination(nsp,combfname)
+    print ' ncmb2, ncmb3 = ',ncmb2,ncmb3
 
+    pairs,triplets= get_comb(nsp)
+    print ' pairs=',pairs
+    print ' triplets=',triplets
+    if len(pairs) != ncmb2:
+        print '[Error] len(pairs) != ncmb2'
+        print 'len(pairs),ncmb2=',len(pairs),ncmb2
+        exit()
+    if len(triplets) != ncmb3:
+        print '[Error] len(triplets) != ncmb3'
+        print 'len(triplets),ncmb3=',len(triplets),ncmb3
+        exit()
+    
     #.....num of 2-body Gaussian-type symmetry functions
     nsf2 = len(reta)*len(rrs)
     nsf2+= len(rk)
     nsf2+= len(rpoly)
     nsf3= len(rsf3)
+
+    print ' nsf2, nsf3 = ',nsf2,nsf3
     
     f= open(constfname,'w')
     nsf= nsf2+nsf3
-    nhl[0]= nsf
+    nhl[0]= nsf2*ncmb2 +nsf3*ncmb3
+    #nhl[0]= nsf
     f.write(' {0:5d} {1:5d}'.format(nl,nsp))
     for il in range(nl+1):
         f.write(' {0:5d}'.format(nhl[il]))
     f.write('\n')
 
-    #.....2-body Gaussian-type
-    for eta in reta:
-        for rs in rrs:
-            f.write(' {0:3d} {1:10.4f} {2:10.4f}\n'.format(type_gauss,eta,rs))
-    #.....cosine
-    for k in rk:
-        f.write(' {0:3d} {1:10.4f}\n'.format(type_cos,k))
-    #.....polynomial
-    for p in rpoly:
-        f.write(' {0:3d} {1:10.4f}\n'.format(type_poly,p))
-    #.....3-body
-    for sf3 in rsf3:
-        f.write(' {0:3d} {1:10.4f}\n'.format(type_angle,sf3))
+    for pair in pairs:
+        ia= pair[0]
+        ja= pair[1]
+        for eta in reta: # Gaussian
+            for rs in rrs:
+                f.write(' {0:3d}'.format(type_gauss) \
+                        +' {0:3d} {1:3d}'.format(ia,ja) \
+                        +' {0:10.4f} {1:10.4f}\n'.format(eta,rs))
+        for k in rk:  # cosine
+            f.write(' {0:3d}'.format(type_cos) \
+                    +' {0:3d} {1:3d}'.format(ia,ja) \
+                    +' {0:10.4f}\n'.format(k))
+        for p in rpoly:  # polynomial
+            f.write(' {0:3d}'.format(type_poly) \
+                    +' {0:3d} {1:3d}'.format(ia,ja) \
+                    +' {0:10.4f}\n'.format(p))
+    for triple in triplets:
+        ia= triple[0]
+        ja= triple[1]
+        ka= triple[2]
+        for sf3 in rsf3: # 3-body
+            f.write(' {0:3d}'.format(type_angle) \
+                    +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
+                    +' {0:10.4f}\n'.format(sf3))
     f.close()
     
     g= open(paramfname,'w')
     #nc= (nsf+1)*nhl1 +(nhl1+1)
     #nsf= nsf2*ncmb2 +nsf3*ncmb3
-    nhl[0]= nsf2*ncmb2 +nsf3*ncmb3
+    #nhl[0]= nsf2*ncmb2 +nsf3*ncmb3
     if nl == 1:
         nc= nhl[0]*nhl[1] +nhl[1]
     elif nl == 2:
