@@ -113,6 +113,7 @@ contains
     allocate(fdiff(3,maxna))
 
 !!$    call standardize_var()
+!!$    call standardize_norm()
 
 !.....make groups for group lasso
     if( trim(cpena).eq.'glasso' ) then
@@ -960,6 +961,62 @@ contains
     deallocate(gmaxl,gminl)
     if(myid.eq.0) print *,'standardize done.'
   end subroutine standardize_max
+!=======================================================================
+  subroutine standardize_norm()
+!
+!  Standardize of inputs by dividing by L2 norm
+!
+    use variables, only: nsmpl,samples,nvars,nalist,vars
+    use parallel
+    implicit none
+    integer:: nsuml,nsumg,ismpl,ia,natm,ihl0,ihl1,iv
+    real(8),allocatable:: gmaxl(:),gminl(:)
+
+    allocate(gmax(nhl(0)),gmaxl(nhl(0)))
+
+    gmaxl(1:nhl(0))= 0d0
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      !.....sum up gsf
+      do ihl0=1,nhl(0)
+        do ia=1,natm
+          gmaxl(ihl0)= gmaxl(ihl0) +sds(ismpl)%gsf(ia,ihl0)**2
+        enddo
+      enddo
+    enddo
+
+    gmax(1:nhl(0))= 0d0
+    call mpi_allreduce(gmaxl,gmax,nhl(0),mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
+    do ihl0=1,nhl(0)
+      gmax(ihl0)= sqrt(gmax(ihl0))
+      if( gmax(ihl0).lt.1d-8 ) gmax(ihl0)= 1d0
+    enddo
+
+!.....standardize G values
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      allocate(sds(ismpl)%gsfo(natm,nhl(0)))
+      do ihl0=1,nhl(0)
+        do ia=1,natm
+          sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
+          sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
+        enddo
+      enddo
+    enddo
+
+    iv=0
+    do ihl0=1,nhl(0)
+      do ihl1=1,nhl(1)
+        iv=iv+1
+        vars(iv)= vars(iv)*gmax(ihl0)
+      enddo
+    enddo
+
+    lstandard= .true.
+    deallocate(gmaxl)
+    if(myid.eq.0) print *,'standardize done.'
+  end subroutine standardize_norm
 !=======================================================================
   subroutine standardize_var()
 !
