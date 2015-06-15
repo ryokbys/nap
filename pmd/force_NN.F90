@@ -8,7 +8,6 @@ module NN
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
   character(128),parameter:: ccfname='in.const.NN'
-  character(128),parameter:: cmbfname='in.comb.NN'
 !.....parameters
   integer:: nwgt1,nwgt2
   real(8),allocatable:: wgt11(:,:),wgt12(:)
@@ -19,9 +18,11 @@ module NN
   integer,allocatable:: itype(:)
   real(8),allocatable:: cnst(:,:)
   integer,allocatable:: icmb2(:,:),icmb3(:,:,:)
+  integer,allocatable:: iaddr2(:,:,:),iaddr3(:,:,:,:)
 !.....function types and num of constatns for types
   integer,parameter:: max_ncnst= 2
   integer:: ncnst_type(200)
+  integer:: ncomb_type(200)
 
 !.....max exponent of the basis function
   integer:: max_nexp
@@ -72,7 +73,7 @@ contains
     endif
 
 !.....first, calculate all the symmetry functions
-    call eval_sf_msp(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
+    call eval_sf_msp2(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
          ,lspr,gsf,dgsf,rc)
 
 #ifdef __FITPOT__
@@ -445,6 +446,123 @@ contains
 
   end subroutine eval_sf_msp
 !=======================================================================
+  subroutine eval_sf_msp2(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr &
+       ,gsf,dgsf,rc)
+!
+!  Evaluate symmetry functions and derivatives for multi-species system.
+!
+    implicit none
+    integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
+    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    real(8),intent(out):: gsf(nsf,natm),dgsf(3,nsf,0:nnmax,namax)
+
+    integer:: isf,isfc,ia,jj,ja,kk,ka,is,js,ks,isfc1,isfc2
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
+         dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
+         driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
+         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1
+
+    real(8),external:: sprod
+
+    gsf(1:nsf,1:natm)= 0d0
+    dgsf(1:3,1:nsf,0:nnmax,1:natm)= 0d0
+    do ia=1,natm
+      xi(1:3)= ra(1:3,ia)
+      is= int(tag(ia))
+      do jj=1,lspr(0,ia)
+        ja= lspr(jj,ia)
+        if( ja.eq.ia ) cycle
+        xj(1:3)= ra(1:3,ja)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        if( dij.ge.rc ) cycle
+        js= int(tag(ja))
+        isfc=0
+        driji(1:3)= -rij(1:3)/dij
+        drijj(1:3)= -driji(1:3)
+        do isf=iaddr2(1,is,js),iaddr2(2,is,js)
+!!$          isfc= isfc+1
+!!$          isf= (icmb2(is,js)-1)*nsfc1 +isfc1
+          fcij= fc(dij,rc)
+          if( itype(isf).eq.1 ) then ! Gaussian
+            eta= cnst(1,isf)
+            rs=  cnst(2,isf)
+            !.....function value
+            texp= exp(-eta*(dij-rs)**2)
+            gsf(isf,ia)= gsf(isf,ia) +texp*fcij
+            !.....derivative
+            dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfc(dij,rc)
+            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
+            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+          else if( itype(isf).eq.2 ) then ! cosine
+            a1= cnst(1,isf)
+            !.....func value
+            tcos= (1d0+cos(dij*a1))
+            gsf(isf,ia)= gsf(isf,ia) +tcos*fcij
+            !.....derivative
+            dgdr= -a1*sin(dij*a1)*fcij +tcos*dfc(dij,rc)
+            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
+            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+          else if( itype(isf).eq.3 ) then ! polynomial
+            a1= cnst(1,isf)
+            !.....func value
+            tpoly= 1d0*dij**(-a1)
+            gsf(isf,ia)= gsf(isf,ia) +tpoly*fcij
+            !.....derivative
+            dgdr= -a1*dij**(-a1-1d0)*fcij +tpoly*dfc(dij,rc)
+            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
+            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+          endif
+        enddo
+
+        fcij= fc(dij,rc)
+        dfcij= dfc(dij,rc)
+        driji(1:3)= -rij(1:3)/dij
+        drijj(1:3)= -driji(1:3)
+        do kk=1,lspr(0,ia)
+          ka= lspr(kk,ia)
+          if( ka.eq.ia .or. ka.le.ja ) cycle
+          xk(1:3)= ra(1:3,ka)
+          xik(1:3)= xk(1:3)-xi(1:3)
+          rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
+          dik= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
+          if( dik.ge.rc ) cycle
+          ks= int(tag(ka))
+          do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
+!!$            isf= nsfc1*nc1 +(icmb3(is,js,ks)-1)*nsfc2 +isfc2
+            almbd= cnst(1,isf)
+            t2= (abs(almbd)+1d0)**2
+            fcik= fc(dik,rc)
+            dfcik= dfc(dik,rc)
+            driki(1:3)= -rik(1:3)/dik
+            drikk(1:3)= -driki(1:3)
+            !.....function value
+            spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
+            cs= spijk/dij/dik
+            t1= (almbd +cs)**2
+            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik 
+            !.....derivative
+            dgdij= dfcij *fcik *t1/t2
+            dgdik= fcij *dfcik *t1/t2
+            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) &
+                 +dgdij*driji(1:3) +dgdik*driki(1:3)
+            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
+            dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
+            dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik
+            dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*spijk/dij**3/dik
+            dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*spijk/dik**3/dij
+            dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
+            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
+            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
+            dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
+          enddo
+        enddo
+      enddo
+    enddo
+
+  end subroutine eval_sf_msp2
+!=======================================================================
   function fc(r,rc)
     implicit none
     real(8),intent(in):: r,rc
@@ -491,8 +609,8 @@ contains
 
     integer,intent(in):: myid,mpi_world
     real(8),intent(out):: rcin
-    integer:: itmp,ierr,i,j,k,nc,ncoeff,is,js,ks&
-         ,n,ihl0,ihl1,ihl2
+    integer:: itmp,ierr,i,j,k,nc,ncoeff,is,js,ks &
+         ,n,ihl0,ihl1,ihl2,icmb(3),nsf,nsf1,nsf2,iap,jap,kap
     integer,allocatable:: nwgt(:)
     logical:: lexist
 
@@ -501,6 +619,9 @@ contains
     ncnst_type(2)= 1   ! cosine
     ncnst_type(3)= 1   ! polynomial
     ncnst_type(101)= 1 ! angular
+
+    ncomb_type(1:100)= 2    ! pair
+    ncomb_type(101:200)= 3  ! triplet
 
 !.....read constants at the 1st call
     inquire(file=trim(ccfname),exist=lexist)
@@ -536,22 +657,45 @@ contains
         stop
       endif
     endif
-    nsfc= nhl(0)
+    nsf= nhl(0)
     nhl(nl+1)= 1
-    allocate(itype(nsfc),cnst(max_ncnst,nsfc))
-    nsfc1= 0
-    nsfc2= 0
-    do i=1,nsfc
-      read(51,*) itype(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
+    allocate(itype(nsf),cnst(max_ncnst,nsf))
+    allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
+    nsf1= 0
+    nsf2= 0
+    iap= 0
+    jap= 0
+    kap= 0
+    do i=1,nsf
+      read(51,*) itype(i),(icmb(k),k=1,ncomb_type(itype(i))) &
+           ,(cnst(j,i),j=1,ncnst_type(itype(i)))
       if( itype(i).le.100 ) then
-        nsfc1= nsfc1 +1
+        if( icmb(1).ne.iap .or. icmb(2).ne.jap ) then
+          iaddr2(1,icmb(1),icmb(2))= i
+          iaddr2(1,icmb(2),icmb(1))= i
+        endif
+        iaddr2(2,icmb(1),icmb(2))= i
+        iaddr2(2,icmb(2),icmb(1))= i
+        nsf1= nsf1 +1
+        iap= icmb(1)
+        jap= icmb(2)
       else if( itype(i).le.200 ) then
-        nsfc2= nsfc2 +1
+        if( icmb(1).ne.iap .or. icmb(2).ne.jap .or. &
+             icmb(3).ne.kap ) then
+          iaddr3(1,icmb(1),icmb(2),icmb(3))= i
+          iaddr3(1,icmb(1),icmb(3),icmb(2))= i
+        endif
+        iaddr3(2,icmb(1),icmb(2),icmb(3))= i
+        iaddr3(2,icmb(1),icmb(3),icmb(2))= i
+        nsf2= nsf2 +1
+        iap= icmb(1)
+        jap= icmb(2)
+        kap= icmb(3)
       endif
     enddo
-    if( nsfc.ne.nsfc1+nsfc2 ) then
+    if( nsf.ne.nsf1+nsf2 ) then
       if(myid.eq.0) then
-        print *,'[Error] nsfc.ne.nsfc1+nsfc2 !!!'
+        print *,'[Error] nsf.ne.nsf1+nsf2 !!!'
       endif
       call mpi_finalize(ierr)
       stop
@@ -559,9 +703,9 @@ contains
     close(51)
 
 !.....calc number of weights
-    nc1= nsp +factorial(nsp,2)/2
-    nc2= nsp*nc1
-    nhl(0)= nsfc1*nc1 +nsfc2*nc2
+!!$    nc1= nsp +factorial(nsp,2)/2
+!!$    nc2= nsp*nc1
+!!$    nhl(0)= nsfc1*nc1 +nsfc2*nc2
 !!$    nwgt1= nsf*nhl1
 !!$    nwgt2= nhl1
     allocate(nwgt(nl+1))
@@ -570,9 +714,7 @@ contains
 !      print *,' i,nhl(i-1),nhl(i),nwgt(i)=',i,nhl(i-1),nhl(i),nwgt(i)
     enddo
     if( myid.le.0 ) then
-      print *, 'nsfc1,nc1,nsfc2,nc2 =',nsfc1,nc1,nsfc2,nc2
-      print *, 'nsfc           =',nsfc
-      print *, 'nsf            =',nhl(0)
+      print *, 'num of basis funcs =',nhl(0)
       do i=1,nl
         print *, 'ihl, nhl(ihl)  =',i,nhl(i)
       enddo
@@ -643,49 +785,36 @@ contains
     endif
     close(50)
 
-!.....read in.comb.NN
-    allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
-    inquire(file=trim(cmbfname),exist=lexist)
-    if( .not.lexist ) then
-      if( myid.ge.0 ) then
-        if( myid.eq.0 ) then
-          write(6,'(a)') ' [Error] '//cmbfname//' does not exist !!!.'
-          write(6,'(a)') '   The NN potential needs '//cmbfname//'.'
-        endif
-        call mpi_finalize(ierr)
-        stop
-      else
-        write(6,'(a)') ' [Error] '//cmbfname//' does not exist !!!.'
-        write(6,'(a)') '   The NN potential needs '//cmbfname//'.'
-        stop
-      endif
-    else
-      open(52,file=trim(cmbfname),status='old')
-!.....read pairs
-      do n=1,nc1
-        read(52,*) i,j,icmb2(i,j)
-        icmb2(j,i)= icmb2(i,j)
-      enddo
-!.....read triplets
-      do n=1,nc2
-        read(52,*) i,j,k,icmb3(i,j,k)
-        icmb3(i,k,j)= icmb3(i,j,k)
-      enddo
-      close(52)
-!!$!.....check icmb2 and icmb3
-!!$      do i=1,nsp
-!!$        do j=1,nsp
-!!$          write(6,*) 'i,j,icmb2(i,j)=',i,j,icmb2(i,j)
-!!$        enddo
+!!$!.....read in.comb.NN
+!!$    allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
+!!$    inquire(file=trim(cmbfname),exist=lexist)
+!!$    if( .not.lexist ) then
+!!$      if( myid.ge.0 ) then
+!!$        if( myid.eq.0 ) then
+!!$          write(6,'(a)') ' [Error] '//cmbfname//' does not exist !!!.'
+!!$          write(6,'(a)') '   The NN potential needs '//cmbfname//'.'
+!!$        endif
+!!$        call mpi_finalize(ierr)
+!!$        stop
+!!$      else
+!!$        write(6,'(a)') ' [Error] '//cmbfname//' does not exist !!!.'
+!!$        write(6,'(a)') '   The NN potential needs '//cmbfname//'.'
+!!$        stop
+!!$      endif
+!!$    else
+!!$      open(52,file=trim(cmbfname),status='old')
+!!$!.....read pairs
+!!$      do n=1,nc1
+!!$        read(52,*) i,j,icmb2(i,j)
+!!$        icmb2(j,i)= icmb2(i,j)
 !!$      enddo
-!!$      do i=1,nsp
-!!$        do j=1,nsp
-!!$          do k=1,nsp
-!!$            write(6,*) 'i,j,k,icmb3(i,j,k)=',i,j,k,icmb3(i,j,k)
-!!$          enddo
-!!$        enddo
+!!$!.....read triplets
+!!$      do n=1,nc2
+!!$        read(52,*) i,j,k,icmb3(i,j,k)
+!!$        icmb3(i,k,j)= icmb3(i,j,k)
 !!$      enddo
-    endif
+!!$      close(52)
+!!$    endif
 
     deallocate(nwgt)
     return

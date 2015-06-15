@@ -7,7 +7,7 @@ module NN
   character(128),parameter:: ccfname='in.const.NN'
   character(128),parameter:: cmbfname='in.comb.NN'
   integer,parameter:: maxnl= 2
-  integer,save:: nl,nsp,nsfc,nsf2,nsf3,ncmb2,ncmb3
+  integer,save:: nl,nsp,nsf2,nsf3,ncmb2,ncmb3
   integer,save:: nhl(0:maxnl+1)
   integer,save,allocatable:: nwgt(:)
   real(8),save,allocatable:: wgt11(:,:),wgt12(:)
@@ -56,21 +56,28 @@ contains
         endif
       enddo
 10    close(20)
-      nsfc= nhl(0)
       nhl(nl+1)= 1
-      write(6,'(a,5i5)') 'nhl(0:nl+1)=',nhl(0:nl+1)
+      write(6,'(a,5i5)') ' nhl(0:nl+1)=',nhl(0:nl+1)
     endif
     call mpi_bcast(nl,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsp,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nhl,nl+2,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf2,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(nsfc,1,mpi_integer,0,mpi_world,ierr)
 
 !.....calc number of weights
     ncmb2= nsp +factorial(nsp,2)/2
     ncmb3= nsp*ncmb2
-    nhl(0)= nsf2*ncmb2 +nsf3*ncmb3
+    if( nhl(0).ne.nsf2 +nsf3 ) then
+      if( myid.eq.0) then
+        print *,'[Error] nhl(0).ne.nsf2 +nsf3 '
+        print *,' ncmb2,ncmb3,nsf2,nsf3=',ncmb2,ncmb3,nsf2,nsf3
+        print *,'   nhl(0),nsf2*ncmb2 +nsf3*ncmb3=',nhl(0) &
+             ,nsf2 +nsf3
+      endif
+      call mpi_finalize(ierr)
+      stop
+    endif
     allocate(nwgt(nl+1))
     nw= 0
     do i=1,nl+1
@@ -106,6 +113,7 @@ contains
     allocate(fdiff(3,maxna))
 
 !!$    call standardize_var()
+!!$    call standardize_norm()
 
 !.....make groups for group lasso
     if( trim(cpena).eq.'glasso' ) then
@@ -954,6 +962,62 @@ contains
     if(myid.eq.0) print *,'standardize done.'
   end subroutine standardize_max
 !=======================================================================
+  subroutine standardize_norm()
+!
+!  Standardize of inputs by dividing by L2 norm
+!
+    use variables, only: nsmpl,samples,nvars,nalist,vars
+    use parallel
+    implicit none
+    integer:: nsuml,nsumg,ismpl,ia,natm,ihl0,ihl1,iv
+    real(8),allocatable:: gmaxl(:),gminl(:)
+
+    allocate(gmax(nhl(0)),gmaxl(nhl(0)))
+
+    gmaxl(1:nhl(0))= 0d0
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      !.....sum up gsf
+      do ihl0=1,nhl(0)
+        do ia=1,natm
+          gmaxl(ihl0)= gmaxl(ihl0) +sds(ismpl)%gsf(ia,ihl0)**2
+        enddo
+      enddo
+    enddo
+
+    gmax(1:nhl(0))= 0d0
+    call mpi_allreduce(gmaxl,gmax,nhl(0),mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
+    do ihl0=1,nhl(0)
+      gmax(ihl0)= sqrt(gmax(ihl0))
+      if( gmax(ihl0).lt.1d-8 ) gmax(ihl0)= 1d0
+    enddo
+
+!.....standardize G values
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      allocate(sds(ismpl)%gsfo(natm,nhl(0)))
+      do ihl0=1,nhl(0)
+        do ia=1,natm
+          sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
+          sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
+        enddo
+      enddo
+    enddo
+
+    iv=0
+    do ihl0=1,nhl(0)
+      do ihl1=1,nhl(1)
+        iv=iv+1
+        vars(iv)= vars(iv)*gmax(ihl0)
+      enddo
+    enddo
+
+    lstandard= .true.
+    deallocate(gmaxl)
+    if(myid.eq.0) print *,'standardize done.'
+  end subroutine standardize_norm
+!=======================================================================
   subroutine standardize_var()
 !
 !  Standardize of inputs is requied when you use lasso or ridge.
@@ -1069,112 +1133,86 @@ contains
     use parallel
     implicit none
     character(len=14),parameter:: cfname= 'out.NN_analyze'
-    character(len=14),parameter:: cfsum = 'out.NN_summary'
     integer,parameter:: ionum=  30
-    integer,allocatable:: icmb2(:,:),icmb3(:,:,:),itype(:),nctype(:)
+    integer,allocatable:: icmb2(:,:),icmb3(:,:,:),itype(:),nctype(:)&
+         ,nstype(:)
     real(8),allocatable:: sumv(:),cnst(:,:),sumvv(:)
-    integer:: i,j,k,l,i2,i3,isf,iv,ic,ihl0,ihl1,itmp
+    integer:: i,j,k,l,i2,i3,isf,iv,ic,ihl0,ihl1,itmp,icmb(3)
 
-    allocate(sumv(nhl(0)),sumvv(nsfc))
+    allocate(sumv(nhl(0)))
     call eval_1st_layer(sumv)
 
+
     if( myid.eq.0 ) then
-!.....read in.comb.NN file
-      allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
-      open(ionum,file=trim(cmaindir)//'/'//trim(cmbfname),status='old')
-      do i2=1,ncmb2
-        read(ionum,*) i,j,icmb2(i,j)
-        icmb2(j,i)= icmb2(i,j)
-      enddo
-      do i3=1,ncmb3
-        read(ionum,*) i,j,k,icmb3(i,j,k)
-        icmb3(i,k,j)= icmb3(i,j,k)
-      enddo
-      close(ionum)
+!!$!.....read in.comb.NN file
+!!$      allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
+!!$      open(ionum,file=trim(cmaindir)//'/'//trim(cmbfname),status='old')
+!!$      do i2=1,ncmb2
+!!$        read(ionum,*) i,j,icmb2(i,j)
+!!$        icmb2(j,i)= icmb2(i,j)
+!!$      enddo
+!!$      do i3=1,ncmb3
+!!$        read(ionum,*) i,j,k,icmb3(i,j,k)
+!!$        icmb3(i,k,j)= icmb3(i,j,k)
+!!$      enddo
+!!$      close(ionum)
 !.....read in.const.NN file
-      allocate(itype(nsfc),cnst(2,nsfc),nctype(200))
+      allocate(itype(nhl(0)),cnst(2,nhl(0)),nctype(200),nstype(200))
       nctype(1)= 2   ! Gaussian
       nctype(2)= 1   ! cosine
       nctype(3)= 1   ! polynomial
       nctype(101)= 1 ! angular
+      nstype(1:100)= 2
+      nstype(101:200)= 3
       open(ionum,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
       read(ionum,*) itmp
-      do isf=1,nsfc
-        read(ionum,*) itype(isf),(cnst(j,isf),j=1,nctype(itype(isf)))
+      do isf=1,nhl(0)
+        read(ionum,*) itype(isf),(icmb(k),k=1,nstype(itype(isf))) &
+             ,(cnst(j,isf),j=1,nctype(itype(isf)))
       enddo
       close(ionum)
 
       open(ionum+1,file=cfname,status='replace')
       iv=0
-!!$      do ihl0=1,nhl(0)
-!!$        sumv(ihl0)= 0d0
-!!$        do ihl1=1,nhl(1)
-!!$          iv=iv+1
-!!$          sumv(ihl0)=sumv(ihl0) +abs(vars(iv))
+      do isf=1,nhl(0)
+        write(ionum+1,'(2i5,f24.14)') isf,itype(isf),sumv(isf)
+      enddo
+!!$!.....about 2body terms
+!!$      do ihl0=1,nsf2*ncmb2
+!!$        isf= mod(ihl0-1,nsf2)+1
+!!$        ic = (ihl0-1)/nsf2 +1
+!!$        do i=1,nsp
+!!$          do j=1,nsp
+!!$            if(ic.eq.icmb2(i,j)) goto 10
+!!$          enddo
 !!$        enddo
+!!$10      continue
+!!$        write(ionum+1,'(f24.14,2x,i1,"-",i1,":",i5,1es12.4,2i8)') &
+!!$             sumv(ihl0),i,j,itype(isf),cnst(1,isf),ihl0,ic
 !!$      enddo
-!.....about 2body terms
-      do ihl0=1,nsf2*ncmb2
-        isf= mod(ihl0-1,nsf2)+1
-        ic = (ihl0-1)/nsf2 +1
-        do i=1,nsp
-          do j=1,nsp
-            if(ic.eq.icmb2(i,j)) goto 10
-          enddo
-        enddo
-10      continue
-        write(ionum+1,'(f24.14,2x,i1,"-",i1,":",i5,1es12.4,2i8)') &
-             sumv(ihl0),i,j,itype(isf),cnst(1,isf),ihl0,ic
-      enddo
-!.....about 3body terms
-      do ihl0=nsf2*ncmb2+1,nsf2*ncmb2+nsf3*ncmb3
-        isf= nsf2+mod(ihl0-nsf2*ncmb2-1,nsf3)+1
-        ic = (ihl0-nsf2*ncmb2-1)/nsf3 +1
-        do i=1,nsp
-          do j=1,nsp
-            do k=1,nsp
-              if(ic.eq.icmb3(i,j,k)) goto 20
-            enddo
-          enddo
-        enddo
-20      continue
-        write(ionum+1,'(f24.14,2x,i1,"-",i1,"-",i1,":",i5,1es12.4,2i8)') &
-             sumv(ihl0),i,j,k,itype(isf),cnst(1,isf),ihl0,ic
-      enddo
+!!$!.....about 3body terms
+!!$      do ihl0=nsf2*ncmb2+1,nsf2*ncmb2+nsf3*ncmb3
+!!$        isf= nsf2+mod(ihl0-nsf2*ncmb2-1,nsf3)+1
+!!$        ic = (ihl0-nsf2*ncmb2-1)/nsf3 +1
+!!$        do i=1,nsp
+!!$          do j=1,nsp
+!!$            do k=1,nsp
+!!$              if(ic.eq.icmb3(i,j,k)) goto 20
+!!$            enddo
+!!$          enddo
+!!$        enddo
+!!$20      continue
+!!$        write(ionum+1,'(f24.14,2x,i1,"-",i1,"-",i1,":",i5,1es12.4,2i8)') &
+!!$             sumv(ihl0),i,j,k,itype(isf),cnst(1,isf),ihl0,ic
+!!$      enddo
       close(ionum+1)
 
-!.....summary
-      open(ionum+2,file=cfsum,status='replace')
-      sumvv(1:nsfc)= 0d0
-      do ihl0=1,nsf2*ncmb2
-        isf= mod(ihl0-1,nsf2)+1
-        ic = (ihl0-1)/nsf2 +1
-        sumvv(isf)= sumvv(isf) +sumv(ihl0)
-      enddo
-      do ihl0=nsf2*ncmb2+1,nsf2*ncmb2+nsf3*ncmb3
-        isf= nsf2+mod(ihl0-nsf2*ncmb2-1,nsf3)+1
-        ic = (ihl0-nsf2*ncmb2-1)/nsf3 +1
-        sumvv(isf)= sumvv(isf) +sumv(ihl0)
-      enddo
-      do isf=1,nsfc
-        if( isf.le.nsf2 ) then
-          if( itype(isf).eq.1 ) then
-            write(ionum+2,'(f24.14,2x,"2body:",i5,2es12.4)') &
-                 sumvv(isf),itype(isf),cnst(1:2,isf)
-          else if( itype(isf).eq.2 ) then
-            write(ionum+2,'(f24.14,2x,"2body:",i5,1es12.4)') &
-                 sumvv(isf),itype(isf),cnst(1,isf)
-          endif
-        else
-          write(ionum+2,'(f24.14,2x,"3body:",i5,1es12.4)') &
-               sumvv(isf),itype(isf),cnst(1,isf)
-        endif
-      enddo
-      close(ionum+2)
-      deallocate(icmb2,icmb3,sumv,sumvv)
+!!$      deallocate(icmb2,icmb3)
     endif
 
+    deallocate(sumv)
     call mpi_barrier(mpi_world,ierr)
+
     return
   end subroutine NN_analyze
 !=======================================================================
