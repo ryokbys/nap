@@ -112,8 +112,11 @@ contains
 !!$    print *,' myid, max num of atoms [maxna] =',myid,maxna
     allocate(fdiff(3,maxna))
 
+    if( cpena.eq.'glasso' .or. cpena.eq.'lasso' ) then
+      call standardize_max()
 !!$    call standardize_var()
 !!$    call standardize_norm()
+    endif
 
 !.....make groups for group lasso
     if( trim(cpena).eq.'glasso' &
@@ -937,6 +940,11 @@ contains
 !!$        write(6,'(i5,2es12.4)') ihl0,gmax(ihl0),gmin(ihl0)
 !!$      enddo
 !!$    endif
+
+!.....neglect 0 values
+    do ihl0=1,nhl(0)
+      if( gmax(ihl0).lt.1d-5 ) gmax(ihl0)=1d0
+    enddo
 
 !.....standardize G values
     do ismpl=isid0,isid1

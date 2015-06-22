@@ -409,7 +409,9 @@ subroutine qn_wrapper()
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
        ,niter_eval,write_stats)
   call NN_analyze()
-!!$  call NN_restore_standard()
+  if( cpena.eq.'lasso' .or. cpena.eq.'glasso' ) then
+    call NN_restore_standard()
+  endif
 
   return
 end subroutine qn_wrapper
