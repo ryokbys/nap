@@ -400,7 +400,7 @@ contains
       gp(1:ndim)= g(1:ndim)
 !.....evaluate statistics at every niter_eval
       if( mod(iter,niter_eval).eq.0 ) &
-           call write_stats(iter)
+           call sub_eval(iter)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
         call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &

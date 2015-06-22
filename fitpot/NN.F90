@@ -1235,7 +1235,7 @@ contains
           do ihl0=1,nhl(0)
             do ihl1=1,nhl(1)
               sumvl(ihl0)= sumvl(ihl0) &
-                   +wgt11(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0)
+                   +abs(wgt11(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0))
             enddo
           enddo
         enddo
@@ -1247,7 +1247,7 @@ contains
           do ihl0=1,nhl(0)
             do ihl1=1,nhl(1)
               sumvl(ihl0)= sumvl(ihl0) &
-                   +wgt21(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0)
+                   +abs(wgt21(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0))
             enddo
           enddo
         enddo
