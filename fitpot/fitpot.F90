@@ -57,6 +57,8 @@ program fitpot
       call qn_wrapper()
     case ('fs','FS')
       call fs_wrapper()
+    case ('gfs')
+      call gfs_wrapper()
     case ('sgd','SGD')
       call sgd()
     case ('check_grad')
@@ -544,6 +546,27 @@ subroutine fs_wrapper()
 
   return
 end subroutine fs_wrapper
+!=======================================================================
+subroutine gfs_wrapper()
+  use variables
+  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use parallel
+  use minimize
+  implicit none
+  integer:: i,m
+  real(8):: fval
+  external:: write_stats
+
+  !.....NN specific code hereafter
+  call NN_init()
+  call gfs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
+       ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval&
+       ,write_stats)
+  call NN_analyze()
+  call NN_restore_standard()
+
+  return
+end subroutine gfs_wrapper
 !=======================================================================
 subroutine check_grad()
   use variables

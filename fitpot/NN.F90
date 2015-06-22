@@ -116,7 +116,8 @@ contains
 !!$    call standardize_norm()
 
 !.....make groups for group lasso
-    if( trim(cpena).eq.'glasso' ) then
+    if( trim(cpena).eq.'glasso' &
+         .or. trim(cfmethod).eq.'gfs') then
       ngl= nhl(0)
       allocate(iglid(nw),glval(0:ngl))
       iglid(1:nw)= 0

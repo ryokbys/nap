@@ -7,6 +7,9 @@ module minimize
   integer:: ngl
   integer,allocatable,save:: iglid(:)
   real(8),allocatable,save:: glval(:)
+!.....group fs and mask
+  logical,allocatable,save:: lmskgfs(:)
+  integer:: nitergfs=100
 
 contains
 !=======================================================================
@@ -1226,4 +1229,280 @@ contains
     return
     
   end subroutine fs
+!=======================================================================
+  subroutine gfs(ndim,x,f,g,d,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
+!
+!  Grouped Forward Stagewise (grouped FS) regression
+!
+    implicit none
+    integer,intent(in):: ndim,maxiter,iprint,myid,niter_eval
+    integer,intent(inout):: iflag
+    real(8),intent(in):: xtol,gtol,ftol
+    real(8),intent(inout):: f,x(ndim),g(ndim),d(ndim)
+    character(len=*),intent(in):: cfmethod
+!!$    real(8):: func,grad
+    interface
+      function func(n,x)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8):: func
+      end function func
+      function grad(n,x)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8):: grad(n)
+      end function grad
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
+    end interface
+
+    integer:: iter,i,imax,ig,itmp,j,igmm,itergfs
+    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,tmp,gmm
+    real(8),allocatable,save:: xt(:),gmaxgl(:),u(:)
+    real(8),save,allocatable:: gg(:,:),v(:),y(:),gp(:) &
+         ,ggy(:),ygg(:),aa(:,:),cc(:,:)
+    logical,allocatable,save:: lmskgfs(:)
+    integer:: nmsks,imsk,nftol
+    real(8):: ynorm,svy,svyi,tmp1,tmp2,b
+
+    if( trim(cpena).eq.'lasso' .and. trim(cpena).eq.'glasso' ) then
+      if(myid.eq.0) then
+        print *,'>>> gfs does not work with lasso or glasso.'
+        print *,'>>> so gfs neglects lasso and glasso.'
+      endif
+    endif
+
+    if( .not.allocated(xt) ) allocate(xt(ndim),u(ndim))
+    if( .not.allocated(gg) ) allocate(gg(ndim,ndim) &
+         ,v(ndim),y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
+         ,aa(ndim,ndim),cc(ndim,ndim))
+    if( .not.allocated(lmskgfs) ) then
+      allocate(lmskgfs(ngl),gmaxgl(ngl))
+      lmskgfs(1:ngl)= .true.
+    endif
+
+    
+    xt(1:ndim)= x(1:ndim)
+    do i=1,ndim
+      ig= iglid(i)
+      if( ig.gt.0 ) xt(1:ndim)= 1d-8
+    enddo
+
+    nmsks= 0
+    do ig=1,ngl
+      if( .not.lmskgfs(ig) ) cycle
+      nmsks= nmsks +1
+    enddo
+
+!.....do loop until the conversion criterion is achieved
+    iter= 0
+    do while(.true.)
+      f= func(ndim,xt)
+      g= grad(ndim,xt)
+
+      if( nmsks.eq.0 ) then
+        if( myid.eq.0 ) then
+          print *,'ngl=',ngl
+          print *,'nmsks is already 0, and while loop should be finished.'
+        endif
+        exit
+      endif
+!.....find bases with large gradients
+      gmaxgl(1:ngl)= 0d0
+      do i=1,ndim
+        ig= iglid(i)
+        if( ig.gt.0 ) gmaxgl(ig)= gmaxgl(ig) &
+             +g(i)*g(i)
+      enddo
+      gmm= 0d0
+      igmm= 0
+      do ig=1,ngl
+        if( gmaxgl(ig).gt.gmm ) then
+          gmm= gmaxgl(ig)
+          igmm= ig
+        endif
+      enddo
+      if( igmm.eq.0 ) then
+        if(myid.eq.0) print *,' igmm.eq.0 !!!'
+        stop
+      endif
+!.....remove mask of bases with large variations
+      if(myid.eq.0) print '(a,i5,es12.4,100l2)',' igmm,gmm,lmskgfs= ' &
+           ,igmm,gmm,lmskgfs
+      lmskgfs(igmm)= .false.
+      nmsks= 0
+      do ig=1,ngl
+        if( .not.lmskgfs(ig) ) cycle
+        nmsks= nmsks +1
+      enddo
+      if( myid.eq.0 ) print '(a,4i8)','iter,ngl,nmsks,ngl-nmsks=' &
+           ,iter,ngl,nmsks,ngl-nmsks
+
+!.....preparation for BFGS
+      gg(1:ndim,1:ndim)= 0d0
+      do i=1,ndim
+        gg(i,i)= 1d0
+      enddo
+!.....mask some g that have small contributions
+      do i=1,ndim
+        ig= iglid(i)
+        if( ig.gt.0 .and. lmskgfs(ig) ) g(i)= 0d0
+      enddo
+      gnorm= sqrt(sprod(ndim,g,g))
+      if( myid.eq.0 ) then
+        if( iprint.eq.1 ) then
+          write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+        else if( iprint.eq.2 ) then
+          write(6,'(a,i8,12es15.7)') ' iter,f,gnorm,x(1:5)=' &
+               ,iter,f,gnorm,x(1:5)
+        endif
+        call flush(6)
+      endif
+      nftol= 0
+      iflag= 0
+      if( mod(iter,niter_eval).eq.0 ) &
+           call sub_eval(iter)
+!.....BFGS loop begins
+      do itergfs=1,nitergfs
+        iter= iter +1
+        if( iter.gt.maxiter ) exit
+        u(1:ndim)= 0d0
+        do i=1,ndim
+          u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
+        enddo
+!.....mask some u that have small contributions
+        do i=1,ndim
+          ig= iglid(i)
+          if( ig.gt.0 .and. lmskgfs(ig) ) u(i)= 0d0
+        enddo
+        fp= f
+        gp(1:ndim)= g(1:ndim)
+        if( mod(iter,niter_eval).eq.0 ) &
+             call sub_eval(iter)
+!.....line minimization
+        if( trim(clinmin).eq.'quadratic' ) then
+          call quad_interpolate(ndim,xt,u,f,xtol,gtol,ftol,alpha &
+               ,iprint,iflag,myid,func)
+!.....if quad interpolation failed, perform golden section
+          if( iflag/100.ne.0 ) then
+            iflag= iflag -(iflag/100)*100
+            if(myid.eq.0) then
+              print *,'since quad_interpolate failed, call golden_section.'
+            endif
+            call golden_section(ndim,xt,u,f,xtol,gtol,ftol,alpha &
+                 ,iprint,iflag,myid,func)
+          endif
+        else if ( trim(clinmin).eq.'golden') then
+          call golden_section(ndim,xt,u,f,xtol,gtol,ftol,alpha &
+               ,iprint,iflag,myid,func)
+        else ! armijo (default)
+          alpha= 1d0
+          call armijo_search(ndim,xt,u,f,g,alpha,iprint &
+               ,iflag,myid,func)
+        endif
+!.....get out of bfgs loop
+        if( iflag/100.ne.0 ) then
+          exit
+        endif
+        xt(1:ndim)= xt(1:ndim) +alpha*u(1:ndim)
+        g= grad(ndim,xt)
+        do i=1,ndim
+          ig= iglid(i)
+          if( ig.gt.0 .and. lmskgfs(ig) ) g(i)= 0d0
+        enddo
+        gnorm= sqrt(sprod(ndim,g,g))
+        if( myid.eq.0 ) then
+          if( iprint.eq.1 ) then
+            write(6,'(a,i8,2es15.7)') ' itergfs,f,gnorm=',itergfs,f,gnorm
+          else if( iprint.eq.2 ) then
+            write(6,'(a,i8,12es15.7)') ' itergfs,f,gnorm,x(1:5)=' &
+                 ,itergfs,f,gnorm,xt(1:5)
+          endif
+          call flush(6)
+        endif
+
+!.....check convergence
+        if( gnorm.lt.gtol ) then
+          if( myid.eq.0 ) then
+            print *,'>>> QM in gFS converged wrt gtol'
+            write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+          endif
+          x(1:ndim)= xt(1:ndim)
+          iflag= iflag +2
+          cycle
+        else if( abs(f-fp)/abs(fp).lt.ftol) then
+          nftol= nftol +1
+          if( nftol.gt.10 ) then
+            if( myid.eq.0 ) then
+              print *,'>>> gFS may be converged because of ftol ' // &
+                   'over 10 times.'
+            endif
+            x(1:ndim)= xt(1:ndim)
+            iflag= iflag +3
+            return
+          else
+            if( myid.eq.0 ) then
+              print *,'>>> gg initialized because |f-fp|/|fp|<ftol '
+            endif
+            gg(1:ndim,1:ndim)= 0d0
+            do i=1,ndim
+              gg(i,i)= 1d0
+            enddo
+            cycle
+          endif
+        endif
+
+        v(1:ndim)= alpha *u(1:ndim)
+        y(1:ndim)= g(1:ndim) -gp(1:ndim)
+        ynorm= sprod(ndim,y,y)
+        if( ynorm.lt.1d-14 ) then
+          if(myid.eq.0) then
+            print *,'>>> gg initialized because y*y < 1d-14'
+            print *,'  ynorm=',ynorm
+            print *,'  alpha=',alpha
+          endif
+          gg(1:ndim,1:ndim)= 0d0
+          do i=1,ndim
+            gg(i,i)= 1d0
+          enddo
+          cycle
+        endif
+
+!.....update G matrix, gg, according to BFGS
+        svy= sprod(ndim,v,y)
+        svyi= 1d0/svy
+        do i=1,ndim
+          tmp1= 0d0
+          tmp2= 0d0
+          do j=1,ndim
+            aa(j,i)= v(j)*v(i) *svyi
+            tmp1= tmp1 +gg(i,j)*y(j)
+            tmp2= tmp2 +y(j)*gg(j,i)
+          enddo
+          ggy(i)= tmp1
+          ygg(i)= tmp2
+        enddo
+        cc(1:ndim,1:ndim)= 0d0
+        do j=1,ndim
+          do i=1,ndim
+            cc(i,j)=cc(i,j) +(v(i)*ygg(j) +ggy(i)*v(j)) *svyi
+          enddo
+        enddo
+        b= 1d0
+        do i=1,ndim
+          b=b +y(i)*ggy(i) *svyi
+        enddo
+        aa(1:ndim,1:ndim)= aa(1:ndim,1:ndim) *b
+        gg(1:ndim,1:ndim)=gg(1:ndim,1:ndim) +aa(1:ndim,1:ndim) &
+             -cc(1:ndim,1:ndim)
+      enddo
+      if( iter.gt.maxiter ) exit
+    enddo
+    if( myid.eq.0 ) print *,'maxiter exceeded in gfs'
+    iflag= iflag +10
+    x(1:ndim)= xt(1:ndim)
+    return
+  end subroutine gfs
 end module

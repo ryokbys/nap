@@ -129,6 +129,9 @@ c=======================================================================
       elseif( trim(cname).eq.'test_ratio' ) then
         call read_r1(ionum,ratio_test)
         return
+      elseif( trim(cname).eq.'num_iter_gfs' ) then
+        call read_i1(ionum,nitergfs)
+        return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return
