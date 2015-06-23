@@ -8,7 +8,7 @@ module minimize
   integer,allocatable,save:: iglid(:)
   real(8),allocatable,save:: glval(:)
 !.....group fs and mask
-  logical,allocatable,save:: lmskgfs(:)
+  logical,allocatable,save:: lmskgfs(:),lmsktmp(:)
   integer:: nitergfs=100
 
 contains
@@ -1263,7 +1263,6 @@ contains
     real(8),allocatable,save:: xt(:),gmaxgl(:),u(:)
     real(8),save,allocatable:: gg(:,:),v(:),y(:),gp(:) &
          ,ggy(:),ygg(:),aa(:,:),cc(:,:)
-    logical,allocatable,save:: lmskgfs(:)
     integer:: nmsks,imsk,nftol
     real(8):: ynorm,svy,svyi,tmp1,tmp2,b
 
@@ -1279,8 +1278,9 @@ contains
          ,v(ndim),y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
          ,aa(ndim,ndim),cc(ndim,ndim))
     if( .not.allocated(lmskgfs) ) then
-      allocate(lmskgfs(ngl),gmaxgl(ngl))
+      allocate(lmskgfs(ngl),lmsktmp(ngl),gmaxgl(ngl))
       lmskgfs(1:ngl)= .true.
+      lmsktmp(1:ngl)= lmskgfs(1:ngl)
     endif
 
     
@@ -1299,8 +1299,13 @@ contains
 !.....do loop until the conversion criterion is achieved
     iter= 0
     do while(.true.)
+!.....first calc of gradient needs to be done with no masks
+!     because it is used to find another new basis
+      lmsktmp(1:ngl)= lmskgfs(1:ngl)
+      lmskgfs(1:ngl)= .false.
       f= func(ndim,xt)
       g= grad(ndim,xt)
+      lmskgfs(1:ngl)= lmsktmp(1:ngl)
 
       if( nmsks.eq.0 ) then
         if( myid.eq.0 ) then
@@ -1330,7 +1335,7 @@ contains
       endif
 !.....remove mask of bases with large variations
       if(myid.eq.0) print '(a,i5,es12.4,100l2)',' igmm,gmm,lmskgfs= ' &
-           ,igmm,gmm,lmskgfs
+           ,igmm,gmm,lmskgfs(1:100)
       lmskgfs(igmm)= .false.
       nmsks= 0
       do ig=1,ngl
@@ -1431,7 +1436,7 @@ contains
           endif
           x(1:ndim)= xt(1:ndim)
           iflag= iflag +2
-          cycle
+          exit
         else if( abs(f-fp)/abs(fp).lt.ftol) then
           nftol= nftol +1
           if( nftol.gt.10 ) then
@@ -1441,7 +1446,7 @@ contains
             endif
             x(1:ndim)= xt(1:ndim)
             iflag= iflag +3
-            return
+            exit
           else
             if( myid.eq.0 ) then
               print *,'>>> gg initialized because |f-fp|/|fp|<ftol '

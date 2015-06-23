@@ -279,6 +279,7 @@ contains
 !=======================================================================
   subroutine calc_ef1(smpl,sds)
     use variables
+    use minimize, only: lmskgfs
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
@@ -293,6 +294,7 @@ contains
       do ihl1=1,nhl(1)
         tmp= 0d0
         do ihl0=1,nhl(0)
+!!$          if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
           tmp= tmp +wgt11(ihl0,ihl1) *sds%gsf(ia,ihl0)
         enddo
         sds%hl1(ia,ihl1)= sigmoid(tmp)
@@ -309,6 +311,7 @@ contains
     do ihl1=1,nhl(1)
       w2= wgt12(ihl1)
       do ihl0=1,nhl(0)
+        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
         w1= wgt11(ihl0,ihl1)
         do ja=1,natm
           h1= sds%hl1(ja,ihl1)
@@ -327,6 +330,7 @@ contains
 !=======================================================================
   subroutine calc_ef2(smpl,sds)
     use variables
+    use minimize, only: lmskgfs
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
@@ -345,6 +349,7 @@ contains
         do ihl1=1,nhl(1)
           tmp1= 0d0
           do ihl0=1,nhl(0)
+!!$            if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
             tmp1=tmp1 +wgt21(ihl0,ihl1) *sds%gsf(ia,ihl0)
           enddo
           sds%hl1(ia,ihl1)= sigmoid(tmp1)
@@ -364,6 +369,7 @@ contains
       do ihl1=1,nhl(1)
         w2= wgt22(ihl1,ihl2)
         do ihl0=1,nhl(0)
+          if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
           w1= wgt21(ihl0,ihl1)
           do ja=1,natm
             h1= sds%hl1(ja,ihl1)
@@ -478,11 +484,12 @@ contains
 !=======================================================================
   subroutine grad1(smpl,sds,gs)
     use variables
+    use minimize, only: lmskgfs
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
     real(8),intent(inout):: gs(nvars)
-    integer:: iv,ihl1,ia,ja,ihl0,jhl0,natm
+    integer:: iv,nv,ihl1,ia,ja,ihl0,jhl0,natm
     real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale,eref,swgt
     real(8),save,allocatable:: dgs(:),ab(:),wdg(:,:,:),bms(:,:,:,:)
 
@@ -512,6 +519,7 @@ contains
       iv= iv -1
     enddo
     do ihl0=nhl(0),1,-1
+!!$      if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
       do ihl1=nhl(1),1,-1
         tmp= 0d0
         w2= wgt12(ihl1)
@@ -536,6 +544,7 @@ contains
     do ihl1=nhl(1),1,-1
       tmp= 0d0
       do ihl0=1,nhl(0)
+        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
         w1= wgt11(ihl0,ihl1)
         do ja=1,natm
           h1= sds%hl1(ja,ihl1)
@@ -556,6 +565,7 @@ contains
     bms(1:3,1:natm,1:natm,1:nhl(1))= 0d0
     do ihl1=1,nhl(1)
       do ihl0=1,nhl(0)
+        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
         w1= wgt11(ihl0,ihl1)
         do ja=1,natm
           do ia=1,natm
@@ -569,6 +579,7 @@ contains
     do ihl0=nhl(0),1,-1
       do ihl1=nhl(1),1,-1
         tmp= 0d0
+        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) goto 10
         w2= wgt12(ihl1)
         do ja=1,natm
           h1= sds%hl1(ja,ihl1)
@@ -584,6 +595,7 @@ contains
                  )
           enddo
         enddo
+10      continue
         dgs(iv)= -tmp
         iv= iv -1
       enddo
@@ -595,6 +607,7 @@ contains
 !=======================================================================
   subroutine grad2(smpl,sds,gs)
     use variables
+    use minimize, only: lmskgfs
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
@@ -643,6 +656,7 @@ contains
       enddo
     enddo
     do ihl0=nhl(0),1,-1
+!!$      if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
       do ihl1=nhl(1),1,-1
         tmp= 0d0
         do ia=1,natm
@@ -675,6 +689,7 @@ contains
     w1dg(1:3,1:natm,1:natm,1:nhl(1))= 0d0
     do ihl1=1,nhl(1)
       do ihl0=1,nhl(0)
+        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
         w1= wgt21(ihl0,ihl1)
         do ja=1,natm
           do ia=1,natm
@@ -750,6 +765,7 @@ contains
     do ihl0=nhl(0),1,-1
       do ihl1=nhl(1),1,-1
         tmp= 0d0
+        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) goto 10
         do ihl2=1,nhl(2)
           w3= wgt23(ihl2)
           w2= wgt22(ihl1,ihl2)
@@ -782,6 +798,7 @@ contains
             enddo
           enddo
         enddo
+10      continue
         dgs(iv)= -tmp
         iv= iv -1
       enddo
