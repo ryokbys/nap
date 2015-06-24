@@ -1287,7 +1287,7 @@ contains
     xt(1:ndim)= x(1:ndim)
     do i=1,ndim
       ig= iglid(i)
-      if( ig.gt.0 ) xt(1:ndim)= 1d-8
+      if( ig.gt.0 ) xt(i)= 1d-8
     enddo
 
     nmsks= 0
@@ -1318,9 +1318,20 @@ contains
       gmaxgl(1:ngl)= 0d0
       do i=1,ndim
         ig= iglid(i)
-        if( ig.gt.0 ) gmaxgl(ig)= gmaxgl(ig) &
-             +g(i)*g(i)
+!!$        if( myid.eq.0 ) then
+!!$          print '(a,2i5,es15.7)','i,ig,g(i)=' &
+!!$               ,i,ig,g(i)
+!!$        endif
+        if( ig.gt.0 ) then
+          gmaxgl(ig)= gmaxgl(ig) &
+               +g(i)*g(i)
+        endif
       enddo
+!!$      if( myid.eq.0 ) then
+!!$        do ig=1,ngl
+!!$          print '(a,i5,es15.7)','ig,gmaxgl(ig)=',ig,gmaxgl(ig)
+!!$        enddo
+!!$      endif
       gmm= 0d0
       igmm= 0
       do ig=1,ngl
@@ -1335,7 +1346,7 @@ contains
       endif
 !.....remove mask of bases with large variations
       if(myid.eq.0) print '(a,i5,es12.4,100l2)',' igmm,gmm,lmskgfs= ' &
-           ,igmm,gmm,lmskgfs(1:100)
+           ,igmm,gmm,lmskgfs(1:min(ngl,100))
       lmskgfs(igmm)= .false.
       nmsks= 0
       do ig=1,ngl
@@ -1409,6 +1420,14 @@ contains
         endif
 !.....get out of bfgs loop
         if( iflag/100.ne.0 ) then
+          if( itergfs.eq.1 ) then
+            if( myid.eq.0 ) then
+              print *,'something wrong with 1D search.'
+              print *,'anyways, going out from gfs...'
+            endif
+            x(1:ndim)= xt(1:ndim)
+            return
+          endif
           exit
         endif
         xt(1:ndim)= xt(1:ndim) +alpha*u(1:ndim)
@@ -1505,9 +1524,11 @@ contains
       enddo
       if( iter.gt.maxiter ) exit
     enddo
-    if( myid.eq.0 ) print *,'maxiter exceeded in gfs'
+
+999 if( myid.eq.0 ) print *,'maxiter exceeded in gfs'
     iflag= iflag +10
     x(1:ndim)= xt(1:ndim)
     return
+
   end subroutine gfs
 end module

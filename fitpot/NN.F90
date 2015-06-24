@@ -112,7 +112,9 @@ contains
 !!$    print *,' myid, max num of atoms [maxna] =',myid,maxna
     allocate(fdiff(3,maxna))
 
-    if( cpena.eq.'glasso' .or. cpena.eq.'lasso' ) then
+    if( cpena.eq.'glasso' .or. cpena.eq.'lasso' .or. &
+         cfmethod.eq.'gfs' ) then
+!!$    if( cpena.eq.'glasso' .or. cpena.eq.'lasso' ) then
       call standardize_max()
 !!$    call standardize_var()
 !!$    call standardize_norm()

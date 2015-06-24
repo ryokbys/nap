@@ -883,6 +883,7 @@ subroutine sync_input()
   call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(niter,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(niter_eval,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nitergfs,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(iprint,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(cfmethod,128,mpi_character,0,mpi_world,ierr)
