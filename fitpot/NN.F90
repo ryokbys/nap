@@ -296,7 +296,7 @@ contains
       do ihl1=1,nhl(1)
         tmp= 0d0
         do ihl0=1,nhl(0)
-!!$          if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
+          if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
           tmp= tmp +wgt11(ihl0,ihl1) *sds%gsf(ia,ihl0)
         enddo
         sds%hl1(ia,ihl1)= sigmoid(tmp)
@@ -351,7 +351,7 @@ contains
         do ihl1=1,nhl(1)
           tmp1= 0d0
           do ihl0=1,nhl(0)
-!!$            if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
+            if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
             tmp1=tmp1 +wgt21(ihl0,ihl1) *sds%gsf(ia,ihl0)
           enddo
           sds%hl1(ia,ihl1)= sigmoid(tmp1)
@@ -521,14 +521,15 @@ contains
       iv= iv -1
     enddo
     do ihl0=nhl(0),1,-1
-!!$      if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
       do ihl1=nhl(1),1,-1
         tmp= 0d0
+        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) goto 20
         w2= wgt12(ihl1)
         do ia=1,natm
           h1= sds%hl1(ia,ihl1)
           tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
         enddo
+20      continue
         gs(iv)= gs(iv) +ediff*tmp
         iv= iv -1
       enddo
@@ -658,9 +659,9 @@ contains
       enddo
     enddo
     do ihl0=nhl(0),1,-1
-!!$      if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
       do ihl1=nhl(1),1,-1
         tmp= 0d0
+        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) goto 20
         do ia=1,natm
           h1= sds%hl1(ia,ihl1)
           dh1= h1*(1d0-h1)
@@ -673,6 +674,7 @@ contains
             tmp=tmp +w3*w2 *dh2 *dh1gsf
           enddo
         enddo
+20      continue
         gs(iv)=gs(iv) +ediff*tmp
         iv=iv -1
       enddo
@@ -1153,14 +1155,16 @@ contains
 
   end subroutine NN_restore_standard
 !=======================================================================
-  subroutine NN_analyze()
+  subroutine NN_analyze(cadd)
 !
 !  Get which input nodes are more/less important.
 !
     use variables
     use parallel
     implicit none
+    character(len=*),intent(in):: cadd
     character(len=14),parameter:: cfname= 'out.NN_analyze'
+
     integer,parameter:: ionum=  30
     integer,allocatable:: icmb2(:,:),icmb3(:,:,:),itype(:),nctype(:)&
          ,nstype(:)
@@ -1200,7 +1204,7 @@ contains
       enddo
       close(ionum)
 
-      open(ionum+1,file=cfname,status='replace')
+      open(ionum+1,file=cfname//"."//trim(cadd),status='replace')
       iv=0
       do isf=1,nhl(0)
         write(ionum+1,'(2i5,f24.14)') isf,itype(isf),sumv(isf)

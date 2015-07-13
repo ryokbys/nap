@@ -1231,9 +1231,10 @@ contains
   end subroutine fs
 !=======================================================================
   subroutine gfs(ndim,x,f,g,d,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
+       ,iprint,iflag,myid,func,grad,cfmethod,niter_eval &
+       ,sub_eval,analyze)
 !
-!  Grouped Forward Stagewise (grouped FS) regression
+!  Grouped Forward Stepwise (grouped FS) regression
 !
     implicit none
     integer,intent(in):: ndim,maxiter,iprint,myid,niter_eval
@@ -1256,6 +1257,9 @@ contains
       subroutine sub_eval(iter)
         integer,intent(in):: iter
       end subroutine sub_eval
+      subroutine analyze(num)
+        integer,intent(in):: num
+      end subroutine analyze
     end interface
 
     integer:: iter,i,imax,ig,itmp,j,igmm,itergfs
@@ -1263,7 +1267,7 @@ contains
     real(8),allocatable,save:: xt(:),gmaxgl(:),u(:)
     real(8),save,allocatable:: gg(:,:),v(:),y(:),gp(:) &
          ,ggy(:),ygg(:),aa(:,:),cc(:,:)
-    integer:: nmsks,imsk,nftol
+    integer:: nmsks,imsk,nftol,nbases,nbasesp
     real(8):: ynorm,svy,svyi,tmp1,tmp2,b
 
     if( trim(cpena).eq.'lasso' .and. trim(cpena).eq.'glasso' ) then
@@ -1295,6 +1299,7 @@ contains
       if( .not.lmskgfs(ig) ) cycle
       nmsks= nmsks +1
     enddo
+    nbasesp= ngl -nmsks
 
 !.....do loop until the conversion criterion is achieved
     iter= 0
@@ -1353,8 +1358,13 @@ contains
         if( .not.lmskgfs(ig) ) cycle
         nmsks= nmsks +1
       enddo
-      if( myid.eq.0 ) print '(a,4i8)','iter,ngl,nmsks,ngl-nmsks=' &
-           ,iter,ngl,nmsks,ngl-nmsks
+      nbases= ngl -nmsks
+      if( myid.eq.0 ) print '(a,4i8)','iter,ngl,nmsks,nbases=' &
+           ,iter,ngl,nmsks,nbases
+      if( nbases > nbasesp .and. nbases.gt.1 ) then
+        call analyze(nbasesp)
+        nbasesp= nbases
+      endif
 
 !.....preparation for BFGS
       gg(1:ndim,1:ndim)= 0d0

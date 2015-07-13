@@ -408,7 +408,7 @@ subroutine qn_wrapper()
   call qn(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
        ,niter_eval,write_stats)
-  call NN_analyze()
+  call NN_analyze("fin")
   if( cpena.eq.'lasso' .or. cpena.eq.'glasso' ) then
     call NN_restore_standard()
   endif
@@ -524,7 +524,7 @@ subroutine sgd()
     gnorm= gnorm +gval(iv)*gval(iv)
   enddo
 
-  call NN_analyze()
+  call NN_analyze("fin")
   call NN_restore_standard()
 
 
@@ -543,7 +543,7 @@ subroutine fs_wrapper()
   call NN_init()
   call fs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad)
-  call NN_analyze()
+  call NN_analyze("fin")
   call NN_restore_standard()
 
   return
@@ -557,14 +557,14 @@ subroutine gfs_wrapper()
   implicit none
   integer:: i,m
   real(8):: fval
-  external:: write_stats
+  external:: write_stats,analyze_wrapper
 
   !.....NN specific code hereafter
   call NN_init()
   call gfs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
-       ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval&
-       ,write_stats)
-  call NN_analyze()
+       ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
+       ,write_stats,analyze_wrapper)
+  call NN_analyze("fin")
   call NN_restore_standard()
 
   return
@@ -873,6 +873,17 @@ subroutine write_eliminated_vars()
   enddo
   if(myid.eq.0) write(6,'(a,i6,a,i6)') ' num of 0-vars = ',i0,'/',nvars
 end subroutine write_eliminated_vars
+!=======================================================================
+subroutine analyze_wrapper(num)
+  use NN
+  implicit none 
+  integer,intent(in):: num
+  character(len=5):: cadd
+
+  write(cadd,'(i5.5)') num
+  call NN_analyze(cadd)
+
+end subroutine analyze_wrapper
 !=======================================================================
 subroutine sync_input()
   use variables
