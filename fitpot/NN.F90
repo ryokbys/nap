@@ -66,7 +66,7 @@ contains
     call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
 
 !.....calc number of weights
-    ncmb2= nsp +factorial(nsp,2)/2
+    ncmb2= nsp +factorial(nsp,2)/factorial((nsp-2),2)/2
     ncmb3= nsp*ncmb2
     if( nhl(0).ne.nsf2 +nsf3 ) then
       if( myid.eq.0) then
@@ -869,6 +869,9 @@ contains
     integer:: i
 
     factorial= 1
+    if( n .le. m-1 ) then
+      return
+    endif
     do i=0,m-1
       factorial= factorial*(n-i)
     enddo

@@ -12,7 +12,7 @@ module variables
   real(8):: xtol= 1d-5
   real(8):: gtol= 1d-5
   real(8):: ftol= 1d-5
-  integer,parameter:: maxnsp= 3
+  integer,parameter:: maxnsp= 4
   real(8):: eatom(maxnsp)
   logical:: lfmatch= .true.
   logical:: lreg   = .false.
