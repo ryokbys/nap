@@ -1374,7 +1374,8 @@ contains
 !.....mask some g that have small contributions
       do i=1,ndim
         ig= iglid(i)
-        if( ig.gt.0 .and. lmskgfs(ig) ) g(i)= 0d0
+        if( ig.le.0 ) cycle
+        if( lmskgfs(ig) ) g(i)= 0d0
       enddo
       gnorm= sqrt(sprod(ndim,g,g))
       if( myid.eq.0 ) then
@@ -1401,7 +1402,8 @@ contains
 !.....mask some u that have small contributions
         do i=1,ndim
           ig= iglid(i)
-          if( ig.gt.0 .and. lmskgfs(ig) ) u(i)= 0d0
+          if( ig.le.0 ) cycle
+          if( lmskgfs(ig) ) g(i)= 0d0
         enddo
         fp= f
         gp(1:ndim)= g(1:ndim)
@@ -1444,7 +1446,8 @@ contains
         g= grad(ndim,xt)
         do i=1,ndim
           ig= iglid(i)
-          if( ig.gt.0 .and. lmskgfs(ig) ) g(i)= 0d0
+          if( ig.le.0 ) cycle
+          if( lmskgfs(ig) ) g(i)= 0d0
         enddo
         gnorm= sqrt(sprod(ndim,g,g))
         if( myid.eq.0 ) then
