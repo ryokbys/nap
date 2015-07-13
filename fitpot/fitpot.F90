@@ -340,8 +340,12 @@ subroutine read_ref_data()
   erefmin= 0d0
   call mpi_allreduce(erefminl,erefmin,1,mpi_double_precision,mpi_min &
        ,mpi_world,ierr)
+  
 
-  if(myid.eq.0) print *,'read_ref_data done.'
+  if(myid.eq.0) then
+    write(6,'(a,es12.4)') ' erefmin = ',erefmin
+    print *,'read_ref_data done.'
+  endif
 
 end subroutine read_ref_data
 !=======================================================================
