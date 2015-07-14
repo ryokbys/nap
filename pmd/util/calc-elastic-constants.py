@@ -91,12 +91,13 @@ if __name__ == '__main__':
     #...get reference energy
     os.system(pmdexec+' > out.pmd')
     erg0= float(commands.getoutput("grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'"))
-    print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(0.0,erg0,erg0,erg0)
-    outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
-    logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
+    # print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(0.0,erg0,erg0,erg0)
+    # outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
+    # logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
     ddlt= dltmax/niter
-    for iter in range(niter):
-        dlt= (ddlt*(iter+1))
+    for iter in range(-niter/2,niter/2+1):
+        #dlt= (ddlt*(iter+1))
+        dlt= ddlt*iter
         dh= hmax*dlt
         #...uniaxial strain for calc C11
         hmat= np.copy(hmat0)
