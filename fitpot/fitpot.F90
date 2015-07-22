@@ -680,12 +680,28 @@ subroutine write_energy_relation(cadd)
     open(90,file=trim(cfname)//'.1',status='replace')
     open(91,file=trim(cfname)//'.2',status='replace')
     do ismpl=1,nsmpl
+      erefg(ismpl)= erefg(ismpl)/nalist(ismpl)
+      epotg(ismpl)= epotg(ismpl)/nalist(ismpl)
       if( iclist(ismpl).eq.1 ) then
-        write(90,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
-             ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)
+        if( lswgt ) then
+          write(90,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
+               ,epotg(ismpl),cdirlist(ismpl) &
+               ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
+        else
+          write(90,'(2es15.7,2x,a)') erefg(ismpl) &
+               ,epotg(ismpl),cdirlist(ismpl)
+        endif
       else if( iclist(ismpl).eq.2 ) then
-        write(91,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
-             ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)
+        if( lswgt ) then
+          write(91,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
+               ,epotg(ismpl),cdirlist(ismpl) &
+               ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
+        else
+          write(91,'(2es15.7,2x,a)') erefg(ismpl) &
+               ,epotg(ismpl),cdirlist(ismpl)
+        endif
+!!$        write(91,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
+!!$             ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)
       endif
     enddo
     close(90)

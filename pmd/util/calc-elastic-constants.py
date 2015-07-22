@@ -154,10 +154,10 @@ if __name__ == '__main__':
     popt12,pcov12= curve_fit(quad_func,dlts,e12s,p0=p0)
     popt44,pcov44= curve_fit(quad_func,dlts,e44s,p0=p0)
 
-    c11= popt11[0]/vol*2 *160.2
-    c11_c12= popt12[0]/vol *160.2
+    c11= popt11[0]/vol*2 *160.218
+    c11_c12= popt12[0]/vol *160.218
     c12= c11 -c11_c12
-    c44= popt44[0]/vol*2 *160.2
+    c44= popt44[0]/vol*2 *160.218
 
     #...output results
     print '{0:=^72}'.format(' RESULTS ')

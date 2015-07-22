@@ -1035,6 +1035,7 @@ contains
   if(myid.eq.0) print *,'[Error] iter.gt.MAXITER in armijo_search.'
   iflag= iflag +100
   alpha=alphai
+  if( myid.eq.0 ) print *,'  alpha=',alpha
   return
     
   end subroutine armijo_search
@@ -1311,6 +1312,16 @@ contains
       f= func(ndim,xt)
       g= grad(ndim,xt)
       lmskgfs(1:ngl)= lmsktmp(1:ngl)
+      gnorm= sqrt(sprod(ndim,g,g))
+      if( myid.eq.0 ) then
+        if( iprint.eq.1 ) then
+          write(6,'(a,i8,2es15.7)') ' itergfs,f,gnorm=',itergfs,f,gnorm
+        else if( iprint.eq.2 ) then
+          write(6,'(a,i8,12es15.7)') ' itergfs,f,gnorm,x(1:5)=' &
+               ,itergfs,f,gnorm,xt(1:5)
+        endif
+        call flush(6)
+      endif
 
       if( nmsks.eq.0 ) then
         if( myid.eq.0 ) then
@@ -1319,24 +1330,15 @@ contains
         endif
         exit
       endif
-!.....find bases with large gradients
+!.....find bases with the largest gradient
       gmaxgl(1:ngl)= 0d0
       do i=1,ndim
         ig= iglid(i)
-!!$        if( myid.eq.0 ) then
-!!$          print '(a,2i5,es15.7)','i,ig,g(i)=' &
-!!$               ,i,ig,g(i)
-!!$        endif
         if( ig.gt.0 ) then
           gmaxgl(ig)= gmaxgl(ig) &
                +g(i)*g(i)
         endif
       enddo
-!!$      if( myid.eq.0 ) then
-!!$        do ig=1,ngl
-!!$          print '(a,i5,es15.7)','ig,gmaxgl(ig)=',ig,gmaxgl(ig)
-!!$        enddo
-!!$      endif
       gmm= 0d0
       igmm= 0
       do ig=1,ngl
@@ -1377,6 +1379,7 @@ contains
         if( ig.le.0 ) cycle
         if( lmskgfs(ig) ) g(i)= 0d0
       enddo
+      call cap_grad(ndim,g)
       gnorm= sqrt(sprod(ndim,g,g))
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
@@ -1403,7 +1406,10 @@ contains
         do i=1,ndim
           ig= iglid(i)
           if( ig.le.0 ) cycle
-          if( lmskgfs(ig) ) g(i)= 0d0
+          if( lmskgfs(ig) ) then
+            g(i)= 0d0
+            u(i)= 0d0
+          endif
         enddo
         fp= f
         gp(1:ndim)= g(1:ndim)
@@ -1417,7 +1423,7 @@ contains
           if( iflag/100.ne.0 ) then
             iflag= iflag -(iflag/100)*100
             if(myid.eq.0) then
-              print *,'since quad_interpolate failed, call golden_section.'
+              print *,'Since quad_interpolate failed, call golden_section.'
             endif
             call golden_section(ndim,xt,u,f,xtol,gtol,ftol,alpha &
                  ,iprint,iflag,myid,func)
@@ -1434,8 +1440,8 @@ contains
         if( iflag/100.ne.0 ) then
           if( itergfs.eq.1 ) then
             if( myid.eq.0 ) then
-              print *,'something wrong with 1D search.'
-              print *,'anyways, going out from gfs...'
+              print *,'Something wrong with 1D search.'
+              print *,'Anyways, going out from gfs...'
             endif
             x(1:ndim)= xt(1:ndim)
             return
@@ -1447,8 +1453,12 @@ contains
         do i=1,ndim
           ig= iglid(i)
           if( ig.le.0 ) cycle
-          if( lmskgfs(ig) ) g(i)= 0d0
+          if( lmskgfs(ig) ) then
+            g(i)= 0d0
+            u(i)= 0d0
+          endif
         enddo
+        call cap_grad(ndim,g)
         gnorm= sqrt(sprod(ndim,g,g))
         if( myid.eq.0 ) then
           if( iprint.eq.1 ) then
@@ -1544,4 +1554,22 @@ contains
     return
 
   end subroutine gfs
+!=======================================================================
+  subroutine cap_grad(ndim,g)
+!
+!  Set the ceiling of gradient to avoid too large gnorm.
+!
+    implicit none
+    integer,intent(in):: ndim
+    real(8),intent(inout):: g(ndim)
+    real(8),parameter:: gmax= 1.0d0
+    real(8):: gnorm
+    
+    gnorm= sqrt(sprod(ndim,g,g))
+
+    if( gnorm.gt.gmax ) then
+      g(1:ndim)= g(1:ndim) *gmax /gnorm
+    endif
+    return
+  end subroutine cap_grad
 end module

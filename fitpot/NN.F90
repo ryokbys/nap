@@ -1196,6 +1196,7 @@ contains
       nctype(1)= 2   ! Gaussian
       nctype(2)= 1   ! cosine
       nctype(3)= 1   ! polynomial
+      nctype(4)= 2   ! Morse
       nctype(101)= 1 ! angular
       nstype(1:100)= 2
       nstype(101:200)= 3

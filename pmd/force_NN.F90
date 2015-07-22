@@ -460,7 +460,7 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
-         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1
+         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse
 
     real(8),external:: sprod
 
@@ -481,10 +481,11 @@ contains
         isfc=0
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
+        fcij= fc(dij,rc)
+        dfcij= dfc(dij,rc)
         do isf=iaddr2(1,is,js),iaddr2(2,is,js)
 !!$          isfc= isfc+1
 !!$          isf= (icmb2(is,js)-1)*nsfc1 +isfc1
-          fcij= fc(dij,rc)
           if( itype(isf).eq.1 ) then ! Gaussian
             eta= cnst(1,isf)
             rs=  cnst(2,isf)
@@ -492,7 +493,7 @@ contains
             texp= exp(-eta*(dij-rs)**2)
             gsf(isf,ia)= gsf(isf,ia) +texp*fcij
             !.....derivative
-            dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfc(dij,rc)
+            dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfcij
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
           else if( itype(isf).eq.2 ) then ! cosine
@@ -513,11 +514,22 @@ contains
             dgdr= -a1*dij**(-a1-1d0)*fcij +tpoly*dfc(dij,rc)
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+          else if( itype(isf).eq.4 ) then ! Morse-type
+            a1= cnst(1,isf)
+            a2= cnst(2,isf)
+            !.....func value
+            texp= exp(-a1*(dij-a2))
+            tmorse= ((1d0-texp)**2 -1d0)
+            gsf(isf,ia)= gsf(isf,ia) +tmorse*fcij
+            !.....derivative
+            dgdr= 2d0*a1*(1d0-texp)*texp*fcij +tmorse*dfcij
+            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
+            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
           endif
         enddo
 
-        fcij= fc(dij,rc)
-        dfcij= dfc(dij,rc)
+!!$        fcij= fc(dij,rc)
+!!$        dfcij= dfc(dij,rc)
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
         do kk=1,lspr(0,ia)
@@ -618,6 +630,7 @@ contains
     ncnst_type(1)= 2   ! Gaussian
     ncnst_type(2)= 1   ! cosine
     ncnst_type(3)= 1   ! polynomial
+    ncnst_type(4)= 2   ! Morse
     ncnst_type(101)= 1 ! angular
 
     ncomb_type(1:100)= 2    ! pair
