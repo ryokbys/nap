@@ -1342,14 +1342,18 @@ contains
       gmm= 0d0
       igmm= 0
       do ig=1,ngl
-        if( gmaxgl(ig).gt.gmm ) then
+        if( lmskgfs(ig) .and. gmaxgl(ig).gt.gmm ) then
           gmm= gmaxgl(ig)
           igmm= ig
         endif
       enddo
       if( igmm.eq.0 ) then
-        if(myid.eq.0) print *,' igmm.eq.0 !!!'
-        stop
+        if(myid.eq.0) then
+          print *,'igmm.eq.0 !!!'
+          print *,'Nothing to do here, and going out from FS.'
+        endif
+        x(1:ndim)= xt(1:ndim)
+        return
       endif
 !.....remove mask of bases with large variations
       if(myid.eq.0) print '(a,i5,es12.4,100l2)',' igmm,gmm,lmskgfs= ' &
@@ -1439,12 +1443,15 @@ contains
 !.....get out of bfgs loop
         if( iflag/100.ne.0 ) then
           if( itergfs.eq.1 ) then
+!!$            if( myid.eq.0 ) then
+!!$              print *,'Armijo failed at 1st step of FS, so going out of FS.'
+!!$            endif
+!!$            x(1:ndim)= xt(1:ndim)
+!!$            return
             if( myid.eq.0 ) then
-              print *,'Something wrong with 1D search.'
-              print *,'Anyways, going out from gfs...'
+              print *,"Armijo failed at 1st step of FS,"
+              print *,"but keep going forward..."
             endif
-            x(1:ndim)= xt(1:ndim)
-            return
           endif
           exit
         endif
