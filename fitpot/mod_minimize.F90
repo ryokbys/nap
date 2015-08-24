@@ -1439,6 +1439,12 @@ contains
           alpha= 1d0
           call armijo_search(ndim,xt,u,f,g,alpha,iprint &
                ,iflag,myid,func)
+          !.....if something wrong with armijo search, try opposite direction
+          if( iflag/100.ne.0 ) then
+            alpha= -1d0
+            call armijo_search(ndim,xt,u,f,g,alpha,iprint &
+                 ,iflag,myid,func)
+          endif
         endif
 !.....get out of bfgs loop
         if( iflag/100.ne.0 ) then
