@@ -875,6 +875,7 @@ subroutine write_stats(iter)
     write(6,'(a,i8,f15.2,4f15.7)') '  force:training(rmse,max)' &
          //',test(rmse,max)=',iter,mpi_wtime()-time0 &
          ,rmse_trn,dfmax_trn,rmse_tst,dfmax_tst
+    call write_vars('tmp')
   endif
 
 end subroutine write_stats
