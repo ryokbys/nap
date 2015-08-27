@@ -13,6 +13,7 @@ OUTPUT:
 """
 
 import optparse
+import NN_io
 
 incnst="in.const.NN"
 inprms="in.params.NN"
@@ -20,59 +21,6 @@ innnanal="out.NN_analysis"
 
 outcnst= 'in.const.NN.new'
 outprms= 'in.params.NN.new'
-
-def read_const(fname):
-    f= open(fname,'r')
-    buf= f.readline().split()
-    nl= int(buf[0])
-    nsp=int(buf[1])
-    nhl= []
-    for il in range(nl+1):
-        nhl.append(int(buf[2+il]))
-    combs= []
-    consts= []
-    itypes= []
-    for ihl0 in range(nhl[0]):
-        buf= f.readline().split()
-        itype= int(buf[0])
-        itypes.append(itype)
-        if itype <= 100:  # 2-body
-            ia= int(buf[1])
-            ja= int(buf[2])
-            combs.append((ia,ja))
-            consts.append(buf[3:])
-        else:    # 3-body
-            ia= int(buf[1])
-            ja= int(buf[2])
-            ka= int(buf[3])
-            combs.append((ia,ja,ka))
-            consts.append(buf[4:])
-    f.close()
-    print ' reading {0:s} done.'.format(fname)
-    return nl,nsp,nhl,itypes,combs,consts
-
-def read_params(fname):
-    f=open(fname,'r')
-    buf= f.readline().split()
-    nprm= int(buf[0])
-    rcut= float(buf[1])
-    prms= []
-    for iprm in range(nprm):
-        buf= f.readline().split()
-        prms.append(buf[0:3])
-    f.close()
-    print ' reading {0:s} done.'.format(fname)
-    return nprm,rcut,prms
-
-def read_NN_analysis(fname):
-    f= open(fname,'r')
-    nnanal= []
-    for line in f.readlines():
-        buf= line.split()
-        nnanal.append((int(buf[1]),float(buf[2])))
-    f.close()
-    print ' reading {0:s} done.'.format(fname)
-    return nnanal
 
 if __name__ == '__main__':
 
@@ -89,9 +37,9 @@ if __name__ == '__main__':
     inprms= args[1]
     innnanal= args[2]
 
-    nl,nsp,nhl,itypes,combs,consts= read_const(incnst)
-    nprm,rcut,prms= read_params(inprms)
-    nnanal= read_NN_analysis(innnanal)
+    nl,nsp,nhl,itypes,combs,consts= NN_io.read_const(incnst)
+    nprm,rcut,prms= NN_io.read_params(inprms)
+    nnanal= NN_io.read_NN_analysis(innnanal)
     
     if nhl[0] != len(nnanal):
         print '[Error] nhl[0] != len(nnanal)'
