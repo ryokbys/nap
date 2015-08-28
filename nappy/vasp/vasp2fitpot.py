@@ -129,7 +129,7 @@ if __name__ == "__main__":
             os.mkdir(dirname)
             vaspstep= vasprun.ionic_steps[istp]
             aSys= structure2aSys(vaspstep['structure'])
-            energy= vaspstep['total']
+            energy= vaspstep['electronic_steps'][-1]['e_fr_energy']
             forces= vaspstep['forces']
             aSys.write_pmd(dirname+'/'+_fname_pos)
             write_ergref(dirname+'/'+_fname_erg,energy)
@@ -137,7 +137,7 @@ if __name__ == "__main__":
             print ' write ',dirname,_fname_pos,_fname_erg,_fname_frc
     else: # only final structure is needed
         aSys= structure2aSys(vasprun.final_structure)
-        energy= vasprun.ionic_steps[-1]['total']
+        energy= vasprun.ionic_steps[-1]['electronic_steps'][-1]['e_fr_energy']
         forces= vasprun.ionic_steps[-1]['forces']
         aSys.write_pmd(_fname_pos)
         write_ergref(_fname_erg,energy)
