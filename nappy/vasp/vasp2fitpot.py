@@ -93,19 +93,8 @@ def write_frcref(fname,forces):
 if __name__ == "__main__":
 
     parser= optparse.OptionParser(usage=_usage)
-    # parser.add_option("-d",dest="dr",type="float",default=0.1, \
-    #                   help="Width of the bin. Default is 0.1.")
-    # parser.add_option("-r",dest="rmax",type="float",default=5.0, \
-    #                   help="Cutoff radius of radial distribution. Default is 5.0.")
-    # parser.add_option("--src-sid",dest="idsrc",type="int",default=0,
-    #                   help="Species-ID of source atoms to be selected.\n" \
-    #                   +"Default is 0. 0 means all the species are selected.")
-    # parser.add_option("--dst-sid",dest="iddst",type="int",default=0,
-    #                   help="Species-ID of source atoms to be selected.\n" \
-    #                   +"Default is 0. 0 means all the species are selected.")
-    # parser.add_option("-p",action="store_true",
-    #                   dest="plot",default=False,
-    #                   help="Plot a graph on the screen.")
+    parser.add_option("-s",dest="skip",type="int",default=1, \
+                      help="Skip every SKIP value from the output of MD data.")
     (options,args)= parser.parse_args()
 
     #...check arguments
@@ -117,6 +106,8 @@ if __name__ == "__main__":
         print _usage
         exit
 
+    iskip= options.skip
+
     #...parse vasprun.xml using Vasprun in pymatgen
     vasprun= Vasprun(_infname)
     
@@ -124,7 +115,7 @@ if __name__ == "__main__":
 
     if ibrion == 0: # MD
         nstps= len(vasprun.ionic_steps)
-        for istp in range(nstps):
+        for istp in range(0,nstps,iskip):
             dirname= '{0:05d}'.format(istp+1)
             os.mkdir(dirname)
             vaspstep= vasprun.ionic_steps[istp]
