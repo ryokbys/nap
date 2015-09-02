@@ -9,7 +9,7 @@ import os,optparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from AtomSystem import AtomSystem
+from pmdsys import pmdsys
 
 usage= '%prog [options] akr0000 akr0001...'
 
@@ -75,7 +75,7 @@ def gr_of_file(infname,dr,rmax):
     if not os.path.exists(infname):
         print "[Error] file does not exist !!!"
         exit()
-    asys= AtomSystem()
+    asys= pmdsys()
     asys.read_akr(infname)
     natm0= asys.num_atoms()
 

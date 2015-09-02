@@ -2,14 +2,14 @@ import numpy as np
 import math
 import sys,copy
 
-from Atom import Atom
+from atom import atom
 
 #...constants
 maxnn= 40
 
-class AtomSystem(object):
-    u"""
-    AtomSystem has cell information and atoms.
+class pmdsys(object):
+    """
+    Contains cell information and atoms, and provides some functionalities.
     """
 
     def __init__(self):
@@ -59,7 +59,7 @@ class AtomSystem(object):
         self.atoms= []
         for i in range(natm):
             data= [float(x) for x in f.readline().split()]
-            ai= Atom()
+            ai= atom()
             ai.decode_tag(data[0])
             ai.set_pos(data[1],data[2],data[3])
             ai.set_vel(data[4],data[5],data[6])
@@ -106,7 +106,7 @@ class AtomSystem(object):
 
     def write_POSCAR(self,fname='POSCAR'):
         f=open(fname,'w')
-        f.write(' created by AtomSystem.py\n')
+        f.write(' created by pmdsys.py\n')
         # lattice vector
         f.write(' {0:15.7f}\n'.format(self.alc))
         # cell vectors
@@ -146,7 +146,7 @@ class AtomSystem(object):
         self.atoms= []
         for i in range(natm):
             data= [float(x) for x in f.readline().split()]
-            ai= Atom()
+            ai= atom()
             ai.set_sid(data[0])
             ai.set_pos(data[1],data[2],data[3])
             ai.set_vel(data[4],data[5],data[6])
@@ -269,9 +269,9 @@ class AtomSystem(object):
         aj= self.atoms[ja]
         pj= aj.pos
         xij= pj-pi
-        xij[0] =self.pbc(xij[0])
-        xij[1] =self.pbc(xij[1])
-        xij[2] =self.pbc(xij[2])
+        xij[0] =self._pbc(xij[0])
+        xij[1] =self._pbc(xij[1])
+        xij[2] =self._pbc(xij[2])
         rij= np.dot(h,xij)
         rij2= rij[0]**2 +rij[1]**2 +rij[2]**2
         if rij2 < rc2:
@@ -284,7 +284,7 @@ class AtomSystem(object):
         ja= lscl[ja]
         self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2)
 
-    def pbc(self,x):
+    def _pbc(self,x):
         if x <= -0.5:
             return x +1.0
         elif x >   0.5:
@@ -310,7 +310,7 @@ class AtomSystem(object):
                 for i3 in range(n3):
                     for ai0 in atoms0:
                         aid += 1
-                        ai= Atom()
+                        ai= atom()
                         ai.sid= ai0.sid
                         ai.ifmv= ai0.ifmv
                         x= ai0.pos[0]/n1 +1.0/n1*i1

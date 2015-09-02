@@ -54,3 +54,4 @@ if __name__ == "__main__":
         shutil.copy('{0}/{1}'.format(sdir,_fpos),ndname)
         shutil.copy('{0}/{1}'.format(sdir,_ferg),ndname)
         shutil.copy('{0}/{1}'.format(sdir,_ffrc),ndname)
+        os.mkdir(ndname+'/smd')

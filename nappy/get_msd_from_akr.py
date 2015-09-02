@@ -13,7 +13,7 @@ import os,sys,glob,time
 import numpy as np
 import optparse
 
-from AtomSystem import AtomSystem
+from pmdsys import pmdsys
 
 usage= '%prog [options] akr0001 akr0002 akr0003 ...'
 
@@ -80,7 +80,7 @@ npbc= np.zeros((3,),dtype=int)
 hmat= np.zeros((3,3))
 for ifile in range(len(infiles)):
     file= infiles[ifile]
-    system= AtomSystem()
+    system= pmdsys()
     system.read_akr(file)
     hmat[0]= system.a1 *system.alc
     hmat[1]= system.a2 *system.alc

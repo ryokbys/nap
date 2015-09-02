@@ -1,8 +1,8 @@
 import numpy as np
 
-class Atom(object):
-    u"""
-    Atom class defines attributions that an atom has to have.
+class atom(object):
+    """
+    Define attributions of an atom.
     """
 
     def __init__(self):

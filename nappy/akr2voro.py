@@ -1,11 +1,11 @@
 #!/bin/env python
 
 import sys,os
-from AtomSystem import AtomSystem
+from pmdsys import pmdsys
 
 infname= sys.argv[1]
 print 'input file: ',infname
-aSys= AtomSystem()
+aSys= pmdsys()
 aSys.read_akr(infname)
 natm= len(aSys.atoms)
 

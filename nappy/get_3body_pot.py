@@ -11,8 +11,8 @@ import os,sys,math,copy
 import optparse
 import numpy as np
 
-from Atom import Atom
-from AtomSystem import AtomSystem
+from atom import atom
+from pmdsys import pmdsys
 
 ################################################# Functions ############
 def get_apot(fname='out.pmd'):
@@ -76,25 +76,25 @@ distance= options.distance
 print ' distance      = ',distance,' Ang.'
 pmdexec= options.pmdexec
 
-asys= AtomSystem()
+asys= pmdsys()
 a1= np.array([2.0, 0.0, 0.0])
 a2= np.array([0.0, 2.0, 0.0])
 a3= np.array([0.0, 0.0, 1.0])
 alc= rcut
 asys.set_lattice(alc,a1,a2,a3)
 
-atom1= Atom()
+atom1= atom()
 atom1.set_pos(0.0,0.0,0.0)
 atom1.set_id(1)
 asys.add_atom(atom1)
 
 hd= distance/(alc*2)
-atom2= Atom()
+atom2= atom()
 atom2.set_pos(hd,0.0,0.0)
 atom2.set_id(2)
 asys.add_atom(atom2)
 
-atom3= Atom()
+atom3= atom()
 atom3.set_pos(0.0,0.0,0.0)
 atom3.set_id(3)
 asys.add_atom(atom3)

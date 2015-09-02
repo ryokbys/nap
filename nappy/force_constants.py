@@ -14,8 +14,8 @@ import os,sys,math,copy
 import optparse
 import numpy as np
 
-from Atom import Atom
-from AtomSystem import AtomSystem
+from atom import atom
+from pmdsys import pmdsys
 
 ################################################# Functions ############
 
@@ -70,7 +70,7 @@ print ' rcut         = ',rcut,' Ang.'
 pmdexec= options.pmdexec
 infname= args[0]
 
-sys0= AtomSystem()
+sys0= pmdsys()
 sys0.read_pmd(infname)
 sys0.write_POSCAR()
 print ' POSCAR was written.'
@@ -89,7 +89,7 @@ r3= 2*n3+1
 print ' num of cells in each axis=',r1,r2,r3
 print ' num of atoms in extended system=',natm0*r1*r2*r3
 
-sysext= AtomSystem()
+sysext= pmdsys()
 sysext.set_lattice( sys0.alc
                     ,np.multiply(sys0.a1,r1)
                     ,np.multiply(sys0.a2,r2)
@@ -105,7 +105,7 @@ for ia in range(natm0):
     for i3 in range(r3):
         for i2 in range(r2):
             for i1 in range(r1):
-                ai= Atom()
+                ai= atom()
                 ai.set_sid(ai0.sid)
                 p1= (ai0.pos[0]+i1)/r1
                 p2= (ai0.pos[1]+i2)/r2
