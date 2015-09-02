@@ -1,20 +1,33 @@
 #!/bin/env python
+"""
+Analyze NN potential with drawing NN structure graph.
+
+Usage:
+    analyze-NN.py [options]
+
+Options:
+    -w    Show weight values. [default: False]
+    -t <threshold>
+          Threshold value multiplied to max edge for omitting criterion
+          of edge. [default: 0.01]
+"""
 
 import math
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import optparse
+from docopt import docopt
 
-cnstfname= 'in.const.NN'
-combfname= 'in.comb.NN'
-paramfname= 'in.params.NN'
+_cnstfname= 'in.const.NN'
+_combfname= 'in.comb.NN'
+_paramfname= 'in.params.NN'
 
 def comb(n,m):
     return math.factorial(n)/math.factorial(m)
 
 def read_NN_config():
-    fcnst= open(cnstfname,'r')
+    fcnst= open(_cnstfname,'r')
     buff= fcnst.readline().split()
     nl= int(buff[0])
     nhl= np.zeros((nl+1),dtype=int)
@@ -66,7 +79,7 @@ def read_NN_config():
     elif nl == 2:
         print 'num of input neurons =',nhl[0]*nhl[1] +nhl[1]*nhl[2] +nhl[2]
 
-    fcmb= open(combfname,'r')
+    fcmb= open(_combfname,'r')
     cmb2= np.zeros((ncmb2,2),dtype=int)
     cmb3= np.zeros((ncmb3,3),dtype=int)
     print 'pairs:'
@@ -88,7 +101,7 @@ def read_NN_config():
     
 def read_NN_params(nl,nhl):
     #.....read in.params.NN
-    fparam= open(paramfname,'r')
+    fparam= open(_paramfname,'r')
     buff= fparam.readline().split()
     if nl == 1:
         wgt11= np.zeros((nhl[0],nhl[1]))
@@ -130,18 +143,10 @@ def read_NN_params(nl,nhl):
 
 if __name__ == '__main__':
 
-    usage= '%prog [options]'
+    args= docopt(__doc__)
 
-    parser= optparse.OptionParser(usage=usage)
-    parser.add_option("-w",action="store_true",
-                      dest="weight",default=False,
-                      help="Show weight values.")
-    parser.add_option("-t",dest="threshold",type="float",default=0.01,
-                      help="Threshold value multiplied to max edge for omitting criterion of edge.")
-    (options,args)= parser.parse_args()
-
-    flag_weight= options.weight
-    threshold= options.threshold
+    flag_weight= args['-w']
+    threshold= args['-t']
 
     nl,nsp,nhl,n2,n3,cmb2,cmb3,ngauss,ncos,npoly,nagnle= read_NN_config()
     if nl == 1:
