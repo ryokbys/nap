@@ -888,6 +888,9 @@ contains
   end function sigmoid
 !=======================================================================
   subroutine get_bases()
+    !
+    ! Read binary files of out.NN.{gsf,dgsf}, written by smd.
+    !
     use variables
     use parallel
     implicit none
@@ -900,22 +903,18 @@ contains
       cdir= samples(ismpl)%cdirname
       !.....gsf
       open(21,file=trim(cmaindir)//'/'//cdir//'/smd/out.NN.gsf'&
-           ,status='old')
-      read(21,*) itmp
+           ,status='old',form='binary')
+      read(21) itmp
       do ia=1,natm
-        do ihl0=1,nhl(0)
-          read(21,*) itmp, itmp, sds(ismpl)%gsf(ia,ihl0)
-        enddo
+        read(21) (sds(ismpl)%gsf(ia,ihl0),ihl0=1,nhl(0))
       enddo
       close(21)
       !.....dgsf
       open(22,file=trim(cmaindir)//'/'//cdir//'/smd/out.NN.dgsf'&
-           ,status='old')
+           ,status='old',form='binary')
       do ia=1,natm
         do ihl0=1,nhl(0)
-          do ja=1,natm
-            read(22,*) itmp,itmp,itmp ,sds(ismpl)%dgsf(1:3,ja,ia,ihl0)
-          enddo
+          read(22) (sds(ismpl)%dgsf(1:3,ja,ia,ihl0),ja=1,natm)
         enddo
       enddo
       close(22)

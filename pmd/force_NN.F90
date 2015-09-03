@@ -77,12 +77,10 @@ contains
          ,lspr,gsf,dgsf,rc)
 
 #ifdef __FITPOT__
-    open(80,file='out.NN.gsf',status='replace')
-    write(80,'(2i10)') nhl(0)
+    open(80,file='out.NN.gsf',status='replace',form='binary')
+    write(80) nhl(0)
     do ia=1,natm
-      do ihl0=1,nhl(0)
-        write(80,'(2i8,es23.14e3)') ia,ihl0,gsf(ihl0,ia)
-      enddo
+      write(80) (gsf(ihl0,ia),ihl0=1,nhl(0))
     enddo
     close(80)
     call write_dgsf(84,natm,namax,nnmax,lspr,tag,nhl(0),dgsf)
@@ -891,12 +889,10 @@ contains
       enddo
     enddo
 !.....write
-    open(ionum,file='out.NN.dgsf',status='replace')
+    open(ionum,file='out.NN.dgsf',status='replace',form='binary')
     do ia=1,natm
       do isf=1,nsf
-        do jra=1,natm
-          write(ionum,'(3i6,3es22.14)') ia,isf,jra,dgsfo(1:3,jra,isf,ia)
-        enddo
+        write(ionum) (dgsfo(1:3,jra,isf,ia),jra=1,natm)
       enddo
     enddo
     close(ionum)
