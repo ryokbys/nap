@@ -293,14 +293,24 @@ contains
     smpl%epot =0d0
     !.....energy
     do ia=1,natm
-      do ihl1=1,nhl(1)
-        tmp= 0d0
-        do ihl0=1,nhl(0)
-          if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
-          tmp= tmp +wgt11(ihl0,ihl1) *sds%gsf(ia,ihl0)
+      if( allocated(lmskgfs) ) then
+        do ihl1=1,nhl(1)
+          tmp= 0d0
+          do ihl0=1,nhl(0)
+            if( lmskgfs(ihl0) ) cycle
+            tmp= tmp +wgt11(ihl0,ihl1) *sds%gsf(ia,ihl0)
+          enddo
+          sds%hl1(ia,ihl1)= sigmoid(tmp)
         enddo
-        sds%hl1(ia,ihl1)= sigmoid(tmp)
-      enddo
+      else
+        do ihl1=1,nhl(1)
+          tmp= 0d0
+          do ihl0=1,nhl(0)
+            tmp= tmp +wgt11(ihl0,ihl1) *sds%gsf(ia,ihl0)
+          enddo
+          sds%hl1(ia,ihl1)= sigmoid(tmp)
+        enddo
+      endif
       do ihl1=1,nhl(1)
         smpl%epot= smpl%epot &
              +wgt12(ihl1)*(sds%hl1(ia,ihl1)-0.5d0)
@@ -310,23 +320,42 @@ contains
     !.....forces
     if( .not.lfmatch ) return
     smpl%fa(1:3,1:natm)= 0d0
-    do ihl1=1,nhl(1)
-      w2= wgt12(ihl1)
-      do ihl0=1,nhl(0)
-        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
-        w1= wgt11(ihl0,ihl1)
-        do ja=1,natm
-          h1= sds%hl1(ja,ihl1)
-          dh1= h1*(1d0-h1)
-          t= w1*w2 *dh1
-          do ia=1,natm
-            dg(1:3)=sds%dgsf(1:3,ia,ja,ihl0)
-            smpl%fa(1:3,ia)= smpl%fa(1:3,ia) &
-                 -t *dg(1:3)
+    if( allocated(lmskgfs) ) then
+      do ihl1=1,nhl(1)
+        w2= wgt12(ihl1)
+        do ihl0=1,nhl(0)
+          if( lmskgfs(ihl0) ) cycle
+          w1= wgt11(ihl0,ihl1)
+          do ja=1,natm
+            h1= sds%hl1(ja,ihl1)
+            dh1= h1*(1d0-h1)
+            t= w1*w2 *dh1
+            do ia=1,natm
+              dg(1:3)=sds%dgsf(1:3,ia,ja,ihl0)
+              smpl%fa(1:3,ia)= smpl%fa(1:3,ia) &
+                   -t *dg(1:3)
+            enddo
           enddo
         enddo
       enddo
-    enddo
+    else
+      do ihl1=1,nhl(1)
+        w2= wgt12(ihl1)
+        do ihl0=1,nhl(0)
+          w1= wgt11(ihl0,ihl1)
+          do ja=1,natm
+            h1= sds%hl1(ja,ihl1)
+            dh1= h1*(1d0-h1)
+            t= w1*w2 *dh1
+            do ia=1,natm
+              dg(1:3)=sds%dgsf(1:3,ia,ja,ihl0)
+              smpl%fa(1:3,ia)= smpl%fa(1:3,ia) &
+                   -t *dg(1:3)
+            enddo
+          enddo
+        enddo
+      enddo
+    endif
 
   end subroutine calc_ef1
 !=======================================================================
@@ -348,15 +377,26 @@ contains
     do ia=1,natm
       do ihl2=1,nhl(2)
         tmp2= 0d0
-        do ihl1=1,nhl(1)
-          tmp1= 0d0
-          do ihl0=1,nhl(0)
-            if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
-            tmp1=tmp1 +wgt21(ihl0,ihl1) *sds%gsf(ia,ihl0)
+        if( allocated(lmskgfs) ) then
+          do ihl1=1,nhl(1)
+            tmp1= 0d0
+            do ihl0=1,nhl(0)
+              if( lmskgfs(ihl0) ) cycle
+              tmp1=tmp1 +wgt21(ihl0,ihl1) *sds%gsf(ia,ihl0)
+            enddo
+            sds%hl1(ia,ihl1)= sigmoid(tmp1)
+            tmp2=tmp2 +wgt22(ihl1,ihl2) *(sds%hl1(ia,ihl1)-0.5d0)
           enddo
-          sds%hl1(ia,ihl1)= sigmoid(tmp1)
-          tmp2=tmp2 +wgt22(ihl1,ihl2) *(sds%hl1(ia,ihl1)-0.5d0)
-        enddo
+        else
+          do ihl1=1,nhl(1)
+            tmp1= 0d0
+            do ihl0=1,nhl(0)
+              tmp1=tmp1 +wgt21(ihl0,ihl1) *sds%gsf(ia,ihl0)
+            enddo
+            sds%hl1(ia,ihl1)= sigmoid(tmp1)
+            tmp2=tmp2 +wgt22(ihl1,ihl2) *(sds%hl1(ia,ihl1)-0.5d0)
+          enddo
+        endif
         sds%hl2(ia,ihl2)= sigmoid(tmp2)
         smpl%epot= smpl%epot &
              +wgt23(ihl2) *(sds%hl2(ia,ihl2)-0.5d0)
@@ -366,27 +406,51 @@ contains
     !.....force term
     if( .not.lfmatch ) return
     smpl%fa(1:3,1:natm)= 0d0
-    do ihl2=1,nhl(2)
-      w3= wgt23(ihl2)
-      do ihl1=1,nhl(1)
-        w2= wgt22(ihl1,ihl2)
-        do ihl0=1,nhl(0)
-          if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
-          w1= wgt21(ihl0,ihl1)
-          do ja=1,natm
-            h1= sds%hl1(ja,ihl1)
-            h2= sds%hl2(ja,ihl2)
-            dh1= h1*(1d0-h1)
-            dh2= h2*(1d0-h2)
-            t= w3*dh2 *w2*dh1 *w1
-            do ia=1,natm
-              smpl%fa(1:3,ia)= smpl%fa(1:3,ia) &
-                   -t *sds%dgsf(1:3,ia,ja,ihl0)
+    if( allocated(lmskgfs) ) then
+      do ihl2=1,nhl(2)
+        w3= wgt23(ihl2)
+        do ihl1=1,nhl(1)
+          w2= wgt22(ihl1,ihl2)
+          do ihl0=1,nhl(0)
+            if( lmskgfs(ihl0) ) cycle
+            w1= wgt21(ihl0,ihl1)
+            do ja=1,natm
+              h1= sds%hl1(ja,ihl1)
+              h2= sds%hl2(ja,ihl2)
+              dh1= h1*(1d0-h1)
+              dh2= h2*(1d0-h2)
+              t= w3*dh2 *w2*dh1 *w1
+              do ia=1,natm
+                smpl%fa(1:3,ia)= smpl%fa(1:3,ia) &
+                     -t *sds%dgsf(1:3,ia,ja,ihl0)
+              enddo
             enddo
           enddo
         enddo
       enddo
-    enddo
+    else
+      do ihl2=1,nhl(2)
+        w3= wgt23(ihl2)
+        do ihl1=1,nhl(1)
+          w2= wgt22(ihl1,ihl2)
+          do ihl0=1,nhl(0)
+            w1= wgt21(ihl0,ihl1)
+            do ja=1,natm
+              h1= sds%hl1(ja,ihl1)
+              h2= sds%hl2(ja,ihl2)
+              dh1= h1*(1d0-h1)
+              dh2= h2*(1d0-h2)
+              t= w3*dh2 *w2*dh1 *w1
+              do ia=1,natm
+                smpl%fa(1:3,ia)= smpl%fa(1:3,ia) &
+                     -t *sds%dgsf(1:3,ia,ja,ihl0)
+              enddo
+            enddo
+          enddo
+        enddo
+      enddo
+    endif
+  
     
   end subroutine calc_ef2
 !=======================================================================
@@ -520,20 +584,35 @@ contains
       gs(iv)= gs(iv) +ediff*tmp
       iv= iv -1
     enddo
-    do ihl0=nhl(0),1,-1
-      do ihl1=nhl(1),1,-1
-        tmp= 0d0
-        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) goto 20
-        w2= wgt12(ihl1)
-        do ia=1,natm
-          h1= sds%hl1(ia,ihl1)
-          tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
+    if( allocated(lmskgfs) ) then
+      do ihl0=nhl(0),1,-1
+        do ihl1=nhl(1),1,-1
+          tmp= 0d0
+          if( lmskgfs(ihl0) ) goto 20
+          w2= wgt12(ihl1)
+          do ia=1,natm
+            h1= sds%hl1(ia,ihl1)
+            tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
+          enddo
+20        continue
+          gs(iv)= gs(iv) +ediff*tmp
+          iv= iv -1
         enddo
-20      continue
-        gs(iv)= gs(iv) +ediff*tmp
-        iv= iv -1
       enddo
-    enddo
+    else
+      do ihl0=nhl(0),1,-1
+        do ihl1=nhl(1),1,-1
+          tmp= 0d0
+          w2= wgt12(ihl1)
+          do ia=1,natm
+            h1= sds%hl1(ia,ihl1)
+            tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
+          enddo
+          gs(iv)= gs(iv) +ediff*tmp
+          iv= iv -1
+        enddo
+      enddo
+    endif
 
     if( .not. lfmatch ) return
     dgs(1:nvars)= 0d0
@@ -544,65 +623,126 @@ contains
     if( lfscale ) fscale= fscl
     fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscale *swgt
     iv= nhl(0)*nhl(1) +nhl(1)
-    do ihl1=nhl(1),1,-1
-      tmp= 0d0
-      do ihl0=1,nhl(0)
-        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
-        w1= wgt11(ihl0,ihl1)
-        do ja=1,natm
-          h1= sds%hl1(ja,ihl1)
-          dh1= h1*(1d0-h1)
-          do ia=1,natm
-            tmp= tmp +w1 *dh1*( &
-                 fdiff(1,ia)  *sds%dgsf(1,ia,ja,ihl0) &
-                 +fdiff(2,ia) *sds%dgsf(2,ia,ja,ihl0) &
-                 +fdiff(3,ia) *sds%dgsf(3,ia,ja,ihl0) &
-                 )
-          enddo
-        enddo
-      enddo
-      dgs(iv)= -tmp
-      iv= iv -1
-    enddo
-!.....make bms before computing dgs
-    bms(1:3,1:natm,1:natm,1:nhl(1))= 0d0
-    do ihl1=1,nhl(1)
-      do ihl0=1,nhl(0)
-        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
-        w1= wgt11(ihl0,ihl1)
-        do ja=1,natm
-          do ia=1,natm
-            bms(1:3,ia,ja,ihl1)= bms(1:3,ia,ja,ihl1) &
-                 +w1*sds%dgsf(1:3,ia,ja,ihl0)
-          enddo
-        enddo
-      enddo
-    enddo
-!.....then compute dgs wrt w1
-    do ihl0=nhl(0),1,-1
+    if( allocated( lmskgfs) ) then
       do ihl1=nhl(1),1,-1
         tmp= 0d0
-        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) goto 10
-        w2= wgt12(ihl1)
-        do ja=1,natm
-          h1= sds%hl1(ja,ihl1)
-          dh1= h1*(1d0-h1)
-          ddhg= dh1*(1d0-2d0*h1)*sds%gsf(ja,ihl0)
-          do ia=1,natm
-            ab(1:3)= dh1*sds%dgsf(1:3,ia,ja,ihl0) &
-                 +ddhg*bms(1:3,ia,ja,ihl1)
-            tmp= tmp +w2 *( &
-                 fdiff(1,ia) *ab(1) &
-                 +fdiff(2,ia) *ab(2) &
-                 +fdiff(3,ia) *ab(3) &
-                 )
+        do ihl0=1,nhl(0)
+          if( lmskgfs(ihl0) ) cycle
+          w1= wgt11(ihl0,ihl1)
+          do ja=1,natm
+            h1= sds%hl1(ja,ihl1)
+            dh1= h1*(1d0-h1)
+            do ia=1,natm
+              tmp= tmp +w1 *dh1*( &
+                   fdiff(1,ia)  *sds%dgsf(1,ia,ja,ihl0) &
+                   +fdiff(2,ia) *sds%dgsf(2,ia,ja,ihl0) &
+                   +fdiff(3,ia) *sds%dgsf(3,ia,ja,ihl0) &
+                   )
+            enddo
           enddo
         enddo
-10      continue
         dgs(iv)= -tmp
         iv= iv -1
       enddo
-    enddo
+    else
+      do ihl1=nhl(1),1,-1
+        tmp= 0d0
+        do ihl0=1,nhl(0)
+          w1= wgt11(ihl0,ihl1)
+          do ja=1,natm
+            h1= sds%hl1(ja,ihl1)
+            dh1= h1*(1d0-h1)
+            do ia=1,natm
+              tmp= tmp +w1 *dh1*( &
+                   fdiff(1,ia)  *sds%dgsf(1,ia,ja,ihl0) &
+                   +fdiff(2,ia) *sds%dgsf(2,ia,ja,ihl0) &
+                   +fdiff(3,ia) *sds%dgsf(3,ia,ja,ihl0) &
+                   )
+            enddo
+          enddo
+        enddo
+        dgs(iv)= -tmp
+        iv= iv -1
+      enddo
+    endif
+!.....make bms before computing dgs
+    bms(1:3,1:natm,1:natm,1:nhl(1))= 0d0
+    if( allocated(lmskgfs) ) then
+      do ihl1=1,nhl(1)
+        do ihl0=1,nhl(0)
+          if( lmskgfs(ihl0) ) cycle
+          w1= wgt11(ihl0,ihl1)
+          do ja=1,natm
+            do ia=1,natm
+              bms(1:3,ia,ja,ihl1)= bms(1:3,ia,ja,ihl1) &
+                   +w1*sds%dgsf(1:3,ia,ja,ihl0)
+            enddo
+          enddo
+        enddo
+      enddo
+    else
+      do ihl1=1,nhl(1)
+        do ihl0=1,nhl(0)
+          w1= wgt11(ihl0,ihl1)
+          do ja=1,natm
+            do ia=1,natm
+              bms(1:3,ia,ja,ihl1)= bms(1:3,ia,ja,ihl1) &
+                   +w1*sds%dgsf(1:3,ia,ja,ihl0)
+            enddo
+          enddo
+        enddo
+      enddo
+    endif
+!.....then compute dgs wrt w1
+    if( allocated(lmskgfs) ) then
+      do ihl0=nhl(0),1,-1
+        do ihl1=nhl(1),1,-1
+          tmp= 0d0
+          if( lmskgfs(ihl0) ) goto 10
+          w2= wgt12(ihl1)
+          do ja=1,natm
+            h1= sds%hl1(ja,ihl1)
+            dh1= h1*(1d0-h1)
+            ddhg= dh1*(1d0-2d0*h1)*sds%gsf(ja,ihl0)
+            do ia=1,natm
+              ab(1:3)= dh1*sds%dgsf(1:3,ia,ja,ihl0) &
+                   +ddhg*bms(1:3,ia,ja,ihl1)
+              tmp= tmp +w2 *( &
+                   fdiff(1,ia) *ab(1) &
+                   +fdiff(2,ia) *ab(2) &
+                   +fdiff(3,ia) *ab(3) &
+                   )
+            enddo
+          enddo
+10        continue
+          dgs(iv)= -tmp
+          iv= iv -1
+        enddo
+      enddo
+    else
+      do ihl0=nhl(0),1,-1
+        do ihl1=nhl(1),1,-1
+          tmp= 0d0
+          w2= wgt12(ihl1)
+          do ja=1,natm
+            h1= sds%hl1(ja,ihl1)
+            dh1= h1*(1d0-h1)
+            ddhg= dh1*(1d0-2d0*h1)*sds%gsf(ja,ihl0)
+            do ia=1,natm
+              ab(1:3)= dh1*sds%dgsf(1:3,ia,ja,ihl0) &
+                   +ddhg*bms(1:3,ia,ja,ihl1)
+              tmp= tmp +w2 *( &
+                   fdiff(1,ia) *ab(1) &
+                   +fdiff(2,ia) *ab(2) &
+                   +fdiff(3,ia) *ab(3) &
+                   )
+            enddo
+          enddo
+          dgs(iv)= -tmp
+          iv= iv -1
+        enddo
+      enddo
+    endif
 
     gs(1:nvars)= gs(1:nvars) +dgs(1:nvars)
     return
@@ -658,27 +798,49 @@ contains
         iv=iv -1
       enddo
     enddo
-    do ihl0=nhl(0),1,-1
-      do ihl1=nhl(1),1,-1
-        tmp= 0d0
-        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) goto 20
-        do ia=1,natm
-          h1= sds%hl1(ia,ihl1)
-          dh1= h1*(1d0-h1)
-          dh1gsf= dh1*sds%gsf(ia,ihl0)
-          do ihl2=1,nhl(2)
-            h2= sds%hl2(ia,ihl2)
-            dh2= h2*(1d0-h2)
-            w2= wgt22(ihl1,ihl2)
-            w3= wgt23(ihl2)
-            tmp=tmp +w3*w2 *dh2 *dh1gsf
+    if( allocated(lmskgfs) ) then
+      do ihl0=nhl(0),1,-1
+        do ihl1=nhl(1),1,-1
+          tmp= 0d0
+          if( lmskgfs(ihl0) ) goto 20
+          do ia=1,natm
+            h1= sds%hl1(ia,ihl1)
+            dh1= h1*(1d0-h1)
+            dh1gsf= dh1*sds%gsf(ia,ihl0)
+            do ihl2=1,nhl(2)
+              h2= sds%hl2(ia,ihl2)
+              dh2= h2*(1d0-h2)
+              w2= wgt22(ihl1,ihl2)
+              w3= wgt23(ihl2)
+              tmp=tmp +w3*w2 *dh2 *dh1gsf
+            enddo
           enddo
+20        continue
+          gs(iv)=gs(iv) +ediff*tmp
+          iv=iv -1
         enddo
-20      continue
-        gs(iv)=gs(iv) +ediff*tmp
-        iv=iv -1
       enddo
-    enddo
+    else
+      do ihl0=nhl(0),1,-1
+        do ihl1=nhl(1),1,-1
+          tmp= 0d0
+          do ia=1,natm
+            h1= sds%hl1(ia,ihl1)
+            dh1= h1*(1d0-h1)
+            dh1gsf= dh1*sds%gsf(ia,ihl0)
+            do ihl2=1,nhl(2)
+              h2= sds%hl2(ia,ihl2)
+              dh2= h2*(1d0-h2)
+              w2= wgt22(ihl1,ihl2)
+              w3= wgt23(ihl2)
+              tmp=tmp +w3*w2 *dh2 *dh1gsf
+            enddo
+          enddo
+          gs(iv)=gs(iv) +ediff*tmp
+          iv=iv -1
+        enddo
+      enddo
+    endif
 
     if( .not. lfmatch ) return
     dgs(1:nvars)= 0d0
@@ -691,18 +853,32 @@ contains
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 !.....make w1dg
     w1dg(1:3,1:natm,1:natm,1:nhl(1))= 0d0
-    do ihl1=1,nhl(1)
-      do ihl0=1,nhl(0)
-        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) cycle
-        w1= wgt21(ihl0,ihl1)
-        do ja=1,natm
-          do ia=1,natm
-            w1dg(1:3,ia,ja,ihl1)= w1dg(1:3,ia,ja,ihl1) &
-                 +w1*sds%dgsf(1:3,ia,ja,ihl0)
+    if( allocated(lmskgfs) ) then
+      do ihl1=1,nhl(1)
+        do ihl0=1,nhl(0)
+          if( lmskgfs(ihl0) ) cycle
+          w1= wgt21(ihl0,ihl1)
+          do ja=1,natm
+            do ia=1,natm
+              w1dg(1:3,ia,ja,ihl1)= w1dg(1:3,ia,ja,ihl1) &
+                   +w1*sds%dgsf(1:3,ia,ja,ihl0)
+            enddo
           enddo
         enddo
       enddo
-    enddo
+    else
+      do ihl1=1,nhl(1)
+        do ihl0=1,nhl(0)
+          w1= wgt21(ihl0,ihl1)
+          do ja=1,natm
+            do ia=1,natm
+              w1dg(1:3,ia,ja,ihl1)= w1dg(1:3,ia,ja,ihl1) &
+                   +w1*sds%dgsf(1:3,ia,ja,ihl0)
+            enddo
+          enddo
+        enddo
+      enddo
+    endif
 !.....make w2sw1dg
     w2sw1dg(1:3,1:natm,1:natm,1:nhl(2))= 0d0
     do ihl2=1,nhl(2)
@@ -766,47 +942,89 @@ contains
       enddo
     enddo
 !.....derivative wrt w1
-    do ihl0=nhl(0),1,-1
-      do ihl1=nhl(1),1,-1
-        tmp= 0d0
-        if( allocated(lmskgfs) .and. lmskgfs(ihl0) ) goto 10
-        do ihl2=1,nhl(2)
-          w3= wgt23(ihl2)
-          w2= wgt22(ihl1,ihl2)
-          do ja=1,natm
-            h1= sds%hl1(ja,ihl1)
-            dh1= h1*(1d0-h1)
-            ddh1= dh1*(1d0-2d0*h1)
-            h2= sds%hl2(ja,ihl2)
-            dh2= h2*(1d0-h2)
-            ddh2= dh2*(1d0-2d0*h2)
-            t1= w3 *ddh2*w2*dh1*sds%gsf(ja,ihl0)
-            t2= w3 *dh2*w2*ddh1*sds%gsf(ja,ihl0)
-            t3= w3 *dh2 *w2 *dh1
-            do ia=1,natm
-              tmp=tmp +t1 *( &
-                   fdiff(1,ia)  *w2sw1dg(1,ia,ja,ihl2) &
-                   +fdiff(2,ia) *w2sw1dg(2,ia,ja,ihl2) &
-                   +fdiff(3,ia) *w2sw1dg(3,ia,ja,ihl2) &
-                   )
-              tmp=tmp +t2 *( &
-                   fdiff(1,ia)  *w1dg(1,ia,ja,ihl1) &
-                   +fdiff(2,ia) *w1dg(2,ia,ja,ihl1) &
-                   +fdiff(3,ia) *w1dg(3,ia,ja,ihl1) &
-                   )
-              tmp=tmp +t3 *( &
-                   fdiff(1,ia)  *sds%dgsf(1,ia,ja,ihl0) &
-                   +fdiff(2,ia) *sds%dgsf(2,ia,ja,ihl0) &
-                   +fdiff(3,ia) *sds%dgsf(3,ia,ja,ihl0) &
-                   )
+    if( allocated(lmskgfs) ) then
+      do ihl0=nhl(0),1,-1
+        do ihl1=nhl(1),1,-1
+          tmp= 0d0
+          if( lmskgfs(ihl0) ) goto 10
+          do ihl2=1,nhl(2)
+            w3= wgt23(ihl2)
+            w2= wgt22(ihl1,ihl2)
+            do ja=1,natm
+              h1= sds%hl1(ja,ihl1)
+              dh1= h1*(1d0-h1)
+              ddh1= dh1*(1d0-2d0*h1)
+              h2= sds%hl2(ja,ihl2)
+              dh2= h2*(1d0-h2)
+              ddh2= dh2*(1d0-2d0*h2)
+              t1= w3 *ddh2*w2*dh1*sds%gsf(ja,ihl0)
+              t2= w3 *dh2*w2*ddh1*sds%gsf(ja,ihl0)
+              t3= w3 *dh2 *w2 *dh1
+              do ia=1,natm
+                tmp=tmp +t1 *( &
+                     fdiff(1,ia)  *w2sw1dg(1,ia,ja,ihl2) &
+                     +fdiff(2,ia) *w2sw1dg(2,ia,ja,ihl2) &
+                     +fdiff(3,ia) *w2sw1dg(3,ia,ja,ihl2) &
+                     )
+                tmp=tmp +t2 *( &
+                     fdiff(1,ia)  *w1dg(1,ia,ja,ihl1) &
+                     +fdiff(2,ia) *w1dg(2,ia,ja,ihl1) &
+                     +fdiff(3,ia) *w1dg(3,ia,ja,ihl1) &
+                     )
+                tmp=tmp +t3 *( &
+                     fdiff(1,ia)  *sds%dgsf(1,ia,ja,ihl0) &
+                     +fdiff(2,ia) *sds%dgsf(2,ia,ja,ihl0) &
+                     +fdiff(3,ia) *sds%dgsf(3,ia,ja,ihl0) &
+                     )
+              enddo
             enddo
           enddo
+10        continue
+          dgs(iv)= -tmp
+          iv= iv -1
         enddo
-10      continue
-        dgs(iv)= -tmp
-        iv= iv -1
       enddo
-    enddo
+    else
+      do ihl0=nhl(0),1,-1
+        do ihl1=nhl(1),1,-1
+          tmp= 0d0
+          do ihl2=1,nhl(2)
+            w3= wgt23(ihl2)
+            w2= wgt22(ihl1,ihl2)
+            do ja=1,natm
+              h1= sds%hl1(ja,ihl1)
+              dh1= h1*(1d0-h1)
+              ddh1= dh1*(1d0-2d0*h1)
+              h2= sds%hl2(ja,ihl2)
+              dh2= h2*(1d0-h2)
+              ddh2= dh2*(1d0-2d0*h2)
+              t1= w3 *ddh2*w2*dh1*sds%gsf(ja,ihl0)
+              t2= w3 *dh2*w2*ddh1*sds%gsf(ja,ihl0)
+              t3= w3 *dh2 *w2 *dh1
+              do ia=1,natm
+                tmp=tmp +t1 *( &
+                     fdiff(1,ia)  *w2sw1dg(1,ia,ja,ihl2) &
+                     +fdiff(2,ia) *w2sw1dg(2,ia,ja,ihl2) &
+                     +fdiff(3,ia) *w2sw1dg(3,ia,ja,ihl2) &
+                     )
+                tmp=tmp +t2 *( &
+                     fdiff(1,ia)  *w1dg(1,ia,ja,ihl1) &
+                     +fdiff(2,ia) *w1dg(2,ia,ja,ihl1) &
+                     +fdiff(3,ia) *w1dg(3,ia,ja,ihl1) &
+                     )
+                tmp=tmp +t3 *( &
+                     fdiff(1,ia)  *sds%dgsf(1,ia,ja,ihl0) &
+                     +fdiff(2,ia) *sds%dgsf(2,ia,ja,ihl0) &
+                     +fdiff(3,ia) *sds%dgsf(3,ia,ja,ihl0) &
+                     )
+              enddo
+            enddo
+          enddo
+          dgs(iv)= -tmp
+          iv= iv -1
+        enddo
+      enddo
+    endif
 
     gs(1:nvars)= gs(1:nvars) +dgs(1:nvars)
     return
