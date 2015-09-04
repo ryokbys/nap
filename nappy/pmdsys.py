@@ -39,9 +39,10 @@ class pmdsys(object):
         self.a3= np.zeros(3)
         self.atoms= []
 
+        ftype= None
         if ffmt in _formats:
             ftype= ffmt
-        else:
+        elif not fname == None:
             ftype= self.parse_fname(fname)
 
         if ftype == 'pmd':

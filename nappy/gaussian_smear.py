@@ -1,82 +1,98 @@
 #!/bin/env python
 """
 Smear 1D data of equidistance intervals with Gaussians.
+
+Usage:
+    gaussian_smear.py [options] INFILE
+
+Options:
+    -h, --help  Show this help messange and exit.
+    -s, --sigma=SIGMA
+                Width of Gaussian (sigma) in the unit of dx. [default: 2.0]
+    -x=<x>      Position of x data (start from 1) [default: 1]
+    -y=<y>      Position of y data (start from 1) [default: 1]
 """
 
 import os,sys,math
-import optparse
+import numpy as np
+from docopt import docopt
 
-usage= '%prog [options] datafile'
+def gsmear(xd,yd,sigma):
+    """
+    Compute Gaussian-smearing of given data with smearing width *sigma*.
+    """
+    dx= xd[1]-yd[0]
+    sgm= sigma*dx
+    isgm= int(sigma)+1
+    pref= 1.0/(np.sqrt(2.0*np.pi)*sgm)
+    
+    ndat= len(xd)
+    gdat= np.zeros(ndat,dtype=np.float)
+    for ix in range(ndat):
+        gdat[ix]= yd[ix]
+        for jx in range(-ndat+1,ndat-1):
+            kx= ix+jx
+            if kx < 0:
+                kx = -kx
+            elif kx >= ndat:
+                kx = ndat -(kx-(ndat-1))
+            gdat[ix] += yd[kx]*pref*np.exp(-(dx*(jx))**2/sgm**2/2)*dx
+    gdat /= 2
+    return xd,gdat
 
-parser= optparse.OptionParser(usage=usage)
-parser.add_option("-s","--sigma",dest="sigma",type="float",
-                  default=2.0,
-                  help="width of Gaussian (sigma) in the unit of dx.")
-parser.add_option("-x",dest="xp",type="int",
-                  default=1,
-                  help="position of x data (start from 1).")
-parser.add_option("-y",dest="yp",type="int",
-                  default=2,
-                  help="position of y data (start from 1).")
-(options,args)= parser.parse_args()
+def gsmear_file(infname,sigma,xp,yp):
+    """
+    Read data from the given file and pass data to `gsmear` method.
+    """
+    infile= open(infname,'r')
+    nline= 0
+    for line in infile.readlines():
+        if line[0] == "#":
+            continue
+        nline += 1
+    #print ' num of data points in the file=',nline
+    infile.seek(0)
+    xd= np.zeros(nline,dtype=np.float)
+    yd= np.zeros(nline,dtype=np.float)
+    il= 0
+    for line in infile.readlines():
+        if line[0] == "#":
+            continue
+        sline= line.split()
+        xd[il]= float(sline[xp])
+        yd[il]= float(sline[yp])
+        il += 1
+    infile.close()
+    xd,gdat= gsmear(xd,yd,sigma)
+    return xd,gdat
+    
 
-xp= options.xp -1
-yp= options.yp -1
-sigma= options.sigma
-infname= args[0]
+if __name__ == "__main__":
 
-infile= open(infname,'r')
-nline= 0
-for line in infile.readlines():
-    if line[0] == "#":
-        continue
-    nline += 1
-print ' num of data points in the file=',nline
-infile.seek(0)
-data= [ [0.0,0.0] for i in range(nline) ]
-il= 0
-for line in infile.readlines():
-    if line[0] == "#":
-        continue
-    sline= line.split()
-    data[il][0]= float(sline[xp])
-    data[il][1]= float(sline[yp])
-    il += 1
-infile.close()
+    args= docopt(__doc__)
+    xp= int(args['-x']) -1
+    yp= int(args['-y']) -1
+    sigma= float(args['--sigma'])
+    infname= args['INFILE']
 
-dx= data[1][0]-data[0][0]
-sgm= sigma*dx
-isgm= int(sigma)+1
-pref= 1.0/(math.sqrt(2.0*math.pi)*sgm)
-
-gdat= [ [0.0,0.0] for i in range(nline) ]
-
-for ix in range(nline):
-    gdat[ix][0]= data[ix][0]
-    for jx in range(-nline+1,nline-1):
-        kx= ix+jx
-        if kx < 0:
-            kx = -kx
-        elif kx >= nline:
-            kx = nline -(kx-(nline-1))
-        gdat[ix][1] += data[kx][1]*pref*math.exp(-(dx*(jx))**2/sgm**2/2)*dx
-
-outfile= open(infname+'.smeared','w')
-for il in range(nline):
-    outfile.write(' {0:15.2f} {1:15.7f}\n'.format(gdat[il][0],gdat[il][1]))
-outfile.close()
-
-print ' write '+infname+'.smeared'
-print ' GAUSSIAN_SMEAR done '
-
-# dtotal= 0.0
-# gtotal= 0.0
-# for ix in range(nline):
-#     if ix == 0 or ix == nline-1:
-#         dtotal += data[ix][1]*dx/2
-#         gtotal += data[ix][1]*dx/2
-#     else:
-#         dtotal += data[ix][1]*dx
-#         gtotal += data[ix][1]*dx
-# print ' dtotal=',dtotal
-# print ' gtotal=',gtotal
+    xd,gdat= gsmear_file(infname,sigma,xp,yp)
+    
+    outfile= open(infname+'.smeared','w')
+    for il in range(len(gdat)):
+        outfile.write(' {0:15.2f} {1:15.7f}\n'.format(xd[il],gdat[il]))
+    outfile.close()
+    
+    print ' write '+infname+'.smeared'
+    print ' GAUSSIAN_SMEAR done '
+    
+    # dtotal= 0.0
+    # gtotal= 0.0
+    # for ix in range(nline):
+    #     if ix == 0 or ix == nline-1:
+    #         dtotal += data[ix][1]*dx/2
+    #         gtotal += data[ix][1]*dx/2
+    #     else:
+    #         dtotal += data[ix][1]*dx
+    #         gtotal += data[ix][1]*dx
+    # print ' dtotal=',dtotal
+    # print ' gtotal=',gtotal

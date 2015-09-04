@@ -1,17 +1,33 @@
 #!/bin/env python
 """
-Calculate the radial distribution function from an akr file.
+Calculate the radial distribution function from *akr* files.
+Ensemble averaging about atoms in a file and about files are taken.
 
-Ensemble averaging about atoms in the snapshot file.
+Usage:
+    radial_distribution.py [options] INFILE [INFILE...]
+
+Options:
+    -h, --help  Show this help message and exit.
+    -d DR       Width of the bin. [default: 0.1]
+    -r RMAX     Cutoff radius of radial distribution. [default: 5.0]
+    --src-sid=IDSRC
+                Species-ID of source atoms to be selected.
+                Zero means all the species will be selected. [default: 0]
+    --dst-sid=IDDST
+                Species-ID of source atoms to be selected.
+                Zero means all the species will be selected. [default: 0]
+    --gsmear=SIGMA
+                Width of Gaussian smearing, zero means no smearing. [default: 0]
+    -p          Plot a graph on the screen. [default: False]
 """
 
-import os,optparse
+import os,sys
 import numpy as np
 import matplotlib.pyplot as plt
-
+from docopt import docopt
 from pmdsys import pmdsys
+from gaussian_smear import gsmear
 
-usage= '%prog [options] akr0000 akr0001...'
 
 def norm(vector):
     norm= 0.0
@@ -113,42 +129,36 @@ def gr_of_file(infname,dr,rmax):
         nadr[ir]= float(nadr[ir])/(4.0*np.pi*rho*r*r*dr)/natm0
     return rd,nadr
 
+def gr_file_average(infiles,dr,rmax):
+    agr= np.zeros(nr,dtype=float)
+    for infname in infiles:
+        print ' infname=',infname
+        rd,gr= gr_of_file(infname,dr,rmax)
+        agr += gr
+    agr /= len(infiles)
+    return rd,agr
+
 ################################################## main routine
 
 if __name__ == "__main__":
 
-    parser= optparse.OptionParser(usage=usage)
-    parser.add_option("-d",dest="dr",type="float",default=0.1, \
-                      help="Width of the bin. Default is 0.1.")
-    parser.add_option("-r",dest="rmax",type="float",default=5.0, \
-                      help="Cutoff radius of radial distribution. Default is 5.0.")
-    parser.add_option("--src-sid",dest="idsrc",type="int",default=0,
-                      help="Species-ID of source atoms to be selected.\n" \
-                      +"Default is 0. 0 means all the species are selected.")
-    parser.add_option("--dst-sid",dest="iddst",type="int",default=0,
-                      help="Species-ID of source atoms to be selected.\n" \
-                      +"Default is 0. 0 means all the species are selected.")
-    parser.add_option("-p",action="store_true",
-                      dest="plot",default=False,
-                      help="Plot a graph on the screen.")
-    (options,args)= parser.parse_args()
+    args= docopt(__doc__)
     
-    nfiles= len(args)
-    idsrc= options.idsrc
-    iddst= options.iddst
-    dr= options.dr
-    rmax= options.rmax
-    shows_graph= options.plot
+    infiles= args['INFILE']
+    idsrc= int(args['--src-sid'])
+    iddst= int(args['--dst-sid'])
+    dr= float(args['-d'])
+    rmax= float(args['-r'])
+    flag_plot= args['-p']
+    sigma= int(args['--gsmear'])
 
     nr= int(rmax/dr) +1
-    agr= np.zeros(nr,dtype=float)
-    for infname in args:
-        print ' infname=',infname
-        rd,gr= gr_of_file(infname,dr,rmax)
-        agr += gr
-    agr /= nfiles
+    rd,agr= gr_file_average(infiles,dr,rmax)
 
-    if shows_graph:
+    if not sigma == 0:
+        rd,agr= gsmear(rd,agr,sigma)
+
+    if flag_plot:
         plt.plot(rd, agr, '-', linewidth=1)
         plt.show()
         
