@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+"""
+Define *atom* class that provides atom information such as id, species (sid),
+positions, velocities, and some flags used in `pmd`.
+"""
+
 import numpy as np
 
 class atom(object):

@@ -9,11 +9,11 @@
 ! PARAMETERS
 !=======================================================================
 !.....max. num. of atoms
-    integer,parameter:: namax = 4000
+    integer,parameter:: namax = 6000
 !.....max. num. of species
     integer,parameter:: nismax= 9
 !.....max. num. of boundary-particles
-    integer,parameter:: nbmax = 4000
+    integer,parameter:: nbmax = 5000
 !.....max. num. of neighbors
     integer,parameter:: nnmax = 200
 
