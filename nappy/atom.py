@@ -25,7 +25,7 @@ class atom(object):
         self.vel= np.array([x,y,z])
 
     def set_sid(self,sid):
-        self.sid= sid
+        self.sid= int(sid)
 
     def set_id(self,id):
         self.id= id

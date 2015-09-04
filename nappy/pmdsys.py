@@ -168,7 +168,7 @@ class pmdsys(object):
                                                           self.a3[1],\
                                                           self.a3[2]))
         # count num of atoms per specie
-        num_species= self._num_species()
+        num_species= self.num_species()
         for n in num_species:
             f.write(' {0:4d}'.format(n))
         f.write('\n')
@@ -181,7 +181,7 @@ class pmdsys(object):
                 ai.pos[0],ai.pos[1],ai.pos[2]))
         f.close()
 
-    def _num_species(self):
+    def num_species(self):
         num_species= []
         max_nsp= 0
         for ai in self.atoms:

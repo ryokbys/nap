@@ -1,21 +1,19 @@
-#!/bin/env python
+#!/usr/bin/env python
 """
-Calculate the radial distribution function from *akr* files.
+Calculate the radial distribution function (RDF) from *akr* files.
 Ensemble averaging about atoms in a file and about files are taken.
 
 Usage:
-    radial_distribution.py [options] INFILE [INFILE...]
+    rdf.py [options] IDSRC IDDST INFILE [INFILE...]
+
+IDSRC is the species-ID of atoms to be an origin of RDF,
+IDDST is the species-ID of atoms to be searched around IDSRC.
+Zero for IDSRC and IDDST means any species is taken into account.
 
 Options:
     -h, --help  Show this help message and exit.
     -d DR       Width of the bin. [default: 0.1]
     -r RMAX     Cutoff radius of radial distribution. [default: 5.0]
-    --src-sid=IDSRC
-                Species-ID of source atoms to be selected.
-                Zero means all the species will be selected. [default: 0]
-    --dst-sid=IDDST
-                Species-ID of source atoms to be selected.
-                Zero means all the species will be selected. [default: 0]
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
     -p          Plot a graph on the screen. [default: False]
@@ -35,27 +33,9 @@ def norm(vector):
         norm += e*e
     return np.sqrt(norm)
 
-def read_akr(fname):
-    h=np.zeros((3,3),dtype=float)
-    f=open(fname,'r')
-    hunit= float(f.readline())
-    h[0,0:3]= [ float(x) for x in f.readline().split() ]
-    h[1,0:3]= [ float(x) for x in f.readline().split() ]
-    h[2,0:3]= [ float(x) for x in f.readline().split() ]
-    natm= int(f.readline().split()[0])
-    isp= np.zeros((natm,),dtype=int)
-    ra= np.zeros((natm,3),dtype=float)
-    for ia in range(natm):
-        data= f.readline().split()
-        isp[ia]= int(data[0])
-        ra[ia,0]= float(data[1])
-        ra[ia,1]= float(data[2])
-        ra[ia,2]= float(data[3])
-    f.close()
-    return hunit,h,natm,isp,ra
-
-def compute_ndr(ia,dr,rmax,asys):
+def compute_ndr(ia,dr,rmax,asys,iddst=0):
     """
+    Compute number of atoms in the every shell [r:r+dr] up to *rmax*.
     This routine can be only applied to cubic systems.
     """
     nr= int(rmax/dr) +1
@@ -64,6 +44,8 @@ def compute_ndr(ia,dr,rmax,asys):
     ri= asys.atoms[ia].pos
     for ja in range(natm):
         if ja == ia:
+            continue
+        if iddst != 0 and asys.atoms[ja].sid != iddst:
             continue
         r1= asys.atoms[ja].pos[0] -ri[0]
         r2= asys.atoms[ja].pos[1] -ri[1]
@@ -86,13 +68,12 @@ def compute_ndr(ia,dr,rmax,asys):
         ndr[ir]= ndr[ir] +1
     return ndr
 
-def gr_of_file(infname,dr,rmax):
+def gr_of_file(infname,dr,rmax,idsrc=0,iddst=0):
 
     if not os.path.exists(infname):
         print "[Error] file does not exist !!!"
-        exit()
-    asys= pmdsys()
-    asys.read_akr(infname)
+        sys.exit()
+    asys= pmdsys(fname=infname)
     natm0= asys.num_atoms()
 
     #.....expand system if the cell size smaller than 2*rmax
@@ -101,7 +82,11 @@ def gr_of_file(infname,dr,rmax):
     a3norm= norm(asys.a1*asys.alc)
     print ' norm a1,a2,a3=',a1norm,a2norm,a3norm
     vol0= a1norm*a2norm*a3norm
-    rho= float(natm0)/vol0
+    if iddst == 0:
+        rho= float(natm0)/vol0
+    else:
+        num_species= asys.num_species()
+        rho= float(num_species[iddst-1])/vol0
     print " natm,vol,rho=",natm0,vol0,rho
     if a1norm/(2.0*rmax) < 1.0 or a2norm/(2.0*rmax) < 1.0 \
        or a3norm/(2.0*rmax) < 1.0:
@@ -120,20 +105,20 @@ def gr_of_file(infname,dr,rmax):
     nadr= [0.0 for n in range(nr)]
     rd= [ dr*ir for ir in range(nr) ]
     for ia in range(natm0):
-        #print "ia=",ia
-        ndr= compute_ndr(ia,dr,rmax,asys)
-        for ir in range(nr):
-            nadr[ir]= nadr[ir] +ndr[ir]
+        if idsrc==0 or asys.atoms[ia].sid==idsrc:
+            ndr= compute_ndr(ia,dr,rmax,asys,iddst)
+            for ir in range(nr):
+                nadr[ir]= nadr[ir] +ndr[ir]
     for ir in range(1,nr):
         r= dr *ir
         nadr[ir]= float(nadr[ir])/(4.0*np.pi*rho*r*r*dr)/natm0
     return rd,nadr
 
-def gr_file_average(infiles,dr,rmax):
+def gr_file_average(infiles,dr,rmax,idsrc=0,iddst=0):
     agr= np.zeros(nr,dtype=float)
     for infname in infiles:
         print ' infname=',infname
-        rd,gr= gr_of_file(infname,dr,rmax)
+        rd,gr= gr_of_file(infname,dr,rmax,idsrc,iddst)
         agr += gr
     agr /= len(infiles)
     return rd,agr
@@ -145,15 +130,15 @@ if __name__ == "__main__":
     args= docopt(__doc__)
     
     infiles= args['INFILE']
-    idsrc= int(args['--src-sid'])
-    iddst= int(args['--dst-sid'])
+    idsrc= int(args['IDSRC'])
+    iddst= int(args['IDDST'])
     dr= float(args['-d'])
     rmax= float(args['-r'])
     flag_plot= args['-p']
     sigma= int(args['--gsmear'])
 
     nr= int(rmax/dr) +1
-    rd,agr= gr_file_average(infiles,dr,rmax)
+    rd,agr= gr_file_average(infiles,dr,rmax,idsrc,iddst)
 
     if not sigma == 0:
         rd,agr= gsmear(rd,agr,sigma)
