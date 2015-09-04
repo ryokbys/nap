@@ -26,21 +26,24 @@ from atom import atom
 
 #...constants
 _maxnn= 40
+_formats= ('pmd','akr','POSCAR')
 
 class pmdsys(object):
     """
     Contains cell information and atoms, and provides some functionalities.
     """
 
-    def __init__(self,fname=None,format=None):
+    def __init__(self,fname=None,ffmt=None):
         self.a1= np.zeros(3)
         self.a2= np.zeros(3)
         self.a3= np.zeros(3)
         self.atoms= []
-        if not format == None:
-            ftype= format
+
+        if ffmt in _formats:
+            ftype= ffmt
         else:
             ftype= self.parse_fname(fname)
+
         if ftype == 'pmd':
             self.read_pmd(fname)
         elif ftype == 'akr':
@@ -163,8 +166,11 @@ class pmdsys(object):
         f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(self.a3[0],\
                                                           self.a3[1],\
                                                           self.a3[2]))
-        # num of atoms
-        f.write(' {0:5d}\n'.format(self.num_atoms()))
+        # count num of atoms per specie
+        num_species= self._num_species()
+        for n in num_species:
+            f.write(' {0:4d}'.format(n))
+        f.write('\n')
         # comments
         f.write('Selective dynamics\n')
         f.write('Direct\n')
@@ -173,6 +179,17 @@ class pmdsys(object):
             f.write(' {0:15.7f} {1:15.7f} {2:15.7f} T T T\n'.format(
                 ai.pos[0],ai.pos[1],ai.pos[2]))
         f.close()
+
+    def _num_species(self):
+        num_species= []
+        max_nsp= 0
+        for ai in self.atoms:
+            max_nsp= max(max_nsp,ai.sid)
+        for i in range(max_nsp):
+            num_species.append(0)
+        for ai in self.atoms:
+            num_species[ai.sid-1] += 1
+        return num_species
 
     def read_akr(self,fname='akr0000'):
         f=open(fname,'r')
@@ -374,7 +391,7 @@ if __name__ == "__main__":
     infname= args['INFILE']
     outfname= args['OUTFILE']
 
-    psys= pmdsys(fname=infname,format=infmt)
+    psys= pmdsys(fname=infname,ffmt=infmt)
 
     if not outfmt == None:
         outfmt= psys.parse_fname(outfname)
