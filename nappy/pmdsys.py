@@ -252,8 +252,8 @@ class pmdsys(object):
         h[1]= self.a2 *self.alc
         h[2]= self.a3 *self.alc
         hi= np.linalg.inv(h)
-        print h
-        print hi
+        # print h
+        # print hi
         lcx= int(1.0/math.sqrt(hi[0,0]**2 +hi[0,1]**2 +hi[0,2]**2)/rcut)
         lcy= int(1.0/math.sqrt(hi[1,0]**2 +hi[1,1]**2 +hi[1,2]**2)/rcut)
         lcz= int(1.0/math.sqrt(hi[2,0]**2 +hi[2,1]**2 +hi[2,2]**2)/rcut)
@@ -272,8 +272,8 @@ class pmdsys(object):
         lshd= np.zeros((lcxyz,),dtype=int)
         lscl[:]= -1
         lshd[:]= -1
-        print 'lcx,lcy,lcz=',lcx,lcy,lcz
-        print 'rcx,rcy,rcz=',rcx,rcy,rcz
+        # print 'lcx,lcy,lcz=',lcx,lcy,lcz
+        # print 'rcx,rcy,rcz=',rcx,rcy,rcz
 
         #...make a linked-cell list
         for i in range(len(self.atoms)):
@@ -296,8 +296,8 @@ class pmdsys(object):
         #     self.lspr.append([])
             
         for ia in range(len(self.atoms)):
-            if ia % 10000 == 0:
-                print 'ia=',ia
+            # if ia % 10000 == 0:
+            #     print 'ia=',ia
             ai= self.atoms[ia]
             pi= ai.pos
             mx= int(pi[0]*rcxi)

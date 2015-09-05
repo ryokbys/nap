@@ -147,10 +147,10 @@ if __name__ == "__main__":
         plt.plot(rd, agr, '-', linewidth=1)
         plt.show()
         
-    outfile= open('out.radial_distribution','w')
+    outfile= open('out.rdf','w')
     for i in range(nr):
         outfile.write(' {0:10.4f} {1:15.7f}\n'.format(rd[i],agr[i]))
     outfile.close()
 
     print '{0:=^72}'.format(' OUTPUT ')
-    print ' * out.radial_distribution'
+    print ' * out.rdf'
