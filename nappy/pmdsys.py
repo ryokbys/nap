@@ -25,7 +25,7 @@ from datetime import datetime
 from atom import atom
 
 #...constants
-_maxnn= 40
+_maxnn= 100
 _formats= ('pmd','akr','POSCAR')
 
 class pmdsys(object):
@@ -83,6 +83,8 @@ class pmdsys(object):
     def num_atoms(self):
         return len(self.atoms)
 
+    def volume(self):
+        return self.alc**3 *np.abs(np.dot(self.a1,np.cross(self.a2,self.a3)))
 
     def read_pmd(self,fname='pmd0000'):
         f=open(fname,'r')
@@ -272,12 +274,13 @@ class pmdsys(object):
         lshd= np.zeros((lcxyz,),dtype=int)
         lscl[:]= -1
         lshd[:]= -1
-        # print 'lcx,lcy,lcz=',lcx,lcy,lcz
+        # print 'lcx,lcy,lcz,lcxyz=',lcx,lcy,lcz,lcxyz
         # print 'rcx,rcy,rcz=',rcx,rcy,rcz
 
         #...make a linked-cell list
         for i in range(len(self.atoms)):
             pi= self.atoms[i].pos
+            # print pi
             #...assign a vector cell index
             mx= int(pi[0]*rcxi)
             my= int(pi[1]*rcyi)
@@ -331,9 +334,10 @@ class pmdsys(object):
         aj= self.atoms[ja]
         pj= aj.pos
         xij= pj-pi
-        xij[0] =self._pbc(xij[0])
-        xij[1] =self._pbc(xij[1])
-        xij[2] =self._pbc(xij[2])
+        xij= xij -np.round(xij)
+        # xij[0] =self._pbc(xij[0])
+        # xij[1] =self._pbc(xij[1])
+        # xij[2] =self._pbc(xij[2])
         rij= np.dot(h,xij)
         rij2= rij[0]**2 +rij[1]**2 +rij[2]**2
         if rij2 < rc2:
@@ -347,12 +351,36 @@ class pmdsys(object):
         self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2)
 
     def _pbc(self,x):
-        if x <= -0.5:
+        if x < 0.:
             return x +1.0
-        elif x >   0.5:
+        elif x >= 1.0:
             return x -1.0
         else:
             return x
+
+    def assign_pbc(self):
+        for ai in self.atoms:
+            ai.pos[0]= self._pbc(ai.pos[0])
+            ai.pos[1]= self._pbc(ai.pos[1])
+            ai.pos[2]= self._pbc(ai.pos[2])
+
+    def get_expansion_num(self,length):
+        """
+        Compute expansion digits along a1, a2, and a3 from a given *length*.
+        System size should be larger than the *length*.
+        """
+        h= np.zeros((3,3),dtype=np.float)
+        h[0]= self.a1 *self.alc
+        h[1]= self.a2 *self.alc
+        h[2]= self.a3 *self.alc
+        vol= np.abs(np.dot(h[0],np.cross(h[1],h[2])))
+        l1= np.abs(vol/(np.linalg.norm(np.cross(h[1],h[2]))))
+        l2= np.abs(vol/(np.linalg.norm(np.cross(h[2],h[0]))))
+        l3= np.abs(vol/(np.linalg.norm(np.cross(h[0],h[1]))))
+        n1= int(np.ceil(length/l1))
+        n2= int(np.ceil(length/l2))
+        n3= int(np.ceil(length/l3))
+        return n1,n2,n3
 
     def expand(self,n1,n2,n3):
         #...expand unit vectors

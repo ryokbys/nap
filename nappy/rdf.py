@@ -14,6 +14,7 @@ Options:
     -h, --help  Show this help message and exit.
     -d DR       Width of the bin. [default: 0.1]
     -r RMAX     Cutoff radius of radial distribution. [default: 5.0]
+    -s FMT      Input file format. If is not *akr*, users must specify it. [default: akr]
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
     -p          Plot a graph on the screen. [default: False]
@@ -39,60 +40,36 @@ def compute_ndr(ia,dr,rmax,asys,iddst=0):
     This routine can be only applied to cubic systems.
     """
     nr= int(rmax/dr) +1
-    ndr= [0 for n in range(nr)]
+    ndr= np.zeros(nr,dtype=np.int)
     natm= asys.num_atoms()
-    ri= asys.atoms[ia].pos
+    hmat= (asys.alc *np.array([asys.a1,asys.a2,asys.a3])).transpose()
+    pi= asys.atoms[ia].pos
     for ja in range(natm):
         if ja == ia:
             continue
         if iddst != 0 and asys.atoms[ja].sid != iddst:
             continue
-        r1= asys.atoms[ja].pos[0] -ri[0]
-        r2= asys.atoms[ja].pos[1] -ri[1]
-        r3= asys.atoms[ja].pos[2] -ri[2]
-        #print ia,ja,ra[ia][0:3],ra[ja][0:3]
-        r1= (r1 -round(r1))
-        r2= (r2 -round(r2))
-        r3= (r3 -round(r3))
-        rx= asys.alc*(r1*asys.a1[0] +r2*asys.a2[0] +r3*asys.a3[0])
-        ry= asys.alc*(r1*asys.a1[1] +r2*asys.a2[1] +r3*asys.a3[1])
-        rz= asys.alc*(r1*asys.a1[2] +r2*asys.a2[2] +r3*asys.a3[2])
-        rr2= rx*rx +ry*ry +rz*rz
-        rr= np.sqrt(rr2)
+        pj= asys.atoms[ja].pos
+        pij= pj -pi
+        pij= pij -np.round(pij)
+        vij= np.dot(hmat,pij)
+        rij2= np.dot(vij,vij)
+        rij= np.sqrt(rij2)
         #print ia,ja,rx,ry,rz,rr,r
-        if rr >= rmax+dr/2:
+        if rij >= rmax+dr/2:
             continue
-        rrdr= rr/dr
+        rrdr= rij/dr
         ir= int(round(rrdr))
         #print "ia,ja,rr,rx,ry,rz,ir=",ia,ja,rr,rx,ry,rz,ir
         ndr[ir]= ndr[ir] +1
     return ndr
 
-def gr_of_file(infname,dr,rmax,idsrc=0,iddst=0):
+def rdf(asys,dr,rmax,idsrc=0,iddst=0):
 
-    if not os.path.exists(infname):
-        print "[Error] file does not exist !!!"
-        sys.exit()
-    asys= pmdsys(fname=infname)
     natm0= asys.num_atoms()
 
-    #.....expand system if the cell size smaller than 2*rmax
-    a1norm= norm(asys.a1*asys.alc)
-    a2norm= norm(asys.a1*asys.alc)
-    a3norm= norm(asys.a1*asys.alc)
-    print ' norm a1,a2,a3=',a1norm,a2norm,a3norm
-    vol0= a1norm*a2norm*a3norm
-    if iddst == 0:
-        rho= float(natm0)/vol0
-    else:
-        num_species= asys.num_species()
-        rho= float(num_species[iddst-1])/vol0
-    print " natm,vol,rho=",natm0,vol0,rho
-    if a1norm/(2.0*rmax) < 1.0 or a2norm/(2.0*rmax) < 1.0 \
-       or a3norm/(2.0*rmax) < 1.0:
-        n1= int(2.0*rmax/a1norm)+1
-        n2= int(2.0*rmax/a1norm)+1
-        n3= int(2.0*rmax/a1norm)+1
+    n1,n2,n3= asys.get_expansion_num(2.0*rmax)
+    if not (n1==1 and n2==1 and n3==1):
         print ' system to be expanded, n1,n2,n3=',n1,n2,n3
         asys.expand(n1,n2,n3)
     print ' a1=',asys.a1
@@ -109,16 +86,32 @@ def gr_of_file(infname,dr,rmax,idsrc=0,iddst=0):
             ndr= compute_ndr(ia,dr,rmax,asys,iddst)
             for ir in range(nr):
                 nadr[ir]= nadr[ir] +ndr[ir]
+    #...compute rho
+    vol= asys.volume()
+    # n=0
+    # if iddst==0:
+    #     n= asys.num_atoms()
+    # else:
+    #     nspecies= asys.num_species()
+    #     n= nspecies[iddst-1]
+    n= asys.num_atoms()
+    rho= float(n)/vol
+    #...normalize
     for ir in range(1,nr):
         r= dr *ir
         nadr[ir]= float(nadr[ir])/(4.0*np.pi*rho*r*r*dr)/natm0
     return rd,nadr
 
-def gr_file_average(infiles,dr,rmax,idsrc=0,iddst=0):
+def gr_file_average(infiles,ffmt='akr',dr=0.1,rmax=3.0,
+                    idsrc=0,iddst=0):
     agr= np.zeros(nr,dtype=float)
     for infname in infiles:
+        if not os.path.exists(infname):
+            print "[Error] File, {0}, does not exist !!!".format(infname)
+            sys.exit()
+        asys= pmdsys(fname=infname,ffmt=ffmt)
         print ' infname=',infname
-        rd,gr= gr_of_file(infname,dr,rmax,idsrc,iddst)
+        rd,gr= rdf(asys,dr,rmax,idsrc,iddst)
         agr += gr
     agr /= len(infiles)
     return rd,agr
@@ -136,9 +129,11 @@ if __name__ == "__main__":
     rmax= float(args['-r'])
     flag_plot= args['-p']
     sigma= int(args['--gsmear'])
+    ffmt= args['-s']
 
     nr= int(rmax/dr) +1
-    rd,agr= gr_file_average(infiles,dr,rmax,idsrc,iddst)
+    rd,agr= gr_file_average(infiles,ffmt=ffmt,dr=dr,rmax=rmax,
+                            idsrc=idsrc,iddst=iddst)
 
     if not sigma == 0:
         rd,agr= gsmear(rd,agr,sigma)

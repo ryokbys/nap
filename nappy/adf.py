@@ -72,7 +72,10 @@ def ndang(ia,dang,rcut,asys,id1=0,id2=0):
                 continue
             rik= np.sqrt(rik2)
             cs= np.dot(vij,vik)/rij/rik
-            rad= np.arccos(cs)
+            if cs <= -1.0:
+                rad= np.pi
+            else:
+                rad= np.arccos(cs)
             deg= rad/np.pi *180.0
             nda[int(deg/dang)] += 1
     return nda
@@ -81,22 +84,14 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
 
     natm0= asys.num_atoms()
 
-    #.....expand system if the cell size smaller than 2*rcut
-    a1norm= norm(asys.a1*asys.alc)
-    a2norm= norm(asys.a1*asys.alc)
-    a3norm= norm(asys.a1*asys.alc)
-    print ' norm a1,a2,a3=',a1norm,a2norm,a3norm
-    vol0= a1norm*a2norm*a3norm
-    if a1norm/(2.0*rcut) < 1.0 or a2norm/(2.0*rcut) < 1.0 \
-       or a3norm/(2.0*rcut) < 1.0:
-        n1= int(2.0*rcut/a1norm)+1
-        n2= int(2.0*rcut/a1norm)+1
-        n3= int(2.0*rcut/a1norm)+1
+    n1,n2,n3= asys.get_expansion_num(2.0*rcut)
+    if not (n1==1 and n2==1 and n3==1):
         print ' system to be expanded, n1,n2,n3=',n1,n2,n3
         asys.expand(n1,n2,n3)
     print ' a1=',asys.a1
     print ' a2=',asys.a2
     print ' a3=',asys.a3
+    asys.assign_pbc()
 
     print ' making pair list...'
     asys.make_pair_list(rcut=rcut)
