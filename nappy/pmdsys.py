@@ -256,9 +256,12 @@ class pmdsys(object):
         hi= np.linalg.inv(h)
         # print h
         # print hi
-        lcx= int(1.0/math.sqrt(hi[0,0]**2 +hi[0,1]**2 +hi[0,2]**2)/rcut)
-        lcy= int(1.0/math.sqrt(hi[1,0]**2 +hi[1,1]**2 +hi[1,2]**2)/rcut)
-        lcz= int(1.0/math.sqrt(hi[2,0]**2 +hi[2,1]**2 +hi[2,2]**2)/rcut)
+        # lcx= int(1.0/math.sqrt(hi[0,0]**2 +hi[0,1]**2 +hi[0,2]**2)/rcut)
+        # lcy= int(1.0/math.sqrt(hi[1,0]**2 +hi[1,1]**2 +hi[1,2]**2)/rcut)
+        # lcz= int(1.0/math.sqrt(hi[2,0]**2 +hi[2,1]**2 +hi[2,2]**2)/rcut)
+        lcx= int(1.0/math.sqrt(hi[0,0]**2 +hi[1,0]**2 +hi[2,0]**2)/rcut)
+        lcy= int(1.0/math.sqrt(hi[0,1]**2 +hi[1,1]**2 +hi[2,1]**2)/rcut)
+        lcz= int(1.0/math.sqrt(hi[0,2]**2 +hi[1,2]**2 +hi[2,2]**2)/rcut)
         if lcx == 0: lcx= 1
         if lcy == 0: lcy= 1
         if lcz == 0: lcz= 1
@@ -286,7 +289,7 @@ class pmdsys(object):
             my= int(pi[1]*rcyi)
             mz= int(pi[2]*rczi)
             m= mx*lcyz +my*lcz +mz
-            # print i,mx,my,mz,m
+            # print i,pi,mx,my,mz,m
             lscl[i]= lshd[m]
             lshd[m]= i
 
@@ -331,22 +334,22 @@ class pmdsys(object):
     def scan_j_in_cell(self,ia,pi,ja,lscl,h,rc2):
         if ja == ia: ja = lscl[ja]
         if ja == -1: return 0
-        aj= self.atoms[ja]
-        pj= aj.pos
-        xij= pj-pi
-        xij= xij -np.round(xij)
-        # xij[0] =self._pbc(xij[0])
-        # xij[1] =self._pbc(xij[1])
-        # xij[2] =self._pbc(xij[2])
-        rij= np.dot(h,xij)
-        rij2= rij[0]**2 +rij[1]**2 +rij[2]**2
-        if rij2 < rc2:
-            n= self.nlspr[ia]
-            self.lspr[ia,n]= ja
-            self.nlspr[ia] += 1
-            if self.nlspr[ia] >= _maxnn:
-                print ' [Error] self.nlspr[{0}] >= _maxnn !!!'.format(ia)
-                sys.exit()
+        if not ja in self.lspr[ia]:
+            aj= self.atoms[ja]
+            pj= aj.pos
+            xij= pj-pi
+            xij= xij -np.round(xij)
+            rij= np.dot(h,xij)
+            rij2= rij[0]**2 +rij[1]**2 +rij[2]**2
+            if rij2 < rc2:
+                n= self.nlspr[ia]
+                self.lspr[ia,n]= ja
+                self.nlspr[ia] += 1
+                if self.nlspr[ia] >= _maxnn:
+                    print ' [Error] self.nlspr[{0}] >= _maxnn !!!'.format(ia)
+                    print self.nlspr[ia]
+                    print self.lspr[ia]
+                    sys.exit()
         ja= lscl[ja]
         self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2)
 

@@ -43,6 +43,9 @@ def ndang(ia,dang,rcut,asys,id1=0,id2=0):
     natm= asys.num_atoms()
     rcut2= rcut*rcut
     pi= asys.atoms[ia].pos
+    # if ia==2:
+    #     print asys.nlspr[ia]
+    #     print asys.lspr[ia]
     for ji in range(asys.nlspr[ia]):
         ja= asys.lspr[ia,ji]
         if ja == ia:
@@ -77,6 +80,7 @@ def ndang(ia,dang,rcut,asys,id1=0,id2=0):
             else:
                 rad= np.arccos(cs)
             deg= rad/np.pi *180.0
+            # print ia,ja,ka,deg
             nda[int(deg/dang)] += 1
     return nda
 
@@ -93,7 +97,6 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
     print ' a3=',asys.a3
     asys.assign_pbc()
 
-    print ' making pair list...'
     asys.make_pair_list(rcut=rcut)
 
     natme= asys.num_atoms()
@@ -106,8 +109,11 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
         if id0==0 or asys.atoms[ia].sid==id0:
             nsum += 1
             nda= ndang(ia,dang,rcut,asys,id1,id2)
+            # print 'ia=',ia
+            # print nda
             for iang in range(na):
                 anda[iang]= anda[iang] +nda[iang]
+    # print 'nsum=',nsum
     anda /= nsum
     return angd,anda
 
