@@ -94,7 +94,7 @@ if __name__ == '__main__':
     else:
         print ' loading {0}...'.format(yafname)
         with open(yafname,'r') as f:
-            loaded= yaml.load(Y)
+            loaded= yaml.load(f)
         Y= np.array(loaded)
     
     #...Get the list of cluster info
@@ -116,4 +116,4 @@ if __name__ == '__main__':
     with open('out.selected','w') as f:
         for dir in selected:
             f.write(' {0}\n'.format(dir))
-    print 'done.'
+    print ' done.'
