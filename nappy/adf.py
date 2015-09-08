@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Calculate the angular distribution function (ADF) from files.
-Ensemble averaging about atoms in a file and about files are taken.
+Ensemble averaging over atoms in a file or files are taken.
 
 Usage:
     adf.py [options] ID0 ID1 ID2 INFILE [INFILE...]
@@ -33,7 +33,7 @@ def norm(vector):
         norm += e*e
     return np.sqrt(norm)
 
-def ndang(ia,dang,rcut,asys,id1=0,id2=0):
+def adf_atom(ia,dang,rcut,asys,id1=0,id2=0):
     """
     Compute number of atoms in the every range of angle [0:180].
     """
@@ -108,29 +108,32 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
     for ia in range(natm0):
         if id0==0 or asys.atoms[ia].sid==id0:
             nsum += 1
-            nda= ndang(ia,dang,rcut,asys,id1,id2)
+            adfa= adf_atom(ia,dang,rcut,asys,id1,id2)
             # print 'ia=',ia
-            # print nda
+            # print adfa
             for iang in range(na):
-                anda[iang]= anda[iang] +nda[iang]
+                anda[iang]= anda[iang] +adfa[iang]
     # print 'nsum=',nsum
-    anda /= nsum
-    return angd,anda
+    # anda /= nsum
+    return angd,anda,nsum
 
 def adf_file_average(infiles,ffmt='akr',dang=1.0,rcut=3.0,
                      id0=0,id1=0,id2=0):
     na= int(180.0/dang) +1
     df= np.zeros(na,dtype=float)
     aadf= np.zeros(na,dtype=float)
+    nsum= 0
     for infname in infiles:
         if not os.path.exists(infname):
             print "[Error] File, {0}, does not exist !!!".format(infname)
             sys.exit()
         asys= pmdsys(fname=infname,ffmt=ffmt)
         print ' infname=',infname
-        angd,df= adf(asys,dang,rcut,id0,id1,id2)
+        angd,df,n= adf(asys,dang,rcut,id0,id1,id2)
         aadf += df
-    aadf /= len(infiles)
+        nsum += n
+    #aadf /= len(infiles)
+    aadf /= nsum
     return angd,aadf
 
 ################################################## main routine
