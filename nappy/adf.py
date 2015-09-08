@@ -16,6 +16,7 @@ Options:
     -s FMT      Input file format. If is not *akr*, users must specify it. [default: akr]
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
+    -o OUT      Output file name [default: out.adf]
     -p          Plot a graph on the screen. [default: False]
 """
 
@@ -152,6 +153,7 @@ if __name__ == "__main__":
     flag_plot= args['-p']
     sigma= int(args['--gsmear'])
     ffmt= args['-s']
+    ofname= args['-o']
 
     na= int(180.0/dang) +1
     angd,agr= adf_file_average(infiles,ffmt=ffmt,dang=dang,
@@ -164,10 +166,7 @@ if __name__ == "__main__":
         plt.plot(angd, agr, '-', linewidth=1)
         plt.show()
         
-    outfile= open('out.adf','w')
+    outfile= open(ofname,'w')
     for i in range(na):
         outfile.write(' {0:10.4f} {1:15.7f}\n'.format(angd[i],agr[i]))
     outfile.close()
-
-    print '{0:=^72}'.format(' OUTPUT ')
-    print ' * out.adf'

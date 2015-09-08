@@ -17,6 +17,7 @@ Options:
     -s FMT      Input file format. If is not *akr*, users must specify it. [default: akr]
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
+    -o OUT      Output file name. [default: out.rdf]
     -p          Plot a graph on the screen. [default: False]
 """
 
@@ -130,6 +131,7 @@ if __name__ == "__main__":
     flag_plot= args['-p']
     sigma= int(args['--gsmear'])
     ffmt= args['-s']
+    ofname= args['-o']
 
     nr= int(rmax/dr) +1
     rd,agr= gr_file_average(infiles,ffmt=ffmt,dr=dr,rmax=rmax,
@@ -142,10 +144,7 @@ if __name__ == "__main__":
         plt.plot(rd, agr, '-', linewidth=1)
         plt.show()
         
-    outfile= open('out.rdf','w')
+    outfile= open(ofname,'w')
     for i in range(nr):
         outfile.write(' {0:10.4f} {1:15.7f}\n'.format(rd[i],agr[i]))
     outfile.close()
-
-    print '{0:=^72}'.format(' OUTPUT ')
-    print ' * out.rdf'
