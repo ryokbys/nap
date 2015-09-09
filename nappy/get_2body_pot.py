@@ -10,8 +10,8 @@ import os,sys,math,copy
 import optparse
 import numpy as np
 
-from atom import atom
-from pmdsys import pmdsys
+from atom import Atom
+from pmdsys import PMDSystem
 
 ################################################# Functions ############
 def get_epot(fname='out.pmd'):
@@ -74,7 +74,7 @@ sid2= options.sid2
 print ' sid2          = ',sid2
 pmdexec= options.pmdexec
 
-asys= pmdsys()
+asys= PMDSystem()
 # system size is bigger than 2*rcut
 a1= np.array([2.0, 0.0, 0.0])
 a2= np.array([0.0, 1.0, 0.0])
@@ -82,8 +82,8 @@ a3= np.array([0.0, 0.0, 1.0])
 alc= rcut
 asys.set_lattice(alc,a1,a2,a3)
 
-atom1= atom()
-atom2= atom()
+atom1= Atom()
+atom2= Atom()
 atom1.set_pos(0.0,0.0,0.0)
 atom1.set_id(1)
 atom1.set_sid(sid1)

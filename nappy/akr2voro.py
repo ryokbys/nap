@@ -1,11 +1,11 @@
 #!/bin/env python
 
 import sys,os
-from pmdsys import pmdsys
+from pmdsys import PMDSystem
 
 infname= sys.argv[1]
 print 'input file: ',infname
-aSys= pmdsys()
+aSys= PMDSystem()
 aSys.read_akr(infname)
 natm= len(aSys.atoms)
 

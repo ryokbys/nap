@@ -25,7 +25,7 @@ import os,sys
 import numpy as np
 import matplotlib.pyplot as plt
 from docopt import docopt
-from pmdsys import pmdsys
+from pmdsys import PMDSystem
 from gaussian_smear import gsmear
 
 
@@ -110,7 +110,7 @@ def gr_file_average(infiles,ffmt='akr',dr=0.1,rmax=3.0,
         if not os.path.exists(infname):
             print "[Error] File, {0}, does not exist !!!".format(infname)
             sys.exit()
-        asys= pmdsys(fname=infname,ffmt=ffmt)
+        asys= PMDSystem(fname=infname,ffmt=ffmt)
         print ' infname=',infname
         rd,gr= rdf(asys,dr,rmax,idsrc,iddst)
         agr += gr

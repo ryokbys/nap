@@ -16,19 +16,20 @@ Options:
                 Format of the output file. [default: None]
 """
 
-import numpy as np
 import math
 import sys,copy
-from docopt import docopt
 from datetime import datetime
 
-from atom import atom
+import numpy as np
+from docopt import docopt
+
+from atom import Atom
 
 #...constants
 _maxnn= 100
 _formats= ('pmd','akr','POSCAR')
 
-class pmdsys(object):
+class PMDSystem(object):
     """
     Contains cell information and atoms, and provides some functionalities.
     """
@@ -109,7 +110,7 @@ class pmdsys(object):
         self.atoms= []
         for i in range(natm):
             data= [float(x) for x in f.readline().split()]
-            ai= atom()
+            ai= Atom()
             ai.decode_tag(data[0])
             ai.set_pos(data[1],data[2],data[3])
             ai.set_vel(data[4],data[5],data[6])
@@ -210,7 +211,7 @@ class pmdsys(object):
         self.atoms= []
         for i in range(natm):
             data= [float(x) for x in f.readline().split()]
-            ai= atom()
+            ai= Atom()
             ai.set_sid(data[0])
             ai.set_pos(data[1],data[2],data[3])
             ai.set_vel(data[4],data[5],data[6])
@@ -403,7 +404,7 @@ class pmdsys(object):
                 for i3 in range(n3):
                     for ai0 in atoms0:
                         aid += 1
-                        ai= atom()
+                        ai= Atom()
                         ai.sid= ai0.sid
                         ai.ifmv= ai0.ifmv
                         x= ai0.pos[0]/n1 +1.0/n1*i1
@@ -423,7 +424,7 @@ if __name__ == "__main__":
     infname= args['INFILE']
     outfname= args['OUTFILE']
 
-    psys= pmdsys(fname=infname,ffmt=infmt)
+    psys= PMDSystem(fname=infname,ffmt=infmt)
 
     if not outfmt == None:
         outfmt= psys.parse_fname(outfname)

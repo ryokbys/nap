@@ -41,21 +41,22 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
 import numpy as np
 from docopt import docopt
 from pymatgen.io.vaspio.vasp_output import Vasprun
-from pmdsys import pmdsys
-from atom import atom
+
+from pmdsys import PMDSystem
+from atom import Atom
 
 
 
 def structure2aSys(structure,idoffset=1):
     """
-    Converts Structure object of pymatgen to pmdsys object in nap.
+    Converts Structure object of pymatgen to PMDSystem object in nap.
 
     Args:
         structure (Structure): pymatgen Structure object to be converted
-        to pmdsys object..
+        to PMDSystem object..
 
     Returns:
-        aSys (pmdsys): 
+        aSys (PMDSystem): 
     """
     lattice= structure.lattice
     alc= lattice.a
@@ -66,10 +67,10 @@ def structure2aSys(structure,idoffset=1):
     a1= a1/alc
     a2= a2/alc
     a3= a3/alc
-    aSys= pmdsys()
+    aSys= PMDSystem()
     aSys.set_lattice(alc,a1,a2,a3)
     for ia in range(structure.num_sites):
-        ai= atom()
+        ai= Atom()
         si= structure[ia]
         crd= si.frac_coords
         ai.set_pos(crd[0],crd[1],crd[2])
