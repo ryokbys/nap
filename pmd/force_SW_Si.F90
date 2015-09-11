@@ -135,27 +135,31 @@ contains
         voli= 1d0/vol
         if( j.le.natm ) then
           do ixyz=1,3
+            drij= -xij(ixyz)*riji
             tmp= 0.5d0*(-df2*drij)
             do jxyz=1,3
               strs(ixyz,jxyz,i)= strs(ixyz,jxyz,i) &
                    -xij(jxyz)*tmp*voli
               strs(ixyz,jxyz,j)= strs(ixyz,jxyz,j) &
                    -xij(jxyz)*tmp*voli
-!!$              write(6,'(a,3i5,2es12.4)') 'i,ixyz,jxyz,vol,val='&
-!!$                   ,i,ixyz,jxyz,vol,-xij(jxyz)*tmp*voli
+!!$              write(6,'(a,4i5,2es12.4)') 'i,j,ixyz,jxyz,vol,val='&
+!!$                   ,i,j,ixyz,jxyz,vol,-xij(jxyz)*tmp*voli
             enddo
           enddo
-!!$          write(6,'(i6,9f10.3)') i,strs(1:3,1:3,i)
         else
           do ixyz=1,3
+            drij= -xij(ixyz)*riji
             tmp= 0.5d0*(-df2*drij)
             do jxyz=1,3
               strs(ixyz,jxyz,i)= strs(ixyz,jxyz,i) &
                    -xij(jxyz)*tmp*voli
+!!$              write(6,'(a,4i5,2es12.4)') 'i,j,ixyz,jxyz,vol,val='&
+!!$                   ,i,j,ixyz,jxyz,vol,-xij(jxyz)*tmp*voli
             enddo
           enddo
         endif
       enddo
+!!$      write(6,'(i6,9f10.3)') i,strs(1:3,1:3,i)
     enddo
 
 !-----3 body term
