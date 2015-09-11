@@ -63,23 +63,26 @@ def compute_ndr(ia,dr,rmax,asys,iddst=0):
         ir= int(round(rrdr))
         #print "ia,ja,rr,rx,ry,rz,ir=",ia,ja,rr,rx,ry,rz,ir
         ndr[ir]= ndr[ir] +1
+        #print 'ia,ja,rij,ir,ndr[ir]=',ia,ja,rij,ir,ndr[ir]
     return ndr
 
 def rdf(asys,dr,rmax,idsrc=0,iddst=0):
 
     natm0= asys.num_atoms()
+    vol= asys.volume()
+    rho= float(natm0)/vol
 
     n1,n2,n3= asys.get_expansion_num(2.0*rmax)
     if not (n1==1 and n2==1 and n3==1):
         print ' system to be expanded, n1,n2,n3=',n1,n2,n3
         asys.expand(n1,n2,n3)
-    print ' a1=',asys.a1
-    print ' a2=',asys.a2
-    print ' a3=',asys.a3
+    # print ' a1=',asys.a1
+    # print ' a2=',asys.a2
+    # print ' a3=',asys.a3
 
     natme= asys.num_atoms()
     nr= int(rmax/dr)+1
-    print " rmax,dr,nr=",rmax,dr,nr
+    # print " rmax,dr,nr=",rmax,dr,nr
     nadr= [0.0 for n in range(nr)]
     rd= [ dr*ir for ir in range(nr) ]
     for ia in range(natm0):
@@ -87,34 +90,28 @@ def rdf(asys,dr,rmax,idsrc=0,iddst=0):
             ndr= compute_ndr(ia,dr,rmax,asys,iddst)
             for ir in range(nr):
                 nadr[ir]= nadr[ir] +ndr[ir]
-    #...compute rho
-    vol= asys.volume()
-    # n=0
-    # if iddst==0:
-    #     n= asys.num_atoms()
-    # else:
-    #     nspecies= asys.num_species()
-    #     n= nspecies[iddst-1]
-    n= asys.num_atoms()
-    rho= float(n)/vol
     #...normalize
     for ir in range(1,nr):
         r= dr *ir
-        nadr[ir]= float(nadr[ir])/(4.0*np.pi*rho*r*r*dr)/natm0
-    return rd,nadr
+        nadr[ir]= float(nadr[ir])/(4.0*np.pi*rho*r*r*dr)
+    return rd,nadr,natm0
 
-def gr_file_average(infiles,ffmt='akr',dr=0.1,rmax=3.0,
-                    idsrc=0,iddst=0):
+def rdf_average(infiles,ffmt='akr',dr=0.1,rmax=3.0,
+                idsrc=0,iddst=0):
     agr= np.zeros(nr,dtype=float)
+    nsum= 0
     for infname in infiles:
         if not os.path.exists(infname):
             print "[Error] File, {0}, does not exist !!!".format(infname)
             sys.exit()
         asys= PMDSystem(fname=infname,ffmt=ffmt)
         print ' infname=',infname
-        rd,gr= rdf(asys,dr,rmax,idsrc,iddst)
+        rd,gr,n= rdf(asys,dr,rmax,idsrc,iddst)
+        nsum += n
         agr += gr
-    agr /= len(infiles)
+    # agr /= len(infiles)
+    #print ' nsum=',nsum
+    agr /= nsum
     return rd,agr
 
 ################################################## main routine
@@ -134,8 +131,8 @@ if __name__ == "__main__":
     ofname= args['-o']
 
     nr= int(rmax/dr) +1
-    rd,agr= gr_file_average(infiles,ffmt=ffmt,dr=dr,rmax=rmax,
-                            idsrc=idsrc,iddst=iddst)
+    rd,agr= rdf_average(infiles,ffmt=ffmt,dr=dr,rmax=rmax,
+                        idsrc=idsrc,iddst=iddst)
 
     if not sigma == 0:
         rd,agr= gsmear(rd,agr,sigma)
