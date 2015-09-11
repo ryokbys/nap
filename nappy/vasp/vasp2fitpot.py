@@ -59,7 +59,7 @@ def structure2aSys(structure,idoffset=1):
         aSys (PMDSystem): 
     """
     lattice= structure.lattice
-    alc= lattice.a
+    alc= 1.0
     a1= np.array(lattice.matrix[0])
     a2= np.array(lattice.matrix[1])
     a3= np.array(lattice.matrix[2])
