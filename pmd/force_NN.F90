@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-08-08 14:03:28 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-09-11 15:03:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -77,7 +77,7 @@ contains
          ,lspr,gsf,dgsf,rc)
 
 #ifdef __FITPOT__
-    open(80,file='out.NN.gsf',status='replace',form='binary')
+    open(80,file='out.NN.gsf',status='replace',form='unformatted')
     write(80) nhl(0)
     do ia=1,natm
       write(80) (gsf(ihl0,ia),ihl0=1,nhl(0))
@@ -889,7 +889,7 @@ contains
       enddo
     enddo
 !.....write
-    open(ionum,file='out.NN.dgsf',status='replace',form='binary')
+    open(ionum,file='out.NN.dgsf',status='replace',form='unformatted')
     do ia=1,natm
       do isf=1,nsf
         write(ionum) (dgsfo(1:3,jra,isf,ia),jra=1,natm)

@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-03-14 11:04:41 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-09-11 15:04:45 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -1121,7 +1121,7 @@ contains
       cdir= samples(ismpl)%cdirname
       !.....gsf
       open(21,file=trim(cmaindir)//'/'//cdir//'/smd/out.NN.gsf'&
-           ,status='old',form='binary')
+           ,status='old',form='unformatted')
       read(21) itmp
       do ia=1,natm
         read(21) (sds(ismpl)%gsf(ia,ihl0),ihl0=1,nhl(0))
@@ -1129,7 +1129,7 @@ contains
       close(21)
       !.....dgsf
       open(22,file=trim(cmaindir)//'/'//cdir//'/smd/out.NN.dgsf'&
-           ,status='old',form='binary')
+           ,status='old',form='unformatted')
       do ia=1,natm
         do ihl0=1,nhl(0)
           read(22) (sds(ismpl)%dgsf(1:3,ja,ia,ihl0),ja=1,natm)

@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2015-02-09 18:01:12 Ryo KOBAYASHI>
+c                        Time-stamp: <2015-09-11 15:02:11 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -1661,7 +1661,7 @@ c.....Acceralation of h-matrix
         do ixyz=1,3
           do kxyz=1,3
             ah(ixyz,jxyz)=ah(ixyz,jxyz)
-     &           -ptnsr(ixyz,kxyz)*sgm(kxyz,jxyz)
+     &           +ptnsr(ixyz,kxyz)*sgm(kxyz,jxyz)
           enddo
         enddo
       enddo
