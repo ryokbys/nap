@@ -688,8 +688,9 @@ subroutine write_energy_relation(cadd)
                ,epotg(ismpl),cdirlist(ismpl) &
                ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
         else
-          write(90,'(2es15.7,2x,a)') erefg(ismpl) &
-               ,epotg(ismpl),cdirlist(ismpl)
+          write(90,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
+               ,epotg(ismpl),cdirlist(ismpl) &
+               ,abs(erefg(ismpl)-epotg(ismpl))
         endif
       else if( iclist(ismpl).eq.2 ) then
         if( lswgt ) then
@@ -697,8 +698,9 @@ subroutine write_energy_relation(cadd)
                ,epotg(ismpl),cdirlist(ismpl) &
                ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
         else
-          write(91,'(2es15.7,2x,a)') erefg(ismpl) &
-               ,epotg(ismpl),cdirlist(ismpl)
+          write(91,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
+               ,epotg(ismpl),cdirlist(ismpl) &
+               ,abs(erefg(ismpl)-epotg(ismpl))
         endif
 !!$        write(91,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
 !!$             ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)
@@ -753,18 +755,20 @@ subroutine write_force_relation(cadd)
         natm= nalist(ismpl)
         do ia=1,natm
           do ixyz=1,3
-            write(92,'(2es15.7,2x,a,i6,i3)') frefg(ixyz,ia,ismpl) &
+            write(92,'(2es15.7,2x,a,i6,i3,es15.7)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
-                 ,cdirlist(ismpl),ia,ixyz
+                 ,cdirlist(ismpl),ia,ixyz &
+                 ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))
           enddo
         enddo
       else if( iclist(ismpl).eq.2 ) then
         natm= nalist(ismpl)
         do ia=1,natm
           do ixyz=1,3
-            write(93,'(2es15.7,2x,a,i6,i3)') frefg(ixyz,ia,ismpl) &
+            write(93,'(2es15.7,2x,a,i6,i3,es15.7)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
-                 ,cdirlist(ismpl),ia,ixyz
+                 ,cdirlist(ismpl),ia,ixyz &
+                 ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))
           enddo
         enddo
       endif
