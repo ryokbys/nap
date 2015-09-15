@@ -118,8 +118,8 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
     # anda /= nsum
     return angd,anda,nsum
 
-def adf_file_average(infiles,ffmt='akr',dang=1.0,rcut=3.0,
-                     id0=0,id1=0,id2=0):
+def adf_average(infiles,ffmt='akr',dang=1.0,rcut=3.0,
+                id0=0,id1=0,id2=0):
     na= int(180.0/dang) +1
     df= np.zeros(na,dtype=float)
     aadf= np.zeros(na,dtype=float)
@@ -156,8 +156,8 @@ if __name__ == "__main__":
     ofname= args['-o']
 
     na= int(180.0/dang) +1
-    angd,agr= adf_file_average(infiles,ffmt=ffmt,dang=dang,
-                               rcut=rcut,id0=id0,id1=id1,id2=id2)
+    angd,agr= adf_average(infiles,ffmt=ffmt,dang=dang,
+                          rcut=rcut,id0=id0,id1=id1,id2=id2)
 
     if not sigma == 0:
         angd,agr= gsmear(angd,agr,sigma)
