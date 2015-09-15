@@ -116,7 +116,7 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
                 anda[iang]= anda[iang] +adfa[iang]
     # print 'nsum=',nsum
     # anda /= nsum
-    return angd,anda,nsum
+    return angd,anda,natm0
 
 def adf_average(infiles,ffmt='akr',dang=1.0,rcut=3.0,
                 id0=0,id1=0,id2=0):
