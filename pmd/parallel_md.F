@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2015-09-11 15:02:11 Ryo KOBAYASHI>
+c                        Time-stamp: <2015-09-18 09:20:32 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -221,29 +221,17 @@ c-----calc kinetic energy
 c.....get_num_dof is called once in a MD run
       call get_num_dof()
 
-      if( ifpctl.ne.0 ) then
-        if( ifpctl.eq.1 ) then
-          if(myid_md.eq.0) write(6,'(a,f10.2,a,es12.4,a)')
-     &         ' target pressure = ',ptgt,' GPa, ',ptgt*gpa2up,' eV/A^3'
-          stgt(1:3,1:3)= 0d0
-          stgt(1,1)= ptgt
-          stgt(2,2)= ptgt
-          stgt(3,3)= ptgt
-        elseif( ifpctl.eq.2 ) then
-          if(myid_md.eq.0) then
-            write(6,'(a,f10.2,a,es12.4,a)')
-     &           ' target stress in GPa:'
-            write(6,'(5x,3es14.4)') stgt(1,1:3)
-            write(6,'(5x,3es14.4)') stgt(2,1:3)
-            write(6,'(5x,3es14.4)') stgt(3,1:3)
-          endif
-        endif
+      if( trim(cpctl).eq.'Berendsen' ) then
+        if(myid_md.eq.0) write(6,'(a,f10.2,a,es12.4,a)')
+     &       ' target pressure = ',ptgt,' GPa, ',ptgt*gpa2up,' eV/A^3'
+        stgt(1:3,1:3)= 0d0
+        stgt(1,1)= ptgt
+        stgt(2,2)= ptgt
+        stgt(3,3)= ptgt
         stgt(1:3,1:3)= stgt(1:3,1:3) *gpa2up
-c.....Parrinello-Rahman Isobaric
-        vm= am(1)*vmcoeff
       endif
-      call force_isobaric(stgt,ah,natm,eki,strs,sgm,vm,vol,avol
-     &     ,ptnsr,mpi_md_world)
+      call force_isobaric(stgt,ah,natm,eki,strs,sgm
+     &     ,dt,srlx,stbeta,vol,avol,ptnsr,mpi_md_world,cpctl)
       if( myid_md.eq.0 ) then
         write(6,'(a)') ' ptnsr in GPa:'
         write(6,'(9f10.5)') ptnsr(1:3,1:3) *up2gpa
@@ -259,6 +247,7 @@ c.....Considering vmax==0d0, make istpe small only for the first step
 c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
 
       if(myid_md.eq.0) then
+        write(6,*) ''
         write(6,'(1x,a)') "initial values:"
         write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
         write(6,'(1x,a,es22.14,a)') " potential energy=",epot0,' eV'
@@ -275,7 +264,7 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
         tave= tave/nave
         write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
 
-        if( ifpctl.ne.0 ) then
+        if( trim(cpctl).eq.'Berendsen' ) then
           write(6,'(a,i8,2f10.2,2es11.3)')
      &         " istp,time,temp,vol,prss="
      &         ,istp,tcpu,tave,vol
@@ -287,6 +276,7 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
         endif
         write(6,'(a)') ' stress tensor in GPa:'
         write(6,'(3f15.7)') ptnsr(1:3,1:3) *up2gpa
+        write(6,*) ''
       endif
 
 c-----initialize the counter for output
@@ -369,12 +359,6 @@ c-------multiply fmv or damping
           va(1:3,i)=va(1:3,i) *fmv(1:3,l)
         enddo
 
-c.....isobaric
-        if( ifpctl.ne.0 ) then
-          h(1:3,1:3,1)=h(1:3,1:3,1) +ah(1:3,1:3)*dt/2
-          h(1:3,1:3,1)=h(1:3,1:3,1)*voldmp
-        endif
-
 c-------update positions
         ra(1:3,1:natm)=ra(1:3,1:natm) +va(1:3,1:natm)
 
@@ -385,9 +369,10 @@ c-------update positions
           call zload_box(natm,nstp,istp,dt,strfin,strnow,h,myid_md)
         endif
 
-        if( ifpctl.ne.0 ) then
-c          write(6,'(a,9f10.3)') ' h(1:3,1:3,1)=',h(1:3,1:3,1)*dt
-          h(1:3,1:3,0)=h(1:3,1:3,0) +h(1:3,1:3,1)*dt
+        if( trim(cpctl).eq.'Berendsen' ) then
+c          write(6,'(a,9f10.3)') ' ah(1:3,1:3)=',ah(1:3,1:3,1)*dt
+c          h(1:3,1:3,0)= ah(1:3,1:3)*h(1:3,1:3,0)
+          h(1:3,1:3,0)= matmul(ah,h(1:3,1:3,0))
 c.....Reset matrices
           call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
         endif
@@ -477,25 +462,25 @@ c.....Calc kinetic energy
         call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki,ekl
      &       ,vmax,mpi_md_world)
 
-        if( ifpctl.ne.0 ) then
+        if( trim(cpctl).eq.'Berendsen' ) then
           call force_isobaric(stgt,ah,natm,eki,strs,sgm
-     &         ,vm,vol,avol,ptnsr,mpi_md_world)
-          h(1:3,1:3,1)=h(1:3,1:3,1) +ah(1:3,1:3)*dt/2
-          gg(1:3,1:3)= 0d0
-          do j=1,3
-            do i=1,3
-              do k=1,3
-                gg(i,j)=gg(i,j) +gi(i,k)*g(k,j,1)
-              enddo
-            enddo
-          enddo
-          do i=1,natm
-            do j=1,3
-              do k=1,3
-                aa(j,i)=aa(j,i) -gg(j,k)*va(k,i)
-              enddo
-            enddo
-          enddo
+     &         ,dt,srlx,stbeta,vol,avol,ptnsr,mpi_md_world,cpctl)
+c          h(1:3,1:3,1)=h(1:3,1:3,1) +ah(1:3,1:3)*dt/2
+c          gg(1:3,1:3)= 0d0
+c          do j=1,3
+c            do i=1,3
+c              do k=1,3
+c                gg(i,j)=gg(i,j) +gi(i,k)*g(k,j,1)
+c              enddo
+c            enddo
+c          enddo
+c          do i=1,natm
+c            do j=1,3
+c              do k=1,3
+c                aa(j,i)=aa(j,i) -gg(j,k)*va(k,i)
+c              enddo
+c            enddo
+c          enddo
         endif
 
 c-------temperature control by velocity scaling
@@ -573,13 +558,17 @@ c.....write temperature
 c---------output step, time, and temperature
           tcpu= mpi_wtime() -tcpu1
           if(myid_md.eq.0) then
-            if( ifpctl.ne.0 ) then
+            if( cpctl.eq.'Berendsen' ) then
               write(6,'(a,i8,2f10.2,2es11.3)')
      &             " istp,time,temp,vol,prss="
      &             ,istp,tcpu,tave,vol
      &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
-              write(6,'(a)') ' H-matrix:'
+              write(6,'(a,9f12.4)') ' h(1:3,1:3,0)=',h(1:3,1:3,0)
+              write(6,'(a)') ' H-matrix:' !,h(1:3,1:3,0)
               write(6,'(3f15.7)') h(1:3,1:3,0)
+              
+              write(6,'(a,9f12.4)') ' ptnsr(1:3,1:3):'
+     &             ,ptnsr(1:3,1:3)*up2gpa
               write(6,'(a)') ' Stress tensor in GPa:'
               write(6,'(3f15.7)') ptnsr(1:3,1:3) *up2gpa
             else
@@ -652,6 +641,7 @@ c.....reset pressure
 
       tcpu= tcpu2 -tcpu1
       if(myid_md.eq.0) then
+        write(6,*) ''
         write(6,'(1x,a)') "final values:"
         write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
         write(6,'(1x,a,es22.14,a)') " potential energy=",epot,' eV'
@@ -667,6 +657,7 @@ c.....reset pressure
         enddo
         tave= tave/nave
         write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
+        write(6,*) ''
         write(6,'(1x,a,2f10.2)') "time cpu & com=",tcpu,tcom
       endif
 
@@ -713,18 +704,12 @@ c.....temperature distribution
       write(6,'(2x,a25,i8)') 'num_temp_dist',ntdst
       write(6,'(2x,a)') ''
 c.....pressure control
-      if( ifpctl.ne.0 ) then
-        write(6,'(2x,a25,i8)') 'flag_isobaric',ifpctl
-        write(6,'(2x,a25,es11.3)') 'vol_mass_coeff',vmcoeff
-        write(6,'(2x,a25,f12.4)') 'vol_change_damping',voldmp
-        if( ifpctl.eq.1 ) then
-          write(6,'(2x,a25,es11.3)') 'pressure_target',ptgt
-        elseif( ifpctl.eq.2 ) then
-          write(6,'(2x,a)') 'stress_target:'
-          write(6,'(5x,3es11.3)') stgt(1,1:3)
-          write(6,'(5x,3es11.3)') stgt(2,1:3)
-          write(6,'(5x,3es11.3)') stgt(3,1:3)
-        endif
+      write(6,'(2x,a25,2x,a)') 'stress_control',cpctl
+      if( cpctl.eq.'Berendsen' ) then
+        write(6,'(2x,a)') 'stress_target:'
+        write(6,'(5x,3es11.3)') stgt(1,1:3)
+        write(6,'(5x,3es11.3)') stgt(2,1:3)
+        write(6,'(5x,3es11.3)') stgt(3,1:3)
         write(6,'(2x,a)') ''
       endif
 c.....strain control
@@ -768,11 +753,10 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(fmv,30,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(shrst,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(ifpctl,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(cpctl,20,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(ptgt,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(srlx,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(stgt,9,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(vmcoeff,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(voldmp,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(czload_type,5,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(am,nismax,mpi_double_precision,0,mpi_md_world,ierr)
@@ -1624,17 +1608,18 @@ c------------------------------------------------------------------------
       end function bmv
 c=======================================================================
       subroutine force_isobaric(stgt,ah,natm,eki,strs,sgm
-     &     ,vm,vol,avol,ptnsr,mpi_md_world)
+     &     ,dt,srlx,stbeta,vol,avol,ptnsr,mpi_md_world,cpctl)
 c
-c Calc. acceralation of h-matrix used in isobaric MD
-c using given stress tensor stgt.
+c  Calc. acceralation of h-matrix used in isobaric MD
+c  using given stress tensor stgt.
 c
       implicit none
       include "mpif.h"
       integer,intent(in):: natm,mpi_md_world
       real(8),intent(in):: stgt(3,3),eki(3,3,natm),strs(3,3,natm)
-     &     ,sgm(3,3),vm,vol,avol
+     &     ,sgm(3,3),dt,vol,avol,srlx,stbeta
       real(8),intent(out):: ah(3,3),ptnsr(3,3)
+      character(len=*):: cpctl
       
       integer:: i,ixyz,jxyz,kxyz,ierr
       real(8):: pt(3,3)
@@ -1654,20 +1639,15 @@ c
      &     ,mpi_md_world,ierr)
       ptnsr(1:3,1:3)=ptnsr(1:3,1:3)/vol
 
-c.....Acceralation of h-matrix
-      ah(1:3,1:3)= 0d0
-      ptnsr(1:3,1:3)= ptnsr(1:3,1:3) -stgt(1:3,1:3)
-      do jxyz=1,3
-        do ixyz=1,3
-          do kxyz=1,3
-            ah(ixyz,jxyz)=ah(ixyz,jxyz)
-     &           +ptnsr(ixyz,kxyz)*sgm(kxyz,jxyz)
-          enddo
-        enddo
-      enddo
-      ah(1:3,1:3)=ah(1:3,1:3)/vm
-c.....Restore ptnsr
-      ptnsr(1:3,1:3)= ptnsr(1:3,1:3) +stgt(1:3,1:3)
+      if( trim(cpctl).eq.'Berendsen' ) then
+c.....now ah is scaling factor for h-mat
+        ah(1:3,1:3)= 0d0
+        ah(1,1)= 1d0
+        ah(2,2)= 1d0
+        ah(3,3)= 1d0
+        ah(1:3,1:3)= ah(1:3,1:3)
+     &       -stbeta*dt/3/srlx*( stgt(1:3,1:3)-ptnsr(1:3,1:3) )
+      endif
 
       end subroutine force_isobaric
 c=======================================================================

@@ -121,14 +121,11 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
       elseif( trim(cname).eq.'stress_target' ) then
         call read_rs(ionum,ctmp,3,3,stgt(1:3,1:3))
         return
-      elseif( trim(cname).eq.'vol_mass_coeff' ) then
-        call read_r1(ionum,vmcoeff)
+      elseif( trim(cname).eq.'stress_relax_time' ) then
+        call read_r1(ionum,srlx)
         return
-      elseif( trim(cname).eq.'vol_change_damping' ) then
-        call read_r1(ionum,voldmp)
-        return
-      elseif( trim(cname).eq.'flag_isobaric' ) then
-        call read_i1(ionum,ifpctl)
+      elseif( trim(cname).eq.'stress_control' ) then
+        call read_c1(ionum,cpctl)
         return
       elseif( trim(cname).eq.'zload_type' ) then
         call read_c1(ionum,czload_type)

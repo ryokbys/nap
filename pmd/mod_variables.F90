@@ -1,6 +1,6 @@
   module variables
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-02-10 17:26:53 Ryo KOBAYASHI>
+!                        Time-stamp: <2015-09-17 22:42:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
     implicit none
     save
@@ -108,13 +108,13 @@
     real(8):: shrfx
 
 
-!.....Isobaric
-    integer:: ifpctl= 0 ! 0:no  1:Parrinello-Rahman  2:Andersen
+!.....Barostat
+    character(len=20):: cpctl='non'
     real(8):: ptgt   = 0d0
-    real(8):: vmcoeff= 1d0
-    real(8):: voldmp = 1d0
+    real(8):: srlx   = 100d0
+    real(8):: stbeta = 1d-1
     real(8):: stgt(1:3,1:3)= 0d0
-    real(8):: phyd,vm,ah(3,3),aht(3,3),ptnsr(3,3) &
+    real(8):: phyd,ah(3,3),aht(3,3),ptnsr(3,3) &
          ,g(3,3,0:1),gt(3,3,0:1),gi(3,3),gg(3,3)
     
   end module variables
