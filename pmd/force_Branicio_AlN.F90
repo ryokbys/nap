@@ -159,11 +159,16 @@ contains
       enddo
     enddo
 
+    if( myid.ge.0 ) then
 !-----send back (3-body) forces and potentials on immigrants
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,aa3,3)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,epi,1)
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_world,aa3,3)
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_world,epi,1)
+    else
+      call reduce_dba_bk(natm,namax,tag,aa3,3)
+      call reduce_dba_bk(natm,namax,tag,epi,1)
+    endif
 
 !-----sum
     aa(1:3,1:natm)= -aa2(1:3,1:natm) -aa3(1:3,1:natm)
@@ -182,21 +187,25 @@ contains
 !-----gather epot
     epot= 0d0
     epotl= epotl2 +epotl3
-    call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
-         ,MPI_SUM,mpi_world,ierr)
+    if( myid.ge.0 ) then
+      call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+           ,MPI_SUM,mpi_world,ierr)
+    else
+      epot= epotl
+    endif
 
-!-----get min bond length
-    tmp1= 1d10
-    do k=1,lspr(0,1)
-      j=lspr(k,1)
-      xi(1:3)= ra(1:3,j) -ra(1:3,1)
-      xij(1:3)= h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
-      rij= sqrt(xij(1)**2 +xij(2)**2 +xij(3)**2)
-      tmp1= min(tmp1,rij)
-    enddo
-!-----output lattice constant
-    vol= h(1,1)*h(2,2)*h(3,3) *0.529177d0**3
-    write(92,'(10es12.4)') tmp1*0.529177d0,vol/natm,epot/natm
+!!$!-----get min bond length
+!!$    tmp1= 1d10
+!!$    do k=1,lspr(0,1)
+!!$      j=lspr(k,1)
+!!$      xi(1:3)= ra(1:3,j) -ra(1:3,1)
+!!$      xij(1:3)= h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
+!!$      rij= sqrt(xij(1)**2 +xij(2)**2 +xij(3)**2)
+!!$      tmp1= min(tmp1,rij)
+!!$    enddo
+!!$!-----output lattice constant
+!!$    vol= h(1,1)*h(2,2)*h(3,3) *0.529177d0**3
+!!$    write(92,'(10es12.4)') tmp1*0.529177d0,vol/natm,epot/natm
 
   end subroutine force_Branicio_AlN
 !=======================================================================

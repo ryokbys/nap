@@ -57,9 +57,13 @@ contains
       enddo
     enddo
 
+    if( myid_md.ge.0 ) then
 !-----copy rho of boundary atoms
-    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
-         ,mpi_md_world,rho)
+      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
+           ,mpi_md_world,rho)
+    else
+      call distribute_dba(natm,namax,tag,rho,1)
+    endif
 
 !-----dE/dr_i
     do i=1,natm
@@ -112,8 +116,12 @@ contains
 
 !-----gather epot
     epot= 0d0
-    call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
-         ,MPI_SUM,mpi_md_world,ierr)
+    if( myid_md.ge.0 ) then
+      call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+           ,MPI_SUM,mpi_md_world,ierr)
+    else
+      epot= epotl
+    endif
 
 !      deallocate(sqrho)
   end subroutine force_Mishin_Al

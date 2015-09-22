@@ -25,7 +25,7 @@ MPIFLAGS= @FCFLAGS@
 
 pmd= read_input.o parallel_md.o util_vec.o util_rnd.o util_tag.o \
 	lasubs.o util_pmd.o zload.o mk_lspr.o common_parallel.o
-smd= read_input.o small_md.o util_vec.o util_rnd.o util_tag.o \
+smd= read_input.o small_md.o small_md_core.o util_vec.o util_rnd.o util_tag.o \
 	lasubs.o util_pmd.o mk_lspr.o common_parallel.o
 mods= mod_variables.o
 args= iargc.o getarg.o

@@ -3,7 +3,7 @@ module Ito3_WHe
 contains
   subroutine force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+       ,mpi_md_world,myid,epi,epot,nismax,acon,avol)
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ito's new potential for W and He (IWHe)
 !    - smoothing is applied to 2-body potential for W-He and He-He
@@ -19,7 +19,7 @@ contains
     include "params_Ito3_WHe.h"
     integer,intent(in):: namax,natm,nnmax,nismax
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_md_world,myid_md
+         ,nn(6),mpi_md_world,myid
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),rc,tag(namax)
@@ -39,15 +39,15 @@ contains
 !        write(6,'(a,es12.4)') ' Potential cutoff=',p_rl(2,2)
 !.....assuming fixed (constant) atomic volume (BCC)
       avol= alcfe**3 /2
-      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
+      if(myid.eq.0) write(6,'(a,es12.4)') ' avol =',avol
       l1st=.false.
 !.....check cutoff radius
-      if( myid_md.eq.0 ) then
+      if( myid.eq.0 ) then
         write(6,'(a,es12.4)') ' rc of input    =',rc
         write(6,'(a,es12.4)') ' rc of this pot =',rc_pot
       endif
       if( rc.lt.rc_pot ) then
-        if( myid_md.eq.0 ) write(6,'(a)') &
+        if( myid.eq.0 ) write(6,'(a)') &
              ' [get_force] rc.lt.rc_pot !!!'
         call mpi_finalize(ierr)
         stop
@@ -81,11 +81,16 @@ contains
       sqrho(i)= dsqrt(rho(i)+p_d)
     enddo
 
+    if( myid.ge.0 ) then
 !-----copy rho of boundary atoms
-    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
-         ,mpi_md_world,sqrho)
-    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
-         ,mpi_md_world,rho)
+      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
+           ,mpi_md_world,sqrho)
+      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
+           ,mpi_md_world,rho)
+    else
+      call distribute_dba(natm,namax,tag,sqrho,1)
+      call distribute_dba(natm,namax,tag,rho,1)
+    endif
 
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -155,9 +160,14 @@ contains
       endif
     enddo
 
+    if( myid.ge.0 ) then
 !-----copy strs of boundary atoms
-    call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
-         ,lsrc,myparity,nn,sv,mpi_md_world,strs)
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_md_world,strs,9)
+    else
+      call reduce_dba_bk(natm,namax,tag,strs,9)
+    endif
+
 !-----atomic level stress in [eV/Ang^3]
     do i=1,natm
       strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
@@ -177,8 +187,12 @@ contains
 
 !-----gather epot
     epot= 0d0
-    call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
-         ,MPI_SUM,mpi_md_world,ierr)
+    if( myid.ge.0 ) then
+      call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+           ,MPI_SUM,mpi_md_world,ierr)
+    else
+      epot= epotl
+    endif
 
 !      deallocate(sqrho)
   end subroutine force_Ito3_WHe
