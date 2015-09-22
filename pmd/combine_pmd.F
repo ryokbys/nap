@@ -71,7 +71,7 @@ c-------output file name
 c-------output combined mts-file
         open(30,file=fout,status="replace")
         write(30,'(es15.7)') hunit
-        write(30,'(3es15.7)') ((h(ia,ib,0)/hunit,ia=1,3),ib=1,3)
+        write(30,'(3es15.7)') ((h(ib,ia,0)/hunit,ia=1,3),ib=1,3)
         write(30,'(i10,3i4)') n, nauxdat, 0, 0
         do i=1,n
           write(30,'(i3,30es13.4e3)') int(dat(18,i)),dat(1:3,i)
