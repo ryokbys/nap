@@ -64,9 +64,13 @@ contains
       sqrho(i)= dsqrt(sqrho(i))
     enddo
 
+    if( myid_md.ge.0 ) then
 !-----copy rho of boundary atoms
-    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
-         ,mpi_md_world,sqrho)
+      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
+           ,mpi_md_world,sqrho)
+    else
+      call distribute_dba(natm,namax,tag,sqrho,1)
+    endif
 
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -126,9 +130,14 @@ contains
       epotl=epotl -p_W_A*sqrho(i)
     enddo
 
+    if( myid_md.ge.0 ) then
 !-----copy strs of boundary atoms
-    call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
-         ,lsrc,myparity,nn,sv,mpi_md_world,strs)
+      call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
+           ,lsrc,myparity,nn,sv,mpi_md_world,strs)
+    else
+      call reduce_dba_bk(natm,namax,tag,strs,9)
+    endif
+
 !-----atomic level stress in [eV/AA^3] assuming 1 Ang thick
     do i=1,natm
       strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
@@ -148,8 +157,12 @@ contains
 
 !-----gather epot
     epot= 0d0
-    call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
-         ,MPI_SUM,mpi_md_world,ierr)
+    if( myid_md.ge.0 ) then
+      call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+           ,MPI_SUM,mpi_md_world,ierr)
+    else
+      epot= epotl
+    endif
 
 !      deallocate(sqrho)
   end subroutine force_AFS_W

@@ -251,13 +251,19 @@ contains
       enddo
     enddo
 
+    if( myid.ge.0 ) then
 !-----send back (3-body) forces and potentials on immigrants
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,aa2,3)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,aa3,3)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,epi,1)
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_world,aa2,3)
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_world,aa3,3)
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_world,epi,1)
+    else
+      call reduce_dba_bk(natm,namax,tag,aa3,3)
+      call reduce_dba_bk(natm,namax,tag,aa2,3)
+      call reduce_dba_bk(natm,namax,tag,epi,1)
+    endif
 
 !-----sum
     aa(1:3,1:natm)= -aa2(1:3,1:natm) -aa3(1:3,1:natm)
@@ -276,8 +282,12 @@ contains
 !-----gather epot
     epot= 0d0
     epotl= epotl2 +epotl3
-    call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
-         ,MPI_SUM,mpi_world,ierr)
+    if( myid.ge.0 ) then
+      call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+           ,MPI_SUM,mpi_world,ierr)
+    else
+      epot= epotl
+    endif
 
   end subroutine force_EDIP_Si
 !=======================================================================

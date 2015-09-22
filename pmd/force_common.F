@@ -361,6 +361,26 @@ c-----------------------------------------------------------------------
 
       end subroutine reduce_dba_bk
 c=======================================================================
+      subroutine distribute_dba(natm,namax,tag,x,ndim)
+c-----------------------------------------------------------------------
+c  Distribute some values to the cached (boundary) atoms.
+c  This routine works only on small MD not on parallel version.
+c-----------------------------------------------------------------------
+      implicit none
+      integer,intent(in):: namax,natm,ndim
+      real(8),intent(in):: tag(namax)
+      real(8),intent(inout):: x(ndim,namax)
+      integer,external:: itotOf
+      integer:: ia,ja
+
+      do ia=natm+1,namax
+        if( tag(ia).lt.1d0 ) cycle
+        ja= itotOf(tag(ia))
+        x(1:ndim,ia)= x(1:ndim,ia)
+      enddo
+
+      end subroutine distribute_dba
+c=======================================================================
       function hvsd(x)
 c
 c  Heaviside's stepwise function

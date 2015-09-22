@@ -63,7 +63,7 @@ contains
       allocate(aa2(3,namax),aa3(3,namax))
       allocate(xi(3),xj(3),xk(3),xij(3),xik(3),at(3),bli(namax))
 !-------check rc
-      if( myid.eq.0 ) then
+      if( myid.le.0 ) then
         write(6,'(a,es12.4)') ' rc of input         =',rc
         write(6,'(a,es12.4)') ' rc of this potential=',swrc*swl
       endif
@@ -248,13 +248,18 @@ contains
     enddo
 
 !-----send back (3-body)forces, stresses, and potentials on immigrants
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,strs,9)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,aa3,3)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-         ,nn,mpi_world,epi,1)
-
+    if( myid.ge.0 ) then
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_world,strs,9)
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_world,aa3,3)
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_world,epi,1)
+    else
+      call reduce_dba_bk(natm,namax,tag,aa3,3)
+      call reduce_dba_bk(natm,namax,tag,strs,9)
+      call reduce_dba_bk(natm,namax,tag,epi,1)
+    endif
 !!$    write(6,'(a)') 'stresses:'
 !!$    do i=1,natm
 !!$      write(6,'(i6,9f10.3)') i,strs(1:3,1:3,i)
@@ -278,8 +283,12 @@ contains
 !-----gather epot
     epot= 0d0
     epotl= epotl2 +epotl3
-    call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
-         ,MPI_SUM,mpi_world,ierr)
+    if( myid.ge.0 ) then
+      call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+           ,MPI_SUM,mpi_world,ierr)
+    else
+      epot= epotl
+    endif
     return
 
   end subroutine force_SW_Si

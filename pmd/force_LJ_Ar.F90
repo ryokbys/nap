@@ -2,7 +2,7 @@ module LJ_Ar
 contains
   subroutine force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+       ,mpi_md_world,myid,epi,epot,nismax,acon,avol)
 !-----------------------------------------------------------------------
 !  Parallel implementation of LJ force calculation
 !    - only force on i is considered, no need to send back
@@ -14,7 +14,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax)
-    integer,intent(in):: mpi_md_world,myid_md
+    integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
          ,acon(nismax),tag(namax),sv(3,6)
     real(8),intent(inout):: tcom,avol
@@ -30,7 +30,7 @@ contains
     if( l1st ) then
 !.....assuming fixed atomic volume
       avol= alcar**3 /4
-      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
+      if(myid.eq.0) write(6,'(a,es12.4)') ' avol =',avol
 !.....prefactors
       vrc= 4d0 *epslj *((sgmlj/rc)**12 -(sgmlj/rc)**6)
       dvdrc=-24.d0 *epslj *( 2.d0*sgmlj**12/(rc**13) &
@@ -90,11 +90,13 @@ contains
       enddo
     enddo
 
-    if( myid_md.ge.0 ) then
-!-----copy strs of boundary atoms
-      call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
-           ,lsrc,myparity,nn,sv,mpi_md_world,strs)
+    if( myid.ge.0 ) then
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_md_world,strs,9)
+    else
+      call reduce_dba_bk(natm,namax,tag,strs,9)
     endif
+
 !-----atomic level stress in [eV/Ang^3] assuming 1 Ang thick
     do i=1,natm
       strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
@@ -113,7 +115,7 @@ contains
 
 !    print *, ' force_LJ_Ar 2'
 !-----gather epot
-    if( myid_md.ge.0 ) then
+    if( myid.ge.0 ) then
       epot= 0d0
       call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
            ,MPI_SUM,mpi_md_world,ierr)
