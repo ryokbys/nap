@@ -1,0 +1,13 @@
+{
+    "host": "localhost",
+    "port": 27017,
+    "user": "kobayashi",
+    "password": "k0b@y@sh1",
+    "database": "potential",
+    "collection": "Si.vasp",
+    "species_ids":
+    {
+	"Si":1,
+	"O":2
+    }
+}
