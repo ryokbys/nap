@@ -23,9 +23,12 @@ def calc_extention_ratio(hmat,rcut):
     a1= np.zeros(3)
     a2= np.zeros(3)
     a3= np.zeros(3)
-    a1[:]= hmat[:,0]
-    a2[:]= hmat[:,1]
-    a3[:]= hmat[:,2]
+    # a1[:]= hmat[:,0]
+    # a2[:]= hmat[:,1]
+    # a3[:]= hmat[:,2]
+    a1[:]= hmat[0,:]
+    a2[:]= hmat[1,:]
+    a3[:]= hmat[2,:]
     vol= abs(np.dot(a1,np.cross(a2,a3)))
     print ' vol of unit cell=',vol
     a23= np.cross(a2,a3)
@@ -44,7 +47,7 @@ def cart2h(vc,h):
     Convert Cartesian vector (x,y,z) to the vector reduced in hmat.
     """
     hi= np.linalg.inv(h)
-    vr= np.dot(hi,vc)
+    vr= np.dot(hi.T,vc)
     return vr
 
 ################################################ Main routine ##########
