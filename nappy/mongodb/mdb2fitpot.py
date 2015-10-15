@@ -28,6 +28,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
 from docopt import docopt
 from pymongo import MongoClient
 import json
+import yaml
 
 from pmdsys import PMDSystem
 from atom import Atom
@@ -105,13 +106,27 @@ def main(conf,dirname='sample',query='{}',offset=0):
         os.system('mkdir -p '+savedir)
         pos= doc_to_pos(doc,conf)
         pos.write_pmd(savedir+"/pos")
+        forces= doc['calculations'][-1]['output']['ionic_steps'][-1]['forces']
+        #...Reference energy output
         with open(savedir+'/erg.ref','w') as f:
             f.write(' {0}\n'.format(doc['output']['final_energy']))
+        #...Reference forces output
         with open(savedir+'/frc.ref','w') as g:
-            forces= doc['calculations'][-1]['output']['ionic_steps'][-1]['forces']
             g.write(' {0}\n'.format(doc['nsites']))
             for force in forces:
                 g.write(' {0:12.7f} {1:12.7f} {2:12.7f}\n'.format(force[0],force[1],force[2]))
+        #...DB information output in YAML format
+        with open(savedir+'/db_info.yaml','w') as f:
+            dbinfo= {}
+            dbinfo['db']= db.name
+            dbinfo['collection']= col.name
+            dbinfo['task_id']= doc['task_id']
+            dbinfo['dir_name']= doc['dir_name']
+            dbinfo['energy']= doc['output']['final_energy']
+            dbinfo['energy_per_atom']= doc['output']['final_energy_per_atom']
+            dbinfo['forces']= forces
+            unicode_to_ascii(dbinfo)
+            yaml.dump(dbinfo,f)
         print '.',
 
 
