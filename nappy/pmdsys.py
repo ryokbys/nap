@@ -50,6 +50,9 @@ class PMDSystem(object):
             self.read_pmd(fname)
         elif ftype == 'akr':
             self.read_akr(fname)
+        elif ftype == 'POSCAR':
+            self.read_POSCAR(fname)
+            
 
     @classmethod
     def parse_fname(self,fname):
@@ -154,6 +157,48 @@ class PMDSystem(object):
                     +"  {0:.1f}  {1:.1f}  {2:.1f}".format(0.0, 0.0, 0.0)
                     +"\n")
         f.close()
+
+    def read_POSCAR(self,fname='POSCAR'):
+        with open(fname,'r') as f:
+            # 1st line: comment
+            f.readline()
+            # 2nd: lattice constant
+            self.alc= float(f.readline().split()[0])
+            # 3rd-5th: cell vectors
+            self.a1= np.array([float(x) for x in f.readline().split()])
+            self.a2= np.array([float(x) for x in f.readline().split()])
+            self.a3= np.array([float(x) for x in f.readline().split()])
+            # 6th: species names or number of each species
+            buff= f.readline().split()
+            if not buff[0].isdigit():
+                buff= f.readline().split()
+            num_species= np.array([ int(n) for n in buff])
+            natm= 0
+            for n in num_species:
+                natm += n
+            #print("Number of atoms = {0:5d}".format(natm))
+            # 7th or 8th line: comment
+            c7= f.readline()
+            if c7[0] in ('s','S'):
+                c8= f.readline()
+            # Atom positions hereafter
+            self.atoms= []
+            for i in range(natm):
+                buff= f.readline().split()
+                ai= Atom()
+                sid= 1
+                m= 0
+                for n in num_species:
+                    m += n
+                    if i < m:
+                        break
+                    sid += 1
+                ai.set_sid(sid)
+                ai.set_pos(float(buff[0]),float(buff[1]),float(buff[2]))
+                ai.set_vel(0.0,0.0,0.0)
+                self.atoms.append(ai)
+                
+            
 
     def write_POSCAR(self,fname='POSCAR'):
         f=open(fname,'w')
