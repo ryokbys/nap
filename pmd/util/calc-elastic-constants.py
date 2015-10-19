@@ -96,6 +96,7 @@ if __name__ == '__main__':
     # logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
     ddlt= dltmax/niter
     for iter in range(-niter/2,niter/2+1):
+    #for iter in range(1,niter+1):
         #dlt= (ddlt*(iter+1))
         dlt= ddlt*iter
         dh= hmax*dlt
@@ -105,6 +106,7 @@ if __name__ == '__main__':
         replace_hmat(hmat)
         os.system(pmdexec+' > out.pmd')
         erg11= float(commands.getoutput("grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'"))
+
         #...orthorhombic volume-conserving strain for (C11-C12)
         hmat= np.copy(hmat0)
         hmat[0,0]= hmat[0,0] +dh
@@ -113,6 +115,7 @@ if __name__ == '__main__':
         replace_hmat(hmat)
         os.system(pmdexec+' > out.pmd')
         erg12= float(commands.getoutput("grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'"))
+
         #...monoclinic volume-conserving strain for C44
         hmat= np.copy(hmat0)
         hmat[0,1]= hmat[0,1] +dh/2

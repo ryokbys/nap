@@ -36,14 +36,14 @@ def get_displacement(r,theta,phi):
     dz= r*cos(theta)
     return np.array([dx,dy,dz])
 
-def make_random_poscars(fname='POSCAR',maxdis=0.05,
+def make_random_poscars(fname='POSCAR',maxdis=0.03,
                       nout=10,offset=0):
     """
     Make displaced POSCARs from non-displaced POSCAR file.
 
     *fname* = 'POSCAR'  (str)
         Name of the non-displaced original POSCAR file.
-    *maxdis* = 0.05  (float)
+    *maxdis* = 0.03  (float)
         Maximum displacement.
     *nout* = 10  (int)
         Number of displaced POSCAR files to be created.
@@ -73,7 +73,7 @@ def make_random_poscars(fname='POSCAR',maxdis=0.05,
         poscar.write(fname=fname+'-{0:03d}'.format(inc))
 
 
-def make_1disp_poscars(fname='POSCAR',maxdis=0.05,
+def make_1disp_poscars(fname='POSCAR',maxdis=0.03,
                        offset=0,idatom=0):
     """
     Make displaced POSCARs, in which only one atom is displaced,
@@ -81,7 +81,7 @@ def make_1disp_poscars(fname='POSCAR',maxdis=0.05,
 
     *fname* = 'POSCAR'  (str)
         Name of the non-displaced original POSCAR file.
-    *maxdis* = 0.05  (float)
+    *maxdis* = 0.03  (float)
         Maximum displacement.
     *offset* = 0  (int)
         Offset of the sequential POSCAR file names.
