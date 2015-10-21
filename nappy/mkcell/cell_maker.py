@@ -35,7 +35,7 @@ def make_sc(latconst=1.0):
     a2= np.array([ 0.0, 1.0, 0.0 ])
     a3= np.array([ 0.0, 0.0, 1.0 ])
     s.set_lattice(latconst,a1,a2,a3)
-    p(0.00, 0.00, 0.00)
+    p=[0.00, 0.00, 0.00]
     atom= Atom()
     atom.set_pos(p[0],p[1],p[2])
     atom.set_sid(1)
@@ -114,17 +114,11 @@ def make_hcp(latconst=1.0):
     s= PMDSystem()
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
-    a2= np.array([ 0.0, 1.0, 0.0 ])
-    a3= np.array([ 0.0, 0.0, 1.0 ])
+    a2= np.array([-0.5, np.sqrt(3.0)/2, 0.0 ])
+    a3= np.array([ 0.0, 0.0, 1.633 ])
     s.set_lattice(latconst,a1,a2,a3)
     positions=[(0.00, 0.00, 0.00),
-               (0.50, 0.50, 0.00),
-               (0.50, 0.00, 0.50),
-               (0.00, 0.50, 0.50),
-               (0.25, 0.25, 0.25),
-               (0.75, 0.75, 0.25),
-               (0.75, 0.25, 0.75),
-               (0.25, 0.75, 0.75)]
+               (1.0/3, 2.0/3, 0.50)]
     for p in positions:
         atom= Atom()
         atom.set_pos(p[0],p[1],p[2])
