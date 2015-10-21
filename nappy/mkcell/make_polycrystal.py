@@ -7,7 +7,7 @@ from random import random
 sys.path.append('../')
 from pmdsys import PMDSystem
 from atom import Atom
-import bravais_maker
+import cell_maker
 
 
 #...constants
@@ -243,7 +243,7 @@ if __name__ == '__main__':
         print 'angle=',ai
         gi= Grain(pi,ai)
         grains.append(gi)
-    uc= bravais_maker.make_bcc()
+    uc= cell_maker.make_bcc()
     #uc.alc= 3.204
     uc.alc= 2.8553
     # uc.write_pmd('uc0000')

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """
-Make typical crystalline structures in Bravais lattice.
+Make typical crystalline structures of conventional cell.
 
 Usage:
-  bravais_maker.py (sc|bcc|fcc|hcp|diamond) [options]
+  cell_maker.py (sc|bcc|fcc|hcp|diamond) [options]
 
 Options:
   -h, --help  Show this help message and exit.
@@ -27,7 +27,7 @@ from atom import Atom
 
 def make_sc(latconst=1.0):
     """
-    Make a Bravais cell of simple cubic structure.
+    Make a cell of simple cubic structure.
     """
     s= PMDSystem()
     #...lattice
@@ -44,7 +44,7 @@ def make_sc(latconst=1.0):
 
 def make_bcc(latconst=1.0):
     """
-    Make a Bravais cell of bcc structure.
+    Make a cell of bcc structure.
     """
     s= PMDSystem()
     #...lattice
@@ -63,7 +63,7 @@ def make_bcc(latconst=1.0):
 
 def make_fcc(latconst=1.0):
     """
-    Make a Bravais cell of fcc structure.
+    Make a cell of fcc structure.
     """
     s= PMDSystem()
     #...lattice
@@ -84,7 +84,7 @@ def make_fcc(latconst=1.0):
 
 def make_diamond(latconst=1.0):
     """
-    Make a Bravais cell of diamond structure.
+    Make a cell of diamond structure.
     """
     s= PMDSystem()
     #...lattice
@@ -109,7 +109,7 @@ def make_diamond(latconst=1.0):
 
 def make_hcp(latconst=1.0):
     """
-    Make a Bravais cell of hcp structure.
+    Make a cell of hcp structure.
     """
     s= PMDSystem()
     #...lattice
