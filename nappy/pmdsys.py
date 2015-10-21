@@ -17,7 +17,7 @@ Options:
 """
 
 import math
-import sys,copy
+import sys,copy,re
 from datetime import datetime
 
 import numpy as np
@@ -27,7 +27,7 @@ from atom import Atom
 
 #...constants
 _maxnn= 100
-_formats= ('pmd','akr','POSCAR')
+_file_formats= ('pmd','akr','POSCAR')
 
 class PMDSystem(object):
     """
@@ -40,35 +40,14 @@ class PMDSystem(object):
         self.a3= np.zeros(3)
         self.atoms= []
 
-        ftype= None
-        if ffmt in _formats:
-            ftype= ffmt
-        elif not fname == None:
-            ftype= self.parse_fname(fname)
-
-        if ftype == 'pmd':
-            self.read_pmd(fname)
-        elif ftype == 'akr':
-            self.read_akr(fname)
-        elif ftype == 'POSCAR':
-            self.read_POSCAR(fname)
-            
-
-    @classmethod
-    def parse_fname(self,fname):
-        """
-        Parse file type from the file name.
-        """
-        ftype= None
-        if 'pmd' in fname:
-            ftype= 'pmd'
-        elif 'akr' in fname:
-            ftype= 'akr'
-        elif 'POSCAR' in fname:
-            ftype= 'POSCAR'
-        if ftype == None:
-            print ' [warning] file type is unknown.'
-        return ftype
+        if not fname == None:
+            ftype= self.parse_filename(fname)
+            if ftype == 'pmd':
+                self.read_pmd(fname)
+            elif ftype == 'akr':
+                self.read_akr(fname)
+            elif ftype == 'POSCAR':
+                self.read_POSCAR(fname)
 
     def set_lattice(self,alc,a1,a2,a3):
         self.alc= alc
@@ -89,6 +68,24 @@ class PMDSystem(object):
 
     def volume(self):
         return self.alc**3 *np.abs(np.dot(self.a1,np.cross(self.a2,self.a3)))
+
+    def write(self,fname="pmd0000"):
+        ftype= self.parse_filename(fname)
+        if ftype == "pmd":
+            self.write_pmd(fname)
+        elif ftype == "akr":
+            self.write_akr(fname)
+        elif ftype == "POSCAR":
+            self.write_POSCAR(fname)
+
+    def read(self,fname="pmd0000"):
+        ftype= self.parse_filename(fname)
+        if ftype == "pmd":
+            self.read_pmd(fname)
+        elif ftype == "akr":
+            self.read_akr(fname)
+        elif ftype == "POSCAR":
+            self.read_POSCAR(fname)
 
     def read_pmd(self,fname='pmd0000'):
         f=open(fname,'r')
@@ -459,6 +456,12 @@ class PMDSystem(object):
                         ai.set_vel(ai0.vel[0],ai0.vel[1],ai0.vel[2])
                         ai.set_id(aid)
                         self.atoms.append(ai)
+
+    @classmethod
+    def parse_filename(self,filename):
+        for format in _file_formats:
+            if re.search(format,filename):
+                return format
         
 if __name__ == "__main__":
 
@@ -472,7 +475,7 @@ if __name__ == "__main__":
     psys= PMDSystem(fname=infname,ffmt=infmt)
 
     if not outfmt == None:
-        outfmt= psys.parse_fname(outfname)
+        outfmt= psys.parse_filename(outfname)
     
     if outfmt == 'pmd':
         psys.write_pmd(outfname)

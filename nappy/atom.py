@@ -19,10 +19,10 @@ class Atom(object):
         self.sid= 1
 
     def set_pos(self,x,y,z):
-        self.pos= np.array([x,y,z])
+        self.pos= np.array([x,y,z],dtype=float)
 
     def set_vel(self,x,y,z):
-        self.vel= np.array([x,y,z])
+        self.vel= np.array([x,y,z],dtype=float)
 
     def set_sid(self,sid):
         self.sid= int(sid)

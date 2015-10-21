@@ -4,11 +4,10 @@ import math,copy
 from math import cos,sin,sqrt
 from random import random
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__))
-                +'/../nappy')
-from AtomSystem import AtomSystem
-from Atom import Atom
-from UnitCellMaker import bccBravaisCell
+sys.path.append('../')
+from pmdsys import PMDSystem
+from atom import Atom
+import bravais_maker
 
 
 #...constants
@@ -244,7 +243,7 @@ if __name__ == '__main__':
         print 'angle=',ai
         gi= Grain(pi,ai)
         grains.append(gi)
-    uc= bccBravaisCell()
+    uc= bravais_maker.make_bcc()
     #uc.alc= 3.204
     uc.alc= 2.8553
     # uc.write_pmd('uc0000')
