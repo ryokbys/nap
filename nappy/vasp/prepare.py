@@ -13,6 +13,10 @@ Options:
   -p PITCH    PITCH of k in a direction. [default: 0.2]
   --spin-polarize
               Set spin polarization true.
+  --break-symmetry
+              Set to allow symmetry breakage.
+  --metal     Set metal flag True, and set ISMEAR=2,
+              otherwise ISMEAR=-5.
 """
 
 import math,optparse
@@ -27,7 +31,7 @@ __version__ = "0.1a"
 _SYSTEM='system made by prepare-vasp.py '+ __version__
 _metal= False
 _spin_polarized= False
-_symmetry= False
+_break_symmetry= False
 _INCAR_name= 'INCAR'
 _KPOINTS_name= 'KPOINTS'
 _KPOINTS_type= 'Monkhorst-Pack' # or 'Gamma'
@@ -81,10 +85,10 @@ def write_INCAR(fname,encut,nbands):
     else:
         file.write("ISPIN  = 1\n")
 
-    if _symmetry:
-        file.write("ISYM   = 2\n")
-    else:
+    if _break_symmetry:
         file.write("ISYM   = 0\n")
+    else:
+        file.write("ISYM   = 2\n")
 
     file.write("\n")
     file.write("ENCUT  = {0:7.3f}\n".format(encut))
@@ -114,38 +118,29 @@ def write_INCAR(fname,encut,nbands):
     
     file.write("NCORE   = {0:4d}\n".format(_NCORE)) 
     file.write("\n")
-    
     file.close()
+
+def check_POTCAR():
+    
+
+#=======================================================================
 
 if __name__ == '__main__':
 
     args= docopt(__doc__)
 
-    # parser= optparse.OptionParser(usage=_usage)
-    # parser.add_option("-p","--pitch",
-    #                   dest="pitch",
-    #                   type="float",
-    #                   default=0.2,
-    #                   help="pitch of k in a direction.")
-    # parser.add_option("-e","--even",
-    #                   action="store_true",
-    #                   dest="leven",
-    #                   default=False,
-    #                   help="flag to set number of k-points in a direction even.")
-
-    #(options,args)= parser.parse_args()
-    #pitch= options.pitch
-    #leven= options.leven
-
     pitch= float(args['-p'])
     leven= args['--even']
     _spin_polarized= args['--spin-polarize']
+    _break_symmetry= args['--break-symmetry']
+    _metal= args['--metal']
     poscar_fname= args['POSCAR']
 
     print ' Pitch of k points = {0:5.1f}'.format(pitch)
 
     poscar= POSCAR.POSCAR()
     poscar.read(poscar_fname)
+
     
     potcar= POTCAR.read_POTCAR()
     species= potcar['species']

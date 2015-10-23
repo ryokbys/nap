@@ -4,13 +4,27 @@ Calculate elastic constants, C11, C12, C44,
 Young's modulus, poison's ratio, and shear modulus,
 by static method which measures energy differences
 w.r.t. given strains.
+
+Usage:
+  elastic_constants.py [options]
+
+Options:
+  -h, --help  Show this help message and exit.
+  -n NITER    Number of points to be calculated. [default: 10]
+  -d DLTMAX   Max deviation of finite difference. [default: 0.01]
+  -p          Plot a graph on the screen.
+  --cmd=CMD   VASP execution command. [default: \"~/bin/vasp > out.vasp\"]
 """
 
 import sys,os,commands
 import numpy as np
-import optparse
+from docopt import docopt
 from scipy.optimize import curve_fit
-import matplotlib.pyplot as plt
+_no_pyplot=False
+try:
+    import matplotlib.pyplot as plt
+except:
+    _no_pyplot=True
 
 #...constants
 outfname='out.elastic-constants'
@@ -65,30 +79,37 @@ def quad_func(x,a,b):
 
 if __name__ == '__main__':
     
-    usage= '%prog [options]'
+    # usage= '%prog [options]'
+    # 
+    # parser= optparse.OptionParser(usage=usage)
+    # parser.add_option("-n",dest="niter",type="int",default=10,
+    #                   help="Number of points to be calculated.")
+    # parser.add_option("-d",dest="dltmax",type="float",default=0.01,
+    #                   help="Max deviation of finite difference..")
+    # parser.add_option("-p",action="store_true",
+    #                   dest="plot",default=False,
+    #                   help="Plot a graph on the screen.")
+    # parser.add_option("--cmd",dest="cmd",type="string",
+    #                   default='~/bin/vasp > out.vasp',
+    #                   help="vasp execution command")
+    # (options,args)= parser.parse_args()
+    # 
+    # if len(args) != 0:
+    #     print ' [Error] number of arguments wrong !!!'
+    #     print '  Usage: $ {0}'.format(args[0])
+    #     sys.exit()
+    # 
+    # niter= options.niter
+    # shows_graph= options.plot
+    # cmd= options.cmd
+    # dltmax= options.dltmax
 
-    parser= optparse.OptionParser(usage=usage)
-    parser.add_option("-n",dest="niter",type="int",default=10,
-                      help="Number of points to be calculated.")
-    parser.add_option("-d",dest="dltmax",type="float",default=0.01,
-                      help="Max deviation of finite difference..")
-    parser.add_option("-p",action="store_true",
-                      dest="plot",default=False,
-                      help="Plot a graph on the screen.")
-    parser.add_option("--cmd",dest="cmd",type="string",
-                      default='~/bin/vasp > out.vasp',
-                      help="vasp execution command")
-    (options,args)= parser.parse_args()
+    args= docopt(__doc__)
 
-    if len(args) != 0:
-        print ' [Error] number of arguments wrong !!!'
-        print '  Usage: $ {0}'.format(args[0])
-        sys.exit()
-
-    niter= options.niter
-    shows_graph= options.plot
-    cmd= options.cmd
-    dltmax= options.dltmax
+    niter= int(args['-n'])
+    dltmax= float['-d']
+    shows_graph= args['-p']
+    cmd= args['--cmd']
 
     al,hmat0,natm= read_POSCAR()
     hmax= np.max(hmat0)
