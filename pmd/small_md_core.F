@@ -97,10 +97,10 @@ c      enddo
      &     ,cforce)
       epot= epot0
 
-      print *,'aa:'
-      do ia=1,natm
-        print *, ia, aa(1:3,ia)
-      enddo
+c      print *,'aa:'
+c      do ia=1,natm
+c        write(6,'(i5,3es15.7)') ia, aa(1:3,ia)
+c      enddo
 
       call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki)
 c-----in case of 3D, <ekin> = 3/2 *NkT
@@ -162,14 +162,19 @@ c---------write pmd file for Akira
 
       enddo ! end of istp=1,nstp
 
-c.....convert accelerations to real the unit
+c.....convert accelerations to the real unit
       do ia=1,natm
         is= int(tag(ia))
-        at(1:3)= h(1:3,1,0)*aa(1,i)
-     &       +h(1:3,2,0)*aa(2,i)
-     &       +h(1:3,3,0)*aa(3,i)
+        at(1:3)= h(1:3,1,0)*aa(1,ia)
+     &       +h(1:3,2,0)*aa(2,ia)
+     &       +h(1:3,3,0)*aa(3,ia)
         aa(1:3,ia)= at(1:3)/acon(is)
       enddo
+
+c      print *,'aa:'
+c      do ia=1,natm
+c        write(6,'(i5,3es15.7)') ia, aa(1:3,ia)
+c      enddo
 
       if( iolevel.gt.0 ) then
         write(6,'(1x,a)') "final values:"
@@ -209,6 +214,7 @@ c-----prefactors for kinetic energy, FACK
 c        fack(i)= 0.5d0*am(i)/dt**2
         fack(i)= 0.5d0*(am(i)*amu2kg)/(dt*fs2s)**2 *ang2m**2 *j2ev
       enddo
+
 
       end subroutine setup
 c=======================================================================

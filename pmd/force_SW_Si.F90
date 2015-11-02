@@ -6,6 +6,8 @@ module SW_Si
   real(8),parameter:: sfac  = 1d0
 !.....number of parameters
   integer,parameter:: nprms = 10
+!.....Small enough value for some criterion
+  real(8),parameter:: eps = 1d-10
 
 !-----SW unit energy in eV
   real(8):: swe   = 2.1678d0
@@ -67,11 +69,12 @@ contains
         write(6,'(a,es12.4)') ' rc of input         =',rc
         write(6,'(a,es12.4)') ' rc of this potential=',swrc*swl
       endif
-      if( int(rc*100d0) &
-           .ne.int(swrc*swl*100d0) ) then
+      if( rc .lt. swrc*swl ) then
+!!$      if( int(rc*100d0) &
+!!$           .ne.int(swrc*swl*100d0) ) then
         if( myid.eq.0 ) then
           write(6,'(1x,a)') "!!! Cutoff radius is not appropriate !!!"
-          write(6,'(1x,a,es12.4)') "rc should be", swrc*swl
+          write(6,'(1x,a,es12.4)') "rc should be longer than ", swrc*swl
         endif
         call mpi_finalize(ierr)
         stop
