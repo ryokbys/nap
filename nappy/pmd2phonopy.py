@@ -11,9 +11,11 @@ Options:
     -c, --cutoff=CUTOFF
                 Cutoff radius of the interatomic potential used for
                 the calculation of forces. [default: 4.0]
-    --pmdexec=PMDEXEC
-                Execution-file path of the ``pmd`` executable.
-                [default: ~/src/nap/pmd/pmd]
+    --pmddir=PMDDIR
+                Path to where ``pmd`` executable exists.
+                [default: ~/src/nap/pmd/]
+    --exec=EXEC
+                Name of the executable. [default: pmd]
     -p, --plot  Show band graph with phonopy.
 """
 
@@ -64,7 +66,8 @@ if __name__ == "__main__":
 
     args= docopt(__doc__)
     rcut= float(args['--cutoff'])
-    pmdexec= args['--pmdexec']
+    pmddir= args['--pmddir']
+    execname= args['--exec']
     infname= args['PMDFILE']
     plot= args['--plot']
     #print(args)
@@ -100,11 +103,13 @@ if __name__ == "__main__":
         # Prepare pmd calculation
         psystmp= PMDSystem()
         psystmp.read_POSCAR(poscar)
-        os.system("mkdir -p {0}/0000".format(dname))
-        psystmp.write_pmd("{0}/0000/pmd00000".format(dname))
         os.system("cp in.* {0}/".format(dname))
-        # Perform pmd calculation
-        os.system("cd {0}/; {1} > out.pmd; cd ..".format(dname,pmdexec))
+        if execname == "pmd":
+            os.system("mkdir -p {0}/0000".format(dname))
+            psystmp.write_pmd("{0}/0000/pmd00000".format(dname))
+        elif execname == "smd":
+            psystmp.write_pmd("{0}/smd0000".format(dname))
+        os.system("cd {0}/; {1}/{2} > out.{2}; cd ..".format(dname,pmddir,execname))
 
     # Make FORCE_SETS file from the pmd results
     natm= int(disp['natom'])
