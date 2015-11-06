@@ -8,7 +8,7 @@ module minimize
   integer,allocatable,save:: iglid(:)
   real(8),allocatable,save:: glval(:)
 !.....group fs and mask
-  logical,allocatable,save:: lmskgfs(:),lmsktmp(:)
+  integer,allocatable,save:: lmskgfs(:),lmsktmp(:)
   integer:: nitergfs=100
 
 contains
@@ -946,7 +946,7 @@ contains
   integer,parameter:: MAXITER= 30
   real(8),parameter:: xtiny  = 1d-14
   integer:: iter,i,ig
-  real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx
+  real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx,fp,pvalp,alphap
   real(8),allocatable,dimension(:):: x1(:),gpena(:)
 
   if( .not. allocated(x1)) allocate(x1(ndim),gpena(ndim))
@@ -991,6 +991,8 @@ contains
   xigd= sprod(ndim,g,d)*xi
 
   f0= f
+  if(myid.eq.0) write(6,'(a,i3,2es12.4)')  &
+       ' armijo: iter,alphai,f0=',0,alphai,f0
   do iter=1,MAXITER
     x1(1:ndim)= x0(1:ndim)
     if( trim(cpena).eq.'lasso' .or.trim(cpena).eq.'glasso') then
@@ -1024,11 +1026,22 @@ contains
 !!$    if(myid.eq.0)write(6,'(a,i5,5es15.7)') &
 !!$         'iter,alphai,fi,pval,fi-f0,xigd*alphai=' &
 !!$         ,iter,alphai,fi,pval,fi-f0,xigd*alphai
-    if( fi+pval.le.f0+pval0 +xigd*alphai ) then
+    if(myid.eq.0) write(6,'(a,i3,3es15.7)')  &
+         ' armijo: iter,alphai,fi-f0,xigd*alphai=' &
+         ,iter,alphai,fi-f0,xigd*alphai
+    if( fi+pval-(f0+pval0).le.xigd*alphai ) then
       f= fi
       alpha= alphai
       return
+!!$    else if( iter.ne.1 .and. (fi+pval-(f0+pval0)).lt.0d0 .and.&
+!!$         (fi+pval)>(fp+pvalp) ) then
+!!$      f= fp
+!!$      alpha= alphap
+!!$      return
     endif
+    fp= fi
+    pvalp= pval
+    alphap= alphai
     alphai= alphai*tau
   enddo
 
@@ -1284,7 +1297,8 @@ contains
          ,aa(ndim,ndim),cc(ndim,ndim))
     if( .not.allocated(lmskgfs) ) then
       allocate(lmskgfs(ngl),lmsktmp(ngl),gmaxgl(ngl))
-      lmskgfs(1:ngl)= .true.
+!      lmskgfs(1:ngl)= .true.
+      lmskgfs(1:ngl)= 1
       lmsktmp(1:ngl)= lmskgfs(1:ngl)
     endif
 
@@ -1297,6 +1311,7 @@ contains
 
     nmsks= 0
     do ig=1,ngl
+!      if( lmskgfs(ig).eq.0 ) cycle
       if( .not.lmskgfs(ig) ) cycle
       nmsks= nmsks +1
     enddo
@@ -1305,10 +1320,11 @@ contains
 !.....do loop until the conversion criterion is achieved
     iter= 0
     do while(.true.)
-!.....first calc of gradient needs to be done with no masks
+!.....First, calc of gradient needs to be done with no masks
 !     because it is used to find another new basis
       lmsktmp(1:ngl)= lmskgfs(1:ngl)
-      lmskgfs(1:ngl)= .false.
+!      lmskgfs(1:ngl)= .false.
+      lmskgfs(1:ngl)= 0
       f= func(ndim,xt)
       g= grad(ndim,xt)
       lmskgfs(1:ngl)= lmsktmp(1:ngl)
@@ -1342,7 +1358,9 @@ contains
       gmm= 0d0
       igmm= 0
       do ig=1,ngl
-        if( lmskgfs(ig) .and. gmaxgl(ig).gt.gmm ) then
+!        if( lmskgfs(ig) .and. gmaxgl(ig).gt.gmm ) then
+!.....Do not take lmskgfs==2 into account !
+        if( lmskgfs(ig).eq.1 .and. gmaxgl(ig).gt.gmm ) then
           gmm= gmaxgl(ig)
           igmm= ig
         endif
@@ -1356,12 +1374,13 @@ contains
         return
       endif
 !.....remove mask of bases with large variations
-      if(myid.eq.0) print '(a,i5,es12.4,100l2)',' igmm,gmm,lmskgfs= ' &
+      if(myid.eq.0) print '(a,i5,es12.4,100i2)',' igmm,gmm,lmskgfs= ' &
            ,igmm,gmm,lmskgfs(1:min(ngl,100))
-      lmskgfs(igmm)= .false.
+      lmskgfs(igmm)= 0
       nmsks= 0
       do ig=1,ngl
-        if( .not.lmskgfs(ig) ) cycle
+!        if( .not.lmskgfs(ig) ) cycle
+        if( lmskgfs(ig).eq.0 ) cycle
         nmsks= nmsks +1
       enddo
       nbases= ngl -nmsks
@@ -1381,7 +1400,7 @@ contains
       do i=1,ndim
         ig= iglid(i)
         if( ig.le.0 ) cycle
-        if( lmskgfs(ig) ) g(i)= 0d0
+        if( lmskgfs(ig).ne.0 ) g(i)= 0d0
       enddo
       call cap_grad(ndim,g)
       gnorm= sqrt(sprod(ndim,g,g))
@@ -1410,7 +1429,7 @@ contains
         do i=1,ndim
           ig= iglid(i)
           if( ig.le.0 ) cycle
-          if( lmskgfs(ig) ) then
+          if( lmskgfs(ig).ne.0 ) then
             g(i)= 0d0
             u(i)= 0d0
           endif
@@ -1439,9 +1458,12 @@ contains
           alpha= 1d0
           call armijo_search(ndim,xt,u,f,g,alpha,iprint &
                ,iflag,myid,func)
-          !.....if something wrong with armijo search, try opposite direction
+!.....if something wrong with armijo search, try opposite direction
           if( iflag/100.ne.0 ) then
+!.....Reset iflag when we do opposite direction search.
+!            iflag= iflag -(iflag/100)*100
             alpha= -1d0
+            if(myid.eq.0) print *,'trying opposite direction...'
             call armijo_search(ndim,xt,u,f,g,alpha,iprint &
                  ,iflag,myid,func)
           endif
@@ -1455,9 +1477,12 @@ contains
 !!$            x(1:ndim)= xt(1:ndim)
 !!$            return
             if( myid.eq.0 ) then
-              print *,"Armijo failed at 1st step of FS,"
-              print *,"but keep going forward..."
+              print *,"Armijo failed at 1st step of FS,"&
+                   //" but keep going forward..."
             endif
+!!$!.....Set mask as 2, which means this basis will be not included
+!!$!     and not taken into consideration anymore.
+!!$            lmskgfs(igmm)= 2
           endif
           exit
         endif
@@ -1466,7 +1491,7 @@ contains
         do i=1,ndim
           ig= iglid(i)
           if( ig.le.0 ) cycle
-          if( lmskgfs(ig) ) then
+          if( lmskgfs(ig).ne.0 ) then
             g(i)= 0d0
             u(i)= 0d0
           endif

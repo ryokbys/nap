@@ -822,7 +822,7 @@ subroutine write_stats(iter)
   rmse_trn= sqrt(desum_trn/nsmpl_trn)
   rmse_tst= sqrt(desum_tst/nsmpl_tst)
   if( myid.eq.0 ) then
-    write(6,'(a,i8,f15.2,4f15.7)') '  energy:training(rmse,max)' &
+    write(6,'(a,i8,f15.2,4f12.7)') '  energy:training(rmse,max)' &
          //',test(rmse,max)=',iter,mpi_wtime()-time0 &
          ,rmse_trn,demax_trn,rmse_tst,demax_tst
   endif
@@ -876,7 +876,7 @@ subroutine write_stats(iter)
   rmse_trn= sqrt(dfsum_trn/ntrn)
   rmse_tst= sqrt(dfsum_tst/ntst)
   if( myid.eq.0 ) then
-    write(6,'(a,i8,f15.2,4f15.7)') '  force:training(rmse,max)' &
+    write(6,'(a,i8,f15.2,4f12.7)') '  force:training(rmse,max)' &
          //',test(rmse,max)=',iter,mpi_wtime()-time0 &
          ,rmse_trn,dfmax_trn,rmse_tst,dfmax_tst
 !    call write_vars('tmp')
@@ -931,6 +931,7 @@ subroutine sync_input()
   call mpi_bcast(clinmin,128,mpi_character,0,mpi_world,ierr)
 
   call mpi_bcast(eps,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(feps,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(xtol,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(ftol,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(gtol,1,mpi_double_precision,0,mpi_world,ierr)

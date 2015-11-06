@@ -144,7 +144,8 @@ contains
 !=======================================================================
   function NN_func(ndim,x)
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
-         ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta,mdsys,erefmin
+         ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta,mdsys,erefmin &
+         ,cmaindir,eps,feps
     use parallel
     use minimize
     implicit none
@@ -178,6 +179,7 @@ contains
       if( smpl%iclass.ne.1 ) cycle
       natm= smpl%natm
       eref= smpl%eref
+      ! ediff= (smpl%epot -eref)/natm/max(abs(eref/natm),eps)
       ediff= (smpl%epot -eref)/natm
       ediff= ediff*ediff
       swgt= 1d0
@@ -186,8 +188,14 @@ contains
       endif
       flocal= flocal +ediff*swgt
       if( .not. lfmatch ) cycle
-      fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
-           -smpl%fref(1:3,1:natm))
+      do ia=1,natm
+        do ixyz=1,3
+!!$          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+!!$               -smpl%fref(ixyz,ia))/max(abs(smpl%fref(ixyz,ia)),feps)
+          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+               -smpl%fref(ixyz,ia))
+        enddo
+      enddo
       dn3i= 1d0 /(3*natm)
       fscale= 1d0
       !.....force-scale makes force contribution same order to energy
@@ -297,7 +305,7 @@ contains
         do ihl1=1,nhl(1)
           tmp= 0d0
           do ihl0=1,nhl(0)
-            if( lmskgfs(ihl0) ) cycle
+            if( lmskgfs(ihl0).ne.0 ) cycle
             tmp= tmp +wgt11(ihl0,ihl1) *sds%gsf(ia,ihl0)
           enddo
           sds%hl1(ia,ihl1)= sigmoid(tmp)
@@ -324,7 +332,7 @@ contains
       do ihl1=1,nhl(1)
         w2= wgt12(ihl1)
         do ihl0=1,nhl(0)
-          if( lmskgfs(ihl0) ) cycle
+          if( lmskgfs(ihl0).ne.0 ) cycle
           w1= wgt11(ihl0,ihl1)
           do ja=1,natm
             h1= sds%hl1(ja,ihl1)
@@ -381,7 +389,7 @@ contains
           do ihl1=1,nhl(1)
             tmp1= 0d0
             do ihl0=1,nhl(0)
-              if( lmskgfs(ihl0) ) cycle
+              if( lmskgfs(ihl0).ne.0 ) cycle
               tmp1=tmp1 +wgt21(ihl0,ihl1) *sds%gsf(ia,ihl0)
             enddo
             sds%hl1(ia,ihl1)= sigmoid(tmp1)
@@ -412,7 +420,7 @@ contains
         do ihl1=1,nhl(1)
           w2= wgt22(ihl1,ihl2)
           do ihl0=1,nhl(0)
-            if( lmskgfs(ihl0) ) cycle
+            if( lmskgfs(ihl0).ne.0 ) cycle
             w1= wgt21(ihl0,ihl1)
             do ja=1,natm
               h1= sds%hl1(ja,ihl1)
@@ -455,7 +463,8 @@ contains
   end subroutine calc_ef2
 !=======================================================================
   function NN_grad(ndim,x)
-    use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm,samples,mdsys
+    use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm,samples,mdsys&
+         ,eps,feps
     use parallel
     use minimize
     implicit none
@@ -555,7 +564,7 @@ contains
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
     real(8),intent(inout):: gs(nvars)
-    integer:: iv,nv,ihl1,ia,ja,ihl0,jhl0,natm
+    integer:: iv,nv,ihl1,ia,ja,ihl0,jhl0,natm,ixyz
     real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale,eref,swgt
     real(8),save,allocatable:: dgs(:),ab(:),wdg(:,:,:),bms(:,:,:,:)
 
@@ -571,7 +580,11 @@ contains
       swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
 !!$      swgt= exp(-eref/natm*swbeta)
     endif
-    ediff= (smpl%epot -eref)*2 /natm/natm *swgt
+!!$    ediff= (smpl%epot -eref)/natm/max(abs(eref/natm),eps)
+!!$    ediff= 2d0 *ediff *swgt /natm/max(abs(eref/natm),eps)
+    ediff= (smpl%epot -eref)/natm
+    ediff= 2d0 *ediff *swgt /natm
+!!$    ediff= (smpl%epot -eref)*2 /natm/natm *swgt
 !!$    print *,'ediff=',ediff*natm
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)
@@ -588,7 +601,7 @@ contains
       do ihl0=nhl(0),1,-1
         do ihl1=nhl(1),1,-1
           tmp= 0d0
-          if( lmskgfs(ihl0) ) goto 20
+          if( lmskgfs(ihl0).ne.0 ) goto 20
           w2= wgt12(ihl1)
           do ia=1,natm
             h1= sds%hl1(ia,ihl1)
@@ -616,18 +629,30 @@ contains
 
     if( .not. lfmatch ) return
     dgs(1:nvars)= 0d0
-    fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
-         -smpl%fref(1:3,1:natm))
+    do ia=1,natm
+      do ixyz=1,3
+!!$        fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+!!$             -smpl%fref(ixyz,ia))/max(abs(smpl%fref(ixyz,ia)),feps)
+        fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+             -smpl%fref(ixyz,ia))
+      enddo
+    enddo
     dn3i= 1d0/(3*natm)
     fscale= 1d0
     if( lfscale ) fscale= fscl
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscale *swgt
+    do ia=1,natm
+      do ixyz=1,3
+!!$        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt &
+!!$             /max(abs(smpl%fref(ixyz,ia)),feps)
+        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt
+      enddo
+    enddo
     iv= nhl(0)*nhl(1) +nhl(1)
     if( allocated( lmskgfs) ) then
       do ihl1=nhl(1),1,-1
         tmp= 0d0
         do ihl0=1,nhl(0)
-          if( lmskgfs(ihl0) ) cycle
+          if( lmskgfs(ihl0).ne.0 ) cycle
           w1= wgt11(ihl0,ihl1)
           do ja=1,natm
             h1= sds%hl1(ja,ihl1)
@@ -670,7 +695,7 @@ contains
     if( allocated(lmskgfs) ) then
       do ihl1=1,nhl(1)
         do ihl0=1,nhl(0)
-          if( lmskgfs(ihl0) ) cycle
+          if( lmskgfs(ihl0).ne.0 ) cycle
           w1= wgt11(ihl0,ihl1)
           do ja=1,natm
             do ia=1,natm
@@ -698,7 +723,7 @@ contains
       do ihl0=nhl(0),1,-1
         do ihl1=nhl(1),1,-1
           tmp= 0d0
-          if( lmskgfs(ihl0) ) goto 10
+          if( lmskgfs(ihl0).ne.0 ) goto 10
           w2= wgt12(ihl1)
           do ja=1,natm
             h1= sds%hl1(ja,ihl1)
@@ -802,7 +827,7 @@ contains
       do ihl0=nhl(0),1,-1
         do ihl1=nhl(1),1,-1
           tmp= 0d0
-          if( lmskgfs(ihl0) ) goto 20
+          if( lmskgfs(ihl0).ne.0 ) goto 20
           do ia=1,natm
             h1= sds%hl1(ia,ihl1)
             dh1= h1*(1d0-h1)
@@ -856,7 +881,7 @@ contains
     if( allocated(lmskgfs) ) then
       do ihl1=1,nhl(1)
         do ihl0=1,nhl(0)
-          if( lmskgfs(ihl0) ) cycle
+          if( lmskgfs(ihl0).ne.0 ) cycle
           w1= wgt21(ihl0,ihl1)
           do ja=1,natm
             do ia=1,natm
@@ -946,7 +971,7 @@ contains
       do ihl0=nhl(0),1,-1
         do ihl1=nhl(1),1,-1
           tmp= 0d0
-          if( lmskgfs(ihl0) ) goto 10
+          if( lmskgfs(ihl0).ne.0 ) goto 10
           do ihl2=1,nhl(2)
             w3= wgt23(ihl2)
             w2= wgt22(ihl1,ihl2)
