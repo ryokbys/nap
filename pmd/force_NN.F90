@@ -73,7 +73,7 @@ contains
     endif
 
 !.....first, calculate all the symmetry functions
-    call eval_sf_msp2(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
+    call eval_sf(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
          ,lspr,gsf,dgsf,rc)
 
 #ifdef __FITPOT__
@@ -237,228 +237,7 @@ contains
     return
   end subroutine force_NN
 !=======================================================================
-  subroutine eval_sf(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr,gsf,dgsf,rc)
-!
-!  Evaluate symmetry functions and derivatives of them.
-!
-    implicit none
-    integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
-    real(8),intent(out):: gsf(nsf,natm),dgsf(3,nsf,0:nnmax,namax)
-
-    integer:: isf,ia,jj,ja,kk,ka
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
-         dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
-         driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
-         dcsdj(3),dcsdk(3),dcsdi(3)
-
-    real(8),external:: sprod
-
-    gsf(1:nsf,1:natm)= 0d0
-!    gsf(0,1:natm)= 1d0
-    dgsf(1:3,1:nsf,0:nnmax,1:natm)= 0d0
-
-    do isf=1,nsf
-      if( itype(isf).eq.1 ) then ! Gaussian (2-body)
-        do ia=1,natm
-          xi(1:3)= ra(1:3,ia)
-          do jj=1,lspr(0,ia)
-            ja= lspr(jj,ia)
-            if( ja.eq.ia ) cycle
-            xj(1:3)= ra(1:3,ja)
-            xij(1:3)= xj(1:3)-xi(1:3)
-            rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-            dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-            if( dij.ge.rc ) cycle
-            fcij= fc(dij,rc)
-            eta= cnst(1,isf)
-            rs=  cnst(2,isf)
-            !.....function value
-            texp= exp(-eta*(dij-rs)**2)
-            gsf(isf,ia)= gsf(isf,ia) +texp*fcij
-            !.....derivative
-            driji(1:3)= -rij(1:3)/dij
-            drijj(1:3)= -driji(1:3)
-            dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfc(dij,rc)
-            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
-            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
-          enddo
-        enddo
-
-      else if( itype(isf).eq.2 ) then ! angular (3-body)
-        almbd= cnst(1,isf)
-        t2= (abs(almbd)+1d0)**2
-        do ia=1,natm
-          xi(1:3)= ra(1:3,ia)
-          do jj=1,lspr(0,ia)
-            ja= lspr(jj,ia)
-            if( ja.eq.ia ) cycle
-            xj(1:3)= ra(1:3,ja)
-            xij(1:3)= xj(1:3)-xi(1:3)
-            rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-            dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-            if( dij.ge.rc ) cycle
-            fcij= fc(dij,rc)
-            dfcij= dfc(dij,rc)
-            driji(1:3)= -rij(1:3)/dij
-            drijj(1:3)= -driji(1:3)
-            do kk=1,lspr(0,ia)
-              ka= lspr(kk,ia)
-              if( ka.eq.ia .or. ka.le.ja ) cycle
-              xk(1:3)= ra(1:3,ka)
-              xik(1:3)= xk(1:3)-xi(1:3)
-              rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
-              dik= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
-              if( dik.ge.rc ) cycle
-              fcik= fc(dik,rc)
-              dfcik= dfc(dik,rc)
-              driki(1:3)= -rik(1:3)/dik
-              drikk(1:3)= -driki(1:3)
-              !.....function value
-              spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
-              cs= spijk/dij/dik
-              t1= (almbd +cs)**2
-              gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik 
-              !.....derivative
-              dgdij= dfcij *fcik *t1/t2
-              dgdik= fcij *dfcik *t1/t2
-              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) &
-                   +dgdij*driji(1:3) +dgdik*driki(1:3)
-              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
-              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
-              dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik
-              dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*spijk/dij**3/dik
-              dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*spijk/dik**3/dij
-              dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
-              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
-              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
-              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
-            enddo
-          enddo
-        enddo
-      endif
-    enddo
-
-  end subroutine eval_sf
-!=======================================================================
-  subroutine eval_sf_msp(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr &
-       ,gsf,dgsf,rc)
-!
-!  Evaluate symmetry functions and derivatives for multi-species system.
-!
-    implicit none
-    integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
-    real(8),intent(out):: gsf(nsf,natm),dgsf(3,nsf,0:nnmax,namax)
-
-    integer:: isf,isfc,ia,jj,ja,kk,ka,is,js,ks,isfc1,isfc2
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
-         dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
-         driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
-         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1
-
-    real(8),external:: sprod
-
-    gsf(1:nsf,1:natm)= 0d0
-    dgsf(1:3,1:nsf,0:nnmax,1:natm)= 0d0
-    do ia=1,natm
-      xi(1:3)= ra(1:3,ia)
-      is= int(tag(ia))
-      do jj=1,lspr(0,ia)
-        ja= lspr(jj,ia)
-        if( ja.eq.ia ) cycle
-        xj(1:3)= ra(1:3,ja)
-        xij(1:3)= xj(1:3)-xi(1:3)
-        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-        if( dij.ge.rc ) cycle
-        js= int(tag(ja))
-        isfc=0
-        driji(1:3)= -rij(1:3)/dij
-        drijj(1:3)= -driji(1:3)
-        do isfc1=1,nsfc1
-          isfc= isfc+1
-          isf= (icmb2(is,js)-1)*nsfc1 +isfc1
-          fcij= fc(dij,rc)
-          if( itype(isfc1).eq.1 ) then ! Gaussian
-            eta= cnst(1,isfc)
-            rs=  cnst(2,isfc)
-            !.....function value
-            texp= exp(-eta*(dij-rs)**2)
-            gsf(isf,ia)= gsf(isf,ia) +texp*fcij
-            !.....derivative
-            dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfc(dij,rc)
-            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
-            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
-          else if( itype(isfc1).eq.2 ) then ! cosine
-            a1= cnst(1,isfc)
-            !.....func value
-            tcos= (1d0+cos(dij*a1))
-            gsf(isf,ia)= gsf(isf,ia) +tcos*fcij
-            !.....derivative
-            dgdr= -a1*sin(dij*a1)*fcij +tcos*dfc(dij,rc)
-            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
-            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
-          else if( itype(isfc1).eq.3 ) then ! polynomial
-            a1= cnst(1,isfc)
-            !.....func value
-            tpoly= 1d0*dij**(-a1)
-            gsf(isf,ia)= gsf(isf,ia) +tpoly*fcij
-            !.....derivative
-            dgdr= -a1*dij**(-a1-1d0)*fcij +tpoly*dfc(dij,rc)
-            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
-            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
-          endif
-        enddo
-        do isfc2=1,nsfc2
-          isfc= isfc +1
-          fcij= fc(dij,rc)
-          dfcij= dfc(dij,rc)
-          driji(1:3)= -rij(1:3)/dij
-          drijj(1:3)= -driji(1:3)
-          do kk=1,lspr(0,ia)
-            ka= lspr(kk,ia)
-            if( ka.eq.ia .or. ka.le.ja ) cycle
-            xk(1:3)= ra(1:3,ka)
-            xik(1:3)= xk(1:3)-xi(1:3)
-            rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
-            dik= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
-            if( dik.ge.rc ) cycle
-            ks= int(tag(ka))
-            isf= nsfc1*nc1 +(icmb3(is,js,ks)-1)*nsfc2 +isfc2
-            almbd= cnst(1,isfc)
-            t2= (abs(almbd)+1d0)**2
-            fcik= fc(dik,rc)
-            dfcik= dfc(dik,rc)
-            driki(1:3)= -rik(1:3)/dik
-            drikk(1:3)= -driki(1:3)
-            !.....function value
-            spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
-            cs= spijk/dij/dik
-            t1= (almbd +cs)**2
-            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik 
-            !.....derivative
-            dgdij= dfcij *fcik *t1/t2
-            dgdik= fcij *dfcik *t1/t2
-            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) &
-                 +dgdij*driji(1:3) +dgdik*driki(1:3)
-            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
-            dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
-            dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik
-            dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*spijk/dij**3/dik
-            dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*spijk/dik**3/dij
-            dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
-            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
-            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
-            dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
-          enddo
-        enddo
-      enddo
-    enddo
-
-  end subroutine eval_sf_msp
-!=======================================================================
-  subroutine eval_sf_msp2(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr &
+  subroutine eval_sf(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr &
        ,gsf,dgsf,rc)
 !
 !  Evaluate symmetry functions and derivatives for multi-species system.
@@ -542,17 +321,18 @@ contains
 
 !!$        fcij= fc(dij,rc)
 !!$        dfcij= dfc(dij,rc)
-        driji(1:3)= -rij(1:3)/dij
-        drijj(1:3)= -driji(1:3)
+!!$        driji(1:3)= -rij(1:3)/dij
+!!$        drijj(1:3)= -driji(1:3)
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
+          ks= int(tag(ka))
+          if( iaddr3(1,is,js,ks).lt.0 ) cycle
           if( ka.eq.ia .or. ka.le.ja ) cycle
           xk(1:3)= ra(1:3,ka)
           xik(1:3)= xk(1:3)-xi(1:3)
           rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
           if( dik.ge.rc ) cycle
-          ks= int(tag(ka))
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
 !!$            isf= nsfc1*nc1 +(icmb3(is,js,ks)-1)*nsfc2 +isfc2
             almbd= cnst(1,isf)
@@ -585,7 +365,7 @@ contains
       enddo
     enddo
 
-  end subroutine eval_sf_msp2
+  end subroutine eval_sf
 !=======================================================================
   function fc(r,rc)
     implicit none
@@ -686,6 +466,8 @@ contains
     nhl(nl+1)= 1
     allocate(itype(nsf),cnst(max_ncnst,nsf))
     allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
+    iaddr2(1:2,1:nsp,1:nsp)= -1
+    iaddr3(1:2,1:nsp,1:nsp,1:nsp)= -1
     nsf1= 0
     nsf2= 0
     iap= 0
