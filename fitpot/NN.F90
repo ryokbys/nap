@@ -179,7 +179,7 @@ contains
       if( smpl%iclass.ne.1 ) cycle
       natm= smpl%natm
       eref= smpl%eref
-      ! ediff= (smpl%epot -eref)/natm/max(abs(eref/natm),eps)
+!!$      ediff= (smpl%epot -eref)/natm/max(abs(eref/natm),eps)
       ediff= (smpl%epot -eref)/natm
       ediff= ediff*ediff
       swgt= 1d0
@@ -289,7 +289,7 @@ contains
 !=======================================================================
   subroutine calc_ef1(smpl,sds)
     use variables
-    use minimize, only: lmskgfs
+    use minimize, only: mskgfs
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
@@ -301,11 +301,11 @@ contains
     smpl%epot =0d0
     !.....energy
     do ia=1,natm
-      if( allocated(lmskgfs) ) then
+      if( allocated(mskgfs) ) then
         do ihl1=1,nhl(1)
           tmp= 0d0
           do ihl0=1,nhl(0)
-            if( lmskgfs(ihl0).ne.0 ) cycle
+            if( mskgfs(ihl0).ne.0 ) cycle
             tmp= tmp +wgt11(ihl0,ihl1) *sds%gsf(ia,ihl0)
           enddo
           sds%hl1(ia,ihl1)= sigmoid(tmp)
@@ -328,11 +328,11 @@ contains
     !.....forces
     if( .not.lfmatch ) return
     smpl%fa(1:3,1:natm)= 0d0
-    if( allocated(lmskgfs) ) then
+    if( allocated(mskgfs) ) then
       do ihl1=1,nhl(1)
         w2= wgt12(ihl1)
         do ihl0=1,nhl(0)
-          if( lmskgfs(ihl0).ne.0 ) cycle
+          if( mskgfs(ihl0).ne.0 ) cycle
           w1= wgt11(ihl0,ihl1)
           do ja=1,natm
             h1= sds%hl1(ja,ihl1)
@@ -369,7 +369,7 @@ contains
 !=======================================================================
   subroutine calc_ef2(smpl,sds)
     use variables
-    use minimize, only: lmskgfs
+    use minimize, only: mskgfs
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
@@ -385,11 +385,11 @@ contains
     do ia=1,natm
       do ihl2=1,nhl(2)
         tmp2= 0d0
-        if( allocated(lmskgfs) ) then
+        if( allocated(mskgfs) ) then
           do ihl1=1,nhl(1)
             tmp1= 0d0
             do ihl0=1,nhl(0)
-              if( lmskgfs(ihl0).ne.0 ) cycle
+              if( mskgfs(ihl0).ne.0 ) cycle
               tmp1=tmp1 +wgt21(ihl0,ihl1) *sds%gsf(ia,ihl0)
             enddo
             sds%hl1(ia,ihl1)= sigmoid(tmp1)
@@ -414,13 +414,13 @@ contains
     !.....force term
     if( .not.lfmatch ) return
     smpl%fa(1:3,1:natm)= 0d0
-    if( allocated(lmskgfs) ) then
+    if( allocated(mskgfs) ) then
       do ihl2=1,nhl(2)
         w3= wgt23(ihl2)
         do ihl1=1,nhl(1)
           w2= wgt22(ihl1,ihl2)
           do ihl0=1,nhl(0)
-            if( lmskgfs(ihl0).ne.0 ) cycle
+            if( mskgfs(ihl0).ne.0 ) cycle
             w1= wgt21(ihl0,ihl1)
             do ja=1,natm
               h1= sds%hl1(ja,ihl1)
@@ -559,7 +559,7 @@ contains
 !=======================================================================
   subroutine grad1(smpl,sds,gs)
     use variables
-    use minimize, only: lmskgfs
+    use minimize, only: mskgfs
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
@@ -584,8 +584,6 @@ contains
 !!$    ediff= 2d0 *ediff *swgt /natm/max(abs(eref/natm),eps)
     ediff= (smpl%epot -eref)/natm
     ediff= 2d0 *ediff *swgt /natm
-!!$    ediff= (smpl%epot -eref)*2 /natm/natm *swgt
-!!$    print *,'ediff=',ediff*natm
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)
     do ihl1=nhl(1),1,-1
@@ -597,11 +595,11 @@ contains
       gs(iv)= gs(iv) +ediff*tmp
       iv= iv -1
     enddo
-    if( allocated(lmskgfs) ) then
+    if( allocated(mskgfs) ) then
       do ihl0=nhl(0),1,-1
         do ihl1=nhl(1),1,-1
           tmp= 0d0
-          if( lmskgfs(ihl0).ne.0 ) goto 20
+          if( mskgfs(ihl0).ne.0 ) goto 20
           w2= wgt12(ihl1)
           do ia=1,natm
             h1= sds%hl1(ia,ihl1)
@@ -648,11 +646,11 @@ contains
       enddo
     enddo
     iv= nhl(0)*nhl(1) +nhl(1)
-    if( allocated( lmskgfs) ) then
+    if( allocated( mskgfs) ) then
       do ihl1=nhl(1),1,-1
         tmp= 0d0
         do ihl0=1,nhl(0)
-          if( lmskgfs(ihl0).ne.0 ) cycle
+          if( mskgfs(ihl0).ne.0 ) cycle
           w1= wgt11(ihl0,ihl1)
           do ja=1,natm
             h1= sds%hl1(ja,ihl1)
@@ -692,10 +690,10 @@ contains
     endif
 !.....make bms before computing dgs
     bms(1:3,1:natm,1:natm,1:nhl(1))= 0d0
-    if( allocated(lmskgfs) ) then
+    if( allocated(mskgfs) ) then
       do ihl1=1,nhl(1)
         do ihl0=1,nhl(0)
-          if( lmskgfs(ihl0).ne.0 ) cycle
+          if( mskgfs(ihl0).ne.0 ) cycle
           w1= wgt11(ihl0,ihl1)
           do ja=1,natm
             do ia=1,natm
@@ -719,11 +717,11 @@ contains
       enddo
     endif
 !.....then compute dgs wrt w1
-    if( allocated(lmskgfs) ) then
+    if( allocated(mskgfs) ) then
       do ihl0=nhl(0),1,-1
         do ihl1=nhl(1),1,-1
           tmp= 0d0
-          if( lmskgfs(ihl0).ne.0 ) goto 10
+          if( mskgfs(ihl0).ne.0 ) goto 10
           w2= wgt12(ihl1)
           do ja=1,natm
             h1= sds%hl1(ja,ihl1)
@@ -775,7 +773,7 @@ contains
 !=======================================================================
   subroutine grad2(smpl,sds,gs)
     use variables
-    use minimize, only: lmskgfs
+    use minimize, only: mskgfs
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
@@ -823,11 +821,11 @@ contains
         iv=iv -1
       enddo
     enddo
-    if( allocated(lmskgfs) ) then
+    if( allocated(mskgfs) ) then
       do ihl0=nhl(0),1,-1
         do ihl1=nhl(1),1,-1
           tmp= 0d0
-          if( lmskgfs(ihl0).ne.0 ) goto 20
+          if( mskgfs(ihl0).ne.0 ) goto 20
           do ia=1,natm
             h1= sds%hl1(ia,ihl1)
             dh1= h1*(1d0-h1)
@@ -878,10 +876,10 @@ contains
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 !.....make w1dg
     w1dg(1:3,1:natm,1:natm,1:nhl(1))= 0d0
-    if( allocated(lmskgfs) ) then
+    if( allocated(mskgfs) ) then
       do ihl1=1,nhl(1)
         do ihl0=1,nhl(0)
-          if( lmskgfs(ihl0).ne.0 ) cycle
+          if( mskgfs(ihl0).ne.0 ) cycle
           w1= wgt21(ihl0,ihl1)
           do ja=1,natm
             do ia=1,natm
@@ -967,11 +965,11 @@ contains
       enddo
     enddo
 !.....derivative wrt w1
-    if( allocated(lmskgfs) ) then
+    if( allocated(mskgfs) ) then
       do ihl0=nhl(0),1,-1
         do ihl1=nhl(1),1,-1
           tmp= 0d0
-          if( lmskgfs(ihl0).ne.0 ) goto 10
+          if( mskgfs(ihl0).ne.0 ) goto 10
           do ihl2=1,nhl(2)
             w3= wgt23(ihl2)
             w2= wgt22(ihl1,ihl2)

@@ -8,7 +8,7 @@ module minimize
   integer,allocatable,save:: iglid(:)
   real(8),allocatable,save:: glval(:)
 !.....group fs and mask
-  integer,allocatable,save:: lmskgfs(:),lmsktmp(:)
+  integer,allocatable,save:: mskgfs(:),msktmp(:)
   integer:: nitergfs=100
 
 contains
@@ -1295,11 +1295,10 @@ contains
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim) &
          ,v(ndim),y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
          ,aa(ndim,ndim),cc(ndim,ndim))
-    if( .not.allocated(lmskgfs) ) then
-      allocate(lmskgfs(ngl),lmsktmp(ngl),gmaxgl(ngl))
-!      lmskgfs(1:ngl)= .true.
-      lmskgfs(1:ngl)= 1
-      lmsktmp(1:ngl)= lmskgfs(1:ngl)
+    if( .not.allocated(mskgfs) ) then
+      allocate(mskgfs(ngl),msktmp(ngl),gmaxgl(ngl))
+      mskgfs(1:ngl)= 1
+      msktmp(1:ngl)= mskgfs(1:ngl)
     endif
 
     
@@ -1311,8 +1310,7 @@ contains
 
     nmsks= 0
     do ig=1,ngl
-!      if( lmskgfs(ig).eq.0 ) cycle
-      if( .not.lmskgfs(ig) ) cycle
+      if( mskgfs(ig).eq.0 ) cycle
       nmsks= nmsks +1
     enddo
     nbasesp= ngl -nmsks
@@ -1322,12 +1320,11 @@ contains
     do while(.true.)
 !.....First, calc of gradient needs to be done with no masks
 !     because it is used to find another new basis
-      lmsktmp(1:ngl)= lmskgfs(1:ngl)
-!      lmskgfs(1:ngl)= .false.
-      lmskgfs(1:ngl)= 0
+      msktmp(1:ngl)= mskgfs(1:ngl)
+      mskgfs(1:ngl)= 0
       f= func(ndim,xt)
       g= grad(ndim,xt)
-      lmskgfs(1:ngl)= lmsktmp(1:ngl)
+      mskgfs(1:ngl)= msktmp(1:ngl)
       gnorm= sqrt(sprod(ndim,g,g))
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
@@ -1346,7 +1343,7 @@ contains
         endif
         exit
       endif
-!.....find bases with the largest gradient
+!.....Find bases with the largest gradient
       gmaxgl(1:ngl)= 0d0
       do i=1,ndim
         ig= iglid(i)
@@ -1358,9 +1355,8 @@ contains
       gmm= 0d0
       igmm= 0
       do ig=1,ngl
-!        if( lmskgfs(ig) .and. gmaxgl(ig).gt.gmm ) then
-!.....Do not take lmskgfs==2 into account !
-        if( lmskgfs(ig).eq.1 .and. gmaxgl(ig).gt.gmm ) then
+!.....Do not take mskgfs==2 into account !
+        if( mskgfs(ig).eq.1 .and. gmaxgl(ig).gt.gmm ) then
           gmm= gmaxgl(ig)
           igmm= ig
         endif
@@ -1374,13 +1370,12 @@ contains
         return
       endif
 !.....remove mask of bases with large variations
-      if(myid.eq.0) print '(a,i5,es12.4,100i2)',' igmm,gmm,lmskgfs= ' &
-           ,igmm,gmm,lmskgfs(1:min(ngl,100))
-      lmskgfs(igmm)= 0
+      mskgfs(igmm)= 0
+      if(myid.eq.0) print '(a,i5,es12.4,100i2)',' igmm,gmm,mskgfs= ' &
+           ,igmm,gmm,mskgfs(1:min(ngl,100))
       nmsks= 0
       do ig=1,ngl
-!        if( .not.lmskgfs(ig) ) cycle
-        if( lmskgfs(ig).eq.0 ) cycle
+        if( mskgfs(ig).eq.0 ) cycle
         nmsks= nmsks +1
       enddo
       nbases= ngl -nmsks
@@ -1400,7 +1395,7 @@ contains
       do i=1,ndim
         ig= iglid(i)
         if( ig.le.0 ) cycle
-        if( lmskgfs(ig).ne.0 ) g(i)= 0d0
+        if( mskgfs(ig).ne.0 ) g(i)= 0d0
       enddo
       call cap_grad(ndim,g)
       gnorm= sqrt(sprod(ndim,g,g))
@@ -1429,7 +1424,7 @@ contains
         do i=1,ndim
           ig= iglid(i)
           if( ig.le.0 ) cycle
-          if( lmskgfs(ig).ne.0 ) then
+          if( mskgfs(ig).ne.0 ) then
             g(i)= 0d0
             u(i)= 0d0
           endif
@@ -1482,7 +1477,7 @@ contains
             endif
 !!$!.....Set mask as 2, which means this basis will be not included
 !!$!     and not taken into consideration anymore.
-!!$            lmskgfs(igmm)= 2
+!!$            mskgfs(igmm)= 2
           endif
           exit
         endif
@@ -1491,7 +1486,7 @@ contains
         do i=1,ndim
           ig= iglid(i)
           if( ig.le.0 ) cycle
-          if( lmskgfs(ig).ne.0 ) then
+          if( mskgfs(ig).ne.0 ) then
             g(i)= 0d0
             u(i)= 0d0
           endif
