@@ -387,6 +387,7 @@ contains
       endif
     endif
 
+    call sub_eval(0)
     do iter=1,maxiter
       u(1:ndim)= 0d0
       do i=1,ndim
