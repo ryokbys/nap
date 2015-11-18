@@ -145,7 +145,7 @@ contains
   function NN_func(ndim,x)
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
          ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta,mdsys,erefmin &
-         ,cmaindir,eps,feps
+         ,cmaindir,epse,epsf
     use parallel
     use minimize
     implicit none
@@ -156,6 +156,7 @@ contains
     integer:: ismpl,natm,ia,ixyz,idim
     real(8):: dn3i,ediff,tf0,tc0,fscale,eref,swgt
     real(8):: flocal
+    real(8):: edenom,fdenom
     type(mdsys):: smpl
 
     nfunc= nfunc +1
@@ -179,29 +180,33 @@ contains
       if( smpl%iclass.ne.1 ) cycle
       natm= smpl%natm
       eref= smpl%eref
-!!$      ediff= (smpl%epot -eref)/natm/max(abs(eref/natm),eps)
       ediff= (smpl%epot -eref)/natm
       ediff= ediff*ediff
+      edenom= abs(eref/natm)
+      edenom= edenom**2 +epse
+      ediff= ediff/edenom
       swgt= 1d0
       if( lswgt ) then
         swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
       endif
       flocal= flocal +ediff*swgt
       if( .not. lfmatch ) cycle
-      do ia=1,natm
-        do ixyz=1,3
-!!$          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-!!$               -smpl%fref(ixyz,ia))/max(abs(smpl%fref(ixyz,ia)),feps)
-          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-               -smpl%fref(ixyz,ia))
-        enddo
-      enddo
-      dn3i= 1d0 /(3*natm)
       fscale= 1d0
       !.....force-scale makes force contribution same order to energy
       if( lfscale ) fscale= fscl
-      fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
-           *dn3i *fscale *swgt
+      dn3i= 1d0 /(3*natm)
+      do ia=1,natm
+        do ixyz=1,3
+          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+               -smpl%fref(ixyz,ia))
+          fdenom= abs(smpl%fref(ixyz,ia))
+          fdenom= fdenom*fdenom +epsf
+          fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia) *dn3i *fscale &
+               *swgt /fdenom
+        enddo
+      enddo
+!!$      fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
+!!$           *dn3i *fscale *swgt
       do ia=1,natm
         do ixyz=1,3
           flocal= flocal +fdiff(ixyz,ia)
@@ -464,7 +469,7 @@ contains
 !=======================================================================
   function NN_grad(ndim,x)
     use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm,samples,mdsys&
-         ,eps,feps
+         ,epse,epsf
     use parallel
     use minimize
     implicit none
@@ -566,6 +571,7 @@ contains
     real(8),intent(inout):: gs(nvars)
     integer:: iv,nv,ihl1,ia,ja,ihl0,jhl0,natm,ixyz
     real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale,eref,swgt
+    real(8):: edenom,fdenom
     real(8),save,allocatable:: dgs(:),ab(:),wdg(:,:,:),bms(:,:,:,:)
 
     if( .not. allocated(dgs) ) then
@@ -580,10 +586,10 @@ contains
       swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
 !!$      swgt= exp(-eref/natm*swbeta)
     endif
-!!$    ediff= (smpl%epot -eref)/natm/max(abs(eref/natm),eps)
-!!$    ediff= 2d0 *ediff *swgt /natm/max(abs(eref/natm),eps)
+    edenom= abs(eref/natm)
+    edenom= edenom**2 +epse
     ediff= (smpl%epot -eref)/natm
-    ediff= 2d0 *ediff *swgt /natm
+    ediff= 2d0 *ediff *swgt /natm /edenom
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)
     do ihl1=nhl(1),1,-1
@@ -627,24 +633,26 @@ contains
 
     if( .not. lfmatch ) return
     dgs(1:nvars)= 0d0
+    dn3i= 1d0/(3*natm)
+    fscale= 1d0
+    if( lfscale ) fscale= fscl
     do ia=1,natm
       do ixyz=1,3
 !!$        fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
 !!$             -smpl%fref(ixyz,ia))/max(abs(smpl%fref(ixyz,ia)),feps)
         fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
              -smpl%fref(ixyz,ia))
+        fdenom= abs(smpl%fref(ixyz,ia))
+        fdenom= fdenom*fdenom +epsf
+        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt &
+             /fdenom
       enddo
     enddo
-    dn3i= 1d0/(3*natm)
-    fscale= 1d0
-    if( lfscale ) fscale= fscl
-    do ia=1,natm
-      do ixyz=1,3
-!!$        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt &
-!!$             /max(abs(smpl%fref(ixyz,ia)),feps)
-        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt
-      enddo
-    enddo
+!!$    do ia=1,natm
+!!$      do ixyz=1,3
+!!$        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt
+!!$      enddo
+!!$    enddo
     iv= nhl(0)*nhl(1) +nhl(1)
     if( allocated( mskgfs) ) then
       do ihl1=nhl(1),1,-1

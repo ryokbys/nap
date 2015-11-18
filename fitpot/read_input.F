@@ -132,6 +132,12 @@ c=======================================================================
       elseif( trim(cname).eq.'num_iter_gfs' ) then
         call read_i1(ionum,nitergfs)
         return
+      elseif( trim(cname).eq.'eps_energy' ) then
+        call read_r1(ionum,epse)
+        return
+      elseif( trim(cname).eq.'eps_force' ) then
+        call read_r1(ionum,epsf)
+        return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return
