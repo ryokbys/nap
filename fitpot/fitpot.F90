@@ -55,6 +55,8 @@ program fitpot
       call cg_wrapper()
     case ('bfgs','BFGS','dfp','DFP')
       call qn_wrapper()
+    case ('sa','SA')
+      call sa_wrapper()
     case ('fs','FS')
       call fs_wrapper()
     case ('gfs')
@@ -145,6 +147,9 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,es12.3)') 'sample_weight_beta',swbeta
   write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
   write(6,'(2x,a25,2x,a)') 'line_minimization',trim(clinmin)
+  write(6,'(a)') ''
+  write(6,'(2x,a25,2x,es12.3)') 'sa_temperature',sa_temp0
+  write(6,'(2x,a25,2x,es12.3)') 'sa_dxwidth',sa_xw0
   write(6,'(a)') '------------------------------------------------'
 
 end subroutine write_initial_setting
@@ -458,6 +463,29 @@ subroutine cg_wrapper()
 
   return
 end subroutine cg_wrapper
+!=======================================================================
+subroutine sa_wrapper()
+  use variables
+  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use parallel
+  use minimize
+  implicit none
+  integer:: i,m
+  real(8):: fval
+  external:: write_stats
+
+  !.....NN specific code hereafter
+  call NN_init()
+  call sa(nvars,vars,fval,xtol,gtol,ftol,niter &
+       ,iprint,iflag,myid,NN_func,cfmethod &
+       ,niter_eval,write_stats)
+  call NN_analyze("fin")
+  if( cpena.eq.'lasso' .or. cpena.eq.'glasso' ) then
+    call NN_restore_standard()
+  endif
+
+  return
+end subroutine sa_wrapper
 !=======================================================================
 subroutine sgd()
 !
@@ -950,6 +978,9 @@ subroutine sync_input()
   call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lfscale,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lswgt,1,mpi_logical,0,mpi_world,ierr)
+
+  call mpi_bcast(sa_temp0,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(sa_xw0,1,mpi_double_precision,0,mpi_world,ierr)
 end subroutine sync_input
 !=======================================================================
 subroutine get_node2sample()

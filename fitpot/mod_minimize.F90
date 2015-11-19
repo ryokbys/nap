@@ -11,6 +11,10 @@ module minimize
   integer,allocatable,save:: mskgfs(:),msktmp(:)
   integer:: nitergfs=100
 
+!.....Simulated annealing parameters
+  real(8):: sa_temp0 = 1d0
+  real(8):: sa_xw0   = 1d0
+
 contains
 !=======================================================================
   subroutine steepest_descent(ndim,x,f,g,d,xtol,gtol,ftol,maxiter &
@@ -1606,4 +1610,87 @@ contains
     endif
     return
   end subroutine cap_grad
+!=======================================================================
+  subroutine sa(ndim,xbest,fbest,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
+!
+! Simulated Annealing
+!
+    implicit none
+    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
+    integer,intent(inout):: iflag
+    real(8),intent(in):: xtol,gtol,ftol
+    real(8),intent(inout):: fbest,xbest(ndim)
+    character(len=*),intent(in):: cfmethod
+    interface
+      function func(n,x)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8):: func
+      end function func
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
+    end interface
+
+    integer:: iter,idim
+    real(8):: f,ft,temp,xw,dx,prob
+    real(8),allocatable:: x(:),xt(:)
+    real(8),external:: urnd
+
+    if( .not.allocated(x) ) allocate(x(ndim),xt(ndim))
+
+!.....Initialize
+    x(1:ndim)= xbest(1:ndim)
+    f= func(ndim,x)
+    fbest= f
+    temp= sa_temp0
+    xw= sa_xw0
+
+    call sub_eval(0)
+!.....Main loop of random displacements
+    do iter=1,maxiter
+
+!.....Choose which parameter is to be displaced
+      idim= urnd()*ndim +1
+
+!.....Compute the displacement using a uniform random number
+      xt(1:ndim)= x(1:ndim)
+      dx= (2d0*urnd()-1d0)*xw*x(idim)
+      xt(idim)= xt(idim) +dx
+
+!.....Compute function value
+      ft= func(ndim,xt)
+
+!.....Compute probability of taking the displacement
+      prob= min(1d0,exp(-(ft-f)/temp))
+
+!.....Update the parameter if needed
+      if( urnd().lt.prob ) then
+        x(idim)= xt(idim)
+        f= ft
+      endif
+
+!.....Store the best one
+      if( f.lt.fbest ) then
+        fbest= f
+        xbest(1:ndim)= x(1:ndim)
+      endif
+
+      if( mod(iter,niter_eval).eq.0 ) then
+        call sub_eval(iter)
+        if( myid.eq.0 ) then
+          write(6,'(a,i10,f10.5,es15.7)') 'iter,temp,fbest='&
+               ,iter,temp,fbest
+        endif
+      endif
+
+!.....Update temperature
+      temp= dble(maxiter-iter)/maxiter *sa_temp0
+
+!.....Update displacement range
+      xw= dble(maxiter-iter)/maxiter *sa_xw0
+    enddo
+    
+  end subroutine sa
 end module
