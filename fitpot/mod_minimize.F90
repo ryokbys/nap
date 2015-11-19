@@ -1665,31 +1665,31 @@ contains
 !.....Compute probability of taking the displacement
       prob= min(1d0,exp(-(ft-f)/temp))
 
+!.....Store the best one
+      if( ft.lt.fbest ) then
+        fbest= ft
+        xbest(1:ndim)= xt(1:ndim)
+      endif
+
+      if( mod(iter,niter_eval).eq.0 ) then
+        call sub_eval(iter)
+        if( myid.eq.0 ) then
+          write(6,'(a,i10,f10.5,2es15.7)') 'iter,temp,ft-f,fbest='&
+               ,iter,temp,ft-f,fbest
+        endif
+      endif
+
 !.....Update the parameter if needed
       if( urnd().lt.prob ) then
         x(idim)= xt(idim)
         f= ft
       endif
 
-!.....Store the best one
-      if( f.lt.fbest ) then
-        fbest= f
-        xbest(1:ndim)= x(1:ndim)
-      endif
-
-      if( mod(iter,niter_eval).eq.0 ) then
-        call sub_eval(iter)
-        if( myid.eq.0 ) then
-          write(6,'(a,i10,f10.5,es15.7)') 'iter,temp,fbest='&
-               ,iter,temp,fbest
-        endif
-      endif
-
 !.....Update temperature
       temp= dble(maxiter-iter)/maxiter *sa_temp0
 
-!.....Update displacement range
-      xw= dble(maxiter-iter)/maxiter *sa_xw0
+!!$!.....Update displacement range
+!!$      xw= dble(maxiter-iter)/maxiter *sa_xw0
     enddo
     
   end subroutine sa
