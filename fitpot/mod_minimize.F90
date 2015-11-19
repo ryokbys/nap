@@ -1633,10 +1633,11 @@ contains
       end subroutine sub_eval
     end interface
 
-    integer:: iter,idim
+    integer:: iter,idim,nadpt
     real(8):: f,ft,temp,xw,dx,prob
     real(8),allocatable:: x(:),xt(:)
     real(8),external:: urnd
+    real(8),parameter:: epsx = 1d-8
 
     if( .not.allocated(x) ) allocate(x(ndim),xt(ndim))
 
@@ -1646,17 +1647,18 @@ contains
     fbest= f
     temp= sa_temp0
     xw= sa_xw0
+    nadpt= 0
 
     call sub_eval(0)
 !.....Main loop of random displacements
     do iter=1,maxiter
 
-!.....Choose which parameter is to be displaced
+!.....Choose a parameter to be displaced
       idim= urnd()*ndim +1
 
 !.....Compute the displacement using a uniform random number
       xt(1:ndim)= x(1:ndim)
-      dx= (2d0*urnd()-1d0)*xw*x(idim)
+      dx= (2d0*urnd()-1d0)*xw *(x(idim)+epsx)
       xt(idim)= xt(idim) +dx
 
 !.....Compute function value
@@ -1674,8 +1676,12 @@ contains
       if( mod(iter,niter_eval).eq.0 ) then
         call sub_eval(iter)
         if( myid.eq.0 ) then
-          write(6,'(a,i10,f10.5,2es15.7)') 'iter,temp,ft-f,fbest='&
-               ,iter,temp,ft-f,fbest
+          write(6,'(a,i10,es12.4,2es15.7,2f9.5)')&
+               'iter,temp,ft-f,fbest,prob,radpt='&
+               ,iter,temp,ft-f,fbest,prob,dble(nadpt)/iter
+!!$          if( abs(ft-f).lt.1d-15 ) then
+!!$            write(6,'(a,5es12.4)') '|ft-f|~0.0: ',ft,f,ft-f,dx,x(idim)
+!!$          endif
         endif
       endif
 
@@ -1683,6 +1689,7 @@ contains
       if( urnd().lt.prob ) then
         x(idim)= xt(idim)
         f= ft
+        nadpt= nadpt +1
       endif
 
 !.....Update temperature
@@ -1691,6 +1698,14 @@ contains
 !!$!.....Update displacement range
 !!$      xw= dble(maxiter-iter)/maxiter *sa_xw0
     enddo
+
+    if( myid.eq.0 ) then
+      write(6,'(a,i10,a,i10)') ' Num of adoption in SA='&
+           ,nadpt,'/',maxiter
+    endif
+
+!.....Finally compute the function value of the best candidate
+    f= func(ndim,xbest)
     
   end subroutine sa
 end module
