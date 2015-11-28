@@ -27,7 +27,7 @@ from atom import Atom
 
 #...constants
 _maxnn= 100
-_file_formats= ('pmd','akr','POSCAR')
+_file_formats= ('pmd','akr','POSCAR','dump')
 
 class PMDSystem(object):
     """
@@ -48,6 +48,8 @@ class PMDSystem(object):
                 self.read_akr(fname)
             elif ftype == 'POSCAR':
                 self.read_POSCAR(fname)
+            elif ftype == 'dump':
+                self.read_dump(fname)
 
     def set_lattice(self,alc,a1,a2,a3):
         self.alc= alc
@@ -63,8 +65,15 @@ class PMDSystem(object):
             ai= self.atoms[i]
             ai.set_id(i+1)
 
-    def num_atoms(self):
-        return len(self.atoms)
+    def num_atoms(self,sid=0):
+        if sid == 0:
+            return len(self.atoms)
+        else:
+            n= 0
+            for ai in self.atoms:
+                if ai.sid == sid:
+                    n += 1
+            return n
 
     def volume(self):
         return self.alc**3 *np.abs(np.dot(self.a1,np.cross(self.a2,self.a3)))
@@ -288,6 +297,70 @@ class PMDSystem(object):
                                                                 ai.vel[1],
                                                                 ai.vel[2])
                     +"\n")
+        f.close()
+
+    def read_dump(self,fname="dump"):
+        f=open(fname,'r')
+        mode= 'None'
+        ixyz= 0
+        iatm= 0
+        self.atoms= []
+        for line in f.readlines():
+            if 'ITEM: NUMBER OF ATOMS' in line:
+                mode= 'NUMBER OF ATOMS'
+                continue
+            elif 'ITEM: BOX BOUNDS' in line:
+                mode= 'BOX BOUNDS'
+                continue
+            elif 'ITEM: ATOMS' in line:
+                mode= 'ATOMS'
+                continue
+            
+            if mode == 'NUMBER OF ATOMS':
+                natm= int(line.split()[0])
+            elif mode == 'BOX BOUNDS':
+                if ixyz == 0:
+                    xlo= float(line.split()[0])
+                    xhi= float(line.split()[1])
+                    xlen= xhi -xlo
+                elif ixyz == 1:
+                    ylo= float(line.split()[0])
+                    yhi= float(line.split()[1])
+                    ylen= yhi -ylo
+                elif ixyz == 2:
+                    zlo= float(line.split()[0])
+                    zhi= float(line.split()[1])
+                    zlen= zhi -zlo
+                ixyz += 1
+            elif mode == 'ATOMS':
+                if iatm < natm:
+                    data= line.split()
+                    ai= Atom()
+                    ai.set_sid(int(data[1]))
+                    xi= float(data[2])
+                    yi= float(data[3])
+                    zi= float(data[4])
+                    xi= xi-xlo -int((xi-xlo)/xlen)*xlen
+                    yi= yi-ylo -int((yi-ylo)/ylen)*ylen
+                    zi= zi-zlo -int((zi-zlo)/zlen)*zlen
+                    if xi < 0.0:
+                        xi= xi +xlen
+                    if yi < 0.0:
+                        yi= yi +ylen
+                    if zi < 0.0:
+                        zi= zi +zlen
+                    ai.set_pos(xi/xlen,yi/ylen,zi/zlen)
+                    ai.set_vel(0.0,0.0,0.0)
+                    self.atoms.append(ai)
+                iatm += 1
+        self.alc= 1.0
+        self.a1[0]= xlen
+        self.a2[1]= ylen
+        self.a3[2]= zlen
+        print self.alc
+        print self.a1[:]
+        print self.a2[:]
+        print self.a3[:]
         f.close()
 
     def make_pair_list(self,rcut=3.0):

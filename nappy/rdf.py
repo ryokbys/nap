@@ -70,7 +70,11 @@ def rdf(asys,dr,rmax,idsrc=0,iddst=0):
 
     natm0= asys.num_atoms()
     vol= asys.volume()
-    rho= float(natm0)/vol
+    ns= asys.num_species()
+    nsrc= asys.num_atoms(sid=idsrc)
+    ndst= asys.num_atoms(sid=iddst)
+    rho= float(ndst)/vol
+    print ' natm0,nsrc,ndst,vol,rho=',natm0,nsrc,ndst,vol,rho
 
     n1,n2,n3= asys.get_expansion_num(2.0*rmax)
     if not (n1==1 and n2==1 and n3==1):
@@ -80,7 +84,6 @@ def rdf(asys,dr,rmax,idsrc=0,iddst=0):
     # print ' a2=',asys.a2
     # print ' a3=',asys.a3
 
-    natme= asys.num_atoms()
     nr= int(rmax/dr)+1
     # print " rmax,dr,nr=",rmax,dr,nr
     nadr= [0.0 for n in range(nr)]
@@ -94,7 +97,7 @@ def rdf(asys,dr,rmax,idsrc=0,iddst=0):
     for ir in range(1,nr):
         r= dr *ir
         nadr[ir]= float(nadr[ir])/(4.0*np.pi*rho*r*r*dr)
-    return rd,nadr,natm0
+    return rd,nadr,nsrc
 
 def rdf_average(infiles,ffmt='akr',dr=0.1,rmax=3.0,
                 idsrc=0,iddst=0):
