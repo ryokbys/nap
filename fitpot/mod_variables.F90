@@ -7,6 +7,7 @@ module variables
   character(len=128):: cmaindir= 'learning_set'
   character(len=128):: cparfile= 'in.params.NN'
   character(len=128):: crunmode= 'serial'
+  character(len=128):: cevaltype= 'absolute' ! (absolute|relative)
   integer:: nprcs= 1
   real(8):: epse= 1d-4
   real(8):: epsf= 1d-4

@@ -996,8 +996,8 @@ contains
   xigd= sprod(ndim,g,d)*xi
 
   f0= f
-  if(myid.eq.0) write(6,'(a,i3,2es12.4)')  &
-       ' armijo: iter,alphai,f0=',0,alphai,f0
+!!$  if(myid.eq.0) write(6,'(a,i3,2es12.4)')  &
+!!$       ' armijo: iter,alphai,f0=',0,alphai,f0
   do iter=1,MAXITER
     x1(1:ndim)= x0(1:ndim)
     if( trim(cpena).eq.'lasso' .or.trim(cpena).eq.'glasso') then
@@ -1031,9 +1031,9 @@ contains
 !!$    if(myid.eq.0)write(6,'(a,i5,5es15.7)') &
 !!$         'iter,alphai,fi,pval,fi-f0,xigd*alphai=' &
 !!$         ,iter,alphai,fi,pval,fi-f0,xigd*alphai
-    if(myid.eq.0) write(6,'(a,i3,3es15.7)')  &
-         ' armijo: iter,alphai,fi-f0,xigd*alphai=' &
-         ,iter,alphai,fi-f0,xigd*alphai
+!!$    if(myid.eq.0) write(6,'(a,i3,3es15.7)')  &
+!!$         ' armijo: iter,alphai,fi-f0,xigd*alphai=' &
+!!$         ,iter,alphai,fi-f0,xigd*alphai
     if( fi+pval-(f0+pval0).le.xigd*alphai ) then
       f= fi
       alpha= alphai

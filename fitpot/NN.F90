@@ -145,7 +145,7 @@ contains
   function NN_func(ndim,x)
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
          ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta,mdsys,erefmin &
-         ,cmaindir,epse,epsf
+         ,cmaindir,epse,epsf,cevaltype
     use parallel
     use minimize
     implicit none
@@ -182,9 +182,11 @@ contains
       eref= smpl%eref
       ediff= (smpl%epot -eref)/natm
       ediff= ediff*ediff
-      edenom= abs(eref/natm)
-      edenom= edenom**2 +epse
-      ediff= ediff/edenom
+      if( trim(cevaltype).eq.'relative' ) then
+        edenom= abs(eref/natm)
+        edenom= edenom**2 +epse
+        ediff= ediff/edenom
+      endif
       swgt= 1d0
       if( lswgt ) then
         swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
@@ -195,16 +197,28 @@ contains
       !.....force-scale makes force contribution same order to energy
       if( lfscale ) fscale= fscl
       dn3i= 1d0 /(3*natm)
-      do ia=1,natm
-        do ixyz=1,3
-          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-               -smpl%fref(ixyz,ia))
+      if( trim(cevaltype).eq.'relative' ) then
+        do ia=1,natm
+          do ixyz=1,3
+            fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+                 -smpl%fref(ixyz,ia))
+            fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia) *dn3i *fscale &
+                 *swgt
           fdenom= abs(smpl%fref(ixyz,ia))
           fdenom= fdenom*fdenom +epsf
-          fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia) *dn3i *fscale &
-               *swgt /fdenom
+          fdiff(ixyz,ia)= fdiff(ixyz,ia) /fdenom
+          enddo
         enddo
-      enddo
+      else
+        do ia=1,natm
+          do ixyz=1,3
+            fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+                 -smpl%fref(ixyz,ia))
+            fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia) *dn3i *fscale &
+                 *swgt
+          enddo
+        enddo
+      endif
 !!$      fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
 !!$           *dn3i *fscale *swgt
       do ia=1,natm
@@ -586,10 +600,13 @@ contains
       swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
 !!$      swgt= exp(-eref/natm*swbeta)
     endif
-    edenom= abs(eref/natm)
-    edenom= edenom**2 +epse
     ediff= (smpl%epot -eref)/natm
-    ediff= 2d0 *ediff *swgt /natm /edenom
+    ediff= 2d0 *ediff *swgt /natm
+    if( trim(cevaltype).eq.'relative' ) then
+      edenom= abs(eref/natm)
+      edenom= edenom**2 +epse
+      ediff= ediff/edenom
+    endif
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)
     do ihl1=nhl(1),1,-1
@@ -636,18 +653,26 @@ contains
     dn3i= 1d0/(3*natm)
     fscale= 1d0
     if( lfscale ) fscale= fscl
-    do ia=1,natm
-      do ixyz=1,3
-!!$        fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-!!$             -smpl%fref(ixyz,ia))/max(abs(smpl%fref(ixyz,ia)),feps)
-        fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-             -smpl%fref(ixyz,ia))
-        fdenom= abs(smpl%fref(ixyz,ia))
-        fdenom= fdenom*fdenom +epsf
-        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt &
-             /fdenom
+    if( trim(cevaltype).eq.'relative' ) then
+      do ia=1,natm
+        do ixyz=1,3
+          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+               -smpl%fref(ixyz,ia))
+          fdenom= abs(smpl%fref(ixyz,ia))
+          fdenom= fdenom*fdenom +epsf
+          fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt &
+               /fdenom
+        enddo
       enddo
-    enddo
+    else
+      do ia=1,natm
+        do ixyz=1,3
+          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+               -smpl%fref(ixyz,ia))
+          fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt
+        enddo
+      enddo
+    endif
 !!$    do ia=1,natm
 !!$      do ixyz=1,3
 !!$        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt

@@ -65,6 +65,9 @@ c=======================================================================
       elseif( trim(cname).eq.'run_mode' ) then
         call read_c1(ionum,crunmode)
         return
+      elseif( trim(cname).eq.'evaluation_type' ) then
+        call read_c1(ionum,cevaltype)
+        return
       elseif( trim(cname).eq.'xtol' ) then
         call read_r1(ionum,xtol)
         return

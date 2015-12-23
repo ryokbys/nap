@@ -134,6 +134,7 @@ c-------species of atom-i
       enddo
       !write(6,'(a,2i8)') " myid,natm=",myid_md,natm
 
+
 #ifdef __FITPOT__
 c.....check whether order of atoms and total-id of atoms match
       do ia=1,natm

@@ -271,6 +271,7 @@ contains
 !-----sum
     aa(1:3,1:natm)= -aa2(1:3,1:natm) -aa3(1:3,1:natm)
 
+
 !-----reduced force
     do i=1,natm
       at(1:3)= aa(1:3,i)

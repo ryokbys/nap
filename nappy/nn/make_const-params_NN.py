@@ -1,19 +1,25 @@
 #!/opt/local/bin/python
-
-u"""
+# -*- coding: utf-8 -*-
+"""
 Make in.const.NN and in.params.NN to be used in NN potential.
 And the file storing combination information, 
 in.comb.NN, is also written.
+
+Usage:
+  make_const-params_NN.py [options]
+
+Options:
+  -h, --help  Show this message and help.
 """
 
 import sys,os,random,math
-import optparse
+from docopt import docopt
 
 #=========================================================== Constants
 #.....cutoff radius in Angstrom
 rcut= 4.0
 #.....number of species
-nsp= 2
+nsp= 1
 #.....number of hidden layers
 nl = 1
 #.....num of nodes in a layer
@@ -104,6 +110,8 @@ def get_comb(nsp):
 
 #========================================================= main routine
 if __name__ == "__main__":
+
+    args= docopt(__doc__)
 
     if not nl in (1,2):
         print " [Error] nl is not 1 nor 2, nl=",nl
