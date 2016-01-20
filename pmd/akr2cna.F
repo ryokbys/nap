@@ -6,6 +6,12 @@ c   - output akr format to STDOUT
 c   - FCC crystal only?
 c   - change cutoff radius, rc, to apply this to your system
 c-----------------------------------------------------------------------
+c Usage:
+c    $ /path/to/akr2cna akr0000 cna0000
+c
+c Output:
+c    - cna0000
+c-----------------------------------------------------------------------
       implicit none
 c-----max num of neighbors; 12 is enough
       integer,parameter:: nnmax = 100
@@ -17,8 +23,10 @@ c      real(8),parameter:: abcc = 2.835d0
 c.....Cutoff radius for BCC W, halfway between 2nd and 3rd N.N.
 cc.....W @1000K = 3.226d-10
 c      real(8),parameter:: abcc = 3.226d0
-c.....W @0K = 3.171d-10
-      real(8),parameter:: abcc = 3.204d0
+cc.....W @0K = 3.171d-10
+c      real(8),parameter:: abcc = 3.204d0
+c.....Cu @0K = 3.615d-10
+      real(8),parameter:: abcc = 4.2d0
       real(8),parameter:: rc   = 0.5d0*(1d0+1.41421356d0)*abcc
 
       integer:: i,n,itmp,nauxdat,j,ix,iy,iz,m,ia,ib
@@ -293,14 +301,14 @@ c-----------------------------------------------------------------------
       real(8),intent(out):: ra(3,natm0),auxdat(nauxdat,natm0)
 
       integer:: i,j,l,m,n,ii,iii,ni,jj,nj,il,jl,n1,n2,iil,nn1,im,iim
-     &     ,ib1,ib2,iib1,iib2,n421,n422,n663,n443
+     &     ,ib1,ib2,iib1,iib2,n421,n422,n663,n443,n555
       integer,allocatable:: icommon(:),ibond(:,:),nb(:),idc(:,:,:)
-cc.....For FCC
-c      integer,parameter:: lmax= 12
+c.....For FCC
+      integer,parameter:: lmax= 12
 c      integer,parameter:: mmax= 12
-c.....For BCC
-c      integer,parameter:: lmax= 14
-      integer,parameter:: lmax= 30
+cc.....For BCC
+cc      integer,parameter:: lmax= 14
+c      integer,parameter:: lmax= 30
       integer,parameter:: mmax= lmax*(lmax-1)/2
 
       allocate(icommon(lmax),ibond(2,mmax),nb(mmax)
@@ -403,6 +411,7 @@ c-----end of atom-i
 
 c-----reduce atoms
       natm= 0
+      write(6,*) '    i, n421, n422, n663, n443, n555'
       do i=1,natm0
         if( itag(i).eq.2 ) then
           natm=natm+1
@@ -413,6 +422,7 @@ c-----reduce atoms
         n422= 0
         n663= 0
         n443= 0
+        n555= 0
         do ii=1,lspr(0,i)
           l=idc(1,ii,i)
           m=idc(2,ii,i)
@@ -424,11 +434,14 @@ c          endif
           if(l.eq.4 .and. m.eq.2 .and. n.eq.2 ) n422=n422 +1
           if(l.eq.6 .and. m.eq.6 .and. n.eq.3 ) n663=n663 +1
           if(l.eq.4 .and. m.eq.4 .and. n.eq.3 ) n443=n443 +1
+          if(l.eq.5 .and. m.eq.5 .and. n.eq.5 ) n555=n555 +1
         enddo
-c.....If perfect FCC structure, reduce the atom-i
-        if(n421.eq.12 .and. n422.eq.0) cycle
-c.....If perfect BCC structure, reduce the atom-i
-        if( n663.eq.8 .and. n443.eq.6 ) cycle
+cc.....If perfect FCC structure, reduce the atom-i
+c        if(n421.eq.12 .and. n422.eq.0) cycle
+cc.....If perfect BCC structure, reduce the atom-i
+c        if( n663.eq.8 .and. n443.eq.6 ) cycle
+        if( n555.eq.0 ) cycle
+        write(6,'(i5,":",5i6)') i,n421,n422,n663,n443,n555
         natm=natm +1
 c.....If HCP structure, itype(i)= 2
         if(n421.eq.6 .and. n422.eq.6) then

@@ -31,11 +31,11 @@ module variables
 !.....training or test
   real(8):: ratio_test= 0.1d0
 
-  character(len=5),allocatable,save:: cdirlist(:)
+  character(len=128),allocatable,save:: cdirlist(:)
   integer,allocatable,save:: nalist(:),iclist(:)
   
   type mdsys
-    character(len=5):: cdirname
+    character(len=128):: cdirname
     integer:: natm
     real(8):: h0,h(3,3),epot,eref
     real(8),allocatable:: tag(:)

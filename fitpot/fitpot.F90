@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-03-14 11:04:41 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-01-20 14:33:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -165,7 +165,7 @@ subroutine get_dir_list(ionum)
   
   if( myid.eq.0 ) then
     call system('ls '//trim(cmaindir) &
-         //' | grep "^[0-9]...." > dir_list.txt')
+         //' | grep "smpl_" > dir_list.txt')
     open(ionum,file='dir_list.txt',status='old')
     do is=1,nsmpl
       read(ionum,*,end=999) cdirlist(is)
@@ -174,7 +174,7 @@ subroutine get_dir_list(ionum)
     call shuffle_dirlist(nsmpl,cdirlist)
   endif
   call mpi_barrier(mpi_world,ierr)
-  call mpi_bcast(cdirlist,5*nsmpl,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cdirlist,128*nsmpl,mpi_character,0,mpi_world,ierr)
 
 !!$  if( myid.eq.0 ) then
 !!$    do is=1,nsmpl
@@ -248,7 +248,7 @@ subroutine read_samples()
   use parallel
   implicit none
   integer:: is
-  character*5:: cdir
+  character*128:: cdir
   integer,allocatable:: nal(:)
 
   if( .not. allocated(nalist) ) allocate(nalist(nsmpl))
@@ -306,7 +306,7 @@ subroutine read_ref_data()
   use parallel
   implicit none 
   integer:: ismpl,i,is,jflag,natm
-  character(len=5):: cdir
+  character(len=128):: cdir
   real(8):: erefminl
 
   jflag= 0
@@ -1041,10 +1041,10 @@ subroutine shuffle_dirlist(nsmpl,cdirlist)
 !
   implicit none
   integer,intent(in):: nsmpl
-  character(len=*):: cdirlist(nsmpl)
+  character(len=128):: cdirlist(nsmpl)
   real(8),external:: urnd
   integer:: i,j,k,n
-  character(len=5),allocatable:: cdltmp(:)
+  character(len=128),allocatable:: cdltmp(:)
   
   allocate(cdltmp(nsmpl))
   cdltmp(1:nsmpl)= cdirlist(1:nsmpl)

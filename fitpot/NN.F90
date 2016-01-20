@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-09-11 15:04:45 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-01-20 14:34:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -1170,13 +1170,13 @@ contains
     implicit none
 
     integer:: itmp,ismpl,natm,ia,ihl0,ja
-    character*5:: cdir
+    character*128:: cdir
 
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
       cdir= samples(ismpl)%cdirname
       !.....gsf
-      open(21,file=trim(cmaindir)//'/'//cdir//'/smd/out.NN.gsf'&
+      open(21,file=trim(cmaindir)//'/'//trim(cdir)//'/smd/out.NN.gsf'&
            ,status='old',form='unformatted')
       read(21) itmp
       do ia=1,natm
@@ -1184,7 +1184,7 @@ contains
       enddo
       close(21)
       !.....dgsf
-      open(22,file=trim(cmaindir)//'/'//cdir//'/smd/out.NN.dgsf'&
+      open(22,file=trim(cmaindir)//'/'//trim(cdir)//'/smd/out.NN.dgsf'&
            ,status='old',form='unformatted')
       do ia=1,natm
         do ihl0=1,nhl(0)
