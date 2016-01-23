@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-09-11 15:03:31 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-01-21 12:48:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -219,6 +219,7 @@ contains
     do i=1,natm
       at(1:3)= aa(1:3,i)
       aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
+!      aa(1:3,i)= hi(1,1:3)*at(1) +hi(2,1:3)*at(2) +hi(3,1:3)*at(3)
     enddo
 !-----multiply 0.5d0*dt**2/am(i)
     do i=1,natm

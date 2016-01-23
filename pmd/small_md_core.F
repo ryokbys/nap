@@ -3,7 +3,7 @@
      &     ,nbmax,nb,nnmax,aa,strs,nstp,nerg,ifpmd,npmd
      &     ,cforce,rc,rbuf,ifdmp,dmp,fmv,ekin,epot,temp,iolevel)
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2015-09-22 18:47:24 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-01-21 13:06:39 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics core routine for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -120,6 +120,7 @@ c      temp= ekin /natm/fkb *2d0/2d0
         write(ioerg,'(a)') '# istp,etot-epot0,ekin,epot-epot0,temp'
      &       //'vol(A^3),pressure(GPa)'
         write(ioerg,'(a,es15.7)') '# epot0 =',epot0
+        istp= 0
         write(ioerg,'(i8,3es15.7,f10.2,2es15.7)') istp
      &       ,(ekin+epot0-epot0),ekin,(epot0-epot0)
      &       ,temp
