@@ -24,7 +24,7 @@ class PMD(FileIOCalculator):
     """
 
     implemented_properties = ['energy', 'forces']
-    command = 'pmd > out.pmd'
+    command = 'pmd'
 
     default_parameters = {
         'num_nodes_x': 1,
@@ -37,7 +37,7 @@ class PMD(FileIOCalculator):
         'flag_out_pmd': 1,
         'num_out_pmd': 10,
         'force_type': None,
-        'cutoff_radius': 4.0,
+        'cutoff_radius': 5.0,
         'cutoff_buffer': 0.5,
         'flag_damping': 0,
         'damping_coeff': 0.95,
@@ -56,7 +56,8 @@ class PMD(FileIOCalculator):
     }
 
     def __init__(self, restart=None, ignore_bad_restart_file=False,
-                 label='pmd', atoms=None, command=None, **kwargs):
+                 label='pmd', atoms=None, command=None, 
+                 specorder=None, **kwargs):
         """Construct PMD-calculator object.
 
         Parameters
@@ -85,7 +86,12 @@ class PMD(FileIOCalculator):
 
         if command is None:
             self.command = self.label+' > out.'+self.label
-        self.command = command
+        elif '>' in command:
+            self.command = command.split('>')[0] +' > out.'+self.label
+        else:
+            self.command = command +' > out.'+self.label
+
+        self.specorder= specorder
 
     def set(self, **kwargs):
         changed_parameters = FileIOCalculator.set(self, **kwargs)
@@ -133,25 +139,34 @@ class PMD(FileIOCalculator):
         if not os.path.exists('0000'):
             os.makedirs('0000')
         with open('0000/pmd00000','w') as f:
-            f.write(get_atom_conf_txt(atoms))
+            f.write(get_atom_conf_txt(atoms,self.specorder))
 
     def write_smd(self, atoms):
         """
         Write smd atom-config file as smd0000
         """
         with open('smd0000','w') as f:
-            f.write(get_atom_conf_txt(atoms))
+            f.write(get_atom_conf_txt(atoms,self.specorder))
         
     def read_results(self):
         """
         Only erg.(pmd|smd) and frc.(pmd|smd) are to be read.
         """
+        outfname= 'out.'+self.label
         ergfname= 'erg.'+self.label
         frcfname= 'frc.'+self.label
+        if not os.path.exists(outfname):
+            raise RuntimeError(outfname+' does not exists.')
         if not os.path.exists(ergfname):
             raise RuntimeError(ergfname+' does not exists.')
         if not os.path.exists(frcfname):
             raise RuntimeError(frcfname+' does not exists.')
+
+        fout= open(outfname,'r')
+        lines= fout.readlines()
+        if not 'correct' in  lines[-1]:
+            raise RuntimeError(self.label+' seems to stop somewhere..')
+        fout.close()
 
         self.results={}
         
@@ -167,10 +182,8 @@ class PMD(FileIOCalculator):
                 frcs[i,:] = data[:]
             self.results['forces'] = frcs
         
-def get_tag(symbols,symbol,atom_id):
-    uniqsymbols= uniq(symbols)
-    uniqsymbols.sort()
-    sid= uniqsymbols.index(symbol)+1
+def get_tag(specorder,symbol,atom_id):
+    sid= specorder.index(symbol)+1
     tag= float(sid) +0.1 +atom_id*1e-14
     return '{0:16.14f}'.format(tag)
 
@@ -181,7 +194,7 @@ def uniq(lst):
             newlst.append(l)
     return newlst
 
-def get_atom_conf_txt(atoms):
+def get_atom_conf_txt(atoms,specorder=None):
     txt= ''
     # no lattice constant in ASE
     txt+='  1.00000  \n'
@@ -203,10 +216,12 @@ def get_atom_conf_txt(atoms):
     txt += ' {0:10d}\n'.format(len(atoms))
     # atom positions
     spos= atoms.get_scaled_positions()
-    symbols = atoms.get_chemical_symbols()
+    if specorder is None:
+        specorder = uniq(atoms.get_chemical_symbols())
+        specorder.sort()
     for i in range(len(atoms)):
         atom= atoms[i]
-        txt += ' {0:s}'.format(get_tag(symbols,atom.symbol,i+1))
+        txt += ' {0:s}'.format(get_tag(specorder,atom.symbol,i+1))
         txt += ' {0:12.7f} {1:12.7f} {2:12.7f}'.format(spos[i,0],spos[i,1],spos[i,2])
         txt += ' 0.0 0.0 0.0'
         txt += ' 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0\n'

@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-01-21 12:48:02 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-02-02 14:59:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -55,10 +55,16 @@ contains
 !.....read in.params.NN
       call read_params(myid,mpi_world,rcin)
 !.....reset rc
-      if( myid.le.0 ) then
+      if( myid.le.0 .and. rc .lt. rcin- 1d-8) then
         write(6,'(a,f10.5,a,f10.5)') &
-             ' Cutoff radius rc may have been changed from '&
+             ' Error: Cutoff radius rc should be corrected from '&
              ,rc,' to ',rcin
+        if( myid.ge.0 ) then
+          call mpi_finalize(ierr)
+          stop
+        else
+          stop
+        endif
       endif
       rc= rcin
       allocate( gsf(nhl(0),namax),dgsf(3,nhl(0),0:nnmax,namax) )
