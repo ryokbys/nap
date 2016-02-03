@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-02-02 14:59:42 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-02-03 21:48:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -26,6 +26,9 @@ module NN
 
 !.....max exponent of the basis function
   integer:: max_nexp
+
+!.....cutoff region width ratio to rc
+  real(8):: rcw = 0.9d0
   
 contains
   subroutine force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -67,6 +70,12 @@ contains
         endif
       endif
       rc= rcin
+      if( myid.le.0 ) then
+        write(6,'(a,i10,a)') ' gsf size  = ', &
+             nhl(0)*namax*8/1000/1000,' MB'
+        write(6,'(a,i10,a)') ' dgsf size = ', &
+             3*nhl(0)*(nnmax+1)*namax*8/1000/1000,' MB'
+      endif
       allocate( gsf(nhl(0),namax),dgsf(3,nhl(0),0:nnmax,namax) )
       if( nl.eq.1 ) then
         allocate( hl1(nhl(1),namax) )
@@ -377,20 +386,20 @@ contains
   function fc(r,rc)
     implicit none
     real(8),intent(in):: r,rc
-    real(8):: fc
+    real(8):: fc,rs
     real(8),parameter:: pi= 3.14159265358979d0
-
-    fc= 0.5d0 *(cos(r/rc*pi)+1d0)
+    rs= rc*rcw
+    fc= 0.5d0 *(cos((r-rs)/(rc-rs)*pi)+1d0)
     return
   end function fc
 !=======================================================================
   function dfc(r,rc)
     implicit none
     real(8),intent(in):: r,rc
-    real(8):: dfc
+    real(8):: dfc,rs
     real(8),parameter:: pi= 3.14159265358979d0
-
-    dfc= -pi/2/rc *sin(r/rc*pi)
+    rs= rc*rcw
+    dfc= -pi/2/(rc-rs) *sin((r-rs)/(rc-rs)*pi)
     return
   end function dfc
 !=======================================================================

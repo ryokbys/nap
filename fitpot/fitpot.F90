@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-01-20 14:33:32 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-02-02 16:37:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -715,21 +715,21 @@ subroutine write_energy_relation(cadd)
       if( iclist(ismpl).eq.1 ) then
         if( lswgt ) then
           write(90,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
-               ,epotg(ismpl),cdirlist(ismpl) &
+               ,epotg(ismpl),trim(cdirlist(ismpl)) &
                ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
         else
           write(90,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
-               ,epotg(ismpl),cdirlist(ismpl) &
+               ,epotg(ismpl),trim(cdirlist(ismpl)) &
                ,abs(erefg(ismpl)-epotg(ismpl))
         endif
       else if( iclist(ismpl).eq.2 ) then
         if( lswgt ) then
           write(91,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
-               ,epotg(ismpl),cdirlist(ismpl) &
+               ,epotg(ismpl),trim(cdirlist(ismpl)) &
                ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
         else
           write(91,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
-               ,epotg(ismpl),cdirlist(ismpl) &
+               ,epotg(ismpl),trim(cdirlist(ismpl)) &
                ,abs(erefg(ismpl)-epotg(ismpl))
         endif
 !!$        write(91,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
@@ -787,7 +787,7 @@ subroutine write_force_relation(cadd)
           do ixyz=1,3
             write(92,'(2es15.7,2x,a,i6,i3,es15.7)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
-                 ,cdirlist(ismpl),ia,ixyz &
+                 ,trim(cdirlist(ismpl)),ia,ixyz &
                  ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))
           enddo
         enddo
@@ -797,7 +797,7 @@ subroutine write_force_relation(cadd)
           do ixyz=1,3
             write(93,'(2es15.7,2x,a,i6,i3,es15.7)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
-                 ,cdirlist(ismpl),ia,ixyz &
+                 ,trim(cdirlist(ismpl)),ia,ixyz &
                  ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))
           enddo
         enddo
@@ -852,6 +852,7 @@ subroutine write_stats(iter)
   rmse_trn= sqrt(desum_trn/nsmpl_trn)
   rmse_tst= sqrt(desum_tst/nsmpl_tst)
   if( myid.eq.0 ) then
+    write(6,'(a,2i6)') 'nsmpl_trn, nsmpl_tst = ',nsmpl_trn,nsmpl_tst
     write(6,'(a,i8,f15.2,4f12.7)') '  energy:training(rmse,max)' &
          //',test(rmse,max)=',iter,mpi_wtime()-time0 &
          ,rmse_trn,demax_trn,rmse_tst,demax_tst
