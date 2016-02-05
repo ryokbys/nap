@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-02-02 16:37:50 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-02-05 16:01:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -399,7 +399,7 @@ subroutine write_vars(cadd)
       write(15,'(es23.14e3,2es12.4)') vars(i),vranges(1:2,i)
     enddo
     close(15)
-    print *, 'vars written.'
+    print *, 'wrote '//trim(cfname)
   endif
 
 end subroutine write_vars
@@ -822,6 +822,7 @@ subroutine write_stats(iter)
   real(8):: demaxl_tst,demax_tst,desuml_tst,desum_tst,rmse_tst
   real(8):: dfmaxl_trn,dfmax_trn,dfsuml_trn,dfsum_trn
   real(8):: dfmaxl_tst,dfmax_tst,dfsuml_tst,dfsum_tst
+  real(8),save:: rmse_tst_best= 1d+30
 
   demaxl_trn= 0d0
   desuml_trn= 0d0
@@ -856,6 +857,10 @@ subroutine write_stats(iter)
     write(6,'(a,i8,f15.2,4f12.7)') '  energy:training(rmse,max)' &
          //',test(rmse,max)=',iter,mpi_wtime()-time0 &
          ,rmse_trn,demax_trn,rmse_tst,demax_tst
+    if( rmse_tst < rmse_tst_best ) then
+      rmse_tst_best= rmse_tst
+      call write_vars('best')
+    endif
   endif
 
 !.....force
