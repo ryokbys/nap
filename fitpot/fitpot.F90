@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-02-05 16:01:37 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-02-11 14:39:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -365,10 +365,11 @@ subroutine read_vars()
 
   if( myid.eq.0 ) then
     open(15,file=trim(cmaindir)//'/'//cparfile,status='old')
-    read(15,*) nvars, rcut
+    read(15,*) nvars, rcut, rc3
   endif
   call mpi_bcast(nvars,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(rcut,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(rc3,1,mpi_double_precision,0,mpi_world,ierr)
   allocate(vars(nvars),vranges(2,nvars))
   if( myid.eq.0 ) then
     do i=1,nvars
@@ -394,7 +395,7 @@ subroutine write_vars(cadd)
 
   if( myid.eq.0 ) then
     open(15,file=trim(cfname),status='replace')
-    write(15,'(i10,es15.4)') nvars,rcut
+    write(15,'(i10,2es15.4)') nvars,rcut,rc3
     do i=1,nvars
       write(15,'(es23.14e3,2es12.4)') vars(i),vranges(1:2,i)
     enddo

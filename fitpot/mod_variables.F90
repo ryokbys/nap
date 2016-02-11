@@ -48,7 +48,7 @@ module variables
   type(mdsys),save,allocatable:: samples(:)
   integer,save:: nvars
   real(8),save,allocatable:: vars(:),vranges(:,:),gvar(:),dvar(:)
-  real(8),save:: rcut
+  real(8),save:: rcut,rc3
 
   real(8),save:: time0,tcomm,tfunc,tgrad
   integer,save:: nfunc,ngrad
