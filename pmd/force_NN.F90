@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-02-03 21:48:14 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-02-11 14:27:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -48,7 +48,7 @@ contains
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ja,nexp,isf &
          ,icoeff,ihl0,ihl1,ihl2,jj,jsf
-    real(8):: rcin,b_na,at(3),epotl,wgt,hl1i,hl2i,tmp2,tmp1,tmp,tmp3(3)
+    real(8):: rcin,rc3,b_na,at(3),epotl,wgt,hl1i,hl2i,tmp2,tmp1,tmp,tmp3(3)
     real(8),save,allocatable:: gsf(:,:),dgsf(:,:,:,:),hl1(:,:),hl2(:,:)
     real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
 !.....1st call
@@ -56,7 +56,7 @@ contains
 
     if( l1st ) then
 !.....read in.params.NN
-      call read_params(myid,mpi_world,rcin)
+      call read_params(myid,mpi_world,rcin,rc3)
 !.....reset rc
       if( myid.le.0 .and. rc .lt. rcin- 1d-8) then
         write(6,'(a,f10.5,a,f10.5)') &
@@ -89,7 +89,7 @@ contains
 
 !.....first, calculate all the symmetry functions
     call eval_sf(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
-         ,lspr,gsf,dgsf,rc)
+         ,lspr,gsf,dgsf,rc,rc3)
 
 #ifdef __FITPOT__
     open(80,file='out.NN.gsf',status='replace',form='unformatted')
@@ -254,13 +254,13 @@ contains
   end subroutine force_NN
 !=======================================================================
   subroutine eval_sf(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr &
-       ,gsf,dgsf,rc)
+       ,gsf,dgsf,rc,rc3)
 !
 !  Evaluate symmetry functions and derivatives for multi-species system.
 !
     implicit none
     integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,rc3
     real(8),intent(out):: gsf(nsf,natm),dgsf(3,nsf,0:nnmax,namax)
 
     integer:: isf,isfc,ia,jj,ja,kk,ka,is,js,ks,isfc1,isfc2
@@ -339,6 +339,7 @@ contains
 !!$        dfcij= dfc(dij,rc)
 !!$        driji(1:3)= -rij(1:3)/dij
 !!$        drijj(1:3)= -driji(1:3)
+        if( dij.gt.rc3 ) cycle
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           ks= int(tag(ka))
@@ -348,7 +349,7 @@ contains
           xik(1:3)= xk(1:3)-xi(1:3)
           rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
-          if( dik.ge.rc ) cycle
+          if( dik.ge.rc3 ) cycle
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
 !!$            isf= nsfc1*nc1 +(icmb3(is,js,ks)-1)*nsfc2 +isfc2
             almbd= cnst(1,isf)
@@ -389,7 +390,13 @@ contains
     real(8):: fc,rs
     real(8),parameter:: pi= 3.14159265358979d0
     rs= rc*rcw
-    fc= 0.5d0 *(cos((r-rs)/(rc-rs)*pi)+1d0)
+    if( r.le.rs ) then
+      fc= 1d0
+    else if( r.gt.rs .and. r.le.rc ) then
+      fc= 0.5d0 *(cos((r-rs)/(rc-rs)*pi)+1d0)
+    else
+      fc= 0d0
+    endif
     return
   end function fc
 !=======================================================================
@@ -399,7 +406,13 @@ contains
     real(8):: dfc,rs
     real(8),parameter:: pi= 3.14159265358979d0
     rs= rc*rcw
-    dfc= -pi/2/(rc-rs) *sin((r-rs)/(rc-rs)*pi)
+    if( r.le.rs ) then
+      dfc= 0d0
+    else if( r.gt.rs .and. r.le.rc ) then
+      dfc= -pi/2/(rc-rs) *sin((r-rs)/(rc-rs)*pi)
+    else
+      dfc= 0d0
+    endif
     return
   end function dfc
 !=======================================================================
@@ -423,12 +436,12 @@ contains
     return
   end function dsigmoid
 !=======================================================================
-  subroutine read_params(myid,mpi_world,rcin)
+  subroutine read_params(myid,mpi_world,rcin,rc3)
     implicit none
     include 'mpif.h'
 
     integer,intent(in):: myid,mpi_world
-    real(8),intent(out):: rcin
+    real(8),intent(out):: rcin,rc3
     integer:: itmp,ierr,i,j,k,nc,ncoeff,is,js,ks &
          ,n,ihl0,ihl1,ihl2,icmb(3),nsf,nsf1,nsf2,iap,jap,kap
     integer,allocatable:: nwgt(:)
@@ -563,8 +576,15 @@ contains
       endif
     endif
     open(50,file=trim(cpfname),status='old')
-    read(50,*) ncoeff,rcin
+    read(50,*) ncoeff,rcin,rc3
 !.....check whether the num of parameters is correct
+    if( rc3.gt.rcin ) then
+      rc3= rcin
+      if( myid.le.0 ) then
+        write(6,*) ' rc3 was corrected to rcin = ',rcin
+        write(6,*) ' because input rc3 > rc, which should not happen.'
+      endif
+    endif
     
     nc= 0
     do i=1,nl+1
