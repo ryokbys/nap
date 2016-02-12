@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-02-11 14:27:57 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-02-12 17:59:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -74,7 +74,7 @@ contains
         write(6,'(a,i10,a)') ' gsf size  = ', &
              nhl(0)*namax*8/1000/1000,' MB'
         write(6,'(a,i10,a)') ' dgsf size = ', &
-             3*nhl(0)*(nnmax+1)*namax*8/1000/1000,' MB'
+             int(3*nhl(0),8)*(nnmax+1)*namax*8/1000/1000,' MB'
       endif
       allocate( gsf(nhl(0),namax),dgsf(3,nhl(0),0:nnmax,namax) )
       if( nl.eq.1 ) then
