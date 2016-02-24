@@ -105,6 +105,8 @@ intstl: put_interstitials.o ${mod} util_pmd.o mk_lspr.o
 
 #.....Dependencies
 parallel_md.o: ${mods} ${forces}
+small_md_core.o: ${mods} ${forces}
+small_md.o: ${mods} ${forces} small_md_core.o
 read_input.o:  ${mods}
 node_conv.o:   ${mods}
 combine_pmd.o: ${mods}

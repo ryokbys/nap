@@ -355,6 +355,7 @@ c.....Search neighbor atoms and make the list
             lspr(0,ia)= lspr(0,ia) +1
             if( lspr(0,ia).gt.nnmax ) then
               write(6,'(a)') ' [Error] lspr(0,ia).gt.nnmax !!!'
+              write(6,'(a,2i4)') ' lspr(0,ia),nnmax=',lspr(0,ia),nnmax
               stop
             endif
             lspr(lspr(0,ia),ia)= ja

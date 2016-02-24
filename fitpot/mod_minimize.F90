@@ -493,6 +493,7 @@ contains
       else
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       endif
+      x0(1:ndim)= x(1:ndim)
       g= grad(ndim,x)
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))

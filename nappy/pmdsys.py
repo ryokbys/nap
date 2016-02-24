@@ -13,7 +13,7 @@ Options:
     --in-format=INFMT
                 Format of the input file. [default: None]
     --out-format=OUTFMT
-                Format of the output file. [default: None]
+                Format of the output file. [default: pmd]
 """
 
 import math
