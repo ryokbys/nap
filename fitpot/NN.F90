@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-01-20 14:34:00 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-02-25 12:33:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -1526,6 +1526,10 @@ contains
   end subroutine NN_analyze
 !=======================================================================
   subroutine eval_1st_layer(sumv)
+!
+!  Evaluate contributions from input nodes. Not only the sum of weights,
+!  contribution means weights*(gsf value) of every atoms in every samples.
+!
     use variables
     use parallel
     implicit none

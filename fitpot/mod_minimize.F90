@@ -1306,12 +1306,11 @@ contains
       mskgfs(1:ngl)= 1
       msktmp(1:ngl)= mskgfs(1:ngl)
     endif
-
     
     xt(1:ndim)= x(1:ndim)
     do i=1,ndim
       ig= iglid(i)
-      if( ig.gt.0 ) xt(i)= 1d-8
+      if( ig.gt.0 ) xt(i)= 1d-14
     enddo
 
     nmsks= 0

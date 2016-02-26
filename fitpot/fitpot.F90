@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-02-11 14:39:50 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-02-26 18:33:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -715,8 +715,9 @@ subroutine write_energy_relation(cadd)
       epotg(ismpl)= epotg(ismpl)/nalist(ismpl)
       if( iclist(ismpl).eq.1 ) then
         if( lswgt ) then
-          write(90,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
+          write(90,'(2es15.7,2x,a,2es15.7)') erefg(ismpl) &
                ,epotg(ismpl),trim(cdirlist(ismpl)) &
+               ,abs(erefg(ismpl)-epotg(ismpl)) &
                ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
         else
           write(90,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
@@ -725,8 +726,9 @@ subroutine write_energy_relation(cadd)
         endif
       else if( iclist(ismpl).eq.2 ) then
         if( lswgt ) then
-          write(91,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
+          write(91,'(2es15.7,2x,a,2es15.7)') erefg(ismpl) &
                ,epotg(ismpl),trim(cdirlist(ismpl)) &
+               ,abs(erefg(ismpl)-epotg(ismpl)) &
                ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
         else
           write(91,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
@@ -852,7 +854,11 @@ subroutine write_stats(iter)
   call mpi_reduce(demaxl_tst,demax_tst,1 &
        ,mpi_double_precision,mpi_max,0,mpi_world,ierr)
   rmse_trn= sqrt(desum_trn/nsmpl_trn)
-  rmse_tst= sqrt(desum_tst/nsmpl_tst)
+  if( nsmpl_tst.ne.0 ) then
+    rmse_tst= sqrt(desum_tst/nsmpl_tst)
+  else
+    rmse_tst= 0.d0
+  endif
   if( myid.eq.0 ) then
     write(6,'(a,2i6)') 'nsmpl_trn, nsmpl_tst = ',nsmpl_trn,nsmpl_tst
     write(6,'(a,i8,f15.2,4f12.7)') '  energy:training(rmse,max)' &
@@ -911,7 +917,11 @@ subroutine write_stats(iter)
   call mpi_reduce(ntstl,ntst,1 &
        ,mpi_integer,mpi_sum,0,mpi_world,ierr)
   rmse_trn= sqrt(dfsum_trn/ntrn)
-  rmse_tst= sqrt(dfsum_tst/ntst)
+  if( ntst.ne.0 ) then
+    rmse_tst= sqrt(dfsum_tst/ntst)
+  else
+    rmse_tst= 0d0
+  endif
   if( myid.eq.0 ) then
     write(6,'(a,i8,f15.2,4f12.7)') '  force:training(rmse,max)' &
          //',test(rmse,max)=',iter,mpi_wtime()-time0 &
