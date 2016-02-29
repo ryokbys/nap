@@ -152,6 +152,7 @@ c=======================================================================
         read(ionum,*) ctmp,nwgtindiv
         allocate(cwgtindiv(nwgtindiv),wgtindiv(nwgtindiv))
         call read_cr(ionum,nwgtindiv,cwgtindiv,wgtindiv)
+        return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return
