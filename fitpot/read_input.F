@@ -147,6 +147,11 @@ c=======================================================================
       elseif( trim(cname).eq.'sa_dxwidth' ) then
         call read_r1(ionum,sa_xw0)
         return
+      elseif( trim(cname).eq.'individual_weight' ) then
+        backspace(ionum)
+        read(ionum,*) ctmp,nwgtindiv
+        allocate(cwgtindiv(nwgtindiv),wgtindiv(nwgtindiv))
+        call read_cr(ionum,nwgtindiv,cwgtindiv,wgtindiv)
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return
@@ -172,6 +177,20 @@ c
 c      write(6,'(1x,a,es15.3)') trim(ctmp),rval
 
       end subroutine read_r1
+c=======================================================================
+      subroutine read_cr(ionum,nrow,cval,rval)
+c
+c  Read sets of (character, real*8)
+c
+      integer,intent(in):: ionum,nrow
+      real(8),intent(out):: rval(nrow)
+      character(len=*),intent(out):: cval(nrow)
+
+      do irow=1,nrow
+        read(ionum,*) cval(irow),rval(irow)
+      enddo
+
+      end subroutine read_cr
 c=======================================================================
       subroutine read_rs(ionum,ctmp,ndata,nrow,rval)
 c

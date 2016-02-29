@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-02-25 12:33:49 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-02-29 16:24:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -154,7 +154,7 @@ contains
     real(8):: NN_func
 
     integer:: ismpl,natm,ia,ixyz,idim
-    real(8):: dn3i,ediff,tf0,tc0,fscale,eref,swgt
+    real(8):: dn3i,ediff,tf0,tc0,fscale,eref,swgt,wgtidv
     real(8):: flocal
     real(8):: edenom,fdenom
     type(mdsys):: smpl
@@ -180,6 +180,7 @@ contains
       if( smpl%iclass.ne.1 ) cycle
       natm= smpl%natm
       eref= smpl%eref
+      wgtidv= smpl%wgt
       ediff= (smpl%epot -eref)/natm
       ediff= ediff*ediff
       if( trim(cevaltype).eq.'relative' ) then
@@ -191,7 +192,7 @@ contains
       if( lswgt ) then
         swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
       endif
-      flocal= flocal +ediff*swgt
+      flocal= flocal +ediff*swgt*wgtidv
       if( .not. lfmatch ) cycle
       fscale= 1d0
       !.....force-scale makes force contribution same order to energy
@@ -203,7 +204,7 @@ contains
             fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
                  -smpl%fref(ixyz,ia))
             fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia) *dn3i *fscale &
-                 *swgt
+                 *swgt*wgtidv
           fdenom= abs(smpl%fref(ixyz,ia))
           fdenom= fdenom*fdenom +epsf
           fdiff(ixyz,ia)= fdiff(ixyz,ia) /fdenom
@@ -215,7 +216,7 @@ contains
             fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
                  -smpl%fref(ixyz,ia))
             fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia) *dn3i *fscale &
-                 *swgt
+                 *swgt*wgtidv
           enddo
         enddo
       endif
@@ -248,7 +249,7 @@ contains
     real(8),intent(in):: x(ndim)
     real(8):: NN_fs
     integer:: natm,ia,ixyz,idim
-    real(8):: dn3i,ediff,tf0,fscale,eref,swgt,flocal,tc0
+    real(8):: dn3i,ediff,tf0,fscale,eref,swgt,flocal,tc0,wgtidv
     integer:: ismpl
     common /samplei/ ismpl
     type(mdsys):: smpl
@@ -270,12 +271,13 @@ contains
     eref= smpl%eref
     ediff= (smpl%epot -eref)/natm
     ediff= ediff*ediff
+    wgtidv= smpl%wgt
     swgt= 1d0
     if( lswgt ) then
       swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
 !!$      swgt= exp(-eref/natm*swbeta)
     endif
-    flocal= flocal +ediff*swgt
+    flocal= flocal +ediff*swgt*wgtidv
     if( .not. lfmatch ) goto 888
     fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
          -smpl%fref(1:3,1:natm))
@@ -284,7 +286,7 @@ contains
 !.....force-scale makes force contribution same order to energy
     if( lfscale ) fscale= fscl
     fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
-         *dn3i *fscale *swgt
+         *dn3i *fscale *swgt *wgtidv
     do ia=1,natm
       do ixyz=1,3
         flocal= flocal +fdiff(ixyz,ia)
@@ -584,7 +586,7 @@ contains
     type(smpldata),intent(inout):: sds
     real(8),intent(inout):: gs(nvars)
     integer:: iv,nv,ihl1,ia,ja,ihl0,jhl0,natm,ixyz
-    real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale,eref,swgt
+    real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale,eref,swgt,wgtidv
     real(8):: edenom,fdenom
     real(8),save,allocatable:: dgs(:),ab(:),wdg(:,:,:),bms(:,:,:,:)
 
@@ -595,13 +597,14 @@ contains
 
     natm= smpl%natm
     eref= smpl%eref
+    wgtidv= smpl%wgt
     swgt= 1d0
     if( lswgt ) then
       swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
 !!$      swgt= exp(-eref/natm*swbeta)
     endif
     ediff= (smpl%epot -eref)/natm
-    ediff= 2d0 *ediff *swgt /natm
+    ediff= 2d0 *ediff *swgt *wgtidv /natm
     if( trim(cevaltype).eq.'relative' ) then
       edenom= abs(eref/natm)
       edenom= edenom**2 +epse
@@ -661,7 +664,7 @@ contains
           fdenom= abs(smpl%fref(ixyz,ia))
           fdenom= fdenom*fdenom +epsf
           fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt &
-               /fdenom
+               *wgtidv /fdenom
         enddo
       enddo
     else
@@ -669,7 +672,7 @@ contains
         do ixyz=1,3
           fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
                -smpl%fref(ixyz,ia))
-          fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt
+          fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt *wgtidv
         enddo
       enddo
     endif
@@ -813,7 +816,7 @@ contains
     real(8),intent(inout):: gs(nvars)
     integer:: iv,ihl0,ihl1,ihl2,ia,ja,natm
     real(8):: ediff,tmp,tmp1,tmp2,h1,h2,w1,w2,w3,dn3i,dh1,dh2,t1,t2,t3&
-         ,ddh1,ddh2,dh1gsf,fscale,eref,swgt
+         ,ddh1,ddh2,dh1gsf,fscale,eref,swgt,wgtidv
     real(8),save,allocatable:: dgs(:),w1dg(:,:,:,:),w2sw1dg(:,:,:,:)
 
     if( .not. allocated(dgs) ) then
@@ -823,12 +826,13 @@ contains
 
     natm= smpl%natm
     eref= smpl%eref
+    wgtidv= smpl%wgt
     swgt= 1d0
     if( lswgt ) then
       swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
 !!$      swgt= exp(-eref/natm*swbeta)
     endif
-    ediff= (smpl%epot -eref)*2 /natm/natm *swgt
+    ediff= (smpl%epot -eref)*2 /natm/natm *swgt *wgtidv
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 
@@ -905,7 +909,7 @@ contains
     dn3i= 1d0/(3*natm)
     fscale= 1d0
     if( lfscale ) fscale= fscl
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscale *swgt
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscale *swgt *wgtidv
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 !.....make w1dg
     w1dg(1:3,1:natm,1:natm,1:nhl(1))= 0d0

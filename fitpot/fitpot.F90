@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-02-26 18:33:00 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-02-29 16:20:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -39,7 +39,9 @@ program fitpot
 !.....store dirname
   do ismpl=isid0,isid1
     samples(ismpl)%cdirname= cdirlist(ismpl)
+    samples(ismpl)%wgt = 1d0
   enddo
+  if( nwgtindiv.gt.0 ) call set_individual_weight()
   call set_training_test()
 
   call read_samples()
@@ -1076,4 +1078,22 @@ subroutine shuffle_dirlist(nsmpl,cdirlist)
   enddo
   deallocate(cdltmp)
 end subroutine shuffle_dirlist
+!=======================================================================
+subroutine set_individual_weight()
+  use variables
+  use parallel
+  implicit none 
+  integer:: ismpl,iwgt,idx
 
+  do ismpl=isid0,isid1
+    do iwgt= 1,nwgtindiv
+      idx= index(samples(ismpl)%cdirname,trim(cwgtindiv(iwgt)))
+      if( idx.ne.0 ) then
+        samples(ismpl)%wgt= wgtindiv(iwgt)
+      endif
+    enddo
+  enddo
+  if( myid.eq.0 ) then
+    write(6,'(a)') ' set_individual_weight done'
+  endif
+end subroutine set_individual_weight

@@ -31,13 +31,15 @@ module variables
 !.....training or test
   real(8):: ratio_test= 0.1d0
 
-  character(len=128),allocatable,save:: cdirlist(:)
+  integer:: nwgtindiv = 0
+  character(len=128),allocatable,save:: cdirlist(:),cwgtindiv(:)
   integer,allocatable,save:: nalist(:),iclist(:)
+  real(8),allocatable,save:: wgtindiv(:)
   
   type mdsys
     character(len=128):: cdirname
     integer:: natm
-    real(8):: h0,h(3,3),epot,eref
+    real(8):: h0,h(3,3),epot,eref,wgt
     real(8),allocatable:: tag(:)
     real(8),allocatable:: ra(:,:),fa(:,:),fref(:,:)
     integer:: iclass
