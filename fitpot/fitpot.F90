@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-02-29 16:20:32 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-03-03 10:54:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -152,6 +152,11 @@ subroutine write_initial_setting()
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,es12.3)') 'sa_temperature',sa_temp0
   write(6,'(2x,a25,2x,es12.3)') 'sa_dxwidth',sa_xw0
+  write(6,'(a)') ''
+  write(6,'(2x,a25,2x,i5)') 'individual_weight',nwgtindiv
+  do i=1,nwgtindiv
+    write(6,'(2x,a25,2x,f6.1)') trim(cwgtindiv(i)),wgtindiv(i)
+  enddo
   write(6,'(a)') '------------------------------------------------'
 
 end subroutine write_initial_setting
@@ -1001,6 +1006,10 @@ subroutine sync_input()
 
   call mpi_bcast(sa_temp0,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(sa_xw0,1,mpi_double_precision,0,mpi_world,ierr)
+
+  call mpi_bcast(nwgtindiv,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(cwgtindiv,128*nwgtindiv,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(wgtindiv,nwgtindiv,mpi_double_precision,0,mpi_world,ierr)
 end subroutine sync_input
 !=======================================================================
 subroutine get_node2sample()
