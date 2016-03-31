@@ -62,17 +62,18 @@ def read_params(fname):
     buf= f.readline().split()
     nprm= int(buf[0])
     rcut= float(buf[1])
+    rcut3 = float(buf[2])
     prms= []
     for iprm in range(nprm):
         buf= f.readline().split()
         prms.append(buf[0:3])
     f.close()
     print ' reading {0:s} done.'.format(fname)
-    return nprm,rcut,prms
+    return nprm,rcut,rcut3,prms
 
-def write_params(fname,nprm,rcut,prms):
+def write_params(fname,nprm,rcut,rcut3,prms):
     foprms= open(fname,'w')
-    foprms.write(' {0:6d} {1:8.4f}\n'.format(nprm,rcut))
+    foprms.write(' {0:6d} {1:8.4f} {2:7.3f}\n'.format(nprm,rcut,rcut3))
     for p in prms:
         foprms.write(' {0:15.7e}  {1:8.4f}  {2:8.4f}\n'.format(p[0],p[1],p[2]))
     foprms.close()

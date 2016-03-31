@@ -21,7 +21,7 @@ if __name__ == '__main__':
     inprms= args[1]
 
     nl,nsp,nhl,itypes,combs,consts= NN_io.read_const(incnst)
-    nprm,rcut,prms= NN_io.read_params(inprms)
+    nprm,rcut,rcut3,prms= NN_io.read_params(inprms)
     
     #.....print current configuration
     print " Current NN configuration:"
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     outcnst= incnst+'.new'
     outprms= inprms+'.new'
     NN_io.write_const(outcnst,nlnew,nsp,nhlnew,itypes,combs,consts)
-    NN_io.write_params(outprms,npnew,rcut,prmsnew)
+    NN_io.write_params(outprms,npnew,rcut,rcut3,prmsnew)
 
     print ""
     print " Output files are:"

@@ -38,7 +38,7 @@ if __name__ == '__main__':
     innnanal= args[2]
 
     nl,nsp,nhl,itypes,combs,consts= NN_io.read_const(incnst)
-    nprm,rcut,prms= NN_io.read_params(inprms)
+    nprm,rcut,rcut3,prms= NN_io.read_params(inprms)
     nnanal= NN_io.read_NN_analysis(innnanal)
     
     if nhl[0] != len(nnanal):
@@ -66,7 +66,7 @@ if __name__ == '__main__':
     for il in range(nl+1):
         focnst.write(' {0:5}'.format(nhl[il]))
     focnst.write('\n')
-    foprms.write(' {0:6d} {1:8.4f}\n'.format(npnew,rcut))
+    foprms.write(' {0:6d} {1:8.4f} {2:7.3f}\n'.format(npnew,rcut,rcut3))
     
     for isf in range(nsfold):
         if nnanal[isf][1] < threshold:
