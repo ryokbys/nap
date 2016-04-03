@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-02-29 16:24:28 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-04-03 19:36:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -154,9 +154,10 @@ contains
     real(8):: NN_func
 
     integer:: ismpl,natm,ia,ixyz,idim
-    real(8):: dn3i,ediff,tf0,tc0,fscale,eref,swgt,wgtidv
+    real(8):: dn3i,ediff,fscale,eref,swgt,wgtidv
     real(8):: flocal
     real(8):: edenom,fdenom
+    real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     type(mdsys):: smpl
 
     nfunc= nfunc +1
@@ -233,10 +234,20 @@ contains
     NN_func= 0d0
     call mpi_allreduce(flocal,NN_func,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
-    tcomm= tcomm +mpi_wtime() -tc0
+    tcl = mpi_wtime() -tc0
+!    tcomm= tcomm +mpi_wtime() -tc0
     NN_func= NN_func/nsmpl_trn
 
-    tfunc= tfunc +mpi_wtime() -tf0
+!    tfunc= tfunc +mpi_wtime() -tf0
+    tfl = mpi_wtime() -tf0
+
+!.....only the bottle-neck times are taken into account
+    call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max &
+         ,mpi_world,ierr)
+    call mpi_reduce(tfl,tfg,1,mpi_double_precision,mpi_max &
+         ,mpi_world,ierr)
+    tcomm= tcomm +tcg
+    tfunc= tfunc +tfg
     return
   end function NN_func
 !=======================================================================
@@ -495,7 +506,8 @@ contains
     
     integer:: ismpl,i,idim
     real(8),save,allocatable:: gs(:),glocal(:)
-    real(8):: gmax,vmax,tc0,tg0
+    real(8):: gmax,vmax
+    real(8):: tcl,tgl,tcg,tgg,tc0,tg0
     type(mdsys):: smpl
 
     if( .not.allocated(gs) ) allocate(gs(ndim),glocal(ndim))
@@ -521,7 +533,8 @@ contains
     NN_grad(1:ndim)= 0d0
     call mpi_allreduce(glocal,NN_grad,ndim,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
-    tcomm= tcomm +mpi_wtime() -tc0
+    tcl= mpi_wtime() -tc0
+!    tcomm= tcomm +mpi_wtime() -tc0
 
     NN_grad(1:ndim)= NN_grad(1:ndim)/nsmpl_trn
 
@@ -535,7 +548,16 @@ contains
 !!$      gval(1:ndim)= gval(1:ndim)/gmax *gscl*vmax
 !!$    endif
 
-    tgrad= tgrad +mpi_wtime() -tg0
+!    tgrad= tgrad +mpi_wtime() -tg0
+    tgl= mpi_wtime() -tg0
+!.....only the bottle-neck times are taken into account
+    call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max &
+         ,mpi_world,ierr)
+    call mpi_reduce(tgl,tgg,1,mpi_double_precision,mpi_max &
+         ,mpi_world,ierr)
+    tcomm= tcomm +tcg
+    tgrad= tgrad +tgg
+    
     return
   end function NN_grad
 !=======================================================================
@@ -1538,12 +1560,16 @@ contains
     use parallel
     implicit none
     real(8),intent(out):: sumv(nhl(0))
-    real(8),allocatable:: sumvl(:)
+    real(8),save,allocatable:: sumvl(:)
 
     integer:: ismpl,ia,ihl0,ihl1,natm
-    
-    allocate(sumvl(nhl(0)))
+    integer,save,allocatable:: ncnt(:)
+
+    if( .not.allocated(sumvl) ) then
+      allocate(sumvl(nhl(0)),ncnt(nhl(0)))
+    endif
     sumvl(1:nhl(0))= 0d0
+    ncnt(1:nhl(0))= 0
     if( nl.eq.1 ) then ! 1-layer NN
       do ismpl=isid0,isid1
         natm= samples(ismpl)%natm
@@ -1552,6 +1578,7 @@ contains
             do ihl1=1,nhl(1)
               sumvl(ihl0)= sumvl(ihl0) &
                    +abs(wgt11(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0))
+              ncnt(ihl0)= ncnt(ihl0) +1
             enddo
           enddo
         enddo
@@ -1564,16 +1591,20 @@ contains
             do ihl1=1,nhl(1)
               sumvl(ihl0)= sumvl(ihl0) &
                    +abs(wgt21(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0))
+              ncnt(ihl0)= ncnt(ihl0) +1
             enddo
           enddo
         enddo
       enddo
     endif
+    
+    do ihl0=1,nhl(0)
+      sumvl(ihl0)= sumvl(ihl0)/ncnt(ihl0)
+    enddo
 
     sumv(1:nhl(0))= 0d0
     call mpi_reduce(sumvl,sumv,nhl(0),mpi_double_precision &
          ,mpi_sum,0,mpi_world,ierr)
     
-    deallocate(sumvl)
   end subroutine eval_1st_layer
 end module NN
