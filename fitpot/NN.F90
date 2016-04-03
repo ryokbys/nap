@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-03 19:36:56 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-04-03 19:40:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -242,9 +242,9 @@ contains
     tfl = mpi_wtime() -tf0
 
 !.....only the bottle-neck times are taken into account
-    call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max &
+    call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
          ,mpi_world,ierr)
-    call mpi_reduce(tfl,tfg,1,mpi_double_precision,mpi_max &
+    call mpi_reduce(tfl,tfg,1,mpi_double_precision,mpi_max,0 &
          ,mpi_world,ierr)
     tcomm= tcomm +tcg
     tfunc= tfunc +tfg
@@ -551,9 +551,9 @@ contains
 !    tgrad= tgrad +mpi_wtime() -tg0
     tgl= mpi_wtime() -tg0
 !.....only the bottle-neck times are taken into account
-    call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max &
+    call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
          ,mpi_world,ierr)
-    call mpi_reduce(tgl,tgg,1,mpi_double_precision,mpi_max &
+    call mpi_reduce(tgl,tgg,1,mpi_double_precision,mpi_max,0 &
          ,mpi_world,ierr)
     tcomm= tcomm +tcg
     tgrad= tgrad +tgg
