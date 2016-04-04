@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-03 19:40:52 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-04-04 09:44:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -230,6 +230,9 @@ contains
       enddo
     enddo
 
+!    tfunc= tfunc +mpi_wtime() -tf0
+    tfl = mpi_wtime() -tf0
+
     tc0= mpi_wtime()
     NN_func= 0d0
     call mpi_allreduce(flocal,NN_func,1,mpi_double_precision &
@@ -238,8 +241,6 @@ contains
 !    tcomm= tcomm +mpi_wtime() -tc0
     NN_func= NN_func/nsmpl_trn
 
-!    tfunc= tfunc +mpi_wtime() -tf0
-    tfl = mpi_wtime() -tf0
 
 !.....only the bottle-neck times are taken into account
     call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
@@ -529,6 +530,9 @@ contains
       glocal(1:ndim)= glocal(1:ndim) +gs(1:ndim)
     enddo
 
+!    tgrad= tgrad +mpi_wtime() -tg0
+    tgl= mpi_wtime() -tg0
+
     tc0= mpi_wtime()
     NN_grad(1:ndim)= 0d0
     call mpi_allreduce(glocal,NN_grad,ndim,mpi_double_precision &
@@ -548,8 +552,6 @@ contains
 !!$      gval(1:ndim)= gval(1:ndim)/gmax *gscl*vmax
 !!$    endif
 
-!    tgrad= tgrad +mpi_wtime() -tg0
-    tgl= mpi_wtime() -tg0
 !.....only the bottle-neck times are taken into account
     call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
          ,mpi_world,ierr)

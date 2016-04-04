@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-03-03 11:19:21 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-04-04 09:46:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -93,15 +93,15 @@ program fitpot
        call write_eliminated_vars()
 !!$  write(6,'(a,i4,3f15.3)') ' myid,tfunc,tgrad,tcom=' &
 !!$       ,myid,tfunc,tgrad,tcomm
-  tmp= tfunc
-  call mpi_reduce(tmp,tfunc,1,mpi_double_precision,mpi_max &
-       ,0,mpi_world,ierr)
-  tmp= tgrad
-  call mpi_reduce(tmp,tgrad,1,mpi_double_precision,mpi_max &
-       ,0,mpi_world,ierr)
-  tmp= tcomm
-  call mpi_reduce(tmp,tcomm,1,mpi_double_precision,mpi_max &
-       ,0,mpi_world,ierr)
+!!$  tmp= tfunc
+!!$  call mpi_reduce(tmp,tfunc,1,mpi_double_precision,mpi_max &
+!!$       ,0,mpi_world,ierr)
+!!$  tmp= tgrad
+!!$  call mpi_reduce(tmp,tgrad,1,mpi_double_precision,mpi_max &
+!!$       ,0,mpi_world,ierr)
+!!$  tmp= tcomm
+!!$  call mpi_reduce(tmp,tcomm,1,mpi_double_precision,mpi_max &
+!!$       ,0,mpi_world,ierr)
   if( myid.eq.0 ) then
     write(6,'(a,i10)') ' num of func calls=',nfunc
     write(6,'(a,i10)') ' num of grad calls=',ngrad
