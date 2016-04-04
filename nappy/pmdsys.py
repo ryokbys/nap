@@ -235,6 +235,7 @@ class PMDSystem(object):
                 ai.pos[0],ai.pos[1],ai.pos[2]))
         f.close()
 
+
     def num_species(self):
         num_species= []
         max_nsp= 0
@@ -361,6 +362,35 @@ class PMDSystem(object):
         print self.a1[:]
         print self.a2[:]
         print self.a3[:]
+        f.close()
+
+    def write_dump(self,fname='dump'):
+        """
+        Write LAMMPS dump format file.
+        Only applicable to orthogonal system.
+        """
+        f= open(fname,'w')
+        f.write(" ITEM: TIMESTEP\n")
+        f.write("0\n")
+        f.write("ITEM: NUMBER OF ATOMS\n")
+        f.write("{0:d}\n".format(len(self.atoms)))
+        f.write("ITEM: BOX BOUNDS pp pp pp\n")
+        f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a1[0]))
+        f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a2[1]))
+        f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a3[2]))
+        f.write("ITEM: ATOMS id type x y z vx vy vz\n")
+        for i in range(len(self.atoms)):
+            ai= self.atoms[i]
+            x= ai.pos[0] *self.a1[0]
+            y= ai.pos[1] *self.a2[1]
+            z= ai.pos[2] *self.a3[2]
+            vx= ai.vel[0]
+            vy= ai.vel[1]
+            vz= ai.vel[2]
+            f.write("{0:8d} {1:3d} ".format(i+1,ai.sid))
+            f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(x,y,z))
+            f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(vx,vy,vz))
+            f.write("\n")
         f.close()
 
     def make_pair_list(self,rcut=3.0):
@@ -556,3 +586,5 @@ if __name__ == "__main__":
         psys.write_akr(outfname)
     elif outfmt == 'POSCAR':
         psys.write_POSCAR(outfname)
+    elif outfmt == 'dump':
+        psys.write_dump(outfname)
