@@ -230,16 +230,18 @@ def get_atom_conf_txt(atoms,specorder=None):
 def get_input_txt(params):
     txt = ''
 
-    order=['num_nodes_x','num_nodes_y','num_nodes_z',
-           'io_format','time_interval','num_iteration',
-           'num_out_energy','flag_out_pmd','num_out_pmd',
-           'force_type','cutoff_radius','cutoff_buffer',
-           'flag_damping','damping_coeff','initial_temperature',
+    order=['num_nodes_x','num_nodes_y','num_nodes_z','',
+           'io_format','',
+           'time_interval','num_iteration','num_out_energy','',
+           'flag_out_pmd','num_out_pmd','',
+           'force_type','cutoff_radius','cutoff_buffer','',
+           'flag_damping','damping_coeff','',
+           'initial_temperature',
            'temperature_control','temperature_target',
-           'temperature_relax_time',
+           'temperature_relax_time','',
            'factor_direction','flag_isobaric','pressure_target',
-           'vol_mass_coeff','vol_change_damping','shear_stress',
-           'mass']
+           'vol_mass_coeff','vol_change_damping','shear_stress','',
+           'mass','',]
 
     int_keys=['num_nodes_x','num_nodes_y','num_nodes_z',
               'num_iteration','num_out_energy','flag_out_pmd',
@@ -253,7 +255,9 @@ def get_input_txt(params):
     for key in order:
         
         # special keys first
-        if key is 'temperature_target':
+        if key is '':
+            txt += '\n'
+        elif key is 'temperature_target':
             vals = params[key]
             for i,v in enumerate(vals):
                 txt += '{0:25s} {1:2d} {2:6.1f}\n'.format(key,i+1,v)
