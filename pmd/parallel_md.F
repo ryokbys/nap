@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2015-09-18 09:20:32 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-05 16:36:02 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -156,6 +156,9 @@ c-----ntset
 
 c-----get total number of particles
       call mpi_allreduce(natm,ntot,1,MPI_INTEGER,MPI_SUM
+     &     ,mpi_md_world,ierr)
+      nisl = nis
+      call mpi_allreduce(nisl,nis,1,MPI_INTEGER,mpi_max
      &     ,mpi_md_world,ierr)
       if(myid_md.eq.0) then
         write(6,'(a,i10)') " ntot=",ntot

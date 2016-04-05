@@ -1,11 +1,11 @@
       program node_conv
 c-----------------------------------------------------------------------
 c Node-layout converter program for pmd.
-c   Read:  pmd?????-0000 (or some other name)
-c   write: pmd?????-0000
+c   Read:  pmd????? (or some other name)
+c   write: pmd?????
 c-----------------------------------------------------------------------
 c USAGE: in case of (1,1,1)-division to (2,2,2)-division
-c   $ ./20nconv 1 1 1 2 2 2
+c   $ ./nconv 1 1 1 2 2 2
 c-----------------------------------------------------------------------
       implicit none
       integer,parameter:: namax = 2000000
@@ -30,7 +30,7 @@ c      nargc= iargc()
       if( nargc.ne.6 ) then
         write(6,'(a)') ' [Error] Wrong number of arguments !!!'
         write(6,'(a)') ' Usage:'
-        write(6,'(a)') '   $ ./20nconv 1 1 1 2 2 2'
+        write(6,'(a)') '   $ ./nconv 1 1 1 2 2 2'
         stop 
       endif
       call getarg(1,cin)
@@ -93,7 +93,7 @@ c.....Some check
           if(  ra(1,j).lt.sxog.or.ra(1,j).ge.sxog+1d0/nox.or.
      &         ra(2,j).lt.syog.or.ra(2,j).ge.syog+1d0/noy.or.
      &         ra(3,j).lt.szog.or.ra(3,j).ge.szog+1d0/noz)then
-            write(*,*)'Old node-layout error!'
+            write(6,'(a)')'Old node-layout error!'
             write(6,'(i10,3es24.15)') j,ra(1:3,j)
             write(6,'(2es24.15)') sxog, sxog+1d0/nox
             write(6,'(2es24.15)') syog, syog+1d0/noy

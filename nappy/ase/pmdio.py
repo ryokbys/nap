@@ -79,8 +79,8 @@ def write_pmd(atoms,fname='pmd00000',specorder=[]):
     Write pmd format file from ASE Atoms object.
     """
     dname = os.path.dirname(fname)
-    if not os.path.exists(dname):
-        os.makedirs(dname)
+    if dname and not os.path.exists(dname):
+        os.system('mkdir -p '+dname)
     with open(fname,'w') as f:
         f.write(get_atom_conf_txt(atoms,specorder))
 
@@ -116,9 +116,9 @@ def get_atom_conf_txt(atoms,specorder=[]):
         atom= atoms[i]
         ifmv = ifmvs[i]
         txt += ' {0:s}'.format(get_tag(specorder,atom.symbol,i+1,ifmv))
-        txt += ' {0:12.7f} {1:12.7f} {2:12.7f}'.format(spos[i,0],
-                                                       spos[i,1],
-                                                       spos[i,2])
+        txt += ' {0:23.14e} {1:23.14e} {2:23.14e}'.format(spos[i,0],
+                                                           spos[i,1],
+                                                           spos[i,2])
         txt += ' 0.0 0.0 0.0'
         txt += ' 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0\n'
     return txt
