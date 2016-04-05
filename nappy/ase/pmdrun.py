@@ -13,6 +13,8 @@ import numpy as np
 import ase.calculators.calculator
 from ase.calculators.calculator import FileIOCalculator,Calculator
 
+from pmdio import read_pmd,write_pmd,get_fmvs
+
 CALC_END_MARK = "finished correctly"
 some_changes = ['positions', 'numbers', 'cell',]
 
@@ -122,31 +124,18 @@ class PMD(FileIOCalculator):
 
         if self.label == 'pmd':
             infname = 'in.pmd'
-            self.write_pmd(atoms)
+            #self.write_pmd(atoms)
+            write_pmd(atoms,fname='0000/pmd00000',specorder=self.specorder)
             
         elif self.label == 'smd':
             infname = 'in.smd'
-            self.write_smd(atoms)
+            #self.write_smd(atoms)
+            write_pmd(atoms,fname='smd0000',specorder=self.specorder)
             
         with open(infname,'w') as f:
-            f.write(get_input_txt(self.parameters))
+            fmvs,ifmvs = get_fmvs(atoms)
+            f.write(get_input_txt(self.parameters,fmvs))
         
-    def write_pmd(self, atoms):
-        """
-        Write pmd atom-config file as 0000/pmd00000.
-        """
-        # check directory
-        if not os.path.exists('0000'):
-            os.makedirs('0000')
-        with open('0000/pmd00000','w') as f:
-            f.write(get_atom_conf_txt(atoms,self.specorder))
-
-    def write_smd(self, atoms):
-        """
-        Write smd atom-config file as smd0000
-        """
-        with open('smd0000','w') as f:
-            f.write(get_atom_conf_txt(atoms,self.specorder))
         
     def read_results(self):
         """
@@ -181,53 +170,9 @@ class PMD(FileIOCalculator):
                 data= [ float(x) for x in f.readline().split() ]
                 frcs[i,:] = data[:]
             self.results['forces'] = frcs
+
         
-def get_tag(specorder,symbol,atom_id):
-    sid= specorder.index(symbol)+1
-    tag= float(sid) +0.1 +atom_id*1e-14
-    return '{0:16.14f}'.format(tag)
-
-def uniq(lst):
-    newlst= []
-    for l in lst:
-        if not l in newlst:
-            newlst.append(l)
-    return newlst
-
-def get_atom_conf_txt(atoms,specorder=None):
-    txt= ''
-    # no lattice constant in ASE
-    txt+='  1.00000  \n'
-    # cell vectors
-    cell= atoms.cell
-    txt += ' {0:12.7f}'.format(cell[0,0]) \
-           +' {0:12.7f}'.format(cell[0,1]) \
-           +' {0:12.7f}\n'.format(cell[0,2])
-    txt += ' {0:12.7f}'.format(cell[1,0]) \
-           +' {0:12.7f}'.format(cell[1,1]) \
-           +' {0:12.7f}\n'.format(cell[1,2])
-    txt += ' {0:12.7f}'.format(cell[2,0]) \
-           +' {0:12.7f}'.format(cell[2,1]) \
-           +' {0:12.7f}\n'.format(cell[2,2])
-    txt += ' {0:12.7f} {1:12.7f} {2:12.7f}\n'.format(0.0,0.0,0.0)
-    txt += ' {0:12.7f} {1:12.7f} {2:12.7f}\n'.format(0.0,0.0,0.0)
-    txt += ' {0:12.7f} {1:12.7f} {2:12.7f}\n'.format(0.0,0.0,0.0)
-    # num of atoms
-    txt += ' {0:10d}\n'.format(len(atoms))
-    # atom positions
-    spos= atoms.get_scaled_positions()
-    if specorder is None:
-        specorder = uniq(atoms.get_chemical_symbols())
-        specorder.sort()
-    for i in range(len(atoms)):
-        atom= atoms[i]
-        txt += ' {0:s}'.format(get_tag(specorder,atom.symbol,i+1))
-        txt += ' {0:12.7f} {1:12.7f} {2:12.7f}'.format(spos[i,0],spos[i,1],spos[i,2])
-        txt += ' 0.0 0.0 0.0'
-        txt += ' 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0\n'
-    return txt
-
-def get_input_txt(params):
+def get_input_txt(params,fmvs):
     txt = ''
 
     order=['num_nodes_x','num_nodes_y','num_nodes_z','',
@@ -239,7 +184,8 @@ def get_input_txt(params):
            'initial_temperature',
            'temperature_control','temperature_target',
            'temperature_relax_time','',
-           'factor_direction','flag_isobaric','pressure_target',
+           'factor_direction','',
+           'flag_isobaric','pressure_target',
            'vol_mass_coeff','vol_change_damping','shear_stress','',
            'mass','',]
 
@@ -262,7 +208,8 @@ def get_input_txt(params):
             for i,v in enumerate(vals):
                 txt += '{0:25s} {1:2d} {2:6.1f}\n'.format(key,i+1,v)
         elif key is 'factor_direction':
-            vals = params[key]
+            #vals = params[key]
+            vals= fmvs
             txt += '{0:25s} 3 {1:d}\n'.format(key,len(vals))
             for i,v in enumerate(vals):
                 txt += '  {0:6.2f} {1:6.2f} {2:6.2f}\n'.format(v[0],v[1],v[2])
