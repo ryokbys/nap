@@ -4,7 +4,7 @@
      &     ,cforce,rc,rbuf,ifdmp,dmp,eps_conv
      &     ,fmv,ekin,epot,temp,iolevel)
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-08 15:06:58 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-08 15:14:40 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics core routine for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -66,6 +66,7 @@ c-----output every these steps, NOUTERG, NOUTPMD
       else
         noutpmd = nstp +1
       endif
+      iocntpmd= 0
       
       call setup(nismax,am,acon,fack,dt)
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)

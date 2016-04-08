@@ -14,6 +14,8 @@ Options:
                 Format of the input file. [default: None]
     --out-format=OUTFMT
                 Format of the output file. [default: pmd]
+    --specorder=SPECORDER
+                Order of species. [default: Al,Mg,Si]
 """
 
 import math
@@ -27,22 +29,25 @@ from atom import Atom
 
 #...constants
 _maxnn= 100
-_file_formats= ('pmd','akr','POSCAR','dump')
+_file_formats= ('pmd','smd','akr','POSCAR','dump')
 
 class PMDSystem(object):
     """
     Contains cell information and atoms, and provides some functionalities.
     """
 
-    def __init__(self,fname=None,ffmt=None):
+    def __init__(self,fname=None,ffmt=None,specorder=[]):
         self.a1= np.zeros(3)
         self.a2= np.zeros(3)
         self.a3= np.zeros(3)
         self.atoms= []
+        self.specorder= specorder
 
         if not fname == None:
             ftype= self.parse_filename(fname)
             if ftype == 'pmd':
+                self.read_pmd(fname)
+            elif ftype == 'smd':
                 self.read_pmd(fname)
             elif ftype == 'akr':
                 self.read_akr(fname)
@@ -370,7 +375,7 @@ class PMDSystem(object):
         Only applicable to orthogonal system.
         """
         f= open(fname,'w')
-        f.write(" ITEM: TIMESTEP\n")
+        f.write("ITEM: TIMESTEP\n")
         f.write("0\n")
         f.write("ITEM: NUMBER OF ATOMS\n")
         f.write("{0:d}\n".format(len(self.atoms)))
@@ -574,13 +579,16 @@ if __name__ == "__main__":
     outfmt= args['--out-format']
     infname= args['INFILE']
     outfname= args['OUTFILE']
+    specorder= args['--specorder'].split(',')
 
-    psys= PMDSystem(fname=infname,ffmt=infmt)
+    psys= PMDSystem(fname=infname,ffmt=infmt,specorder=specorder)
 
     if not outfmt == None:
         outfmt= psys.parse_filename(outfname)
     
     if outfmt == 'pmd':
+        psys.write_pmd(outfname)
+    elif outfmt == 'smd':
         psys.write_pmd(outfname)
     elif outfmt == 'akr':
         psys.write_akr(outfname)
