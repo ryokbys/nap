@@ -1,6 +1,6 @@
       program small_md_main
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2015-09-22 18:26:48 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-08 14:10:34 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics program for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -16,6 +16,10 @@ c-----------------------------------------------------------------------
 
       call read_input(10,'in.smd')
       call write_initial_setting()
+c.....Multiply damping factor to avoid multiplication of every step
+      if( ifdmp.eq.1 ) then
+        fmv(1:3,0:9)= fmv(1:3,0:9) *dmp
+      endif
 
       if( trim(ciofmt).ne.'ascii' ) then
         write(6,*) ' [Error] io_format must be ascii !!!'
@@ -57,7 +61,7 @@ c.....check whether order of atoms and total-id of atoms match
       call smd_core(namax,natm,h,hunit,tag,ra,va,eki,epi
      &     ,nis,nismax,am,dt,vol,tinit
      &     ,nbmax,nb,nnmax,aa,strs,nstp,nerg,ifpmd,npmd
-     &     ,cforce,rc,rbuf,ifdmp,dmp,fmv,ekin,epot,temp,1)
+     &     ,cforce,rc,rbuf,ifdmp,dmp,eps_conv,fmv,ekin,epot,temp,1)
 
       call write_force(20,natm,aa)
       call write_energy(21,epot)

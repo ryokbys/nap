@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-05 16:36:02 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-08 14:58:46 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -31,10 +31,11 @@ c.....Epot threshold for disl core extraction [Hartree]
       real(8),parameter:: epith = -0.1410d0
 #endif
 
-      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave
-      real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3)
+      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl
+      real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epotp
       integer,external:: ispOf,ifmvOf,itotOf
       real(8),external:: box_muller,sprod
+      logical:: lconverged = .false.
 c-----output file names
       character:: cnode*5,cnum*4
 
@@ -207,7 +208,7 @@ c.....Calc forces
      &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,avol
      &     ,cforce)
       epot= epot0
-
+      epotp = 0d0
 
 #ifdef __SHEAR__
       call add_shear_stress(natm,ra,aa,tag,sorg,shrfx)
@@ -587,10 +588,24 @@ c.....Output disl core pos
           call perf_disl_pos_by_pot(epith,natm,ra,h,epi,sorg
      &         ,nodes_md,myid_md,mpi_md_world,iocnterg,21)
 #endif
+        endif ! energy output
+
+c.....check convergence criteria if it is dumped MD
+        if( ifdmp.eq.1 .and.
+     &       abs(epot-epotp).lt.eps_conv ) then
+          if( myid_md.eq.0 ) then
+            write(6,'(a,es9.3)') 'Dumping MD converged since ediff < ',
+     &           eps_conv
+            write(6,'(a,2es20.10)') '  epot,epotp = ',epot,epotp
+            lconverged = .true.
+          endif
+        else
+          epotp = epot
         endif
 
 c-------write the particle positions
-        if(ifpmd.eq.1.and.mod(istp,noutpmd).eq.0)then
+        if(ifpmd.eq.1.and.
+     &       (mod(istp,noutpmd).eq.0.or.lconverged) )then
 c---------decide pmd-file name
           iocntpmd=iocntpmd+1
           write(cnum(1:4),'(i4.4)') iocntpmd
@@ -627,6 +642,7 @@ c.....reset pressure
         wbot= min(wbot,bbot)
 #endif
 
+        if( lconverged ) exit
       enddo
 
       tcpu2= mpi_wtime()
@@ -747,6 +763,8 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(rc,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(rbuf,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(dmp,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(eps_conv,1,MPI_DOUBLE_PRECISION,0,
+     &     mpi_md_world,ierr)
       call mpi_bcast(tinit,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(ctctl,20,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(ttgt,9,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)

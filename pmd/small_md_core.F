@@ -1,9 +1,10 @@
       subroutine smd_core(namax,natm,h,hunit,tag,ra,va,eki,epi
      &     ,nis,nismax,am,dt,vol,tinit
      &     ,nbmax,nb,nnmax,aa,strs,nstp,nerg,ifpmd,npmd
-     &     ,cforce,rc,rbuf,ifdmp,dmp,fmv,ekin,epot,temp,iolevel)
+     &     ,cforce,rc,rbuf,ifdmp,dmp,eps_conv
+     &     ,fmv,ekin,epot,temp,iolevel)
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-01-21 13:06:39 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-08 14:56:41 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics core routine for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -21,7 +22,7 @@ c.....arguments
      &     ,npmd,nbmax,nnmax,iolevel
       integer,intent(inout):: nb,ifpmd
       real(8),intent(in):: rbuf,dmp,h(3,3,0:1),hunit,dt,fmv(3,0:9)
-     &     ,am(nismax),tinit
+     &     ,am(nismax),tinit,eps_conv
       real(8),intent(inout):: tag(namax),ra(3,namax)
      &     ,va(3,namax),eki(3,3,namax),epi(namax),aa(3,namax)
      &     ,strs(3,3,namax),rc
@@ -29,16 +30,18 @@ c.....arguments
       character(len=*),intent(in):: cforce
 
 c.....local variables
-      integer:: i,ia,is,ioerg,nouterg,noutpmd,iocntpmd,istp
+      integer:: i,j,k,l,m,n
+      integer:: ia,is,ioerg,nouterg,noutpmd,iocntpmd,istp
       real(8):: tmp,at(3)
       character:: cnum*4
       integer,external:: itotOf
-      real(8):: acon(nismax),fack(nismax),tcom,avol,epot0
+      real(8):: acon(nismax),fack(nismax),tcom,avol,epot0,epotp
      &     ,g(3,3,0:1),gi(3,3),gt(3,3,0:1),hi(3,3),ht(3,3,0:1),sgm(3,3)
      &     ,sv(3,6),sorg(3)
       integer:: nn(6),myparity(3),lsrc(6)
      &     ,myid_md,nodes_md,mpi_md_world,myx,myy,myz,ierr
       integer,allocatable:: lspr(:,:),lsb(:,:)
+      logical:: lconverged = .false.
 
       allocate(lspr(0:nnmax,natm),lsb(0:nbmax,6))
 
@@ -96,6 +99,7 @@ c      enddo
      &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,avol
      &     ,cforce)
       epot= epot0
+      epotp= epot
 
 c      print *,'aa:'
 c      do ia=1,natm
@@ -132,6 +136,11 @@ c.....make MD loop starts
       do istp=1,nstp
         va(1:3,1:natm)= va(1:3,1:natm) +aa(1:3,1:natm)
         ra(1:3,1:natm)= ra(1:3,1:natm) +va(1:3,1:natm)
+c-------multiply fmv or damping
+        do i=1,natm
+          l= int(mod(tag(i)*10,10d0))
+          va(1:3,i)=va(1:3,i) *fmv(1:3,l)
+        enddo
 
         call mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf
      &       ,h,hi,sgm,lspr)
@@ -151,8 +160,20 @@ c.....make MD loop starts
           call flush(ioerg)
         endif
 
+c.....check convergence criteria if it is dumping simulation
+        if( ifdmp.eq.1 .and.
+     &       abs(epot-epotp).lt.eps_conv ) then
+          write(6,'(a,es9.3)') 'Dumping MD converged since ediff < ',
+     &         eps_conv
+          write(6,'(a,2es20.10)') '  epot,epotp = ',epot,epotp
+          lconverged = .true.
+        else
+          epotp = epot
+        endif
+
 c-------write the particle positions
-        if(ifpmd.eq.1.and.mod(istp,noutpmd).eq.0)then
+        if(ifpmd.eq.1.and.
+     &       (mod(istp,noutpmd).eq.0 .or. lconverged))then
 c---------decide pmd-file name
           iocntpmd=iocntpmd+1
           write(cnum(1:4),'(i4.4)') iocntpmd
@@ -160,6 +181,8 @@ c---------write pmd file for Akira
           call write_pmd_ascii(20,"smd"//cnum,natm,h,hunit
      &         ,tag,ra,va,eki,epi,strs,sorg,dt)
         endif
+
+        if( lconverged ) exit
 
       enddo ! end of istp=1,nstp
 

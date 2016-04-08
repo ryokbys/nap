@@ -76,6 +76,9 @@ c=======================================================================
       elseif( trim(cname).eq.'damping_coeff' ) then
         call read_r1(ionum,dmp)
         return
+      elseif( trim(cname).eq.'converge_eps' ) then
+        call read_r1(ionum,eps_conv)
+        return
       elseif( trim(cname).eq.'initial_temperature' ) then
         call read_r1(ionum,tinit)
         return

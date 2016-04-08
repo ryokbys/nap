@@ -22,6 +22,7 @@
 
   flag_damping      0
   damping_coeff     0.95d0
+  converge_eps      1d-8
 
   initial_temperature     -2000d0
   temperature_control     None
