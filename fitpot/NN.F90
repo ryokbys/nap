@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-04 09:44:32 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-04-11 18:20:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -93,8 +93,8 @@ contains
     allocate(sds(isid0:isid1))
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
-      allocate( sds(ismpl)%gsf(natm,nhl(0)) &
-           ,sds(ismpl)%dgsf(3,natm,natm,nhl(0)) )
+      allocate( sds(ismpl)%gsf(natm,nhl(0)) )
+      if( lfmatch ) allocate( sds(ismpl)%dgsf(3,natm,natm,nhl(0)) )
       if( nl.eq.1 ) then
         allocate(sds(ismpl)%hl1(natm,nhl(1)))
       else if( nl.eq.2 ) then
@@ -1212,14 +1212,16 @@ contains
       enddo
       close(21)
       !.....dgsf
-      open(22,file=trim(cmaindir)//'/'//trim(cdir)//'/smd/out.NN.dgsf'&
-           ,status='old',form='unformatted')
-      do ia=1,natm
-        do ihl0=1,nhl(0)
-          read(22) (sds(ismpl)%dgsf(1:3,ja,ia,ihl0),ja=1,natm)
+      if( lfmatch ) then
+        open(22,file=trim(cmaindir)//'/'//trim(cdir)//'/smd/out.NN.dgsf'&
+             ,status='old',form='unformatted')
+        do ia=1,natm
+          do ihl0=1,nhl(0)
+            read(22) (sds(ismpl)%dgsf(1:3,ja,ia,ihl0),ja=1,natm)
+          enddo
         enddo
-      enddo
-      close(22)
+        close(22)
+      endif
     enddo
 
 
