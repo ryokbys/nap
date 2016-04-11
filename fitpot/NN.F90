@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-11 18:20:41 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-04-11 21:01:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -162,7 +162,9 @@ contains
 
     nfunc= nfunc +1
 
+    tc0= mpi_wtime()
     call mpi_bcast(x,ndim,mpi_double_precision,0,mpi_world,ierr)
+    tcl= mpi_wtime() -tc0
     tf0= mpi_wtime()
     call vars2wgts(ndim,x)
     
@@ -237,7 +239,7 @@ contains
     NN_func= 0d0
     call mpi_allreduce(flocal,NN_func,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
-    tcl = mpi_wtime() -tc0
+    tcl = tcl + (mpi_wtime() -tc0)
 !    tcomm= tcomm +mpi_wtime() -tc0
     NN_func= NN_func/nsmpl_trn
 
