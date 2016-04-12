@@ -82,14 +82,22 @@ if __name__ == '__main__':
         #....params
         offset= isf*nhl[1]
         for ip in range(nhl[1]):
-            for p in prms[offset+ip]:
-                foprms.write('  {0:s}'.format(p))
+            for i,p in enumerate(prms[offset+ip]):
+                fp = float(p)
+                if i == 0:
+                    foprms.write(' {0:20.10e}'.format(fp))
+                else:
+                    foprms.write(' {0:9.5f}'.format(fp))
             foprms.write('\n')
             
     offset= nsfold*nhl[1]
     for prm in prms[offset:]:
-        for p in prm:
-            foprms.write('  {0:s}'.format(p))
+        for i,p in enumerate(prm):
+            fp = float(p)
+            if i == 0:
+                foprms.write(' {0:20.10e}'.format(fp))
+            else:
+                foprms.write(' {0:9.5f}'.format(fp))
         foprms.write('\n')
     
     focnst.close()
