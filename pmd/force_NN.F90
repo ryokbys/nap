@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-15 11:27:04 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-04-15 11:38:17 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -542,7 +542,7 @@ contains
     open(51,file=trim(ccfname),status='old')
 !.....num of symmetry functions, num of node in 1st hidden layer
     read(51,*) nl,nsp,(nhl(i),i=0,nl)
-    print *,' nl,nsp,(nhl(i),i=0,nl)=',nl,nsp,(nhl(i),i=0,nl)
+!    print *,' nl,nsp,(nhl(i),i=0,nl)=',nl,nsp,(nhl(i),i=0,nl)
     if( nl.gt.nlmax ) then
       if( myid.ge.0 ) then
         if( myid.eq.0 ) then
