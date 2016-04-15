@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-02-12 17:59:30 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-04-15 11:27:04 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -29,6 +29,10 @@ module NN
 
 !.....cutoff region width ratio to rc
   real(8):: rcw = 0.9d0
+
+!.....num of atoms and neighbors for dgsf array
+  integer:: nal, nnl, nalmax,nnlmax,nnltmp
+  logical:: lrealloc = .false.
   
 contains
   subroutine force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -70,13 +74,43 @@ contains
         endif
       endif
       rc= rcin
-      if( myid.le.0 ) then
-        write(6,'(a,i10,a)') ' gsf size  = ', &
-             nhl(0)*namax*8/1000/1000,' MB'
-        write(6,'(a,i10,a)') ' dgsf size = ', &
-             int(3*nhl(0),8)*(nnmax+1)*namax*8/1000/1000,' MB'
+
+!  To reduce the memory usage, compute num of atoms and num of neighbors,
+!  and add some margin for those numbers because they can change during
+!  the simulation.
+      nal = int(natm*1.1)
+      nnltmp = 0
+      do i=1,natm
+        nnltmp = max(nnltmp,lspr(0,i))
+      enddo
+      nnl = int(nnltmp*1.1)
+      if( nal .gt. namax ) then
+        write(6,'(a)') ' [Error] nal .gt.namax'
+        write(6,'(a,3i10)') '   myid,nal,namax = ',myid,nal,namax
+        stop
       endif
-      allocate( gsf(nhl(0),namax),dgsf(3,nhl(0),0:nnmax,namax) )
+      if( nnl.gt.nnmax ) then
+        write(6,'(a)') ' [Error] nl .gt.nnmax'
+        write(6,'(a,3i10)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
+        stop
+      endif
+      if( myid.ge.0 ) then
+        call mpi_reduce(nal,nalmax,1,mpi_integer,mpi_sum,0,mpi_world,ierr)
+        call mpi_reduce(nnl,nnlmax,1,mpi_integer,mpi_sum,0,mpi_world,ierr)
+      else
+        nalmax = nal
+        nnlmax = nnl
+      endif
+      if( myid.le.0 ) then
+        write(6,'(a,2i10)') ' max num of (local atoms *1.1) = ',nalmax
+        write(6,'(a,2i10)') ' max num of (neighbors *1.1)   = ',nnlmax
+        write(6,'(a,i10,a)') ' gsf size  = ', &
+             nhl(0)*nalmax*8/1000/1000,' MB'
+        write(6,'(a,i10,a)') ' dgsf size = ', &
+             int(3*nhl(0),8)*(nnlmax+1)*nalmax*8/1000/1000,' MB'
+      endif
+      allocate( gsf(nhl(0),nal),dgsf(3,nhl(0),0:nnl,nal) )
+      lrealloc = .false.
       if( nl.eq.1 ) then
         allocate( hl1(nhl(1),namax) )
       else if( nl.eq.2 ) then
@@ -86,6 +120,38 @@ contains
       gsf(nhl(0),1:namax)= 0d0
       l1st= .false.
     endif
+
+!  Since natm and nn can change every step of MD,
+!  if natm/nnltmp becomes nal/nnl, they should be updated and
+!  gsf/dgsf as well.
+    if( natm.gt.nal ) then
+      nal = int(natm*1.1)
+      if( nal .gt. namax ) then
+        write(6,'(a)') ' [Error] nal .gt.namax'
+        write(6,'(a,3i10)') '   myid,nal,namax = ',myid,nal,namax
+        stop
+      endif
+      lrealloc=.true.
+    endif
+    nnltmp = 0
+    do i=1,natm
+      nnltmp = max(nnltmp,lspr(0,ia))
+    enddo
+    if( nnltmp.gt.nnl ) then
+      nnl = int(nnltmp*1.1)
+      if( nnl.gt.nnmax ) then
+        write(6,'(a)') ' [Error] nl .gt.nnmax'
+        write(6,'(a,3i10)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
+        stop
+      endif
+      lrealloc=.true.
+    endif
+    if( allocated(dgsf).and.lrealloc ) then
+      deallocate( gsf,dgsf )
+      allocate( gsf(nhl(0),nal),dgsf(3,nhl(0),0:nnl,nal) )
+      lrealloc=.false.
+    endif
+
 
 !.....first, calculate all the symmetry functions
     call eval_sf(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
@@ -261,7 +327,7 @@ contains
     implicit none
     integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,rc3
-    real(8),intent(out):: gsf(nsf,natm),dgsf(3,nsf,0:nnmax,namax)
+    real(8),intent(out):: gsf(nsf,natm),dgsf(3,nsf,0:nnl,nal)
 
     integer:: isf,isfc,ia,jj,ja,kk,ka,is,js,ks,isfc1,isfc2
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
@@ -272,7 +338,7 @@ contains
     real(8),external:: sprod
 
     gsf(1:nsf,1:natm)= 0d0
-    dgsf(1:3,1:nsf,0:nnmax,1:natm)= 0d0
+    dgsf(1:3,1:nsf,0:nnl,1:nal)= 0d0
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
       is= int(tag(ia))
@@ -684,7 +750,7 @@ contains
     implicit none
     integer,intent(in):: ionum
     integer,intent(in):: natm,namax,nnmax,nsf,lspr(0:nnmax,namax)
-    real(8),intent(in):: dgsf(3,nsf,0:nnmax,namax),tag(namax)
+    real(8),intent(in):: dgsf(3,nsf,0:nnl,nal),tag(namax)
     integer:: ia,jj,ja,jra,isf
     real(8),allocatable:: dgsfo(:,:,:,:)
     integer,external:: itotOf
