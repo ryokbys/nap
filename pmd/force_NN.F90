@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-15 11:38:17 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-04-15 14:08:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -95,8 +95,8 @@ contains
         stop
       endif
       if( myid.ge.0 ) then
-        call mpi_reduce(nal,nalmax,1,mpi_integer,mpi_sum,0,mpi_world,ierr)
-        call mpi_reduce(nnl,nnlmax,1,mpi_integer,mpi_sum,0,mpi_world,ierr)
+        call mpi_reduce(nal,nalmax,1,mpi_integer,mpi_max,0,mpi_world,ierr)
+        call mpi_reduce(nnl,nnlmax,1,mpi_integer,mpi_max,0,mpi_world,ierr)
       else
         nalmax = nal
         nnlmax = nnl
