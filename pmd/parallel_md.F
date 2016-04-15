@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-08 15:07:11 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-15 14:19:11 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -592,7 +592,7 @@ c.....Output disl core pos
 
 c.....check convergence criteria if it is dumped MD
         if( ifdmp.eq.1 .and.
-     &       abs(epot-epotp).lt.eps_conv ) then
+     &       abs((epot-epotp)/epotp).lt.eps_conv ) then
           if( myid_md.eq.0 ) then
             write(6,'(a,es10.3)') 'Dumping MD converged since ediff < ',
      &           eps_conv
