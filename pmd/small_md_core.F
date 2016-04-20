@@ -4,7 +4,7 @@
      &     ,cforce,rc,rbuf,ifdmp,dmp,eps_conv
      &     ,fmv,ekin,epot,temp,iolevel)
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-15 14:19:38 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-19 17:26:02 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics core routine for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -162,7 +162,7 @@ c-------multiply fmv or damping
         endif
 
 c.....check convergence criteria if it is dumping simulation
-        if( ifdmp.eq.1 .and.
+        if( ifdmp.eq.1 .and. epot.lt.epotp .and.
      &       abs((epot-epotp)/epotp).lt.eps_conv ) then
           write(6,'(a,es10.3)') 'Dumping MD converged since ediff < ',
      &         eps_conv

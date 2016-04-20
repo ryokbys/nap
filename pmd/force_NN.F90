@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-15 14:08:10 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-04-20 10:48:24 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -54,7 +54,7 @@ contains
          ,icoeff,ihl0,ihl1,ihl2,jj,jsf
     real(8):: rcin,rc3,b_na,at(3),epotl,wgt,hl1i,hl2i,tmp2,tmp1,tmp,tmp3(3)
     real(8),save,allocatable:: gsf(:,:),dgsf(:,:,:,:),hl1(:,:),hl2(:,:)
-    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
+!    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
 !.....1st call
     logical,save:: l1st=.true.
 
@@ -112,12 +112,10 @@ contains
       allocate( gsf(nhl(0),nal),dgsf(3,nhl(0),0:nnl,nal) )
       lrealloc = .false.
       if( nl.eq.1 ) then
-        allocate( hl1(nhl(1),namax) )
+        allocate( hl1(nhl(1),nal) )
       else if( nl.eq.2 ) then
-        allocate( hl1(nhl(1),namax), hl2(nhl(2),namax) )
+        allocate( hl1(nhl(1),nal), hl2(nhl(2),nal) )
       endif
-!      gsf(nsf,1:natm+nb)= 0d0
-      gsf(nhl(0),1:namax)= 0d0
       l1st= .false.
     endif
 
@@ -135,7 +133,7 @@ contains
     endif
     nnltmp = 0
     do i=1,natm
-      nnltmp = max(nnltmp,lspr(0,ia))
+      nnltmp = max(nnltmp,lspr(0,i))
     enddo
     if( nnltmp.gt.nnl ) then
       nnl = int(nnltmp*1.1)
@@ -149,6 +147,13 @@ contains
     if( allocated(dgsf).and.lrealloc ) then
       deallocate( gsf,dgsf )
       allocate( gsf(nhl(0),nal),dgsf(3,nhl(0),0:nnl,nal) )
+      if( nl.eq.1 ) then
+        deallocate( hl1 )
+        allocate( hl1(nhl(1),nal) )
+      else if( nl.eq.2 ) then
+        deallocate( hl1,hl2 )
+        allocate( hl1(nhl(1),nal), hl2(nhl(2),nal) )
+      endif
       lrealloc=.false.
     endif
 
@@ -170,7 +175,7 @@ contains
 !.....2nd, calculate the node values by summing contributions from
 !.....  symmetry functions
     if( nl.eq.1 ) then
-      hl1(1:nhl(1),1:natm+nb)= 0d0
+      hl1(1:nhl(1),1:natm)= 0d0
       do ia=1,natm
 #ifdef __DEBUG__
         print *,"ia=",ia
@@ -195,8 +200,8 @@ contains
         enddo
       enddo
     else if( nl.eq.2 ) then
-      hl1(1:nhl(1),1:natm+nb)= 0d0
-      hl2(1:nhl(2),1:natm+nb)= 0d0
+      hl1(1:nhl(1),1:natm)= 0d0
+      hl2(1:nhl(2),1:natm)= 0d0
       do ia=1,natm
         do ihl1=1,nhl(1)
           tmp= 0d0
@@ -327,7 +332,7 @@ contains
     implicit none
     integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,rc3
-    real(8),intent(out):: gsf(nsf,natm),dgsf(3,nsf,0:nnl,nal)
+    real(8),intent(out):: gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal)
 
     integer:: isf,isfc,ia,jj,ja,kk,ka,is,js,ks,isfc1,isfc2
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
@@ -337,7 +342,7 @@ contains
 
     real(8),external:: sprod
 
-    gsf(1:nsf,1:natm)= 0d0
+    gsf(1:nsf,1:nal)= 0d0
     dgsf(1:3,1:nsf,0:nnl,1:nal)= 0d0
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
@@ -665,8 +670,13 @@ contains
 !.....different number of weights for different number of layers
     if( nl.eq.1 ) then
       allocate(wgt11(nhl(0),nhl(1)),wgt12(nhl(1)))
+      wgt11(1:nhl(0),1:nhl(1)) = 0d0
+      wgt12(1:nhl(1)) = 0d0
     else if( nl.eq.2 ) then
       allocate(wgt21(nhl(0),nhl(1)),wgt22(nhl(1),nhl(2)),wgt23(nhl(2)))
+      wgt21(1:nhl(0),1:nhl(1)) = 0d0
+      wgt22(1:nhl(1),1:nhl(2)) = 0d0
+      wgt23(1:nhl(2)) = 0d0
     endif
     if( nl.eq.1 ) then
       do ihl0=1,nhl(0)
@@ -693,6 +703,17 @@ contains
       enddo
     endif
     close(50)
+
+#ifdef __DEBUG__
+    if(myid.le.0) then
+      write(6,'(a)') ' DEBUG: ihl0,ihl1,wgt11(ihl0,ihl1)'
+      do ihl0=1,nhl(0)
+        do ihl1=1,nhl(1)
+          write(6,'(2i5,es15.7)') ,ihl0,ihl1,wgt11(ihl0,ihl1)
+        enddo
+      enddo
+    endif
+#endif
 
 !!$!.....read in.comb.NN
 !!$    allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
