@@ -1,10 +1,10 @@
       subroutine smd_core(namax,natm,h,hunit,tag,ra,va,eki,epi
-     &     ,nis,nismax,am,dt,vol,tinit
-     &     ,nbmax,nb,nnmax,aa,strs,nstp,nerg,ifpmd,npmd
+     &     ,nis,nismax,am,dt,vol,tinit,tfin,ttgt,tfac,trlx
+     &     ,ctctl,ndof,nbmax,nb,nnmax,aa,strs,nstp,nerg,ifpmd,npmd
      &     ,cforce,rc,rbuf,ifdmp,dmp,eps_conv
      &     ,fmv,ekin,epot,temp,iolevel)
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-19 17:26:02 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-24 14:26:21 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics core routine for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -20,18 +20,18 @@ c-----------------------------------------------------------------------
 c.....arguments
       integer,intent(in):: namax,natm,nis,nismax,nstp,nerg,ifdmp
      &     ,npmd,nbmax,nnmax,iolevel
-      integer,intent(inout):: nb,ifpmd
+      integer,intent(inout):: nb,ifpmd,ndof(9)
       real(8),intent(in):: rbuf,dmp,h(3,3,0:1),hunit,dt,fmv(3,0:9)
-     &     ,am(nismax),tinit,eps_conv
+     &     ,am(nismax),tinit,tfin,eps_conv,trlx
       real(8),intent(inout):: tag(namax),ra(3,namax)
      &     ,va(3,namax),eki(3,3,namax),epi(namax),aa(3,namax)
-     &     ,strs(3,3,namax),rc
-      real(8),intent(out):: ekin,epot,temp,vol
-      character(len=*),intent(in):: cforce
+     &     ,strs(3,3,namax),rc,tfac(9),ttgt(9)
+      real(8),intent(out):: ekin,epot,temp(9),vol
+      character(len=*),intent(in):: cforce,ctctl
 
 c.....local variables
       integer:: i,j,k,l,m,n
-      integer:: ia,is,ioerg,nouterg,noutpmd,iocntpmd,istp
+      integer:: ia,is,ioerg,nouterg,noutpmd,iocntpmd,istp,ifmv
       real(8):: tmp,at(3)
       character:: cnum*4
       integer,external:: itotOf
@@ -108,10 +108,9 @@ c        write(6,'(i5,3es15.7)') ia, aa(1:3,ia)
 c      enddo
 
       call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki)
-c-----in case of 3D, <ekin> = 3/2 *NkT
-      temp= ekin /natm/fkb *2d0/3d0
-cc-----in case of 2D, <ekin> = 2/2 *NkT
-c      temp= ekin /natm/fkb *2d0/2d0
+      call get_num_dof(natm,tag,fmv,ndof)
+c.....only use ifmv(1) for temperature
+      temp(1)= ekin /fkb *2d0 /ndof(1)
 
       if( iolevel.gt.0 ) then
         write(6,'(1x,a)') "initial values:"
@@ -119,16 +118,15 @@ c      temp= ekin /natm/fkb *2d0/2d0
      &       ,ekin," eV"
         write(6,'(1x,a,es22.14,a)') " potential energy="
      &       ,epot0," eV"
-        write(6,'(1x,a,es15.7,a)') " temperature     =",temp," K"
+        write(6,'(1x,a,es15.7,a)') " temperature     =",temp(1)," K"
 
         open(ioerg,file="out.erg",status='replace')
-        write(ioerg,'(a)') '# istp,etot-epot0,ekin,epot-epot0,temp'
-     &       //'vol(A^3),pressure(GPa)'
+        write(ioerg,'(a)') '# istp,etot-epot0,ekin,epot-epot0,temp(K)'
         write(ioerg,'(a,es15.7)') '# epot0 =',epot0
         istp= 0
         write(ioerg,'(i8,3es15.7,f10.2,2es15.7)') istp
      &       ,(ekin+epot0-epot0),ekin,(epot0-epot0)
-     &       ,temp
+     &       ,temp(1)
         call flush(ioerg)
       endif
 
@@ -152,13 +150,38 @@ c-------multiply fmv or damping
         va(1:3,1:natm)= va(1:3,1:natm) +aa(1:3,1:natm)
 
         call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki)
-        temp= ekin /natm/fkb *2d0/3d0
+        temp(1)= ekin /fkb *2d0 /ndof(1)
         if( iolevel.gt.0 ) then
-          write(6,'(a,i8,f10.2)') ' istp,temp = ',istp,temp
+          write(6,'(a,i8,f10.2)') ' istp,temp = ',istp,temp(1)
           write(ioerg,'(i8,3es15.7,f10.2,2es15.7)') istp
      &         ,(ekin+epot-epot0),ekin,(epot-epot0)
-     &         ,temp
+     &         ,temp(1)
           call flush(ioerg)
+        endif
+
+c.....temperature control by velocity scaling
+c.....note: only 1st element of array is used
+        if( trim(ctctl).eq.'Berendsen' ) then
+          ifmv = 1
+          tfac(ifmv)= 0d0
+          if( tfin.gt.0d0 ) then
+            ttgt(ifmv) = tinit +(tfin-tinit)*istp/nstp
+          endif
+          if(ndof(ifmv).le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
+          temp(ifmv)= ekin *2d0 /fkb /ndof(ifmv)
+          if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
+            tfac(ifmv)= sqrt(1d0 +dt/trlx*100d0 )
+          else
+            tfac(ifmv)= sqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv))
+     &           /temp(ifmv))
+          endif
+c          write(6,*) ttgt(ifmv),ndof(ifmv),temp(ifmv),tfac(ifmv)
+          do i=1,natm
+            ifmv= int(mod(tag(i)*10,10d0))
+            if( ifmv.ne.1 .or. ttgt(ifmv).lt.0d0 ) cycle
+            va(1:3,i)= va(1:3,i) *tfac(ifmv)
+          enddo
+          
         endif
 
 c.....check convergence criteria if it is dumping simulation
@@ -208,7 +231,7 @@ c      enddo
         write(6,'(1x,a,es22.14,a)') " potential energy="
      &       ,epot," eV"
         write(6,'(1x,a,es15.7,a)') " temperature     ="
-     &       ,temp," K"
+     &       ,temp(1)," K"
       endif
 
       end subroutine smd_core
@@ -408,6 +431,26 @@ c.....Tensor form eki
 
       end subroutine get_ekin
 c=======================================================================
+      subroutine get_num_dof(natm,tag,fmv,ndof)
+      implicit none
+      integer,intent(in):: natm
+      real(8),intent(in):: fmv(3,0:9),tag(natm)
+      integer,intent(inout):: ndof(9)
+      integer:: i,l,k
+      real(8),parameter:: deps= 1d-12
+
+      ndof(1:9)= 0d0
+      do i=1,natm
+        l= int(mod(tag(i)*10,10d0))
+        do k=1,3
+          if( abs(fmv(k,l)).lt.0.5d0 ) cycle
+          ndof(l)= ndof(l) +1
+        enddo
+      enddo
+      
+      write(6,'(a,9i9)') ' ndof=',ndof(1:9)
+      return
+      end subroutine get_num_dof
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make smd"

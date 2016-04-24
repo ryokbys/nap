@@ -82,6 +82,9 @@ c=======================================================================
       elseif( trim(cname).eq.'initial_temperature' ) then
         call read_r1(ionum,tinit)
         return
+      elseif( trim(cname).eq.'final_temperature' ) then
+        call read_r1(ionum,tfin)
+        return
       elseif( trim(cname).eq.'temperature_control' ) then
         call read_c1(ionum,ctctl)
         return

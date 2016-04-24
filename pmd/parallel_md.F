@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-15 14:19:11 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-24 09:24:52 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -713,6 +713,9 @@ c=======================================================================
       write(6,'(2x,a)') ''
 c.....temperature control
       write(6,'(2x,a25,f12.4)') 'initial_temperature',tinit
+      if( tfin.ge.0d0 ) then
+        write(6,'(2x,a25,f12.4)') 'final_temperature',tfin
+      endif
       write(6,'(2x,a25,2x,a)') 'temperature_control',ctctl
       do i=1,9
         write(6,'(2x,a25,i3,f12.4)') 'temperature_target',i,ttgt(i)
@@ -766,6 +769,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(eps_conv,1,MPI_DOUBLE_PRECISION,0,
      &     mpi_md_world,ierr)
       call mpi_bcast(tinit,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(tfin,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(ctctl,20,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(ttgt,9,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(trlx,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
