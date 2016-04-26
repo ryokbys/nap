@@ -2,9 +2,11 @@
      &     ,nis,nismax,am,dt,vol,tinit,tfin,ttgt,tfac,trlx
      &     ,ctctl,ndof,nbmax,nb,nnmax,aa,strs,nstp,nerg,ifpmd,npmd
      &     ,cforce,rc,rbuf,ifdmp,dmp,eps_conv,n_conv
-     &     ,fmv,ekin,epot,temp,iolevel)
+     &     ,fmv,ekin,epot,temp,iolevel
+     &     ,nmin_fire,finc_fire,fdec_fire
+     &     ,alp0_fire,falp_fire,dtmax_fire)
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-25 14:33:07 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-26 21:35:59 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics core routine for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -21,13 +23,17 @@ c.....arguments
       integer,intent(in):: namax,natm,nis,nismax,nstp,nerg,ifdmp
      &     ,npmd,nbmax,nnmax,iolevel,n_conv
       integer,intent(inout):: nb,ifpmd,ndof(9)
-      real(8),intent(in):: rbuf,dmp,h(3,3,0:1),hunit,dt,fmv(3,0:9)
-     &     ,am(nismax),tinit,tfin,eps_conv,trlx
-      real(8),intent(inout):: tag(namax),ra(3,namax)
+      real(8),intent(in):: rbuf,dmp,h(3,3,0:1),hunit,fmv(3,0:9)
+     &     ,tinit,tfin,eps_conv,trlx
+      real(8),intent(inout):: tag(namax),ra(3,namax),dt
      &     ,va(3,namax),eki(3,3,namax),epi(namax),aa(3,namax)
-     &     ,strs(3,3,namax),rc,tfac(9),ttgt(9)
+     &     ,strs(3,3,namax),rc,tfac(9),ttgt(9),am(nismax)
       real(8),intent(out):: ekin,epot,temp(9),vol
       character(len=*),intent(in):: cforce,ctctl
+c.....FIRE args
+      integer,intent(in):: nmin_fire
+      real(8),intent(in):: finc_fire,fdec_fire,alp0_fire,falp_fire
+     &     ,dtmax_fire
 
 c.....local variables
       integer:: i,j,k,l,m,n
@@ -43,6 +49,9 @@ c.....local variables
       integer:: i_conv
       integer,allocatable:: lspr(:,:),lsb(:,:)
       logical:: lconverged = .false.
+c.....FIRE variables
+      real(8):: alp_fire,fnorm,vnorm,fdotv
+      integer:: num_fire
 
       allocate(lspr(0:nnmax,natm),lsb(0:nbmax,6))
 
@@ -69,6 +78,13 @@ c-----output every these steps, NOUTERG, NOUTPMD
       endif
       iocntpmd= 0
       
+c.....Setup for FIRE
+      if( ifdmp.eq.2 ) then
+        alp_fire = alp0_fire
+        am(1:nismax) = 10.d0
+        num_fire = 0
+      endif
+
       call setup(nismax,am,acon,fack,dt)
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 
@@ -80,14 +96,9 @@ c.....Set initial temperature if needed
         va(1:3,1:natm)= 0d0
       endif
 
-c      print *,' hi:'
-c      print *, hi(1:3,1)
-c      print *, hi(1:3,2)
-c      print *, hi(1:3,3)
-c      print *,' sgm:'
-c      print *, sgm(1:3,1)
-c      print *, sgm(1:3,2)
-c      print *, sgm(1:3,3)
+      if( ifdmp.eq.2 ) then
+        va(1:3,1:natm) = 0d0
+      endif
 
       call mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf
      &     ,h,hi,sgm,lspr)
@@ -136,6 +147,10 @@ c.....only use ifmv(1) for temperature
 c.....make MD loop starts
       do istp=1,nstp
         va(1:3,1:natm)= va(1:3,1:natm) +aa(1:3,1:natm)
+        if( ifdmp.eq.2 ) then
+          call vfire(natm,num_fire,nmin_fire,finc_fire,fdec_fire
+     &         ,falp_fire,alp0_fire,alp_fire,aa,va,dt,dtmax_fire)
+        endif
         ra(1:3,1:natm)= ra(1:3,1:natm) +va(1:3,1:natm)
 c-------multiply fmv or damping
         do i=1,natm
@@ -187,8 +202,8 @@ c          write(6,*) ttgt(ifmv),ndof(ifmv),temp(ifmv),tfac(ifmv)
         endif
 
 c.....check convergence criteria if it is dumping simulation
-        if( ifdmp.eq.1 .and. epot.lt.epotp .and.
-     &       abs((epot-epotp)/epotp).lt.eps_conv ) then
+        if( ifdmp.gt.0 .and. epot-epotp.lt.0d0 .and.
+     &       abs(epot-epotp).lt.eps_conv ) then
           i_conv = i_conv + 1
           if( i_conv.eq.n_conv ) then
             write(6,'(a,es10.3,a,i3,a)')
@@ -458,6 +473,52 @@ c=======================================================================
       write(6,'(a,9i9)') ' ndof=',ndof(1:9)
       return
       end subroutine get_num_dof
+c=======================================================================
+      subroutine vfire(natm,num_fire,nmin_fire,finc_fire,fdec_fire
+     &     ,falp_fire,alp0_fire,alp_fire,aa,va,dt,dtmax_fire)
+      implicit none
+      integer,intent(in):: natm,nmin_fire
+      integer,intent(inout):: num_fire
+      real(8),intent(in):: finc_fire,fdec_fire,falp_fire,alp0_fire
+     &     ,aa(3,natm),dtmax_fire
+      real(8),intent(inout):: dt,alp_fire,va(3,natm)
+
+      integer:: i,ixyz
+      real(8):: fdotv,vnorm,fnorm
+
+      fdotv = 0d0
+      vnorm = 0d0
+      fnorm = 0d0
+      do i=1,natm
+        do ixyz=1,3
+          fdotv = fdotv +aa(ixyz,i)*va(ixyz,i)
+          vnorm = vnorm +va(ixyz,i)*va(ixyz,i)
+          fnorm = fnorm +aa(ixyz,i)*aa(ixyz,i)
+        enddo
+      enddo
+      vnorm = sqrt(vnorm)
+      fnorm = sqrt(fnorm)
+      do i=1,natm
+        do ixyz=1,3
+          va(ixyz,i) = (1d0 -alp_fire)*va(ixyz,i)
+     &         +alp_fire*aa(ixyz,i)/fnorm *vnorm
+        enddo
+      enddo
+      
+      if( fdotv.gt.0d0  ) then
+        num_fire = num_fire + 1
+        if( num_fire.gt.nmin_fire ) then
+          dt = dt*finc_fire
+          alp_fire = alp_fire*falp_fire
+          write(6,'(a,2f10.3)') ' dt,alp_fire = ',dt,alp_fire
+        endif
+      else
+        dt = min(dtmax_fire,dt*fdec_fire)
+        va(1:3,1:natm) = 0d0
+        alp_fire = alp0_fire
+        num_fire = 0
+      endif
+      end subroutine vfire
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make smd"

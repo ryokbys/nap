@@ -1,6 +1,6 @@
   module variables
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-25 14:29:29 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-04-26 22:00:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
     implicit none
     save
@@ -35,7 +35,8 @@
     integer:: nerg = 1000
     integer:: ifpmd= 1
     integer:: npmd = 10
-    integer:: ifdmp= 0
+    integer:: ifdmp= 0 ! 0:none, 1:damped-MD, 2:FIRE
+    character(len=20):: cmin= ''
     real(8):: dmp  = 0.9d0
     real(8):: eps_conv = 1d-8
     integer:: n_conv = 1
@@ -119,5 +120,13 @@
     real(8):: stgt(1:3,1:3)= 0d0
     real(8):: phyd,ah(3,3),aht(3,3),ptnsr(3,3) &
          ,g(3,3,0:1),gt(3,3,0:1),gi(3,3),gg(3,3)
+
+!.....FIRE parameters
+    integer:: nmin_fire = 5
+    real(8):: finc_fire = 1.1
+    real(8):: fdec_fire = 0.5
+    real(8):: alp0_fire = 0.1
+    real(8):: falp_fire = 0.99
+    real(8):: dtmax_fire = 10.0
     
   end module variables

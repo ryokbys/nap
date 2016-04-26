@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-25 14:41:08 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-26 21:18:14 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -593,8 +593,8 @@ c.....Output disl core pos
         endif ! energy output
 
 c.....check convergence criteria if it is dumped MD
-        if( ifdmp.eq.1 .and.
-     &       abs((epot-epotp)/epotp).lt.eps_conv ) then
+        if( ifdmp.eq.1 .and. epot-epotp.lt.0d0 .and.
+     &       abs(epot-epotp).lt.eps_conv ) then
           i_conv = i_conv + 1
           if( i_conv.ge.n_conv ) then
             if( myid_md.eq.0 ) then

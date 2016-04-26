@@ -1,6 +1,6 @@
       program small_md_main
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-25 14:29:54 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-26 22:02:51 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics program for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -15,6 +15,7 @@ c-----------------------------------------------------------------------
       integer,external:: itotOf
 
       call read_input(10,'in.smd')
+      call check_cmin()
       call write_initial_setting()
 c.....Multiply damping factor to avoid multiplication of every step
       if( ifdmp.eq.1 ) then
@@ -62,7 +63,9 @@ c.....check whether order of atoms and total-id of atoms match
      &     ,nis,nismax,am,dt,vol,tinit,tfin,ttgt,tfac,trlx
      &     ,ctctl,ndof,nbmax,nb,nnmax,aa,strs,nstp,nerg,ifpmd,npmd
      &     ,cforce,rc,rbuf,ifdmp,dmp,eps_conv,n_conv
-     &     ,fmv,ekin,epot,temp,1)
+     &     ,fmv,ekin,epot,temp,1
+     &     ,nmin_fire,finc_fire,fdec_fire
+     &     ,alp0_fire,falp_fire,dtmax_fire)
 
       call write_force(20,natm,aa)
       call write_energy(21,epot)
@@ -90,6 +93,9 @@ c=======================================================================
       write(6,'(2x,a25,es15.7)') 'cutoff_radius',rc
       write(6,'(2x,a25,es15.7)') 'cutoff_buffer',rbuf
       write(6,'(2x,a)') ''
+      if( cmin.ne.'' ) then
+        write(6,'(2x,a25,2x,a)') 'minimization',cmin
+      endif
       write(6,'(2x,a25,i8)') 'flag_damping',ifdmp
       write(6,'(2x,a25,es11.3)') 'damping_coeff',dmp
       write(6,'(2x,a)') ''
@@ -139,6 +145,26 @@ c.....Write out energy
 
       end subroutine write_energy
 c=======================================================================
+      subroutine check_cmin()
+      use variables
+      implicit none 
+
+      if( cmin.ne.'' ) then
+        if( cmin.eq.'none' ) then
+          ifdmp = 0
+        else if( cmin.eq.'damp' ) then
+          ifdmp = 1
+        else if( cmin.eq.'FIRE' ) then
+          ifdmp = 2
+        else
+          write(6,'(a)') ' [Warning] There is no minimization'
+     &         //' method: '//cmin
+          write(6,'(a)') '           So ifdmp is set 0.'
+          ifdmp = 0
+        endif
+      endif
+      
+      end subroutine check_cmin
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make smd"

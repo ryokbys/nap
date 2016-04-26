@@ -73,6 +73,9 @@ c=======================================================================
       elseif( trim(cname).eq.'flag_damping' ) then
         call read_i1(ionum,ifdmp)
         return
+      elseif( trim(cname).eq.'minimization' ) then
+        call read_c1(ionum,cmin)
+        return
       elseif( trim(cname).eq.'damping_coeff' ) then
         call read_r1(ionum,dmp)
         return
