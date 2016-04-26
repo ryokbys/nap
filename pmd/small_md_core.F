@@ -202,7 +202,7 @@ c          write(6,*) ttgt(ifmv),ndof(ifmv),temp(ifmv),tfac(ifmv)
         endif
 
 c.....check convergence criteria if it is dumping simulation
-        if( ifdmp.gt.0 .and. epot-epotp.lt.0d0 .and.
+        if( ifdmp.gt.0 .and. epot-epotp.le.0d0 .and.
      &       abs(epot-epotp).lt.eps_conv ) then
           i_conv = i_conv + 1
           if( i_conv.eq.n_conv ) then
@@ -508,7 +508,7 @@ c=======================================================================
       if( fdotv.gt.0d0  ) then
         num_fire = num_fire + 1
         if( num_fire.gt.nmin_fire ) then
-          dt = dt*finc_fire
+          dt = min(dtmax_fire,dt*finc_fire)
           alp_fire = alp_fire*falp_fire
           write(6,'(a,2f10.3)') ' dt,alp_fire = ',dt,alp_fire
         endif
