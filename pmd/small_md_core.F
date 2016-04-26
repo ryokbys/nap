@@ -50,7 +50,7 @@ c.....local variables
       integer,allocatable:: lspr(:,:),lsb(:,:)
       logical:: lconverged = .false.
 c.....FIRE variables
-      real(8):: alp_fire,fnorm,vnorm,fdotv
+      real(8):: alp_fire
       integer:: num_fire
 
       allocate(lspr(0:nnmax,natm),lsb(0:nbmax,6))

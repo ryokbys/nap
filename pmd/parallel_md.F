@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-26 21:18:14 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-26 22:40:15 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -38,6 +38,9 @@ c.....Epot threshold for disl core extraction [Hartree]
       logical:: lconverged = .false.
 c-----output file names
       character:: cnode*5,cnum*4
+c.....FIRE variables
+      real(8):: alp_fire,fnorm,vnorm,fdotv
+      integer:: num_fire
 
 c.....For tensile test of Al nanorod
       real(8):: strnow,ftop,fbot
@@ -56,6 +59,7 @@ c.....Set fmv as default value before reading 'in.pmd'
 
       if( myid_md.eq.0 ) then
         call read_input(10,'in.pmd')
+        call check_cmin()
         call write_initial_setting()
 c.....Multiply damping factor to avoid multiplication of every step
         if( ifdmp.eq.1 ) then
@@ -148,6 +152,13 @@ c.....check whether order of atoms and total-id of atoms match
       enddo
 #endif
 
+c.....Setup for FIRE
+      if( ifdmp.eq.2 ) then
+        alp_fire = alp0_fire
+        am(1:nismax) = 10.d0
+        num_fire = 0
+      endif
+
 c-----setup
       call setup(nismax,am,acon,fack,dt)
 c-----set HI and SGM
@@ -172,6 +183,10 @@ c.....Set initial temperature if needed
         call rm_trans_motion()
       elseif( abs(tinit).le.1d-5 ) then
         va(1:3,1:natm)= 0d0
+      endif
+
+      if( ifdmp.eq.2 ) then
+        va(1:3,1:natm) = 0d0
       endif
 
       if( trim(ctctl).eq.'Langevin' ) then
@@ -365,6 +380,10 @@ c-------multiply fmv or damping
           l= int(mod(tag(i)*10,10d0))
           va(1:3,i)=va(1:3,i) *fmv(1:3,l)
         enddo
+
+        if( ifdmp.eq.2 ) then
+          call vfire(num_fire,alp_fire)
+        endif
 
 c-------update positions
         ra(1:3,1:natm)=ra(1:3,1:natm) +va(1:3,1:natm)
@@ -593,7 +612,7 @@ c.....Output disl core pos
         endif ! energy output
 
 c.....check convergence criteria if it is dumped MD
-        if( ifdmp.eq.1 .and. epot-epotp.lt.0d0 .and.
+        if( ifdmp.gt.0 .and. epot-epotp.lt.0d0 .and.
      &       abs(epot-epotp).lt.eps_conv ) then
           i_conv = i_conv + 1
           if( i_conv.ge.n_conv ) then
@@ -715,6 +734,9 @@ c=======================================================================
       write(6,'(2x,a25,es15.7)') 'cutoff_radius',rc
       write(6,'(2x,a25,es15.7)') 'cutoff_buffer',rbuf
       write(6,'(2x,a)') ''
+      if( cmin.ne.'' ) then
+        write(6,'(2x,a25,2x,a)') 'minimization',cmin
+      endif
       write(6,'(2x,a25,i8)') 'flag_damping',ifdmp
       write(6,'(2x,a25,es11.3)') 'damping_coeff',dmp
       write(6,'(2x,a)') ''
@@ -1786,6 +1808,82 @@ c-----set center of mass motion to zero
       endif
 
       end subroutine rm_trans_motion
+c=======================================================================
+      subroutine check_cmin()
+      use variables
+      implicit none 
+
+      if( cmin.ne.'' ) then
+        if( cmin.eq.'none' ) then
+          ifdmp = 0
+        else if( cmin.eq.'damp' ) then
+          ifdmp = 1
+        else if( cmin.eq.'FIRE' ) then
+          ifdmp = 2
+        else
+          write(6,'(a)') ' [Warning] There is no minimization'
+     &         //' method: '//cmin
+          write(6,'(a)') '           So ifdmp is set 0.'
+          ifdmp = 0
+        endif
+      endif
+      
+      end subroutine check_cmin
+c=======================================================================
+      subroutine vfire(num_fire,alp_fire)
+      use variables
+      implicit none
+      include 'mpif.h'
+      integer,intent(inout):: num_fire
+      real(8),intent(inout):: alp_fire
+
+      integer:: i,ixyz
+      real(8):: fdotv,vnorm,fnorm
+      real(8):: fdotvl,vnorml,fnorml
+
+      fdotvl = 0d0
+      vnorml = 0d0
+      fnorml = 0d0
+      do i=1,natm
+        do ixyz=1,3
+          fdotvl = fdotvl +aa(ixyz,i)*va(ixyz,i)
+          vnorml = vnorml +va(ixyz,i)*va(ixyz,i)
+          fnorml = fnorml +aa(ixyz,i)*aa(ixyz,i)
+        enddo
+      enddo
+      call mpi_allreduce(vnorml,vnorm,1,mpi_double_precision
+     &     ,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(fnorml,fnorm,1,mpi_double_precision
+     &     ,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(fdotvl,fdotv,1,mpi_double_precision
+     &     ,mpi_sum,mpi_md_world,ierr)
+      vnorm = sqrt(vnorm)
+      fnorm = sqrt(fnorm)
+      do i=1,natm
+        do ixyz=1,3
+          va(ixyz,i) = (1d0 -alp_fire)*va(ixyz,i)
+     &         +alp_fire*aa(ixyz,i)/fnorm *vnorm
+        enddo
+      enddo
+      
+      if( myid_md.eq.0 ) then
+        if( fdotv.gt.0d0  ) then
+          num_fire = num_fire + 1
+          if( num_fire.gt.nmin_fire ) then
+            dt = dt*finc_fire
+            alp_fire = alp_fire*falp_fire
+          endif
+        else
+          dt = min(dtmax_fire,dt*fdec_fire)
+          va(1:3,1:natm) = 0d0
+          alp_fire = alp0_fire
+          num_fire = 0
+        endif
+      endif
+      call mpi_bcast(dt,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(alp_fire,1,mpi_double_precision,0,mpi_md_world
+     &     ,ierr)
+      end subroutine vfire
 c=======================================================================
 #ifdef __WALL__
       subroutine wall_reflect()
