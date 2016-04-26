@@ -79,6 +79,9 @@ c=======================================================================
       elseif( trim(cname).eq.'converge_eps' ) then
         call read_r1(ionum,eps_conv)
         return
+      elseif( trim(cname).eq.'converge_num' ) then
+        call read_i1(ionum,n_conv)
+        return
       elseif( trim(cname).eq.'initial_temperature' ) then
         call read_r1(ionum,tinit)
         return

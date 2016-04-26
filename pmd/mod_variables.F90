@@ -1,6 +1,6 @@
   module variables
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-24 09:23:45 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-04-25 14:29:29 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
     implicit none
     save
@@ -38,6 +38,7 @@
     integer:: ifdmp= 0
     real(8):: dmp  = 0.9d0
     real(8):: eps_conv = 1d-8
+    integer:: n_conv = 1
     real(8):: dt = 1d0
     real(8):: rc = 5.0d0
     real(8):: rbuf= 0d0

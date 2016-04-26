@@ -1,10 +1,10 @@
       subroutine smd_core(namax,natm,h,hunit,tag,ra,va,eki,epi
      &     ,nis,nismax,am,dt,vol,tinit,tfin,ttgt,tfac,trlx
      &     ,ctctl,ndof,nbmax,nb,nnmax,aa,strs,nstp,nerg,ifpmd,npmd
-     &     ,cforce,rc,rbuf,ifdmp,dmp,eps_conv
+     &     ,cforce,rc,rbuf,ifdmp,dmp,eps_conv,n_conv
      &     ,fmv,ekin,epot,temp,iolevel)
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-24 14:26:21 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-25 14:33:07 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics core routine for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -19,7 +19,7 @@ c-----------------------------------------------------------------------
 
 c.....arguments
       integer,intent(in):: namax,natm,nis,nismax,nstp,nerg,ifdmp
-     &     ,npmd,nbmax,nnmax,iolevel
+     &     ,npmd,nbmax,nnmax,iolevel,n_conv
       integer,intent(inout):: nb,ifpmd,ndof(9)
       real(8),intent(in):: rbuf,dmp,h(3,3,0:1),hunit,dt,fmv(3,0:9)
      &     ,am(nismax),tinit,tfin,eps_conv,trlx
@@ -40,6 +40,7 @@ c.....local variables
      &     ,sv(3,6),sorg(3)
       integer:: nn(6),myparity(3),lsrc(6)
      &     ,myid_md,nodes_md,mpi_md_world,myx,myy,myz,ierr
+      integer:: i_conv
       integer,allocatable:: lspr(:,:),lsb(:,:)
       logical:: lconverged = .false.
 
@@ -130,6 +131,7 @@ c.....only use ifmv(1) for temperature
         call flush(ioerg)
       endif
 
+      i_conv = 0
 
 c.....make MD loop starts
       do istp=1,nstp
@@ -187,12 +189,17 @@ c          write(6,*) ttgt(ifmv),ndof(ifmv),temp(ifmv),tfac(ifmv)
 c.....check convergence criteria if it is dumping simulation
         if( ifdmp.eq.1 .and. epot.lt.epotp .and.
      &       abs((epot-epotp)/epotp).lt.eps_conv ) then
-          write(6,'(a,es10.3)') 'Dumping MD converged since ediff < ',
-     &         eps_conv
-          write(6,'(a,2es20.10)') '  epot,epotp = ',epot,epotp
-          lconverged = .true.
+          i_conv = i_conv + 1
+          if( i_conv.eq.n_conv ) then
+            write(6,'(a,es10.3,a,i3,a)')
+     &           'Dumping MD converged since ediff < ',
+     &           eps_conv,', ',n_conv,' times'
+            write(6,'(a,2es20.10)') '  epot,epotp = ',epot,epotp
+            lconverged = .true.
+          endif
         else
           epotp = epot
+          i_conv = 0
         endif
 
 c-------write the particle positions

@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-24 09:24:52 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-04-25 14:41:08 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -31,7 +31,7 @@ c.....Epot threshold for disl core extraction [Hartree]
       real(8),parameter:: epith = -0.1410d0
 #endif
 
-      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl
+      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl,i_conv
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epotp
       integer,external:: ispOf,ifmvOf,itotOf
       real(8),external:: box_muller,sprod
@@ -352,6 +352,8 @@ c.....Set al
       al(2)= h(2,2,0)
       al(3)= h(3,3,0)
 
+      i_conv = 0
+
 c-----MD loop with velocity-Verlet--------------------------------------
       do istp=1,nstp
 
@@ -593,14 +595,19 @@ c.....Output disl core pos
 c.....check convergence criteria if it is dumped MD
         if( ifdmp.eq.1 .and.
      &       abs((epot-epotp)/epotp).lt.eps_conv ) then
-          if( myid_md.eq.0 ) then
-            write(6,'(a,es10.3)') 'Dumping MD converged since ediff < ',
-     &           eps_conv
-            write(6,'(a,2es20.10)') '  epot,epotp = ',epot,epotp
+          i_conv = i_conv + 1
+          if( i_conv.ge.n_conv ) then
+            if( myid_md.eq.0 ) then
+              write(6,'(a,es10.3,a,i3,a)')
+     &             'Dumping MD converged since ediff < ',
+     &             eps_conv,', ',n_conv,' times'
+              write(6,'(a,2es20.10)') '  epot,epotp = ',epot,epotp
+            endif
             lconverged = .true.
           endif
         else
           epotp = epot
+          i_conv = 0
         endif
 
 c-------write the particle positions
@@ -768,6 +775,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(dmp,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(eps_conv,1,MPI_DOUBLE_PRECISION,0,
      &     mpi_md_world,ierr)
+      call mpi_bcast(n_conv,1,mpi_integer,0,mpi_md_world,ierr)
       call mpi_bcast(tinit,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(tfin,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(ctctl,20,mpi_character,0,mpi_md_world,ierr)
