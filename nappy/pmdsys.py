@@ -25,11 +25,11 @@ from datetime import datetime
 import numpy as np
 from docopt import docopt
 
-from atom import Atom
+from atom import Atom,get_symbol_from_number,get_number_from_symbol
 
 #...constants
 _maxnn= 100
-_file_formats= ('pmd','smd','akr','POSCAR','dump')
+_file_formats= ('pmd','smd','akr','POSCAR','dump','xsf')
 
 class PMDSystem(object):
     """
@@ -55,6 +55,8 @@ class PMDSystem(object):
                 self.read_POSCAR(fname)
             elif ftype == 'dump':
                 self.read_dump(fname)
+            elif ftype == 'xsf':
+                self.read_xsf(fname)
 
     def set_lattice(self,alc,a1,a2,a3):
         self.alc= alc
@@ -413,6 +415,114 @@ class PMDSystem(object):
             f.write("\n")
         f.close()
 
+    def read_xsf(self,fname="xsf"):
+        f=open(fname,'r')
+        mode= 'None'
+        ixyz= 0
+        iatm= 0
+        self.atoms= []
+        natm= 0
+        for line in f.readlines():
+            if 'CRYSTAL' in line:
+                mode= 'CRYSTAL'
+                continue
+            elif 'PRIMVEC' in line:
+                mode= 'PRIMVEC'
+                continue
+            elif 'PRIMCOORD' in line:
+                mode= 'PRIMCOORD'
+                # Before going further, create inversed h-matrix
+                hi = unitvec_to_hi(self.a1,self.a2,self.a3)
+                print 'Inversed h-matrix:'
+                print hi
+                continue
+            
+            if mode == 'CRYSTAL':
+                pass
+            elif mode == 'PRIMVEC':
+                if ixyz == 0:
+                    arr = [ float(x) for x in line.split() ]
+                    self.a1[0] = arr[0]
+                    self.a1[1] = arr[1]
+                    self.a1[2] = arr[2]
+                elif ixyz == 1:
+                    arr = [ float(x) for x in line.split() ]
+                    self.a2[0] = arr[0]
+                    self.a2[1] = arr[1]
+                    self.a2[2] = arr[2]
+                elif ixyz == 2:
+                    arr = [ float(x) for x in line.split() ]
+                    self.a3[0] = arr[0]
+                    self.a3[1] = arr[1]
+                    self.a3[2] = arr[2]
+                ixyz += 1
+            elif mode == 'PRIMCOORD':
+                data = line.split()
+                if len(data) < 4:
+                    natm= int(data[0])
+                    continue
+                else:
+                    if iatm >= natm:
+                        continue
+                    symbol = get_symbol_from_number(int(data[0]))
+                    sid = self.specorder.index(symbol) +1
+                    ai= Atom()
+                    ai.set_sid(sid)
+                    xc= float(data[1])
+                    yc= float(data[2])
+                    zc= float(data[3])
+                    xi,yi,zi = cartessian_to_scaled(hi,xc,yc,zc)
+                    ai.set_pos(xi,yi,zi)
+                    ai.set_vel(0.0,0.0,0.0)
+                    self.atoms.append(ai)
+                iatm += 1
+        self.alc= 1.0
+        print self.alc
+        print self.a1[:]
+        print self.a2[:]
+        print self.a3[:]
+        f.close()
+
+    def write_xsf(self,fname='xsf'):
+        """
+        Write XCrysden xsf format.
+        Only applicable to orthogonal system.
+        """
+        if not self.specorder:
+            raise ValueError('Specorder has to be defined to write'
+                             +' xsf format file.')
+        h = np.zeros((3,3),dtype=float)
+        h[0,:] = self.a1[:]
+        h[1,:] = self.a2[:]
+        h[2,:] = self.a3[:]
+        f= open(fname,'w')
+        f.write("CRYSTAL\n")
+        f.write("PRIMVEC\n")
+        f.write("{0:9.3f} {1:9.3f} {2:9.3f}\n".format(self.a1[0],
+                                                      self.a1[1],
+                                                      self.a1[2]))
+        f.write("{0:9.3f} {1:9.3f} {2:9.3f}\n".format(self.a2[0],
+                                                      self.a2[1],
+                                                      self.a2[2]))
+        f.write("{0:9.3f} {1:9.3f} {2:9.3f}\n".format(self.a3[0],
+                                                      self.a3[1],
+                                                      self.a3[2]))
+        f.write("PRIMCOORD\n")
+        f.write("{0:>8d}  1\n".format(len(self.atoms)))
+        for i in range(len(self.atoms)):
+            ai= self.atoms[i]
+            x,y,z = scaled_to_cartessian(h,ai.pos[0],ai.pos[1],ai.pos[2])
+            vx= ai.vel[0]
+            vy= ai.vel[1]
+            vz= ai.vel[2]
+            symbol = self.specorder[ai.sid-1]
+            number = get_number_from_symbol(symbol)
+            f.write(" {0:3d} ".format(number))
+            f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(x,y,z))
+            #f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(vx,vy,vz))
+            f.write("\n")
+        f.close()
+
     def make_pair_list(self,rcut=3.0):
         rc2= rcut**2
         h= np.zeros((3,3))
@@ -585,7 +695,47 @@ class PMDSystem(object):
         for format in _file_formats:
             if re.search(format,filename):
                 return format
-        
+
+def cartessian_to_scaled(hi,xc,yc,zc):
+    """
+    Convert an atomic position in Cartessian coordinate
+    to scaled position using inversed h-matrix.
+    Inversed h-matrix has to be given.
+    """
+    x = 0.0
+    y = 0.0
+    z = 0.0
+    x += hi[0,0]*xc +hi[0,1]*yc +hi[0,2]*zc
+    y += hi[1,0]*xc +hi[1,1]*yc +hi[1,2]*zc
+    z += hi[2,0]*xc +hi[2,1]*yc +hi[2,2]*zc
+    return x,y,z
+
+def scaled_to_cartessian(h,xs,ys,zs):
+    """
+    Convert a scaled positions to Cartessian coordinate.
+    H-matrix has to be given.
+    """
+    xc = 0.0
+    yc = 0.0
+    zc = 0.0
+    xc += h[0,0]*xs +h[0,1]*ys +h[0,2]*zs
+    yc += h[1,0]*xs +h[1,1]*ys +h[1,2]*zs
+    zc += h[2,0]*xs +h[2,1]*ys +h[2,2]*zs
+    return xc,yc,zc
+
+
+def unitvec_to_hi(a1,a2,a3):
+    """
+    Convert 3 unitvectors to inversed h-matrix via h-matrix.
+    """
+    h = np.zeros((3,3),dtype=float)
+    for i in range(3):
+        h[0,i] = a1[i]
+        h[1,i] = a2[i]
+        h[2,i] = a3[i]
+    return np.linalg.inv(h)
+
+
 if __name__ == "__main__":
 
     args= docopt(__doc__)
@@ -611,3 +761,5 @@ if __name__ == "__main__":
         psys.write_POSCAR(outfname)
     elif outfmt == 'dump':
         psys.write_dump(outfname)
+    elif outfmt == 'xsf':
+        psys.write_xsf(outfname)

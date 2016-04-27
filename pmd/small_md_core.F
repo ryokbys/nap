@@ -151,6 +151,7 @@ c.....make MD loop starts
           call vfire(natm,num_fire,nmin_fire,finc_fire,fdec_fire
      &         ,falp_fire,alp0_fire,alp_fire,aa,va,dt,dtmax_fire)
         endif
+!        write(6,*) va(1:3,1)
         ra(1:3,1:natm)= ra(1:3,1:natm) +va(1:3,1:natm)
 c-------multiply fmv or damping
         do i=1,natm
@@ -517,6 +518,7 @@ c=======================================================================
         va(1:3,1:natm) = 0d0
         alp_fire = alp0_fire
         num_fire = 0
+        write(6,'(a,2f10.3)') ' dt,alp_fire = ',dt,alp_fire
       endif
       end subroutine vfire
 c-----------------------------------------------------------------------
