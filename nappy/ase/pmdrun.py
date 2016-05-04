@@ -43,7 +43,10 @@ class PMD(FileIOCalculator):
         'cutoff_buffer': 0.5,
         'flag_damping': 0,
         'damping_coeff': 0.95,
+        'converge_eps': 1e-4,
+        'converge_num': 3,
         'initial_temperature': -10.0,
+        'final_temperature': -10.0,
         'temperature_control': 'None',
         'temperature_target': [300.0, 100.0,],
         'temperature_relax_time': 100.0,
@@ -180,8 +183,8 @@ def get_input_txt(params,fmvs):
            'time_interval','num_iteration','num_out_energy','',
            'flag_out_pmd','num_out_pmd','',
            'force_type','cutoff_radius','cutoff_buffer','',
-           'flag_damping','damping_coeff','',
-           'initial_temperature',
+           'flag_damping','damping_coeff','converge_eps','converge_num','',
+           'initial_temperature','final_temperature',
            'temperature_control','temperature_target',
            'temperature_relax_time','',
            'factor_direction','',
@@ -191,11 +194,13 @@ def get_input_txt(params,fmvs):
 
     int_keys=['num_nodes_x','num_nodes_y','num_nodes_z',
               'num_iteration','num_out_energy','flag_out_pmd',
-              'num_out_pmd','flag_damping','flag_isobaric',]
+              'num_out_pmd','flag_damping','flag_isobaric',
+              'converge_num']
     float_keys=['time_interval','cutoff_radius','cutoff_buffer',
                 'damping_coeff','initial_temperature',
                 'temperature_relax_time','pressure_target',
-                'vol_mass_coeff','vol_change_damping','shear_stress',]
+                'vol_mass_coeff','vol_change_damping','shear_stress',
+                'converge_eps']
     str_keys=['io_format','force_type','temperature_control']
 
     for key in order:
