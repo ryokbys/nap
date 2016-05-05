@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-05-05 12:20:54 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-05-05 20:13:03 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -147,7 +147,10 @@ c-------species of atom-i
           stop
         endif
       enddo
-      !write(6,'(a,2i8)') " myid,natm=",myid_md,natm
+c      do i=1,natm
+c        write(6,'(i3,i5,3es12.3)') myid_md,i,ra(1:3,i)
+c      enddo
+c      write(6,'(a,2i8)') " myid,natm=",myid_md,natm
 
 
 #ifdef __FITPOT__
@@ -177,8 +180,8 @@ c-----ntset
       call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
 c-----get total number of particles
-      call mpi_allreduce(natm,ntot,1,MPI_INTEGER,MPI_SUM
-     &     ,mpi_md_world,ierr)
+c      call mpi_allreduce(natm,ntot,1,MPI_INTEGER,MPI_SUM
+c     &     ,mpi_md_world,ierr)
       nisl = nis
       call mpi_allreduce(nisl,nis,1,MPI_INTEGER,mpi_max
      &     ,mpi_md_world,ierr)
@@ -1772,6 +1775,8 @@ c-----velocities in Maxwell-Boltzmann distribution
         do l=1,3
           va(l,i)=facv(is) *box_muller()
         enddo
+c        write(6,'(i3,i5,i3,es24.14,3es15.7)') myid_md,i,is,tag(i)
+c     &       ,va(1:3,i)
       enddo
 
       do i=1,natm
@@ -1819,6 +1824,7 @@ c-----set center of mass motion to zero
         va(2,i)=va(2,i)-sumpy/amtot
         va(3,i)=va(3,i)-sumpz/amtot
       enddo
+
       if( myid_md.eq.0 ) then
         write(6,'(a,3es12.4)') ' sumpx,y,z/amtot='
      &       ,sumpx/amtot,sumpy/amtot,sumpz/amtot
@@ -1929,12 +1935,28 @@ c.....count max number of atoms in a node
           do ixyz=0,nxyz-1
             myxt = ixyz/(ny*nz)
             myyt = mod(ixyz/nz,ny)
-            myzt = mod(i,nz)
+            myzt = mod(ixyz,nz)
             sxogt = dble(myxt)/nx
             syogt = dble(myyt)/ny
             szogt = dble(myzt)/nz
             n = 0
             do i=1,ntot
+c.....wrap atom position inside [0:1)
+              if( rtot(1,i).lt.0d0 ) then
+                rtot(1,i) = rtot(1,i) +1d0
+              else if( rtot(1,i).ge.1d0 ) then
+                rtot(1,i) = rtot(1,i) -1d0
+              endif
+              if( rtot(2,i).lt.0d0 ) then
+                rtot(2,i) = rtot(2,i) +1d0
+              else if( rtot(2,i).ge.1d0 ) then
+                rtot(2,i) = rtot(2,i) -1d0
+              endif
+              if( rtot(3,i).lt.0d0 ) then
+                rtot(3,i) = rtot(3,i) +1d0
+              else if( rtot(3,i).ge.1d0 ) then
+                rtot(3,i) = rtot(3,i) -1d0
+              endif
               if(  rtot(1,i).ge.sxogt .and.
      &             rtot(1,i).lt.sxogt+1d0/nx .and.
      &             rtot(2,i).ge.syogt .and.
@@ -1950,12 +1972,12 @@ c.....count max number of atoms in a node
           write(6,'(a,i10)') ' min number of local atoms = ',nmin
           write(6,'(a,i10)') ' max number of local atoms = ',nmax
           namax = int(nmax*1.2)
-          nbmax = namax*3
+          nbmax = namax*27
           namax = namax +nbmax
-          write(6,'(a,i10)') ' nbmax = nmax*1.2*3        = ',nbmax
+          write(6,'(a,i10)') ' nbmax = nmax*1.2*27       = ',nbmax
           write(6,'(a,i10)') ' namax = nmax*1.2 + nbmax  = ',namax
           write(6,'(a,i10,a)') ' estimated memory usage    = '
-     &         ,namax*(3*4 +3*3*5 +1 +nnmax/2)*8/1000,' MB'
+     &         ,namax*(3*4 +3*3*5 +1 +nnmax/2)*8/1000/1000,' MB'
         endif
         call mpi_bcast(namax,1,mpi_integer,0,mpi_md_world,ierr)
 c.....allocate memory for local arrays of length namax
@@ -1965,11 +1987,14 @@ c.....allocate memory for local arrays of length namax
      &       ,stp(3,3,namax),stn(3,3,namax),lsb(0:nbmax,6))
       endif
 
+      call mpi_bcast(hunit,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(h,9,mpi_double_precision,0,mpi_md_world,ierr)
+
       if( myid_md.eq.0 ) then
         do ixyz=nxyz-1,0,-1
           myxt = ixyz/(ny*nz)
           myyt = mod(ixyz/nz,ny)
-          myzt = mod(i,nz)
+          myzt = mod(ixyz,nz)
           sxogt = dble(myxt)/nx
           syogt = dble(myyt)/ny
           szogt = dble(myzt)/nz
@@ -1981,7 +2006,7 @@ c.....allocate memory for local arrays of length namax
      &           rtot(2,i).lt.syogt+1d0/ny .and.
      &           rtot(3,i).ge.szogt .and.
      &           rtot(3,i).lt.szogt+1d0/nz ) then
-              natm = natm+1
+              natm = natm +1
               tag(natm)= tagtot(i)
               ra(1:3,natm)= rtot(1:3,i)
               va(1:3,natm)= vtot(1:3,i)
@@ -1990,35 +2015,26 @@ c.....allocate memory for local arrays of length namax
           if( ixyz.ne.0 ) then
             call mpi_send(natm,1,mpi_integer,ixyz,ixyz
      &           ,mpi_md_world,ierr)
-            call mpi_isend(tag,natm,mpi_double_precision,ixyz,ixyz
-     &           ,mpi_md_world,3*(ixyz+1)-3,ierr)
-            call mpi_isend(ra,3*natm,mpi_double_precision,ixyz,ixyz
-     &           ,mpi_md_world,3*(ixyz+1)-2,ierr)
-            call mpi_isend(va,3*natm,mpi_double_precision,ixyz,ixyz
-     &           ,mpi_md_world,3*(ixyz+1)-1,ierr)
+            call mpi_send(tag,natm,mpi_double_precision,ixyz
+     &           ,3*(ixyz+1)-3,mpi_md_world,ierr)
+            call mpi_send(ra,3*natm,mpi_double_precision,ixyz
+     &           ,3*(ixyz+1)-2,mpi_md_world,ierr)
+            call mpi_send(va,3*natm,mpi_double_precision,ixyz
+     &           ,3*(ixyz+1)-1,mpi_md_world,ierr)
           endif
         enddo
-c.....wait all the isend communication to end
-        do ixyz=nxyz-1,1,-1
-          call mpi_wait(3*(ixyz+1)-3,istat,ierr)
-          call mpi_wait(3*(ixyz+1)-2,istat,ierr)
-          call mpi_wait(3*(ixyz+1)-1,istat,ierr)
-        enddo
+        write(6,'(a,f10.3)') ' time space_decomp = ',mpi_wtime() -t0
       else ! myid_md.ne.0
         call mpi_recv(natm,1,mpi_integer,0,myid_md
      &       ,mpi_md_world,istat,ierr)
-        call mpi_irecv(tag,natm,mpi_double_precision,0,myid_md
-     &       ,mpi_md_world,3*(myid_md+1)-3,ierr)
-        call mpi_irecv(ra,3*natm,mpi_double_precision,0,myid_md
-     &       ,mpi_md_world,3*(myid_md+1)-2,ierr)
-        call mpi_irecv(va,3*natm,mpi_double_precision,0,myid_md
-     &       ,mpi_md_world,3*(myid_md+1)-1,ierr)
-        call mpi_wait(3*(myid_md+1)-3,istat,ierr)
-        call mpi_wait(3*(myid_md+1)-2,istat,ierr)
-        call mpi_wait(3*(myid_md+1)-1,istat,ierr)
+        call mpi_recv(tag,natm,mpi_double_precision,0
+     &       ,3*(myid_md+1)-3,mpi_md_world,ierr)
+        call mpi_recv(ra,3*natm,mpi_double_precision,0
+     &       ,3*(myid_md+1)-2,mpi_md_world,ierr)
+        call mpi_recv(va,3*natm,mpi_double_precision,0
+     &       ,3*(myid_md+1)-1,mpi_md_world,ierr)
       endif
 
-      write(6,'(a,f10.3)') ' time space_decomp = ',mpi_wtime() -t0
       end subroutine space_decomp
 c=======================================================================
       subroutine space_comp()
@@ -2029,55 +2045,58 @@ c
       use variables
       implicit none
       include 'mpif.h'
+      integer,parameter:: nmpi = 7
       integer:: n0,ixyz,natmt
-      integer:: istat(mpi_status_size)
+      integer:: istat(mpi_status_size),itag
       real(8):: t0
 
       t0 = mpi_wtime()
 
       if( myid_md.eq.0 ) then
-        n0 = natm + 1
+        n0 = natm
         tagtot(1:natm) = tag(1:natm)
         rtot(1:3,1:natm) = ra(1:3,1:natm)
         vtot(1:3,1:natm) = va(1:3,1:natm)
         epitot(1:natm) = epi(1:natm)
         ekitot(1:3,1:3,1:natm) = eki(1:3,1:3,1:natm)
         stot(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
+        n0 = n0 +1
         do ixyz=1,nxyz-1
-          call mpi_recv(natmt,1,mpi_integer,ixyz,ixyz
+          itag = ixyz*nmpi -nmpi
+          call mpi_recv(natmt,1,mpi_integer,ixyz,itag
      &         ,mpi_md_world,istat,ierr)
           call mpi_recv(tagtot(n0),natmt,mpi_double_precision
-     &         ,ixyz,ixyz,mpi_md_world,istat,ierr)
+     &         ,ixyz,itag+1,mpi_md_world,istat,ierr)
           call mpi_recv(rtot(1,n0),3*natmt,mpi_double_precision
-     &         ,ixyz,ixyz,mpi_md_world,istat,ierr)
+     &         ,ixyz,itag+2,mpi_md_world,istat,ierr)
           call mpi_recv(vtot(1,n0),3*natmt,mpi_double_precision
-     &         ,ixyz,ixyz,mpi_md_world,istat,ierr)
+     &         ,ixyz,itag+3,mpi_md_world,istat,ierr)
           call mpi_recv(epitot(n0),natmt,mpi_double_precision
-     &         ,ixyz,ixyz,mpi_md_world,istat,ierr)
+     &         ,ixyz,itag+4,mpi_md_world,istat,ierr)
           call mpi_recv(ekitot(1,1,n0),3*3*natmt,mpi_double_precision
-     &         ,ixyz,ixyz,mpi_md_world,istat,ierr)
+     &         ,ixyz,itag+5,mpi_md_world,istat,ierr)
           call mpi_recv(stot(1,1,n0),3*3*natmt,mpi_double_precision
-     &         ,ixyz,ixyz,mpi_md_world,istat,ierr)
+     &         ,ixyz,itag+6,mpi_md_world,istat,ierr)
           n0 = n0 + natmt
         enddo
+        write(6,'(a,f10.3)') ' time space_comp = ',mpi_wtime() -t0
       else ! myid_md.ne.0
-        call mpi_send(natm,1,mpi_integer,0,myid_md
+        itag = myid_md*nmpi -nmpi
+        call mpi_send(natm,1,mpi_integer,0,itag
      &       ,mpi_md_world,ierr)
-        call mpi_send(tag,natm,mpi_double_precision,0,myid_md
+        call mpi_send(tag,natm,mpi_double_precision,0,itag+1
      &       ,mpi_md_world,ierr)
-        call mpi_send(ra,3*natm,mpi_double_precision,0,myid_md
+        call mpi_send(ra,3*natm,mpi_double_precision,0,itag+2
      &       ,mpi_md_world,ierr)
-        call mpi_send(va,3*natm,mpi_double_precision,0,myid_md
+        call mpi_send(va,3*natm,mpi_double_precision,0,itag+3
      &       ,mpi_md_world,ierr)
-        call mpi_send(epi,3*natm,mpi_double_precision,0,myid_md
+        call mpi_send(epi,natm,mpi_double_precision,0,itag+4
      &       ,mpi_md_world,ierr)
-        call mpi_send(eki,3*3*natm,mpi_double_precision,0,myid_md
+        call mpi_send(eki,3*3*natm,mpi_double_precision,0,itag+5
      &       ,mpi_md_world,ierr)
-        call mpi_send(strs,3*3*natm,mpi_double_precision,0,myid_md
+        call mpi_send(strs,3*3*natm,mpi_double_precision,0,itag+6
      &       ,mpi_md_world,ierr)
       endif
-      
-      write(6,'(a,f10.3)') ' time space_comp = ',mpi_wtime() -t0
 
       end subroutine space_comp
 c=======================================================================

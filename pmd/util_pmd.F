@@ -148,8 +148,8 @@ c=======================================================================
       read(ionum,*) ntot
       allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot)
      &     ,ekitot(3,3,ntot),stot(3,3,ntot))
-      read(ionum,*) (tag(i),ra(1:3,i),va(1:3,i)
-     &     ,eki(1,1,i),epi(i),strs(1:3,1:3,i),i=1,natm)
+      read(ionum,*) (tagtot(i),rtot(1:3,i),vtot(1:3,i)
+     &     ,ekitot(1,1,i),epitot(i),stot(1:3,1:3,i),i=1,ntot)
       close(ionum)
       
       end subroutine read_pmdtot_ascii
