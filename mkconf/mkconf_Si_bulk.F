@@ -4,7 +4,7 @@ c Make atom configuration file of Si bulk of diamond structure.
 c-----------------------------------------------------------------------
 c OUTPUT
 c ------
-c  * pmd00000
+c  * pmd0000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
       include "../pmd/params_unit.h"
@@ -77,7 +77,7 @@ c     &             ,0.5d0/h(1,1,0) *exp(-(si(1)-0.5d0)**2/0.005d0)
 
       va(1:3,1:inc)= 0d0
 
-      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag
+      call write_pmd0_ascii(15,'pmd0000','replace',inc,tag
      &     ,ra,va,h,cunit,eki,epi,strs)
       
 c-----output for Akira

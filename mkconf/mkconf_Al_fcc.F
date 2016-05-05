@@ -70,7 +70,7 @@ c-----scale velocities to reduced unit
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
       
-      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va,h
+      call write_pmd0_ascii(15,'pmd0000','replace',inc,tag,ra,va,h
      &     ,al,eki,epi,strs)
       
 c-----output 'akr0000' for KVS visualization

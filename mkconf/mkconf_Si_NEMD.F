@@ -7,7 +7,7 @@ c direction. Vacuum region is added in x-direction.
 c-----------------------------------------------------------------------
 c OUTPUT
 c ------
-c  * pmd00000
+c  * pmd0000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z)
       include "../pmd/params_unit.h"
@@ -89,7 +89,7 @@ c.....fix atoms at leftmost and rightmost face
 
       va(1:3,1:inc)= 0d0
 
-      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag
+      call write_pmd0_ascii(15,'pmd0000','replace',inc,tag
      &     ,ra,va,h,cunit,eki,epi,strs)
       
 c-----output for Akira

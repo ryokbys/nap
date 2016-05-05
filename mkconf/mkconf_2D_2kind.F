@@ -105,7 +105,7 @@ c      do i=1,inc
 c        write(15,'(7es22.14)') tag(i),ra(1:3,i),va(1:3,i)
 c      enddo
 c      close(15)
-      call write_pmd(15,'pmd00000','replace',inc,tag,ra,va,h
+      call write_pmd(15,'pmd0000','replace',inc,tag,ra,va,h
      &     ,eki,epi,strs)
 
       

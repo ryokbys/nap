@@ -4,7 +4,7 @@ c  Make atom configuration file of fcc Al nanorod
 c-----------------------------------------------------------------------
 c  OUTPUT
 c  ------
-c    - pmd00000
+c    - pmd0000
 c-----------------------------------------------------------------------
       implicit none
       include "../pmd/params_unit.h"
@@ -98,7 +98,7 @@ c-----scale velocities to reduced unit
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
       
-      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va
+      call write_pmd0_ascii(15,'pmd0000','replace',inc,tag,ra,va
      &     ,h,al,eki,epi,strs)
       
       end program mkconf_Al_nanorod

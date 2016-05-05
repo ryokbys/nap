@@ -30,7 +30,7 @@ c-----scale velocities to reduced unit
         va(3,i)=va(3,i) /h(3,3,0)
       enddo
 
-      call write_pmd(15,'pmd00000','replace',natm,tag,ra,va,h
+      call write_pmd(15,'pmd0000','replace',natm,tag,ra,va,h
      &     ,eki,epi,strs)
       
 c-----output 'akr000' for Akira visualization

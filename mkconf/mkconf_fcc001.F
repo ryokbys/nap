@@ -132,7 +132,7 @@ c-----scale velocities to reduced unit
       enddo
       
 c-----output 'ini000' for MD program
-      open(15,file='pmd00000',form='formatted',status='replace')
+      open(15,file='pmd0000',form='formatted',status='replace')
       write(15,'(es15.7)') hunit
       write(15,'(3es22.14)') (((h(ia,ib,l)/hunit,ia=1,3),ib=1,3),l=0,1)
       write(15,'(i10)')inc

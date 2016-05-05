@@ -4,7 +4,7 @@ c  Create a BCC crystal for edge dislocation calculation.
 c-----------------------------------------------------------------------
 c  Output
 c  ------
-c    * pmd00000
+c    * pmd0000
 c    * akr0000
 c-----------------------------------------------------------------------
       implicit real*8(a-h,o-z),integer(i-n)
@@ -164,9 +164,9 @@ c        va(2,i)=va(2,i) /h(2,2,0)
 c        va(3,i)=va(3,i) /h(3,3,0)
 c      enddo
 
-      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va,h
+      call write_pmd0_ascii(15,'pmd0000','replace',inc,tag,ra,va,h
      &     ,cunit,eki,epi,strs)
-c      call write_pmd0_bin(15,'pmd00000','replace',inc,tag,ra,va,h
+c      call write_pmd0_bin(15,'pmd0000','replace',inc,tag,ra,va,h
 c     &     ,eki,epi,strs)
       
 c-----output 'akr0000' for Akira visualization

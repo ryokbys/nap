@@ -70,7 +70,7 @@ c-----check pos
 c-----set initial velocity as zero
       va(1:3,natm)= 0d0
 
-      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag
+      call write_pmd0_ascii(15,'pmd0000','replace',inc,tag
      &     ,ra,va,h,alc,eki,epi,strs)
 
 c-----output for Akira

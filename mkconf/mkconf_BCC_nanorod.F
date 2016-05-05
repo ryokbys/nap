@@ -4,7 +4,7 @@ c  Make atom configuration file of bcc-Fe nanorod
 c-----------------------------------------------------------------------
 c  OUTPUT
 c  ------
-c    - pmd00000
+c    - pmd0000
 c-----------------------------------------------------------------------
       implicit none
       include "../pmd/params_unit.h"
@@ -164,7 +164,7 @@ c.....Only inside atoms the radius remain to form cylinder
 
       va(1:3,1:inc)= 0d0
 
-      call write_pmd0_ascii(15,'pmd00000','replace',inc,tag,ra,va
+      call write_pmd0_ascii(15,'pmd0000','replace',inc,tag,ra,va
      &     ,h,hunit,eki,epi,strs)
 
 c.....output 'akr0000' for Akira visualization

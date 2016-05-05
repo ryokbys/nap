@@ -9,7 +9,7 @@ c  wrong boundary condition rather than dislocation dipole config.
 c-----------------------------------------------------------------------
 c  Output
 c  ------
-c    * pmd00000
+c    * pmd0000
 c    * akr0000
 c-----------------------------------------------------------------------
       implicit none
@@ -112,7 +112,7 @@ c.....output 'pmdref'
         if( ra(3,i).lt.0d0 ) ra(3,i)=ra(3,i)+1d0
       enddo
 
-      call write_pmd0_ascii(15,'pmd00000','replace',natm,tag,ra,va,h
+      call write_pmd0_ascii(15,'pmd0000','replace',natm,tag,ra,va,h
      &     ,cunit,eki,epi,strs)
       
       
