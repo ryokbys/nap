@@ -1,6 +1,6 @@
   module variables
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-26 23:16:44 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-05 12:21:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
     implicit none
     save
@@ -8,14 +8,14 @@
 !=======================================================================
 ! PARAMETERS
 !=======================================================================
-!.....max. num. of atoms
-    integer,parameter:: namax = 26000
+!.....max. num. of atoms in a node
+    integer:: namax = 10000
 !.....max. num. of species
     integer,parameter:: nismax= 9
 !.....max. num. of boundary-particles
-    integer,parameter:: nbmax = 26000
+    integer:: nbmax = 10000
 !.....max. num. of neighbors
-    integer,parameter:: nnmax = 100
+    integer:: nnmax = 100
 
 !.....output #
     integer,parameter:: ioerg = 11
@@ -67,8 +67,10 @@
     integer:: istps,istpe
 !.....parallel-related variables
     integer:: nxyz
-    integer:: nn(6),myparity(3),lsrc(6),lsb(0:nbmax,6) &
+    integer:: nn(6),myparity(3),lsrc(6) &
          ,myid_md,nodes_md,mpi_md_world,myx,myy,myz,ierr
+    integer,allocatable:: lsb(:,:)
+!    integer:: lsb(0:nbmax,6)
     real(8):: sv(3,6),sorg(3),anxi,anyi,anzi
     integer:: nx = 1
     integer:: ny = 1
@@ -90,19 +92,28 @@
            1d0, 1d0, 1d0, &
            1d0, 1d0, 1d0 &
          /
+!.....data of total system
+    real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
+         ,ekitot(:,:,:),tagtot(:)
 !.....positions, velocities, and accelerations
-    real(8):: ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax) &
-         ,strs(3,3,namax),stt(3,3,namax)
+    real(8),allocatable:: ra(:,:),va(:,:),aa(:,:),ra0(:,:) &
+         ,strs(:,:,:),stt(:,:,:)
+!!$    real(8):: ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax) &
+!!$         ,strs(3,3,namax),stt(3,3,namax)
 !.....real*8 identifier which includes species, index of FMV, total id
-    real(8):: tag(namax)
-    integer:: lspr(0:nnmax,namax)
+    real(8),allocatable:: tag(:)
+!!$    real(8):: tag(namax)
+    integer,allocatable:: lspr(:,:)
+!!$    integer:: lspr(0:nnmax,namax)
 !.....potential and kinetic energy per atoms
-    real(8):: epi(namax),eki(3,3,namax),stp(3,3,namax)
+    real(8),allocatable:: epi(:),eki(:,:,:),stp(:,:,:)
+!!$    real(8):: epi(namax),eki(3,3,namax),stp(3,3,namax)
 !.....mass, prefactors
     real(8):: acon(nismax),fack(nismax)
     real(8):: am(1:nismax)= 12.0d0
 !.....strain
-    real(8):: stn(3,3,namax)
+    real(8),allocatable:: stn(:,:,:)
+!!$    real(8):: stn(3,3,namax)
 
 !.....zload type
     character(len=5):: czload_type= 'no'

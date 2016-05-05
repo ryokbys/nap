@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-26 23:13:15 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-05-05 12:20:54 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -109,15 +109,25 @@ c-----reduced node origin
       sorg(2)= anyi*myy
       sorg(3)= anzi*myz
 
-c.....Each node opens one MD-configuration file
-      write(cnode(1:5),'(i5.5)') myid_md
-      if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-        call read_pmd_bin(20,"0000/pmd"//cnode
-     &       ,namax,natm,h,hunit,tag,ra,va,eki,epi,strs)
-      else if( trim(ciofmt).eq.'ascii' ) then
-        call read_pmd_ascii(20,"0000/pmd"//cnode
-     &     ,namax,natm,h,hunit,tag,ra,va,eki,epi,strs)
+cc.....Each node opens one MD-configuration file
+c      write(cnode(1:5),'(i5.5)') myid_md
+c      if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
+c        call read_pmd_bin(20,"0000/pmd"//cnode
+c     &       ,namax,natm,h,hunit,tag,ra,va,eki,epi,strs)
+c      else if( trim(ciofmt).eq.'ascii' ) then
+c        call read_pmd_ascii(20,"0000/pmd"//cnode
+c     &     ,namax,natm,h,hunit,tag,ra,va,eki,epi,strs)
+c      endif
+c.....only 0th-node reads pmd0000 file
+      if( myid_md.eq.0 ) then
+        if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
+          call read_pmdtot_bin(20,"pmd0000")
+        else if( trim(ciofmt).eq.'ascii' ) then
+          call read_pmdtot_ascii(20,"pmd0000")
+        endif
       endif
+c.....perform space decomposition after reading atomic configuration
+      call space_decomp()
       if( myid_md.eq.0 ) then
         write(6,'(a)') " H-matrix:"
         write(6,'(3es15.7)') h(1:3,1,0)
@@ -305,17 +315,19 @@ c-----initialize the counter for output
       write(cnum(1:4),'(i4.4)') iocntpmd
       if(myid_md.eq.0) call write_force(21,cnum,natm,h,tag,aa,acon
      &     ,nismax,epot0)
-c-----output initial configuration
-      if( ifpmd.eq.1 ) then
-        call system("mkdir -p "//cnum)
-        if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-          call write_pmd_bin(20,cnum//"/pmd"//cnode
-     &         ,natm,h,hunit,tag,ra,va,eki,epi,strs,sorg,dt)
-        elseif( trim(ciofmt).eq.'ascii' ) then
-          call write_pmd_ascii(20,cnum//"/pmd"//cnode
-     &         ,natm,h,hunit,tag,ra,va,eki,epi,strs,sorg,dt)
-        endif
-      endif
+c.....I do not know why I need to write initial configuration,
+c.....since initial configuration is already given as pmd0000.
+cc-----output initial configuration
+c      if( ifpmd.eq.1 ) then
+c        call system("mkdir -p "//cnum)
+c        if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
+c          call write_pmd_bin(20,cnum//"/pmd"//cnode
+c     &         ,natm,h,hunit,tag,ra,va,eki,epi,strs,sorg,dt)
+c        elseif( trim(ciofmt).eq.'ascii' ) then
+c          call write_pmd_ascii(20,cnum//"/pmd"//cnode
+c     &         ,natm,h,hunit,tag,ra,va,eki,epi,strs,sorg,dt)
+c        endif
+c      endif
 
 #ifdef __WALL__
       call update_wall()
@@ -635,15 +647,20 @@ c-------write the particle positions
 c---------decide pmd-file name
           iocntpmd=iocntpmd+1
           write(cnum(1:4),'(i4.4)') iocntpmd
-          call system("mkdir -p "//cnum)
-c---------write pmd file for Akira
+c          call system("mkdir -p "//cnum)
+          call space_comp()
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-            call write_pmd_bin(20,cnum//"/pmd"//cnode
-     &           ,natm,h,hunit,tag,ra,va,eki,epi,strs,sorg,dt)
+            call write_pmdtot_bin(20,"pmd"//cnum)
           elseif( trim(ciofmt).eq.'ascii' ) then
-            call write_pmd_ascii(20,cnum//"/pmd"//cnode
-     &           ,natm,h,hunit,tag,ra,va,eki,epi,strs,sorg,dt)
+            call write_pmdtot_ascii(20,"pmd"//cnum)
           endif
+c          if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
+c            call write_pmd_bin(20,cnum//"/pmd"//cnode
+c     &           ,natm,h,hunit,tag,ra,va,eki,epi,strs,sorg,dt)
+c          elseif( trim(ciofmt).eq.'ascii' ) then
+c            call write_pmd_ascii(20,cnum//"/pmd"//cnode
+c     &           ,natm,h,hunit,tag,ra,va,eki,epi,strs,sorg,dt)
+c          endif
         endif
 
 #ifdef __WALL__
@@ -1884,6 +1901,185 @@ c=======================================================================
       call mpi_bcast(alp_fire,1,mpi_double_precision,0,mpi_md_world
      &     ,ierr)
       end subroutine vfire
+c=======================================================================
+      subroutine space_decomp()
+c
+c  Decompose the system and scatter atoms to every process.
+c  This would be called only the first time, but the routine is
+c  written as if it is called several times.
+c
+      use variables
+      implicit none
+      include 'mpif.h'
+      integer:: istat(mpi_status_size)
+
+      integer:: i,j,ixyz,n
+      integer:: myxt,myyt,myzt,nmax,nmin
+      real(8):: sxogt,syogt,szogt
+      real(8):: t0
+
+      t0 = mpi_wtime()
+
+c.....at 1st call
+      if( .not. allocated(ra) ) then
+        if( myid_md.eq.0 ) then
+c.....count max number of atoms in a node
+          nmax = 0
+          nmin = 1000000000
+          do ixyz=0,nxyz-1
+            myxt = ixyz/(ny*nz)
+            myyt = mod(ixyz/nz,ny)
+            myzt = mod(i,nz)
+            sxogt = dble(myxt)/nx
+            syogt = dble(myyt)/ny
+            szogt = dble(myzt)/nz
+            n = 0
+            do i=1,ntot
+              if(  rtot(1,i).ge.sxogt .and.
+     &             rtot(1,i).lt.sxogt+1d0/nx .and.
+     &             rtot(2,i).ge.syogt .and.
+     &             rtot(2,i).lt.syogt+1d0/ny .and.
+     &             rtot(3,i).ge.szogt .and.
+     &             rtot(3,i).lt.szogt+1d0/nz ) then
+                n = n+1
+              endif
+            enddo
+            nmax = max(nmax,n)
+            nmin = min(nmin,n)
+          enddo
+          write(6,'(a,i10)') ' min number of local atoms = ',nmin
+          write(6,'(a,i10)') ' max number of local atoms = ',nmax
+          namax = int(nmax*1.2)
+          nbmax = namax*3
+          namax = namax +nbmax
+          write(6,'(a,i10)') ' nbmax = nmax*1.2*3        = ',nbmax
+          write(6,'(a,i10)') ' namax = nmax*1.2 + nbmax  = ',namax
+          write(6,'(a,i10,a)') ' estimated memory usage    = '
+     &         ,namax*(3*4 +3*3*5 +1 +nnmax/2)*8/1000,' MB'
+        endif
+        call mpi_bcast(namax,1,mpi_integer,0,mpi_md_world,ierr)
+c.....allocate memory for local arrays of length namax
+        allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax)
+     &       ,strs(3,3,namax),stt(3,3,namax),tag(namax)
+     &       ,lspr(0:nnmax,namax),epi(namax),eki(3,3,namax)
+     &       ,stp(3,3,namax),stn(3,3,namax),lsb(0:nbmax,6))
+      endif
+
+      if( myid_md.eq.0 ) then
+        do ixyz=nxyz-1,0,-1
+          myxt = ixyz/(ny*nz)
+          myyt = mod(ixyz/nz,ny)
+          myzt = mod(i,nz)
+          sxogt = dble(myxt)/nx
+          syogt = dble(myyt)/ny
+          szogt = dble(myzt)/nz
+          natm = 0
+          do i=1,ntot
+            if(  rtot(1,i).ge.sxogt .and.
+     &           rtot(1,i).lt.sxogt+1d0/nx .and.
+     &           rtot(2,i).ge.syogt .and.
+     &           rtot(2,i).lt.syogt+1d0/ny .and.
+     &           rtot(3,i).ge.szogt .and.
+     &           rtot(3,i).lt.szogt+1d0/nz ) then
+              natm = natm+1
+              tag(natm)= tagtot(i)
+              ra(1:3,natm)= rtot(1:3,i)
+              va(1:3,natm)= vtot(1:3,i)
+            endif
+          enddo
+          if( ixyz.ne.0 ) then
+            call mpi_send(natm,1,mpi_integer,ixyz,ixyz
+     &           ,mpi_md_world,ierr)
+            call mpi_isend(tag,natm,mpi_double_precision,ixyz,ixyz
+     &           ,mpi_md_world,3*(ixyz+1)-3,ierr)
+            call mpi_isend(ra,3*natm,mpi_double_precision,ixyz,ixyz
+     &           ,mpi_md_world,3*(ixyz+1)-2,ierr)
+            call mpi_isend(va,3*natm,mpi_double_precision,ixyz,ixyz
+     &           ,mpi_md_world,3*(ixyz+1)-1,ierr)
+          endif
+        enddo
+c.....wait all the isend communication to end
+        do ixyz=nxyz-1,1,-1
+          call mpi_wait(3*(ixyz+1)-3,istat,ierr)
+          call mpi_wait(3*(ixyz+1)-2,istat,ierr)
+          call mpi_wait(3*(ixyz+1)-1,istat,ierr)
+        enddo
+      else ! myid_md.ne.0
+        call mpi_recv(natm,1,mpi_integer,0,myid_md
+     &       ,mpi_md_world,istat,ierr)
+        call mpi_irecv(tag,natm,mpi_double_precision,0,myid_md
+     &       ,mpi_md_world,3*(myid_md+1)-3,ierr)
+        call mpi_irecv(ra,3*natm,mpi_double_precision,0,myid_md
+     &       ,mpi_md_world,3*(myid_md+1)-2,ierr)
+        call mpi_irecv(va,3*natm,mpi_double_precision,0,myid_md
+     &       ,mpi_md_world,3*(myid_md+1)-1,ierr)
+        call mpi_wait(3*(myid_md+1)-3,istat,ierr)
+        call mpi_wait(3*(myid_md+1)-2,istat,ierr)
+        call mpi_wait(3*(myid_md+1)-1,istat,ierr)
+      endif
+
+      write(6,'(a,f10.3)') ' time space_decomp = ',mpi_wtime() -t0
+      end subroutine space_decomp
+c=======================================================================
+      subroutine space_comp()
+c
+c  Opposite to space_decomp, gather atoms from every process
+c  to create the total system for output.
+c
+      use variables
+      implicit none
+      include 'mpif.h'
+      integer:: n0,ixyz,natmt
+      integer:: istat(mpi_status_size)
+      real(8):: t0
+
+      t0 = mpi_wtime()
+
+      if( myid_md.eq.0 ) then
+        n0 = natm + 1
+        tagtot(1:natm) = tag(1:natm)
+        rtot(1:3,1:natm) = ra(1:3,1:natm)
+        vtot(1:3,1:natm) = va(1:3,1:natm)
+        epitot(1:natm) = epi(1:natm)
+        ekitot(1:3,1:3,1:natm) = eki(1:3,1:3,1:natm)
+        stot(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
+        do ixyz=1,nxyz-1
+          call mpi_recv(natmt,1,mpi_integer,ixyz,ixyz
+     &         ,mpi_md_world,istat,ierr)
+          call mpi_recv(tagtot(n0),natmt,mpi_double_precision
+     &         ,ixyz,ixyz,mpi_md_world,istat,ierr)
+          call mpi_recv(rtot(1,n0),3*natmt,mpi_double_precision
+     &         ,ixyz,ixyz,mpi_md_world,istat,ierr)
+          call mpi_recv(vtot(1,n0),3*natmt,mpi_double_precision
+     &         ,ixyz,ixyz,mpi_md_world,istat,ierr)
+          call mpi_recv(epitot(n0),natmt,mpi_double_precision
+     &         ,ixyz,ixyz,mpi_md_world,istat,ierr)
+          call mpi_recv(ekitot(1,1,n0),3*3*natmt,mpi_double_precision
+     &         ,ixyz,ixyz,mpi_md_world,istat,ierr)
+          call mpi_recv(stot(1,1,n0),3*3*natmt,mpi_double_precision
+     &         ,ixyz,ixyz,mpi_md_world,istat,ierr)
+          n0 = n0 + natmt
+        enddo
+      else ! myid_md.ne.0
+        call mpi_send(natm,1,mpi_integer,0,myid_md
+     &       ,mpi_md_world,ierr)
+        call mpi_send(tag,natm,mpi_double_precision,0,myid_md
+     &       ,mpi_md_world,ierr)
+        call mpi_send(ra,3*natm,mpi_double_precision,0,myid_md
+     &       ,mpi_md_world,ierr)
+        call mpi_send(va,3*natm,mpi_double_precision,0,myid_md
+     &       ,mpi_md_world,ierr)
+        call mpi_send(epi,3*natm,mpi_double_precision,0,myid_md
+     &       ,mpi_md_world,ierr)
+        call mpi_send(eki,3*3*natm,mpi_double_precision,0,myid_md
+     &       ,mpi_md_world,ierr)
+        call mpi_send(strs,3*3*natm,mpi_double_precision,0,myid_md
+     &       ,mpi_md_world,ierr)
+      endif
+      
+      write(6,'(a,f10.3)') ' time space_comp = ',mpi_wtime() -t0
+
+      end subroutine space_comp
 c=======================================================================
 #ifdef __WALL__
       subroutine wall_reflect()
