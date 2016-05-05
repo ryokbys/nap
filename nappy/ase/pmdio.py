@@ -7,7 +7,7 @@ import numpy as np
 from ase import Atoms
 from ase.constraints import FixAtoms, FixScaled
 
-def read_pmd(fname='pmd00000',specorder=[],fmvs=[]):
+def read_pmd(fname='pmd0000',specorder=[],fmvs=[]):
     """
     Import pmd format file.
 
@@ -74,7 +74,7 @@ def read_pmd(fname='pmd00000',specorder=[],fmvs=[]):
         atoms.set_constraint(constraints)
     return atoms
 
-def write_pmd(atoms,fname='pmd00000',specorder=[]):
+def write_pmd(atoms,fname='pmd0000',specorder=[]):
     """
     Write pmd format file from ASE Atoms object.
     """

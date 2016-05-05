@@ -156,7 +156,6 @@ if __name__ == '__main__':
         logfile.write(' {0:10.4f} {1:10.4f} {2:15.7f}\n'.format(al,vol,erg))
     outfile1.close()
 
-    #...revert 0000/pmd00000
     if not mvx and not mvy and not mvz:
         replace_1st_line(al_orig)
     else:

@@ -128,7 +128,7 @@ class PMD(FileIOCalculator):
         if self.label == 'pmd':
             infname = 'in.pmd'
             #self.write_pmd(atoms)
-            write_pmd(atoms,fname='0000/pmd00000',specorder=self.specorder)
+            write_pmd(atoms,fname='pmd0000',specorder=self.specorder)
             
         elif self.label == 'smd':
             infname = 'in.smd'

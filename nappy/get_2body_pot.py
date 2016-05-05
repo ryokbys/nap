@@ -96,19 +96,19 @@ asys.add_atom(atom2)
 hmin= rmin/(2*rcut)
 hd  = (0.5-hmin)/nsmpl
 
-os.system('cp 0000/pmd00000 pmd00000.tmp')
+os.system('cp pmd0000 pmd0000.orig')
 
 fout= open('out.2body','w')
 for ip in range(nsmpl+1):
     print '.',
     d= hmin +hd*ip
     asys.atoms[1].pos[0] = d
-    asys.write_pmd('0000/pmd00000')
+    asys.write_pmd('pmd0000')
     os.system(pmdexec+' > out.pmd')
     epot= get_epot('out.pmd')
     fout.write(' {0:12.3f} {1:22.14e}\n'.format(d*2*rcut,epot))
 
 fout.close()
-#....restore 0000/pmd00000
-os.system('cp pmd00000.tmp 0000/pmd00000')
+#....restore pmd0000
+os.system('cp pmd0000.orig pmd0000')
 print ' program done.'

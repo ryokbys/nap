@@ -1,7 +1,7 @@
 #!/bin/env python
 """
 Compute force constants for the calculation of phonopy.
-pmd00000 should be passed to the program as input and
+pmd0000 should be passed to the program as input and
 the system will be extended to include all the interaction within
 the cutoff range specified.
 
@@ -122,7 +122,7 @@ print ' sysext.num_atoms()=',natme
 # for ai in sysext.atoms:
 #     print ai.pos
 
-os.system('cp 0000/pmd00000 pmd00000.tmp')
+os.system('cp pmd0000 pmd0000.orig')
 
 #...loop for all atoms in the extended system
 fcmat= np.zeros((natme,natme,3,3))
@@ -140,7 +140,7 @@ for ia in range(natme):
             hdx= cart2h(dx,hext)
             sysext.atoms[ia].pos[:] += hdx
             #...perform pmd here
-            sysext.write_pmd('0000/pmd00000')
+            sysext.write_pmd('pmd0000')
             os.system(pmdexec+' > out.pmd')
             #os.system('cp frc0000 frc0000-{0:1d}-{1:1d}-{2:1d}'.format(ia,ixyz,kd))
             #...obtain forces on atoms
@@ -179,5 +179,5 @@ for ja in range(natme):
             ,fcmat[ia,ja,2,1]
             ,fcmat[ia,ja,2,2]))
 fcfile.close()
-os.system('cp pmd00000.tmp 0000/pmd00000')
+os.system('cp pmd0000.orig pmd0000')
 

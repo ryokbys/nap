@@ -248,7 +248,7 @@ if __name__ == '__main__':
     uc.alc= 2.8553
     # uc.write_pmd('uc0000')
     system= make_polycrystal(grains,uc,n1,n2,n3)
-    system.write_pmd('pmd00000')
+    system.write_pmd('pmd0000')
     system.write_akr('akr0000')
 
     print '{0:=^72}'.format(' finished correctly ')
