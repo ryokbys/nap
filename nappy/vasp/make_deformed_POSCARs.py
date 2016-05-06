@@ -1,25 +1,47 @@
 #!/bin/env python
 # -*- coding: utf-8 -*-
-#-----------------------------------------------------------------------
-# Make deformed POSCAR files from the non-deformed POSCAR file.
-# Deformation is performed by multiplying deformation matrix to h-mat.
-#-----------------------------------------------------------------------
-#
+"""
+Make deformed POSCAR files from the non-deformed POSCAR file.
+
+Usage:
+    make_deformed_POSCARs.py isotropic [options] POSCAR
+    make_deformed_POSCARs.py uniaxial [options] POSCAR
+    make_deformed_POSCARs.py orthorhombic [options] POSCAR
+    make_deformed_POSCARs.py monoclinic [options] POSCAR
+    make_deformed_POSCARs.py random [options] POSCAR
+
+Options:
+    -h, --help  Show this help message and exit.
+    -d DEV      Maximum value of each strain element. [default: 0.01]
+    -n NDEV     Number of deviation in each strain element. [default: 2]
+    -o OFFSET   Offset of sequential number in output files. [default: 0]
+"""
 
 import numpy as np
-import copy,optparse
+import copy
+from docopt import docopt
 
 from POSCAR import POSCAR
 
 #======================================== subroutines and functions
 
-def deform_cubic(poscar):
-    """
-    Deformation of the simulation cell that has cubic symmetry.
-    Only uniaxial deformation for C11 and C12,
-    off diagonal deformation for C44 are considered.
-    Be sure that you are applying this routine to the cubic cell.
-    """
+def isotropic(poscar):
+    inc= _offset
+    afac0= copy.deepcopy(poscar.afac)
+    
+    da= 2*_dev/_ndev *afac0
+    al0= afac0 *(1.0 -dev)
+    for na in range(_ndev+1):
+        poscar.afac= al0 +da*na
+        inc += 1
+        fname = _fname+'-{0:03d}'.format(inc)
+        print fname
+        poscar.write(fname=fname)
+    # retore poscar.afac
+    poscar.afac = afac0
+    
+
+def uniaxial(poscar):
     ho= copy.deepcopy(poscar.h)
     h = np.zeros((3,3),dtype=float)
     inc= _offset
@@ -40,9 +62,21 @@ def deform_cubic(poscar):
         h[2,2]= ho[2,2]
         poscar.h= h
         inc += 1
-        poscar.write(fname=_fname+'-{0:03d}'.format(inc))
+        fname = _fname+'-{0:03d}'.format(inc)
+        print fname
+        poscar.write(fname=fname)
+    #...restore poscar.h
+    poscar.h= ho
 
-    #...orthorhombic volume-conserving strain for (C11-C12)
+
+def orthorhombic(poscar):
+    """
+    Orthorhombic volume-conserving strain for (C11-C12).
+    """
+    ho= copy.deepcopy(poscar.h)
+    h = np.zeros((3,3),dtype=float)
+    inc= _offset
+
     dg11= _dev/_ndev
     for ng11 in range(_ndev+1):
         g11= ng11*dg11
@@ -57,9 +91,21 @@ def deform_cubic(poscar):
         h[2,2]= ho[2,2] +g11**2 /(1.0-g11**2)
         poscar.h= h
         inc += 1
-        poscar.write(fname=_fname+'-{0:03d}'.format(inc))
+        fname = _fname+'-{0:03d}'.format(inc)
+        print fname
+        poscar.write(fname=fname)
+    #...restore poscar.h
+    poscar.h= ho
 
-    #...monoclinic volume-conserving strain for C44
+
+def monoclinic(poscar):
+    """
+    Monoclinic volume-conserving strain for C44.
+    """
+    ho= copy.deepcopy(poscar.h)
+    h = np.zeros((3,3),dtype=float)
+    inc= _offset
+
     dg12= _dev/_ndev
     for ng12 in range(_ndev+1):
         g12= ng12*dg12
@@ -74,13 +120,14 @@ def deform_cubic(poscar):
         h[2,2]= ho[2,2] +g12**2 /(4.0-g12**2)
         poscar.h= h
         inc += 1
-        poscar.write(fname=_fname+'-{0:03d}'.format(inc))
-        
+        fname = _fname+'-{0:03d}'.format(inc)
+        print fname
+        poscar.write(fname=fname)
     #...restore poscar.h
     poscar.h= ho
 
 
-def deform_random(poscar):
+def random(poscar):
     """
     Random deformation of the simulation cell.
     """
@@ -113,41 +160,33 @@ def deform_random(poscar):
                     h[2,2]= g23g31   *ho[2,0] +g23g31      *ho[2,1] +(1.0+e22e33)*ho[2,2]
                     poscar.h= h
                     inc += 1
-                    poscar.write(fname=_fname+'-{0:03d}'.format(inc))
+                    fname = _fname+'-{0:03d}'.format(inc)
+                    print fname
+                    poscar.write(fname=fname)
     #...restore poscar.h
     poscar.h= ho
 
 ############################################################ main
 
 if __name__ == "__main__":
-    _usage= '%prog [options] [POSCAR]'
-    parser= optparse.OptionParser(usage=_usage)
-    parser.add_option("-d","--dev",dest="dev",type="float",default=0.01,
-                      help="maximum value of each strain element. Default: 0.01.")
-    parser.add_option("-n","--num-dev",dest="ndev",type="int",default=2,
-                      help="number of devision in each strain element. Default: 2.")
-    parser.add_option("-o","--offset",dest="offset",type="int",default=0,
-                      help="offset of sequential number in output file."
-                      +" Default: 0.")
-    parser.add_option("-m","--mode",dest="mode",
-                      type="string",default="random",
-                      help="deformation mode setting."
-                      +" random: random deformation of the cell,"
-                      +" cubic: for the case of cubic symmetry. Default: random.")
-    
-    (options,args)= parser.parse_args()
-    
-    _dev= options.dev
-    _ndev= options.ndev
-    _offset= options.offset
-    _mode= options.mode
-    
-    _fname= args[0]
+
+    args = docopt(__doc__)
+    _dev = float(args['-d'])
+    _ndev= int(args['-n'])
+    _offset = int(args['-o'])
+    _fname= args['POSCAR']
+
     poscar= POSCAR()
     poscar.read(fname=_fname)
     
-    if _mode in ("random","Random","RANDOM"):
-        deform_random(poscar)
-    elif _mode in ("cubic","Cubic","CUBIC"):
-        deform_cubic(poscar)
+    if args['isotropic']:
+        isotropic(poscar)
+    elif args['uniaxial']:
+        uniaxial(poscar)
+    elif args['orthorhombic']:
+        orthorhombic(poscar)
+    elif args['monoclinic']:
+        monoclinic(poscar)
+    elif args['random']:
+        random(poscar)
 

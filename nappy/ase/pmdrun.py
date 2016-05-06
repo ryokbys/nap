@@ -198,6 +198,7 @@ def get_input_txt(params,fmvs):
               'converge_num']
     float_keys=['time_interval','cutoff_radius','cutoff_buffer',
                 'damping_coeff','initial_temperature',
+                'final_temperature',
                 'temperature_relax_time','pressure_target',
                 'vol_mass_coeff','vol_change_damping','shear_stress',
                 'converge_eps']
