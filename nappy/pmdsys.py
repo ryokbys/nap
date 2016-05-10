@@ -37,6 +37,7 @@ class PMDSystem(object):
     """
 
     def __init__(self,fname=None,ffmt=None,specorder=[]):
+        self.alc= 1.0
         self.a1= np.zeros(3)
         self.a2= np.zeros(3)
         self.a3= np.zeros(3)
@@ -44,7 +45,7 @@ class PMDSystem(object):
         self.specorder= specorder
 
         if not fname == None:
-            ftype= self.parse_filename(fname)
+            ftype= parse_filename(fname)
             if ftype == 'pmd':
                 self.read_pmd(fname)
             elif ftype == 'smd':
@@ -57,6 +58,8 @@ class PMDSystem(object):
                 self.read_dump(fname)
             elif ftype == 'xsf':
                 self.read_xsf(fname)
+            else:
+                raise IOError('Cannot detect input file format.')
 
     def set_lattice(self,alc,a1,a2,a3):
         self.alc= alc
@@ -65,7 +68,10 @@ class PMDSystem(object):
         self.a3= a3
 
     def add_atom(self,atom):
+        if self.specorder and atom.symbol:
+            atom.set_sid(self.specorder.index(atom.symbol)+1)
         self.atoms.append(atom)
+            
 
     def reset_ids(self):
         for i in range(len(self.atoms)):
@@ -84,6 +90,34 @@ class PMDSystem(object):
 
     def volume(self):
         return self.alc**3 *np.abs(np.dot(self.a1,np.cross(self.a2,self.a3)))
+
+    def get_hmat(self):
+        hmat = np.zeros((3,3),dtype=float)
+        hmat[:,0] = self.a1 *self.alc
+        hmat[:,1] = self.a2 *self.alc
+        hmat[:,2] = self.a3 *self.alc
+        return hmat
+
+    def get_real_positions(self):
+        hmat = self.get_hmat()
+        spos = self.get_scaled_positions()
+        pos = np.zeros((self.num_atoms(),3),dtype=float)
+        for ia,a in enumerate(self.atoms):
+            pos[ia,:] = np.dot(hmat,spos[ia])
+        return pos
+
+    def get_scaled_positions(self):
+        spos = np.zeros((self.num_atoms(),3),dtype=float)
+        for ia,a in enumerate(self.atoms):
+            spos[ia,:] = a.pos
+        return spos
+
+
+    def get_symbols(self):
+        symbols = []
+        for a in self.atoms:
+            symbols.append(a.symbol)
+        return symbols
 
     def write(self,fname="pmd0000"):
         ftype= self.parse_filename(fname)
@@ -128,6 +162,9 @@ class PMDSystem(object):
             data= [float(x) for x in f.readline().split()]
             ai= Atom()
             ai.decode_tag(data[0])
+            symbol = self.specorder[ai.sid-1]
+            if ai.symbol != symbol:
+                ai.set_symbol(symbol)
             ai.set_pos(data[1],data[2],data[3])
             ai.set_vel(data[4],data[5],data[6])
             self.atoms.append(ai)
@@ -208,10 +245,13 @@ class PMDSystem(object):
                     if i < m:
                         if spcs and self.specorder:
                             sid = self.specorder.index(spcs[sindex]) + 1
+                            symbol = spcs[sindex]
                         break
                     sid += 1
                     sindex += 1
+                ai.set_id(i+1)
                 ai.set_sid(sid)
+                ai.symbol = symbol
                 ai.set_pos(float(buff[0]),float(buff[1]),float(buff[2]))
                 ai.set_vel(0.0,0.0,0.0)
                 self.atoms.append(ai)
@@ -252,7 +292,16 @@ class PMDSystem(object):
         f.write('Selective dynamics\n')
         f.write('Direct\n')
         # atom positions
-        for ai in self.atoms:
+        # before writing out, the order should be sorted
+        outorder = []
+        for spc in self.specorder:
+            for ia,ai in enumerate(self.atoms):
+                if ai.symbol == spc:
+                    outorder.append(ia)
+        if len(outorder) != len(self.atoms):
+            raise RuntimeError(' len(outorder) != len(self.atoms)')
+        for ia in outorder:
+            ai = self.atoms[ia]
             f.write(' {0:15.7f} {1:15.7f} {2:15.7f} T T T\n'.format(
                 ai.pos[0],ai.pos[1],ai.pos[2]))
         f.close()
@@ -690,11 +739,12 @@ class PMDSystem(object):
                         ai.set_id(aid)
                         self.atoms.append(ai)
 
-    @classmethod
-    def parse_filename(self,filename):
-        for format in _file_formats:
-            if re.search(format,filename):
-                return format
+
+def parse_filename(filename):
+    for fmt in _file_formats:
+        if re.search(fmt,filename):
+            return fmt
+    return None
 
 def cartessian_to_scaled(hi,xc,yc,zc):
     """
@@ -749,7 +799,7 @@ if __name__ == "__main__":
     psys= PMDSystem(fname=infname,ffmt=infmt,specorder=specorder)
 
     if not outfmt == None:
-        outfmt= psys.parse_filename(outfname)
+        outfmt= parse_filename(outfname)
     
     if outfmt == 'pmd':
         psys.write_pmd(outfname)
@@ -763,3 +813,5 @@ if __name__ == "__main__":
         psys.write_dump(outfname)
     elif outfmt == 'xsf':
         psys.write_xsf(outfname)
+    else:
+        print 'Cannot detect output file format.'

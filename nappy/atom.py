@@ -133,7 +133,7 @@ ELEMENTS = {
     'Lv' :{'number':116, 'name':'-------------', 'weight':298.000},
     'Uus':{'number':117, 'name':'-------------', 'weight': -1.000},
     'Uuo':{'number':118, 'name':'-------------', 'weight': -1.000},
-}                      
+}
 
 def get_symbol_from_number(number):
     if number > len(ELEMENTS):
