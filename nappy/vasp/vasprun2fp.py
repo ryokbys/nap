@@ -20,6 +20,9 @@ from ase.io import read,write
 from glob import glob
 from docopt import docopt
 
+__author__ = "Ryo KOBAYASHI"
+__version__ = "160507"
+
 _symbolist = []
 
 def get_tag(symbol,atom_id):
@@ -80,6 +83,7 @@ if __name__ == "__main__":
         except:
             print 'Failed to read vasprun.xml, so skip it.'
             continue
+        del atoms.constraints
         write('POSCAR',images=atoms,format='vasp',direct=True,vasp5=True)
         with open('erg.ref','w') as f:
             f.write("{0:12.7f}\n".format(atoms.get_potential_energy()))

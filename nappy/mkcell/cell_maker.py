@@ -61,7 +61,7 @@ def make_bcc(latconst=1.0):
         s.add_atom(atom)
     return s
 
-def make_fcc(latconst=1.0):
+def make_fcc(latconst=1.0,size=(1,1,1)):
     """
     Make a cell of fcc structure.
     """
