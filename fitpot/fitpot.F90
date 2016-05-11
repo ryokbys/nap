@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-04 09:46:42 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-10 18:29:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -699,19 +699,24 @@ subroutine write_energy_relation(cadd)
   cfname='out.erg.'//trim(cadd)
 
   if( .not. allocated(erefl) ) allocate(erefl(nsmpl),erefg(nsmpl) &
-       ,epotl(nsmpl),epotg(nsmpl))
+       ,epotl(nsmpl),epotg(nsmpl),wgtl(nsmpl),wgtg(nsmpl))
 
   erefl(1:nsmpl)= 0d0
   epotl(1:nsmpl)= 0d0
+  wgtl(1:nsmpl)= 0d0
   do ismpl=isid0,isid1
     erefl(ismpl)= samples(ismpl)%eref
     epotl(ismpl)= samples(ismpl)%epot
+    wgtl(ismpl)= samples(ismpl)%wgt
   enddo
   erefg(1:nsmpl)= 0d0
   epotg(1:nsmpl)= 0d0
+  wgtg(1:nsmpl)= 0d0
   call mpi_reduce(epotl,epotg,nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
   call mpi_reduce(erefl,erefg,nsmpl,mpi_double_precision,mpi_sum &
+       ,0,mpi_world,ierr)
+  call mpi_reduce(wgtl,wgtg,nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
 
   if( myid.eq.0 ) then
@@ -722,25 +727,29 @@ subroutine write_energy_relation(cadd)
       epotg(ismpl)= epotg(ismpl)/nalist(ismpl)
       if( iclist(ismpl).eq.1 ) then
         if( lswgt ) then
+          write(90,'(2es15.7,2x,a,3es15.7)') erefg(ismpl) &
+               ,epotg(ismpl),trim(cdirlist(ismpl)) &
+               ,abs(erefg(ismpl)-epotg(ismpl)) &
+               ,wgtg(ismpl) &
+               ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
+        else
           write(90,'(2es15.7,2x,a,2es15.7)') erefg(ismpl) &
                ,epotg(ismpl),trim(cdirlist(ismpl)) &
                ,abs(erefg(ismpl)-epotg(ismpl)) &
-               ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
-        else
-          write(90,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
-               ,epotg(ismpl),trim(cdirlist(ismpl)) &
-               ,abs(erefg(ismpl)-epotg(ismpl))
+               ,wgtg(ismpl)
         endif
       else if( iclist(ismpl).eq.2 ) then
         if( lswgt ) then
+          write(91,'(2es15.7,2x,a,3es15.7)') erefg(ismpl) &
+               ,epotg(ismpl),trim(cdirlist(ismpl)) &
+               ,abs(erefg(ismpl)-epotg(ismpl)) &
+               ,wgtg(ismpl) &
+               ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
+        else
           write(91,'(2es15.7,2x,a,2es15.7)') erefg(ismpl) &
                ,epotg(ismpl),trim(cdirlist(ismpl)) &
                ,abs(erefg(ismpl)-epotg(ismpl)) &
-               ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
-        else
-          write(91,'(2es15.7,2x,a,es15.7)') erefg(ismpl) &
-               ,epotg(ismpl),trim(cdirlist(ismpl)) &
-               ,abs(erefg(ismpl)-epotg(ismpl))
+               ,wgtg(ismpl)
         endif
 !!$        write(91,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
 !!$             ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)

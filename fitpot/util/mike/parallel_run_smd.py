@@ -2,15 +2,25 @@
 
 import os,sys,glob,subprocess
 
-if len(sys.argv) != 2:
+usage="""
+Usage: python parallel_run_smd.py in.params.NN
+       python parallel_run_smd.py in.params.NN smpl_Mg1 smpl_Mg2 ...
+"""
+
+if len(sys.argv) < 2:
     print '[Error] Number of arguments was wrong.'
-    print ' Usage: ./parallel_run_smd.py in.params.SW_Si'
+    print usage
     sys.exit()
-
-fparam= sys.argv[1]
-
-#dirs= glob.glob('[0-9]????')
-dirs= glob.glob('0????')
+elif len(sys.argv) == 2:
+    fparam= sys.argv[1]
+    dirs= glob.glob('smpl_*')
+elif len(sys.argv) > 2:
+    fparam= sys.argv[1]
+    dirs = []
+    for iarg,arg in enumerate(sys.argv):
+        if iarg < 2:
+            continue
+        dirs.append(arg)
 dirs.sort()
 #print dirs
 
@@ -23,6 +33,11 @@ nodes=[]
 for line in nodefile.readlines():
     nodes.append(line.split()[0])
 nodefile.close()
+
+uniqnodes = []
+for node in nodes:
+    if node not in uniqnodes:
+        uniqnodes.append(node)
 
 #...assign to-be-computed directories to each node
 dir_per_node= []
@@ -47,7 +62,8 @@ for inode in range(len(nodes)):
     if done:
         break
 
-#print ' len(dir_per_node)=',len(dir_per_node)
+for node in uniqnodes:
+    os.system('scp {0} {1}:{2}/'.format(fparam,node,os.getcwd()))
 
 procs= []
 for inode in range(len(dir_per_node)):
@@ -64,7 +80,7 @@ for inode in range(len(dir_per_node)):
     #...run run_smd.sh on the remote node
     # cmd='mpirun --hostfile {}'.format(fname) \
     #      + ' -np 1 ./run_smd.sh {} {}'.format(fparam,str)
-    os.system('scp {0} {1}:{2}/'.format(fparam,node,os.getcwd()))
+    #os.system('scp {0} {1}:{2}/'.format(fparam,node,os.getcwd()))
     cmd='ssh -q {0} "cd {1} && ./run_smd.sh {2} {3}"'.format(node,os.getcwd(),fparam,str)
     procs.append(subprocess.Popen(cmd,shell=True))
 for i in range(len(procs)):

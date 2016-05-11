@@ -59,5 +59,6 @@ module variables
   real(8),allocatable,save:: erefl(:),erefg(:),epotl(:),epotg(:)
   real(8),allocatable,save:: frefl(:,:,:),frefg(:,:,:),fal(:,:,:)&
        ,fag(:,:,:)
+  real(8),allocatable,save:: wgtl(:),wgtg(:)
 
 end module variables

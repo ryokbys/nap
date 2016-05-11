@@ -158,12 +158,14 @@ class PMDSystem(object):
         natm= int(f.readline().split()[0])
         # 9th-: atom positions
         self.atoms= []
+        symbol = None
         for i in range(natm):
             data= [float(x) for x in f.readline().split()]
             ai= Atom()
             ai.decode_tag(data[0])
-            symbol = self.specorder[ai.sid-1]
-            if ai.symbol != symbol:
+            if self.specorder:
+                symbol = self.specorder[ai.sid-1]
+            if symbol and ai.symbol != symbol:
                 ai.set_symbol(symbol)
             ai.set_pos(data[1],data[2],data[3])
             ai.set_vel(data[4],data[5],data[6])
