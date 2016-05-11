@@ -8,7 +8,7 @@ Usage:
 
 IDSRC is the species-ID of atoms to be an origin of RDF,
 IDDST is the species-ID of atoms to be searched around IDSRC.
-Zero for IDSRC and IDDST means any species is taken into account.
+Zero for IDSRC and IDDST means every species is taken into account.
 
 Options:
     -h, --help  Show this help message and exit.
@@ -18,12 +18,10 @@ Options:
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
     -o OUT      Output file name. [default: out.rdf]
-    -p          Plot a graph on the screen. [default: False]
 """
 
 import os,sys
 import numpy as np
-import matplotlib.pyplot as plt
 from docopt import docopt
 from pmdsys import PMDSystem
 from gaussian_smear import gsmear
@@ -86,17 +84,20 @@ def rdf(asys,dr,rmax,idsrc=0,iddst=0):
 
     nr= int(rmax/dr)+1
     # print " rmax,dr,nr=",rmax,dr,nr
-    nadr= [0.0 for n in range(nr)]
+    nadr= np.zeros(nr,dtype=float)
     rd= [ dr*ir for ir in range(nr) ]
     for ia in range(natm0):
         if idsrc==0 or asys.atoms[ia].sid==idsrc:
             ndr= compute_ndr(ia,dr,rmax,asys,iddst)
             for ir in range(nr):
                 nadr[ir]= nadr[ir] +ndr[ir]
+    #nadr /= nsrc
+    #print nadr
     #...normalize
     for ir in range(1,nr):
         r= dr *ir
-        nadr[ir]= float(nadr[ir])/(4.0*np.pi*rho*r*r*dr)
+        nadr[ir]= nadr[ir]/(4.0*np.pi*rho*r*r*dr)
+    #print nadr
     return rd,nadr,nsrc
 
 def rdf_average(infiles,ffmt='akr',dr=0.1,rmax=3.0,
@@ -114,6 +115,7 @@ def rdf_average(infiles,ffmt='akr',dr=0.1,rmax=3.0,
         agr += gr
     # agr /= len(infiles)
     #print ' nsum=',nsum
+    #print agr
     agr /= nsum
     return rd,agr
 
@@ -128,7 +130,6 @@ if __name__ == "__main__":
     iddst= int(args['IDDST'])
     dr= float(args['-d'])
     rmax= float(args['-r'])
-    flag_plot= args['-p']
     sigma= int(args['--gsmear'])
     ffmt= args['-s']
     ofname= args['-o']
@@ -138,13 +139,12 @@ if __name__ == "__main__":
                         idsrc=idsrc,iddst=iddst)
 
     if not sigma == 0:
+        print ' Gaussian smearing...'
         rd,agr= gsmear(rd,agr,sigma)
 
-    if flag_plot:
-        plt.plot(rd, agr, '-', linewidth=1)
-        plt.show()
-        
     outfile= open(ofname,'w')
     for i in range(nr):
         outfile.write(' {0:10.4f} {1:15.7f}\n'.format(rd[i],agr[i]))
     outfile.close()
+    print ' Check '+ofname+' with gnuplot ;)'
+    print ''

@@ -21,7 +21,7 @@ def gsmear(xd,yd,sigma):
     """
     Compute Gaussian-smearing of given data with smearing width *sigma*.
     """
-    dx= xd[1]-yd[0]
+    dx= xd[1]-xd[0]
     sgm= sigma*dx
     isgm= int(sigma)+1
     pref= 1.0/(np.sqrt(2.0*np.pi)*sgm)
@@ -29,7 +29,7 @@ def gsmear(xd,yd,sigma):
     ndat= len(xd)
     gdat= np.zeros(ndat,dtype=np.float)
     for ix in range(ndat):
-        gdat[ix]= yd[ix]
+        #gdat[ix]= yd[ix]
         for jx in range(-ndat+1,ndat-1):
             kx= ix+jx
             if kx < 0:
