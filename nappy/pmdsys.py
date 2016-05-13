@@ -63,9 +63,58 @@ class PMDSystem(object):
 
     def set_lattice(self,alc,a1,a2,a3):
         self.alc= alc
-        self.a1= a1
-        self.a2= a2
-        self.a3= a3
+        self.a1[:]= a1[:]
+        self.a2[:]= a2[:]
+        self.a3[:]= a3[:]
+
+
+    def get_hmat(self):
+        """
+        Be careful about the definition of H-matrix here.
+        It is transpose of the definition of that in POSCAR.
+        Here hmat = [a1,a2,a3] so that
+        pos = hmat * spos
+        where pos and spos are real Cartessian position and scaled position.
+        """
+        hmat = np.zeros((3,3),dtype=float)
+        hmat[:,0] = self.a1 *self.alc
+        hmat[:,1] = self.a2 *self.alc
+        hmat[:,2] = self.a3 *self.alc
+        return hmat
+
+    def set_hmat(self,hmat):
+        self.alc = 1.0
+        self.a1[:] = hmat[:,0]
+        self.a2[:] = hmat[:,1]
+        self.a3[:] = hmat[:,2]
+
+    def get_lattice_vectors(self):
+        return self.a1*self.alc, self.a2*self.alc, self.a3*self.alc
+
+    def get_lattice_lengths(self):
+        a = np.linalg.norm(self.a1*self.alc)
+        b = np.linalg.norm(self.a2*self.alc)
+        c = np.linalg.norm(self.a3*self.alc)
+        return a,b,c
+
+    def get_lattice_angles(self):
+        a = np.linalg.norm(self.a1)
+        b = np.linalg.norm(self.a2)
+        c = np.linalg.norm(self.a3)
+        bc = np.cross(self.a2,self.a3)
+        ac = np.cross(self.a1,self.a3)
+        ab = np.cross(self.a1,self.a2)
+        bc = np.linalg.norm(bc)
+        ac = np.linalg.norm(ac)
+        ab = np.linalg.norm(ab)
+        # make it inside the range of arcsin
+        ta = min(1.0-1.0e-10,bc/b/c)
+        tb = min(1.0-1.0e-10,ac/a/c)
+        tc = min(1.0-1.0e-10,ab/a/b)
+        alpha = np.arcsin(ta)
+        beta  = np.arcsin(tb)
+        gamma = np.arcsin(tc)
+        return alpha,beta,gamma
 
     def add_atom(self,atom):
         if self.specorder and atom.symbol:
@@ -90,13 +139,6 @@ class PMDSystem(object):
 
     def volume(self):
         return self.alc**3 *np.abs(np.dot(self.a1,np.cross(self.a2,self.a3)))
-
-    def get_hmat(self):
-        hmat = np.zeros((3,3),dtype=float)
-        hmat[:,0] = self.a1 *self.alc
-        hmat[:,1] = self.a2 *self.alc
-        hmat[:,2] = self.a3 *self.alc
-        return hmat
 
     def get_real_positions(self):
         hmat = self.get_hmat()
@@ -225,6 +267,8 @@ class PMDSystem(object):
             if not buff[0].isdigit():
                 spcs = copy.deepcopy(buff)
                 buff= f.readline().split()
+                if not self.specorder:
+                    self.specorder = spcs
             num_species= np.array([ int(n) for n in buff])
             natm= 0
             for n in num_species:
@@ -242,6 +286,7 @@ class PMDSystem(object):
                 sid= 1
                 m= 0
                 sindex=0
+                symbol = None
                 for n in num_species:
                     m += n
                     if i < m:
@@ -253,7 +298,8 @@ class PMDSystem(object):
                     sindex += 1
                 ai.set_id(i+1)
                 ai.set_sid(sid)
-                ai.symbol = symbol
+                if symbol:
+                    ai.symbol = symbol
                 ai.set_pos(float(buff[0]),float(buff[1]),float(buff[2]))
                 ai.set_vel(0.0,0.0,0.0)
                 self.atoms.append(ai)

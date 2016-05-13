@@ -22,7 +22,7 @@ Options:
 import math,optparse
 from docopt import docopt
 
-import POSCAR,POTCAR
+import poscar, potcar
 
 __author__ = "Ryo KOBAYASHI"
 __version__ = "0.1a"
@@ -138,11 +138,11 @@ if __name__ == '__main__':
 
     print ' Pitch of k points = {0:5.1f}'.format(pitch)
 
-    poscar= POSCAR.POSCAR()
+    poscar= poscar.POSCAR()
     poscar.read(poscar_fname)
 
     
-    potcar= POTCAR.read_POTCAR()
+    potcar= potcar.read_POTCAR()
     species= potcar['species']
     encut= max(potcar['encut'])
     valences= potcar['valence']

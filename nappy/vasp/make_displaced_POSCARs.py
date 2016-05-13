@@ -25,7 +25,7 @@ import numpy as np
 from math import sin,cos,pi,sqrt
 from random import random
 
-from POSCAR import POSCAR
+from poscar import POSCAR
 
 def get_displacement(r,theta,phi):
     """

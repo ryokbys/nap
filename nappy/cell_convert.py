@@ -53,20 +53,27 @@ if __name__ == '__main__':
     
     # print(psys.get_scaled_positions())
     # print(psys.get_real_positions())
-    a1new = np.zeros(3,dtype=float)
-    a2new = np.zeros(3,dtype=float)
-    a3new = np.zeros(3,dtype=float)
+    sa1new = np.zeros(3,dtype=float)
+    sa2new = np.zeros(3,dtype=float)
+    sa3new = np.zeros(3,dtype=float)
     #tmp = raw_input('Input new a1 vector: ')
     #a1new[:] = [ float(x) for x in tmp.split(',') ]
-    a1new[:] = [ 7.09671, 2.02007, -2.63251]
-    print('new a1 =',a1new)
+    sa1new[:] = [ 0.5, 0.5, 0.0]
     #tmp = raw_input('Input new a2 vector: ')
     #a2new[:] = [ float(x) for x in tmp.split(',') ]
-    a2new[:] = [ 0.0, 4.040132, 0.0 ]
-    print('new a2 =',a2new)
+    sa2new[:] = [ 0.0, 1.0, 0.0 ]
     #tmp = raw_input('Input new a3 vector: ')
     #a3new[:] = [ float(x) for x in tmp.split(',') ]
-    a3new[:] = [ 7.09671, 2.02007, 4.349458 ]
+    sa3new[:] = [ 0.5, 0.5, 1.0 ]
+    hmat = psys.get_hmat()
+    a1new = np.dot(hmat,sa1new)
+    a2new = np.dot(hmat,sa2new)
+    a3new = np.dot(hmat,sa3new)
+    print('new a1 in hmat_orig =',sa1new)
+    print('new a2 in hmat_orig =',sa2new)
+    print('new a3 in hmat_orig =',sa3new)
+    print('new a1 =',a1new)
+    print('new a2 =',a2new)
     print('new a3 =',a3new)
     psnew = PMDSystem(specorder=specorder)
     psnew.set_lattice(psys.alc,a1new,a2new,a3new)
@@ -74,14 +81,7 @@ if __name__ == '__main__':
     # Expand the original system for the search of atoms to be included 
     # in the new system.
     # First, compute how much we have to expand the original system
-    hmat = psys.get_hmat()
     hi = np.linalg.inv(hmat)
-    sa1new = np.dot(hi,a1new)
-    sa2new = np.dot(hi,a2new)
-    sa3new = np.dot(hi,a3new)
-    print('new a1 in hmat_orig: ',sa1new)
-    print('new a2 in hmat_orig: ',sa2new)
-    print('new a3 in hmat_orig: ',sa3new)
     icsa1new = [0,0,0]
     icsa2new = [0,0,0]
     icsa3new = [0,0,0]

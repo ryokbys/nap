@@ -28,7 +28,7 @@ from docopt import docopt
 from math import sin,cos,pi,sqrt
 from random import random
 
-from POSCAR import POSCAR
+from poscar import POSCAR
 
 def _shift_and_write(poscar0,sfplane,ndiv,zmin,zmax,dr):
 
