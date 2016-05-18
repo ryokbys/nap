@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-20 10:48:24 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-18 10:45:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -52,7 +52,8 @@ contains
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ja,nexp,isf &
          ,icoeff,ihl0,ihl1,ihl2,jj,jsf
-    real(8):: rcin,rc3,b_na,at(3),epotl,wgt,hl1i,hl2i,tmp2,tmp1,tmp,tmp3(3)
+    real(8):: rcin,b_na,at(3),epotl,wgt,hl1i,hl2i,tmp2,tmp1,tmp,tmp3(3)
+    real(8),save:: rc3
     real(8),save,allocatable:: gsf(:,:),dgsf(:,:,:,:),hl1(:,:),hl2(:,:)
 !    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
 !.....1st call
