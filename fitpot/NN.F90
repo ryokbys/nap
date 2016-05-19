@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-19 19:23:52 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-19 21:05:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -200,6 +200,7 @@ contains
       if( .not. lfmatch ) cycle
       ferr = smpl%ferr
       ferri = 1d0/ferr
+      dn3i = 1d0/3/natm
       do ia=1,natm
         do ixyz=1,3
           fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
@@ -211,7 +212,7 @@ contains
 !!$           *dn3i *fscale *swgt
       do ia=1,natm
         do ixyz=1,3
-          flocal= flocal +fdiff(ixyz,ia)
+          flocal= flocal +fdiff(ixyz,ia) *dn3i
         enddo
       enddo
     enddo
@@ -253,10 +254,16 @@ contains
     integer:: ismpl
     common /samplei/ ismpl
     type(mdsys):: smpl
+    logical,save:: l1st = .true.
 
     nfunc=nfunc +1
     tf0= mpi_wtime()
     call vars2wgts(ndim,x)
+
+    if( l1st ) then
+      call count_nterms()
+      l1st = .false.
+    endif
 
     smpl= samples(ismpl)
     if( nl.eq.1 ) then
@@ -275,12 +282,13 @@ contains
     flocal= flocal +ediff
     if( .not. lfmatch ) goto 888
     ferr = smpl%ferr
+    dn3i = 1d0/3/natm
     fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
          -smpl%fref(1:3,1:natm)) /ferr
     fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm)
     do ia=1,natm
       do ixyz=1,3
-        flocal= flocal +fdiff(ixyz,ia)
+        flocal= flocal +fdiff(ixyz,ia)*dn3i
       enddo
     enddo
 
@@ -672,7 +680,7 @@ contains
     do ia=1,natm
       do ixyz=1,3
         fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-             -smpl%fref(ixyz,ia)) *ferri *2
+             -smpl%fref(ixyz,ia)) *ferri *2 *dn3i
 !!$        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt *wgtidv
       enddo
       enddo
@@ -910,11 +918,11 @@ contains
     dgs(1:nvars)= 0d0
     fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
          -smpl%fref(1:3,1:natm)) /ferr
-!!$    dn3i= 1d0/(3*natm)
+    dn3i= 1d0/3/natm
 !!$    fscale= 1d0
 !!$    if( lfscale ) fscale= fscl
 !    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *dn3i*fscale*swgt*wgtidv
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2/ferr/ferr
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2/ferr/ferr *dn3i
 
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 !.....make w1dg
@@ -1606,9 +1614,9 @@ contains
       smpl = samples(ismpl)
       natm = smpl%natm
       if( smpl%iclass.eq.1 ) then
-        nttrnl = nttrnl + 1 +3*natm
+        nttrnl = nttrnl + 1 +1
       else
-        nttstl = nttstl + 1 +3*natm
+        nttstl = nttstl + 1 +1
       endif
     enddo
 
