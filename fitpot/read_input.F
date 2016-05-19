@@ -153,6 +153,12 @@ c=======================================================================
         allocate(cwgtindiv(nwgtindiv),wgtindiv(nwgtindiv))
         call read_cr(ionum,nwgtindiv,cwgtindiv,wgtindiv)
         return
+      elseif( trim(cname).eq.'sample_error' ) then
+        backspace(ionum)
+        read(ionum,*) ctmp,nserr
+        allocate(cserr(nserr),seerr(nserr),sferr(nserr))
+        call read_crr(ionum,nserr,cserr,seerr,sferr)
+        return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return
@@ -192,6 +198,20 @@ c
       enddo
 
       end subroutine read_cr
+c=======================================================================
+      subroutine read_crr(ionum,nrow,cval,rval1,rval2)
+c
+c  Read sets of (character, real*8, real*8)
+c
+      integer,intent(in):: ionum,nrow
+      real(8),intent(out):: rval1(nrow),rval2(nrow)
+      character(len=*),intent(out):: cval(nrow)
+
+      do irow=1,nrow
+        read(ionum,*) cval(irow),rval1(irow),rval2(irow)
+      enddo
+
+      end subroutine read_crr
 c=======================================================================
       subroutine read_rs(ionum,ctmp,ndata,nrow,rval)
 c

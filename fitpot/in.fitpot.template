@@ -15,4 +15,6 @@ ga_num_bit          16
 ga_temperature      0.1
 ga_murate           0.01
 
-
+sample_error  2
+   smpl_1   0.001  0.1
+   smpl_1   0.01   0.2

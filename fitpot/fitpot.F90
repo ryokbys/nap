@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-10 18:29:52 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-19 18:50:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -41,7 +41,8 @@ program fitpot
     samples(ismpl)%cdirname= cdirlist(ismpl)
     samples(ismpl)%wgt = 1d0
   enddo
-  if( nwgtindiv.gt.0 ) call set_individual_weight()
+
+  if( nserr.gt.0 ) call set_sample_errors()
   call set_training_test()
 
   call read_samples()
@@ -1118,3 +1119,23 @@ subroutine set_individual_weight()
     write(6,'(a)') ' set_individual_weight done'
   endif
 end subroutine set_individual_weight
+!=======================================================================
+subroutine set_sample_errors()
+  use variables
+  use parallel
+  implicit none 
+  integer:: ismpl,iserr,idx
+
+  do ismpl=isid0,isid1
+    do iserr= 1,nserr
+      idx= index(samples(ismpl)%cdirname,trim(cserr(iserr)))
+      if( idx.ne.0 ) then
+        samples(ismpl)%eerr= seerr(iserr)
+        samples(ismpl)%ferr= sferr(iserr)
+      endif
+    enddo
+  enddo
+  if( myid.eq.0 ) then
+    write(6,'(a)') ' set_individual_weight done'
+  endif
+end subroutine set_sample_errors

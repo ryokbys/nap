@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-04-11 21:01:51 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-19 19:23:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -26,6 +26,9 @@ module NN
   real(8),save,allocatable:: gmax(:),gmin(:)
 
   logical,save:: lstandard= .false.
+
+  integer,save:: nterm_trn = 0
+  integer,save:: nterm_tst = 0
 
 contains
 !=======================================================================
@@ -155,10 +158,12 @@ contains
 
     integer:: ismpl,natm,ia,ixyz,idim
     real(8):: dn3i,ediff,fscale,eref,swgt,wgtidv
+    real(8):: eerr,ferr,ferri
     real(8):: flocal
     real(8):: edenom,fdenom
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     type(mdsys):: smpl
+    logical:: l1st = .true.
 
     nfunc= nfunc +1
 
@@ -167,6 +172,11 @@ contains
     tcl= mpi_wtime() -tc0
     tf0= mpi_wtime()
     call vars2wgts(ndim,x)
+
+    if( l1st ) then
+      call count_nterms()
+      l1st = .false.
+    endif
     
     do ismpl=isid0,isid1
       if( nl.eq.1 ) then
@@ -183,46 +193,20 @@ contains
       if( smpl%iclass.ne.1 ) cycle
       natm= smpl%natm
       eref= smpl%eref
-      wgtidv= smpl%wgt
-      ediff= (smpl%epot -eref)/natm
+      eerr = smpl%eerr
+      ediff= (smpl%epot -eref)/natm /eerr
       ediff= ediff*ediff
-      if( trim(cevaltype).eq.'relative' ) then
-        edenom= abs(eref/natm)
-        edenom= edenom**2 +epse
-        ediff= ediff/edenom
-      endif
-      swgt= 1d0
-      if( lswgt ) then
-        swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
-      endif
-      flocal= flocal +ediff*swgt*wgtidv
+      flocal= flocal +ediff
       if( .not. lfmatch ) cycle
-      fscale= 1d0
-      !.....force-scale makes force contribution same order to energy
-      if( lfscale ) fscale= fscl
-      dn3i= 1d0 /(3*natm)
-      if( trim(cevaltype).eq.'relative' ) then
-        do ia=1,natm
-          do ixyz=1,3
-            fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-                 -smpl%fref(ixyz,ia))
-            fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia) *dn3i *fscale &
-                 *swgt*wgtidv
-          fdenom= abs(smpl%fref(ixyz,ia))
-          fdenom= fdenom*fdenom +epsf
-          fdiff(ixyz,ia)= fdiff(ixyz,ia) /fdenom
-          enddo
+      ferr = smpl%ferr
+      ferri = 1d0/ferr
+      do ia=1,natm
+        do ixyz=1,3
+          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+               -smpl%fref(ixyz,ia)) *ferri
+          fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
         enddo
-      else
-        do ia=1,natm
-          do ixyz=1,3
-            fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-                 -smpl%fref(ixyz,ia))
-            fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia) *dn3i *fscale &
-                 *swgt*wgtidv
-          enddo
-        enddo
-      endif
+      enddo
 !!$      fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
 !!$           *dn3i *fscale *swgt
       do ia=1,natm
@@ -241,7 +225,8 @@ contains
          ,mpi_sum,mpi_world,ierr)
     tcl = tcl + (mpi_wtime() -tc0)
 !    tcomm= tcomm +mpi_wtime() -tc0
-    NN_func= NN_func/nsmpl_trn
+!    NN_func= NN_func/nsmpl_trn
+    NN_func= NN_func /nterm_trn
 
 
 !.....only the bottle-neck times are taken into account
@@ -264,6 +249,7 @@ contains
     real(8):: NN_fs
     integer:: natm,ia,ixyz,idim
     real(8):: dn3i,ediff,tf0,fscale,eref,swgt,flocal,tc0,wgtidv
+    real(8):: eerr,ferr,ferri
     integer:: ismpl
     common /samplei/ ismpl
     type(mdsys):: smpl
@@ -283,24 +269,15 @@ contains
     if( smpl%iclass.ne.1 ) goto 888
     natm= smpl%natm
     eref= smpl%eref
-    ediff= (smpl%epot -eref)/natm
+    eerr = smpl%eerr
+    ediff= (smpl%epot -eref)/natm /eerr
     ediff= ediff*ediff
-    wgtidv= smpl%wgt
-    swgt= 1d0
-    if( lswgt ) then
-      swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
-!!$      swgt= exp(-eref/natm*swbeta)
-    endif
-    flocal= flocal +ediff*swgt*wgtidv
+    flocal= flocal +ediff
     if( .not. lfmatch ) goto 888
+    ferr = smpl%ferr
     fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
-         -smpl%fref(1:3,1:natm))
-    dn3i= 1d0 /(3*natm)
-    fscale= 1d0
-!.....force-scale makes force contribution same order to energy
-    if( lfscale ) fscale= fscl
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
-         *dn3i *fscale *swgt *wgtidv
+         -smpl%fref(1:3,1:natm)) /ferr
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm)
     do ia=1,natm
       do ixyz=1,3
         flocal= flocal +fdiff(ixyz,ia)
@@ -614,6 +591,7 @@ contains
     integer:: iv,nv,ihl1,ia,ja,ihl0,jhl0,natm,ixyz
     real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale,eref,swgt,wgtidv
     real(8):: edenom,fdenom
+    real(8):: eerr,ferr,ferri
     real(8),save,allocatable:: dgs(:),ab(:),wdg(:,:,:),bms(:,:,:,:)
 
     if( .not. allocated(dgs) ) then
@@ -623,19 +601,14 @@ contains
 
     natm= smpl%natm
     eref= smpl%eref
-    wgtidv= smpl%wgt
-    swgt= 1d0
-    if( lswgt ) then
-      swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
-!!$      swgt= exp(-eref/natm*swbeta)
-    endif
-    ediff= (smpl%epot -eref)/natm
-    ediff= 2d0 *ediff *swgt *wgtidv /natm
-    if( trim(cevaltype).eq.'relative' ) then
-      edenom= abs(eref/natm)
-      edenom= edenom**2 +epse
-      ediff= ediff/edenom
-    endif
+    eerr= smpl%eerr
+!!$    wgtidv= smpl%wgt
+!!$    swgt= 1d0
+!!$    if( lswgt ) then
+!!$      swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
+!!$    endif
+    ediff= (smpl%epot -eref) /natm /eerr
+    ediff= 2d0 *ediff /natm /eerr ! *swgt *wgtidv /natm
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)
     do ihl1=nhl(1),1,-1
@@ -679,29 +652,31 @@ contains
 
     if( .not. lfmatch ) return
     dgs(1:nvars)= 0d0
+    ferr = smpl%ferr
+    ferri= 1d0/ferr
     dn3i= 1d0/(3*natm)
-    fscale= 1d0
-    if( lfscale ) fscale= fscl
-    if( trim(cevaltype).eq.'relative' ) then
-      do ia=1,natm
-        do ixyz=1,3
-          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-               -smpl%fref(ixyz,ia))
-          fdenom= abs(smpl%fref(ixyz,ia))
-          fdenom= fdenom*fdenom +epsf
-          fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt &
-               *wgtidv /fdenom
-        enddo
+!!$    fscale= 1d0
+!!$    if( lfscale ) fscale= fscl
+!!$    if( trim(cevaltype).eq.'relative' ) then
+!!$      do ia=1,natm
+!!$        do ixyz=1,3
+!!$          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+!!$               -smpl%fref(ixyz,ia))
+!!$          fdenom= abs(smpl%fref(ixyz,ia))
+!!$          fdenom= fdenom*fdenom +epsf
+!!$          fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt &
+!!$               *wgtidv /fdenom
+!!$        enddo
+!!$      enddo
+!!$    else
+    do ia=1,natm
+      do ixyz=1,3
+        fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+             -smpl%fref(ixyz,ia)) *ferri *2
+!!$        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt *wgtidv
       enddo
-    else
-      do ia=1,natm
-        do ixyz=1,3
-          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-               -smpl%fref(ixyz,ia))
-          fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt *wgtidv
-        enddo
       enddo
-    endif
+!!$    endif
 !!$    do ia=1,natm
 !!$      do ixyz=1,3
 !!$        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt
@@ -843,6 +818,7 @@ contains
     integer:: iv,ihl0,ihl1,ihl2,ia,ja,natm
     real(8):: ediff,tmp,tmp1,tmp2,h1,h2,w1,w2,w3,dn3i,dh1,dh2,t1,t2,t3&
          ,ddh1,ddh2,dh1gsf,fscale,eref,swgt,wgtidv
+    real(8):: eerr,ferr,ferri
     real(8),save,allocatable:: dgs(:),w1dg(:,:,:,:),w2sw1dg(:,:,:,:)
 
     if( .not. allocated(dgs) ) then
@@ -852,13 +828,14 @@ contains
 
     natm= smpl%natm
     eref= smpl%eref
-    wgtidv= smpl%wgt
-    swgt= 1d0
-    if( lswgt ) then
-      swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
-!!$      swgt= exp(-eref/natm*swbeta)
-    endif
-    ediff= (smpl%epot -eref)*2 /natm/natm *swgt *wgtidv
+    eerr= smpl%eerr
+!!$    wgtidv= smpl%wgt
+!!$    swgt= 1d0
+!!$    if( lswgt ) then
+!!$      swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
+!!$    endif
+!!$    ediff= (smpl%epot -eref)*2 /natm/natm *swgt *wgtidv
+    ediff= (smpl%epot -eref)*2 /natm/natm /eerr /eerr
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 
@@ -929,13 +906,16 @@ contains
     endif
 
     if( .not. lfmatch ) return
+    ferr = smpl%ferr
     dgs(1:nvars)= 0d0
     fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
-         -smpl%fref(1:3,1:natm))
-    dn3i= 1d0/(3*natm)
-    fscale= 1d0
-    if( lfscale ) fscale= fscl
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *dn3i *fscale *swgt *wgtidv
+         -smpl%fref(1:3,1:natm)) /ferr
+!!$    dn3i= 1d0/(3*natm)
+!!$    fscale= 1d0
+!!$    if( lfscale ) fscale= fscl
+!    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *dn3i*fscale*swgt*wgtidv
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2/ferr/ferr
+
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 !.....make w1dg
     w1dg(1:3,1:natm,1:natm,1:nhl(1))= 0d0
@@ -1613,4 +1593,31 @@ contains
          ,mpi_sum,0,mpi_world,ierr)
     
   end subroutine eval_1st_layer
+!=======================================================================
+  subroutine count_nterms()
+    use variables
+    use parallel
+    integer:: ismpl,natm,nttrnl,nttstl
+    type(mdsys):: smpl
+
+    nttrnl = 0
+    nttstl = 0
+    do ismpl=isid0,isid1
+      smpl = samples(ismpl)
+      natm = smpl%natm
+      if( smpl%iclass.eq.1 ) then
+        nttrnl = nttrnl + 1 +3*natm
+      else
+        nttstl = nttstl + 1 +3*natm
+      endif
+    enddo
+
+    nterm_trn = 0
+    nterm_tst = 0
+    call mpi_allreduce(nttrnl,nttrn,1,mpi_integer &
+         ,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(nttstl,nttst,1,mpi_integer &
+         ,mpi_sum,mpi_world,ierr)
+    
+  end subroutine count_nterms
 end module NN
