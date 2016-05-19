@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-19 21:05:06 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-19 21:53:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -175,6 +175,9 @@ contains
 
     if( l1st ) then
       call count_nterms()
+      if( myid.eq.0 ) then
+        write(6,*) ' nterm_trn, nterm_tst = ',nterm_trn, nterm_tst
+      endif
       l1st = .false.
     endif
     
@@ -301,7 +304,7 @@ contains
          ,mpi_sum,mpi_world,ierr)
 !!$    print *,'here02,myid,NN_func=',myid,NN_func
     tcomm= tcomm +mpi_wtime() -tc0
-    NN_fs= NN_fs/nnode
+    NN_fs= NN_fs /nterm_trn
 
 999 tfunc= tfunc +mpi_wtime() -tf0
     return
@@ -527,7 +530,7 @@ contains
     tcl= mpi_wtime() -tc0
 !    tcomm= tcomm +mpi_wtime() -tc0
 
-    NN_grad(1:ndim)= NN_grad(1:ndim)/nsmpl_trn
+    NN_grad(1:ndim)= NN_grad(1:ndim) /nterm_trn
 
 !!$    if( lgscale ) then
 !!$      gmax= 0d0
@@ -583,7 +586,7 @@ contains
     call mpi_allreduce(gsl,NN_gs,ndim,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
     tcomm= tcomm +mpi_wtime() -tc0
-    NN_gs(1:ndim)= NN_gs(1:ndim)/nnode
+    NN_gs(1:ndim)= NN_gs(1:ndim) /nterm_trn
 
     tgrad= tgrad +mpi_wtime() -tg0
     return
@@ -680,10 +683,10 @@ contains
     do ia=1,natm
       do ixyz=1,3
         fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-             -smpl%fref(ixyz,ia)) *ferri *2 *dn3i
+             -smpl%fref(ixyz,ia)) *ferri *ferri *2 *dn3i
 !!$        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt *wgtidv
       enddo
-      enddo
+    enddo
 !!$    endif
 !!$    do ia=1,natm
 !!$      do ixyz=1,3
@@ -915,14 +918,15 @@ contains
 
     if( .not. lfmatch ) return
     ferr = smpl%ferr
+    ferri= 1d0/ferr
     dgs(1:nvars)= 0d0
     fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
-         -smpl%fref(1:3,1:natm)) /ferr
+         -smpl%fref(1:3,1:natm)) *ferri
     dn3i= 1d0/3/natm
 !!$    fscale= 1d0
 !!$    if( lfscale ) fscale= fscl
 !    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *dn3i*fscale*swgt*wgtidv
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2/ferr/ferr *dn3i
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *ferri *dn3i
 
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 !.....make w1dg
@@ -1605,6 +1609,7 @@ contains
   subroutine count_nterms()
     use variables
     use parallel
+    implicit none
     integer:: ismpl,natm,nttrnl,nttstl
     type(mdsys):: smpl
 
@@ -1622,9 +1627,9 @@ contains
 
     nterm_trn = 0
     nterm_tst = 0
-    call mpi_allreduce(nttrnl,nttrn,1,mpi_integer &
+    call mpi_allreduce(nttrnl,nterm_trn,1,mpi_integer &
          ,mpi_sum,mpi_world,ierr)
-    call mpi_allreduce(nttstl,nttst,1,mpi_integer &
+    call mpi_allreduce(nttstl,nterm_tst,1,mpi_integer &
          ,mpi_sum,mpi_world,ierr)
     
   end subroutine count_nterms

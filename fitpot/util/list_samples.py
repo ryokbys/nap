@@ -32,7 +32,7 @@ if __name__ == "__main__":
     for i in range(len(smpls)):
         smpls[i] = smpls[i].split('/')[-1][5:-6]
     uniq_smpls = uniq(smpls)
-
+    uniq_smpls.sort()
     print('sample_error   {0:d}'.format(len(uniq_smpls)))
     for s in uniq_smpls:
         print('{0:>20s}  0.001  0.1'.format(s))
