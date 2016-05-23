@@ -1032,9 +1032,11 @@ contains
 !!$    if(myid.eq.0)write(6,'(a,i5,5es15.7)') &
 !!$         'iter,alphai,fi,pval,fi-f0,xigd*alphai=' &
 !!$         ,iter,alphai,fi,pval,fi-f0,xigd*alphai
-!!$    if(myid.eq.0) write(6,'(a,i3,3es15.7)')  &
-!!$         ' armijo: iter,alphai,fi-f0,xigd*alphai=' &
-!!$         ,iter,alphai,fi-f0,xigd*alphai
+    if(myid.eq.0) then
+      write(6,'(a,i3,6es15.7)')  &
+         ' armijo: iter,alphai,fi,pval,f0,pval0,xigd*alphai =' &
+         ,iter,alphai,fi,pval,f0,pval0,xigd*alphai
+    endif
     if( fi+pval-(f0+pval0).le.xigd*alphai ) then
       f= fi
       alpha= alphai
@@ -1054,7 +1056,13 @@ contains
   if(myid.eq.0) print *,'[Error] iter.gt.MAXITER in armijo_search.'
   iflag= iflag +100
   alpha=alphai
-  if( myid.eq.0 ) print *,'  alpha=',alpha
+  if( myid.eq.0 ) then
+    print *,'  alpha= ',alpha
+    print *,'  xigd = ',xigd
+    print *,'  norm(g) = ',sqrt(sprod(ndim,g,g))
+    print *,'  norm(d) = ',sqrt(sprod(ndim,d,d))
+    print *,'  pval = ',pval
+  endif
   return
     
   end subroutine armijo_search

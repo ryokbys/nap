@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-19 18:50:34 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-23 19:08:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -621,6 +621,8 @@ subroutine check_grad()
   integer:: iv
   real(8):: f0,ftmp,dv,vmax
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
+  real(8),parameter:: dev  = 1d-4
+  real(8),parameter:: tiny = 1d-8
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
   call NN_init()
@@ -633,7 +635,7 @@ subroutine check_grad()
     vmax= max(vmax,abs(vars0(iv)))
     if( myid.eq.0) write(6,'(a,i6,es12.4)') ' iv,vars(iv)=',iv,vars0(iv)
   enddo
-  dv= vmax *1d-4
+  dv= vmax *dev
   if( myid.eq.0 ) then
     print *,''
     print *,'deviation [dv] =',dv
@@ -653,7 +655,7 @@ subroutine check_grad()
          '      error [%]'
     do iv=1,nvars
       write(6,'(i6,2es15.4,f15.3)') iv,ganal(iv),gnumer(iv), &
-           abs((ganal(iv)-gnumer(iv))/gnumer(iv))*100
+           abs((ganal(iv)-gnumer(iv))/(gnumer(iv)+tiny))*100
     enddo
     write(6,'(a)') '-----------------------------------------------------'
     print *, 'check_grad done.'
@@ -700,24 +702,24 @@ subroutine write_energy_relation(cadd)
   cfname='out.erg.'//trim(cadd)
 
   if( .not. allocated(erefl) ) allocate(erefl(nsmpl),erefg(nsmpl) &
-       ,epotl(nsmpl),epotg(nsmpl),wgtl(nsmpl),wgtg(nsmpl))
+       ,epotl(nsmpl),epotg(nsmpl),eerrl(nsmpl),eerrg(nsmpl))
 
   erefl(1:nsmpl)= 0d0
   epotl(1:nsmpl)= 0d0
-  wgtl(1:nsmpl)= 0d0
+  eerrl(1:nsmpl)= 0d0
   do ismpl=isid0,isid1
     erefl(ismpl)= samples(ismpl)%eref
     epotl(ismpl)= samples(ismpl)%epot
-    wgtl(ismpl)= samples(ismpl)%wgt
+    eerrl(ismpl)= samples(ismpl)%eerr
   enddo
   erefg(1:nsmpl)= 0d0
   epotg(1:nsmpl)= 0d0
-  wgtg(1:nsmpl)= 0d0
+  eerrg(1:nsmpl)= 0d0
   call mpi_reduce(epotl,epotg,nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
   call mpi_reduce(erefl,erefg,nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
-  call mpi_reduce(wgtl,wgtg,nsmpl,mpi_double_precision,mpi_sum &
+  call mpi_reduce(eerrl,eerrg,nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
 
   if( myid.eq.0 ) then
@@ -731,26 +733,26 @@ subroutine write_energy_relation(cadd)
           write(90,'(2es15.7,2x,a,3es15.7)') erefg(ismpl) &
                ,epotg(ismpl),trim(cdirlist(ismpl)) &
                ,abs(erefg(ismpl)-epotg(ismpl)) &
-               ,wgtg(ismpl) &
+               ,eerrg(ismpl) &
                ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
         else
           write(90,'(2es15.7,2x,a,2es15.7)') erefg(ismpl) &
                ,epotg(ismpl),trim(cdirlist(ismpl)) &
                ,abs(erefg(ismpl)-epotg(ismpl)) &
-               ,wgtg(ismpl)
+               ,eerrg(ismpl)
         endif
       else if( iclist(ismpl).eq.2 ) then
         if( lswgt ) then
           write(91,'(2es15.7,2x,a,3es15.7)') erefg(ismpl) &
                ,epotg(ismpl),trim(cdirlist(ismpl)) &
                ,abs(erefg(ismpl)-epotg(ismpl)) &
-               ,wgtg(ismpl) &
+               ,eerrg(ismpl) &
                ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
         else
           write(91,'(2es15.7,2x,a,2es15.7)') erefg(ismpl) &
                ,epotg(ismpl),trim(cdirlist(ismpl)) &
                ,abs(erefg(ismpl)-epotg(ismpl)) &
-               ,wgtg(ismpl)
+               ,eerrg(ismpl)
         endif
 !!$        write(91,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
 !!$             ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)
@@ -781,20 +783,26 @@ subroutine write_force_relation(cadd)
        ,mpi_world,ierr)
 
   if( .not. allocated(frefl) ) allocate(frefl(3,nmax,nsmpl)&
-       ,frefg(3,nmax,nsmpl),fal(3,nmax,nsmpl),fag(3,nmax,nsmpl) )
+       ,frefg(3,nmax,nsmpl),fal(3,nmax,nsmpl),fag(3,nmax,nsmpl)&
+       ,ferrl(nsmpl),ferrg(nsmpl))
 
   frefl(1:3,1:nmax,1:nsmpl)= 0d0
   fal(1:3,1:nmax,1:nsmpl)= 0d0
+  ferrl(1:nsmpl) = 0d0
   do ismpl=isid0,isid1
     natm= samples(ismpl)%natm
     frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm)
     fal(1:3,1:natm,ismpl)= samples(ismpl)%fa(1:3,1:natm)
+    ferrl(ismpl) = samples(ismpl)%ferr
   enddo
   frefg(1:3,1:nmax,1:nsmpl)= 0d0
   fag(1:3,1:nmax,1:nsmpl)= 0d0
+  ferrg(1:nsmpl) = 0d0
   call mpi_reduce(fal,fag,3*nmax*nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
   call mpi_reduce(frefl,frefg,3*nmax*nsmpl,mpi_double_precision,mpi_sum &
+       ,0,mpi_world,ierr)
+  call mpi_reduce(ferrl,ferrg,nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
 
   if( myid.eq.0 ) then
@@ -805,20 +813,22 @@ subroutine write_force_relation(cadd)
         natm= nalist(ismpl)
         do ia=1,natm
           do ixyz=1,3
-            write(92,'(2es15.7,2x,a,i6,i3,es15.7)') frefg(ixyz,ia,ismpl) &
+            write(92,'(2es15.7,2x,a,i6,i3,2es15.7)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
                  ,trim(cdirlist(ismpl)),ia,ixyz &
-                 ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))
+                 ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
+                 ,ferrg(ismpl)
           enddo
         enddo
       else if( iclist(ismpl).eq.2 ) then
         natm= nalist(ismpl)
         do ia=1,natm
           do ixyz=1,3
-            write(93,'(2es15.7,2x,a,i6,i3,es15.7)') frefg(ixyz,ia,ismpl) &
+            write(93,'(2es15.7,2x,a,i6,i3,2es15.7)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
                  ,trim(cdirlist(ismpl)),ia,ixyz &
-                 ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))
+                 ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
+                 ,ferrg(ismpl)
           enddo
         enddo
       endif
@@ -877,7 +887,7 @@ subroutine write_stats(iter)
     rmse_tst= 0.d0
   endif
   if( myid.eq.0 ) then
-    write(6,'(a,2i6)') 'nsmpl_trn, nsmpl_tst = ',nsmpl_trn,nsmpl_tst
+    write(6,'(a,2i6)') ' nsmpl_trn, nsmpl_tst = ',nsmpl_trn,nsmpl_tst
     write(6,'(a,i8,f15.2,4f12.7)') '  energy:training(rmse,max)' &
          //',test(rmse,max)=',iter,mpi_wtime()-time0 &
          ,rmse_trn,demax_trn,rmse_tst,demax_tst
@@ -1023,6 +1033,14 @@ subroutine sync_input()
   endif
   call mpi_bcast(cwgtindiv,128*nwgtindiv,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(wgtindiv,nwgtindiv,mpi_double_precision,0,mpi_world,ierr)
+
+  call mpi_bcast(nserr,1,mpi_integer,0,mpi_world,ierr)
+  if( myid.gt.0 ) then
+    allocate(cserr(nserr),seerr(nserr),sferr(nserr))
+  endif
+  call mpi_bcast(cserr,128*nserr,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(seerr,nserr,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(sferr,nserr,mpi_double_precision,0,mpi_world,ierr)
 end subroutine sync_input
 !=======================================================================
 subroutine get_node2sample()

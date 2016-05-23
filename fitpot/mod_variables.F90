@@ -67,5 +67,7 @@ module variables
   real(8),allocatable,save:: frefl(:,:,:),frefg(:,:,:),fal(:,:,:)&
        ,fag(:,:,:)
   real(8),allocatable,save:: wgtl(:),wgtg(:)
+  real(8),allocatable,save:: eerrl(:),eerrg(:)
+  real(8),allocatable,save:: ferrl(:),ferrg(:)
 
 end module variables
