@@ -76,8 +76,8 @@ def rdf(asys,dr,rmax,idsrc=0,iddst=0):
 
     n1,n2,n3= asys.get_expansion_num(2.0*rmax)
     if not (n1==1 and n2==1 and n3==1):
-        print ' system to be expanded, n1,n2,n3=',n1,n2,n3
-        asys.expand(n1,n2,n3)
+        print ' system to be repeated, n1,n2,n3=',n1,n2,n3
+        asys.repeat(n1,n2,n3)
     # print ' a1=',asys.a1
     # print ' a2=',asys.a2
     # print ' a3=',asys.a3

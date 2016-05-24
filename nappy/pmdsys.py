@@ -6,16 +6,16 @@ number of atoms, atom species, atom positions.
 Users can use `pmdsys.py` as a converter program as described below.
 
 Usage:
-    pmdsys.py [options] INFILE OUTFILE
+  pmdsys.py [options] INFILE OUTFILE
 
 Options:
-    -h, --help  Show this help message and exit.
-    --in-format=INFMT
-                Format of the input file. [default: None]
-    --out-format=OUTFMT
-                Format of the output file. [default: pmd]
-    --specorder=SPECORDER
-                Order of species. [default: Al,Mg,Si]
+  -h, --help  Show this help message and exit.
+  --in-format=INFMT
+              Format of the input file. [default: None]
+  --out-format=OUTFMT
+              Format of the output file. [default: pmd]
+  --specorder=SPECORDER
+              Order of species. [default: Al,Mg,Si]
 """
 
 import math
@@ -29,7 +29,12 @@ from atom import Atom,get_symbol_from_number,get_number_from_symbol
 
 #...constants
 _maxnn= 100
-_file_formats= ('pmd','smd','akr','POSCAR','dump','xsf')
+_file_formats= ('pmd',
+                'smd',
+                'akr',
+                'POSCAR',
+                'dump',
+                'xsf')
 
 class PMDSystem(object):
     """
@@ -758,8 +763,8 @@ class PMDSystem(object):
         n3= int(np.ceil(length/l3))
         return n1,n2,n3
 
-    def expand(self,n1,n2,n3):
-        #...expand unit vectors
+    def repeat(self,n1,n2,n3):
+        #...unit vectors to be repeated
         self.a1= self.a1*n1
         self.a2= self.a2*n2
         self.a3= self.a3*n3
