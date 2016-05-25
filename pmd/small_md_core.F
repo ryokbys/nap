@@ -87,6 +87,7 @@ c.....Setup for FIRE
 
       call setup(nismax,am,acon,fack,dt)
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
+      sorg(1:3) = 0d0
 
 c.....Set initial temperature if needed
       if( tinit.gt.1d-5 ) then
@@ -95,6 +96,8 @@ c.....Set initial temperature if needed
       elseif( abs(tinit).le.1d-5 ) then
         va(1:3,1:natm)= 0d0
       endif
+
+      call pbc(natm,ra)
 
       if( ifdmp.eq.2 ) then
         va(1:3,1:natm) = 0d0
@@ -153,6 +156,7 @@ c.....make MD loop starts
         endif
 !        write(6,*) va(1:3,1)
         ra(1:3,1:natm)= ra(1:3,1:natm) +va(1:3,1:natm)
+        write(6,*) ra(1:3,1)
 c-------multiply fmv or damping
         do i=1,natm
           l= int(mod(tag(i)*10,10d0))
@@ -221,6 +225,7 @@ c.....check convergence criteria if it is dumping simulation
 c-------write the particle positions
         if(ifpmd.eq.1.and.
      &       (mod(istp,noutpmd).eq.0 .or. lconverged))then
+          call pbc(natm,ra)
 c---------decide pmd-file name
           iocntpmd=iocntpmd+1
           write(cnum(1:4),'(i4.4)') iocntpmd
@@ -521,6 +526,31 @@ c=======================================================================
         write(6,'(a,2f10.3)') ' dt,alp_fire = ',dt,alp_fire
       endif
       end subroutine vfire
+c=======================================================================
+      subroutine pbc(natm,ra)
+      implicit none 
+      integer,intent(in):: natm
+      real(8),intent(inout):: ra(3,natm)
+
+      integer:: i,ixyz
+
+      do i=1,natm
+        do ixyz=1,3
+          if( ra(ixyz,i).ge.1.d0 ) then
+            ra(ixyz,i) = ra(ixyz,i) - 1.d0
+          else if( ra(ixyz,i).lt.0d0 ) then
+            ra(ixyz,i) = ra(ixyz,i) + 1.d0
+          endif
+          ! if still ra(ixyz,i) < 0.0 or ra(ixyz,i) >= 1.0, stop
+          if( ra(ixyz,i).ge.1.d0 .or. ra(ixyz,i).lt.0d0 ) then
+            print *,'something wrong'
+            print *,'i,ixyz,ra(ixyz,i)=',i,ixyz,ra(ixyz,i)
+            stop
+          endif
+        enddo
+      enddo
+
+      end subroutine pbc
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make smd"

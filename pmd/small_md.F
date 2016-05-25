@@ -1,6 +1,6 @@
       program small_md_main
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-05-05 20:22:10 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-05-25 10:33:47 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics program for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -26,7 +26,8 @@ c.....Multiply damping factor to avoid multiplication of every step
         write(6,*) ' [Error] io_format must be ascii !!!'
         stop
       endif
-      namax = 10000
+      namax = 26000
+      nbmax = namax
       allocate(tag(namax),ra(3,namax),va(3,namax),epi(namax)
      &     ,eki(3,3,namax),strs(3,3,namax),aa(3,namax))
       call read_pmd_ascii(20,"smd0000",namax,natm,h,hunit,tag,ra,va
