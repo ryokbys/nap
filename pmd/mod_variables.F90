@@ -1,6 +1,6 @@
   module variables
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-05 12:21:05 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-25 14:48:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
     implicit none
     save
@@ -32,6 +32,7 @@
     real(8):: tcpu,tcpu1,tcpu2,tcom
     real(8):: epot,ekin,epot0,vmaxold,vmax
     integer:: nstp = 0
+    integer:: minstp = 0
     integer:: nerg = 1000
     integer:: ifpmd= 1
     integer:: npmd = 10

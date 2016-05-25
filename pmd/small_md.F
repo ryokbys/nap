@@ -1,6 +1,6 @@
       program small_md_main
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-05-25 10:33:47 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-05-25 14:50:58 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics program for systems small enough not to use 
 c  cell-list method and parallelization.
@@ -65,8 +65,8 @@ c.....check whether order of atoms and total-id of atoms match
 
       call smd_core(namax,natm,h,hunit,tag,ra,va,eki,epi
      &     ,nis,nismax,am,dt,vol,tinit,tfin,ttgt,tfac,trlx
-     &     ,ctctl,ndof,nbmax,nb,nnmax,aa,strs,nstp,nerg,ifpmd,npmd
-     &     ,cforce,rc,rbuf,ifdmp,dmp,eps_conv,n_conv
+     &     ,ctctl,ndof,nbmax,nb,nnmax,aa,strs,nstp,minstp,nerg,ifpmd
+     &     ,npmd,cforce,rc,rbuf,ifdmp,dmp,eps_conv,n_conv
      &     ,fmv,ekin,epot,temp,1
      &     ,nmin_fire,finc_fire,fdec_fire
      &     ,alp0_fire,falp_fire,dtmax_fire)

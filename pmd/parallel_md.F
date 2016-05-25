@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-05-05 20:13:03 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-05-25 22:42:55 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -170,6 +170,7 @@ c.....Setup for FIRE
         alp_fire = alp0_fire
         am(1:nismax) = 10.d0
         num_fire = 0
+        dtmax_fire = 100.0 * dt
       endif
 
 c-----setup
@@ -628,14 +629,15 @@ c.....Output disl core pos
 
 c.....check convergence criteria if it is dumped MD
         if( ifdmp.gt.0 .and. epot-epotp.le.0d0 .and.
-     &       abs(epot-epotp).lt.eps_conv ) then
+     &       abs(epot-epotp).lt.eps_conv .and. istp.gt.minstp ) then
           i_conv = i_conv + 1
           if( i_conv.ge.n_conv ) then
             if( myid_md.eq.0 ) then
               write(6,'(a,es10.3,a,i3,a)')
      &             'Dumping MD converged since ediff < ',
      &             eps_conv,', ',n_conv,' times'
-              write(6,'(a,2es20.10)') '  epot,epotp = ',epot,epotp
+              write(6,'(a,3es20.10)') '  epot,epotp,epot-epotp = '
+     &             ,epot,epotp,epot-epotp
             endif
             lconverged = .true.
           endif
@@ -759,6 +761,7 @@ c=======================================================================
       endif
       write(6,'(2x,a25,i8)') 'flag_damping',ifdmp
       write(6,'(2x,a25,es11.3)') 'damping_coeff',dmp
+      write(6,'(2x,a25,i8)')   'min_iteration',minstp
       write(6,'(2x,a)') ''
 c.....temperature control
       write(6,'(2x,a25,f12.4)') 'initial_temperature',tinit
@@ -811,6 +814,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(ny,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(nz,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(nstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(minstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(dt,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(rc,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
       call mpi_bcast(rbuf,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
@@ -1895,12 +1899,14 @@ c=======================================================================
           if( num_fire.gt.nmin_fire ) then
             dt = min(dtmax_fire,dt*finc_fire)
             alp_fire = alp_fire*falp_fire
+            write(6,'(a,2f10.3)') ' dt,alp_fire = ',dt,alp_fire
           endif
         else
           dt = min(dtmax_fire,dt*fdec_fire)
           va(1:3,1:natm) = 0d0
           alp_fire = alp0_fire
           num_fire = 0
+          write(6,'(a,2f10.3)') ' dt,alp_fire = ',dt,alp_fire
         endif
       endif
       call mpi_bcast(dt,1,mpi_double_precision,0,mpi_md_world,ierr)
@@ -2046,7 +2052,7 @@ c
       implicit none
       include 'mpif.h'
       integer,parameter:: nmpi = 7
-      integer:: n0,ixyz,natmt
+      integer:: n0,ixyz,natmt,i
       integer:: istat(mpi_status_size),itag
       real(8):: t0
 
@@ -2086,8 +2092,14 @@ c
      &       ,mpi_md_world,ierr)
         call mpi_send(tag,natm,mpi_double_precision,0,itag+1
      &       ,mpi_md_world,ierr)
+        do i=1,natm
+          ra(1:3,i) = ra(1:3,i) + sorg(1:3)
+        enddo
         call mpi_send(ra,3*natm,mpi_double_precision,0,itag+2
      &       ,mpi_md_world,ierr)
+        do i=1,natm
+          ra(1:3,i) = ra(1:3,i) - sorg(1:3)
+        enddo
         call mpi_send(va,3*natm,mpi_double_precision,0,itag+3
      &       ,mpi_md_world,ierr)
         call mpi_send(epi,natm,mpi_double_precision,0,itag+4

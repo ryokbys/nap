@@ -55,6 +55,10 @@ c=======================================================================
      &       trim(cname).eq.'num_steps' ) then
         call read_i1(ionum,nstp)
         return
+      elseif( trim(cname).eq.'min_iteration' .or.
+     &       trim(cname).eq.'min_steps' ) then
+        call read_i1(ionum,minstp)
+        return
       elseif( trim(cname).eq.'num_out_energy' ) then
         call read_i1(ionum,nerg)
         return

@@ -1,7 +1,7 @@
       subroutine smd_core(namax,natm,h,hunit,tag,ra,va,eki,epi
      &     ,nis,nismax,am,dt,vol,tinit,tfin,ttgt,tfac,trlx
-     &     ,ctctl,ndof,nbmax,nb,nnmax,aa,strs,nstp,nerg,ifpmd,npmd
-     &     ,cforce,rc,rbuf,ifdmp,dmp,eps_conv,n_conv
+     &     ,ctctl,ndof,nbmax,nb,nnmax,aa,strs,nstp,minstp,nerg,ifpmd
+     &     ,npmd,cforce,rc,rbuf,ifdmp,dmp,eps_conv,n_conv
      &     ,fmv,ekin,epot,temp,iolevel
      &     ,nmin_fire,finc_fire,fdec_fire
      &     ,alp0_fire,falp_fire,dtmax_fire)
@@ -21,7 +21,7 @@ c-----------------------------------------------------------------------
 
 c.....arguments
       integer,intent(in):: namax,natm,nis,nismax,nstp,nerg,ifdmp
-     &     ,npmd,nbmax,nnmax,iolevel,n_conv
+     &     ,npmd,nbmax,nnmax,iolevel,n_conv,minstp
       integer,intent(inout):: nb,ifpmd,ndof(9)
       real(8),intent(in):: rbuf,dmp,h(3,3,0:1),hunit,fmv(3,0:9)
      &     ,tinit,tfin,eps_conv,trlx
@@ -154,9 +154,7 @@ c.....make MD loop starts
           call vfire(natm,num_fire,nmin_fire,finc_fire,fdec_fire
      &         ,falp_fire,alp0_fire,alp_fire,aa,va,dt,dtmax_fire)
         endif
-!        write(6,*) va(1:3,1)
         ra(1:3,1:natm)= ra(1:3,1:natm) +va(1:3,1:natm)
-        write(6,*) ra(1:3,1)
 c-------multiply fmv or damping
         do i=1,natm
           l= int(mod(tag(i)*10,10d0))
@@ -208,7 +206,7 @@ c          write(6,*) ttgt(ifmv),ndof(ifmv),temp(ifmv),tfac(ifmv)
 
 c.....check convergence criteria if it is dumping simulation
         if( ifdmp.gt.0 .and. epot-epotp.le.0d0 .and.
-     &       abs(epot-epotp).lt.eps_conv ) then
+     &       abs(epot-epotp).lt.eps_conv .and. istp.gt.minstp ) then
           i_conv = i_conv + 1
           if( i_conv.eq.n_conv ) then
             write(6,'(a,es10.3,a,i3,a)')

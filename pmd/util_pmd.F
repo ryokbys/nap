@@ -168,7 +168,8 @@ c=======================================================================
       write(ionum,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3)
      &     ,ib=1,3),l=0,1)
       write(ionum,'(i10)') ntot
-      write(ionum,'(7es23.14e3,11es22.14)') (tagtot(i),rtot(1:3,i)
+      write(ionum,'(7es23.14e3,11es22.14)') (tagtot(i)
+     &     ,rtot(1:3,i)
      &     ,vtot(1:3,i)/dt
      &     ,ekitot(1,1,i)+ekitot(2,2,i)+ekitot(3,3,i)
      &     ,epitot(i),stot(1:3,1:3,i)*up2gpa,i=1,ntot)
@@ -190,7 +191,8 @@ c-----natm: num. of particles in this node
       read(ionum) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       h(1:3,1:3,0:1)= h(1:3,1:3,0:1)*hunit
       read(ionum) ntot
-      allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot)
+      allocate(tagtot(ntot),rtot(3,ntot)
+     &     ,vtot(3,ntot),epitot(ntot)
      &     ,ekitot(3,3,ntot),stot(3,3,ntot))
       read(ionum) (tagtot(i),rtot(1:3,i),vtot(1:3,i)
      &     ,ekitot(1,1,i),epitot(i),stot(1:3,1:3,i),i=1,ntot)
