@@ -41,7 +41,7 @@ c.....local variables
       real(8):: tmp,at(3)
       character:: cnum*4
       integer,external:: itotOf
-      real(8):: acon(nismax),fack(nismax),tcom,avol,epot0,epotp
+      real(8):: acon(nismax),fack(nismax),tcom,epot0,epotp
      &     ,g(3,3,0:1),gi(3,3),gt(3,3,0:1),hi(3,3),ht(3,3,0:1),sgm(3,3)
      &     ,sv(3,6),sorg(3)
       integer:: nn(6),myparity(3),lsrc(6)
@@ -49,6 +49,7 @@ c.....local variables
       integer:: i_conv
       integer,allocatable:: lspr(:,:),lsb(:,:)
       logical:: lconverged = .false.
+      logical:: lstrs = .false.
 c.....FIRE variables
       real(8):: alp_fire
       integer:: num_fire
@@ -110,10 +111,12 @@ c      do ia=1,natm
 c        write(6,'(i3,"(",i2,")",100i4)') ia,lspr(0,ia)
 c     &       ,(lspr(i,ia),i=1,lspr(0,ia))
 c      enddo
+      lstrs = .true.
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &     ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,avol
+     &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,lstrs
      &     ,cforce)
+      lstrs = .false.
       epot= epot0
       epotp= epot
 
@@ -163,10 +166,15 @@ c-------multiply fmv or damping
 
         call mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf
      &       ,h,hi,sgm,lspr)
+
+        if(ifpmd.eq.1.and. mod(istp,noutpmd).eq.0) then
+          lstrs = .true.
+        endif
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &       ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs
      &       ,cforce)
+        lstrs = .false.
         va(1:3,1:natm)= va(1:3,1:natm) +aa(1:3,1:natm)
 
         call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki)
@@ -531,6 +539,7 @@ c=======================================================================
       real(8),intent(inout):: ra(3,natm)
 
       integer:: i,ixyz
+      real(8),parameter:: tiny = 1d-10
 
       do i=1,natm
         do ixyz=1,3
@@ -540,7 +549,8 @@ c=======================================================================
             ra(ixyz,i) = ra(ixyz,i) + 1.d0
           endif
           ! if still ra(ixyz,i) < 0.0 or ra(ixyz,i) >= 1.0, stop
-          if( ra(ixyz,i).ge.1.d0 .or. ra(ixyz,i).lt.0d0 ) then
+          if( ra(ixyz,i).ge.1.d0+tiny
+     &         .or. ra(ixyz,i).lt.0d0 -tiny ) then
             print *,'something wrong'
             print *,'i,ixyz,ra(ixyz,i)=',i,ixyz,ra(ixyz,i)
             stop

@@ -2,7 +2,7 @@ module LJ_Ar
 contains
   subroutine force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,avol)
+       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs)
 !-----------------------------------------------------------------------
 !  Parallel implementation of LJ force calculation
 !    - only force on i is considered, no need to send back
@@ -17,8 +17,9 @@ contains
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
          ,acon(nismax),tag(namax),sv(3,6)
-    real(8),intent(inout):: tcom,avol
+    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,ixyz,jxyz
     real(8):: xi(3),xij(3),rij,riji,dvdr &
@@ -28,15 +29,15 @@ contains
     real(8),save:: vrc,dvdrc
 
     if( l1st ) then
-!.....assuming fixed atomic volume
-      avol= alcar**3 /4
-      if(myid.eq.0) write(6,'(a,es12.4)') ' avol =',avol
+!!$!.....assuming fixed atomic volume
+!!$      avol= alcar**3 /4
+!!$      if(myid.eq.0) write(6,'(a,es12.4)') ' avol =',avol
 !.....prefactors
       vrc= 4d0 *epslj *((sgmlj/rc)**12 -(sgmlj/rc)**6)
       dvdrc=-24.d0 *epslj *( 2.d0*sgmlj**12/(rc**13) &
            -sgmlj**6/(rc**7) )
-!.....assuming fixed (constant) atomic volume
-      avol= (2d0**(1d0/6) *sgmlj)**2 *sqrt(3d0) /2
+!!$!.....assuming fixed (constant) atomic volume
+!!$      avol= (2d0**(1d0/6) *sgmlj)**2 *sqrt(3d0) /2
       l1st=.false.
     endif
 
@@ -97,10 +98,10 @@ contains
       call reduce_dba_bk(natm,namax,tag,strs,9)
     endif
 
-!-----atomic level stress in [eV/Ang^3] assuming 1 Ang thick
-    do i=1,natm
-      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
-    enddo
+!!$!-----atomic level stress in [eV/Ang^3] assuming 1 Ang thick
+!!$    do i=1,natm
+!!$      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
+!!$    enddo
 
 !-----reduced force
     do i=1,natm

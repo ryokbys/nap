@@ -2,7 +2,7 @@ module Branicio_AlN
 contains
   subroutine force_Branicio_AlN(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,avol)
+       ,mpi_world,myid,epi,epot,nismax,acon,lstrs)
 !-----------------------------------------------------------------------
 !  Parallel implementation of Branicio potential for AlN
 !    - Branicio potential (Vashishta group)
@@ -18,8 +18,9 @@ contains
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
-    real(8),intent(inout):: tcom,avol
+    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ks,ir
     real(8):: f2rc,df2rc,ri,cst,cs

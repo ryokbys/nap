@@ -57,7 +57,7 @@ c=======================================================================
       write(ionum) natm
       write(ionum) (tag(i),ra(1:3,i)+sorg(1:3),va(1:3,i)/dt
      &     ,eki(1,1,i)+eki(2,2,i)+eki(3,3,i)
-     &     ,epi(i),strs(1:3,1:3,i)*up2gpa,i=1,natm)
+     &     ,epi(i),strs(1:3,1:3,i),i=1,natm)
       close(ionum)
 
       end subroutine write_pmd_bin
@@ -105,7 +105,7 @@ c=======================================================================
       write(ionum,'(7es23.14e3,11es22.14)') (tag(i),ra(1:3,i)+sorg(1:3)
      &     ,va(1:3,i)/dt
      &     ,eki(1,1,i)+eki(2,2,i)+eki(3,3,i)
-     &     ,epi(i),strs(1:3,1:3,i)*up2gpa,i=1,natm)
+     &     ,epi(i),strs(1:3,1:3,i),i=1,natm)
       close(ionum)
 
       end subroutine write_pmd_ascii
@@ -172,7 +172,7 @@ c=======================================================================
      &     ,rtot(1:3,i)
      &     ,vtot(1:3,i)/dt
      &     ,ekitot(1,1,i)+ekitot(2,2,i)+ekitot(3,3,i)
-     &     ,epitot(i),stot(1:3,1:3,i)*up2gpa,i=1,ntot)
+     &     ,epitot(i),stot(1:3,1:3,i),i=1,ntot)
       close(ionum)
 
       end subroutine write_pmdtot_ascii
@@ -216,7 +216,7 @@ c=======================================================================
       write(ionum) ntot
       write(ionum) (tagtot(i),rtot(1:3,i),vtot(1:3,i)/dt
      &     ,ekitot(1,1,i)+ekitot(2,2,i)+ekitot(3,3,i)
-     &     ,epitot(i),stot(1:3,1:3,i)*up2gpa,i=1,ntot)
+     &     ,epitot(i),stot(1:3,1:3,i),i=1,ntot)
       close(ionum)
 
       end subroutine write_pmdtot_bin

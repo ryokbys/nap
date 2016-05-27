@@ -3,7 +3,7 @@ module RK_WHe
 contains
   subroutine force_RK_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs)
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ito's new potential for W and He (IWHe)
 !    - smoothing is applied to 2-body potential for W-He and He-He
@@ -23,8 +23,9 @@ contains
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),rc,tag(namax)
-    real(8),intent(inout):: tcom,avol
+    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,at(3)
@@ -37,9 +38,9 @@ contains
       allocate(rho(namax+nbmax),sqrho(namax+nbmax))
 !        write(6,'(a,es12.4)') ' Input cutoff    =',rc
 !        write(6,'(a,es12.4)') ' Potential cutoff=',p_rl(2,2)
-!.....assuming fixed (constant) atomic volume (BCC)
-      avol= alcfe**3 /2
-      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
+!!$!.....assuming fixed (constant) atomic volume (BCC)
+!!$      avol= alcfe**3 /2
+!!$      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
       l1st=.false.
 !.....check cutoff radius
       if( myid_md.eq.0 ) then
@@ -158,11 +159,11 @@ contains
 !-----copy strs of boundary atoms
     call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
          ,lsrc,myparity,nn,sv,mpi_md_world,strs)
-!-----atomic level stress in [eV/Ang^3] assuming 1 Ang thick
-    do i=1,natm
-      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
-!        write(6,'(i5,9es10.2)') i,strs(1:3,1:3,i)
-    enddo
+!!$!-----atomic level stress in [eV/Ang^3] assuming 1 Ang thick
+!!$    do i=1,natm
+!!$      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
+!!$!        write(6,'(i5,9es10.2)') i,strs(1:3,1:3,i)
+!!$    enddo
 
 !-----reduced force
     do i=1,natm

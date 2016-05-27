@@ -2,7 +2,7 @@ module AFS_W
 contains
   subroutine force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs)
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ackland potential for W based on 
 !  Finnis and Sinclair potential.
@@ -23,8 +23,9 @@ contains
          ,nn(6),mpi_md_world,myid_md
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),rc,tag(namax)
-    real(8),intent(inout):: tcom,avol
+    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,at(3)
@@ -34,9 +35,6 @@ contains
 
     if( l1st ) then
       allocate(sqrho(namax+nbmax))
-!.....set atomic volume
-      avol= h(1,1,0)*h(2,2,0)*h(3,3,0)/natm
-      if(myid_md.eq.0) write(6,'(a,es12.4)') ' atomic volume=',avol
       l1st=.false.
     endif
 
@@ -137,12 +135,6 @@ contains
     else
       call reduce_dba_bk(natm,namax,tag,strs,9)
     endif
-
-!-----atomic level stress in [eV/AA^3] assuming 1 Ang thick
-    do i=1,natm
-      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
-!        write(6,'(i5,9es10.2)') i,strs(1:3,1:3,i)
-    enddo
 
 !-----reduced force
     do i=1,natm

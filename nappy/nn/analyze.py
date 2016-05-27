@@ -3,13 +3,14 @@
 Analyze NN potential with drawing NN structure graph.
 
 Usage:
-    analyze-NN.py [options]
+  analyze.py [options]
+  analyze.py draw [options]
 
 Options:
-    -w    Show weight values. [default: False]
-    -t <threshold>
-          Threshold value multiplied to max edge for omitting criterion
-          of edge. [default: 0.01]
+  -h,--help  Show this message and exit.
+  -w         Show weight values. [default: False]
+  -t THRESHOLD
+             Threshold value multiplied to max edge for omitting criterion of edge. [default: 0.01]
 """
 
 import math
@@ -141,19 +142,17 @@ def read_NN_params(nl,nhl):
     elif nl == 2:
         return wgt21,wgt22,wgt23
 
-if __name__ == '__main__':
 
-    args= docopt(__doc__)
+def analyze(nl,nsp,nhl,n2,n3,cmb2,cmb3,ngauss,ncos,npoly,nagnle,
+            wgt11=None,wgt12=None,wgt21=None,wgt22=None,wgt23=None):
+    """
+    Analyze the NN structure.
+    """
+    pass
 
-    flag_weight= args['-w']
-    threshold= args['-t']
 
-    nl,nsp,nhl,n2,n3,cmb2,cmb3,ngauss,ncos,npoly,nagnle= read_NN_config()
-    if nl == 1:
-        wgt11,wgt12= read_NN_params(nl,nhl)
-    elif nl == 2:
-        wgt21,wgt22,wgt23= read_NN_params(nl,nhl)
-    
+def draw(nl,nsp,nhl,n2,n3,cmb2,cmb3,ngauss,ncos,npoly,nagnle,
+         wgt11=None,wgt12=None,wgt21=None,wgt22=None,wgt23=None):
     g= nx.Graph()
     pos= {}
     dy=-1.0
@@ -284,3 +283,27 @@ if __name__ == '__main__':
     plt.tick_params(axis='x',bottom='off',top='off',labelbottom='off')
     plt.tick_params(axis='y',bottom='off',top='off',labelleft='off')
     plt.show()
+
+
+if __name__ == '__main__':
+
+    args= docopt(__doc__)
+
+    flag_weight= args['-w']
+    threshold= args['-t']
+
+    nl,nsp,nhl,n2,n3,cmb2,cmb3,ngauss,ncos,npoly,nagnle= read_NN_config()
+    if nl == 1:
+        wgt11,wgt12= read_NN_params(nl,nhl)
+    elif nl == 2:
+        wgt21,wgt22,wgt23= read_NN_params(nl,nhl)
+
+    if args['draw']:
+        if nl == 1:
+            draw(nl,nsp,nhl,n2,n3,cmb2,cmb3,ngauss,ncos,npoly,nagnle,
+                 wgt11=wgt11,wgt12=wgt12)
+        elif nl == 2:
+            draw(nl,nsp,nhl,n2,n3,cmb2,cmb3,ngauss,ncos,npoly,nagnle,
+                 wgt21=wgt21,wgt22=wgt22,wgt23=wgt23)
+    else:
+        analyze(nl,nsp,nhl,n2,n3,cmb2,cmb3,ngauss,ncos,npoly,nagnle)

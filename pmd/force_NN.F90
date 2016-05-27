@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-18 10:45:19 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-27 22:59:33 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -17,6 +17,8 @@ module NN
   integer:: nsfc,nsfc1,nsfc2,nc1,nc2,nsp,nl,nhl(0:nlmax+1)
   integer,allocatable:: itype(:)
   real(8),allocatable:: cnst(:,:)
+  real(8),allocatable:: hl1(:,:),hl2(:,:)
+  real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
   integer,allocatable:: icmb2(:,:),icmb3(:,:,:)
   integer,allocatable:: iaddr2(:,:,:),iaddr3(:,:,:,:)
 !.....function types and num of constatns for types
@@ -37,7 +39,7 @@ module NN
 contains
   subroutine force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,avol)
+       ,mpi_world,myid,epi,epot,nismax,acon,lstrs)
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -46,15 +48,15 @@ contains
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
          ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: tcom,avol,rc
+    real(8),intent(inout):: tcom,rc
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical:: lstrs
 
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ja,nexp,isf &
          ,icoeff,ihl0,ihl1,ihl2,jj,jsf
     real(8):: rcin,b_na,at(3),epotl,wgt,hl1i,hl2i,tmp2,tmp1,tmp,tmp3(3)
     real(8),save:: rc3
-    real(8),save,allocatable:: gsf(:,:),dgsf(:,:,:,:),hl1(:,:),hl2(:,:)
 !    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
 !.....1st call
     logical,save:: l1st=.true.
@@ -161,7 +163,7 @@ contains
 
 !.....first, calculate all the symmetry functions
     call eval_sf(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
-         ,lspr,gsf,dgsf,rc,rc3)
+         ,lspr,rc,rc3)
 
 #ifdef __FITPOT__
     open(80,file='out.NN.gsf',status='replace',form='unformatted')
@@ -170,7 +172,7 @@ contains
       write(80) (gsf(ihl0,ia),ihl0=1,nhl(0))
     enddo
     close(80)
-    call write_dgsf(84,natm,namax,nnmax,lspr,tag,nhl(0),dgsf)
+    call write_dgsf(84,natm,namax,nnmax,lspr,tag,nhl(0))
 #endif
 
 !.....2nd, calculate the node values by summing contributions from
@@ -249,7 +251,6 @@ contains
     endif
 
 !.....sum up for forces
-    strs(1:3,1:3,1:natm)= 0d0
     aa(1:3,1:natm+nb)= 0d0
     if( nl.eq.1 ) then
       do ia=1,natm
@@ -314,6 +315,13 @@ contains
       aa(1:3,i)= acon(is)*aa(1:3,i)
     enddo
 
+    if( lstrs ) then
+      call compute_stress(namax,natm,tag,ra,nnmax,strs,h &
+           ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,rc,lspr &
+           ,mpi_world,myid)
+      write(6,'(a,i5,9es12.4)') 'i,strs(1:3,1:3,i)=',1,strs(1:3,1:3,1)
+    endif
+
 !-----gather epot
     epot= 0d0
     if( myid.ge.0 ) then
@@ -325,15 +333,14 @@ contains
     return
   end subroutine force_NN
 !=======================================================================
-  subroutine eval_sf(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr &
-       ,gsf,dgsf,rc,rc3)
+  subroutine eval_sf(nsf,namax,natm,nb,nnmax,h,tag,ra,lspr,rc,rc3)
 !
 !  Evaluate symmetry functions and derivatives for multi-species system.
 !
     implicit none
     integer,intent(in):: nsf,namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,rc3
-    real(8),intent(out):: gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal)
+!    real(8),intent(out):: gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal)
 
     integer:: isf,isfc,ia,jj,ja,kk,ka,is,js,ks,isfc1,isfc2
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
@@ -372,6 +379,9 @@ contains
             texp= exp(-eta*(dij-rs)**2)
             gsf(isf,ia)= gsf(isf,ia) +texp*fcij
             !.....derivative
+            ! dgsf(ixyz,isf,jj,ia): derivative of isf-th basis of atom-ia
+            ! by ixyz coordinate of atom-jj.
+            ! jj=0 means derivative by atom-ia.
             dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfcij
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
@@ -766,13 +776,14 @@ contains
     return
   end function factorial
 !=======================================================================
-  subroutine write_dgsf(ionum,natm,namax,nnmax,lspr,tag,nsf,dgsf)
+  subroutine write_dgsf(ionum,natm,namax,nnmax,lspr,tag,nsf)
 !   Write out dgsf data.
 !   Buffer atom indices are replaced to resident atom ones.
     implicit none
     integer,intent(in):: ionum
     integer,intent(in):: natm,namax,nnmax,nsf,lspr(0:nnmax,namax)
-    real(8),intent(in):: dgsf(3,nsf,0:nnl,nal),tag(namax)
+!    real(8),intent(in):: dgsf(3,nsf,0:nnl,nal),tag(namax)
+    real(8),intent(in):: tag(namax)
     integer:: ia,jj,ja,jra,isf
     real(8),allocatable:: dgsfo(:,:,:,:)
     integer,external:: itotOf
@@ -855,6 +866,98 @@ contains
 
     deallocate(dbuf,dbufr)
   end subroutine copy_dba_fwd
+!=======================================================================
+  subroutine compute_stress(namax,natm,tag,ra,nnmax,strs,h &
+       ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,rc,lspr &
+       ,mpi_world,myid)
+    implicit none
+    integer,intent(in):: namax,natm,nnmax,nb,nbmax,lsb(0:nbmax,6)&
+         ,lsrc(6),myparity(3),nn(6),mpi_world,myid,lspr(0:nnmax,namax)
+    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3),rc,tcom
+    real(8),intent(out):: strs(3,3,namax)
+
+    integer:: ia,ja,ixyz,jxyz,ihl0,ihl1,ihl2,jj
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij,sji,sii&
+         ,hl2i,hl2j,tmp2i,tmp2j,hl1i,hl1j,tmp1i,tmp1j
+
+    strs(1:3,1:3,1:namax) = 0d0
+    if( nl.eq.1 ) then
+      do ia=1,natm
+        xi(1:3)= ra(1:3,ia)
+        do jj=1,lspr(0,ia)
+          ja= lspr(jj,ia)
+          xj(1:3)= ra(1:3,ja)
+          xij(1:3)= xj(1:3)-xi(1:3)
+          rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+          dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+          if( dij.ge.rc ) cycle
+          do ihl1=1,nhl(1)
+            hl1i= hl1(ihl1,ia)
+            hl1j= hl1(ihl1,ja)
+            tmp1i= wgt12(ihl1)*hl1i*(1d0-hl1i)
+            tmp1j= wgt12(ihl1)*hl1j*(1d0-hl1j)
+            do ihl0=1,nhl(0)
+              do ixyz=1,3
+                do jxyz=1,3
+! derivative of gsf of atom-i by atom-j
+                  sji= -tmp1i*wgt11(ihl0,ihl1)*dgsf(jxyz,ihl0,jj,ia) &
+                       *rij(ixyz)
+! counter contribution
+                  sii= -tmp1j*wgt11(ihl0,ihl1)*dgsf(jxyz,ihl0,jj,ia) &
+                       *rij(ixyz)
+                  strs(ixyz,jxyz,ja) = strs(ixyz,jxyz,ja) +sji +sii
+                enddo
+              enddo
+            enddo
+          enddo
+        enddo
+      enddo
+    else if( nl.eq.2 ) then
+      do ia=1,natm
+        xi(1:3)= ra(1:3,ia)
+        do jj=1,lspr(0,ia)
+          ja= lspr(jj,ia)
+          xj(1:3)= ra(1:3,ja)
+          xij(1:3)= xj(1:3)-xi(1:3)
+          rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+          dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+          if( dij.ge.rc ) cycle
+          do ihl2=1,nhl(2)
+            hl2i= hl2(ihl2,ia)
+            hl2j= hl2(ihl2,ja)
+            tmp2i= wgt23(ihl2) *hl2i*(1d0-hl2i)
+            tmp2j= wgt23(ihl2) *hl2j*(1d0-hl2j)
+            do ihl1=1,nhl(1)
+              hl1i= hl1(ihl1,ia)
+              hl1j= hl1(ihl1,ja)
+              tmp1i= wgt22(ihl1,ihl2) *hl1i*(1d0-hl1i)
+              tmp1j= wgt22(ihl1,ihl2) *hl1j*(1d0-hl1j)
+              do ihl0=1,nhl(0)
+!......derivative of gsf of atom-j by atom-i
+                sji= -tmp2i *tmp1i &
+                     *wgt21(ihl0,ihl1) *dgsf(jxyz,ihl0,jj,ia) &
+                     *rij(ixyz)
+!.....derivative of gsf of atom-i by atom-i
+                sii= -tmp2j *tmp1j &
+                     *wgt21(ihl0,ihl1) *dgsf(jxyz,ihl0,jj,ia) &
+                     *rij(ixyz)
+                strs(ixyz,jxyz,ja) = strs(ixyz,jxyz,ja) +sji +sii
+              enddo
+            enddo
+          enddo
+        enddo
+      enddo
+    endif
+    
+!-----send back (3-body)forces, stresses, and potentials on immigrants
+    if( myid.ge.0 ) then
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+           ,nn,mpi_world,strs,9)
+    else
+      call reduce_dba_bk(natm,namax,tag,strs,9)
+    endif
+
+  end subroutine compute_stress
 end module NN
 !-----------------------------------------------------------------------
 !     Local Variables:

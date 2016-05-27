@@ -3,7 +3,7 @@ module Ramas_FeH
 contains
   subroutine force_Ramas_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol) 
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs) 
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM Ackland model for Fe (iron) and H.
 !    - See Philos. Mag. 83(35) (2003) 3977--3994
@@ -21,8 +21,9 @@ contains
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),rc,tag(namax)
-    real(8),intent(inout):: tcom,avol
+    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),at(3)
@@ -37,8 +38,8 @@ contains
       rs    = a_rs*a0 /(z_fe**(2d0/3) +z_fe**(2d0/3))
       rs_feh= a_rs*a0 /(z_fe**(2d0/3) +z_h**(2d0/3))
 !.....assuming fixed (constant) atomic volume (BCC)
-      avol= alcfe**3 /2
-      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
+!!$      avol= alcfe**3 /2
+!!$      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
       l1st=.false.
 !.....check cutoff radius
       if( myid_md.eq.0 ) then
@@ -190,10 +191,10 @@ contains
       call reduce_dba_bk(natm,namax,tag,strs,9)
     endif
 
-!.....atomic level stress in [eV/Ang^3] assuming 1 Ang thick
-    do i=1,natm
-      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
-    enddo
+!!$!.....atomic level stress in [eV/Ang^3] assuming 1 Ang thick
+!!$    do i=1,natm
+!!$      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
+!!$    enddo
 
 !.....reduced force
     do i=1,natm
@@ -219,7 +220,7 @@ contains
 !=======================================================================
   subroutine force_Ackland_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr,mpi_md_world &
-       ,myid_md,epi,epot,nismax,acon,avol) 
+       ,myid_md,epi,epot,nismax,acon,lstrs) 
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM Ackland model for Fe (iron).
 !    - See Philos. Mag. 83(35) (2003) 3977--3994
@@ -236,8 +237,9 @@ contains
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),rc,tag(namax)
-    real(8),intent(inout):: tcom,avol
+    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,ixyz,jxyz
     real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),at(3)
@@ -251,8 +253,8 @@ contains
       allocate(rho(namax+nbmax))
       rs=  a_rs /dsqrt(2d0)/z_fe**(1d0/3)
 !.....assuming fixed (constant) atomic volume (BCC)
-      avol= alcfe**3 /2
-      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
+!!$      avol= alcfe**3 /2
+!!$      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
       l1st=.false.
 !.....check cutoff radius
       if( myid_md.eq.0 ) then
@@ -352,10 +354,10 @@ contains
 !.....copy strs of boundary atoms
     call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
          ,lsrc,myparity,nn,sv,mpi_md_world,strs)
-!.....atomic level stress in [eV/Ang^3] assuming 1 Ang thick
-    do i=1,natm
-      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
-    enddo
+!!$!.....atomic level stress in [eV/Ang^3] assuming 1 Ang thick
+!!$    do i=1,natm
+!!$      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
+!!$    enddo
 
 !.....reduced force
     do i=1,natm

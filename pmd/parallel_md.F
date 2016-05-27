@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-05-25 22:42:55 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-05-27 15:55:55 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -36,6 +36,7 @@ c.....Epot threshold for disl core extraction [Hartree]
       integer,external:: ispOf,ifmvOf,itotOf
       real(8),external:: box_muller,sprod
       logical:: lconverged = .false.
+      logical:: lstrs = .false.
 c-----output file names
       character:: cnode*5,cnum*4
 c.....FIRE variables
@@ -68,6 +69,7 @@ c.....Multiply damping factor to avoid multiplication of every step
       endif
 
       call bcast_params()
+
 
 c-----output every these steps, NOUTERG, NOUTPMD
       if( nerg.ne.0 ) then
@@ -232,10 +234,12 @@ c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
 c.....Calc forces
+      lstrs = .true.
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &     ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,avol
+     &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,lstrs
      &     ,cforce)
+      lstrs = .false.
       epot= epot0
       epotp = 0d0
 
@@ -388,6 +392,13 @@ c.....Set al
 c-----MD loop with velocity-Verlet--------------------------------------
       do istp=1,nstp
 
+c.....In case of isobaric MD, lstrs has to be always TRUE.
+        if( cpctl.eq.'Berendsen' ) then
+          lstrs = .true.
+        else
+          lstrs = .false.
+        endif
+
 c-------first kick of velocities
         va(1:3,1:natm)=va(1:3,1:natm) +aa(1:3,1:natm)
 
@@ -448,12 +459,16 @@ c.....Copy RA of boundary atoms determined by 'bacopy'
      &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &         ,mpi_md_world)
         endif
-
+        
+        if(ifpmd.eq.1.and. mod(istp,noutpmd).eq.0 )then
+          lstrs = .true.
+        endif
 c-------Calc forces
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &       ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr
-     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs
      &       ,cforce)
+        lstrs = .false.
 
 #ifdef __SHEAR__
         call add_shear_stress(natm,ra,aa,tag,sorg,shrfx)
@@ -1878,6 +1893,9 @@ c=======================================================================
           fnorml = fnorml +aa(ixyz,i)*aa(ixyz,i)
         enddo
       enddo
+      vnorm = 0d0
+      fnorm = 0d0
+      fdotv = 0d0
       call mpi_allreduce(vnorml,vnorm,1,mpi_double_precision
      &     ,mpi_sum,mpi_md_world,ierr)
       call mpi_allreduce(fnorml,fnorm,1,mpi_double_precision
@@ -1899,14 +1917,16 @@ c=======================================================================
           if( num_fire.gt.nmin_fire ) then
             dt = min(dtmax_fire,dt*finc_fire)
             alp_fire = alp_fire*falp_fire
-            write(6,'(a,2f10.3)') ' dt,alp_fire = ',dt,alp_fire
+            write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
+     &           ,dt,alp_fire,fdotv
           endif
         else
           dt = min(dtmax_fire,dt*fdec_fire)
           va(1:3,1:natm) = 0d0
           alp_fire = alp0_fire
           num_fire = 0
-          write(6,'(a,2f10.3)') ' dt,alp_fire = ',dt,alp_fire
+          write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
+     &         ,dt,alp_fire,fdotv
         endif
       endif
       call mpi_bcast(dt,1,mpi_double_precision,0,mpi_md_world,ierr)

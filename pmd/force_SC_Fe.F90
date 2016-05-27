@@ -2,7 +2,7 @@ module SC_Fe
 contains
   subroutine force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs)
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM Sutton-Chen model for Fe (iron).
 !    - See PRB 73, 224113 (2006), L.Koci et al.
@@ -19,8 +19,9 @@ contains
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),rc,tag(namax)
-    real(8),intent(inout):: tcom,avol
+    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is
     real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),at(3)

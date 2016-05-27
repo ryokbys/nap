@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2015-02-03 18:12:05 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-27 15:32:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -48,7 +48,7 @@ module linreg
 contains
   subroutine force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,avol)
+       ,mpi_world,myid,epi,epot,nismax,acon,lstrs)
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -57,8 +57,9 @@ contains
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
          ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: tcom,avol,rc
+    real(8),intent(inout):: tcom,rc
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical:: lstrs
 
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ielem &

@@ -27,7 +27,7 @@ module SW_Si
 contains
   subroutine force_SW_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,avol)
+       ,mpi_world,myid,epi,epot,nismax,acon,lstrs)
 !-----------------------------------------------------------------------
 !  Parallel implementation of SW(Si) force calculation for pmd
 !    - 2014.04.07 by R.K.
@@ -44,8 +44,10 @@ contains
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
-    real(8),intent(inout):: tcom,avol
+    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical:: lstrs
+
 !-----local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl
     real(8):: rij,rik,riji,riki,rij2,rik2,rc2,src2,src
@@ -80,8 +82,8 @@ contains
         stop
       endif
       swli= 1d0/swl
-      a8d3r3= 8d0/(3d0*sqrt(3d0))
-      avol= 5.427d0**3/8
+!!$      a8d3r3= 8d0/(3d0*sqrt(3d0))
+!!$      avol= 5.427d0**3/8
 !-------finally set l1st
       l1st=.false.
     endif
@@ -134,17 +136,17 @@ contains
           aa2(ixyz,j)= aa2(ixyz,j) -df2*drij
         enddo
 !-----------Stress
-        vol= a8d3r3*rij**3
-        voli= 1d0/vol
+!!$        vol= a8d3r3*rij**3
+!!$        voli= 1d0/vol
         if( j.le.natm ) then
           do ixyz=1,3
             drij= -xij(ixyz)*riji
             tmp= 0.5d0*(-df2*drij)
             do jxyz=1,3
               strs(ixyz,jxyz,i)= strs(ixyz,jxyz,i) &
-                   -xij(jxyz)*tmp*voli
+                   -xij(jxyz)*tmp !*voli
               strs(ixyz,jxyz,j)= strs(ixyz,jxyz,j) &
-                   -xij(jxyz)*tmp*voli
+                   -xij(jxyz)*tmp !*voli
 !!$              write(6,'(a,4i5,2es12.4)') 'i,j,ixyz,jxyz,vol,val='&
 !!$                   ,i,j,ixyz,jxyz,vol,-xij(jxyz)*tmp*voli
             enddo
@@ -155,7 +157,7 @@ contains
             tmp= 0.5d0*(-df2*drij)
             do jxyz=1,3
               strs(ixyz,jxyz,i)= strs(ixyz,jxyz,i) &
-                   -xij(jxyz)*tmp*voli
+                   -xij(jxyz)*tmp! *voli
 !!$              write(6,'(a,4i5,2es12.4)') 'i,j,ixyz,jxyz,vol,val='&
 !!$                   ,i,j,ixyz,jxyz,vol,-xij(jxyz)*tmp*voli
             enddo
@@ -188,8 +190,8 @@ contains
         rij= dsqrt(rij2)
         riji= 1d0/rij
         drijc= 1d0/(rij-src)
-        vol= a8d3r3*rij**3
-        volj= 1d0/vol
+!!$        vol= a8d3r3*rij**3
+!!$        volj= 1d0/vol
 !---------atom (k)
         do m=1,lspr(0,i)
           k=lspr(m,i)
@@ -206,8 +208,8 @@ contains
           rik=dsqrt(rik2)
           riki= 1d0/rik
           drikc= 1d0/(rik-src)
-          vol= a8d3r3*rik**3
-          volk= 1d0/vol
+!!$          vol= a8d3r3*rik**3
+!!$          volk= 1d0/vol
 !-----------common term
           csn=(xij(1)*xik(1) +xij(2)*xik(2) +xij(3)*xik(3)) &
                * (riji*riki)
@@ -239,11 +241,12 @@ contains
 !-------------Stress
             do jxyz=1,3
               strs(l,jxyz,i)=strs(l,jxyz,i) &
-                   -xij(jxyz)*(-tmp1)*volj -xik(jxyz)*(-tmp2)*volk
+                   -xij(jxyz)*(-tmp1) & !*volj &
+                   -xik(jxyz)*(-tmp2) !*volk
               strs(l,jxyz,j)=strs(l,jxyz,j) &
-                   -xij(jxyz)*(-tmp1)*volj
+                   -xij(jxyz)*(-tmp1) !*volj
               strs(l,jxyz,k)=strs(l,jxyz,k) &
-                   -xik(jxyz)*(-tmp2)*volk
+                   -xik(jxyz)*(-tmp2) !*volk
             enddo
           enddo
         enddo

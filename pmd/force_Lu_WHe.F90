@@ -2,7 +2,7 @@ module Lu_WHe
 contains
   subroutine force_Lu_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,avol)
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs)
 !-----------------------------------------------------------------------
 ! Parallel implementation of the G.-H. Lu potential and forces
 !                                                     2013.07.08 by R.K.
@@ -17,8 +17,9 @@ contains
          ,nn(6),mpi_md_world,myid_md,lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),tag(namax),rc
-    real(8),intent(inout):: tcom,avol
+    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical:: lstrs
 
 !-----locals
     integer:: i,j,jj,k,kk,ierr,is,js,ks

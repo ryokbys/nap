@@ -2,7 +2,7 @@ module EDIP_Si
 contains
   subroutine force_EDIP_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,avol)
+       ,mpi_world,myid,epi,epot,nismax,acon,lstrs)
 !-----------------------------------------------------------------------
 !  Parallel implementation of EDIP(Si) force calculation for pmd
 !    - Environment Dependent Interatomic Potential (EDIP) for Si
@@ -18,8 +18,10 @@ contains
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
-    real(8),intent(inout):: tcom,avol
+    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical:: lstrs
+
 !-----local
     integer:: i,j,k,l,m,n,ixyz,is,js,ks,ierr,jj,kk,ll
     real(8):: epotl,epotl2,epotl3
