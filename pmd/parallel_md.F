@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-05-27 15:55:55 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-05-31 12:14:26 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -227,6 +227,7 @@ c.....Set initial temperature if needed
       tcom = 0d0
 
 c-----copy RA of boundary atoms
+      call check_size_and_parallel()
       call bacopy(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
      &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &     ,mpi_md_world)
@@ -1202,8 +1203,43 @@ c      write(6,'(a,i3,a,9i6)') ' myid=',myid_md,': ndof=',ndof(1:9)
       return
       end subroutine get_num_dof
 c=======================================================================
+      subroutine check_size_and_parallel()
+      use variables
+      implicit none
+      include 'mpif.h'
+
+      real(8):: vala,valb,valc,rca,rcb,rcc
+      
+c-----calculate the cut-off lengths
+      vala=dsqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/vol
+      valb=dsqrt(sgm(1,2)**2+sgm(2,2)**2+sgm(3,2)**2)/vol
+      valc=dsqrt(sgm(1,3)**2+sgm(2,3)**2+sgm(3,3)**2)/vol
+      rca=rc*vala
+      rcb=rc*valb
+      rcc=rc*valc
+
+c.....check whether the size of the system is large enough
+      if(  (rca.lt.anxi .and. nx.gt.1) .or.
+     &     (rcb.lt.anyi .and. ny.gt.1) .or.
+     &     (rcc.lt.anzi .and. nz.gt.1) ) then
+        if( myid_md.le.0 ) then
+          write(6,'(a)') " Error: about size and parallelization"
+          write(6,'(a,2f15.3,i5)') "rca,anxi,nx = ",rca,anxi,nx
+          write(6,'(a,2f15.3,i5)') "rcb,anyi,ny = ",rcb,anyi,ny
+          write(6,'(a,2f15.3,i5)') "rcc,anzi,nz = ",rcc,anzi,nz
+          write(6,'(a)') " * All the size (xyz) per node "
+     &         //"with more than 1 node should be larger "
+     &         //"than the cutoff radius."
+          write(6,*) ""
+        endif
+        call mpi_finalize(ierr)
+        stop
+      endif
+
+      end subroutine check_size_and_parallel
+c=======================================================================
       subroutine bacopy(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
-     &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
+     &     ,anxi,anyi,anzi,nn,tag,rc,myid,myparity,lsrc,sv
      &     ,mpi_md_world)
 c-----------------------------------------------------------------------
 c     Exchanges boundary-atom data among neighbor nodes: tag and ra
@@ -1211,7 +1247,7 @@ c-----------------------------------------------------------------------
       implicit none
       include 'mpif.h'
       integer,intent(in):: namax,nbmax,nn(6)
-     &     ,myid_md,myparity(3),mpi_md_world
+     &     ,myid,myparity(3),mpi_md_world
       integer,intent(inout):: natm,nb,lsb(0:nbmax,6),lsrc(6)
       real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
       real(8),intent(inout):: tag(namax),ra(3,namax),tcom
@@ -1239,7 +1275,6 @@ c-----calculate the cut-off lengths
       rca=rc*vala
       rcb=rc*valb
       rcc=rc*valc
-c      write(6,'(a,3es12.4)') "rca,rcb,rcc=",rca,rcb,rcc
 
 c-----loop over x, y, & z directions
       do 100 kd=1,3
@@ -1273,7 +1308,7 @@ c-------Error trap
           call MPI_ALLREDUCE(lsb(0,ku),maxb,1,MPI_INTEGER,MPI_MAX,
      &         mpi_md_world,ierr)
           if (maxb.gt.nbmax) then
-            if (myid_md.eq.0) then
+            if (myid.eq.0) then
               write(*,*)'Buffer or list overflowed at bacopy'
               write(*,*)'LSB(0) NBMAX =',maxb,nbmax
             endif
@@ -1323,7 +1358,7 @@ c-------Error trap
         call MPI_ALLREDUCE(nav,maxna,1,MPI_INTEGER,MPI_MAX
      &       ,mpi_md_world,ierr)
         if (maxna.gt.namax) then
-          if (myid_md.eq.0) then
+          if (myid.eq.0) then
             write(*,*)'NAMAX overflowed at bacopy'
             write(*,*)'N+NB NAMAX = ',maxna,namax
           endif
@@ -1339,6 +1374,186 @@ c-----num. of received boundary atoms
 c      print *, 'bacopy: nb=',nb
 
       end subroutine bacopy
+c=======================================================================
+      subroutine bacopy_mixed(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
+     &     ,anxi,anyi,anzi,nn,tag,rc,myid,myparity,lsrc,sv
+     &     ,mpi_md_world)
+c-----------------------------------------------------------------------
+c Exchanges boundary-atom data among neighbor nodes: tag and ra
+c Normal data passing and repeating the cell are mixed, and
+c automatically selected according to the size of the system.
+c
+c Note: parallelized to smaller than rcut should not happen.
+c-----------------------------------------------------------------------
+      implicit none
+      include 'mpif.h'
+      integer,intent(in):: namax,nbmax,nn(6)
+     &     ,myid,myparity(3),mpi_md_world
+      integer,intent(inout):: natm,nb,lsb(0:nbmax,6),lsrc(6)
+      real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
+      real(8),intent(inout):: tag(namax),ra(3,namax),tcom
+
+c      integer:: status(MPI_STATUS_SIZE)
+      integer:: i,j,kd,kdd,kul,kuh,ku,ierr
+      integer:: nav,maxna,maxb,inode,nsd,nrc,nbnew,nex(3)
+      real(8):: tcom1,tcom2,vala,valb,valc,rca,rcb,rcc,xi(3),rcv(3)
+      logical,external:: bbd
+      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+      logical,save:: l1st=.true.
+      logical:: lshort(3)
+
+      if( l1st ) then
+        allocate(dbuf(4,nbmax),dbufr(4,nbmax))
+        l1st=.false.
+      endif
+
+c-----reset the num of "received" boundary atoms
+      nbnew=0
+
+c-----calculate the cut-off lengths
+      do kd=1,3
+        asgm= dsqrt(sgm(1,i)**2 +sgm(2,i)**2 +sgm(3,i)**2)
+        rcv(kd)= rc*asgm/vol
+        nex(kd)= int(rcv(kd)) +1
+      enddo
+
+c-----loop over x, y, & z directions
+      do 100 kd=1,3
+
+c-------No. of to-be-copied atoms, LSB(0,)
+        do kdd= -1,0
+          lsb(0,2*kd+kdd)=0
+        enddo
+
+c.....Dependent on the unit vector size, different treatment is required
+        if( nex(kd).gt.1 ) then
+          kul=2*kd-1
+          kuh=2*kd
+          do iex=-nex(kd),nex(kd)
+            if( iex.eq.0 ) cycle
+            if(iex.lt.0) then
+              do i=natm+nbnew
+                lsb(0,kul)= lsb(0,kul) +1
+                lsb(lsb(0,kul),kul)= i
+              enddo
+            else
+              do i=natm+nbnew
+                lsb(0,kuh)= lsb(0,kuh) +1
+                lsb(lsb(0,kuh),kuh)= i
+              enddo
+            endif
+          enddo
+        else ! long enough for normal boundary-atom copy
+c-------Scan all the residents & copies
+          do i=1,natm+nbnew
+            xi(1:3)= ra(1:3,i)
+c---------For low & high directions
+            kul=2*kd-1
+            kuh=2*kd
+c---------Lower neighbor
+            if (bbd(xi(1),xi(2),xi(3),rca,rcb,rcc
+     &           ,kul,anxi,anyi,anzi)) then
+              lsb(0,kul)=lsb(0,kul)+1
+              lsb(lsb(0,kul),kul)=i
+            endif
+c---------Higher neighbor
+            if(bbd(xi(1),xi(2),xi(3),rca,rcb,rcc
+     &           ,kuh,anxi,anyi,anzi)) then
+              lsb(0,kuh)=lsb(0,kuh)+1
+              lsb(lsb(0,kuh),kuh)=i
+            endif
+          enddo
+        endif ! if(nex.gt.1)
+
+c-------Error trap
+        do kdd= -1,0
+          ku=2*kd+kdd
+          call MPI_ALLREDUCE(lsb(0,ku),maxb,1,MPI_INTEGER,MPI_MAX,
+     &         mpi_md_world,ierr)
+          if (maxb.gt.nbmax) then
+            if (myid.eq.0) then
+              write(*,*)'Buffer or list overflowed at bacopy'
+              write(*,*)'LSB(0) NBMAX =',maxb,nbmax
+            endif
+            call MPI_FINALIZE(ierr)
+            stop
+          endif
+        enddo
+
+c-------To calculate the communication time
+        tcom1=MPI_WTIME()
+
+        if( nex(kd).gt.1 ) then
+          do iex=-nex(kd),nex(kd)
+            if( iex.eq.0 ) cycle
+            if( iex.lt.0 ) then
+              ku= 2*kd -1
+            else
+              ku= 2*kd +0
+            enddo
+            do i=1,lsb(0,ku)
+              j= lsb(i,ku)
+              ra(1:3,natm+nbnew+i)= ra(1:3,j)
+              ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
+              tag(natm+nbnew+i)= tag(j)
+            enddo
+            nbnew= nbnew +lsb(0,ku)
+          enddo
+        else
+          do 200 kdd= -1,0
+            ku=2*kd+kdd
+            inode=nn(ku)
+            nsd=lsb(0,ku)
+            call mespasi(inode,myparity(kd),nsd,nrc,1,1,10
+     &           ,mpi_md_world)
+c---------Store the # of received boundary atoms in LSRC
+            lsrc(ku)=nrc
+
+c---------Exchange ra and tag
+            do i=1,nsd
+              j= lsb(i,ku)
+              dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
+              dbuf(4,i)  = tag(j)
+            enddo
+            call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*4,nrc*4,21
+     &           ,mpi_md_world)
+            do i=1,nrc
+              ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
+              tag(natm+nbnew+i)   = dbufr(4,i)
+            enddo
+
+            call MPI_BARRIER(mpi_md_world,ierr)
+c---------increase the # of received boundary atoms
+            nbnew=nbnew+nrc
+c          write(6,'(a,2i8)') " nbnew,nrc=",nbnew,nrc
+ 200      continue
+        endif
+
+c-------Add the communication time to COMT
+        tcom2=MPI_WTIME()
+        tcom=tcom+tcom2-tcom1
+
+c-------Error trap
+        nav=natm+nbnew
+        call MPI_ALLREDUCE(nav,maxna,1,MPI_INTEGER,MPI_MAX
+     &       ,mpi_md_world,ierr)
+        if (maxna.gt.namax) then
+          if (myid.eq.0) then
+            write(*,*)'NAMAX overflowed at bacopy'
+            write(*,*)'N+NB NAMAX = ',maxna,namax
+          endif
+          call MPI_FINALIZE(ierr)
+          stop
+        endif
+
+100   continue
+
+c-----num. of received boundary atoms
+      nb=nbnew
+
+c      print *, 'bacopy: nb=',nb
+
+      end subroutine bacopy_mixed
 c=======================================================================
       subroutine bacopy_fixed(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
      &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv

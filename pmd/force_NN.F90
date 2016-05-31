@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-27 22:59:33 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-29 18:03:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -113,6 +113,7 @@ contains
              int(3*nhl(0),8)*(nnlmax+1)*nalmax*8/1000/1000,' MB'
       endif
       allocate( gsf(nhl(0),nal),dgsf(3,nhl(0),0:nnl,nal) )
+
       lrealloc = .false.
       if( nl.eq.1 ) then
         allocate( hl1(nhl(1),nal) )
@@ -159,7 +160,6 @@ contains
       endif
       lrealloc=.false.
     endif
-
 
 !.....first, calculate all the symmetry functions
     call eval_sf(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
@@ -303,6 +303,7 @@ contains
     else
       call reduce_dba_bk(natm,namax,tag,aa,3)
     endif
+
 !-----reduced force
     do i=1,natm
       at(1:3)= aa(1:3,i)
@@ -315,11 +316,11 @@ contains
       aa(1:3,i)= acon(is)*aa(1:3,i)
     enddo
 
+
     if( lstrs ) then
       call compute_stress(namax,natm,tag,ra,nnmax,strs,h &
            ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,rc,lspr &
            ,mpi_world,myid)
-      write(6,'(a,i5,9es12.4)') 'i,strs(1:3,1:3,i)=',1,strs(1:3,1:3,1)
     endif
 
 !-----gather epot
@@ -877,7 +878,7 @@ contains
     real(8),intent(out):: strs(3,3,namax)
 
     integer:: ia,ja,ixyz,jxyz,ihl0,ihl1,ihl2,jj
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,sji,sii&
+    real(8):: xi(3),xj(3),xji(3),rij(3),rji(3),dji,sji,sii&
          ,hl2i,hl2j,tmp2i,tmp2j,hl1i,hl1j,tmp1i,tmp1j
 
     strs(1:3,1:3,1:namax) = 0d0
@@ -887,25 +888,25 @@ contains
         do jj=1,lspr(0,ia)
           ja= lspr(jj,ia)
           xj(1:3)= ra(1:3,ja)
-          xij(1:3)= xj(1:3)-xi(1:3)
-          rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-          dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-          if( dij.ge.rc ) cycle
+          xji(1:3)= xj(1:3)-xi(1:3)
+          rji(1:3)= h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
+          rij(1:3)= -rji(1:3)
+          dji= sqrt(rji(1)**2 +rji(2)**2 +rji(3)**2)
+          if( dji.ge.rc ) cycle
           do ihl1=1,nhl(1)
             hl1i= hl1(ihl1,ia)
-            hl1j= hl1(ihl1,ja)
             tmp1i= wgt12(ihl1)*hl1i*(1d0-hl1i)
-            tmp1j= wgt12(ihl1)*hl1j*(1d0-hl1j)
             do ihl0=1,nhl(0)
               do ixyz=1,3
                 do jxyz=1,3
 ! derivative of gsf of atom-i by atom-j
                   sji= -tmp1i*wgt11(ihl0,ihl1)*dgsf(jxyz,ihl0,jj,ia) &
-                       *rij(ixyz)
+                       *rji(ixyz)
 ! counter contribution
-                  sii= -tmp1j*wgt11(ihl0,ihl1)*dgsf(jxyz,ihl0,jj,ia) &
+                  sii= tmp1i*wgt11(ihl0,ihl1)*dgsf(jxyz,ihl0,jj,ia) &
                        *rij(ixyz)
-                  strs(ixyz,jxyz,ja) = strs(ixyz,jxyz,ja) +sji +sii
+                  strs(ixyz,jxyz,ja) = strs(ixyz,jxyz,ja) +sji
+                  strs(ixyz,jxyz,ia) = strs(ixyz,jxyz,ia) +sii
                 enddo
               enddo
             enddo
@@ -918,37 +919,35 @@ contains
         do jj=1,lspr(0,ia)
           ja= lspr(jj,ia)
           xj(1:3)= ra(1:3,ja)
-          xij(1:3)= xj(1:3)-xi(1:3)
-          rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-          dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-          if( dij.ge.rc ) cycle
+          xji(1:3)= xj(1:3)-xi(1:3)
+          rji(1:3)= h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
+          rij(1:3)= -rji(1:3)
+          dji= sqrt(rji(1)**2 +rji(2)**2 +rji(3)**2)
+          if( dji.ge.rc ) cycle
           do ihl2=1,nhl(2)
             hl2i= hl2(ihl2,ia)
-            hl2j= hl2(ihl2,ja)
             tmp2i= wgt23(ihl2) *hl2i*(1d0-hl2i)
-            tmp2j= wgt23(ihl2) *hl2j*(1d0-hl2j)
             do ihl1=1,nhl(1)
               hl1i= hl1(ihl1,ia)
-              hl1j= hl1(ihl1,ja)
               tmp1i= wgt22(ihl1,ihl2) *hl1i*(1d0-hl1i)
-              tmp1j= wgt22(ihl1,ihl2) *hl1j*(1d0-hl1j)
               do ihl0=1,nhl(0)
 !......derivative of gsf of atom-j by atom-i
                 sji= -tmp2i *tmp1i &
                      *wgt21(ihl0,ihl1) *dgsf(jxyz,ihl0,jj,ia) &
-                     *rij(ixyz)
+                     *rji(ixyz)
 !.....derivative of gsf of atom-i by atom-i
-                sii= -tmp2j *tmp1j &
+                sii= tmp2i *tmp1i &
                      *wgt21(ihl0,ihl1) *dgsf(jxyz,ihl0,jj,ia) &
                      *rij(ixyz)
-                strs(ixyz,jxyz,ja) = strs(ixyz,jxyz,ja) +sji +sii
+                strs(ixyz,jxyz,ja) = strs(ixyz,jxyz,ja) +sji
+                strs(ixyz,jxyz,ia) = strs(ixyz,jxyz,ia) +sii
               enddo
             enddo
           enddo
         enddo
       enddo
     endif
-    
+
 !-----send back (3-body)forces, stresses, and potentials on immigrants
     if( myid.ge.0 ) then
       call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
