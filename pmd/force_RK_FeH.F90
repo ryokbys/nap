@@ -2,8 +2,8 @@ module RK_FeH
 
 contains
   subroutine force_RK_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs)
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM Ackland model for Fe (iron) and H.
 !    - See Philos. Mag. 83(35) (2003) 3977--3994
@@ -15,9 +15,9 @@ contains
     include "mpif.h"
     include "./params_unit.h"
     include "params_RK_FeH.h"
-    integer,intent(in):: namax,natm,nnmax,nismax
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_md_world,myid_md
+         ,nn(6),mpi_md_world,myid_md,nex(3)
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),rc,tag(namax)
@@ -86,13 +86,15 @@ contains
       enddo
     enddo
 
-    if( myid_md.ge.0 ) then
-!.....copy rho of boundary atoms
-      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
-           ,lsrc,myparity,nn,sv,mpi_md_world,rho)
-    else
-      call distribute_dba(natm,namax,tag,rho,1)
-    endif
+    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+         lsrc,myparity,nn,sv,mpi_md_world,rho,1)
+!!$    if( myid_md.ge.0 ) then
+!!$!.....copy rho of boundary atoms
+!!$      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
+!!$           ,lsrc,myparity,nn,sv,mpi_md_world,rho)
+!!$    else
+!!$      call distribute_dba(natm,namax,tag,rho,1)
+!!$    endif
 
 !.....dE/dr_i
     do i=1,natm
@@ -183,13 +185,15 @@ contains
       epotl=epotl +vemb
     enddo
 
-    if( myid_md.ge.0 ) then
-!.....copy strs of boundary atoms
-      call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
-           ,lsrc,myparity,nn,sv,mpi_md_world,strs)
-    else
-      call reduce_dba_bk(natm,namax,tag,strs,9)
-    endif
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_md_world,strs,9)
+!!$    if( myid_md.ge.0 ) then
+!!$!.....copy strs of boundary atoms
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$           ,nn,mpi_world,strs,9)
+!!$    else
+!!$      call reduce_dba_bk(natm,namax,tag,strs,9)
+!!$    endif
 
 !!$!.....atomic level stress in [eV/Ang^3] assuming 1 Ang thick
 !!$    do i=1,natm

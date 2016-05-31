@@ -159,6 +159,9 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
       elseif( trim(cname).eq.'force_type' ) then
         call read_c1(ionum,cforce)
         return
+      elseif( trim(cname).eq.'print_level' ) then
+        call read_i1(ionum,iprint)
+        return
 #ifdef __WALL__
       elseif( trim(cname).eq.'wall_pos_top' ) then
         call read_r1(ionum,wtop)

@@ -1,6 +1,6 @@
   module variables
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-25 14:48:39 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-31 16:48:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
     implicit none
     save
@@ -29,7 +29,7 @@
     integer:: nouterg,noutpmd,istp &
          ,iocntpmd,iocnterg
     integer:: natm,nb,ntot,nis
-    real(8):: tcpu,tcpu1,tcpu2,tcom
+    real(8):: tcpu,tcpu1,tcpu2,tcom,tspdcmp
     real(8):: epot,ekin,epot0,vmaxold,vmax
     integer:: nstp = 0
     integer:: minstp = 0
@@ -46,6 +46,10 @@
     real(8):: rbuf= 0d0
     character(len=6):: ciofmt='ascii '
     character(len=20):: cforce='LJ_Ar'
+!.....print level
+!       0:quiet, 1:normal,
+!       >10:fitpot data
+    integer:: iprint= 1
 !.....temperature
     character(len=20):: ctctl='none'
     integer:: iftctl= 0
@@ -68,9 +72,9 @@
     integer:: istps,istpe
 !.....parallel-related variables
     integer:: nxyz
-    integer:: nn(6),myparity(3),lsrc(6) &
+    integer:: nn(6),myparity(3),lsrc(6),nex(3) &
          ,myid_md,nodes_md,mpi_md_world,myx,myy,myz,ierr
-    integer,allocatable:: lsb(:,:)
+    integer,allocatable:: lsb(:,:),lsex(:,:)
 !    integer:: lsb(0:nbmax,6)
     real(8):: sv(3,6),sorg(3),anxi,anyi,anzi
     integer:: nx = 1
@@ -95,7 +99,7 @@
          /
 !.....data of total system
     real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
-         ,ekitot(:,:,:),tagtot(:)
+         ,ekitot(:,:,:),tagtot(:),atot(:,:)
 !.....positions, velocities, and accelerations
     real(8),allocatable:: ra(:,:),va(:,:),aa(:,:),ra0(:,:) &
          ,strs(:,:,:),stt(:,:,:)

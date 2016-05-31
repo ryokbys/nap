@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-27 15:32:15 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-31 15:57:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -47,14 +47,14 @@ module linreg
 
 contains
   subroutine force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,lstrs)
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint)
     implicit none
     include "mpif.h"
     include "./params_unit.h"
-    integer,intent(in):: namax,natm,nnmax,nismax
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_world,myid,lspr(0:nnmax,namax)
+         ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
          ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: tcom,rc
@@ -135,7 +135,7 @@ contains
     enddo
 
 #ifdef __FITPOT__
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,dbna,3*nelem)
     do ia=1,natm
       do ielem=1,nelem
@@ -146,7 +146,7 @@ contains
     close(81)
 #endif
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa,3)
 !-----reduced force
     do i=1,natm

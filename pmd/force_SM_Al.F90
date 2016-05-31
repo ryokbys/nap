@@ -1,8 +1,8 @@
 module SM_Al
 contains
   subroutine force_SM_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs)
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM force calculation for Al
 !    - smoothing is applied to both 2- and many-body terms
@@ -17,9 +17,10 @@ contains
     include "mpif.h"
     include "./params_unit.h"
     include "params_SM_Al.h"
-    integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)
+    integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
+         ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_md_world,myid_md
+         ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),rc,tag(namax)
     real(8),intent(inout):: tcom
@@ -71,8 +72,10 @@ contains
     enddo
 
 !-----copy rho of boundary atoms
-    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
-         ,mpi_md_world,sqrho)
+    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+         lsrc,myparity,nn,sv,mpi_md_world,sqrho,1)
+!!$    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
+!!$         ,mpi_md_world,sqrho)
 
 !-----dE/dr_i
     do i=1,natm

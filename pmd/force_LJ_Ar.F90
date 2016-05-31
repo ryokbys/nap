@@ -1,8 +1,8 @@
 module LJ_Ar
 contains
   subroutine force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs)
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of LJ force calculation
 !    - only force on i is considered, no need to send back
@@ -11,9 +11,9 @@ contains
     include "mpif.h"
     include "./params_unit.h"
     include "params_LJ_Ar.h"
-    integer,intent(in):: namax,natm,nnmax,nismax
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),lspr(0:nnmax,namax)
+         ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
          ,acon(nismax),tag(namax),sv(3,6)
@@ -91,12 +91,14 @@ contains
       enddo
     enddo
 
-    if( myid.ge.0 ) then
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-           ,nn,mpi_md_world,strs,9)
-    else
-      call reduce_dba_bk(natm,namax,tag,strs,9)
-    endif
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_md_world,strs,9)
+!!$    if( myid.ge.0 ) then
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$           ,nn,mpi_md_world,strs,9)
+!!$    else
+!!$      call reduce_dba_bk(natm,namax,tag,strs,9)
+!!$    endif
 
 !!$!-----atomic level stress in [eV/Ang^3] assuming 1 Ang thick
 !!$    do i=1,natm

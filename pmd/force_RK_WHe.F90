@@ -2,8 +2,8 @@ module RK_WHe
 
 contains
   subroutine force_RK_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs)
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ito's new potential for W and He (IWHe)
 !    - smoothing is applied to 2-body potential for W-He and He-He
@@ -17,9 +17,9 @@ contains
     include "mpif.h"
     include "params_unit.h"
     include "params_RK_WHe.h"
-    integer,intent(in):: namax,natm,nnmax,nismax
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_md_world,myid_md
+         ,nn(6),mpi_md_world,myid_md,nex(3)
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),rc,tag(namax)
@@ -82,11 +82,15 @@ contains
       sqrho(i)= dsqrt(rho(i)+p_d)
     enddo
 
-!-----copy rho of boundary atoms
-    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
-         ,mpi_md_world,sqrho)
-    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
-         ,mpi_md_world,rho)
+    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+         lsrc,myparity,nn,sv,mpi_md_world,sqrho,1)
+    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+         lsrc,myparity,nn,sv,mpi_md_world,rho,1)
+!!$!-----copy rho of boundary atoms
+!!$    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
+!!$         ,mpi_md_world,sqrho)
+!!$    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
+!!$         ,mpi_md_world,rho)
 
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -156,14 +160,15 @@ contains
       endif
     enddo
 
-!-----copy strs of boundary atoms
-    call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
-         ,lsrc,myparity,nn,sv,mpi_md_world,strs)
-!!$!-----atomic level stress in [eV/Ang^3] assuming 1 Ang thick
-!!$    do i=1,natm
-!!$      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
-!!$!        write(6,'(i5,9es10.2)') i,strs(1:3,1:3,i)
-!!$    enddo
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_md_world,strs,9)
+!!$    if( myid_md.ge.0 ) then
+!!$!-----copy strs of boundary atoms
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$           ,nn,mpi_world,strs,9)
+!!$    else
+!!$      call reduce_dba_bk(natm,namax,tag,strs,9)
+!!$    endif
 
 !-----reduced force
     do i=1,natm

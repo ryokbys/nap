@@ -1,8 +1,8 @@
 module SC_Fe
 contains
   subroutine force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs)
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM Sutton-Chen model for Fe (iron).
 !    - See PRB 73, 224113 (2006), L.Koci et al.
@@ -13,9 +13,9 @@ contains
     include "mpif.h"
     include "./params_unit.h"
     include "params_SC_Fe.h"
-    integer,intent(in):: namax,natm,nnmax,nismax
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_md_world,myid_md
+         ,nn(6),mpi_md_world,myid_md,nex(3)
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),rc,tag(namax)
@@ -67,8 +67,10 @@ contains
     enddo
 
 !.....copy rho of boundary atoms
-    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
-         ,lsrc,myparity,nn,sv,mpi_md_world,sqrho)
+    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+         lsrc,myparity,nn,sv,mpi_md_world,sqrho,1)
+!!$    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
+!!$         ,lsrc,myparity,nn,sv,mpi_md_world,sqrho)
 
 !-----smoothing 2-body term
     phic = sc_eps*(sc_a/rc)**sc_n

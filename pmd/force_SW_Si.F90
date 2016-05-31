@@ -26,8 +26,8 @@ module SW_Si
 
 contains
   subroutine force_SW_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,lstrs)
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of SW(Si) force calculation for pmd
 !    - 2014.04.07 by R.K.
@@ -39,9 +39,9 @@ contains
     include "mpif.h"
     include "./params_unit.h"
 !    include "params_SW_Si.h"
-    integer,intent(in):: namax,natm,nnmax,nismax
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_world,myid,lspr(0:nnmax,namax)
+         ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
     real(8),intent(inout):: tcom
@@ -253,19 +253,25 @@ contains
       enddo
     enddo
 
-!-----send back (3-body)forces, stresses, and potentials on immigrants
-    if( myid.ge.0 ) then
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-           ,nn,mpi_world,strs,9)
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-           ,nn,mpi_world,aa3,3)
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-           ,nn,mpi_world,epi,1)
-    else
-      call reduce_dba_bk(natm,namax,tag,aa3,3)
-      call reduce_dba_bk(natm,namax,tag,strs,9)
-      call reduce_dba_bk(natm,namax,tag,epi,1)
-    endif
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,strs,9)
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,aa3,3)
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,epi,1)
+!!$!-----send back (3-body)forces, stresses, and potentials on immigrants
+!!$    if( myid.ge.0 ) then
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$           ,nn,mpi_world,strs,9)
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$           ,nn,mpi_world,aa3,3)
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$           ,nn,mpi_world,epi,1)
+!!$    else
+!!$      call reduce_dba_bk(natm,namax,tag,aa3,3)
+!!$      call reduce_dba_bk(natm,namax,tag,strs,9)
+!!$      call reduce_dba_bk(natm,namax,tag,epi,1)
+!!$    endif
 !!$    write(6,'(a)') 'stresses:'
 !!$    do i=1,natm
 !!$      write(6,'(i6,9f10.3)') i,strs(1:3,1:3,i)

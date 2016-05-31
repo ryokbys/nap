@@ -1,8 +1,8 @@
 module Brenner
 contains
   subroutine force_Brenner(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs)
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
 !-----------------------------------------------------------------------
 ! Parallel implementation of the Brenner potential and forces
 !                                               since 2009.04.27 by R.K.
@@ -13,9 +13,9 @@ contains
     include "mpif.h"
     include "./params_unit.h"
     include "./params_Brenner.h"
-    integer,intent(in):: namax,natm,nnmax,nismax
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_md_world,myid_md,lspr(0:nnmax,namax)
+         ,nn(6),mpi_md_world,myid_md,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),tag(namax),rc
     real(8),intent(inout):: tcom
@@ -249,16 +249,21 @@ contains
       enddo
     enddo
 
-    if( myid_md.ge.0 ) then
 !-----send back forces and potentials on immigrants
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-           ,nn,mpi_md_world,aa2,3)
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-           ,nn,mpi_md_world,epi,1)
-    else
-      call reduce_dba_bk(natm,namax,tag,aa2,3)
-      call reduce_dba_bk(natm,namax,tag,epi,1)
-    endif
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_md_world,aa2,3)
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_md_world,epi,1)
+!!$    if( myid_md.ge.0 ) then
+!!$!-----send back forces and potentials on immigrants
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$           ,nn,mpi_md_world,aa2,3)
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$           ,nn,mpi_md_world,epi,1)
+!!$    else
+!!$      call reduce_dba_bk(natm,namax,tag,aa2,3)
+!!$      call reduce_dba_bk(natm,namax,tag,epi,1)
+!!$    endif
 
 !-----sum
     aa(1:3,1:natm)= -aa1(1:3,1:natm) -aa2(1:3,1:natm)
@@ -286,8 +291,8 @@ contains
   end subroutine force_Brenner
 !=======================================================================
   subroutine force_Brenner_vdW(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,tcom,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs)
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
 !-----------------------------------------------------------------------
 ! Parallel implementation of the Brenner potential and forces
 !                                               since 2009.04.27 by R.K.
@@ -301,9 +306,10 @@ contains
     include "mpif.h"
     include "./params_unit.h"
     include "./params_Brenner.h"
-    integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax),nismax
+    integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax),nismax&
+         ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_md_world,myid_md
+         ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),tag(namax),rc
     real(8),intent(inout):: tcom
@@ -585,9 +591,9 @@ contains
     enddo
 
 !-----send back forces and potentials on immigrants
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,aa2,3)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,epi,1)
 
 !-----sum

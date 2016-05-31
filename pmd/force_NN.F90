@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-29 18:03:38 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-31 16:18:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -38,14 +38,14 @@ module NN
   
 contains
   subroutine force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,lstrs)
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint)
     implicit none
     include "mpif.h"
     include "./params_unit.h"
-    integer,intent(in):: namax,natm,nnmax,nismax
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_world,myid,lspr(0:nnmax,namax)
+         ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
          ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: tcom,rc
@@ -165,35 +165,35 @@ contains
     call eval_sf(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
          ,lspr,rc,rc3)
 
-#ifdef __FITPOT__
-    open(80,file='out.NN.gsf',status='replace',form='unformatted')
-    write(80) nhl(0)
-    do ia=1,natm
-      write(80) (gsf(ihl0,ia),ihl0=1,nhl(0))
-    enddo
-    close(80)
-    call write_dgsf(84,natm,namax,nnmax,lspr,tag,nhl(0))
-#endif
+    if( mod(iprint,100)/10.eq.1 ) then
+      open(80,file='out.NN.gsf',status='replace',form='unformatted')
+      write(80) nhl(0)
+      do ia=1,natm
+        write(80) (gsf(ihl0,ia),ihl0=1,nhl(0))
+      enddo
+      close(80)
+      call write_dgsf(84,natm,namax,nnmax,lspr,tag,nhl(0))
+    endif
 
 !.....2nd, calculate the node values by summing contributions from
 !.....  symmetry functions
     if( nl.eq.1 ) then
       hl1(1:nhl(1),1:natm)= 0d0
       do ia=1,natm
-#ifdef __DEBUG__
-        print *,"ia=",ia
-        do ihl1=1,nhl(1)
-          tmp= 0d0
-          do ihl0=1,nhl(0)
-            tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
-            write(6,'(a,i4,3es15.7)') "ihl0,wgt1*gsf=",ihl0 &
-                 ,wgt11(ihl0,ihl1),gsf(ihl0,ia) &
-                 ,wgt11(ihl0,ihl1) *gsf(ihl0,ia)
+        if( iprint.ge.100 ) then
+          print *,"ia=",ia
+          do ihl1=1,nhl(1)
+            tmp= 0d0
+            do ihl0=1,nhl(0)
+              tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
+              write(6,'(a,i4,3es15.7)') "ihl0,wgt1*gsf=",ihl0 &
+                   ,wgt11(ihl0,ihl1),gsf(ihl0,ia) &
+                   ,wgt11(ihl0,ihl1) *gsf(ihl0,ia)
+            enddo
+            hl1(ihl1,ia)= sigmoid(tmp)
+            print *,"ihl1,hl1=",ihl1,hl1(ihl1,ia)
           enddo
-          hl1(ihl1,ia)= sigmoid(tmp)
-          print *,"ihl1,hl1=",ihl1,hl1(ihl1,ia)
-        enddo
-#endif
+        endif
         do ihl1=1,nhl(1)
           tmp= 0d0
           do ihl0=1,nhl(0)
@@ -297,12 +297,14 @@ contains
       enddo
     endif
 
-    if( myid.ge.0 ) then
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-           ,nn,mpi_world,aa,3)
-    else
-      call reduce_dba_bk(natm,namax,tag,aa,3)
-    endif
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,aa,3)
+!!$    if( myid.ge.0 ) then
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$           ,nn,mpi_world,aa,3)
+!!$    else
+!!$      call reduce_dba_bk(natm,namax,tag,aa,3)
+!!$    endif
 
 !-----reduced force
     do i=1,natm
@@ -319,7 +321,7 @@ contains
 
     if( lstrs ) then
       call compute_stress(namax,natm,tag,ra,nnmax,strs,h &
-           ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,rc,lspr &
+           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rc,lspr &
            ,mpi_world,myid)
     endif
 
@@ -869,11 +871,12 @@ contains
   end subroutine copy_dba_fwd
 !=======================================================================
   subroutine compute_stress(namax,natm,tag,ra,nnmax,strs,h &
-       ,tcom,nb,nbmax,lsb,lsrc,myparity,nn,rc,lspr &
+       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rc,lspr &
        ,mpi_world,myid)
     implicit none
     integer,intent(in):: namax,natm,nnmax,nb,nbmax,lsb(0:nbmax,6)&
-         ,lsrc(6),myparity(3),nn(6),mpi_world,myid,lspr(0:nnmax,namax)
+         ,lsrc(6),myparity(3),nn(6),mpi_world,myid,lspr(0:nnmax,namax)&
+         ,nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax),h(3,3),rc,tcom
     real(8),intent(out):: strs(3,3,namax)
 
@@ -949,12 +952,14 @@ contains
     endif
 
 !-----send back (3-body)forces, stresses, and potentials on immigrants
-    if( myid.ge.0 ) then
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-           ,nn,mpi_world,strs,9)
-    else
-      call reduce_dba_bk(natm,namax,tag,strs,9)
-    endif
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,strs,9)
+!!$    if( myid.ge.0 ) then
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$           ,nn,mpi_world,strs,9)
+!!$    else
+!!$      call reduce_dba_bk(natm,namax,tag,strs,9)
+!!$    endif
 
   end subroutine compute_stress
 end module NN

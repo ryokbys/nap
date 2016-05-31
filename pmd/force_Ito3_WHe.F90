@@ -2,8 +2,8 @@ module Ito3_WHe
 
 contains
   subroutine force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs)
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ito's new potential for W and He (IWHe)
 !    - smoothing is applied to 2-body potential for W-He and He-He
@@ -17,9 +17,9 @@ contains
     include "mpif.h"
     include "./params_unit.h"
     include "params_Ito3_WHe.h"
-    integer,intent(in):: namax,natm,nnmax,nismax
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_md_world,myid
+         ,nn(6),mpi_md_world,myid,nex(3)
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),rc,tag(namax)
@@ -82,16 +82,20 @@ contains
       sqrho(i)= dsqrt(rho(i)+p_d)
     enddo
 
-    if( myid.ge.0 ) then
-!-----copy rho of boundary atoms
-      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
-           ,mpi_md_world,sqrho)
-      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
-           ,mpi_md_world,rho)
-    else
-      call distribute_dba(natm,namax,tag,sqrho,1)
-      call distribute_dba(natm,namax,tag,rho,1)
-    endif
+    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+         lsrc,myparity,nn,sv,mpi_md_world,sqrho,1)
+    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+         lsrc,myparity,nn,sv,mpi_md_world,rho,1)
+!!$    if( myid.ge.0 ) then
+!!$!-----copy rho of boundary atoms
+!!$      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
+!!$           ,mpi_md_world,sqrho)
+!!$      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
+!!$           ,mpi_md_world,rho)
+!!$    else
+!!$      call distribute_dba(natm,namax,tag,sqrho,1)
+!!$      call distribute_dba(natm,namax,tag,rho,1)
+!!$    endif
 
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -161,13 +165,15 @@ contains
       endif
     enddo
 
-    if( myid.ge.0 ) then
-!-----copy strs of boundary atoms
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-           ,nn,mpi_md_world,strs,9)
-    else
-      call reduce_dba_bk(natm,namax,tag,strs,9)
-    endif
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_md_world,strs,9)
+!!$    if( myid.ge.0 ) then
+!!$!-----copy strs of boundary atoms
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$           ,nn,mpi_md_world,strs,9)
+!!$    else
+!!$      call reduce_dba_bk(natm,namax,tag,strs,9)
+!!$    endif
 
 !!$!-----atomic level stress in [eV/Ang^3]
 !!$    do i=1,natm
