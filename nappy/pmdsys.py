@@ -214,8 +214,12 @@ class PMDSystem(object):
                 symbol = self.specorder[ai.sid-1]
             if symbol and ai.symbol != symbol:
                 ai.set_symbol(symbol)
-            ai.set_pos(data[1],data[2],data[3])
-            ai.set_vel(data[4],data[5],data[6])
+            ai.set_pos(data[1],data[2],data[3]) # position
+            ai.set_vel(data[4],data[5],data[6]) # velocity
+            ai.set_ekin(data[7])
+            ai.set_epot(data[8])
+            ai.set_strs(data[9],data[10],data[11],
+                        data[12],data[13],data[14])
             self.atoms.append(ai)
         f.close()
 
@@ -251,7 +255,6 @@ class PMDSystem(object):
                                                                 ai.vel[1],
                                                                 ai.vel[2])
                     +"  {0:.1f}  {1:.1f}".format(0.0, 0.0)
-                    +"  {0:.1f}  {1:.1f}  {2:.1f}".format(0.0, 0.0, 0.0)
                     +"  {0:.1f}  {1:.1f}  {2:.1f}".format(0.0, 0.0, 0.0)
                     +"  {0:.1f}  {1:.1f}  {2:.1f}".format(0.0, 0.0, 0.0)
                     +"\n")
@@ -502,7 +505,8 @@ class PMDSystem(object):
         f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a1[0]))
         f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a2[1]))
         f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a3[2]))
-        f.write("ITEM: ATOMS id type x y z vx vy vz\n")
+        f.write("ITEM: ATOMS id type x y z vx vy vz"
+                +" epot ekin sxx syy szz syz sxz sxy\n")
         for i in range(len(self.atoms)):
             ai= self.atoms[i]
             x= ai.pos[0] *self.a1[0]
@@ -511,9 +515,19 @@ class PMDSystem(object):
             vx= ai.vel[0]
             vy= ai.vel[1]
             vz= ai.vel[2]
+            ekin= ai.ekin
+            epot= ai.epot
+            sti= ai.strs
             f.write("{0:8d} {1:3d} ".format(i+1,ai.sid))
             f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(x,y,z))
-            f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(vx,vy,vz))
+            f.write("{0:8.3f} {1:8.3f} {2:8.3f} ".format(vx,vy,vz))
+            f.write("{0:8.3f} {1:8.3f} ".format(ekin,epot))
+            f.write("{0:8.3f} {1:8.3f} {2:8.3f} ".format(sti[0],
+                                                         sti[1],
+                                                         sti[2]))
+            f.write("{0:8.3f} {1:8.3f} {2:8.3f} ".format(sti[3],
+                                                         sti[4],
+                                                         sti[5]))
             f.write("\n")
         f.close()
 

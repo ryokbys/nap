@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-05-31 16:51:45 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-05-31 18:04:25 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -1233,9 +1233,9 @@ c-----calculate the cut-off lengths
       rcc=rc*valc
 
 c.....check whether the size of the system is large enough
-      if(  (rca.lt.anxi .and. nx.gt.1) .or.
-     &     (rcb.lt.anyi .and. ny.gt.1) .or.
-     &     (rcc.lt.anzi .and. nz.gt.1) ) then
+      if(  (rca.gt.anxi .and. nx.gt.1) .or.
+     &     (rcb.gt.anyi .and. ny.gt.1) .or.
+     &     (rcc.gt.anzi .and. nz.gt.1) ) then
         if( myid_md.le.0 ) then
           write(6,'(a)') " Error: about size and parallelization"
           write(6,'(a,2f15.3,i5)') "rca,anxi,nx = ",rca,anxi,nx

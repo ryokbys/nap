@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-31 16:18:55 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-05-31 17:30:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -180,6 +180,7 @@ contains
     if( nl.eq.1 ) then
       hl1(1:nhl(1),1:natm)= 0d0
       do ia=1,natm
+!.....debug
         if( iprint.ge.100 ) then
           print *,"ia=",ia
           do ihl1=1,nhl(1)
@@ -193,7 +194,7 @@ contains
             hl1(ihl1,ia)= sigmoid(tmp)
             print *,"ihl1,hl1=",ihl1,hl1(ihl1,ia)
           enddo
-        endif
+        endif !end of debug
         do ihl1=1,nhl(1)
           tmp= 0d0
           do ihl0=1,nhl(0)

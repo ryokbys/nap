@@ -178,6 +178,9 @@ class Atom(object):
     def __init__(self):
         self.pos= np.zeros((3,))
         self.vel= np.zeros((3,))
+        self.strs= np.zeros((6,))
+        self.epot = 0.0
+        self.ekin = 0.0
         self.id= 0
         self.ifmv= 1
         self.sid= 1
@@ -188,6 +191,16 @@ class Atom(object):
 
     def set_vel(self,x,y,z):
         self.vel= np.array([x,y,z],dtype=float)
+
+
+    def set_strs(self,xx,yy,zz,yz,xz,xy):
+        self.strs= np.array([xx,yy,zz,yz,xz,xy],dtype=float)
+
+    def set_epot(self,epot):
+        self.epot = epot
+
+    def set_ekin(self,ekin):
+        self.ekin = ekin
 
     def set_sid(self,sid):
         self.sid= int(sid)
