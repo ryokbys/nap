@@ -119,8 +119,9 @@ def get_atom_conf_txt(atoms,specorder=[]):
         txt += ' {0:23.14e} {1:23.14e} {2:23.14e}'.format(spos[i,0],
                                                            spos[i,1],
                                                            spos[i,2])
-        txt += ' 0.0 0.0 0.0'
-        txt += ' 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0\n'
+        txt += '  0.0  0.0  0.0'
+        txt += '  0.0  0.0'
+        txt += '  0.0  0.0  0.0  0.0  0.0  0.0\n'
     return txt
 
 

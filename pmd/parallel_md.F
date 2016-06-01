@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-05-31 18:04:25 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-06-01 10:51:23 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -154,7 +154,6 @@ c        write(6,'(i3,i5,3es12.3)') myid_md,i,ra(1:3,i)
 c      enddo
 c      write(6,'(a,2i8)') " myid,natm=",myid_md,natm
 
-
 #ifdef __FITPOT__
 c.....check whether order of atoms and total-id of atoms match
       do ia=1,natm
@@ -228,9 +227,9 @@ c.....Set initial temperature if needed
 
 c-----copy RA of boundary atoms
       call check_size_and_parallel()
-      call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax,natm,nb
-     &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv,nex
-     &     ,mpi_md_world)
+      call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
+     &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity
+     &     ,lsrc,sv,nex,mpi_md_world)
 c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
@@ -324,12 +323,6 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
 c-----initialize the counter for output
       iocntpmd=0
       iocnterg=0
-c.....write energy and forces only for fitpot (2nd digit of iprint==1)
-      if( mod(iprint,100)/10.eq.1 ) then
-        write(cnum(1:4),'(i4.4)') iocntpmd
-        if(myid_md.eq.0) call write_force(21,cnum,natm,h,tag,aa,acon
-     &       ,nismax,epot0,myid_md,mpi_md_world,nxyz,ntot,tagtot,atot)
-      endif
 c.....I do not know why I need to write initial configuration,
 c.....since initial configuration is already given as pmd0000.
 cc-----output initial configuration
@@ -734,6 +727,10 @@ c.....reset pressure
 #endif
       endif
 
+c.....write energy and forces only for fitpot (2nd digit of iprint==1)
+      call write_force(21,'.pmd',natm,h,tag,aa,acon
+     &     ,nismax,epot,myid_md,mpi_md_world,nxyz,ntot,tagtot,atot)
+      
       tcpu= tcpu2 -tcpu1
       if(myid_md.eq.0) then
         write(6,*) ''
@@ -1389,9 +1386,9 @@ c      print *, 'bacopy: nb=',nb
 
       end subroutine bacopy
 c=======================================================================
-      subroutine bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax,natm,nb
-     &     ,anxi,anyi,anzi,nn,tag,rc,myid,myparity,lsrc,sv,nex
-     &     ,mpi_md_world)
+      subroutine bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
+     &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid,myparity
+     &     ,lsrc,sv,nex,mpi_md_world)
 c-----------------------------------------------------------------------
 c Exchanges boundary-atom data among neighbor nodes: tag and ra
 c Normal data passing and repeating the cell are mixed, and
@@ -1419,7 +1416,6 @@ c      integer:: status(MPI_STATUS_SIZE)
 
       if( l1st ) then
         allocate(dbuf(4,nbmax),dbufr(4,nbmax))
-        l1st=.false.
       endif
 
 c-----reset the num of "received" boundary atoms
@@ -1431,8 +1427,11 @@ c-----calculate the cut-off lengths
         rcv(kd)= rc*asgm/vol
         nex(kd)= int(rcv(kd)) +1
       enddo
-c      write(6,*) 'rcv = ',rcv(1:3)
-c      write(6,*) 'nex = ',nex(1:3)
+      if( l1st .and. myid.eq.0 ) then
+        write(6,'(a,3f10.3)') ' rcv = ',rcv(1:3)
+        write(6,'(a,3i10)')   ' nex = ',nex(1:3)
+      endif
+
 
 c-----loop over x, y, & z directions
       do 100 kd=1,3
@@ -1571,6 +1570,7 @@ c      do i=1,natm+nb
 c        write(6,'(i5,3f15.7)') i,ra(1:3,i)
 c      enddo
 
+      l1st=.false.
       end subroutine bacopy_new
 c=======================================================================
       subroutine bacopy_fixed(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
@@ -1660,7 +1660,7 @@ c-----------------------------------------------------------------------
 c      integer:: status(MPI_STATUS_SIZE)
       integer:: i,j,kd,kdd,ku,ierr,iex
       integer:: inode,nsd,nrc,nbnew
-      real(8):: tcom1,tcom2,rcv(3),asgm
+      real(8):: tcom1,tcom2 !,rcv(3),asgm
       real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
       logical,save:: l1st=.true.
 
@@ -2070,13 +2070,13 @@ c.....now ah is scaling factor for h-mat
 
       end subroutine force_isobaric
 c=======================================================================
-      subroutine write_force(ionum,cnum,natm,h,tag,aa,acon,nismax
+      subroutine write_force(ionum,cpostfix,natm,h,tag,aa,acon,nismax
      &     ,epot,myid_md,mpi_md_world,nxyz,ntot,tagtot,atot)
       implicit none
       include 'mpif.h'
       integer,intent(in):: natm,nismax,ionum,nxyz
      &     ,ntot,myid_md,mpi_md_world
-      character(len=*),intent(in):: cnum 
+      character(len=*),intent(in):: cpostfix
       real(8),intent(in):: h(3,3),acon(nismax),aa(3,natm),tag(natm)
      &     ,epot
       real(8),intent(inout):: tagtot(ntot),atot(3,ntot)
@@ -2116,7 +2116,7 @@ c  parallelization.
 
       if( myid_md.eq.0 ) then
 c.....Write out forces
-        open(ionum,file='frc'//trim(cnum),status='replace')
+        open(ionum,file='frc'//trim(cpostfix),status='replace')
         write(ionum,'(i10)') ntot
         do i=1,ntot
           is= int(tagtot(i))
@@ -2129,7 +2129,7 @@ c.....Write out forces
         close(ionum)
 
 c.....Write out energy
-        open(ionum+1,file='erg'//trim(cnum),status='replace')
+        open(ionum+1,file='erg'//trim(cpostfix),status='replace')
         write(ionum+1,'(es23.14e3)') epot
         close(ionum+1)
       endif
@@ -2358,7 +2358,7 @@ c.....wrap atom position inside [0:1)
           enddo
           write(6,'(a,i10)') ' min number of local atoms = ',nmin
           write(6,'(a,i10)') ' max number of local atoms = ',nmax
-          namax = max(int(nmax*1.2),1000)
+          namax = max(int(nmax*1.2),200)
           nbmax = namax*27
           namax = namax +nbmax
           write(6,'(a,i10)') ' nbmax = nmax*1.2*27       = ',nbmax

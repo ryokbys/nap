@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-31 17:30:37 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-06-01 10:52:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -33,7 +33,7 @@ module NN
   real(8):: rcw = 0.9d0
 
 !.....num of atoms and neighbors for dgsf array
-  integer:: nal, nnl, nalmax,nnlmax,nnltmp
+  integer,save:: nal, nnl, nalmax,nnlmax,nnltmp
   logical:: lrealloc = .false.
   
 contains
@@ -93,7 +93,7 @@ contains
         stop
       endif
       if( nnl.gt.nnmax ) then
-        write(6,'(a)') ' [Error] nl .gt.nnmax'
+        write(6,'(a)') ' [Error] nnl.gt.nnmax'
         write(6,'(a,3i10)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
         stop
       endif
@@ -141,8 +141,8 @@ contains
     enddo
     if( nnltmp.gt.nnl ) then
       nnl = int(nnltmp*1.1)
-      if( nnl.gt.nnmax ) then
-        write(6,'(a)') ' [Error] nl .gt.nnmax'
+      if( nnlmax.gt.nnmax ) then
+        write(6,'(a)') ' [Error] nnl.gt.nnmax'
         write(6,'(a,3i10)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
         stop
       endif

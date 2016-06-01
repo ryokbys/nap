@@ -120,7 +120,9 @@ c          if (rij2.lt.rcij2(ic,jc)) then
           if(rij2.lt.rc2) then
             lspr(0,i)=lspr(0,i)+1
             if(lspr(0,i).gt.nnmax) then
-              write(6,'(a)') " !!!lspr(0,i).gt.nnmax"
+              write(6,'(a)') " Error: lspr(0,i).gt.nnmax"
+              write(6,'(a,2i5)') "  lspr(0,i), nnmax = "
+     &             ,lspr(0,i),nnmax
               call mpi_finalize(ierr)
               stop
             endif

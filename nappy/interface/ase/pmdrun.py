@@ -75,7 +75,7 @@ class PMD(FileIOCalculator):
         ========
         Use default values:
 
-        >>> h = Atoms('H', calculator=PMD(label='smd',force_type='NN'))
+        >>> h = Atoms('H', calculator=PMD(label='pmd',force_type='NN'))
         >>> e = h.get_potential_energy()
 
         """
@@ -83,7 +83,7 @@ class PMD(FileIOCalculator):
         Calculator.__init__(self, restart, ignore_bad_restart_file,
                             label, atoms, **kwargs)
 
-        if not label in ['pmd','smd']:
+        if not label in ['pmd']:
             raise RuntimeError('label must be either pmd or smd.')
 
         if self.parameters['force_type'] is None:
@@ -130,11 +130,6 @@ class PMD(FileIOCalculator):
             #self.write_pmd(atoms)
             write_pmd(atoms,fname='pmd0000',specorder=self.specorder)
             
-        elif self.label == 'smd':
-            infname = 'in.smd'
-            #self.write_smd(atoms)
-            write_pmd(atoms,fname='smd0000',specorder=self.specorder)
-            
         with open(infname,'w') as f:
             fmvs,ifmvs = get_fmvs(atoms)
             f.write(get_input_txt(self.parameters,fmvs))
@@ -142,7 +137,7 @@ class PMD(FileIOCalculator):
         
     def read_results(self):
         """
-        Only erg.(pmd|smd) and frc.(pmd|smd) are to be read.
+        Only erg.pmd and frc.pmd are to be read.
         """
         outfname= 'out.'+self.label
         ergfname= 'erg.'+self.label
@@ -156,7 +151,7 @@ class PMD(FileIOCalculator):
 
         fout= open(outfname,'r')
         lines= fout.readlines()
-        if not 'correct' in  lines[-1]:
+        if not 'time' in  lines[-1]:
             raise RuntimeError(self.label+' seems to stop somewhere..')
         fout.close()
 

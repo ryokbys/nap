@@ -63,11 +63,11 @@ nconv: node_conv.o ${mods} read_input.o util_pmd.o
 pmd: ${mods} ${pmd} ${forces} ${params}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmd}
 
-smd: ${mods} ${smd} ${forces} ${params}
-	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${smd}
+# smd: ${mods} ${smd} ${forces} ${params}
+# 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${smd}
 
-combine: ${comb} ${mods}
-	${MPIFC} ${MPIFLAGS} -o $@  ${mods} ${comb}
+# combine: ${comb} ${mods}
+# 	${MPIFC} ${MPIFLAGS} -o $@  ${mods} ${comb}
 
 pmd2akr: ${pmd2akr} ${mods}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${pmd2akr}

@@ -1,6 +1,6 @@
   module variables
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-31 16:48:50 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-06-01 11:10:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
     implicit none
     save
@@ -15,7 +15,7 @@
 !.....max. num. of boundary-particles
     integer:: nbmax = 10000
 !.....max. num. of neighbors
-    integer:: nnmax = 100
+    integer:: nnmax = 200
 
 !.....output #
     integer,parameter:: ioerg = 11
