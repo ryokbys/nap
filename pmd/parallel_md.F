@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-06-01 10:51:23 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-06-01 14:18:24 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -750,9 +750,9 @@ c.....write energy and forces only for fitpot (2nd digit of iprint==1)
         tave= tave/nave
         write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
         write(6,*) ''
-        write(6,'(1x,a,2f10.2)') "time cpu          =",tcpu
-        write(6,'(1x,a,2f10.2)') "time comm         =",tcom
         write(6,'(1x,a,2f10.2)') "time space decomp =",tspdcmp
+        write(6,'(1x,a,2f10.2)') "time comm         =",tcom
+        write(6,'(1x,a,2f10.2)') "time              =",tcpu
       endif
 
       call mpi_finalize(ierr)

@@ -506,7 +506,7 @@ class PMDSystem(object):
         f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a2[1]))
         f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a3[2]))
         f.write("ITEM: ATOMS id type x y z vx vy vz"
-                +" epot ekin sxx syy szz syz sxz sxy\n")
+                +" ekin epot sxx syy szz syz sxz sxy\n")
         for i in range(len(self.atoms)):
             ai= self.atoms[i]
             x= ai.pos[0] *self.a1[0]
