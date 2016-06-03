@@ -191,7 +191,7 @@ c=======================================================================
      &     ,ib=1,3),l=0,1)
       write(ionum,'(i10)') ntot
       do i=1,ntot
-        write(ionum,'(7es23.14e3,11es22.14)') tagtot(i)
+        write(ionum,'(7es23.14e3,11es12.4)') tagtot(i)
      &       ,rtot(1:3,i)
      &       ,vtot(1:3,i)/dt
      &       ,ekitot(1,1,i)+ekitot(2,2,i)+ekitot(3,3,i)

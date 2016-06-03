@@ -501,10 +501,33 @@ class PMDSystem(object):
         f.write("0\n")
         f.write("ITEM: NUMBER OF ATOMS\n")
         f.write("{0:d}\n".format(len(self.atoms)))
-        f.write("ITEM: BOX BOUNDS pp pp pp\n")
-        f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a1[0]))
-        f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a2[1]))
-        f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a3[2]))
+        f.write("ITEM: BOX BOUNDS xy xz yz\n")
+        a,b,c = hmat_to_lammps(self.get_hmat())
+        xlo = ylo = zlo = 0.0
+        xhi = a[0]
+        xy  = b[0]
+        yhi = b[1]
+        xz  = c[0]
+        yz  = c[1]
+        zhi = c[2]
+        xlo_bound = xlo +min(0.0, xy, xz, xy+xz)
+        xhi_bound = xhi +max(0.0, xy, xz, xy+xz)
+        ylo_bound = ylo +min(0.0, yz)
+        yhi_bound = yhi +max(0.0, yz)
+        zlo_bound = zlo
+        zhi_bound = zhi
+        # f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a1[0]))
+        # f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a2[1]))
+        # f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a3[2]))
+        f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(xlo_bound,
+                                                         xhi_bound,
+                                                         xy))
+        f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(ylo_bound,
+                                                         yhi_bound,
+                                                         xz))
+        f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(zlo_bound,
+                                                         zhi_bound,
+                                                         yz))
         f.write("ITEM: ATOMS id type x y z vx vy vz"
                 +" ekin epot sxx syy szz syz sxz sxy\n")
         for i in range(len(self.atoms)):
@@ -840,6 +863,64 @@ def scaled_to_cartessian(h,xs,ys,zs):
     zc += h[2,0]*xs +h[2,1]*ys +h[2,2]*zs
     return xc,yc,zc
 
+
+def get_axis_and_angle(v,u):
+    """
+    Get rotation axis and angle between given two vectors v and u.
+    """
+    lv = np.linalg.norm(v)
+    lu = np.linalg.norm(u)
+    cs = np.dot(v,u)/lv/lu
+    vxu = np.cross(v,u)
+    axis = vxu/lv/lu
+    sn = np.linalg.norm(vxu)/lv/lu
+    ang = np.arccos(cs)
+    return axis, ang
+
+def rotate(vector,axis,ang):
+    """
+    Rotate the given *vector* around the *axis* by *ang*.
+    *axis* should be normalized vector.
+    """
+    rmat = np.zeros((3,3),dtype=float)
+    nx,ny,nz = axis[:]
+    rmat[0,:] = [ 0., -nz, ny]
+    rmat[1,:] = [ nz,  0.,-nx]
+    rmat[2,:] = [-ny,  nx, 0.]
+    mmat = np.zeros((3,3),dtype=float)
+    imat = np.identity(3)
+    rmat2 = np.dot(rmat,rmat)
+    mmat[:,:] = imat[:,:] +np.sin(ang)*rmat[:,:] \
+                +(1.0 -np.cos(ang))*rmat2[:,:]
+    return np.dot(mmat,vector)
+
+
+def hmat_to_lammps(hmat):
+    """
+    Convert h-matrix to LAMMPS cell vectors.
+    LAMMPS cell is defined as,
+      a = ( xhi-xlo,       0,       0 )
+      b = (      xy, yhi-hlo,       0 )
+      c = (      xz,      yz, zhi-zlo )
+    """
+    a0 = hmat[:,0]
+    b0 = hmat[:,1]
+    c0 = hmat[:,2]
+    #...rotate a0 to x-axis
+    xaxis = np.array([1.0, 0.0, 0.0])
+    ax0,ang0 = get_axis_and_angle(a0,xaxis)
+    a1 = rotate(a0,ax0,ang0)
+    b1 = rotate(b0,ax0,ang0)
+    c1 = rotate(c0,ax0,ang0)
+    #...rotate b1 to xy plane
+    b1yz = copy.deepcopy(b1)
+    b1yz[0] = 0.0
+    yaxis = np.array([0.0, 1.0, 0.0])
+    ax1,ang1 = get_axis_and_angle(b1,yaxis)
+    a2 = rotate(a1,ax1,ang1)
+    b2 = rotate(b1,ax1,ang1)
+    c2 = rotate(c1,ax1,ang1)
+    return a2,b2,c2
 
 def unitvec_to_hi(a1,a2,a3):
     """
