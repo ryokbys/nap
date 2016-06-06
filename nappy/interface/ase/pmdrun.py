@@ -1,9 +1,9 @@
 """
-ASE interface to pmd/smd.
+ASE interface to pmd.
 """
 
 __author__  = "Ryo KOBAYASHI"
-__version__ = "160123"
+__version__ = "160605"
 __LICENSE__ = "MIT"
 
 import os
@@ -15,7 +15,7 @@ from ase.calculators.calculator import FileIOCalculator,Calculator
 
 from pmdio import read_pmd,write_pmd,get_fmvs
 
-CALC_END_MARK = "finished correctly"
+CALC_END_MARK = "time  "
 some_changes = ['positions', 'numbers', 'cell',]
 
 class PMD(FileIOCalculator):
@@ -25,7 +25,8 @@ class PMD(FileIOCalculator):
     calc = PMD(label='pmd')
     """
 
-    implemented_properties = ['energy', 'forces']
+    implemented_properties = ['energy', 'forces',
+                              'relaxed_scaled_positions']
     command = 'pmd'
 
     default_parameters = {
@@ -61,7 +62,8 @@ class PMD(FileIOCalculator):
     }
 
     def __init__(self, restart=None, ignore_bad_restart_file=False,
-                 label='pmd', atoms=None, command=None, 
+                 label='pmd', atoms=None, 
+                 command='pmd > out.pmd', 
                  specorder=None, **kwargs):
         """Construct PMD-calculator object.
 
@@ -84,7 +86,7 @@ class PMD(FileIOCalculator):
                             label, atoms, **kwargs)
 
         if not label in ['pmd']:
-            raise RuntimeError('label must be either pmd or smd.')
+            raise RuntimeError('label must be pmd.')
 
         if self.parameters['force_type'] is None:
             raise RuntimeError('force_type must be specified.')
@@ -120,6 +122,35 @@ class PMD(FileIOCalculator):
                                (self.name, errorcode))
         self.read_results()
 
+
+    def relax(self, atoms=None, properties=['energy'],
+              system_changes=some_changes,
+              converge_eps=1.0e-4,nsteps=100):
+        """
+        Relax atom positions by running damped MD in pmd instead of using
+        optimize module in ASE.
+        """
+        self.set(flag_damping=2,
+                 converge_eps=converge_eps,
+                 num_iteration=nsteps)
+        Calculator.calculate(self, atoms, properties, system_changes)
+        # print 'type(atoms),type(self.atoms)= ',type(atoms),type(self.atoms)
+        # print 'self.atoms = ',self.atoms
+        self.write_input(self.atoms, properties, system_changes)
+
+        olddir = os.getcwd()
+        try:
+            os.chdir(self.directory)
+            errorcode = subprocess.call(self.command, shell=True)
+        finally:
+            os.chdir(olddir)
+
+        if errorcode:
+            raise RuntimeError('%s returned an error: %d' %
+                               (self.name, errorcode))
+        self.read_results(relax=True)
+
+
     def write_input(self, atoms, properties=None, system_changes=None):
         """Write input parameters to files-file."""
 
@@ -135,10 +166,11 @@ class PMD(FileIOCalculator):
             f.write(get_input_txt(self.parameters,fmvs))
         
         
-    def read_results(self):
+    def read_results(self,relax=False):
         """
         Only erg.pmd and frc.pmd are to be read.
         """
+        import glob
         outfname= 'out.'+self.label
         ergfname= 'erg.'+self.label
         frcfname= 'frc.'+self.label
@@ -151,8 +183,17 @@ class PMD(FileIOCalculator):
 
         fout= open(outfname,'r')
         lines= fout.readlines()
-        if not 'time' in  lines[-1]:
+        if not CALC_END_MARK in  lines[-1]:
             raise RuntimeError(self.label+' seems to stop somewhere..')
+        if relax:
+            relax_converged = False
+            for line in lines:
+                if 'damped MD converged with' in lines:
+                    relax_converged = True
+            if not relax_converged:
+                print ''
+                print '** Warning: relaxation does not seem to be converged**'
+                print ''
         fout.close()
 
         self.results={}
@@ -168,7 +209,16 @@ class PMD(FileIOCalculator):
                 data= [ float(x) for x in f.readline().split() ]
                 frcs[i,:] = data[:]
             self.results['forces'] = frcs
+        
+        if relax:
+            posfile = max(glob.glob('pmd[0-9]*'), key=os.path.getctime)
+            tmpatoms = read_pmd(fname=posfile,specorder=self.specorder)
+            self.results['relaxed_scaled_positions'] = tmpatoms.get_scaled_positions()
 
+    def get_relaxed_scaled_positions(self):
+        # print 'self.results = ',self.results
+        # relaxed_spos = self.get_property('relaxed_scaled_positions',self.atoms)
+        return self.results['relaxed_scaled_positions']
         
 def get_input_txt(params,fmvs):
     txt = ''

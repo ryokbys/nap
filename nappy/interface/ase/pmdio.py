@@ -7,7 +7,7 @@ import numpy as np
 from ase import Atoms
 from ase.constraints import FixAtoms, FixScaled
 
-def read_pmd(fname='pmd0000',specorder=[],fmvs=[]):
+def read_pmd(fname='pmd0000',specorder=[],fmvs=[(True,True,True),]):
     """
     Import pmd format file.
 
@@ -86,11 +86,12 @@ def write_pmd(atoms,fname='pmd0000',specorder=[]):
 
 
 def get_atom_conf_txt(atoms,specorder=[]):
+    # print 'atoms = ',atoms
     txt= ''
     # no lattice constant in ASE
     txt+='  1.00000  \n'
     # cell vectors
-    cell= atoms.cell
+    cell= atoms.get_cell()
     txt += ' {0:12.7f}'.format(cell[0,0]) \
            +' {0:12.7f}'.format(cell[0,1]) \
            +' {0:12.7f}\n'.format(cell[0,2])
