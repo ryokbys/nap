@@ -36,12 +36,13 @@ class PMD(FileIOCalculator):
         'io_format': 'ascii',
         'time_interval': 1.0,
         'num_iteration': 0,
+        'min_iteration': 0,
         'num_out_energy': 10,
         'flag_out_pmd': 1,
         'num_out_pmd': 10,
         'force_type': None,
         'cutoff_radius': 5.0,
-        'cutoff_buffer': 0.5,
+        'cutoff_buffer': 0.0,
         'flag_damping': 0,
         'damping_coeff': 0.95,
         'converge_eps': 1e-4,
@@ -125,14 +126,21 @@ class PMD(FileIOCalculator):
 
     def relax(self, atoms=None, properties=['energy'],
               system_changes=some_changes,
-              converge_eps=1.0e-4,nsteps=100):
+              flag_damping=2,
+              converge_eps=1.0e-3,nsteps=100,min_iteration=5,
+              converge_num=3,time_interval=2.0,
+              initial_temperature=10.0):
         """
         Relax atom positions by running damped MD in pmd instead of using
         optimize module in ASE.
         """
-        self.set(flag_damping=2,
+        self.set(flag_damping=flag_damping,
                  converge_eps=converge_eps,
-                 num_iteration=nsteps)
+                 num_iteration=nsteps,
+                 min_iteration=min_iteration,
+                 converge_num=converge_num,
+                 time_interval=time_interval,
+                 initial_temperature=initial_temperature)
         Calculator.calculate(self, atoms, properties, system_changes)
         # print 'type(atoms),type(self.atoms)= ',type(atoms),type(self.atoms)
         # print 'self.atoms = ',self.atoms
@@ -188,11 +196,11 @@ class PMD(FileIOCalculator):
         if relax:
             relax_converged = False
             for line in lines:
-                if 'damped MD converged with' in lines:
+                if 'damped MD converged with' in line:
                     relax_converged = True
             if not relax_converged:
                 print ''
-                print '** Warning: relaxation does not seem to be converged**'
+                print '** Warning: pmd relaxation does not seem to be converged**'
                 print ''
         fout.close()
 
@@ -240,7 +248,7 @@ def get_input_txt(params,fmvs):
     int_keys=['num_nodes_x','num_nodes_y','num_nodes_z',
               'num_iteration','num_out_energy','flag_out_pmd',
               'num_out_pmd','flag_damping','flag_isobaric',
-              'converge_num']
+              'converge_num','min_iteration']
     float_keys=['time_interval','cutoff_radius','cutoff_buffer',
                 'damping_coeff','initial_temperature',
                 'final_temperature',
@@ -267,7 +275,9 @@ def get_input_txt(params,fmvs):
         elif key is 'mass':
             vals = params[key]
             for i,v in enumerate(vals):
-                txt += '{0:25s} {1:2d} {2:6.1f}\n'.format(key,i+1,v)
+                txt += '{0:25s} {1:2d} {2:10.4f}\n'.format(key,i+1,v)
+        elif key is 'converge_eps':
+            txt += '{0:25s} {1:10.1e}\n'.format(key,params[key])
         elif key in int_keys:
             txt += '{0:25s} {1:3d}\n'.format(key,params[key])
         elif key in float_keys:
