@@ -1,24 +1,32 @@
 #!/opt/local/bin/python
-u"""
+"""
 Calculate elastic constants, C11, C12, C44,
 Young's modulus, poison's ratio, and shear modulus,
 by static method which measures energy differences
 w.r.t. given strains.
+
+Usage:
+  elastic_constants.py [options]
+
+Options:
+  -h, --help  Show this message and exit.
+  -n NITER    Num of points to be calculated. [default: 10]
+  -d DLTMAX   Max deviation of finite difference. [default: 0.01]
+  --mdexec=MDEXEC
+              Path to *pmd*. [default: ~/src/nap/pmd/pmd]
 """
 
 import sys,os,commands
 import numpy as np
-import optparse
+from docopt import docopt
 from scipy.optimize import curve_fit
-import matplotlib.pyplot as plt
 
 #...constants
-outfname='out.elastic-constants'
-logfname='log.elastic-constants'
-graphname='graph.elastic-constants.eps'
+outfname='out.elastic_constants'
+logfname='log.elastic_constants'
 
 def read_pmd():
-    f=open('0000/pmd00000','r')
+    f=open('pmd0000','r')
     #...read 1st line and get current lattice size
     al= float(f.readline().split()[0])
     hmat= np.zeros((3,3))
@@ -39,10 +47,10 @@ def get_vol(al,hmat):
     return np.dot(a1,np.cross(a2,a3))
 
 def replace_hmat(hmat):
-    f=open('0000/pmd00000','r')
+    f=open('pmd0000','r')
     ini= f.readlines()
     f.close()
-    g=open('0000/pmd00000','w')
+    g=open('pmd0000','w')
     for l in range(len(ini)):
         if l in (1,2,3): #...hmat lines
             g.write(' {0:15.7f}'.format(hmat[l-1,0]))
@@ -58,30 +66,35 @@ def quad_func(x,a,b):
 
 if __name__ == '__main__':
     
-    usage= '%prog [options]'
+    # usage= '%prog [options]'
 
-    parser= optparse.OptionParser(usage=usage)
-    parser.add_option("-n",dest="niter",type="int",default=10,
-                      help="Number of points to be calculated.")
-    parser.add_option("-d",dest="dltmax",type="float",default=0.01,
-                      help="Max deviation of finite difference..")
-    parser.add_option("-p",action="store_true",
-                      dest="plot",default=False,
-                      help="Plot a graph on the screen.")
-    parser.add_option("--pmdexec",dest="pmdexec",type="string",
-                      default='~/src/nap/pmd/pmd',
-                      help="path to the pmd executable.")
-    (options,args)= parser.parse_args()
+    # parser= optparse.OptionParser(usage=usage)
+    # parser.add_option("-n",dest="niter",type="int",default=10,
+    #                   help="Number of points to be calculated.")
+    # parser.add_option("-d",dest="dltmax",type="float",default=0.01,
+    #                   help="Max deviation of finite difference..")
+    # parser.add_option("-p",action="store_true",
+    #                   dest="plot",default=False,
+    #                   help="Plot a graph on the screen.")
+    # parser.add_option("--pmdexec",dest="pmdexec",type="string",
+    #                   default='~/src/nap/pmd/pmd',
+    #                   help="path to the pmd executable.")
+    # (options,args)= parser.parse_args()
 
-    if len(args) != 0:
-        print ' [Error] number of arguments wrong !!!'
-        print usage
-        sys.exit()
+    # if len(args) != 0:
+    #     print ' [Error] number of arguments wrong !!!'
+    #     print usage
+    #     sys.exit()
 
-    niter= options.niter
-    shows_graph= options.plot
-    pmdexec= options.pmdexec
-    dltmax= options.dltmax
+    # niter= options.niter
+    # shows_graph= options.plot
+    # pmdexec= options.pmdexec
+    # dltmax= options.dltmax
+
+    args = docopt(__doc__)
+    niter = int(args['-n'])
+    dltmax = float(args['-d'])
+    mdexec = args['--mdexec']
 
     al,hmat0,natm= read_pmd()
     hmax= np.max(hmat0)
@@ -89,8 +102,8 @@ if __name__ == '__main__':
     logfile= open(logfname,'w')
     outfile1= open(outfname,'w')
     #...get reference energy
-    os.system(pmdexec+' > out.pmd')
-    erg0= float(commands.getoutput("grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'"))
+    os.system(mdexec+' > out.pmd')
+    erg0= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
     print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(0.0,erg0,erg0,erg0)
     outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
     logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
@@ -104,8 +117,8 @@ if __name__ == '__main__':
         hmat= np.copy(hmat0)
         hmat[0,0]= hmat[0,0] +dh
         replace_hmat(hmat)
-        os.system(pmdexec+' > out.pmd')
-        erg11= float(commands.getoutput("grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'"))
+        os.system(mdexec+' > out.pmd')
+        erg11= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
 
         #...orthorhombic volume-conserving strain for (C11-C12)
         hmat= np.copy(hmat0)
@@ -113,8 +126,8 @@ if __name__ == '__main__':
         hmat[1,1]= hmat[1,1] -dh
         hmat[2,2]= hmat[2,2] +dh**2/(1.0-dh**2)
         replace_hmat(hmat)
-        os.system(pmdexec+' > out.pmd')
-        erg12= float(commands.getoutput("grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'"))
+        os.system(mdexec+' > out.pmd')
+        erg12= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
 
         #...monoclinic volume-conserving strain for C44
         hmat= np.copy(hmat0)
@@ -122,14 +135,14 @@ if __name__ == '__main__':
         hmat[1,0]= hmat[1,0] +dh/2
         hmat[2,2]= hmat[2,2] +dh**2/(4.0-dh**2)
         replace_hmat(hmat)
-        os.system(pmdexec+' > out.pmd')
-        erg44= float(commands.getoutput("grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'"))        
+        os.system(mdexec+' > out.pmd')
+        erg44= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))        
         print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(dlt,erg11,erg12,erg44)
         outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlt,erg11,erg12,erg44))
         logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlt,erg11,erg12,erg44))
     outfile1.close()
 
-    #...revert 0000/pmd00000
+    #...revert pmd0000
     replace_hmat(hmat0)
 
     #...prepare for Murnaghan fitting
@@ -186,19 +199,5 @@ if __name__ == '__main__':
     logfile.write(' Poisson\'s ratio = {0:10.3f}\n'.format(prto))
     logfile.close()
 
-    if shows_graph:
-        plt.plot(dlts,quad_func(dlts,*popt11),dlts,e11s,'o')
-        plt.plot(dlts,quad_func(dlts,*popt12),dlts,e12s,'o')
-        plt.plot(dlts,quad_func(dlts,*popt44),dlts,e44s,'o')
-        plt.title('Energy vs. strain')
-        plt.legend(['C11 fitted','C11 data'
-                    ,'C12 fitted','C12 data'
-                    ,'C44 fitted','C44 data'],loc=2)
-        plt.xlabel('Strain')
-        plt.ylabel('Energy (eV)')
-        plt.savefig(graphname,dpi=150)
-        plt.show()
-
     print '{0:=^72}'.format(' OUTPUT ')
     print ' * '+outfname
-    print ' * '+graphname
