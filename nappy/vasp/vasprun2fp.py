@@ -46,8 +46,9 @@ def write_pos(atoms,fname="pos"):
             atom= atoms[i]
             f.write(' {0:s}'.format(get_tag(atom.symbol,i+1)))
             f.write(' {0:12.8f} {1:12.8f} {2:12.8f}'.format(pos[i,0],pos[i,1],pos[i,2]))
-            f.write(' 0.0 0.0 0.0')
-            f.write(' 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0\n')
+            f.write(' 0.0 0.0 0.0 ')
+            f.write(' 0.0 0.0 ' 
+                    +' 0.0 0.0 0.0 0.0 0.0 0.0\n')
 
 
 

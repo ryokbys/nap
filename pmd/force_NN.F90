@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-06-01 10:52:00 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-06-07 11:53:04 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -165,7 +165,7 @@ contains
     call eval_sf(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
          ,lspr,rc,rc3)
 
-    if( mod(iprint,100)/10.eq.1 ) then
+    if( mod(iprint,100)/10.eq.1 .and. myid.le.0 ) then
       open(80,file='out.NN.gsf',status='replace',form='unformatted')
       write(80) nhl(0)
       do ia=1,natm

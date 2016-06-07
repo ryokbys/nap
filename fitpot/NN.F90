@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-19 21:53:52 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-06-07 10:34:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -1185,7 +1185,7 @@ contains
 !=======================================================================
   subroutine get_bases()
     !
-    ! Read binary files of out.NN.{gsf,dgsf}, written by smd.
+    ! Read binary files of out.NN.{gsf,dgsf}, written by pmd.
     !
     use variables
     use parallel
@@ -1198,7 +1198,7 @@ contains
       natm= samples(ismpl)%natm
       cdir= samples(ismpl)%cdirname
       !.....gsf
-      open(21,file=trim(cmaindir)//'/'//trim(cdir)//'/smd/out.NN.gsf'&
+      open(21,file=trim(cmaindir)//'/'//trim(cdir)//'/pmd/out.NN.gsf'&
            ,status='old',form='unformatted')
       read(21) itmp
       do ia=1,natm
@@ -1207,7 +1207,7 @@ contains
       close(21)
       !.....dgsf
       if( lfmatch ) then
-        open(22,file=trim(cmaindir)//'/'//trim(cdir)//'/smd/out.NN.dgsf'&
+        open(22,file=trim(cmaindir)//'/'//trim(cdir)//'/pmd/out.NN.dgsf'&
              ,status='old',form='unformatted')
         do ia=1,natm
           do ihl0=1,nhl(0)

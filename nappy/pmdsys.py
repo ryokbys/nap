@@ -13,7 +13,7 @@ Options:
   --in-format=INFMT
               Format of the input file. [default: None]
   --out-format=OUTFMT
-              Format of the output file. [default: pmd]
+              Format of the output file. [default: None]
   --specorder=SPECORDER
               Order of species. [default: Al,Mg,Si]
 """
@@ -946,9 +946,9 @@ if __name__ == "__main__":
 
     psys= PMDSystem(fname=infname,ffmt=infmt,specorder=specorder)
 
-    if not outfmt == None:
+    if outfmt == None:
         outfmt= parse_filename(outfname)
-    
+
     if outfmt == 'pmd':
         psys.write_pmd(outfname)
     elif outfmt == 'smd':
