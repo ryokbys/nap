@@ -50,7 +50,11 @@ class PMDSystem(object):
         self.specorder= specorder
 
         if not fname == None:
-            ftype= parse_filename(fname)
+            if ffmt == None or \
+               ffmt not in _file_formats:
+                ftype= parse_filename(fname)
+            else:
+                ftype = ffmt
             if ftype == 'pmd':
                 self.read_pmd(fname)
             elif ftype == 'smd':
@@ -832,7 +836,7 @@ class PMDSystem(object):
 
 def parse_filename(filename):
     for fmt in _file_formats:
-        if re.search(fmt,filename):
+        if fmt in filename:
             return fmt
     return None
 
@@ -946,7 +950,7 @@ if __name__ == "__main__":
 
     psys= PMDSystem(fname=infname,ffmt=infmt,specorder=specorder)
 
-    if outfmt == None:
+    if outfmt == 'None':
         outfmt= parse_filename(outfname)
 
     if outfmt == 'pmd':

@@ -131,6 +131,42 @@ def uniaxial(psys0,factors=[]):
     return psyslist
 
 
+def orthorhombic(psys0,factors=[]):
+    """
+    Orthorhombic deformation to the cell, not volume conserving.
+    """
+    a,b,c = psys0.get_lattice_lengths()
+    ra = round(a,_length_digit)
+    rb = round(b,_length_digit)
+    rc = round(c,_length_digit)
+    psyslist = []
+    for fac in factors:
+        psys = copy.deepcopy(psys0)
+        hmat = psys0.get_hmat()
+        hmat[0,:] *= fac
+        hmat[1,:] *= (1.0-fac)
+        psys.set_hmat(hmat)
+        psyslist.append(psys)
+
+    if rb != ra:
+        for fac in factors:
+            psys = copy.deepcopy(psys0)
+            hmat = psys0.get_hmat()
+            hmat[1,:] *= fac
+            hmat[2,:] *= (1.0-fac)
+            psys.set_hmat(hmat)
+            psyslist.append(psys)
+    if rc != ra and rc != rb:
+        for fac in factors:
+            psys = copy.deepcopy(psys0)
+            hmat = psys0.get_hmat()
+            hmat[2,:] *= fac
+            hmat[0,:] *= (1.0-fac)
+            psys.set_hmat(hmat)
+            psyslist.append(psys)
+    return psyslist
+
+
 def shear(psys0,factors=[]):
     aa,ba,ca = psys0.get_lattice_angles()
     raa = round(aa,_angle_digit)

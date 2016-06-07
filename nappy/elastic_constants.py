@@ -10,10 +10,12 @@ Usage:
 
 Options:
   -h, --help  Show this message and exit.
-  -n NITER    Num of points to be calculated. [default: 10]
+  -n NITER    Num of points to be calculated. 
+              Even number is same as an odd number NITER+1. [default: 5]
   -d DLTMAX   Max deviation of finite difference. [default: 0.01]
   --mdexec=MDEXEC
               Path to *pmd*. [default: ~/src/nap/pmd/pmd]
+  --relax     Relax internal coordinates. [default: False]
 """
 
 import sys,os,commands
@@ -66,35 +68,17 @@ def quad_func(x,a,b):
 
 if __name__ == '__main__':
     
-    # usage= '%prog [options]'
-
-    # parser= optparse.OptionParser(usage=usage)
-    # parser.add_option("-n",dest="niter",type="int",default=10,
-    #                   help="Number of points to be calculated.")
-    # parser.add_option("-d",dest="dltmax",type="float",default=0.01,
-    #                   help="Max deviation of finite difference..")
-    # parser.add_option("-p",action="store_true",
-    #                   dest="plot",default=False,
-    #                   help="Plot a graph on the screen.")
-    # parser.add_option("--pmdexec",dest="pmdexec",type="string",
-    #                   default='~/src/nap/pmd/pmd',
-    #                   help="path to the pmd executable.")
-    # (options,args)= parser.parse_args()
-
-    # if len(args) != 0:
-    #     print ' [Error] number of arguments wrong !!!'
-    #     print usage
-    #     sys.exit()
-
-    # niter= options.niter
-    # shows_graph= options.plot
-    # pmdexec= options.pmdexec
-    # dltmax= options.dltmax
-
     args = docopt(__doc__)
     niter = int(args['-n'])
     dltmax = float(args['-d'])
     mdexec = args['--mdexec']
+    relax = args['--relax']
+
+    if niter < 2:
+        raise ValueError('NITER {0:d} should be larger than 1.'.format(niter))
+
+    if niter % 2 == 0:
+        niter += 1
 
     al,hmat0,natm= read_pmd()
     hmax= np.max(hmat0)
@@ -104,61 +88,78 @@ if __name__ == '__main__':
     #...get reference energy
     os.system(mdexec+' > out.pmd')
     erg0= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
-    print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(0.0,erg0,erg0,erg0)
-    outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
-    logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
-    ddlt= dltmax/niter
+    # print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(0.0,erg0,erg0,erg0)
+    # outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
+    # logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
+    dltmin = -dltmax
+    ddlt= (dltmax-dltmin)/(niter-1)
+    dlts = np.zeros(niter,dtype=float)
+    e11s = np.zeros(niter,dtype=float)
+    e12s = np.zeros(niter,dtype=float)
+    e44s = np.zeros(niter,dtype=float)
+    
     #for iter in range(-niter/2,niter/2+1):
-    for iter in range(1,niter+1):
+    for it in range(niter):
         #dlt= (ddlt*(iter+1))
-        dlt= ddlt*iter
-        dh= hmax*dlt
-        #...uniaxial strain for calc C11
-        hmat= np.copy(hmat0)
-        hmat[0,0]= hmat[0,0] +dh
-        replace_hmat(hmat)
-        os.system(mdexec+' > out.pmd')
-        erg11= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
+        if it == niter/2:
+            dlts[it] = 0.0
+            e11s[it] = erg0
+            e12s[it] = erg0
+            e44s[it] = erg0
+        else:
+            dlt= dltmin +ddlt*it
+            dh= hmax*dlt
+            #...uniaxial strain for calc C11
+            hmat= np.copy(hmat0)
+            hmat[0,0]= hmat[0,0] +dh
+            replace_hmat(hmat)
+            os.system(mdexec+' > out.pmd')
+            erg11= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
+            dlts[it] = dlt
+            e11s[it] = erg11
+    
+            #...orthorhombic volume-conserving strain for (C11-C12)
+            hmat= np.copy(hmat0)
+            hmat[0,0]= hmat[0,0] +dh
+            hmat[1,1]= hmat[1,1] -dh
+            hmat[2,2]= hmat[2,2] +dh**2/(1.0-dh**2)
+            replace_hmat(hmat)
+            os.system(mdexec+' > out.pmd')
+            erg12= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
+            e12s[it] = erg12
+    
+            #...monoclinic volume-conserving strain for C44
+            hmat= np.copy(hmat0)
+            hmat[0,1]= hmat[0,1] +dh/2
+            hmat[1,0]= hmat[1,0] +dh/2
+            hmat[2,2]= hmat[2,2] +dh**2/(4.0-dh**2)
+            replace_hmat(hmat)
+            os.system(mdexec+' > out.pmd')
+            erg44= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))        
+            e44s[it] = erg44
 
-        #...orthorhombic volume-conserving strain for (C11-C12)
-        hmat= np.copy(hmat0)
-        hmat[0,0]= hmat[0,0] +dh
-        hmat[1,1]= hmat[1,1] -dh
-        hmat[2,2]= hmat[2,2] +dh**2/(1.0-dh**2)
-        replace_hmat(hmat)
-        os.system(mdexec+' > out.pmd')
-        erg12= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
-
-        #...monoclinic volume-conserving strain for C44
-        hmat= np.copy(hmat0)
-        hmat[0,1]= hmat[0,1] +dh/2
-        hmat[1,0]= hmat[1,0] +dh/2
-        hmat[2,2]= hmat[2,2] +dh**2/(4.0-dh**2)
-        replace_hmat(hmat)
-        os.system(mdexec+' > out.pmd')
-        erg44= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))        
-        print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(dlt,erg11,erg12,erg44)
-        outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlt,erg11,erg12,erg44))
-        logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlt,erg11,erg12,erg44))
+        print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(dlts[it],e11s[it],e12s[it],e44s[it])
+        logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlts[it],e11s[it],e12s[it],e44s[it]))
+        outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlts[it],e11s[it],e12s[it],e44s[it]))
     outfile1.close()
 
     #...revert pmd0000
     replace_hmat(hmat0)
 
     #...prepare for Murnaghan fitting
-    f= open(outfname,'r')
-    lines= f.readlines()
-    dlts= np.zeros((len(lines)))
-    e11s= np.zeros((len(lines)))
-    e12s= np.zeros((len(lines)))
-    e44s= np.zeros((len(lines)))
-    for l in range(len(lines)):
-        dat= lines[l].split()
-        dlts[l]= float(dat[0])
-        e11s[l]= float(dat[1])
-        e12s[l]= float(dat[2])
-        e44s[l]= float(dat[3])
-    f.close()
+    # f= open(outfname,'r')
+    # lines= f.readlines()
+    # dlts= np.zeros((len(lines)))
+    # e11s= np.zeros((len(lines)))
+    # e12s= np.zeros((len(lines)))
+    # e44s= np.zeros((len(lines)))
+    # for l in range(len(lines)):
+    #     dat= lines[l].split()
+    #     dlts[l]= float(dat[0])
+    #     e11s[l]= float(dat[1])
+    #     e12s[l]= float(dat[2])
+    #     e44s[l]= float(dat[3])
+    # f.close()
 
     #...set initial values
     a= 1.0
