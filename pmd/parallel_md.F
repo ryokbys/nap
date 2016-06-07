@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-06-07 15:42:47 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-06-07 22:52:16 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -675,6 +675,8 @@ c---------decide pmd-file name
           write(cnum(1:4),'(i4.4)') iocntpmd
 c          call system("mkdir -p "//cnum)
           call space_comp()
+          if( ifsort.eq.1 ) call sort_by_tag(ntot,tagtot,rtot,vtot
+     &         ,ekitot,epitot,stot)
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
             call write_pmdtot_bin(20,"pmd"//cnum)
           elseif( trim(ciofmt).eq.'ascii' ) then
@@ -857,6 +859,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(nerg,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(ifpmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(npmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
+      call mpi_bcast(ifsort,1,mpi_integer,0,mpi_md_world,ierr)
       call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(iprint,1,mpi_integer,0,mpi_md_world,ierr)
       call mpi_bcast(fmv,30,mpi_double_precision,0,mpi_md_world,ierr)
@@ -2496,6 +2499,54 @@ c        write(6,'(a,f10.3)') ' time space_comp = ',mpi_wtime() -t0
       endif
 
       end subroutine space_comp
+c=======================================================================
+      subroutine sort_by_tag(natm,tag,ra,va,eki,epi,strs)
+c
+c  Sort by tag for output.
+c  
+      implicit none
+      integer,intent(in):: natm
+      real(8),intent(inout):: ra(3,natm),va(3,natm),eki(3,3,natm)
+     &     ,epi(natm),strs(3,3,natm),tag(natm)
+
+      integer,allocatable:: itag(:)
+      real(8),allocatable:: buf(:,:)
+      integer:: i
+      integer,save:: nsave = 0
+      integer,external:: itotOf
+
+      if( .not. allocated(itag) .or. natm.gt.nsave ) then
+        if( allocated(itag) ) deallocate(itag,buf)
+        nsave = natm
+        allocate(itag(natm),buf(18,natm))
+      endif
+
+      do i=1,natm
+        buf(1:3,i)= ra(1:3,i)
+        buf(4:6,i)= va(1:3,i)
+        buf(7,i)= eki(1,1,i)
+        buf(8,i)= epi(i)
+        buf(9:11,i) = strs(1:3,1,i)
+        buf(12:14,i)= strs(1:3,2,i)
+        buf(15:17,i)= strs(1:3,3,i)
+        buf(18,i)= tag(i)
+        itag(i)= itotOf(tag(i))
+      enddo
+
+      call heapsort_itag(natm,natm,itag,18,buf)
+
+      do i=1,natm
+        ra(1:3,i)= buf(1:3,i)
+        va(1:3,i)= buf(4:6,i)
+        eki(1,1,i)= buf(7,i)
+        epi(i)= buf(8,i)
+        strs(1:3,1,i)= buf(9:11,i)
+        strs(1:3,2,i)= buf(12:14,i)
+        strs(1:3,3,i)= buf(15:17,i)
+        tag(i)= buf(18,i)
+      enddo
+
+      end subroutine sort_by_tag
 c=======================================================================
 #ifdef __WALL__
       subroutine wall_reflect()

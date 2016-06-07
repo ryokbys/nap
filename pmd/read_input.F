@@ -68,6 +68,9 @@ c=======================================================================
       elseif( trim(cname).eq.'num_out_pmd' ) then
         call read_i1(ionum,npmd)
         return
+      elseif( trim(cname).eq.'flag_sort' ) then
+        call read_i1(ionum,ifsort)
+        return
       elseif( trim(cname).eq.'cutoff_radius' ) then
         call read_r1(ionum,rc)
         return

@@ -40,6 +40,7 @@ class PMD(FileIOCalculator):
         'num_out_energy': 10,
         'flag_out_pmd': 1,
         'num_out_pmd': 10,
+        'flag_sort':  1,
         'force_type': None,
         'cutoff_radius': 5.0,
         'cutoff_buffer': 0.0,
@@ -140,7 +141,8 @@ class PMD(FileIOCalculator):
                  min_iteration=min_iteration,
                  converge_num=converge_num,
                  time_interval=time_interval,
-                 initial_temperature=initial_temperature)
+                 initial_temperature=initial_temperature,
+                 flag_sort=1)
         Calculator.calculate(self, atoms, properties, system_changes)
         # print 'type(atoms),type(self.atoms)= ',type(atoms),type(self.atoms)
         # print 'self.atoms = ',self.atoms
@@ -233,8 +235,8 @@ def get_input_txt(params,fmvs):
 
     order=['num_nodes_x','num_nodes_y','num_nodes_z','',
            'io_format','',
-           'time_interval','num_iteration','num_out_energy','',
-           'flag_out_pmd','num_out_pmd','',
+           'time_interval','num_iteration','min_iteration','num_out_energy','',
+           'flag_out_pmd','num_out_pmd','flag_sort','',
            'force_type','cutoff_radius','cutoff_buffer','',
            'flag_damping','damping_coeff','converge_eps','converge_num','',
            'initial_temperature','final_temperature',
@@ -248,7 +250,7 @@ def get_input_txt(params,fmvs):
     int_keys=['num_nodes_x','num_nodes_y','num_nodes_z',
               'num_iteration','num_out_energy','flag_out_pmd',
               'num_out_pmd','flag_damping','flag_isobaric',
-              'converge_num','min_iteration']
+              'converge_num','min_iteration','flag_sort']
     float_keys=['time_interval','cutoff_radius','cutoff_buffer',
                 'damping_coeff','initial_temperature',
                 'final_temperature',

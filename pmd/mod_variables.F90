@@ -1,6 +1,6 @@
   module variables
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-06-01 11:10:40 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-06-07 22:51:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
     implicit none
     save
@@ -36,6 +36,7 @@
     integer:: nerg = 1000
     integer:: ifpmd= 1
     integer:: npmd = 10
+    integer:: ifsort= 1
     integer:: ifdmp= 0 ! 0:none, 1:damped-MD, 2:FIRE
     character(len=20):: cmin= ''
     real(8):: dmp  = 0.9d0
