@@ -1,20 +1,28 @@
 #!/opt/local/bin/python
-u"""
+"""
 Calculate the cohesive energy as a function of lattice constant,
-by altering the lattice constant in 0000/pmd00000 or smd0000 file.
+by altering the lattice constant in pmd0000 file.
 
 And if possible, calculate equilibrium lattice size and
 bulk modulus, too.
+
+Usage:
+  energy_vs_size.py [options] MIN MAX
+
+Options:
+  -h, --help  Show this message and exit.
+  -n ITER     Num of points to be calculated. [default: 10]
+  --mdexec=MDEXEC
+              Path to *pmd*. [default: /Users/Kobayashi/src/nap/pmd/pmd]
 """
 
 import sys,os,commands
 import numpy as np
-import optparse
+from docopt import docopt
 from scipy.optimize import leastsq
-import matplotlib.pyplot as plt
 
 
-def read_pmd(fname="0000/pmd00000"):
+def read_pmd(fname="pmd0000"):
     f=open(fname,'r')
     #...read 1st line and get current lattice size
     al= float(f.readline().split()[0])
@@ -35,7 +43,7 @@ def get_vol(al,hmat):
     a3= hmat[0:3,2] *al
     return np.dot(a1,np.cross(a2,a3))
 
-def replace_1st_line(x,fname="0000/pmd00000"):
+def replace_1st_line(x,fname="pmd0000"):
     f=open(fname,'r')
     ini= f.readlines()
     f.close()
@@ -57,40 +65,18 @@ def peval(x,p):
     return b*x/(bp*(bp-1.0)) *(bp*(1.0-v0/x) +(v0/x)**bp -1.0) +ev0
 
 if __name__ == '__main__':
-    
-    usage= '%prog [options] <min> <max>'
 
-    parser= optparse.OptionParser(usage=usage)
-    parser.add_option("-n",dest="niter",type="int",default=10,
-                      help="Number of points to be calculated.")
-    parser.add_option("-p",action="store_true",
-                      dest="plot",default=False,
-                      help="Plot a graph on the screen.")
-    parser.add_option("--mdexec",dest="mdexec",type="string",
-                      default='~/src/nap/pmd/pmd',
-                      help="path to the pmd/smd executable.")
-    parser.add_option("--smd",action="store_true",dest="usesmd",
-                      default=False,
-                      help="use smd instead of pmd.")
-    (options,args)= parser.parse_args()
+    args = docopt(__doc__)
 
-    if len(args) != 2:
-        print ' [Error] number of arguments wrong !!!'
-        print usage
-        sys.exit()
+    niter = int(args['-n'])
+    mdexec = args['--mdexec']
 
-    niter= options.niter
-    shows_graph= options.plot
-    mdexec= options.mdexec
-    usesmd= options.usesmd
-
-    if usesmd:
-        fname= "smd0000"
-    else:
-        fname= "0000/pmd00000"
+    fname = 'pmd0000'
+    tmpfname = fname+'.tmp'
+    os.system('cp '+fname+' '+tmpfname)
     al_orig,hmat,natm= read_pmd(fname)
-    al_min = float(args[0])
-    al_max = float(args[1])
+    al_min = float(args['MIN'])
+    al_max = float(args['MAX'])
 
     if al_orig < al_min or al_orig > al_max:
         print ' [Warning] min and max maybe wrong.'
@@ -98,25 +84,27 @@ if __name__ == '__main__':
         print '   al_min, al_orig, al_max=',al_min, al_orig, al_max
         #sys.exit()
 
-    logfile= open('log.Ecoh-vs-size','w')
-    outfile1= open('out.Ecoh-vs-size','w')
+    logfile= open('log.energy_vs_size','w')
+    outfile1= open('out.energy_vs_size','w')
     dl= (al_max -al_min)/niter
     for iter in range(niter+1):
         al= al_min +dl*iter
         replace_1st_line(al,fname)
-        os.system(mdexec +' > out.md')
-        erg= float(commands.getoutput("grep 'potential energy' out.md | head -n1 | awk '{print $3}'"))
+        os.system(mdexec +' > out.pmd')
+        erg= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
         vol= get_vol(al,hmat)
         print ' {0:10.4f} {1:10.4f} {2:15.7f}'.format(al,vol,erg)
         outfile1.write(' {0:10.4f} {1:10.4f} {2:15.7f}\n'.format(al,vol,erg))
         logfile.write(' {0:10.4f} {1:10.4f} {2:15.7f}\n'.format(al,vol,erg))
     outfile1.close()
 
-    #...revert 0000/pmd00000
-    replace_1st_line(al_orig,fname)
+    #...revert pmd0000
+    os.system('cp '+tmpfname+' '+fname)
+    os.system('rm '+tmpfname)
+    #replace_1st_line(al_orig,fname)
 
     #...prepare for Murnaghan fitting
-    f= open('out.Ecoh-vs-size','r')
+    f= open('out.energy_vs_size','r')
     lines= f.readlines()
     xarr= np.zeros((len(lines)))
     yarr= np.zeros((len(lines)))
@@ -149,14 +137,6 @@ if __name__ == '__main__':
     logfile.write(' Lattice constant = {0:10.4f} Ang.\n'.format(lc))
     logfile.write(' Cohesive energy  = {0:10.3f} eV\n'.format(plsq[0][3]/natm))
     logfile.write(' Bulk modulus     = {0:10.2f} GPa\n'.format(plsq[0][0]*1.602e+2))
-    if shows_graph:
-        plt.plot(xarr,peval(xarr,plsq[0]),xarr,yarr,'o')
-        plt.title('Data fitted with Murnaghan eq.')
-        plt.legend(['fitted','data'])
-        plt.xlabel('Volume (Ang.^3)')
-        plt.ylabel('Energy (eV)')
-        plt.savefig('graph.Ecoh-vs-size.eps',dpi=150)
-        plt.show()
 
     print '{0:=^72}'.format(' OUTPUT ')
     print ' * out.Ecoh-vs-size'
