@@ -146,6 +146,18 @@ class PMDSystem(object):
                     n += 1
             return n
 
+
+    def num_species(self):
+        num_species= []
+        max_nsp= 0
+        for ai in self.atoms:
+            max_nsp= max(max_nsp,ai.sid)
+        for i in range(max_nsp):
+            num_species.append(0)
+        for ai in self.atoms:
+            num_species[ai.sid-1] += 1
+        return num_species
+
     def volume(self):
         return self.alc**3 *np.abs(np.dot(self.a1,np.cross(self.a2,self.a3)))
 
@@ -366,17 +378,6 @@ class PMDSystem(object):
                 ai.pos[0],ai.pos[1],ai.pos[2]))
         f.close()
 
-
-    def num_species(self):
-        num_species= []
-        max_nsp= 0
-        for ai in self.atoms:
-            max_nsp= max(max_nsp,ai.sid)
-        for i in range(max_nsp):
-            num_species.append(0)
-        for ai in self.atoms:
-            num_species[ai.sid-1] += 1
-        return num_species
 
     def read_akr(self,fname='akr0000'):
         f=open(fname,'r')
