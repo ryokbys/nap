@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-06-07 10:34:31 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-06-10 19:58:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -38,6 +38,7 @@ contains
     use minimize
     implicit none 
     integer:: itmp,i,nw,natm,ismpl,ihl0,ihl1
+    real(8):: swgt
 
     tfunc= 0d0
     tgrad= 0d0
@@ -142,13 +143,23 @@ contains
       enddo
     endif
 
+!.....set nominator for sample weights
+    swgt = 0d0
+    do ismpl=isid0,isid1
+      swgt = swgt +samples(ismpl)%wgt
+    enddo
+    swgt2 = 0d0
+    call mpi_allreduce(swgt,swgt2,1,mpi_double_precision,mpi_sum &
+         ,mpi_world,ierr)
+    swgt2 = swgt2*2d0
+
     if( myid.eq.0 ) print *, 'NN_init done.'
   end subroutine NN_init
 !=======================================================================
   function NN_func(ndim,x)
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
-         ,lfmatch,lfscale,fscl,nfunc,tcomm,lswgt,swbeta,mdsys,erefmin &
-         ,cmaindir,epse,epsf,cevaltype
+         ,lfmatch,lfscale,fscl,nfunc,tcomm,mdsys,erefmin &
+         ,cmaindir,epse,epsf,cevaltype,swgt2
     use parallel
     use minimize
     implicit none
@@ -178,7 +189,6 @@ contains
       if( myid.eq.0 ) then
         write(6,*) ' nterm_trn, nterm_tst = ',nterm_trn, nterm_tst
       endif
-      l1st = .false.
     endif
     
     do ismpl=isid0,isid1
@@ -197,9 +207,10 @@ contains
       natm= smpl%natm
       eref= smpl%eref
       eerr = smpl%eerr
+      swgt = smpl%wgt
       ediff= (smpl%epot -eref)/natm /eerr
       ediff= ediff*ediff
-      flocal= flocal +ediff
+      flocal= flocal +ediff *swgt
       if( .not. lfmatch ) cycle
       ferr = smpl%ferr
       ferri = 1d0/ferr
@@ -215,7 +226,7 @@ contains
 !!$           *dn3i *fscale *swgt
       do ia=1,natm
         do ixyz=1,3
-          flocal= flocal +fdiff(ixyz,ia) *dn3i
+          flocal= flocal +fdiff(ixyz,ia) *dn3i *swgt
         enddo
       enddo
     enddo
@@ -230,7 +241,7 @@ contains
     tcl = tcl + (mpi_wtime() -tc0)
 !    tcomm= tcomm +mpi_wtime() -tc0
 !    NN_func= NN_func/nsmpl_trn
-    NN_func= NN_func /nterm_trn
+    NN_func= NN_func /swgt2
 
 
 !.....only the bottle-neck times are taken into account
@@ -240,7 +251,8 @@ contains
          ,mpi_world,ierr)
     tcomm= tcomm +tcg
     tfunc= tfunc +tfg
-    return
+    l1st = .false.
+
   end function NN_func
 !=======================================================================
   function NN_fs(ndim,x)
@@ -586,7 +598,7 @@ contains
     call mpi_allreduce(gsl,NN_gs,ndim,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
     tcomm= tcomm +mpi_wtime() -tc0
-    NN_gs(1:ndim)= NN_gs(1:ndim) /nterm_trn
+    NN_gs(1:ndim)= NN_gs(1:ndim) /swgt2
 
     tgrad= tgrad +mpi_wtime() -tg0
     return
@@ -613,13 +625,9 @@ contains
     natm= smpl%natm
     eref= smpl%eref
     eerr= smpl%eerr
-!!$    wgtidv= smpl%wgt
-!!$    swgt= 1d0
-!!$    if( lswgt ) then
-!!$      swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
-!!$    endif
+    swgt= smpl%wgt
     ediff= (smpl%epot -eref) /natm /eerr
-    ediff= 2d0 *ediff /natm /eerr ! *swgt *wgtidv /natm
+    ediff= 2d0 *ediff /natm /eerr *swgt ! *wgtidv /natm
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)
     do ihl1=nhl(1),1,-1
@@ -683,7 +691,7 @@ contains
     do ia=1,natm
       do ixyz=1,3
         fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-             -smpl%fref(ixyz,ia)) *ferri *ferri *2 *dn3i
+             -smpl%fref(ixyz,ia)) !*ferri *ferri *2 *dn3i
 !!$        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt *wgtidv
       enddo
     enddo
@@ -815,7 +823,7 @@ contains
       enddo
     endif
 
-    gs(1:nvars)= gs(1:nvars) +dgs(1:nvars)
+    gs(1:nvars)= gs(1:nvars) +dgs(1:nvars)*ferri *ferri *2 *dn3i *swgt
     return
   end subroutine grad1
 !=======================================================================
@@ -840,13 +848,8 @@ contains
     natm= smpl%natm
     eref= smpl%eref
     eerr= smpl%eerr
-!!$    wgtidv= smpl%wgt
-!!$    swgt= 1d0
-!!$    if( lswgt ) then
-!!$      swgt= exp(-(eref/natm-erefmin)/abs(erefmin)*swbeta)
-!!$    endif
-!!$    ediff= (smpl%epot -eref)*2 /natm/natm *swgt *wgtidv
-    ediff= (smpl%epot -eref)*2 /natm/natm /eerr /eerr
+    swgt= smpl%wgt
+    ediff= (smpl%epot -eref)*2 /natm/natm /eerr /eerr *swgt
     gs(1:nvars)= 0d0
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 
@@ -926,7 +929,7 @@ contains
 !!$    fscale= 1d0
 !!$    if( lfscale ) fscale= fscl
 !    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *dn3i*fscale*swgt*wgtidv
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *ferri *dn3i
+    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *ferri *dn3i *swgt
 
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
 !.....make w1dg

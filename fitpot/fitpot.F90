@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-23 19:08:47 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-06-10 20:34:16 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -47,7 +47,8 @@ program fitpot
 
   call read_samples()
   call read_ref_data()
-
+  call get_base_energies()
+  if( lswgt ) call set_sample_weights()
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
 
@@ -147,7 +148,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,l3)') 'force_scale',lfscale
   write(6,'(2x,a25,2x,es12.3)') 'fscale_factor',fscl
   write(6,'(2x,a25,2x,l3)') 'sample_weight',lswgt
-  write(6,'(2x,a25,2x,es12.3)') 'sample_weight_beta',swbeta
+  write(6,'(2x,a25,2x,es12.3)') 'sample_weight_erg',swerg
   write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
   write(6,'(2x,a25,2x,a)') 'line_minimization',trim(clinmin)
   write(6,'(a)') ''
@@ -326,11 +327,14 @@ subroutine read_ref_data()
     read(13,*) samples(ismpl)%eref
     close(13)
 !.....reduce atomic energy from eref
+    samples(ismpl)%naps(1:mspcs) = 0
     do i=1,samples(ismpl)%natm
       is= samples(ismpl)%tag(i)
+      samples(ismpl)%naps(is) = samples(ismpl)%naps(is) +1
       samples(ismpl)%eref= samples(ismpl)%eref -eatom(is)
     enddo
-    erefminl= min(erefminl,samples(ismpl)%eref/samples(ismpl)%natm)
+!!$    erefminl= min(erefminl,samples(ismpl)%eref/samples(ismpl)%natm)
+!    write(6,*) 'ismpl,naps=',ismpl,samples(ismpl)%naps(1:mspcs)
 
     open(14,file=trim(cmaindir)//'/'//trim(cdir) &
          //'/frc.ref',status='old')
@@ -352,17 +356,54 @@ subroutine read_ref_data()
     stop
   endif
 
-  erefmin= 0d0
-  call mpi_allreduce(erefminl,erefmin,1,mpi_double_precision,mpi_min &
-       ,mpi_world,ierr)
-  
-
+!!$  erefmin= 0d0
+!!$  call mpi_allreduce(erefminl,erefmin,1,mpi_double_precision,mpi_min &
+!!$       ,mpi_world,ierr)
+!!$  
+!!$
   if(myid.eq.0) then
-    write(6,'(a,es12.4)') ' erefmin = ',erefmin
+!    write(6,'(a,es12.4)') ' erefmin = ',erefmin
     print *,'read_ref_data done.'
   endif
 
 end subroutine read_ref_data
+!=======================================================================
+subroutine get_base_energies()
+  use variables
+  use parallel
+  implicit none
+  integer:: ismpl,naps(mspcs),natm,ispcs,ielem
+  real(8):: ebl(mspcs),erg
+  
+  ebl(1:mspcs) = 0d0
+  do ismpl=isid0,isid1
+    naps(1:mspcs) = samples(ismpl)%naps(1:mspcs)
+    natm = samples(ismpl)%natm
+    !write(6,*) ' ismpl,naps =',ismpl,naps(1:mspcs)
+    ielem = 0
+    do ispcs=1,mspcs
+      if( naps(ispcs).eq.natm ) then
+        ! this system is unary system
+        erg = samples(ismpl)%eref/natm
+        ielem = ispcs
+        exit
+      endif
+    enddo
+    if( ielem.ne.0 ) ebl(ielem) = min(ebl(ielem),erg)
+  enddo
+
+  ebase(1:mspcs) = 0d0
+  call mpi_allreduce(ebl,ebase,mspcs,mpi_double_precision,mpi_min &
+       ,mpi_world,ierr)
+
+  if(myid.eq.0) then
+    write(6,'(a)') ' base energies:'
+    do ispcs=1,mspcs
+      write(6,'(a,i3,es12.4)') '   is, ebase(is) =',ispcs,ebase(ispcs)
+    enddo
+  endif
+
+end subroutine get_base_energies
 !=======================================================================
 subroutine read_vars()
   use variables
@@ -698,28 +739,40 @@ subroutine write_energy_relation(cadd)
   character(len=128):: cfname
   
   integer:: ismpl,n
+  logical,save:: l1st = .true.
   
   cfname='out.erg.'//trim(cadd)
 
   if( .not. allocated(erefl) ) allocate(erefl(nsmpl),erefg(nsmpl) &
-       ,epotl(nsmpl),epotg(nsmpl),eerrl(nsmpl),eerrg(nsmpl))
+       ,epotl(nsmpl),epotg(nsmpl),eerrl(nsmpl),eerrg(nsmpl)&
+       ,swgtl(nsmpl),swgtg(nsmpl))
 
-  erefl(1:nsmpl)= 0d0
+  if( l1st ) then
+    erefl(1:nsmpl)= 0d0
+    eerrl(1:nsmpl)= 0d0
+    swgtl(1:nsmpl)= 0d0
+    do ismpl=isid0,isid1
+      erefl(ismpl)= samples(ismpl)%eref
+      eerrl(ismpl)= samples(ismpl)%eerr
+      swgtl(ismpl)= samples(ismpl)%wgt
+    enddo
+    erefg(1:nsmpl)= 0d0
+    eerrg(1:nsmpl)= 0d0
+    swgtg(1:nsmpl)= 0d0
+    call mpi_reduce(erefl,erefg,nsmpl,mpi_double_precision,mpi_sum &
+         ,0,mpi_world,ierr)
+    call mpi_reduce(eerrl,eerrg,nsmpl,mpi_double_precision,mpi_sum &
+         ,0,mpi_world,ierr)
+    call mpi_reduce(swgtl,swgtg,nsmpl,mpi_double_precision,mpi_sum &
+         ,0,mpi_world,ierr)
+  endif
+
   epotl(1:nsmpl)= 0d0
-  eerrl(1:nsmpl)= 0d0
   do ismpl=isid0,isid1
-    erefl(ismpl)= samples(ismpl)%eref
     epotl(ismpl)= samples(ismpl)%epot
-    eerrl(ismpl)= samples(ismpl)%eerr
   enddo
-  erefg(1:nsmpl)= 0d0
   epotg(1:nsmpl)= 0d0
-  eerrg(1:nsmpl)= 0d0
   call mpi_reduce(epotl,epotg,nsmpl,mpi_double_precision,mpi_sum &
-       ,0,mpi_world,ierr)
-  call mpi_reduce(erefl,erefg,nsmpl,mpi_double_precision,mpi_sum &
-       ,0,mpi_world,ierr)
-  call mpi_reduce(eerrl,eerrg,nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
 
   if( myid.eq.0 ) then
@@ -729,31 +782,15 @@ subroutine write_energy_relation(cadd)
       erefg(ismpl)= erefg(ismpl)/nalist(ismpl)
       epotg(ismpl)= epotg(ismpl)/nalist(ismpl)
       if( iclist(ismpl).eq.1 ) then
-        if( lswgt ) then
-          write(90,'(2es15.7,2x,a,3es15.7)') erefg(ismpl) &
-               ,epotg(ismpl),trim(cdirlist(ismpl)) &
-               ,abs(erefg(ismpl)-epotg(ismpl)) &
-               ,eerrg(ismpl) &
-               ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
-        else
-          write(90,'(2es15.7,2x,a,2es15.7)') erefg(ismpl) &
-               ,epotg(ismpl),trim(cdirlist(ismpl)) &
-               ,abs(erefg(ismpl)-epotg(ismpl)) &
-               ,eerrg(ismpl)
-        endif
+        write(90,'(2es15.7,2x,a,3es15.7)') erefg(ismpl) &
+             ,epotg(ismpl),trim(cdirlist(ismpl)) &
+             ,abs(erefg(ismpl)-epotg(ismpl)) &
+             ,eerrg(ismpl),swgtg(ismpl)
       else if( iclist(ismpl).eq.2 ) then
-        if( lswgt ) then
-          write(91,'(2es15.7,2x,a,3es15.7)') erefg(ismpl) &
-               ,epotg(ismpl),trim(cdirlist(ismpl)) &
-               ,abs(erefg(ismpl)-epotg(ismpl)) &
-               ,eerrg(ismpl) &
-               ,exp(-(erefg(ismpl)-erefmin)/abs(erefmin)*swbeta)
-        else
-          write(91,'(2es15.7,2x,a,2es15.7)') erefg(ismpl) &
-               ,epotg(ismpl),trim(cdirlist(ismpl)) &
-               ,abs(erefg(ismpl)-epotg(ismpl)) &
-               ,eerrg(ismpl)
-        endif
+        write(91,'(2es15.7,2x,a,3es15.7)') erefg(ismpl) &
+             ,epotg(ismpl),trim(cdirlist(ismpl)) &
+             ,abs(erefg(ismpl)-epotg(ismpl)) &
+             ,eerrg(ismpl),swgtg(ismpl)
 !!$        write(91,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
 !!$             ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)
       endif
@@ -761,6 +798,7 @@ subroutine write_energy_relation(cadd)
     close(90)
     close(91)
   endif
+  l1st = .false.
   
 end subroutine write_energy_relation
 !=======================================================================
@@ -772,6 +810,7 @@ subroutine write_force_relation(cadd)
   character(len=128):: cfname
 
   integer:: ismpl,ia,ixyz,natm,nmax,nmaxl
+  logical:: l1st = .true.
   
   cfname= 'out.frc.'//trim(cadd)
 
@@ -786,23 +825,29 @@ subroutine write_force_relation(cadd)
        ,frefg(3,nmax,nsmpl),fal(3,nmax,nsmpl),fag(3,nmax,nsmpl)&
        ,ferrl(nsmpl),ferrg(nsmpl))
 
-  frefl(1:3,1:nmax,1:nsmpl)= 0d0
+  if( l1st ) then
+    frefl(1:3,1:nmax,1:nsmpl)= 0d0
+    ferrl(1:nsmpl) = 0d0
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm)
+      ferrl(ismpl) = samples(ismpl)%ferr
+    enddo
+    frefg(1:3,1:nmax,1:nsmpl)= 0d0
+    ferrg(1:nsmpl) = 0d0
+    call mpi_reduce(frefl,frefg,3*nmax*nsmpl,mpi_double_precision,mpi_sum &
+         ,0,mpi_world,ierr)
+    call mpi_reduce(ferrl,ferrg,nsmpl,mpi_double_precision,mpi_sum &
+         ,0,mpi_world,ierr)
+  endif
+
   fal(1:3,1:nmax,1:nsmpl)= 0d0
-  ferrl(1:nsmpl) = 0d0
   do ismpl=isid0,isid1
     natm= samples(ismpl)%natm
-    frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm)
     fal(1:3,1:natm,ismpl)= samples(ismpl)%fa(1:3,1:natm)
-    ferrl(ismpl) = samples(ismpl)%ferr
   enddo
-  frefg(1:3,1:nmax,1:nsmpl)= 0d0
   fag(1:3,1:nmax,1:nsmpl)= 0d0
-  ferrg(1:nsmpl) = 0d0
   call mpi_reduce(fal,fag,3*nmax*nsmpl,mpi_double_precision,mpi_sum &
-       ,0,mpi_world,ierr)
-  call mpi_reduce(frefl,frefg,3*nmax*nsmpl,mpi_double_precision,mpi_sum &
-       ,0,mpi_world,ierr)
-  call mpi_reduce(ferrl,ferrg,nsmpl,mpi_double_precision,mpi_sum &
        ,0,mpi_world,ierr)
 
   if( myid.eq.0 ) then
@@ -836,7 +881,7 @@ subroutine write_force_relation(cadd)
     close(92)
     close(93)
   endif
-  
+  l1st = .false.
 end subroutine write_force_relation
 !=======================================================================
 subroutine write_stats(iter)
@@ -1013,7 +1058,6 @@ subroutine sync_input()
   call mpi_bcast(eatom,maxnsp,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(gscl,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(fscl,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(swbeta,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(pwgt,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(ratio_test,1,mpi_double_precision,0,mpi_world,ierr)
   
@@ -1022,7 +1066,9 @@ subroutine sync_input()
   call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lfscale,1,mpi_logical,0,mpi_world,ierr)
+
   call mpi_bcast(lswgt,1,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(swerg,1,mpi_double_precision,0,mpi_world,ierr)
 
   call mpi_bcast(sa_temp0,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(sa_xw0,1,mpi_double_precision,0,mpi_world,ierr)
@@ -1154,6 +1200,27 @@ subroutine set_sample_errors()
     enddo
   enddo
   if( myid.eq.0 ) then
-    write(6,'(a)') ' set_individual_weight done'
+    write(6,'(a)') ' set_samples_errors done'
   endif
 end subroutine set_sample_errors
+!=======================================================================
+subroutine set_sample_weights()
+  use variables
+  use parallel
+  implicit none
+  integer:: naps(mspcs),ismpl,is
+  real(8):: erg
+  
+  do ismpl=isid0,isid1
+    naps(1:mspcs) = samples(ismpl)%naps(1:mspcs)
+    erg = samples(ismpl)%eref
+    do is=1,mspcs
+      erg = erg -naps(is)*ebase(is)
+    enddo
+    erg = erg/samples(ismpl)%natm
+    samples(ismpl)%wgt = min(exp(-erg/swerg),1d0)
+  enddo
+  if( myid.eq.0 ) then
+    write(6,'(a)') ' set_sample_weights done'
+  endif
+end subroutine set_sample_weights

@@ -114,8 +114,8 @@ c=======================================================================
       elseif( trim(cname).eq.'sample_weight' ) then
         call read_l1(ionum,lswgt)
         return
-      elseif( trim(cname).eq.'sample_weight_beta' ) then
-        call read_r1(ionum,swbeta)
+      elseif( trim(cname).eq.'sample_weight_erg' ) then
+        call read_r1(ionum,swerg)
         return
       elseif( trim(cname).eq.'num_multiprocess' ) then
         call read_i1(ionum,nprcs)
