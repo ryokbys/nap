@@ -13,7 +13,7 @@ Options:
   -h, --help  Show this message and exit.
   -n ITER     Num of points to be calculated. [default: 10]
   --mdexec=MDEXEC
-              Path to *pmd*. [default: /Users/Kobayashi/src/nap/pmd/pmd]
+              Path to *pmd*. [default: ~/src/nap/pmd/pmd]
 """
 
 import sys,os,commands
