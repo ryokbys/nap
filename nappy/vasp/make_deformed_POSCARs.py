@@ -16,7 +16,7 @@ Options:
   --fmin=FMIN 
               Minimum factor to be multiplied to the cell. [default: 0.8]
   --dmin=DMIN 
-              Minimum deviation in case of non-uniform interval. [default: 0.01]
+              Minimum deviation in case of non-uniform interval. [default: 0.002]
   -n NDIV     Number of divisions in each strain element. [default: 20]
   --offset=OFFSET
               Offset of sequential number in output file. [default: 0]
