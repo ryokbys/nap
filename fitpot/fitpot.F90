@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-06-21 11:36:01 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-06-21 12:36:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -303,7 +303,7 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
   smpl%natm= natm
   allocate(smpl%ra(3,natm),smpl%fa(3,natm) &
        ,smpl%tag(natm) &
-       ,smpl%fref(3,natm), smpl%ifcal(natm))
+       ,smpl%fref(3,natm), smpl%ifcal(natm),smpl%fabs(natm))
   do i=1,smpl%natm
     read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), &
          tmp,tmp,tmp
@@ -315,9 +315,9 @@ subroutine read_ref_data()
   use variables
   use parallel
   implicit none 
-  integer:: ismpl,i,is,jflag,natm,nfrc,nftot,nfrcg,nftotg
+  integer:: ismpl,i,is,jflag,natm,nfrc,nftot,nfrcg,nftotg,imax,ifsmpl
   character(len=128):: cdir
-  real(8):: erefminl,ftmp(3),fabs
+  real(8):: erefminl,ftmp(3),fmax
 
   jflag= 0
   erefminl= 0d0
@@ -343,8 +343,8 @@ subroutine read_ref_data()
          //'/frc.ref',status='old')
     read(14,*) natm
     if( natm.ne.samples(ismpl)%natm ) then
-      print *,'Error: natm in sample is not same as smpl%natm'
-      print *,' myid,ismpl,natm,smpl%natm=',myid,ismpl &
+      print *,'Error: natm in sample is not same as samples(ismpl)%natm'
+      print *,' myid,ismpl,natm,samples(ismpl)%natm=',myid,ismpl &
            ,natm,samples(ismpl)%natm
       jflag= jflag +1
     endif
@@ -352,17 +352,40 @@ subroutine read_ref_data()
       nftot= nftot + 1
       read(14,*) ftmp(1:3)
       samples(ismpl)%fref(1:3,i)= ftmp(1:3)
-      fabs= sqrt(ftmp(1)**2 +ftmp(2)**2 +ftmp(3)**2)
-      if( fabs.lt.fred ) then
-        samples(ismpl)%ifcal(i)= 0
-      else
-        nfrc = nfrc +1
-        samples(ismpl)%ifcal(i)= 1
-      endif
-!!$      print *,'smpl,ia,ifcal=',trim(samples(ismpl)%cdirname) &
-!!$           ,i,samples(ismpl)%ifcal(i)
+      samples(ismpl)%fabs(i)= sqrt(ftmp(1)**2 +ftmp(2)**2 +ftmp(3)**2)
     enddo
     close(14)
+    !...choose nfpsmpl forces by descending order
+    if( samples(ismpl)%natm.lt.nfpsmpl ) then
+      samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 1
+      nfrc= nfrc +samples(ismpl)%natm
+    else
+      samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 0
+      do ifsmpl=1,nfpsmpl
+        fmax=-1d0
+        imax= 0
+        do i=1,natm
+          if( samples(ismpl)%fabs(i).gt.fmax .and. &
+               samples(ismpl)%ifcal(i).eq.0 ) then
+            fmax= samples(ismpl)%fabs(i)
+            imax= i
+          endif
+        enddo
+        if( imax.eq.0 .or. imax.gt.natm) &
+             stop 'Error: something is wrong, imax==0.or.imax>natm'
+        if( fmax.gt.fred ) then
+          samples(ismpl)%ifcal(imax)= 1
+          nfrc= nfrc +1
+        else
+          exit
+        endif
+      enddo
+    endif
+!    write(6,*) 'ismpl,naps=',ismpl,samples(ismpl)%naps(1:mspcs)
+!!$    do i=1,natm
+!!$      print *,'smpl,ia,ifcal=',trim(samples(ismpl)%cdirname) &
+!!$           ,i,samples(ismpl)%ifcal(i)
+!!$    enddo
   enddo
 
   if( jflag.gt.0 ) then
@@ -401,7 +424,8 @@ subroutine get_base_energies()
   do ismpl=isid0,isid1
     naps(1:mspcs) = samples(ismpl)%naps(1:mspcs)
     natm = samples(ismpl)%natm
-    !write(6,*) ' ismpl,naps =',ismpl,naps(1:mspcs)
+!!$    write(6,*) ' ismpl,eref =',ismpl,samples(ismpl)%eref
+!!$    write(6,*) ' ismpl,naps =',ismpl,naps(1:mspcs)
     ielem = 0
     do ispcs=1,mspcs
       if( naps(ispcs).eq.natm ) then
@@ -1084,6 +1108,7 @@ subroutine sync_input()
   call mpi_bcast(gscl,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(fscl,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(fred,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(nfpsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(pwgt,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(ratio_test,1,mpi_double_precision,0,mpi_world,ierr)
   

@@ -24,7 +24,8 @@ module variables
   real(8):: gscl   = 0.1d0
   logical:: lfscale= .false.
   real(8):: fscl   = 1d0
-  real(8):: fred   = 1d-3
+  real(8):: fred   = -1d0
+  integer:: nfpsmpl= 10
   logical:: lswgt  = .false.
   real(8):: swerg = 1d0
   real(8):: seqcoef= 1d-2
@@ -56,6 +57,7 @@ module variables
     real(8),allocatable:: tag(:)
     real(8),allocatable:: ra(:,:),fa(:,:),fref(:,:)
     integer,allocatable:: ifcal(:)
+    real(8),allocatable:: fabs(:)
     integer:: naps(mspcs) ! num of atoms per species
     integer:: iclass
   end type mdsys
