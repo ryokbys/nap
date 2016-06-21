@@ -178,6 +178,7 @@ class Atom(object):
     def __init__(self):
         self.pos= np.zeros((3,))
         self.vel= np.zeros((3,))
+        self.frc= np.zeros((3,))
         self.strs= np.zeros((6,))
         self.epot = 0.0
         self.ekin = 0.0
@@ -191,6 +192,14 @@ class Atom(object):
 
     def set_vel(self,x,y,z):
         self.vel= np.array([x,y,z],dtype=float)
+
+
+    def set_frc(self,x,y,z):
+        """
+        Set force on this atom.
+        The force should be not scaled and eV/A unit in Cartessian coordinate.
+        """
+        self.frc= np.array([x,y,z],dtype=float)
 
 
     def set_strs(self,xx,yy,zz,yz,xz,xy):

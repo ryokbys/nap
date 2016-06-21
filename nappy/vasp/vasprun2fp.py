@@ -9,8 +9,8 @@ Usage:
 
 Options:
   -h,--help  Show this message and exit.
-  --symbols=SYMBOLS
-             Specify symbol order need to convert POSCAR to pos. [default: Al,Mg,Si]
+  --specorder=SPECORDER
+             Specify the order of species needed to convert POSCAR to pos. [default: Al,Mg,Si]
   --index=INDEX
              Convert a snapshot of INDEX. [default: -1]
 """
@@ -23,10 +23,10 @@ from docopt import docopt
 __author__ = "Ryo KOBAYASHI"
 __version__ = "160507"
 
-_symbolist = []
+_specorder = []
 
 def get_tag(symbol,atom_id):
-    sid= _symbolist.index(symbol)+1
+    sid= _specorder.index(symbol)+1
     tag= float(sid) +0.1 +atom_id*1e-14
     return '{0:16.14f}'.format(tag)
 
@@ -56,11 +56,11 @@ if __name__ == "__main__":
 
     args=docopt(__doc__)
     dirs= args['DIR']
-    symbols= args['--symbols']
+    specorder= args['--specorder']
     index= int(args['--index'])
 
-    _symbolist = symbols.split(',')
-    print 'symbols = ',_symbolist
+    _specorder = specorder.split(',')
+    print 'specorder = ',_specorder
     print 'index   = ',index
 
     ndirs= len(dirs)
