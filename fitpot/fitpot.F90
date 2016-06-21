@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-06-20 11:04:26 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-06-21 11:36:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -147,6 +147,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,l3)') 'regularize',lreg
   write(6,'(2x,a25,2x,l3)') 'force_scale',lfscale
   write(6,'(2x,a25,2x,es12.3)') 'fscale_factor',fscl
+  write(6,'(2x,a25,2x,es12.3)') 'freduce_threshold',fred
   write(6,'(2x,a25,2x,l3)') 'sample_weight',lswgt
   write(6,'(2x,a25,2x,es12.3)') 'sample_weight_erg',swerg
   write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
@@ -314,12 +315,14 @@ subroutine read_ref_data()
   use variables
   use parallel
   implicit none 
-  integer:: ismpl,i,is,jflag,natm
+  integer:: ismpl,i,is,jflag,natm,nfrc,nftot,nfrcg,nftotg
   character(len=128):: cdir
   real(8):: erefminl,ftmp(3),fabs
 
   jflag= 0
   erefminl= 0d0
+  nftot= 0
+  nfrc = 0
   do ismpl=isid0,isid1
     cdir=samples(ismpl)%cdirname
     open(13,file=trim(cmaindir)//'/'//trim(cdir) &
@@ -346,13 +349,18 @@ subroutine read_ref_data()
       jflag= jflag +1
     endif
     do i=1,natm
+      nftot= nftot + 1
       read(14,*) ftmp(1:3)
       samples(ismpl)%fref(1:3,i)= ftmp(1:3)
-      samples(ismpl)%ifcal(1:3,i)= 1
       fabs= sqrt(ftmp(1)**2 +ftmp(2)**2 +ftmp(3)**2)
-      if( fabs.lt.1d-3 ) then
-        samples(ismpl)%ifcal(1:3,i)= 0
+      if( fabs.lt.fred ) then
+        samples(ismpl)%ifcal(i)= 0
+      else
+        nfrc = nfrc +1
+        samples(ismpl)%ifcal(i)= 1
       endif
+!!$      print *,'smpl,ia,ifcal=',trim(samples(ismpl)%cdirname) &
+!!$           ,i,samples(ismpl)%ifcal(i)
     enddo
     close(14)
   enddo
@@ -365,10 +373,18 @@ subroutine read_ref_data()
 !!$  erefmin= 0d0
 !!$  call mpi_allreduce(erefminl,erefmin,1,mpi_double_precision,mpi_min &
 !!$       ,mpi_world,ierr)
-!!$  
-!!$
+
+  nfrcg= 0
+  nftotg= 0
+  call mpi_reduce(nfrc,nfrcg,1,mpi_integer,mpi_sum,0 &
+       ,mpi_world,ierr)
+  call mpi_reduce(nftot,nftotg,1,mpi_integer,mpi_sum,0 &
+       ,mpi_world,ierr)
+
   if(myid.eq.0) then
 !    write(6,'(a,es12.4)') ' erefmin = ',erefmin
+    write(6,'(a,i8)') ' number of forces to be used = ',nfrcg
+    write(6,'(a,i8)') ' total number of forces      = ',nftotg
     print *,'read_ref_data done.'
   endif
 
@@ -1067,6 +1083,7 @@ subroutine sync_input()
   call mpi_bcast(eatom,maxnsp,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(gscl,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(fscl,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(fred,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(pwgt,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(ratio_test,1,mpi_double_precision,0,mpi_world,ierr)
   

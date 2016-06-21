@@ -111,6 +111,9 @@ c=======================================================================
       elseif( trim(cname).eq.'fscale_factor' ) then
         call read_r1(ionum,fscl)
         return
+      elseif( trim(cname).eq.'freduce_threshold' ) then
+        call read_r1(ionum,fred)
+        return
       elseif( trim(cname).eq.'sample_weight' ) then
         call read_l1(ionum,lswgt)
         return

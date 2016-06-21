@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-06-21 10:25:52 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-06-21 11:05:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -216,6 +216,7 @@ contains
       ferri = 1d0/ferr
       dn3i = 1d0/3/natm
       do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
         do ixyz=1,3
           fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
                -smpl%fref(ixyz,ia)) *ferri
@@ -376,15 +377,16 @@ contains
         enddo
       enddo
     else
-      do ihl1=1,nhl(1)
-        w2= wgt12(ihl1)
-        do ihl0=1,nhl(0)
-          w1= wgt11(ihl0,ihl1)
-          do ja=1,natm
-            h1= sds%hl1(ja,ihl1)
-            dh1= h1*(1d0-h1)
-            t= w1*w2 *dh1
-            do ia=1,natm
+      do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
+        do ihl1=1,nhl(1)
+          w2= wgt12(ihl1)
+          do ihl0=1,nhl(0)
+            w1= wgt11(ihl0,ihl1)
+            do ja=1,natm
+              h1= sds%hl1(ja,ihl1)
+              dh1= h1*(1d0-h1)
+              t= w1*w2 *dh1
               dg(1:3)=sds%dgsf(1:3,ia,ja,ihl0)
               smpl%fa(1:3,ia)= smpl%fa(1:3,ia) &
                    -t *dg(1:3)
@@ -466,19 +468,20 @@ contains
         enddo
       enddo
     else
-      do ihl2=1,nhl(2)
-        w3= wgt23(ihl2)
-        do ihl1=1,nhl(1)
-          w2= wgt22(ihl1,ihl2)
-          do ihl0=1,nhl(0)
-            w1= wgt21(ihl0,ihl1)
-            do ja=1,natm
-              h1= sds%hl1(ja,ihl1)
-              h2= sds%hl2(ja,ihl2)
-              dh1= h1*(1d0-h1)
-              dh2= h2*(1d0-h2)
-              t= w3*dh2 *w2*dh1 *w1
-              do ia=1,natm
+      do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
+        do ihl2=1,nhl(2)
+          w3= wgt23(ihl2)
+          do ihl1=1,nhl(1)
+            w2= wgt22(ihl1,ihl2)
+            do ihl0=1,nhl(0)
+              w1= wgt21(ihl0,ihl1)
+              do ja=1,natm
+                h1= sds%hl1(ja,ihl1)
+                h2= sds%hl2(ja,ihl2)
+                dh1= h1*(1d0-h1)
+                dh2= h2*(1d0-h2)
+                t= w3*dh2 *w2*dh1 *w1
                 smpl%fa(1:3,ia)= smpl%fa(1:3,ia) &
                      -t *sds%dgsf(1:3,ia,ja,ihl0)
               enddo
@@ -668,33 +671,12 @@ contains
     ferr = smpl%ferr
     ferri= 1d0/ferr
     dn3i= 1d0/(3*natm)
-!!$    fscale= 1d0
-!!$    if( lfscale ) fscale= fscl
-!!$    if( trim(cevaltype).eq.'relative' ) then
-!!$      do ia=1,natm
-!!$        do ixyz=1,3
-!!$          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-!!$               -smpl%fref(ixyz,ia))
-!!$          fdenom= abs(smpl%fref(ixyz,ia))
-!!$          fdenom= fdenom*fdenom +epsf
-!!$          fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt &
-!!$               *wgtidv /fdenom
-!!$        enddo
-!!$      enddo
-!!$    else
     do ia=1,natm
       do ixyz=1,3
         fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
              -smpl%fref(ixyz,ia)) !*ferri *ferri *2 *dn3i
-!!$        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt *wgtidv
       enddo
     enddo
-!!$    endif
-!!$    do ia=1,natm
-!!$      do ixyz=1,3
-!!$        fdiff(ixyz,ia)= fdiff(ixyz,ia) *2 *dn3i *fscale *swgt
-!!$      enddo
-!!$    enddo
     iv= nhl(0)*nhl(1) +nhl(1)
     if( allocated( mskgfs) ) then
       do ihl1=nhl(1),1,-1
@@ -720,12 +702,13 @@ contains
     else
       do ihl1=nhl(1),1,-1
         tmp= 0d0
-        do ihl0=1,nhl(0)
-          w1= wgt11(ihl0,ihl1)
-          do ja=1,natm
-            h1= sds%hl1(ja,ihl1)
-            dh1= h1*(1d0-h1)
-            do ia=1,natm
+        do ia=1,natm
+          if( smpl%ifcal(ia).eq.0 ) cycle
+          do ihl0=1,nhl(0)
+            w1= wgt11(ihl0,ihl1)
+            do ja=1,natm
+              h1= sds%hl1(ja,ihl1)
+              dh1= h1*(1d0-h1)
               tmp= tmp +w1 *dh1*( &
                    fdiff(1,ia)  *sds%dgsf(1,ia,ja,ihl0) &
                    +fdiff(2,ia) *sds%dgsf(2,ia,ja,ihl0) &
@@ -754,11 +737,12 @@ contains
         enddo
       enddo
     else
-      do ihl1=1,nhl(1)
-        do ihl0=1,nhl(0)
-          w1= wgt11(ihl0,ihl1)
-          do ja=1,natm
-            do ia=1,natm
+      do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
+        do ihl1=1,nhl(1)
+          do ihl0=1,nhl(0)
+            w1= wgt11(ihl0,ihl1)
+            do ja=1,natm
               bms(1:3,ia,ja,ihl1)= bms(1:3,ia,ja,ihl1) &
                    +w1*sds%dgsf(1:3,ia,ja,ihl0)
             enddo
@@ -797,11 +781,12 @@ contains
         do ihl1=nhl(1),1,-1
           tmp= 0d0
           w2= wgt12(ihl1)
-          do ja=1,natm
-            h1= sds%hl1(ja,ihl1)
-            dh1= h1*(1d0-h1)
-            ddhg= dh1*(1d0-2d0*h1)*sds%gsf(ja,ihl0)
-            do ia=1,natm
+          do ia=1,natm
+            if( smpl%ifcal(ia).eq.0 ) cycle
+            do ja=1,natm
+              h1= sds%hl1(ja,ihl1)
+              dh1= h1*(1d0-h1)
+              ddhg= dh1*(1d0-2d0*h1)*sds%gsf(ja,ihl0)
               ab(1:3)= dh1*sds%dgsf(1:3,ia,ja,ihl0) &
                    +ddhg*bms(1:3,ia,ja,ihl1)
               tmp= tmp +w2 *( &
