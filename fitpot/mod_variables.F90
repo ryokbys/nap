@@ -54,6 +54,7 @@ module variables
     real(8):: ferr = 0.1d0  ! in eV/A
     real(8),allocatable:: tag(:)
     real(8),allocatable:: ra(:,:),fa(:,:),fref(:,:)
+    integer,allocatable:: ifcal(:)
     integer:: naps(mspcs) ! num of atoms per species
     integer:: iclass
   end type mdsys

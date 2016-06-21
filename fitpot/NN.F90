@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-06-10 19:58:31 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-06-21 10:25:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -220,12 +220,6 @@ contains
           fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
                -smpl%fref(ixyz,ia)) *ferri
           fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
-        enddo
-      enddo
-!!$      fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm) &
-!!$           *dn3i *fscale *swgt
-      do ia=1,natm
-        do ixyz=1,3
           flocal= flocal +fdiff(ixyz,ia) *dn3i *swgt
         enddo
       enddo

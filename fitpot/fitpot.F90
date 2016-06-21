@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-06-13 23:32:19 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-06-20 11:04:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -302,7 +302,7 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
   smpl%natm= natm
   allocate(smpl%ra(3,natm),smpl%fa(3,natm) &
        ,smpl%tag(natm) &
-       ,smpl%fref(3,natm))
+       ,smpl%fref(3,natm), smpl%ifcal(natm))
   do i=1,smpl%natm
     read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), &
          tmp,tmp,tmp
@@ -316,7 +316,7 @@ subroutine read_ref_data()
   implicit none 
   integer:: ismpl,i,is,jflag,natm
   character(len=128):: cdir
-  real(8):: erefminl
+  real(8):: erefminl,ftmp(3),fabs
 
   jflag= 0
   erefminl= 0d0
@@ -346,7 +346,13 @@ subroutine read_ref_data()
       jflag= jflag +1
     endif
     do i=1,natm
-      read(14,*) samples(ismpl)%fref(1:3,i)
+      read(14,*) ftmp(1:3)
+      samples(ismpl)%fref(1:3,i)= ftmp(1:3)
+      samples(ismpl)%ifcal(1:3,i)= 1
+      fabs= sqrt(ftmp(1)**2 +ftmp(2)**2 +ftmp(3)**2)
+      if( fabs.lt.1d-3 ) then
+        samples(ismpl)%ifcal(1:3,i)= 0
+      endif
     enddo
     close(14)
   enddo
