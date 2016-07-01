@@ -8,9 +8,9 @@ Usage:
 Options:
   -h, --help  Show this message and help.
   --specorder=SPECORDER
-             Specify the order of species needed to convert to pos. [default: Al,Mg,Si]
+              Specify the order of species needed to convert to pos. [default: Al,Mg,Si]
   --index=INDEX
-             Convert a snapshot of INDEX. [default: -1]
+              Convert a snapshot of INDEX. [default: -1]
 
 """
 from __future__ import print_function
@@ -20,12 +20,17 @@ from glob import glob
 from docopt import docopt
 import numpy as np
 
-sys.path.append(os.environ['HOME']+'/src/nap/nappy')
-from atom import Atom
-from pmdsys import PMDSystem,unitvec_to_hi,cartessian_to_scaled
+sys.path.append(os.environ['HOME']+'/src/nap')
+from nappy.atom import Atom
+from nappy.pmdsys import PMDSystem,unitvec_to_hi,cartessian_to_scaled
+from nappy.units import Ry_to_eV, Bohr_to_Ang
+
+sys.path.append(os.path.dirname(__file__))
+from espresso_in import read_espresso_in
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "160620"
+__version__ = "160629"
+
 
 def get_tag(symbol,atom_id):
     sid= _specorder.index(symbol)+1
@@ -72,7 +77,14 @@ def read_espresso_out(fname,):
     f= open(fname,'r')
     lines = f.readlines()
     f.close()
-    
+
+    il_cell = -1
+    il_spcs = -1
+    il_forces = -1
+    il_pos = -1
+    infname = None
+    nspcs = None
+
     for il in range(len(lines)):
         if '   atomic species ' in lines[il]:
             il_spcs = il
@@ -88,7 +100,22 @@ def read_espresso_out(fname,):
             natm = int(lines[il].split()[4])
         elif 'number of atomic types' in lines[il]:
             nspcs = int(lines[il].split()[5])
-            
+        if '    Reading input from ' in lines[il]:
+            infname = lines[il].split()[3]
+
+    # some checks
+    if infname is None:
+        raise IOError('No input file read...')
+    try:
+        natm_in,cell_in,elems_in,pos_in = read_espresso_in(infname)
+        if natm_in != natm:
+            ValueError('natm_in != natm; natm_in,natm=',natm_in,natm)
+    except:
+        IOError('Could not read espresso input file: '+infname)
+    if il_spcs == -1:
+        raise IOError('No species info in the output file.')
+    if nspcs == None:
+        raise IOError('No atoimc-type info in the output file.')
     
     # read atom species
     il= il_spcs +1
@@ -98,32 +125,40 @@ def read_espresso_out(fname,):
         spcs.append(l[0])
     
     # read cell parameters
-    il= il_cell
-    cell = np.zeros((3,3),dtype=float)
-    ixyz = 0
-    while True:
-        il += 1
-        l = lines[il].split()
-        if len(l) == 0:
-            break
-        cell[:,ixyz] = [ float(x) for x in l ]
-        ixyz += 1
+    if il_cell == -1:
+        cell = cell_in
+    else:
+        il= il_cell
+        cell = np.zeros((3,3),dtype=float)
+        ixyz = 0
+        while True:
+            il += 1
+            l = lines[il].split()
+            if len(l) == 0:
+                break
+            cell[:,ixyz] = [ float(x) for x in l ]
+            ixyz += 1
     
     # read atom coordinates
-    elems = []
-    pos = np.zeros((natm,3),dtype=float)
-    il = il_pos + 1
-    for ia in range(natm):
-        l = lines[il+ia].split()
-        elems.append(l[0])
-        pos[ia,:] = [ float(x) for x in l[1:4] ]
+    if il_pos == -1:
+        pos = pos_in
+        elems = elems_in
+    else:
+        elems = []
+        pos = np.zeros((natm,3),dtype=float)
+        il = il_pos + 1
+        for ia in range(natm):
+            l = lines[il+ia].split()
+            elems.append(l[0])
+            pos[ia,:] = [ float(x) for x in l[1:4] ]
     
     # read forces
-    il = il_forces +2
     frcs = np.zeros((natm,3),dtype=float)
-    for ia in range(natm):
-        l = lines[il+ia].split()
-        frcs[ia,:] = [ float(x) for x in l[6:9] ]
+    if il_forces != -1:
+        il = il_forces +2
+        for ia in range(natm):
+            l = lines[il+ia].split()
+            frcs[ia,:] = [ float(x)*Ry_to_eV/Bohr_to_Ang for x in l[6:9] ]
 
     return natm,nspcs,spcs,cell,pos,elems,erg,frcs
 
@@ -143,10 +178,13 @@ def convert(fname,specorder,index):
     #atoms= read('POSCAR',index=0,format='vasp')
     try:
         natm,nspcs,spcs,cell,pos,elems,erg,frcs = read_espresso_out(fname)
-    except:
-        raise IOError('Failed to read '+fname)
+    except IOError as e:
+        print('IOError({0:s}): {1:s}'.format(e.errno,e.strerror))
+        raise
 
-    psys = PMDSystem(specorder=spcs)
+    erg = erg *Ry_to_eV
+
+    psys = PMDSystem(specorder=specorder)
     psys.set_hmat(cell)
     hi = unitvec_to_hi(cell[0,:],cell[1,:],cell[2,:])
     frcs[:,:] *= ryau2evang
@@ -182,7 +220,7 @@ if __name__ == "__main__":
         f = files[i]
         path = os.path.dirname(f)
         fname = os.path.basename(f)
-        print('{0:5d}/{1:d}: '.format(i+1,nfiles)+fname)
+        print('{0:5d}/{1:d}: '.format(i+1,nfiles)+f)
         if path == '':
             convert(fname,specorder,index)
         else:
