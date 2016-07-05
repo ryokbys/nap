@@ -153,6 +153,9 @@ c=======================================================================
       elseif( trim(cname).eq.'sa_dxwidth' ) then
         call read_r1(ionum,sa_xw0)
         return
+      elseif( trim(cname).eq.'random_seed' ) then
+        call read_r1(ionum,rseed)
+        return
       elseif( trim(cname).eq.'individual_weight' ) then
         backspace(ionum)
         read(ionum,*) ctmp,nwgtindiv

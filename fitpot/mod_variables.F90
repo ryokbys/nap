@@ -30,6 +30,7 @@ module variables
   real(8):: swerg = 1d0
   real(8):: seqcoef= 1d-2
   integer:: iprint = 1
+  real(8),save:: rseed  = 12345d0
 !.....training or test
   real(8):: ratio_test= 0.1d0
 

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-06-21 12:36:35 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-05 16:00:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -155,6 +155,7 @@ subroutine write_initial_setting()
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,es12.3)') 'sa_temperature',sa_temp0
   write(6,'(2x,a25,2x,es12.3)') 'sa_dxwidth',sa_xw0
+  write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,i5)') 'individual_weight',nwgtindiv
   do i=1,nwgtindiv
@@ -1111,6 +1112,7 @@ subroutine sync_input()
   call mpi_bcast(nfpsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(pwgt,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(ratio_test,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(rseed,1,mpi_double_precision,0,mpi_world,ierr)
   
   call mpi_bcast(lfmatch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lreg,1,mpi_logical,0,mpi_world,ierr)
@@ -1179,15 +1181,19 @@ function urnd()
 !
 !  Uniform random number generator
 !      
+  use variables,only: rseed
   implicit none 
   real(8):: urnd
-  real(8),save:: dseed= 12345d0
+!  real(8),save:: dseed= 12345d0
   real(8),save:: d2p31m,d2p31
   data d2p31m/2147483647d0/
   data d2p31 /2147483648d0/
+  logical,save:: l1st = .true.
 
-  dseed=dmod(16807d0*dseed,d2p31m)
-  urnd=dseed/d2p31
+!!$  dseed=dmod(16807d0*dseed,d2p31m)
+!!$  urnd=dseed/d2p31
+  rseed=dmod(16807d0*rseed,d2p31m)
+  urnd=rseed/d2p31
   return
 end function urnd
 !=======================================================================
