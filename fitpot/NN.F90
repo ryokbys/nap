@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-06-21 12:56:28 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-06 14:07:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
@@ -152,6 +152,7 @@ contains
     call mpi_allreduce(swgt,swgt2,1,mpi_double_precision,mpi_sum &
          ,mpi_world,ierr)
     swgt2 = swgt2*2d0
+    if( myid.eq.0 ) write(6,'(a,es12.3)') ' swgt2 = ',swgt2
 
     if( myid.eq.0 ) print *, 'NN_init done.'
   end subroutine NN_init
@@ -238,7 +239,6 @@ contains
 !    NN_func= NN_func/nsmpl_trn
     NN_func= NN_func /swgt2
 
-
 !.....only the bottle-neck times are taken into account
     call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
          ,mpi_world,ierr)
@@ -258,62 +258,82 @@ contains
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8):: NN_fs
-    integer:: natm,ia,ixyz,idim
-    real(8):: dn3i,ediff,tf0,fscale,eref,swgt,flocal,tc0,wgtidv
+    integer:: natm,ia,ixyz,idim,i
+    real(8):: dn3i,ediff,fscale,eref,swgt,flocal,wgtidv
+    real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     real(8):: eerr,ferr,ferri
     integer:: ismpl
-    common /samplei/ ismpl
     type(mdsys):: smpl
     logical,save:: l1st = .true.
 
     nfunc=nfunc +1
+
+    tc0= mpi_wtime()
+    call mpi_bcast(x,ndim,mpi_double_precision,0,mpi_world,ierr)
+    tcl= mpi_wtime() -tc0
     tf0= mpi_wtime()
     call vars2wgts(ndim,x)
 
     if( l1st ) then
       call count_nterms()
-      l1st = .false.
+      if( myid.eq.0 ) then
+        write(6,*) ' nterm_trn, nterm_tst = ',nterm_trn, nterm_tst
+      endif
     endif
 
-    smpl= samples(ismpl)
-    if( nl.eq.1 ) then
-      call calc_ef1(smpl,sds(ismpl))
-    else if( nl.eq.2 ) then
-      call calc_ef2(smpl,sds(ismpl))
-    endif
+    do i=1,nsgdbsize
+      ismpl= ismplsgd(i)
+      if( nl.eq.1 ) then
+        call calc_ef1(samples(ismpl),sds(ismpl))
+      else if( nl.eq.2 ) then
+        call calc_ef2(samples(ismpl),sds(ismpl))
+      endif
+    enddo
 
     flocal= 0d0
-    if( smpl%iclass.ne.1 ) goto 888
-    natm= smpl%natm
-    eref= smpl%eref
-    eerr = smpl%eerr
-    ediff= (smpl%epot -eref)/natm /eerr
-    ediff= ediff*ediff
-    flocal= flocal +ediff
-    if( .not. lfmatch ) goto 888
-    ferr = smpl%ferr
-    dn3i = 1d0/3/natm
-    fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
-         -smpl%fref(1:3,1:natm)) /ferr
-    fdiff(1:3,1:natm)= fdiff(1:3,1:natm)*fdiff(1:3,1:natm)
-    do ia=1,natm
-      do ixyz=1,3
-        flocal= flocal +fdiff(ixyz,ia)*dn3i
+    do i=1,nsgdbsize
+      ismpl= ismplsgd(i)
+      smpl= samples(ismpl)
+      if( smpl%iclass.ne.1 ) cycle
+      natm= smpl%natm
+      eref= smpl%eref
+      eerr = smpl%eerr
+      swgt = smpl%wgt
+      ediff= (smpl%epot -eref)/natm /eerr
+      ediff= ediff*ediff
+      flocal= flocal +ediff*swgt
+      if( .not. lfmatch ) cycle
+      ferr = smpl%ferr
+      ferri = 1d0/ferr
+      dn3i = 1d0/3/natm
+      do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
+        do ixyz=1,3
+          fdiff(1:3,ia)= (smpl%fa(1:3,ia) &
+               -smpl%fref(1:3,ia)) *ferri
+          fdiff(1:3,ia)= fdiff(1:3,ia)*fdiff(1:3,ia)
+          flocal= flocal +fdiff(ixyz,ia)*dn3i *swgt
+        enddo
       enddo
     enddo
 
-888 continue
+    tfl = mpi_wtime() -tf0
 
     tc0= mpi_wtime()
     NN_fs= 0d0
-!!$    print *,'here01,myid,flocal=',myid,flocal
     call mpi_allreduce(flocal,NN_fs,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
-!!$    print *,'here02,myid,NN_func=',myid,NN_func
-    tcomm= tcomm +mpi_wtime() -tc0
-    NN_fs= NN_fs /nterm_trn
+    NN_fs= NN_fs /swgt2
+    tcl = tcl + (mpi_wtime() -tc0)
 
-999 tfunc= tfunc +mpi_wtime() -tf0
+!.....only the bottle-neck times are taken into account
+    call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
+         ,mpi_world,ierr)
+    call mpi_reduce(tfl,tfg,1,mpi_double_precision,mpi_max,0 &
+         ,mpi_world,ierr)
+    tcomm= tcomm +tcg
+    tfunc= tfunc +tfg
+    l1st = .false.
     return
   end function NN_fs
 !=======================================================================
@@ -533,8 +553,8 @@ contains
   end subroutine calc_ef2
 !=======================================================================
   function NN_grad(ndim,x)
-    use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm,samples,mdsys&
-         ,epse,epsf
+    use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm &
+         ,samples,mdsys,epse,epsf,swgt2
     use parallel
     use minimize
     implicit none
@@ -563,11 +583,9 @@ contains
       else if( nl.eq.2 ) then
         call grad2(samples(ismpl),sds(ismpl),gs)
       endif
-!!$      NN_grad(1:ndim)= NN_grad(1:ndim) +gs(1:ndim)
       glocal(1:ndim)= glocal(1:ndim) +gs(1:ndim)
     enddo
 
-!    tgrad= tgrad +mpi_wtime() -tg0
     tgl= mpi_wtime() -tg0
 
     tc0= mpi_wtime()
@@ -577,17 +595,7 @@ contains
     tcl= mpi_wtime() -tc0
 !    tcomm= tcomm +mpi_wtime() -tc0
 
-    NN_grad(1:ndim)= NN_grad(1:ndim) /nterm_trn
-
-!!$    if( lgscale ) then
-!!$      gmax= 0d0
-!!$      vmax= 0d0
-!!$      do i=1,ndim
-!!$        vmax= max(vmax,abs(vars(i)))
-!!$        gmax= max(gmax,abs(gval(i)))
-!!$      enddo
-!!$      gval(1:ndim)= gval(1:ndim)/gmax *gscl*vmax
-!!$    endif
+    NN_grad(1:ndim)= NN_grad(1:ndim) /swgt2
 
 !.....only the bottle-neck times are taken into account
     call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
@@ -609,26 +617,30 @@ contains
     real(8),intent(in):: x(ndim)
     real(8):: NN_gs(ndim)
     integer:: i,idim
-    real(8),save,allocatable:: gsl(:)
+    real(8),save,allocatable:: gsl(:),gs(:)
     real(8):: gmax,vmax,tg0,tc0
     integer:: ismpl
-    common /samplei/ ismpl
 
-    if( .not.allocated(gsl) ) allocate(gsl(nvars))
+    if( .not.allocated(gsl) ) allocate(gsl(ndim),gs(ndim))
 
     ngrad= ngrad +1
     tg0= mpi_wtime()
 
-    gsl(1:nvars)= 0d0
-    if( samples(ismpl)%iclass.ne.1 ) goto 888
-    if( nl.eq.1 ) then
-      call grad1(samples(ismpl),sds(ismpl),gsl)
-    else if( nl.eq.2 ) then
-      call grad2(samples(ismpl),sds(ismpl),gsl)
-    endif
+    gsl(1:ndim)= 0d0
 
-888 continue
+    do i=1,nsgdbsize
+      ismpl= ismplsgd(i)
+      if( samples(ismpl)%iclass.ne.1 ) cycle
+      if( nl.eq.1 ) then
+        call grad1(samples(ismpl),sds(ismpl),gs)
+      else if( nl.eq.2 ) then
+        call grad2(samples(ismpl),sds(ismpl),gs)
+      endif
+      gsl(1:ndim)= gsl(1:ndim) +gs(1:ndim)
+    enddo
+
     tc0= mpi_wtime()
+
     NN_gs(1:ndim)= 0d0
     call mpi_allreduce(gsl,NN_gs,ndim,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)

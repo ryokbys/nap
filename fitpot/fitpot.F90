@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-05 16:00:52 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-06 14:06:29 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -596,30 +596,45 @@ subroutine sgd()
   implicit none
   integer,parameter:: niter_time= 1
   real(8),parameter:: alpha0  = 1d0
-  real(8),parameter:: dalpha  = 0.00001d0
+  real(8),parameter:: dalpha  = 0.0001d0
 !!$  real(8),parameter:: dalpha  = 0.d0
-  real(8),allocatable:: gval(:),u(:)
-  integer:: iter,istp,iv
-  real(8):: gnorm,alpha,alpha1,gmax,vmax,fval,gg
+  real(8),allocatable:: g(:),u(:),gp(:)
+  integer:: iter,istp,iv,i,nsize
+  real(8):: gnorm,alpha,alpha1,gmax,vmax,f,gg,fp,gpnorm
   integer:: ismpl
-  common /samplei/ ismpl
   real(8),external:: urnd
 
-  allocate(gval(nvars),u(nvars))
+  allocate(g(nvars),u(nvars),gp(nvars))
+
+  if( myid.eq.0 ) write(6,'(a,i6)') ' sgd_batch_size = ',nsgdbsize
+
+  if( nsgdbsize.gt.maxmynsmpl ) then
+    if(myid.eq.0) then
+      write(6,'(a)') ' Error: nsgdbsize > maxmynsml'
+      write(6,'(a,2i6)') '   nsgdbsize,maxmynsmpl = '&
+         ,nsgdbsize,maxmynsmpl
+      write(6,*) '  sgd_batch_size is too large.'
+      write(6,*) '  You should decrease it much less than maxmynsmpl'
+      write(6,*) '  Or you should use other minimization method.'
+    endif
+    call mpi_finalize(ierr)
+    stop
+  endif
+
+  allocate(ismplsgd(nsgdbsize))
 
   alpha1= alpha0
 
   call NN_init()
   do iter=1,niter
     if(mod(iter,niter_eval).eq.0) then
-      fval= NN_func(nvars,vars)
-      gval= NN_grad(nvars,vars)
-      gnorm= 0d0
-      do iv=1,nvars
-        gnorm= gnorm +gval(iv)*gval(iv)
-      enddo
+      f= NN_func(nvars,vars)
+      g= NN_grad(nvars,vars)
+      call penalty(cpena,pwgt,nvars,f,g,fp,gp,vars)
+      g(1:nvars)= g(1:nvars) +gp(1:nvars)
+      gnorm= sqrt(sprod(nvars,g,g))
       if( myid.eq.0 ) then
-        write(6,'(a,i6,2es15.7,f10.3)') ' iter,f,gnorm,time=',iter,fval &
+        write(6,'(a,i6,2es15.7,f10.3)') ' iter,f,gnorm,time=',iter,f &
              ,gnorm ,mpi_wtime()-time0
         call write_vars('tmp')
       endif
@@ -629,36 +644,58 @@ subroutine sgd()
         write(6,'(a,i6,f10.3)') ' iter,time=',iter,mpi_wtime()-time0
       endif
     endif
-    do istp=1,maxmynsmpl
-      ismpl= isid0 +mynsmpl*urnd()
-      fval= NN_fs(nvars,vars)
-      gval= NN_gs(nvars,vars)
-      u(1:nvars)= -gval(1:nvars)
-!!$      print '(a,3i5,es12.4)',' istp,ismpl,myid,fval=',istp,ismpl,myid,fval
-      alpha= alpha1
-      call armijo_search(nvars,vars,u,fval,gval,alpha,iprint &
-           ,iflag,myid,NN_fs)
-      gnorm= 0d0
-      do iv=1,nvars
-        gnorm= gnorm +gval(iv)*gval(iv)
-      enddo
-!!$      if(myid.eq.0) print '(a,i5,3es12.4)',' istp,fval,gnorm,alpha=',istp,fval,gnorm,alpha
-      vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
+
+    nsize = 0
+    call get_uniq_iarr(mynsmpl,nsgdbsize,ismplsgd)
+    do i=1,nsgdbsize
+      ismplsgd(i)= ismplsgd(i)+isid0-1
     enddo
+    f= NN_fs(nvars,vars)
+    g= NN_gs(nvars,vars)
+    call penalty(cpena,pwgt,nvars,f,g,fp,gp,vars)
+    gnorm= sqrt(sprod(nvars,g,g))
+    gpnorm= sqrt(sprod(nvars,gp,gp))
+    g(1:nvars)= g(1:nvars) +gp(1:nvars)
+!!$    if( myid.eq.0 ) then
+!!$      write(6,'(a,i6,2es15.7,f10.3,es15.7)') ' iter,f,gnorm,time=' &
+!!$           ,iter,f,gnorm ,mpi_wtime()-time0,gpnorm
+!!$    endif
+    u(1:nvars)= -g(1:nvars)
+    alpha= alpha1
+    call armijo_search(nvars,vars,u,f,g,alpha,iprint &
+         ,iflag,myid,NN_fs)
+    vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
+    
+!!$    do istp=1,maxmynsmpl
+!!$      ismpl= isid0 +mynsmpl*urnd()
+!!$      f= NN_fs(nvars,vars)
+!!$      g= NN_gs(nvars,vars)
+!!$      u(1:nvars)= -g(1:nvars)
+!!$!!      print '(a,3i5,es12.4)',' istp,ismpl,myid,f=',istp,ismpl,myid,f
+!!$      alpha= alpha1
+!!$      call armijo_search(nvars,vars,u,f,g,alpha,iprint &
+!!$           ,iflag,myid,NN_fs)
+!!$      gnorm= 0d0
+!!$      do iv=1,nvars
+!!$        gnorm= gnorm +g(iv)*g(iv)
+!!$      enddo
+!!$!!      if(myid.eq.0) print '(a,i5,3es12.4)',' istp,f,gnorm,alpha=',istp,f,gnorm,alpha
+!!$      vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
+!!$    enddo
     alpha1= alpha1*(1d0-dalpha)
   enddo
 
-  fval= NN_func(nvars,vars)
-  gval= NN_grad(nvars,vars)
+  f= NN_func(nvars,vars)
+  g= NN_grad(nvars,vars)
   gnorm= 0d0
   do iv=1,nvars
-    gnorm= gnorm +gval(iv)*gval(iv)
+    gnorm= gnorm +g(iv)*g(iv)
   enddo
 
   call NN_analyze("fin")
   call NN_restore_standard()
 
-
+  deallocate(ismplsgd,g,u,gp)
 end subroutine sgd
 !=======================================================================
 subroutine fs_wrapper()
@@ -1090,6 +1127,7 @@ subroutine sync_input()
   call mpi_bcast(niter_eval,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(nitergfs,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(iprint,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nsgdbsize,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(cfmethod,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cmaindir,128,mpi_character,0,mpi_world,ierr)
@@ -1281,3 +1319,29 @@ subroutine set_sample_weights()
     write(6,'(a)') ' set_sample_weights done'
   endif
 end subroutine set_sample_weights
+!=======================================================================
+subroutine get_uniq_iarr(n,m,iarr)
+!
+! Create an array with length m which includes a unique set of integers
+! randomly chosen from from 1 to n.
+!
+  integer,intent(in):: n,m
+  integer,intent(out):: iarr(m)
+  real(8),external:: urnd
+  integer:: jarr(n)
+  integer:: i,j,k,l
+  
+  do i=1,n
+    jarr(i) = i
+  enddo
+  l=n
+  do i=1,m
+    j = l*urnd()+1
+    iarr(i)= jarr(j)
+    do k=j,l-1
+      jarr(k)= jarr(k+1)
+    enddo
+    l= l-1
+  enddo
+  return
+end subroutine get_uniq_iarr

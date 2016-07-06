@@ -156,6 +156,9 @@ c=======================================================================
       elseif( trim(cname).eq.'random_seed' ) then
         call read_r1(ionum,rseed)
         return
+      elseif( trim(cname).eq.'sgd_batch_size' ) then
+        call read_i1(ionum,nsgdbsize)
+        return
       elseif( trim(cname).eq.'individual_weight' ) then
         backspace(ionum)
         read(ionum,*) ctmp,nwgtindiv

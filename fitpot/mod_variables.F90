@@ -31,6 +31,8 @@ module variables
   real(8):: seqcoef= 1d-2
   integer:: iprint = 1
   real(8),save:: rseed  = 12345d0
+  integer:: nsgdbsize = 1   ! batch size per process for SGD
+  integer,allocatable:: ismplsgd(:)
 !.....training or test
   real(8):: ratio_test= 0.1d0
 

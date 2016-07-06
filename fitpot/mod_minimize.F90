@@ -1006,6 +1006,9 @@ contains
     else
       x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
     endif
+!!$    write(6,*) 'iter,alphai,d,x1:',iter,alphai
+!!$    write(6,'(5es12.3)') d(1:5)
+!!$    write(6,'(5es12.3)') x1(1:5)
     fi= func(ndim,x1)
     pval= 0d0
     if( trim(cpena).eq.'lasso' ) then
@@ -1716,4 +1719,60 @@ contains
     f= func(ndim,xbest)
     
   end subroutine sa
+!=======================================================================
+  subroutine penalty(cpena,pwgt,ndim,f,g,fp,gp,x)
+!
+! Calculate penalty term and its derivative.
+! lasso and ridge are available.
+!
+    implicit none
+    character(len=*),intent(in):: cpena
+    integer,intent(in):: ndim
+    real(8),intent(in):: pwgt,f,g(ndim),x(ndim)
+    real(8),intent(out):: fp,gp(ndim)
+
+    integer:: i,ig
+    real(8):: absx,sgnx
+    real(8),parameter:: xtiny  = 1d-14
+
+    fp= 0d0
+    gp(1:ndim)= 0d0
+    if( trim(cpena).eq.'lasso' ) then
+      do i=1,ndim
+        absx= abs(x(i))
+        fp= fp +pwgt*absx
+        sgnx= sign(1d0,x(i))
+        if( absx.gt.xtiny ) gp(i)= pwgt*sgnx
+      enddo
+    else if( trim(cpena).eq.'glasso' ) then
+      glval(0:ngl)= 0d0
+      do i=1,ndim
+        ig= iglid(i)
+        if(ig.gt.0) glval(ig)= glval(ig) +x(i)*x(i)
+      enddo
+      glval(0)= 1d0
+      do ig=1,ngl
+        glval(ig)= sqrt(glval(ig))
+        fp= fp +pwgt*glval(ig)
+      enddo
+      do i=1,ndim
+        ig= iglid(i)
+        if( ig.eq.0 ) then ! i is not in a group
+          absx= abs(x(i))
+          sgnx= sign(1d0,x(i))
+          if( absx.gt.xtiny ) gp(i)= pwgt*sgnx
+          fp= fp +pwgt*absx
+        else if( ig.gt.0 ) then ! i is in a group
+          if( glval(ig).gt.xtiny) gp(i)= pwgt*x(i)/glval(ig)
+        endif
+      enddo
+    else if( trim(cpena).eq.'ridge' ) then
+      do i=1,ndim
+        fp= fp +pwgt*x(i)*x(i)
+        gp(i)= 2d0*pwgt*x(i)
+      enddo
+    endif
+
+    return
+  end subroutine penalty
 end module
