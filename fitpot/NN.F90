@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-06 17:45:54 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-07 14:20:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -418,7 +418,8 @@ contains
           enddo
         enddo
       enddo
-    else if( fred.ge.0d0 .or. nfpsmpl.lt.natm ) then
+    else if( fred.ge.0d0 .or. &
+         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do ihl1=1,nhl(1)
@@ -526,7 +527,8 @@ contains
           enddo
         enddo
       enddo
-    else if( fred.ge.0d0 .or. nfpsmpl.lt.natm ) then
+    else if( fred.ge.0d0 .or. &
+         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do ihl2=1,nhl(2)
@@ -771,7 +773,8 @@ contains
         dgs(iv)= -tmp
         iv= iv -1
       enddo
-    else if( fred.ge.0d0 .or. nfpsmpl.lt.natm ) then
+    else if( fred.ge.0d0 .or. &
+         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
       do ihl1=nhl(1),1,-1
         tmp= 0d0
         do ia=1,natm
@@ -828,7 +831,8 @@ contains
           enddo
         enddo
       enddo
-    else if( fred.ge.0d0 .or. nfpsmpl.lt.natm ) then
+    else if( fred.ge.0d0 .or. &
+         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do ihl1=1,nhl(1)
@@ -880,7 +884,8 @@ contains
           iv= iv -1
         enddo
       enddo
-    else if( fred.ge.0d0 .or. nfpsmpl.lt.natm ) then
+    else if( fred.ge.0d0 .or. &
+         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
       do ihl0=nhl(0),1,-1
         do ihl1=nhl(1),1,-1
           tmp= 0d0

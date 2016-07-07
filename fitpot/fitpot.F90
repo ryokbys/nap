@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-07 12:05:42 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-07 14:21:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -357,7 +357,7 @@ subroutine read_ref_data()
     enddo
     close(14)
     !...choose nfpsmpl forces by descending order
-    if( samples(ismpl)%natm.lt.nfpsmpl ) then
+    if( samples(ismpl)%natm.lt.nfpsmpl .or. nfpsmpl.le.0 ) then
       samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 1
       nfrc= nfrc +samples(ismpl)%natm
     else
@@ -693,8 +693,8 @@ subroutine sgd()
           v(i)= -sqrt(v2m(i)+tiny)/sqrt(g2m(i)+tiny) *g(i)
         enddo
       endif
-      write(6,'(a,i5,10es11.3)') 'iter,v(:)=',iter,v(1:10)
       vars(1:nvars)= vars(1:nvars) +v(1:nvars)
+!!$      write(6,'(a,i5,10es11.3)') 'iter,v(:)=',iter,v(1:10)
     endif
   enddo
 
