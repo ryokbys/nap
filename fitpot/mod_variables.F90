@@ -1,5 +1,6 @@
 module variables
 
+  save
   integer:: nsmpl
   integer:: niter= 1
   integer:: niter_eval= 1
@@ -17,7 +18,7 @@ module variables
   integer,parameter:: maxnsp= 4
   real(8):: eatom(maxnsp)
   logical:: lfmatch= .true.
-  logical:: lreg   = .false.
+  character(len=128):: cnormalize= 'variance'
   character(len=128):: cpot= 'NN'
   logical:: lgrad  = .true.
   logical:: lgscale= .false.
@@ -30,9 +31,11 @@ module variables
   real(8):: swerg = 1d0
   real(8):: seqcoef= 1d-2
   integer:: iprint = 1
-  real(8),save:: rseed  = 12345d0
+  real(8):: rseed  = 12345d0
+  character(len=128):: csgdupdate= 'adadelta'
   integer:: nsgdbsize = 1   ! batch size per process for SGD
   integer,allocatable:: ismplsgd(:)
+  real(8):: r0sgd = 1.0
 !.....training or test
   real(8):: ratio_test= 0.1d0
 
@@ -42,14 +45,14 @@ module variables
   real(8):: swgt2
 
   integer:: nwgtindiv = 0
-  character(len=128),allocatable,save:: cdirlist(:),cwgtindiv(:)
-  integer,allocatable,save:: nalist(:),iclist(:)
-  real(8),allocatable,save:: wgtindiv(:)
+  character(len=128),allocatable:: cdirlist(:),cwgtindiv(:)
+  integer,allocatable:: nalist(:),iclist(:)
+  real(8),allocatable:: wgtindiv(:)
 
 !.....sample error
   integer:: nserr = 0
-  character(len=128),allocatable,save:: cserr(:)
-  real(8),allocatable,save:: seerr(:),sferr(:)
+  character(len=128),allocatable:: cserr(:)
+  real(8),allocatable:: seerr(:),sferr(:)
   
   type mdsys
     character(len=128):: cdirname
@@ -67,20 +70,20 @@ module variables
   real(8):: erefmin
 
   integer:: nsmpl_trn,nsmpl_tst
-  type(mdsys),save,allocatable:: samples(:)
-  integer,save:: nvars
-  real(8),save,allocatable:: vars(:),vranges(:,:),gvar(:),dvar(:)
-  real(8),save:: rcut,rc3
+  type(mdsys),allocatable:: samples(:)
+  integer:: nvars
+  real(8),allocatable:: vars(:),vranges(:,:),gvar(:),dvar(:)
+  real(8):: rcut,rc3
 
-  real(8),save:: time0,tcomm,tfunc,tgrad
-  integer,save:: nfunc,ngrad
-  integer,save:: iflag
+  real(8):: time0,tcomm,tfunc,tgrad
+  integer:: nfunc,ngrad
+  integer:: iflag
 
-  real(8),allocatable,save:: erefl(:),erefg(:),epotl(:),epotg(:)
-  real(8),allocatable,save:: frefl(:,:,:),frefg(:,:,:),fal(:,:,:)&
+  real(8),allocatable:: erefl(:),erefg(:),epotl(:),epotg(:)
+  real(8),allocatable:: frefl(:,:,:),frefg(:,:,:),fal(:,:,:)&
        ,fag(:,:,:)
-  real(8),allocatable,save:: swgtl(:),swgtg(:)
-  real(8),allocatable,save:: eerrl(:),eerrg(:)
-  real(8),allocatable,save:: ferrl(:),ferrg(:)
+  real(8),allocatable:: swgtl(:),swgtg(:)
+  real(8),allocatable:: eerrl(:),eerrg(:)
+  real(8),allocatable:: ferrl(:),ferrg(:)
 
 end module variables

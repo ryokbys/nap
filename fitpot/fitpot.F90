@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-06 14:06:29 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-07 12:05:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -144,7 +144,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,l3)') 'gradient',lgrad
   write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
   write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
-  write(6,'(2x,a25,2x,l3)') 'regularize',lreg
+  write(6,'(2x,a25,2x,a)') 'normalize_input',trim(cnormalize)
   write(6,'(2x,a25,2x,l3)') 'force_scale',lfscale
   write(6,'(2x,a25,2x,es12.3)') 'fscale_factor',fscl
   write(6,'(2x,a25,2x,es12.3)') 'freduce_threshold',fred
@@ -595,18 +595,26 @@ subroutine sgd()
   use minimize
   implicit none
   integer,parameter:: niter_time= 1
-  real(8),parameter:: alpha0  = 1d0
+  real(8),parameter:: alpha0  = 1d-2
   real(8),parameter:: dalpha  = 0.0001d0
+  real(8),parameter:: gmmin   = 0.5d0
+  real(8),parameter:: gmmax   = 0.95d0
+  real(8),parameter:: dgmm    = 0.01d0
+  real(8),parameter:: tiny  = 1d-8
 !!$  real(8),parameter:: dalpha  = 0.d0
-  real(8),allocatable:: g(:),u(:),gp(:)
+  real(8),allocatable:: g(:),u(:),gp(:),v(:),g2m(:),v2m(:)
   integer:: iter,istp,iv,i,nsize
-  real(8):: gnorm,alpha,alpha1,gmax,vmax,f,gg,fp,gpnorm
+  real(8):: gnorm,alpha,alpha1,gmax,vmax,f,gg,fp,gpnorm,gamma,vnorm
   integer:: ismpl
   real(8),external:: urnd
 
-  allocate(g(nvars),u(nvars),gp(nvars))
+  allocate(g(nvars),u(nvars),gp(nvars),v(nvars)&
+       ,g2m(nvars),v2m(nvars))
 
-  if( myid.eq.0 ) write(6,'(a,i6)') ' sgd_batch_size = ',nsgdbsize
+  if( myid.eq.0 ) then
+    write(6,'(a,a)') ' sgd_update: ',csgdupdate
+    write(6,'(a,i6)') ' sgd_batch_size = ',nsgdbsize
+  endif
 
   if( nsgdbsize.gt.maxmynsmpl ) then
     if(myid.eq.0) then
@@ -623,7 +631,9 @@ subroutine sgd()
 
   allocate(ismplsgd(nsgdbsize))
 
-  alpha1= alpha0
+  alpha1= r0sgd
+  v(1:nvars)= 0d0
+  gamma = gmmin
 
   call NN_init()
   do iter=1,niter
@@ -656,33 +666,36 @@ subroutine sgd()
     gnorm= sqrt(sprod(nvars,g,g))
     gpnorm= sqrt(sprod(nvars,gp,gp))
     g(1:nvars)= g(1:nvars) +gp(1:nvars)
-!!$    if( myid.eq.0 ) then
-!!$      write(6,'(a,i6,2es15.7,f10.3,es15.7)') ' iter,f,gnorm,time=' &
-!!$           ,iter,f,gnorm ,mpi_wtime()-time0,gpnorm
-!!$    endif
     u(1:nvars)= -g(1:nvars)
-    alpha= alpha1
-    call armijo_search(nvars,vars,u,f,g,alpha,iprint &
-         ,iflag,myid,NN_fs)
-    vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
-    
-!!$    do istp=1,maxmynsmpl
-!!$      ismpl= isid0 +mynsmpl*urnd()
-!!$      f= NN_fs(nvars,vars)
-!!$      g= NN_gs(nvars,vars)
-!!$      u(1:nvars)= -g(1:nvars)
-!!$!!      print '(a,3i5,es12.4)',' istp,ismpl,myid,f=',istp,ismpl,myid,f
-!!$      alpha= alpha1
-!!$      call armijo_search(nvars,vars,u,f,g,alpha,iprint &
-!!$           ,iflag,myid,NN_fs)
-!!$      gnorm= 0d0
-!!$      do iv=1,nvars
-!!$        gnorm= gnorm +g(iv)*g(iv)
-!!$      enddo
-!!$!!      if(myid.eq.0) print '(a,i5,3es12.4)',' istp,f,gnorm,alpha=',istp,f,gnorm,alpha
-!!$      vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
-!!$    enddo
-    alpha1= alpha1*(1d0-dalpha)
+    if( csgdupdate.eq.'armijo' ) then
+      alpha= alpha1
+      call armijo_search(nvars,vars,u,f,g,alpha,iprint &
+           ,iflag,myid,NN_fs)
+      vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
+      alpha1= alpha1*(1d0-dalpha)
+    else if( csgdupdate.eq.'momentum' ) then
+      v(1:nvars)= gamma*v(1:nvars) +alpha1*u(1:nvars)
+      vars(1:nvars)= vars(1:nvars) +v(1:nvars)
+      vnorm = sqrt(sprod(nvars,v,v))
+      write(6,'(a,i5,3es12.3)') 'iter,gamma,vnorm=',iter,gamma,vnorm,gnorm
+      gamma= min(gamma+dgmm,gmmax)
+    else ! default: adadelta
+      if(iter.eq.1) then
+        alpha = r0sgd
+        do i=1,nvars
+          g2m(i)= gamma*g2m(i) +(1d0-gamma)*g(i)*g(i)
+          v(i)= -alpha/sqrt(g2m(i)+tiny) *g(i)
+        enddo
+      else
+        do i=1,nvars
+          v2m(i)= gamma*v2m(i) +(1d0-gamma)*v(i)*v(i)
+          g2m(i)= gamma*g2m(i) +(1d0-gamma)*g(i)*g(i)
+          v(i)= -sqrt(v2m(i)+tiny)/sqrt(g2m(i)+tiny) *g(i)
+        enddo
+      endif
+      write(6,'(a,i5,10es11.3)') 'iter,v(:)=',iter,v(1:10)
+      vars(1:nvars)= vars(1:nvars) +v(1:nvars)
+    endif
   enddo
 
   f= NN_func(nvars,vars)
@@ -695,7 +708,7 @@ subroutine sgd()
   call NN_analyze("fin")
   call NN_restore_standard()
 
-  deallocate(ismplsgd,g,u,gp)
+  deallocate(ismplsgd,g,u,gp,v,g2m,v2m)
 end subroutine sgd
 !=======================================================================
 subroutine fs_wrapper()
@@ -1127,7 +1140,6 @@ subroutine sync_input()
   call mpi_bcast(niter_eval,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(nitergfs,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(iprint,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(nsgdbsize,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(cfmethod,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cmaindir,128,mpi_character,0,mpi_world,ierr)
@@ -1137,6 +1149,7 @@ subroutine sync_input()
   call mpi_bcast(cpot,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cpena,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(clinmin,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cnormalize,128,mpi_character,0,mpi_world,ierr)
 
   call mpi_bcast(epse,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(epsf,1,mpi_double_precision,0,mpi_world,ierr)
@@ -1153,7 +1166,6 @@ subroutine sync_input()
   call mpi_bcast(rseed,1,mpi_double_precision,0,mpi_world,ierr)
   
   call mpi_bcast(lfmatch,1,mpi_logical,0,mpi_world,ierr)
-  call mpi_bcast(lreg,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lfscale,1,mpi_logical,0,mpi_world,ierr)
@@ -1163,6 +1175,10 @@ subroutine sync_input()
 
   call mpi_bcast(sa_temp0,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(sa_xw0,1,mpi_double_precision,0,mpi_world,ierr)
+!.....sgd
+  call mpi_bcast(csgdupdate,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(r0sgd,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(nsgdbsize,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(nwgtindiv,1,mpi_integer,0,mpi_world,ierr)
   if( myid.gt.0 ) then

@@ -1,17 +1,19 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-06 14:07:38 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-06 17:45:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
+  save
   character(128),parameter:: cpfname= 'in.params.NN'
   character(128),parameter:: ccfname='in.const.NN'
   character(128),parameter:: cmbfname='in.comb.NN'
   integer,parameter:: maxnl= 2
-  integer,save:: nl,nsp,nsf2,nsf3,ncmb2,ncmb3
-  integer,save:: nhl(0:maxnl+1)
-  integer,save,allocatable:: nwgt(:)
-  real(8),save,allocatable:: wgt11(:,:),wgt12(:)
-  real(8),save,allocatable:: wgt21(:,:),wgt22(:,:),wgt23(:)
+  integer:: nl,nsp,nsf2,nsf3,ncmb2,ncmb3
+  integer:: nhl(0:maxnl+1)
+  integer,allocatable:: nwgt(:)
+  real(8),allocatable:: wgt11(:,:),wgt12(:)
+  real(8),allocatable:: wgt21(:,:),wgt22(:,:),wgt23(:)
+  real(8):: gsfmean,gsfvar
 
   type smpldata
     real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
@@ -19,16 +21,16 @@ module NN
     real(8),allocatable:: gsfo(:,:)
   end type smpldata
 
-  type(smpldata),save,allocatable:: sds(:)
+  type(smpldata),allocatable:: sds(:)
 
-  integer,save:: maxna
-  real(8),save,allocatable:: fdiff(:,:)
-  real(8),save,allocatable:: gmax(:),gmin(:)
+  integer:: maxna
+  real(8),allocatable:: fdiff(:,:)
+  real(8),allocatable:: gmax(:),gmin(:)
 
-  logical,save:: lstandard= .false.
+  logical:: lstandard= .false.
 
-  integer,save:: nterm_trn = 0
-  integer,save:: nterm_tst = 0
+  integer:: nterm_trn = 0
+  integer:: nterm_tst = 0
 
 contains
 !=======================================================================
@@ -116,12 +118,32 @@ contains
 !!$    print *,' myid, max num of atoms [maxna] =',myid,maxna
     allocate(fdiff(3,maxna))
 
-    if( cpena.eq.'glasso' .or. cpena.eq.'lasso' .or. &
-         cfmethod.eq.'gfs' ) then
-!!$    if( cpena.eq.'glasso' .or. cpena.eq.'lasso' ) then
-      call standardize_max()
-!!$    call standardize_var()
-!!$    call standardize_norm()
+    gsfmean= get_mean_input()
+    gsfvar = get_variance_input(gsfmean)
+    if(myid.eq.0) then
+      write(6,'(a,es12.3)') ' mean of input     = ',gsfmean
+      write(6,'(a,es12.3)') ' variance of input = ',gsfvar
+    endif
+
+    if( (cpena.eq.'glasso' .or. cpena.eq.'lasso' .or. &
+         cfmethod.eq.'gfs') .and. &
+      (cnormalize(1:3).ne.'var' .and. cnormalize(1:3).ne.'max') ) then
+      if(myid.eq.0) then
+        print *,'Error: no normalization with glasso, lasso, or gfs'
+        print *,'   might cause no-good optimization.'
+        print *,'   You should use var or max for normalize_input.'
+      endif
+      call mpi_finalize(ierr)
+      stop
+    endif
+    if( cnormalize(1:3).eq.'var' ) then
+      if(myid.eq.0) print *,'normalize w.r.t. variance'
+      call standardize_var()
+    else if( cnormalize(1:3).eq.'max' ) then
+      if(myid.eq.0) print *,'normalize w.r.t. max not implemented'
+      call mpi_finalize(ierr)
+      stop
+      !call standardize_max()
     endif
 
 !.....make groups for group lasso
@@ -1309,9 +1331,78 @@ contains
     if(myid.eq.0) print *, 'get_bases done.'
   end subroutine get_bases
 !=======================================================================
+  function get_mean_input()
+!
+! Compute the mean of input symmetric functions.
+!
+    use variables
+    use parallel
+    implicit none 
+    real(8):: get_mean_input
+    integer:: nsuml,nsumg,ismpl,natm,ihl0,ia
+    real(8):: gmeanl,gmean
+
+    !.....compute mean value
+    gmeanl= 0d0
+    nsuml= 0
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      !.....sum up gsf
+      do ihl0=1,nhl(0)
+        do ia=1,natm
+          gmeanl= gmeanl +sds(ismpl)%gsf(ia,ihl0)
+          nsuml= nsuml +1
+        enddo
+      enddo
+    enddo
+    gmean= 0d0
+    nsumg= 0
+    call mpi_allreduce(gmeanl,gmean,1,mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(nsuml,nsumg,1,mpi_integer &
+         ,mpi_sum,mpi_world,ierr)
+    get_mean_input = gmean/nsumg
+    return
+  end function get_mean_input
+!=======================================================================
+  function get_variance_input(gmean)
+    use variables
+    use parallel
+    implicit none
+    real(8),intent(in):: gmean
+    real(8):: get_variance_input
+    real(8):: varl,varg
+    integer:: nsuml,nsumg
+    integer:: ismpl,natm,ihl0,ia
+
+    varl = 0d0
+    nsuml= 0
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      !.....sum up gsf
+      do ihl0=1,nhl(0)
+        do ia=1,natm
+          varl = varl &
+               +(gmean-sds(ismpl)%gsf(ia,ihl0))&
+               *(gmean-sds(ismpl)%gsf(ia,ihl0))
+          nsuml= nsuml +1
+        enddo
+      enddo
+    enddo
+    varg = 0d0
+    nsumg= 0
+    call mpi_allreduce(varl,varg,1,mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(nsuml,nsumg,1,mpi_integer &
+         ,mpi_sum,mpi_world,ierr)
+    varg = varg/nsumg
+    get_variance_input = varg
+    return
+  end function get_variance_input
+!=======================================================================
   subroutine standardize_max()
 !
-!  Standardize of inputs is requied when you use lasso or ridge.
+!  Standardize of inputs is recommended when you use lasso or ridge.
 !
     use variables, only: nsmpl,samples,nvars,nalist,vars
     use parallel
@@ -1376,7 +1467,6 @@ contains
 
     lstandard= .true.
     deallocate(gmaxl,gminl)
-    if(myid.eq.0) print *,'standardize done.'
   end subroutine standardize_max
 !=======================================================================
   subroutine standardize_norm()
@@ -1443,55 +1533,10 @@ contains
     use parallel
     implicit none
     integer:: ismpl,ia,natm,ihl0,ihl1,iv
-    real(8),allocatable:: gmaxl(:),gminl(:),gmeanl(:),gmean(:)
-    integer,allocatable:: nsum(:),nsuml(:)
+    real(8):: sgm,sgmi
 
-    allocate(gmax(nhl(0)),gmin(nhl(0)) &
-         ,gmaxl(nhl(0)),gminl(nhl(0)) &
-         ,gmean(nhl(0)),gmeanl(nhl(0)),nsum(nhl(0)),nsuml(nhl(0)))
-
-    !.....compute mean value
-    gmeanl(1:nhl(0))= 0d0
-    nsuml(1:nhl(0))= 0
-    do ismpl=isid0,isid1
-      natm= samples(ismpl)%natm
-      !.....sum up gsf
-      do ihl0=1,nhl(0)
-        do ia=1,natm
-          gmeanl(ihl0)= gmeanl(ihl0) +sds(ismpl)%gsf(ia,ihl0)
-          nsuml(ihl0)= nsuml(ihl0) +1
-        enddo
-      enddo
-    enddo
-    gmean(1:nhl(0))= 0d0
-    nsum(1:nhl(0))= 0
-    call mpi_allreduce(gmeanl,gmean,nhl(0),mpi_double_precision &
-         ,mpi_sum,mpi_world,ierr)
-    call mpi_allreduce(nsuml,nsum,nhl(0),mpi_integer &
-         ,mpi_sum,mpi_world,ierr)
-    gmean(1:nhl(0))= gmean(1:nhl(0))/nsum(1:nhl(0))
-
-    !.....compute variance
-    gmaxl(1:nhl(0))= 0d0
-    do ismpl=isid0,isid1
-      natm= samples(ismpl)%natm
-      !.....sum up gsf
-      do ihl0=1,nhl(0)
-        do ia=1,natm
-          gmaxl(ihl0)= gmaxl(ihl0) +(gmean(ihl0)-sds(ismpl)%gsf(ia,ihl0))&
-               *(gmean(ihl0)-sds(ismpl)%gsf(ia,ihl0))
-        enddo
-      enddo
-    enddo
-    gmax(1:nhl(0))= 0d0
-    call mpi_allreduce(gmaxl,gmax,nhl(0),mpi_double_precision &
-         ,mpi_sum,mpi_world,ierr)
-    !.....get standard deviation
-    do ihl0=1,nhl(0)
-      gmax(ihl0)= sqrt(gmax(ihl0)/nsum(ihl0))
-      if( gmax(ihl0).lt.1d-14 ) gmax(ihl0)=1d0
-    enddo
-
+    sgm = sqrt(gsfvar)
+    sgmi= 1d0/sgm
 !.....standardize G values
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
@@ -1499,7 +1544,7 @@ contains
       do ihl0=1,nhl(0)
         do ia=1,natm
           sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
-          sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
+          sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) *sgmi
         enddo
       enddo
     enddo
@@ -1508,13 +1553,11 @@ contains
     do ihl0=1,nhl(0)
       do ihl1=1,nhl(1)
         iv=iv+1
-        vars(iv)= vars(iv)*gmax(ihl0)
+        vars(iv)= vars(iv)*sgm
       enddo
     enddo
 
     lstandard= .true.
-    deallocate(gmaxl,gminl,gmeanl,gmean,nsuml,nsum)
-    if(myid.eq.0) print *,'standardize done.'
   end subroutine standardize_var
 !=======================================================================
   subroutine NN_restore_standard()
@@ -1525,19 +1568,30 @@ contains
     use parallel
     implicit none
     integer:: iv,ihl0,ihl1
+    real(8):: sgm
 
     if( .not. lstandard ) then
       if(myid.eq.0) print *,'NN_restore_standard not needed.'
       return
     endif
 
-    iv= 0
-    do ihl0=1,nhl(0)
-      do ihl1=1,nhl(1)
-        iv=iv+1
-        vars(iv)= vars(iv)/gmax(ihl0)
+    if( cnormalize.eq.'var' ) then
+      sgm = sqrt(gsfvar)
+      iv= 0
+      do ihl0=1,nhl(0)
+        do ihl1=1,nhl(1)
+          iv=iv+1
+          vars(iv)= vars(iv)/sgm
+        enddo
       enddo
-    enddo
+    else if( cnormalize.eq.'max' ) then
+      if(myid.eq.0) then
+        print *,'It is not implemented yet.'
+        print *,'Something wrong if you come here...'
+      endif
+      call mpi_finalize(ierr)
+      stop
+    endif
     if(myid.eq.0) print *,'NN_restore_standard done.'
 
   end subroutine NN_restore_standard

@@ -102,8 +102,8 @@ c=======================================================================
       elseif( trim(cname).eq.'gscale_factor' ) then
         call read_r1(ionum,gscl)
         return
-      elseif( trim(cname).eq.'regularize' ) then
-        call read_l1(ionum,lreg)
+      elseif( trim(cname).eq.'normalize_input' ) then
+        call read_c1(ionum,cnormalize)
         return
       elseif( trim(cname).eq.'force_scale' ) then
         call read_l1(ionum,lfscale)
@@ -156,8 +156,14 @@ c=======================================================================
       elseif( trim(cname).eq.'random_seed' ) then
         call read_r1(ionum,rseed)
         return
+      elseif( trim(cname).eq.'sgd_update' ) then
+        call read_c1(ionum,csgdupdate)
+        return
       elseif( trim(cname).eq.'sgd_batch_size' ) then
         call read_i1(ionum,nsgdbsize)
+        return
+      elseif( trim(cname).eq.'sgd_rate0' ) then
+        call read_r1(ionum,r0sgd)
         return
       elseif( trim(cname).eq.'individual_weight' ) then
         backspace(ionum)
