@@ -31,13 +31,17 @@ module variables
   real(8):: swerg = 1d0
   real(8):: seqcoef= 1d-2
   integer:: iprint = 1
-  real(8):: rseed  = 12345d0
   character(len=128):: csgdupdate= 'adadelta'
   integer:: nsgdbsize = 1   ! batch size per process for SGD
   integer,allocatable:: ismplsgd(:)
   real(8):: r0sgd = 1.0
 !.....training or test
   real(8):: ratio_test= 0.1d0
+!.....initializing parameters
+  character(len=128):: cinitv= 'read'
+  real(8):: vinitsgm = 1d0
+  real(8):: vinitmu  = 0d0
+  real(8):: vinitrs  = 12345d0
 
 !.....max num of species
   integer,parameter:: mspcs = 4

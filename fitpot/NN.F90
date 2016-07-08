@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-07 14:20:01 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-08 12:33:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -1400,7 +1400,7 @@ contains
          ,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(nsuml,nsumg,1,mpi_integer &
          ,mpi_sum,mpi_world,ierr)
-    varg = varg/nsumg
+    varg = varg/(nsumg-1) ! unbiased variance (not sample variance)
     get_variance_input = varg
     return
   end function get_variance_input

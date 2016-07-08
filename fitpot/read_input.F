@@ -37,6 +37,7 @@ c=======================================================================
       subroutine set_variable(ionum,cname)
       use variables
       use minimize
+      use random
       implicit none
       integer,intent(in):: ionum
       character(len=*),intent(in):: cname
@@ -164,6 +165,18 @@ c=======================================================================
         return
       elseif( trim(cname).eq.'sgd_rate0' ) then
         call read_r1(ionum,r0sgd)
+        return
+      elseif( trim(cname).eq.'init_params' ) then
+        call read_c1(ionum,cinitv)
+        return
+      elseif( trim(cname).eq.'init_params_sgm' ) then
+        call read_r1(ionum,vinitsgm)
+        return
+      elseif( trim(cname).eq.'init_params_mu' ) then
+        call read_r1(ionum,vinitmu)
+        return
+      elseif( trim(cname).eq.'init_params_rs' ) then
+        call read_r1(ionum,vinitrs)
         return
       elseif( trim(cname).eq.'individual_weight' ) then
         backspace(ionum)

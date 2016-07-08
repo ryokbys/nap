@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-07 14:21:00 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-08 18:59:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -119,6 +119,7 @@ end program fitpot
 subroutine write_initial_setting()
   use variables
   use minimize
+  use random
   implicit none 
   integer:: i
 
@@ -407,8 +408,10 @@ subroutine read_ref_data()
 
   if(myid.eq.0) then
 !    write(6,'(a,es12.4)') ' erefmin = ',erefmin
-    write(6,'(a,i8)') ' number of forces to be used = ',nfrcg
-    write(6,'(a,i8)') ' total number of forces      = ',nftotg
+    if( lfmatch ) then
+      write(6,'(a,i8)') ' number of forces to be used = ',nfrcg
+      write(6,'(a,i8)') ' total number of forces      = ',nftotg
+    endif
     print *,'read_ref_data done.'
   endif
 
@@ -455,9 +458,10 @@ end subroutine get_base_energies
 subroutine read_vars()
   use variables
   use parallel
+  use random
   implicit none
-
   integer:: i
+  real(8):: rs0
 
   if( myid.eq.0 ) then
     open(15,file=trim(cmaindir)//'/'//cparfile,status='old')
@@ -472,6 +476,19 @@ subroutine read_vars()
       read(15,*) vars(i),vranges(1:2,i)
 !    print *, vars(i),vranges(1:2,i)
     enddo
+    if( cinitv.eq.'gauss' ) then
+      rs0 = get_seed()
+      call set_seed(vinitrs)
+      do i=1,nvars
+        vars(i) = vinitsgm*(polarbm()-vinitmu)
+      enddo
+      call set_seed(rs0)
+      write(6,'(a)') ' params are shuffled to give normal distribution'
+      write(6,'(a,2es10.2)') '   with mu and sgm =',vinitmu,vinitsgm
+    else
+      write(6,'(a)') ' params are read from file '//&
+           trim(cmaindir)//'/'//cparfile
+    endif
   endif
   call mpi_bcast(vars,nvars,mpi_double_precision,0,mpi_world,ierr)
 
@@ -593,10 +610,11 @@ subroutine sgd()
        ,NN_restore_standard
   use parallel
   use minimize
+  use random
   implicit none
   integer,parameter:: niter_time= 1
   real(8),parameter:: alpha0  = 1d-2
-  real(8),parameter:: dalpha  = 0.0001d0
+  real(8),parameter:: dalpha  = 0.001d0
   real(8),parameter:: gmmin   = 0.5d0
   real(8),parameter:: gmmax   = 0.95d0
   real(8),parameter:: dgmm    = 0.01d0
@@ -606,7 +624,6 @@ subroutine sgd()
   integer:: iter,istp,iv,i,nsize
   real(8):: gnorm,alpha,alpha1,gmax,vmax,f,gg,fp,gpnorm,gamma,vnorm
   integer:: ismpl
-  real(8),external:: urnd
 
   allocate(g(nvars),u(nvars),gp(nvars),v(nvars)&
        ,g2m(nvars),v2m(nvars))
@@ -668,7 +685,7 @@ subroutine sgd()
     g(1:nvars)= g(1:nvars) +gp(1:nvars)
     u(1:nvars)= -g(1:nvars)
     if( csgdupdate.eq.'armijo' ) then
-      alpha= alpha1
+      alpha= r0sgd
       call armijo_search(nvars,vars,u,f,g,alpha,iprint &
            ,iflag,myid,NN_fs)
       vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
@@ -1133,6 +1150,7 @@ subroutine sync_input()
   use variables
   use parallel
   use minimize
+  use random
   implicit none
   
   call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)
@@ -1179,6 +1197,10 @@ subroutine sync_input()
   call mpi_bcast(csgdupdate,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(r0sgd,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(nsgdbsize,1,mpi_integer,0,mpi_world,ierr)
+!.....initialize parameters
+  call mpi_bcast(cinitv,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(vinitsgm,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(vinitmu,1,mpi_double_precision,0,mpi_world,ierr)
 
   call mpi_bcast(nwgtindiv,1,mpi_integer,0,mpi_world,ierr)
   if( myid.gt.0 ) then
@@ -1231,34 +1253,14 @@ subroutine get_node2sample()
   return
 end subroutine get_node2sample
 !=======================================================================
-function urnd()
-!
-!  Uniform random number generator
-!      
-  use variables,only: rseed
-  implicit none 
-  real(8):: urnd
-!  real(8),save:: dseed= 12345d0
-  real(8),save:: d2p31m,d2p31
-  data d2p31m/2147483647d0/
-  data d2p31 /2147483648d0/
-  logical,save:: l1st = .true.
-
-!!$  dseed=dmod(16807d0*dseed,d2p31m)
-!!$  urnd=dseed/d2p31
-  rseed=dmod(16807d0*rseed,d2p31m)
-  urnd=rseed/d2p31
-  return
-end function urnd
-!=======================================================================
 subroutine shuffle_dirlist(nsmpl,cdirlist)
 !
 !  Randomize the order of the cdirlist
 !
+  use random
   implicit none
   integer,intent(in):: nsmpl
   character(len=128):: cdirlist(nsmpl)
-  real(8),external:: urnd
   integer:: i,j,k,n
   character(len=128),allocatable:: cdltmp(:)
   
@@ -1341,9 +1343,9 @@ subroutine get_uniq_iarr(n,m,iarr)
 ! Create an array with length m which includes a unique set of integers
 ! randomly chosen from from 1 to n.
 !
+  use random
   integer,intent(in):: n,m
   integer,intent(out):: iarr(m)
-  real(8),external:: urnd
   integer:: jarr(n)
   integer:: i,j,k,l
   

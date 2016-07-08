@@ -1627,6 +1627,7 @@ contains
 !
 ! Simulated Annealing
 !
+    use random
     implicit none
     integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
     integer,intent(inout):: iflag
@@ -1647,7 +1648,6 @@ contains
     integer:: iter,idim,nadpt
     real(8):: f,ft,temp,xw,dx,prob
     real(8),allocatable:: x(:),xt(:)
-    real(8),external:: urnd
     real(8),parameter:: epsx = 1d-8
 
     if( .not.allocated(x) ) allocate(x(ndim),xt(ndim))
