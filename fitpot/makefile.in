@@ -38,4 +38,5 @@ fitpot: ${mods} ${fitpot}
 read_input.o: ${mods}
 fitpot.o: ${mods} NN.o
 NN.o: ${mods}
+mod_minimize.o: mod_random.o
 

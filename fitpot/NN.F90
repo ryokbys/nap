@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-08 12:33:08 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-09 08:52:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -682,7 +682,7 @@ contains
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
     real(8),intent(inout):: gs(nvars)
-    integer:: iv,nv,ihl1,ia,ja,ihl0,jhl0,natm,ixyz
+    integer:: iv,ivp,nv,ihl1,ia,ja,ihl0,jhl0,natm,ixyz
     real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale,eref,swgt,wgtidv
     real(8):: edenom,fdenom
     real(8):: eerr,ferr,ferri
@@ -775,10 +775,12 @@ contains
       enddo
     else if( fred.ge.0d0 .or. &
          (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
-      do ihl1=nhl(1),1,-1
-        tmp= 0d0
-        do ia=1,natm
-          if( smpl%ifcal(ia).eq.0 ) cycle
+      ivp = iv
+      do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
+        iv = ivp
+        do ihl1=nhl(1),1,-1
+          tmp= 0d0
           do ihl0=1,nhl(0)
             w1= wgt11(ihl0,ihl1)
             do ja=1,natm
@@ -791,9 +793,9 @@ contains
                    )
             enddo
           enddo
+          dgs(iv)= dgs(iv) -tmp
+          iv= iv -1
         enddo
-        dgs(iv)= -tmp
-        iv= iv -1
       enddo
     else
       do ihl1=nhl(1),1,-1
@@ -886,12 +888,14 @@ contains
       enddo
     else if( fred.ge.0d0 .or. &
          (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
-      do ihl0=nhl(0),1,-1
-        do ihl1=nhl(1),1,-1
-          tmp= 0d0
-          w2= wgt12(ihl1)
-          do ia=1,natm
-            if( smpl%ifcal(ia).eq.0 ) cycle
+      ivp = iv
+      do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
+        iv = ivp
+        do ihl0=nhl(0),1,-1
+          do ihl1=nhl(1),1,-1
+            tmp= 0d0
+            w2= wgt12(ihl1)
             do ja=1,natm
               h1= sds%hl1(ja,ihl1)
               dh1= h1*(1d0-h1)
@@ -904,9 +908,9 @@ contains
                    +fdiff(3,ia) *ab(3) &
                    )
             enddo
+            dgs(iv)= dgs(iv) -tmp
+            iv= iv -1
           enddo
-          dgs(iv)= -tmp
-          iv= iv -1
         enddo
       enddo
     else
