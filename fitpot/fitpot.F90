@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-09 08:01:43 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-09 20:51:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -316,7 +316,8 @@ subroutine read_ref_data()
   use variables
   use parallel
   implicit none 
-  integer:: ismpl,i,is,jflag,natm,nfrc,nftot,nfrcg,nftotg,imax,ifsmpl
+  integer:: ismpl,i,is,jflag,natm,nfrc,nftot,nfrcg,nftotg
+  integer:: imax,ifsmpl,nfsmplmax
   character(len=128):: cdir
   real(8):: erefminl,ftmp(3),fmax
 
@@ -356,32 +357,32 @@ subroutine read_ref_data()
       samples(ismpl)%fabs(i)= sqrt(ftmp(1)**2 +ftmp(2)**2 +ftmp(3)**2)
     enddo
     close(14)
-    !...choose nfpsmpl forces by descending order
-    if( samples(ismpl)%natm.lt.nfpsmpl .or. nfpsmpl.le.0 ) then
-      samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 1
-      nfrc= nfrc +samples(ismpl)%natm
+!.....neglect atoms with too small forces (smaller than FRED)
+    samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 0
+    if( nfpsmpl.lt.0 ) then
+      nfsmplmax = samples(ismpl)%natm
     else
-      samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 0
-      do ifsmpl=1,nfpsmpl
-        fmax=-1d0
-        imax= 0
-        do i=1,natm
-          if( samples(ismpl)%fabs(i).gt.fmax .and. &
-               samples(ismpl)%ifcal(i).eq.0 ) then
-            fmax= samples(ismpl)%fabs(i)
-            imax= i
-          endif
-        enddo
-        if( imax.eq.0 .or. imax.gt.natm) &
-             stop 'Error: something is wrong, imax==0.or.imax>natm'
-        if( fmax.gt.fred ) then
-          samples(ismpl)%ifcal(imax)= 1
-          nfrc= nfrc +1
-        else
-          exit
+      nfsmplmax = min(samples(ismpl)%natm,nfpsmpl)
+    endif
+    do ifsmpl=1,nfsmplmax
+      fmax=-1d0
+      imax= 0
+      do i=1,natm
+        if( samples(ismpl)%fabs(i).gt.fmax .and. &
+             samples(ismpl)%ifcal(i).eq.0 ) then
+          fmax= samples(ismpl)%fabs(i)
+          imax= i
         endif
       enddo
-    endif
+      if( imax.eq.0 .or. imax.gt.natm) &
+           stop 'Error: something is wrong, imax==0.or.imax>natm'
+      if( fmax.gt.fred ) then
+        samples(ismpl)%ifcal(imax)= 1
+        nfrc= nfrc +1
+      else
+        exit
+      endif
+    enddo
 !    write(6,*) 'ismpl,naps=',ismpl,samples(ismpl)%naps(1:mspcs)
 !!$    do i=1,natm
 !!$      print *,'smpl,ia,ifcal=',trim(samples(ismpl)%cdirname) &
