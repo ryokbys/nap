@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-09 20:51:28 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-09 21:50:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -359,6 +359,7 @@ subroutine read_ref_data()
     close(14)
 !.....neglect atoms with too small forces (smaller than FRED)
     samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 0
+    samples(ismpl)%nfcal= 0
     if( nfpsmpl.lt.0 ) then
       nfsmplmax = samples(ismpl)%natm
     else
@@ -378,6 +379,7 @@ subroutine read_ref_data()
            stop 'Error: something is wrong, imax==0.or.imax>natm'
       if( fmax.gt.fred ) then
         samples(ismpl)%ifcal(imax)= 1
+        samples(ismpl)%nfcal= samples(ismpl)%nfcal + 1
         nfrc= nfrc +1
       else
         exit
@@ -1004,7 +1006,7 @@ subroutine write_stats(iter)
   use NN
   implicit none
   integer,intent(in):: iter
-  integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst
+  integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst,nfcal
   type(mdsys)::smpl
   real(8):: de,df
   real(8):: demaxl_trn,demax_trn,desuml_trn,desum_trn,rmse_trn
@@ -1068,9 +1070,12 @@ subroutine write_stats(iter)
   ntstl= 0
   do ismpl=isid0,isid1
     smpl= samples(ismpl)
+    nfcal= smpl%nfcal
+    if( nfcal.eq.0 ) cycle
     natm= smpl%natm
     if( smpl%iclass.eq.1 ) then
       do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
           df= abs(smpl%fa(l,ia)-smpl%fref(l,ia))
           dfmaxl_trn= max(dfmaxl_trn,df)
@@ -1080,6 +1085,7 @@ subroutine write_stats(iter)
       enddo
     else if( smpl%iclass.eq.2 ) then
       do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
           df= abs(smpl%fa(l,ia)-smpl%fref(l,ia))
           dfmaxl_tst= max(dfmaxl_tst,df)

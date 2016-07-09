@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-09 08:52:07 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-09 21:13:16 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -235,9 +235,10 @@ contains
       ediff= ediff*ediff
       flocal= flocal +ediff *swgt
       if( .not. lfmatch ) cycle
+      if( smpl%nfcal.eq.0 ) cycle
       ferr = smpl%ferr
       ferri = 1d0/ferr
-      dn3i = 1d0/3/natm
+      dn3i = 1d0/3/smpl%nfcal
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do ixyz=1,3
@@ -325,9 +326,10 @@ contains
       ediff= ediff*ediff
       flocal= flocal +ediff*swgt
       if( .not. lfmatch ) cycle
+      if( smpl%nfcal.eq.0 ) cycle
       ferr = smpl%ferr
       ferri = 1d0/ferr
-      dn3i = 1d0/3/natm
+      dn3i = 1d0/3/smpl%nfcal
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do ixyz=1,3
@@ -365,7 +367,7 @@ contains
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
-    integer:: natm,ia,ja,ihl0,ihl1
+    integer:: natm,ia,ja,ihl0,ihl1,nfcal
     real(8):: tmp,w1,w2,h1,dh1,ddh,t,dg(3)
     
     natm= smpl%natm
@@ -399,6 +401,8 @@ contains
 
     !.....forces
     if( .not.lfmatch ) return
+    nfcal= smpl%nfcal
+    if( nfcal.eq.0 ) return
     smpl%fa(1:3,1:natm)= 0d0
     if( allocated(mskgfs) ) then
       do ihl1=1,nhl(1)
@@ -418,8 +422,9 @@ contains
           enddo
         enddo
       enddo
-    else if( fred.ge.0d0 .or. &
-         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
+!!$    else if( fred.ge.0d0 .or. &
+!!$         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
+    else if( nfcal.lt.natm ) then
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do ihl1=1,nhl(1)
@@ -464,7 +469,7 @@ contains
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
-    integer:: natm,ia,ja,ihl0,ihl1,ihl2
+    integer:: natm,ia,ja,ihl0,ihl1,ihl2,nfcal
     real(8):: tmp1,tmp2,w1,w2,w3,h1,h2,dh1,dh2,t
 
     natm= smpl%natm
@@ -504,6 +509,8 @@ contains
     
     !.....force term
     if( .not.lfmatch ) return
+    nfcal= smpl%nfcal
+    if( nfcal.eq.0 ) return
     smpl%fa(1:3,1:natm)= 0d0
     if( allocated(mskgfs) ) then
       do ihl2=1,nhl(2)
@@ -527,8 +534,9 @@ contains
           enddo
         enddo
       enddo
-    else if( fred.ge.0d0 .or. &
-         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
+!!$    else if( fred.ge.0d0 .or. &
+!!$         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
+    else if( nfcal.lt.natm ) then
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do ihl2=1,nhl(2)
@@ -682,7 +690,7 @@ contains
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
     real(8),intent(inout):: gs(nvars)
-    integer:: iv,ivp,nv,ihl1,ia,ja,ihl0,jhl0,natm,ixyz
+    integer:: iv,ivp,nv,ihl1,ia,ja,ihl0,jhl0,natm,ixyz,nfcal
     real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale,eref,swgt,wgtidv
     real(8):: edenom,fdenom
     real(8):: eerr,ferr,ferri
@@ -741,10 +749,12 @@ contains
     endif
 
     if( .not. lfmatch ) return
+    nfcal= smpl%nfcal
+    if( nfcal.eq.0 ) return
     dgs(1:nvars)= 0d0
     ferr = smpl%ferr
     ferri= 1d0/ferr
-    dn3i= 1d0/(3*natm)
+    dn3i= 1d0/(3*nfcal)
     do ia=1,natm
       do ixyz=1,3
         fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
@@ -773,8 +783,9 @@ contains
         dgs(iv)= -tmp
         iv= iv -1
       enddo
-    else if( fred.ge.0d0 .or. &
-         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
+!!$    else if( fred.ge.0d0 .or. &
+!!$         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
+    else if( nfcal.lt.natm ) then
       ivp = iv
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
@@ -949,7 +960,7 @@ contains
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
     real(8),intent(inout):: gs(nvars)
-    integer:: iv,ihl0,ihl1,ihl2,ia,ja,natm
+    integer:: iv,ihl0,ihl1,ihl2,ia,ja,natm,nfcal
     real(8):: ediff,tmp,tmp1,tmp2,h1,h2,w1,w2,w3,dn3i,dh1,dh2,t1,t2,t3&
          ,ddh1,ddh2,dh1gsf,fscale,eref,swgt,wgtidv
     real(8):: eerr,ferr,ferri
@@ -1035,6 +1046,7 @@ contains
     endif
 
     if( .not. lfmatch ) return
+    nfcal= smpl%nfcal
     ferr = smpl%ferr
     ferri= 1d0/ferr
     dgs(1:nvars)= 0d0

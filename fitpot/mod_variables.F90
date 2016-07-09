@@ -60,7 +60,7 @@ module variables
   
   type mdsys
     character(len=128):: cdirname
-    integer:: natm
+    integer:: natm,nfcal
     real(8):: h0,h(3,3),epot,eref,wgt
     real(8):: eerr = 1.0d-3 ! in eV
     real(8):: ferr = 0.1d0  ! in eV/A
