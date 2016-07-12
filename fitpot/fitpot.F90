@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-12 17:19:11 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-12 18:34:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -90,7 +90,9 @@ program fitpot
   endif
   call write_vars('fin')
   call write_energy_relation('fin')
-  call write_force_relation('fin')
+  if( nsmpl.lt.2000 ) then
+    call write_force_relation('fin')
+  endif
   call write_stats(niter)
   if(trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso') &
        call write_eliminated_vars()

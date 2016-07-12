@@ -1231,8 +1231,8 @@ contains
 
 !!$  real(8),external:: sprod
   real(8),parameter:: xi     = 0.5d0
-  real(8),parameter:: tau    = 0.5d0
-  integer,parameter:: MAXITER= 30
+  real(8),parameter:: tau    = 0.25d0
+  integer,parameter:: MAXITER= 15
   real(8),parameter:: xtiny  = 1d-14
   integer:: iter,i,ig
   real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx,fp,pvalp,alphap
