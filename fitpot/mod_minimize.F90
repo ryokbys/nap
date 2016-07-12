@@ -312,9 +312,14 @@ contains
     real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm,ynorm,pval,sgnx,absx
     integer:: i,j,iter,nftol,ig
 
+    if(myid.eq.0) then
+      print *, 'QN(BFGS) routine...'
+    endif
+
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim),x(ndim) &
          ,v(ndim),y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
          ,aa(ndim,ndim),cc(ndim,ndim),gpena(ndim))
+
 
     nftol= 0
 !.....initial G = I
@@ -607,6 +612,284 @@ contains
     x0(1:ndim)= x(1:ndim)
     return
   end subroutine qn
+!=======================================================================
+  subroutine lbfgs(ndim,x0,f,g,u,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
+!
+!  Limited memory BFGS(Broyden-Fletcher-Goldfarb-Shanno).
+!  See, https://en.wikipedia.org/wiki/Limited-memory_BFGS
+!
+    implicit none
+    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
+    integer,intent(inout):: iflag
+    real(8),intent(in):: xtol,gtol,ftol
+    real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
+    character(len=*),intent(in):: cfmethod
+    interface
+      function func(n,x)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8):: func
+      end function func
+      function grad(n,x)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8):: grad(n)
+      end function grad
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
+    end interface
+    real(8),parameter:: xtiny  = 1d-14
+    integer,parameter:: mstore = 10
+    logical:: ltwice = .false.
+!!$    real(8),external:: sprod
+    real(8),save,allocatable:: x(:),s(:,:),y(:,:)&
+         ,gp(:),xp(:),gpena(:),a(:),rho(:)
+    real(8):: tmp1,tmp2,dsy,dsyi,fp,alpha,gnorm,ynorm,pval,sgnx,absx&
+         ,beta
+    integer:: i,j,k,l,m,n,iter,nftol,ig
+
+    if(myid.eq.0) then
+      print *, 'L-BFGS routine...'
+    endif
+
+    if( .not.allocated(x) ) allocate(x(ndim) &
+         ,s(ndim,0:mstore),y(ndim,0:mstore) &
+         ,gp(ndim),gpena(ndim),xp(ndim) &
+         ,a(0:mstore),rho(0:mstore))
+
+    s(1:ndim,0:mstore)= 0d0
+    y(1:ndim,0:mstore)= 0d0
+    rho(0:mstore)= 0d0
+    a(0:mstore)= 0d0
+
+    nftol= 0
+!.....initial G = I
+    f= func(ndim,x0)
+    g= grad(ndim,x0)
+!.....penalty
+    call penalty(cpena,pwgt,ndim,f,g,pval,gpena,x0)
+    g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+
+    gnorm= sqrt(sprod(ndim,g,g))
+    x(1:ndim)= x0(1:ndim)
+
+    iter= 0
+    if( myid.eq.0 ) then
+      if( iprint.eq.1 ) then
+        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
+             .or. trim(cpena).eq.'ridge' ) then
+          write(6,'(a,i8,3es15.7)') ' iter,f,p,gnorm=',iter,f &
+               ,pval,gnorm
+        else
+          write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+        endif
+        call flush(6)
+      else if( iprint.ge.2 ) then
+        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
+             .or. trim(cpena).eq.'ridge' ) then
+          write(6,'(a,i8,12es15.7)') ' iter,f,p,gnorm,x(1:5)=' &
+               ,iter,f,pval,gnorm,x(1:5)
+        else
+          write(6,'(a,i8,12es15.7)') ' iter,f,gnorm,x(1:5)=' &
+               ,iter,f,gnorm,x(1:5)
+        endif
+        call flush(6)
+      endif
+    endif
+
+    call sub_eval(0)
+    u(1:ndim)= -g(1:ndim)
+    do iter=1,maxiter
+!.....store previous func and grad values
+      fp= f
+      gp(1:ndim)= g(1:ndim)
+      xp(1:ndim)= x(1:ndim)
+!.....evaluate statistics at every niter_eval
+      if( mod(iter,niter_eval).eq.0 ) &
+           call sub_eval(iter)
+!.....line minimization
+      if( trim(clinmin).eq.'quadratic' ) then
+        call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
+             ,iprint,iflag,myid,func)
+!.....if quad interpolation failed, perform golden section
+        if( iflag/100.ne.0 ) then
+          iflag= iflag -(iflag/100)*100
+          if(myid.eq.0) then
+            print *,'since quad_interpolate failed, call golden_section.'
+          endif
+          call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+               ,iprint,iflag,myid,func)
+        endif
+      else if ( trim(clinmin).eq.'golden') then
+        call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+             ,iprint,iflag,myid,func)
+      else ! armijo (default)
+        alpha= 1d0
+!!$        write(6,'(a,10es11.3)') 'u before armijo=',u(1:10)
+        call armijo_search(ndim,x,u,f,g,alpha,iprint &
+             ,iflag,myid,func)
+      endif
+!!$      if(myid.eq.0) print *,'alpha=',alpha
+      if( iflag/100.ne.0 ) then
+        if( ltwice ) then
+          x0(1:ndim)= x(1:ndim)
+          if(myid.eq.0) then
+            print *,'>>> armijo_search failed twice continuously...'
+          endif
+          return
+        else
+          ltwice= .true.
+          if(myid.eq.0) then
+            print *,'>>> gg initialized because alpha was not found.'
+          endif
+          u(1:ndim)= -g(1:ndim)
+          f= fp
+          iflag= iflag -100*(iflag/100)
+          cycle
+        endif
+      else
+        ltwice=.false.
+      endif
+      pval= 0d0
+      gpena(1:ndim)= 0d0
+      if( trim(cpena).eq.'lasso' ) then
+        call soft_threshold(ndim,x,u,alpha)
+        do i=1,ndim
+          absx= abs(x(i))
+          pval= pval +pwgt*absx
+          sgnx= sign(1d0,x(i))
+          if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
+        enddo
+      else if( trim(cpena).eq.'glasso' ) then
+        call soft_threshold(ndim,x,u,alpha)
+        glval(0:ngl)= 0d0
+        do i=1,ndim
+          ig= iglid(i)
+          if( ig.gt.0 ) glval(ig)= glval(ig) +x(i)*x(i)
+        enddo
+        glval(0)= 1d0
+        do ig=1,ngl
+          glval(ig)= sqrt(glval(ig))
+          pval= pval +pwgt*glval(ig)
+        enddo
+        do i=1,ndim
+          ig= iglid(i)
+          if( ig.eq.0 ) then ! i is not in a group
+            absx= abs(x(i))
+            sgnx= sign(1d0,x(i))
+            if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
+            pval= pval +pwgt*absx
+          else if( ig.gt.0 ) then ! i is in a group
+            if( glval(ig).gt.xtiny) gpena(i)= pwgt*x(i)/glval(ig)
+          endif
+        enddo
+      else if( trim(cpena).eq.'ridge' ) then
+        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+        do i=1,ndim
+          pval= pval +pwgt*x(i)*x(i)
+          gpena(i)= 2d0*pwgt*x(i)
+        enddo
+      else
+        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+      endif
+      x0(1:ndim)= x(1:ndim)
+      g= grad(ndim,x)
+      g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+      gnorm= sqrt(sprod(ndim,g,g))
+!!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
+!!$      gnorm= gnorm/ndim
+      if( myid.eq.0 ) then
+        if( iprint.eq.1 ) then
+          if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
+               .or.trim(cpena).eq.'ridge' ) then
+            write(6,'(a,i8,4es15.7)') ' iter,f,p,gnorm,f-fp=',iter,f &
+                 ,pval,gnorm,f-fp
+          else
+            write(6,'(a,i8,3es15.7)') ' iter,f,gnorm,f-fp=',iter,f &
+                 ,gnorm,f-fp
+          endif
+          call flush(6)
+        else if( iprint.ge.2 ) then
+          if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
+               .or. trim(cpena).eq.'ridge' ) then
+            write(6,'(a,i8,13es15.7)') ' iter,f,p,gnorm,f-fp,x(1:5)=' &
+                 ,iter,f,pval,gnorm,f-fp,x(1:5)
+          else
+            write(6,'(a,i8,13es15.7)') ' iter,f,gnorm,f-fp,x(1:5)=' &
+                 ,iter,f,gnorm,f-fp,x(1:5)
+          endif
+          call flush(6)
+        endif
+      endif
+!.....check convergence 
+      if( gnorm.lt.gtol ) then
+        if( myid.eq.0 ) then
+          print *,'>>> QN converged wrt gtol'
+          write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+        endif
+        x0(1:ndim)= x(1:ndim)
+        iflag= iflag +2
+        return
+      else if( abs(f-fp)/abs(fp).lt.ftol) then
+        nftol= nftol +1
+        if( nftol.gt.10 ) then
+          if( myid.eq.0 ) then
+            print *,'>>> QN may be converged because of ftol ' // &
+                 'over 10 times.'
+!!$            write(6,'(a,2es15.7)') '   f-fp/fp,ftol=' &
+!!$                 ,abs(f-fp)/abs(fp),ftol
+          endif
+          x0(1:ndim)= x(1:ndim)
+          iflag= iflag +3
+          return
+        endif
+      endif
+      
+!.....limited-memory BFGS procedure
+!.....compute rho,s,y
+      s(1:ndim,0)= x(1:ndim) -xp(1:ndim)
+      y(1:ndim,0)= g(1:ndim) -gp(1:ndim)
+      dsy= sprod(ndim,s(1,0),y(1,0))
+      rho(0)= 1d0/dsy
+      ynorm= sprod(ndim,y(1,0),y(1,0))
+!.....shift the history values
+      do m=mstore-1,0,-1
+        rho(m+1)= rho(m)
+        s(1:ndim,m+1)= s(1:ndim,m)
+        y(1:ndim,m+1)= y(1:ndim,m)
+      enddo
+      if( ynorm.lt.1d-14 ) then
+        if(myid.eq.0) then
+          print *,'>>> gg initialized because y*y < 1d-14'
+        endif
+        u(1:ndim)= u(1:ndim) -g(1:ndim)
+        cycle
+      endif
+
+      if( iter.eq.1 ) then
+        u(1:ndim)= -g(1:ndim)
+        cycle
+      endif
+      u(1:ndim)= -g(1:ndim)
+      do m=1,mstore
+        a(m)= rho(m)*sprod(ndim,s(1,m),u)
+        u(1:ndim)= u(1:ndim) -a(m)*y(1:ndim,m)
+      enddo
+      u(1:ndim)= dsy/ynorm *u(1:ndim)
+      do m=mstore,1,-1
+        beta= rho(m)*sprod(ndim,y(1,m),u)
+        u(1:ndim)= u(1:ndim) +s(1:ndim,m)*(a(m)-beta)
+      enddo
+
+    enddo
+    
+!!$    if( myid.eq.0 ) print *,'maxiter exceeded in qn'
+!!$    iflag= iflag +10
+    x0(1:ndim)= x(1:ndim)
+    return
+  end subroutine lbfgs
 !=======================================================================
   subroutine get_bracket(ndim,x0,d,a,b,c,fa,fb,fc,iprint,iflag,myid,func)
     implicit none
@@ -997,8 +1280,6 @@ contains
   xigd= sprod(ndim,g,d)*xi
 
   f0= f
-!!$  if(myid.eq.0) write(6,'(a,i3,2es12.4)')  &
-!!$       ' armijo: iter,alphai,f0=',0,alphai,f0
   do iter=1,MAXITER
     x1(1:ndim)= x0(1:ndim)
     if( trim(cpena).eq.'lasso' .or.trim(cpena).eq.'glasso') then
@@ -1006,10 +1287,8 @@ contains
     else
       x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
     endif
-!!$    write(6,*) 'iter,alphai,d,x1:',iter,alphai
-!!$    write(6,'(5es12.3)') d(1:5)
-!!$    write(6,'(5es12.3)') x1(1:5)
     fi= func(ndim,x1)
+!!$    print *,'iter,alphai,fi=',iter,alphai,fi
     pval= 0d0
     if( trim(cpena).eq.'lasso' ) then
       do i=1,ndim
@@ -1032,23 +1311,10 @@ contains
         pval= pval +pwgt*x1(i)*x1(i)
       enddo
     endif
-!!$    if(myid.eq.0)write(6,'(a,i5,5es15.7)') &
-!!$         'iter,alphai,fi,pval,fi-f0,xigd*alphai=' &
-!!$         ,iter,alphai,fi,pval,fi-f0,xigd*alphai
-!!$    if(myid.eq.0) then
-!!$      write(6,'(a,i3,6es15.7)')  &
-!!$         ' armijo: iter,alphai,fi,pval,f0,pval0,xigd*alphai =' &
-!!$         ,iter,alphai,fi,pval,f0,pval0,xigd*alphai
-!!$    endif
     if( fi+pval-(f0+pval0).le.xigd*alphai ) then
       f= fi
       alpha= alphai
       return
-!!$    else if( iter.ne.1 .and. (fi+pval-(f0+pval0)).lt.0d0 .and.&
-!!$         (fi+pval)>(fp+pvalp) ) then
-!!$      f= fp
-!!$      alpha= alphap
-!!$      return
     endif
     fp= fi
     pvalp= pval
@@ -1060,11 +1326,11 @@ contains
   iflag= iflag +100
   alpha=alphai
   if( myid.eq.0 ) then
-    print *,'  alpha= ',alpha
-    print *,'  xigd = ',xigd
-    print *,'  norm(g) = ',sqrt(sprod(ndim,g,g))
-    print *,'  norm(d) = ',sqrt(sprod(ndim,d,d))
-    print *,'  pval = ',pval
+    write(6,'(a,es15.7)') '  alpha   = ',alpha
+    write(6,'(a,es15.7)') '  xigd    = ',xigd
+    write(6,'(a,es15.7)') '  norm(g) = ',sqrt(sprod(ndim,g,g))
+    write(6,'(a,es15.7)') '  norm(d) = ',sqrt(sprod(ndim,d,d))
+    write(6,'(a,es15.7)') '  pval    = ',pval
   endif
   return
     

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-09 21:50:00 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-12 17:19:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -59,6 +59,8 @@ program fitpot
       call cg_wrapper()
     case ('bfgs','BFGS','dfp','DFP')
       call qn_wrapper()
+    case ('lbfgs','LBFGS','L-BFGS')
+      call lbfgs_wrapper()
     case ('sa','SA')
       call sa_wrapper()
     case ('fs','FS')
@@ -536,12 +538,31 @@ subroutine qn_wrapper()
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
        ,niter_eval,write_stats)
   call NN_analyze("fin")
-  if( cpena.eq.'lasso' .or. cpena.eq.'glasso' ) then
-    call NN_restore_standard()
-  endif
+  call NN_restore_standard()
 
   return
 end subroutine qn_wrapper
+!=======================================================================
+subroutine lbfgs_wrapper()
+  use variables
+  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use parallel
+  use minimize
+  implicit none
+  integer:: i,m
+  real(8):: fval
+  external:: write_stats
+
+  !.....NN specific code hereafter
+  call NN_init()
+  call lbfgs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
+       ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
+       ,niter_eval,write_stats)
+  call NN_analyze("fin")
+  call NN_restore_standard()
+
+  return
+end subroutine lbfgs_wrapper
 !=======================================================================
 subroutine sd_wrapper()
 !
@@ -898,12 +919,12 @@ subroutine write_energy_relation(cadd)
       erefg(ismpl)= erefg(ismpl)/nalist(ismpl)
       epotg(ismpl)= epotg(ismpl)/nalist(ismpl)
       if( iclist(ismpl).eq.1 ) then
-        write(90,'(2es15.7,2x,a,3es15.7)') erefg(ismpl) &
+        write(90,'(2es15.7,2x,a,3es15.6e3)') erefg(ismpl) &
              ,epotg(ismpl),trim(cdirlist(ismpl)) &
              ,abs(erefg(ismpl)-epotg(ismpl)) &
              ,eerrg(ismpl),swgtg(ismpl)
       else if( iclist(ismpl).eq.2 ) then
-        write(91,'(2es15.7,2x,a,3es15.7)') erefg(ismpl) &
+        write(91,'(2es15.7,2x,a,3es15.6e3)') erefg(ismpl) &
              ,epotg(ismpl),trim(cdirlist(ismpl)) &
              ,abs(erefg(ismpl)-epotg(ismpl)) &
              ,eerrg(ismpl),swgtg(ismpl)
@@ -974,7 +995,7 @@ subroutine write_force_relation(cadd)
         natm= nalist(ismpl)
         do ia=1,natm
           do ixyz=1,3
-            write(92,'(2es15.7,2x,a,i6,i3,2es15.7)') frefg(ixyz,ia,ismpl) &
+            write(92,'(2es15.7,2x,a,i6,i3,2es15.6e3)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
                  ,trim(cdirlist(ismpl)),ia,ixyz &
                  ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
@@ -985,7 +1006,7 @@ subroutine write_force_relation(cadd)
         natm= nalist(ismpl)
         do ia=1,natm
           do ixyz=1,3
-            write(93,'(2es15.7,2x,a,i6,i3,2es15.7)') frefg(ixyz,ia,ismpl) &
+            write(93,'(2es15.7,2x,a,i6,i3,2es15.6e3)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
                  ,trim(cdirlist(ismpl)),ia,ixyz &
                  ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
@@ -1049,7 +1070,7 @@ subroutine write_stats(iter)
     rmse_tst= 0.d0
   endif
   if( myid.eq.0 ) then
-    write(6,'(a,2i6)') ' nsmpl_trn, nsmpl_tst = ',nsmpl_trn,nsmpl_tst
+!!$    write(6,'(a,2i6)') ' nsmpl_trn, nsmpl_tst = ',nsmpl_trn,nsmpl_tst
     write(6,'(a,i8,f15.2,4f12.7)') '  energy:training(rmse,max)' &
          //',test(rmse,max)=',iter,mpi_wtime()-time0 &
          ,rmse_trn,demax_trn,rmse_tst,demax_tst
