@@ -5,7 +5,7 @@ module variables
   integer:: niter= 1
   integer:: niter_eval= 1
   character(len=128):: cfmethod= 'BFGS'
-  character(len=128):: cmaindir= 'learning_set'
+  character(len=128):: cmaindir= 'data_set'
   character(len=128):: cparfile= 'in.params.NN'
   character(len=128):: crunmode= 'serial'
   character(len=128):: cevaltype= 'absolute' ! (absolute|relative)

@@ -736,13 +736,13 @@ contains
         if( ltwice ) then
           x0(1:ndim)= x(1:ndim)
           if(myid.eq.0) then
-            print *,'>>> armijo_search failed twice continuously...'
+            print *,'   armijo_search failed twice continuously...'
           endif
           return
         else
           ltwice= .true.
           if(myid.eq.0) then
-            print *,'>>> gg initialized because alpha was not found.'
+            print *,'   gg initialized because alpha was not found.'
           endif
           u(1:ndim)= -g(1:ndim)
           f= fp
@@ -877,6 +877,9 @@ contains
         a(m)= rho(m)*sprod(ndim,s(1,m),u)
         u(1:ndim)= u(1:ndim) -a(m)*y(1:ndim,m)
       enddo
+      m=min(mstore,iter)
+      dsy= sprod(ndim,y(1,m),s(1,m))
+      ynorm= sprod(ndim,y(1,m),y(1,m))
       u(1:ndim)= dsy/ynorm *u(1:ndim)
       do m=mstore,1,-1
         beta= rho(m)*sprod(ndim,y(1,m),u)
@@ -1239,6 +1242,12 @@ contains
   real(8),allocatable,dimension(:):: x1(:),gpena(:)
 
   if( .not. allocated(x1)) allocate(x1(ndim),gpena(ndim))
+  xigd= sprod(ndim,g,d)*xi
+  if( xigd.gt.0d0 ) then
+    iflag= iflag + 100
+    if( myid.eq.0 ) print *,' WARNING: g*d > 0.0'
+    return
+  endif
   alphai= alpha
   pval0= 0d0
   gpena(1:ndim)= 0d0
@@ -1277,7 +1286,6 @@ contains
       gpena(i)= 2d0*pwgt*x0(i)
     enddo
   endif
-  xigd= sprod(ndim,g,d)*xi
 
   f0= f
   do iter=1,MAXITER
