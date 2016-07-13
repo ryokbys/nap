@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-13 16:45:18 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-13 20:51:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1234,6 +1234,8 @@ subroutine sync_input()
   call mpi_bcast(cinitv,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(vinitsgm,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(vinitmu,1,mpi_double_precision,0,mpi_world,ierr)
+!.....CG
+  call mpi_bcast(icgbtype,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(nwgtindiv,1,mpi_integer,0,mpi_world,ierr)
   if( myid.gt.0 ) then

@@ -178,6 +178,9 @@ c=======================================================================
       elseif( trim(cname).eq.'init_params_rs' ) then
         call read_r1(ionum,vinitrs)
         return
+      elseif( trim(cname).eq.'cg_beta_type' ) then
+        call read_i1(ionum,icgbtype)
+        return
       elseif( trim(cname).eq.'individual_weight' ) then
         backspace(ionum)
         read(ionum,*) ctmp,nwgtindiv

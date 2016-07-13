@@ -15,6 +15,9 @@ module minimize
   real(8):: sa_temp0 = 1d0
   real(8):: sa_xw0   = 1d0
 
+!.....CG
+  integer:: icgbtype = 1 ! 1:FR, 2:PRP, 3:HS, 4:DY
+
 contains
 !=======================================================================
   subroutine steepest_descent(ndim,x,f,g,d,xtol,gtol,ftol,maxiter &
@@ -173,17 +176,19 @@ contains
       end subroutine sub_eval
     end interface
     real(8),parameter:: xtiny  = 1d-14
+    real(8),parameter:: t_DL   = 0.2d0
     logical:: ltwice = .false.
 
     integer:: i,iter,nftol
-    real(8):: alpha,fp,gnorm,gnormp,beta,pval
-    real(8),save,allocatable:: gpena(:)
+    real(8):: alpha,fp,gnorm,gnormp,beta,pval,sgnorm
+    real(8),save,allocatable:: gpena(:),gp(:),y(:),xp(:),s(:)
 
     if( myid.eq.0 ) then
       print *,'entering CG routine...'
     endif
 
-    if( .not.allocated(gpena) ) allocate(gpena(ndim))
+    if( .not.allocated(gpena) ) allocate(gpena(ndim),gp(ndim)&
+         ,y(ndim),xp(ndim),s(ndim))
 
     iter= 0
     nftol= 0
@@ -194,15 +199,16 @@ contains
     call penalty(cpena,pwgt,ndim,f,g,pval,gpena,x)
     g(1:ndim)= g(1:ndim) +gpena(1:ndim)
     gnorm= sprod(ndim,g,g)
+    sgnorm= sqrt(gnorm)
 !!$    g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$    gnorm= gnorm/ndim
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
         write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
-             ,iter,f,sqrt(gnorm)
+             ,iter,f,sgnorm
       else if( iprint.ge.2 ) then
         write(6,'(a,i8,10es15.7)') ' iter,x,f,gnorm=' &
-             ,iter,f,sqrt(gnorm),x(1:5)
+             ,iter,f,sgnorm,x(1:5)
       endif
     endif
     u(1:ndim)= -g(1:ndim)
@@ -210,6 +216,7 @@ contains
     call sub_eval(0)
     do iter=1,maxiter
       fp= f
+      xp(1:ndim)= x(1:ndim)
 !.....evaluate statistics at every niter_eval
       if( mod(iter,niter_eval).eq.0 ) &
            call sub_eval(iter)
@@ -234,6 +241,7 @@ contains
         call armijo_search(ndim,x,u,f,g,alpha,iprint &
              ,iflag,myid,func)
       endif
+
       if( iflag/100.ne.0 ) then
         if( ltwice ) then
           if(myid.eq.0) then
@@ -266,37 +274,50 @@ contains
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       endif
 
+      gnormp= gnorm
+      gp(1:ndim)= g(1:ndim)
       g= grad(ndim,x)
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
 !.....store previous gnorm
-      gnormp= gnorm
       gnorm= sprod(ndim,g,g)
-!.....Fletcher-Reeves
-      beta= gnorm/gnormp
-!!$!.....Polak-Ribiere      
-!!$      beta= 
+      sgnorm= sqrt(gnorm)
+      if( icgbtype.eq.2 ) then
+!.....Polak-Ribiere-Polyak (PRP)
+        y(1:ndim)= g(1:ndim) -gp(1:ndim)
+        beta= sprod(ndim,g,y)/gnormp
+      else if( icgbtype.eq.3 ) then
+!.....Hestenes-Stiefel (HS)
+        y(1:ndim)= g(1:ndim) -gp(1:ndim)
+        beta= sprod(ndim,g,y)/sprod(ndim,u,y)
+      else if( icgbtype.eq.4 ) then
+!.....Dai-Yuan (DY)
+        y(1:ndim)= g(1:ndim) -gp(1:ndim)
+        beta= gnorm/sprod(ndim,u,y)
+      else if( icgbtype.eq.5 ) then
+!.....Dai-Liao (DL)
+        s(1:ndim)= x(1:ndim) -xp(1:ndim)
+        y(1:ndim)= g(1:ndim) -gp(1:ndim)
+        beta= (sprod(ndim,g,y) -t_DL*sprod(ndim,g,s))&
+             /sprod(ndim,u,y)
+      else ! including icgbtype == 1
+!.....Fletcher-Reeves (FR)
+        beta= gnorm/gnormp
+      endif
       u(1:ndim)= -g(1:ndim) +beta*u(1:ndim)
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
           write(6,'(a,i8,10es15.7)') ' iter,f,gnorm,beta=' &
-               ,iter,f,sqrt(gnorm),beta
+               ,iter,f,sgnorm,beta
         else if( iprint.ge.2 ) then
           write(6,'(a,i8,10es15.7)') ' iter,f,gnorm,beta,x=' &
-               ,iter,f,sqrt(gnorm),beta,x(1:5)
+               ,iter,f,sgnorm,beta,x(1:5)
         endif
       endif
 !.....check convergence 
-!!$      if( abs(alpha).lt.xtol ) then
-!!$        if( myid.eq.0 ) then
-!!$          print *,'>>> CG converged wrt xtol'
-!!$          write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
-!!$        endif
-!!$        iflag= iflag +1
-!!$        return
-      if( gnorm.lt.gtol ) then
+      if( sgnorm.lt.gtol ) then
         if( myid.eq.0 ) then
           print *,'>>> CG converged wrt gtol'
-          write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+          write(6,'(a,2es15.7)') '   gnorm,gtol=',sgnorm,gtol
         endif
         iflag= iflag +2
         return
