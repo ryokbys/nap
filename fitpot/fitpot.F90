@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-12 18:34:49 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-13 16:45:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -588,18 +588,22 @@ end subroutine sd_wrapper
 !=======================================================================
 subroutine cg_wrapper()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad
+  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
   integer:: i,m
   real(8):: fval
+  external:: write_stats
 
   !.....NN specific code hereafter
   call NN_init()
   call cg(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
-       ,iprint,iflag,myid,NN_func,NN_grad)
-
+       ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
+       ,write_stats)
+  call NN_analyze("fin")
+  call NN_restore_standard()
+  
   return
 end subroutine cg_wrapper
 !=======================================================================

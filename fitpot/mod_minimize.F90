@@ -143,24 +143,20 @@ contains
       endif
     enddo
     
-    if( myid.eq.0 ) then
-      print *,'maxiter exceeded in steepest_descent'
-      print *,'steepest_descent done.'
-    endif
-    iflag= iflag +10
     return
   end subroutine steepest_descent
 !=======================================================================
   subroutine cg(ndim,x,f,g,u,xtol,gtol,ftol,maxiter,iprint,iflag,myid &
-       ,func,grad)
+       ,func,grad,cfmethod,niter_eval,sub_eval)
 !
 !  Conjugate gradient minimization
 !
     implicit none
-    integer,intent(in):: ndim,maxiter,iprint,myid
+    integer,intent(in):: ndim,maxiter,iprint,myid,niter_eval
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol
     real(8),intent(inout):: f,x(ndim),g(ndim),u(ndim)
+    character(len=*),intent(in):: cfmethod
     interface
       function func(n,x)
         integer,intent(in):: n
@@ -172,30 +168,51 @@ contains
         real(8),intent(in):: x(n)
         real(8):: grad(n)
       end function grad
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
     end interface
+    real(8),parameter:: xtiny  = 1d-14
+    logical:: ltwice = .false.
 
-    integer:: iter
-    real(8):: alpha,fp,gnorm,gnormp,beta
+    integer:: i,iter,nftol
+    real(8):: alpha,fp,gnorm,gnormp,beta,pval
+    real(8),save,allocatable:: gpena(:)
+
+    if( myid.eq.0 ) then
+      print *,'entering CG routine...'
+    endif
+
+    if( .not.allocated(gpena) ) allocate(gpena(ndim))
 
     iter= 0
+    nftol= 0
+    gpena(1:ndim)= 0d0
     f= func(ndim,x)
     g= grad(ndim,x)
-    gnorm= sqrt(sprod(ndim,g,g))
+!.....penalty
+    call penalty(cpena,pwgt,ndim,f,g,pval,gpena,x)
+    g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+    gnorm= sprod(ndim,g,g)
 !!$    g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$    gnorm= gnorm/ndim
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
         write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
-             ,iter,f,gnorm
+             ,iter,f,sqrt(gnorm)
       else if( iprint.ge.2 ) then
         write(6,'(a,i8,10es15.7)') ' iter,x,f,gnorm=' &
-             ,iter,x(1:ndim),f,gnorm
+             ,iter,f,sqrt(gnorm),x(1:5)
       endif
     endif
     u(1:ndim)= -g(1:ndim)
 
+    call sub_eval(0)
     do iter=1,maxiter
       fp= f
+!.....evaluate statistics at every niter_eval
+      if( mod(iter,niter_eval).eq.0 ) &
+           call sub_eval(iter)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
         call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint &
@@ -217,19 +234,43 @@ contains
         call armijo_search(ndim,x,u,f,g,alpha,iprint &
              ,iflag,myid,func)
       endif
-      if( iflag/100.ne.0 ) return
+      if( iflag/100.ne.0 ) then
+        if( ltwice ) then
+          if(myid.eq.0) then
+            print *,'   armijo_search failed twice continuously...'
+          endif
+          return
+        else
+          ltwice= .true.
+          if(myid.eq.0) then
+            print *,'   gg initialized because alpha was not found.'
+          endif
+          u(1:ndim)= -g(1:ndim)
+          f= fp
+          iflag= iflag -100*(iflag/100)
+          cycle
+        endif
+      else
+        ltwice=.false.
+      endif
+
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
         call soft_threshold(ndim,x,u,alpha)
+      else if( trim(cpena).eq.'ridge' ) then
+        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+        do i=1,ndim
+          pval= pval +pwgt*x(i)*x(i)
+          gpena(i)= 2d0*pwgt*x(i)
+        enddo
       else
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       endif
-      f= func(ndim,x)
+
       g= grad(ndim,x)
+      g(1:ndim)= g(1:ndim) +gpena(1:ndim)
 !.....store previous gnorm
       gnormp= gnorm
-      gnorm= sqrt(sprod(ndim,g,g))
-!!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
-!!$      gnorm= gnorm/ndim
+      gnorm= sprod(ndim,g,g)
 !.....Fletcher-Reeves
       beta= gnorm/gnormp
 !!$!.....Polak-Ribiere      
@@ -237,11 +278,11 @@ contains
       u(1:ndim)= -g(1:ndim) +beta*u(1:ndim)
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
-          write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
-               ,iter,f,gnorm
+          write(6,'(a,i8,10es15.7)') ' iter,f,gnorm,beta=' &
+               ,iter,f,sqrt(gnorm),beta
         else if( iprint.ge.2 ) then
-          write(6,'(a,i8,10es15.7)') ' iter,x,f,gnorm=' &
-               ,iter,x(1:ndim),f,gnorm
+          write(6,'(a,i8,10es15.7)') ' iter,f,gnorm,beta,x=' &
+               ,iter,f,sqrt(gnorm),beta,x(1:5)
         endif
       endif
 !.....check convergence 
@@ -259,22 +300,20 @@ contains
         endif
         iflag= iflag +2
         return
-!!$      else if( abs(f-fp)/abs(fp).lt.ftol ) then
-!!$        if( myid.eq.0 ) then
-!!$          print *,'>>> CG converged wrt ftol'
-!!$          write(6,'(a,2es15.7)') '   f-fp,ftol=' &
-!!$               ,abs(f-fp)/abs(fp),ftol
-!!$        endif
-!!$        iflag= iflag +3
-!!$        return
+      else if( abs(f-fp)/abs(fp).lt.ftol ) then
+        nftol= nftol +1
+        if( nftol.gt.10 ) then
+          if( myid.eq.0 ) then
+            print *,'>>> CG converged wrt ftol'
+            write(6,'(a,2es15.7)') '   f-fp,ftol=' &
+                 ,abs(f-fp)/abs(fp),ftol
+          endif
+          iflag= iflag +3
+          return
+        endif
       endif
     enddo
     
-    if( myid.eq.0 ) then
-      print *,'*** maxiter exceeded ***'
-      print *,'steepest_descent done.'
-    endif
-    iflag= iflag +10
     return
   end subroutine cg
 !=======================================================================
@@ -313,7 +352,7 @@ contains
     integer:: i,j,iter,nftol,ig
 
     if(myid.eq.0) then
-      print *, 'QN(BFGS) routine...'
+      print *, 'entering QN(BFGS) routine...'
     endif
 
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim),x(ndim) &
@@ -651,7 +690,7 @@ contains
     integer:: i,j,k,l,m,n,iter,nftol,ig
 
     if(myid.eq.0) then
-      print *, 'L-BFGS routine...'
+      print *, 'entering L-BFGS routine...'
     endif
 
     if( .not.allocated(x) ) allocate(x(ndim) &
@@ -798,8 +837,6 @@ contains
       g= grad(ndim,x)
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
-!!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
-!!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
           if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
@@ -864,7 +901,7 @@ contains
         if(myid.eq.0) then
           print *,'>>> gg initialized because y*y < 1d-14'
         endif
-        u(1:ndim)= u(1:ndim) -g(1:ndim)
+        u(1:ndim)= -g(1:ndim)
         cycle
       endif
 
@@ -1322,6 +1359,7 @@ contains
     if( fi+pval-(f0+pval0).le.xigd*alphai ) then
       f= fi
       alpha= alphai
+      if(myid.eq.0) print *,'armijo finishes with iter=',iter
       return
     endif
     fp= fi
