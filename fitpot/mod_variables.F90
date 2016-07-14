@@ -17,16 +17,14 @@ module variables
   real(8):: ftol= 1d-5
   integer,parameter:: maxnsp= 4
   real(8):: eatom(maxnsp)
-  logical:: lfmatch= .true.
+  logical:: lfmatch= .false.
   character(len=128):: cnormalize= 'variance'
   character(len=128):: cpot= 'NN'
   logical:: lgrad  = .true.
   logical:: lgscale= .false.
   real(8):: gscl   = 0.1d0
-  logical:: lfscale= .false.
-  real(8):: fscl   = 1d0
   real(8):: fred   = -1d0
-  integer:: nfpsmpl= 10
+  integer:: nfpsmpl= -10
   logical:: lswgt  = .false.
   real(8):: swerg = 1d0
   real(8):: seqcoef= 1d-2
