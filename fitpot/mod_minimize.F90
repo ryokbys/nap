@@ -1,14 +1,15 @@
 module minimize
+  save
 !.....penalty: lasso or ridge
   character(len=128):: cpena= 'none'
   character(len=128):: clinmin= 'armijo'
   real(8):: pwgt
 !.....group lasso
   integer:: ngl
-  integer,allocatable,save:: iglid(:)
-  real(8),allocatable,save:: glval(:)
+  integer,allocatable:: iglid(:)
+  real(8),allocatable:: glval(:)
 !.....group fs and mask
-  integer,allocatable,save:: mskgfs(:),msktmp(:)
+  integer,allocatable:: mskgfs(:),msktmp(:)
   integer:: nitergfs=100
 
 !.....Simulated annealing parameters
@@ -17,6 +18,9 @@ module minimize
 
 !.....CG
   integer:: icgbtype = 1 ! 1:FR, 2:PRP, 3:HS, 4:DY
+
+!.....L-BFGS
+  integer:: mstore   = 10
 
 contains
 !=======================================================================
@@ -701,7 +705,6 @@ contains
       end subroutine sub_eval
     end interface
     real(8),parameter:: xtiny  = 1d-14
-    integer,parameter:: mstore = 10
     logical:: ltwice = .false.
 !!$    real(8),external:: sprod
     real(8),save,allocatable:: x(:),s(:,:),y(:,:)&
@@ -714,10 +717,15 @@ contains
       print *, 'entering L-BFGS routine...'
     endif
 
-    if( .not.allocated(x) ) allocate(x(ndim) &
+    if( .not.allocated(x) ) then
+      if(myid.eq.0) then
+        print *,'history length in L-BFGS =',mstore
+      endif
+      allocate(x(ndim) &
          ,s(ndim,0:mstore),y(ndim,0:mstore) &
          ,gp(ndim),gpena(ndim),xp(ndim) &
          ,a(0:mstore),rho(0:mstore))
+    endif
 
     s(1:ndim,0:mstore)= 0d0
     y(1:ndim,0:mstore)= 0d0

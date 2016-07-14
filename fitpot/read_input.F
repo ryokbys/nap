@@ -175,6 +175,9 @@ c=======================================================================
       elseif( trim(cname).eq.'cg_beta_type' ) then
         call read_i1(ionum,icgbtype)
         return
+      elseif( trim(cname).eq.'lbfgs_history' ) then
+        call read_i1(ionum,mstore)
+        return
       elseif( trim(cname).eq.'individual_weight' ) then
         backspace(ionum)
         read(ionum,*) ctmp,nwgtindiv
