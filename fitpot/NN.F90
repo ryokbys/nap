@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-09 21:13:16 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-14 21:55:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -181,7 +181,7 @@ contains
 !=======================================================================
   function NN_func(ndim,x)
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
-         ,lfmatch,lfscale,fscl,nfunc,tcomm,mdsys,erefmin &
+         ,lfmatch,nfunc,tcomm,mdsys,erefmin &
          ,cmaindir,epse,epsf,cevaltype,swgt2
     use parallel
     use minimize
@@ -1053,9 +1053,6 @@ contains
     fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
          -smpl%fref(1:3,1:natm)) *ferri
     dn3i= 1d0/3/natm
-!!$    fscale= 1d0
-!!$    if( lfscale ) fscale= fscl
-!    fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *dn3i*fscale*swgt*wgtidv
     fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *ferri *dn3i *swgt
 
     iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-13 20:51:42 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-14 21:55:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -149,8 +149,6 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
   write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
   write(6,'(2x,a25,2x,a)') 'normalize_input',trim(cnormalize)
-  write(6,'(2x,a25,2x,l3)') 'force_scale',lfscale
-  write(6,'(2x,a25,2x,es12.3)') 'fscale_factor',fscl
   write(6,'(2x,a25,2x,es12.3)') 'freduce_threshold',fred
   write(6,'(2x,a25,2x,l3)') 'sample_weight',lswgt
   write(6,'(2x,a25,2x,es12.3)') 'sample_weight_erg',swerg
@@ -1209,7 +1207,6 @@ subroutine sync_input()
   call mpi_bcast(gtol,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(eatom,maxnsp,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(gscl,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(fscl,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(fred,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(nfpsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(pwgt,1,mpi_double_precision,0,mpi_world,ierr)
@@ -1219,7 +1216,6 @@ subroutine sync_input()
   call mpi_bcast(lfmatch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
-  call mpi_bcast(lfscale,1,mpi_logical,0,mpi_world,ierr)
 
   call mpi_bcast(lswgt,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(swerg,1,mpi_double_precision,0,mpi_world,ierr)

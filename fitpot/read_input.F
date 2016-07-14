@@ -106,12 +106,6 @@ c=======================================================================
       elseif( trim(cname).eq.'normalize_input' ) then
         call read_c1(ionum,cnormalize)
         return
-      elseif( trim(cname).eq.'force_scale' ) then
-        call read_l1(ionum,lfscale)
-        return
-      elseif( trim(cname).eq.'fscale_factor' ) then
-        call read_r1(ionum,fscl)
-        return
       elseif( trim(cname).eq.'freduce_threshold' ) then
         call read_r1(ionum,fred)
         return
