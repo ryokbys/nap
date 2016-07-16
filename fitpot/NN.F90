@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-14 21:55:32 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-16 23:37:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -136,15 +136,7 @@ contains
       call mpi_finalize(ierr)
       stop
     endif
-    if( cnormalize(1:3).eq.'var' ) then
-      if(myid.eq.0) print *,'normalize w.r.t. variance'
-      call standardize_var()
-    else if( cnormalize(1:3).eq.'max' ) then
-      if(myid.eq.0) print *,'normalize w.r.t. max not implemented'
-      call mpi_finalize(ierr)
-      stop
-      !call standardize_max()
-    endif
+    call NN_standardize()
 
 !.....make groups for group lasso
     if( trim(cpena).eq.'glasso' &
@@ -1418,6 +1410,25 @@ contains
     return
   end function get_variance_input
 !=======================================================================
+  subroutine NN_standardize()
+    use variables
+    use parallel
+    implicit none
+
+!.....if the standardize already done, skip
+    if( lstandard ) return
+    
+    if( cnormalize(1:3).eq.'var' ) then
+      if(myid.eq.0) print *,'normalize w.r.t. variance'
+      call standardize_var()
+    else if( cnormalize(1:3).eq.'max' ) then
+      if(myid.eq.0) print *,'normalize w.r.t. max not implemented'
+      call mpi_finalize(ierr)
+      stop
+      !call standardize_max()
+    endif
+  end subroutine NN_standardize
+!=======================================================================
   subroutine standardize_max()
 !
 !  Standardize of inputs is recommended when you use lasso or ridge.
@@ -1552,20 +1563,27 @@ contains
     implicit none
     integer:: ismpl,ia,natm,ihl0,ihl1,iv
     real(8):: sgm,sgmi
+    logical,save:: l1st= .true.
 
-    sgm = sqrt(gsfvar)
-    sgmi= 1d0/sgm
+    if( l1st ) then
+      do ismpl=isid0,isid1
+        natm= samples(ismpl)%natm
+        allocate(sds(ismpl)%gsfo(natm,nhl(0)))
+      enddo
+
+      sgm = sqrt(gsfvar)
+      sgmi= 1d0/sgm
 !.....standardize G values
-    do ismpl=isid0,isid1
-      natm= samples(ismpl)%natm
-      allocate(sds(ismpl)%gsfo(natm,nhl(0)))
-      do ihl0=1,nhl(0)
-        do ia=1,natm
-          sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
-          sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) *sgmi
+      do ismpl=isid0,isid1
+        natm= samples(ismpl)%natm
+        do ihl0=1,nhl(0)
+          do ia=1,natm
+            sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
+            sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) *sgmi
+          enddo
         enddo
       enddo
-    enddo
+    endif
 
     iv=0
     do ihl0=1,nhl(0)
@@ -1575,6 +1593,7 @@ contains
       enddo
     enddo
 
+    l1st= .false.
     lstandard= .true.
   end subroutine standardize_var
 !=======================================================================
@@ -1589,7 +1608,7 @@ contains
     real(8):: sgm
 
     if( .not. lstandard ) then
-      if(myid.eq.0) print *,'NN_restore_standard not needed.'
+!!$      if(myid.eq.0) print *,'NN_restore_standard not needed.'
       return
     endif
 
@@ -1610,8 +1629,9 @@ contains
       call mpi_finalize(ierr)
       stop
     endif
-    if(myid.eq.0) print *,'NN_restore_standard done.'
 
+    !if(myid.eq.0) print *,'NN_restore_standard done.'
+    lstandard = .false.
   end subroutine NN_restore_standard
 !=======================================================================
   subroutine NN_analyze(cadd)

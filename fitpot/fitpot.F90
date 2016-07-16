@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-14 22:16:17 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-07-16 23:08:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -502,10 +502,13 @@ end subroutine read_vars
 subroutine write_vars(cadd)
   use variables
   use parallel
+  use NN, only: NN_standardize, NN_restore_standard
   implicit none
   character(len=*),intent(in):: cadd
   integer:: i
   character(len=128):: cfname
+
+  call NN_restore_standard()
 
 !!$  cfname= trim(cmaindir)//'/'//trim(cparfile)//'.'//trim(cadd)
   cfname= trim(cparfile)//'.'//trim(cadd)
@@ -517,8 +520,10 @@ subroutine write_vars(cadd)
       write(15,'(es23.14e3,2es12.4)') vars(i),vranges(1:2,i)
     enddo
     close(15)
-    print *, 'wrote '//trim(cfname)
+!    print *, 'wrote '//trim(cfname)
   endif
+
+  call NN_standardize()
 
 end subroutine write_vars
 !=======================================================================
@@ -538,7 +543,7 @@ subroutine qn_wrapper()
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
        ,niter_eval,write_stats)
   call NN_analyze("fin")
-  call NN_restore_standard()
+!!$  call NN_restore_standard()
 
   return
 end subroutine qn_wrapper
@@ -559,7 +564,7 @@ subroutine lbfgs_wrapper()
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
        ,niter_eval,write_stats)
   call NN_analyze("fin")
-  call NN_restore_standard()
+!!$  call NN_restore_standard()
 
   return
 end subroutine lbfgs_wrapper
@@ -600,7 +605,7 @@ subroutine cg_wrapper()
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
        ,write_stats)
   call NN_analyze("fin")
-  call NN_restore_standard()
+!!$  call NN_restore_standard()
   
   return
 end subroutine cg_wrapper
@@ -621,9 +626,9 @@ subroutine sa_wrapper()
        ,iprint,iflag,myid,NN_func,cfmethod &
        ,niter_eval,write_stats)
   call NN_analyze("fin")
-  if( cpena.eq.'lasso' .or. cpena.eq.'glasso' ) then
-    call NN_restore_standard()
-  endif
+!!$  if( cpena.eq.'lasso' .or. cpena.eq.'glasso' ) then
+!!$    call NN_restore_standard()
+!!$  endif
 
   return
 end subroutine sa_wrapper
@@ -750,7 +755,7 @@ subroutine sgd()
   enddo
 
   call NN_analyze("fin")
-  call NN_restore_standard()
+!!$  call NN_restore_standard()
 
   deallocate(ismplsgd,g,u,gp,v,g2m,v2m)
 end subroutine sgd
@@ -769,7 +774,7 @@ subroutine fs_wrapper()
   call fs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad)
   call NN_analyze("fin")
-  call NN_restore_standard()
+!!$  call NN_restore_standard()
 
   return
 end subroutine fs_wrapper
@@ -790,7 +795,7 @@ subroutine gfs_wrapper()
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
        ,write_stats,analyze_wrapper)
   call NN_analyze("fin")
-  call NN_restore_standard()
+!!$  call NN_restore_standard()
 
   return
 end subroutine gfs_wrapper
@@ -1082,9 +1087,9 @@ subroutine write_stats(iter)
 !!$      rmse_tst_best= rmse_tst
 !!$      call write_vars('best')
 !!$    endif
-    write(cnum(1:5),'(i5.5)') iter
-    call write_vars(cnum)
   endif
+  write(cnum(1:5),'(i5.5)') iter
+  call write_vars(cnum)
 
 !.....force
   dfmaxl_trn= 0d0

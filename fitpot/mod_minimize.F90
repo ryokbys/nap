@@ -472,9 +472,6 @@ contains
 !.....store previous func and grad values
       fp= f
       gp(1:ndim)= g(1:ndim)
-!.....evaluate statistics at every niter_eval
-      if( mod(iter,niter_eval).eq.0 ) &
-           call sub_eval(iter)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
         call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
@@ -520,6 +517,9 @@ contains
       else
         ltwice=.false.
       endif
+!.....evaluate statistics at every niter_eval
+      if( mod(iter,niter_eval).eq.0 ) &
+           call sub_eval(iter)
       pval= 0d0
       gpena(1:ndim)= 0d0
       if( trim(cpena).eq.'lasso' ) then
@@ -774,9 +774,6 @@ contains
       fp= f
       gp(1:ndim)= g(1:ndim)
       xp(1:ndim)= x(1:ndim)
-!.....evaluate statistics at every niter_eval
-      if( mod(iter,niter_eval).eq.0 ) &
-           call sub_eval(iter)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
         call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
@@ -799,6 +796,7 @@ contains
         call armijo_search(ndim,x,u,f,g,alpha,iprint &
              ,iflag,myid,func)
       endif
+
 !!$      if(myid.eq.0) print *,'alpha=',alpha
       if( iflag/100.ne.0 ) then
         if( ltwice ) then
@@ -820,6 +818,9 @@ contains
       else
         ltwice=.false.
       endif
+!.....evaluate statistics at every niter_eval
+      if( mod(iter,niter_eval).eq.0 ) &
+           call sub_eval(iter)
       pval= 0d0
       gpena(1:ndim)= 0d0
       if( trim(cpena).eq.'lasso' ) then
