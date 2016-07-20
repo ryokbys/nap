@@ -372,7 +372,7 @@ contains
     logical:: ltwice = .false.
 !!$    real(8),external:: sprod
     real(8),save,allocatable:: gg(:,:),x(:),v(:),y(:),gp(:) &
-         ,ggy(:),ygg(:),aa(:,:),cc(:,:),gpena(:)
+         ,ggy(:),ygg(:),aa(:,:),gpena(:)
     real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm,ynorm,pval,sgnx,absx
     integer:: i,j,iter,nftol,ig
 
@@ -382,7 +382,7 @@ contains
 
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim),x(ndim) &
          ,v(ndim),y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
-         ,aa(ndim,ndim),cc(ndim,ndim),gpena(ndim))
+         ,aa(ndim,ndim),gpena(ndim))
 
 
     nftol= 0
@@ -643,32 +643,18 @@ contains
         ggy(i)= tmp1
         ygg(i)= tmp2
       enddo
-      if( trim(cfmethod).eq.'bfgs' .or. trim(cfmethod).eq.'BFGS' ) then
-        cc(1:ndim,1:ndim)= 0d0
-        do j=1,ndim
-          do i=1,ndim
-            cc(i,j)=cc(i,j) +(v(i)*ygg(j) +ggy(i)*v(j)) *svyi
-          enddo
-        enddo
-        b= 1d0
+
+      b= 1d0
+      do i=1,ndim
+        b=b +y(i)*ggy(i) *svyi
+      enddo
+      aa(1:ndim,1:ndim)= aa(1:ndim,1:ndim) *b
+      do j=1,ndim
         do i=1,ndim
-          b=b +y(i)*ggy(i) *svyi
+          aa(i,j)=aa(i,j) -(v(i)*ygg(j) +ggy(i)*v(j)) *svyi
         enddo
-        aa(1:ndim,1:ndim)= aa(1:ndim,1:ndim) *b
-        gg(1:ndim,1:ndim)=gg(1:ndim,1:ndim) +aa(1:ndim,1:ndim) &
-             -cc(1:ndim,1:ndim)
-      else if( trim(cfmethod).eq.'dfp'.or.trim(cfmethod).eq.'DFP') then
-        b= 0d0
-        cc(1:ndim,1:ndim)= 0d0
-        do i=1,ndim
-          b= b+ y(i)*ggy(i)
-          do j=1,ndim
-            cc(j,i)= -ggy(j)*ggy(i)
-          enddo
-        enddo
-        gg(1:ndim,1:ndim)=gg(1:ndim,1:ndim) +aa(1:ndim,1:ndim) &
-             +cc(1:ndim,1:ndim)
-      endif
+      enddo
+      gg(1:ndim,1:ndim)=gg(1:ndim,1:ndim) +aa(1:ndim,1:ndim)
     enddo
     
 !!$    if( myid.eq.0 ) print *,'maxiter exceeded in qn'
