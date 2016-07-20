@@ -371,9 +371,9 @@ contains
     real(8),parameter:: xtiny  = 1d-14
     logical:: ltwice = .false.
 !!$    real(8),external:: sprod
-    real(8),save,allocatable:: gg(:,:),x(:),v(:),y(:),gp(:) &
-         ,ggy(:),ygg(:),aa(:,:),gpena(:)
-    real(8):: tmp1,tmp2,b,svy,svyi,fp,alpha,gnorm,ynorm,pval,sgnx,absx
+    real(8),save,allocatable:: gg(:,:),x(:),s(:),y(:),gp(:) &
+         ,ggy(:),ygg(:),gpena(:)
+    real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,pval,sgnx,absx
     integer:: i,j,iter,nftol,ig
 
     if(myid.eq.0) then
@@ -381,8 +381,8 @@ contains
     endif
 
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim),x(ndim) &
-         ,v(ndim),y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
-         ,aa(ndim,ndim),gpena(ndim))
+         ,s(ndim),y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
+         ,gpena(ndim))
 
 
     nftol= 0
@@ -615,7 +615,7 @@ contains
         endif
       endif
       
-      v(1:ndim)= alpha *u(1:ndim)
+      s(1:ndim)= alpha *u(1:ndim)
       y(1:ndim)= g(1:ndim) -gp(1:ndim)
       ynorm= sprod(ndim,y,y)
       if( ynorm.lt.1d-14 ) then
@@ -629,33 +629,33 @@ contains
         cycle
       endif
 
-!.....update G matrix, gg, according to BFGS
-      svy= sprod(ndim,v,y)
-      svyi= 1d0/svy
+!.....update matrix gg
+      sy= sprod(ndim,s,y)
+      syi= 1d0/sy
       do i=1,ndim
         tmp1= 0d0
         tmp2= 0d0
         do j=1,ndim
-          aa(j,i)= v(j)*v(i) *svyi
           tmp1= tmp1 +gg(i,j)*y(j)
           tmp2= tmp2 +y(j)*gg(j,i)
         enddo
-        ggy(i)= tmp1
-        ygg(i)= tmp2
+        ggy(i)= tmp1 *syi
+        ygg(i)= tmp2 *syi
       enddo
-
       b= 1d0
       do i=1,ndim
-        b=b +y(i)*ggy(i) *svyi
+        b=b +y(i)*ggy(i)
       enddo
-      aa(1:ndim,1:ndim)= aa(1:ndim,1:ndim) *b
+      b= b*syi
+!.....without temporary matrix aa
       do j=1,ndim
         do i=1,ndim
-          aa(i,j)=aa(i,j) -(v(i)*ygg(j) +ggy(i)*v(j)) *svyi
+          gg(i,j)=gg(i,j) +s(j)*s(i)*b &
+               -(s(i)*ygg(j) +ggy(i)*s(j))
         enddo
       enddo
-      gg(1:ndim,1:ndim)=gg(1:ndim,1:ndim) +aa(1:ndim,1:ndim)
     enddo
+
     
 !!$    if( myid.eq.0 ) print *,'maxiter exceeded in qn'
 !!$    iflag= iflag +10
