@@ -370,19 +370,32 @@ contains
     end interface
     real(8),parameter:: xtiny  = 1d-14
     logical:: ltwice = .false.
-!!$    real(8),external:: sprod
     real(8),save,allocatable:: gg(:,:),x(:),s(:),y(:),gp(:) &
-         ,ggy(:),ygg(:),gpena(:)
-    real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,pval,sgnx,absx
-    integer:: i,j,iter,nftol,ig
+         ,ggy(:),gpena(:)
+    real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,pval&
+         ,sgnx,absx,estmem
+    integer:: i,j,iter,nftol,ig,mem
 
     if(myid.eq.0) then
       print *, 'entering QN(BFGS) routine...'
     endif
 
-    if( .not.allocated(gg) ) allocate(gg(ndim,ndim),x(ndim) &
-         ,s(ndim),y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
-         ,gpena(ndim))
+    if( .not.allocated(gg) ) then
+      if(myid.eq.0) then
+        estmem = (ndim*ndim +ndim*6)*8
+        mem= estmem/1000/1000
+        if( mem.eq.0 ) then
+          mem= estmem/1000
+          write(6,'(a,i6,a)') ' memory for BFGS = ' &
+               ,int(estmem/1000),' kB'
+        else
+          write(6,'(a,i6,a)') ' memory for BFGS = ' &
+               ,int(estmem/1000/1000),' MB'
+        endif
+      endif
+      allocate(gg(ndim,ndim),x(ndim) &
+         ,s(ndim),y(ndim),gp(ndim),ggy(ndim),gpena(ndim))
+    endif
 
 
     nftol= 0
@@ -636,11 +649,9 @@ contains
         tmp1= 0d0
         tmp2= 0d0
         do j=1,ndim
-          tmp1= tmp1 +gg(i,j)*y(j)
-          tmp2= tmp2 +y(j)*gg(j,i)
+          tmp1= tmp1 +gg(j,i)*y(j)
         enddo
         ggy(i)= tmp1 *syi
-        ygg(i)= tmp2 *syi
       enddo
       b= 1d0
       do i=1,ndim
@@ -651,7 +662,7 @@ contains
       do j=1,ndim
         do i=1,ndim
           gg(i,j)=gg(i,j) +s(j)*s(i)*b &
-               -(s(i)*ygg(j) +ggy(i)*s(j))
+               -(s(i)*ggy(j) +ggy(i)*s(j))
         enddo
       enddo
     enddo
