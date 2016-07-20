@@ -376,12 +376,10 @@ contains
          ,sgnx,absx,estmem
     integer:: i,j,iter,nftol,ig,mem
 
-    if(myid.eq.0) then
-      print *, 'entering QN(BFGS) routine...'
-    endif
-
     if( .not.allocated(gg) ) then
       if(myid.eq.0) then
+        print *,''
+        print *, '***** QN(BFGS) starts *****'
         estmem = (ndim*ndim +ndim*6)*8
         mem= estmem/1000/1000
         if( mem.eq.0 ) then
@@ -707,16 +705,22 @@ contains
     real(8),save,allocatable:: x(:),s(:,:),y(:,:)&
          ,gp(:),xp(:),gpena(:),a(:),rho(:)
     real(8):: tmp1,tmp2,dsy,dsyi,fp,alpha,gnorm,ynorm,pval,sgnx,absx&
-         ,beta
-    integer:: i,j,k,l,m,n,iter,nftol,ig
-
-    if(myid.eq.0) then
-      print *, 'entering L-BFGS routine...'
-    endif
+         ,beta,estmem
+    integer:: i,j,k,l,m,n,iter,nftol,ig,mem
 
     if( .not.allocated(x) ) then
       if(myid.eq.0) then
+        print *, ''
+        print *, '**** L-BFGS starts ****'
         print *,'history length in L-BFGS =',mstore
+        estmem= (ndim*(mstore+1)*2 +ndim*4 +(mstore+1)*2)*8
+        mem= estmem/1000/1000
+        if( mem.eq.0 ) then
+          mem= estmem/1000
+          print *,'memory for L-BFGS =',mem,'kB'
+        else
+          print *,'memory for L-BFGS =',mem,'MB'
+        endif
       endif
       allocate(x(ndim) &
          ,s(ndim,0:mstore),y(ndim,0:mstore) &
