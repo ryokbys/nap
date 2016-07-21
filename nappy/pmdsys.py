@@ -16,6 +16,8 @@ Options:
               Format of the output file. [default: None]
   --specorder=SPECORDER
               Order of species. [default: Al,Mg,Si]
+  --scale=SCALE
+              Scale the cell. [default: None]
 """
 
 import math
@@ -948,11 +950,15 @@ if __name__ == "__main__":
     infname= args['INFILE']
     outfname= args['OUTFILE']
     specorder= args['--specorder'].split(',')
+    scalefactor= args['--scale']
 
     psys= PMDSystem(fname=infname,ffmt=infmt,specorder=specorder)
 
     if outfmt == 'None':
         outfmt= parse_filename(outfname)
+
+    if scalefactor != "None":
+        psys.alc *= float(scalefactor)
 
     if outfmt == 'pmd':
         psys.write_pmd(outfname)
