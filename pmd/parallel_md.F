@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-06-07 22:52:16 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-07-22 14:35:21 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -2320,6 +2320,25 @@ c
 c.....at 1st call
       if( .not. allocated(ra) ) then
         if( myid_md.eq.0 ) then
+c.....wrap atom position inside [0:1)
+          do i =1,ntot
+            if( rtot(1,i).lt.0d0 ) then
+              rtot(1,i) = rtot(1,i) +1d0
+            else if( rtot(1,i).ge.1d0 ) then
+              rtot(1,i) = rtot(1,i) -1d0
+            endif
+            if( rtot(2,i).lt.0d0 ) then
+              rtot(2,i) = rtot(2,i) +1d0
+            else if( rtot(2,i).ge.1d0 ) then
+              rtot(2,i) = rtot(2,i) -1d0
+            endif
+            if( rtot(3,i).lt.0d0 ) then
+              rtot(3,i) = rtot(3,i) +1d0
+            else if( rtot(3,i).ge.1d0 ) then
+              rtot(3,i) = rtot(3,i) -1d0
+            endif
+          enddo
+
 c.....count max number of atoms in a node
           nmax = 0
           nmin = 1000000000
@@ -2332,22 +2351,6 @@ c.....count max number of atoms in a node
             szogt = dble(myzt)/nz
             n = 0
             do i=1,ntot
-c.....wrap atom position inside [0:1)
-              if( rtot(1,i).lt.0d0 ) then
-                rtot(1,i) = rtot(1,i) +1d0
-              else if( rtot(1,i).ge.1d0 ) then
-                rtot(1,i) = rtot(1,i) -1d0
-              endif
-              if( rtot(2,i).lt.0d0 ) then
-                rtot(2,i) = rtot(2,i) +1d0
-              else if( rtot(2,i).ge.1d0 ) then
-                rtot(2,i) = rtot(2,i) -1d0
-              endif
-              if( rtot(3,i).lt.0d0 ) then
-                rtot(3,i) = rtot(3,i) +1d0
-              else if( rtot(3,i).ge.1d0 ) then
-                rtot(3,i) = rtot(3,i) -1d0
-              endif
               if(  rtot(1,i).ge.sxogt .and.
      &             rtot(1,i).lt.sxogt+1d0/nx .and.
      &             rtot(2,i).ge.syogt .and.
@@ -2365,12 +2368,13 @@ c.....wrap atom position inside [0:1)
           namax = max(int(nmax*1.2),200)
           nbmax = namax*27
           namax = namax +nbmax
-          write(6,'(a,i10)') ' nbmax = nmax*1.2*27       = ',nbmax
-          write(6,'(a,i10)') ' namax = nmax*1.2 + nbmax  = ',namax
-          write(6,'(a,i10,a)') ' estimated memory usage    = '
+          write(6,'(a,i10)')   ' nbmax = nmax*1.2*27       = ',nbmax
+          write(6,'(a,i10)')   ' namax = nmax*1.2 + nbmax  = ',namax
+          write(6,'(a,i10,a)') ' memory for main routine   = '
      &         ,namax*(3*4 +3*3*5 +1 +nnmax/2)*8/1000/1000,' MB'
         endif
         call mpi_bcast(namax,1,mpi_integer,0,mpi_md_world,ierr)
+        call mpi_bcast(nbmax,1,mpi_integer,0,mpi_md_world,ierr)
 c.....allocate memory for local arrays of length namax
         allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax)
      &       ,strs(3,3,namax),stt(3,3,namax),tag(namax)
