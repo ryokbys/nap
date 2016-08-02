@@ -91,6 +91,14 @@ def make_random_poscars(atoms0,rtype='uniform',dis=0.03,
     hi = np.linalg.inv(ho)
     
     inc= offset
+
+    # default constraints
+    cdefault = copy.deepcopy(atoms0.constraints)
+
+    # constraints object of every atoms being able to move
+    from ase.constraints import FixScaled
+    atmlist= [ i for i in range(len(atoms0))]
+    atoms0.set_constraint(FixScaled(ho,atmlist,[0,0,0]))
     
     for i in range(nout):
         atoms = copy.deepcopy(atoms0)
@@ -111,6 +119,8 @@ def make_random_poscars(atoms0,rtype='uniform',dis=0.03,
         inc += 1
         atoms.set_positions(pos)
         atoms.wrap()
+        # reset constraint
+        atoms.set_constraint(cdefault)
         write(fname+'-{0:03d}'.format(inc),
               images=atoms,format="vasp",vasp5=True,
               direct=True,sort=False)
@@ -146,6 +156,14 @@ def make_1disp_poscars(atoms0,rtype='uniform',dis=0.03,
     
     inc= offset
 
+    # default constraints
+    cdefault = copy.deepcopy(atoms0.constraints)
+
+    # constraints object of every atoms being able to move
+    from ase.constraints import FixScaled
+    atmlist= [ i for i in range(len(atoms0))]
+    atoms0.set_constraint(FixScaled(ho,atmlist,[0,0,0]))
+
     dd= np.zeros(3,dtype=float)
     d= dis/nd
     for ixyz in range(3):
@@ -161,6 +179,8 @@ def make_1disp_poscars(atoms0,rtype='uniform',dis=0.03,
             inc += 1
             atoms.set_positions(pos)
             atoms.wrap()
+            # reset constraint
+            atoms.set_constraint(cdefault)
             #poscar.write(fname=fname+'-{0:03d}'.format(inc))
             write(fname+'-{0:03d}'.format(inc),
                   images=atoms,format="vasp",vasp5=True,

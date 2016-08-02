@@ -13,6 +13,8 @@ Options:
              Specify the order of species needed to convert POSCAR to pos. [default: Al,Mg,Si]
   --index=INDEX
              Convert a snapshot of INDEX. [default: -1]
+  --remove-constraints
+             Remove constraints originally set to the system. [default: False]
 """
 
 import os,sys
@@ -58,10 +60,12 @@ if __name__ == "__main__":
     dirs= args['DIR']
     specorder= args['--specorder']
     index= int(args['--index'])
+    remove_const = args['--remove-constraints']
 
     _specorder = specorder.split(',')
     print 'specorder = ',_specorder
     print 'index   = ',index
+    print 'remove_const   = ',remove_const
 
     ndirs= len(dirs)
     print 'number of directories = ',ndirs
@@ -78,13 +82,13 @@ if __name__ == "__main__":
            os.stat('erg.ref').st_mtime > os.stat('vasprun.xml').st_mtime:
             print 'Since there is newer erg.ref, skip it.'
             continue
-        #atoms= read('POSCAR',index=0,format='vasp')
         try:
             atoms= read('vasprun.xml',index=index,format='vasp-xml')
         except:
             print 'Failed to read vasprun.xml, so skip it.'
             continue
-        del atoms.constraints
+        if remove_const:
+            del atoms.constraints
         write('POSCAR',images=atoms,format='vasp',direct=True,vasp5=True)
         with open('erg.ref','w') as f:
             f.write("{0:12.7f}\n".format(atoms.get_potential_energy()))

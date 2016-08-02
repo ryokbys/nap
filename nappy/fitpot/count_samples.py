@@ -15,6 +15,7 @@ import os,sys
 from docopt import docopt
 from glob import glob
 
+
 if __name__ == "__main__":
     
     args = docopt(__doc__)

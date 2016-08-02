@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-07-22 14:35:21 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-07-22 23:03:34 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -305,14 +305,14 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
         write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
 
         if( trim(cpctl).eq.'Berendsen' ) then
-          write(6,'(a,i8,2f10.2,2es11.3)')
+          write(6,'(a,i8,2f10.2,es15.7,2es11.3)')
      &         " istp,time,temp,vol,prss="
-     &         ,istp,tcpu,tave,vol
+     &         ,istp,tcpu,tave,epot,vol
      &         ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))*up2gpa/3
         else
-          write(6,'(a,i8,2f10.2)')
-     &         " istp,time,temp="
-     &         ,istp,tcpu,tave
+          write(6,'(a,i8,2f10.2,es15.7)')
+     &         " istp,time,epot,temp="
+     &         ,istp,tcpu,tave,epot
         endif
         write(6,'(a,6f10.3)')' stress tensor [GPa]: '
      &       ,ptnsr(1,1)*up2gpa,ptnsr(2,2)*up2gpa,ptnsr(2,2)*up2gpa
@@ -621,9 +621,9 @@ c---------output step, time, and temperature
           tcpu= mpi_wtime() -tcpu1
           if(myid_md.eq.0) then
             if( cpctl.eq.'Berendsen' ) then
-              write(6,'(a,i8,2f10.2,2es11.3)')
-     &             " istp,time,temp,vol,prss="
-     &             ,istp,tcpu,tave,vol
+              write(6,'(a,i8,2f10.2,es15.7,2es11.3)')
+     &             " istp,time,temp,epot,vol,prss="
+     &             ,istp,tcpu,tave,epot,vol
      &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
               write(6,'(a,9f12.4)') ' h(1:3,1:3,0)=',h(1:3,1:3,0)
               write(6,'(a)') ' H-matrix:' !,h(1:3,1:3,0)
@@ -634,9 +634,9 @@ c---------output step, time, and temperature
               write(6,'(a)') ' Stress tensor in GPa:'
               write(6,'(3f15.7)') ptnsr(1:3,1:3) *up2gpa
             else
-              write(6,'(a,i8,2f10.2)')
-     &             " istp,time,temp="
-     &             ,istp,tcpu,tave
+              write(6,'(a,i8,2f10.2,es15.7)')
+     &             " istp,time,temp,epot="
+     &             ,istp,tcpu,tave,epot
             endif
           endif
             
