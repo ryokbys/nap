@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """
 Convert Quantum Espresso output to fitpot data.
+Since the input file name of PWscf (QuantumESPRESSO) can be anything,
+users must specify the file name not the directory name which contains it.
 
 Usage:
   qeout2fp.py [options] FILES [FILES...]
@@ -158,7 +160,7 @@ def read_espresso_out(fname,):
         il = il_forces +2
         for ia in range(natm):
             l = lines[il+ia].split()
-            frcs[ia,:] = [ float(x)*Ry_to_eV/Bohr_to_Ang for x in l[6:9] ]
+            frcs[ia,:] = [ float(x) for x in l[6:9] ]
 
     return natm,nspcs,spcs,cell,pos,elems,erg,frcs
 
@@ -187,13 +189,14 @@ def convert(fname,specorder,index):
     psys = PMDSystem(specorder=specorder)
     psys.set_hmat(cell)
     hi = unitvec_to_hi(cell[0,:],cell[1,:],cell[2,:])
+    # converting force here, not when reading the file
     frcs[:,:] *= ryau2evang
     for ia in range(natm):
         ai = Atom()
         pi = pos[ia,:]
         sx,sy,sz = cartessian_to_scaled(hi,pi[0],pi[1],pi[2])
         ai.set_pos(sx,sy,sz)
-        ai.set_frc(frcs[ia,0],frcs[ia,1],frcs[ia,2]) # Ry/au at the moment
+        ai.set_frc(frcs[ia,0],frcs[ia,1],frcs[ia,2])
         ai.set_symbol(elems[ia])
         psys.add_atom(ai)
     psys.assign_pbc()
@@ -212,6 +215,8 @@ if __name__ == "__main__":
 
     print('specorder = ',specorder)
     print('index = ',index)
+    # print('Ry_to_eV = ',Ry_to_eV)
+    # print('Bohr_to_Ang = ',Bohr_to_Ang)
 
     nfiles = len(files)
     print('number of files = ',nfiles)
