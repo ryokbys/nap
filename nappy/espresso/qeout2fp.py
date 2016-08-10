@@ -109,11 +109,16 @@ def read_espresso_out(fname,):
     if infname is None:
         raise IOError('No input file read...')
     try:
-        natm_in,cell_in,elems_in,pos_in = read_espresso_in(infname)
+        natm_in,cell_in,elems_in,pos_in,cell_unit,pos_unit = read_espresso_in(infname)
         if natm_in != natm:
-            ValueError('natm_in != natm; natm_in,natm=',natm_in,natm)
+            raise ValueError('natm_in != natm; natm_in,natm=',natm_in,natm)
     except:
-        IOError('Could not read espresso input file: '+infname)
+        #print('Error: {} !!!'.format(e.message))
+        raise
+
+    if il_cell == -1 and cell_in is None:
+        raise IOError('No cell info in {} and {}.'.format(fname,infname))
+
     if il_spcs == -1:
         raise IOError('No species info in the output file.')
     if nspcs == None:
@@ -162,7 +167,7 @@ def read_espresso_out(fname,):
             l = lines[il+ia].split()
             frcs[ia,:] = [ float(x) for x in l[6:9] ]
 
-    return natm,nspcs,spcs,cell,pos,elems,erg,frcs
+    return natm,nspcs,spcs,cell,pos,elems,erg,frcs,pos_unit
 
 
 def convert(fname,specorder,index):
@@ -179,7 +184,7 @@ def convert(fname,specorder,index):
         
     #atoms= read('POSCAR',index=0,format='vasp')
     try:
-        natm,nspcs,spcs,cell,pos,elems,erg,frcs = read_espresso_out(fname)
+        natm,nspcs,spcs,cell,pos,elems,erg,frcs,pos_unit = read_espresso_out(fname)
     except IOError as e:
         print('IOError({0:s}): {1:s}'.format(e.errno,e.strerror))
         raise
@@ -194,12 +199,18 @@ def convert(fname,specorder,index):
     for ia in range(natm):
         ai = Atom()
         pi = pos[ia,:]
-        sx,sy,sz = cartessian_to_scaled(hi,pi[0],pi[1],pi[2])
+        if pos_unit != "crystal":
+            sx,sy,sz = cartessian_to_scaled(hi,pi[0],pi[1],pi[2])
+        else:
+            sx,sy,sz = pi[:]
         ai.set_pos(sx,sy,sz)
         ai.set_frc(frcs[ia,0],frcs[ia,1],frcs[ia,2])
         ai.set_symbol(elems[ia])
         psys.add_atom(ai)
     psys.assign_pbc()
+    if os.path.exists('POSCAR'):
+        print('  cp original POSCAR to POSCAR.orig')
+        os.system('cp POSCAR POSCAR.orig')
     psys.write_POSCAR()
     psys.write_pmd(fname='pos')
     write_ergref(fname='erg.ref',erg=erg)

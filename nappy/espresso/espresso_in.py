@@ -60,6 +60,7 @@ def read_espresso_in(fname):
             raise IOError('There is no info about number of atoms.')
 
     # read cell parameters
+    cell_unit = lines[il_cell].split()[1]
     il = il_cell
     cell = np.zeros((3,3),dtype=float)
     ixyz = 0
@@ -73,7 +74,8 @@ def read_espresso_in(fname):
         if ixyz > 2:
             break
 
-    # read atoms
+    # read atom species and positions
+    pos_unit = lines[il_pos].split()[1]
     il = il_pos + 1
     elems = []
     pos = np.zeros((natm,3),dtype=float)
@@ -82,7 +84,7 @@ def read_espresso_in(fname):
         elems.append(l[0])
         pos[ia,:] = [ float(x) for x in l[1:4] ]
     
-    return natm,cell,elems,pos
+    return natm,cell,elems,pos,cell_unit,pos_unit
     
 
 if __name__ == '__main__':
