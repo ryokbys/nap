@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-07-22 23:03:34 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-08-18 10:37:01 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -32,6 +32,7 @@ c.....Epot threshold for disl core extraction [Hartree]
 #endif
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl,i_conv
+      integer:: ihour,imin,isec
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epotp
       integer,external:: ispOf,ifmvOf,itotOf
       real(8),external:: box_muller,sprod
@@ -753,9 +754,15 @@ c.....write energy and forces only for fitpot (2nd digit of iprint==1)
         tave= tave/nave
         write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
         write(6,*) ''
-        write(6,'(1x,a,2f10.2)') "time space decomp =",tspdcmp
-        write(6,'(1x,a,2f10.2)') "time comm         =",tcom
-        write(6,'(1x,a,2f10.2)') "time              =",tcpu
+        write(6,'(1x,a,f10.2)') "time space decomp =",tspdcmp
+        write(6,'(1x,a,f10.2)') "time comm         =",tcom
+
+        ihour = int(tcpu/3600)
+        imin  = int((tcpu-ihour*3600)/60)
+        isec  = int(tcpu -ihour*3600 -imin*60)
+        write(6,'(1x,a,f10.2,a,i3,"h",i2.2,"m",i2.2,"s")')
+     &       "time              =",tcpu,
+     &       " sec  = ",ihour,imin,isec
       endif
 
       call mpi_finalize(ierr)
