@@ -1,12 +1,12 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-07-16 23:08:23 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-08-17 10:59:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
   use minimize
   implicit none
-  integer:: ismpl
+  integer:: ismpl,ihour,imin,isec
   real(8):: tmp
 
   call mpi_init(ierr)
@@ -113,7 +113,13 @@ program fitpot
     write(6,'(a,f15.3,a)') ' time func =', tfunc,' sec'
     write(6,'(a,f15.3,a)') ' time grad =', tgrad,' sec'
     write(6,'(a,f15.3,a)') ' time comm =', tcomm,' sec'
-    write(6,'(a,f15.3,a)') ' time      =', mpi_wtime() -time0, ' sec'
+    tmp = mpi_wtime() -time0
+    ihour = int(tmp/3600)
+    imin  = int((tmp-ihour*3600)/60)
+    isec  = int(tmp -ihour*3600 -imin*60)
+    write(6,'(a,f15.3,a,i3,"h",i2.2,"m",i2.2,"s")') &
+         ' time      =', tmp, &
+         ' sec  = ', ihour,imin,isec
   endif
   call mpi_finalize(ierr)
 
