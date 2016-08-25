@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-08-25 13:59:55 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-08-25 14:23:32 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -403,15 +403,16 @@ c.....In case of isobaric MD, lstrs has to be always TRUE.
 c-------first kick of velocities
         va(1:3,1:natm)=va(1:3,1:natm) +aa(1:3,1:natm)
 
+        if( ifdmp.eq.2 ) then
+          call vfire(num_fire,alp_fire)
+        endif
+
 c-------multiply fmv or damping
         do i=1,natm
           l= int(mod(tag(i)*10,10d0))
           va(1:3,i)=va(1:3,i) *fmv(1:3,l)
         enddo
 
-        if( ifdmp.eq.2 ) then
-          call vfire(num_fire,alp_fire)
-        endif
 
 c-------update positions
         ra(1:3,1:natm)=ra(1:3,1:natm) +va(1:3,1:natm)
