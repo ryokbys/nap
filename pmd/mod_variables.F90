@@ -1,6 +1,6 @@
   module variables
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-06-07 22:51:39 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-08-25 14:00:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
     implicit none
     save
@@ -145,5 +145,7 @@
     real(8):: alp0_fire = 0.1
     real(8):: falp_fire = 0.99
     real(8):: dtmax_fire = 10.0
+! factor to be multiplied to dt to get dtmax_fire
+    real(8):: dtmfctr_fire = 1000.0
     
   end module variables

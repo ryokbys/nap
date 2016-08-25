@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-08-18 10:37:01 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-08-25 13:59:55 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -172,7 +172,7 @@ c.....Setup for FIRE
         alp_fire = alp0_fire
         am(1:nismax) = 10.d0
         num_fire = 0
-        dtmax_fire = 100.0 * dt
+        dtmax_fire = dtmfctr_fire * dt
       endif
 
 c-----setup
