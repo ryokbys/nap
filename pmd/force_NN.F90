@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-06-07 11:53:04 Ryo KOBAYASHI>
+!                        Time-stamp: <2016-09-06 16:34:13 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -955,6 +955,7 @@ contains
 !-----send back (3-body)forces, stresses, and potentials on immigrants
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,strs,9)
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)*0.5d0
 !!$    if( myid.ge.0 ) then
 !!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
 !!$           ,nn,mpi_world,strs,9)
