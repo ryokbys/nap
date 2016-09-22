@@ -92,7 +92,7 @@ if __name__ == '__main__':
     infname = args['FILE']
     specorder= args['--specorder'].split(',')
 
-    natm,cell,elems,pos = read_espresso_in(infname)
+    natm,cell,elems,pos,cell_unit,pos_unit = read_espresso_in(infname)
     print('natm = ',natm)
     print('cell:',cell)
     # print('elems:',elems)
