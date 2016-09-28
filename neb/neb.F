@@ -102,10 +102,10 @@ c=======================================================================
      &     ,ib=1,3),l=0,1)
       write(ionum,'(i10)') natm
       do i=1,natm
-        write(ionum,'(7es23.14e3,11es12.4)') tag(i),ra(1:3,i)
+        write(ionum,'(7es23.14e3,8es12.4)') tag(i),ra(1:3,i)
      &       ,va(1:3,i)
      &       ,0d0,0d0           ! eki(i),epi(i)
-     &       ,0d0,0d0,0d0 ,0d0,0d0,0d0 ,0d0,0d0,0d0 ! strs(1:3,1:3,i)
+     &       ,0d0,0d0,0d0 ,0d0,0d0,0d0 ! strs1,2,3,4,5,6
       enddo
       close(ionum)
       
@@ -680,8 +680,9 @@ c=======================================================================
       implicit none
       integer,intent(in):: nslc,natm,istp,iclmb
       real(8),intent(in):: tag(natm,nslc),ra(3,natm,nslc),erg
-     &     ,rat(3,natm,nslc),fa(3,natm,nslc),feps,deps,h(3,3),scnst
+     &     ,rat(3,natm,nslc),feps,deps,h(3,3),scnst
      &     ,va(3,natm,nslc)
+      real(8),intent(inout)::fa(3,natm,nslc) 
 
       logical:: lconverged
 

@@ -26,7 +26,8 @@ class PMD(FileIOCalculator):
     """
 
     implemented_properties = ['energy', 'forces',
-                              'relaxed_scaled_positions']
+                              'relaxed_scaled_positions',
+                              'stress']
     command = 'pmd'
 
     default_parameters = {
@@ -39,7 +40,7 @@ class PMD(FileIOCalculator):
         'min_iteration': 0,
         'num_out_energy': 10,
         'flag_out_pmd': 1,
-        'num_out_pmd': 10,
+        'num_out_pmd':  1,
         'flag_sort':  1,
         'force_type': None,
         'cutoff_radius': 5.0,
@@ -184,12 +185,15 @@ class PMD(FileIOCalculator):
         outfname= 'out.'+self.label
         ergfname= 'erg.'+self.label
         frcfname= 'frc.'+self.label
+        strfname= 'str.'+self.label
         if not os.path.exists(outfname):
             raise RuntimeError(outfname+' does not exists.')
         if not os.path.exists(ergfname):
             raise RuntimeError(ergfname+' does not exists.')
         if not os.path.exists(frcfname):
             raise RuntimeError(frcfname+' does not exists.')
+        if not os.path.exists(strfname):
+            print 'Warning: '+frcfname+' does not exists.'
 
         fout= open(outfname,'r')
         lines= fout.readlines()
@@ -219,6 +223,11 @@ class PMD(FileIOCalculator):
                 data= [ float(x) for x in f.readline().split() ]
                 frcs[i,:] = data[:]
             self.results['forces'] = frcs
+
+        if os.path.exists(strfname):
+            with open(strfname,'r') as f:
+                strs = np.array([ float(x) for x in f.readline().split() ])
+            self.results['stress'] = strs
         
         if relax:
             posfile = max(glob.glob('pmd[0-9]*'), key=os.path.getctime)

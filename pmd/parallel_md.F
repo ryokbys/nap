@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-09-07 11:14:01 Ryo KOBAYASHI>
+c                        Time-stamp: <2016-09-07 11:26:35 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -630,7 +630,6 @@ c---------output step, time, and temperature
      &             " istp,time,temp,epot,vol,prss="
      &             ,istp,tcpu,tave,epot,vol
      &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
-              write(6,'(a,9f12.4)') ' h(1:3,1:3,0)=',h(1:3,1:3,0)
               write(6,'(a)') ' H-matrix:' !,h(1:3,1:3,0)
               write(6,'(3f15.7)') h(1:3,1:3,0)
               

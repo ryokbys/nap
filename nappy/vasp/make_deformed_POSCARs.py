@@ -12,12 +12,12 @@ Usage:
 Options:
   -h, --help  Show this help message and exit.
   --fmax=FMAX 
-              Maximum factor to be multiplied to the cell. [default: 2.0]
+              Maximum factor to be multiplied to the cell vectors. [default: 2.0]
   --fmin=FMIN 
-              Minimum factor to be multiplied to the cell. [default: 0.8]
+              Minimum factor to be multiplied to the cell vectors. [default: 0.8]
   --dmin=DMIN 
               Minimum deviation in case of non-uniform interval. [default: 0.002]
-  -n NDIV     Number of divisions in each strain element. [default: 20]
+  -n NDIV     Number of divisions along one direction in each strain element. [default: 20]
   --offset=OFFSET
               Offset of sequential number in output file. [default: 0]
   --uniform
