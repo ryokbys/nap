@@ -204,6 +204,8 @@ class PMDSystem(object):
             self.read_pmd(fname)
         elif ftype == "akr":
             self.read_akr(fname)
+        elif ftype == "dump":
+            self.read_dump(fname)
         elif ftype == "POSCAR":
             self.read_POSCAR(fname)
 
@@ -400,12 +402,17 @@ class PMDSystem(object):
         natm= int(f.readline().split()[0])
         # 9th-: atom positions
         self.atoms= []
+        symbol = None
         for i in range(natm):
             data= [float(x) for x in f.readline().split()]
             ai= Atom()
             ai.set_sid(data[0])
             ai.set_pos(data[1],data[2],data[3])
             ai.set_vel(data[4],data[5],data[6])
+            if self.specorder:
+                symbol = self.specorder[ai.sid-1]
+            if symbol and ai.symbol != symbol:
+                ai.set_symbol(symbol)
             self.atoms.append(ai)
         f.close()
 
@@ -444,6 +451,7 @@ class PMDSystem(object):
         mode= 'None'
         ixyz= 0
         iatm= 0
+        symbol = None
         self.atoms= []
         for line in f.readlines():
             if 'ITEM: NUMBER OF ATOMS' in line:
@@ -477,6 +485,10 @@ class PMDSystem(object):
                     data= line.split()
                     ai= Atom()
                     ai.set_sid(int(data[1]))
+                    if self.specorder:
+                        symbol = self.specorder[ai.sid-1]
+                    if symbol and ai.symbol != symbol:
+                        ai.set_symbol(symbol)
                     xi= float(data[2])
                     yi= float(data[3])
                     zi= float(data[4])
@@ -616,6 +628,8 @@ class PMDSystem(object):
                     if iatm >= natm:
                         continue
                     symbol = get_symbol_from_number(int(data[0]))
+                    if symbol not in self.specorder:
+                        self.specorder.append(symbol)
                     sid = self.specorder.index(symbol) +1
                     ai= Atom()
                     ai.set_sid(sid)
@@ -840,6 +854,55 @@ class PMDSystem(object):
                         ai.set_vel(ai0.vel[0],ai0.vel[1],ai0.vel[2])
                         ai.set_id(aid)
                         self.atoms.append(ai)
+
+
+    def to_ase_atoms(self):
+        """
+        Convert PMDSystem object to ASE atoms.
+        Note that some information will be abandonned.
+        """
+        try:
+            from ase import Atoms
+        except ImportError:
+            raise ImportError('ASE Atoms cannot be loaded.')
+            
+        cell = [self.a1, self.a2, self.a3]
+        spos = [ a.pos for a in self.atoms ]
+        symbols = [ a.symbol for a in self.atoms ]
+        atoms = Atoms(symbols=symbols,
+                      cell=cell,
+                      scaled_positions=spos,
+                      pbc=True)
+        return atoms
+        
+    def from_ase_atoms(self,atoms):
+        """
+        Convert ASE Atoms object to PMDSystem object.
+        """
+        self.a1 = np.array(atoms.cell[0])
+        self.a2 = np.array(atoms.cell[1])
+        self.a3 = np.array(atoms.cell[2])
+        spos = atoms.get_scaled_positions()
+        symbols = atoms.get_chemical_symbols()
+        #...initialize and remake self.specorder
+        self.specorder = []
+        for s in symbols:
+            if s not in self.specorder:
+                self.specorder.append(s)
+        #...first, initialize atoms array
+        self.atoms = []
+        #...append each atom from ASE-Atoms
+        for ia,spi in enumerate(spos):
+            si = symbols[ia]
+            ai = Atom()
+            sid = self.specorder.index(si)+1
+            ai.set_id(ia+1)
+            ai.set_sid(sid)
+            ai.set_symbol(si)
+            ai.set_pos(spi[0],spi[1],spi[2])
+            ai.set_vel(0.,0.,0.)
+            self.atoms.append(ai)
+        return
 
 
 def parse_filename(filename):
