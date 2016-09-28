@@ -1,4 +1,4 @@
-#!/bin/local/env python
+#!/usr/bin/env python
 """
 System information used in pmd, including cell information, lattice constant,
 number of atoms, atom species, atom positions.
@@ -131,7 +131,12 @@ class PMDSystem(object):
         if self.specorder and atom.symbol:
             atom.set_sid(self.specorder.index(atom.symbol)+1)
         self.atoms.append(atom)
-            
+
+    def remove_atom(self,ia):
+        """
+        Remove an atom of ID ia from the atoms list.
+        """
+        self.atoms.pop(ia)
 
     def reset_ids(self):
         for i in range(len(self.atoms)):
@@ -269,7 +274,7 @@ class PMDSystem(object):
                                                             ai.pos[0],\
                                                             ai.pos[1],\
                                                             ai.pos[2])
-                    +"  {0:9.5f}  {1:9.5f}  {2:9.5f}".format(ai.vel[0], 
+                    +"  {0:8.4f}  {1:8.4f}  {2:8.4f}".format(ai.vel[0], 
                                                              ai.vel[1],
                                                              ai.vel[2])
                     +"  {0:4.1f}  {1:4.1f}".format(0.0, 0.0)
@@ -492,10 +497,10 @@ class PMDSystem(object):
         self.a1[0]= xlen
         self.a2[1]= ylen
         self.a3[2]= zlen
-        print self.alc
-        print self.a1[:]
-        print self.a2[:]
-        print self.a3[:]
+        # print self.alc
+        # print self.a1[:]
+        # print self.a2[:]
+        # print self.a3[:]
         f.close()
 
     def write_dump(self,fname='dump'):
