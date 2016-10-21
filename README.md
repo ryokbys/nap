@@ -11,7 +11,7 @@ and uses spatial decomposition technique for the parallelization, and cell-list 
 
 # Compilation and usage
 See the manual web site below,
-http://locs.bw.nitech.ac.jp/~kobayashi/pmd_manual
+http://ryokbys.web.nitech.ac.jp/contents/pmd_manual
 
 For the short test, whether or not you can use this program in your environment,
 
