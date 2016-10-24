@@ -1,6 +1,6 @@
       program parallel_md
 c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-09-07 11:26:35 Ryo KOBAYASHI>
+c                     Last-modified: <2016-10-24 20:51:39 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c
@@ -30,6 +30,7 @@ c-----------------------------------------------------------------------
 c.....Epot threshold for disl core extraction [Hartree]
       real(8),parameter:: epith = -0.1410d0
 #endif
+
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl,i_conv
       integer:: ihour,imin,isec

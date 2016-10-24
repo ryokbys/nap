@@ -1,3 +1,6 @@
+c-----------------------------------------------------------------------
+c                     Last-modified: <2016-10-24 20:53:50 Ryo KOBAYASHI>
+c-----------------------------------------------------------------------
       subroutine smd_core(namax,natm,h,hunit,tag,ra,va,eki,epi
      &     ,nis,nismax,am,dt,vol,tinit,tfin,ttgt,tfac,trlx
      &     ,ctctl,ndof,nbmax,nb,nnmax,aa,strs,nstp,minstp,nerg,ifpmd
@@ -5,8 +8,6 @@
      &     ,fmv,ekin,epot,temp,iolevel
      &     ,nmin_fire,finc_fire,fdec_fire
      &     ,alp0_fire,falp_fire,dtmax_fire)
-c-----------------------------------------------------------------------
-c                        Time-stamp: <2016-04-26 21:35:59 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c  Molecular dynamics core routine for systems small enough not to use 
 c  cell-list method and parallelization.
