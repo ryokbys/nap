@@ -6,4 +6,7 @@ makefile
 autom4te.cache
 *.o
 *.mod
+*.pyc
+*.tgz
+*.dSYM
 fitpot/run_pmd.sh
