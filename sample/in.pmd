@@ -1,43 +1,38 @@
-!
-!  unit of time  = femto sec
-!  unit of length= Angstrom
-!  unit of mass  = unified atomic mass unit
-!
-  num_nodes_x       1
-  num_nodes_y       1
-  num_nodes_z       1
+num_nodes_x                 1
+num_nodes_y                 1
+num_nodes_z                 1
 
-  io_format    ascii
+io_format                 ascii
 
-  time_interval     0.2d0
-  num_iteration     1000
-  num_out_energy    100
+time_interval                1.0
+num_iteration              10
+min_iteration               1
+num_out_energy             10
 
-  flag_out_pmd      1
-  num_out_pmd       10
+flag_out_pmd                1
+num_out_pmd                10
+flag_sort                   1
 
-  force_type        Ramas_FeH
-  cutoff_radius     5.3d0
-  cutoff_buffer     0.2d0
+force_type                NN
+cutoff_radius                5.8
+cutoff_buffer                0.0
 
-  flag_damping      0
-  damping_coeff     0.3d0
+flag_damping                0
+damping_coeff                0.9
+converge_eps                 1.0e-04
+converge_num                3
 
-  initial_temperature     300d0
-  flag_temperature        0
-  temperature_target      100d0
-  temperature_relax_time  1d0
+initial_temperature        300.0
+final_temperature          -10.0
+temperature_control       None
+temperature_target         1  300.0
+temperature_target         2  100.0
+temperature_relax_time     100.0
 
-  factor_direction 3 2
-    1.000d0  1.000d0  1.000d0
-    1.000d0  1.000d0  1.000d0
+factor_direction          3 1
+    1.00   1.00   1.00
 
-  flag_isobaric        0
-  pressure_target      0d0
-  vol_mass_coeff       1d-3
-  vol_change_damping   1d0
+mass                       1    26.9820
+mass                       2    24.3050
+mass                       3    28.0850
 
-  shear_stress   0.00
-
-  mass  1    55.845
-  mass  2     1.008
