@@ -2,21 +2,20 @@
 ASE interface to pmd.
 """
 
-__author__  = "Ryo KOBAYASHI"
-__version__ = "160605"
-__LICENSE__ = "MIT"
-
 import os
-import copy
 import subprocess
 import numpy as np
-import ase.calculators.calculator
 from ase.calculators.calculator import FileIOCalculator,Calculator
 
 from pmdio import read_pmd,write_pmd,get_fmvs
 
+__author__  = "Ryo KOBAYASHI"
+__version__ = "160605"
+__LICENSE__ = "MIT"
+
 CALC_END_MARK = "time  "
 some_changes = ['positions', 'numbers', 'cell',]
+
 
 class PMD(FileIOCalculator):
     """
@@ -27,7 +26,8 @@ class PMD(FileIOCalculator):
 
     implemented_properties = ['energy', 'forces',
                               'relaxed_scaled_positions',
-                              'stress']
+                              'stress',
+                              'num_step_relax']
     command = 'pmd'
 
     default_parameters = {
@@ -40,8 +40,8 @@ class PMD(FileIOCalculator):
         'min_iteration': 0,
         'num_out_energy': 10,
         'flag_out_pmd': 1,
-        'num_out_pmd':  1,
-        'flag_sort':  1,
+        'num_out_pmd': 1,
+        'flag_sort': 1,
         'force_type': None,
         'cutoff_radius': 5.0,
         'cutoff_buffer': 0.0,
@@ -88,7 +88,7 @@ class PMD(FileIOCalculator):
         Calculator.__init__(self, restart, ignore_bad_restart_file,
                             label, atoms, **kwargs)
 
-        if not label in ['pmd']:
+        if label not in ['pmd']:
             raise RuntimeError('label must be pmd.')
 
         if self.parameters['force_type'] is None:
@@ -110,6 +110,7 @@ class PMD(FileIOCalculator):
 
     def calculate(self, atoms=None, properties=['energy'],
                   system_changes=some_changes):
+        # print 'pmdrun:calculate'
         Calculator.calculate(self, atoms, properties, system_changes)
         self.write_input(self.atoms, properties, system_changes)
 
@@ -125,7 +126,6 @@ class PMD(FileIOCalculator):
                                (self.name, errorcode))
         self.read_results()
 
-
     def relax(self, atoms=None, properties=['energy'],
               system_changes=some_changes,
               flag_damping=2,
@@ -140,6 +140,7 @@ class PMD(FileIOCalculator):
                  converge_eps=converge_eps,
                  num_iteration=nsteps,
                  min_iteration=min_iteration,
+                 num_out_energy=nsteps,
                  converge_num=converge_num,
                  time_interval=time_interval,
                  initial_temperature=initial_temperature,
@@ -161,21 +162,19 @@ class PMD(FileIOCalculator):
                                (self.name, errorcode))
         self.read_results(relax=True)
 
-
     def write_input(self, atoms, properties=None, system_changes=None):
-        """Write input parameters to files-file."""
+        """Write input parameters to in.pmd file."""
 
         FileIOCalculator.write_input(self, atoms, properties, system_changes)
 
         if self.label == 'pmd':
             infname = 'in.pmd'
-            #self.write_pmd(atoms)
+            # self.write_pmd(atoms)
             write_pmd(atoms,fname='pmd0000',specorder=self.specorder)
             
         with open(infname,'w') as f:
             fmvs,ifmvs = get_fmvs(atoms)
             f.write(get_input_txt(self.parameters,fmvs))
-        
         
     def read_results(self,relax=False):
         """
@@ -195,23 +194,28 @@ class PMD(FileIOCalculator):
         if not os.path.exists(strfname):
             print 'Warning: '+frcfname+' does not exists.'
 
+        self.results={}
+
         fout= open(outfname,'r')
         lines= fout.readlines()
-        if not CALC_END_MARK in  lines[-1]:
+        if CALC_END_MARK not in lines[-1]:
             raise RuntimeError(self.label+' seems to stop somewhere..')
         if relax:
             relax_converged = False
+            num_step_relax = -1
             for line in lines:
                 if 'damped MD converged with' in line:
                     relax_converged = True
+                    num_step_relax = int(line.split()[4])
+                    break
             if not relax_converged:
                 print ''
-                print '** Warning: pmd relaxation does not seem to be converged**'
+                print '** Warning: pmd relaxation does not' +\
+                    ' seem to be converged**'
                 print ''
+            self.results['num_step_relax'] = num_step_relax
         fout.close()
 
-        self.results={}
-        
         with open(ergfname,'r') as f:
             erg = float(f.readline().split()[0])
             self.results['energy'] = erg
@@ -232,13 +236,14 @@ class PMD(FileIOCalculator):
         if relax:
             posfile = max(glob.glob('pmd[0-9]*'), key=os.path.getctime)
             tmpatoms = read_pmd(fname=posfile,specorder=self.specorder)
-            self.results['relaxed_scaled_positions'] = tmpatoms.get_scaled_positions()
+            self.results['relaxed_scaled_positions'] \
+                = tmpatoms.get_scaled_positions()
+        # print 'pmdrun:read_results, results=',self.results.keys()
 
     def get_relaxed_scaled_positions(self):
-        # print 'self.results = ',self.results
-        # relaxed_spos = self.get_property('relaxed_scaled_positions',self.atoms)
         return self.results['relaxed_scaled_positions']
         
+
 def get_input_txt(params,fmvs):
     txt = ''
 
@@ -278,7 +283,7 @@ def get_input_txt(params,fmvs):
             for i,v in enumerate(vals):
                 txt += '{0:25s} {1:2d} {2:6.1f}\n'.format(key,i+1,v)
         elif key is 'factor_direction':
-            #vals = params[key]
+            # vals = params[key]
             vals= fmvs
             txt += '{0:25s} 3 {1:d}\n'.format(key,len(vals))
             for i,v in enumerate(vals):

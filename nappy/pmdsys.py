@@ -21,40 +21,41 @@ Options:
 """
 
 import math
-import sys,copy,re
+import sys, copy
 from datetime import datetime
 
 import numpy as np
 from docopt import docopt
 
-from atom import Atom,get_symbol_from_number,get_number_from_symbol
+from atom import Atom, get_symbol_from_number, get_number_from_symbol
 
 #...constants
-_maxnn= 100
-_file_formats= ('pmd',
-                'smd',
-                'akr',
-                'POSCAR',
-                'dump',
-                'xsf')
+_maxnn = 100
+_file_formats = ('pmd',
+                 'smd',
+                 'akr',
+                 'POSCAR',
+                 'dump',
+                 'xsf')
+
 
 class PMDSystem(object):
     """
     Contains cell information and atoms, and provides some functionalities.
     """
 
-    def __init__(self,fname=None,ffmt=None,specorder=[]):
-        self.alc= 1.0
-        self.a1= np.zeros(3)
-        self.a2= np.zeros(3)
-        self.a3= np.zeros(3)
-        self.atoms= []
-        self.specorder= specorder
+    def __init__(self, fname=None, ffmt=None, specorder=[]):
+        self.alc = 1.0
+        self.a1 = np.zeros(3)
+        self.a2 = np.zeros(3)
+        self.a3 = np.zeros(3)
+        self.atoms = []
+        self.specorder = specorder
 
-        if not fname == None:
-            if ffmt == None or \
+        if fname is not None:
+            if ffmt is None or \
                ffmt not in _file_formats:
-                ftype= parse_filename(fname)
+                ftype = parse_filename(fname)
             else:
                 ftype = ffmt
             if ftype == 'pmd':
@@ -72,12 +73,11 @@ class PMDSystem(object):
             else:
                 raise IOError('Cannot detect input file format.')
 
-    def set_lattice(self,alc,a1,a2,a3):
-        self.alc= alc
-        self.a1[:]= a1[:]
-        self.a2[:]= a2[:]
-        self.a3[:]= a3[:]
-
+    def set_lattice(self, alc, a1, a2, a3):
+        self.alc = alc
+        self.a1[:] = a1[:]
+        self.a2[:] = a2[:]
+        self.a3[:] = a3[:]
 
     def get_hmat(self):
         """
@@ -87,17 +87,17 @@ class PMDSystem(object):
         pos = hmat * spos
         where pos and spos are real Cartessian position and scaled position.
         """
-        hmat = np.zeros((3,3),dtype=float)
-        hmat[:,0] = self.a1 *self.alc
-        hmat[:,1] = self.a2 *self.alc
-        hmat[:,2] = self.a3 *self.alc
+        hmat = np.zeros((3, 3), dtype=float)
+        hmat[:, 0] = self.a1 * self.alc
+        hmat[:, 1] = self.a2 * self.alc
+        hmat[:, 2] = self.a3 * self.alc
         return hmat
 
-    def set_hmat(self,hmat):
+    def set_hmat(self, hmat):
         self.alc = 1.0
-        self.a1[:] = hmat[:,0]
-        self.a2[:] = hmat[:,1]
-        self.a3[:] = hmat[:,2]
+        self.a1[:] = hmat[:, 0]
+        self.a2[:] = hmat[:, 1]
+        self.a3[:] = hmat[:, 2]
 
     def get_lattice_vectors(self):
         return self.a1*self.alc, self.a2*self.alc, self.a3*self.alc
