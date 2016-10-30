@@ -25,8 +25,10 @@ MPIFLAGS= @FCFLAGS@
 
 pmd= read_input.o parallel_md.o util_vec.o util_rnd.o util_tag.o \
 	lasubs.o util_pmd.o zload.o mk_lspr.o common_parallel.o sort.o
-smd= read_input.o small_md.o small_md_core.o util_vec.o util_rnd.o util_tag.o \
-	lasubs.o util_pmd.o mk_lspr.o common_parallel.o
+pmd2= pmd_main.o pmd_core.o read_input.o util_vec.o util_rnd.o \
+    util_tag.o lasubs.o util_pmd.o zload.o mk_lspr.o \
+	  common_parallel.o sort.o
+
 mods= mod_variables.o
 args= iargc.o getarg.o
 
@@ -50,7 +52,7 @@ pmd2akr= pmd2akr.o read_input.o util_pmd.o sort.o
 #-----------------------------------------------------------------------
 # Make rule entries
 #
-execs=nconv pmd smd combine pmd2akr akr2cna sortpmd
+execs=pmd
 
 all: ${execs}
 
@@ -62,6 +64,9 @@ nconv: node_conv.o ${mods} read_input.o util_pmd.o
 
 pmd: ${mods} ${pmd} ${forces} ${params}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmd}
+
+pmd2: ${mods} ${pmd2} ${forces} ${params}
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmd2}
 
 # smd: ${mods} ${smd} ${forces} ${params}
 # 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${smd}
