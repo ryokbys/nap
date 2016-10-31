@@ -28,6 +28,7 @@ pmd= read_input.o parallel_md.o util_vec.o util_rnd.o util_tag.o \
 pmd2= pmd_main.o pmd_core.o read_input.o util_vec.o util_rnd.o \
     util_tag.o lasubs.o util_pmd.o zload.o mk_lspr.o \
 	  common_parallel.o sort.o
+pmc= prec_mc.o util_rnd.o mk_lspr.o read_input.o
 
 mods= mod_variables.o
 args= iargc.o getarg.o
@@ -67,6 +68,9 @@ pmd: ${mods} ${pmd} ${forces} ${params}
 
 pmd2: ${mods} ${pmd2} ${forces} ${params}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmd2}
+
+pmc: ${mods} ${pmc}
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${pmc}
 
 # smd: ${mods} ${smd} ${forces} ${params}
 # 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${smd}
