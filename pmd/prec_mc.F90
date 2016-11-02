@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2016-10-31 15:22:16 Ryo KOBAYASHI>
+!                     Last-modified: <2016-10-31 23:48:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 module pmc
 ! 
@@ -8,7 +8,7 @@ module pmc
 ! Species IDs are fixed: 0) Vac, 1) Al, 2) Mg, 3) Si
 !
 !.....input file name
-  character:: cinpfname = 'in.pmc'
+  character(len=128):: cinpfname = 'in.pmc'
   integer:: ionum_inp = 10
 !.....kinetic or not
   logical:: lkinetic = .true.
@@ -19,6 +19,7 @@ module pmc
   integer:: ncy = 6
   integer:: ncz = 6
   real(8):: hmat(3,3),hmati(3,3)
+  real(8),allocatable:: sites(:,:),tagmc(:),epimc(:)
 !.....symbols and SIDs array
   character,allocatable:: csymbols(:)
   integer(1),allocatable:: i1sids(:)
@@ -30,15 +31,28 @@ module pmc
   integer:: num_Vac= 1
 !.....initial structure: 1) random, 2) clustered,
 !      3) read from file (restart)
-  integer:: init_strct = 1
+  integer:: init_strct = 2
 !.....maximum steps for relaxation in pmd
   integer:: nstps_relax = 10
 !.....atoms to be moved
+  character:: species(0:3) = (/ 'V','A','M','S' /)
   logical:: lmove(0:3) = (/ &
        .true., &
        .false., &
        .false., &
        .false. /)
+!.....frequency prefactors in 1/sec
+!.....values taken from Mantina et al., Acta Mater. 57 (2009)
+  real(8):: prefreq(1:3) = (/ &
+       16.6d+12, &
+       18.6d+12, &
+       15.7d+12 /)
+!.....average migration barriers in eV
+!.....also taken from Mantina et al.
+  real(8):: demig = (/ &
+       0.58d0, &
+       0.42d0, &
+       0.55d0 /)
 !.....pair-list for MC only, not to conflict with pmd
   integer,parameter:: nnmaxmc = 20
   integer,allocatable:: lsprmc(:,:)
@@ -55,7 +69,7 @@ contains
     integer(1),intent(out):: i1sids(natm)
 !.....local
     integer:: i
-    character:: c
+    character(len=1):: c
 
     do i = 1,natm
       c = csymbols(i)
@@ -71,7 +85,7 @@ contains
 !  This function should be changed once you change the components.
 !
     implicit none 
-    character,intent(in):: csymbol
+    character(len=1),intent(in):: csymbol
     integer(1):: sid
     if( csymbol == 'V' ) then
       sid = 0
@@ -109,10 +123,11 @@ program prec_mc
   include "mpif.h"
   include "./params_unit.h"
 
-  write(6,'(a)') ' program pmc starts...'
+  integer:: i,j,k,l,m,n
 
 !.....initialize parallel
   call init_parallel(mpi_md_world,nodes_md,myid_md)
+  if( myid_md.eq.0 ) write(6,'(a)') ' program pmc starts...'
 !.....read input parameters
   call read_in_pmc(ionum_inp, cinpfname)
 !.....parallel setting for pmd
@@ -121,33 +136,34 @@ program prec_mc
 !.....create 1st Al fcc crystal
   natm = ncx*ncy*ncz*4
   allocate(csymbols(natm),i1sids(natm), &
-       rtot(3,natm),tagtot(natm),epitot(natm))
-  call create_Al_fcc(ncx,ncy,ncz,natm,alat,rtot,csymbols,hmat)
+       sites(3,natm),tagmc(natm),epimc(natm))
+  call create_Al_fcc(ncx,ncy,ncz,natm,alat,sites,csymbols,hmat)
   call symbols2sids(natm,csymbols,i1sids)
   hmati(1:3,1:3) = 0d0
   hmati(1,1) = 1d0/hmat(1,1)
   hmati(2,2) = 1d0/hmat(2,2)
   hmati(3,3) = 1d0/hmat(3,3)
 
-
 !.....create neighbor list only once here, and no longer needed after
   rc = 3.0
   allocate(lsprmc(0:nnmaxmc,natm))
-  call make_tag(natm,csymbols,tagtot)
-  call mk_lspr_sngl(natm,natm,nnmaxmc,rtot,rc,hmat,hmati,lsprmc)
+  call make_tag(natm,csymbols,tagmc)
+  call mk_lspr_sngl(natm,natm,nnmaxmc,tagmc,sites,rc,hmat,hmati,lsprmc)
 !.....check restart,
 !     if not restart, initialize system eigher random or clustered
   if( init_strct.eq.1 ) then  ! random
     call random_symbols(natm,csymbols,num_Mg,num_Si,num_Vac)
   elseif( init_strct.eq.2 ) then  ! clustered
-    call clustered_symbols(natm,rtot,csymbols,num_Mg,num_Si,num_Vac &
-         ,nnmax,lsprmc)
+    call clustered_symbols(natm,sites,csymbols,num_Mg,num_Si,num_Vac &
+         ,nnmaxmc,lsprmc)
   elseif( init_strct.eq.3 ) then  ! read from file (restart)
     call read_symbols(11,'dat.symbols',natm,csymbols)
   endif
 
+  call write_POSCAR('POSCAR_000000',natm,csymbols,sites,hmat,species)
   
-  write(6,'(a)') ' program pmc ends'
+  if( myid_md.eq.0 ) write(6,'(a)') ' program pmc ends'
+  call mpi_finalize(ierr)
 
 end program prec_mc
 !=======================================================================
@@ -155,12 +171,9 @@ subroutine kinetic_mc()
 !
 ! Kinetic MC simulation using
 !
-
+  use pmc
+  
 !.....initialize some values here
-
-!.....frequency prefactors in sec^{-1}
-
-!.....average/base migration barrier in eV
   
 !.....compute chemical potentials of solutes
 
@@ -384,11 +397,11 @@ subroutine make_tag(natm,csymbols,tag)
   real(8),intent(out):: tag(natm)
 
   integer:: i
-  character:: c
+  character(len=1):: c
 
   do i = 1,natm
     c = csymbols(i)
-    tag(natm) = dble(symbol2sid(c)) +0.1 +1d-14*i
+    tag(i) = dble(symbol2sid(c)) +0.1d0 +1d-14*i
   end do
   return
   
@@ -437,13 +450,13 @@ subroutine random_symbols(natm,csymbols,num_Mg,num_Si,num_Vac)
   
 end subroutine random_symbols
 !=======================================================================
-subroutine clustered_symbols(natm,rtot,csymbols,num_Mg,num_Si,num_Vac &
-     ,nnmax,lspr)
+subroutine clustered_symbols(natm,sites,csymbols &
+     ,num_Mg,num_Si,num_Vac,nnmax,lspr)
   implicit none
   integer,intent(in):: natm,num_Mg,num_Si,num_Vac &
        ,nnmax,lspr(0:nnmax,natm)
   character,intent(inout):: csymbols(natm)
-  real(8),intent(in):: rtot(3,natm)
+  real(8),intent(in):: sites(3,natm)
 
   integer:: i,jj,j,irnd,nsol,isol,icntr
   real(8):: cntr(3),dmin,d
@@ -455,14 +468,15 @@ subroutine clustered_symbols(natm,rtot,csymbols,num_Mg,num_Si,num_Vac &
   icntr = -1
   dmin = 1d+30
   do i = 1,natm
-    d = (cntr(1)-rtot(1,i))**2 &
-         +(cntr(2)-rtot(2,i))**2 &
-         +(cntr(3)-rtot(3,i))**2
+    d = (cntr(1)-sites(1,i))**2 &
+         +(cntr(2)-sites(2,i))**2 &
+         +(cntr(3)-sites(3,i))**2
     if( d < dmin ) then
       dmin = d
       icntr = i
     endif
   enddo
+  
 !.....make random array of symbols to be replaced
   nsol = num_Mg +num_Si +num_Vac
   allocate(carr(nsol))
@@ -476,13 +490,12 @@ subroutine clustered_symbols(natm,rtot,csymbols,num_Mg,num_Si,num_Vac &
     endif
   enddo
 
-
   isol = 1
   csymbols(icntr) = carr(isol)
 
   do while(.true.)
     do i = 1,natm
-      if( csymbols(i).eq.'A' ) continue
+      if( csymbols(i).eq.'A' ) cycle
       do jj = 1,lspr(0,i)
         j = lspr(jj,i)
         if( csymbols(j).eq.'A' ) then
@@ -536,6 +549,74 @@ subroutine read_symbols(ionum,fname,natm,csymbols)
   return
   
 end subroutine read_symbols
+!=======================================================================
+subroutine write_POSCAR(cfname,natm,csymbols,pos,hmat,species)
+!
+!  Write system config in POSCAR format.
+!  Vacancies are written as an atom of species Vanadium in order to
+!  make them visible on purpose.
+!
+  implicit none
+  character(len=*),intent(in):: cfname
+  integer,intent(in):: natm
+  character,intent(in):: csymbols(natm),species(0:3)
+  real(8),intent(in):: pos(3,natm),hmat(3,3)
+
+  integer:: i,m,id,ns(0:3),idorder(natm)
+  integer:: date_time(8)
+  character(len=10):: sys_time(3)
+  character(len=1):: cs
+  character(len=2):: sname(0:3) = (/ 'V ','Al','Mg','Si' /)
+  
+  call date_and_time(sys_time(1), sys_time(2), sys_time(3), date_time)
+
+  id = 0
+  do m = 0,3
+    cs = species(m)
+    ns(m) = 0
+    do i = 1,natm
+      if( csymbols(i).eq.cs ) then
+        id = id + 1
+        idorder(id) = i
+        ns(m) = ns(m) + 1
+      endif
+    end do
+  enddo
+  
+  open(90,file=trim(cfname))
+  write(90,'(3a)') 'written by PMC at ', &
+       trim(sys_time(1)),trim(sys_time(3))
+  write(90,'(a)') '   1.00000000'
+  write(90,'(3es15.7)') hmat(1:3,1)
+  write(90,'(3es15.7)') hmat(1:3,2)
+  write(90,'(3es15.7)') hmat(1:3,3)
+  write(90,'(4a8)') sname(0:3)
+  write(90,'(4i8)') ns(0:3)
+  write(90,'(a)') 'Direct'
+  do m = 1,natm
+    i = idorder(m)
+    write(90,'(3f15.8)') pos(1:3,i)
+  enddo
+  close(90)
+  
+end subroutine write_POSCAR
+!=======================================================================
+subroutine run_pmd(hmat,sites,csymbols,epimc,epotmc &
+     ,nstps_pmd,)
+  use variables
+  implicit none
+  real(8),intent(in):: hmat(3,3),sites(3,natm)
+  real(8),intent(out):: epimc(natm),epotmc
+
+  integer:: i
+
+  call make_tag(natm,csymbols,tagtot)
+  h(1:3,1:3,0) = hmat(1:3,1:3)
+  do i = 1,natm
+    rtot(1:3,i) = sites(1:3,i)
+  enddo
+  
+end subroutine run_pmd
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmc"
