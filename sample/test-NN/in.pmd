@@ -5,7 +5,7 @@ num_nodes_z                 1
 io_format                 ascii
 
 time_interval                1.0
-num_iteration              10
+num_iteration              0
 min_iteration               1
 num_out_energy             10
 
