@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2016-10-30 08:26:50 Ryo KOBAYASHI>
+c                     Last-modified: <2016-11-02 22:26:35 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -18,7 +18,8 @@ c               in the MD run if required by "flag_out_pmd" in in.pmd.
 c   out.stress: Stress component normal to z-upper surface of nanorod,
 c               and z-strain of the nanorod.
 c-----------------------------------------------------------------------
-      use variables
+      use pmdio
+      use pmdmpi
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -28,9 +29,8 @@ c.....Epot threshold for disl core extraction [Hartree]
       real(8),parameter:: epith = -0.1410d0
 #endif
 
-      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl,i_conv
-      integer:: ihour,imin,isec
-      real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epotp
+      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl,i_conv,ierr
+      real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin
 
 c-----initialize the MPI environment
       call mpi_init(ierr)
@@ -46,51 +46,11 @@ c.....Set fmv as default value before reading 'in.pmd'
 
       if( myid_md.eq.0 ) then
         call read_input(10,'in.pmd')
-        call check_cmin()
+        call check_cmin(cmin,ifdmp)
         call write_initial_setting()
-c.....Multiply damping factor to avoid multiplication of every step
-        if( ifdmp.eq.1 ) then
-          fmv(1:3,0:9)= fmv(1:3,0:9) *dmp
-        endif
       endif
 
       call bcast_params()
-
-
-c-----output every these steps, NOUTERG, NOUTPMD
-      if( nerg.ne.0 ) then
-        nouterg = max(nstp/nerg,1)
-      else
-        nouterg = nstp +1
-      endif
-      if( npmd.ne.0 ) then
-        noutpmd = max(nstp/npmd,1)
-      else
-        noutpmd = nstp +1
-      endif
-c-----parallel configuration
-      nxyz= nx*ny*nz
-      anxi= 1d0/nx
-      anyi= 1d0/ny
-      anzi= 1d0/nz
-c-----error trap
-      if(nodes_md.ne.nxyz) then
-        write(6,'(a)') " error: nodes_md .ne. nxyz!!"
-        write(6,'(a,3i5)') ' myid_md,nodes_md,nxyz='
-     &       ,myid_md,nodes_md,nxyz
-        print *,'nx,ny,nz =',nx,ny,nz
-        call mpi_finalize(ierr)
-        stop
-      endif
-
-c-----vector node indices: range [0:nx-1]
-      myx=myid_md/(ny*nz)
-      myy=mod(myid_md/nz,ny)
-      myz=mod(myid_md,nz)
-c-----reduced node origin
-      sorg(1)= anxi*myx
-      sorg(2)= anyi*myy
-      sorg(3)= anzi*myz
 
 c.....only 0th-node reads pmd0000 file
       if( myid_md.eq.0 ) then
@@ -99,59 +59,31 @@ c.....only 0th-node reads pmd0000 file
         else if( trim(ciofmt).eq.'ascii' ) then
           call read_pmdtot_ascii(20,"pmd0000")
         endif
+
+c.....make ntot and ?tot() not null in nodes myid_md != 0
+      else
+        ntot = 1
+        allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot)
+     &       ,ekitot(3,3,ntot),stot(3,3,ntot),atot(3,ntot))
       endif
 
 c.....call pmd_core to perfom MD
-      call pmd_core()
+      call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
+     &     ,ekitot,epitot,nstp,nerg,npmd,myid_md,mpi_md_world,nodes_md
+     &     ,nx,ny,nz
+     &     ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
+     &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
+     &     ,srlx,stbeta,strfin
+     &     ,fmv,ptnsr,epot,ekin,n_conv
+     &     ,czload_type,eps_conv,ifsort,iprint)
 
-      if(myid_md.eq.0) then
-        close(ioerg)
-        close(iotemp)
-        if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
-          close(iostrs)
-        endif
-        if( ltdst ) close(iotdst)
+c.....write energy, forces and stresses only for fitpot
+      if( myid_md.eq.0 ) then
+        call write_force(21,'.pmd',h,epot,ntot,tagtot,atot,ptnsr)
       endif
-
-c.....write energy and forces only for fitpot (2nd digit of iprint==1)
-      call write_force(21,'.pmd',natm,h,tag,aa,acon
-     &     ,nismax,epot,myid_md,mpi_md_world,nxyz,ntot,tagtot,atot
-     &     ,ptnsr)
       
-      tcpu= tcpu2 -tcpu1
-      if(myid_md.eq.0) then
-        write(6,*) ''
-        write(6,'(1x,a)') "final values:"
-        write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
-        write(6,'(1x,a,es22.14,a)') " potential energy=",epot,' eV'
-        nave= 0
-        tave= 0d0
-        do ifmv=1,9
-          if( ndof(ifmv).le.0 ) cycle
-          temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
-          nave= nave +ndof(ifmv)
-          write(6,'(1x,a,i1,a,es15.7,a)') " temperature ",ifmv
-     &         ,"   =",temp(ifmv),' K'
-          tave= tave +temp(ifmv)*ndof(ifmv)
-        enddo
-        tave= tave/nave
-        write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
-        write(6,'(1x,a,f8.3,a)') " stress          =",
-     &       (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa,' GPa'
-        write(6,*) ''
-        write(6,'(1x,a,f10.2)') "time space decomp =",tspdcmp
-        write(6,'(1x,a,f10.2)') "time comm         =",tcom
-
-        ihour = int(tcpu/3600)
-        imin  = int((tcpu-ihour*3600)/60)
-        isec  = int(tcpu -ihour*3600 -imin*60)
-        write(6,'(1x,a,f10.2,a,i3,"h",i2.2,"m",i2.2,"s")')
-     &       "time              =",tcpu,
-     &       " sec  = ",ihour,imin,isec
-      endif
-
       call mpi_finalize(ierr)
-
+        
       end program pmd
 c=======================================================================
       subroutine set_fmv(fmv)
@@ -175,9 +107,10 @@ c-----set fmv(1:3,ifmv) to be multiplied to the velocities
 
       end subroutine set_fmv
 c=======================================================================
-      subroutine check_cmin()
-      use variables
-      implicit none 
+      subroutine check_cmin(cmin,ifdmp)
+      implicit none
+      character,intent(in):: cmin 
+      integer,intent(inout):: ifdmp
 
       if( cmin.ne.'' ) then
         if( cmin.eq.'none' ) then
@@ -197,7 +130,8 @@ c=======================================================================
       end subroutine check_cmin
 c=======================================================================
       subroutine write_initial_setting()
-      use variables
+      use pmdio
+      use pmdmpi
       implicit none 
       integer:: i
 
@@ -271,9 +205,12 @@ c.....velocity multiplying factor
       end subroutine write_initial_setting
 c=======================================================================
       subroutine bcast_params()
-      use variables
+      use pmdio
+      use pmdmpi
       implicit none
       include 'mpif.h'
+
+      integer:: ierr
 
 c-----Broadcast input parameters to all nodes
       call mpi_bcast(nx,1,MPI_INTEGER,0,mpi_md_world,ierr)
@@ -314,17 +251,17 @@ c.....NEMD
       call mpi_bcast(ltdst,1,mpi_logical,0,mpi_md_world,ierr)
       if( ltdst ) then
         call mpi_bcast(ntdst,1,mpi_integer,0,mpi_md_world,ierr)
-        if( mod(ntdst,nx).ne.0 )
-     &       call error_mpi_stop('mod(ntdst,nx).ne.0')
-        allocate(tdst(ntdst),nadst(ntdst))
       endif
 
       end subroutine bcast_params
 c=======================================================================
       subroutine error_mpi_stop(cerrmsg)
-      use variables
+      use pmdmpi
       implicit none
       character(len=*):: cerrmsg
+
+      integer:: ierr
+      
       if(myid_md.eq.0) then
         write(6,'(a)')
      &       '=================================================='
@@ -338,75 +275,37 @@ c=======================================================================
       stop
       end subroutine error_mpi_stop
 c=======================================================================
-      subroutine write_force(ionum,cpostfix,natm,h,tag,aa,acon,nismax
-     &     ,epot,myid_md,mpi_md_world,nxyz,ntot,tagtot,atot,ptnsr)
+      subroutine write_force(ionum,cpostfix,h,epot,ntot
+     &     ,tagtot,atot,ptnsr)
       implicit none
-      include 'mpif.h'
-      integer,intent(in):: natm,nismax,ionum,nxyz
-     &     ,ntot,myid_md,mpi_md_world
+      integer,intent(in):: ionum,ntot
       character(len=*),intent(in):: cpostfix
-      real(8),intent(in):: h(3,3),acon(nismax),aa(3,natm),tag(natm)
-     &     ,epot,ptnsr(3,3)
+      real(8),intent(in):: h(3,3),epot,ptnsr(3,3)
       real(8),intent(inout):: tagtot(ntot),atot(3,ntot)
 
-      integer:: i,is,n0,ixyz,itag,natmt,ierr
-      integer:: istat(mpi_status_size)
+      integer:: i,n0,ixyz,ierr
       real(8):: at(3)
       integer,parameter:: nmpi = 2
 
-c.....Gather acceralations
-c  Since this routine is mainly for fitpot which requires only
-c  very small number of atoms, usually one does not need to think about
-c  parallelization.
-      if( myid_md.eq.0 ) then
-        n0 = natm
-        atot(1:3,1:natm)= aa(1:3,1:natm)
-        n0 = n0 +1
-        do ixyz=1,nxyz-1
-          itag = ixyz*nmpi -nmpi
-          call mpi_recv(natmt,1,mpi_integer,ixyz,itag
-     &         ,mpi_md_world,istat,ierr)
-          call mpi_recv(tagtot(n0),natmt,mpi_double_precision
-     &         ,ixyz,itag+1,mpi_md_world,istat,ierr)
-          call mpi_recv(atot(1,n0),3*natmt,mpi_double_precision
-     &         ,ixyz,itag+2,mpi_md_world,istat,ierr)
-          n0 = n0 + natmt
-        enddo
-      else
-        itag = myid_md*nmpi -nmpi
-        call mpi_send(natm,1,mpi_integer,0,itag
-     &       ,mpi_md_world,ierr)
-        call mpi_send(tag,natm,mpi_double_precision,0,itag+1
-     &       ,mpi_md_world,ierr)
-        call mpi_send(aa,3*natm,mpi_double_precision,0,itag+2
-     &       ,mpi_md_world,ierr)
-      endif
 
-      if( myid_md.eq.0 ) then
 c.....Write out forces
-        open(ionum,file='frc'//trim(cpostfix),status='replace')
-        write(ionum,'(i10)') ntot
-        do i=1,ntot
-          is= int(tagtot(i))
-          at(1:3)= h(1:3,1)*atot(1,i)
-     &         +h(1:3,2)*atot(2,i)
-     &         +h(1:3,3)*atot(3,i)
-          at(1:3)= at(1:3)/acon(is)
-          write(ionum,'(3es23.14e3)') at(1:3)
-        enddo
-        close(ionum)
+      open(ionum,file='frc'//trim(cpostfix),status='replace')
+      write(ionum,'(i10)') ntot
+      do i=1,ntot
+        write(ionum,'(3es23.14e3)') atot(1:3,i)
+      enddo
+      close(ionum)
 
 c.....Write out energy
-        open(ionum+1,file='erg'//trim(cpostfix),status='replace')
-        write(ionum+1,'(es23.14e3)') epot
-        close(ionum+1)
+      open(ionum+1,file='erg'//trim(cpostfix),status='replace')
+      write(ionum+1,'(es23.14e3)') epot
+      close(ionum+1)
 
 c.....Write stress tensor
-        open(ionum+2,file='str'//trim(cpostfix),status='replace')
-        write(ionum+2,'(6es16.7e3)') ptnsr(1,1),ptnsr(2,2),ptnsr(3,3),
-     &       ptnsr(2,3),ptnsr(1,3),ptnsr(1,2)
-        close(ionum+2)
-      endif
+      open(ionum+2,file='str'//trim(cpostfix),status='replace')
+      write(ionum+2,'(6es16.7e3)') ptnsr(1,1),ptnsr(2,2),ptnsr(3,3),
+     &     ptnsr(2,3),ptnsr(1,3),ptnsr(1,2)
+      close(ionum+2)
 
       end subroutine write_force
 c=======================================================================

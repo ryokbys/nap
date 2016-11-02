@@ -153,7 +153,7 @@ c-----natm: num. of particles in this node
       end subroutine read_pmd_ascii
 c=======================================================================
       subroutine read_pmdtot_ascii(ionum,cfname)
-      use variables
+      use pmdio
       implicit none
       integer,intent(in):: ionum
       character(len=*),intent(in):: cfname
@@ -177,7 +177,7 @@ c=======================================================================
       end subroutine read_pmdtot_ascii
 c=======================================================================
       subroutine write_pmdtot_ascii(ionum,cfname)
-      use variables
+      use pmdio
       implicit none
       include './params_unit.h'
       integer,intent(in):: ionum
@@ -205,7 +205,7 @@ c=======================================================================
       end subroutine write_pmdtot_ascii
 c=======================================================================
       subroutine read_pmdtot_bin(ionum,cfname)
-      use variables
+      use pmdio
       implicit none
       integer,intent(in):: ionum
       character(len=*),intent(in):: cfname
@@ -231,7 +231,7 @@ c-----natm: num. of particles in this node
       end subroutine read_pmdtot_bin
 c=======================================================================
       subroutine write_pmdtot_bin(ionum,cfname)
-      use variables
+      use pmdio
       implicit none
       include './params_unit.h'
       integer,intent(in):: ionum

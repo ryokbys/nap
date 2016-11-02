@@ -37,7 +37,8 @@ c        write(6,'(a)') c1st
       end subroutine read_input
 c=======================================================================
       subroutine set_variable(ionum,cname)
-      use variables
+      use pmdio
+      use pmdmpi
 #ifdef __WALL__
       use wall
 #endif

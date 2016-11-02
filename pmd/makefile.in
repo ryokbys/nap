@@ -31,6 +31,7 @@ pmd2= pmd_main.o pmd_core.o read_input.o util_vec.o util_rnd.o \
 pmc= prec_mc.o util_rnd.o mk_lspr.o read_input.o
 
 mods= mod_variables.o
+mods2= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o
 args= iargc.o getarg.o
 
 forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
@@ -66,8 +67,8 @@ nconv: node_conv.o ${mods} read_input.o util_pmd.o
 pmd: ${mods} ${pmd} ${forces} ${params}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmd}
 
-pmd2: ${mods} ${pmd2} ${forces} ${params}
-	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmd2}
+pmd2: ${mods2} ${pmd2} ${forces} ${params}
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods2} ${forces} ${pmd2}
 
 pmc: ${mods} ${pmc}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${pmc}

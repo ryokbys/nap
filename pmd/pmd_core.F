@@ -1,15 +1,35 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2016-10-30 08:26:52 Ryo KOBAYASHI>
+c                     Last-modified: <2016-11-02 22:24:11 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file include core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
-      subroutine pmd_core()
-      use variables
+      subroutine pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
+     &     ,ekitot,epitot,nstp,nerg,npmd,myid_md,mpi_md_world,nodes_md
+     &     ,nx,ny,nz
+     &     ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
+     &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
+     &     ,srlx,stbeta,strfin
+     &     ,fmv,ptnsr,epot,ekin,n_conv
+     &     ,czload_type,eps_conv,ifsort,iprint)
+      use pmdvars
       implicit none
       include "mpif.h"
       include "./params_unit.h"
+      integer,intent(in):: ntot,nstp,nerg,npmd,myid_md,mpi_md_world
+     &     ,nismax,ifpmd,ifdmp,minstp,ntdst,ifsort
+     &     ,iprint,nodes_md,nx,ny,nz,n_conv
+      real(8),intent(in):: hunit,tinit,tfin
+     &     ,trlx,srlx,stbeta,strfin,dmp,eps_conv
+      real(8),intent(inout):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
+     &     ,atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot)
+     &     ,epitot(ntot),dt,rc,rbuf,h(3,3,0:1),ptnsr(3,3),fmv(3,0:9)
+     &     ,epot,ekin,am(nismax),stgt(3,3),ptgt,ttgt(9)
+      character,intent(in):: ciofmt*6, cforce*20, cpctl*20, ctctl*20
+     &     ,czload_type*5
+      logical,intent(in):: ltdst
 
-      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl,i_conv
+      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl,i_conv,ierr,nxyz
+      integer:: ihour,imin,isec
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epotp
       real(8),external:: box_muller,sprod
       logical:: lconverged = .false.
@@ -23,8 +43,48 @@ c-----output file names
       character:: cnum*4
       integer,external:: itotOf
 
+c.....multiply damping factor 1st to avoid doing every step
+      if( ifdmp.eq.1 ) then
+        fmv(1:3,0:9)= fmv(1:3,0:9) *dmp
+      endif
+      
+c-----parallel configuration
+      nxyz= nx*ny*nz
+      anxi= 1d0/nx
+      anyi= 1d0/ny
+      anzi= 1d0/nz
+c-----error trap
+      if(nodes_md.ne.nxyz) then
+        write(6,'(a)') " error: nodes_md .ne. nxyz!!"
+        write(6,'(a,3i5)') ' myid_md,nodes_md,nxyz='
+     &       ,myid_md,nodes_md,nxyz
+        print *,'nx,ny,nz =',nx,ny,nz
+        call mpi_finalize(ierr)
+        stop
+      endif
+c-----vector node indices: range [0:nx-1]
+      myx=myid_md/(ny*nz)
+      myy=mod(myid_md/nz,ny)
+      myz=mod(myid_md,nz)
+c-----reduced node origin
+      sorg(1)= anxi*myx
+      sorg(2)= anyi*myy
+      sorg(3)= anzi*myz
+
+c-----output every these steps, NOUTERG, NOUTPMD
+      if( nerg.ne.0 ) then
+        nouterg = max(nstp/nerg,1)
+      else
+        nouterg = nstp +1
+      endif
+      if( npmd.ne.0 ) then
+        noutpmd = max(nstp/npmd,1)
+      else
+        noutpmd = nstp +1
+      endif
 c.....perform space decomposition after reading atomic configuration
-      call space_decomp()
+      call space_decomp(hunit,h,ntot,tagtot,rtot,vtot
+     &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz)
       if( myid_md.eq.0 ) then
         write(6,'(a)') " H-matrix:"
         write(6,'(3es15.7)') h(1:3,1,0)
@@ -65,7 +125,16 @@ c.....Setup for FIRE
         dtmax_fire = dtmfctr_fire * dt
       endif
 
+c.....NEMD setting
+      if( ltdst ) then
+        if( mod(ntdst,nx).ne.0 )
+     &       call error_mpi_stop('mod(ntdst,nx).ne.0')
+        allocate(tdst(ntdst),nadst(ntdst))
+      endif
+
+
 c-----setup
+      allocate(acon(nismax),fack(nismax))
       call setup(nismax,am,acon,fack,dt)
 c-----set HI and SGM
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
@@ -83,8 +152,9 @@ c-----get total number of particles
 
 c.....Set initial temperature if needed
       if( tinit.gt.1d-5 ) then
-        call setv()
-        call rm_trans_motion()
+        call setv(h,natm,tag,va,nismax,am,tinit,dt)
+        call rm_trans_motion(natm,tag,va,nismax,am
+     &       ,mpi_md_world,myid_md)
       elseif( abs(tinit).le.1d-5 ) then
         va(1:3,1:natm)= 0d0
       endif
@@ -110,7 +180,8 @@ c.....Set initial temperature if needed
       tcom = 0d0
 
 c-----copy RA of boundary atoms
-      call check_size_and_parallel()
+      call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
+     &     ,nx,ny,nz,myid_md)
       call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity
      &     ,lsrc,sv,nex,mpi_md_world)
@@ -137,7 +208,7 @@ c-----calc kinetic energy
      &     ,vmax,mpi_md_world)
       vmaxold=vmax
 c.....get_num_dof is called once in a MD run
-      call get_num_dof()
+      call get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world)
 
       if( trim(cpctl).eq.'Berendsen' .or.
      &     trim(cpctl).eq.'vc-Berendsen' ) then
@@ -251,7 +322,8 @@ c.....temperature distribution along x
           open(iotdst,file='out.temp-dist')
           write(iotdst,'(a)') '#   x-pos,   temp   '
         endif
-        call calc_temp_dist()
+        call calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra,eki
+     &     ,istp,nouterg,myid_md,mpi_md_world,sorg)
       endif
 
 c.....Set al
@@ -277,7 +349,9 @@ c-------first kick of velocities
         va(1:3,1:natm)=va(1:3,1:natm) +aa(1:3,1:natm)
 
         if( ifdmp.eq.2 ) then
-          call vfire(num_fire,alp_fire)
+          call vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire
+     &         ,finc_fire,fdec_fire,nmin_fire
+     &         ,natm,va,aa,myid_md,mpi_md_world,dt)
         endif
 
 c-------multiply fmv or damping
@@ -422,7 +496,8 @@ c.....accumulate energy difference
         endif
 
 c.....temperature distribution along x
-        if( ltdst ) call calc_temp_dist()
+        if( ltdst ) call calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra
+     &       ,eki,istp,nouterg,myid_md,mpi_md_world,sorg)
 
 cc.....Eliminate translational motion
 c        if( mod(istp,100).eq.0 ) then
@@ -528,7 +603,9 @@ c---------decide pmd-file name
           iocntpmd=iocntpmd+1
           write(cnum(1:4),'(i4.4)') iocntpmd
 c          call system("mkdir -p "//cnum)
-          call space_comp()
+          call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
+     &         ,stot,natm,tag,ra,va,aa,epi,eki,strs,sorg
+     &         ,nxyz,myid_md,mpi_md_world,tspdcmp)
           if( myid_md.eq.0 ) then
             if( ifsort.eq.1 ) call sort_by_tag(ntot,tagtot,rtot,vtot
      &           ,ekitot,epitot,stot)
@@ -555,6 +632,48 @@ c          call system("mkdir -p "//cnum)
         if( ltdst ) close(iotdst)
       endif
       
+      tcpu= tcpu2 -tcpu1
+      if(myid_md.eq.0) then
+        write(6,*) ''
+        write(6,'(1x,a)') "final values:"
+        write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
+        write(6,'(1x,a,es22.14,a)') " potential energy=",epot,' eV'
+        nave= 0
+        tave= 0d0
+        do ifmv=1,9
+          if( ndof(ifmv).le.0 ) cycle
+          temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
+          nave= nave +ndof(ifmv)
+          write(6,'(1x,a,i1,a,es15.7,a)') " temperature ",ifmv
+     &         ,"   =",temp(ifmv),' K'
+          tave= tave +temp(ifmv)*ndof(ifmv)
+        enddo
+        tave= tave/nave
+        write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
+        write(6,'(1x,a,f8.3,a)') " stress          =",
+     &       (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa,' GPa'
+        write(6,*) ''
+        write(6,'(1x,a,f10.2)') "time space decomp =",tspdcmp
+        write(6,'(1x,a,f10.2)') "time comm         =",tcom
+
+        ihour = int(tcpu/3600)
+        imin  = int((tcpu-ihour*3600)/60)
+        isec  = int(tcpu -ihour*3600 -imin*60)
+        write(6,'(1x,a,f10.2,a,i3,"h",i2.2,"m",i2.2,"s")')
+     &       "time              =",tcpu,
+     &       " sec  = ",ihour,imin,isec
+      endif
+
+c.....revert forces to the unit eV/A before going out pmd_core
+      do i=1,ntot
+        is= int(tagtot(i))
+        aai(1:3)= h(1:3,1,0)*atot(1,i)
+     &       +h(1:3,2,0)*atot(2,i)
+     &       +h(1:3,3,0)*atot(3,i)
+        atot(1:3,i) = aai(1:3)/acon(is)
+      enddo
+
+      deallocate(acon,fack)
 
       end subroutine pmd_core
 c=======================================================================
@@ -563,12 +682,13 @@ c=======================================================================
       include "params_unit.h"
       integer,intent(in):: nismax
       real(8),intent(in):: dt
-      real(8),intent(out):: acon(nismax),fack(nismax),am(nismax)
+      real(8),intent(in):: am(nismax)
+      real(8),intent(out):: acon(nismax),fack(nismax)
 
       integer:: i
       real(8):: tmp
 
-      am(1:nismax)= am(1:nismax)
+c      am(1:nismax)= am(1:nismax)
 
 c.....umass*Ang^2/fs^2 ---> kg*m^2/sec^2 (=Joule)
       tmp= amu2kg *ang2m**2 /fs2s**2
@@ -771,12 +891,18 @@ c.....Find max speed
 
       end subroutine get_ekin
 c=======================================================================
-      subroutine calc_temp_dist()
-      use variables
+      subroutine calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra,eki
+     &     ,istp,nouterg,myid_md,mpi_md_world,sorg)
       implicit none
       include 'mpif.h'
       include './params_unit.h'
-      integer:: i,ix,itmp
+      integer,intent(in):: iotdst,ntdst,natm,istp,nouterg,myid_md
+     &     ,mpi_md_world
+      real(8),intent(in):: ra(3,natm),eki(3,3,natm),sorg(3)
+      integer,intent(out):: nadst(ntdst)
+      real(8),intent(out):: tdst(ntdst)
+      
+      integer:: i,ix,itmp,ierr
       real(8):: dx,xi,tmp
       real(8),allocatable,save:: tdl(:)
       integer,allocatable,save:: ndl(:)
@@ -821,11 +947,14 @@ c.....initialize tdst
 
       end subroutine calc_temp_dist
 c=======================================================================
-      subroutine get_num_dof()
-      use variables
+      subroutine get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world)
       implicit none
       include 'mpif.h'
-      integer:: i,l,k,ndofl(9)
+      integer,intent(in):: natm,myid_md,mpi_md_world
+      real(8),intent(in):: tag(natm),fmv(3,0:9)
+      integer,intent(out):: ndof(9)
+      
+      integer:: i,l,k,ndofl(9),ierr
       real(8),parameter:: deps= 1d-12
 
       ndofl(1:9)= 0d0
@@ -845,11 +974,14 @@ c      write(6,'(a,i3,a,9i6)') ' myid=',myid_md,': ndof=',ndof(1:9)
       return
       end subroutine get_num_dof
 c=======================================================================
-      subroutine check_size_and_parallel()
-      use variables
+      subroutine check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
+     &     ,nx,ny,nz,myid_md)
       implicit none
       include 'mpif.h'
+      integer,intent(in):: nx,ny,nz,myid_md
+      real(8),intent(in):: sgm(3,3),vol,rc,anxi,anyi,anzi
 
+      integer:: ierr
       real(8):: vala,valb,valc,rca,rcb,rcc
       
 c-----calculate the cut-off lengths
@@ -1712,11 +1844,13 @@ c.....Berendsen for variable-volume not variable-cell
 
       end subroutine force_isobaric
 c=======================================================================
-      subroutine setv()
-      use variables
+      subroutine setv(h,natm,tag,va,nismax,am,tinit,dt)
       implicit none
       include 'mpif.h'
       include 'params_unit.h'
+      integer,intent(in):: natm,nismax
+      real(8),intent(in):: tag(natm),am(nismax),tinit,dt,h(3,3,0:1)
+      real(8),intent(out):: va(3,natm)
       integer:: i,l,is
       real(8):: dseed,sumvx,sumvy,sumvz,tmp,facv(nismax)
       real(8),parameter:: pi = 3.14159265358979d0
@@ -1743,11 +1877,15 @@ c     &       ,va(1:3,i)
 
       end subroutine setv
 c=======================================================================
-      subroutine rm_trans_motion()
-      use variables
+      subroutine rm_trans_motion(natm,tag,va,nismax,am
+     &     ,mpi_md_world,myid_md)
       implicit none
       include 'mpif.h'
-      integer:: i,is
+      integer,intent(in):: natm,nismax,mpi_md_world,myid_md
+      real(8),intent(in):: tag(natm),am(nismax)
+      real(8),intent(out):: va(3,natm)
+      
+      integer:: i,is,ierr
       real(8):: sumpx,sumpy,sumpz,amss,amtot,tmp
 
 c-----set center of mass motion to zero
@@ -1788,14 +1926,18 @@ c-----set center of mass motion to zero
 
       end subroutine rm_trans_motion
 c=======================================================================
-      subroutine vfire(num_fire,alp_fire)
-      use variables
+      subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire
+     &     ,finc_fire,fdec_fire,nmin_fire
+     &     ,natm,va,aa,myid_md,mpi_md_world,dt)
       implicit none
       include 'mpif.h'
+      integer,intent(in):: natm,myid_md,mpi_md_world,nmin_fire
+      real(8),intent(in):: aa(3,natm),falp_fire,alp0_fire,dtmax_fire
+     &     ,finc_fire,fdec_fire
       integer,intent(inout):: num_fire
-      real(8),intent(inout):: alp_fire
+      real(8),intent(inout):: alp_fire,va(3,natm),dt
 
-      integer:: i,ixyz
+      integer:: i,ixyz,ierr
       real(8):: fdotv,vnorm,fnorm
       real(8):: fdotvl,vnorml,fnorml
 
@@ -1832,7 +1974,7 @@ c=======================================================================
           num_fire = num_fire + 1
           if( num_fire.gt.nmin_fire ) then
             dt = min(dtmax_fire,dt*finc_fire)
-            alp_fire = alp_fire*falp_fire
+            alp_fire = alp_fire*alp_fire
             write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
      &           ,dt,alp_fire,fdotv
           endif
@@ -1850,18 +1992,23 @@ c=======================================================================
      &     ,ierr)
       end subroutine vfire
 c=======================================================================
-      subroutine space_decomp()
+      subroutine space_decomp(hunit,h,ntot,tagtot,rtot,vtot
+     &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz)
 c
 c  Decompose the system and scatter atoms to every process.
 c  This would be called only the first time, but the routine is
 c  written as if it is called several times.
 c
-      use variables
+      use pmdvars
       implicit none
       include 'mpif.h'
-      integer:: istat(mpi_status_size)
+      integer,intent(in):: ntot,myid_md,mpi_md_world,nx,ny,nz,nxyz
+      real(8),intent(in):: tagtot(ntot),vtot(3,ntot)
+      real(8),intent(in):: hunit,h(3,3,0:1)
+      real(8),intent(inout):: rtot(3,ntot)
 
-      integer:: i,j,ixyz,n
+      integer:: istat(mpi_status_size)
+      integer:: i,j,ixyz,n,ierr
       integer:: myxt,myyt,myzt,nmax,nmin
       real(8):: sxogt,syogt,szogt
       real(8):: t0
@@ -1930,12 +2077,12 @@ c.....allocate memory for local arrays of length namax
         allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax)
      &       ,strs(3,3,namax),stt(3,3,namax),tag(namax)
      &       ,lspr(0:nnmax,namax),epi(namax),eki(3,3,namax)
-     &       ,stp(3,3,namax),stn(3,3,namax),lsb(0:nbmax,6)
-     &       ,lsex(nbmax,6))
+     &       ,stp(3,3,namax),stn(3,3,namax)
+     &       ,lsb(0:nbmax,6),lsex(nbmax,6))
       endif
 
       call mpi_bcast(hunit,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(h,9,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(h,9*2,mpi_double_precision,0,mpi_md_world,ierr)
 
       ixyz= 0
       if( myid_md.eq.0 ) then
@@ -1987,16 +2134,23 @@ c        write(6,'(a,f10.3)') ' time space_decomp = ',mpi_wtime() -t0
 
       end subroutine space_decomp
 c=======================================================================
-      subroutine space_comp()
+      subroutine space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
+     &     ,stot,natm,tag,ra,va,aa,epi,eki,strs,sorg
+     &     ,nxyz,myid_md,mpi_md_world,tspdcmp)
 c
 c  Opposite to space_decomp, gather atoms from every process
 c  to create the total system for output.
 c
-      use variables
       implicit none
       include 'mpif.h'
-      integer,parameter:: nmpi = 7
-      integer:: n0,ixyz,natmt,i
+      integer,intent(in):: ntot,natm,nxyz,myid_md,mpi_md_world
+      real(8),intent(in):: va(3,natm),aa(3,natm),epi(natm),eki(3,3,natm)
+     &     ,strs(3,3,natm),tag(natm),sorg(3)
+      real(8),intent(inout):: ra(3,natm),tspdcmp
+      real(8),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
+     &     ,atot(3,ntot),epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot)
+      integer,parameter:: nmpi = 8
+      integer:: n0,ixyz,natmt,i,ierr
       integer:: istat(mpi_status_size),itag
       real(8):: t0
 
@@ -2007,6 +2161,7 @@ c
         tagtot(1:natm) = tag(1:natm)
         rtot(1:3,1:natm) = ra(1:3,1:natm)
         vtot(1:3,1:natm) = va(1:3,1:natm)
+        atot(1:3,1:natm) = aa(1:3,1:natm)
         epitot(1:natm) = epi(1:natm)
         ekitot(1:3,1:3,1:natm) = eki(1:3,1:3,1:natm)
         stot(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
@@ -2027,6 +2182,8 @@ c
      &         ,ixyz,itag+5,mpi_md_world,istat,ierr)
           call mpi_recv(stot(1,1,n0),3*3*natmt,mpi_double_precision
      &         ,ixyz,itag+6,mpi_md_world,istat,ierr)
+          call mpi_recv(atot(1,n0),3*natmt,mpi_double_precision
+     &         ,ixyz,itag+7,mpi_md_world,istat,ierr)
           n0 = n0 + natmt
         enddo
         tspdcmp = tspdcmp +(mpi_wtime()-t0)
@@ -2037,11 +2194,13 @@ c        write(6,'(a,f10.3)') ' time space_comp = ',mpi_wtime() -t0
      &       ,mpi_md_world,ierr)
         call mpi_send(tag,natm,mpi_double_precision,0,itag+1
      &       ,mpi_md_world,ierr)
+c.....positions should be shifted before passing data
         do i=1,natm
           ra(1:3,i) = ra(1:3,i) + sorg(1:3)
         enddo
         call mpi_send(ra,3*natm,mpi_double_precision,0,itag+2
      &       ,mpi_md_world,ierr)
+c.....positions should be reverted after passing data
         do i=1,natm
           ra(1:3,i) = ra(1:3,i) - sorg(1:3)
         enddo
@@ -2052,6 +2211,8 @@ c        write(6,'(a,f10.3)') ' time space_comp = ',mpi_wtime() -t0
         call mpi_send(eki,3*3*natm,mpi_double_precision,0,itag+5
      &       ,mpi_md_world,ierr)
         call mpi_send(strs,3*3*natm,mpi_double_precision,0,itag+6
+     &       ,mpi_md_world,ierr)
+        call mpi_send(aa,3*natm,mpi_double_precision,0,itag+7
      &       ,mpi_md_world,ierr)
       endif
 
