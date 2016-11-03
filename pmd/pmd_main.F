@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2016-11-02 22:26:35 Ryo KOBAYASHI>
+c                     Last-modified: <2016-11-03 12:00:02 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -81,7 +81,8 @@ c.....write energy, forces and stresses only for fitpot
       if( myid_md.eq.0 ) then
         call write_force(21,'.pmd',h,epot,ntot,tagtot,atot,ptnsr)
       endif
-      
+
+      deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot)
       call mpi_finalize(ierr)
         
       end program pmd
@@ -311,5 +312,5 @@ c.....Write stress tensor
 c=======================================================================
 c-----------------------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make pmd2"
+c     compile-command: "make pmd"
 c     End:

@@ -23,15 +23,12 @@ MPIFLAGS= @FCFLAGS@
 .F90.o: 
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
-pmd= read_input.o parallel_md.o util_vec.o util_rnd.o util_tag.o \
-	lasubs.o util_pmd.o zload.o mk_lspr.o common_parallel.o sort.o
-pmd2= pmd_main.o pmd_core.o read_input.o util_vec.o util_rnd.o \
+pmd= pmd_main.o pmd_core.o read_input.o util_vec.o util_rnd.o \
     util_tag.o lasubs.o util_pmd.o zload.o mk_lspr.o \
 	  common_parallel.o sort.o
 pmc= prec_mc.o util_rnd.o mk_lspr.o read_input.o
 
-mods= mod_variables.o
-mods2= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o
+mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o
 args= iargc.o getarg.o
 
 forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
@@ -48,7 +45,6 @@ params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 #-----------------------------------------------------------------------
 # Post process programs
 #
-comb= combine_pmd.o read_input.o util_pmd.o sort.o
 pmd2akr= pmd2akr.o read_input.o util_pmd.o sort.o
 
 #-----------------------------------------------------------------------
@@ -61,14 +57,8 @@ all: ${execs}
 clean:
 	rm -f *.o *.mod *~ ${execs}
 
-nconv: node_conv.o ${mods} read_input.o util_pmd.o
-	${MPIFC} ${MPIFLAGS} -o $@ ${mods} node_conv.o read_input.o util_pmd.o
-
 pmd: ${mods} ${pmd} ${forces} ${params}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmd}
-
-pmd2: ${mods2} ${pmd2} ${forces} ${params}
-	${MPIFC} ${MPIFLAGS} -o $@ ${mods2} ${forces} ${pmd2}
 
 pmc: ${mods} ${pmc}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${pmc}
@@ -114,12 +104,10 @@ intstl: put_interstitials.o ${mod} util_pmd.o mk_lspr.o
 
 
 #.....Dependencies
-parallel_md.o: ${mods} ${forces}
-small_md_core.o: ${mods} ${forces}
-small_md.o: ${mods} ${forces} small_md_core.o
+pmd_main.o: ${mods}
+pmd_core.o: ${mods} ${forces}
 read_input.o:  ${mods}
 node_conv.o:   ${mods}
-combine_pmd.o: ${mods}
 pmd2akr.o: ${mods}
 put_interstitials.o: ${mods}
 force_Ito_W-He.o: ${mods}

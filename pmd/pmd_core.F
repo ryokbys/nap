@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2016-11-02 22:24:11 Ryo KOBAYASHI>
+c                     Last-modified: <2016-11-03 11:59:56 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file include core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -665,13 +665,15 @@ c          call system("mkdir -p "//cnum)
       endif
 
 c.....revert forces to the unit eV/A before going out pmd_core
-      do i=1,ntot
-        is= int(tagtot(i))
-        aai(1:3)= h(1:3,1,0)*atot(1,i)
-     &       +h(1:3,2,0)*atot(2,i)
-     &       +h(1:3,3,0)*atot(3,i)
-        atot(1:3,i) = aai(1:3)/acon(is)
-      enddo
+      if( myid_md.eq.0 ) then
+        do i=1,ntot
+          is= int(tagtot(i))
+          aai(1:3)= h(1:3,1,0)*atot(1,i)
+     &         +h(1:3,2,0)*atot(2,i)
+     &         +h(1:3,3,0)*atot(3,i)
+          atot(1:3,i) = aai(1:3)/acon(is)
+        enddo
+      endif
 
       deallocate(acon,fack)
 
@@ -2268,5 +2270,5 @@ c
 c=======================================================================
 c-----------------------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make pmd2"
+c     compile-command: "make pmd"
 c     End:
