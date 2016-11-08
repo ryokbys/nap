@@ -5,8 +5,8 @@ num_nodes_z                 1
 io_format                 ascii
 
 time_interval                1.0
-num_iteration              0
-min_iteration               1
+num_iteration              10
+min_iteration              1
 num_out_energy             10
 
 flag_out_pmd                1
@@ -36,3 +36,4 @@ mass                       1    26.9820
 mass                       2    24.3050
 mass                       3    28.0850
 
+print_level   1

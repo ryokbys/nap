@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2016-11-03 11:59:56 Ryo KOBAYASHI>
+c                     Last-modified: <2016-11-08 20:52:03 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file include core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -84,8 +84,8 @@ c-----output every these steps, NOUTERG, NOUTPMD
       endif
 c.....perform space decomposition after reading atomic configuration
       call space_decomp(hunit,h,ntot,tagtot,rtot,vtot
-     &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz)
-      if( myid_md.eq.0 ) then
+     &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
+      if( myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,'(a)') " H-matrix:"
         write(6,'(3es15.7)') h(1:3,1,0)
         write(6,'(3es15.7)') h(1:3,2,0)
@@ -145,7 +145,7 @@ c-----get total number of particles
       nisl = nis
       call mpi_allreduce(nisl,nis,1,MPI_INTEGER,mpi_max
      &     ,mpi_md_world,ierr)
-      if(myid_md.eq.0) then
+      if(myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,'(a,i10)') " ntot=",ntot
         write(6,'(a,i10)') " nis =",nis
       endif
@@ -154,7 +154,7 @@ c.....Set initial temperature if needed
       if( tinit.gt.1d-5 ) then
         call setv(h,natm,tag,va,nismax,am,tinit,dt)
         call rm_trans_motion(natm,tag,va,nismax,am
-     &       ,mpi_md_world,myid_md)
+     &       ,mpi_md_world,myid_md,iprint)
       elseif( abs(tinit).le.1d-5 ) then
         va(1:3,1:natm)= 0d0
       endif
@@ -184,7 +184,7 @@ c-----copy RA of boundary atoms
      &     ,nx,ny,nz,myid_md)
       call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity
-     &     ,lsrc,sv,nex,mpi_md_world)
+     &     ,lsrc,sv,nex,mpi_md_world,iprint)
 c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
@@ -208,11 +208,11 @@ c-----calc kinetic energy
      &     ,vmax,mpi_md_world)
       vmaxold=vmax
 c.....get_num_dof is called once in a MD run
-      call get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world)
+      call get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world,iprint)
 
       if( trim(cpctl).eq.'Berendsen' .or.
      &     trim(cpctl).eq.'vc-Berendsen' ) then
-        if(myid_md.eq.0) then
+        if(myid_md.eq.0 .and. iprint.ne.0 ) then
           write(6,*) ''
           write(6,'(a)') ' variable-cell Berendsen is chosen'
           write(6,'(a)') ' target stress (GPa):'
@@ -222,7 +222,7 @@ c.....get_num_dof is called once in a MD run
         endif
         stgt(1:3,1:3)= stgt(1:3,1:3) *gpa2up
       else if( trim(cpctl).eq.'vv-Berendsen' ) then
-        if(myid_md.eq.0) then
+        if(myid_md.eq.0 .and. iprint.ne.0 ) then
           write(6,*) ''
           write(6,'(a)') ' variable-volume Berendsen is chosen'
           write(6,'(a,f10.2,a,es12.4,a)')
@@ -233,7 +233,7 @@ c.....get_num_dof is called once in a MD run
       call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
      &     ,dt,srlx,stbeta,vol,avol,ptnsr,mpi_md_world,cpctl)
 c      ptnsr(1:3,1:3)= ptnsr(1:3,1:3)/vol
-      if( myid_md.eq.0 ) then
+      if( myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,'(a,6f10.3)')' stress tensor [GPa]: '
      &       ,ptnsr(1,1)*up2gpa,ptnsr(2,2)*up2gpa,ptnsr(3,3)*up2gpa
      &       ,ptnsr(2,3)*up2gpa,ptnsr(3,1)*up2gpa,ptnsr(1,2)*up2gpa
@@ -248,7 +248,7 @@ c.....Considering vmax==0d0, make istpe small only for the first step
       if( istpe.gt.100 ) istpe=100
 c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
 
-      if(myid_md.eq.0) then
+      if(myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,*) ''
         write(6,'(1x,a)') "initial values:"
         write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
@@ -393,7 +393,7 @@ c.....Move atoms that cross the boundary
 c.....Copy RA of boundary atoms
           call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax,natm,nb
      &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv,nex
-     &         ,mpi_md_world)
+     &         ,mpi_md_world,iprint)
 c.....Make pair list
           call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h
      &         ,hi,anxi,anyi,anzi,lspr)
@@ -550,7 +550,8 @@ c---------output step, time, and temperature
           if(myid_md.eq.0) then
             if( trim(cpctl).eq.'Berendsen' .or.
      &           trim(cpctl).eq.'vc-Berendsen' .or.
-     &           trim(cpctl).eq.'vv-Berendsen' ) then
+     &           trim(cpctl).eq.'vv-Berendsen' .and.
+     &           iprint.ne.0 ) then
               write(6,'(a,i8,2f10.2,es15.7,2es11.3)')
      &             " istp,time,temp,epot,vol,prss="
      &             ,istp,tcpu,tave,epot,vol
@@ -562,7 +563,7 @@ c---------output step, time, and temperature
      &             ,ptnsr(1,1)*up2gpa ,ptnsr(2,2)*up2gpa
      &             ,ptnsr(3,3)*up2gpa ,ptnsr(2,3)*up2gpa
      &             ,ptnsr(1,3)*up2gpa ,ptnsr(1,2)*up2gpa
-            else
+            elseif( iprint.ne.0 ) then
               write(6,'(a,i8,2f10.2,es15.7)')
      &             " istp,time,temp,epot="
      &             ,istp,tcpu,tave,epot
@@ -581,7 +582,7 @@ c.....check convergence criteria if it is dumped MD
      &       abs(epot-epotp).lt.eps_conv .and. istp.gt.minstp ) then
           i_conv = i_conv + 1
           if( i_conv.ge.n_conv ) then
-            if( myid_md.eq.0 ) then
+            if( myid_md.eq.0 .and. iprint.ne.0 ) then
               write(6,'(a,i6,a,es10.3,a,i3,a)')
      &             ' damped MD converged with ',istp,
      &             ' steps, since ediff < ',
@@ -633,7 +634,7 @@ c          call system("mkdir -p "//cnum)
       endif
       
       tcpu= tcpu2 -tcpu1
-      if(myid_md.eq.0) then
+      if( myid_md.eq.0 .and. iprint.ne. 0 ) then
         write(6,*) ''
         write(6,'(1x,a)') "final values:"
         write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
@@ -675,7 +676,13 @@ c.....revert forces to the unit eV/A before going out pmd_core
         enddo
       endif
 
+c.....deallocate all the arrays allocated in pmd_core
+      if( ltdst ) then
+        deallocate(tdst,nadst)
+      endif
       deallocate(acon,fack)
+      deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
+     &     ,epi,eki,stp,stn,lsb,lsex)
 
       end subroutine pmd_core
 c=======================================================================
@@ -949,10 +956,11 @@ c.....initialize tdst
 
       end subroutine calc_temp_dist
 c=======================================================================
-      subroutine get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world)
+      subroutine get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world
+     &     ,iprint)
       implicit none
       include 'mpif.h'
-      integer,intent(in):: natm,myid_md,mpi_md_world
+      integer,intent(in):: natm,myid_md,mpi_md_world,iprint
       real(8),intent(in):: tag(natm),fmv(3,0:9)
       integer,intent(out):: ndof(9)
       
@@ -971,7 +979,8 @@ c=======================================================================
       ndof(1:9)= 0
       call mpi_allreduce(ndofl,ndof,9,mpi_integer,mpi_sum
      &     ,mpi_md_world,ierr)
-      if(myid_md.eq.0) write(6,'(a,9i9)') ' ndof=',ndof(1:9)
+      if(myid_md.eq.0 .and. iprint.ne.0 )
+     &     write(6,'(a,9i9)') ' ndof=',ndof(1:9)
 c      write(6,'(a,i3,a,9i6)') ' myid=',myid_md,': ndof=',ndof(1:9)
       return
       end subroutine get_num_dof
@@ -1153,7 +1162,7 @@ c      print *, 'bacopy: nb=',nb
 c=======================================================================
       subroutine bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid,myparity
-     &     ,lsrc,sv,nex,mpi_md_world)
+     &     ,lsrc,sv,nex,mpi_md_world,iprint)
 c-----------------------------------------------------------------------
 c Exchanges boundary-atom data among neighbor nodes: tag and ra
 c Normal data passing and repeating the cell are mixed, and
@@ -1164,7 +1173,7 @@ c-----------------------------------------------------------------------
       implicit none
       include 'mpif.h'
       integer,intent(in):: namax,nbmax,nn(6)
-     &     ,myid,myparity(3),mpi_md_world
+     &     ,myid,myparity(3),mpi_md_world,iprint
       integer,intent(inout):: natm,nb,lsb(0:nbmax,6),lsex(nbmax,6)
      &     ,lsrc(6),nex(3)
       real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
@@ -1192,7 +1201,7 @@ c-----calculate the cut-off lengths
         rcv(kd)= rc*asgm/vol
         nex(kd)= int(rcv(kd)) +1
       enddo
-      if( l1st .and. myid.eq.0 ) then
+      if( l1st .and. myid.eq.0 .and. iprint.ne.0 ) then
         write(6,'(a,3f10.3)') ' rcv = ',rcv(1:3)
         write(6,'(a,3i10)')   ' nex = ',nex(1:3)
       endif
@@ -1880,10 +1889,10 @@ c     &       ,va(1:3,i)
       end subroutine setv
 c=======================================================================
       subroutine rm_trans_motion(natm,tag,va,nismax,am
-     &     ,mpi_md_world,myid_md)
+     &     ,mpi_md_world,myid_md,iprint)
       implicit none
       include 'mpif.h'
-      integer,intent(in):: natm,nismax,mpi_md_world,myid_md
+      integer,intent(in):: natm,nismax,mpi_md_world,myid_md,iprint
       real(8),intent(in):: tag(natm),am(nismax)
       real(8),intent(out):: va(3,natm)
       
@@ -1921,7 +1930,7 @@ c-----set center of mass motion to zero
         va(3,i)=va(3,i)-sumpz/amtot
       enddo
 
-      if( myid_md.eq.0 ) then
+      if( myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,'(a,3es12.4)') ' sumpx,y,z/amtot='
      &       ,sumpx/amtot,sumpy/amtot,sumpz/amtot
       endif
@@ -1995,7 +2004,7 @@ c=======================================================================
       end subroutine vfire
 c=======================================================================
       subroutine space_decomp(hunit,h,ntot,tagtot,rtot,vtot
-     &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz)
+     &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
 c
 c  Decompose the system and scatter atoms to every process.
 c  This would be called only the first time, but the routine is
@@ -2005,6 +2014,7 @@ c
       implicit none
       include 'mpif.h'
       integer,intent(in):: ntot,myid_md,mpi_md_world,nx,ny,nz,nxyz
+     &     ,iprint
       real(8),intent(in):: tagtot(ntot),vtot(3,ntot)
       real(8),intent(in):: hunit,h(3,3,0:1)
       real(8),intent(inout):: rtot(3,ntot)
@@ -2063,15 +2073,17 @@ c.....count max number of atoms in a node
             nmax = max(nmax,n)
             nmin = min(nmin,n)
           enddo
-          write(6,'(a,i10)') ' min number of local atoms = ',nmin
-          write(6,'(a,i10)') ' max number of local atoms = ',nmax
           namax = max(int(nmax*1.2),200)
           nbmax = namax*27
           namax = namax +nbmax
-          write(6,'(a,i10)')   ' nbmax = nmax*1.2*27       = ',nbmax
-          write(6,'(a,i10)')   ' namax = nmax*1.2 + nbmax  = ',namax
-          write(6,'(a,i10,a)') ' memory for main routine   = '
-     &         ,namax*(3*4 +3*3*5 +1 +nnmax/2)*8/1000/1000,' MB'
+          if( iprint.ne.0 ) then
+            write(6,'(a,i10)') ' min number of local atoms = ',nmin
+            write(6,'(a,i10)') ' max number of local atoms = ',nmax
+            write(6,'(a,i10)')   ' nbmax = nmax*1.2*27       = ',nbmax
+            write(6,'(a,i10)')   ' namax = nmax*1.2 + nbmax  = ',namax
+            write(6,'(a,i10,a)') ' memory for main routine   = '
+     &           ,namax*(3*4 +3*3*5 +1 +nnmax/2)*8/1000/1000,' MB'
+          endif
         endif
         call mpi_bcast(namax,1,mpi_integer,0,mpi_md_world,ierr)
         call mpi_bcast(nbmax,1,mpi_integer,0,mpi_md_world,ierr)
@@ -2268,6 +2280,25 @@ c
 
       end subroutine sort_by_tag
 c=======================================================================
+      subroutine error_mpi_stop(cerrmsg)
+      use pmdmpi
+      implicit none
+      character(len=*):: cerrmsg
+
+      integer:: ierr
+      
+      if(myid_md.eq.0) then
+        write(6,'(a)')
+     &       '=================================================='
+        write(6,'(a)') ' !!! ERROR !!!'
+        write(6,'(a)') '   '
+     &       //trim(cerrmsg)
+        write(6,'(a)')
+     &       '=================================================='
+      endif
+      call mpi_finalize(ierr)
+      stop
+      end subroutine error_mpi_stop
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"

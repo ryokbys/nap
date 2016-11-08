@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2016-11-03 12:00:02 Ryo KOBAYASHI>
+c                     Last-modified: <2016-11-04 14:11:05 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -255,26 +255,6 @@ c.....NEMD
       endif
 
       end subroutine bcast_params
-c=======================================================================
-      subroutine error_mpi_stop(cerrmsg)
-      use pmdmpi
-      implicit none
-      character(len=*):: cerrmsg
-
-      integer:: ierr
-      
-      if(myid_md.eq.0) then
-        write(6,'(a)')
-     &       '=================================================='
-        write(6,'(a)') ' !!! ERROR !!!'
-        write(6,'(a)') '   '
-     &       //trim(cerrmsg)
-        write(6,'(a)')
-     &       '=================================================='
-      endif
-      call mpi_finalize(ierr)
-      stop
-      end subroutine error_mpi_stop
 c=======================================================================
       subroutine write_force(ionum,cpostfix,h,epot,ntot
      &     ,tagtot,atot,ptnsr)

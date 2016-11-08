@@ -63,7 +63,7 @@ contains
 
     if( l1st ) then
 !.....read in.params.NN
-      call read_params(myid,mpi_world,rcin,rc3)
+      call read_params(myid,mpi_world,rcin,rc3,iprint)
 !.....reset rc
       if( myid.le.0 .and. rc .lt. rcin- 1d-8) then
         write(6,'(a,f10.5,a,f10.5)') &
@@ -104,7 +104,7 @@ contains
         nalmax = nal
         nnlmax = nnl
       endif
-      if( myid.le.0 ) then
+      if( myid.le.0 .and. iprint.ne.0 ) then
         write(6,'(a,2i10)') ' max num of (local atoms *1.1) = ',nalmax
         write(6,'(a,2i10)') ' max num of (neighbors *1.1)   = ',nnlmax
         write(6,'(a,i10,a)') ' gsf size  = ', &
@@ -522,11 +522,11 @@ contains
     return
   end function dsigmoid
 !=======================================================================
-  subroutine read_params(myid,mpi_world,rcin,rc3)
+  subroutine read_params(myid,mpi_world,rcin,rc3,iprint)
     implicit none
     include 'mpif.h'
 
-    integer,intent(in):: myid,mpi_world
+    integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(out):: rcin,rc3
     integer:: itmp,ierr,i,j,k,nc,ncoeff,is,js,ks &
          ,n,ihl0,ihl1,ihl2,icmb(3),nsf,nsf1,nsf2,iap,jap,kap
@@ -616,7 +616,7 @@ contains
       endif
     enddo
     if( nsf.ne.nsf1+nsf2 ) then
-      if(myid.eq.0) then
+      if(myid.eq.0 ) then
         print *,'[Error] nsf.ne.nsf1+nsf2 !!!'
       endif
       call mpi_finalize(ierr)
@@ -635,7 +635,7 @@ contains
       nwgt(i)= nhl(i-1)*nhl(i)
 !      print *,' i,nhl(i-1),nhl(i),nwgt(i)=',i,nhl(i-1),nhl(i),nwgt(i)
     enddo
-    if( myid.le.0 ) then
+    if( myid.le.0 .and. iprint.ne.0 ) then
       print *, 'num of basis funcs =',nhl(0)
       do i=1,nl
         print *, 'ihl, nhl(ihl)  =',i,nhl(i)
@@ -666,7 +666,7 @@ contains
 !.....check whether the num of parameters is correct
     if( rc3.gt.rcin ) then
       rc3= rcin
-      if( myid.le.0 ) then
+      if( myid.le.0 .and. iprint.ne.0 ) then
         write(6,*) ' rc3 was corrected to rcin = ',rcin
         write(6,*) ' because input rc3 > rc, which should not happen.'
       endif

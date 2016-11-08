@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2016-10-31 23:48:49 Ryo KOBAYASHI>
+!                     Last-modified: <2016-11-04 14:07:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 module pmc
 ! 
@@ -18,8 +18,9 @@ module pmc
   integer:: ncx = 6
   integer:: ncy = 6
   integer:: ncz = 6
+  integer:: natm
   real(8):: hmat(3,3),hmati(3,3)
-  real(8),allocatable:: sites(:,:),tagmc(:),epimc(:)
+  real(8),allocatable:: pos0(:,:),pos(:,:),tagmc(:),epimc(:)
 !.....symbols and SIDs array
   character,allocatable:: csymbols(:)
   integer(1),allocatable:: i1sids(:)
@@ -49,14 +50,18 @@ module pmc
        15.7d+12 /)
 !.....average migration barriers in eV
 !.....also taken from Mantina et al.
-  real(8):: demig = (/ &
+  real(8):: demig(1:3) = (/ &
        0.58d0, &
        0.42d0, &
        0.55d0 /)
 !.....pair-list for MC only, not to conflict with pmd
   integer,parameter:: nnmaxmc = 20
   integer,allocatable:: lsprmc(:,:)
-
+!.....parallel setting for pmd
+  integer:: nx = 1
+  integer:: ny = 1
+  integer:: nz = 1
+  
 contains
 !=======================================================================
   subroutine symbols2sids(natm,csymbols,i1sids)
@@ -117,13 +122,14 @@ program prec_mc
 !   dat.symbols: MC step, symbol array 
 !   POSCAR_#####: Cell info and atom coordinations of a certain steps.
 !-----------------------------------------------------------------------
-  use variables
   use pmc
   implicit none 
   include "mpif.h"
   include "./params_unit.h"
 
-  integer:: i,j,k,l,m,n
+  integer:: i,j,k,l,m,n,ierr
+  integer:: mpi_md_world,nodes_md,myid_md,myx,myy,myz
+  real(8):: rc,anxi,anyi,anzi,sorg(3)
 
 !.....initialize parallel
   call init_parallel(mpi_md_world,nodes_md,myid_md)
@@ -135,9 +141,9 @@ program prec_mc
 
 !.....create 1st Al fcc crystal
   natm = ncx*ncy*ncz*4
-  allocate(csymbols(natm),i1sids(natm), &
-       sites(3,natm),tagmc(natm),epimc(natm))
-  call create_Al_fcc(ncx,ncy,ncz,natm,alat,sites,csymbols,hmat)
+  allocate(csymbols(natm),i1sids(natm),pos0(3,natm),pos(3,natm) &
+       ,tagmc(natm),epimc(natm))
+  call create_Al_fcc(ncx,ncy,ncz,natm,alat,pos0,csymbols,hmat)
   call symbols2sids(natm,csymbols,i1sids)
   hmati(1:3,1:3) = 0d0
   hmati(1,1) = 1d0/hmat(1,1)
@@ -148,19 +154,19 @@ program prec_mc
   rc = 3.0
   allocate(lsprmc(0:nnmaxmc,natm))
   call make_tag(natm,csymbols,tagmc)
-  call mk_lspr_sngl(natm,natm,nnmaxmc,tagmc,sites,rc,hmat,hmati,lsprmc)
+  call mk_lspr_sngl(natm,natm,nnmaxmc,tagmc,pos0,rc,hmat,hmati,lsprmc)
 !.....check restart,
 !     if not restart, initialize system eigher random or clustered
   if( init_strct.eq.1 ) then  ! random
     call random_symbols(natm,csymbols,num_Mg,num_Si,num_Vac)
   elseif( init_strct.eq.2 ) then  ! clustered
-    call clustered_symbols(natm,sites,csymbols,num_Mg,num_Si,num_Vac &
+    call clustered_symbols(natm,pos0,csymbols,num_Mg,num_Si,num_Vac &
          ,nnmaxmc,lsprmc)
   elseif( init_strct.eq.3 ) then  ! read from file (restart)
     call read_symbols(11,'dat.symbols',natm,csymbols)
   endif
 
-  call write_POSCAR('POSCAR_000000',natm,csymbols,sites,hmat,species)
+  call write_POSCAR('POSCAR_000000',natm,csymbols,pos0,hmat,species)
   
   if( myid_md.eq.0 ) write(6,'(a)') ' program pmc ends'
   call mpi_finalize(ierr)
@@ -291,7 +297,6 @@ subroutine read_in_pmc(ionum,cfname)
 end subroutine read_in_pmc
 !=======================================================================
 subroutine read_in_pmc_core(ionum,cname)
-  use variables
   use pmc
   implicit none
   integer,intent(in):: ionum
@@ -450,13 +455,13 @@ subroutine random_symbols(natm,csymbols,num_Mg,num_Si,num_Vac)
   
 end subroutine random_symbols
 !=======================================================================
-subroutine clustered_symbols(natm,sites,csymbols &
+subroutine clustered_symbols(natm,pos0,csymbols &
      ,num_Mg,num_Si,num_Vac,nnmax,lspr)
   implicit none
   integer,intent(in):: natm,num_Mg,num_Si,num_Vac &
        ,nnmax,lspr(0:nnmax,natm)
   character,intent(inout):: csymbols(natm)
-  real(8),intent(in):: sites(3,natm)
+  real(8),intent(in):: pos0(3,natm)
 
   integer:: i,jj,j,irnd,nsol,isol,icntr
   real(8):: cntr(3),dmin,d
@@ -468,9 +473,9 @@ subroutine clustered_symbols(natm,sites,csymbols &
   icntr = -1
   dmin = 1d+30
   do i = 1,natm
-    d = (cntr(1)-sites(1,i))**2 &
-         +(cntr(2)-sites(2,i))**2 &
-         +(cntr(3)-sites(3,i))**2
+    d = (cntr(1)-pos0(1,i))**2 &
+         +(cntr(2)-pos0(2,i))**2 &
+         +(cntr(3)-pos0(3,i))**2
     if( d < dmin ) then
       dmin = d
       icntr = i
@@ -601,20 +606,110 @@ subroutine write_POSCAR(cfname,natm,csymbols,pos,hmat,species)
   
 end subroutine write_POSCAR
 !=======================================================================
-subroutine run_pmd(hmat,sites,csymbols,epimc,epotmc &
-     ,nstps_pmd,)
-  use variables
+subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
+     ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
   implicit none
-  real(8),intent(in):: hmat(3,3),sites(3,natm)
+  integer,intent(in):: natm,nstps_pmd,nx,ny,nz&
+       ,mpi_md_world,nodes_md,myid_md
+  real(8),intent(in):: hmat(3,3),pos0(3,natm)
   real(8),intent(out):: epimc(natm),epotmc
+  character,intent(in):: csymbols(natm)
 
-  integer:: i
+  integer:: i,inc
+  integer,parameter:: nismax = 9
+  integer:: nstp,nerg,npmd,ifpmd,minstp,ntdst,n_conv,ifsort,iprint &
+       ,ifdmp
+  real(8):: hunit,h(3,3,0:1),am(nismax),dt,rc,dmp,tinit,tfin,ttgt(9)&
+       ,trlx,stgt(3,3),ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3) &
+       ,epot,ekin,eps_conv,rbuf
+  character:: ciofmt*6,cforce*20,ctctl*20,cpctl*20,czload_type*5,csi*1
+  logical:: ltdst
+  
+  logical,save:: l1st = .true.
+  integer,save:: ntot
+  real(8),save,allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:) &
+       ,epitot(:),ekitot(:,:,:),stot(:,:,:)
+
+!.....at the 1st call, evaluate number of total atoms to be used in pmd
+!     and allocate total system arrays
+  if( l1st ) then
+    inc = 0
+    do i = 1,natm
+      csi = csymbols(i)
+      if( csi.eq.'V' ) cycle
+      inc = inc + 1
+    enddo
+    ntot = inc
+    allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),atot(3,ntot) &
+         ,epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot))
+  endif
 
   call make_tag(natm,csymbols,tagtot)
+  hunit = 1d0
   h(1:3,1:3,0) = hmat(1:3,1:3)
+  
+  inc = 0
   do i = 1,natm
-    rtot(1:3,i) = sites(1:3,i)
+    csi = csymbols(i)
+    if( csi.eq.'V' ) cycle
+    inc = inc + 1
+    rtot(1:3,inc) = pos0(1:3,i)
+    vtot(1:3,inc) = 0d0
+    atot(1:3,inc) = 0d0
+    stot(1:3,1:3,inc) = 0d0
+    ekitot(1:3,1:3,inc) = 0d0
+    epitot(inc) = 0d0
   enddo
+  nstp = ntot
+  nerg = nstp
+  npmd = 1
+  am(1:9) = 1d0
+  am(1) = 26.982  ! Al
+  am(2) = 24.305  ! Mg
+  am(3) = 28.085  ! Si
+  dt = 5d0
+  ciofmt = 'ascii'
+  ifpmd = 1
+  cforce = 'NN'
+  rc = 5.8d0
+  rbuf = 0.2d0
+  ifdmp = 2  ! FIRE
+  dmp = 0.99d0
+  minstp = 3
+  tinit = 100d0
+  tfin = 1d0
+  ctctl = 'none'
+  ttgt(1:9) = 300d0
+  trlx = 100d0
+  ltdst = .false.
+  ntdst = 1
+  cpctl = 'none'
+  stgt(1:3,1:3) = 0d0
+  ptgt = 0d0
+  srlx = 100d0
+  stbeta = 1d-1
+  strfin = 0d0
+  fmv(1:3,0) = (/ 0d0, 0d0, 0d0 /)
+  fmv(1:3,1:9) = 1d0
+  ptnsr(1:3,1:3) = 0d0
+  epot = 0d0
+  ekin = 0d0
+  n_conv = 1
+  czload_type = 'no'
+  eps_conv = 1d-3
+  ifsort = 1
+  iprint = 1
+
+!.....call pmd_core to perfom MD
+  call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot &
+       ,ekitot,epitot,nstp,nerg,npmd,myid_md,mpi_md_world,nodes_md &
+       ,nx,ny,nz &
+       ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp &
+       ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
+       ,srlx,stbeta,strfin &
+       ,fmv,ptnsr,epot,ekin,n_conv &
+       ,czload_type,eps_conv,ifsort,iprint)
+  
   
 end subroutine run_pmd
 !-----------------------------------------------------------------------

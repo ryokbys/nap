@@ -26,7 +26,9 @@ MPIFLAGS= @FCFLAGS@
 pmd= pmd_main.o pmd_core.o read_input.o util_vec.o util_rnd.o \
     util_tag.o lasubs.o util_pmd.o zload.o mk_lspr.o \
 	  common_parallel.o sort.o
-pmc= prec_mc.o util_rnd.o mk_lspr.o read_input.o
+pmc= prec_mc.o util_rnd.o mk_lspr.o read_input.o pmd_core.o util_vec.o \
+   util_tag.o lasubs.o util_pmd.o zload.o \
+   common_parallel.o sort.o
 
 mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o
 args= iargc.o getarg.o
@@ -60,8 +62,8 @@ clean:
 pmd: ${mods} ${pmd} ${forces} ${params}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmd}
 
-pmc: ${mods} ${pmc}
-	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${pmc}
+pmc: ${mods} ${pmc} ${forces}
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmc}
 
 # smd: ${mods} ${smd} ${forces} ${params}
 # 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${smd}
