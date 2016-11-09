@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2016-11-04 14:07:42 Ryo KOBAYASHI>
+!                     Last-modified: <2016-11-10 06:09:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 module pmc
 ! 
@@ -166,6 +166,10 @@ program prec_mc
     call read_symbols(11,'dat.symbols',natm,csymbols)
   endif
 
+  call kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
+       ,nx,ny,nz,anxi,anyi,anzi,sorg, hmat,natm,pos0,csymbols&
+       ,nstps_relax)
+
   call write_POSCAR('POSCAR_000000',natm,csymbols,pos0,hmat,species)
   
   if( myid_md.eq.0 ) write(6,'(a)') ' program pmc ends'
@@ -173,11 +177,30 @@ program prec_mc
 
 end program prec_mc
 !=======================================================================
-subroutine kinetic_mc()
+subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
+     ,nx,ny,nz,anxi,anyi,anzi,sorg, hmat,natm,pos0,csymbols,nstps_relax)
 !
 ! Kinetic MC simulation using
 !
-  use pmc
+  implicit none
+  integer,intent(in):: mpi_md_world,nodes_md,myid_md,myx,myy,myz &
+       ,nx,ny,nz,natm,nstps_relax
+  real(8),intent(in):: anxi,anyi,anzi,sorg(3),hmat(3,3),pos0(3,natm)
+  character,intent(in):: csymbols(natm)
+
+  real(8):: epotmc
+  real(8),allocatable:: epimc(:)
+
+  allocate(epimc(natm))
+
+!.....test run pmd
+  print *,'natm,nstps_relax, =',natm,nstps_relax
+  print *,'nx,ny,nz = ',nx,ny,nz
+  call run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
+       ,nstps_relax,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+  print *,'epotmc = ',epotmc
+  print *,'epimc(1) =',epimc(1)
+  print *,'epimc(N) =',epimc(natm)
   
 !.....initialize some values here
   
@@ -205,6 +228,8 @@ subroutine kinetic_mc()
 !.....proceed real-time clock
 
 !.....output if needed
+
+  deallocate(epimc)
   
   return
 end subroutine kinetic_mc
@@ -608,6 +633,7 @@ end subroutine write_POSCAR
 !=======================================================================
 subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
      ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+  use pmc, only: symbol2sid
   implicit none
   integer,intent(in):: natm,nstps_pmd,nx,ny,nz&
        ,mpi_md_world,nodes_md,myid_md
@@ -644,7 +670,6 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
          ,epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot))
   endif
 
-  call make_tag(natm,csymbols,tagtot)
   hunit = 1d0
   h(1:3,1:3,0) = hmat(1:3,1:3)
   
@@ -653,6 +678,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
     csi = csymbols(i)
     if( csi.eq.'V' ) cycle
     inc = inc + 1
+    tagtot(inc) = dble(symbol2sid(csi)) +0.1d0 +1d-14*inc
     rtot(1:3,inc) = pos0(1:3,i)
     vtot(1:3,inc) = 0d0
     atot(1:3,inc) = 0d0
@@ -709,7 +735,16 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,srlx,stbeta,strfin &
        ,fmv,ptnsr,epot,ekin,n_conv &
        ,czload_type,eps_conv,ifsort,iprint)
-  
+
+  inc = 0
+  epimc(1:natm) = 0d0
+  do i = 1,natm
+    csi = csymbols(i)
+    if( csi.eq.'V' ) cycle
+    inc = inc + 1
+    epimc(i) = epitot(inc)
+  enddo
+  epotmc = epot
   
 end subroutine run_pmd
 !-----------------------------------------------------------------------
