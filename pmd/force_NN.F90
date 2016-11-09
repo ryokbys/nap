@@ -18,9 +18,12 @@ module NN
   integer,allocatable:: itype(:)
   real(8),allocatable:: cnst(:,:)
   real(8),allocatable:: hl1(:,:),hl2(:,:)
+!.....symmetry function values and their derivatives
   real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
-  integer,allocatable:: icmb2(:,:),icmb3(:,:,:)
+!.....start and end points of symmetry function IDs for each species pair
   integer,allocatable:: iaddr2(:,:,:),iaddr3(:,:,:,:)
+!.....symmetry function IDs for each pair
+  integer(2),allocatable:: igsf(:,:,:)
 !.....function types and num of constatns for types
   integer,parameter:: max_ncnst= 2
   integer:: ncnst_type(200)
@@ -107,12 +110,15 @@ contains
       if( myid.le.0 .and. iprint.ne.0 ) then
         write(6,'(a,2i10)') ' max num of (local atoms *1.1) = ',nalmax
         write(6,'(a,2i10)') ' max num of (neighbors *1.1)   = ',nnlmax
-        write(6,'(a,i10,a)') ' gsf size  = ', &
-             nhl(0)*nalmax*8/1000/1000,' MB'
-        write(6,'(a,i10,a)') ' dgsf size = ', &
-             int(3*nhl(0),8)*(nnlmax+1)*nalmax*8/1000/1000,' MB'
+        write(6,'(a,f10.3,a)') ' gsf size  = ', &
+             dble(nhl(0)*nalmax*8)/1000/1000,' MB'
+        write(6,'(a,f10.3,a)') ' dgsf size = ', &
+             dble(3*nhl(0)*(nnlmax+1)*nalmax*8)/1000/1000,' MB'
+        write(6,'(a,f10.3,a)') ' igsf size = ', &
+             dble((nhl(0)+1)*(nnlmax+1)*nalmax*2)/1000/1000,' MB'
       endif
-      allocate( gsf(nhl(0),nal),dgsf(3,nhl(0),0:nnl,nal) )
+      allocate( gsf(nhl(0),nal),dgsf(3,nhl(0),0:nnl,nal) &
+           ,igsf(0:nhl(0),0:nnl,nal) )
 
       lrealloc = .false.
       if( nl.eq.1 ) then
@@ -149,8 +155,9 @@ contains
       lrealloc=.true.
     endif
     if( allocated(dgsf).and.lrealloc ) then
-      deallocate( gsf,dgsf )
-      allocate( gsf(nhl(0),nal),dgsf(3,nhl(0),0:nnl,nal) )
+      deallocate( gsf,dgsf,igsf )
+      allocate( gsf(nhl(0),nal),dgsf(3,nhl(0),0:nnl,nal) &
+           ,igsf(0:nhl(0),0:nnl,nal))
       if( nl.eq.1 ) then
         deallocate( hl1 )
         allocate( hl1(nhl(1),nal) )
@@ -254,6 +261,7 @@ contains
 !.....sum up for forces
     aa(1:3,1:natm+nb)= 0d0
     if( nl.eq.1 ) then
+!.....loop over every energy per atom-i
       do ia=1,natm
         do ihl1=1,nhl(1)
           hl1i= hl1(ihl1,ia)
@@ -261,6 +269,7 @@ contains
           do jj=1,lspr(0,ia)
             ja= lspr(jj,ia)
             do ihl0=1,nhl(0)
+              if( igsf(ihl0,jj,ia).eq.0 ) cycle
               aa(1:3,ja)=aa(1:3,ja) &
                    -tmp*wgt11(ihl0,ihl1)*dgsf(1:3,ihl0,jj,ia)
             enddo
@@ -283,6 +292,7 @@ contains
             do jj=1,lspr(0,ia)
               ja= lspr(jj,ia)
               do ihl0=1,nhl(0)
+                if( igsf(ihl0,jj,ia).eq.0 ) cycle
                 aa(1:3,ja)=aa(1:3,ja) &
                      -tmp2 *tmp1 &
                      *wgt21(ihl0,ihl1)*dgsf(1:3,ihl0,jj,ia)
@@ -319,7 +329,6 @@ contains
       aa(1:3,i)= acon(is)*aa(1:3,i)
     enddo
 
-
     if( lstrs ) then
       call compute_stress(namax,natm,tag,ra,nnmax,strs,h &
            ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rc,lspr &
@@ -346,7 +355,7 @@ contains
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,rc3
 !    real(8),intent(out):: gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal)
 
-    integer:: isf,isfc,ia,jj,ja,kk,ka,is,js,ks,isfc1,isfc2
+    integer:: isf,ia,jj,ja,kk,ka,is,js,ks
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
@@ -356,6 +365,7 @@ contains
 
     gsf(1:nsf,1:nal)= 0d0
     dgsf(1:3,1:nsf,0:nnl,1:nal)= 0d0
+    igsf(1:nsf,0:nnl,1:nal) = 0
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
       is= int(tag(ia))
@@ -368,14 +378,11 @@ contains
         dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
         if( dij.ge.rc ) cycle
         js= int(tag(ja))
-        isfc=0
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
         fcij= fc(dij,rc)
         dfcij= dfc(dij,rc)
         do isf=iaddr2(1,is,js),iaddr2(2,is,js)
-!!$          isfc= isfc+1
-!!$          isf= (icmb2(is,js)-1)*nsfc1 +isfc1
           if( itype(isf).eq.1 ) then ! Gaussian
             eta= cnst(1,isf)
             rs=  cnst(2,isf)
@@ -389,6 +396,8 @@ contains
             dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfcij
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+            igsf(isf,0,ia) = 1
+            igsf(isf,jj,ia) = 1
           else if( itype(isf).eq.2 ) then ! cosine
             a1= cnst(1,isf)
             !.....func value
@@ -398,6 +407,8 @@ contains
             dgdr= -a1*sin(dij*a1)*fcij +tcos*dfc(dij,rc)
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+            igsf(isf,0,ia) = 1
+            igsf(isf,jj,ia) = 1
           else if( itype(isf).eq.3 ) then ! polynomial
             a1= cnst(1,isf)
             !.....func value
@@ -407,6 +418,8 @@ contains
             dgdr= -a1*dij**(-a1-1d0)*fcij +tpoly*dfc(dij,rc)
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+            igsf(isf,0,ia) = 1
+            igsf(isf,jj,ia) = 1
           else if( itype(isf).eq.4 ) then ! Morse-type
             a1= cnst(1,isf)
             a2= cnst(2,isf)
@@ -418,6 +431,8 @@ contains
             dgdr= 2d0*a1*(1d0-texp)*texp*fcij +tmorse*dfcij
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+            igsf(isf,0,ia) = 1
+            igsf(isf,jj,ia) = 1
           endif
         enddo
 
@@ -437,7 +452,6 @@ contains
           dik= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
           if( dik.ge.rc3 ) cycle
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
-!!$            isf= nsfc1*nc1 +(icmb3(is,js,ks)-1)*nsfc2 +isfc2
             almbd= cnst(1,isf)
             t2= (abs(almbd)+1d0)**2
             fcik= fc(dik,rc)
@@ -463,6 +477,9 @@ contains
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
             dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
+            igsf(isf,0,ia) = 1
+            igsf(isf,jj,ia) = 1
+            igsf(isf,kk,ia) = 1
           enddo
         enddo
       enddo
@@ -730,37 +747,6 @@ contains
     endif
 #endif
 
-!!$!.....read in.comb.NN
-!!$    allocate(icmb2(nsp,nsp),icmb3(nsp,nsp,nsp))
-!!$    inquire(file=trim(cmbfname),exist=lexist)
-!!$    if( .not.lexist ) then
-!!$      if( myid.ge.0 ) then
-!!$        if( myid.eq.0 ) then
-!!$          write(6,'(a)') ' [Error] '//cmbfname//' does not exist !!!.'
-!!$          write(6,'(a)') '   The NN potential needs '//cmbfname//'.'
-!!$        endif
-!!$        call mpi_finalize(ierr)
-!!$        stop
-!!$      else
-!!$        write(6,'(a)') ' [Error] '//cmbfname//' does not exist !!!.'
-!!$        write(6,'(a)') '   The NN potential needs '//cmbfname//'.'
-!!$        stop
-!!$      endif
-!!$    else
-!!$      open(52,file=trim(cmbfname),status='old')
-!!$!.....read pairs
-!!$      do n=1,nc1
-!!$        read(52,*) i,j,icmb2(i,j)
-!!$        icmb2(j,i)= icmb2(i,j)
-!!$      enddo
-!!$!.....read triplets
-!!$      do n=1,nc2
-!!$        read(52,*) i,j,k,icmb3(i,j,k)
-!!$        icmb3(i,k,j)= icmb3(i,j,k)
-!!$      enddo
-!!$      close(52)
-!!$    endif
-
     deallocate(nwgt)
     return
   end subroutine read_params
@@ -881,7 +867,7 @@ contains
     real(8),intent(in):: ra(3,namax),tag(namax),h(3,3),rc,tcom
     real(8),intent(out):: strs(3,3,namax)
 
-    integer:: ia,ja,ixyz,jxyz,ihl0,ihl1,ihl2,jj
+    integer:: ia,ja,ixyz,jxyz,ihl0,ihl1,ihl2,jj,is,js
     real(8):: xi(3),xj(3),xji(3),rij(3),rji(3),dji,sji,sii&
          ,hl2i,hl2j,tmp2i,tmp2j,hl1i,hl1j,tmp1i,tmp1j
 
@@ -889,6 +875,7 @@ contains
     if( nl.eq.1 ) then
       do ia=1,natm
         xi(1:3)= ra(1:3,ia)
+        is = int(tag(ia))
         do jj=1,lspr(0,ia)
           ja= lspr(jj,ia)
           xj(1:3)= ra(1:3,ja)
@@ -897,10 +884,13 @@ contains
           rij(1:3)= -rji(1:3)
           dji= sqrt(rji(1)**2 +rji(2)**2 +rji(3)**2)
           if( dji.ge.rc ) cycle
+          js = int(tag(ja))
           do ihl1=1,nhl(1)
             hl1i= hl1(ihl1,ia)
             tmp1i= wgt12(ihl1)*hl1i*(1d0-hl1i)
+!!$            do ihl0=iaddr2(1,is,js),iaddr2(2,is,js)
             do ihl0=1,nhl(0)
+              if( igsf(ihl0,jj,ia).eq.0 ) cycle
               do ixyz=1,3
                 do jxyz=1,3
 ! derivative of gsf of atom-i by atom-j
@@ -920,6 +910,7 @@ contains
     else if( nl.eq.2 ) then
       do ia=1,natm
         xi(1:3)= ra(1:3,ia)
+        is = int(tag(ia))
         do jj=1,lspr(0,ia)
           ja= lspr(jj,ia)
           xj(1:3)= ra(1:3,ja)
@@ -928,13 +919,16 @@ contains
           rij(1:3)= -rji(1:3)
           dji= sqrt(rji(1)**2 +rji(2)**2 +rji(3)**2)
           if( dji.ge.rc ) cycle
+          js = int(tag(ja))
           do ihl2=1,nhl(2)
             hl2i= hl2(ihl2,ia)
             tmp2i= wgt23(ihl2) *hl2i*(1d0-hl2i)
             do ihl1=1,nhl(1)
               hl1i= hl1(ihl1,ia)
               tmp1i= wgt22(ihl1,ihl2) *hl1i*(1d0-hl1i)
+!!$              do ihl0=iaddr2(1,is,js),iaddr2(2,is,js)
               do ihl0=1,nhl(0)
+                if( igsf(ihl0,jj,ia).eq.0 ) cycle
 !......derivative of gsf of atom-j by atom-i
                 sji= -tmp2i *tmp1i &
                      *wgt21(ihl0,ihl1) *dgsf(jxyz,ihl0,jj,ia) &
@@ -956,6 +950,7 @@ contains
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,strs,9)
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)*0.5d0
+
 !!$    if( myid.ge.0 ) then
 !!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
 !!$           ,nn,mpi_world,strs,9)
