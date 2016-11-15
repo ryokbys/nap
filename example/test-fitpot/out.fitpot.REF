@@ -1,0 +1,474 @@
+ Start reading in.fitpot
+ Finished reading in.fitpot
+---------------- INITIAL SETTING -----------------
+                num_samples     14
+              num_iteration         100
+             fitting_method  bfgs
+             main_directory  data_set
+                 param_file  in.params.NN
+                   run_mode  serial
+                       xtol     1.000E-05
+                       ftol     1.000E-05
+                       gtol     1.000E-05
+                atom_energy   1 -1.9778000E-01
+                atom_energy   2 -7.4000000E-04
+                atom_energy   3 -8.0706000E-01
+                atom_energy   4  0.0000000E+00
+                force_match    T
+                    penalty  none
+             penalty_weight     1.000E-03
+                 eps_energy     1.000E-04
+                  eps_force     1.000E-04
+                  potential  NN
+                   gradient    T
+                 grad_scale    F
+              gscale_factor     1.000E+00
+            normalize_input  none
+          freduce_threshold    -1.000E+00
+              sample_weight    F
+          sample_weight_erg     1.000E-01
+           coeff_sequential     1.000E-02
+          line_minimization  armijo
+
+             sa_temperature     1.000E-03
+                 sa_dxwidth     1.000E+00
+                random_seed     1.234E+04
+
+          individual_weight      0
+------------------------------------------------
+ maxmynsmpl=          14
+ get_node2sample done.
+ get_dir_list done.
+ nsmpl, training, test=          14          13           1
+ set_training_test done.
+ read_samples done.
+ number of forces to be used =      338
+ total number of forces      =      338
+ read_ref_data done.
+ base energies:
+   is, ebase(is) =  1 -3.5469E+00
+   is, ebase(is) =  2 -1.5054E+00
+   is, ebase(is) =  3 -4.6169E+00
+   is, ebase(is) =  4  0.0000E+00
+ params are read from file data_set/in.params.NN                                                                                                                    
+ nhl(0:nl+1)=   30    3    1
+ nsf2,nsf3,ncmb2,ncmb3=          30           0           6          18
+ nhl(0:nl+1),nw=          30           3           1          93
+ get_bases done.
+ mean of input     =    6.209E-01
+ variance of input =    2.615E+00
+ swgt2 =    2.800E+01
+ NN_init done.
+ 
+ ***** QN(BFGS) starts *****
+ memory for BFGS =     73 kB
+  nterm_trn, nterm_tst =           26           2
+ iter,f,gnorm=       0  5.6195579E+06  7.4395020E+05
+  energy:training(rmse,max),test(rmse,max)=       0           0.09   3.4790300   4.6291993   3.5589453   3.5589453
+  force:training(rmse,max),test(rmse,max)=       0           0.09   0.2363765   1.8114057   0.1464084   0.4099630
+ armijo finishes with iter=           9
+  energy:training(rmse,max),test(rmse,max)=       1           0.12   0.4590481   1.3593698   0.3291704   0.3291704
+  force:training(rmse,max),test(rmse,max)=       1           0.12   0.2931967   1.8186139   0.2383276   0.9177821
+ iter,f,gnorm,f-fp=       1  9.7844072E+04  3.8450221E+05 -5.5217138E+06
+ armijo finishes with iter=          13
+  energy:training(rmse,max),test(rmse,max)=       2           0.16   0.4398359   1.3425029   0.3117212   0.3117212
+  force:training(rmse,max),test(rmse,max)=       2           0.16   0.2917917   1.8186125   0.2355866   0.9287155
+ iter,f,gnorm,f-fp=       2  8.9826061E+04  2.3893585E+05 -8.0180110E+03
+ armijo finishes with iter=          12
+  energy:training(rmse,max),test(rmse,max)=       3           0.20   0.3917514   1.2663541   0.2337205   0.2337205
+  force:training(rmse,max),test(rmse,max)=       3           0.20   0.2874849   1.8186054   0.2318791   0.9044050
+ iter,f,gnorm,f-fp=       3  7.1260840E+04  2.0060125E+05 -1.8565221E+04
+ armijo finishes with iter=          10
+  energy:training(rmse,max),test(rmse,max)=       4           0.24   0.3867449   1.2384071   0.2400959   0.2400959
+  force:training(rmse,max),test(rmse,max)=       4           0.24   0.3268375   1.8186043   0.2719556   1.0852713
+ iter,f,gnorm,f-fp=       4  6.9452078E+04  2.0301588E+05 -1.8087622E+03
+ armijo finishes with iter=           9
+  energy:training(rmse,max),test(rmse,max)=       5           0.26   0.3331834   0.9649755   0.2633919   0.2633919
+  force:training(rmse,max),test(rmse,max)=       5           0.26   0.3512283   1.8185977   0.2868737   1.1496125
+ iter,f,gnorm,f-fp=       5  5.1549582E+04  2.1731388E+05 -1.7902495E+04
+ armijo finishes with iter=           7
+  energy:training(rmse,max),test(rmse,max)=       6           0.29   0.2414263   0.7687808   0.0376441   0.0376441
+  force:training(rmse,max),test(rmse,max)=       6           0.29   0.3411213   1.8185786   0.2751035   1.4141212
+ iter,f,gnorm,f-fp=       6  2.7070082E+04  1.6912728E+05 -2.4479500E+04
+ armijo finishes with iter=          11
+  energy:training(rmse,max),test(rmse,max)=       7           0.32   0.2322750   0.7116523   0.0221382   0.0221382
+  force:training(rmse,max),test(rmse,max)=       7           0.32   0.3480006   1.8185786   0.2804411   1.4536883
+ iter,f,gnorm,f-fp=       7  2.5057586E+04  1.9579261E+05 -2.0124957E+03
+ armijo finishes with iter=           9
+  energy:training(rmse,max),test(rmse,max)=       8           0.35   0.2253405   0.6852528   0.0057394   0.0057394
+  force:training(rmse,max),test(rmse,max)=       8           0.35   0.3624973   1.8441570   0.2882933   1.5071806
+ iter,f,gnorm,f-fp=       8  2.3584596E+04  1.6330550E+05 -1.4729900E+03
+ armijo finishes with iter=           8
+  energy:training(rmse,max),test(rmse,max)=       9           0.38   0.2200088   0.6658663   0.0180195   0.0180195
+  force:training(rmse,max),test(rmse,max)=       9           0.39   0.4566587   2.3568405   0.3014894   1.5759502
+ iter,f,gnorm,f-fp=       9  2.2484795E+04  1.5706581E+05 -1.0998015E+03
+ armijo finishes with iter=           9
+  energy:training(rmse,max),test(rmse,max)=      10           0.42   0.2185779   0.6615074   0.0201516   0.0201516
+  force:training(rmse,max),test(rmse,max)=      10           0.42   0.4637814   2.3681344   0.2742244   1.4106553
+ iter,f,gnorm,f-fp=      10  2.2193638E+04  1.5359021E+05 -2.9115693E+02
+ armijo finishes with iter=           7
+  energy:training(rmse,max),test(rmse,max)=      11           0.44   0.2168525   0.6588089   0.0247835   0.0247835
+  force:training(rmse,max),test(rmse,max)=      11           0.44   0.5526395   2.9030789   0.2828094   1.3098659
+ iter,f,gnorm,f-fp=      11  2.1847937E+04  1.2784321E+05 -3.4570092E+02
+ armijo finishes with iter=           7
+  energy:training(rmse,max),test(rmse,max)=      12           0.47   0.2118174   0.6401666   0.0213064   0.0213064
+  force:training(rmse,max),test(rmse,max)=      12           0.47   0.9516799   7.2457773   0.3455988   1.5180929
+ iter,f,gnorm,f-fp=      12  2.0866459E+04  1.1826468E+05 -9.8147788E+02
+ armijo finishes with iter=          10
+  energy:training(rmse,max),test(rmse,max)=      13           0.50   0.2099987   0.6333134   0.0173693   0.0173693
+  force:training(rmse,max),test(rmse,max)=      13           0.51   1.1077434   9.3385688   0.3877320   1.7668214
+ iter,f,gnorm,f-fp=      13  2.0521310E+04  1.0706327E+05 -3.4514876E+02
+ armijo finishes with iter=           8
+  energy:training(rmse,max),test(rmse,max)=      14           0.54   0.2075126   0.6193423   0.0260036   0.0260036
+  force:training(rmse,max),test(rmse,max)=      14           0.54   1.3882276  12.2780965   0.3637711   1.8050276
+ iter,f,gnorm,f-fp=      14  2.0063418E+04  9.8691545E+04 -4.5789213E+02
+ armijo finishes with iter=           5
+  energy:training(rmse,max),test(rmse,max)=      15           0.56   0.2013962   0.5906645   0.0018021   0.0018021
+  force:training(rmse,max),test(rmse,max)=      15           0.56   1.6603514  14.1097338   0.5085594   2.5737913
+ iter,f,gnorm,f-fp=      15  1.8931743E+04  1.0670980E+05 -1.1316748E+03
+ armijo finishes with iter=           6
+  energy:training(rmse,max),test(rmse,max)=      16           0.59   0.1911709   0.5507509   0.0120617   0.0120617
+  force:training(rmse,max),test(rmse,max)=      16           0.59   2.0193624  19.6629544   0.5798879   2.1176789
+ iter,f,gnorm,f-fp=      16  1.7120504E+04  1.0361808E+05 -1.8112388E+03
+ armijo finishes with iter=          11
+  energy:training(rmse,max),test(rmse,max)=      17           0.62   0.1905462   0.5479654   0.0222616   0.0222616
+  force:training(rmse,max),test(rmse,max)=      17           0.62   2.0486034  19.8109581   0.6437409   2.1116931
+ iter,f,gnorm,f-fp=      17  1.7014646E+04  1.0314772E+05 -1.0585844E+02
+ armijo finishes with iter=           7
+  energy:training(rmse,max),test(rmse,max)=      18           0.65   0.1904480   0.5476389   0.0223664   0.0223664
+  force:training(rmse,max),test(rmse,max)=      18           0.65   2.0645990  20.1287411   0.6410293   2.0886694
+ iter,f,gnorm,f-fp=      18  1.6999981E+04  1.0294472E+05 -1.4664550E+01
+ armijo finishes with iter=           6
+  energy:training(rmse,max),test(rmse,max)=      19           0.67   0.1900899   0.5470220   0.0245603   0.0245603
+  force:training(rmse,max),test(rmse,max)=      19           0.67   2.1938446  22.1310819   0.6314088   2.1855375
+ iter,f,gnorm,f-fp=      19  1.6959592E+04  1.0238744E+05 -4.0389520E+01
+ armijo finishes with iter=           5
+  energy:training(rmse,max),test(rmse,max)=      20           0.70   0.1898803   0.5463262   0.0268073   0.0268073
+  force:training(rmse,max),test(rmse,max)=      20           0.70   2.2879426  23.3257697   0.6565264   2.3806895
+ iter,f,gnorm,f-fp=      20  1.6938999E+04  1.0193382E+05 -2.0592455E+01
+ armijo finishes with iter=           7
+  energy:training(rmse,max),test(rmse,max)=      21           0.72   0.1897813   0.5460440   0.0273929   0.0273929
+  force:training(rmse,max),test(rmse,max)=      21           0.72   2.3368316  23.7114497   0.6693007   2.4971615
+ iter,f,gnorm,f-fp=      21  1.6930158E+04  1.0163963E+05 -8.8411928E+00
+ armijo finishes with iter=           4
+  energy:training(rmse,max),test(rmse,max)=      22           0.74   0.1893314   0.5432120   0.0265141   0.0265141
+  force:training(rmse,max),test(rmse,max)=      22           0.74   2.6408448  26.4737058   0.8385669   3.0685586
+ iter,f,gnorm,f-fp=      22  1.6905630E+04  1.0033200E+05 -2.4528153E+01
+  WARNING: g*d > 0.0
+ >>> gg initialized because alpha was not found.
+ armijo finishes with iter=          12
+  energy:training(rmse,max),test(rmse,max)=      24           0.78   0.1794062   0.4965344   0.0273584   0.0273584
+  force:training(rmse,max),test(rmse,max)=      24           0.78   2.6096467  26.6430230   0.8364252   3.0343801
+ iter,f,gnorm,f-fp=      24  1.5199068E+04  9.7375784E+04 -1.7065619E+03
+ armijo finishes with iter=          12
+  energy:training(rmse,max),test(rmse,max)=      25           0.82   0.1530876   0.3882920   0.0268133   0.0268133
+  force:training(rmse,max),test(rmse,max)=      25           0.82   2.5245018  26.8688650   0.8322322   2.9504996
+ iter,f,gnorm,f-fp=      25  1.1122584E+04  4.9433549E+04 -4.0764837E+03
+ armijo finishes with iter=          11
+  energy:training(rmse,max),test(rmse,max)=      26           0.86   0.1469659   0.3686249   0.0057067   0.0057067
+  force:training(rmse,max),test(rmse,max)=      26           0.86   2.4753969  26.8226647   0.8409934   2.9313297
+ iter,f,gnorm,f-fp=      26  1.0261050E+04  4.6969513E+04 -8.6153408E+02
+ armijo finishes with iter=          10
+  energy:training(rmse,max),test(rmse,max)=      27           0.89   0.1170363   0.2975843   0.0336724   0.0336724
+  force:training(rmse,max),test(rmse,max)=      27           0.89   1.3825155  15.6207758   0.7250741   3.3038572
+ iter,f,gnorm,f-fp=      27  6.4473333E+03  3.9554564E+04 -3.8137171E+03
+ armijo finishes with iter=          10
+  energy:training(rmse,max),test(rmse,max)=      28           0.92   0.1044682   0.2886059   0.0284415   0.0284415
+  force:training(rmse,max),test(rmse,max)=      28           0.93   1.5167503  18.2512743   0.7045910   3.3990879
+ iter,f,gnorm,f-fp=      28  5.1677732E+03  3.3209678E+04 -1.2795601E+03
+ armijo finishes with iter=           9
+  energy:training(rmse,max),test(rmse,max)=      29           0.96   0.1029920   0.2995745   0.0193551   0.0193551
+  force:training(rmse,max),test(rmse,max)=      29           0.96   1.5909663  18.7352776   0.7347262   3.3823133
+ iter,f,gnorm,f-fp=      29  5.0335290E+03  3.2135978E+04 -1.3424422E+02
+ armijo finishes with iter=           8
+  energy:training(rmse,max),test(rmse,max)=      30           0.99   0.1009862   0.2887595   0.0094348   0.0094348
+  force:training(rmse,max),test(rmse,max)=      30           0.99   1.6225767  18.5037372   0.6726607   2.5392649
+ iter,f,gnorm,f-fp=      30  4.8469533E+03  3.3147878E+04 -1.8657567E+02
+ armijo finishes with iter=           8
+  energy:training(rmse,max),test(rmse,max)=      31           1.02   0.1007067   0.2885424   0.0081941   0.0081941
+  force:training(rmse,max),test(rmse,max)=      31           1.02   1.6367352  18.4567564   0.6847136   2.6069302
+ iter,f,gnorm,f-fp=      31  4.8223571E+03  3.3299778E+04 -2.4596185E+01
+ armijo finishes with iter=           6
+  energy:training(rmse,max),test(rmse,max)=      32           1.04   0.0988475   0.2830241   0.0125582   0.0125582
+  force:training(rmse,max),test(rmse,max)=      32           1.04   1.8620837  20.2694575   0.7168097   2.3180721
+ iter,f,gnorm,f-fp=      32  4.6764475E+03  3.7416281E+04 -1.4590956E+02
+ armijo finishes with iter=           8
+  energy:training(rmse,max),test(rmse,max)=      33           1.07   0.0985678   0.2823005   0.0125629   0.0125629
+  force:training(rmse,max),test(rmse,max)=      33           1.08   1.8981585  20.4146725   0.7269275   2.2965271
+ iter,f,gnorm,f-fp=      33  4.6548680E+03  3.4623438E+04 -2.1579524E+01
+ armijo finishes with iter=           7
+  energy:training(rmse,max),test(rmse,max)=      34           1.10   0.0977060   0.2797688   0.0105646   0.0105646
+  force:training(rmse,max),test(rmse,max)=      34           1.11   1.9108904  20.4297928   0.7352367   2.5428447
+ iter,f,gnorm,f-fp=      34  4.5764856E+03  3.7024829E+04 -7.8382460E+01
+ armijo finishes with iter=           8
+  energy:training(rmse,max),test(rmse,max)=      35           1.13   0.0966734   0.2768115   0.0091318   0.0091318
+  force:training(rmse,max),test(rmse,max)=      35           1.13   1.9234910  20.4921127   0.7428744   2.7974144
+ iter,f,gnorm,f-fp=      35  4.4828626E+03  3.5692260E+04 -9.3622947E+01
+ armijo finishes with iter=           6
+  energy:training(rmse,max),test(rmse,max)=      36           1.16   0.0948394   0.2703720   0.0049184   0.0049184
+  force:training(rmse,max),test(rmse,max)=      36           1.16   2.1413838  23.2098535   0.7096683   3.0168676
+ iter,f,gnorm,f-fp=      36  4.3462096E+03  3.2596518E+04 -1.3665303E+02
+ armijo finishes with iter=           7
+  energy:training(rmse,max),test(rmse,max)=      37           1.18   0.0946694   0.2697584   0.0047910   0.0047910
+  force:training(rmse,max),test(rmse,max)=      37           1.18   2.1679830  23.3305078   0.7073950   3.0314105
+ iter,f,gnorm,f-fp=      37  4.3348295E+03  3.1231073E+04 -1.1380072E+01
+ armijo finishes with iter=           5
+  energy:training(rmse,max),test(rmse,max)=      38           1.21   0.0935456   0.2665136   0.0069109   0.0069109
+  force:training(rmse,max),test(rmse,max)=      38           1.21   2.1755583  21.0304278   0.7590385   3.4605859
+ iter,f,gnorm,f-fp=      38  4.2360665E+03  3.1928012E+04 -9.8762968E+01
+ armijo finishes with iter=           6
+  energy:training(rmse,max),test(rmse,max)=      39           1.23   0.0918738   0.2628919   0.0072777   0.0072777
+  force:training(rmse,max),test(rmse,max)=      39           1.23   2.4185044  26.6281404   0.8109127   3.4829218
+ iter,f,gnorm,f-fp=      39  4.1278010E+03  3.1125094E+04 -1.0826551E+02
+ armijo finishes with iter=           5
+  energy:training(rmse,max),test(rmse,max)=      40           1.26   0.0902063   0.2579795   0.0044440   0.0044440
+  force:training(rmse,max),test(rmse,max)=      40           1.26   2.5437521  25.5576875   0.7747042   3.4855989
+ iter,f,gnorm,f-fp=      40  4.0071785E+03  3.2687667E+04 -1.2062251E+02
+ armijo finishes with iter=           5
+  energy:training(rmse,max),test(rmse,max)=      41           1.28   0.0853052   0.2428644   0.0179052   0.0179052
+  force:training(rmse,max),test(rmse,max)=      41           1.28   2.9280779  25.1454027   0.7895474   4.1995281
+ iter,f,gnorm,f-fp=      41  3.6758600E+03  3.0254866E+04 -3.3131847E+02
+ armijo finishes with iter=           5
+  energy:training(rmse,max),test(rmse,max)=      42           1.30   0.0831757   0.2357733   0.0150985   0.0150985
+  force:training(rmse,max),test(rmse,max)=      42           1.30   2.9858397  23.5313206   0.9286245   3.3668538
+ iter,f,gnorm,f-fp=      42  3.5222424E+03  2.9410217E+04 -1.5361769E+02
+ armijo finishes with iter=           5
+  energy:training(rmse,max),test(rmse,max)=      43           1.32   0.0801563   0.2282024   0.0121125   0.0121125
+  force:training(rmse,max),test(rmse,max)=      43           1.32   3.2429118  20.8666396   1.1134220   3.7034375
+ iter,f,gnorm,f-fp=      43  3.3549759E+03  2.7558930E+04 -1.6726641E+02
+ armijo finishes with iter=           6
+  energy:training(rmse,max),test(rmse,max)=      44           1.35   0.0782029   0.2248620   0.0074072   0.0074072
+  force:training(rmse,max),test(rmse,max)=      44           1.35   3.2980599  20.6846231   1.2561950   4.1128298
+ iter,f,gnorm,f-fp=      44  3.2291514E+03  2.6608616E+04 -1.2582454E+02
+ armijo finishes with iter=           4
+  energy:training(rmse,max),test(rmse,max)=      45           1.37   0.0705572   0.2121284   0.0315411   0.0315411
+  force:training(rmse,max),test(rmse,max)=      45           1.37   3.5775241  23.7607243   1.5117762   4.8645379
+ iter,f,gnorm,f-fp=      45  2.7737795E+03  2.2341669E+04 -4.5537186E+02
+ armijo finishes with iter=           5
+  energy:training(rmse,max),test(rmse,max)=      46           1.39   0.0654578   0.2030273   0.0516703   0.0516703
+  force:training(rmse,max),test(rmse,max)=      46           1.39   3.7753832  27.4713083   1.6407677   5.0594739
+ iter,f,gnorm,f-fp=      46  2.4969588E+03  1.9560034E+04 -2.7682079E+02
+ armijo finishes with iter=           5
+  energy:training(rmse,max),test(rmse,max)=      47           1.42   0.0641624   0.1998277   0.0696681   0.0696681
+  force:training(rmse,max),test(rmse,max)=      47           1.42   3.7497751  27.0407689   1.6756443   4.7773336
+ iter,f,gnorm,f-fp=      47  2.4107734E+03  1.9134717E+04 -8.6185405E+01
+ armijo finishes with iter=           4
+  energy:training(rmse,max),test(rmse,max)=      48           1.44   0.0590317   0.1862777   0.0492122   0.0492122
+  force:training(rmse,max),test(rmse,max)=      48           1.44   3.8261015  25.0204862   1.7197154   5.7545018
+ iter,f,gnorm,f-fp=      48  2.1387557E+03  1.7273445E+04 -2.7201761E+02
+ armijo finishes with iter=           4
+  energy:training(rmse,max),test(rmse,max)=      49           1.46   0.0558869   0.1790690   0.0517628   0.0517628
+  force:training(rmse,max),test(rmse,max)=      49           1.46   3.6789867  23.6179144   2.0398195   6.6229028
+ iter,f,gnorm,f-fp=      49  1.9340211E+03  1.5338870E+04 -2.0473460E+02
+ armijo finishes with iter=           4
+  energy:training(rmse,max),test(rmse,max)=      50           1.47   0.0519905   0.1679487   0.0630345   0.0630345
+  force:training(rmse,max),test(rmse,max)=      50           1.47   3.3688874  21.5928432   3.3244575  11.0436590
+ iter,f,gnorm,f-fp=      50  1.6621875E+03  1.3237329E+04 -2.7183361E+02
+ armijo finishes with iter=           4
+  energy:training(rmse,max),test(rmse,max)=      51           1.49   0.0483633   0.1599680   0.0856800   0.0856800
+  force:training(rmse,max),test(rmse,max)=      51           1.49   3.3943655  20.3523882   3.2721925  10.2125639
+ iter,f,gnorm,f-fp=      51  1.4992064E+03  1.1240873E+04 -1.6298112E+02
+ armijo finishes with iter=           4
+  energy:training(rmse,max),test(rmse,max)=      52           1.52   0.0480455   0.1571999   0.0794148   0.0794148
+  force:training(rmse,max),test(rmse,max)=      52           1.52   3.2648393  20.8136557   3.1492916   9.9933235
+ iter,f,gnorm,f-fp=      52  1.4527908E+03  1.0610542E+04 -4.6415651E+01
+ armijo finishes with iter=           4
+  energy:training(rmse,max),test(rmse,max)=      53           1.53   0.0461804   0.1512541   0.0703273   0.0703273
+  force:training(rmse,max),test(rmse,max)=      53           1.53   3.3105435  21.0568604   3.0495902  10.4787213
+ iter,f,gnorm,f-fp=      53  1.3724596E+03  1.0188103E+04 -8.0331197E+01
+ armijo finishes with iter=           3
+  energy:training(rmse,max),test(rmse,max)=      54           1.55   0.0405014   0.1346362   0.0791635   0.0791635
+  force:training(rmse,max),test(rmse,max)=      54           1.55   3.4899651  21.0738960   3.2371772  10.4446733
+ iter,f,gnorm,f-fp=      54  1.1828425E+03  7.6951224E+03 -1.8961709E+02
+ armijo finishes with iter=           3
+  energy:training(rmse,max),test(rmse,max)=      55           1.56   0.0368928   0.1209111   0.0599980   0.0599980
+  force:training(rmse,max),test(rmse,max)=      55           1.57   3.4121357  21.2846619   2.9641998  10.0618583
+ iter,f,gnorm,f-fp=      55  1.0408600E+03  7.3359080E+03 -1.4198244E+02
+ armijo finishes with iter=           3
+  energy:training(rmse,max),test(rmse,max)=      56           1.58   0.0334417   0.1068942   0.0404118   0.0404118
+  force:training(rmse,max),test(rmse,max)=      56           1.59   3.4573652  21.9638386   2.8465219   9.2475362
+ iter,f,gnorm,f-fp=      56  9.3893430E+02  6.4960690E+03 -1.0192573E+02
+ armijo finishes with iter=           3
+  energy:training(rmse,max),test(rmse,max)=      57           1.61   0.0315948   0.0991983   0.0370298   0.0370298
+  force:training(rmse,max),test(rmse,max)=      57           1.61   3.3976922  19.0819664   3.2095441  10.8573131
+ iter,f,gnorm,f-fp=      57  8.7495286E+02  6.1246176E+03 -6.3981447E+01
+ armijo finishes with iter=           3
+  energy:training(rmse,max),test(rmse,max)=      58           1.63   0.0306882   0.0935564   0.0402376   0.0402376
+  force:training(rmse,max),test(rmse,max)=      58           1.63   3.3971718  20.1237826   3.3594792  12.4450149
+ iter,f,gnorm,f-fp=      58  8.4074486E+02  6.5450694E+03 -3.4207995E+01
+ armijo finishes with iter=           3
+  energy:training(rmse,max),test(rmse,max)=      59           1.65   0.0300418   0.0857323   0.0595224   0.0595224
+  force:training(rmse,max),test(rmse,max)=      59           1.65   3.2103281  18.3381733   4.2376843  16.5328327
+ iter,f,gnorm,f-fp=      59  7.7807860E+02  6.1344862E+03 -6.2666260E+01
+ armijo finishes with iter=           3
+  energy:training(rmse,max),test(rmse,max)=      60           1.67   0.0283631   0.0732483   0.0814090   0.0814090
+  force:training(rmse,max),test(rmse,max)=      60           1.67   3.1202563  17.4102821   4.5469038  19.1814390
+ iter,f,gnorm,f-fp=      60  7.1148117E+02  5.4719427E+03 -6.6597427E+01
+ armijo finishes with iter=           3
+  energy:training(rmse,max),test(rmse,max)=      61           1.68   0.0257148   0.0658546   0.0944642   0.0944642
+  force:training(rmse,max),test(rmse,max)=      61           1.68   3.2205604  18.6885175   4.5939076  18.7227885
+ iter,f,gnorm,f-fp=      61  6.6664629E+02  5.4010196E+03 -4.4834889E+01
+ armijo finishes with iter=           4
+  energy:training(rmse,max),test(rmse,max)=      62           1.70   0.0235758   0.0598548   0.1054477   0.1054477
+  force:training(rmse,max),test(rmse,max)=      62           1.71   3.2701458  19.2148057   4.3168189  16.0528301
+ iter,f,gnorm,f-fp=      62  6.2820787E+02  5.6651779E+03 -3.8438419E+01
+ armijo finishes with iter=           3
+  energy:training(rmse,max),test(rmse,max)=      63           1.72   0.0191576   0.0409798   0.1096497   0.1096497
+  force:training(rmse,max),test(rmse,max)=      63           1.72   3.3023508  19.1402309   3.9736447  16.1517094
+ iter,f,gnorm,f-fp=      63  5.4715298E+02  5.1649814E+03 -8.1054888E+01
+ armijo finishes with iter=           3
+  energy:training(rmse,max),test(rmse,max)=      64           1.74   0.0181026   0.0361876   0.1032690   0.1032690
+  force:training(rmse,max),test(rmse,max)=      64           1.74   3.2210226  19.1353336   4.1578422  17.5287197
+ iter,f,gnorm,f-fp=      64  5.1085820E+02  3.6855599E+03 -3.6294783E+01
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      65           1.76   0.0138222   0.0328588   0.0949410   0.0949410
+  force:training(rmse,max),test(rmse,max)=      65           1.76   2.9192625  17.2734351   4.8673801  19.8163946
+ iter,f,gnorm,f-fp=      65  3.8507639E+02  3.1335150E+03 -1.2578181E+02
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      66           1.77   0.0104664   0.0223947   0.0682764   0.0682764
+  force:training(rmse,max),test(rmse,max)=      66           1.77   2.7566306  16.8809685   4.8586421  23.9590187
+ iter,f,gnorm,f-fp=      66  3.1552643E+02  4.0367667E+03 -6.9549958E+01
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      67           1.79   0.0103197   0.0258805   0.0534988   0.0534988
+  force:training(rmse,max),test(rmse,max)=      67           1.79   2.5723381  15.8750222   4.8069833  23.9384529
+ iter,f,gnorm,f-fp=      67  2.8009891E+02  3.9040575E+03 -3.5427522E+01
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      68           1.80   0.0097031   0.0240369   0.0569737   0.0569737
+  force:training(rmse,max),test(rmse,max)=      68           1.81   2.4536494  14.0253253   4.8134704  24.1753794
+ iter,f,gnorm,f-fp=      68  2.5414001E+02  3.6874314E+03 -2.5958897E+01
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      69           1.82   0.0090727   0.0217817   0.0584466   0.0584466
+  force:training(rmse,max),test(rmse,max)=      69           1.82   2.3692443  13.1166736   4.7912010  24.2232906
+ iter,f,gnorm,f-fp=      69  2.3474849E+02  3.5811770E+03 -1.9391525E+01
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      70           1.84   0.0085982   0.0170118   0.0632169   0.0632169
+  force:training(rmse,max),test(rmse,max)=      70           1.84   2.3059908  12.6058088   4.6739058  23.9803090
+ iter,f,gnorm,f-fp=      70  2.2051908E+02  2.0467099E+03 -1.4229407E+01
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      71           1.85   0.0083992   0.0169314   0.0651064   0.0651064
+  force:training(rmse,max),test(rmse,max)=      71           1.85   2.2720871  12.5596985   4.6429791  23.9428951
+ iter,f,gnorm,f-fp=      71  2.1368474E+02  1.3244899E+03 -6.8343382E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      72           1.87   0.0083948   0.0170122   0.0676724   0.0676724
+  force:training(rmse,max),test(rmse,max)=      72           1.87   2.2322954  12.4125549   4.5950396  23.6923041
+ iter,f,gnorm,f-fp=      72  2.0745273E+02  7.0536480E+02 -6.2320079E+00
+ armijo finishes with iter=           1
+  energy:training(rmse,max),test(rmse,max)=      73           1.88   0.0087026   0.0171402   0.0742681   0.0742681
+  force:training(rmse,max),test(rmse,max)=      73           1.88   2.1399670  12.1544186   4.5318612  23.5430086
+ iter,f,gnorm,f-fp=      73  1.9605492E+02  2.3928754E+03 -1.1397814E+01
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      74           1.90   0.0083806   0.0173594   0.0753187   0.0753187
+  force:training(rmse,max),test(rmse,max)=      74           1.90   2.1290104  12.4260362   4.5078825  23.3305667
+ iter,f,gnorm,f-fp=      74  1.9189639E+02  1.6221039E+03 -4.1585294E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      75           1.91   0.0082713   0.0177247   0.0748849   0.0748849
+  force:training(rmse,max),test(rmse,max)=      75           1.91   2.1205974  12.4150937   4.5370732  23.3970076
+ iter,f,gnorm,f-fp=      75  1.8982674E+02  1.0857723E+03 -2.0696553E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      76           1.93   0.0081274   0.0175772   0.0744770   0.0744770
+  force:training(rmse,max),test(rmse,max)=      76           1.93   2.1103481  12.4987816   4.5572743  23.5650982
+ iter,f,gnorm,f-fp=      76  1.8724788E+02  6.1795291E+02 -2.5788561E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      77           1.95   0.0080026   0.0171928   0.0723009   0.0723009
+  force:training(rmse,max),test(rmse,max)=      77           1.95   2.0968405  12.5512468   4.6012449  23.9172795
+ iter,f,gnorm,f-fp=      77  1.8436861E+02  6.3800711E+02 -2.8792744E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      78           1.96   0.0079053   0.0167601   0.0704623   0.0704623
+  force:training(rmse,max),test(rmse,max)=      78           1.96   2.0795668  12.5779860   4.6269062  24.0594430
+ iter,f,gnorm,f-fp=      78  1.8118496E+02  6.5344740E+02 -3.1836437E+00
+ armijo finishes with iter=           1
+  energy:training(rmse,max),test(rmse,max)=      79           1.97   0.0080675   0.0154502   0.0570206   0.0570206
+  force:training(rmse,max),test(rmse,max)=      79           1.97   2.0190270  12.4735676   4.6419813  23.6108673
+ iter,f,gnorm,f-fp=      79  1.7390379E+02  2.8010419E+03 -7.2811721E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      80           1.99   0.0078812   0.0152547   0.0559746   0.0559746
+  force:training(rmse,max),test(rmse,max)=      80           1.99   2.0152650  12.5441001   4.6275894  23.2974068
+ iter,f,gnorm,f-fp=      80  1.7200876E+02  1.2399641E+03 -1.8950286E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      81           2.00   0.0077947   0.0151733   0.0549115   0.0549115
+  force:training(rmse,max),test(rmse,max)=      81           2.00   2.0050233  12.5350829   4.6139246  23.0823720
+ iter,f,gnorm,f-fp=      81  1.6997668E+02  1.2397235E+03 -2.0320798E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      82           2.02   0.0077150   0.0153704   0.0531793   0.0531793
+  force:training(rmse,max),test(rmse,max)=      82           2.02   1.9908469  12.4719265   4.5939146  22.9154894
+ iter,f,gnorm,f-fp=      82  1.6746342E+02  6.9518436E+02 -2.5132589E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      83           2.03   0.0075583   0.0155237   0.0521326   0.0521326
+  force:training(rmse,max),test(rmse,max)=      83           2.03   1.9832107  12.4695174   4.5689271  22.7089300
+ iter,f,gnorm,f-fp=      83  1.6531314E+02  2.7069729E+02 -2.1502810E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      84           2.05   0.0075419   0.0157794   0.0516871   0.0516871
+  force:training(rmse,max),test(rmse,max)=      84           2.05   1.9737291  12.4359061   4.5717201  22.7617079
+ iter,f,gnorm,f-fp=      84  1.6391092E+02  3.1268627E+02 -1.4022210E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      85           2.07   0.0074281   0.0159949   0.0518582   0.0518582
+  force:training(rmse,max),test(rmse,max)=      85           2.07   1.9703999  12.4135377   4.5704902  22.7638980
+ iter,f,gnorm,f-fp=      85  1.6266840E+02  2.4866361E+02 -1.2425206E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      86           2.08   0.0074269   0.0162905   0.0526528   0.0526528
+  force:training(rmse,max),test(rmse,max)=      86           2.08   1.9610211  12.4007562   4.5983957  22.9536680
+ iter,f,gnorm,f-fp=      86  1.6139802E+02  2.7387904E+02 -1.2703783E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      87           2.10   0.0072887   0.0165318   0.0536880   0.0536880
+  force:training(rmse,max),test(rmse,max)=      87           2.10   1.9593486  12.3813322   4.6265543  23.0345966
+ iter,f,gnorm,f-fp=      87  1.6022813E+02  1.9055459E+02 -1.1698891E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      88           2.13   0.0072333   0.0167290   0.0553596   0.0553596
+  force:training(rmse,max),test(rmse,max)=      88           2.13   1.9553857  12.3798006   4.6715261  23.1737329
+ iter,f,gnorm,f-fp=      88  1.5932379E+02  1.7745480E+02 -9.0434305E-01
+ armijo finishes with iter=           1
+  energy:training(rmse,max),test(rmse,max)=      89           2.14   0.0070429   0.0172747   0.0629573   0.0629573
+  force:training(rmse,max),test(rmse,max)=      89           2.14   1.9515782  12.3745028   4.9652489  23.2668360
+ iter,f,gnorm,f-fp=      89  1.5755180E+02  4.8545509E+02 -1.7719867E+00
+ armijo finishes with iter=           1
+  energy:training(rmse,max),test(rmse,max)=      90           2.16   0.0069994   0.0170756   0.0653916   0.0653916
+  force:training(rmse,max),test(rmse,max)=      90           2.16   1.9481893  12.3737023   4.9912532  23.2258792
+ iter,f,gnorm,f-fp=      90  1.5682577E+02  3.9441833E+02 -7.2602725E-01
+ armijo finishes with iter=           1
+  energy:training(rmse,max),test(rmse,max)=      91           2.17   0.0069667   0.0161122   0.0688317   0.0688317
+  force:training(rmse,max),test(rmse,max)=      91           2.17   1.9376233  12.3404429   5.1254238  23.1054911
+ iter,f,gnorm,f-fp=      91  1.5522530E+02  3.3611900E+02 -1.6004740E+00
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      92           2.19   0.0068371   0.0157969   0.0695935   0.0695935
+  force:training(rmse,max),test(rmse,max)=      92           2.19   1.9397761  12.3562705   5.1767121  23.0369272
+ iter,f,gnorm,f-fp=      92  1.5467365E+02  1.9357904E+02 -5.5164924E-01
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      93           2.20   0.0066885   0.0154549   0.0698513   0.0698513
+  force:training(rmse,max),test(rmse,max)=      93           2.20   1.9428677  12.3709982   5.2051396  22.9390509
+ iter,f,gnorm,f-fp=      93  1.5414850E+02  2.1553072E+02 -5.2515257E-01
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      94           2.22   0.0065771   0.0151442   0.0692395   0.0692395
+  force:training(rmse,max),test(rmse,max)=      94           2.22   1.9448251  12.3695657   5.2200471  22.9056427
+ iter,f,gnorm,f-fp=      94  1.5371458E+02  1.7335940E+02 -4.3391472E-01
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      95           2.23   0.0064576   0.0149024   0.0685602   0.0685602
+  force:training(rmse,max),test(rmse,max)=      95           2.23   1.9476460  12.3805613   5.2337392  22.8796304
+ iter,f,gnorm,f-fp=      95  1.5336449E+02  1.7094779E+02 -3.5009475E-01
+ armijo finishes with iter=           1
+  energy:training(rmse,max),test(rmse,max)=      96           2.25   0.0061344   0.0140068   0.0641835   0.0641835
+  force:training(rmse,max),test(rmse,max)=      96           2.25   1.9562748  12.3635179   5.2566757  22.9823847
+ iter,f,gnorm,f-fp=      96  1.5262617E+02  4.1172311E+02 -7.3831951E-01
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=      97           2.26   0.0060918   0.0139507   0.0635603   0.0635603
+  force:training(rmse,max),test(rmse,max)=      97           2.27   1.9571777  12.3749886   5.2553062  23.0754542
+ iter,f,gnorm,f-fp=      97  1.5250499E+02  2.9338142E+02 -1.2118051E-01
+ armijo finishes with iter=           1
+  energy:training(rmse,max),test(rmse,max)=      98           2.28   0.0060223   0.0136801   0.0608529   0.0608529
+  force:training(rmse,max),test(rmse,max)=      98           2.28   1.9547843  12.3797362   5.3413899  23.5167474
+ iter,f,gnorm,f-fp=      98  1.5179347E+02  6.3690323E+02 -7.1152357E-01
+ armijo finishes with iter=           1
+  energy:training(rmse,max),test(rmse,max)=      99           2.29   0.0061550   0.0136265   0.0562811   0.0562811
+  force:training(rmse,max),test(rmse,max)=      99           2.29   1.9442238  12.3138235   5.3990369  24.1953663
+ iter,f,gnorm,f-fp=      99  1.5114919E+02  3.0899046E+02 -6.4427233E-01
+ armijo finishes with iter=           2
+  energy:training(rmse,max),test(rmse,max)=     100           2.31   0.0061138   0.0134672   0.0550892   0.0550892
+  force:training(rmse,max),test(rmse,max)=     100           2.31   1.9440658  12.3058662   5.4392238  24.3758423
+ iter,f,gnorm,f-fp=     100  1.5089149E+02  2.3660536E+02 -2.5770751E-01
+  energy:training(rmse,max),test(rmse,max)=     100           2.32   0.0061138   0.0134672   0.0550892   0.0550892
+  force:training(rmse,max),test(rmse,max)=     100           2.33   1.9440658  12.3058662   5.4392238  24.3758423
+ num of func calls=       476
+ num of grad calls=       100
+ time func =          1.281 sec
+ time grad =          0.834 sec
+ time comm =          0.003 sec
+ time      =          2.328 sec  =   0h00m02s
