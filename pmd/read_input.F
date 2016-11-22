@@ -147,6 +147,9 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
       elseif( trim(cname).eq.'stress_control' ) then
         call read_c1(ionum,cpctl)
         return
+      elseif( trim(cname).eq.'flag_compute_stress' ) then
+        call read_l1(ionum,lstrs0)
+        return
       elseif( trim(cname).eq.'zload_type' ) then
         call read_c1(ionum,czload_type)
         return

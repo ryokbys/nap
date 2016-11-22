@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2016-11-10 06:39:59 Ryo KOBAYASHI>
+c                     Last-modified: <2016-11-10 16:20:14 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file include core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -8,7 +8,7 @@ c-----------------------------------------------------------------------
      &     ,nx,ny,nz
      &     ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
      &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
-     &     ,srlx,stbeta,strfin
+     &     ,srlx,stbeta,strfin,lstrs0
      &     ,fmv,ptnsr,epot,ekin,n_conv
      &     ,czload_type,eps_conv,ifsort,iprint)
       use pmdvars
@@ -26,7 +26,7 @@ c-----------------------------------------------------------------------
      &     ,epot,ekin,am(nismax),stgt(3,3),ptgt,ttgt(9)
       character,intent(in):: ciofmt*6, cforce*20, cpctl*20, ctctl*20
      &     ,czload_type*5
-      logical,intent(in):: ltdst
+      logical,intent(in):: ltdst,lstrs0
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl,i_conv,ierr,nxyz
       integer:: ihour,imin,isec
@@ -189,7 +189,10 @@ c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
 c.....Calc forces
-      lstrs = .true.
+      lstrs = lstrs0 .and.
+     &     ( trim(cpctl).eq.'Berendsen' .or.
+     &       trim(cpctl).eq.'vc-Berendsen' .or.
+     &       trim(cpctl).eq.'vv-Berendsen')
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &     ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,lstrs
@@ -351,7 +354,7 @@ c-------first kick of velocities
         if( ifdmp.eq.2 ) then
           call vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire
      &         ,finc_fire,fdec_fire,nmin_fire
-     &         ,natm,va,aa,myid_md,mpi_md_world,dt)
+     &         ,natm,va,aa,myid_md,mpi_md_world,dt,iprint)
         endif
 
 c-------multiply fmv or damping
@@ -410,7 +413,7 @@ c.....Copy RA of boundary atoms determined by 'bacopy'
         endif
         
         if(ifpmd.eq.1.and. mod(istp,noutpmd).eq.0 )then
-          lstrs = .true.
+          lstrs = lstrs0
         endif
 c-------Calc forces
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
@@ -1939,10 +1942,10 @@ c-----set center of mass motion to zero
 c=======================================================================
       subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire
      &     ,finc_fire,fdec_fire,nmin_fire
-     &     ,natm,va,aa,myid_md,mpi_md_world,dt)
+     &     ,natm,va,aa,myid_md,mpi_md_world,dt,iprint)
       implicit none
       include 'mpif.h'
-      integer,intent(in):: natm,myid_md,mpi_md_world,nmin_fire
+      integer,intent(in):: natm,myid_md,mpi_md_world,nmin_fire,iprint
       real(8),intent(in):: aa(3,natm),falp_fire,alp0_fire,dtmax_fire
      &     ,finc_fire,fdec_fire
       integer,intent(inout):: num_fire
@@ -1986,16 +1989,20 @@ c=======================================================================
           if( num_fire.gt.nmin_fire ) then
             dt = min(dtmax_fire,dt*finc_fire)
             alp_fire = alp_fire*alp_fire
-            write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
-     &           ,dt,alp_fire,fdotv
+            if( iprint.ne.0 ) then
+              write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
+     &             ,dt,alp_fire,fdotv
+            endif
           endif
         else
           dt = min(dtmax_fire,dt*fdec_fire)
           va(1:3,1:natm) = 0d0
           alp_fire = alp0_fire
           num_fire = 0
-          write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
-     &         ,dt,alp_fire,fdotv
+          if( iprint.ne.0 ) then
+            write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
+     &           ,dt,alp_fire,fdotv
+          endif
         endif
       endif
       call mpi_bcast(dt,1,mpi_double_precision,0,mpi_md_world,ierr)

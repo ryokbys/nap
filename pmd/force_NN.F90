@@ -115,10 +115,10 @@ contains
         write(6,'(a,f10.3,a)') ' dgsf size = ', &
              dble(3*nhl(0)*(nnlmax+1)*nalmax*8)/1000/1000,' MB'
         write(6,'(a,f10.3,a)') ' igsf size = ', &
-             dble((nhl(0)+1)*(nnlmax+1)*nalmax*2)/1000/1000,' MB'
+             dble(nhl(0)*(nnlmax+1)*nalmax*2)/1000/1000,' MB'
       endif
       allocate( gsf(nhl(0),nal),dgsf(3,nhl(0),0:nnl,nal) &
-           ,igsf(0:nhl(0),0:nnl,nal) )
+           ,igsf(nhl(0),0:nnl,nal) )
 
       lrealloc = .false.
       if( nl.eq.1 ) then
@@ -157,7 +157,7 @@ contains
     if( allocated(dgsf).and.lrealloc ) then
       deallocate( gsf,dgsf,igsf )
       allocate( gsf(nhl(0),nal),dgsf(3,nhl(0),0:nnl,nal) &
-           ,igsf(0:nhl(0),0:nnl,nal))
+           ,igsf(nhl(0),0:nnl,nal))
       if( nl.eq.1 ) then
         deallocate( hl1 )
         allocate( hl1(nhl(1),nal) )
@@ -774,13 +774,16 @@ contains
     integer,intent(in):: natm,namax,nnmax,nsf,lspr(0:nnmax,namax)
 !    real(8),intent(in):: dgsf(3,nsf,0:nnl,nal),tag(namax)
     real(8),intent(in):: tag(namax)
+
     integer:: ia,jj,ja,jra,isf
     real(8),allocatable:: dgsfo(:,:,:,:)
+    integer(2),allocatable:: igsfo(:,:,:)
     integer,external:: itotOf
 
-    allocate(dgsfo(3,natm,nsf,natm))
-!.....reduce dgsf data of buffer atoms to those of resident atoms
+    allocate(dgsfo(3,natm,nsf,natm),igsfo(nsf,natm,natm))
+!.....reduce d(i)gsf data of buffer atoms to those of resident atoms
     dgsfo(1:3,1:natm,1:nsf,1:natm)= 0d0
+    igsfo(1:nsf,1:natm,1:natm)= 0
     do ia=1,natm
       do jj=0,lspr(0,ia)
         if( jj.eq.0 ) then
@@ -792,6 +795,7 @@ contains
         do isf=1,nsf
           dgsfo(1:3,jra,isf,ia)= dgsfo(1:3,jra,isf,ia) &
                +dgsf(1:3,isf,jj,ia)
+          igsfo(isf,jra,ia) = igsf(isf,jj,ia)
         enddo
       enddo
     enddo
@@ -803,8 +807,16 @@ contains
       enddo
     enddo
     close(ionum)
+!.....write igsf to ionum+1
+    open(ionum+1,file='out.NN.igsf',status='replace',form='unformatted')
+    do ia=1,natm
+      do ja=1,natm
+        write(ionum+1) (igsfo(isf,ja,ia),isf=1,nsf)
+      enddo
+    enddo
+    close(ionum+1)
 
-    deallocate(dgsfo)
+    deallocate(dgsfo,igsfo)
   end subroutine write_dgsf
 !=======================================================================
   subroutine copy_dba_fwd(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &

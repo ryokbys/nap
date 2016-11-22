@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2016-11-10 06:09:26 Ryo KOBAYASHI>
+!                     Last-modified: <2016-11-15 23:23:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 module pmc
 ! 
@@ -168,7 +168,7 @@ program prec_mc
 
   call kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
        ,nx,ny,nz,anxi,anyi,anzi,sorg, hmat,natm,pos0,csymbols&
-       ,nstps_relax)
+       ,nstps_relax,nnmaxmc,lsprmc)
 
   call write_POSCAR('POSCAR_000000',natm,csymbols,pos0,hmat,species)
   
@@ -178,56 +178,170 @@ program prec_mc
 end program prec_mc
 !=======================================================================
 subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
-     ,nx,ny,nz,anxi,anyi,anzi,sorg, hmat,natm,pos0,csymbols,nstps_relax)
+     ,nx,ny,nz,anxi,anyi,anzi,sorg, hmat,natm,pos0,csymbols &
+     ,nstps_relax, nnmaxmc,lsprmc)
 !
 ! Kinetic MC simulation using
 !
   implicit none
   integer,intent(in):: mpi_md_world,nodes_md,myid_md,myx,myy,myz &
-       ,nx,ny,nz,natm,nstps_relax
+       ,nx,ny,nz,natm,nstps_relax,nnmaxmc,lsprmc(0:nnmaxmc,natm)
   real(8),intent(in):: anxi,anyi,anzi,sorg(3),hmat(3,3),pos0(3,natm)
   character,intent(in):: csymbols(natm)
 
+  integer:: nstps_pmd,maxhist
   real(8):: epotmc
-  real(8),allocatable:: epimc(:)
+  real(8),allocatable:: epimc(:),ecpot(:),erghist(:)
+  character:: ci*1,cj*1,cfmt*10,cergtxt*128
+  character,allocatable:: csymprev(:),csymhist(:,:)
 
-  allocate(epimc(natm))
+  integer,parameter:: ioerg = 20
+  integer,parameter:: iosym = 21
+
+  maxhist = nstpmc * 12
+  allocate(epimc(natm),ecpot(0:3),csymprev(natm), &
+       csymhist(natm,maxhist),erghist(maxhist))
 
 !.....test run pmd
-  print *,'natm,nstps_relax, =',natm,nstps_relax
-  print *,'nx,ny,nz = ',nx,ny,nz
-  call run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
-       ,nstps_relax,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
-  print *,'epotmc = ',epotmc
-  print *,'epimc(1) =',epimc(1)
-  print *,'epimc(N) =',epimc(natm)
+
+!!$  print *,'natm,nstps_relax, =',natm,nstps_relax
+!!$  print *,'nx,ny,nz = ',nx,ny,nz
+!!$  call run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
+!!$       ,nstps_relax,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+!!$  print *,'epotmc = ',epotmc
+!!$  print *,'epimc(1) =',epimc(1)
+!!$  print *,'epimc(N) =',epimc(natm)
   
 !.....initialize some values here
+  nstps_pmd = nstps_relax
+  if( nstps_pmd.lt.0 ) then
+    nstps_pmd = natm
+  endif
+
+!.....Open output files
+  if( myid_md.eq.0 ) then
+    open(ioerg,file='out.mc.erg',status='replace')
+    open(iosym,file='out.mc.symbols',status='replace')
+  endif
   
 !.....compute chemical potentials of solutes
+  call calc_chem_pot(nspcs,species,ecpot,hmat,natm,pos0 &
+       ,nstps_relax,nx,ny,nz,mpi_md_world,nodes_md,myid_md)  
 
 !.....compute energy of the initial configuration
+  call run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
+       ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+  epotmc0 = epotmc
+
+!.....Register initial structure to history list
+  nhist = 1
+  csymhist(1:natm,nhist) = csymbols(1:natm)
+  erghist(nhist) = epotmc
 
 !.....main loop starts..................................................
+  do istp = 1, nstpmc
 
 !.....store previous symbols
+    csymprev(1:natm) = csymbols(1:natm)
 
 !.....pick one solutes to be moved (usually vacancy)
+    do i=1,natm
+      if( csymbols(i).eq.'V' ) then
+        ic = i
+        exit
+      enddo
+    enddo
+    ci = csymbols(ic)
 
-!.....look for neighbor site and check if they are different species
+!.....Look for neighbor site and check if they are different species
+    ncandidate = 0
+    do jj=1,lsprmc(ic)
+      jc = lsprmc(jj)
+      cj = csymbols(jc)
+      if( cj.ne.ci ) then
+        ncandidate = ncandidate + 1
+      endif
+    enddo
+    if( ncandidate.eq.0 ) cycle
 
-!.....loop for possible neighbor sites and compute migration barriers.
-!.....to reduce computation cost, look at history of symbol array
-!.....if the symbol matches one of the history, no need to calc energy
+!.....Loop for possible neighbor sites and compute migration barriers.
+!.....To reduce computation cost, look at history of symbol array.
+!.....If the symbol matches one of the history, no need to calc energy
 !.....of the system and just take from the history.
-
-!.....compute the every and total probabilities
-
+    do jj=1,lsprmc(ic)
+      jc = lsprmc(jj)
+      cj = csymbols(jc)
+      if( cj.eq.ci ) cycle
+!.....Exchange positions or migrate vacancy
+      csymtmp(1:natm)= csymbols(1:natm)
+      csymtmp(ic) = cj
+      csymtmp(jc) = ci
+!.....Look for the history to check if we need to compute energy
+      ihist = check_history(natm,nhist,csymtmp,csymhist)
+      if( ihist.eq.-1 ) then  ! no same symbols
+        call run_pmd(hmat,natm,pos0,csymtmp,epimc,epotmc &
+             ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+        nhist = nhist + 1
+        csymhist(1:natm,nhist) = csymbols(1:natm)
+        erghist(nhist) = epotmc
+      else  ! there is one same symbols
+        epotmc = erghist(ihist)
+      endif
+      ergtmp(jj) = epotmc
+      csymtmp(1:natm,jj) = csymbols(1:natm)
+      cjtmp(jj) = cj
+!.....Since ci should be vacancy, cj is the migrating atom.
+      js = cs2is(cj)
+      de = demig(js) + (erg-ergp)/2
+      p = freq(js) *exp(-de/(temp*fkb))
+      probtmp(jj) = p
+    enddo  ! loop over nearest neighbors
+    
+!.....Compute total probability
+    ptot = 0d0
+    do jj=1,lsprmc(ic)
+      ptot = ptot +probtmp(jj)
+    enddo
 !.....pick one event from the event list
+    rand = urnd()*ptot
+    ievent = lsprmc(ic)
+    ptmp = 0d0
+    do jj=1,lsprmc(ic)
+      ptmp = ptmp +probtmp(jj)
+      if( rand.lt.ptmp ) then
+        ievent = jj
+        exit
+      endif
+    enddo
+    ergp = ergtmp(ievent)
+    csymbols(1:natm) = csymtmp(1:natm,ievent)
+!.....Proceed real-time clock
+    rand = urnd()
+    dt = -log(rand)/ptot
+    tclck = tclck +dt
 
-!.....proceed real-time clock
+!.....Output if needed
+    if( myid_md.eq.0 ) then
+!.....Write symbols
+      write(cfmt,'(i10)') natm
+      write(iosym,'(i8,3x,'//trim(cfmt)//'a)') istp,csymbols(1:natm)
+!.....Write POSCAR if migrating atom is not Al
+      if( cjtmp(ievent).ne.'A' ) then
+        call write_POSCAR()
+      endif
+!.....Write energy
+      write(cergtxt,'(i8,es11.3,es15.7,a,i3,a,i2,a,a)') istp,tclck&
+           ,ergp,', ncalc=',ncalc,'ievent=',ievent,', ',cjtmp(ievent)
+      write(ioerg,'(a)') trim(cergtxt)
+      write(6,'(a)') trim(cergtxt)
+    endif
 
-!.....output if needed
+  enddo  ! end of loop: istp
+
+  if( myid_md.eq.0 ) then
+    close(ioerg)
+    close(iosym)
+  endif
 
   deallocate(epimc)
   
@@ -649,7 +763,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,trlx,stgt(3,3),ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3) &
        ,epot,ekin,eps_conv,rbuf
   character:: ciofmt*6,cforce*20,ctctl*20,cpctl*20,czload_type*5,csi*1
-  logical:: ltdst
+  logical:: ltdst,lstrs
   
   logical,save:: l1st = .true.
   integer,save:: ntot
@@ -709,6 +823,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   trlx = 100d0
   ltdst = .false.
   ntdst = 1
+  lstrs = .false.
   cpctl = 'none'
   stgt(1:3,1:3) = 0d0
   ptgt = 0d0
@@ -724,7 +839,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   czload_type = 'no'
   eps_conv = 1d-3
   ifsort = 1
-  iprint = 1
+  iprint = 0
 
 !.....call pmd_core to perfom MD
   call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot &
@@ -732,7 +847,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,nx,ny,nz &
        ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp &
        ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
-       ,srlx,stbeta,strfin &
+       ,srlx,stbeta,strfin,lstrs &
        ,fmv,ptnsr,epot,ekin,n_conv &
        ,czload_type,eps_conv,ifsort,iprint)
 
@@ -747,6 +862,113 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   epotmc = epot
   
 end subroutine run_pmd
+!=======================================================================
+subroutine calc_chem_pot(nspcs,species,ecpot,hmat,natm,pos0 &
+     ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+!
+! Calculate chemical potentials
+!
+  implicit none
+  integer,intent(in):: nspcs,natm,nx,ny,nz,nstps_pmd&
+       ,mpi_md_world,nodes_md,myid_md
+  real(8),intent(in):: hmat(3,3),pos0(3,natm)
+  character,intent(in):: species(0:nspcs)
+  real(8),intent(out):: ecpot(0:nspcs)
+
+  integer:: ispcs,i
+  character:: cspcs*1
+  character,allocatable:: csymtmp(:)
+  real(8):: epot
+  real(8),allocatable:: epi(:)
+
+  allocate(csymtmp(natm),epi(natm))
+
+
+  do ispcs = 0,nspcs
+    do i=1,natm
+      csymtmp(i) = 'A'
+    enddo
+    cspcs = species(ispcs)
+    csymtmp(1) = cspcs
+    call run_pmd(hmat,natm,pos0,csymtmp,epi,epot &
+         ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+    ecpot(ispcs) = epot
+  enddo
+  
+!.....chemical potential of Al
+  ecpot(1) = ecpot(1) / natm
+
+!.....subtract epot of Al bulk
+  do ispcs = 0,nspcs
+    if( ispcs.eq.1 ) cycle
+    do i=1,natm
+      csymtmp(i) = 'A'
+    enddo
+    cspcs = species(ispcs)
+    csymtmp(1) = cspcs
+    do i = 1,natm
+      if( csymtmp(i).eq.species(1) ) then
+        ecpot(ispcs) = ecpot(ispcs) -ecpot(1)
+      enddo
+    enddo
+  enddo
+  
+end subroutine calc_chem_pot
+!=======================================================================
+function check_history(natm,nhist,csymbols,csymhist) result(ihist)
+  implicit none
+  integer,intent(in):: natm,nhist
+  character,intent(in):: csymbols(natm),csymhist(natm,nhist)
+  integer:: ihist
+
+  integer:: i
+
+  ihist = -1
+  do i=1,nhist
+    if( symbols_same(natm,csymbols,csymhist(1,i)) ) then
+      ihist=i
+      return
+    endif
+  end do
+!.....If there is no same structure in the history, return -1
+  return
+
+end function check_history
+!=======================================================================
+function symbols_same(ndim,csym1,csym2) result(lsame)
+  implicit none
+  integer,intent(in):: ndim
+  character,intent(in):: csym1(ndim),csym2(ndim)
+
+  logical:: lsame = .false.
+  integer:: i
+
+  do i=1,ndim
+    if( csym1(i).ne.csym2(i) ) then
+      lsame = .false.
+      return
+    endif
+  enddo
+  lsame = .true.
+  return
+  
+end function symbols_same
+!=======================================================================
+function cs2is(cspcs) result(ispcs)
+  use pmc
+  implicit none
+  character,intent(in):: cspcs*1
+
+  integer:: ispcs
+  integer:: i
+
+  do i=0,3
+    if( species(i).eq.cspcs ) then
+      ispcs = i
+    endif
+  enddo
+  return
+end function cspcs2ispcs
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmc"

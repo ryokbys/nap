@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2016-11-02 17:50:27 Ryo KOBAYASHI>
+!                     Last modified: <2016-11-10 16:14:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -52,7 +52,9 @@ module pmdio
          1d0, 1d0, 1d0, &
          1d0, 1d0, 1d0, &
          1d0, 1d0, 1d0  &
-       /
+         /
+!.....whether compute stress or not
+  logical:: lstrs0 = .true.
 !.....barostat
   character(len=20):: cpctl='non'
   real(8):: ptgt   = 0d0
