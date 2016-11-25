@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2016-11-15 10:40:48 Ryo KOBAYASHI>
+!                     Last modified: <2016-11-25 15:21:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1043,8 +1043,9 @@ subroutine write_stats(iter)
   implicit none
   integer,intent(in):: iter
   integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst,nfcal
+  integer:: i
   type(mdsys)::smpl
-  real(8):: de,df
+  real(8):: de,df,vnorm
   real(8):: demaxl_trn,demax_trn,desuml_trn,desum_trn,rmse_trn
   real(8):: demaxl_tst,demax_tst,desuml_tst,desum_tst,rmse_tst
   real(8):: dfmaxl_trn,dfmax_trn,dfsuml_trn,dfsum_trn
@@ -1085,10 +1086,15 @@ subroutine write_stats(iter)
     rmse_tst= 0.d0
   endif
   if( myid.eq.0 ) then
+    vnorm = 0d0
+    do i=1,nvars
+      vnorm = vars(i)*vars(i)
+    enddo
 !!$    write(6,'(a,2i6)') ' nsmpl_trn, nsmpl_tst = ',nsmpl_trn,nsmpl_tst
-    write(6,'(a,i8,f15.2,4f12.7)') '  energy:training(rmse,max)' &
-         //',test(rmse,max)=',iter,mpi_wtime()-time0 &
-         ,rmse_trn,demax_trn,rmse_tst,demax_tst
+    write(6,'(a,i8,f15.2,4f12.7,es11.3)') ' energy:training(rmse,max)' &
+         //',test(rmse,max),vnorm=',iter,mpi_wtime()-time0 &
+         ,rmse_trn,demax_trn,rmse_tst,demax_tst &
+         ,vnorm
 !!$    if( rmse_tst < rmse_tst_best ) then
 !!$      rmse_tst_best= rmse_tst
 !!$      call write_vars('best')
@@ -1154,9 +1160,10 @@ subroutine write_stats(iter)
     rmse_tst= 0d0
   endif
   if( myid.eq.0 ) then
-    write(6,'(a,i8,f15.2,4f12.7)') '  force:training(rmse,max)' &
-         //',test(rmse,max)=',iter,mpi_wtime()-time0 &
-         ,rmse_trn,dfmax_trn,rmse_tst,dfmax_tst
+    write(6,'(a,i8,f15.2,4f12.7,es11.3)') ' force: training(rmse,max)' &
+         //',test(rmse,max),vnorm=',iter,mpi_wtime()-time0 &
+         ,rmse_trn,dfmax_trn,rmse_tst,dfmax_tst &
+         ,vnorm
 !    call write_vars('tmp')
   endif
 
@@ -1407,3 +1414,7 @@ subroutine get_uniq_iarr(n,m,iarr)
   enddo
   return
 end subroutine get_uniq_iarr
+!-----------------------------------------------------------------------
+! Local Variables:
+! compile-command: "make fitpot"
+! End:
