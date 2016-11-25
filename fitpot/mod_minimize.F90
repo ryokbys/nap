@@ -372,7 +372,7 @@ contains
     logical:: ltwice = .false.
     real(8),save,allocatable:: gg(:,:),x(:),s(:),y(:),gp(:) &
          ,ggy(:),gpena(:)
-    real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,pval&
+    real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,vnorm,pval &
          ,sgnx,absx,estmem
     integer:: i,j,iter,nftol,ig,mem
 
@@ -446,26 +446,27 @@ contains
 
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
+    vnorm= sqrt(sprod(ndim,x,x))
 
     iter= 0
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,3es15.7)') ' iter,f,p,gnorm=',iter,f &
-               ,pval,gnorm
+          write(6,'(a,i8,4es15.7)') ' iter,f,p,vnorm,gnorm=',iter,f &
+               ,pval,vnorm,gnorm
         else
-          write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+          write(6,'(a,i8,3es15.7)') ' iter,f,vnorm,gnorm=',iter,f,vnorm,gnorm
         endif
         call flush(6)
       else if( iprint.ge.2 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,12es15.7)') ' iter,f,p,gnorm,x(1:5)=' &
-               ,iter,f,pval,gnorm,x(1:5)
+          write(6,'(a,i8,13es15.7)') ' iter,f,p,vnorm,gnorm,x(1:5)=' &
+               ,iter,f,pval,vnorm,gnorm,x(1:5)
         else
-          write(6,'(a,i8,12es15.7)') ' iter,f,gnorm,x(1:5)=' &
-               ,iter,f,gnorm,x(1:5)
+          write(6,'(a,i8,13es15.7)') ' iter,f,vnorm,gnorm,x(1:5)=' &
+               ,iter,f,vnorm,gnorm,x(1:5)
         endif
         call flush(6)
       endif
@@ -577,27 +578,28 @@ contains
       g= grad(ndim,x)
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
+      vnorm= sqrt(sprod(ndim,x,x))
 !!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
           if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
                .or.trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,4es15.7)') ' iter,f,p,gnorm,f-fp=',iter,f &
-                 ,pval,gnorm,f-fp
+            write(6,'(a,i8,5es15.7)') ' iter,f,p,vnorm,gnorm,f-fp=',iter,f &
+                 ,pval,vnorm,gnorm,f-fp
           else
-            write(6,'(a,i8,3es15.7)') ' iter,f,gnorm,f-fp=',iter,f &
-                 ,gnorm,f-fp
+            write(6,'(a,i8,4es15.7)') ' iter,f,vnorm,gnorm,f-fp=',iter,f &
+                 ,vnorm,gnorm,f-fp
           endif
           call flush(6)
         else if( iprint.ge.2 ) then
           if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
                .or. trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,13es15.7)') ' iter,f,p,gnorm,f-fp,x(1:5)=' &
-                 ,iter,f,pval,gnorm,f-fp,x(1:5)
+            write(6,'(a,i8,14es15.7)') ' iter,f,p,vnorm,gnorm,f-fp,x(1:5)=' &
+                 ,iter,f,pval,vnorm,gnorm,f-fp,x(1:5)
           else
-            write(6,'(a,i8,13es15.7)') ' iter,f,gnorm,f-fp,x(1:5)=' &
-                 ,iter,f,gnorm,f-fp,x(1:5)
+            write(6,'(a,i8,14es15.7)') ' iter,f,vnorm,gnorm,f-fp,x(1:5)=' &
+                 ,iter,f,vnorm,gnorm,f-fp,x(1:5)
           endif
           call flush(6)
         endif
