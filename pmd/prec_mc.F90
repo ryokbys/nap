@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2016-12-01 16:47:51 Ryo KOBAYASHI>
+!                     Last-modified: <2016-12-01 17:40:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 module pmc
 ! 
@@ -130,9 +130,12 @@ program prec_mc
   include "./params_unit.h"
 
   integer:: i,j,k,l,m,n,ierr
+  integer:: ihour,imin,isec
   integer:: mpi_md_world,nodes_md,myid_md,myx,myy,myz
-  real(8):: rc,anxi,anyi,anzi,sorg(3)
-  character:: cnum*6 
+  real(8):: rc,anxi,anyi,anzi,sorg(3),t0,t1
+  character:: cnum*6
+
+  t0 = mpi_wtime()
 
 !.....initialize parallel
   call init_parallel(mpi_md_world,nodes_md,myid_md)
@@ -194,7 +197,13 @@ program prec_mc
 
   if( myid_md.eq.0 ) then
     call write_POSCAR('POSCAR_final',natm,csymbols,pos0,hmat,species)
-    write(6,'(a)') ' program pmc ends'
+    t1 = mpi_wtime() - t0
+    ihour = int(t1/3600)
+    imin  = int((t1-ihour*3600)/60)
+    isec  = int(t1 -ihour*3600 -imin*60)
+    write(6,'(a,f10.2,a,i3,"h",i2.2,"m",i2.2,"s")') &
+         " time =",t1, &
+         " sec  = ",ihour,imin,isec
   endif
 
   call mpi_finalize(ierr)
@@ -271,8 +280,8 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
 
 
   real(8),parameter:: fkb = 8.61733034d-5  ! eV/K
-  integer,parameter:: ioerg = 20
-  integer,parameter:: iosym = 21
+  integer,parameter:: ioerg = 30
+  integer,parameter:: iosym = 31
 
   maxhist = nstps_mc * 12 + 1
   allocate(epimc(natm),ecpot(0:3),csymprev(natm), &
@@ -1061,7 +1070,6 @@ subroutine calc_chem_pot(nspcs,species,ecpot,hmat,natm,pos0 &
     call run_pmd(hmat,natm,pos0,csymtmp,epi,epot &
          ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
     ecpot(ispcs) = epot
-    print *, 'i,c,e = ',i,cspcs,epot
   enddo
   
 !.....chemical potential of Al
