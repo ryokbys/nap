@@ -247,9 +247,17 @@ c-----Scan resident cells
           rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
 
           if(rij2.lt.rc2) then
+            do l=1,lspr(0,i)
+              if( lspr(l,i).eq.j ) then
+                write(6,'(a)') " [Error] lspr(0,i) already has it !!!"
+                write(6,'(a)') "   Check the simulation cell size."
+                stop
+              endif
+            enddo
             lspr(0,i)=lspr(0,i)+1
             if(lspr(0,i).gt.nnmax) then
               write(6,'(a)') " [Error] lspr(0,i).gt.nnmax !!!"
+              print *, '   i,lspr(0,i),nnmax =',i,lspr(0,i),nnmax
               stop
             endif
             lspr(lspr(0,i),i)=j

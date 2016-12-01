@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2016-11-25 21:17:08 Ryo KOBAYASHI>
+!                     Last-modified: <2016-12-01 16:47:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 module pmc
 ! 
@@ -132,6 +132,7 @@ program prec_mc
   integer:: i,j,k,l,m,n,ierr
   integer:: mpi_md_world,nodes_md,myid_md,myx,myy,myz
   real(8):: rc,anxi,anyi,anzi,sorg(3)
+  character:: cnum*6 
 
 !.....initialize parallel
   call init_parallel(mpi_md_world,nodes_md,myid_md)
@@ -142,10 +143,16 @@ program prec_mc
   endif
   call bcast_params(myid_md,mpi_md_world,lkinetic, &
        nstps_mc,ncx,ncy,ncz,alat,num_Mg,num_Si,num_Vac, &
-       init_strct,nx,ny,nz,nstps_relax,lmove)
+       init_strct,nx,ny,nz,nstps_relax,lmove,temp)
 !.....parallel setting for pmd
   call parallel_setting(nx,ny,nz,myid_md,myx,myy,myz,anxi,anyi,anzi,sorg)
 
+  if( myid_md.eq.0 ) then
+    call write_init_params(lkinetic,nstps_mc, ncx,ncy,ncz,alat, &
+         num_Mg,num_Si,num_Vac, &
+         init_strct,nx,ny,nz,nstps_relax,lmove,temp)
+  endif
+  
 !.....create 1st Al fcc crystal
   natm = ncx*ncy*ncz*4
   allocate(csymbols(natm),i1sids(natm),pos0(3,natm),pos(3,natm) &
@@ -161,6 +168,10 @@ program prec_mc
   rc = 3.0
   allocate(lsprmc(0:nnmaxmc,natm))
   call make_tag(natm,csymbols,tagmc)
+  if( myid_md.eq.0 ) then
+    write(cnum,'(i6.6)') 0
+    call write_POSCAR('POSCAR_'//cnum,natm,csymbols,pos0,hmat,species)
+  endif
   call mk_lspr_sngl(natm,natm,nnmaxmc,tagmc,pos0,rc,hmat,hmati,lsprmc)
 
 !.....check restart,
@@ -192,13 +203,13 @@ end program prec_mc
 !=======================================================================
 subroutine bcast_params(myid_md,mpi_md_world,lkinetic, &
      nstps_mc, ncx,ncy,ncz,alat,num_Mg,num_Si,num_Vac, &
-     init_strct,nx,ny,nz,nstps_relax,lmove)
+     init_strct,nx,ny,nz,nstps_relax,lmove,temp)
   implicit none
   include 'mpif.h'
   integer,intent(in):: myid_md,mpi_md_world
   integer,intent(inout):: nx,ny,nz,ncx,ncy,ncz,nstps_mc, &
        num_Mg,num_Si,num_Vac,init_strct,nstps_relax
-  real(8),intent(inout):: alat
+  real(8),intent(inout):: alat,temp
   logical,intent(inout):: lmove(0:3),lkinetic
   
   integer:: ierr
@@ -224,6 +235,7 @@ subroutine bcast_params(myid_md,mpi_md_world,lkinetic, &
   call mpi_bcast(lmove,4,mpi_logical,0,mpi_md_world,ierr)
 
   call mpi_bcast(alat,1,mpi_double_precision,0,mpi_md_world,ierr)
+  call mpi_bcast(temp,1,mpi_double_precision,0,mpi_md_world,ierr)
 
 end subroutine bcast_params
 !=======================================================================
@@ -247,7 +259,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   integer:: i,ic,ievent,ihist,iorder,istp,jc,jj,js,ncalc,ncandidate, &
        nhist,nspcs,ierr
   integer:: nstps_pmd,maxhist
-  real(8):: epotmc,epotmc0,de,dt,epot,erg,ergp,ptmp,ptot,rand, &
+  real(8):: epotmc,epotmc0,de,dt,epot,ergp,ptmp,ptot,rand, &
        tclck,p
   real(8),allocatable:: epimc(:),ecpot(:),erghist(:),ergtmp(:), &
        probtmp(:)
@@ -262,7 +274,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   integer,parameter:: ioerg = 20
   integer,parameter:: iosym = 21
 
-  maxhist = nstps_mc * 12
+  maxhist = nstps_mc * 12 + 1
   allocate(epimc(natm),ecpot(0:3),csymprev(natm), &
        csymhist(natm,maxhist),erghist(maxhist), &
        csymtmp(natm,nnmaxmc),ergtmp(nnmaxmc), &
@@ -290,6 +302,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
     open(iosym,file='out.mc.symbols',status='replace')
   endif
 
+  nspcs = 3
 !.....compute chemical potentials of solutes
   call calc_chem_pot(nspcs,species,ecpot,hmat,natm,pos0 &
        ,nstps_relax,nx,ny,nz,mpi_md_world,nodes_md,myid_md)  
@@ -298,8 +311,16 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   call run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
   epotmc0 = epotmc
+  ergp = epotmc0
 
   if( myid_md.eq.0 ) then
+    write(6,*) ''
+    write(6,'(a)') ' chemical potentials:'
+    do i=0,3
+      write(6,'(1x,i4,a2,f12.3)') i, species(i), ecpot(i)
+    enddo
+    write(6,'(a,f12.3)') ' initial potential energy = ',epotmc0
+    write(6,*) ''
 !.....Register initial structure to history list
     nhist = 1
     csymhist(1:natm,nhist) = csymbols(1:natm)
@@ -329,12 +350,12 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
           ncandidate = ncandidate + 1
         endif
       enddo
-      if( ncandidate.eq.0 ) cycle
 
 !.....Loop for possible neighbor sites and compute migration barriers.
 !.....To reduce computation cost, look at history of symbol array.
 !.....If the symbol matches one of the history, no need to calc energy
 !.....of the system and just take from the history.
+      ncalc = 0
       do jj=1,lsprmc(0,ic)
         jc = lsprmc(jj,ic)
         cj = csymbols(jc)
@@ -344,15 +365,19 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
         csymtmp(ic,jj) = cj
         csymtmp(jc,jj) = ci
 !.....Look for the history to check if we need to compute energy
-        ihist = check_history(natm,nhist,csymtmp,csymhist)
+        ihist = check_history(natm,nhist,csymtmp(1,jj),csymhist)
         if( ihist.eq.-1 ) then  ! no same symbols
 !.....Send the order to run_pmd
           iorder = 1
           call mpi_bcast(iorder,1,mpi_integer,0,mpi_md_world,ierr)
           call run_pmd(hmat,natm,pos0,csymtmp(1,jj),epimc,epotmc &
                ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+          ncalc = ncalc + 1
           nhist = nhist + 1
-          csymhist(1:natm,nhist) = csymbols(1:natm)
+          if( nhist.gt.maxhist ) then
+            stop ' Error: nhist.gt.maxhist'
+          endif
+          csymhist(1:natm,nhist) = csymtmp(1:natm,jj)
           erghist(nhist) = epotmc
         else  ! there is one same symbols
           epotmc = erghist(ihist)
@@ -362,7 +387,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
         cjtmp(jj) = cj
 !.....Since ci should be vacancy, cj is the migrating atom.
         js = cs2is(cj)
-        de = demig(js) + (erg-ergp)/2
+        de = demig(js) + (epotmc-ergp)/2
         p = prefreq(js) *exp(-de/(temp*fkb))
         probtmp(jj) = p
       enddo  ! loop over nearest neighbors
@@ -402,9 +427,11 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
       endif
 !.....Write energy
       write(cergtxt,'(i8,es11.3,es15.7,a,i3,a,i2,a,a)') istp,tclck&
-           ,ergp,', ncalc=',ncalc,'ievent=',ievent,', ',cjtmp(ievent)
+           ,ergp,', ncalc=',ncalc,', ievent=',ievent,', ',cjtmp(ievent)
       write(ioerg,'(a)') trim(cergtxt)
       write(6,'(a)') trim(cergtxt)
+      flush(iosym)
+      flush(ioerg)
 
     enddo  ! end of loop: istp
     iorder = -1
@@ -520,7 +547,7 @@ subroutine read_in_pmc(ionum,cfname)
     call read_in_pmc_core(ionum,c1st)
   enddo
   close(ionum)
-10 write(6,'(a)') ' read '//trim(cfname)//' done'
+10 write(6,'(a)') ' reading '//trim(cfname)//' done'
 end subroutine read_in_pmc
 !=======================================================================
 subroutine read_in_pmc_core(ionum,cname)
@@ -623,6 +650,38 @@ subroutine parallel_setting(nx,ny,nz,myid_md,myx,myy,myz &
   return
 
 end subroutine parallel_setting
+!=======================================================================
+subroutine write_init_params(lkinetic,nstps_mc, ncx,ncy,ncz,alat, &
+     num_Mg,num_Si,num_Vac, &
+     init_strct,nx,ny,nz,nstps_relax,lmove,temp)
+  implicit none
+  integer,intent(in):: nstps_mc,ncx,ncy,ncz,num_Mg,num_Si,num_Vac &
+       ,init_strct,nx,ny,nz,nstps_relax
+  real(8),intent(in):: alat,temp
+  logical,intent(in):: lmove(0:3),lkinetic
+
+  write(6,*) '=============== initial parameters =================='
+  write(6,*) ''
+  write(6,'(1x,a20,1x,i8)') 'num_steps',nstps_mc
+  write(6,'(1x,a20,1x,i8)') 'num_relax_steps',nstps_relax
+  write(6,*) ''
+  write(6,'(1x,a20,1x,i2)') 'ncopy_x',ncx
+  write(6,'(1x,a20,1x,i2)') 'ncopy_y',ncy
+  write(6,'(1x,a20,1x,i2)') 'ncopy_z',ncz
+  write(6,'(1x,a20,1x,i2)') 'parallel_x',nx
+  write(6,'(1x,a20,1x,i2)') 'parallel_y',ny
+  write(6,'(1x,a20,1x,i2)') 'parallel_z',nz
+  write(6,'(1x,a20,1x,i2)') 'initial_structure',init_strct
+  write(6,*) ''
+  write(6,'(1x,a20,1x,f8.3)') 'lattice_constant',alat
+  write(6,'(1x,a20,1x,f8.3)') 'temperature',temp
+  write(6,*) ''
+  write(6,'(1x,a20,1x,l1)') 'kinetic',lkinetic
+  write(6,'(1x,a20,4(1x,l1))') 'atoms_to_be_moved',lmove(0:3)
+  write(6,*) ''
+  write(6,*) '====================================================='
+  
+end subroutine write_init_params
 !=======================================================================
 subroutine make_tag(natm,csymbols,tag)
   use pmc, only: symbol2sid
@@ -857,25 +916,33 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   logical:: ltdst,lstrs
 
   logical,save:: l1st = .true.
-  integer,save:: ntot
+  integer,save:: ntot = 0
   real(8),save,allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:) &
        ,epitot(:),ekitot(:,:,:),stot(:,:,:)
 
 !.....at the 1st call, evaluate number of total atoms to be used in pmd
 !     and allocate total system arrays
-  if( l1st ) then
-    if( myid_md.eq.0 ) then
-      inc = 0
-      do i = 1,natm
-        csi = csymbols(i)
-        if( csi.eq.'V' ) cycle
-        inc = inc + 1
-      enddo
+  if( myid_md.eq.0 ) then
+    inc = 0
+    do i = 1,natm
+      csi = csymbols(i)
+      if( csi.eq.'V' ) cycle
+      inc = inc + 1
+    enddo
+    if( ntot.ne.inc ) then
       ntot = inc
+      if( allocated(tagtot) ) then
+        deallocate(tagtot,rtot,vtot,atot,epitot,ekitot,stot)
+      endif
       allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),atot(3,ntot) &
            ,epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot))
-    else
+    endif
+  else
+    if( ntot.ne.1 ) then
       ntot = 1
+      if( allocated(tagtot) ) then
+        deallocate(tagtot,rtot,vtot,atot,epitot,ekitot,stot)
+      endif
       allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),atot(3,ntot) &
            ,epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot))
     endif
@@ -899,8 +966,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
       epitot(inc) = 0d0
     enddo
   end if
-  nstp = ntot
-  nerg = nstp
+  nerg = nstps_pmd
   npmd = 1
   am(1:9) = 1d0
   am(1) = 26.982  ! Al
@@ -942,8 +1008,8 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
 
 !.....call pmd_core to perfom MD
   call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot &
-       ,ekitot,epitot,nstp,nerg,npmd,myid_md,mpi_md_world,nodes_md &
-       ,nx,ny,nz &
+       ,ekitot,epitot,nstps_pmd,nerg,npmd &
+       ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
        ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp &
        ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
        ,srlx,stbeta,strfin,lstrs &
@@ -961,6 +1027,8 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
     enddo
     epotmc = epot
   endif
+
+  l1st = .false.
 
 end subroutine run_pmd
 !=======================================================================
@@ -993,6 +1061,7 @@ subroutine calc_chem_pot(nspcs,species,ecpot,hmat,natm,pos0 &
     call run_pmd(hmat,natm,pos0,csymtmp,epi,epot &
          ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
     ecpot(ispcs) = epot
+    print *, 'i,c,e = ',i,cspcs,epot
   enddo
   
 !.....chemical potential of Al
@@ -1007,7 +1076,7 @@ subroutine calc_chem_pot(nspcs,species,ecpot,hmat,natm,pos0 &
     cspcs = species(ispcs)
     csymtmp(1) = cspcs
     do i = 1,natm
-      if( csymtmp(i).eq.species(1) ) then
+      if( csymtmp(i).eq.'A' ) then
         ecpot(ispcs) = ecpot(ispcs) -ecpot(1)
       endif
     enddo
@@ -1024,8 +1093,11 @@ function check_history(natm,nhist,csymbols,csymhist) result(ihist)
   integer:: i
   logical,external:: symbols_same
 
+!!$  print *, 'check_history:'
+!!$  print *, 'csymbols = ',csymbols(1:natm)
   ihist = -1
   do i=1,nhist
+!!$    print *, 'csymhist(:,i) = ',csymhist(1:natm,i)
     if( symbols_same(natm,csymbols,csymhist(1,i)) ) then
       ihist=i
       return

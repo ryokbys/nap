@@ -4,6 +4,8 @@ System information used in pmd, including cell information, lattice constant,
 number of atoms, atom species, atom positions.
 
 Users can use `pmdsys.py` as a converter program as described below.
+Available formats are,
+  pmd, akr, POSCAR, dump, xsf
 
 Usage:
   pmdsys.py [options] INFILE OUTFILE
