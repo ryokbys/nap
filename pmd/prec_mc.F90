@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2016-12-01 17:44:47 Ryo KOBAYASHI>
+!                     Last-modified: <2016-12-02 11:27:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 module pmc
 ! 
@@ -135,10 +135,10 @@ program prec_mc
   real(8):: rc,anxi,anyi,anzi,sorg(3),t0,t1
   character:: cnum*6
 
-  t0 = mpi_wtime()
 
 !.....initialize parallel
   call init_parallel(mpi_md_world,nodes_md,myid_md)
+  t0 = mpi_wtime()
   if( myid_md.eq.0 ) then
     write(6,'(a)') ' program pmc starts...'
 !.....read input parameters
@@ -171,10 +171,10 @@ program prec_mc
   rc = 3.0
   allocate(lsprmc(0:nnmaxmc,natm))
   call make_tag(natm,csymbols,tagmc)
-  if( myid_md.eq.0 ) then
-    write(cnum,'(i6.6)') 0
-    call write_POSCAR('POSCAR_'//cnum,natm,csymbols,pos0,hmat,species)
-  endif
+!!$  if( myid_md.eq.0 ) then
+!!$    write(cnum,'(i6.6)') 0
+!!$    call write_POSCAR('POSCAR_'//cnum,natm,csymbols,pos0,hmat,species)
+!!$  endif
   call mk_lspr_sngl(natm,natm,nnmaxmc,tagmc,pos0,rc,hmat,hmati,lsprmc)
 
 !.....check restart,
@@ -195,12 +195,13 @@ program prec_mc
        ,nstps_mc,nstps_relax,nnmaxmc,lsprmc,species,temp &
        ,demig,prefreq)
 
+  t1 = mpi_wtime() - t0
   if( myid_md.eq.0 ) then
     call write_POSCAR('POSCAR_final',natm,csymbols,pos0,hmat,species)
-    t1 = mpi_wtime() - t0
     ihour = int(t1/3600)
     imin  = int((t1-ihour*3600)/60)
     isec  = int(t1 -ihour*3600 -imin*60)
+    write(6,*) ''
     write(6,'(a,f10.2,a,i3,"h",i2.2,"m",i2.2,"s")') &
          " time =",t1, &
          " sec  = ",ihour,imin,isec
@@ -267,7 +268,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
 
   integer:: i,ic,ievent,ihist,iorder,istp,jc,jj,js,ncalc,ncandidate, &
        nhist,nspcs,ierr
-  integer:: nstps_pmd,maxhist
+  integer:: nstps_pmd,maxhist,mem
   real(8):: epotmc,epotmc0,de,dt,epot,ergp,ptmp,ptot,rand, &
        tclck,p
   real(8),allocatable:: epimc(:),ecpot(:),erghist(:),ergtmp(:), &
@@ -284,10 +285,22 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   integer,parameter:: iosym = 31
 
   maxhist = nstps_mc * 12 + 1
-  allocate(epimc(natm),ecpot(0:3),csymprev(natm), &
-       csymhist(natm,maxhist),erghist(maxhist), &
-       csymtmp(natm,nnmaxmc),ergtmp(nnmaxmc), &
-       cjtmp(nnmaxmc),probtmp(nnmaxmc))
+  if( myid_md.eq.0 ) then
+    allocate(epimc(natm),ecpot(0:3),csymprev(natm), &
+         csymhist(natm,maxhist),erghist(maxhist), &
+         csymtmp(natm,nnmaxmc),ergtmp(nnmaxmc), &
+         cjtmp(nnmaxmc),probtmp(nnmaxmc))
+    mem = 8*(natm +4 +maxhist +nnmaxmc +nnmaxmc) &
+         +1*(natm +natm*maxhist +natm*nnmaxmc +nnmaxmc)
+    write(6,'(a,f10.3,a)') ' allocated array in kinetic_mc = ', &
+         dble(mem)/1000/1000, ' MB'
+  else
+    allocate(epimc(natm),ecpot(0:3),csymprev(natm), &
+         csymhist(natm,1),erghist(1), &
+         csymtmp(natm,1),ergtmp(1), &
+         cjtmp(1),probtmp(1))
+  endif
+  
 
 !.....test run pmd
 
@@ -370,6 +383,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
         cj = csymbols(jc)
         if( cj.eq.ci ) cycle
 !.....Exchange positions or migrate vacancy
+!!$        print *,' jj,ic,jc = ',jj,ic,jc
         csymtmp(1:natm,jj)= csymbols(1:natm)
         csymtmp(ic,jj) = cj
         csymtmp(jc,jj) = ci
@@ -392,14 +406,14 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
           epotmc = erghist(ihist)
         endif
         ergtmp(jj) = epotmc
-        csymtmp(1:natm,jj) = csymbols(1:natm)
+!        csymtmp(1:natm,jj) = csymbols(1:natm)
         cjtmp(jj) = cj
 !.....Since ci should be vacancy, cj is the migrating atom.
         js = cs2is(cj)
         de = demig(js) + (epotmc-ergp)/2
         p = prefreq(js) *exp(-de/(temp*fkb))
         probtmp(jj) = p
-      enddo  ! loop over nearest neighbors
+      enddo  ! loop over nearest neighbors, jj
 
 !.....Compute total probability
       ptot = 0d0
@@ -418,6 +432,10 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
         endif
       enddo
       ergp = ergtmp(ievent)
+!!$      do jj=1,lsprmc(0,ic)
+!!$        print *,' jj,csymtmp = ',jj,csymtmp(1:natm,jj)
+!!$      enddo
+!!$      print *,' ievent = ',ievent
       csymbols(1:natm) = csymtmp(1:natm,ievent)
 !.....Proceed real-time clock
       rand = urnd()
