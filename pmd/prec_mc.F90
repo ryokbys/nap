@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2016-12-06 14:26:47 Ryo KOBAYASHI>
+!                     Last-modified: <2016-12-06 18:38:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 module pmc
 ! 
@@ -50,10 +50,15 @@ module pmc
        15.7d+12 /)
 !.....average migration barriers in eV
 !.....also taken from Mantina et al.
+!!$  real(8):: demig(1:3) = (/ &
+!!$       0.58d0, &
+!!$       0.42d0, &
+!!$       0.55d0 /)
+!.....obtained by own DFT calculations
   real(8):: demig(1:3) = (/ &
-       0.58d0, &
-       0.42d0, &
-       0.55d0 /)
+       0.569d0, &
+       0.450d0, &
+       0.479d0 /)
 !.....pair-list for MC only, not to conflict with pmd
   integer,parameter:: nnmaxmc = 20
   integer,allocatable:: lsprmc(:,:)
@@ -197,7 +202,7 @@ program prec_mc
 
   t1 = mpi_wtime() - t0
   if( myid_md.eq.0 ) then
-    call write_POSCAR('POSCAR_final',natm,csymbols,pos0,hmat,species)
+    call write_POSCAR('poscars/POSCAR_final',natm,csymbols,pos0,hmat,species)
     ihour = int(t1/3600)
     imin  = int((t1-ihour*3600)/60)
     isec  = int(t1 -ihour*3600 -imin*60)
@@ -280,7 +285,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   real(8),external:: urnd,epot2efrm
 
 
-  real(8),parameter:: fkb = 8.61733034d-5  ! eV/K
+  real(8),parameter:: fkb = 8.61733035d-5  ! eV/K
   integer,parameter:: ioerg = 30
   integer,parameter:: iosym = 31
 
@@ -458,7 +463,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
 !.....Write POSCAR if migrating atom is not Al
       if( cjtmp(ievent).ne.'A' ) then
         write(cnum,'(i6.6)') istp
-        call write_POSCAR('POSCAR_'//cnum,natm,csymbols,pos0, &
+        call write_POSCAR('poscars/POSCAR_'//cnum,natm,csymbols,pos0, &
              hmat,species)
       endif
 !.....Write energy
