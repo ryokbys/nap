@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2016-12-02 11:27:57 Ryo KOBAYASHI>
+!                     Last-modified: <2016-12-06 14:26:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 module pmc
 ! 
@@ -267,17 +267,17 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   character,intent(inout):: csymbols(natm) 
 
   integer:: i,ic,ievent,ihist,iorder,istp,jc,jj,js,ncalc,ncandidate, &
-       nhist,nspcs,ierr
+       nhist,nspcs,ierr,isc
   integer:: nstps_pmd,maxhist,mem
   real(8):: epotmc,epotmc0,de,dt,epot,ergp,ptmp,ptot,rand, &
-       tclck,p
+       tclck,p,efrm,efrm0
   real(8),allocatable:: epimc(:),ecpot(:),erghist(:),ergtmp(:), &
        probtmp(:)
-  character:: ci*1,cj*1,cfmt*10,cergtxt*128,cnum*6
+  character:: ci*1,cj*1,cfmt*10,cergtxt*128,cnum*6,csi*1
   character,allocatable:: csymprev(:),csymhist(:,:),csymtmp(:,:) &
        ,cjtmp(:)
   integer,external:: cs2is,check_history
-  real(8),external:: urnd
+  real(8),external:: urnd,epot2efrm
 
 
   real(8),parameter:: fkb = 8.61733034d-5  ! eV/K
@@ -332,8 +332,9 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
 !.....compute energy of the initial configuration
   call run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
-  epotmc0 = epotmc
-  ergp = epotmc0
+  efrm = epot2efrm(natm,ecpot,csymbols,epotmc)
+  efrm0 = efrm
+  ergp = efrm0
 
   if( myid_md.eq.0 ) then
     write(6,*) ''
@@ -341,12 +342,18 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
     do i=0,3
       write(6,'(1x,i4,a2,f12.3)') i, species(i), ecpot(i)
     enddo
-    write(6,'(a,f12.3)') ' initial potential energy = ',epotmc0
+    write(6,*) ''
+    write(6,'(a)') ' base migration barriers (eV) and prefactors (Hz):'
+    do i=1,3
+      write(6,'(1x,i4,a2,f12.3,es12.3)') i, species(i),demig(i),prefreq(i)
+    enddo
+    write(6,*) ''
+    write(6,'(a,f12.3)') ' initial formation energy = ',efrm0
     write(6,*) ''
 !.....Register initial structure to history list
     nhist = 1
     csymhist(1:natm,nhist) = csymbols(1:natm)
-    erghist(nhist) = epotmc
+    erghist(nhist) = efrm
 
 !.....main loop starts..................................................
     do istp = 1, nstps_mc
@@ -401,17 +408,19 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
             stop ' Error: nhist.gt.maxhist'
           endif
           csymhist(1:natm,nhist) = csymtmp(1:natm,jj)
-          erghist(nhist) = epotmc
+          efrm = epot2efrm(natm,ecpot,csymtmp(1,jj),epotmc)
+          erghist(nhist) = efrm
         else  ! there is one same symbols
-          epotmc = erghist(ihist)
+          efrm = erghist(ihist)
         endif
-        ergtmp(jj) = epotmc
+        ergtmp(jj) = efrm
 !        csymtmp(1:natm,jj) = csymbols(1:natm)
         cjtmp(jj) = cj
 !.....Since ci should be vacancy, cj is the migrating atom.
         js = cs2is(cj)
-        de = demig(js) + (epotmc-ergp)/2
+        de = demig(js) + (efrm-ergp)/2
         p = prefreq(js) *exp(-de/(temp*fkb))
+!!$        print *,'jj,cj,ergp,erg,de,p = ',jj,cj,ergp,efrm,de,p
         probtmp(jj) = p
       enddo  ! loop over nearest neighbors, jj
 
@@ -906,7 +915,7 @@ subroutine write_POSCAR(cfname,natm,csymbols,pos,hmat,species)
   
   open(90,file=trim(cfname))
   write(90,'(3a)') 'written by PMC at ', &
-       trim(sys_time(1)),trim(sys_time(3))
+       trim(sys_time(1))
   write(90,'(a)') '   1.00000000'
   write(90,'(3es15.7)') hmat(1:3,1)
   write(90,'(3es15.7)') hmat(1:3,2)
@@ -1168,6 +1177,27 @@ function cs2is(cspcs) result(ispcs)
   enddo
   return
 end function cs2is
+!=======================================================================
+function epot2efrm(natm,ecpot,csym,epot)
+  implicit none
+  integer,intent(in):: natm
+  real(8),intent(in):: ecpot(0:4),epot
+  character,intent(in):: csym(natm)
+  real(8):: epot2efrm
+
+  integer:: i,isc
+  character:: csi
+  integer,external:: cs2is
+
+  epot2efrm = epot
+  do i=1,natm
+    csi = csym(i)
+    if( csi.eq.'V' ) cycle
+    isc = cs2is(csi)
+    epot2efrm = epot2efrm - ecpot(isc)
+  enddo
+  return
+end function epot2efrm
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmc"
