@@ -1,23 +1,24 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2016-11-10 16:20:14 Ryo KOBAYASHI>
+c                     Last-modified: <2016-12-08 11:05:39 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file include core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
       subroutine pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
-     &     ,ekitot,epitot,nstp,nerg,npmd,myid_md,mpi_md_world,nodes_md
-     &     ,nx,ny,nz
+     &     ,ekitot,epitot,maxstp,nerg,npmd
+     &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
      &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
      &     ,srlx,stbeta,strfin,lstrs0
      &     ,fmv,ptnsr,epot,ekin,n_conv
-     &     ,czload_type,eps_conv,ifsort,iprint)
+     &     ,czload_type,eps_conv,ifsort,iprint,nstp_done)
       use pmdvars
       implicit none
       include "mpif.h"
       include "./params_unit.h"
-      integer,intent(in):: ntot,nstp,nerg,npmd,myid_md,mpi_md_world
+      integer,intent(in):: ntot,maxstp,nerg,npmd,myid_md,mpi_md_world
      &     ,nismax,ifpmd,ifdmp,minstp,ntdst,ifsort
      &     ,iprint,nodes_md,nx,ny,nz,n_conv
+      integer,intent(out):: nstp_done
       real(8),intent(in):: hunit,tinit,tfin
      &     ,trlx,srlx,stbeta,strfin,dmp,eps_conv
       real(8),intent(inout):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
@@ -73,14 +74,14 @@ c-----reduced node origin
 
 c-----output every these steps, NOUTERG, NOUTPMD
       if( nerg.ne.0 ) then
-        nouterg = max(nstp/nerg,1)
+        nouterg = max(maxstp/nerg,1)
       else
-        nouterg = nstp +1
+        nouterg = maxstp +1
       endif
       if( npmd.ne.0 ) then
-        noutpmd = max(nstp/npmd,1)
+        noutpmd = max(maxstp/npmd,1)
       else
-        noutpmd = nstp +1
+        noutpmd = maxstp +1
       endif
 c.....perform space decomposition after reading atomic configuration
       call space_decomp(hunit,h,ntot,tagtot,rtot,vtot
@@ -335,9 +336,9 @@ c.....Set al
       al(3)= h(3,3,0)
 
       i_conv = 0
-
+      lconverged = .false.
 c-----MD loop with velocity-Verlet--------------------------------------
-      do istp=1,nstp
+      do istp=1,maxstp
 
 c.....In case of isobaric MD, lstrs has to be always TRUE.
         if( trim(cpctl).eq.'Berendsen' .or.
@@ -368,10 +369,10 @@ c-------update positions
         ra(1:3,1:natm)=ra(1:3,1:natm) +va(1:3,1:natm)
 
         if( czload_type.eq.'atoms' ) then
-          call zload_atoms(natm,ra,tag,nstp,strfin,strnow
+          call zload_atoms(natm,ra,tag,maxstp,strfin,strnow
      &         ,sorg,myid_md,mpi_md_world)
         else if( czload_type.eq.'box' ) then
-          call zload_box(natm,nstp,istp,dt,strfin,strnow,h,myid_md)
+          call zload_box(natm,maxstp,istp,dt,strfin,strnow,h,myid_md)
         endif
 
         if( trim(cpctl).eq.'Berendsen' .or.
@@ -476,7 +477,7 @@ c-------temperature control by Berendsen thermostat
 c.....if final temperature is assigned,
 c.....target temperatures are forced to be set intermediate temperatures
           if( tfin.gt.0d0 ) then
-            ttgt(1:9) = tinit +(tfin-tinit)*istp/nstp
+            ttgt(1:9) = tinit +(tfin-tinit)*istp/maxstp
           endif
           do ifmv=1,9
             if(ndof(ifmv).le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
@@ -583,6 +584,11 @@ c.....Output disl core pos
 c.....check convergence criteria if it is dumped MD
         if( ifdmp.gt.0 .and. epot-epotp.le.0d0 .and.
      &       abs(epot-epotp).lt.eps_conv .and. istp.gt.minstp ) then
+c          print *,'ifdmp.gt.0 = ',ifdmp.gt.0
+c          print *,'epot-epotp.le.0d0 = ',epot-epotp.le.0d0
+c          print *,'abs(epot-epotp).lt.eps_conv = ',abs(epot-epotp)
+c     &         .lt.eps_conv
+c          print *,'istp.gt.minstp = ',istp.gt.minstp
           i_conv = i_conv + 1
           if( i_conv.ge.n_conv ) then
             if( myid_md.eq.0 .and. iprint.ne.0 ) then
@@ -623,8 +629,9 @@ c          call system("mkdir -p "//cnum)
         endif
 
         if( lconverged ) exit
-      enddo
+      enddo ! end of istp
 
+      nstp_done = istp
       tcpu2= mpi_wtime()
 
       if(myid_md.eq.0) then

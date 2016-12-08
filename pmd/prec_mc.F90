@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2016-12-06 18:38:15 Ryo KOBAYASHI>
+!                     Last-modified: <2016-12-08 11:22:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 module pmc
 ! 
@@ -273,11 +273,12 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
 
   integer:: i,ic,ievent,ihist,iorder,istp,jc,jj,js,ncalc,ncandidate, &
        nhist,nspcs,ierr,isc
-  integer:: nstps_pmd,maxhist,mem
+  integer:: nstps_pmd,maxhist,mem,nstps_done
   real(8):: epotmc,epotmc0,de,dt,epot,ergp,ptmp,ptot,rand, &
        tclck,p,efrm,efrm0
   real(8),allocatable:: epimc(:),ecpot(:),erghist(:),ergtmp(:), &
        probtmp(:)
+  integer,allocatable:: nstptmp(:)
   character:: ci*1,cj*1,cfmt*10,cergtxt*128,cnum*6,csi*1
   character,allocatable:: csymprev(:),csymhist(:,:),csymtmp(:,:) &
        ,cjtmp(:)
@@ -294,7 +295,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
     allocate(epimc(natm),ecpot(0:3),csymprev(natm), &
          csymhist(natm,maxhist),erghist(maxhist), &
          csymtmp(natm,nnmaxmc),ergtmp(nnmaxmc), &
-         cjtmp(nnmaxmc),probtmp(nnmaxmc))
+         cjtmp(nnmaxmc),probtmp(nnmaxmc),nstptmp(nnmaxmc))
     mem = 8*(natm +4 +maxhist +nnmaxmc +nnmaxmc) &
          +1*(natm +natm*maxhist +natm*nnmaxmc +nnmaxmc)
     write(6,'(a,f10.3,a)') ' allocated array in kinetic_mc = ', &
@@ -303,7 +304,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
     allocate(epimc(natm),ecpot(0:3),csymprev(natm), &
          csymhist(natm,1),erghist(1), &
          csymtmp(natm,1),ergtmp(1), &
-         cjtmp(1),probtmp(1))
+         cjtmp(1),probtmp(1),nstptmp(1))
   endif
   
 
@@ -336,7 +337,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
 
 !.....compute energy of the initial configuration
   call run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
-       ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+       ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md,nstps_done)
   efrm = epot2efrm(natm,ecpot,csymbols,epotmc)
   efrm0 = efrm
   ergp = efrm0
@@ -406,7 +407,9 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
           iorder = 1
           call mpi_bcast(iorder,1,mpi_integer,0,mpi_md_world,ierr)
           call run_pmd(hmat,natm,pos0,csymtmp(1,jj),epimc,epotmc &
-               ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+               ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md&
+               ,nstps_done)
+          nstptmp(jj) = nstps_done
           ncalc = ncalc + 1
           nhist = nhist + 1
           if( nhist.gt.maxhist ) then
@@ -446,6 +449,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
         endif
       enddo
       ergp = ergtmp(ievent)
+      nstps_done = nstptmp(ievent)
 !!$      do jj=1,lsprmc(0,ic)
 !!$        print *,' jj,csymtmp = ',jj,csymtmp(1:natm,jj)
 !!$      enddo
@@ -467,8 +471,10 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
              hmat,species)
       endif
 !.....Write energy
-      write(cergtxt,'(i8,es11.3,es15.7,a,i3,a,i2,a,a)') istp,tclck&
-           ,ergp,', ncalc=',ncalc,', ievent=',ievent,', ',cjtmp(ievent)
+      write(cergtxt,'(i8,es11.3,es15.7,a,i3,a,i2,a,a,a,i3)') &
+           istp,tclck&
+           ,ergp,', ncalc=',ncalc,', ievent=',ievent,', ',cjtmp(ievent) &
+           ,', nstp=',nstps_done
       write(ioerg,'(a)') trim(cergtxt)
       write(6,'(a)') trim(cergtxt)
       flush(iosym)
@@ -487,7 +493,8 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
 !     iorder == -1 : exit
       if( iorder.eq.1 ) then
         call run_pmd(hmat,natm,pos0,csymtmp,epimc,epot &
-             ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+             ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md&
+             ,nstps_done)
       else if( iorder.eq.-1 ) then
         exit
       endif
@@ -937,11 +944,12 @@ subroutine write_POSCAR(cfname,natm,csymbols,pos,hmat,species)
 end subroutine write_POSCAR
 !=======================================================================
 subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
-     ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+     ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md,nstps_done)
   use pmc, only: symbol2sid
   implicit none
   integer,intent(in):: natm,nstps_pmd,nx,ny,nz&
        ,mpi_md_world,nodes_md,myid_md
+  integer,intent(out):: nstps_done
   real(8),intent(in):: hmat(3,3),pos0(3,natm)
   real(8),intent(out):: epimc(natm),epotmc
   character,intent(in):: csymbols(natm)
@@ -1043,11 +1051,13 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   ekin = 0d0
   n_conv = 1
   czload_type = 'no'
-  eps_conv = 1d-3
+  eps_conv = 1d-4
   ifsort = 1
   iprint = 0
 
 !.....call pmd_core to perfom MD
+!!$  print *,'nstps_pmd = ',nstps_pmd
+!!$  print *,'minstp = ',minstp
   call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot &
        ,ekitot,epitot,nstps_pmd,nerg,npmd &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
@@ -1055,8 +1065,9 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
        ,srlx,stbeta,strfin,lstrs &
        ,fmv,ptnsr,epot,ekin,n_conv &
-       ,czload_type,eps_conv,ifsort,iprint)
-
+       ,czload_type,eps_conv,ifsort,iprint,nstps_done)
+!!$  print *,'nstps_pmd,minstp,nstps_done = ' &
+!!$       ,nstps_pmd,minstp,nstps_done
   if( myid_md.eq.0 ) then
     inc = 0
     epimc(1:natm) = 0d0
@@ -1068,6 +1079,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
     enddo
     epotmc = epot
   endif
+!!$  print *,'epot after pmd =',epot
 
   l1st = .false.
 
@@ -1085,7 +1097,7 @@ subroutine calc_chem_pot(nspcs,species,ecpot,hmat,natm,pos0 &
   character,intent(in):: species(0:nspcs)
   real(8),intent(out):: ecpot(0:nspcs)
 
-  integer:: ispcs,i
+  integer:: ispcs,i,nstps_done
   character:: cspcs*1
   character,allocatable:: csymtmp(:)
   real(8):: epot
@@ -1100,7 +1112,8 @@ subroutine calc_chem_pot(nspcs,species,ecpot,hmat,natm,pos0 &
     cspcs = species(ispcs)
     csymtmp(1) = cspcs
     call run_pmd(hmat,natm,pos0,csymtmp,epi,epot &
-         ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md)
+         ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md&
+         ,nstps_done)
     ecpot(ispcs) = epot
   enddo
   
