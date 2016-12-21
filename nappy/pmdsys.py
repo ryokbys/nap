@@ -8,7 +8,8 @@ Available formats are,
   pmd, akr, POSCAR, dump, xsf
 
 Usage:
-  pmdsys.py [options] INFILE OUTFILE
+  pmdsys.py convert [options] INFILE OUTFILE
+  pmdsys.py analyse [options] INFILE
 
 Options:
   -h, --help  Show this help message and exit.
@@ -378,10 +379,13 @@ class PMDSystem(object):
         # before writing out, the order should be sorted
         outorder = []
         for spc in self.specorder:
+            # print 'spc =',spc
             for ia,ai in enumerate(self.atoms):
+                # print ia,ai.symbol
                 if ai.symbol == spc:
                     outorder.append(ia)
         if len(outorder) != len(self.atoms):
+            print 'len(outorder),len(self.atoms)=', len(outorder),len(self.atoms)
             raise RuntimeError(' len(outorder) != len(self.atoms)')
         for ia in outorder:
             ai = self.atoms[ia]
@@ -598,8 +602,8 @@ class PMDSystem(object):
                 mode= 'PRIMCOORD'
                 # Before going further, create inversed h-matrix
                 hi = unitvec_to_hi(self.a1,self.a2,self.a3)
-                print 'Inversed h-matrix:'
-                print hi
+                # print 'Inversed h-matrix:'
+                # print hi
                 continue
             
             if mode == 'CRYSTAL':
@@ -623,10 +627,14 @@ class PMDSystem(object):
                 ixyz += 1
             elif mode == 'PRIMCOORD':
                 data = line.split()
-                if len(data) < 4:
+                if len(data) == 1:
                     natm= int(data[0])
                     continue
-                else:
+                elif len(data) == 2:
+                    natm= int(data[0])
+                    nspcs= int(data[1])
+                    continue
+                elif len(data) == 4 or len(data) == 7:
                     if iatm >= natm:
                         continue
                     symbol = get_symbol_from_number(int(data[0]))
@@ -634,6 +642,7 @@ class PMDSystem(object):
                         self.specorder.append(symbol)
                     sid = self.specorder.index(symbol) +1
                     ai= Atom()
+                    ai.symbol = symbol
                     ai.set_sid(sid)
                     xc= float(data[1])
                     yc= float(data[2])
@@ -642,12 +651,15 @@ class PMDSystem(object):
                     ai.set_pos(xi,yi,zi)
                     ai.set_vel(0.0,0.0,0.0)
                     self.atoms.append(ai)
+                    # print 'iatm,symbol,sid,xc,yc,zc = ',iatm,symbol,sid,xc,yc,zc
+                else:
+                    continue
                 iatm += 1
         self.alc= 1.0
-        print self.alc
-        print self.a1[:]
-        print self.a2[:]
-        print self.a3[:]
+        # print self.alc
+        # print self.a1[:]
+        # print self.a2[:]
+        # print self.a3[:]
         f.close()
 
     def write_xsf(self,fname='xsf'):
@@ -1011,6 +1023,38 @@ def unitvec_to_hi(a1,a2,a3):
     return np.linalg.inv(h)
 
 
+def analyse(psys):
+    a1 = psys.a1
+    a2 = psys.a2
+    a3 = psys.a3
+    a = np.linalg.norm(a1)
+    b = np.linalg.norm(a2)
+    c = np.linalg.norm(a3)
+    alpha = np.arccos(np.dot(a2,a3)/b/c)/np.pi*180.0
+    beta  = np.arccos(np.dot(a1,a3)/a/c)/np.pi*180.0
+    gamma = np.arccos(np.dot(a1,a2)/a/b)/np.pi*180.0
+    print 'a1 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a1[0],
+                                                                 a1[1],
+                                                                 a1[2])
+    print 'a2 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a2[0],
+                                                                 a2[1],
+                                                                 a2[2])
+    print 'a3 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a3[0],
+                                                                 a3[1],
+                                                                 a3[2])
+    print 'a = {0:10.3f} A'.format(a)
+    print 'b = {0:10.3f} A'.format(b)
+    print 'c = {0:10.3f} A'.format(c)
+    print 'alpha = {0:7.2f} deg.'.format(alpha)
+    print 'beta  = {0:7.2f} deg.'.format(beta)
+    print 'gamma = {0:7.2f} deg.'.format(gamma)
+    print 'number of atoms   = ',psys.num_atoms()
+    print 'number of species:'
+    nspcs = psys.num_species()
+    for i,s in enumerate(psys.specorder):
+        print '   {0:s}: {1:d}'.format(s,nspcs[i])
+
+
 if __name__ == "__main__":
 
     args= docopt(__doc__)
@@ -1024,23 +1068,30 @@ if __name__ == "__main__":
 
     psys= PMDSystem(fname=infname,ffmt=infmt,specorder=specorder)
 
-    if outfmt == 'None':
-        outfmt= parse_filename(outfname)
+    if args['analyse']:
+        analyse(psys)
 
-    if scalefactor != "None":
-        psys.alc *= float(scalefactor)
+    elif args['convert']:
+        if outfmt == 'None':
+            outfmt= parse_filename(outfname)
+    
+        if scalefactor != "None":
+            psys.alc *= float(scalefactor)
+    
+        if outfmt == 'pmd':
+            psys.write_pmd(outfname)
+        elif outfmt == 'smd':
+            psys.write_pmd(outfname)
+        elif outfmt == 'akr':
+            psys.write_akr(outfname)
+        elif outfmt == 'POSCAR':
+            psys.write_POSCAR(outfname)
+        elif outfmt == 'dump':
+            psys.write_dump(outfname)
+        elif outfmt == 'xsf':
+            psys.write_xsf(outfname)
+        else:
+            print 'Cannot detect output file format.'
 
-    if outfmt == 'pmd':
-        psys.write_pmd(outfname)
-    elif outfmt == 'smd':
-        psys.write_pmd(outfname)
-    elif outfmt == 'akr':
-        psys.write_akr(outfname)
-    elif outfmt == 'POSCAR':
-        psys.write_POSCAR(outfname)
-    elif outfmt == 'dump':
-        psys.write_dump(outfname)
-    elif outfmt == 'xsf':
-        psys.write_xsf(outfname)
     else:
-        print 'Cannot detect output file format.'
+        raise NotImplementedError()
