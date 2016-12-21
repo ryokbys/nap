@@ -9,7 +9,7 @@ Available formats are,
 
 Usage:
   pmdsys.py convert [options] INFILE OUTFILE
-  pmdsys.py analyse [options] INFILE
+  pmdsys.py analyze [options] INFILE
 
 Options:
   -h, --help  Show this help message and exit.
@@ -1023,7 +1023,7 @@ def unitvec_to_hi(a1,a2,a3):
     return np.linalg.inv(h)
 
 
-def analyse(psys):
+def analyze(psys):
     a1 = psys.a1
     a2 = psys.a2
     a3 = psys.a3
@@ -1068,8 +1068,8 @@ if __name__ == "__main__":
 
     psys= PMDSystem(fname=infname,ffmt=infmt,specorder=specorder)
 
-    if args['analyse']:
-        analyse(psys)
+    if args['analyze']:
+        analyze(psys)
 
     elif args['convert']:
         if outfmt == 'None':
