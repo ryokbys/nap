@@ -54,13 +54,14 @@ class PMD(FileIOCalculator):
         'temperature_control': 'None',
         'temperature_target': [300.0, 100.0,],
         'temperature_relax_time': 100.0,
+        'flag_temp_dist': 'F',
         'factor_direction':[[1.0, 1.0, 1.0],
                             [1.0, 0.0, 1.0]],
-        'flag_isobaric': 0,
+        'stress_control': 'None',
         'pressure_target': 0.0,
-        'vol_mass_coeff': 1e-3,
-        'vol_change_damping': 1.0,
+        'stress_relax_time': 20.0,
         'shear_stress': 0.0,
+        'flag_compute_stress': 'T',
         'mass': [28.0855,4.0,]
     }
 
@@ -73,7 +74,7 @@ class PMD(FileIOCalculator):
         Parameters
         ==========
         label: str
-            Prefix to use for filenames (label.in, label.txt, ...).
+            Prefix to use for filenames (in.label, erg.label, ...).
             Default is 'pmd'.
 
         Examples
@@ -255,23 +256,26 @@ def get_input_txt(params,fmvs):
            'flag_damping','damping_coeff','converge_eps','converge_num','',
            'initial_temperature','final_temperature',
            'temperature_control','temperature_target',
-           'temperature_relax_time','',
+           'temperature_relax_time','flag_temp_dist','',
            'factor_direction','',
-           'flag_isobaric','pressure_target',
-           'vol_mass_coeff','vol_change_damping','shear_stress','',
+           'stress_control','pressure_target',
+           'stress_relax_time',
+           'shear_stress','flag_compute_stress','',
            'mass','',]
 
     int_keys=['num_nodes_x','num_nodes_y','num_nodes_z',
               'num_iteration','num_out_energy','flag_out_pmd',
-              'num_out_pmd','flag_damping','flag_isobaric',
+              'num_out_pmd','flag_damping',
               'converge_num','min_iteration','flag_sort']
     float_keys=['time_interval','cutoff_radius','cutoff_buffer',
                 'damping_coeff','initial_temperature',
                 'final_temperature',
                 'temperature_relax_time','pressure_target',
-                'vol_mass_coeff','vol_change_damping','shear_stress',
+                'stress_relax_time','shear_stress',
                 'converge_eps']
-    str_keys=['io_format','force_type','temperature_control']
+    str_keys=['io_format','force_type','temperature_control',
+              'stress_control','flag_temp_dist',
+              'flag_compute_stress']
 
     for key in order:
         

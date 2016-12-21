@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2016-12-08 11:05:39 Ryo KOBAYASHI>
+c                     Last-modified: <2016-12-21 15:49:49 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file include core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -190,7 +190,7 @@ c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
 c.....Calc forces
-      lstrs = lstrs0 .and.
+      lstrs = lstrs0 .or.
      &     ( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &       trim(cpctl).eq.'vv-Berendsen')

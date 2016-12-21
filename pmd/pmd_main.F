@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2016-11-10 16:15:55 Ryo KOBAYASHI>
+c                     Last-modified: <2016-12-21 15:53:27 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -30,6 +30,7 @@ c.....Epot threshold for disl core extraction [Hartree]
 #endif
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl,i_conv,ierr
+     &     ,nstp_done
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin
 
 c-----initialize the MPI environment
@@ -75,7 +76,7 @@ c.....call pmd_core to perfom MD
      &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
      &     ,srlx,stbeta,strfin,lstrs0
      &     ,fmv,ptnsr,epot,ekin,n_conv
-     &     ,czload_type,eps_conv,ifsort,iprint)
+     &     ,czload_type,eps_conv,ifsort,iprint,nstp_done)
 
 c.....write energy, forces and stresses only for fitpot
       if( myid_md.eq.0 ) then
