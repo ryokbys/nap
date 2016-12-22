@@ -11,7 +11,7 @@ and uses spatial decomposition technique for the parallelization, and cell-list 
 
 # Compilation and usage
 See the manual web site below,
-http://ryokbys.web.nitech.ac.jp/contents/pmd_manual
+http://ryokbys.web.nitech.ac.jp/contents/pmd_usage
 
 For the short test, whether or not you can use this program in your environment,
 
@@ -24,7 +24,7 @@ $ ../pmd/pmd
 ```
 
 If it works, you can use this program.
-For details, please see the [manual](http://locs.bw.nitech.ac.jp/~kobayashi/pmd_manual) or ask me via e-mail (kobayashi.ryo[at]nitech.ac.jp).
+For details, please see the [manual](http://locs.bw.nitech.ac.jp/~kobayashi/pmd_usage) or ask me via e-mail (kobayashi.ryo[at]nitech.ac.jp).
 
 # LICENSE
 This software is released under the MIT License, see LICENSE.
