@@ -39,7 +39,8 @@ _file_formats = ('pmd',
                  'akr',
                  'POSCAR',
                  'dump',
-                 'xsf')
+                 'xsf',
+                 'lammps')
 
 
 class PMDSystem(object):
@@ -155,7 +156,6 @@ class PMDSystem(object):
                 if ai.sid == sid:
                     n += 1
             return n
-
 
     def num_species(self):
         num_species= []
@@ -459,6 +459,7 @@ class PMDSystem(object):
         iatm= 0
         symbol = None
         self.atoms= []
+        self.alc= 1.0
         for line in f.readlines():
             if 'ITEM: NUMBER OF ATOMS' in line:
                 mode= 'NUMBER OF ATOMS'
@@ -473,19 +474,35 @@ class PMDSystem(object):
             if mode == 'NUMBER OF ATOMS':
                 natm= int(line.split()[0])
             elif mode == 'BOX BOUNDS':
+                data = line.split()
                 if ixyz == 0:
-                    xlo= float(line.split()[0])
-                    xhi= float(line.split()[1])
-                    xlen= xhi -xlo
+                    xlo_bound= float(data[0])
+                    xhi_bound= float(data[1])
+                    if len(data) > 2:
+                        xy = float(data[2])
                 elif ixyz == 1:
-                    ylo= float(line.split()[0])
-                    yhi= float(line.split()[1])
-                    ylen= yhi -ylo
+                    ylo_bound= float(line.split()[0])
+                    yhi_bound= float(line.split()[1])
+                    if len(data) > 2:
+                        xz = float(data[2])
                 elif ixyz == 2:
-                    zlo= float(line.split()[0])
-                    zhi= float(line.split()[1])
-                    zlen= zhi -zlo
+                    zlo_bound= float(line.split()[0])
+                    zhi_bound= float(line.split()[1])
+                    if len(data) > 2:
+                        yz = float(data[2])
                 ixyz += 1
+                if ixyz > 2:
+                    xlo = xlo_bound -min(0.0,xy,xz,xy+yz)
+                    xhi = xhi_bound -max(0.0,xy,xz,xy+yz)
+                    ylo = ylo_bound -min(0.0,yz)
+                    yhi = yhi_bound -max(0.0,yz)
+                    zlo = zlo_bound
+                    zhi = zhi_bound
+                    self.a1 = np.array([xhi-xlo,xy,xz],dtype=float)
+                    self.a2 = np.array([0.0,yhi-ylo,yz],dtype=float)
+                    self.a3 = np.array([0.0,0.0,zhi-zlo],dtype=float)
+                    hmat = self.get_hmat()
+                    hmati= np.linalg.inv(hmat)
             elif mode == 'ATOMS':
                 if iatm < natm:
                     data= line.split()
@@ -495,26 +512,19 @@ class PMDSystem(object):
                         symbol = self.specorder[ai.sid-1]
                     if symbol and ai.symbol != symbol:
                         ai.set_symbol(symbol)
-                    xi= float(data[2])
-                    yi= float(data[3])
-                    zi= float(data[4])
-                    xi= xi-xlo -int((xi-xlo)/xlen)*xlen
-                    yi= yi-ylo -int((yi-ylo)/ylen)*ylen
-                    zi= zi-zlo -int((zi-zlo)/zlen)*zlen
-                    if xi < 0.0:
-                        xi= xi +xlen
-                    if yi < 0.0:
-                        yi= yi +ylen
-                    if zi < 0.0:
-                        zi= zi +zlen
-                    ai.set_pos(xi/xlen,yi/ylen,zi/zlen)
+                    x0= float(data[2])
+                    y0= float(data[3])
+                    z0= float(data[4])
+                    x = hmati[0,0]*x0 +hmati[0,1]*y0 +hmati[0,2]*z0
+                    y = hmati[1,0]*x0 +hmati[1,1]*y0 +hmati[1,2]*z0
+                    z = hmati[2,0]*x0 +hmati[2,1]*y0 +hmati[2,2]*z0
+                    x = self._pbc(x)
+                    y = self._pbc(y)
+                    z = self._pbc(z)
+                    ai.set_pos(x,y,z)
                     ai.set_vel(0.0,0.0,0.0)
                     self.atoms.append(ai)
                 iatm += 1
-        self.alc= 1.0
-        self.a1[0]= xlen
-        self.a2[1]= ylen
-        self.a3[2]= zlen
         # print self.alc
         # print self.a1[:]
         # print self.a2[:]
@@ -532,8 +542,9 @@ class PMDSystem(object):
         f.write("ITEM: NUMBER OF ATOMS\n")
         f.write("{0:d}\n".format(len(self.atoms)))
         f.write("ITEM: BOX BOUNDS xy xz yz\n")
-        a,b,c = hmat_to_lammps(self.get_hmat())
-        xlo = ylo = zlo = 0.0
+        xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz = hmat_to_lammps(self.get_hmat())
+        # a,b,c = hmat_to_lammps(self.get_hmat())
+        # xlo = ylo = zlo = 0.0
         xhi = a[0]
         xy  = b[0]
         yhi = b[1]
@@ -581,6 +592,64 @@ class PMDSystem(object):
             f.write("{0:8.3f} {1:8.3f} {2:8.3f} ".format(sti[3],
                                                          sti[4],
                                                          sti[5]))
+            f.write("\n")
+        f.close()
+
+    def write_lammps_data(self,fname='data.lammps'):
+        """
+        Write LAMMPS data format file.
+        """
+        f= open(fname,'w')
+        f.write("LAMMPS data format file written by pmdsys.py\n")
+        f.write("\n")
+        f.write("{0:d}  atoms\n".format(len(self.atoms)))
+        f.write("{0:d}  atom types\n".format(len(self.num_species())))
+        xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz = hmat_to_lammps(self.get_hmat())
+        # xlo = ylo = zlo = 0.0
+        # xhi = a[0]
+        # xy  = b[0]
+        # yhi = b[1]
+        # xz  = c[0]
+        # yz  = c[1]
+        # zhi = c[2]
+        # xlo_bound = xlo +min(0.0, xy, xz, xy+xz)
+        # xhi_bound = xhi +max(0.0, xy, xz, xy+xz)
+        # ylo_bound = ylo +min(0.0, yz)
+        # yhi_bound = yhi +max(0.0, yz)
+        # zlo_bound = zlo
+        # zhi_bound = zhi
+        # f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a1[0]))
+        # f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a2[1]))
+        # f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a3[2]))
+        # f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(xlo_bound,
+        #                                                  xhi_bound,
+        #                                                  xy))
+        # f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(ylo_bound,
+        #                                                  yhi_bound,
+        #                                                  xz))
+        # f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(zlo_bound,
+        #                                                  zhi_bound,
+        #                                                  yz))
+        f.write("{0:15.4f} {1:15.4f} xlo xhi\n".format(xlo,xhi))
+        f.write("{0:15.4f} {1:15.4f} ylo yhi\n".format(ylo,yhi))
+        f.write("{0:15.4f} {1:15.4f} zlo zhi\n".format(zlo,zhi))
+        f.write("{0:15.4f} {1:15.4f} {2:15.4f} xy xz yz\n".format(xy,xz,yz))
+        f.write("\n")
+        f.write("Atoms\n")
+        f.write("\n")
+        for i in range(len(self.atoms)):
+            ai= self.atoms[i]
+            x= ai.pos[0] *self.a1[0]
+            y= ai.pos[1] *self.a2[1]
+            z= ai.pos[2] *self.a3[2]
+            vx= ai.vel[0]
+            vy= ai.vel[1]
+            vz= ai.vel[2]
+            ekin= ai.ekin
+            epot= ai.epot
+            sti= ai.strs
+            f.write("{0:8d} {1:3d} ".format(i+1,ai.sid))
+            f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(x,y,z))
             f.write("\n")
         f.close()
 
@@ -987,29 +1056,34 @@ def rotate(vector,axis,ang):
 def hmat_to_lammps(hmat):
     """
     Convert h-matrix to LAMMPS cell vectors.
-    LAMMPS cell is defined as,
+    Parameters to be output:
+      xlo, xhi, ylo, yhi, zlo, zhi, xy, xz, yz
+    LAMMPS cell should be defined as,
       a = ( xhi-xlo,       0,       0 )
       b = (      xy, yhi-hlo,       0 )
       c = (      xz,      yz, zhi-zlo )
+    See, http://lammps.sandia.gov/doc/Section_howto.html, for detail.
     """
+    import numpy as np
     a0 = hmat[:,0]
     b0 = hmat[:,1]
     c0 = hmat[:,2]
-    #...rotate a0 to x-axis
-    xaxis = np.array([1.0, 0.0, 0.0])
-    ax0,ang0 = get_axis_and_angle(a0,xaxis)
-    a1 = rotate(a0,ax0,ang0)
-    b1 = rotate(b0,ax0,ang0)
-    c1 = rotate(c0,ax0,ang0)
-    #...rotate b1 to xy plane
-    b1yz = copy.deepcopy(b1)
-    b1yz[0] = 0.0
-    yaxis = np.array([0.0, 1.0, 0.0])
-    ax1,ang1 = get_axis_and_angle(b1,yaxis)
-    a2 = rotate(a1,ax1,ang1)
-    b2 = rotate(b1,ax1,ang1)
-    c2 = rotate(c1,ax1,ang1)
-    return a2,b2,c2
+    xlo = 0.0
+    ylo = 0.0
+    zlo = 0.0
+    a = np.linalg.norm(a0)
+    b = np.linalg.norm(b0)
+    c = np.linalg.norm(c0)
+    alpha = np.arccos(np.dot(b0,c0)/b/c)
+    beta  = np.arccos(np.dot(a0,c0)/a/c)
+    gamma = np.arccos(np.dot(a0,b0)/a/b)
+    xhi = a
+    xy = b*np.cos(gamma)
+    xz = c*np.cos(beta)
+    yhi = np.sqrt(b*b -xy*xy)
+    yz = (b*c*np.cos(alpha) -xy*xz)/yhi
+    zhi = np.sqrt(c*c -xz*xz -yz*yz)
+    return xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz
 
 def unitvec_to_hi(a1,a2,a3):
     """
@@ -1030,6 +1104,7 @@ def analyze(psys):
     a = np.linalg.norm(a1)
     b = np.linalg.norm(a2)
     c = np.linalg.norm(a3)
+    vol = psys.volume()
     alpha = np.arccos(np.dot(a2,a3)/b/c)/np.pi*180.0
     beta  = np.arccos(np.dot(a1,a3)/a/c)/np.pi*180.0
     gamma = np.arccos(np.dot(a1,a2)/a/b)/np.pi*180.0
@@ -1048,6 +1123,7 @@ def analyze(psys):
     print 'alpha = {0:7.2f} deg.'.format(alpha)
     print 'beta  = {0:7.2f} deg.'.format(beta)
     print 'gamma = {0:7.2f} deg.'.format(gamma)
+    print 'volume= {0:10.3f} A^3'.format(vol)
     print 'number of atoms   = ',psys.num_atoms()
     print 'number of species:'
     nspcs = psys.num_species()
@@ -1088,6 +1164,8 @@ if __name__ == "__main__":
             psys.write_POSCAR(outfname)
         elif outfmt == 'dump':
             psys.write_dump(outfname)
+        elif outfmt == 'lammps':
+            psys.write_lammps_data(outfname)
         elif outfmt == 'xsf':
             psys.write_xsf(outfname)
         else:

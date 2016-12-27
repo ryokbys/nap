@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2016-12-08 11:22:26 Ryo KOBAYASHI>
+!                     Last-modified: <2016-12-08 12:25:27 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 module pmc
 ! 
@@ -1051,7 +1051,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   ekin = 0d0
   n_conv = 1
   czload_type = 'no'
-  eps_conv = 1d-4
+  eps_conv = 1d-3
   ifsort = 1
   iprint = 0
 

@@ -1,0 +1,36 @@
+!
+!  unit of time  = femto sec
+!  unit of length= Angstrom
+!  unit of mass  = unified atomic mass unit
+!
+num_nodes_x       2
+num_nodes_y       2
+num_nodes_z       1
+
+io_format    ascii
+
+time_interval     1d0
+num_iteration     1000
+num_out_energy    1000
+
+flag_out_pmd      1
+num_out_pmd       10
+
+force_type        Ito3_WHe
+cutoff_radius     4.07d0
+cutoff_buffer     0.2d0
+
+flag_damping      0
+damping_coeff     0.99d0
+
+initial_temperature     1000d0
+temperature_control     none
+temperature_target      1 100d0
+temperature_relax_time  100d0
+
+factor_direction 3 2
+  1.000d0  1.000d0  1.000d0
+  1.000d0  0.000d0  1.000d0
+
+mass  1    183.84
+mass  2    4.0
