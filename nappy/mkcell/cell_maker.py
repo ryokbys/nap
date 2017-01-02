@@ -25,11 +25,14 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
 from pmdsys import PMDSystem
 from atom import Atom
 
+_default_specorder=['Si']
+
+
 def make_sc(latconst=1.0):
     """
     Make a cell of simple cubic structure.
     """
-    s= PMDSystem()
+    s= PMDSystem(specorder=_default_specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.0, 0.0 ])
@@ -38,15 +41,16 @@ def make_sc(latconst=1.0):
     p=[0.00, 0.00, 0.00]
     atom= Atom()
     atom.set_pos(p[0],p[1],p[2])
-    atom.set_sid(1)
+    atom.set_symbol(_default_specorder[0])
     s.add_atom(atom)
     return s
+
 
 def make_bcc(latconst=1.0):
     """
     Make a cell of bcc structure.
     """
-    s= PMDSystem()
+    s= PMDSystem(specorder=_default_specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.0, 0.0 ])
@@ -57,15 +61,16 @@ def make_bcc(latconst=1.0):
     for p in positions:
         atom= Atom()
         atom.set_pos(p[0],p[1],p[2])
-        atom.set_sid(1)
+        atom.set_symbol(_default_specorder[0])
         s.add_atom(atom)
     return s
+
 
 def make_fcc(latconst=1.0,size=(1,1,1)):
     """
     Make a cell of fcc structure.
     """
-    s= PMDSystem()
+    s= PMDSystem(specorder=_default_specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.0, 0.0 ])
@@ -78,15 +83,16 @@ def make_fcc(latconst=1.0,size=(1,1,1)):
     for p in positions:
         atom= Atom()
         atom.set_pos(p[0],p[1],p[2])
-        atom.set_sid(1)
+        atom.set_symbol(_default_specorder[0])
         s.add_atom(atom)
     return s
+
 
 def make_diamond(latconst=1.0):
     """
     Make a cell of diamond structure.
     """
-    s= PMDSystem()
+    s= PMDSystem(specorder=_default_specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.0, 0.0 ])
@@ -103,15 +109,16 @@ def make_diamond(latconst=1.0):
     for p in positions:
         atom= Atom()
         atom.set_pos(p[0],p[1],p[2])
-        atom.set_sid(1)
+        atom.set_symbol(_default_specorder[0])
         s.add_atom(atom)
     return s
+
 
 def make_hcp(latconst=1.0):
     """
     Make a cell of hcp structure.
     """
-    s= PMDSystem()
+    s= PMDSystem(specorder=_default_specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([-0.5, np.sqrt(3.0)/2, 0.0 ])
@@ -122,12 +129,12 @@ def make_hcp(latconst=1.0):
     for p in positions:
         atom= Atom()
         atom.set_pos(p[0],p[1],p[2])
-        atom.set_sid(1)
+        atom.set_symbol(_default_specorder[0])
         s.add_atom(atom)
     return s
 
-#=======================================================================
 
+#=======================================================================
 if __name__ == "__main__":
 
     args= docopt(__doc__)
@@ -151,10 +158,10 @@ if __name__ == "__main__":
     elif args['diamond']:
         struct= make_diamond(latconst)
 
-    if struct == None:
+    if struct is None:
         print "Something wrong: structure is not created..."
         sys.exit()
 
-    struct.expand(nx,ny,nz)
+    struct.repeat(nx,ny,nz)
     
     struct.write(ofname)
