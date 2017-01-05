@@ -42,21 +42,21 @@ import numpy as np
 from docopt import docopt
 from pymatgen.io.vaspio.vasp_output import Vasprun
 
-from pmdsys import PMDSystem
+from napsys import NAPSystem
 from atom import Atom
 
 
 
 def structure2aSys(structure,idoffset=1):
     """
-    Converts Structure object of pymatgen to PMDSystem object in nap.
+    Converts Structure object of pymatgen to NAPSystem object in nap.
 
     Args:
         structure (Structure): pymatgen Structure object to be converted
-        to PMDSystem object..
+        to NAPSystem object..
 
     Returns:
-        aSys (PMDSystem): 
+        aSys (NAPSystem): 
     """
     lattice= structure.lattice
     alc= 1.0
@@ -67,7 +67,7 @@ def structure2aSys(structure,idoffset=1):
     a1= a1/alc
     a2= a2/alc
     a3= a3/alc
-    aSys= PMDSystem()
+    aSys= NAPSystem()
     aSys.set_lattice(alc,a1,a2,a3)
     for ia in range(structure.num_sites):
         ai= Atom()

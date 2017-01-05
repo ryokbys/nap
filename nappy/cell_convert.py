@@ -18,7 +18,7 @@ import numpy as np
 
 sys.path.append(__file__)
 from atom import Atom
-from pmdsys import PMDSystem
+from napsys import NAPSystem
 
 __author__ = 'Ryo KOBAYASHI'
 __version__ = '160510'
@@ -29,7 +29,7 @@ if __name__ == '__main__':
     infile = args['INFILE']
     specorder = args['--specorder'].split(',')
 
-    psys = PMDSystem(fname=infile,specorder=specorder)
+    psys = NAPSystem(fname=infile,specorder=specorder)
     psys.assign_pbc()
     psys.a1 = psys.a1 *psys.alc
     psys.a2 = psys.a2 *psys.alc
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     print('new a1 =',a1new)
     print('new a2 =',a2new)
     print('new a3 =',a3new)
-    psnew = PMDSystem(specorder=specorder)
+    psnew = NAPSystem(specorder=specorder)
     psnew.set_lattice(psys.alc,a1new,a2new,a3new)
 
     # Expand the original system for the search of atoms to be included 

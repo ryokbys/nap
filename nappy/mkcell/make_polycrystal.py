@@ -5,7 +5,7 @@ from math import cos,sin,sqrt
 from random import random
 
 sys.path.append('../')
-from pmdsys import PMDSystem
+from napsys import NAPSystem
 from atom import Atom
 import cell_maker
 

@@ -21,7 +21,7 @@ Options:
 import os,sys
 import numpy as np
 from docopt import docopt
-from pmdsys import PMDSystem
+from napsys import NAPSystem
 from gaussian_smear import gsmear
 
 
@@ -100,7 +100,7 @@ def rdf_average(infiles,nspcs,nr,ffmt='akr',dr=0.1,rmax=3.0,):
         if not os.path.exists(infname):
             print "[Error] File, {0}, does not exist !!!".format(infname)
             sys.exit()
-        asys= PMDSystem(fname=infname,ffmt=ffmt)
+        asys= NAPSystem(fname=infname,ffmt=ffmt)
         print ' infname=',infname
         rd,gr,n= rdf(asys,nspcs,dr,rmax)
         nsum += n

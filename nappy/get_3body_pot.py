@@ -12,7 +12,7 @@ import optparse
 import numpy as np
 
 from atom import Atom
-from pmdsys import PMDSystem
+from napsys import NAPSystem
 
 ################################################# Functions ############
 def get_apot(fname='out.pmd'):
@@ -76,7 +76,7 @@ distance= options.distance
 print ' distance      = ',distance,' Ang.'
 pmdexec= options.pmdexec
 
-asys= PMDSystem()
+asys= NAPSystem()
 a1= np.array([2.0, 0.0, 0.0])
 a2= np.array([0.0, 2.0, 0.0])
 a3= np.array([0.0, 0.0, 1.0])

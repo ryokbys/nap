@@ -25,7 +25,7 @@ import numpy as np
 import glob,yaml
 
 from atom import Atom
-from pmdsys import PMDSystem
+from napsys import NAPSystem
 
 __author__="Ryo KOBAYASHI"
 __version__="0.1a"
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     plot= args['--plot']
     #print(args)
     
-    sys0= PMDSystem()
+    sys0= NAPSystem()
     sys0.read_pmd(infname)
     sys0.write_POSCAR()
     print ' POSCAR was written.'
@@ -101,7 +101,7 @@ if __name__ == "__main__":
         os.system("cp {0} {1}/POSCAR".format(poscar,dname))
         print("processing {0}...".format(dname))
         # Prepare pmd calculation
-        psystmp= PMDSystem()
+        psystmp= NAPSystem()
         psystmp.read_POSCAR(poscar)
         os.system("cp in.* {0}/".format(dname))
         if execname == "pmd":

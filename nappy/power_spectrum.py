@@ -14,7 +14,7 @@ import os,sys,glob,time,math
 import numpy as np
 import optparse
 
-from pmdsys import PMDSystem
+from napsys import NAPSystem
 
 ################################################## Functions ###########
 
@@ -88,7 +88,7 @@ if ntwindow <= 0:
 
 #...set global values
 infile= infiles[0]
-system=PMDSystem()
+system=NAPSystem()
 system.read_akr(infile)
 natm= len(system.atoms)
 psid= np.zeros((natm,),dtype=np.int8)
@@ -113,7 +113,7 @@ for ifile in range(len(infiles)):
     print '.',
     sys.stdout.flush()
     infile= infiles[ifile]
-    system= PMDSystem()
+    system= NAPSystem()
     system.read_akr(infile)
     hmat[0]= system.a1 *system.alc
     hmat[1]= system.a2 *system.alc

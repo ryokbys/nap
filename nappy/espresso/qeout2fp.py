@@ -24,7 +24,7 @@ import numpy as np
 
 sys.path.append(os.environ['HOME']+'/src/nap')
 from nappy.atom import Atom
-from nappy.pmdsys import PMDSystem,unitvec_to_hi,cartessian_to_scaled
+from nappy.pmdsys import NAPSystem,unitvec_to_hi,cartessian_to_scaled
 from nappy.units import Ry_to_eV, Bohr_to_Ang
 
 sys.path.append(os.path.dirname(__file__))
@@ -191,7 +191,7 @@ def convert(fname,specorder,index):
 
     erg = erg *Ry_to_eV
 
-    psys = PMDSystem(specorder=specorder)
+    psys = NAPSystem(specorder=specorder)
     psys.set_hmat(cell)
     hi = unitvec_to_hi(cell[0,:],cell[1,:],cell[2,:])
     # converting force here, not when reading the file

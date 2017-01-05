@@ -24,7 +24,7 @@ import os,sys,copy
 import numpy as np
 from docopt import docopt
 
-from pmdsys import PMDSystem, parse_filename
+from napsys import NAPSystem, parse_filename
 
 def isotropic(psys0,strain=0.01):
     fac = 1.0 + strain
@@ -121,7 +121,7 @@ if __name__ == "__main__":
     print('args:')
     print(args)
 
-    psys0= PMDSystem(fname=infname,ffmt=infmt,specorder=specorder)
+    psys0= NAPSystem(fname=infname,ffmt=infmt,specorder=specorder)
 
     if not outfmt == None:
         outfmt= parse_filename(outfname)

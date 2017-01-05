@@ -30,7 +30,7 @@ from pymongo import MongoClient
 import json
 import yaml
 
-from pmdsys import PMDSystem
+from napsys import NAPSystem
 from atom import Atom
 
 def read_db_config(fname='config.json'):
@@ -55,7 +55,7 @@ def doc_to_pos(doc,conf):
     """
     Make a pos file, which has pmd format, from a document in MongoDB.
     """
-    psys= PMDSystem()
+    psys= NAPSystem()
     matrix=doc['calculations'][-1]['output']['crystal']['lattice']['matrix']
     a1= matrix[0]
     a2= matrix[1]

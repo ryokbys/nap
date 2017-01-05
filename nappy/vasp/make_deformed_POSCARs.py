@@ -35,7 +35,7 @@ from docopt import docopt
 sys.path.append(os.path.dirname(__file__))
 sys.path.append(os.path.dirname(__file__)+'/../')
 from poscar import POSCAR
-from pmdsys import PMDSystem
+from napsys import NAPSystem
 
 _length_digit = 3
 _angle_digit = 3
@@ -230,7 +230,7 @@ if __name__ == "__main__":
     specorder = args['--specorder'].split(',')
     fname= args['POSCAR']
 
-    psys0 = PMDSystem(fname,specorder=specorder)
+    psys0 = NAPSystem(fname,specorder=specorder)
     factors = []
     if uniform:
         factors = get_uniform_factors(min_factor=fmin,max_factor=fmax,

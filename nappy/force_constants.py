@@ -15,7 +15,7 @@ import optparse
 import numpy as np
 
 from atom import Atom
-from pmdsys import PMDSystem
+from napsys import NAPSystem
 
 ################################################# Functions ############
 
@@ -73,7 +73,7 @@ print ' rcut         = ',rcut,' Ang.'
 pmdexec= options.pmdexec
 infname= args[0]
 
-sys0= PMDSystem()
+sys0= NAPSystem()
 sys0.read_pmd(infname)
 sys0.write_POSCAR()
 print ' POSCAR was written.'
@@ -92,7 +92,7 @@ r3= 2*n3+1
 print ' num of cells in each axis=',r1,r2,r3
 print ' num of atoms in extended system=',natm0*r1*r2*r3
 
-sysext= PMDSystem()
+sysext= NAPSystem()
 sysext.set_lattice( sys0.alc
                     ,np.multiply(sys0.a1,r1)
                     ,np.multiply(sys0.a2,r2)

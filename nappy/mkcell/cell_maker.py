@@ -22,7 +22,7 @@ from docopt import docopt
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
 
-from pmdsys import PMDSystem
+from napsys import NAPSystem
 from atom import Atom
 
 _default_specorder=['Si']
@@ -32,7 +32,7 @@ def make_sc(latconst=1.0):
     """
     Make a cell of simple cubic structure.
     """
-    s= PMDSystem(specorder=_default_specorder)
+    s= NAPSystem(specorder=_default_specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.0, 0.0 ])
@@ -50,7 +50,7 @@ def make_bcc(latconst=1.0):
     """
     Make a cell of bcc structure.
     """
-    s= PMDSystem(specorder=_default_specorder)
+    s= NAPSystem(specorder=_default_specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.0, 0.0 ])
@@ -70,7 +70,7 @@ def make_fcc(latconst=1.0,size=(1,1,1)):
     """
     Make a cell of fcc structure.
     """
-    s= PMDSystem(specorder=_default_specorder)
+    s= NAPSystem(specorder=_default_specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.0, 0.0 ])
@@ -92,7 +92,7 @@ def make_diamond(latconst=1.0):
     """
     Make a cell of diamond structure.
     """
-    s= PMDSystem(specorder=_default_specorder)
+    s= NAPSystem(specorder=_default_specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.0, 0.0 ])
@@ -118,7 +118,7 @@ def make_hcp(latconst=1.0):
     """
     Make a cell of hcp structure.
     """
-    s= PMDSystem(specorder=_default_specorder)
+    s= NAPSystem(specorder=_default_specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([-0.5, np.sqrt(3.0)/2, 0.0 ])
