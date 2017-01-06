@@ -1,12 +1,14 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2016-11-15 10:41:03 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-06 15:44:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
   character(128),parameter:: cpfname= 'in.params.NN'
   character(128),parameter:: ccfname='in.const.NN'
   character(128),parameter:: cmbfname='in.comb.NN'
+!.....NN mode, which determines if it contains bias node
+  integer:: mode = 0
   integer,parameter:: maxnl= 2
   integer:: nl,nsp,nsf2,nsf3,ncmb2,ncmb3
   integer:: nhl(0:maxnl+1)
@@ -50,7 +52,14 @@ contains
     !.....read in.const.NN to get nl,nsp,nhl(:)
     if( myid.eq.0 ) then
       open(20,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
-      read(20,*) nl,nsp,nhl(0:nl)
+      mode = -1
+      read(20,*) nl,nsp,nhl(0:nl),mode
+      if( mode.eq.-1 ) then  ! old in.const.NN file
+        ! set mode = 1 and reread 1st line without reading mode
+        mode = 1
+        rewind(20)
+        read(20,*) nl,nsp,nhl(0:nl)
+      endif
       nsf2= 0
       nsf3= 0
       do while(.true.)
@@ -70,20 +79,34 @@ contains
     call mpi_bcast(nhl,nl+2,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf2,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(mode,1,mpi_integer,0,mpi_world,ierr)
 
-!.....calc number of weights
-    ncmb2= nsp +factorial(nsp,2)/factorial((nsp-2),2)/2
-    ncmb3= nsp*ncmb2
+
+!!$    ncmb2= nsp +factorial(nsp,2)/factorial((nsp-2),2)/2
+!!$    ncmb3= nsp*ncmb2
+!.....check number of symmetry functions
     if( nhl(0).ne.nsf2 +nsf3 ) then
       if( myid.eq.0) then
         print *,'[Error] nhl(0).ne.nsf2 +nsf3 '
-        print *,' ncmb2,ncmb3,nsf2,nsf3=',ncmb2,ncmb3,nsf2,nsf3
-        print *,'   nhl(0),nsf2*ncmb2 +nsf3*ncmb3=',nhl(0) &
-             ,nsf2 +nsf3
+!!$        print *,' ncmb2,ncmb3,nsf2,nsf3=',ncmb2,ncmb3,nsf2,nsf3
+        print *,'   nsf2,nsf3 = ',nsf2,nsf3
+        print *,'   nhl(0),nsf2+nsf3=',nhl(0),nsf2+nsf3
       endif
       call mpi_finalize(ierr)
       stop
     endif
+
+!.....correct number of nodes according to mode value
+    if( mode.ge.10 ) then
+      nhl(0) = nhl(0) +1
+      nhl(1) = nhl(1) +1
+      if( nl.eq.2 ) then
+        nhl(2) = nhl(2) +1
+      endif
+    endif
+    if( mode.eq.11 ) nhl(0) = nhl(0) +1
+
+!.....total number of weights
     allocate(nwgt(nl+1))
     nw= 0
     do i=1,nl+1
@@ -91,8 +114,9 @@ contains
       nw= nw +nwgt(i)
     enddo
     if(myid.eq.0) then
-      print *,'nsf2,nsf3,ncmb2,ncmb3=',nsf2,nsf3,ncmb2,ncmb3
-      print *,'nhl(0:nl+1),nw=',nhl(0:nl+1),nw
+!!$      print *,'nsf2,nsf3,ncmb2,ncmb3=',nsf2,nsf3,ncmb2,ncmb3
+      print *,'nsf2,nsf3 = ',nsf2,nsf3
+      print *,'nhl(0:nl+1),nw = ',nhl(0:nl+1),nw
     endif
 
 !.....training set
@@ -359,16 +383,25 @@ contains
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
-    integer:: natm,ia,ja,ihl0,ihl1,nfcal
+    integer:: natm,ia,ja,ihl0,ihl1,nfcal,nl1,nl0
     real(8):: tmp,w1,w2,h1,dh1,ddh,t,dg(3)
     
     natm= smpl%natm
     sds%hl1(1:natm,1:nhl(1))= 0d0
     smpl%epot =0d0
-    !.....energy
+
+    nl1 = nhl(1)
+    nl0 = nhl(0)
+    if( mode.ge.10 ) then
+      nl0 = nl0 -1
+      nl1 = nl1 -1
+      sds%hl1(1:natm,nhl(1)) = 1d0
+    endif
+    
+!.....energy
     do ia=1,natm
       if( allocated(mskgfs) ) then
-        do ihl1=1,nhl(1)
+        do ihl1=1,nl1
           tmp= 0d0
           do ihl0=1,nhl(0)
             if( mskgfs(ihl0).ne.0 ) cycle
@@ -377,7 +410,7 @@ contains
           sds%hl1(ia,ihl1)= sigmoid(tmp)
         enddo
       else
-        do ihl1=1,nhl(1)
+        do ihl1=1,nl1
           tmp= 0d0
           do ihl0=1,nhl(0)
             tmp= tmp +wgt11(ihl0,ihl1) *sds%gsf(ia,ihl0)
@@ -399,7 +432,7 @@ contains
     if( allocated(mskgfs) ) then
       do ihl1=1,nhl(1)
         w2= wgt12(ihl1)
-        do ihl0=1,nhl(0)
+        do ihl0=1,nl0
           if( mskgfs(ihl0).ne.0 ) cycle
           w1= wgt11(ihl0,ihl1)
           do ja=1,natm
@@ -421,7 +454,7 @@ contains
         if( smpl%ifcal(ia).eq.0 ) cycle
         do ihl1=1,nhl(1)
           w2= wgt12(ihl1)
-          do ihl0=1,nhl(0)
+          do ihl0=1,nl0
             w1= wgt11(ihl0,ihl1)
             do ja=1,natm
               h1= sds%hl1(ja,ihl1)
@@ -437,7 +470,7 @@ contains
     else
       do ihl1=1,nhl(1)
         w2= wgt12(ihl1)
-        do ihl0=1,nhl(0)
+        do ihl0=1,nl0
           w1= wgt11(ihl0,ihl1)
           do ja=1,natm
             h1= sds%hl1(ja,ihl1)
@@ -461,7 +494,7 @@ contains
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
-    integer:: natm,ia,ja,ihl0,ihl1,ihl2,nfcal
+    integer:: natm,ia,ja,ihl0,ihl1,ihl2,nfcal,nl0,nl1,nl2
     real(8):: tmp1,tmp2,w1,w2,w3,h1,h2,dh1,dh2,t
 
     natm= smpl%natm
@@ -469,22 +502,35 @@ contains
     sds%hl2(1:natm,1:nhl(2))= 0d0
     smpl%epot= 0d0
 
-    !.....energy term
+    nl0 = nhl(0)
+    nl1 = nhl(1)
+    nl2 = nhl(2)
+    if( mode.ge.10 ) then
+      nl0 = nl0 -1
+      nl1 = nl1 -1
+      nl2 = nl2 -1
+      sds%hl1(1:natm,nhl(1)) = 1d0
+      sds%hl2(1:natm,nhl(2)) = 1d0
+    endif
+
+!.....energy term
     do ia=1,natm
-      do ihl2=1,nhl(2)
+      do ihl2=1,nl2
         tmp2= 0d0
         if( allocated(mskgfs) ) then
-          do ihl1=1,nhl(1)
+          do ihl1=1,nl1
             tmp1= 0d0
             do ihl0=1,nhl(0)
               if( mskgfs(ihl0).ne.0 ) cycle
               tmp1=tmp1 +wgt21(ihl0,ihl1) *sds%gsf(ia,ihl0)
             enddo
             sds%hl1(ia,ihl1)= sigmoid(tmp1)
+          enddo
+          do ihl1=1,nhl(1)
             tmp2=tmp2 +wgt22(ihl1,ihl2) *(sds%hl1(ia,ihl1)-0.5d0)
           enddo
         else
-          do ihl1=1,nhl(1)
+          do ihl1=1,nl1
             tmp1= 0d0
             do ihl0=1,nhl(0)
               tmp1=tmp1 +wgt21(ihl0,ihl1) *sds%gsf(ia,ihl0)
@@ -492,8 +538,15 @@ contains
             sds%hl1(ia,ihl1)= sigmoid(tmp1)
             tmp2=tmp2 +wgt22(ihl1,ihl2) *(sds%hl1(ia,ihl1)-0.5d0)
           enddo
+          do ihl1=1,nhl(1)
+            tmp2=tmp2 +wgt22(ihl1,ihl2) *(sds%hl1(ia,ihl1)-0.5d0)
+          enddo
         endif
         sds%hl2(ia,ihl2)= sigmoid(tmp2)
+        smpl%epot= smpl%epot &
+             +wgt23(ihl2) *(sds%hl2(ia,ihl2)-0.5d0)
+      enddo
+      do ihl2=1,nhl(2)
         smpl%epot= smpl%epot &
              +wgt23(ihl2) *(sds%hl2(ia,ihl2)-0.5d0)
       enddo

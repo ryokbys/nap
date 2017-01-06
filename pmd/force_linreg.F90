@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                        Time-stamp: <2016-05-31 15:57:09 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-06 09:33:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
