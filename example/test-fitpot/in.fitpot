@@ -5,7 +5,7 @@ num_iter_eval    1
 num_iter_gfs     100
 
 fitting_method   bfgs
-main_directory   data_set
+main_directory   data_set_w_bias
 param_file       in.params.NN
 run_mode         serial
 evaluation_type  absolute

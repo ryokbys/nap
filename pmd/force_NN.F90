@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-06 13:46:31 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-06 18:09:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -11,7 +11,7 @@ module NN
 !.....mode of NN implementation
 !.....  1: without bias nodes
 !.....  10-: with bias nodes
-!.....  11: with electronic temperature node only at input layer
+!.....  12: with electronic temperature node only at input layer
   integer:: mode = 1
 !.....parameters
   integer:: nwgt1,nwgt2
@@ -19,7 +19,10 @@ module NN
   real(8),allocatable:: wgt21(:,:),wgt22(:,:),wgt23(:)
 !.....constants
   integer,parameter:: nlmax= 2
-  integer:: nsfc,nsfc1,nsfc2,nc1,nc2,nsp,nl,nhl(0:nlmax+1)
+  integer:: nsfc,nsfc1,nsfc2,nc1,nc2,nsp,nl
+!.....number of nodes in each layer
+!.....  nhl includes bias nodes whereas mhl does not
+  integer:: nhl(0:nlmax+1),mhl(0:nlmax+1)
   integer,allocatable:: itype(:)
   real(8),allocatable:: cnst(:,:)
   real(8),allocatable:: hl1(:,:),hl2(:,:)
@@ -193,19 +196,13 @@ contains
 !.....set num of nodes in hidden layers without bias node
     if( nl.eq.1 ) then
       hl1(1:nhl(1),1:natm)= 0d0
-      nl1 = nhl(1)
       if( mode.ge.10 ) then
-        nl1 = nl1 -1
         hl1(nhl(1),1:natm)= 1d0
       endif
     else if( nl.eq.2 ) then
       hl1(1:nhl(1),1:natm)= 0d0
       hl2(1:nhl(2),1:natm)= 0d0
-      nl1 = nhl(1)
-      nl2 = nhl(2)
       if( mode.ge.10 ) then
-        nl1 = nl1 -1
-        nl2 = nl2 -1
         hl1(nhl(1),1:natm)= 1d0
         hl2(nhl(2),1:natm)= 1d0
       endif
@@ -219,7 +216,7 @@ contains
 !.....debug
         if( iprint.ge.100 ) then
           print *,"ia=",ia
-          do ihl1=1,nl1
+          do ihl1=1,mhl(1)
             tmp= 0d0
             do ihl0=1,nhl(0)
               tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
@@ -231,7 +228,7 @@ contains
             print *,"ihl1,hl1=",ihl1,hl1(ihl1,ia)
           enddo
         endif  ! end of debug
-        do ihl1=1,nl1
+        do ihl1=1,mhl(1)
           tmp= 0d0
           do ihl0=1,nhl(0)
             tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
@@ -241,14 +238,14 @@ contains
       enddo
     else if( nl.eq.2 ) then
       do ia=1,natm
-        do ihl1=1,nl1
+        do ihl1=1,mhl(1)
           tmp= 0d0
           do ihl0=1,nhl(0)
             tmp= tmp +wgt21(ihl0,ihl1) *gsf(ihl0,ia)
           enddo
           hl1(ihl1,ia)= sigmoid(tmp)
         enddo
-        do ihl2=1,nl2
+        do ihl2=1,mhl(2)
           tmp= 0d0
           do ihl1=1,nhl(1)
             tmp= tmp +wgt22(ihl1,ihl2) *(hl1(ihl1,ia)-0.5d0)
@@ -290,7 +287,7 @@ contains
     if( nl.eq.1 ) then
 !.....loop over every energy per atom-i
       do ia=1,natm
-        do ihl1=1,nl1
+        do ihl1=1,mhl(1)
           hl1i= hl1(ihl1,ia)
           tmp= wgt12(ihl1)*hl1i*(1d0-hl1i)
           do jj=1,lspr(0,ia)
@@ -310,10 +307,10 @@ contains
       enddo
     else if( nl.eq.2 ) then
       do ia=1,natm
-        do ihl2=1,nl2
+        do ihl2=1,mhl(2)
           hl2i= hl2(ihl2,ia)
           tmp2= wgt23(ihl2) *hl2i*(1d0-hl2i)
-          do ihl1=1,nl1
+          do ihl1=1,mhl(1)
             hl1i= hl1(ihl1,ia)
             tmp1= wgt22(ihl1,ihl2) *hl1i*(1d0-hl1i)
             do jj=1,lspr(0,ia)
@@ -572,10 +569,12 @@ contains
 
     integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(out):: rcin,rc3
+
     integer:: itmp,ierr,i,j,k,nc,ncoeff,is,js,ks &
-         ,n,ihl0,ihl1,ihl2,icmb(3),nsf,nsf1,nsf2,iap,jap,kap
-    integer,allocatable:: nwgt(:)
+         ,n,ihl0,ihl1,ihl2,icmb(3),nsf,nsf1,nsf2,iap,jap,kap,ndat
+    integer,allocatable:: nwgt(:),nhlt(:)
     logical:: lexist
+    character:: ctmp*128
 
 !.....initialize some
     ncnst_type(1)= 2   ! Gaussian
@@ -605,13 +604,15 @@ contains
     endif
     open(51,file=trim(ccfname),status='old')
 !.....num of symmetry functions, num of node in 1st hidden layer
-    mode = -1
-    read(51,*) nl,nsp,(nhl(i),i=0,nl), mode
-    if( mode.eq.-1 ) then  ! old in.const.NN file
+    read(51,'(a)') ctmp
+    ndat = num_data(trim(ctmp),' ')
+    backspace(51)
+    if( ndat.eq.4 ) then  ! old in.const.NN file
       ! set mode = 1 and reread 1st line without reading mode
       mode = 1
-      rewind(51)
       read(51,*) nl,nsp,(nhl(i),i=0,nl)
+    else if( ndat.eq.5 ) then
+      read(51,*) nl,nsp,nhl(0:nl),mode
     endif
 !    print *,' nl,nsp,(nhl(i),i=0,nl)=',nl,nsp,(nhl(i),i=0,nl)
     if( nl.gt.nlmax ) then
@@ -628,7 +629,7 @@ contains
         stop
       endif
     endif
-    if( .not.(mode.eq.1 .or. mode.eq.10 .or. mode.eq.11) ) then
+    if( .not.(mode.eq.1 .or. mode.eq.11 .or. mode.eq.12) ) then
       if( myid.eq.0 ) then
         print *, '[Error] Wrong NN mode specified.'
         print *, '  mode = ',mode
@@ -639,11 +640,12 @@ contains
 
 !.....Determined num of symmetry functions and nodes depending on mode
     nsf= nhl(0)
+    nhl(nl+1)= 1  ! only one output node, an energy
+    mhl(0:nl+1)= nhl(0:nl+1)
     if( mode.gt.10 ) then  ! bias node
       nhl(0:nl) = nhl(0:nl) +1
     endif
-    if( mode.eq.11 ) nhl(0) = nhl(0) +1  ! T_e
-    nhl(nl+1)= 1  ! only one output node, an energy
+    if( mode.eq.12 ) nhl(0) = nhl(0) +1  ! T_e
     
     allocate(itype(nsf),cnst(max_ncnst,nsf))
     allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
@@ -734,15 +736,9 @@ contains
 
 !.....calc number of weights
     allocate(nwgt(nl+1))
+    nwgt(1:nl+1) = 0
     do i=1,nl+1
-      if( mode.eq.1 ) then
-        nwgt(i)= nhl(i-1)*nhl(i)  ! without bias nodes
-      else if( mode.gt.10 ) then
-        nwgt(i)= (nhl(i-1)+1)*nhl(i)  ! with bias nodes
-      endif
-      if( mode.eq.11 ) then
-        nwgt(1)= nwgt(1) +nhl(1)  ! with T_e
-      endif
+      nwgt(i)= nhl(i-1)*mhl(i)
     enddo
     if( myid.le.0 .and. iprint.ne.0 ) then
       print *, 'num of basis funcs =',nhl(0)
@@ -766,18 +762,18 @@ contains
     endif
 !.....different number of weights depending on mode and number of layers
     if( nl.eq.1 ) then
-      allocate(wgt11(nhl(0),nhl(1)),wgt12(nhl(1)))
-      wgt11(1:nhl(0),1:nhl(1)) = 0d0
+      allocate(wgt11(nhl(0),mhl(1)),wgt12(nhl(1)))
+      wgt11(1:nhl(0),1:mhl(1)) = 0d0
       wgt12(1:nhl(1)) = 0d0
     else if( nl.eq.2 ) then
-      allocate(wgt21(nhl(0),nhl(1)),wgt22(nhl(1),nhl(2)),wgt23(nhl(2)))
-      wgt21(1:nhl(0),1:nhl(1)) = 0d0
-      wgt22(1:nhl(1),1:nhl(2)) = 0d0
+      allocate(wgt21(nhl(0),mhl(1)),wgt22(nhl(1),mhl(2)),wgt23(nhl(2)))
+      wgt21(1:nhl(0),1:mhl(1)) = 0d0
+      wgt22(1:nhl(1),1:mhl(2)) = 0d0
       wgt23(1:nhl(2)) = 0d0
     endif
     if( nl.eq.1 ) then
       do ihl0=1,nhl(0)
-        do ihl1=1,nhl(1)
+        do ihl1=1,mhl(1)
           read(50,*) wgt11(ihl0,ihl1)
         enddo
       enddo
@@ -786,12 +782,12 @@ contains
       enddo
     else if( nl.eq.2 ) then
       do ihl0=1,nhl(0)
-        do ihl1=1,nhl(1)
+        do ihl1=1,mhl(1)
           read(50,*) wgt21(ihl0,ihl1)
         enddo
       enddo
       do ihl1=1,nhl(1)
-        do ihl2=1,nhl(2)
+        do ihl2=1,mhl(2)
           read(50,*) wgt22(ihl1,ihl2)
         enddo
       enddo
@@ -944,14 +940,12 @@ contains
     real(8),intent(in):: ra(3,namax),tag(namax),h(3,3),rc,tcom
     real(8),intent(out):: strs(3,3,namax)
 
-    integer:: ia,ja,ixyz,jxyz,ihl0,ihl1,ihl2,jj,is,js,nl1,nl2
+    integer:: ia,ja,ixyz,jxyz,ihl0,ihl1,ihl2,jj,is,js
     real(8):: xi(3),xj(3),xji(3),rij(3),rji(3),dji,sji,sii&
          ,hl2i,hl2j,tmp2i,tmp2j,hl1i,hl1j,tmp1i,tmp1j
 
     strs(1:3,1:3,1:namax) = 0d0
     if( nl.eq.1 ) then
-      nl1 = nhl(1)
-      if( mode.ge.10 ) nl1 = nl1 -1
       do ia=1,natm
         xi(1:3)= ra(1:3,ia)
         is = int(tag(ia))
@@ -964,7 +958,7 @@ contains
           dji= sqrt(rji(1)**2 +rji(2)**2 +rji(3)**2)
           if( dji.ge.rc ) cycle
           js = int(tag(ja))
-          do ihl1=1,nl1
+          do ihl1=1,mhl(1)
             hl1i= hl1(ihl1,ia)
             tmp1i= wgt12(ihl1)*hl1i*(1d0-hl1i)
 !!$            do ihl0=iaddr2(1,is,js),iaddr2(2,is,js)
@@ -987,12 +981,6 @@ contains
         enddo
       enddo
     else if( nl.eq.2 ) then
-      nl1 = nhl(1)
-      nl2 = nhl(2)
-      if( mode.ge.10 ) then
-        nl1 = nl1 -1
-        nl2 = nl2 -1
-      endif
       do ia=1,natm
         xi(1:3)= ra(1:3,ia)
         is = int(tag(ia))
@@ -1005,10 +993,10 @@ contains
           dji= sqrt(rji(1)**2 +rji(2)**2 +rji(3)**2)
           if( dji.ge.rc ) cycle
           js = int(tag(ja))
-          do ihl2=1,nl2
+          do ihl2=1,mhl(2)
             hl2i= hl2(ihl2,ia)
             tmp2i= wgt23(ihl2) *hl2i*(1d0-hl2i)
-            do ihl1=1,nl1
+            do ihl1=1,mhl(1)
               hl1i= hl1(ihl1,ia)
               tmp1i= wgt22(ihl1,ihl2) *hl1i*(1d0-hl1i)
 !!$              do ihl0=iaddr2(1,is,js),iaddr2(2,is,js)
@@ -1044,6 +1032,30 @@ contains
 !!$    endif
 
   end subroutine compute_stress
+!=======================================================================
+  function num_data(str,delim)
+    implicit none
+    character(len=*),intent(in):: str
+    character(len=1),intent(in):: delim
+    integer:: num_data
+
+    integer:: i
+
+    i=1
+    num_data = 0
+    do
+      if( i.gt.len(str) ) exit
+      if( str(i:i).ne.' ' ) then
+        num_data = num_data + 1
+        do
+          i = i + 1
+          if( str(i:i).eq.' ' ) exit
+        end do
+      end if
+      i = i + 1
+    end do
+    return
+  end function num_data
 !=======================================================================
 end module NN
 !-----------------------------------------------------------------------

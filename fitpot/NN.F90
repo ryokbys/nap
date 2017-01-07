@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-06 15:44:51 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-08 00:15:33 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -8,10 +8,12 @@ module NN
   character(128),parameter:: ccfname='in.const.NN'
   character(128),parameter:: cmbfname='in.comb.NN'
 !.....NN mode, which determines if it contains bias node
-  integer:: mode = 0
+  integer:: mode = -1
   integer,parameter:: maxnl= 2
   integer:: nl,nsp,nsf2,nsf3,ncmb2,ncmb3
-  integer:: nhl(0:maxnl+1)
+!.....number of nodes in each layer
+!.....  nhl includes bias nodes whereas mhl does not
+  integer:: nhl(0:maxnl+1),mhl(0:maxnl+1)
   integer,allocatable:: nwgt(:)
   real(8),allocatable:: wgt11(:,:),wgt12(:)
   real(8),allocatable:: wgt21(:,:),wgt22(:,:),wgt23(:)
@@ -41,8 +43,9 @@ contains
     use parallel
     use minimize
     implicit none 
-    integer:: itmp,i,nw,natm,ismpl,ihl0,ihl1
-    real(8):: swgt
+    integer:: itmp,i,nw,natm,ismpl,ihl0,ihl1,itmp2,ndat
+    real(8):: swgt,dtmp
+    character:: ctmp*128
 
     tfunc= 0d0
     tgrad= 0d0
@@ -52,27 +55,30 @@ contains
     !.....read in.const.NN to get nl,nsp,nhl(:)
     if( myid.eq.0 ) then
       open(20,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
-      mode = -1
-      read(20,*) nl,nsp,nhl(0:nl),mode
-      if( mode.eq.-1 ) then  ! old in.const.NN file
+      read(20,'(a)') ctmp
+      ndat = num_data(trim(ctmp),' ')
+      backspace(20)
+      if( ndat.eq.4 ) then  ! old in.const.NN file
         ! set mode = 1 and reread 1st line without reading mode
         mode = 1
-        rewind(20)
         read(20,*) nl,nsp,nhl(0:nl)
+      else if( ndat.eq.5 ) then
+        read(20,*) nl,nsp,nhl(0:nl),mode
       endif
+!!$      print *,'nl,nsp,nhl(0:nl),mode = ',nl,nsp,nhl(0:nl),mode
       nsf2= 0
       nsf3= 0
       do while(.true.)
-        read(20,*,end=10) itmp
+        read(20,*,end=10) itmp,itmp2,itmp2,dtmp,dtmp
         if( itmp.le.100 ) then
           nsf2=nsf2+1
         else if( itmp.le.200 ) then
           nsf3=nsf3+1
         endif
+!!$        print *, nsf2,nsf3,dtmp
       enddo
 10    close(20)
       nhl(nl+1)= 1
-      write(6,'(a,5i5)') ' nhl(0:nl+1)=',nhl(0:nl+1)
     endif
     call mpi_bcast(nl,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsp,1,mpi_integer,0,mpi_world,ierr)
@@ -97,6 +103,7 @@ contains
     endif
 
 !.....correct number of nodes according to mode value
+    mhl(0:nl+1) = nhl(0:nl+1)
     if( mode.ge.10 ) then
       nhl(0) = nhl(0) +1
       nhl(1) = nhl(1) +1
@@ -104,13 +111,17 @@ contains
         nhl(2) = nhl(2) +1
       endif
     endif
-    if( mode.eq.11 ) nhl(0) = nhl(0) +1
+    if( mode.eq.12 ) nhl(0) = nhl(0) +1
+    if( myid.eq.0 ) then
+      write(6,'(a,5i5)') ' nhl(0:nl+1)=',nhl(0:nl+1)
+      write(6,'(a,5i5)') ' mhl(0:nl+1)=',mhl(0:nl+1)
+    endif
 
 !.....total number of weights
     allocate(nwgt(nl+1))
     nw= 0
     do i=1,nl+1
-      nwgt(i)= nhl(i-1)*nhl(i)
+      nwgt(i)= nhl(i-1)*mhl(i)
       nw= nw +nwgt(i)
     enddo
     if(myid.eq.0) then
@@ -383,25 +394,21 @@ contains
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
-    integer:: natm,ia,ja,ihl0,ihl1,nfcal,nl1,nl0
+    integer:: natm,ia,ja,ihl0,ihl1,nfcal
     real(8):: tmp,w1,w2,h1,dh1,ddh,t,dg(3)
-    
+
     natm= smpl%natm
     sds%hl1(1:natm,1:nhl(1))= 0d0
     smpl%epot =0d0
 
-    nl1 = nhl(1)
-    nl0 = nhl(0)
     if( mode.ge.10 ) then
-      nl0 = nl0 -1
-      nl1 = nl1 -1
       sds%hl1(1:natm,nhl(1)) = 1d0
     endif
     
 !.....energy
     do ia=1,natm
       if( allocated(mskgfs) ) then
-        do ihl1=1,nl1
+        do ihl1=1,mhl(1)
           tmp= 0d0
           do ihl0=1,nhl(0)
             if( mskgfs(ihl0).ne.0 ) cycle
@@ -410,7 +417,7 @@ contains
           sds%hl1(ia,ihl1)= sigmoid(tmp)
         enddo
       else
-        do ihl1=1,nl1
+        do ihl1=1,mhl(1)
           tmp= 0d0
           do ihl0=1,nhl(0)
             tmp= tmp +wgt11(ihl0,ihl1) *sds%gsf(ia,ihl0)
@@ -430,9 +437,9 @@ contains
     if( nfcal.eq.0 ) return
     smpl%fa(1:3,1:natm)= 0d0
     if( allocated(mskgfs) ) then
-      do ihl1=1,nhl(1)
+      do ihl1=1,mhl(1)
         w2= wgt12(ihl1)
-        do ihl0=1,nl0
+        do ihl0=1,mhl(0)
           if( mskgfs(ihl0).ne.0 ) cycle
           w1= wgt11(ihl0,ihl1)
           do ja=1,natm
@@ -452,9 +459,9 @@ contains
     else if( nfcal.lt.natm ) then
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
-        do ihl1=1,nhl(1)
+        do ihl1=1,mhl(1)
           w2= wgt12(ihl1)
-          do ihl0=1,nl0
+          do ihl0=1,mhl(0)
             w1= wgt11(ihl0,ihl1)
             do ja=1,natm
               h1= sds%hl1(ja,ihl1)
@@ -468,9 +475,9 @@ contains
         enddo
       enddo
     else
-      do ihl1=1,nhl(1)
+      do ihl1=1,mhl(1)
         w2= wgt12(ihl1)
-        do ihl0=1,nl0
+        do ihl0=1,mhl(0)
           w1= wgt11(ihl0,ihl1)
           do ja=1,natm
             h1= sds%hl1(ja,ihl1)
@@ -502,23 +509,17 @@ contains
     sds%hl2(1:natm,1:nhl(2))= 0d0
     smpl%epot= 0d0
 
-    nl0 = nhl(0)
-    nl1 = nhl(1)
-    nl2 = nhl(2)
     if( mode.ge.10 ) then
-      nl0 = nl0 -1
-      nl1 = nl1 -1
-      nl2 = nl2 -1
       sds%hl1(1:natm,nhl(1)) = 1d0
       sds%hl2(1:natm,nhl(2)) = 1d0
     endif
 
 !.....energy term
     do ia=1,natm
-      do ihl2=1,nl2
+      do ihl2=1,mhl(2)
         tmp2= 0d0
         if( allocated(mskgfs) ) then
-          do ihl1=1,nl1
+          do ihl1=1,mhl(1)
             tmp1= 0d0
             do ihl0=1,nhl(0)
               if( mskgfs(ihl0).ne.0 ) cycle
@@ -530,7 +531,7 @@ contains
             tmp2=tmp2 +wgt22(ihl1,ihl2) *(sds%hl1(ia,ihl1)-0.5d0)
           enddo
         else
-          do ihl1=1,nl1
+          do ihl1=1,mhl(1)
             tmp1= 0d0
             do ihl0=1,nhl(0)
               tmp1=tmp1 +wgt21(ihl0,ihl1) *sds%gsf(ia,ihl0)
@@ -558,9 +559,9 @@ contains
     if( nfcal.eq.0 ) return
     smpl%fa(1:3,1:natm)= 0d0
     if( allocated(mskgfs) ) then
-      do ihl2=1,nhl(2)
+      do ihl2=1,mhl(2)
         w3= wgt23(ihl2)
-        do ihl1=1,nhl(1)
+        do ihl1=1,mhl(1)
           w2= wgt22(ihl1,ihl2)
           do ihl0=1,nhl(0)
             if( mskgfs(ihl0).ne.0 ) cycle
@@ -584,9 +585,9 @@ contains
     else if( nfcal.lt.natm ) then
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
-        do ihl2=1,nhl(2)
+        do ihl2=1,mhl(2)
           w3= wgt23(ihl2)
-          do ihl1=1,nhl(1)
+          do ihl1=1,mhl(1)
             w2= wgt22(ihl1,ihl2)
             do ihl0=1,nhl(0)
               w1= wgt21(ihl0,ihl1)
@@ -604,9 +605,9 @@ contains
         enddo
       enddo
     else
-      do ihl2=1,nhl(2)
+      do ihl2=1,mhl(2)
         w3= wgt23(ihl2)
-        do ihl1=1,nhl(1)
+        do ihl1=1,mhl(1)
           w2= wgt22(ihl1,ihl2)
           do ihl0=1,nhl(0)
             w1= wgt21(ihl0,ihl1)
@@ -655,12 +656,14 @@ contains
 
     do ismpl=isid0,isid1
       if( samples(ismpl)%iclass.ne.1 ) cycle
+!!$      write(6,*) ' grad ismpl = ',ismpl
       if( nl.eq.1 ) then
         call grad1(samples(ismpl),sds(ismpl),gs)
       else if( nl.eq.2 ) then
         call grad2(samples(ismpl),sds(ismpl),gs)
       endif
       glocal(1:ndim)= glocal(1:ndim) +gs(1:ndim)
+!!$      print *,' ismpl,glocal(16)=',ismpl,glocal(16)
     enddo
 
     tgl= mpi_wtime() -tg0
@@ -753,7 +756,7 @@ contains
     ediff= (smpl%epot -eref) /natm /eerr
     ediff= 2d0 *ediff /natm /eerr *swgt ! *wgtidv /natm
     gs(1:nvars)= 0d0
-    iv= nhl(0)*nhl(1) +nhl(1)
+    iv= nhl(0)*mhl(1) +nhl(1)
     do ihl1=nhl(1),1,-1
       tmp= 0d0
       do ia=1,natm
@@ -765,7 +768,7 @@ contains
     enddo
     if( allocated(mskgfs) ) then
       do ihl0=nhl(0),1,-1
-        do ihl1=nhl(1),1,-1
+        do ihl1=mhl(1),1,-1
           tmp= 0d0
           if( mskgfs(ihl0).ne.0 ) goto 20
           w2= wgt12(ihl1)
@@ -780,18 +783,24 @@ contains
       enddo
     else
       do ihl0=nhl(0),1,-1
-        do ihl1=nhl(1),1,-1
+        do ihl1=mhl(1),1,-1
           tmp= 0d0
           w2= wgt12(ihl1)
           do ia=1,natm
             h1= sds%hl1(ia,ihl1)
             tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
+!!$            if( ihl0.eq.6 .and. ihl1.eq.1 ) then
+!!$              write(6,'(a,2i4,3es12.4,i4,es12.4)') &
+!!$                   'ihl0,ihl1,w2,h1,tmp,ia,gsf= ' &
+!!$                   ,ihl0,ihl1,w2,h1,tmp,ia,sds%gsf(ia,ihl0)
+!!$            endif
           enddo
           gs(iv)= gs(iv) +ediff*tmp
           iv= iv -1
         enddo
       enddo
     endif
+!!$    print *, 'gs(16) = ',gs(16)
 
     if( .not. lfmatch ) return
     nfcal= smpl%nfcal
@@ -806,9 +815,9 @@ contains
              -smpl%fref(ixyz,ia)) !*ferri *ferri *2 *dn3i
       enddo
     enddo
-    iv= nhl(0)*nhl(1) +nhl(1)
+    iv= nhl(0)*mhl(1) +nhl(1)
     if( allocated( mskgfs) ) then
-      do ihl1=nhl(1),1,-1
+      do ihl1=mhl(1),1,-1
         tmp= 0d0
         do ihl0=1,nhl(0)
           if( mskgfs(ihl0).ne.0 ) cycle
@@ -835,7 +844,7 @@ contains
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         iv = ivp
-        do ihl1=nhl(1),1,-1
+        do ihl1=mhl(1),1,-1
           tmp= 0d0
           do ihl0=1,nhl(0)
             w1= wgt11(ihl0,ihl1)
@@ -854,7 +863,7 @@ contains
         enddo
       enddo
     else
-      do ihl1=nhl(1),1,-1
+      do ihl1=mhl(1),1,-1
         tmp= 0d0
         do ihl0=1,nhl(0)
           w1= wgt11(ihl0,ihl1)
@@ -877,7 +886,7 @@ contains
 !.....make bms before computing dgs
     bms(1:3,1:natm,1:natm,1:nhl(1))= 0d0
     if( allocated(mskgfs) ) then
-      do ihl1=1,nhl(1)
+      do ihl1=1,mhl(1)
         do ihl0=1,nhl(0)
           if( mskgfs(ihl0).ne.0 ) cycle
           w1= wgt11(ihl0,ihl1)
@@ -893,7 +902,7 @@ contains
          (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
-        do ihl1=1,nhl(1)
+        do ihl1=1,mhl(1)
           do ihl0=1,nhl(0)
             w1= wgt11(ihl0,ihl1)
             do ja=1,natm
@@ -904,7 +913,7 @@ contains
         enddo
       enddo
     else
-      do ihl1=1,nhl(1)
+      do ihl1=1,mhl(1)
         do ihl0=1,nhl(0)
           w1= wgt11(ihl0,ihl1)
           do ja=1,natm
@@ -919,7 +928,7 @@ contains
 !.....then compute dgs wrt w1
     if( allocated(mskgfs) ) then
       do ihl0=nhl(0),1,-1
-        do ihl1=nhl(1),1,-1
+        do ihl1=mhl(1),1,-1
           tmp= 0d0
           if( mskgfs(ihl0).ne.0 ) goto 10
           w2= wgt12(ihl1)
@@ -949,7 +958,7 @@ contains
         if( smpl%ifcal(ia).eq.0 ) cycle
         iv = ivp
         do ihl0=nhl(0),1,-1
-          do ihl1=nhl(1),1,-1
+          do ihl1=mhl(1),1,-1
             tmp= 0d0
             w2= wgt12(ihl1)
             do ja=1,natm
@@ -971,7 +980,7 @@ contains
       enddo
     else
       do ihl0=nhl(0),1,-1
-        do ihl1=nhl(1),1,-1
+        do ihl1=mhl(1),1,-1
           tmp= 0d0
           w2= wgt12(ihl1)
           do ja=1,natm
@@ -1022,7 +1031,7 @@ contains
     swgt= smpl%wgt
     ediff= (smpl%epot -eref)*2 /natm/natm /eerr /eerr *swgt
     gs(1:nvars)= 0d0
-    iv= nhl(0)*nhl(1) +nhl(1)*nhl(2) +nhl(2)
+    iv= nhl(0)*mhl(1) +nhl(1)*mhl(2) +nhl(2)
 
     do ihl2=nhl(2),1,-1
       tmp= 0d0
@@ -1034,7 +1043,7 @@ contains
       iv=iv -1
     enddo
     do ihl1=nhl(1),1,-1
-      do ihl2=nhl(2),1,-1
+      do ihl2=mhl(2),1,-1
         tmp= 0d0
         w3= wgt23(ihl2)
         do ia=1,natm
@@ -1048,7 +1057,7 @@ contains
     enddo
     if( allocated(mskgfs) ) then
       do ihl0=nhl(0),1,-1
-        do ihl1=nhl(1),1,-1
+        do ihl1=mhl(1),1,-1
           tmp= 0d0
           if( mskgfs(ihl0).ne.0 ) goto 20
           do ia=1,natm
@@ -1070,7 +1079,7 @@ contains
       enddo
     else
       do ihl0=nhl(0),1,-1
-        do ihl1=nhl(1),1,-1
+        do ihl1=mhl(1),1,-1
           tmp= 0d0
           do ia=1,natm
             h1= sds%hl1(ia,ihl1)
@@ -1104,7 +1113,7 @@ contains
 !.....make w1dg
     w1dg(1:3,1:natm,1:natm,1:nhl(1))= 0d0
     if( allocated(mskgfs) ) then
-      do ihl1=1,nhl(1)
+      do ihl1=1,mhl(1)
         do ihl0=1,nhl(0)
           if( mskgfs(ihl0).ne.0 ) cycle
           w1= wgt21(ihl0,ihl1)
@@ -1117,7 +1126,7 @@ contains
         enddo
       enddo
     else
-      do ihl1=1,nhl(1)
+      do ihl1=1,mhl(1)
         do ihl0=1,nhl(0)
           w1= wgt21(ihl0,ihl1)
           do ja=1,natm
@@ -1131,7 +1140,7 @@ contains
     endif
 !.....make w2sw1dg
     w2sw1dg(1:3,1:natm,1:natm,1:nhl(2))= 0d0
-    do ihl2=1,nhl(2)
+    do ihl2=1,mhl(2)
       do ihl1=1,nhl(1)
         w2= wgt22(ihl1,ihl2)
         do ja=1,natm
@@ -1163,7 +1172,7 @@ contains
     enddo
 !.....derivative wrt w2
     do ihl1=nhl(1),1,-1
-      do ihl2=nhl(2),1,-1
+      do ihl2=mhl(2),1,-1
         tmp= 0d0
         w3= wgt23(ihl2)
         do ja=1,natm
@@ -1194,10 +1203,10 @@ contains
 !.....derivative wrt w1
     if( allocated(mskgfs) ) then
       do ihl0=nhl(0),1,-1
-        do ihl1=nhl(1),1,-1
+        do ihl1=mhl(1),1,-1
           tmp= 0d0
           if( mskgfs(ihl0).ne.0 ) goto 10
-          do ihl2=1,nhl(2)
+          do ihl2=1,mhl(2)
             w3= wgt23(ihl2)
             w2= wgt22(ihl1,ihl2)
             do ja=1,natm
@@ -1236,9 +1245,9 @@ contains
       enddo
     else
       do ihl0=nhl(0),1,-1
-        do ihl1=nhl(1),1,-1
+        do ihl1=mhl(1),1,-1
           tmp= 0d0
-          do ihl2=1,nhl(2)
+          do ihl2=1,mhl(2)
             w3= wgt23(ihl2)
             w2= wgt22(ihl1,ihl2)
             do ja=1,natm
@@ -1289,33 +1298,35 @@ contains
 
     if( nl.eq.1 ) then
       if( .not. allocated(wgt11) ) then
-        allocate(wgt11(nhl(0),nhl(1)),wgt12(nhl(1)))
+        allocate(wgt11(nhl(0),mhl(1)),wgt12(nhl(1)))
       endif
       iv= 0
       do ihl0=1,nhl(0)
-        do ihl1=1,nhl(1)
+        do ihl1=1,mhl(1)
           iv= iv +1
           wgt11(ihl0,ihl1)= vars(iv)
+!!$          print *, ' iv,ihl0,ihl1 = ',iv,ihl0,ihl1
         enddo
       enddo
       do ihl1=1,nhl(1)
         iv= iv+1
         wgt12(ihl1)= vars(iv)
+!!$        print *, ' iv,ihl1 = ',iv,ihl1
       enddo
     else if( nl.eq.2 ) then
       if( .not. allocated(wgt21) ) then
-        allocate(wgt21(nhl(0),nhl(1)),wgt22(nhl(1),nhl(2)) &
+        allocate(wgt21(nhl(0),mhl(1)),wgt22(nhl(1),mhl(2)) &
              ,wgt23(nhl(2)))
       endif
       iv= 0
       do ihl0=1,nhl(0)
-        do ihl1=1,nhl(1)
+        do ihl1=1,mhl(1)
           iv=iv+1
           wgt21(ihl0,ihl1)= vars(iv)
         enddo
       enddo
       do ihl1=1,nhl(1)
-        do ihl2=1,nhl(2)
+        do ihl2=1,mhl(2)
           iv=iv+1
           wgt22(ihl1,ihl2)= vars(iv)
         enddo
@@ -1703,7 +1714,7 @@ contains
     real(8),allocatable:: sumv(:),cnst(:,:),sumvv(:)
     integer:: i,j,k,l,i2,i3,isf,iv,ic,ihl0,ihl1,itmp,icmb(3)
 
-    allocate(sumv(nhl(0)))
+    allocate(sumv(mhl(0)))
     call eval_1st_layer(sumv)
 
 
@@ -1731,7 +1742,7 @@ contains
       nstype(101:200)= 3
       open(ionum,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
       read(ionum,*) itmp
-      do isf=1,nhl(0)
+      do isf=1,mhl(0)
         read(ionum,*) itype(isf),(icmb(k),k=1,nstype(itype(isf))) &
              ,(cnst(j,isf),j=1,nctype(itype(isf)))
       enddo
@@ -1739,7 +1750,7 @@ contains
 
       open(ionum+1,file=cfname//"."//trim(cadd),status='replace')
       iv=0
-      do isf=1,nhl(0)
+      do isf=1,mhl(0)
         write(ionum+1,'(2i5,f24.14)') isf,itype(isf),sumv(isf)
       enddo
 !!$!.....about 2body terms
@@ -1789,14 +1800,14 @@ contains
     use variables
     use parallel
     implicit none
-    real(8),intent(out):: sumv(nhl(0))
+    real(8),intent(out):: sumv(mhl(0))
     real(8),save,allocatable:: sumvl(:)
 
     integer:: ismpl,ia,ihl0,ihl1,natm
     integer,save,allocatable:: ncnt(:)
 
     if( .not.allocated(sumvl) ) then
-      allocate(sumvl(nhl(0)),ncnt(nhl(0)))
+      allocate(sumvl(mhl(0)),ncnt(mhl(0)))
     endif
     sumvl(1:nhl(0))= 0d0
     ncnt(1:nhl(0))= 0
@@ -1805,7 +1816,7 @@ contains
         natm= samples(ismpl)%natm
         do ia=1,natm
           do ihl0=1,nhl(0)
-            do ihl1=1,nhl(1)
+            do ihl1=1,mhl(1)
               sumvl(ihl0)= sumvl(ihl0) &
                    +abs(wgt11(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0))
               ncnt(ihl0)= ncnt(ihl0) +1
@@ -1818,7 +1829,7 @@ contains
         natm= samples(ismpl)%natm
         do ia=1,natm
           do ihl0=1,nhl(0)
-            do ihl1=1,nhl(1)
+            do ihl1=1,mhl(1)
               sumvl(ihl0)= sumvl(ihl0) &
                    +abs(wgt21(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0))
               ncnt(ihl0)= ncnt(ihl0) +1
@@ -1828,12 +1839,12 @@ contains
       enddo
     endif
     
-    do ihl0=1,nhl(0)
+    do ihl0=1,mhl(0)
       sumvl(ihl0)= sumvl(ihl0)/ncnt(ihl0)
     enddo
 
-    sumv(1:nhl(0))= 0d0
-    call mpi_reduce(sumvl,sumv,nhl(0),mpi_double_precision &
+    sumv(1:mhl(0))= 0d0
+    call mpi_reduce(sumvl,sumv,mhl(0),mpi_double_precision &
          ,mpi_sum,0,mpi_world,ierr)
     
   end subroutine eval_1st_layer
@@ -1865,4 +1876,29 @@ contains
          ,mpi_sum,mpi_world,ierr)
     
   end subroutine count_nterms
+!=======================================================================
+  function num_data(str,delim)
+    implicit none
+    character(len=*),intent(in):: str
+    character(len=1),intent(in):: delim
+    integer:: num_data
+
+    integer:: i
+    print *, 'len(str), str = ',len(str),str
+    i=1
+    num_data = 0
+    do
+      if( i.gt.len(str) ) exit
+      if( str(i:i).ne.delim ) then
+        num_data = num_data + 1
+        do
+          i = i + 1
+          if( i.gt.len(str) ) exit
+          if( str(i:i).eq.delim ) exit
+        end do
+      end if
+      i = i + 1
+    end do
+    return
+  end function num_data
 end module NN

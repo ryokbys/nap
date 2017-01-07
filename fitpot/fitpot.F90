@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2016-11-15 10:40:48 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-08 00:06:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -814,8 +814,8 @@ subroutine check_grad()
   integer:: iv
   real(8):: f0,ftmp,dv,vmax
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
-  real(8),parameter:: dev  = 1d-4
-  real(8),parameter:: tiny = 1d-8
+  real(8),parameter:: dev  = 1d-3
+  real(8),parameter:: tiny = 1d-6
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
   call NN_init()
@@ -835,7 +835,6 @@ subroutine check_grad()
   endif
   do iv=1,nvars
     vars(1:nvars)= vars0(1:nvars)
-!!$    dv= abs(vars(iv)) *1d-6
     vars(iv)= vars(iv) +dv
     ftmp= NN_func(nvars,vars)
     gnumer(iv)= (ftmp-f0)/dv
