@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-08 00:06:32 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-08 23:53:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -814,7 +814,7 @@ subroutine check_grad()
   integer:: iv
   real(8):: f0,ftmp,dv,vmax
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
-  real(8),parameter:: dev  = 1d-3
+  real(8),parameter:: dev  = 1d-5
   real(8),parameter:: tiny = 1d-6
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
@@ -826,7 +826,7 @@ subroutine check_grad()
   vmax= 0d0
   do iv=1,nvars
     vmax= max(vmax,abs(vars0(iv)))
-    if( myid.eq.0) write(6,'(a,i6,es12.4)') ' iv,vars(iv)=',iv,vars0(iv)
+!!$    if( myid.eq.0) write(6,'(a,i6,es12.4)') ' iv,vars(iv)=',iv,vars0(iv)
   enddo
   dv= vmax *dev
   if( myid.eq.0 ) then
@@ -835,6 +835,7 @@ subroutine check_grad()
   endif
   do iv=1,nvars
     vars(1:nvars)= vars0(1:nvars)
+    dv = vars(iv)*dev
     vars(iv)= vars(iv) +dv
     ftmp= NN_func(nvars,vars)
     gnumer(iv)= (ftmp-f0)/dv
@@ -842,11 +843,12 @@ subroutine check_grad()
 
   if( myid.eq.0 ) then
     write(6,'(a)') '----------------- check_grad ------------------------'
-    write(6,'(a)') '     #,    analytical,'// &
+    write(6,'(a)') '     #,          x,    analytical,'// &
          '     numerical,'// &
          '      error [%]'
     do iv=1,nvars
-      write(6,'(i6,2es15.4,f15.3)') iv,ganal(iv),gnumer(iv), &
+      write(6,'(i6,es12.4,2es15.4,f15.3)') iv,vars0(iv), &
+           ganal(iv) ,gnumer(iv), &
            abs((ganal(iv)-gnumer(iv))/(gnumer(iv)+tiny))*100
     enddo
     write(6,'(a)') '-----------------------------------------------------'
