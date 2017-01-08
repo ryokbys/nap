@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-08 00:15:33 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-08 22:16:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -789,18 +789,12 @@ contains
           do ia=1,natm
             h1= sds%hl1(ia,ihl1)
             tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
-!!$            if( ihl0.eq.6 .and. ihl1.eq.1 ) then
-!!$              write(6,'(a,2i4,3es12.4,i4,es12.4)') &
-!!$                   'ihl0,ihl1,w2,h1,tmp,ia,gsf= ' &
-!!$                   ,ihl0,ihl1,w2,h1,tmp,ia,sds%gsf(ia,ihl0)
-!!$            endif
           enddo
           gs(iv)= gs(iv) +ediff*tmp
           iv= iv -1
         enddo
       enddo
     endif
-!!$    print *, 'gs(16) = ',gs(16)
 
     if( .not. lfmatch ) return
     nfcal= smpl%nfcal
@@ -817,8 +811,9 @@ contains
     enddo
     iv= nhl(0)*mhl(1) +nhl(1)
     if( allocated( mskgfs) ) then
-      do ihl1=mhl(1),1,-1
+      do ihl1=nhl(1),1,-1
         tmp= 0d0
+        if( ihl1.gt.mhl(1) ) goto 30
         do ihl0=1,nhl(0)
           if( mskgfs(ihl0).ne.0 ) cycle
           w1= wgt11(ihl0,ihl1)
@@ -834,7 +829,7 @@ contains
             enddo
           enddo
         enddo
-        dgs(iv)= -tmp
+30      dgs(iv)= -tmp
         iv= iv -1
       enddo
 !!$    else if( fred.ge.0d0 .or. &
@@ -844,8 +839,9 @@ contains
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         iv = ivp
-        do ihl1=mhl(1),1,-1
+        do ihl1=nhl(1),1,-1
           tmp= 0d0
+          if( ihl1.gt.mhl(1) ) goto 40
           do ihl0=1,nhl(0)
             w1= wgt11(ihl0,ihl1)
             do ja=1,natm
@@ -858,13 +854,14 @@ contains
                    )
             enddo
           enddo
-          dgs(iv)= dgs(iv) -tmp
+40        dgs(iv)= dgs(iv) -tmp
           iv= iv -1
         enddo
       enddo
     else
-      do ihl1=mhl(1),1,-1
+      do ihl1=nhl(1),1,-1
         tmp= 0d0
+        if( ihl1.gt.mhl(1) ) goto 50
         do ihl0=1,nhl(0)
           w1= wgt11(ihl0,ihl1)
           do ja=1,natm
@@ -879,7 +876,7 @@ contains
             enddo
           enddo
         enddo
-        dgs(iv)= -tmp
+50      dgs(iv)= -tmp
         iv= iv -1
       enddo
     endif
@@ -1552,7 +1549,7 @@ contains
 
     iv=0
     do ihl0=1,nhl(0)
-      do ihl1=1,nhl(1)
+      do ihl1=1,mhl(1)
         iv=iv+1
         vars(iv)= vars(iv)*gmax(ihl0)
       enddo
@@ -1607,7 +1604,7 @@ contains
 
     iv=0
     do ihl0=1,nhl(0)
-      do ihl1=1,nhl(1)
+      do ihl1=1,mhl(1)
         iv=iv+1
         vars(iv)= vars(iv)*gmax(ihl0)
       enddo
@@ -1651,7 +1648,7 @@ contains
 
     iv=0
     do ihl0=1,nhl(0)
-      do ihl1=1,nhl(1)
+      do ihl1=1,mhl(1)
         iv=iv+1
         vars(iv)= vars(iv)*sgm
       enddo
@@ -1680,7 +1677,7 @@ contains
       sgm = sqrt(gsfvar)
       iv= 0
       do ihl0=1,nhl(0)
-        do ihl1=1,nhl(1)
+        do ihl1=1,mhl(1)
           iv=iv+1
           vars(iv)= vars(iv)/sgm
         enddo
