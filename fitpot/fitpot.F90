@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-08 23:53:26 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-11 14:45:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -325,9 +325,10 @@ subroutine read_ref_data()
   use parallel
   implicit none 
   integer:: ismpl,i,is,jflag,natm,nfrc,nftot,nfrcg,nftotg
-  integer:: imax,ifsmpl,nfsmplmax
+  integer:: imax,ifsmpl,nfsmplmax,nfrefdat,ifcal
   character(len=128):: cdir
   real(8):: erefminl,ftmp(3),fmax
+  integer,external:: ndat_in_line
 
   jflag= 0
   erefminl= 0d0
@@ -346,6 +347,7 @@ subroutine read_ref_data()
       samples(ismpl)%naps(is) = samples(ismpl)%naps(is) +1
       samples(ismpl)%eref= samples(ismpl)%eref -eatom(is)
     enddo
+    samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 1
 !!$    erefminl= min(erefminl,samples(ismpl)%eref/samples(ismpl)%natm)
 !    write(6,*) 'ismpl,naps=',ismpl,samples(ismpl)%naps(1:mspcs)
 
@@ -358,45 +360,56 @@ subroutine read_ref_data()
            ,natm,samples(ismpl)%natm
       jflag= jflag +1
     endif
+    nfrefdat = ndat_in_line(14,' ')
     do i=1,natm
       nftot= nftot + 1
-      read(14,*) ftmp(1:3)
+      if( nfrefdat.eq.3 ) then
+        read(14,*) ftmp(1:3)
+      else if( nfrefdat.eq.4 ) then
+!.....if frc.ref includes ifcal values after each force data,
+!.....read 4 values from every line
+        read(14,*) ftmp(1:3), ifcal
+      endif
       samples(ismpl)%fref(1:3,i)= ftmp(1:3)
+      samples(ismpl)%ifcal(i)= ifcal
       samples(ismpl)%fabs(i)= sqrt(ftmp(1)**2 +ftmp(2)**2 +ftmp(3)**2)
     enddo
     close(14)
-!.....neglect atoms with too small forces (smaller than FRED)
-    samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 0
+
+!.....count nfcal
     samples(ismpl)%nfcal= 0
-    if( nfpsmpl.lt.0 ) then
-      nfsmplmax = samples(ismpl)%natm
-    else
-      nfsmplmax = min(samples(ismpl)%natm,nfpsmpl)
-    endif
-    do ifsmpl=1,nfsmplmax
-      fmax=-1d0
-      imax= 0
-      do i=1,natm
-        if( samples(ismpl)%fabs(i).gt.fmax .and. &
-             samples(ismpl)%ifcal(i).eq.0 ) then
-          fmax= samples(ismpl)%fabs(i)
-          imax= i
-        endif
-      enddo
-      if( imax.eq.0 .or. imax.gt.natm) &
-           stop 'Error: something is wrong, imax==0.or.imax>natm'
-      if( fmax.gt.fred ) then
-        samples(ismpl)%ifcal(imax)= 1
-        samples(ismpl)%nfcal= samples(ismpl)%nfcal + 1
-        nfrc= nfrc +1
-      else
-        exit
+    do i=1,natm
+      if( samples(ismpl)%ifcal(i).eq.1 ) then
+        samples(ismpl)%nfcal = samples(ismpl)%nfcal +1
       endif
     enddo
-!    write(6,*) 'ismpl,naps=',ismpl,samples(ismpl)%naps(1:mspcs)
-!!$    do i=1,natm
-!!$      print *,'smpl,ia,ifcal=',trim(samples(ismpl)%cdirname) &
-!!$           ,i,samples(ismpl)%ifcal(i)
+
+!!$!.....neglect atoms with too small forces (smaller than FRED)
+!!$    samples(ismpl)%nfcal= 0
+!!$    if( nfpsmpl.lt.0 ) then
+!!$      nfsmplmax = samples(ismpl)%natm
+!!$    else
+!!$      nfsmplmax = min(samples(ismpl)%natm,nfpsmpl)
+!!$    endif
+!!$    do ifsmpl=1,nfsmplmax
+!!$      fmax=-1d0
+!!$      imax= 0
+!!$      do i=1,natm
+!!$        if( samples(ismpl)%fabs(i).gt.fmax .and. &
+!!$             samples(ismpl)%ifcal(i).eq.0 ) then
+!!$          fmax= samples(ismpl)%fabs(i)
+!!$          imax= i
+!!$        endif
+!!$      enddo
+!!$      if( imax.eq.0 .or. imax.gt.natm) &
+!!$           stop 'Error: something is wrong, imax==0.or.imax>natm'
+!!$      if( fmax.gt.fred ) then
+!!$        samples(ismpl)%ifcal(imax)= 1
+!!$        samples(ismpl)%nfcal= samples(ismpl)%nfcal + 1
+!!$        nfrc= nfrc +1
+!!$      else
+!!$        exit
+!!$      endif
 !!$    enddo
   enddo
 
@@ -404,10 +417,6 @@ subroutine read_ref_data()
     call mpi_finalize(ierr)
     stop
   endif
-
-!!$  erefmin= 0d0
-!!$  call mpi_allreduce(erefminl,erefmin,1,mpi_double_precision,mpi_min &
-!!$       ,mpi_world,ierr)
 
   nfrcg= 0
   nftotg= 0

@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-11 14:30:57 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-11 14:31:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -57,9 +57,6 @@ contains
     if( myid.eq.0 ) then
       open(20,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
       ndat = ndat_in_line(20,' ')
-!!$      read(20,'(a)') ctmp
-!!$      ndat = num_data(trim(ctmp),' ')
-!!$      backspace(20)
       if( ndat.eq.4 ) then  ! old in.const.NN file
         ! set mode = 1 and reread 1st line without reading mode
         mode = 1
