@@ -167,11 +167,12 @@ c=======================================================================
       read(ionum,*) ntot
       allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot)
      &     ,ekitot(3,3,ntot),stot(3,3,ntot),atot(3,ntot))
-      read(ionum,*) (tagtot(i),rtot(1:3,i),vtot(1:3,i)
-     &     ,ekitot(1,1,i),epitot(i)
-     &     ,stot(1,1,i),stot(2,2,i),stot(3,3,i)
-     &     ,stot(2,3,i),stot(3,1,i),stot(1,2,i)
-     &     ,i=1,ntot)
+      do i=1,ntot
+        read(ionum,*) tagtot(i),rtot(1:3,i),vtot(1:3,i)
+     &       ,ekitot(1,1,i),epitot(i)
+     &       ,stot(1,1,i),stot(2,2,i),stot(3,3,i)
+     &       ,stot(2,3,i),stot(3,1,i),stot(1,2,i)
+      enddo
       close(ionum)
       
       end subroutine read_pmdtot_ascii

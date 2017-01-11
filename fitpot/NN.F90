@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-11 14:31:54 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-11 15:04:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -68,7 +68,7 @@ contains
       nsf2= 0
       nsf3= 0
       do while(.true.)
-        read(20,*,end=10) itmp,itmp2,itmp2,dtmp,dtmp
+        read(20,*,end=10) itmp !,itmp2,itmp2,dtmp,dtmp
         if( itmp.le.100 ) then
           nsf2=nsf2+1
         else if( itmp.le.200 ) then

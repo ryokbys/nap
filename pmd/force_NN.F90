@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-06 18:09:50 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-11 15:59:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -614,7 +614,8 @@ contains
     else if( ndat.eq.5 ) then
       read(51,*) nl,nsp,nhl(0:nl),mode
     endif
-!    print *,' nl,nsp,(nhl(i),i=0,nl)=',nl,nsp,(nhl(i),i=0,nl)
+!!$    print *,' nl,nsp,(nhl(i),i=0,nl)=',nl,nsp,(nhl(i),i=0,nl)
+!!$    print *,' mode = ',mode
     if( nl.gt.nlmax ) then
       if( myid.ge.0 ) then
         if( myid.eq.0 ) then
@@ -638,7 +639,7 @@ contains
       stop
     endif
 
-!.....Determined num of symmetry functions and nodes depending on mode
+!.....Determine num of symmetry functions and nodes depending on mode
     nsf= nhl(0)
     nhl(nl+1)= 1  ! only one output node, an energy
     mhl(0:nl+1)= nhl(0:nl+1)
@@ -646,6 +647,8 @@ contains
       nhl(0:nl) = nhl(0:nl) +1
     endif
     if( mode.eq.12 ) nhl(0) = nhl(0) +1  ! T_e
+    print *,'nhl = ',nhl(0:nl+1)
+    print *,'mhl = ',mhl(0:nl+1)
     
     allocate(itype(nsf),cnst(max_ncnst,nsf))
     allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
@@ -691,6 +694,17 @@ contains
       stop
     endif
     close(51)
+
+    do i=1,nsp
+      do j=1,nsp
+        write(6,'(a,4i5)') ' is,js,iaddr2(1:2,is,js)=' &
+             ,i,j,iaddr2(1:2,i,j)
+        do k=1,nsp
+          write(6,'(a,5i5)') ' is,js,ks,iaddr3(1:2,is,js,ks)=' &
+               ,i,j,k,iaddr3(1:2,i,j,k)
+        enddo
+      enddo
+    enddo
 
 !.....read parameters at the 1st call
     inquire(file=trim(cpfname),exist=lexist)
@@ -1049,6 +1063,7 @@ contains
         num_data = num_data + 1
         do
           i = i + 1
+          if( i.gt.len(str) ) exit
           if( str(i:i).eq.' ' ) exit
         end do
       end if
