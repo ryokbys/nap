@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-08 22:16:26 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-11 14:30:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -46,6 +46,7 @@ contains
     integer:: itmp,i,nw,natm,ismpl,ihl0,ihl1,itmp2,ndat
     real(8):: swgt,dtmp
     character:: ctmp*128
+    integer,external:: ndat_in_line
 
     tfunc= 0d0
     tgrad= 0d0
@@ -55,9 +56,10 @@ contains
     !.....read in.const.NN to get nl,nsp,nhl(:)
     if( myid.eq.0 ) then
       open(20,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
-      read(20,'(a)') ctmp
-      ndat = num_data(trim(ctmp),' ')
-      backspace(20)
+      ndat = ndat_in_line(20,' ')
+!!$      read(20,'(a)') ctmp
+!!$      ndat = num_data(trim(ctmp),' ')
+!!$      backspace(20)
       if( ndat.eq.4 ) then  ! old in.const.NN file
         ! set mode = 1 and reread 1st line without reading mode
         mode = 1
@@ -1874,28 +1876,4 @@ contains
     
   end subroutine count_nterms
 !=======================================================================
-  function num_data(str,delim)
-    implicit none
-    character(len=*),intent(in):: str
-    character(len=1),intent(in):: delim
-    integer:: num_data
-
-    integer:: i
-    print *, 'len(str), str = ',len(str),str
-    i=1
-    num_data = 0
-    do
-      if( i.gt.len(str) ) exit
-      if( str(i:i).ne.delim ) then
-        num_data = num_data + 1
-        do
-          i = i + 1
-          if( i.gt.len(str) ) exit
-          if( str(i:i).eq.delim ) exit
-        end do
-      end if
-      i = i + 1
-    end do
-    return
-  end function num_data
 end module NN
