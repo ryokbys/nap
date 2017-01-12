@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-11 14:45:42 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-11 16:43:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -365,6 +365,7 @@ subroutine read_ref_data()
       nftot= nftot + 1
       if( nfrefdat.eq.3 ) then
         read(14,*) ftmp(1:3)
+        ifcal = 1
       else if( nfrefdat.eq.4 ) then
 !.....if frc.ref includes ifcal values after each force data,
 !.....read 4 values from every line

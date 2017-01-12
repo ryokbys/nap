@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2016-12-21 15:49:49 Ryo KOBAYASHI>
+c                     Last-modified: <2017-01-12 21:56:07 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file include core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -235,7 +235,7 @@ c.....get_num_dof is called once in a MD run
         ptgt = ptgt *gpa2up
       endif
       call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
-     &     ,dt,srlx,stbeta,vol,avol,ptnsr,mpi_md_world,cpctl)
+     &     ,dt,srlx,stbeta,vol,ptnsr,mpi_md_world,cpctl)
 c      ptnsr(1:3,1:3)= ptnsr(1:3,1:3)/vol
       if( myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,'(a,6f10.3)')' stress tensor [GPa]: '
@@ -247,7 +247,7 @@ c      ptnsr(1:3,1:3)= ptnsr(1:3,1:3)/vol
       istps= istp
       ts= istps*dt
       te= rbuf/(2d0*vmax/dt) +istp*dt
-      istpe= te/dt
+      istpe= int(te/dt)
 c.....Considering vmax==0d0, make istpe small only for the first step
       if( istpe.gt.100 ) istpe=100
 c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
@@ -385,7 +385,7 @@ c.....Reset matrices
 
 c.....Update te considering change of vmax
         te=(te-ts)*vmaxold/vmax +ts
-        istpe= te/dt
+        istpe= int(te/dt)
 
 c.....Update pair list and boundary atoms
 c.....if making new pair list is needed.
@@ -403,7 +403,7 @@ c.....Make pair list
      &         ,hi,anxi,anyi,anzi,lspr)
           ts= istp*dt
           te=rbuf/(2d0*vmax/dt) +ts
-          istpe= te/dt
+          istpe= int(te/dt)
 c          if(myid_md.eq.0) write(6,'(a,i10)')
 c     &         " Next update step will be ",istpe
         else
@@ -469,7 +469,7 @@ c.....Calc kinetic energy
      &       ,vmax,mpi_md_world)
 
         call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
-     &       ,dt,srlx,stbeta,vol,avol,ptnsr,mpi_md_world,cpctl)
+     &       ,dt,srlx,stbeta,vol,ptnsr,mpi_md_world,cpctl)
 
 c-------temperature control by Berendsen thermostat
         if( trim(ctctl).eq.'Berendsen' ) then
@@ -921,8 +921,8 @@ c=======================================================================
       integer,intent(out):: nadst(ntdst)
       real(8),intent(out):: tdst(ntdst)
       
-      integer:: i,ix,itmp,ierr
-      real(8):: dx,xi,tmp
+      integer:: i,ix,ierr
+      real(8):: dx,xi
       real(8),allocatable,save:: tdl(:)
       integer,allocatable,save:: ndl(:)
       logical,save:: l1st=.true.
@@ -977,7 +977,7 @@ c=======================================================================
       integer:: i,l,k,ndofl(9),ierr
       real(8),parameter:: deps= 1d-12
 
-      ndofl(1:9)= 0d0
+      ndofl(1:9)= 0
       do i=1,natm
         l= int(mod(tag(i)*10,10d0))
         do k=1,3
@@ -1809,7 +1809,7 @@ c------------------------------------------------------------------------
       end function bmv
 c=======================================================================
       subroutine force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
-     &     ,dt,srlx,stbeta,vol,avol,ptnsr,mpi_md_world,cpctl)
+     &     ,dt,srlx,stbeta,vol,ptnsr,mpi_md_world,cpctl)
 c
 c  Calc. acceralation of h-matrix used in isobaric MD
 c  using given stress tensor stgt.
@@ -1818,11 +1818,11 @@ c
       include "mpif.h"
       integer,intent(in):: natm,mpi_md_world
       real(8),intent(in):: stgt(3,3),eki(3,3,natm),strs(3,3,natm),ptgt
-     &     ,sgm(3,3),dt,vol,avol,srlx,stbeta
+     &     ,sgm(3,3),dt,vol,srlx,stbeta
       real(8),intent(out):: ah(3,3),ptnsr(3,3)
       character(len=*):: cpctl
       
-      integer:: i,ixyz,jxyz,kxyz,ierr
+      integer:: i,ixyz,jxyz,ierr
       real(8):: pt(3,3),prss,fac
 
       pt(1:3,1:3)= 0d0

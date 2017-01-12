@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-11 15:59:49 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-12 22:00:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -64,9 +64,9 @@ contains
     logical:: lstrs
 
 !.....local
-    integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ja,nexp,isf &
-         ,icoeff,ihl0,ihl1,ihl2,jj,jsf,nl1,nl2
-    real(8):: rcin,b_na,at(3),epotl,wgt,hl1i,hl2i,tmp2,tmp1,tmp,tmp3(3)
+    integer:: i,j,k,l,m,n,is,ierr,ia,ja &
+         ,ihl0,ihl1,ihl2,jj
+    real(8):: rcin,at(3),epotl,hl1i,hl2i,tmp2,tmp1,tmp
     real(8),save:: rc3
 !    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
 !.....1st call
@@ -181,7 +181,7 @@ contains
          ,lspr,rc,rc3)
 !.....set bias node to 1
     gsf(nhl(0),1:natm) = 1d0
-    dgsf(1:3,:,nhl(0),:) = 0d0
+    dgsf(1:3,nhl(0),:,:) = 0d0
 
     if( mod(iprint,100)/10.eq.1 .and. myid.le.0 ) then
       open(80,file='out.NN.gsf',status='replace',form='unformatted')
@@ -570,9 +570,9 @@ contains
     integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(out):: rcin,rc3
 
-    integer:: itmp,ierr,i,j,k,nc,ncoeff,is,js,ks &
-         ,n,ihl0,ihl1,ihl2,icmb(3),nsf,nsf1,nsf2,iap,jap,kap,ndat
-    integer,allocatable:: nwgt(:),nhlt(:)
+    integer:: ierr,i,j,k,nc,ncoeff &
+         ,ihl0,ihl1,ihl2,icmb(3),nsf,nsf1,nsf2,iap,jap,kap,ndat
+    integer,allocatable:: nwgt(:)
     logical:: lexist
     character:: ctmp*128
 
@@ -695,16 +695,16 @@ contains
     endif
     close(51)
 
-    do i=1,nsp
-      do j=1,nsp
-        write(6,'(a,4i5)') ' is,js,iaddr2(1:2,is,js)=' &
-             ,i,j,iaddr2(1:2,i,j)
-        do k=1,nsp
-          write(6,'(a,5i5)') ' is,js,ks,iaddr3(1:2,is,js,ks)=' &
-               ,i,j,k,iaddr3(1:2,i,j,k)
-        enddo
-      enddo
-    enddo
+!!$    do i=1,nsp
+!!$      do j=1,nsp
+!!$        write(6,'(a,4i5)') ' is,js,iaddr2(1:2,is,js)=' &
+!!$             ,i,j,iaddr2(1:2,i,j)
+!!$        do k=1,nsp
+!!$          write(6,'(a,5i5)') ' is,js,ks,iaddr3(1:2,is,js,ks)=' &
+!!$               ,i,j,k,iaddr3(1:2,i,j,k)
+!!$        enddo
+!!$      enddo
+!!$    enddo
 
 !.....read parameters at the 1st call
     inquire(file=trim(cpfname),exist=lexist)
@@ -956,7 +956,7 @@ contains
 
     integer:: ia,ja,ixyz,jxyz,ihl0,ihl1,ihl2,jj,is,js
     real(8):: xi(3),xj(3),xji(3),rij(3),rji(3),dji,sji,sii&
-         ,hl2i,hl2j,tmp2i,tmp2j,hl1i,hl1j,tmp1i,tmp1j
+         ,hl2i,tmp2i,hl1i,tmp1i
 
     strs(1:3,1:3,1:namax) = 0d0
     if( nl.eq.1 ) then
@@ -1016,16 +1016,20 @@ contains
 !!$              do ihl0=iaddr2(1,is,js),iaddr2(2,is,js)
               do ihl0=1,nhl(0)
                 if( igsf(ihl0,jj,ia).eq.0 ) cycle
+                do ixyz=1,3
+                  do jxyz=1,3
 !......derivative of gsf of atom-j by atom-i
-                sji= -tmp2i *tmp1i &
-                     *wgt21(ihl0,ihl1) *dgsf(jxyz,ihl0,jj,ia) &
-                     *rji(ixyz)
+                    sji= -tmp2i *tmp1i &
+                         *wgt21(ihl0,ihl1) *dgsf(jxyz,ihl0,jj,ia) &
+                         *rji(ixyz)
 !.....derivative of gsf of atom-i by atom-i
-                sii= tmp2i *tmp1i &
-                     *wgt21(ihl0,ihl1) *dgsf(jxyz,ihl0,jj,ia) &
-                     *rij(ixyz)
-                strs(ixyz,jxyz,ja) = strs(ixyz,jxyz,ja) +sji
-                strs(ixyz,jxyz,ia) = strs(ixyz,jxyz,ia) +sii
+                    sii= tmp2i *tmp1i &
+                         *wgt21(ihl0,ihl1) *dgsf(jxyz,ihl0,jj,ia) &
+                         *rij(ixyz)
+                    strs(ixyz,jxyz,ja) = strs(ixyz,jxyz,ja) +sji
+                    strs(ixyz,jxyz,ia) = strs(ixyz,jxyz,ia) +sii
+                  enddo
+                enddo
               enddo
             enddo
           enddo
@@ -1059,12 +1063,12 @@ contains
     num_data = 0
     do
       if( i.gt.len(str) ) exit
-      if( str(i:i).ne.' ' ) then
+      if( str(i:i).ne.delim ) then
         num_data = num_data + 1
         do
           i = i + 1
           if( i.gt.len(str) ) exit
-          if( str(i:i).eq.' ' ) exit
+          if( str(i:i).eq.delim ) exit
         end do
       end if
       i = i + 1
