@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-11 15:04:57 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-13 15:39:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -453,8 +453,6 @@ contains
           enddo
         enddo
       enddo
-!!$    else if( fred.ge.0d0 .or. &
-!!$         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
     else if( nfcal.lt.natm ) then
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
@@ -831,8 +829,6 @@ contains
 30      dgs(iv)= -tmp
         iv= iv -1
       enddo
-!!$    else if( fred.ge.0d0 .or. &
-!!$         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
     else if( nfcal.lt.natm ) then
       ivp = iv
       do ia=1,natm
@@ -894,8 +890,7 @@ contains
           enddo
         enddo
       enddo
-    else if( fred.ge.0d0 .or. &
-         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
+    else if( nfcal.lt.natm ) then
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do ihl1=1,mhl(1)
@@ -947,8 +942,7 @@ contains
           iv= iv -1
         enddo
       enddo
-    else if( fred.ge.0d0 .or. &
-         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
+    else if( nfcal.lt.natm ) then
       ivp = iv
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle

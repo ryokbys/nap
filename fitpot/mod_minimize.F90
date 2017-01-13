@@ -1392,7 +1392,7 @@ contains
     if( fi+pval-(f0+pval0).le.xigd*alphai ) then
       f= fi
       alpha= alphai
-      if(myid.eq.0) print *,'armijo finishes with iter=',iter
+!!$      if(myid.eq.0) print *,'armijo finishes with iter=',iter
       return
     endif
     fp= fi

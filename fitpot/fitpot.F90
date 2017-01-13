@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-11 16:43:14 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-13 14:24:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -382,6 +382,7 @@ subroutine read_ref_data()
     do i=1,natm
       if( samples(ismpl)%ifcal(i).eq.1 ) then
         samples(ismpl)%nfcal = samples(ismpl)%nfcal +1
+        nfrc = nfrc +1
       endif
     enddo
 
