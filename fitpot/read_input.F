@@ -48,6 +48,9 @@ c=======================================================================
       if( trim(cname).eq.'num_samples' ) then
         call read_i1(ionum,nsmpl)
         return
+      elseif( trim(cname).eq.'sample_list' ) then
+        call read_c1(ionum,csmplist)
+        return
       elseif( trim(cname).eq.'num_iteration' ) then
         call read_i1(ionum,niter)
         return

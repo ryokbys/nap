@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-13 14:24:12 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-13 18:31:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -43,7 +43,12 @@ program fitpot
   enddo
 
   if( nserr.gt.0 ) call set_sample_errors()
-  call set_training_test()
+  if( test_assigned ) then
+    call count_training_test()
+  else
+    call set_training_test_with_ratio()
+    test_assigned= .true.
+  endif
 
   call read_samples()
   call read_ref_data()
@@ -177,23 +182,58 @@ subroutine get_dir_list(ionum)
   use variables
   use parallel
   implicit none
+  interface
+    subroutine shuffle_dirlist(nsmpl,cdirlist,iclist)
+      integer,intent(in):: nsmpl
+      character(len=128),intent(inout):: cdirlist(nsmpl)
+      integer,optional,intent(inout):: iclist(nsmpl)
+    end subroutine shuffle_dirlist
+  end interface
   integer,intent(in):: ionum
-  integer:: is
+  integer:: is,ndat
+  integer,external:: ndat_in_line
 
   if( .not. allocated(cdirlist)) allocate(cdirlist(nsmpl))
+  if( .not. allocated(iclist)) allocate(iclist(nsmpl))
+
+  print *,'csmplist = ',csmplist
   
   if( myid.eq.0 ) then
-    call system('ls '//trim(cmaindir) &
-         //' | grep "smpl_" > dir_list.txt')
-    open(ionum,file='dir_list.txt',status='old')
-    do is=1,nsmpl
-      read(ionum,*,end=999) cdirlist(is)
-    enddo
+    if( len(trim(csmplist)).lt.1 ) then
+      print *,'sample list was created by command line...'
+      call system('ls '//trim(cmaindir) &
+           //' | grep "smpl_" > dir_list.txt')
+      open(ionum,file='dir_list.txt',status='old')
+    else
+      print *,'sample list was given by input.'
+      open(ionum,file=trim(csmplist),status='old')
+    endif
+    ndat = ndat_in_line(ionum,' ')
+    if( ndat.eq.1 ) then
+      do is=1,nsmpl
+        read(ionum,*,end=999) cdirlist(is)
+      enddo
+      call shuffle_dirlist(nsmpl,cdirlist)
+    else if(ndat.eq.2 ) then
+      print *,'training and test are determined by input, ',trim(csmplist)
+      do is=1,nsmpl
+        read(ionum,*,end=999) cdirlist(is),iclist(is)
+      enddo
+      call shuffle_dirlist(nsmpl,cdirlist,iclist)
+    else
+      print *,'[Error] ndat should be 1 or 2, ndat = ',ndat
+      call mpi_finalize(ierr)
+      stop
+    endif
     close(ionum)
-    call shuffle_dirlist(nsmpl,cdirlist)
   endif
   call mpi_barrier(mpi_world,ierr)
   call mpi_bcast(cdirlist,128*nsmpl,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(ndat,1,mpi_integer,0,mpi_world,ierr)
+  if( ndat.eq.2 ) then
+    call mpi_bcast(iclist,nsmpl,mpi_integer,0,mpi_world,ierr)
+    test_assigned = .true.
+  endif
 
 !!$  if( myid.eq.0 ) then
 !!$    do is=1,nsmpl
@@ -211,14 +251,15 @@ subroutine get_dir_list(ionum)
 
 end subroutine get_dir_list
 !=======================================================================
-subroutine set_training_test()
+subroutine set_training_test_with_ratio()
   use variables
   use parallel
   implicit none
   integer:: ismpl,n
   integer,allocatable,dimension(:):: icll
 
-  allocate(icll(nsmpl),iclist(nsmpl))
+  allocate(icll(nsmpl))
+  if( .not. allocated(iclist) ) allocate(iclist(nsmpl))
   icll(1:nsmpl)= 0
 
   nsmpl_tst= nsmpl*ratio_test
@@ -256,11 +297,40 @@ subroutine set_training_test()
 !!$      print *,'ismpl,iclist=',ismpl,iclist(ismpl)
 !!$    enddo
     print *,'nsmpl, training, test=',nsmpl,nsmpl_trn,nsmpl_tst
-    print *,'set_training_test done.'
+    print *,'set_training_test_with_ratio done.'
   endif
   deallocate(icll)
   return
-end subroutine set_training_test
+end subroutine set_training_test_with_ratio
+!=======================================================================
+subroutine count_training_test()
+!
+!  Count number of training set and test set,
+!  only if iclist is already set.
+!
+  use variables
+  use parallel
+  implicit none
+  integer:: i
+
+  myntrn = 0
+  myntst = 0
+  do i=isid0,isid1
+    samples(i)%iclass = iclist(i)
+    if( iclist(i).eq.1 ) myntrn= myntrn +1
+    if( iclist(i).eq.2 ) myntst= myntst +1
+  enddo
+  
+  if( myid.eq.0 ) then
+    nsmpl_trn = 0
+    nsmpl_tst = 0
+    do i=1,nsmpl
+      if( iclist(i).eq.1 ) nsmpl_trn = nsmpl_trn +1
+      if( iclist(i).eq.2 ) nsmpl_tst = nsmpl_tst +1
+    enddo
+    print *,'nsmpl, training, test=',nsmpl,nsmpl_trn,nsmpl_tst
+  endif
+end subroutine count_training_test
 !=======================================================================
 subroutine read_samples()
   use variables
@@ -1309,28 +1379,52 @@ subroutine get_node2sample()
   return
 end subroutine get_node2sample
 !=======================================================================
-subroutine shuffle_dirlist(nsmpl,cdirlist)
+subroutine shuffle_dirlist(nsmpl,cdirlist,iclist)
 !
 !  Randomize the order of the cdirlist
 !
   use random
   implicit none
   integer,intent(in):: nsmpl
-  character(len=128):: cdirlist(nsmpl)
+  character(len=128),intent(inout):: cdirlist(nsmpl)
+  integer,optional,intent(inout):: iclist(nsmpl)
+
   integer:: i,j,k,n
   character(len=128),allocatable:: cdltmp(:)
-  
+  integer,allocatable:: icltmp(:)
+
   allocate(cdltmp(nsmpl))
-  cdltmp(1:nsmpl)= cdirlist(1:nsmpl)
-  n=nsmpl
-  do i=1,nsmpl
-    j= n*urnd()+1
-    cdirlist(i)= cdltmp(j)
-    do k=j,n-1
-      cdltmp(k)= cdltmp(k+1)
+  if( .not. present(iclist) ) then
+    cdltmp(1:nsmpl)= cdirlist(1:nsmpl)
+    n=nsmpl
+    do i=1,nsmpl
+      j= n*urnd()+1
+      cdirlist(i)= cdltmp(j)
+      do k=j,n-1
+        cdltmp(k)= cdltmp(k+1)
+      enddo
+      n= n -1
     enddo
-    n= n -1
-  enddo
+!!$  do i=1,nsmpl
+!!$    print *,i,trim(cdirlist(i))
+!!$  enddo
+  else
+    allocate(icltmp(nsmpl))
+    cdltmp(1:nsmpl)= cdirlist(1:nsmpl)
+    icltmp(1:nsmpl)= iclist(1:nsmpl)
+    n=nsmpl
+    do i=1,nsmpl
+      j= n*urnd()+1
+      cdirlist(i)= cdltmp(j)
+      iclist(i)= icltmp(j)
+      do k=j,n-1
+        cdltmp(k)= cdltmp(k+1)
+        icltmp(k)= icltmp(k+1)
+      enddo
+      n= n -1
+    enddo
+    deallocate(icltmp)
+  endif
   deallocate(cdltmp)
 end subroutine shuffle_dirlist
 !=======================================================================

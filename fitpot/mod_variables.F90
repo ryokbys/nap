@@ -9,6 +9,7 @@ module variables
   character(len=128):: cparfile= 'in.params.NN'
   character(len=128):: crunmode= 'serial'
   character(len=128):: cevaltype= 'absolute' ! (absolute|relative)
+  character(len=128):: csmplist= ''
   integer:: nprcs= 1
   real(8):: epse= 1d-4
   real(8):: epsf= 1d-4
@@ -35,6 +36,7 @@ module variables
   real(8):: r0sgd = 1.0
 !.....training or test
   real(8):: ratio_test= 0.1d0
+  logical:: test_assigned = .false.  ! already assigned test set?
 !.....initializing parameters
   character(len=128):: cinitv= 'read'
   real(8):: vinitsgm = 1d0
@@ -60,14 +62,14 @@ module variables
     character(len=128):: cdirname
     integer:: natm,nfcal
     real(8):: h0,h(3,3),epot,eref,wgt
-    real(8):: eerr = 1.0d-3 ! in eV
-    real(8):: ferr = 0.1d0  ! in eV/A
+    real(8):: eerr = 1.0d-3  ! in eV
+    real(8):: ferr = 0.1d0   ! in eV/A
     real(8),allocatable:: tag(:)
     real(8),allocatable:: ra(:,:),fa(:,:),fref(:,:)
     integer,allocatable:: ifcal(:)
     real(8),allocatable:: fabs(:)
-    integer:: naps(mspcs) ! num of atoms per species
-    integer:: iclass
+    integer:: naps(mspcs)  ! num of atoms per species
+    integer:: iclass       ! 1: training,  2: test
   end type mdsys
   real(8):: erefmin
 
