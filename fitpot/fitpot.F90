@@ -196,8 +196,6 @@ subroutine get_dir_list(ionum)
   if( .not. allocated(cdirlist)) allocate(cdirlist(nsmpl))
   if( .not. allocated(iclist)) allocate(iclist(nsmpl))
 
-  print *,'csmplist = ',csmplist
-  
   if( myid.eq.0 ) then
     if( len(trim(csmplist)).lt.1 ) then
       print *,'sample list was created by command line...'
