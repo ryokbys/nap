@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-13 15:39:23 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-19 10:59:36 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -44,7 +44,7 @@ contains
     use minimize
     implicit none 
     integer:: itmp,i,nw,natm,ismpl,ihl0,ihl1,itmp2,ndat
-    real(8):: swgt,dtmp
+    real(8):: swgtrn,swgtst,dtmp
     character:: ctmp*128
     integer,external:: ndat_in_line
 
@@ -192,34 +192,48 @@ contains
     endif
 
 !.....set nominator for sample weights
-    swgt = 0d0
+    swgtrn = 0d0
+    swgtst = 0d0
     do ismpl=isid0,isid1
-      swgt = swgt +samples(ismpl)%wgt
+      if( samples(ismpl)%iclass.eq.1 ) then
+        swgtrn = swgtrn +samples(ismpl)%wgt
+      else if(samples(ismpl)%iclass.eq.2 ) then
+        swgtst = swgtst +samples(ismpl)%wgt
+      endif
     enddo
-    swgt2 = 0d0
-    call mpi_allreduce(swgt,swgt2,1,mpi_double_precision,mpi_sum &
+    swgt2trn = 0d0
+    swgt2tst = 0d0
+    call mpi_allreduce(swgtrn,swgt2trn,1,mpi_double_precision,mpi_sum &
          ,mpi_world,ierr)
-    swgt2 = swgt2*2d0
-    if( myid.eq.0 ) write(6,'(a,es12.3)') ' swgt2 = ',swgt2
+    call mpi_allreduce(swgtst,swgt2tst,1,mpi_double_precision,mpi_sum &
+         ,mpi_world,ierr)
+    if( lfmatch ) then
+      swgt2trn = swgt2trn*2d0
+      swgt2tst = swgt2tst*2d0
+    endif
+    if( myid.eq.0 ) then
+      write(6,'(a,es12.3)') ' swgt2trn = ',swgt2trn
+      write(6,'(a,es12.3)') ' swgt2tst = ',swgt2tst
+    endif
 
     if( myid.eq.0 ) print *, 'NN_init done.'
   end subroutine NN_init
 !=======================================================================
-  function NN_func(ndim,x)
+  subroutine NN_func(ndim,x,ftrn,ftst)
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
          ,lfmatch,nfunc,tcomm,mdsys,erefmin &
-         ,cmaindir,epse,epsf,cevaltype,swgt2
+         ,cmaindir,epse,epsf,cevaltype,swgt2trn,swgt2tst
     use parallel
     use minimize
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
-    real(8):: NN_func
+    real(8),intent(out):: ftrn,ftst
 
     integer:: ismpl,natm,ia,ixyz,idim
     real(8):: dn3i,ediff,fscale,eref,swgt,wgtidv
     real(8):: eerr,ferr,ferri
-    real(8):: flocal
+    real(8):: flocal,ftrnl,ftstl,ftmp
     real(8):: edenom,fdenom
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     type(mdsys):: smpl
@@ -249,44 +263,53 @@ contains
     enddo
 
 !!$    NN_func= 0d0
-    flocal= 0d0
+    ftrnl = 0d0
+    ftstl = 0d0
+!!$    flocal= 0d0
     do ismpl=isid0,isid1
+      ftmp = 0d0
       smpl= samples(ismpl)
-      if( smpl%iclass.ne.1 ) cycle
       natm= smpl%natm
       eref= smpl%eref
       eerr = smpl%eerr
       swgt = smpl%wgt
       ediff= (smpl%epot -eref)/natm /eerr
       ediff= ediff*ediff
-      flocal= flocal +ediff *swgt
-      if( .not. lfmatch ) cycle
-      if( smpl%nfcal.eq.0 ) cycle
-      ferr = smpl%ferr
-      ferri = 1d0/ferr
-      dn3i = 1d0/3/smpl%nfcal
-      do ia=1,natm
-        if( smpl%ifcal(ia).eq.0 ) cycle
-        do ixyz=1,3
-          fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-               -smpl%fref(ixyz,ia)) *ferri
-          fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
-          flocal= flocal +fdiff(ixyz,ia) *dn3i *swgt
+      ftmp= ftmp +ediff *swgt
+      if( lfmatch .and. smpl%nfcal.ne.0 ) then
+        ferr = smpl%ferr
+        ferri = 1d0/ferr
+        dn3i = 1d0/3/smpl%nfcal
+        do ia=1,natm
+          if( smpl%ifcal(ia).eq.0 ) cycle
+          do ixyz=1,3
+            fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+                 -smpl%fref(ixyz,ia)) *ferri
+            fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
+            ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt
+          enddo
         enddo
-      enddo
+      endif
+      if( smpl%iclass.eq.1 ) then
+        ftrnl = ftrnl +ftmp
+      else if( smpl%iclass.eq.2 ) then
+        ftstl = ftstl +ftmp
+      endif
     enddo
 
 !    tfunc= tfunc +mpi_wtime() -tf0
     tfl = mpi_wtime() -tf0
 
     tc0= mpi_wtime()
-    NN_func= 0d0
-    call mpi_allreduce(flocal,NN_func,1,mpi_double_precision &
+    ftrn= 0d0
+    ftst = 0d0
+    call mpi_allreduce(ftrnl,ftrn,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(ftstl,ftst,1,mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
+    ftrn = ftrn /swgt2trn
+    ftst = ftst /swgt2tst
     tcl = tcl + (mpi_wtime() -tc0)
-!    tcomm= tcomm +mpi_wtime() -tc0
-!    NN_func= NN_func/nsmpl_trn
-    NN_func= NN_func /swgt2
 
 !.....only the bottle-neck times are taken into account
     call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
@@ -297,18 +320,19 @@ contains
     tfunc= tfunc +tfg
     l1st = .false.
 
-  end function NN_func
+  end subroutine NN_func
 !=======================================================================
-  function NN_fs(ndim,x)
+  subroutine NN_fs(ndim,x,ftrn,ftst)
     use variables
     use parallel
     use minimize
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
-    real(8):: NN_fs
+    real(8),intent(out):: ftrn,ftst
+    real(8):: ftrnl,ftstl,ftmp
     integer:: natm,ia,ixyz,idim,i
-    real(8):: dn3i,ediff,fscale,eref,swgt,flocal,wgtidv
+    real(8):: dn3i,ediff,fscale,eref,swgt,wgtidv
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     real(8):: eerr,ferr,ferri
     integer:: ismpl
@@ -339,41 +363,51 @@ contains
       endif
     enddo
 
-    flocal= 0d0
+    ftrnl= 0d0
+    ftstl= 0d0
     do i=1,nsgdbsize
+      ftmp= 0d0
       ismpl= ismplsgd(i)
       smpl= samples(ismpl)
-      if( smpl%iclass.ne.1 ) cycle
       natm= smpl%natm
       eref= smpl%eref
       eerr = smpl%eerr
       swgt = smpl%wgt
       ediff= (smpl%epot -eref)/natm /eerr
       ediff= ediff*ediff
-      flocal= flocal +ediff*swgt
-      if( .not. lfmatch ) cycle
-      if( smpl%nfcal.eq.0 ) cycle
-      ferr = smpl%ferr
-      ferri = 1d0/ferr
-      dn3i = 1d0/3/smpl%nfcal
-      do ia=1,natm
-        if( smpl%ifcal(ia).eq.0 ) cycle
-        do ixyz=1,3
-          fdiff(1:3,ia)= (smpl%fa(1:3,ia) &
-               -smpl%fref(1:3,ia)) *ferri
-          fdiff(1:3,ia)= fdiff(1:3,ia)*fdiff(1:3,ia)
-          flocal= flocal +fdiff(ixyz,ia)*dn3i *swgt
+      ftmp= ftmp +ediff*swgt
+      if( lfmatch .and. smpl%nfcal.ne.0 ) then
+        ferr = smpl%ferr
+        ferri = 1d0/ferr
+        dn3i = 1d0/3/smpl%nfcal
+        do ia=1,natm
+          if( smpl%ifcal(ia).eq.0 ) cycle
+          do ixyz=1,3
+            fdiff(1:3,ia)= (smpl%fa(1:3,ia) &
+                 -smpl%fref(1:3,ia)) *ferri
+            fdiff(1:3,ia)= fdiff(1:3,ia)*fdiff(1:3,ia)
+            ftmp= ftmp +fdiff(ixyz,ia)*dn3i *swgt
+          enddo
         enddo
-      enddo
+      endif
+      if( smpl%iclass.eq.1 ) then
+        ftrnl = ftrnl +ftmp
+      else if( smpl%iclass.eq.2 ) then
+        ftstl = ftstl +ftmp
+      endif
     enddo
 
     tfl = mpi_wtime() -tf0
 
     tc0= mpi_wtime()
-    NN_fs= 0d0
-    call mpi_allreduce(flocal,NN_fs,1,mpi_double_precision &
+    ftrn= 0d0
+    ftst= 0d0
+    call mpi_allreduce(ftrnl,ftrn,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
-    NN_fs= NN_fs /swgt2
+    call mpi_allreduce(ftstl,ftst,1,mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
+    ftrn= ftrn /swgt2trn
+    ftst= ftst /swgt2tst
     tcl = tcl + (mpi_wtime() -tc0)
 
 !.....only the bottle-neck times are taken into account
@@ -385,7 +419,7 @@ contains
     tfunc= tfunc +tfg
     l1st = .false.
     return
-  end function NN_fs
+  end subroutine NN_fs
 !=======================================================================
   subroutine calc_ef1(smpl,sds)
     use variables
@@ -627,52 +661,55 @@ contains
     
   end subroutine calc_ef2
 !=======================================================================
-  function NN_grad(ndim,x)
+  subroutine NN_grad(ndim,x,gtrn)
     use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm &
-         ,samples,mdsys,epse,epsf,swgt2
+         ,samples,mdsys,epse,epsf,swgt2trn,swgt2tst
     use parallel
     use minimize
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
-    real(8):: NN_grad(ndim)
+    real(8),intent(out):: gtrn(ndim)
+!!$    real(8):: NN_grad(ndim)
     
     integer:: ismpl,i,idim
-    real(8),save,allocatable:: gs(:),glocal(:)
+    real(8),save,allocatable:: gs(:),glocal(:),gtrnl(:)
     real(8):: gmax,vmax
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0
     type(mdsys):: smpl
 
-    if( .not.allocated(gs) ) allocate(gs(ndim),glocal(ndim))
+    if( .not.allocated(gs) ) allocate(gs(ndim),gtrnl(ndim))
 
     ngrad= ngrad +1
     tg0= mpi_wtime()
 
 !!$    NN_grad(1:ndim)= 0d0
-    glocal(1:ndim)= 0d0
+!!$    glocal(1:ndim)= 0d0
+    gtrnl(1:ndim) = 0d0
 
     do ismpl=isid0,isid1
+!.....Since g calc is time consuming,
+!.....not calculate g for test set.
       if( samples(ismpl)%iclass.ne.1 ) cycle
-!!$      write(6,*) ' grad ismpl = ',ismpl
       if( nl.eq.1 ) then
         call grad1(samples(ismpl),sds(ismpl),gs)
       else if( nl.eq.2 ) then
         call grad2(samples(ismpl),sds(ismpl),gs)
       endif
-      glocal(1:ndim)= glocal(1:ndim) +gs(1:ndim)
-!!$      print *,' ismpl,glocal(16)=',ismpl,glocal(16)
+      gtrnl(1:ndim)= gtrnl(1:ndim) +gs(1:ndim)
     enddo
 
     tgl= mpi_wtime() -tg0
 
     tc0= mpi_wtime()
-    NN_grad(1:ndim)= 0d0
-    call mpi_allreduce(glocal,NN_grad,ndim,mpi_double_precision &
+!!$    NN_grad(1:ndim)= 0d0
+    gtrn(1:ndim) = 0d0
+    call mpi_allreduce(gtrnl,gtrn,ndim,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
     tcl= mpi_wtime() -tc0
 !    tcomm= tcomm +mpi_wtime() -tc0
 
-    NN_grad(1:ndim)= NN_grad(1:ndim) /swgt2
+    gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
 
 !.....only the bottle-neck times are taken into account
     call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
@@ -683,16 +720,17 @@ contains
     tgrad= tgrad +tgg
     
     return
-  end function NN_grad
+  end subroutine NN_grad
 !=======================================================================
-  function NN_gs(ndim,x)
+  subroutine NN_gs(ndim,x,gtrn)
     use variables
     use parallel
     use minimize
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
-    real(8):: NN_gs(ndim)
+    real(8),intent(out):: gtrn(ndim)
+
     integer:: i,idim
     real(8),save,allocatable:: gsl(:),gs(:)
     real(8):: gmax,vmax,tg0,tc0
@@ -718,15 +756,15 @@ contains
 
     tc0= mpi_wtime()
 
-    NN_gs(1:ndim)= 0d0
-    call mpi_allreduce(gsl,NN_gs,ndim,mpi_double_precision &
+    gtrn(1:ndim)= 0d0
+    call mpi_allreduce(gsl,gtrn,ndim,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
     tcomm= tcomm +mpi_wtime() -tc0
-    NN_gs(1:ndim)= NN_gs(1:ndim) /swgt2
+    gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
 
     tgrad= tgrad +mpi_wtime() -tg0
     return
-  end function NN_gs
+  end subroutine NN_gs
 !=======================================================================
   subroutine grad1(smpl,sds,gs)
     use variables

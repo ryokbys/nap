@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-13 18:31:55 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-19 11:40:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -740,6 +740,7 @@ subroutine sgd()
   real(8),allocatable:: g(:),u(:),gp(:),v(:),g2m(:),v2m(:)
   integer:: iter,istp,iv,i,nsize
   real(8):: gnorm,alpha,alpha1,gmax,vmax,f,gg,fp,gpnorm,gamma,vnorm
+  real(8):: ftrn,ftst
   integer:: ismpl
 
   allocate(g(nvars),u(nvars),gp(nvars),v(nvars)&
@@ -772,13 +773,13 @@ subroutine sgd()
   call NN_init()
   do iter=1,niter
     if(mod(iter,niter_eval).eq.0) then
-      f= NN_func(nvars,vars)
-      g= NN_grad(nvars,vars)
+      call NN_func(nvars,vars,ftrn,ftst)
+      call NN_grad(nvars,vars,g)
       call penalty(cpena,pwgt,nvars,f,g,fp,gp,vars)
       g(1:nvars)= g(1:nvars) +gp(1:nvars)
       gnorm= sqrt(sprod(nvars,g,g))
       if( myid.eq.0 ) then
-        write(6,'(a,i6,2es15.7,f10.3)') ' iter,f,gnorm,time=',iter,f &
+        write(6,'(a,i6,2es15.7,f10.3)') ' iter,f,gnorm,time=',iter,ftrn &
              ,gnorm ,mpi_wtime()-time0
         call write_vars('tmp')
       endif
@@ -794,16 +795,16 @@ subroutine sgd()
     do i=1,nsgdbsize
       ismplsgd(i)= ismplsgd(i)+isid0-1
     enddo
-    f= NN_fs(nvars,vars)
-    g= NN_gs(nvars,vars)
-    call penalty(cpena,pwgt,nvars,f,g,fp,gp,vars)
+    call NN_fs(nvars,vars,ftrn,ftst)
+    call NN_gs(nvars,vars,g)
+    call penalty(cpena,pwgt,nvars,ftrn,g,fp,gp,vars)
     gnorm= sqrt(sprod(nvars,g,g))
     gpnorm= sqrt(sprod(nvars,gp,gp))
     g(1:nvars)= g(1:nvars) +gp(1:nvars)
     u(1:nvars)= -g(1:nvars)
     if( csgdupdate.eq.'armijo' ) then
       alpha= r0sgd
-      call armijo_search(nvars,vars,u,f,g,alpha,iprint &
+      call armijo_search(nvars,vars,u,ftrn,ftst,g,alpha,iprint &
            ,iflag,myid,NN_fs)
       vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
       alpha1= alpha1*(1d0-dalpha)
@@ -832,8 +833,8 @@ subroutine sgd()
     endif
   enddo
 
-  f= NN_func(nvars,vars)
-  g= NN_grad(nvars,vars)
+  call NN_func(nvars,vars,ftrn,ftst)
+  call NN_grad(nvars,vars,g)
   gnorm= 0d0
   do iv=1,nvars
     gnorm= gnorm +g(iv)*g(iv)
@@ -891,15 +892,15 @@ subroutine check_grad()
   use parallel
   implicit none
   integer:: iv
-  real(8):: f0,ftmp,dv,vmax
+  real(8):: ftrn0,ftst0,ftmp,dv,vmax,ftst
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
   real(8),parameter:: dev  = 1d-5
   real(8),parameter:: tiny = 1d-6
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
   call NN_init()
-  f0= NN_func(nvars,vars)
-  ganal= NN_grad(nvars,vars)
+  call NN_func(nvars,vars,ftrn0,ftst0)
+  call NN_grad(nvars,vars,ganal)
 
   vars0(1:nvars)= vars(1:nvars)
   vmax= 0d0
@@ -916,8 +917,8 @@ subroutine check_grad()
     vars(1:nvars)= vars0(1:nvars)
     dv = vars(iv)*dev
     vars(iv)= vars(iv) +dv
-    ftmp= NN_func(nvars,vars)
-    gnumer(iv)= (ftmp-f0)/dv
+    call NN_func(nvars,vars,ftmp,ftst)
+    gnumer(iv)= (ftmp-ftrn0)/dv
   enddo
 
   if( myid.eq.0 ) then
@@ -941,25 +942,27 @@ subroutine test()
   use parallel
   implicit none 
   integer:: iv
-  real(8):: ft
-  real(8),allocatable:: gt(:)
+  real(8):: ftrn,ftst
+  real(8),allocatable:: g(:)
 
-  allocate(gt(nvars))
+  allocate(g(nvars))
 
   call NN_init()
-  ft= NN_func(nvars,vars)
-  gt= NN_grad(nvars,vars)
+  call NN_func(nvars,vars,ftrn,ftst)
+  call NN_grad(nvars,vars,g)
 
   call write_stats(0)
 
   if( myid.eq.0 ) then
-    print *,'func value     =',ft
-    print *,'grad values:'
+    print *,'func values (training,test) =',ftrn,ftst
+    print *,'grad values (training):'
     do iv=1,nvars
-      print *,'iv,grad(iv)=',iv,gt(iv)
+      print *,'iv,grad(iv)=',iv,g(iv)
     enddo
     print *,'test done.'
   endif
+
+  deallocate(g)
 
 end subroutine test
 !=======================================================================

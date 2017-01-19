@@ -46,7 +46,7 @@ module variables
 !.....max num of species
   integer,parameter:: mspcs = 4
   real(8):: ebase(mspcs)
-  real(8):: swgt2
+  real(8):: swgt2trn,swgt2tst
 
   integer:: nwgtindiv = 0
   character(len=128),allocatable:: cdirlist(:),cwgtindiv(:)

@@ -33,23 +33,23 @@ contains
     real(8),intent(inout):: f,x(ndim),g(ndim),d(ndim)
 !!$    real(8):: func,grad
     interface
-      function func(n,x)
+      subroutine func(n,x,ftrn,ftst)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: func
-      end function func
-      function grad(n,x)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+      subroutine grad(n,x,gtrn)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: grad(n)
-      end function grad
+        real(8),intent(out):: gtrn(n)
+      end subroutine grad
     end interface
 
     integer:: iter,i
-    real(8):: alpha,fp,gnorm
+    real(8):: alpha,fp,gnorm,ftst
 
     iter= 0
-    f= func(ndim,x)
+    call func(ndim,x,f,ftst)
     if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
       do i=1,ndim
         f= f +pwgt*abs(x(i))
@@ -59,7 +59,7 @@ contains
         f= f +pwgt*x(i)*x(i)
       enddo
     endif
-    g= grad(ndim,x)
+    call grad(ndim,x,g)
     gnorm= sqrt(sprod(ndim,g,g))
     d(1:ndim)= -g(1:ndim)
 !!$    g(1:ndim)= -g(1:ndim)/gnorm
@@ -80,7 +80,7 @@ contains
       fp= f
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
-        call quad_interpolate(ndim,x,d,f,xtol,gtol,ftol,alpha &
+        call quad_interpolate(ndim,x,d,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
 !.....if quad interpolation failed, perform golden section
         if( iflag/100.ne.0 ) then
@@ -88,20 +88,20 @@ contains
           if(myid.eq.0) then
             print *,'since quad_interpolate failed, call golden_section.'
           endif
-          call golden_section(ndim,x,d,f,xtol,gtol,ftol,alpha &
+          call golden_section(ndim,x,d,f,ftst,xtol,gtol,ftol,alpha &
                ,iprint,iflag,myid,func)
         endif
       else if ( trim(clinmin).eq.'golden') then
-        call golden_section(ndim,x,d,f,xtol,gtol,ftol,alpha &
+        call golden_section(ndim,x,d,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else ! armijo (default)
         alpha= 1d0
-        call armijo_search(ndim,x,d,f,g,alpha,iprint &
+        call armijo_search(ndim,x,d,f,ftst,g,alpha,iprint &
              ,iflag,myid,func)
       endif
       if( iflag/100.ne.0 ) return
       x(1:ndim)= x(1:ndim) +alpha*d(1:ndim)
-      f= func(ndim,x)
+      call func(ndim,x,f,ftst)
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
         do i=1,ndim
           f= f +pwgt*abs(x(i))
@@ -111,7 +111,7 @@ contains
           f= f +pwgt*x(i)*x(i)
         enddo
       endif
-      g= grad(ndim,x)
+      call grad(ndim,x,g)
       gnorm= sqrt(sprod(ndim,g,g))
       d(1:ndim)= -g(1:ndim)
 !!$      g(1:ndim)= -g(1:ndim)/gnorm
@@ -165,16 +165,16 @@ contains
     real(8),intent(inout):: f,x(ndim),g(ndim),u(ndim)
     character(len=*),intent(in):: cfmethod
     interface
-      function func(n,x)
+      subroutine func(n,x,ftrn,ftst)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: func
-      end function func
-      function grad(n,x)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+      subroutine grad(n,x,gtrn)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: grad(n)
-      end function grad
+        real(8),intent(out):: gtrn(n)
+      end subroutine grad
       subroutine sub_eval(iter)
         integer,intent(in):: iter
       end subroutine sub_eval
@@ -184,7 +184,7 @@ contains
     logical:: ltwice = .false.
 
     integer:: i,iter,nftol
-    real(8):: alpha,fp,gnorm,gnormp,beta,pval,sgnorm
+    real(8):: alpha,fp,gnorm,gnormp,beta,pval,sgnorm,ftst
     real(8),save,allocatable:: gpena(:),gp(:),y(:),xp(:),s(:)
 
     if( myid.eq.0 ) then
@@ -197,8 +197,8 @@ contains
     iter= 0
     nftol= 0
     gpena(1:ndim)= 0d0
-    f= func(ndim,x)
-    g= grad(ndim,x)
+    call func(ndim,x,f,ftst)
+    call grad(ndim,x,g)
 !.....penalty
     call penalty(cpena,pwgt,ndim,f,g,pval,gpena,x)
     g(1:ndim)= g(1:ndim) +gpena(1:ndim)
@@ -226,23 +226,23 @@ contains
            call sub_eval(iter)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
-        call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha,iprint &
-             ,iflag,myid,func)
+        call quad_interpolate(ndim,x,u,f,ftst,xtol,gtol,ftol &
+             ,alpha,iprint,iflag,myid,func)
 !.....if quad interpolation failed, perform golden section
         if( iflag/100.ne.0 ) then
           iflag= iflag -(iflag/100)*100
           if(myid.eq.0) then
             print *,'since quad_interpolate failed, call golden_section.'
           endif
-          call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
-               ,iprint,iflag,myid,func)
+          call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol &
+               ,alpha,iprint,iflag,myid,func)
         endif
       else if ( trim(clinmin).eq.'golden') then
-        call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+        call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else ! armijo (default)
         alpha= 1d0
-        call armijo_search(ndim,x,u,f,g,alpha,iprint &
+        call armijo_search(ndim,x,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func)
       endif
 
@@ -280,7 +280,7 @@ contains
 
       gnormp= gnorm
       gp(1:ndim)= g(1:ndim)
-      g= grad(ndim,x)
+      call grad(ndim,x,g)
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
 !.....store previous gnorm
       gnorm= sprod(ndim,g,g)
@@ -354,16 +354,16 @@ contains
     real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
     character(len=*),intent(in):: cfmethod
     interface
-      function func(n,x)
+      subroutine func(n,x,ftrn,ftst)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: func
-      end function func
-      function grad(n,x)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+      subroutine grad(n,x,gtrn)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: grad(n)
-      end function grad
+        real(8),intent(out):: gtrn(n)
+      end subroutine grad
       subroutine sub_eval(iter)
         integer,intent(in):: iter
       end subroutine sub_eval
@@ -373,7 +373,7 @@ contains
     real(8),save,allocatable:: gg(:,:),x(:),s(:),y(:),gp(:) &
          ,ggy(:),gpena(:)
     real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,vnorm,pval &
-         ,sgnx,absx,estmem
+         ,sgnx,absx,estmem,ftst
     integer:: i,j,iter,nftol,ig,mem
 
     if( .not.allocated(gg) ) then
@@ -402,8 +402,8 @@ contains
     do i=1,ndim
       gg(i,i)= 1d0
     enddo
-    f= func(ndim,x0)
-    g= grad(ndim,x0)
+    call func(ndim,x0,f,ftst)
+    call grad(ndim,x0,g)
 !.....penalty
     pval= 0d0
     gpena(1:ndim)= 0d0
@@ -453,20 +453,25 @@ contains
       if( iprint.eq.1 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,4es15.7)') ' iter,f,p,vnorm,gnorm=',iter,f &
-               ,pval,vnorm,gnorm
+          write(6,'(a,i8,6es15.7)') &
+               ' iter,ftrn,ftst,p,vnorm,gnorm,f-fp=',iter,f,ftst &
+               ,pval,vnorm,gnorm,f
         else
-          write(6,'(a,i8,3es15.7)') ' iter,f,vnorm,gnorm=',iter,f,vnorm,gnorm
+          write(6,'(a,i8,6es15.7)') &
+               ' iter,ftrn,ftst,vnorm,gnorm,f-fp=' &
+               ,iter,f,ftst,vnorm,gnorm,f
         endif
         call flush(6)
       else if( iprint.ge.2 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,13es15.7)') ' iter,f,p,vnorm,gnorm,x(1:5)=' &
-               ,iter,f,pval,vnorm,gnorm,x(1:5)
+          write(6,'(a,i8,14es15.7)') &
+               ' iter,ftrn,ftst,p,vnorm,gnorm,x(1:5)=' &
+               ,iter,f,ftst,pval,vnorm,gnorm,x(1:5)
         else
-          write(6,'(a,i8,13es15.7)') ' iter,f,vnorm,gnorm,x(1:5)=' &
-               ,iter,f,vnorm,gnorm,x(1:5)
+          write(6,'(a,i8,14es15.7)') &
+               ' iter,frn,ftst,vnorm,gnorm,x(1:5)=' &
+               ,iter,f,ftst,vnorm,gnorm,x(1:5)
         endif
         call flush(6)
       endif
@@ -486,7 +491,7 @@ contains
       gp(1:ndim)= g(1:ndim)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
-        call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
+        call quad_interpolate(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
 !.....if quad interpolation failed, perform golden section
         if( iflag/100.ne.0 ) then
@@ -494,15 +499,15 @@ contains
           if(myid.eq.0) then
             print *,'since quad_interpolate failed, call golden_section.'
           endif
-          call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+          call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
                ,iprint,iflag,myid,func)
         endif
       else if ( trim(clinmin).eq.'golden') then
-        call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+        call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else ! armijo (default)
         alpha= 1d0
-        call armijo_search(ndim,x,u,f,g,alpha,iprint &
+        call armijo_search(ndim,x,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func)
       endif
 !!$      if(myid.eq.0) print *,'alpha=',alpha
@@ -575,7 +580,7 @@ contains
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       endif
       x0(1:ndim)= x(1:ndim)
-      g= grad(ndim,x)
+      call grad(ndim,x,g)
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
       vnorm= sqrt(sprod(ndim,x,x))
@@ -585,21 +590,27 @@ contains
         if( iprint.eq.1 ) then
           if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
                .or.trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,5es15.7)') ' iter,f,p,vnorm,gnorm,f-fp=',iter,f &
+            write(6,'(a,i8,6es15.7)') &
+                 ' iter,ftrn,ftst,p,vnorm,gnorm,f-fp=',&
+                 iter,f,ftst &
                  ,pval,vnorm,gnorm,f-fp
           else
-            write(6,'(a,i8,4es15.7)') ' iter,f,vnorm,gnorm,f-fp=',iter,f &
+            write(6,'(a,i8,5es15.7)') &
+                 ' iter,ftrn,ftst,vnorm,gnorm,f-fp=' &
+                 ,iter,f,ftst &
                  ,vnorm,gnorm,f-fp
           endif
           call flush(6)
         else if( iprint.ge.2 ) then
           if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
                .or. trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,14es15.7)') ' iter,f,p,vnorm,gnorm,f-fp,x(1:5)=' &
-                 ,iter,f,pval,vnorm,gnorm,f-fp,x(1:5)
+            write(6,'(a,i8,15es15.7)') &
+                 ' iter,ftrn,ftst,p,vnorm,gnorm,f-fp,x(1:5)=' &
+                 ,iter,f,ftst,pval,vnorm,gnorm,f-fp,x(1:5)
           else
-            write(6,'(a,i8,14es15.7)') ' iter,f,vnorm,gnorm,f-fp,x(1:5)=' &
-                 ,iter,f,vnorm,gnorm,f-fp,x(1:5)
+            write(6,'(a,i8,15es15.7)') &
+                 ' iter,ftrn,ftst,vnorm,gnorm,f-fp,x(1:5)=' &
+                 ,iter,f,ftst,vnorm,gnorm,f-fp,x(1:5)
           endif
           call flush(6)
         endif
@@ -687,16 +698,16 @@ contains
     real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
     character(len=*),intent(in):: cfmethod
     interface
-      function func(n,x)
+      subroutine func(n,x,ftrn,ftst)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: func
-      end function func
-      function grad(n,x)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+      subroutine grad(n,x,gtrn)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: grad(n)
-      end function grad
+        real(8),intent(out):: gtrn(n)
+      end subroutine grad
       subroutine sub_eval(iter)
         integer,intent(in):: iter
       end subroutine sub_eval
@@ -707,7 +718,7 @@ contains
     real(8),save,allocatable:: x(:),s(:,:),y(:,:)&
          ,gp(:),xp(:),gpena(:),a(:),rho(:)
     real(8):: tmp1,tmp2,dsy,dsyi,fp,alpha,gnorm,ynorm,pval,sgnx,absx&
-         ,beta,estmem
+         ,beta,estmem,ftst
     integer:: i,j,k,l,m,n,iter,nftol,ig,mem
 
     if( .not.allocated(x) ) then
@@ -737,8 +748,8 @@ contains
 
     nftol= 0
 !.....initial G = I
-    f= func(ndim,x0)
-    g= grad(ndim,x0)
+    call func(ndim,x0,f,ftst)
+    call grad(ndim,x0,g)
 !.....penalty
     call penalty(cpena,pwgt,ndim,f,g,pval,gpena,x0)
     g(1:ndim)= g(1:ndim) +gpena(1:ndim)
@@ -779,7 +790,7 @@ contains
       xp(1:ndim)= x(1:ndim)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
-        call quad_interpolate(ndim,x,u,f,xtol,gtol,ftol,alpha &
+        call quad_interpolate(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
 !.....if quad interpolation failed, perform golden section
         if( iflag/100.ne.0 ) then
@@ -787,16 +798,16 @@ contains
           if(myid.eq.0) then
             print *,'since quad_interpolate failed, call golden_section.'
           endif
-          call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+          call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
                ,iprint,iflag,myid,func)
         endif
       else if ( trim(clinmin).eq.'golden') then
-        call golden_section(ndim,x,u,f,xtol,gtol,ftol,alpha &
+        call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else ! armijo (default)
         alpha= 1d0
 !!$        write(6,'(a,10es11.3)') 'u before armijo=',u(1:10)
-        call armijo_search(ndim,x,u,f,g,alpha,iprint &
+        call armijo_search(ndim,x,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func)
       endif
 
@@ -867,7 +878,7 @@ contains
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       endif
       x0(1:ndim)= x(1:ndim)
-      g= grad(ndim,x)
+      call grad(ndim,x,g)
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
       if( myid.eq.0 ) then
@@ -964,20 +975,21 @@ contains
     return
   end subroutine lbfgs
 !=======================================================================
-  subroutine get_bracket(ndim,x0,d,a,b,c,fa,fb,fc,iprint,iflag,myid,func)
+  subroutine get_bracket(ndim,x0,d,a,b,c,fa,fb,fc,fta,ftb,ftc &
+       ,iprint,iflag,myid,func)
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag
     real(8),intent(in):: x0(ndim),d(ndim)
-    real(8),intent(inout):: a,b,fa,fb
-    real(8),intent(out):: c,fc
+    real(8),intent(inout):: a,b,fa,fb,fta,ftb
+    real(8),intent(out):: c,fc,ftc
     
     interface
-      function func(n,x)
+      subroutine func(n,x,ftrn,ftst)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: func
-      end function func
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
     end interface
 
     real(8),parameter:: RATIO = 1.61803398875d0
@@ -985,11 +997,11 @@ contains
     real(8),parameter:: TINY= 1d-12
     real(8),parameter:: GLIMIT= 100d0
     real(8),parameter:: MAXITER= 50
-    real(8):: dum,r,q,u,ulim,fu
+    real(8):: dum,r,q,u,ulim,fu,ftst
     integer:: iter
 
-    fa= func(ndim,x0+a*d)
-    fb= func(ndim,x0+b*d)
+    call func(ndim,x0+a*d,fa,fta)
+    call func(ndim,x0+b*d,fb,ftb)
     iter= 0
 10  continue
     iter= iter +1
@@ -1013,21 +1025,23 @@ contains
     endif
     if( fa.lt.fb ) then
       c= a +RATIOI*(b-a)
-      fc= func(ndim,x0+c*d)
+      call func(ndim,x0+c*d,fc,ftc)
       call exchange(c,b)
       call exchange(fc,fb)
+      call exchange(ftc,ftb)
       if( iprint.eq.3 .and. myid.eq.0 ) then
         write(6,'(a,2(1x,3es12.4))') ' a,b,c,fa,fb,fc=',a,b,c,fa,fb,fc
       endif
       goto 10
     else
       c= a +RATIO*(b-a)
-      fc= func(ndim,x0+c*d)
+      call func(ndim,x0+c*d,fc,ftc)
       if( fb.gt.fc ) then
         b= a +RATIO*(c-a)
-        fb= func(ndim,x0+b*d)
+        call func(ndim,x0+b*d,fb,ftb)
         call exchange(b,c)
         call exchange(fb,fc)
+        call exchange(ftb,ftc)
         if( iprint.eq.3 .and. myid.eq.0 ) then
           write(6,'(a,2(1x,3es12.4))') ' a,b,c,fa,fb,fc=',a,b,c,fa,fb,fc
         endif
@@ -1049,14 +1063,14 @@ contains
     return
   end subroutine exchange
 !=======================================================================
-  subroutine quad_interpolate(ndim,x0,g,f,xtol,gtol,ftol,a,iprint &
+  subroutine quad_interpolate(ndim,x0,g,f,ftst,xtol,gtol,ftol,a,iprint &
        ,iflag,myid,func)
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag
 
     real(8),intent(in):: x0(ndim),xtol,gtol,ftol,g(ndim)
-    real(8),intent(out):: f,a
+    real(8),intent(out):: f,a,ftst
 
     real(8),parameter:: STP0    = 1d-1
     real(8),parameter:: STPMAX  = 1d+1
@@ -1064,33 +1078,25 @@ contains
     integer,parameter:: MAXITER = 100
 
     interface
-      function func(n,x)
+      subroutine func(n,x,ftrn,ftst)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: func
-      end function func
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
     end interface
 
     integer:: iter,imin,imax,ix
     real(8):: r,q,fmin,fmax,dmin,dmax,d,xmin
-    real(8),save,allocatable:: xi(:),fi(:)
+    real(8),save,allocatable:: xi(:),fi(:),fti(:)
 
-    if( .not. allocated(xi) ) allocate(xi(4),fi(4))
+    if( .not. allocated(xi) ) allocate(xi(4),fi(4),fti(4))
     
     xi(1)= 0d0
     xi(2)= xi(1) +STP0
-    call get_bracket(ndim,x0,g,xi(1),xi(2),xi(3),fi(1),fi(2),fi(3)&
+    call get_bracket(ndim,x0,g,xi(1),xi(2),xi(3),fi(1),fi(2),fi(3) &
+         ,fti(1),fti(2),fti(3) &
          ,iprint,iflag,myid,func)
     if( iflag/1000.ne.0 ) return
-!!$    fi(1)= func(ndim,x0+xi(1)*g)
-!!$    fi(2)= func(ndim,x0+xi(2)*g)
-!!$    if( fi(1).gt.fi(2) ) then
-!!$      xi(3)= xi(1) +2*STP0
-!!$      fi(3)= func(ndim,x0+xi(3)*g)
-!!$    else
-!!$      xi(3)= xi(1) -STP0
-!!$      fi(3)= func(ndim,x0+xi(3)*g)
-!!$    endif
     
     iter= 0
 10  continue
@@ -1109,7 +1115,7 @@ contains
     q= (xi(2)-xi(3))*(fi(2)-fi(1))
     xi(4)= xi(2) -((xi(2)-xi(3))*q -(xi(2)-xi(1))*r) &
          /(2d0*sign(max(abs(q-r),TINY),q-r))
-    fi(4)= func(ndim,x0+xi(4)*g)
+    call func(ndim,x0+xi(4)*g,fi(4),fti(4))
 !!$    write(6,'(a,2(2x,4f11.2))') ' xi,fi=',xi(1:4),fi(1:4)
 
     !.....step4
@@ -1139,13 +1145,14 @@ contains
       do ix=imax+1,3
         xi(ix-1)= xi(ix)
         fi(ix-1)= fi(ix)
+        fti(ix-1)= fti(ix)
       enddo
       if( fi(2).gt.fi(1) ) then
         xi(3)= xi(1) +STPMAX
       else
         xi(3)= xi(2) +STPMAX
       endif
-      fi(3)= func(ndim,x0+xi(3)*g)
+      call func(ndim,x0+xi(3)*g,fi(3),fti(3))
       goto 10
     else if( fi(4).gt.fmax ) then ! fi(4) is maximum
 !!$      print *,' 02'
@@ -1163,14 +1170,10 @@ contains
       do ix=imin+1,3
         xi(ix-1)= xi(ix)
         fi(ix-1)= fi(ix)
+        fti(ix-1)= fti(ix)
       enddo
-!!$      if( fi(2).gt.fi(1) ) then
-!!$        xi(3)= xi(1) +STPMAX
-!!$      else
-!!$        xi(3)= xi(2) +STPMAX
-!!$      endif
       xi(3)= (xmin +xi(4))*0.5
-      fi(3)= func(ndim,x0+xi(3)*g)
+      call func(ndim,x0+xi(3)*g,fi(3),fti(3))
       goto 10
     endif
 
@@ -1201,23 +1204,24 @@ contains
     enddo
     xi(imax)= xi(4)
     fi(imax)= fi(4)
+    fti(imax)= fti(4)
     goto 10
 
   end subroutine quad_interpolate
 !=======================================================================
-  subroutine golden_section(ndim,x0,g,f,xtol,gtol,ftol,alpha,iprint &
+  subroutine golden_section(ndim,x0,g,f,ftst,xtol,gtol,ftol,alpha,iprint &
        ,iflag,myid,func)
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol,x0(ndim),g(ndim)
-    real(8),intent(inout):: f,alpha
+    real(8),intent(inout):: f,alpha,ftst
     interface
-      function func(n,x)
+      subroutine func(n,x,ftrn,ftst)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: func
-      end function func
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
     end interface
 
     real(8),parameter:: STP0 = 1d-1
@@ -1227,16 +1231,18 @@ contains
 
     integer:: iter
     real(8):: a,b1,b2,c,fa,fb1,fb2,fc,xl
+    real(8):: ftb1,ftb2,fta,ftc
 
     a= 0d0
     b1= STP0
-    call get_bracket(ndim,x0,g,a,b1,c,fa,fb1,fc,iprint,iflag,myid,func)
+    call get_bracket(ndim,x0,g,a,b1,c,fa,fb1,fc,fta,ftb1,ftc,&
+         iprint,iflag,myid,func)
     if( iflag/1000.ne.0 ) return
     xl= (c-a)
     b1= a +GR2*xl
     b2= a +GR *xl
-    fb1= func(ndim,x0+b1*g)
-    fb2= func(ndim,x0+b2*g)
+    call func(ndim,x0+b1*g,fb1,ftb1)
+    call func(ndim,x0+b2*g,fb2,ftb2)
 
     iter= 0
 10  continue
@@ -1255,28 +1261,34 @@ contains
     if( fb1.gt.fb2 ) then
       a= b1
       fa= fb1
+      fta= ftb1
       b1= b2
       fb1= fb2
+      ftb1= ftb2
       xl= (c-a)
       b2= a +GR*xl
-      fb2= func(ndim,x0+b2*g)
+      call func(ndim,x0+b2*g,fb2,ftb2)
     else
       c= b2
       fc= fb2
+      ftc= ftb2
       b2= b1
       fb2= fb1
+      ftb2= ftb1
       xl= (c-a)
       b1= a +GR2*xl
-      fb1= func(ndim,x0+b1*g)
+      call func(ndim,x0+b1*g,fb1,ftb1)
     endif
 !!$    print *,' xl,c,a,xtol=',xl,c,a,xtol
     if( xl.lt.xtol ) then
       if( fb1.gt.fb2 ) then
         alpha= b2
         f= fb2
+        ftst= ftb2
       else
         alpha= b1
         f= fb1
+        ftst= ftb1
       endif
       return
     endif
@@ -1284,7 +1296,7 @@ contains
 
   end subroutine golden_section
 !=======================================================================
-  subroutine armijo_search(ndim,x0,d,f,g,alpha,iprint &
+  subroutine armijo_search(ndim,x0,d,f,ftst,g,alpha,iprint &
        ,iflag,myid,func)
 !  
 !  1D search using Armijo rule.
@@ -1293,13 +1305,13 @@ contains
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag
     real(8),intent(in):: x0(ndim),g(ndim),d(ndim)
-    real(8),intent(inout):: f,alpha
+    real(8),intent(inout):: f,alpha,ftst
     interface
-      function func(n,x)
+      subroutine func(n,x,ftrn,ftst)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: func
-      end function func
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
     end interface
 
 !!$  real(8),external:: sprod
@@ -1308,7 +1320,7 @@ contains
   integer,parameter:: MAXITER= 15
   real(8),parameter:: xtiny  = 1d-14
   integer:: iter,i,ig
-  real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx,fp,pvalp,alphap
+  real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx,fp,pvalp,alphap,ftsti
   real(8),allocatable,dimension(:):: x1(:),gpena(:)
 
   if( .not. allocated(x1)) allocate(x1(ndim),gpena(ndim))
@@ -1365,7 +1377,7 @@ contains
     else
       x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
     endif
-    fi= func(ndim,x1)
+    call func(ndim,x1,fi,ftsti)
 !!$    print *,'iter,alphai,fi=',iter,alphai,fi
     pval= 0d0
     if( trim(cpena).eq.'lasso' ) then
@@ -1392,6 +1404,7 @@ contains
     if( fi+pval-(f0+pval0).le.xigd*alphai ) then
       f= fi
       alpha= alphai
+      ftst= ftsti
 !!$      if(myid.eq.0) print *,'armijo finishes with iter=',iter
       return
     endif
@@ -1462,22 +1475,22 @@ contains
     real(8),intent(inout):: f,x(ndim),g(ndim),d(ndim)
 !!$    real(8):: func,grad
     interface
-      function func(n,x)
+      subroutine func(n,x,ftrn,ftst)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: func
-      end function func
-      function grad(n,x)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+      subroutine grad(n,x,gtrn)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: grad(n)
-      end function grad
+        real(8),intent(out):: gtrn(n)
+      end subroutine grad
     end interface
 
     real(8),parameter:: eps = 1d0
     real(8),parameter:: xtiny= 1d-14
     integer:: iter,i,imax,ig
-    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp
+    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,ftst
     real(8),allocatable,dimension(:):: xt,gpena,grpg
 
     if( trim(cpena).ne.'lasso' .and. trim(cpena).ne.'glasso' ) then
@@ -1497,8 +1510,8 @@ contains
     do iter=1,maxiter
       fp= f
 !.....find maximum contribution in g
-      f= func(ndim,xt)
-      g= grad(ndim,xt)
+      call func(ndim,xt,f,ftst)
+      call grad(ndim,xt,g)
       pval= 0d0
       gpena(1:ndim)= 0d0
       if( trim(cpena).eq.'lasso' ) then
@@ -1620,16 +1633,16 @@ contains
     character(len=*),intent(in):: cfmethod
 !!$    real(8):: func,grad
     interface
-      function func(n,x)
+      subroutine func(n,x,ftrn,ftst)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: func
-      end function func
-      function grad(n,x)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+      subroutine grad(n,x,gtrn)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: grad(n)
-      end function grad
+        real(8),intent(out):: gtrn(n)
+      end subroutine grad
       subroutine sub_eval(iter)
         integer,intent(in):: iter
       end subroutine sub_eval
@@ -1639,7 +1652,7 @@ contains
     end interface
 
     integer:: iter,i,imax,ig,itmp,j,igmm,itergfs
-    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,tmp,gmm
+    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,tmp,gmm,ftst
     real(8),allocatable,save:: xt(:),gmaxgl(:),u(:)
     real(8),save,allocatable:: gg(:,:),v(:),y(:),gp(:) &
          ,ggy(:),ygg(:),aa(:,:),cc(:,:)
@@ -1683,8 +1696,8 @@ contains
 !     because it is used to find another new basis
       msktmp(1:ngl)= mskgfs(1:ngl)
       mskgfs(1:ngl)= 0
-      f= func(ndim,xt)
-      g= grad(ndim,xt)
+      call func(ndim,xt,f,ftst)
+      call grad(ndim,xt,g)
       mskgfs(1:ngl)= msktmp(1:ngl)
       gnorm= sqrt(sprod(ndim,g,g))
       if( myid.eq.0 ) then
@@ -1796,7 +1809,7 @@ contains
              call sub_eval(iter)
 !.....line minimization
         if( trim(clinmin).eq.'quadratic' ) then
-          call quad_interpolate(ndim,xt,u,f,xtol,gtol,ftol,alpha &
+          call quad_interpolate(ndim,xt,u,f,ftst,xtol,gtol,ftol,alpha &
                ,iprint,iflag,myid,func)
 !.....if quad interpolation failed, perform golden section
           if( iflag/100.ne.0 ) then
@@ -1804,15 +1817,15 @@ contains
             if(myid.eq.0) then
               print *,'Since quad_interpolate failed, call golden_section.'
             endif
-            call golden_section(ndim,xt,u,f,xtol,gtol,ftol,alpha &
+            call golden_section(ndim,xt,u,f,ftst,xtol,gtol,ftol,alpha &
                  ,iprint,iflag,myid,func)
           endif
         else if ( trim(clinmin).eq.'golden') then
-          call golden_section(ndim,xt,u,f,xtol,gtol,ftol,alpha &
+          call golden_section(ndim,xt,u,f,ftst,xtol,gtol,ftol,alpha &
                ,iprint,iflag,myid,func)
         else ! armijo (default)
           alpha= 1d0
-          call armijo_search(ndim,xt,u,f,g,alpha,iprint &
+          call armijo_search(ndim,xt,u,f,ftst,g,alpha,iprint &
                ,iflag,myid,func)
 !.....if something wrong with armijo search, try opposite direction
           if( iflag/100.ne.0 ) then
@@ -1820,7 +1833,7 @@ contains
 !            iflag= iflag -(iflag/100)*100
             alpha= -1d0
             if(myid.eq.0) print *,'trying opposite direction...'
-            call armijo_search(ndim,xt,u,f,g,alpha,iprint &
+            call armijo_search(ndim,xt,u,f,ftst,g,alpha,iprint &
                  ,iflag,myid,func)
           endif
         endif
@@ -1843,7 +1856,7 @@ contains
           exit
         endif
         xt(1:ndim)= xt(1:ndim) +alpha*u(1:ndim)
-        g= grad(ndim,xt)
+        call grad(ndim,xt,g)
         do i=1,ndim
           ig= iglid(i)
           if( ig.le.0 ) cycle
@@ -1980,18 +1993,18 @@ contains
     real(8),intent(inout):: fbest,xbest(ndim)
     character(len=*),intent(in):: cfmethod
     interface
-      function func(n,x)
+      subroutine func(n,x,ftrn,ftst)
         integer,intent(in):: n
         real(8),intent(in):: x(n)
-        real(8):: func
-      end function func
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
       subroutine sub_eval(iter)
         integer,intent(in):: iter
       end subroutine sub_eval
     end interface
 
     integer:: iter,idim,nadpt
-    real(8):: f,ft,temp,xw,dx,prob
+    real(8):: f,ft,temp,xw,dx,prob,ftst
     real(8),allocatable:: x(:),xt(:)
     real(8),parameter:: epsx = 1d-8
 
@@ -1999,7 +2012,7 @@ contains
 
 !.....Initialize
     x(1:ndim)= xbest(1:ndim)
-    f= func(ndim,x)
+    call func(ndim,x,f,ftst)
     fbest= f
     temp= sa_temp0
     xw= sa_xw0
@@ -2018,7 +2031,7 @@ contains
       xt(idim)= xt(idim) +dx
 
 !.....Compute function value
-      ft= func(ndim,xt)
+      call func(ndim,xt,ft,ftst)
 
 !.....Compute probability of taking the displacement
       prob= min(1d0,exp(-(ft-f)/temp))
@@ -2061,7 +2074,7 @@ contains
     endif
 
 !.....Finally compute the function value of the best candidate
-    f= func(ndim,xbest)
+    call func(ndim,xbest,f,ftst)
     
   end subroutine sa
 !=======================================================================
