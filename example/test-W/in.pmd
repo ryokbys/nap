@@ -3,15 +3,15 @@
 !  unit of length= Angstrom
 !  unit of mass  = unified atomic mass unit
 !
-num_nodes_x       2
-num_nodes_y       2
+num_nodes_x       1
+num_nodes_y       1
 num_nodes_z       1
 
 io_format    ascii
 
 time_interval     1d0
-num_iteration     1000
-num_out_energy    1000
+num_iteration     100
+num_out_energy    100
 
 flag_out_pmd      1
 num_out_pmd       10

@@ -1,11 +1,12 @@
 num_samples      14
+#sample_list      dir_list.txt
 test_ratio       0.1
 num_iteration    100
 num_iter_eval    1
 num_iter_gfs     100
 
 fitting_method   bfgs
-main_directory   data_set_w_bias
+main_directory   data_set
 param_file       in.params.NN
 run_mode         serial
 evaluation_type  absolute
