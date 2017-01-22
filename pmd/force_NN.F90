@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-12 22:00:55 Ryo KOBAYASHI>
+!                     Last modified: <2017-01-22 13:49:04 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -179,9 +179,11 @@ contains
 !.....first, calculate all the symmetry functions
     call eval_sf(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
          ,lspr,rc,rc3)
+    if( mode.gt.10 ) then
 !.....set bias node to 1
-    gsf(nhl(0),1:natm) = 1d0
-    dgsf(1:3,nhl(0),:,:) = 0d0
+      gsf(nhl(0),1:natm) = 1d0
+      dgsf(1:3,nhl(0),:,:) = 0d0
+    endif
 
     if( mod(iprint,100)/10.eq.1 .and. myid.le.0 ) then
       open(80,file='out.NN.gsf',status='replace',form='unformatted')
@@ -193,7 +195,7 @@ contains
       call write_dgsf(84,natm,namax,nnmax,lspr,tag,nhl(0))
     endif
 
-!.....set num of nodes in hidden layers without bias node
+!.....initialize hidden-layer node values
     if( nl.eq.1 ) then
       hl1(1:nhl(1),1:natm)= 0d0
       if( mode.ge.10 ) then
@@ -334,18 +336,11 @@ contains
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa,3)
-!!$    if( myid.ge.0 ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-!!$           ,nn,mpi_world,aa,3)
-!!$    else
-!!$      call reduce_dba_bk(natm,namax,tag,aa,3)
-!!$    endif
 
 !-----reduced force
     do i=1,natm
       at(1:3)= aa(1:3,i)
       aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-!      aa(1:3,i)= hi(1,1:3)*at(1) +hi(2,1:3)*at(2) +hi(3,1:3)*at(3)
     enddo
 !-----multiply 0.5d0*dt**2/am(i)
     do i=1,natm
@@ -460,10 +455,6 @@ contains
           endif
         enddo
 
-!!$        fcij= fc(dij,rc)
-!!$        dfcij= dfc(dij,rc)
-!!$        driji(1:3)= -rij(1:3)/dij
-!!$        drijj(1:3)= -driji(1:3)
         if( dij.gt.rc3 ) cycle
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
@@ -647,8 +638,11 @@ contains
       nhl(0:nl) = nhl(0:nl) +1
     endif
     if( mode.eq.12 ) nhl(0) = nhl(0) +1  ! T_e
-    print *,'nhl = ',nhl(0:nl+1)
-    print *,'mhl = ',mhl(0:nl+1)
+    if( myid.eq.0 .and. iprint.ne.0 ) then
+      print *,'mode= ',mode
+      print *,'nhl = ',nhl(0:nl+1)
+      print *,'mhl = ',mhl(0:nl+1)
+    endif
     
     allocate(itype(nsf),cnst(max_ncnst,nsf))
     allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
@@ -695,17 +689,6 @@ contains
     endif
     close(51)
 
-!!$    do i=1,nsp
-!!$      do j=1,nsp
-!!$        write(6,'(a,4i5)') ' is,js,iaddr2(1:2,is,js)=' &
-!!$             ,i,j,iaddr2(1:2,i,j)
-!!$        do k=1,nsp
-!!$          write(6,'(a,5i5)') ' is,js,ks,iaddr3(1:2,is,js,ks)=' &
-!!$               ,i,j,k,iaddr3(1:2,i,j,k)
-!!$        enddo
-!!$      enddo
-!!$    enddo
-
 !.....read parameters at the 1st call
     inquire(file=trim(cpfname),exist=lexist)
     if( .not. lexist ) then
@@ -732,21 +715,6 @@ contains
         write(6,*) ' because input rc3 > rc, which should not happen.'
       endif
     endif
-
-!!$!.....Depending on NCOEFF, mode and nwgt size are determined
-!!$    mode = determine_mode(nl,nhl,ncoeff)
-!!$    if( mode.eq.0 ) then
-!!$      if( myid.eq.0 ) then
-!!$        write(6,'(a)') ' [Error] Num of parameters is not correct !!!'
-!!$        write(6,'(a,i10)')  '   ncoeff= ',ncoeff
-!!$        write(6,'(a,i3)')   '   mode  = ',mode
-!!$      endif
-!!$      call mpi_finalize(ierr)
-!!$      stop
-!!$    endif
-!!$    if( myid.eq.0 .and. iprint.ne.0 ) then
-!!$      write(6,'(a,i3)') ' NN mode = ',mode
-!!$    endif
 
 !.....calc number of weights
     allocate(nwgt(nl+1))
