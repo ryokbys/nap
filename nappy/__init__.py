@@ -1,5 +1,12 @@
-#!/usr/local/env python
 """
 `nappy` provides python scripts related to programs in the *nap* package.
 """
+
+import os
+
+_nappy_dir = '.nappy'
+
+def get_nappy_dir():
+    homedir = os.environ['HOME']
+    return homedir + '/' +_nappy_dir
 

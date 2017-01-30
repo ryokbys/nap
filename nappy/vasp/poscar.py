@@ -18,6 +18,7 @@ class POSCAR(object):
         self.num_atoms= []
         self.pos= []
         self.flags= []
+        self.species= []
 
 #     def to_dict(self):
 #         """
@@ -37,15 +38,15 @@ class POSCAR(object):
         self.afac= float(f.readline().split()[0])
         #.....3rd-5th lines: lattice vectors
         data= f.readline().split()
-        self.h[0,:]= [ float(x) for x in data ]
+        self.h[0]= [ float(x) for x in data ]
         data= f.readline().split()
-        self.h[1,:]= [ float(x) for x in data ]
+        self.h[1]= [ float(x) for x in data ]
         data= f.readline().split()
-        self.h[2,:]= [ float(x) for x in data ]
+        self.h[2]= [ float(x) for x in data ]
         #.....6th line: num of atoms
         data= f.readline().split()
         if not data[0].isdigit(): # if it is not digit, read next line
-            data= f.readline().split()
+            self.species = f.readline().split()
         self.num_atoms= np.array([ int(n) for n in data ])
         #.....7th line: comment
         self.c7= f.readline()
