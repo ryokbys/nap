@@ -6,14 +6,15 @@ This class provides read and write functions of VASP POSCAR file.
 """
 
 import numpy as np
+import copy
 
 class POSCAR(object):
     """
     POSCAR class enables POSCAR read/write functions.
     """
     
-    def __init__(self):
-        self.fname='POSCAR'
+    def __init__(self,fname="POSCAR"):
+        self.fname = fname
         self.h = np.zeros((3,3),dtype=float)
         self.num_atoms= []
         self.pos= []
@@ -29,8 +30,8 @@ class POSCAR(object):
 #         dict.update({'afac':self.afac})
 #         dict.update({})
 
-    def read(self,fname='POSCAR'):
-        self.fname=fname
+    def read(self,fname = 'POSCAR'):
+        self.fname = fname
         f= open(fname,'r')
         #.....1st line: comment
         self.c1= f.readline()
@@ -46,14 +47,14 @@ class POSCAR(object):
         #.....6th line: num of atoms
         data= f.readline().split()
         if not data[0].isdigit(): # if it is not digit, read next line
-            self.species = f.readline().split()
+            self.species = copy.copy(data)
+            data = f.readline().split()
         self.num_atoms= np.array([ int(n) for n in data ])
         #.....7th line: comment
         self.c7= f.readline()
         if self.c7[0] in ('s','S'):
             self.c8= f.readline()
         #.....following lines: atom positions
-        sid= 0
         for ni in self.num_atoms:
             for j in range(ni):
                 data= f.readline().split()

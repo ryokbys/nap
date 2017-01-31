@@ -39,14 +39,14 @@ def parse_INCAR(fname='INCAR'):
         #...check if it is a comment line
         if entry[0][0] is '#':
             continue
-        print('entry =',entry)
+        # print('entry =',entry)
         #...If else, start parsing the line
         for kw in _keywords:
-            print(' entry[0],kw =',entry[0],kw)
             if entry[0] == kw:
                 value = parse_entry(entry[1])
                 if value is None:
                     value = parse_entry(entry[2])
+                # print(' kw,val =',kw,value)
                 incar_dic[kw] = value
     return incar_dic
 

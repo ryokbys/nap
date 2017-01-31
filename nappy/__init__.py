@@ -4,6 +4,11 @@
 
 import os
 
+import vasp
+import scheduler
+import clutil
+import espresso
+
 _nappy_dir = '.nappy'
 
 def get_nappy_dir():

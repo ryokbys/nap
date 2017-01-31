@@ -7,7 +7,12 @@ import os
 import copy
 import math
 
-from nappy import vasp
+import nappy
+import incar
+import poscar
+import potcar
+
+import yaml
 
 # def needs_calc(path):
 #     """
@@ -38,7 +43,32 @@ from nappy import vasp
 #     return False
 
 
-class VASP(object):
+def get_conf_path():
+    return nappy.get_nappy_dir()+'/vasp.conf'
+
+def parse_KPOINTS(fname='KPOINTS'):
+    """
+    Parse KPOINTS file and get k-points.
+    Note: The k-points read from file are not actually the number of 
+    k-points used in the calculation, because it can be reduced by 
+    using symmetry of the system considered.
+    Estimation of the number of actual number of k-points is not easy 
+    at the moment.
+    """
+    with open(fname,'r') as f:
+        lines = f.readlines()
+
+    comment = lines[0]
+    auto = int(lines[1].split()[0])
+    method = lines[2].split()[0]
+    kpt = [ int(x) for x in lines[3].split()[0:3] ]
+    if auto == 0:
+        nkpt = kpt[0]*kpt[1]*kpt[2]
+    else:
+        nkpt = auto
+    return nkpt
+    
+class VASP:
     
     _input_files = (
         'POSCAR',
@@ -60,18 +90,19 @@ class VASP(object):
         self.input_files = {}
         for f in self._input_files:
             if os.path.exists(self.path+'/'+f):
-                self.input_files['f'] = os.stat(self.path+'/'+f).st_mtime
+                self.input_files[f] = os.stat(self.path+'/'+f).st_mtime
             else:
-                self.input_files['f'] = None
+                self.input_files[f] = None
         self.output_files = {}
         for f in self._output_files:
             if os.path.exists(self.path+'/'+f):
-                self.output_files['f'] = os.stat(self.path+'/'+f).st_mtime
+                self.output_files[f] = os.stat(self.path+'/'+f).st_mtime
             else:
-                self.output_files['f'] = None
+                self.output_files[f] = None
 
         self.config = {}
         self.load_config()
+
         
     def needs_calc(self):
         """
@@ -89,7 +120,7 @@ class VASP(object):
         #...compare dates between OUTCAR and infiles
         #...to determine if the VASP calc should be performed
         outcar_mtime = self.output_files['OUTCAR']
-        for fin,tin in self.input_files:
+        for fin,tin in self.input_files.items():
             if tin > outcar_mtime:
                 return True
 
@@ -104,17 +135,17 @@ class VASP(object):
         #...Read POSCAR file and get number of atoms of each species
         try:
             self.poscar
-        except NameError:
-            poscar = vasp.poscar.POSCAR(self.path+'/POSCAR')
-        poscar.read()
-        num_atoms = copy.copy(poscar.num_atoms)
+        except:
+            self.poscar = poscar.POSCAR()
+        self.poscar.read(self.path+'/POSCAR')
+        num_atoms = copy.copy(self.poscar.num_atoms)
 
         #...Read POTCAR file and get number of electrons of each species
         try:
             self.potcar
-        except NameError:
-            potcar = vasp.potcar.read_POTCAR(self.path+'/POTCAR')
-        valences = potcar['valence']
+        except:
+            self.potcar = potcar.read_POTCAR(self.path+'/POTCAR')
+        valences = self.potcar['valence']
 
         #...Total num of valence electrons
         nel = 0
@@ -123,27 +154,6 @@ class VASP(object):
         return nel
 
     
-    def parse_KPOINTS(fname='KPOINTS'):
-        """
-        Parse KPOINTS file and get k-points.
-        Note: The k-points read from file are not actually the number of 
-        k-points used in the calculation, because it can be reduced by 
-        using symmetry of the system considered.
-        Estimation of the number of actual number of k-points is not easy 
-        at the moment.
-        """
-        with open(fname,'r') as f:
-            lines = f.readlines()
-
-        comment = lines[0]
-        auto = int(lines[1].split()[0])
-        method = lines[2].split()[0]
-        kpt = [ int(x) for x in lines[3].split()[0:3] ]
-        if auto == 0:
-            nkpt = kpt[0]*kpt[1]*kpt[2]
-        else:
-            nkpt = auto
-        return nkpt
 
     
     def estimate_calctime(self,nprocs=1):
@@ -158,67 +168,71 @@ class VASP(object):
         """
         try:
             self.incar
-        except NameError:
-            incar = vasp.incar.parse_INCAR()
+        except:
+            self.incar = incar.parse_INCAR()
             
         nel = self.get_num_valence()
-        nkpt = self.parse_KPOINTS()
+        nkpt = parse_KPOINTS()
         
-        nband = incar['NBAND']
+        nband = self.incar['NBAND']
         estime = 0.005 *math.sqrt(nprocs) /(nel *nband *nkpt)
         return estime
 
     
-    def estimate_nprocs(self,procs_per_node=16):
+    def estimate_nprocs(self,max_npn=16):
         """
         Estimate the computation time wrt num of valence electrons,
         num of bands, num of k-points and procs_per_node.
-        Make nprocs multiples of procs_per_node.
         """
         try:
             self.incar
-        except NameError:
-            self.incar = vasp.incar.parse_INCAR()
+        except:
+            self.incar = incar.parse_INCAR()
 
-        nel = self.get_num_valence()
-        nkpt = self.parse_KPOINTS()
-        nband = self.incar['NBAND']
+        #...Recommended nprocs per node, which should not be the full of
+        #...the true nprocs per node.
+        npn = max_npn/2
+
+        npara = 0
         if self.incar.has_key('NPAR') and self.incar.has_key('NCORE'):
-            nprocs = self.incar['NPAR'] *self.incar['NCORE']
+            npara = self.incar['NPAR'] *self.incar['NCORE']
         elif self.incar.has_key('NPAR'):
-            nprocs = self.incar['NPAR']
+            npara = self.incar['NPAR']
         elif self.incar.has_key('NCORE'):
-            nprocs = self.incar['NCORE']
-        #...Make nprocs to be multiples of procs_per_node
-        nprocs = max(nprocs,procs_per_node)
-        if nprocs % procs_per_node != 0:
-            n = int(nprocs/procs_per_node)
-            nprocs = (n+1) *procs_per_node
+            npara = self.incar['NCORE']
+        else:
+            #...MANAGE to estimate npara from nel, nkpt, nband !!
+            # nel = self.get_num_valence()
+            # nkpt = parse_KPOINTS()
+            # nband = self.incar['NBAND']
+            npara = npn
+        if npara == 0:
+            raise RuntimeError("npara == 0")
 
-        return nprocs
+        nnodes = npara /npn + 1
+
+        return nnodes, npn, npara
         
 
     def command_text(self):
         """
         Make command text to run VASP using mpirun.
         """
-        import nappy
         if not self.config.has_key('exec_path'):
             msg = """
 Error: self.exec_path has not been set yet.
-You should write a path to the VASP executable in ~/{0}/vasp.conf .
-Like,
+You should write a path to the VASP executable in {0}.
+It should be in YAML format like,
 ::
 
-  exec_path  /home/username/bin/vasp535-openmpi
+  exec_path:  /home/username/bin/vasp535-openmpi
 
 
-""".format(nappy._nappy_dir)
+""".format(get_conf_path())
             raise RuntimeError(msg)
         
-        text = 'mpirun -np {{txt}} {path}'.format(txt='NPROCS',
-                                                  path=self.config['exec_path']) \
-               +' > out.vasp 2>&1'
+        text = 'mpirun -np {{NPARA}} {path}'.format(path=self.config['exec_path']) \
+                +' > out.vasp 2>&1'
         return text
     
     def set_exec_path(self,path):
@@ -229,25 +243,20 @@ Like,
         """
         Load config from `~/.nappy/vasp.conf` file.
         """
-        import nappy
-        with open(nappy._nappy_dir+'/vasp.conf','r') as f:
-            lines = f.readlines()
+        with open(get_conf_path(),'r') as f:
+            self.config = yaml.load(f)
 
-        for line in lines:
-            entry = line.split()
-            self.config[entry[0]] = entry[1]
         return None
         
     def save_config(self):
-        import nappy
         try:
             self.config
-        except NameError:
+        except:
             raise RuntimeError('self.config has not been set.')
 
         #...Read all the current config from file
         dic = {}
-        with open(nappy._nappy_dir+'/vasp.conf','r') as f:
+        with open(get_conf_path(),'r') as f:
             lines = f.readlines()
         for line in lines:
             dat = line.split()
@@ -256,7 +265,7 @@ Like,
         for k,v in self.config.items():
             dic[k] = v
         #...Override the config file
-        with open(nappy._nappy_dir+'/vasp.conf','w') as f:
+        with open(get_conf_path(),'w') as f:
             for k,v in dic.items():
                 f.write('{0:s}  {1:s}\n').format(k,v)
         return None
