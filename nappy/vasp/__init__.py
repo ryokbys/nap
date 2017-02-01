@@ -46,6 +46,25 @@ import yaml
 def get_conf_path():
     return nappy.get_nappy_dir()+'/vasp.conf'
 
+def get_exec_path():
+    import yaml
+    conf_path = get_conf_path()
+    with open(conf_path,'r') as f:
+        config = yaml.load(f)
+    if not config.has_key('exec_path'):
+        msg = """
+Error: self.exec_path has not been set yet.
+You should write a path to the VASP executable in {0}.
+It should be in YAML format like,
+::
+
+  exec_path:  /home/username/bin/vasp535-openmpi
+
+
+""".format(get_conf_path())
+        raise RuntimeError('config does not have exec_path.')
+    return config['exec_path']
+
 def parse_KPOINTS(fname='KPOINTS'):
     """
     Parse KPOINTS file and get k-points.
@@ -214,7 +233,7 @@ class VASP:
         return nnodes, npn, npara
         
 
-    def command_text(self):
+    def get_exec_command(self):
         """
         Make command text to run VASP using mpirun.
         """
@@ -230,14 +249,31 @@ It should be in YAML format like,
 
 """.format(get_conf_path())
             raise RuntimeError(msg)
-        
-        text = 'mpirun -np {{NPARA}} {path}'.format(path=self.config['exec_path']) \
-                +' > out.vasp 2>&1'
+
+        text = self.config['exec_path']
+        # text = 'mpirun -np {{NPARA}} {path}'.format(path=self.config['exec_path']) \
+        #         +' > out.vasp 2>&1'
         return text
-    
+
     def set_exec_path(self,path):
         self.config['exec_path'] = path
         return None
+
+    def get_exec_path(self):
+        if not self.config.has_key('exec_path'):
+            msg = """
+Error: self.exec_path has not been set yet.
+You should write a path to the VASP executable in {0}.
+It should be in YAML format like,
+::
+
+  exec_path:  /home/username/bin/vasp535-openmpi
+
+
+""".format(get_conf_path())
+            raise RuntimeError(msg)
+        return self.config['exec_path']
+
 
     def load_config(self):
         """

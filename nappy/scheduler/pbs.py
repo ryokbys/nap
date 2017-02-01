@@ -28,6 +28,21 @@ _commands = {
     'full-status' : 'qstat -f',
 }
 
+_script_template_single = """#!/bin/bash
+#PBS -N {JOB_NAME}
+#PBS -o out
+#PBS -q {QUEUE}
+#PBS -j oe
+#PBS -l nodes={NNODES}:ppn={NPROCS_NODE}
+#PBS -l walltime={WALLTIME}
+
+cd {WORKDIR}
+
+echo 'started at ' `date`
+{COMMANDS}
+echo 'ended at ' `date`
+"""
+
 def get_command(command_type):
     if _commands.has_key(command_type):
         return _commands[command_type]
@@ -77,23 +92,8 @@ def parse_jobdata(command_out):
         jobdata.append(job)
     return jobdata
     
-_job_script_template = """#!/bin/bash
-#PBS -N {JOB_NAME}
-#PBS -o out
-#PBS -q {QUEUE}
-#PBS -j oe
-#PBS -l nodes={NNODES}:ppn={NPROCS_NODE}
-#PBS -l walltime={WALLTIME}
 
-cd {WORKDIR}
-NPROCS=`wc -l < $PBS_NODEFILE`
-
-echo 'started at ' `date`
-{COMMANDS}
-echo 'ended at ' `date`
-"""
-
-def script_for_one_job(job_info):
+def script_single(job_info):
     """
     Create job script context using given `job_info`.
     The `job_info` has to contain the following keys:
@@ -109,7 +109,7 @@ def script_for_one_job(job_info):
     The job script that can run more than 1 calculation is now under construction...
     """
 
-    return _job_script_template.format(**job_info)
+    return _script_template_single.format(**job_info)
 
 def submit(script_path):
     from subprocess import Popen,PIPE

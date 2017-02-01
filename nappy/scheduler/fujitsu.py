@@ -111,6 +111,63 @@ _rscgrps = {
     'fx-xlarge':{'num_nodes':864, 'default_sec':86400, 'limit_sec': 86400},
 }
 
+_script_template_single = """#!/bin/bash
+#PJM -N {JOB_NAME}
+#PJM -L "rscgrp={QUEUE}"
+#PJM -L "node={NNODES}"
+#PJM --mpi "proc={NPARA}"
+#PJM --mpi "rank-map-bychip"
+#PJM -L "elapse={WALLTIME}"
+#PJM -o out
+#PJM -j
+#PJM -X
+#PJM -S
+
+cd {WORKDIR}
+
+echo "started at `date`"
+{COMMANDS}
+echo "ended at `date`"
+"""
+
+_script_template_plural = """#!/bin/bash
+#PJM -N {JOB_NAME}
+#PJM -L "rscgrp={QUEUE}"
+#PJM -L "node={NNODES}"
+#PJM --mpi "proc={NPARA}"
+#PJM --mpi "rank-map-bychip"
+#PJM -L "elapse={WALLTIME}"
+#PJM -o out
+#PJM -j
+#PJM -X
+#PJM -S
+
+export OMP_NUM_THREADS=1
+export PARALLEL=1
+
+NNODE=16
+NPROC=32
+
+for i in `seq 0 $NNODE`
+do
+    rm rank$i
+    for j in `seq 1 $NPROC`
+    do
+        echo "($i)" >> rank$i
+    done
+done
+
+
+echo "started at `date`"
+cwd=`pwd`
+{COMMANDS}
+wait
+echo "ended at `date`"
+
+rest=`expr $n % $NNODE`
+mpiexec --vcoordfile ../rank$rest -n {NPROC} --stdout out.vasp --stderr err.vasp $vasp &
+"""
+
 def get_joblist_command():
     command = ["pjstat","-S",
                "--choose {}".format(_field_separator.join(
@@ -118,9 +175,9 @@ def get_joblist_command():
     comm = ' '.join(command)
     return comm
     
-def extract_jobdata(command_out):
+def parse_jobdata(command_out):
     """
-    Extract data from output of `pjstat -S` command.
+    Parse job data from output of `pjstat -S` command.
     `command_out` should be obtained like following,
     .. code:: 
 
@@ -161,9 +218,75 @@ def get_jobids():
     cmd = get_joblist_command()
     p = Popen(cmd,shell=True,stdout=PIPE,stderr=PIPE)
     command_out,err = p.communicate()
-    jobdata = extract_jobdata(command_out)
+    jobdata = parse_jobdata(command_out)
 
     jobids = []
     for job in jobdata:
         jobids.append(int(job['JOB ID']))
     return jobids
+
+def script_single(job_info):
+    """
+    Create job script context using given `job_info`.
+    The `job_info` has to contain the following keys:
+
+    - JOB_NAME
+    - QUEUE
+    - NNODES
+    - NPROCS_NODE
+    - WORKDIR
+    - COMMANDS
+
+    This only makes a script for only one calculation.
+    """
+
+    return _script_template_single.format(**job_info)
+
+def script_plural(job_info):
+    """
+    Create job script context using given `job_info`.
+    The `job_info` has to contain the following keys:
+
+    - JOB_NAME
+    - QUEUE
+    - NNODES
+    - NPROCS_NODE
+    - WORKDIR
+    - COMMANDS
+
+    This makes a script for many calculations.
+    """
+
+    return _script_template_plural.format(**job_info)
+
+
+def submit(script_path):
+    """
+    Submit a job with a given `script_path` and return its `JOB ID`.
+    Output from pjsub command is something like,
+    ::
+
+      [INFO] PJM 0000 pjsub Job 543330 submitted.
+
+    In case of error, something like,
+    ::
+
+      [ERR.] PJM 0020 pjsub Cannot open the file (rscgrp=fx-debug) : 2.
+
+    """
+    from subprocess import Popen,PIPE
+
+    command = '{0} {1}'.format('pjsub',script_path)
+    try:
+        p = Popen(command,shell=True,stdout=PIPE,stderr=PIPE)
+        out,err = p.communicate()
+        data = out.split(' ')
+        if 'ERR' in data[0]:
+            raise ValueError('Error in submission.')
+        else:
+            # JOB ID is at the 5th position of output (counting from 0)
+            jobid = int(data[5])
+    except:
+        raise
+        
+    return jobid
