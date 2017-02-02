@@ -14,34 +14,6 @@ import potcar
 
 import yaml
 
-# def needs_calc(path):
-#     """
-#     Check whether the VASP calculation is needed on the given path.
-#     """
-#     import os
-
-#     infiles = ('POSCAR','INCAR','POTCAR','KPOINTS')
-#     #...check if necessary for VASP files exist
-#     for f in infiles:
-#         if not os.path.exists(path+'/'+f):
-#             return False
-
-#     #...if there is not OUTCAR in the directory, VASP should be performed
-#     outcar = 'OUTCAR'
-#     if not os.path.exists(path+'/'+outcar):
-#         return True
-    
-#     #...compare dates between OUTCAR and infiles
-#     #...to determine if the VASP calc should be performed
-#     outcar_mtime = os.stat(path+'/'+outcar).st_mtime
-#     for f in infiles:
-#         infile_mtime = os.stat(path+'/'+f).st_mtime
-#         if infile_mtime > outcar_mtime:
-#             return True
-
-#     #...otherwise no need to perform VASP
-#     return False
-
 
 def get_conf_path():
     return nappy.get_nappy_dir()+'/vasp.conf'
@@ -192,8 +164,12 @@ class VASP:
             
         nel = self.get_num_valence()
         nkpt = parse_KPOINTS()
-        
-        nband = self.incar['NBAND']
+
+        if self.incar.has_key('NBAND'):
+            nband = self.incar['NBAND']
+        else:
+            # If INCAR does not have NBAND entry, estimate NBAND from nel.
+            nband = max(8,nel/2)
         estime = 0.005 *math.sqrt(nprocs) /(nel *nband *nkpt)
         return estime
 

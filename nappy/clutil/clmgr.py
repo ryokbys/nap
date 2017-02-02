@@ -194,26 +194,33 @@ Please wait until the other clmgr stops or stop it manually.
             #...Otherwise, put this directory into new_dirs 
             self.dirs_to_work.append(d)
 
+    def make_mpi_command_dict(self):
+        """
+        Prepare mpi command keys.
+        There are some common keys between all the machines
+        such as `npara`, `out` and `exec_path`.
+        And there could be some keys very specific to some machines.
+        """
+        
+        mpi_command_keys = self.machine.mpi_command_keys()
+        self.mpi_command_dict = {}
+        for k in mpi_command_keys:
+            if k == 'npara':
+                self.mpi_command_dict[k] = None
+            elif k == 'out':
+                self.mpi_command_dict[k] = 'out.'+self.calculator
+            elif k == 'exec_path':
+                self.mpi_command_dict[k] = self.calc_module.get_exec_path()
+            elif k == 'rankfile':
+                self.mpi_command_dict[k] = None
+
+
     def single_job_per_submission(self,dryrun=False):
         """
         Assign all the jobs to corresponding jobscripts in appropriate directories.
         """
 
-        # Prepare mpi command keys.
-        # There are some common keys between all the machines
-        # such as `npara`, `out` and `exec_path`.
-        # And there could be some keys very specific to some machines.
-        mpi_command_keys = self.machine.mpi_command_keys()
-        mpi_command_dict = {}
-        for k in mpi_command_keys:
-            if k == 'npara':
-                mpi_command_dict[k] = None
-            elif k == 'out':
-                mpi_command_dict[k] = 'out.'+self.calculator
-            elif k == 'exec_path':
-                mpi_command_dict[k] = self.calc_module.get_exec_path()
-            elif k == 'rankfile':
-                mpi_command_dict[k] = None
+        self.make_mpi_command_dict()
         
         cwd = os.getcwd()
         pid = os.getpid()
@@ -239,8 +246,8 @@ Please wait until the other clmgr stops or stop it manually.
             job_info['WORKDIR'] = d
             hours = int(ctime / 3600 + 1)
             job_info['WALLTIME'] = '{0:d}:00:00'.format(hours)
-            mpi_command_dict['npara'] = npara
-            command = self.machine.get_mpi_command(**mpi_command_dict)
+            self.mpi_command_dict['npara'] = npara
+            command = self.machine.get_mpi_command(**self.mpi_command_dict)
             job_info['COMMANDS'] = command
             script = self.sched.script_single(job_info)
             with open(self._batch_fname,'w') as f:
@@ -248,7 +255,8 @@ Please wait until the other clmgr stops or stop it manually.
     
             if dryrun:
                 logger.info(self.sched.get_command('submit')
-                            +' '+self._batch_fname)
+                            +' '+self._batch_fname
+                            +' at '+d)
                 jobid = 0
                 jobs.append((d,jobid))
             else:
