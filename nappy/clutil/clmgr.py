@@ -7,7 +7,7 @@ Manage DFT calculations on some cluster.
 - Create job scripts for each submission.
 
 Usage:
-  clmgr.py [options] DIRS [DIRS..]
+  clmgr.py [options] DIRS...
 
 Options:
   -h, --help  Show this message and exit.
