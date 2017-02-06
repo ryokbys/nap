@@ -174,7 +174,7 @@ class VASP:
         return estime
 
     
-    def estimate_nprocs(self,max_npn=16):
+    def estimate_nprocs(self,max_npn=16,limit_npn=None):
         """
         Estimate the computation time wrt num of valence electrons,
         num of bands, num of k-points and procs_per_node.
@@ -184,27 +184,41 @@ class VASP:
         except:
             self.incar = incar.parse_INCAR()
 
-        #...Recommended nprocs per node, which should not be the full of
-        #...the true nprocs per node.
-        npn = max_npn/2
+        #...Limit NPN if provided, because using full cores in a node
+        #...could cause slowdown.
+        if limit_npn and limit_npn <= max_npn:
+            npn = limit_npn
+        else:
+            npn = max_npn
 
+        # In VASP, NPAR = NPROCS/NCORE.
+        # So if NPAR and NCORE are both specified, NPROCS is fixed.
+        # If either NPAR or NCORE is specified, NPROCS can be chosen from
+        # common multiples of either NPAR or NCORE and less than and equal to NPN.
         npara = 0
         if self.incar.has_key('NPAR') and self.incar.has_key('NCORE'):
             npara = self.incar['NPAR'] *self.incar['NCORE']
-        elif self.incar.has_key('NPAR'):
-            npara = self.incar['NPAR']
-        elif self.incar.has_key('NCORE'):
-            npara = self.incar['NCORE']
+            nnodes = npara /npn +1
+        elif self.incar.has_key('NPAR') or self.incar.has_key('NCORE'):
+            if self.incar.has_key('NPAR'):
+                ntmp = self.incar['NPAR']
+            else:
+                ntmp = self.incar['NCORE']
+            if ntmp > npn:
+                nnodes = ntmp/npn +1
+                npara = ntmp
+            else:
+                nnodes = 1
+                npara = ((npn-1)/ntmp +1)*ntmp
         else:
             #...MANAGE to estimate npara from nel, nkpt, nband !!
             # nel = self.get_num_valence()
             # nkpt = parse_KPOINTS()
             # nband = self.incar['NBAND']
             npara = npn
+            nnodes = 1
         if npara == 0:
             raise RuntimeError("npara == 0")
-
-        nnodes = npara /npn + 1
 
         return nnodes, npn, npara
         

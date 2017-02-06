@@ -16,13 +16,11 @@ Options:
               [default: vasp]
   -d          Dryrun: run clmgr without actually submitting jobs.
               [default: False]
-  -j NUM_JOBS
-              Number of jobs in one submission.
+  -m          Enable multiple jobs in one submission.
               In case that there is a limitation to the number of jobs 
               that can run at the same time in the server, you may 
-              had better set this larger than 1 to reduce the number of 
-              submission by increasing number of jobs in one submission.
-              [default: 1]
+              had better set this TRUE.
+              [default: False]
   -q QUEUE_NAME
               Queue name the jobs are submitted to. [default: default]
 """
@@ -58,7 +56,38 @@ def pid_exists(pid):
             return True
     return False
 
+def make_rankfile(offset,nnodes,npn,d,logger=None):
+    """
+    Create rankfile, which is required in Fujitsu FX100 when plural jobs are 
+    to be running in one submission, into the directory specified by `d`.
+    The rankfile should be like,
+    ::
 
+      (0)
+      (0)
+      ...
+      (1)
+      (1)
+      ...
+    
+    The number of lines should be the same as the number of processes run by MPI
+    for the job. And the `N` in `(N)` is the node index of the submission
+    starting from 0.
+
+    Parameters:
+
+    - offset:  Offset of node index `N`.
+    - nnodes:  Number of nodes to be used by the job.
+    - npn:     Number of processes per node to be used.
+    - d:       Directory where the `rankfile` is to be saved.
+    """
+    logger = logger or getLogger(__name__)
+    with open(d+'/rankfile','w') as f:
+        for n in range(nnodes):
+            for i in range(npn):
+                f.write('({0:d})\n'.format(offset+n))
+    return None
+    
 
 class ClusterManager(object):
     
@@ -66,7 +95,7 @@ class ClusterManager(object):
     _pid_file = _clmgr_dir +'/pid'
     _date = datetime.now().strftime("%y%m%d")
     _log_file = _clmgr_dir +'/log_{0:s}_{1:d}'.format(_date,os.getpid())
-    _batch_fname = 'batch.clmgr.sh'
+    _batch_fname = 'batch.clmgr{batch_id}.sh'
     
     def __init__(self,calculator=None,queue=None):
         nappydir = nappy.get_nappy_dir()
@@ -83,7 +112,7 @@ class ClusterManager(object):
 
         # Set machine
         try:
-            self.machine = Machine()
+            self.machine = Machine(logger=self.logger)
         except:
             raise
         # Then the scheduler should be already fixed here
@@ -167,9 +196,8 @@ Please wait until the other clmgr stops or stop it manually.
         And remove directories that are in progress by other clmgrs.
         """
         scheduler = self.machine.scheduler
-        if scheduler in ('fx',):
+        if scheduler in ('fx','fujitsu'):
             from nappy.scheduler.fujitsu import get_jobids
-            
         elif scheduler in ('torque', 'pbs'):
             from nappy.scheduler.pbs import get_jobids
         elif scheduler in ('sge',):
@@ -179,6 +207,9 @@ Please wait until the other clmgr stops or stop it manually.
         
         #...Get jobids currently running on the cluster
         jobids = get_jobids()
+        # self.logger.info('jobids:')
+        # for jid in jobids:
+        #     self.logger.info('{0:d}'.format(jid))
 
         dirs = copy.copy(self.dirs_to_work)
         self.dirs_to_work = []
@@ -231,8 +262,8 @@ Please wait until the other clmgr stops or stop it manually.
             os.chdir(d)
             calc = self.Calculator(d)
             nnodes,npn1,npara = calc.estimate_nprocs(max_npn=npn)
-            nprocs = nnodes *npn1
-            ctime = calc.estimate_calctime(nprocs=nprocs)
+            #nprocs = nnodes *npn1
+            ctime = calc.estimate_calctime(nprocs=npara)
             if ctime > self.machine.qattr['limit_sec']:
                 logger.info('The estimated calctime at {0:s} seems to '.format(d)
                             +'be longer than the limit_sec:')
@@ -247,31 +278,148 @@ Please wait until the other clmgr stops or stop it manually.
             hours = int(ctime / 3600 + 1)
             job_info['WALLTIME'] = '{0:d}:00:00'.format(hours)
             self.mpi_command_dict['npara'] = npara
+            job_info['NPROCS'] = npara
             command = self.machine.get_mpi_command(**self.mpi_command_dict)
             job_info['COMMANDS'] = command
             script = self.sched.script_single(job_info)
-            with open(self._batch_fname,'w') as f:
+            batch_fname = self._batch_fname.format(batch_id=i)
+            with open(batch_fname,'w') as f:
                 f.write(script)
     
             if dryrun:
                 logger.info(self.sched.get_command('submit')
-                            +' '+self._batch_fname
+                            +' '+batch_fname
                             +' at '+d)
                 jobid = 0
                 jobs.append((d,jobid))
             else:
                 try:
-                    jobid = self.sched.submit(self._batch_fname)
+                    jobid = self.sched.submit(batch_fname)
                     njobs += 1
                     jobs.append((d,jobid))
                 except Exception, e:
                     logger.warning('There is an error occurred, e = ',e)
                     pass
+            with open(self._stat_file,'w') as f:
+                f.write('{0:d}\n'.format(jobid))
         os.chdir(cwd)
         return jobs        
 
     def plural_jobs_per_submission(self,dryrun=False):
-        pass
+        """
+        Assign all the jobs by grouping some jobs to one submission.
+        Run groupped submission at ~/.nappy/clmgr/tmpdir/ without specific
+        output.
+        """
+        self.make_mpi_command_dict()
+
+        tmpdir = _clmgr_dir+'/tmpdir'
+        os.system('mkdir -p '+tmpdir)
+
+        cwd = os.getcwd()
+        pid = os.getpid()
+        njobs = 0
+        jobs = []
+        #...Num procs per node
+        npn = self.machine.nprocs_per_node
+        #...Num nodes per submission
+        limit_nodes = self.machine.qattr['num_nodes']  
+        limit_sec = self.machine.qattr['limit_sec']
+        max_ctime = 0.0
+        #...Initialize job_info
+        job_info = {}
+        #...Initial submission-ID
+        isub = 1  
+        job_info['WORKDIR'] = tmpdir
+        job_info['QUEUE'] = queue
+        #...Use full procs per node
+        job_info['NPROCS_NODE'] = npn
+        dirs = []
+        sum_nodes = 0
+        commands = ""
+        for i,d in enumerate(self.dirs_to_work):
+            os.chdir(d)
+            calc = self.Calculator(d)
+            nnodes,npn1,npara = calc.estimate_nprocs(max_npn=npn)
+            if sum_nodes+nnodes > limit_nodes:
+                #...Register job_info and dirs to jobs
+                isub = len(jobs)+1
+                job_info['NNODES'] = sum_nodes
+                job_info['NPROCS'] = npn *sum_nodes
+                job_info['JOB_NAME'] = 'clmgr{0:d}_{1:d}'.format(pid,isub)
+                job_info['COMMANDS'] = commands
+                hours = int(max_ctime /3600 +1)
+                job_info['WALLTIME'] = '{0:d}:00:00'.format(hours)
+                job = {}
+                job['info'] = copy.copy(job_info)
+                job['dirs'] = copy.copy(dirs)
+                jobs.append(job)
+                #...Initialize some
+                sum_nodes = 0
+                commands = ""
+                dirs = []
+                max_ctime = 0.0
+            make_rankfile(sum_nodes,nnodes,npn1,d)
+            sum_nodes += nnodes
+            dirs.append(d)
+            ctime = calc.estimate_calctime(nprocs=npara)
+            max_ctime = max(max_ctime,ctime)
+            if ctime > limit_sec:
+                logger.info('The estimated calctime at {0:s} seems to '.format(d)
+                            +'be longer than the limit_sec:')
+                logger.info('  estimated_calctime = {0:d}'.format(ctime))
+                logger.info('  limited time       = {0:d}'.format(limit_sec))
+            self.mpi_command_dict['npara'] = npara
+            self.mpi_command_dict['rankfile'] = './rankfile'
+            commands += "cd {0:s}\n".format(d) \
+                        +self.machine.get_mpi_command(**self.mpi_command_dict) \
+                        +" &\n"
+        if dirs:
+            # Register rest of works to jobs
+            isub = len(jobs) +1
+            job_info['JOB_NAME'] = 'clmgr{0:d}_{1:d}'.format(pid,isub)
+            job_info['NNODES'] = sum_nodes
+            job_info['NPROCS'] = npn *sum_nodes
+            job_info['COMMANDS'] = commands
+            hours = int(max_ctime /3600 +1)
+            job_info['WALLTIME'] = '{0:d}:00:00'.format(hours)
+            job = {}
+            job['info'] = copy.copy(job_info)
+            job['dirs'] = copy.copy(dirs)
+            jobs.append(job)
+
+        #...Submit jobs to the scheduler
+        # print('len(jobs) = ',len(jobs))
+        os.chdir(tmpdir)
+        jobs2 = []
+        for i, job in enumerate(jobs):
+            jobnum = i+1
+            job_info = job['info']
+            dirs = job['dirs']
+            script = self.sched.script_plural(job_info)
+            batch_fname = self._batch_fname.format(batch_id=
+                                                   '{0:d}_{1:d}'.format(pid,jobnum))
+            with open(batch_fname,"w") as f:
+                f.write(script)
+
+            if dryrun:
+                logger.info(self.sched.get_command('submit')
+                            +' '+batch_fname+' at '+os.getcwd())
+                jobid = 0
+            else:
+                try:
+                    jobid = self.sched.submit(batch_fname)
+                    njobs += 1
+                except Exception,e:
+                    logger.warn('There is an error occurred, e = ',e)
+                    pass
+            for d in dirs:
+                jobs2.append((d,jobid))
+                with open(d+'/'+self._stat_file,'w') as f:
+                    f.write('{0:d}\n'.format(jobid))
+        os.chdir(cwd)
+        return jobs2
+
 
 class Machine(object):
 
@@ -289,17 +437,19 @@ queues:
 nprocs_per_node: 12
 """
 
-    def __init__(self):
+    def __init__(self,logger=None):
         self.scheduler = None
         self.qattr = None
         self.mpi_command = None
         self.machine_conf = None
 
+        self.logger = logger or getLogger(__name__)
+        
         # Check existence of the machine configuration file
         if not os.path.exists(self._machine_file):
-            logger.warn("Please create a machine-attribute file at "+_clmgr_dir)
-            logger.warn("which is like this (in YAML format):")
-            logger.warn(self._sample_machine_file)
+            self.logger.warn("Please create a machine-attribute file at "+_clmgr_dir)
+            self.logger.warn("which is like this (in YAML format):")
+            self.logger.warn(self._sample_machine_file)
             raise RuntimeError('No '+self._machine_file)
 
         self.load()
@@ -314,14 +464,14 @@ nprocs_per_node: 12
         
         if not self.machine_conf.has_key('scheduler') \
            or len(self.machine_conf['scheduler']) < 1:
-            print('No valid scheduler in '+self._machine_file)
+            self.logger.warn('No valid scheduler in '+self._machine_file)
             raise RuntimeError()
         if not self.machine_conf.has_key('queues') \
            or len(self.machine_conf['queues']) < 1:
-            print('No valid queues in '+self._machine_file)
+            self.logger.warn('No valid queues in '+self._machine_file)
             raise RuntimeError()
         if not self.machine_conf.has_key('nprocs_per_node'):
-            print('No valid nprocs_per_node in '+self._machine_file)
+            self.logger.warn('No valid nprocs_per_node in '+self._machine_file)
             raise RuntimeError()
 
         # Set default MPI command unless something is specified
@@ -334,14 +484,14 @@ nprocs_per_node: 12
 
     def set_queue(self,queue):
         if not self.machine_conf['queues'].has_key(queue):
-            print('There is no '+queue+' in queues from '+self._machine_file)
+            self.logger.warn('There is no '+queue+' in queues from '+self._machine_file)
             raise RuntimeError()
         self.qattr = self.machine_conf['queues'][queue]
 
     def get_scheduler(self):
         if self.scheduler in ('pbs','torque'):
             import nappy.scheduler.pbs as sched
-        elif self.scheduler in ('fx',):
+        elif self.scheduler in ('fx','fujitsu'):
             import nappy.scheduler.fujitsu as sched
         elif self.scheduler in ('sge',):
             import nappy.scheduler.sge as sched
@@ -388,7 +538,7 @@ if __name__ == "__main__":
     args = docopt(__doc__)
     calculator = args['-c']
     dry = bool(args['-d'])
-    jobs_per_submission = int(args['-j'])
+    multiple_jobs_per_submission = bool(args['-m'])
     queue = args['-q']
     
     dirs = args['DIRS']
@@ -409,10 +559,10 @@ if __name__ == "__main__":
     clmgr = ClusterManager(calculator=calculator,queue=queue)
     clmgr.find_dirs_to_work(dirs)
     clmgr.avoid_conflict()
-    if jobs_per_submission == 1:
-        jobs = clmgr.single_job_per_submission(dryrun=dry)
-    else:
+    if multiple_jobs_per_submission:
         jobs = clmgr.plural_jobs_per_submission(dryrun=dry)
+    else:
+        jobs = clmgr.single_job_per_submission(dryrun=dry)
 
     logger.info("")
     logger.info("Directories treated in this clmgr {0:d} ".format(os.getpid())

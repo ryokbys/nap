@@ -7,7 +7,9 @@ The schedulers used in FX10 and K computer are supposed to be the same as this,
 but it has not been tested for those two systems.
 """
 from __future__ import division
+
 import re
+from logging import getLogger
 
 __author__  = "Ryo KOBAYASHI"
 __version__ = "170123"
@@ -99,23 +101,20 @@ _pjstat_fields = (
     'RESOURCE GROUP',
 )
 
+_commands = {
+    'submit' : 'pjsub',
+    'delete' : 'pjdel',
+    'status' : 'pjstat',
+}
+
 # Total number of cores in a node, 32 for FX100
 _num_cores_in_node = 32
-
-# Resource groups and their nums of nodes and time limits
-_rscgrps = {
-    # 'fx-debug': {'num_nodes': 32, 'default_sec': 3600, 'limit_sec':  3600},
-    'fx-small': {'num_nodes': 16, 'default_sec':86400, 'limit_sec':604800},
-    'fx-middle':{'num_nodes': 96, 'default_sec':86400, 'limit_sec':259200},
-    'fx-large': {'num_nodes':192, 'default_sec':86400, 'limit_sec':259200},
-    'fx-xlarge':{'num_nodes':864, 'default_sec':86400, 'limit_sec': 86400},
-}
 
 _script_template_single = """#!/bin/bash
 #PJM -N {JOB_NAME}
 #PJM -L "rscgrp={QUEUE}"
 #PJM -L "node={NNODES}"
-#PJM --mpi "proc={NPARA}"
+#PJM --mpi "proc={NPROCS}"
 #PJM --mpi "rank-map-bychip"
 #PJM -L "elapse={WALLTIME}"
 #PJM -o out
@@ -130,11 +129,13 @@ echo "started at `date`"
 echo "ended at `date`"
 """
 
+#...Script template for plural jobs per one submission, where only one cycle of
+#...plural jobs will be done and wait all the jobs done.
 _script_template_plural = """#!/bin/bash
 #PJM -N {JOB_NAME}
 #PJM -L "rscgrp={QUEUE}"
 #PJM -L "node={NNODES}"
-#PJM --mpi "proc={NPARA}"
+#PJM --mpi "proc={NPROCS}"
 #PJM --mpi "rank-map-bychip"
 #PJM -L "elapse={WALLTIME}"
 #PJM -o out
@@ -145,28 +146,18 @@ _script_template_plural = """#!/bin/bash
 export OMP_NUM_THREADS=1
 export PARALLEL=1
 
-NNODE=16
-NPROC=32
-
-for i in `seq 0 $NNODE`
-do
-    rm rank$i
-    for j in `seq 1 $NPROC`
-    do
-        echo "($i)" >> rank$i
-    done
-done
-
-
 echo "started at `date`"
 cwd=`pwd`
 {COMMANDS}
 wait
 echo "ended at `date`"
-
-rest=`expr $n % $NNODE`
-mpiexec --vcoordfile ../rank$rest -n {NPROC} --stdout out.vasp --stderr err.vasp $vasp &
 """
+
+def get_command(command_type):
+    if _commands.has_key(command_type):
+        return _commands[command_type]
+    else:
+        return None
 
 def get_joblist_command():
     command = ["pjstat","-S",
@@ -260,7 +251,7 @@ def script_plural(job_info):
     return _script_template_plural.format(**job_info)
 
 
-def submit(script_path):
+def submit(script_path,logger=None):
     """
     Submit a job with a given `script_path` and return its `JOB ID`.
     Output from pjsub command is something like,
@@ -276,13 +267,16 @@ def submit(script_path):
     """
     from subprocess import Popen,PIPE
 
+    logger = logger or getLogger(__name__)
+
     command = '{0} {1}'.format('pjsub',script_path)
     try:
         p = Popen(command,shell=True,stdout=PIPE,stderr=PIPE)
         out,err = p.communicate()
         data = out.split(' ')
         if 'ERR' in data[0]:
-            raise ValueError('Error in submission.')
+            logger.warn('Error in submission, {0}'.format(script_path))
+            #raise ValueError('Error in submission.')
         else:
             # JOB ID is at the 5th position of output (counting from 0)
             jobid = int(data[5])
