@@ -87,7 +87,15 @@ def make_rankfile(offset,nnodes,npn,d,logger=None):
             for i in range(npn):
                 f.write('({0:d})\n'.format(offset+n))
     return None
-    
+
+def sec2hms(sec):
+    """
+    Convert seconds to hours, minutes and seconds.
+    """
+    hours = int(sec/3600)
+    minutes = int((sec -3600*hours)/60)
+    seconds = int(sec -3600*hours -60*minutes)
+    return hours,minutes,seconds
 
 class ClusterManager(object):
     
@@ -275,8 +283,11 @@ Please wait until the other clmgr stops or stop it manually.
             job_info['NNODES'] = nnodes
             job_info['NPROCS_NODE'] = npn1
             job_info['WORKDIR'] = d
-            hours = int(ctime / 3600 + 1)
-            job_info['WALLTIME'] = '{0:d}:00:00'.format(hours)
+            hours,minutes,seconds = sec2hms(ctime)
+            # hours = int(ctime / 3600 + 1)
+            job_info['WALLTIME'] = '{0:d}:{1:02d}:{2:02d}'.format(hours,
+                                                                  minutes,
+                                                                  seconds)
             self.mpi_command_dict['npara'] = npara
             job_info['NPROCS'] = npara
             command = self.machine.get_mpi_command(**self.mpi_command_dict)
@@ -348,8 +359,11 @@ Please wait until the other clmgr stops or stop it manually.
                 job_info['NPROCS'] = npn *sum_nodes
                 job_info['JOB_NAME'] = 'clmgr{0:d}_{1:d}'.format(pid,isub)
                 job_info['COMMANDS'] = commands
-                hours = int(max_ctime /3600 +1)
-                job_info['WALLTIME'] = '{0:d}:00:00'.format(hours)
+                # hours = int(max_ctime /3600 +1)
+                hours,minutes,seconds = sec2hms(max_ctime)
+                job_info['WALLTIME'] = '{0:d}:{1:02d}:{2:02d}'.format(hours,
+                                                                      minutes,
+                                                                      seconds)
                 job = {}
                 job['info'] = copy.copy(job_info)
                 job['dirs'] = copy.copy(dirs)
