@@ -17,18 +17,27 @@ Options:
               Set to allow symmetry breakage.
   --metal     Set metal flag True, and set ISMEAR=2,
               otherwise ISMEAR=-5.
+  --potcar-dir POTCARDIR
+              Specify the directory that contains POTCAR files.
+              [default: ~/local/vasp/potpaw_PBE]
+  --potcar-postfix POTCAR_POSTFIX
+              Postfix of POTCAR directory name. If the species does not have this
+              postfix, use directory without it. [default: ]
 """
+from __future__ import print_function
 
-import math,optparse
+import os
+import math
 from docopt import docopt
 
-import poscar, potcar
+import nappy.vasp.poscar
+import nappy.vasp.potcar
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "0.1a"
+__version__ = "170206"
 
 
-_SYSTEM='system made by prepare-vasp.py '+ __version__
+_SYSTEM='system made by prepare.py '+ __version__
 _metal= False
 _spin_polarized= False
 _break_symmetry= False
@@ -59,69 +68,145 @@ def determine_num_kpoint(b_length,pitch,leven):
     return nk
 
 def write_KPOINTS(fname,type,ndiv):
-    f=open(fname,'w')
-    f.write('{0:d}x{1:d}x{1:d}\n'.format(ndiv[0],ndiv[1],ndiv[2]))
-    f.write('0\n')
-    f.write(type+'\n')
-    f.write(' {0:2d} {1:2d} {2:2d}\n'.format(ndiv[0],ndiv[1],ndiv[2]))
-    f.write(' {0:2d} {1:2d} {2:2d}\n'.format(0,0,0))
-    f.close()
+    with open(fname,'w') as f:
+        f.write('{0:d}x{1:d}x{1:d}\n'.format(ndiv[0],ndiv[1],ndiv[2]))
+        f.write('0\n')
+        f.write(type+'\n')
+        f.write(' {0:2d} {1:2d} {2:2d}\n'.format(ndiv[0],ndiv[1],ndiv[2]))
+        f.write(' {0:2d} {1:2d} {2:2d}\n'.format(0,0,0))
+        f.close()
 
-def write_INCAR(fname,encut,nbands):
-    file=open(fname,'w')
-    file.write("SYSTEM ="+_SYSTEM+"\n")
-    file.write("\n")
-    file.write("ISTART = 1\n")
-    file.write("ICHARG = 1\n")
-    file.write("INIWAV = 1\n")
-    if _spin_polarized:
-        file.write("ISPIN  = 2\n")
-        file.write("IMIX     = 4\n")
-        file.write("AMIX     = 0.05\n")
-        file.write("BMIX     = 0.0001\n")
-        file.write("AMIX_MAG = 0.2\n")
-        file.write("BMIX_MAG = 0.0001\n")
-        file.write("MAXMIX   = 40\n")
-    else:
-        file.write("ISPIN  = 1\n")
-
-    if _break_symmetry:
-        file.write("ISYM   = 0\n")
-    else:
-        file.write("ISYM   = 2\n")
-
-    file.write("\n")
-    file.write("ENCUT  = {0:7.3f}\n".format(encut))
-    file.write("LREAL  = Auto\n")
-    file.write("EDIFF  = 1.0e-6\n")
-    file.write("ALGO   = Fast\n")
-    file.write("PREC   = Normal\n")
-    file.write("\n")
-    file.write("NELMIN = 4\n")
-    file.write("NELM   = 100\n")
-    file.write("NBANDS = {0:4d}\n".format(nbands))
-    file.write("\n")
-    if _metal:
-        file.write("ISMEAR = 2\n")
-        file.write("SIGMA  = 0.2\n")
-    else:
-        file.write("ISMEAR = -5\n")
-        file.write("SIGMA  = 0.00001\n")
-
-    file.write("\n")
-    file.write("ISIF   = {0:2d}\n".format(_ISIF))
-    file.write("IBRION = {0:2d}\n".format(_IBRION))
-    file.write("POTIM  = 0.5\n") 
-    file.write("SMASS  = 0.4\n") 
-    file.write("NSW    = {0:4d}\n".format(_NSW))
-    file.write("\n")
+def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal):
     
-    file.write("NCORE   = {0:4d}\n".format(_NCORE)) 
-    file.write("\n")
-    file.close()
-
-def check_POTCAR():
+    with open(fname,'w') as f:
+        f.write("SYSTEM ="+_SYSTEM+"\n")
+        f.write("\n")
+        f.write("ISTART = 1\n")
+        f.write("ICHARG = 1\n")
+        f.write("INIWAV = 1\n")
+        if spin_polarized:
+            f.write("ISPIN  = 2\n")
+            f.write("IMIX     = 4\n")
+            f.write("AMIX     = 0.05\n")
+            f.write("BMIX     = 0.0001\n")
+            f.write("AMIX_MAG = 0.2\n")
+            f.write("BMIX_MAG = 0.0001\n")
+            f.write("MAXMIX   = 40\n")
+        else:
+            f.write("ISPIN  = 1\n")
     
+        if break_symmetry:
+            f.write("ISYM   = 0\n")
+        else:
+            f.write("ISYM   = 2\n")
+    
+        f.write("\n")
+        f.write("ENCUT  = {0:7.3f}\n".format(encut))
+        f.write("LREAL  = Auto\n")
+        f.write("EDIFF  = 1.0e-6\n")
+        f.write("ALGO   = Fast\n")
+        f.write("PREC   = Normal\n")
+        f.write("\n")
+        f.write("NELMIN = 4\n")
+        f.write("NELM   = 100\n")
+        f.write("NBANDS = {0:4d}\n".format(nbands))
+        f.write("\n")
+        if metal:
+            f.write("ISMEAR = 2\n")
+            f.write("SIGMA  = 0.2\n")
+        else:
+            f.write("ISMEAR = -5\n")
+            f.write("SIGMA  = 0.00001\n")
+    
+        f.write("\n")
+        f.write("ISIF   = {0:2d}\n".format(_ISIF))
+        f.write("IBRION = {0:2d}\n".format(_IBRION))
+        f.write("POTIM  = 0.5\n") 
+        f.write("SMASS  = 0.4\n") 
+        f.write("NSW    = {0:4d}\n".format(_NSW))
+        f.write("\n")
+        
+        f.write("NCORE   = {0:4d}\n".format(_NCORE)) 
+        f.write("\n")
+        f.close()
+
+def prepare_potcar(poscar,potcar_dir,potcar_postfix):
+    """
+    Create a POTCAR if there is not in the directory.
+    The directory that contains pseudo-potential files should be specified.
+    Potentials without `_h`, `_s`, or `_GW` are to be used.
+    """
+    if not potcar_dir:
+        return None
+    if not os.path.exists(potcar_dir):
+        raise RuntimeError(potcar_dir+' does not exist.')
+    if len(poscar.species) == 0:
+        return None
+    if os.path.exists('POTCAR'):
+        os.system('rm POTCAR')
+    for sp in poscar.species:
+        spdir = potcar_dir+'/'+sp+potcar_postfix
+        if not os.path.exists(spdir):
+            raise RuntimeError(spdir+' does not exist.')
+        os.system('cat '+spdir+'/POTCAR >> ./POTCAR')
+    return None
+
+def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
+                 metal,potcar_dir,potcar_postfix):
+    
+    print(' Pitch of k points = {0:5.1f}'.format(pitch))
+
+    poscar= nappy.vasp.poscar.POSCAR(poscar_fname)
+    poscar.read(poscar_fname)
+
+    if os.path.exists('./POTCAR'):
+        potcar = nappy.vasp.potcar.read_POTCAR()
+    else:
+        prepare_potcar(poscar,potcar_dir,potcar_postfix)
+        potcar = nappy.vasp.potcar.read_POTCAR()
+    species= potcar['species']
+    encut= max(potcar['encut'])
+    valences= potcar['valence']
+    a1= poscar.h[:,0]
+    a2= poscar.h[:,1]
+    a3= poscar.h[:,2]
+    al= poscar.afac
+    natms= poscar.num_atoms
+
+    print(" species:",species)
+    print(" encut:",encut)
+    print(" valences:",valences)
+    print(" natms:",natms)
+    ntot= 0
+    nele= 0
+    for i in range(len(natms)):
+        ntot= ntot +natms[i]
+        nele= nele +natms[i]*int(valences[i])
+    
+    if spin_polarized:
+        nbands= int(nele/2 *1.8)
+    else:
+        nbands= int(nele/2 *1.4)
+    
+    if nbands < 50:
+        nbands= nele
+
+    l1= al *math.sqrt(a1[0]**2 +a1[1]**2 +a1[2]**2)
+    l2= al *math.sqrt(a2[0]**2 +a2[1]**2 +a2[2]**2)
+    l3= al *math.sqrt(a3[0]**2 +a3[1]**2 +a3[2]**2)
+    print(' Length of each axes:')
+    print('   l1 = {0:10.3f}'.format(l1))
+    print('   l2 = {0:10.3f}'.format(l2))
+    print('   l3 = {0:10.3f}'.format(l3))
+    k1= determine_num_kpoint(l1,pitch,even)
+    k2= determine_num_kpoint(l2,pitch,even)
+    k3= determine_num_kpoint(l3,pitch,even)
+    print(' Number of k-points: {0:2d} {1:2d} {2:2d}'.format(k1,k2,k3))
+    ndiv= [k1,k2,k3]
+    
+    write_KPOINTS(_KPOINTS_name,_KPOINTS_type,ndiv)
+    write_INCAR(_INCAR_name,encut,nbands,break_symmetry,
+                spin_polarized,metal)
 
 #=======================================================================
 
@@ -135,53 +220,8 @@ if __name__ == '__main__':
     _break_symmetry= args['--break-symmetry']
     _metal= args['--metal']
     poscar_fname= args['POSCAR']
+    potcar_dir = os.path.expanduser(args['--potcar-dir'])
+    potcar_postfix = args['--potcar-postfix']
 
-    print ' Pitch of k points = {0:5.1f}'.format(pitch)
-
-    poscar= poscar.POSCAR()
-    poscar.read(poscar_fname)
-
-    
-    potcar= potcar.read_POTCAR()
-    species= potcar['species']
-    encut= max(potcar['encut'])
-    valences= potcar['valence']
-    a1= poscar.h[:,0]
-    a2= poscar.h[:,1]
-    a3= poscar.h[:,2]
-    al= poscar.afac
-    natms= poscar.num_atoms
-
-    print " species:",species
-    print " encut:",encut
-    print " valences:",valences
-    print " natms:",natms
-    ntot= 0
-    nele= 0
-    for i in range(len(natms)):
-        ntot= ntot +natms[i]
-        nele= nele +natms[i]*int(valences[i])
-    
-    if _spin_polarized:
-        nbands= int(nele/2 *1.8)
-    else:
-        nbands= int(nele/2 *1.4)
-    
-    if nbands < 50:
-        nbands= nele
-
-    l1= al *math.sqrt(a1[0]**2 +a1[1]**2 +a1[2]**2)
-    l2= al *math.sqrt(a2[0]**2 +a2[1]**2 +a2[2]**2)
-    l3= al *math.sqrt(a3[0]**2 +a3[1]**2 +a3[2]**2)
-    print ' Length of each axes:'
-    print '   l1 = {0:10.3f}'.format(l1)
-    print '   l2 = {0:10.3f}'.format(l2)
-    print '   l3 = {0:10.3f}'.format(l3)
-    k1= determine_num_kpoint(l1,pitch,leven)
-    k2= determine_num_kpoint(l2,pitch,leven)
-    k3= determine_num_kpoint(l3,pitch,leven)
-    print ' Number of k-points: {0:2d} {1:2d} {2:2d}'.format(k1,k2,k3)
-    ndiv= [k1,k2,k3]
-    
-    write_KPOINTS(_KPOINTS_name,_KPOINTS_type,ndiv)
-    write_INCAR(_INCAR_name,encut,nbands)
+    prepare_vasp(poscar_fname,pitch,leven,_spin_polarized,_break_symmetry,
+                 _metal,potcar_dir,potcar_postfix)

@@ -1,4 +1,5 @@
 #!/bin/env python
+from __future__ import print_function
 
 import re
 
@@ -32,5 +33,5 @@ def read_POTCAR(fname='POTCAR'):
 if __name__ == '__main__':
 
     potcar=read_POTCAR()
-    print potcar
+    print(potcar)
 
