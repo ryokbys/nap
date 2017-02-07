@@ -56,6 +56,15 @@ class NAPSystem(object):
         self.atoms = []
         self.specorder = specorder
 
+        specorder_good = False
+        for s in self.specorder:
+            if len(s) > 0:
+                specorder_good = True
+                break
+        if not specorder_good:
+            self.specorder = None
+        
+
         if fname is not None:
             if ffmt is None or \
                ffmt not in _file_formats:
@@ -1145,9 +1154,9 @@ if __name__ == "__main__":
     outfmt= args['--out-format']
     infname= args['INFILE']
     outfname= args['OUTFILE']
-    specorder= args['--specorder'].split(',')
     scalefactor= args['--scale']
-
+    specorder= args['--specorder'].split('')
+    
     psys= NAPSystem(fname=infname,ffmt=infmt,specorder=specorder)
 
     if args['analyze']:

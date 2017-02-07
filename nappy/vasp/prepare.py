@@ -11,6 +11,8 @@ Options:
   -h, --help  Show this help message and exit.
   -e, --even  Set even number to the k-points in a direction.
   -p PITCH    PITCH of k in a direction. [default: 0.2]
+  --encut ENCUT
+              Cutoff energy. [default: None]
   --spin-polarize
               Set spin polarization true.
   --break-symmetry
@@ -127,11 +129,11 @@ def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal):
         #...Estimated NCORE
         #...See, https://www.nsc.liu.se/~pla/blog/2015/01/12/vasp-how-many-cores/
         ncore = max(int(nbands / 8),4)
-        f.write("NCORE   = {0:4d}\n".format(ncore)) 
+        f.write("NCORE  = {0:4d}\n".format(ncore)) 
         f.write("\n")
         f.close()
 
-def prepare_potcar(poscar,potcar_dir,potcar_postfix):
+def prepare_potcar(poscar,potcar_dir,potcar_postfix=''):
     """
     Create a POTCAR if there is not in the directory.
     The directory that contains pseudo-potential files should be specified.
@@ -145,15 +147,20 @@ def prepare_potcar(poscar,potcar_dir,potcar_postfix):
         return None
     if os.path.exists('POTCAR'):
         os.system('rm POTCAR')
+
+    postfixes = [potcar_postfix, '', '_sv', '_pv', '_s', '_h']
     for sp in poscar.species:
-        spdir = potcar_dir+'/'+sp+potcar_postfix
-        if not os.path.exists(spdir):
-            raise RuntimeError(spdir+' does not exist.')
-        os.system('cat '+spdir+'/POTCAR >> ./POTCAR')
+        for pf in postfixes:
+            spdir = potcar_dir+'/'+sp +pf
+            if not os.path.exists(spdir):
+                raise RuntimeError(spdir+' does not exist.')
+            os.system('cat '+spdir+'/POTCAR >> ./POTCAR')
+            print('POTCAR for {0:3s}: {1:s}'.format(sp,spdir))
+            break
     return None
 
 def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
-                 metal,potcar_dir,potcar_postfix):
+                 metal,potcar_dir,potcar_postfix,encut=None):
     
     print(' Pitch of k points = {0:5.1f}'.format(pitch))
 
@@ -166,13 +173,14 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
         prepare_potcar(poscar,potcar_dir,potcar_postfix)
         potcar = nappy.vasp.potcar.read_POTCAR()
     species= potcar['species']
-    encut= max(potcar['encut'])
     valences= potcar['valence']
     a1= poscar.h[:,0]
     a2= poscar.h[:,1]
     a3= poscar.h[:,2]
     al= poscar.afac
     natms= poscar.num_atoms
+    if not encut:
+        encut= max(potcar['encut'])
 
     print(" species:",species)
     print(" encut:",encut)
@@ -223,6 +231,12 @@ if __name__ == '__main__':
     poscar_fname= args['POSCAR']
     potcar_dir = os.path.expanduser(args['--potcar-dir'])
     potcar_postfix = args['--potcar-postfix']
+    encut = args['--encut']
+
+    if encut[0].isdigit():
+        encut = float(encut)
+    else:
+        encut = None
 
     prepare_vasp(poscar_fname,pitch,leven,_spin_polarized,_break_symmetry,
-                 _metal,potcar_dir,potcar_postfix)
+                 _metal,potcar_dir,potcar_postfix,encut=encut)

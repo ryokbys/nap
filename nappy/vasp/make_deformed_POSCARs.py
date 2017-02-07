@@ -23,7 +23,7 @@ Options:
   --uniform
               Use uniform interval deviation. [default: False]
   --specorder=SPECORDER
-              Order of species. [default: Al,Mg,Si]
+              Order of species. [default: ]
 """
 from __future__ import print_function
 
