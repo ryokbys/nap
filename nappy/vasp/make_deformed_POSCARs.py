@@ -28,7 +28,6 @@ Options:
 from __future__ import print_function
 
 import os,sys
-import numpy as np
 import copy
 from docopt import docopt
 
