@@ -49,8 +49,6 @@ _IBRION= -1  # -1:no update, 0:MD, 1:q-Newton, 2:CG, 3:damped MD
 _ISIF= 2     # 2: relax ions only, 3:shell-shape too, 4:shell volume too
 _NSW= 0      # number of ion relaxation steps
 
-_NCORE= 4
-
 def determine_num_kpoint(b_length,pitch,leven):
     # maximum 11
     # minimum 1
@@ -79,13 +77,13 @@ def write_KPOINTS(fname,type,ndiv):
 def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal):
     
     with open(fname,'w') as f:
-        f.write("SYSTEM ="+_SYSTEM+"\n")
+        f.write("SYSTEM = "+_SYSTEM+"\n")
         f.write("\n")
         f.write("ISTART = 1\n")
         f.write("ICHARG = 1\n")
         f.write("INIWAV = 1\n")
         if spin_polarized:
-            f.write("ISPIN  = 2\n")
+            f.write("ISPIN    = 2\n")
             f.write("IMIX     = 4\n")
             f.write("AMIX     = 0.05\n")
             f.write("BMIX     = 0.0001\n")
@@ -125,8 +123,11 @@ def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal):
         f.write("SMASS  = 0.4\n") 
         f.write("NSW    = {0:4d}\n".format(_NSW))
         f.write("\n")
-        
-        f.write("NCORE   = {0:4d}\n".format(_NCORE)) 
+
+        #...Estimated NCORE
+        #...See, https://www.nsc.liu.se/~pla/blog/2015/01/12/vasp-how-many-cores/
+        ncore = max(int(nbands / 8),4)
+        f.write("NCORE   = {0:4d}\n".format(ncore)) 
         f.write("\n")
         f.close()
 

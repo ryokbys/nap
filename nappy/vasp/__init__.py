@@ -153,9 +153,11 @@ class VASP:
         num of bands, num of k-points and num of processes used.
         ::
 
-          Time = 0.005 sec *sqrt(nprocs) /(nel *nband *nkpt)
+          Time = 2.0e-6 *nband**3 *encut *nkpt *nsw /nprocs [sec]
 
-        It is a very rough estimation of computation time.
+        Where nkpt is estimated actual number of k-points after symmetry 
+        operations, if ISYM != 0, encut is energy cutoff in eV.
+        Of course, it is a very rough estimation of computation time.
         """
         try:
             self.incar
@@ -163,14 +165,24 @@ class VASP:
             self.incar = incar.parse_INCAR()
             
         nel = self.get_num_valence()
-        nkpt = parse_KPOINTS()
-
+        nband = int(max(nel/2*1.5, 8))
         if self.incar.has_key('NBAND'):
-            nband = self.incar['NBAND']
-        else:
-            # If INCAR does not have NBAND entry, estimate NBAND from nel.
-            nband = max(8,nel/2)
-        estime = 0.005 *math.sqrt(nprocs) /(nel *nband *nkpt)
+            nband = int(self.incar['NBAND'])
+
+        nsw = 1
+        if self.incar.has_key('NSW'):
+            nsw = int(self.incar['NSW'])
+        
+        nkpt = parse_KPOINTS()
+        if self.incar.has_key('ISYM') \
+           and int(self.incar['ISYM']) != 0:
+            nkpt = max(math.sqrt(nkpt),1)
+
+        encut = 400.0
+        if self.incar.has_key('ENCUT'):
+            encut = float(self.incar['ENCUT'])
+
+        estime = 2.0e-6 *nband**3 *nkpt *nsw *encut / nprocs
         return estime
 
     
