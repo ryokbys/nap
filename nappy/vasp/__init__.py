@@ -169,9 +169,12 @@ class VASP:
         if self.incar.has_key('NBAND'):
             nband = int(self.incar['NBAND'])
 
-        nsw = 1
         if self.incar.has_key('NSW'):
             nsw = int(self.incar['NSW'])
+            if nsw < 1:
+                nsw = 1
+        else:
+            nsw = 1
         
         nkpt = parse_KPOINTS()
         if self.incar.has_key('ISYM') \

@@ -9,7 +9,7 @@ python $script shear --fmax=1.1 --fmin=0.9 -n 15 --offset 300 POSCAR
 
 for f in POSCAR-*
 do
-    dname=smpl_$(basename `pwd`)_deform_`echo $f | sed 's/POSCAR-//'`
+    dname=$(basename `pwd`)_deform_`echo $f | sed 's/POSCAR-//'`
     mkdir -p $dname
     mv $f $dname/POSCAR
 done

@@ -25,6 +25,10 @@ Options:
   --potcar-postfix POTCAR_POSTFIX
               Postfix of POTCAR directory name. If the species does not have this
               postfix, use directory without it. [default: ]
+  --relax     Enable structure relaxation. This sets IBRION=1 and NSW=100.
+  --relax-cell RELAX_CELL
+              Type of relaxation of cell, either (ion_only, cell, volume)
+              [default: ion_only]
 """
 from __future__ import print_function
 
@@ -76,7 +80,8 @@ def write_KPOINTS(fname,type,ndiv):
         f.write(' {0:2d} {1:2d} {2:2d}\n'.format(0,0,0))
         f.close()
 
-def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal):
+def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal,
+                relax=None,relax_cell=None):
     
     with open(fname,'w') as f:
         f.write("SYSTEM = "+_SYSTEM+"\n")
@@ -119,11 +124,20 @@ def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal):
             f.write("SIGMA  = 0.00001\n")
     
         f.write("\n")
-        f.write("ISIF   = {0:2d}\n".format(_ISIF))
-        f.write("IBRION = {0:2d}\n".format(_IBRION))
+        if relax_cell == 'cell':
+            f.write("ISIF   = {0:2d}\n".format(3))
+        elif relax_cell == 'volume':
+            f.write("ISIF   = {0:2d}\n".format(4))
+        else:
+            f.write("ISIF   = {0:2d}\n".format(2))
+        if relax:
+            f.write("IBRION = {0:2d}\n".format(1))
+            f.write("NSW    = {0:4d}\n".format(100))
+        else:
+            f.write("IBRION = {0:2d}\n".format(_IBRION))
+            f.write("NSW    = {0:4d}\n".format(_NSW))
         f.write("POTIM  = 0.5\n") 
         f.write("SMASS  = 0.4\n") 
-        f.write("NSW    = {0:4d}\n".format(_NSW))
         f.write("\n")
 
         #...Estimated NCORE
@@ -150,17 +164,23 @@ def prepare_potcar(poscar,potcar_dir,potcar_postfix=''):
 
     postfixes = [potcar_postfix, '', '_sv', '_pv', '_s', '_h']
     for sp in poscar.species:
+        found = False
         for pf in postfixes:
             spdir = potcar_dir+'/'+sp +pf
-            if not os.path.exists(spdir):
-                raise RuntimeError(spdir+' does not exist.')
+            if os.path.exists(spdir):
+                found = True
+            else:
+                continue
             os.system('cat '+spdir+'/POTCAR >> ./POTCAR')
             print('POTCAR for {0:3s}: {1:s}'.format(sp,spdir))
             break
+        if not found:
+            raise RuntimeError('POTCAR was not found for '+sp)
     return None
 
 def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
-                 metal,potcar_dir,potcar_postfix,encut=None):
+                 metal,potcar_dir,potcar_postfix,encut=None,
+                 relax=None,relax_cell=None):
     
     print(' Pitch of k points = {0:5.1f}'.format(pitch))
 
@@ -215,7 +235,7 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
     
     write_KPOINTS(_KPOINTS_name,_KPOINTS_type,ndiv)
     write_INCAR(_INCAR_name,encut,nbands,break_symmetry,
-                spin_polarized,metal)
+                spin_polarized,metal,relax=relax,relax_cell=relax_cell)
 
 #=======================================================================
 
@@ -232,6 +252,8 @@ if __name__ == '__main__':
     potcar_dir = os.path.expanduser(args['--potcar-dir'])
     potcar_postfix = args['--potcar-postfix']
     encut = args['--encut']
+    relax = args['--relax']
+    relax_cell = args['--relax-cell']
 
     if encut[0].isdigit():
         encut = float(encut)
@@ -239,4 +261,5 @@ if __name__ == '__main__':
         encut = None
 
     prepare_vasp(poscar_fname,pitch,leven,_spin_polarized,_break_symmetry,
-                 _metal,potcar_dir,potcar_postfix,encut=encut)
+                 _metal,potcar_dir,potcar_postfix,encut=encut,
+                 relax=relax,relax_cell=relax_cell)
