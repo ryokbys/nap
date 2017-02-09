@@ -224,7 +224,7 @@ class VASP:
                 npara = ntmp
             else:
                 nnodes = 1
-                npara = ((npn-1)/ntmp +1)*ntmp
+                npara = int(npn/ntmp) *ntmp
         else:
             #...MANAGE to estimate npara from nel, nkpt, nband !!
             # nel = self.get_num_valence()

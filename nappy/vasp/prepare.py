@@ -71,6 +71,32 @@ def determine_num_kpoint(b_length,pitch,leven):
             nk= nk +1
     return nk
 
+def estimate_ncore(nbands):
+    """
+    Estimate NCORE value from NBANDS info.
+    NCORE specifies how many cores store one orbital (NPAR=cpu/NCORE). 
+    VASP master recommends that 
+
+        NCORE = 4 - approx. SQRT( # of cores )
+
+    And according to the site below,
+    https://www.nsc.liu.se/~pla/blog/2015/01/12/vasp-how-many-cores/
+    NCORE ~ NBANDS/8 is also a good approximation.
+    And we limit NCORE as a multiplier of 2.
+    """
+    nb8 = int(nbands/8)
+    if nb8 < 4:
+        ncore = 4
+        return ncore
+    else:
+        ncore = 4
+        for i in range(20):
+            if ncore*2 > nb8:
+                return ncore
+            ncore *= 2
+    raise RuntimeError('Something is wrong.')
+
+
 def write_KPOINTS(fname,type,ndiv):
     with open(fname,'w') as f:
         f.write('{0:d}x{1:d}x{1:d}\n'.format(ndiv[0],ndiv[1],ndiv[2]))
@@ -140,9 +166,7 @@ def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal,
         f.write("SMASS  = 0.4\n") 
         f.write("\n")
 
-        #...Estimated NCORE
-        #...See, https://www.nsc.liu.se/~pla/blog/2015/01/12/vasp-how-many-cores/
-        ncore = max(int(nbands / 8),4)
+        ncore = estimate_ncore(nbands)
         f.write("NCORE  = {0:4d}\n".format(ncore)) 
         f.write("\n")
         f.close()
