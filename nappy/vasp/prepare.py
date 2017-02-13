@@ -13,6 +13,8 @@ Options:
   -p PITCH    PITCH of k in a direction. [default: 0.2]
   --encut ENCUT
               Cutoff energy. [default: None]
+  --ediff EDIFF
+              Convergence criteria for the energy difference. [default: 1.0e-6]
   --spin-polarize
               Set spin polarization true.
   --break-symmetry
@@ -42,11 +44,8 @@ import nappy.vasp.potcar
 __author__ = "Ryo KOBAYASHI"
 __version__ = "170206"
 
+_magnetic_elements = ('Cr','Mn','Fe','Co','Ni')
 
-_SYSTEM='system made by prepare.py '+ __version__
-_metal= False
-_spin_polarized= False
-_break_symmetry= False
 _INCAR_name= 'INCAR'
 _KPOINTS_name= 'KPOINTS'
 _KPOINTS_type= 'Monkhorst-Pack' # or 'Gamma'
@@ -107,10 +106,12 @@ def write_KPOINTS(fname,type,ndiv):
         f.close()
 
 def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal,
+                ediff,
                 relax=None,relax_cell=None):
+    SYSTEM = 'system made by prepare.py '+ __version__
     
     with open(fname,'w') as f:
-        f.write("SYSTEM = "+_SYSTEM+"\n")
+        f.write("SYSTEM = "+SYSTEM+"\n")
         f.write("\n")
         f.write("ISTART = 1\n")
         f.write("ICHARG = 1\n")
@@ -134,7 +135,7 @@ def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal,
         f.write("\n")
         f.write("ENCUT  = {0:7.3f}\n".format(encut))
         f.write("LREAL  = Auto\n")
-        f.write("EDIFF  = 1.0e-6\n")
+        f.write("EDIFF  = {0:7.1e}\n".format(ediff))
         f.write("ALGO   = Fast\n")
         f.write("PREC   = Normal\n")
         f.write("\n")
@@ -203,7 +204,8 @@ def prepare_potcar(poscar,potcar_dir,potcar_postfix=''):
     return None
 
 def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
-                 metal,potcar_dir,potcar_postfix,encut=None,
+                 metal,potcar_dir,potcar_postfix,
+                 encut=None,ediff=None,
                  relax=None,relax_cell=None):
     
     print(' Pitch of k points = {0:5.1f}'.format(pitch))
@@ -235,6 +237,10 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
     for i in range(len(natms)):
         ntot= ntot +natms[i]
         nele= nele +natms[i]*int(valences[i])
+
+    for e in _magnetic_elements:
+        if e in species:
+            spin_polarized = True
     
     if spin_polarized:
         nbands= int(nele/2 *1.8)
@@ -259,7 +265,8 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
     
     write_KPOINTS(_KPOINTS_name,_KPOINTS_type,ndiv)
     write_INCAR(_INCAR_name,encut,nbands,break_symmetry,
-                spin_polarized,metal,relax=relax,relax_cell=relax_cell)
+                spin_polarized,metal,
+                ediff,relax=relax,relax_cell=relax_cell)
 
 #=======================================================================
 
@@ -269,13 +276,14 @@ if __name__ == '__main__':
 
     pitch= float(args['-p'])
     leven= args['--even']
-    _spin_polarized= args['--spin-polarize']
-    _break_symmetry= args['--break-symmetry']
-    _metal= args['--metal']
+    spin_polarized= args['--spin-polarize']
+    break_symmetry= args['--break-symmetry']
+    metal= args['--metal']
     poscar_fname= args['POSCAR']
     potcar_dir = os.path.expanduser(args['--potcar-dir'])
     potcar_postfix = args['--potcar-postfix']
     encut = args['--encut']
+    ediff = float(args['--ediff'])
     relax = args['--relax']
     relax_cell = args['--relax-cell']
 
@@ -284,6 +292,7 @@ if __name__ == '__main__':
     else:
         encut = None
 
-    prepare_vasp(poscar_fname,pitch,leven,_spin_polarized,_break_symmetry,
-                 _metal,potcar_dir,potcar_postfix,encut=encut,
+    prepare_vasp(poscar_fname,pitch,leven,spin_polarized,break_symmetry,
+                 metal,potcar_dir,potcar_postfix,
+                 encut=encut,ediff=ediff,
                  relax=relax,relax_cell=relax_cell)
