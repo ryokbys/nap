@@ -95,6 +95,20 @@ def estimate_ncore(nbands):
             ncore *= 2
     raise RuntimeError('Something is wrong.')
 
+def estimate_nbands(nel):
+    """
+    Estimate appropriate number of bands to be computed.
+
+    The policy is that the NBANDS:
+    - should be multiples of 4 considering the efficient
+      parallelization (which cannot be taken account here, though),
+    - should be not be less than number of electrons, NEL, 
+      if it is less than 50,
+    """
+    nbands = nel
+    if nbands % 4 != 0:
+        nbands += nbands % 4
+    return nbands
 
 def write_KPOINTS(fname,type,ndiv):
     with open(fname,'w') as f:
@@ -242,14 +256,6 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
         if e in species:
             spin_polarized = True
     
-    if spin_polarized:
-        nbands= int(nele/2 *1.8)
-    else:
-        nbands= int(nele/2 *1.4)
-    
-    if nbands < 50:
-        nbands= nele
-
     l1= al *math.sqrt(a1[0]**2 +a1[1]**2 +a1[2]**2)
     l2= al *math.sqrt(a2[0]**2 +a2[1]**2 +a2[2]**2)
     l3= al *math.sqrt(a3[0]**2 +a3[1]**2 +a3[2]**2)
@@ -262,7 +268,9 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
     k3= determine_num_kpoint(l3,pitch,even)
     print(' Number of k-points: {0:2d} {1:2d} {2:2d}'.format(k1,k2,k3))
     ndiv= [k1,k2,k3]
-    
+
+    nbands = estimate_nbands(nele)
+
     write_KPOINTS(_KPOINTS_name,_KPOINTS_type,ndiv)
     write_INCAR(_INCAR_name,encut,nbands,break_symmetry,
                 spin_polarized,metal,
