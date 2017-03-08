@@ -153,7 +153,7 @@ class VASP:
         num of bands, num of k-points and num of processes used.
         ::
 
-          Time = 2.0e-6 *nband**3 *encut *nkpt *nsw /nprocs [sec]
+          Time = 2.0e-6 *nband**3 *encut *nkpt *nsw /sqrt(nprocs) [sec]
 
         Where nkpt is estimated actual number of k-points after symmetry 
         operations, if ISYM != 0, encut is energy cutoff in eV.
@@ -185,7 +185,7 @@ class VASP:
         if self.incar.has_key('ENCUT'):
             encut = float(self.incar['ENCUT'])
 
-        estime = 2.0e-6 *nband**3 *nkpt *nsw *encut / nprocs
+        estime = 2.0e-6 *nband**3 *nkpt *nsw *encut / math.sqrt(nprocs)
         return estime
 
     

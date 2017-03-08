@@ -269,7 +269,8 @@ Please wait until the other clmgr stops or stop it manually.
         for i,d in enumerate(self.dirs_to_work):
             os.chdir(d)
             calc = self.Calculator(d)
-            nnodes,npn1,npara = calc.estimate_nprocs(max_npn=npn)
+            nnodes,npn1,npara = calc.estimate_nprocs(max_npn=npn,
+                                                     limit_npn=npn/2)
             #nprocs = nnodes *npn1
             ctime = calc.estimate_calctime(nprocs=npara)
             if ctime > self.machine.qattr['limit_sec']:
@@ -351,7 +352,8 @@ Please wait until the other clmgr stops or stop it manually.
         for i,d in enumerate(self.dirs_to_work):
             os.chdir(d)
             calc = self.Calculator(d)
-            nnodes,npn1,npara = calc.estimate_nprocs(max_npn=npn)
+            nnodes,npn1,npara = calc.estimate_nprocs(max_npn=npn,
+                                                     limit_npn=npn/2)
             if sum_nodes+nnodes > limit_nodes:
                 #...Register job_info and dirs to jobs
                 isub = len(jobs)+1

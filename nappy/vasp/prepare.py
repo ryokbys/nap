@@ -150,7 +150,7 @@ def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal,
         f.write("ENCUT  = {0:7.3f}\n".format(encut))
         f.write("LREAL  = Auto\n")
         f.write("EDIFF  = {0:7.1e}\n".format(ediff))
-        f.write("ALGO   = Fast\n")
+        f.write("ALGO   = Normal\n")
         f.write("PREC   = Normal\n")
         f.write("\n")
         f.write("NELMIN = 4\n")

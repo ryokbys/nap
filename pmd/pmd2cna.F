@@ -210,7 +210,7 @@ c=======================================================================
       subroutine setup(nismax,am,acon,fack,dt)
       implicit none
       include "params_unit.h"
-      include "params_eam_al.h"
+c      include "params_eam_al.h"
 c      include "params_lj_ar.h"
       integer,intent(in):: nismax
       real(8),intent(in):: dt
@@ -219,7 +219,8 @@ c      include "params_lj_ar.h"
       integer:: i
 
 c-----atomic masses
-      am(1:nismax)= am_al
+      am(1:nismax)= 1.0
+c      am(1:nismax)= am_al
 c      am(1:nismax)= am_ar
 
 c-----prefactors for normalized accelerration
