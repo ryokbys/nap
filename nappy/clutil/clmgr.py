@@ -278,6 +278,7 @@ Please wait until the other clmgr stops or stop it manually.
                             +'be longer than the limit_sec:')
                 logger.info('  estimated_calctime = {0:d}'.format(ctime))
                 logger.info('  limited time       = {0:d}'.format(self.machine.qattr['limit_sec']))
+            ctime = max(ctime,3600)
             job_info = {}  # initialize job_info
             job_info['JOB_NAME'] = 'clmgr{0:d}_{1:d}'.format(pid,i)
             job_info['QUEUE'] = queue
@@ -385,6 +386,7 @@ Please wait until the other clmgr stops or stop it manually.
                             +'be longer than the limit_sec:')
                 logger.info('  estimated_calctime = {0:d}'.format(ctime))
                 logger.info('  limited time       = {0:d}'.format(limit_sec))
+            max_ctime = max(max_ctime,3600)
             self.mpi_command_dict['npara'] = npara
             self.mpi_command_dict['rankfile'] = './rankfile'
             commands += "cd {0:s}\n".format(d) \

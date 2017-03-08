@@ -26,6 +26,7 @@ __author__ = "Ryo KOBAYASHI"
 __version__ = "160507"
 
 _specorder = []
+_kb2gpa = 160.2176487
 
 def get_tag(symbol,atom_id):
     sid= _specorder.index(symbol)+1
@@ -98,5 +99,10 @@ if __name__ == "__main__":
             for frc in frcs:
                 f.write("{0:12.7f} {1:12.7f} {2:12.7f}\n".format(frc[0],frc[1],frc[2]))
         write_pos(atoms,fname='pos')
+        with open('strs.ref','w') as f:
+            strs = atoms.get_stress()
+            for s in strs:
+                f.write(" {0:15.7f}".format(s*_kb2gpa)) # converting from kBar to GPa
+            f.write('\n')
     os.chdir(cwd)
 
