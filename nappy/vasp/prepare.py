@@ -31,6 +31,7 @@ Options:
   --relax-cell RELAX_CELL
               Type of relaxation of cell, either (ion_only, cell, volume)
               [default: ion_only]
+  --isif ISIF  Directly specify ISIF value. [default: 2]
 """
 from __future__ import print_function
 
@@ -121,7 +122,7 @@ def write_KPOINTS(fname,type,ndiv):
 
 def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal,
                 ediff,
-                relax=None,relax_cell=None):
+                relax=None,relax_cell=None,isif=2):
     SYSTEM = 'system made by prepare.py '+ __version__
     
     with open(fname,'w') as f:
@@ -170,7 +171,7 @@ def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal,
         elif relax_cell == 'volume':
             f.write("ISIF   = {0:2d}\n".format(4))
         else:
-            f.write("ISIF   = {0:2d}\n".format(2))
+            f.write("ISIF   = {0:2d}\n".format(isif))
         if relax:
             f.write("IBRION = {0:2d}\n".format(1))
             f.write("NSW    = {0:4d}\n".format(100))
@@ -220,7 +221,7 @@ def prepare_potcar(poscar,potcar_dir,potcar_postfix=''):
 def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
                  metal,potcar_dir,potcar_postfix,
                  encut=None,ediff=None,
-                 relax=None,relax_cell=None):
+                 relax=None,relax_cell=None,isif=None):
     
     print(' Pitch of k points = {0:5.1f}'.format(pitch))
 
@@ -274,7 +275,7 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
     write_KPOINTS(_KPOINTS_name,_KPOINTS_type,ndiv)
     write_INCAR(_INCAR_name,encut,nbands,break_symmetry,
                 spin_polarized,metal,
-                ediff,relax=relax,relax_cell=relax_cell)
+                ediff,relax=relax,relax_cell=relax_cell,isif=isif)
 
 #=======================================================================
 
@@ -294,6 +295,7 @@ if __name__ == '__main__':
     ediff = float(args['--ediff'])
     relax = args['--relax']
     relax_cell = args['--relax-cell']
+    isif = int(args['--isif'])
 
     if encut[0].isdigit():
         encut = float(encut)
@@ -303,4 +305,4 @@ if __name__ == '__main__':
     prepare_vasp(poscar_fname,pitch,leven,spin_polarized,break_symmetry,
                  metal,potcar_dir,potcar_postfix,
                  encut=encut,ediff=ediff,
-                 relax=relax,relax_cell=relax_cell)
+                 relax=relax,relax_cell=relax_cell,isif=isif)

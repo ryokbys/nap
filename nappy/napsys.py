@@ -1155,7 +1155,7 @@ if __name__ == "__main__":
     infname= args['INFILE']
     outfname= args['OUTFILE']
     scalefactor= args['--scale']
-    specorder= args['--specorder'].split('')
+    specorder= args['--specorder'].split(',')
     
     psys= NAPSystem(fname=infname,ffmt=infmt,specorder=specorder)
 
