@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-03-09 13:22:06 Ryo KOBAYASHI>
+c                     Last-modified: <2017-03-09 14:12:58 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -284,13 +284,13 @@ c.....Write out energy
       write(ionum+1,'(es23.14e3)') epot
       close(ionum+1)
 
-c.....Write stress tensor
-      ptmp(1) = ptnsr(1,1)*up2gpa
-      ptmp(2) = ptnsr(2,2)*up2gpa
-      ptmp(3) = ptnsr(3,3)*up2gpa
-      ptmp(4) = ptnsr(3,2)*up2gpa
-      ptmp(5) = ptnsr(1,3)*up2gpa
-      ptmp(6) = ptnsr(1,2)*up2gpa
+c.....Write stress tensor, negative as compressive, positive as tensile
+      ptmp(1) = ptnsr(1,1)*up2gpa*(-1d0)
+      ptmp(2) = ptnsr(2,2)*up2gpa*(-1d0)
+      ptmp(3) = ptnsr(3,3)*up2gpa*(-1d0)
+      ptmp(4) = ptnsr(3,2)*up2gpa*(-1d0)
+      ptmp(5) = ptnsr(1,3)*up2gpa*(-1d0)
+      ptmp(6) = ptnsr(1,2)*up2gpa*(-1d0)
       open(ionum+2,file='strs'//trim(cpostfix),status='replace')
       write(ionum+2,'(6f12.4)') ptmp(1:6)
       close(ionum+2)

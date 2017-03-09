@@ -80,7 +80,7 @@ def prepare(infname='POSCAR'):
         os.system('mkdir -p {}'.format(dname))
         print(dname)
         cell0 = atoms.get_cell()
-        cell = np.dot(fmat,cell0)
+        cell = np.dot(cell0,fmat.T)
         atoms.set_cell(cell,scale_atoms=True)
         atoms.write(dname+'/POSCAR',format='vasp',vasp5=True,direct=True,
                     sort=False)

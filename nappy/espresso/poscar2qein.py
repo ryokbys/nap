@@ -20,6 +20,9 @@ Options:
   -s SCALEFACTOR
               Scaling factor for the original lattice constant.
               [default: 1.0]
+  --pseudo-dir PSUEDODIR
+              Path to the directory where pseudopotential data exist.
+              [default: /home/usr0/z41110v/local/espresso/PPs_Daniele/]
 """
 from __future__ import print_function
 
@@ -194,6 +197,7 @@ if __name__ == "__main__":
     calc = args['--calc']
     constraints = args['--constraints'].split(',')
     pitch = float(args['--pitch'])
+    psdir = args['--pseudo-dir']
 
     atoms = read(poscar,format="vasp")
 
@@ -206,6 +210,7 @@ if __name__ == "__main__":
     write_espresso_in(atoms,outfname,
                       pitch=pitch,
                       constraints=constraints,
-                      calculation=calc)
+                      calculation=calc,
+                      pseudo_dir=psdir)
     
 
