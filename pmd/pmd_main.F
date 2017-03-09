@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2016-12-21 15:53:27 Ryo KOBAYASHI>
+c                     Last-modified: <2017-03-09 13:22:06 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -260,13 +260,14 @@ c=======================================================================
       subroutine write_force(ionum,cpostfix,h,epot,ntot
      &     ,tagtot,atot,ptnsr)
       implicit none
+      include "./params_unit.h"
       integer,intent(in):: ionum,ntot
       character(len=*),intent(in):: cpostfix
       real(8),intent(in):: h(3,3),epot,ptnsr(3,3)
       real(8),intent(inout):: tagtot(ntot),atot(3,ntot)
 
       integer:: i,n0,ixyz,ierr
-      real(8):: at(3)
+      real(8):: at(3),ptmp(6)
       integer,parameter:: nmpi = 2
 
 
@@ -274,7 +275,7 @@ c.....Write out forces
       open(ionum,file='frc'//trim(cpostfix),status='replace')
       write(ionum,'(i10)') ntot
       do i=1,ntot
-        write(ionum,'(3es23.14e3)') atot(1:3,i)
+        write(ionum,'(3f12.6)') atot(1:3,i)
       enddo
       close(ionum)
 
@@ -284,9 +285,14 @@ c.....Write out energy
       close(ionum+1)
 
 c.....Write stress tensor
-      open(ionum+2,file='str'//trim(cpostfix),status='replace')
-      write(ionum+2,'(6es16.7e3)') ptnsr(1,1),ptnsr(2,2),ptnsr(3,3),
-     &     ptnsr(2,3),ptnsr(1,3),ptnsr(1,2)
+      ptmp(1) = ptnsr(1,1)*up2gpa
+      ptmp(2) = ptnsr(2,2)*up2gpa
+      ptmp(3) = ptnsr(3,3)*up2gpa
+      ptmp(4) = ptnsr(3,2)*up2gpa
+      ptmp(5) = ptnsr(1,3)*up2gpa
+      ptmp(6) = ptnsr(1,2)*up2gpa
+      open(ionum+2,file='strs'//trim(cpostfix),status='replace')
+      write(ionum+2,'(6f12.4)') ptmp(1:6)
       close(ionum+2)
 
       end subroutine write_force
