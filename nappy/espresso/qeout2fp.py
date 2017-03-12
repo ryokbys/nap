@@ -24,7 +24,7 @@ import numpy as np
 
 sys.path.append(os.environ['HOME']+'/src/nap')
 from nappy.atom import Atom
-from nappy.pmdsys import NAPSystem,unitvec_to_hi,cartessian_to_scaled
+from nappy.napsys import NAPSystem,unitvec_to_hi,cartessian_to_scaled
 from nappy.units import Ry_to_eV, Bohr_to_Ang
 
 sys.path.append(os.path.dirname(__file__))
@@ -84,6 +84,7 @@ def read_espresso_out(fname,):
     il_spcs = -1
     il_forces = -1
     il_pos = -1
+    il_stress = -1
     infname = None
     nspcs = None
 
@@ -102,6 +103,8 @@ def read_espresso_out(fname,):
             natm = int(lines[il].split()[4])
         elif 'number of atomic types' in lines[il]:
             nspcs = int(lines[il].split()[5])
+        elif 'total   stress' in lines[il]:
+            il_stress = il
         if '    Reading input from ' in lines[il]:
             infname = lines[il].split()[3]
 
@@ -123,6 +126,7 @@ def read_espresso_out(fname,):
         raise IOError('No species info in the output file.')
     if nspcs == None:
         raise IOError('No atoimc-type info in the output file.')
+    
     
     # read atom species
     il= il_spcs +1
@@ -167,7 +171,22 @@ def read_espresso_out(fname,):
             l = lines[il+ia].split()
             frcs[ia,:] = [ float(x) for x in l[6:9] ]
 
-    return natm,nspcs,spcs,cell,pos,elems,erg,frcs,pos_unit
+    #...read stress
+    stnsr = np.zeros((3,3),dtype=float)
+    strs = np.zeros(6,dtype=float)
+    if il_stress != -1:
+        il = il_stress +1
+        for iil in range(3):
+            l = lines[il+iil].split()
+            stnsr[iil,:] = [ float(x) for x in l[3:6] ]
+        strs[0] = stnsr[0,0]
+        strs[1] = stnsr[1,1]
+        strs[2] = stnsr[2,2]
+        strs[3] = stnsr[1,2]
+        strs[4] = stnsr[0,2]
+        strs[5] = stnsr[0,1]
+
+    return natm,nspcs,spcs,cell,pos,elems,erg,frcs,pos_unit,strs
 
 
 def convert(fname,specorder,index):
@@ -180,11 +199,12 @@ def convert(fname,specorder,index):
     ryau2evang = ry2ev/au2ang
 
     if not os.path.exists(fname):
-        raise RuntimeError('No '+fname+' exists.')
+        raise RuntimeError(fname+' not found.')
         
     #atoms= read('POSCAR',index=0,format='vasp')
     try:
-        natm,nspcs,spcs,cell,pos,elems,erg,frcs,pos_unit = read_espresso_out(fname)
+        natm,nspcs,spcs,cell,pos,elems,erg,frcs,pos_unit,strs \
+            = read_espresso_out(fname)
     except IOError as e:
         print('IOError({0:s}): {1:s}'.format(e.errno,e.strerror))
         raise
@@ -215,6 +235,12 @@ def convert(fname,specorder,index):
     psys.write_pmd(fname='pos')
     write_ergref(fname='erg.ref',erg=erg)
     write_frcref(fname='frc.ref',frcs=frcs)
+
+    #...write stress
+    with open('strs.ref','w') as f:
+        for s in strs:
+            f.write(' {0:8.2f}'.format(s))
+        f.write('\n')
 
 
 if __name__ == "__main__":

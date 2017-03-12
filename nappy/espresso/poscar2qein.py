@@ -39,6 +39,7 @@ qe_params = {
         'calculation': 'scf',
         'max_seconds': 85400,
         'outdir': './out/',
+        'disk_io': 'none',
         'prefix': 'pw',
         'pseudo_dir': '/home/usr0/z41110v/local/espresso/PPs_Daniele/',
         'restart_mode': 'from_scratch',
