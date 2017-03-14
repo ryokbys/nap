@@ -179,12 +179,13 @@ def read_espresso_out(fname,):
         for iil in range(3):
             l = lines[il+iil].split()
             stnsr[iil,:] = [ float(x) for x in l[3:6] ]
-        strs[0] = stnsr[0,0]
-        strs[1] = stnsr[1,1]
-        strs[2] = stnsr[2,2]
-        strs[3] = stnsr[1,2]
-        strs[4] = stnsr[0,2]
-        strs[5] = stnsr[0,1]
+        #...Reduce to 6 components in GPa and opposite sign
+        strs[0] = stnsr[0,0] *(-0.1)
+        strs[1] = stnsr[1,1] *(-0.1)
+        strs[2] = stnsr[2,2] *(-0.1)
+        strs[3] = stnsr[1,2] *(-0.1)
+        strs[4] = stnsr[0,2] *(-0.1)
+        strs[5] = stnsr[0,1] *(-0.1)
 
     return natm,nspcs,spcs,cell,pos,elems,erg,frcs,pos_unit,strs
 

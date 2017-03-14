@@ -21,27 +21,30 @@ Options:
               Scaling factor for the original lattice constant.
               [default: 1.0]
   --pseudo-dir PSUEDODIR
-              Path to the directory where pseudopotential data exist.
-              [default: /home/usr0/z41110v/local/espresso/PPs_Daniele/]
+              Path to the directory where pseudopotential data exist,
+              which is appended to $HOME environmental variable.
+              [default: /local/espresso/SSSP_acc_PBESOL/]
 """
 from __future__ import print_function
 
 import os,sys
+import glob
 from docopt import docopt
 from ase.io import read,write
+import ase.data
 import numpy as np
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "160802"
+__version__ = "170314"
 
 qe_params = {
     '&CONTROL':{
-        'calculation': 'scf',
+        'calculation': 'vc-relax',
         'max_seconds': 85400,
         'outdir': './out/',
         'disk_io': 'none',
         'prefix': 'pw',
-        'pseudo_dir': '/home/usr0/z41110v/local/espresso/PPs_Daniele/',
+        'pseudo_dir': '/Users/kobayashi/local/espresso/SSSP_acc_PBESOL/',
         'restart_mode': 'from_scratch',
         'verbosity': 'high',
         'wf_collect': False,
@@ -60,10 +63,18 @@ qe_params = {
         'nbnd': 0,
     },
     '&ELECTRONS':{
-        'conv_thr': 1.0e-06,
+        'conv_thr': 1.0e-04,
         'mixing_beta': 7.0e-01,
         'mixing_mode': 'plain',
         'diagonalization': 'cg',
+    },
+    '&IONS':{
+        'ion_dynamics': 'bfgs',
+    },
+    '&CELL':{
+        'cell_dynamics': 'bfgs',
+        'press': 0.0,
+        'cell_dofree': 'all',
     },
 }
 
@@ -71,6 +82,8 @@ namelist_order = (
     '&CONTROL',
     '&SYSTEM',
     '&ELECTRONS',
+    '&IONS',
+    '&CELL',
 )
 
 nelectrons = {
@@ -96,6 +109,7 @@ def override_qe_params(**kwargs):
     
 
 def write_espresso_in(atoms,outfname,k_shift=(0.,0.,0.),pitch=0.0968,
+                      symbols=[],ppfiles=[],valences=[],
                       constraints=[],
                       **kwargs):
     """
@@ -106,6 +120,7 @@ def write_espresso_in(atoms,outfname,k_shift=(0.,0.,0.),pitch=0.0968,
     fo = open(outfname,'w')
 
     override_qe_params(**kwargs)
+    psdir = kwargs['pseudo_dir']
 
     #...Some necessary paramters.
     elms = atoms.get_chemical_symbols()
@@ -119,8 +134,8 @@ def write_espresso_in(atoms,outfname,k_shift=(0.,0.,0.),pitch=0.0968,
             elif k == 'nbnd':
                 nbnd = 0
                 for e in elms:
-                    nbnd += nelectrons[e]
-                fo.write("   {0:s} = {1:d}\n".format(k,nbnd))
+                    nbnd += valences[e]
+                fo.write("   {0:s} = {1:d}\n".format(k,int(nbnd)))
                 continue
             if isinstance(v,bool):
                 if v:
@@ -135,19 +150,24 @@ def write_espresso_in(atoms,outfname,k_shift=(0.,0.,0.),pitch=0.0968,
                 fo.write("   {0:s} = {1:f}\n".format(k,v))
         fo.write('/\n')
 
-    if 'relax' in qe_params['&CONTROL']['calculation']:
-        fo.write('&IONS\n')
-        fo.write("   ion_dynamics = 'bfgs'\n")
-        fo.write('/\n')
-    if 'vc' in qe_params['&CONTROL']['calculation']:
-        fo.write('&CELL\n')
-        fo.write("   cell_dynamics = 'bfgs'\n")
-        fo.write('/\n')
+    # if 'relax' in qe_params['&CONTROL']['calculation']:
+    #     fo.write('&IONS\n')
+    #     fo.write("   ion_dynamics = 'bfgs'\n")
+    #     fo.write('/\n')
+    # if 'vc' in qe_params['&CONTROL']['calculation']:
+    #     fo.write('&CELL\n')
+    #     fo.write("   cell_dynamics = 'bfgs'\n")
+    #     fo.write('/\n')
 
     ####### INPUT_CARDS hereafter #######
 
     #...ATOMIC_SPECIES
-    fo.write(atomic_species_txt)
+    fo.write('ATOMIC_SPECIES\n')
+    for i,s in enumerate(symbols):
+        anum = ase.data.atomic_numbers[s]
+        mass = ase.data.atomic_masses[anum]
+        fo.write('{0:s}  {1:8.3f}  {2:s}\n'.format(s,mass,ppfiles[i]))
+    #fo.write(atomic_species_txt)
     
     #...CELL_PARAMETERS
     fo.write('CELL_PARAMETERS angstrom\n')
@@ -189,6 +209,41 @@ def get_kpoints(cell,pitch):
     k3 = max(int(b3/pitch),1)
     return k1,k2,k3
 
+def uniq(arr):
+    uniqarr = []
+    for a in arr:
+        if not a in uniqarr:
+            uniqarr.append(a)
+    return uniqarr
+    
+def get_PP_files(symbols,psdir):
+    files = [ os.path.basename(f) for f in glob.glob(psdir+'/*[Uu][Pp][Ff]') ]
+    ppfiles = []
+    for s in symbols:
+        for f in files:
+            if s.lower() in f[:4].lower():
+                ppfiles.append(f)
+                break
+    if len(symbols) != len(ppfiles):
+        print('symbols = ',symbols)
+        print('ppfiles = ',ppfiles)
+        print('files = ',files)
+        raise ValueError('Something wrong...')
+    return ppfiles
+
+def get_valence(upf):
+    valence = 0.0
+    with open(upf,'r') as f:
+        for line in f.readlines():
+            if 'z_val' in line:
+                data = line.split('=')[1]
+                valence = float(data.replace('"',''))
+                break
+            elif 'Z val' in line:
+                valence = float(line.split()[0])
+                break
+    return valence
+
 if __name__ == "__main__":
 
     args = docopt(__doc__)
@@ -200,18 +255,40 @@ if __name__ == "__main__":
     pitch = float(args['--pitch'])
     psdir = args['--pseudo-dir']
 
+    #...PP directory
+    psdir = os.environ['HOME']+'/'+psdir
+    
     atoms = read(poscar,format="vasp")
+    print('system: {}'.format(atoms.get_chemical_formula()))
 
     #...some scaling to the system
     cell = atoms.get_cell()
     cell *= sfac
     atoms.set_cell(cell,scale_atoms=True)
+    print('cell:')
+    print(cell)
+
+    #...get PP file
+    symbols = uniq(atoms.get_chemical_symbols())
+    ppfiles = get_PP_files(symbols,psdir)
+    print('PP files:')
+    for ppf in ppfiles:
+        print(ppf)
+
+    #...get_valence electrons
+    valences = {}
+    for s,ppf in zip(symbols,ppfiles):
+        valences[s] = get_valence(psdir+'/'+ppf)
     
     #...write it out in QE format
     write_espresso_in(atoms,outfname,
+                      symbols=symbols,
+                      ppfiles=ppfiles,
+                      valences=valences,
                       pitch=pitch,
                       constraints=constraints,
                       calculation=calc,
-                      pseudo_dir=psdir)
+                      pseudo_dir=psdir,
+                      ntyp=len(symbols))
     
 
