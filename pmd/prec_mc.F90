@@ -1,7 +1,7 @@
-!-----------------------------------------------------------------------
-!                     Last-modified: <2016-12-08 12:25:27 Ryo KOBAYASHI>
-!-----------------------------------------------------------------------
 module pmc
+!-----------------------------------------------------------------------
+!                     Last-modified: <2017-03-15 16:36:08 Ryo KOBAYASHI>
+!-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
 !
@@ -343,6 +343,9 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   ergp = efrm0
 
   if( myid_md.eq.0 ) then
+    write(cfmt,'(i10)') natm
+    write(iosym,'(i8,3x,'//trim(cfmt)//'a)') 0,csymbols(1:natm)
+    flush(iosym)
     write(6,*) ''
     write(6,'(a)') ' chemical potentials:'
     do i=0,3
@@ -906,11 +909,13 @@ subroutine write_POSCAR(cfname,natm,csymbols,pos,hmat,species)
 
   integer:: i,m,id,ns(0:3),idorder(natm)
   integer:: date_time(8)
-  character(len=10):: sys_time(3)
+  character(len=8):: date,cdate
+  character(len=10):: time
+  character(len=5):: zone
   character(len=1):: cs
   character(len=2):: sname(0:3) = (/ 'V ','Al','Mg','Si' /)
   
-  call date_and_time(sys_time(1), sys_time(2), sys_time(3), date_time)
+  call date_and_time(date, time, zone, date_time)
 
   id = 0
   do m = 0,3
@@ -926,8 +931,8 @@ subroutine write_POSCAR(cfname,natm,csymbols,pos,hmat,species)
   enddo
   
   open(90,file=trim(cfname))
-  write(90,'(3a)') 'written by PMC at ', &
-       trim(sys_time(1))
+  write(cdate,'(i4.4,i2.2,i2.2)') date_time(1),date_time(2),date_time(3)
+  write(90,'(3a)') 'written by PMC at ',trim(cdate)
   write(90,'(a)') '   1.00000000'
   write(90,'(3es15.7)') hmat(1:3,1)
   write(90,'(3es15.7)') hmat(1:3,2)
@@ -1030,7 +1035,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   ifdmp = 2  ! FIRE
   dmp = 0.99d0
   minstp = 3
-  tinit = 100d0
+  tinit = 0d0
   tfin = 1d0
   ctctl = 'none'
   ttgt(1:9) = 300d0
@@ -1053,7 +1058,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   czload_type = 'no'
   eps_conv = 1d-3
   ifsort = 1
-  iprint = 0
+  iprint = 1
 
 !.....call pmd_core to perfom MD
 !!$  print *,'nstps_pmd = ',nstps_pmd

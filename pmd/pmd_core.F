@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-01-12 21:56:07 Ryo KOBAYASHI>
+c                     Last-modified: <2017-03-15 17:01:24 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file include core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -1990,31 +1990,29 @@ c=======================================================================
         enddo
       enddo
       
-      if( myid_md.eq.0 ) then
-        if( fdotv.gt.0d0  ) then
-          num_fire = num_fire + 1
-          if( num_fire.gt.nmin_fire ) then
-            dt = min(dtmax_fire,dt*finc_fire)
-            alp_fire = alp_fire*alp_fire
-            if( iprint.ne.0 ) then
-              write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
-     &             ,dt,alp_fire,fdotv
-            endif
-          endif
-        else
-          dt = min(dtmax_fire,dt*fdec_fire)
-          va(1:3,1:natm) = 0d0
-          alp_fire = alp0_fire
-          num_fire = 0
-          if( iprint.ne.0 ) then
+      if( fdotv.gt.0d0  ) then
+        num_fire = num_fire + 1
+        if( num_fire.gt.nmin_fire ) then
+          dt = min(dtmax_fire,dt*finc_fire)
+          alp_fire = alp_fire*alp_fire
+          if( iprint.ne.0 .and. myid_md.eq.0 ) then
             write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
      &           ,dt,alp_fire,fdotv
           endif
         endif
+      else
+        dt = min(dtmax_fire,dt*fdec_fire)
+        va(1:3,1:natm) = 0d0
+        alp_fire = alp0_fire
+        num_fire = 0
+        if( iprint.ne.0 .and. myid_md.eq.0 ) then
+          write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
+     &         ,dt,alp_fire,fdotv
+        endif
       endif
-      call mpi_bcast(dt,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(alp_fire,1,mpi_double_precision,0,mpi_md_world
-     &     ,ierr)
+c      call mpi_bcast(dt,1,mpi_double_precision,0,mpi_md_world,ierr)
+c      call mpi_bcast(alp_fire,1,mpi_double_precision,0,mpi_md_world
+c     &     ,ierr)
       end subroutine vfire
 c=======================================================================
       subroutine space_decomp(hunit,h,ntot,tagtot,rtot,vtot
