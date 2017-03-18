@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-03-15 16:36:08 Ryo KOBAYASHI>
+!                     Last-modified: <2017-03-18 09:34:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -125,9 +125,9 @@ program prec_mc
 !
 ! OUTPUT FILES:
 ! -------------
-!   dat.erg:    MC step, real time, epot
-!   dat.symbols: MC step, symbol array 
-!   POSCAR_#####: Cell info and atom coordinations of a certain steps.
+!   out.mc.erg:     MC step, real time, epot
+!   out.mc.symbols: MC step, symbol array 
+!   poscars/POSCAR_######: Cell info and atom coordinations
 !-----------------------------------------------------------------------
   use pmc
   implicit none 
@@ -879,15 +879,13 @@ subroutine read_symbols(ionum,fname,natm,csymbols)
   character(len=*),intent(in):: fname
   character,intent(out):: csymbols(natm)
 
-  character:: txt(natm)
+!!$  character:: txt(natm)
+  character(len=natm):: txt
   integer:: itmp,ios
 
 !.....read the last symbols from file
-  open(ionum,file='fname',status='old')
-  do while(.true.)
-    read(ionum,iostat=ios) itmp, txt
-    if( ios.lt.0 ) exit
-  end do
+  open(ionum,file=trim(fname),status='old')
+  read(ionum,*) itmp, txt
   close(ionum)
 
   call loads_symbols(natm,txt,csymbols)
@@ -1058,7 +1056,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   czload_type = 'no'
   eps_conv = 1d-3
   ifsort = 1
-  iprint = 1
+  iprint = 0
 
 !.....call pmd_core to perfom MD
 !!$  print *,'nstps_pmd = ',nstps_pmd
