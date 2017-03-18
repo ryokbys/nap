@@ -25,7 +25,7 @@ contains
 
     integer:: i,j,k,l,m,n,ierr,is
     real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),at(3)
-    real(8):: x,y,z,xi(3),epotl,phic,dphic,phi,dphi,tmp
+    real(8):: x,y,z,xi(3),epotl,epott,phic,dphic,phi,dphi,tmp
 
     logical,save:: l1st=.true.
     real(8),allocatable,save:: sqrho(:)
@@ -39,11 +39,8 @@ contains
       l1st=.false.
     endif
 
-    aa(1:3,1:natm)=0d0
-    epi(1:natm)= 0d0
     epotl= 0d0
     sqrho(1:natm)= 0d0
-
 
 !c-----make pair list for 2-body term
 !      call mk_lspr(namax,natm,nb,nnmax,tag,ra,rc,h,hi
@@ -114,21 +111,10 @@ contains
       epotl=epotl -sc_eps*sc_c*sqrho(i)
     enddo
 
-!-----reduced force
-    do i=1,natm
-      at(1:3)= aa(1:3,i)
-      aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-    enddo
-!-----multiply 0.5d0*dt**2/am(i)
-    do i=1,natm
-      is= int(tag(i))
-      aa(1:3,i)= acon(is)*aa(1:3,i)
-    enddo
-
 !-----gather epot
-    epot= 0d0
-    call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
          ,MPI_SUM,mpi_md_world,ierr)
+    epot= epot +epott
 
   end subroutine force_SC_Fe
 end module SC_Fe

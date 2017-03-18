@@ -24,7 +24,7 @@ contains
 
 !-----local
     integer:: i,j,k,l,m,n,ixyz,is,js,ks,ierr,jj,kk,ll
-    real(8):: epotl,epotl2,epotl3
+    real(8):: epotl,epotl2,epotl3,epott
     real(8):: rij,rij2,riji,rim,rimi,v2,t1,t2,t3,dft,aexp,gg &
          ,eda2,eda,edb,edc,edg,eds
     real(8):: v3,qz,dqz,tz,dtz,grij,dgrij,grik,dgrik,rik,rik2,riki,h1 &
@@ -276,25 +276,14 @@ contains
 !-----sum
     aa(1:3,1:natm)= -aa2(1:3,1:natm) -aa3(1:3,1:natm)
 
-!-----reduced force
-    do i=1,natm
-      at(1:3)= aa(1:3,i)
-      aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-    enddo
-!-----multiply 0.5d0*dt**2/am(i)
-    do i=1,natm
-      is= int(tag(i))
-      aa(1:3,i)= acon(is)*aa(1:3,i)
-    enddo
-
 !-----gather epot
-    epot= 0d0
     epotl= epotl2 +epotl3
     if( myid.ge.0 ) then
-      call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+      call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
            ,MPI_SUM,mpi_world,ierr)
+      epot= epot +epott
     else
-      epot= epotl
+      epot= epot +epotl
     endif
 
   end subroutine force_EDIP_Si

@@ -54,7 +54,7 @@ contains
     real(8):: tmp,tmp1,tmp2,vexp,df2,drij,csn,tcsn,tcsn2,dhrij,dhrik &
          ,dhcsn,vol,voli,volj,volk
     real(8):: drik,dcsni,dcsnj,dcsnk,drijc,drikc,x,y,z,bl
-    real(8):: epotl,epotl2,epotl3
+    real(8):: epotl,epotl2,epotl3,epott
     real(8),save:: swli,a8d3r3
     real(8),save,allocatable:: aa2(:,:),aa3(:,:)
     real(8),save,allocatable,dimension(:):: xi,xj,xk,xij,xik,at,bli
@@ -281,26 +281,14 @@ contains
     aa(1:3,1:natm)= -aa2(1:3,1:natm) -aa3(1:3,1:natm)
 
 
-!-----reduced force
-    do i=1,natm
-      at(1:3)= aa(1:3,i)
-      aa(1:3,i)= ( hi(1:3,1)*at(1) +hi(1:3,2)*at(2) &
-           +hi(1:3,3)*at(3) ) *swli
-    enddo
-!-----multiply 0.5d0*dt**2/am(i)
-    do i=1,natm
-      is= int(tag(i))
-      aa(1:3,i)= acon(is)*aa(1:3,i)
-    enddo
-
 !-----gather epot
-    epot= 0d0
     epotl= epotl2 +epotl3
     if( myid.ge.0 ) then
-      call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+      call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
            ,MPI_SUM,mpi_world,ierr)
+      epot= epot +epott
     else
-      epot= epotl
+      epot= epot +epotl
     endif
     return
 

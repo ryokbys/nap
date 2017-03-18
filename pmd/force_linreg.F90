@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-06 09:33:21 Ryo KOBAYASHI>
+!                     Last modified: <2017-03-18 18:40:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -64,7 +64,7 @@ contains
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ielem &
          ,iwgt
-    real(8):: rcin,b_na,at(3),epotl,wgt,aexp,bnai,apot
+    real(8):: rcin,b_na,at(3),epotl,wgt,aexp,bnai,apot,epott
     real(8),save,allocatable:: fat(:,:),dbna(:,:,:)
 !.....1st call
     logical,save:: l1st=.true.
@@ -91,9 +91,6 @@ contains
 #endif
 
     epotl= 0d0
-    epi(1:natm+nb)= 0d0
-    strs(1:3,1:3,1:namax)= 0d0
-    aa(1:3,1:namax)= 0d0
 
     dbna(1:3,1:nelem,1:natm+nb)= 0d0
     do ia=1,natm
@@ -148,21 +145,12 @@ contains
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa,3)
-!-----reduced force
-    do i=1,natm
-      at(1:3)= aa(1:3,i)
-      aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-    enddo
-!-----multiply 0.5d0*dt**2/am(i)
-    do i=1,natm
-      is= int(tag(i))
-      aa(1:3,i)= acon(is)*aa(1:3,i)
-    enddo
 
 !-----gather epot
-    epot= 0d0
-    call mpi_allreduce(epotl,epot,1,mpi_double_precision &
+    call mpi_allreduce(epotl,epott,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
+    epot= epot +epott
+    
     return
   end subroutine force_linreg
 !=======================================================================

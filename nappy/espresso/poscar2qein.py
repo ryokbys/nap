@@ -120,11 +120,18 @@ def write_espresso_in(atoms,outfname,k_shift=(0.,0.,0.),pitch=0.0968,
     fo = open(outfname,'w')
 
     override_qe_params(**kwargs)
-    psdir = kwargs['pseudo_dir']
+    #psdir = kwargs['pseudo_dir']
 
     #...Some necessary paramters.
     elms = atoms.get_chemical_symbols()
     for namelist in namelist_order:
+        if not 'relax' in qe_params['&CONTROL']['calculation'] and \
+           not 'md' in qe_params['&CONTROL']['calculation'] and \
+           namelist == '&IONS':
+            continue
+        if not 'vc' in qe_params['&CONTROL']['calculation'] and \
+           namelist == '&CELL':
+            continue
         ctx = qe_params[namelist]
         fo.write(namelist+'\n')
         for k,v in ctx.items():

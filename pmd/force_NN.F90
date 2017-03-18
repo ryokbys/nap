@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-22 13:49:04 Ryo KOBAYASHI>
+!                     Last modified: <2017-03-18 18:44:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -66,7 +66,7 @@ contains
 !.....local
     integer:: i,j,k,l,m,n,is,ierr,ia,ja &
          ,ihl0,ihl1,ihl2,jj
-    real(8):: rcin,at(3),epotl,hl1i,hl2i,tmp2,tmp1,tmp
+    real(8):: rcin,at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp
     real(8),save:: rc3
 !    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
 !.....1st call
@@ -262,7 +262,6 @@ contains
     epotl= 0d0
     if( nl.eq.1 ) then
       do ia=1,natm
-        epi(ia)= 0d0
         do ihl1=1,nhl(1)
           epi(ia)= epi(ia) +wgt12(ihl1) *(hl1(ihl1,ia)-0.5d0)
         enddo
@@ -273,7 +272,6 @@ contains
       enddo
     else if( nl.eq.2 ) then
       do ia=1,natm
-        epi(ia)= 0d0
         do ihl2=1,nhl(2)
           epi(ia)= epi(ia) +wgt23(ihl2) *(hl2(ihl2,ia)-0.5d0)
         enddo
@@ -285,7 +283,6 @@ contains
     endif
 
 !.....sum up for forces
-    aa(1:3,1:natm+nb)= 0d0
     if( nl.eq.1 ) then
 !.....loop over every energy per atom-i
       do ia=1,natm
@@ -337,17 +334,6 @@ contains
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa,3)
 
-!-----reduced force
-    do i=1,natm
-      at(1:3)= aa(1:3,i)
-      aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-    enddo
-!-----multiply 0.5d0*dt**2/am(i)
-    do i=1,natm
-      is= int(tag(i))
-      aa(1:3,i)= acon(is)*aa(1:3,i)
-    enddo
-
     if( lstrs ) then
       call compute_stress(namax,natm,tag,ra,nnmax,strs,h &
            ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rc,lspr &
@@ -355,12 +341,12 @@ contains
     endif
 
 !-----gather epot
-    epot= 0d0
     if( myid.ge.0 ) then
-      call mpi_allreduce(epotl,epot,1,mpi_double_precision &
+      call mpi_allreduce(epotl,epott,1,mpi_double_precision &
            ,mpi_sum,mpi_world,ierr)
+      epot= epot +epott
     else
-      epot= epotl
+      epot= epot +epotl
     endif
     return
   end subroutine force_NN
@@ -926,7 +912,6 @@ contains
     real(8):: xi(3),xj(3),xji(3),rij(3),rji(3),dji,sji,sii&
          ,hl2i,tmp2i,hl1i,tmp1i
 
-    strs(1:3,1:3,1:namax) = 0d0
     if( nl.eq.1 ) then
       do ia=1,natm
         xi(1:3)= ra(1:3,ia)
@@ -1008,6 +993,7 @@ contains
 !-----send back (3-body)forces, stresses, and potentials on immigrants
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,strs,9)
+!.....TODO: should this strs be additive?
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)*0.5d0
 
 !!$    if( myid.ge.0 ) then

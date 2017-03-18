@@ -26,7 +26,7 @@ contains
     integer:: i,j,jj,k,kk,ierr,is
     real(8):: rij,riji,rik,riki,rjk,rjki,rexp,aexp,dvrdr,cs,gc,tk,t1, &
          va,dgc,frik,dfrik,frjk,dfrjk,bij,bji,b,dvadr,frij,dfrij, &
-         gfi,gfj,tmp,x,y,z,epotl
+         gfi,gfj,tmp,x,y,z,epotl,epott
     real(8):: xi(3),xj(3),xk(3),xij(3),xji(3),xik(3),xjk(3),dixij(3) &
          ,djxij(3),dixji(3),djxji(3),fi(3),fj(3),dixik(3),djxjk(3) &
          ,dkxik(3),dkxjk(3),dics(3),djcs(3),dkcs(3),at(3)
@@ -54,7 +54,6 @@ contains
     aa1(1:3,1:namax)= 0d0
     aa2(1:3,1:namax)= 0d0
     epotl= 0d0
-    epi(1:namax)= 0d0
 
 !-----Repulsive term: V_R
     do i=1,natm
@@ -266,27 +265,12 @@ contains
 !!$    endif
 
 !-----sum
-    aa(1:3,1:natm)= -aa1(1:3,1:natm) -aa2(1:3,1:natm)
-
-!-----reduced force
-    do i=1,natm
-      at(1:3)= aa(1:3,i)
-      aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-    enddo
-!-----multiply 0.5d0*dt**2/am(i)
-    do i=1,natm
-      is= int(tag(i))
-      aa(1:3,i)= acon(is)*aa(1:3,i)
-    enddo
+    aa(1:3,1:natm)= aa(1:3,1:natm) -aa1(1:3,1:natm) -aa2(1:3,1:natm)
 
 !-----gather epot
-    epot= 0d0
-    if( myid_md.ge.0 ) then
-      call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
-           ,MPI_SUM,mpi_md_world,ierr)
-    else
-      epot= epotl
-    endif
+    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+         ,MPI_SUM,mpi_md_world,ierr)
+    epot= epot +epotl
 
   end subroutine force_Brenner
 !=======================================================================

@@ -2,6 +2,11 @@
      &     ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs
      &     ,cforce,iprint)
+c-----------------------------------------------------------------------
+c  Wrapper routine for force calculations.
+c  Each force calculation routine is called from this subroutine.
+c  Any new force routine should be implemented in this subroutine.
+c-----------------------------------------------------------------------
       use RK_FeH,only:force_RK_FeH
       use Ramas_FeH,only:force_Ramas_FeH,force_Ackland_Fe
       use RK_WHe,only:force_RK_WHe
@@ -30,87 +35,104 @@
       character(len=*),intent(in):: cforce
       logical:: lstrs
       
-      integer:: ierr
+      integer:: ierr,is,i
+      real(8):: at(3)
+
+      epot = 0d0
+      aa(1:3,1:natm+nb)=0d0
+      epi(1:natm+nb)= 0d0
+      strs(1:3,1:3,1:natm+nb)= 0d0
       
       select case (trim(cforce))
-        case ('LJ_Ar')
-          call force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('Ito3_WHe')
-          call force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('RK_WHe')
-          call force_RK_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('RK_FeH')
-          call force_RK_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('Ramas_FeH')
-          call force_Ramas_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('Ackland_Fe')
-          call force_Ackland_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('SW_Si')
-          call force_SW_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('EDIP_Si')
-          call force_EDIP_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('Brenner')
-          call force_Brenner(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('Brenner_vdW')
-          call force_Brenner_vdW(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('Lu_WHe')
-          call force_Lu_Whe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('Branicio_AlN')
-          call force_Branicio_AlN(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('Mishin_Al')
-          call force_Mishin_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('AFS_W')
-          call force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('SC_Fe')
-          call force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('SM_Al')
-          call force_SM_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('linreg')
-          call force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case ('NN')
-          call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &         ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
-        case default
-          write(6,'(a)') ' [get_force] unknown force: '
-     &         //trim(cforce)//' !!'
-          call mpi_finalize(ierr)
-          stop
+      case ('LJ_Ar')
+        call force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('Ito3_WHe')
+        call force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('RK_WHe')
+        call force_RK_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('RK_FeH')
+        call force_RK_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('Ramas_FeH')
+        call force_Ramas_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('Ackland_Fe')
+        call force_Ackland_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('SW_Si')
+        call force_SW_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('EDIP_Si')
+        call force_EDIP_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('Brenner')
+        call force_Brenner(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('Brenner_vdW')
+        call force_Brenner_vdW(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('Lu_WHe')
+        call force_Lu_Whe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('Branicio_AlN')
+        call force_Branicio_AlN(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('Mishin_Al')
+        call force_Mishin_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('AFS_W')
+        call force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('SC_Fe')
+        call force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('SM_Al')
+        call force_SM_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('linreg')
+        call force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('NN')
+        call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case default
+        write(6,'(a)') ' [get_force] unknown force: '
+     &       //trim(cforce)//' !!'
+        call mpi_finalize(ierr)
+        stop
       end select
+
+c.....convert forces from hmat-coordinates to Cartesian coordinates
+      do i=1,natm
+        at(1:3)= aa(1:3,i)
+        aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
+      enddo
+c-----multiply 0.5d0*dt**2/am(i)
+      do i=1,natm
+        is= int(tag(i))
+        aa(1:3,i)= acon(is)*aa(1:3,i)
+      enddo
 
       end subroutine get_force
 c=======================================================================

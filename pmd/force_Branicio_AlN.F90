@@ -24,7 +24,7 @@ contains
 
     integer:: i,j,k,l,m,n,ierr,is,js,ks,ir
     real(8):: f2rc,df2rc,ri,cst,cs
-    real(8):: epotl,epotl2,epotl3,t1,t2,tmp1,tmp2,vol
+    real(8):: epotl,epotl2,epotl3,t1,t2,tmp1,tmp2,vol,epott
     real(8):: rij,riji,rik,riki,d,v2,dv2,expij,expik,v3,dt1j,dt1k,dt2
     real(8):: xi(3),xj(3),xij(3),xik(3),at(3),xx(3),drij(3),drik(3) &
          ,dcsj(3),dcsk(3),dcsi(3)
@@ -76,7 +76,6 @@ contains
     endif
 
     epotl= 0d0
-    epi(1:namax)= 0d0
     aa2(1:3,1:namax)= 0d0
     aa3(1:3,1:namax)= 0d0
     epotl2= 0d0
@@ -177,27 +176,17 @@ contains
 !!$    endif
 
 !-----sum
-    aa(1:3,1:natm)= -aa2(1:3,1:natm) -aa3(1:3,1:natm)
-
-!-----reduced force
-    do i=1,natm
-      at(1:3)= aa(1:3,i)
-      aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-    enddo
-!-----multiply 0.5d0*dt**2/am(i)
-    do i=1,natm
-      is= int(tag(i))
-      aa(1:3,i)= acon(is)*aa(1:3,i)
-    enddo
+    aa(1:3,1:natm)= aa(1:3,1:natm) -aa2(1:3,1:natm) -aa3(1:3,1:natm)
 
 !-----gather epot
-    epot= 0d0
     epotl= epotl2 +epotl3
     if( myid.ge.0 ) then
-      call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+      epott = 0d0
+      call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
            ,MPI_SUM,mpi_world,ierr)
+      epot= epot +epott
     else
-      epot= epotl
+      epot= epot +epotl
     endif
 
 !!$!-----get min bond length

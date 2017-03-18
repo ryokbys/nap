@@ -200,17 +200,6 @@ contains
 !!$      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
 !!$    enddo
 
-!.....reduced force
-    do i=1,natm
-      at(1:3)= aa(1:3,i)
-      aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-    enddo
-!.....multiply 0.5d0*dt**2/am(i)
-    do i=1,natm
-      is= int(tag(i))
-      aa(1:3,i)= acon(is)*aa(1:3,i)
-    enddo
-
 !.....gather epot
     epot= 0d0
     if( myid_md.ge.0 ) then

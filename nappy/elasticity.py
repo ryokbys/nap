@@ -9,7 +9,7 @@ ANALYZE mode reads the stress values obtained by some code.
 
 Usage:
     elastic_constants.py prepare [options] POSCAR
-    elastic_constants.py fit STRSFILE
+    elastic_constants.py analyze STRSFILE
 
 Options:
   -h, --help  Shows this message and exit.
@@ -109,16 +109,33 @@ def params2ctnsr(params):
     Create C_ij tensor from flat params vector assuring symmetry of C_ij.
     """
     ctnsr = np.zeros((6,6),dtype=float)
-    n = 0
+    # n = 0
+    # for i in range(6):
+    #     for j in range(i,6):
+    #         ctnsr[i,j] = params[n]
+    #         ctnsr[j,i] = ctnsr[i,j]
+    #         n += 1
+    ctnsr[0,0] = params[0]
+    ctnsr[1,1] = params[1]
+    ctnsr[2,2] = params[2]
+    ctnsr[1,2] = params[3]
+    ctnsr[0,2] = params[4]
+    ctnsr[0,1] = params[5]
+    ctnsr[3,3] = params[6]
+    ctnsr[4,4] = params[7]
+    ctnsr[5,5] = params[8]
+    ctnsr[3,5] = params[9]
+    ctnsr[0,4] = params[10]
+    ctnsr[1,4] = params[11]
+    ctnsr[2,4] = params[12]
+
     for i in range(6):
         for j in range(i,6):
-            ctnsr[i,j] = params[n]
             ctnsr[j,i] = ctnsr[i,j]
-            n += 1
     return ctnsr
 
 
-def fit(strsfname):
+def analyze(strsfname):
 
     #...get 24 deformations
     fmats = get_deformations()
@@ -146,10 +163,14 @@ def fit(strsfname):
                 strss[i] = np.array([ float(d) for d in data ])
         except:
             raise
+        print(fmats[i])
+        print(strss[i])
     strss = strss.flatten()
 
     #...parameters 21 elements
-    params = np.zeros(21,dtype=float)
+    #params = np.zeros(21,dtype=float)
+    #...parameters 13 elements
+    params = np.zeros(13,dtype=float)
 
     #...fit
     opt,covar = curve_fit(cdote,strns,strss,p0=params)
@@ -170,6 +191,6 @@ if __name__ == '__main__':
     if args['prepare']:
         infname = args['POSCAR']
         prepare(infname)
-    elif args['fit']:
+    elif args['analyze']:
         strsfname = args['STRSFILE']
-        fit(strsfname)
+        analyze(strsfname)
