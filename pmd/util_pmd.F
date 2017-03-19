@@ -256,3 +256,76 @@ c=======================================================================
 
       end subroutine write_pmdtot_bin
 c=======================================================================
+      subroutine read_chgtot_ascii(ionum,cfname)
+      use pmdio
+      implicit none
+      integer,intent(in):: ionum
+      character(len=*),intent(in):: cfname
+
+      integer:: ia,ib,l,i,ntott,itmp
+
+      open(ionum,file=trim(cfname),status='old')
+      read(ionum,*) ntott
+      allocate(chgtot(ntott),chitot(ntott))
+      do i=1,ntott
+        read(ionum,*) itmp,chgtot(i),chitot(i)
+      enddo
+      close(ionum)
+      
+      end subroutine read_chgtot_ascii
+c=======================================================================
+      subroutine read_chgtot_bin(ionum,cfname)
+      use pmdio
+      implicit none
+      integer,intent(in):: ionum
+      character(len=*),intent(in):: cfname
+
+      integer:: ia,ib,l,i,ntott,itmp
+
+      open(ionum,file=trim(cfname),form='unformatted',status='old')
+      read(ionum) ntott
+      allocate(chgtot(ntott),chitot(ntott))
+      do i=1,ntott
+        read(ionum) itmp,chgtot(i),chitot(i)
+      enddo
+      close(ionum)
+      
+      end subroutine read_chgtot_bin
+c=======================================================================
+      subroutine write_chgtot_ascii(ionum,cfname)
+      use pmdio
+      implicit none
+      integer,intent(in):: ionum
+      character(len=*),intent(in) :: cfname
+      integer,external:: itotOf
+
+      integer:: ia,ib,l,i
+
+      open(ionum,file=cfname,status='replace')
+      write(ionum,'(i10)') ntot
+      do i=1,ntot
+        write(ionum,'(es23.14e3,2es13.4e3)') itotOf(tagtot(i))
+     &       ,chgtot(i),chitot(i)
+      enddo
+      close(ionum)
+
+      end subroutine write_chgtot_ascii
+c=======================================================================
+      subroutine write_chgtot_bin(ionum,cfname)
+      use pmdio
+      implicit none
+      integer,intent(in):: ionum
+      character(len=*),intent(in) :: cfname
+      integer,external:: itotOf
+
+      integer:: ia,ib,l,i
+
+      open(ionum,file=cfname,form='unformatted',status='replace')
+      write(ionum) ntot
+      do i=1,ntot
+        write(ionum) itotOf(tagtot(i))
+     &       ,chgtot(i),chitot(i)
+      enddo
+      close(ionum)
+
+      end subroutine write_chgtot_bin

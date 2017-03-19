@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-03-18 09:34:28 Ryo KOBAYASHI>
+!                     Last-modified: <2017-03-19 06:13:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -960,7 +960,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   integer:: i,inc
   integer,parameter:: nismax = 9
   integer:: nstp,nerg,npmd,ifpmd,minstp,ntdst,n_conv,ifsort,iprint &
-       ,ifdmp
+       ,ifdmp,ifchg
   real(8):: hunit,h(3,3,0:1),am(nismax),dt,rc,dmp,tinit,tfin,ttgt(9)&
        ,trlx,stgt(3,3),ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3) &
        ,epot,ekin,eps_conv,rbuf
@@ -970,7 +970,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   logical,save:: l1st = .true.
   integer,save:: ntot = 0
   real(8),save,allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:) &
-       ,epitot(:),ekitot(:,:,:),stot(:,:,:)
+       ,epitot(:),ekitot(:,:,:),stot(:,:,:),chgtot(:),chitot(:)
 
 !.....at the 1st call, evaluate number of total atoms to be used in pmd
 !     and allocate total system arrays
@@ -984,19 +984,21 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
     if( ntot.ne.inc ) then
       ntot = inc
       if( allocated(tagtot) ) then
-        deallocate(tagtot,rtot,vtot,atot,epitot,ekitot,stot)
+        deallocate(tagtot,rtot,vtot,atot,epitot,ekitot,stot,chgtot,chitot)
       endif
       allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),atot(3,ntot) &
-           ,epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot))
+           ,epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot) &
+           ,chgtot(ntot),chitot(ntot))
     endif
   else
     if( ntot.ne.1 ) then
       ntot = 1
       if( allocated(tagtot) ) then
-        deallocate(tagtot,rtot,vtot,atot,epitot,ekitot,stot)
+        deallocate(tagtot,rtot,vtot,atot,epitot,ekitot,stot,chgtot,chitot)
       endif
       allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),atot(3,ntot) &
-           ,epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot))
+           ,epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot) &
+           ,chgtot(ntot),chitot(ntot))
     endif
   endif
 
@@ -1057,16 +1059,17 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   eps_conv = 1d-3
   ifsort = 1
   iprint = 0
+  ifchg = 0
 
 !.....call pmd_core to perfom MD
 !!$  print *,'nstps_pmd = ',nstps_pmd
 !!$  print *,'minstp = ',minstp
   call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot &
-       ,ekitot,epitot,nstps_pmd,nerg,npmd &
+       ,ekitot,epitot,chgtot,chitot,nstps_pmd,nerg,npmd &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
        ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp &
        ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
-       ,srlx,stbeta,strfin,lstrs &
+       ,srlx,stbeta,strfin,lstrs,ifchg &
        ,fmv,ptnsr,epot,ekin,n_conv &
        ,czload_type,eps_conv,ifsort,iprint,nstps_done)
 !!$  print *,'nstps_pmd,minstp,nstps_done = ' &

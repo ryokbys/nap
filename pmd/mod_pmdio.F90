@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2016-11-10 16:14:47 Ryo KOBAYASHI>
+!                     Last modified: <2017-03-18 21:00:17 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -8,7 +8,7 @@ module pmdio
   integer:: ntot
 !.....data of total system
   real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
-       ,ekitot(:,:,:),tagtot(:),atot(:,:)
+       ,ekitot(:,:,:),tagtot(:),atot(:,:),chgtot(:),chitot(:)
   real(8):: hunit,h(3,3,0:1)
   
   integer:: nstp = 0
@@ -34,6 +34,8 @@ module pmdio
   data ttgt / 300d0, 300d0, 300d0, 300d0, 300d0, 300d0, &
        300d0, 300d0, 300d0 /
   real(8):: trlx = 100d0
+!.....charged system?
+  integer:: ifchg = 0
 !.....temperature distribution on x-direction
   logical:: ltdst= .false.
   integer:: ntdst= 1

@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-03-09 14:12:58 Ryo KOBAYASHI>
+c                     Last-modified: <2017-03-18 21:37:05 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -59,23 +59,40 @@ c.....only 0th-node reads pmd0000 file
           call read_pmdtot_bin(20,"pmd0000")
         else if( trim(ciofmt).eq.'ascii' ) then
           call read_pmdtot_ascii(20,"pmd0000")
+        else
+          write(6,*) 'Error: io_format must be either ascii, '
+     &         //'bin or binary.'
+          stop
+        endif
+
+c.....if needed, read atomic charges from chg0000 file
+c.....but even if not needed, allocate ntot long array
+c.....for the simplicty of code
+        allocate(chgtot(ntot),chitot(ntot))
+        if( ifchg .ne. 0 ) then
+          if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
+            call read_chgtot_bin(20,"chg0000")
+          else if( trim(ciofmt).eq.'ascii' ) then
+            call read_chgtot_ascii(20,"chg0000")
+          endif
         endif
 
 c.....make ntot and ?tot() not null in nodes myid_md != 0
       else
         ntot = 1
         allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot)
-     &       ,ekitot(3,3,ntot),stot(3,3,ntot),atot(3,ntot))
+     &       ,ekitot(3,3,ntot),stot(3,3,ntot),atot(3,ntot)
+     &       ,chgtot(ntot),chitot(ntot))
       endif
 
 c.....call pmd_core to perfom MD
       call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
-     &     ,ekitot,epitot,nstp,nerg,npmd,myid_md,mpi_md_world,nodes_md
-     &     ,nx,ny,nz
+     &     ,ekitot,epitot,chgtot,chitot,nstp,nerg,npmd
+     &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
      &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
      &     ,srlx,stbeta,strfin,lstrs0
-     &     ,fmv,ptnsr,epot,ekin,n_conv
+     &     ,fmv,ptnsr,epot,ekin,n_conv,ifchg
      &     ,czload_type,eps_conv,ifsort,iprint,nstp_done)
 
 c.....write energy, forces and stresses only for fitpot

@@ -1,5 +1,5 @@
-      subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
-     &     ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+      subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi
+     &     ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs
      &     ,cforce,iprint)
 c-----------------------------------------------------------------------
@@ -32,6 +32,7 @@ c-----------------------------------------------------------------------
      &     ,acon(nismax),tag(namax)
       real(8),intent(inout):: tcom,rc
       real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+     &     ,chg(namax),chi(namax)
       character(len=*),intent(in):: cforce
       logical:: lstrs
       

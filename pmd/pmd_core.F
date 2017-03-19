@@ -1,15 +1,15 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-03-15 17:01:24 Ryo KOBAYASHI>
+c                     Last-modified: <2017-03-19 10:44:50 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file include core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
       subroutine pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
-     &     ,ekitot,epitot,maxstp,nerg,npmd
+     &     ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
      &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
      &     ,srlx,stbeta,strfin,lstrs0
-     &     ,fmv,ptnsr,epot,ekin,n_conv
+     &     ,fmv,ptnsr,epot,ekin,n_conv,ifchg
      &     ,czload_type,eps_conv,ifsort,iprint,nstp_done)
       use pmdvars
       implicit none
@@ -17,7 +17,7 @@ c-----------------------------------------------------------------------
       include "./params_unit.h"
       integer,intent(in):: ntot,maxstp,nerg,npmd,myid_md,mpi_md_world
      &     ,nismax,ifpmd,ifdmp,minstp,ntdst,ifsort
-     &     ,iprint,nodes_md,nx,ny,nz,n_conv
+     &     ,iprint,nodes_md,nx,ny,nz,n_conv,ifchg
       integer,intent(out):: nstp_done
       real(8),intent(in):: hunit,tinit,tfin
      &     ,trlx,srlx,stbeta,strfin,dmp,eps_conv
@@ -25,6 +25,7 @@ c-----------------------------------------------------------------------
      &     ,atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot)
      &     ,epitot(ntot),dt,rc,rbuf,h(3,3,0:1),ptnsr(3,3),fmv(3,0:9)
      &     ,epot,ekin,am(nismax),stgt(3,3),ptgt,ttgt(9)
+     &     ,chgtot(ntot),chitot(ntot)
       character,intent(in):: ciofmt*6, cforce*20, cpctl*20, ctctl*20
      &     ,czload_type*5
       logical,intent(in):: ltdst,lstrs0
@@ -84,7 +85,7 @@ c-----output every these steps, NOUTERG, NOUTPMD
         noutpmd = maxstp +1
       endif
 c.....perform space decomposition after reading atomic configuration
-      call space_decomp(hunit,h,ntot,tagtot,rtot,vtot
+      call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
       if( myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,'(a)') " H-matrix:"
@@ -194,7 +195,7 @@ c.....Calc forces
      &     ( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &       trim(cpctl).eq.'vv-Berendsen')
-      call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+      call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &     ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,lstrs
      &     ,cforce,iprint)
@@ -417,7 +418,7 @@ c.....Copy RA of boundary atoms determined by 'bacopy'
           lstrs = lstrs0
         endif
 c-------Calc forces
-        call get_force(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+        call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs
      &       ,cforce,iprint)
@@ -614,8 +615,8 @@ c---------decide pmd-file name
           write(cnum(1:4),'(i4.4)') iocntpmd
 c          call system("mkdir -p "//cnum)
           call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
-     &         ,stot,natm,tag,ra,va,aa,epi,eki,strs,sorg
-     &         ,nxyz,myid_md,mpi_md_world,tspdcmp)
+     &         ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
+     &         ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
           if( myid_md.eq.0 ) then
             if( ifsort.eq.1 ) call sort_by_tag(ntot,tagtot,rtot,vtot
      &           ,ekitot,epitot,stot)
@@ -2016,10 +2017,10 @@ c     &     ,ierr)
       end subroutine vfire
 c=======================================================================
       subroutine space_decomp(hunit,h,ntot,tagtot,rtot,vtot
-     &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
+     &     ,chgtot,chitot,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
 c
 c  Decompose the system and scatter atoms to every process.
-c  This would be called only the first time, but the routine is
+c  This would be called only the first time of MD, but the routine is
 c  written as if it is called several times.
 c
       use pmdvars
@@ -2027,7 +2028,8 @@ c
       include 'mpif.h'
       integer,intent(in):: ntot,myid_md,mpi_md_world,nx,ny,nz,nxyz
      &     ,iprint
-      real(8),intent(in):: tagtot(ntot),vtot(3,ntot)
+      real(8),intent(in):: tagtot(ntot),vtot(3,ntot),chgtot(ntot)
+     &     ,chitot(ntot)
       real(8),intent(in):: hunit,h(3,3,0:1)
       real(8),intent(inout):: rtot(3,ntot)
 
@@ -2104,6 +2106,7 @@ c.....allocate memory for local arrays of length namax
      &       ,strs(3,3,namax),stt(3,3,namax),tag(namax)
      &       ,lspr(0:nnmax,namax),epi(namax),eki(3,3,namax)
      &       ,stp(3,3,namax),stn(3,3,namax)
+     &       ,chg(namax),chi(namax)
      &       ,lsb(0:nbmax,6),lsex(nbmax,6))
       endif
 
@@ -2131,38 +2134,48 @@ c.....allocate memory for local arrays of length namax
               tag(natm)= tagtot(i)
               ra(1:3,natm)= rtot(1:3,i)
               va(1:3,natm)= vtot(1:3,i)
+              chg(natm)= chgtot(i)
+              chi(natm)= chitot(i)
             endif
           enddo
           if( ixyz.ne.0 ) then
-            call mpi_send(natm,1,mpi_integer,ixyz,ixyz
+            call mpi_send(natm,1,mpi_integer,ixyz,ixyz+1
      &           ,mpi_md_world,ierr)
-            call mpi_send(tag,natm,mpi_double_precision,ixyz
-     &           ,3*(ixyz+1)-3,mpi_md_world,ierr)
-            call mpi_send(ra,3*natm,mpi_double_precision,ixyz
-     &           ,3*(ixyz+1)-2,mpi_md_world,ierr)
-            call mpi_send(va,3*natm,mpi_double_precision,ixyz
-     &           ,3*(ixyz+1)-1,mpi_md_world,ierr)
+            call mpi_send(tag,natm,mpi_double_precision,ixyz,ixyz+2
+     &           ,mpi_md_world,ierr)
+            call mpi_send(ra,3*natm,mpi_double_precision,ixyz,ixyz+3
+     &           ,mpi_md_world,ierr)
+            call mpi_send(va,3*natm,mpi_double_precision,ixyz,ixyz+4
+     &           ,mpi_md_world,ierr)
+            call mpi_send(chg,natm,mpi_double_precision,ixyz,ixyz+5
+     &           ,mpi_md_world,ierr)
+            call mpi_send(chi,natm,mpi_double_precision,ixyz,ixyz+6
+     &           ,mpi_md_world,ierr)
           endif
         enddo
 c        write(6,'(a,f10.3)') ' time space_decomp = ',mpi_wtime() -t0
         tspdcmp = mpi_wtime() -t0
       else ! myid_md.ne.0
-        call mpi_recv(natm,1,mpi_integer,0,myid_md
+        call mpi_recv(natm,1,mpi_integer,0,myid_md+1
      &       ,mpi_md_world,istat,ierr)
-        call mpi_recv(tag,natm,mpi_double_precision,0
-     &       ,3*(myid_md+1)-3,mpi_md_world,istat,ierr)
-        call mpi_recv(ra,3*natm,mpi_double_precision,0
-     &       ,3*(myid_md+1)-2,mpi_md_world,istat,ierr)
-        call mpi_recv(va,3*natm,mpi_double_precision,0
-     &       ,3*(myid_md+1)-1,mpi_md_world,istat,ierr)
+        call mpi_recv(tag,natm,mpi_double_precision,0,myid_md+2
+     &       ,mpi_md_world,istat,ierr)
+        call mpi_recv(ra,3*natm,mpi_double_precision,0,myid_md+3
+     &       ,mpi_md_world,istat,ierr)
+        call mpi_recv(va,3*natm,mpi_double_precision,0,myid_md+4
+     &       ,mpi_md_world,istat,ierr)
+        call mpi_recv(chg,natm,mpi_double_precision,0,myid_md+5
+     &       ,mpi_md_world,istat,ierr)
+        call mpi_recv(chi,natm,mpi_double_precision,0,myid_md+6
+     &       ,mpi_md_world,istat,ierr)
       endif
       call mpi_barrier(mpi_md_world,ierr)
 
       end subroutine space_decomp
 c=======================================================================
       subroutine space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
-     &     ,stot,natm,tag,ra,va,aa,epi,eki,strs,sorg
-     &     ,nxyz,myid_md,mpi_md_world,tspdcmp)
+     &     ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs,chg,chi
+     &     ,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
 c
 c  Opposite to space_decomp, gather atoms from every process
 c  to create the total system for output.
@@ -2171,10 +2184,11 @@ c
       include 'mpif.h'
       integer,intent(in):: ntot,natm,nxyz,myid_md,mpi_md_world
       real(8),intent(in):: va(3,natm),aa(3,natm),epi(natm),eki(3,3,natm)
-     &     ,strs(3,3,natm),tag(natm),sorg(3)
+     &     ,strs(3,3,natm),tag(natm),sorg(3),chg(natm),chi(natm)
       real(8),intent(inout):: ra(3,natm),tspdcmp
       real(8),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
      &     ,atot(3,ntot),epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot)
+     &     ,chgtot(ntot),chitot(ntot)
       integer,parameter:: nmpi = 8
       integer:: n0,ixyz,natmt,i,ierr
       integer:: istat(mpi_status_size),itag
@@ -2191,6 +2205,8 @@ c
         epitot(1:natm) = epi(1:natm)
         ekitot(1:3,1:3,1:natm) = eki(1:3,1:3,1:natm)
         stot(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
+        chgtot(1:natm) = chg(1:natm)
+        chitot(1:natm) = chi(1:natm)
         n0 = n0 +1
         do ixyz=1,nxyz-1
           itag = ixyz*nmpi -nmpi
@@ -2210,6 +2226,10 @@ c
      &         ,ixyz,itag+6,mpi_md_world,istat,ierr)
           call mpi_recv(atot(1,n0),3*natmt,mpi_double_precision
      &         ,ixyz,itag+7,mpi_md_world,istat,ierr)
+          call mpi_recv(chgtot(n0),natmt,mpi_double_precision
+     &         ,ixyz,itag+8,mpi_md_world,istat,ierr)
+          call mpi_recv(chitot(n0),natmt,mpi_double_precision
+     &         ,ixyz,itag+9,mpi_md_world,istat,ierr)
           n0 = n0 + natmt
         enddo
         tspdcmp = tspdcmp +(mpi_wtime()-t0)
@@ -2239,6 +2259,10 @@ c.....positions should be reverted after passing data
         call mpi_send(strs,3*3*natm,mpi_double_precision,0,itag+6
      &       ,mpi_md_world,ierr)
         call mpi_send(aa,3*natm,mpi_double_precision,0,itag+7
+     &       ,mpi_md_world,ierr)
+        call mpi_send(chg,natm,mpi_double_precision,0,itag+8
+     &       ,mpi_md_world,ierr)
+        call mpi_send(chi,natm,mpi_double_precision,0,itag+9
      &       ,mpi_md_world,ierr)
       endif
 
