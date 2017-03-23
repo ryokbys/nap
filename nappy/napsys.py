@@ -98,7 +98,7 @@ class NAPSystem(object):
         It is transpose of the definition of that in POSCAR.
         Here hmat = [a1,a2,a3] so that
         pos = hmat * spos
-        where pos and spos are real Cartessian position and scaled position.
+        where pos and spos are real Cartesian position and scaled position.
         """
         hmat = np.zeros((3, 3), dtype=float)
         hmat[:, 0] = self.a1 * self.alc
@@ -321,7 +321,13 @@ class NAPSystem(object):
             # 7th or 8th line: comment
             c7= f.readline()
             if c7[0] in ('s','S'):
-                c8= f.readline()
+                c7= f.readline()
+            if c7[0] in ('c','C'): # positions are in Cartesian coordinate
+                hi = unitvec_to_hi(self.a1,self.a2,self.a3)
+                coord = 'cartesian'
+            else:
+                coord = 'scaled'
+            
             # Atom positions hereafter
             self.atoms= []
             for i in range(natm):
@@ -344,7 +350,12 @@ class NAPSystem(object):
                 ai.set_sid(sid)
                 if symbol:
                     ai.symbol = symbol
-                ai.set_pos(float(buff[0]),float(buff[1]),float(buff[2]))
+                pos = [ float(buff[0]), float(buff[1]), float(buff[2])]
+                if coord == 'cartesian':
+                    x1,x2,x3 = cartesian_to_scaled(hi,pos[0],pos[1],pos[2])
+                elif coord == 'scaled':
+                    x1,x2,x3 = pos[0],pos[1],pos[2]
+                ai.set_pos(x1,x2,x3)
                 ai.set_vel(0.0,0.0,0.0)
                 self.atoms.append(ai)
                 
@@ -550,12 +561,12 @@ class NAPSystem(object):
         xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz = hmat_to_lammps(self.get_hmat())
         # a,b,c = hmat_to_lammps(self.get_hmat())
         # xlo = ylo = zlo = 0.0
-        xhi = a[0]
-        xy  = b[0]
-        yhi = b[1]
-        xz  = c[0]
-        yz  = c[1]
-        zhi = c[2]
+        # xhi = a[0]
+        # xy  = b[0]
+        # yhi = b[1]
+        # xz  = c[0]
+        # yz  = c[1]
+        # zhi = c[2]
         xlo_bound = xlo +min(0.0, xy, xz, xy+xz)
         xhi_bound = xhi +max(0.0, xy, xz, xy+xz)
         ylo_bound = ylo +min(0.0, yz)
@@ -578,9 +589,9 @@ class NAPSystem(object):
                 +" ekin epot sxx syy szz syz sxz sxy\n")
         for i in range(len(self.atoms)):
             ai= self.atoms[i]
-            x= ai.pos[0] *self.a1[0]
-            y= ai.pos[1] *self.a2[1]
-            z= ai.pos[2] *self.a3[2]
+            x= ai.pos[0] *self.a1[0] *self.alc
+            y= ai.pos[1] *self.a2[1] *self.alc
+            z= ai.pos[2] *self.a3[2] *self.alc
             vx= ai.vel[0]
             vy= ai.vel[1]
             vz= ai.vel[2]
@@ -727,7 +738,7 @@ class NAPSystem(object):
                     xc= float(data[1])
                     yc= float(data[2])
                     zc= float(data[3])
-                    xi,yi,zi = cartessian_to_scaled(hi,xc,yc,zc)
+                    xi,yi,zi = cartesian_to_scaled(hi,xc,yc,zc)
                     ai.set_pos(xi,yi,zi)
                     ai.set_vel(0.0,0.0,0.0)
                     self.atoms.append(ai)
@@ -770,7 +781,7 @@ class NAPSystem(object):
         f.write("{0:>8d}  1\n".format(len(self.atoms)))
         for i in range(len(self.atoms)):
             ai= self.atoms[i]
-            x,y,z = scaled_to_cartessian(h,ai.pos[0],ai.pos[1],ai.pos[2])
+            x,y,z = scaled_to_cartesian(h,ai.pos[0],ai.pos[1],ai.pos[2])
             vx= ai.vel[0]
             vy= ai.vel[1]
             vz= ai.vel[2]
@@ -1006,9 +1017,9 @@ def parse_filename(filename):
     return None
 
 
-def cartessian_to_scaled(hi,xc,yc,zc):
+def cartesian_to_scaled(hi,xc,yc,zc):
     """
-    Convert an atomic position in Cartessian coordinate
+    Convert an atomic position in Cartesian coordinate
     to scaled position using inversed h-matrix.
     Inversed h-matrix has to be given.
     """
@@ -1021,9 +1032,9 @@ def cartessian_to_scaled(hi,xc,yc,zc):
     return x,y,z
 
 
-def scaled_to_cartessian(h,xs,ys,zs):
+def scaled_to_cartesian(h,xs,ys,zs):
     """
-    Convert a scaled positions to Cartessian coordinate.
+    Convert a scaled positions to Cartesian coordinate.
     H-matrix has to be given.
     """
     xc = 0.0

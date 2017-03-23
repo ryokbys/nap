@@ -1,7 +1,7 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-03-19 10:44:50 Ryo KOBAYASHI>
+c                     Last-modified: <2017-03-23 16:12:05 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
-c This file include core subroutines/functions needed for pmd.
+c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
       subroutine pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd
@@ -12,6 +12,7 @@ c-----------------------------------------------------------------------
      &     ,fmv,ptnsr,epot,ekin,n_conv,ifchg
      &     ,czload_type,eps_conv,ifsort,iprint,nstp_done)
       use pmdvars
+      use zload
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -48,6 +49,15 @@ c-----output file names
 c.....multiply damping factor 1st to avoid doing every step
       if( ifdmp.eq.1 ) then
         fmv(1:3,0:9)= fmv(1:3,0:9) *dmp
+      endif
+
+c.....Set 0d0 to z of fmv(9) in case of z-loading
+      if( czload_type.eq.'atoms' .or. czload_type.eq.'box' ) then
+        fmv(3,9) = 0d0
+        if( myid_md.eq.0 ) then
+          write(6,'(a)') 'Set fmv(3,9)=0d0, because czload_type='
+     &         //czload_type
+        endif
       endif
       
 c-----parallel configuration
@@ -152,6 +162,12 @@ c-----get total number of particles
         write(6,'(a,i10)') " nis =",nis
       endif
 
+c.....Set ifmv of top and bottom atoms for z-loading if needed
+      if( czload_type .eq. 'atoms' ) then
+        call set_zload_atoms(natm,ra,tag,fmv,sorg,strfin,maxstp
+     &       ,myid_md,mpi_md_world)
+      endif
+
 c.....Set initial temperature if needed
       if( tinit.gt.1d-5 ) then
         call setv(h,natm,tag,va,nismax,am,tinit,dt)
@@ -186,7 +202,7 @@ c-----copy RA of boundary atoms
      &     ,nx,ny,nz,myid_md)
       call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint)
+     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifchg,chg,chi)
 c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
@@ -198,7 +214,7 @@ c.....Calc forces
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &     ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,lstrs
-     &     ,cforce,iprint)
+     &     ,cforce,ifchg,iprint)
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -292,6 +308,23 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
         write(6,*) ''
       endif
 
+c.....output initial configuration including epi, eki, and strs
+      write(cnum(1:4),'(i4.4)') 0
+      call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
+     &     ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
+     &     ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+      if( myid_md.eq.0 ) then
+        if( ifsort.eq.1 ) call sort_by_tag(ntot,tagtot,rtot,vtot
+     &       ,ekitot,epitot,stot)
+        if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' )
+     &       then
+          call write_pmdtot_bin(20,"pmd"//cnum)
+        elseif( trim(ciofmt).eq.'ascii' ) then
+          call write_pmdtot_ascii(20,"pmd"//cnum)
+        endif
+      endif
+      
+
 c-----initialize the counter for output
       iocntpmd=0
       iocnterg=0
@@ -314,9 +347,9 @@ c.....write out temperatures
         write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff(1:9)
         call flush(iotemp)
         
-c.....write out stresses
+c.....write out tensile forces
         if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
-          open(iostrs,file='out.stress',status='replace')
+          open(iostrs,file='out.zload',status='replace')
           write(iostrs,'(a)') '#  istp,   strnow,      ftop,     fbot'
         endif
       endif
@@ -398,7 +431,7 @@ c.....Move atoms that cross the boundary
 c.....Copy RA of boundary atoms
           call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax,natm,nb
      &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv,nex
-     &         ,mpi_md_world,iprint)
+     &         ,mpi_md_world,iprint,ifchg,chg,chi)
 c.....Make pair list
           call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h
      &         ,hi,anxi,anyi,anzi,lspr)
@@ -411,7 +444,7 @@ c     &         " Next update step will be ",istpe
 c.....Copy RA of boundary atoms determined by 'bacopy'
           call bacopy_fixed_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &         ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc
-     &         ,sv,nex,mpi_md_world)
+     &         ,sv,nex,mpi_md_world,ifchg,chg,chi)
         endif
         
         if(ifpmd.eq.1.and. mod(istp,noutpmd).eq.0 )then
@@ -421,7 +454,7 @@ c-------Calc forces
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs
-     &       ,cforce,iprint)
+     &       ,cforce,ifchg,iprint)
         lstrs = .false.
 
 c.....Second kick of velocities
@@ -523,7 +556,7 @@ c-------output energies
           tave= tave/nave
 
           if(czload_type.eq.'atoms') then
-            call get_stress_on_base(natm,ra,aa,tag,h,acon(1),ftop,fbot
+            call get_forces_on_base(natm,ra,aa,tag,h,acon(1),ftop,fbot
      &           ,sorg,myid_md,mpi_md_world)
           endif
 
@@ -1173,13 +1206,13 @@ c      print *, 'bacopy: nb=',nb
 c=======================================================================
       subroutine bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint)
+     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifchg,chg,chi)
 c-----------------------------------------------------------------------
-c Exchanges boundary-atom data among neighbor nodes: tag and ra
-c Normal data passing and repeating the cell are mixed, and
-c automatically selected according to the size of the system.
-c
-c Note: parallelized to smaller than rcut should not happen.
+c  Exchanges boundary-atom data among neighbor nodes: tag and ra
+c  Normal data passing and repeating the cell are mixed, and
+c  automatically selected according to the size of the system.
+c  
+c  Note: parallelized to smaller than rcut should not happen.
 c-----------------------------------------------------------------------
       implicit none
       include 'mpif.h'
@@ -1189,8 +1222,10 @@ c-----------------------------------------------------------------------
      &     ,lsrc(6),nex(3)
       real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
       real(8),intent(inout):: tag(namax),ra(3,namax),tcom
+      integer,intent(in):: ifchg
+      real(8),intent(inout):: chg(namax),chi(namax)
 
-c      integer:: status(MPI_STATUS_SIZE)
+c.....integer:: status(MPI_STATUS_SIZE)
       integer:: i,j,kd,kdd,kul,kuh,ku,ierr,iex
       integer:: nav,maxna,maxb,inode,nsd,nrc,nbnew
       real(8):: tcom1,tcom2,xi(3),rcv(3),asgm
@@ -1200,7 +1235,11 @@ c      integer:: status(MPI_STATUS_SIZE)
       logical:: lshort(3)
 
       if( l1st ) then
-        allocate(dbuf(4,nbmax),dbufr(4,nbmax))
+        if( ifchg .eq. 0 ) then
+          allocate(dbuf(4,nbmax),dbufr(4,nbmax))
+        else
+          allocate(dbuf(6,nbmax),dbufr(6,nbmax))
+        endif
       endif
 
 c-----reset the num of "received" boundary atoms
@@ -1243,9 +1282,7 @@ c.....Dependent on the unit vector size, different treatment is required
               lsex(lsb(0,ku),ku)= iex
             enddo
           enddo
-c          write(6,'(a,i5,i6)') ' ku,lsb(0,ku) = ',kul,lsb(0,kul)
-c          write(6,'(a,i5,i6)') ' ku,lsb(0,ku) = ',kuh,lsb(0,kuh)
-        else ! long enough for normal boundary-atom copy
+        else                    ! long enough for normal boundary-atom copy
 c-------Scan all the residents & copies
           do i=1,natm+nbnew
             xi(1:3)= ra(1:3,i)
@@ -1265,7 +1302,7 @@ c---------Higher neighbor
               lsb(lsb(0,kuh),kuh)=i
             endif
           enddo
-        endif ! if(nex.gt.1)
+        endif                   ! if(nex.gt.1)
 
 c-------Error trap
         do kdd= -1,0
@@ -1285,15 +1322,25 @@ c-------Error trap
         if( nex(kd).gt.1 ) then
           do kdd= -1,0
             ku= 2*kd+kdd
-            do i=1,lsb(0,ku)
-              j= lsb(i,ku)
-              iex= lsex(i,ku)
-              ra(1:3,natm+nbnew+i)= ra(1:3,j)
-              ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
-c              write(6,*) 'kd,iex,ku,i,ra=',kd,iex,ku
-c     &             ,i,ra(1:3,natm+nbnew+i)
-              tag(natm+nbnew+i)= tag(j)
-            enddo
+            if( ifchg.eq.0 ) then
+              do i=1,lsb(0,ku)
+                j= lsb(i,ku)
+                iex= lsex(i,ku)
+                ra(1:3,natm+nbnew+i)= ra(1:3,j)
+                ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
+                tag(natm+nbnew+i)= tag(j)
+              enddo
+            else
+              do i=1,lsb(0,ku)
+                j= lsb(i,ku)
+                iex= lsex(i,ku)
+                ra(1:3,natm+nbnew+i)= ra(1:3,j)
+                ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
+                tag(natm+nbnew+i)= tag(j)
+                chg(natm+nbnew+i)= chg(j)
+                chi(natm+nbnew+i)= chi(j)
+              enddo
+            endif
             nbnew= nbnew +lsb(0,ku)
           enddo
         else
@@ -1303,29 +1350,46 @@ c-------To calculate the communication time
             ku=2*kd+kdd
             inode=nn(ku)
             nsd=lsb(0,ku)
-c            write(6,*) ' kd,kdd,ku,nsd =',kd,kdd,ku,nsd
             call mespasi(inode,myparity(kd),nsd,nrc,1,1,10
      &           ,mpi_md_world)
 c---------Store the # of received boundary atoms in LSRC
             lsrc(ku)=nrc
 
 c---------Exchange ra and tag
-            do i=1,nsd
-              j= lsb(i,ku)
-              dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-              dbuf(4,i)  = tag(j)
-            enddo
-            call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*4,nrc*4,21
-     &           ,mpi_md_world)
-            do i=1,nrc
-              ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
-              tag(natm+nbnew+i)   = dbufr(4,i)
-            enddo
+            if( ifchg.eq.0 ) then
+              do i=1,nsd
+                j= lsb(i,ku)
+                dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
+                dbuf(4,i)  = tag(j)
+              enddo
+              call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*4,nrc*4,21
+     &             ,mpi_md_world)
+              do i=1,nrc
+                ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
+                tag(natm+nbnew+i)   = dbufr(4,i)
+              enddo
+            else
+              do i=1,nsd
+                j= lsb(i,ku)
+                dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
+                dbuf(4,i)  = tag(j)
+                dbuf(5,i)  = chg(j)
+                dbuf(6,i)  = chi(j)
+              enddo
+              call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*6,nrc*6,21
+     &             ,mpi_md_world)
+              do i=1,nrc
+                ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
+                tag(natm+nbnew+i)   = dbufr(4,i)
+                chg(natm+nbnew+i)   = dbufr(5,i)
+                chi(natm+nbnew+i)   = dbufr(6,i)
+              enddo
+            endif
 
             call MPI_BARRIER(mpi_md_world,ierr)
 c---------increase the # of received boundary atoms
             nbnew=nbnew+nrc
-c            write(6,'(a,2i8)') " nbnew,nrc=",nbnew,nrc
+
  200      continue
 c-------Add the communication time to COMT
           tcom2=MPI_WTIME()
@@ -1345,15 +1409,10 @@ c-------Error trap
           stop
         endif
 
-100   continue
+ 100  continue
 
 c-----num. of received boundary atoms
       nb=nbnew
-
-c      print *, 'bacopy: nb=',nb
-c      do i=1,natm+nb
-c        write(6,'(i5,3f15.7)') i,ra(1:3,i)
-c      enddo
 
       l1st=.false.
       end subroutine bacopy_new
@@ -1428,11 +1487,13 @@ c=======================================================================
       subroutine bacopy_fixed_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &     ,nex
-     &     ,mpi_md_world)
+     &     ,mpi_md_world,ifchg,chg,chi)
 c-----------------------------------------------------------------------
 c  Exchanges boundary-atom data among neighbor nodes: tag and ra
 c  This doesnt search using position, just send & recv data of atoms
 c    which were listed by 'bacopy'.
+c  Different number of data are copied depending on whether 
+c    using atomic charges or not.
 c-----------------------------------------------------------------------
       implicit none
       include 'mpif.h'
@@ -1441,6 +1502,8 @@ c-----------------------------------------------------------------------
       integer,intent(inout):: lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6)
       real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
       real(8),intent(inout):: tag(namax),ra(3,namax),tcom
+      integer,intent(in):: ifchg
+      real(8),intent(inout):: chg(namax),chi(namax)
 
 c      integer:: status(MPI_STATUS_SIZE)
       integer:: i,j,kd,kdd,ku,ierr,iex
@@ -1450,7 +1513,11 @@ c      integer:: status(MPI_STATUS_SIZE)
       logical,save:: l1st=.true.
 
       if( l1st ) then
-        allocate(dbuf(4,nbmax),dbufr(4,nbmax))
+        if( ifchg .eq. 0 ) then
+          allocate(dbuf(4,nbmax),dbufr(4,nbmax))
+        else
+          allocate(dbuf(6,nbmax),dbufr(6,nbmax))
+        endif
         l1st=.false.
       endif
 
@@ -1472,13 +1539,25 @@ c-------To calculate the communication time
         if( nex(kd).gt.1 ) then
           do kdd= -1,0
             ku= 2*kd+kdd
-            do i=1,lsb(0,ku)
-              j= lsb(i,ku)
-              iex= lsex(i,ku)
-              ra(1:3,natm+nbnew+i)= ra(1:3,j)
-              ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
-              tag(natm+nbnew+i)= tag(j)
-            enddo
+            if( ifchg .eq. 0 ) then
+              do i=1,lsb(0,ku)
+                j= lsb(i,ku)
+                iex= lsex(i,ku)
+                ra(1:3,natm+nbnew+i)= ra(1:3,j)
+                ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
+                tag(natm+nbnew+i)= tag(j)
+              enddo
+            else
+              do i=1,lsb(0,ku)
+                j= lsb(i,ku)
+                iex= lsex(i,ku)
+                ra(1:3,natm+nbnew+i)= ra(1:3,j)
+                ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
+                tag(natm+nbnew+i)= tag(j)
+                chg(natm+nbnew+i)= chg(j)
+                chi(natm+nbnew+i)= chi(j)
+              enddo
+            endif
             nbnew= nbnew +lsb(0,ku)
           enddo
         else
@@ -1489,17 +1568,35 @@ c-------To calculate the communication time
             nrc=lsrc(ku)
 
 c---------Exchange ra and tag
-            do i=1,nsd
-              j= lsb(i,ku)
-              dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-              dbuf(4,i)  = tag(j)
-            enddo
-            call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*4,nrc*4,21
-     &           ,mpi_md_world)
-            do i=1,nrc
-              ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
-              tag(natm+nbnew+i)   = dbufr(4,i)
-            enddo
+            if( ifchg .eq. 0 ) then  ! in case of no charge
+              do i=1,nsd
+                j= lsb(i,ku)
+                dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
+                dbuf(4,i)  = tag(j)
+              enddo
+              call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*4,nrc*4,21
+     &             ,mpi_md_world)
+              do i=1,nrc
+                ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
+                tag(natm+nbnew+i)   = dbufr(4,i)
+              enddo
+            else  ! in case of using atomic charge
+              do i=1,nsd
+                j= lsb(i,ku)
+                dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
+                dbuf(4,i)  = tag(j)
+                dbuf(5,i)  = chg(j)
+                dbuf(6,i)  = chi(j)
+              enddo
+              call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*6,nrc*6,21
+     &             ,mpi_md_world)
+              do i=1,nrc
+                ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
+                tag(natm+nbnew+i)   = dbufr(4,i)
+                chg(natm+nbnew+i)   = dbufr(5,i)
+                chi(natm+nbnew+i)   = dbufr(6,i)
+              enddo
+            endif
 
             call MPI_BARRIER(mpi_md_world,ierr)
             nbnew=nbnew +nrc

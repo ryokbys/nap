@@ -24,13 +24,13 @@ MPIFLAGS= @FCFLAGS@
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
 pmd= pmd_main.o pmd_core.o read_input.o util_vec.o util_rnd.o \
-    util_tag.o lasubs.o util_pmd.o zload.o mk_lspr.o \
+    util_tag.o lasubs.o util_pmd.o mk_lspr.o \
 	  common_parallel.o sort.o
 pmc= prec_mc.o util_rnd.o mk_lspr.o read_input.o pmd_core.o util_vec.o \
-   util_tag.o lasubs.o util_pmd.o zload.o \
+   util_tag.o lasubs.o util_pmd.o \
    common_parallel.o sort.o
 
-mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o
+mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o
 args= iargc.o getarg.o
 
 forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \

@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-03-18 21:37:05 Ryo KOBAYASHI>
+c                     Last-modified: <2017-03-23 16:09:34 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -55,6 +55,7 @@ c.....Set fmv as default value before reading 'in.pmd'
 
 c.....only 0th-node reads pmd0000 file
       if( myid_md.eq.0 ) then
+        call system('cp pmd0000 pmd0000.orig')
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
           call read_pmdtot_bin(20,"pmd0000")
         else if( trim(ciofmt).eq.'ascii' ) then

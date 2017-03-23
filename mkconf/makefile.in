@@ -46,8 +46,8 @@ mkconf_BCC_WHe= mkconf_BCC_W-He.o
 mkconf_WHe_compress= mkconf_W-He-compress.o
 mkconf_W_surface_migrate= mkconf_W_surface_migrate.o
 
-mods=../pmd/mod_variables.o
-util=../pmd/util_pmd.o util_akr.o
+mods=../pmd/mod_pmdvars.o ../pmd/mod_pmdio.o
+util=../pmd/util_pmd.o ../pmd/util_tag.o util_akr.o
 
 #-----------------------------------------------------------------------
 # Make rule entries
@@ -99,3 +99,5 @@ mkconf_BCC_screw: ${mkconf_BCC_screw} ${util} ${mods}
 mkconf_BCC_WHe: ${mkconf_BCC_WHe} ${util} ${mods}
 	${MPIFC} -o $@ ${mods} ${mkconf_BCC_WHe} ${util}
 
+mkconf_graphene: mkconf_graphene.o ${util} ${mods}
+	${MPIFC} -o $@ ${mods} mkconf_graphene.o ${util}

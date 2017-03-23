@@ -1,7 +1,7 @@
       subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi
      &     ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs
-     &     ,cforce,iprint)
+     &     ,cforce,ifchg,iprint)
 c-----------------------------------------------------------------------
 c  Wrapper routine for force calculations.
 c  Each force calculation routine is called from this subroutine.
@@ -24,7 +24,7 @@ c-----------------------------------------------------------------------
       use linreg,only:force_linreg
       use NN,only:force_NN
       implicit none
-      integer,intent(in):: namax,natm,nnmax,nismax,iprint
+      integer,intent(in):: namax,natm,nnmax,nismax,iprint,ifchg
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
      &     ,nnn(6),mpi_md_world,myid_md,nex(3)
       integer,intent(in):: lspr(0:nnmax,namax)
@@ -123,6 +123,10 @@ c-----------------------------------------------------------------------
         call mpi_finalize(ierr)
         stop
       end select
+
+      if( ifchg .eq. 1 ) then   ! screened Coulomb
+
+      endif
 
 c.....convert forces from hmat-coordinates to Cartesian coordinates
       do i=1,natm

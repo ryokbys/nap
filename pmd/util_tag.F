@@ -24,3 +24,26 @@ c=======================================================================
       itotOf= nint(tmp*1d+14)
       return
       end function itotOf
+c=======================================================================
+      subroutine replaceTag(ctx,ival,tag)
+      implicit none
+      character(len=*),intent(in):: ctx
+      integer,intent(in):: ival
+      real(8),intent(inout):: tag
+
+      integer,external:: ifmvOf
+      integer:: ifmv
+
+      if( trim(ctx) .eq. 'isp' ) then
+        ! not implemented
+      else if( trim(ctx) .eq. 'ifmv' ) then
+        if( ival.lt.0 .or. ival.gt.9 ) then
+          stop 'Error @replaceTag: ival.lt.0 .or. ival.gt.9'
+        endif
+        ifmv = ifmvOf(tag)
+        tag = tag -ifmv*0.1 +ival*0.1
+      else if( trim(ctx) .eq. 'itot' ) then
+        ! not implemented
+      endif
+      
+      end subroutine replaceTag
