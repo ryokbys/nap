@@ -23,6 +23,8 @@ c-----------------------------------------------------------------------
       use SM_Al,only:force_SM_Al
       use linreg,only:force_linreg
       use NN,only:force_NN
+      use Coulomb, only: force_screened_Coulomb
+      use Morse, only: force_Morse
       implicit none
       integer,intent(in):: namax,natm,nnmax,nismax,iprint,ifchg
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
@@ -117,6 +119,10 @@ c-----------------------------------------------------------------------
         call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+      case ('Morse')
+        call force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi
+     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
       case default
         write(6,'(a)') ' [get_force] unknown force: '
      &       //trim(cforce)//' !!'
@@ -125,7 +131,10 @@ c-----------------------------------------------------------------------
       end select
 
       if( ifchg .eq. 1 ) then   ! screened Coulomb
-
+        call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
+     &       ,chg,h,hi,tcom
+     &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
       endif
 
 c.....convert forces from hmat-coordinates to Cartesian coordinates
@@ -531,3 +540,7 @@ c
 
       end function hvsd
 c=======================================================================
+c-----------------------------------------------------------------------
+c     Local Variables:
+c     compile-command: "make pmd"
+c     End:

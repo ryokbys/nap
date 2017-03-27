@@ -8,7 +8,7 @@ module zload
   real(8):: zlen, ztop, zbot
   
 contains
-  subroutine set_zload_atoms(natm,ra,tag,fmv,sorg,strfin,nstp &
+  subroutine set_zload_atoms(natm,ra,tag,h,fmv,sorg,strfin,nstp &
        ,myid_md,mpi_md_world)
 !
 !     Choose atoms to be applied z-loading.
@@ -18,7 +18,7 @@ contains
     implicit none
     include 'mpif.h'
     integer,intent(in):: natm,myid_md,mpi_md_world,nstp
-    real(8),intent(in):: ra(3,natm),sorg(3),strfin
+    real(8),intent(in):: ra(3,natm),sorg(3),strfin,h(3,3)
     real(8),intent(inout):: tag(natm),fmv(3,0:9)
     integer:: ierr,i,nztopl,nzbotl
     real(8):: ztopl,zbotl,dzlfin
@@ -53,10 +53,10 @@ contains
     nztopl = 0
     nzbotl = 0
     do i=1,natm
-      if( ra(3,i)+sorg(3) .gt. ztop-zlen*0.05d0 ) then
+      if( ra(3,i)+sorg(3) .gt. ztop-1.5d0/h(3,3) ) then
         call replaceTag('ifmv',9,tag(i))
         nztopl = nztopl +1
-      else if( ra(3,i)+sorg(3) .lt. zbot+zlen*0.05d0 ) then
+      else if( ra(3,i)+sorg(3) .lt. zbot+1.5d0/h(3,3) ) then
         call replaceTag('ifmv',9,tag(i))
         nzbotl = nzbotl +1
       endif

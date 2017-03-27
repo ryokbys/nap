@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-03-23 16:12:05 Ryo KOBAYASHI>
+c                     Last-modified: <2017-03-24 15:35:52 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -164,7 +164,7 @@ c-----get total number of particles
 
 c.....Set ifmv of top and bottom atoms for z-loading if needed
       if( czload_type .eq. 'atoms' ) then
-        call set_zload_atoms(natm,ra,tag,fmv,sorg,strfin,maxstp
+        call set_zload_atoms(natm,ra,tag,h,fmv,sorg,strfin,maxstp
      &       ,myid_md,mpi_md_world)
       endif
 
@@ -726,7 +726,7 @@ c.....deallocate all the arrays allocated in pmd_core
       endif
       deallocate(acon,fack)
       deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
-     &     ,epi,eki,stp,stn,lsb,lsex)
+     &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
 
       end subroutine pmd_core
 c=======================================================================
