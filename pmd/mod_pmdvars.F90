@@ -1,9 +1,8 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2017-03-18 20:36:09 Ryo KOBAYASHI>
+!                    Last modified: <2017-03-28 10:45:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
-  save
 !=======================================================================
 ! PARAMETERS
 !=======================================================================
@@ -25,11 +24,14 @@ module pmdvars
 !=======================================================================
   integer:: nouterg,noutpmd,istp &
        ,iocntpmd,iocnterg
-  integer:: natm,nb,nis
+  integer:: natm,nb,nsp
   real(8):: tcpu,tcpu1,tcpu2,tcom,tspdcmp
   real(8):: epot0,vmaxold,vmax
-  real(8):: tgmm,tfac(9),ediff(9),ediff0(9),temp(9),ekl(9)
-  integer:: ndof(9)
+  real(8):: tgmm
+!!$  real(8):: tgmm,tfac(9),ediff(9),ediff0(9),temp(9),ekl(9)
+  real(8),allocatable:: tfac(:),ediff(:),ediff0(:),temp(:),ekl(:)
+  integer,allocatable:: ndof(:)
+!!$  integer:: ndof(9)
   integer:: nxmlt
 !.....Search time and expiration time
   real(8):: ts,te
@@ -84,4 +86,13 @@ module pmdvars
   integer:: nn(6),myparity(3),lsrc(6),nex(3),myx,myy,myz
   real(8):: sv(3,6),sorg(3),anxi,anyi,anzi
 
+contains
+  subroutine initialize_pmdvars(nspmax)
+    integer,intent(in):: nspmax
+    
+    if( .not. allocated(tfac) ) then
+      allocate(tfac(nspmax),ediff(nspmax),ediff0(nspmax),temp(nspmax)&
+           ,ekl(nspmax),ndof(nspmax))
+    endif
+  end subroutine initialize_pmdvars
 end module pmdvars

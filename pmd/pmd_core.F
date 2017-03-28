@@ -1,15 +1,15 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-03-24 15:35:52 Ryo KOBAYASHI>
+c                     Last-modified: <2017-03-28 18:30:22 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
       subroutine pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
-     &     ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
+     &     ,nspmax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
      &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
      &     ,srlx,stbeta,strfin,lstrs0
-     &     ,fmv,ptnsr,epot,ekin,n_conv,ifchg
+     &     ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb
      &     ,czload_type,eps_conv,ifsort,iprint,nstp_done)
       use pmdvars
       use zload
@@ -17,21 +17,21 @@ c-----------------------------------------------------------------------
       include "mpif.h"
       include "./params_unit.h"
       integer,intent(in):: ntot,maxstp,nerg,npmd,myid_md,mpi_md_world
-     &     ,nismax,ifpmd,ifdmp,minstp,ntdst,ifsort
-     &     ,iprint,nodes_md,nx,ny,nz,n_conv,ifchg
+     &     ,nspmax,ifpmd,ifdmp,minstp,ntdst,ifsort
+     &     ,iprint,nodes_md,nx,ny,nz,n_conv,ifcoulomb
       integer,intent(out):: nstp_done
       real(8),intent(in):: hunit,tinit,tfin
      &     ,trlx,srlx,stbeta,strfin,dmp,eps_conv
       real(8),intent(inout):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
      &     ,atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot)
      &     ,epitot(ntot),dt,rc,rbuf,h(3,3,0:1),ptnsr(3,3),fmv(3,0:9)
-     &     ,epot,ekin,am(nismax),stgt(3,3),ptgt,ttgt(9)
+     &     ,epot,ekin,am(nspmax),stgt(3,3),ptgt,ttgt(9)
      &     ,chgtot(ntot),chitot(ntot)
       character,intent(in):: ciofmt*6, cforce*20, cpctl*20, ctctl*20
      &     ,czload_type*5
       logical,intent(in):: ltdst,lstrs0
 
-      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl,i_conv,ierr,nxyz
+      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
       integer:: ihour,imin,isec
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epotp
       real(8),external:: box_muller,sprod
@@ -45,6 +45,8 @@ c.....For tensile test of Al nanorod
 c-----output file names
       character:: cnum*4
       integer,external:: itotOf
+
+      call initialize_pmdvars(nspmax)
 
 c.....multiply damping factor 1st to avoid doing every step
       if( ifdmp.eq.1 ) then
@@ -104,15 +106,15 @@ c.....perform space decomposition after reading atomic configuration
         write(6,'(3es15.7)') h(1:3,3,0)
       endif
 c.....Some conversions
-      nis= 0
+      nsp= 0
       do i=1,natm
         ra(1:3,i)= ra(1:3,i) -sorg(1:3)
 c-------scaling
         va(1:3,i)= va(1:3,i) *dt
 c-------species of atom-i
-        nis= max(int(tag(i)),nis)
-        if(nis.gt.nismax) then
-          write(6,'(a)') " nis.gt.nismax!!"
+        nsp= max(int(tag(i)),nsp)
+        if(nsp.gt.nspmax) then
+          write(6,'(a)') " nsp.gt.nspmax!!"
           stop
         endif
       enddo
@@ -132,7 +134,7 @@ c.....check whether order of atoms and total-id of atoms match
 c.....Setup for FIRE
       if( ifdmp.eq.2 ) then
         alp_fire = alp0_fire
-        am(1:nismax) = 10.d0
+        am(1:nspmax) = 10.d0
         num_fire = 0
         dtmax_fire = dtmfctr_fire * dt
       endif
@@ -146,20 +148,20 @@ c.....NEMD setting
 
 
 c-----setup
-      allocate(acon(nismax),fack(nismax))
-      call setup(nismax,am,acon,fack,dt)
+      allocate(acon(nspmax),fack(nspmax))
+      call setup(nspmax,am,acon,fack,dt)
 c-----set HI and SGM
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 c-----ntset
       call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
 c-----get total number of particles
-      nisl = nis
-      call mpi_allreduce(nisl,nis,1,MPI_INTEGER,mpi_max
+      nspl = nsp
+      call mpi_allreduce(nspl,nsp,1,MPI_INTEGER,mpi_max
      &     ,mpi_md_world,ierr)
       if(myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,'(a,i10)') " ntot=",ntot
-        write(6,'(a,i10)') " nis =",nis
+        write(6,'(a,i10)') " nsp =",nsp
       endif
 
 c.....Set ifmv of top and bottom atoms for z-loading if needed
@@ -170,8 +172,8 @@ c.....Set ifmv of top and bottom atoms for z-loading if needed
 
 c.....Set initial temperature if needed
       if( tinit.gt.1d-5 ) then
-        call setv(h,natm,tag,va,nismax,am,tinit,dt)
-        call rm_trans_motion(natm,tag,va,nismax,am
+        call setv(h,natm,tag,va,nspmax,am,tinit,dt)
+        call rm_trans_motion(natm,tag,va,nspmax,am
      &       ,mpi_md_world,myid_md,iprint)
       elseif( abs(tinit).le.1d-5 ) then
         va(1:3,1:natm)= 0d0
@@ -202,7 +204,7 @@ c-----copy RA of boundary atoms
      &     ,nx,ny,nz,myid_md)
       call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifchg,chg,chi)
+     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi)
 c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
@@ -213,8 +215,8 @@ c.....Calc forces
      &       trim(cpctl).eq.'vv-Berendsen')
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &     ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
-     &     ,mpi_md_world,myid_md,epi,epot0,nismax,acon,lstrs
-     &     ,cforce,ifchg,iprint)
+     &     ,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
+     &     ,cforce,ifcoulomb,iprint)
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -225,7 +227,7 @@ c.....Calc forces
 #endif
 
 c-----calc kinetic energy
-      call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki,ekl
+      call get_ekin(namax,natm,va,tag,h,nspmax,fack,ekin,eki,ekl
      &     ,vmax,mpi_md_world)
       vmaxold=vmax
 c.....get_num_dof is called once in a MD run
@@ -426,12 +428,12 @@ c.....if making new pair list is needed.
         if( istp.ge.istpe .or.
      &       (ifpmd.eq.1.and.mod(istp,noutpmd).eq.0) ) then
 c.....Move atoms that cross the boundary
-          call bamove_stress(tcom,namax,nbmax,natm,ra,va,tag,strs
+          call bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi
      &         ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world)
 c.....Copy RA of boundary atoms
           call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax,natm,nb
      &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv,nex
-     &         ,mpi_md_world,iprint,ifchg,chg,chi)
+     &         ,mpi_md_world,iprint,ifcoulomb,chg,chi)
 c.....Make pair list
           call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h
      &         ,hi,anxi,anyi,anzi,lspr)
@@ -444,7 +446,7 @@ c     &         " Next update step will be ",istpe
 c.....Copy RA of boundary atoms determined by 'bacopy'
           call bacopy_fixed_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &         ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc
-     &         ,sv,nex,mpi_md_world,ifchg,chg,chi)
+     &         ,sv,nex,mpi_md_world,ifcoulomb,chg,chi)
         endif
         
         if(ifpmd.eq.1.and. mod(istp,noutpmd).eq.0 )then
@@ -453,8 +455,8 @@ c.....Copy RA of boundary atoms determined by 'bacopy'
 c-------Calc forces
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
-     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs
-     &       ,cforce,ifchg,iprint)
+     &       ,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
+     &       ,cforce,ifcoulomb,iprint)
         lstrs = .false.
 
 c.....Second kick of velocities
@@ -499,7 +501,7 @@ c.....accumulate energy difference
 
 c.....Calc kinetic energy
         vmaxold= vmax
-        call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki,ekl
+        call get_ekin(namax,natm,va,tag,h,nspmax,fack,ekin,eki,ekl
      &       ,vmax,mpi_md_world)
 
         call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
@@ -730,18 +732,18 @@ c.....deallocate all the arrays allocated in pmd_core
 
       end subroutine pmd_core
 c=======================================================================
-      subroutine setup(nismax,am,acon,fack,dt)
+      subroutine setup(nspmax,am,acon,fack,dt)
       implicit none
       include "params_unit.h"
-      integer,intent(in):: nismax
+      integer,intent(in):: nspmax
       real(8),intent(in):: dt
-      real(8),intent(in):: am(nismax)
-      real(8),intent(out):: acon(nismax),fack(nismax)
+      real(8),intent(in):: am(nspmax)
+      real(8),intent(out):: acon(nspmax),fack(nspmax)
 
       integer:: i
       real(8):: tmp
 
-c      am(1:nismax)= am(1:nismax)
+c      am(1:nspmax)= am(1:nspmax)
 
 c.....umass*Ang^2/fs^2 ---> kg*m^2/sec^2 (=Joule)
       tmp= amu2kg *ang2m**2 /fs2s**2
@@ -749,12 +751,12 @@ c      write(6,'(a,es12.4,a,es12.4,a)') ' umass*Ang^2/fs^2 ='
 c     &     ,tmp,' Joule =',tmp*j2ev,' eV'
 
 c-----prefactors for normalized accelerration
-      do i=1,nismax
+      do i=1,nspmax
         acon(i)=  ev2j/ang2m *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg) *m2ang
       enddo
 
 c-----prefactors for kinetic energy in eV
-      do i=1,nismax
+      do i=1,nspmax
         fack(i)= 0.5d0*(am(i)*amu2kg)/(dt*fs2s)**2 *ang2m**2 *j2ev
       enddo
 
@@ -890,12 +892,12 @@ c-----Set up the node parity table
       return
       end
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-      subroutine get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki,ekl
+      subroutine get_ekin(namax,natm,va,tag,h,nspmax,fack,ekin,eki,ekl
      &     ,vmax,mpi_md_world)
       implicit none 
       include "mpif.h"
-      integer,intent(in):: namax,natm,mpi_md_world,nismax
-      real(8),intent(in):: va(3,namax),h(3,3),fack(nismax)
+      integer,intent(in):: namax,natm,mpi_md_world,nspmax
+      real(8),intent(in):: va(3,namax),h(3,3),fack(nspmax)
      &     ,tag(namax)
       real(8),intent(out):: ekin,eki(3,3,namax),vmax,ekl(9)
 c-----locals
@@ -1206,7 +1208,7 @@ c      print *, 'bacopy: nb=',nb
 c=======================================================================
       subroutine bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifchg,chg,chi)
+     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi)
 c-----------------------------------------------------------------------
 c  Exchanges boundary-atom data among neighbor nodes: tag and ra
 c  Normal data passing and repeating the cell are mixed, and
@@ -1222,7 +1224,7 @@ c-----------------------------------------------------------------------
      &     ,lsrc(6),nex(3)
       real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
       real(8),intent(inout):: tag(namax),ra(3,namax),tcom
-      integer,intent(in):: ifchg
+      integer,intent(in):: ifcoulomb
       real(8),intent(inout):: chg(namax),chi(namax)
 
 c.....integer:: status(MPI_STATUS_SIZE)
@@ -1235,7 +1237,7 @@ c.....integer:: status(MPI_STATUS_SIZE)
       logical:: lshort(3)
 
       if( l1st ) then
-        if( ifchg .eq. 0 ) then
+        if( ifcoulomb .eq. 0 ) then
           allocate(dbuf(4,nbmax),dbufr(4,nbmax))
         else
           allocate(dbuf(6,nbmax),dbufr(6,nbmax))
@@ -1322,7 +1324,7 @@ c-------Error trap
         if( nex(kd).gt.1 ) then
           do kdd= -1,0
             ku= 2*kd+kdd
-            if( ifchg.eq.0 ) then
+            if( ifcoulomb.eq.0 ) then
               do i=1,lsb(0,ku)
                 j= lsb(i,ku)
                 iex= lsex(i,ku)
@@ -1356,7 +1358,7 @@ c---------Store the # of received boundary atoms in LSRC
             lsrc(ku)=nrc
 
 c---------Exchange ra and tag
-            if( ifchg.eq.0 ) then
+            if( ifcoulomb.eq.0 ) then
               do i=1,nsd
                 j= lsb(i,ku)
                 dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
@@ -1487,7 +1489,7 @@ c=======================================================================
       subroutine bacopy_fixed_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &     ,nex
-     &     ,mpi_md_world,ifchg,chg,chi)
+     &     ,mpi_md_world,ifcoulomb,chg,chi)
 c-----------------------------------------------------------------------
 c  Exchanges boundary-atom data among neighbor nodes: tag and ra
 c  This doesnt search using position, just send & recv data of atoms
@@ -1502,7 +1504,7 @@ c-----------------------------------------------------------------------
       integer,intent(inout):: lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6)
       real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
       real(8),intent(inout):: tag(namax),ra(3,namax),tcom
-      integer,intent(in):: ifchg
+      integer,intent(in):: ifcoulomb
       real(8),intent(inout):: chg(namax),chi(namax)
 
 c      integer:: status(MPI_STATUS_SIZE)
@@ -1513,7 +1515,7 @@ c      integer:: status(MPI_STATUS_SIZE)
       logical,save:: l1st=.true.
 
       if( l1st ) then
-        if( ifchg .eq. 0 ) then
+        if( ifcoulomb .eq. 0 ) then
           allocate(dbuf(4,nbmax),dbufr(4,nbmax))
         else
           allocate(dbuf(6,nbmax),dbufr(6,nbmax))
@@ -1539,7 +1541,7 @@ c-------To calculate the communication time
         if( nex(kd).gt.1 ) then
           do kdd= -1,0
             ku= 2*kd+kdd
-            if( ifchg .eq. 0 ) then
+            if( ifcoulomb .eq. 0 ) then
               do i=1,lsb(0,ku)
                 j= lsb(i,ku)
                 iex= lsex(i,ku)
@@ -1568,7 +1570,7 @@ c-------To calculate the communication time
             nrc=lsrc(ku)
 
 c---------Exchange ra and tag
-            if( ifchg .eq. 0 ) then  ! in case of no charge
+            if( ifcoulomb .eq. 0 ) then  ! in case of no charge
               do i=1,nsd
                 j= lsb(i,ku)
                 dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
@@ -1611,10 +1613,10 @@ c-------Add the communication time to COMT
 
       end subroutine bacopy_fixed_new
 c=======================================================================
-      subroutine bamove(tcom,namax,nbmax,natm,ra,va,tag
+      subroutine bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi
      &     ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world)
 c-----------------------------------------------------------------------
-c  Exchange atoms between neighbor nodes.
+c  Exchange atoms between neighbor nodes and atomic data as well.
 c
 c  MVQUE(0:NBMAX,6):
 c    MVQUE(0,ku) is the # of to-be-moved atoms to neighbor ku;
@@ -1627,6 +1629,7 @@ c----------------------------------------------------------------------
       real(8),intent(in):: anxi,anyi,anzi,sv(3,6)
       integer,intent(inout):: natm
       real(8),intent(inout):: tcom,ra(3,namax),va(3,namax),tag(namax)
+     &     ,chg(namax),chi(namax)
 
 c      integer:: status(MPI_STATUS_SIZE)
       integer:: i,j,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is
@@ -1637,128 +1640,7 @@ c      integer:: status(MPI_STATUS_SIZE)
       logical,save:: l1st=.true.
 
       if( l1st ) then
-        allocate(dbuf(7,nbmax),dbufr(7,nbmax))
-        l1st=.false.
-      endif
-
-c-----newim: num. of new immigrants
-      newim= 0
-      mvque(0,1:6)= 0
-
-      do 100 kd=1,3
-
-c-------num of to-be-moved atoms
-        do i=1,natm+newim
-          xi(1:3)= ra(1:3,i)
-          kul=2*kd-1
-          kuh=2*kd
-          is= int(tag(i))
-          if (is.gt.0) then
-            if (bmv(xi(1),xi(2),xi(3),kul,anxi,anyi,anzi)) then
-              mvque(0,kul)=mvque(0,kul)+1
-              mvque(mvque(0,kul),kul)=i
-            else if (bmv(xi(1),xi(2),xi(3),kuh,anxi,anyi,anzi)) then
-              mvque(0,kuh)=mvque(0,kuh)+1
-              mvque(mvque(0,kuh),kuh)=i
-            endif
-          endif
-        enddo
-
-c-------Error trap
-        if (mvque(0,kul).gt.nbmax) then
-          print *,'Buffer overflowed at bamove node',myid_md
-          print *,'# in MVQUE=',mvque(0,kul)
-          stop
-        else if (mvque(0,kuh).gt.nbmax) then
-          print *,'Buffer overflowed at bamove node',myid_md
-          print *,'# in MVQUE=',mvque(0,kuh)
-          stop
-        endif
-
-c-------To calculate the communacation time
-        tcom1=MPI_WTIME()
-
-        do 200 kdd= -1,0
-
-          ku=2*kd+kdd
-          inode=nn(ku)
-          nsd=mvque(0,ku)
-          
-          call mespasi(inode,myparity(kd),nsd,nrc,1,1,60,
-     &         mpi_md_world)
-
-c---------move atom positions, RA
-          do i=1,nsd
-            j= mvque(i,ku)
-            dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-            dbuf(4:6,i)= va(1:3,j)
-            dbuf(7,i)  = tag(j)
-c-----------Eliminate the record of a moved-out atom
-            tag(j)= 0d0
-          enddo
-          call mespasd(inode,myparity(kd),dbuf,dbufr,7*nsd,7*nrc,71
-     &         ,mpi_md_world)
-          do i=1,nrc
-            ra(1:3,natm+newim+i)= dbufr(1:3,i)
-            va(1:3,natm+newim+i)= dbufr(4:6,i)
-            tag(natm+newim+i)   = dbufr(7,i)
-          enddo
-
-          newim=newim+nrc
-          call MPI_BARRIER(mpi_md_world,ierr)
-
-200     continue
-
-        tcom2=MPI_WTIME()
-        tcom=tcom+tcom2-tcom1 
-
-100   continue
-
-c-----Compression
-      ipt=0
-      do i=1,natm+newim
-        is= int(tag(i))
-        if(is.ne.0) then
-          ipt=ipt+1
-          ra(1:3,ipt)= ra(1:3,i)
-          va(1:3,ipt)= va(1:3,i)
-          tag(ipt)   = tag(i)
-        endif
-      enddo
-c-----Update # of resident atoms
-      natm=ipt
-
-      return
-      end subroutine bamove
-c=======================================================================
-      subroutine bamove_stress(tcom,namax,nbmax,natm,ra,va,tag,strs
-     &     ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world)
-c-----------------------------------------------------------------------
-c  Exchange atoms between neighbor nodes.
-c
-c  MVQUE(0:NBMAX,6):
-c    MVQUE(0,ku) is the # of to-be-moved atoms to neighbor ku;
-c    MVQUE(i,ku) is the adress, in IS, of atom i
-c----------------------------------------------------------------------
-      implicit none
-      include 'mpif.h'
-      integer,intent(in):: namax,nbmax
-      integer,intent(in):: myid_md,mpi_md_world,myparity(3),nn(6)
-      real(8),intent(in):: anxi,anyi,anzi,sv(3,6)
-      integer,intent(inout):: natm
-      real(8),intent(inout):: tcom,ra(3,namax),va(3,namax),tag(namax)
-     &     ,strs(9,namax)
-
-c      integer:: status(MPI_STATUS_SIZE)
-      integer:: i,j,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is
-      integer:: mvque(0:nbmax,6),newim
-      real(8):: tcom1,tcom2,xi(3)
-      logical,external:: bmv
-      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
-      logical,save:: l1st=.true.
-
-      if( l1st ) then
-        allocate(dbuf(16,nbmax),dbufr(16,nbmax))
+        allocate(dbuf(9,nbmax),dbufr(9,nbmax))
         l1st=.false.
       endif
 
@@ -1814,18 +1696,21 @@ c---------move atom positions, RA
             dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
             dbuf(4:6,i)= va(1:3,j)
             dbuf(7,i)  = tag(j)
-            dbuf(8:16,i)= strs(1:9,j)
+            dbuf(8,i)  = chg(j)
+            dbuf(9,i)  = chi(j)
 c-----------Eliminate the record of a moved-out atom
             tag(j)= 0d0
-            strs(1:9,j)= 0d0
+            chg(j)= 0d0
+            chi(j)= 0d0
           enddo
-          call mespasd(inode,myparity(kd),dbuf,dbufr,16*nsd,16*nrc,71
+          call mespasd(inode,myparity(kd),dbuf,dbufr,9*nsd,9*nrc,71
      &         ,mpi_md_world)
           do i=1,nrc
             ra(1:3,natm+newim+i)= dbufr(1:3,i)
             va(1:3,natm+newim+i)= dbufr(4:6,i)
             tag(natm+newim+i)   = dbufr(7,i)
-            strs(1:9,natm+newim+i)= dbufr(8:16,i)
+            chg(natm+newim+i)   = dbufr(8,i)
+            chi(natm+newim+i)   = dbufr(9,i)
           enddo
 
           newim=newim+nrc
@@ -1847,14 +1732,15 @@ c-----Compression
           ra(1:3,ipt)= ra(1:3,i)
           va(1:3,ipt)= va(1:3,i)
           tag(ipt)   = tag(i)
-          strs(1:9,ipt)= strs(1:9,i)
+          chg(ipt)   = chg(i)
+          chi(ipt)   = chi(i)
         endif
       enddo
 c-----Update # of resident atoms
       natm=ipt
 
       return
-      end subroutine bamove_stress
+      end subroutine bamove
 c=======================================================================
       function bbd(xv,yv,zv,rcav,rcbv,rccv,ku,anxi,anyi,anzi)
 c-----------------------------------------------------------------------
@@ -1963,19 +1849,19 @@ c.....Berendsen for variable-volume not variable-cell
 
       end subroutine force_isobaric
 c=======================================================================
-      subroutine setv(h,natm,tag,va,nismax,am,tinit,dt)
+      subroutine setv(h,natm,tag,va,nspmax,am,tinit,dt)
       implicit none
       include 'mpif.h'
       include 'params_unit.h'
-      integer,intent(in):: natm,nismax
-      real(8),intent(in):: tag(natm),am(nismax),tinit,dt,h(3,3,0:1)
+      integer,intent(in):: natm,nspmax
+      real(8),intent(in):: tag(natm),am(nspmax),tinit,dt,h(3,3,0:1)
       real(8),intent(out):: va(3,natm)
       integer:: i,l,is
-      real(8):: dseed,sumvx,sumvy,sumvz,tmp,facv(nismax)
+      real(8):: dseed,sumvx,sumvy,sumvz,tmp,facv(nspmax)
       real(8),parameter:: pi = 3.14159265358979d0
       real(8),external:: box_muller
 
-      facv(1:nismax)=dsqrt(tinit*fkb*ev2j /(am(1:nismax)*amu2kg))
+      facv(1:nspmax)=dsqrt(tinit*fkb*ev2j /(am(1:nspmax)*amu2kg))
      &     *m2ang /s2fs
 
 c-----velocities in Maxwell-Boltzmann distribution
@@ -1996,12 +1882,12 @@ c     &       ,va(1:3,i)
 
       end subroutine setv
 c=======================================================================
-      subroutine rm_trans_motion(natm,tag,va,nismax,am
+      subroutine rm_trans_motion(natm,tag,va,nspmax,am
      &     ,mpi_md_world,myid_md,iprint)
       implicit none
       include 'mpif.h'
-      integer,intent(in):: natm,nismax,mpi_md_world,myid_md,iprint
-      real(8),intent(in):: tag(natm),am(nismax)
+      integer,intent(in):: natm,nspmax,mpi_md_world,myid_md,iprint
+      real(8),intent(in):: tag(natm),am(nspmax)
       real(8),intent(out):: va(3,natm)
       
       integer:: i,is,ierr

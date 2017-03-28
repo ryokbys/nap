@@ -166,6 +166,9 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
       elseif( trim(cname).eq.'force_type' ) then
         call read_c1(ionum,cforce)
         return
+      elseif( trim(cname).eq.'flag_coulomb' ) then
+        call read_i1(ionum,ifcoulomb)
+        return
       elseif( trim(cname).eq.'print_level' ) then
         call read_i1(ionum,iprint)
         return

@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-03-18 21:00:17 Ryo KOBAYASHI>
+!                     Last modified: <2017-03-27 16:48:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -34,8 +34,8 @@ module pmdio
   data ttgt / 300d0, 300d0, 300d0, 300d0, 300d0, 300d0, &
        300d0, 300d0, 300d0 /
   real(8):: trlx = 100d0
-!.....charged system?
-  integer:: ifchg = 0
+!.....Coulomb system?
+  integer:: ifcoulomb = 0
 !.....temperature distribution on x-direction
   logical:: ltdst= .false.
   integer:: ntdst= 1
@@ -74,9 +74,9 @@ module pmdio
   character(len=6):: ciofmt='ascii '
   character(len=20):: cforce='LJ_Ar'
 !.....max. num. of species
-  integer,parameter:: nismax= 9
+  integer,parameter:: nspmax= 9
 !.....mass
-  real(8):: am(1:nismax)= 12.0d0
+  real(8):: am(1:nspmax)= 12.0d0
 !.....zload type
   character(len=5):: czload_type= 'no'
 end module pmdio

@@ -1,7 +1,7 @@
       subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi
      &     ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs
-     &     ,cforce,ifchg,iprint)
+     &     ,cforce,ifcoulomb,iprint)
 c-----------------------------------------------------------------------
 c  Wrapper routine for force calculations.
 c  Each force calculation routine is called from this subroutine.
@@ -26,7 +26,7 @@ c-----------------------------------------------------------------------
       use Coulomb, only: force_screened_Coulomb
       use Morse, only: force_Morse
       implicit none
-      integer,intent(in):: namax,natm,nnmax,nismax,iprint,ifchg
+      integer,intent(in):: namax,natm,nnmax,nismax,iprint,ifcoulomb
       integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
      &     ,nnn(6),mpi_md_world,myid_md,nex(3)
       integer,intent(in):: lspr(0:nnmax,namax)
@@ -45,7 +45,7 @@ c-----------------------------------------------------------------------
       aa(1:3,1:natm+nb)=0d0
       epi(1:natm+nb)= 0d0
       strs(1:3,1:3,1:natm+nb)= 0d0
-      
+
       select case (trim(cforce))
       case ('LJ_Ar')
         call force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h,hi
@@ -96,6 +96,7 @@ c-----------------------------------------------------------------------
      &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
       case ('Mishin_Al')
+        print *,' going into force_Mishin_Al'
         call force_Mishin_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
@@ -120,6 +121,7 @@ c-----------------------------------------------------------------------
      &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
       case ('Morse')
+        
         call force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi
      &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
@@ -130,11 +132,12 @@ c-----------------------------------------------------------------------
         stop
       end select
 
-      if( ifchg .eq. 1 ) then   ! screened Coulomb
+      if( ifcoulomb.eq.1 ) then   ! screened Coulomb
         call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
      &       ,chg,h,hi,tcom
      &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint
+     &       ,ifcoulomb)
       endif
 
 c.....convert forces from hmat-coordinates to Cartesian coordinates

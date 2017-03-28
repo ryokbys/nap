@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-03-23 16:09:34 Ryo KOBAYASHI>
+c                     Last-modified: <2017-03-27 16:48:52 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -29,7 +29,7 @@ c.....Epot threshold for disl core extraction [Hartree]
       real(8),parameter:: epith = -0.1410d0
 #endif
 
-      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl,i_conv,ierr
+      integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr
      &     ,nstp_done
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin
 
@@ -70,13 +70,6 @@ c.....if needed, read atomic charges from chg0000 file
 c.....but even if not needed, allocate ntot long array
 c.....for the simplicty of code
         allocate(chgtot(ntot),chitot(ntot))
-        if( ifchg .ne. 0 ) then
-          if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-            call read_chgtot_bin(20,"chg0000")
-          else if( trim(ciofmt).eq.'ascii' ) then
-            call read_chgtot_ascii(20,"chg0000")
-          endif
-        endif
 
 c.....make ntot and ?tot() not null in nodes myid_md != 0
       else
@@ -90,10 +83,10 @@ c.....call pmd_core to perfom MD
       call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot,nstp,nerg,npmd
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
-     &     ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
+     &     ,nspmax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
      &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
      &     ,srlx,stbeta,strfin,lstrs0
-     &     ,fmv,ptnsr,epot,ekin,n_conv,ifchg
+     &     ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb
      &     ,czload_type,eps_conv,ifsort,iprint,nstp_done)
 
 c.....write energy, forces and stresses only for fitpot
@@ -217,7 +210,7 @@ c.....velocity multiplying factor
       enddo
       write(6,'(2x,a)') ''
       write(6,'(2x,a)') 'mass'
-      do i=1,nismax
+      do i=1,nspmax
         write(6,'(4x,i2,f10.3)') i,am(i)
       enddo
       write(6,'(a)') '======================================'
@@ -264,9 +257,10 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(stgt,9,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(czload_type,5,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(am,nismax,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(am,nspmax,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
+      call mpi_bcast(ifcoulomb,1,mpi_integer,0,mpi_md_world,ierr)
 c.....NEMD
       call mpi_bcast(ltdst,1,mpi_logical,0,mpi_md_world,ierr)
       if( ltdst ) then
