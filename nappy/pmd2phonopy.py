@@ -105,7 +105,7 @@ if __name__ == "__main__":
         psystmp.read_POSCAR(poscar)
         os.system("cp in.* {0}/".format(dname))
         if execname == "pmd":
-            psystmp.write_pmd("{0}/pmd0000".format(dname))
+            psystmp.write_pmd("{0}/pmdini".format(dname))
         elif execname == "smd":
             psystmp.write_pmd("{0}/smd0000".format(dname))
         os.system("cd {0}/; {1}/{2} > out.{2}; cd ..".format(dname,pmddir,execname))

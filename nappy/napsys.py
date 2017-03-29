@@ -200,7 +200,7 @@ class NAPSystem(object):
             symbols.append(a.symbol)
         return symbols
 
-    def write(self,fname="pmd0000"):
+    def write(self,fname="pmdini"):
         ftype= parse_filename(fname)
         if ftype == "pmd":
             self.write_pmd(fname)
@@ -209,7 +209,7 @@ class NAPSystem(object):
         elif ftype == "POSCAR":
             self.write_POSCAR(fname)
 
-    def read(self,fname="pmd0000"):
+    def read(self,fname="pmdini"):
         ftype= self.parse_filename(fname)
         if ftype == "pmd":
             self.read_pmd(fname)
@@ -220,7 +220,7 @@ class NAPSystem(object):
         elif ftype == "POSCAR":
             self.read_POSCAR(fname)
 
-    def read_pmd(self,fname='pmd0000'):
+    def read_pmd(self,fname='pmdini'):
         f=open(fname,'r')
         # 1st: lattice constant
         self.alc= float(f.readline().split()[0])
@@ -259,7 +259,7 @@ class NAPSystem(object):
             self.atoms.append(ai)
         f.close()
 
-    def write_pmd(self,fname='pmd0000'):
+    def write_pmd(self,fname='pmdini'):
         f=open(fname,'w')
         # lattice constant
         f.write(" {0:15.9f}\n".format(self.alc))
@@ -601,13 +601,13 @@ class NAPSystem(object):
             f.write("{0:8d} {1:3d} ".format(i+1,ai.sid))
             f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(x,y,z))
             f.write("{0:8.3f} {1:8.3f} {2:8.3f} ".format(vx,vy,vz))
-            f.write("{0:8.3f} {1:8.3f} ".format(ekin,epot))
-            f.write("{0:8.3f} {1:8.3f} {2:8.3f} ".format(sti[0],
-                                                         sti[1],
-                                                         sti[2]))
-            f.write("{0:8.3f} {1:8.3f} {2:8.3f} ".format(sti[3],
-                                                         sti[4],
-                                                         sti[5]))
+            f.write("{0:11.3e} {1:11.3e} ".format(ekin,epot))
+            f.write("{0:11.3e} {1:11.3e} {2:11.3e} ".format(sti[0],
+                                                            sti[1],
+                                                            sti[2]))
+            f.write("{0:11.3e} {1:11.3e} {2:11.3e} ".format(sti[3],
+                                                            sti[4],
+                                                            sti[5]))
             f.write("\n")
         f.close()
 

@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-03-19 06:13:38 Ryo KOBAYASHI>
+!                     Last-modified: <2017-03-29 17:53:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -68,6 +68,8 @@ module pmc
   integer:: nz = 1
 !.....temperature
   real(8):: temp = 300d0
+!.....random seed
+  real(8):: dseed0 = 12345d0
   
 contains
 !=======================================================================
@@ -139,7 +141,15 @@ program prec_mc
   integer:: mpi_md_world,nodes_md,myid_md,myx,myy,myz
   real(8):: rc,anxi,anyi,anzi,sorg(3),t0,t1
   character:: cnum*6
+  interface
+    function urnd(dseed0)
+      real(8),intent(in),optional:: dseed0
+      real(8):: urnd
+    end function urnd
+  end interface
 
+!.....set random seed
+  t0 = urnd(dseed0)
 
 !.....initialize parallel
   call init_parallel(mpi_md_world,nodes_md,myid_md)
@@ -171,6 +181,7 @@ program prec_mc
   hmati(1,1) = 1d0/hmat(1,1)
   hmati(2,2) = 1d0/hmat(2,2)
   hmati(3,3) = 1d0/hmat(3,3)
+
 
 !.....create neighbor list only once here, and no longer needed after
   rc = 3.0
@@ -283,7 +294,13 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   character,allocatable:: csymprev(:),csymhist(:,:),csymtmp(:,:) &
        ,cjtmp(:)
   integer,external:: cs2is,check_history
-  real(8),external:: urnd,epot2efrm
+  real(8),external:: epot2efrm
+  interface
+    function urnd(dseed0)
+      real(8),intent(in),optional:: dseed0
+      real(8):: urnd
+    end function urnd
+  end interface
 
 
   real(8),parameter:: fkb = 8.61733035d-5  ! eV/K
@@ -370,9 +387,9 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
 !.....store previous symbols
       csymprev(1:natm) = csymbols(1:natm)
 
-!.....pick one solutes to be moved (usually vacancy)
+!.....pick solutes/vacancies to be moved
       do i=1,natm
-        if( csymbols(i).eq.'V' ) then
+        if( csymbols(i).eq.'V' ) then  ! only vacancies
           ic = i
           exit
         endif
@@ -659,6 +676,9 @@ subroutine read_in_pmc_core(ionum,cname)
   elseif( trim(cname).eq.'temperature' ) then
     call read_r1(ionum,temp)
     return
+  elseif( trim(cname).eq.'random_seed' ) then
+    call read_r1(ionum,dseed0)
+    return
   endif
 end subroutine read_in_pmc_core
 !=======================================================================
@@ -758,7 +778,12 @@ subroutine random_symbols(natm,csymbols,num_Mg,num_Si,num_Vac)
   character,intent(inout):: csymbols(natm)
 
   integer:: i,img,isi,ivac,irnd
-  real(8),external:: urnd
+  interface
+    function urnd(dseed0)
+      real(8),intent(in),optional:: dseed0
+      real(8):: urnd
+    end function urnd
+  end interface
 
   img = num_Mg
   isi = num_Si
@@ -803,10 +828,16 @@ subroutine clustered_symbols(natm,pos0,csymbols &
   character,intent(inout):: csymbols(natm)
   real(8),intent(in):: pos0(3,natm)
 
-  integer:: i,jj,j,irnd,nsol,isol,icntr
-  real(8):: cntr(3),dmin,d
-  real(8),external:: urnd
-  character,allocatable:: carr(:) 
+  interface
+    function urnd(dseed0)
+      real(8),intent(in),optional:: dseed0
+      real(8):: urnd
+    end function urnd
+  end interface
+  integer:: i,jj,j,irnd,nsol,isol,icntr,nmg,nsi,nvac,inc
+  real(8):: cntr(3),dmin,d,r,rMg,rSi
+  character,allocatable:: carr(:)
+
 
 !.....1st, pick one site close to the center
   cntr(1:3) = (/ 0.5d0, 0.5d0, 0.5d0 /)
@@ -824,14 +855,31 @@ subroutine clustered_symbols(natm,pos0,csymbols &
   
 !.....make random array of symbols to be replaced
   nsol = num_Mg +num_Si +num_Vac
+  nmg= 0
+  nsi= 0
+  nvac= 0
   allocate(carr(nsol))
-  do i = 1,nsol
-    if( i.le.num_Mg ) then
-      carr(i) = 'M'
-    else if( i.le.num_Mg+num_Si) then
-      carr(i) = 'S'
+  inc = 0
+  do while(.true.)
+    if( inc.eq.nsol ) exit
+    rMg = dble(num_Mg-nmg)/(nsol-inc)
+    rSi = dble(num_Mg-nmg +num_Si-nsi)/(nsol-inc)
+    r = urnd()
+    if( r.lt.rMg ) then
+      if( nmg.ge.num_Mg ) cycle
+      inc= inc +1
+      carr(inc) = 'M'
+      nmg= nmg +1
+    else if( r.le.rSi ) then
+      if( nsi.ge.num_Si ) cycle
+      inc= inc +1
+      carr(inc) = 'S'
+      nsi= nsi +1
     else
-      carr(i) = 'V'
+      if( nvac.ge.num_Vac ) cycle
+      inc= inc +1
+      carr(inc) = 'V'
+      nvac= nvac +1
     endif
   enddo
 
@@ -847,7 +895,7 @@ subroutine clustered_symbols(natm,pos0,csymbols &
           isol = isol + 1
           csymbols(j) = carr(isol)
         endif
-        if( isol.eq.nsol) return
+        if( isol.eq.nsol ) return
       enddo
     enddo
   enddo
@@ -1069,8 +1117,8 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
        ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp &
        ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
-       ,srlx,stbeta,strfin,lstrs,ifchg &
-       ,fmv,ptnsr,epot,ekin,n_conv &
+       ,srlx,stbeta,strfin,lstrs &
+       ,fmv,ptnsr,epot,ekin,n_conv,ifchg &
        ,czload_type,eps_conv,ifsort,iprint,nstps_done)
 !!$  print *,'nstps_pmd,minstp,nstps_done = ' &
 !!$       ,nstps_pmd,minstp,nstps_done

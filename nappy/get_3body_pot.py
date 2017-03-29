@@ -109,7 +109,7 @@ for ip in range(nsmpl+1):
     y= hd*np.sin(ang/180*np.pi)
     asys.atoms[2].pos[0] = x
     asys.atoms[2].pos[1] = y
-    asys.write_pmd('pmd0000')
+    asys.write_pmd('pmdini')
     os.system(pmdexec+' > out.pmd')
     apot= get_apot('out.pmd')
     fout.write(' {0:12.3f} {1:22.14e}\n'.format(ang,apot))

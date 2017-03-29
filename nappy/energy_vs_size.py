@@ -1,7 +1,7 @@
 #!/opt/local/bin/python
 """
 Calculate the cohesive energy as a function of lattice constant,
-by altering the lattice constant in pmd0000 file.
+by altering the lattice constant in pmdini file.
 
 And if possible, calculate equilibrium lattice size and
 bulk modulus, too.
@@ -22,7 +22,7 @@ from docopt import docopt
 from scipy.optimize import leastsq
 
 
-def read_pmd(fname="pmd0000"):
+def read_pmd(fname="pmdini"):
     f=open(fname,'r')
     #...read 1st line and get current lattice size
     al= float(f.readline().split()[0])
@@ -43,7 +43,7 @@ def get_vol(al,hmat):
     a3= hmat[0:3,2] *al
     return np.dot(a1,np.cross(a2,a3))
 
-def replace_1st_line(x,fname="pmd0000"):
+def replace_1st_line(x,fname="pmdini"):
     f=open(fname,'r')
     ini= f.readlines()
     f.close()
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     niter = int(args['-n'])
     mdexec = args['--mdexec']
 
-    fname = 'pmd0000'
+    fname = 'pmdini'
     tmpfname = fname+'.tmp'
     os.system('cp '+fname+' '+tmpfname)
     al_orig,hmat,natm= read_pmd(fname)
@@ -98,7 +98,7 @@ if __name__ == '__main__':
         logfile.write(' {0:10.4f} {1:10.4f} {2:15.7f}\n'.format(al,vol,erg))
     outfile1.close()
 
-    #...revert pmd0000
+    #...revert pmdini
     os.system('cp '+tmpfname+' '+fname)
     os.system('rm '+tmpfname)
     #replace_1st_line(al_orig,fname)

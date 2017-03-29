@@ -171,7 +171,7 @@ class PMD(FileIOCalculator):
         if self.label == 'pmd':
             infname = 'in.pmd'
             # self.write_pmd(atoms)
-            write_pmd(atoms,fname='pmd0000',specorder=self.specorder)
+            write_pmd(atoms,fname='pmdini',specorder=self.specorder)
             
         with open(infname,'w') as f:
             fmvs,ifmvs = get_fmvs(atoms)

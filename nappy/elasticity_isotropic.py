@@ -28,7 +28,7 @@ outfname='out.elastic_constants'
 logfname='log.elastic_constants'
 
 def read_pmd():
-    f=open('pmd0000','r')
+    f=open('pmdini','r')
     #...read 1st line and get current lattice size
     al= float(f.readline().split()[0])
     hmat= np.zeros((3,3))
@@ -49,10 +49,10 @@ def get_vol(al,hmat):
     return np.dot(a1,np.cross(a2,a3))
 
 def replace_hmat(hmat):
-    f=open('pmd0000','r')
+    f=open('pmdini','r')
     ini= f.readlines()
     f.close()
-    g=open('pmd0000','w')
+    g=open('pmdini','w')
     for l in range(len(ini)):
         if l in (1,2,3): #...hmat lines
             g.write(' {0:15.7f}'.format(hmat[l-1,0]))
@@ -143,7 +143,7 @@ if __name__ == '__main__':
         outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlts[it],e11s[it],e12s[it],e44s[it]))
     outfile1.close()
 
-    #...revert pmd0000
+    #...revert pmdini
     replace_hmat(hmat0)
 
     #...prepare for Murnaghan fitting
