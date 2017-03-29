@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-03-28 18:30:22 Ryo KOBAYASHI>
+c                     Last-modified: <2017-03-28 19:09:02 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -45,6 +45,7 @@ c.....For tensile test of Al nanorod
 c-----output file names
       character:: cnum*4
       integer,external:: itotOf
+      logical:: ltot_updated = .true.
 
       call initialize_pmdvars(nspmax)
 
@@ -288,7 +289,7 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
         enddo
         tave= tave/nave
         write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
-        write(6,'(1x,a,f8.3,a)') " stress          =",
+        write(6,'(1x,a,f15.3,a)') " stress          =",
      &       (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa,' GPa'
         
 
@@ -403,6 +404,7 @@ c-------multiply fmv or damping
 
 c-------update positions
         ra(1:3,1:natm)=ra(1:3,1:natm) +va(1:3,1:natm)
+        ltot_updated = .false.
 
         if( czload_type.eq.'atoms' ) then
           call zload_atoms(natm,ra,tag,maxstp,strfin,strnow
@@ -652,6 +654,7 @@ c          call system("mkdir -p "//cnum)
           call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
      &         ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
      &         ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+          ltot_updated = .true.
           if( myid_md.eq.0 ) then
             if( ifsort.eq.1 ) call sort_by_tag(ntot,tagtot,rtot,vtot
      &           ,ekitot,epitot,stot)
@@ -667,6 +670,12 @@ c          call system("mkdir -p "//cnum)
         if( lconverged ) exit
       enddo ! end of istp
 
+      if( .not. ltot_updated ) then
+        call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
+     &       ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
+     &       ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+      endif
+      
       nstp_done = istp
       tcpu2= mpi_wtime()
 
@@ -697,7 +706,7 @@ c          call system("mkdir -p "//cnum)
         enddo
         tave= tave/nave
         write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
-        write(6,'(1x,a,f8.3,a)') " stress          =",
+        write(6,'(1x,a,f15.3,a)') " stress          =",
      &       (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa,' GPa'
         write(6,*) ''
         write(6,'(1x,a,f10.2)') "time space decomp =",tspdcmp
@@ -1813,10 +1822,8 @@ c
       do i=1,natm
         do jxyz=1,3
           do ixyz=1,3
-c            pt(ixyz,jxyz)=pt(ixyz,jxyz)
-c     &           +2d0*eki(ixyz,jxyz,i) +strs(ixyz,jxyz,i)*avol
             pt(ixyz,jxyz)=pt(ixyz,jxyz)
-     &           +2d0*eki(ixyz,jxyz,i) +strs(ixyz,jxyz,i) !*avol
+     &           +2d0*eki(ixyz,jxyz,i) +strs(ixyz,jxyz,i)
           enddo
         enddo
       enddo

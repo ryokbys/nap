@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-03-27 16:48:34 Ryo KOBAYASHI>
+!                     Last modified: <2017-03-28 18:56:16 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -71,6 +71,8 @@ module pmdio
 !  >10:fitpot data
   integer:: iprint= 1
 
+  character(len=128):: cpmdini = 'pmdini'
+  character(len=128):: cpmdfin = 'pmdfin'
   character(len=6):: ciofmt='ascii '
   character(len=20):: cforce='LJ_Ar'
 !.....max. num. of species

@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-03-27 16:48:52 Ryo KOBAYASHI>
+c                     Last-modified: <2017-03-28 18:56:25 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -53,13 +53,13 @@ c.....Set fmv as default value before reading 'in.pmd'
 
       call bcast_params()
 
-c.....only 0th-node reads pmd0000 file
+c.....only 0th-node reads pmdini file
       if( myid_md.eq.0 ) then
-        call system('cp pmd0000 pmd0000.orig')
+c        call system('cp pmd0000 pmd0000.orig')
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-          call read_pmdtot_bin(20,"pmd0000")
+          call read_pmdtot_bin(20,trim(cpmdini))
         else if( trim(ciofmt).eq.'ascii' ) then
-          call read_pmdtot_ascii(20,"pmd0000")
+          call read_pmdtot_ascii(20,trim(cpmdini))
         else
           write(6,*) 'Error: io_format must be either ascii, '
      &         //'bin or binary.'
@@ -88,6 +88,14 @@ c.....call pmd_core to perfom MD
      &     ,srlx,stbeta,strfin,lstrs0
      &     ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb
      &     ,czload_type,eps_conv,ifsort,iprint,nstp_done)
+
+      if( myid_md.eq.0 ) then
+        if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
+          call write_pmdtot_bin(20,cpmdfin)
+        elseif( trim(ciofmt).eq.'ascii' ) then
+          call write_pmdtot_ascii(20,cpmdfin)
+        endif
+      endif
 
 c.....write energy, forces and stresses only for fitpot
       if( myid_md.eq.0 ) then
