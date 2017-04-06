@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-03-28 19:09:02 Ryo KOBAYASHI>
+c                     Last-modified: <2017-04-06 07:20:26 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -302,7 +302,7 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
      &         ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))*up2gpa/3
         else
           write(6,'(a,i8,2f10.2,es15.7)')
-     &         " istp,time,epot,temp="
+     &         " istp,time,temp,epot="
      &         ,istp,tcpu,tave,epot
         endif
         write(6,'(a,6f10.3)')' stress tensor [GPa]: '

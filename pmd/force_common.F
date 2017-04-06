@@ -23,7 +23,7 @@ c-----------------------------------------------------------------------
       use SM_Al,only:force_SM_Al
       use linreg,only:force_linreg
       use NN,only:force_NN
-      use Coulomb, only: force_screened_Coulomb
+      use Coulomb, only: force_screened_Coulomb, force_Ewald_Coulomb
       use Morse, only: force_Morse
       implicit none
       integer,intent(in):: namax,natm,nnmax,nismax,iprint,ifcoulomb
@@ -40,6 +40,7 @@ c-----------------------------------------------------------------------
       
       integer:: ierr,is,i
       real(8):: at(3)
+      logical,save:: l1st = .true.
 
       epot = 0d0
       aa(1:3,1:natm+nb)=0d0
@@ -125,14 +126,24 @@ c-----------------------------------------------------------------------
      &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
       case default
-        write(6,'(a)') ' [get_force] unknown force: '
-     &       //trim(cforce)//' !!'
-        call mpi_finalize(ierr)
-        stop
+        if( ifcoulomb.eq.0 ) then
+          write(6,'(a)') ' Error: No force specified.'
+          call mpi_finalize(ierr)
+          stop
+        endif
+        if( l1st ) then
+          write(6,'(a)') ' No force specified except Coulomb.'
+        endif
       end select
 
       if( ifcoulomb.eq.1 ) then   ! screened Coulomb
         call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
+     &       ,chg,h,hi,tcom
+     &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint
+     &       ,ifcoulomb)
+      else if( ifcoulomb.eq.2 ) then
+        call force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
      &       ,chg,h,hi,tcom
      &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint
@@ -149,7 +160,8 @@ c-----multiply 0.5d0*dt**2/am(i)
         is= int(tag(i))
         aa(1:3,i)= acon(is)*aa(1:3,i)
       enddo
-
+      
+      l1st = .false.
       end subroutine get_force
 c=======================================================================
       subroutine copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb
@@ -542,6 +554,81 @@ c
 
       end function hvsd
 c=======================================================================
+      function fcut1(r,rc)
+c
+c     Cutof function type-1
+c     f(r) = 1                                  for r <= rs
+c          = 1/2 *[1+cos(pi*(r-rs)/(rc-rs))]    for rs < r <= rc
+c          = 0                                  for rc < r
+c
+      real(8),intent(in):: r,rc
+      real(8),parameter:: pi = 3.14159265358979d0
+      real(8):: fcut1
+      real(8):: rs
+
+      rs = rc*0.9d0
+      if( r.le.rs ) then
+        fcut1 = 1d0
+      else if( rs.lt.r .and. r.le.rc ) then
+        fcut1 = 0.5d0 *(1d0 +cos(pi*(r-rs)/(rc-rs)))
+      else
+        fcut1 = 0d0
+      endif
+      return
+      end function fcut1
+c=======================================================================
+      function dfcut1(r,rc)
+c
+c     Derivative of the cutoff function type-1
+c
+      real(8),intent(in):: r,rc
+      real(8),parameter:: pi = 3.14159265358979d0
+      real(8):: dfcut1,rs
+
+      rs = rc *0.9d0
+      if( r.le.rs ) then
+        dfcut1 = 0d0
+      else if( rs.lt.r .and. r.le.rc ) then
+        dfcut1 = 0.5d0 *pi/(rc-rs) *sin(pi*(r-rs)/(rc-rs))
+      else
+        dfcut1 = 0d0
+      endif
+      return
+      end function dfcut1
+c=======================================================================
+      function fcut2(r,rc)
+c
+c     Cutoff function type-2
+c     f(r) = (1-(r/rc)^2)^3      for r <= rc
+c          = 0d0                 for rc < r
+c
+      real(8),intent(in):: r,rc
+      real(8):: fcut2
+
+      if( r.le.rc ) then
+        fcut2 = (1d0 -(r/rc)**2)**3
+      else
+        fcut2 = 0d0
+      endif
+      end function fcut2
+c=======================================================================
+      function dfcut2(r,rc)
+c
+c     Derivative of the cutoff function type-2
+c     f(r) = (1-(r/rc)^2)^3      for r <= rc
+c          = 0d0                 for rc < r
+c
+      real(8),intent(in):: r,rc
+      real(8):: dfcut2
+      real(8):: rrc
+
+      if( r.le.rc ) then
+        rrc = r/rc
+        dfcut2 = 3d0 *(1d0-rrc**2)**2  *(-2d0*rrc) /rc
+      else
+        dfcut2 = 0d0
+      endif
+      end function dfcut2
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"

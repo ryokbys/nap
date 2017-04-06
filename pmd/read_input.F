@@ -160,6 +160,10 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
         backspace(ionum)
         read(ionum,*) ctmp,is,am(is)
         return
+      elseif( trim(cname).eq.'charge' ) then
+        backspace(ionum)
+        read(ionum,*) ctmp,is,schg(is)
+        return
       elseif( trim(cname).eq.'io_format' ) then
         call read_c1(ionum,ciofmt)
         return

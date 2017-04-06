@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-03-28 18:56:25 Ryo KOBAYASHI>
+c                     Last-modified: <2017-04-06 06:32:19 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -70,6 +70,7 @@ c.....if needed, read atomic charges from chg0000 file
 c.....but even if not needed, allocate ntot long array
 c.....for the simplicty of code
         allocate(chgtot(ntot),chitot(ntot))
+        call set_atomic_charges(ntot,chgtot,tagtot,nspmax,schg)
 
 c.....make ntot and ?tot() not null in nodes myid_md != 0
       else
@@ -269,6 +270,8 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(ifcoulomb,1,mpi_integer,0,mpi_md_world,ierr)
+      call mpi_bcast(schg,nspmax,mpi_double_precision,0,mpi_md_world
+     &     ,ierr)
 c.....NEMD
       call mpi_bcast(ltdst,1,mpi_logical,0,mpi_md_world,ierr)
       if( ltdst ) then
@@ -317,6 +320,20 @@ c.....Write stress tensor, negative as compressive, positive as tensile
 
       end subroutine write_force
 c=======================================================================
+      subroutine set_atomic_charges(ntot,chg,tag,nspmax,schg)
+      implicit none 
+      integer,intent(in):: ntot,nspmax
+      real(8),intent(in):: tag(ntot),schg(nspmax)
+      real(8),intent(out):: chg(ntot)
+
+      integer:: i,is
+
+      do i=1,ntot
+        is = int(tag(i))
+        chg(i)= schg(is)
+      enddo
+      
+      end subroutine set_atomic_charges
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"

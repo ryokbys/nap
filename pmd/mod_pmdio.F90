@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-03-28 18:56:16 Ryo KOBAYASHI>
+!                     Last modified: <2017-04-06 06:34:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -74,11 +74,13 @@ module pmdio
   character(len=128):: cpmdini = 'pmdini'
   character(len=128):: cpmdfin = 'pmdfin'
   character(len=6):: ciofmt='ascii '
-  character(len=20):: cforce='LJ_Ar'
+  character(len=20):: cforce='none'
 !.....max. num. of species
   integer,parameter:: nspmax= 9
 !.....mass
   real(8):: am(1:nspmax)= 12.0d0
+!.....charges
+  real(8):: schg(1:nspmax)= 0d0
 !.....zload type
   character(len=5):: czload_type= 'no'
 end module pmdio
