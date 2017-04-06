@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2017-03-28 10:45:59 Ryo KOBAYASHI>
+!                    Last modified: <2017-04-06 14:26:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -11,7 +11,7 @@ module pmdvars
 !.....max. num. of boundary-particles
   integer:: nbmax = 10000
 !.....max. num. of neighbors
-  integer:: nnmax = 200
+  integer:: nnmax = 1000
 
 !.....output #
   integer,parameter:: ioerg = 11

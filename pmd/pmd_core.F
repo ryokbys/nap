@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-04-06 07:20:26 Ryo KOBAYASHI>
+c                     Last-modified: <2017-04-06 15:20:11 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -296,12 +296,12 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
         if( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &       trim(cpctl).eq.'vv-Berendsen') then
-          write(6,'(a,i8,2f10.2,es15.7,2es11.3)')
+          write(6,'(a,i8,2f10.2,es15.6,2es11.3)')
      &         " istp,time,temp,vol,prss="
      &         ,istp,tcpu,tave,epot,vol
      &         ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))*up2gpa/3
         else
-          write(6,'(a,i8,2f10.2,es15.7)')
+          write(6,'(a,i8,2f10.2,es15.6)')
      &         " istp,time,temp,epot="
      &         ,istp,tcpu,tave,epot
         endif
@@ -594,7 +594,7 @@ c---------output step, time, and temperature
      &           trim(cpctl).eq.'vc-Berendsen' .or.
      &           trim(cpctl).eq.'vv-Berendsen' .and.
      &           iprint.ne.0 ) then
-              write(6,'(a,i8,2f10.2,es15.7,2es11.3)')
+              write(6,'(a,i8,2f10.2,es15.6,2es11.3)')
      &             " istp,time,temp,epot,vol,prss="
      &             ,istp,tcpu,tave,epot,vol
      &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
@@ -606,7 +606,7 @@ c---------output step, time, and temperature
      &             ,ptnsr(3,3)*up2gpa ,ptnsr(2,3)*up2gpa
      &             ,ptnsr(1,3)*up2gpa ,ptnsr(1,2)*up2gpa
             elseif( iprint.ne.0 ) then
-              write(6,'(a,i8,2f10.2,es15.7)')
+              write(6,'(a,i8,2f10.2,es15.6)')
      &             " istp,time,temp,epot="
      &             ,istp,tcpu,tave,epot
             endif
