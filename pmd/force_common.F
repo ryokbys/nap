@@ -142,7 +142,7 @@ c-----------------------------------------------------------------------
      &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint
      &       ,ifcoulomb)
-      else if( ifcoulomb.eq.2 ) then
+      else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
         call force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
      &       ,chg,h,hi,tcom
      &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr

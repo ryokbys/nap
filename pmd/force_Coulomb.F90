@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-04-06 15:39:34 Ryo KOBAYASHI>
+!                     Last modified: <2017-04-07 14:01:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  For screened Coulomb potential:  
@@ -33,7 +33,7 @@ module Coulomb
   real(8),parameter:: fbvs = 0.74d0
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
-  real(8),parameter:: qthd = 0.01d0
+  real(8),parameter:: qthd = 1d-8
 
 !.....Gaussian width of Ewald sum [default: 1.0 (Angstrom)]
   real(8):: sgm_ew = 1d0
@@ -186,9 +186,9 @@ contains
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
-    integer:: i,j,ik,is,js,k1,k2,k3,ierr,jj
-    real(8):: elrl,esrl,epot_self,epotl,epott,qi,qj,tmp&
-         ,bdotr,terfc,diji,dij,ss2i,sgmsq2,rc2,q2tot,q2loc,bb2
+    integer:: i,j,ik,is,js,k1,k2,k3,ierr,jj,ixyz,jxyz
+    real(8):: elrl,esrl,epot_self,epotl,epott,qi,qj,tmp,ftmp &
+         ,bdotr,terfc,diji,dij,ss2i,sgmsq2,rc2,q2tot,q2loc,bb2,sqpi
     real(8),allocatable,save:: qcosl(:),qcos(:),qsinl(:),qsin(:),pflr(:)&
          ,ri(:),bk(:),bk1(:),bk2(:),bk3(:),bb(:),dxdi(:),dxdj(:),rij(:)&
          ,xij(:),xj(:),xi(:)
@@ -259,6 +259,7 @@ contains
     rc2 = rc*rc
     sgmsq2 = sqrt(2d0)*sgm_ew
     ss2i = 1d0 /sgmsq2
+    sqpi = 1d0 /sqrt(pi)
     esrl = 0d0
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -292,7 +293,22 @@ contains
           epi(i)= epi(i) +tmp
           esrl = esrl +tmp
         endif
-!.....TODO: force
+!.....force
+        ftmp = -acc *qj*qi*diji *( diji *terfc &
+             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) )
+        aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
+        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
+!.....stress
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+            enddo
+          enddo
+        endif
       enddo
     enddo
 !!$    write(6,*) ' esrl = ',esrl
@@ -330,7 +346,7 @@ contains
          ,mpi_sum,mpi_md_world,ierr)
     call mpi_allreduce(qsinl,qsin,nk,mpi_double_precision &
          ,mpi_sum,mpi_md_world,ierr)
-!.....Compute long-range contribution to energy
+!.....Compute long-range contribution to potential energy
     elrl = 0d0
     ik = 0
     do k1= -kmax1,kmax1
@@ -343,7 +359,31 @@ contains
       enddo
     enddo
     elrl = elrl /avol *acc /2
-!!$    write(6,*) ' elrl = ',elrl
+!.....Long-range contribution to forces
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is= int(tag(i))
+      qi = chg(i)
+      if( abs(qi).lt.qthd ) cycle
+      ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
+      ik = 0
+      do k1= -kmax1,kmax1
+        bk1(1:3) = k1 *b1(1:3)
+        do k2= -kmax2,kmax2
+          bk2(1:3) = k2 *b2(1:3)
+          do k3= -kmax3,kmax3
+            if( .not. lkuse(k3,k2,k1) ) cycle
+            ik= ik +1
+            bk3(1:3) = k3 *b3(1:3)
+            bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
+            bdotr = sprod(bb,ri)
+            aa(1:3,i)= aa(1:3,i) -acc/avol *qi*bb(1:3) *pflr(ik) &
+                 *(-sin(bdotr)*qcos(ik) +cos(bdotr)*qsin(ik))
+          enddo
+        enddo
+      enddo
+    enddo
+    
     
     epotl = elrl +esrl
 !.....Gather epot
