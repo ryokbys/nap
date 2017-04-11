@@ -24,7 +24,7 @@ import numpy as np
 
 sys.path.append(os.environ['HOME']+'/src/nap')
 from nappy.atom import Atom
-from nappy.napsys import NAPSystem,unitvec_to_hi,cartessian_to_scaled
+from nappy.napsys import NAPSystem,unitvec_to_hi,cartesian_to_scaled
 from nappy.units import Ry_to_eV, Bohr_to_Ang
 
 sys.path.append(os.path.dirname(__file__))
@@ -221,7 +221,7 @@ def convert(fname,specorder,index):
         ai = Atom()
         pi = pos[ia,:]
         if pos_unit != "crystal":
-            sx,sy,sz = cartessian_to_scaled(hi,pi[0],pi[1],pi[2])
+            sx,sy,sz = cartesian_to_scaled(hi,pi[0],pi[1],pi[2])
         else:
             sx,sy,sz = pi[:]
         ai.set_pos(sx,sy,sz)

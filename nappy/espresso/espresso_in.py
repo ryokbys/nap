@@ -18,8 +18,6 @@ from docopt import docopt
 import numpy as np
 
 sys.path.append(os.environ['HOME']+'/src/nap/nappy')
-from atom import Atom
-from napsys import NAPSystem,unitvec_to_hi,cartessian_to_scaled
 
 __author__ = "Ryo KOBAYASHI"
 __version__ = "160629"

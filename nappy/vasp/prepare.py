@@ -123,7 +123,10 @@ def write_KPOINTS(fname,type,ndiv):
 def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal,
                 ediff,
                 relax=None,relax_cell=None,isif=2):
-    SYSTEM = 'system made by prepare.py '+ __version__
+    from datetime import datetime as dt
+    tdate = dt.now()
+    dstr = tdate.strftime('%Y-%m-%d')
+    SYSTEM = 'system made by prepare.py '+ dstr
     
     with open(fname,'w') as f:
         f.write("SYSTEM = "+SYSTEM+"\n")
@@ -168,8 +171,10 @@ def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal,
         f.write("\n")
         if relax_cell == 'cell':
             f.write("ISIF   = {0:2d}\n".format(3))
+            relax = True
         elif relax_cell == 'volume':
-            f.write("ISIF   = {0:2d}\n".format(4))
+            f.write("ISIF   = {0:2d}\n".format(3))
+            relax = True
         else:
             f.write("ISIF   = {0:2d}\n".format(isif))
         if relax:
@@ -222,7 +227,6 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
                  metal,potcar_dir,potcar_postfix,
                  encut=None,ediff=None,
                  relax=None,relax_cell=None,isif=None):
-    
     print(' Pitch of k points = {0:5.1f}'.format(pitch))
 
     poscar= nappy.vasp.poscar.POSCAR(poscar_fname)

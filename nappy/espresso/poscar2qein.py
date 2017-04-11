@@ -13,6 +13,8 @@ Options:
               Constraint string added to each entry of atom.
               '1' indicates the atom moving, while '0' being fixed.
               [default: 1,1,1]
+  --ecut=ECUT
+              Energy cutoff for wave function expansion. [default: 35]
   -o OUTFNAME
               Output file name. [default: in.pw]
   -p,--pitch=PITCH
@@ -261,6 +263,7 @@ if __name__ == "__main__":
     constraints = args['--constraints'].split(',')
     pitch = float(args['--pitch'])
     psdir = args['--pseudo-dir']
+    ecutwfc = float(args['--ecut'])
 
     #...PP directory
     psdir = os.environ['HOME']+'/'+psdir
@@ -296,6 +299,7 @@ if __name__ == "__main__":
                       constraints=constraints,
                       calculation=calc,
                       pseudo_dir=psdir,
+                      ecutwfc=ecutwfc,
                       ntyp=len(symbols))
     
 
