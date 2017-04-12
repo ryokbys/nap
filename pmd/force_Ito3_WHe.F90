@@ -1,8 +1,8 @@
 module Ito3_WHe
 
 contains
-  subroutine force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+  subroutine force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ito's new potential for W and He (IWHe)
@@ -32,16 +32,14 @@ contains
     real(8):: x,y,z,xi(3),epotl,epott,v2,dv2,dphi,dphj,tmp
     logical,save:: l1st=.true.
     real(8),allocatable,save:: rho(:),sqrho(:)
-!    real(8),external:: v2_IWHe,dv2_IWHe,phi_IWHe,dphi_IWHe
+    real(8),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
+      if( myid.eq.0 ) write(6,'(a)') ' use force_Ito3_Whe'
       allocate(rho(namax+nbmax),sqrho(namax+nbmax))
-!        write(6,'(a,es12.4)') ' Input cutoff    =',rc
-!        write(6,'(a,es12.4)') ' Potential cutoff=',p_rl(2,2)
-!!$!.....assuming fixed (constant) atomic volume (BCC)
-!!$      avol= alcfe**3 /2
-!!$      if(myid.eq.0) write(6,'(a,es12.4)') ' avol =',avol
-      l1st=.false.
+      if( .not. allocated(strsl) ) then
+        allocate(strsl(3,3,namax))
+      endif
 !.....check cutoff radius
       if( myid.eq.0 ) then
         write(6,'(a,es12.4)') ' rc of input    =',rc
@@ -53,14 +51,12 @@ contains
         call mpi_finalize(ierr)
         stop
       endif
+      l1st=.false.
     endif
 
-    aa(1:3,1:natm)=0d0
-    epi(1:natm)= 0d0
     epotl= 0d0
+    strsl(1:3,1:3,1:namax) = 0d0
     rho(1:namax+nbmax)= 0d0
-    sqrho(1:namax+nbmax)= 0d0
-    strs(1:3,1:3,1:natm+nb)= 0d0
 
 !-----rho(i)
     do i=1,natm
@@ -130,14 +126,16 @@ contains
         aa(1:3,i)=aa(1:3,i) -dv2*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dv2*drdxi(1:3)
 !.....atomic stress for 2-body terms
-        do ixyz=1,3
-          do jxyz=1,3
-            strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
-                 +0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
-            strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
-                 +0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                   -0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
+              strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                   -0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
+            enddo
           enddo
-        enddo
+        endif
 !.....N-body term
         if( is.ne.1 .or. js.ne.1 ) cycle
         dfj= -0.5d0*(rho(j)+2d0*p_d)/sqrho(j)**3
@@ -150,14 +148,16 @@ contains
         aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +tmp*drdxi(1:3)
 !.....atomic stress of many-body contributions
-        do ixyz=1,3
-          do jxyz=1,3
-            strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
-                 +0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
-            strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
-                 +0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+              strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+            enddo
           enddo
-        enddo
+        endif
       enddo
       if( is.eq.1 ) then
         epi(i)=epi(i) -rho(i)/sqrho(i)
@@ -165,30 +165,16 @@ contains
       endif
     enddo
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_md_world,strs,9)
-!!$    if( myid.ge.0 ) then
-!!$!-----copy strs of boundary atoms
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-!!$           ,nn,mpi_md_world,strs,9)
-!!$    else
-!!$      call reduce_dba_bk(natm,namax,tag,strs,9)
-!!$    endif
-
-!!$!-----atomic level stress in [eV/Ang^3]
-!!$    do i=1,natm
-!!$      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
-!!$!        write(6,'(i5,9es10.2)') i,strs(1:3,1:3,i)
-!!$    enddo
+    if( lstrs ) then
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+           ,nn,mpi_md_world,strsl,9)
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
 
 !-----gather epot
-    if( myid.ge.0 ) then
-      call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
-           ,MPI_SUM,mpi_md_world,ierr)
-      epot= epot +epott
-    else
-      epot= epot +epotl
-    endif
+    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+         ,MPI_SUM,mpi_md_world,ierr)
+    epot= epot +epott
 
 !      deallocate(sqrho)
   end subroutine force_Ito3_WHe

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-04-06 15:20:11 Ryo KOBAYASHI>
+c                     Last-modified: <2017-04-13 03:02:31 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -217,7 +217,7 @@ c.....Calc forces
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &     ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
-     &     ,cforce,ifcoulomb,iprint)
+     &     ,cforce,ifcoulomb,iprint,.true.)
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -240,9 +240,9 @@ c.....get_num_dof is called once in a MD run
           write(6,*) ''
           write(6,'(a)') ' variable-cell Berendsen is chosen'
           write(6,'(a)') ' target stress (GPa):'
-          write(6,'(3f8.3)') stgt(1,1:3)
-          write(6,'(3f8.3)') stgt(2,1:3)
-          write(6,'(3f8.3)') stgt(3,1:3)
+          write(6,'(3f10.3)') stgt(1,1:3)
+          write(6,'(3f10.3)') stgt(2,1:3)
+          write(6,'(3f10.3)') stgt(3,1:3)
         endif
         stgt(1:3,1:3)= stgt(1:3,1:3) *gpa2up
       else if( trim(cpctl).eq.'vv-Berendsen' ) then
@@ -458,7 +458,7 @@ c-------Calc forces
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
-     &       ,cforce,ifcoulomb,iprint)
+     &       ,cforce,ifcoulomb,iprint,.false.)
         lstrs = .false.
 
 c.....Second kick of velocities
@@ -601,7 +601,7 @@ c---------output step, time, and temperature
               write(6,'(a)') ' H-matrix:' !,h(1:3,1:3,0)
               write(6,'(3f15.7)') h(1:3,1:3,0)
               
-              write(6,'(a,6f8.3)') ' stress (GPa):'
+              write(6,'(a,6f10.3)') ' stress (GPa):'
      &             ,ptnsr(1,1)*up2gpa ,ptnsr(2,2)*up2gpa
      &             ,ptnsr(3,3)*up2gpa ,ptnsr(2,3)*up2gpa
      &             ,ptnsr(1,3)*up2gpa ,ptnsr(1,2)*up2gpa
@@ -1816,18 +1816,20 @@ c
       character(len=*):: cpctl
       
       integer:: i,ixyz,jxyz,ierr
-      real(8):: pt(3,3),prss,fac
+      real(8):: pt(3,3),ptp(3,3),ptk(3,3),prss,fac
 
-      pt(1:3,1:3)= 0d0
+      ptp(1:3,1:3)= 0d0
+      ptk(1:3,1:3)= 0d0
       do i=1,natm
         do jxyz=1,3
           do ixyz=1,3
-            pt(ixyz,jxyz)=pt(ixyz,jxyz)
-     &           +2d0*eki(ixyz,jxyz,i) +strs(ixyz,jxyz,i)
+            ptk(ixyz,jxyz)=ptk(ixyz,jxyz) +2d0*eki(ixyz,jxyz,i)
+            ptp(ixyz,jxyz)=ptp(ixyz,jxyz) +strs(ixyz,jxyz,i)
           enddo
         enddo
       enddo
 
+      pt(1:3,1:3) = ptk(1:3,1:3) +ptp(1:3,1:3)
       ptnsr(1:3,1:3)= 0d0
       call mpi_allreduce(pt,ptnsr,9,mpi_double_precision,mpi_sum
      &     ,mpi_md_world,ierr)
@@ -1835,7 +1837,7 @@ c
 
 c.....Berendsen for variable-cell
       if( trim(cpctl).eq.'Berendsen' .or.
-     &     trim(cpctl).eq.'vc-Berendsen') then
+     &     trim(cpctl).eq.'vc-Berendsen' ) then
 c.....now ah is scaling factor for h-mat
         ah(1:3,1:3)= 0d0
         ah(1,1)= 1d0

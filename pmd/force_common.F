@@ -1,7 +1,7 @@
       subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi
      &     ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs
-     &     ,cforce,ifcoulomb,iprint)
+     &     ,cforce,ifcoulomb,iprint,l1st)
 c-----------------------------------------------------------------------
 c  Wrapper routine for force calculations.
 c  Each force calculation routine is called from this subroutine.
@@ -24,6 +24,7 @@ c-----------------------------------------------------------------------
       use linreg,only:force_linreg
       use NN,only:force_NN
       use Coulomb, only: force_screened_Coulomb, force_Ewald_Coulomb
+     &     ,initialize_coulomb
       use Morse, only: force_Morse
       implicit none
       integer,intent(in):: namax,natm,nnmax,nismax,iprint,ifcoulomb
@@ -36,16 +37,34 @@ c-----------------------------------------------------------------------
       real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
      &     ,chg(namax),chi(namax)
       character(len=*),intent(in):: cforce
+      logical,intent(in):: l1st
       logical:: lstrs
       
       integer:: ierr,is,i
-      real(8):: at(3)
-      logical,save:: l1st = .true.
+      real(8):: at(3),tmp
 
       epot = 0d0
       aa(1:3,1:natm+nb)=0d0
       epi(1:natm+nb)= 0d0
       strs(1:3,1:3,1:natm+nb)= 0d0
+
+      if( ifcoulomb.eq.1 ) then ! screened Coulomb
+        if( l1st ) call initialize_coulomb(natm,tag,myid_md
+     &       ,mpi_md_world,ifcoulomb,h,rc)
+        call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
+     &       ,chg,h,hi,tcom
+     &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint
+     &       ,ifcoulomb)
+      else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
+        if( l1st ) call initialize_coulomb(natm,tag,myid_md,mpi_md_world
+     &       ,ifcoulomb,h,rc)
+        call force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
+     &       ,chg,h,hi,tcom
+     &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint
+     &       ,ifcoulomb)
+      endif
 
       select case (trim(cforce))
       case ('LJ_Ar')
@@ -136,20 +155,6 @@ c-----------------------------------------------------------------------
         endif
       end select
 
-      if( ifcoulomb.eq.1 ) then   ! screened Coulomb
-        call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
-     &       ,chg,h,hi,tcom
-     &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint
-     &       ,ifcoulomb)
-      else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
-        call force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
-     &       ,chg,h,hi,tcom
-     &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
-     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint
-     &       ,ifcoulomb)
-      endif
-
 c.....convert forces from hmat-coordinates to Cartesian coordinates
       do i=1,natm
         at(1:3)= aa(1:3,i)
@@ -160,8 +165,7 @@ c-----multiply 0.5d0*dt**2/am(i)
         is= int(tag(i))
         aa(1:3,i)= acon(is)*aa(1:3,i)
       enddo
-      
-      l1st = .false.
+
       end subroutine get_force
 c=======================================================================
       subroutine copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb

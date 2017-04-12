@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-03-29 17:53:05 Ryo KOBAYASHI>
+!                     Last-modified: <2017-04-11 14:26:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -374,7 +374,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
       write(6,'(1x,i4,a2,f12.3,es12.3)') i, species(i),demig(i),prefreq(i)
     enddo
     write(6,*) ''
-    write(6,'(a,f12.3)') ' initial formation energy = ',efrm0
+    write(6,'(a,es15.7)') ' initial formation energy = ',efrm0
     write(6,*) ''
 !.....Register initial structure to history list
     nhist = 1
@@ -491,7 +491,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
              hmat,species)
       endif
 !.....Write energy
-      write(cergtxt,'(i8,es11.3,es15.7,a,i3,a,i2,a,a,a,i3)') &
+      write(cergtxt,'(i8,es15.7,es15.7,a,i3,a,i2,a,a,a,i3)') &
            istp,tclck&
            ,ergp,', ncalc=',ncalc,', ievent=',ievent,', ',cjtmp(ievent) &
            ,', nstp=',nstps_done
