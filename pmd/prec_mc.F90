@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-04-11 14:26:10 Ryo KOBAYASHI>
+!                     Last-modified: <2017-04-16 12:09:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -148,8 +148,6 @@ program prec_mc
     end function urnd
   end interface
 
-!.....set random seed
-  t0 = urnd(dseed0)
 
 !.....initialize parallel
   call init_parallel(mpi_md_world,nodes_md,myid_md)
@@ -159,6 +157,9 @@ program prec_mc
 !.....read input parameters
     call read_in_pmc(ionum_inp, cinpfname)
   endif
+!.....set random seed
+  t0 = urnd(dseed0)
+  
   call bcast_params(myid_md,mpi_md_world,lkinetic, &
        nstps_mc,ncx,ncy,ncz,alat,num_Mg,num_Si,num_Vac, &
        init_strct,nx,ny,nz,nstps_relax,lmove,temp)
@@ -182,7 +183,6 @@ program prec_mc
   hmati(2,2) = 1d0/hmat(2,2)
   hmati(3,3) = 1d0/hmat(3,3)
 
-
 !.....create neighbor list only once here, and no longer needed after
   rc = 3.0
   allocate(lsprmc(0:nnmaxmc,natm))
@@ -196,13 +196,19 @@ program prec_mc
 !.....check restart,
 !     if not restart, initialize system eigher random or clustered
   if( myid_md.eq.0 ) then
-    if( init_strct.eq.1 ) then  ! random
+    if( init_strct.eq.0 ) then  ! read from file (restart)
+      call read_symbols(11,'dat.symbols',natm,csymbols)
+    elseif( init_strct.eq.1 ) then  ! random
       call random_symbols(natm,csymbols,num_Mg,num_Si,num_Vac)
     elseif( init_strct.eq.2 ) then  ! clustered
       call clustered_symbols(natm,pos0,csymbols,num_Mg,num_Si,num_Vac &
            ,nnmaxmc,lsprmc)
-    elseif( init_strct.eq.3 ) then  ! read from file (restart)
-      call read_symbols(11,'dat.symbols',natm,csymbols)
+    elseif( init_strct.eq.3 ) then  ! pairs between same species
+      call paired_symbols(natm,pos0,csymbols,num_Mg,num_Si,num_Vac,&
+           nnmaxmc,lsprmc,'XX')
+    elseif( init_strct.eq.4 ) then  ! pairs between different species
+      call paired_symbols(natm,pos0,csymbols,num_Mg,num_Si,num_Vac,&
+           nnmaxmc,lsprmc,'XY')
     endif
   endif
 
@@ -903,6 +909,87 @@ subroutine clustered_symbols(natm,pos0,csymbols &
   
 end subroutine clustered_symbols
 !=======================================================================
+subroutine paired_symbols(natm,pos0,csymbols,&
+     num_Mg,num_Si,num_Vac,nnmax,lspr,cpair_type)
+  implicit none
+  integer,intent(in):: natm,num_Mg,num_Si,num_Vac &
+       ,nnmax,lspr(0:nnmax,natm)
+  character,intent(in):: cpair_type*2
+  character,intent(inout):: csymbols(natm)
+  real(8),intent(in):: pos0(3,natm)
+
+  interface
+    function urnd(dseed0)
+      real(8),intent(in),optional:: dseed0
+      real(8):: urnd
+    end function urnd
+  end interface
+
+  integer:: npair,ipair,irnd,n,ichosen,jchosen,jj,i,j
+  character:: cpairs(2,natm),c1,c2
+  logical,external:: solute_in_neighbors
+  integer:: isite_avail(natm),navail
+
+  call create_pairs(natm,csymbols,num_Mg,num_Si,num_Vac, &
+       npair,cpairs,cpair_type)
+
+  write(6,'(a,i5)') ' npair = ',npair
+  do i=1,npair
+    write(6,'(a,i4,2a4)') ' i,cpairs(1:2,i) = ',i,cpairs(1:2,i)
+  enddo
+
+!.....Choose sites where Mg or Si or Vac will be put
+!     which should be separated far enough not to connect each other
+  ipair = 0
+  do while(.true.)
+    if( ipair.eq.npair ) exit
+    isite_avail(1:natm) = 1
+    do i=1,natm
+      if( csymbols(i).ne.'A' ) then
+        isite_avail(i) = 0
+        do jj=1,lspr(0,i)
+          j= lspr(jj,i)
+          isite_avail(j)= 0
+        enddo
+      endif
+    enddo
+    navail= 0
+    do i=1,natm
+      if( isite_avail(i).eq.1 ) navail= navail +1
+    enddo
+    if( navail.eq.0 ) then
+      write(6,'(a)') ' No more available sites for non-overlapping distribution.'
+      stop
+    endif
+
+    irnd = int(navail*urnd()) +1
+    n = 0
+!.....Pick a random site that is available
+    do i=1,natm
+      if( isite_avail(i).eq.1 ) then
+        n=n+1
+        if( n.ge.irnd ) then
+          ichosen = i
+          exit
+        endif
+      endif
+    enddo
+!.....Check whether there is no Mg, Si, or Vac among neighbors
+    if( solute_in_neighbors(ichosen,natm,csymbols,nnmax,lspr) ) cycle
+!.....Put solute or vacancy on the chosen site
+    ipair = ipair +1
+    c1 = cpairs(1,ipair)
+    c2 = cpairs(2,ipair)
+    csymbols(ichosen)= c1
+    if( c2.eq.'0' ) cycle
+!.....Pick one one of neighbor sites and put c2 into it
+    jj = lspr(0,ichosen)*urnd() +1
+    jchosen = lspr(jj,ichosen)
+    csymbols(jchosen)= c2
+  enddo
+
+end subroutine paired_symbols
+!=======================================================================
 subroutine loads_symbols(natm,txt,csymbols)
 !
 ! Load symbols from a character string
@@ -1270,6 +1357,115 @@ function epot2efrm(natm,ecpot,csym,epot)
   enddo
   return
 end function epot2efrm
+!=======================================================================
+function solute_in_neighbors(isite,natm,csymbols,nnmax,lspr)
+  implicit none
+  integer,intent(in):: isite,natm,nnmax,lspr(0:nnmax,natm)
+  character,intent(in):: csymbols(natm)
+  logical:: solute_in_neighbors
+
+  integer:: j,jj
+
+  solute_in_neighbors = .false.
+
+  do jj=1,lspr(0,isite)
+    j=lspr(jj,isite)
+    if( csymbols(j).ne.'A' ) then
+      solute_in_neighbors = .true.
+      return
+    endif
+  enddo
+  return
+  
+end function solute_in_neighbors
+!=======================================================================
+subroutine create_pairs(natm,csymbols,num_Mg,num_Si,num_Vac, &
+     npair,cpairs,cpair_type)
+!
+!  Create pairs of X-X or X-Y if possible.
+!  If it is not possible, put '0' in cpair(2,i).
+!
+  implicit none
+  integer,intent(in):: natm,num_Mg,num_Si,num_Vac
+  character,intent(in):: csymbols(natm),cpair_type*2
+  integer,intent(out):: npair
+  character,intent(out):: cpairs(2,natm)
+
+  integer:: img,isi,ivac
+  
+  img = num_Mg
+  isi = num_Si
+  ivac= num_Vac
+
+  npair = 0
+  cpairs(1:2,1:natm) = '0'
+
+  if( cpair_type.eq.'XX' ) then  ! pairs of same species
+!.....Mg
+    do while(.true.)
+      if( img.le.0 ) exit
+      npair = npair +1
+      cpairs(1,npair) = 'M'
+      img = img -1
+      if( img.le.0 ) exit
+      cpairs(2,npair) = 'M'
+      img = img -1
+    enddo
+!.....Si
+    do while(.true.)
+      if( isi.le.0 ) exit
+      npair = npair +1
+      cpairs(1,npair) = 'S'
+      isi = isi -1
+      if( isi.le.0 ) exit
+      cpairs(2,npair) = 'S'
+      isi = isi -1
+    enddo
+!.....Vac
+    do while(.true.)
+      if( ivac.le.0 ) exit
+      npair = npair +1
+      cpairs(1,npair) = 'V'
+      ivac = ivac -1
+      if( ivac.le.0 ) exit
+      cpairs(2,npair) = 'V'
+      ivac = ivac -1
+    enddo
+  else if( cpair_type.eq.'XY' ) then  ! pairs of different species
+!.....Mg
+    do while(.true.)
+      if( img.le.0 ) exit
+      npair = npair +1
+      cpairs(1,npair) = 'M'
+      img = img -1
+      if( isi.le.0 ) exit
+      cpairs(2,npair) = 'S'
+      isi = isi -1
+    enddo
+!.....Si
+    do while(.true.)
+      if( isi.le.0 ) exit
+      npair = npair +1
+      cpairs(1,npair) = 'S'
+      isi = isi -1
+      if( img.le.0 ) exit
+      cpairs(2,npair) = 'M'
+      img = img -1
+    enddo
+!.....Vac
+    do while(.true.)
+      if( ivac.le.0 ) exit
+      npair = npair +1
+      cpairs(1,npair) = 'V'
+      ivac = ivac -1
+      if( ivac.le.0 ) exit
+      cpairs(2,npair) = 'V'
+      ivac = ivac -1
+    enddo
+    
+  endif
+  
+end subroutine create_pairs
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmc"
