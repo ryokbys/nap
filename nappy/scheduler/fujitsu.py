@@ -117,7 +117,7 @@ _script_template_single = """#!/bin/bash
 #PJM --mpi "proc={NPROCS}"
 #PJM --mpi "rank-map-bychip"
 #PJM -L "elapse={WALLTIME}"
-#PJM -o out
+#PJM -o out_{JOB_NAME}
 #PJM -j
 #PJM -X
 #PJM -S
@@ -138,7 +138,7 @@ _script_template_plural = """#!/bin/bash
 #PJM --mpi "proc={NPROCS}"
 #PJM --mpi "rank-map-bychip"
 #PJM -L "elapse={WALLTIME}"
-#PJM -o out
+#PJM -o out_{JOB_NAME}
 #PJM -j
 #PJM -X
 #PJM -S

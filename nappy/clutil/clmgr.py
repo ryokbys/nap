@@ -382,10 +382,10 @@ Please wait until the other clmgr stops or stop it manually.
             ctime = calc.estimate_calctime(nprocs=npara)
             max_ctime = max(max_ctime,ctime)
             if ctime > limit_sec:
-                logger.info('The estimated calctime at {0:s} seems to '.format(d)
-                            +'be longer than the limit_sec:')
-                logger.info('  estimated_calctime = {0:d}'.format(ctime))
-                logger.info('  limited time       = {0:d}'.format(limit_sec))
+                logger.info('Since the estimated calctime {0:s}'.format(d)
+                            +' seems to be longer than the limit_sec,'
+                            +' the maximum calucation time of the queue is applied.')
+                max_ctime = limit_sec
             max_ctime = max(max_ctime,3600)
             self.mpi_command_dict['npara'] = npara
             self.mpi_command_dict['rankfile'] = './rankfile'
@@ -399,7 +399,7 @@ Please wait until the other clmgr stops or stop it manually.
             job_info['NNODES'] = sum_nodes
             job_info['NPROCS'] = npn *sum_nodes
             job_info['COMMANDS'] = commands
-            hours = int(max_ctime /3600 +1)
+            hours = max(int(max_ctime /3600),1)
             job_info['WALLTIME'] = '{0:d}:00:00'.format(hours)
             job = {}
             job['info'] = copy.copy(job_info)
