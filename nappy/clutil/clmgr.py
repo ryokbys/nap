@@ -23,6 +23,10 @@ Options:
               [default: False]
   -q QUEUE_NAME
               Queue name the jobs are submitted to. [default: default]
+  --limit-sec LIMIT_SEC
+              Maximum time of computation in second which will replace the
+              machine default value. Negative value means to use the machine default.
+              [default: -1]
 """
 from __future__ import print_function
 
@@ -226,7 +230,10 @@ Please wait until the other clmgr stops or stop it manually.
                 self.dirs_to_work.append(d)
                 continue
             with open(d+'/'+self._stat_file,'r') as f:
-                stat = int(f.readline())
+                try:
+                    stat = int(f.readline())
+                except:
+                    stat = -1
             #...Skip this directory because some job is/will be perfromed here
             if stat in jobids:
                 continue
@@ -254,13 +261,19 @@ Please wait until the other clmgr stops or stop it manually.
                 self.mpi_command_dict[k] = None
 
 
-    def single_job_per_submission(self,dryrun=False):
+    def single_job_per_submission(self,dryrun=False,limit_seconds=-1):
         """
         Assign all the jobs to corresponding jobscripts in appropriate directories.
         """
 
         self.make_mpi_command_dict()
         
+        limit_sec = self.machine.qattr['limit_sec']
+        if limit_seconds > 0:
+            limit_sec = min(limit_sec,limit_seconds)
+            logger.info('Limit second is modified from machine default value'
+                        +' to {0:d}.'.format(limit_sec))
+
         cwd = os.getcwd()
         pid = os.getpid()
         njobs = 0
@@ -273,11 +286,12 @@ Please wait until the other clmgr stops or stop it manually.
                                                      limit_npn=npn/2)
             #nprocs = nnodes *npn1
             ctime = calc.estimate_calctime(nprocs=npara)
-            if ctime > self.machine.qattr['limit_sec']:
-                logger.info('The estimated calctime at {0:s} seems to '.format(d)
-                            +'be longer than the limit_sec:')
-                logger.info('  estimated_calctime = {0:d}'.format(ctime))
-                logger.info('  limited time       = {0:d}'.format(self.machine.qattr['limit_sec']))
+            if ctime > limit_sec:
+                logger.info('Since the estimated calctime {0:s}'.format(d)
+                            +' seems to be longer than the limit_sec,'
+                            +' the maximum calucation time of the queue is applied.')
+                ctime = limit_sec
+
             ctime = max(ctime,3600)
             job_info = {}  # initialize job_info
             job_info['JOB_NAME'] = 'clmgr{0:d}_{1:d}'.format(pid,i)
@@ -311,6 +325,7 @@ Please wait until the other clmgr stops or stop it manually.
                     njobs += 1
                     jobs.append((d,jobid))
                 except Exception, e:
+                    print('Error: ',e)
                     logger.warning('There is an error occurred, e = ',e)
                     pass
             with open(self._stat_file,'w') as f:
@@ -318,7 +333,7 @@ Please wait until the other clmgr stops or stop it manually.
         os.chdir(cwd)
         return jobs        
 
-    def plural_jobs_per_submission(self,dryrun=False):
+    def plural_jobs_per_submission(self,dryrun=False,limit_seconds=-1):
         """
         Assign all the jobs by grouping some jobs to one submission.
         Run groupped submission at ~/.nappy/clmgr/tmpdir/ without specific
@@ -336,8 +351,12 @@ Please wait until the other clmgr stops or stop it manually.
         #...Num procs per node
         npn = self.machine.nprocs_per_node
         #...Num nodes per submission
-        limit_nodes = self.machine.qattr['num_nodes']  
+        limit_nodes = self.machine.qattr['num_nodes']
         limit_sec = self.machine.qattr['limit_sec']
+        if limit_seconds > 0:
+            limit_sec = min(limit_sec,limit_seconds)
+            logger.info('Limit second is modified from machine default value'
+                        +' to {0:d}.'.format(limit_sec))
         max_ctime = 0.0
         #...Initialize job_info
         job_info = {}
@@ -558,6 +577,7 @@ if __name__ == "__main__":
     dry = bool(args['-d'])
     multiple_jobs_per_submission = bool(args['-m'])
     queue = args['-q']
+    limit_sec = int(args['--limit-sec'])
     
     dirs = args['DIRS']
     if isinstance(dirs,str):
@@ -578,9 +598,9 @@ if __name__ == "__main__":
     clmgr.find_dirs_to_work(dirs)
     clmgr.avoid_conflict()
     if multiple_jobs_per_submission:
-        jobs = clmgr.plural_jobs_per_submission(dryrun=dry)
+        jobs = clmgr.plural_jobs_per_submission(dryrun=dry,limit_seconds=limit_sec)
     else:
-        jobs = clmgr.single_job_per_submission(dryrun=dry)
+        jobs = clmgr.single_job_per_submission(dryrun=dry,limit_seconds=limit_sec)
 
     logger.info("")
     logger.info("Directories treated in this clmgr {0:d} ".format(os.getpid())
