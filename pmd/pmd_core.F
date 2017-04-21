@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-04-13 03:02:31 Ryo KOBAYASHI>
+c                     Last-modified: <2017-04-21 10:50:17 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -380,7 +380,7 @@ c-----MD loop with velocity-Verlet--------------------------------------
 c.....In case of isobaric MD, lstrs has to be always TRUE.
         if( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
-     &       trim(cpctl).eq.'vv-Berendsen') then
+     &       trim(cpctl).eq.'vv-Berendsen' .or. lstrs0 ) then
           lstrs = .true.
         else
           lstrs = .false.
