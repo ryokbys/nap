@@ -13,7 +13,7 @@ def read_POTCAR(fname='POTCAR'):
     lines= file.readlines()
     for iline in range(len(lines)):
         line= lines[iline]
-        if re.match(r'^\s+US ',line) or re.match('^\s+PAW_PBE ',line):
+        if re.match(r'^\s+US ',line) or re.match('^\s+PAW_(PBE|GGA) ',line):
             isp=isp +1
             data= line.split()
             species.append(data[1]) # species name

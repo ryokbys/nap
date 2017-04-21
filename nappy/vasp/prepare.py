@@ -16,7 +16,9 @@ Options:
   --ediff EDIFF
               Convergence criteria for the energy difference. [default: 1.0e-6]
   --spin-polarize
-              Set spin polarization true.
+              Set spin polarization true. If '--high-spin' is set, this is also set.
+  --high-spin 
+              Set initial spin state as high. Otherwise set it low.
   --break-symmetry
               Set to allow symmetry breakage.
   --metal     Set metal flag True, and set ISMEAR=2,
@@ -27,10 +29,10 @@ Options:
   --potcar-postfix POTCAR_POSTFIX
               Postfix of POTCAR directory name. If the species does not have this
               postfix, use directory without it. [default: ]
-  --relax     Enable structure relaxation. This sets IBRION=1 and NSW=100.
-  --relax-cell RELAX_CELL
-              Type of relaxation of cell, either (ion_only, cell, volume)
-              [default: ion_only]
+  --mode MODE
+              Mode of VASP calculation, either one of the followings:
+              scf, relax-ion, relax-cell, relax-shape, md-ion, md-cell, md-shape.
+              [default: scf]
   --isif ISIF  Directly specify ISIF value. [default: 2]
 """
 from __future__ import print_function
@@ -52,7 +54,7 @@ _KPOINTS_name= 'KPOINTS'
 _KPOINTS_type= 'Monkhorst-Pack' # or 'Gamma'
 
 _IBRION= -1  # -1:no update, 0:MD, 1:q-Newton, 2:CG, 3:damped MD
-_ISIF= 2     # 2: relax ions only, 3:shell-shape too, 4:shell volume too
+_ISIF= 2     # 2: relax ions only, 3:shape & vol too, 4:shape but not vol
 _NSW= 0      # number of ion relaxation steps
 
 def determine_num_kpoint(b_length,pitch,leven):
@@ -111,6 +113,19 @@ def estimate_nbands(nel):
         nbands += nbands % 4
     return nbands
 
+def get_magmom_str(high_spin,species=[],natms=[],valences=[]):
+    magmom = ""
+    if high_spin:
+        for i,spcs in enumerate(species):
+            n = natms[i]
+            spin = valences[i]
+            magmom += ' {0:d}*{1:d}'.format(n,int(spin))
+    else:
+        for i,spcs in enumerate(species):
+            n = natms[i]
+            magmom += ' {0:d}*{1:d}'.format(n,0)
+    return magmom
+
 def write_KPOINTS(fname,type,ndiv):
     with open(fname,'w') as f:
         f.write('{0:d}x{1:d}x{1:d}\n'.format(ndiv[0],ndiv[1],ndiv[2]))
@@ -120,9 +135,10 @@ def write_KPOINTS(fname,type,ndiv):
         f.write(' {0:2d} {1:2d} {2:2d}\n'.format(0,0,0))
         f.close()
 
-def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal,
-                ediff,
-                relax=None,relax_cell=None,isif=2):
+def write_INCAR(fname,encut,nbands,break_symmetry,
+                spin_polarized,metal,ediff,
+                high_spin,species,natms,valences,
+                mode=None,isif=2):
     from datetime import datetime as dt
     tdate = dt.now()
     dstr = tdate.strftime('%Y-%m-%d')
@@ -142,6 +158,8 @@ def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal,
             f.write("AMIX_MAG = 0.2\n")
             f.write("BMIX_MAG = 0.0001\n")
             f.write("MAXMIX   = 40\n")
+            magmom = get_magmom_str(high_spin,species,natms,valences)
+            f.write("MAGMOM   = {0:s}\n".format(magmom))
         else:
             f.write("ISPIN  = 1\n")
     
@@ -151,46 +169,56 @@ def write_INCAR(fname,encut,nbands,break_symmetry,spin_polarized,metal,
             f.write("ISYM   = 2\n")
     
         f.write("\n")
-        f.write("ENCUT  = {0:7.3f}\n".format(encut))
-        f.write("LREAL  = Auto\n")
-        f.write("EDIFF  = {0:7.1e}\n".format(ediff))
-        f.write("ALGO   = Normal\n")
-        f.write("PREC   = Normal\n")
+        f.write("ENCUT  =  {0:7.3f}\n".format(encut))
+        f.write("LREAL  =  Auto\n")
+        f.write("EDIFF  =  {0:7.1e}\n".format(ediff))
+        f.write("ALGO   =  Normal\n")
+        f.write("PREC   =  Normal\n")
         f.write("\n")
-        f.write("NELMIN = 4\n")
-        f.write("NELM   = 100\n")
+        f.write("NELMIN =  4\n")
+        f.write("NELM   =  100\n")
         f.write("NBANDS = {0:4d}\n".format(nbands))
         f.write("\n")
         if metal:
-            f.write("ISMEAR = 2\n")
-            f.write("SIGMA  = 0.2\n")
+            f.write("ISMEAR =   2\n")
+            f.write("SIGMA  =   0.2\n")
         else:
-            f.write("ISMEAR = -5\n")
-            f.write("SIGMA  = 0.00001\n")
+            f.write("ISMEAR =   0\n")
+            f.write("SIGMA  =   0.01\n")
     
         f.write("\n")
-        if relax_cell == 'cell':
-            f.write("ISIF   = {0:2d}\n".format(3))
-            relax = True
-        elif relax_cell == 'volume':
-            f.write("ISIF   = {0:2d}\n".format(3))
-            relax = True
-        else:
-            f.write("ISIF   = {0:2d}\n".format(isif))
-        if relax:
-            f.write("IBRION = {0:2d}\n".format(1))
+        if 'scf' in mode:
+            f.write("IBRION = {0:4d}\n".format(-1))
+            f.write("NSW    = {0:4d}\n".format(0))
+        elif 'relax' in mode:
+            f.write("IBRION = {0:4d}\n".format(1))
             f.write("NSW    = {0:4d}\n".format(100))
+            f.write("POTIM  = 0.5\n") 
+        elif 'md' in mode:
+            f.write("IBRION = {0:4d}\n".format(0))
+            f.write("NSW    = {0:4d}\n".format(100))
+            f.write("POTIM  = 1.0\n") 
+            f.write("SMASS  = 0.4\n") 
         else:
-            f.write("IBRION = {0:2d}\n".format(_IBRION))
-            f.write("NSW    = {0:4d}\n".format(_NSW))
-        f.write("POTIM  = 0.5\n") 
-        f.write("SMASS  = 0.4\n") 
+            raise ValueError('mode is wrong, mode = ',mode)
+
+        if 'ion' in mode:
+            f.write("ISIF   = {0:4d}\n".format(2))
+        elif 'cell' in mode:
+            f.write("ISIF   = {0:4d}\n".format(3))
+        elif 'shape' in mode:
+            f.write("ISIF   = {0:4d}\n".format(4))
+        else:
+            f.write("ISIF   = {0:4d}\n".format(2))
+
         f.write("\n")
 
         ncore = estimate_ncore(nbands)
         f.write("NCORE  = {0:4d}\n".format(ncore)) 
         f.write("\n")
         f.close()
+
+
 
 def prepare_potcar(poscar,potcar_dir,potcar_postfix=''):
     """
@@ -207,7 +235,12 @@ def prepare_potcar(poscar,potcar_dir,potcar_postfix=''):
     if os.path.exists('POTCAR'):
         os.system('rm POTCAR')
 
-    postfixes = [potcar_postfix, '', '_sv', '_pv', '_s', '_h']
+    if potcar_postfix == '_sv':
+        postfixes = [potcar_postfix, '_pv', '', '_s', '_h']
+    elif potcar_postfix == '_pv':
+        postfixes = [potcar_postfix, '', '_sv', '_s', '_h']
+    else:
+        postfixes = [potcar_postfix, '', '_pv', '_sv', '_s', '_h']
     for sp in poscar.species:
         found = False
         for pf in postfixes:
@@ -217,7 +250,7 @@ def prepare_potcar(poscar,potcar_dir,potcar_postfix=''):
             else:
                 continue
             os.system('cat '+spdir+'/POTCAR >> ./POTCAR')
-            print('POTCAR for {0:3s}: {1:s}'.format(sp,spdir))
+            print(' POTCAR for {0:3s}: {1:s}'.format(sp,spdir))
             break
         if not found:
             raise RuntimeError('POTCAR was not found for '+sp)
@@ -226,13 +259,14 @@ def prepare_potcar(poscar,potcar_dir,potcar_postfix=''):
 def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
                  metal,potcar_dir,potcar_postfix,
                  encut=None,ediff=None,
-                 relax=None,relax_cell=None,isif=None):
+                 mode=None,isif=None,high_spin=False):
     print(' Pitch of k points = {0:5.1f}'.format(pitch))
 
     poscar= nappy.vasp.poscar.POSCAR(poscar_fname)
     poscar.read(poscar_fname)
 
     if os.path.exists('./POTCAR'):
+        print(' Use ./POTCAR already exists.')
         potcar = nappy.vasp.potcar.read_POTCAR()
     else:
         prepare_potcar(poscar,potcar_dir,potcar_postfix)
@@ -278,8 +312,9 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
 
     write_KPOINTS(_KPOINTS_name,_KPOINTS_type,ndiv)
     write_INCAR(_INCAR_name,encut,nbands,break_symmetry,
-                spin_polarized,metal,
-                ediff,relax=relax,relax_cell=relax_cell,isif=isif)
+                spin_polarized,metal,ediff,
+                high_spin,species,natms,valences,
+                mode=mode,isif=isif)
 
 #=======================================================================
 
@@ -290,6 +325,7 @@ if __name__ == '__main__':
     pitch= float(args['-p'])
     leven= args['--even']
     spin_polarized= args['--spin-polarize']
+    high_spin = args['--high-spin']
     break_symmetry= args['--break-symmetry']
     metal= args['--metal']
     poscar_fname= args['POSCAR']
@@ -297,8 +333,7 @@ if __name__ == '__main__':
     potcar_postfix = args['--potcar-postfix']
     encut = args['--encut']
     ediff = float(args['--ediff'])
-    relax = args['--relax']
-    relax_cell = args['--relax-cell']
+    mode = args['--mode']
     isif = int(args['--isif'])
 
     if encut[0].isdigit():
@@ -306,7 +341,11 @@ if __name__ == '__main__':
     else:
         encut = None
 
+    if high_spin:
+        spin_polarized = True
+
     prepare_vasp(poscar_fname,pitch,leven,spin_polarized,break_symmetry,
                  metal,potcar_dir,potcar_postfix,
                  encut=encut,ediff=ediff,
-                 relax=relax,relax_cell=relax_cell,isif=isif)
+                 mode=mode,isif=isif,
+                 high_spin=high_spin)

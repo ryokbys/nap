@@ -8,8 +8,8 @@ PREPARE mode creates directories and POSCARs to be computed.
 ANALYZE mode reads the stress values obtained by some code.
 
 Usage:
-    elastic_constants.py prepare [options] POSCAR
-    elastic_constants.py analyze STRSFILE
+    elasticity.py prepare [options] POSCAR
+    elasticity.py analyze STRSFILE
 
 Options:
   -h, --help  Shows this message and exit.
