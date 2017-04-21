@@ -58,7 +58,7 @@ def parse_KPOINTS(fname='KPOINTS'):
     else:
         nkpt = auto
     return nkpt
-    
+
 class VASP:
     
     _input_files = (
@@ -115,8 +115,20 @@ class VASP:
             if tin > outcar_mtime:
                 return True
 
+        #...Check whether the calculation done correctly.
+        if not self.calc_done():
+            return True
+
         #...otherwise no need to perform VASP
         return False
+
+    def calc_done(self):
+        with open('OUTCAR','r') as f:
+            lines = f.readlines()
+        if 'Voluntary' in lines[-1]:
+            return True
+        else:
+            return False
 
     def get_num_valence(self):
         """
