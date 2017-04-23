@@ -13,6 +13,8 @@ Options:
              Specify the order of species needed to convert POSCAR to pos. [default: Al,Mg,Si]
   --index=INDEX
              Convert a snapshot of INDEX. [default: -1]
+  --sequence
+             Extract all the sequence of MD or relaxation stored in vasprun.xml.
   --remove-constraints
              Remove constraints originally set to the system. [default: False]
 """
@@ -54,6 +56,29 @@ def write_pos(atoms,fname="pos"):
                     +' 0.0 0.0 0.0 0.0 0.0 0.0\n')
 
 
+def output_for_fitpot(atoms,remove_const,dirname='./'):
+    if remove_const:
+        del atoms.constraints
+    write(dirname+'POSCAR',images=atoms,format='vasp',direct=True,vasp5=True)
+    try:
+        epot = atoms.get_potential_energy()
+    except:
+        print ' Failed to get_potential_energy(), so skip it.'
+        return None
+    with open(dirname+'erg.ref','w') as f:
+        f.write("{0:12.7f}\n".format(epot))
+    with open(dirname+'frc.ref','w') as f:
+        f.write("{0:6d}\n".format(len(atoms)))
+        frcs= atoms.get_forces()
+        for frc in frcs:
+            f.write("{0:12.7f} {1:12.7f} {2:12.7f}\n".format(frc[0],frc[1],frc[2]))
+    write_pos(atoms,fname=dirname+'pos')
+    with open(dirname+'strs.ref','w') as f:
+        strs = atoms.get_stress()
+        for s in strs:
+            f.write(" {0:15.7f}".format(s*_kb2gpa)) # converting from kBar to GPa
+        f.write('\n')
+    
 
 if __name__ == "__main__":
 
@@ -61,15 +86,20 @@ if __name__ == "__main__":
     dirs= args['DIR']
     specorder= args['--specorder']
     index= int(args['--index'])
+    sequence = args['--sequence']
     remove_const = args['--remove-constraints']
 
     _specorder = specorder.split(',')
-    print 'specorder = ',_specorder
-    print 'index   = ',index
-    print 'remove_const   = ',remove_const
+    print ' specorder = ',_specorder
+    if sequence:
+        print ' All the sequence are to be extracted.'
+        index = ':'
+    else:
+        print ' index   = ',index
+    print ' remove_const   = ',remove_const
 
     ndirs= len(dirs)
-    print 'number of directories = ',ndirs
+    print ' number of directories = ',ndirs
 
     cwd=os.getcwd()
     for i,d in enumerate(dirs):
@@ -77,32 +107,28 @@ if __name__ == "__main__":
         print '{0:5d}/{1:d}: '.format(i+1,ndirs)+d
         os.chdir(d)
         if not os.path.exists('vasprun.xml'):
-            print 'No vasprun so skip.'
+            print ' No vasprun.xml, so skip.'
             continue
         if os.path.exists('erg.ref') and \
            os.stat('erg.ref').st_mtime > os.stat('vasprun.xml').st_mtime:
-            print 'Since there is newer erg.ref, skip it.'
+            print ' Since there is newer erg.ref, skip it.'
             continue
         try:
             atoms= read('vasprun.xml',index=index,format='vasp-xml')
         except:
-            print 'Failed to read vasprun.xml, so skip it.'
+            print ' Failed to read vasprun.xml, so skip it.'
             continue
-        if remove_const:
-            del atoms.constraints
-        write('POSCAR',images=atoms,format='vasp',direct=True,vasp5=True)
-        with open('erg.ref','w') as f:
-            f.write("{0:12.7f}\n".format(atoms.get_potential_energy()))
-        with open('frc.ref','w') as f:
-            f.write("{0:6d}\n".format(len(atoms)))
-            frcs= atoms.get_forces()
-            for frc in frcs:
-                f.write("{0:12.7f} {1:12.7f} {2:12.7f}\n".format(frc[0],frc[1],frc[2]))
-        write_pos(atoms,fname='pos')
-        with open('strs.ref','w') as f:
-            strs = atoms.get_stress()
-            for s in strs:
-                f.write(" {0:15.7f}".format(s*_kb2gpa)) # converting from kBar to GPa
-            f.write('\n')
+
+        if sequence:  # MD sequence
+            print(' Extracting sequence...')
+            for j,a in enumerate(atoms):
+                dirname = '{0:05d}/'.format(j)
+                print('  {0:s}'.format(dirname))
+                os.system('mkdir -p {0:s}'.format(dirname))
+                output_for_fitpot(a,remove_const,dirname=dirname)
+            pass
+        else:   # snapshopt
+            dirname = './'
+            output_for_fitpot(atoms,remove_const,dirname=dirname)
     os.chdir(cwd)
 

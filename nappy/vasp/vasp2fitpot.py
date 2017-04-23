@@ -40,7 +40,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
 
 import numpy as np
 from docopt import docopt
-from pymatgen.io.vaspio.vasp_output import Vasprun
+from pymatgen.io.vasp.outputs import Vasprun
 
 from napsys import NAPSystem
 from atom import Atom
