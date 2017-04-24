@@ -1,60 +1,70 @@
-#!/opt/local/bin/python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
 """
 Make in.const.NN and in.params.NN to be used in NN potential.
 And the file storing combination information, 
 in.comb.NN, is also written.
-
-Usage:
-  make_const-params_NN.py [options]
-
-Options:
-  -h, --help  Show this message and help.
 """
 
-import sys,os,random,math
-from docopt import docopt
+import random,math
 
 #=========================================================== Constants
 #.....cutoff radius in Angstrom
-rcut= 4.0
+rcut= 5.8
+rc3 = 3.5
 #.....number of species
-nsp= 1
+nsp= 4
 #.....number of hidden layers
 nl = 1
 #.....num of nodes in a layer
-nhl= [0,10]
+nhl= [0,30]
 #.....min,max of parameters
-pmin= -1.0
-pmax=  1.0
+pmin= -0.1
+pmax=  0.1
 #.....num of eta in Gaussian symmetry function, f(r)=exp(-eta*(dij-rs)**2)
 type_gauss= 1
-nr= 5
-dr= (rcut-0.1)/(nr-1)
-reta=[ 0.1+dr*i for i in range(nr) ]
-#reta=[0.5, 1.0, 1.5, 2.0, 2.5]
 #.....num of Rs in 2-body symmetry function
 #rrs=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5]
 #rrs=[0.5, 1.0, 1.5, 2.0, 2.5]
-rrs=[0.0]
-#.....num of k in cosine func, f(r)= (1d0+cos(k*r))
-type_cos= 2
-nk= 5
-drk= (rcut-1.0)*math.pi/rcut/(nk-1)
-rk= [ math.pi/rcut +drk*i for i in range(nk) ]
+nrs= 20
+rmin= 1.5
+dr= ((rcut-0.1)-rmin)/(nrs-1)
+rrs=[ rmin+dr*i for i in range(nrs) ]
+#rrs=[0.0]
+nr= 1
+#dr= (10.0-0.01)/(nr-1)
+#reta=[ 0.1*10.0**i for i in range(nr) ]
+#reta=[ 0.01+dr*i for i in range(nr) ]
+# reta= [0.01, 0.1, 1.0, 10.0]
+# reta=[0.01, 0.1, 1.0]
+#reta= [ 1.0/2/(2*dr)**2 ]
+reta= [10.0]
+
+# #.....num of k in cosine func, f(r)= (1d0+cos(k*r))
+# type_cos= 2
+# nk= 50
+# drk= (rcut-1.0)*math.pi/rcut/(nk-1)
+# rk= [ math.pi/rcut +drk*i for i in range(nk) ]
 # r2pi= 2.0*math.pi/rcut
-# rk= [r2pi, r2pi*1.5]
-#.....num of a in polynomial func, f(r)= 1.0/r**a
-type_poly= 3
-#rpoly= [1.0, 2.0, 3.0, 6.0, 9.0, 12.0]
-rpoly= []
+#rk= [0.5, 1.0, 2.0, 3.0, 4.0]
+rk= []
+# #.....num of Morse potential
+# type_morse= 4
+# nm1= 4
+# dnm1= (10.0-0.1)/(nm1-1)
+# rm1= [ 0.1 +dnm1*i for i in range(nm1) ]
+# nm2= 20
+# dnm2= (rcut-1.0-0.5)/(nm2-1)
+# rm2= [ 0.5 +dnm2*i for i in range(nm2) ]
 #.....num of 3-body angular symmetry functions (cosine value)
 type_angle= 101
-nang= 5
+nang= 3
 dang= 1.0/(nang-1)
 rsf3= [ dang*i for i in range(nang) ]
+#rsf3= []
 #rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 2.0/3, 3.0/5]
-#rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2]
+# rsf3=[0.0, 1.0/5, 1.0/3, 1.0/2, 1.0]
+#choose_triplet = []
+choose_triplet = [(3, 1, 1), (3, 1, 2), (3, 1, 3), (3, 2, 2), (3, 2, 3), (3, 3, 3),]
 
 constfname='in.const.NN'
 paramfname='in.params.NN'
@@ -104,6 +114,8 @@ def get_comb(nsp):
     for i in range(1,nsp+1):
         tmp= [i]
         for pair in pairs:
+            if choose_triplet and not (tmp[0],pair[0],pair[1]) in choose_triplet:
+                continue
             triplets.append(tmp+pair)
     return pairs,triplets
     
@@ -111,14 +123,17 @@ def get_comb(nsp):
 #========================================================= main routine
 if __name__ == "__main__":
 
-    args= docopt(__doc__)
-
     if not nl in (1,2):
         print " [Error] nl is not 1 nor 2, nl=",nl
         exit()
 
+    print 'rrs = ',rrs
+    print 'reta = ',reta
+    print 'rk = ',rk
+    print 'rsf3 = ',rsf3
+
     #....compute num of combinations
-    ncmb2= nsp+ ncomb(nsp,2)
+    ncmb2= nsp+ ncomb(nsp,2)/2
     ncmb3= ncmb2*nsp
 
     print ' ncmb2, ncmb3 = ',ncmb2,ncmb3
@@ -131,14 +146,12 @@ if __name__ == "__main__":
         print 'len(pairs),ncmb2=',len(pairs),ncmb2
         exit()
     if len(triplets) != ncmb3:
-        print '[Error] len(triplets) != ncmb3'
-        print 'len(triplets),ncmb3=',len(triplets),ncmb3
-        exit()
+        print 'Since len(triplets) != ncmb3, set ncmb3 = len(triplets)'
+        ncmb3 = len(triplets)
     
     #.....num of 2-body Gaussian-type symmetry functions
     nsf2 = len(reta)*len(rrs)
     nsf2+= len(rk)
-    nsf2+= len(rpoly)
     nsf3= len(rsf3)
 
     print ' nsf2, nsf3 = ',nsf2,nsf3
@@ -164,10 +177,6 @@ if __name__ == "__main__":
             f.write(' {0:3d}'.format(type_cos) \
                     +' {0:3d} {1:3d}'.format(ia,ja) \
                     +' {0:10.4f}\n'.format(k))
-        for p in rpoly:  # polynomial
-            f.write(' {0:3d}'.format(type_poly) \
-                    +' {0:3d} {1:3d}'.format(ia,ja) \
-                    +' {0:10.4f}\n'.format(p))
     for triple in triplets:
         ia= triple[0]
         ja= triple[1]
@@ -186,7 +195,7 @@ if __name__ == "__main__":
         nc= nhl[0]*nhl[1] +nhl[1]
     elif nl == 2:
         nc= nhl[0]*nhl[1] +nhl[1]*nhl[2] +nhl[2]
-    g.write(' {0:6d} {1:10.4f}\n'.format(nc,rcut))
+    g.write(' {0:6d} {1:10.4f} {2:6.2f}\n'.format(nc,rcut,rc3))
     for ic in range(nc):
         g.write(' {0:10.6f}'.format(random.uniform(pmin,pmax)))
         g.write(' {0:10.4f} {1:10.4f}\n'.format(pmin,pmax))

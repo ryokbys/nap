@@ -47,7 +47,7 @@ Potential parameters are fitted as the following procedure:
 
 Prepare reference data
 ------------------------------
-Assuming that there are some reference data sets in ``ref_data/`` directory,
+Assuming that there are some reference data sets in ``dataset/`` directory,
 and all the data are stored in the directories whose names start with ``smpl_``.
 
 Files needed to perform *fitpot* in eacy sample directory (``smpl_*``) are:
@@ -74,7 +74,8 @@ In case of extracting DFT data from *ab-initio* MD runs with **VASP**, positions
 can be obtained from ``vasprun.xml`` file as follows.
 ::
 
-  $ python path/to/nap/nappy/vasp/vasprun2fitpot.py vasprun.xml
+  $ python path/to/nap/nappy/vasp/vasprun2fp.py /path/to/dir/that/includes/vasprun.xml/
+
 
 Then you get directories with names like ``#####`` including ``pos``, ``erg.ref``, and ``frc.ref`` files in it.
 
@@ -103,13 +104,13 @@ And if you are fitting some special potential that needs an auxiliary file like 
 Make links of some scripts
 -----------------------------------
 In order to run ``fitpot`` program there must be the following scripts 
-in the ``data_set/`` directory.
+in the ``dataset/`` directory.
 You can make links of the scripts as,
 ::
 
-  $ ln -s /path/to/nap/fitpot/run_pmd.sh data_set/
-  $ ln -s /path/to/nap/fitpot/serial_run_pmd.sh data_set/
-  $ ln -s /path/to/nap/fitpot/parallel_run_pmd.py data_set/
+  $ ln -s /path/to/nap/fitpot/run_pmd.sh dataset/
+  $ ln -s /path/to/nap/fitpot/serial_run_pmd.sh dataset/
+  $ ln -s /path/to/nap/fitpot/parallel_run_pmd.py dataset/
 
 Here you have to check whether you can run ``pmd`` correctly in every sample directory.
 ::
@@ -136,12 +137,12 @@ Prepare input files
 Inputs files needed for *fitpot* program are the following:
 
  * in.fitpot
- * data_set/in.params.NN
+ * dataset/in.params.NN
 
 where ``NN`` indicates the name of interatomic potential used in *pmd* program.
 
 You have to specify the ``num_samples`` in ``in.fitpot`` file 
-which is a number of samples in ``data_set/`` directory.
+which is a number of samples in ``dataset/`` directory.
 The number of sample directories can be counted by the following command,
 
 .. code-block:: bash
@@ -154,7 +155,7 @@ The number of sample directories can be counted by the following command,
 
 Run *fitpot* program
 ------------------------------------
-In the directory where ``data_set/`` directory and ``in.fitpot`` file exist,
+In the directory where ``dataset/`` directory and ``in.fitpot`` file exist,
 you can run *fitpot* program as,
 ::
 
@@ -317,11 +318,11 @@ Available methods are the following:
 
 main_directory
 --------------------
-Default: *data_set*
+Default: *dataset*
 
-The directory that includes sample data. We call this ``data_set`` in the above instruction.
+The directory that includes sample data. We call this ``dataset`` in the above instruction.
 
-If you want to use ``..`` to specify the directory relative to the current working directory, e.g. ``../data_set``, you need to enclose with double-quotation marks like ``"../data_set"``.
+If you want to use ``..`` to specify the directory relative to the current working directory, e.g. ``../dataset``, you need to enclose with double-quotation marks like ``"../dataset"``.
 
 
 .. _param_file:

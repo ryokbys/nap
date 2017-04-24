@@ -123,6 +123,8 @@ class VASP:
         return False
 
     def calc_done(self):
+        if not os.path.exists('OUTCAR'):
+            return False
         with open('OUTCAR','r') as f:
             lines = f.readlines()
         if 'Voluntary' in lines[-1]:
