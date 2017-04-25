@@ -23,7 +23,6 @@ def gsmear(xd,yd,sigma):
     """
     dx= xd[1]-xd[0]
     sgm= sigma*dx
-    isgm= int(sigma)+1
     pref= 1.0/(np.sqrt(2.0*np.pi)*sgm)
     
     ndat= len(xd)
@@ -38,7 +37,7 @@ def gsmear(xd,yd,sigma):
                 kx = ndat -(kx-(ndat-1))
             gdat[ix] += yd[kx]*pref*np.exp(-(dx*(jx))**2/sgm**2/2)*dx
     gdat /= 2
-    return xd,gdat
+    return gdat
 
 def gsmear_file(infname,sigma,xp,yp):
     """

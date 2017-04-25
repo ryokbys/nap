@@ -1,9 +1,10 @@
+#!/usr/bin/env python
 """
 Reduce degenerate samples by looking at erg.ref.
 Put redundant samples to reduced/ directory.
 
 Usage:
-  reduce.py DIRS [DIRS...]
+  reduce_degenerate_samples.py DIRS [DIRS...]
 
 """
 from __future__ import print_function
@@ -11,7 +12,7 @@ from __future__ import print_function
 import os
 from docopt import docopt
 
-reduce_dir = 'reduced'
+not_used_dir = 'not_used'
 
 
 if __name__ == "__main__":
@@ -20,7 +21,7 @@ if __name__ == "__main__":
     dirs = args['DIRS']
     names = []
     print('num of dirs = ',len(dirs))
-    os.system('mkdir -p ./'+reduce_dir)
+    os.system('mkdir -p ./'+not_used_dir)
     nreduced = 0
     for d in dirs:
         with open(d+'/erg.ref','r') as f:
@@ -34,7 +35,7 @@ if __name__ == "__main__":
             names.append(name)
             redundant = False
         if redundant:
-            cmd = 'mv '+d+' '+reduce_dir+'/'
+            cmd = 'mv '+d+' '+not_used_dir+'/'
             print(cmd)
             os.system(cmd)
             nreduced += 1

@@ -53,10 +53,6 @@ _INCAR_name= 'INCAR'
 _KPOINTS_name= 'KPOINTS'
 _KPOINTS_type= 'Monkhorst-Pack' # or 'Gamma'
 
-_IBRION= -1  # -1:no update, 0:MD, 1:q-Newton, 2:CG, 3:damped MD
-_ISIF= 2     # 2: relax ions only, 3:shape & vol too, 4:shape but not vol
-_NSW= 0      # number of ion relaxation steps
-
 def determine_num_kpoint(b_length,pitch,leven):
     # maximum 11
     # minimum 1

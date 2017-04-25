@@ -160,7 +160,8 @@ if __name__ == "__main__":
                           rcut=rcut,id0=id0,id1=id1,id2=id2)
 
     if not sigma == 0:
-        angd,agr= gsmear(angd,agr,sigma)
+        print ' Gaussian smearing...'
+        agr= gsmear(angd,agr,sigma)
 
     if flag_plot:
         plt.plot(angd, agr, '-', linewidth=1)

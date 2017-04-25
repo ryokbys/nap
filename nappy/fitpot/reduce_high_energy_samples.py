@@ -2,6 +2,9 @@
 """
 Reduce samples that have too high energies by comparing
 between the same group of samples.
+The group is defined according to the name of directory before the last 5 digits.
+For example, the directory `smpl_XX_YYYYYY_#####` where `#####` is the
+last 5 digits and the group name would be `smpl_XX_YYYYY`.
 
 Usage:
   reduce_high_energy_samples.py [options] DIRS...
@@ -10,7 +13,7 @@ Options:
   -h,--help  Show this message and exit.
   -o OUT     Output file name. [default: out.high_energy_samples]
   --threshold=THRESHOLD
-             Threshold of energy that determines high energy samples.
+             Threshold of energy/atom that determines high energy samples.
              [default: 1.0]
 """
 from __future__ import print_function
@@ -18,7 +21,8 @@ from __future__ import print_function
 import os,sys
 from docopt import docopt
 from datetime import datetime
-from ase.io import read
+
+from nappy.napsys import NAPSystem
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "160727"
@@ -54,8 +58,10 @@ def get_list_high_energy(gsmpls,threshold):
     for i,s in enumerate(gsmpls):
         smpldir = s[0]
         erg = s[1]
-        atoms = read(smpldir+'/POSCAR',format='vasp')
-        erg /= len(atoms)
+        #atoms = read(smpldir+'/POSCAR',format='vasp')
+        atoms = NAPSystem(fname=smpldir+"/pos",ffmt='pmd')
+        natm = atoms.num_atoms()
+        erg /= natm
         ergs.append(erg)
         emin = min(erg,emin)
     for i,s in enumerate(gsmpls):

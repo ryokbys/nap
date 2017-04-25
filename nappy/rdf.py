@@ -130,7 +130,14 @@ if __name__ == "__main__":
 
     if not sigma == 0:
         print ' Gaussian smearing...'
-        rd,agr= gsmear(rd,agr,sigma)
+        #...Smearing of total RDF
+        agrt= gsmear(rd,agr[0,0],sigma)
+        agr[0,0,:] = agrt[:]
+        #...Smearing of inter-species RDF
+        for isid in range(1,nspcs+1):
+            for jsid in range(1,nspcs+1):
+                agrt= gsmear(rd,agr[isid,jsid],sigma)
+                agr[isid,jsid,:] = agrt[:]
 
     outfile= open(ofname,'w')
     outfile.write('# {0:10s} {1:15s}'.format('rd[i],','agr[0,0,i],'))
