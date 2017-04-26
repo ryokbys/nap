@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Calculate the radial distribution function (RDF) from files.
-Ensemble averaging about atoms in a file and about files are taken.
+Statistical averaging about atoms in a file and over files are taken.
 
 Usage:
     rdf.py [options] INFILE [INFILE...]
@@ -16,6 +16,8 @@ Options:
     -o OUT      Output file name. [default: out.rdf]
     --num-species=NSPCS
                 Number of species in the system. [default: 1]
+    --no-average
+                Not to take average over files.
 """
 
 import os,sys
@@ -93,7 +95,7 @@ def rdf(asys,nspcs,dr,rmax):
     #print nadr
     return rd,nadr,natm0
 
-def rdf_average(infiles,nspcs,nr,ffmt='akr',dr=0.1,rmax=3.0,):
+def rdf_average(infiles,nspcs,nr,ffmt='akr',dr=0.1,rmax=3.0,average=True):
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     nsum= 0
     for infname in infiles:
@@ -108,7 +110,8 @@ def rdf_average(infiles,nspcs,nr,ffmt='akr',dr=0.1,rmax=3.0,):
     # agr /= len(infiles)
     #print ' nsum=',nsum
     #print agr
-    agr /= nsum
+    if average:
+        agr /= nsum
     return rd,agr
 
 ################################################## main routine
@@ -124,9 +127,12 @@ if __name__ == "__main__":
     ffmt= args['-s']
     ofname= args['-o']
     nspcs = int(args['--num-species'])
+    no_average = args['--no-average']
+    average = not no_average
 
     nr= int(rmax/dr) +1
-    rd,agr= rdf_average(infiles,nspcs,nr,ffmt=ffmt,dr=dr,rmax=rmax,)
+    rd,agr= rdf_average(infiles,nspcs,nr,ffmt=ffmt,dr=dr,rmax=rmax,
+                        average=average)
 
     if not sigma == 0:
         print ' Gaussian smearing...'
@@ -140,16 +146,18 @@ if __name__ == "__main__":
                 agr[isid,jsid,:] = agrt[:]
 
     outfile= open(ofname,'w')
-    outfile.write('# {0:10s} {1:15s}'.format('rd[i],','agr[0,0,i],'))
+    outfile.write('# 1:{0:10s} 2:{1:13s}'.format('rd[i],','agr[0,0,i],'))
+    n = 2
     for isid in range(1,nspcs+1):
-        for jsid in range(1,nspcs+1):
-            outfile.write(' {0:10s}'.format('agr[{0:d}-{1:d}]'.format(isid,jsid)))
+        for jsid in range(isid,nspcs+1):
+            n += 1
+            outfile.write(' {0:d}:{1:10s}'.format(n,'agr[{0:d}-{1:d}]'.format(isid,jsid)))
     outfile.write('\n')
     for i in range(nr):
-        outfile.write(' {0:10.4f} {1:15.7f}'.format(rd[i],agr[0,0,i]))
+        outfile.write(' {0:10.4f} {1:13.5e}'.format(rd[i],agr[0,0,i]))
         for isid in range(1,nspcs+1):
-            for jsid in range(1,nspcs+1):
-                outfile.write(' {0:10.3f}'.format(agr[isid,jsid,i]))
+            for jsid in range(isid,nspcs+1):
+                outfile.write(' {0:12.4e}'.format(agr[isid,jsid,i]))
         outfile.write('\n')
     outfile.close()
     print ' Check '+ofname+' with gnuplot, like'
