@@ -15,20 +15,20 @@ MPIFLAGS= @FCFLAGS@
 # suffixes
 .SUFFIXES: .o .f .F .f90 .F90
 .f.o: 
-  ${MPIFC} -c ${MPIFLAGS} $<
+	${MPIFC} -c ${MPIFLAGS} $<
 .F.o: 
-  ${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
+	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 .f90.o: 
-  ${MPIFC} -c ${MPIFLAGS} $<
+	${MPIFC} -c ${MPIFLAGS} $<
 .F90.o: 
-  ${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
+	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
 pmd= read_input.o util_vec.o util_rnd.o \
-    util_tag.o lasubs.o util_pmd.o mk_lspr.o \
-    common_parallel.o sort.o pmd_main.o pmd_core.o 
+	util_tag.o lasubs.o util_pmd.o mk_lspr.o \
+	common_parallel.o sort.o pmd_main.o pmd_core.o 
 pmc= prec_mc.o util_rnd.o mk_lspr.o read_input.o pmd_core.o util_vec.o \
-   util_tag.o lasubs.o util_pmd.o \
-   common_parallel.o sort.o
+	util_tag.o lasubs.o util_pmd.o \
+	common_parallel.o sort.o
 
 mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o
 args= iargc.o getarg.o
@@ -36,16 +36,16 @@ args= iargc.o getarg.o
 force_common= force_common.o
 
 forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
-    force_Ito3_WHe.o force_LJ_Ar.o force_SW_Si.o force_EDIP_Si.o \
-    force_Brenner.o force_Lu_WHe.o force_Branicio_AlN.o \
-    force_Mishin_Al.o force_AFS_W.o force_SC_Fe.o \
-    force_SM_Al.o force_linreg.o force_NN.o \
-    force_Morse.o force_Coulomb.o
+	force_Ito3_WHe.o force_LJ_Ar.o force_SW_Si.o force_EDIP_Si.o \
+	force_Brenner.o force_Lu_WHe.o force_Branicio_AlN.o \
+	force_Mishin_Al.o force_AFS_W.o force_SC_Fe.o \
+	force_SM_Al.o force_linreg.o force_NN.o \
+	force_Morse.o force_Coulomb.o
 params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
-    params_LJ_Ar.h params_SW_Si.h params_EDIP_Si.h \
-    params_Brenner.h params_Lu_WHe.h params_Branicio_AlN.h \
-    params_Mishin_Al.h params_AFS_W.h params_SC_Fe.h \
-    params_SM_Al.h
+	params_LJ_Ar.h params_SW_Si.h params_EDIP_Si.h \
+	params_Brenner.h params_Lu_WHe.h params_Branicio_AlN.h \
+	params_Mishin_Al.h params_AFS_W.h params_SC_Fe.h \
+	params_SM_Al.h
 
 #-----------------------------------------------------------------------
 # Post process programs
@@ -60,13 +60,13 @@ execs=pmd
 all: ${execs}
 
 clean:
-  rm -f *.o *.mod *~ ${execs}
+	rm -f *.o *.mod *~ ${execs}
 
 pmd: ${mods} ${pmd} ${forces} ${params}
-  ${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${force_common} ${forces} ${pmd}
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${force_common} ${forces} ${pmd}
 
 pmc: ${mods} ${pmc} ${forces}
-  ${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${force_common} ${forces} ${pmc}
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${force_common} ${forces} ${pmc}
 
 # smd: ${mods} ${smd} ${forces} ${params}
 #   ${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${smd}
@@ -75,37 +75,37 @@ pmc: ${mods} ${pmc} ${forces}
 #   ${MPIFC} ${MPIFLAGS} -o $@  ${mods} ${comb}
 
 pmd2akr: ${pmd2akr} ${mods}
-  ${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${pmd2akr}
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${pmd2akr}
 
 akr2cna: akr2cna.o sort.o
-  ${MPIFC} ${MPIFLAGS} -o $@ akr2cna.o sort.o
+	${MPIFC} ${MPIFLAGS} -o $@ akr2cna.o sort.o
 
 akr2csp: akr2csp.o
-  ${MPIFC} ${MPIFLAGS} -o $@ akr2csp.o
+	${MPIFC} ${MPIFLAGS} -o $@ akr2csp.o
 
 akr2pot: akr2pot.o
-  ${MPIFC} ${MPIFLAGS} -o $@ akr2pot.o
+	${MPIFC} ${MPIFLAGS} -o $@ akr2pot.o
 
 akr2ddm: akr2ddm.o
-  ${MPIFC} ${MPIFLAGS} -o $@ akr2ddm.o
+	${MPIFC} ${MPIFLAGS} -o $@ akr2ddm.o
 
 akr2ddplot: akr2ddplot.o
-  ${MPIFC} ${MPIFLAGS} -o $@ akr2ddplot.o
+	${MPIFC} ${MPIFLAGS} -o $@ akr2ddplot.o
 
 cna2disl: cna2disl.o
-  ${MPIFC} ${MPIFLAGS} -o $@ cna2disl.o
+	${MPIFC} ${MPIFLAGS} -o $@ cna2disl.o
 
 rdpmd: read_pmd.o ${mods}
-  ${MPIFC} ${MPIFLAGS} -o $@ read_pmd.o ${mods}
+	${MPIFC} ${MPIFLAGS} -o $@ read_pmd.o ${mods}
 
 boxsize: change_pmd_boxsize.o ${mods} util_pmd.o
-  ${MPIFC} ${MPIFLAGS} -o $@ change_pmd_boxsize.o ${mods} util_pmd.o
+	${MPIFC} ${MPIFLAGS} -o $@ change_pmd_boxsize.o ${mods} util_pmd.o
 
 sortpmd: sort_pmd.o ${mods} util_pmd.o sort.o
-  ${MPIFC} ${MPIFLAGS} -o $@ sort_pmd.o ${mods} util_pmd.o sort.o
+	${MPIFC} ${MPIFLAGS} -o $@ sort_pmd.o ${mods} util_pmd.o sort.o
 
 intstl: put_interstitials.o ${mod} util_pmd.o mk_lspr.o 
-  ${MPIFC} ${MPIFLAGS} -o $@ ${mods} util_pmd.o mk_lspr.o put_interstitials.o
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} util_pmd.o mk_lspr.o put_interstitials.o
 
 
 #.....Dependencies
