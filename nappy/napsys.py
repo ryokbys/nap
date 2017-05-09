@@ -21,6 +21,8 @@ Options:
               Order of species. [default: Al,Mg,Si]
   --scale=SCALE
               Scale the cell. [default: None]
+  --periodic-copy=COPIES
+              Number of copies of a,b,and c directions. [default: 1,1,1]
 """
 
 import math
@@ -35,7 +37,6 @@ from atom import Atom, get_symbol_from_number, get_number_from_symbol
 #...constants
 _maxnn = 100
 _file_formats = ('pmd',
-                 'smd',
                  'akr',
                  'POSCAR',
                  'dump',
@@ -64,27 +65,8 @@ class NAPSystem(object):
         if not specorder_good:
             self.specorder = None
         
-
         if fname is not None:
-            if ffmt is None or \
-               ffmt not in _file_formats:
-                ftype = parse_filename(fname)
-            else:
-                ftype = ffmt
-            if ftype == 'pmd':
-                self.read_pmd(fname)
-            elif ftype == 'smd':
-                self.read_pmd(fname)
-            elif ftype == 'akr':
-                self.read_akr(fname)
-            elif ftype == 'POSCAR':
-                self.read_POSCAR(fname)
-            elif ftype == 'dump':
-                self.read_dump(fname)
-            elif ftype == 'xsf':
-                self.read_xsf(fname)
-            else:
-                raise IOError('Cannot detect input file format.')
+            self.read(fname=fname,fmt=ffmt)
 
     def set_lattice(self, alc, a1, a2, a3):
         self.alc = alc
@@ -200,25 +182,41 @@ class NAPSystem(object):
             symbols.append(a.symbol)
         return symbols
 
-    def write(self,fname="pmdini"):
-        ftype= parse_filename(fname)
-        if ftype == "pmd":
-            self.write_pmd(fname)
-        elif ftype == "akr":
-            self.write_akr(fname)
-        elif ftype == "POSCAR":
-            self.write_POSCAR(fname)
+    def write(self,fname="pmdini",fmt=None):
+        if fmt in (None,'None'):
+            fmt= parse_filename(fname)
 
-    def read(self,fname="pmdini"):
-        ftype= self.parse_filename(fname)
-        if ftype == "pmd":
+        if fmt == 'pmd':
+            psys.write_pmd(fname)
+        elif fmt == 'akr':
+            psys.write_akr(fname)
+        elif fmt == 'POSCAR':
+            psys.write_POSCAR(fname)
+        elif fmt == 'dump':
+            psys.write_dump(fname)
+        elif fmt == 'lammps':
+            psys.write_lammps_data(fname)
+        elif fmt == 'xsf':
+            psys.write_xsf(fname)
+        else:
+            raise ValueError('Cannot detect output file format: '+fmt)
+
+    def read(self,fname="pmdini",fmt=None):
+        if fmt in (None, 'None'):
+            fmt= parse_filename(fname)
+        
+        if fmt == 'pmd':
             self.read_pmd(fname)
-        elif ftype == "akr":
+        elif fmt == 'akr':
             self.read_akr(fname)
-        elif ftype == "dump":
-            self.read_dump(fname)
-        elif ftype == "POSCAR":
+        elif fmt == 'POSCAR':
             self.read_POSCAR(fname)
+        elif fmt == 'dump':
+            self.read_dump(fname)
+        elif fmt == 'xsf':
+            self.read_xsf(fname)
+        else:
+            raise IOError('Cannot detect input file format: '+fmt)
 
     def read_pmd(self,fname='pmdini'):
         f=open(fname,'r')
@@ -314,6 +312,13 @@ class NAPSystem(object):
                 if not self.specorder:
                     self.specorder = spcs
             num_species= np.array([ int(n) for n in buff])
+            #...Check number of species in POSCAR file and in specorder
+            if len(num_species) != len(specorder):
+                msg = 'Numbers of species in POSCAR and in specorder' \
+                      +' are different, which should be the same.\n' \
+                      +'Number of species in POSCAR = {0:d}\n'.format(len(num_species)) \
+                      +'You need to specify the species order correctly with --specorder option.'
+                raise ValueError(msg)
             natm= 0
             for n in num_species:
                 natm += n
@@ -1167,35 +1172,49 @@ if __name__ == "__main__":
     outfname= args['OUTFILE']
     scalefactor= args['--scale']
     specorder= args['--specorder'].split(',')
+    copies= [ int(i) for i in args['--periodic-copy'].split(',') ]
     
     psys= NAPSystem(fname=infname,ffmt=infmt,specorder=specorder)
+
+    #...Periodic copy if needed
+    copy_needed = False
+    for c in copies:
+        if c != 1:
+            copy_needed = True
+            break
+        elif c < 1:
+            raise ValueError('Periodic copy was wrong. It should be >= 1.')
+    if copy_needed:
+        psys.repeat(copies[0],copies[1],copies[2])
 
     if args['analyze']:
         analyze(psys)
 
     elif args['convert']:
-        if outfmt == 'None':
-            outfmt= parse_filename(outfname)
-    
         if scalefactor != "None":
             psys.alc *= float(scalefactor)
+
+        psys.write(fname=outfname,fmt=outfmt)
     
-        if outfmt == 'pmd':
-            psys.write_pmd(outfname)
-        elif outfmt == 'smd':
-            psys.write_pmd(outfname)
-        elif outfmt == 'akr':
-            psys.write_akr(outfname)
-        elif outfmt == 'POSCAR':
-            psys.write_POSCAR(outfname)
-        elif outfmt == 'dump':
-            psys.write_dump(outfname)
-        elif outfmt == 'lammps':
-            psys.write_lammps_data(outfname)
-        elif outfmt == 'xsf':
-            psys.write_xsf(outfname)
-        else:
-            print 'Cannot detect output file format.'
+        # if outfmt == 'None':
+        #     outfmt= parse_filename(outfname)
+    
+        # if outfmt == 'pmd':
+        #     psys.write_pmd(outfname)
+        # elif outfmt == 'smd':
+        #     psys.write_pmd(outfname)
+        # elif outfmt == 'akr':
+        #     psys.write_akr(outfname)
+        # elif outfmt == 'POSCAR':
+        #     psys.write_POSCAR(outfname)
+        # elif outfmt == 'dump':
+        #     psys.write_dump(outfname)
+        # elif outfmt == 'lammps':
+        #     psys.write_lammps_data(outfname)
+        # elif outfmt == 'xsf':
+        #     psys.write_xsf(outfname)
+        # else:
+        #     print 'Cannot detect output file format.'
 
     else:
         raise NotImplementedError()
