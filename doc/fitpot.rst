@@ -204,17 +204,16 @@ Here are input parameters that users can change in *fitpot* program.
 * :ref:`num_forces`
 * :ref:`regularize`
 * :ref:`penalty_weight`
-* :ref:`sample_weight`
-* :ref:`sample_weight_erg`
+* :ref:`sample_error`
 * :ref:`atom_energy`
-* :ref:`sgd_batch_size`
-* :ref:`sgd_update`
-* :ref:`sgd_rate0`
 * :ref:`init_params`
 * :ref:`init_params_sgm`
 * :ref:`init_params_mu`
 * :ref:`init_params_rs`
-
+..
+   * :ref:`sgd_batch_size`
+   * :ref:`sgd_update`
+   * :ref:`sgd_rate0`
 
 
 .. _num_samples:
@@ -427,26 +426,52 @@ cross-validation scoring...
 Default: *1.0*
 
 
+.. _sample_error:
 
-.. _sample_weight:
+sample_error
+------------------------------
 
-sample_weight
---------------------
-Default: *False*
+Default: *0*
 
-Whether or not to apply weights to samples ( *True* or *False* ).
+The number of samples whose errors are to be given. This error is a denominator of energy or force in the evaluation function like
+
+.. math::
+
+    \left( \frac{E^\mathrm{NN}-E^\mathrm{DFT}}{\varepsilon_\mathrm{e}}\right)^2
+
+thus the difference between NN energy and DFT energy/force is lower than this value, this term becomes less than 1.0, which means the energy/force of the sample is thought to be converged.
+The initial values of the errors are 0.001 (eV/atom) and 0.1 (eV/Ang) for energy and force, respectively.
+
+There must be the same number of following entry lines as the above value which determine the errors of energy and force of each sample like the this,
+::
+
+  sample_error   2
+      Al_fcc    0.001  0.2
+      Al_bcc    0.001  0.2
+
+The each entry has *entry_name*, *error of energy (eV/atom)* and *error of forces (eV/Ang)*.
+The error values are applied to all the samples that contain *entry_name* in their directory names.
+
+..
+   .. _sample_weight:
+
+   sample_weight
+   --------------------
+   Default: *False*
+
+   Whether or not to apply weights to samples ( *True* or *False* ).
 
 
 
 
-.. _sample_weight_erg:
+   .. _sample_weight_erg:
 
-sample_weight_erg
---------------------
-Default: *1.0*
+   sample_weight_erg
+   --------------------
+   Default: *1.0*
 
-Energy value :math:`E_\text{s}` in eV of the sample weight :math:`\exp (-\Delta E /E_\text{s})`.
-The :math:`\Delta E` is defined as the energy difference (per atom) from the most stable atomic energies.
+   Energy value :math:`E_\text{s}` in eV of the sample weight :math:`\exp (-\Delta E /E_\text{s})`.
+   The :math:`\Delta E` is defined as the energy difference (per atom) from the most stable atomic energies.
 
 
 
@@ -470,39 +495,41 @@ Default: *0.0*
 
 --------------
 
-.. _sgd_batch_size:
+..
 
-sgd_batch_size
---------------------
-Default: *1*
+   .. _sgd_batch_size:
 
-Size of batch size per parallel process for the **stochastic gradient decent (SGD)**.
-Strictly speaking, if this is over 1, it is called **mini batch gradient decent** or something.
-Note that this is not the size of batch in total, but the size per parallel process. Thus if you set this 1 and use 10 processes, it means you are using 1x10=10 batch size for SGD.
+   sgd_batch_size
+   --------------------
+   Default: *1*
 
-.. warning::
+   Size of batch size per parallel process for the **stochastic gradient decent (SGD)**.
+   Strictly speaking, if this is over 1, it is called **mini batch gradient decent** or something.
+   Note that this is not the size of batch in total, but the size per parallel process. Thus if you set this 1 and use 10 processes, it means you are using 1x10=10 batch size for SGD.
 
-   Currently, the SGD does not work well. It does not go enough low in the objective function. 
-   So I STRONGLY recommend to use batch method such as BFGS or CG instead.
+   .. warning::
+
+      Currently, the SGD does not work well. It does not go enough low in the objective function. 
+      So I STRONGLY recommend to use batch method such as BFGS or CG instead.
 
 
-.. _sgd_update:
+   .. _sgd_update:
 
-sgd_update
---------------------
-Default: *adadelta*
+   sgd_update
+   --------------------
+   Default: *adadelta*
 
-Update method in **SGD**.
+   Update method in **SGD**.
 
-.. _sgd_rate0:
+   .. _sgd_rate0:
 
-sgd_rate0
---------------------
-Default: *0.1*
+   sgd_rate0
+   --------------------
+   Default: *0.1*
 
-Initial learning rate used in **SGD**.
+   Initial learning rate used in **SGD**.
 
--------------
+   -------------
 
 .. _init_params:
 
