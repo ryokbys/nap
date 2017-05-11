@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-03-18 18:44:12 Ryo KOBAYASHI>
+!                     Last modified: <2017-05-11 17:17:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -584,7 +584,7 @@ contains
     read(51,'(a)') ctmp
     ndat = num_data(trim(ctmp),' ')
     backspace(51)
-    if( ndat.eq.4 ) then  ! old in.const.NN file
+    if( ndat.eq.4 ) then  ! without bias node
       ! set mode = 1 and reread 1st line without reading mode
       mode = 1
       read(51,*) nl,nsp,(nhl(i),i=0,nl)
