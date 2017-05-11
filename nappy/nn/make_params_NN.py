@@ -2,6 +2,8 @@
 """
 Make in.const.NN and in.params.NN to be used in NN potential.
 It is a new version of `make_const-params_NN.py` to be fully replaced.
+If you want to specify precisely different symmetry functions for each pairs,
+you may had better modify config file and load it.
 
 Usage:
   make_params_NN.py [options]
