@@ -1,0 +1,8 @@
+in.params.NN.0*
+out.energy*
+out.frc.*
+out.ftrn
+out.erg.*
+out.NN_analyze.*
+data_set/**/frc.ref.*
+data_set/**/out.soap
