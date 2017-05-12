@@ -12,6 +12,11 @@ you have to prepare an interatomic potential that reproduces the phenomena you a
 Here we indroduce how to make interatomic potentials and fit potential parameters
 by using ``fitpot`` program included in **NAP** package.
 
+.. note::
+
+   ``fitpot`` program now is specific to **Neural-network (NN)** potential and cannot produce other potential parameters.
+
+
 
 Compilation
 ===============

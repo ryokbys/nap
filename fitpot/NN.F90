@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-19 10:59:36 Ryo KOBAYASHI>
+!                     Last modified: <2017-05-12 11:31:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -142,7 +142,7 @@ contains
              sds(ismpl)%hl2(natm,nhl(2)))
       endif
     enddo
-    call get_bases()
+    call read_symmetry_functions()
 
     maxna= 0
     do ismpl=isid0,isid1
@@ -216,7 +216,10 @@ contains
       write(6,'(a,es12.3)') ' swgt2tst = ',swgt2tst
     endif
 
-    if( myid.eq.0 ) print *, 'NN_init done.'
+    if( myid.eq.0 ) then
+      print *, 'NN_init done.'
+      print *, ''
+    endif
   end subroutine NN_init
 !=======================================================================
   subroutine NN_func(ndim,x,ftrn,ftst)
@@ -1394,7 +1397,7 @@ contains
     return
   end function sigmoid
 !=======================================================================
-  subroutine get_bases()
+  subroutine read_symmetry_functions()
     !
     ! Read binary files of out.NN.{gsf,dgsf}, written by pmd.
     !
@@ -1404,6 +1407,7 @@ contains
 
     integer:: itmp,ismpl,natm,ia,ihl0,ja
     character*128:: cdir
+    real(8):: tmp
 
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
@@ -1430,8 +1434,11 @@ contains
     enddo
 
 
-    if(myid.eq.0) print *, 'get_bases done.'
-  end subroutine get_bases
+    if(myid.eq.0) then
+      print *, 'get_bases done.'
+      print *, ''
+    endif
+  end subroutine read_symmetry_functions
 !=======================================================================
   function get_mean_input()
 !

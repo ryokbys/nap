@@ -29,6 +29,7 @@ Contents:
   usage
   in-pmd
   pmd-file
+  forces
   analysis
   example
   nappy
