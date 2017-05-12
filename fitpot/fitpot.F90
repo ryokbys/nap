@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-01-19 11:40:19 Ryo KOBAYASHI>
+!                     Last modified: <2017-05-12 17:52:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1134,6 +1134,18 @@ subroutine write_stats(iter)
   real(8):: dfmaxl_tst,dfmax_tst,dfsuml_tst,dfsum_tst
   real(8),save:: rmse_tst_best= 1d+30
   character:: cnum*5
+  logical,save:: l1st = .true.
+
+  if( l1st ) then
+    if( myid.eq.0 ) then
+      write(6,*) '# ENERGY: ITER, TIME, ' &
+           //'RMSE(TRAINING), MAX(TRAINING), ' &
+           //'RMSE(TEST), RMSE(TEST)'
+      write(6,*) '# FORCE:  ITER, TIME, ' &
+           //'RMSE(TRAINING), MAX(TRAINING), ' &
+           //'RMSE(TEST), RMSE(TEST)'
+    endif
+  endif
 
   demaxl_trn= 0d0
   desuml_trn= 0d0
@@ -1169,8 +1181,8 @@ subroutine write_stats(iter)
   endif
   if( myid.eq.0 ) then
 !!$    write(6,'(a,2i6)') ' nsmpl_trn, nsmpl_tst = ',nsmpl_trn,nsmpl_tst
-    write(6,'(a,i8,f15.2,4f12.7)') '  energy:training(rmse,max)' &
-         //',test(rmse,max)=',iter,mpi_wtime()-time0 &
+    write(6,'(a,i8,f15.2,4(1x,f12.7))') ' ENERGY: ' &
+         ,iter,mpi_wtime()-time0 &
          ,rmse_trn,demax_trn,rmse_tst,demax_tst
 !!$    if( rmse_tst < rmse_tst_best ) then
 !!$      rmse_tst_best= rmse_tst
@@ -1237,12 +1249,13 @@ subroutine write_stats(iter)
     rmse_tst= 0d0
   endif
   if( myid.eq.0 ) then
-    write(6,'(a,i8,f15.2,4f12.7)') '  force:training(rmse,max)' &
-         //',test(rmse,max)=',iter,mpi_wtime()-time0 &
+    write(6,'(a,i8,f15.2,4(1x,f12.7))') ' FORCE:  ' &
+         ,iter,mpi_wtime()-time0 &
          ,rmse_trn,dfmax_trn,rmse_tst,dfmax_tst
 !    call write_vars('tmp')
   endif
-
+  
+  l1st = .false.
 end subroutine write_stats
 !=======================================================================
 subroutine write_eliminated_vars()
