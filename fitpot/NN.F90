@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-05-12 11:31:22 Ryo KOBAYASHI>
+!                     Last modified: <2017-05-16 15:48:45 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
@@ -225,7 +225,7 @@ contains
   subroutine NN_func(ndim,x,ftrn,ftst)
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
          ,lfmatch,nfunc,tcomm,mdsys,erefmin &
-         ,cmaindir,epse,epsf,cevaltype,swgt2trn,swgt2tst
+         ,cmaindir,cevaltype,swgt2trn,swgt2tst
     use parallel
     use minimize
     implicit none
@@ -666,7 +666,7 @@ contains
 !=======================================================================
   subroutine NN_grad(ndim,x,gtrn)
     use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm &
-         ,samples,mdsys,epse,epsf,swgt2trn,swgt2tst
+         ,samples,mdsys,swgt2trn,swgt2tst
     use parallel
     use minimize
     implicit none

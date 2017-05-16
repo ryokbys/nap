@@ -1,55 +1,21 @@
 num_samples      14
-#sample_list      dir_list.txt
 test_ratio       0.1
 num_iteration    100
 num_iter_eval    1
-num_iter_gfs     100
 
 fitting_method   bfgs
 main_directory   data_set
 param_file       in.params.NN
-run_mode         serial
-evaluation_type  absolute
 normalize_input  none
-
-cg_beta_type     5
-lbfgs_history    10
-
-sgd_batch_size   5
-sgd_update       armijo
-sgd_rate0        1d0
 
 force_match      true
 potential        NN
-num_multiprocess 1
 
-init_params      read
-init_params_sgm  1d0
-init_params_mu   0d0
-init_params_rs   12d0
-
-grad_scale       false
-gscale_factor    1.0
 freduce_threshold  -1.0
 num_forces       -10
 
-eps_energy       1d-4
-eps_force        1d-4
-
-sa_temperature   1d-3
-sa_dxwidth       1.0
-random_seed      12345.0
-
 penalty          none
 penalty_weight   1d-3
-
-line_minimization  armijo
-
-sample_weight      false
-sample_weight_erg  0.1
-
-
-coeff_sequential 1d-2
 
 # 1:Al, 2:Mg, 3:Si
 atom_energy  1  -0.19778

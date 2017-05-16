@@ -428,7 +428,7 @@ Default:
   | 0.00d0   0.00d0   0.00d0
   | 0.00d0   0.00d0   0.00d0
 
-Target stress tensor which works when *stress_control* is ``vc-Berendsen``.
+Target stress tensor which only works when *stress_control* is ``Berendsen`` or ``vc-Berendsen``.
 
 -------------------------
 

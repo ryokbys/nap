@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-05-12 17:52:57 Ryo KOBAYASHI>
+!                     Last modified: <2017-05-16 15:50:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -153,8 +153,6 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,l3)') 'force_match',lfmatch
   write(6,'(2x,a25,2x,a)') 'penalty',trim(cpena)
   write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',pwgt
-  write(6,'(2x,a25,2x,es12.3)') 'eps_energy',epse
-  write(6,'(2x,a25,2x,es12.3)') 'eps_force',epsf
   write(6,'(2x,a25,2x,a)') 'potential',trim(cpot)
   write(6,'(2x,a25,2x,l3)') 'gradient',lgrad
   write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
@@ -1307,8 +1305,6 @@ subroutine sync_input()
   call mpi_bcast(clinmin,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cnormalize,128,mpi_character,0,mpi_world,ierr)
 
-  call mpi_bcast(epse,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(epsf,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(xtol,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(ftol,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(gtol,1,mpi_double_precision,0,mpi_world,ierr)
