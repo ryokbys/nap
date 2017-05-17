@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-05-16 15:50:26 Ryo KOBAYASHI>
+!                     Last modified: <2017-05-17 10:52:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -452,33 +452,6 @@ subroutine read_ref_data()
       endif
     enddo
 
-!!$!.....neglect atoms with too small forces (smaller than FRED)
-!!$    samples(ismpl)%nfcal= 0
-!!$    if( nfpsmpl.lt.0 ) then
-!!$      nfsmplmax = samples(ismpl)%natm
-!!$    else
-!!$      nfsmplmax = min(samples(ismpl)%natm,nfpsmpl)
-!!$    endif
-!!$    do ifsmpl=1,nfsmplmax
-!!$      fmax=-1d0
-!!$      imax= 0
-!!$      do i=1,natm
-!!$        if( samples(ismpl)%fabs(i).gt.fmax .and. &
-!!$             samples(ismpl)%ifcal(i).eq.0 ) then
-!!$          fmax= samples(ismpl)%fabs(i)
-!!$          imax= i
-!!$        endif
-!!$      enddo
-!!$      if( imax.eq.0 .or. imax.gt.natm) &
-!!$           stop 'Error: something is wrong, imax==0.or.imax>natm'
-!!$      if( fmax.gt.fred ) then
-!!$        samples(ismpl)%ifcal(imax)= 1
-!!$        samples(ismpl)%nfcal= samples(ismpl)%nfcal + 1
-!!$        nfrc= nfrc +1
-!!$      else
-!!$        exit
-!!$      endif
-!!$    enddo
   enddo
 
   if( jflag.gt.0 ) then

@@ -189,9 +189,38 @@ There are some output files:
 
 ------------------------------
 
+Input file for *fitpot*
+================================
+
+The following code shows an example of the input file ``in.fitpot``.
+::
+
+   num_samples      14
+   test_ratio       0.1
+   num_iteration    100
+   num_iter_eval    1
+   
+   fitting_method   bfgs
+   main_directory   data_set
+   param_file       in.params.NN
+   normalize_input  none
+   
+   force_match      true
+   potential        NN
+   
+   penalty          none
+   penalty_weight   1d-3
+   
+   # 1:Al, 2:Mg, 3:Si
+   atom_energy  1  -0.19778
+   atom_energy  2  -0.00074
+   atom_energy  3  -0.80706
+
+
+
 
 Input parameters for *fitpot*
-========================================
+----------------------------------------
 Here are input parameters that users can change in *fitpot* program.
 
 * :ref:`num_samples`
@@ -204,9 +233,6 @@ Here are input parameters that users can change in *fitpot* program.
 * :ref:`param_file`
 * :ref:`force_match`
 * :ref:`potential`
-* :ref:`grad_scale`
-* :ref:`freduce_threshold`
-* :ref:`num_forces`
 * :ref:`regularize`
 * :ref:`penalty_weight`
 * :ref:`sample_error`
@@ -215,10 +241,6 @@ Here are input parameters that users can change in *fitpot* program.
 * :ref:`init_params_sgm`
 * :ref:`init_params_mu`
 * :ref:`init_params_rs`
-..
-   * :ref:`sgd_batch_size`
-   * :ref:`sgd_update`
-   * :ref:`sgd_rate0`
 
 
 .. _num_samples:
@@ -305,10 +327,6 @@ Available methods are the following:
    Limited-memory version of BFGS. This requires gradient information.
    In case of optimizing a lot of parameters, this should be used instead of *BFGS*.
 
-*sgd/SGD* :
-   Stochastic gradient decent. This requires gradient information.
-   **Currently SGD does not work well...**
-
 *check_grad* :
    Comparison of analytical derivative and numerical derivative.
    Use this to check the implemented analytical gradient.
@@ -363,43 +381,6 @@ Now folloing potentials are available:
    Neural network potential
 
 
-.. _grad_scale:
-
-grad_scale
---------------------
-Default: *False*
-
-Since sometimes the gradient obtained by implemented function becomes too large, 
-scale the size of the gradient vector to 100th of the size of variable vector.
-This may cause slow convergence of line optimization.
-
-
-.. _freduce_threshold:
-
-freduce_threshold
---------------------
-Default: *-1d0*
-
-Since force matching takes way more time than non force matching. You can omit forces less than this value.
-
-.. note::
-
-   [21 Jun 2016] **freduce_threshold** and **num_forces** do not currently work with 2-layer NN.
-
-
-.. _num_forces:
-
-num_forces
---------------------
-Default: *-10*
-
-Since force-matching takes way more time than non force-matching. You can limit the number of forces in a sample. If this is less than or equal to 0, all forces are taken into account.
-Since the number of forces used is written in the ``out.fitpot`` file as following, you can control the number of forces used which of course greatly affects the total time of fitting as well as the accuracy of the potential created.
-::
-
-   number of forces to be used =        9
-   total number of forces      =      338
-
 
 .. _regularize:
 
@@ -438,13 +419,13 @@ sample_error
 
 Default: *0*
 
-The number of samples whose errors are to be given. This error is a denominator of energy or force in the evaluation function like
+The number of samples whose errors are to be given. These errors appear at the denominators of energy and force in the evaluation function such that
 
 .. math::
 
-    \left( \frac{E^\mathrm{NN}-E^\mathrm{DFT}}{\varepsilon_\mathrm{e}}\right)^2
+    \left( \frac{E^\mathrm{NN}-E^\mathrm{DFT}}{N_\mathrm{a}\varepsilon_\mathrm{e}}\right)^2 +\sum_i^{N_\mathrm{a}} \sum_\alpha^{xyz} \frac{1}{3N_\mathrm{a}}\left( \frac{F^\mathrm{NN}_{i\alpha} -F^\mathrm{DFT}_{i\alpha}}{\varepsilon_\mathrm{f}}\right)^2
 
-thus the difference between NN energy and DFT energy/force is lower than this value, this term becomes less than 1.0, which means the energy/force of the sample is thought to be converged.
+If the difference between NN energy and DFT energy/force is lower than this value, this term becomes less than 1.0, which means the energy/force of the sample is thought to be converged.
 The initial values of the errors are 0.001 (eV/atom) and 0.1 (eV/Ang) for energy and force, respectively.
 
 There must be the same number of following entry lines as the above value which determine the errors of energy and force of each sample like the this,
@@ -499,42 +480,6 @@ Default: *0.0*
 
 
 --------------
-
-..
-
-   .. _sgd_batch_size:
-
-   sgd_batch_size
-   --------------------
-   Default: *1*
-
-   Size of batch size per parallel process for the **stochastic gradient decent (SGD)**.
-   Strictly speaking, if this is over 1, it is called **mini batch gradient decent** or something.
-   Note that this is not the size of batch in total, but the size per parallel process. Thus if you set this 1 and use 10 processes, it means you are using 1x10=10 batch size for SGD.
-
-   .. warning::
-
-      Currently, the SGD does not work well. It does not go enough low in the objective function. 
-      So I STRONGLY recommend to use batch method such as BFGS or CG instead.
-
-
-   .. _sgd_update:
-
-   sgd_update
-   --------------------
-   Default: *adadelta*
-
-   Update method in **SGD**.
-
-   .. _sgd_rate0:
-
-   sgd_rate0
-   --------------------
-   Default: *0.1*
-
-   Initial learning rate used in **SGD**.
-
-   -------------
 
 .. _init_params:
 
