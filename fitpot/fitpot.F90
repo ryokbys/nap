@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-05-17 10:52:05 Ryo KOBAYASHI>
+!                     Last modified: <2017-05-17 18:40:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -95,7 +95,7 @@ program fitpot
   endif
   call write_vars('fin')
   call write_energy_relation('fin')
-  if( nsmpl.lt.2000 ) then
+  if( nsmpl.lt.10000 ) then
     call write_force_relation('fin')
   endif
   call write_stats(niter)

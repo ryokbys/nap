@@ -4,7 +4,6 @@ Analyzing simulation results
 
   #. :ref:`energy`
   #. :ref:`visualize`
-  #. :ref:`CNA`
   #. :ref:`voronoi`
   #. :ref:`rdf`
   #. :ref:`adf`
@@ -46,39 +45,22 @@ Or copy ``util/gp.erg`` script to the working directory and,
 Visualization of atom configuration
 ==============================================
 There is a conversion program which changes from pmd format to visualization software format.
-When visualizing the atom configuration by using **Akira** ,
-first convert the pmd-format files, ``pmd#####`` , to Akira-format files as,
+When visualizing the atom configuration by using `Ovito <https://www.ovito.org>`_ ,
+first convert the pmd-format files, ``pmd####`` , to LAMMPS-dump format files by doing the following,
 ::
 
-  $ /path/to/pmd/combine
+  $ /path/to/nap/nappy/napsys.py convert --specorder=A,B,C pmd#### dump####
 
-Then you get ``akr????`` corresponding to ``????`` directories.
-By editing ``AkiraConverter.conf``, visualize the atom configuration as,
+where ``--specorder=A,B,C`` specifies the order of species used in the pmd-format file.
+Then you get ``dump####`` file where ``####`` should be a 4-digit number.
+The `Ovito <https://www.ovito.org>`_ can open the LAMMPS-dump format file.
+
+If there are sequential ``pmd####`` files, one can convert those files by using bash for-statement as
 ::
 
-  $ Akira.sh
+  $ for f in pmd????; do /path/to/nap/nappy/napsys.py convert \
+      --specorder=A,B,C $f `echo $f | sed 's/pmd/dump/'`; done
 
---------
-
-.. _CNA:
-
-Common Neighbor Analysis (CNA)
-==================================
-In materials, generally there are a lot of atoms that have crystalline order and 
-there are very small number of atoms that deviate from crystalline structure.
-It is not easy to see defect structures in many crystalline atoms.
-One approach to see defect structure by detecting local crystalline order and
-distinguish crystalline atoms and defect-structure atoms is the **common neighbor analysis (CNA)**.
-
-The CNA is a method that detect FCC, HCP, and BCC structures by looking at local atomic structure.
-By using CNA, one can omit crystalline atoms from the system and extract only defect structures.
-
-To apply CNA to Akira-format files, run the command as follows,
-::
-
-  $ /path/to/pmd/akr2cna akr0000 cna0000
-
-The second argument indicates output file that includes defected atoms extracted by CNA.
 
 --------
 

@@ -10,11 +10,15 @@
 pmd manual
 ==========
 
-This is a manual about the ``pmd`` (parallel molecular dynamics) that
-is included in the **Nagoya Atomistic-simulation Package (NAP)** .
-And it is hosted at Github and you can download it from
+This is a manual of the **Nagoya Atomistic-simulation Package (NAP)** and ``pmd`` (parallel molecular dynamics) included in the **NAP**.
 
-  https://github.com/ryokbys/nap
+- **NAP** is hosted at Github: https://github.com/ryokbys/nap
+- **NAP** includes the following programs and utilities:
+
+  - ``pmd``: Fortran program of massively parallel molecular dynamics
+  - ``fitpot``: Fortran program for fitting interatomic potential parameters
+  - ``nappy``: Python scripts for pre- and post-processing
+
 
 ------------
 
