@@ -24,7 +24,7 @@ c-----------------------------------------------------------------------
       use linreg,only:force_linreg
       use NN,only:force_NN
       use Coulomb, only: force_screened_Coulomb, force_Ewald_Coulomb
-     &     ,initialize_coulomb
+     &     ,initialize_coulomb, force_vc_Gaussian
       use Morse, only: force_Morse
       implicit none
       integer,intent(in):: namax,natm,nnmax,nismax,iprint,ifcoulomb
@@ -50,7 +50,7 @@ c-----------------------------------------------------------------------
 
       if( ifcoulomb.eq.1 ) then ! screened Coulomb
         if( l1st ) call initialize_coulomb(natm,tag,myid_md
-     &       ,mpi_md_world,ifcoulomb,h,rc)
+     &       ,mpi_md_world,ifcoulomb,iprint,h,rc)
         call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
      &       ,chg,h,hi,tcom
      &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
@@ -58,9 +58,17 @@ c-----------------------------------------------------------------------
      &       ,ifcoulomb)
       else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
         if( l1st ) call initialize_coulomb(natm,tag,myid_md,mpi_md_world
-     &       ,ifcoulomb,h,rc)
+     &       ,ifcoulomb,iprint,h,rc)
         call force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
      &       ,chg,h,hi,tcom
+     &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
+     &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint
+     &       ,ifcoulomb)
+      else if( ifcoulomb.eq.3 ) then ! variable-charge with Gaussians
+        if( l1st ) call initialize_coulomb(natm,tag,myid_md,mpi_md_world
+     &       ,ifcoulomb,iprint,h,rc)
+        call force_vc_Gaussian(namax,natm,tag,ra,nnmax,aa,strs
+     &       ,chg,chi,h,hi,tcom
      &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint
      &       ,ifcoulomb)

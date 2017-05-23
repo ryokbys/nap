@@ -312,6 +312,10 @@ class NAPSystem(object):
                 if not self.specorder:
                     self.specorder = spcs
             num_species= np.array([ int(n) for n in buff])
+            try:
+                spcs
+            except NameError:
+                spcs = self.specorder
             #...Check number of species in POSCAR file and in specorder
             if len(num_species) != len(specorder):
                 msg = 'Numbers of species in POSCAR and in specorder' \

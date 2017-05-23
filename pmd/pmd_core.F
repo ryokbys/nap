@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-04-21 10:50:17 Ryo KOBAYASHI>
+c                     Last-modified: <2017-05-23 15:13:02 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -85,6 +85,14 @@ c-----reduced node origin
       sorg(1)= anxi*myx
       sorg(2)= anyi*myy
       sorg(3)= anzi*myz
+
+c     check number of parallel node and vc_gaussian
+      if( nxyz.gt.1 .and. ifcoulomb.eq.3 ) then
+        write(6,'(a)') ' [Error] vc_gaussian potential is '
+     &       //'not available in parallel.'
+        call mpi_finalize(ierr)
+        stop
+      endif
 
 c-----output every these steps, NOUTERG, NOUTPMD
       if( nerg.ne.0 ) then
