@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-05-23 16:53:06 Ryo KOBAYASHI>
+!                     Last modified: <2017-05-24 10:45:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -84,10 +84,16 @@ contains
          ,mpi_md_world,ierr)
 
     if( ifcoulomb.eq.1 ) then  ! screened Coulomb
+      if( myid.eq.0 .and. iprint.ne.0) &
+           write(6,'(a)') ' use force_screened_Coulomb'
       if( .not.allocated(interact) ) allocate(interact(nsp,nsp))
     else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
+      if( myid.eq.0 .and. iprint.ne.0) &
+           write(6,'(a)') ' use force_Ewald_Coulomb'
       call init_Ewald(h,rc,myid)
     else if( ifcoulomb.eq.3 ) then
+      if( myid.eq.0 .and. iprint.ne.0) &
+           write(6,'(a)') ' use force_vc_Gaussian'
 !.....Variable-charge Coulomb with Gaussian distribution charges
 !     which ends-up long-range-only Ewald summation
       call init_vc_gaussian(myid,mpi_md_world,ifcoulomb,iprint,h,rc)
@@ -106,14 +112,14 @@ contains
     sgm_ew = rc/sqrt(2d0*pacc)
     bkmax  = 2d0*pacc /rc
     if( myid.eq.0 ) then
-      write(6,'(a)') ' Initializing Ewald summation...'
+      write(6,'(a)') ' initializing Ewald summation...'
       write(6,'(a,es12.3)') '  accuracy parameter p = ', pacc
       write(6,'(a,es12.3)') '  Gaussian width sgm   = ', sgm_ew
-      write(6,'(a,es12.3)') '  K-space cutoff       = ', bkmax
+      write(6,'(a,es12.3)') '  k-space cutoff       = ', bkmax
     endif
     call get_recip_vectors(h)
     if( myid.eq.0 ) then
-      write(6,'(a)') ' Reciprocal vectors:'
+      write(6,'(a)') ' reciprocal vectors:'
       write(6,'(a,3es12.3)') '   b1 = ',b1(1:3)
       write(6,'(a,3es12.3)') '   b2 = ',b2(1:3)
       write(6,'(a,3es12.3)') '   b3 = ',b3(1:3)
@@ -121,7 +127,7 @@ contains
 !.....kmax# is constant during MD run even if h-matrix can change...
     call setup_kspace()
     if( myid.eq.0 ) then
-      write(6,'(a)') ' Number of k-points for Ewald sum:'
+      write(6,'(a)') ' number of k-points for Ewald sum:'
       write(6,'(a,i8)') '   kmax1 = ',kmax1
       write(6,'(a,i8)') '   kmax2 = ',kmax2
       write(6,'(a,i8)') '   kmax3 = ',kmax3
@@ -175,14 +181,14 @@ contains
     enddo
     bkmax  = sqrt(2d0*pacc) /sgm_min
     if( myid.eq.0 .and. iprint.ne.0 ) then
-      write(6,'(a)') ' Initializing Ewald summation...'
+      write(6,'(a)') ' initializing Ewald summation...'
       write(6,'(a,es12.3)') '  accuracy parameter p = ', pacc
       write(6,'(a,es12.3)') '  minimum sigma        = ', sgm_min
-      write(6,'(a,es12.3)') '  K-space cutoff       = ', bkmax
+      write(6,'(a,es12.3)') '  k-space cutoff       = ', bkmax
     endif
     call get_recip_vectors(h)
     if( myid.eq.0 .and. iprint.ne.0 ) then
-      write(6,'(a)') ' Reciprocal vectors:'
+      write(6,'(a)') ' reciprocal vectors:'
       write(6,'(a,3es12.3)') '   b1 = ',b1(1:3)
       write(6,'(a,3es12.3)') '   b2 = ',b2(1:3)
       write(6,'(a,3es12.3)') '   b3 = ',b3(1:3)
@@ -190,7 +196,7 @@ contains
 !.....kmax# is constant during MD run even if h-matrix can change...
     call setup_kspace()
     if( myid.eq.0 .and. iprint.ne.0 ) then
-      write(6,'(a)') ' Number of k-points for Ewald sum:'
+      write(6,'(a)') ' number of k-points for Ewald sum:'
       write(6,'(a,i8)') '   kmax1 = ',kmax1
       write(6,'(a,i8)') '   kmax2 = ',kmax2
       write(6,'(a,i8)') '   kmax3 = ',kmax3
@@ -320,6 +326,10 @@ contains
             vcg_chi(isp) = dchi
             vcg_jii(isp) = djii
             vcg_sgm(isp) = dsgm
+            if( iprint.gt.0 ) then
+              write(6,'(a,i3,3f8.4)') ' isp,chi,Jii,sgm = ', &
+                   isp,dchi,djii,dsgm
+            endif
           endif
         enddo  ! do while
 20      close(ioprms)
@@ -360,7 +370,6 @@ contains
     logical,save:: l1st=.true.
 
     if( l1st ) then
-      if( myid.eq.0 ) write(6,'(a)') ' use force_screened_Coulomb'
       call read_params(myid,mpi_md_world,ifcoulomb,iprint)
       call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world)
       if( .not. allocated(strsl) ) then
@@ -473,7 +482,6 @@ contains
     real(8),external:: sprod,absv
 
     if( l1st ) then
-      if( myid.eq.0 ) write(6,'(a)') ' Use force_Ewald_Coulomb'
       if( .not.allocated(ri) ) then
         allocate(ri(3),bk(3),bk1(3),bk2(3),bk3(3),bb(3),dxdi(3) &
              ,dxdj(3),rij(3),xij(3),xj(3),xi(3))
@@ -540,7 +548,6 @@ contains
     logical,save:: l1st= .true.
 
     if( l1st ) then
-      if( myid.eq.0 .and. iprint.ne.0) write(6,'(a)') ' Use force_vc_Gaussian'
       if( .not. allocated(strsl) ) then
         allocate(strsl(3,3,namax))
       endif
@@ -591,8 +598,8 @@ contains
     real(8),intent(in):: tag(natm+nb)
     real(8),intent(out):: chg(natm+nb)
     
-    integer,allocatable:: nbvsl(:),nbvs(:)
-    real(8),allocatable:: vc_bvs(:)
+    integer,allocatable,save:: nbvsl(:),nbvs(:)
+    real(8),allocatable,save:: vc_bvs(:)
     integer:: i,is,ierr
     real(8):: sum_anion,sum_cation
 
@@ -1030,7 +1037,7 @@ contains
     integer:: ia,ja,k1,k2,k3,is,js,ik,ierr
     real(8):: xi(3),xj(3),ri(3),rj(3),qi,qj,sgmi,sgmi2,sgmj,sgmj2, &
          bk1(3),bk2(3),bk3(3),bb(3),bdotri,bdotrj,bb2,djii,a0,sqpi
-    real(8),allocatable:: amat(:,:),qvec(:),xvec(:)
+    real(8),allocatable,save:: amat(:,:),qvec(:),xvec(:)
     logical,save:: l1st = .true.
     real(8),external:: sprod
 
@@ -1046,7 +1053,7 @@ contains
 !     and does not work in parallel mode.
 !     TODO: And also the code is very primitive and could be much faster.
     a0 = 1d0 /(2d0 *avol *eps0)
-    do ia=1,natm-1
+    do ia=1,natm
       xi(1:3) = ra(1:3,ia)
       ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
       is = int(tag(ia))
@@ -1073,7 +1080,7 @@ contains
               bb2 = sprod(bb,bb)
               
               amat(ia,ja) = amat(ia,ja) +1d0/bb2 &
-                   *exp(bb2/2*(sgmi2+sgmj2)) &
+                   *exp(-bb2/2*(sgmi2+sgmj2)) &
                    *( cos(bdotri)*cos(bdotrj) + sin(bdotri)*sin(bdotrj) )
             enddo  ! k3
           enddo  ! k2
@@ -1091,8 +1098,8 @@ contains
       amat(ia,ia) = djii + 1d0/(sqpi *sgmi)
     enddo
 !.....Symmetrize A-matrix
-    do ia=1,natm-1
-      do ja=ia-1,natm
+    do ia=1,natm
+      do ja=ia-1,natm+1
         amat(ja,ia) = amat(ia,ja)
       enddo
     enddo
@@ -1105,13 +1112,27 @@ contains
 !.....Make X vector
     do ia=1,natm
       is = int(tag(ia))
-      xvec(ia) = chi(is)
+      xvec(ia) = -vcg_chi(is)
     enddo
     xvec(natm+1) = 0d0  ! charge neutrality, qtot = 0.0
 
+!!$    print *,'amat:'
+!!$    do ia=1,natm+1
+!!$      write(6,'(10es10.2)') (amat(ia,ja),ja=1,natm+1)
+!!$    enddo
+!!$    print *,'qvec:'
+!!$    write(6,'(10es10.2)') (qvec(ja),ja=1,natm+1)
+!!$    print *,'xvec:'
+!!$    write(6,'(10es10.2)') (xvec(ja),ja=1,natm+1)
+
 !.....Perform CG optimization to equilibrate the system and get charges
     call cg(natm+1,natm+2,1d-5,amat,xvec,qvec,ierr)
-    write(6,'(a,i6)') ' CG opt converged at ',ierr
+!!$    write(6,'(a,i6)') ' CG opt converged at ',ierr
+!!$    print *,'qvec after CG opt:'
+!!$    write(6,'(a,10es10.2)') 'q=',(qvec(ja),ja=1,natm+1)
+!!$    print *,'A*Q:'
+!!$    xvec = matmul(amat,qvec)
+!!$    write(6,'(10es10.2)') (xvec(ja),ja=1,natm+1)
 
 !.....Restore charge to chg
     do ia=1,natm
@@ -1149,7 +1170,7 @@ contains
 !.....Check convergence
       xd(1:ndim) = x(1:ndim) -xp(1:ndim)
       xdnrm = sqrt(dot_product(xd,xd))
-!      write(6,'(i5,8es10.2)') istp,xdnrm,x(1:ndim),xdnrm/bnrm
+!      write(6,'(i5,8es10.2)') istp,xdnrm,x(1:5),xdnrm/bnrm
       if( xdnrm/bnrm .lt. eps ) then
         ierr = istp
         return

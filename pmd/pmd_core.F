@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-05-23 15:13:02 Ryo KOBAYASHI>
+c                     Last-modified: <2017-05-23 18:03:26 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -109,7 +109,7 @@ c.....perform space decomposition after reading atomic configuration
       call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
       if( myid_md.eq.0 .and. iprint.ne.0 ) then
-        write(6,'(a)') " H-matrix:"
+        write(6,'(a)') " h-matrix:"
         write(6,'(3es15.7)') h(1:3,1,0)
         write(6,'(3es15.7)') h(1:3,2,0)
         write(6,'(3es15.7)') h(1:3,3,0)
@@ -606,7 +606,7 @@ c---------output step, time, and temperature
      &             " istp,time,temp,epot,vol,prss="
      &             ,istp,tcpu,tave,epot,vol
      &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
-              write(6,'(a)') ' H-matrix:' !,h(1:3,1:3,0)
+              write(6,'(a)') ' h-matrix:' !,h(1:3,1:3,0)
               write(6,'(3f15.7)') h(1:3,1:3,0)
               
               write(6,'(a,6f10.3)') ' stress (GPa):'

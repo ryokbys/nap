@@ -154,12 +154,12 @@ c-----------------------------------------------------------------------
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
       case default
         if( ifcoulomb.eq.0 ) then
-          write(6,'(a)') ' Error: No force specified.'
+          write(6,'(a)') ' Error: no force-field specified.'
           call mpi_finalize(ierr)
           stop
         endif
         if( l1st ) then
-          write(6,'(a)') ' No force specified except Coulomb.'
+          write(6,'(a)') ' no force-field specified except Coulomb.'
         endif
       end select
 
