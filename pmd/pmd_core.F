@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-05-23 18:03:26 Ryo KOBAYASHI>
+c                     Last-modified: <2017-05-25 18:02:31 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -326,12 +326,16 @@ c.....output initial configuration including epi, eki, and strs
      &     ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
       if( myid_md.eq.0 ) then
         if( ifsort.eq.1 ) call sort_by_tag(ntot,tagtot,rtot,vtot
-     &       ,ekitot,epitot,stot)
-        if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' )
-     &       then
-          call write_pmdtot_bin(20,"pmd"//cnum)
-        elseif( trim(ciofmt).eq.'ascii' ) then
-          call write_pmdtot_ascii(20,"pmd"//cnum)
+     &       ,ekitot,epitot,stot,chgtot,chitot)
+        if( ifpmd.eq.1 ) then  ! pmd format
+          if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' )
+     &         then
+            call write_pmdtot_bin(20,"pmd"//cnum)
+          elseif( trim(ciofmt).eq.'ascii' ) then
+            call write_pmdtot_ascii(20,"pmd"//cnum)
+          endif
+        else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
+          call write_dump(20,'dump'//cnum)
         endif
       endif
       
@@ -382,7 +386,7 @@ c.....Set al
 
       i_conv = 0
       lconverged = .false.
-c-----MD loop with velocity-Verlet--------------------------------------
+c-----velocity-Verlet loop starts---------------------------------------
       do istp=1,maxstp
 
 c.....In case of isobaric MD, lstrs has to be always TRUE.
@@ -436,7 +440,7 @@ c.....Update te considering change of vmax
 c.....Update pair list and boundary atoms
 c.....if making new pair list is needed.
         if( istp.ge.istpe .or.
-     &       (ifpmd.eq.1.and.mod(istp,noutpmd).eq.0) ) then
+     &       (ifpmd.gt.0.and.mod(istp,noutpmd).eq.0) ) then
 c.....Move atoms that cross the boundary
           call bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi
      &         ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world)
@@ -459,7 +463,7 @@ c.....Copy RA of boundary atoms determined by 'bacopy'
      &         ,sv,nex,mpi_md_world,ifcoulomb,chg,chi)
         endif
         
-        if(ifpmd.eq.1.and. mod(istp,noutpmd).eq.0 )then
+        if(ifpmd.gt.0.and. mod(istp,noutpmd).eq.0 )then
           lstrs = lstrs0
         endif
 c-------Calc forces
@@ -653,7 +657,7 @@ c          print *,'istp.gt.minstp = ',istp.gt.minstp
         endif
 
 c-------write the particle positions
-        if(ifpmd.eq.1.and.
+        if(ifpmd.gt.0.and.
      &       (mod(istp,noutpmd).eq.0.or.lconverged) )then
 c---------decide pmd-file name
           iocntpmd=iocntpmd+1
@@ -665,12 +669,16 @@ c          call system("mkdir -p "//cnum)
           ltot_updated = .true.
           if( myid_md.eq.0 ) then
             if( ifsort.eq.1 ) call sort_by_tag(ntot,tagtot,rtot,vtot
-     &           ,ekitot,epitot,stot)
-            if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' )
-     &           then
-              call write_pmdtot_bin(20,"pmd"//cnum)
-            elseif( trim(ciofmt).eq.'ascii' ) then
-              call write_pmdtot_ascii(20,"pmd"//cnum)
+     &           ,ekitot,epitot,stot,chgtot,chitot)
+            if( ifpmd.eq.1 ) then  ! pmd format
+              if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' )
+     &             then
+                call write_pmdtot_bin(20,"pmd"//cnum)
+              elseif( trim(ciofmt).eq.'ascii' ) then
+                call write_pmdtot_ascii(20,"pmd"//cnum)
+              endif
+            else if( ifpmd.eq.2 ) then  ! LAMMPS-dump format
+              call write_dump(20,'dump'//cnum)
             endif
           endif
         endif
@@ -2268,14 +2276,14 @@ c.....positions should be reverted after passing data
 
       end subroutine space_comp
 c=======================================================================
-      subroutine sort_by_tag(natm,tag,ra,va,eki,epi,strs)
+      subroutine sort_by_tag(natm,tag,ra,va,eki,epi,strs,chg,chi)
 c
 c  Sort by tag for output.
 c  
       implicit none
       integer,intent(in):: natm
       real(8),intent(inout):: ra(3,natm),va(3,natm),eki(3,3,natm)
-     &     ,epi(natm),strs(3,3,natm),tag(natm)
+     &     ,epi(natm),strs(3,3,natm),tag(natm),chg(natm),chi(natm)
 
       integer,allocatable:: itag(:)
       real(8),allocatable:: buf(:,:)
@@ -2286,7 +2294,7 @@ c
       if( .not. allocated(itag) .or. natm.gt.nsave ) then
         if( allocated(itag) ) deallocate(itag,buf)
         nsave = natm
-        allocate(itag(natm),buf(18,natm))
+        allocate(itag(natm),buf(20,natm))
       endif
 
       do i=1,natm
@@ -2298,10 +2306,12 @@ c
         buf(12:14,i)= strs(1:3,2,i)
         buf(15:17,i)= strs(1:3,3,i)
         buf(18,i)= tag(i)
+        buf(19,i)= chg(i)
+        buf(20,i)= chi(i)
         itag(i)= itotOf(tag(i))
       enddo
 
-      call heapsort_itag(natm,natm,itag,18,buf)
+      call heapsort_itag(natm,natm,itag,20,buf)
 
       do i=1,natm
         ra(1:3,i)= buf(1:3,i)
@@ -2312,6 +2322,8 @@ c
         strs(1:3,2,i)= buf(12:14,i)
         strs(1:3,3,i)= buf(15:17,i)
         tag(i)= buf(18,i)
+        chg(i)= buf(19,i)
+        chi(i)= buf(20,i)
       enddo
 
       end subroutine sort_by_tag

@@ -329,3 +329,91 @@ c=======================================================================
       close(ionum)
 
       end subroutine write_chgtot_bin
+c=======================================================================
+      subroutine write_dump(ionum,cfname)
+c
+c     Write atomic configuration in LAMMPS-dump format file.
+c
+      use pmdio
+      implicit none 
+      integer,intent(in):: ionum
+      character(len=*),intent(in) :: cfname
+
+      integer:: i
+      real(8):: xi(3),ri(3),eki,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,
+     &     xlo_bound,xhi_bound,ylo_bound,yhi_bound,
+     &     zlo_bound,zhi_bound
+      integer,external:: itotOf
+
+      open(ionum,file=trim(cfname),status='replace')
+      write(ionum,'(a)') 'ITEM: TIMESTEP'
+      write(ionum,'(i10)') 0
+      write(ionum,'(a)') 'ITEM: NUMBER OF ATOMS'
+      write(ionum,'(i10)') ntot
+      write(ionum,'(a)') 'ITEM: BOX BOUNDS xy xz yz'
+      call hmat2lammps(h,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
+      xlo_bound = xlo +min(0d0, xy, xz, xy+xz)
+      xhi_bound = xhi +max(0d0, xy, xz, xy+xz)
+      ylo_bound = ylo +min(0d0, yz)
+      yhi_bound = yhi +max(0d0, yz)
+      zlo_bound = zlo
+      zhi_bound = zhi
+      write(ionum,'(3f15.4)') xlo_bound, xhi_bound, xy
+      write(ionum,'(3f15.4)') ylo_bound, yhi_bound, xz
+      write(ionum,'(3f15.4)') zlo_bound, zhi_bound, yz
+      write(ionum,'(a)') 'ITEM: ATOMS id type x y z ekin epot'
+     &     //' sxx syy szz syz sx sxy chg chi'
+      do i=1,ntot
+        xi(1:3)= rtot(1:3,i)
+        ri(1:3)= h(1:3,1,0)*xi(1) +h(1:3,2,0)*xi(2) +h(1:3,3,0)*xi(3)
+        eki = ekitot(1,1,i) +ekitot(2,2,i) +ekitot(3,3,i)
+        write(ionum,'(i8,i3,3f12.5,2f11.3,6f11.3,f9.4,f9.2)')
+     &       itotOf(tagtot(i)),int(tagtot(i)),ri(1:3),eki,
+     &       epitot(i),
+     &       stot(1,1,i),stot(2,2,i),stot(3,3,i),
+     &       stot(2,3,i),stot(3,1,i),stot(1,2,i),
+     &       chgtot(i),chitot(i)
+      enddo
+      
+      close(ionum)
+      end subroutine write_dump
+c=======================================================================
+      subroutine hmat2lammps(h,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
+c
+c     Convert h-matrix to LAMMPS cell vectors.
+c     Parameters to be output:
+c       xlo, xhi, ylo, yhi, zlo, zhi, xy, xz, yz
+c     LAMMPS cell should be defined as,
+c       a = ( xhi-xlo,       0,       0 )
+c       b = (      xy, yhi-hlo,       0 )
+c       c = (      xz,      yz, zhi-zlo )
+c     See, http://lammps.sandia.gov/doc/Section_howto.html, for detail.
+c
+      implicit none
+      real(8),intent(in):: h(3,3)
+      real(8),intent(out):: xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz
+
+      real(8):: a0(3),b0(3),c0(3)
+      real(8):: a,b,c,alpha,beta,gamma
+      real(8),external:: absv,sprod
+      
+      xlo = 0d0
+      ylo = 0d0
+      zlo = 0d0
+      a0(1:3) = h(1:3,1)
+      b0(1:3) = h(1:3,2)
+      c0(1:3) = h(1:3,3)
+      a = absv(a0)
+      b = absv(b0)
+      c = absv(c0)
+      alpha = acos(sprod(b0,c0)/b/c)
+      beta  = acos(sprod(a0,c0)/a/c)
+      gamma = acos(sprod(a0,b0)/a/b)
+      xhi = a
+      xy = b*cos(gamma)
+      xz = c*cos(beta)
+      yhi= sqrt(b*b -xy*xy)
+      yz = (b*c*cos(alpha) -xy*xz)/yhi
+      zhi= sqrt(c*c -xz*xz -yz*yz)
+      return
+      end subroutine hmat2lammps
