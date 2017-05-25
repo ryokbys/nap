@@ -49,7 +49,7 @@ c-----------------------------------------------------------------------
       strs(1:3,1:3,1:natm+nb)= 0d0
 
       if( ifcoulomb.eq.1 ) then ! screened Coulomb
-        if( l1st ) call initialize_coulomb(natm,tag,myid_md
+        if( l1st ) call initialize_coulomb(natm,tag,chg,chi,myid_md
      &       ,mpi_md_world,ifcoulomb,iprint,h,rc)
         call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
      &       ,chg,h,hi,tcom
@@ -57,16 +57,16 @@ c-----------------------------------------------------------------------
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint
      &       ,ifcoulomb)
       else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
-        if( l1st ) call initialize_coulomb(natm,tag,myid_md,mpi_md_world
-     &       ,ifcoulomb,iprint,h,rc)
+        if( l1st ) call initialize_coulomb(natm,tag,chg,chi,myid_md
+     &       ,mpi_md_world,ifcoulomb,iprint,h,rc)
         call force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs
      &       ,chg,h,hi,tcom
      &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint
      &       ,ifcoulomb)
       else if( ifcoulomb.eq.3 ) then ! variable-charge with Gaussians
-        if( l1st ) call initialize_coulomb(natm,tag,myid_md,mpi_md_world
-     &       ,ifcoulomb,iprint,h,rc)
+        if( l1st ) call initialize_coulomb(natm,tag,chg,chi,myid_md
+     &       ,mpi_md_world,ifcoulomb,iprint,h,rc)
         call force_vc_Gaussian(namax,natm,tag,ra,nnmax,aa,strs
      &       ,chg,chi,h,hi,tcom
      &       ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr

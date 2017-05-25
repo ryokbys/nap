@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-05-24 10:45:31 Ryo KOBAYASHI>
+!                     Last modified: <2017-05-25 22:29:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -64,14 +64,15 @@ module Coulomb
   real(8),allocatable:: vcg_chi(:),vcg_jii(:),vcg_sgm(:)
 
 contains
-  subroutine initialize_coulomb(natm,tag,myid,mpi_md_world,ifcoulomb, &
-       iprint,h,rc)
+  subroutine initialize_coulomb(natm,tag,chg,chi, &
+       myid,mpi_md_world,ifcoulomb,iprint,h,rc)
 !
 !  Allocate and initialize parameters to be used.
 !
     include "mpif.h"
     integer,intent(in):: myid,mpi_md_world,natm,ifcoulomb,iprint
-    real(8),intent(in):: tag(natm),rc,h(3,3)
+    real(8),intent(in):: tag(natm),rc,h(3,3),chg(natm)
+    real(8),intent(inout):: chi(natm)
 
     integer:: i,ierr,nspl
 
@@ -96,7 +97,8 @@ contains
            write(6,'(a)') ' use force_vc_Gaussian'
 !.....Variable-charge Coulomb with Gaussian distribution charges
 !     which ends-up long-range-only Ewald summation
-      call init_vc_gaussian(myid,mpi_md_world,ifcoulomb,iprint,h,rc)
+      call init_vc_gaussian(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
+           natm,tag,chi,chg)
     endif
 
   end subroutine initialize_coulomb
@@ -157,7 +159,8 @@ contains
 
   end subroutine init_Ewald
 !=======================================================================
-  subroutine init_vc_Gaussian(myid,mpi_world,ifcoulomb,iprint,h,rc)
+  subroutine init_vc_Gaussian(myid,mpi_world,ifcoulomb,iprint,h,rc,&
+       natm,tag,chi,chg)
 !
 !  Since variable-charge potential with Gaussian distribution charges
 !  is mostly identical to the long-range part of Ewald summation,
@@ -167,13 +170,20 @@ contains
 !
     implicit none
     integer,intent(in):: myid,mpi_world,ifcoulomb,iprint
-    real(8),intent(in):: h(3,3),rc
+    integer,intent(in):: natm
+    real(8),intent(in):: h(3,3),rc,tag(natm),chg(natm)
+    real(8),intent(inout):: chi(natm)
 
-    integer:: i,isp,ik,k1,k2,k3
+    integer:: i,isp,ik,k1,k2,k3,is
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min
     real(8),external:: absv
 
     call read_params(myid,mpi_world,ifcoulomb,iprint)
+
+    do i=1,natm
+      is = int(tag(i))
+      chi(i) = vcg_chi(is)
+    enddo
 
     sgm_min = 1d+30
     do i=1,nsp
@@ -542,10 +552,12 @@ contains
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs
 
-    integer:: i,ierr
-    real(8):: elrl,epot_self,epotl,epott,q2loc,q2tot
+    integer:: i,ierr,is
+    real(8):: elrl,eself,eselfl,epotl,epott,prefac,q2,sgmi
     real(8),allocatable,save:: strsl(:,:,:)
     logical,save:: l1st= .true.
+    integer,external:: itotOf
+    real(8),external:: sprod
 
     if( l1st ) then
       if( .not. allocated(strsl) ) then
@@ -560,24 +572,36 @@ contains
 ! TODO: this part is limited to single computation and needs parallelization
     call cgopt_charge(natm,h,ra,tag,chg,chi)
 
-!.....Compute self term, if fixed charge per atom, it is constant
-    q2loc = 0d0
+!.....Compute self term. If charge per atom is fixed, it is constant.
+    eselfl = 0d0
+    prefac = 1d0 /(4d0*pi*eps0)
     do i=1,natm
-      q2loc = q2loc +chg(i)*chg(i)
+      is = int(tag(i))
+      sgmi = vcg_sgm(is)
+      q2 = chg(i)*chg(i)
+      eselfl = eselfl +chi(i)*chg(i) +0.5d0*vcg_jii(is)*q2 !&
+          ! -prefac *2d0 /sgmi *q2
     enddo
-    call mpi_allreduce(q2loc,q2tot,1,mpi_double_precision &
-         ,mpi_sum,mpi_md_world,ierr)
-    epot_self = q2tot *acc /sqrt(2d0*pi) /sgm_ew
-!!$    write(6,*) ' epot_self = ',epot_self
+
+!!$    write(6,'(a,2es12.4)') 'ra(1,1:2)= ',ra(1,1:2)
+!!$    write(6,'(a,10i3)') 'tagtot = ',(itotOf(tag(i)),i=1,natm)
+
+!!$    call mpi_allreduce(q2loc,q2tot,1,mpi_double_precision &
+!!$         ,mpi_sum,mpi_md_world,ierr)
+!.....TODO: still non-parallelized
+    eself = eselfl
+!!$    write(6,*) ' eself = ',eself
 
     call vcg_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi, &
        lspr,epi,elrl,iprint,ifcoulomb,mpi_md_world,lstrs)
     
-    epotl = elrl
-!.....Gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_double_precision &
-         ,mpi_sum,mpi_md_world,ierr)
-    epot= epot +epott -epot_self
+    epotl = elrl +eselfl
+!!$!.....Gather epot
+!!$    call mpi_allreduce(epotl,epott,1,mpi_double_precision &
+!!$         ,mpi_sum,mpi_md_world,ierr)
+!.....TODO: still non-parallelized
+    epott = epotl
+    epot= epot +epott
 
     l1st=.false.
     return
@@ -720,8 +744,6 @@ contains
     do k1= 1,kmaxini
       do k2= 1,kmaxini
         do k3= 1,kmaxini
-!.....threshold factor = 1d-4 is hard coded, which has no meaning
-!!$          if( bbs(k3,k2,k1).gt.bbmax*threshold_kmax ) then
           if( bbs(k3,k2,k1).le.bkmax ) then
             kmax1= max(kmax1,k1)
             kmax2= max(kmax2,k2)
@@ -842,7 +864,8 @@ contains
          elrl
 
     integer:: i,is,ik,k1,k2,k3,ierr
-    real(8):: qi,xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3),bdotr
+    real(8):: qi,xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3),bdotr, &
+         tmp,cs,sn,texp
     real(8),external:: sprod
     
 !.....Compute reciprocal vectors
@@ -880,17 +903,18 @@ contains
          ,mpi_sum,mpi_md_world,ierr)
 !.....Compute long-range contribution to potential energy
     elrl = 0d0
-    ik = 0
-    do k1= -kmax1,kmax1
-      do k2= -kmax2,kmax2
-        do k3= -kmax3,kmax3
-          if( .not. lkuse(k3,k2,k1) ) cycle
-          ik= ik+1
-          elrl= elrl +pflr(ik)*(qcos(ik)*qcos(ik) +qsin(ik)*qsin(ik))
-        enddo
-      enddo
-    enddo
-    elrl = elrl /avol *acc /2
+!!$    ik = 0
+!!$    do k1= -kmax1,kmax1
+!!$      do k2= -kmax2,kmax2
+!!$        do k3= -kmax3,kmax3
+!!$          if( .not. lkuse(k3,k2,k1) ) cycle
+!!$          ik= ik+1
+!!$          elrl= elrl +pflr(ik)*(qcos(ik)*qcos(ik) +qsin(ik)*qsin(ik))
+!!$        enddo
+!!$      enddo
+!!$    enddo
+!!$    elrl = elrl /avol *acc /2
+
 !.....Long-range contribution to forces
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -909,12 +933,20 @@ contains
             bk3(1:3) = k3 *b3(1:3)
             bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
             bdotr = sprod(bb,ri)
+            cs = cos(bdotr)
+            sn = sin(bdotr)
+!.....Potential energy per atom
+            tmp = 0.5d0 *acc /avol *qi *pflr(ik) &
+                 *( cs*qcos(ik) +sn*qsin(ik) )
+            epi(i) = epi(i) +tmp
+            elrl = elrl +tmp
+!.....Forces
             aa(1:3,i)= aa(1:3,i) -acc/avol *qi*bb(1:3) *pflr(ik) &
-                 *(-sin(bdotr)*qcos(ik) +cos(bdotr)*qsin(ik))
-          enddo
-        enddo
-      enddo
-    enddo
+                 *( -sn*qcos(ik) +cs*qsin(ik) )
+          enddo  ! k3
+        enddo  ! k2
+      enddo  ! k1
+    enddo  ! ia
 
   end subroutine Ewald_long
 !=======================================================================
@@ -934,48 +966,21 @@ contains
          elrl
 
     integer:: i,is,ik,k1,k2,k3,ierr
-    real(8):: qi,xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3),bdotr, &
-         bb2,texp,sgmi,sgmi2,prefac
+    real(8):: qi,bdotr,bb2,texp,sgmi,sgmi2,prefac,cs,sn,tmp
+    real(8),allocatable,save:: xi(:),ri(:),bk1(:),bk2(:),bk3(:),bb(:)
     real(8),external:: sprod
+    logical,save:: l1st = .true.
+
+    if( l1st ) then
+      allocate(xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3))
+    endif
     
 !.....Compute reciprocal vectors
     call get_recip_vectors(h)
 !.....Compute structure factor of the local processor
     qcosl(1:nk)= 0d0
     qsinl(1:nk)= 0d0
-    do i=1,natm
-      xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
-      sgmi = vcg_sgm(is)
-      sgmi2= sgmi*sgmi
-      qi = chg(i)
-      ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
-      ik = 0
-      do k1= -kmax1,kmax1
-        bk1(1:3) = k1 *b1(1:3)
-        do k2= -kmax2,kmax2
-          bk2(1:3) = k2 *b2(1:3)
-          do k3= -kmax3,kmax3
-            if( .not. lkuse(k3,k2,k1) ) cycle
-            ik= ik +1
-            bk3(1:3) = k3 *b3(1:3)
-            bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-            bdotr = sprod(bb,ri)
-            bb2 = sprod(bb,bb)
-            texp = exp(-bb2*sgmi2/2)
-            qcosl(ik) = qcosl(ik) +texp*qi*cos(bdotr)
-            qsinl(ik) = qsinl(ik) +texp*qi*sin(bdotr)
-          enddo
-        enddo
-      enddo
-    enddo
-!.....Allreduce qcos and qsin, which would be stupid and time consuming
-    call mpi_allreduce(qcosl,qcos,nk,mpi_double_precision &
-         ,mpi_sum,mpi_md_world,ierr)
-    call mpi_allreduce(qsinl,qsin,nk,mpi_double_precision &
-         ,mpi_sum,mpi_md_world,ierr)
-!.....Compute long-range contribution to potential energy
-    elrl = 0d0
+
     ik = 0
     do k1= -kmax1,kmax1
       bk1(1:3) = k1 *b1(1:3)
@@ -983,44 +988,74 @@ contains
         bk2(1:3) = k2 *b2(1:3)
         do k3= -kmax3,kmax3
           if( .not. lkuse(k3,k2,k1) ) cycle
-          ik= ik+1
+          ik= ik +1
           bk3(1:3) = k3 *b3(1:3)
           bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
           bb2 = sprod(bb,bb)
-          elrl= elrl +(qcos(ik)*qcos(ik) +qsin(ik)*qsin(ik))/bb2
-        enddo
-      enddo
-    enddo
-    prefac = 1d0 /(2d0*avol*eps0)
-    elrl = elrl *prefac
-!.....Long-range contribution to forces
-    do i=1,natm
-      xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
-      sgmi = vcg_sgm(is)
-      sgmi2= sgmi*sgmi
-      qi = chg(i)
-      ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
-      ik = 0
-      do k1= -kmax1,kmax1
-        bk1(1:3) = k1 *b1(1:3)
-        do k2= -kmax2,kmax2
-          bk2(1:3) = k2 *b2(1:3)
-          do k3= -kmax3,kmax3
-            if( .not. lkuse(k3,k2,k1) ) cycle
-            ik= ik +1
-            bk3(1:3) = k3 *b3(1:3)
-            bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
+          do i=1,natm
+            xi(1:3)= ra(1:3,i)
+            is= int(tag(i))
+            sgmi = vcg_sgm(is)
+            sgmi2= sgmi*sgmi
+            qi = chg(i)
+            ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
             bdotr = sprod(bb,ri)
-            bb2 = sprod(bb,bb)
             texp = exp(-bb2*sgmi2/2)
-            aa(1:3,i)= aa(1:3,i) -prefac /bb2 *qi *bb(1:3) *texp &
-                  *(-sin(bdotr)*qcos(ik) +cos(bdotr)*qsin(ik))
+            qcosl(ik) = qcosl(ik) +texp*qi*cos(bdotr)
+            qsinl(ik) = qsinl(ik) +texp*qi*sin(bdotr)
           enddo
         enddo
       enddo
-    enddo
+    enddo  ! ia
+!.....Allreduce qcos and qsin, which would be stupid and time consuming
+    call mpi_allreduce(qcosl,qcos,nk,mpi_double_precision &
+         ,mpi_sum,mpi_md_world,ierr)
+    call mpi_allreduce(qsinl,qsin,nk,mpi_double_precision &
+         ,mpi_sum,mpi_md_world,ierr)
+    
+!  Long-range contribution to energy and forces.
+!  If only total energy is required, it can be much simpler without
+!  the loop over atoms. But since forces and energy per atom are also
+!  required, the loop over atoms appear.
+    elrl = 0d0
+    prefac = 1d0 /(2d0*avol*eps0)
 
+    ik = 0
+    do k1= -kmax1,kmax1
+      bk1(1:3) = k1 *b1(1:3)
+      do k2= -kmax2,kmax2
+        bk2(1:3) = k2 *b2(1:3)
+        do k3= -kmax3,kmax3
+          if( .not. lkuse(k3,k2,k1) ) cycle
+          ik= ik +1
+          bk3(1:3) = k3 *b3(1:3)
+          bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
+          bb2 = sprod(bb,bb)
+          do i=1,natm
+            xi(1:3)= ra(1:3,i)
+            is= int(tag(i))
+            sgmi = vcg_sgm(is)
+            sgmi2= sgmi*sgmi
+            qi = chg(i)
+            ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
+            bdotr = sprod(bb,ri)
+            texp = exp(-bb2*sgmi2/2)
+            cs = cos(bdotr)
+            sn = sin(bdotr)
+!.....Potential energy per atom
+            tmp = prefac/bb2*qi*texp &
+                 *(cs*qcos(ik) +sn*qsin(ik))
+            epi(i) = epi(i) +tmp
+            elrl = elrl +tmp
+!.....Forces
+            aa(1:3,i)= aa(1:3,i) -2d0 *prefac /bb2 *qi *bb(1:3) *texp &
+                  *(-sn*qcos(ik) +cs*qsin(ik))
+          enddo
+        enddo
+      enddo
+    enddo  ! ia
+
+    l1st = .false.
   end subroutine vcg_long
 !=======================================================================
   subroutine cgopt_charge(natm,h,ra,tag,chg,chi)
@@ -1036,7 +1071,8 @@ contains
 
     integer:: ia,ja,k1,k2,k3,is,js,ik,ierr
     real(8):: xi(3),xj(3),ri(3),rj(3),qi,qj,sgmi,sgmi2,sgmj,sgmj2, &
-         bk1(3),bk2(3),bk3(3),bb(3),bdotri,bdotrj,bb2,djii,a0,sqpi
+         bk1(3),bk2(3),bk3(3),bb(3),bdotri,bdotrj,bb2,djii,a0,sqpi,r2,&
+         prefac
     real(8),allocatable,save:: amat(:,:),qvec(:),xvec(:)
     logical,save:: l1st = .true.
     real(8),external:: sprod
@@ -1047,11 +1083,12 @@ contains
     endif
     
     amat(1:natm+1,1:natm+1) = 0d0
+    qvec(natm+1) = 0d0
         
 !.....Make A-matrix for linear equation, A*Q=X
 !     Assuming all the atoms are in the root node (0),
 !     and does not work in parallel mode.
-!     TODO: And also the code is very primitive and could be much faster.
+!     TODO: And also the code is very primitive and could be faster.
     a0 = 1d0 /(2d0 *avol *eps0)
     do ia=1,natm
       xi(1:3) = ra(1:3,ia)
@@ -1059,7 +1096,7 @@ contains
       is = int(tag(ia))
       sgmi = vcg_sgm(is)
       sgmi2= sgmi*sgmi
-      do ja=ia+1,natm
+      do ja=ia,natm
         xj(1:3) = ra(1:3,ja)
         rj(1:3) = h(1:3,1)*xj(1) +h(1:3,2)*xj(2) +h(1:3,3)*xj(3)
         js = int(tag(ja))
@@ -1079,7 +1116,7 @@ contains
               bdotrj = sprod(bb,rj)
               bb2 = sprod(bb,bb)
               
-              amat(ia,ja) = amat(ia,ja) +1d0/bb2 &
+              amat(ia,ja) = amat(ia,ja) +2d0/bb2 &
                    *exp(-bb2/2*(sgmi2+sgmj2)) &
                    *( cos(bdotri)*cos(bdotrj) + sin(bdotri)*sin(bdotrj) )
             enddo  ! k3
@@ -1087,19 +1124,19 @@ contains
         enddo  ! k1
         amat(ia,ja) = amat(ia,ja) *a0
       enddo  ! ja
-      amat(ia,natm+1) = 1d0
     enddo  ! ia
-!.....Self interaction term
-    sqpi = sqrt(pi)
+    amat(1:natm,natm+1) = 1d0
+!.....Self term
+    prefac = 1d0/(4d0*pi*eps0)
     do ia=1,natm
       is = int(tag(ia))
-      sgmi = vcg_sgm(is)
       djii = vcg_jii(is)
-      amat(ia,ia) = djii + 1d0/(sqpi *sgmi)
+      sgmi = vcg_sgm(is)
+      amat(ia,ia) = amat(ia,ia) +djii !-2d0 *prefac /sqrt(pi) /sgmi
     enddo
 !.....Symmetrize A-matrix
     do ia=1,natm
-      do ja=ia-1,natm+1
+      do ja=ia+1,natm+1
         amat(ja,ia) = amat(ia,ja)
       enddo
     enddo
@@ -1121,7 +1158,7 @@ contains
 !!$      write(6,'(10es10.2)') (amat(ia,ja),ja=1,natm+1)
 !!$    enddo
 !!$    print *,'qvec:'
-!!$    write(6,'(10es10.2)') (qvec(ja),ja=1,natm+1)
+!!$    write(6,'(a,10f8.4)') 'qvec=',(qvec(ja),ja=1,natm+1)
 !!$    print *,'xvec:'
 !!$    write(6,'(10es10.2)') (xvec(ja),ja=1,natm+1)
 
@@ -1129,7 +1166,7 @@ contains
     call cg(natm+1,natm+2,1d-5,amat,xvec,qvec,ierr)
 !!$    write(6,'(a,i6)') ' CG opt converged at ',ierr
 !!$    print *,'qvec after CG opt:'
-!!$    write(6,'(a,10es10.2)') 'q=',(qvec(ja),ja=1,natm+1)
+!!$    write(6,'(a,10f10.6)') 'q=',(qvec(ja),ja=1,natm)
 !!$    print *,'A*Q:'
 !!$    xvec = matmul(amat,qvec)
 !!$    write(6,'(10es10.2)') (xvec(ja),ja=1,natm+1)
