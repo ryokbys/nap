@@ -6,6 +6,10 @@ by altering the lattice constant in pmdini file.
 And if possible, calculate equilibrium lattice size and
 bulk modulus, too.
 
+MIN and MAX values correspond to the original value in *pmdini* file.
+So check the value at the 2nd line in *pmdini* file and usually MIN and MAX
+values should smaller and larger than the original value, respectively.
+
 Usage:
   energy_vs_size.py [options] MIN MAX
 
@@ -80,7 +84,7 @@ if __name__ == '__main__':
 
     if al_orig < al_min or al_orig > al_max:
         print ' [Warning] min and max maybe wrong.'
-        print '   hoping you know what you are doing.'
+        print '   I hope you know what you are doing.'
         print '   al_min, al_orig, al_max=',al_min, al_orig, al_max
         #sys.exit()
 

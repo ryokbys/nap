@@ -94,6 +94,14 @@ class NAPSystem(object):
         self.a2[:] = hmat[:, 1]
         self.a3[:] = hmat[:, 2]
 
+    def set_specorder(self,*specorder):
+        self.specorder = specorder
+        for ai in self.atoms:
+            try:
+                ai.sid = self.specorder.index(ai.symbol) +1
+            except ValueError:
+                ai.sid = 1
+                
     def get_lattice_vectors(self):
         return self.a1*self.alc, self.a2*self.alc, self.a3*self.alc
 
@@ -187,17 +195,17 @@ class NAPSystem(object):
             fmt= parse_filename(fname)
 
         if fmt == 'pmd':
-            psys.write_pmd(fname)
+            self.write_pmd(fname)
         elif fmt == 'akr':
-            psys.write_akr(fname)
+            self.write_akr(fname)
         elif fmt == 'POSCAR':
-            psys.write_POSCAR(fname)
+            self.write_POSCAR(fname)
         elif fmt == 'dump':
-            psys.write_dump(fname)
+            self.write_dump(fname)
         elif fmt == 'lammps':
-            psys.write_lammps_data(fname)
+            self.write_lammps_data(fname)
         elif fmt == 'xsf':
-            psys.write_xsf(fname)
+            self.write_xsf(fname)
         else:
             raise ValueError('Cannot detect output file format: '+fmt)
 
@@ -317,11 +325,12 @@ class NAPSystem(object):
             except NameError:
                 spcs = self.specorder
             #...Check number of species in POSCAR file and in specorder
-            if len(num_species) != len(specorder):
-                msg = 'Numbers of species in POSCAR and in specorder' \
-                      +' are different, which should be the same.\n' \
-                      +'Number of species in POSCAR = {0:d}\n'.format(len(num_species)) \
-                      +'You need to specify the species order correctly with --specorder option.'
+            if len(num_species) > len(specorder):
+                msg = '''
+Numbers of species in POSCAR is greater than the one in specorder, which should be the same or less.
+Number of species in POSCAR = {0:d}
+You need to specify the species order correctly with --specorder option.
+                '''.format(len(num_species))
                 raise ValueError(msg)
             natm= 0
             for n in num_species:

@@ -20,10 +20,10 @@ import os,sys
 import numpy as np
 from docopt import docopt
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
+#sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
 
-from napsys import NAPSystem
-from atom import Atom
+from nappy.napsys import NAPSystem
+from nappy.atom import Atom
 
 _default_specorder=['Si']
 
@@ -66,7 +66,7 @@ def make_bcc(latconst=1.0):
     return s
 
 
-def make_fcc(latconst=1.0,size=(1,1,1)):
+def make_fcc(latconst=1.0):
     """
     Make a cell of fcc structure.
     """
