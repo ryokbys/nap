@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-05-30 22:20:05 Ryo KOBAYASHI>
+c                     Last-modified: <2017-06-01 11:02:58 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -8,7 +8,7 @@ c-----------------------------------------------------------------------
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
      &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
-     &     ,srlx,stbeta,strfin,lstrs0
+     &     ,srlx,stbeta,strfin,lstrs0,lcellfix
      &     ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb
      &     ,czload_type,eps_conv,ifsort,iprint,nstp_done)
       use pmdvars
@@ -29,11 +29,12 @@ c-----------------------------------------------------------------------
      &     ,chgtot(ntot),chitot(ntot)
       character,intent(in):: ciofmt*6, cforce*20, cpctl*20, ctctl*20
      &     ,czload_type*5
-      logical,intent(in):: ltdst,lstrs0
+      logical,intent(in):: ltdst,lstrs0,lcellfix(3,3)
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
       integer:: ihour,imin,isec
-      real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epotp
+      real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epotp,
+     &     htmp(3,3)
       real(8),external:: box_muller,sprod
       logical:: lconverged = .false.
       logical:: lstrs = .false.
@@ -432,7 +433,17 @@ c-------update positions
         if( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &       trim(cpctl).eq.'vv-Berendsen' ) then
-          h(1:3,1:3,0)= matmul(ah,h(1:3,1:3,0))
+c     h(1:3,1:3,0)= matmul(ah,h(1:3,1:3,0))
+          htmp(1:3,1:3) = matmul(ah,h(1:3,1:3,0))
+          do i=1,3
+            do j=1,3
+              if( .not. lcellfix(i,j) ) then
+                h(i,j,0) = htmp(i,j)
+              else
+                h(i,j,0) = h(i,j,0)
+              endif
+            enddo
+          enddo
 c.....Reset matrices
           call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
         endif

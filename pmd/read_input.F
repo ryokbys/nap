@@ -133,13 +133,13 @@ c.....temperature distribution along x
         backspace(ionum)
         read(ionum,*) ctmp,ndata,nrow
 c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
-        call read_rs(ionum,ctmp,3,nrow,fmv(1:3,1:nrow))
+        call read_rs(ionum,3,nrow,fmv(1:3,1:nrow))
         return
       elseif( trim(cname).eq.'pressure_target' ) then
         call read_r1(ionum,ptgt)
         return
       elseif( trim(cname).eq.'stress_target' ) then
-        call read_rs(ionum,ctmp,3,3,stgt(1:3,1:3))
+        call read_rs(ionum,3,3,stgt(1:3,1:3))
         return
       elseif( trim(cname).eq.'stress_relax_time' ) then
         call read_r1(ionum,srlx)
@@ -149,6 +149,9 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
         return
       elseif( trim(cname).eq.'flag_compute_stress' ) then
         call read_l1(ionum,lstrs0)
+        return
+      elseif( trim(cname).eq.'cell_fix' ) then
+        call read_ls(ionum,3,3,lcellfix)
         return
       elseif( trim(cname).eq.'zload_type' ) then
         call read_c1(ionum,czload_type)
@@ -219,15 +222,13 @@ c      write(6,'(1x,a,es15.3)') trim(ctmp),rval
 
       end subroutine read_r1
 c=======================================================================
-      subroutine read_rs(ionum,ctmp,ndata,nrow,rval)
+      subroutine read_rs(ionum,ndata,nrow,rval)
 c
 c  Read several read*8 parameters
 c
       integer,intent(in):: ionum,ndata,nrow
       real(8),intent(out):: rval(ndata,nrow)
-      character(len=*),intent(in):: ctmp
 
-c      write(6,'(1x,a,2i8)') trim(ctmp), ndata, nrow
       do n=1,nrow
         read(ionum,*) (rval(i,n),i=1,ndata)
 c        write(6,'(1x,100es15.3)') (rval(i,n),i=1,ndata)
@@ -276,4 +277,18 @@ c
 c      write(6,'(1x,a,5x,l1)') trim(ctmp),lval
 
       end subroutine read_l1
+c=======================================================================
+      subroutine read_ls(ionum,ndata,nrow,lval)
+c
+c  Read several logical parameters
+c
+      integer,intent(in):: ionum,ndata,nrow
+      logical,intent(out):: lval(ndata,nrow)
 
+      do n=1,nrow
+        read(ionum,*) (lval(i,n),i=1,ndata)
+c        write(6,'(1x,100es15.3)') (rval(i,n),i=1,ndata)
+      enddo
+
+      end subroutine read_ls
+c=======================================================================

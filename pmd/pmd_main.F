@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-06-01 10:12:59 Ryo KOBAYASHI>
+c                     Last-modified: <2017-06-01 11:03:14 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -88,7 +88,7 @@ c.....call pmd_core to perfom MD
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
      &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
-     &     ,srlx,stbeta,strfin,lstrs0
+     &     ,srlx,stbeta,strfin,lstrs0,lcellfix
      &     ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb
      &     ,czload_type,eps_conv,ifsort,iprint,nstp_done)
 
@@ -266,6 +266,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(ptgt,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(srlx,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(stgt,9,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(lcellfix,9,mpi_logical,0,mpi_md_world,ierr)
       call mpi_bcast(czload_type,5,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(am,nspmax,mpi_double_precision,0,mpi_md_world,ierr)

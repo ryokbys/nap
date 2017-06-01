@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-04-12 15:59:51 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-01 10:47:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -65,6 +65,7 @@ module pmdio
   real(8):: strfin = 0.0d0
   real(8):: ptnsr(3,3)
   real(8):: stgt(1:3,1:3)= 0d0
+  logical:: lcellfix(1:3,1:3)= .false.
 
 !.....print level
 !  0:quiet, 1:normal,

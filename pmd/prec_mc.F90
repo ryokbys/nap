@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-04-16 12:09:20 Ryo KOBAYASHI>
+!                     Last-modified: <2017-06-01 11:03:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -1204,7 +1204,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
        ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp &
        ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
-       ,srlx,stbeta,strfin,lstrs &
+       ,srlx,stbeta,strfin,lstrs,lcellfix &
        ,fmv,ptnsr,epot,ekin,n_conv,ifchg &
        ,czload_type,eps_conv,ifsort,iprint,nstps_done)
 !!$  print *,'nstps_pmd,minstp,nstps_done = ' &
