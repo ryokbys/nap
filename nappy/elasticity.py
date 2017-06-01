@@ -268,20 +268,50 @@ def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
             print(' {0:10.3f}'.format(ctnsr[i,j]),end='')
         print('')
 
-    reduce_cij(atoms0,ctnsr)
+    cij = reduce_cij(atoms0,ctnsr)
     print('C_ij [GPa]:')
     for i in range(6):
         for j in range(6):
             print(' {0:10.3f}'.format(ctnsr[i,j]),end='')
         print('')
-    return ctnsr
+    some_moduli(cij)
+    return cij
 
-def reduce_cij(atoms0,cij,eps=1.e-4):
+def some_moduli(cij):
+    sij = np.linalg.inv(cij)
+    c112233 = cij[0,0]+cij[1,1]+cij[2,2]
+    c122331 = cij[0,1]+cij[0,2]+cij[1,2]
+    c445566 = cij[3,3]+cij[4,4]+cij[5,5]
+    s112233 = sij[0,0]+sij[1,1]+sij[2,2]
+    s122331 = sij[0,1]+sij[0,2]+sij[1,2]
+    s445566 = sij[3,3]+sij[4,4]+sij[5,5]
+    kv = (c112233 +2.0*c122331)/9
+    kr = 1.0/(s112233 +2.0*(s122331))
+    gv = (c112233 -c122331 +3.0*c445566)/15
+    gr = 15.0 /(4.0*s112233 -4.0*s122331 +3.0*s445566)
+    kvrh = (kv+kr)/2
+    gvrh = (gv+gr)/2
+    prto2 = (3.0*kvrh -2.0*gvrh)/(6.0*kvrh +2.0*gvrh)
+
+    print('')
+    # print(' Definition of the following values, see ' \
+    #     +'https://materialsproject.org/wiki/index.php/Elasticity_calculations')
+    # print(' K_V   = {0:10.3f} GPa'.format(kv))
+    # print(' K_R   = {0:10.3f} GPa'.format(kr))
+    # print(' G_V   = {0:10.3f} GPa'.format(gr))
+    # print(' G_R   = {0:10.3f} GPa'.format(gv))
+    print(' Bulk modulus    = {0:10.3f} GPa'.format(kvrh))
+    print(' shear modulus   = {0:10.3f} GPa'.format(gvrh))
+    print(' Poisson\'s ratio = {0:10.3f}'.format(prto2))
+    
+
+def reduce_cij(atoms0,cij0,eps=1.e-4):
     """
     Reduce number of independent Cij according to the crystal system of original cell.
     It is not Cij=Cji.
     """
 
+    cij = cij0
     symdata = spglib.get_symmetry_dataset(atoms0)
     napsys = NAPSystem(ase_atoms=atoms0)
     sgnum = symdata['number']
@@ -293,12 +323,10 @@ def reduce_cij(atoms0,cij,eps=1.e-4):
     aeqb = abs(a-b) < eps*min(a,b)
     beqc = abs(b-c) < eps*min(b,c)
     ceqa = abs(c-a) < eps*min(c,a)
-    neqlen = count_true(aeqb,beqc,ceqa)
     
     aleqpi2 = abs(alpha-np.pi/2) < eps*np.pi/2
     bteqpi2 = abs(beta -np.pi/2) < eps*np.pi/2
     gmeqpi2 = abs(gamma-np.pi/2) < eps*np.pi/2
-    neqang = count_true(aleqpi2,bteqpi2,gmeqpi2)
 
     if 0 < sgnum <= 2:  # Triclinic
         print('Triclinic')
@@ -354,12 +382,7 @@ def reduce_cij(atoms0,cij,eps=1.e-4):
         for j in range(i,6):
             cij[j,i] = cij[i,j]
 
-def count_true(l1,l2,l3):
-    n = 0
-    if l1: n += 1
-    if l2: n += 1
-    if l3: n += 1
-    return n
+    return cij
 
 if __name__ == '__main__':
 

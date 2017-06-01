@@ -814,6 +814,23 @@ You need to specify the species order correctly with --specorder option.
             f.write("\n")
         f.close()
 
+    def get_distance(self,ia,ja):
+        """
+        Compute distance between atoms ia and ja taking the periodic boundary
+        condition into account.
+        """
+        if ia > len(self.atoms):
+            raise ValueError('ia > natms, ia,natms = ',ia,len(self.atoms))
+        if ja > len(self.atoms):
+            raise ValueError('ja > natms, ja,natms = ',ja,len(self.atoms))
+        xi = self.atoms[ia].pos
+        xj = self.atoms[ja].pos
+        xij = xj-xi -np.round(xj-xi)
+        hmat = self.get_hmat()
+        rij = np.dot(hmat,xij)
+        rij2 = rij[0]**2 +rij[1]**2 +rij[2]**2
+        return np.sqrt(rij2)
+        
     def make_pair_list(self,rcut=3.0):
         rc2= rcut**2
         h= np.zeros((3,3))
