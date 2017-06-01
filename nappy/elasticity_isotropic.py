@@ -25,7 +25,6 @@ from scipy.optimize import curve_fit
 
 #...constants
 outfname='out.elastic_constants'
-logfname='log.elastic_constants'
 
 def read_pmd():
     f=open('pmdini','r')
@@ -83,14 +82,12 @@ if __name__ == '__main__':
     al,hmat0,natm= read_pmd()
     hmax= np.max(hmat0)
 
-    logfile= open(logfname,'w')
     outfile1= open(outfname,'w')
     #...get reference energy
     os.system(mdexec+' > out.pmd')
     erg0= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
     # print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(0.0,erg0,erg0,erg0)
     # outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
-    # logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
     dltmin = -dltmax
     ddlt= (dltmax-dltmin)/(niter-1)
     dlts = np.zeros(niter,dtype=float)
@@ -139,7 +136,6 @@ if __name__ == '__main__':
             e44s[it] = erg44
 
         print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(dlts[it],e11s[it],e12s[it],e44s[it])
-        logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlts[it],e11s[it],e12s[it],e44s[it]))
         outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlts[it],e11s[it],e12s[it],e44s[it]))
     outfile1.close()
 
@@ -176,29 +172,46 @@ if __name__ == '__main__':
     c12= c11 -c11_c12
     c44= popt44[0]/vol*2 *160.218
 
+    cij = np.zeros((6,6),dtype=float)
+    cij[0,0] = cij[1,1] = cij[2,2] = c11
+    cij[0,1] = cij[0,2] = cij[1,2] = cij[2,1] = cij[2,0] = cij[1,0] = c12
+    cij[3,3] = cij[4,4] = cij[5,5] = c44
+    sij = np.linalg.inv(cij)
+
     #...output results
     print '{0:=^72}'.format(' RESULTS ')
-    logfile.write('{0:=^72}\n'.format(' RESULTS '))
-    print ' C11     = {0:10.3f} GPa'.format(c11)
-    print ' C11-C12 = {0:10.3f} GPa'.format(c11_c12)
-    print ' C12     = {0:10.3f} GPa'.format(c12)
-    print ' C44     = {0:10.3f} GPa'.format(c44)
-    logfile.write(' C11     = {0:10.3f} GPa\n'.format(c11))
-    logfile.write(' C11-C12 = {0:10.3f} GPa\n'.format(c11_c12))
-    logfile.write(' C12     = {0:10.3f} GPa\n'.format(c12))
-    logfile.write(' C44     = {0:10.3f} GPa\n'.format(c44))
-    ymod= c44*(2.0*c44+3.0*c12)/(c11+c44)
-    prto= c12/2.0/(c11+c44)
-    smod= ymod/2.0/(1.0+prto)
-    print ' Following values maybe only valid for isotropic materials...'
-    print ' Young\'s modulus = {0:10.3f} GPa'.format(ymod)
-    print ' shear modulus   = {0:10.3f} GPa'.format(smod)
-    print ' Poisson\'s ratio = {0:10.3f}'.format(prto)
-    logfile.write(' Following values maybe only valid for isotropic materials...\n')
-    logfile.write(' Young\'s modulus = {0:10.3f} GPa\n'.format(ymod))
-    logfile.write(' shear modulus   = {0:10.3f} GPa\n'.format(smod))
-    logfile.write(' Poisson\'s ratio = {0:10.3f}\n'.format(prto))
-    logfile.close()
+
+    print ' Cij [GPa]:'
+    for i in range(6):
+        for j in range(6):
+            print ' {0:8.2f}'.format(cij[i,j]),
+        print ''
+
+    c112233 = cij[0,0]+cij[1,1]+cij[2,2]
+    c122331 = cij[0,1]+cij[0,2]+cij[1,2]
+    c445566 = cij[3,3]+cij[4,4]+cij[5,5]
+    s112233 = sij[0,0]+sij[1,1]+sij[2,2]
+    s122331 = sij[0,1]+sij[0,2]+sij[1,2]
+    s445566 = sij[3,3]+sij[4,4]+sij[5,5]
+    kv = (c112233 +2.0*c122331)/9
+    kr = 1.0/(s112233 +2.0*(s122331))
+    gv = (c112233 -c122331 +3.0*c445566)/15
+    gr = 15.0 /(4.0*s112233 -4.0*s122331 +3.0*s445566)
+    kvrh = (kv+kr)/2
+    gvrh = (gv+gr)/2
+    prto2 = (3.0*kvrh -2.0*gvrh)/(6.0*kvrh +2.0*gvrh)
+
+    print ''
+    # print ' Definition of the following values, see ' \
+    #     +'https://materialsproject.org/wiki/index.php/Elasticity_calculations'
+    # print ' K_V   = {0:10.3f} GPa'.format(kv)
+    # print ' K_R   = {0:10.3f} GPa'.format(kr)
+    # print ' G_V   = {0:10.3f} GPa'.format(gr)
+    # print ' G_R   = {0:10.3f} GPa'.format(gv)
+    print ' Bulk modulus    = {0:10.3f} GPa'.format(kvrh)
+    print ' shear modulus   = {0:10.3f} GPa'.format(gvrh)
+    print ' Poisson\'s ratio = {0:10.3f}'.format(prto2)
+    
 
     print '{0:=^72}'.format(' OUTPUT ')
     print ' * '+outfname

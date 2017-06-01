@@ -89,7 +89,7 @@ so that they become absolute positions after multiplying the cell matrix,  :math
                & = & r_a\mathbf{a} +r_b\mathbf{b} +r_c\mathbf{c},
    \end{eqnarray*}
 
-which is written in the code like follows,
+which is written in the code as follows,
 
 .. code-block:: fortran
 
@@ -222,24 +222,21 @@ ASE interface
 ==============================
 
 There is a python script that connects pmd to ASE (atomistic simulation environment).
-This enable us small calculation of pmd very easier.
-The following code shows how to use ``nappy/ase/pmdrun.py`` with ase program.
+This enable us small calculation of pmd much easier.
+The following code shows how to use ``nappy/interface/ase/pmdrun.py`` with ase program.
 
 .. code-block:: python
 
   import os,sys
   from ase.io import read
-  sys.path.append('/Users/kobayashi/src/nap/nappy/ase/')
-  from pmdrun import PMD
+  from nappy.interface.ase.pmdrun import PMD
 
   atoms=read('POSCAR',index=0,format='vasp')
   os.system('cp /path/to/in.*.NN ./')
-  calc= PMD(label='pmd',command='/Users/kobayashi/src/nap/pmd/pmd > out.pmd',force_type='NN')
+  calc= PMD(label='pmd',command='/path/to/nap/pmd/pmd > out.pmd',force_type='NN')
   atoms.set_calculator(calc)
   print atoms.get_potential_energy()
   print atoms.get_forces()
 
-When ``atoms.get_potential_energy()`` is called, pmd program is performed on the background and ase gets results from the calculation.
-Currently only energy and forces on atoms can be obtained from the pmd calculation.
-And dynamics cannot be performed.
+When ``atoms.get_potential_energy()`` is called, pmd program is performed on the background and ASE gets results from the calculation.
 

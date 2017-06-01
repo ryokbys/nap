@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-05-25 18:02:31 Ryo KOBAYASHI>
+c                     Last-modified: <2017-05-30 22:20:05 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -109,10 +109,15 @@ c.....perform space decomposition after reading atomic configuration
       call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
       if( myid_md.eq.0 .and. iprint.ne.0 ) then
+        write(6,*) ''
         write(6,'(a)') " h-matrix:"
-        write(6,'(3es15.7)') h(1:3,1,0)
-        write(6,'(3es15.7)') h(1:3,2,0)
-        write(6,'(3es15.7)') h(1:3,3,0)
+        write(6,'("   | ",3f12.3," |")') h(1,1:3,0)
+        write(6,'("   | ",3f12.3," |")') h(2,1:3,0)
+        write(6,'("   | ",3f12.3," |")') h(3,1:3,0)
+        write(6,'(a)') " which means the following lattice vectors:"
+        write(6,'(a,"[ ",3f12.3," ]")') '   a = ',h(1:3,1,0)
+        write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
+        write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
       endif
 c.....Some conversions
       nsp= 0
@@ -247,10 +252,9 @@ c.....get_num_dof is called once in a MD run
         if(myid_md.eq.0 .and. iprint.ne.0 ) then
           write(6,*) ''
           write(6,'(a)') ' variable-cell Berendsen is chosen'
-          write(6,'(a)') ' target stress (GPa):'
-          write(6,'(3f10.3)') stgt(1,1:3)
-          write(6,'(3f10.3)') stgt(2,1:3)
-          write(6,'(3f10.3)') stgt(3,1:3)
+          write(6,'(a,6f10.3)')' target stress [GPa]: '
+     &         ,stgt(1,1),stgt(2,2),stgt(3,3)
+     &         ,stgt(2,3),stgt(3,1),stgt(1,2)
         endif
         stgt(1:3,1:3)= stgt(1:3,1:3) *gpa2up
       else if( trim(cpctl).eq.'vv-Berendsen' ) then
@@ -1837,6 +1841,10 @@ c
       ptp(1:3,1:3)= 0d0
       ptk(1:3,1:3)= 0d0
       do i=1,natm
+c        write(6,'(a,i3,6es12.4)') 'i,strsi=',i,strs(1,1,i),
+c     &       strs(2,2,i),strs(3,3,i),
+c     &       strs(2,3,i),strs(1,3,i),
+c     &       strs(1,2,i)
         do jxyz=1,3
           do ixyz=1,3
             ptk(ixyz,jxyz)=ptk(ixyz,jxyz) +2d0*eki(ixyz,jxyz,i)
@@ -1845,11 +1853,15 @@ c
         enddo
       enddo
 
+c      write(6,'(a,6es12.4)') 'ptp =',ptp(1,1),ptp(2,2),ptp(3,3),
+c     &     ptp(2,3),ptp(1,3),ptp(1,2)
       pt(1:3,1:3) = ptk(1:3,1:3) +ptp(1:3,1:3)
       ptnsr(1:3,1:3)= 0d0
       call mpi_allreduce(pt,ptnsr,9,mpi_double_precision,mpi_sum
      &     ,mpi_md_world,ierr)
       ptnsr(1:3,1:3)=ptnsr(1:3,1:3) /vol
+c      write(6,*) 'ptnsr =',ptnsr(1,1),ptnsr(2,2),ptnsr(3,3),
+c     &     ptnsr(2,3),ptnsr(1,3),ptnsr(1,2)
 
 c.....Berendsen for variable-cell
       if( trim(cpctl).eq.'Berendsen' .or.

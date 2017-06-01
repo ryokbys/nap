@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-05-12 11:04:59 Ryo KOBAYASHI>
+!                     Last modified: <2017-05-30 22:16:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -910,12 +910,13 @@ contains
 
     integer:: ia,ja,ixyz,jxyz,ihl0,ihl1,ihl2,jj,is,js
     real(8):: xi(3),xj(3),xji(3),rij(3),rji(3),dji,sji,sii&
-         ,hl2i,tmp2i,hl1i,tmp1i
+         ,hl2i,tmp2i,hl1i,tmp1i,stmp(3,3)
 
     if( nl.eq.1 ) then
       do ia=1,natm
         xi(1:3)= ra(1:3,ia)
         is = int(tag(ia))
+        stmp(1:3,1:3)= 0d0
         do jj=1,lspr(0,ia)
           ja= lspr(jj,ia)
           xj(1:3)= ra(1:3,ja)
@@ -936,17 +937,24 @@ contains
 ! derivative of gsf of atom-i by atom-j
                   sji= -tmp1i*wgt11(ihl0,ihl1)*dgsf(jxyz,ihl0,jj,ia) &
                        *rji(ixyz)
-! counter contribution
-                  sii= tmp1i*wgt11(ihl0,ihl1)*dgsf(jxyz,ihl0,jj,ia) &
-                       *rij(ixyz)
+!  Since counter contribution seems the same as the above,
+!  no need to perform redundant calculations.
+!!$! counter contribution
+!!$                  sii= tmp1i*wgt11(ihl0,ihl1)*dgsf(jxyz,ihl0,jj,ia) &
+!!$                       *rij(ixyz)
                   strs(ixyz,jxyz,ja) = strs(ixyz,jxyz,ja) +sji
-                  strs(ixyz,jxyz,ia) = strs(ixyz,jxyz,ia) +sii
-                enddo
-              enddo
-            enddo
-          enddo
-        enddo
-      enddo
+                  strs(ixyz,jxyz,ia) = strs(ixyz,jxyz,ia) +sji
+                  stmp(ixyz,jxyz) = stmp(ixyz,jxyz) +sji
+                enddo  ! jxyz
+              enddo  ! ixyz
+            enddo  ! ihl0
+          enddo  ! ihl1
+!!$          if( ia.eq.1 ) then
+!!$            write(6,'(3i4,6es12.4)') ia,jj,ja,stmp(1,1),stmp(2,2),stmp(3,3),&
+!!$                 stmp(2,3),stmp(1,3),stmp(1,2)
+!!$          endif
+        enddo  ! ja
+      enddo  ! ia
     else if( nl.eq.2 ) then
       do ia=1,natm
         xi(1:3)= ra(1:3,ia)
@@ -993,7 +1001,7 @@ contains
 !-----send back (3-body)forces, stresses, and potentials on immigrants
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,strs,9)
-!.....TODO: should this strs be additive?
+!.....TODO: should this strs be additive? If so, 0.5 should not be here.
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)*0.5d0
 
 !!$    if( myid.ge.0 ) then

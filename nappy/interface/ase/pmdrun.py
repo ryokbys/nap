@@ -185,7 +185,7 @@ class PMD(FileIOCalculator):
         outfname= 'out.'+self.label
         ergfname= 'erg.'+self.label
         frcfname= 'frc.'+self.label
-        strfname= 'str.'+self.label
+        strfname= 'strs.'+self.label
         if not os.path.exists(outfname):
             raise RuntimeError(outfname+' does not exists.')
         if not os.path.exists(ergfname):
@@ -193,7 +193,7 @@ class PMD(FileIOCalculator):
         if not os.path.exists(frcfname):
             raise RuntimeError(frcfname+' does not exists.')
         if not os.path.exists(strfname):
-            print 'Warning: '+frcfname+' does not exists.'
+            print 'Warning: '+strfname+' does not exists.'
 
         self.results={}
 
