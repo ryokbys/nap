@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-05-24 10:27:18 Ryo KOBAYASHI>
+c                     Last-modified: <2017-06-01 10:12:59 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -70,6 +70,7 @@ c.....if needed, read atomic charges from chg0000 file
 c.....but even if not needed, allocate ntot long array
 c.....for the simplicty of code
         allocate(chgtot(ntot),chitot(ntot))
+        chitot(1:ntot) = 0d0
         call set_atomic_charges(ntot,chgtot,tagtot,nspmax,schg)
 
 c.....make ntot and ?tot() not null in nodes myid_md != 0
@@ -78,6 +79,7 @@ c.....make ntot and ?tot() not null in nodes myid_md != 0
         allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot)
      &       ,ekitot(3,3,ntot),stot(3,3,ntot),atot(3,ntot)
      &       ,chgtot(ntot),chitot(ntot))
+        chitot(1:ntot) = 0d0
       endif
 
 c.....call pmd_core to perfom MD
