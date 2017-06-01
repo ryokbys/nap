@@ -9,7 +9,7 @@ ANALYZE mode reads the stress values obtained by some code.
 
 Usage:
     elasticity.py prepare [options] POSCAR
-    elasticity.py analyze [options] STRSFILE
+    elasticity.py analyze [options] POSCAR STRSFILE
 
 Options:
   -h, --help  Shows this message and exit.
@@ -24,8 +24,10 @@ import os
 import numpy as np
 from docopt import docopt
 from scipy.optimize import curve_fit
+import spglib
 
 from ase.io import read
+from nappy.napsys import NAPSystem
 
 __author__  = 'Ryo KOBAYASHI'
 __version__ = '170308'
@@ -212,8 +214,11 @@ def params2ctnsr(params):
     return ctnsr
 
 
-def analyze(strsfname,dlt1max=0.01,dlt2max=0.06):
+def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
 
+    #...original system
+    atoms0 = read(infname,format='vasp')
+    
     #...get deformations
     fmats = get_deformations(dlt1max,dlt2max)
     strns = []
@@ -263,7 +268,98 @@ def analyze(strsfname,dlt1max=0.01,dlt2max=0.06):
             print(' {0:10.3f}'.format(ctnsr[i,j]),end='')
         print('')
 
+    reduce_cij(atoms0,ctnsr)
+    print('C_ij [GPa]:')
+    for i in range(6):
+        for j in range(6):
+            print(' {0:10.3f}'.format(ctnsr[i,j]),end='')
+        print('')
+    return ctnsr
 
+def reduce_cij(atoms0,cij,eps=1.e-4):
+    """
+    Reduce number of independent Cij according to the crystal system of original cell.
+    It is not Cij=Cji.
+    """
+
+    symdata = spglib.get_symmetry_dataset(atoms0)
+    napsys = NAPSystem(ase_atoms=atoms0)
+    sgnum = symdata['number']
+    print('Spacegroup number = ',sgnum,' ==> ',end='')
+    
+    a,b,c = napsys.get_lattice_lengths()
+    alpha,beta,gamma = napsys.get_lattice_angles()
+
+    aeqb = abs(a-b) < eps*min(a,b)
+    beqc = abs(b-c) < eps*min(b,c)
+    ceqa = abs(c-a) < eps*min(c,a)
+    neqlen = count_true(aeqb,beqc,ceqa)
+    
+    aleqpi2 = abs(alpha-np.pi/2) < eps*np.pi/2
+    bteqpi2 = abs(beta -np.pi/2) < eps*np.pi/2
+    gmeqpi2 = abs(gamma-np.pi/2) < eps*np.pi/2
+    neqang = count_true(aleqpi2,bteqpi2,gmeqpi2)
+
+    if 0 < sgnum <= 2:  # Triclinic
+        print('Triclinic')
+        pass
+    elif sgnum <= 15:  # Monoclinic
+        print('Monoclinic')
+        pass
+    elif sgnum <= 74:  # Orthorhombic
+        print('Orthorhombic')
+        pass
+    elif sgnum <= 142:  # Tetragonal
+        print('Tetragonal')
+        pass
+    elif sgnum <= 194:  # Hexagonal
+        print('Hexagonal')
+        print('Number of independent C_ij elements are reduced to 6.')
+        print('C_66 should be 1/2(C_11-C_12) but this is not enforced now.')
+        if not aleqpi2:
+            c22 = (cij[1,1] +cij[2,2])/2
+            c13 = (cij[0,1] +cij[0,2])/2
+            c55 = (cij[4,4] +cij[5,5])/2
+            cij[1,1] = cij[2,2] = c22
+            cij[0,1] = cij[0,2] = c13
+            cij[4,4] = cij[5,5] = c55
+        elif not bteqpi2:
+            c11 = (cij[0,0] +cij[2,2])/2
+            c12 = (cij[0,1] +cij[1,2])/2
+            c44 = (cij[3,3] +cij[5,5])/2
+            cij[0,0] = cij[2,2] = c11
+            cij[0,1] = cij[1,2] = c12
+            cij[3,3] = cij[5,5] = c44
+        elif not gmeqpi2:
+            c11 = (cij[0,0] +cij[1,1])/2
+            c12 = (cij[0,2] +cij[1,2])/2
+            c44 = (cij[3,3] +cij[4,4])/2
+            cij[0,0] = cij[1,1] = c11
+            cij[0,2] = cij[1,2] = c12
+            cij[3,3] = cij[4,4] = c44
+        
+    elif sgnum <= 230:  # Cubic
+        print('Cubic')
+        print('Number of independent C_ij elements are reduced to 3.')
+        c11 = (cij[0,0] +cij[1,1] +cij[2,2])/3
+        c12 = (cij[0,1] +cij[0,2] +cij[1,2])/3
+        c44 = (cij[3,3] +cij[4,4] +cij[5,5])/3
+        cij[0,0] = cij[1,1] = cij[2,2] = c11
+        cij[0,1] = cij[0,2] = cij[1,2] = c12
+        cij[3,3] = cij[4,4] = cij[5,5] = c44
+    else:
+        raise ValueError('Invalid space group number, ',sgnum)
+    # Just symmetrize Cij
+    for i in range(6):
+        for j in range(i,6):
+            cij[j,i] = cij[i,j]
+
+def count_true(l1,l2,l3):
+    n = 0
+    if l1: n += 1
+    if l2: n += 1
+    if l3: n += 1
+    return n
 
 if __name__ == '__main__':
 
@@ -272,9 +368,10 @@ if __name__ == '__main__':
     dlt1max = float(args['--delta1'])
     dlt2max = float(args['--delta2'])
 
+    infname = args['POSCAR']
+    
     if args['prepare']:
-        infname = args['POSCAR']
         prepare(infname,dlt1max=dlt1max,dlt2max=dlt2max)
     elif args['analyze']:
         strsfname = args['STRSFILE']
-        analyze(strsfname,dlt1max=dlt1max,dlt2max=dlt2max)
+        analyze(infname,strsfname,dlt1max=dlt1max,dlt2max=dlt2max)

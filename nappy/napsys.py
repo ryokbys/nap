@@ -49,7 +49,7 @@ class NAPSystem(object):
     Contains cell information and atoms, and provides some functionalities.
     """
 
-    def __init__(self, fname=None, ffmt=None, specorder=[]):
+    def __init__(self, fname=None, ffmt=None, specorder=[], ase_atoms=None):
         self.alc = 1.0
         self.a1 = np.zeros(3)
         self.a2 = np.zeros(3)
@@ -67,6 +67,9 @@ class NAPSystem(object):
         
         if fname is not None:
             self.read(fname=fname,fmt=ffmt)
+
+        if ase_atoms is not None:
+            self.from_ase_atoms(ase_atoms)
 
     def set_lattice(self, alc, a1, a2, a3):
         self.alc = alc
