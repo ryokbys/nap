@@ -1044,9 +1044,10 @@ You need to specify the species order correctly with --specorder option.
         try:
             from ase import Atoms
         except ImportError:
-            raise ImportError('ASE Atoms cannot be loaded.')
-            
-        cell = [self.a1, self.a2, self.a3]
+            raise ImportError('ASE Atoms was not loaded.')
+
+        cell = np.array([self.a1, self.a2, self.a3])
+        cell *= self.alc
         spos = [ a.pos for a in self.atoms ]
         symbols = [ a.symbol for a in self.atoms ]
         atoms = Atoms(symbols=symbols,
