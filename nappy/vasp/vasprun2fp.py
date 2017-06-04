@@ -15,13 +15,13 @@ Options:
              Convert a snapshot of INDEX. [default: -1]
   --sequence
              Extract all the sequence of MD or relaxation stored in vasprun.xml.
-  --remove-constraints
-             Remove constraints originally set to the system. [default: False]
+  --keep-constraints
+             Keep constraints originally set to the system. 
+             Otherwise all the constratins are removed. [default: False]
 """
 
 import os,sys
 from ase.io import read,write
-from glob import glob
 from docopt import docopt
 
 __author__ = "Ryo KOBAYASHI"
@@ -56,8 +56,8 @@ def write_pos(atoms,fname="pos"):
                     +' 0.0 0.0 0.0 0.0 0.0 0.0\n')
 
 
-def output_for_fitpot(atoms,remove_const,dirname='./'):
-    if remove_const:
+def output_for_fitpot(atoms,keep_const,dirname='./'):
+    if not keep_const:
         del atoms.constraints
     write(dirname+'POSCAR',images=atoms,format='vasp',direct=True,vasp5=True)
     try:
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     specorder= args['--specorder']
     index= int(args['--index'])
     sequence = args['--sequence']
-    remove_const = args['--remove-constraints']
+    keep_const = args['--keep-constraints']
 
     _specorder = specorder.split(',')
     print ' specorder = ',_specorder
@@ -96,7 +96,7 @@ if __name__ == "__main__":
         index = ':'
     else:
         print ' index   = ',index
-    print ' remove_const   = ',remove_const
+    print ' keep_const   = ',keep_const
 
     ndirs= len(dirs)
     print ' number of directories = ',ndirs
@@ -125,10 +125,10 @@ if __name__ == "__main__":
                 dirname = '{0:05d}/'.format(j)
                 print('  {0:s}'.format(dirname))
                 os.system('mkdir -p {0:s}'.format(dirname))
-                output_for_fitpot(a,remove_const,dirname=dirname)
+                output_for_fitpot(a,keep_const,dirname=dirname)
             pass
         else:   # snapshopt
             dirname = './'
-            output_for_fitpot(atoms,remove_const,dirname=dirname)
+            output_for_fitpot(atoms,keep_const,dirname=dirname)
     os.chdir(cwd)
 
