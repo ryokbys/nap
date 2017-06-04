@@ -97,6 +97,10 @@ class NAPSystem(object):
         self.a2[:] = hmat[:, 1]
         self.a3[:] = hmat[:, 2]
 
+    def get_hmat_inv(self):
+        hmat = self.get_hmat()
+        return np.linalg.inv(hmat)
+
     def set_specorder(self,*specorder):
         self.specorder = specorder
         for ai in self.atoms:
@@ -970,6 +974,8 @@ You need to specify the species order correctly with --specorder option.
         return n1,n2,n3
 
     def repeat(self,n1,n2,n3):
+        if n1 == n2 == n3 == 1:
+            return None
         #...unit vectors to be repeated
         self.a1= self.a1*n1
         self.a2= self.a2*n2
@@ -999,6 +1005,37 @@ You need to specify the species order correctly with --specorder option.
                         ai.set_id(aid)
                         self.atoms.append(ai)
 
+    def add_vacuum(self,va,vb,vc):
+        """
+        Add vacuum of the given height.
+        And atoms are shifted along each direction so that they are placed at the center.
+        """
+        a,b,c = self.get_lattice_lengths()
+        aratio = (a+va)/a
+        bratio = (b+vb)/b
+        cratio = (c+vc)/c
+        self.assign_pbc()
+        rpos = self.get_real_positions()
+        self.a1 *= aratio
+        self.a2 *= bratio
+        self.a3 *= cratio
+        hmati = self.get_hmat_inv()
+        spos = np.zeros((len(self.atoms),3),dtype=float)
+        mins = np.array((1.0,1.0,1.0),dtype=float)
+        maxs = np.zeros(3,dtype=float)
+        for ia in range(len(self.atoms)):
+            xi = rpos[ia]
+            spos[ia] = np.dot(hmati,xi)
+            for l in range(3):
+                mins[l] = min(mins[l],spos[ia,l])
+                maxs[l] = max(maxs[l],spos[ia,l])
+        cntrs = (maxs +mins)/2
+        shfts = -(cntrs-0.5)
+        for ia in range(len(self.atoms)):
+            spos[ia] += shfts
+            self.atoms[ia].set_pos(spos[ia,0],spos[ia,1],spos[ia,2])
+        return None
+        
     def to_ase_atoms(self):
         """
         Convert NAPSystem object to ASE atoms.
@@ -1018,7 +1055,7 @@ You need to specify the species order correctly with --specorder option.
                       pbc=True)
         return atoms
         
-    def from_ase_atoms(self,atoms):
+    def from_ase_atoms(self,atoms,specorder=None):
         """
         Convert ASE Atoms object to NAPSystem object.
         """
@@ -1028,7 +1065,8 @@ You need to specify the species order correctly with --specorder option.
         spos = atoms.get_scaled_positions()
         symbols = atoms.get_chemical_symbols()
         #...initialize and remake self.specorder
-        self.specorder = []
+        if specorder is not None:
+            self.specorder = specorder
         for s in symbols:
             if s not in self.specorder:
                 self.specorder.append(s)

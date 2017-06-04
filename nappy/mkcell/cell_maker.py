@@ -16,11 +16,9 @@ Options:
              Output file name. Format is detected automatically. [default: POSCAR]
 """
 
-import os,sys
+import sys
 import numpy as np
 from docopt import docopt
-
-#sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
 
 from nappy.napsys import NAPSystem
 from nappy.atom import Atom
@@ -88,6 +86,28 @@ def make_fcc(latconst=1.0):
     return s
 
 
+def make_honeycomb(latconst=1.0):
+    """
+    Make a cell of 2D honeycomb structure.
+    """
+    s= NAPSystem(specorder=_default_specorder)
+    #...lattice
+    a1= np.array([ 1.0, 0.0, 0.0 ])
+    a2= np.array([ 0.0, 1.5, 0.0 ])
+    a3= np.array([ 0.0, 0.0, np.sqrt(3.0) ])
+    s.set_lattice(latconst,a1,a2,a3)
+    positions=[(0.00, 0.50, 0.00),
+               (0.50, 0.50, 1./6),
+               (0.50, 0.50, 0.50),
+               (0.00, 0.50, 0.5 +1.0/6)]
+    for p in positions:
+        atom= Atom()
+        atom.set_pos(p[0],p[1],p[2])
+        atom.set_symbol(_default_specorder[0])
+        s.add_atom(atom)
+    return s
+
+
 def make_diamond(latconst=1.0):
     """
     Make a cell of diamond structure.
@@ -133,6 +153,15 @@ def make_hcp(latconst=1.0):
         s.add_atom(atom)
     return s
 
+def make_graphene(latconst=2.467,size=(1,1,1)):
+    """
+    Make graphene.
+    """
+    napsys = make_honeycomb(latconst=latconst)
+    napsys.repeat(*size)
+    napsys.add_vacuum(2.*latconst, 0.0, 10.*latconst*np.sqrt(3))
+    
+    return napsys
 
 #=======================================================================
 if __name__ == "__main__":
