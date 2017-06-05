@@ -21,7 +21,7 @@ def read_pmd(fname='pmdini',specorder=[],fmvs=[(True,True,True),]):
         e.g., fmv = ((True,True,True),(True,True,False),)
         True means fix and False means free.
     """
-    
+
     f = open(fname,'r')
     # 1st line: lattice_constant
     lattice_constant = float(f.readline().split()[0])
@@ -51,8 +51,11 @@ def read_pmd(fname='pmdini',specorder=[],fmvs=[(True,True,True),]):
         ifmvs[ia] = ifmv
         maxifmv = max(maxifmv,ifmv)
     f.close()
-    if maxifmv > len(fmvs)+1:
-        raise ValueError('Length of fmvs are too short.')
+    if maxifmv > len(fmvs):
+        #raise ValueError('Length of fmvs are too short.')
+        # temporary treatment for fmvs
+        for i in range(maxifmv-len(fmvs)):
+            fmvs.append([True,True,True])
 
     atoms = Atoms(symbols=symbols,cell=basis_vectors,pbc=True)
     atoms.set_scaled_positions(positions)

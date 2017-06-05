@@ -27,7 +27,8 @@ class PMD(FileIOCalculator):
     implemented_properties = ['energy', 'forces',
                               'relaxed_scaled_positions',
                               'stress',
-                              'num_step_relax']
+                              'num_step_relax',
+                              'relaxed_cell']
     command = 'pmd'
 
     default_parameters = {
@@ -39,7 +40,7 @@ class PMD(FileIOCalculator):
         'num_iteration': 0,
         'min_iteration': 0,
         'num_out_energy': 10,
-        'flag_out_pmd': 1,
+        'flag_out_pmd': 2,
         'num_out_pmd': 1,
         'flag_sort': 1,
         'force_type': None,
@@ -51,16 +52,18 @@ class PMD(FileIOCalculator):
         'converge_num': 3,
         'initial_temperature': -10.0,
         'final_temperature': -10.0,
-        'temperature_control': 'None',
+        'temperature_control': 'none',
         'temperature_target': [300.0, 100.0,],
         'temperature_relax_time': 100.0,
         'flag_temp_dist': 'F',
         'factor_direction':[[1.0, 1.0, 1.0],
                             [1.0, 0.0, 1.0]],
-        'stress_control': 'None',
+        'stress_control': 'none',
         'pressure_target': 0.0,
+        'stress_target': [[0.0, 0.0, 0.0],
+                          [0.0, 0.0, 0.0],
+                          [0.0, 0.0, 0.0]],
         'stress_relax_time': 20.0,
-        'shear_stress': 0.0,
         'flag_compute_stress': 'T',
         'mass': [28.0855,4.0,]
     }
@@ -132,7 +135,9 @@ class PMD(FileIOCalculator):
               flag_damping=2,
               converge_eps=1.0e-3,nsteps=100,min_iteration=5,
               converge_num=3,time_interval=2.0,
-              initial_temperature=10.0):
+              initial_temperature=10.0, stress_control='none',
+              pressure_target=0.0,
+              stress_target=[[0.,0.,0.],[0.,0.,0.],[0.,0.,0.]]):
         """
         Relax atom positions by running damped MD in pmd instead of using
         optimize module in ASE.
@@ -145,6 +150,8 @@ class PMD(FileIOCalculator):
                  converge_num=converge_num,
                  time_interval=time_interval,
                  initial_temperature=initial_temperature,
+                 stress_control=stress_control,
+                 stress_target=stress_target,
                  flag_sort=1)
         Calculator.calculate(self, atoms, properties, system_changes)
         # print 'type(atoms),type(self.atoms)= ',type(atoms),type(self.atoms)
@@ -181,7 +188,6 @@ class PMD(FileIOCalculator):
         """
         Only erg.pmd and frc.pmd are to be read.
         """
-        import glob
         outfname= 'out.'+self.label
         ergfname= 'erg.'+self.label
         frcfname= 'frc.'+self.label
@@ -195,7 +201,7 @@ class PMD(FileIOCalculator):
         if not os.path.exists(strfname):
             print 'Warning: '+strfname+' does not exists.'
 
-        self.results={}
+        self.results={ k : None for k in self.implemented_properties}
 
         fout= open(outfname,'r')
         lines= fout.readlines()
@@ -230,20 +236,26 @@ class PMD(FileIOCalculator):
             self.results['forces'] = frcs
 
         if os.path.exists(strfname):
-            with open(strfname,'r') as f:
-                strs = np.array([ float(x) for x in f.readline().split() ])
-            self.results['stress'] = strs
+            try:
+                with open(strfname,'r') as f:
+                    strs = np.array([ float(x) for x in f.readline().split() ])
+                self.results['stress'] = strs
+            except:
+                self.results['srress'] = None
         
         if relax:
-            posfile = max(glob.glob('pmd[0-9]*'), key=os.path.getctime)
+            posfile = 'pmdfin'
             tmpatoms = read_pmd(fname=posfile,specorder=self.specorder)
             self.results['relaxed_scaled_positions'] \
                 = tmpatoms.get_scaled_positions()
+            self.results['relaxed_cell'] = tmpatoms.get_cell()
         # print 'pmdrun:read_results, results=',self.results.keys()
 
     def get_relaxed_scaled_positions(self):
         return self.results['relaxed_scaled_positions']
-        
+
+    def get_relaxed_cell(self):
+        return self.results['relaxed_cell']
 
 def get_input_txt(params,fmvs):
     txt = ''
@@ -258,9 +270,8 @@ def get_input_txt(params,fmvs):
            'temperature_control','temperature_target',
            'temperature_relax_time','flag_temp_dist','',
            'factor_direction','',
-           'stress_control','pressure_target',
-           'stress_relax_time',
-           'shear_stress','flag_compute_stress','',
+           'stress_control','pressure_target','stress_target',
+           'stress_relax_time','flag_compute_stress','',
            'mass','',]
 
     int_keys=['num_nodes_x','num_nodes_y','num_nodes_z',
@@ -291,6 +302,12 @@ def get_input_txt(params,fmvs):
             vals= fmvs
             txt += '{0:25s} 3 {1:d}\n'.format(key,len(vals))
             for i,v in enumerate(vals):
+                txt += '  {0:6.2f} {1:6.2f} {2:6.2f}\n'.format(v[0],v[1],v[2])
+        elif key is 'stress_target':
+            vals = params[key]
+            txt += '{0:25s}\n'.format(key)
+            for i in range(3):
+                v = vals[i]
                 txt += '  {0:6.2f} {1:6.2f} {2:6.2f}\n'.format(v[0],v[1],v[2])
         elif key is 'mass':
             vals = params[key]
