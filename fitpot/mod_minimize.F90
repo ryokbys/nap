@@ -373,7 +373,7 @@ contains
     real(8),save,allocatable:: gg(:,:),x(:),s(:),y(:),gp(:) &
          ,ggy(:),gpena(:)
     real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,vnorm,pval &
-         ,sgnx,absx,estmem,ftst
+         ,sgnx,absx,estmem,ftst,unorm
     integer:: i,j,iter,nftol,ig,mem
 
     if( .not.allocated(gg) ) then
@@ -483,6 +483,8 @@ contains
       do i=1,ndim
         u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
       enddo
+      unorm = sqrt(sprod(ndim,u,u))
+      u(1:ndim) = u(1:ndim) /unorm
 !!$      print *,' u =',u(1:10)
 !!$      print *,' g =',g(1:10)
 !!$      print *,' gg=',gg(1:5,1:5)
@@ -515,7 +517,7 @@ contains
         if( ltwice ) then
           x0(1:ndim)= x(1:ndim)
           if(myid.eq.0) then
-            print *,'>>> armijo_search failed twice continuously...'
+            print *,'>>> line_search failed twice continuously...'
           endif
           return
         else
@@ -816,7 +818,7 @@ contains
         if( ltwice ) then
           x0(1:ndim)= x(1:ndim)
           if(myid.eq.0) then
-            print *,'   armijo_search failed twice continuously...'
+            print *,'   line_search failed twice continuously...'
           endif
           return
         else
@@ -1315,8 +1317,8 @@ contains
     end interface
 
 !!$  real(8),external:: sprod
-  real(8),parameter:: xi     = 0.5d0
-  real(8),parameter:: tau    = 0.25d0
+  real(8),parameter:: xi     = 1.d0
+  real(8),parameter:: tau    = 0.5d0
   integer,parameter:: MAXITER= 15
   real(8),parameter:: xtiny  = 1d-14
   integer:: iter,i,ig
@@ -1400,6 +1402,10 @@ contains
       do i=1,ndim
         pval= pval +pwgt*x1(i)*x1(i)
       enddo
+    endif
+    if(myid.eq.0) then
+      write(6,'(a,4es12.4)') 'fi,pval,fi+pval-(f0+pval0),xigd*alphai',&
+           fi,pval,fi+pval-(f0+pval0),xigd*alphai
     endif
     if( fi+pval-(f0+pval0).le.xigd*alphai ) then
       f= fi
