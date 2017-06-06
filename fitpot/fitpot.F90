@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-05-17 18:40:03 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-06 13:52:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -190,11 +190,13 @@ subroutine get_dir_list(ionum)
   integer,intent(in):: ionum
   integer:: is,ndat
   integer,external:: ndat_in_line
+  logical:: lerror = .false.
 
   if( .not. allocated(cdirlist)) allocate(cdirlist(nsmpl))
   if( .not. allocated(iclist)) allocate(iclist(nsmpl))
 
   if( myid.eq.0 ) then
+    lerror = .true.
     if( len(trim(csmplist)).lt.1 ) then
       print *,'sample list was created by command line...'
       call system('ls '//trim(cmaindir) &
@@ -207,14 +209,16 @@ subroutine get_dir_list(ionum)
     ndat = ndat_in_line(ionum,' ')
     if( ndat.eq.1 ) then
       do is=1,nsmpl
-        read(ionum,*,end=999) cdirlist(is)
+        read(ionum,*,end=998) cdirlist(is)
       enddo
+      lerror = .false.
       call shuffle_dirlist(nsmpl,cdirlist)
     else if(ndat.eq.2 ) then
       print *,'training and test are determined by input, ',trim(csmplist)
       do is=1,nsmpl
-        read(ionum,*,end=999) cdirlist(is),iclist(is)
+        read(ionum,*,end=998) cdirlist(is),iclist(is)
       enddo
+      lerror = .false.
       call shuffle_dirlist(nsmpl,cdirlist,iclist)
     else
       print *,'[Error] ndat should be 1 or 2, ndat = ',ndat
@@ -222,8 +226,11 @@ subroutine get_dir_list(ionum)
       stop
     endif
     close(ionum)
-  endif
+  endif  ! myid.eq.0
+998 continue
+  call mpi_bcast(lerror,mpi_logical,0,mpi_world,ierr)
   call mpi_barrier(mpi_world,ierr)
+  if( lerror ) goto 999
   call mpi_bcast(cdirlist,128*nsmpl,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(ndat,1,mpi_integer,0,mpi_world,ierr)
   if( ndat.eq.2 ) then
@@ -1496,3 +1503,7 @@ subroutine get_uniq_iarr(n,m,iarr)
   enddo
   return
 end subroutine get_uniq_iarr
+!-----------------------------------------------------------------------
+! Local Variables:
+! compile-command: "make fitpot"
+! End:
