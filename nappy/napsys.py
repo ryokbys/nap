@@ -332,7 +332,7 @@ class NAPSystem(object):
             except NameError:
                 spcs = self.specorder
             #...Check number of species in POSCAR file and in specorder
-            if len(num_species) > len(specorder):
+            if len(num_species) > len(self.specorder):
                 msg = '''
 Numbers of species in POSCAR is greater than the one in specorder, which should be the same or less.
 Number of species in POSCAR = {0:d}
