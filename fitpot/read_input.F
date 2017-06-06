@@ -145,6 +145,15 @@ c=======================================================================
       elseif( trim(cname).eq.'eps_force' ) then
         call read_r1(ionum,epsf)
         return
+      elseif( trim(cname).eq.'armijo_xi' ) then
+        call read_r1(ionum,armijo_xi)
+        return
+      elseif( trim(cname).eq.'armijo_tau' ) then
+        call read_r1(ionum,armijo_tau)
+        return
+      elseif( trim(cname).eq.'armijo_maxiter' ) then
+        call read_i1(ionum,armijo_maxiter)
+        return
       elseif( trim(cname).eq.'sa_temperature' ) then
         call read_r1(ionum,sa_temp0)
         return

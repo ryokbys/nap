@@ -12,6 +12,11 @@ module minimize
   integer,allocatable:: mskgfs(:),msktmp(:)
   integer:: nitergfs=100
 
+!.....Armijo parameters
+  real(8):: armijo_xi      = 0.1d0
+  real(8):: armijo_tau     = 0.5d0
+  integer:: armijo_maxiter = 15
+
 !.....Simulated annealing parameters
   real(8):: sa_temp0 = 1d0
   real(8):: sa_xw0   = 1d0
@@ -1317,121 +1322,127 @@ contains
     end interface
 
 !!$  real(8),external:: sprod
-  real(8),parameter:: xi     = 1.d0
-  real(8),parameter:: tau    = 0.5d0
-  integer,parameter:: MAXITER= 15
-  real(8),parameter:: xtiny  = 1d-14
-  integer:: iter,i,ig
-  real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx,fp,pvalp,alphap,ftsti
-  real(8),allocatable,dimension(:):: x1(:),gpena(:)
+    real(8),parameter:: xtiny  = 1d-14
+    integer:: iter,i,ig
+    real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx,fp,pvalp,alphap,ftsti
+    real(8),allocatable,dimension(:):: x1(:),gpena(:)
+    logical,save:: l1st = .true.
 
-  if( .not. allocated(x1)) allocate(x1(ndim),gpena(ndim))
-  xigd= sprod(ndim,g,d)*xi
-  if( xigd.gt.0d0 ) then
-    iflag= iflag + 100
-    if( myid.eq.0 ) print *,' WARNING: g*d > 0.0'
-    return
-  endif
-  alphai= alpha
-  pval0= 0d0
-  gpena(1:ndim)= 0d0
-  if( trim(cpena).eq.'lasso' ) then
-    do i=1,ndim
-      absx= abs(x0(i))
-      sgnx= sign(1d0,x0(i))
-      if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
-      pval0= pval0 +pwgt*absx
-    enddo
-  else if( trim(cpena).eq.'glasso' ) then
-    glval(0:ngl)= 0d0
-    do i=1,ndim
-      ig= iglid(i)
-      if( ig.gt.0 ) glval(ig)= glval(ig) +x0(i)*x0(i)
-    enddo
-    glval(0)= 1d0
-    do ig=1,ngl
-      glval(ig)= sqrt(glval(ig))
-      pval0= pval0 +pwgt*glval(ig)
-    enddo
-    do i=1,ndim
-      ig= iglid(i)
-      if( ig.eq.0 ) then ! i is not in a group
+    if( l1st ) then
+      if( myid.eq.0 ) then
+        write(6,'(a)') ' Armijo rule parameters:'
+        write(6,'(a,f8.4)') '   c       = ',armijo_xi
+        write(6,'(a,f8.4)') '   tau     = ',armijo_tau
+        write(6,'(a,i5)')   '   maxiter = ',armijo_maxiter
+      endif
+      l1st = .false.
+    endif
+
+    if( .not. allocated(x1)) allocate(x1(ndim),gpena(ndim))
+    xigd= sprod(ndim,g,d)*armijo_xi
+    if( xigd.gt.0d0 ) then
+      iflag= iflag + 100
+      if( myid.eq.0 ) print *,' WARNING: g*d > 0.0'
+      return
+    endif
+    alphai= alpha
+    pval0= 0d0
+    gpena(1:ndim)= 0d0
+    if( trim(cpena).eq.'lasso' ) then
+      do i=1,ndim
         absx= abs(x0(i))
         sgnx= sign(1d0,x0(i))
         if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
         pval0= pval0 +pwgt*absx
-      else if( ig.gt.0 ) then ! i is in a group
-        if( glval(ig).gt.xtiny) gpena(i)= pwgt*x0(i)/glval(ig)
-      endif
-    enddo
-  else if( trim(cpena).eq.'ridge' ) then
-    do i=1,ndim
-      pval0= pval0 +pwgt*x0(i)*x0(i)
-      gpena(i)= 2d0*pwgt*x0(i)
-    enddo
-  endif
-
-  f0= f
-  do iter=1,MAXITER
-    x1(1:ndim)= x0(1:ndim)
-    if( trim(cpena).eq.'lasso' .or.trim(cpena).eq.'glasso') then
-      call soft_threshold(ndim,x1,d,alphai)
-    else
-      x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
-    endif
-    call func(ndim,x1,fi,ftsti)
-!!$    print *,'iter,alphai,fi=',iter,alphai,fi
-    pval= 0d0
-    if( trim(cpena).eq.'lasso' ) then
-      do i=1,ndim
-        pval= pval +pwgt*abs(x1(i))
       enddo
     else if( trim(cpena).eq.'glasso' ) then
-      pval= 0d0
       glval(0:ngl)= 0d0
       do i=1,ndim
         ig= iglid(i)
-        if( ig.gt.0 ) glval(ig)= glval(ig) +x1(i)*x1(i)
-        if( ig.eq.0 ) pval= pval +pwgt*abs(x1(i))
+        if( ig.gt.0 ) glval(ig)= glval(ig) +x0(i)*x0(i)
       enddo
+      glval(0)= 1d0
       do ig=1,ngl
         glval(ig)= sqrt(glval(ig))
-        pval= pval +pwgt*glval(ig)
+        pval0= pval0 +pwgt*glval(ig)
+      enddo
+      do i=1,ndim
+        ig= iglid(i)
+        if( ig.eq.0 ) then ! i is not in a group
+          absx= abs(x0(i))
+          sgnx= sign(1d0,x0(i))
+          if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
+          pval0= pval0 +pwgt*absx
+        else if( ig.gt.0 ) then ! i is in a group
+          if( glval(ig).gt.xtiny) gpena(i)= pwgt*x0(i)/glval(ig)
+        endif
       enddo
     else if( trim(cpena).eq.'ridge' ) then
       do i=1,ndim
-        pval= pval +pwgt*x1(i)*x1(i)
+        pval0= pval0 +pwgt*x0(i)*x0(i)
+        gpena(i)= 2d0*pwgt*x0(i)
       enddo
     endif
-    if(myid.eq.0) then
-      write(6,'(a,4es12.4)') 'fi,pval,fi+pval-(f0+pval0),xigd*alphai',&
-           fi,pval,fi+pval-(f0+pval0),xigd*alphai
-    endif
-    if( fi+pval-(f0+pval0).le.xigd*alphai ) then
-      f= fi
-      alpha= alphai
-      ftst= ftsti
-!!$      if(myid.eq.0) print *,'armijo finishes with iter=',iter
-      return
-    endif
-    fp= fi
-    pvalp= pval
-    alphap= alphai
-    alphai= alphai*tau
-  enddo
 
-  if(myid.eq.0) print *,'[Error] iter.gt.MAXITER in armijo_search.'
-  iflag= iflag +100
-  alpha=alphai
-  if( myid.eq.0 ) then
-    write(6,'(a,es15.7)') '  alpha   = ',alpha
-    write(6,'(a,es15.7)') '  xigd    = ',xigd
-    write(6,'(a,es15.7)') '  norm(g) = ',sqrt(sprod(ndim,g,g))
-    write(6,'(a,es15.7)') '  norm(d) = ',sqrt(sprod(ndim,d,d))
-    write(6,'(a,es15.7)') '  pval    = ',pval
-  endif
-  return
-    
+    f0= f
+    do iter=1,armijo_maxiter
+      x1(1:ndim)= x0(1:ndim)
+      if( trim(cpena).eq.'lasso' .or.trim(cpena).eq.'glasso') then
+        call soft_threshold(ndim,x1,d,alphai)
+      else
+        x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
+      endif
+      call func(ndim,x1,fi,ftsti)
+!!$      if( myid.eq.0 ) print *,'iter,alphai,fi=',iter,alphai,fi
+      pval= 0d0
+      if( trim(cpena).eq.'lasso' ) then
+        do i=1,ndim
+          pval= pval +pwgt*abs(x1(i))
+        enddo
+      else if( trim(cpena).eq.'glasso' ) then
+        pval= 0d0
+        glval(0:ngl)= 0d0
+        do i=1,ndim
+          ig= iglid(i)
+          if( ig.gt.0 ) glval(ig)= glval(ig) +x1(i)*x1(i)
+          if( ig.eq.0 ) pval= pval +pwgt*abs(x1(i))
+        enddo
+        do ig=1,ngl
+          glval(ig)= sqrt(glval(ig))
+          pval= pval +pwgt*glval(ig)
+        enddo
+      else if( trim(cpena).eq.'ridge' ) then
+        do i=1,ndim
+          pval= pval +pwgt*x1(i)*x1(i)
+        enddo
+      endif
+!!$      if( myid.eq.0 ) print *,'fi,pval,fi+pval-(f0+pval0),xigd*alphai' ,&
+!!$           fi,pval,fi+pval-(f0+pval0),xigd*alphai
+      if( fi+pval-(f0+pval0).le.xigd*alphai ) then
+        f= fi
+        alpha= alphai
+        ftst= ftsti
+!!$        if(myid.eq.0) print *,'armijo finishes with iter=',iter
+        return
+      endif
+      fp= fi
+      pvalp= pval
+      alphap= alphai
+      alphai= alphai*armijo_tau
+    enddo
+
+    if(myid.eq.0) print *,'[Error] iter.gt.MAXITER in armijo_search.'
+    iflag= iflag +100
+    alpha=alphai
+    if( myid.eq.0 ) then
+      write(6,'(a,es15.7)') '  alpha   = ',alpha
+      write(6,'(a,es15.7)') '  xigd    = ',xigd
+      write(6,'(a,es15.7)') '  norm(g) = ',sqrt(sprod(ndim,g,g))
+      write(6,'(a,es15.7)') '  norm(d) = ',sqrt(sprod(ndim,d,d))
+      write(6,'(a,es15.7)') '  pval    = ',pval
+    endif
+    return
+
   end subroutine armijo_search
 !=======================================================================
   function sprod(n,a,b)

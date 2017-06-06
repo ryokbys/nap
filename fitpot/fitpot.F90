@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-06 13:52:01 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-06 17:38:45 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -228,7 +228,7 @@ subroutine get_dir_list(ionum)
     close(ionum)
   endif  ! myid.eq.0
 998 continue
-  call mpi_bcast(lerror,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(lerror,1,mpi_logical,0,mpi_world,ierr)
   call mpi_barrier(mpi_world,ierr)
   if( lerror ) goto 999
   call mpi_bcast(cdirlist,128*nsmpl,mpi_character,0,mpi_world,ierr)
