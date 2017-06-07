@@ -207,6 +207,9 @@ The following code shows an example of the input file ``in.fitpot``.
    
    force_match      true
    potential        NN
+
+   ftol             1.0e-5
+   xtol             1.0e-4
    
    penalty          none
    penalty_weight   1d-3
@@ -231,6 +234,8 @@ Here are input parameters that users can change in *fitpot* program.
 * :ref:`fitting_method`
 * :ref:`main_directory`
 * :ref:`param_file`
+* :ref:`ftol`
+* :ref:`xtol`
 * :ref:`force_match`
 * :ref:`potential`
 * :ref:`regularize`
@@ -355,6 +360,23 @@ Default: *in.params.NN*
 
 The name of the file that has parameter values in it. This is passed to ``pmd`` program.
 
+
+.. _ftol:
+
+ftol
+-------
+Default: *1.0e-5*
+
+The tolerance of difference of the loss function value.
+
+.. _xtol:
+
+xtol
+------
+Default: *1.0e-4*
+
+The tolerance of the change of variables which are optimized.
+If either one of `ftol` or `xtol` is achieved, the optimization stops.
 
 
 .. _force_match:

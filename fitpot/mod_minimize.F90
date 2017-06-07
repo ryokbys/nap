@@ -1,5 +1,10 @@
 module minimize
   save
+!.....number of convergence criteria achieved
+  integer:: mnftol = 1
+  integer:: mngtol = 1
+  integer:: mnxtol = 1
+  
 !.....penalty: lasso or ridge
   character(len=128):: cpena= 'none'
   character(len=128):: clinmin= 'armijo'
@@ -188,19 +193,20 @@ contains
     real(8),parameter:: t_DL   = 0.2d0
     logical:: ltwice = .false.
 
-    integer:: i,iter,nftol
-    real(8):: alpha,fp,gnorm,gnormp,beta,pval,sgnorm,ftst
-    real(8),save,allocatable:: gpena(:),gp(:),y(:),xp(:),s(:)
+    integer:: i,iter,nftol,nxtol
+    real(8):: alpha,fp,gnorm,gnormp,beta,pval,sgnorm,ftst,dxnorm
+    real(8),save,allocatable:: gpena(:),gp(:),y(:),xp(:),s(:),dx(:)
 
     if( myid.eq.0 ) then
       print *,'entering CG routine...'
     endif
 
     if( .not.allocated(gpena) ) allocate(gpena(ndim),gp(ndim)&
-         ,y(ndim),xp(ndim),s(ndim))
+         ,y(ndim),xp(ndim),s(ndim),dx(ndim))
 
     iter= 0
     nftol= 0
+    nxtol= 0
     gpena(1:ndim)= 0d0
     call func(ndim,x,f,ftst)
     call grad(ndim,x,g)
@@ -283,13 +289,14 @@ contains
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       endif
 
+      dx(1:ndim)= x(1:ndim) -xp(1:ndim)
       gnormp= gnorm
       gp(1:ndim)= g(1:ndim)
       call grad(ndim,x,g)
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
-!.....store previous gnorm
       gnorm= sprod(ndim,g,g)
       sgnorm= sqrt(gnorm)
+      dxnorm= sqrt(sprod(ndim,dx,dx))
       if( icgbtype.eq.2 ) then
 !.....Polak-Ribiere-Polyak (PRP)
         y(1:ndim)= g(1:ndim) -gp(1:ndim)
@@ -323,20 +330,20 @@ contains
         endif
       endif
 !.....check convergence 
-      if( sgnorm.lt.gtol ) then
+      if( dxnorm.lt.xtol ) then
         if( myid.eq.0 ) then
-          print *,'>>> CG converged wrt gtol'
-          write(6,'(a,2es15.7)') '   gnorm,gtol=',sgnorm,gtol
+          print *,'>>> CG converged wrt xtol'
+          write(6,'(a,2es15.7)') '   dxnorm,xtol=',dxnorm,xtol
         endif
         iflag= iflag +2
         return
-      else if( abs(f-fp)/abs(fp).lt.ftol ) then
+      else if( abs(f-fp).lt.ftol ) then
         nftol= nftol +1
-        if( nftol.gt.10 ) then
+        if( nftol.gt.mnftol ) then
           if( myid.eq.0 ) then
             print *,'>>> CG converged wrt ftol'
             write(6,'(a,2es15.7)') '   f-fp,ftol=' &
-                 ,abs(f-fp)/abs(fp),ftol
+                 ,abs(f-fp),ftol
           endif
           iflag= iflag +3
           return
@@ -376,10 +383,10 @@ contains
     real(8),parameter:: xtiny  = 1d-14
     logical:: ltwice = .false.
     real(8),save,allocatable:: gg(:,:),x(:),s(:),y(:),gp(:) &
-         ,ggy(:),gpena(:)
+         ,ggy(:),gpena(:),dx(:)
     real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,vnorm,pval &
-         ,sgnx,absx,estmem,ftst,unorm
-    integer:: i,j,iter,nftol,ig,mem
+         ,sgnx,absx,estmem,ftst,unorm,dxnorm
+    integer:: i,j,iter,nftol,ngtol,nxtol,ig,mem
 
     if( .not.allocated(gg) ) then
       if(myid.eq.0) then
@@ -396,12 +403,14 @@ contains
                ,int(estmem/1000/1000),' MB'
         endif
       endif
-      allocate(gg(ndim,ndim),x(ndim) &
+      allocate(gg(ndim,ndim),x(ndim),dx(ndim) &
          ,s(ndim),y(ndim),gp(ndim),ggy(ndim),gpena(ndim))
     endif
 
 
     nftol= 0
+    ngtol= 0
+    nxtol= 0
 !.....initial G = I
     gg(1:ndim,1:ndim)= 0d0
     do i=1,ndim
@@ -586,26 +595,28 @@ contains
       else
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       endif
+      dx(1:ndim)= x(1:ndim) -x0(1:ndim)
       x0(1:ndim)= x(1:ndim)
       call grad(ndim,x,g)
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
       vnorm= sqrt(sprod(ndim,x,x))
+      dxnorm= sqrt(sprod(ndim,dx,dx))
 !!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
           if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
                .or.trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,6es15.7)') &
-                 ' iter,ftrn,ftst,p,vnorm,gnorm,f-fp=',&
+            write(6,'(a,i8,7es15.7)') &
+                 ' iter,ftrn,ftst,p,vnorm,gnorm,dxnorm,f-fp=',&
                  iter,f,ftst &
-                 ,pval,vnorm,gnorm,f-fp
+                 ,pval,vnorm,gnorm,dxnorm,f-fp
           else
-            write(6,'(a,i8,5es15.7)') &
-                 ' iter,ftrn,ftst,vnorm,gnorm,f-fp=' &
+            write(6,'(a,i8,6es15.7)') &
+                 ' iter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
                  ,iter,f,ftst &
-                 ,vnorm,gnorm,f-fp
+                 ,vnorm,gnorm,dxnorm,f-fp
           endif
           call flush(6)
         else if( iprint.ge.2 ) then
@@ -623,22 +634,37 @@ contains
         endif
       endif
 !.....check convergence 
-      if( gnorm.lt.gtol ) then
-        if( myid.eq.0 ) then
-          print *,'>>> QN converged wrt gtol'
-          write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
-        endif
-        x0(1:ndim)= x(1:ndim)
-        iflag= iflag +2
-        return
-      else if( abs(f-fp)/abs(fp).lt.ftol) then
-        nftol= nftol +1
-        if( nftol.gt.10 ) then
+      if( dxnorm.lt.xtol ) then
+        nxtol = nxtol +1
+        if( nxtol.ge.mnxtol ) then
           if( myid.eq.0 ) then
-            print *,'>>> QN may be converged because of ftol ' // &
-                 'over 10 times.'
-!!$            write(6,'(a,2es15.7)') '   f-fp/fp,ftol=' &
-!!$                 ,abs(f-fp)/abs(fp),ftol
+            print *,'>>> QN converged because of xtol over ' &
+                 ,mnxtol,' times.'
+            write(6,'(a,2es15.7)') '   dxnorm,xtol=',dxnorm,xtol
+          endif
+          x0(1:ndim)= x(1:ndim)
+          iflag= iflag +1
+          return
+        endif
+      else if( gnorm.lt.gtol ) then
+        ngtol = ngtol +1
+        if( ngtol.ge.mngtol ) then
+          if( myid.eq.0 ) then
+            print *,'>>> QN converged because of gtol over ' &
+                 ,mngtol,' times.'
+            write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+          endif
+          x0(1:ndim)= x(1:ndim)
+          iflag= iflag +2
+          return
+        endif
+      else if( abs(f-fp).lt.ftol) then
+        nftol= nftol +1
+        if( nftol.ge.mnftol ) then
+          if( myid.eq.0 ) then
+            print *,'>>> QN converged because of ftol over ' &
+                 ,mnftol,' times.'
+            write(6,'(a,2es15.7)') '   abs(f-fp),ftol=',abs(f-fp), ftol
           endif
           x0(1:ndim)= x(1:ndim)
           iflag= iflag +3
@@ -1303,13 +1329,13 @@ contains
 
   end subroutine golden_section
 !=======================================================================
-  subroutine armijo_search(ndim,x0,d,f,ftst,g,alpha,iprint &
+  subroutine armijo_search(ndim,x0,d,f,ftst,g,alpha,iprint0 &
        ,iflag,myid,func)
 !  
 !  1D search using Armijo rule.
 !    
     implicit none
-    integer,intent(in):: ndim,iprint,myid
+    integer,intent(in):: ndim,iprint0,myid
     integer,intent(inout):: iflag
     real(8),intent(in):: x0(ndim),g(ndim),d(ndim)
     real(8),intent(inout):: f,alpha,ftst
@@ -1323,7 +1349,7 @@ contains
 
 !!$  real(8),external:: sprod
     real(8),parameter:: xtiny  = 1d-14
-    integer:: iter,i,ig
+    integer:: iter,i,ig,iprint
     real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx,fp,pvalp,alphap,ftsti
     real(8),allocatable,dimension(:):: x1(:),gpena(:)
     logical,save:: l1st = .true.
@@ -1438,8 +1464,10 @@ contains
       write(6,'(a,es15.7)') '  alpha   = ',alpha
       write(6,'(a,es15.7)') '  xigd    = ',xigd
       write(6,'(a,es15.7)') '  norm(g) = ',sqrt(sprod(ndim,g,g))
-      write(6,'(a,es15.7)') '  norm(d) = ',sqrt(sprod(ndim,d,d))
-      write(6,'(a,es15.7)') '  pval    = ',pval
+      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' .or. &
+           trim(cpena).eq.'ridge' ) then
+        write(6,'(a,es15.7)') '  pval    = ',pval
+      endif
     endif
     return
 
