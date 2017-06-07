@@ -1055,37 +1055,39 @@ You need to specify the species order correctly with --specorder option.
                       scaled_positions=spos,
                       pbc=True)
         return atoms
-        
-    def from_ase_atoms(self,atoms,specorder=None):
+
+    @classmethod
+    def from_ase_atoms(cls,ase_atoms,specorder=None):
         """
         Convert ASE Atoms object to NAPSystem object.
         """
-        self.a1 = np.array(atoms.cell[0])
-        self.a2 = np.array(atoms.cell[1])
-        self.a3 = np.array(atoms.cell[2])
-        spos = atoms.get_scaled_positions()
-        symbols = atoms.get_chemical_symbols()
-        #...initialize and remake self.specorder
+        spcorder = []
         if specorder is not None:
-            self.specorder = specorder
+            spcorder = specorder
+        symbols = ase_atoms.get_chemical_symbols()
+        spos = ase_atoms.get_scaled_positions()
+        #...initialize and remake self.specorder
         for s in symbols:
-            if s not in self.specorder:
-                self.specorder.append(s)
+            if s not in spcorder:
+                spcorder.append(s)
+        nap = cls(specorder=spcorder)
+        nap.a1 = np.array(ase_atoms.cell[0])
+        nap.a2 = np.array(ase_atoms.cell[1])
+        nap.a3 = np.array(ase_atoms.cell[2])
         #...first, initialize atoms array
-        self.atoms = []
+        nap.atoms = []
         #...append each atom from ASE-Atoms
         for ia,spi in enumerate(spos):
             si = symbols[ia]
             ai = Atom()
-            sid = self.specorder.index(si)+1
+            sid = nap.specorder.index(si)+1
             ai.set_id(ia+1)
             ai.set_sid(sid)
             ai.set_symbol(si)
             ai.set_pos(spi[0],spi[1],spi[2])
             ai.set_vel(0.,0.,0.)
-            self.atoms.append(ai)
-        return
-
+            nap.atoms.append(ai)
+        return nap
 
 def parse_filename(filename):
     for fmt in _file_formats:
