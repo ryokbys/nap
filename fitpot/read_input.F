@@ -78,6 +78,9 @@ c=======================================================================
       elseif( trim(cname).eq.'ftol' ) then
         call read_r1(ionum,ftol)
         return
+      elseif( trim(cname).eq.'numtol' ) then
+        call read_i1(ionum,numtol)
+        return
       elseif( trim(cname).eq.'gtol' ) then
         call read_r1(ionum,gtol)
         return

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-06 17:38:45 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-08 17:59:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -54,6 +54,10 @@ program fitpot
   call read_ref_data()
   call get_base_energies()
   if( lswgt ) call set_sample_weights()
+
+!.....Subtract energy and forces of other force-fields
+!  call subtract_other_FF()
+  
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
 
@@ -151,6 +155,7 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,i2,es15.7)') 'atom_energy',i,eatom(i)
   enddo
   write(6,'(2x,a25,2x,l3)') 'force_match',lfmatch
+  write(6,'(a)') ''
   write(6,'(2x,a25,2x,a)') 'penalty',trim(cpena)
   write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',pwgt
   write(6,'(2x,a25,2x,a)') 'potential',trim(cpot)
@@ -164,9 +169,11 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
   write(6,'(2x,a25,2x,a)') 'line_minimization',trim(clinmin)
   write(6,'(a)') ''
-  write(6,'(2x,a25,2x,es12.3)') 'sa_temperature',sa_temp0
-  write(6,'(2x,a25,2x,es12.3)') 'sa_dxwidth',sa_xw0
-  write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
+  if( trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' ) then
+    write(6,'(2x,a25,2x,es12.3)') 'sa_temperature',sa_temp0
+    write(6,'(2x,a25,2x,es12.3)') 'sa_dxwidth',sa_xw0
+    write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
+  endif
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,i5)') 'individual_weight',nwgtindiv
   do i=1,nwgtindiv
@@ -413,7 +420,7 @@ subroutine read_ref_data()
          //'/erg.ref',status='old')
     read(13,*) samples(ismpl)%eref
     close(13)
-!.....reduce atomic energy from eref
+!.....Subtract (isolated) atomic energy from eref
     samples(ismpl)%naps(1:mspcs) = 0
     do i=1,samples(ismpl)%natm
       is= samples(ismpl)%tag(i)
@@ -531,7 +538,8 @@ subroutine read_vars()
   real(8):: rs0
 
   if( myid.eq.0 ) then
-    open(15,file=trim(cmaindir)//'/'//cparfile,status='old')
+!!$    open(15,file=trim(cmaindir)//'/'//cparfile,status='old')
+    open(15,file=trim(cparfile),status='old')
     read(15,*) nvars, rcut, rc3
   endif
   call mpi_bcast(nvars,1,mpi_integer,0,mpi_world,ierr)
@@ -553,8 +561,7 @@ subroutine read_vars()
       write(6,'(a)') ' params are shuffled to give normal distribution'
       write(6,'(a,2es10.2)') '   with mu and sgm =',vinitmu,vinitsgm
     else
-      write(6,'(a)') ' params are read from file '//&
-           trim(cmaindir)//'/'//cparfile
+      write(6,'(a)') ' params are read from file: '//cparfile
     endif
   endif
   call mpi_bcast(vars,nvars,mpi_double_precision,0,mpi_world,ierr)
@@ -1313,10 +1320,15 @@ subroutine sync_input()
   call mpi_bcast(cinitv,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(vinitsgm,1,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(vinitmu,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(numtol,1,mpi_integer,0,mpi_world,ierr)
 !.....CG
   call mpi_bcast(icgbtype,1,mpi_integer,0,mpi_world,ierr)
 !.....L-BFGS
   call mpi_bcast(mstore,1,mpi_integer,0,mpi_world,ierr)
+!.....Armijo
+  call mpi_bcast(armijo_xi,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(armijo_tau,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(armijo_maxiter,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(nwgtindiv,1,mpi_integer,0,mpi_world,ierr)
   if( myid.gt.0 ) then
@@ -1503,6 +1515,23 @@ subroutine get_uniq_iarr(n,m,iarr)
   enddo
   return
 end subroutine get_uniq_iarr
+!=======================================================================
+subroutine subtract_other_FF()
+!
+!  Subtract energies and forces from other force-fields.
+!  This uses force-fields implemented in pmd and the NN potential made
+!  should also be used with those force-fields, of course.
+!  This routine should be called for each force-field specified, so
+!  it could be called several times if several force-fields are taken
+!  into account.
+!
+  implicit none
+
+!.....Compute energy and forces using the given force-fields
+
+!.....Subtract energies and forces from referece data
+  
+end subroutine subtract_other_FF
 !-----------------------------------------------------------------------
 ! Local Variables:
 ! compile-command: "make fitpot"

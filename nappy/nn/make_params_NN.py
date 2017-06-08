@@ -27,18 +27,20 @@ _logfname = 'log.make_params_NN'
 _pmin = -0.01
 _pmax =  0.01
 
-_type_avail = ('Gaussian','cosine','Morse','angular')
-_type_2body = ('Gaussian','cosine','Morse',)
+_type_avail = ('Gaussian','cosine','polynomial','Morse','angular')
+_type_2body = ('Gaussian','cosine','polynomial','Morse',)
 _type_3body = ('angular')
 _type2num = {
     'Gaussian': 1,
     'cosine': 2,
+    'polynomial': 3,
     'Morse': 4,
     'angular': 101,
 }
 _nparam_type = {
     'Gaussian': 2,
     'cosine': 1,
+    'polynomial': 1,
     'Morse': 3,
     'angular': 2,
 }
@@ -177,6 +179,9 @@ def get_params(sfname,isp1,isp2,isp3=None):
     elif sfname == 'cosine':
         rk = get_cosine_params(isp1,isp2)
         return rk
+    elif sfname == 'polynomial':
+        a1s = get_polynomial_params(isp1,isp2)
+        return a1s
     elif sfname == 'Morse':
         ds,alps,rs = get_Morse_params(isp1,isp2)
         return ds,alps,rs
@@ -218,6 +223,10 @@ def get_cosine_params(isp1,isp2):
     rk = []
     return rk
 
+def get_polynomial_params(isp1,isp2):
+    a1s = []
+    return a1s
+
 def get_Morse_params(isp1,isp2):
     ds = []
     alps = []
@@ -233,8 +242,13 @@ def get_nsf2(pairs):
     for pair in pairs:
         for it,t in enumerate(pair.symfuncs):
             n = 1
-            for sfps in pair.sfparams[it]:
-                n *= len(sfps)
+            if t == 'Gaussian':
+                for sfps in pair.sfparams[it]:
+                    if isinstance(sfps,list) or isinstance(sfps,tuple):
+                        n *= len(sfps)
+            elif t == 'polynomial' or 'cosine':
+                n = len(pair.sfparams[it])
+
             nsf2 += n
     return nsf2
 
@@ -283,6 +297,12 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
                         f.write(' {0:3d}'.format(_type2num[sf]) \
                                 +' {0:3d} {1:3d}'.format(ia,ja) \
                                 +' {0:10.4f}\n'.format(r))
+                elif sf == 'polynomial':
+                    a1s = pair.sfparams[isf]
+                    for a1 in a1s:
+                        f.write(' {0:3d}'.format(_type2num[sf]) \
+                                +' {0:3d} {1:3d}'.format(ia,ja) \
+                                +' {0:10.4f}\n'.format(a1))
                 elif sf == 'Morse':
                     ds,alps,rs = pair.sfparams[isf]
                     for d in ds:

@@ -1,9 +1,7 @@
 module minimize
   save
 !.....number of convergence criteria achieved
-  integer:: mnftol = 1
-  integer:: mngtol = 1
-  integer:: mnxtol = 1
+  integer:: numtol = 1
   
 !.....penalty: lasso or ridge
   character(len=128):: cpena= 'none'
@@ -339,7 +337,7 @@ contains
         return
       else if( abs(f-fp).lt.ftol ) then
         nftol= nftol +1
-        if( nftol.gt.mnftol ) then
+        if( nftol.gt.numtol ) then
           if( myid.eq.0 ) then
             print *,'>>> CG converged wrt ftol'
             write(6,'(a,2es15.7)') '   f-fp,ftol=' &
@@ -467,11 +465,11 @@ contains
       if( iprint.eq.1 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,6es15.7)') &
+          write(6,'(a,i8,6es13.5)') &
                ' iter,ftrn,ftst,p,vnorm,gnorm,f-fp=',iter,f,ftst &
                ,pval,vnorm,gnorm,f
         else
-          write(6,'(a,i8,6es15.7)') &
+          write(6,'(a,i8,6es13.5)') &
                ' iter,ftrn,ftst,vnorm,gnorm,f-fp=' &
                ,iter,f,ftst,vnorm,gnorm,f
         endif
@@ -479,11 +477,11 @@ contains
       else if( iprint.ge.2 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,14es15.7)') &
+          write(6,'(a,i8,14es13.5)') &
                ' iter,ftrn,ftst,p,vnorm,gnorm,x(1:5)=' &
                ,iter,f,ftst,pval,vnorm,gnorm,x(1:5)
         else
-          write(6,'(a,i8,14es15.7)') &
+          write(6,'(a,i8,14es13.5)') &
                ' iter,frn,ftst,vnorm,gnorm,x(1:5)=' &
                ,iter,f,ftst,vnorm,gnorm,x(1:5)
         endif
@@ -608,12 +606,12 @@ contains
         if( iprint.eq.1 ) then
           if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
                .or.trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,7es15.7)') &
+            write(6,'(a,i8,7es13.5)') &
                  ' iter,ftrn,ftst,p,vnorm,gnorm,dxnorm,f-fp=',&
                  iter,f,ftst &
                  ,pval,vnorm,gnorm,dxnorm,f-fp
           else
-            write(6,'(a,i8,6es15.7)') &
+            write(6,'(a,i8,6es13.5)') &
                  ' iter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
                  ,iter,f,ftst &
                  ,vnorm,gnorm,dxnorm,f-fp
@@ -622,13 +620,13 @@ contains
         else if( iprint.ge.2 ) then
           if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
                .or. trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,15es15.7)') &
-                 ' iter,ftrn,ftst,p,vnorm,gnorm,f-fp,x(1:5)=' &
-                 ,iter,f,ftst,pval,vnorm,gnorm,f-fp,x(1:5)
+            write(6,'(a,i8,15es13.5)') &
+                 ' iter,ftrn,ftst,p,vnorm,gnorm,dxnorm,f-fp,x(1:5)=' &
+                 ,iter,f,ftst,pval,vnorm,gnorm,dxnorm,f-fp,x(1:5)
           else
-            write(6,'(a,i8,15es15.7)') &
-                 ' iter,ftrn,ftst,vnorm,gnorm,f-fp,x(1:5)=' &
-                 ,iter,f,ftst,vnorm,gnorm,f-fp,x(1:5)
+            write(6,'(a,i8,15es13.5)') &
+                 ' iter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp,x(1:5)=' &
+                 ,iter,f,ftst,vnorm,gnorm,dxnorm,f-fp,x(1:5)
           endif
           call flush(6)
         endif
@@ -636,11 +634,11 @@ contains
 !.....check convergence 
       if( dxnorm.lt.xtol ) then
         nxtol = nxtol +1
-        if( nxtol.ge.mnxtol ) then
+        if( nxtol.ge.numtol ) then
           if( myid.eq.0 ) then
             print *,'>>> QN converged because of xtol over ' &
-                 ,mnxtol,' times.'
-            write(6,'(a,2es15.7)') '   dxnorm,xtol=',dxnorm,xtol
+                 ,numtol,' times.'
+            write(6,'(a,2es13.5)') '   dxnorm,xtol=',dxnorm,xtol
           endif
           x0(1:ndim)= x(1:ndim)
           iflag= iflag +1
@@ -648,11 +646,11 @@ contains
         endif
       else if( gnorm.lt.gtol ) then
         ngtol = ngtol +1
-        if( ngtol.ge.mngtol ) then
+        if( ngtol.ge.numtol ) then
           if( myid.eq.0 ) then
             print *,'>>> QN converged because of gtol over ' &
-                 ,mngtol,' times.'
-            write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+                 ,numtol,' times.'
+            write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
           endif
           x0(1:ndim)= x(1:ndim)
           iflag= iflag +2
@@ -660,11 +658,11 @@ contains
         endif
       else if( abs(f-fp).lt.ftol) then
         nftol= nftol +1
-        if( nftol.ge.mnftol ) then
+        if( nftol.ge.numtol ) then
           if( myid.eq.0 ) then
             print *,'>>> QN converged because of ftol over ' &
-                 ,mnftol,' times.'
-            write(6,'(a,2es15.7)') '   abs(f-fp),ftol=',abs(f-fp), ftol
+                 ,numtol,' times.'
+            write(6,'(a,2es13.5)') '   abs(f-fp),ftol=',abs(f-fp), ftol
           endif
           x0(1:ndim)= x(1:ndim)
           iflag= iflag +3
@@ -795,19 +793,19 @@ contains
       if( iprint.eq.1 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,3es15.7)') ' iter,f,p,gnorm=',iter,f &
+          write(6,'(a,i8,3es13.5)') ' iter,f,p,gnorm=',iter,f &
                ,pval,gnorm
         else
-          write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+          write(6,'(a,i8,2es13.5)') ' iter,f,gnorm=',iter,f,gnorm
         endif
         call flush(6)
       else if( iprint.ge.2 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,12es15.7)') ' iter,f,p,gnorm,x(1:5)=' &
+          write(6,'(a,i8,12es13.5)') ' iter,f,p,gnorm,x(1:5)=' &
                ,iter,f,pval,gnorm,x(1:5)
         else
-          write(6,'(a,i8,12es15.7)') ' iter,f,gnorm,x(1:5)=' &
+          write(6,'(a,i8,12es13.5)') ' iter,f,gnorm,x(1:5)=' &
                ,iter,f,gnorm,x(1:5)
         endif
         call flush(6)
@@ -918,20 +916,20 @@ contains
         if( iprint.eq.1 ) then
           if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
                .or.trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,4es15.7)') ' iter,f,p,gnorm,f-fp=',iter,f &
+            write(6,'(a,i8,4es13.5)') ' iter,f,p,gnorm,f-fp=',iter,f &
                  ,pval,gnorm,f-fp
           else
-            write(6,'(a,i8,3es15.7)') ' iter,f,gnorm,f-fp=',iter,f &
+            write(6,'(a,i8,3es13.5)') ' iter,f,gnorm,f-fp=',iter,f &
                  ,gnorm,f-fp
           endif
           call flush(6)
         else if( iprint.ge.2 ) then
           if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
                .or. trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,13es15.7)') ' iter,f,p,gnorm,f-fp,x(1:5)=' &
+            write(6,'(a,i8,13es13.5)') ' iter,f,p,gnorm,f-fp,x(1:5)=' &
                  ,iter,f,pval,gnorm,f-fp,x(1:5)
           else
-            write(6,'(a,i8,13es15.7)') ' iter,f,gnorm,f-fp,x(1:5)=' &
+            write(6,'(a,i8,13es13.5)') ' iter,f,gnorm,f-fp,x(1:5)=' &
                  ,iter,f,gnorm,f-fp,x(1:5)
           endif
           call flush(6)
@@ -941,7 +939,7 @@ contains
       if( gnorm.lt.gtol ) then
         if( myid.eq.0 ) then
           print *,'>>> QN converged wrt gtol'
-          write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+          write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
         endif
         x0(1:ndim)= x(1:ndim)
         iflag= iflag +2
@@ -952,7 +950,7 @@ contains
           if( myid.eq.0 ) then
             print *,'>>> QN may be converged because of ftol ' // &
                  'over 10 times.'
-!!$            write(6,'(a,2es15.7)') '   f-fp/fp,ftol=' &
+!!$            write(6,'(a,2es13.5)') '   f-fp/fp,ftol=' &
 !!$                 ,abs(f-fp)/abs(fp),ftol
           endif
           x0(1:ndim)= x(1:ndim)
@@ -1461,12 +1459,12 @@ contains
     iflag= iflag +100
     alpha=alphai
     if( myid.eq.0 ) then
-      write(6,'(a,es15.7)') '  alpha   = ',alpha
-      write(6,'(a,es15.7)') '  xigd    = ',xigd
-      write(6,'(a,es15.7)') '  norm(g) = ',sqrt(sprod(ndim,g,g))
+      write(6,'(a,es13.5)') '  alpha   = ',alpha
+      write(6,'(a,es13.5)') '  xigd    = ',xigd
+      write(6,'(a,es13.5)') '  norm(g) = ',sqrt(sprod(ndim,g,g))
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' .or. &
            trim(cpena).eq.'ridge' ) then
-        write(6,'(a,es15.7)') '  pval    = ',pval
+        write(6,'(a,es13.5)') '  pval    = ',pval
       endif
     endif
     return
@@ -1594,11 +1592,11 @@ contains
       if( myid.eq.0 ) then
 !!$        if( iprint.eq.1 .and. mod(iter,ndim).eq.1 ) then
         if( iprint.eq.1 ) then
-          write(6,'(a,i8,4es15.7)') ' iter,f,p,gnorm,f-fp=',iter,f &
+          write(6,'(a,i8,4es13.5)') ' iter,f,p,gnorm,f-fp=',iter,f &
                ,pval,gnorm,f-fp
           call flush(6)
         else if( iprint.ge.2 ) then
-          write(6,'(a,i8,12es15.7)') ' iter,f,p,gnorm,f-fp,x(1:5)=' &
+          write(6,'(a,i8,12es13.5)') ' iter,f,p,gnorm,f-fp,x(1:5)=' &
                ,iter,f,pval,gnorm,f-fp,x(1:5)
           call flush(6)
         endif
@@ -1606,7 +1604,7 @@ contains
       if( gnorm.lt.gtol ) then
         if( myid.eq.0 ) then
           print *,'>>> FS converged wrt gtol'
-          write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+          write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
         endif
         x(1:ndim)= xt(1:ndim)
         iflag= iflag +2
@@ -1747,9 +1745,9 @@ contains
       gnorm= sqrt(sprod(ndim,g,g))
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
-          write(6,'(a,i8,2es15.7)') ' itergfs,f,gnorm=',itergfs,f,gnorm
+          write(6,'(a,i8,2es13.5)') ' itergfs,f,gnorm=',itergfs,f,gnorm
         else if( iprint.eq.2 ) then
-          write(6,'(a,i8,12es15.7)') ' itergfs,f,gnorm,x(1:5)=' &
+          write(6,'(a,i8,12es13.5)') ' itergfs,f,gnorm,x(1:5)=' &
                ,itergfs,f,gnorm,xt(1:5)
         endif
         call flush(6)
@@ -1820,9 +1818,9 @@ contains
       gnorm= sqrt(sprod(ndim,g,g))
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
-          write(6,'(a,i8,2es15.7)') ' iter,f,gnorm=',iter,f,gnorm
+          write(6,'(a,i8,2es13.5)') ' iter,f,gnorm=',iter,f,gnorm
         else if( iprint.eq.2 ) then
-          write(6,'(a,i8,12es15.7)') ' iter,f,gnorm,x(1:5)=' &
+          write(6,'(a,i8,12es13.5)') ' iter,f,gnorm,x(1:5)=' &
                ,iter,f,gnorm,x(1:5)
         endif
         call flush(6)
@@ -1914,9 +1912,9 @@ contains
         gnorm= sqrt(sprod(ndim,g,g))
         if( myid.eq.0 ) then
           if( iprint.eq.1 ) then
-            write(6,'(a,i8,2es15.7)') ' itergfs,f,gnorm=',itergfs,f,gnorm
+            write(6,'(a,i8,2es13.5)') ' itergfs,f,gnorm=',itergfs,f,gnorm
           else if( iprint.eq.2 ) then
-            write(6,'(a,i8,12es15.7)') ' itergfs,f,gnorm,x(1:5)=' &
+            write(6,'(a,i8,12es13.5)') ' itergfs,f,gnorm,x(1:5)=' &
                  ,itergfs,f,gnorm,xt(1:5)
           endif
           call flush(6)
@@ -1926,14 +1924,14 @@ contains
         if( gnorm.lt.gtol ) then
           if( myid.eq.0 ) then
             print *,'>>> QM in gFS converged wrt gtol'
-            write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+            write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
           endif
           x(1:ndim)= xt(1:ndim)
           iflag= iflag +2
           exit
         else if( abs(f-fp)/abs(fp).lt.ftol) then
           nftol= nftol +1
-          if( nftol.gt.10 ) then
+          if( nftol.gt.numtol ) then
             if( myid.eq.0 ) then
               print *,'>>> gFS may be converged because of ftol ' // &
                    'over 10 times.'
@@ -2090,7 +2088,7 @@ contains
       if( mod(iter,niter_eval).eq.0 ) then
         call sub_eval(iter)
         if( myid.eq.0 ) then
-          write(6,'(a,i10,es12.4,2es15.7,2f9.5)')&
+          write(6,'(a,i10,es12.4,2es13.5,2f9.5)')&
                'iter,temp,ft-f,fbest,prob,radpt='&
                ,iter,temp,ft-f,fbest,prob,dble(nadpt)/iter
 !!$          if( abs(ft-f).lt.1d-15 ) then

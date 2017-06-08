@@ -1,10 +1,9 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-05-16 15:48:45 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-08 17:28:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !.....parameter file name
   save
-  character(128),parameter:: cpfname= 'in.params.NN'
   character(128),parameter:: ccfname='in.const.NN'
   character(128),parameter:: cmbfname='in.comb.NN'
 !.....NN mode, which determines if it contains bias node
