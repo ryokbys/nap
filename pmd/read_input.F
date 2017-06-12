@@ -170,8 +170,10 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
       elseif( trim(cname).eq.'io_format' ) then
         call read_c1(ionum,ciofmt)
         return
-      elseif( trim(cname).eq.'force_type' ) then
-        call read_c1(ionum,cforce)
+      elseif( trim(cname).eq.'force_type' .or.
+     &       trim(cname).eq.'force_field' ) then
+c        call read_c1(ionum,cforce)
+        call read_force_field(ionum)
         return
       elseif( trim(cname).eq.'flag_coulomb' ) then
         call read_i1(ionum,ifcoulomb)
@@ -292,3 +294,28 @@ c        write(6,'(1x,100es15.3)') (rval(i,n),i=1,ndata)
 
       end subroutine read_ls
 c=======================================================================
+      subroutine read_force_field(ionum)
+c
+c     Read forces
+c     There is no limit of number of force-fields to be specified.
+c
+      use pmdio
+      implicit none
+      integer,intent(in):: ionum
+
+      integer:: i,ndat
+      character(len=1024):: ctmp
+      integer,external:: num_data
+
+      backspace(ionum)
+      read(ionum,'(a)') ctmp
+      ndat = num_data(trim(ctmp),' ')
+      if( ndat.lt.2 ) then
+        write(6,'(a)') 'There is no force-field specified' //
+     &       ' by forces entry.'
+      endif
+      numff = ndat -1
+      allocate(cffs(numff))
+      backspace(ionum)
+      read(ionum,*) ctmp, (cffs(i),i=1,numff)
+      end subroutine read_force_field

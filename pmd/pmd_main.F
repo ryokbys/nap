@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-06-01 11:03:14 Ryo KOBAYASHI>
+c                     Last-modified: <2017-06-13 07:32:10 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -32,6 +32,7 @@ c.....Epot threshold for disl core extraction [Hartree]
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr
      &     ,nstp_done
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin
+      logical,external:: force_on
 
 c-----initialize the MPI environment
       call mpi_init(ierr)
@@ -51,7 +52,19 @@ c.....Set fmv as default value before reading 'in.pmd'
         call write_initial_setting()
       endif
 
+      print *,' numff = ',numff
+      print *,' cffs  = ',(cffs(i),i=1,numff)
+
       call bcast_params()
+
+c.....Set Coulomb flag here
+      if( force_on('screened_Coulomb') ) then
+        ifcoulomb = 1
+      else if( force_on('Ewald_Coulomb') ) then
+        ifcoulomb = 2
+      else if( force_on('vc_gaussian') ) then
+        ifcoulomb = 3
+      endif
 
 c.....only 0th-node reads pmdini file
       if( myid_md.eq.0 ) then
@@ -86,11 +99,11 @@ c.....call pmd_core to perfom MD
       call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot,nstp,nerg,npmd
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
-     &     ,nspmax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
-     &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
-     &     ,srlx,stbeta,strfin,lstrs0,lcellfix
-     &     ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb
-     &     ,czload_type,eps_conv,ifsort,iprint,nstp_done)
+     &     ,nspmax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp
+     &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt
+     &     ,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,ptnsr,epot,ekin
+     &     ,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
+     &     ,nstp_done)
 
       if( myid_md.eq.0 ) then
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
@@ -105,7 +118,7 @@ c.....write energy, forces and stresses only for fitpot
         call write_force(21,'.pmd',h,epot,ntot,tagtot,atot,ptnsr)
       endif
 
-      deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot)
+      deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot,cffs)
       call mpi_finalize(ierr)
         
       end program pmd
@@ -173,7 +186,7 @@ c=======================================================================
       write(6,'(2x,a25,i8)')   'flag_out_pmd',ifpmd
       write(6,'(2x,a25,i8)')   'num_out_pmd',npmd
       write(6,'(2x,a)') ''
-      write(6,'(2x,a25,2x,a)') 'force_type',cforce
+      write(6,'(2x,a25,10(2x,a))') 'force_type',(cffs(i),i=1,numff)
       write(6,'(2x,a25,es15.7)') 'cutoff_radius',rc
       write(6,'(2x,a25,es15.7)') 'cutoff_buffer',rbuf
       write(6,'(2x,a)') ''
@@ -271,7 +284,13 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(am,nspmax,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
+c.....Force-fields
       call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
+      call mpi_bcast(numff,1,mpi_integer,0,mpi_md_world,ierr)
+      if( myid_md.ne.0 ) then
+        allocate(cffs(numff))
+      endif
+      call mpi_bcast(cffs,20*numff,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(ifcoulomb,1,mpi_integer,0,mpi_md_world,ierr)
       call mpi_bcast(schg,nspmax,mpi_double_precision,0,mpi_md_world
      &     ,ierr)

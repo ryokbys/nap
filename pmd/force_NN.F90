@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-05-30 22:16:18 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-12 21:45:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -552,6 +552,7 @@ contains
     integer,allocatable:: nwgt(:)
     logical:: lexist
     character:: ctmp*128
+    integer,external:: num_data
 
 !.....initialize some
     ncnst_type(1)= 2   ! Gaussian
@@ -1012,31 +1013,6 @@ contains
 !!$    endif
 
   end subroutine compute_stress
-!=======================================================================
-  function num_data(str,delim)
-    implicit none
-    character(len=*),intent(in):: str
-    character(len=1),intent(in):: delim
-    integer:: num_data
-
-    integer:: i
-
-    i=1
-    num_data = 0
-    do
-      if( i.gt.len(str) ) exit
-      if( str(i:i).ne.delim ) then
-        num_data = num_data + 1
-        do
-          i = i + 1
-          if( i.gt.len(str) ) exit
-          if( str(i:i).eq.delim ) exit
-        end do
-      end if
-      i = i + 1
-    end do
-    return
-  end function num_data
 !=======================================================================
 end module NN
 !-----------------------------------------------------------------------

@@ -1,23 +1,23 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-06-01 11:02:58 Ryo KOBAYASHI>
+c                     Last-modified: <2017-06-13 07:21:43 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
       subroutine pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
-     &     ,nspmax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp
-     &     ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt
-     &     ,srlx,stbeta,strfin,lstrs0,lcellfix
-     &     ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb
-     &     ,czload_type,eps_conv,ifsort,iprint,nstp_done)
+     &     ,nspmax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp
+     &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt
+     &     ,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,ptnsr,epot,ekin
+     &     ,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
+     &     ,nstp_done)
       use pmdvars
       use zload
       implicit none
       include "mpif.h"
       include "./params_unit.h"
       integer,intent(in):: ntot,maxstp,nerg,npmd,myid_md,mpi_md_world
-     &     ,nspmax,ifpmd,ifdmp,minstp,ntdst,ifsort
+     &     ,nspmax,ifpmd,ifdmp,minstp,ntdst,ifsort,numff
      &     ,iprint,nodes_md,nx,ny,nz,n_conv,ifcoulomb
       integer,intent(out):: nstp_done
       real(8),intent(in):: hunit,tinit,tfin
@@ -27,8 +27,9 @@ c-----------------------------------------------------------------------
      &     ,epitot(ntot),dt,rc,rbuf,h(3,3,0:1),ptnsr(3,3),fmv(3,0:9)
      &     ,epot,ekin,am(nspmax),stgt(3,3),ptgt,ttgt(9)
      &     ,chgtot(ntot),chitot(ntot)
-      character,intent(in):: ciofmt*6, cforce*20, cpctl*20, ctctl*20
+      character,intent(in):: ciofmt*6, cpctl*20, ctctl*20
      &     ,czload_type*5
+      character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: ltdst,lstrs0,lcellfix(3,3)
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
@@ -231,7 +232,7 @@ c.....Calc forces
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &     ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
-     &     ,cforce,ifcoulomb,iprint,.true.)
+     &     ,numff,cffs,ifcoulomb,iprint,.true.)
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -485,7 +486,7 @@ c-------Calc forces
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
-     &       ,cforce,ifcoulomb,iprint,.false.)
+     &       ,numff,cffs,ifcoulomb,iprint,.false.)
         lstrs = .false.
 
 c.....Second kick of velocities
