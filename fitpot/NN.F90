@@ -1,7 +1,11 @@
-module NN
+module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-08 17:28:34 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-12 13:04:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
+!
+!  Since the module name "NN" conflicts with the same name in pmd/,
+!  the name has been changed to "NNd" in which "d" for derivative is added.
+!
 !.....parameter file name
   save
   character(128),parameter:: ccfname='in.const.NN'
@@ -211,8 +215,8 @@ contains
       swgt2tst = swgt2tst*2d0
     endif
     if( myid.eq.0 ) then
-      write(6,'(a,es12.3)') ' swgt2trn = ',swgt2trn
-      write(6,'(a,es12.3)') ' swgt2tst = ',swgt2tst
+      write(6,'(a,es15.7)') ' swgt2trn = ',swgt2trn
+      write(6,'(a,es15.7)') ' swgt2tst = ',swgt2tst
     endif
 
     if( myid.eq.0 ) then
@@ -1911,4 +1915,4 @@ contains
     
   end subroutine count_nterms
 !=======================================================================
-end module NN
+end module NNd

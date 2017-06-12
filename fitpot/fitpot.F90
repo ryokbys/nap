@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-08 17:59:58 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-12 13:05:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -392,7 +392,10 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
   smpl%natm= natm
   allocate(smpl%ra(3,natm),smpl%fa(3,natm) &
        ,smpl%tag(natm) &
-       ,smpl%fref(3,natm), smpl%ifcal(natm),smpl%fabs(natm))
+       ,smpl%fref(3,natm), smpl%ifcal(natm),smpl%fabs(natm) &
+       ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
+       ,smpl%eki(3,3,natm),smpl%epi(natm) &
+       ,smpl%chg(natm),smpl%chi(natm))
   do i=1,smpl%natm
     read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), &
          tmp,tmp,tmp
@@ -572,7 +575,7 @@ end subroutine read_vars
 subroutine write_vars(cadd)
   use variables
   use parallel
-  use NN, only: NN_standardize, NN_restore_standard
+  use NNd, only: NN_standardize, NN_restore_standard
   implicit none
   character(len=*),intent(in):: cadd
   integer:: i
@@ -599,7 +602,7 @@ end subroutine write_vars
 !=======================================================================
 subroutine qn_wrapper()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
@@ -620,7 +623,7 @@ end subroutine qn_wrapper
 !=======================================================================
 subroutine lbfgs_wrapper()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
@@ -644,7 +647,7 @@ subroutine sd_wrapper()
 !  Steepest descent minimization
 !
   use variables
-  use NN,only:NN_init,NN_func,NN_grad
+  use NNd,only:NN_init,NN_func,NN_grad
   use parallel
   use minimize
   implicit none
@@ -661,7 +664,7 @@ end subroutine sd_wrapper
 !=======================================================================
 subroutine cg_wrapper()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
@@ -682,7 +685,7 @@ end subroutine cg_wrapper
 !=======================================================================
 subroutine sa_wrapper()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
@@ -708,7 +711,7 @@ subroutine sgd()
 ! Stochastic gradient decent (SGD)
 !
   use variables
-  use NN,only:NN_init,NN_fs,NN_gs,NN_func,NN_grad,NN_analyze &
+  use NNd,only:NN_init,NN_fs,NN_gs,NN_func,NN_grad,NN_analyze &
        ,NN_restore_standard
   use parallel
   use minimize
@@ -833,7 +836,7 @@ end subroutine sgd
 !=======================================================================
 subroutine fs_wrapper()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
@@ -852,7 +855,7 @@ end subroutine fs_wrapper
 !=======================================================================
 subroutine gfs_wrapper()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
@@ -873,11 +876,11 @@ end subroutine gfs_wrapper
 !=======================================================================
 subroutine check_grad()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad
+  use NNd,only:NN_init,NN_func,NN_grad
   use parallel
   implicit none
   integer:: iv
-  real(8):: ftrn0,ftst0,ftmp,dv,vmax,ftst
+  real(8):: ftrn0,ftst0,ftmp,dv,vmax,ftst,ftmp1,ftmp2
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
   real(8),parameter:: dev  = 1d-5
   real(8),parameter:: tiny = 1d-6
@@ -901,9 +904,12 @@ subroutine check_grad()
   do iv=1,nvars
     vars(1:nvars)= vars0(1:nvars)
     dv = vars(iv)*dev
-    vars(iv)= vars(iv) +dv
-    call NN_func(nvars,vars,ftmp,ftst)
-    gnumer(iv)= (ftmp-ftrn0)/dv
+    vars(iv)= vars(iv) +dv/2
+    call NN_func(nvars,vars,ftmp1,ftst)
+    vars(1:nvars)= vars0(1:nvars)
+    vars(iv)= vars(iv) -dv/2
+    call NN_func(nvars,vars,ftmp2,ftst)
+    gnumer(iv)= (ftmp1-ftmp2)/dv
   enddo
 
   if( myid.eq.0 ) then
@@ -923,7 +929,7 @@ end subroutine check_grad
 !=======================================================================
 subroutine test()
   use variables
-  use NN,only:NN_init,NN_func,NN_grad
+  use NNd,only:NN_init,NN_func,NN_grad
   use parallel
   implicit none 
   integer:: iv
@@ -1107,7 +1113,7 @@ end subroutine write_force_relation
 subroutine write_stats(iter)
   use variables
   use parallel
-  use NN
+  use NNd
   implicit none
   integer,intent(in):: iter
   integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst,nfcal
@@ -1259,7 +1265,7 @@ subroutine write_eliminated_vars()
 end subroutine write_eliminated_vars
 !=======================================================================
 subroutine analyze_wrapper(num)
-  use NN
+  use NNd
   implicit none 
   integer,intent(in):: num
   character(len=5):: cadd
@@ -1525,13 +1531,141 @@ subroutine subtract_other_FF()
 !  it could be called several times if several force-fields are taken
 !  into account.
 !
+  use variables
+  use parallel
   implicit none
 
-!.....Compute energy and forces using the given force-fields
+  integer:: ismpl
+  type(mdsys):: smpl
 
-!.....Subtract energies and forces from referece data
+  do ismpl=isid0,isid1
+    smpl = samples(ismpl)
+    call run_pmd(smpl)
+  enddo
+  
   
 end subroutine subtract_other_FF
+!=======================================================================
+subroutine run_pmd(smpl)
+!
+!  Run pmd and get energy and forces of the system.
+!
+  use variables
+  use parallel
+  implicit none
+  type(mdsys),intent(inout):: smpl
+
+  logical,save:: l1st = .true.
+
+  integer:: i,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
+       ifchg,nismax,nstps_done,ntdst,nx,ny,nz
+  real(8):: am(9),dt,rc,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
+       ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),epot,ekin,eps_conv
+  logical:: ltdst,lstrs,lcellfix
+  character(len=128):: ciofmt, cforce, ctctl, cpctl, czload_type
+
+  if( l1st ) then
+!.....Create MPI COMM for pmd only for the 1st time
+    call create_mpi_comm_pmd()
+  endif
+
+!.....Every time allocate total arrays according to the num of atoms
+!     in the givin sample system.
+  maxstp = 0
+  nismax = 9
+  nerg = 1
+  npmd = 1
+  am(1:9) = 1d0  ! Since no dynamics, no need of mass
+  dt = 5d0
+  ciofmt = 'ascii'
+  ifpmd = 0
+  cforce = 'NN'
+  rc = 5.5d0
+  rbuf = 0.2d0
+  ifdmp = 0  ! no damping as well
+  dmp = 0.99d0
+  minstp = 0
+  tinit = 0d0
+  tfin = 0d0
+  ctctl = 'none'
+  ttgt(1:9) = 300d0
+  trlx = 100d0
+  ltdst = .false.
+  ntdst = 1
+  lstrs = .false.
+  cpctl = 'none'
+  stgt(1:3,1:3) = 0d0
+  ptgt = 0d0
+  srlx = 100d0
+  stbeta = 1d-1
+  strfin = 0d0
+  fmv(1:3,0) = (/ 0d0, 0d0, 0d0 /)
+  fmv(1:3,1:9) = 1d0
+  ptnsr(1:3,1:3) = 0d0
+  epot = 0d0
+  ekin = 0d0
+  n_conv = 1
+  czload_type = 'no'
+  eps_conv = 1d-3
+  ifsort = 1
+  iprint = 0
+  ifchg = 0
+  lcellfix = .true.
+  nx = 1
+  ny = 1
+  nz = 1
+  
+!.....Run one-shot force calculation to get an energy and forces
+  call pmd_core(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
+       ,smpl%va,smpl%fa,smpl%strsi,smpl%eki,smpl%epi &
+       ,smpl%chg,smpl%chi,maxstp,nerg,npmd &
+       ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
+       ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp &
+       ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
+       ,srlx,stbeta,strfin,lstrs,lcellfix &
+       ,fmv,ptnsr,epot,ekin,n_conv,ifchg &
+       ,czload_type,eps_conv,ifsort,iprint,nstps_done)
+
+!.....Subtract energy and forces from eref and fref, respectively
+  smpl%eref = smpl%eref -epot
+  do i=1,smpl%natm
+    smpl%fref(1:3,i) = smpl%fref(1:3,i) -smpl%fa(1:3,i)
+  enddo
+  
+end subroutine run_pmd
+!=======================================================================
+subroutine create_mpi_comm_pmd()
+!
+!  Create MPI COMM for pmd.
+!  To create a MPI COMM on each node, first create a MPI GROUP for world,
+!  then create a MPI GROUP for this node, and then create the MPI COMM
+!  from the GROUP for this node. This is how to create sub communicator
+!  in the MPI.
+!
+  use parallel
+  implicit none
+
+  integer:: n = 1
+  integer:: iranks(1)
+  integer:: mpi_group_world,mpi_group_pmd
+
+  call mpi_comm_group(mpi_world, mpi_group_world,ierr)
+
+  iranks(1) = myid
+  call mpi_group_incl(mpi_group_world, 1, iranks, mpi_group_pmd,ierr)
+  call mpi_comm_create_group(mpi_world, mpi_group_pmd, 0, mpi_comm_pmd,ierr)
+
+  call mpi_comm_size(mpi_comm_pmd,nnode_pmd,ierr)
+  call mpi_comm_rank(mpi_comm_pmd,myid_pmd,ierr)
+  
+  call mpi_group_free(mpi_group_world,ierr)
+  call mpi_group_free(mpi_group_pmd,ierr)
+  if( myid.eq.0 ) then
+    write(6,'(a)') ''
+    write(6,'(a)') 'MPI_COMM_PMD were created for pmd calculations.'
+  endif
+  
+end subroutine create_mpi_comm_pmd
 !-----------------------------------------------------------------------
 ! Local Variables:
 ! compile-command: "make fitpot"

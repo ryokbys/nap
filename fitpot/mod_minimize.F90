@@ -6,7 +6,7 @@ module minimize
 !.....penalty: lasso or ridge
   character(len=128):: cpena= 'none'
   character(len=128):: clinmin= 'armijo'
-  real(8):: pwgt
+  real(8):: pwgt = 1d-15
 !.....group lasso
   integer:: ngl
   integer,allocatable:: iglid(:)
@@ -192,15 +192,15 @@ contains
     logical:: ltwice = .false.
 
     integer:: i,iter,nftol,nxtol
-    real(8):: alpha,fp,gnorm,gnormp,beta,pval,sgnorm,ftst,dxnorm
-    real(8),save,allocatable:: gpena(:),gp(:),y(:),xp(:),s(:),dx(:)
+    real(8):: alpha,fp,gnorm,gnormp,beta,pval,sgnorm,ftst,dxnorm,unorm
+    real(8),save,allocatable:: gpena(:),gp(:),y(:),xp(:),s(:),dx(:),uu(:)
 
     if( myid.eq.0 ) then
       print *,'entering CG routine...'
     endif
 
     if( .not.allocated(gpena) ) allocate(gpena(ndim),gp(ndim)&
-         ,y(ndim),xp(ndim),s(ndim),dx(ndim))
+         ,y(ndim),xp(ndim),s(ndim),dx(ndim),uu(ndim))
 
     iter= 0
     nftol= 0
@@ -230,12 +230,15 @@ contains
     do iter=1,maxiter
       fp= f
       xp(1:ndim)= x(1:ndim)
+!.....normalize u-vector only for line search
+      unorm = sqrt(sprod(ndim,u,u))
+      uu(1:ndim) = u(1:ndim)/unorm
 !.....evaluate statistics at every niter_eval
       if( mod(iter,niter_eval).eq.0 ) &
            call sub_eval(iter)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
-        call quad_interpolate(ndim,x,u,f,ftst,xtol,gtol,ftol &
+        call quad_interpolate(ndim,x,uu,f,ftst,xtol,gtol,ftol &
              ,alpha,iprint,iflag,myid,func)
 !.....if quad interpolation failed, perform golden section
         if( iflag/100.ne.0 ) then
@@ -243,15 +246,15 @@ contains
           if(myid.eq.0) then
             print *,'since quad_interpolate failed, call golden_section.'
           endif
-          call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol &
+          call golden_section(ndim,x,uu,f,ftst,xtol,gtol,ftol &
                ,alpha,iprint,iflag,myid,func)
         endif
       else if ( trim(clinmin).eq.'golden') then
-        call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
+        call golden_section(ndim,x,uu,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else ! armijo (default)
         alpha= 1d0
-        call armijo_search(ndim,x,u,f,ftst,g,alpha,iprint &
+        call armijo_search(ndim,x,uu,f,ftst,g,alpha,iprint &
              ,iflag,myid,func)
       endif
 
@@ -276,15 +279,15 @@ contains
       endif
 
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
-        call soft_threshold(ndim,x,u,alpha)
+        call soft_threshold(ndim,x,uu,alpha)
       else if( trim(cpena).eq.'ridge' ) then
-        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+        x(1:ndim)= x(1:ndim) +alpha*uu(1:ndim)
         do i=1,ndim
           pval= pval +pwgt*x(i)*x(i)
           gpena(i)= 2d0*pwgt*x(i)
         enddo
       else
-        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+        x(1:ndim)= x(1:ndim) +alpha*uu(1:ndim)
       endif
 
       dx(1:ndim)= x(1:ndim) -xp(1:ndim)
@@ -454,36 +457,42 @@ contains
         gpena(i)= 2d0*pwgt*x0(i)
       enddo
     endif
+!!$    if( myid.eq.0 ) then
+!!$      do i=1,ndim
+!!$        write(6,'(a,i6,2es15.7)') 'i,g,gpena=',i,g(i),gpena(i)
+!!$      enddo
+!!$    endif
     g(1:ndim)= g(1:ndim) +gpena(1:ndim)
 
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
     vnorm= sqrt(sprod(ndim,x,x))
+    dxnorm = 0d0
 
     iter= 0
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,6es13.5)') &
-               ' iter,ftrn,ftst,p,vnorm,gnorm,f-fp=',iter,f,ftst &
-               ,pval,vnorm,gnorm,f
+          write(6,'(a,i8,7es13.5)') &
+               ' iter,ftrn,ftst,p,vnorm,gnorm,dxnorm,f-fp=',iter,f,ftst &
+               ,pval,vnorm,gnorm,dxnorm,f
         else
-          write(6,'(a,i8,6es13.5)') &
-               ' iter,ftrn,ftst,vnorm,gnorm,f-fp=' &
-               ,iter,f,ftst,vnorm,gnorm,f
+          write(6,'(a,i8,7es13.5)') &
+               ' iter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
+               ,iter,f,ftst,vnorm,gnorm,dxnorm,f
         endif
         call flush(6)
       else if( iprint.ge.2 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,14es13.5)') &
-               ' iter,ftrn,ftst,p,vnorm,gnorm,x(1:5)=' &
-               ,iter,f,ftst,pval,vnorm,gnorm,x(1:5)
+          write(6,'(a,i8,15es13.5)') &
+               ' iter,ftrn,ftst,p,vnorm,gnorm,dxnorm,x(1:5)=' &
+               ,iter,f,ftst,pval,vnorm,gnorm,dxnorm,x(1:5)
         else
-          write(6,'(a,i8,14es13.5)') &
-               ' iter,frn,ftst,vnorm,gnorm,x(1:5)=' &
-               ,iter,f,ftst,vnorm,gnorm,x(1:5)
+          write(6,'(a,i8,15es13.5)') &
+               ' iter,frn,ftst,vnorm,gnorm,dxnorm,x(1:5)=' &
+               ,iter,f,ftst,vnorm,gnorm,dxnorm,x(1:5)
         endif
         call flush(6)
       endif

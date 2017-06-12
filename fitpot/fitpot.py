@@ -1,9 +1,11 @@
 #!/usr/local/bin/python
 # -*- coding: utf-8 -*-
+"""
+Fit parameters of a certain potential to reference DFT data.
+The potential must be specified in pmd input file, in.pmd.
 
-"""Fit parameters of a certain potential to DFT data.
-
-The potential must be specified in smd input file, in.smd.
+Usage:
+  fitpot.py [options] 
 """
 
 import os,sys

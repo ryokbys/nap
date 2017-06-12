@@ -121,7 +121,7 @@ def make_random_poscars(atoms0,rtype='uniform',dis=0.03,
         atoms.wrap()
         # reset constraint
         atoms.set_constraint(cdefault)
-        write(fname+'-{0:03d}'.format(inc),
+        write(fname+'-{0:05d}'.format(inc),
               images=atoms,format="vasp",vasp5=True,
               direct=True,sort=False)
 
@@ -182,7 +182,7 @@ def make_1disp_poscars(atoms0,rtype='uniform',dis=0.03,
             # reset constraint
             atoms.set_constraint(cdefault)
             #poscar.write(fname=fname+'-{0:03d}'.format(inc))
-            write(fname+'-{0:03d}'.format(inc),
+            write(fname+'-{0:05d}'.format(inc),
                   images=atoms,format="vasp",vasp5=True,
                   direct=True,sort=False)
             
