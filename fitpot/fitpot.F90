@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-12 13:05:31 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-13 07:54:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1558,11 +1558,12 @@ subroutine run_pmd(smpl)
   logical,save:: l1st = .true.
 
   integer:: i,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
-       ifchg,nismax,nstps_done,ntdst,nx,ny,nz
+       ifcoulomb,nismax,nstps_done,ntdst,nx,ny,nz,numff
   real(8):: am(9),dt,rc,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
        ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),epot,ekin,eps_conv
-  logical:: ltdst,lstrs,lcellfix
-  character(len=128):: ciofmt, cforce, ctctl, cpctl, czload_type
+  logical:: ltdst,lstrs,lcellfix(3,3)
+  character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5
+  character(len=20):: cffs(1)
 
   if( l1st ) then
 !.....Create MPI COMM for pmd only for the 1st time
@@ -1579,7 +1580,8 @@ subroutine run_pmd(smpl)
   dt = 5d0
   ciofmt = 'ascii'
   ifpmd = 0
-  cforce = 'NN'
+  numff = 1
+  cffs(1) = 'NN'
   rc = 5.5d0
   rbuf = 0.2d0
   ifdmp = 0  ! no damping as well
@@ -1609,8 +1611,8 @@ subroutine run_pmd(smpl)
   eps_conv = 1d-3
   ifsort = 1
   iprint = 0
-  ifchg = 0
-  lcellfix = .true.
+  ifcoulomb = 0
+  lcellfix(1:3,1:3) = .false.
   nx = 1
   ny = 1
   nz = 1
@@ -1620,10 +1622,10 @@ subroutine run_pmd(smpl)
        ,smpl%va,smpl%fa,smpl%strsi,smpl%eki,smpl%epi &
        ,smpl%chg,smpl%chi,maxstp,nerg,npmd &
        ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
-       ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp &
+       ,nismax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp,minstp &
        ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
        ,srlx,stbeta,strfin,lstrs,lcellfix &
-       ,fmv,ptnsr,epot,ekin,n_conv,ifchg &
+       ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb &
        ,czload_type,eps_conv,ifsort,iprint,nstps_done)
 
 !.....Subtract energy and forces from eref and fref, respectively

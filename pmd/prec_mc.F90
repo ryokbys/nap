@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-06-01 11:03:54 Ryo KOBAYASHI>
+!                     Last-modified: <2017-06-13 07:54:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -1095,12 +1095,13 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   integer:: i,inc
   integer,parameter:: nismax = 9
   integer:: nstp,nerg,npmd,ifpmd,minstp,ntdst,n_conv,ifsort,iprint &
-       ,ifdmp,ifchg
+       ,ifdmp,ifcoulomb,numff
   real(8):: hunit,h(3,3,0:1),am(nismax),dt,rc,dmp,tinit,tfin,ttgt(9)&
        ,trlx,stgt(3,3),ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3) &
        ,epot,ekin,eps_conv,rbuf
   character:: ciofmt*6,cforce*20,ctctl*20,cpctl*20,czload_type*5,csi*1
-  logical:: ltdst,lstrs
+  character(len=20):: cffs(1)
+  logical:: ltdst,lstrs,lcellfix(3,3)
 
   logical,save:: l1st = .true.
   integer,save:: ntot = 0
@@ -1139,6 +1140,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
 
   hunit = 1d0
   h(1:3,1:3,0) = hmat(1:3,1:3)
+  lcellfix(1:3,1:3) = .false.
 
   if( myid_md.eq.0 ) then
     inc = 0
@@ -1164,7 +1166,9 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   dt = 5d0
   ciofmt = 'ascii'
   ifpmd = 1
+  numff = 1
   cforce = 'NN'
+  cffs(1) = 'NN'
   rc = 5.8d0
   rbuf = 0.2d0
   ifdmp = 2  ! FIRE
@@ -1194,7 +1198,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   eps_conv = 1d-3
   ifsort = 1
   iprint = 0
-  ifchg = 0
+  ifcoulomb = 0
 
 !.....call pmd_core to perfom MD
 !!$  print *,'nstps_pmd = ',nstps_pmd
@@ -1202,10 +1206,10 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot &
        ,ekitot,epitot,chgtot,chitot,nstps_pmd,nerg,npmd &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
-       ,nismax,am,dt,ciofmt,ifpmd,cforce,rc,rbuf,ifdmp,dmp,minstp &
+       ,nismax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp,minstp &
        ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
        ,srlx,stbeta,strfin,lstrs,lcellfix &
-       ,fmv,ptnsr,epot,ekin,n_conv,ifchg &
+       ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb &
        ,czload_type,eps_conv,ifsort,iprint,nstps_done)
 !!$  print *,'nstps_pmd,minstp,nstps_done = ' &
 !!$       ,nstps_pmd,minstp,nstps_done
