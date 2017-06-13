@@ -43,7 +43,6 @@ c-----------------------------------------------------------------------
       
       integer:: ierr,is,i
       real(8):: at(3),tmp
-      logical,external:: force_on
       logical,save:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH,
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
@@ -51,52 +50,12 @@ c-----------------------------------------------------------------------
      &     luse_linreg,luse_NN,luse_Morse
 
       if( l1st ) then
-        luse_LJ = .false.
-        luse_Ito3_WHe = .false.
-        luse_RK_WHe = .false.
-        luse_RK_FeH = .false.
-        luse_Ramas_FeH = .false.
-        luse_Ackland_Fe = .false.
-        luse_SW_Si = .false.
-        luse_EDIP_Si = .false.
-        luse_Brenner = .false.
-        luse_Brenner_vdW = .false.
-        luse_Lu_WHe = .false.
-        luse_Branicio_AlN = .false.
-        luse_Mishin_Al = .false.
-        luse_AFS_W = .false.
-        luse_SC_Fe = .false.
-        luse_SM_Al = .false.
-        luse_linreg = .false.
-        luse_NN = .false.
-        luse_Morse = .false.
-        if( force_on('LJ_Ar') ) luse_LJ = .true.
-        if( force_on('Ito3_WHe') ) luse_Ito3_WHe = .true.
-        if( force_on('RK_WHe') ) luse_RK_WHe = .true.
-        if( force_on('RK_FeH') ) luse_RK_FeH = .true.
-        if( force_on('Ramas_FeH') ) luse_Ramas_FeH = .true.
-        if( force_on('Ackland_Fe') ) luse_Ackland_Fe = .true.
-        if( force_on('SW_Si') ) luse_SW_Si = .true.
-        if( force_on('EDIP_Si') ) luse_EDIP_Si = .true.
-        if( force_on('Brenner') ) luse_Brenner = .true.
-        if( force_on('Brenner_vdW') ) luse_Brenner_vdW = .true.
-        if( force_on('Lu_WHe') ) luse_Lu_WHe = .true.
-        if( force_on('Branicio_AlN') ) luse_Branicio_AlN = .true.
-        if( force_on('Mishin_Al') ) luse_Mishin_Al = .true.
-        if( force_on('AFS_W') ) luse_AFS_W = .true.
-        if( force_on('SC_Fe') ) luse_SC_Fe = .true.
-        if( force_on('SM_Al') ) luse_SM_Al = .true.
-        if( force_on('linreg') ) luse_linreg = .true.
-        if( force_on('NN') ) luse_NN = .true.
-        if( force_on('Morse') ) luse_Morse = .true.
-c.....Coulomb forces should be exclusive each other
-        if( force_on('screened_Coulomb') ) then
-          ifcoulomb = 1
-        else if( force_on('Ewald_Coulomb') ) then
-          ifcoulomb = 2
-        else if( force_on('vc_gaussian') ) then
-          ifcoulomb = 3
-        endif
+        call set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe,
+     &       luse_RK_FeH,luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,
+     &       luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,
+     &       luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,
+     &       luse_SM_Al,luse_linreg,luse_NN,luse_Morse,ifcoulomb,
+     &       numff,cffs,myid_md,iprint)
       endif
 
       epot = 0d0
@@ -670,10 +629,11 @@ c
       endif
       end function dfcut2
 c=======================================================================
-      function force_on(force_name)
-      use pmdio
+      function force_on(force_name,numff,cffs)
       implicit none
       character(len=*),intent(in):: force_name
+      integer,intent(in):: numff
+      character(len=20),intent(in):: cffs(numff)
       logical:: force_on
       integer:: i
 
@@ -687,6 +647,107 @@ c=======================================================================
       return
       
       end function force_on
+c=======================================================================
+      subroutine set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe,
+     &     luse_RK_FeH,luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,
+     &     luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,
+     &     luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,
+     &     luse_SM_Al,luse_linreg,luse_NN,luse_Morse,ifcoulomb,
+     &     numff,cffs,myid,iprint)
+c     
+c     Set flags for forces whether or not using them.
+c
+      implicit none
+      integer,intent(in):: myid,numff,iprint
+      integer,intent(inout):: ifcoulomb
+      character(len=20),intent(in):: cffs(numff)
+      logical,intent(inout):: luse_LJ,luse_Ito3_WHe,luse_RK_WHe
+     &     ,luse_RK_FeH,luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si
+     &     ,luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe
+     &     ,luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe
+     &     ,luse_SM_Al,luse_linreg,luse_NN,luse_Morse
+
+      logical,external:: force_on
+
+      luse_LJ = .false.
+      luse_Ito3_WHe = .false.
+      luse_RK_WHe = .false.
+      luse_RK_FeH = .false.
+      luse_Ramas_FeH = .false.
+      luse_Ackland_Fe = .false.
+      luse_SW_Si = .false.
+      luse_EDIP_Si = .false.
+      luse_Brenner = .false.
+      luse_Brenner_vdW = .false.
+      luse_Lu_WHe = .false.
+      luse_Branicio_AlN = .false.
+      luse_Mishin_Al = .false.
+      luse_AFS_W = .false.
+      luse_SC_Fe = .false.
+      luse_SM_Al = .false.
+      luse_linreg = .false.
+      luse_NN = .false.
+      luse_Morse = .false.
+      if( force_on('LJ_Ar',numff,cffs) ) luse_LJ = .true.
+      if( force_on('Ito3_WHe',numff,cffs) ) luse_Ito3_WHe = .true.
+      if( force_on('RK_WHe',numff,cffs) ) luse_RK_WHe = .true.
+      if( force_on('RK_FeH',numff,cffs) ) luse_RK_FeH = .true.
+      if( force_on('Ramas_FeH',numff,cffs) ) luse_Ramas_FeH = .true.
+      if( force_on('Ackland_Fe',numff,cffs) ) luse_Ackland_Fe = .true.
+      if( force_on('SW_Si',numff,cffs) ) luse_SW_Si = .true.
+      if( force_on('EDIP_Si',numff,cffs) ) luse_EDIP_Si = .true.
+      if( force_on('Brenner',numff,cffs) ) luse_Brenner = .true.
+      if( force_on('Brenner_vdW',numff,cffs) ) luse_Brenner_vdW = .true.
+      if( force_on('Lu_WHe',numff,cffs) ) luse_Lu_WHe = .true.
+      if( force_on('Branicio_AlN',numff,cffs) ) luse_Branicio_AlN=.true.
+      if( force_on('Mishin_Al',numff,cffs) ) luse_Mishin_Al = .true.
+      if( force_on('AFS_W',numff,cffs) ) luse_AFS_W = .true.
+      if( force_on('SC_Fe',numff,cffs) ) luse_SC_Fe = .true.
+      if( force_on('SM_Al',numff,cffs) ) luse_SM_Al = .true.
+      if( force_on('linreg',numff,cffs) ) luse_linreg = .true.
+      if( force_on('NN',numff,cffs) ) luse_NN = .true.
+      if( force_on('Morse',numff,cffs) ) luse_Morse = .true.
+c.....Coulomb forces should be exclusive each other
+      if( force_on('screened_Coulomb',numff,cffs) ) then
+        ifcoulomb = 1
+      else if( force_on('Ewald_Coulomb',numff,cffs) ) then
+        ifcoulomb = 2
+      else if( force_on('vc_gaussian',numff,cffs) ) then
+        ifcoulomb = 3
+      endif
+
+      if( myid.eq.0 .and. iprint.ne.0 ) then
+        write(6,'(a)') ' Use the following force-fields:'
+        if( luse_LJ ) print *,' LJ_Ar'
+        if( luse_Ito3_WHe ) print *,' Ito3_WHe'
+        if( luse_RK_WHe ) print *,' RK_WHe'
+        if( luse_RK_FeH ) print *,' RK_FeH'
+        if( luse_Ramas_FeH ) print *,' Ramas_FeH'
+        if( luse_Ackland_Fe ) print *,' Ackland_Fe'
+        if( luse_SW_Si ) print *,' SW_Si'
+        if( luse_EDIP_Si ) print *,' EDIP_Si'
+        if( luse_Brenner ) print *,' Brenner'
+        if( luse_Brenner_vdW ) print *,' Brenner_vdW'
+        if( luse_Lu_WHe ) print *,' Lu_WHe'
+        if( luse_Branicio_AlN ) print *,' Branicio_AlN'
+        if( luse_Mishin_Al ) print *,' Mishin_Al'
+        if( luse_AFS_W ) print *,' AFS_W'
+        if( luse_SC_Fe ) print *,' SC_Fe'
+        if( luse_SM_Al ) print *,' SM_Al'
+        if( luse_linreg ) print *,' linreg'
+        if( luse_NN ) print *,' NN'
+        if( luse_Morse ) print *,' Morse'
+c.....Coulomb forces should be exclusive each other
+        if( ifcoulomb.eq.1 ) then
+          print *,' screened_Coulomb'
+        else if( ifcoulomb.eq.2 ) then
+          print *,' Ewald_Coulomb'
+        else if( ifcoulomb.eq.3 ) then
+          print *,' vc_gaussian'
+        endif
+      endif
+
+      end subroutine set_force_flags
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"

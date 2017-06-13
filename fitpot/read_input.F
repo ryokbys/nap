@@ -100,6 +100,9 @@ c=======================================================================
       elseif( trim(cname).eq.'potential' ) then
         call read_c1(ionum,cpot)
         return
+      elseif( trim(cname).eq.'subtract_force_field' ) then
+        call read_force_field(ionum)
+        return
       elseif( trim(cname).eq.'gradient' ) then
         call read_l1(ionum,lgrad)
         return
@@ -316,4 +319,26 @@ c
 c      write(6,'(1x,a,5x,l1)') trim(ctmp),lval
 
       end subroutine read_l1
+c=======================================================================
+      subroutine read_force_field(ionum)
+c
+c     Read forces
+c     There is no limit of number of force-fields to be specified.
+c
+      use variables
+      implicit none
+      integer,intent(in):: ionum
+
+      integer:: i,ndat
+      character(len=1024):: ctmp
+      integer,external:: num_data
+
+      backspace(ionum)
+      read(ionum,'(a)') ctmp
+      ndat = num_data(trim(ctmp),' ')
+      numff = ndat -1
+      allocate(cffs(numff))
+      backspace(ionum)
+      read(ionum,*) ctmp, (cffs(i),i=1,numff)
+      end subroutine read_force_field
 

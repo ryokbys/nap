@@ -61,7 +61,7 @@ module variables
   type mdsys
     character(len=128):: cdirname
     integer:: natm,nfcal
-    real(8):: h0,h(3,3),epot,eref,wgt
+    real(8):: h0,h(3,3),epot,eref,wgt,esub
     real(8):: eerr = 1.0d-3  ! in eV
     real(8):: ferr = 0.1d0   ! in eV/A
     real(8),allocatable:: tag(:)
@@ -69,7 +69,7 @@ module variables
     integer,allocatable:: ifcal(:)
     real(8),allocatable:: fabs(:)
     real(8),allocatable:: va(:,:),strsi(:,:,:),eki(:,:,:),epi(:)&
-         ,chg(:),chi(:)
+         ,chg(:),chi(:),fsub(:,:)
     integer:: naps(mspcs)  ! num of atoms per species
     integer:: iclass       ! 1: training,  2: test
   end type mdsys
@@ -91,5 +91,9 @@ module variables
   real(8),allocatable:: swgtl(:),swgtg(:)
   real(8),allocatable:: eerrl(:),eerrg(:)
   real(8),allocatable:: ferrl(:),ferrg(:)
+
+!.....Force-fields which are subtracted from reference values
+  integer:: numff
+  character(len=20),allocatable:: cffs(:)
 
 end module variables

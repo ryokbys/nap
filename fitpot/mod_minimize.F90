@@ -261,13 +261,13 @@ contains
       if( iflag/100.ne.0 ) then
         if( ltwice ) then
           if(myid.eq.0) then
-            print *,'   armijo_search failed twice continuously...'
+            print *,'>>> Line search failed twice continuously.'
           endif
           return
         else
           ltwice= .true.
           if(myid.eq.0) then
-            print *,'   gg initialized because alpha was not found.'
+            print *,'>>> gg initialized because alpha was not found.'
           endif
           u(1:ndim)= -g(1:ndim)
           f= fp
@@ -538,7 +538,7 @@ contains
         if( ltwice ) then
           x0(1:ndim)= x(1:ndim)
           if(myid.eq.0) then
-            print *,'>>> line_search failed twice continuously...'
+            print *,'>>> line_search failed twice continuously.'
           endif
           return
         else

@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-12 13:04:49 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-13 14:17:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -739,7 +739,7 @@ contains
 
     integer:: i,idim
     real(8),save,allocatable:: gsl(:),gs(:)
-    real(8):: gmax,vmax,tg0,tc0
+    real(8):: gmax,vmax,tg0,tc0,tgl,tcl,tcg,tgg
     integer:: ismpl
 
     if( .not.allocated(gsl) ) allocate(gsl(ndim),gs(ndim))
@@ -759,16 +759,25 @@ contains
       endif
       gsl(1:ndim)= gsl(1:ndim) +gs(1:ndim)
     enddo
+    tgl = mpi_wtime() -tg0
 
     tc0= mpi_wtime()
 
     gtrn(1:ndim)= 0d0
     call mpi_allreduce(gsl,gtrn,ndim,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
-    tcomm= tcomm +mpi_wtime() -tc0
+    tcl = mpi_wtime() -tc0
+
     gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
 
-    tgrad= tgrad +mpi_wtime() -tg0
+!.....only the bottle-neck times are taken into account
+    call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
+         ,mpi_world,ierr)
+    call mpi_reduce(tgl,tgg,1,mpi_double_precision,mpi_max,0 &
+         ,mpi_world,ierr)
+    tcomm= tcomm +tcg
+    tgrad= tgrad +tgg
+    
     return
   end subroutine NN_gs
 !=======================================================================
@@ -1900,9 +1909,9 @@ contains
       smpl = samples(ismpl)
       natm = smpl%natm
       if( smpl%iclass.eq.1 ) then
-        nttrnl = nttrnl + 1 +1
+        nttrnl = nttrnl + 1
       else
-        nttstl = nttstl + 1 +1
+        nttstl = nttstl + 1
       endif
     enddo
 

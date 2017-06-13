@@ -246,7 +246,9 @@ Here are input parameters that users can change in *fitpot* program.
 * :ref:`init_params_sgm`
 * :ref:`init_params_mu`
 * :ref:`init_params_rs`
-
+* :ref:`sgd_update`
+* :ref:`sgd_batch_size`
+* :ref:`sgd_rate0`
 
 .. _num_samples:
 
@@ -394,10 +396,10 @@ It is highly recommended to match forces, since forces are important for molecul
 
 potential
 --------------------
-Default: *none*
+Default: *NN*
 
 The potential whose parameters you are going to fit.
-Now folloing potentials are available:
+Now only *NN* potential is available:
 
 *NN*:
    Neural network potential
@@ -543,4 +545,32 @@ Default: *12345.0*
 
 Random seed for the initialization of parameters.
 
+
+------------
+
+.. _sgd_update:
+
+sgd_update
+-------------
+Default: *adadelta*
+
+Method of update in **stochastic gradient decent (SGD)**.
+
+.. _sgd_batch_size:
+
+
+sgd_batch_size
+-----------------
+Default: *1*
+
+Batch size per parallel node for SGD.
+
+
+.. _sgd_rate0:
+
+sgd_rate0
+-----------
+Default: *1.0*
+
+Initial value of coefficient used for update in SGD.
 

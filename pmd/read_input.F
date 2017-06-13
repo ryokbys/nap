@@ -310,10 +310,8 @@ c
       backspace(ionum)
       read(ionum,'(a)') ctmp
       ndat = num_data(trim(ctmp),' ')
-      if( ndat.lt.2 ) then
-        write(6,'(a)') 'There is no force-field specified' //
-     &       ' by forces entry.'
-      endif
+      if( ndat.lt.2 ) write(6,'(a)') 'There is no force-field'//
+     &     ' specified.'
       numff = ndat -1
       allocate(cffs(numff))
       backspace(ionum)

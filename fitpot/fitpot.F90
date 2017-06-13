@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-13 07:54:30 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-13 17:24:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -56,7 +56,9 @@ program fitpot
   if( lswgt ) call set_sample_weights()
 
 !.....Subtract energy and forces of other force-fields
-!  call subtract_other_FF()
+  if( numff.gt.0 ) then
+    call subtract_FF()
+  endif
   
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
@@ -90,13 +92,19 @@ program fitpot
 
   if( myid.eq.0 ) then
     if( iflag/1000.ne.0 ) then
-      print *,'something wrong with 1D line search.'
+      print *,'Minimization stopped because of convergence or something.'
       print *,'  iflag=',iflag
     else if( iflag/100.ne.0 ) then
-      print *,'something wrong with minimization.'
+      print *,'Minimization stopped because of convergence or something.'
       print *,'  iflag=',iflag
     endif
   endif
+
+!.....Restore subtracted energies and forces to get original reference values
+  if( numff.gt.0 ) then
+    call restore_FF()
+  endif
+  
   call write_vars('fin')
   call write_energy_relation('fin')
   if( nsmpl.lt.10000 ) then
@@ -395,7 +403,7 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%fref(3,natm), smpl%ifcal(natm),smpl%fabs(natm) &
        ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
        ,smpl%eki(3,3,natm),smpl%epi(natm) &
-       ,smpl%chg(natm),smpl%chi(natm))
+       ,smpl%chg(natm),smpl%chi(natm),smpl%fsub(3,natm))
   do i=1,smpl%natm
     read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), &
          tmp,tmp,tmp
@@ -1350,6 +1358,15 @@ subroutine sync_input()
   call mpi_bcast(cserr,128*nserr,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(seerr,nserr,mpi_double_precision,0,mpi_world,ierr)
   call mpi_bcast(sferr,nserr,mpi_double_precision,0,mpi_world,ierr)
+
+!.....Force-fields to be subtracted from reference values
+  call mpi_bcast(numff,1,mpi_integer,0,mpi_world,ierr)
+  if( myid.gt.0 ) then
+    allocate(cffs(numff))
+  endif
+!.....TODO: check what happens if numff==0...
+  call mpi_bcast(cffs,20*numff,mpi_character,0,mpi_world,ierr)
+
 end subroutine sync_input
 !=======================================================================
 subroutine get_node2sample()
@@ -1522,7 +1539,7 @@ subroutine get_uniq_iarr(n,m,iarr)
   return
 end subroutine get_uniq_iarr
 !=======================================================================
-subroutine subtract_other_FF()
+subroutine subtract_FF()
 !
 !  Subtract energies and forces from other force-fields.
 !  This uses force-fields implemented in pmd and the NN potential made
@@ -1535,20 +1552,50 @@ subroutine subtract_other_FF()
   use parallel
   implicit none
 
-  integer:: ismpl
+  integer:: i,ismpl
   type(mdsys):: smpl
 
   do ismpl=isid0,isid1
     smpl = samples(ismpl)
     call run_pmd(smpl)
+!.....Subtract energy and forces from eref and fref, respectively
+    smpl%eref = smpl%eref -smpl%esub
+    do i=1,smpl%natm
+      smpl%fref(1:3,i) = smpl%fref(1:3,i) -smpl%fsub(1:3,i)
+    enddo
+!.....TODO: stress should also come here.
+  
   enddo
   
   
-end subroutine subtract_other_FF
+end subroutine subtract_FF
+!=======================================================================
+subroutine restore_FF()
+!
+!  Restore subtracted energies and forces
+!
+  use variables
+  use parallel
+  implicit none
+
+  integer:: i,ismpl
+  type(mdsys):: smpl
+
+  do ismpl=isid0,isid1
+    smpl = samples(ismpl)
+    smpl%eref = smpl%eref +smpl%esub
+    do i=1,smpl%natm
+      smpl%fref(1:3,i) = smpl%fref(1:3,i) +smpl%fsub(1:3,i)
+    enddo
+!.....TODO: stress should also come here.
+  enddo
+  
+end subroutine restore_FF
 !=======================================================================
 subroutine run_pmd(smpl)
 !
 !  Run pmd and get energy and forces of the system.
+!  TODO: stress should be returned as well.
 !
   use variables
   use parallel
@@ -1558,16 +1605,16 @@ subroutine run_pmd(smpl)
   logical,save:: l1st = .true.
 
   integer:: i,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
-       ifcoulomb,nismax,nstps_done,ntdst,nx,ny,nz,numff
+       ifcoulomb,nismax,nstps_done,ntdst,nx,ny,nz
   real(8):: am(9),dt,rc,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
-       ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),epot,ekin,eps_conv
+       ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv
   logical:: ltdst,lstrs,lcellfix(3,3)
   character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5
-  character(len=20):: cffs(1)
 
   if( l1st ) then
 !.....Create MPI COMM for pmd only for the 1st time
     call create_mpi_comm_pmd()
+    l1st = .false.
   endif
 
 !.....Every time allocate total arrays according to the num of atoms
@@ -1580,8 +1627,6 @@ subroutine run_pmd(smpl)
   dt = 5d0
   ciofmt = 'ascii'
   ifpmd = 0
-  numff = 1
-  cffs(1) = 'NN'
   rc = 5.5d0
   rbuf = 0.2d0
   ifdmp = 0  ! no damping as well
@@ -1604,7 +1649,6 @@ subroutine run_pmd(smpl)
   fmv(1:3,0) = (/ 0d0, 0d0, 0d0 /)
   fmv(1:3,1:9) = 1d0
   ptnsr(1:3,1:3) = 0d0
-  epot = 0d0
   ekin = 0d0
   n_conv = 1
   czload_type = 'no'
@@ -1619,21 +1663,16 @@ subroutine run_pmd(smpl)
   
 !.....Run one-shot force calculation to get an energy and forces
   call pmd_core(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
-       ,smpl%va,smpl%fa,smpl%strsi,smpl%eki,smpl%epi &
+       ,smpl%va,smpl%fsub,smpl%strsi,smpl%eki,smpl%epi &
        ,smpl%chg,smpl%chi,maxstp,nerg,npmd &
        ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
        ,nismax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp,minstp &
        ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
        ,srlx,stbeta,strfin,lstrs,lcellfix &
-       ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb &
+       ,fmv,ptnsr,smpl%esub,ekin,n_conv,ifcoulomb &
        ,czload_type,eps_conv,ifsort,iprint,nstps_done)
 
-!.....Subtract energy and forces from eref and fref, respectively
-  smpl%eref = smpl%eref -epot
-  do i=1,smpl%natm
-    smpl%fref(1:3,i) = smpl%fref(1:3,i) -smpl%fa(1:3,i)
-  enddo
-  
+  return
 end subroutine run_pmd
 !=======================================================================
 subroutine create_mpi_comm_pmd()
@@ -1664,7 +1703,9 @@ subroutine create_mpi_comm_pmd()
   call mpi_group_free(mpi_group_pmd,ierr)
   if( myid.eq.0 ) then
     write(6,'(a)') ''
-    write(6,'(a)') 'MPI_COMM_PMD were created for pmd calculations.'
+    write(6,'(a)') ' MPI_COMM_PMD was created at each node '// &
+         'for pmd calculations.'
+    write(6,'(a)') ''
   endif
   
 end subroutine create_mpi_comm_pmd

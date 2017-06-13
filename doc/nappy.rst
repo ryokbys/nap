@@ -7,6 +7,24 @@ It is contained in ``nappy`` directory, but currenly it is not exactly a python 
 Users may have to use those utilities by calling them directly from the shell.
 
 
+Setup
+=======
+
+To use ``nappy`` in python program, it is required to add a path to ``nappy`` directory
+to the environment variable ``PYTHONPATH``.
+In case of ``bash``, you can achieve this by adding the following line to ``~/.bash_profile``,
+
+.. code:: bash
+
+   export PYTHONPATH=${PYTHONPATH}:/path/to/nap
+
+You can check whether the path to ``nappy`` is added to ``PYTHONPATH`` by the following command,
+::
+
+   $ python -c 'import nappy; print nappy.__file__'
+
+
+
 Read and write files
 ==============================
 

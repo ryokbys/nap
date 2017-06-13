@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-06-13 07:32:10 Ryo KOBAYASHI>
+c                     Last-modified: <2017-06-13 18:21:53 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -52,17 +52,14 @@ c.....Set fmv as default value before reading 'in.pmd'
         call write_initial_setting()
       endif
 
-      print *,' numff = ',numff
-      print *,' cffs  = ',(cffs(i),i=1,numff)
-
       call bcast_params()
 
 c.....Set Coulomb flag here
-      if( force_on('screened_Coulomb') ) then
+      if( force_on('screened_Coulomb',numff,cffs) ) then
         ifcoulomb = 1
-      else if( force_on('Ewald_Coulomb') ) then
+      else if( force_on('Ewald_Coulomb',numff,cffs) ) then
         ifcoulomb = 2
-      else if( force_on('vc_gaussian') ) then
+      else if( force_on('vc_gaussian',numff,cffs) ) then
         ifcoulomb = 3
       endif
 
@@ -70,8 +67,10 @@ c.....only 0th-node reads pmdini file
       if( myid_md.eq.0 ) then
 c        call system('cp pmd0000 pmd0000.orig')
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
+          write(6,*) 'Read pmdini in binary mode.'
           call read_pmdtot_bin(20,trim(cpmdini))
         else if( trim(ciofmt).eq.'ascii' ) then
+          write(6,*) 'Read pmdini in ascii mode.'
           call read_pmdtot_ascii(20,trim(cpmdini))
         else
           write(6,*) 'Error: io_format must be either ascii, '
@@ -249,6 +248,8 @@ c=======================================================================
 
       integer:: ierr
 
+      if( myid_md.eq.0 ) write(6,'(a)') ' Broadcast data to be shared'
+     &     //' with all the nodes.'
 c-----Broadcast input parameters to all nodes
       call mpi_bcast(nx,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(ny,1,MPI_INTEGER,0,mpi_md_world,ierr)
@@ -287,6 +288,12 @@ c-----Broadcast input parameters to all nodes
 c.....Force-fields
       call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(numff,1,mpi_integer,0,mpi_md_world,ierr)
+      if( numff.eq.0 ) then
+        if( myid_md.eq.0 ) write(6,'(a)')
+     &       ' Error: no force-field specified'
+        call mpi_finalize(ierr)
+        stop
+      endif
       if( myid_md.ne.0 ) then
         allocate(cffs(numff))
       endif
