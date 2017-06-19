@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-19 11:24:02 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-19 13:01:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -61,7 +61,7 @@ contains
     nfunc= 0
     ngrad= 0
 
-    !.....read in.const.NN to get nl,nsp,nhl(:)
+!.....read in.const.NN to get nl,nsp,nhl(:)
     if( myid.eq.0 ) then
       open(20,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
 20    read(20,'(a)') ctmp
@@ -95,7 +95,7 @@ contains
     call mpi_bcast(lbias,1,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(lcharge,1,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(letemp,1,mpi_logical,0,mpi_world,ierr)
-    
+
 
 !!$    ncmb2= nsp +factorial(nsp,2)/factorial((nsp-2),2)/2
 !!$    ncmb3= nsp*ncmb2
@@ -121,7 +121,10 @@ contains
       endif
     endif
     if( letemp ) nhl(0) = nhl(0) +1
-    if( myid.eq.0 ) then
+    if( myid.eq.0 .and. iprint.ne.0 ) then
+      print *,'lbias  = ',lbias
+      print *,'lcharge= ',lcharge
+      print *,'letemp = ',letemp
       write(6,'(a,5i5)') ' nhl(0:nl+1)=',nhl(0:nl+1)
       write(6,'(a,5i5)') ' mhl(0:nl+1)=',mhl(0:nl+1)
     endif
@@ -133,6 +136,18 @@ contains
       nwgt(i)= nhl(i-1)*mhl(i)
       nw= nw +nwgt(i)
     enddo
+
+!.....check number of variables
+    if( nw.ne.nvars ) then
+      if( myid.eq.0 ) then
+        print *, 'Error: nw.ne.nvars !!!'
+        print *, '  Check the consistency between in.params.NN '//&
+             'and in.const.NN carefully.'
+      endif
+      call mpi_finalize(ierr)
+      stop
+    endif
+    
     if(myid.eq.0) then
 !!$      print *,'nsf2,nsf3,ncmb2,ncmb3=',nsf2,nsf3,ncmb2,ncmb3
       print *,'nsf2,nsf3 = ',nsf2,nsf3
@@ -1809,6 +1824,7 @@ contains
          ,nstype(:)
     real(8),allocatable:: sumv(:),cnst(:,:),sumvv(:)
     integer:: i,j,k,l,i2,i3,isf,iv,ic,ihl0,ihl1,itmp,icmb(3)
+    character(len=128):: ctmp
 
     allocate(sumv(mhl(0)))
     call eval_1st_layer(sumv)
@@ -1837,6 +1853,12 @@ contains
       nstype(1:100)= 2
       nstype(101:200)= 3
       open(ionum,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
+30    read(ionum,'(a)') ctmp
+      if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) then
+        goto 30
+      else
+        backspace(ionum)
+      endif
       read(ionum,*) itmp
       do isf=1,mhl(0)
         read(ionum,*) itype(isf),(icmb(k),k=1,nstype(itype(isf))) &
@@ -1905,13 +1927,13 @@ contains
     if( .not.allocated(sumvl) ) then
       allocate(sumvl(mhl(0)),ncnt(mhl(0)))
     endif
-    sumvl(1:nhl(0))= 0d0
+    sumvl(1:mhl(0))= 0d0
     ncnt(1:nhl(0))= 0
     if( nl.eq.1 ) then ! 1-layer NN
       do ismpl=isid0,isid1
         natm= samples(ismpl)%natm
         do ia=1,natm
-          do ihl0=1,nhl(0)
+          do ihl0=1,mhl(0)
             do ihl1=1,mhl(1)
               sumvl(ihl0)= sumvl(ihl0) &
                    +abs(wgt11(ihl0,ihl1) *sds(ismpl)%gsf(ia,ihl0))
