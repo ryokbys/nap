@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-13 14:17:03 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-19 11:24:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -10,8 +10,13 @@ module NNd
   save
   character(128),parameter:: ccfname='in.const.NN'
   character(128),parameter:: cmbfname='in.comb.NN'
-!.....NN mode, which determines if it contains bias node
-  integer:: mode = -1
+!.....flag for bias
+  logical:: lbias = .false.
+!.....flag for charge
+  logical:: lcharge = .false.
+!.....flag for electron temperature
+  logical:: letemp = .false.
+  
   integer,parameter:: maxnl= 2
   integer:: nl,nsp,nsf2,nsf3,ncmb2,ncmb3
 !.....number of nodes in each layer
@@ -59,15 +64,15 @@ contains
     !.....read in.const.NN to get nl,nsp,nhl(:)
     if( myid.eq.0 ) then
       open(20,file=trim(cmaindir)//'/'//trim(ccfname),status='old')
-      ndat = ndat_in_line(20,' ')
-      if( ndat.eq.4 ) then  ! old in.const.NN file
-        ! set mode = 1 and reread 1st line without reading mode
-        mode = 1
-        read(20,*) nl,nsp,nhl(0:nl)
-      else if( ndat.eq.5 ) then
-        read(20,*) nl,nsp,nhl(0:nl),mode
+20    read(20,'(a)') ctmp
+      if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) then
+        call parse_option(ctmp,iprint,ierr)
+        goto 20
+      else
+        backspace(20)
       endif
-!!$      print *,'nl,nsp,nhl(0:nl),mode = ',nl,nsp,nhl(0:nl),mode
+      read(20,*) nl,nsp,nhl(0:nl)
+
       nsf2= 0
       nsf3= 0
       do while(.true.)
@@ -87,8 +92,10 @@ contains
     call mpi_bcast(nhl,nl+2,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf2,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(mode,1,mpi_integer,0,mpi_world,ierr)
-
+    call mpi_bcast(lbias,1,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(lcharge,1,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(letemp,1,mpi_logical,0,mpi_world,ierr)
+    
 
 !!$    ncmb2= nsp +factorial(nsp,2)/factorial((nsp-2),2)/2
 !!$    ncmb3= nsp*ncmb2
@@ -104,16 +111,16 @@ contains
       stop
     endif
 
-!.....correct number of nodes according to mode value
+!.....correct number of nodes according to bias flag, lbias
     mhl(0:nl+1) = nhl(0:nl+1)
-    if( mode.ge.10 ) then
+    if( lbias ) then
       nhl(0) = nhl(0) +1
       nhl(1) = nhl(1) +1
       if( nl.eq.2 ) then
         nhl(2) = nhl(2) +1
       endif
     endif
-    if( mode.eq.12 ) nhl(0) = nhl(0) +1
+    if( letemp ) nhl(0) = nhl(0) +1
     if( myid.eq.0 ) then
       write(6,'(a,5i5)') ' nhl(0:nl+1)=',nhl(0:nl+1)
       write(6,'(a,5i5)') ' mhl(0:nl+1)=',mhl(0:nl+1)
@@ -224,6 +231,48 @@ contains
       print *, ''
     endif
   end subroutine NN_init
+!=======================================================================
+  subroutine parse_option(cline,iprint,ierr)
+!
+!  Parse options from a comment line.
+!  Lines starting from ! or # are treated as comment lines,
+!  but options can be given at the comment lines.
+!  The option words should be put after these comment characters with
+!  one or more spaces between them for example,
+!
+!  bias:  .true.
+!
+!  Currently available options are:
+!    - "bias:" with an argument .true. (T) or .false. (F)
+!    - "charge:" with an argument .true. (T) or .false. (F)
+!
+    implicit none
+    character(len=*),intent(in):: cline
+    integer,intent(in):: iprint
+    integer,intent(out):: ierr
+
+    character(len=10):: c1,copt
+    logical:: lopt
+    integer,external:: num_data
+
+    ierr = 0
+    if( index(cline,'bias:').ne.0 ) then
+      read(cline,*) c1,copt,lopt
+      if( trim(copt).ne.'bias:' ) then
+        print *, 'Error: copt is not "bias:" !!!'
+        ierr = 1
+      endif
+      lbias = lopt
+    else if( index(cline,'charge:').ne.0 ) then
+      read(cline,*) c1,copt,lopt
+      if( trim(copt).ne.'charge:' ) then
+        print *, 'Error: copt is not "charge:" !!!'
+        ierr = 2
+      endif
+      lcharge = lopt
+    endif
+    
+  end subroutine parse_option
 !=======================================================================
   subroutine NN_func(ndim,x,ftrn,ftst)
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
@@ -440,7 +489,7 @@ contains
     sds%hl1(1:natm,1:nhl(1))= 0d0
     smpl%epot =0d0
 
-    if( mode.ge.10 ) then
+    if( lbias ) then
       sds%hl1(1:natm,nhl(1)) = 1d0
     endif
     
@@ -546,7 +595,7 @@ contains
     sds%hl2(1:natm,1:nhl(2))= 0d0
     smpl%epot= 0d0
 
-    if( mode.ge.10 ) then
+    if( lbias ) then
       sds%hl1(1:natm,nhl(1)) = 1d0
       sds%hl2(1:natm,nhl(2)) = 1d0
     endif

@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-12 21:45:22 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-19 11:22:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -8,11 +8,14 @@ module NN
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
   character(128),parameter:: ccfname='in.const.NN'
-!.....mode of NN implementation
-!.....  1: without bias nodes
-!.....  10-: with bias nodes
-!.....  12: with electronic temperature node only at input layer
-  integer:: mode = 1
+
+!.....logical flag for bias
+  logical:: lbias = .false.
+!.....logical flag for charge
+  logical:: lcharge = .false.
+!.....logical flag for electron temperature
+  logical:: letemp = .false.
+  
 !.....parameters
   integer:: nwgt1,nwgt2
   real(8),allocatable:: wgt11(:,:),wgt12(:)
@@ -179,7 +182,7 @@ contains
 !.....first, calculate all the symmetry functions
     call eval_sf(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
          ,lspr,rc,rc3)
-    if( mode.gt.10 ) then
+    if( lbias ) then
 !.....set bias node to 1
       gsf(nhl(0),1:natm) = 1d0
       dgsf(1:3,nhl(0),:,:) = 0d0
@@ -198,13 +201,13 @@ contains
 !.....initialize hidden-layer node values
     if( nl.eq.1 ) then
       hl1(1:nhl(1),1:natm)= 0d0
-      if( mode.ge.10 ) then
+      if( lbias ) then
         hl1(nhl(1),1:natm)= 1d0
       endif
     else if( nl.eq.2 ) then
       hl1(1:nhl(1),1:natm)= 0d0
       hl2(1:nhl(2),1:natm)= 0d0
-      if( mode.ge.10 ) then
+      if( lbias ) then
         hl1(nhl(1),1:natm)= 1d0
         hl2(nhl(2),1:natm)= 1d0
       endif
@@ -582,18 +585,14 @@ contains
     endif
     open(51,file=trim(ccfname),status='old')
 !.....num of symmetry functions, num of node in 1st hidden layer
-    read(51,'(a)') ctmp
-    ndat = num_data(trim(ctmp),' ')
-    backspace(51)
-    if( ndat.eq.4 ) then  ! without bias node
-      ! set mode = 1 and reread 1st line without reading mode
-      mode = 1
-      read(51,*) nl,nsp,(nhl(i),i=0,nl)
-    else if( ndat.eq.5 ) then
-      read(51,*) nl,nsp,nhl(0:nl),mode
+10  read(51,'(a)') ctmp
+    if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) then
+      call parse_option(ctmp,iprint,ierr)
+      goto 10
+    else
+      backspace(51)
     endif
-!!$    print *,' nl,nsp,(nhl(i),i=0,nl)=',nl,nsp,(nhl(i),i=0,nl)
-!!$    print *,' mode = ',mode
+    read(51,*) nl,nsp,(nhl(i),i=0,nl)
     if( nl.gt.nlmax ) then
       if( myid.ge.0 ) then
         if( myid.eq.0 ) then
@@ -608,25 +607,23 @@ contains
         stop
       endif
     endif
-    if( .not.(mode.eq.1 .or. mode.eq.11 .or. mode.eq.12) ) then
-      if( myid.eq.0 ) then
-        print *, '[Error] Wrong NN mode specified.'
-        print *, '  mode = ',mode
-      endif
-      call mpi_finalize(ierr)
-      stop
-    endif
 
-!.....Determine num of symmetry functions and nodes depending on mode
+    call mpi_bcast(lbias,1,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(lcharge,1,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(letemp,1,mpi_logical,0,mpi_world,ierr)
+
+!.....Determine num of symmetry functions and nodes
     nsf= nhl(0)
     nhl(nl+1)= 1  ! only one output node, an energy
     mhl(0:nl+1)= nhl(0:nl+1)
-    if( mode.gt.10 ) then  ! bias node
+    if( lbias ) then  ! bias node
       nhl(0:nl) = nhl(0:nl) +1
     endif
-    if( mode.eq.12 ) nhl(0) = nhl(0) +1  ! T_e
+    if( letemp ) nhl(0) = nhl(0) +1  ! T_e
     if( myid.eq.0 .and. iprint.ne.0 ) then
-      print *,'mode= ',mode
+      print *,'lbias  = ',lbias
+      print *,'lcharge= ',lcharge
+      print *,'letemp = ',letemp
       print *,'nhl = ',nhl(0:nl+1)
       print *,'mhl = ',mhl(0:nl+1)
     endif
@@ -729,7 +726,7 @@ contains
       write(6,'(a,i10)')  '   ncoeff should be ',nc
       stop
     endif
-!.....different number of weights depending on mode and number of layers
+!.....different number of weights and number of layers
     if( nl.eq.1 ) then
       allocate(wgt11(nhl(0),mhl(1)),wgt12(nhl(1)))
       wgt11(1:nhl(0),1:mhl(1)) = 0d0
@@ -780,6 +777,48 @@ contains
     deallocate(nwgt)
     return
   end subroutine read_params
+!=======================================================================
+  subroutine parse_option(cline,iprint,ierr)
+!
+!  Parse options from a comment line.
+!  Lines starting from ! or # are treated as comment lines,
+!  but options can be given at the comment lines.
+!  The option words should be put after these comment characters with
+!  one or more spaces between them for example,
+!
+!  bias:  .true.
+!
+!  Currently available options are:
+!    - "bias:" with an argument .true. (T) or .false. (F)
+!    - "charge:" with an argument .true. (T) or .false. (F)
+!
+    implicit none
+    character(len=*),intent(in):: cline
+    integer,intent(in):: iprint
+    integer,intent(out):: ierr
+
+    character(len=10):: c1,copt
+    logical:: lopt
+    integer,external:: num_data
+
+    ierr = 0
+    if( index(cline,'bias:').ne.0 ) then
+      read(cline,*) c1,copt,lopt
+      if( trim(copt).ne.'bias:' ) then
+        print *, 'Error: copt is not "bias:" !!!'
+        ierr = 1
+      endif
+      lbias = lopt
+    else if( index(cline,'charge:').ne.0 ) then
+      read(cline,*) c1,copt,lopt
+      if( trim(copt).ne.'charge:' ) then
+        print *, 'Error: copt is not "charge:" !!!'
+        ierr = 2
+      endif
+      lcharge = lopt
+    endif
+    
+  end subroutine parse_option
 !=======================================================================
   function factorial(n,m)
 !  compute factorial of n, m-times.

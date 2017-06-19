@@ -502,17 +502,23 @@ You need to specify the species order correctly with --specorder option.
         self.atoms= []
         self.alc= 1.0
         for line in f.readlines():
-            if 'ITEM: NUMBER OF ATOMS' in line:
-                mode= 'NUMBER OF ATOMS'
-                continue
-            elif 'ITEM: BOX BOUNDS' in line:
-                mode= 'BOX BOUNDS'
-                continue
-            elif 'ITEM: ATOMS' in line:
-                mode= 'ATOMS'
-                continue
-            
-            if mode == 'NUMBER OF ATOMS':
+            if 'ITEM' in line:
+                if 'NUMBER OF ATOMS' in line:
+                    mode= 'NUMBER OF ATOMS'
+                    continue
+                elif 'BOX BOUNDS' in line:
+                    mode= 'BOX BOUNDS'
+                    continue
+                elif 'ATOMS' in line:
+                    mode= 'ATOMS'
+                    continue
+                elif 'TIMESTEP' in line:
+                    mode= 'TIMESTEP'
+                    continue
+                
+            if mode == 'TIMESTEP':
+                timestep = int(line.split()[0])
+            elif mode == 'NUMBER OF ATOMS':
                 natm= int(line.split()[0])
             elif mode == 'BOX BOUNDS':
                 data = line.split()

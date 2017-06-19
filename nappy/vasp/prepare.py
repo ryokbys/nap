@@ -262,7 +262,8 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
     poscar.read(poscar_fname)
 
     if os.path.exists('./POTCAR'):
-        print(' Use ./POTCAR already exists.')
+        print(' WARNING:')
+        print('   Use ./POTCAR already exists.')
         potcar = nappy.vasp.potcar.read_POTCAR()
     else:
         prepare_potcar(poscar,potcar_dir,potcar_postfix)

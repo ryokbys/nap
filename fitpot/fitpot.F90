@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-13 17:24:34 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-14 22:30:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -213,7 +213,9 @@ subroutine get_dir_list(ionum)
   if( myid.eq.0 ) then
     lerror = .true.
     if( len(trim(csmplist)).lt.1 ) then
-      print *,'sample list was created by command line...'
+      print *,'sample list was created by performing the following'
+      print *,'  $ ls '//trim(cmaindir) &
+           //' | grep "smpl_" > dir_list.txt'
       call system('ls '//trim(cmaindir) &
            //' | grep "smpl_" > dir_list.txt')
       open(ionum,file='dir_list.txt',status='old')

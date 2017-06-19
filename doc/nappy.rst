@@ -10,6 +10,8 @@ Users may have to use those utilities by calling them directly from the shell.
 Setup
 =======
 
+The ``nappy`` does not work with python-3 series, so users should install python-2.7 or later. It is recommended to install python-2.7 environment using ``pyenv`` and to choose ``anaconda-4.0.0`` in the versions available.
+
 To use ``nappy`` in python program, it is required to add a path to ``nappy`` directory
 to the environment variable ``PYTHONPATH``.
 In case of ``bash``, you can achieve this by adding the following line to ``~/.bash_profile``,

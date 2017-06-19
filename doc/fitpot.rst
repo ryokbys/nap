@@ -238,6 +238,7 @@ Here are input parameters that users can change in *fitpot* program.
 * :ref:`xtol`
 * :ref:`force_match`
 * :ref:`potential`
+* :ref:`random_seed`
 * :ref:`regularize`
 * :ref:`penalty_weight`
 * :ref:`sample_error`
@@ -405,6 +406,14 @@ Now only *NN* potential is available:
    Neural network potential
 
 
+.. _random_seed:
+
+random_seed
+---------------
+Default: *12345d0*
+
+Initial random seed for the uniform random numbers used in the *fitpot*.
+This mainly works to change the choice of training and test sets.
 
 .. _regularize:
 
@@ -544,6 +553,8 @@ init_params_rs
 Default: *12345.0*
 
 Random seed for the initialization of parameters.
+This random seed is only used for this purpose and does not affect random seed for the choice of 
+training and test sets, which is affected by :ref:`random_seed`.
 
 
 ------------

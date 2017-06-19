@@ -95,7 +95,7 @@ def rdf(asys,nspcs,dr,rmax):
     #print nadr
     return rd,nadr,natm0
 
-def rdf_average(infiles,nspcs,nr,ffmt='akr',dr=0.1,rmax=3.0,average=True):
+def rdf_average(infiles,nspcs,nr,ffmt='pmd',dr=0.1,rmax=3.0,average=True):
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     nsum= 0
     for infname in infiles:
