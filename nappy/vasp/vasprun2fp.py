@@ -25,17 +25,16 @@ from ase.io import read,write
 from docopt import docopt
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "160507"
+__version__ = "170620"
 
-_specorder = []
 _kb2gpa = 160.2176487
 
-def get_tag(symbol,atom_id):
-    sid= _specorder.index(symbol)+1
+def get_tag(symbol,atom_id,specorder):
+    sid= specorder.index(symbol)+1
     tag= float(sid) +0.1 +atom_id*1e-14
     return '{0:16.14f}'.format(tag)
 
-def write_pos(atoms,fname="pos"):
+def write_pos(atoms,fname="pos",specorder=[]):
     cell= atoms.cell
     pos= atoms.get_scaled_positions()
     with open(fname,'w') as f:
@@ -49,31 +48,31 @@ def write_pos(atoms,fname="pos"):
         f.write(' {0:10d}\n'.format(len(atoms)))
         for i in range(len(atoms)):
             atom= atoms[i]
-            f.write(' {0:s}'.format(get_tag(atom.symbol,i+1)))
+            f.write(' {0:s}'.format(get_tag(atom.symbol,i+1,specorder)))
             f.write(' {0:12.8f} {1:12.8f} {2:12.8f}'.format(pos[i,0],pos[i,1],pos[i,2]))
             f.write(' 0.0 0.0 0.0 ')
             f.write(' 0.0 0.0 ' 
                     +' 0.0 0.0 0.0 0.0 0.0 0.0\n')
 
 
-def output_for_fitpot(atoms,keep_const,dirname='./'):
+def output_for_fitpot(atoms,keep_const,dirname='./',specorder=[]):
     if not keep_const:
         del atoms.constraints
-    write(dirname+'POSCAR',images=atoms,format='vasp',direct=True,vasp5=True)
+    write(dirname+'/POSCAR',images=atoms,format='vasp',direct=True,vasp5=True)
     try:
         epot = atoms.get_potential_energy()
     except:
         print ' Failed to get_potential_energy(), so skip it.'
         return None
-    with open(dirname+'erg.ref','w') as f:
+    with open(dirname+'/erg.ref','w') as f:
         f.write("{0:12.7f}\n".format(epot))
-    with open(dirname+'frc.ref','w') as f:
+    with open(dirname+'/frc.ref','w') as f:
         f.write("{0:6d}\n".format(len(atoms)))
         frcs= atoms.get_forces()
         for frc in frcs:
             f.write("{0:12.7f} {1:12.7f} {2:12.7f}\n".format(frc[0],frc[1],frc[2]))
-    write_pos(atoms,fname=dirname+'pos')
-    with open(dirname+'strs.ref','w') as f:
+    write_pos(atoms,fname=dirname+'/pos',specorder=specorder)
+    with open(dirname+'/strs.ref','w') as f:
         strs = atoms.get_stress()
         for s in strs:
             f.write(" {0:15.7f}".format(s*_kb2gpa)) # converting from kBar to GPa
@@ -84,13 +83,12 @@ if __name__ == "__main__":
 
     args=docopt(__doc__)
     dirs= args['DIR']
-    specorder= args['--specorder']
+    specorder= args['--specorder'].split(',')
     index= int(args['--index'])
     sequence = args['--sequence']
     keep_const = args['--keep-constraints']
 
-    _specorder = specorder.split(',')
-    print ' specorder = ',_specorder
+    print ' specorder = ',specorder
     if sequence:
         print ' All the sequence are to be extracted.'
         index = ':'
@@ -125,10 +123,12 @@ if __name__ == "__main__":
                 dirname = '{0:05d}/'.format(j)
                 print('  {0:s}'.format(dirname))
                 os.system('mkdir -p {0:s}'.format(dirname))
-                output_for_fitpot(a,keep_const,dirname=dirname)
+                output_for_fitpot(a,keep_const,dirname=dirname,
+                                  specorder=specorder)
             pass
         else:   # snapshopt
             dirname = './'
-            output_for_fitpot(atoms,keep_const,dirname=dirname)
+            output_for_fitpot(atoms,keep_const,dirname=dirname,
+                              specorder=specorder)
     os.chdir(cwd)
 
