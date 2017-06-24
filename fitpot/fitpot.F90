@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-14 22:30:25 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-24 23:30:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -55,14 +55,17 @@ program fitpot
   call get_base_energies()
   if( lswgt ) call set_sample_weights()
 
+  call read_vars()
+  allocate(gvar(nvars),dvar(nvars))
+
 !.....Subtract energy and forces of other force-fields
   if( numff.gt.0 ) then
     call subtract_FF()
   endif
-  
-  call read_vars()
-  allocate(gvar(nvars),dvar(nvars))
 
+!!$!.....Subtract atomic energy
+!!$  call subtract_atomic_energy()
+  
   select case (trim(cfmethod))
     case ('sd','SD')
       call sd_wrapper()
@@ -100,6 +103,8 @@ program fitpot
     endif
   endif
 
+  call write_stats(niter)
+
 !.....Restore subtracted energies and forces to get original reference values
   if( numff.gt.0 ) then
     call restore_FF()
@@ -110,7 +115,6 @@ program fitpot
   if( nsmpl.lt.10000 ) then
     call write_force_relation('fin')
   endif
-  call write_stats(niter)
   if(trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso') &
        call write_eliminated_vars()
 !!$  write(6,'(a,i4,3f15.3)') ' myid,tfunc,tgrad,tcom=' &
@@ -194,6 +198,7 @@ end subroutine write_initial_setting
 subroutine get_dir_list(ionum)
   use variables
   use parallel
+  use fp_common,only: ndat_in_line
   implicit none
   interface
     subroutine shuffle_dirlist(nsmpl,cdirlist,iclist)
@@ -204,7 +209,6 @@ subroutine get_dir_list(ionum)
   end interface
   integer,intent(in):: ionum
   integer:: is,ndat
-  integer,external:: ndat_in_line
   logical:: lerror = .false.
 
   if( .not. allocated(cdirlist)) allocate(cdirlist(nsmpl))
@@ -405,7 +409,8 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%fref(3,natm), smpl%ifcal(natm),smpl%fabs(natm) &
        ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
        ,smpl%eki(3,3,natm),smpl%epi(natm) &
-       ,smpl%chg(natm),smpl%chi(natm),smpl%fsub(3,natm))
+       ,smpl%chg(natm),smpl%chi(natm),smpl%fsub(3,natm) &
+       ,smpl%symbols(natm),smpl%eatm(natm))
   do i=1,smpl%natm
     read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), &
          tmp,tmp,tmp
@@ -416,12 +421,12 @@ end subroutine read_pos
 subroutine read_ref_data()
   use variables
   use parallel
+  use fp_common,only: ndat_in_line
   implicit none 
   integer:: ismpl,i,is,jflag,natm,nfrc,nftot,nfrcg,nftotg
   integer:: imax,ifsmpl,nfsmplmax,nfrefdat,ifcal
   character(len=128):: cdir
   real(8):: erefminl,ftmp(3),fmax
-  integer,external:: ndat_in_line
 
   jflag= 0
   erefminl= 0d0
@@ -436,9 +441,9 @@ subroutine read_ref_data()
 !.....Subtract (isolated) atomic energy from eref
     samples(ismpl)%naps(1:mspcs) = 0
     do i=1,samples(ismpl)%natm
-      is= samples(ismpl)%tag(i)
+      is= int(samples(ismpl)%tag(i))
       samples(ismpl)%naps(is) = samples(ismpl)%naps(is) +1
-      samples(ismpl)%eref= samples(ismpl)%eref -eatom(is)
+      samples(ismpl)%eref= samples(ismpl)%eref  !-eatom(is)
     enddo
     samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 1
 !!$    erefminl= min(erefminl,samples(ismpl)%eref/samples(ismpl)%natm)
@@ -454,6 +459,7 @@ subroutine read_ref_data()
       jflag= jflag +1
     endif
     nfrefdat = ndat_in_line(14,' ')
+    print *,'ismpl,cdirname =',ismpl,cdir
     do i=1,natm
       nftot= nftot + 1
       if( nfrefdat.eq.3 ) then
@@ -467,6 +473,8 @@ subroutine read_ref_data()
       samples(ismpl)%fref(1:3,i)= ftmp(1:3)
       samples(ismpl)%ifcal(i)= ifcal
       samples(ismpl)%fabs(i)= sqrt(ftmp(1)**2 +ftmp(2)**2 +ftmp(3)**2)
+!!$      write(6,'(a,2i5,3es12.4)') 'ismpl,i,samples(ismpl)%fref(1:3,i) = ',&
+!!$           ismpl,i,samples(ismpl)%fref(1:3,i)
     enddo
     close(14)
 
@@ -505,6 +513,9 @@ subroutine read_ref_data()
 end subroutine read_ref_data
 !=======================================================================
 subroutine get_base_energies()
+!
+!  Compute base energies for elements from unary systems.
+!
   use variables
   use parallel
   implicit none
@@ -549,10 +560,16 @@ subroutine read_vars()
   implicit none
   integer:: i
   real(8):: rs0
+  character(len=128):: fname = 'in.vars.fitpot'
+
+  if( trim(cpot).eq.'NN' ) then
+    fname = cparfile
+  else
+    fname = 'in.vars.fitpot'
+  endif
 
   if( myid.eq.0 ) then
-!!$    open(15,file=trim(cmaindir)//'/'//cparfile,status='old')
-    open(15,file=trim(cparfile),status='old')
+    open(15,file=trim(fname),status='old')
     read(15,*) nvars, rcut, rc3
   endif
   call mpi_bcast(nvars,1,mpi_integer,0,mpi_world,ierr)
@@ -571,15 +588,16 @@ subroutine read_vars()
         vars(i) = vinitsgm*(polarbm()-vinitmu)
       enddo
       call set_seed(rs0)
-      write(6,'(a)') ' params are shuffled to give normal distribution'
+      write(6,'(a)') ' Potential parameters are shuffled'&
+           //' to give normal distribution'
       write(6,'(a,2es10.2)') '   with mu and sgm =',vinitmu,vinitsgm
     else
-      write(6,'(a)') ' params are read from file: '//cparfile
+      write(6,'(a)') ' Potential parameters are read from file: '//fname
     endif
+    close(15)
   endif
   call mpi_bcast(vars,nvars,mpi_double_precision,0,mpi_world,ierr)
 
-  close(15)
 end subroutine read_vars
 !=======================================================================
 subroutine write_vars(cadd)
@@ -615,18 +633,25 @@ subroutine qn_wrapper()
   use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
+  use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   integer:: i,m
   real(8):: fval
   external:: write_stats
 
-  !.....NN specific code hereafter
-  call NN_init()
-  call qn(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
-       ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
-       ,niter_eval,write_stats)
-  call NN_analyze("fin")
-!!$  call NN_restore_standard()
+  if( trim(cpot).eq.'NN' ) then
+!.....NN specific code hereafter
+    call NN_init()
+    call qn(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
+         ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
+         ,niter_eval,write_stats)
+    call NN_analyze("fin")
+    
+  else if( trim(cpot).eq.'vcMorse' ) then
+    call qn(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
+         ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
+         ,niter_eval,write_stats)
+  endif
 
   return
 end subroutine qn_wrapper
@@ -1148,6 +1173,11 @@ subroutine write_stats(iter)
     endif
   endif
 
+!.....Restore subtracted energies and forces to get original reference values
+  if( numff.gt.0 ) then
+    call restore_FF()
+  endif
+
   demaxl_trn= 0d0
   desuml_trn= 0d0
   demaxl_tst= 0d0
@@ -1212,6 +1242,8 @@ subroutine write_stats(iter)
           df= abs(smpl%fa(l,ia)-smpl%fref(l,ia))
           dfmaxl_trn= max(dfmaxl_trn,df)
           dfsuml_trn=dfsuml_trn +df*df
+!!$          write(6,'(a,3i5,3es12.4)')  'ismpl,ia,l,fa,fref,dfsuml_trn=',&
+!!$               ismpl,ia,l,smpl%fa(l,ia),smpl%fref(l,ia),dfsuml_trn
           ntrnl=ntrnl +1
         enddo
       enddo
@@ -1244,6 +1276,7 @@ subroutine write_stats(iter)
   call mpi_reduce(ntstl,ntst,1 &
        ,mpi_integer,mpi_sum,0,mpi_world,ierr)
   rmse_trn= sqrt(dfsum_trn/ntrn)
+!!$  print *,'dfsum_trn,ntrn = ',dfsum_trn,dfsuml_trn,ntrn,rmse_trn
   if( ntst.ne.0 ) then
     rmse_tst= sqrt(dfsum_tst/ntst)
   else
@@ -1254,6 +1287,11 @@ subroutine write_stats(iter)
          ,iter,mpi_wtime()-time0 &
          ,rmse_trn,dfmax_trn,rmse_tst,dfmax_tst
 !    call write_vars('tmp')
+  endif
+
+!.....Subtract energy and forces again
+  if( numff.gt.0 ) then
+    call subtract_FF()
   endif
   
   l1st = .false.
@@ -1555,21 +1593,38 @@ subroutine subtract_FF()
   implicit none
 
   integer:: i,ismpl
-  type(mdsys):: smpl
+  logical:: lcalcgrad = .false.
+  logical,save:: l1st = .true.
 
+  if( l1st ) then
+    if( myid.eq.0 .and. iprint.ne.0 ) then
+      print *,'subtract_FF'
+      do i=1,numff
+        print *,'  i,FF = ',i,trim(cffs(i))
+      enddo
+    endif
+
+!.....Only at the 1st call, perform pmd to get esubs
+    do ismpl=isid0,isid1
+      samples(ismpl)%chg(1:samples(ismpl)%natm) = 0d0
+      call run_pmd(samples(ismpl),lcalcgrad,nvars,gvar)
+    enddo
+  endif
+
+!.....After the 1st call, subtract esubs calculated at the 1st call
   do ismpl=isid0,isid1
-    smpl = samples(ismpl)
-    call run_pmd(smpl)
 !.....Subtract energy and forces from eref and fref, respectively
-    smpl%eref = smpl%eref -smpl%esub
-    do i=1,smpl%natm
-      smpl%fref(1:3,i) = smpl%fref(1:3,i) -smpl%fsub(1:3,i)
+    samples(ismpl)%eref = samples(ismpl)%eref -samples(ismpl)%esub
+    do i=1,samples(ismpl)%natm
+      samples(ismpl)%fref(1:3,i) = samples(ismpl)%fref(1:3,i) &
+           -samples(ismpl)%fsub(1:3,i)
     enddo
 !.....TODO: stress should also come here.
-  
+
   enddo
-  
-  
+
+  l1st = .false.
+  return
 end subroutine subtract_FF
 !=======================================================================
 subroutine restore_FF()
@@ -1581,20 +1636,19 @@ subroutine restore_FF()
   implicit none
 
   integer:: i,ismpl
-  type(mdsys):: smpl
 
   do ismpl=isid0,isid1
-    smpl = samples(ismpl)
-    smpl%eref = smpl%eref +smpl%esub
-    do i=1,smpl%natm
-      smpl%fref(1:3,i) = smpl%fref(1:3,i) +smpl%fsub(1:3,i)
+    samples(ismpl)%eref = samples(ismpl)%eref +samples(ismpl)%esub
+    do i=1,samples(ismpl)%natm
+      samples(ismpl)%fref(1:3,i) = samples(ismpl)%fref(1:3,i) &
+           +samples(ismpl)%fsub(1:3,i)
     enddo
 !.....TODO: stress should also come here.
   enddo
   
 end subroutine restore_FF
 !=======================================================================
-subroutine run_pmd(smpl)
+subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv)
 !
 !  Run pmd and get energy and forces of the system.
 !  TODO: stress should be returned as well.
@@ -1603,6 +1657,9 @@ subroutine run_pmd(smpl)
   use parallel
   implicit none
   type(mdsys),intent(inout):: smpl
+  integer,intent(in):: ndimp
+  real(8),intent(inout):: pderiv(ndimp)
+  logical,intent(in):: lcalcgrad
 
   logical,save:: l1st = .true.
 
@@ -1629,8 +1686,8 @@ subroutine run_pmd(smpl)
   dt = 5d0
   ciofmt = 'ascii'
   ifpmd = 0
-  rc = 5.5d0
-  rbuf = 0.2d0
+  rc = rcut
+  rbuf = 0.0d0
   ifdmp = 0  ! no damping as well
   dmp = 0.99d0
   minstp = 0
@@ -1656,23 +1713,35 @@ subroutine run_pmd(smpl)
   czload_type = 'no'
   eps_conv = 1d-3
   ifsort = 1
-  iprint = 0
+  iprint = 1
   ifcoulomb = 0
   lcellfix(1:3,1:3) = .false.
   nx = 1
   ny = 1
   nz = 1
   
-!.....Run one-shot force calculation to get an energy and forces
-  call pmd_core(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
+!!$!.....Run one-shot force calculation to get an energy and forces
+!!$  call pmd_core(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
+!!$       ,smpl%va,smpl%fsub,smpl%strsi,smpl%eki,smpl%epi &
+!!$       ,smpl%chg,smpl%chi,maxstp,nerg,npmd &
+!!$       ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
+!!$       ,nismax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp,minstp &
+!!$       ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
+!!$       ,srlx,stbeta,strfin,lstrs,lcellfix &
+!!$       ,fmv,ptnsr,smpl%esub,ekin,n_conv,ifcoulomb &
+!!$       ,czload_type,eps_conv,ifsort,iprint,nstps_done)
+
+!.....one_shot force calculation
+  print *,'calling one_shot...'
+  call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
        ,smpl%va,smpl%fsub,smpl%strsi,smpl%eki,smpl%epi &
-       ,smpl%chg,smpl%chi,maxstp,nerg,npmd &
+       ,smpl%chg,smpl%chi &
        ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
-       ,nismax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp,minstp &
-       ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
-       ,srlx,stbeta,strfin,lstrs,lcellfix &
-       ,fmv,ptnsr,smpl%esub,ekin,n_conv,ifcoulomb &
-       ,czload_type,eps_conv,ifsort,iprint,nstps_done)
+       ,nismax,am,dt,numff,cffs,rc,rbuf,ptnsr,smpl%esub,ekin &
+       ,ifcoulomb,iprint,lcalcgrad,ndimp,pderiv)
+
+!!$  print *,'smpl%natm =',smpl%natm
+!!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)
 
   return
 end subroutine run_pmd
@@ -1711,6 +1780,28 @@ subroutine create_mpi_comm_pmd()
   endif
   
 end subroutine create_mpi_comm_pmd
+!=======================================================================
+subroutine subtract_atomic_energy()
+  use variables
+  use parallel
+  implicit none
+  integer:: ismpl,is,i
+  type(mdsys):: smpl
+
+  if( trim(cpot).eq.'vcMorse' ) then
+    do ismpl=isid0,isid1
+      smpl = samples(ismpl)
+    enddo
+  else
+    do ismpl=isid0,isid1
+      smpl = samples(ismpl)
+      do i=1,smpl%natm
+        is= int(smpl%tag(i))
+        samples(ismpl)%eref= samples(ismpl)%eref -eatom(is)
+      enddo
+    enddo
+  endif
+end subroutine subtract_atomic_energy
 !-----------------------------------------------------------------------
 ! Local Variables:
 ! compile-command: "make fitpot"

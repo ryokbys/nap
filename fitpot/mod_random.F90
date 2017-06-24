@@ -37,7 +37,7 @@ contains
 !
 !  Polar form of Box-Muller method.
 !  See: http://www.design.caltech.edu/erik/Misc/Gaussian.html
-!  Generate Gaussian distribution from two uniform random number.
+!  Generate Gaussian distribution from two uniform random numbers.
 !  Only one of two dependent random numbers is returned.
 !
     implicit none

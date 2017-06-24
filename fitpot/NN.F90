@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-19 13:01:38 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-24 23:27:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -50,11 +50,11 @@ contains
     use variables
     use parallel
     use minimize
+    use fp_common,only: ndat_in_line
     implicit none 
     integer:: itmp,i,nw,natm,ismpl,ihl0,ihl1,itmp2,ndat
     real(8):: swgtrn,swgtst,dtmp
     character:: ctmp*128
-    integer,external:: ndat_in_line
 
     tfunc= 0d0
     tgrad= 0d0
@@ -503,6 +503,7 @@ contains
     natm= smpl%natm
     sds%hl1(1:natm,1:nhl(1))= 0d0
     smpl%epot =0d0
+    smpl%fa(1:3,1:natm)= 0d0
 
     if( lbias ) then
       sds%hl1(1:natm,nhl(1)) = 1d0
@@ -538,7 +539,6 @@ contains
     if( .not.lfmatch ) return
     nfcal= smpl%nfcal
     if( nfcal.eq.0 ) return
-    smpl%fa(1:3,1:natm)= 0d0
     if( allocated(mskgfs) ) then
       do ihl1=1,mhl(1)
         w2= wgt12(ihl1)
@@ -609,6 +609,7 @@ contains
     sds%hl1(1:natm,1:nhl(1))= 0d0
     sds%hl2(1:natm,1:nhl(2))= 0d0
     smpl%epot= 0d0
+    smpl%fa(1:3,1:natm)= 0d0
 
     if( lbias ) then
       sds%hl1(1:natm,nhl(1)) = 1d0
@@ -658,7 +659,6 @@ contains
     if( .not.lfmatch ) return
     nfcal= smpl%nfcal
     if( nfcal.eq.0 ) return
-    smpl%fa(1:3,1:natm)= 0d0
     if( allocated(mskgfs) ) then
       do ihl2=1,mhl(2)
         w3= wgt23(ihl2)
@@ -743,7 +743,7 @@ contains
 !!$    real(8):: NN_grad(ndim)
     
     integer:: ismpl,i,idim
-    real(8),save,allocatable:: gs(:),glocal(:),gtrnl(:)
+    real(8),save,allocatable:: gs(:),gtrnl(:)
     real(8):: gmax,vmax
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0
     type(mdsys):: smpl
@@ -753,8 +753,6 @@ contains
     ngrad= ngrad +1
     tg0= mpi_wtime()
 
-!!$    NN_grad(1:ndim)= 0d0
-!!$    glocal(1:ndim)= 0d0
     gtrnl(1:ndim) = 0d0
 
     do ismpl=isid0,isid1

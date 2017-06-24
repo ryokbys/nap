@@ -1,7 +1,12 @@
 subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
      ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
      ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
-     ,numff,cffs,ifcoulomb,iprint,l1st)
+     ,numff,cffs,ifcoulomb,iprint,l1st, &
+     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH,  &
+     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si, &
+     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN, &
+     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, &
+     luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc)
 !-----------------------------------------------------------------------
 !  Wrapper routine for force calculations.
 !  Each force calculation routine is called from this subroutine.
@@ -39,45 +44,51 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
        ,chg(namax),chi(namax)
   character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: l1st
-  logical:: lstrs
-
-  integer:: ierr,is,i
-  real(8):: at(3),tmp
-  logical,save:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, &
+  logical,intent(inout):: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, &
        luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si, &
        luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN, &
        luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, &
        luse_linreg,luse_NN,luse_Morse,luse_vcMorse
-  logical,save:: lvc = .false.
+  logical,intent(inout):: lvc
+  logical,intent(in):: lstrs
 
-  if( l1st ) then
-    call set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
-         luse_RK_FeH,luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si, &
-         luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe, &
-         luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe, &
-         luse_SM_Al,luse_linreg,luse_NN,luse_Morse,luse_vcMorse, &
-         ifcoulomb,numff,cffs,myid_md,iprint)
-    if( luse_vcMorse .or. ifcoulomb.eq.3 ) lvc = .true.
-  endif
+  integer:: ierr,is,i
+  real(8):: at(3),tmp
+
+!!$  if( l1st ) then
+!!$    call set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
+!!$         luse_RK_FeH,luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si, &
+!!$         luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe, &
+!!$         luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe, &
+!!$         luse_SM_Al,luse_linreg,luse_NN,luse_Morse,luse_vcMorse, &
+!!$         ifcoulomb,numff,cffs,myid_md,iprint)
+!!$    lvc = .false.
+!!$    if( luse_vcMorse ) then
+!!$      if( ifcoulomb.ne.3 ) then
+!!$        if( myid_md.eq.0 .and. iprint.ne.0 ) print *,'ifcoulomb is set to 3,' &
+!!$             //' because vcMorse is chosen.'
+!!$        ifcoulomb = 3
+!!$      endif
+!!$      lvc = .true.
+!!$    endif
+!!$
+!!$!.....Initialization if needed
+!!$    if( ifcoulomb.eq.1 ) then ! screened Coulomb
+!!$      call initialize_coulomb(natm,tag,chg,chi,myid_md &
+!!$           ,mpi_md_world,ifcoulomb,iprint,h,rc)
+!!$    else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
+!!$      call initialize_coulomb(natm,tag,chg,chi,myid_md &
+!!$           ,mpi_md_world,ifcoulomb,iprint,h,rc)
+!!$    else if( ifcoulomb.eq.3 ) then ! variable-charge with Gaussians
+!!$      call initialize_coulomb(natm,tag,chg,chi,myid_md &
+!!$           ,mpi_md_world,ifcoulomb,iprint,h,rc)
+!!$    endif
+!!$  endif
 
   epot = 0d0
   aa(1:3,1:natm+nb)=0d0
   epi(1:natm+nb)= 0d0
   strs(1:3,1:3,1:natm+nb)= 0d0
-
-!.....Initialization if needed
-  if( l1st ) then
-    if( ifcoulomb.eq.1 ) then ! screened Coulomb
-      call initialize_coulomb(natm,tag,chg,chi,myid_md &
-           ,mpi_md_world,ifcoulomb,iprint,h,rc)
-    else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
-      call initialize_coulomb(natm,tag,chg,chi,myid_md &
-           ,mpi_md_world,ifcoulomb,iprint,h,rc)
-    else if( ifcoulomb.eq.3 ) then ! variable-charge with Gaussians
-      call initialize_coulomb(natm,tag,chg,chi,myid_md &
-           ,mpi_md_world,ifcoulomb,iprint,h,rc)
-    endif
-  endif
 
 !.....If varaible charge, optimize charges before any force calc
   if( lvc ) then
@@ -85,10 +96,11 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
       print *, 'Charges are to be equilibrated.'
       print *, ''
     endif
+    write(6,'(a,30es12.4)') 'chg before dampopt=',chg(1:natm)
     call dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
          tcom,myid_md,mpi_md_world,iprint,ifcoulomb, &
          luse_vcMorse,l1st)
-    write(6,'(a,12f6.2)') 'chg(1:natm) = ',chg(1:natm)
+    write(6,'(a,30es12.4)') 'chg after dampopt=',chg(1:natm)
   endif
 
 !.....Exclusive choice of different Coulomb force-fields
@@ -188,6 +200,72 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
   enddo
 
 end subroutine get_force
+!=======================================================================
+subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
+     iprint,h,rc,numff,cffs, &
+     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH,  &
+     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si, &
+     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN, &
+     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, &
+     luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc,ifcoulomb)
+!
+!  Initialization routine is separated from main get_force routine,
+!  mainly because the initialization is not necessary in case of fitpot.
+!
+  use Coulomb, only: initialize_coulomb
+  use Morse, only: init_vcMorse, read_params_vcMorse, lprmset, &
+       read_element_descriptors
+  implicit none
+  integer,intent(in):: namax,natm,myid_md,mpi_md_world,iprint,numff
+  real(8),intent(in):: tag(namax),h(3,3),rc
+  character(len=20),intent(in):: cffs(numff)
+  integer,intent(inout):: ifcoulomb
+  real(8),intent(inout):: chg(namax),chi(namax)
+  logical,intent(inout):: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, &
+       luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si, &
+       luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN, &
+       luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, &
+       luse_linreg,luse_NN,luse_Morse,luse_vcMorse
+  logical,intent(inout):: lvc
+
+  call set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
+       luse_RK_FeH,luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si, &
+       luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe, &
+       luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe, &
+       luse_SM_Al,luse_linreg,luse_NN,luse_Morse,luse_vcMorse, &
+       ifcoulomb,numff,cffs,myid_md,iprint)
+  lvc = .false.
+  if( luse_vcMorse ) then
+    if( ifcoulomb.ne.3 ) then
+      if( myid_md.eq.0 .and. iprint.ne.0 ) print *,'ifcoulomb is set to 3,' &
+           //' because vcMorse is chosen.'
+      ifcoulomb = 3
+    endif
+    lvc = .true.
+  endif
+
+!.....Coulomb interaction
+  if( ifcoulomb.eq.1 ) then ! screened Coulomb
+    call initialize_coulomb(natm,tag,chg,chi,myid_md &
+         ,mpi_md_world,ifcoulomb,iprint,h,rc)
+  else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
+    call initialize_coulomb(natm,tag,chg,chi,myid_md &
+         ,mpi_md_world,ifcoulomb,iprint,h,rc)
+  else if( ifcoulomb.eq.3 ) then ! variable-charge with Gaussians
+    call initialize_coulomb(natm,tag,chg,chi,myid_md &
+         ,mpi_md_world,ifcoulomb,iprint,h,rc)
+  endif
+
+!.....vcMorse
+  if( luse_vcMorse ) then
+    call init_vcMorse(natm,tag,mpi_md_world)
+    if( .not. lprmset ) then
+      call read_params_vcMorse(myid_md,mpi_md_world,iprint)
+    endif
+    call read_element_descriptors(myid_md,mpi_md_world,iprint)
+  endif
+
+end subroutine init_force
 !=======================================================================
 subroutine copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
      ,lsrc,myparity,nn,sv,mpi_md_world,rho)
@@ -716,6 +794,7 @@ subroutine set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
   luse_linreg = .false.
   luse_NN = .false.
   luse_Morse = .false.
+  luse_vcMorse = .false.
   if( force_on('LJ_Ar',numff,cffs) ) luse_LJ = .true.
   if( force_on('Ito3_WHe',numff,cffs) ) luse_Ito3_WHe = .true.
   if( force_on('RK_WHe',numff,cffs) ) luse_RK_WHe = .true.
@@ -803,7 +882,8 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   integer,parameter:: nstp_dampopt = 1000
   integer,parameter:: minstp_dampopt = 0
   real(8),parameter:: dt_dampopt = 0.005  ! 0.005 fs
-  real(8),parameter:: eta_dampopt = 0.01
+!!$  real(8),parameter:: eta_dampopt = 0.01
+  real(8),parameter:: eta_dampopt = 0.1
   real(8),parameter:: ecrit_dampopt = 1.0d-4
   real(8),parameter:: amassq = 0.002
 
@@ -815,17 +895,22 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 !.....Gather forces on charges
   fq(1:natm) = 0d0
   eclong = 0d0
+!!$  write(6,'(a,50es10.2)') 'chg before qforce_long=',chg(1:natm)
   call qforce_long(namax,natm,tag,ra,chg,chi,h,tcom,mpi_md_world, &
        myid,iprint,ifcoulomb,fq,eclong)
   epot = eclong
+!!$  write(6,'(a,50es10.2)') 'chg before qforce_Morse=',chg(1:natm)
+!!$  write(6,'(a,50es10.2)') 'epot,afq,fq=',epot,afq,fq(1:natm)
   if( luse_vcMorse ) then
     eMorse = 0d0
     call qforce_vcMorse(namax,natm,tag,ra,fq,nnmax,chg &
-         ,h,tcom,rc,lspr,mpi_md_world,myid,eMorse,iprint, &
-         (.true. .and. l1st))
+         ,h,tcom,rc,lspr,mpi_md_world,myid,eMorse,iprint,.true.)
     epot = epot + eMorse
   endif
+!!$  write(6,'(a,50es10.2)') 'chg after qforce_Morse=',chg(1:natm)
+!!$  write(6,'(a,50es10.2)') 'epot,afq,fq=',epot,afq,fq(1:natm)
   call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
+!!$  write(6,'(a,50es10.2)') 'epot,afq,fq=',epot,afq,fq(1:natm)
 
   vq(1:natm) = 0d0
   do istp=1,nstp_dampopt
@@ -848,12 +933,13 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       epot = epot + eMorse
     endif
     call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
-!!$    write(6,'(a,i6,es12.4,12f6.2)') ' istp,epot-epotp,chg(1:natm)=' &
+!!$    write(6,'(a,50es10.2)') 'epot,afq,fq,chg=',epot,afq,fq(1:4),chg(1:4)
+!!$    write(6,'(a,i6,es10.2,30f6.2)') ' istp,epot-epotp,chg(1:natm)=' &
 !!$         ,istp,epot-epotp,chg(1:natm)
 !.....check convergence
     if( istp.gt.minstp_dampopt .and. &
          abs(epot-epotp).lt.ecrit_dampopt ) then
-      if( myid.eq.0 ) then
+      if( myid.eq.0 .and. iprint.ne.0 ) then
         write(6,'(a,i4,a)') ' dampopt_charge converged with ', &
              istp,' steps.'
       endif
@@ -895,6 +981,41 @@ subroutine get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
   
   return
 end subroutine get_average_fq
+!=======================================================================
+subroutine get_pderiv(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
+     ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+     ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
+     ,numff,cffs,ifcoulomb,iprint,l1st,luse_vcMorse,lvc &
+     ,ndimp,pderiv)
+!
+! Compute derivative of potential energy (and forces) 
+! w.r.t. potential parameters.
+!
+  use Morse,only: pderiv_vcMorse
+  implicit none
+  integer,intent(in):: namax,natm,nnmax,nismax,iprint
+  integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+       ,nnn(6),mpi_md_world,myid_md,nex(3)
+  integer,intent(in):: lspr(0:nnmax,namax),numff
+  integer,intent(inout):: ifcoulomb
+  real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+       ,acon(nismax),tag(namax)
+  real(8),intent(inout):: tcom,rc
+  real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
+       ,chg(namax),chi(namax)
+  character(len=20),intent(in):: cffs(numff)
+  logical,intent(in):: l1st
+  logical,intent(inout):: luse_vcMorse
+  logical,intent(inout):: lvc
+  logical,intent(in):: lstrs
+  integer,intent(in):: ndimp
+  real(8),intent(out):: pderiv(ndimp)
+
+  if( luse_vcMorse ) call pderiv_vcMorse(namax,natm,tag,ra,nnmax,chg &
+       ,h,rc,lspr,epot,iprint,ndimp,pderiv)
+  
+  
+end subroutine get_pderiv
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"

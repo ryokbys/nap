@@ -69,7 +69,8 @@ module variables
     integer,allocatable:: ifcal(:)
     real(8),allocatable:: fabs(:)
     real(8),allocatable:: va(:,:),strsi(:,:,:),eki(:,:,:),epi(:)&
-         ,chg(:),chi(:),fsub(:,:)
+         ,chg(:),chi(:),fsub(:,:),eatm(:)
+    character(len=2),allocatable:: symbols(:)
     integer:: naps(mspcs)  ! num of atoms per species
     integer:: iclass       ! 1: training,  2: test
   end type mdsys

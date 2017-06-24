@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-20 15:13:00 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-23 10:42:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -16,6 +16,7 @@ module Coulomb
   implicit none
   save
 
+  character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.Coulomb'
   real(8),parameter:: pi = 3.14159265398979d0
 
@@ -130,9 +131,8 @@ contains
       write(6,'(a,i8)') '   total = ',nk
       write(6,*) ''
     endif
-    if( .not.allocated(qcos) ) then
-      allocate(qcosl(nk),qcos(nk),qsinl(nk),qsin(nk),pflr(nk))
-    endif
+    if( allocated(qcos) ) deallocate(qcosl,qcos,qsinl,qsin,pflr)
+    allocate(qcosl(nk),qcos(nk),qsinl(nk),qsin(nk),pflr(nk))
 !.....prefactor for long-range term
     ik = 0
     do k1= -kmax1,kmax1
@@ -235,7 +235,7 @@ contains
 !
     include "mpif.h"
     integer,intent(in):: myid,mpi_world,ifcoulomb,iprint
-    character(len=128):: cline,c1st
+    character(len=128):: cline,c1st,fname
     character(len=5):: cname
     
     real(8):: vid,rad,dchi,djii,dsgm
@@ -245,7 +245,8 @@ contains
       allocate(rad_bvs(nsp),npq_bvs(nsp),vid_bvs(nsp) &
            ,rho_bvs(nsp,nsp))
       if( myid.eq.0 ) then
-        open(ioprms,file=trim(paramsfname),status='old')
+        fname = trim(paramsdir)//'/'//trim(paramsfname)
+        open(ioprms,file=trim(fname),status='old')
         mode = 1
         interact(1:nsp,1:nsp) = .false.
 !.....1st line for check the Coulomb computation type
@@ -287,7 +288,7 @@ contains
         enddo
 10      close(ioprms)
         if( iprint.ne.0 ) then
-          write(6,'(a)') ' Finish reading '//trim(paramsfname)
+          write(6,'(a)') ' Finish reading '//trim(fname)
           write(6,*) ''
         endif
 
@@ -308,9 +309,11 @@ contains
 !.....end of screend_bvs      
 
     else if( ifcoulomb.eq.3 ) then  ! vcGaussian
+      if( allocated(vcg_chi) ) deallocate(vcg_chi,vcg_jii,vcg_sgm)
       allocate( vcg_chi(nsp), vcg_jii(nsp), vcg_sgm(nsp))
       if( myid.eq.0 ) then
-        open(ioprms,file=trim(paramsfname),status='old')
+        fname = trim(paramsdir)//'/'//trim(paramsfname)
+        open(ioprms,file=trim(fname),status='old')
 !.....1st line for check the Coulomb computation type
         read(ioprms,*) c1st
         if( trim(c1st).ne.'vcGaussian' ) then
@@ -876,9 +879,8 @@ contains
       enddo
     enddo
 
-    if( .not. allocated(lkuse) ) then
-      allocate(lkuse(-kmax3:kmax3,-kmax2:kmax2,-kmax1:kmax1))
-    endif
+    if( allocated(lkuse) ) deallocate(lkuse)
+    allocate(lkuse(-kmax3:kmax3,-kmax2:kmax2,-kmax1:kmax1))
 
     lkuse(:,:,:) = .false.
     nk = 0
@@ -1090,13 +1092,9 @@ contains
 
     integer:: i,is,ik,k1,k2,k3,ierr
     real(8):: qi,bdotr,bb2,texp,sgmi,sgmi2,prefac,cs,sn,tmp
-    real(8),allocatable,save:: xi(:),ri(:),bk1(:),bk2(:),bk3(:),bb(:)
+    real(8):: xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3)
     real(8),external:: sprod
     logical,save:: l1st = .true.
-
-    if( l1st ) then
-      allocate(xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3))
-    endif
     
 !.....Compute reciprocal vectors
     call get_recip_vectors(h)
@@ -1202,6 +1200,7 @@ contains
 
 !.....TODO: not work in parallel
     if( l1st ) then
+      if( allocated(amat) ) deallocate(amat,qvec,xvec)
       allocate(amat(natm+1,natm+1),qvec(natm+1),xvec(natm+1))
     endif
     
@@ -1347,6 +1346,17 @@ contains
     ierr= -1
     return
   end subroutine cg
+!=======================================================================
+  subroutine set_paramsdir_Coulomb(dname)
+!
+!  Accessor routine to set paramsdir.
+!
+    implicit none
+    character(len=*),intent(in):: dname
+
+    paramsdir = trim(dname)
+    return
+  end subroutine set_paramsdir_Coulomb
 end module Coulomb
 !-----------------------------------------------------------------------
 !     Local Variables:

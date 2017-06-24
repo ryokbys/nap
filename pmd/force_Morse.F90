@@ -1,12 +1,13 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-20 17:15:45 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-24 21:49:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
 !    - Currently no cutoff tail treatment is done. (170310)
 !-----------------------------------------------------------------------
   implicit none
+  character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.Morse'
   character(len=128),parameter:: configfname = 'in.config.Morse'
   character(len=128),parameter:: descfname   = 'in.desc.vcMorse'
@@ -45,7 +46,12 @@ module Morse
 !       - EN_Pauling: electronegativity of Pauling's scale
   integer,parameter:: ndesc = 6
   integer,parameter:: nprm  = ndesc*2  ! 2 for each descriptor
-  real(8),allocatable:: walp(:),wd(:),wrmin(:)
+  real(8):: walp(0:nprm),wd(0:nprm),wrmin(0:nprm),&
+       pdij(0:nprm)
+!.....Derivatives w.r.t. weights
+  real(8):: gwalp(0:nprm),gwd(0:nprm),gwrmin(0:nprm)
+
+  logical:: lprmset = .false.
   
 contains
   subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -171,12 +177,15 @@ contains
     logical,intent(in):: lstrs,l1st
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji(3),dedr,epott &
-         ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,texp,d0ij,alpij,rminij &
+    real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,chgi,chgj,tmp2
     real(8),allocatable,save:: strsl(:,:,:)
     type(atdesc):: atdi,atdj
-    real(8),external:: fcut1,dfcut1
+    real(8),external:: fcut1,dfcut1,sprod
+    real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:),diji(:)&
+         ,dxdi(:),dxdj(:),at(:)
+    if( .not.allocated(xi) ) allocate(xi(3),xj(3),xij(3),rij(3),diji(3),&
+         dxdi(3),dxdj(3),at(3) )
 
     if( l1st ) then
 !!$      call init_vcMorse(natm,tag,mpi_md_world)
@@ -209,10 +218,11 @@ contains
         dxdj(1:3)=  rij(1:3)*diji
         chgj = chg(j)
         atdj = atdescs(js)
+        call make_pair_desc(chgi,chgj,atdi,atdj,pdij)
 !.....Create Morse parameters that depend on current atom charges
-        d0ij = get_coeff(wd,chgi,chgj,atdi,atdj)
-        alpij= get_coeff(walp,chgi,chgj,atdi,atdj)
-        rminij= get_coeff(wrmin,chgi,chgj,atdi,atdj)
+        d0ij = sprod(wd,pdij)
+        alpij= sprod(walp,pdij)
+        rminij= sprod(wrmin,pdij)
         texp = exp(alpij*(rminij-dij))
 !.....potential
         tmp= d0ij*((texp-1d0)**2 -1d0)
@@ -275,22 +285,22 @@ contains
          ,tag(namax),chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: epot,fq(namax)
-    logical,intent(in):: l1st
+    logical,intent(in):: l1st 
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji(3),dedr,epott &
-         ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,texp,d0ij,alpij,rminij &
+    real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2
     type(atdesc):: atdi,atdj
-    real(8),external:: fcut1
+    real(8),external:: fcut1,sprod
+    real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:),diji(:) &
+         ,dxdi(:),dxdj(:),at(:)
 
-    if( l1st ) then
-      call init_vcMorse(natm,tag,mpi_md_world)
-      call read_params_vcMorse(myid,mpi_md_world,iprint)
-      call read_element_descriptors(myid,mpi_md_world,iprint)
-    endif
+    if( .not.allocated(xi) ) allocate(xi(3),xj(3),xij(3),rij(3),diji(3), &
+         dxdi(3),dxdj(3),at(3) )
 
     epotl= 0d0
+
+!!$    write(6,'(a,30es10.2)') 'chg in qforce_Morse =',chg(1:natm)
 
 !.....Loop over resident atoms
     do i=1,natm
@@ -313,10 +323,11 @@ contains
         dxdj(1:3)=  rij(1:3)*diji
         chgj = chg(j)
         atdj = atdescs(js)
+        call make_pair_desc(chgi,chgj,atdi,atdj,pdij)
 !.....Create Morse parameters that depend on current atom charges
-        d0ij = get_coeff(wd,chgi,chgj,atdi,atdj)
-        alpij= get_coeff(walp,chgi,chgj,atdi,atdj)
-        rminij= get_coeff(wrmin,chgi,chgj,atdi,atdj)
+        d0ij = sprod(wd,pdij)
+        alpij= sprod(walp,pdij)
+        rminij= sprod(wrmin,pdij)
         texp = exp(alpij*(rminij-dij))
 !.....potential
         tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
@@ -335,7 +346,13 @@ contains
         dedrmin = -2d0*d0ij*(texp-1d0)*texp*alpij
         fq(i) = fq(i) +(dd0dq*dedd0 +dalpdq*dedalp +drmindq*dedrmin) &
              *fcut1(dij,rc)
+!!$        if( l1st ) then
+!!$          write(6,'(a,2i5,30es10.2)') 'i,j,rij,chgi,chgj,d0ij,alpij,rminij'&
+!!$               //',epotl,fq(i)=',i,j,rij(1:3),chgi,chgj,d0ij,alpij,rminij &
+!!$               ,epotl,fq(i)
+!!$        endif
       enddo
+!!$      if( l1st ) write(6,'(a,i5,2es10.2)') 'i,chgi,fq(i)=',i,chgi,fq(i)
     enddo
     
 !-----gather epot
@@ -343,7 +360,7 @@ contains
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
- 
+
   end subroutine qforce_vcMorse
 !=======================================================================
   subroutine init_Morse(natm,tag,mpi_md_world)
@@ -385,9 +402,10 @@ contains
     call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max &
          ,mpi_md_world,ierr)
 
-!.....Allocate parameter arrays
-    if( allocated(walp) ) deallocate(walp,wd,wrmin)
-    allocate(walp(0:nprm),wd(0:nprm),wrmin(0:nprm))
+!!$!.....Allocate parameter arrays
+!!$    if( .not.allocated(walp) ) then
+!!$      allocate(walp(0:nprm),wd(0:nprm),wrmin(0:nprm),pdij(0:nprm))
+!!$    endif
 
   end subroutine init_vcMorse
 !=======================================================================
@@ -398,11 +416,12 @@ contains
     include 'mpif.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
     integer:: i,j,isp,jsp,id,ierr
-    character(len=128):: cline
+    character(len=128):: cline,fname
     real(8):: d,r,a
 
     if( myid_md.eq.0 ) then
-      open(ioprms,file=trim(paramsfname),status='old')
+      fname = trim(paramsdir)//'/'//trim(paramsfname)
+      open(ioprms,file=trim(fname),status='old')
       interact(1:nsp,1:nsp) = .false.
       d0(1:nsp,1:nsp)= 0d0
       rmin(1:nsp,1:nsp)= 0d0
@@ -430,7 +449,7 @@ contains
 
 10    close(ioprms)
       if( iprint.ne.0 ) then
-        write(6,'(a)') ' finish reading '//trim(paramsfname)
+        write(6,'(a)') ' finish reading '//trim(fname)
         write(6,*) ''
       endif
     endif
@@ -450,11 +469,11 @@ contains
     integer,intent(in):: myid,mpi_md_world,iprint
 
     integer:: i,ierr
-    character(len=128) :: cline
-    
+    character(len=128) :: cline,fname
 
     if( myid .eq.0 ) then
-      open(ioprmsvc,file=trim(paramsvcfname),status='old')
+      fname = trim(paramsdir)//'/'//trim(paramsvcfname)
+      open(ioprmsvc,file=trim(fname),status='old')
       read(ioprmsvc,'(a)') cline
       if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) then
 !.....Read comment line, if needed, it can contain options
@@ -469,7 +488,7 @@ contains
       close(ioprmsvc)
 
       if( iprint.ne.0 ) then
-        print *, 'Finished reading '//trim(paramsvcfname)
+        print *, 'Finished reading '//trim(fname)
         print *, ''
       endif
     endif
@@ -478,7 +497,47 @@ contains
     call mpi_bcast(wd,nprm+1,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(wrmin,nprm+1,mpi_real8,0,mpi_md_world,ierr)
 
+    lprmset = .true.
+    
   end subroutine read_params_vcMorse
+!=======================================================================
+  subroutine set_params_vcMorse(ndimp,params,ierr)
+!
+! Accessor routine to set vcMorse parameters from outside.
+! Curretnly this routine is supposed to be called only on serial run.
+! So no need of treating this as parallel code.
+!
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params(ndimp)
+    integer,intent(inout):: ierr
+
+    integer:: i,inc
+
+    ierr = 0
+    if( ndimp.ne.3*(nprm+1) ) then
+      ierr = 10
+      print *,'Error: ndimp.ne.3*(nprm+1) !!!'
+      stop
+      return
+    endif
+
+    inc = 0
+    do i=0,ndesc*2
+      inc = inc + 1
+      walp(i) = params(inc)
+    enddo
+    do i=0,ndesc*2
+      inc = inc + 1
+      wd(i) = params(inc)
+    enddo
+    do i=0,ndesc*2
+      inc = inc + 1
+      wrmin(i) = params(inc)
+    enddo
+    
+    lprmset = .true.
+    return
+  end subroutine set_params_vcMorse
 !=======================================================================
   subroutine read_element_descriptors(myid_md,mpi_md_world,iprint)
 !
@@ -488,7 +547,7 @@ contains
 
     integer:: itmp,isp
     character(len=5):: ctmp
-    character(len=128):: cline
+    character(len=128):: cline,fname
     type(atdesc):: atd
     real(8):: eion1,eion2,eaff,atrad,enpaul
 
@@ -496,7 +555,8 @@ contains
     allocate(atdescs(nsp))
     
     if( myid_md.eq.0 ) then
-      open(iodesc,file=trim(descfname),status='old')
+      fname = trim(paramsdir)//'/'//trim(descfname)
+      open(iodesc,file=trim(fname),status='old')
       isp = 0
       do while(.true.)
         read(iodesc,*,end=10) cline
@@ -508,7 +568,7 @@ contains
           isp = isp + 1
           if( isp.gt.nsp ) then
             if( iprint.ne.0 ) then
-              write(6,*) trim(descfname)//' has more entries than nsp.' &
+              write(6,*) trim(fname)//' has more entries than nsp.' &
                    //' So skip reading it.'
               write(6,*) '  NSP = ',nsp
             endif
@@ -525,7 +585,7 @@ contains
       enddo
 10    close(iodesc)
       if( iprint.ne.0 ) then
-        write(6,*) 'Atomic descriptors were loaded from '//trim(descfname)
+        write(6,*) 'Atomic descriptors were loaded from '//trim(fname)
         write(6,*) 'atomic number, symbol,    IE1,    IE2,    EA,'//&
              '  radius,  EN_Pauling'
         do isp=1,nsp
@@ -582,6 +642,40 @@ contains
     deallocate(eion1s,eion2s,eaffs,enpauls,atrads,nas,csyms)
   end subroutine bcast_atdescs
 !=======================================================================
+  subroutine make_pair_desc(chgi,chgj,atdi,atdj,pdij)
+!
+!  Make a pair descriptor vector from atomic descriptros
+!
+    real(8),intent(in):: chgi,chgj
+    type(atdesc),intent(in):: atdi,atdj
+    real(8),intent(inout):: pdij(0:nprm)
+
+    integer:: i
+    real(8):: di(ndesc),dj(ndesc)
+
+    di(1) = chgi
+    di(2) = atdi%eion1
+    di(3) = atdi%eion2
+    di(4) = atdi%eaff
+    di(5) = atdi%atrad
+    di(6) = atdi%enpaul
+
+    dj(1) = chgj
+    dj(2) = atdj%eion1
+    dj(3) = atdj%eion2
+    dj(4) = atdj%eaff
+    dj(5) = atdj%atrad
+    dj(6) = atdj%enpaul
+
+    pdij(0) = 1d0  ! bias
+    do i=1,ndesc
+      pdij(2*i-1) = di(i)+dj(i)
+      pdij(2*i)   = di(i)*dj(i)
+    enddo
+    return
+    
+  end subroutine make_pair_desc
+!=======================================================================
   function get_coeff(prms,chgi,chgj,atdi,atdj)
 !
 !  Determine D which depends on charges of atom-i and atom-j.
@@ -615,6 +709,107 @@ contains
     return
     
   end function get_coeff
+!=======================================================================
+  subroutine pderiv_vcMorse(namax,natm,tag,ra,nnmax,chg &
+       ,h,rc,lspr,epot,iprint,ndimp,pderiv)
+!
+!  Derivative w.r.t.parameters {w}.
+!  Note: This routine is always called in single run,
+!  thus no need of parallel implementation.
+!
+    implicit none
+    include "./params_unit.h"
+    integer,intent(in):: namax,natm,nnmax,iprint
+    integer,intent(in):: lspr(0:nnmax,namax)
+    real(8),intent(in):: ra(3,namax),h(3,3),rc &
+         ,tag(namax),chg(namax)
+    real(8),intent(out):: epot
+    integer,intent(in):: ndimp
+    real(8),intent(inout):: pderiv(ndimp)
+
+    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,inc
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji(3),dedr,epott &
+         ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,texp,d0ij,alpij,rminij &
+         ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2
+    type(atdesc):: atdi,atdj
+    real(8),external:: fcut1,sprod
+
+!!$    if( .not.allocated(gwalp) ) allocate(gwalp(0:nprm), &
+!!$         gwd(0:nprm),gwrmin(0:nprm))
+
+    epotl= 0d0
+
+!.....Loop over resident atoms
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is=int(tag(i))
+      chgi = chg(i)
+      atdi = atdescs(is)
+      do k=1,lspr(0,i)
+        j=lspr(k,i)
+        if(j.eq.0) exit
+!!$        if(j.le.i) cycle
+        js= int(tag(j))
+        xj(1:3)= ra(1:3,j)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        if( dij.gt.rc ) cycle
+        diji= 1d0/dij
+        dxdi(1:3)= -rij(1:3)*diji
+        dxdj(1:3)=  rij(1:3)*diji
+        chgj = chg(j)
+        atdj = atdescs(js)
+        call make_pair_desc(chgi,chgj,atdi,atdj,pdij)
+!.....Create Morse parameters that depend on current atom charges
+        d0ij = sprod(wd,pdij)
+        alpij= sprod(walp,pdij)
+        rminij= sprod(wrmin,pdij)
+        texp = exp(alpij*(rminij-dij))
+!.....potential
+        tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
+        tmp2 = tmp *fcut1(dij,rc)
+        epotl = epotl +tmp2
+!.....Derivative of potential energy w.r.t. {w}
+        dedd0 = (texp -1d0)**2 -1d0
+        dedalp = 2d0*d0ij*(texp-1d0)*texp*(rminij-dij)
+        dedrmin = -2d0*d0ij*(texp-1d0)*texp*alpij
+        gwd(0:nprm) = gwd(0:nprm) +0.5d0 *dedd0 *pdij(0:nprm)
+        gwalp(0:nprm) = gwalp(0:nprm) +0.5d0 *dedalp *pdij(0:nprm)
+        gwrmin(0:nprm) = gwrmin(0:nprm) +0.5d0 *dedrmin *pdij(0:nprm)
+      enddo
+    enddo
+    
+    epot= epot +epotl
+
+!.....gwalp,gwd,gwrmin to pderiv
+    inc = 0
+    do i=0,ndesc*2
+      inc = inc + 1
+      pderiv(inc) = gwalp(i)
+    enddo
+    do i=0,ndesc*2
+      inc = inc + 1
+      pderiv(inc) = gwd(i)
+    enddo
+    do i=0,ndesc*2
+      inc = inc + 1
+      pderiv(inc) = gwrmin(i)
+    enddo
+    return
+  end subroutine pderiv_vcMorse
+!=======================================================================
+  subroutine set_paramsdir_Morse(dname)
+!
+!  Accessor routine to set paramsdir.
+!
+    implicit none
+    character(len=*),intent(in):: dname
+
+    paramsdir = trim(dname)
+    return
+  end subroutine set_paramsdir_Morse
+!=======================================================================
 
 end module Morse
 !-----------------------------------------------------------------------

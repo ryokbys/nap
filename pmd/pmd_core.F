@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-06-13 07:21:43 Ryo KOBAYASHI>
+c                     Last-modified: <2017-06-24 21:48:46 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -48,6 +48,13 @@ c-----output file names
       character:: cnum*4
       integer,external:: itotOf
       logical:: ltot_updated = .true.
+
+      logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
+     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, 
+     &     luse_linreg,luse_NN,luse_Morse,luse_vcMorse
+      logical:: lvc
 
       call initialize_pmdvars(nspmax)
 
@@ -215,6 +222,13 @@ c.....Set initial temperature if needed
       tcpu1= mpi_wtime()
       tcom = 0d0
 
+      call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
+     &     iprint,h,rc,numff,cffs,
+     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
+     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,
+     &     luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc,ifcoulomb)
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
@@ -228,11 +242,16 @@ c.....Calc forces
       lstrs = lstrs0 .or.
      &     ( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
-     &       trim(cpctl).eq.'vv-Berendsen')
+     &     trim(cpctl).eq.'vv-Berendsen')
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &     ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
-     &     ,numff,cffs,ifcoulomb,iprint,.true.)
+     &     ,numff,cffs,ifcoulomb,iprint,.true.,
+     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
+     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, 
+     &     luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc)
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -486,7 +505,12 @@ c-------Calc forces
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
-     &       ,numff,cffs,ifcoulomb,iprint,.false.)
+     &       ,numff,cffs,ifcoulomb,iprint,.false.,
+     &       luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+     &       luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+     &       luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
+     &       ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al
+     &       ,luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc)
         lstrs = .false.
 
 c.....Second kick of velocities
@@ -772,6 +796,148 @@ c.....deallocate all the arrays allocated in pmd_core
      &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
 
       end subroutine pmd_core
+c=======================================================================
+      subroutine one_shot(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
+     &     ,ekitot,epitot,chgtot,chitot
+     &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
+     &     ,nspmax,am,dt,numff,cffs,rc,rbuf,ptnsr,epot
+     &     ,ekin,ifcoulomb,iprint,lcalcgrad,ndimp,pderiv)
+c.....
+c..... In case that only one shot force calculation is required.
+c.....
+      use pmdvars
+      use Morse,only: pderiv_vcMorse
+      implicit none
+      include "mpif.h"
+      include "./params_unit.h"
+      integer,intent(in):: ntot,myid_md,mpi_md_world
+     &     ,nspmax,numff
+     &     ,iprint,nodes_md,nx,ny,nz,ifcoulomb
+      real(8),intent(in):: hunit
+      real(8),intent(inout):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
+     &     ,atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot)
+     &     ,epitot(ntot),rc,rbuf,h(3,3,0:1),ptnsr(3,3)
+     &     ,epot,ekin,am(nspmax),dt
+     &     ,chgtot(ntot),chitot(ntot)
+      character(len=20),intent(in):: cffs(numff)
+      logical,intent(in):: lcalcgrad
+      integer,intent(in):: ndimp
+      real(8),intent(inout):: pderiv(ndimp)
+
+      integer:: i,ierr,is,nspl,nxyz
+      real(8):: aai(3)
+      logical:: lstrs = .false.
+
+      logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
+     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, 
+     &     luse_linreg,luse_NN,luse_Morse,luse_vcMorse
+      logical:: lvc
+      
+c      write(6,'(a,30es10.2)') 'chgtot in pmd_core = ',
+c     &     chgtot(1:ntot)
+      call initialize_pmdvars(nspmax)
+
+      nxyz = nx*ny*nz
+      anxi= 1d0/nx
+      anyi= 1d0/ny
+      anzi= 1d0/nz
+c-----vector node indices: range [0:nx-1]
+      myx=myid_md/(ny*nz)
+      myy=mod(myid_md/nz,ny)
+      myz=mod(myid_md,nz)
+c-----reduced node origin
+      sorg(1)= anxi*myx
+      sorg(2)= anyi*myy
+      sorg(3)= anzi*myz
+c.....perform space decomposition after reading atomic configuration
+c      write(6,'(a,30es10.2)') 'chgtot before space_decomp = ',
+c     &     chgtot(1:ntot)
+      call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
+     &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
+c      write(6,'(a,200es10.2)') 'chg after space_decomp = ',chg(1:natm)
+
+c.....Some conversions
+      nsp= 0
+      do i=1,natm
+c-------species of atom-i
+        nsp= max(int(tag(i)),nsp)
+      enddo
+c-----setup
+      allocate(acon(nspmax),fack(nspmax))
+      call setup(nspmax,am,acon,fack,dt)
+c-----set HI and SGM
+      call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
+c-----ntset
+      call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
+c-----get total number of species
+      nspl = nsp
+      call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max
+     &     ,mpi_md_world,ierr)
+
+      tcpu1= mpi_wtime()
+      tcom = 0d0
+
+c      write(6,'(a,200es10.2)') 'chg before init_force = ',chg(1:natm+nb)
+      call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
+     &     iprint,h,rc,numff,cffs,
+     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
+     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,
+     &     luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc,ifcoulomb)
+
+c      print *,' lvc,ifcoulomb = ',lvc,ifcoulomb
+c      write(6,'(a,200es10.2)') 'chg before bacopy = ',chg(1:natm+nb)
+c-----copy RA of boundary atoms
+      call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
+     &     ,nx,ny,nz,myid_md)
+      call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
+     &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity
+     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi)
+c-----Make pair list
+      call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
+     &     ,anxi,anyi,anzi,lspr)
+      lstrs = .true.
+
+c      write(6,'(a,200es10.2)') 'chg before get_force = ',chg(1:natm+nb)
+      call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
+     &     ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
+     &     ,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
+     &     ,numff,cffs,ifcoulomb,iprint,.true.,
+     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
+     &     ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al
+     &     ,luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc)
+
+      if( lcalcgrad ) then
+        if( luse_vcMorse ) call pderiv_vcMorse(namax,natm,tag,ra,nnmax
+     &       ,chg,h,rc,lspr,epot,iprint,ndimp,pderiv)
+      endif
+
+      call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
+     &     ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
+     &     ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+      
+c.....revert forces to the unit eV/A before going out 
+      if( myid_md.eq.0 ) then
+        do i=1,ntot
+          is= int(tagtot(i))
+          aai(1:3)= h(1:3,1,0)*atot(1,i)
+     &         +h(1:3,2,0)*atot(2,i)
+     &         +h(1:3,3,0)*atot(3,i)
+          atot(1:3,i) = aai(1:3)/acon(is)
+        enddo
+      endif
+
+c.....deallocate all the arrays allocated 
+      deallocate(acon,fack)
+      deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
+     &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
+      return
+      end subroutine one_shot
 c=======================================================================
       subroutine setup(nspmax,am,acon,fack,dt)
       implicit none
