@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-27 13:57:16 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-27 21:11:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -72,7 +72,7 @@ contains
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji(3),dedr,epott &
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,texp,d0ij,alpij,rminij
     real(8),allocatable,save:: strsl(:,:,:)
 
@@ -178,13 +178,13 @@ contains
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
-         ,chgi,chgj,tmp2
+         ,chgi,chgj,tmp2,diji
     real(8),allocatable,save:: strsl(:,:,:)
     type(atdesc):: atdi,atdj
     real(8),external:: fcut1,dfcut1,sprod
-    real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:),diji(:)&
+    real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:)&
          ,dxdi(:),dxdj(:),at(:)
-    if( .not.allocated(xi) ) allocate(xi(3),xj(3),xij(3),rij(3),diji(3),&
+    if( .not.allocated(xi) ) allocate(xi(3),xj(3),xij(3),rij(3),&
          dxdi(3),dxdj(3),at(3) )
 
     if( l1st ) then
@@ -203,6 +203,8 @@ contains
 !!$           is,atdi%na,atdi%csym,atdi%eion1,atdi%eion2,atdi%eaff,&
 !!$           atdi%atrad,atdi%enpaul
 !!$    enddo
+
+!!$    write(6,'(a,30es13.5)') ' chg @force = ',chg(1:natm+10)
 
 !.....Loop over resident atoms
     do i=1,natm
@@ -226,23 +228,17 @@ contains
         chgj = chg(j)
         atdj = atdescs(js)
         call make_pair_desc(chgi,chgj,atdi,atdj,pdij)
+!!$        write(6,'(a,20es11.3)') 'pdij = ',pdij(0:nprm)
 !.....Create Morse parameters that depend on current atom charges
         d0ij = sprod(nprm+1,wd,pdij)
         alpij= sprod(nprm+1,walp,pdij)
         rminij= sprod(nprm+1,wrmin,pdij)
-!!$        if( i.eq.1 .and. j.eq.2 ) then
-!!$          write(6,'(a,4i4,5es15.7)') &
-!!$             ' i,is,j,js,chgi,chgj,alp,d0,rmin=',&
-!!$             i,is,j,js,chgi,chgj,alpij,d0ij,rminij
-!!$          write(6,'(a,20es13.5)') ' pdij = ',pdij(0:nprm)
-!!$          write(6,'(a,20es13.5)') ' walp = ',walp(0:nprm)
-!!$          write(6,'(a,20es13.5)') ' wd   = ',wd(0:nprm)
-!!$          write(6,'(a,20es13.5)') ' wrmin= ',wrmin(0:nprm)
-!!$        endif
         texp = exp(alpij*(rminij-dij))
 !.....potential
         tmp= d0ij*((texp-1d0)**2 -1d0)
         tmp2 = 0.5d0 *tmp *fcut1(dij,rc)
+!!$        write(6,'(a,2i5,10es15.7)') 'i,j,d0ij,alpij,rminij,tmp2,epotl = ',&
+!!$             i,j,d0ij,alpij,rminij,tmp2,epotl
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp2
           epi(j)= epi(j) +tmp2
@@ -305,13 +301,13 @@ contains
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
-         ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2
+         ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2,diji
     type(atdesc):: atdi,atdj
     real(8),external:: fcut1,sprod
-    real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:),diji(:) &
+    real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:) &
          ,dxdi(:),dxdj(:),at(:)
 
-    if( .not.allocated(xi) ) allocate(xi(3),xj(3),xij(3),rij(3),diji(3), &
+    if( .not.allocated(xi) ) allocate(xi(3),xj(3),xij(3),rij(3), &
          dxdi(3),dxdj(3),at(3) )
 
     epotl= 0d0
@@ -701,25 +697,24 @@ contains
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3),rc &
          ,tag(namax),chg(namax)
-    real(8),intent(out):: epot
+    real(8),intent(inout):: epot
     integer,intent(in):: ndimp
     real(8),intent(inout):: pderiv(ndimp)
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,inc
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji(3),dedr,epott &
-         ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,texp,d0ij,alpij,rminij &
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij,dedr &
+         ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2
     type(atdesc):: atdi,atdj
     real(8),external:: fcut1,sprod
-
-!!$    if( .not.allocated(gwalp) ) allocate(gwalp(0:nprm), &
-!!$         gwd(0:nprm),gwrmin(0:nprm))
 
     epotl= 0d0
 
     gwalp(0:nprm) = 0d0
     gwd(0:nprm) = 0d0
     gwrmin(0:nprm) = 0d0
+
+!!$    write(6,'(a,30es13.5)') ' chg @pderiv = ',chg(1:natm+10)
     
 !.....Loop over resident atoms
     do i=1,natm
@@ -737,9 +732,6 @@ contains
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
         if( dij.gt.rc ) cycle
-        diji= 1d0/dij
-        dxdi(1:3)= -rij(1:3)*diji
-        dxdj(1:3)=  rij(1:3)*diji
         chgj = chg(j)
         atdj = atdescs(js)
         call make_pair_desc(chgi,chgj,atdi,atdj,pdij)
@@ -759,13 +751,11 @@ contains
         gwd(0:nprm) = gwd(0:nprm) +0.5d0 *dedd0 *pdij(0:nprm)
         gwalp(0:nprm) = gwalp(0:nprm) +0.5d0 *dedalp *pdij(0:nprm)
         gwrmin(0:nprm) = gwrmin(0:nprm) +0.5d0 *dedrmin *pdij(0:nprm)
-!!$        write(6,'(a,2i5,30es11.3)') 'i,j,chgi,chgj,d0ij,alpij,rminij,dedd0,dedalp,dedrmin,pdij='&
-!!$             ,i,j,chgi,chgj,d0ij,alpij,rminij,dedd0,dedalp,dedrmin,pdij(0:nprm)
       enddo
     enddo
 
-!.....Not parallel
-    epot= epot +epotl
+!!$!.....Not parallel
+!!$    epot= epotl
 
 !.....gwalp,gwd,gwrmin to pderiv
     inc = 0

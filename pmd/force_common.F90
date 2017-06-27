@@ -124,6 +124,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
          ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
          ,ifcoulomb)
   endif
+!!$  print *,'epot after force_vcGaussian = ',epot
 
   if( luse_LJ ) call force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &

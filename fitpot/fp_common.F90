@@ -101,7 +101,6 @@ contains
         call set_params_vcMorse(ndim,x)
       endif
       call run_pmd(smpl,lcalcgrad,ndim,gdummy,nff,cffs,epot,frcs)
-!!$      print *, 'epot =',epot
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
 
@@ -111,8 +110,6 @@ contains
       swgt = smpl%wgt
 !.....Energy matching
       ediff= (epot -eref)/natm /eerr
-!!$      write(6,'(a,2i5,3es15.7)') ' ismpl,natm,eref,epot,ediff = ', &
-!!$           ismpl,natm,eref,epot,ediff
       ediff= ediff*ediff
       ftmp= ftmp +ediff *swgt
 !.....Force matching
@@ -202,6 +199,7 @@ contains
         call set_params_vcMorse(ndim,x)
       endif
       call run_pmd(smpl,lcalcgrad,ndim,gs,nff,cffs,epot,frcs)
+!!$      print *, 'ismpl,epot @grad_w_pmd =',ismpl,epot
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
 

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-06-27 11:03:56 Ryo KOBAYASHI>
+c                     Last-modified: <2017-06-27 21:12:42 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -825,7 +825,7 @@ c.....
       real(8),intent(inout):: pderiv(ndimp)
 
       integer:: i,ierr,is,nspl,nxyz
-      real(8):: aai(3)
+      real(8):: aai(3),epott
       logical:: lstrs = .false.
 
       logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
@@ -915,8 +915,9 @@ c      write(6,'(a,200es10.2)') 'chg before get_force = ',chg(1:natm+10)
      &     ,luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc)
 
       if( lcalcgrad ) then
+c.....Do not update epot here, so use epott instead.
         if( luse_vcMorse ) call pderiv_vcMorse(namax,natm,tag,ra,nnmax
-     &       ,chg,h,rc,lspr,epot,iprint,ndimp,pderiv)
+     &       ,chg,h,rc,lspr,epott,iprint,ndimp,pderiv)
       endif
 
       call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
