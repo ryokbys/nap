@@ -79,7 +79,7 @@ contains
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij= dsqrt(sprod(xij,xij))
+        rij= dsqrt(sprod(3,xij,xij))
 !.....He-He
         if( is.eq.2 .and. js.eq.2 ) then
           if( rij.gt.p_HeHe_rc ) cycle
@@ -164,7 +164,7 @@ contains
         z= xj(3) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         xji(1:3)= -xij(1:3)
-        rij= dsqrt(sprod(xij,xij))
+        rij= dsqrt(sprod(3,xij,xij))
         R1ij= p_R1(is,js)
         D1ij= p_D1(is,js)
 !---------cutoff judgement
@@ -197,13 +197,13 @@ contains
           y= ra(2,k) -xi(2)
           z= ra(3,k) -xi(3)
           xik(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rik=dsqrt(sprod(xik,xik))
+          rik=dsqrt(sprod(3,xik,xik))
           R1ik= p_R1(is,ks)
           D1ik= p_D1(is,ks)
 !-----------cutoff judgement
           if(rik.gt.R1ik+D1ik) cycle
           riki= 1d0/rik
-          cs= sprod(xij,xik)*riji*riki
+          cs= sprod(3,xij,xik)*riji*riki
           gc= gij*(1d0 +cij**2/dij**2 &
                -(cij**2/(dij**2 +(hij+cs)**2)))
 !.....alpha is always 0d0 in cases of W-W and W-He
@@ -224,7 +224,7 @@ contains
           y= ra(2,k) -xi(2)
           z= ra(3,k) -xi(3)
           xik(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rik=dsqrt(sprod(xik,xik))
+          rik=dsqrt(sprod(3,xik,xik))
           R1ik= p_R1(is,ks)
           D1ik= p_D1(is,ks)
 !-----------cutoff judgement
@@ -232,7 +232,7 @@ contains
           riki= 1d0/rik
           dixik(1:3)= -xik(1:3)*riki
           dkxik(1:3)=  xik(1:3)*riki
-          cs= sprod(xij,xik)*riji*riki
+          cs= sprod(3,xij,xik)*riji*riki
           dics(1:3)= -riji*riki*(xij(1:3)+xik(1:3)) &
                -cs*(dixij(1:3)*riji+dixik(1:3)*riki)
           djcs(1:3)= riji*riki*xik(1:3) -cs*djxij(1:3)*riji
@@ -272,13 +272,13 @@ contains
           y= ra(2,k) -xj(2)
           z= ra(3,k) -xj(3)
           xjk(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rjk=dsqrt(sprod(xjk,xjk))
+          rjk=dsqrt(sprod(3,xjk,xjk))
           R1jk= p_R1(js,ks)
           D1jk= p_D1(js,ks)
 !-----------cutoff judgement
           if(rjk.gt.R1jk+D1jk) cycle
           rjki= 1d0/rjk
-          cs= sprod(xji,xjk)*riji*rjki
+          cs= sprod(3,xji,xjk)*riji*rjki
           gc= gij*(1d0 +cij**2/dij**2 &
                -(cij**2/(dij**2 +(hij+cs)**2)))
 !.....alpha is always 0d0 in cases of W-W and W-He
@@ -299,7 +299,7 @@ contains
           y= ra(2,k) -xj(2)
           z= ra(3,k) -xj(3)
           xjk(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rjk=dsqrt(sprod(xjk,xjk))
+          rjk=dsqrt(sprod(3,xjk,xjk))
           R1jk= p_R1(js,ks)
           D1jk= p_D1(js,ks)
 !-----------cutoff judgement
@@ -307,7 +307,7 @@ contains
           rjki= 1d0/rjk
           djxjk(1:3)= -xjk(1:3)*rjki
           dkxjk(1:3)=  xjk(1:3)*rjki
-          cs= sprod(xji,xjk)*riji*rjki
+          cs= sprod(3,xji,xjk)*riji*rjki
           djcs(1:3)= -riji*rjki*(xji(1:3)+xjk(1:3)) &
                -cs*(djxji(1:3)*riji+djxjk(1:3)*rjki)
           dics(1:3)= riji*rjki*xjk(1:3) -cs*dixji(1:3)*riji

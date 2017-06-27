@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-19 11:22:26 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-27 10:45:53 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -368,8 +368,6 @@ contains
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
          dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse
-
-    real(8),external:: sprod
 
     gsf(1:nsf,1:nal)= 0d0
     dgsf(1:3,1:nsf,0:nnl,1:nal)= 0d0

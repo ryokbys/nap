@@ -1,21 +1,33 @@
 c
 c     Vector analysis routines
 c
-      function sprod(a,b)
+      function sprod(ndim,a,b)
       implicit none
-      real(8),intent(in):: a(3),b(3)
+      integer,intent(in):: ndim
+      real(8),intent(in):: a(ndim),b(ndim)
       real(8):: sprod
-      
-      sprod= a(1)*b(1) +a(2)*b(2) +a(3)*b(3)
+      integer:: i
+
+      sprod = 0d0
+      do i=1,ndim
+        sprod = sprod +a(i)*b(i)
+      enddo
       return
       end function sprod
 c=======================================================================
-      function absv(a)
+      function absv(ndim,a)
       implicit none
-      real(8),intent(in):: a(3)
+      integer,intent(in):: ndim
+      real(8),intent(in):: a(ndim)
       real(8):: absv
+      integer:: i
 
-      absv= sqrt(a(1)*a(1) +a(2)*a(2) +a(3)*a(3))
+      absv = 0d0
+      do i=1,ndim
+        absv = absv +a(i)*a(i)
+      enddo
+      absv = sqrt(absv)
+
       return
       end function absv
 c=======================================================================

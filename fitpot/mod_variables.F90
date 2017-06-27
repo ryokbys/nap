@@ -6,7 +6,7 @@ module variables
   integer:: niter_eval= 1
   character(len=128):: cfmethod= 'BFGS'
   character(len=128):: cmaindir= 'data_set'
-  character(len=128):: cparfile= 'in.params.NN'
+  character(len=128):: cparfile= 'in.vars.fitpot'
   character(len=128):: crunmode= 'serial'
   character(len=128):: cevaltype= 'absolute' ! (absolute|relative)
   character(len=128):: csmplist= ''
@@ -47,6 +47,9 @@ module variables
   integer,parameter:: mspcs = 4
   real(8):: ebase(mspcs)
   real(8):: swgt2trn,swgt2tst
+
+!.....max num of atoms among reference data
+  integer:: maxna = 0
 
   integer:: nwgtindiv = 0
   character(len=128),allocatable:: cdirlist(:),cwgtindiv(:)
@@ -94,7 +97,8 @@ module variables
   real(8),allocatable:: ferrl(:),ferrg(:)
 
 !.....Force-fields which are subtracted from reference values
-  integer:: numff
-  character(len=20),allocatable:: cffs(:)
+!.....and whose parameters to be fitted
+  integer:: nsubff,nff
+  character(len=20),allocatable:: csubffs(:),cffs(:)
 
 end module variables

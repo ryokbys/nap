@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-03-18 18:40:51 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-27 10:45:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -257,7 +257,7 @@ contains
           dkrik(1:3)= -dirik(1:3)
           if( itype(ielem).eq.3 ) then
             acnst= cnst(1,ielem)
-            cs= sprod(rij,rik)/rj/rk
+            cs= sprod(3,rij,rik)/rj/rk
             f3= func3(rij,rj,rik,rk,ielem,is,js,ks)
             dbna(1:3,ielem,ia)= dbna(1:3,ielem,ia) &
                  +f3*fcik *dfcj*dirij(1:3) *tmp &
@@ -462,7 +462,7 @@ contains
     func3= 0d0
     if( itype(ielem).eq.3 ) then ! angular
       a(1)= cnst(1,ielem)
-      cs= sprod(rij,rik)/rj/rk
+      cs= sprod(3,rij,rik)/rj/rk
       func3= (a(1)+cs)**2/(abs(a(1))+1d0)**2
     endif
 

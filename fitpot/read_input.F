@@ -325,7 +325,7 @@ c
 c     Read forces
 c     There is no limit of number of force-fields to be specified.
 c
-      use variables
+      use variables,only: nsubff,csubffs
       implicit none
       integer,intent(in):: ionum
 
@@ -336,9 +336,9 @@ c
       backspace(ionum)
       read(ionum,'(a)') ctmp
       ndat = num_data(trim(ctmp),' ')
-      numff = ndat -1
-      allocate(cffs(numff))
+      nsubff = ndat -1
+      allocate(csubffs(nsubff))
       backspace(ionum)
-      read(ionum,*) ctmp, (cffs(i),i=1,numff)
+      read(ionum,*) ctmp, (csubffs(i),i=1,nsubff)
       end subroutine read_force_field
 

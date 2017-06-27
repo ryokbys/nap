@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-23 10:42:07 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-27 11:03:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -77,6 +77,8 @@ contains
 
     integer:: i,ierr,nspl
 
+!!$    print *,'ifcoulomb @initialize_coulomb = ',ifcoulomb
+
 !.....Get umber of species
     nspl = 0
     do i=1,natm
@@ -144,7 +146,7 @@ contains
           ik= ik+1
           bk3(1:3) = k3*b3(1:3)
           bk(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-          bb2 = absv(bk)
+          bb2 = absv(3,bk)
           bb2 = bb2*bb2
           pflr(ik)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm_ew**2 *bb2)
         enddo
@@ -171,6 +173,7 @@ contains
     integer:: i,isp,ik,k1,k2,k3,is
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min
     real(8),external:: absv
+
 
     call read_params(myid,mpi_world,ifcoulomb,iprint)
 
@@ -220,7 +223,7 @@ contains
 !!$          ik= ik+1
 !!$          bk3(1:3) = k3*b3(1:3)
 !!$          bk(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-!!$          bb2 = absv(bk)
+!!$          bb2 = absv(3,bk)
 !!$          bb2 = bb2*bb2
 !!$          pflr(ik)= 1d0 /eps0
 !!$        enddo
@@ -252,7 +255,7 @@ contains
 !.....1st line for check the Coulomb computation type
         read(ioprms,*) c1st
         if( trim(c1st).ne.'screened_bvs' ) then
-          write(6,*) ' Error@read_params: ifcoulomb does not match '&
+          write(6,*) 'Error@read_params: ifcoulomb does not match '&
                //'with Coulomb type: '//trim(c1st)
           stop
         endif
@@ -649,7 +652,7 @@ contains
           ik= ik +1
           bk3(1:3) = k3 *b3(1:3)
           bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-          bb2 = sprod(bb,bb)
+          bb2 = sprod(3,bb,bb)
           do i=1,natm
             xi(1:3)= ra(1:3,i)
             is= int(tag(i))
@@ -657,7 +660,7 @@ contains
             sgmi2= sgmi*sgmi
             qi = chg(i)
             ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
-            bdotr = sprod(bb,ri)
+            bdotr = sprod(3,bb,ri)
             texp = exp(-bb2*sgmi2/2)
             cs = cos(bdotr)
             sn = sin(bdotr)
@@ -772,7 +775,7 @@ contains
     call vprod(a2,a3,a23)
     call vprod(a3,a1,a31)
     call vprod(a1,a2,a12)
-    avol = sprod(a1,absv(a23))
+    avol = sprod(3,a1,absv(3,a23))
     pi2 = 2d0 *pi
     b1(1:3) = pi2 /avol *a23(1:3)
     b2(1:3) = pi2 /avol *a31(1:3)
@@ -810,7 +813,7 @@ contains
           ik= ik +1
           bk3(1:3) = k3 *b3(1:3)
           bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-          bb2 = sprod(bb,bb)
+          bb2 = sprod(3,bb,bb)
           do i=1,natm
             xi(1:3)= ra(1:3,i)
             is= int(tag(i))
@@ -818,7 +821,7 @@ contains
             sgmi2= sgmi*sgmi
             qi = chg(i)
             ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
-            bdotr = sprod(bb,ri)
+            bdotr = sprod(3,bb,ri)
             texp = exp(-bb2*sgmi2/2)
             qcosl(ik) = qcosl(ik) +texp*qi*cos(bdotr)
             qsinl(ik) = qsinl(ik) +texp*qi*sin(bdotr)
@@ -855,7 +858,7 @@ contains
           if( k1.eq.0 .and. k2.eq.0 .and. k3.eq.0 ) cycle
           bk3(1:3) = k3*b3(1:3)
           bk(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-          bb2 = absv(bk)
+          bb2 = absv(3,bk)
           bbs(k3,k2,k1) = bb2
 !!$          bb2= bb2*bb2
 !!$          bbs(k3,k2,k1) = exp(-0.5d0 *sgm_ew**2 *bb2)/bb2
@@ -1014,7 +1017,7 @@ contains
             ik= ik +1
             bk3(1:3) = k3 *b3(1:3)
             bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-            bdotr = sprod(bb,ri)
+            bdotr = sprod(3,bb,ri)
             qcosl(ik) = qcosl(ik) +qi*cos(bdotr)
             qsinl(ik) = qsinl(ik) +qi*sin(bdotr)
           enddo
@@ -1057,7 +1060,7 @@ contains
             ik= ik +1
             bk3(1:3) = k3 *b3(1:3)
             bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-            bdotr = sprod(bb,ri)
+            bdotr = sprod(3,bb,ri)
             cs = cos(bdotr)
             sn = sin(bdotr)
 !.....Potential energy per atom
@@ -1112,7 +1115,7 @@ contains
           ik= ik +1
           bk3(1:3) = k3 *b3(1:3)
           bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-          bb2 = sprod(bb,bb)
+          bb2 = sprod(3,bb,bb)
           do i=1,natm
             xi(1:3)= ra(1:3,i)
             is= int(tag(i))
@@ -1120,7 +1123,7 @@ contains
             sgmi2= sgmi*sgmi
             qi = chg(i)
             ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
-            bdotr = sprod(bb,ri)
+            bdotr = sprod(3,bb,ri)
             texp = exp(-bb2*sgmi2/2)
             qcosl(ik) = qcosl(ik) +texp*qi*cos(bdotr)
             qsinl(ik) = qsinl(ik) +texp*qi*sin(bdotr)
@@ -1151,7 +1154,7 @@ contains
           ik= ik +1
           bk3(1:3) = k3 *b3(1:3)
           bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-          bb2 = sprod(bb,bb)
+          bb2 = sprod(3,bb,bb)
           do i=1,natm
             xi(1:3)= ra(1:3,i)
             is= int(tag(i))
@@ -1159,7 +1162,7 @@ contains
             sgmi2= sgmi*sgmi
             qi = chg(i)
             ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
-            bdotr = sprod(bb,ri)
+            bdotr = sprod(3,bb,ri)
             texp = exp(-bb2*sgmi2/2)
             cs = cos(bdotr)
             sn = sin(bdotr)
@@ -1234,9 +1237,9 @@ contains
               ik = ik + 1
               bk3(1:3)= k3 *b3(1:3)
               bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-              bdotri = sprod(bb,ri)
-              bdotrj = sprod(bb,rj)
-              bb2 = sprod(bb,bb)
+              bdotri = sprod(3,bb,ri)
+              bdotrj = sprod(3,bb,rj)
+              bb2 = sprod(3,bb,bb)
               
               amat(ia,ja) = amat(ia,ja) +2d0/bb2 &
                    *exp(-bb2/2*(sgmi2+sgmj2)) &

@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-24 23:27:52 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-26 19:04:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -35,7 +35,6 @@ module NNd
 
   type(smpldata),allocatable:: sds(:)
 
-  integer:: maxna
   real(8),allocatable:: fdiff(:,:)
   real(8),allocatable:: gmax(:),gmin(:)
 
@@ -169,12 +168,6 @@ contains
     enddo
     call read_symmetry_functions()
 
-    maxna= 0
-    do ismpl=isid0,isid1
-      if( maxna.lt.samples(ismpl)%natm )  &
-           maxna= samples(ismpl)%natm
-    enddo
-!!$    print *,' myid, max num of atoms [maxna] =',myid,maxna
     allocate(fdiff(3,maxna))
 
     gsfmean= get_mean_input()

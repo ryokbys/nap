@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-24 21:49:19 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-27 13:57:16 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -197,6 +197,13 @@ contains
     epotl= 0d0
     strsl(1:3,1:3,1:namax) = 0d0
 
+!!$    do is = 1,nsp
+!!$      atdi = atdescs(is)
+!!$      write(6,'(a,2i5,a,5es11.3)') 'is,na,csym,eion1,eion2,eaff,atrad,enpaul =',&
+!!$           is,atdi%na,atdi%csym,atdi%eion1,atdi%eion2,atdi%eaff,&
+!!$           atdi%atrad,atdi%enpaul
+!!$    enddo
+
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -220,9 +227,18 @@ contains
         atdj = atdescs(js)
         call make_pair_desc(chgi,chgj,atdi,atdj,pdij)
 !.....Create Morse parameters that depend on current atom charges
-        d0ij = sprod(wd,pdij)
-        alpij= sprod(walp,pdij)
-        rminij= sprod(wrmin,pdij)
+        d0ij = sprod(nprm+1,wd,pdij)
+        alpij= sprod(nprm+1,walp,pdij)
+        rminij= sprod(nprm+1,wrmin,pdij)
+!!$        if( i.eq.1 .and. j.eq.2 ) then
+!!$          write(6,'(a,4i4,5es15.7)') &
+!!$             ' i,is,j,js,chgi,chgj,alp,d0,rmin=',&
+!!$             i,is,j,js,chgi,chgj,alpij,d0ij,rminij
+!!$          write(6,'(a,20es13.5)') ' pdij = ',pdij(0:nprm)
+!!$          write(6,'(a,20es13.5)') ' walp = ',walp(0:nprm)
+!!$          write(6,'(a,20es13.5)') ' wd   = ',wd(0:nprm)
+!!$          write(6,'(a,20es13.5)') ' wrmin= ',wrmin(0:nprm)
+!!$        endif
         texp = exp(alpij*(rminij-dij))
 !.....potential
         tmp= d0ij*((texp-1d0)**2 -1d0)
@@ -325,9 +341,9 @@ contains
         atdj = atdescs(js)
         call make_pair_desc(chgi,chgj,atdi,atdj,pdij)
 !.....Create Morse parameters that depend on current atom charges
-        d0ij = sprod(wd,pdij)
-        alpij= sprod(walp,pdij)
-        rminij= sprod(wrmin,pdij)
+        d0ij = sprod(nprm+1,wd,pdij)
+        alpij= sprod(nprm+1,walp,pdij)
+        rminij= sprod(nprm+1,wrmin,pdij)
         texp = exp(alpij*(rminij-dij))
 !.....potential
         tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
@@ -501,7 +517,7 @@ contains
     
   end subroutine read_params_vcMorse
 !=======================================================================
-  subroutine set_params_vcMorse(ndimp,params,ierr)
+  subroutine set_params_vcMorse(ndimp,params)
 !
 ! Accessor routine to set vcMorse parameters from outside.
 ! Curretnly this routine is supposed to be called only on serial run.
@@ -509,16 +525,12 @@ contains
 !
     integer,intent(in):: ndimp
     real(8),intent(in):: params(ndimp)
-    integer,intent(inout):: ierr
 
     integer:: i,inc
 
-    ierr = 0
     if( ndimp.ne.3*(nprm+1) ) then
-      ierr = 10
       print *,'Error: ndimp.ne.3*(nprm+1) !!!'
       stop
-      return
     endif
 
     inc = 0
@@ -676,40 +688,6 @@ contains
     
   end subroutine make_pair_desc
 !=======================================================================
-  function get_coeff(prms,chgi,chgj,atdi,atdj)
-!
-!  Determine D which depends on charges of atom-i and atom-j.
-!
-    real(8),intent(in):: chgi,chgj,prms(0:nprm)
-    type(atdesc),intent(in):: atdi,atdj
-    real(8):: get_coeff
-
-    integer:: i
-    real(8):: di(ndesc),dj(ndesc)
-
-    di(1) = chgi
-    di(2) = atdi%eion1
-    di(3) = atdi%eion2
-    di(4) = atdi%eaff
-    di(5) = atdi%atrad
-    di(6) = atdi%enpaul
-
-    dj(1) = chgj
-    dj(2) = atdj%eion1
-    dj(3) = atdj%eion2
-    dj(4) = atdj%eaff
-    dj(5) = atdj%atrad
-    dj(6) = atdj%enpaul
-
-    get_coeff = prms(0)
-    do i=1,ndesc
-      get_coeff = get_coeff +prms(2*i-1)*(di(i)+dj(i)) &
-           +prms(2*i)*( di(i)*dj(i) )
-    enddo
-    return
-    
-  end function get_coeff
-!=======================================================================
   subroutine pderiv_vcMorse(namax,natm,tag,ra,nnmax,chg &
        ,h,rc,lspr,epot,iprint,ndimp,pderiv)
 !
@@ -739,6 +717,10 @@ contains
 
     epotl= 0d0
 
+    gwalp(0:nprm) = 0d0
+    gwd(0:nprm) = 0d0
+    gwrmin(0:nprm) = 0d0
+    
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -762,24 +744,27 @@ contains
         atdj = atdescs(js)
         call make_pair_desc(chgi,chgj,atdi,atdj,pdij)
 !.....Create Morse parameters that depend on current atom charges
-        d0ij = sprod(wd,pdij)
-        alpij= sprod(walp,pdij)
-        rminij= sprod(wrmin,pdij)
+        d0ij = sprod(nprm+1,wd,pdij)
+        alpij= sprod(nprm+1,walp,pdij)
+        rminij= sprod(nprm+1,wrmin,pdij)
         texp = exp(alpij*(rminij-dij))
 !.....potential
         tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
         tmp2 = tmp *fcut1(dij,rc)
         epotl = epotl +tmp2
 !.....Derivative of potential energy w.r.t. {w}
-        dedd0 = (texp -1d0)**2 -1d0
+        dedd0 = ((texp -1d0)**2 -1d0)
         dedalp = 2d0*d0ij*(texp-1d0)*texp*(rminij-dij)
-        dedrmin = -2d0*d0ij*(texp-1d0)*texp*alpij
+        dedrmin = 2d0*d0ij*(texp-1d0)*texp*alpij
         gwd(0:nprm) = gwd(0:nprm) +0.5d0 *dedd0 *pdij(0:nprm)
         gwalp(0:nprm) = gwalp(0:nprm) +0.5d0 *dedalp *pdij(0:nprm)
         gwrmin(0:nprm) = gwrmin(0:nprm) +0.5d0 *dedrmin *pdij(0:nprm)
+!!$        write(6,'(a,2i5,30es11.3)') 'i,j,chgi,chgj,d0ij,alpij,rminij,dedd0,dedalp,dedrmin,pdij='&
+!!$             ,i,j,chgi,chgj,d0ij,alpij,rminij,dedd0,dedalp,dedrmin,pdij(0:nprm)
       enddo
     enddo
-    
+
+!.....Not parallel
     epot= epot +epotl
 
 !.....gwalp,gwd,gwrmin to pderiv

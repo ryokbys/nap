@@ -1,5 +1,5 @@
 subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
-     ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr &
      ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
      ,numff,cffs,ifcoulomb,iprint,l1st, &
      luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH,  &
@@ -33,8 +33,8 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
   use Morse, only: force_Morse, force_vcMorse
   implicit none
   integer,intent(in):: namax,natm,nnmax,nismax,iprint
-  integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-       ,nnn(6),mpi_md_world,myid_md,nex(3)
+  integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
+       ,myparity(3),nnn(6),mpi_md_world,myid_md,nex(3)
   integer,intent(in):: lspr(0:nnmax,namax),numff
   integer,intent(inout):: ifcoulomb
   real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
@@ -96,11 +96,12 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
       print *, 'Charges are to be equilibrated.'
       print *, ''
     endif
-    write(6,'(a,30es12.4)') 'chg before dampopt=',chg(1:natm)
+!!$    write(6,'(a,30es12.4)') 'chg before dampopt=',chg(1:natm)
     call dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
+         lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
          tcom,myid_md,mpi_md_world,iprint,ifcoulomb, &
          luse_vcMorse,l1st)
-    write(6,'(a,30es12.4)') 'chg after dampopt=',chg(1:natm)
+!!$    write(6,'(a,500es11.3)') ' chg after dampopt=',chg(1:natm+12)
   endif
 
 !.....Exclusive choice of different Coulomb force-fields
@@ -859,6 +860,7 @@ subroutine set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
 end subroutine set_force_flags
 !=======================================================================
 subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
+     lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
      tcom,myid,mpi_md_world,iprint,ifcoulomb,luse_vcMorse,l1st)
 !
 !  Charge optimization/equilibration by damped dynamics.
@@ -874,6 +876,8 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   real(8),intent(in):: chi(namax),h(3,3),tag(namax),ra(3,namax),rc
   real(8),intent(inout):: chg(namax),tcom
   logical,intent(in):: luse_vcMorse,l1st
+  integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+       ,nnn(6),nex(3),lsex(nbmax,6)
 
   integer:: istp,i
   real(8):: eclong,epot,epotp,afq,eMorse
@@ -920,6 +924,9 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
          *(fq(1:natm) -afq -eta_dampopt*vq(1:natm))
 !.....update charges
     chg(1:natm)= chg(1:natm) +vq(1:natm)*dt_dampopt
+    call bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
+            ,natm,nb,nnn,myid,myparity,lsrc &
+            ,nex,mpi_md_world,chg)
 
 !.....get new qforces
     fq(1:natm) = 0d0

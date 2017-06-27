@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-24 23:30:44 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-27 13:21:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -54,17 +54,23 @@ program fitpot
   call read_ref_data()
   call get_base_energies()
   if( lswgt ) call set_sample_weights()
+  call set_max_num_atoms()
 
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
 
 !.....Subtract energy and forces of other force-fields
-  if( numff.gt.0 ) then
+  if( nsubff.gt.0 ) then
     call subtract_FF()
   endif
 
-!!$!.....Subtract atomic energy
-!!$  call subtract_atomic_energy()
+!.....Subtract atomic energy
+  call subtract_atomic_energy()
+
+!.....Set cffs only for pmd calculation
+  nff = 1
+  allocate(cffs(nff))
+  cffs(1) = trim(cpot)
   
   select case (trim(cfmethod))
     case ('sd','SD')
@@ -106,7 +112,7 @@ program fitpot
   call write_stats(niter)
 
 !.....Restore subtracted energies and forces to get original reference values
-  if( numff.gt.0 ) then
+  if( nsubff.gt.0 ) then
     call restore_FF()
   endif
   
@@ -120,13 +126,13 @@ program fitpot
 !!$  write(6,'(a,i4,3f15.3)') ' myid,tfunc,tgrad,tcom=' &
 !!$       ,myid,tfunc,tgrad,tcomm
 !!$  tmp= tfunc
-!!$  call mpi_reduce(tmp,tfunc,1,mpi_double_precision,mpi_max &
+!!$  call mpi_reduce(tmp,tfunc,1,mpi_real8,mpi_max &
 !!$       ,0,mpi_world,ierr)
 !!$  tmp= tgrad
-!!$  call mpi_reduce(tmp,tgrad,1,mpi_double_precision,mpi_max &
+!!$  call mpi_reduce(tmp,tgrad,1,mpi_real8,mpi_max &
 !!$       ,0,mpi_world,ierr)
 !!$  tmp= tcomm
-!!$  call mpi_reduce(tmp,tcomm,1,mpi_double_precision,mpi_max &
+!!$  call mpi_reduce(tmp,tcomm,1,mpi_real8,mpi_max &
 !!$       ,0,mpi_world,ierr)
   if( myid.eq.0 ) then
     write(6,'(a,i10)') ' num of func calls=',nfunc
@@ -411,6 +417,7 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%eki(3,3,natm),smpl%epi(natm) &
        ,smpl%chg(natm),smpl%chi(natm),smpl%fsub(3,natm) &
        ,smpl%symbols(natm),smpl%eatm(natm))
+  smpl%chg(1:natm) = 0d0
   do i=1,smpl%natm
     read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), &
          tmp,tmp,tmp
@@ -459,7 +466,7 @@ subroutine read_ref_data()
       jflag= jflag +1
     endif
     nfrefdat = ndat_in_line(14,' ')
-    print *,'ismpl,cdirname =',ismpl,cdir
+!!$    print *,'ismpl,cdirname =',ismpl,trim(cdir)
     do i=1,natm
       nftot= nftot + 1
       if( nfrefdat.eq.3 ) then
@@ -541,7 +548,7 @@ subroutine get_base_energies()
   enddo
 
   ebase(1:mspcs) = 0d0
-  call mpi_allreduce(ebl,ebase,mspcs,mpi_double_precision,mpi_min &
+  call mpi_allreduce(ebl,ebase,mspcs,mpi_real8,mpi_min &
        ,mpi_world,ierr)
 
   if(myid.eq.0) then
@@ -560,7 +567,7 @@ subroutine read_vars()
   implicit none
   integer:: i
   real(8):: rs0
-  character(len=128):: fname = 'in.vars.fitpot'
+  character(len=128):: fname
 
   if( trim(cpot).eq.'NN' ) then
     fname = cparfile
@@ -573,8 +580,8 @@ subroutine read_vars()
     read(15,*) nvars, rcut, rc3
   endif
   call mpi_bcast(nvars,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(rcut,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(rc3,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(rcut,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(rc3,1,mpi_real8,0,mpi_world,ierr)
   allocate(vars(nvars),vranges(2,nvars))
   if( myid.eq.0 ) then
     do i=1,nvars
@@ -596,7 +603,7 @@ subroutine read_vars()
     endif
     close(15)
   endif
-  call mpi_bcast(vars,nvars,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(vars,nvars,mpi_real8,0,mpi_world,ierr)
 
 end subroutine read_vars
 !=======================================================================
@@ -913,6 +920,7 @@ subroutine check_grad()
   use variables
   use NNd,only:NN_init,NN_func,NN_grad
   use parallel
+  use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   integer:: iv
   real(8):: ftrn0,ftst0,ftmp,dv,vmax,ftst,ftmp1,ftmp2
@@ -921,9 +929,15 @@ subroutine check_grad()
   real(8),parameter:: tiny = 1d-6
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
-  call NN_init()
-  call NN_func(nvars,vars,ftrn0,ftst0)
-  call NN_grad(nvars,vars,ganal)
+
+  if( trim(cpot).eq.'NN' ) then
+    call NN_init()
+    call NN_func(nvars,vars,ftrn0,ftst0)
+    call NN_grad(nvars,vars,ganal)
+  else if( trim(cpot).eq.'vcMorse' ) then
+    call func_w_pmd(nvars,vars,ftrn0,ftst)
+    call grad_w_pmd(nvars,vars,ganal)
+  endif
 
   vars0(1:nvars)= vars(1:nvars)
   vmax= 0d0
@@ -938,13 +952,25 @@ subroutine check_grad()
   endif
   do iv=1,nvars
     vars(1:nvars)= vars0(1:nvars)
-    dv = vars(iv)*dev
+    dv = max(abs(vars(iv)*dev),dev)
     vars(iv)= vars(iv) +dv/2
-    call NN_func(nvars,vars,ftmp1,ftst)
+    if( trim(cpot).eq.'NN' ) then
+      call NN_func(nvars,vars,ftmp1,ftst)
+    else if( trim(cpot).eq.'vcMorse' ) then
+      call func_w_pmd(nvars,vars,ftmp1,ftst)
+    endif
     vars(1:nvars)= vars0(1:nvars)
     vars(iv)= vars(iv) -dv/2
-    call NN_func(nvars,vars,ftmp2,ftst)
+    if( trim(cpot).eq.'NN' ) then
+      call NN_func(nvars,vars,ftmp2,ftst)
+    else if( trim(cpot).eq.'vcMorse' ) then
+      call func_w_pmd(nvars,vars,ftmp2,ftst)
+    endif
     gnumer(iv)= (ftmp1-ftmp2)/dv
+    write(6,'(a,i5,10es15.7)') 'iv,var1,var2,ftmp1,ftmp2,gnumer = ', &
+         iv,vars0(iv)+dev/2,&
+         vars0(iv)-dev/2,ftmp1,ftmp2,gnumer(iv)
+    print *,''
   enddo
 
   if( myid.eq.0 ) then
@@ -966,6 +992,7 @@ subroutine test()
   use variables
   use NNd,only:NN_init,NN_func,NN_grad
   use parallel
+  use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none 
   integer:: iv
   real(8):: ftrn,ftst
@@ -973,9 +1000,14 @@ subroutine test()
 
   allocate(g(nvars))
 
-  call NN_init()
-  call NN_func(nvars,vars,ftrn,ftst)
-  call NN_grad(nvars,vars,g)
+  if( trim(cpot).eq.'NN' ) then
+    call NN_init()
+    call NN_func(nvars,vars,ftrn,ftst)
+    call NN_grad(nvars,vars,g)
+  else if( trim(cpot).eq.'vcMorse' ) then
+    call func_w_pmd(nvars,vars,ftrn,ftst)
+    call grad_w_pmd(nvars,vars,g)
+  endif
 
   call write_stats(0)
 
@@ -1020,11 +1052,11 @@ subroutine write_energy_relation(cadd)
     erefg(1:nsmpl)= 0d0
     eerrg(1:nsmpl)= 0d0
     swgtg(1:nsmpl)= 0d0
-    call mpi_reduce(erefl,erefg,nsmpl,mpi_double_precision,mpi_sum &
+    call mpi_reduce(erefl,erefg,nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
-    call mpi_reduce(eerrl,eerrg,nsmpl,mpi_double_precision,mpi_sum &
+    call mpi_reduce(eerrl,eerrg,nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
-    call mpi_reduce(swgtl,swgtg,nsmpl,mpi_double_precision,mpi_sum &
+    call mpi_reduce(swgtl,swgtg,nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
   endif
 
@@ -1033,7 +1065,7 @@ subroutine write_energy_relation(cadd)
     epotl(ismpl)= samples(ismpl)%epot
   enddo
   epotg(1:nsmpl)= 0d0
-  call mpi_reduce(epotl,epotg,nsmpl,mpi_double_precision,mpi_sum &
+  call mpi_reduce(epotl,epotg,nsmpl,mpi_real8,mpi_sum &
        ,0,mpi_world,ierr)
 
   if( myid.eq.0 ) then
@@ -1096,9 +1128,9 @@ subroutine write_force_relation(cadd)
     enddo
     frefg(1:3,1:nmax,1:nsmpl)= 0d0
     ferrg(1:nsmpl) = 0d0
-    call mpi_reduce(frefl,frefg,3*nmax*nsmpl,mpi_double_precision,mpi_sum &
+    call mpi_reduce(frefl,frefg,3*nmax*nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
-    call mpi_reduce(ferrl,ferrg,nsmpl,mpi_double_precision,mpi_sum &
+    call mpi_reduce(ferrl,ferrg,nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
   endif
 
@@ -1108,7 +1140,7 @@ subroutine write_force_relation(cadd)
     fal(1:3,1:natm,ismpl)= samples(ismpl)%fa(1:3,1:natm)
   enddo
   fag(1:3,1:nmax,1:nsmpl)= 0d0
-  call mpi_reduce(fal,fag,3*nmax*nsmpl,mpi_double_precision,mpi_sum &
+  call mpi_reduce(fal,fag,3*nmax*nsmpl,mpi_real8,mpi_sum &
        ,0,mpi_world,ierr)
 
   if( myid.eq.0 ) then
@@ -1174,7 +1206,7 @@ subroutine write_stats(iter)
   endif
 
 !.....Restore subtracted energies and forces to get original reference values
-  if( numff.gt.0 ) then
+  if( nsubff.gt.0 ) then
     call restore_FF()
   endif
 
@@ -1197,13 +1229,13 @@ subroutine write_stats(iter)
   desum_trn= 0d0
   desum_tst= 0d0
   call mpi_reduce(desuml_trn,desum_trn,1 &
-       ,mpi_double_precision,mpi_sum,0,mpi_world,ierr)
+       ,mpi_real8,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(desuml_tst,desum_tst,1 &
-       ,mpi_double_precision,mpi_sum,0,mpi_world,ierr)
+       ,mpi_real8,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(demaxl_trn,demax_trn,1 &
-       ,mpi_double_precision,mpi_max,0,mpi_world,ierr)
+       ,mpi_real8,mpi_max,0,mpi_world,ierr)
   call mpi_reduce(demaxl_tst,demax_tst,1 &
-       ,mpi_double_precision,mpi_max,0,mpi_world,ierr)
+       ,mpi_real8,mpi_max,0,mpi_world,ierr)
   rmse_trn= sqrt(desum_trn/nsmpl_trn)
   if( nsmpl_tst.ne.0 ) then
     rmse_tst= sqrt(desum_tst/nsmpl_tst)
@@ -1262,13 +1294,13 @@ subroutine write_stats(iter)
   dfsum_trn= 0d0
   dfsum_tst= 0d0
   call mpi_reduce(dfsuml_trn,dfsum_trn,1 &
-       ,mpi_double_precision,mpi_sum,0,mpi_world,ierr)
+       ,mpi_real8,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(dfsuml_tst,dfsum_tst,1 &
-       ,mpi_double_precision,mpi_sum,0,mpi_world,ierr)
+       ,mpi_real8,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(dfmaxl_trn,dfmax_trn,1 &
-       ,mpi_double_precision,mpi_max,0,mpi_world,ierr)
+       ,mpi_real8,mpi_max,0,mpi_world,ierr)
   call mpi_reduce(dfmaxl_tst,dfmax_tst,1 &
-       ,mpi_double_precision,mpi_max,0,mpi_world,ierr)
+       ,mpi_real8,mpi_max,0,mpi_world,ierr)
   ntrn= 0
   ntst= 0
   call mpi_reduce(ntrnl,ntrn,1 &
@@ -1290,7 +1322,7 @@ subroutine write_stats(iter)
   endif
 
 !.....Subtract energy and forces again
-  if( numff.gt.0 ) then
+  if( nsubff.gt.0 ) then
     call subtract_FF()
   endif
   
@@ -1346,42 +1378,42 @@ subroutine sync_input()
   call mpi_bcast(clinmin,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cnormalize,128,mpi_character,0,mpi_world,ierr)
 
-  call mpi_bcast(xtol,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(ftol,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(gtol,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(eatom,maxnsp,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(gscl,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(fred,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(xtol,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(ftol,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(gtol,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(eatom,maxnsp,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(gscl,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(fred,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nfpsmpl,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(pwgt,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(ratio_test,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(rseed,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(pwgt,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(ratio_test,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(rseed,1,mpi_real8,0,mpi_world,ierr)
   
   call mpi_bcast(lfmatch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
 
   call mpi_bcast(lswgt,1,mpi_logical,0,mpi_world,ierr)
-  call mpi_bcast(swerg,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(swerg,1,mpi_real8,0,mpi_world,ierr)
 
-  call mpi_bcast(sa_temp0,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(sa_xw0,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(sa_temp0,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(sa_xw0,1,mpi_real8,0,mpi_world,ierr)
 !.....sgd
   call mpi_bcast(csgdupdate,128,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(r0sgd,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(r0sgd,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nsgdbsize,1,mpi_integer,0,mpi_world,ierr)
 !.....initialize parameters
   call mpi_bcast(cinitv,128,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(vinitsgm,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(vinitmu,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(vinitsgm,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(vinitmu,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(numtol,1,mpi_integer,0,mpi_world,ierr)
 !.....CG
   call mpi_bcast(icgbtype,1,mpi_integer,0,mpi_world,ierr)
 !.....L-BFGS
   call mpi_bcast(mstore,1,mpi_integer,0,mpi_world,ierr)
 !.....Armijo
-  call mpi_bcast(armijo_xi,1,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(armijo_tau,1,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(armijo_xi,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(armijo_tau,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(armijo_maxiter,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(nwgtindiv,1,mpi_integer,0,mpi_world,ierr)
@@ -1389,23 +1421,23 @@ subroutine sync_input()
     allocate(cwgtindiv(nwgtindiv),wgtindiv(nwgtindiv))
   endif
   call mpi_bcast(cwgtindiv,128*nwgtindiv,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(wgtindiv,nwgtindiv,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(wgtindiv,nwgtindiv,mpi_real8,0,mpi_world,ierr)
 
   call mpi_bcast(nserr,1,mpi_integer,0,mpi_world,ierr)
   if( myid.gt.0 ) then
     allocate(cserr(nserr),seerr(nserr),sferr(nserr))
   endif
   call mpi_bcast(cserr,128*nserr,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(seerr,nserr,mpi_double_precision,0,mpi_world,ierr)
-  call mpi_bcast(sferr,nserr,mpi_double_precision,0,mpi_world,ierr)
+  call mpi_bcast(seerr,nserr,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(sferr,nserr,mpi_real8,0,mpi_world,ierr)
 
 !.....Force-fields to be subtracted from reference values
-  call mpi_bcast(numff,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nsubff,1,mpi_integer,0,mpi_world,ierr)
   if( myid.gt.0 ) then
-    allocate(cffs(numff))
+    allocate(csubffs(nsubff))
   endif
 !.....TODO: check what happens if numff==0...
-  call mpi_bcast(cffs,20*numff,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(csubffs,20*nsubff,mpi_character,0,mpi_world,ierr)
 
 end subroutine sync_input
 !=======================================================================
@@ -1592,23 +1624,31 @@ subroutine subtract_FF()
   use parallel
   implicit none
 
-  integer:: i,ismpl
+  integer:: i,ismpl,natm
   logical:: lcalcgrad = .false.
   logical,save:: l1st = .true.
+  real(8):: epot
+  real(8),save,allocatable:: frcs(:,:)
 
   if( l1st ) then
     if( myid.eq.0 .and. iprint.ne.0 ) then
       print *,'subtract_FF'
-      do i=1,numff
-        print *,'  i,FF = ',i,trim(cffs(i))
+      do i=1,nsubff
+        print *,'  i,FF = ',i,trim(csubffs(i))
       enddo
     endif
 
+    allocate(frcs(3,maxna))
+
 !.....Only at the 1st call, perform pmd to get esubs
     do ismpl=isid0,isid1
-      samples(ismpl)%chg(1:samples(ismpl)%natm) = 0d0
-      call run_pmd(samples(ismpl),lcalcgrad,nvars,gvar)
+      natm = samples(ismpl)%natm
+      call run_pmd(samples(ismpl),lcalcgrad,nvars,gvar,&
+           nsubff,csubffs,epot,frcs)
+      samples(ismpl)%esub = epot
+      samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
     enddo
+    
   endif
 
 !.....After the 1st call, subtract esubs calculated at the 1st call
@@ -1648,23 +1688,24 @@ subroutine restore_FF()
   
 end subroutine restore_FF
 !=======================================================================
-subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv)
+subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs)
 !
 !  Run pmd and get energy and forces of the system.
 !  TODO: stress should be returned as well.
 !
-  use variables
-  use parallel
+  use variables,only: rcut,mdsys,maxna
+  use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd
   implicit none
   type(mdsys),intent(inout):: smpl
-  integer,intent(in):: ndimp
-  real(8),intent(inout):: pderiv(ndimp)
+  integer,intent(in):: ndimp,nff
+  real(8),intent(inout):: pderiv(ndimp),epot,frcs(3,maxna)
   logical,intent(in):: lcalcgrad
+  character(len=20),intent(in):: cffs(nff)
 
   logical,save:: l1st = .true.
 
   integer:: i,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
-       ifcoulomb,nismax,nstps_done,ntdst,nx,ny,nz
+       ifcoulomb,nismax,nstps_done,ntdst,nx,ny,nz,iprint_pmd
   real(8):: am(9),dt,rc,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
        ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv
   logical:: ltdst,lstrs,lcellfix(3,3)
@@ -1713,33 +1754,22 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv)
   czload_type = 'no'
   eps_conv = 1d-3
   ifsort = 1
-  iprint = 1
+  iprint_pmd = 0
   ifcoulomb = 0
   lcellfix(1:3,1:3) = .false.
   nx = 1
   ny = 1
   nz = 1
   
-!!$!.....Run one-shot force calculation to get an energy and forces
-!!$  call pmd_core(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
-!!$       ,smpl%va,smpl%fsub,smpl%strsi,smpl%eki,smpl%epi &
-!!$       ,smpl%chg,smpl%chi,maxstp,nerg,npmd &
-!!$       ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
-!!$       ,nismax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp,minstp &
-!!$       ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
-!!$       ,srlx,stbeta,strfin,lstrs,lcellfix &
-!!$       ,fmv,ptnsr,smpl%esub,ekin,n_conv,ifcoulomb &
-!!$       ,czload_type,eps_conv,ifsort,iprint,nstps_done)
-
 !.....one_shot force calculation
-  print *,'calling one_shot...'
+!!$  print *,'calling one_shot...'
   call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
-       ,smpl%va,smpl%fsub,smpl%strsi,smpl%eki,smpl%epi &
+       ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
        ,smpl%chg,smpl%chi &
        ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
-       ,nismax,am,dt,numff,cffs,rc,rbuf,ptnsr,smpl%esub,ekin &
-       ,ifcoulomb,iprint,lcalcgrad,ndimp,pderiv)
-
+       ,nismax,am,dt,nff,cffs,rc,rbuf,ptnsr,epot,ekin &
+       ,ifcoulomb,iprint_pmd,lcalcgrad,ndimp,pderiv)
+!!$  print *,'one_shot done, epot = ',epot
 !!$  print *,'smpl%natm =',smpl%natm
 !!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)
 
@@ -1802,6 +1832,24 @@ subroutine subtract_atomic_energy()
     enddo
   endif
 end subroutine subtract_atomic_energy
+!=======================================================================
+subroutine set_max_num_atoms()
+  use variables
+  use parallel
+  integer:: ismpl, maxnal
+
+  maxnal = 0
+  do ismpl=isid0,isid1
+    na = samples(ismpl)%natm
+    maxnal = max(na,maxnal)
+  enddo
+  maxna = 0
+  call mpi_allreduce(maxnal,maxna,1,mpi_real8,mpi_max,mpi_world,ierr)
+  if( myid.eq.0 .and. iprint.ne.0 ) then
+    print *,'max num of atoms among data = ',maxna
+  endif
+  
+end subroutine set_max_num_atoms
 !-----------------------------------------------------------------------
 ! Local Variables:
 ! compile-command: "make fitpot"

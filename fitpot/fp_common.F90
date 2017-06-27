@@ -4,11 +4,47 @@ module fp_common
 !
   implicit none
 
-  integer:: maxna = 0
   real(8),allocatable:: fdiff(:,:)
 
+  logical:: fp_common_initialized= .false.
 
 contains
+!=======================================================================
+  subroutine init()
+    use variables,only: swgt2trn, swgt2tst, samples, lfmatch
+    use parallel
+
+    integer:: ismpl
+    real(8):: swgtrn,swgtst
+    
+!.....set nominator for sample weights
+    swgtrn = 0d0
+    swgtst = 0d0
+    do ismpl=isid0,isid1
+      if( samples(ismpl)%iclass.eq.1 ) then
+        swgtrn = swgtrn +samples(ismpl)%wgt
+      else if(samples(ismpl)%iclass.eq.2 ) then
+        swgtst = swgtst +samples(ismpl)%wgt
+      endif
+    enddo
+    swgt2trn = 0d0
+    swgt2tst = 0d0
+    call mpi_allreduce(swgtrn,swgt2trn,1,mpi_real8,mpi_sum &
+         ,mpi_world,ierr)
+    call mpi_allreduce(swgtst,swgt2tst,1,mpi_real8,mpi_sum &
+         ,mpi_world,ierr)
+    if( lfmatch ) then
+      swgt2trn = swgt2trn*2d0
+      swgt2tst = swgt2tst*2d0
+    endif
+    if( myid.eq.0 ) then
+      write(6,'(a,es15.7)') ' swgt2trn = ',swgt2trn
+      write(6,'(a,es15.7)') ' swgt2tst = ',swgt2tst
+    endif
+
+    fp_common_initialized = .true.
+
+  end subroutine init
 !=======================================================================
   subroutine func_w_pmd(ndim,x,ftrn,ftst)
 !
@@ -16,11 +52,12 @@ contains
 !
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
          ,lfmatch,nfunc,tcomm,mdsys,erefmin &
-         ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot
+         ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
+         ,nff,cffs,cmaindir,maxna
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb
-    use Morse,only: set_paramsdir_Morse
+    use Morse,only: set_paramsdir_Morse, set_params_vcMorse
     implicit none
     
     integer,intent(in):: ndim
@@ -28,7 +65,7 @@ contains
     real(8),intent(out):: ftrn,ftst
 
     integer:: ismpl,natm,ia,ixyz,idim
-    real(8):: dn3i,ediff,fscale,eref,swgt,wgtidv
+    real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv
     real(8):: eerr,ferr,ferri
     real(8):: ftrnl,ftstl,ftmp
     real(8):: edenom,fdenom
@@ -36,7 +73,7 @@ contains
     type(mdsys):: smpl
     logical:: l1st = .true.
     logical:: lcalcgrad = .false.
-    real(8),save,allocatable:: gdummy(:)
+    real(8),save,allocatable:: gdummy(:),frcs(:,:)
     character(len=128):: cdirname
 
     nfunc= nfunc +1
@@ -48,31 +85,34 @@ contains
 
     if( l1st ) then
       if( .not.allocated(gdummy) ) allocate(gdummy(ndim))
+      if( .not.fp_common_initialized ) call init()
+      if( .not.allocated(fdiff) ) allocate(fdiff(3,maxna),frcs(3,maxna))
     endif
     
     ftrnl = 0d0
     ftstl = 0d0
     do ismpl=isid0,isid1
       smpl = samples(ismpl)
-      cdirname = smpl%cdirname
+      natm= smpl%natm
+      cdirname = trim(smpl%cdirname)
       if( trim(cpot).eq.'vcMorse' ) then
-        call set_paramsdir_Morse(cdirname)
-        call set_paramsdir_Coulomb(cdirname)
+        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname))
+        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname))
+        call set_params_vcMorse(ndim,x)
       endif
-      call run_pmd(smpl,lcalcgrad,ndim,gdummy)
+      call run_pmd(smpl,lcalcgrad,ndim,gdummy,nff,cffs,epot,frcs)
+!!$      print *, 'epot =',epot
+      samples(ismpl)%epot = epot
+      samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
 
       ftmp = 0d0
-      natm= smpl%natm
-      if( natm.gt.maxna ) then
-        maxna = natm
-        if( allocated(fdiff) ) deallocate(fdiff)
-        allocate(fdiff(3,maxna))
-      endif
       eref= smpl%eref
       eerr = smpl%eerr
       swgt = smpl%wgt
 !.....Energy matching
-      ediff= (smpl%epot -eref)/natm /eerr
+      ediff= (epot -eref)/natm /eerr
+!!$      write(6,'(a,2i5,3es15.7)') ' ismpl,natm,eref,epot,ediff = ', &
+!!$           ismpl,natm,eref,epot,ediff
       ediff= ediff*ediff
       ftmp= ftmp +ediff *swgt
 !.....Force matching
@@ -83,7 +123,7 @@ contains
         do ia=1,natm
           if( smpl%ifcal(ia).eq.0 ) cycle
           do ixyz=1,3
-            fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
+            fdiff(ixyz,ia)= (frcs(ixyz,ia) &
                  -smpl%fref(ixyz,ia)) *ferri
             fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
             ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt
@@ -124,25 +164,25 @@ contains
 !  using pmd (actually one_shot routine.)
 !
     use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm &
-         ,samples,mdsys,swgt2trn,swgt2tst,cpot
+         ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,cmaindir,maxna
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb
-    use Morse,only: set_paramsdir_Morse
+    use Morse,only: set_paramsdir_Morse, set_params_vcMorse
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gtrn(ndim)
     
     integer:: ismpl,i,idim,natm
-    real(8),save,allocatable:: gs(:),gtrnl(:)
-    real(8):: tcl,tgl,tcg,tgg,tc0,tg0
+    real(8),save,allocatable:: gs(:),gtrnl(:),frcs(:,:)
+    real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot
     real(8):: ediff,eerr,eref,swgt
     type(mdsys):: smpl
     logical:: lcalcgrad = .true. 
     character(len=128):: cdirname
 
-    if( .not.allocated(gs) ) allocate(gs(ndim),gtrnl(ndim))
+    if( .not.allocated(gs) ) allocate(gs(ndim),gtrnl(ndim),frcs(3,maxna))
 
     ngrad= ngrad +1
     tg0= mpi_wtime()
@@ -151,24 +191,29 @@ contains
 
     do ismpl=isid0,isid1
       smpl = samples(ismpl)
+      natm= smpl%natm
       cdirname = smpl%cdirname
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
       if( trim(cpot).eq.'vcMorse' ) then
-        call set_paramsdir_Morse(cdirname)
-        call set_paramsdir_Coulomb(cdirname)
+        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname))
+        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname))
+        call set_params_vcMorse(ndim,x)
       endif
-      call run_pmd(smpl,lcalcgrad,ndim,gs)
+      call run_pmd(smpl,lcalcgrad,ndim,gs,nff,cffs,epot,frcs)
+      samples(ismpl)%epot = epot
+      samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
 
-      natm= smpl%natm
       eref= smpl%eref
       eerr= smpl%eerr
       swgt= smpl%wgt
 !.....Energy matching
-      ediff= (smpl%epot -eref) /natm /eerr
+      ediff= (epot -eref) /natm /eerr
       ediff= 2d0 *ediff /natm /eerr *swgt
       gtrnl(1:ndim)= gtrnl(1:ndim) +gs(1:ndim)*ediff
+!!$      print *,'ismpl,epot,eref,ediff=',ismpl,epot,eref,ediff
+!!$      print *,'gs =',gs(1:ndim)
 !.....TODO: force matching
       
     enddo  ! ismpl

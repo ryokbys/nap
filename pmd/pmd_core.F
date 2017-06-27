@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-06-24 21:48:46 Ryo KOBAYASHI>
+c                     Last-modified: <2017-06-27 11:03:56 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -244,7 +244,7 @@ c.....Calc forces
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &     trim(cpctl).eq.'vv-Berendsen')
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
-     &     ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
+     &     ,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
      &     ,numff,cffs,ifcoulomb,iprint,.true.,
      &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
@@ -503,7 +503,7 @@ c.....Copy RA of boundary atoms determined by 'bacopy'
         endif
 c-------Calc forces
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
-     &       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
+     &       ,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr
      &       ,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
      &       ,numff,cffs,ifcoulomb,iprint,.false.,
      &       luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
@@ -543,7 +543,7 @@ c.....accumulate energy difference
      &             +h(1:3,2,0)*aai(2)
      &             +h(1:3,3,0)*aai(3)
               ediff(ifmv)= ediff(ifmv) +fack(is)
-     &             *(2d0*sprod(vi,vl)+sprod(vl,vl))
+     &             *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
               va(1:3,i)= va(1:3,i) +aai(1:3)
             endif
           enddo
@@ -879,7 +879,8 @@ c-----get total number of species
       tcpu1= mpi_wtime()
       tcom = 0d0
 
-c      write(6,'(a,200es10.2)') 'chg before init_force = ',chg(1:natm+nb)
+c      write(6,'(a,500es10.2)') ' chg before init_force = ',
+c     &     chg(1:natm+10)
       call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
      &     iprint,h,rc,numff,cffs,
      &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
@@ -889,7 +890,8 @@ c      write(6,'(a,200es10.2)') 'chg before init_force = ',chg(1:natm+nb)
      &     luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc,ifcoulomb)
 
 c      print *,' lvc,ifcoulomb = ',lvc,ifcoulomb
-c      write(6,'(a,200es10.2)') 'chg before bacopy = ',chg(1:natm+nb)
+c      write(6,'(a,500es10.2)') ' chg before bacopy = ',
+c     &     chg(1:natm+10)
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
@@ -901,9 +903,9 @@ c-----Make pair list
      &     ,anxi,anyi,anzi,lspr)
       lstrs = .true.
 
-c      write(6,'(a,200es10.2)') 'chg before get_force = ',chg(1:natm+nb)
+c      write(6,'(a,200es10.2)') 'chg before get_force = ',chg(1:natm+10)
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
-     &     ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr
+     &     ,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
      &     ,numff,cffs,ifcoulomb,iprint,.true.,
      &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
@@ -1819,6 +1821,89 @@ c-------Add the communication time to COMT
 100   continue
 
       end subroutine bacopy_fixed_new
+c=======================================================================
+      subroutine bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax
+     &     ,natm,nb,nn,myid_md,myparity,lsrc
+     &     ,nex,mpi_md_world,chg)
+c-----------------------------------------------------------------------
+c  Exchange only chg of boundary-atom
+c  This doesnt search using position, just send & recv data of atoms
+c    which were listed by 'bacopy'.
+c-----------------------------------------------------------------------
+      implicit none
+      include 'mpif.h'
+      integer,intent(in):: namax,nbmax,nn(6),natm,nb
+     &     ,myid_md,myparity(3),mpi_md_world,nex(3)
+      integer,intent(inout):: lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6)
+      real(8),intent(inout):: tcom
+      real(8),intent(inout):: chg(namax)
+
+      integer:: i,j,kd,kdd,ku,ierr,iex
+      integer:: inode,nsd,nrc,nbnew
+      real(8):: tcom1,tcom2 !,rcv(3),asgm
+      real(8),save,allocatable:: dbuf(:),dbufr(:)
+      logical,save:: l1st=.true.
+
+      if( l1st ) then
+        allocate(dbuf(nbmax),dbufr(nbmax))
+        l1st=.false.
+      endif
+
+      nbnew= 0
+
+cc-----calculate the cut-off lengths
+c      do kd=1,3
+c        asgm= dsqrt(sgm(1,i)**2 +sgm(2,i)**2 +sgm(3,i)**2)
+c        rcv(kd)= rc*asgm/vol
+c        nex(kd)= int(rcv(kd)) +1
+c      enddo
+
+c-----loop over x, y, & z directions
+      do 100 kd=1,3
+
+c-------To calculate the communication time
+        tcom1=MPI_WTIME()
+
+        if( nex(kd).gt.1 ) then
+          do kdd= -1,0
+            ku= 2*kd+kdd
+            do i=1,lsb(0,ku)
+              j= lsb(i,ku)
+              iex= lsex(i,ku)
+              chg(natm+nbnew+i)= chg(j)
+            enddo
+            nbnew= nbnew +lsb(0,ku)
+          enddo
+        else
+          do 200 kdd= -1,0
+            ku=2*kd+kdd
+            inode=nn(ku)
+            nsd=lsb(0,ku)
+            nrc=lsrc(ku)
+
+c---------Exchange ra and tag
+            do i=1,nsd
+              j= lsb(i,ku)
+              dbuf(i)  = chg(j)
+            enddo
+            call mespasd(inode,myparity(kd),dbuf,dbufr,nsd,nrc,23
+     &           ,mpi_md_world)
+            do i=1,nrc
+              chg(natm+nbnew+i)   = dbufr(i)
+            enddo
+
+            call mpi_barrier(mpi_md_world,ierr)
+            nbnew=nbnew +nrc
+ 200      continue
+        endif
+
+c-------Add the communication time to COMT
+        tcom2=MPI_WTIME()
+        tcom=tcom+tcom2-tcom1
+
+100   continue
+
+      end subroutine bacopy_chg_fixed
 c=======================================================================
       subroutine bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi
      &     ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world)

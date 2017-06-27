@@ -28,10 +28,10 @@ mods= mod_variables.o mod_parallel.o mod_minimize.o mod_random.o fp_common.o
 args= iargc.o getarg.o
 
 pmdobj= ${PMDDIR}/mod_pmdvars.o ${PMDDIR}/mod_pmdmpi.o ${PMDDIR}/mod_pmdio.o \
-      ${PMDDIR}/zload.o ${PMDDIR}/util_rnd.o ${PMDDIR}/util_tag.o \
-      ${PMDDIR}/force_*.o ${PMDDIR}/sort.o ${PMDDIR}/mk_lspr.o \
-      ${PMDDIR}/util_pmd.o ${PMDDIR}/lasubs.o ${PMDDIR}/util_vec.o \
-			${PMDDIR}/common_parallel.o ${PMDDIR}/pmd_core.o
+    ${PMDDIR}/zload.o ${PMDDIR}/util_rnd.o ${PMDDIR}/util_tag.o \
+    ${PMDDIR}/force_*.o ${PMDDIR}/sort.o ${PMDDIR}/mk_lspr.o \
+    ${PMDDIR}/util_pmd.o ${PMDDIR}/lasubs.o ${PMDDIR}/util_vec.o \
+    ${PMDDIR}/common_parallel.o ${PMDDIR}/pmd_core.o
 
 $(PMDDIR)/%.o: $(PMDDIR)/%.F90
 	@[ -d $(PMDDIR) ]
@@ -56,3 +56,5 @@ fitpot.o: ${mods} NN.o
 NN.o: ${mods}
 mod_minimize.o: mod_random.o
 
+fp_common.o fp_common.mod: fp_common.F90
+	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
