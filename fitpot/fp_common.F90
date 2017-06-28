@@ -101,6 +101,7 @@ contains
         call set_params_vcMorse(ndim,x)
       endif
       call run_pmd(smpl,lcalcgrad,ndim,gdummy,nff,cffs,epot,frcs)
+!!$      print *,'ismpl,epot = ',ismpl,epot
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
 

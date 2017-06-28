@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-27 11:03:23 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-28 15:55:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -62,7 +62,7 @@ module Coulomb
   real(8),parameter:: threshold_kmax = 1d-4
 
 !.....Variable-charge potential variables
-  real(8),allocatable:: vcg_chi(:),vcg_jii(:),vcg_sgm(:)
+  real(8),allocatable:: vcg_chi(:),vcg_jii(:),vcg_sgm(:),vcg_e0(:)
 
 contains
   subroutine initialize_coulomb(natm,tag,chg,chi, &
@@ -241,7 +241,7 @@ contains
     character(len=128):: cline,c1st,fname
     character(len=5):: cname
     
-    real(8):: vid,rad,dchi,djii,dsgm
+    real(8):: vid,rad,dchi,djii,dsgm,de0
     integer:: npq,isp,jsp,ierr,mode
     
     if( ifcoulomb.eq.1 ) then  ! screened_bvs
@@ -303,17 +303,17 @@ contains
         enddo
       endif  ! myid
       
-      call mpi_bcast(vid_bvs,nsp,mpi_double_precision,0,mpi_world,ierr)
-      call mpi_bcast(rad_bvs,nsp,mpi_double_precision,0,mpi_world,ierr)
+      call mpi_bcast(vid_bvs,nsp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(rad_bvs,nsp,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(npq_bvs,nsp,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(rho_bvs,nsp*nsp,mpi_double_precision &
+      call mpi_bcast(rho_bvs,nsp*nsp,mpi_real8 &
            ,0,mpi_world,ierr)
       call mpi_bcast(interact,nsp*nsp,mpi_logical,0,mpi_world,ierr)
 !.....end of screend_bvs      
 
     else if( ifcoulomb.eq.3 ) then  ! vcGaussian
-      if( allocated(vcg_chi) ) deallocate(vcg_chi,vcg_jii,vcg_sgm)
-      allocate( vcg_chi(nsp), vcg_jii(nsp), vcg_sgm(nsp))
+      if( allocated(vcg_chi) ) deallocate(vcg_chi,vcg_jii,vcg_sgm,vcg_e0)
+      allocate( vcg_chi(nsp), vcg_jii(nsp), vcg_sgm(nsp), vcg_e0(nsp))
       if( myid.eq.0 ) then
         fname = trim(paramsdir)//'/'//trim(paramsfname)
         open(ioprms,file=trim(fname),status='old')
@@ -328,24 +328,26 @@ contains
           read(ioprms,*,end=20) cline
           if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
           backspace(ioprms)
-          read(ioprms,*) isp, dchi,djii,dsgm
+          read(ioprms,*) isp, dchi,djii,dsgm,de0
           if( isp.gt.nsp .and. iprint.gt.0 ) then
             write(6,'(a,i2)') ' [WARNING] isp.gt.nsp !!!  isp = ',isp
           else
             vcg_chi(isp) = dchi
             vcg_jii(isp) = djii
             vcg_sgm(isp) = dsgm
+            vcg_e0(isp) = de0
             if( iprint.gt.0 ) then
-              write(6,'(a,i3,3f8.4)') ' isp,chi,Jii,sgm = ', &
-                   isp,dchi,djii,dsgm
+              write(6,'(a,i3,10f10.4)') ' isp,chi,Jii,sgm,e0 = ', &
+                   isp,dchi,djii,dsgm,de0
             endif
           endif
         enddo  ! do while
 20      close(ioprms)
       endif  ! myid
-      call mpi_bcast(vcg_chi,nsp,mpi_double_precision,0,mpi_world,ierr)
-      call mpi_bcast(vcg_jii,nsp,mpi_double_precision,0,mpi_world,ierr)
-      call mpi_bcast(vcg_sgm,nsp,mpi_double_precision,0,mpi_world,ierr)
+      call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(vcg_sgm,nsp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(vcg_e0,nsp,mpi_real8,0,mpi_world,ierr)
 
     endif  ! ifcoulomb
     
@@ -452,7 +454,7 @@ contains
     endif
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+    call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
   end subroutine force_screened_Coulomb
@@ -506,7 +508,7 @@ contains
     do i=1,natm
       q2loc = q2loc +chg(i)*chg(i)
     enddo
-    call mpi_allreduce(q2loc,q2tot,1,mpi_double_precision &
+    call mpi_allreduce(q2loc,q2tot,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
     epot_self = q2tot *acc /sqrt(2d0*pi) /sgm_ew
 !!$    write(6,*) ' epot_self = ',epot_self
@@ -519,7 +521,7 @@ contains
     
     epotl = elrl +esrl
 !.....Gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_double_precision &
+    call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott -epot_self
     
@@ -552,7 +554,7 @@ contains
     logical,intent(in):: lstrs
 
     integer:: i,ierr,is
-    real(8):: elrl,eself,eselfl,epotl,epott,prefac,q2,sgmi
+    real(8):: elrl,eself,eselfl,epotl,epott,prefac,q2,sgmi,e0
     real(8),allocatable,save:: strsl(:,:,:)
     logical,save:: l1st= .true.
     integer,external:: itotOf
@@ -580,14 +582,15 @@ contains
       is = int(tag(i))
       sgmi = vcg_sgm(is)
       q2 = chg(i)*chg(i)
-      eselfl = eselfl +chi(i)*chg(i) +0.5d0*vcg_jii(is)*q2 !&
+      e0 = vcg_e0(is)
+      eselfl = eselfl +e0 +chi(i)*chg(i) +0.5d0*vcg_jii(is)*q2 !&
           ! -prefac *2d0 /sgmi *q2
     enddo
 
 !!$    write(6,'(a,2es12.4)') 'ra(1,1:2)= ',ra(1,1:2)
 !!$    write(6,'(a,10i3)') 'tagtot = ',(itotOf(tag(i)),i=1,natm)
 
-!!$    call mpi_allreduce(q2loc,q2tot,1,mpi_double_precision &
+!!$    call mpi_allreduce(q2loc,q2tot,1,mpi_real8 &
 !!$         ,mpi_sum,mpi_md_world,ierr)
 !.....TODO: still non-parallelized
     eself = eselfl
@@ -598,7 +601,7 @@ contains
     
     epotl = elrl +eselfl
 !!$!.....Gather epot
-!!$    call mpi_allreduce(epotl,epott,1,mpi_double_precision &
+!!$    call mpi_allreduce(epotl,epott,1,mpi_real8 &
 !!$         ,mpi_sum,mpi_md_world,ierr)
 !.....TODO: still non-parallelized
     epott = epotl
@@ -830,9 +833,9 @@ contains
       enddo
     enddo  ! ia
 !.....Allreduce qcos and qsin, which would be stupid and time consuming
-    call mpi_allreduce(qcosl,qcos,nk,mpi_double_precision &
+    call mpi_allreduce(qcosl,qcos,nk,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
-    call mpi_allreduce(qsinl,qsin,nk,mpi_double_precision &
+    call mpi_allreduce(qsinl,qsin,nk,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
     return
   end subroutine calc_qcos_qsin
@@ -1025,9 +1028,9 @@ contains
       enddo
     enddo
 !.....Allreduce qcos and qsin, which would be stupid and time consuming
-    call mpi_allreduce(qcosl,qcos,nk,mpi_double_precision &
+    call mpi_allreduce(qcosl,qcos,nk,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
-    call mpi_allreduce(qsinl,qsin,nk,mpi_double_precision &
+    call mpi_allreduce(qsinl,qsin,nk,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
 !.....Compute long-range contribution to potential energy
     elrl = 0d0
@@ -1132,9 +1135,9 @@ contains
       enddo
     enddo  ! ia
 !.....Allreduce qcos and qsin, which would be stupid and time consuming
-    call mpi_allreduce(qcosl,qcos,nk,mpi_double_precision &
+    call mpi_allreduce(qcosl,qcos,nk,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
-    call mpi_allreduce(qsinl,qsin,nk,mpi_double_precision &
+    call mpi_allreduce(qsinl,qsin,nk,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
     
 !  Long-range contribution to energy and forces.

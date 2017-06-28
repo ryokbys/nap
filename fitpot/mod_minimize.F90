@@ -16,7 +16,7 @@ module minimize
   integer:: nitergfs=100
 
 !.....Armijo parameters
-  real(8):: armijo_xi      = 0.1d0
+  real(8):: armijo_xi      = 1.0d-4
   real(8):: armijo_tau     = 0.5d0
   integer:: armijo_maxiter = 15
 
@@ -53,7 +53,7 @@ contains
       end subroutine grad
     end interface
 
-    integer:: iter,i
+    integer:: iter,i,niter
     real(8):: alpha,fp,gnorm,ftst
 
     iter= 0
@@ -105,7 +105,7 @@ contains
       else ! armijo (default)
         alpha= 1d0
         call armijo_search(ndim,x,d,f,ftst,g,alpha,iprint &
-             ,iflag,myid,func)
+             ,iflag,myid,func,niter)
       endif
       if( iflag/100.ne.0 ) return
       x(1:ndim)= x(1:ndim) +alpha*d(1:ndim)
@@ -191,7 +191,7 @@ contains
     real(8),parameter:: t_DL   = 0.2d0
     logical:: ltwice = .false.
 
-    integer:: i,iter,nftol,nxtol
+    integer:: i,iter,nftol,nxtol,niter
     real(8):: alpha,fp,gnorm,gnormp,beta,pval,sgnorm,ftst,dxnorm,unorm
     real(8),save,allocatable:: gpena(:),gp(:),y(:),xp(:),s(:),dx(:),uu(:)
 
@@ -255,7 +255,7 @@ contains
       else ! armijo (default)
         alpha= 1d0
         call armijo_search(ndim,x,uu,f,ftst,g,alpha,iprint &
-             ,iflag,myid,func)
+             ,iflag,myid,func,niter)
       endif
 
       if( iflag/100.ne.0 ) then
@@ -387,7 +387,7 @@ contains
          ,ggy(:),gpena(:),dx(:)
     real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,vnorm,pval &
          ,sgnx,absx,estmem,ftst,unorm,dxnorm
-    integer:: i,j,iter,nftol,ngtol,nxtol,ig,mem
+    integer:: i,j,iter,nftol,ngtol,nxtol,ig,mem,niter
 
     if( .not.allocated(gg) ) then
       if(myid.eq.0) then
@@ -506,6 +506,8 @@ contains
       enddo
       unorm = sqrt(sprod(ndim,u,u))
       u(1:ndim) = u(1:ndim) /unorm
+!!$      unorm = sqrt(sprod(ndim,u,u))
+!!$      print *,'qn: iter,gnorm,unorm = ',iter,gnorm,unorm
 !!$      print *,' u =',u(1:10)
 !!$      print *,' g =',g(1:10)
 !!$      print *,' gg=',gg(1:5,1:5)
@@ -531,9 +533,9 @@ contains
       else ! armijo (default)
         alpha= 1d0
         call armijo_search(ndim,x,u,f,ftst,g,alpha,iprint &
-             ,iflag,myid,func)
+             ,iflag,myid,func,niter)
       endif
-!!$      if(myid.eq.0) print *,'alpha=',alpha
+      if(myid.eq.0) print *,'armijo steps, alpha=',niter,alpha
       if( iflag/100.ne.0 ) then
         if( ltwice ) then
           x0(1:ndim)= x(1:ndim)
@@ -759,7 +761,7 @@ contains
          ,gp(:),xp(:),gpena(:),a(:),rho(:)
     real(8):: tmp1,tmp2,dsy,dsyi,fp,alpha,gnorm,ynorm,pval,sgnx,absx&
          ,beta,estmem,ftst
-    integer:: i,j,k,l,m,n,iter,nftol,ig,mem
+    integer:: i,j,k,l,m,n,iter,nftol,ig,mem,niter
 
     if( .not.allocated(x) ) then
       if(myid.eq.0) then
@@ -848,7 +850,7 @@ contains
         alpha= 1d0
 !!$        write(6,'(a,10es11.3)') 'u before armijo=',u(1:10)
         call armijo_search(ndim,x,u,f,ftst,g,alpha,iprint &
-             ,iflag,myid,func)
+             ,iflag,myid,func,niter)
       endif
 
 !!$      if(myid.eq.0) print *,'alpha=',alpha
@@ -1337,13 +1339,13 @@ contains
   end subroutine golden_section
 !=======================================================================
   subroutine armijo_search(ndim,x0,d,f,ftst,g,alpha,iprint0 &
-       ,iflag,myid,func)
+       ,iflag,myid,func,niter)
 !  
 !  1D search using Armijo rule.
 !    
     implicit none
     integer,intent(in):: ndim,iprint0,myid
-    integer,intent(inout):: iflag
+    integer,intent(inout):: iflag,niter
     real(8),intent(in):: x0(ndim),g(ndim),d(ndim)
     real(8),intent(inout):: f,alpha,ftst
     interface
@@ -1449,13 +1451,15 @@ contains
           pval= pval +pwgt*x1(i)*x1(i)
         enddo
       endif
-!!$      if( myid.eq.0 ) print *,'fi,pval,fi+pval-(f0+pval0),xigd*alphai' ,&
-!!$           fi,pval,fi+pval-(f0+pval0),xigd*alphai
+      if( myid.eq.0 ) write(6,'(a,i5,2es15.7)') &
+           ' armijo: iter,fi+pval-(f0+pval0),xigd*alphai=',&
+           iter,fi+pval-(f0+pval0),xigd*alphai
       if( fi+pval-(f0+pval0).le.xigd*alphai ) then
         f= fi
         alpha= alphai
         ftst= ftsti
 !!$        if(myid.eq.0) print *,'armijo finishes with iter=',iter
+        niter = iter
         return
       endif
       fp= fi
@@ -1466,6 +1470,7 @@ contains
 
     if(myid.eq.0) print *,'[Error] iter.gt.MAXITER in armijo_search.'
     iflag= iflag +100
+    niter= iter
     alpha=alphai
     if( myid.eq.0 ) then
       write(6,'(a,es13.5)') '  alpha   = ',alpha
@@ -1703,7 +1708,7 @@ contains
       end subroutine analyze
     end interface
 
-    integer:: iter,i,imax,ig,itmp,j,igmm,itergfs
+    integer:: iter,i,imax,ig,itmp,j,igmm,itergfs,niter
     real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,tmp,gmm,ftst
     real(8),allocatable,save:: xt(:),gmaxgl(:),u(:)
     real(8),save,allocatable:: gg(:,:),v(:),y(:),gp(:) &
@@ -1878,7 +1883,7 @@ contains
         else ! armijo (default)
           alpha= 1d0
           call armijo_search(ndim,xt,u,f,ftst,g,alpha,iprint &
-               ,iflag,myid,func)
+               ,iflag,myid,func,niter)
 !.....if something wrong with armijo search, try opposite direction
           if( iflag/100.ne.0 ) then
 !.....Reset iflag when we do opposite direction search.
@@ -1886,7 +1891,7 @@ contains
             alpha= -1d0
             if(myid.eq.0) print *,'trying opposite direction...'
             call armijo_search(ndim,xt,u,f,ftst,g,alpha,iprint &
-                 ,iflag,myid,func)
+                 ,iflag,myid,func,niter)
           endif
         endif
 !.....get out of bfgs loop

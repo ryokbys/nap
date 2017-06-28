@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-27 21:04:39 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-28 14:17:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -616,7 +616,9 @@ subroutine write_vars(cadd)
   integer:: i
   character(len=128):: cfname
 
-  call NN_restore_standard()
+  if( trim(cpot).eq.'NN' ) then
+    call NN_restore_standard()
+  endif
 
 !!$  cfname= trim(cmaindir)//'/'//trim(cparfile)//'.'//trim(cadd)
   cfname= trim(cparfile)//'.'//trim(cadd)
@@ -768,7 +770,7 @@ subroutine sgd()
   real(8),parameter:: tiny  = 1d-8
 !!$  real(8),parameter:: dalpha  = 0.d0
   real(8),allocatable:: g(:),u(:),gp(:),v(:),g2m(:),v2m(:)
-  integer:: iter,istp,iv,i,nsize
+  integer:: iter,istp,iv,i,nsize,narmijo
   real(8):: gnorm,alpha,alpha1,gmax,vmax,f,gg,fp,gpnorm,gamma,vnorm
   real(8):: ftrn,ftst
   integer:: ismpl
@@ -835,7 +837,7 @@ subroutine sgd()
     if( csgdupdate.eq.'armijo' ) then
       alpha= r0sgd
       call armijo_search(nvars,vars,u,ftrn,ftst,g,alpha,iprint &
-           ,iflag,myid,NN_fs)
+           ,iflag,myid,NN_fs,narmijo)
       vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
       alpha1= alpha1*(1d0-dalpha)
     else if( csgdupdate.eq.'momentum' ) then
@@ -1819,9 +1821,10 @@ subroutine subtract_atomic_energy()
   type(mdsys):: smpl
 
   if( trim(cpot).eq.'vcMorse' ) then
-    do ismpl=isid0,isid1
-      smpl = samples(ismpl)
-    enddo
+!!$    do ismpl=isid0,isid1
+!!$      smpl = samples(ismpl)
+!!$    enddo
+    
   else
     do ismpl=isid0,isid1
       smpl = samples(ismpl)
