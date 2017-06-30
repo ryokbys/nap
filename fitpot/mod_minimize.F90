@@ -408,6 +408,8 @@ contains
          ,s(ndim),y(ndim),gp(ndim),ggy(ndim),gpena(ndim))
     endif
 
+!.....initialize alpha (line minimization factor)
+    alpha = 1d0
 
     nftol= 0
     ngtol= 0
@@ -531,7 +533,7 @@ contains
         call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else ! armijo (default)
-        alpha= 1d0
+        alpha = max(alpha*2d0, 1d0)
         call armijo_search(ndim,x,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
@@ -1366,8 +1368,8 @@ contains
     if( l1st ) then
       if( myid.eq.0 ) then
         write(6,'(a)') ' Armijo rule parameters:'
-        write(6,'(a,f8.4)') '   c       = ',armijo_xi
-        write(6,'(a,f8.4)') '   tau     = ',armijo_tau
+        write(6,'(a,es12.4)') '   c       = ',armijo_xi
+        write(6,'(a,f10.4)') '   tau     = ',armijo_tau
         write(6,'(a,i5)')   '   maxiter = ',armijo_maxiter
       endif
       l1st = .false.
