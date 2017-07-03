@@ -22,7 +22,9 @@ module minimize
 
 !.....Simulated annealing parameters
   real(8):: sa_temp0 = 1d0
-  real(8):: sa_xw0   = 1d0
+  real(8):: sa_xw0   = 1d-3
+  real(8):: sa_fctr  = 0.5d0
+  real(8),allocatable:: sa_xws(:)
 
 !.....CG
   integer:: icgbtype = 1 ! 1:FR, 2:PRP, 3:HS, 4:DY
@@ -533,7 +535,10 @@ contains
         call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else ! armijo (default)
-        alpha = max(alpha*2d0, 1d0)
+!.....To enhance the convergence in Armijo search,
+!.....use the history of previous alpha by multiplying 2
+!.....avoiding constant decrease, but alpha should not be greater than 1.
+        alpha = min(alpha*2d0, 1d0)
         call armijo_search(ndim,x,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
@@ -1453,9 +1458,9 @@ contains
           pval= pval +pwgt*x1(i)*x1(i)
         enddo
       endif
-      if( myid.eq.0 ) write(6,'(a,i5,2es15.7)') &
-           ' armijo: iter,fi+pval-(f0+pval0),xigd*alphai=',&
-           iter,fi+pval-(f0+pval0),xigd*alphai
+      if( myid.eq.0 ) write(6,'(a,i5,3es15.7)') &
+           ' armijo: iter,fi+pval-(f0+pval0),xigd*alphai,alphai=',&
+           iter,fi+pval-(f0+pval0),xigd*alphai,alphai
       if( fi+pval-(f0+pval0).le.xigd*alphai ) then
         f= fi
         alpha= alphai
@@ -1473,9 +1478,8 @@ contains
     if(myid.eq.0) print *,'[Error] iter.gt.MAXITER in armijo_search.'
     iflag= iflag +100
     niter= iter
-    alpha=alphai
     if( myid.eq.0 ) then
-      write(6,'(a,es13.5)') '  alpha   = ',alpha
+      write(6,'(a,es13.5)') '  alphai   = ',alphai
       write(6,'(a,es13.5)') '  xigd    = ',xigd
       write(6,'(a,es13.5)') '  norm(g) = ',sqrt(sprod(ndim,g,g))
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' .or. &
@@ -1483,6 +1487,8 @@ contains
         write(6,'(a,es13.5)') '  pval    = ',pval
       endif
     endif
+!.....Reset alpha to 1
+    alpha= 1d0
     return
 
   end subroutine armijo_search
@@ -2062,10 +2068,23 @@ contains
       end subroutine sub_eval
     end interface
 
-    integer:: iter,idim,nadpt
-    real(8):: f,ft,temp,xw,dx,prob,ftst
+    integer:: iter,idim,nadpt,i
+    real(8):: f,ft,temp,xw,dx,prob,ftst,tau
     real(8),allocatable:: x(:),xt(:)
-    real(8),parameter:: epsx = 1d-8
+    logical,save:: l1st = .true.
+
+    if( l1st ) then
+      if(myid.eq.0 .and. iprint.ne.0) then
+        print *,'Simulated annealing starts...'
+      endif
+      
+      if(.not.allocated(sa_xws) ) allocate(sa_xws(ndim))
+      do i=1,ndim
+!!$        sa_xws(i) = max(xbest(i)*sa_xw0,1d-2)
+        sa_xws(i) = 1d-2
+      enddo
+      tau = max(dble(maxiter)/10,1d0)
+    endif
 
     if( .not.allocated(x) ) allocate(x(ndim),xt(ndim))
 
@@ -2086,11 +2105,18 @@ contains
 
 !.....Compute the displacement using a uniform random number
       xt(1:ndim)= x(1:ndim)
-      dx= (2d0*urnd()-1d0)*xw *(x(idim)+epsx)
+      dx= (urnd()-0.5d0)*sa_xws(idim)
       xt(idim)= xt(idim) +dx
 
 !.....Compute function value
       call func(ndim,xt,ft,ftst)
+
+!.....Detect NaN and skip this trial
+      if( ft*0d0 .ne. 0d0 ) then
+!.....Decrease the width of deviation
+        sa_xws(idim) = sa_xws(idim) *sa_fctr
+        goto 10
+      endif
 
 !.....Compute probability of taking the displacement
       prob= min(1d0,exp(-(ft-f)/temp))
@@ -2103,37 +2129,47 @@ contains
 
       if( mod(iter,niter_eval).eq.0 ) then
         call sub_eval(iter)
-        if( myid.eq.0 ) then
-          write(6,'(a,i10,es12.4,2es13.5,2f9.5)')&
-               'iter,temp,ft-f,fbest,prob,radpt='&
-               ,iter,temp,ft-f,fbest,prob,dble(nadpt)/iter
-!!$          if( abs(ft-f).lt.1d-15 ) then
-!!$            write(6,'(a,5es12.4)') '|ft-f|~0.0: ',ft,f,ft-f,dx,x(idim)
-!!$          endif
-        endif
       endif
 
+      if( myid.eq.0 .and. iprint.ne.0 ) then
+        write(6,'(a,2i10,es12.4,3es13.5,2f9.5)')&
+             ' iter,idim,temp,f,ft,fbest,prob,radpt='&
+             ,iter,idim,temp,f,ft,fbest,prob,dble(nadpt)/iter
+      endif
+      
 !.....Update the parameter if needed
       if( urnd().lt.prob ) then
         x(idim)= xt(idim)
         f= ft
         nadpt= nadpt +1
+!.....Increase the width of deviation
+        sa_xws(idim) = sa_xws(idim) /sa_fctr
+      else
+!.....Decrease the width of deviation
+        sa_xws(idim) = sa_xws(idim) *sa_fctr
       endif
 
-!.....Update temperature
-      temp= dble(maxiter-iter)/maxiter *sa_temp0
+10    continue
+!!$!.....Update temperature (linear)
+!!$      temp= dble(maxiter-iter)/maxiter *sa_temp0
+!.....Update temperature (exponential)
+      temp= sa_temp0 *exp(-dble(iter)/tau)
 
-!!$!.....Update displacement range
-!!$      xw= dble(maxiter-iter)/maxiter *sa_xw0
     enddo
 
     if( myid.eq.0 ) then
       write(6,'(a,i10,a,i10)') ' Num of adoption in SA='&
            ,nadpt,'/',maxiter
+      print *,'sa_xws:'
+      do i=1,ndim
+        write(6,'(i6,es15.7)') i,sa_xws(i)
+      enddo
     endif
 
 !.....Finally compute the function value of the best candidate
     call func(ndim,xbest,f,ftst)
+
+    l1st = .false.
     
   end subroutine sa
 !=======================================================================

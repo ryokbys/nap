@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-28 14:17:51 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-03 16:59:24 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -732,20 +732,25 @@ subroutine sa_wrapper()
   use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
+  use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   integer:: i,m
   real(8):: fval
   external:: write_stats
 
+  if( trim(cpot).eq.'NN' ) then
   !.....NN specific code hereafter
-  call NN_init()
-  call sa(nvars,vars,fval,xtol,gtol,ftol,niter &
-       ,iprint,iflag,myid,NN_func,cfmethod &
-       ,niter_eval,write_stats)
-  call NN_analyze("fin")
-!!$  if( cpena.eq.'lasso' .or. cpena.eq.'glasso' ) then
-!!$    call NN_restore_standard()
-!!$  endif
+    call NN_init()
+    call sa(nvars,vars,fval,xtol,gtol,ftol,niter &
+         ,iprint,iflag,myid,NN_func,cfmethod &
+         ,niter_eval,write_stats)
+    call NN_analyze("fin")
+    
+  else if( trim(cpot).eq.'vcMorse' ) then
+    call sa(nvars,vars,fval,xtol,gtol,ftol,niter &
+         ,iprint,iflag,myid,func_w_pmd,cfmethod &
+         ,niter_eval,write_stats)
+  endif
 
   return
 end subroutine sa_wrapper
@@ -927,7 +932,7 @@ subroutine check_grad()
   integer:: iv
   real(8):: ftrn0,ftst0,ftmp,dv,vmax,ftst,ftmp1,ftmp2
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
-  real(8),parameter:: dev  = 1d-5
+  real(8),parameter:: dev  = 1d-6
   real(8),parameter:: tiny = 1d-6
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
@@ -969,10 +974,10 @@ subroutine check_grad()
       call func_w_pmd(nvars,vars,ftmp2,ftst)
     endif
     gnumer(iv)= (ftmp1-ftmp2)/dv
-    write(6,'(a,i5,10es15.7)') 'iv,var1,var2,ftmp1,ftmp2,gnumer = ', &
-         iv,vars0(iv)+dev/2,&
-         vars0(iv)-dev/2,ftmp1,ftmp2,gnumer(iv)
-    print *,''
+!!$    write(6,'(a,i5,10es15.7)') 'iv,var1,var2,ftmp1,ftmp2,gnumer = ', &
+!!$         iv,vars0(iv)+dev/2,&
+!!$         vars0(iv)-dev/2,ftmp1,ftmp2,gnumer(iv)
+!!$    print *,''
   enddo
 
   if( myid.eq.0 ) then

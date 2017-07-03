@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-27 21:11:28 Ryo KOBAYASHI>
+!                     Last modified: <2017-06-30 15:25:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -204,7 +204,7 @@ contains
 !!$           atdi%atrad,atdi%enpaul
 !!$    enddo
 
-!!$    write(6,'(a,30es13.5)') ' chg @force = ',chg(1:natm+10)
+!!$    write(6,'(a,30es16.8)') ' chg @force = ',chg(1:natm)
 
 !.....Loop over resident atoms
     do i=1,natm
@@ -234,6 +234,8 @@ contains
         alpij= sprod(nprm+1,walp,pdij)
         rminij= sprod(nprm+1,wrmin,pdij)
         texp = exp(alpij*(rminij-dij))
+!!$        write(6,'(a,4i5,4es15.7)') 'i,is,j,js,d0ij,alpij,rminij,texp=',&
+!!$             i,is,j,js,d0ij,alpij,rminij,texp
 !.....potential
         tmp= d0ij*((texp-1d0)**2 -1d0)
         tmp2 = 0.5d0 *tmp *fcut1(dij,rc)
@@ -714,7 +716,7 @@ contains
     gwd(0:nprm) = 0d0
     gwrmin(0:nprm) = 0d0
 
-!!$    write(6,'(a,30es13.5)') ' chg @pderiv = ',chg(1:natm+10)
+!!$    write(6,'(a,30es16.8)') ' chg @pderiv = ',chg(1:natm)
     
 !.....Loop over resident atoms
     do i=1,natm
@@ -740,7 +742,10 @@ contains
         alpij= sprod(nprm+1,walp,pdij)
         rminij= sprod(nprm+1,wrmin,pdij)
         texp = exp(alpij*(rminij-dij))
-!.....potential
+!!$        write(6,'(a,4i5,4es15.7)') 'i,is,j,js,d0ij,alpij,rminij,texp=',&
+!!$             i,is,j,js,d0ij,alpij,rminij,texp
+!!$        write(6,'(a,13f8.3)') 'pdij=',pdij(0:nprm)
+!.....Potential
         tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
         tmp2 = tmp *fcut1(dij,rc)
         epotl = epotl +tmp2
@@ -751,6 +756,8 @@ contains
         gwd(0:nprm) = gwd(0:nprm) +0.5d0 *dedd0 *pdij(0:nprm)
         gwalp(0:nprm) = gwalp(0:nprm) +0.5d0 *dedalp *pdij(0:nprm)
         gwrmin(0:nprm) = gwrmin(0:nprm) +0.5d0 *dedrmin *pdij(0:nprm)
+!!$        write(6,'(a,2i5,3es15.7)') 'i,j,gwalp(6),dedalp,pdij(6)=', &
+!!$             i,j,gwalp(6),dedalp,pdij(6)
       enddo
     enddo
 

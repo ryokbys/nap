@@ -211,6 +211,8 @@ contains
       ediff= (epot -eref) /natm /eerr
       ediff= 2d0 *ediff /natm /eerr *swgt
       gtrnl(1:ndim)= gtrnl(1:ndim) +gs(1:ndim)*ediff
+!!$      write(6,'(a,i5,5es15.7)') 'ismpl,ediff,gs(7),gtrnl(7),epot,eref=',&
+!!$           ismpl,ediff,gs(7),gtrnl(7),epot,eref
 !!$      print *,'ismpl,epot,eref,ediff=',ismpl,epot,eref,ediff
 !!$      print *,'gs =',gs(1:ndim)
 !.....TODO: force matching
