@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-03 16:59:24 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-04 19:49:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -755,6 +755,27 @@ subroutine sa_wrapper()
   return
 end subroutine sa_wrapper
 !=======================================================================
+subroutine random_search()
+  use variables
+  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use parallel
+  use minimize
+  use fp_common,only: func_w_pmd, grad_w_pmd
+  implicit none
+  integer:: i,m
+  real(8):: fval
+  external:: write_stats
+
+  if( trim(cpot).eq.'NN' ) then
+    if( myid.eq.0 ) then
+      print *,'random_search is not available for NN.'
+    endif
+  else if( trim(cpot).eq.'vcMorse' ) then
+    
+  endif
+  
+end subroutine random_search
+!=======================================================================
 subroutine sgd()
 !
 ! Stochastic gradient decent (SGD)
@@ -1016,6 +1037,7 @@ subroutine test()
     call grad_w_pmd(nvars,vars,g)
   endif
 
+!!$  print *,'write_stats, myid=',myid
   call write_stats(0)
 
   if( myid.eq.0 ) then
@@ -1701,7 +1723,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs)
 !  TODO: stress should be returned as well.
 !
   use variables,only: rcut,mdsys,maxna
-  use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd
+  use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
   implicit none
   type(mdsys),intent(inout):: smpl
   integer,intent(in):: ndimp,nff
@@ -1769,7 +1791,8 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs)
   nz = 1
   
 !.....one_shot force calculation
-!!$  print *,'calling one_shot...'
+!!$  print *,'calling one_shot, myid,mpi_world,myid_pmd,mpi_comm_pmd='&
+!!$       ,myid,mpi_world,myid_pmd,mpi_comm_pmd
   call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
        ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
        ,smpl%chg,smpl%chi &
@@ -1798,17 +1821,23 @@ subroutine create_mpi_comm_pmd()
   integer:: iranks(1)
   integer:: mpi_group_world,mpi_group_pmd
 
-  call mpi_comm_group(mpi_world, mpi_group_world,ierr)
-
+!!$  call mpi_comm_group(mpi_world, mpi_group_world,ierr)
   iranks(1) = myid
-  call mpi_group_incl(mpi_group_world, 1, iranks, mpi_group_pmd,ierr)
-  call mpi_comm_create_group(mpi_world, mpi_group_pmd, 0, mpi_comm_pmd,ierr)
+!!$  call mpi_group_incl(mpi_group_world, 1, iranks, mpi_group_pmd,ierr)
+!!$  call mpi_comm_create_group(mpi_world, mpi_group_pmd, 0, mpi_comm_pmd,ierr)
+!!$  print *,'myid,iranks(1),mpi_group_pmd,mpi_comm_pmd=',&
+!!$       myid,iranks(1),mpi_group_pmd,mpi_comm_pmd
+
+  call mpi_comm_split(mpi_world,myid,myid,mpi_comm_pmd,ierr)
 
   call mpi_comm_size(mpi_comm_pmd,nnode_pmd,ierr)
   call mpi_comm_rank(mpi_comm_pmd,myid_pmd,ierr)
+  call mpi_comm_group(mpi_comm_pmd,mpi_group_pmd,ierr)
+!!$  print *,'myid,mpi_world,myid_pmd,mpi_comm_pmd,mpi_group_pmd = ',&
+!!$       myid,mpi_world,myid_pmd,mpi_comm_pmd,mpi_group_pmd
   
-  call mpi_group_free(mpi_group_world,ierr)
-  call mpi_group_free(mpi_group_pmd,ierr)
+!!$  call mpi_group_free(mpi_group_world,ierr)
+!!$  call mpi_group_free(mpi_group_pmd,ierr)
   if( myid.eq.0 ) then
     write(6,'(a)') ''
     write(6,'(a)') ' MPI_COMM_PMD was created at each node '// &
@@ -1852,7 +1881,7 @@ subroutine set_max_num_atoms()
     maxnal = max(na,maxnal)
   enddo
   maxna = 0
-  call mpi_allreduce(maxnal,maxna,1,mpi_real8,mpi_max,mpi_world,ierr)
+  call mpi_allreduce(maxnal,maxna,1,mpi_integer,mpi_max,mpi_world,ierr)
   if( myid.eq.0 .and. iprint.ne.0 ) then
     print *,'max num of atoms among data = ',maxna
   endif

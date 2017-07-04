@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-06-30 17:26:26 Ryo KOBAYASHI>
+c                     Last-modified: <2017-07-04 19:34:36 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -835,7 +835,7 @@ c.....
      &     luse_linreg,luse_NN,luse_Morse,luse_vcMorse
       logical:: lvc
       
-c      write(6,'(a,30es10.2)') 'chgtot in pmd_core = ',
+c      write(6,'(a,200es10.2)') 'chgtot in pmd_core = ',
 c     &     chgtot(1:ntot)
       call initialize_pmdvars(nspmax)
 
@@ -891,7 +891,7 @@ c     &     chg(1:natm+10)
 
 c      print *,' lvc,ifcoulomb = ',lvc,ifcoulomb
 c      write(6,'(a,500es10.2)') ' chg before bacopy = ',
-c     &     chg(1:natm+10)
+c     &     chg(1:natm)
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
@@ -903,7 +903,7 @@ c-----Make pair list
      &     ,anxi,anyi,anzi,lspr)
       lstrs = .true.
 
-c      write(6,'(a,200es10.2)') 'chg before get_force = ',chg(1:natm+10)
+c      write(6,'(a,200es10.2)') 'chg before get_force = ',chg(1:natm)
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &     ,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
@@ -915,6 +915,8 @@ c      write(6,'(a,200es10.2)') 'chg before get_force = ',chg(1:natm+10)
      &     ,luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc)
 
       if( lcalcgrad ) then
+c        write(6,'(a,200es10.2)') 'chg before pderiv_vcMorse = '
+c     &       ,chg(1:natm)
 c.....Do not update epot here, so use epott instead.
         if( luse_vcMorse ) call pderiv_vcMorse(namax,natm,tag,ra,nnmax
      &       ,chg,h,rc,lspr,epott,iprint,ndimp,pderiv)
@@ -939,6 +941,8 @@ c.....deallocate all the arrays allocated
       deallocate(acon,fack)
       deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
      &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
+
+c      write(6,'(a)') 'one_shot done.'
       return
       end subroutine one_shot
 c=======================================================================

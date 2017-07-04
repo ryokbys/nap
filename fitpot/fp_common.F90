@@ -88,7 +88,8 @@ contains
       if( .not.fp_common_initialized ) call init()
       if( .not.allocated(fdiff) ) allocate(fdiff(3,maxna),frcs(3,maxna))
     endif
-    
+
+!!$    print *,'myid,isid0,isid1=',myid,isid0,isid1
     ftrnl = 0d0
     ftstl = 0d0
     do ismpl=isid0,isid1
@@ -100,8 +101,9 @@ contains
         call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname))
         call set_params_vcMorse(ndim,x)
       endif
+!!$      print *,'myid,ismpl,cdirname,natm=',myid,ismpl,trim(cdirname),natm,' before pmd'
       call run_pmd(smpl,lcalcgrad,ndim,gdummy,nff,cffs,epot,frcs)
-!!$      print *,'ismpl,epot = ',ismpl,epot
+!!$      print *,'myid,ismpl,cdirname,epot = ',myid,ismpl,trim(cdirname),epot
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
 
@@ -113,6 +115,8 @@ contains
       ediff= (epot -eref)/natm /eerr
       ediff= ediff*ediff
       ftmp= ftmp +ediff *swgt
+!!$      print *,'myid,ismpl,natm,eerr,epot,eref,ediff='&
+!!$           ,myid,ismpl,natm,eerr,epot,eref,ediff
 !.....Force matching
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
         ferr = smpl%ferr
@@ -135,23 +139,29 @@ contains
       endif
     enddo  ! ismpl
 
+!!$    call mpi_barrier(mpi_world,ierr)
 !    tfunc= tfunc +mpi_wtime() -tf0
     tfl = mpi_wtime() -tf0
 
+!!$    print *,'myid,ftrnl=',myid,ftrnl
     tc0= mpi_wtime()
     ftrn= 0d0
     ftst = 0d0
     call mpi_allreduce(ftrnl,ftrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(ftstl,ftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
     ftrn = ftrn /swgt2trn
-    ftst = ftst /swgt2tst
+    if( swgt2tst.gt.1d-5 ) then
+      ftst = ftst /swgt2tst
+    endif
     tcl = tcl + (mpi_wtime() -tc0)
 
+!!$    print *,'myid,ftrn=',myid,ftrn
 !.....only the bottle-neck times are taken into account
     call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     call mpi_reduce(tfl,tfg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     tcomm= tcomm +tcg
     tfunc= tfunc +tfg
+!!$    print *,'myid,tfunc=',myid,tfunc
     l1st = .false.
 
   end subroutine func_w_pmd

@@ -47,8 +47,8 @@ all: fitpot
 clean:
 	rm -f *.o *.mod *~ fitpot
 
-fitpot: ${mods} ${fitpotojb}
-	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${fitpotobj}
+fitpot: ${mods} ${fitpotobj} ${pmdobj}
+	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${fitpotobj} ${pmdobj}
 
 #.....Dependencies
 read_input.o: ${mods}

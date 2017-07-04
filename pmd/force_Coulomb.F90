@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-28 15:55:39 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-04 14:06:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -1318,7 +1318,6 @@ contains
     integer:: istp
     real(8):: xp(ndim),bnrm,rr,rrp,beta,ap(ndim), &
          alpha,r(ndim),xd(ndim),p(ndim),xdnrm
-    real(8),external:: vecnorm
 
     xp(1:ndim) = x(1:ndim)
     r = matmul(amat,xp)
