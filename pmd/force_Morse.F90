@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-30 15:25:08 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-04 12:26:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -50,6 +50,11 @@ module Morse
        pdij(0:nprm)
 !.....Derivatives w.r.t. weights
   real(8):: gwalp(0:nprm),gwd(0:nprm),gwrmin(0:nprm)
+
+!.....beta: ratio to D_ij such that the absolute value of Eij
+!     should be smaller than beta*Dij
+  real(8),parameter:: beta = 0.1d0
+  real(8):: prefbeta
 
   logical:: lprmset = .false.
   
@@ -192,6 +197,7 @@ contains
 !!$      call read_params_vcMorse(myid,mpi_md_world,iprint)
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
+      prefbeta = log(1d0 -sqrt(1d0 -beta))
     endif
 
     epotl= 0d0
@@ -233,6 +239,9 @@ contains
         d0ij = sprod(nprm+1,wd,pdij)
         alpij= sprod(nprm+1,walp,pdij)
         rminij= sprod(nprm+1,wrmin,pdij)
+        d0ij = max(d0ij, 0d0)
+        rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
+        alpij= max(alpij, prefbeta/(rminij -rc))
         texp = exp(alpij*(rminij-dij))
 !!$        write(6,'(a,4i5,4es15.7)') 'i,is,j,js,d0ij,alpij,rminij,texp=',&
 !!$             i,is,j,js,d0ij,alpij,rminij,texp
@@ -309,8 +318,11 @@ contains
     real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:) &
          ,dxdi(:),dxdj(:),at(:)
 
-    if( .not.allocated(xi) ) allocate(xi(3),xj(3),xij(3),rij(3), &
-         dxdi(3),dxdj(3),at(3) )
+    if( .not.allocated(xi) ) then
+      allocate(xi(3),xj(3),xij(3),rij(3), &
+           dxdi(3),dxdj(3),at(3) )
+      prefbeta = log(1d0 -sqrt(1d0 -beta))
+    endif
 
     epotl= 0d0
 
@@ -340,9 +352,14 @@ contains
         call make_pair_desc(chgi,chgj,atdi,atdj,pdij)
 !.....Create Morse parameters that depend on current atom charges
         d0ij = sprod(nprm+1,wd,pdij)
-        alpij= sprod(nprm+1,walp,pdij)
         rminij= sprod(nprm+1,wrmin,pdij)
+        alpij= sprod(nprm+1,walp,pdij)
+        d0ij = max(d0ij, 0d0)
+        rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
+        alpij= max(alpij, prefbeta/(rminij -rc))
         texp = exp(alpij*(rminij-dij))
+!!$        write(6,'(a,4i5,4es15.7)') 'i,is,j,js,d0ij,alpij,rminij,texp=',&
+!!$             i,is,j,js,d0ij,alpij,rminij,texp
 !.....potential
         tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
         tmp2 = tmp *fcut1(dij,rc)
@@ -741,6 +758,9 @@ contains
         d0ij = sprod(nprm+1,wd,pdij)
         alpij= sprod(nprm+1,walp,pdij)
         rminij= sprod(nprm+1,wrmin,pdij)
+        d0ij = max(d0ij, 0d0)
+        rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
+        alpij= max(alpij, prefbeta/(rminij -rc))
         texp = exp(alpij*(rminij-dij))
 !!$        write(6,'(a,4i5,4es15.7)') 'i,is,j,js,d0ij,alpij,rminij,texp=',&
 !!$             i,is,j,js,d0ij,alpij,rminij,texp

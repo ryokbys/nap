@@ -2069,7 +2069,7 @@ contains
     end interface
 
     integer:: iter,idim,nadpt,i
-    real(8):: f,ft,temp,xw,dx,prob,ftst,tau
+    real(8):: f,ft,temp,xw,dx,p,pt,ptrans,ftst,tau
     real(8),allocatable:: x(:),xt(:)
     logical,save:: l1st = .true.
 
@@ -2091,6 +2091,7 @@ contains
 !.....Initialize
     x(1:ndim)= xbest(1:ndim)
     call func(ndim,x,f,ftst)
+!!$    p = exp(-f/temp)
     fbest= f
     temp= sa_temp0
     xw= sa_xw0
@@ -2110,16 +2111,22 @@ contains
 
 !.....Compute function value
       call func(ndim,xt,ft,ftst)
-
 !.....Detect NaN and skip this trial
       if( ft*0d0 .ne. 0d0 ) then
+        if( myid.eq.0 .and. iprint.ne.0 ) then
+          write(6,'(a,2i10,es12.4,3es13.5,2f9.5)')&
+               ' [ft.eq.NaN] iter,idim,sa_xws(idim)=' &
+               ,iter,idim,sa_xws(idim)
+        endif
 !.....Decrease the width of deviation
         sa_xws(idim) = sa_xws(idim) *sa_fctr
         goto 10
       endif
+!!$      pt = exp(-ft/temp)
 
 !.....Compute probability of taking the displacement
-      prob= min(1d0,exp(-(ft-f)/temp))
+      ptrans= min(1d0,exp(-(ft-f)/temp))
+!!$      ptrans = min(1d0,pt/p)
 
 !.....Store the best one
       if( ft.lt.fbest ) then
@@ -2132,13 +2139,13 @@ contains
       endif
 
       if( myid.eq.0 .and. iprint.ne.0 ) then
-        write(6,'(a,2i10,es12.4,3es13.5,2f9.5)')&
-             ' iter,idim,temp,f,ft,fbest,prob,radpt='&
-             ,iter,idim,temp,f,ft,fbest,prob,dble(nadpt)/iter
+        write(6,'(a,2i10,4es13.5,2f9.5)')&
+             ' iter,idim,temp,f,ft,fbest,ptrans,radpt='&
+             ,iter,idim,temp,f,ft,fbest,ptrans,dble(nadpt)/iter
       endif
       
 !.....Update the parameter if needed
-      if( urnd().lt.prob ) then
+      if( urnd().lt.ptrans ) then
         x(idim)= xt(idim)
         f= ft
         nadpt= nadpt +1
