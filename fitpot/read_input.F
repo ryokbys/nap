@@ -163,6 +163,9 @@ c=======================================================================
       elseif( trim(cname).eq.'sa_temperature' ) then
         call read_r1(ionum,sa_temp0)
         return
+      elseif( trim(cname).eq.'sa_taui' ) then
+        call read_r1(ionum,sa_taui)
+        return
       elseif( trim(cname).eq.'sa_dxwidth' ) then
         call read_r1(ionum,sa_xw0)
         return

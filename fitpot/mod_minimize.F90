@@ -22,6 +22,7 @@ module minimize
 
 !.....Simulated annealing parameters
   real(8):: sa_temp0 = 1d0
+  real(8):: sa_taui  = 10d0
   real(8):: sa_xw0   = 1d-3
   real(8):: sa_fctr  = 0.5d0
   real(8),allocatable:: sa_xws(:)
@@ -538,7 +539,7 @@ contains
 !.....To enhance the convergence in Armijo search,
 !.....use the history of previous alpha by multiplying 2
 !.....avoiding constant decrease, but alpha should not be greater than 1.
-        alpha = min(alpha*2d0, 1d0)
+        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
         call armijo_search(ndim,x,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
@@ -1345,13 +1346,13 @@ contains
 
   end subroutine golden_section
 !=======================================================================
-  subroutine armijo_search(ndim,x0,d,f,ftst,g,alpha,iprint0 &
+  subroutine armijo_search(ndim,x0,d,f,ftst,g,alpha,iprint &
        ,iflag,myid,func,niter)
 !  
 !  1D search using Armijo rule.
 !    
     implicit none
-    integer,intent(in):: ndim,iprint0,myid
+    integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag,niter
     real(8),intent(in):: x0(ndim),g(ndim),d(ndim)
     real(8),intent(inout):: f,alpha,ftst
@@ -1365,13 +1366,13 @@ contains
 
 !!$  real(8),external:: sprod
     real(8),parameter:: xtiny  = 1d-14
-    integer:: iter,i,ig,iprint
+    integer:: iter,i,ig
     real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx,fp,pvalp,alphap,ftsti
     real(8),allocatable,dimension(:):: x1(:),gpena(:)
     logical,save:: l1st = .true.
 
     if( l1st ) then
-      if( myid.eq.0 ) then
+      if( myid.eq.0 .and. iprint.gt.0 ) then
         write(6,'(a)') ' Armijo rule parameters:'
         write(6,'(a,es12.4)') '   c       = ',armijo_xi
         write(6,'(a,f10.4)') '   tau     = ',armijo_tau
@@ -1384,7 +1385,7 @@ contains
     xigd= sprod(ndim,g,d)*armijo_xi
     if( xigd.gt.0d0 ) then
       iflag= iflag + 100
-      if( myid.eq.0 ) print *,' WARNING: g*d > 0.0'
+      if( myid.eq.0 .and. iprint.gt.0 ) print *,' WARNING: g*d > 0.0'
       return
     endif
     alphai= alpha
@@ -1458,7 +1459,7 @@ contains
           pval= pval +pwgt*x1(i)*x1(i)
         enddo
       endif
-      if( myid.eq.0 ) write(6,'(a,i5,3es15.7)') &
+      if( myid.eq.0 .and. iprint.ge.10 ) write(6,'(a,i5,3es15.7)') &
            ' armijo: iter,fi+pval-(f0+pval0),xigd*alphai,alphai=',&
            iter,fi+pval-(f0+pval0),xigd*alphai,alphai
       if( fi+pval-(f0+pval0).le.xigd*alphai ) then
@@ -1475,10 +1476,11 @@ contains
       alphai= alphai*armijo_tau
     enddo
 
-    if(myid.eq.0) print *,'[Error] iter.gt.MAXITER in armijo_search.'
+    if(myid.eq.0 .and. iprint.gt.0 ) &
+         print *,'[Error] iter.gt.MAXITER in armijo_search.'
     iflag= iflag +100
     niter= iter
-    if( myid.eq.0 ) then
+    if( myid.eq.0 .and. iprint.gt.0 ) then
       write(6,'(a,es13.5)') '  alphai   = ',alphai
       write(6,'(a,es13.5)') '  xigd    = ',xigd
       write(6,'(a,es13.5)') '  norm(g) = ',sqrt(sprod(ndim,g,g))
@@ -2083,7 +2085,7 @@ contains
 !!$        sa_xws(i) = max(xbest(i)*sa_xw0,1d-2)
         sa_xws(i) = 1d-2
       enddo
-      tau = max(dble(maxiter)/10,1d0)
+      tau = max(dble(maxiter)/sa_taui,1d0)
     endif
 
     if( .not.allocated(x) ) allocate(x(ndim),xt(ndim))
@@ -2130,6 +2132,11 @@ contains
 
 !.....Store the best one
       if( ft.lt.fbest ) then
+        fbest= ft
+        xbest(1:ndim)= xt(1:ndim)
+
+!.....In case of fbest being NaN...
+      else if( fbest*0d0.ne.0d0 ) then
         fbest= ft
         xbest(1:ndim)= xt(1:ndim)
       endif
