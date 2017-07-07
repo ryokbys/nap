@@ -880,17 +880,24 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
        ,nnn(6),nex(3),lsex(nbmax,6)
 
-  integer:: istp,i
-  real(8):: eclong,epot,epotp,afq,eMorse
+  integer:: istp,i,istp_pos,istp_conv
+  real(8):: eclong,epot,epotp,afq,eMorse,fqnorm,vqnorm,dt,alpha,p
   real(8),save,allocatable:: vq(:),fq(:)
 
   integer,parameter:: nstp_dampopt = 1000
-  integer,parameter:: minstp_dampopt = 0
   real(8),parameter:: dt_dampopt = 0.005  ! 0.005 fs
 !!$  real(8),parameter:: eta_dampopt = 0.01
-  real(8),parameter:: eta_dampopt = 0.1
+  real(8),parameter:: eta_dampopt = 0.01
   real(8),parameter:: ecrit_dampopt = 1.0d-4
   real(8),parameter:: amassq = 0.002
+!.....FIRE parameters 
+  integer,parameter:: nstp_min = 5
+  integer,parameter:: nstp_conv = 3
+  real(8),parameter:: finc = 1.1d0
+  real(8),parameter:: fdec = 0.5d0
+  real(8),parameter:: alpha0 = 0.1d0
+  real(8),parameter:: falpha = 0.99d0
+  real(8),parameter:: dtmax  = dt_dampopt*10
 
   if( l1st ) then
     if( allocated(vq) ) deallocate(vq,fq)
@@ -912,19 +919,44 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
          ,h,tcom,rc,lspr,mpi_md_world,myid,eMorse,iprint,.true.)
     epot = epot + eMorse
   endif
-!!$  write(6,'(a,50es10.2)') 'chg after qforce_Morse=',chg(1:natm)
+  write(6,'(a,50f10.4)') 'chg after qforce_Morse=',chg(1:natm)
 !!$  write(6,'(a,50es10.2)') 'epot,afq,fq=',epot,afq,fq(1:natm)
   call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
-!!$  write(6,'(a,50es10.2)') 'epot,afq,fq=',epot,afq,fq(1:natm)
+!!$  write(6,'(a,50es10.2)') 'epot,afq,fqnorm,fq=',epot,afq &
+!!$       ,dot_product(fq,fq),fq(1:natm)
 
   vq(1:natm) = 0d0
+  istp_pos = 0
+  istp_conv = 0
+  alpha = alpha0
+  dt = dt_dampopt
   do istp=1,nstp_dampopt
     epotp = epot
 !.....update velocities
-    vq(1:natm) = vq(1:natm) +dt_dampopt/amassq &
-         *(fq(1:natm) -afq -eta_dampopt*vq(1:natm))
+!!$      vq(1:natm) = vq(1:natm) +dt_dampopt/amassq &
+!!$           *(fq(1:natm) -afq -eta_dampopt*vq(1:natm))
+    fq(1:natm) = fq(1:natm) -afq
+    vq(1:natm) = vq(1:natm) +dt/amassq*fq(1:natm)
+    p = dot_product(fq,vq)
+    vqnorm = sqrt(dot_product(vq,vq))
+    fqnorm = sqrt(dot_product(fq,fq))
+    if( istp.gt.nstp_min ) then
+      vq(1:natm) = (1d0-alpha)*vq(1:natm) -alpha*vqnorm*fq(1:natm)/fqnorm
+    endif
+    if( p.gt.0d0 ) then
+      istp_pos = istp_pos +1
+      if( istp_pos.gt.nstp_min ) then  ! start FIRE after nstp_min
+        dt = min(dt*finc,dtmax)
+        alpha = alpha *falpha
+      endif
+    else if( p.le.0d0 ) then
+      istp_pos = 0
+      dt = dt*fdec
+      alpha = alpha0
+      vq(1:natm) = 0d0
+    endif
 !.....update charges
-    chg(1:natm)= chg(1:natm) +vq(1:natm)*dt_dampopt
+    chg(1:natm)= chg(1:natm) +vq(1:natm)*dt
     call bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
             ,natm,nb,nnn,myid,myparity,lsrc &
             ,nex,mpi_md_world,chg)
@@ -941,17 +973,24 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       epot = epot + eMorse
     endif
     call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
-!!$    write(6,'(a,50es10.2)') 'epot,afq,fq,chg=',epot,afq,fq(1:4),chg(1:4)
+!!$    write(6,'(a,50f10.4)') 'chg after qforce_Morse=',chg(1:natm)
+!!$    write(6,'(a,es16.8,50es10.2)') 'epot,afq,fqnorm,fq=',epot,afq &
+!!$         ,dot_product(fq,fq),fq(1:natm)
 !!$    write(6,'(a,i6,es10.2,30f6.2)') ' istp,epot-epotp,chg(1:natm)=' &
 !!$         ,istp,epot-epotp,chg(1:natm)
 !.....check convergence
-    if( istp.gt.minstp_dampopt .and. &
+    if( istp.gt.nstp_min .and. &
          abs(epot-epotp).lt.ecrit_dampopt ) then
-      if( myid.eq.0 .and. iprint.ne.0 ) then
-        write(6,'(a,i4,a)') ' dampopt_charge converged with ', &
-             istp,' steps.'
+      istp_conv = istp_conv +1
+      if( istp_conv.gt.nstp_conv ) then
+        if( myid.eq.0 .and. iprint.ne.0 ) then
+          write(6,'(a,i4,a)') ' dampopt_charge converged with ', &
+               istp,' steps.'
+        endif
+        exit
       endif
-      exit
+    else
+      istp_conv = 0
     endif
   enddo
 
