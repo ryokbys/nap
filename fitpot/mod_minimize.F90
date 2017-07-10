@@ -556,6 +556,7 @@ contains
           if(myid.eq.0) then
             print *,'>>> gg initialized because alpha was not found.'
           endif
+          alpha= 1d0  ! reset alpha to 1
           gg(1:ndim,1:ndim)= 0d0
           do i=1,ndim
             gg(i,i)= 1d0
@@ -653,6 +654,8 @@ contains
 !.....check convergence 
       if( dxnorm.lt.xtol ) then
         nxtol = nxtol +1
+        ngtol = 0
+        nftol = 0
         if( nxtol.ge.numtol ) then
           if( myid.eq.0 ) then
             print *,'>>> QN converged because of xtol over ' &
@@ -665,6 +668,8 @@ contains
         endif
       else if( gnorm.lt.gtol ) then
         ngtol = ngtol +1
+        nxtol = 0
+        nftol = 0
         if( ngtol.ge.numtol ) then
           if( myid.eq.0 ) then
             print *,'>>> QN converged because of gtol over ' &
@@ -677,6 +682,8 @@ contains
         endif
       else if( abs(f-fp).lt.ftol) then
         nftol= nftol +1
+        nxtol = 0
+        ngtol = 0
         if( nftol.ge.numtol ) then
           if( myid.eq.0 ) then
             print *,'>>> QN converged because of ftol over ' &
@@ -687,14 +694,19 @@ contains
           iflag= iflag +3
           return
         endif
+      else
+        nxtol = 0
+        ngtol = 0
+        nftol = 0
       endif
       
       s(1:ndim)= alpha *u(1:ndim)
       y(1:ndim)= g(1:ndim) -gp(1:ndim)
       ynorm= sprod(ndim,y,y)
-      if( ynorm.lt.1d-14 ) then
+      if( ynorm.lt.1d-14 .or. dxnorm.lt.xtol .or. gnorm.lt.gtol &
+           .or. abs(f-fp).lt.ftol ) then
         if(myid.eq.0) then
-          print *,'>>> gg initialized because y*y < 1d-14'
+          print *,'>>> gg initialized'
         endif
         gg(1:ndim,1:ndim)= 0d0
         do i=1,ndim
@@ -1489,8 +1501,6 @@ contains
         write(6,'(a,es13.5)') '  pval    = ',pval
       endif
     endif
-!.....Reset alpha to 1
-    alpha= 1d0
     return
 
   end subroutine armijo_search

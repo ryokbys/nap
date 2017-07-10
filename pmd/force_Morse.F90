@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-04 12:26:34 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-10 11:43:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -326,6 +326,7 @@ contains
 
     epotl= 0d0
 
+!!$    write(6,'(a,9f10.6)') 'h(1:3,1:3) in qforce_vcMorse=',h(1:3,1:3)
 !!$    write(6,'(a,30es10.2)') 'chg in qforce_Morse =',chg(1:natm)
 
 !.....Loop over resident atoms
@@ -358,8 +359,12 @@ contains
         rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
         alpij= max(alpij, prefbeta/(rminij -rc))
         texp = exp(alpij*(rminij-dij))
-!!$        write(6,'(a,4i5,4es15.7)') 'i,is,j,js,d0ij,alpij,rminij,texp=',&
-!!$             i,is,j,js,d0ij,alpij,rminij,texp
+!!$        if( i.eq.1 .and. j.eq.2 ) then
+!!$          write(6,'(a,2i5,8es12.4)') 'i,j,dij,xj(1:3),xi(1:3)='&
+!!$               ,i,j,dij,xj(1:3),xi(1:3)
+!!$          write(6,'(a,4i5,5es15.7)') 'i,is,j,js,d0ij,alpij,rminij,dij,texp=',&
+!!$               i,is,j,js,d0ij,alpij,rminij,dij,texp
+!!$        endif
 !.....potential
         tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
         tmp2 = tmp *fcut1(dij,rc)

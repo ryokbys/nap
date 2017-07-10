@@ -163,6 +163,30 @@ def make_graphene(latconst=2.467,size=(1,1,1)):
     
     return napsys
 
+def make_2D_triangle(latconst=3.8,size=(1,1,1)):
+    """
+    Make 2D triangle lattice on x-z plane. 
+    Note that it is not x-y plane.
+    """
+    specorder = ['Ar']
+    s = NAPSystem(specorder=specorder)
+    #...lattice
+    a1= np.array([ 1.0,  0.0, 0.0 ])
+    a2= np.array([ 0.0, 10.0, 0.0 ])
+    a3= np.array([ 0.0,  0.0, np.sqrt(3.0) ])
+    s.set_lattice(latconst,a1,a2,a3)
+    positions=[(0.00, 0.50, 0.00),
+               (0.50, 0.50, 0.50)]
+    for p in positions:
+        atom= Atom()
+        atom.set_pos(p[0],p[1],p[2])
+        atom.set_symbol(specorder[0])
+        s.add_atom(atom)
+    
+    s.repeat(*size)
+    s.add_vacuum(2.*latconst, 0.0, 10.*latconst*np.sqrt(3))
+    return s
+
 #=======================================================================
 if __name__ == "__main__":
 

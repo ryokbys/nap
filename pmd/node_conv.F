@@ -87,7 +87,8 @@ c.....Ascii format
           stop
         endif
         read(12,*) (tag(j),ra(1:3,j),va(1:3,j)
-     &       ,eki(j),epi(j),strs(1:3,1:3,j),j=nlast+1,nlast+n)
+     &       ,eki(j),epi(j),strs(1,1,j),strs(2,2,j),strs(3,3,j)
+     &       ,strs(2,3,j),strs(1,3,j),strs(1,2,j),j=nlast+1,nlast+n)
 c.....Some check
         do j=nlast+1,nlast+n
           if(  ra(1,j).lt.sxog.or.ra(1,j).ge.sxog+1d0/nox.or.
@@ -151,5 +152,5 @@ c     &       ,ekit,epit,strst)
       end program node_conv
 c-----------------------------------------------------------------------
 c     Local Variables:
-c     compile-command: "make nconv"
+c     compile-command: "make combine"
 c     End:

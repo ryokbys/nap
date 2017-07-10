@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-07-04 19:34:36 Ryo KOBAYASHI>
+c                     Last-modified: <2017-07-10 12:38:50 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -255,6 +255,8 @@ c.....Calc forces
       lstrs = .false.
       epot= epot0
       epotp = 0d0
+c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
+c     &     ,epot,chg(1:natm)
 
 #ifdef __DISL__
       call perf_disl_pos_by_pot(epith,natm,ra,h,epi,sorg
@@ -903,7 +905,6 @@ c-----Make pair list
      &     ,anxi,anyi,anzi,lspr)
       lstrs = .true.
 
-c      write(6,'(a,200es10.2)') 'chg before get_force = ',chg(1:natm)
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
      &     ,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr
      &     ,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
@@ -913,6 +914,8 @@ c      write(6,'(a,200es10.2)') 'chg before get_force = ',chg(1:natm)
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
      &     ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al
      &     ,luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc)
+c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
+c     &     ,epot,chg(1:natm)
 
       if( lcalcgrad ) then
 c        write(6,'(a,200es10.2)') 'chg before pderiv_vcMorse = '

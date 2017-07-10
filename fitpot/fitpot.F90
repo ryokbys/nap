@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-04 19:49:59 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-10 11:33:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -402,9 +402,9 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
 
   open(ionum,file=trim(fname),status='old')
   read(ionum,*) smpl%h0
-  read(ionum,*) smpl%h(1,1:3)
-  read(ionum,*) smpl%h(2,1:3)
-  read(ionum,*) smpl%h(3,1:3)
+  read(ionum,*) smpl%h(1:3,1)
+  read(ionum,*) smpl%h(1:3,2)
+  read(ionum,*) smpl%h(1:3,3)
   read(ionum,*) tmp,tmp,tmp
   read(ionum,*) tmp,tmp,tmp
   read(ionum,*) tmp,tmp,tmp
@@ -588,7 +588,7 @@ subroutine read_vars()
       read(15,*) vars(i),vranges(1:2,i)
 !    print *, vars(i),vranges(1:2,i)
     enddo
-    if( cinitv.eq.'gauss' ) then
+    if( cinitv.eq.'gaussian' ) then
       rs0 = get_seed()
       call set_seed(vinitrs)
       do i=1,nvars

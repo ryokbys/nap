@@ -629,7 +629,8 @@ You need to specify the species order correctly with --specorder option.
             ekin= ai.ekin
             epot= ai.epot
             sti= ai.strs
-            f.write("{0:8d} {1:3d} ".format(i+1,ai.sid))
+            # f.write("{0:8d} {1:3d} ".format(i+1,ai.sid))
+            f.write("{0:8d} {1:3s} ".format(i+1,ai.symbol))
             f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(x,y,z))
             f.write("{0:8.3f} {1:8.3f} {2:8.3f} ".format(vx,vy,vz))
             f.write("{0:11.3e} {1:11.3e} ".format(ekin,epot))
