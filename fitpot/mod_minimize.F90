@@ -2252,4 +2252,72 @@ contains
 
     return
   end subroutine penalty
+!=======================================================================
+  subroutine random_search(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
+!
+!  Pure random search with variable range
+!
+    use random
+    implicit none
+    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
+    integer,intent(inout):: iflag
+    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
+    real(8),intent(inout):: fbest,xbest(ndim)
+    character(len=*),intent(in):: cfmethod
+    interface
+      subroutine func(n,x,ftrn,ftst)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
+    end interface
+
+    integer:: iter,idim,i
+    real(8):: f,ftst,fmin,xmin,xmax,xi
+    real(8),allocatable:: x(:)
+    logical,save:: l1st = .true.
+
+    if( l1st ) then
+      if( .not. allocated(x) ) allocate(x(ndim))
+      l1st = .false.
+    endif
+
+    x(1:ndim)= xbest(1:ndim)
+    call func(ndim,x,f,ftst)
+    if( fmin*0d0.ne.0d0 ) then  ! NaN
+      fmin = 1.0d+10
+    endif
+    fmin = f
+    write(6,'(a,i8,2es15.7)') ' iter,f,fmin = ',0,f,fmin
+    
+    do iter=1,maxiter
+      do idim=1,ndim
+        xmin = xranges(1,idim)
+        xmax = xranges(2,idim)
+        xi = (xmax-xmin)*urnd() +xmin
+        x(idim) = xi
+      enddo
+
+      call func(ndim,x,f,ftst)
+      if( f*0d0.ne.0d0 ) then  !NaN
+        f = 1.0d+10
+      endif
+      write(6,'(a,i8,2es15.7)') ' iter,f,fmin = ',iter,f,fmin
+      if( f.lt.fmin ) then
+        if( myid.eq.0 .and. iprint.gt.0 ) then
+          write(6,'(a,i8,2es15.7)') ' fmin is updated: iter,fmin,df= ' &
+               ,iter,fmin,abs(f-fmin)
+        endif
+        fmin = f
+        fbest = fmin
+        xbest(1:ndim) = x(1:ndim)
+        call sub_eval(iter)
+      endif
+    enddo
+
+  end subroutine random_search
 end module

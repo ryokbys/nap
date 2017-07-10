@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-10 11:33:06 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-10 19:10:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -83,6 +83,8 @@ program fitpot
       call lbfgs_wrapper()
     case ('sa','SA')
       call sa_wrapper()
+    case ('random_search','random')
+      call random_search_wrapper()
     case ('fs','FS')
       call fs_wrapper()
     case ('gfs')
@@ -755,7 +757,7 @@ subroutine sa_wrapper()
   return
 end subroutine sa_wrapper
 !=======================================================================
-subroutine random_search()
+subroutine random_search_wrapper()
   use variables
   use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
@@ -771,10 +773,12 @@ subroutine random_search()
       print *,'random_search is not available for NN.'
     endif
   else if( trim(cpot).eq.'vcMorse' ) then
-    
+    call random_search(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
+         ,iprint,iflag,myid,func_w_pmd,cfmethod &
+         ,niter_eval,write_stats)
   endif
   
-end subroutine random_search
+end subroutine random_search_wrapper
 !=======================================================================
 subroutine sgd()
 !
