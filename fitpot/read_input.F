@@ -88,8 +88,14 @@ c=======================================================================
         backspace(ionum)
         read(ionum,*) ctmp,itmp,eatom(itmp)
         return
+      elseif( trim(cname).eq.'energy_match' ) then
+        call read_l1(ionum,lematch)
+        return
       elseif( trim(cname).eq.'force_match' ) then
         call read_l1(ionum,lfmatch)
+        return
+      elseif( trim(cname).eq.'stress_match' ) then
+        call read_l1(ionum,lsmatch)
         return
       elseif( trim(cname).eq.'penalty' ) then
         call read_c1(ionum,cpena)
@@ -160,14 +166,29 @@ c=======================================================================
       elseif( trim(cname).eq.'armijo_maxiter' ) then
         call read_i1(ionum,armijo_maxiter)
         return
+      elseif( trim(cname).eq.'sa_temp_control' ) then
+        call read_c1(ionum,sa_tctrl)
+        return
       elseif( trim(cname).eq.'sa_temperature' ) then
         call read_r1(ionum,sa_temp0)
         return
-      elseif( trim(cname).eq.'sa_taui' ) then
-        call read_r1(ionum,sa_taui)
+      elseif( trim(cname).eq.'sa_tau' ) then
+        call read_r1(ionum,sa_tau)
         return
       elseif( trim(cname).eq.'sa_dxwidth' ) then
         call read_r1(ionum,sa_xw0)
+        return
+      elseif( trim(cname).eq.'sa_div_best' ) then
+        call read_r1(ionum,sa_div_best)
+        return
+      elseif( trim(cname).eq.'md_height' ) then
+        call read_r1(ionum,md_height)
+        return
+      elseif( trim(cname).eq.'md_sigma' ) then
+        call read_r1(ionum,md_sigma)
+        return
+      elseif( trim(cname).eq.'md_num_gaussian' ) then
+        call read_i1(ionum,md_ng)
         return
       elseif( trim(cname).eq.'random_seed' ) then
         call read_r1(ionum,rseed)

@@ -18,7 +18,9 @@ module variables
   real(8):: ftol= 1d-5
   integer,parameter:: maxnsp= 4
   real(8):: eatom(maxnsp)
-  logical:: lfmatch= .false.
+  logical:: lematch= .true.   ! energy matching
+  logical:: lfmatch= .false.  ! force matching
+  logical:: lsmatch= .false.  ! stress matching
   character(len=128):: cnormalize= 'variance'
   character(len=128):: cpot= 'NN'
   logical:: lgrad  = .true.

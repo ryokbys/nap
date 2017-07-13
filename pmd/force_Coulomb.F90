@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-04 14:06:58 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-13 14:21:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -245,6 +245,9 @@ contains
     integer:: npq,isp,jsp,ierr,mode
     
     if( ifcoulomb.eq.1 ) then  ! screened_bvs
+      if( allocated(rad_bvs) ) then
+        deallocate(rad_bvs,npq_bvs,vid_bvs,rho_bvs)
+      endif
       allocate(rad_bvs(nsp),npq_bvs(nsp),vid_bvs(nsp) &
            ,rho_bvs(nsp,nsp))
       if( myid.eq.0 ) then
@@ -287,6 +290,9 @@ contains
             read(ioprms,*) isp, jsp
             interact(isp,jsp) = .true.
             interact(jsp,isp) = interact(isp,jsp)
+!!$            if( iprint.gt.0 ) then
+!!$              write(6,'(a,2i5,l3)') ' isp,jsp,interact= ',isp,jsp,interact(isp,jsp)
+!!$            endif
           endif
         enddo
 10      close(ioprms)
@@ -298,7 +304,11 @@ contains
 !.....Set screening length
         do isp=1,nsp
           do jsp=1,nsp
-            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+!!$            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+            rho_bvs(isp,jsp) = 2d0
+!!$            if( iprint.gt.0 .and. interact(isp,jsp) .and. jsp.ge.isp ) then
+!!$              write(6,'(a,2i5,f10.4)') ' isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
+!!$            endif
           enddo
         enddo
       endif  ! myid
@@ -356,7 +366,8 @@ contains
   subroutine force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,ifcoulomb)
+       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,ifcoulomb&
+       ,l1st)
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -370,7 +381,7 @@ contains
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical:: lstrs
+    logical,intent(in):: lstrs,l1st
 
     
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
@@ -378,19 +389,18 @@ contains
          ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp &
          ,qi,qj,radi,radj,rhoij,terfc,texp
     real(8),allocatable,save:: strsl(:,:,:)
-    logical,save:: l1st=.true.
 
     if( l1st ) then
       call read_params(myid,mpi_md_world,ifcoulomb,iprint)
-      call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world)
+      call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint)
       if( .not. allocated(strsl) ) then
         allocate(strsl(3,3,namax))
       endif
-      l1st=.false.
     endif
 
     epotl= 0d0
     strsl(1:3,1:3,1:namax) = 0d0
+!!$    write(6,'(a,30f7.3)') 'chgs =',chg(1:natm)
 
 !.....Loop over resident atoms
     do i=1,natm
@@ -457,6 +467,8 @@ contains
     call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
+!!$    write(6,'(a,es15.7)') ' screened Coulomb epott = ',epott
+    
   end subroutine force_screened_Coulomb
 !=======================================================================
   subroutine force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
@@ -685,7 +697,7 @@ contains
     return
   end subroutine qforce_long
 !=======================================================================
-  subroutine set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world)
+  subroutine set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint)
 !
 ! Reset actual charges of atoms using effective charge information
 ! in order to keep charge neutrality in the system.
@@ -696,7 +708,7 @@ contains
 ! This would be called only once at the beginning.
 !
     include "mpif.h"
-    integer,intent(in):: natm,nb,myid,mpi_md_world
+    integer,intent(in):: natm,nb,myid,mpi_md_world,iprint
     real(8),intent(in):: tag(natm+nb)
     real(8),intent(out):: chg(natm+nb)
     
@@ -725,7 +737,6 @@ contains
       is = int(tag(i))
       nbvsl(is) = nbvsl(is) +1
     enddo
-
     call mpi_allreduce(nbvsl,nbvs,nsp,mpi_integer &
          ,mpi_sum,mpi_md_world,ierr)
 
@@ -744,7 +755,10 @@ contains
            *sqrt(sum_anion/sum_cation)
     enddo
 
-    if( myid.eq.0 ) then
+!.....Overwrite charges for debugging...
+    vc_bvs(1:4) = (/ 1.27443, 0.78466, 1.10968, 3.20338/)
+
+    if( myid.eq.0 .and. iprint.gt.0 ) then
       do is=1,nsp
         write(6,'(a,i3,2f7.3)') ' isp, V_ideal, V_actual = '&
              ,is,vid_bvs(is),vc_bvs(is)
@@ -759,6 +773,9 @@ contains
       else
         chg(i)= vc_bvs(is)
       endif
+!!$      if( i.le.natm ) then
+!!$        write(6,'(a,2i5,f10.4)') ' i,is,chg=',i,is,chg(i)
+!!$      endif
     enddo
     
     deallocate(nbvsl,nbvs,vc_bvs)

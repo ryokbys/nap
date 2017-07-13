@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-07-10 12:38:50 Ryo KOBAYASHI>
+c                     Last-modified: <2017-07-13 14:18:01 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -234,7 +234,7 @@ c-----copy RA of boundary atoms
      &     ,nx,ny,nz,myid_md)
       call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi)
+     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,.true.)
 c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
@@ -484,7 +484,7 @@ c.....Move atoms that cross the boundary
 c.....Copy RA of boundary atoms
           call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax,natm,nb
      &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv,nex
-     &         ,mpi_md_world,iprint,ifcoulomb,chg,chi)
+     &         ,mpi_md_world,iprint,ifcoulomb,chg,chi,.false.)
 c.....Make pair list
           call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h
      &         ,hi,anxi,anyi,anzi,lspr)
@@ -899,7 +899,7 @@ c-----copy RA of boundary atoms
      &     ,nx,ny,nz,myid_md)
       call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi)
+     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,.true.)
 c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr)
@@ -1425,7 +1425,7 @@ c      print *, 'bacopy: nb=',nb
 c=======================================================================
       subroutine bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi)
+     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,l1st)
 c-----------------------------------------------------------------------
 c  Exchanges boundary-atom data among neighbor nodes: tag and ra
 c  Normal data passing and repeating the cell are mixed, and
@@ -1443,6 +1443,7 @@ c-----------------------------------------------------------------------
       real(8),intent(inout):: tag(namax),ra(3,namax),tcom
       integer,intent(in):: ifcoulomb
       real(8),intent(inout):: chg(namax),chi(namax)
+      logical,intent(in):: l1st
 
 c.....integer:: status(MPI_STATUS_SIZE)
       integer:: i,j,kd,kdd,kul,kuh,ku,ierr,iex
@@ -1450,10 +1451,10 @@ c.....integer:: status(MPI_STATUS_SIZE)
       real(8):: tcom1,tcom2,xi(3),rcv(3),asgm
       logical,external:: bbd
       real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
-      logical,save:: l1st=.true.
       logical:: lshort(3)
 
       if( l1st ) then
+        if( allocated(dbuf) ) deallocate(dbuf,dbufr)
         if( ifcoulomb .eq. 0 ) then
           allocate(dbuf(4,nbmax),dbufr(4,nbmax))
         else
@@ -1633,7 +1634,6 @@ c-------Error trap
 c-----num. of received boundary atoms
       nb=nbnew
 
-      l1st=.false.
       end subroutine bacopy_new
 c=======================================================================
       subroutine bacopy_fixed(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb

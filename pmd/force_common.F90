@@ -109,7 +109,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
          ,chg,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
-         ,ifcoulomb)
+         ,ifcoulomb,l1st)
   else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
     call force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,h,hi,tcom &
@@ -184,7 +184,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
   if( luse_Morse ) call force_Morse(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
   if( luse_vcMorse ) call force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
@@ -215,7 +215,8 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
 !
   use Coulomb, only: initialize_coulomb
   use Morse, only: init_vcMorse, read_params_vcMorse, lprmset, &
-       read_element_descriptors
+       read_element_descriptors,init_Morse,read_params_Morse,&
+       update_params_Morse
   implicit none
   integer,intent(in):: namax,natm,myid_md,mpi_md_world,iprint,numff
   real(8),intent(in):: tag(namax),h(3,3),rc
@@ -264,6 +265,16 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
       call read_params_vcMorse(myid_md,mpi_md_world,iprint)
     endif
     call read_element_descriptors(myid_md,mpi_md_world,iprint)
+  endif
+!.....Morse
+  if( luse_Morse ) then
+    call init_Morse(natm,tag,mpi_md_world)
+    if( .not.lprmset ) then
+      call read_params_Morse(myid_md,mpi_md_world,iprint)
+    else
+!.....This code is not parallelized, and only for fitpot
+      call update_params_Morse()  
+    endif
   endif
 
 end subroutine init_force
@@ -883,7 +894,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   real(8):: eclong,epot,epotp,afq,eMorse,fqnorm,vqnorm,dt,alpha,p
   real(8),save,allocatable:: vq(:),fq(:)
 
-  integer,parameter:: nstp_dampopt = 1000
+  integer,parameter:: nstp_dampopt = 100
   real(8),parameter:: dt_dampopt = 0.001  ! 0.005 fs
 !!$  real(8),parameter:: eta_dampopt = 0.01
   real(8),parameter:: eta_dampopt = 0.1
@@ -921,6 +932,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 !!$  write(6,'(a,50f10.4)') 'chg after qforce_Morse=',chg(1:natm)
 !!$  write(6,'(a,200es10.2)') 'epot,afq,fq=',epot,afq,fq(1:natm)
   call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
+  if( afq*0d0.ne.0d0 ) return   ! NaN
   fq(1:natm) = fq(1:natm) -afq
 !!$  write(6,'(a,200es10.2)') 'epot,afq,fq=',epot,afq,fq(1:natm)
 
@@ -974,6 +986,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       epot = epot + eMorse
     endif
     call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
+    if( afq*0d0.ne.0d0 ) return   ! NaN
     fq(1:natm) = fq(1:natm) -afq
 
 !.....second update of velocity

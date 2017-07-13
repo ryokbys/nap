@@ -51,13 +51,13 @@ contains
 !  Evaluate loss function value using pmd (actually one_shot routine.)
 !
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
-         ,lfmatch,nfunc,tcomm,mdsys,erefmin &
+         ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys,erefmin &
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
          ,nff,cffs,cmaindir,maxna
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb
-    use Morse,only: set_paramsdir_Morse, set_params_vcMorse
+    use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     implicit none
     
     integer,intent(in):: ndim
@@ -89,6 +89,14 @@ contains
       if( .not.allocated(fdiff) ) allocate(fdiff(3,maxna),frcs(3,maxna))
     endif
 
+    if( .not. lematch .and. .not.lfmatch .and. .not.lsmatch ) then
+      if( myid.eq.0 ) then
+        print *,'Nothing to be fitted.'
+      endif
+      call mpi_finalize(ierr)
+      stop
+    endif
+
 !!$    print *,'myid,isid0,isid1=',myid,isid0,isid1
     ftrnl = 0d0
     ftstl = 0d0
@@ -97,26 +105,32 @@ contains
       natm= smpl%natm
       cdirname = trim(smpl%cdirname)
       if( trim(cpot).eq.'vcMorse' ) then
-        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname))
-        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname))
+        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
         call set_params_vcMorse(ndim,x)
+      else if( trim(cpot).eq.'Morse' ) then
+        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_Morse(ndim,x)
       endif
 !!$      print *,'myid,ismpl,cdirname,natm=',myid,ismpl,trim(cdirname),natm,' before pmd'
       call run_pmd(smpl,lcalcgrad,ndim,gdummy,nff,cffs,epot,frcs)
-!!$      print *,'myid,ismpl,cdirname,epot = ',myid,ismpl,trim(cdirname),epot
+!!$      print *,'myid,ismpl,cdirname,epot= ',myid,ismpl,trim(cdirname),epot
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
 
       ftmp = 0d0
-      eref= smpl%eref
-      eerr = smpl%eerr
       swgt = smpl%wgt
+      if( lematch ) then
+        eref= smpl%eref
+        eerr = smpl%eerr
 !.....Energy matching
-      ediff= (epot -eref)/natm /eerr
-      ediff= ediff*ediff
-      ftmp= ftmp +ediff *swgt
-!!$      print *,'myid,ismpl,natm,eerr,epot,eref,ediff='&
-!!$           ,myid,ismpl,natm,eerr,epot,eref,ediff
+        ediff= (epot -eref)/natm /eerr
+        ediff= ediff*ediff
+        ftmp= ftmp +ediff *swgt
+      endif
 !.....Force matching
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
         ferr = smpl%ferr
@@ -131,7 +145,12 @@ contains
             ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt
           enddo
         enddo
+!!$        write(6,'(a,i6,es12.4)') 'ismpl,ftmp=',ismpl,ftmp
       endif
+!!$!.....Stress matching
+!!$      if( lsmatch ) then
+!!$        
+!!$      endif
       if( smpl%iclass.eq.1 ) then
         ftrnl = ftrnl +ftmp
       else if( smpl%iclass.eq.2 ) then
@@ -172,11 +191,12 @@ contains
 !  using pmd (actually one_shot routine.)
 !
     use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm &
-         ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,cmaindir,maxna
+         ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,cmaindir,maxna &
+         ,lematch,lfmatch,lsmatch
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb
-    use Morse,only: set_paramsdir_Morse, set_params_vcMorse
+    use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -192,6 +212,12 @@ contains
 
     if( .not.allocated(gs) ) allocate(gs(ndim),gtrnl(ndim),frcs(3,maxna))
 
+    if( lfmatch ) then
+      if( myid.eq.0 ) then
+        print *,'WARNING: FORCE-MATCHING IS NOT AVAILABLE IN GRAD_W_PMD().'
+      endif
+    endif
+
     ngrad= ngrad +1
     tg0= mpi_wtime()
 
@@ -205,28 +231,35 @@ contains
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
       if( trim(cpot).eq.'vcMorse' ) then
-        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname))
-        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname))
+        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
         call set_params_vcMorse(ndim,x)
+      else if( trim(cpot).eq.'Morse' ) then
+        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_Morse(ndim,x)
       endif
       call run_pmd(smpl,lcalcgrad,ndim,gs,nff,cffs,epot,frcs)
 !!$      print *, 'ismpl,epot @grad_w_pmd =',ismpl,epot
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
 
-      eref= smpl%eref
-      eerr= smpl%eerr
       swgt= smpl%wgt
+      if( lematch ) then
+        eref= smpl%eref
+        eerr= smpl%eerr
 !.....Energy matching
-      ediff= (epot -eref) /natm /eerr
-      ediff= 2d0 *ediff /natm /eerr *swgt
-      gtrnl(1:ndim)= gtrnl(1:ndim) +gs(1:ndim)*ediff
+        ediff= (epot -eref) /natm /eerr
+        ediff= 2d0 *ediff /natm /eerr *swgt
+        gtrnl(1:ndim)= gtrnl(1:ndim) +gs(1:ndim)*ediff
+      endif
 !!$      write(6,'(a,i5,5es15.7)') 'ismpl,ediff,gs(7),gtrnl(7),epot,eref=',&
 !!$           ismpl,ediff,gs(7),gtrnl(7),epot,eref
 !!$      print *,'ismpl,epot,eref,ediff=',ismpl,epot,eref,ediff
 !!$      print *,'gs =',gs(1:ndim)
 !.....TODO: force matching
-      
     enddo  ! ismpl
 
     tgl= mpi_wtime() -tg0

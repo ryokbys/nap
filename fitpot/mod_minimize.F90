@@ -22,10 +22,23 @@ module minimize
 
 !.....Simulated annealing parameters
   real(8):: sa_temp0 = 1d0
-  real(8):: sa_taui  = 10d0
+  real(8):: sa_tau   = 10d0
   real(8):: sa_xw0   = 1d-3
   real(8):: sa_fctr  = 0.5d0
   real(8),allocatable:: sa_xws(:)
+!.....T control method
+!.....  - linear
+!.....  - exp
+!.....  - best_under
+  character(len=128):: sa_tctrl = 'best_under'
+  real(8):: sa_div_best = 10d0
+
+!.....Metadynamics
+  real(8):: md_height = 1d0
+  real(8):: md_sigma  = 1d0
+!.....Max num of gaussian potentials
+  integer:: md_ng = 1000
+  real(8),allocatable:: md_gp(:,:)
 
 !.....CG
   integer:: icgbtype = 1 ! 1:FR, 2:PRP, 3:HS, 4:DY
@@ -395,7 +408,7 @@ contains
     if( .not.allocated(gg) ) then
       if(myid.eq.0) then
         print *,''
-        print *, '***** QN(BFGS) starts *****'
+        print *, '********************* QN(BFGS) *********************'
         estmem = (ndim*ndim +ndim*6)*8
         mem= estmem/1000/1000
         if( mem.eq.0 ) then
@@ -2057,7 +2070,7 @@ contains
     return
   end subroutine cap_grad
 !=======================================================================
-  subroutine sa(ndim,xbest,fbest,xtol,gtol,ftol,maxiter &
+  subroutine sa(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
        ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
 !
 ! Simulated Annealing
@@ -2066,7 +2079,7 @@ contains
     implicit none
     integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
     integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol
+    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: fbest,xbest(ndim)
     character(len=*),intent(in):: cfmethod
     interface
@@ -2080,32 +2093,52 @@ contains
       end subroutine sub_eval
     end interface
 
-    integer:: iter,idim,nadpt,i
-    real(8):: f,ft,temp,xw,dx,p,pt,ptrans,ftst,tau
+    integer:: iter,idim,nadpt,i,l
+    real(8):: f,ft,temp,xw,dx,p,pt,ptrans,ftst,tau,xmin,xmax
     real(8),allocatable:: x(:),xt(:)
     logical,save:: l1st = .true.
 
     if( l1st ) then
-      if(myid.eq.0 .and. iprint.ne.0) then
-        print *,'Simulated annealing starts...'
-      endif
-      
       if(.not.allocated(sa_xws) ) allocate(sa_xws(ndim))
       do i=1,ndim
 !!$        sa_xws(i) = max(xbest(i)*sa_xw0,1d-2)
         sa_xws(i) = 1d-2
       enddo
-      tau = max(dble(maxiter)/sa_taui,1d0)
+      tau = max(sa_tau,1d0)
+      if(myid.eq.0 .and. iprint.ne.0) then
+        print *,''
+        print *,'******************** Simulated annealing ********************'
+        print *,''
+        write(6,'(a,a)') ' Temperature control method = ',trim(sa_tctrl)
+        if( sa_tctrl(1:3).eq.'exp' ) then
+          write(6,'(a,f10.4)') ' Initial temperature = ',sa_temp0
+          write(6,'(a,f10.4)') ' Relaxation iteration (tau) = ',tau
+        else if( sa_tctrl(1:3).eq.'bes' ) then
+          write(6,'(a,f8.1)') ' Division of fbest = ',sa_div_best
+        else
+          write(6,'(a,f10.4)') ' Initial temperature = ',sa_temp0
+        endif
+      endif
+      
     endif
 
     if( .not.allocated(x) ) allocate(x(ndim),xt(ndim))
 
 !.....Initialize
     x(1:ndim)= xbest(1:ndim)
+    do idim=1,ndim
+      if( x(idim).lt.xranges(1,idim) ) x(idim) = xranges(1,idim)
+      if( x(idim).gt.xranges(2,idim) ) x(idim) = xranges(2,idim)
+    enddo
     call func(ndim,x,f,ftst)
 !!$    p = exp(-f/temp)
+    if( f*0d0 .ne. 0d0 ) f = 1d+10
     fbest= f
-    temp= sa_temp0
+    if( sa_tctrl(1:3).eq.'bes' ) then
+      temp = fbest/sa_div_best
+    else
+      temp= max(sa_temp0,1d-8)
+    endif
     xw= sa_xw0
     nadpt= 0
 
@@ -2120,6 +2153,8 @@ contains
       xt(1:ndim)= x(1:ndim)
       dx= (urnd()-0.5d0)*sa_xws(idim)
       xt(idim)= xt(idim) +dx
+      if( xt(idim).lt.xranges(1,idim) ) xt(idim) = xranges(1,idim)
+      if( xt(idim).gt.xranges(2,idim) ) xt(idim) = xranges(2,idim)
 
 !.....Compute function value
       call func(ndim,xt,ft,ftst)
@@ -2144,11 +2179,7 @@ contains
       if( ft.lt.fbest ) then
         fbest= ft
         xbest(1:ndim)= xt(1:ndim)
-
-!.....In case of fbest being NaN...
-      else if( fbest*0d0.ne.0d0 ) then
-        fbest= ft
-        xbest(1:ndim)= xt(1:ndim)
+        if( sa_tctrl(1:3).eq.'bes' ) temp = fbest/sa_div_best
       endif
 
       if( mod(iter,niter_eval).eq.0 ) then
@@ -2174,20 +2205,22 @@ contains
       endif
 
 10    continue
-!!$!.....Update temperature (linear)
-!!$      temp= dble(maxiter-iter)/maxiter *sa_temp0
+      if( sa_tctrl(1:3).eq.'lin' ) then
+!.....Update temperature (linear)
+        temp= dble(maxiter-iter)/maxiter *sa_temp0
+      else if( sa_tctrl(1:3).eq.'exp' ) then
 !.....Update temperature (exponential)
-      temp= sa_temp0 *exp(-dble(iter)/tau)
-
+        temp= sa_temp0 *exp(-dble(iter)/tau)
+      endif
     enddo
 
     if( myid.eq.0 ) then
       write(6,'(a,i10,a,i10)') ' Num of adoption in SA='&
            ,nadpt,'/',maxiter
-      print *,'sa_xws:'
-      do i=1,ndim
-        write(6,'(i6,es15.7)') i,sa_xws(i)
-      enddo
+!!$      print *,'sa_xws:'
+!!$      do i=1,ndim
+!!$        write(6,'(i6,es15.7)') i,sa_xws(i)
+!!$      enddo
     endif
 
 !.....Finally compute the function value of the best candidate
@@ -2292,7 +2325,8 @@ contains
       fmin = 1.0d+10
     endif
     fmin = f
-    write(6,'(a,i8,2es15.7)') ' iter,f,fmin = ',0,f,fmin
+    if( myid.eq.0 .and. iprint.gt.0 ) &
+         write(6,'(a,i8,2es15.7,100f7.3)') ' iter,f,fmin = ',0,f,fmin
     
     do iter=1,maxiter
       do idim=1,ndim
@@ -2306,11 +2340,12 @@ contains
       if( f*0d0.ne.0d0 ) then  !NaN
         f = 1.0d+10
       endif
-      write(6,'(a,i8,2es15.7)') ' iter,f,fmin = ',iter,f,fmin
+      if( myid.eq.0 .and. iprint.gt.0 ) &
+           write(6,'(a,i8,2es15.7,100f7.3)') ' iter,f,fmin = ',iter,f,fmin
       if( f.lt.fmin ) then
         if( myid.eq.0 .and. iprint.gt.0 ) then
           write(6,'(a,i8,2es15.7)') ' fmin is updated: iter,fmin,df= ' &
-               ,iter,fmin,abs(f-fmin)
+               ,iter,f,abs(f-fmin)
         endif
         fmin = f
         fbest = fmin
@@ -2320,4 +2355,186 @@ contains
     enddo
 
   end subroutine random_search
+!=======================================================================
+  subroutine metadynamics(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
+!
+!  Metadynamics for minimum search
+!  Use simulated annealing-like search for local minimum search
+!  and once the local minimum is found, add a gaussian potential to
+!  the minimum to make it possible to escape from the minimum.
+!
+    use random
+    implicit none
+    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
+    integer,intent(inout):: iflag
+    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
+    real(8),intent(inout):: fbest,xbest(ndim)
+    character(len=*),intent(in):: cfmethod
+    interface
+      subroutine func(n,x,ftrn,ftst)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
+    end interface
+
+    integer:: iter,idim,nadpt,i,ng,ig,interval
+    real(8):: f,ft,temp,xw,dx,p,pt,ptrans,ftst,tau,xmin,xmax,adx,&
+         fg,fgt,tmp,gval
+    real(8),allocatable:: x(:),xt(:),xxt(:)
+    logical,save:: l1st = .true.
+
+    if( l1st ) then
+      interval = max(maxiter/md_ng,1)
+      if(.not.allocated(md_gp) ) allocate(md_gp(ndim,md_ng))
+      md_gp(:,:) = 0d0
+      if(.not.allocated(sa_xws) ) allocate(sa_xws(ndim))
+      do i=1,ndim
+!!$        sa_xws(i) = max(xbest(i)*sa_xw0,1d-2)
+        sa_xws(i) = 1d-2
+      enddo
+      tau = max(sa_tau,1d0)
+      if(myid.eq.0 .and. iprint.ne.0) then
+        print *,''
+        print *,'******************** Metadynamics ********************'
+        print *,''
+        write(6,'(a,i5)') ' Number of gaussians to be added = ',md_ng
+        write(6,'(a,f10.4)') ' Gaussian height         = ',md_height
+        write(6,'(a,f10.4)') ' Gaussian width (sigma)  = ',md_sigma
+      endif
+      l1st = .false.
+    endif
+
+    if( .not.allocated(x) ) allocate(x(ndim),xt(ndim),xxt(ndim))
+
+!.....Initialize
+    x(1:ndim)= xbest(1:ndim)
+    do idim=1,ndim
+      if( x(idim).lt.xranges(1,idim) ) x(idim) = xranges(1,idim)
+      if( x(idim).gt.xranges(2,idim) ) x(idim) = xranges(2,idim)
+    enddo
+    call func(ndim,x,f,ftst)
+!!$    p = exp(-f/temp)
+    if( f*0d0.ne.0d0 ) f = 1.0d+10
+    fbest= f
+    fg = f
+!!$    temp= sa_temp0
+    temp= fbest/100
+    xw= sa_xw0
+    nadpt= 0
+    ng = 0
+
+    call sub_eval(0)
+!.....Main loop of random displacements
+    do iter=1,maxiter
+
+!.....Choose a parameter to be displaced
+      idim= urnd()*ndim +1
+
+!.....Compute the displacement using a uniform random number
+      xt(1:ndim)= x(1:ndim)
+      dx= (urnd()-0.5d0)*sa_xws(idim)
+      xt(idim)= xt(idim) +dx
+      if( xt(idim).lt.xranges(1,idim) ) xt(idim) = xranges(1,idim)
+      if( xt(idim).gt.xranges(2,idim) ) xt(idim) = xranges(2,idim)
+
+!.....Compute function value
+      call func(ndim,xt,ft,ftst)
+!.....Detect NaN and skip this trial
+      if( ft*0d0 .ne. 0d0 ) then
+        if( myid.eq.0 .and. iprint.ne.0 ) then
+          write(6,'(a,2i10,es12.4,3es13.5,2f9.5)')&
+               ' [ft.eq.NaN] iter,idim,sa_xws(idim)=' &
+               ,iter,idim,sa_xws(idim)
+        endif
+!.....Decrease the width of deviation
+        sa_xws(idim) = sa_xws(idim) *sa_fctr
+        goto 10
+      endif
+!.....Add gaussian potentials to ft
+      fgt = ft
+      do ig=1,ng
+        xxt(1:ndim) = xt(1:ndim)-md_gp(1:ndim,ig)
+        adx = dot_product(xxt(1:ndim),xxt(1:ndim))
+        tmp = md_height*exp(-adx/2/md_sigma**2)
+        fgt = fgt +tmp
+      enddo
+      fg = f
+      do ig=1,ng
+        xxt(1:ndim) = x(1:ndim)-md_gp(1:ndim,ig)
+        adx = dot_product(xxt(1:ndim),xxt(1:ndim))
+        tmp = md_height*exp(-adx/2/md_sigma**2)
+        fg = fg +tmp
+      enddo
+!!$      pt = exp(-ft/temp)
+
+!.....Store the best one
+      if( ft.lt.fbest ) then
+        fbest= ft
+        xbest(1:ndim)= xt(1:ndim)
+        temp = fbest/100
+      endif
+
+!.....Compute probability of taking the displacement
+      ptrans= min(1d0,exp(-(fgt-fg)/temp))
+!!$      ptrans = min(1d0,pt/p)
+
+      if( mod(iter,niter_eval).eq.0 ) then
+        call sub_eval(iter)
+      endif
+
+      if( myid.eq.0 .and. iprint.ne.0 ) then
+        write(6,'(a,2i10,6es13.5,2f9.5,i5,es13.5)')&
+             ' iter,idim,temp,f,ft,fbest,fg,fgt,ptrans,radpt,ng='&
+             ,iter,idim,temp,f,ft,fbest,fg,fgt,ptrans,dble(nadpt)/iter,ng
+      endif
+      
+!.....Update the parameter if adopted
+      if( urnd().lt.ptrans ) then
+        x(idim)= xt(idim)
+        f= ft
+        fg= fgt
+        nadpt= nadpt +1
+!.....Increase the width of deviation
+        sa_xws(idim) = sa_xws(idim) /sa_fctr
+      else
+!.....Decrease the width of deviation
+        sa_xws(idim) = sa_xws(idim) *sa_fctr
+      endif
+
+!.....Put a gaussian potential to the current variable position
+      if( mod(iter,interval).eq.0 ) then
+        ng = ng + 1
+        if( ng.gt.md_ng ) then
+          if( myid.eq.0 .and. iprint.gt.0 ) then
+            write(6,'(a,i8)') ' Number of gaussian exceeds md_ng = ',md_ng
+          endif
+          exit
+        endif
+        md_gp(1:ndim,ng) = x(1:ndim)
+      endif
+
+10    continue
+!!$!.....Update temperature (linear)
+!!$      temp= dble(maxiter-iter)/maxiter *sa_temp0
+!!$!.....Update temperature (exponential)
+!!$      temp= sa_temp0 *exp(-dble(iter)/tau)
+
+    enddo
+
+    if( myid.eq.0 ) then
+      write(6,'(a,i10,a,i10)') ' Num of adoption in SA in Metadynamics='&
+           ,nadpt,'/',maxiter
+    endif
+
+!.....Finally compute the function value of the best candidate
+    call func(ndim,xbest,f,ftst)
+
+    
+  end subroutine metadynamics
+!=======================================================================
 end module

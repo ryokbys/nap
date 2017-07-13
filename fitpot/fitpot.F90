@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-10 19:10:15 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-13 15:18:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -65,7 +65,7 @@ program fitpot
   endif
 
 !.....Subtract atomic energy
-  call subtract_atomic_energy()
+  if( trim(cpot).ne.'vcMorse' ) call subtract_atomic_energy()
 
 !.....Set cffs only for pmd calculation
   nff = 1
@@ -83,6 +83,8 @@ program fitpot
       call lbfgs_wrapper()
     case ('sa','SA')
       call sa_wrapper()
+    case ('md','metadynamics')
+      call md_wrapper()
     case ('random_search','random')
       call random_search_wrapper()
     case ('fs','FS')
@@ -123,6 +125,7 @@ program fitpot
   if( nsmpl.lt.10000 ) then
     call write_force_relation('fin')
   endif
+
   if(trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso') &
        call write_eliminated_vars()
 !!$  write(6,'(a,i4,3f15.3)') ' myid,tfunc,tgrad,tcom=' &
@@ -174,7 +177,9 @@ subroutine write_initial_setting()
   do i=1,maxnsp
     write(6,'(2x,a25,2x,i2,es15.7)') 'atom_energy',i,eatom(i)
   enddo
+  write(6,'(2x,a25,2x,l3)') 'energy_match',lematch
   write(6,'(2x,a25,2x,l3)') 'force_match',lfmatch
+  write(6,'(2x,a25,2x,l3)') 'stress_match',lsmatch
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,a)') 'penalty',trim(cpena)
   write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',pwgt
@@ -743,19 +748,53 @@ subroutine sa_wrapper()
   if( trim(cpot).eq.'NN' ) then
   !.....NN specific code hereafter
     call NN_init()
-    call sa(nvars,vars,fval,xtol,gtol,ftol,niter &
+    call sa(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,NN_func,cfmethod &
          ,niter_eval,write_stats)
     call NN_analyze("fin")
     
-  else if( trim(cpot).eq.'vcMorse' ) then
-    call sa(nvars,vars,fval,xtol,gtol,ftol,niter &
+  else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
+    call sa(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)
+  else
+    if(myid.eq.0) print *,'Simulated annealing is not available for '//&
+         trim(cpot)
   endif
 
   return
 end subroutine sa_wrapper
+!=======================================================================
+subroutine md_wrapper()
+  use variables
+  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use parallel
+  use minimize
+  use fp_common,only: func_w_pmd, grad_w_pmd
+  implicit none
+  integer:: i,m
+  real(8):: fval
+  external:: write_stats
+
+  if( trim(cpot).eq.'NN' ) then
+  !.....NN specific code hereafter
+    call NN_init()
+    call metadynamics(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
+         ,iprint,iflag,myid,NN_func,cfmethod &
+         ,niter_eval,write_stats)
+    call NN_analyze("fin")
+    
+  else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
+    call metadynamics(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
+         ,iprint,iflag,myid,func_w_pmd,cfmethod &
+         ,niter_eval,write_stats)
+  else
+    if(myid.eq.0) print *,'Metadynamics is not available for '//&
+         trim(cpot)
+  endif
+
+  return
+end subroutine md_wrapper
 !=======================================================================
 subroutine random_search_wrapper()
   use variables
@@ -768,14 +807,13 @@ subroutine random_search_wrapper()
   real(8):: fval
   external:: write_stats
 
-  if( trim(cpot).eq.'NN' ) then
-    if( myid.eq.0 ) then
-      print *,'random_search is not available for NN.'
-    endif
-  else if( trim(cpot).eq.'vcMorse' ) then
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
     call random_search(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)
+  else
+    if(myid.eq.0) print *,'Random search is not available for '//&
+         trim(cpot)
   endif
   
 end subroutine random_search_wrapper
@@ -1036,9 +1074,9 @@ subroutine test()
     call NN_init()
     call NN_func(nvars,vars,ftrn,ftst)
     call NN_grad(nvars,vars,g)
-  else if( trim(cpot).eq.'vcMorse' ) then
+  else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse') then
     call func_w_pmd(nvars,vars,ftrn,ftst)
-    call grad_w_pmd(nvars,vars,g)
+!!$    call grad_w_pmd(nvars,vars,g)
   endif
 
 !!$  print *,'write_stats, myid=',myid
@@ -1046,10 +1084,10 @@ subroutine test()
 
   if( myid.eq.0 ) then
     print *,'func values (training,test) =',ftrn,ftst
-    print *,'grad values (training):'
-    do iv=1,nvars
-      print *,'iv,grad(iv)=',iv,g(iv)
-    enddo
+!!$    print *,'grad values (training):'
+!!$    do iv=1,nvars
+!!$      print *,'iv,grad(iv)=',iv,g(iv)
+!!$    enddo
     print *,'test done.'
   endif
 
@@ -1422,15 +1460,24 @@ subroutine sync_input()
   call mpi_bcast(ratio_test,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rseed,1,mpi_real8,0,mpi_world,ierr)
   
+  call mpi_bcast(lematch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lfmatch,1,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(lsmatch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
 
   call mpi_bcast(lswgt,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(swerg,1,mpi_real8,0,mpi_world,ierr)
-
+!.....Simulated annealing
   call mpi_bcast(sa_temp0,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sa_xw0,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(sa_tau,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(sa_div_best,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(sa_tctrl,128,mpi_character,0,mpi_world,ierr)
+!.....Metadynamics
+  call mpi_bcast(md_height,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(md_sigma,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(md_ng,1,mpi_integer,0,mpi_world,ierr)
 !.....sgd
   call mpi_bcast(csgdupdate,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(r0sgd,1,mpi_real8,0,mpi_world,ierr)
@@ -1655,17 +1702,29 @@ subroutine subtract_FF()
 !
   use variables
   use parallel
+  use Coulomb,only: set_paramsdir_Coulomb
+  use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
   implicit none
 
   integer:: i,ismpl,natm
   logical:: lcalcgrad = .false.
+  logical:: luse_Morse = .false.
+  logical:: luse_Coulomb = .false.
   logical,save:: l1st = .true.
   real(8):: epot
   real(8),save,allocatable:: frcs(:,:)
 
+!!$  print *,'subtract_FF'
   if( l1st ) then
+    do i=1,nsubff
+      if( index(trim(csubffs(i)),'Morse').ne.0 ) then
+        luse_Morse = .true.
+      else if( index(trim(csubffs(i)),'Coulomb').ne.0 .or. &
+           index(trim(csubffs(i)),'vcGaussian').ne.0 ) then
+        luse_Coulomb = .true.
+      endif
+    enddo
     if( myid.eq.0 .and. iprint.ne.0 ) then
-      print *,'subtract_FF'
       do i=1,nsubff
         print *,'  i,FF = ',i,trim(csubffs(i))
       enddo
@@ -1676,10 +1735,18 @@ subroutine subtract_FF()
 !.....Only at the 1st call, perform pmd to get esubs
     do ismpl=isid0,isid1
       natm = samples(ismpl)%natm
+      if( luse_Morse ) then
+        call set_paramsdir_Morse(trim(cmaindir)//'/'&
+             //trim(samples(ismpl)%cdirname)//'/pmd')
+      else if( luse_Coulomb ) then
+        call set_paramsdir_Coulomb(trim(cmaindir)//'/'&
+             //trim(samples(ismpl)%cdirname)//'/pmd')
+      endif
       call run_pmd(samples(ismpl),lcalcgrad,nvars,gvar,&
            nsubff,csubffs,epot,frcs)
       samples(ismpl)%esub = epot
       samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
+!!$      write(6,'(a,i5,es15.7)') ' ismpl,esub = ',ismpl,epot
     enddo
     
   endif
@@ -1687,11 +1754,17 @@ subroutine subtract_FF()
 !.....After the 1st call, subtract esubs calculated at the 1st call
   do ismpl=isid0,isid1
 !.....Subtract energy and forces from eref and fref, respectively
+!!$    write(6,*) 'ismpl,eref,epot,esub=',ismpl,samples(ismpl)%eref,&
+!!$         samples(ismpl)%epot,samples(ismpl)%esub
     samples(ismpl)%eref = samples(ismpl)%eref -samples(ismpl)%esub
+    samples(ismpl)%epot = samples(ismpl)%epot -samples(ismpl)%esub
     do i=1,samples(ismpl)%natm
       samples(ismpl)%fref(1:3,i) = samples(ismpl)%fref(1:3,i) &
            -samples(ismpl)%fsub(1:3,i)
+      samples(ismpl)%fa(1:3,i) = samples(ismpl)%fa(1:3,i) &
+           -samples(ismpl)%fsub(1:3,i)
     enddo
+!!$    write(6,'(a,i5,2es15.7)') ' ismpl,eref=',ismpl,samples(ismpl)%eref
 !.....TODO: stress should also come here.
 
   enddo
@@ -1710,10 +1783,18 @@ subroutine restore_FF()
 
   integer:: i,ismpl
 
+!!$  print *,'restore_FF'
   do ismpl=isid0,isid1
+!!$    write(6,*) 'ismpl,eref,epot,esub=',ismpl,samples(ismpl)%eref,&
+!!$         samples(ismpl)%epot,samples(ismpl)%esub
     samples(ismpl)%eref = samples(ismpl)%eref +samples(ismpl)%esub
+    samples(ismpl)%epot = samples(ismpl)%epot +samples(ismpl)%esub
+!!$    write(6,*) 'ismpl,eref,epot,esub=',ismpl,samples(ismpl)%eref,&
+!!$         samples(ismpl)%epot,samples(ismpl)%esub
     do i=1,samples(ismpl)%natm
       samples(ismpl)%fref(1:3,i) = samples(ismpl)%fref(1:3,i) &
+           +samples(ismpl)%fsub(1:3,i)
+      samples(ismpl)%fa(1:3,i) = samples(ismpl)%fa(1:3,i) &
            +samples(ismpl)%fsub(1:3,i)
     enddo
 !.....TODO: stress should also come here.
@@ -1787,12 +1868,12 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs)
   czload_type = 'no'
   eps_conv = 1d-3
   ifsort = 1
-  iprint_pmd = 0
   ifcoulomb = 0
   lcellfix(1:3,1:3) = .false.
   nx = 1
   ny = 1
   nz = 1
+  iprint_pmd = 0
   
 !.....one_shot force calculation
 !!$  print *,'calling one_shot, myid,mpi_world,myid_pmd,mpi_comm_pmd='&
@@ -1803,7 +1884,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs)
        ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
        ,nismax,am,dt,nff,cffs,rc,rbuf,ptnsr,epot,ekin &
        ,ifcoulomb,iprint_pmd,lcalcgrad,ndimp,pderiv)
-!!$  print *,'one_shot done, epot = ',epot
+!!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
 !!$  print *,'smpl%natm =',smpl%natm
 !!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)
 
@@ -1858,20 +1939,14 @@ subroutine subtract_atomic_energy()
   integer:: ismpl,is,i
   type(mdsys):: smpl
 
-  if( trim(cpot).eq.'vcMorse' ) then
-!!$    do ismpl=isid0,isid1
-!!$      smpl = samples(ismpl)
-!!$    enddo
-    
-  else
-    do ismpl=isid0,isid1
-      smpl = samples(ismpl)
-      do i=1,smpl%natm
-        is= int(smpl%tag(i))
-        samples(ismpl)%eref= samples(ismpl)%eref -eatom(is)
-      enddo
+  do ismpl=isid0,isid1
+    smpl = samples(ismpl)
+    do i=1,smpl%natm
+      is= int(smpl%tag(i))
+      samples(ismpl)%eref= samples(ismpl)%eref -eatom(is)
     enddo
-  endif
+  enddo
+
 end subroutine subtract_atomic_energy
 !=======================================================================
 subroutine set_max_num_atoms()
