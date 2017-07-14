@@ -845,9 +845,9 @@ You need to specify the species order correctly with --specorder option.
     def make_pair_list(self,rcut=3.0):
         rc2= rcut**2
         h= np.zeros((3,3))
-        h[0]= self.a1 *self.alc
-        h[1]= self.a2 *self.alc
-        h[2]= self.a3 *self.alc
+        h[:,0]= self.a1 *self.alc
+        h[:,1]= self.a2 *self.alc
+        h[:,2]= self.a3 *self.alc
         hi= np.linalg.inv(h)
         # print h
         # print hi
@@ -980,33 +980,36 @@ You need to specify the species order correctly with --specorder option.
         n3= int(np.ceil(length/l3))
         return n1,n2,n3
 
-    def repeat(self,n1,n2,n3):
+    def repeat(self,n1,n2,n3,n1m=0,n2m=0,n3m=0):
         if n1 == n2 == n3 == 1:
             return None
         #...unit vectors to be repeated
-        self.a1= self.a1*n1
-        self.a2= self.a2*n2
-        self.a3= self.a3*n3
-        n123= n1*n2*n3
+        m1 = n1-n1m
+        m2 = n2-n2m
+        m3 = n3-n3m
+        self.a1= self.a1*m1
+        self.a2= self.a2*m2
+        self.a3= self.a3*m3
+        #n123= m1*m2*m3
         nsid= 0
         for ai in self.atoms:
             nsid= max(nsid,ai.sid)
-        natm0= self.num_atoms()
+        #natm0= self.num_atoms()
         atoms0= copy.copy(self.atoms)
         self.atoms= []
         aid= 0
-        for i1 in range(n1):
-            for i2 in range(n2):
-                for i3 in range(n3):
+        for i1 in range(n1m,n1):
+            for i2 in range(n2m,n2):
+                for i3 in range(n3m,n3):
                     for ai0 in atoms0:
                         aid += 1
                         ai= Atom()
                         ai.sid= ai0.sid
                         ai.symbol= ai0.symbol
                         ai.ifmv= ai0.ifmv
-                        x= ai0.pos[0]/n1 +1.0/n1*i1
-                        y= ai0.pos[1]/n2 +1.0/n2*i2
-                        z= ai0.pos[2]/n3 +1.0/n3*i3
+                        x= ai0.pos[0]/m1 +1.0/m1*i1
+                        y= ai0.pos[1]/m2 +1.0/m2*i2
+                        z= ai0.pos[2]/m3 +1.0/m3*i3
                         ai.set_pos(x,y,z)
                         ai.set_vel(ai0.vel[0],ai0.vel[1],ai0.vel[2])
                         ai.set_id(aid)
@@ -1096,6 +1099,81 @@ You need to specify the species order correctly with --specorder option.
             nap.atoms.append(ai)
         return nap
 
+    def change_unitcell(self,a,b,c):
+        """
+        Change the current unitcell to the new one with 
+        given unit vectors, a, b, and c.
+        And the atoms are reduced to those within the new unitcell.
+        The new unitcell should be included or the same size as the 
+        current unitcell, otherwise there appear vacuum region 
+        in the new unitcell.
+        """
+        #...Repeat the system in order to fill the outer space
+        #   arround the current unitcell but in the new unitcell...
+        self.repeat(2,2,2,-1,-1,-1)
+        rpos = self.get_real_positions()
+        #...Set new unitcell 
+        self.alc = 1.0
+        self.a1 = np.array(a)
+        self.a2 = np.array(b)
+        self.a3 = np.array(c)
+        newhmat = np.zeros((3,3),dtype=float)
+        newhmat[:,0] = a[:]
+        newhmat[:,1] = b[:]
+        newhmat[:,2] = c[:]
+        newhmati = np.linalg.inv(newhmat)
+        for i in range(len(rpos)):
+            spos = np.dot(newhmati,rpos[i])
+            self.atoms[i].pos[:]  = spos[:]
+
+        #...Remove atoms outside the unitcell
+        remove_ids = []
+        tiny = 1.0e-5
+        for i in range(len(self.atoms)):
+            pi = self.atoms[i].pos
+            if pi[0] < 0.0 or pi[0] >= 1.0-tiny or \
+               pi[1] < 0.0 or pi[1] >= 1.0-tiny or \
+               pi[2] < 0.0 or pi[2] >= 1.0-tiny:
+                remove_ids.append(i)
+        self.atoms = [ atom for i,atom in enumerate(self.atoms)
+                       if i not in remove_ids ]
+        return
+
+    def remove_overlapping_atoms(self,criterion=0.01):
+        """
+        Remove overlapping atoms in the system.
+        Atoms with bigger indices in overlapping atoms are removed.
+        Judgement of overlap is done by comparing the distance between
+        atoms and *criterion*.
+        """
+        try:
+            self.lspr
+        except:
+            self.make_pair_list(rcut=1.0)
+        remove_ids = []
+        h = np.zeros((3,3),dtype=float)
+        h[:,0] = self.a1 *self.alc
+        h[:,1] = self.a2 *self.alc
+        h[:,2] = self.a3 *self.alc
+        cr2 = criterion*criterion
+        for i in range(len(self.atoms)):
+            ai = self.atoms[i]
+            pi = ai.pos
+            for jj in range(self.nlspr[i]):
+                j = self.lspr[i,jj]
+                aj = self.atoms[j]
+                pj = aj.pos
+                xij = pj-pi
+                xij = xij -np.round(xij)
+                rij = np.dot(h,xij)
+                rij2= np.linalg.norm(rij)
+                if rij2 < cr2:
+                    remove_ids.append(max(i,j))
+        # print remove_ids
+        self.atoms = [ atom for i,atom in enumerate(self.atoms)
+                       if i not in remove_ids ]
+        return
+        
 def parse_filename(filename):
     for fmt in _file_formats:
         if fmt in filename:

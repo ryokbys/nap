@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-13 14:21:08 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-13 18:32:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -304,8 +304,8 @@ contains
 !.....Set screening length
         do isp=1,nsp
           do jsp=1,nsp
-!!$            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
-            rho_bvs(isp,jsp) = 2d0
+            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+!!$            rho_bvs(isp,jsp) = 2d0
 !!$            if( iprint.gt.0 .and. interact(isp,jsp) .and. jsp.ge.isp ) then
 !!$              write(6,'(a,2i5,f10.4)') ' isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
 !!$            endif
@@ -755,8 +755,8 @@ contains
            *sqrt(sum_anion/sum_cation)
     enddo
 
-!.....Overwrite charges for debugging...
-    vc_bvs(1:4) = (/ 1.27443, 0.78466, 1.10968, 3.20338/)
+!!$!.....Overwrite charges for debugging...
+!!$    vc_bvs(1:4) = (/ 1.27443, 0.78466, 1.10968, 3.20338/)
 
     if( myid.eq.0 .and. iprint.gt.0 ) then
       do is=1,nsp

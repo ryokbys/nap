@@ -29,8 +29,9 @@ module minimize
 !.....T control method
 !.....  - linear
 !.....  - exp
-!.....  - best_under
-  character(len=128):: sa_tctrl = 'best_under'
+!.....  - best
+!.....  - constant
+  character(len=128):: sa_tctrl = 'best'
   real(8):: sa_div_best = 10d0
 
 !.....Metadynamics
@@ -2423,7 +2424,7 @@ contains
     fbest= f
     fg = f
 !!$    temp= sa_temp0
-    temp= fbest/100
+    temp= fbest/sa_div_best
     xw= sa_xw0
     nadpt= 0
     ng = 0
@@ -2476,7 +2477,7 @@ contains
       if( ft.lt.fbest ) then
         fbest= ft
         xbest(1:ndim)= xt(1:ndim)
-        temp = fbest/100
+        temp = fbest/sa_div_best
       endif
 
 !.....Compute probability of taking the displacement
