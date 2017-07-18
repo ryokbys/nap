@@ -3,12 +3,12 @@ test_ratio       0.1
 num_iteration    100
 num_iter_eval    1
 
-fitting_method   bfgs
+fitting_method   check_grad
 main_directory   data_set
 param_file       in.params.NN
 normalize_input  none
 
-force_match      true
+force_match      false
 potential        NN
 
 freduce_threshold  -1.0

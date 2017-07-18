@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-06-13 07:54:11 Ryo KOBAYASHI>
+!                     Last-modified: <2017-07-18 11:00:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -136,11 +136,6 @@ program prec_mc
   include "mpif.h"
   include "./params_unit.h"
 
-  integer:: i,j,k,l,m,n,ierr
-  integer:: ihour,imin,isec
-  integer:: mpi_md_world,nodes_md,myid_md,myx,myy,myz
-  real(8):: rc,anxi,anyi,anzi,sorg(3),t0,t1
-  character:: cnum*6
   interface
     function urnd(dseed0)
       real(8),intent(in),optional:: dseed0
@@ -148,6 +143,11 @@ program prec_mc
     end function urnd
   end interface
 
+  integer:: i,j,k,l,m,n,ierr
+  integer:: ihour,imin,isec
+  integer:: mpi_md_world,nodes_md,myid_md,myx,myy,myz
+  real(8):: rc,anxi,anyi,anzi,sorg(3),t0,t1
+  character:: cnum*6
 
 !.....initialize parallel
   call init_parallel(mpi_md_world,nodes_md,myid_md)
@@ -158,7 +158,7 @@ program prec_mc
     call read_in_pmc(ionum_inp, cinpfname)
   endif
 !.....set random seed
-  t0 = urnd(dseed0)
+  t1 = urnd(dseed0)
   
   call bcast_params(myid_md,mpi_md_world,lkinetic, &
        nstps_mc,ncx,ncy,ncz,alat,num_Mg,num_Si,num_Vac, &
@@ -187,10 +187,10 @@ program prec_mc
   rc = 3.0
   allocate(lsprmc(0:nnmaxmc,natm))
   call make_tag(natm,csymbols,tagmc)
-!!$  if( myid_md.eq.0 ) then
-!!$    write(cnum,'(i6.6)') 0
-!!$    call write_POSCAR('POSCAR_'//cnum,natm,csymbols,pos0,hmat,species)
-!!$  endif
+  if( myid_md.eq.0 ) then
+    write(cnum,'(i6.6)') 0
+    call write_POSCAR('poscars/POSCAR_'//cnum,natm,csymbols,pos0,hmat,species)
+  endif
   call mk_lspr_sngl(natm,natm,nnmaxmc,tagmc,pos0,rc,hmat,hmati,lsprmc)
 
 !.....check restart,
@@ -224,7 +224,7 @@ program prec_mc
     imin  = int((t1-ihour*3600)/60)
     isec  = int(t1 -ihour*3600 -imin*60)
     write(6,*) ''
-    write(6,'(a,f10.2,a,i3,"h",i2.2,"m",i2.2,"s")') &
+    write(6,'(a,f10.2,a,i4,"h",i2.2,"m",i2.2,"s")') &
          " time =",t1, &
          " sec  = ",ihour,imin,isec
   endif
@@ -296,7 +296,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   real(8),allocatable:: epimc(:),ecpot(:),erghist(:),ergtmp(:), &
        probtmp(:)
   integer,allocatable:: nstptmp(:)
-  character:: ci*1,cj*1,cfmt*10,cergtxt*128,cnum*6,csi*1
+  character:: ci*1,cj*1,cfmt*10,cergtxt*1024,cnum*6,csi*1
   character,allocatable:: csymprev(:),csymhist(:,:),csymtmp(:,:) &
        ,cjtmp(:)
   integer,external:: cs2is,check_history
@@ -454,7 +454,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
         js = cs2is(cj)
         de = demig(js) + (efrm-ergp)/2
         p = prefreq(js) *exp(-de/(temp*fkb))
-!!$        print *,'jj,cj,ergp,erg,de,p = ',jj,cj,ergp,efrm,de,p
+        print *,'jj,cj,ergp,erg,de,p = ',jj,cj,ergp,efrm,de,p
         probtmp(jj) = p
       enddo  ! loop over nearest neighbors, jj
 
@@ -497,10 +497,10 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
              hmat,species)
       endif
 !.....Write energy
-      write(cergtxt,'(i8,es15.7,es15.7,a,i3,a,i2,a,a,a,i3)') &
+      write(cergtxt,'(i8,2es15.7,a,i3,a,i2,a,a,a,i3,a,12es11.3)') &
            istp,tclck&
            ,ergp,', ncalc=',ncalc,', ievent=',ievent,', ',cjtmp(ievent) &
-           ,', nstp=',nstps_done
+           ,', nstp=',nstps_done,', prob=',probtmp(1:12)
       write(ioerg,'(a)') trim(cergtxt)
       write(6,'(a)') trim(cergtxt)
       flush(iosym)
@@ -675,7 +675,7 @@ subroutine read_in_pmc_core(ionum,cname)
   elseif( trim(cname).eq.'num_relax_steps' ) then
     call read_i1(ionum,nstps_relax)
     return
-  elseif( trim(cname).eq.'atoms_to_be_moved' ) then
+  elseif( trim(cname).eq.'atoms_to_move' ) then
     backspace(ionum)
     read(ionum,*) ctmp, lmove(0:3)
     return
