@@ -209,10 +209,10 @@ class NAPSystem(object):
             self.write_POSCAR(fname)
         elif fmt == 'dump':
             self.write_dump(fname)
-        elif fmt == 'lammps':
-            self.write_lammps_data(fname)
         elif fmt == 'xsf':
             self.write_xsf(fname)
+        elif fmt == 'lammps':
+            self.write_lammps_data(fname)
         else:
             raise ValueError('Cannot detect output file format: '+fmt)
 
@@ -230,6 +230,8 @@ class NAPSystem(object):
             self.read_dump(fname)
         elif fmt == 'xsf':
             self.read_xsf(fname)
+        elif fmt == 'lammps':
+            self.read_lammps_data(fname)
         else:
             raise IOError('Cannot detect input file format: '+fmt)
 
@@ -643,6 +645,76 @@ You need to specify the species order correctly with --specorder option.
             f.write("\n")
         f.close()
 
+    def read_lammps_data(self,fname="data.lammps"):
+        f=open(fname,'r')
+        mode= 'None'
+        ixyz= 0
+        iatm= 0
+        symbol = None
+        self.atoms= []
+        self.alc= 1.0
+
+        for line in f.readlines():
+            data = line.split()
+            if mode == 'None':
+                if 'atoms' in line:
+                    natm = int(data[0])
+                elif 'atom types' in line:
+                    nspcs = int(data[0])
+                elif 'xlo' in line:
+                    xlo = float(data[0])
+                    xhi = float(data[1])
+                elif 'ylo' in line:
+                    ylo = float(data[0])
+                    yhi = float(data[1])
+                elif 'zlo' in line:
+                    zlo = float(data[0])
+                    zhi = float(data[1])
+                elif 'xy' in line:
+                    xy = float(data[0])
+                    xz = float(data[1])
+                    yz = float(data[2])
+                elif 'Atoms' in line:
+                    mode = 'Atoms'
+                    #...Cell info should be already read
+                    self.a1 = np.array([xhi-xlo,xy,xz],dtype=float)
+                    self.a2 = np.array([0.0,yhi-ylo,yz],dtype=float)
+                    self.a3 = np.array([0.0,0.0,zhi-zlo],dtype=float)
+                    hmat = self.get_hmat()
+                    hmati= np.linalg.inv(hmat)
+                    continue
+            elif mode == 'Atoms':
+                if len(data) > 5 and iatm < natm:
+                    idat = 0
+                    ai = Atom()
+                    idat += 1
+                    ai.set_sid(int(data[idat]))
+                    if self.specorder:
+                        symbol = self.specorder[ai.sid-1]
+                    if symbol and ai.symbol != symbol:
+                        ai.set_symbol(symbol)
+                    if len(data) == 6:  # In case data have atomic charges
+                        idat += 1
+                        chg = float(data[idat])
+                        ai.set_aux('charge',chg)
+                    idat += 1
+                    x0= float(data[idat])
+                    idat += 1
+                    y0= float(data[idat])
+                    idat += 1
+                    z0= float(data[idat])
+                    x = hmati[0,0]*x0 +hmati[0,1]*y0 +hmati[0,2]*z0
+                    y = hmati[1,0]*x0 +hmati[1,1]*y0 +hmati[1,2]*z0
+                    z = hmati[2,0]*x0 +hmati[2,1]*y0 +hmati[2,2]*z0
+                    x = self._pbc(x)
+                    y = self._pbc(y)
+                    z = self._pbc(z)
+                    ai.set_pos(x,y,z)
+                    ai.set_vel(0.0,0.0,0.0)
+                    self.atoms.append(ai)
+                    iatm += 1
+        f.close()
+
     def write_lammps_data(self,fname='data.lammps'):
         """
         Write LAMMPS data format file.
@@ -652,33 +724,9 @@ You need to specify the species order correctly with --specorder option.
         f.write("\n")
         f.write("{0:d}  atoms\n".format(len(self.atoms)))
         f.write("{0:d}  atom types\n".format(len(self.num_species())))
+        f.write('\n')
         hmat = self.get_hmat()
         xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz = hmat_to_lammps(hmat)
-        # xlo = ylo = zlo = 0.0
-        # xhi = a[0]
-        # xy  = b[0]
-        # yhi = b[1]
-        # xz  = c[0]
-        # yz  = c[1]
-        # zhi = c[2]
-        # xlo_bound = xlo +min(0.0, xy, xz, xy+xz)
-        # xhi_bound = xhi +max(0.0, xy, xz, xy+xz)
-        # ylo_bound = ylo +min(0.0, yz)
-        # yhi_bound = yhi +max(0.0, yz)
-        # zlo_bound = zlo
-        # zhi_bound = zhi
-        # f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a1[0]))
-        # f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a2[1]))
-        # f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a3[2]))
-        # f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(xlo_bound,
-        #                                                  xhi_bound,
-        #                                                  xy))
-        # f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(ylo_bound,
-        #                                                  yhi_bound,
-        #                                                  xz))
-        # f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(zlo_bound,
-        #                                                  zhi_bound,
-        #                                                  yz))
         f.write("{0:15.4f} {1:15.4f} xlo xhi\n".format(xlo,xhi))
         f.write("{0:15.4f} {1:15.4f} ylo yhi\n".format(ylo,yhi))
         f.write("{0:15.4f} {1:15.4f} zlo zhi\n".format(zlo,zhi))
@@ -688,6 +736,9 @@ You need to specify the species order correctly with --specorder option.
         f.write("Atoms\n")
         f.write("\n")
         pos = np.zeros(3,dtype=float)
+        atom_style = 'atomic'
+        if self.atoms[0].aux.has_key('charge'):
+            atom_style = 'charge'
         for i in range(len(self.atoms)):
             ai= self.atoms[i]
             pos = np.dot(hmat,ai.pos)
@@ -701,6 +752,8 @@ You need to specify the species order correctly with --specorder option.
             epot= ai.epot
             sti= ai.strs
             f.write("{0:8d} {1:3d} ".format(i+1,ai.sid))
+            if atom_style == 'charge':
+                f.write('{0:10.4f} '.format(ai.aux['charge']))
             f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(pos[0],
                                                             pos[1],
                                                             pos[2]))

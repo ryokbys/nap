@@ -297,3 +297,7 @@ contains
   end function ndat_in_line
   
 end module fp_common
+!-----------------------------------------------------------------------
+! Local Variables:
+! compile-command: "make fitpot"
+! End:
