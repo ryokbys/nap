@@ -19,8 +19,8 @@ For the short test, whether or not you can use this program in your environment,
 $ ./configure --prefix=$(pwd)
 $ cd pmd/
 $ make
-$ cd ../sample
-$ ../pmd/pmd
+$ cd ../example/test_W/
+$ ../../pmd/pmd
 ```
 
 If it works, you can use this program.
