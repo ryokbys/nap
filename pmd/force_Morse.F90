@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-13 14:21:00 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-19 09:43:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -45,7 +45,8 @@ module Morse
 !       - EA: electron affinity
 !       - raidus: atomic radius
 !       - EN_Pauling: electronegativity of Pauling's scale
-  integer,parameter:: ndesc = 6
+!       - na: atomic number
+  integer,parameter:: ndesc = 7
   integer,parameter:: nprm  = ndesc*2  ! 2 for each descriptor
   real(8):: walp(0:nprm),wd(0:nprm),wrmin(0:nprm),&
        pdij(0:nprm)
@@ -781,6 +782,7 @@ contains
     di(4) = atdi%eaff
     di(5) = atdi%atrad
     di(6) = atdi%enpaul
+    di(7) = atdi%na
 
     dj(1) = chgj
     dj(2) = atdj%eion1
@@ -788,6 +790,7 @@ contains
     dj(4) = atdj%eaff
     dj(5) = atdj%atrad
     dj(6) = atdj%enpaul
+    dj(7) = atdj%na
 
     pdij(0) = 1d0  ! bias
     do i=1,ndesc

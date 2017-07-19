@@ -715,9 +715,13 @@ You need to specify the species order correctly with --specorder option.
                     iatm += 1
         f.close()
 
-    def write_lammps_data(self,fname='data.lammps'):
+    def write_lammps_data(self,fname='data.lammps',atom_style='atomic'):
         """
         Write LAMMPS data format file.
+        The definition of cell vectors is a bit tricky, see the following page
+        http://lammps.sandia.gov/doc/Section_howto.html#howto-12
+        And also the format of Atoms entry could change depending on 
+        `atom_style` which is not given in the same file.
         """
         f= open(fname,'w')
         f.write("LAMMPS data format file written by napsys.py\n")
@@ -735,22 +739,22 @@ You need to specify the species order correctly with --specorder option.
         f.write("\n")
         f.write("Atoms\n")
         f.write("\n")
-        pos = np.zeros(3,dtype=float)
-        atom_style = 'atomic'
+        # pos = np.zeros(3,dtype=float)
         if self.atoms[0].aux.has_key('charge'):
             atom_style = 'charge'
+        poss = np.zeros((len(self.atoms),3),dtype=float)
+        for i in range(len(self.atoms)):
+            poss[i,:] = self.atoms[i].pos[:]
+        print poss
+        poss = spos_to_lammps_pos(hmat,poss)
+        print poss
         for i in range(len(self.atoms)):
             ai= self.atoms[i]
-            pos = np.dot(hmat,ai.pos)
-            # x= ai.pos[0] ai.pos[1]*hmat[0,1]
-            # y= ai.pos[1] *self.a2[1]
-            # z= ai.pos[2] *self.a3[2]
-            vx= ai.vel[0]
-            vy= ai.vel[1]
-            vz= ai.vel[2]
-            ekin= ai.ekin
-            epot= ai.epot
-            sti= ai.strs
+            # print hmat
+            # print ai.pos
+            # pos = np.dot(hmat,ai.pos)
+            # print pos
+            pos = poss[i]
             f.write("{0:8d} {1:3d} ".format(i+1,ai.sid))
             if atom_style == 'charge':
                 f.write('{0:10.4f} '.format(ai.aux['charge']))
@@ -1327,7 +1331,57 @@ def hmat_to_lammps(hmat):
     zhi = np.sqrt(c*c -xz*xz -yz*yz)
     return xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz
 
+def spos_to_lammps_pos(hmat,spos):
+    """
+    Scaled positions in hmat-representation to
+    positions in the lammps basis.
+    """
+    if isinstance(hmat,list):
+        hmat = np.array(hmat)
+        
+    if not isinstance(spos,np.ndarray):
+        if isinstance(spos,list):
+            spos = np.array(spos)
+        else:
+            raise TypeError('spos should be list or numpy.ndarray.')
+    a1 = np.array(hmat[:,0])
+    a2 = np.array(hmat[:,1])
+    a3 = np.array(hmat[:,2])
+    vol = abs(np.dot(a1,np.cross(a2,a3)))
+    a23 = np.cross(a2,a3)
+    a31 = np.cross(a3,a1)
+    a12 = np.cross(a1,a2)
+    amat = np.zeros((3,3),dtype=float)
+    amat[0,:] = a23[:]
+    amat[1,:] = a31[:]
+    amat[2,:] = a12[:]
+    print 'hmat=',hmat
+    print 'vol=',vol
+    print 'a1=',a1
+    print 'a2=',a2
+    print 'a3=',a3
+    print 'amat=',amat
 
+    xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz = hmat_to_lammps(hmat)
+    b1 = np.array((xhi-xlo,0.0,0.0))
+    b2 = np.array((xy,yhi-ylo,0.0))
+    b3 = np.array((xz,yz,zhi-zlo))
+    bmat = np.zeros((3,3),dtype=float)
+    bmat[:,0] = b1[:]
+    bmat[:,1] = b2[:]
+    bmat[:,2] = b3[:]
+    print 'bmat=',bmat
+    if len(spos.shape) == 1:  # only one atom
+        pos = np.zeros(spos.shape,dtype=float)
+        pos = np.dot(hmat,spos)
+        pos = np.dot(bmat,np.dot(amat,pos))/vol
+    elif len(spos.shape) == 2:  # array of atoms
+        pos = np.zeros(spos.shape,dtype=float)
+        for i,sp in enumerate(spos):
+            pos[i] = np.dot(hmat,sp)
+            pos[i] = np.dot(bmat,np.dot(amat,pos[i]))/vol
+    return pos
+    
 def unitvec_to_hi(a1,a2,a3):
     """
     Convert 3 unitvectors to inversed h-matrix via h-matrix.

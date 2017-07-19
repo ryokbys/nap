@@ -33,13 +33,13 @@ pmdobj= ${PMDDIR}/mod_pmdvars.o ${PMDDIR}/mod_pmdmpi.o ${PMDDIR}/mod_pmdio.o \
     ${PMDDIR}/util_pmd.o ${PMDDIR}/lasubs.o ${PMDDIR}/util_vec.o \
     ${PMDDIR}/common_parallel.o ${PMDDIR}/pmd_core.o
 
-$(PMDDIR)/%.o: $(PMDDIR)/%.F90
-	@[ -d $(PMDDIR) ]
-	$(MPIFC) -c $(MPIFLAGS) -o $@ -c $<
+${PMDDIR}/%.o: ${PMDDIR}/%.F90
+	@[ -d ${PMDDIR} ]
+	cd ${PMDDIR} && ${MPIFC} -c ${MPIFLAGS} -o $@ -c $<
 
-$(PMDDIR)/%.o: $(PMDDIR)/%.F
-	@[ -d $(PMDDIR) ]
-	$(MPIFC) -c $(MPIFLAGS) -o $@ -c $<
+${PMDDIR}/%.o: ${PMDDIR}/%.F
+	@[ -d ${PMDDIR} ]
+	cd ${PMDDIR} && ${MPIFC} -c ${MPIFLAGS} -o $@ -c $<
 
 .PHONY: all clean
 all: fitpot
