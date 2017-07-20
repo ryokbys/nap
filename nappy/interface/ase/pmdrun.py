@@ -65,7 +65,9 @@ class PMD(FileIOCalculator):
                           [0.0, 0.0, 0.0]],
         'stress_relax_time': 20.0,
         'flag_compute_stress': 'T',
-        'mass': [28.0855,4.0,]
+        'mass': [28.0855,4.0,],
+        'zload_type': 'none',
+        'final_strain': 0.0,
     }
 
     def __init__(self, restart=None, ignore_bad_restart_file=False,
