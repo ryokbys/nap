@@ -19,7 +19,7 @@ some_changes = ['positions', 'numbers', 'cell',]
 
 class PMD(FileIOCalculator):
     """
-    Class for doint PMD/SMD calculations.
+    Class for PMD calculations.
 
     calc = PMD(label='pmd')
     """
@@ -70,7 +70,8 @@ class PMD(FileIOCalculator):
 
     def __init__(self, restart=None, ignore_bad_restart_file=False,
                  label='pmd', atoms=None, 
-                 command='pmd > out.pmd', 
+                 command='pmd > out.pmd',
+                 dimension=(True,True,True),
                  specorder=None, **kwargs):
         """Construct PMD-calculator object.
 
@@ -106,6 +107,7 @@ class PMD(FileIOCalculator):
             self.command = command +' > out.'+self.label
 
         self.specorder= specorder
+        self.dimension = dimension
 
     def set(self, **kwargs):
         changed_parameters = FileIOCalculator.set(self, **kwargs)
@@ -177,11 +179,14 @@ class PMD(FileIOCalculator):
 
         if self.label == 'pmd':
             infname = 'in.pmd'
-            # self.write_pmd(atoms)
             write_pmd(atoms,fname='pmdini',specorder=self.specorder)
             
         with open(infname,'w') as f:
             fmvs,ifmvs = get_fmvs(atoms)
+            for i in range(len(fmvs)):
+                for ii in range(3):
+                    if fmvs[i][ii] > 0.1 and not self.dimension[ii]:
+                        fmvs[i][ii] = 0.0
             f.write(get_input_txt(self.parameters,fmvs))
         
     def read_results(self,relax=False):
@@ -272,7 +277,8 @@ def get_input_txt(params,fmvs):
            'factor_direction','',
            'stress_control','pressure_target','stress_target',
            'stress_relax_time','flag_compute_stress','',
-           'mass','',]
+           'mass','',
+           'zload_type','final_strain','']
 
     int_keys=['num_nodes_x','num_nodes_y','num_nodes_z',
               'num_iteration','num_out_energy','flag_out_pmd',
@@ -283,10 +289,10 @@ def get_input_txt(params,fmvs):
                 'final_temperature',
                 'temperature_relax_time','pressure_target',
                 'stress_relax_time','shear_stress',
-                'converge_eps']
+                'converge_eps','final_strain']
     str_keys=['io_format','force_type','temperature_control',
               'stress_control','flag_temp_dist',
-              'flag_compute_stress']
+              'flag_compute_stress','zload_type']
 
     for key in order:
         
