@@ -176,17 +176,19 @@ def get_fmvs(atoms):
                 if all(matched):
                     ifmvs[cnst.a] = i+1
                     break
-            if not all(matched):
-                constraints.append(mask)
-                ifmvs[cnst.a] = len(constraints)
-    # convert constraints to fmv
+            #...If the mask does not exist in the constraints list, add it
+            constraints.append(mask)
+            ifmvs[cnst.a] = len(constraints)
+    
+    #...Convert constraints to fmv
     fmvs = []
     for c in constraints:
         fmv = np.array((1.0, 1.0, 1.0))
         for ii in range(3):
             if c[ii]:
                 fmv[ii] = 0.0
-        fmvs.append(fmv)    
+        fmvs.append(fmv)
+        
     return fmvs,ifmvs
 
 def uniq(lst):

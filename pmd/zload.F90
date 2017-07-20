@@ -23,7 +23,7 @@ contains
     integer:: ierr,i,nztopl,nzbotl
     real(8):: ztopl,zbotl,dzlfin
 
-!.....Set 9th fmv to fix all the directions
+!.....Set 9th fmv to fix y and z directions, not x
     fmv(1:3,9) = (/ 1d0, 0d0, 0d0 /)
     
 !.....Detect initial top and bottom positions

@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-07-18 11:00:57 Ryo KOBAYASHI>
+!                     Last-modified: <2017-07-20 06:50:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -14,6 +14,7 @@ module pmc
   logical:: lkinetic = .true.
 !.....number of MC steps
   integer:: nstps_mc = 10
+  integer:: noutint  = 10
 !.....size of the system in multiple of FCC cell
   integer:: ncx = 6
   integer:: ncy = 6
@@ -214,7 +215,7 @@ program prec_mc
 
   call kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
        ,nx,ny,nz,anxi,anyi,anzi,sorg, hmat,natm,pos0,csymbols&
-       ,nstps_mc,nstps_relax,nnmaxmc,lsprmc,species,temp &
+       ,nstps_mc,nstps_relax,noutint,nnmaxmc,lsprmc,species,temp &
        ,demig,prefreq)
 
   t1 = mpi_wtime() - t0
@@ -273,7 +274,7 @@ end subroutine bcast_params
 !=======================================================================
 subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
      ,nx,ny,nz,anxi,anyi,anzi,sorg, hmat,natm,pos0,csymbols &
-     ,nstps_mc,nstps_relax, nnmaxmc,lsprmc,species,temp &
+     ,nstps_mc,nstps_relax,noutint,nnmaxmc,lsprmc,species,temp &
      ,demig,prefreq)
 !
 ! Kinetic MC simulation using
@@ -281,7 +282,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   implicit none
   include 'mpif.h'
   integer,intent(in):: mpi_md_world,nodes_md,myid_md,myx,myy,myz &
-       ,nx,ny,nz,natm,nstps_mc,nstps_relax &
+       ,nx,ny,nz,natm,nstps_mc,nstps_relax,noutint &
        ,nnmaxmc,lsprmc(0:nnmaxmc,natm)
   real(8),intent(in):: anxi,anyi,anzi,sorg(3),hmat(3,3),pos0(3,natm), &
        temp,demig(3),prefreq(3)
@@ -491,7 +492,8 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
       write(cfmt,'(i10)') natm
       write(iosym,'(i8,3x,'//trim(cfmt)//'a)') istp,csymbols(1:natm)
 !.....Write POSCAR if migrating atom is not Al
-      if( cjtmp(ievent).ne.'A' ) then
+!!$      if( cjtmp(ievent).ne.'A' ) then
+      if( mod(istp,noutint).eq.0 ) then
         write(cnum,'(i6.6)') istp
         call write_POSCAR('poscars/POSCAR_'//cnum,natm,csymbols,pos0, &
              hmat,species)
@@ -641,6 +643,9 @@ subroutine read_in_pmc_core(ionum,cname)
     return
   elseif( trim(cname).eq.'ncopy_x' ) then
     call read_i1(ionum,ncx)
+    return
+  elseif( trim(cname).eq.'num_out_interval' ) then
+    call read_i1(ionum,noutint)
     return
   elseif( trim(cname).eq.'ncopy_y' ) then
     call read_i1(ionum,ncy)

@@ -66,6 +66,7 @@ class Atom(object):
         self.ifmv= 1
         self.sid= 1
         self.symbol = get_symbol_from_number(self.sid)
+        self.aux= {}
 
     def set_pos(self,x,y,z):
         self.pos= np.array([x,y,z],dtype=float)
@@ -100,6 +101,9 @@ class Atom(object):
     def set_id(self,id):
         self.id= id
 
+    def set_aux(self,key,value):
+        self.aux[key] = value
+        
     def tag(self):
         tag= self.sid +self.ifmv*0.1 +self.id*1e-14
         return tag
