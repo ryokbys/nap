@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-13 15:18:52 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-20 16:21:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -122,7 +122,7 @@ program fitpot
   
   call write_vars('fin')
   call write_energy_relation('fin')
-  if( nsmpl.lt.10000 ) then
+  if( nsmpl.lt.nsmpl_outfrc ) then
     call write_force_relation('fin')
   endif
 
@@ -1510,6 +1510,8 @@ subroutine sync_input()
   call mpi_bcast(cserr,128*nserr,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(seerr,nserr,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sferr,nserr,mpi_real8,0,mpi_world,ierr)
+
+  call mpi_bcast(nsmpl_outfrc,1,mpi_integer,0,mpi_world,ierr)
 
 !.....Force-fields to be subtracted from reference values
   call mpi_bcast(nsubff,1,mpi_integer,0,mpi_world,ierr)

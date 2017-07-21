@@ -731,11 +731,11 @@ You need to specify the species order correctly with --specorder option.
         f.write('\n')
         hmat = self.get_hmat()
         xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz = hmat_to_lammps(hmat)
-        f.write("{0:15.4f} {1:15.4f} xlo xhi\n".format(xlo,xhi))
-        f.write("{0:15.4f} {1:15.4f} ylo yhi\n".format(ylo,yhi))
-        f.write("{0:15.4f} {1:15.4f} zlo zhi\n".format(zlo,zhi))
+        f.write("{0:20.10f} {1:20.10f} xlo xhi\n".format(xlo,xhi))
+        f.write("{0:20.10f} {1:20.10f} ylo yhi\n".format(ylo,yhi))
+        f.write("{0:20.10f} {1:20.10f} zlo zhi\n".format(zlo,zhi))
         if abs(xy) > 1e-8 or abs(xz) > 1e-8 or abs(yz) > 1e-8:
-            f.write("{0:15.4f} {1:15.4f} {2:15.4f} xy xz yz\n".format(xy,xz,yz))
+            f.write("{0:20.10f} {1:20.10f} {2:20.10f} xy xz yz\n".format(xy,xz,yz))
         f.write("\n")
         f.write("Atoms\n")
         f.write("\n")
@@ -1138,9 +1138,10 @@ You need to specify the species order correctly with --specorder option.
             if s not in spcorder:
                 spcorder.append(s)
         nap = cls(specorder=spcorder)
-        nap.a1 = np.array(ase_atoms.cell[0])
-        nap.a2 = np.array(ase_atoms.cell[1])
-        nap.a3 = np.array(ase_atoms.cell[2])
+        nap.alc= 1.0
+        nap.a1[:] = ase_atoms.cell[0]
+        nap.a2[:] = ase_atoms.cell[1]
+        nap.a3[:] = ase_atoms.cell[2]
         #...first, initialize atoms array
         nap.atoms = []
         #...append each atom from ASE-Atoms
@@ -1323,12 +1324,34 @@ def hmat_to_lammps(hmat):
     alpha = np.arccos(np.dot(b0,c0)/b/c)
     beta  = np.arccos(np.dot(a0,c0)/a/c)
     gamma = np.arccos(np.dot(a0,b0)/a/b)
+    # print 'hmat=',hmat
+    # print 'a,b,c = ',a,b,c
+    # print 'alpha,beta,gamma = ',alpha,beta,gamma
     xhi = a
     xy = b*np.cos(gamma)
     xz = c*np.cos(beta)
     yhi = np.sqrt(b*b -xy*xy)
     yz = (b*c*np.cos(alpha) -xy*xz)/yhi
     zhi = np.sqrt(c*c -xz*xz -yz*yz)
+    # print 'xhi-xlo,yhi-ylo,zhi-zlo= ',xhi-xlo,yhi-ylo,zhi-zlo
+    # print 'xy,     xz,     yz     = ',xy/xhi,xz/xhi,yz/yhi
+
+    if xy > xhi/2:
+        xy -= xhi
+    elif xy < -xhi/2:
+        xy += xhi
+
+    if xz > xhi/2:
+        xz -= xhi
+    elif xz < -xhi/2:
+        xz += xhi
+
+    if yz > yhi/2:
+        yz -= yhi
+    elif yz < -yhi/2:
+        yz += yhi
+    # print 'xy,     xz,     yz     = ',xy/xhi,xz/xhi,yz/yhi
+
     return xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz
 
 def spos_to_lammps_pos(hmat,spos):
@@ -1355,12 +1378,12 @@ def spos_to_lammps_pos(hmat,spos):
     amat[0,:] = a23[:]
     amat[1,:] = a31[:]
     amat[2,:] = a12[:]
-    print 'hmat=',hmat
-    print 'vol=',vol
-    print 'a1=',a1
-    print 'a2=',a2
-    print 'a3=',a3
-    print 'amat=',amat
+    # print 'hmat=',hmat
+    # print 'vol=',vol
+    # print 'a1=',a1
+    # print 'a2=',a2
+    # print 'a3=',a3
+    # print 'amat=',amat
 
     xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz = hmat_to_lammps(hmat)
     b1 = np.array((xhi-xlo,0.0,0.0))
@@ -1370,7 +1393,7 @@ def spos_to_lammps_pos(hmat,spos):
     bmat[:,0] = b1[:]
     bmat[:,1] = b2[:]
     bmat[:,2] = b3[:]
-    print 'bmat=',bmat
+    # print 'bmat=',bmat
     if len(spos.shape) == 1:  # only one atom
         pos = np.zeros(spos.shape,dtype=float)
         pos = np.dot(hmat,spos)

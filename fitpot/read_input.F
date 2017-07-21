@@ -220,6 +220,9 @@ c=======================================================================
       elseif( trim(cname).eq.'lbfgs_history' ) then
         call read_i1(ionum,mstore)
         return
+      elseif( trim(cname).eq.'nsmpl_outfrc' ) then
+        call read_i1(ionum,nsmpl_outfrc)
+        return
       elseif( trim(cname).eq.'individual_weight' ) then
         backspace(ionum)
         read(ionum,*) ctmp,nwgtindiv
