@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-07-13 14:18:01 Ryo KOBAYASHI>
+c                     Last-modified: <2017-07-25 15:30:03 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -53,7 +53,7 @@ c-----output file names
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, 
-     &     luse_linreg,luse_NN,luse_Morse,luse_vcMorse
+     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse
       logical:: lvc
 
       call initialize_pmdvars(nspmax)
@@ -228,7 +228,8 @@ c.....Set initial temperature if needed
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,
-     &     luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc,ifcoulomb)
+     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
+     &     luse_vcMorse,lvc,ifcoulomb)
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
@@ -251,7 +252,8 @@ c.....Calc forces
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, 
-     &     luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc)
+     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
+     &     luse_vcMorse,lvc)
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -512,7 +514,8 @@ c-------Calc forces
      &       luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &       luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
      &       ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al
-     &       ,luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc)
+     &       ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul
+     &       ,luse_vcMorse,lvc)
         lstrs = .false.
 
 c.....Second kick of velocities
@@ -834,7 +837,7 @@ c.....
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, 
-     &     luse_linreg,luse_NN,luse_Morse,luse_vcMorse
+     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse
       logical:: lvc
       
 c      write(6,'(a,200es10.2)') 'chgtot in pmd_core = ',
@@ -889,7 +892,8 @@ c     &     chg(1:natm+10)
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,
-     &     luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc,ifcoulomb)
+     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
+     &     luse_vcMorse,lvc,ifcoulomb)
 
 c      print *,' lvc,ifcoulomb = ',lvc,ifcoulomb
 c      write(6,'(a,500es10.2)') ' chg before bacopy = ',
@@ -913,7 +917,8 @@ c-----Make pair list
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
      &     ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al
-     &     ,luse_linreg,luse_NN,luse_Morse,luse_vcMorse,lvc)
+     &     ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
+     &     luse_vcMorse,lvc)
 c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
 c     &     ,epot,chg(1:natm)
 

@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-19 09:43:42 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-25 15:25:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -178,6 +178,122 @@ contains
 !!$    write(6,'(a,es15.7)') ' Morse epott = ',epott
  
   end subroutine force_Morse
+!=======================================================================
+  subroutine force_Morse_repul(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
+!
+!  Repulsive-only Morse potential
+!
+    implicit none
+    include "mpif.h"
+    include "./params_unit.h"
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
+    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+         ,nn(6),lspr(0:nnmax,namax),nex(3)
+    integer,intent(in):: mpi_md_world,myid
+    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
+         ,acon(nismax),tag(namax),sv(3,6)
+    real(8),intent(inout):: tcom
+    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: l1st
+    logical:: lstrs
+
+    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
+         ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
+         ,d0ij,alpij,rminij
+    real(8),allocatable,save:: strsl(:,:,:)
+    real(8),external:: fcut1,dfcut1
+
+    if( l1st ) then
+!!$      call init_Morse(natm,tag,mpi_md_world)
+!!$      call read_params_Morse(myid,mpi_md_world,iprint)
+      if( .not. allocated(strsl) ) then
+        allocate(strsl(3,3,namax))
+      endif
+    endif
+
+    epotl= 0d0
+    strsl(1:3,1:3,1:namax) = 0d0
+
+!!$    do i=1,natm+nb
+!!$      write(6,'(a,i5,3f10.5)') 'i,ra(1:3,i)=',i,ra(1:3,i)
+!!$    enddo
+
+!.....Loop over resident atoms
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is=int(tag(i))
+      do k=1,lspr(0,i)
+        j=lspr(k,i)
+        if(j.eq.0) exit
+        if(j.le.i) cycle
+        js= int(tag(j))
+!.....Check if these two species interact
+        if( .not. interact(is,js) ) cycle
+        xj(1:3)= ra(1:3,j)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        if( dij.gt.rc ) cycle
+        diji= 1d0/dij
+        dxdi(1:3)= -rij(1:3)*diji
+        dxdj(1:3)=  rij(1:3)*diji
+        d0ij = d0(is,js)
+        alpij= alp(is,js)
+        rminij=rmin(is,js)
+        texp = exp(2d0*alpij*(rminij-dij))
+!!$        if( i.eq.1 ) then
+!!$          write(6,'(a,4i6,10es12.4)') 'i,j,is,js,dij,d0ij,alpij,rminij,texp='&
+!!$               ,i,j,is,js,dij,d0ij,alpij,rminij,texp
+!!$          write(6,'(a,3(2x,3f10.5))') 'xi,xj,rij='&
+!!$               ,xi(1:3),xj(1:3),rij(1:3)
+!!$        endif
+!.....potential
+        tmp= d0ij*texp
+        tmp2 = 0.5d0 *tmp *fcut1(dij,rc)
+        if( j.le.natm ) then
+          epi(i)= epi(i) +tmp2
+          epi(j)= epi(j) +tmp2
+          epotl = epotl +tmp2 +tmp2
+        else
+          epi(i)= epi(i) +tmp2
+          epotl = epotl +tmp2
+        endif
+!.....force
+        dedr= -2d0 *alpij *d0ij *texp *fcut1(dij,rc) &
+             + tmp*dfcut1(dij,rc)
+        aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
+        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
+!.....stress
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+            enddo
+          enddo
+        endif
+      enddo
+    enddo
+
+    if( lstrs ) then
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+           ,nn,mpi_md_world,strsl,9)
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
+    
+!-----gather epot
+    epott= 0d0
+    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+         ,MPI_SUM,mpi_md_world,ierr)
+    epot= epot +epott
+!!$    write(6,'(a,es15.7)') ' Morse repul epott = ',epott
+ 
+  end subroutine force_Morse_repul
 !=======================================================================
   subroutine force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs,chg &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
