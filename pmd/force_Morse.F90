@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-25 15:25:21 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-26 11:23:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -18,7 +18,8 @@ module Morse
   integer,parameter:: iodesc = 22
   integer,parameter:: ioprmsvc = 23
 
-!.....Number of species
+!.....Max number of species available in this potential
+  integer,parameter:: msp = 9
   integer:: nsp
 !.....Morse parameters
   real(8),allocatable:: alp(:,:),d0(:,:),rmin(:,:)
@@ -540,20 +541,12 @@ contains
     include 'mpif.h'
     integer,intent(in):: natm,mpi_md_world
     real(8),intent(in):: tag(natm)
-    integer:: i,nspl,ierr
-
-!.....Get umber of species
-    nspl = 0
-    do i=1,natm
-      nspl = max(int(tag(i)),nspl)
-    enddo
-    call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max &
-         ,mpi_md_world,ierr)
+    integer:: i,ierr
 
 !.....Allocate parameter arrays
     if( .not.allocated(alp) ) then
-      allocate(alp(nsp,nsp),d0(nsp,nsp),rmin(nsp,nsp),interact(nsp,nsp)&
-           ,galp(nsp,nsp),gd0(nsp,nsp),grmin(nsp,nsp))
+      allocate(alp(msp,msp),d0(msp,msp),rmin(msp,msp),interact(msp,msp)&
+           ,galp(msp,msp),gd0(msp,msp),grmin(msp,msp))
     endif
     
   end subroutine init_Morse
@@ -566,14 +559,6 @@ contains
     integer,intent(in):: natm,mpi_md_world
     real(8),intent(in):: tag(natm)
     integer:: i,nspl,ierr
-
-!.....Get umber of species
-    nspl = 0
-    do i=1,natm
-      nspl = max(int(tag(i)),nspl)
-    enddo
-    call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max &
-         ,mpi_md_world,ierr)
 
 !!$!.....Allocate parameter arrays
 !!$    if( .not.allocated(walp) ) then
@@ -595,17 +580,17 @@ contains
     if( myid_md.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
-      interact(1:nsp,1:nsp) = .false.
-      d0(1:nsp,1:nsp)= 0d0
-      rmin(1:nsp,1:nsp)= 0d0
-      alp(1:nsp,1:nsp)= 0d0
+      interact(1:msp,1:msp) = .false.
+      d0(1:msp,1:msp)= 0d0
+      rmin(1:msp,1:msp)= 0d0
+      alp(1:msp,1:msp)= 0d0
       do while(.true.)
         read(ioprms,*,end=10) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
         backspace(ioprms)
         read(ioprms,*) isp,jsp,d,a,r
-        if( isp.gt.nsp .or. jsp.gt.nsp ) then
-          write(6,*) ' Warning @read_params: since isp/jsp is greater than nsp,'&
+        if( isp.gt.msp .or. jsp.gt.msp ) then
+          write(6,*) ' Warning @read_params: since isp/jsp is greater than msp,'&
                //' skip reading the line.'
           cycle
         endif
@@ -627,10 +612,10 @@ contains
       endif
     endif
 
-    call mpi_bcast(d0,nsp*nsp,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(rmin,nsp*nsp,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(alp,nsp*nsp,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(interact,nsp*nsp,mpi_logical,0,mpi_md_world,ierr)
+    call mpi_bcast(d0,msp*msp,mpi_double_precision,0,mpi_md_world,ierr)
+    call mpi_bcast(rmin,msp*msp,mpi_double_precision,0,mpi_md_world,ierr)
+    call mpi_bcast(alp,msp*msp,mpi_double_precision,0,mpi_md_world,ierr)
+    call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_md_world,ierr)
     
   end subroutine read_params_Morse
 !=======================================================================
@@ -695,26 +680,28 @@ contains
   subroutine update_params_Morse()
 !
 !  Update Morse parameters by taking parameter values from params array.
+!  This routine would be called only from externally within fitpot.
 !
-    integer:: i,inc
+    integer:: i,inc, nspt
 
     if( .not.lprmset ) then
       print *,'ERROR: params have not been set yet.'
       stop
     endif
     
-    if( nprms.ne.3*(nsp-1) ) then
-      print *,'ERROR: nprms.ne.3*(nsp-1), nprms,nsp=',nprms,nsp
-      stop
-    endif
+!!$    if( nprms.ne.3*(nsp-1) ) then
+!!$      print *,'ERROR: nprms.ne.3*(nsp-1), nprms,nsp=',nprms,nsp
+!!$      stop
+!!$    endif
+    nspt = nprms/3 +1
 
-    d0(1:nsp,1:nsp)= 0d0
-    alp(1:nsp,1:nsp)= 0d0
-    rmin(1:nsp,1:nsp)= 0d0
-    interact(1:nsp,1:nsp) = .false.
+    d0(1:nspt,1:nspt)= 0d0
+    alp(1:nspt,1:nspt)= 0d0
+    rmin(1:nspt,1:nspt)= 0d0
+    interact(1:nspt,1:nspt) = .false.
 
     inc = 0
-    do i=2,nsp
+    do i=2,nspt
       inc= inc +1
       d0(1,i) = params(inc)
       d0(i,1) = d0(1,i)
@@ -784,14 +771,14 @@ contains
 !
     integer,intent(in):: myid_md,mpi_md_world,iprint
 
-    integer:: itmp,isp
+    integer:: itmp,isp,nspt
     character(len=5):: ctmp
     character(len=128):: cline,fname
     type(atdesc):: atd
     real(8):: eion1,eion2,eaff,atrad,enpaul
 
     if( allocated(atdescs) ) deallocate(atdescs)
-    allocate(atdescs(nsp))
+    allocate(atdescs(msp))
     
     if( myid_md.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(descfname)
@@ -805,11 +792,11 @@ contains
           backspace(iodesc)
           read(iodesc,*) itmp, ctmp, eion1, eion2, eaff, atrad, enpaul
           isp = isp + 1
-          if( isp.gt.nsp ) then
+          if( isp.gt.msp ) then
             if( iprint.ne.0 ) then
-              write(6,*) trim(fname)//' has more entries than nsp.' &
+              write(6,*) trim(fname)//' has more entries than MSP.' &
                    //' So skip reading it.'
-              write(6,*) '  NSP = ',nsp
+              write(6,*) '  MSP = ',msp
             endif
             goto 10
           endif
@@ -822,12 +809,13 @@ contains
           atdescs(isp)%enpaul= enpaul
         endif
       enddo
+      nspt = isp
 10    close(iodesc)
       if( iprint.ne.0 ) then
         write(6,*) 'Atomic descriptors were loaded from '//trim(fname)
         write(6,*) 'atomic number, symbol,    IE1,    IE2,    EA,'//&
              '  radius,  EN_Pauling'
-        do isp=1,nsp
+        do isp=1,nspt
           atd = atdescs(isp)
           write(6,'(i14,5x,a3,5f8.3)') atd%na, &
                trim(atd%csym), &
@@ -838,28 +826,28 @@ contains
     endif
 
 !.....Share the descriptor information with all nodes
-    call bcast_atdescs(nsp,myid_md,mpi_md_world)
+    call bcast_atdescs(nspt,myid_md,mpi_md_world)
 
   end subroutine read_element_descriptors
 !=======================================================================
-  subroutine bcast_atdescs(nsp,myid_md,mpi_md_world)
+  subroutine bcast_atdescs(nspt,myid_md,mpi_md_world)
 !
 !  Broadcast type atdesc
 !
     implicit none 
     include 'mpif.h'
-    integer,intent(in):: nsp,myid_md,mpi_md_world
+    integer,intent(in):: nspt,myid_md,mpi_md_world
 
     integer,allocatable:: nas(:)
     character(len=3),allocatable:: csyms(:)
     real(8),allocatable:: eion1s(:),eion2s(:),eaffs(:),enpauls(:),atrads(:)
     integer:: isp,ierr
 
-    allocate(eion1s(nsp),eion2s(nsp),eaffs(nsp),enpauls(nsp),&
-         atrads(nsp),nas(nsp),csyms(nsp))
+    allocate(eion1s(nspt),eion2s(nspt),eaffs(nspt),enpauls(nspt),&
+         atrads(nspt),nas(nspt),csyms(nspt))
 
     if( myid_md.eq.0 ) then
-      do isp=1,nsp
+      do isp=1,nspt
         nas(isp) = atdescs(isp)%na
         csyms(isp) = atdescs(isp)%csym
         eion1s(isp) = atdescs(isp)%eion1
@@ -870,13 +858,13 @@ contains
       enddo
     endif
 
-    call mpi_bcast(nas,nsp,mpi_integer,0,mpi_md_world,ierr)
-    call mpi_bcast(csyms,nsp,mpi_character,0,mpi_md_world,ierr)
-    call mpi_bcast(eion1s,nsp,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(eion2s,nsp,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(eaffs,nsp,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(atrads,nsp,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(enpauls,nsp,mpi_double_precision,0,mpi_md_world,ierr)
+    call mpi_bcast(nas,nspt,mpi_integer,0,mpi_md_world,ierr)
+    call mpi_bcast(csyms,nspt,mpi_character,0,mpi_md_world,ierr)
+    call mpi_bcast(eion1s,nspt,mpi_double_precision,0,mpi_md_world,ierr)
+    call mpi_bcast(eion2s,nspt,mpi_double_precision,0,mpi_md_world,ierr)
+    call mpi_bcast(eaffs,nspt,mpi_double_precision,0,mpi_md_world,ierr)
+    call mpi_bcast(atrads,nspt,mpi_double_precision,0,mpi_md_world,ierr)
+    call mpi_bcast(enpauls,nspt,mpi_double_precision,0,mpi_md_world,ierr)
     
     deallocate(eion1s,eion2s,eaffs,enpauls,atrads,nas,csyms)
   end subroutine bcast_atdescs
@@ -934,7 +922,7 @@ contains
     integer,intent(in):: ndimp
     real(8),intent(inout):: pderiv(ndimp)
 
-    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,inc
+    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,inc,nspt
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,dedr &
          ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2
@@ -943,9 +931,9 @@ contains
 
     epotl= 0d0
 
-    galp(1:nsp,1:nsp) = 0d0
-    gd0(1:nsp,1:nsp) = 0d0
-    grmin(1:nsp,1:nsp) = 0d0
+    galp(1:msp,1:msp) = 0d0
+    gd0(1:msp,1:msp) = 0d0
+    grmin(1:msp,1:msp) = 0d0
 
 !!$    write(6,'(a,30es16.8)') ' chg @pderiv = ',chg(1:natm)
     
@@ -997,7 +985,8 @@ contains
 
 !.....galp,gd0,grmin to pderiv
     inc = 0
-    do is=2,nsp
+    nspt = nprms/3 +1
+    do is=2,nspt
       inc = inc + 1
       pderiv(inc) = gd0(1,is)
       inc = inc + 1

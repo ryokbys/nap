@@ -557,7 +557,7 @@ contains
         call armijo_search(ndim,x,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
-      if(myid.eq.0) print *,'armijo steps, alpha=',niter,alpha
+!!$      if(myid.eq.0) print *,'armijo steps, alpha=',niter,alpha
       if( iflag/100.ne.0 ) then
         if( ltwice ) then
           x0(1:ndim)= x(1:ndim)

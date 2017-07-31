@@ -1449,7 +1449,7 @@ def analyze(psys):
     nspcs = psys.num_species()
     for i,s in enumerate(psys.specorder):
         print '   {0:s}: {1:d}'.format(s,nspcs[i])
-
+        
 
 if __name__ == "__main__":
 

@@ -93,9 +93,9 @@ module variables
   integer:: nfunc,ngrad
   integer:: iflag
 
-  real(8),allocatable:: erefl(:),erefg(:),epotl(:),epotg(:)
+  real(8),allocatable:: erefl(:),erefg(:),epotl(:),epotg(:),esubl(:),esubg(:)
   real(8),allocatable:: frefl(:,:,:),frefg(:,:,:),fal(:,:,:)&
-       ,fag(:,:,:)
+       ,fag(:,:,:),fsubl(:,:,:),fsubg(:,:,:)
   real(8),allocatable:: swgtl(:),swgtg(:)
   real(8),allocatable:: eerrl(:),eerrg(:)
   real(8),allocatable:: ferrl(:),ferrg(:)
@@ -104,5 +104,12 @@ module variables
 !.....and whose parameters to be fitted
   integer:: nsubff,nff
   character(len=20),allocatable:: csubffs(:),cffs(:)
+
+!.....For the purpose of setting the reference energy from a structure
+!.....within the whole sample structures.
+  character(len=128):: crefstrct= ''
+  integer:: myidrefsub = -1
+  integer:: isidrefsub = -1
+  real(8):: erefsub = 0d0
 
 end module variables

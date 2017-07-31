@@ -88,6 +88,9 @@ c=======================================================================
         backspace(ionum)
         read(ionum,*) ctmp,itmp,eatom(itmp)
         return
+      elseif( trim(cname).eq.'reference_structure' ) then
+        call read_c1(ionum,crefstrct)
+        return
       elseif( trim(cname).eq.'energy_match' ) then
         call read_l1(ionum,lematch)
         return

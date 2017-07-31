@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-20 16:21:42 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-31 17:00:53 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -59,13 +59,20 @@ program fitpot
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
 
+!.....Subtract atomic energy
+  if( trim(cpot).ne.'vcMorse' ) then
+    if( len(trim(crefstrct)).gt.5 ) then
+      call subtract_ref_struct_energy()
+    else
+      call subtract_atomic_energy()
+    endif
+  endif
+
 !.....Subtract energy and forces of other force-fields
   if( nsubff.gt.0 ) then
     call subtract_FF()
   endif
 
-!.....Subtract atomic energy
-  if( trim(cpot).ne.'vcMorse' ) call subtract_atomic_energy()
 
 !.....Set cffs only for pmd calculation
   nff = 1
@@ -115,10 +122,16 @@ program fitpot
 
   call write_stats(niter)
 
-!.....Restore subtracted energies and forces to get original reference values
-  if( nsubff.gt.0 ) then
-    call restore_FF()
-  endif
+!!$  call write_energy_relation('subtracted')
+!!$  if( nsmpl.lt.nsmpl_outfrc ) then
+!!$    call write_force_relation('subtracted')
+!!$  endif
+
+
+!!$!.....Restore subtracted energies and forces to get original reference values
+!!$  if( nsubff.gt.0 ) then
+!!$    call restore_FF()
+!!$  endif
   
   call write_vars('fin')
   call write_energy_relation('fin')
@@ -170,40 +183,51 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,a)') 'fitting_method',trim(cfmethod)
   write(6,'(2x,a25,2x,a)') 'main_directory',trim(cmaindir)
   write(6,'(2x,a25,2x,a)') 'param_file',trim(cparfile)
-  write(6,'(2x,a25,2x,a)') 'run_mode',trim(crunmode)
+!!$  write(6,'(2x,a25,2x,a)') 'run_mode',trim(crunmode)
   write(6,'(2x,a25,2x,es12.3)') 'xtol',xtol
   write(6,'(2x,a25,2x,es12.3)') 'ftol',ftol
   write(6,'(2x,a25,2x,es12.3)') 'gtol',gtol
-  do i=1,maxnsp
-    write(6,'(2x,a25,2x,i2,es15.7)') 'atom_energy',i,eatom(i)
-  enddo
+  if( len(trim(crefstrct)).gt.5 ) then
+    write(6,'(2x,a25,2x,a)') 'reference_structure',trim(crefstrct)
+  else
+    do i=1,maxnsp
+      write(6,'(2x,a25,2x,i2,es15.7)') 'atom_energy',i,eatom(i)
+    enddo
+  endif
   write(6,'(2x,a25,2x,l3)') 'energy_match',lematch
   write(6,'(2x,a25,2x,l3)') 'force_match',lfmatch
   write(6,'(2x,a25,2x,l3)') 'stress_match',lsmatch
   write(6,'(a)') ''
+  write(6,'(2x,a25,2x,a)') 'potential',trim(cpot)
+  write(6,'(2x,a25,10(2x,a))') 'subtract_force_field',(trim(csubffs(i)),i=1,nsubff)
+  write(6,'(a)') ''
   write(6,'(2x,a25,2x,a)') 'penalty',trim(cpena)
   write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',pwgt
-  write(6,'(2x,a25,2x,a)') 'potential',trim(cpot)
   write(6,'(2x,a25,2x,l3)') 'gradient',lgrad
-  write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
-  write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
+!!$  write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
+!!$  write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
   write(6,'(2x,a25,2x,a)') 'normalize_input',trim(cnormalize)
   write(6,'(2x,a25,2x,es12.3)') 'freduce_threshold',fred
-  write(6,'(2x,a25,2x,l3)') 'sample_weight',lswgt
-  write(6,'(2x,a25,2x,es12.3)') 'sample_weight_erg',swerg
+!!$  write(6,'(2x,a25,2x,l3)') 'sample_weight',lswgt
+!!$  write(6,'(2x,a25,2x,es12.3)') 'sample_weight_erg',swerg
   write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
   write(6,'(2x,a25,2x,a)') 'line_minimization',trim(clinmin)
+  write(6,'(a)') ''
+  write(6,'(2x,a25,2x,i4)') 'sample_error',nserr
+  do i=1,nserr
+    write(6,'(4x,a23,2(1x,f8.4))') trim(cserr(i)), seerr(i), sferr(i)
+  enddo
   write(6,'(a)') ''
   if( trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' ) then
     write(6,'(2x,a25,2x,es12.3)') 'sa_temperature',sa_temp0
     write(6,'(2x,a25,2x,es12.3)') 'sa_dxwidth',sa_xw0
     write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
   endif
-  write(6,'(a)') ''
-  write(6,'(2x,a25,2x,i5)') 'individual_weight',nwgtindiv
-  do i=1,nwgtindiv
-    write(6,'(2x,a25,2x,f6.1)') trim(cwgtindiv(i)),wgtindiv(i)
-  enddo
+!!$  write(6,'(a)') ''
+!!$  write(6,'(2x,a25,2x,i5)') 'individual_weight',nwgtindiv
+!!$  do i=1,nwgtindiv
+!!$    write(6,'(2x,a25,2x,f6.1)') trim(cwgtindiv(i)),wgtindiv(i)
+!!$  enddo
   write(6,'(a)') '------------------------------------------------'
 
 end subroutine write_initial_setting
@@ -425,6 +449,8 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%chg(natm),smpl%chi(natm),smpl%fsub(3,natm) &
        ,smpl%symbols(natm),smpl%eatm(natm))
   smpl%chg(1:natm) = 0d0
+  smpl%esub= 0d0
+  smpl%fsub(1:3,1:natm)= 0d0
   do i=1,smpl%natm
     read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), &
          tmp,tmp,tmp
@@ -1109,26 +1135,35 @@ subroutine write_energy_relation(cadd)
 
   if( .not. allocated(erefl) ) allocate(erefl(nsmpl),erefg(nsmpl) &
        ,epotl(nsmpl),epotg(nsmpl),eerrl(nsmpl),eerrg(nsmpl)&
-       ,swgtl(nsmpl),swgtg(nsmpl))
+       ,swgtl(nsmpl),swgtg(nsmpl),esubl(nsmpl),esubg(nsmpl))
 
   if( l1st ) then
     erefl(1:nsmpl)= 0d0
+    esubl(1:nsmpl)= 0d0
     eerrl(1:nsmpl)= 0d0
-    swgtl(1:nsmpl)= 0d0
+!!$    swgtl(1:nsmpl)= 0d0
     do ismpl=isid0,isid1
-      erefl(ismpl)= samples(ismpl)%eref
+      erefl(ismpl)= samples(ismpl)%eref -samples(ismpl)%esub
+      esubl(ismpl)= samples(ismpl)%esub
       eerrl(ismpl)= samples(ismpl)%eerr
-      swgtl(ismpl)= samples(ismpl)%wgt
+!!$      swgtl(ismpl)= samples(ismpl)%wgt
     enddo
     erefg(1:nsmpl)= 0d0
+    esubg(1:nsmpl)= 0d0
     eerrg(1:nsmpl)= 0d0
-    swgtg(1:nsmpl)= 0d0
+!!$    swgtg(1:nsmpl)= 0d0
     call mpi_reduce(erefl,erefg,nsmpl,mpi_real8,mpi_sum &
+         ,0,mpi_world,ierr)
+    call mpi_reduce(esubl,esubg,nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
     call mpi_reduce(eerrl,eerrg,nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
-    call mpi_reduce(swgtl,swgtg,nsmpl,mpi_real8,mpi_sum &
-         ,0,mpi_world,ierr)
+!!$    call mpi_reduce(swgtl,swgtg,nsmpl,mpi_real8,mpi_sum &
+!!$         ,0,mpi_world,ierr)
+    do ismpl=1,nsmpl
+      erefg(ismpl)= erefg(ismpl)/nalist(ismpl)
+      esubg(ismpl)= esubg(ismpl)/nalist(ismpl)
+    enddo
   endif
 
   epotl(1:nsmpl)= 0d0
@@ -1143,18 +1178,17 @@ subroutine write_energy_relation(cadd)
     open(90,file=trim(cfname)//'.1',status='replace')
     open(91,file=trim(cfname)//'.2',status='replace')
     do ismpl=1,nsmpl
-      erefg(ismpl)= erefg(ismpl)/nalist(ismpl)
       epotg(ismpl)= epotg(ismpl)/nalist(ismpl)
       if( iclist(ismpl).eq.1 ) then
-        write(90,'(2es15.7,2x,a,3es15.6e3)') erefg(ismpl) &
+        write(90,'(2es15.7,2x,a,3es12.3e3)') erefg(ismpl) &
              ,epotg(ismpl),trim(cdirlist(ismpl)) &
              ,abs(erefg(ismpl)-epotg(ismpl)) &
-             ,eerrg(ismpl),swgtg(ismpl)
+             ,eerrg(ismpl),esubg(ismpl)
       else if( iclist(ismpl).eq.2 ) then
-        write(91,'(2es15.7,2x,a,3es15.6e3)') erefg(ismpl) &
+        write(91,'(2es15.7,2x,a,3es12.3e3)') erefg(ismpl) &
              ,epotg(ismpl),trim(cdirlist(ismpl)) &
              ,abs(erefg(ismpl)-epotg(ismpl)) &
-             ,eerrg(ismpl),swgtg(ismpl)
+             ,eerrg(ismpl),esubg(ismpl)
 !!$        write(91,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
 !!$             ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)
       endif
@@ -1187,19 +1221,25 @@ subroutine write_force_relation(cadd)
 
   if( .not. allocated(frefl) ) allocate(frefl(3,nmax,nsmpl)&
        ,frefg(3,nmax,nsmpl),fal(3,nmax,nsmpl),fag(3,nmax,nsmpl)&
-       ,ferrl(nsmpl),ferrg(nsmpl))
+       ,ferrl(nsmpl),ferrg(nsmpl),fsubl(3,nmax,nsmpl),fsubg(3,nmax,nsmpl))
 
   if( l1st ) then
     frefl(1:3,1:nmax,1:nsmpl)= 0d0
+    fsubl(1:3,1:nmax,1:nsmpl)= 0d0
     ferrl(1:nsmpl) = 0d0
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
-      frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm)
+      frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm) &
+           -samples(ismpl)%fsub(1:3,1:natm)
+      fsubl(1:3,1:natm,ismpl)= samples(ismpl)%fsub(1:3,1:natm)
       ferrl(ismpl) = samples(ismpl)%ferr
     enddo
     frefg(1:3,1:nmax,1:nsmpl)= 0d0
+    fsubg(1:3,1:nmax,1:nsmpl)= 0d0
     ferrg(1:nsmpl) = 0d0
     call mpi_reduce(frefl,frefg,3*nmax*nsmpl,mpi_real8,mpi_sum &
+         ,0,mpi_world,ierr)
+    call mpi_reduce(fsubl,fsubg,3*nmax*nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
     call mpi_reduce(ferrl,ferrg,nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
@@ -1222,22 +1262,22 @@ subroutine write_force_relation(cadd)
         natm= nalist(ismpl)
         do ia=1,natm
           do ixyz=1,3
-            write(92,'(2es15.7,2x,a,i6,i3,2es15.6e3)') frefg(ixyz,ia,ismpl) &
+            write(92,'(2es15.7,2x,a,i6,i3,3es12.3e3)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
                  ,trim(cdirlist(ismpl)),ia,ixyz &
                  ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
-                 ,ferrg(ismpl)
+                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl)
           enddo
         enddo
       else if( iclist(ismpl).eq.2 ) then
         natm= nalist(ismpl)
         do ia=1,natm
           do ixyz=1,3
-            write(93,'(2es15.7,2x,a,i6,i3,2es15.6e3)') frefg(ixyz,ia,ismpl) &
+            write(93,'(2es15.7,2x,a,i6,i3,3es12.3e3)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
                  ,trim(cdirlist(ismpl)),ia,ixyz &
                  ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
-                 ,ferrg(ismpl)
+                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl)
           enddo
         enddo
       endif
@@ -1276,10 +1316,10 @@ subroutine write_stats(iter)
     endif
   endif
 
-!.....Restore subtracted energies and forces to get original reference values
-  if( nsubff.gt.0 ) then
-    call restore_FF()
-  endif
+!!$!.....Restore subtracted energies and forces to get original reference values
+!!$  if( nsubff.gt.0 ) then
+!!$    call restore_FF()
+!!$  endif
 
   demaxl_trn= 0d0
   desuml_trn= 0d0
@@ -1288,7 +1328,7 @@ subroutine write_stats(iter)
   do ismpl=isid0,isid1
     smpl= samples(ismpl)
     natm= smpl%natm
-    de= abs(smpl%epot -smpl%eref)/natm
+    de= abs(smpl%epot -(smpl%eref-smpl%esub))/natm
     if( smpl%iclass.eq.1 ) then
       demaxl_trn= max(demaxl_trn,de)
       desuml_trn=desuml_trn +de*de
@@ -1342,7 +1382,7 @@ subroutine write_stats(iter)
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
-          df= abs(smpl%fa(l,ia)-smpl%fref(l,ia))
+          df= abs(smpl%fa(l,ia)-(smpl%fref(l,ia)-smpl%fsub(l,ia)))
           dfmaxl_trn= max(dfmaxl_trn,df)
           dfsuml_trn=dfsuml_trn +df*df
 !!$          write(6,'(a,3i5,3es12.4)')  'ismpl,ia,l,fa,fref,dfsuml_trn=',&
@@ -1354,7 +1394,7 @@ subroutine write_stats(iter)
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
-          df= abs(smpl%fa(l,ia)-smpl%fref(l,ia))
+          df= abs(smpl%fa(l,ia)-(smpl%fref(l,ia)-smpl%fsub(l,ia)))
           dfmaxl_tst= max(dfmaxl_tst,df)
           dfsuml_tst=dfsuml_tst +df*df
           ntstl=ntstl +1
@@ -1392,10 +1432,10 @@ subroutine write_stats(iter)
 !    call write_vars('tmp')
   endif
 
-!.....Subtract energy and forces again
-  if( nsubff.gt.0 ) then
-    call subtract_FF()
-  endif
+!!$!.....Subtract energy and forces again
+!!$  if( nsubff.gt.0 ) then
+!!$    call subtract_FF()
+!!$  endif
   
   l1st = .false.
 end subroutine write_stats
@@ -1448,6 +1488,7 @@ subroutine sync_input()
   call mpi_bcast(cpena,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(clinmin,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cnormalize,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(crefstrct,128,mpi_character,0,mpi_world,ierr)
 
   call mpi_bcast(xtol,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ftol,1,mpi_real8,0,mpi_world,ierr)
@@ -1711,22 +1752,25 @@ subroutine subtract_FF()
   integer:: i,ismpl,natm
   logical:: lcalcgrad = .false.
   logical:: luse_Morse = .false.
+  logical:: luse_Morse_repul = .false.
   logical:: luse_Coulomb = .false.
   logical,save:: l1st = .true.
   real(8):: epot
   real(8),save,allocatable:: frcs(:,:)
 
-!!$  print *,'subtract_FF'
   if( l1st ) then
     do i=1,nsubff
       if( index(trim(csubffs(i)),'Morse').ne.0 ) then
         luse_Morse = .true.
+      else if( index(trim(csubffs(i)),'Morse_repul').ne.0 ) then
+        luse_Morse_repul = .true.
       else if( index(trim(csubffs(i)),'Coulomb').ne.0 .or. &
            index(trim(csubffs(i)),'vcGaussian').ne.0 ) then
         luse_Coulomb = .true.
       endif
     enddo
     if( myid.eq.0 .and. iprint.ne.0 ) then
+      print *,'force field to be subtracted:'
       do i=1,nsubff
         print *,'  i,FF = ',i,trim(csubffs(i))
       enddo
@@ -1740,6 +1784,9 @@ subroutine subtract_FF()
       if( luse_Morse ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'&
              //trim(samples(ismpl)%cdirname)//'/pmd')
+      else if( luse_Morse_repul ) then
+        call set_paramsdir_Morse(trim(cmaindir)//'/'&
+             //trim(samples(ismpl)%cdirname)//'/pmd')
       else if( luse_Coulomb ) then
         call set_paramsdir_Coulomb(trim(cmaindir)//'/'&
              //trim(samples(ismpl)%cdirname)//'/pmd')
@@ -1748,28 +1795,48 @@ subroutine subtract_FF()
            nsubff,csubffs,epot,frcs)
       samples(ismpl)%esub = epot
       samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
-!!$      write(6,'(a,i5,es15.7)') ' ismpl,esub = ',ismpl,epot
+!!$      write(6,'(a,i8,1x,a,es15.7)') ' ismpl,cdirname,esub = ', &
+!!$           ismpl,trim(samples(ismpl)%cdirname),epot
     enddo
-    
+
+!!$    allocate(esubl(nsmpl),esubg(nsmpl))
+!!$    esubl(1:nsmpl) = 0d0
+!!$    do ismpl=isid0,isid1
+!!$      esubl(ismpl) = samples(ismpl)%esub
+!!$    enddo
+!!$    esubg(1:nsmpl) = 0d0
+!!$    call mpi_reduce(esubl,esubg,nsmpl,mpi_real8,mpi_sum,0,mpi_world,ierr)
+!!$
+!!$    if( myid.eq.0 ) then
+!!$      esubg(1:nsmpl)= esubg(1:nsmpl)/nalist(1:nsmpl)
+!!$      open(92,file='out.erg.subtract',status='replace')
+!!$      do ismpl=1,nsmpl
+!!$        write(92,'(i8,es15.7,2x,a)') ismpl,esubg(ismpl),trim(cdirlist(ismpl))
+!!$      enddo
+!!$      close(92)
+!!$    endif
+!!$    deallocate(esubl,esubg)
   endif
 
-!.....After the 1st call, subtract esubs calculated at the 1st call
-  do ismpl=isid0,isid1
-!.....Subtract energy and forces from eref and fref, respectively
-!!$    write(6,*) 'ismpl,eref,epot,esub=',ismpl,samples(ismpl)%eref,&
+!!$!.....After the 1st call, subtract esubs calculated at the 1st call
+!!$  do ismpl=isid0,isid1
+!!$!.....Subtract energy and forces from eref and fref, respectively
+!!$    write(6,'(a,i8,1x,a,3es15.7)') 'ismpl,cdirname,eref,epot,esub=',ismpl,&
+!!$         trim(samples(ismpl)%cdirname),samples(ismpl)%eref,&
 !!$         samples(ismpl)%epot,samples(ismpl)%esub
-    samples(ismpl)%eref = samples(ismpl)%eref -samples(ismpl)%esub
-    samples(ismpl)%epot = samples(ismpl)%epot -samples(ismpl)%esub
-    do i=1,samples(ismpl)%natm
-      samples(ismpl)%fref(1:3,i) = samples(ismpl)%fref(1:3,i) &
-           -samples(ismpl)%fsub(1:3,i)
-      samples(ismpl)%fa(1:3,i) = samples(ismpl)%fa(1:3,i) &
-           -samples(ismpl)%fsub(1:3,i)
-    enddo
-!!$    write(6,'(a,i5,2es15.7)') ' ismpl,eref=',ismpl,samples(ismpl)%eref
-!.....TODO: stress should also come here.
-
-  enddo
+!!$    samples(ismpl)%eref = samples(ismpl)%eref -samples(ismpl)%esub
+!!$    samples(ismpl)%epot = samples(ismpl)%epot -samples(ismpl)%esub
+!!$    do i=1,samples(ismpl)%natm
+!!$      samples(ismpl)%fref(1:3,i) = samples(ismpl)%fref(1:3,i) &
+!!$           -samples(ismpl)%fsub(1:3,i)
+!!$      samples(ismpl)%fa(1:3,i) = samples(ismpl)%fa(1:3,i) &
+!!$           -samples(ismpl)%fsub(1:3,i)
+!!$    enddo
+!!$    write(6,'(a,i8,1x,a,2es15.7)') ' ismpl,cdirname,eref=',ismpl, &
+!!$         trim(samples(ismpl)%cdirname),samples(ismpl)%eref
+!!$!.....TODO: stress should also come here.
+!!$
+!!$  enddo
 
   l1st = .false.
   return
@@ -1950,6 +2017,29 @@ subroutine subtract_atomic_energy()
   enddo
 
 end subroutine subtract_atomic_energy
+!=======================================================================
+subroutine subtract_ref_struct_energy()
+  use variables
+  use parallel
+  implicit none
+  integer:: ismpl
+
+  do ismpl=isid0,isid1
+    if( trim(samples(ismpl)%cdirname).eq.trim(crefstrct) ) then
+      myidrefsub = myid
+      isidrefsub = ismpl
+      erefsub = samples(ismpl)%eref
+    endif
+  enddo
+
+  call mpi_bcast(erefsub,1,mpi_integer,myidrefsub,mpi_world,ierr)
+
+  if( myid.eq.0 .and. iprint.ne.0 ) then
+    write(6,'(a,es12.4,a)') ' reference structure energy = ', &
+         erefsub,' eV'
+  endif
+  
+end subroutine subtract_ref_struct_energy
 !=======================================================================
 subroutine set_max_num_atoms()
   use variables
