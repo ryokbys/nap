@@ -53,7 +53,8 @@ contains
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
          ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys,erefmin &
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
-         ,nff,cffs,cmaindir,maxna
+         ,nff,cffs,cmaindir,maxna &
+         ,crefstrct,erefsub,myidrefsub,isidrefsub
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb
@@ -65,7 +66,7 @@ contains
     real(8),intent(out):: ftrn,ftst
 
     integer:: ismpl,natm,ia,ixyz,idim
-    real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv
+    real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv,esub,epotsub
     real(8):: eerr,ferr,ferri
     real(8):: ftrnl,ftstl,ftmp
     real(8):: edenom,fdenom
@@ -120,19 +121,39 @@ contains
 !!$      print *,'myid,ismpl,cdirname,epot= ',myid,ismpl,trim(cdirname),epot
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
+    enddo
 
+    if( len(trim(crefstrct)).gt.5 ) then
+      if( myid.eq.myidrefsub ) then
+        epotsub = samples(isidrefsub)%epot
+      endif
+      call mpi_bcast(epotsub,1,mpi_integer,myidrefsub,mpi_world,ierr)
+    endif
+
+    do ismpl=isid0,isid1
+      smpl = samples(ismpl)
+      natm = smpl%natm
+      epot = smpl%epot
       ftmp = 0d0
       swgt = smpl%wgt
       if( lematch ) then
         eref= smpl%eref
+        esub= smpl%esub
         eerr = smpl%eerr
 !.....Energy matching
-        ediff= (epot -eref)/natm /eerr
+        if( len(trim(crefstrct)).gt.5 ) then
+          ediff= (epot-epotsub -(eref-esub-erefsub))/natm /eerr
+!!$          print *,'ismpl,cdirname,ediff= ',ismpl,&
+!!$               trim(smpl%cdirname),ediff
+        else
+          ediff= (epot -(eref-esub))/natm /eerr
+        endif
         ediff= ediff*ediff
         ftmp= ftmp +ediff *swgt
       endif
 !.....Force matching
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
+        frcs(1:3,1:natm) = smpl%fa(1:3,1:natm)
         ferr = smpl%ferr
         ferri = 1d0/ferr
         dn3i = 1d0/3/smpl%nfcal
@@ -140,7 +161,7 @@ contains
           if( smpl%ifcal(ia).eq.0 ) cycle
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia) &
-                 -smpl%fref(ixyz,ia)) *ferri
+                 -(smpl%fref(ixyz,ia)-smpl%fsub(ixyz,ia))) *ferri
             fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
             ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt
           enddo
@@ -204,7 +225,7 @@ contains
     
     integer:: ismpl,i,idim,natm
     real(8),save,allocatable:: gs(:),gtrnl(:),frcs(:,:)
-    real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot
+    real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub
     real(8):: ediff,eerr,eref,swgt
     type(mdsys):: smpl
     logical:: lcalcgrad = .true. 
@@ -249,9 +270,10 @@ contains
       swgt= smpl%wgt
       if( lematch ) then
         eref= smpl%eref
+        esub= smpl%esub
         eerr= smpl%eerr
 !.....Energy matching
-        ediff= (epot -eref) /natm /eerr
+        ediff= (epot -(eref-esub)) /natm /eerr
         ediff= 2d0 *ediff /natm /eerr *swgt
         gtrnl(1:ndim)= gtrnl(1:ndim) +gs(1:ndim)*ediff
       endif

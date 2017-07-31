@@ -88,6 +88,9 @@ c=======================================================================
         backspace(ionum)
         read(ionum,*) ctmp,itmp,eatom(itmp)
         return
+      elseif( trim(cname).eq.'reference_structure' ) then
+        call read_c1(ionum,crefstrct)
+        return
       elseif( trim(cname).eq.'energy_match' ) then
         call read_l1(ionum,lematch)
         return
@@ -219,6 +222,9 @@ c=======================================================================
         return
       elseif( trim(cname).eq.'lbfgs_history' ) then
         call read_i1(ionum,mstore)
+        return
+      elseif( trim(cname).eq.'nsmpl_outfrc' ) then
+        call read_i1(ionum,nsmpl_outfrc)
         return
       elseif( trim(cname).eq.'individual_weight' ) then
         backspace(ionum)

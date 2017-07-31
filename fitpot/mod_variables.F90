@@ -21,6 +21,7 @@ module variables
   logical:: lematch= .true.   ! energy matching
   logical:: lfmatch= .false.  ! force matching
   logical:: lsmatch= .false.  ! stress matching
+  integer:: nsmpl_outfrc = 20000
   character(len=128):: cnormalize= 'variance'
   character(len=128):: cpot= 'NN'
   logical:: lgrad  = .true.
@@ -44,6 +45,7 @@ module variables
   real(8):: vinitsgm = 1d0
   real(8):: vinitmu  = 0d0
   real(8):: vinitrs  = 12345d0
+  
 
 !.....max num of species
   integer,parameter:: mspcs = 4
@@ -91,9 +93,9 @@ module variables
   integer:: nfunc,ngrad
   integer:: iflag
 
-  real(8),allocatable:: erefl(:),erefg(:),epotl(:),epotg(:)
+  real(8),allocatable:: erefl(:),erefg(:),epotl(:),epotg(:),esubl(:),esubg(:)
   real(8),allocatable:: frefl(:,:,:),frefg(:,:,:),fal(:,:,:)&
-       ,fag(:,:,:)
+       ,fag(:,:,:),fsubl(:,:,:),fsubg(:,:,:)
   real(8),allocatable:: swgtl(:),swgtg(:)
   real(8),allocatable:: eerrl(:),eerrg(:)
   real(8),allocatable:: ferrl(:),ferrg(:)
@@ -102,5 +104,12 @@ module variables
 !.....and whose parameters to be fitted
   integer:: nsubff,nff
   character(len=20),allocatable:: csubffs(:),cffs(:)
+
+!.....For the purpose of setting the reference energy from a structure
+!.....within the whole sample structures.
+  character(len=128):: crefstrct= ''
+  integer:: myidrefsub = -1
+  integer:: isidrefsub = -1
+  real(8):: erefsub = 0d0
 
 end module variables

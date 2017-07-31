@@ -301,6 +301,15 @@ def get_input_txt(params,fmvs):
         # special keys first
         if key is '':
             txt += '\n'
+        elif key is 'force_type':
+            vals = params[key]
+            txt += '{0:25s} '.format('force_type')
+            if isinstance(vals,str):
+                txt += '  {0:s}'.format(vals)
+            elif type(vals) in (list,tuple):
+                for v in vals:
+                    txt += '  {0:s}'.format(v)
+            txt += '\n'
         elif key is 'temperature_target':
             vals = params[key]
             for i,v in enumerate(vals):

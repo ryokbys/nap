@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-26 19:04:40 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-27 16:53:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -294,9 +294,10 @@ contains
     real(8),intent(out):: ftrn,ftst
 
     integer:: ismpl,natm,ia,ixyz,idim
-    real(8):: dn3i,ediff,fscale,eref,swgt,wgtidv
+    real(8):: dn3i,ediff,fscale,eref,swgt,wgtidv,esub
     real(8):: eerr,ferr,ferri
     real(8):: flocal,ftrnl,ftstl,ftmp
+    real(8):: fetrnl,fetrng,fftrnl,fftrng,fstrnl,fstrng
     real(8):: edenom,fdenom
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     type(mdsys):: smpl
@@ -325,20 +326,26 @@ contains
       endif
     enddo
 
-!!$    NN_func= 0d0
     ftrnl = 0d0
     ftstl = 0d0
-!!$    flocal= 0d0
+!!$    fetrnl= 0d0
+!!$    fftrnl= 0d0
+!!$    fstrnl= 0d0
+
     do ismpl=isid0,isid1
       ftmp = 0d0
       smpl= samples(ismpl)
       natm= smpl%natm
       eref= smpl%eref
+      esub= smpl%esub
       eerr = smpl%eerr
       swgt = smpl%wgt
-      ediff= (smpl%epot -eref)/natm /eerr
+      ediff= (smpl%epot -(eref-esub))/natm /eerr
+!!$      print *,'ismpl,eref,eref/natm,epot,epot/natm=',ismpl,eref, eref/natm,&
+!!$           smpl%epot, smpl%epot/natm
       ediff= ediff*ediff
       ftmp= ftmp +ediff *swgt
+!!$      fetrnl= fetrnl +ediff *swgt
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
         ferr = smpl%ferr
         ferri = 1d0/ferr
@@ -347,9 +354,10 @@ contains
           if( smpl%ifcal(ia).eq.0 ) cycle
           do ixyz=1,3
             fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-                 -smpl%fref(ixyz,ia)) *ferri
+                 -(smpl%fref(ixyz,ia)-smpl%fsub(ixyz,ia))) *ferri
             fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
             ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt
+!!$            fftrnl=fftrnl +fdiff(ixyz,ia) *dn3i *swgt
           enddo
         enddo
       endif
@@ -372,6 +380,21 @@ contains
          ,mpi_sum,mpi_world,ierr)
     ftrn = ftrn /swgt2trn
     ftst = ftst /swgt2tst
+
+!!$    if( l1st ) then
+!!$      fetrng= 0d0
+!!$      fftrng= 0d0
+!!$      fstrng= 0d0
+!!$      call mpi_allreduce(fetrnl,fetrng,1,mpi_double_precision &
+!!$           ,mpi_sum,mpi_world,ierr)
+!!$      call mpi_allreduce(fftrnl,fftrng,1,mpi_double_precision &
+!!$           ,mpi_sum,mpi_world,ierr)
+!!$      if( myid.eq.0 ) then
+!!$        write(6,'(a,3es12.4)') ' term values: energy,force,stress = ', &
+!!$             fetrng,fftrng,fstrng
+!!$      endif
+!!$    endif
+    
     tcl = tcl + (mpi_wtime() -tc0)
 
 !.....only the bottle-neck times are taken into account
@@ -395,7 +418,7 @@ contains
     real(8),intent(out):: ftrn,ftst
     real(8):: ftrnl,ftstl,ftmp
     integer:: natm,ia,ixyz,idim,i
-    real(8):: dn3i,ediff,fscale,eref,swgt,wgtidv
+    real(8):: dn3i,ediff,fscale,eref,swgt,wgtidv,esub
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     real(8):: eerr,ferr,ferri
     integer:: ismpl
@@ -434,9 +457,10 @@ contains
       smpl= samples(ismpl)
       natm= smpl%natm
       eref= smpl%eref
+      esub= smpl%esub
       eerr = smpl%eerr
       swgt = smpl%wgt
-      ediff= (smpl%epot -eref)/natm /eerr
+      ediff= (smpl%epot -(eref-esub))/natm /eerr
       ediff= ediff*ediff
       ftmp= ftmp +ediff*swgt
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
@@ -447,7 +471,7 @@ contains
           if( smpl%ifcal(ia).eq.0 ) cycle
           do ixyz=1,3
             fdiff(1:3,ia)= (smpl%fa(1:3,ia) &
-                 -smpl%fref(1:3,ia)) *ferri
+                 -(smpl%fref(1:3,ia)-smpl%fsub(1:3,ia))) *ferri
             fdiff(1:3,ia)= fdiff(1:3,ia)*fdiff(1:3,ia)
             ftmp= ftmp +fdiff(ixyz,ia)*dn3i *swgt
           enddo
@@ -844,7 +868,7 @@ contains
     type(smpldata),intent(inout):: sds
     real(8),intent(inout):: gs(nvars)
     integer:: iv,ivp,nv,ihl1,ia,ja,ihl0,jhl0,natm,ixyz,nfcal
-    real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale,eref,swgt,wgtidv
+    real(8):: ediff,tmp,h1,w1,w2,dn3i,dh1,ddhg,fscale,eref,swgt,wgtidv,esub
     real(8):: edenom,fdenom
     real(8):: eerr,ferr,ferri
     real(8),save,allocatable:: dgs(:),ab(:),wdg(:,:,:),bms(:,:,:,:)
@@ -856,9 +880,10 @@ contains
 
     natm= smpl%natm
     eref= smpl%eref
+    esub= smpl%esub
     eerr= smpl%eerr
     swgt= smpl%wgt
-    ediff= (smpl%epot -eref) /natm /eerr
+    ediff= (smpl%epot -(eref-esub)) /natm /eerr
     ediff= 2d0 *ediff /natm /eerr *swgt ! *wgtidv /natm
     gs(1:nvars)= 0d0
     iv= nhl(0)*mhl(1) +nhl(1)
@@ -911,7 +936,7 @@ contains
     do ia=1,natm
       do ixyz=1,3
         fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
-             -smpl%fref(ixyz,ia)) !*ferri *ferri *2 *dn3i
+             -(smpl%fref(ixyz,ia)-smpl%fsub(ixyz,ia))) !*ferri *ferri *2 *dn3i
       enddo
     enddo
     iv= nhl(0)*mhl(1) +nhl(1)
@@ -1114,7 +1139,7 @@ contains
     real(8),intent(inout):: gs(nvars)
     integer:: iv,ihl0,ihl1,ihl2,ia,ja,natm,nfcal
     real(8):: ediff,tmp,tmp1,tmp2,h1,h2,w1,w2,w3,dn3i,dh1,dh2,t1,t2,t3&
-         ,ddh1,ddh2,dh1gsf,fscale,eref,swgt,wgtidv
+         ,ddh1,ddh2,dh1gsf,fscale,eref,swgt,wgtidv,esub
     real(8):: eerr,ferr,ferri
     real(8),save,allocatable:: dgs(:),w1dg(:,:,:,:),w2sw1dg(:,:,:,:)
 
@@ -1125,9 +1150,10 @@ contains
 
     natm= smpl%natm
     eref= smpl%eref
+    esub= smpl%esub
     eerr= smpl%eerr
     swgt= smpl%wgt
-    ediff= (smpl%epot -eref)*2 /natm/natm /eerr /eerr *swgt
+    ediff= (smpl%epot -(eref-esub))*2 /natm/natm /eerr /eerr *swgt
     gs(1:nvars)= 0d0
     iv= nhl(0)*mhl(1) +nhl(1)*mhl(2) +nhl(2)
 
@@ -1203,7 +1229,7 @@ contains
     ferri= 1d0/ferr
     dgs(1:nvars)= 0d0
     fdiff(1:3,1:natm)= (smpl%fa(1:3,1:natm) &
-         -smpl%fref(1:3,1:natm)) *ferri
+         -(smpl%fref(1:3,1:natm)-smpl%fsub(1:3,1:natm))) *ferri
     dn3i= 1d0/3/natm
     fdiff(1:3,1:natm)= fdiff(1:3,1:natm) *2 *ferri *dn3i *swgt
 
@@ -1585,7 +1611,7 @@ contains
     if( lstandard ) return
     
     if( cnormalize(1:3).eq.'var' ) then
-      if(myid.eq.0) print *,'normalize w.r.t. variance'
+!!$      if(myid.eq.0) print *,'normalize w.r.t. variance'
       call standardize_var()
     else if( cnormalize(1:3).eq.'max' ) then
       if(myid.eq.0) print *,'normalize w.r.t. max not implemented'
