@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-31 17:00:53 Ryo KOBAYASHI>
+!                     Last modified: <2017-07-31 17:30:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1296,7 +1296,7 @@ subroutine write_stats(iter)
   integer,intent(in):: iter
   integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst,nfcal
   type(mdsys)::smpl
-  real(8):: de,df
+  real(8):: de,df,epotsub
   real(8):: demaxl_trn,demax_trn,desuml_trn,desum_trn,rmse_trn
   real(8):: demaxl_tst,demax_tst,desuml_tst,desum_tst,rmse_tst
   real(8):: dfmaxl_trn,dfmax_trn,dfsuml_trn,dfsum_trn
@@ -1321,6 +1321,13 @@ subroutine write_stats(iter)
 !!$    call restore_FF()
 !!$  endif
 
+  if( len(trim(crefstrct)).gt.5 ) then
+    if( myid.eq.myidrefsub ) then
+      epotsub = samples(isidrefsub)%epot
+    endif
+    call mpi_bcast(epotsub,1,mpi_integer,myidrefsub,mpi_world,ierr)
+  endif
+
   demaxl_trn= 0d0
   desuml_trn= 0d0
   demaxl_tst= 0d0
@@ -1328,7 +1335,12 @@ subroutine write_stats(iter)
   do ismpl=isid0,isid1
     smpl= samples(ismpl)
     natm= smpl%natm
-    de= abs(smpl%epot -(smpl%eref-smpl%esub))/natm
+    if( len(trim(crefstrct)).gt.5 ) then
+      de= abs(smpl%epot-epotsub &
+           -(smpl%eref-smpl%esub-erefsub))/natm
+    else
+      de= abs(smpl%epot -(smpl%eref-smpl%esub))/natm
+    endif
     if( smpl%iclass.eq.1 ) then
       demaxl_trn= max(demaxl_trn,de)
       desuml_trn=desuml_trn +de*de

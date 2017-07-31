@@ -143,8 +143,6 @@ contains
 !.....Energy matching
         if( len(trim(crefstrct)).gt.5 ) then
           ediff= (epot-epotsub -(eref-esub-erefsub))/natm /eerr
-!!$          print *,'ismpl,cdirname,ediff= ',ismpl,&
-!!$               trim(smpl%cdirname),ediff
         else
           ediff= (epot -(eref-esub))/natm /eerr
         endif
