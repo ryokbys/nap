@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-31 17:30:20 Ryo KOBAYASHI>
+!                     Last modified: <2017-08-02 14:13:29 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1788,7 +1788,7 @@ subroutine subtract_FF()
       enddo
     endif
 
-    allocate(frcs(3,maxna))
+    if( .not.allocated(frcs) ) allocate(frcs(3,maxna))
 
 !.....Only at the 1st call, perform pmd to get esubs
     do ismpl=isid0,isid1
@@ -1807,8 +1807,6 @@ subroutine subtract_FF()
            nsubff,csubffs,epot,frcs)
       samples(ismpl)%esub = epot
       samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
-!!$      write(6,'(a,i8,1x,a,es15.7)') ' ismpl,cdirname,esub = ', &
-!!$           ismpl,trim(samples(ismpl)%cdirname),epot
     enddo
 
 !!$    allocate(esubl(nsmpl),esubg(nsmpl))
@@ -1912,8 +1910,6 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs)
     l1st = .false.
   endif
 
-!.....Every time allocate total arrays according to the num of atoms
-!     in the givin sample system.
   maxstp = 0
   nismax = 9
   nerg = 1
@@ -2034,7 +2030,7 @@ subroutine subtract_ref_struct_energy()
   use variables
   use parallel
   implicit none
-  integer:: ismpl
+  integer:: ismpl,myidrefsubl
 
   do ismpl=isid0,isid1
     if( trim(samples(ismpl)%cdirname).eq.trim(crefstrct) ) then
@@ -2044,6 +2040,9 @@ subroutine subtract_ref_struct_energy()
     endif
   enddo
 
+  myidrefsubl = myidrefsub
+  call mpi_allreduce(myidrefsubl,myidrefsub,1,mpi_integer,mpi_max,&
+       mpi_world,ierr)
   call mpi_bcast(erefsub,1,mpi_integer,myidrefsub,mpi_world,ierr)
 
   if( myid.eq.0 .and. iprint.ne.0 ) then
