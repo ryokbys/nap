@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-07-25 15:30:03 Ryo KOBAYASHI>
+c                     Last-modified: <2017-08-01 23:28:34 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -238,7 +238,8 @@ c-----copy RA of boundary atoms
      &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,.true.)
 c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
-     &     ,anxi,anyi,anzi,lspr)
+     &     ,anxi,anyi,anzi,lspr,iprint,.true.)
+      
 c.....Calc forces
       lstrs = lstrs0 .or.
      &     ( trim(cpctl).eq.'Berendsen' .or.
@@ -489,7 +490,7 @@ c.....Copy RA of boundary atoms
      &         ,mpi_md_world,iprint,ifcoulomb,chg,chi,.false.)
 c.....Make pair list
           call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h
-     &         ,hi,anxi,anyi,anzi,lspr)
+     &         ,hi,anxi,anyi,anzi,lspr,iprint,.false.)
           ts= istp*dt
           te=rbuf/(2d0*vmax/dt) +ts
           istpe= int(te/dt)
@@ -807,9 +808,9 @@ c=======================================================================
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,numff,cffs,rc,rbuf,ptnsr,epot
      &     ,ekin,ifcoulomb,iprint,lcalcgrad,ndimp,pderiv)
-c.....
-c..... In case that only one shot force calculation is required.
-c.....
+c
+c  In case that only one shot force calculation is required.
+c
       use pmdvars
       use Morse,only: pderiv_vcMorse
       implicit none
@@ -859,6 +860,21 @@ c-----reduced node origin
 c.....perform space decomposition after reading atomic configuration
 c      write(6,'(a,30es10.2)') 'chgtot before space_decomp = ',
 c     &     chgtot(1:ntot)
+      if( iprint.ne.0 ) then
+        write(6,'(a,i8)') ' number of total atoms = ',ntot
+        write(6,'(a)') " h-matrix:"
+        write(6,'("   | ",3f12.3," |")') h(1,1:3,0)
+        write(6,'("   | ",3f12.3," |")') h(2,1:3,0)
+        write(6,'("   | ",3f12.3," |")') h(3,1:3,0)
+        write(6,'(a)') " which means the following lattice vectors:"
+        write(6,'(a,"[ ",3f12.3," ]")') '   a = ',h(1:3,1,0)
+        write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
+        write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
+        write(6,*) ''
+        do i=1,ntot
+          write(6,'(i8,3f12.5)') i,rtot(1:3,i)
+        enddo
+      endif
       call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
 c      write(6,'(a,200es10.2)') 'chg after space_decomp = ',chg(1:natm)
@@ -906,7 +922,7 @@ c-----copy RA of boundary atoms
      &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,.true.)
 c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
-     &     ,anxi,anyi,anzi,lspr)
+     &     ,anxi,anyi,anzi,lspr,iprint,.true.)
       lstrs = .true.
 
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
@@ -928,6 +944,10 @@ c     &       ,chg(1:natm)
 c.....Do not update epot here, so use epott instead.
         if( luse_vcMorse ) call pderiv_vcMorse(namax,natm,tag,ra,nnmax
      &       ,chg,h,rc,lspr,epott,iprint,ndimp,pderiv)
+      endif
+
+      if( iprint.ne.0 ) then
+        write(6,'(a,es15.7)') ' potential energy = ',epot
       endif
 
       call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
@@ -2316,8 +2336,6 @@ c=======================================================================
      &     ,chgtot,chitot,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
 c
 c  Decompose the system and scatter atoms to every process.
-c  This would be called only the first time of MD, but the routine is
-c  written as if it is called several times.
 c
       use pmdvars
       implicit none

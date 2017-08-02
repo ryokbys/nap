@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-26 11:23:10 Ryo KOBAYASHI>
+!                     Last modified: <2017-08-01 23:28:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -245,12 +245,6 @@ contains
         alpij= alp(is,js)
         rminij=rmin(is,js)
         texp = exp(2d0*alpij*(rminij-dij))
-!!$        if( i.eq.1 ) then
-!!$          write(6,'(a,4i6,10es12.4)') 'i,j,is,js,dij,d0ij,alpij,rminij,texp='&
-!!$               ,i,j,is,js,dij,d0ij,alpij,rminij,texp
-!!$          write(6,'(a,3(2x,3f10.5))') 'xi,xj,rij='&
-!!$               ,xi(1:3),xj(1:3),rij(1:3)
-!!$        endif
 !.....potential
         tmp= d0ij*texp
         tmp2 = 0.5d0 *tmp *fcut1(dij,rc)
@@ -262,6 +256,10 @@ contains
           epi(i)= epi(i) +tmp2
           epotl = epotl +tmp2
         endif
+!!$        if( i.eq.1 .and. iprint.ne.0 ) then
+!!$          write(6,'(a,4i6,10es12.4)') 'i,j,is,js,dij,d0ij,alpij,rminij,texp,tmp2='&
+!!$               ,i,j,is,js,dij,d0ij,alpij,rminij,texp,tmp2
+!!$        endif
 !.....force
         dedr= -2d0 *alpij *d0ij *texp *fcut1(dij,rc) &
              + tmp*dfcut1(dij,rc)

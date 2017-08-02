@@ -2,18 +2,18 @@ c-----------------------------------------------------------------------
 c Routines for making pair-list.
 c-----------------------------------------------------------------------
       subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc
-     &     ,h,hi,anxi,anyi,anzi,lspr)
+     &     ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
       implicit none
-      integer,intent(in):: namax,natm,nbmax,nb,nnmax
+      integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
       integer,intent(out):: lspr(0:nnmax,natm)
       real(8),intent(in):: ra(3,namax),rc,anxi,anyi,anzi
      &     ,hi(3,3),h(3,3),tag(namax)
+      logical,intent(in):: l1st
 
       integer:: i,j,k,l,m,n
       integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr
       real(8):: xi(3),xij(3),rij(3),rij2
       
-      logical,save:: l1st=.true.
       integer,allocatable,save:: lscl(:),lshd(:)
       real(8),save:: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi
       integer,save:: lcx,lcy,lcz,lcx2,lcy2,lcz2,lcyz2,lcxyz2
@@ -45,8 +45,8 @@ c        write(6,'(a,3i8)') ' lcx2,lcy2,lcz2=',lcx2,lcy2,lcz2
 c        write(6,'(a,i8)') ' lcxyz2=',lcxyz2
 c        write(6,'(a,3es12.4)') ' rcx,rcy,rcz=',rcx,rcy,rcz
 c-----allocate LSCL & LSHD after obtaining lcxyz2
+        if( allocated(lscl) ) deallocate(lscl,lshd)
         allocate(lscl(namax+nbmax),lshd(lcxyz2))
-        l1st=.false.
       endif
 
 c-----reset pair list, LSPR
