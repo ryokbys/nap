@@ -1479,7 +1479,7 @@ if __name__ == "__main__":
     specorder= args['--specorder'].split(',')
     copies= [ int(i) for i in args['--periodic-copy'].split(',') ]
     charges= args['--charges']
-    if charges is 'None':
+    if charges == 'None':
         cahrges = []
     else:
         charges = [ float(c) for c in charges.split(',') ]

@@ -210,8 +210,16 @@ flag_out_pmd
 
 * Default: 1
 
-A flag whether or not to write atom-configuration files at a certain steps.
+A flag whether or not to write atomic configurations to files at certain steps.
 
+0:
+  Not to write.
+
+1:
+  Write *pmd*-format atomic configurations to files ``pmd####`` where ``####`` indicates sequential number of the files.
+
+2:
+  Write LAMMPS *dump*-fomrat atomic configurations to files ``dump####``.
 
 ------------------------
 
@@ -222,7 +230,7 @@ num_out_pmd
 
 * Default: 10
 
-Number of atom-configuration outputs.
+Number of atom-configuration files to be written.
 
 
 ------------------------
