@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-07-20 06:50:38 Ryo KOBAYASHI>
+!                     Last-modified: <2017-08-05 12:25:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -145,7 +145,7 @@ program prec_mc
   end interface
 
   integer:: i,j,k,l,m,n,ierr
-  integer:: ihour,imin,isec
+  integer:: ihour,imin,isec,iday
   integer:: mpi_md_world,nodes_md,myid_md,myx,myy,myz
   real(8):: rc,anxi,anyi,anzi,sorg(3),t0,t1
   character:: cnum*6
@@ -192,7 +192,8 @@ program prec_mc
     write(cnum,'(i6.6)') 0
     call write_POSCAR('poscars/POSCAR_'//cnum,natm,csymbols,pos0,hmat,species)
   endif
-  call mk_lspr_sngl(natm,natm,nnmaxmc,tagmc,pos0,rc,hmat,hmati,lsprmc)
+  call mk_lspr_sngl(natm,natm,nnmaxmc,tagmc,pos0,rc,hmat,hmati,lsprmc, &
+       0,.true.)
 
 !.....check restart,
 !     if not restart, initialize system eigher random or clustered
@@ -221,13 +222,20 @@ program prec_mc
   t1 = mpi_wtime() - t0
   if( myid_md.eq.0 ) then
     call write_POSCAR('poscars/POSCAR_final',natm,csymbols,pos0,hmat,species)
+    iday  = int(t1/86400)
     ihour = int(t1/3600)
     imin  = int((t1-ihour*3600)/60)
     isec  = int(t1 -ihour*3600 -imin*60)
     write(6,*) ''
-    write(6,'(a,f10.2,a,i4,"h",i2.2,"m",i2.2,"s")') &
-         " time =",t1, &
-         " sec  = ",ihour,imin,isec
+    if( iday.gt.0 ) then
+      write(6,'(a,f12.1,a,i3,"D",i2,"h",i2.2,"m",i2.2,"s")') &
+           " time =",t1, &
+           " sec  = ",iday,ihour,imin,isec
+    else
+      write(6,'(a,f14.1,a,i5,"h",i2.2,"m",i2.2,"s")') &
+           " time =",t1, &
+           " sec  = ",ihour,imin,isec
+    endif
   endif
 
   call mpi_finalize(ierr)

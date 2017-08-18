@@ -47,6 +47,19 @@ module minimize
 !.....L-BFGS
   integer:: mstore   = 10
 
+!.....GA
+  type gene  ! A Gene corresponds to a parameter/variable to be optimized
+    integer:: bit_length
+    integer(2),allocatable:: bits(:)
+    real(8):: vmax,vmin
+  end type gene
+
+  type individual  ! An individual is a set of parameters
+    integer:: num_gene
+    real(8):: rate_mutate
+    real(8):: value
+  end type individual
+
 contains
 !=======================================================================
   subroutine steepest_descent(ndim,x,f,g,d,xtol,gtol,ftol,maxiter &
@@ -2538,4 +2551,59 @@ contains
     
   end subroutine metadynamics
 !=======================================================================
+  subroutine ga(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
+!
+!  Genetic algorithm (GA) which does not use gradient information.
+!
+    use random
+    implicit none
+    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
+    integer,intent(inout):: iflag
+    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
+    real(8),intent(inout):: fbest,xbest(ndim)
+    character(len=*),intent(in):: cfmethod
+    interface
+      subroutine func(n,x,ftrn,ftst)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
+    end interface
+
+    integer:: iter,idim,nadpt,i,l
+    real(8):: f,ft,temp,xw,dx,p,pt,ptrans,ftst,tau,xmin,xmax
+    real(8),allocatable:: x(:),xt(:)
+    logical,save:: l1st = .true.
+
+    if( l1st ) then
+      if( myid.eq.0 .and. iprint.ne.0 ) then
+        print *,''
+        print *,'******************** Genetic Algorithm ********************'
+        print *,''
+      endif
+    endif
+
+!.....Create population that includes some individuals
+
+!.....GA loop starts....................................................
+
+!.....Give birth some offsprings by crossover
+
+!.....Mutation of new-born babies
+
+!.....Evaluate the value of each new-born babies
+
+!.....Selection
+
+!.....Output the current best, if needed
+
+!.....END of GA loop....................................................
+
+!.....Output information of the best    
+
+  end subroutine ga
 end module

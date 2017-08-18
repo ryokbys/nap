@@ -23,6 +23,11 @@ Options:
               Scale the cell. [default: None]
   --periodic-copy=COPIES
               Number of copies of a,b,and c directions. [default: 1,1,1]
+  --charges=CHARGES
+              Charges of species. Charges should be numbers separated by comma.
+              If it is None, no charge is set.
+              If it is set and the output format accepts, charges are written.
+              [default: None]
 """
 
 import math
@@ -49,13 +54,15 @@ class NAPSystem(object):
     Contains cell information and atoms, and provides some functionalities.
     """
 
-    def __init__(self, fname=None, ffmt=None, specorder=[], ase_atoms=None):
+    def __init__(self, fname=None, ffmt=None, specorder=[], ase_atoms=None,
+                 charges=[]):
         self.alc = 1.0
         self.a1 = np.zeros(3)
         self.a2 = np.zeros(3)
         self.a3 = np.zeros(3)
         self.atoms = []
         self.specorder = specorder
+        self.charges = charges
 
         specorder_good = False
         for s in self.specorder:
@@ -70,6 +77,12 @@ class NAPSystem(object):
 
         if ase_atoms is not None:
             self.from_ase_atoms(ase_atoms)
+
+        if len(self.charges) > 0:
+            if len(self.charges) < len(self.specorder):
+                lenc = len(self.charges)
+                for i in range(len(self.specorder)-lenc):
+                    self.charges.append(0.0)
 
     def set_lattice(self, alc, a1, a2, a3):
         self.alc = alc
@@ -212,7 +225,10 @@ class NAPSystem(object):
         elif fmt == 'xsf':
             self.write_xsf(fname)
         elif fmt == 'lammps':
-            self.write_lammps_data(fname)
+            if len(self.charges) > 0:
+                self.write_lammps_data(fname,atom_style='charge')
+            else:
+                self.write_lammps_data(fname)
         else:
             raise ValueError('Cannot detect output file format: '+fmt)
 
@@ -745,9 +761,9 @@ You need to specify the species order correctly with --specorder option.
         poss = np.zeros((len(self.atoms),3),dtype=float)
         for i in range(len(self.atoms)):
             poss[i,:] = self.atoms[i].pos[:]
-        print poss
+        #print poss
         poss = spos_to_lammps_pos(hmat,poss)
-        print poss
+        #print poss
         for i in range(len(self.atoms)):
             ai= self.atoms[i]
             # print hmat
@@ -757,7 +773,7 @@ You need to specify the species order correctly with --specorder option.
             pos = poss[i]
             f.write("{0:8d} {1:3d} ".format(i+1,ai.sid))
             if atom_style == 'charge':
-                f.write('{0:10.4f} '.format(ai.aux['charge']))
+                f.write('{0:10.4f} '.format(self.charges[ai.sid-1]))
             f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(pos[0],
                                                             pos[1],
                                                             pos[2]))
@@ -1418,9 +1434,9 @@ def unitvec_to_hi(a1,a2,a3):
 
 
 def analyze(psys):
-    a1 = psys.a1
-    a2 = psys.a2
-    a3 = psys.a3
+    a1 = psys.a1 *psys.alc
+    a2 = psys.a2 *psys.alc
+    a3 = psys.a3 *psys.alc
     a = np.linalg.norm(a1)
     b = np.linalg.norm(a2)
     c = np.linalg.norm(a3)
@@ -1462,8 +1478,13 @@ if __name__ == "__main__":
     scalefactor= args['--scale']
     specorder= args['--specorder'].split(',')
     copies= [ int(i) for i in args['--periodic-copy'].split(',') ]
-    
-    psys= NAPSystem(fname=infname,ffmt=infmt,specorder=specorder)
+    charges= args['--charges']
+    if charges == 'None':
+        cahrges = []
+    else:
+        charges = [ float(c) for c in charges.split(',') ]
+
+    psys= NAPSystem(fname=infname,ffmt=infmt,specorder=specorder,charges=charges)
 
     #...Periodic copy if needed
     copy_needed = False
