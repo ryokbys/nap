@@ -142,21 +142,22 @@ c---------Continue until i= 0
 
       end subroutine mk_lspr_para
 c=======================================================================
-      subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,h,hi,lspr)
+      subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,h,hi,lspr
+     &     ,iprint,l1st)
 c
 c Make lspr in serial implimentation taking the periodic boundary
 c condition into account.
 c
       implicit none
-      integer,intent(in):: namax,natm,nnmax
+      integer,intent(in):: namax,natm,nnmax,iprint
       integer,intent(out):: lspr(0:nnmax,natm)
       real(8),intent(in):: ra(3,namax),rc,hi(3,3),h(3,3),tag(namax)
+      logical,intent(in):: l1st
 
       integer:: i,j,k,l,m,n
       integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr
       real(8):: xi(3),xij(3),rij(3),rij2
       
-      logical,save:: l1st=.true.
       integer,allocatable,save:: lscl(:),lshd(:)
       real(8),save:: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi
       integer,save:: lcx,lcy,lcz,lcyz,lcxyz
@@ -182,7 +183,6 @@ c-----make a linked cell list, LSCL
         rczi=1d0/rcz
 c-----allocate LSCL & LSHD after obtaining lcxyz
         allocate(lscl(namax),lshd(lcxyz))
-        l1st=.false.
       endif
 
 c-----reset pair list, LSPR
@@ -277,22 +277,22 @@ c---------Continue until i= 0
       end subroutine mk_lspr_sngl
 c=======================================================================
       subroutine mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc
-     &     ,h,hi,sgm,lspr)
+     &     ,h,hi,sgm,lspr,iprint,l1st)
 c
 c  Make pair list, lspr, by brute force approach, because the system
 c  is supposed to be small. Expand the system to take all the atoms 
 c  within given cutoff radius into account.
 c
       implicit none
-      integer,intent(in):: namax,natm,nnmax,nbmax
+      integer,intent(in):: namax,natm,nnmax,nbmax,iprint
       integer,intent(out):: lspr(0:nnmax,natm),nb
       real(8),intent(in):: rc,hi(3,3),h(3,3),sgm(3,3)
       real(8),intent(out):: ra(3,namax),tag(namax)
+      logical,intent(in):: l1st
 
       integer:: i,j,k,l,m,n,ia,ja,inc,ix,iy,iz
       real(8):: tmp,xi(3),sij(3),xij(3),rij,vol,asgm
 
-      logical,save:: l1st=.true.
       integer,save:: naex,nex(3)
       real(8),save:: rc2
 
@@ -379,7 +379,6 @@ c          write(6,'(i3,a,50i6)') ia,": ",(lspr(i,ia),i=1,lspr(0,ia))
 c        enddo
 c      endif
 
-      l1st=.false.
       end subroutine mk_lspr_brute
 c-----------------------------------------------------------------------
 c     Local Variables:
