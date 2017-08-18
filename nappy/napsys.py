@@ -1445,7 +1445,7 @@ def analyze(psys):
     print 'gamma = {0:7.2f} deg.'.format(gamma)
     print 'volume= {0:10.3f} A^3'.format(vol)
     print 'number of atoms   = ',psys.num_atoms()
-    print 'number of species:'
+    print 'number of atoms per species:'
     nspcs = psys.num_species()
     for i,s in enumerate(psys.specorder):
         print '   {0:s}: {1:d}'.format(s,nspcs[i])
