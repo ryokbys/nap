@@ -143,6 +143,6 @@ if __name__ == '__main__':
     logfile.write(' Bulk modulus     = {0:10.2f} GPa\n'.format(plsq[0][0]*1.602e+2))
 
     print '{0:=^72}'.format(' OUTPUT ')
-    print ' * out.Ecoh-vs-size'
-    print ' * log.Ecoh-vs-size'
-    print ' * graph.Ecoh-vs-size.eps'
+    print ' * out.energy_vs_size'
+    print ' * log.energy_vs_size'
+    #print ' * graph.Ecoh-vs-size.eps'

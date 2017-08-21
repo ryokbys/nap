@@ -58,20 +58,20 @@ and curvature around the lattice constant corresponds to the bulk modulus.
 3. Set ``num_iteration`` value in ``in.pmd`` file to zero. (Because only the 1st evaluation of the potential energy and forces are required.)
 
 4. Perform test run of ``pmd`` as,
-  ::
+   ::
   
-    $ /path/to/pmd/pmd
+     $ /path/to/pmd/pmd
   
-  And confirm that ``pmd`` works correctly.
+   And confirm that ``pmd`` works correctly.
 
 5. Run the script as,
-  ::
+   ::
   
-    $ /path/to/pmd/util/Ecoh-vs-size.py 3.1  3.3
+     $ /path/to/nap/nappy/energy_vs_size.py 3.1  3.3
   
-  where 3.1 and 3.3 are the min and max value of lattice size.
-  Then you get the following output and graph.
-  ::
+   where 3.1 and 3.3 are the min and max value of lattice size.
+   Then you get the following output and graph.
+   ::
   
          3.1000   804.3570    -455.5304887
          3.1100   812.1662    -457.0570473
@@ -101,11 +101,11 @@ and curvature around the lattice constant corresponds to the bulk modulus.
      Bulk modulus     =     302.16 GPa
     ================================ OUTPUT ================================
      * out.Ecoh-vs-size
-     * graph.Ecoh-vs-size.eps
+     * log.Ecoh-vs-size.eps
   
-  .. image:: ./figs/Ecoh-vs-size.png
+   .. image:: ./figs/Ecoh-vs-size.png
   
-  Also an eps file of the same graph is written in ``graph.Ecoh-vs-size.eps``.
+   Then you can make a graph using some plotting program like ``gnuplot`` with the ``out.energy_vs_size`` file.
 
 ------
 
@@ -123,7 +123,7 @@ and the lattice constant is alreadly obtained.
 1. Set the lattice constant in ``pmdini`` file to the value obtained in :ref:`lattice-constant` .
 
 2. Run the script as follows, then you can get the following outputs and graph.
-  ::
+   ::
   
     $ calc-elastic-constants.py
          0.0000    -222.6114952    -222.6114952    -222.6114952
@@ -150,7 +150,7 @@ and the lattice constant is alreadly obtained.
      * out.elastic-constants
      * graph.elastic-constants.eps
 
-  .. image:: ./figs/graph_elastic-constants.png
+   .. image:: ./figs/graph_elastic-constants.png
 
 
 --------
