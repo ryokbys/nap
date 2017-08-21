@@ -103,10 +103,10 @@ and curvature around the lattice constant corresponds to the bulk modulus.
      * out.Ecoh-vs-size
      * log.Ecoh-vs-size.eps
   
-   .. image:: ./figs/Ecoh-vs-size.png
-  
    Then you can make a graph using some plotting program like ``gnuplot`` with the ``out.energy_vs_size`` file.
 
+   .. image:: ./figs/Ecoh-vs-size.png
+  
 ------
 
 .. _elastic-constants:

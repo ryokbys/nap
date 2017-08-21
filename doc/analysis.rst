@@ -44,9 +44,13 @@ Or copy ``util/gp.erg`` script to the working directory and,
 
 Visualization of atom configuration
 ==============================================
-There is a conversion program which changes from pmd format to visualization software format.
+
+Convert from *pmd*-format files
+-----------------------------------
+
+There is a conversion program that changes from pmd format to visualization software format.
 When visualizing the atom configuration by using `Ovito <https://www.ovito.org>`_ ,
-first convert the pmd-format files, ``pmd####`` , to LAMMPS-dump format files by doing the following,
+first convert the *pmd*-format files, ``pmd####`` , to *LAMMPS-dump* format files by doing the following,
 ::
 
   $ /path/to/nap/nappy/napsys.py convert --specorder=A,B,C pmd#### dump####
@@ -60,6 +64,13 @@ If there are sequential ``pmd####`` files, one can convert those files by using 
 
   $ for f in pmd????; do /path/to/nap/nappy/napsys.py convert \
       --specorder=A,B,C $f `echo $f | sed 's/pmd/dump/'`; done
+
+
+Write *LAMMPS-dump* file directly
+-------------------------------------
+If you set ``flag_out_pmd`` as ``2``, the ``pmd`` program writes atomic configurations in *LAMMPS-dump* format
+with file names ``dump####``.
+So you can visualize those files without any conversion using *Ovito* or some other programs that can visualize *LAMMPS-dump* file.
 
 
 --------
@@ -78,6 +89,11 @@ To perform Voronoi analysis, you need to instal ``voro++`` first, and then
 
 This command will provide an output ``akr0000.voro`` and ``akr0000.voro.vol`` which are
 input and output of ``voro++``, respectively.
+
+.. note::
+
+   This *akr* format is obsolete. But currently there is no other Voronoi analysis tool in this package.
+   So if you need to do Voronoi analysis, you need to convert ``pmd####`` files to ``akr####`` files by using ``napsys.py convert``.
 
 
 --------

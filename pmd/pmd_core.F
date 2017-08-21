@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-08-01 23:28:34 Ryo KOBAYASHI>
+c                     Last-modified: <2017-08-21 15:04:57 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -871,9 +871,9 @@ c     &     chgtot(1:ntot)
         write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
         write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
         write(6,*) ''
-        do i=1,ntot
-          write(6,'(i8,3f12.5)') i,rtot(1:3,i)
-        enddo
+c        do i=1,ntot
+c          write(6,'(i8,3f12.5)') i,rtot(1:3,i)
+c        enddo
       endif
       call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
