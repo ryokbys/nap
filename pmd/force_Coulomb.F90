@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-13 18:32:31 Ryo KOBAYASHI>
+!                     Last modified: <2017-08-21 15:09:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -297,7 +297,7 @@ contains
         enddo
 10      close(ioprms)
         if( iprint.ne.0 ) then
-          write(6,'(a)') ' Finish reading '//trim(fname)
+          write(6,'(a)') ' Finished reading '//trim(fname)
           write(6,*) ''
         endif
 

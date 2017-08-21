@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-08-21 15:04:57 Ryo KOBAYASHI>
+c                     Last-modified: <2017-08-21 15:14:28 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -970,7 +970,10 @@ c.....deallocate all the arrays allocated
       deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
      &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
 
-c      write(6,'(a)') 'one_shot done.'
+      if( iprint.ne.0 ) then
+        write(6,'(a)') ' one_shot done.'
+        write(6,*) ''
+      endif
       return
       end subroutine one_shot
 c=======================================================================
