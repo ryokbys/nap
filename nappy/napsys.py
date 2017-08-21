@@ -746,7 +746,10 @@ You need to specify the species order correctly with --specorder option.
         f.write("{0:d}  atom types\n".format(len(self.num_species())))
         f.write('\n')
         hmat = self.get_hmat()
-        xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz = hmat_to_lammps(hmat)
+        poss = np.zeros((len(self.atoms),3),dtype=float)
+        for i in range(len(self.atoms)):
+            poss[i,:] = self.atoms[i].pos[:]
+        xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,poss = to_lammps(hmat,poss)
         f.write("{0:20.10f} {1:20.10f} xlo xhi\n".format(xlo,xhi))
         f.write("{0:20.10f} {1:20.10f} ylo yhi\n".format(ylo,yhi))
         f.write("{0:20.10f} {1:20.10f} zlo zhi\n".format(zlo,zhi))
@@ -758,11 +761,8 @@ You need to specify the species order correctly with --specorder option.
         # pos = np.zeros(3,dtype=float)
         if self.atoms[0].aux.has_key('charge'):
             atom_style = 'charge'
-        poss = np.zeros((len(self.atoms),3),dtype=float)
-        for i in range(len(self.atoms)):
-            poss[i,:] = self.atoms[i].pos[:]
         #print poss
-        poss = spos_to_lammps_pos(hmat,poss)
+        # poss = spos_to_lammps_pos(hmat,poss)
         #print poss
         for i in range(len(self.atoms)):
             ai= self.atoms[i]
@@ -1420,7 +1420,120 @@ def spos_to_lammps_pos(hmat,spos):
             pos[i] = np.dot(hmat,sp)
             pos[i] = np.dot(bmat,np.dot(amat,pos[i]))/vol
     return pos
+
+def to_lammps(hmat,spos):
+    """
+    Convert h-matrix and scaled positions in napsys to 
+    LAMMPS representation.
+    Parameters to be output:
+      xlo, xhi, ylo, yhi, zlo, zhi, xy, xz, yz, pos
+    LAMMPS cell should be defined as,
+      a = ( xhi-xlo,       0,       0 )
+      b = (      xy, yhi-hlo,       0 )
+      c = (      xz,      yz, zhi-zlo )
+    See, http://lammps.sandia.gov/doc/Section_howto.html, for detail.
+    Note that xy, xz, and yz have limitations in their ranges.
+    """
+    import numpy as np
+    if isinstance(hmat,list):
+        hmat = np.array(hmat)
+        
+    if not isinstance(spos,np.ndarray):
+        if isinstance(spos,list):
+            spos = np.array(spos)
+        else:
+            raise TypeError('spos should be list or numpy.ndarray.')
+    a0 = hmat[:,0]
+    b0 = hmat[:,1]
+    c0 = hmat[:,2]
+    xlo = 0.0
+    ylo = 0.0
+    zlo = 0.0
+    a = np.linalg.norm(a0)
+    b = np.linalg.norm(b0)
+    c = np.linalg.norm(c0)
+    alpha = np.arccos(np.dot(b0,c0)/b/c)
+    beta  = np.arccos(np.dot(a0,c0)/a/c)
+    gamma = np.arccos(np.dot(a0,b0)/a/b)
+    xhi = a
+    xy = b*np.cos(gamma)
+    xz = c*np.cos(beta)
+    yhi = np.sqrt(b*b -xy*xy)
+    yz = (b*c*np.cos(alpha) -xy*xz)/yhi
+    zhi = np.sqrt(c*c -xz*xz -yz*yz)
     
+    lxy = 0
+    if xy > xhi/2:
+        xy -= xhi
+        lxy = -1
+    elif xy < -xhi/2:
+        xy += xhi
+        lxy = 1
+    lxz = 0
+    if xz > xhi/2:
+        xz -= xhi
+        lxz = -1
+    elif xz < -xhi/2:
+        xz += xhi
+        lxz = 1
+    lyz = 0
+    if yz > yhi/2:
+        yz -= yhi
+        lyz = -1
+    elif yz < -yhi/2:
+        yz += yhi
+        lyz = 1
+
+    a1 = np.array(hmat[:,0])
+    a2 = np.array(hmat[:,1])
+    a3 = np.array(hmat[:,2])
+    vol = abs(np.dot(a1,np.cross(a2,a3)))
+    a23 = np.cross(a2,a3)
+    a31 = np.cross(a3,a1)
+    a12 = np.cross(a1,a2)
+    amat = np.zeros((3,3),dtype=float)
+    amat[0,:] = a23[:]
+    amat[1,:] = a31[:]
+    amat[2,:] = a12[:]
+    b1 = np.array((xhi-xlo,0.0,0.0))
+    b2 = np.array((xy,yhi-ylo,0.0))
+    b3 = np.array((xz,yz,zhi-zlo))
+    bmat = np.zeros((3,3),dtype=float)
+    bmat[:,0] = b1[:]
+    bmat[:,1] = b2[:]
+    bmat[:,2] = b3[:]
+    if len(spos.shape) == 1:  # only one atom
+        pos = np.zeros(spos.shape,dtype=float)
+        newspos = shift_spos_for_lammps(spos,lxy,lxz,lyz)
+        pos = np.dot(hmat,newspos)
+        pos = np.dot(bmat,np.dot(amat,pos))/vol
+    elif len(spos.shape) == 2:  # array of atoms
+        pos = np.zeros(spos.shape,dtype=float)
+        for i,sp in enumerate(spos):
+            newspos = shift_spos_for_lammps(sp,lxy,lxz,lyz)
+            pos[i] = np.dot(hmat,newspos)
+            pos[i] = np.dot(bmat,np.dot(amat,pos[i]))/vol
+        
+    return xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,pos
+
+def pbc(x):
+    if x < 0.:
+        return x +1.0
+    elif x >= 1.0:
+        return x -1.0
+    else:
+        return x
+
+def shift_spos_for_lammps(spos,lxy,lxz,lyz):
+    import copy
+    new_spos = copy.deepcopy(spos)
+    new_spos[0] -= lxy*spos[1]
+    new_spos[0] -= lyz*spos[2]
+    new_spos[1] -= lyz*spos[2]
+    for i in range(3):
+        new_spos[i] = pbc(new_spos[i])
+    return new_spos
+
 def unitvec_to_hi(a1,a2,a3):
     """
     Convert 3 unitvectors to inversed h-matrix via h-matrix.
@@ -1480,7 +1593,7 @@ if __name__ == "__main__":
     copies= [ int(i) for i in args['--periodic-copy'].split(',') ]
     charges= args['--charges']
     if charges == 'None':
-        cahrges = []
+        charges = []
     else:
         charges = [ float(c) for c in charges.split(',') ]
 
