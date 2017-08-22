@@ -678,7 +678,9 @@ You need to specify the species order correctly with --specorder option.
         symbol = None
         self.atoms= []
         self.alc= 1.0
-
+        xy = 0.0
+        xz = 0.0
+        yz = 0.0
         for line in f.readlines():
             data = line.split()
             if mode == 'None':
@@ -1559,6 +1561,8 @@ def unitvec_to_hi(a1,a2,a3):
 
 
 def analyze(psys):
+    import elements
+    from units import amu_to_g, Ang_to_cm
     a1 = psys.a1 *psys.alc
     a2 = psys.a2 *psys.alc
     a3 = psys.a3 *psys.alc
@@ -1586,11 +1590,15 @@ def analyze(psys):
     print 'gamma = {0:7.2f} deg.'.format(gamma)
     print 'volume= {0:10.3f} A^3'.format(vol)
     print 'number of atoms   = ',psys.num_atoms()
-    print 'number of atoms per species:'
-    nspcs = psys.num_species()
-    for i,s in enumerate(psys.specorder):
-        print '   {0:s}: {1:d}'.format(s,nspcs[i])
-        
+    if psys.specorder:
+        print 'number of atoms per species:'
+        nspcs = psys.num_species()
+        mass = 0.0
+        for i,s in enumerate(psys.specorder):
+            print '   {0:s}: {1:d}'.format(s,nspcs[i])
+            mass += nspcs[i]*elements.elements[s]['mass']
+        print 'density = {0:7.2f} g/cm^3'.format(mass*amu_to_g
+                                                 /(vol*Ang_to_cm**3) )
 
 if __name__ == "__main__":
 
