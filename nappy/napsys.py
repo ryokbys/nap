@@ -62,7 +62,6 @@ class NAPSystem(object):
         self.a3 = np.zeros(3)
         self.atoms = []
         self.specorder = specorder
-        self.charges = charges
 
         specorder_good = False
         for s in self.specorder:
@@ -78,11 +77,7 @@ class NAPSystem(object):
         if ase_atoms is not None:
             self.from_ase_atoms(ase_atoms)
 
-        if len(self.charges) > 0:
-            if len(self.charges) < len(self.specorder):
-                lenc = len(self.charges)
-                for i in range(len(self.specorder)-lenc):
-                    self.charges.append(0.0)
+        self.set_charges(charges)
 
     def set_lattice(self, alc, a1, a2, a3):
         self.alc = alc
@@ -210,6 +205,20 @@ class NAPSystem(object):
             symbols.append(a.symbol)
         return symbols
 
+    def get_charges(self):
+        return self.charges
+
+    def set_charges(self,charges):
+        self.charges = charges
+        if len(self.charges) > 0:
+            if self.specorder is not None \
+               and len(self.charges) < len(self.specorder):
+                lenc = len(self.charges)
+                for i in range(len(self.specorder)-lenc):
+                    self.charges.append(0.0)
+        return None
+        
+        
     def write(self,fname="pmdini",fmt=None):
         if fmt in (None,'None'):
             fmt= parse_filename(fname)
@@ -661,7 +670,7 @@ You need to specify the species order correctly with --specorder option.
             f.write("\n")
         f.close()
 
-    def read_lammps_data(self,fname="data.lammps"):
+    def read_lammps_data(self,fname="data.lammps",atom_style='atomic'):
         f=open(fname,'r')
         mode= 'None'
         ixyz= 0
@@ -692,10 +701,13 @@ You need to specify the species order correctly with --specorder option.
                     yz = float(data[2])
                 elif 'Atoms' in line:
                     mode = 'Atoms'
-                    #...Cell info should be already read
-                    self.a1 = np.array([xhi-xlo,xy,xz],dtype=float)
-                    self.a2 = np.array([0.0,yhi-ylo,yz],dtype=float)
-                    self.a3 = np.array([0.0,0.0,zhi-zlo],dtype=float)
+                    #...Cell info (xhi,xlo,...) should already be read
+                    # self.a1 = np.array([xhi-xlo,xy,xz],dtype=float)
+                    # self.a2 = np.array([0.0,yhi-ylo,yz],dtype=float)
+                    # self.a3 = np.array([0.0,0.0,zhi-zlo],dtype=float)
+                    self.a1 = np.array([xhi-xlo,0.0,0.0],dtype=float)
+                    self.a2 = np.array([xy,yhi-ylo,0.0],dtype=float)
+                    self.a3 = np.array([xz,yz,zhi-zlo],dtype=float)
                     hmat = self.get_hmat()
                     hmati= np.linalg.inv(hmat)
                     continue
@@ -709,7 +721,7 @@ You need to specify the species order correctly with --specorder option.
                         symbol = self.specorder[ai.sid-1]
                     if symbol and ai.symbol != symbol:
                         ai.set_symbol(symbol)
-                    if len(data) == 6:  # In case data have atomic charges
+                    if atom_style == 'charge': 
                         idat += 1
                         chg = float(data[idat])
                         ai.set_aux('charge',chg)
