@@ -528,6 +528,9 @@ You need to specify the species order correctly with --specorder option.
         symbol = None
         self.atoms= []
         self.alc= 1.0
+        xy = 0.0
+        xz = 0.0
+        yz = 0.0
         for line in f.readlines():
             if 'ITEM' in line:
                 if 'NUMBER OF ATOMS' in line:
@@ -1475,6 +1478,9 @@ def to_lammps(hmat,spos):
     yhi = np.sqrt(b*b -xy*xy)
     yz = (b*c*np.cos(alpha) -xy*xz)/yhi
     zhi = np.sqrt(c*c -xz*xz -yz*yz)
+    x = xhi-xlo
+    y = yhi-ylo
+    z = zhi-zlo
     
     lxy = 0
     if xy > xhi/2:
@@ -1497,7 +1503,6 @@ def to_lammps(hmat,spos):
     elif yz < -yhi/2:
         yz += yhi
         lyz = 1
-
     a1 = np.array(hmat[:,0])
     a2 = np.array(hmat[:,1])
     a3 = np.array(hmat[:,2])
@@ -1509,22 +1514,22 @@ def to_lammps(hmat,spos):
     amat[0,:] = a23[:]
     amat[1,:] = a31[:]
     amat[2,:] = a12[:]
-    b1 = np.array((xhi-xlo,0.0,0.0))
-    b2 = np.array((xy,yhi-ylo,0.0))
-    b3 = np.array((xz,yz,zhi-zlo))
+    b1 = np.array((x,0.0,0.0))
+    b2 = np.array((xy,y,0.0))
+    b3 = np.array((xz,yz,z))
     bmat = np.zeros((3,3),dtype=float)
     bmat[:,0] = b1[:]
     bmat[:,1] = b2[:]
     bmat[:,2] = b3[:]
     if len(spos.shape) == 1:  # only one atom
         pos = np.zeros(spos.shape,dtype=float)
-        newspos = shift_spos_for_lammps(spos,lxy,lxz,lyz)
+        newspos = shift_spos_for_lammps(spos,lxy,lxz,lyz,x,y,z,yz,xz,xy)
         pos = np.dot(hmat,newspos)
         pos = np.dot(bmat,np.dot(amat,pos))/vol
     elif len(spos.shape) == 2:  # array of atoms
         pos = np.zeros(spos.shape,dtype=float)
         for i,sp in enumerate(spos):
-            newspos = shift_spos_for_lammps(sp,lxy,lxz,lyz)
+            newspos = shift_spos_for_lammps(sp,lxy,lxz,lyz,x,y,z,yz,xz,xy)
             pos[i] = np.dot(hmat,newspos)
             pos[i] = np.dot(bmat,np.dot(amat,pos[i]))/vol
         
@@ -1532,18 +1537,19 @@ def to_lammps(hmat,spos):
 
 def pbc(x):
     if x < 0.:
-        return x +1.0
+        return x -int(x) +1.0
     elif x >= 1.0:
-        return x -1.0
+        return x -int(x)
     else:
         return x
 
-def shift_spos_for_lammps(spos,lxy,lxz,lyz):
+def shift_spos_for_lammps(spos,lxy,lxz,lyz,x,y,z,yz,xz,xy):
     import copy
+    xyp = xy -lxy*x
     new_spos = copy.deepcopy(spos)
-    new_spos[0] -= lxy*spos[1]
-    new_spos[0] -= lyz*spos[2]
     new_spos[1] -= lyz*spos[2]
+    new_spos[0] = new_spos[0] -lxz*spos[2] \
+                  +(spos[1]*xyp -new_spos[1]*xy)/x
     for i in range(3):
         new_spos[i] = pbc(new_spos[i])
     return new_spos
