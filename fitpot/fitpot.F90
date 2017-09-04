@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-08-21 15:21:44 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-04 17:33:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1130,6 +1130,7 @@ subroutine write_energy_relation(cadd)
   
   integer:: ismpl,n
   logical,save:: l1st = .true.
+!!$  real(8):: epotsub
   
   cfname='out.erg.'//trim(cadd)
 
@@ -1166,6 +1167,13 @@ subroutine write_energy_relation(cadd)
     enddo
   endif
 
+!!$  if( len(trim(crefstrct)).gt.5 ) then
+!!$    if( myid.eq.myidrefsub ) then
+!!$      epotsub = samples(isidrefsub)%epot
+!!$    endif
+!!$    call mpi_bcast(epotsub,1,mpi_integer,myidrefsub,mpi_world,ierr)
+!!$  endif
+
   epotl(1:nsmpl)= 0d0
   do ismpl=isid0,isid1
     epotl(ismpl)= samples(ismpl)%epot
@@ -1180,7 +1188,7 @@ subroutine write_energy_relation(cadd)
     do ismpl=1,nsmpl
       epotg(ismpl)= epotg(ismpl)/nalist(ismpl)
       if( iclist(ismpl).eq.1 ) then
-        write(90,'(2es15.7,2x,a,3es12.3e3)') erefg(ismpl) &
+        write(90,'(2es15.7,2x,a,10es13.4e3)') erefg(ismpl) &
              ,epotg(ismpl),trim(cdirlist(ismpl)) &
              ,abs(erefg(ismpl)-epotg(ismpl)) &
              ,eerrg(ismpl),esubg(ismpl)

@@ -128,6 +128,7 @@ contains
         epotsub = samples(isidrefsub)%epot
       endif
       call mpi_bcast(epotsub,1,mpi_integer,myidrefsub,mpi_world,ierr)
+!!$      print *,'myid,epotsub=', myid,epotsub
     endif
 
     do ismpl=isid0,isid1
@@ -148,6 +149,12 @@ contains
         endif
         ediff= ediff*ediff
         ftmp= ftmp +ediff *swgt
+!!$        write(6,'(a,i3,a20,6f12.5)') &
+!!$             'ismpl,cdirname,(eref-esub),epot,ediff,esub,epotsub,erefsub=',&
+!!$             ismpl,trim(samples(ismpl)%cdirname),&
+!!$             (eref-esub)/natm,epot/natm,&
+!!$             abs(epot-epotsub -(eref-esub-erefsub))/natm,esub/natm,&
+!!$             epotsub/natm, erefsub/natm
       endif
 !.....Force matching
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
@@ -175,6 +182,7 @@ contains
       else if( smpl%iclass.eq.2 ) then
         ftstl = ftstl +ftmp
       endif
+!!$      write(6,'(a,f12.5)') ' ftrnl = ',ftrnl
     enddo  ! ismpl
 
 !!$    call mpi_barrier(mpi_world,ierr)
