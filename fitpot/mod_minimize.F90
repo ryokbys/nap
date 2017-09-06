@@ -2591,6 +2591,8 @@ contains
 
     integer,parameter:: io_indivs = 30
     character(len=128),parameter:: cf_indivs = 'out.ga.individuals'
+    integer,parameter:: io_steps = 31
+    character(len=128),parameter:: cf_steps = 'out.ga.generations'
 
     if( l1st ) then
 !.....Initialize
@@ -2628,6 +2630,8 @@ contains
     if( myid.eq.0 ) then
       open(io_indivs,file=cf_indivs,status='replace')
       write(io_indivs,'(a)') '# iid, fval, vars...'
+      open(io_steps,file=cf_steps,status='replace')
+      write(io_steps,'(a)') '# iter, iid, ftrn'
     endif
 100 format(i6,es14.6,20f9.4)
 
@@ -2660,11 +2664,18 @@ contains
         xbest(1:ndim) = xtmp(1:ndim)
       endif
     enddo
+    if( myid.eq.0 ) then
+      iter = 0
+      write(6,'(a,i8,1x,100es12.4)') &
+           " iter,fbest,fvals= ",&
+           iter,fbest,(indivs(i)%fvalue,i=1,min(ndim,10))
+      do i=1,ga_nindivs
+        write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
+      enddo
+    endif
 
 !.....GA loop starts....................................................
     do iter=1,maxiter
-      if( myid.eq.0 ) write(6,'(a,i8,1x,100es12.4)') " iter,fvals= ",iter, &
-           (indivs(i)%fvalue,i=1,ndim)
 
 !.....Give birth some offsprings by crossover
 !!$      print *,'giving birth...'
@@ -2695,6 +2706,14 @@ contains
 !!$      print *,'selecting...'
       call roulette_selection(indivs,ga_noffsp,offsprings,fbest)
 
+      if( myid.eq.0 ) then
+        write(6,'(a,i8,1x,100es12.4)') &
+           " iter,fbest,fvals= ",&
+           iter,fbest,(indivs(i)%fvalue,i=1,min(ndim,10))
+        do i=1,ga_nindivs
+          write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
+        enddo
+      endif
     end do
 !.....END of GA loop....................................................
 
@@ -2710,6 +2729,7 @@ contains
     call func(ndim,xbest,ftrn,ftst)
 
     close(io_indivs)
+    close(io_steps)
     return
   end subroutine ga
 !=======================================================================
