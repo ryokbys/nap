@@ -193,6 +193,21 @@ c=======================================================================
       elseif( trim(cname).eq.'md_num_gaussian' ) then
         call read_i1(ionum,md_ng)
         return
+      elseif( trim(cname).eq.'ga_temperature' ) then
+        call read_r1(ionum,ga_temp)
+        return
+      elseif( trim(cname).eq.'ga_num_bits' ) then
+        call read_i1(ionum,ga_nbits)
+        return
+      elseif( trim(cname).eq.'ga_num_individuals' ) then
+        call read_i1(ionum,ga_nindivs)
+        return
+      elseif( trim(cname).eq.'ga_mutation_rate' ) then
+        call read_r1(ionum,ga_rate_mutate)
+        return
+      elseif( trim(cname).eq.'ga_fitness' ) then
+        call read_c1(ionum,ga_fitness)
+        return
       elseif( trim(cname).eq.'random_seed' ) then
         call read_r1(ionum,rseed)
         return

@@ -127,7 +127,7 @@ contains
       if( myid.eq.myidrefsub ) then
         epotsub = samples(isidrefsub)%epot
       endif
-      call mpi_bcast(epotsub,1,mpi_integer,myidrefsub,mpi_world,ierr)
+      call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
 !!$      print *,'myid,epotsub=', myid,epotsub
     endif
 
@@ -149,9 +149,9 @@ contains
         endif
         ediff= ediff*ediff
         ftmp= ftmp +ediff *swgt
-!!$        write(6,'(a,i3,a20,6f12.5)') &
-!!$             'ismpl,cdirname,(eref-esub),epot,ediff,esub,epotsub,erefsub=',&
-!!$             ismpl,trim(samples(ismpl)%cdirname),&
+!!$        write(6,'(a,2i3,a20,6f12.5)') &
+!!$             'myid,ismpl,cdirname,(eref-esub),epot,ediff,esub,epotsub,erefsub=',&
+!!$             myid,ismpl,trim(samples(ismpl)%cdirname),&
 !!$             (eref-esub)/natm,epot/natm,&
 !!$             abs(epot-epotsub -(eref-esub-erefsub))/natm,esub/natm,&
 !!$             epotsub/natm, erefsub/natm

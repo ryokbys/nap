@@ -47,17 +47,24 @@ module minimize
 !.....L-BFGS
   integer:: mstore   = 10
 
-!.....GA
+!.....Genetic Algorithm variables.......................................
+  real(8):: ga_rate_mutate = 0.1
+  integer:: ga_nindivs = 10
+  integer:: ga_nbits = 16
+  integer:: ga_noffsp = 0
+  real(8):: ga_temp = 1d0
+  integer:: ga_ngenes
+  character(len=128):: ga_fitness = 'inv'
+  
   type gene  ! A Gene corresponds to a parameter/variable to be optimized
-    integer:: bit_length
     integer(2),allocatable:: bits(:)
     real(8):: vmax,vmin
   end type gene
 
   type individual  ! An individual is a set of parameters
-    integer:: num_gene
-    real(8):: rate_mutate
-    real(8):: value
+    integer:: iid  ! ID for this individual
+    type(gene),allocatable:: genes(:)
+    real(8):: fvalue  ! Loss function value of the individual
   end type individual
 
 contains
@@ -2122,7 +2129,6 @@ contains
       if(myid.eq.0 .and. iprint.ne.0) then
         print *,''
         print *,'******************** Simulated annealing ********************'
-        print *,''
         write(6,'(a,a)') ' Temperature control method = ',trim(sa_tctrl)
         if( sa_tctrl(1:3).eq.'exp' ) then
           write(6,'(a,f10.4)') ' Initial temperature = ',sa_temp0
@@ -2132,6 +2138,7 @@ contains
         else
           write(6,'(a,f10.4)') ' Initial temperature = ',sa_temp0
         endif
+        print *,''
       endif
       
     endif
@@ -2554,7 +2561,8 @@ contains
   subroutine ga(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
        ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
 !
-!  Genetic algorithm (GA) which does not use gradient information.
+! Genetic algorithm (GA) which does not use gradient information.
+! GA itself is a serial code, but the function evaluation can be parallel.
 !
     use random
     implicit none
@@ -2574,36 +2582,371 @@ contains
       end subroutine sub_eval
     end interface
 
-    integer:: iter,idim,nadpt,i,l
-    real(8):: f,ft,temp,xw,dx,p,pt,ptrans,ftst,tau,xmin,xmax
-    real(8),allocatable:: x(:),xt(:)
+    integer:: i,j,k,l,m,n,iter,i1,i2
+    real(8):: ftrn,ftst
     logical,save:: l1st = .true.
+    integer:: iid,iidbest
+    type(individual),allocatable:: indivs(:),offsprings(:)
+    real(8),allocatable:: xtmp(:)
+
+    integer,parameter:: io_indivs = 30
+    character(len=128),parameter:: cf_indivs = 'out.ga.individuals'
 
     if( l1st ) then
+!.....Initialize
+      ga_ngenes = ndim
+      if( ga_noffsp.le.0 ) then
+        ga_noffsp = ga_nindivs
+      endif
+!.....Allocate necessary memory spaces
+      allocate(indivs(ga_nindivs),offsprings(ga_noffsp))
+      allocate(xtmp(ndim))
+      do i=1,ga_noffsp
+        allocate(offsprings(i)%genes(ga_ngenes))
+        do j=1,ga_ngenes
+          allocate(offsprings(i)%genes(j)%bits(ga_nbits))
+        enddo
+      enddo
+      do i=1,ga_nindivs
+        allocate(indivs(i)%genes(ga_ngenes))
+        do j=1,ga_ngenes
+          allocate(indivs(i)%genes(j)%bits(ga_nbits))
+        enddo
+      enddo
       if( myid.eq.0 .and. iprint.ne.0 ) then
         print *,''
         print *,'******************** Genetic Algorithm ********************'
+        print '(a,i4)',' Number of individuals = ',ga_nindivs
+        print '(a,i4)',' Number of genes       = ',ga_ngenes
+        print '(a,i4)',' Number of bits        = ',ga_nbits
+        print '(a,i4)',' Number of offsprings  = ',ga_noffsp
         print *,''
       endif
+      l1st = .false.
     endif
 
+    if( myid.eq.0 ) then
+      open(io_indivs,file=cf_indivs,status='replace')
+      write(io_indivs,'(a)') '# iid, fval, vars...'
+    endif
+100 format(i6,es14.6,20f9.4)
+
 !.....Create population that includes some individuals
+    iid = 0
+    fbest = 1d+30
+    do i=1,ga_nindivs
+      do j=1,ga_ngenes
+        indivs(i)%genes(j)%vmin = xranges(1,j)
+        indivs(i)%genes(j)%vmax = xranges(2,j)
+      enddo
+      do j=1,ga_ngenes
+        call var2gene(xbest(j),indivs(i)%genes(j))
+      enddo
+!.....Use a given X in case of i==1, otherwise mutate it with high rate.
+      if( i.ne.1 ) then
+        do j=1,ga_ngenes
+          call mutate(indivs(i)%genes(j),0.25d0)
+        enddo
+      endif
+      call indiv2vars(indivs(i),ndim,xtmp)
+      call func(ndim,xtmp,ftrn,ftst)
+      indivs(i)%fvalue = ftrn
+      iid = iid + 1
+      indivs(i)%iid = iid
+      if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,20))
+      if( ftrn.lt.fbest ) then
+        fbest = ftrn
+        iidbest = iid
+        xbest(1:ndim) = xtmp(1:ndim)
+      endif
+    enddo
 
 !.....GA loop starts....................................................
+    do iter=1,maxiter
+      if( myid.eq.0 ) write(6,'(a,i8,1x,100es12.4)') " iter,fvals= ",iter, &
+           (indivs(i)%fvalue,i=1,ndim)
 
 !.....Give birth some offsprings by crossover
-
+!!$      print *,'giving birth...'
+      do i=1,ga_noffsp
+        i1 = int(urnd()*ga_nindivs) +1
+10      i2 = int(urnd()*ga_nindivs) +1
+        if( i1.eq.i2 ) goto 10
+        call crossover(indivs(i1),indivs(i2),offsprings(i))
 !.....Mutation of new-born babies
-
+        do j=1,ga_ngenes
+          call mutate(offsprings(i)%genes(j),ga_rate_mutate)
+        enddo
 !.....Evaluate the value of each new-born babies
+        call indiv2vars(offsprings(i),ndim,xtmp)
+        call func(ndim,xtmp,ftrn,ftst)
+        offsprings(i)%fvalue = ftrn
+        iid = iid + 1
+        offsprings(i)%iid = iid
+        if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,20))
+        if( ftrn.lt.fbest ) then
+          fbest = ftrn
+          iidbest = iid
+          xbest(1:ndim) = xtmp(1:ndim)
+        endif
+      enddo
 
 !.....Selection
+!!$      print *,'selecting...'
+      call roulette_selection(indivs,ga_noffsp,offsprings,fbest)
 
-!.....Output the current best, if needed
-
+    end do
 !.....END of GA loop....................................................
 
-!.....Output information of the best    
+!.....Output information of the best
+    if( myid.eq.0 ) then
+      write(6,*) ''
+      write(6,'(a)') ' The best one in this GA simulation run:'
+      write(6,'(a,i8,f12.4)') '   ID, f-value: ',iidbest,fbest
+      write(6,*) ''
+    endif
 
+    close(io_indivs)
+    return
   end subroutine ga
+!=======================================================================
+  subroutine bin2dec(nbit,bin,dec)
+    integer,intent(in):: nbit
+    integer(2),intent(in):: bin(nbit)
+    integer,intent(out):: dec
+    integer:: i
+
+    dec = 0
+    do i=1,nbit
+      dec = dec +bin(i)*2**(i-1)
+    end do
+    return
+  end subroutine bin2dec
+!=======================================================================
+  subroutine dec2bin(nbit,dec,bin)
+    integer,intent(in):: nbit
+    integer,intent(in):: dec
+    integer(2),intent(out):: bin(nbit)
+    integer:: i,idec
+
+    idec = dec
+    bin(1:nbit) = 0
+    do i=1,nbit
+      bin(i) = mod(idec,2)
+      idec = idec /2
+    enddo
+    return
+  end subroutine dec2bin
+!=======================================================================
+  subroutine make_pairs(num,pairs)
+!
+!  Make random pairs from NUM elements.
+!
+    use random
+    integer,intent(in):: num
+    integer,intent(out):: pairs(2,num/2)
+
+    integer:: i,j,k,l,m,n,ival,jval
+    integer:: chosen(num),navail
+
+    chosen(1:num) = 0
+    
+    navail = num
+    do n=1,num/2
+      i = int(urnd()*navail) +1
+10    j = int(urnd()*navail) +1
+      if( j.eq.i ) goto 10
+      l=0
+      ival = 0
+      jval = 0
+      do m=1,num
+        if( chosen(m).eq.0 ) then
+          l=l+1
+          if( l.eq.i ) then
+            ival = m
+            chosen(m) = 1
+          else if( l.eq.j ) then
+            jval = m
+            chosen(m) = 1
+          endif
+          if( ival.ne.0 .and. jval.ne.0 ) then
+            exit
+          endif
+        endif
+      enddo
+      pairs(1,n) = ival
+      pairs(2,n) = jval
+      navail = 0
+      do m=1,num
+        if( chosen(m).eq.0 ) then
+          navail = navail + 1
+        endif
+      enddo
+    enddo
+    return
+  end subroutine make_pairs
+!=======================================================================
+  subroutine mutate(g,rate)
+    use random
+    type(gene),intent(inout):: g
+    real(8),intent(in):: rate
+    integer:: i
+
+    do i=1,ga_nbits
+      if( urnd().lt.rate ) then
+        g%bits(i) = mod(g%bits(i)+1,2)
+      endif
+    enddo
+    return
+  end subroutine mutate
+!=======================================================================
+  subroutine gene2var(g,v)
+    type(gene),intent(in):: g
+    real(8),intent(out):: v
+    integer:: i,dec
+
+    call bin2dec(ga_nbits,g%bits,dec)
+    v = g%vmin +dble(dec)*(g%vmax-g%vmin)/(2**ga_nbits-1)
+    return
+  end subroutine gene2var
+!=======================================================================
+  subroutine var2gene(v,g)
+    real(8),intent(in):: v
+    type(gene),intent(inout):: g
+    integer:: dec
+    
+    dec = int((v -g%vmin)/(g%vmax-g%vmin)*(2**ga_nbits-1))
+    call dec2bin(ga_nbits,dec,g%bits)
+    return
+  end subroutine var2gene
+!=======================================================================
+  subroutine indiv2vars(indiv,ndim,vars)
+    type(individual),intent(in):: indiv
+    integer,intent(in):: ndim
+    real(8),intent(out):: vars(ndim)
+    integer:: i
+    
+    do i=1,ndim
+      call gene2var(indiv%genes(i),vars(i))
+    enddo
+    return
+  end subroutine indiv2vars
+!=======================================================================
+  subroutine crossover(ind1,ind2,offspring)
+!
+!  Homogeneous crossover of two individuals to create an offspring
+!  that has some similarities to the parents.
+!
+    use random
+    type(individual),intent(in):: ind1,ind2
+    type(individual),intent(inout):: offspring
+    
+    integer:: i
+    type(gene):: g1,g2
+    
+    do i=1,ga_ngenes
+      g1 = ind1%genes(i)
+      g2 = ind2%genes(i)
+      
+      do j=1,ga_nbits
+        offspring%genes(i)%bits(j) = g1%bits(j)
+        offspring%genes(i)%vmin = g1%vmin
+        offspring%genes(i)%vmax = g1%vmax
+        if( g1%bits(j).ne.g2%bits(j) .and. urnd() .lt. 0.5 ) then
+          offspring%genes(i)%bits(j) = g2%bits(j)
+        end if
+      end do
+!!$      print '(a,i4,2x,100i1)','i,bits=',i,&
+!!$           (mod(offspring%genes(i)%bits(j),10),j=1,ga_nbits)
+    end do
+    return
+  end subroutine crossover
+!=======================================================================
+  subroutine roulette_selection(indivs,noffsp,offsprings,fbest)
+!
+!  Select individuals that are alive in the next generation according to
+!  their evaulation values.
+!  Selected ones are returned as an INDIVS array.
+!  No treatment for the best one, so it could be abondoned.
+!
+    use random
+    type(individual),intent(inout):: indivs(ga_nindivs)
+    integer,intent(in):: noffsp
+    type(individual),intent(in):: offsprings(noffsp)
+    real(8),intent(in):: fbest
+
+    integer:: i,j,k,l,m,n
+    integer:: islct(ga_nindivs)
+
+    integer,save:: nall
+    real(8),save,allocatable:: probs(:)
+    logical,save:: l1st = .true.
+    type(individual),save,allocatable:: tmp_indivs(:)
+    real(8),parameter:: pmax = 1d+10
+
+    if( l1st ) then
+      nall = ga_nindivs + noffsp
+      allocate(probs(nall),tmp_indivs(ga_nindivs))
+      l1st = .false.
+    endif
+
+!.....Compute all the probabilities using func values and temperature
+    n = 0
+    do i=1,ga_nindivs
+      n = n + 1
+      if( trim(ga_fitness).eq.'exp' ) then
+        probs(n) = exp(-(indivs(i)%fvalue-fbest)/ga_temp)
+      else if( trim(ga_fitness).eq.'inv' ) then
+        probs(n) = 1d0/indivs(i)%fvalue
+      endif
+!!$      print *,'n,fvalue,prob=',n,indivs(i)%fvalue,probs(n)
+    enddo
+    do i=1,noffsp
+      n = n + 1
+      if( trim(ga_fitness).eq.'exp' ) then
+        probs(n) = exp(-(offsprings(i)%fvalue-fbest)/ga_temp)
+      else if( trim(ga_fitness).eq.'inv' ) then
+        probs(n) = 1d0/offsprings(i)%fvalue
+      endif
+!!$      print *,'n,fvalue,prob=',n,offsprings(i)%fvalue,probs(n)
+    enddo
+
+!.....Select individuals
+    do i=1,ga_nindivs
+      ptot = 0d0
+      do j=1,nall
+        ptot = ptot + probs(j)
+      enddo
+      prnd = urnd()*ptot
+      ptot = 0d0
+      do j=1,nall
+        ptot = ptot +probs(j)
+        if( prnd.lt.ptot ) then
+          islct(i) = j
+          probs(j) = 0d0
+          exit
+        endif
+      enddo
+    enddo
+
+!!$    print *,'islct:'
+!!$    do i=1,ga_nindivs
+!!$      print *,'i,islct(i)=',i,islct(i)
+!!$    enddo
+
+!.....Replace indivs elements with selected ones
+    do i=1,ga_nindivs
+      j = islct(i)
+      if( j.le.ga_nindivs ) then
+        tmp_indivs(i) = indivs(j)
+      else
+        j = j - ga_nindivs
+        tmp_indivs(i) = offsprings(j)
+      endif
+    enddo
+    do i=1,ga_nindivs
+      indivs(i) = tmp_indivs(i)
+    enddo
+    return
+  end subroutine roulette_selection
 end module

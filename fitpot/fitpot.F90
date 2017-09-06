@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-04 17:33:34 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-06 16:13:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -90,6 +90,8 @@ program fitpot
       call lbfgs_wrapper()
     case ('sa','SA')
       call sa_wrapper()
+    case ('ga','GA')
+      call ga_wrapper()
     case ('md','metadynamics')
       call md_wrapper()
     case ('random_search','random')
@@ -221,6 +223,12 @@ subroutine write_initial_setting()
   if( trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' ) then
     write(6,'(2x,a25,2x,es12.3)') 'sa_temperature',sa_temp0
     write(6,'(2x,a25,2x,es12.3)') 'sa_dxwidth',sa_xw0
+    write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
+  else if( trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' ) then
+    write(6,'(2x,a25,2x,i3)') 'ga_num_bits',ga_nbits
+    write(6,'(2x,a25,2x,i3)') 'ga_num_individuals',ga_nindivs
+    write(6,'(2x,a25,2x,a)') 'ga_fitness',ga_fitness
+    write(6,'(2x,a25,2x,f8.4)') 'ga_mutation_rate',ga_rate_mutate
     write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
   endif
 !!$  write(6,'(a)') ''
@@ -632,7 +640,7 @@ subroutine read_vars()
            //' to give normal distribution'
       write(6,'(a,2es10.2)') '   with mu and sgm =',vinitmu,vinitsgm
     else
-      write(6,'(a)') ' Potential parameters are read from file: '//fname
+      write(6,'(a)') ' Potential parameters are read from file: '//trim(fname)
     endif
     close(15)
   endif
@@ -821,6 +829,29 @@ subroutine md_wrapper()
 
   return
 end subroutine md_wrapper
+!=======================================================================
+subroutine ga_wrapper()
+  use variables
+  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use parallel
+  use minimize
+  use fp_common,only: func_w_pmd, grad_w_pmd
+  implicit none
+  integer:: i,m
+  real(8):: fval
+  external:: write_stats
+
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
+    call ga(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
+         ,iprint,iflag,myid,func_w_pmd,cfmethod &
+         ,niter_eval,write_stats)
+  else
+    if(myid.eq.0) print *,'Genetic Algorithm (GA) is not available for '//&
+         trim(cpot)
+  endif
+
+  return
+end subroutine ga_wrapper
 !=======================================================================
 subroutine random_search_wrapper()
   use variables
@@ -1333,7 +1364,7 @@ subroutine write_stats(iter)
     if( myid.eq.myidrefsub ) then
       epotsub = samples(isidrefsub)%epot
     endif
-    call mpi_bcast(epotsub,1,mpi_integer,myidrefsub,mpi_world,ierr)
+    call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
   endif
 
   demaxl_trn= 0d0
@@ -1539,6 +1570,12 @@ subroutine sync_input()
   call mpi_bcast(md_height,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(md_sigma,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(md_ng,1,mpi_integer,0,mpi_world,ierr)
+!.....Genetic algorithm
+  call mpi_bcast(ga_temp,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(ga_nbits,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(ga_nindivs,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(ga_rate_mutate,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(ga_fitness,128,mpi_character,0,mpi_world,ierr)
 !.....sgd
   call mpi_bcast(csgdupdate,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(r0sgd,1,mpi_real8,0,mpi_world,ierr)
@@ -2051,12 +2088,14 @@ subroutine subtract_ref_struct_energy()
   myidrefsubl = myidrefsub
   call mpi_allreduce(myidrefsubl,myidrefsub,1,mpi_integer,mpi_max,&
        mpi_world,ierr)
-  call mpi_bcast(erefsub,1,mpi_integer,myidrefsub,mpi_world,ierr)
+  call mpi_bcast(erefsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
 
   if( myid.eq.0 .and. iprint.ne.0 ) then
     write(6,'(a,es12.4,a)') ' reference structure energy = ', &
          erefsub,' eV'
   endif
+!!$  print *,'myid,myidrefsubl,myidrefsub,erefsub=',myid,&
+!!$       myidrefsubl,myidrefsub,erefsub
   
 end subroutine subtract_ref_struct_energy
 !=======================================================================
