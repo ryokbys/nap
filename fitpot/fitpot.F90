@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-06 16:13:00 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-06 16:40:36 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -226,7 +226,8 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
   else if( trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' ) then
     write(6,'(2x,a25,2x,i3)') 'ga_num_bits',ga_nbits
-    write(6,'(2x,a25,2x,i3)') 'ga_num_individuals',ga_nindivs
+    write(6,'(2x,a25,2x,i4)') 'ga_num_individuals',ga_nindivs
+    write(6,'(2x,a25,2x,i4)') 'ga_num_offsprings',ga_noffsp
     write(6,'(2x,a25,2x,a)') 'ga_fitness',ga_fitness
     write(6,'(2x,a25,2x,f8.4)') 'ga_mutation_rate',ga_rate_mutate
     write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
@@ -1574,6 +1575,7 @@ subroutine sync_input()
   call mpi_bcast(ga_temp,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ga_nbits,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(ga_nindivs,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(ga_noffsp,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(ga_rate_mutate,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ga_fitness,128,mpi_character,0,mpi_world,ierr)
 !.....sgd

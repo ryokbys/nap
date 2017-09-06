@@ -202,6 +202,9 @@ c=======================================================================
       elseif( trim(cname).eq.'ga_num_individuals' ) then
         call read_i1(ionum,ga_nindivs)
         return
+      elseif( trim(cname).eq.'ga_num_offsprings' ) then
+        call read_i1(ionum,ga_noffsp)
+        return
       elseif( trim(cname).eq.'ga_mutation_rate' ) then
         call read_r1(ionum,ga_rate_mutate)
         return

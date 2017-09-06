@@ -2706,6 +2706,9 @@ contains
       write(6,*) ''
     endif
 
+!.....Just for outputing out.erg.fin.1 of the best one     
+    call func(ndim,xbest,ftrn,ftst)
+
     close(io_indivs)
     return
   end subroutine ga
