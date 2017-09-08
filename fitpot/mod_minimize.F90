@@ -67,6 +67,7 @@ module minimize
     type(gene),allocatable:: genes(:)
     real(8):: fvalue  ! Loss function value of the individual
     real(8):: fitness ! Fittness value of the individual
+    real(8),allocatable:: vel(:)
   end type individual
 
 !.....Differential evolution variables..................................
@@ -78,6 +79,13 @@ module minimize
   real(8):: de_cross_rate = 0.5d0
   real(8):: de_wmin    = 0.4d0
   real(8):: de_wmax    = 0.8d0
+
+!.....Particle swarm optimization variables.............................
+  integer:: pso_nindivs = 10
+  real(8):: pso_w       = 0.99d0
+  real(8):: pso_c1      = 2d0
+  real(8):: pso_c2      = 2d0
+  real(8):: pso_vinimax = 0.1d0
 
 contains
 !=======================================================================
@@ -2934,7 +2942,7 @@ contains
 !  Select individuals that are alive in the next generation according to
 !  their evaulation values.
 !  Selected ones are returned as an INDIVS array.
-!  No treatment for the best one, so it could be abondoned.
+!  The best one is always selected at first.
 !
     use random
     type(individual),intent(inout):: indivs(ga_nindivs)
@@ -2942,8 +2950,9 @@ contains
     type(individual),intent(in):: offsprings(noffsp)
     real(8),intent(in):: fbest
 
-    integer:: i,j,k,l,m,n
+    integer:: i,j,k,l,m,n,ibest
     integer:: islct(ga_nindivs)
+    real(8):: fbestl
 
     integer,save:: nall
     real(8),save,allocatable:: probs(:)
@@ -2959,8 +2968,14 @@ contains
 
 !.....Compute all the probabilities using func values and temperature
     n = 0
+    ibest = 0
+    fbestl = 1d+30
     do i=1,ga_nindivs
       n = n + 1
+      if( indivs(i)%fvalue.lt.fbestl ) then
+        fbestl = indivs(i)%fvalue
+        ibest = n
+      endif
       if( trim(ga_fitness).eq.'exp' ) then
         probs(n) = exp(-(indivs(i)%fvalue-fbest)/ga_temp)
       else if( trim(ga_fitness).eq.'inv' ) then
@@ -2970,6 +2985,10 @@ contains
     enddo
     do i=1,noffsp
       n = n + 1
+      if( offsprings(i)%fvalue.lt.fbestl ) then
+        fbestl = offsprings(i)%fvalue
+        ibest = n
+      endif
       if( trim(ga_fitness).eq.'exp' ) then
         probs(n) = exp(-(offsprings(i)%fvalue-fbest)/ga_temp)
       else if( trim(ga_fitness).eq.'inv' ) then
@@ -2979,7 +2998,9 @@ contains
     enddo
 
 !.....Select individuals
-    do i=1,ga_nindivs
+    islct(1) = ibest
+    probs(ibest) = 0d0
+    do i=2,ga_nindivs
       ptot = 0d0
       do j=1,nall
         ptot = ptot + probs(j)
@@ -3082,7 +3103,7 @@ contains
         print '(a,f8.4)',' fracl                 =',fracl
         print '(a,f8.4)',' lmdg                  =',lmdg
         print '(a,f8.4)',' lmdl                  =',lmdl
-        
+
         print *,''
       endif
       l1st = .false.
@@ -3094,8 +3115,8 @@ contains
       open(io_steps,file=cf_steps,status='replace')
       write(io_steps,'(a)') '# iter, iid, ftrn'
     endif
-100 format(i6,es14.6,100f9.4)
-    
+10  format(i6,es14.6,100f9.4)
+
     iter = 0
 
 !.....Create population that includes some individuals
@@ -3135,7 +3156,7 @@ contains
         indivs(i)%fitness = 1d0/ftrn
       endif
       indivs(i)%iid = iid
-      if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,100))
+      if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,xtmp(1:min(ndim,100))
       if( ftrn.lt.fbest ) then
         fbest = ftrn
         iidbest = iid
@@ -3165,40 +3186,61 @@ contains
           xi(j) = indivs(i)%genes(j)%val
         enddo
 
+        if( trim(de_algo).eq.'local_neighbor' ) then
+
 !.....Create a local vector
-        ip = i+1
-        if( ip.gt.de_nindivs ) ip = ip - de_nindivs
-        iq = i-1
-        if( iq.le.0 ) iq = iq + de_nindivs
-        do j=1,ndim
-          xp(j) = indivs(ip)%genes(j)%val
-          xq(j) = indivs(iq)%genes(j)%val
-        enddo
-        xbestl(1:ndim) = 0d0
-        call make_local_best(indivs(i),indivs(ip),indivs(iq),ndim,xbestl)
-        xl(1:ndim) = xi(1:ndim) +lmdl*(xbestl(1:ndim)-xi(1:ndim)) &
-             +fracl*(xp(1:ndim)-xq(1:ndim))
+          ip = i+1
+          if( ip.gt.de_nindivs ) ip = ip - de_nindivs
+          iq = i-1
+          if( iq.le.0 ) iq = iq + de_nindivs
+          do j=1,ndim
+            xp(j) = indivs(ip)%genes(j)%val
+            xq(j) = indivs(iq)%genes(j)%val
+          enddo
+          xbestl(1:ndim) = 0d0
+          call make_local_best(indivs(i),indivs(ip),indivs(iq),ndim,xbestl)
+!!$        xl(1:ndim) = xi(1:ndim) +lmdl*(xbestl(1:ndim)-xi(1:ndim)) &
+!!$             +fracl*(xp(1:ndim)-xq(1:ndim))
+          xl(1:ndim) = xi(1:ndim) +lmdl*(xbestl(1:ndim)-xi(1:ndim)) &
+               +urnd()*(xp(1:ndim)-xq(1:ndim))
 !!$        print '(a,8es12.4)','xi,xp,xq,xbestl,fi,fp,fq,xl=' &
 !!$             ,xi(1),xp(1),xq(1),xbestl(1)&
 !!$             ,indivs(i)%fvalue,indivs(ip)%fvalue,indivs(iq)%fvalue,xl(1)
 !.....Create a global vector
-10      ir = int(urnd() *de_nindivs) +1
-        if( ir.eq.i ) goto 10
-20      is = int(urnd() *de_nindivs) +1
-        if( is.eq.i .or. is.eq.ir ) goto 20
-        do j=1,ndim
-          xr(j) = indivs(ir)%genes(j)%val
-          xs(j) = indivs(is)%genes(j)%val
-        enddo
-        xg(1:ndim) = xi(1:ndim) +lmdg*(xbestg(1:ndim)-xi(1:ndim)) &
-             +fracg*(xr(1:ndim)-xs(1:ndim))
+100       ir = int(urnd() *de_nindivs) +1
+          if( ir.eq.i ) goto 100
+110       is = int(urnd() *de_nindivs) +1
+          if( is.eq.i .or. is.eq.ir ) goto 110
+          do j=1,ndim
+            xr(j) = indivs(ir)%genes(j)%val
+            xs(j) = indivs(is)%genes(j)%val
+          enddo
+!!$        xg(1:ndim) = xi(1:ndim) +lmdg*(xbestg(1:ndim)-xi(1:ndim)) &
+!!$             +fracg*(xr(1:ndim)-xs(1:ndim))
+          xg(1:ndim) = xi(1:ndim) +lmdg*(xbestg(1:ndim)-xi(1:ndim)) &
+               +urnd()*(xr(1:ndim)-xs(1:ndim))
 !!$        print '(a,100f7.3)','xg(1:ndim)=',xg(1:ndim)
 !.....Make the donor vector from the local and global vectors
-        xd(1:ndim) = w*xg(1:ndim) +(1d0-w)*xl(1:ndim)
-        do j=1,ndim
-          xtmp(j) = max(xtmp(j),indivs(i)%genes(j)%vmin)
-          xtmp(j) = min(xtmp(j),indivs(i)%genes(j)%vmax)
-        enddo
+          xd(1:ndim) = w*xg(1:ndim) +(1d0-w)*xl(1:ndim)
+
+!.....Classical DE
+        else
+200       ip = int(urnd()*de_nindivs) +1
+          if( ip.eq.i ) goto 200
+210       ir = int(urnd()*de_nindivs) +1
+          if( ir.eq.i .or. ir.eq.ip ) goto 210
+220       is = int(urnd()*de_nindivs) +1
+          if( is.eq.i .or. is.eq.ip .or. is.eq.ir )  goto 220
+          do j=1,ndim
+            xp(j) = indivs(ip)%genes(j)%val
+            xr(j) = indivs(ir)%genes(j)%val
+            xs(j) = indivs(is)%genes(j)%val
+          enddo
+!!$        xg(1:ndim) = xi(1:ndim) +lmdg*(xbestg(1:ndim)-xi(1:ndim)) &
+!!$             +fracg*(xr(1:ndim)-xs(1:ndim))
+          xd(1:ndim) = xp(1:ndim) +de_frac *(xr(1:ndim)-xs(1:ndim))
+        endif
+
 !.....Make a new candidate
         do j=1,ndim
           if( urnd().lt.de_cross_rate ) then
@@ -3206,6 +3248,10 @@ contains
           else
             xtmp(j) = xi(j)
           endif
+        enddo
+        do j=1,ndim
+          xtmp(j) = max(xtmp(j),indivs(i)%genes(j)%vmin)
+          xtmp(j) = min(xtmp(j),indivs(i)%genes(j)%vmax)
         enddo
         call func(ndim,xtmp,ftrn,ftst)
 !!$        print *,'i,fvalue,ftrn=',i,indivs(i)%fvalue,ftrn
@@ -3222,7 +3268,7 @@ contains
         else
           cycle
         endif
-        if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,100))
+        if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,xtmp(1:min(ndim,100))
         if( ftrn.lt.fbest ) then
           fbest = ftrn
           iidbest = iid
@@ -3230,11 +3276,11 @@ contains
         endif
 
       enddo  ! loop over individuals
-      
+
       if( myid.eq.0 ) then
         write(6,'(a,i8,es12.4,f5.2,1x,100es12.4)') &
-           " iter,fbest,w,fvals= ",&
-           iter,fbest,w,(indivs(i)%fvalue,i=1,min(ndim,10))
+             " iter,fbest,w,fvals= ",&
+             iter,fbest,w,(indivs(i)%fvalue,i=1,min(ndim,10))
         do i=1,de_nindivs
           write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
         enddo
@@ -3299,4 +3345,219 @@ contains
     enddo
     return
   end subroutine make_global_best
+!=======================================================================
+  subroutine pso(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
+!
+! Particle Swarm Optimization (PSO).
+! DE itself is a serial code, but the function evaluation can be parallel.
+!
+    use random
+    implicit none
+    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
+    integer,intent(inout):: iflag
+    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
+    real(8),intent(inout):: fbest,xbest(ndim)
+    character(len=*),intent(in):: cfmethod
+    interface
+      subroutine func(n,x,ftrn,ftst)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
+    end interface
+
+    real(8),parameter:: fmax = 1.0d+10
+
+    integer:: i,j,k,l,m,n,iter
+    real(8):: ftrn,ftst,tmp,xj,vj,r1,r2
+    logical,save:: l1st = .true.
+    integer:: iid,iidbest
+    type(individual),allocatable:: indivs(:)
+    real(8),allocatable:: xtmp(:),xpbest(:,:),fpbest(:)
+
+    integer,parameter:: io_indivs = 30
+    character(len=128),parameter:: cf_indivs = 'out.pso.individuals'
+    integer,parameter:: io_fvalues = 31
+    character(len=128),parameter:: cf_fvalues = 'out.pso.fvalues'
+    integer,parameter:: io_steps = 32
+    character(len=128),parameter:: cf_steps = 'out.pso.generations'
+
+    if( l1st ) then
+!.....Allocate necessary memory spaces
+      allocate(indivs(pso_nindivs))
+      allocate(xtmp(ndim),fpbest(pso_nindivs),xpbest(ndim,pso_nindivs))
+      do i=1,pso_nindivs
+        allocate(indivs(i)%genes(ndim),indivs(i)%vel(ndim))
+      enddo
+      if( myid.eq.0 .and. iprint.ne.0 ) then
+        print *,''
+        print *,'*************** Particle Swarm Optimization (PSO) ***************'
+        print '(a,i4)',  ' Number of individuals = ',pso_nindivs
+        print '(a,f8.4)',' w                     =',pso_w
+        print '(a,f8.4)',' C1                    =',pso_c1
+        print '(a,f8.4)',' C2                    =',pso_c2
+        print *,''
+      endif
+      l1st = .false.
+    endif
+
+    if( myid.eq.0 ) then
+      open(io_indivs,file=cf_indivs,status='replace')
+      write(io_indivs,'(a)') '# iid, fval, vars...'
+      open(io_fvalues,file=cf_fvalues,status='replace')
+      write(io_fvalues,'(a)') '# iter, iid, ftrn'
+      open(io_steps,file=cf_steps,status='replace')
+      write(io_steps,'(a)') '# iter, iid, ftrn'
+    endif
+10  format(i6,es14.6,100f9.4)
+
+    iter = 0
+
+!.....Create population that includes some individuals
+    iid = 0
+    fbest = 1d+30
+    do i=1,pso_nindivs
+      do j=1,ndim
+        indivs(i)%genes(j)%vmin = xranges(1,j)
+        indivs(i)%genes(j)%vmax = xranges(2,j)
+        if( i.eq.1 ) then
+          indivs(i)%genes(j)%val = xbest(j)
+        else
+          indivs(i)%genes(j)%val = xranges(1,j) + &
+               (xranges(2,j)-xranges(1,j))*urnd()
+        endif
+        indivs(i)%vel(j) = pso_vinimax*(urnd()-0.5d0)
+      enddo
+      do j=1,ndim
+        xtmp(j) = indivs(i)%genes(j)%val
+      enddo
+      call func(ndim,xtmp,ftrn,ftst)
+      iid = iid + 1
+!.....Detect NaN and replace it with 1d+10
+      if( ftrn*0d0 .ne. 0d0 ) then
+        if( myid.eq.0 .and. iprint.ne.0 ) then
+          write(6,'(a,2i10)')&
+               ' [ftrn.eq.NaN] iter,iid = ',iter,iid
+        endif
+        ftrn = fmax
+      endif
+      if( ftrn.gt.fmax ) then
+        ftrn = fmax
+      endif
+      indivs(i)%fvalue = ftrn
+      fpbest(i) = ftrn
+      xpbest(1:ndim,i) = xtmp(1:ndim)
+      if( ftrn*0d0.ne.0d0 ) then
+        indivs(i)%fitness = 0d0
+      else
+        indivs(i)%fitness = 1d0/ftrn
+      endif
+      indivs(i)%iid = iid
+      if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,xtmp(1:min(ndim,100))
+      if( ftrn.lt.fbest ) then
+        fbest = ftrn
+        iidbest = iid
+        xbest(1:ndim) = xtmp(1:ndim)
+      endif
+    enddo
+    if( myid.eq.0 ) then
+      write(6,'(a,i8,es12.4,1x,100es12.4)') &
+           " iter,fbest,fvals= ",&
+           iter,fbest,(indivs(i)%fvalue,i=1,min(ndim,10))
+      write(io_fvalues,'(2i8, 100es12.4)') iter, indivs(i)%iid, &
+           (indivs(i)%fvalue,i=1,pso_nindivs)
+      do i=1,pso_nindivs
+        write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
+      enddo
+    endif
+
+!.....PSO loop starts....................................................
+    do iter=1,maxiter
+
+!.....Loop for individuals
+      do i=1,pso_nindivs
+
+!.....Update velocity and position
+        r1 = urnd()
+        r2 = urnd()
+        do j=1,ndim
+          xj = indivs(i)%genes(j)%val
+          vj = indivs(i)%vel(j)
+          indivs(i)%vel(j) = vj &
+               +pso_c1*r1*( xpbest(j,i) -xj ) &
+               +pso_c2*r2*( xbest(j) -xj )
+          indivs(i)%genes(j)%val = xj +indivs(i)%vel(j)
+          xtmp(j) = indivs(i)%genes(j)%val
+!.....Make sure the range of xtmp
+          xtmp(j) = max(xtmp(j),indivs(i)%genes(j)%vmin)
+          xtmp(j) = min(xtmp(j),indivs(i)%genes(j)%vmax)
+        enddo
+        call func(ndim,xtmp,ftrn,ftst)
+        iid = iid + 1
+!.....Detect NaN and replace it with 1d+10
+        if( ftrn*0d0 .ne. 0d0 ) then
+          ftrn = fmax
+        endif
+        if( ftrn.gt.fmax ) then
+          ftrn = fmax
+        endif
+        indivs(i)%fvalue = ftrn
+        indivs(i)%iid = iid
+        if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,xtmp(1:min(ndim,100))
+!.....Check the global best and update if needed
+        if( ftrn.lt.fbest ) then
+          fbest = ftrn
+          iidbest = iid
+          xbest(1:ndim) = xtmp(1:ndim)
+        endif
+!.....Check the particle best and update if needed
+        if( ftrn.lt.fpbest(i) ) then
+          fpbest(i)= ftrn
+          xpbest(1:ndim,i) = xtmp(1:ndim)
+        endif
+
+      enddo  ! loop over individuals
+
+      if( myid.eq.0 ) then
+        write(6,'(a,i8,es12.4,1x,100es12.4)') &
+             " iter,fbest,fvals= ",&
+             iter,fbest,(indivs(i)%fvalue,i=1,min(ndim,10))
+        write(io_fvalues,'(2i8, 100es12.4)') iter, indivs(i)%iid, &
+             (indivs(i)%fvalue,i=1,pso_nindivs)
+        do i=1,pso_nindivs
+          write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
+        enddo
+      endif
+    enddo
+!.....DE loop ends......................................................
+
+!.....Output information of the best
+    if( myid.eq.0 ) then
+      write(6,*) ''
+      write(6,'(a)') ' The best one in this PSO simulation run:'
+      write(6,'(a,i8,f12.4)') '   ID, f-value: ',iidbest,fbest
+      write(6,'(a,100f7.3)')  '   Variables: ',xbest(1:ndim)
+      write(6,*) ''
+
+      do i=1,pso_nindivs
+        print '(a,i4,f10.1,1x,100f9.4)', ' i,fpbest,xpbest =' ,i,fpbest(i),&
+             xpbest(1:ndim,i)
+      enddo
+      print *,''
+    endif
+
+!.....Just for outputing out.erg.fin.1 of the best one     
+    call func(ndim,xbest,ftrn,ftst)
+
+    close(io_indivs)
+    close(io_fvalues)
+    close(io_steps)
+    return
+  end subroutine pso
+!=======================================================================
+  
 end module

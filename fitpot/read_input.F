@@ -235,6 +235,18 @@ c=======================================================================
       elseif( trim(cname).eq.'de_wmax' ) then
         call read_r1(ionum,de_wmax)
         return
+      elseif( trim(cname).eq.'pso_num_individuals' ) then
+        call read_i1(ionum,pso_nindivs)
+        return
+      elseif( trim(cname).eq.'pso_w' ) then
+        call read_r1(ionum,pso_w)
+        return
+      elseif( trim(cname).eq.'pso_c1' ) then
+        call read_r1(ionum,pso_c1)
+        return
+      elseif( trim(cname).eq.'pso_c2' ) then
+        call read_r1(ionum,pso_c2)
+        return
       elseif( trim(cname).eq.'random_seed' ) then
         call read_r1(ionum,rseed)
         return

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-08 18:07:30 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-08 22:48:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -94,6 +94,8 @@ program fitpot
       call ga_wrapper()
     case ('de','DE')
       call de_wrapper()
+    case ('pso','PSO')
+      call pso_wrapper()
     case ('md','metadynamics')
       call md_wrapper()
     case ('random_search','random')
@@ -124,7 +126,7 @@ program fitpot
     endif
   endif
 
-  if( myid.eq.0 ) write(6,'(a,100f7.3)')  ' vars beofre stats: ',vars(1:nvars)
+!!$  if( myid.eq.0 ) write(6,'(a,100f7.3)')  ' vars beofre stats: ',vars(1:nvars)
   call write_stats(niter)
 
 !!$  call write_energy_relation('subtracted')
@@ -243,6 +245,11 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,f8.4)') 'de_wmin',de_wmin
     write(6,'(2x,a25,2x,f8.4)') 'de_wmax',de_wmax
     write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
+  else if( trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO' ) then
+    write(6,'(2x,a25,2x,i4)') 'pso_num_individuals',pso_nindivs
+    write(6,'(2x,a25,2x,f8.4)') 'pso_w',pso_w
+    write(6,'(2x,a25,2x,f8.4)') 'pso_c1',pso_c1
+    write(6,'(2x,a25,2x,f8.4)') 'pso_c2',pso_c2
   endif
 !!$  write(6,'(a)') ''
 !!$  write(6,'(2x,a25,2x,i5)') 'individual_weight',nwgtindiv
@@ -888,6 +895,29 @@ subroutine de_wrapper()
 
   return
 end subroutine de_wrapper
+!=======================================================================
+subroutine pso_wrapper()
+  use variables
+  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use parallel
+  use minimize
+  use fp_common,only: func_w_pmd, grad_w_pmd
+  implicit none
+  integer:: i,m
+  real(8):: fval
+  external:: write_stats
+
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
+    call pso(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
+         ,iprint,iflag,myid,func_w_pmd,cfmethod &
+         ,niter_eval,write_stats)
+  else
+    if(myid.eq.0) print *,'Particle Swarm Optimization (PSO) is'//&
+         ' not available for '//trim(cpot)
+  endif
+
+  return
+end subroutine pso_wrapper
 !=======================================================================
 subroutine random_search_wrapper()
   use variables
@@ -1622,6 +1652,11 @@ subroutine sync_input()
   call mpi_bcast(de_wmax,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(de_fitness,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(de_algo,128,mpi_character,0,mpi_world,ierr)
+!.....Particle swarm optimization
+  call mpi_bcast(pso_nindivs,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(pso_w,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(pso_c1,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(pso_c2,1,mpi_real8,0,mpi_world,ierr)
 !.....sgd
   call mpi_bcast(csgdupdate,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(r0sgd,1,mpi_real8,0,mpi_world,ierr)
