@@ -58,6 +58,7 @@ module minimize
   
   type gene  ! A Gene corresponds to a parameter/variable to be optimized
     integer(2),allocatable:: bits(:)
+    real(8):: val
     real(8):: vmax,vmin
   end type gene
 
@@ -65,7 +66,18 @@ module minimize
     integer:: iid  ! ID for this individual
     type(gene),allocatable:: genes(:)
     real(8):: fvalue  ! Loss function value of the individual
+    real(8):: fitness ! Fittness value of the individual
   end type individual
+
+!.....Differential evolution variables..................................
+  character(len=128):: de_fitness = 'inv'
+  character(len=128):: de_algo = 'local_neigh'
+  integer:: de_nindivs = 10
+  real(8):: de_frac    = 1d0
+  real(8):: de_lambda  = -1d0
+  real(8):: de_cross_rate = 0.5d0
+  real(8):: de_wmin    = 0.4d0
+  real(8):: de_wmax    = 0.8d0
 
 contains
 !=======================================================================
@@ -2582,6 +2594,8 @@ contains
       end subroutine sub_eval
     end interface
 
+    real(8),parameter:: fmax = 1.0d+5
+
     integer:: i,j,k,l,m,n,iter,i1,i2
     real(8):: ftrn,ftst
     logical,save:: l1st = .true.
@@ -2633,8 +2647,10 @@ contains
       open(io_steps,file=cf_steps,status='replace')
       write(io_steps,'(a)') '# iter, iid, ftrn'
     endif
-100 format(i6,es14.6,20f9.4)
+100 format(i6,es14.6,100f9.4)
 
+    iter = 0
+    
 !.....Create population that includes some individuals
     iid = 0
     fbest = 1d+30
@@ -2654,10 +2670,21 @@ contains
       endif
       call indiv2vars(indivs(i),ndim,xtmp)
       call func(ndim,xtmp,ftrn,ftst)
-      indivs(i)%fvalue = ftrn
       iid = iid + 1
+!.....Detect NaN and replace it with 1d+10
+      if( ftrn*0d0 .ne. 0d0 ) then
+        if( myid.eq.0 .and. iprint.ne.0 ) then
+          write(6,'(a,2i10)')&
+               ' [ftrn.eq.NaN] iter,iid = ',iter,iid
+        endif
+        ftrn = fmax
+      endif
+      if( ftrn.gt.fmax ) then
+        ftrn = fmax
+      endif
+      indivs(i)%fvalue = ftrn
       indivs(i)%iid = iid
-      if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,20))
+      if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,100))
       if( ftrn.lt.fbest ) then
         fbest = ftrn
         iidbest = iid
@@ -2665,7 +2692,6 @@ contains
       endif
     enddo
     if( myid.eq.0 ) then
-      iter = 0
       write(6,'(a,i8,1x,100es12.4)') &
            " iter,fbest,fvals= ",&
            iter,fbest,(indivs(i)%fvalue,i=1,min(ndim,10))
@@ -2691,10 +2717,21 @@ contains
 !.....Evaluate the value of each new-born babies
         call indiv2vars(offsprings(i),ndim,xtmp)
         call func(ndim,xtmp,ftrn,ftst)
-        offsprings(i)%fvalue = ftrn
         iid = iid + 1
+!.....Detect NaN and replace it with 1d+10
+        if( ftrn*0d0 .ne. 0d0 ) then
+          if( myid.eq.0 .and. iprint.ne.0 ) then
+            write(6,'(a,2i10)')&
+                 ' [ftrn.eq.NaN] iter,iid = ',iter,iid
+          endif
+          ftrn = fmax
+        endif
+        if( ftrn.gt.fmax ) then
+          ftrn = fmax
+        endif
+        offsprings(i)%fvalue = ftrn
         offsprings(i)%iid = iid
-        if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,20))
+        if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,100))
         if( ftrn.lt.fbest ) then
           fbest = ftrn
           iidbest = iid
@@ -2722,11 +2759,15 @@ contains
       write(6,*) ''
       write(6,'(a)') ' The best one in this GA simulation run:'
       write(6,'(a,i8,f12.4)') '   ID, f-value: ',iidbest,fbest
+      write(6,'(a,100f7.3)')  '   Variables: ',xbest(1:ndim)
       write(6,*) ''
     endif
 
 !.....Just for outputing out.erg.fin.1 of the best one     
     call func(ndim,xbest,ftrn,ftst)
+!!$    if( myid.eq.0 ) then
+!!$      write(6,*) 'best one re-caluclated = ', ftrn
+!!$    endif
 
     close(io_indivs)
     close(io_steps)
@@ -2866,16 +2907,19 @@ contains
     
     integer:: i
     type(gene):: g1,g2
+    real(8):: v1,v2,r1
     
     do i=1,ga_ngenes
       g1 = ind1%genes(i)
       g2 = ind2%genes(i)
-      
+      v1 = ind1%fvalue
+      v2 = ind2%fvalue
+      r1 = log(v2+1d0)/(log(v1+1d0)+log(v2+1d0))
       do j=1,ga_nbits
         offspring%genes(i)%bits(j) = g1%bits(j)
         offspring%genes(i)%vmin = g1%vmin
         offspring%genes(i)%vmax = g1%vmax
-        if( g1%bits(j).ne.g2%bits(j) .and. urnd() .lt. 0.5 ) then
+        if( g1%bits(j).ne.g2%bits(j) .and. urnd() .gt. r1 ) then
           offspring%genes(i)%bits(j) = g2%bits(j)
         end if
       end do
@@ -2972,4 +3016,287 @@ contains
     enddo
     return
   end subroutine roulette_selection
+!=======================================================================
+  subroutine de(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
+!
+! Differential evolution (DE) which does not use gradient information.
+! DE itself is a serial code, but the function evaluation can be parallel.
+!
+    use random
+    implicit none
+    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
+    integer,intent(inout):: iflag
+    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
+    real(8),intent(inout):: fbest,xbest(ndim)
+    character(len=*),intent(in):: cfmethod
+    interface
+      subroutine func(n,x,ftrn,ftst)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
+    end interface
+
+    real(8),parameter:: fmax = 1.0d+10
+
+    integer:: i,j,k,l,m,n,iter,i1,i2,ip,iq,ir,is
+    real(8):: ftrn,ftst,fracl,fracg,lmdl,lmdg,w
+    logical,save:: l1st = .true.
+    integer:: iid,iidbest
+    type(individual),allocatable:: indivs(:)
+    real(8),allocatable,dimension(:):: xtmp,xi,xp,xq,xr,xs,xbestl,xbestg&
+         ,xl,xg,xd
+
+    integer,parameter:: io_indivs = 30
+    character(len=128),parameter:: cf_indivs = 'out.de.individuals'
+    integer,parameter:: io_steps = 31
+    character(len=128),parameter:: cf_steps = 'out.de.generations'
+
+    if( l1st ) then
+!.....Allocate necessary memory spaces
+      allocate(indivs(de_nindivs))
+      allocate(xtmp(ndim),xi(ndim),xp(ndim),xq(ndim),xr(ndim),xs(ndim)&
+           ,xbestl(ndim),xbestg(ndim),xl(ndim),xg(ndim),xd(ndim))
+      do i=1,de_nindivs
+        allocate(indivs(i)%genes(ndim))
+      enddo
+!.....Initialize
+      fracg = de_frac
+      fracl = fracg
+      if( de_lambda.le.0d0 ) de_lambda = de_frac
+      lmdg = de_lambda
+      lmdl = lmdg
+      if( myid.eq.0 .and. iprint.ne.0 ) then
+        print *,''
+        print *,'******************** Differential Evolution ********************'
+        print '(a,i4)',' Number of individuals = ',de_nindivs
+        print '(a,f8.4)',' Fraction              =',de_frac
+        print '(a,f8.4)',' Crossover rate        =',de_cross_rate
+        print '(a,f8.4)',' wmin                  =',de_wmin
+        print '(a,f8.4)',' wmax                  =',de_wmax
+        print '(a,f8.4)',' fracg                 =',fracg
+        print '(a,f8.4)',' fracl                 =',fracl
+        print '(a,f8.4)',' lmdg                  =',lmdg
+        print '(a,f8.4)',' lmdl                  =',lmdl
+        
+        print *,''
+      endif
+      l1st = .false.
+    endif
+
+    if( myid.eq.0 ) then
+      open(io_indivs,file=cf_indivs,status='replace')
+      write(io_indivs,'(a)') '# iid, fval, vars...'
+      open(io_steps,file=cf_steps,status='replace')
+      write(io_steps,'(a)') '# iter, iid, ftrn'
+    endif
+100 format(i6,es14.6,100f9.4)
+    
+    iter = 0
+
+!.....Create population that includes some individuals
+    iid = 0
+    fbest = 1d+30
+    do i=1,de_nindivs
+      do j=1,ndim
+        indivs(i)%genes(j)%vmin = xranges(1,j)
+        indivs(i)%genes(j)%vmax = xranges(2,j)
+        if( i.eq.1 ) then
+          indivs(i)%genes(j)%val = xbest(j)
+        else
+          indivs(i)%genes(j)%val = xranges(1,j) + &
+               (xranges(2,j)-xranges(1,j))*urnd()
+        endif
+      enddo
+      do j=1,ndim
+        xtmp(j) = indivs(i)%genes(j)%val
+      enddo
+      call func(ndim,xtmp,ftrn,ftst)
+      iid = iid + 1
+!.....Detect NaN and replace it with 1d+10
+      if( ftrn*0d0 .ne. 0d0 ) then
+        if( myid.eq.0 .and. iprint.ne.0 ) then
+          write(6,'(a,2i10)')&
+               ' [ftrn.eq.NaN] iter,iid = ',iter,iid
+        endif
+        ftrn = fmax
+      endif
+      if( ftrn.gt.fmax ) then
+        ftrn = fmax
+      endif
+      indivs(i)%fvalue = ftrn
+      if( ftrn*0d0.ne.0d0 ) then
+        indivs(i)%fitness = 0d0
+      else
+        indivs(i)%fitness = 1d0/ftrn
+      endif
+      indivs(i)%iid = iid
+      if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,100))
+      if( ftrn.lt.fbest ) then
+        fbest = ftrn
+        iidbest = iid
+        xbest(1:ndim) = xtmp(1:ndim)
+      endif
+    enddo
+    w = de_wmin + (de_wmax -de_wmin)*dble(iter)/maxiter
+    if( myid.eq.0 ) then
+      write(6,'(a,i8,es12.4,f5.2,1x,100es12.4)') &
+           " iter,fbest,w,fvals= ",&
+           iter,fbest,w,(indivs(i)%fvalue,i=1,min(ndim,10))
+      do i=1,de_nindivs
+        write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
+      enddo
+    endif
+
+!.....DE loop starts....................................................
+    do iter=1,maxiter
+
+      w = de_wmin + (de_wmax -de_wmin)*dble(iter)/maxiter
+      call make_global_best(de_nindivs,indivs,ndim,xbestg)
+
+!.....Loop for individuals
+      do i=1,de_nindivs
+
+        do j=1,ndim
+          xi(j) = indivs(i)%genes(j)%val
+        enddo
+
+!.....Create a local vector
+        ip = i+1
+        if( ip.gt.de_nindivs ) ip = ip - de_nindivs
+        iq = i-1
+        if( iq.le.0 ) iq = iq + de_nindivs
+        do j=1,ndim
+          xp(j) = indivs(ip)%genes(j)%val
+          xq(j) = indivs(iq)%genes(j)%val
+        enddo
+        xbestl(1:ndim) = 0d0
+        call make_local_best(indivs(i),indivs(ip),indivs(iq),ndim,xbestl)
+        xl(1:ndim) = xi(1:ndim) +lmdl*(xbestl(1:ndim)-xi(1:ndim)) &
+             +fracl*(xp(1:ndim)-xq(1:ndim))
+!!$        print '(a,8es12.4)','xi,xp,xq,xbestl,fi,fp,fq,xl=' &
+!!$             ,xi(1),xp(1),xq(1),xbestl(1)&
+!!$             ,indivs(i)%fvalue,indivs(ip)%fvalue,indivs(iq)%fvalue,xl(1)
+!.....Create a global vector
+10      ir = int(urnd() *de_nindivs) +1
+        if( ir.eq.i ) goto 10
+20      is = int(urnd() *de_nindivs) +1
+        if( is.eq.i .or. is.eq.ir ) goto 20
+        do j=1,ndim
+          xr(j) = indivs(ir)%genes(j)%val
+          xs(j) = indivs(is)%genes(j)%val
+        enddo
+        xg(1:ndim) = xi(1:ndim) +lmdg*(xbestg(1:ndim)-xi(1:ndim)) &
+             +fracg*(xr(1:ndim)-xs(1:ndim))
+!!$        print '(a,100f7.3)','xg(1:ndim)=',xg(1:ndim)
+!.....Make the donor vector from the local and global vectors
+        xd(1:ndim) = w*xg(1:ndim) +(1d0-w)*xl(1:ndim)
+        do j=1,ndim
+          xtmp(j) = max(xtmp(j),indivs(i)%genes(j)%vmin)
+          xtmp(j) = min(xtmp(j),indivs(i)%genes(j)%vmax)
+        enddo
+!.....Make a new candidate
+        do j=1,ndim
+          if( urnd().lt.de_cross_rate ) then
+            xtmp(j) = xd(j)
+          else
+            xtmp(j) = xi(j)
+          endif
+        enddo
+        call func(ndim,xtmp,ftrn,ftst)
+!!$        print *,'i,fvalue,ftrn=',i,indivs(i)%fvalue,ftrn
+!.....Detect NaN and replace it with fmax
+        if( ftrn*0d0.ne.0d0 ) cycle
+        if( ftrn.le.indivs(i)%fvalue .or. indivs(i)%fvalue*0d0.ne.0d0 ) then
+          iid = iid + 1
+          do j=1,ndim
+            indivs(i)%genes(j)%val = xtmp(j)
+          enddo
+          if( ftrn.gt.fmax ) ftrn = fmax
+          indivs(i)%fvalue = ftrn
+          indivs(i)%fitness = 1d0/ftrn
+        else
+          cycle
+        endif
+        if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,100))
+        if( ftrn.lt.fbest ) then
+          fbest = ftrn
+          iidbest = iid
+          xbest(1:ndim) = xtmp(1:ndim)
+        endif
+
+      enddo  ! loop over individuals
+      
+      if( myid.eq.0 ) then
+        write(6,'(a,i8,es12.4,f5.2,1x,100es12.4)') &
+           " iter,fbest,w,fvals= ",&
+           iter,fbest,w,(indivs(i)%fvalue,i=1,min(ndim,10))
+        do i=1,de_nindivs
+          write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
+        enddo
+      endif
+    enddo
+!.....DE loop ends......................................................
+
+!.....Output information of the best
+    if( myid.eq.0 ) then
+      write(6,*) ''
+      write(6,'(a)') ' The best one in this DE simulation run:'
+      write(6,'(a,i8,f12.4)') '   ID, f-value: ',iidbest,fbest
+      write(6,'(a,100f7.3)')  '   Variables: ',xbest(1:ndim)
+      write(6,*) ''
+    endif
+
+!.....Just for outputing out.erg.fin.1 of the best one     
+    call func(ndim,xbest,ftrn,ftst)
+
+    close(io_indivs)
+    close(io_steps)
+    return
+  end subroutine de
+!=======================================================================
+  subroutine make_local_best(ind0,ind1,ind2,ndim,xbestl)
+    type(individual),intent(in):: ind0,ind1,ind2
+    integer,intent(in):: ndim
+    real(8),intent(out):: xbestl(ndim)
+
+    integer:: i
+    real(8):: allf
+    
+    xbestl(1:ndim) = 0d0
+    allf = ind0%fitness +ind1%fitness +ind2%fitness
+    do i=1,ndim
+      xbestl(i) = xbestl(i) + (&
+           ind0%genes(i)%val *ind0%fitness  &
+           +ind1%genes(i)%val *ind1%fitness  &
+           +ind2%genes(i)%val *ind2%fitness ) /allf
+    enddo
+    return
+  end subroutine make_local_best
+!=======================================================================
+  subroutine make_global_best(nindivs,indivs,ndim,xbestg)
+    integer,intent(in):: nindivs,ndim
+    type(individual),intent(in):: indivs(nindivs)
+    real(8),intent(out):: xbestg(ndim)
+
+    integer:: i,j
+    real(8):: allf
+
+    xbestg(1:ndim) = 0d0
+    allf = 0d0
+    do i=1,nindivs
+      allf = allf +indivs(i)%fitness
+    enddo
+    do i=1,ndim
+      do j=1,nindivs
+        xbestg(i) = xbestg(i) +indivs(i)%fitness *indivs(i)%genes(i)%val
+      enddo
+      xbestg(i) = xbestg(i) /allf
+    enddo
+    return
+  end subroutine make_global_best
 end module

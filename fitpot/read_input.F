@@ -211,6 +211,30 @@ c=======================================================================
       elseif( trim(cname).eq.'ga_fitness' ) then
         call read_c1(ionum,ga_fitness)
         return
+      elseif( trim(cname).eq.'de_fitness' ) then
+        call read_c1(ionum,de_fitness)
+        return
+      elseif( trim(cname).eq.'de_algorithm' ) then
+        call read_c1(ionum,de_algo)
+        return
+      elseif( trim(cname).eq.'de_num_individuals' ) then
+        call read_i1(ionum,de_nindivs)
+        return
+      elseif( trim(cname).eq.'de_fraction' ) then
+        call read_r1(ionum,de_frac)
+        return
+      elseif( trim(cname).eq.'de_lambda' ) then
+        call read_r1(ionum,de_lambda)
+        return
+      elseif( trim(cname).eq.'de_crossover_rate' ) then
+        call read_r1(ionum,de_cross_rate)
+        return
+      elseif( trim(cname).eq.'de_wmin' ) then
+        call read_r1(ionum,de_wmin)
+        return
+      elseif( trim(cname).eq.'de_wmax' ) then
+        call read_r1(ionum,de_wmax)
+        return
       elseif( trim(cname).eq.'random_seed' ) then
         call read_r1(ionum,rseed)
         return

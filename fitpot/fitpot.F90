@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-06 16:40:36 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-08 18:07:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -92,6 +92,8 @@ program fitpot
       call sa_wrapper()
     case ('ga','GA')
       call ga_wrapper()
+    case ('de','DE')
+      call de_wrapper()
     case ('md','metadynamics')
       call md_wrapper()
     case ('random_search','random')
@@ -122,6 +124,7 @@ program fitpot
     endif
   endif
 
+  if( myid.eq.0 ) write(6,'(a,100f7.3)')  ' vars beofre stats: ',vars(1:nvars)
   call write_stats(niter)
 
 !!$  call write_energy_relation('subtracted')
@@ -228,8 +231,17 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,i3)') 'ga_num_bits',ga_nbits
     write(6,'(2x,a25,2x,i4)') 'ga_num_individuals',ga_nindivs
     write(6,'(2x,a25,2x,i4)') 'ga_num_offsprings',ga_noffsp
-    write(6,'(2x,a25,2x,a)') 'ga_fitness',ga_fitness
+    write(6,'(2x,a25,2x,a)') 'ga_fitness',trim(ga_fitness)
     write(6,'(2x,a25,2x,f8.4)') 'ga_mutation_rate',ga_rate_mutate
+    write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
+  else if( trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' ) then
+    write(6,'(2x,a25,2x,i4)') 'de_num_individuals',de_nindivs
+    write(6,'(2x,a25,2x,a)') 'de_fitness',trim(de_fitness)
+    write(6,'(2x,a25,2x,f8.4)') 'de_fraction',de_frac
+    write(6,'(2x,a25,2x,f8.4)') 'de_lambda',de_lambda
+    write(6,'(2x,a25,2x,f8.4)') 'de_crossover_rate',de_cross_rate
+    write(6,'(2x,a25,2x,f8.4)') 'de_wmin',de_wmin
+    write(6,'(2x,a25,2x,f8.4)') 'de_wmax',de_wmax
     write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
   endif
 !!$  write(6,'(a)') ''
@@ -853,6 +865,29 @@ subroutine ga_wrapper()
 
   return
 end subroutine ga_wrapper
+!=======================================================================
+subroutine de_wrapper()
+  use variables
+  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+  use parallel
+  use minimize
+  use fp_common,only: func_w_pmd, grad_w_pmd
+  implicit none
+  integer:: i,m
+  real(8):: fval
+  external:: write_stats
+
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
+    call de(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
+         ,iprint,iflag,myid,func_w_pmd,cfmethod &
+         ,niter_eval,write_stats)
+  else
+    if(myid.eq.0) print *,'Differential evolution (DE) is not available for '//&
+         trim(cpot)
+  endif
+
+  return
+end subroutine de_wrapper
 !=======================================================================
 subroutine random_search_wrapper()
   use variables
@@ -1578,6 +1613,15 @@ subroutine sync_input()
   call mpi_bcast(ga_noffsp,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(ga_rate_mutate,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ga_fitness,128,mpi_character,0,mpi_world,ierr)
+!.....Differential evolution
+  call mpi_bcast(de_nindivs,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(de_frac,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(de_lambda,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(de_cross_rate,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(de_wmin,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(de_wmax,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(de_fitness,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(de_algo,128,mpi_character,0,mpi_world,ierr)
 !.....sgd
   call mpi_bcast(csgdupdate,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(r0sgd,1,mpi_real8,0,mpi_world,ierr)
