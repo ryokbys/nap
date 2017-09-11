@@ -45,7 +45,7 @@ def write_info_of_element(*symbols):
         print 'Element: {0:s}'.format(s)
         print '  name: {0:s}'.format(element['name'])
         print '  atomic number: {0:d}'.format(element['number'])
-        print '  weight: {0:8.3f}'.format(element['weight'])
+        print '  mass: {0:8.3f}'.format(element['mass'])
         print '  abundance: {0:s}'.format(element['abundance'])
         print ''
 

@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-08-21 15:09:34 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-11 15:39:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -304,8 +304,8 @@ contains
 !.....Set screening length
         do isp=1,nsp
           do jsp=1,nsp
-            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
-!!$            rho_bvs(isp,jsp) = 2d0
+!!$            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+            rho_bvs(isp,jsp) = 2d0
 !!$            if( iprint.gt.0 .and. interact(isp,jsp) .and. jsp.ge.isp ) then
 !!$              write(6,'(a,2i5,f10.4)') ' isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
 !!$            endif
@@ -319,7 +319,7 @@ contains
       call mpi_bcast(rho_bvs,nsp*nsp,mpi_real8 &
            ,0,mpi_world,ierr)
       call mpi_bcast(interact,nsp*nsp,mpi_logical,0,mpi_world,ierr)
-!.....end of screend_bvs      
+!.....end of screend_bvs
 
     else if( ifcoulomb.eq.3 ) then  ! vcGaussian
       if( allocated(vcg_chi) ) deallocate(vcg_chi,vcg_jii,vcg_sgm,vcg_e0)
@@ -396,6 +396,9 @@ contains
       if( .not. allocated(strsl) ) then
         allocate(strsl(3,3,namax))
       endif
+!!$      do i=1,natm
+!!$        print *,'i,chg(i)=',i,chg(i)
+!!$      enddo
     endif
 
     epotl= 0d0

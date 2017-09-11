@@ -2183,6 +2183,15 @@ contains
     xw= sa_xw0
     nadpt= 0
 
+    iter= 0
+    ft = 0d0
+    idim = 0
+    if( myid.eq.0 .and. iprint.ne.0 ) then
+      write(6,'(a,2i10,4es13.5,2f9.5)')&
+           ' iter,idim,temp,f,ft,fbest,ptrans,radpt='&
+           ,iter,idim,temp,f,ft,fbest,ptrans,0d0
+    endif
+    
     call sub_eval(0)
 !.....Main loop of random displacements
     do iter=1,maxiter

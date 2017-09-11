@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-08 22:48:05 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-11 15:36:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1931,6 +1931,7 @@ subroutine subtract_FF()
       endif
       call run_pmd(samples(ismpl),lcalcgrad,nvars,gvar,&
            nsubff,csubffs,epot,frcs)
+!!$      print *,'myid,ismpl,epot=',myid,ismpl,epot
       samples(ismpl)%esub = epot
       samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
     enddo
