@@ -2691,6 +2691,7 @@ contains
         ftrn = fmax
       endif
       indivs(i)%fvalue = ftrn
+      indivs(i)%fitness = 1d0/ftrn
       indivs(i)%iid = iid
       if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,100))
       if( ftrn.lt.fbest ) then
@@ -2738,6 +2739,7 @@ contains
           ftrn = fmax
         endif
         offsprings(i)%fvalue = ftrn
+        offsprings(i)%fitness = 1d0/ftrn
         offsprings(i)%iid = iid
         if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,100))
         if( ftrn.lt.fbest ) then
@@ -2749,7 +2751,7 @@ contains
 
 !.....Selection
 !!$      print *,'selecting...'
-      call roulette_selection(indivs,ga_noffsp,offsprings,fbest)
+      call roulette_selection(ga_nindivs,indivs,ga_noffsp,offsprings,fbest)
 
       if( myid.eq.0 ) then
         write(6,'(a,i8,1x,100es12.4)') &
@@ -2937,7 +2939,7 @@ contains
     return
   end subroutine crossover
 !=======================================================================
-  subroutine roulette_selection(indivs,noffsp,offsprings,fbest)
+  subroutine roulette_selection(nindivs,indivs,noffsp,offsprings,fbest)
 !
 !  Select individuals that are alive in the next generation according to
 !  their evaulation values.
@@ -2945,13 +2947,13 @@ contains
 !  The best one is always selected at first.
 !
     use random
-    type(individual),intent(inout):: indivs(ga_nindivs)
-    integer,intent(in):: noffsp
+    integer,intent(in):: nindivs,noffsp
+    type(individual),intent(inout):: indivs(nindivs)
     type(individual),intent(in):: offsprings(noffsp)
     real(8),intent(in):: fbest
 
     integer:: i,j,k,l,m,n,ibest
-    integer:: islct(ga_nindivs)
+    integer:: islct(nindivs)
     real(8):: fbestl
 
     integer,save:: nall
@@ -2961,8 +2963,8 @@ contains
     real(8),parameter:: pmax = 1d+10
 
     if( l1st ) then
-      nall = ga_nindivs + noffsp
-      allocate(probs(nall),tmp_indivs(ga_nindivs))
+      nall = nindivs + noffsp
+      allocate(probs(nall),tmp_indivs(nindivs))
       l1st = .false.
     endif
 
@@ -2970,17 +2972,18 @@ contains
     n = 0
     ibest = 0
     fbestl = 1d+30
-    do i=1,ga_nindivs
+    do i=1,nindivs
       n = n + 1
       if( indivs(i)%fvalue.lt.fbestl ) then
         fbestl = indivs(i)%fvalue
         ibest = n
       endif
-      if( trim(ga_fitness).eq.'exp' ) then
-        probs(n) = exp(-(indivs(i)%fvalue-fbest)/ga_temp)
-      else if( trim(ga_fitness).eq.'inv' ) then
-        probs(n) = 1d0/indivs(i)%fvalue
-      endif
+      probs(n) = indivs(i)%fitness
+!!$      if( trim(ga_fitness).eq.'exp' ) then
+!!$        probs(n) = exp(-(indivs(i)%fvalue-fbest)/ga_temp)
+!!$      else if( trim(ga_fitness).eq.'inv' ) then
+!!$        probs(n) = 1d0/indivs(i)%fvalue
+!!$      endif
 !!$      print *,'n,fvalue,prob=',n,indivs(i)%fvalue,probs(n)
     enddo
     do i=1,noffsp
@@ -2989,18 +2992,19 @@ contains
         fbestl = offsprings(i)%fvalue
         ibest = n
       endif
-      if( trim(ga_fitness).eq.'exp' ) then
-        probs(n) = exp(-(offsprings(i)%fvalue-fbest)/ga_temp)
-      else if( trim(ga_fitness).eq.'inv' ) then
-        probs(n) = 1d0/offsprings(i)%fvalue
-      endif
+      probs(n) = indivs(i)%fitness
+!!$      if( trim(ga_fitness).eq.'exp' ) then
+!!$        probs(n) = exp(-(offsprings(i)%fvalue-fbest)/ga_temp)
+!!$      else if( trim(ga_fitness).eq.'inv' ) then
+!!$        probs(n) = 1d0/offsprings(i)%fvalue
+!!$      endif
 !!$      print *,'n,fvalue,prob=',n,offsprings(i)%fvalue,probs(n)
     enddo
 
 !.....Select individuals
     islct(1) = ibest
     probs(ibest) = 0d0
-    do i=2,ga_nindivs
+    do i=2,nindivs
       ptot = 0d0
       do j=1,nall
         ptot = ptot + probs(j)
@@ -3023,16 +3027,16 @@ contains
 !!$    enddo
 
 !.....Replace indivs elements with selected ones
-    do i=1,ga_nindivs
+    do i=1,nindivs
       j = islct(i)
-      if( j.le.ga_nindivs ) then
+      if( j.le.nindivs ) then
         tmp_indivs(i) = indivs(j)
       else
-        j = j - ga_nindivs
+        j = j - nindivs
         tmp_indivs(i) = offsprings(j)
       endif
     enddo
-    do i=1,ga_nindivs
+    do i=1,nindivs
       indivs(i) = tmp_indivs(i)
     enddo
     return
@@ -3068,9 +3072,10 @@ contains
     real(8):: ftrn,ftst,fracl,fracg,lmdl,lmdg,w
     logical,save:: l1st = .true.
     integer:: iid,iidbest
-    type(individual),allocatable:: indivs(:)
+    type(individual),allocatable:: indivs(:),offsprings(:)
     real(8),allocatable,dimension(:):: xtmp,xi,xp,xq,xr,xs,xbestl,xbestg&
          ,xl,xg,xd
+    real(8),allocatable:: xpbest(:,:)
 
     integer,parameter:: io_indivs = 30
     character(len=128),parameter:: cf_indivs = 'out.de.individuals'
@@ -3079,11 +3084,12 @@ contains
 
     if( l1st ) then
 !.....Allocate necessary memory spaces
-      allocate(indivs(de_nindivs))
+      allocate(indivs(de_nindivs),offsprings(de_nindivs))
       allocate(xtmp(ndim),xi(ndim),xp(ndim),xq(ndim),xr(ndim),xs(ndim)&
            ,xbestl(ndim),xbestg(ndim),xl(ndim),xg(ndim),xd(ndim))
+      allocate(xpbest(ndim,de_nindivs))
       do i=1,de_nindivs
-        allocate(indivs(i)%genes(ndim))
+        allocate(indivs(i)%genes(ndim),offsprings(i)%genes(ndim))
       enddo
 !.....Initialize
       fracg = de_frac
@@ -3167,7 +3173,7 @@ contains
     if( myid.eq.0 ) then
       write(6,'(a,i8,es12.4,f5.2,1x,100es12.4)') &
            " iter,fbest,w,fvals= ",&
-           iter,fbest,w,(indivs(i)%fvalue,i=1,min(ndim,10))
+           iter,fbest,w,(indivs(i)%fvalue,i=1,min(de_nindivs,10))
       do i=1,de_nindivs
         write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
       enddo
@@ -3238,10 +3244,12 @@ contains
           enddo
 !!$        xg(1:ndim) = xi(1:ndim) +lmdg*(xbestg(1:ndim)-xi(1:ndim)) &
 !!$             +fracg*(xr(1:ndim)-xs(1:ndim))
-          xd(1:ndim) = xp(1:ndim) +de_frac *(xr(1:ndim)-xs(1:ndim))
-        endif
+!!$          xd(1:ndim) = xp(1:ndim) +de_frac *(xr(1:ndim)-xs(1:ndim))
+          xd(1:ndim) = xp(1:ndim) +urnd()*de_frac *(xr(1:ndim)-xs(1:ndim))
+        endif  ! de_algo
 
-!.....Make a new candidate
+        iid = iid + 1
+!.....Make a new candidate by the crossover of xd and xi
         do j=1,ndim
           if( urnd().lt.de_cross_rate ) then
             xtmp(j) = xd(j)
@@ -3252,13 +3260,19 @@ contains
         do j=1,ndim
           xtmp(j) = max(xtmp(j),indivs(i)%genes(j)%vmin)
           xtmp(j) = min(xtmp(j),indivs(i)%genes(j)%vmax)
+!!$          offsprings(i)%genes(j)%val = xtmp(j)
         enddo
+!!$        offsprings(i)%iid = iid
         call func(ndim,xtmp,ftrn,ftst)
-!!$        print *,'i,fvalue,ftrn=',i,indivs(i)%fvalue,ftrn
+!!$        offsprings(i)%fvalue = ftrn
 !.....Detect NaN and replace it with fmax
-        if( ftrn*0d0.ne.0d0 ) cycle
+!!$        if( ftrn*0d0.ne.0d0 ) then
+!!$          offsprings(i)%fitness = 0d0
+!!$        else
+!!$          offsprings(i)%fitness = 1d0/ftrn
+!!$        endif
+!!$        print *,'i,fvalue,ftrn=',i,indivs(i)%fvalue,ftrn
         if( ftrn.le.indivs(i)%fvalue .or. indivs(i)%fvalue*0d0.ne.0d0 ) then
-          iid = iid + 1
           do j=1,ndim
             indivs(i)%genes(j)%val = xtmp(j)
           enddo
@@ -3280,7 +3294,7 @@ contains
       if( myid.eq.0 ) then
         write(6,'(a,i8,es12.4,f5.2,1x,100es12.4)') &
              " iter,fbest,w,fvals= ",&
-             iter,fbest,w,(indivs(i)%fvalue,i=1,min(ndim,10))
+             iter,fbest,w,(indivs(i)%fvalue,i=1,min(de_nindivs,10))
         do i=1,de_nindivs
           write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
         enddo
@@ -3339,7 +3353,7 @@ contains
     enddo
     do i=1,ndim
       do j=1,nindivs
-        xbestg(i) = xbestg(i) +indivs(i)%fitness *indivs(i)%genes(i)%val
+        xbestg(i) = xbestg(i) +indivs(j)%fitness *indivs(j)%genes(i)%val
       enddo
       xbestg(i) = xbestg(i) /allf
     enddo
