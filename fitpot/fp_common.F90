@@ -125,7 +125,7 @@ contains
 
     if( len(trim(crefstrct)).gt.5 ) then
       if( myid.eq.myidrefsub ) then
-        epotsub = samples(isidrefsub)%epot
+        epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
       endif
       call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
 !!$      print *,'myid,epotsub=', myid,epotsub
@@ -143,9 +143,9 @@ contains
         eerr = smpl%eerr
 !.....Energy matching
         if( len(trim(crefstrct)).gt.5 ) then
-          ediff= (epot-epotsub -(eref-esub-erefsub))/natm /eerr
+          ediff= (epot-epotsub+esub -(eref-erefsub))/natm /eerr
         else
-          ediff= (epot -(eref-esub))/natm /eerr
+          ediff= (epot+esub -eref)/natm /eerr
         endif
         ediff= ediff*ediff
         ftmp= ftmp +ediff *swgt
@@ -165,8 +165,8 @@ contains
         do ia=1,natm
           if( smpl%ifcal(ia).eq.0 ) cycle
           do ixyz=1,3
-            fdiff(ixyz,ia)= (frcs(ixyz,ia) &
-                 -(smpl%fref(ixyz,ia)-smpl%fsub(ixyz,ia))) *ferri
+            fdiff(ixyz,ia)= (frcs(ixyz,ia)+smpl%fsub(ixyz,ia) &
+                 -(smpl%fref(ixyz,ia))) *ferri
             fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
             ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt
           enddo
@@ -279,7 +279,7 @@ contains
         esub= smpl%esub
         eerr= smpl%eerr
 !.....Energy matching
-        ediff= (epot -(eref-esub)) /natm /eerr
+        ediff= (epot+esub -eref) /natm /eerr
         ediff= 2d0 *ediff /natm /eerr *swgt
         gtrnl(1:ndim)= gtrnl(1:ndim) +gs(1:ndim)*ediff
       endif

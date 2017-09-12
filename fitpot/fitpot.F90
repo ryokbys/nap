@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-11 15:36:11 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-12 18:18:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1241,7 +1241,7 @@ subroutine write_energy_relation(cadd)
     eerrl(1:nsmpl)= 0d0
 !!$    swgtl(1:nsmpl)= 0d0
     do ismpl=isid0,isid1
-      erefl(ismpl)= samples(ismpl)%eref -samples(ismpl)%esub
+      erefl(ismpl)= samples(ismpl)%eref
       esubl(ismpl)= samples(ismpl)%esub
       eerrl(ismpl)= samples(ismpl)%eerr
 !!$      swgtl(ismpl)= samples(ismpl)%wgt
@@ -1273,7 +1273,7 @@ subroutine write_energy_relation(cadd)
 
   epotl(1:nsmpl)= 0d0
   do ismpl=isid0,isid1
-    epotl(ismpl)= samples(ismpl)%epot
+    epotl(ismpl)= samples(ismpl)%epot +samples(ismpl)%esub
   enddo
   epotg(1:nsmpl)= 0d0
   call mpi_reduce(epotl,epotg,nsmpl,mpi_real8,mpi_sum &
@@ -1334,8 +1334,7 @@ subroutine write_force_relation(cadd)
     ferrl(1:nsmpl) = 0d0
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
-      frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm) &
-           -samples(ismpl)%fsub(1:3,1:natm)
+      frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm)
       fsubl(1:3,1:natm,ismpl)= samples(ismpl)%fsub(1:3,1:natm)
       ferrl(ismpl) = samples(ismpl)%ferr
     enddo
@@ -1353,7 +1352,8 @@ subroutine write_force_relation(cadd)
   fal(1:3,1:nmax,1:nsmpl)= 0d0
   do ismpl=isid0,isid1
     natm= samples(ismpl)%natm
-    fal(1:3,1:natm,ismpl)= samples(ismpl)%fa(1:3,1:natm)
+    fal(1:3,1:natm,ismpl)= samples(ismpl)%fa(1:3,1:natm) &
+         +samples(ismpl)%fsub(1:3,1:natm)
   enddo
   fag(1:3,1:nmax,1:nsmpl)= 0d0
   call mpi_reduce(fal,fag,3*nmax*nsmpl,mpi_real8,mpi_sum &
@@ -1428,7 +1428,7 @@ subroutine write_stats(iter)
 
   if( len(trim(crefstrct)).gt.5 ) then
     if( myid.eq.myidrefsub ) then
-      epotsub = samples(isidrefsub)%epot
+      epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
     endif
     call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
   endif
@@ -1441,10 +1441,10 @@ subroutine write_stats(iter)
     smpl= samples(ismpl)
     natm= smpl%natm
     if( len(trim(crefstrct)).gt.5 ) then
-      de= abs(smpl%epot-epotsub &
-           -(smpl%eref-smpl%esub-erefsub))/natm
+      de= abs(smpl%epot-epotsub+smpl%esub &
+           -(smpl%eref-erefsub))/natm
     else
-      de= abs(smpl%epot -(smpl%eref-smpl%esub))/natm
+      de= abs(smpl%epot+smpl%esub -smpl%eref)/natm
     endif
     if( smpl%iclass.eq.1 ) then
       demaxl_trn= max(demaxl_trn,de)
@@ -1499,7 +1499,7 @@ subroutine write_stats(iter)
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
-          df= abs(smpl%fa(l,ia)-(smpl%fref(l,ia)-smpl%fsub(l,ia)))
+          df= abs(smpl%fa(l,ia)+smpl%fsub(l,ia) -smpl%fref(l,ia))
           dfmaxl_trn= max(dfmaxl_trn,df)
           dfsuml_trn=dfsuml_trn +df*df
 !!$          write(6,'(a,3i5,3es12.4)')  'ismpl,ia,l,fa,fref,dfsuml_trn=',&
@@ -1511,7 +1511,7 @@ subroutine write_stats(iter)
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
-          df= abs(smpl%fa(l,ia)-(smpl%fref(l,ia)-smpl%fsub(l,ia)))
+          df= abs(smpl%fa(l,ia)+smpl%fsub(l,ia) -smpl%fref(l,ia))
           dfmaxl_tst= max(dfmaxl_tst,df)
           dfsuml_tst=dfsuml_tst +df*df
           ntstl=ntstl +1
