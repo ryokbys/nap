@@ -23,7 +23,7 @@ Options:
 import numpy as np
 from docopt import docopt
 
-from napsys import NAPSystem
+from nappy.napsys import NAPSystem
 
 def anint(x):
     if x >= 0.5:
