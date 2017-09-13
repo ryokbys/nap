@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-08-05 12:25:40 Ryo KOBAYASHI>
+!                     Last-modified: <2017-09-13 12:54:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -463,7 +463,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
         js = cs2is(cj)
         de = demig(js) + (efrm-ergp)/2
         p = prefreq(js) *exp(-de/(temp*fkb))
-        print *,'jj,cj,ergp,erg,de,p = ',jj,cj,ergp,efrm,de,p
+!!$        print *,'jj,cj,ergp,erg,de,p = ',jj,cj,ergp,efrm,de,p
         probtmp(jj) = p
       enddo  ! loop over nearest neighbors, jj
 
