@@ -182,6 +182,7 @@ c-----make a linked cell list, LSCL
         rcyi=1d0/rcy
         rczi=1d0/rcz
 c-----allocate LSCL & LSHD after obtaining lcxyz
+        if( allocated(lscl) ) deallocate(lscl,lshd)
         allocate(lscl(namax),lshd(lcxyz))
       endif
 

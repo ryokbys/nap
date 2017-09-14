@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-09-13 12:54:08 Ryo KOBAYASHI>
+!                     Last-modified: <2017-09-14 16:46:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -31,6 +31,7 @@ module pmc
   integer:: num_Mg = 10
   integer:: num_Si = 5
   integer:: num_Vac= 1
+  integer:: num_Al_clst= 0
 !.....initial structure: 1) random, 2) clustered,
 !      3) read from file (restart)
   integer:: init_strct = 2
@@ -163,13 +164,13 @@ program prec_mc
   
   call bcast_params(myid_md,mpi_md_world,lkinetic, &
        nstps_mc,ncx,ncy,ncz,alat,num_Mg,num_Si,num_Vac, &
-       init_strct,nx,ny,nz,nstps_relax,lmove,temp)
+       init_strct,nx,ny,nz,nstps_relax,lmove,temp,num_Al_clst)
 !.....parallel setting for pmd
   call parallel_setting(nx,ny,nz,myid_md,myx,myy,myz,anxi,anyi,anzi,sorg)
 
   if( myid_md.eq.0 ) then
     call write_init_params(lkinetic,nstps_mc, ncx,ncy,ncz,alat, &
-         num_Mg,num_Si,num_Vac, &
+         num_Mg,num_Si,num_Vac,num_Al_clst, &
          init_strct,nx,ny,nz,nstps_relax,lmove,temp)
   endif
   
@@ -203,8 +204,8 @@ program prec_mc
     elseif( init_strct.eq.1 ) then  ! random
       call random_symbols(natm,csymbols,num_Mg,num_Si,num_Vac)
     elseif( init_strct.eq.2 ) then  ! clustered
-      call clustered_symbols(natm,pos0,csymbols,num_Mg,num_Si,num_Vac &
-           ,nnmaxmc,lsprmc)
+      call clustered_symbols(natm,pos0,csymbols,num_Mg,num_Si,num_Vac, &
+           nnmaxmc,lsprmc,num_Al_clst)
     elseif( init_strct.eq.3 ) then  ! pairs between same species
       call paired_symbols(natm,pos0,csymbols,num_Mg,num_Si,num_Vac,&
            nnmaxmc,lsprmc,'XX')
@@ -244,12 +245,12 @@ end program prec_mc
 !=======================================================================
 subroutine bcast_params(myid_md,mpi_md_world,lkinetic, &
      nstps_mc, ncx,ncy,ncz,alat,num_Mg,num_Si,num_Vac, &
-     init_strct,nx,ny,nz,nstps_relax,lmove,temp)
+     init_strct,nx,ny,nz,nstps_relax,lmove,temp,num_Al_clst)
   implicit none
   include 'mpif.h'
   integer,intent(in):: myid_md,mpi_md_world
   integer,intent(inout):: nx,ny,nz,ncx,ncy,ncz,nstps_mc, &
-       num_Mg,num_Si,num_Vac,init_strct,nstps_relax
+       num_Mg,num_Si,num_Vac,init_strct,nstps_relax,num_Al_clst
   real(8),intent(inout):: alat,temp
   logical,intent(inout):: lmove(0:3),lkinetic
   
@@ -269,6 +270,7 @@ subroutine bcast_params(myid_md,mpi_md_world,lkinetic, &
   call mpi_bcast(num_Mg,1,mpi_integer,0,mpi_md_world,ierr)
   call mpi_bcast(num_Si,1,mpi_integer,0,mpi_md_world,ierr)
   call mpi_bcast(num_Vac,1,mpi_integer,0,mpi_md_world,ierr)
+  call mpi_bcast(num_Al_clst,1,mpi_integer,0,mpi_md_world,ierr)
 
   call mpi_bcast(init_strct,1,mpi_integer,0,mpi_md_world,ierr)
 
@@ -673,6 +675,9 @@ subroutine read_in_pmc_core(ionum,cname)
   elseif( trim(cname).eq.'num_Vac' ) then
     call read_i1(ionum,num_Vac)
     return
+  elseif( trim(cname).eq.'num_Al_in_cluster' ) then
+    call read_i1(ionum,num_Al_clst)
+    return
   elseif( trim(cname).eq.'initial_structure' ) then
     call read_i1(ionum,init_strct)
     return
@@ -742,11 +747,11 @@ subroutine parallel_setting(nx,ny,nz,myid_md,myx,myy,myz &
 end subroutine parallel_setting
 !=======================================================================
 subroutine write_init_params(lkinetic,nstps_mc, ncx,ncy,ncz,alat, &
-     num_Mg,num_Si,num_Vac, &
+     num_Mg,num_Si,num_Vac,num_Al_clst, &
      init_strct,nx,ny,nz,nstps_relax,lmove,temp)
   implicit none
   integer,intent(in):: nstps_mc,ncx,ncy,ncz,num_Mg,num_Si,num_Vac &
-       ,init_strct,nx,ny,nz,nstps_relax
+       ,init_strct,nx,ny,nz,nstps_relax,num_Al_clst
   real(8),intent(in):: alat,temp
   logical,intent(in):: lmove(0:3),lkinetic
 
@@ -758,6 +763,12 @@ subroutine write_init_params(lkinetic,nstps_mc, ncx,ncy,ncz,alat, &
   write(6,'(1x,a20,1x,i2)') 'ncopy_x',ncx
   write(6,'(1x,a20,1x,i2)') 'ncopy_y',ncy
   write(6,'(1x,a20,1x,i2)') 'ncopy_z',ncz
+  write(6,*) ''
+  write(6,'(1x,a20,1x,i4)') 'num_Mg',num_Mg
+  write(6,'(1x,a20,1x,i4)') 'num_Si',num_Si
+  write(6,'(1x,a20,1x,i4)') 'num_Vac',num_Vac
+  write(6,'(1x,a20,1x,i4)') 'num_Al_in_cluster',num_Al_clst
+  write(6,*) ''
   write(6,'(1x,a20,1x,i2)') 'parallel_x',nx
   write(6,'(1x,a20,1x,i2)') 'parallel_y',ny
   write(6,'(1x,a20,1x,i2)') 'parallel_z',nz
@@ -840,10 +851,10 @@ subroutine random_symbols(natm,csymbols,num_Mg,num_Si,num_Vac)
 end subroutine random_symbols
 !=======================================================================
 subroutine clustered_symbols(natm,pos0,csymbols &
-     ,num_Mg,num_Si,num_Vac,nnmax,lspr)
+     ,num_Mg,num_Si,num_Vac,nnmaxmc,lsprmc,num_Al_clst)
   implicit none
-  integer,intent(in):: natm,num_Mg,num_Si,num_Vac &
-       ,nnmax,lspr(0:nnmax,natm)
+  integer,intent(in):: natm,num_Mg,num_Si,num_Vac, &
+       nnmaxmc,lsprmc(0:nnmaxmc,natm),num_Al_clst
   character,intent(inout):: csymbols(natm)
   real(8),intent(in):: pos0(3,natm)
 
@@ -853,10 +864,9 @@ subroutine clustered_symbols(natm,pos0,csymbols &
       real(8):: urnd
     end function urnd
   end interface
-  integer:: i,jj,j,irnd,nsol,isol,icntr,nmg,nsi,nvac,inc
-  real(8):: cntr(3),dmin,d,r,rMg,rSi
+  integer:: i,jj,j,k,irnd,nsol,isol,icntr,nmg,nsi,nvac,inc,nal
+  real(8):: cntr(3),dmin,d,r,rMg,rSi,rAl,rc
   character,allocatable:: carr(:)
-
 
 !.....1st, pick one site close to the center
   cntr(1:3) = (/ 0.5d0, 0.5d0, 0.5d0 /)
@@ -873,9 +883,10 @@ subroutine clustered_symbols(natm,pos0,csymbols &
   enddo
   
 !.....make random array of symbols to be replaced
-  nsol = num_Mg +num_Si +num_Vac
+  nsol = num_Mg +num_Si +num_Vac +num_Al_clst
   nmg= 0
   nsi= 0
+  nal= 0
   nvac= 0
   allocate(carr(nsol))
   inc = 0
@@ -883,6 +894,7 @@ subroutine clustered_symbols(natm,pos0,csymbols &
     if( inc.eq.nsol ) exit
     rMg = dble(num_Mg-nmg)/(nsol-inc)
     rSi = dble(num_Mg-nmg +num_Si-nsi)/(nsol-inc)
+    rAl = dble(num_Mg-nmg +num_Si-nsi +num_Al_clst-nal)/(nsol-inc)
     r = urnd()
     if( r.lt.rMg ) then
       if( nmg.ge.num_Mg ) cycle
@@ -894,6 +906,11 @@ subroutine clustered_symbols(natm,pos0,csymbols &
       inc= inc +1
       carr(inc) = 'S'
       nsi= nsi +1
+    else if( r.le.rAl ) then
+      if( nal.ge.num_Al_clst ) cycle
+      inc= inc +1
+      carr(inc) = 'X'
+      nal= nal +1
     else
       if( nvac.ge.num_Vac ) cycle
       inc= inc +1
@@ -908,13 +925,19 @@ subroutine clustered_symbols(natm,pos0,csymbols &
   do while(.true.)
     do i = 1,natm
       if( csymbols(i).eq.'A' ) cycle
-      do jj = 1,lspr(0,i)
-        j = lspr(jj,i)
+      do jj = 1,lsprmc(0,i)
+        j = lsprmc(jj,i)
         if( csymbols(j).eq.'A' ) then
           isol = isol + 1
           csymbols(j) = carr(isol)
         endif
-        if( isol.eq.nsol ) return
+        if( isol.eq.nsol ) then
+!.....Replace X with A to restore Al atoms
+          do k=1,natm
+            if( csymbols(k).eq.'X' ) csymbols(k) = 'A'
+          enddo
+          return
+        endif
       enddo
     enddo
   enddo
