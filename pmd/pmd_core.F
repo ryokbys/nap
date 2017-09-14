@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-08-21 15:14:28 Ryo KOBAYASHI>
+c                     Last-modified: <2017-09-14 18:05:17 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -530,7 +530,6 @@ c.....Langevin thermostat with Mannella integrator
             ifmv= int(mod(tag(i)*10,10d0))
             if( ifmv.eq.0 .or. tfac(ifmv).lt.0d0 ) then
               va(1:3,i)=va(1:3,i) +aa(1:3,i)
-              cycle
             else
               is= int(tag(i))
               ami= am(is)
@@ -553,6 +552,8 @@ c.....accumulate energy difference
               va(1:3,i)= va(1:3,i) +aai(1:3)
             endif
           enddo
+          call rm_trans_motion(natm,tag,va,nspmax,am
+     &         ,mpi_md_world,myid_md,0)
         else
           va(1:3,1:natm)=va(1:3,1:natm) +aa(1:3,1:natm)
         endif
@@ -593,6 +594,8 @@ c.....accumulate energy difference
             is= int(tag(i))
             ediff(ifmv)= ediff(ifmv) +(tfac(ifmv)**2-1d0)*fack(is)
           enddo
+          call rm_trans_motion(natm,tag,va,nspmax,am
+     &         ,mpi_md_world,myid_md,0)
         endif
 
 c.....temperature distribution along x
