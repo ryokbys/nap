@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-09-14 16:46:11 Ryo KOBAYASHI>
+!                     Last-modified: <2017-09-15 12:30:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -149,7 +149,7 @@ program prec_mc
   integer:: ihour,imin,isec,iday
   integer:: mpi_md_world,nodes_md,myid_md,myx,myy,myz
   real(8):: rc,anxi,anyi,anzi,sorg(3),t0,t1
-  character:: cnum*6
+  character:: cnum*128
 
 !.....initialize parallel
   call init_parallel(mpi_md_world,nodes_md,myid_md)
@@ -190,8 +190,8 @@ program prec_mc
   allocate(lsprmc(0:nnmaxmc,natm))
   call make_tag(natm,csymbols,tagmc)
   if( myid_md.eq.0 ) then
-    write(cnum,'(i6.6)') 0
-    call write_POSCAR('poscars/POSCAR_'//cnum,natm,csymbols,pos0,hmat,species)
+    write(cnum,'(i0)') 0
+    call write_POSCAR('poscars/POSCAR_'//trim(cnum),natm,csymbols,pos0,hmat,species)
   endif
   call mk_lspr_sngl(natm,natm,nnmaxmc,tagmc,pos0,rc,hmat,hmati,lsprmc, &
        0,.true.)
@@ -307,7 +307,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   real(8),allocatable:: epimc(:),ecpot(:),erghist(:),ergtmp(:), &
        probtmp(:)
   integer,allocatable:: nstptmp(:)
-  character:: ci*1,cj*1,cfmt*10,cergtxt*1024,cnum*6,csi*1
+  character:: ci*1,cj*1,cfmt*10,cergtxt*1024,cnum*128,csi*1
   character,allocatable:: csymprev(:),csymhist(:,:),csymtmp(:,:) &
        ,cjtmp(:)
   integer,external:: cs2is,check_history
@@ -502,10 +502,10 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
       write(cfmt,'(i10)') natm
       write(iosym,'(i8,3x,'//trim(cfmt)//'a)') istp,csymbols(1:natm)
 !.....Write POSCAR if migrating atom is not Al
-!!$      if( cjtmp(ievent).ne.'A' ) then
-      if( mod(istp,noutint).eq.0 ) then
-        write(cnum,'(i6.6)') istp
-        call write_POSCAR('poscars/POSCAR_'//cnum,natm,csymbols,pos0, &
+      if( (noutint.le.0 .and. cjtmp(ievent).ne.'A') .or. &
+           (noutint.gt.0 .and. mod(istp,noutint).eq.0) ) then
+        write(cnum,'(i0)') istp
+        call write_POSCAR('poscars/POSCAR_'//trim(cnum),natm,csymbols,pos0, &
              hmat,species)
       endif
 !.....Write energy
