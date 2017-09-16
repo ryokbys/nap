@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-09-15 12:30:57 Ryo KOBAYASHI>
+!                     Last-modified: <2017-09-16 16:31:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -1131,7 +1131,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   integer:: i,inc
   integer,parameter:: nismax = 9
   integer:: nstp,nerg,npmd,ifpmd,minstp,ntdst,n_conv,ifsort,iprint &
-       ,ifdmp,ifcoulomb,numff
+       ,ifdmp,ifcoulomb,numff,nrmtrans
   real(8):: hunit,h(3,3,0:1),am(nismax),dt,rc,dmp,tinit,tfin,ttgt(9)&
        ,trlx,stgt(3,3),ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3) &
        ,epot,ekin,eps_conv,rbuf
@@ -1217,6 +1217,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   trlx = 100d0
   ltdst = .false.
   ntdst = 1
+  nrmtrans = 1
   lstrs = .false.
   cpctl = 'none'
   stgt(1:3,1:3) = 0d0
@@ -1243,7 +1244,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,ekitot,epitot,chgtot,chitot,nstps_pmd,nerg,npmd &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
        ,nismax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp,minstp &
-       ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt,ptgt &
+       ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl,stgt,ptgt &
        ,srlx,stbeta,strfin,lstrs,lcellfix &
        ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb &
        ,czload_type,eps_conv,ifsort,iprint,nstps_done)

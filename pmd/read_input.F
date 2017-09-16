@@ -110,6 +110,9 @@ c        call read_r1(ionum,ttgt)
       elseif( trim(cname).eq.'temperature_relax_time' ) then
         call read_r1(ionum,trlx)
         return
+      elseif( trim(cname).eq.'remove_translation' ) then
+        call read_i1(ionum,nrmtrans)
+        return
 c.....temperature distribution along x
       elseif( trim(cname).eq.'flag_temp_dist' ) then
         call read_l1(ionum,ltdst)

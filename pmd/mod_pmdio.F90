@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-19 17:53:15 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-16 16:26:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -34,6 +34,9 @@ module pmdio
   data ttgt / 300d0, 300d0, 300d0, 300d0, 300d0, 300d0, &
        300d0, 300d0, 300d0 /
   real(8):: trlx = 100d0
+!.....Remove translational motion every NRMTRANS steps,
+!.....if it is less than 1, not to remove translational motion.
+  integer:: nrmtrans = 1
 !.....Coulomb system?
   integer:: ifcoulomb = 0
 !.....temperature distribution on x-direction

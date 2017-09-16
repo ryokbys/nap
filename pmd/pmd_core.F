@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-09-14 18:05:17 Ryo KOBAYASHI>
+c                     Last-modified: <2017-09-16 16:30:17 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -7,9 +7,9 @@ c-----------------------------------------------------------------------
      &     ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp
-     &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,cpctl,stgt
-     &     ,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,ptnsr,epot,ekin
-     &     ,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
+     &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
+     &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,ptnsr,epot
+     &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
      &     ,nstp_done)
       use pmdvars
       use zload
@@ -18,7 +18,7 @@ c-----------------------------------------------------------------------
       include "./params_unit.h"
       integer,intent(in):: ntot,maxstp,nerg,npmd,myid_md,mpi_md_world
      &     ,nspmax,ifpmd,ifdmp,minstp,ntdst,ifsort,numff
-     &     ,iprint,nodes_md,nx,ny,nz,n_conv,ifcoulomb
+     &     ,iprint,nodes_md,nx,ny,nz,n_conv,ifcoulomb,nrmtrans
       integer,intent(out):: nstp_done
       real(8),intent(in):: hunit,tinit,tfin
      &     ,trlx,srlx,stbeta,strfin,dmp,eps_conv
@@ -196,7 +196,7 @@ c.....Set ifmv of top and bottom atoms for z-loading if needed
 c.....Set initial temperature if needed
       if( tinit.gt.1d-5 ) then
         call setv(h,natm,tag,va,nspmax,am,tinit,dt)
-        call rm_trans_motion(natm,tag,va,nspmax,am
+        if( nrmtrans.gt.0 ) call rm_trans_motion(natm,tag,va,nspmax,am
      &       ,mpi_md_world,myid_md,iprint)
       elseif( abs(tinit).le.1d-5 ) then
         va(1:3,1:natm)= 0d0
@@ -552,8 +552,10 @@ c.....accumulate energy difference
               va(1:3,i)= va(1:3,i) +aai(1:3)
             endif
           enddo
-          call rm_trans_motion(natm,tag,va,nspmax,am
-     &         ,mpi_md_world,myid_md,0)
+          if( mod(istp,nrmtrans).eq.0 ) then
+            call rm_trans_motion(natm,tag,va,nspmax,am
+     &           ,mpi_md_world,myid_md,0)
+          endif
         else
           va(1:3,1:natm)=va(1:3,1:natm) +aa(1:3,1:natm)
         endif
@@ -594,8 +596,10 @@ c.....accumulate energy difference
             is= int(tag(i))
             ediff(ifmv)= ediff(ifmv) +(tfac(ifmv)**2-1d0)*fack(is)
           enddo
-          call rm_trans_motion(natm,tag,va,nspmax,am
-     &         ,mpi_md_world,myid_md,0)
+          if( mod(istp,nrmtrans).eq.0 ) then
+            call rm_trans_motion(natm,tag,va,nspmax,am
+     &           ,mpi_md_world,myid_md,0)
+          endif
         endif
 
 c.....temperature distribution along x
