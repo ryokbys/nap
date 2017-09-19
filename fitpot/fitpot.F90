@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-12 18:18:22 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-19 14:20:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1429,6 +1429,7 @@ subroutine write_stats(iter)
   if( len(trim(crefstrct)).gt.5 ) then
     if( myid.eq.myidrefsub ) then
       epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
+      epotsub = epotsub /samples(isidrefsub)%natm
     endif
     call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
   endif
@@ -1441,7 +1442,7 @@ subroutine write_stats(iter)
     smpl= samples(ismpl)
     natm= smpl%natm
     if( len(trim(crefstrct)).gt.5 ) then
-      de= abs(smpl%epot-epotsub+smpl%esub &
+      de= abs(smpl%epot-epotsub*natm+smpl%esub &
            -(smpl%eref-erefsub))/natm
     else
       de= abs(smpl%epot+smpl%esub -smpl%eref)/natm

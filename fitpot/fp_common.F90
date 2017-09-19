@@ -11,10 +11,10 @@ module fp_common
 contains
 !=======================================================================
   subroutine init()
-    use variables,only: swgt2trn, swgt2tst, samples, lfmatch
+    use variables,only: swgt2trn, swgt2tst, samples,lematch,lfmatch,lsmatch
     use parallel
 
-    integer:: ismpl
+    integer:: ismpl,nterms
     real(8):: swgtrn,swgtst
     
 !.....set nominator for sample weights
@@ -33,13 +33,16 @@ contains
          ,mpi_world,ierr)
     call mpi_allreduce(swgtst,swgt2tst,1,mpi_real8,mpi_sum &
          ,mpi_world,ierr)
-    if( lfmatch ) then
-      swgt2trn = swgt2trn*2d0
-      swgt2tst = swgt2tst*2d0
-    endif
+    nterms = 0
+    if( lematch ) nterms = nterms + 1
+    if( lfmatch ) nterms = nterms + 1
+    if( lsmatch ) nterms = nterms + 1
+    swgt2trn = swgt2trn*nterms
+    swgt2tst = swgt2tst*nterms
     if( myid.eq.0 ) then
-      write(6,'(a,es15.7)') ' swgt2trn = ',swgt2trn
-      write(6,'(a,es15.7)') ' swgt2tst = ',swgt2tst
+      write(6,'(a)') ' Weights to be multiplied to evaluation value:'
+      write(6,'(a,f10.1)') '   for training: ',swgt2trn
+      write(6,'(a,f10.1)') '   for test:     ',swgt2tst
     endif
 
     fp_common_initialized = .true.
@@ -126,6 +129,7 @@ contains
     if( len(trim(crefstrct)).gt.5 ) then
       if( myid.eq.myidrefsub ) then
         epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
+        epotsub = epotsub /samples(isidrefsub)%natm
       endif
       call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
 !!$      print *,'myid,epotsub=', myid,epotsub
@@ -143,7 +147,7 @@ contains
         eerr = smpl%eerr
 !.....Energy matching
         if( len(trim(crefstrct)).gt.5 ) then
-          ediff= (epot-epotsub+esub -(eref-erefsub))/natm /eerr
+          ediff= (epot-epotsub*natm+esub -(eref-erefsub))/natm /eerr
         else
           ediff= (epot+esub -eref)/natm /eerr
         endif
