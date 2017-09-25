@@ -50,16 +50,16 @@ Convert from *pmd*-format files
 
 There is a conversion program that changes from pmd format to visualization software format.
 When visualizing the atom configuration by using `Ovito <https://www.ovito.org>`_ ,
-first convert the *pmd*-format files, ``pmd####`` , to *LAMMPS-dump* format files by doing the following,
+first convert the *pmd*-format files, ``pmd_###`` , to *LAMMPS-dump* format files by doing the following,
 ::
 
-  $ /path/to/nap/nappy/napsys.py convert --specorder=A,B,C pmd#### dump####
+  $ /path/to/nap/nappy/napsys.py convert --specorder=A,B,C pmd_#### dump_####
 
 where ``--specorder=A,B,C`` specifies the order of species used in the pmd-format file.
-Then you get ``dump####`` file where ``####`` should be a 4-digit number.
+Then you get ``dump_####`` file where ``####`` should be a 4-digit number.
 The `Ovito <https://www.ovito.org>`_ can open the LAMMPS-dump format file.
 
-If there are sequential ``pmd####`` files, one can convert those files by using bash for-statement as
+If there are sequential ``pmd_####`` files, one can convert those files by using bash for-statement as
 ::
 
   $ for f in pmd????; do /path/to/nap/nappy/napsys.py convert \
@@ -69,7 +69,7 @@ If there are sequential ``pmd####`` files, one can convert those files by using 
 Write *LAMMPS-dump* file directly
 -------------------------------------
 If you set ``flag_out_pmd`` as ``2``, the ``pmd`` program writes atomic configurations in *LAMMPS-dump* format
-with file names ``dump####``.
+with file names ``dump_####``.
 So you can visualize those files without any conversion using *Ovito* or some other programs that can visualize *LAMMPS-dump* file.
 
 
@@ -93,7 +93,7 @@ input and output of ``voro++``, respectively.
 .. note::
 
    This *akr* format is obsolete. But currently there is no other Voronoi analysis tool in this package.
-   So if you need to do Voronoi analysis, you need to convert ``pmd####`` files to ``akr####`` files by using ``napsys.py convert``.
+   So if you need to do Voronoi analysis, you need to convert ``pmd_####`` files to ``akr####`` files by using ``napsys.py convert``.
 
 
 --------

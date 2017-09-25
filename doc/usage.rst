@@ -158,8 +158,13 @@ the total energy conserves conpensating the deviations of kinetic and potential 
 
 .. image:: ./figs/graph_energy-steps.png
 
-And also configurations of atoms at each 10 steps out of 100 steps are written in files
-from ``pmd0000`` to ``pmd0010``.
+And also configurations of atoms at each 10 steps out of 100 steps are written in files, e.g.)
+``pmd_0``, ``pmd_10``,..., ``pmd_100``.
+
+.. note::
+   The file name format ``pmd####`` has been changed to ``pmd_###`` because this format works for
+   larger number of files than previous definition.
+   And now the number ``###`` means exactly the MD step in the MD simulation run.
 
 ------------
 
@@ -317,8 +322,8 @@ The following files appear when you perform ``pmd`` :
 
   ``out.erg``
         Total, kinetic, and potential energies.
-  ``pmd####``
-        Atom-configurations at a certain MD step. ``####`` means the order of output.
+  ``pmd_###``
+        Atom-configurations at a certain MD step. ``###`` means the MD step.
 
 
 
