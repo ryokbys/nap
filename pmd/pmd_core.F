@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-09-16 16:30:17 Ryo KOBAYASHI>
+c                     Last-modified: <2017-09-25 22:00:21 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -45,7 +45,7 @@ c.....FIRE variables
 c.....For tensile test of Al nanorod
       real(8):: strnow,ftop,fbot
 c-----output file names
-      character:: cnum*4
+      character:: cnum*128
       integer,external:: itotOf
       logical:: ltot_updated = .true.
 
@@ -350,7 +350,8 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
       endif
 
 c.....output initial configuration including epi, eki, and strs
-      write(cnum(1:4),'(i4.4)') 0
+c      write(cnum(1:4),'(i4.4)') 0
+      write(cnum,'(i0)') 0
       call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
      &     ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
      &     ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
@@ -360,12 +361,12 @@ c.....output initial configuration including epi, eki, and strs
         if( ifpmd.eq.1 ) then  ! pmd format
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' )
      &         then
-            call write_pmdtot_bin(20,"pmd"//cnum)
+            call write_pmdtot_bin(20,"pmd_"//trim(cnum))
           elseif( trim(ciofmt).eq.'ascii' ) then
-            call write_pmdtot_ascii(20,"pmd"//cnum)
+            call write_pmdtot_ascii(20,"pmd_"//trim(cnum))
           endif
         else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
-          call write_dump(20,'dump'//cnum)
+          call write_dump(20,'dump_'//trim(cnum))
         endif
       endif
       
@@ -714,7 +715,8 @@ c-------write the particle positions
      &       (mod(istp,noutpmd).eq.0.or.lconverged) )then
 c---------decide pmd-file name
           iocntpmd=iocntpmd+1
-          write(cnum(1:4),'(i4.4)') iocntpmd
+c          write(cnum(1:4),'(i4.4)') iocntpmd
+          write(cnum,'(i0)') istp
 c          call system("mkdir -p "//cnum)
           call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
      &         ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
@@ -726,12 +728,12 @@ c          call system("mkdir -p "//cnum)
             if( ifpmd.eq.1 ) then  ! pmd format
               if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' )
      &             then
-                call write_pmdtot_bin(20,"pmd"//cnum)
+                call write_pmdtot_bin(20,"pmd_"//trim(cnum))
               elseif( trim(ciofmt).eq.'ascii' ) then
-                call write_pmdtot_ascii(20,"pmd"//cnum)
+                call write_pmdtot_ascii(20,"pmd_"//trim(cnum))
               endif
             else if( ifpmd.eq.2 ) then  ! LAMMPS-dump format
-              call write_dump(20,'dump'//cnum)
+              call write_dump(20,'dump_'//trim(cnum))
             endif
           endif
         endif
