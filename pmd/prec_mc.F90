@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-09-16 16:31:26 Ryo KOBAYASHI>
+!                     Last-modified: <2017-09-20 17:51:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -184,6 +184,10 @@ program prec_mc
   hmati(1,1) = 1d0/hmat(1,1)
   hmati(2,2) = 1d0/hmat(2,2)
   hmati(3,3) = 1d0/hmat(3,3)
+
+  if( myid_md.eq.0 ) then
+    write(6,'(a,i8)') ' Number of total atoms = ',natm
+  endif
 
 !.....create neighbor list only once here, and no longer needed after
   rc = 3.0
@@ -509,10 +513,10 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
              hmat,species)
       endif
 !.....Write energy
-      write(cergtxt,'(i8,2es15.7,a,i3,a,i2,a,a,a,i3,a,12es11.3)') &
+      write(cergtxt,'(i8,2es15.7,a,i3,a,i2,a,a,a,i3)') &
            istp,tclck&
            ,ergp,', ncalc=',ncalc,', ievent=',ievent,', ',cjtmp(ievent) &
-           ,', nstp=',nstps_done,', prob=',probtmp(1:12)
+           ,', nstp=',nstps_done
       write(ioerg,'(a)') trim(cergtxt)
       write(6,'(a)') trim(cergtxt)
       flush(iosym)

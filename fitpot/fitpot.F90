@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-19 14:20:00 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-28 12:08:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -882,12 +882,12 @@ subroutine de_wrapper()
   implicit none
   integer:: i,m
   real(8):: fval
-  external:: write_stats
+  external:: write_stats, write_energy_relation
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
     call de(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
-         ,niter_eval,write_stats)
+         ,niter_eval,write_stats, write_energy_relation)
   else
     if(myid.eq.0) print *,'Differential evolution (DE) is not available for '//&
          trim(cpot)
@@ -1229,7 +1229,7 @@ subroutine write_energy_relation(cadd)
   logical,save:: l1st = .true.
 !!$  real(8):: epotsub
   
-  cfname='out.erg.'//trim(cadd)
+  cfname='out.erg'
 
   if( .not. allocated(erefl) ) allocate(erefl(nsmpl),erefg(nsmpl) &
        ,epotl(nsmpl),epotg(nsmpl),eerrl(nsmpl),eerrg(nsmpl)&
@@ -1280,8 +1280,8 @@ subroutine write_energy_relation(cadd)
        ,0,mpi_world,ierr)
 
   if( myid.eq.0 ) then
-    open(90,file=trim(cfname)//'.1',status='replace')
-    open(91,file=trim(cfname)//'.2',status='replace')
+    open(90,file=trim(cfname)//'.trn.'//trim(cadd),status='replace')
+    open(91,file=trim(cfname)//'.tst.'//trim(cadd),status='replace')
     do ismpl=1,nsmpl
       epotg(ismpl)= epotg(ismpl)/nalist(ismpl)
       if( iclist(ismpl).eq.1 ) then
@@ -1315,7 +1315,7 @@ subroutine write_force_relation(cadd)
   integer:: ismpl,ia,ixyz,natm,nmax,nmaxl
   logical:: l1st = .true.
   
-  cfname= 'out.frc.'//trim(cadd)
+  cfname= 'out.frc'
 
   nmaxl= 0
   do ismpl=1,nsmpl
@@ -1360,8 +1360,8 @@ subroutine write_force_relation(cadd)
        ,0,mpi_world,ierr)
 
   if( myid.eq.0 ) then
-    open(92,file=trim(cfname)//'.1',status='replace')
-    open(93,file=trim(cfname)//'.2',status='replace')
+    open(92,file=trim(cfname)//'.trn.'//trim(cadd),status='replace')
+    open(93,file=trim(cfname)//'.tst.'//trim(cadd),status='replace')
     do ismpl=1,nsmpl
       if( iclist(ismpl).eq.1 ) then
         natm= nalist(ismpl)
@@ -1407,7 +1407,7 @@ subroutine write_stats(iter)
   real(8):: dfmaxl_trn,dfmax_trn,dfsuml_trn,dfsum_trn
   real(8):: dfmaxl_tst,dfmax_tst,dfsuml_tst,dfsum_tst
   real(8),save:: rmse_tst_best= 1d+30
-  character:: cnum*5
+  character(len=128):: cnum
   logical,save:: l1st = .true.
 
   if( l1st ) then
@@ -1481,7 +1481,7 @@ subroutine write_stats(iter)
 !!$      call write_vars('best')
 !!$    endif
   endif
-  write(cnum(1:5),'(i5.5)') iter
+  write(cnum,'(i0)') iter
   call write_vars(cnum)
 
 !.....force

@@ -3052,7 +3052,7 @@ contains
   end subroutine roulette_selection
 !=======================================================================
   subroutine de(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
+       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval,sub_ergrel)
 !
 ! Differential evolution (DE) which does not use gradient information.
 ! DE itself is a serial code, but the function evaluation can be parallel.
@@ -3073,6 +3073,9 @@ contains
       subroutine sub_eval(iter)
         integer,intent(in):: iter
       end subroutine sub_eval
+      subroutine sub_ergrel(cadd)
+        character(len=*),intent(in):: cadd
+      end subroutine sub_ergrel
     end interface
 
     real(8),parameter:: fmax = 1.0d+10
@@ -3085,6 +3088,7 @@ contains
     real(8),allocatable,dimension(:):: xtmp,xi,xp,xq,xr,xs,xbestl,xbestg&
          ,xl,xg,xd
     real(8),allocatable:: xpbest(:,:)
+    character(len=128):: cadd
 
     integer,parameter:: io_indivs = 30
     character(len=128),parameter:: cf_indivs = 'out.de.individuals'
@@ -3177,8 +3181,16 @@ contains
         iidbest = iid
         xbest(1:ndim) = xtmp(1:ndim)
       endif
+
+      if( iprint.ge.20 ) then
+        write(cadd,'(i0)') iid
+        call sub_ergrel(cadd)
+      endif
     enddo
     w = de_wmin + (de_wmax -de_wmin)*dble(iter)/maxiter
+    if( maxiter.eq.0 ) w = de_wmin
+
+    call sub_eval(iter)
     if( myid.eq.0 ) then
       write(6,'(a,i8,es12.4,f5.2,1x,100es12.4)') &
            " iter,fbest,w,fvals= ",&
@@ -3298,6 +3310,11 @@ contains
           xbest(1:ndim) = xtmp(1:ndim)
         endif
 
+        if( iprint.ge.20 ) then
+          write(cadd,'(i0)') iid
+          call sub_ergrel(cadd)
+        endif
+        
       enddo  ! loop over individuals
 
       if( myid.eq.0 ) then
@@ -3307,6 +3324,10 @@ contains
         do i=1,de_nindivs
           write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
         enddo
+      endif
+
+      if( mod(iter,niter_eval).eq.0 ) then
+        call sub_eval(iter)
       endif
     enddo
 !.....DE loop ends......................................................

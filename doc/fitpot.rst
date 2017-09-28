@@ -173,17 +173,17 @@ Or if you want it to run in parallel mode,
 
 There are some output files:
 
-  ``out.erg.fin.[12]``
+  ``out.erg.trn.fin``, ``out.erg.tst.fin``
       These files include reference and *pmd* data of energies.
       To see whether the fitting went well or not, plot these data by using ``gnuplot`` as
       ::
          
          $ gnuplot
-         gnuplot> plot 'out.erg.fin.1' us 1:2 w p t 'training set'
-         gnuplot> rep 'out.erg.fin.2' us 1:2 w p t 'test set'
+         gnuplot> plot 'out.erg.trn.fin' us 1:2 w p t 'training set'
+         gnuplot> rep 'out.erg.tst.fin' us 1:2 w p t 'test set'
 
 
-  ``out.frc.fin.[12]``
+  ``out.frc.trn.fin``, ``out.frc.tst.fin``
       These files include reference and *pmd* data of forces.
 
 

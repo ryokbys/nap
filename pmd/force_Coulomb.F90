@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-12 19:25:18 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-28 13:50:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -28,6 +28,7 @@ module Coulomb
 
   logical,allocatable:: interact(:,:)
 
+  integer,parameter:: msp = 9
   integer:: nsp
 !.....ideal valence charges of species
   real(8),allocatable:: vid_bvs(:)
@@ -715,8 +716,8 @@ contains
     real(8),intent(in):: tag(natm+nb)
     real(8),intent(out):: chg(natm+nb)
     
-    integer,allocatable,save:: nbvsl(:),nbvs(:)
-    real(8),allocatable,save:: vc_bvs(:)
+    integer,allocatable:: nbvsl(:),nbvs(:)
+    real(8),allocatable:: vc_bvs(:)
     integer:: i,is,ierr
     real(8):: sum_anion,sum_cation
 
@@ -733,7 +734,7 @@ contains
 !!$    return
 !!$!.....END DEBUGGING
 
-    allocate(nbvsl(nsp),nbvs(nsp),vc_bvs(nsp))
+    allocate(nbvsl(msp),nbvs(msp),vc_bvs(msp))
     nbvsl(1:nsp) = 0
     nbvs(1:nsp) = 0
     do i=1,natm
@@ -790,7 +791,7 @@ contains
     real(8),intent(in):: h(3,3)
 
     real(8):: a1(3),a2(3),a3(3),a23(3),a12(3),a31(3),pi2
-    real(8),external:: sprod,absv
+    real(8),external:: sprod
 
     a1(1:3) = h(1:3,1)
     a2(1:3) = h(1:3,2)
@@ -798,7 +799,7 @@ contains
     call vprod(a2,a3,a23)
     call vprod(a3,a1,a31)
     call vprod(a1,a2,a12)
-    avol = sprod(3,a1,absv(3,a23))
+    avol = abs(sprod(3,a1,a23))
     pi2 = 2d0 *pi
     b1(1:3) = pi2 /avol *a23(1:3)
     b2(1:3) = pi2 /avol *a31(1:3)
