@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-30 13:28:54 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-30 15:38:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -868,12 +868,12 @@ subroutine ga_wrapper()
   implicit none
   integer:: i,m
   real(8):: fval
-  external:: write_stats
+  external:: write_stats,write_energy_relation
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
     call ga(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
-         ,niter_eval,write_stats)
+         ,niter_eval,write_stats,write_energy_relation)
   else
     if(myid.eq.0) print *,'Genetic Algorithm (GA) is not available for '//&
          trim(cpot)
@@ -2088,7 +2088,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs)
   ny = 1
   nz = 1
   iprint_pmd = 0
-  if( iprint.ge.10 ) iprint_pmd = iprint
+  if( iprint.ge.100 ) iprint_pmd = 10
   
 !.....one_shot force calculation
 !!$  print *,'calling one_shot, myid,mpi_world,myid_pmd,mpi_comm_pmd='&

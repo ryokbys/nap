@@ -2588,7 +2588,7 @@ contains
   end subroutine metadynamics
 !=======================================================================
   subroutine ga(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
+       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval,sub_ergrel)
 !
 ! Genetic algorithm (GA) which does not use gradient information.
 ! GA itself is a serial code, but the function evaluation can be parallel.
@@ -2609,6 +2609,9 @@ contains
       subroutine sub_eval(iter)
         integer,intent(in):: iter
       end subroutine sub_eval
+      subroutine sub_ergrel(cadd)
+        character(len=*),intent(in):: cadd
+      end subroutine sub_ergrel
     end interface
 
     real(8),parameter:: fmax = 1.0d+5
@@ -2619,6 +2622,7 @@ contains
     integer:: iid,iidbest
     type(individual),allocatable:: indivs(:),offsprings(:)
     real(8),allocatable:: xtmp(:)
+    character(len=128):: cadd
 
     integer,parameter:: io_indivs = 30
     character(len=128),parameter:: cf_indivs = 'out.ga.individuals'
@@ -2709,6 +2713,8 @@ contains
         xbest(1:ndim) = xtmp(1:ndim)
       endif
     enddo
+
+    call sub_eval(iter)
     if( myid.eq.0 ) then
       write(6,'(a,i8,1x,100es12.4)') &
            " iter,fbest,fvals= ",&
@@ -2755,6 +2761,11 @@ contains
           fbest = ftrn
           iidbest = iid
           xbest(1:ndim) = xtmp(1:ndim)
+          if( iprint.ge.10 ) then
+            write(cadd,'(i0)') iid
+            call sub_ergrel(cadd)
+          endif
+          call sub_eval(iid)
         endif
       enddo
 
@@ -3182,7 +3193,7 @@ contains
         xbest(1:ndim) = xtmp(1:ndim)
       endif
 
-      if( iprint.ge.20 ) then
+      if( iprint.ge.10 ) then
         write(cadd,'(i0)') iid
         call sub_ergrel(cadd)
       endif
@@ -3308,7 +3319,7 @@ contains
           fbest = ftrn
           iidbest = iid
           xbest(1:ndim) = xtmp(1:ndim)
-          if( iprint.ge.20 ) then
+          if( iprint.ge.10 ) then
             write(cadd,'(i0)') iid
             call sub_ergrel(cadd)
           endif

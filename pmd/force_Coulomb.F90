@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-30 14:57:12 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-30 15:46:17 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -408,13 +408,11 @@ contains
     strsl(1:3,1:3,1:namax) = 0d0
 !!$    write(6,'(a,30f7.3)') 'chgs =',chg(1:natm)
 
-    if( iprint.ge.10 .and. myid.eq.0 ) &
-         print *,'after set_charge_BVS'
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
-      nconnect(i) = 0
+!!$      nconnect(i) = 0
       qi= chg(i)
       if( abs(qi).lt.qthd ) cycle
       do k=1,lspr(0,i)
@@ -430,7 +428,7 @@ contains
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
         if( dij.gt.rc ) cycle
-        nconnect(i)= nconnect(i) +1
+!!$        nconnect(i)= nconnect(i) +1
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji

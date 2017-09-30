@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-09-30 12:47:26 Ryo KOBAYASHI>
+c                     Last-modified: <2017-09-30 15:07:51 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -1501,6 +1501,19 @@ c.....integer:: status(MPI_STATUS_SIZE)
         endif
       endif
 
+      if( ifcoulomb .eq. 0 ) then
+        if( size(dbuf).lt.4*nbmax ) then
+          deallocate(dbuf,dbufr)
+          allocate(dbuf(4,nbmax),dbufr(4,nbmax))
+        endif
+      else
+        if( size(dbuf).lt.6*nbmax ) then
+          deallocate(dbuf,dbufr)
+          allocate(dbuf(6,nbmax),dbufr(6,nbmax))
+        endif
+      endif
+      
+
 c-----reset the num of "received" boundary atoms
       nbnew=0
 
@@ -1771,6 +1784,7 @@ c      integer:: status(MPI_STATUS_SIZE)
       logical,save:: l1st=.true.
 
       if( l1st ) then
+        if( allocated(dbuf) ) deallocate(dbuf,dbufr)
         if( ifcoulomb .eq. 0 ) then
           allocate(dbuf(4,nbmax),dbufr(4,nbmax))
         else
@@ -1779,6 +1793,18 @@ c      integer:: status(MPI_STATUS_SIZE)
         l1st=.false.
       endif
 
+      if( ifcoulomb .eq. 0 ) then
+        if( size(dbuf).lt.4*nbmax ) then
+          deallocate(dbuf,dbufr)
+          allocate(dbuf(4,nbmax),dbufr(4,nbmax))
+        endif
+      else
+        if( size(dbuf).lt.6*nbmax ) then
+          deallocate(dbuf,dbufr)
+          allocate(dbuf(6,nbmax),dbufr(6,nbmax))
+        endif
+      endif
+      
       nbnew= 0
 
 cc-----calculate the cut-off lengths
