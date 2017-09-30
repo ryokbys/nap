@@ -64,7 +64,7 @@ contains
     endif
 
     epotl= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    strsl(1:3,1:3,1:natm) = 0d0
     rho(1:namax+nbmax)= 0d0
 
 !-----rho(i)
@@ -181,8 +181,8 @@ contains
     endif
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
-         ,MPI_SUM,mpi_md_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+         ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
 
 !      deallocate(sqrho)

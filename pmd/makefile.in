@@ -41,7 +41,7 @@ forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
 	force_Brenner.o force_Lu_WHe.o force_Branicio_AlN.o \
 	force_Mishin_Al.o force_AFS_W.o force_SC_Fe.o \
 	force_SM_Al.o force_linreg.o force_NN.o \
-	force_Morse.o force_Coulomb.o
+	force_Morse.o force_Coulomb.o force_EAM.o
 params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 	params_LJ_Ar.h params_SW_Si.h params_EDIP_Si.h \
 	params_Brenner.h params_Lu_WHe.h params_Branicio_AlN.h \
