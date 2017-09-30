@@ -1,16 +1,16 @@
-.. pmd_manual documentation master file, created by
+.. nap_manual documentation master file, created by
    sphinx-quickstart on Wed Jan 29 22:34:45 2014.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
 :author: Ryo KOBAYASHI
-:date: Time-stamp: <2015-09-10 21:12:29 Ryo KOBAYASHI>
+:date: Last modified: <2017-09-29 10:23:07 Ryo KOBAYASHI>
 
 ==========
-pmd manual
+nap manual
 ==========
 
-This is a manual of the **Nagoya Atomistic-simulation Package (NAP)** and ``pmd`` (parallel molecular dynamics) included in the **NAP**.
+This is a manual of the **Nagoya Atomistic-simulation Package (NAP)**.
 
 - **NAP** is hosted at Github: https://github.com/ryokbys/nap
 - **NAP** includes the following programs and utilities:
@@ -40,6 +40,14 @@ Contents:
   clmgr
   fitpot
   development
+
+
+-------------
+
+Acknowledgements
+================
+
+This program is supported in part by `"Materials research by Information Integration" Initiative (MI2I) <http://www.nims.go.jp/MII-I/>`_ project of the Support Program for Starting Up Innovation Hub from Japan Science and Technology Agency (JST).
 
 
 -------------
@@ -90,5 +98,10 @@ Contact
 
 | Ryo KOBAYASHI
 | kobayashi.ryo [at] nitech.ac.jp
+| 
+| Department of Physical Science and Engineering,
 | Nagoya Institute of Technology
-
+| 
+| Center for Materials research by Information Integration (CMI2),
+| Research and Services Division of Materials Data and Integrated System (MaDIS),
+| National Institute for Materials Science (NIMS)

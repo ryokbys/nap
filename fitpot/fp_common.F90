@@ -40,7 +40,7 @@ contains
     swgt2trn = swgt2trn*nterms
     swgt2tst = swgt2tst*nterms
     if( myid.eq.0 ) then
-      write(6,'(a)') ' Weights to be multiplied to evaluation value:'
+      write(6,'(a)') ' Weights to divide evaluation value:'
       write(6,'(a,f10.1)') '   for training: ',swgt2trn
       write(6,'(a,f10.1)') '   for test:     ',swgt2tst
     endif
@@ -57,7 +57,7 @@ contains
          ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys,erefmin &
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
          ,nff,cffs,cmaindir,maxna &
-         ,crefstrct,erefsub,myidrefsub,isidrefsub
+         ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb
@@ -120,8 +120,9 @@ contains
         call set_params_Morse(ndim,x)
       endif
 !!$      print *,'myid,ismpl,cdirname,natm=',myid,ismpl,trim(cdirname),natm,' before pmd'
+      if( iprint.ge.10 ) print *,'run_pmd,myid,ismpl=',myid,ismpl,trim(cdirname)
       call run_pmd(smpl,lcalcgrad,ndim,gdummy,nff,cffs,epot,frcs)
-!!$      print *,'myid,ismpl,cdirname,epot= ',myid,ismpl,trim(cdirname),epot
+      if( iprint.ge.10 ) print *,'myid,ismpl,cdirname,epot= ',myid,ismpl,trim(cdirname),epot
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
     enddo

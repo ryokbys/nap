@@ -3308,13 +3308,12 @@ contains
           fbest = ftrn
           iidbest = iid
           xbest(1:ndim) = xtmp(1:ndim)
+          if( iprint.ge.20 ) then
+            write(cadd,'(i0)') iid
+            call sub_ergrel(cadd)
+          endif
+          call sub_eval(iid)
         endif
-
-        if( iprint.ge.20 ) then
-          write(cadd,'(i0)') iid
-          call sub_ergrel(cadd)
-        endif
-        
       enddo  ! loop over individuals
 
       if( myid.eq.0 ) then
@@ -3326,9 +3325,6 @@ contains
         enddo
       endif
 
-      if( mod(iter,niter_eval).eq.0 ) then
-        call sub_eval(iter)
-      endif
     enddo
 !.....DE loop ends......................................................
 

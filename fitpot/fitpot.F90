@@ -1,10 +1,11 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-28 12:08:56 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-30 13:28:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
   use minimize
+  use version
   implicit none
   integer:: ismpl,ihour,imin,isec
   real(8):: tmp
@@ -17,6 +18,14 @@ program fitpot
   tcomm= 0d0
 
   if( myid.eq.0 ) then
+    write(6,'(a)') '========================================================================'
+    write(6,'(a)') ' FITPOT: A program for FITting interatomic POTential parameters'
+    write(6,*) ''
+    call write_version()
+    call write_authors()
+    write(6,'(a)') '========================================================================'
+    write(6,*) ''
+    write(6,'(a,i6)') ' Number of processes in MPI = ',nnode
     call read_input(10,'in.fitpot')
     call write_initial_setting()
   endif
@@ -2014,7 +2023,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs)
 !  Run pmd and get energy and forces of the system.
 !  TODO: stress should be returned as well.
 !
-  use variables,only: rcut,mdsys,maxna
+  use variables,only: rcut,mdsys,maxna,iprint
   use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
   implicit none
   type(mdsys),intent(inout):: smpl
@@ -2079,6 +2088,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs)
   ny = 1
   nz = 1
   iprint_pmd = 0
+  if( iprint.ge.10 ) iprint_pmd = iprint
   
 !.....one_shot force calculation
 !!$  print *,'calling one_shot, myid,mpi_world,myid_pmd,mpi_comm_pmd='&
@@ -2195,7 +2205,7 @@ subroutine set_max_num_atoms()
   maxna = 0
   call mpi_allreduce(maxnal,maxna,1,mpi_integer,mpi_max,mpi_world,ierr)
   if( myid.eq.0 .and. iprint.ne.0 ) then
-    print *,'max num of atoms among data = ',maxna
+    print *,'max num of atoms among samples = ',maxna
   endif
   
 end subroutine set_max_num_atoms

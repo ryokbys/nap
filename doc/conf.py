@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# pmd_manual documentation build configuration file, created by
+# nap_manual documentation build configuration file, created by
 # sphinx-quickstart on Wed Jan 29 22:34:45 2014.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -55,7 +55,7 @@ source_parsers = {
 master_doc = 'index'
 
 # General information about the project.
-project = u'pmd manual'
+project = u'nap manual'
 copyright = u'2014, Ryo KOBAYASHI'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -181,7 +181,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'pmd_manualdoc'
+htmlhelp_basename = 'nap_manualdoc'
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -210,7 +210,7 @@ latex_docclass = {'manual': 'jsbook'}
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'pmd_manual.tex', u'pmd\\_manual Documentation',
+  ('index', 'nap_manual.tex', u'nap\\_manual Documentation',
    u'Ryo KOBAYASHI', 'manual'),
 ]
 
@@ -240,7 +240,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'pmd_manual', u'pmd_manual Documentation',
+    ('index', 'nap_manual', u'nap_manual Documentation',
      [u'Ryo KOBAYASHI'], 1)
 ]
 
@@ -254,8 +254,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'pmd_manual', u'pmd_manual Documentation',
-   u'Ryo KOBAYASHI', 'pmd_manual', 'One line description of project.',
+  ('index', 'nap_manual', u'nap_manual Documentation',
+   u'Ryo KOBAYASHI', 'nap_manual', 'One line description of project.',
    'Miscellaneous'),
 ]
 
