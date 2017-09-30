@@ -123,7 +123,6 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
          ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
          ,ifcoulomb)
   endif
-!!$  print *,'epot after force_vcGaussian = ',epot
 
   if( luse_LJ ) call force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
@@ -191,6 +190,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
   if( luse_vcMorse ) call force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+
 
 !.....convert forces from hmat-coordinates to Cartesian coordinates
   do i=1,natm

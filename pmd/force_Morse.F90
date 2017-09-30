@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-08-21 15:09:42 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-30 14:52:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -94,9 +94,13 @@ contains
     if( l1st ) then
 !!$      call init_Morse(natm,tag,mpi_md_world)
 !!$      call read_params_Morse(myid,mpi_md_world,iprint)
-      if( .not. allocated(strsl) ) then
-        allocate(strsl(3,3,namax))
-      endif
+      if( allocated(strsl) ) deallocate(strsl)
+      allocate(strsl(3,3,namax))
+    endif
+
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
     endif
 
     epotl= 0d0
@@ -210,9 +214,13 @@ contains
     if( l1st ) then
 !!$      call init_Morse(natm,tag,mpi_md_world)
 !!$      call read_params_Morse(myid,mpi_md_world,iprint)
-      if( .not. allocated(strsl) ) then
-        allocate(strsl(3,3,namax))
-      endif
+      if( allocated(strsl) ) deallocate(strsl)
+      allocate(strsl(3,3,namax))
+    endif
+
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
     endif
 
     epotl= 0d0
@@ -331,6 +339,11 @@ contains
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
       prefbeta = log(1d0 -sqrt(1d0 -beta))
+    endif
+
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
     endif
 
     epotl= 0d0

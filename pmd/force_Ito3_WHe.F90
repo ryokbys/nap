@@ -36,10 +36,10 @@ contains
 
     if( l1st ) then
       if( myid.eq.0 ) write(6,'(a)') ' use force_Ito3_Whe'
+      if( allocated(rho) ) deallocate(rho,sqrho)
       allocate(rho(namax+nbmax),sqrho(namax+nbmax))
-      if( .not. allocated(strsl) ) then
-        allocate(strsl(3,3,namax))
-      endif
+      if( allocated(strsl) ) deallocate(strsl)
+      allocate(strsl(3,3,namax))
 !.....check cutoff radius
       if( myid.eq.0 ) then
         write(6,'(a,es12.4)') ' rc of input    =',rc
@@ -52,6 +52,15 @@ contains
         stop
       endif
       l1st=.false.
+    endif
+
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
+    endif
+    if( size(rho).lt.namax+nbmax ) then
+      deallocate(rho,sqrho)
+      allocate(rho(namax+nbmax),sqrho(namax+nbmax))
     endif
 
     epotl= 0d0

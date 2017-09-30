@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-28 13:50:02 Ryo KOBAYASHI>
+!                     Last modified: <2017-09-30 14:57:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -89,7 +89,7 @@ contains
          ,mpi_md_world,ierr)
 
     if( ifcoulomb.eq.1 ) then  ! screened Coulomb
-      if( .not.allocated(interact) ) allocate(interact(nsp,nsp))
+      if( .not.allocated(interact) ) allocate(interact(msp,msp))
     else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
       call init_Ewald(h,rc,myid)
     else if( ifcoulomb.eq.3 ) then
@@ -246,9 +246,7 @@ contains
     integer:: npq,isp,jsp,ierr,mode
     
     if( ifcoulomb.eq.1 ) then  ! screened_bvs
-      if( allocated(rad_bvs) ) then
-        deallocate(rad_bvs,npq_bvs,vid_bvs,rho_bvs)
-      endif
+      if( allocated(rad_bvs) ) deallocate(rad_bvs,npq_bvs,vid_bvs,rho_bvs)
       allocate(rad_bvs(nsp),npq_bvs(nsp),vid_bvs(nsp) &
            ,rho_bvs(nsp,nsp))
       if( myid.eq.0 ) then
@@ -394,18 +392,24 @@ contains
     if( l1st ) then
       call read_params(myid,mpi_md_world,ifcoulomb,iprint)
       call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint)
-      if( .not. allocated(strsl) ) then
-        allocate(strsl(3,3,namax))
-      endif
+      if( allocated(strsl) ) deallocate(strsl)
+      allocate(strsl(3,3,namax))
 !!$      do i=1,natm
 !!$        print *,'i,chg(i)=',i,chg(i)
 !!$      enddo
     endif
 
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
+    endif
+    
     epotl= 0d0
     strsl(1:3,1:3,1:namax) = 0d0
 !!$    write(6,'(a,30f7.3)') 'chgs =',chg(1:natm)
 
+    if( iprint.ge.10 .and. myid.eq.0 ) &
+         print *,'after set_charge_BVS'
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -513,10 +517,14 @@ contains
         allocate(ri(3),bk(3),bk1(3),bk2(3),bk3(3),bb(3),dxdi(3) &
              ,dxdj(3),rij(3),xij(3),xj(3),xi(3))
       endif
-      if( .not. allocated(strsl) ) then
-        allocate(strsl(3,3,namax))
-      endif
+      if( allocated(strsl) ) deallocate(strsl)
+      allocate(strsl(3,3,namax))
       l1st=.false.
+    endif
+
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
     endif
 
 !.....Compute self term, if fixed charge per atom, it is constant
@@ -577,9 +585,13 @@ contains
     real(8),external:: sprod
 
     if( l1st ) then
-      if( .not. allocated(strsl) ) then
-        allocate(strsl(3,3,namax))
-      endif
+      if( allocated(strsl) ) deallocate(strsl)
+      allocate(strsl(3,3,namax))
+    endif
+
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
     endif
 
 !.....Compute reciprocal vectors
