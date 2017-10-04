@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-09-30 15:07:51 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-04 16:00:47 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -35,7 +35,7 @@ c-----------------------------------------------------------------------
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
       integer:: ihour,imin,isec
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epotp,
-     &     htmp(3,3)
+     &     htmp(3,3),prss
       real(8),external:: box_muller,sprod
       logical:: lconverged = .false.
       logical:: lstrs = .false.
@@ -52,7 +52,7 @@ c-----output file names
       logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, 
+     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse
       logical:: lvc
 
@@ -227,7 +227,7 @@ c.....Set initial temperature if needed
      &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,
+     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
      &     luse_vcMorse,lvc,ifcoulomb)
 c-----copy RA of boundary atoms
@@ -252,7 +252,7 @@ c.....Calc forces
      &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, 
+     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
      &     luse_vcMorse,lvc)
       lstrs = .false.
@@ -327,8 +327,9 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
         enddo
         tave= tave/nave
         write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
+        prss = (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
         write(6,'(1x,a,f15.3,a)') " stress          =",
-     &       (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa,' GPa'
+     &       prss,' GPa'
         
 
         if( trim(cpctl).eq.'Berendsen' .or.
@@ -337,11 +338,11 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
           write(6,'(a,i8,2f10.2,es15.6,2es11.3)')
      &         " istp,time,temp,vol,prss="
      &         ,istp,tcpu,tave,epot,vol
-     &         ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))*up2gpa/3
+     &         ,prss
         else
-          write(6,'(a,i8,2f10.2,es15.6)')
-     &         " istp,time,temp,epot="
-     &         ,istp,tcpu,tave,epot
+          write(6,'(a,i8,2f10.2,es15.6,es11.3)')
+     &         " istp,time,temp,epot,prss="
+     &         ,istp,tcpu,tave,epot,prss
         endif
         write(6,'(a,6f10.3)')' stress tensor [GPa]: '
      &       ,ptnsr(1,1)*up2gpa,ptnsr(2,2)*up2gpa,ptnsr(3,3)*up2gpa
@@ -515,7 +516,7 @@ c-------Calc forces
      &       luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
      &       luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &       luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
-     &       ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al
+     &       ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
      &       ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul
      &       ,luse_vcMorse,lvc)
         lstrs = .false.
@@ -570,7 +571,7 @@ c.....Calc kinetic energy
 
         call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
      &       ,dt,srlx,stbeta,vol,ptnsr,mpi_md_world,cpctl)
-
+        prss = (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
 c-------temperature control by Berendsen thermostat
         if( trim(ctctl).eq.'Berendsen' ) then
           tfac(1:9)= 0d0
@@ -639,8 +640,7 @@ c-------output energies
 c.....write energies
             write(ioerg,'(i10,3es16.7e3,f10.2,2es16.7e3)') istp
      &           ,ekin+epot-epot0,ekin,epot-epot0,tave
-     &           ,vol
-     &           ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
+     &           ,vol,prss
             call flush(ioerg)
 c.....write temperature
             write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff0(1:9)
@@ -662,8 +662,7 @@ c---------output step, time, and temperature
      &           iprint.ne.0 ) then
               write(6,'(a,i8,2f10.2,es15.6,2es11.3)')
      &             " istp,time,temp,epot,vol,prss="
-     &             ,istp,tcpu,tave,epot,vol
-     &             ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
+     &             ,istp,tcpu,tave,epot,vol,prss
               write(6,'(a)') ' h-matrix:' !,h(1:3,1:3,0)
               write(6,'(3f15.7)') h(1:3,1:3,0)
               
@@ -672,9 +671,9 @@ c---------output step, time, and temperature
      &             ,ptnsr(3,3)*up2gpa ,ptnsr(2,3)*up2gpa
      &             ,ptnsr(1,3)*up2gpa ,ptnsr(1,2)*up2gpa
             elseif( iprint.ne.0 ) then
-              write(6,'(a,i8,2f10.2,es15.6)')
-     &             " istp,time,temp,epot="
-     &             ,istp,tcpu,tave,epot
+              write(6,'(a,i8,2f10.2,es15.6,es11.3)')
+     &             " istp,time,temp,epot,prss="
+     &             ,istp,tcpu,tave,epot,prss
             endif
           endif
             
@@ -778,7 +777,7 @@ c          call system("mkdir -p "//cnum)
         tave= tave/nave
         write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
         write(6,'(1x,a,f15.3,a)') " stress          =",
-     &       (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa,' GPa'
+     &       prss,' GPa'
         write(6,*) ''
         write(6,'(1x,a,f10.2)') "time space decomp =",tspdcmp
         write(6,'(1x,a,f10.2)') "time comm         =",tcom
@@ -846,7 +845,7 @@ c
       logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al, 
+     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse
       logical:: lvc
       
@@ -917,7 +916,7 @@ c     &     chg(1:natm+10)
      &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,
+     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
      &     luse_vcMorse,lvc,ifcoulomb)
 
@@ -943,7 +942,7 @@ c-----Make pair list
      &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
-     &     ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al
+     &     ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
      &     ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
      &     luse_vcMorse,lvc)
 c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '

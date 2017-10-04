@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 :author: Ryo KOBAYASHI
-:date: Last modified: <2017-09-29 10:23:07 Ryo KOBAYASHI>
+:date: Last modified: <2017-09-30 19:44:18 Ryo KOBAYASHI>
 
 ==========
 nap manual
@@ -44,14 +44,6 @@ Contents:
 
 -------------
 
-Acknowledgements
-================
-
-This program is supported in part by `"Materials research by Information Integration" Initiative (MI2I) <http://www.nims.go.jp/MII-I/>`_ project of the Support Program for Starting Up Innovation Hub from Japan Science and Technology Agency (JST).
-
-
--------------
-
 License
 =======
 
@@ -84,15 +76,6 @@ License
 
 ----------
 
-Indices and tables
-===================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
-----------
-
 Contact
 ========
 
@@ -105,3 +88,22 @@ Contact
 | Center for Materials research by Information Integration (CMI2),
 | Research and Services Division of Materials Data and Integrated System (MaDIS),
 | National Institute for Materials Science (NIMS)
+
+
+-------------
+
+Acknowledgements
+================
+
+This program is supported in part by `"Materials research by Information Integration" Initiative (MI2I) <http://www.nims.go.jp/MII-I/>`_ project of the Support Program for Starting Up Innovation Hub from Japan Science and Technology Agency (JST).
+
+
+----------
+
+Indices and tables
+===================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
+

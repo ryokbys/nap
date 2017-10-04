@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-30 14:52:58 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-04 17:11:27 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -627,7 +627,7 @@ contains
     call mpi_bcast(rmin,msp*msp,mpi_double_precision,0,mpi_md_world,ierr)
     call mpi_bcast(alp,msp*msp,mpi_double_precision,0,mpi_md_world,ierr)
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_md_world,ierr)
-    
+
   end subroutine read_params_Morse
 !=======================================================================
   subroutine read_params_vcMorse(myid,mpi_md_world,iprint)
@@ -670,6 +670,17 @@ contains
     
   end subroutine read_params_vcMorse
 !=======================================================================
+  subroutine set_paramsdir_Morse(dname)
+!
+!  Accessor routine to set paramsdir.
+!
+    implicit none
+    character(len=*),intent(in):: dname
+
+    paramsdir = trim(dname)
+    return
+  end subroutine set_paramsdir_Morse
+!=======================================================================
   subroutine set_params_Morse(ndimp,params_in)
 !
 !  Accessor routine to set Morse parameters from outside.
@@ -687,6 +698,40 @@ contains
     return
     
   end subroutine set_params_Morse
+!=======================================================================
+  subroutine set_params_vcMorse(ndimp,params)
+!
+! Accessor routine to set vcMorse parameters from outside.
+! Curretnly this routine is supposed to be called only on serial run.
+! So no need of treating this as parallel code.
+!
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params(ndimp)
+
+    integer:: i,inc
+
+    if( ndimp.ne.3*(nprm+1) ) then
+      print *,'Error: ndimp.ne.3*(nprm+1) !!!'
+      stop
+    endif
+
+    inc = 0
+    do i=0,ndesc*2
+      inc = inc + 1
+      walp(i) = params(inc)
+    enddo
+    do i=0,ndesc*2
+      inc = inc + 1
+      wd(i) = params(inc)
+    enddo
+    do i=0,ndesc*2
+      inc = inc + 1
+      wrmin(i) = params(inc)
+    enddo
+    
+    lprmset = .true.
+    return
+  end subroutine set_params_vcMorse
 !=======================================================================
   subroutine update_params_Morse()
 !
@@ -730,51 +775,6 @@ contains
     
     return
   end subroutine update_params_Morse
-!=======================================================================
-  subroutine set_paramsdir_Morse(dname)
-!
-!  Accessor routine to set paramsdir.
-!
-    implicit none
-    character(len=*),intent(in):: dname
-
-    paramsdir = trim(dname)
-    return
-  end subroutine set_paramsdir_Morse
-!=======================================================================
-  subroutine set_params_vcMorse(ndimp,params)
-!
-! Accessor routine to set vcMorse parameters from outside.
-! Curretnly this routine is supposed to be called only on serial run.
-! So no need of treating this as parallel code.
-!
-    integer,intent(in):: ndimp
-    real(8),intent(in):: params(ndimp)
-
-    integer:: i,inc
-
-    if( ndimp.ne.3*(nprm+1) ) then
-      print *,'Error: ndimp.ne.3*(nprm+1) !!!'
-      stop
-    endif
-
-    inc = 0
-    do i=0,ndesc*2
-      inc = inc + 1
-      walp(i) = params(inc)
-    enddo
-    do i=0,ndesc*2
-      inc = inc + 1
-      wd(i) = params(inc)
-    enddo
-    do i=0,ndesc*2
-      inc = inc + 1
-      wrmin(i) = params(inc)
-    enddo
-    
-    lprmset = .true.
-    return
-  end subroutine set_params_vcMorse
 !=======================================================================
   subroutine read_element_descriptors(myid_md,mpi_md_world,iprint)
 !
