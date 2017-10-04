@@ -62,6 +62,7 @@ contains
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
+    use EAM,only: set_paramsdir_EAM,set_params_EAM
     implicit none
     
     integer,intent(in):: ndim
@@ -118,9 +119,12 @@ contains
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_Morse(ndim,x)
+      else if( trim(cpot).eq.'EAM' ) then
+        call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_EAM(ndim,x)
       endif
 !!$      print *,'myid,ismpl,cdirname,natm=',myid,ismpl,trim(cdirname),natm,' before pmd'
-      if( iprint.ge.10 ) print *,'run_pmd,myid,ismpl=',myid,ismpl,trim(cdirname)
       call run_pmd(smpl,lcalcgrad,ndim,gdummy,nff,cffs,epot,frcs)
       if( iprint.ge.10 ) print *,'myid,ismpl,cdirname,epot= ',myid,ismpl,trim(cdirname),epot
       samples(ismpl)%epot = epot
@@ -229,6 +233,7 @@ contains
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
+    use EAM,only: set_paramsdir_EAM,set_params_EAM
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -272,6 +277,10 @@ contains
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_Morse(ndim,x)
+      else if( trim(cpot).eq.'EAM' ) then
+        call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_EAM(ndim,x)
       endif
       call run_pmd(smpl,lcalcgrad,ndim,gs,nff,cffs,epot,frcs)
 !!$      print *, 'ismpl,epot @grad_w_pmd =',ismpl,epot
