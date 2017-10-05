@@ -87,6 +87,8 @@ module minimize
   real(8):: pso_c2      = 2d0
   real(8):: pso_vinimax = 0.1d0
 
+  real(8):: fupper_lim = 1d+5
+
 contains
 !=======================================================================
   subroutine steepest_descent(ndim,x,f,g,d,xtol,gtol,ftol,maxiter &
@@ -2614,8 +2616,6 @@ contains
       end subroutine sub_ergrel
     end interface
 
-    real(8),parameter:: fmax = 1.0d+5
-
     integer:: i,j,k,l,m,n,iter,i1,i2
     real(8):: ftrn,ftst
     logical,save:: l1st = .true.
@@ -2698,10 +2698,9 @@ contains
           write(6,'(a,2i10)')&
                ' [ftrn.eq.NaN] iter,iid = ',iter,iid
         endif
-        ftrn = fmax
-      endif
-      if( ftrn.gt.fmax ) then
-        ftrn = fmax
+        ftrn = fupper_lim
+      else if( ftrn.gt.fupper_lim ) then
+        ftrn = fupper_lim
       endif
       indivs(i)%fvalue = ftrn
       indivs(i)%fitness = 1d0/ftrn
@@ -2748,10 +2747,10 @@ contains
             write(6,'(a,2i10)')&
                  ' [ftrn.eq.NaN] iter,iid = ',iter,iid
           endif
-          ftrn = fmax
+          ftrn = fupper_lim
         endif
-        if( ftrn.gt.fmax ) then
-          ftrn = fmax
+        if( ftrn.gt.fupper_lim ) then
+          ftrn = fupper_lim
         endif
         offsprings(i)%fvalue = ftrn
         offsprings(i)%fitness = 1d0/ftrn
@@ -3089,8 +3088,6 @@ contains
       end subroutine sub_ergrel
     end interface
 
-    real(8),parameter:: fmax = 1.0d+10
-
     integer:: i,j,k,l,m,n,iter,i1,i2,ip,iq,ir,is
     real(8):: ftrn,ftst,fracl,fracg,lmdl,lmdg,w
     logical,save:: l1st = .true.
@@ -3174,10 +3171,10 @@ contains
           write(6,'(a,2i10)')&
                ' [ftrn.eq.NaN] iter,iid = ',iter,iid
         endif
-        ftrn = fmax
+        ftrn = fupper_lim
       endif
-      if( ftrn.gt.fmax ) then
-        ftrn = fmax
+      if( ftrn.gt.fupper_lim ) then
+        ftrn = fupper_lim
       endif
       indivs(i)%fvalue = ftrn
       if( ftrn*0d0.ne.0d0 ) then
@@ -3297,7 +3294,7 @@ contains
 !!$        offsprings(i)%iid = iid
         call func(ndim,xtmp,ftrn,ftst)
 !!$        offsprings(i)%fvalue = ftrn
-!.....Detect NaN and replace it with fmax
+!.....Detect NaN and replace it with fupper_lim
 !!$        if( ftrn*0d0.ne.0d0 ) then
 !!$          offsprings(i)%fitness = 0d0
 !!$        else
@@ -3308,7 +3305,7 @@ contains
           do j=1,ndim
             indivs(i)%genes(j)%val = xtmp(j)
           enddo
-          if( ftrn.gt.fmax ) ftrn = fmax
+          if( ftrn.gt.fupper_lim ) ftrn = fupper_lim
           indivs(i)%fvalue = ftrn
           indivs(i)%fitness = 1d0/ftrn
         else
@@ -3421,8 +3418,6 @@ contains
       end subroutine sub_eval
     end interface
 
-    real(8),parameter:: fmax = 1.0d+10
-
     integer:: i,j,k,l,m,n,iter
     real(8):: ftrn,ftst,tmp,xj,vj,r1,r2
     logical,save:: l1st = .true.
@@ -3494,10 +3489,10 @@ contains
           write(6,'(a,2i10)')&
                ' [ftrn.eq.NaN] iter,iid = ',iter,iid
         endif
-        ftrn = fmax
+        ftrn = fupper_lim
       endif
-      if( ftrn.gt.fmax ) then
-        ftrn = fmax
+      if( ftrn.gt.fupper_lim ) then
+        ftrn = fupper_lim
       endif
       indivs(i)%fvalue = ftrn
       fpbest(i) = ftrn
@@ -3551,10 +3546,10 @@ contains
         iid = iid + 1
 !.....Detect NaN and replace it with 1d+10
         if( ftrn*0d0 .ne. 0d0 ) then
-          ftrn = fmax
+          ftrn = fupper_lim
         endif
-        if( ftrn.gt.fmax ) then
-          ftrn = fmax
+        if( ftrn.gt.fupper_lim ) then
+          ftrn = fupper_lim
         endif
         indivs(i)%fvalue = ftrn
         indivs(i)%iid = iid

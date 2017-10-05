@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-30 15:38:22 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-05 15:12:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1636,6 +1636,7 @@ subroutine sync_input()
 
   call mpi_bcast(lswgt,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(swerg,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(fupper_lim,1,mpi_real8,0,mpi_world,ierr)
 !.....Simulated annealing
   call mpi_bcast(sa_temp0,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sa_xw0,1,mpi_real8,0,mpi_world,ierr)

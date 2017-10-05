@@ -292,6 +292,9 @@ c=======================================================================
         allocate(cserr(nserr),seerr(nserr),sferr(nserr))
         call read_crr(ionum,nserr,cserr,seerr,sferr)
         return
+      elseif( trim(cname).eq.'f_upper_limit' ) then
+        call read_r1(ionum,fupper_lim)
+        return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return
