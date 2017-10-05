@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-04 16:33:33 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-05 15:13:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -35,6 +35,11 @@ module EAM
 !.....Parameters from fitpot
   integer:: nprms
   real(8),allocatable:: prms(:)
+
+!.....Types of forms of potential terms
+  character(len=128):: type_rho = 'exp'
+  character(len=128):: type_frho = 'sqrt'
+  character(len=128):: type_phi = 'SM'
 
 contains
   subroutine init_EAM()
@@ -562,6 +567,51 @@ contains
 
   end subroutine force_REAM
 !=======================================================================
+  function rhoij(rij,rcij,is,js)
+!
+! Calculate rho_ij from rij and rcij.
+! The type of rho form is given by TYPE_RHO global variable.
+!
+    real(8),intent(in):: rij,rcij
+    integer,intent(in):: is,js
+    real(8),external:: fcut1
+    real(8):: rhoij
+
+    if( trim(type_rho).eq.'exp' ) then
+      rhoij = exp(-ea_beta(is,js)*(rij-ea_re(is,js))) &
+           *fcut1(rij,rcij)
+    endif
+    return
+  end function rhoij
+!=======================================================================
+  function frho(rij,rcij,is,js,rho)
+!
+! Calc F[rho] with given rho
+! The type of F[.] form is given by TYPE_FRHO global variable.
+!
+    integer,intent(in):: is,js
+    real(8),intent(in):: rho,rij,rcij
+    real(8),external:: fcut1
+    real(8):: frho
+
+    real(8):: r
+
+    return
+  end function frho
+!=======================================================================
+  function phi(rij,rcij,is,js)
+    integer,intent(in):: is,js
+    real(8),intent(in):: rij,rcij
+    real(8):: phi
+    real(8):: r
+    
+    if( trim(type_frho).eq.'sqrt' ) then
+      r = rij -ea_re(is,js)
+      phi = 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &
+             -ea_c(is,js)*(1d0+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
+    endif
+    return
+  end function phi
 end module EAM
 !-----------------------------------------------------------------------
 !     Local Variables:
