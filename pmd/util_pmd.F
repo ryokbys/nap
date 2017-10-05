@@ -442,3 +442,16 @@ c=======================================================================
       end do
       return
       end function num_data
+c=======================================================================
+      function is_numeric(str)
+c
+c  Check if the given string is numeric or not.
+c
+      character(len=*),intent(in):: str
+      logical:: is_numeric
+      integer:: i
+      i = verify(trim(str),'0123456789')
+      is_numeric = i==0
+      return
+      end function is_numeric
+      

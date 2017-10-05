@@ -2779,6 +2779,8 @@ contains
         do i=1,ga_nindivs
           write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
         enddo
+        flush(io_indivs)
+        flush(io_steps)
       endif
     end do
 !.....END of GA loop....................................................
@@ -3331,8 +3333,9 @@ contains
         do i=1,de_nindivs
           write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
         enddo
+        flush(io_indivs)
+        flush(io_steps)
       endif
-
     enddo
 !.....DE loop ends......................................................
 
@@ -3577,6 +3580,9 @@ contains
         do i=1,pso_nindivs
           write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
         enddo
+        flush(io_indivs)
+        flush(io_steps)
+        flush(io_fvalues)
       endif
     enddo
 !.....DE loop ends......................................................
