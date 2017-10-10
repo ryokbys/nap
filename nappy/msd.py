@@ -109,6 +109,11 @@ def get_msd(files,ids0,nmeasure,nshift):
     
     return msd
 
+def get_key(v):
+    import re
+    prefix, index = re.match(r'([a-z]+)_(\d+)', v).groups()
+    return prefix, -int(index)
+
 if __name__ == "__main__":
 
     args = docopt(__doc__)
@@ -125,6 +130,10 @@ if __name__ == "__main__":
         err=' [Error] ntwindow <= 0 !!!\n'\
               + '  Chech the parameters nmeasure and nshift, and input files.'
         raise ValueError(err)
+
+    files.sort(key=get_key,reverse=True)
+    # for i in range(len(files)):
+    #     print i,files[i]
     
     msd = get_msd(files,ids,nmeasure,nshift)
 
