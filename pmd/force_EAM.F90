@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-05 22:04:05 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-06 00:04:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -26,7 +26,6 @@ module EAM
 !!$  real(8):: ea_xi = 0.147699d0
 !!$  real(8):: am_al = 26.9815d0
 
-  character(len=3),allocatable,dimension(:):: ea_spcs
   real(8),allocatable:: ea_a(:),ea_xi(:)
   real(8),allocatable,dimension(:,:):: ea_b,ea_c,ea_re, &
        ea_alp,ea_beta,ea_rc
@@ -39,9 +38,10 @@ module EAM
   real(8),allocatable:: prms(:)
 
 !.....Types of forms of potential terms
-  character(len=128):: type_rho = 'exp'
-  character(len=128):: type_frho = 'sqrt'
-  character(len=128):: type_phi = 'SM'
+  character(len=128),allocatable:: type_rho(:,:),type_frho(:),type_phi(:,:)
+  character(len=128):: default_type_rho = 'exp1'
+  character(len=128):: default_type_frho = 'sqrt1'
+  character(len=128):: default_type_phi = 'SM'
 
 contains
   subroutine init_EAM()
@@ -51,8 +51,8 @@ contains
     if( .not.allocated(ea_a) ) then
       allocate(ea_a(msp), ea_b(msp,msp), ea_c(msp,msp), &
            ea_re(msp,msp), ea_alp(msp,msp), ea_beta(msp,msp),&
-           ea_xi(msp), interact(msp,msp), ea_rc(msp,msp), &
-           ea_spcs(msp))
+           ea_xi(msp), interact(msp,msp), ea_rc(msp,msp),&
+           type_rho(msp,msp),type_frho(msp),type_phi(msp,msp))
     endif
     
   end subroutine init_EAM
@@ -66,11 +66,10 @@ contains
 
     integer:: isp,jsp,ierr
     real(8):: a,b,c,re,alp,beta,xi,rc
-    character(len=128):: cline,fname,c1,c2
+    character(len=128):: cline,fname,c1,c2,c3
     logical,external:: is_numeric 
 
     if( myid_md.eq.0 ) then
-      ea_spcs(1:msp) = ''
       ea_a(1:msp) = 0d0
       ea_xi(1:msp) = 0d0
       ea_b(1:msp,1:msp) = 0d0
@@ -90,11 +89,11 @@ contains
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
         if( len_trim(cline).eq.0 ) cycle
         backspace(ioprms)
-!.....If the 2nd entry is not digit, the line would be the entry for atomic data
-        read(ioprms,*) c1,c2
-        if( .not. is_numeric(c2) ) then
+!.....The 1st entry specifies ATOMIC or PAIR parameters
+        read(ioprms,*) c1
+        if( trim(c1).eq.'atomic' ) then
           backspace(ioprms)
-          read(ioprms,*) isp,c1,a,xi
+          read(ioprms,*) c1,isp,c2,a,xi
 !!$          print *, 'isp,c1,a,xi=',isp,trim(c1),a,xi
           if( isp.gt.msp ) then
             print *,'Warning @read_params_EAM: isp is greater than msp,' &
@@ -103,11 +102,11 @@ contains
           endif
           ea_a(isp) = a
           ea_xi(isp) = xi
-          ea_spcs(isp) = c1
+          type_frho(isp) = trim(c2)
 !.....Otherwise the entry is for pair parameter
-        else
+        else if( trim(c1).eq.'pair' ) then
           backspace(ioprms)
-          read(ioprms,*) isp,jsp,b,c,re,alp,beta,rc
+          read(ioprms,*) c1,isp,jsp,c2,c3,b,c,re,alp,beta,rc
 !!$          print *, 'isp,jsp,b,c,re,alp,beta,rc=',isp,jsp,b,c,re,alp,beta,rc
           if( isp.gt.msp .or. jsp.gt.msp ) then
             print *,'Warning @read_params_EAM: isp/jsp is greater than msp,'&
@@ -115,6 +114,8 @@ contains
             cycle
           endif
 
+          type_rho(isp,jsp) = trim(c2)
+          type_phi(isp,jsp) = trim(c3)
           ea_b(isp,jsp) = b
           ea_c(isp,jsp) = c
           ea_re(isp,jsp) = re
@@ -123,6 +124,8 @@ contains
           ea_rc(isp,jsp) = rc
           interact(isp,jsp) = .true.
 !.....Symmetrize parameters
+          type_rho(jsp,isp) = trim(c2)
+          type_phi(jsp,isp) = trim(c3)
           ea_b(jsp,isp) = b
           ea_c(jsp,isp) = c
           ea_re(jsp,isp) = re
@@ -140,15 +143,15 @@ contains
         write(6,'(a)') ' EAM parameters read from file '//trim(fname) &
              //':'
         do isp=1,msp
-          if( len_trim(ea_spcs(isp)).ne.0 ) then
-            write(6,'(i3,a5,2f8.3)') isp,trim(ea_spcs(isp)), &
+          if( abs(ea_a(isp)).gt.1d-8 ) then
+            write(6,'(a8,i3,a5,2f8.3)') 'atomic',isp, &
                  ea_a(isp),ea_xi(isp)
           endif
         enddo
         do isp=1,msp
           do jsp=isp,msp
             if( interact(isp,jsp) ) then
-              write(6,'(2i3,6f8.3)') isp,jsp &
+              write(6,'(a8,2i3,6f8.3)') 'pair',isp,jsp &
                    ,ea_b(isp,jsp),ea_c(isp,jsp) &
                    ,ea_re(isp,jsp),ea_alp(isp,jsp),ea_beta(isp,jsp) &
                    ,ea_rc(isp,jsp)
@@ -161,7 +164,6 @@ contains
 
     call mpi_bcast(ea_a,msp,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(ea_xi,msp,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_spcs,msp*3,mpi_character,0,mpi_md_world,ierr)
 
     call mpi_bcast(ea_b,msp*msp,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(ea_c,msp*msp,mpi_real8,0,mpi_md_world,ierr)
@@ -338,7 +340,7 @@ contains
         if( rij.gt.rcij ) cycle
 !!$        rho(i)= rho(i) +exp(-ea_beta(is,js)*(rij-ea_re(is,js))) &
 !!$             *fcut1(rij,rcij)
-        rho(i) = rho(i) +rhoij(rij,is,js)
+        rho(i) = rho(i) +rhoij(rij,is,js,type_rho(is,js))
       enddo
 !!$      rho(i)= dsqrt(rho(i))
     enddo
@@ -352,7 +354,7 @@ contains
       xi(1:3)= ra(1:3,i)
       is = int(tag(i))
 !!$      dfi= -0.5d0*ea_a(is)/rho(i)
-      dfi = dfrho(is,rho(i))
+      dfi = dfrho(is,rho(i),type_frho(is))
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
@@ -371,7 +373,7 @@ contains
 !!$        tmp= 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &
 !!$             -ea_c(is,js)*(1d0+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
 !!$        tmp2 = tmp *0.5d0 *fcut1(rij,rcij)
-        tmp = 0.5d0 *phi(rij,rcij,is,js)
+        tmp = 0.5d0 *phi(rij,rcij,is,js,type_phi(is,js))
         epi(i)= epi(i) +tmp
         epi(j)= epi(j) +tmp
         if(j.le.natm) then
@@ -383,7 +385,7 @@ contains
 !!$             +ea_c(is,js)*ea_alp(is,js)*ea_alp(is,js)*r &
 !!$             *exp(-ea_alp(is,js)*r) *fcut1(rij,rcij) &
 !!$             +tmp*dfcut1(rij,rcij)
-        dtmp = dphi(rij,rcij,is,js)
+        dtmp = dphi(rij,rcij,is,js,type_phi(is,js))
         aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
 !.....Atomic stress for 2-body terms
@@ -400,9 +402,9 @@ contains
 !.....Embedded term
 !!$        drhoij= -ea_beta(is,js)*exp(-ea_beta(is,js)*r)*fcut1(rij,rcij) &
 !!$             +exp(-ea_beta(is,js)*r)*dfcut1(rij,rcij)
-        drho = drhoij(rij,rcij,is,js)
+        drho = drhoij(rij,rcij,is,js,type_rho(is,js))
 !!$        dfj= -0.5d0*ea_a(js)/rho(j)
-        dfj = dfrho(js,rho(j))
+        dfj = dfrho(js,rho(j),type_frho(js))
         tmp = (dfi+dfj)*drho
         aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +tmp*drdxi(1:3)
@@ -418,7 +420,7 @@ contains
           enddo
         endif
       enddo
-      tmp = frho(is,rho(i))
+      tmp = frho(is,rho(i),type_frho(is))
       epi(i)=epi(i) +tmp
       epotl=epotl +tmp
     enddo
@@ -436,31 +438,33 @@ contains
 
   end subroutine force_EAM
 !=======================================================================
-  function rhoij(rij,is,js)
+  function rhoij(rij,is,js,ctype)
 !
 ! Calculate rho_ij from rij and rcij.
 ! The type of rho form is given by TYPE_RHO global variable.
 !
     real(8),intent(in):: rij
     integer,intent(in):: is,js
+    character(len=*),intent(in):: ctype
     real(8),external:: fcut1
     real(8):: rhoij
 
-    if( trim(type_rho).eq.'exp' ) then
+    if( trim(ctype).eq.'exp1' ) then
       rhoij = ea_xi(is)*exp(-ea_beta(is,js)*(rij-ea_re(is,js))) &
            *fcut1(rij,ea_rc(is,js))
     endif
     return
   end function rhoij
 !=======================================================================
-  function drhoij(rij,rcij,is,js)
+  function drhoij(rij,rcij,is,js,ctype)
     integer,intent(in):: is,js
     real(8),intent(in):: rij,rcij
+    character(len=*),intent(in):: ctype 
     real(8):: drhoij
     real(8):: r
     real(8),external:: fcut1,dfcut1
     
-    if( trim(type_rho).eq.'exp' ) then
+    if( trim(ctype).eq.'exp1' ) then
       r = rij -ea_re(is,js)
       drhoij= -ea_xi(is)*ea_beta(is,js)*exp(-ea_beta(is,js)*r)*fcut1(rij,rcij) &
            +ea_xi(is)*exp(-ea_beta(is,js)*r)*dfcut1(rij,rcij)
@@ -468,42 +472,46 @@ contains
     return
   end function drhoij
 !=======================================================================
-  function frho(is,rho)
+  function frho(is,rho,ctype)
 !
 ! Calc F[rho] with given rho
 ! The type of F[.] form is given by TYPE_FRHO global variable.
 !
     integer,intent(in):: is
     real(8),intent(in):: rho
+    character(len=*),intent(in):: ctype 
+    
     real(8):: frho
 
     frho = 0d0
-    if( trim(type_frho).eq.'sqrt' ) then
+    if( trim(ctype).eq.'sqrt1' ) then
       frho = -ea_a(is)*sqrt(rho/ea_xi(is))
     endif
     return
   end function frho
 !=======================================================================
-  function dfrho(is,rho)
+  function dfrho(is,rho,ctype)
     integer,intent(in):: is
     real(8),intent(in):: rho
+    character(len=*),intent(in):: ctype 
     real(8):: dfrho
 
     dfrho = 0d0
-    if( trim(type_frho).eq.'sqrt') then
+    if( trim(ctype).eq.'sqrt1') then
       dfrho = -ea_a(is) /ea_xi(is) *0.5d0 /sqrt(rho/ea_xi(is))
     endif
     return
   end function dfrho
 !=======================================================================
-  function phi(rij,rcij,is,js)
+  function phi(rij,rcij,is,js,ctype)
     integer,intent(in):: is,js
     real(8),intent(in):: rij,rcij
+    character(len=*),intent(in):: ctype 
     real(8):: phi
     real(8):: r
     real(8),external:: fcut1
     
-    if( trim(type_phi).eq.'SM' ) then
+    if( trim(ctype).eq.'SM' ) then
       r = rij -ea_re(is,js)
       phi = 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &
            -ea_c(is,js)*(1d0+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
@@ -512,14 +520,15 @@ contains
     return
   end function phi
 !=======================================================================
-  function dphi(rij,rcij,is,js)
+  function dphi(rij,rcij,is,js,ctype)
     integer,intent(in):: is,js
     real(8),intent(in):: rij,rcij
+    character(len=*),intent(in):: ctype 
     real(8):: dphi,tmp
     real(8):: r
     real(8),external:: fcut1,dfcut1
 
-    if( trim(type_phi).eq.'SM' ) then
+    if( trim(ctype).eq.'SM' ) then
       r = rij -ea_re(is,js)
 !!$      dphi = 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &
 !!$           -ea_c(is,js)*(1d0+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
