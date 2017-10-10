@@ -24,6 +24,7 @@ import numpy as np
 from docopt import docopt
 
 from nappy.napsys import NAPSystem
+from nappy.common import get_key
 
 def anint(x):
     if x >= 0.5:
@@ -109,10 +110,10 @@ def get_msd(files,ids0,nmeasure,nshift):
     
     return msd
 
-def get_key(v):
-    import re
-    prefix, index = re.match(r'([a-z]+)_(\d+)', v).groups()
-    return prefix, -int(index)
+# def get_key(v):
+#     import re
+#     prefix, index = re.match(r'([a-z]+)_(\d+)', v).groups()
+#     return prefix, -int(index)
 
 if __name__ == "__main__":
 
