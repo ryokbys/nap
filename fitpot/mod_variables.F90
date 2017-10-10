@@ -73,10 +73,11 @@ module variables
     real(8):: ferr = 0.1d0   ! in eV/A
     real(8),allocatable:: tag(:)
     real(8),allocatable:: ra(:,:),fa(:,:),fref(:,:)
+    real(8):: sref(3,3),ptnsr(3,3)
     integer,allocatable:: ifcal(:)
     real(8),allocatable:: fabs(:)
     real(8),allocatable:: va(:,:),strsi(:,:,:),eki(:,:,:),epi(:)&
-         ,chg(:),chi(:),fsub(:,:),eatm(:)
+         ,chg(:),chi(:),fsub(:,:),ssub(:,:,:),eatm(:)
     character(len=2),allocatable:: symbols(:)
     integer:: naps(mspcs)  ! num of atoms per species
     integer:: iclass       ! 1: training,  2: test

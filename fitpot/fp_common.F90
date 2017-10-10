@@ -5,7 +5,8 @@ module fp_common
   implicit none
 
   real(8),allocatable:: fdiff(:,:)
-
+  real(8):: pdiff(3,3), ptnsr(3,3)
+  
   logical:: fp_common_initialized= .false.
 
 contains
@@ -78,7 +79,7 @@ contains
     type(mdsys):: smpl
     logical:: l1st = .true.
     logical:: lcalcgrad = .false.
-    real(8),save,allocatable:: gdummy(:),frcs(:,:)
+    real(8),save,allocatable:: gdummy(:),frcs(:,:),strs(:,:,:)
     character(len=128):: cdirname
 
     nfunc= nfunc +1
@@ -92,6 +93,7 @@ contains
       if( .not.allocated(gdummy) ) allocate(gdummy(ndim))
       if( .not.fp_common_initialized ) call init()
       if( .not.allocated(fdiff) ) allocate(fdiff(3,maxna),frcs(3,maxna))
+      if( .not.allocated(strs) ) allocate(strs(3,3,maxna))
     endif
 
     if( .not. lematch .and. .not.lfmatch .and. .not.lsmatch ) then
@@ -125,10 +127,11 @@ contains
         call set_params_EAM(ndim,x)
       endif
 !!$      print *,'myid,ismpl,cdirname,natm=',myid,ismpl,trim(cdirname),natm,' before pmd'
-      call run_pmd(smpl,lcalcgrad,ndim,gdummy,nff,cffs,epot,frcs)
+      call run_pmd(smpl,lcalcgrad,ndim,gdummy,nff,cffs,epot,frcs,strs)
       if( iprint.ge.10 ) print *,'myid,ismpl,cdirname,epot= ',myid,ismpl,trim(cdirname),epot
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
+      samples(ismpl)%strsi(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
     enddo
 
     if( len(trim(crefstrct)).gt.5 ) then

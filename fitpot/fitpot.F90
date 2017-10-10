@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-05 15:12:30 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-10 17:40:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -484,7 +484,7 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
        ,smpl%eki(3,3,natm),smpl%epi(natm) &
        ,smpl%chg(natm),smpl%chi(natm),smpl%fsub(3,natm) &
-       ,smpl%symbols(natm),smpl%eatm(natm))
+       ,smpl%symbols(natm),smpl%eatm(natm),smpl%ssub(3,3,natm))
   smpl%chg(1:natm) = 0d0
   smpl%esub= 0d0
   smpl%fsub(1:3,1:natm)= 0d0
@@ -503,7 +503,7 @@ subroutine read_ref_data()
   integer:: ismpl,i,is,jflag,natm,nfrc,nftot,nfrcg,nftotg
   integer:: imax,ifsmpl,nfsmplmax,nfrefdat,ifcal
   character(len=128):: cdir
-  real(8):: erefminl,ftmp(3),fmax
+  real(8):: erefminl,ftmp(3),fmax,ptnsr(3,3)
 
   jflag= 0
   erefminl= 0d0
@@ -564,6 +564,18 @@ subroutine read_ref_data()
       endif
     enddo
 
+!.....Read stress tensor data
+    ptnsr(1:3,1:3) = 0d0
+    open(15,file=trim(cmaindir)//'/'//trim(cdir) &
+         //'/strs.ref',status='old')
+    read(15,*) ptnsr(1,1),ptnsr(2,2),ptnsr(3,3), &
+         ptnsr(2,3),ptnsr(1,3),ptnsr(1,2)
+    close(15)
+    ptnsr(2,1) = ptnsr(1,2)
+    ptnsr(3,1) = ptnsr(1,3)
+    ptnsr(3,2) = ptnsr(2,3)
+    samples(ismpl)%sref(1:3,1:3) = ptnsr(1:3,1:3)
+    
   enddo
 
   if( jflag.gt.0 ) then
@@ -1905,7 +1917,7 @@ subroutine subtract_FF()
   logical:: luse_Coulomb = .false.
   logical,save:: l1st = .true.
   real(8):: epot
-  real(8),save,allocatable:: frcs(:,:)
+  real(8),save,allocatable:: frcs(:,:),strs(:,:,:)
 
   if( l1st ) then
     do i=1,nsubff
@@ -1926,6 +1938,7 @@ subroutine subtract_FF()
     endif
 
     if( .not.allocated(frcs) ) allocate(frcs(3,maxna))
+    if( .not.allocated(strs) ) allocate(strs(3,3,maxna))
 
 !.....Only at the 1st call, perform pmd to get esubs
     do ismpl=isid0,isid1
@@ -1941,10 +1954,11 @@ subroutine subtract_FF()
              //trim(samples(ismpl)%cdirname)//'/pmd')
       endif
       call run_pmd(samples(ismpl),lcalcgrad,nvars,gvar,&
-           nsubff,csubffs,epot,frcs)
+           nsubff,csubffs,epot,frcs,strs)
 !!$      print *,'myid,ismpl,epot=',myid,ismpl,epot
       samples(ismpl)%esub = epot
       samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
+      samples(ismpl)%ssub(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
     enddo
 
 !!$    allocate(esubl(nsmpl),esubg(nsmpl))
@@ -2019,17 +2033,18 @@ subroutine restore_FF()
   
 end subroutine restore_FF
 !=======================================================================
-subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs)
+subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
+     strs)
 !
 !  Run pmd and get energy and forces of the system.
 !  TODO: stress should be returned as well.
 !
-  use variables,only: rcut,mdsys,maxna,iprint
+  use variables,only: rcut,mdsys,maxna,iprint,lsmatch
   use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
   implicit none
   type(mdsys),intent(inout):: smpl
   integer,intent(in):: ndimp,nff
-  real(8),intent(inout):: pderiv(ndimp),epot,frcs(3,maxna)
+  real(8),intent(inout):: pderiv(ndimp),epot,frcs(3,maxna),strs(3,3,maxna)
   logical,intent(in):: lcalcgrad
   character(len=20),intent(in):: cffs(nff)
 
@@ -2068,7 +2083,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs)
   trlx = 100d0
   ltdst = .false.
   ntdst = 1
-  lstrs = .false.
+  lstrs = lsmatch
   cpctl = 'none'
   stgt(1:3,1:3) = 0d0
   ptgt = 0d0
@@ -2095,7 +2110,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs)
 !!$  print *,'calling one_shot, myid,mpi_world,myid_pmd,mpi_comm_pmd='&
 !!$       ,myid,mpi_world,myid_pmd,mpi_comm_pmd
   call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
-       ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
+       ,smpl%va,frcs,strs,smpl%eki,smpl%epi &
        ,smpl%chg,smpl%chi &
        ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
        ,nismax,am,dt,nff,cffs,rc,rbuf,ptnsr,epot,ekin &
