@@ -71,9 +71,10 @@ module variables
     real(8):: h0,h(3,3),epot,eref,wgt,esub
     real(8):: eerr = 1.0d-3  ! in eV
     real(8):: ferr = 0.1d0   ! in eV/A
+    real(8):: serr = 0.1d0   ! in GPa
     real(8),allocatable:: tag(:)
     real(8),allocatable:: ra(:,:),fa(:,:),fref(:,:)
-    real(8):: sref(3,3),ptnsr(3,3)
+    real(8):: cptnsr(3,3),sref(3,3)
     integer,allocatable:: ifcal(:)
     real(8),allocatable:: fabs(:)
     real(8),allocatable:: va(:,:),strsi(:,:,:),eki(:,:,:),epi(:)&

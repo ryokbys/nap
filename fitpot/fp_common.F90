@@ -1,4 +1,7 @@
 module fp_common
+!-----------------------------------------------------------------------
+!                     Last modified: <2017-10-11 17:12:38 Ryo KOBAYASHI>
+!-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
 !
@@ -125,6 +128,9 @@ contains
         call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_EAM(ndim,x)
+      else if( trim(cpot).eq.'NN' ) then
+        call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
       endif
 !!$      print *,'myid,ismpl,cdirname,natm=',myid,ismpl,trim(cdirname),natm,' before pmd'
       call run_pmd(smpl,lcalcgrad,ndim,gdummy,nff,cffs,epot,frcs,strs)
@@ -185,10 +191,37 @@ contains
         enddo
 !!$        write(6,'(a,i6,es12.4)') 'ismpl,ftmp=',ismpl,ftmp
       endif
-!!$!.....Stress matching
-!!$      if( lsmatch ) then
-!!$        
-!!$      endif
+
+!.....Stress matching
+      if( lsmatch ) then
+!.....Make current ptnsr of the system
+        smpl%cptnsr(1:3,1:3)= 0d0
+        do ia=1,natm
+          do jxyz=1,3
+            do ixyz=1,3
+              smpl%cptnsr(ixyz,jxyz)=smpl%cptnsr(ixyz,jxyz) &
+                   +smpl%strsi(ixyz,jxyz,ia)
+            enddo
+          enddo
+        enddo
+
+!  vol = 1d0
+        smpl%cptnsr(1:3,1:3) = smpl%cptnsr(1:3,1:3) !/vol
+
+!.....Compare these ptnsr elements with sref elements
+   
+        serr = smpl%serr
+        serri = 1d0/serr
+        do ixyz=1,3
+          do jxyz=ixyz,3
+            pdiff(ixyz,jxyz)= (smpl%cptnsr(ixyz,jxyz) &
+                 -smpl%sref(ixyz,jxyz)) *serri
+            pdiff(ixyz,jxyz)= pdiff(ixyz,jxyz)*pdiff(ixyz,jxyz)/6
+            ftmp= ftmp +pdiff(ixyz,jxyz) 
+          enddo
+        enddo
+      endif  ! stress matching
+
       if( smpl%iclass.eq.1 ) then
         ftrnl = ftrnl +ftmp
       else if( smpl%iclass.eq.2 ) then
