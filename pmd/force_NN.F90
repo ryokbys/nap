@@ -1,10 +1,13 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-06-27 10:45:53 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-11 17:49:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
 !-----------------------------------------------------------------------
+
+  character(len=128):: paramsdir = '.'
+
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.NN'
   character(128),parameter:: ccfname='in.const.NN'
@@ -45,6 +48,8 @@ module NN
 
 !.....cutoff region width ratio to rc
   real(8):: rcw = 0.9d0
+  real(8):: rcin = 4.0d0
+  real(8):: rc3in = 3.0d0
 
 !.....num of atoms and neighbors for dgsf array
   integer,save:: nal, nnl, nalmax,nnlmax,nnltmp
@@ -69,15 +74,15 @@ contains
 !.....local
     integer:: i,j,k,l,m,n,is,ierr,ia,ja &
          ,ihl0,ihl1,ihl2,jj
-    real(8):: rcin,at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp
-    real(8),save:: rc3
+    real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,rc3
+
 !    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
 !.....1st call
     logical,save:: l1st=.true.
 
     if( l1st ) then
-!.....read in.params.NN
-      call read_params(myid,mpi_world,rcin,rc3,iprint)
+      call read_const_NN(myid,mpi_world,iprint)
+      call read_params_NN(myid,iprint)
 !.....reset rc
       if( myid.le.0 .and. rc .lt. rcin- 1d-8) then
         write(6,'(a,f10.5,a,f10.5)') &
@@ -91,6 +96,7 @@ contains
         endif
       endif
       rc= rcin
+      rc3 = rc3in
 
 !  To reduce the memory usage, compute num of atoms and num of neighbors,
 !  and add some margin for those numbers because they can change during
@@ -541,18 +547,17 @@ contains
     return
   end function dsigmoid
 !=======================================================================
-  subroutine read_params(myid,mpi_world,rcin,rc3,iprint)
+  subroutine read_params(myid,mpi_world,iprint)
     implicit none
     include 'mpif.h'
 
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(out):: rcin,rc3
 
     integer:: ierr,i,j,k,nc,ncoeff &
          ,ihl0,ihl1,ihl2,icmb(3),nsf,nsf1,nsf2,iap,jap,kap,ndat
     integer,allocatable:: nwgt(:)
     logical:: lexist
-    character:: ctmp*128
+    character:: ctmp*128,fname*128
     integer,external:: num_data
 
 !.....initialize some
@@ -566,22 +571,23 @@ contains
     ncomb_type(101:200)= 3  ! triplet
 
 !.....read constants at the 1st call
-    inquire(file=trim(ccfname),exist=lexist)
+    fname = trim(paramsdir)//'/'//trim(ccfname)
+    inquire(file=trim(fname),exist=lexist)
     if( .not. lexist ) then
       if( myid.ge.0 ) then
         if( myid.eq.0 ) then
-          write(6,'(a)') ' [Error] '//ccfname//' does not exist !!!.'
-          write(6,'(a)') '   The NN potential needs '//ccfname//'.'
+          write(6,'(a)') ' [Error] '//trim(fname)//' does not exist !!!.'
+          write(6,'(a)') '   The NN potential needs '//trim(fname)//'.'
         endif
         call mpi_finalize(ierr)
         stop
       else
-        write(6,'(a)') ' [Error] '//ccfname//' does not exist !!!.'
-        write(6,'(a)') '   The NN potential needs '//ccfname//'.'
+        write(6,'(a)') ' [Error] '//trim(fname)//' does not exist !!!.'
+        write(6,'(a)') '   The NN potential needs '//trim(fname)//'.'
         stop
       endif
     endif
-    open(51,file=trim(ccfname),status='old')
+    open(51,file=trim(fname),status='old')
 !.....num of symmetry functions, num of node in 1st hidden layer
 10  read(51,'(a)') ctmp
     if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) then
@@ -672,29 +678,30 @@ contains
     close(51)
 
 !.....read parameters at the 1st call
-    inquire(file=trim(cpfname),exist=lexist)
+    fname = trim(paramsdir)//'/'//trim(cpfname)
+    inquire(file=trim(fname),exist=lexist)
     if( .not. lexist ) then
       if( myid.ge.0 ) then
         if( myid.eq.0 ) then
-          write(6,'(a)') ' [Error] '//cpfname//' does not exist !!!.'
-          write(6,'(a)') '   The NN potential needs '//cpfname//'.'
+          write(6,'(a)') ' [Error] '//trim(fname)//' does not exist !!!.'
+          write(6,'(a)') '   The NN potential needs '//trim(fname)//'.'
         endif
         call mpi_finalize(ierr)
         stop
       else
-        write(6,'(a)') ' [Error] '//cpfname//' does not exist !!!.'
-        write(6,'(a)') '   The NN potential needs '//cpfname//'.'
+        write(6,'(a)') ' [Error] '//trim(fname)//' does not exist !!!.'
+        write(6,'(a)') '   The NN potential needs '//trim(fname)//'.'
         stop
       endif
     endif
-    open(50,file=trim(cpfname),status='old')
-    read(50,*) ncoeff,rcin,rc3
+    open(50,file=trim(fname),status='old')
+    read(50,*) ncoeff,rcin,rc3in
 !.....check whether the num of parameters is correct
-    if( rc3.gt.rcin ) then
-      rc3= rcin
+    if( rc3in.gt.rcin ) then
+      rc3in= rcin
       if( myid.le.0 .and. iprint.ne.0 ) then
-        write(6,*) ' rc3 was corrected to rcin = ',rcin
-        write(6,*) ' because input rc3 > rc, which should not happen.'
+        write(6,*) ' rc3in was corrected to rcin = ',rcin
+        write(6,*) ' because input rc3in > rcin, which should not happen.'
       endif
     endif
 
@@ -775,6 +782,257 @@ contains
     deallocate(nwgt)
     return
   end subroutine read_params
+!=======================================================================
+  subroutine read_const_NN(myid,mpi_world,iprint)
+    implicit none
+    include 'mpif.h'
+
+    integer,intent(in):: myid,mpi_world,iprint
+
+    integer:: ierr,i,j,k,nc,ncoeff &
+         ,ihl0,ihl1,ihl2,icmb(3),nsf,nsf1,nsf2,iap,jap,kap,ndat
+    logical:: lexist
+    character:: ctmp*128,fname*128
+    integer,external:: num_data
+
+!.....initialize some
+    ncnst_type(1)= 2   ! Gaussian
+    ncnst_type(2)= 1   ! cosine
+    ncnst_type(3)= 1   ! polynomial
+    ncnst_type(4)= 2   ! Morse
+    ncnst_type(101)= 1 ! angular
+
+    ncomb_type(1:100)= 2    ! pair
+    ncomb_type(101:200)= 3  ! triplet
+
+!.....read constants at the 1st call
+    fname = trim(paramsdir)//'/'//trim(ccfname)
+    inquire(file=trim(fname),exist=lexist)
+    if( .not. lexist ) then
+      if( myid.ge.0 ) then
+        if( myid.eq.0 ) then
+          write(6,'(a)') ' [Error] '//trim(fname)//' does not exist !!!.'
+          write(6,'(a)') '   The NN potential needs '//trim(fname)//'.'
+        endif
+        call mpi_finalize(ierr)
+        stop
+      else
+        write(6,'(a)') ' [Error] '//trim(fname)//' does not exist !!!.'
+        write(6,'(a)') '   The NN potential needs '//trim(fname)//'.'
+        stop
+      endif
+    endif
+    open(51,file=trim(fname),status='old')
+!.....num of symmetry functions, num of node in 1st hidden layer
+10  read(51,'(a)') ctmp
+    if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) then
+      call parse_option(ctmp,iprint,ierr)
+      goto 10
+    else
+      backspace(51)
+    endif
+    read(51,*) nl,nsp,(nhl(i),i=0,nl)
+    if( nl.gt.nlmax ) then
+      if( myid.ge.0 ) then
+        if( myid.eq.0 ) then
+          print *, '[Error] nl.gt.nlmax '
+          print *, '  nl,nlmax=',nl,nlmax
+        endif
+        call mpi_finalize(ierr)
+        stop
+      else
+        print *, '[Error] nl.gt.nlmax '
+        print *, '  nl,nlmax=',nl,nlmax
+        stop
+      endif
+    endif
+
+    call mpi_bcast(lbias,1,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(lcharge,1,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(letemp,1,mpi_logical,0,mpi_world,ierr)
+
+!.....Determine num of symmetry functions and nodes
+    nsf= nhl(0)
+    nhl(nl+1)= 1  ! only one output node, an energy
+    mhl(0:nl+1)= nhl(0:nl+1)
+    if( lbias ) then  ! bias node
+      nhl(0:nl) = nhl(0:nl) +1
+    endif
+    if( letemp ) nhl(0) = nhl(0) +1  ! T_e
+    if( myid.eq.0 .and. iprint.ne.0 ) then
+      print *,'lbias  = ',lbias
+      print *,'lcharge= ',lcharge
+      print *,'letemp = ',letemp
+      print *,'nhl = ',nhl(0:nl+1)
+      print *,'mhl = ',mhl(0:nl+1)
+    endif
+    
+    allocate(itype(nsf),cnst(max_ncnst,nsf))
+    allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
+    iaddr2(1:2,1:nsp,1:nsp)= -1
+    iaddr3(1:2,1:nsp,1:nsp,1:nsp)= -1
+    nsf1= 0
+    nsf2= 0
+    iap= 0
+    jap= 0
+    kap= 0
+    do i=1,nsf
+      read(51,*) itype(i),(icmb(k),k=1,ncomb_type(itype(i))) &
+           ,(cnst(j,i),j=1,ncnst_type(itype(i)))
+      if( itype(i).le.100 ) then
+        if( icmb(1).ne.iap .or. icmb(2).ne.jap ) then
+          iaddr2(1,icmb(1),icmb(2))= i
+          iaddr2(1,icmb(2),icmb(1))= i
+        endif
+        iaddr2(2,icmb(1),icmb(2))= i
+        iaddr2(2,icmb(2),icmb(1))= i
+        nsf1= nsf1 +1
+        iap= icmb(1)
+        jap= icmb(2)
+      else if( itype(i).le.200 ) then
+        if( icmb(1).ne.iap .or. icmb(2).ne.jap .or. &
+             icmb(3).ne.kap ) then
+          iaddr3(1,icmb(1),icmb(2),icmb(3))= i
+          iaddr3(1,icmb(1),icmb(3),icmb(2))= i
+        endif
+        iaddr3(2,icmb(1),icmb(2),icmb(3))= i
+        iaddr3(2,icmb(1),icmb(3),icmb(2))= i
+        nsf2= nsf2 +1
+        iap= icmb(1)
+        jap= icmb(2)
+        kap= icmb(3)
+      endif
+    enddo
+    if( nsf.ne.nsf1+nsf2 ) then
+      if(myid.eq.0 ) then
+        print *,'[Error] nsf.ne.nsf1+nsf2 !!!'
+      endif
+      call mpi_finalize(ierr)
+      stop
+    endif
+    close(51)
+
+    return
+  end subroutine read_const_NN
+!=======================================================================
+  subroutine read_params_NN(myid,iprint)
+    implicit none
+    include 'mpif.h'
+
+    integer,intent(in):: myid,iprint
+
+    integer:: ierr,i,j,k,nc,ncoeff &
+         ,ihl0,ihl1,ihl2,icmb(3),nsf,nsf1,nsf2,iap,jap,kap,ndat
+    integer,allocatable:: nwgt(:)
+    logical:: lexist
+    character:: ctmp*128,fname*128
+    integer,external:: num_data
+
+!.....read parameters at the 1st call
+    fname = trim(paramsdir)//'/'//trim(cpfname)
+    inquire(file=trim(fname),exist=lexist)
+    if( .not. lexist ) then
+      if( myid.ge.0 ) then
+        if( myid.eq.0 ) then
+          write(6,'(a)') ' [Error] '//trim(fname)//' does not exist !!!.'
+          write(6,'(a)') '   The NN potential needs '//trim(fname)//'.'
+        endif
+        call mpi_finalize(ierr)
+        stop
+      else
+        write(6,'(a)') ' [Error] '//trim(fname)//' does not exist !!!.'
+        write(6,'(a)') '   The NN potential needs '//trim(fname)//'.'
+        stop
+      endif
+    endif
+    open(50,file=trim(fname),status='old')
+    read(50,*) ncoeff,rcin,rc3in
+!.....check whether the num of parameters is correct
+    if( rc3in.gt.rcin ) then
+      rc3in= rcin
+      if( myid.le.0 .and. iprint.ne.0 ) then
+        write(6,*) ' rc3in was corrected to rcin = ',rcin
+        write(6,*) ' because input rc3in > rc, which should not happen.'
+      endif
+    endif
+
+!.....calc number of weights
+    allocate(nwgt(nl+1))
+    nwgt(1:nl+1) = 0
+    do i=1,nl+1
+      nwgt(i)= nhl(i-1)*mhl(i)
+    enddo
+    if( myid.le.0 .and. iprint.ne.0 ) then
+      print *, 'num of basis funcs =',nhl(0)
+      do i=1,nl
+        print *, 'ihl, nhl(ihl)  =',i,nhl(i)
+      enddo
+      do i=1,nl+1
+        print *, 'ihl, nwgt(ihl)  =',i,nwgt(i)
+      enddo
+    endif
+    
+    nc= 0
+    do i=1,nl+1
+      nc= nc +nwgt(i)
+    enddo
+    if( ncoeff .ne. nc ) then
+      write(6,'(a)') ' [Error] num of parameters is not correct !!!'
+      write(6,'(a,i10)')  '   ncoeff=',ncoeff
+      write(6,'(a,i10)')  '   ncoeff should be ',nc
+      stop
+    endif
+!.....different number of weights and number of layers
+    if( nl.eq.1 ) then
+      allocate(wgt11(nhl(0),mhl(1)),wgt12(nhl(1)))
+      wgt11(1:nhl(0),1:mhl(1)) = 0d0
+      wgt12(1:nhl(1)) = 0d0
+    else if( nl.eq.2 ) then
+      allocate(wgt21(nhl(0),mhl(1)),wgt22(nhl(1),mhl(2)),wgt23(nhl(2)))
+      wgt21(1:nhl(0),1:mhl(1)) = 0d0
+      wgt22(1:nhl(1),1:mhl(2)) = 0d0
+      wgt23(1:nhl(2)) = 0d0
+    endif
+    if( nl.eq.1 ) then
+      do ihl0=1,nhl(0)
+        do ihl1=1,mhl(1)
+          read(50,*) wgt11(ihl0,ihl1)
+        enddo
+      enddo
+      do ihl1=1,nhl(1)
+        read(50,*) wgt12(ihl1)
+      enddo
+    else if( nl.eq.2 ) then
+      do ihl0=1,nhl(0)
+        do ihl1=1,mhl(1)
+          read(50,*) wgt21(ihl0,ihl1)
+        enddo
+      enddo
+      do ihl1=1,nhl(1)
+        do ihl2=1,mhl(2)
+          read(50,*) wgt22(ihl1,ihl2)
+        enddo
+      enddo
+      do ihl2=1,nhl(2)
+        read(50,*) wgt23(ihl2)
+      enddo
+    endif
+    close(50)
+
+#ifdef __DEBUG__
+    if(myid.le.0) then
+      write(6,'(a)') ' DEBUG: ihl0,ihl1,wgt11(ihl0,ihl1)'
+      do ihl0=1,nhl(0)
+        do ihl1=1,nhl(1)
+          write(6,'(2i5,es15.7)') ,ihl0,ihl1,wgt11(ihl0,ihl1)
+        enddo
+      enddo
+    endif
+#endif
+
+    deallocate(nwgt)
+    return
+  end subroutine read_params_NN
 !=======================================================================
   subroutine parse_option(cline,iprint,ierr)
 !
@@ -1050,6 +1308,17 @@ contains
 !!$    endif
 
   end subroutine compute_stress
+!=======================================================================
+  subroutine set_paramsdir_NN(dname)
+!
+!  Accessor routine for setting paramsdir
+!
+    implicit none
+    character(len=*),intent(in):: dname
+
+    paramsdir = trim(dname)
+    return
+  end subroutine set_paramsdir_NN
 !=======================================================================
 end module NN
 !-----------------------------------------------------------------------
