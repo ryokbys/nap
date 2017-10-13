@@ -178,13 +178,13 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
   if( luse_EAM) call force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
   if( luse_linreg ) call force_linreg(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
   if( luse_NN ) call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
   if( luse_Morse ) call force_Morse(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
@@ -226,6 +226,7 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
        read_element_descriptors,init_Morse,read_params_Morse,&
        update_params_Morse
   use EAM, only: init_EAM, read_params_EAM, update_params_EAM, lprmset_EAM
+  use NN, only: read_const_NN, read_params_NN, update_params_NN, lprmset_NN
   implicit none
   integer,intent(in):: namax,natm,myid_md,mpi_md_world,iprint,numff
   real(8),intent(in):: tag(namax),h(3,3),rc
@@ -295,7 +296,16 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
       call update_params_EAM()
     endif
   endif
-
+!.....NN
+  if( luse_NN ) then
+    call read_const_NN(myid_md,mpi_md_world,iprint)
+    if( .not.lprmset_NN ) then
+      call read_params_NN(myid_md,iprint)
+    else
+!.....This code is not parallelized, and only for fitpot
+      call update_params_NN()
+    endif
+  endif
   
 end subroutine init_force
 !=======================================================================

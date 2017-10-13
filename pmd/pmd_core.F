@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-04 16:00:47 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-13 15:50:15 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -959,6 +959,8 @@ c.....Do not update epot here, so use epott instead.
       if( iprint.ne.0 ) then
         write(6,'(a,es15.7)') ' potential energy = ',epot
       endif
+
+      call sa2stnsr(natm,strs,eki,ptnsr,vol,mpi_md_world)
 
       call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
      &     ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
@@ -2171,32 +2173,9 @@ c
       character(len=*):: cpctl
       
       integer:: i,ixyz,jxyz,ierr
-      real(8):: pt(3,3),ptp(3,3),ptk(3,3),prss,fac
+      real(8):: prss,fac
 
-      ptp(1:3,1:3)= 0d0
-      ptk(1:3,1:3)= 0d0
-      do i=1,natm
-c        write(6,'(a,i3,6es12.4)') 'i,strsi=',i,strs(1,1,i),
-c     &       strs(2,2,i),strs(3,3,i),
-c     &       strs(2,3,i),strs(1,3,i),
-c     &       strs(1,2,i)
-        do jxyz=1,3
-          do ixyz=1,3
-            ptk(ixyz,jxyz)=ptk(ixyz,jxyz) +2d0*eki(ixyz,jxyz,i)
-            ptp(ixyz,jxyz)=ptp(ixyz,jxyz) +strs(ixyz,jxyz,i)
-          enddo
-        enddo
-      enddo
-
-c      write(6,'(a,6es12.4)') 'ptp =',ptp(1,1),ptp(2,2),ptp(3,3),
-c     &     ptp(2,3),ptp(1,3),ptp(1,2)
-      pt(1:3,1:3) = ptk(1:3,1:3) +ptp(1:3,1:3)
-      ptnsr(1:3,1:3)= 0d0
-      call mpi_allreduce(pt,ptnsr,9,mpi_double_precision,mpi_sum
-     &     ,mpi_md_world,ierr)
-      ptnsr(1:3,1:3)=ptnsr(1:3,1:3) /vol
-c      write(6,*) 'ptnsr =',ptnsr(1,1),ptnsr(2,2),ptnsr(3,3),
-c     &     ptnsr(2,3),ptnsr(1,3),ptnsr(1,2)
+      call sa2stnsr(natm,strs,eki,ptnsr,vol,mpi_md_world)
 
 c.....Berendsen for variable-cell
       if( trim(cpctl).eq.'Berendsen' .or.
@@ -2220,6 +2199,38 @@ c.....Berendsen for variable-volume not variable-cell
       endif
 
       end subroutine force_isobaric
+c=======================================================================
+      subroutine sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
+c      
+c  Take sum of atomic stresses to compute cell stress
+c
+      implicit none
+      include "mpif.h"
+      integer,intent(in):: natm,mpi_md_world
+      real(8),intent(in):: eki(3,3,natm),strs(3,3,natm),vol
+      real(8),intent(out):: stnsr(3,3)
+
+      integer:: i,ixyz,jxyz,ierr
+      real(8):: stp(3,3),stk(3,3),st(3,3)
+      
+      stp(1:3,1:3)= 0d0
+      stk(1:3,1:3)= 0d0
+      do i=1,natm
+        do jxyz=1,3
+          do ixyz=1,3
+            stk(ixyz,jxyz)=stk(ixyz,jxyz) +2d0*eki(ixyz,jxyz,i)
+            stp(ixyz,jxyz)=stp(ixyz,jxyz) +strs(ixyz,jxyz,i)
+          enddo
+        enddo
+      enddo
+
+      st(1:3,1:3) = stk(1:3,1:3) +stp(1:3,1:3)
+      stnsr(1:3,1:3)= 0d0
+      call mpi_allreduce(st,stnsr,9,mpi_double_precision,mpi_sum
+     &     ,mpi_md_world,ierr)
+      stnsr(1:3,1:3)=stnsr(1:3,1:3) /vol
+      return
+      end subroutine sa2stnsr
 c=======================================================================
       subroutine setv(h,natm,tag,va,nspmax,am,tinit,dt)
       implicit none

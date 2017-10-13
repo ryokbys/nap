@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-11 17:12:38 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-13 15:49:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -60,29 +60,30 @@ contains
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
          ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys,erefmin &
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
-         ,nff,cffs,cmaindir,maxna &
+         ,nff,cffs,cmaindir,maxna,rcut,rc3 &
          ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use EAM,only: set_paramsdir_EAM,set_params_EAM
+    use NN,only: set_paramsdir_NN,set_params_NN
     implicit none
     
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: ftrn,ftst
 
-    integer:: ismpl,natm,ia,ixyz,idim
+    integer:: ismpl,natm,ia,ixyz,jxyz,idim
     real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv,esub,epotsub
-    real(8):: eerr,ferr,ferri
+    real(8):: eerr,ferr,ferri,serr,serri,strs(3,3)
     real(8):: ftrnl,ftstl,ftmp
     real(8):: edenom,fdenom
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     type(mdsys):: smpl
     logical:: l1st = .true.
     logical:: lcalcgrad = .false.
-    real(8),save,allocatable:: gdummy(:),frcs(:,:),strs(:,:,:)
+    real(8),save,allocatable:: gdummy(:),frcs(:,:)
     character(len=128):: cdirname
 
     nfunc= nfunc +1
@@ -96,7 +97,6 @@ contains
       if( .not.allocated(gdummy) ) allocate(gdummy(ndim))
       if( .not.fp_common_initialized ) call init()
       if( .not.allocated(fdiff) ) allocate(fdiff(3,maxna),frcs(3,maxna))
-      if( .not.allocated(strs) ) allocate(strs(3,3,maxna))
     endif
 
     if( .not. lematch .and. .not.lfmatch .and. .not.lsmatch ) then
@@ -131,13 +131,18 @@ contains
       else if( trim(cpot).eq.'NN' ) then
         call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
+        call set_params_NN(ndim,x,rcut,rc3)
       endif
 !!$      print *,'myid,ismpl,cdirname,natm=',myid,ismpl,trim(cdirname),natm,' before pmd'
       call run_pmd(smpl,lcalcgrad,ndim,gdummy,nff,cffs,epot,frcs,strs)
-      if( iprint.ge.10 ) print *,'myid,ismpl,cdirname,epot= ',myid,ismpl,trim(cdirname),epot
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
-      samples(ismpl)%strsi(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
+      samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
+      if( iprint.ge.10 ) then
+        write(6,'(a,2i4,1x,a,7es12.4)') 'myid,ismpl,cdirname,epot,strs= ', &
+             myid,ismpl,trim(cdirname), &
+             epot,strs(1,1),strs(2,2),strs(3,3),strs(2,3),strs(1,3),strs(1,2)
+      endif
     enddo
 
     if( len(trim(crefstrct)).gt.5 ) then
@@ -194,27 +199,26 @@ contains
 
 !.....Stress matching
       if( lsmatch ) then
-!.....Make current ptnsr of the system
-        smpl%cptnsr(1:3,1:3)= 0d0
-        do ia=1,natm
-          do jxyz=1,3
-            do ixyz=1,3
-              smpl%cptnsr(ixyz,jxyz)=smpl%cptnsr(ixyz,jxyz) &
-                   +smpl%strsi(ixyz,jxyz,ia)
-            enddo
-          enddo
-        enddo
+!!$!.....Make current ptnsr of the system
+!!$        smpl%cptnsr(1:3,1:3)= 0d0
+!!$        do ia=1,natm
+!!$          do jxyz=1,3
+!!$            do ixyz=1,3
+!!$              smpl%cptnsr(ixyz,jxyz)=smpl%cptnsr(ixyz,jxyz) &
+!!$                   +smpl%strsi(ixyz,jxyz,ia)
+!!$            enddo
+!!$          enddo
+!!$        enddo
 
-!  vol = 1d0
-        smpl%cptnsr(1:3,1:3) = smpl%cptnsr(1:3,1:3) !/vol
+!!$!  vol = 1d0
+!!$        smpl%cptnsr(1:3,1:3) = smpl%cptnsr(1:3,1:3) !/vol
 
 !.....Compare these ptnsr elements with sref elements
-   
         serr = smpl%serr
         serri = 1d0/serr
         do ixyz=1,3
           do jxyz=ixyz,3
-            pdiff(ixyz,jxyz)= (smpl%cptnsr(ixyz,jxyz) &
+            pdiff(ixyz,jxyz)= (smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
                  -smpl%sref(ixyz,jxyz)) *serri
             pdiff(ixyz,jxyz)= pdiff(ixyz,jxyz)*pdiff(ixyz,jxyz)/6
             ftmp= ftmp +pdiff(ixyz,jxyz) 

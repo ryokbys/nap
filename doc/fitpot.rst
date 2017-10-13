@@ -73,7 +73,7 @@ Files needed to perform *fitpot* in eacy sample directory (``smpl_*``) are:
     0.0000  -0.1000   0.0000
    -0.1000   0.0000   0.0000
 
-``out.NN.gsf`` and ``out.NN.dgsf`` are specific to neural-network (NN) potential and written out by *pmd* program.
+``out.NN.gsf`` and ``out.NN.dgsf`` are specific to neural-network (NN) potential and written out from *pmd* program with `print_level 11`.
 
 In case of extracting DFT data from *ab-initio* MD runs with **VASP**, positions, energy, and forces of each MD step 
 can be obtained from ``vasprun.xml`` file as follows.

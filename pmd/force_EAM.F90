@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-06 00:04:30 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-13 12:07:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -260,7 +260,7 @@ contains
 !=======================================================================
   subroutine force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of SM paper.
 !    - smoothing is applied to both 2- and many-body terms
@@ -280,12 +280,12 @@ contains
          ,acon(nismax),rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: l1st
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: xij(3),rij,rcij,dfi,dfj,drho,drdxi(3),drdxj(3),r,at(3)
     real(8):: x,y,z,xi(3),epotl,epott,tmp,dtmp
-    logical,save:: l1st=.true.
     real(8),allocatable,save:: rho(:)
     real(8),allocatable,save:: strsl(:,:,:)
 
@@ -307,7 +307,6 @@ contains
           endif
         enddo
       enddo
-      l1st=.false.
     endif
 
     if( size(strsl).lt.3*3*namax ) then

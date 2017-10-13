@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-11 17:49:47 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-13 15:48:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -48,17 +48,22 @@ module NN
 
 !.....cutoff region width ratio to rc
   real(8):: rcw = 0.9d0
-  real(8):: rcin = 4.0d0
-  real(8):: rc3in = 3.0d0
+  real(8):: rcnn = 4.0d0
+  real(8):: rc3nn = 3.0d0
 
 !.....num of atoms and neighbors for dgsf array
   integer,save:: nal, nnl, nalmax,nnlmax,nnltmp
   logical:: lrealloc = .false.
+
+!.....parameters given from outside (fitpot)
+  integer:: nprms
+  real(8),allocatable:: prms(:)
+  logical:: lprmset_NN = .false.
   
 contains
   subroutine force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -69,25 +74,24 @@ contains
          ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: tcom,rc
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: l1st
     logical:: lstrs
 
 !.....local
     integer:: i,j,k,l,m,n,is,ierr,ia,ja &
          ,ihl0,ihl1,ihl2,jj
-    real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,rc3
+    real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp
 
 !    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
-!.....1st call
-    logical,save:: l1st=.true.
 
     if( l1st ) then
-      call read_const_NN(myid,mpi_world,iprint)
-      call read_params_NN(myid,iprint)
+!!$      call read_const_NN(myid,mpi_world,iprint)
+!!$      call read_params_NN(myid,iprint)
 !.....reset rc
-      if( myid.le.0 .and. rc .lt. rcin- 1d-8) then
+      if( myid.le.0 .and. rc .lt. rcnn- 1d-8) then
         write(6,'(a,f10.5,a,f10.5)') &
              ' Error: Cutoff radius rc should be corrected from '&
-             ,rc,' to ',rcin
+             ,rc,' to greater than ',rcnn
         if( myid.ge.0 ) then
           call mpi_finalize(ierr)
           stop
@@ -95,8 +99,6 @@ contains
           stop
         endif
       endif
-      rc= rcin
-      rc3 = rc3in
 
 !  To reduce the memory usage, compute num of atoms and num of neighbors,
 !  and add some margin for those numbers because they can change during
@@ -134,16 +136,18 @@ contains
         write(6,'(a,f10.3,a)') ' igsf size = ', &
              dble(nhl(0)*(nnlmax+1)*nalmax*2)/1000/1000,' MB'
       endif
+      if( allocated(gsf) ) deallocate(gsf,dgsf,igsf)
       allocate( gsf(nhl(0),nal),dgsf(3,nhl(0),0:nnl,nal) &
            ,igsf(nhl(0),0:nnl,nal) )
 
       lrealloc = .false.
       if( nl.eq.1 ) then
+        if( allocated(hl1) ) deallocate(hl1)
         allocate( hl1(nhl(1),nal) )
       else if( nl.eq.2 ) then
+        if( allocated(hl1) ) deallocate(hl1,hl2)
         allocate( hl1(nhl(1),nal), hl2(nhl(2),nal) )
       endif
-      l1st= .false.
     endif
 
 !  Since natm and nn can change every step of MD,
@@ -155,6 +159,8 @@ contains
         write(6,'(a)') ' [Error] nal .gt.namax'
         write(6,'(a,3i10)') '   myid,nal,namax = ',myid,nal,namax
         stop
+      else
+        write(6,*) ' Since natm.gt.nal, nal was updated at myid =',myid
       endif
       lrealloc=.true.
     endif
@@ -168,6 +174,8 @@ contains
         write(6,'(a)') ' [Error] nnl.gt.nnmax'
         write(6,'(a,3i10)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
         stop
+      else
+        write(6,*) ' Since nnltmp.gt.nnl, nnl was updated at myid =',myid
       endif
       lrealloc=.true.
     endif
@@ -187,14 +195,14 @@ contains
 
 !.....first, calculate all the symmetry functions
     call eval_sf(nhl(0),namax,natm,nb,nnmax,h,tag,ra &
-         ,lspr,rc,rc3)
+         ,lspr,rcnn,rc3nn)
     if( lbias ) then
 !.....set bias node to 1
       gsf(nhl(0),1:natm) = 1d0
       dgsf(1:3,nhl(0),:,:) = 0d0
     endif
 
-    if( mod(iprint,100)/10.eq.1 .and. myid.le.0 ) then
+    if( iprint.gt.10 .and. mod(iprint,10).eq.1 .and. myid.le.0 ) then
       open(80,file='out.NN.gsf',status='replace',form='unformatted')
       write(80) nhl(0)
       do ia=1,natm
@@ -218,7 +226,6 @@ contains
         hl2(nhl(2),1:natm)= 1d0
       endif
     endif
-    
 
 !.....2nd, calculate the node values by summing contributions from
 !.....  symmetry functions
@@ -345,7 +352,7 @@ contains
 
     if( lstrs ) then
       call compute_stress(namax,natm,tag,ra,nnmax,strs,h &
-           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rc,lspr &
+           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rcnn,lspr &
            ,mpi_world,myid)
     endif
 
@@ -631,7 +638,7 @@ contains
       print *,'nhl = ',nhl(0:nl+1)
       print *,'mhl = ',mhl(0:nl+1)
     endif
-    
+
     allocate(itype(nsf),cnst(max_ncnst,nsf))
     allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
     iaddr2(1:2,1:nsp,1:nsp)= -1
@@ -695,13 +702,13 @@ contains
       endif
     endif
     open(50,file=trim(fname),status='old')
-    read(50,*) ncoeff,rcin,rc3in
+    read(50,*) ncoeff,rcnn,rc3nn
 !.....check whether the num of parameters is correct
-    if( rc3in.gt.rcin ) then
-      rc3in= rcin
+    if( rc3nn.gt.rcnn ) then
+      rc3nn= rcnn
       if( myid.le.0 .and. iprint.ne.0 ) then
-        write(6,*) ' rc3in was corrected to rcin = ',rcin
-        write(6,*) ' because input rc3in > rcin, which should not happen.'
+        write(6,*) ' rc3nn was corrected to rcnn = ',rcnn
+        write(6,*) ' because input rc3nn > rcnn, which should not happen.'
       endif
     endif
 
@@ -866,9 +873,11 @@ contains
       print *,'nhl = ',nhl(0:nl+1)
       print *,'mhl = ',mhl(0:nl+1)
     endif
-    
-    allocate(itype(nsf),cnst(max_ncnst,nsf))
-    allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
+
+    if( .not.allocated(itype) ) then
+      allocate(itype(nsf),cnst(max_ncnst,nsf))
+      allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
+    endif
     iaddr2(1:2,1:nsp,1:nsp)= -1
     iaddr3(1:2,1:nsp,1:nsp,1:nsp)= -1
     nsf1= 0
@@ -946,13 +955,13 @@ contains
       endif
     endif
     open(50,file=trim(fname),status='old')
-    read(50,*) ncoeff,rcin,rc3in
+    read(50,*) ncoeff,rcnn,rc3nn
 !.....check whether the num of parameters is correct
-    if( rc3in.gt.rcin ) then
-      rc3in= rcin
+    if( rc3nn.gt.rcnn ) then
+      rc3nn= rcnn
       if( myid.le.0 .and. iprint.ne.0 ) then
-        write(6,*) ' rc3in was corrected to rcin = ',rcin
-        write(6,*) ' because input rc3in > rc, which should not happen.'
+        write(6,*) ' rc3nn was corrected to rcnn = ',rcnn
+        write(6,*) ' because input rc3nn > rcnn, which should not happen.'
       endif
     endif
 
@@ -1033,6 +1042,87 @@ contains
     deallocate(nwgt)
     return
   end subroutine read_params_NN
+!=======================================================================
+  subroutine set_params_NN(nprms_in,prms_in,rc,rc3)
+!
+!  Accessor routine to set NN parameters from outside.
+!  Curretnly this routine is supposed to be called only on serial run.
+!
+    implicit none 
+    integer,intent(in):: nprms_in
+    real(8),intent(in):: prms_in(nprms_in),rc,rc3
+
+    nprms = nprms_in
+    if( .not.allocated(prms) ) allocate(prms(nprms))
+    prms(1:nprms) = prms_in(1:nprms_in)
+
+    rcnn = rc
+    rc3nn= rc3
+    
+    lprmset_NN = .true.
+    return
+  end subroutine set_params_NN
+!=======================================================================
+  subroutine update_params_NN()
+!
+!  Update NN parameters by taking parameter values from params array.
+!  This routine would be called only from externally from fitpot.
+!
+    integer:: i,inc,is,js,ihl0,ihl1,ihl2
+
+    if( .not.lprmset_NN ) then
+      print *,'ERROR: params have not been set yet.'
+      stop
+    endif
+    
+    if( nl.eq.1 ) then
+      if( .not.allocated(wgt11) ) &
+           allocate(wgt11(nhl(0),mhl(1)),wgt12(nhl(1)))
+      wgt11(1:nhl(0),1:mhl(1)) = 0d0
+      wgt12(1:nhl(1)) = 0d0
+    else if( nl.eq.2 ) then
+      if( .not.allocated(wgt21) ) &
+           allocate(wgt21(nhl(0),mhl(1)), &
+           wgt22(nhl(1),mhl(2)), &
+           wgt23(nhl(2)))
+      wgt21(1:nhl(0),1:mhl(1)) = 0d0
+      wgt22(1:nhl(1),1:mhl(2)) = 0d0
+      wgt23(1:nhl(2)) = 0d0
+    endif
+
+    inc = 0
+    if( nl.eq.1 ) then
+      do ihl0=1,nhl(0)
+        do ihl1=1,mhl(1)
+          inc = inc +1
+          wgt11(ihl0,ihl1) = prms(inc)
+        enddo
+      enddo
+      do ihl1=1,nhl(1)
+        inc = inc +1
+        wgt12(ihl1) = prms(inc)
+      enddo
+    else if( nl.eq.2 ) then
+      do ihl0=1,nhl(0)
+        do ihl1=1,mhl(1)
+          inc = inc +1
+          wgt21(ihl0,ihl1) = prms(inc)
+        enddo
+      enddo
+      do ihl1=1,nhl(1)
+        do ihl2=1,mhl(2)
+          inc = inc +1
+          wgt22(ihl1,ihl2) = prms(inc)
+        enddo
+      enddo
+      do ihl2=1,nhl(2)
+        inc = inc +1
+        wgt23(ihl2) = prms(inc)
+      enddo
+    endif
+    
+    return
+  end subroutine update_params_NN
 !=======================================================================
   subroutine parse_option(cline,iprint,ierr)
 !

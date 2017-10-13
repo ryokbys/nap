@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-10 17:40:10 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-13 09:30:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -154,6 +154,7 @@ program fitpot
   if( nsmpl.lt.nsmpl_outfrc ) then
     call write_force_relation('fin')
   endif
+  call write_stress_relation('fin')
 
   if(trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso') &
        call write_eliminated_vars()
@@ -484,10 +485,11 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
        ,smpl%eki(3,3,natm),smpl%epi(natm) &
        ,smpl%chg(natm),smpl%chi(natm),smpl%fsub(3,natm) &
-       ,smpl%symbols(natm),smpl%eatm(natm),smpl%ssub(3,3,natm))
+       ,smpl%symbols(natm),smpl%eatm(natm))
   smpl%chg(1:natm) = 0d0
   smpl%esub= 0d0
   smpl%fsub(1:3,1:natm)= 0d0
+  smpl%ssub(1:3,1:3) = 0d0
   do i=1,smpl%natm
     read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), &
          tmp,tmp,tmp
@@ -882,7 +884,8 @@ subroutine ga_wrapper()
   real(8):: fval
   external:: write_stats,write_energy_relation
 
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' ) then
     call ga(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats,write_energy_relation)
@@ -905,7 +908,8 @@ subroutine de_wrapper()
   real(8):: fval
   external:: write_stats, write_energy_relation
 
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' ) then
     call de(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats, write_energy_relation)
@@ -928,7 +932,8 @@ subroutine pso_wrapper()
   real(8):: fval
   external:: write_stats
 
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' ) then
     call pso(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -951,7 +956,8 @@ subroutine random_search_wrapper()
   real(8):: fval
   external:: write_stats
 
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' ) then
     call random_search(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -1413,6 +1419,91 @@ subroutine write_force_relation(cadd)
   endif
   l1st = .false.
 end subroutine write_force_relation
+!=======================================================================
+subroutine write_stress_relation(cadd)
+  use variables
+  use parallel
+  implicit none
+  character(len=*),intent(in):: cadd
+  character(len=128):: cfname
+
+  integer:: ismpl,ia,ixyz,jxyz,natm,nmax,nmaxl
+  logical:: l1st = .true.
+
+  cfname= 'out.strs'
+
+  nmaxl= 0
+  do ismpl=1,nsmpl
+    nmaxl= max(nmaxl,nalist(ismpl))
+  enddo
+  call mpi_allreduce(nmaxl,nmax,1,mpi_integer,mpi_max &
+       ,mpi_world,ierr)
+
+  if( .not. allocated(srefl) ) allocate(srefl(3,3,nsmpl)&
+       ,srefg(3,3,nsmpl),strsl(3,3,nsmpl),strsg(3,3,nsmpl)&
+       ,serrl(nsmpl),serrg(nsmpl),ssubl(3,3,nsmpl),ssubg(3,3,nsmpl))
+
+  if( l1st ) then
+    srefl(1:3,1:3,1:nsmpl)= 0d0
+    ssubl(1:3,1:3,1:nsmpl)= 0d0
+    serrl(1:nsmpl) = 0d0
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      srefl(1:3,1:3,ismpl)= samples(ismpl)%sref(1:3,1:3)
+      ssubl(1:3,1:3,ismpl)= samples(ismpl)%ssub(1:3,1:3)
+      serrl(ismpl) = samples(ismpl)%serr
+    enddo
+    srefg(1:3,1:3,1:nsmpl)= 0d0
+    ssubg(1:3,1:3,1:nsmpl)= 0d0
+    serrg(1:nsmpl) = 0d0
+    call mpi_reduce(srefl,srefg,3*3*nsmpl,mpi_real8,mpi_sum &
+         ,0,mpi_world,ierr)
+    call mpi_reduce(ssubl,ssubg,3*3*nsmpl,mpi_real8,mpi_sum &
+         ,0,mpi_world,ierr)
+    call mpi_reduce(serrl,serrg,nsmpl,mpi_real8,mpi_sum &
+         ,0,mpi_world,ierr)
+  endif
+
+  strsl(1:3,1:3,1:nsmpl)= 0d0
+  do ismpl=isid0,isid1
+    strsl(1:3,1:3,ismpl)= samples(ismpl)%strs(1:3,1:3) &
+         +samples(ismpl)%ssub(1:3,1:3)
+  enddo
+  strsg(1:3,1:3,1:nsmpl)= 0d0
+  call mpi_reduce(strsl,strsg,3*3*nsmpl,mpi_real8,mpi_sum &
+       ,0,mpi_world,ierr)
+
+  if( myid.eq.0 ) then
+    open(94,file=trim(cfname)//'.trn.'//trim(cadd),status='replace')
+    open(95,file=trim(cfname)//'.tst.'//trim(cadd),status='replace')
+    do ismpl=1,nsmpl
+      if( iclist(ismpl).eq.1 ) then
+        do ixyz=1,3
+          do jxyz=ixyz,3
+            write(94,'(2es15.7,2x,a,i6,i3,3es12.3e3)') srefg(ixyz,jxyz,ismpl) &
+                 ,strsg(ixyz,jxyz,ismpl) &
+                 ,trim(cdirlist(ismpl)),ixyz,jxyz &
+                 ,abs(srefg(ixyz,jxyz,ismpl)-strsg(ixyz,jxyz,ismpl))&
+                 ,serrg(ismpl),ssubg(ixyz,jxyz,ismpl)
+          enddo
+        enddo
+      else if( iclist(ismpl).eq.2 ) then
+        do ixyz=1,3
+          do jxyz=ixyz,3
+            write(95,'(2es15.7,2x,a,i6,i3,3es12.3e3)') srefg(ixyz,jxyz,ismpl) &
+                 ,strsg(ixyz,jxyz,ismpl) &
+                 ,trim(cdirlist(ismpl)),ixyz,jxyz &
+                 ,abs(srefg(ixyz,jxyz,ismpl)-strsg(ixyz,jxyz,ismpl))&
+                 ,serrg(ismpl),ssubg(ixyz,jxyz,ismpl)
+          enddo
+        enddo
+      endif
+    enddo
+    close(94)
+    close(95)
+  endif
+  l1st = .false.
+end subroutine write_stress_relation
 !=======================================================================
 subroutine write_stats(iter)
   use variables
@@ -1916,8 +2007,8 @@ subroutine subtract_FF()
   logical:: luse_Morse_repul = .false.
   logical:: luse_Coulomb = .false.
   logical,save:: l1st = .true.
-  real(8):: epot
-  real(8),save,allocatable:: frcs(:,:),strs(:,:,:)
+  real(8):: epot,strs(3,3)
+  real(8),save,allocatable:: frcs(:,:)
 
   if( l1st ) then
     do i=1,nsubff
@@ -1938,7 +2029,6 @@ subroutine subtract_FF()
     endif
 
     if( .not.allocated(frcs) ) allocate(frcs(3,maxna))
-    if( .not.allocated(strs) ) allocate(strs(3,3,maxna))
 
 !.....Only at the 1st call, perform pmd to get esubs
     do ismpl=isid0,isid1
@@ -1958,7 +2048,7 @@ subroutine subtract_FF()
 !!$      print *,'myid,ismpl,epot=',myid,ismpl,epot
       samples(ismpl)%esub = epot
       samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
-      samples(ismpl)%ssub(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
+      samples(ismpl)%ssub(1:3,1:3) = strs(1:3,1:3)
     enddo
 
 !!$    allocate(esubl(nsmpl),esubg(nsmpl))
@@ -2042,9 +2132,11 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
   use variables,only: rcut,mdsys,maxna,iprint,lsmatch
   use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
   implicit none
+  include "../pmd/params_unit.h"
   type(mdsys),intent(inout):: smpl
   integer,intent(in):: ndimp,nff
-  real(8),intent(inout):: pderiv(ndimp),epot,frcs(3,maxna),strs(3,3,maxna)
+  real(8),intent(inout):: pderiv(ndimp),epot,frcs(3,maxna)
+  real(8),intent(out):: strs(3,3)
   logical,intent(in):: lcalcgrad
   character(len=20),intent(in):: cffs(nff)
 
@@ -2110,11 +2202,12 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
 !!$  print *,'calling one_shot, myid,mpi_world,myid_pmd,mpi_comm_pmd='&
 !!$       ,myid,mpi_world,myid_pmd,mpi_comm_pmd
   call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
-       ,smpl%va,frcs,strs,smpl%eki,smpl%epi &
+       ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
        ,smpl%chg,smpl%chi &
        ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
        ,nismax,am,dt,nff,cffs,rc,rbuf,ptnsr,epot,ekin &
        ,ifcoulomb,iprint_pmd,lcalcgrad,ndimp,pderiv)
+  strs(1:3,1:3) = ptnsr(1:3,1:3)*up2gpa*(-1d0)
 !!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
 !!$  print *,'smpl%natm =',smpl%natm
 !!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)

@@ -2760,7 +2760,7 @@ contains
           fbest = ftrn
           iidbest = iid
           xbest(1:ndim) = xtmp(1:ndim)
-          if( iprint.ge.10 ) then
+          if( iprint.ge.2 ) then
             write(cadd,'(i0)') iid
             call sub_ergrel(cadd)
           endif
@@ -3192,7 +3192,7 @@ contains
         xbest(1:ndim) = xtmp(1:ndim)
       endif
 
-      if( iprint.ge.10 ) then
+      if( iprint.ge.2 ) then
         write(cadd,'(i0)') iid
         call sub_ergrel(cadd)
       endif
@@ -3318,7 +3318,7 @@ contains
           fbest = ftrn
           iidbest = iid
           xbest(1:ndim) = xtmp(1:ndim)
-          if( iprint.ge.10 ) then
+          if( iprint.ge.2 ) then
             write(cadd,'(i0)') iid
             call sub_ergrel(cadd)
           endif
@@ -3344,7 +3344,7 @@ contains
       write(6,*) ''
       write(6,'(a)') ' The best one in this DE simulation run:'
       write(6,'(a,i8,f12.4)') '   ID, f-value: ',iidbest,fbest
-      write(6,'(a,100f7.3)')  '   Variables: ',xbest(1:ndim)
+      write(6,'(a,100f7.3)') '   Variables: ', xbest(1:min(ndim,100))
       write(6,*) ''
     endif
 

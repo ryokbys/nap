@@ -74,11 +74,11 @@ module variables
     real(8):: serr = 0.1d0   ! in GPa
     real(8),allocatable:: tag(:)
     real(8),allocatable:: ra(:,:),fa(:,:),fref(:,:)
-    real(8):: cptnsr(3,3),sref(3,3)
+    real(8):: strs(3,3),sref(3,3),ssub(3,3)
     integer,allocatable:: ifcal(:)
     real(8),allocatable:: fabs(:)
     real(8),allocatable:: va(:,:),strsi(:,:,:),eki(:,:,:),epi(:)&
-         ,chg(:),chi(:),fsub(:,:),ssub(:,:,:),eatm(:)
+         ,chg(:),chi(:),fsub(:,:),eatm(:)
     character(len=2),allocatable:: symbols(:)
     integer:: naps(mspcs)  ! num of atoms per species
     integer:: iclass       ! 1: training,  2: test
@@ -98,9 +98,12 @@ module variables
   real(8),allocatable:: erefl(:),erefg(:),epotl(:),epotg(:),esubl(:),esubg(:)
   real(8),allocatable:: frefl(:,:,:),frefg(:,:,:),fal(:,:,:)&
        ,fag(:,:,:),fsubl(:,:,:),fsubg(:,:,:)
+  real(8),allocatable:: srefl(:,:,:),srefg(:,:,:),strsl(:,:,:), &
+       strsg(:,:,:),ssubl(:,:,:),ssubg(:,:,:)
   real(8),allocatable:: swgtl(:),swgtg(:)
   real(8),allocatable:: eerrl(:),eerrg(:)
   real(8),allocatable:: ferrl(:),ferrg(:)
+  real(8),allocatable:: serrl(:),serrg(:)
 
 !.....Force-fields which are subtracted from reference values
 !.....and whose parameters to be fitted
