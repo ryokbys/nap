@@ -152,7 +152,7 @@ if __name__ == "__main__":
                     dev += msd[ifile,nm]
                 dev /= nmeasure
                 f.write(' {:10d}'.format(ifile)
-                        +' {:15.7f}'.format((dev[0]+dev[1]+dev[2])/3)
+                        +' {:15.7f}'.format((dev[0]+dev[1]+dev[2]))
                         +' {:15.7f}'.format(dev[0])
                         +' {:15.7f}'.format(dev[1])
                         +' {:15.7f}'.format(dev[2])
