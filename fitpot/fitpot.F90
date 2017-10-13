@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-13 09:30:58 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-13 16:01:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -232,7 +232,7 @@ subroutine write_initial_setting()
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,i4)') 'sample_error',nserr
   do i=1,nserr
-    write(6,'(4x,a23,2(1x,f8.4))') trim(cserr(i)), seerr(i), sferr(i)
+    write(6,'(4x,a23,3(1x,f8.4))') trim(cserr(i)), seerr(i), sferr(i), sserr(i)
   enddo
   write(6,'(a)') ''
   if( trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' ) then
@@ -1798,11 +1798,12 @@ subroutine sync_input()
 
   call mpi_bcast(nserr,1,mpi_integer,0,mpi_world,ierr)
   if( myid.gt.0 ) then
-    allocate(cserr(nserr),seerr(nserr),sferr(nserr))
+    allocate(cserr(nserr),seerr(nserr),sferr(nserr),sserr(nserr))
   endif
   call mpi_bcast(cserr,128*nserr,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(seerr,nserr,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sferr,nserr,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(sserr,nserr,mpi_real8,0,mpi_world,ierr)
 
   call mpi_bcast(nsmpl_outfrc,1,mpi_integer,0,mpi_world,ierr)
 
@@ -1931,6 +1932,7 @@ subroutine set_sample_errors()
       if( idx.ne.0 ) then
         samples(ismpl)%eerr= seerr(iserr)
         samples(ismpl)%ferr= sferr(iserr)
+        samples(ismpl)%serr= sferr(iserr)
       endif
     enddo
   enddo

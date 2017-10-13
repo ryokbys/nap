@@ -63,7 +63,7 @@ module variables
 !.....sample error
   integer:: nserr = 0
   character(len=128),allocatable:: cserr(:)
-  real(8),allocatable:: seerr(:),sferr(:)
+  real(8),allocatable:: seerr(:),sferr(:),sserr(:)
   
   type mdsys
     character(len=128):: cdirname

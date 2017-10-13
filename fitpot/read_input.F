@@ -289,8 +289,8 @@ c=======================================================================
       elseif( trim(cname).eq.'sample_error' ) then
         backspace(ionum)
         read(ionum,*) ctmp,nserr
-        allocate(cserr(nserr),seerr(nserr),sferr(nserr))
-        call read_crr(ionum,nserr,cserr,seerr,sferr)
+        allocate(cserr(nserr),seerr(nserr),sferr(nserr),sserr(nserr))
+        call read_smpl_err(ionum,nserr,cserr,seerr,sferr,sserr)
         return
       elseif( trim(cname).eq.'f_upper_limit' ) then
         call read_r1(ionum,fupper_lim)
@@ -335,19 +335,35 @@ c
 
       end subroutine read_cr
 c=======================================================================
-      subroutine read_crr(ionum,nrow,cval,rval1,rval2)
+      subroutine read_smpl_err(ionum,nrow,cval,eerr,ferr,serr)
 c
-c  Read sets of (character, real*8, real*8)
+c  Read sample errors
 c
+      implicit none
       integer,intent(in):: ionum,nrow
-      real(8),intent(out):: rval1(nrow),rval2(nrow)
+      real(8),intent(out):: eerr(nrow),ferr(nrow),serr(nrow)
       character(len=*),intent(out):: cval(nrow)
 
-      do irow=1,nrow
-        read(ionum,*) cval(irow),rval1(irow),rval2(irow)
-      enddo
+      integer,external:: num_data
+      integer:: irow,ndat
+      character(len=1024):: ctmp 
+      
+      read(ionum,'(a)') ctmp
+      ndat = num_data(trim(ctmp),' ')
 
-      end subroutine read_crr
+      backspace(ionum)
+      if( ndat.eq.3 ) then
+        do irow=1,nrow
+          read(ionum,*) cval(irow),eerr(irow),ferr(irow)
+          serr(irow) = 1d0
+        enddo
+      else if( ndat.eq.4 ) then
+        do irow=1,nrow
+          read(ionum,*) cval(irow),eerr(irow),ferr(irow),serr(irow)
+        enddo
+      endif
+
+      end subroutine read_smpl_err
 c=======================================================================
       subroutine read_rs(ionum,ctmp,ndata,nrow,rval)
 c
