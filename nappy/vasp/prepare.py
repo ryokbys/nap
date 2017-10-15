@@ -33,6 +33,7 @@ Options:
               Mode of VASP calculation, either one of the followings:
               scf, relax-ion, relax-cell, relax-shape, md-ion, md-cell, md-shape.
               [default: scf]
+  --nsw NSW   Number of MD/relaxation steps. [default: 0]
   --isif ISIF  Directly specify ISIF value. [default: 2]
 """
 from __future__ import print_function
@@ -134,12 +135,18 @@ def write_KPOINTS(fname,type,ndiv):
 def write_INCAR(fname,encut,nbands,break_symmetry,
                 spin_polarized,metal,ediff,
                 high_spin,species,natms,valences,
-                mode=None,isif=2):
+                mode=None,nsw=0,isif=2):
     from datetime import datetime as dt
     tdate = dt.now()
     dstr = tdate.strftime('%Y-%m-%d')
     SYSTEM = 'system made by prepare.py '+ dstr
     
+    if mode == 'scf' and nsw != 0:
+        print('NSW is meaningless for mode==scf, so reset NSW=0.')
+        nsw = 0
+    elif mode != 'scf' and nsw == 0:
+        raise ValueError('NSW==0 is meaningless for mode==(relax|md)')
+        
     with open(fname,'w') as f:
         f.write("SYSTEM = "+SYSTEM+"\n")
         f.write("\n")
@@ -188,11 +195,11 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
             f.write("NSW    = {0:4d}\n".format(0))
         elif 'relax' in mode:
             f.write("IBRION = {0:4d}\n".format(1))
-            f.write("NSW    = {0:4d}\n".format(100))
+            f.write("NSW    = {0:4d}\n".format(nsw))
             f.write("POTIM  = 0.5\n") 
         elif 'md' in mode:
             f.write("IBRION = {0:4d}\n".format(0))
-            f.write("NSW    = {0:4d}\n".format(100))
+            f.write("NSW    = {0:4d}\n".format(nsw))
             f.write("POTIM  = 1.0\n") 
             f.write("SMASS  = 0.4\n") 
         else:
@@ -255,7 +262,7 @@ def prepare_potcar(poscar,potcar_dir,potcar_postfix=''):
 def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
                  metal,potcar_dir,potcar_postfix,
                  encut=None,ediff=None,
-                 mode=None,isif=None,high_spin=False):
+                 mode=None,nsw=0,isif=None,high_spin=False):
     print(' Pitch of k points = {0:5.1f}'.format(pitch))
 
     poscar= nappy.vasp.poscar.POSCAR(poscar_fname)
@@ -268,6 +275,7 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
     else:
         prepare_potcar(poscar,potcar_dir,potcar_postfix)
         potcar = nappy.vasp.potcar.read_POTCAR()
+
     species= potcar['species']
     valences= potcar['valence']
     a1= poscar.h[:,0]
@@ -311,7 +319,7 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
     write_INCAR(_INCAR_name,encut,nbands,break_symmetry,
                 spin_polarized,metal,ediff,
                 high_spin,species,natms,valences,
-                mode=mode,isif=isif)
+                mode=mode,nsw=nsw,isif=isif)
 
 #=======================================================================
 
@@ -331,6 +339,7 @@ if __name__ == '__main__':
     encut = args['--encut']
     ediff = float(args['--ediff'])
     mode = args['--mode']
+    nsw  = int(args['--nsw'])
     isif = int(args['--isif'])
 
     if encut[0].isdigit():
@@ -344,5 +353,5 @@ if __name__ == '__main__':
     prepare_vasp(poscar_fname,pitch,leven,spin_polarized,break_symmetry,
                  metal,potcar_dir,potcar_postfix,
                  encut=encut,ediff=ediff,
-                 mode=mode,isif=isif,
+                 mode=mode,nsw=nsw,isif=isif,
                  high_spin=high_spin)
