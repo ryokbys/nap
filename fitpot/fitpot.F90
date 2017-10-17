@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-13 16:01:08 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-17 11:00:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -700,7 +700,11 @@ subroutine write_vars(cadd)
   integer:: i
   character(len=128):: cfname
 
-  if( trim(cpot).eq.'NN' ) then
+  if( trim(cpot).eq.'NN' .and. .not. &
+    (trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' .or. &
+     trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' .or. &
+     trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
+     trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
     call NN_restore_standard()
   endif
 
@@ -717,7 +721,13 @@ subroutine write_vars(cadd)
 !    print *, 'wrote '//trim(cfname)
   endif
 
-  call NN_standardize()
+  if( trim(cpot).eq.'NN' .and. .not. &
+    (trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' .or. &
+     trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' .or. &
+     trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
+     trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
+    call NN_standardize()
+  endif
 
 end subroutine write_vars
 !=======================================================================
@@ -813,7 +823,6 @@ end subroutine cg_wrapper
 !=======================================================================
 subroutine sa_wrapper()
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
@@ -822,15 +831,8 @@ subroutine sa_wrapper()
   real(8):: fval
   external:: write_stats
 
-  if( trim(cpot).eq.'NN' ) then
-  !.....NN specific code hereafter
-    call NN_init()
-    call sa(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
-         ,iprint,iflag,myid,NN_func,cfmethod &
-         ,niter_eval,write_stats)
-    call NN_analyze("fin")
-    
-  else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' ) then
     call sa(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -844,7 +846,6 @@ end subroutine sa_wrapper
 !=======================================================================
 subroutine md_wrapper()
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
@@ -853,15 +854,8 @@ subroutine md_wrapper()
   real(8):: fval
   external:: write_stats
 
-  if( trim(cpot).eq.'NN' ) then
-  !.....NN specific code hereafter
-    call NN_init()
-    call metadynamics(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
-         ,iprint,iflag,myid,NN_func,cfmethod &
-         ,niter_eval,write_stats)
-    call NN_analyze("fin")
-    
-  else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' ) then
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' ) then
     call metadynamics(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -875,7 +869,6 @@ end subroutine md_wrapper
 !=======================================================================
 subroutine ga_wrapper()
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
@@ -899,7 +892,6 @@ end subroutine ga_wrapper
 !=======================================================================
 subroutine de_wrapper()
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
@@ -923,7 +915,6 @@ end subroutine de_wrapper
 !=======================================================================
 subroutine pso_wrapper()
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
@@ -947,7 +938,6 @@ end subroutine pso_wrapper
 !=======================================================================
 subroutine random_search_wrapper()
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
@@ -1511,13 +1501,15 @@ subroutine write_stats(iter)
   use NNd
   implicit none
   integer,intent(in):: iter
-  integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst,nfcal
+  integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst,nfcal,ixyz,jxyz
   type(mdsys)::smpl
-  real(8):: de,df,epotsub
+  real(8):: de,df,epotsub,ds
   real(8):: demaxl_trn,demax_trn,desuml_trn,desum_trn,rmse_trn
   real(8):: demaxl_tst,demax_tst,desuml_tst,desum_tst,rmse_tst
   real(8):: dfmaxl_trn,dfmax_trn,dfsuml_trn,dfsum_trn
   real(8):: dfmaxl_tst,dfmax_tst,dfsuml_tst,dfsum_tst
+  real(8):: dsmaxl_trn,dsmax_trn,dssuml_trn,dssum_trn
+  real(8):: dsmaxl_tst,dsmax_tst,dssuml_tst,dssum_tst
   real(8),save:: rmse_tst_best= 1d+30
   character(len=128):: cnum
   logical,save:: l1st = .true.
@@ -1662,11 +1654,65 @@ subroutine write_stats(iter)
 !    call write_vars('tmp')
   endif
 
-!!$!.....Subtract energy and forces again
-!!$  if( nsubff.gt.0 ) then
-!!$    call subtract_FF()
-!!$  endif
-  
+!.....stress
+  dsmaxl_trn = 0d0
+  dssuml_trn = 0d0
+  dsmaxl_tst = 0d0
+  dssuml_tst = 0d0
+  ntrnl = 0
+  ntstl = 0
+  do ismpl=isid0,isid1
+    smpl = samples(ismpl)
+    if( smpl%iclass.eq.1 ) then
+      do ixyz=1,3
+        do jxyz=1,3
+          ds = abs(smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
+               -smpl%sref(ixyz,jxyz))
+          dsmaxl_trn = max(dsmaxl_trn,ds)
+          dssuml_trn = dssuml_trn +ds
+          ntrnl = ntrnl +1
+        enddo
+      enddo
+    else if( smpl%iclass.eq.2 ) then
+      do ixyz=1,3
+        do jxyz=1,3
+          ds = abs(smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
+               -smpl%sref(ixyz,jxyz))
+          dsmaxl_tst = max(dsmaxl_tst,ds)
+          dssuml_tst = dssuml_tst +ds
+          ntstl = ntstl +1
+        enddo
+      enddo
+    endif
+  enddo
+  dssum_trn = 0d0
+  dssum_tst = 0d0
+  call mpi_reduce(dssuml_trn,dssum_trn,1,mpi_real8,mpi_sum, &
+       0,mpi_world,ierr)
+  call mpi_reduce(dssuml_tst,dssum_tst,1,mpi_real8,mpi_sum, &
+       0,mpi_world,ierr)
+  call mpi_reduce(dsmaxl_trn,dsmax_trn,1,mpi_real8,mpi_max, &
+       0,mpi_world,ierr)
+  call mpi_reduce(dsmaxl_tst,dsmax_tst,1,mpi_real8,mpi_max, &
+       0,mpi_world,ierr)
+  ntrn = 0
+  ntst = 0
+  call mpi_reduce(ntrnl,ntrn,1 &
+       ,mpi_integer,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(ntstl,ntst,1 &
+       ,mpi_integer,mpi_sum,0,mpi_world,ierr)
+  rmse_trn= sqrt(dssum_trn/ntrn)
+  if( ntst.ne.0 ) then
+    rmse_tst = sqrt(dssum_tst/ntst)
+  else
+    rmse_tst = 0d0
+  endif
+  if( myid.eq.0 ) then
+    write(6,'(a,i8,f15.2,4(1x,f12.7))') ' STRESS: ' &
+         ,iter,mpi_wtime()-time0 &
+         ,rmse_trn,dsmax_trn,rmse_tst,dsmax_tst
+  endif
+
   l1st = .false.
 end subroutine write_stats
 !=======================================================================
