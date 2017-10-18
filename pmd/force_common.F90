@@ -89,7 +89,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
   epot = 0d0
   aa(1:3,1:natm+nb)=0d0
   epi(1:natm+nb)= 0d0
-  strs(1:3,1:3,1:natm+nb)= 0d0
+  strs(1:3,1:3,1:namax)= 0d0
 
 !.....If varaible charge, optimize charges before any force calc
   if( lvc ) then

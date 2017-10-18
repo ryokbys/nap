@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-09-30 13:35:22 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-18 16:00:27 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -8,12 +8,12 @@ c-----------------------------------------------------------------------
 c INPUT FILES:
 c ------------
 c   in.pmd:     Main input file
-c   pmd0000:    Cell info and atom coordinations
+c   pmdini:     Cell info and atom coordinations
 c
 c OUTPUT FILES:
 c -------------
 c   out.erg:    Total, kinetic, and potential energy
-c   pmd####:    Cell info and atom coordinations of a certain steps
+c   pmd_####:   Cell info and atom coordinations of a certain steps
 c               in the MD run if required by "flag_out_pmd" in in.pmd.
 c   out.stress: Stress component normal to z-upper surface of nanorod,
 c               and z-strain of the nanorod.
@@ -57,7 +57,7 @@ c.....Set fmv as default value before reading 'in.pmd'
         write(6,'(a)') '================================='
      &       //'======================================='
         write(6,*) ''
-        write(6,'(a,i6)') ' Number of processes in MPI = ',nodes_md
+        write(6,'(a,i0)') ' Number of processes in MPI = ',nodes_md
         call read_input(10,'in.pmd')
         call check_cmin(cmin,ifdmp)
         call write_initial_setting()
@@ -182,7 +182,12 @@ c=======================================================================
       implicit none 
       integer:: i
 
-      write(6,'(a)') '========== INITIAL SETTING ==========='
+      write(6,*) ''
+      write(6,'(a)') '---------------------------------'
+     &       //'---------------------------------------'
+      write(6,'(a)') '           Initial settings   '
+      write(6,'(a)') '---------------------------------'
+     &       //'---------------------------------------'
       write(6,'(2x,a25,2x,a)') 'io_format',ciofmt
       write(6,'(2x,a)') ''
       write(6,'(2x,a25,i8)')   'num_nodes_x',nx
@@ -247,7 +252,8 @@ c.....velocity multiplying factor
       do i=1,nspmax
         write(6,'(4x,i2,f10.3)') i,am(i)
       enddo
-      write(6,'(a)') '======================================'
+      write(6,'(a)') '---------------------------------'
+     &       //'---------------------------------------'
 
       end subroutine write_initial_setting
 c=======================================================================
@@ -259,7 +265,7 @@ c=======================================================================
 
       integer:: ierr
 
-      if( myid_md.eq.0 ) write(6,'(a)') ' Broadcast data to be shared'
+      if( myid_md.eq.0 ) write(6,'(/,a)') ' Broadcast data to be shared'
      &     //' with all the nodes.'
 c-----Broadcast input parameters to all nodes
       call mpi_bcast(nx,1,MPI_INTEGER,0,mpi_md_world,ierr)

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-13 15:50:15 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-18 16:15:15 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -118,15 +118,7 @@ c.....perform space decomposition after reading atomic configuration
       call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
       if( myid_md.eq.0 .and. iprint.ne.0 ) then
-        write(6,*) ''
-        write(6,'(a)') " h-matrix:"
-        write(6,'("   | ",3f12.3," |")') h(1,1:3,0)
-        write(6,'("   | ",3f12.3," |")') h(2,1:3,0)
-        write(6,'("   | ",3f12.3," |")') h(3,1:3,0)
-        write(6,'(a)') " which means the following lattice vectors:"
-        write(6,'(a,"[ ",3f12.3," ]")') '   a = ',h(1:3,1,0)
-        write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
-        write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
+        call cell_info(h)
       endif
 c.....Some conversions
       nsp= 0
@@ -137,7 +129,8 @@ c-------scaling
 c-------species of atom-i
         nsp= max(int(tag(i)),nsp)
         if(nsp.gt.nspmax) then
-          write(6,'(a)') " nsp.gt.nspmax!!"
+          write(6,'(a)') " Error: nsp.gt.nspmax!!"
+          call mpi_finalize(ierr)
           stop
         endif
       enddo
@@ -175,6 +168,9 @@ c-----setup
       call setup(nspmax,am,acon,fack,dt)
 c-----set HI and SGM
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
+      if( myid_md.eq.0 ) then
+        write(6,'(a,f0.2,a)') ' Cell volume = ',vol,' Ang^3'
+      endif
 c-----ntset
       call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
@@ -183,8 +179,9 @@ c-----get total number of particles
       call mpi_allreduce(nspl,nsp,1,MPI_INTEGER,mpi_max
      &     ,mpi_md_world,ierr)
       if(myid_md.eq.0 .and. iprint.ne.0 ) then
-        write(6,'(a,i10)') " ntot=",ntot
-        write(6,'(a,i10)') " nsp =",nsp
+        write(6,*) ''
+        write(6,'(a,i0)') " Number of total atoms = ",ntot
+        write(6,'(a,i0)') " Number of species     = ",nsp
       endif
 
 c.....Set ifmv of top and bottom atoms for z-loading if needed
@@ -277,8 +274,8 @@ c.....get_num_dof is called once in a MD run
      &     trim(cpctl).eq.'vc-Berendsen' ) then
         if(myid_md.eq.0 .and. iprint.ne.0 ) then
           write(6,*) ''
-          write(6,'(a)') ' variable-cell Berendsen is chosen'
-          write(6,'(a,6f10.3)')' target stress [GPa]: '
+          write(6,'(a)') ' Variable-cell Berendsen is chosen'
+          write(6,'(a,6f10.3)')' Target stress [GPa]: '
      &         ,stgt(1,1),stgt(2,2),stgt(3,3)
      &         ,stgt(2,3),stgt(3,1),stgt(1,2)
         endif
@@ -286,9 +283,9 @@ c.....get_num_dof is called once in a MD run
       else if( trim(cpctl).eq.'vv-Berendsen' ) then
         if(myid_md.eq.0 .and. iprint.ne.0 ) then
           write(6,*) ''
-          write(6,'(a)') ' variable-volume Berendsen is chosen'
-          write(6,'(a,f10.2,a,es12.4,a)')
-     &       ' target pressure = ',ptgt,' GPa'
+          write(6,'(a)') ' Variable-volume Berendsen is chosen'
+          write(6,'(a,f0.3,a)')
+     &       ' Target pressure = ',ptgt,' GPa'
         endif
         ptgt = ptgt *gpa2up
       endif
@@ -296,7 +293,7 @@ c.....get_num_dof is called once in a MD run
      &     ,dt,srlx,stbeta,vol,ptnsr,mpi_md_world,cpctl)
 c      ptnsr(1:3,1:3)= ptnsr(1:3,1:3)/vol
       if( myid_md.eq.0 .and. iprint.ne.0 ) then
-        write(6,'(a,6f10.3)')' stress tensor [GPa]: '
+        write(6,'(a,6f10.3)')' Stress tensor [GPa]: '
      &       ,ptnsr(1,1)*up2gpa,ptnsr(2,2)*up2gpa,ptnsr(3,3)*up2gpa
      &       ,ptnsr(2,3)*up2gpa,ptnsr(3,1)*up2gpa,ptnsr(1,2)*up2gpa
       endif
@@ -312,23 +309,23 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
 
       if(myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,*) ''
-        write(6,'(1x,a)') "initial values:"
-        write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
-        write(6,'(1x,a,es22.14,a)') " potential energy=",epot0,' eV'
+        write(6,'(1x,a)') "Initial values:"
+        write(6,'(1x,a,f0.4,a)') " Kinetic energy  = ",ekin,' eV'
+        write(6,'(1x,a,f0.4,a)') " Potential energy= ",epot0,' eV'
         nave= 0
         tave= 0d0
         do ifmv=1,9
           if( ndof(ifmv).eq.0 ) cycle
           temp(ifmv)= ekl(ifmv) /ndof(ifmv) /fkb *2d0
           nave= nave +ndof(ifmv)
-          write(6,'(1x,a,i1,a,es15.7,a)') " temperature ",ifmv
-     &         ,"   =",temp(ifmv),' K'
+          write(6,'(1x,a,i1,a,f0.2,a)') " Temperature ",ifmv
+     &         ,"   = ",temp(ifmv),' K'
           tave= tave +temp(ifmv)*ndof(ifmv)
         enddo
         tave= tave/nave
-        write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
+        write(6,'(1x,a,f0.2,a)') " Temperature     = ",tave,' K'
         prss = (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
-        write(6,'(1x,a,f15.3,a)') " stress          =",
+        write(6,'(1x,a,f0.3,a)') " Stress          = ",
      &       prss,' GPa'
         
 
@@ -344,7 +341,7 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
      &         " istp,time,temp,epot,prss="
      &         ,istp,tcpu,tave,epot,prss
         endif
-        write(6,'(a,6f10.3)')' stress tensor [GPa]: '
+        write(6,'(a,6f10.3)')' Stress tensor [GPa]: '
      &       ,ptnsr(1,1)*up2gpa,ptnsr(2,2)*up2gpa,ptnsr(3,3)*up2gpa
      &       ,ptnsr(2,3)*up2gpa,ptnsr(3,1)*up2gpa,ptnsr(1,2)*up2gpa
         write(6,*) ''
@@ -696,7 +693,7 @@ c          print *,'istp.gt.minstp = ',istp.gt.minstp
           if( i_conv.ge.n_conv ) then
             if( myid_md.eq.0 .and. iprint.ne.0 ) then
               write(6,'(a,i6,a,es10.3,a,i3,a)')
-     &             ' damped MD converged with ',istp,
+     &             ' Damped MD converged with ',istp,
      &             ' steps, since ediff < ',
      &             eps_conv,', ',n_conv,' times'
               write(6,'(a,3es20.10)') '  epot,epotp,epot-epotp = '
@@ -761,32 +758,37 @@ c          call system("mkdir -p "//cnum)
       tcpu= tcpu2 -tcpu1
       if( myid_md.eq.0 .and. iprint.ne. 0 ) then
         write(6,*) ''
-        write(6,'(1x,a)') "final values:"
-        write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
-        write(6,'(1x,a,es22.14,a)') " potential energy=",epot,' eV'
+        write(6,'(1x,a)') "Final values:"
+        write(6,'(1x,a,f0.4,a)') " Kinetic energy  = ",ekin,' eV'
+        write(6,'(1x,a,f0.4,a)') " Potential energy= ",epot,' eV'
         nave= 0
         tave= 0d0
         do ifmv=1,9
           if( ndof(ifmv).le.0 ) cycle
           temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
           nave= nave +ndof(ifmv)
-          write(6,'(1x,a,i1,a,es15.7,a)') " temperature ",ifmv
-     &         ,"   =",temp(ifmv),' K'
+          write(6,'(1x,a,i1,a,f0.2,a)') " Temperature ",ifmv
+     &         ,"   = ",temp(ifmv),' K'
           tave= tave +temp(ifmv)*ndof(ifmv)
         enddo
         tave= tave/nave
-        write(6,'(1x,a,es15.7,a)') " temperature     =",tave,' K'
-        write(6,'(1x,a,f15.3,a)') " stress          =",
+        write(6,'(1x,a,f0.2,a)') " Temperature     = ",tave,' K'
+        write(6,'(1x,a,f0.3,a)') " Stress          = ",
      &       prss,' GPa'
+        if( trim(cpctl).eq.'Berendsen' .or.
+     &       trim(cpctl).eq.'vc-Berendsen' .or.
+     &       trim(cpctl).eq.'vv-Berendsen' ) then
+          call cell_info(h)
+        endif
         write(6,*) ''
-        write(6,'(1x,a,f10.2)') "time space decomp =",tspdcmp
-        write(6,'(1x,a,f10.2)') "time comm         =",tcom
+        write(6,'(1x,a,f10.2)') "Time space decomp = ",tspdcmp
+        write(6,'(1x,a,f10.2)') "Time comm         = ",tcom
 
         ihour = int(tcpu/3600)
         imin  = int((tcpu-ihour*3600)/60)
         isec  = int(tcpu -ihour*3600 -imin*60)
         write(6,'(1x,a,f10.2,a,i3,"h",i2.2,"m",i2.2,"s")')
-     &       "time              =",tcpu,
+     &       "Time              = ",tcpu,
      &       " sec  = ",ihour,imin,isec
       endif
 
@@ -1283,8 +1285,8 @@ c=======================================================================
       call mpi_allreduce(ndofl,ndof,9,mpi_integer,mpi_sum
      &     ,mpi_md_world,ierr)
       if(myid_md.eq.0 .and. iprint.ne.0 )
-     &     write(6,'(a,9i9)') ' ndof=',ndof(1:9)
-c      write(6,'(a,i3,a,9i6)') ' myid=',myid_md,': ndof=',ndof(1:9)
+     &     write(6,'(a,9(2x,i0))') ' Degrees of freedom for each ifmv ='
+     &     ,ndof(1:9)
       return
       end subroutine get_num_dof
 c=======================================================================
@@ -2455,11 +2457,11 @@ c.....count max number of atoms in a node
           nbmax = namax*27
           namax = namax +nbmax
           if( iprint.ne.0 ) then
-            write(6,'(a,i10)') ' min number of local atoms = ',nmin
-            write(6,'(a,i10)') ' max number of local atoms = ',nmax
-            write(6,'(a,i10)')   ' nbmax = nmax*1.2*27       = ',nbmax
-            write(6,'(a,i10)')   ' namax = nmax*1.2 + nbmax  = ',namax
-            write(6,'(a,i10,a)') ' memory for main routine   = '
+            write(6,'(a,i10)') ' Min number of local atoms = ',nmin
+            write(6,'(a,i10)') ' Max number of local atoms = ',nmax
+            write(6,'(a,i10)')   '   nbmax = nmax*1.2*27       = ',nbmax
+            write(6,'(a,i10)')   '   namax = nmax*1.2 + nbmax  = ',namax
+            write(6,'(a,i10,a)') ' Memory for main routine   = '
      &           ,namax*(3*4 +3*3*5 +1 +nnmax/2)*8/1000/1000,' MB'
           endif
         endif
@@ -2703,6 +2705,41 @@ c=======================================================================
       call mpi_finalize(ierr)
       stop
       end subroutine error_mpi_stop
+c=======================================================================
+      subroutine cell_info(h)
+      implicit none
+      real(8),intent(in):: h(3,3)
+
+      real(8):: a,b,c,alpha,beta,gamma
+      real(8),parameter:: pi = 3.14159265358979d0
+      real(8),external:: sprod
+
+      write(6,*) ''
+      write(6,'(a)') " H-matrix:"
+      write(6,'("   | ",3f12.3," |")') h(1,1:3)
+      write(6,'("   | ",3f12.3," |")') h(2,1:3)
+      write(6,'("   | ",3f12.3," |")') h(3,1:3)
+      write(6,'(a)') " which means the following lattice vectors:"
+      write(6,'(a,"[ ",3f12.3," ]")') '   a = ',h(1:3,1)
+      write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2)
+      write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3)
+
+      a = sqrt(sprod(3,h(1:3,1),h(1:3,1)))
+      b = sqrt(sprod(3,h(1:3,2),h(1:3,2)))
+      c = sqrt(sprod(3,h(1:3,3),h(1:3,3)))
+      alpha = acos(sprod(3,h(1:3,2),h(1:3,3))/b/c) /pi *180d0
+      beta  = acos(sprod(3,h(1:3,1),h(1:3,3))/a/c) /pi *180d0
+      gamma = acos(sprod(3,h(1:3,1),h(1:3,2))/a/b) /pi *180d0
+
+      write(6,'(a)') ' Lattice parameters:'
+      write(6,'(a,f10.2,a)') '   a = ',a,' Ang.'
+      write(6,'(a,f10.2,a)') '   b = ',b,' Ang.'
+      write(6,'(a,f10.2,a)') '   c = ',c,' Ang.'
+      write(6,'(a,f10.2,a)') '   alpha = ',alpha,' deg.'
+      write(6,'(a,f10.2,a)') '   beta  = ',beta,' deg.'
+      write(6,'(a,f10.2,a)') '   gamma = ',gamma,' deg.'
+
+      end subroutine cell_info
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"

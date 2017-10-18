@@ -7,8 +7,6 @@ c
       character(len=*),intent(in):: cfname
       character(len=128):: c1st
 
-      write(6,'(a)') ' Start reading '//trim(cfname)
-
       open(ionum,file=trim(cfname))
       do
 c.....Read 1st word in each line
@@ -32,8 +30,8 @@ c.....Skip lines starting from digits or sign
 c        write(6,'(a)') c1st
         call set_variable(ionum,c1st)
       enddo
-      close(ionum)
- 10   write(6,'(a)') " Finished reading "//trim(cfname)
+ 10   close(ionum)
+
       end subroutine read_input
 c=======================================================================
       subroutine set_variable(ionum,cname)
