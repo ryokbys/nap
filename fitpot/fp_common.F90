@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-13 15:49:08 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-18 11:15:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -221,7 +221,7 @@ contains
             pdiff(ixyz,jxyz)= (smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
                  -smpl%sref(ixyz,jxyz)) *serri
             pdiff(ixyz,jxyz)= pdiff(ixyz,jxyz)*pdiff(ixyz,jxyz)/6
-            ftmp= ftmp +pdiff(ixyz,jxyz) 
+            ftmp= ftmp +pdiff(ixyz,jxyz) *swgt
           enddo
         enddo
       endif  ! stress matching

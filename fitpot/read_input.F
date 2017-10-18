@@ -130,12 +130,6 @@ c=======================================================================
       elseif( trim(cname).eq.'num_forces' ) then
         call read_i1(ionum,nfpsmpl)
         return
-      elseif( trim(cname).eq.'sample_weight' ) then
-        call read_l1(ionum,lswgt)
-        return
-      elseif( trim(cname).eq.'sample_weight_erg' ) then
-        call read_r1(ionum,swerg)
-        return
       elseif( trim(cname).eq.'num_multiprocess' ) then
         call read_i1(ionum,nprcs)
         return
@@ -280,17 +274,17 @@ c=======================================================================
       elseif( trim(cname).eq.'nsmpl_outfrc' ) then
         call read_i1(ionum,nsmpl_outfrc)
         return
-      elseif( trim(cname).eq.'individual_weight' ) then
-        backspace(ionum)
-        read(ionum,*) ctmp,nwgtindiv
-        allocate(cwgtindiv(nwgtindiv),wgtindiv(nwgtindiv))
-        call read_cr(ionum,nwgtindiv,cwgtindiv,wgtindiv)
-        return
       elseif( trim(cname).eq.'sample_error' ) then
         backspace(ionum)
         read(ionum,*) ctmp,nserr
         allocate(cserr(nserr),seerr(nserr),sferr(nserr),sserr(nserr))
         call read_smpl_err(ionum,nserr,cserr,seerr,sferr,sserr)
+        return
+      elseif( trim(cname).eq.'sample_weight' ) then
+        backspace(ionum)
+        read(ionum,*) ctmp,nswgt
+        allocate(cswgt(nswgt),swerg0(nswgt),swdenom(nswgt))
+        call read_smpl_wgt(ionum,nswgt,cswgt,swerg0,swdenom)
         return
       elseif( trim(cname).eq.'f_upper_limit' ) then
         call read_r1(ionum,fupper_lim)
@@ -364,6 +358,25 @@ c
       endif
 
       end subroutine read_smpl_err
+c=======================================================================
+      subroutine read_smpl_wgt(ionum,nrow,cval,erg0,temp)
+c
+c  Read sample weights
+c
+      implicit none
+      integer,intent(in):: ionum,nrow
+      real(8),intent(out):: erg0(nrow),temp(nrow)
+      character(len=*),intent(out):: cval(nrow)
+
+      integer,external:: num_data
+      integer:: irow,ndat
+      character(len=1024):: ctmp
+
+      do irow=1,nrow
+        read(ionum,*) cval(irow),erg0(irow),temp(irow)
+      enddo
+
+      end subroutine read_smpl_wgt
 c=======================================================================
       subroutine read_rs(ionum,ctmp,ndata,nrow,rval)
 c

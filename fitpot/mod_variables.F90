@@ -29,8 +29,6 @@ module variables
   real(8):: gscl   = 0.1d0
   real(8):: fred   = -1d0
   integer:: nfpsmpl= -10
-  logical:: lswgt  = .false.
-  real(8):: swerg = 1d0
   real(8):: seqcoef= 1d-2
   integer:: iprint = 1
   character(len=128):: csgdupdate= 'adadelta'
@@ -64,6 +62,11 @@ module variables
   integer:: nserr = 0
   character(len=128),allocatable:: cserr(:)
   real(8),allocatable:: seerr(:),sferr(:),sserr(:)
+  
+!.....sample weights
+  integer:: nswgt = 0
+  character(len=128),allocatable:: cswgt(:)
+  real(8),allocatable:: swerg0(:),swdenom(:)
   
   type mdsys
     character(len=128):: cdirname

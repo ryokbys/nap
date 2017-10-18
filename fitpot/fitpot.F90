@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-17 11:00:41 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-18 11:37:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -62,7 +62,6 @@ program fitpot
   call read_samples()
   call read_ref_data()
   call get_base_energies()
-  if( lswgt ) call set_sample_weights()
   call set_max_num_atoms()
 
   call read_vars()
@@ -76,12 +75,13 @@ program fitpot
       call subtract_atomic_energy()
     endif
   endif
+  
+  if( nswgt.gt.0 ) call set_sample_weights()
 
 !.....Subtract energy and forces of other force-fields
   if( nsubff.gt.0 ) then
     call subtract_FF()
   endif
-
 
 !.....Set cffs only for pmd calculation
   nff = 1
@@ -225,8 +225,14 @@ subroutine write_initial_setting()
 !!$  write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
   write(6,'(2x,a25,2x,a)') 'normalize_input',trim(cnormalize)
   write(6,'(2x,a25,2x,es12.3)') 'freduce_threshold',fred
-!!$  write(6,'(2x,a25,2x,l3)') 'sample_weight',lswgt
-!!$  write(6,'(2x,a25,2x,es12.3)') 'sample_weight_erg',swerg
+
+  if( nswgt.gt.0 ) then
+    write(6,'(2x,a25,2x,i5)') 'sample_weight',nswgt
+    do i=1,nswgt
+      write(6,'(4x,a23,2x,f8.4,2x,f8.1)') trim(cswgt(i)), swerg0(i), swdenom(i)
+    enddo
+  endif
+  
   write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
   write(6,'(2x,a25,2x,a)') 'line_minimization',trim(clinmin)
   write(6,'(a)') ''
@@ -517,12 +523,12 @@ subroutine read_ref_data()
          //'/erg.ref',status='old')
     read(13,*) samples(ismpl)%eref
     close(13)
-!.....Subtract (isolated) atomic energy from eref
+!.....Count numbers of each species
     samples(ismpl)%naps(1:mspcs) = 0
     do i=1,samples(ismpl)%natm
       is= int(samples(ismpl)%tag(i))
       samples(ismpl)%naps(is) = samples(ismpl)%naps(is) +1
-      samples(ismpl)%eref= samples(ismpl)%eref  !-eatom(is)
+!!$      samples(ismpl)%eref= samples(ismpl)%eref  !-eatom(is)
     enddo
     samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 1
 !!$    erefminl= min(erefminl,samples(ismpl)%eref/samples(ismpl)%natm)
@@ -1783,8 +1789,6 @@ subroutine sync_input()
   call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
 
-  call mpi_bcast(lswgt,1,mpi_logical,0,mpi_world,ierr)
-  call mpi_bcast(swerg,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(fupper_lim,1,mpi_real8,0,mpi_world,ierr)
 !.....Simulated annealing
   call mpi_bcast(sa_temp0,1,mpi_real8,0,mpi_world,ierr)
@@ -1835,13 +1839,6 @@ subroutine sync_input()
   call mpi_bcast(armijo_tau,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(armijo_maxiter,1,mpi_integer,0,mpi_world,ierr)
 
-  call mpi_bcast(nwgtindiv,1,mpi_integer,0,mpi_world,ierr)
-  if( myid.gt.0 ) then
-    allocate(cwgtindiv(nwgtindiv),wgtindiv(nwgtindiv))
-  endif
-  call mpi_bcast(cwgtindiv,128*nwgtindiv,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(wgtindiv,nwgtindiv,mpi_real8,0,mpi_world,ierr)
-
   call mpi_bcast(nserr,1,mpi_integer,0,mpi_world,ierr)
   if( myid.gt.0 ) then
     allocate(cserr(nserr),seerr(nserr),sferr(nserr),sserr(nserr))
@@ -1850,6 +1847,14 @@ subroutine sync_input()
   call mpi_bcast(seerr,nserr,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sferr,nserr,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sserr,nserr,mpi_real8,0,mpi_world,ierr)
+
+  call mpi_bcast(nswgt,1,mpi_integer,0,mpi_world,ierr)
+  if( myid.gt.0 ) then
+    allocate(cswgt(nswgt),swerg0(nswgt),swdenom(nswgt))
+  endif
+  call mpi_bcast(cswgt,128*nswgt,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(swerg0,nswgt,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(swdenom,nswgt,mpi_real8,0,mpi_world,ierr)
 
   call mpi_bcast(nsmpl_outfrc,1,mpi_integer,0,mpi_world,ierr)
 
@@ -1947,25 +1952,6 @@ subroutine shuffle_dirlist(nsmpl,cdirlist,iclist)
   deallocate(cdltmp)
 end subroutine shuffle_dirlist
 !=======================================================================
-subroutine set_individual_weight()
-  use variables
-  use parallel
-  implicit none 
-  integer:: ismpl,iwgt,idx
-
-  do ismpl=isid0,isid1
-    do iwgt= 1,nwgtindiv
-      idx= index(samples(ismpl)%cdirname,trim(cwgtindiv(iwgt)))
-      if( idx.ne.0 ) then
-        samples(ismpl)%wgt= wgtindiv(iwgt)
-      endif
-    enddo
-  enddo
-  if( myid.eq.0 ) then
-    write(6,'(a)') ' set_individual_weight done'
-  endif
-end subroutine set_individual_weight
-!=======================================================================
 subroutine set_sample_errors()
   use variables
   use parallel
@@ -1991,20 +1977,25 @@ subroutine set_sample_weights()
   use variables
   use parallel
   implicit none
-  integer:: naps(mspcs),ismpl,is
+  integer:: ismpl,iswgt,idx,natm
   real(8):: erg
   
   do ismpl=isid0,isid1
-    naps(1:mspcs) = samples(ismpl)%naps(1:mspcs)
-    erg = samples(ismpl)%eref
-    do is=1,mspcs
-      erg = erg -naps(is)*ebase(is)
+    natm = samples(ismpl)%natm
+    erg = samples(ismpl)%eref /natm
+    samples(ismpl)%wgt = 1d0
+    do iswgt=1,nswgt
+      idx = index(samples(ismpl)%cdirname,trim(cswgt(iswgt)))
+      if( idx.ne.0 ) then
+        samples(ismpl)%wgt = exp(-(erg -swerg0(iswgt))/swdenom(iswgt))
+      endif
     enddo
-    erg = erg/samples(ismpl)%natm
-    samples(ismpl)%wgt = min(exp(-erg/swerg),1d0)
+!!$    write(6,'(a,i5,a20,3es12.4)') ' ismpl,cdirname,wgt,eref,erg=' &
+!!$         ,ismpl,trim(samples(ismpl)%cdirname)&
+!!$         ,samples(ismpl)%wgt,samples(ismpl)%eref,erg
   enddo
   if( myid.eq.0 ) then
-    write(6,'(a)') ' set_sample_weights done'
+    write(6,'(a)') ' Set sample weights of Botlzmann factor.'
   endif
 end subroutine set_sample_weights
 !=======================================================================
@@ -2318,6 +2309,10 @@ subroutine subtract_atomic_energy()
       samples(ismpl)%eref= samples(ismpl)%eref -eatom(is)
     enddo
   enddo
+
+  if( myid.eq.0 ) then
+    write(6,'(a)') ' Subtracted atomic energies from reference energies.'
+  endif
 
 end subroutine subtract_atomic_energy
 !=======================================================================
