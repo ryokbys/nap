@@ -1,6 +1,6 @@
 module Buckingham
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-19 14:42:49 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-19 15:36:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Buckingham calculation
 !    - only force on i is considered, no need to send back
@@ -154,7 +154,7 @@ contains
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
         backspace(ioprms)
         read(ioprms,*) isp,jsp,a,rho,c
-        print *,'isp,jsp,a,rho,c=',isp,jsp,a,rho,c
+!!$        print *,'isp,jsp,a,rho,c=',isp,jsp,a,rho,c
         if( isp.gt.msp .or. jsp.gt.msp ) then
           write(6,*) ' Warning @read_params: since isp/jsp is greater than msp,'&
                //' skip reading the line.'
@@ -171,17 +171,6 @@ contains
         interact(jsp,isp)= interact(isp,jsp)
       enddo
 10    close(ioprms)
-      if( iprint.ne.0 ) then
-        write(6,'(a)') ' Finished reading '//trim(fname)
-        write(6,*) ''
-      endif
-
-      do isp=1,4
-        do jsp=isp,4
-          print *,'isp,jsp,a,rho,c,int=',isp,jsp,buck_a(isp,jsp)&
-               ,buck_rho(isp,jsp),buck_c(isp,jsp),interact(isp,jsp)
-        enddo
-      enddo
     endif
 
     call mpi_bcast(buck_a,msp*msp,mpi_real8,0,mpi_md_world,ierr)
