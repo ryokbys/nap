@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-19 14:39:42 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-19 19:04:23 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -934,6 +934,8 @@ c-------species of atom-i
 c-----setup
       allocate(acon(nspmax),fack(nspmax))
       call setup(nspmax,am,acon,fack,dt)
+      allocate(fekin(nspmax),fa2v(nspmax))
+      call setup2(nspmax,am,fekin,fa2v,dt)
 c-----set HI and SGM
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 c-----ntset
@@ -1017,6 +1019,7 @@ c.....revert forces to the unit eV/A before going out
 
 c.....deallocate all the arrays allocated 
       deallocate(acon,fack)
+      deallocate(fekin,fa2v)
       deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
      &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
 
@@ -1049,7 +1052,7 @@ c-----prefactors for normalized accelerration
       do i=1,nspmax
         acon(i)=  ev2j *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg) *m2ang**2
 c        acon(i)=  ev2j *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg)
-        print *,'i,acon(i)=',i,acon(i)
+c        print *,'i,acon(i)=',i,acon(i)
       enddo
 
 c-----prefactors for kinetic energy in eV

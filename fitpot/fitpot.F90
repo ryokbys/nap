@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-18 11:37:47 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-19 18:47:27 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -170,17 +170,17 @@ program fitpot
 !!$  call mpi_reduce(tmp,tcomm,1,mpi_real8,mpi_max &
 !!$       ,0,mpi_world,ierr)
   if( myid.eq.0 ) then
-    write(6,'(a,i10)') ' num of func calls=',nfunc
-    write(6,'(a,i10)') ' num of grad calls=',ngrad
-    write(6,'(a,f15.3,a)') ' time func =', tfunc,' sec'
-    write(6,'(a,f15.3,a)') ' time grad =', tgrad,' sec'
-    write(6,'(a,f15.3,a)') ' time comm =', tcomm,' sec'
+    write(6,'(a,i0)') ' Number of func calls = ',nfunc
+    write(6,'(a,i0)') ' Number of grad calls = ',ngrad
+    write(6,'(a,f15.3,a)') ' Time func = ', tfunc,' sec'
+    write(6,'(a,f15.3,a)') ' Time grad = ', tgrad,' sec'
+    write(6,'(a,f15.3,a)') ' Time comm = ', tcomm,' sec'
     tmp = mpi_wtime() -time0
     ihour = int(tmp/3600)
     imin  = int((tmp-ihour*3600)/60)
     isec  = int(tmp -ihour*3600 -imin*60)
     write(6,'(a,f15.3,a,i3,"h",i2.2,"m",i2.2,"s")') &
-         ' time      =', tmp, &
+         ' Time      = ', tmp, &
          ' sec  = ', ihour,imin,isec
   endif
   call mpi_finalize(ierr)
@@ -194,7 +194,10 @@ subroutine write_initial_setting()
   implicit none 
   integer:: i
 
-  write(6,'(a)') '---------------- INITIAL SETTING -----------------'
+  write(6,*) ''
+  write(6,'(a)') '------------------------------------------------------------------------'
+  write(6,'(a)') '                          Initial setting                               '
+  write(6,'(a)') '------------------------------------------------------------------------'
   write(6,'(2x,a25,2x,i5)') 'num_samples',nsmpl
   write(6,'(2x,a25,2x,i10)') 'num_iteration',niter
   write(6,'(2x,a25,2x,a)') 'fitting_method',trim(cfmethod)
@@ -272,7 +275,7 @@ subroutine write_initial_setting()
 !!$  do i=1,nwgtindiv
 !!$    write(6,'(2x,a25,2x,f6.1)') trim(cwgtindiv(i)),wgtindiv(i)
 !!$  enddo
-  write(6,'(a)') '------------------------------------------------'
+  write(6,'(a)') '------------------------------------------------------------------------'
 
 end subroutine write_initial_setting
 !=======================================================================
@@ -298,7 +301,7 @@ subroutine get_dir_list(ionum)
   if( myid.eq.0 ) then
     lerror = .true.
     if( len(trim(csmplist)).lt.1 ) then
-      print *,'sample list was created by performing the following'
+      print '(/,a)','Sample list was created by performing the following'
       print *,'  $ ls '//trim(cmaindir) &
            //' | grep "smpl_" > dir_list.txt'
       call system('ls '//trim(cmaindir) &
@@ -346,7 +349,7 @@ subroutine get_dir_list(ionum)
 !!$    enddo
 !!$  endif
   
-  if(myid.eq.0) print*,'get_dir_list done.'
+  if(myid.eq.0) print*,'Finished get_dir_list.'
   return
 
 999 continue
@@ -459,7 +462,7 @@ subroutine read_samples()
   call mpi_reduce(nal,nalist,nsmpl,mpi_integer,mpi_sum &
        ,0,mpi_world,ierr)
   
-  if( myid.eq.0 ) print *,'read_samples done.'
+  if( myid.eq.0 ) write(6,'(/,a)') 'Finished reading samples.'
   call mpi_barrier(mpi_world,ierr)
   deallocate(nal)
   return
@@ -601,10 +604,10 @@ subroutine read_ref_data()
   if(myid.eq.0) then
 !    write(6,'(a,es12.4)') ' erefmin = ',erefmin
     if( lfmatch ) then
-      write(6,'(a,i8)') ' number of forces to be used = ',nfrcg
-      write(6,'(a,i8)') ' total number of forces      = ',nftotg
+      write(6,'(a,i8)') ' Number of forces to be used = ',nfrcg
+      write(6,'(a,i8)') ' Total number of forces      = ',nftotg
     endif
-    print *,'read_ref_data done.'
+    print *,'Finished read_ref_data.'
   endif
 
 end subroutine read_ref_data
@@ -2061,7 +2064,7 @@ subroutine subtract_FF()
       endif
     enddo
     if( myid.eq.0 .and. iprint.ne.0 ) then
-      print *,'force field to be subtracted:'
+      print '(/,a)','Force field to be subtracted:'
       do i=1,nsubff
         print *,'  i,FF = ',i,trim(csubffs(i))
       enddo
