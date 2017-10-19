@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-19 19:04:23 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-19 21:51:28 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -933,7 +933,7 @@ c-------species of atom-i
       enddo
 c-----setup
       allocate(acon(nspmax),fack(nspmax))
-      call setup(nspmax,am,acon,fack,dt)
+c      call setup(nspmax,am,acon,fack,dt)
       allocate(fekin(nspmax),fa2v(nspmax))
       call setup2(nspmax,am,fekin,fa2v,dt)
 c-----set HI and SGM
@@ -1013,7 +1013,8 @@ c.....revert forces to the unit eV/A before going out
           aai(1:3)= h(1:3,1,0)*atot(1,i)
      &         +h(1:3,2,0)*atot(2,i)
      &         +h(1:3,3,0)*atot(3,i)
-          atot(1:3,i) = aai(1:3)/acon(is)
+          atot(1:3,i) = aai(1:3)
+c          atot(1:3,i) = aai(1:3)/acon(is)
         enddo
       endif
 

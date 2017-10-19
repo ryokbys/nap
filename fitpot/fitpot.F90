@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-19 18:47:27 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-19 21:32:43 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -301,14 +301,14 @@ subroutine get_dir_list(ionum)
   if( myid.eq.0 ) then
     lerror = .true.
     if( len(trim(csmplist)).lt.1 ) then
-      print '(/,a)','Sample list was created by performing the following'
+      print '(/,a)',' Sample list was created by performing the following'
       print *,'  $ ls '//trim(cmaindir) &
            //' | grep "smpl_" > dir_list.txt'
       call system('ls '//trim(cmaindir) &
            //' | grep "smpl_" > dir_list.txt')
       open(ionum,file='dir_list.txt',status='old')
     else
-      print *,'sample list was given by input.'
+      print *,'Sample list was given by input.'
       open(ionum,file=trim(csmplist),status='old')
     endif
     ndat = ndat_in_line(ionum,' ')
@@ -2217,7 +2217,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
   trlx = 100d0
   ltdst = .false.
   ntdst = 1
-  lstrs = lsmatch
+!!$  lstrs = lsmatch
   cpctl = 'none'
   stgt(1:3,1:3) = 0d0
   ptgt = 0d0

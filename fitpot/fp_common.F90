@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-18 11:15:59 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-19 21:53:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -69,7 +69,6 @@ contains
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN,only: set_paramsdir_NN,set_params_NN
     implicit none
-    
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: ftrn,ftst
@@ -139,9 +138,10 @@ contains
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
       samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
       if( iprint.ge.10 ) then
-        write(6,'(a,2i4,1x,a,7es12.4)') 'myid,ismpl,cdirname,epot,strs= ', &
+        write(6,'(a,2i4,1x,a,7es12.4)') ' myid,ismpl,cdirname,epot,strs= ', &
              myid,ismpl,trim(cdirname), &
-             epot,strs(1,1),strs(2,2),strs(3,3),strs(2,3),strs(1,3),strs(1,2)
+             epot,strs(1,1),strs(2,2),strs(3,3), &
+             strs(2,3),strs(1,3),strs(1,2)
       endif
     enddo
 
