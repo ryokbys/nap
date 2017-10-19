@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-19 13:21:59 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-19 14:39:42 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -443,9 +443,10 @@ c.....In case of isobaric MD, lstrs has to be always TRUE.
 c-------first kick of velocities
         do i=1,natm
           is = int(tag(i))
-c          write(6,'(a,i4,6es11.3)') ' i,aa(1:3),va(1:3) = '
-c     &         ,i,aa(1:3,i),va(1:3,i)
           va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
+c          if( i.eq.52 ) then
+c            print *,'i,is,aa(1:3,i),va(1:3,i)=',i,is,aa(1:3,i),va(1:3,i)
+c          endif
         enddo
 
         if( ifdmp.eq.2 ) then
@@ -584,6 +585,10 @@ c.....accumulate energy difference
           do i=1,natm
             is = int(tag(i))
             va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
+c            if( i.eq.52 ) then
+c              print *,'i,is,aa(1:3,i),va(1:3,i)=',
+c     &             i,is,aa(1:3,i),va(1:3,i)
+c            endif
           enddo
         endif
 
@@ -1242,6 +1247,7 @@ c-----locals
         y= va(2,i)
         z= va(3,i)
         v(1:3)= h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z
+c        print *,'i,is,va,v=',i,is,x,y,z,v(1:3)
 c.....Tensor form eki
         do jxyz=1,3
           do ixyz=1,3
@@ -1258,6 +1264,8 @@ c.....Find max speed
         if( v2.gt.vmaxl ) imax=i
         vmaxl=max(vmaxl,v2)
       enddo
+c      print *,'imax,vmax,ekin=',imax,vmaxl,ekinl
+c      print *,'va(1:3,imax)=',va(1:3,imax)
 
       ekin= 0d0
       call mpi_allreduce(ekinl,ekin,1,mpi_real8

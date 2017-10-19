@@ -1,6 +1,6 @@
 module Buckingham
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-19 13:57:17 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-19 14:42:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Buckingham calculation
 !    - only force on i is considered, no need to send back
@@ -86,7 +86,7 @@ contains
         aa(1:3,i)=aa(1:3,i) -dxdi(1:3)*dvdr
         aa(1:3,j)=aa(1:3,j) -dxdj(1:3)*dvdr
 !---------potential
-        tmp= a*exp(-rij/rho) -c/rij6
+        tmp= 0.5d0 *(a*exp(-rij/rho) -c/rij6)
         if(j.le.natm) then
           epi(i)=epi(i) +tmp
           epi(j)=epi(j) +tmp
