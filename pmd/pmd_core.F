@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-18 16:15:15 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-19 13:21:59 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -53,7 +53,8 @@ c-----output file names
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
-     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse
+     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
+     &     luse_Buckingham
       logical:: lvc
 
       call initialize_pmdvars(nspmax)
@@ -147,14 +148,6 @@ c.....check whether order of atoms and total-id of atoms match
       enddo
 #endif
 
-c.....Setup for FIRE
-      if( ifdmp.eq.2 ) then
-        alp_fire = alp0_fire
-        am(1:nspmax) = 10.d0
-        num_fire = 0
-        dtmax_fire = dtmfctr_fire * dt
-      endif
-
 c.....NEMD setting
       if( ltdst ) then
         if( mod(ntdst,nx).ne.0 )
@@ -165,7 +158,9 @@ c.....NEMD setting
 
 c-----setup
       allocate(acon(nspmax),fack(nspmax))
-      call setup(nspmax,am,acon,fack,dt)
+c      call setup(nspmax,am,acon,fack,dt)
+      allocate(fekin(nspmax),fa2v(nspmax))
+      call setup2(nspmax,am,fekin,fa2v,dt)
 c-----set HI and SGM
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
       if( myid_md.eq.0 ) then
@@ -182,6 +177,21 @@ c-----get total number of particles
         write(6,*) ''
         write(6,'(a,i0)') " Number of total atoms = ",ntot
         write(6,'(a,i0)') " Number of species     = ",nsp
+      endif
+
+c.....Setup for FIRE
+      if( ifdmp.eq.2 ) then
+        alp_fire = alp0_fire
+c        am(1:nspmax) = 20.d0
+        num_fire = 0
+        dtmax_fire = dtmfctr_fire * dt
+        if( myid_md.eq.0 .and. iprint.ne.0 ) then
+          write(6,'(/,a)') ' FIRE relaxation parameters:'
+          write(6,'(a,f0.2,a)') '   Max dt = ',dtmax_fire,' fs'
+          write(6,'(a,f0.2)') '   Factor of dt increment = '
+     &         ,finc_fire
+          write(6,'(a,f0.2)') '   Default alpha = ',alp0_fire
+        endif
       endif
 
 c.....Set ifmv of top and bottom atoms for z-loading if needed
@@ -226,7 +236,7 @@ c.....Set initial temperature if needed
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,ifcoulomb)
+     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham)
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
@@ -251,7 +261,7 @@ c.....Calc forces
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc)
+     &     luse_vcMorse,lvc,luse_Buckingham)
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -264,7 +274,7 @@ c     &     ,epot,chg(1:natm)
 #endif
 
 c-----calc kinetic energy
-      call get_ekin(namax,natm,va,tag,h,nspmax,fack,ekin,eki,ekl
+      call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl
      &     ,vmax,mpi_md_world)
       vmaxold=vmax
 c.....get_num_dof is called once in a MD run
@@ -310,22 +320,23 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
       if(myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,*) ''
         write(6,'(1x,a)') "Initial values:"
-        write(6,'(1x,a,f0.4,a)') " Kinetic energy  = ",ekin,' eV'
-        write(6,'(1x,a,f0.4,a)') " Potential energy= ",epot0,' eV'
+        write(6,'(1x,a,f0.4,a)') "  Kinetic energy  = ",ekin,' eV'
+        write(6,'(1x,a,f0.4,a)') "  Potential energy= ",epot0,' eV'
         nave= 0
         tave= 0d0
         do ifmv=1,9
           if( ndof(ifmv).eq.0 ) cycle
           temp(ifmv)= ekl(ifmv) /ndof(ifmv) /fkb *2d0
+c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
           nave= nave +ndof(ifmv)
-          write(6,'(1x,a,i1,a,f0.2,a)') " Temperature ",ifmv
+          write(6,'(1x,a,i1,a,f0.2,a)') "  Temperature ",ifmv
      &         ,"   = ",temp(ifmv),' K'
           tave= tave +temp(ifmv)*ndof(ifmv)
         enddo
         tave= tave/nave
-        write(6,'(1x,a,f0.2,a)') " Temperature     = ",tave,' K'
+        write(6,'(1x,a,f0.2,a)') "  Temperature     = ",tave,' K'
         prss = (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
-        write(6,'(1x,a,f0.3,a)') " Stress          = ",
+        write(6,'(1x,a,f0.3,a)') "  Stress          = ",
      &       prss,' GPa'
         
 
@@ -376,9 +387,9 @@ c-----initialize the counter for output
       if(myid_md.eq.0) then
 c.....write out energies
         open(ioerg,file="out.erg",status='replace')
-        write(ioerg,'(a)') '# istp,etot-epot0[eV],ekin,epot-epot0'
-     &       //',temp[K],vol[Ang^3],pressure[GPa]'
-        write(ioerg,'(a,es16.7e3,a)') '# epot0 =',epot0,' [eV]'
+        write(ioerg,'(a)') '# istp,  etot-epot0[eV],  ekin,'
+     &       //'  epot-epot0,  temp[K],  vol[Ang^3],  pressure[GPa]'
+        write(ioerg,'(a,es16.7e3,a)') '#  Epot0 =',epot0,' [eV]'
         write(ioerg,'(i10,3es16.7e3,f10.2,2es16.7e3)') istp
      &       ,ekin+epot0-epot0,ekin,epot0-epot0,tave
      &       ,vol
@@ -413,6 +424,8 @@ c.....Set al
       al(2)= h(2,2,0)
       al(3)= h(3,3,0)
 
+      
+      simtime = 0d0
       i_conv = 0
       lconverged = .false.
 c-----velocity-Verlet loop starts---------------------------------------
@@ -428,12 +441,20 @@ c.....In case of isobaric MD, lstrs has to be always TRUE.
         endif
 
 c-------first kick of velocities
-        va(1:3,1:natm)=va(1:3,1:natm) +aa(1:3,1:natm)
+        do i=1,natm
+          is = int(tag(i))
+c          write(6,'(a,i4,6es11.3)') ' i,aa(1:3),va(1:3) = '
+c     &         ,i,aa(1:3,i),va(1:3,i)
+          va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
+        enddo
 
         if( ifdmp.eq.2 ) then
           call vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire
      &         ,finc_fire,fdec_fire,nmin_fire
      &         ,natm,va,aa,myid_md,mpi_md_world,dt,iprint)
+c.....Update dt-related variables
+c          call setup(nspmax,am,acon,fack,dt)
+          call setup2(nspmax,am,fekin,fa2v,dt)
         endif
 
 c-------multiply fmv or damping
@@ -444,7 +465,10 @@ c-------multiply fmv or damping
 
 
 c-------update positions
-        ra(1:3,1:natm)=ra(1:3,1:natm) +va(1:3,1:natm)
+        do i=1,natm
+          is = int(tag(i))
+          ra(1:3,i)=ra(1:3,i) +va(1:3,i)*dt
+        enddo
         ltot_updated = .false.
 
         if( czload_type.eq.'atoms' ) then
@@ -471,6 +495,7 @@ c     h(1:3,1:3,0)= matmul(ah,h(1:3,1:3,0))
 c.....Reset matrices
           call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
         endif
+        simtime = simtime +dt
 
 c.....Update te considering change of vmax
         te=(te-ts)*vmaxold/vmax +ts
@@ -515,7 +540,7 @@ c-------Calc forces
      &       luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
      &       ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
      &       ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul
-     &       ,luse_vcMorse,lvc)
+     &       ,luse_vcMorse,lvc,luse_Buckingham)
         lstrs = .false.
 
 c.....Second kick of velocities
@@ -546,7 +571,7 @@ c.....accumulate energy difference
               vl(1:3)= h(1:3,1,0)*aai(1)
      &             +h(1:3,2,0)*aai(2)
      &             +h(1:3,3,0)*aai(3)
-              ediff(ifmv)= ediff(ifmv) +fack(is)
+              ediff(ifmv)= ediff(ifmv) +fekin(is)
      &             *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
               va(1:3,i)= va(1:3,i) +aai(1:3)
             endif
@@ -556,14 +581,17 @@ c.....accumulate energy difference
      &           ,mpi_md_world,myid_md,0)
           endif
         else
-          va(1:3,1:natm)=va(1:3,1:natm) +aa(1:3,1:natm)
+          do i=1,natm
+            is = int(tag(i))
+            va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
+          enddo
         endif
 
         
 
 c.....Calc kinetic energy
         vmaxold= vmax
-        call get_ekin(namax,natm,va,tag,h,nspmax,fack,ekin,eki,ekl
+        call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl
      &       ,vmax,mpi_md_world)
 
         call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
@@ -593,7 +621,7 @@ c.....target temperatures are forced to be set intermediate temperatures
             va(1:3,i)= va(1:3,i) *tfac(ifmv)
 c.....accumulate energy difference
             is= int(tag(i))
-            ediff(ifmv)= ediff(ifmv) +(tfac(ifmv)**2-1d0)*fack(is)
+            ediff(ifmv)= ediff(ifmv) +(tfac(ifmv)**2-1d0)*fekin(is)
           enddo
           if( mod(istp,nrmtrans).eq.0 ) then
             call rm_trans_motion(natm,tag,va,nspmax,am
@@ -660,10 +688,10 @@ c---------output step, time, and temperature
               write(6,'(a,i8,2f10.2,es15.6,2es11.3)')
      &             " istp,time,temp,epot,vol,prss="
      &             ,istp,tcpu,tave,epot,vol,prss
-              write(6,'(a)') ' h-matrix:' !,h(1:3,1:3,0)
+              write(6,'(a)') ' H-matrix:' !,h(1:3,1:3,0)
               write(6,'(3f15.7)') h(1:3,1:3,0)
               
-              write(6,'(a,6f10.3)') ' stress (GPa):'
+              write(6,'(a,6f10.3)') ' Stress (GPa):'
      &             ,ptnsr(1,1)*up2gpa ,ptnsr(2,2)*up2gpa
      &             ,ptnsr(3,3)*up2gpa ,ptnsr(2,3)*up2gpa
      &             ,ptnsr(1,3)*up2gpa ,ptnsr(1,2)*up2gpa
@@ -759,36 +787,37 @@ c          call system("mkdir -p "//cnum)
       if( myid_md.eq.0 .and. iprint.ne. 0 ) then
         write(6,*) ''
         write(6,'(1x,a)') "Final values:"
-        write(6,'(1x,a,f0.4,a)') " Kinetic energy  = ",ekin,' eV'
-        write(6,'(1x,a,f0.4,a)') " Potential energy= ",epot,' eV'
+        write(6,'(1x,a,f0.4,a)') "  Kinetic energy  = ",ekin,' eV'
+        write(6,'(1x,a,f0.4,a)') "  Potential energy= ",epot,' eV'
         nave= 0
         tave= 0d0
         do ifmv=1,9
           if( ndof(ifmv).le.0 ) cycle
           temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
           nave= nave +ndof(ifmv)
-          write(6,'(1x,a,i1,a,f0.2,a)') " Temperature ",ifmv
+          write(6,'(1x,a,i1,a,f0.2,a)') "  Temperature ",ifmv
      &         ,"   = ",temp(ifmv),' K'
           tave= tave +temp(ifmv)*ndof(ifmv)
         enddo
         tave= tave/nave
-        write(6,'(1x,a,f0.2,a)') " Temperature     = ",tave,' K'
-        write(6,'(1x,a,f0.3,a)') " Stress          = ",
+        write(6,'(1x,a,f0.2,a)') "  Temperature     = ",tave,' K'
+        write(6,'(1x,a,f0.3,a)') "  Stress          = ",
      &       prss,' GPa'
         if( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &       trim(cpctl).eq.'vv-Berendsen' ) then
           call cell_info(h)
+          write(6,'(a,f0.2,a)') ' Cell volume = ',vol,' Ang^3'
         endif
         write(6,*) ''
-        write(6,'(1x,a,f10.2)') "Time space decomp = ",tspdcmp
-        write(6,'(1x,a,f10.2)') "Time comm         = ",tcom
+        write(6,'(1x,a,f10.2)') "Time for space decomp = ",tspdcmp
+        write(6,'(1x,a,f10.2)') "Time for comm         = ",tcom
 
         ihour = int(tcpu/3600)
         imin  = int((tcpu-ihour*3600)/60)
         isec  = int(tcpu -ihour*3600 -imin*60)
         write(6,'(1x,a,f10.2,a,i3,"h",i2.2,"m",i2.2,"s")')
-     &       "Time              = ",tcpu,
+     &       "Time                  = ",tcpu,
      &       " sec  = ",ihour,imin,isec
       endif
 
@@ -799,7 +828,7 @@ c.....revert forces to the unit eV/A before going out pmd_core
           aai(1:3)= h(1:3,1,0)*atot(1,i)
      &         +h(1:3,2,0)*atot(2,i)
      &         +h(1:3,3,0)*atot(3,i)
-          atot(1:3,i) = aai(1:3)/acon(is)
+c          atot(1:3,i) = aai(1:3)/acon(is)
         enddo
       endif
 
@@ -808,6 +837,7 @@ c.....deallocate all the arrays allocated in pmd_core
         deallocate(tdst,nadst)
       endif
       deallocate(acon,fack)
+      deallocate(fekin,fa2v)
       deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
      &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
 
@@ -848,7 +878,8 @@ c
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
-     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse
+     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
+     &     luse_Buckingham
       logical:: lvc
       
 c      write(6,'(a,200es10.2)') 'chgtot in pmd_core = ',
@@ -920,7 +951,7 @@ c     &     chg(1:natm+10)
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,ifcoulomb)
+     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham)
 
 c      print *,' lvc,ifcoulomb = ',lvc,ifcoulomb
 c      write(6,'(a,500es10.2)') ' chg before bacopy = ',
@@ -946,7 +977,7 @@ c-----Make pair list
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
      &     ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
      &     ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc)
+     &     luse_vcMorse,lvc,luse_Buckingham)
 c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
 c     &     ,epot,chg(1:natm)
 
@@ -1011,7 +1042,9 @@ c     &     ,tmp,' Joule =',tmp*j2ev,' eV'
 
 c-----prefactors for normalized accelerration
       do i=1,nspmax
-        acon(i)=  ev2j/ang2m *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg) *m2ang
+        acon(i)=  ev2j *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg) *m2ang**2
+c        acon(i)=  ev2j *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg)
+        print *,'i,acon(i)=',i,acon(i)
       enddo
 
 c-----prefactors for kinetic energy in eV
@@ -1020,6 +1053,39 @@ c-----prefactors for kinetic energy in eV
       enddo
 
       end subroutine setup
+c=======================================================================
+      subroutine setup2(nspmax,am,fekin,fa2v,dt)
+      implicit none
+      include "params_unit.h"
+      integer,intent(in):: nspmax
+      real(8),intent(in):: dt
+      real(8),intent(in):: am(nspmax)
+      real(8),intent(out):: fekin(nspmax),fa2v(nspmax)
+
+      integer:: i
+      real(8):: tmp
+
+c      am(1:nspmax)= am(1:nspmax)
+
+c.....umass*Ang^2/fs^2 ---> kg*m^2/sec^2 (=Joule)
+      tmp= amu2kg *ang2m**2 /fs2s**2
+c      write(6,'(a,es12.4,a,es12.4,a)') ' umass*Ang^2/fs^2 ='
+c     &     ,tmp,' Joule =',tmp*j2ev,' eV'
+
+c.....Factors for the following quantities
+c.....Force: eV/Ang = (me*bohr**2/atu**2)/Ang
+c.....Acceleration: Ang/fs/fs
+c.....Velocity: Ang/fs
+c.....Position: Ang
+c.....Energy: eV = (me*bohr*bohr/atu/atu)
+      do i=1,nspmax
+        fa2v(i) = 0.5d0 *ume2ump *bohr2ang**2 /atu2fs**2 /am(i)
+        fekin(i)=  0.5d0 *(am(i)*ump2ume) *ang2bohr**2 /fs2atu**2
+c        acon(i)=  ev2j *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg)
+c        print *,'i,fekin(i),fa2v(i)=',i,fekin(i),fa2v(i)
+      enddo
+
+      end subroutine setup2
 c=======================================================================
       subroutine boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 c-----------------------------------------------------------------------
@@ -1151,12 +1217,12 @@ c-----Set up the node parity table
       return
       end
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-      subroutine get_ekin(namax,natm,va,tag,h,nspmax,fack,ekin,eki,ekl
+      subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl
      &     ,vmax,mpi_md_world)
       implicit none 
       include "mpif.h"
       integer,intent(in):: namax,natm,mpi_md_world,nspmax
-      real(8),intent(in):: va(3,namax),h(3,3),fack(nspmax)
+      real(8),intent(in):: va(3,namax),h(3,3),fekin(nspmax)
      &     ,tag(namax)
       real(8),intent(out):: ekin,eki(3,3,namax),vmax,ekl(9)
 c-----locals
@@ -1183,7 +1249,8 @@ c.....Tensor form eki
           enddo
         enddo
         v2= eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
-        eki(1:3,1:3,i)=eki(1:3,1:3,i)*fack(is)
+c        eki(1:3,1:3,i)=eki(1:3,1:3,i)*fack(is)
+        eki(1:3,1:3,i)=eki(1:3,1:3,i)*fekin(is)
         ekinl=ekinl +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
 c.....ekin of each ifmv
         ekll(ifmv)= ekll(ifmv) +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
@@ -1193,13 +1260,13 @@ c.....Find max speed
       enddo
 
       ekin= 0d0
-      call mpi_allreduce(ekinl,ekin,1,MPI_DOUBLE_PRECISION
+      call mpi_allreduce(ekinl,ekin,1,mpi_real8
      &     ,MPI_SUM,mpi_md_world,ierr)
       ekl(1:9)= 0d0
-      call mpi_allreduce(ekll,ekl,9,mpi_double_precision
+      call mpi_allreduce(ekll,ekl,9,mpi_real8
      &     ,mpi_sum,mpi_md_world,ierr)
       vmax= 0d0
-      call mpi_allreduce(vmaxl,vmax,1,mpi_double_precision
+      call mpi_allreduce(vmaxl,vmax,1,mpi_real8
      &     ,mpi_max,mpi_md_world,ierr)
       vmax=sqrt(vmax)
 
@@ -2228,7 +2295,7 @@ c
 
       st(1:3,1:3) = stk(1:3,1:3) +stp(1:3,1:3)
       stnsr(1:3,1:3)= 0d0
-      call mpi_allreduce(st,stnsr,9,mpi_double_precision,mpi_sum
+      call mpi_allreduce(st,stnsr,9,mpi_real8,mpi_sum
      &     ,mpi_md_world,ierr)
       stnsr(1:3,1:3)=stnsr(1:3,1:3) /vol
       return
@@ -2246,9 +2313,11 @@ c=======================================================================
       real(8),parameter:: pi = 3.14159265358979d0
       real(8),external:: box_muller
 
-      facv(1:nspmax)=dsqrt(tinit*fkb*ev2j /(am(1:nspmax)*amu2kg))
-     &     *m2ang /s2fs
-
+c      facv(1:nspmax)=dsqrt(tinit*fkb*ev2j /(am(1:nspmax)*amu2kg))
+c     &     *m2ang /s2fs
+      facv(1:nspmax) = dsqrt(tinit*fkb
+     &     *(ume2ump* bohr2ang**2/atu2fs**2) /am(1:nspmax))
+      
 c-----velocities in Maxwell-Boltzmann distribution
       do i=1,natm
         is= int(tag(i))
@@ -2260,9 +2329,9 @@ c     &       ,va(1:3,i)
       enddo
 
       do i=1,natm
-        va(1,i)= va(1,i) /h(1,1,0) *dt
-        va(2,i)= va(2,i) /h(2,2,0) *dt
-        va(3,i)= va(3,i) /h(3,3,0) *dt
+        va(1,i)= va(1,i) /h(1,1,0) !*dt
+        va(2,i)= va(2,i) /h(2,2,0) !*dt
+        va(3,i)= va(3,i) /h(3,3,0) !*dt
       enddo
 
       end subroutine setv
@@ -2309,10 +2378,10 @@ c-----set center of mass motion to zero
         va(3,i)=va(3,i)-sumpz/amtot
       enddo
 
-      if( myid_md.eq.0 .and. iprint.ne.0 ) then
-        write(6,'(a,3es12.4)') ' sumpx,y,z/amtot='
-     &       ,sumpx/amtot,sumpy/amtot,sumpz/amtot
-      endif
+c      if( myid_md.eq.0 .and. iprint.ne.0 ) then
+c        write(6,'(a,3es12.4)') ' sumpx,y,z/amtot='
+c     &       ,sumpx/amtot,sumpy/amtot,sumpz/amtot
+c      endif
 
       end subroutine rm_trans_motion
 c=======================================================================
@@ -2321,7 +2390,8 @@ c=======================================================================
      &     ,natm,va,aa,myid_md,mpi_md_world,dt,iprint)
       implicit none
       include 'mpif.h'
-      integer,intent(in):: natm,myid_md,mpi_md_world,nmin_fire,iprint
+      integer,intent(in):: natm,myid_md,mpi_md_world,nmin_fire
+     &     ,iprint
       real(8),intent(in):: aa(3,natm),falp_fire,alp0_fire,dtmax_fire
      &     ,finc_fire,fdec_fire
       integer,intent(inout):: num_fire
@@ -2344,11 +2414,11 @@ c=======================================================================
       vnorm = 0d0
       fnorm = 0d0
       fdotv = 0d0
-      call mpi_allreduce(vnorml,vnorm,1,mpi_double_precision
+      call mpi_allreduce(vnorml,vnorm,1,mpi_real8
      &     ,mpi_sum,mpi_md_world,ierr)
-      call mpi_allreduce(fnorml,fnorm,1,mpi_double_precision
+      call mpi_allreduce(fnorml,fnorm,1,mpi_real8
      &     ,mpi_sum,mpi_md_world,ierr)
-      call mpi_allreduce(fdotvl,fdotv,1,mpi_double_precision
+      call mpi_allreduce(fdotvl,fdotv,1,mpi_real8
      &     ,mpi_sum,mpi_md_world,ierr)
       vnorm = sqrt(vnorm)
       fnorm = sqrt(fnorm)
@@ -2358,14 +2428,15 @@ c=======================================================================
      &         +alp_fire*aa(ixyz,i)/fnorm *vnorm
         enddo
       enddo
+      print '(a,2e14.5)','vnorm,fnorm =',vnorm,fnorm
       
       if( fdotv.gt.0d0  ) then
         num_fire = num_fire + 1
         if( num_fire.gt.nmin_fire ) then
           dt = min(dtmax_fire,dt*finc_fire)
-          alp_fire = alp_fire*alp_fire
+          alp_fire = alp_fire *falp_fire
           if( iprint.ne.0 .and. myid_md.eq.0 ) then
-            write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
+            write(6,'(a,f10.3,f10.5,es12.4)') ' dt,alp_fire,fdotv = '
      &           ,dt,alp_fire,fdotv
           endif
         endif
@@ -2375,12 +2446,13 @@ c=======================================================================
         alp_fire = alp0_fire
         num_fire = 0
         if( iprint.ne.0 .and. myid_md.eq.0 ) then
-          write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
+          write(6,'(a,f10.3,f10.5,es12.4)') ' dt,alp_fire,fdotv = '
      &         ,dt,alp_fire,fdotv
         endif
       endif
-c      call mpi_bcast(dt,1,mpi_double_precision,0,mpi_md_world,ierr)
-c      call mpi_bcast(alp_fire,1,mpi_double_precision,0,mpi_md_world
+
+c      call mpi_bcast(dt,1,mpi_real8,0,mpi_md_world,ierr)
+c      call mpi_bcast(alp_fire,1,mpi_real8,0,mpi_md_world
 c     &     ,ierr)
       end subroutine vfire
 c=======================================================================
@@ -2476,8 +2548,8 @@ c.....allocate memory for local arrays of length namax
      &       ,lsb(0:nbmax,6),lsex(nbmax,6))
       endif
 
-      call mpi_bcast(hunit,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(h,9*2,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(hunit,1,mpi_real8,0,mpi_md_world,ierr)
+      call mpi_bcast(h,9*2,mpi_real8,0,mpi_md_world,ierr)
 
       ixyz= 0
       if( myid_md.eq.0 ) then
@@ -2507,15 +2579,15 @@ c.....allocate memory for local arrays of length namax
           if( ixyz.ne.0 ) then
             call mpi_send(natm,1,mpi_integer,ixyz,ixyz+1
      &           ,mpi_md_world,ierr)
-            call mpi_send(tag,natm,mpi_double_precision,ixyz,ixyz+2
+            call mpi_send(tag,natm,mpi_real8,ixyz,ixyz+2
      &           ,mpi_md_world,ierr)
-            call mpi_send(ra,3*natm,mpi_double_precision,ixyz,ixyz+3
+            call mpi_send(ra,3*natm,mpi_real8,ixyz,ixyz+3
      &           ,mpi_md_world,ierr)
-            call mpi_send(va,3*natm,mpi_double_precision,ixyz,ixyz+4
+            call mpi_send(va,3*natm,mpi_real8,ixyz,ixyz+4
      &           ,mpi_md_world,ierr)
-            call mpi_send(chg,natm,mpi_double_precision,ixyz,ixyz+5
+            call mpi_send(chg,natm,mpi_real8,ixyz,ixyz+5
      &           ,mpi_md_world,ierr)
-            call mpi_send(chi,natm,mpi_double_precision,ixyz,ixyz+6
+            call mpi_send(chi,natm,mpi_real8,ixyz,ixyz+6
      &           ,mpi_md_world,ierr)
           endif
         enddo
@@ -2524,15 +2596,15 @@ c        write(6,'(a,f10.3)') ' time space_decomp = ',mpi_wtime() -t0
       else ! myid_md.ne.0
         call mpi_recv(natm,1,mpi_integer,0,myid_md+1
      &       ,mpi_md_world,istat,ierr)
-        call mpi_recv(tag,natm,mpi_double_precision,0,myid_md+2
+        call mpi_recv(tag,natm,mpi_real8,0,myid_md+2
      &       ,mpi_md_world,istat,ierr)
-        call mpi_recv(ra,3*natm,mpi_double_precision,0,myid_md+3
+        call mpi_recv(ra,3*natm,mpi_real8,0,myid_md+3
      &       ,mpi_md_world,istat,ierr)
-        call mpi_recv(va,3*natm,mpi_double_precision,0,myid_md+4
+        call mpi_recv(va,3*natm,mpi_real8,0,myid_md+4
      &       ,mpi_md_world,istat,ierr)
-        call mpi_recv(chg,natm,mpi_double_precision,0,myid_md+5
+        call mpi_recv(chg,natm,mpi_real8,0,myid_md+5
      &       ,mpi_md_world,istat,ierr)
-        call mpi_recv(chi,natm,mpi_double_precision,0,myid_md+6
+        call mpi_recv(chi,natm,mpi_real8,0,myid_md+6
      &       ,mpi_md_world,istat,ierr)
       endif
       call mpi_barrier(mpi_md_world,ierr)
@@ -2578,23 +2650,23 @@ c
           itag = ixyz*nmpi -nmpi
           call mpi_recv(natmt,1,mpi_integer,ixyz,itag
      &         ,mpi_md_world,istat,ierr)
-          call mpi_recv(tagtot(n0),natmt,mpi_double_precision
+          call mpi_recv(tagtot(n0),natmt,mpi_real8
      &         ,ixyz,itag+1,mpi_md_world,istat,ierr)
-          call mpi_recv(rtot(1,n0),3*natmt,mpi_double_precision
+          call mpi_recv(rtot(1,n0),3*natmt,mpi_real8
      &         ,ixyz,itag+2,mpi_md_world,istat,ierr)
-          call mpi_recv(vtot(1,n0),3*natmt,mpi_double_precision
+          call mpi_recv(vtot(1,n0),3*natmt,mpi_real8
      &         ,ixyz,itag+3,mpi_md_world,istat,ierr)
-          call mpi_recv(epitot(n0),natmt,mpi_double_precision
+          call mpi_recv(epitot(n0),natmt,mpi_real8
      &         ,ixyz,itag+4,mpi_md_world,istat,ierr)
-          call mpi_recv(ekitot(1,1,n0),3*3*natmt,mpi_double_precision
+          call mpi_recv(ekitot(1,1,n0),3*3*natmt,mpi_real8
      &         ,ixyz,itag+5,mpi_md_world,istat,ierr)
-          call mpi_recv(stot(1,1,n0),3*3*natmt,mpi_double_precision
+          call mpi_recv(stot(1,1,n0),3*3*natmt,mpi_real8
      &         ,ixyz,itag+6,mpi_md_world,istat,ierr)
-          call mpi_recv(atot(1,n0),3*natmt,mpi_double_precision
+          call mpi_recv(atot(1,n0),3*natmt,mpi_real8
      &         ,ixyz,itag+7,mpi_md_world,istat,ierr)
-          call mpi_recv(chgtot(n0),natmt,mpi_double_precision
+          call mpi_recv(chgtot(n0),natmt,mpi_real8
      &         ,ixyz,itag+8,mpi_md_world,istat,ierr)
-          call mpi_recv(chitot(n0),natmt,mpi_double_precision
+          call mpi_recv(chitot(n0),natmt,mpi_real8
      &         ,ixyz,itag+9,mpi_md_world,istat,ierr)
           n0 = n0 + natmt
         enddo
@@ -2604,31 +2676,31 @@ c        write(6,'(a,f10.3)') ' time space_comp = ',mpi_wtime() -t0
         itag = myid_md*nmpi -nmpi
         call mpi_send(natm,1,mpi_integer,0,itag
      &       ,mpi_md_world,ierr)
-        call mpi_send(tag,natm,mpi_double_precision,0,itag+1
+        call mpi_send(tag,natm,mpi_real8,0,itag+1
      &       ,mpi_md_world,ierr)
 c.....positions should be shifted before passing data
         do i=1,natm
           ra(1:3,i) = ra(1:3,i) + sorg(1:3)
         enddo
-        call mpi_send(ra,3*natm,mpi_double_precision,0,itag+2
+        call mpi_send(ra,3*natm,mpi_real8,0,itag+2
      &       ,mpi_md_world,ierr)
 c.....positions should be reverted after passing data
         do i=1,natm
           ra(1:3,i) = ra(1:3,i) - sorg(1:3)
         enddo
-        call mpi_send(va,3*natm,mpi_double_precision,0,itag+3
+        call mpi_send(va,3*natm,mpi_real8,0,itag+3
      &       ,mpi_md_world,ierr)
-        call mpi_send(epi,natm,mpi_double_precision,0,itag+4
+        call mpi_send(epi,natm,mpi_real8,0,itag+4
      &       ,mpi_md_world,ierr)
-        call mpi_send(eki,3*3*natm,mpi_double_precision,0,itag+5
+        call mpi_send(eki,3*3*natm,mpi_real8,0,itag+5
      &       ,mpi_md_world,ierr)
-        call mpi_send(strs,3*3*natm,mpi_double_precision,0,itag+6
+        call mpi_send(strs,3*3*natm,mpi_real8,0,itag+6
      &       ,mpi_md_world,ierr)
-        call mpi_send(aa,3*natm,mpi_double_precision,0,itag+7
+        call mpi_send(aa,3*natm,mpi_real8,0,itag+7
      &       ,mpi_md_world,ierr)
-        call mpi_send(chg,natm,mpi_double_precision,0,itag+8
+        call mpi_send(chg,natm,mpi_real8,0,itag+8
      &       ,mpi_md_world,ierr)
-        call mpi_send(chi,natm,mpi_double_precision,0,itag+9
+        call mpi_send(chi,natm,mpi_real8,0,itag+9
      &       ,mpi_md_world,ierr)
       endif
 

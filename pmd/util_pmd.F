@@ -62,7 +62,7 @@ c=======================================================================
       write(ionum) hunit
       write(ionum) (((h(ia,ib,l)/hunit,ia=1,3),ib=1,3),l=0,1)
       write(ionum) natm
-      write(ionum) (tag(i),ra(1:3,i)+sorg(1:3),va(1:3,i)/dt
+      write(ionum) (tag(i),ra(1:3,i)+sorg(1:3),va(1:3,i) !/dt
      &     ,eki(1,1,i)+eki(2,2,i)+eki(3,3,i)
      &     ,epi(i)
      &     ,strs(1,1,i),strs(2,2,i),strs(3,3,i)
@@ -117,7 +117,8 @@ c=======================================================================
       write(ionum,'(i10)') natm
       do i=1,natm
         write(ionum,'(7es23.14e3,11es22.14)') tag(i),ra(1:3,i)
-     &       +sorg(1:3),va(1:3,i)/dt,eki(1,1,i)+eki(2,2,i)+eki(3,3,i)
+     &       +sorg(1:3),va(1:3,i) !/dt
+     &       ,eki(1,1,i)+eki(2,2,i)+eki(3,3,i)
      &       ,epi(i)
      &       ,strs(1,1,i),strs(2,2,i),strs(3,3,i)
      &       ,strs(2,3,i),strs(3,1,i),strs(1,2,i)
@@ -194,7 +195,7 @@ c=======================================================================
       do i=1,ntot
         write(ionum,'(7es23.14e3,11es13.4e3)') tagtot(i)
      &       ,rtot(1:3,i)
-     &       ,vtot(1:3,i)/dt
+     &       ,vtot(1:3,i) !/dt
      &       ,ekitot(1,1,i)+ekitot(2,2,i)+ekitot(3,3,i)
      &       ,epitot(i)
      &       ,stot(1,1,i),stot(2,2,i),stot(3,3,i)
@@ -246,7 +247,7 @@ c=======================================================================
       write(ionum) (((h(ia,ib,l)/hunit,ia=1,3),ib=1,3),l=0,1)
       write(ionum) ntot
       do i=1,ntot
-        write(ionum) tagtot(i),rtot(1:3,i),vtot(1:3,i)/dt
+        write(ionum) tagtot(i),rtot(1:3,i),vtot(1:3,i) !/dt
      &       ,ekitot(1,1,i)+ekitot(2,2,i)+ekitot(3,3,i)
      &       ,epitot(i)
      &       ,stot(1,1,i),stot(2,2,i),stot(3,3,i)

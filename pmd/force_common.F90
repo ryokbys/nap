@@ -6,7 +6,8 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
      luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si, &
      luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN, &
      luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM, &
-     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,lvc)
+     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,lvc,&
+     luse_Buckingham)
 !-----------------------------------------------------------------------
 !  Wrapper routine for force calculations.
 !  Each force calculation routine is called from this subroutine.
@@ -32,6 +33,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
   use Coulomb, only: force_screened_Coulomb, force_Ewald_Coulomb &
        ,initialize_coulomb, force_vcGaussian
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
+  use Buckingham,only:force_Buckingham
   implicit none
   integer,intent(in):: namax,natm,nnmax,nismax,iprint
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
@@ -49,7 +51,8 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
        luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si, &
        luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN, &
        luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM, &
-       luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse
+       luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse, &
+       luse_Buckingham
   logical,intent(inout):: lvc
   logical,intent(in):: lstrs
 
@@ -194,6 +197,9 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
   if( luse_vcMorse ) call force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+  if( luse_Buckingham ) call force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
 
 
 !.....convert forces from hmat-coordinates to Cartesian coordinates
@@ -201,11 +207,11 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
     at(1:3)= aa(1:3,i)
     aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
   enddo
-!-----multiply 0.5d0*dt**2/am(i)
-  do i=1,natm
-    is= int(tag(i))
-    aa(1:3,i)= acon(is)*aa(1:3,i)
-  enddo
+!!$!-----multiply 0.5d0*dt**2/am(i)
+!!$  do i=1,natm
+!!$    is= int(tag(i))
+!!$    aa(1:3,i)= acon(is)*aa(1:3,i)
+!!$  enddo
 
 end subroutine get_force
 !=======================================================================
@@ -216,7 +222,7 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
      luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN, &
      luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM, &
      luse_linreg,luse_NN,luse_Morse,luse_Morse_repul, &
-     luse_vcMorse,lvc,ifcoulomb)
+     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham)
 !
 !  Initialization routine is separated from main get_force routine,
 !  mainly because the initialization is not necessary in case of fitpot.
@@ -227,6 +233,7 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
        update_params_Morse
   use EAM, only: init_EAM, read_params_EAM, update_params_EAM, lprmset_EAM
   use NN, only: read_const_NN, read_params_NN, update_params_NN, lprmset_NN
+  use Buckingham, only: init_Buckingham, read_params_Buckingham, lprmset_Buckingham
   implicit none
   integer,intent(in):: namax,natm,myid_md,mpi_md_world,iprint,numff
   real(8),intent(in):: tag(namax),h(3,3),rc
@@ -237,7 +244,8 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
        luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si, &
        luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN, &
        luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM, &
-       luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse
+       luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse, &
+       luse_Buckingham
   logical,intent(inout):: lvc
 
   call set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
@@ -245,7 +253,7 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
        luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe, &
        luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe, &
        luse_SM_Al,luse_EAM,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul, &
-       luse_vcMorse,ifcoulomb,numff,cffs,myid_md,iprint)
+       luse_vcMorse,luse_Buckingham,ifcoulomb,numff,cffs,myid_md,iprint)
   lvc = .false.
   if( luse_vcMorse ) then
     if( ifcoulomb.ne.3 ) then
@@ -304,6 +312,13 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
     else
 !.....This code is not parallelized, and only for fitpot
       call update_params_NN()
+    endif
+  endif
+
+  if( luse_Buckingham ) then
+    call init_Buckingham()
+    if( .not.lprmset_Buckingham ) then
+      call read_params_Buckingham(myid_md,mpi_md_world,iprint)
     endif
   endif
   
@@ -801,7 +816,7 @@ subroutine set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
      luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe, &
      luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe, &
      luse_SM_Al,luse_EAM,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul, &
-     luse_vcMorse,ifcoulomb,numff,cffs,myid,iprint)
+     luse_vcMorse,luse_Buckingham,ifcoulomb,numff,cffs,myid,iprint)
 !     
 !     Set flags for forces whether or not using them.
 !
@@ -814,7 +829,7 @@ subroutine set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
        ,luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe &
        ,luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe &
        ,luse_SM_Al,luse_EAM,luse_linreg,luse_NN,luse_Morse &
-       ,luse_Morse_repul,luse_vcMorse
+       ,luse_Morse_repul,luse_vcMorse,luse_Buckingham
 
   logical,external:: force_on
 
@@ -840,6 +855,7 @@ subroutine set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
   luse_Morse = .false.
   luse_Morse_repul = .false.
   luse_vcMorse = .false.
+  luse_Buckingham = .false.
   if( force_on('LJ_Ar',numff,cffs) ) luse_LJ = .true.
   if( force_on('Ito3_WHe',numff,cffs) ) luse_Ito3_WHe = .true.
   if( force_on('RK_WHe',numff,cffs) ) luse_RK_WHe = .true.
@@ -862,6 +878,7 @@ subroutine set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
   if( force_on('Morse',numff,cffs) ) luse_Morse = .true.
   if( force_on('Morse_repul',numff,cffs) ) luse_Morse_repul = .true.
   if( force_on('vcMorse',numff,cffs) ) luse_vcMorse = .true.
+  if( force_on('Buckingham',numff,cffs) ) luse_Buckingham = .true.
 !.....Coulomb forces should be exclusive each other
   if( force_on('screened_Coulomb',numff,cffs) ) then
     ifcoulomb = 1
@@ -872,7 +889,7 @@ subroutine set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
   endif
 
   if( myid.eq.0 .and. iprint.ne.0 ) then
-    write(6,'(a)') ' Use the following force-fields:'
+    write(6,'(/,a)') ' Use the following force-fields:'
     if( luse_LJ ) print *,'  LJ_Ar'
     if( luse_Ito3_WHe ) print *,'  Ito3_WHe'
     if( luse_RK_WHe ) print *,'  RK_WHe'
@@ -895,6 +912,7 @@ subroutine set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
     if( luse_Morse ) print *,'  Morse'
     if( luse_Morse_repul ) print *,'  Morse_repul'
     if( luse_vcMorse ) print *,'  vcMorse'
+    if( luse_Buckingham ) print *,'  Buckingham'
 !.....Coulomb forces should be exclusive each other
     if( ifcoulomb.eq.1 ) then
       print *,'  screened_Coulomb'

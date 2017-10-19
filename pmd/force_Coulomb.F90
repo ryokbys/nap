@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-09-30 15:46:17 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-19 14:01:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -112,14 +112,14 @@ contains
     sgm_ew = rc/sqrt(2d0*pacc)
     bkmax  = 2d0*pacc /rc
     if( myid.eq.0 ) then
-      write(6,'(a)') ' initializing Ewald summation...'
-      write(6,'(a,es12.3)') '  accuracy parameter p = ', pacc
-      write(6,'(a,es12.3)') '  Gaussian width sgm   = ', sgm_ew
-      write(6,'(a,es12.3)') '  k-space cutoff       = ', bkmax
+      write(6,'(a)') ' Initialize Ewald summation'
+      write(6,'(a,es12.3)') '   Accuracy parameter p = ', pacc
+      write(6,'(a,es12.3)') '   Gaussian width sgm   = ', sgm_ew
+      write(6,'(a,es12.3)') '   k-space cutoff       = ', bkmax
     endif
     call get_recip_vectors(h)
     if( myid.eq.0 ) then
-      write(6,'(a)') ' reciprocal vectors:'
+      write(6,'(a)') ' Reciprocal vectors:'
       write(6,'(a,3es12.3)') '   b1 = ',b1(1:3)
       write(6,'(a,3es12.3)') '   b2 = ',b2(1:3)
       write(6,'(a,3es12.3)') '   b3 = ',b3(1:3)
@@ -127,7 +127,7 @@ contains
 !.....kmax# is constant during MD run even if h-matrix can change...
     call setup_kspace()
     if( myid.eq.0 ) then
-      write(6,'(a)') ' number of k-points for Ewald sum:'
+      write(6,'(a)') ' Number of k-points for Ewald sum:'
       write(6,'(a,i8)') '   kmax1 = ',kmax1
       write(6,'(a,i8)') '   kmax2 = ',kmax2
       write(6,'(a,i8)') '   kmax3 = ',kmax3
@@ -769,8 +769,8 @@ contains
            *sqrt(sum_anion/sum_cation)
     enddo
 
-!!$!.....Overwrite charges for debugging...
-!!$    vc_bvs(1:4) = (/ 1.27443, 0.78466, 1.10968, 3.20338/)
+!.....Overwrite charges for debugging...
+    vc_bvs(1:4) = (/ 1.27443, 0.78466, 1.10968, 3.20338/)
 
     if( myid.eq.0 .and. iprint.gt.0 ) then
       do is=1,nsp

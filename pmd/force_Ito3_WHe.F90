@@ -64,7 +64,7 @@ contains
     endif
 
     epotl= 0d0
-    strsl(1:3,1:3,1:natm) = 0d0
+    strsl(1:3,1:3,1:namax) = 0d0
     rho(1:namax+nbmax)= 0d0
 
 !-----rho(i)

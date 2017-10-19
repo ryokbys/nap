@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2017-06-19 17:53:07 Ryo KOBAYASHI>
+!                    Last modified: <2017-10-19 11:39:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -26,7 +26,7 @@ module pmdvars
        ,iocntpmd,iocnterg
   integer:: natm,nb,nsp
   real(8):: tcpu,tcpu1,tcpu2,tcom,tspdcmp
-  real(8):: epot0,vmaxold,vmax
+  real(8):: epot0,vmaxold,vmax,simtime
   real(8):: tgmm
 !!$  real(8):: tgmm,tfac(9),ediff(9),ediff0(9),temp(9),ekl(9)
   real(8),allocatable:: tfac(:),ediff(:),ediff0(:),temp(:),ekl(:)
@@ -54,6 +54,8 @@ module pmdvars
 !!$    real(8):: epi(namax),eki(3,3,namax),stp(3,3,namax)
 !.....mass, prefactors
   real(8),allocatable:: acon(:),fack(:)
+!.....Factors for ekin
+  real(8),allocatable:: fekin(:),fa2v(:),fv2p(:)
 !.....atomic strain
   real(8),allocatable:: stn(:,:,:)
 !.....atomic charge and electronegativity
@@ -75,7 +77,7 @@ module pmdvars
   real(8):: falp_fire = 0.99
   real(8):: dtmax_fire = 10.0
 ! factor to be multiplied to dt to get dtmax_fire
-  real(8):: dtmfctr_fire = 1000.0
+  real(8):: dtmfctr_fire = 10.0
 
 !.....temperature distribution along x
   real(8),allocatable:: tdst(:)
@@ -94,5 +96,6 @@ contains
       allocate(tfac(nspmax),ediff(nspmax),ediff0(nspmax),temp(nspmax)&
            ,ekl(nspmax),ndof(nspmax))
     endif
+    
   end subroutine initialize_pmdvars
 end module pmdvars
