@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-19 21:51:28 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-20 11:18:19 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -2558,6 +2558,7 @@ c.....allocate memory for local arrays of length namax
      &       ,stp(3,3,namax),stn(3,3,namax)
      &       ,chg(namax),chi(namax)
      &       ,lsb(0:nbmax,6),lsex(nbmax,6))
+        eki(1:3,1:3,1:namax) = 0d0
       endif
 
       call mpi_bcast(hunit,1,mpi_real8,0,mpi_md_world,ierr)
