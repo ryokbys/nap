@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-18 23:51:03 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-20 15:05:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -132,6 +132,7 @@ contains
         d0ij = d0(is,js)
         alpij= alp(is,js)
         rminij=rmin(is,js)
+!!$        write(6,*) 'is,js,d,a,r=',is,js,d0ij,alpij,rminij
         texp = exp(alpij*(rminij-dij))
 !!$        if( i.eq.1 ) then
 !!$          write(6,'(a,4i6,10es12.4)') 'i,j,is,js,dij,d0ij,alpij,rminij,texp='&
@@ -177,7 +178,7 @@ contains
     
 !-----gather epot
     epott= 0d0
-    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+    call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
 !!$    write(6,'(a,es15.7)') ' Morse epott = ',epott
@@ -295,7 +296,7 @@ contains
     
 !-----gather epot
     epott= 0d0
-    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+    call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
 !!$    write(6,'(a,es15.7)') ' Morse repul epott = ',epott
@@ -432,7 +433,7 @@ contains
     
 !-----gather epot
     epott= 0d0
-    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+    call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
  
@@ -595,6 +596,7 @@ contains
       d0(1:msp,1:msp)= 0d0
       rmin(1:msp,1:msp)= 0d0
       alp(1:msp,1:msp)= 0d0
+      write(6,'(/,a)') ' Morse parameters:'
       do while(.true.)
         read(ioprms,*,end=10) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
@@ -609,6 +611,9 @@ contains
         rmin(isp,jsp) = r
         alp(isp,jsp) = a
         interact(isp,jsp) = .true.
+        if( iprint.ne.0 ) then
+          write(6,'(a,2i3,3f7.3)') '   is,js,D,alpha,rmin = ',isp,jsp,d,a,r
+        endif
 !.....Symmetrize parameters
         d0(jsp,isp) = d0(isp,jsp)
         rmin(jsp,isp)= rmin(isp,jsp)
@@ -617,15 +622,15 @@ contains
       enddo
 
 10    close(ioprms)
-      if( iprint.ne.0 ) then
-        write(6,'(a)') ' Finished reading '//trim(fname)
-        write(6,*) ''
-      endif
+!!$      if( iprint.ne.0 ) then
+!!$        write(6,'(a)') ' Finished reading '//trim(fname)
+!!$        write(6,*) ''
+!!$      endif
     endif
 
-    call mpi_bcast(d0,msp*msp,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(rmin,msp*msp,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(alp,msp*msp,mpi_double_precision,0,mpi_md_world,ierr)
+    call mpi_bcast(d0,msp*msp,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(rmin,msp*msp,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(alp,msp*msp,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_md_world,ierr)
 
   end subroutine read_params_Morse
@@ -656,10 +661,10 @@ contains
       enddo
       close(ioprmsvc)
 
-      if( iprint.ne.0 ) then
-        print *, 'Finished reading '//trim(fname)
-        print *, ''
-      endif
+!!$      if( iprint.ne.0 ) then
+!!$        print *, 'Finished reading '//trim(fname)
+!!$        print *, ''
+!!$      endif
     endif
 
     call mpi_bcast(walp,nprm+1,mpi_real8,0,mpi_md_world,ierr)
@@ -871,11 +876,11 @@ contains
 
     call mpi_bcast(nas,nspt,mpi_integer,0,mpi_md_world,ierr)
     call mpi_bcast(csyms,nspt,mpi_character,0,mpi_md_world,ierr)
-    call mpi_bcast(eion1s,nspt,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(eion2s,nspt,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(eaffs,nspt,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(atrads,nspt,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(enpauls,nspt,mpi_double_precision,0,mpi_md_world,ierr)
+    call mpi_bcast(eion1s,nspt,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(eion2s,nspt,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(eaffs,nspt,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(atrads,nspt,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(enpauls,nspt,mpi_real8,0,mpi_md_world,ierr)
     
     deallocate(eion1s,eion2s,eaffs,enpauls,atrads,nas,csyms)
   end subroutine bcast_atdescs

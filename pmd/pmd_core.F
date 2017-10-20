@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-20 11:18:19 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-20 12:42:28 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -2440,7 +2440,7 @@ c=======================================================================
      &         +alp_fire*aa(ixyz,i)/fnorm *vnorm
         enddo
       enddo
-      print '(a,2e14.5)','vnorm,fnorm =',vnorm,fnorm
+c      print '(a,2e14.5)','vnorm,fnorm =',vnorm,fnorm
       
       if( fdotv.gt.0d0  ) then
         num_fire = num_fire + 1

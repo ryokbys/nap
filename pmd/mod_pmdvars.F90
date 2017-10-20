@@ -1,13 +1,13 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2017-10-19 11:39:38 Ryo KOBAYASHI>
+!                    Last modified: <2017-10-20 15:23:04 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
 ! PARAMETERS
 !=======================================================================
 !.....max. num. of atoms in a node
-  integer:: namax = 10000
+  integer:: namax = 20000
 !.....max. num. of boundary-particles
   integer:: nbmax = 10000
 !.....max. num. of neighbors
