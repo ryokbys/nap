@@ -1,6 +1,6 @@
 module Buckingham
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-19 15:36:42 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-21 10:20:27 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Buckingham calculation
 !    - only force on i is considered, no need to send back
@@ -149,6 +149,7 @@ contains
       buck_a(1:msp,1:msp) = 0d0
       buck_rho(1:msp,1:msp) = 0d0
       buck_c(1:msp,1:msp) = 0d0
+      write(6,'(/,a)') ' Buckingham parameters:'
       do while(.true.)
         read(ioprms,*,end=10) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
@@ -164,6 +165,7 @@ contains
         buck_rho(isp,jsp) = rho
         buck_c(isp,jsp) = c
         interact(isp,jsp) = .true.
+        write(6,'(a,2i3,3f10.3)') '   is,js,A,rho,C = ',isp,jsp,a,rho,c
 !.....Symmetrize parameters
         buck_a(jsp,isp) = buck_a(isp,jsp)
         buck_rho(jsp,isp)= buck_rho(isp,jsp)

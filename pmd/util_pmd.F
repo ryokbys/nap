@@ -455,4 +455,19 @@ c
       is_numeric = i==0
       return
       end function is_numeric
-      
+c=======================================================================
+      subroutine time_stamp(prefix)
+      implicit none
+      character(len=*),intent(in):: prefix
+      character(len=10):: c1,c2,c3
+      integer:: date(8)
+      character(len=128):: cdate,ctime
+
+      call date_and_time(c1,c2,c3,date)
+
+      write(ctime,'(i2,a,i2,a,i2)') date(5),':',date(6),':',date(7)
+      write(cdate,'(i4,a,i2,a,i2)') date(1),'-',date(2),'-',date(3)
+      write(6,'(a,1x,a,1x,a)') prefix, 'at '//trim(ctime),
+     &     'on '//trim(cdate)
+      return
+      end subroutine time_stamp

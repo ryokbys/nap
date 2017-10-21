@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-19 14:25:08 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-21 10:55:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -50,7 +50,7 @@ module Coulomb
 !.....Exp(-pacc) = 1e-7 when pacc= 18.0
   real(8),parameter:: pacc   = 18d0
 !.....real-space cell volume
-  real(8):: avol
+  real(8):: vol
 !.....k-space variables
   real(8):: b1(3),b2(3),b3(3)
   real(8),allocatable:: qcosl(:),qcos(:),qsinl(:),qsin(:),pflr(:)
@@ -112,7 +112,7 @@ contains
     sgm_ew = rc/sqrt(2d0*pacc)
     bkmax  = 2d0*pacc /rc
     if( myid.eq.0 ) then
-      write(6,'(a)') ' Initialize Ewald summation'
+      write(6,'(/,a)') ' Initialize Ewald summation'
       write(6,'(a,es12.3)') '   Accuracy parameter p = ', pacc
       write(6,'(a,es12.3)') '   Gaussian width sgm   = ', sgm_ew
       write(6,'(a,es12.3)') '   k-space cutoff       = ', bkmax
@@ -132,7 +132,6 @@ contains
       write(6,'(a,i8)') '   kmax2 = ',kmax2
       write(6,'(a,i8)') '   kmax3 = ',kmax3
       write(6,'(a,i8)') '   total = ',nk
-      write(6,*) ''
     endif
     if( allocated(qcos) ) deallocate(qcosl,qcos,qsinl,qsin,pflr)
     allocate(qcosl(nk),qcos(nk),qsinl(nk),qsin(nk),pflr(nk))
@@ -478,7 +477,7 @@ contains
   end subroutine force_screened_Coulomb
 !=======================================================================
   subroutine force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,h,hi,tcom &
+       ,chg,stnsr,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,ifcoulomb)
 !
@@ -496,7 +495,7 @@ contains
     integer,intent(in):: mpi_md_world,myid,ifcoulomb
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,acon(nismax),tag(namax),sv(3,6)
-    real(8),intent(inout):: chg(namax)
+    real(8),intent(inout):: chg(namax),stnsr(3,3)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
@@ -525,6 +524,8 @@ contains
       allocate(strsl(3,3,namax))
     endif
 
+    strsl(1:3,1:3,1:namax) = 0d0
+
 !.....Compute self term, if fixed charge per atom, it is constant
     q2loc = 0d0
     do i=1,natm
@@ -536,11 +537,18 @@ contains
 !!$    write(6,*) ' epot_self = ',epot_self
 
     call Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-       ,lspr,epi,esrl,iprint,ifcoulomb,lstrs,rc)
+         ,lspr,epi,esrl,iprint,ifcoulomb,lstrs,rc)
 
-    call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
-       lspr,epi,elrl,iprint,ifcoulomb,mpi_md_world,lstrs)
+    call Ewald_long(namax,natm,tag,ra,nnmax,aa,chg,stnsr,h,hi,&
+         lspr,epi,elrl,iprint,ifcoulomb,mpi_md_world,lstrs)
+!!$    stnsr(1:3,1:3) = 0d0
     
+    if( lstrs ) then
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+           ,nn,mpi_md_world,strsl,9)
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
+
     epotl = elrl +esrl
 !.....Gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
@@ -666,7 +674,7 @@ contains
 
 !.....Compute reciprocal vectors
     call get_recip_vectors(h)
-    prefac = 1d0 /(2d0*avol*eps0)
+    prefac = 1d0 /(2d0*vol*eps0)
 !.....Compute structure factor
     call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint,mpi_md_world)
 
@@ -809,11 +817,11 @@ contains
     call vprod(a2,a3,a23)
     call vprod(a3,a1,a31)
     call vprod(a1,a2,a12)
-    avol = abs(sprod(3,a1,a23))
+    vol = abs(sprod(3,a1,a23))
     pi2 = 2d0 *pi
-    b1(1:3) = pi2 /avol *a23(1:3)
-    b2(1:3) = pi2 /avol *a31(1:3)
-    b3(1:3) = pi2 /avol *a12(1:3)
+    b1(1:3) = pi2 /vol *a23(1:3)
+    b2(1:3) = pi2 /vol *a31(1:3)
+    b3(1:3) = pi2 /vol *a12(1:3)
     return
   end subroutine get_recip_vectors
 !=======================================================================
@@ -1011,9 +1019,10 @@ contains
     enddo
 !!$    write(6,*) ' esrl = ',esrl
 
+    
   end subroutine Ewald_short
 !=======================================================================
-  subroutine Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
+  subroutine Ewald_long(namax,natm,tag,ra,nnmax,aa,chg,stnsr,h,hi,&
        lspr,epi,elrl,iprint,ifcoulomb,mpi_md_world,lstrs)
     implicit none
     include 'mpif.h'
@@ -1022,14 +1031,15 @@ contains
     real(8),intent(in):: tag(namax),ra(3,namax),chg(namax),&
          h(3,3),hi(3,3)
     logical,intent(in):: lstrs 
-    real(8),intent(inout):: aa(3,namax),strsl(3,3,namax),epi(namax),&
-         elrl
+    real(8),intent(inout):: aa(3,namax),epi(namax),&
+         elrl,stnsr(3,3)
 
-    integer:: i,is,ik,k1,k2,k3,ierr
+    integer:: i,is,ik,k1,k2,k3,ierr,ixyz,jxyz
     real(8):: qi,xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3),bdotr, &
-         tmp,cs,sn,texp
-    real(8),external:: sprod
-    
+         tmp,cs,sn,texp,bb2,bk
+    real(8),external:: sprod,absv
+    real(8):: emat(3,3)
+
 !.....Compute reciprocal vectors
     call get_recip_vectors(h)
 !.....Compute structure factor of the local processor
@@ -1075,7 +1085,7 @@ contains
 !!$        enddo
 !!$      enddo
 !!$    enddo
-!!$    elrl = elrl /avol *acc /2
+!!$    elrl = elrl /vol *acc /2
 
 !.....Long-range contribution to forces
     do i=1,natm
@@ -1098,17 +1108,47 @@ contains
             cs = cos(bdotr)
             sn = sin(bdotr)
 !.....Potential energy per atom
-            tmp = 0.5d0 *acc /avol *qi *pflr(ik) &
+            tmp = 0.5d0 *acc /vol *qi *pflr(ik) &
                  *( cs*qcos(ik) +sn*qsin(ik) )
             epi(i) = epi(i) +tmp
             elrl = elrl +tmp
 !.....Forces
-            aa(1:3,i)= aa(1:3,i) -acc/avol *qi*bb(1:3) *pflr(ik) &
+            aa(1:3,i)= aa(1:3,i) -acc/vol *qi*bb(1:3) *pflr(ik) &
                  *( -sn*qcos(ik) +cs*qsin(ik) )
           enddo  ! k3
         enddo  ! k2
       enddo  ! k1
     enddo  ! ia
+
+    if( lstrs ) then
+      emat(1:3,1) = (/ 1d0, 0d0, 0d0 /)
+      emat(1:3,2) = (/ 0d0, 1d0, 0d0 /)
+      emat(1:3,3) = (/ 0d0, 0d0, 1d0 /)
+      ik = 0
+      do k1= -kmax1,kmax1
+        bk1(1:3) = k1 *b1(1:3)
+        do k2= -kmax2,kmax2
+          bk2(1:3) = k2 *b2(1:3)
+          do k3= -kmax3,kmax3
+            if( .not. lkuse(k3,k2,k1) ) cycle
+            ik= ik +1
+            bk3(1:3) = k3 *b3(1:3)
+            bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
+            bb2 = absv(3,bb)
+            bk = sqrt(bb2)
+            tmp = 0.5d0 *acc/vol**2 &
+                 *pflr(ik) *(qcos(ik)**2 +qsin(ik)**2)
+            do ixyz=1,3
+              do jxyz=1,3
+                stnsr(ixyz,jxyz) = stnsr(ixyz,jxyz) +tmp &
+                     *( bb(ixyz)*bb(jxyz)/bk*(bk *sgm_ew**2 +2d0/bk) &
+                     -emat(ixyz,jxyz))
+              enddo
+            enddo
+          enddo  ! k3
+        enddo  ! k2
+      enddo  ! k1
+    endif
 
   end subroutine Ewald_long
 !=======================================================================
@@ -1176,7 +1216,7 @@ contains
 !  the loop over atoms. But since forces and energy per atom are also
 !  required, the loop over atoms appear.
     elrl = 0d0
-    prefac = 1d0 /(2d0*avol*eps0)
+    prefac = 1d0 /(2d0*vol*eps0)
 
     ik = 0
     do k1= -kmax1,kmax1
@@ -1248,7 +1288,7 @@ contains
 !     Assuming all the atoms are in the root node (0),
 !     and does not work in parallel mode.
 !     TODO: And also the code is very primitive and could be faster.
-    a0 = 1d0 /(2d0 *avol *eps0)
+    a0 = 1d0 /(2d0 *vol *eps0)
     do ia=1,natm
       xi(1:3) = ra(1:3,ia)
       ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)

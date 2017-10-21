@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-20 12:42:28 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-21 10:39:53 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -8,7 +8,7 @@ c-----------------------------------------------------------------------
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
-     &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,ptnsr,epot
+     &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,stnsr,epot
      &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
      &     ,nstp_done)
       use pmdvars
@@ -24,7 +24,7 @@ c-----------------------------------------------------------------------
      &     ,trlx,srlx,stbeta,strfin,dmp,eps_conv
       real(8),intent(inout):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
      &     ,atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot)
-     &     ,epitot(ntot),dt,rc,rbuf,h(3,3,0:1),ptnsr(3,3),fmv(3,0:9)
+     &     ,epitot(ntot),dt,rc,rbuf,h(3,3,0:1),stnsr(3,3),fmv(3,0:9)
      &     ,epot,ekin,am(nspmax),stgt(3,3),ptgt,ttgt(9)
      &     ,chgtot(ntot),chitot(ntot)
       character,intent(in):: ciofmt*6, cpctl*20, ctctl*20
@@ -45,7 +45,7 @@ c.....FIRE variables
 c.....For tensile test of Al nanorod
       real(8):: strnow,ftop,fbot
 c-----output file names
-      character:: cnum*128
+      character:: cnum*128, ctmp*128
       integer,external:: itotOf
       logical:: ltot_updated = .true.
 
@@ -252,9 +252,9 @@ c.....Calc forces
      &     ( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &     trim(cpctl).eq.'vv-Berendsen')
-      call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
-     &     ,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr
-     &     ,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
+      call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
+     &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
+     &     ,lspr,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
      &     ,numff,cffs,ifcoulomb,iprint,.true.,
      &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
@@ -285,7 +285,7 @@ c.....get_num_dof is called once in a MD run
         if(myid_md.eq.0 .and. iprint.ne.0 ) then
           write(6,*) ''
           write(6,'(a)') ' Variable-cell Berendsen is chosen'
-          write(6,'(a,6f10.3)')' Target stress [GPa]: '
+          write(6,'(a,6f10.3)') '   Target stress [GPa]: '
      &         ,stgt(1,1),stgt(2,2),stgt(3,3)
      &         ,stgt(2,3),stgt(3,1),stgt(1,2)
         endif
@@ -295,17 +295,17 @@ c.....get_num_dof is called once in a MD run
           write(6,*) ''
           write(6,'(a)') ' Variable-volume Berendsen is chosen'
           write(6,'(a,f0.3,a)')
-     &       ' Target pressure = ',ptgt,' GPa'
+     &       '   Target pressure = ',ptgt,' GPa'
         endif
         ptgt = ptgt *gpa2up
       endif
       call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
-     &     ,dt,srlx,stbeta,vol,ptnsr,mpi_md_world,cpctl)
-c      ptnsr(1:3,1:3)= ptnsr(1:3,1:3)/vol
+     &     ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
+c      stnsr(1:3,1:3)= stnsr(1:3,1:3)/vol
       if( myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,'(a,6f10.3)')' Stress tensor [GPa]: '
-     &       ,ptnsr(1,1)*up2gpa,ptnsr(2,2)*up2gpa,ptnsr(3,3)*up2gpa
-     &       ,ptnsr(2,3)*up2gpa,ptnsr(3,1)*up2gpa,ptnsr(1,2)*up2gpa
+     &       ,stnsr(1,1)*up2gpa,stnsr(2,2)*up2gpa,stnsr(3,3)*up2gpa
+     &       ,stnsr(2,3)*up2gpa,stnsr(3,1)*up2gpa,stnsr(1,2)*up2gpa
       endif
 
       istp= 0
@@ -335,9 +335,14 @@ c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
         enddo
         tave= tave/nave
         write(6,'(1x,a,f0.2,a)') "  Temperature     = ",tave,' K'
-        prss = (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
-        write(6,'(1x,a,f0.3,a)') "  Stress          = ",
-     &       prss,' GPa'
+        prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
+        if( prss.ge.0d0 ) then
+          ctmp = '(tensile)'
+        else
+          ctmp = '(compressive)'
+        endif
+        write(6,'(1x,a,f0.3,a)') "  Pressure        = ",
+     &       prss,' GPa '//trim(ctmp)
         
 
         if( trim(cpctl).eq.'Berendsen' .or.
@@ -353,8 +358,8 @@ c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
      &         ,istp,tcpu,tave,epot,prss
         endif
         write(6,'(a,6f10.3)')' Stress tensor [GPa]: '
-     &       ,ptnsr(1,1)*up2gpa,ptnsr(2,2)*up2gpa,ptnsr(3,3)*up2gpa
-     &       ,ptnsr(2,3)*up2gpa,ptnsr(3,1)*up2gpa,ptnsr(1,2)*up2gpa
+     &       ,stnsr(1,1)*up2gpa,stnsr(2,2)*up2gpa,stnsr(3,3)*up2gpa
+     &       ,stnsr(2,3)*up2gpa,stnsr(3,1)*up2gpa,stnsr(1,2)*up2gpa
         write(6,*) ''
       endif
 
@@ -393,7 +398,7 @@ c.....write out energies
         write(ioerg,'(i10,3es16.7e3,f10.2,2es16.7e3)') istp
      &       ,ekin+epot0-epot0,ekin,epot0-epot0,tave
      &       ,vol
-     &       ,(ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
+     &       ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
         call flush(ioerg)
 c.....write out temperatures
         open(iotemp,file='out.temperature',status='replace')
@@ -532,9 +537,9 @@ c.....Copy RA of boundary atoms determined by 'bacopy'
           lstrs = lstrs0
         endif
 c-------Calc forces
-        call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
-     &       ,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr
-     &       ,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
+        call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
+     &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
+     &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
      &       ,numff,cffs,ifcoulomb,iprint,.false.,
      &       luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
      &       luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
@@ -600,8 +605,8 @@ c.....Calc kinetic energy
      &       ,vmax,mpi_md_world)
 
         call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
-     &       ,dt,srlx,stbeta,vol,ptnsr,mpi_md_world,cpctl)
-        prss = (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3*up2gpa
+     &       ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
+        prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
 c-------temperature control by Berendsen thermostat
         if( trim(ctctl).eq.'Berendsen' ) then
           tfac(1:9)= 0d0
@@ -697,9 +702,9 @@ c---------output step, time, and temperature
               write(6,'(3f15.7)') h(1:3,1:3,0)
               
               write(6,'(a,6f10.3)') ' Stress (GPa):'
-     &             ,ptnsr(1,1)*up2gpa ,ptnsr(2,2)*up2gpa
-     &             ,ptnsr(3,3)*up2gpa ,ptnsr(2,3)*up2gpa
-     &             ,ptnsr(1,3)*up2gpa ,ptnsr(1,2)*up2gpa
+     &             ,stnsr(1,1)*up2gpa ,stnsr(2,2)*up2gpa
+     &             ,stnsr(3,3)*up2gpa ,stnsr(2,3)*up2gpa
+     &             ,stnsr(1,3)*up2gpa ,stnsr(1,2)*up2gpa
             elseif( iprint.ne.0 ) then
               write(6,'(a,i8,2f10.2,es15.6,es11.3)')
      &             " istp,time,temp,epot,prss="
@@ -806,8 +811,13 @@ c          call system("mkdir -p "//cnum)
         enddo
         tave= tave/nave
         write(6,'(1x,a,f0.2,a)') "  Temperature     = ",tave,' K'
-        write(6,'(1x,a,f0.3,a)') "  Stress          = ",
-     &       prss,' GPa'
+        if( prss.ge.0d0 ) then
+          ctmp = '(tensile)'
+        else
+          ctmp = '(compressive)'
+        endif
+        write(6,'(1x,a,f0.3,a)') "  Pressure        = ",
+     &       prss,' GPa '//trim(ctmp)
         if( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &       trim(cpctl).eq.'vv-Berendsen' ) then
@@ -851,7 +861,7 @@ c=======================================================================
       subroutine one_shot(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
-     &     ,nspmax,am,dt,numff,cffs,rc,rbuf,ptnsr,epot
+     &     ,nspmax,am,dt,numff,cffs,rc,rbuf,stnsr,epot
      &     ,ekin,ifcoulomb,iprint,lcalcgrad,ndimp,pderiv)
 c
 c  In case that only one shot force calculation is required.
@@ -867,7 +877,7 @@ c
       real(8),intent(in):: hunit
       real(8),intent(inout):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
      &     ,atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot)
-     &     ,epitot(ntot),rc,rbuf,h(3,3,0:1),ptnsr(3,3)
+     &     ,epitot(ntot),rc,rbuf,h(3,3,0:1),stnsr(3,3)
      &     ,epot,ekin,am(nspmax),dt
      &     ,chgtot(ntot),chitot(ntot)
       character(len=20),intent(in):: cffs(numff)
@@ -975,9 +985,9 @@ c-----Make pair list
       lstrs = .true.
 
       if( iprint.ge.10 ) print *,'get_force,myid_md=',myid_md
-      call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,h,hi
-     &     ,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr
-     &     ,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
+      call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
+     &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
+     &     ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
      &     ,numff,cffs,ifcoulomb,iprint,.true.,
      &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
      &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
@@ -1000,7 +1010,7 @@ c.....Do not update epot here, so use epott instead.
         write(6,'(a,es15.7)') ' potential energy = ',epot
       endif
 
-      call sa2stnsr(natm,strs,eki,ptnsr,vol,mpi_md_world)
+      call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 
       call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
      &     ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
@@ -1364,8 +1374,8 @@ c=======================================================================
       call mpi_allreduce(ndofl,ndof,9,mpi_integer,mpi_sum
      &     ,mpi_md_world,ierr)
       if(myid_md.eq.0 .and. iprint.ne.0 )
-     &     write(6,'(a,9(2x,i0))') ' Degrees of freedom for each ifmv ='
-     &     ,ndof(1:9)
+     &     write(6,'(/,a,9(2x,i0))')
+     &     ' Degrees of freedom for each ifmv =',ndof(1:9)
       return
       end subroutine get_num_dof
 c=======================================================================
@@ -1605,7 +1615,7 @@ c-----calculate the cut-off lengths
         rcv(kd)= rc*asgm/vol
         nex(kd)= int(rcv(kd)) +1
       enddo
-      if( l1st .and. myid.eq.0 .and. iprint.ne.0 ) then
+      if( l1st .and. myid.eq.0 .and. iprint.ge.2 ) then
         write(6,'(a,3f10.3)') ' rcv = ',rcv(1:3)
         write(6,'(a,3i10)')   ' nex = ',nex(1:3)
       endif
@@ -2240,7 +2250,7 @@ c------------------------------------------------------------------------
       end function bmv
 c=======================================================================
       subroutine force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
-     &     ,dt,srlx,stbeta,vol,ptnsr,mpi_md_world,cpctl)
+     &     ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
 c
 c  Calc. acceralation of h-matrix used in isobaric MD
 c  using given stress tensor stgt.
@@ -2250,13 +2260,13 @@ c
       integer,intent(in):: natm,mpi_md_world
       real(8),intent(in):: stgt(3,3),eki(3,3,natm),strs(3,3,natm),ptgt
      &     ,sgm(3,3),dt,vol,srlx,stbeta
-      real(8),intent(out):: ah(3,3),ptnsr(3,3)
+      real(8),intent(out):: ah(3,3),stnsr(3,3)
       character(len=*):: cpctl
       
       integer:: i,ixyz,jxyz,ierr
       real(8):: prss,fac
 
-      call sa2stnsr(natm,strs,eki,ptnsr,vol,mpi_md_world)
+      call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 
 c.....Berendsen for variable-cell
       if( trim(cpctl).eq.'Berendsen' .or.
@@ -2267,14 +2277,14 @@ c.....now ah is scaling factor for h-mat
         ah(2,2)= 1d0
         ah(3,3)= 1d0
         ah(1:3,1:3)= ah(1:3,1:3)
-     &       -stbeta*dt/3/srlx*( stgt(1:3,1:3)-ptnsr(1:3,1:3) )
+     &       -stbeta*dt/3/srlx*( stgt(1:3,1:3)-stnsr(1:3,1:3) )
 c.....Berendsen for variable-volume not variable-cell
       else if( trim(cpctl).eq.'vv-Berendsen' ) then
         ah(1:3,1:3)= 0d0
         ah(1,1)= 1d0
         ah(2,2)= 1d0
         ah(3,3)= 1d0
-        prss = (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3
+        prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
         fac = 1.0 -stbeta/dt/3/srlx *(ptgt-prss)
         ah(1:3,1:3) = ah(1:3,1:3)*fac
       endif
@@ -2292,7 +2302,7 @@ c
       real(8),intent(out):: stnsr(3,3)
 
       integer:: i,ixyz,jxyz,ierr
-      real(8):: stp(3,3),stk(3,3),st(3,3)
+      real(8):: stp(3,3),stk(3,3),stl(3,3),stg(3,3)
       
       stp(1:3,1:3)= 0d0
       stk(1:3,1:3)= 0d0
@@ -2305,11 +2315,11 @@ c
         enddo
       enddo
 
-      st(1:3,1:3) = stk(1:3,1:3) +stp(1:3,1:3)
-      stnsr(1:3,1:3)= 0d0
-      call mpi_allreduce(st,stnsr,9,mpi_real8,mpi_sum
+      stl(1:3,1:3) = stk(1:3,1:3) +stp(1:3,1:3)
+      stg(1:3,1:3)= 0d0
+      call mpi_allreduce(stl,stg,9,mpi_real8,mpi_sum
      &     ,mpi_md_world,ierr)
-      stnsr(1:3,1:3)=stnsr(1:3,1:3) /vol
+      stnsr(1:3,1:3) = stnsr(1:3,1:3) +stg(1:3,1:3)/vol
       return
       end subroutine sa2stnsr
 c=======================================================================

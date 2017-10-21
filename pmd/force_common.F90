@@ -1,4 +1,4 @@
-subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
+subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
      ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr &
      ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
      ,numff,cffs,ifcoulomb,iprint,l1st, &
@@ -44,7 +44,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
        ,acon(nismax),tag(namax)
   real(8),intent(inout):: tcom,rc
   real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
-       ,chg(namax),chi(namax)
+       ,chg(namax),chi(namax),stnsr(3,3)
   character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: l1st
   logical,intent(inout):: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, &
@@ -59,40 +59,11 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
   integer:: ierr,is,i
   real(8):: at(3),tmp
 
-!!$  if( l1st ) then
-!!$    call set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
-!!$         luse_RK_FeH,luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si, &
-!!$         luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe, &
-!!$         luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe, &
-!!$         luse_SM_Al,luse_linreg,luse_NN,luse_Morse,luse_vcMorse, &
-!!$         ifcoulomb,numff,cffs,myid_md,iprint)
-!!$    lvc = .false.
-!!$    if( luse_vcMorse ) then
-!!$      if( ifcoulomb.ne.3 ) then
-!!$        if( myid_md.eq.0 .and. iprint.ne.0 ) print *,'ifcoulomb is set to 3,' &
-!!$             //' because vcMorse is chosen.'
-!!$        ifcoulomb = 3
-!!$      endif
-!!$      lvc = .true.
-!!$    endif
-!!$
-!!$!.....Initialization if needed
-!!$    if( ifcoulomb.eq.1 ) then ! screened Coulomb
-!!$      call initialize_coulomb(natm,tag,chg,chi,myid_md &
-!!$           ,mpi_md_world,ifcoulomb,iprint,h,rc)
-!!$    else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
-!!$      call initialize_coulomb(natm,tag,chg,chi,myid_md &
-!!$           ,mpi_md_world,ifcoulomb,iprint,h,rc)
-!!$    else if( ifcoulomb.eq.3 ) then ! variable-charge with Gaussians
-!!$      call initialize_coulomb(natm,tag,chg,chi,myid_md &
-!!$           ,mpi_md_world,ifcoulomb,iprint,h,rc)
-!!$    endif
-!!$  endif
-
   epot = 0d0
   aa(1:3,1:namax)=0d0
   epi(1:namax)= 0d0
   strs(1:3,1:3,1:namax)= 0d0
+  stnsr(1:3,1:3) = 0d0
 
 !.....If varaible charge, optimize charges before any force calc
   if( lvc ) then
@@ -116,7 +87,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
          ,ifcoulomb,l1st)
   else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
     call force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-         ,chg,h,hi,tcom &
+         ,chg,stnsr,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
          ,ifcoulomb)
@@ -201,17 +172,11 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
 
-
 !.....convert forces from hmat-coordinates to Cartesian coordinates
   do i=1,natm
     at(1:3)= aa(1:3,i)
     aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
   enddo
-!!$!-----multiply 0.5d0*dt**2/am(i)
-!!$  do i=1,natm
-!!$    is= int(tag(i))
-!!$    aa(1:3,i)= acon(is)*aa(1:3,i)
-!!$  enddo
 
 end subroutine get_force
 !=======================================================================

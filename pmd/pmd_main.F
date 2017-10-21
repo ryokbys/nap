@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-18 16:00:27 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-21 10:42:41 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -57,6 +57,8 @@ c.....Set fmv as default value before reading 'in.pmd'
         write(6,'(a)') '================================='
      &       //'======================================='
         write(6,*) ''
+        call time_stamp(' Job started')
+        write(6,*) ''
         write(6,'(a,i0)') ' Number of processes in MPI = ',nodes_md
         call read_input(10,'in.pmd')
         call check_cmin(cmin,ifdmp)
@@ -111,7 +113,7 @@ c.....call pmd_core to perfom MD
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
-     &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,ptnsr,epot
+     &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,stnsr,epot
      &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
      &     ,nstp_done)
 
@@ -125,7 +127,9 @@ c.....call pmd_core to perfom MD
 
 c.....write energy, forces and stresses only for fitpot
       if( myid_md.eq.0 ) then
-        call write_force(21,'.pmd',h,epot,ntot,tagtot,atot,ptnsr)
+        call write_force(21,'.pmd',h,epot,ntot,tagtot,atot,stnsr)
+        write(6,*) ''
+        call time_stamp(' Job finished')
       endif
 
       deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot,cffs)
@@ -201,7 +205,8 @@ c=======================================================================
       write(6,'(2x,a25,i8)')   'flag_out_pmd',ifpmd
       write(6,'(2x,a25,i8)')   'num_out_pmd',npmd
       write(6,'(2x,a)') ''
-      write(6,'(2x,a25,10(2x,a))') 'force_type',(cffs(i),i=1,numff)
+      write(6,'(2x,a25,10(2x,a))') 'force_type',
+     &     (trim(cffs(i)),i=1,numff)
       write(6,'(2x,a25,es15.7)') 'cutoff_radius',rc
       write(6,'(2x,a25,es15.7)') 'cutoff_buffer',rbuf
       write(6,'(2x,a)') ''
@@ -328,12 +333,12 @@ c.....NEMD
       end subroutine bcast_params
 c=======================================================================
       subroutine write_force(ionum,cpostfix,h,epot,ntot
-     &     ,tagtot,atot,ptnsr)
+     &     ,tagtot,atot,stnsr)
       implicit none
       include "./params_unit.h"
       integer,intent(in):: ionum,ntot
       character(len=*),intent(in):: cpostfix
-      real(8),intent(in):: h(3,3),epot,ptnsr(3,3)
+      real(8),intent(in):: h(3,3),epot,stnsr(3,3)
       real(8),intent(inout):: tagtot(ntot),atot(3,ntot)
 
       integer:: i,n0,ixyz,ierr
@@ -355,12 +360,12 @@ c.....Write out energy
       close(ionum+1)
 
 c.....Write stress tensor, negative as compressive, positive as tensile
-      ptmp(1) = ptnsr(1,1)*up2gpa*(-1d0)
-      ptmp(2) = ptnsr(2,2)*up2gpa*(-1d0)
-      ptmp(3) = ptnsr(3,3)*up2gpa*(-1d0)
-      ptmp(4) = ptnsr(3,2)*up2gpa*(-1d0)
-      ptmp(5) = ptnsr(1,3)*up2gpa*(-1d0)
-      ptmp(6) = ptnsr(1,2)*up2gpa*(-1d0)
+      ptmp(1) = stnsr(1,1)*up2gpa*(-1d0)
+      ptmp(2) = stnsr(2,2)*up2gpa*(-1d0)
+      ptmp(3) = stnsr(3,3)*up2gpa*(-1d0)
+      ptmp(4) = stnsr(3,2)*up2gpa*(-1d0)
+      ptmp(5) = stnsr(1,3)*up2gpa*(-1d0)
+      ptmp(6) = stnsr(1,2)*up2gpa*(-1d0)
       open(ionum+2,file='strs'//trim(cpostfix),status='replace')
       write(ionum+2,'(6f12.4)') ptmp(1:6)
       close(ionum+2)
