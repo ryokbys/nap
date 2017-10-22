@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-21 10:39:53 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-22 16:45:12 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -10,7 +10,7 @@ c-----------------------------------------------------------------------
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
      &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,stnsr,epot
      &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
-     &     ,nstp_done)
+     &     ,nstp_done,lvc)
       use pmdvars
       use zload
       implicit none
@@ -31,6 +31,7 @@ c-----------------------------------------------------------------------
      &     ,czload_type*5
       character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: ltdst,lstrs0,lcellfix(3,3)
+      logical,intent(inout):: lvc
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
       integer:: ihour,imin,isec
@@ -39,6 +40,7 @@ c-----------------------------------------------------------------------
       real(8),external:: box_muller,sprod
       logical:: lconverged = .false.
       logical:: lstrs = .false.
+      logical:: lcell_updated = .true.
 c.....FIRE variables
       real(8):: alp_fire,fnorm,vnorm,fdotv
       integer:: num_fire
@@ -55,7 +57,6 @@ c-----output file names
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
      &     luse_Buckingham
-      logical:: lvc
 
       call initialize_pmdvars(nspmax)
 
@@ -63,6 +64,7 @@ c.....multiply damping factor 1st to avoid doing every step
       if( ifdmp.eq.1 ) then
         fmv(1:3,0:9)= fmv(1:3,0:9) *dmp
       endif
+
 
 c.....Set 0d0 to z of fmv(9) in case of z-loading
       if( czload_type.eq.'atoms' .or. czload_type.eq.'box' ) then
@@ -115,6 +117,9 @@ c-----output every these steps, NOUTERG, NOUTPMD
       else
         noutpmd = maxstp +1
       endif
+c      do i=1,ntot
+c        rtot(1:3,i) = rtot(1:3,i) +0.1d0
+c      enddo
 c.....perform space decomposition after reading atomic configuration
       call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
@@ -126,7 +131,7 @@ c.....Some conversions
       do i=1,natm
         ra(1:3,i)= ra(1:3,i) -sorg(1:3)
 c-------scaling
-        va(1:3,i)= va(1:3,i) *dt
+        va(1:3,i)= va(1:3,i) !*dt
 c-------species of atom-i
         nsp= max(int(tag(i)),nsp)
         if(nsp.gt.nspmax) then
@@ -252,6 +257,9 @@ c.....Calc forces
      &     ( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &     trim(cpctl).eq.'vv-Berendsen')
+      lcell_updated = ( trim(cpctl).eq.'Berendsen' .or.
+     &       trim(cpctl).eq.'vc-Berendsen' .or.
+     &     trim(cpctl).eq.'vv-Berendsen')
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &     ,lspr,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
@@ -261,7 +269,7 @@ c.....Calc forces
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,luse_Buckingham)
+     &     luse_vcMorse,lvc,luse_Buckingham,lcell_updated)
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -301,12 +309,6 @@ c.....get_num_dof is called once in a MD run
       endif
       call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
      &     ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
-c      stnsr(1:3,1:3)= stnsr(1:3,1:3)/vol
-      if( myid_md.eq.0 .and. iprint.ne.0 ) then
-        write(6,'(a,6f10.3)')' Stress tensor [GPa]: '
-     &       ,stnsr(1,1)*up2gpa,stnsr(2,2)*up2gpa,stnsr(3,3)*up2gpa
-     &       ,stnsr(2,3)*up2gpa,stnsr(3,1)*up2gpa,stnsr(1,2)*up2gpa
-      endif
 
       istp= 0
       istps= istp
@@ -343,8 +345,10 @@ c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
         endif
         write(6,'(1x,a,f0.3,a)') "  Pressure        = ",
      &       prss,' GPa '//trim(ctmp)
-        
-
+        write(6,'(1x,a,6(1x,f0.3))') '  Stress tensor   ='
+     &       ,stnsr(1,1)*up2gpa,stnsr(2,2)*up2gpa,stnsr(3,3)*up2gpa
+     &       ,stnsr(2,3)*up2gpa,stnsr(3,1)*up2gpa,stnsr(1,2)*up2gpa
+        write(6,*) ''
         if( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &       trim(cpctl).eq.'vv-Berendsen') then
@@ -357,10 +361,6 @@ c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
      &         " istp,time,temp,epot,prss="
      &         ,istp,tcpu,tave,epot,prss
         endif
-        write(6,'(a,6f10.3)')' Stress tensor [GPa]: '
-     &       ,stnsr(1,1)*up2gpa,stnsr(2,2)*up2gpa,stnsr(3,3)*up2gpa
-     &       ,stnsr(2,3)*up2gpa,stnsr(3,1)*up2gpa,stnsr(1,2)*up2gpa
-        write(6,*) ''
       endif
 
 c.....output initial configuration including epi, eki, and strs
@@ -546,7 +546,7 @@ c-------Calc forces
      &       luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
      &       ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
      &       ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul
-     &       ,luse_vcMorse,lvc,luse_Buckingham)
+     &       ,luse_vcMorse,lvc,luse_Buckingham,lcell_updated)
         lstrs = .false.
 
 c.....Second kick of velocities
@@ -862,7 +862,7 @@ c=======================================================================
      &     ,ekitot,epitot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,numff,cffs,rc,rbuf,stnsr,epot
-     &     ,ekin,ifcoulomb,iprint,lcalcgrad,ndimp,pderiv)
+     &     ,ekin,ifcoulomb,iprint,lcalcgrad,ndimp,pderiv,lvc)
 c
 c  In case that only one shot force calculation is required.
 c
@@ -884,6 +884,7 @@ c
       logical,intent(in):: lcalcgrad
       integer,intent(in):: ndimp
       real(8),intent(inout):: pderiv(ndimp)
+      logical,intent(inout):: lvc
 
       integer:: i,ierr,is,nspl,nxyz
       real(8):: aai(3),epott
@@ -895,7 +896,7 @@ c
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
      &     luse_Buckingham
-      logical:: lvc
+      logical:: lcell_updated = .false.
       
 c      write(6,'(a,200es10.2)') 'chgtot in pmd_core = ',
 c     &     chgtot(1:ntot)
@@ -994,7 +995,7 @@ c-----Make pair list
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
      &     ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
      &     ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,luse_Buckingham)
+     &     luse_vcMorse,lvc,luse_Buckingham,lcell_updated)
 c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
 c     &     ,epot,chg(1:natm)
 

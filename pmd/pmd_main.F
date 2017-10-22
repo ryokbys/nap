@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-21 10:42:41 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-21 17:42:43 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -72,7 +72,7 @@ c.....Set Coulomb flag here
         ifcoulomb = 1
       else if( force_on('Ewald_Coulomb',numff,cffs) ) then
         ifcoulomb = 2
-      else if( force_on('vc_gaussian',numff,cffs) ) then
+      else if( force_on('long_Coulomb',numff,cffs) ) then
         ifcoulomb = 3
       endif
 
@@ -115,7 +115,7 @@ c.....call pmd_core to perfom MD
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
      &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,stnsr,epot
      &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
-     &     ,nstp_done)
+     &     ,nstp_done,lvc)
 
       if( myid_md.eq.0 ) then
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
@@ -207,6 +207,9 @@ c=======================================================================
       write(6,'(2x,a)') ''
       write(6,'(2x,a25,10(2x,a))') 'force_type',
      &     (trim(cffs(i)),i=1,numff)
+      if( lvc ) then
+        write(6,'(2x,a25,l8)') 'charge_optimize',lvc
+      endif
       write(6,'(2x,a25,es15.7)') 'cutoff_radius',rc
       write(6,'(2x,a25,es15.7)') 'cutoff_buffer',rbuf
       write(6,'(2x,a)') ''
@@ -308,6 +311,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(am,nspmax,mpi_double_precision,0,mpi_md_world,ierr)
       call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(nrmtrans,6,mpi_integer,0,mpi_md_world,ierr)
+      call mpi_bcast(lvc,1,mpi_logical,0,mpi_md_world,ierr)
 c.....Force-fields
       call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(numff,1,mpi_integer,0,mpi_md_world,ierr)

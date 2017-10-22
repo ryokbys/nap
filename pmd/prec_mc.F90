@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-09-20 17:51:05 Ryo KOBAYASHI>
+!                     Last-modified: <2017-10-21 17:43:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -1141,7 +1141,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,epot,ekin,eps_conv,rbuf
   character:: ciofmt*6,cforce*20,ctctl*20,cpctl*20,czload_type*5,csi*1
   character(len=20):: cffs(1)
-  logical:: ltdst,lstrs,lcellfix(3,3)
+  logical:: ltdst,lstrs,lcellfix(3,3),lvc
 
   logical,save:: l1st = .true.
   integer,save:: ntot = 0
@@ -1240,6 +1240,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   ifsort = 1
   iprint = 0
   ifcoulomb = 0
+  lvc = .false.
 
 !.....call pmd_core to perfom MD
 !!$  print *,'nstps_pmd = ',nstps_pmd
@@ -1251,7 +1252,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl,stgt,ptgt &
        ,srlx,stbeta,strfin,lstrs,lcellfix &
        ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb &
-       ,czload_type,eps_conv,ifsort,iprint,nstps_done)
+       ,czload_type,eps_conv,ifsort,iprint,nstps_done,lvc)
 !!$  print *,'nstps_pmd,minstp,nstps_done = ' &
 !!$       ,nstps_pmd,minstp,nstps_done
   if( myid_md.eq.0 ) then

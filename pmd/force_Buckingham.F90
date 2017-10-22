@@ -1,6 +1,6 @@
 module Buckingham
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-21 10:20:27 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-22 19:33:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Buckingham calculation
 !    - only force on i is considered, no need to send back
@@ -43,9 +43,9 @@ contains
          ,a,rho,c
     real(8),allocatable,save:: strsl(:,:,:)
 
+    integer,external:: itotOf
+
     if( l1st ) then
-!!$      call init_Morse(natm,tag,mpi_md_world)
-!!$      call read_params_Morse(myid,mpi_md_world,iprint)
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif
@@ -110,8 +110,8 @@ contains
     enddo
 
     if( lstrs ) then
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-           ,nn,mpi_md_world,strsl,9)
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
 

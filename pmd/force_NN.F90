@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-13 15:48:12 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-22 21:41:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -81,6 +81,7 @@ contains
     integer:: i,j,k,l,m,n,is,ierr,ia,ja &
          ,ihl0,ihl1,ihl2,jj
     real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp
+    real(8),allocatable,save:: strsl(:,:,:)
 
 !    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
 
@@ -148,7 +149,16 @@ contains
         if( allocated(hl1) ) deallocate(hl1,hl2)
         allocate( hl1(nhl(1),nal), hl2(nhl(2),nal) )
       endif
+
+      if( allocated(strsl) ) deallocate(strsl)
+      allocate(strsl(3,3,namax))
     endif
+
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
+    endif
+    strsl(1:3,1:3,1:namax) = 0d0
 
 !  Since natm and nn can change every step of MD,
 !  if natm/nnltmp becomes nal/nnl, they should be updated and
@@ -351,9 +361,10 @@ contains
          ,nn,mpi_world,aa,3)
 
     if( lstrs ) then
-      call compute_stress(namax,natm,tag,ra,nnmax,strs,h &
+      call compute_stress(namax,natm,tag,ra,nnmax,strsl,h &
            ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rcnn,lspr &
            ,mpi_world,myid)
+      strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
 
 !-----gather epot
@@ -1335,10 +1346,6 @@ contains
               enddo  ! ixyz
             enddo  ! ihl0
           enddo  ! ihl1
-!!$          if( ia.eq.1 ) then
-!!$            write(6,'(3i4,6es12.4)') ia,jj,ja,stmp(1,1),stmp(2,2),stmp(3,3),&
-!!$                 stmp(2,3),stmp(1,3),stmp(1,2)
-!!$          endif
         enddo  ! ja
       enddo  ! ia
     else if( nl.eq.2 ) then
@@ -1387,16 +1394,8 @@ contains
 !-----send back (3-body)forces, stresses, and potentials on immigrants
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,strs,9)
-!.....TODO: should this strs be additive? If so, 0.5 should not be here.
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)*0.5d0
-
-!!$    if( myid.ge.0 ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-!!$           ,nn,mpi_world,strs,9)
-!!$    else
-!!$      call reduce_dba_bk(natm,namax,tag,strs,9)
-!!$    endif
-
+    return
   end subroutine compute_stress
 !=======================================================================
   subroutine set_paramsdir_NN(dname)

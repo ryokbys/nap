@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-20 17:30:40 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-21 17:46:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -24,6 +24,8 @@ program fitpot
     call write_version()
     call write_authors()
     write(6,'(a)') '========================================================================'
+    write(6,*) ''
+    call time_stamp(' Job started')
     write(6,*) ''
     write(6,'(a,i6)') ' Number of processes in MPI = ',nnode
     call read_input(10,'in.fitpot')
@@ -182,6 +184,8 @@ program fitpot
     write(6,'(a,f15.3,a,i3,"h",i2.2,"m",i2.2,"s")') &
          ' Time      = ', tmp, &
          ' sec  = ', ihour,imin,isec
+    write(6,*) ''
+    call time_stamp(' Job finished')
   endif
   call mpi_finalize(ierr)
 
@@ -2190,7 +2194,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
        ifcoulomb,nismax,nstps_done,ntdst,nx,ny,nz,iprint_pmd
   real(8):: am(9),dt,rc,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
        ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv
-  logical:: ltdst,lstrs,lcellfix(3,3)
+  logical:: ltdst,lstrs,lcellfix(3,3),lvc
   character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5
 
   if( l1st ) then
@@ -2241,6 +2245,13 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
   nz = 1
   iprint_pmd = 0
   if( iprint.ge.100 ) iprint_pmd = 10
+
+  lvc = .false.
+  do i=1,nffs
+    if( trim(cff(i)).eq.'long_Coulomb' .or. &
+         trim(cff(i)).eq.'vcMorse' ) then
+      lvc = .true.
+  enddo
   
 !.....one_shot force calculation
 !!$  print *,'calling one_shot, myid,mpi_world,myid_pmd,mpi_comm_pmd='&
@@ -2250,7 +2261,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
        ,smpl%chg,smpl%chi &
        ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
        ,nismax,am,dt,nff,cffs,rc,rbuf,ptnsr,epot,ekin &
-       ,ifcoulomb,iprint_pmd,lcalcgrad,ndimp,pderiv)
+       ,ifcoulomb,iprint_pmd,lcalcgrad,ndimp,pderiv,lvc)
   strs(1:3,1:3) = ptnsr(1:3,1:3)*up2gpa*(-1d0)
 !!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
 !!$  print *,'smpl%natm =',smpl%natm
