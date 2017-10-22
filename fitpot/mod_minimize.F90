@@ -3343,7 +3343,7 @@ contains
     if( myid.eq.0 ) then
       write(6,*) ''
       write(6,'(a)') ' The best one in this DE simulation run:'
-      write(6,'(a,i8,f12.4)') '   ID, f-value: ',iidbest,fbest
+      write(6,'(a,i8,2x,f0.4)') '   ID, f-value: ',iidbest,fbest
       write(6,'(a,100f7.3)') '   Variables: ', xbest(1:min(ndim,100))
       write(6,*) ''
     endif
