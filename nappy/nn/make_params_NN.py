@@ -139,7 +139,7 @@ def get_inputs():
     print('Number of species: ')
     inputs['nsp'] = int(sys.stdin.readline())
 
-    print('Number of hidden layers: ')
+    print('Number of hidden layers (1 or 2): ')
     inputs['nl'] = int(sys.stdin.readline())
     if not inputs['nl'] in (1,2):
         raise ValueError(' nl is not 1 or 2, nl={0:d}'.format(inputs['nl']))
@@ -194,7 +194,7 @@ def get_params(sfname,isp1,isp2,isp3=None):
         raise ValueError('No such symmetry function: '+sfname)
 
 def get_gauss_params(isp1,isp2):
-    print('\nDetermining Gaussian parameters for {0:d}-{1:d}:'.format(isp1,isp2))
+    print('\nDetermine Gaussian parameters for {0:d}-{1:d}:'.format(isp1,isp2))
     print('Minimum interaction distance [Ang]:')
     rmin = float(sys.stdin.readline())
     print('Maximum interaction distance [Ang]:')
@@ -216,6 +216,7 @@ def get_gauss_params(isp1,isp2):
     print('Gaussian width parameters [1/Ang]'
           +' (several values separated by white-space):')
     etas = [ float(eta) for eta in sys.stdin.readline().split() ]
+    print('\n')
     print('Number of Gaussian width parameters = {0:d}'.format(len(etas)))
     return rs, etas
 
@@ -354,6 +355,7 @@ def load_config(fname):
     triplets = dic['triplets']
     return inputs, pairs, triplets
 
+
 #========================================================= main routine
 if __name__ == "__main__":
 
@@ -362,6 +364,7 @@ if __name__ == "__main__":
 
     if load:
         inconfname = args['CONFIG']
+        print('Loading {0:s}...'.format(inconfname))
         inputs,pairs,triplets = load_config(inconfname)
     else:
         inputs = get_inputs()
@@ -376,7 +379,7 @@ if __name__ == "__main__":
     
         nsp = inputs['nsp']
         if b2_exists:
-            ncmb2= nsp+ ncomb(nsp,2)/2
+            ncmb2= nsp+ ncomb(nsp,2)
             pairs = get_pairs(nsp)
             print('Number of pair combinations: {0:d}'.format(ncmb2))
             print('Pairs=',pairs)
@@ -420,4 +423,4 @@ if __name__ == "__main__":
     create_param_files(inputs,nsf2,pairs,nsf3,triplets)
     if not load:
         save_config('out.conf.make_params_NN',inputs,pairs,triplets)
-    print('Please check '+_constfname+' and '+_paramfname)
+    print('\nPlease check '+_constfname+' and '+_paramfname)

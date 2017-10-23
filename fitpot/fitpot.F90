@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-21 17:46:54 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-22 22:14:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -2247,10 +2247,11 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
   if( iprint.ge.100 ) iprint_pmd = 10
 
   lvc = .false.
-  do i=1,nffs
-    if( trim(cff(i)).eq.'long_Coulomb' .or. &
-         trim(cff(i)).eq.'vcMorse' ) then
+  do i=1,nff
+    if( trim(cffs(i)).eq.'long_Coulomb' .or. &
+         trim(cffs(i)).eq.'vcMorse' ) then
       lvc = .true.
+    endif
   enddo
   
 !.....one_shot force calculation

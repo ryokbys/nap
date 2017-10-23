@@ -2651,8 +2651,10 @@ contains
         enddo
       enddo
       if( myid.eq.0 .and. iprint.ne.0 ) then
-        print *,''
-        print *,'******************** Genetic Algorithm ********************'
+        write(6,*) ''
+        write(6,'(a)') '------------------------------------------------------------------------'
+        write(6,'(a)') '                    Genetic Algorithm'
+        write(6,'(a)') '------------------------------------------------------------------------'
         print '(a,i4)',' Number of individuals = ',ga_nindivs
         print '(a,i4)',' Number of genes       = ',ga_ngenes
         print '(a,i4)',' Number of bits        = ',ga_nbits
@@ -2789,8 +2791,8 @@ contains
     if( myid.eq.0 ) then
       write(6,*) ''
       write(6,'(a)') ' The best one in this GA simulation run:'
-      write(6,'(a,i8,f12.4)') '   ID, f-value: ',iidbest,fbest
-      write(6,'(a,100f7.3)')  '   Variables: ',xbest(1:ndim)
+      write(6,'(a,i8,1x,f0.4)') '   ID, f-value: ',iidbest,fbest
+!!$      write(6,'(a,100f7.3)')  '   Variables: ',xbest(1:ndim)
       write(6,*) ''
     endif
 
@@ -3121,8 +3123,10 @@ contains
       lmdg = de_lambda
       lmdl = lmdg
       if( myid.eq.0 .and. iprint.ne.0 ) then
-        print *,''
-        print *,'******************** Differential Evolution ********************'
+        write(6,*) ''
+        write(6,'(a)') '------------------------------------------------------------------------'
+        write(6,'(a)') '                          Differential Evolution'
+        write(6,'(a)') '------------------------------------------------------------------------'
         print '(a,i4)',' Number of individuals = ',de_nindivs
         print '(a,f8.4)',' Fraction              =',de_frac
         print '(a,f8.4)',' Crossover rate        =',de_cross_rate
@@ -3343,8 +3347,8 @@ contains
     if( myid.eq.0 ) then
       write(6,*) ''
       write(6,'(a)') ' The best one in this DE simulation run:'
-      write(6,'(a,i8,2x,f0.4)') '   ID, f-value: ',iidbest,fbest
-      write(6,'(a,100f7.3)') '   Variables: ', xbest(1:min(ndim,100))
+      write(6,'(a,i8,1x,f0.4)') '   ID, f-value: ',iidbest,fbest
+!!$      write(6,'(a,100f7.3)') '   Variables: ', xbest(1:min(ndim,100))
       write(6,*) ''
     endif
 
@@ -3443,8 +3447,10 @@ contains
         allocate(indivs(i)%genes(ndim),indivs(i)%vel(ndim))
       enddo
       if( myid.eq.0 .and. iprint.ne.0 ) then
-        print *,''
-        print *,'*************** Particle Swarm Optimization (PSO) ***************'
+        write(6,*) ''
+        write(6,'(a)') '------------------------------------------------------------------------'
+        write(6,'(a)') '                   Particle Swarm Optimization (PSO)'
+        write(6,'(a)') '------------------------------------------------------------------------'
         print '(a,i4)',  ' Number of individuals = ',pso_nindivs
         print '(a,f8.4)',' w                     =',pso_w
         print '(a,f8.4)',' C1                    =',pso_c1
@@ -3591,14 +3597,14 @@ contains
     if( myid.eq.0 ) then
       write(6,*) ''
       write(6,'(a)') ' The best one in this PSO simulation run:'
-      write(6,'(a,i8,f12.4)') '   ID, f-value: ',iidbest,fbest
-      write(6,'(a,100f7.3)')  '   Variables: ',xbest(1:ndim)
+      write(6,'(a,i8,1x,f0.4)') '   ID, f-value: ',iidbest,fbest
+!!$      write(6,'(a,100f7.3)')  '   Variables: ',xbest(1:ndim)
       write(6,*) ''
 
-      do i=1,pso_nindivs
-        print '(a,i4,f10.1,1x,100f9.4)', ' i,fpbest,xpbest =' ,i,fpbest(i),&
-             xpbest(1:ndim,i)
-      enddo
+!!$      do i=1,pso_nindivs
+!!$        print '(a,i4,f10.1,1x,100f9.4)', ' i,fpbest,xpbest =' ,i,fpbest(i),&
+!!$             xpbest(1:ndim,i)
+!!$      enddo
       print *,''
     endif
 
