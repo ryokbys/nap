@@ -11,7 +11,9 @@ Options:
   --deform-range=DEFORM_RANGE
               Range of the lattice deformation ratio. [default: 0.01,0.2]
   --displace-range=DISPLACE_RANGE
-              Range of the atom displacements in ratio to volume^{-3}. [default: 0.01,0.1]
+              Range of the atom displacements in ratio to (atomic volume)^{-3}. [default: 0.1]
+  --num-displace=NUM_DISPLACE
+              Number of displacements per deformation. [default: 2]
 """
 from __future__ import print_function
 
@@ -61,52 +63,50 @@ if __name__ == "__main__":
 
     num_data = int(args['-n'])
     deform_range = [ float(x) for x in args['--deform-range'].split(',') ]
-    displace_range = [ float(x) for x in args['--displace-range'].split(',') ]
+    displace_range = float(args['--displace-range'])
+    num_displace = int(args['--num-displace'])
     infname= args['POSCAR']
 
     atoms0 = read(infname,format='vasp')
 
     dlatd = (deform_range[1] -deform_range[0])/(num_data-1)
-    ddisp = (displace_range[1] -displace_range[0])/(num_data-1)
+    ddisp = displace_range/num_displace
     print('deformation range = ',deform_range[0],deform_range[1])
-    print('displace range    = ',displace_range[0],displace_range[1])
+    print('displace range    = ',displace_range)
+    print('num of displace   = ',num_displace)
     print('dlatd = ',dlatd)
     print('ddisp = ',ddisp)
-    
-    for i in range(num_data):
-        latd = dlatd*i +deform_range[0]
-        disp = ddisp*i +displace_range[0]
-        #print 'latd = ',latd
-        #print 'disp = ',disp
+
+    n = 0
+    while True:
+        latd = dlatd*n +deform_range[0]
         cell0 = atoms0.get_cell()
-        atoms = atoms0.copy()
         a = np.array(cell0[0])
         b = np.array(cell0[1])
         c = np.array(cell0[2])
         anew = deformed_vector(a,np.linalg.norm(a)*latd)
         bnew = deformed_vector(b,np.linalg.norm(b)*latd)
         cnew = deformed_vector(c,np.linalg.norm(c)*latd)
-        #print a, np.linalg.norm(a)
-        #print anew, np.linalg.norm(anew)
-        #print b, np.linalg.norm(b)
-        #print bnew, np.linalg.norm(bnew)
-        #print c, np.linalg.norm(c)
-        #print cnew, np.linalg.norm(cnew)
         cell = [anew,bnew,cnew]
-        atoms.set_cell(cell,scale_atoms=True)
-        avol = atoms.get_volume()/len(atoms)
-        avol3= avol**(1.0/3)
-        dmax = avol3*disp
-        # print('avol,avol^(1/3),dmax=',avol,avol3,dmax)
-        pos = atoms.get_positions()
-        for ia in range(1,len(atoms)):
-            for l in range(3):
-                pos[ia,l] = pos[ia,l] +dmax*(2.0*random.random()-1.0)
-        atoms.set_positions(pos)
-        outfname = 'POSCAR_{0:05d}'.format(i+1)
-        write(outfname,images=atoms,format='vasp',
-              direct=True,vasp5=True,sort=True)
-        print('fname,avol= {0:s} {1:7.2f}'.format(outfname,
-                                                  atoms.get_volume()/len(atoms)))
-
-
+        for idisp in range(num_displace):
+            n += 1
+            if n > num_data:
+                break
+            disp = ddisp*(idisp+1)
+            atoms = atoms0.copy()
+            atoms.set_cell(cell,scale_atoms=True)
+            avol = atoms.get_volume()/len(atoms)
+            avol3= avol**(1.0/3)
+            dmax = avol3*disp
+            pos = atoms.get_positions()
+            for ia in range(1,len(atoms)):
+                for l in range(3):
+                    pos[ia,l] = pos[ia,l] +dmax*(2.0*random.random()-1.0)
+            atoms.set_positions(pos)
+            outfname = 'POSCAR_{0:05d}'.format(n)
+            write(outfname,images=atoms,format='vasp',
+                  direct=True,vasp5=True,sort=True)
+            print('fname,avol= {0:s} {1:7.2f}'.format(outfname,
+                                                      atoms.get_volume()/len(atoms)))
+        if n > num_data:
+            break
