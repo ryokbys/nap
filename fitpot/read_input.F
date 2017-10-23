@@ -60,7 +60,8 @@ c=======================================================================
       elseif( trim(cname).eq.'fitting_method' ) then
         call read_c1(ionum,cfmethod)
         return
-      elseif( trim(cname).eq.'main_directory' ) then
+      elseif( trim(cname).eq.'main_directory' .or.
+     &       trim(cname).eq.'sample_directory' ) then
         call read_c1(ionum,cmaindir)
         return
       elseif( trim(cname).eq.'param_file' ) then
@@ -109,7 +110,8 @@ c=======================================================================
       elseif( trim(cname).eq.'potential' ) then
         call read_c1(ionum,cpot)
         return
-      elseif( trim(cname).eq.'subtract_force_field' ) then
+      elseif( trim(cname).eq.'subtract_force_field' .or.
+     &       trim(cname).eq.'additive_force_field' ) then
         call read_force_field(ionum)
         return
       elseif( trim(cname).eq.'gradient' ) then

@@ -423,4 +423,4 @@ if __name__ == "__main__":
     create_param_files(inputs,nsf2,pairs,nsf3,triplets)
     if not load:
         save_config('out.conf.make_params_NN',inputs,pairs,triplets)
-    print('\nPlease check '+_constfname+' and '+_paramfname)
+    print('\nCheck '+_constfname+' and '+_paramfname)
