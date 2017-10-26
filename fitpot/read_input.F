@@ -126,9 +126,6 @@ c=======================================================================
       elseif( trim(cname).eq.'normalize_input' ) then
         call read_c1(ionum,cnormalize)
         return
-      elseif( trim(cname).eq.'freduce_threshold' ) then
-        call read_r1(ionum,fred)
-        return
       elseif( trim(cname).eq.'num_forces' ) then
         call read_i1(ionum,nfpsmpl)
         return
@@ -288,8 +285,11 @@ c=======================================================================
         allocate(cswgt(nswgt),swerg0(nswgt),swdenom(nswgt))
         call read_smpl_wgt(ionum,nswgt,cswgt,swerg0,swdenom)
         return
-      elseif( trim(cname).eq.'f_upper_limit' ) then
+      elseif( trim(cname).eq.'fval_upper_limit' ) then
         call read_r1(ionum,fupper_lim)
+        return
+      elseif( trim(cname).eq.'force_limit' ) then
+        call read_r1(ionum,force_limit)
         return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)

@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-07-27 16:53:15 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-26 15:11:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -698,8 +698,6 @@ contains
           enddo
         enddo
       enddo
-!!$    else if( fred.ge.0d0 .or. &
-!!$         (nfpsmpl.gt.0 .and. nfpsmpl.lt.natm) ) then
     else if( nfcal.lt.natm ) then
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle

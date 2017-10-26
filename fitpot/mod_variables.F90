@@ -27,7 +27,6 @@ module variables
   logical:: lgrad  = .true.
   logical:: lgscale= .false.
   real(8):: gscl   = 0.1d0
-  real(8):: fred   = -1d0
   integer:: nfpsmpl= -10
   real(8):: seqcoef= 1d-2
   integer:: iprint = 1
@@ -43,7 +42,8 @@ module variables
   real(8):: vinitsgm = 1d0
   real(8):: vinitmu  = 0d0
   real(8):: vinitrs  = 12345d0
-  
+!.....Atomic forces over this value will not be used for fitting
+  real(8):: force_limit = 100d0
 
 !.....max num of species
   integer,parameter:: mspcs = 4

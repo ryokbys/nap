@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-22 22:14:58 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-26 15:21:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -231,7 +231,9 @@ subroutine write_initial_setting()
 !!$  write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
 !!$  write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
   write(6,'(2x,a25,2x,a)') 'normalize_input',trim(cnormalize)
-  write(6,'(2x,a25,2x,es12.3)') 'freduce_threshold',fred
+  if( lfmatch ) then
+    write(6,'(2x,a25,2x,f0.2)') 'force_limit',force_limit
+  endif
 
   if( nswgt.gt.0 ) then
     write(6,'(2x,a25,2x,i5)') 'sample_weight',nswgt
@@ -563,8 +565,9 @@ subroutine read_ref_data()
         read(14,*) ftmp(1:3), ifcal
       endif
       samples(ismpl)%fref(1:3,i)= ftmp(1:3)
-      samples(ismpl)%ifcal(i)= ifcal
       samples(ismpl)%fabs(i)= sqrt(ftmp(1)**2 +ftmp(2)**2 +ftmp(3)**2)
+      if( samples(ismpl)%fabs(i).gt.force_limit ) ifcal = 0
+      samples(ismpl)%ifcal(i)= ifcal
 !!$      write(6,'(a,2i5,3es12.4)') 'ismpl,i,samples(ismpl)%fref(1:3,i) = ',&
 !!$           ismpl,i,samples(ismpl)%fref(1:3,i)
     enddo
@@ -1786,11 +1789,11 @@ subroutine sync_input()
   call mpi_bcast(gtol,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(eatom,maxnsp,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(gscl,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(fred,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nfpsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(pwgt,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ratio_test,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rseed,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(force_limit,1,mpi_real8,0,mpi_world,ierr)
   
   call mpi_bcast(lematch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lfmatch,1,mpi_logical,0,mpi_world,ierr)
