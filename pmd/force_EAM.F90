@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-22 22:12:24 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-23 18:56:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -508,13 +508,15 @@ contains
     character(len=*),intent(in):: ctype 
     real(8):: phi
     real(8):: r
-    real(8),external:: fcut1
+    real(8),external:: fcut1,hvsd
     
     if( trim(ctype).eq.'SM' ) then
       r = rij -ea_re(is,js)
       phi = 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &
            -ea_c(is,js)*(1d0+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
       phi = phi*fcut1(rij,rcij)
+    else if( trim(ctype).eq.'Bonny' ) then
+
     endif
     return
   end function phi
@@ -542,6 +544,57 @@ contains
     endif
     return
   end function dphi
+!=======================================================================
+  function veq(r)
+    implicit none
+    real(8),intent(in):: r
+    real(8):: veq
+!.....TODO: code...
+    veq = 0d0
+    return
+  end function veq
+!=======================================================================
+  function xi(x)
+    implicit none
+    real(8),intent(in):: x
+    real(8):: xi
+
+    xi= 0.1818d0*exp(-3.2d0*x) &
+         +0.5099d0*exp(-0.9423d0*x) &
+         +0.2802d0*exp(-0.4029d0*x) &
+         +0.02817d0*exp(-0.2016d0*x)
+    return
+  end function xi
+!=======================================================================
+  function dxi(x)
+    implicit none
+    real(8),intent(in):: x
+    real(8):: dxi
+
+    dxi= -0.58176d0*exp(-3.2d0*x) &
+         -0.48047877d0*exp(-0.9423d0*x) &
+         -0.11289258d0*exp(-0.4029d0*x) &
+         -0.005679072d0*exp(-0.2016d0*x)
+    return
+  end function dxi
+!=======================================================================
+  function zeta(x)
+    implicit none
+    real(8),intent(in):: x
+    real(8):: zeta
+
+    zeta = (3d0*x**5 -10d0*x**3 +15d0*x +8d0)/16d0
+    return
+  end function zeta
+!=======================================================================
+  function dzeta(x)
+    implicit none
+    real(8),intent(in):: x
+    real(8):: dzeta
+
+    dzeta = (15d0*x**4 -30d0*x**2 +15d0)/16d0
+    return
+  end function dzeta
 end module EAM
 !-----------------------------------------------------------------------
 !     Local Variables:
