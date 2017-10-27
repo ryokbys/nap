@@ -85,6 +85,7 @@ module variables
     character(len=2),allocatable:: symbols(:)
     integer:: naps(mspcs)  ! num of atoms per species
     integer:: iclass       ! 1: training,  2: test
+    logical:: charge_set = .false.
   end type mdsys
   real(8):: erefmin
 

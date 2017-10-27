@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-26 15:21:35 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-27 10:05:36 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -184,7 +184,6 @@ program fitpot
     write(6,'(a,f15.3,a,i3,"h",i2.2,"m",i2.2,"s")') &
          ' Time      = ', tmp, &
          ' sec  = ', ihour,imin,isec
-    write(6,*) ''
     call time_stamp(' Job finished')
   endif
   call mpi_finalize(ierr)
@@ -2253,13 +2252,11 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
   do i=1,nff
     if( trim(cffs(i)).eq.'long_Coulomb' .or. &
          trim(cffs(i)).eq.'vcMorse' ) then
-      lvc = .true.
+      if( .not. smpl%charge_set ) lvc = .true.
     endif
   enddo
   
 !.....one_shot force calculation
-!!$  print *,'calling one_shot, myid,mpi_world,myid_pmd,mpi_comm_pmd='&
-!!$       ,myid,mpi_world,myid_pmd,mpi_comm_pmd
   call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
        ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
        ,smpl%chg,smpl%chi &
@@ -2270,6 +2267,8 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
 !!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
 !!$  print *,'smpl%natm =',smpl%natm
 !!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)
+
+  if( lvc ) smpl%charge_set = .true.
 
   return
 end subroutine run_pmd
