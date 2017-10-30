@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-22 21:41:48 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-27 13:00:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -1073,6 +1073,35 @@ contains
     lprmset_NN = .true.
     return
   end subroutine set_params_NN
+!=======================================================================
+  subroutine check_consistency(myid,iprint)
+    implicit none
+    integer,intent(in):: myid,iprint
+
+    integer:: i,nc
+    integer,allocatable:: nwgt(:)
+
+!.....calc number of weights
+    allocate(nwgt(nl+1))
+    nwgt(1:nl+1) = 0
+    do i=1,nl+1
+      nwgt(i)= nhl(i-1)*mhl(i)
+    enddo
+    
+    nc= 0
+    do i=1,nl+1
+      nc= nc +nwgt(i)
+    enddo
+    if( nprms .ne. nc ) then
+      write(6,'(a)') ' [Error] Number of parameters is not correct !!!'
+      write(6,'(a,i0)')  '   nprms = ',nprms
+      write(6,'(a,i0)')  '   where nprms should be ',nc
+      stop
+    endif
+
+    deallocate(nwgt)
+    return
+  end subroutine check_consistency
 !=======================================================================
   subroutine update_params_NN()
 !
