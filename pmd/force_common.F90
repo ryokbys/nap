@@ -951,6 +951,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   dt = dt_dampopt
   do istp=1,nstp_dampopt
     epotp = epot
+    if( myid.eq.0 .and. iprint.ge.20 ) write(6,'(a,i5,20f6.2)') ' istp,chgs = ',istp,chg(1:natm)
 !.....first update of velocity
     vq(1:natm) = vq(1:natm) +0.5d0*dt/amassq*fq(1:natm)
     p = dot_product(fq(1:natm),vq(1:natm))

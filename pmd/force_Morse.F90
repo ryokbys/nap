@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-22 19:34:48 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-30 16:25:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -825,8 +825,8 @@ contains
           atdescs(isp)%enpaul= enpaul
         endif
       enddo
-      nspt = isp
 10    close(iodesc)
+      nspt = isp
       if( iprint.ne.0 ) then
         write(6,*) 'Atomic descriptors were loaded from '//trim(fname)
         write(6,*) 'atomic number, symbol,    IE1,    IE2,    EA,'//&

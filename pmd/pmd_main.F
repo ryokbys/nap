@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-21 17:42:43 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-30 16:26:28 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -128,7 +128,7 @@ c.....call pmd_core to perfom MD
 c.....write energy, forces and stresses only for fitpot
       if( myid_md.eq.0 ) then
         call write_force(21,'.pmd',h,epot,ntot,tagtot,atot,stnsr)
-        write(6,*) ''
+        print *,''
         call time_stamp(' Job finished')
       endif
 
