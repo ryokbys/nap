@@ -905,12 +905,15 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   real(8):: eclong,epot,epotp,afq,eMorse,fqnorm,vqnorm,dt,alpha,p
   real(8),save,allocatable:: vq(:),fq(:)
 
-  integer,parameter:: nstp_dampopt = 100
+!!$  character(len=128),parameter:: algorithm = 'damping'
+  character(len=128),parameter:: algorithm = 'FIRE'
+  
+  integer,parameter:: nstp_dampopt = 1000
   real(8),parameter:: dt_dampopt = 0.001  ! 0.005 fs
-!!$  real(8),parameter:: eta_dampopt = 0.01
-  real(8),parameter:: eta_dampopt = 0.1
   real(8),parameter:: ecrit_dampopt = 1.0d-4
   real(8),parameter:: amassq = 0.002
+!.....Simple velocity damping
+  real(8),parameter:: fdamp = 0.95
 !.....FIRE parameters 
   integer,parameter:: nstp_min = 3
   integer,parameter:: nstp_conv = 3
@@ -928,18 +931,40 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 !.....Gather forces on charges
   fq(1:natm) = 0d0
   eclong = 0d0
+  istp = 0
 
   call qforce_long(namax,natm,tag,ra,chg,chi,h,tcom,mpi_md_world, &
        myid,iprint,ifcoulomb,fq,eclong)
   epot = eclong
 
+  if( myid.eq.0 .and. iprint.ge.20 ) then
+      write(6,'(a)') ' After qforce_long:'
+    write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,20))
+  endif
+  
   if( luse_vcMorse ) then
     eMorse = 0d0
     call qforce_vcMorse(namax,natm,tag,ra,fq,nnmax,chg &
          ,h,tcom,rc,lspr,mpi_md_world,myid,eMorse,iprint,.true.)
     epot = epot + eMorse
+!!$    if( myid.eq.0 .and. iprint.ge.20 ) then
+!!$      write(6,'(a)') ' After qforce_vcMorse:'
+!!$      write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,20))
+!!$    endif
   endif
 
+  do i=1,natm
+!!$!    fq(i) = sign(1d0,fq(i)) *log(abs(fq(i)))
+    if( fq(i).gt.0d0 ) then
+      fq(i) = min(fq(i),10d0)
+    else
+      fq(i) = max(fq(i),-10d0)
+    endif
+  enddo
+!!$  if( myid.eq.0 .and. iprint.ge.20 ) then
+!!$    write(6,'(a)') ' After log(fq):'
+!!$    write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,20))
+!!$  endif
   call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
   if( afq*0d0.ne.0d0 ) return   ! NaN
   fq(1:natm) = fq(1:natm) -afq
@@ -951,27 +976,32 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   dt = dt_dampopt
   do istp=1,nstp_dampopt
     epotp = epot
-    if( myid.eq.0 .and. iprint.ge.20 ) write(6,'(a,i5,20f6.2)') ' istp,chgs = ',istp,chg(1:natm)
+    if( myid.eq.0 .and. iprint.ge.20 ) then
+      write(6,'(a,i5,20es11.3)') ' istp,chgs = ',istp,chg(1:min(natm,5))&
+           ,fq(1:min(natm,5)),vq(1:min(natm,5))
+    endif
 !.....first update of velocity
     vq(1:natm) = vq(1:natm) +0.5d0*dt/amassq*fq(1:natm)
-    p = dot_product(fq(1:natm),vq(1:natm))
-    vqnorm = sqrt(dot_product(vq(1:natm),vq(1:natm)))
-    fqnorm = sqrt(dot_product(fq(1:natm),fq(1:natm)))
-!!$    write(6,'(a,200es10.2)') 'vqnorm,vq,before 1st kick=',vqnorm,vq(1:natm)
-    vq(1:natm) = (1d0-alpha)*vq(1:natm) -alpha*vqnorm*fq(1:natm)/fqnorm
-    vqnorm = sqrt(dot_product(vq(1:natm),vq(1:natm)))
-!!$    write(6,'(a,200es10.2)') 'vqnorm,vq,after 1st kick=',vqnorm,vq(1:natm)
-    if( p.gt.0d0 ) then
-      istp_pos = istp_pos +1
-      if( istp_pos.gt.nstp_min ) then  ! start FIRE after nstp_min
-        dt = min(dt*finc,dtmax)
-        alpha = alpha *falpha
+
+    if( trim(algorithm).eq.'FIRE' ) then
+      p = dot_product(fq(1:natm),vq(1:natm))
+      vqnorm = sqrt(dot_product(vq(1:natm),vq(1:natm)))
+      fqnorm = sqrt(dot_product(fq(1:natm),fq(1:natm)))
+      vq(1:natm) = (1d0-alpha)*vq(1:natm) -alpha*vqnorm*fq(1:natm)/fqnorm
+      if( p.gt.0d0 ) then
+        istp_pos = istp_pos +1
+        if( istp_pos.gt.nstp_min ) then  ! start FIRE after nstp_min
+          dt = min(dt*finc,dtmax)
+          alpha = alpha *falpha
+        endif
+      else if( p.le.0d0 ) then
+        istp_pos = 0
+        dt = dt*fdec
+        alpha = alpha0
+        vq(1:natm) = 0d0
       endif
-    else if( p.le.0d0 ) then
-      istp_pos = 0
-      dt = dt*fdec
-      alpha = alpha0
-      vq(1:natm) = 0d0
+    else  ! simple velocity damping
+      vq(1:natm) = vq(1:natm)*fdamp
     endif
 !.....update charges
     chg(1:natm)= chg(1:natm) +vq(1:natm)*dt
@@ -990,6 +1020,14 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
            ,h,tcom,rc,lspr,mpi_md_world,myid,eMorse,iprint,.false.)
       epot = epot + eMorse
     endif
+    do i=1,natm
+!!$!      fq(i) = sign(1d0,fq(i)) *log(abs(fq(i)))
+      if( fq(i).gt.0d0 ) then
+        fq(i) = min(fq(i),10d0)
+      else
+        fq(i) = max(fq(i),-10d0)
+      endif
+    enddo
     call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
     if( afq*0d0.ne.0d0 ) return   ! NaN
     fq(1:natm) = fq(1:natm) -afq

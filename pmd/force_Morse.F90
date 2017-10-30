@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-30 16:25:35 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-30 21:34:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -64,6 +64,11 @@ module Morse
 !.....params
   integer:: nprms
   real(8),allocatable:: params(:)
+
+!.....Limit of exponential term to avoid Inf and NaN...
+!.....The term larger than this is replaced by square of r
+  real(8),parameter:: ecore = 2.d0
+  real(8),parameter:: ln_ecore = log(ecore)
 
 contains
   subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -325,7 +330,7 @@ contains
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
-         ,chgi,chgj,tmp2,diji
+         ,chgi,chgj,tmp2,diji,rcore
     real(8),allocatable,save:: strsl(:,:,:)
     type(atdesc):: atdi,atdj
     real(8),external:: fcut1,dfcut1,sprod
@@ -390,13 +395,19 @@ contains
         rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
         alpij= max(alpij, prefbeta/(rminij -rc))
         texp = exp(alpij*(rminij-dij))
-!!$        write(6,'(a,4i5,4es15.7)') 'i,is,j,js,d0ij,alpij,rminij,texp=',&
-!!$             i,is,j,js,d0ij,alpij,rminij,texp
+        if( texp.gt.ecore ) then
+          rcore = rminij -ln_ecore/alpij
+          texp = -dij*dij +rcore*rcore +ecore
+          tmp= d0ij*((texp-1d0)**2 -1d0)
+          dedr= -4d0 *dij *d0ij *(texp-1d0) *fcut1(dij,rc) &
+               + tmp *dfcut1(dij,rc)
+        else
+          tmp= d0ij*((texp-1d0)**2 -1d0)
+          dedr= -2d0 *alpij *d0ij *texp *(texp-1d0) *fcut1(dij,rc) &
+               + tmp *dfcut1(dij,rc)
+        endif
 !.....potential
-        tmp= d0ij*((texp-1d0)**2 -1d0)
         tmp2 = 0.5d0 *tmp *fcut1(dij,rc)
-!!$        write(6,'(a,2i5,10es15.7)') 'i,j,d0ij,alpij,rminij,tmp2,epotl = ',&
-!!$             i,j,d0ij,alpij,rminij,tmp2,epotl
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp2
           epi(j)= epi(j) +tmp2
@@ -406,8 +417,6 @@ contains
           epotl = epotl +tmp2
         endif
 !.....force
-        dedr= -2d0 *alpij *d0ij *texp *(texp-1d0) *fcut1(dij,rc) &
-             + tmp *dfcut1(dij,rc)
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
@@ -455,10 +464,10 @@ contains
          ,tag(namax),chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: epot,fq(namax)
-    logical,intent(in):: l1st 
+    logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
+    real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij,rcore &
          ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2,diji
     type(atdesc):: atdi,atdj
     real(8),external:: fcut1,sprod
@@ -504,14 +513,32 @@ contains
         alpij= sprod(nprm+1,walp,pdij)
         d0ij = max(d0ij, 0d0)
         rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
+        rminij= min(rminij,rc*0.9d0)
         alpij= max(alpij, prefbeta/(rminij -rc))
         texp = exp(alpij*(rminij-dij))
-!!$        if( i.eq.1 .and. j.eq.2 ) then
-!!$          write(6,'(a,2i5,8es12.4)') 'i,j,dij,xj(1:3),xi(1:3)='&
-!!$               ,i,j,dij,xj(1:3),xi(1:3)
-!!$          write(6,'(a,4i5,5es15.7)') 'i,is,j,js,d0ij,alpij,rminij,dij,texp=',&
-!!$               i,is,j,js,d0ij,alpij,rminij,dij,texp
-!!$        endif
+!.....force on charge
+        dd0dq = wd(1) +wd(2)*chgj
+        dalpdq = walp(1) +walp(2)*chgj
+        drmindq = wrmin(1) +wrmin(2)*chgj
+        if( texp.gt.ecore ) then
+          rcore = rminij -ln_ecore/alpij
+          texp = -dij*dij +rcore*rcore +ecore
+          dedalp = 2d0*d0ij*(texp-1d0)*ecore*(rminij-rcore)
+          dedrmin = 2d0*d0ij*(texp-1d0)*ecore*alpij
+!!$          print '(a,2i5,10es11.3)', 'i,j,alpij,d0ij,rminij,rcore,texp,dedalp,dedrmin=' &
+!!$               ,i,j,alpij,d0ij,rminij,rcore,texp,dedalp,dedrmin
+!!$          print '(a,3es12.4)', 'alpij,d0ij,rminij = ',alpij,d0ij,rminij
+!!$          print '(a,3es12.4)', 'rcore,texp = ',rcore,texp
+!!$          print '(a,3es12.4)', 'dedalp,dedrmin = ',dedalp,dedrmin
+        else
+          dedalp = 2d0*d0ij*(texp-1d0)*texp*(rminij-dij)
+          dedrmin = 2d0*d0ij*(texp-1d0)*texp*alpij
+        endif
+        dedd0 = (texp -1d0)**2 -1d0
+        fq(i) = fq(i) +(dd0dq*dedd0 +dalpdq*dedalp +drmindq*dedrmin) &
+             *fcut1(dij,rc)
+!!$        print '(a,4i5,7es11.3)','i,is,j,js,dd0dq,dedd0,dalpdq,dedalp,drmindq,dedrmin,fqi='&
+!!$             ,i,is,j,js,dd0dq,dedd0,dalpdq,dedalp,drmindq,dedrmin,fq(i)
 !.....potential
         tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
         tmp2 = tmp *fcut1(dij,rc)
@@ -520,20 +547,6 @@ contains
         else
           epotl = epotl +tmp2
         endif
-!.....force on charge
-        dd0dq = wd(1) +wd(2)*chgj
-        dalpdq = walp(1) +walp(2)*chgj
-        drmindq = wrmin(1) +wrmin(2)*chgj
-        dedd0 = (texp -1d0)**2 -1d0
-        dedalp = 2d0*d0ij*(texp-1d0)*texp*(rminij-dij)
-        dedrmin = -2d0*d0ij*(texp-1d0)*texp*alpij
-        fq(i) = fq(i) +(dd0dq*dedd0 +dalpdq*dedalp +drmindq*dedrmin) &
-             *fcut1(dij,rc)
-!!$        if( l1st ) then
-!!$          write(6,'(a,2i5,30es10.2)') 'i,j,rij,chgi,chgj,d0ij,alpij,rminij'&
-!!$               //',epotl,fq(i)=',i,j,rij(1:3),chgi,chgj,d0ij,alpij,rminij &
-!!$               ,epotl,fq(i)
-!!$        endif
       enddo
 !!$      if( l1st ) write(6,'(a,i5,2es10.2)') 'i,chgi,fq(i)=',i,chgi,fq(i)
     enddo
