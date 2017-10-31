@@ -905,10 +905,10 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   real(8):: eclong,epot,epotp,afq,eMorse,fqnorm,vqnorm,dt,alpha,p
   real(8),save,allocatable:: vq(:),fq(:)
 
-!!$  character(len=128),parameter:: algorithm = 'damping'
-  character(len=128),parameter:: algorithm = 'FIRE'
+  character(len=128),parameter:: algorithm = 'damping'
+!!$  character(len=128),parameter:: algorithm = 'FIRE'
   
-  integer,parameter:: nstp_dampopt = 100
+  integer,parameter:: nstp_dampopt = 1000
   real(8),parameter:: dt_dampopt = 0.001  ! 0.005 fs
   real(8),parameter:: ecrit_dampopt = 1.0d-4
   real(8),parameter:: amassq = 0.002
@@ -953,14 +953,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 !!$    endif
   endif
 
-  do i=1,natm
-!!$!    fq(i) = sign(1d0,fq(i)) *log(abs(fq(i)))
-    if( fq(i).gt.0d0 ) then
-      fq(i) = min(fq(i),10d0)
-    else
-      fq(i) = max(fq(i),-10d0)
-    endif
-  enddo
+  call suppress_fq(namax,natm,fq,myid,mpi_md_world)
 !!$  if( myid.eq.0 .and. iprint.ge.20 ) then
 !!$    write(6,'(a)') ' After log(fq):'
 !!$    write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,20))
@@ -1014,20 +1007,22 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     call qforce_long(namax,natm,tag,ra,chg,chi,h,tcom,mpi_md_world, &
          myid,iprint,ifcoulomb,fq,eclong)
     epot = eclong
+    if( myid.eq.0 .and. iprint.ge.20 ) then
+      write(6,'(a)') ' After qforce_long:'
+      write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,20))
+    endif
     if( luse_vcMorse ) then
       eMorse = 0d0
       call qforce_vcMorse(namax,natm,tag,ra,fq,nnmax,chg &
            ,h,tcom,rc,lspr,mpi_md_world,myid,eMorse,iprint,.false.)
       epot = epot + eMorse
-    endif
-    do i=1,natm
-!!$!      fq(i) = sign(1d0,fq(i)) *log(abs(fq(i)))
-      if( fq(i).gt.0d0 ) then
-        fq(i) = min(fq(i),10d0)
-      else
-        fq(i) = max(fq(i),-10d0)
+      if( myid.eq.0 .and. iprint.ge.20 ) then
+        write(6,'(a)') ' After qforce_vcMorse:'
+        write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,20))
       endif
-    enddo
+    endif
+
+    call suppress_fq(namax,natm,fq,myid,mpi_md_world)
     call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
     if( afq*0d0.ne.0d0 ) return   ! NaN
     fq(1:natm) = fq(1:natm) -afq
@@ -1085,6 +1080,45 @@ subroutine get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
   
   return
 end subroutine get_average_fq
+!=======================================================================
+subroutine suppress_fq(namax,natm,fq,myid,mpi_md_world)
+!
+! Scale fqs in order to suppress too large fq values
+!
+! Method == scale:
+!   To keep ratio between fqs, all the fqs are multiplied by the same factor
+!
+  implicit none
+  include "mpif.h"
+  integer,intent(in):: namax,natm,myid,mpi_md_world
+  real(8),intent(inout):: fq(namax)
+
+  integer:: i,ierr
+  real(8):: fqmaxl,fqmax,fqfactor
+  real(8),parameter:: fqlimit = 10d0
+  character(len=128),parameter:: method = 'scale'
+!!$  character(len=128),parameter:: method = 'ceiling'
+
+  if( trim(method).eq.'scale' ) then
+    fqmaxl = 0d0
+    do i=1,natm
+      fqmaxl = max(fqmaxl,abs(fq(i)))
+    enddo
+    fqmax = 0d0
+    call mpi_allreduce(fqmaxl,fqmax,1,mpi_real8,mpi_max,mpi_md_world,ierr)
+
+    fqfactor = fqlimit /fqmax
+    do i=1,natm
+      fq(i) = fq(i)*fqfactor
+    enddo
+  else if( trim(method).eq.'ceiling' ) then
+    do i=1,natm
+      fq(i) = sign(1d0,fq(i)) *min(abs(fq(i)),fqlimit)
+    enddo
+  endif
+
+  return
+end subroutine suppress_fq
 !=======================================================================
 subroutine get_pderiv(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
      ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &

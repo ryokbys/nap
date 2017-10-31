@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-22 16:45:12 Ryo KOBAYASHI>
+c                     Last-modified: <2017-10-31 16:21:48 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -48,7 +48,7 @@ c.....For tensile test of Al nanorod
       real(8):: strnow,ftop,fbot
 c-----output file names
       character:: cnum*128, ctmp*128
-      integer,external:: itotOf
+      integer,external:: itotOf,ifmvOf
       logical:: ltot_updated = .true.
 
       logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
@@ -225,7 +225,7 @@ c.....Set initial temperature if needed
           if( ttgt(ifmv).lt.0d0 ) then
             tfac(ifmv)= -1d0
           else
-            tfac(ifmv)= sqrt(2d0*tgmm*dt*(fkb*ev2j)*ttgt(ifmv))
+            tfac(ifmv)= sqrt(2d0*tgmm*(fkb*ev2j)*ttgt(ifmv)/dt)
      &           *m2ang/s2fs
           endif
         enddo
@@ -469,7 +469,6 @@ c-------multiply fmv or damping
           va(1:3,i)=va(1:3,i) *fmv(1:3,l)
         enddo
 
-
 c-------update positions
         do i=1,natm
           is = int(tag(i))
@@ -557,19 +556,20 @@ c.....Langevin thermostat with Mannella integrator
             hscl(l)= sqrt(h(1,l,0)**2 +h(2,l,0)**2 +h(3,l,0)**2)
           enddo
           do i=1,natm
-            ifmv= int(mod(tag(i)*10,10d0))
+c            ifmv= int(mod(tag(i)*10,10d0))
+            ifmv = ifmvOf(tag(i))
+            is = int(tag(i))
             if( ifmv.eq.0 .or. tfac(ifmv).lt.0d0 ) then
-              va(1:3,i)=va(1:3,i) +aa(1:3,i)
+              va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
             else
-              is= int(tag(i))
+              va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
               ami= am(is)
               aai(1:3)= 0d0
-              tmp= tfac(ifmv) /sqrt(2d0*ami*amu2kg)*dt
+              tmp= tfac(ifmv) /sqrt(ami*amu2kg) !*dt
               do l=1,3
-                aai(l)= -va(l,i)*tgmm*dt2 +tmp*box_muller()/hscl(l)
+                aai(l)= -va(l,i)*tgmm +tmp*box_muller()/hscl(l)
               enddo
-              va(1:3,i)=va(1:3,i) +aa(1:3,i)
-c              aa(1:3,i)= aa(1:3,i) +aai(1:3)
+              va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(is)*dt
 c.....accumulate energy difference
               vi(1:3)= h(1:3,1,0)*va(1,i)
      &             +h(1:3,2,0)*va(2,i)
@@ -579,7 +579,6 @@ c.....accumulate energy difference
      &             +h(1:3,3,0)*aai(3)
               ediff(ifmv)= ediff(ifmv) +fekin(is)
      &             *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
-              va(1:3,i)= va(1:3,i) +aai(1:3)
             endif
           enddo
           if( mod(istp,nrmtrans).eq.0 ) then
@@ -626,7 +625,8 @@ c.....target temperatures are forced to be set intermediate temperatures
             endif
           enddo
           do i=1,natm
-            ifmv= int(mod(tag(i)*10,10d0))
+c            ifmv= int(mod(tag(i)*10,10d0))
+            ifmv = ifmvOf(tag(i))
             if( ifmv.le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
             va(1:3,i)= va(1:3,i) *tfac(ifmv)
 c.....accumulate energy difference
@@ -1248,6 +1248,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c-----locals
       integer:: i,ierr,is,ixyz,jxyz,imax,ifmv
       real(8):: ekinl,x,y,z,v(3),v2,vmaxl,ekll(9)
+      integer,external:: ifmvOf
 
       ekinl=0d0
       eki(1:3,1:3,1:natm)= 0d0
@@ -1256,7 +1257,8 @@ c-----locals
 
       do i=1,natm
         is= int(tag(i))
-        ifmv= int(mod(tag(i)*10,10d0))
+c.....ifmv= int(mod(tag(i)*10,10d0))
+        ifmv = ifmvOf(tag(i))
         if( ifmv.eq.0 ) cycle
         x= va(1,i)
         y= va(2,i)
