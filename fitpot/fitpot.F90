@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-27 10:05:36 Ryo KOBAYASHI>
+!                     Last modified: <2017-10-31 12:01:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -354,7 +354,7 @@ subroutine get_dir_list(ionum)
 !!$    enddo
 !!$  endif
   
-  if(myid.eq.0) print*,'Finished get_dir_list.'
+  if(myid.eq.0) print*,'Finished get_dir_list'
   return
 
 999 continue
@@ -410,7 +410,7 @@ subroutine set_training_test_with_ratio()
 !!$      print *,'ismpl,iclist=',ismpl,iclist(ismpl)
 !!$    enddo
     print *,'nsmpl, training, test=',nsmpl,nsmpl_trn,nsmpl_tst
-    print *,'set_training_test_with_ratio done.'
+    print *,'Finished set_training_test_with_ratio'
   endif
   deallocate(icll)
   return
@@ -467,7 +467,7 @@ subroutine read_samples()
   call mpi_reduce(nal,nalist,nsmpl,mpi_integer,mpi_sum &
        ,0,mpi_world,ierr)
   
-  if( myid.eq.0 ) write(6,'(/,a)') 'Finished reading samples.'
+  if( myid.eq.0 ) write(6,'(/,a)') ' Finished read_samples'
   call mpi_barrier(mpi_world,ierr)
   deallocate(nal)
   return
@@ -651,7 +651,7 @@ subroutine get_base_energies()
        ,mpi_world,ierr)
 
   if(myid.eq.0) then
-    write(6,'(a)') ' base energies:'
+    write(6,'(a)') ' Base energies obtained from unary systems:'
     do ispcs=1,mspcs
       write(6,'(a,i3,es12.4)') '   is, ebase(is) =',ispcs,ebase(ispcs)
     enddo
@@ -1209,7 +1209,7 @@ subroutine check_grad()
            abs((ganal(iv)-gnumer(iv))/(gnumer(iv)+tiny))*100
     enddo
     write(6,'(a)') '-----------------------------------------------------'
-    print *, 'check_grad done.'
+    print *, 'Finished check_grad'
   endif
 end subroutine check_grad
 !=======================================================================
@@ -1243,7 +1243,7 @@ subroutine test()
 !!$    do iv=1,nvars
 !!$      print *,'iv,grad(iv)=',iv,g(iv)
 !!$    enddo
-    print *,'test done.'
+    print *,'Finished test'
   endif
 
   deallocate(g)
@@ -1910,7 +1910,7 @@ subroutine get_node2sample()
 
 !!$  print *,'myid,isid0,isid1=',myid,isid0,isid1
 
-  if( myid.eq.0 ) print *,'get_node2sample done.'
+  if( myid.eq.0 ) print *,'Finished get_node2sample'
   return
 end subroutine get_node2sample
 !=======================================================================
@@ -1980,7 +1980,7 @@ subroutine set_sample_errors()
     enddo
   enddo
   if( myid.eq.0 ) then
-    write(6,'(a)') ' set_samples_errors done'
+    write(6,'(a)') ' Finished set_samples_errors'
   endif
 end subroutine set_sample_errors
 !=======================================================================
@@ -2376,7 +2376,7 @@ subroutine set_max_num_atoms()
   maxna = 0
   call mpi_allreduce(maxnal,maxna,1,mpi_integer,mpi_max,mpi_world,ierr)
   if( myid.eq.0 .and. iprint.ne.0 ) then
-    print *,'max num of atoms among samples = ',maxna
+    write(6,'(a,i0)') ' Max num of atoms among samples = ',maxna
   endif
   
 end subroutine set_max_num_atoms

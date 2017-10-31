@@ -908,7 +908,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 !!$  character(len=128),parameter:: algorithm = 'damping'
   character(len=128),parameter:: algorithm = 'FIRE'
   
-  integer,parameter:: nstp_dampopt = 1000
+  integer,parameter:: nstp_dampopt = 100
   real(8),parameter:: dt_dampopt = 0.001  ! 0.005 fs
   real(8),parameter:: ecrit_dampopt = 1.0d-4
   real(8),parameter:: amassq = 0.002
