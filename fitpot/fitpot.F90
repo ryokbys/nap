@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-31 12:01:55 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-01 11:02:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -184,6 +184,7 @@ program fitpot
     write(6,'(a,f15.3,a,i3,"h",i2.2,"m",i2.2,"s")') &
          ' Time      = ', tmp, &
          ' sec  = ', ihour,imin,isec
+    write(6,*) ''
     call time_stamp(' Job finished')
   endif
   call mpi_finalize(ierr)

@@ -465,8 +465,9 @@ c=======================================================================
 
       call date_and_time(c1,c2,c3,date)
 
-      write(ctime,'(i2,a,i2,a,i2)') date(5),':',date(6),':',date(7)
-      write(cdate,'(i4,a,i2,a,i2)') date(1),'-',date(2),'-',date(3)
+      write(ctime,'(i0.2,a,i0.2,a,i0.2)') date(5),':',date(6)
+     &     ,':',date(7)
+      write(cdate,'(i4,a,i0.2,a,i0.2)') date(1),'-',date(2),'-',date(3)
       write(6,'(a,1x,a,1x,a)') prefix, 'at '//trim(ctime),
      &     'on '//trim(cdate)
       return

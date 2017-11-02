@@ -2149,8 +2149,10 @@ contains
       enddo
       tau = max(sa_tau,1d0)
       if(myid.eq.0 .and. iprint.ne.0) then
-        print *,''
-        print *,'******************** Simulated annealing ********************'
+        write(6,*) ''
+        write(6,'(a)') '------------------------------------------------------------------------'
+        write(6,'(a)') '                    Simulated annealing'
+        write(6,'(a)') '------------------------------------------------------------------------'
         write(6,'(a,a)') ' Temperature control method = ',trim(sa_tctrl)
         if( sa_tctrl(1:3).eq.'exp' ) then
           write(6,'(a,f10.4)') ' Initial temperature = ',sa_temp0
@@ -2713,9 +2715,9 @@ contains
         iidbest = iid
         xbest(1:ndim) = xtmp(1:ndim)
       endif
+      if( i.eq.1 ) call sub_eval(iter)
     enddo
 
-    call sub_eval(iter)
     if( myid.eq.0 ) then
       write(6,'(a,i8,1x,100es12.4)') &
            " iter,fbest,fvals= ",&
@@ -3200,11 +3202,11 @@ contains
         write(cadd,'(i0)') iid
         call sub_ergrel(cadd)
       endif
+      if( i.eq.1 ) call sub_eval(iter)
     enddo
     w = de_wmin + (de_wmax -de_wmin)*dble(iter)/maxiter
     if( maxiter.eq.0 ) w = de_wmin
 
-    call sub_eval(iter)
     if( myid.eq.0 ) then
       write(6,'(a,i8,es12.4,f5.2,1x,100es12.4)') &
            " iter,fbest,w,fvals= ",&
@@ -3518,6 +3520,7 @@ contains
         iidbest = iid
         xbest(1:ndim) = xtmp(1:ndim)
       endif
+      if( i.eq.1 ) call sub_eval(iter)
     enddo
     if( myid.eq.0 ) then
       write(6,'(a,i8,es12.4,1x,100es12.4)') &
@@ -3568,6 +3571,7 @@ contains
           fbest = ftrn
           iidbest = iid
           xbest(1:ndim) = xtmp(1:ndim)
+          call sub_eval(iid)
         endif
 !.....Check the particle best and update if needed
         if( ftrn.lt.fpbest(i) ) then

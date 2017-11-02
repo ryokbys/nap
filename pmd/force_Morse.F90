@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-30 21:34:22 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-01 13:20:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -362,7 +362,7 @@ contains
 !!$           atdi%atrad,atdi%enpaul
 !!$    enddo
 
-!!$    write(6,'(a,30es16.8)') ' chg @force = ',chg(1:natm)
+!!$    write(6,'(a,30es10.2)') ' chg @force = ',chg(1:natm)
 
 !.....Loop over resident atoms
     do i=1,natm
@@ -394,6 +394,10 @@ contains
         d0ij = max(d0ij, 0d0)
         rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
         alpij= max(alpij, prefbeta/(rminij -rc))
+!!$        if( j.le.natm ) then
+!!$          write(6,*) ' i,is,j,js,d0ij,alpij,rminij= ', &
+!!$               i,is,j,js,d0ij,alpij,rminij
+!!$        endif
         texp = exp(alpij*(rminij-dij))
         if( texp.gt.ecore ) then
           rcore = rminij -ln_ecore/alpij

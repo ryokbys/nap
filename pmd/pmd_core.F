@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-31 16:21:48 Ryo KOBAYASHI>
+c                     Last-modified: <2017-11-02 12:41:38 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -56,7 +56,7 @@ c-----output file names
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
-     &     luse_Buckingham
+     &     luse_Buckingham,luse_Bonny_WRe
 
       call initialize_pmdvars(nspmax)
 
@@ -183,6 +183,8 @@ c-----get total number of particles
         write(6,'(a,i0)') " Number of total atoms = ",ntot
         write(6,'(a,i0)') " Number of species     = ",nsp
       endif
+c.....get_num_dof is called once in a MD run
+      call get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world,iprint)
 
 c.....Setup for FIRE
       if( ifdmp.eq.2 ) then
@@ -241,7 +243,7 @@ c.....Set initial temperature if needed
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham)
+     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham,luse_Bonny_WRe)
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
@@ -269,7 +271,8 @@ c.....Calc forces
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,luse_Buckingham,lcell_updated)
+     &     luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,
+     &     lcell_updated)
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -285,8 +288,6 @@ c-----calc kinetic energy
       call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl
      &     ,vmax,mpi_md_world)
       vmaxold=vmax
-c.....get_num_dof is called once in a MD run
-      call get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world,iprint)
 
       if( trim(cpctl).eq.'Berendsen' .or.
      &     trim(cpctl).eq.'vc-Berendsen' ) then
@@ -545,7 +546,8 @@ c-------Calc forces
      &       luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
      &       ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
      &       ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul
-     &       ,luse_vcMorse,lvc,luse_Buckingham,lcell_updated)
+     &       ,luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe
+     &       ,lcell_updated)
         lstrs = .false.
 
 c.....Second kick of velocities
@@ -895,7 +897,7 @@ c
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
-     &     luse_Buckingham
+     &     luse_Buckingham,luse_Bonny_WRe
       logical:: lcell_updated = .false.
       
 c      write(6,'(a,200es10.2)') 'chgtot in pmd_core = ',
@@ -969,7 +971,8 @@ c     &     chg(1:natm+10)
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham)
+     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham,
+     &     luse_Bonny_WRe)
 
 c      print *,' lvc,ifcoulomb = ',lvc,ifcoulomb
 c      write(6,'(a,500es10.2)') ' chg before bacopy = ',
@@ -995,7 +998,8 @@ c-----Make pair list
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
      &     ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
      &     ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,luse_Buckingham,lcell_updated)
+     &     luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,
+     &     lcell_updated)
 c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
 c     &     ,epot,chg(1:natm)
 

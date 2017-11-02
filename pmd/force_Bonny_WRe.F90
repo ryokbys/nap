@@ -1,44 +1,136 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-24 14:50:58 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-02 14:35:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
+!-----------------------------------------------------------------------
+!  Species 1 should be W and 2 should be Re.
 !-----------------------------------------------------------------------
   implicit none
 
 !.....Max num of species
   integer,parameter:: msp = 9
-!.....Number of species
-  integer:: nsp = 0
 
-!!$.....Default parameter set for Al
-!!$  real(8):: ea_a  = 0.763905d0
-!!$  real(8):: ea_b  = 0.075016d0
-!!$  real(8):: ea_c  = 0.159472d0
-!!$  real(8):: ea_re = 3.389513d-10 /ang
-!!$  real(8):: ea_al = 1.755162d+10 *ang
-!!$  real(8):: ea_bt = 2.003449d+10 *ang
-!!$  real(8):: ea_xi = 0.147699d0
-!!$  real(8):: am_al = 26.9815d0
+  logical:: interact(msp,msp)
 
-  real(8),allocatable:: ea_a(:),ea_xi(:)
-  real(8),allocatable,dimension(:,:):: ea_b,ea_c,ea_re, &
-       ea_alp,ea_beta,ea_rc
-  logical,allocatable:: interact(:,:)
+  real(8):: qnucl(1:2) = (/ &
+       74.0d0, & ! 1, W
+       75.0d0  & ! 2, Re
+       /)
 
-  logical:: lprmset_EAM = .false.
+  real(8):: r_inner(1:2,1:2) = reshape( (/ 2d0, 2d0, 2d0, 2d0 /), &
+       shape(r_inner) )
+  real(8):: r_outer(1:2,1:2) = reshape( (/ 2d0, 2d0, 2d0, 2d0 /), &
+       shape(r_outer) )
 
-!.....Parameters from fitpot
-  integer:: nprms
-  real(8),allocatable:: prms(:)
+  real(8),parameter:: bonny_rc(1:2,1:2) = reshape( &
+       (/ 5.460d0, 3.825d0 , &  ! 1-1 W-W, 1-2 W-Re
+          3.825d0, 5.460d0 /) &  ! 2-1 Re-W, 2-2 Re-Re
+       , shape(bonny_rc) )
 
-!.....Types of forms of potential terms
-  character(len=128),allocatable:: type_rho(:,:),type_frho(:),type_phi(:,:)
-  character(len=128):: default_type_rho = 'exp1'
-  character(len=128):: default_type_frho = 'sqrt1'
-  character(len=128):: default_type_phi = 'SM'
+!.....Pure W parameters
+  real(8),parameter:: gauge_C = 1.848055990d0
+  real(8),parameter:: gauge_S = 0.2232322602d0
 
+  real(8),parameter:: A0_W  = -5.524855802d0
+  real(8),parameter:: A1_W  =  2.317313103d-1
+  real(8),parameter:: A2_W  = -3.665345949d-2
+  real(8),parameter:: A3_W  =  8.989367404d-3
+  real(8),parameter:: rhoi_W = 1.359141225d0
+
+  integer,parameter:: n_rhoeam2 = 4
+  real(8),parameter:: rhoeam2_a(1:4) = (/&
+       -0.420429107805055d+1, &
+        0.518217702261442d0,  &
+        0.562720834534370d-1, &
+        0.344164178842340d-1 &
+        /)
+  real(8),parameter:: rhoeam2_r(1:4) = (/&
+       2.5d0, &
+       3.1d0, &
+       3.5d0, &
+       4.9d0 &
+       /)
+  real(8),parameter:: feam2_a1 = -5.946454472402710d0
+  real(8),parameter:: feam2_a2 = -0.049477376935239d0
+  integer,parameter:: n_veam2 = 15
+  real(8),parameter:: veam2_a(1:15) = (/ &
+        0.960851701343041d+2, &
+       -0.184410923895214d+3, &
+        0.935784079613550d+2, &
+       -0.798358265041677d+1, &
+        0.747034092936229d+1, &
+       -0.152756043708453d+1, &
+        0.125205932634393d+1, &
+        0.163082162159425d+1, &
+       -0.141854775352260d+1, &
+       -0.819936046256149d0,  &
+        0.198013514305908d1,  &
+       -0.696430179520267d0,  &
+        0.304546909722160d-1, &
+       -0.163131143161660d+1, &
+        0.138409896486177d+1  &
+        /)
+  real(8),parameter:: veam2_r(1:15) = (/ &
+       2.5648975d0, &
+       2.6297950d0, &
+       2.6946925d0, &
+       2.8663175d0, &
+       2.9730450d0, &
+       3.0797725d0, &
+       3.5164725d0, &
+       3.8464450d0, &
+       4.1764175d0, &
+       4.7008450d0, &
+       4.8953000d0, &
+       5.0897550d0, &
+       5.3429525d0, &
+       5.4016950d0, &
+       5.4600000d0  &  ! shortened from original value 5.4604375
+       /)
+  
+!.....Pure Re parameters
+  real(8),parameter:: A_Re = -7.046791948d0
+  real(8),parameter:: B_Re =  1.236584720d0
+  real(8),parameter:: C_Re =  1.143405627d0
+  real(8),parameter:: C0_Re=  3.704045964d-3
+
+  integer,parameter:: n_veq_ReRe = 6
+  real(8),parameter:: veq_ReRe_a(1:6) = (/ &
+        6.726805309d0, &
+        3.217593889d0, &
+       -6.545857587d-1, &
+        1.453229484d-1, &
+       -2.063629464d-1, &
+        6.114909116d-2  &
+        /)
+  real(8),parameter:: veq_ReRe_r(1:6) = (/ &
+        2.700d0, &
+        3.252d0, &
+        3.804d0, &
+        4.356d0, &
+        4.908d0, &
+        5.460d0  &
+        /)
+
+!.....W-Re parameters
+  integer,parameter:: n_veq_WRe = 5
+  real(8),parameter:: veq_WRe_a(1:5) = (/ &
+       -2.335000000d+1,  &
+        2.456959229d+1,  &
+       -2.585878138d0,   &
+        3.457586051d0,   &
+       -7.013105493d-1   &
+       /)
+  real(8),parameter:: veq_WRe_r(1:5) = (/ &
+       2.650d0, &
+       2.700d0, &
+       3.075d0, &
+       3.450d0, &
+       3.825d0  &
+       /)
+  
 contains
   subroutine force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -58,29 +150,39 @@ contains
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xij(3),rij,rcij,dfi,dfj,drho,drdxi(3),drdxj(3),r,at(3)
-    real(8):: x,y,z,xi(3),epotl,epott,tmp,dtmp
+    real(8):: xij(3),rij,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
+    real(8):: x,y,z,xi(3),epotl,epott,tmp,dtmp,drhoi,drhoj
     real(8),allocatable,save:: rho(:)
     real(8),allocatable,save:: strsl(:,:,:)
 
+    real(8),save:: rcmax
+
     if( l1st ) then
-!.....Check cutoff radius
+      if( rc.lt.bonny_rc(1,1) ) then
+        if( myid_md.eq.0 .and. iprint.gt.0 ) then
+          print '(/,a)',' Input cutoff radius is smaller than rc of Bonny potential.'
+          print '(a,f0.3)', '   Input rc     = ',rc
+          print '(a,f0.3)', '   Potential rc = ',bonny_rc(1,1)
+        endif
+        call mpi_finalize(ierr)
+        stop
+      endif
+      interact(1:msp,1:msp) = .false.
+      interact(1:2,1:2) = .true.
+      rcmax = 0d0
+      do is=1,2
+        do js=1,2
+          rcmax = max(rcmax, bonny_rc(is,js))
+        enddo
+      enddo
+      if( myid_md.eq.0 .and. iprint.gt.0 )  then
+        print '(/,a,f0.3)', ' Max cutoff in Bonny potential = ',rcmax
+      endif
+
       if( allocated(rho) ) deallocate(rho)
       allocate(rho(namax+nbmax))
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
-      do is=1,msp
-        do js=is,msp
-          if( .not.interact(is,js) ) cycle
-          if( rc.lt.ea_rc(is,js) ) then
-            if( myid_md.eq.0 ) then
-              write(6,*) ' Error: rc is smaller than one of EAM rcs'
-            endif
-            call mpi_finalize(ierr)
-            stop
-          endif
-        enddo
-      enddo
     endif
 
     if( size(strsl).lt.3*3*namax ) then
@@ -104,19 +206,15 @@ contains
         j=lspr(k,i)
         if(j.eq.0) exit
         js = int(tag(j))
+        if( .not. interact(is,js) ) cycle
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         rij=sqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
-        rcij= ea_rc(is,js)
-        if( rij.gt.rcij ) cycle
-!!$        rho(i)= rho(i) +exp(-ea_beta(is,js)*(rij-ea_re(is,js))) &
-!!$             *fcut1(rij,rcij)
-        
-        rho(i) = rho(i) +rhoij(rij,is,js,type_rho(is,js))
+        if( rij.gt.rcmax ) cycle
+        rho(i) = rho(i) +rhoij(js,rij)
       enddo
-!!$      rho(i)= dsqrt(rho(i))
     enddo
 
 !-----copy rho of boundary atoms
@@ -127,27 +225,22 @@ contains
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is = int(tag(i))
-!!$      dfi= -0.5d0*ea_a(is)/rho(i)
-      dfi = dfrho(is,rho(i),type_frho(is))
+      dfi = dfrho(is,rho(i))
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
         js = int(tag(j))
+        if( .not. interact(is,js) ) cycle
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         rij=sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
-        rcij = ea_rc(is,js)
-        if( rij.gt.rcij ) cycle
+        if( rij.gt.rcmax ) cycle
         drdxi(1:3)= -xij(1:3)/rij
-!!$        r= rij -ea_re(is,js)
 !.....2-body term
-!!$        tmp= 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &
-!!$             -ea_c(is,js)*(1d0+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
-!!$        tmp2 = tmp *0.5d0 *fcut1(rij,rcij)
-        tmp = 0.5d0 *phi(rij,rcij,is,js,type_phi(is,js))
+        tmp = 0.5d0 *vij(is,js,rij)
         epi(i)= epi(i) +tmp
         epi(j)= epi(j) +tmp
         if(j.le.natm) then
@@ -155,11 +248,7 @@ contains
         else
           epotl=epotl +tmp
         endif
-!!$        dphi= -ea_beta(is,js)*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r)*fcut1(rij,rcij)  &
-!!$             +ea_c(is,js)*ea_alp(is,js)*ea_alp(is,js)*r &
-!!$             *exp(-ea_alp(is,js)*r) *fcut1(rij,rcij) &
-!!$             +tmp*dfcut1(rij,rcij)
-        dtmp = dphi(rij,rcij,is,js,type_phi(is,js))
+        dtmp = dvij(is,js,rij)
         aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
 !.....Atomic stress for 2-body terms
@@ -174,12 +263,10 @@ contains
           enddo
         endif
 !.....Embedded term
-!!$        drhoij= -ea_beta(is,js)*exp(-ea_beta(is,js)*r)*fcut1(rij,rcij) &
-!!$             +exp(-ea_beta(is,js)*r)*dfcut1(rij,rcij)
-        drho = drhoij(rij,rcij,is,js,type_rho(is,js))
-!!$        dfj= -0.5d0*ea_a(js)/rho(j)
-        dfj = dfrho(js,rho(j),type_frho(js))
-        tmp = (dfi+dfj)*drho
+        drhoi = drhoij(is,rij)
+        drhoj = drhoij(js,rij)
+        dfj = dfrho(js,rho(j))
+        tmp = dfi*drhoj + dfj*drhoi
         aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +tmp*drdxi(1:3)
 !.....Atomic stress of many-body contributions
@@ -194,7 +281,7 @@ contains
           enddo
         endif
       enddo
-      tmp = frho(is,rho(i),type_frho(is))
+      tmp = frho(is,rho(i))
       epi(i)=epi(i) +tmp
       epotl=epotl +tmp
     enddo
@@ -212,62 +299,340 @@ contains
 
   end subroutine force_Bonny_WRe
 !=======================================================================
-  function rhoij(rij,js)
+  function rhoij(js,rij)
 !
 ! Calculate rho of atom j at distance rij.
 !
     real(8),intent(in):: rij
     integer,intent(in):: js
     real(8):: rhoij
+    real(8),external:: hvsd
 
-    rhoij = phi(r)
+    rhoij = 0d0
     if( js.eq.1 ) then  ! Only in case of W, scaling with S
-      rhoij = rhoij *bonny_gauge_S
+      rhoij = gauge_S *rhoeam2(rij)
+    else if( js.eq.2 ) then
+      rhoij = C0_Re *(bonny_rc(2,2) -rij)**3 *hvsd(bonny_rc(2,2) -rij)
     endif
     return
   end function rhoij
 !=======================================================================
-  function drhoij(rij,js)
+  function drhoij(js,rij)
     implicit none
     real(8),intent(in):: rij
     integer,intent(in):: js
     real(8):: drhoij
-    drhoij = dphi(r)
+    real(8),external:: hvsd
+
+    drhoij = 0d0
     if( js.eq.1 ) then
-      drhoij = drhoij *bonny_gauge_S
+      drhoij = gauge_S *drhoeam2(rij)
+    else if( js.eq.2 ) then
+      drhoij = -3d0 *C0_Re *(bonny_rc(2,2) -rij)**2 *hvsd(bonny_rc(2,2) -rij)
     endif
     return
   end function drhoij
 !=======================================================================
-  function phi(r)
+  function rhoeam2(rij)
+!
+!  rho_j(rij) from Marinica et al., JAP 121 (2017)
+!
     implicit none
-    real(8),intent(in):: r
-    real(8):: phi
+    real(8),intent(in):: rij
+    real(8):: rhoeam2,ri
+    integer:: i
     real(8),external:: hvsd
-    phi = bonny_c0 *(bonny_rc -r)**3 *hvsd(bonny_rc -r)
+
+    rhoeam2 = 0d0
+    do i=1,n_rhoeam2
+      ri = rhoeam2_r(i)
+      rhoeam2 = rhoeam2 +rhoeam2_a(i)*(ri -rij)**3 &
+           *hvsd(ri -rij)
+    enddo
     return
-  end function phi
+  end function rhoeam2
 !=======================================================================
-  function dphi(r)
+  function drhoeam2(rij)
+!
+!  rho_j(rij) from Marinica et al., JAP 121 (2017)
+!
     implicit none
-    real(8),intent(in):: r
-    real(8):: dphi
-    real(8),external:: hsvd
-    dphi = -3d0 * bonny_c0 *(bonny_rc -r)**2 *hvsd(bonny_rc -r)
-  end function dphi
+    real(8),intent(in):: rij
+    real(8):: drhoeam2,ri
+    integer:: i
+    real(8),external:: hvsd
+
+    drhoeam2 = 0d0
+    do i=1,n_rhoeam2
+      ri = rhoeam2_r(i)
+      drhoeam2 = drhoeam2 -rhoeam2_a(i)*(ri -rij)**2 &
+           *hvsd(ri -rij)
+    enddo
+    drhoeam2 = drhoeam2*3d0
+    return
+  end function drhoeam2
 !=======================================================================
-  function frho(rho)
+  function frho(is,rho)
     implicit none
+    integer,intent(in):: is
     real(8),intent(in):: rho
     real(8):: frho
+
+    if( is.eq.1 ) then  ! W
+      if( rho.le.rhoi_W ) then
+        frho = feff(rho)
+      else
+        frho = A0_W +A1_W*rho &
+             +A2_W*rho*rho +A3_W*rho*rho*rho
+      endif
+    else if( is.eq.2 ) then  ! Re
+      frho = A_Re*sqrt(rho) +B_Re*rho +C_Re*rho*rho
+    endif
     
   end function frho
 !=======================================================================
-  function veq(r)
+  function dfrho(is,rho)
     implicit none
-    real(8),intent(in):: r
+    integer,intent(in):: is
+    real(8),intent(in):: rho
+    real(8):: dfrho
+
+    if( is.eq.1 ) then  ! W
+      if( rho.le.rhoi_W ) then
+        dfrho = dfeff(rho)
+      else
+        dfrho = A1_W +2d0*A2_W*rho +3d0*A3_W*rho*rho
+      endif
+    else if( is.eq.2 ) then  ! Re
+      dfrho = 0.5d0*A_Re/sqrt(rho) +B_Re +2d0*C_Re*rho
+    endif
     
+  end function dfrho
+!=======================================================================
+  function feff(rho)
+!
+!  F^{eff} for pure W
+!
+    implicit none
+    real(8),intent(in):: rho
+    real(8):: feff
+
+    feff = feam2(rho/gauge_S) +gauge_C/gauge_S*rho
+    return
+  end function feff
+!=======================================================================
+  function dfeff(rho)
+!
+!  Derivative of F^{eff} for pure W
+!
+    implicit none
+    real(8),intent(in):: rho
+    real(8):: dfeff
+
+    dfeff = dfeam2(rho/gauge_S)/gauge_S +gauge_C/gauge_S
+    return
+  end function dfeff
+!=======================================================================
+  function feam2(rho)
+!
+!  F[rho] function of EAM2 from Marinica, JAP 121, 165107 (2017)
+!
+    implicit none
+    real(8),intent(in):: rho
+    real(8):: feam2
+
+    feam2 = feam2_a1*sqrt(rho) +feam2_a2*rho*rho
+    return
+  end function feam2
+!=======================================================================
+  function dfeam2(rho)
+!
+!  Derivative of F[rho] function of EAM2 from Marinica et al.
+!
+    implicit none
+    real(8),intent(in):: rho
+    real(8):: dfeam2
+
+    dfeam2 = 0.5d0*feam2_a1/sqrt(rho) +2d0*feam2_a2*rho
+    return
+  end function dfeam2
+!=======================================================================
+  function vij(is,js,rij)
+!
+! Main two-body function.
+!
+    implicit none
+    integer,intent(in):: is,js
+    real(8),intent(in):: rij
+    real(8):: vij
+    real(8):: ri,ro
+
+    ri = r_inner(is,js)
+    ro = r_outer(is,js)
+    if( rij.lt.ri ) then
+      vij = vnucl(is,js,rij)
+    else if( rij.ge.ri .and. rij.lt.ro ) then
+      vij = veq(is,js,rij) +zeta((ro+ri-2d0*rij)/(ro-ri)) &
+           *(vnucl(is,js,rij) -veq(is,js,rij))
+    else if( rij.ge.ro ) then
+      vij = veq(is,js,rij)
+    endif
+    return
+  end function vij
+!=======================================================================
+  function dvij(is,js,rij)
+!
+!  Derivative of the main two-body function.
+!
+    implicit none
+    integer,intent(in):: is,js
+    real(8),intent(in):: rij
+    real(8):: dvij
+    real(8):: ri,ro
+
+    ri = r_inner(is,js)
+    ro = r_outer(is,js)
+    if( rij.lt.ri ) then
+      dvij = dvnucl(is,js,rij)
+    else if( rij.ge.ri .and. rij.lt.ro ) then
+      dvij = dveq(is,js,rij) +dzeta((ro+ri-2d0*rij)/(ro-ri))*(-2d0/(ro-ri)) &
+           *(vnucl(is,js,rij) -veq(is,js,rij)) &
+           +zeta((ro+ri-2d0*rij)/(ro-ri))*(dvnucl(is,js,rij) -dveq(is,js,rij))
+    else if( rij.ge.ro ) then
+      dvij = dveq(is,js,rij)
+    endif
+    return
+  end function dvij
+!=======================================================================
+  function vnucl(is,js,rij)
+!
+!  Repulsive potential between nuclei
+!
+    implicit none
+    integer,intent(in):: is,js
+    real(8),intent(in):: rij
+    real(8):: vnucl
+    real(8):: rs,qi,qj
+
+    qi = qnucl(is)
+    qj = qnucl(js)
+    rs = 0.4683766d0  /(qi**(2d0/3) +qj**(2d0/3))
+    vnucl = qi*qj/rij *xi(rij/rs)
+    return
+  end function vnucl
+!=======================================================================
+  function dvnucl(is,js,rij)
+!
+!  Derivative of the repulsive potential between nuclei
+!
+    implicit none
+    integer,intent(in):: is,js
+    real(8),intent(in):: rij
+    real(8):: dvnucl
+    real(8):: rs,qi,qj
+
+    qi = qnucl(is)
+    qj = qnucl(js)
+    rs = 0.4683766d0  /(qi**(2d0/3) +qj**(2d0/3))
+    dvnucl = qi*qj/rij* ( -1d0/rij*xi(rij/rs) &
+         +dxi(rij/rs)/rs )
+    return
+  end function dvnucl
+!=======================================================================
+  function veq(is,js,rij)
+    implicit none
+    integer,intent(in):: is,js
+    real(8),intent(in):: rij
+    real(8):: veq
+    real(8):: rk
+    integer:: i
+    real(8),external:: hvsd
+
+    veq = 0d0
+    if( rij.gt.bonny_rc(is,js) ) return
+    if( is.eq.1 .and. js.eq.1 ) then  ! W-W
+      veq = veam2(rij) -2d0*gauge_C*rhoeam2(rij)
+    else if( (is.eq.1 .and. js.eq.2) .or.&
+         (is.eq.2 .and. js.eq.1) ) then  ! W-Re, Re-W
+      do i=1,n_veq_WRe
+        rk = veq_WRe_r(i)
+        veq = veq +veq_WRe_a(i)*(rk -rij)**3 &
+             *hvsd(rk -rij)
+      enddo
+    else if( is.eq.2 .and. js.eq.2 ) then  ! Re-Re
+      do i=1,n_veq_ReRe
+        rk = veq_ReRe_r(i)
+        veq = veq +veq_ReRe_a(i)*(rk -rij)**3 &
+             *hvsd(rk -rij)
+      enddo
+    endif
+    return
   end function veq
+!=======================================================================
+  function dveq(is,js,rij)
+    implicit none
+    integer,intent(in):: is,js
+    real(8),intent(in):: rij
+    real(8):: dveq
+    real(8):: rk
+    integer:: i
+    real(8),external:: hvsd
+
+    dveq = 0d0
+    if( rij.gt.bonny_rc(is,js) ) return
+    if( is.eq.1 .and. js.eq.1 ) then  ! W-W
+      dveq = dveam2(rij) -2d0*gauge_C*drhoeam2(rij)
+    else if( (is.eq.1 .and. js.eq.2) .or. &
+         (is.eq.2 .and. js.eq.1) ) then  ! W-Re, Re-W
+      do i=1,n_veq_WRe
+        rk = veq_WRe_r(i)
+        dveq = dveq -veq_WRe_a(i)*(rk -rij)**2 &
+             *hvsd(rk -rij)
+      enddo
+      dveq = dveq *3d0
+    else if (is.eq.2 .and. js.eq.2 ) then ! Re-Re
+      do i=1,n_veq_ReRe
+        rk = veq_ReRe_r(i)
+        dveq = dveq -veq_ReRe_a(i)*(rk -rij)**2 &
+             *hvsd(rk -rij)
+      enddo
+      dveq = dveq *3d0
+    endif
+    return
+  end function dveq
+!=======================================================================
+  function veam2(rij)
+    implicit none
+    real(8),intent(in):: rij
+    real(8):: veam2,ri
+    integer:: i
+    real(8),external:: hvsd
+
+    veam2 = 0d0
+    do i=1,n_veam2
+      ri = veam2_r(i)
+      veam2 = veam2 +veam2_a(i)*(ri -rij)**3 &
+           *hvsd(ri -rij)
+    enddo
+    return
+  end function veam2
+!=======================================================================
+  function dveam2(rij)
+    implicit none
+    real(8),intent(in):: rij
+    real(8):: dveam2,ri
+    integer:: i
+    real(8),external:: hvsd
+
+    dveam2 = 0d0
+    do i=1,n_veam2
+      ri = veam2_r(i)
+      dveam2 = dveam2 -veam2_a(i)*(ri -rij)**2 &
+           *hvsd(ri -rij)
+    enddo
+    dveam2 = dveam2*3d0
+    return
+  end function dveam2
 !=======================================================================
   function xi(x)
     implicit none
@@ -310,6 +675,8 @@ contains
     dzeta = (15d0*x**4 -30d0*x**2 +15d0)/16d0
     return
   end function dzeta
+!=======================================================================
+  
 end module Bonny_WRe
 !-----------------------------------------------------------------------
 !     Local Variables:
