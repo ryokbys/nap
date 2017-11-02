@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-02 14:35:28 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-02 15:14:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -38,24 +38,25 @@ module Bonny_WRe
   real(8),parameter:: A2_W  = -3.665345949d-2
   real(8),parameter:: A3_W  =  8.989367404d-3
   real(8),parameter:: rhoi_W = 1.359141225d0
-
-  integer,parameter:: n_rhoeam2 = 4
-  real(8),parameter:: rhoeam2_a(1:4) = (/&
+  
+  real(8),parameter:: rhospln_rc = 2.002970124727d0
+  integer,parameter:: n_rhospln = 4
+  real(8),parameter:: rhospln_a(1:4) = (/&
        -0.420429107805055d+1, &
         0.518217702261442d0,  &
         0.562720834534370d-1, &
         0.344164178842340d-1 &
         /)
-  real(8),parameter:: rhoeam2_r(1:4) = (/&
+  real(8),parameter:: rhospln_r(1:4) = (/&
        2.5d0, &
        3.1d0, &
        3.5d0, &
        4.9d0 &
        /)
-  real(8),parameter:: feam2_a1 = -5.946454472402710d0
-  real(8),parameter:: feam2_a2 = -0.049477376935239d0
-  integer,parameter:: n_veam2 = 15
-  real(8),parameter:: veam2_a(1:15) = (/ &
+  real(8),parameter:: fspln_a1 = -5.946454472402710d0
+  real(8),parameter:: fspln_a2 = -0.049477376935239d0
+  integer,parameter:: n_vspln = 15
+  real(8),parameter:: vspln_a(1:15) = (/ &
         0.960851701343041d+2, &
        -0.184410923895214d+3, &
         0.935784079613550d+2, &
@@ -72,7 +73,7 @@ module Bonny_WRe
        -0.163131143161660d+1, &
         0.138409896486177d+1  &
         /)
-  real(8),parameter:: veam2_r(1:15) = (/ &
+  real(8),parameter:: vspln_r(1:15) = (/ &
        2.5648975d0, &
        2.6297950d0, &
        2.6946925d0, &
@@ -310,7 +311,7 @@ contains
 
     rhoij = 0d0
     if( js.eq.1 ) then  ! Only in case of W, scaling with S
-      rhoij = gauge_S *rhoeam2(rij)
+      rhoij = gauge_S *rhospln(rij)
     else if( js.eq.2 ) then
       rhoij = C0_Re *(bonny_rc(2,2) -rij)**3 *hvsd(bonny_rc(2,2) -rij)
     endif
@@ -326,51 +327,63 @@ contains
 
     drhoij = 0d0
     if( js.eq.1 ) then
-      drhoij = gauge_S *drhoeam2(rij)
+      drhoij = gauge_S *drhospln(rij)
     else if( js.eq.2 ) then
       drhoij = -3d0 *C0_Re *(bonny_rc(2,2) -rij)**2 *hvsd(bonny_rc(2,2) -rij)
     endif
     return
   end function drhoij
 !=======================================================================
-  function rhoeam2(rij)
+  function rhospln(rij)
 !
 !  rho_j(rij) from Marinica et al., JAP 121 (2017)
 !
     implicit none
     real(8),intent(in):: rij
-    real(8):: rhoeam2,ri
+    real(8):: rhospln,ri
     integer:: i
     real(8),external:: hvsd
 
-    rhoeam2 = 0d0
-    do i=1,n_rhoeam2
-      ri = rhoeam2_r(i)
-      rhoeam2 = rhoeam2 +rhoeam2_a(i)*(ri -rij)**3 &
-           *hvsd(ri -rij)
-    enddo
+    rhospln = 0d0
+    if( rij.le.rhospln_rc ) then
+      do i=1,n_rhospln
+        ri = rhospln_r(i)
+        rhospln = rhospln +rhospln_a(i)*(ri -rhospln_rc)**3 &
+             *hvsd(ri -rhospln_rc)
+      enddo
+    else
+      do i=1,n_rhospln
+        ri = rhospln_r(i)
+        rhospln = rhospln +rhospln_a(i)*(ri -rij)**3 &
+             *hvsd(ri -rij)
+      enddo
+    endif
     return
-  end function rhoeam2
+  end function rhospln
 !=======================================================================
-  function drhoeam2(rij)
+  function drhospln(rij)
 !
 !  rho_j(rij) from Marinica et al., JAP 121 (2017)
 !
     implicit none
     real(8),intent(in):: rij
-    real(8):: drhoeam2,ri
+    real(8):: drhospln,ri
     integer:: i
     real(8),external:: hvsd
 
-    drhoeam2 = 0d0
-    do i=1,n_rhoeam2
-      ri = rhoeam2_r(i)
-      drhoeam2 = drhoeam2 -rhoeam2_a(i)*(ri -rij)**2 &
-           *hvsd(ri -rij)
-    enddo
-    drhoeam2 = drhoeam2*3d0
+    drhospln = 0d0
+    if( rij.le.rhospln_rc ) then
+      drhospln = 0d0
+    else
+      do i=1,n_rhospln
+        ri = rhospln_r(i)
+        drhospln = drhospln -rhospln_a(i)*(ri -rij)**2 &
+             *hvsd(ri -rij)
+      enddo
+      drhospln = drhospln*3d0
+    endif
     return
-  end function drhoeam2
+  end function drhospln
 !=======================================================================
   function frho(is,rho)
     implicit none
@@ -417,7 +430,7 @@ contains
     real(8),intent(in):: rho
     real(8):: feff
 
-    feff = feam2(rho/gauge_S) +gauge_C/gauge_S*rho
+    feff = fspln(rho/gauge_S) +gauge_C/gauge_S*rho
     return
   end function feff
 !=======================================================================
@@ -429,33 +442,33 @@ contains
     real(8),intent(in):: rho
     real(8):: dfeff
 
-    dfeff = dfeam2(rho/gauge_S)/gauge_S +gauge_C/gauge_S
+    dfeff = dfspln(rho/gauge_S)/gauge_S +gauge_C/gauge_S
     return
   end function dfeff
 !=======================================================================
-  function feam2(rho)
+  function fspln(rho)
 !
-!  F[rho] function of EAM2 from Marinica, JAP 121, 165107 (2017)
+!  F[rho] function from Marinica, JAP 121, 165107 (2017)
 !
     implicit none
     real(8),intent(in):: rho
-    real(8):: feam2
+    real(8):: fspln
 
-    feam2 = feam2_a1*sqrt(rho) +feam2_a2*rho*rho
+    fspln = fspln_a1*sqrt(rho) +fspln_a2*rho*rho
     return
-  end function feam2
+  end function fspln
 !=======================================================================
-  function dfeam2(rho)
+  function dfspln(rho)
 !
-!  Derivative of F[rho] function of EAM2 from Marinica et al.
+!  Derivative of F[rho] function from Marinica et al.
 !
     implicit none
     real(8),intent(in):: rho
-    real(8):: dfeam2
+    real(8):: dfspln
 
-    dfeam2 = 0.5d0*feam2_a1/sqrt(rho) +2d0*feam2_a2*rho
+    dfspln = 0.5d0*fspln_a1/sqrt(rho) +2d0*fspln_a2*rho
     return
-  end function dfeam2
+  end function dfspln
 !=======================================================================
   function vij(is,js,rij)
 !
@@ -551,7 +564,7 @@ contains
     veq = 0d0
     if( rij.gt.bonny_rc(is,js) ) return
     if( is.eq.1 .and. js.eq.1 ) then  ! W-W
-      veq = veam2(rij) -2d0*gauge_C*rhoeam2(rij)
+      veq = vspln(rij) -2d0*gauge_C*rhospln(rij)
     else if( (is.eq.1 .and. js.eq.2) .or.&
          (is.eq.2 .and. js.eq.1) ) then  ! W-Re, Re-W
       do i=1,n_veq_WRe
@@ -581,7 +594,7 @@ contains
     dveq = 0d0
     if( rij.gt.bonny_rc(is,js) ) return
     if( is.eq.1 .and. js.eq.1 ) then  ! W-W
-      dveq = dveam2(rij) -2d0*gauge_C*drhoeam2(rij)
+      dveq = dvspln(rij) -2d0*gauge_C*drhospln(rij)
     else if( (is.eq.1 .and. js.eq.2) .or. &
          (is.eq.2 .and. js.eq.1) ) then  ! W-Re, Re-W
       do i=1,n_veq_WRe
@@ -601,38 +614,38 @@ contains
     return
   end function dveq
 !=======================================================================
-  function veam2(rij)
+  function vspln(rij)
     implicit none
     real(8),intent(in):: rij
-    real(8):: veam2,ri
+    real(8):: vspln,ri
     integer:: i
     real(8),external:: hvsd
 
-    veam2 = 0d0
-    do i=1,n_veam2
-      ri = veam2_r(i)
-      veam2 = veam2 +veam2_a(i)*(ri -rij)**3 &
+    vspln = 0d0
+    do i=1,n_vspln
+      ri = vspln_r(i)
+      vspln = vspln +vspln_a(i)*(ri -rij)**3 &
            *hvsd(ri -rij)
     enddo
     return
-  end function veam2
+  end function vspln
 !=======================================================================
-  function dveam2(rij)
+  function dvspln(rij)
     implicit none
     real(8),intent(in):: rij
-    real(8):: dveam2,ri
+    real(8):: dvspln,ri
     integer:: i
     real(8),external:: hvsd
 
-    dveam2 = 0d0
-    do i=1,n_veam2
-      ri = veam2_r(i)
-      dveam2 = dveam2 -veam2_a(i)*(ri -rij)**2 &
+    dvspln = 0d0
+    do i=1,n_vspln
+      ri = vspln_r(i)
+      dvspln = dvspln -vspln_a(i)*(ri -rij)**2 &
            *hvsd(ri -rij)
     enddo
-    dveam2 = dveam2*3d0
+    dvspln = dvspln*3d0
     return
-  end function dveam2
+  end function dvspln
 !=======================================================================
   function xi(x)
     implicit none
