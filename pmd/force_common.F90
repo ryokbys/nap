@@ -221,7 +221,9 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
        luse_SM_Al,luse_EAM,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul, &
        luse_vcMorse,luse_Buckingham,luse_Bonny_WRe, &
        ifcoulomb,numff,cffs,myid_md,iprint)
-!!$  lvc = .false.
+
+!.....vcMorse requires charge optimization, 
+!.....everywhen atomic positions or potential parameters change
   if( luse_vcMorse ) then
     if( ifcoulomb.ne.3 ) then
       if( myid_md.eq.0 .and. iprint.ne.0 ) print *,'ifcoulomb is set to 3,' &
@@ -252,7 +254,11 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
       call read_params_Morse(myid_md,mpi_md_world,iprint)
     else
 !.....This code is not parallelized, and only for fitpot
-      call update_params_Morse()  
+      if( ifcoulomb.eq.1 ) then
+        call update_params_Morse('BVS')
+      else
+        call update_params_Morse('full_Morse')
+      endif
     endif
   endif
 !.....EAM
@@ -1136,8 +1142,8 @@ subroutine get_pderiv(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
      ,numff,cffs,ifcoulomb,iprint,l1st,luse_vcMorse,lvc &
      ,ndimp,pderiv)
 !
-! Compute derivative of potential energy (and forces) 
-! w.r.t. potential parameters.
+!  Compute derivative of potential energy (and forces) 
+!  w.r.t. potential parameters.
 !
   use Morse,only: pderiv_vcMorse
   implicit none

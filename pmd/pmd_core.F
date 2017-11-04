@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-11-02 12:41:38 Ryo KOBAYASHI>
+c                     Last-modified: <2017-11-02 16:57:23 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -732,7 +732,7 @@ c          print *,'istp.gt.minstp = ',istp.gt.minstp
           i_conv = i_conv + 1
           if( i_conv.ge.n_conv ) then
             if( myid_md.eq.0 .and. iprint.ne.0 ) then
-              write(6,'(a,i6,a,es10.3,a,i3,a)')
+              write(6,'(/,a,i6,a,es10.3,a,i3,a)')
      &             ' Damped MD converged with ',istp,
      &             ' steps, since ediff < ',
      &             eps_conv,', ',n_conv,' times'

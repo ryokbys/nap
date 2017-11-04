@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-01 13:20:49 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-04 11:00:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -755,23 +755,56 @@ contains
     return
   end subroutine set_params_vcMorse
 !=======================================================================
-  subroutine update_params_Morse()
+  subroutine update_params_Morse(ctype)
 !
 !  Update Morse parameters by taking parameter values from params array.
-!  This routine would be called only from externally within fitpot.
+!  This routine would be called only from fitpot externally.
 !
-    integer:: i,inc, nspt
+    character(len=*),intent(in):: ctype
+    integer:: i,inc, nspt, itmp
 
     if( .not.lprmset ) then
       print *,'ERROR: params have not been set yet.'
       stop
     endif
-    
+
+!.....Different operations for different potential type
+!.....for example, only O-X interactions in BVS potential,
+!.....whereas all the pair interactions for normal Morse potential
+    if( trim(ctype).eq.'BVS' ) then
 !!$    if( nprms.ne.3*(nsp-1) ) then
 !!$      print *,'ERROR: nprms.ne.3*(nsp-1), nprms,nsp=',nprms,nsp
 !!$      stop
 !!$    endif
-    nspt = nprms/3 +1
+      nspt = nprms/3 +1
+
+    else  ! All the pair interactions for normal Morse potential
+!.....Number of pairs should be, 1 or 3, 6, 10, 15, 21, 28, 36, 45
+      itmp = nprms/3
+      if( itmp.eq.1 ) then
+        nspt = 1
+      else if( itmp.eq.3 ) then
+        nspt = 2
+      else if( itmp.eq.6 ) then
+        nspt = 3
+      else if( itmp.eq.10 ) then
+        nspt = 4
+      else if( itmp.eq.15 ) then
+        nspt = 5
+      else if( itmp.eq.21 ) then
+        nspt = 6
+      else if( itmp.eq.28 ) then
+        nspt = 7
+      else if( itmp.eq.36 ) then
+        nspt = 8
+      else if( itmp.eq.45 ) then
+        nspt = 9
+      else
+        print *,'ERROR: number of pairs wrong.'
+        print *,'  number of pairs extracted from nprms = ',itmp
+        stop
+      endif
+    endif
 
     d0(1:nspt,1:nspt)= 0d0
     alp(1:nspt,1:nspt)= 0d0
@@ -794,7 +827,7 @@ contains
       interact(1,i) = .true.
       interact(i,1) = .true.
     enddo
-    
+
     return
   end subroutine update_params_Morse
 !=======================================================================

@@ -2244,6 +2244,7 @@ contains
         write(6,'(a,2i10,4es13.5,2f9.5)')&
              ' iter,idim,temp,f,ft,fbest,ptrans,radpt='&
              ,iter,idim,temp,f,ft,fbest,ptrans,dble(nadpt)/iter
+        flush(6)
       endif
       
 !.....Update the parameter if needed

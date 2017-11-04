@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-01 11:02:41 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-04 11:10:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -2246,14 +2246,15 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
   nx = 1
   ny = 1
   nz = 1
-  iprint_pmd = 0
-  if( iprint.ge.100 ) iprint_pmd = 10
+  iprint_pmd = max(0,iprint-10)
 
   lvc = .false.
   do i=1,nff
     if( trim(cffs(i)).eq.'long_Coulomb' .or. &
          trim(cffs(i)).eq.'vcMorse' ) then
       if( .not. smpl%charge_set ) lvc = .true.
+!.....Even if lvc is .false., lvc will be set true at the begining of init_force
+!.....in case of vcMorse.
     endif
   enddo
   
