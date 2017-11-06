@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-26 15:17:12 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-06 18:06:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -60,7 +60,7 @@ contains
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
          ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys,erefmin &
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
-         ,nff,cffs,cmaindir,maxna,rcut,rc3 &
+         ,nff,cffs,nsubff,csubffs,cmaindir,maxna,rcut,rc3 &
          ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint
     use parallel
     use minimize
@@ -83,7 +83,9 @@ contains
     logical:: l1st = .true.
     logical:: lcalcgrad = .false.
     real(8),save,allocatable:: gdummy(:),frcs(:,:)
-    character(len=128):: cdirname
+    character(len=128):: cdirname,ctype
+
+    logical,external:: string_in_arr
 
     nfunc= nfunc +1
 
@@ -122,7 +124,14 @@ contains
       else if( trim(cpot).eq.'Morse' ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_Morse(ndim,x)
+        if( string_in_arr('screened_Coulomb',nsubff,csubffs) ) then
+          ctype = 'BVS'
+        else if( string_in_arr('long_Coulomb',nsubff,csubffs) ) then
+          ctype = 'full_Morse'
+        else
+          ctype = 'full_Morse'
+        endif
+        call set_params_Morse(ndim,x,ctype)
       else if( trim(cpot).eq.'EAM' ) then
         call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -267,8 +276,8 @@ contains
 !  using pmd (actually one_shot routine.)
 !
     use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm &
-         ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,cmaindir,maxna &
-         ,lematch,lfmatch,lsmatch
+         ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,nsubff,csubffs &
+         ,cmaindir,maxna,lematch,lfmatch,lsmatch
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb
@@ -285,7 +294,9 @@ contains
     real(8):: ediff,eerr,eref,swgt
     type(mdsys):: smpl
     logical:: lcalcgrad = .true. 
-    character(len=128):: cdirname
+    character(len=128):: cdirname,ctype
+
+    logical,external:: string_in_arr 
 
     if( .not.allocated(gs) ) allocate(gs(ndim),gtrnl(ndim),frcs(3,maxna))
 
@@ -316,7 +327,14 @@ contains
       else if( trim(cpot).eq.'Morse' ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_Morse(ndim,x)
+        if( string_in_arr('screened_Coulomb',nsubff,csubffs) ) then
+          ctype = 'BVS'
+        else if( string_in_arr('long_Coulomb',nsubff,csubffs) ) then
+          ctype = 'full_Morse'
+        else
+          ctype = 'full_Morse'
+        endif
+        call set_params_Morse(ndim,x,ctype)
       else if( trim(cpot).eq.'EAM' ) then
         call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')

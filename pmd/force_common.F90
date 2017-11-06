@@ -194,8 +194,8 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
 !  mainly because the initialization is not necessary in case of fitpot.
 !
   use Coulomb, only: initialize_coulomb
-  use Morse, only: init_vcMorse, read_params_vcMorse, lprmset, &
-       read_element_descriptors,init_Morse,read_params_Morse,&
+  use Morse, only: read_params_vcMorse, lprmset_Morse, &
+       read_element_descriptors,read_params_Morse,&
        update_params_Morse
   use EAM, only: init_EAM, read_params_EAM, update_params_EAM, lprmset_EAM
   use NN, only: read_const_NN, read_params_NN, update_params_NN, lprmset_NN
@@ -241,24 +241,22 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
 
 !.....vcMorse
   if( luse_vcMorse ) then
-    call init_vcMorse(natm,tag,mpi_md_world)
-    if( .not. lprmset ) then
+    if( .not. lprmset_Morse ) then
       call read_params_vcMorse(myid_md,mpi_md_world,iprint)
     endif
     call read_element_descriptors(myid_md,mpi_md_world,iprint)
   endif
 !.....Morse
   if( luse_Morse .or. luse_Morse_repul ) then
-    call init_Morse(natm,tag,mpi_md_world)
-    if( .not.lprmset ) then
+    if( .not.lprmset_Morse ) then
       call read_params_Morse(myid_md,mpi_md_world,iprint)
-    else
-!.....This code is not parallelized, and only for fitpot
-      if( ifcoulomb.eq.1 ) then
-        call update_params_Morse('BVS')
-      else
-        call update_params_Morse('full_Morse')
-      endif
+!!$    else
+!!$!.....This code is not parallelized, and only for fitpot
+!!$      if( ifcoulomb.eq.1 ) then
+!!$        call update_params_Morse('BVS')
+!!$      else
+!!$        call update_params_Morse('full_Morse')
+!!$      endif
     endif
   endif
 !.....EAM

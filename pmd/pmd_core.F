@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-11-02 16:57:23 Ryo KOBAYASHI>
+c                     Last-modified: <2017-11-05 22:26:43 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -1017,10 +1017,16 @@ c.....Do not update epot here, so use epott instead.
 
       call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 
+      if( iprint.ne.0 ) then
+        write(6,'(a,es15.7)') ' after sa2stnsr'
+      endif
       call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
      &     ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
      &     ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
       
+      if( iprint.ne.0 ) then
+        write(6,'(a,es15.7)') ' after after space_comp'
+      endif
 c.....revert forces to the unit eV/A before going out 
       if( myid_md.eq.0 ) then
         do i=1,ntot
@@ -1033,6 +1039,9 @@ c          atot(1:3,i) = aai(1:3)/acon(is)
         enddo
       endif
 
+      if( iprint.ne.0 ) then
+        write(6,'(a,es15.7)') ' deallocating...'
+      endif
 c.....deallocate all the arrays allocated 
       deallocate(acon,fack)
       deallocate(fekin,fa2v)

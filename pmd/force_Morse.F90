@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-04 11:00:23 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-06 18:14:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -22,10 +22,10 @@ module Morse
   integer,parameter:: msp = 9
   integer:: nsp
 !.....Morse parameters
-  real(8),allocatable:: alp(:,:),d0(:,:),rmin(:,:)
-  real(8),allocatable:: galp(:,:),gd0(:,:),grmin(:,:)
-  logical,allocatable:: interact(:,:)
-
+  real(8):: alp(msp,msp),d0(msp,msp),rmin(msp,msp)
+  real(8):: galp(msp,msp),gd0(msp,msp),grmin(msp,msp)
+  logical:: interact(msp,msp) 
+  
 !.....Atomic descriptor
   type atdesc
     integer:: na            ! atomic number
@@ -59,7 +59,7 @@ module Morse
   real(8),parameter:: beta = 0.1d0
   real(8):: prefbeta
 
-  logical:: lprmset = .false.
+  logical:: lprmset_Morse = .false.
 
 !.....params
   integer:: nprms
@@ -137,7 +137,6 @@ contains
         d0ij = d0(is,js)
         alpij= alp(is,js)
         rminij=rmin(is,js)
-!!$        write(6,*) 'is,js,d,a,r=',is,js,d0ij,alpij,rminij
         texp = exp(alpij*(rminij-dij))
 !!$        if( i.eq.1 ) then
 !!$          write(6,'(a,4i6,10es12.4)') 'i,j,is,js,dij,d0ij,alpij,rminij,texp='&
@@ -563,39 +562,6 @@ contains
 
   end subroutine qforce_vcMorse
 !=======================================================================
-  subroutine init_Morse(natm,tag,mpi_md_world)
-!
-!  Allocate and initialize parameters to be used.
-!
-    include 'mpif.h'
-    integer,intent(in):: natm,mpi_md_world
-    real(8),intent(in):: tag(natm)
-    integer:: i,ierr
-
-!.....Allocate parameter arrays
-    if( .not.allocated(alp) ) then
-      allocate(alp(msp,msp),d0(msp,msp),rmin(msp,msp),interact(msp,msp)&
-           ,galp(msp,msp),gd0(msp,msp),grmin(msp,msp))
-    endif
-    
-  end subroutine init_Morse
-!=======================================================================
-  subroutine init_vcMorse(natm,tag,mpi_md_world)
-!
-!  Allocate and initialize parameters to be used.
-!
-    include 'mpif.h'
-    integer,intent(in):: natm,mpi_md_world
-    real(8),intent(in):: tag(natm)
-    integer:: i,nspl,ierr
-
-!!$!.....Allocate parameter arrays
-!!$    if( .not.allocated(walp) ) then
-!!$      allocate(walp(0:nprm),wd(0:nprm),wrmin(0:nprm),pdij(0:nprm))
-!!$    endif
-
-  end subroutine init_vcMorse
-!=======================================================================
   subroutine read_params_Morse(myid_md,mpi_md_world,iprint)
 !
 !  Read pair parameters for Morse potential from file
@@ -688,7 +654,7 @@ contains
     call mpi_bcast(wd,nprm+1,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(wrmin,nprm+1,mpi_real8,0,mpi_md_world,ierr)
 
-    lprmset = .true.
+    lprmset_Morse = .true.
     
   end subroutine read_params_vcMorse
 !=======================================================================
@@ -703,22 +669,107 @@ contains
     return
   end subroutine set_paramsdir_Morse
 !=======================================================================
-  subroutine set_params_Morse(ndimp,params_in)
+  subroutine set_params_Morse(ndimp,params_in,ctype)
 !
 !  Accessor routine to set Morse parameters from outside.
 !  Curretnly this routine is supposed to be called only on serial run.
 !
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
+    character(len=*),intent(in):: ctype
 
-    integer:: i,inc
+    integer:: i,j,inc,itmp,nspt
 
     nprms = ndimp
     if( .not.allocated(params) ) allocate(params(nprms))
     params(1:nprms) = params_in(1:ndimp)
-    lprmset = .true.
+    lprmset_Morse = .true.
+
+!.....Different operations for different potential type
+!.....for example, only O-X interactions in BVS potential,
+!.....whereas all the pair interactions for normal Morse potential
+    if( trim(ctype).eq.'BVS' ) then
+!!$    if( nprms.ne.3*(nsp-1) ) then
+!!$      print *,'ERROR: nprms.ne.3*(nsp-1), nprms,nsp=',nprms,nsp
+!!$      stop
+!!$    endif
+      nspt = nprms/3 +1
+
+      d0(1:nspt,1:nspt)= 0d0
+      alp(1:nspt,1:nspt)= 0d0
+      rmin(1:nspt,1:nspt)= 0d0
+      interact(1:nspt,1:nspt) = .false.
+
+      inc = 0
+      do i=2,nspt
+        inc= inc +1
+        d0(1,i) = params(inc)
+        d0(i,1) = d0(1,i)
+        inc= inc +1
+        alp(1,i) = params(inc)
+        alp(i,1) = alp(1,i)
+        inc= inc +1
+        rmin(1,i) = params(inc)
+        rmin(i,1) = rmin(1,i)
+!!$        write(6,'(a,2i5,3f8.4)') ' isp,jsp,d0,alp,rmin=', &
+!!$             1,i,d0(1,i),alp(1,i),rmin(1,i)
+        interact(1,i) = .true.
+        interact(i,1) = .true.
+      enddo
+      
+    else  ! All the pair interactions for normal Morse potential
+!.....Number of pairs should be, 1 or 3, 6, 10, 15, 21, 28, 36, 45
+      itmp = nprms/3
+      if( itmp.eq.1 ) then
+        nspt = 1
+      else if( itmp.eq.3 ) then
+        nspt = 2
+      else if( itmp.eq.6 ) then
+        nspt = 3
+      else if( itmp.eq.10 ) then
+        nspt = 4
+      else if( itmp.eq.15 ) then
+        nspt = 5
+      else if( itmp.eq.21 ) then
+        nspt = 6
+      else if( itmp.eq.28 ) then
+        nspt = 7
+      else if( itmp.eq.36 ) then
+        nspt = 8
+      else if( itmp.eq.45 ) then
+        nspt = 9
+      else
+        print *,'ERROR: number of pairs wrong.'
+        print *,'  number of pairs extracted from nprms = ',itmp
+        stop
+      endif
+
+      d0(1:nspt,1:nspt)= 0d0
+      alp(1:nspt,1:nspt)= 0d0
+      rmin(1:nspt,1:nspt)= 0d0
+      interact(1:nspt,1:nspt) = .false.
+
+      inc = 0
+      do i=1,nspt
+        do j=i,nspt
+          inc= inc +1
+          d0(i,j) = params(inc)
+          d0(j,i) = d0(i,j)
+          inc= inc +1
+          alp(i,j) = params(inc)
+          alp(j,i) = alp(i,j)
+          inc= inc +1
+          rmin(i,j) = params(inc)
+          rmin(j,i) = rmin(i,j)
+!!$          write(6,'(a,2i5,3f8.4)') ' isp,jsp,d0,alp,rmin=', &
+!!$               i,j,d0(i,j),alp(i,j),rmin(i,j)
+          interact(i,j) = .true.
+          interact(j,i) = .true.
+        enddo
+      enddo
+    endif
+
     return
-    
   end subroutine set_params_Morse
 !=======================================================================
   subroutine set_params_vcMorse(ndimp,params)
@@ -751,7 +802,7 @@ contains
       wrmin(i) = params(inc)
     enddo
     
-    lprmset = .true.
+    lprmset_Morse = .true.
     return
   end subroutine set_params_vcMorse
 !=======================================================================
@@ -761,9 +812,9 @@ contains
 !  This routine would be called only from fitpot externally.
 !
     character(len=*),intent(in):: ctype
-    integer:: i,inc, nspt, itmp
+    integer:: i,j,inc, nspt, itmp
 
-    if( .not.lprmset ) then
+    if( .not.lprmset_Morse ) then
       print *,'ERROR: params have not been set yet.'
       stop
     endif
@@ -778,6 +829,27 @@ contains
 !!$    endif
       nspt = nprms/3 +1
 
+      d0(1:nspt,1:nspt)= 0d0
+      alp(1:nspt,1:nspt)= 0d0
+      rmin(1:nspt,1:nspt)= 0d0
+      interact(1:nspt,1:nspt) = .false.
+
+      inc = 0
+      do i=2,nspt
+        inc= inc +1
+        d0(1,i) = params(inc)
+        d0(i,1) = d0(1,i)
+        inc= inc +1
+        alp(1,i) = params(inc)
+        alp(i,1) = alp(1,i)
+        inc= inc +1
+        rmin(1,i) = params(inc)
+        rmin(i,1) = rmin(1,i)
+        write(6,'(a,2i5,3f8.4)') ' isp,jsp,d0,alp,rmin=', &
+             1,i,d0(1,i),alp(1,i),rmin(1,i)
+        interact(1,i) = .true.
+        interact(i,1) = .true.
+      enddo
     else  ! All the pair interactions for normal Morse potential
 !.....Number of pairs should be, 1 or 3, 6, 10, 15, 21, 28, 36, 45
       itmp = nprms/3
@@ -804,29 +876,32 @@ contains
         print *,'  number of pairs extracted from nprms = ',itmp
         stop
       endif
+
+      d0(1:nspt,1:nspt)= 0d0
+      alp(1:nspt,1:nspt)= 0d0
+      rmin(1:nspt,1:nspt)= 0d0
+      interact(1:nspt,1:nspt) = .false.
+
+      inc = 0
+      do i=1,nspt
+        do j=i,nspt
+          inc= inc +1
+          d0(i,j) = params(inc)
+          d0(j,i) = d0(i,j)
+          inc= inc +1
+          alp(i,j) = params(inc)
+          alp(j,i) = alp(i,j)
+          inc= inc +1
+          rmin(i,j) = params(inc)
+          rmin(j,i) = rmin(i,j)
+          write(6,'(a,2i5,3f8.4)') ' isp,jsp,d0,alp,rmin=', &
+               i,j,d0(i,j),alp(i,j),rmin(i,j)
+          interact(i,j) = .true.
+          interact(j,i) = .true.
+        enddo
+      enddo
     endif
 
-    d0(1:nspt,1:nspt)= 0d0
-    alp(1:nspt,1:nspt)= 0d0
-    rmin(1:nspt,1:nspt)= 0d0
-    interact(1:nspt,1:nspt) = .false.
-
-    inc = 0
-    do i=2,nspt
-      inc= inc +1
-      d0(1,i) = params(inc)
-      d0(i,1) = d0(1,i)
-      inc= inc +1
-      alp(1,i) = params(inc)
-      alp(i,1) = alp(1,i)
-      inc= inc +1
-      rmin(1,i) = params(inc)
-      rmin(i,1) = rmin(1,i)
-!!$      write(6,'(a,2i5,3f8.4)') ' isp,jsp,d0,alp,rmin=', &
-!!$           1,i,d0(1,i),alp(1,i),rmin(1,i)
-      interact(1,i) = .true.
-      interact(i,1) = .true.
-    enddo
 
     return
   end subroutine update_params_Morse

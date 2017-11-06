@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-04 11:10:14 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-06 17:56:53 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -307,7 +307,7 @@ subroutine get_dir_list(ionum)
   if( myid.eq.0 ) then
     lerror = .true.
     if( len(trim(csmplist)).lt.1 ) then
-      print '(/,a)',' Sample list was created by performing the following'
+      print '(/,a)',' Sample list was created by performing the following command:'
       print *,'  $ ls '//trim(cmaindir) &
            //' | grep "smpl_" > dir_list.txt'
       call system('ls '//trim(cmaindir) &
@@ -1897,7 +1897,7 @@ subroutine get_node2sample()
   mynsmpl= nspn(myid+1)
   call mpi_allreduce(mynsmpl,maxmynsmpl,1,mpi_integer,mpi_max &
        ,mpi_world,ierr)
-  if( myid.eq.0 ) print *,'maxmynsmpl=',maxmynsmpl
+  if( myid.eq.0 ) print *,'Max num of samples per node = ',maxmynsmpl
 
   !.....compute start and end of sample-id of this process
   isid0= 0
@@ -2073,7 +2073,7 @@ subroutine subtract_FF()
       endif
     enddo
     if( myid.eq.0 .and. iprint.ne.0 ) then
-      print '(/,a)','Force field to be subtracted:'
+      print '(/,a)',' Force field to be subtracted:'
       do i=1,nsubff
         print *,'  i,FF = ',i,trim(csubffs(i))
       enddo
@@ -2194,11 +2194,13 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
   logical,save:: l1st = .true.
 
   integer:: i,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
-       ifcoulomb,nismax,nstps_done,ntdst,nx,ny,nz,iprint_pmd
+       nismax,nstps_done,ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
   real(8):: am(9),dt,rc,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
        ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv
   logical:: ltdst,lstrs,lcellfix(3,3),lvc
   character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5
+
+  logical,external:: string_in_arr
 
   if( l1st ) then
 !.....Create MPI COMM for pmd only for the 1st time
@@ -2241,13 +2243,13 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
   czload_type = 'no'
   eps_conv = 1d-3
   ifsort = 1
-  ifcoulomb = 0
   lcellfix(1:3,1:3) = .false.
   nx = 1
   ny = 1
   nz = 1
   iprint_pmd = max(0,iprint-10)
-
+  ifcoulomb = 0
+  
   lvc = .false.
   do i=1,nff
     if( trim(cffs(i)).eq.'long_Coulomb' .or. &
@@ -2382,6 +2384,25 @@ subroutine set_max_num_atoms()
   endif
   
 end subroutine set_max_num_atoms
+!=======================================================================
+function string_in_arr(string,narr,array)
+  implicit none
+  integer,intent(in):: narr
+  character(len=*),intent(in):: string
+  character(len=*),intent(in):: array(narr)
+  logical:: string_in_arr
+  integer:: i
+
+  string_in_arr = .false.
+  do i=1,narr
+    if( trim(string).eq.trim(array(i)) ) then
+      string_in_arr = .true.
+      return
+    endif
+  enddo
+  return
+  
+end function string_in_arr
 !-----------------------------------------------------------------------
 ! Local Variables:
 ! compile-command: "make fitpot"
