@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-10-30 16:26:28 Ryo KOBAYASHI>
+c                     Last-modified: <2017-11-07 14:17:01 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -91,14 +91,14 @@ c        call system('cp pmd0000 pmd0000.orig')
           stop
         endif
 
-c.....if needed, read atomic charges from chg0000 file
+c.....If needed, read atomic charges from chg0000 file
 c.....but even if not needed, allocate ntot long array
-c.....for the simplicty of code
+c.....for the simplicty of the code
         allocate(chgtot(ntot),chitot(ntot))
         chitot(1:ntot) = 0d0
         call set_atomic_charges(ntot,chgtot,tagtot,nspmax,schg)
 
-c.....make ntot and ?tot() not null in nodes myid_md != 0
+c.....Make ntot and ?tot() not null in nodes myid_md != 0
       else
         ntot = 1
         allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot)
@@ -281,37 +281,39 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(nz,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(nstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(minstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
-      call mpi_bcast(dt,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(rc,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(rbuf,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(dmp,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(eps_conv,1,MPI_DOUBLE_PRECISION,0,
+      call mpi_bcast(dt,1,MPI_REAL8,0,mpi_md_world,ierr)
+      call mpi_bcast(rc,1,MPI_REAL8,0,mpi_md_world,ierr)
+      call mpi_bcast(rbuf,1,MPI_REAL8,0,mpi_md_world,ierr)
+      call mpi_bcast(cmin,20,mpi_character,0,mpi_md_world,ierr)
+      call mpi_bcast(dmp,1,MPI_REAL8,0,mpi_md_world,ierr)
+      call mpi_bcast(eps_conv,1,MPI_REAL8,0,
      &     mpi_md_world,ierr)
       call mpi_bcast(n_conv,1,mpi_integer,0,mpi_md_world,ierr)
-      call mpi_bcast(tinit,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(tfin,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(tinit,1,mpi_real8,0,mpi_md_world,ierr)
+      call mpi_bcast(tfin,1,mpi_real8,0,mpi_md_world,ierr)
       call mpi_bcast(ctctl,20,mpi_character,0,mpi_md_world,ierr)
-      call mpi_bcast(ttgt,9,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(trlx,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(ttgt,9,MPI_REAL8,0,mpi_md_world,ierr)
+      call mpi_bcast(trlx,1,MPI_REAL8,0,mpi_md_world,ierr)
       call mpi_bcast(nerg,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(ifpmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(npmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(ifsort,1,mpi_integer,0,mpi_md_world,ierr)
       call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(iprint,1,mpi_integer,0,mpi_md_world,ierr)
-      call mpi_bcast(fmv,30,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(shrst,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(fmv,30,mpi_real8,0,mpi_md_world,ierr)
+      call mpi_bcast(shrst,1,mpi_real8,0,mpi_md_world,ierr)
       call mpi_bcast(cpctl,20,mpi_character,0,mpi_md_world,ierr)
-      call mpi_bcast(ptgt,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(srlx,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(stgt,9,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(ptgt,1,mpi_real8,0,mpi_md_world,ierr)
+      call mpi_bcast(srlx,1,mpi_real8,0,mpi_md_world,ierr)
+      call mpi_bcast(stgt,9,mpi_real8,0,mpi_md_world,ierr)
       call mpi_bcast(lcellfix,9,mpi_logical,0,mpi_md_world,ierr)
       call mpi_bcast(czload_type,5,mpi_character,0,mpi_md_world,ierr)
-      call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(am,nspmax,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(strfin,1,mpi_real8,0,mpi_md_world,ierr)
+      call mpi_bcast(am,nspmax,mpi_real8,0,mpi_md_world,ierr)
       call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(nrmtrans,6,mpi_integer,0,mpi_md_world,ierr)
       call mpi_bcast(lvc,1,mpi_logical,0,mpi_md_world,ierr)
+      call mpi_bcast(lstrs0,1,mpi_logical,0,mpi_md_world,ierr)
 c.....Force-fields
       call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(numff,1,mpi_integer,0,mpi_md_world,ierr)
@@ -326,7 +328,7 @@ c.....Force-fields
       endif
       call mpi_bcast(cffs,20*numff,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(ifcoulomb,1,mpi_integer,0,mpi_md_world,ierr)
-      call mpi_bcast(schg,nspmax,mpi_double_precision,0,mpi_md_world
+      call mpi_bcast(schg,nspmax,mpi_real8,0,mpi_md_world
      &     ,ierr)
 c.....NEMD
       call mpi_bcast(ltdst,1,mpi_logical,0,mpi_md_world,ierr)

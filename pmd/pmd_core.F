@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-11-05 22:26:43 Ryo KOBAYASHI>
+c                     Last-modified: <2017-11-08 10:53:07 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -308,8 +308,10 @@ c-----calc kinetic energy
         endif
         ptgt = ptgt *gpa2up
       endif
+
       call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
      &     ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
+      prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
 
       istp= 0
       istps= istp
@@ -338,7 +340,6 @@ c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
         enddo
         tave= tave/nave
         write(6,'(1x,a,f0.2,a)') "  Temperature     = ",tave,' K'
-        prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
         if( prss.ge.0d0 ) then
           ctmp = '(tensile)'
         else
@@ -1249,7 +1250,7 @@ c-----Set up the node parity table
 
       return
       end
-ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c=======================================================================
       subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl
      &     ,vmax,mpi_md_world)
       implicit none 
@@ -1371,6 +1372,7 @@ c=======================================================================
       implicit none
       include 'mpif.h'
       integer,intent(in):: natm,myid_md,mpi_md_world,iprint
+c.....TODO: hard coding number 9 should be replaced...
       real(8),intent(in):: tag(natm),fmv(3,0:9)
       integer,intent(out):: ndof(9)
       
@@ -1635,7 +1637,6 @@ c-----calculate the cut-off lengths
         write(6,'(a,3f10.3)') ' rcv = ',rcv(1:3)
         write(6,'(a,3i10)')   ' nex = ',nex(1:3)
       endif
-
 
 c-----loop over x, y, & z directions
       do 100 kd=1,3
@@ -2283,6 +2284,8 @@ c
       real(8):: prss,fac
 
       call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
+
+c      print '(a,9f8.3)','stnsr = ',stnsr(1:3,1:3)
 
 c.....Berendsen for variable-cell
       if( trim(cpctl).eq.'Berendsen' .or.

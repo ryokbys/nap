@@ -64,6 +64,11 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   epi(1:namax)= 0d0
   strs(1:3,1:3,1:namax)= 0d0
   stnsr(1:3,1:3) = 0d0
+  
+!!$  print *,'myid,namax,natm=',myid_md,namax,natm
+!!$  do i=1,natm
+!!$    print '(a,2i5,9f8.3)','myid,i,strs=',myid_md,i,strs(1:3,1,i)
+!!$  enddo
 
 !.....If varaible charge, optimize charges before any force calc
   if( lvc ) then
@@ -190,8 +195,7 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
      luse_linreg,luse_NN,luse_Morse,luse_Morse_repul, &
      luse_vcMorse,lvc,ifcoulomb,luse_Buckingham,luse_Bonny_WRe)
 !
-!  Initialization routine is separated from main get_force routine,
-!  mainly because the initialization is not necessary in case of fitpot.
+!  Initialization routine is separated from main get_force routine.
 !
   use Coulomb, only: initialize_coulomb
   use Morse, only: read_params_vcMorse, lprmset_Morse, &

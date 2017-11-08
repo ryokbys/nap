@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-06 18:14:18 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-08 10:52:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -24,7 +24,9 @@ module Morse
 !.....Morse parameters
   real(8):: alp(msp,msp),d0(msp,msp),rmin(msp,msp)
   real(8):: galp(msp,msp),gd0(msp,msp),grmin(msp,msp)
-  logical:: interact(msp,msp) 
+  logical:: interact(msp,msp)
+
+  real(8),allocatable:: strsl(:,:,:)
   
 !.....Atomic descriptor
   type atdesc
@@ -93,7 +95,6 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
          ,d0ij,alpij,rminij
-    real(8),allocatable,save:: strsl(:,:,:)
     real(8),external:: fcut1,dfcut1
 
     if( l1st ) then
@@ -113,6 +114,12 @@ contains
 
 !!$    do i=1,natm+nb
 !!$      write(6,'(a,i5,3f10.5)') 'i,ra(1:3,i)=',i,ra(1:3,i)
+!!$    enddo
+
+!!$    is = 1
+!!$    do js=2,4
+!!$      write(6,'(a,3i3,3f8.3)') 'myid,is,js,alp,d0,rmin=',myid,is,js,alp(is,js)&
+!!$           ,d0(is,js),rmin(is,js)
 !!$    enddo
 
 !.....Loop over resident atoms
@@ -175,8 +182,6 @@ contains
     enddo
 
     if( lstrs ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-!!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
     
@@ -185,7 +190,6 @@ contains
     call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
-!!$    write(6,'(a,es15.7)') ' Morse epott = ',epott
  
   end subroutine force_Morse
 !=======================================================================
@@ -213,7 +217,7 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
          ,d0ij,alpij,rminij
-    real(8),allocatable,save:: strsl(:,:,:)
+!!$    real(8),allocatable,save:: strsl(:,:,:)
     real(8),external:: fcut1,dfcut1
 
     if( l1st ) then
@@ -330,7 +334,7 @@ contains
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,chgi,chgj,tmp2,diji,rcore
-    real(8),allocatable,save:: strsl(:,:,:)
+!!$    real(8),allocatable,save:: strsl(:,:,:)
     type(atdesc):: atdi,atdj
     real(8),external:: fcut1,dfcut1,sprod
     real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:)&

@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-22 19:30:44 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-08 10:22:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -323,12 +323,12 @@ contains
         enddo
       endif  ! myid
       
-      call mpi_bcast(vid_bvs,nsp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(rad_bvs,nsp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(npq_bvs,nsp,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(rho_bvs,nsp*nsp,mpi_real8 &
+      call mpi_bcast(vid_bvs,msp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(rad_bvs,msp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(npq_bvs,msp,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(rho_bvs,msp*msp,mpi_real8 &
            ,0,mpi_world,ierr)
-      call mpi_bcast(interact,nsp*nsp,mpi_logical,0,mpi_world,ierr)
+      call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
 !.....end of screend_bvs
     endif
     
@@ -476,8 +476,8 @@ contains
     enddo
 
     if( lstrs ) then
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-           ,nn,mpi_md_world,strsl,9)
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
 
