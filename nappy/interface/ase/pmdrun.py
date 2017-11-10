@@ -13,7 +13,7 @@ __author__  = "Ryo KOBAYASHI"
 __version__ = "160605"
 __LICENSE__ = "MIT"
 
-CALC_END_MARK = "time  "
+CALC_END_MARK = "Job finished "
 some_changes = ['positions', 'numbers', 'cell',]
 
 
@@ -218,7 +218,7 @@ class PMD(FileIOCalculator):
             relax_converged = False
             num_step_relax = -1
             for line in lines:
-                if 'damped MD converged with' in line:
+                if 'Damped MD converged with' in line:
                     relax_converged = True
                     num_step_relax = int(line.split()[4])
                     break

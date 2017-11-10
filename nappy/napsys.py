@@ -611,48 +611,42 @@ You need to specify the species order correctly with --specorder option.
     def write_dump(self,fname='dump'):
         """
         Write LAMMPS dump format file.
-        Only applicable to orthogonal system.
         """
         f= open(fname,'w')
         f.write("ITEM: TIMESTEP\n")
         f.write("0\n")
         f.write("ITEM: NUMBER OF ATOMS\n")
         f.write("{0:d}\n".format(len(self.atoms)))
-        f.write("ITEM: BOX BOUNDS xy xz yz\n")
-        xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz = hmat_to_lammps(self.get_hmat())
-        # a,b,c = hmat_to_lammps(self.get_hmat())
-        # xlo = ylo = zlo = 0.0
-        # xhi = a[0]
-        # xy  = b[0]
-        # yhi = b[1]
-        # xz  = c[0]
-        # yz  = c[1]
-        # zhi = c[2]
+
+        hmat = self.get_hmat()
+        poss = np.zeros((len(self.atoms),3),dtype=float)
+        for i in range(len(self.atoms)):
+            poss[i,:] = self.atoms[i].pos[:]
+        xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,poss = to_lammps(hmat,poss)
         xlo_bound = xlo +min(0.0, xy, xz, xy+xz)
         xhi_bound = xhi +max(0.0, xy, xz, xy+xz)
         ylo_bound = ylo +min(0.0, yz)
         yhi_bound = yhi +max(0.0, yz)
-        zlo_bound = zlo
-        zhi_bound = zhi
-        # f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a1[0]))
-        # f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a2[1]))
-        # f.write("{0:15.4f}  {1:15.4f}\n".format(0.0, self.a3[2]))
+        f.write("ITEM: BOX BOUNDS xy xz yz\n")
         f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(xlo_bound,
                                                          xhi_bound,
                                                          xy))
         f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(ylo_bound,
                                                          yhi_bound,
                                                          xz))
-        f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(zlo_bound,
-                                                         zhi_bound,
+        f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(zlo,
+                                                         zhi,
                                                          yz))
+        
+        
         f.write("ITEM: ATOMS id type x y z vx vy vz"
                 +" ekin epot sxx syy szz syz sxz sxy\n")
         for i in range(len(self.atoms)):
             ai= self.atoms[i]
-            x= ai.pos[0] *self.a1[0] *self.alc
-            y= ai.pos[1] *self.a2[1] *self.alc
-            z= ai.pos[2] *self.a3[2] *self.alc
+            # x= ai.pos[0] *self.a1[0] *self.alc
+            # y= ai.pos[1] *self.a2[1] *self.alc
+            # z= ai.pos[2] *self.a3[2] *self.alc
+            pos = poss[i]
             vx= ai.vel[0]
             vy= ai.vel[1]
             vz= ai.vel[2]
@@ -661,7 +655,7 @@ You need to specify the species order correctly with --specorder option.
             sti= ai.strs
             # f.write("{0:8d} {1:3d} ".format(i+1,ai.sid))
             f.write("{0:8d} {1:3s} ".format(i+1,ai.symbol))
-            f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(x,y,z))
+            f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(pos[0],pos[1],pos[2]))
             f.write("{0:8.3f} {1:8.3f} {2:8.3f} ".format(vx,vy,vz))
             f.write("{0:11.3e} {1:11.3e} ".format(ekin,epot))
             f.write("{0:11.3e} {1:11.3e} {2:11.3e} ".format(sti[0],
@@ -1333,110 +1327,110 @@ def rotate(vector,axis,ang):
     return np.dot(mmat,vector)
 
 
-def hmat_to_lammps(hmat):
-    """
-    Convert h-matrix to LAMMPS cell vectors.
-    Parameters to be output:
-      xlo, xhi, ylo, yhi, zlo, zhi, xy, xz, yz
-    LAMMPS cell should be defined as,
-      a = ( xhi-xlo,       0,       0 )
-      b = (      xy, yhi-hlo,       0 )
-      c = (      xz,      yz, zhi-zlo )
-    See, http://lammps.sandia.gov/doc/Section_howto.html, for detail.
-    """
-    import numpy as np
-    a0 = hmat[:,0]
-    b0 = hmat[:,1]
-    c0 = hmat[:,2]
-    xlo = 0.0
-    ylo = 0.0
-    zlo = 0.0
-    a = np.linalg.norm(a0)
-    b = np.linalg.norm(b0)
-    c = np.linalg.norm(c0)
-    alpha = np.arccos(np.dot(b0,c0)/b/c)
-    beta  = np.arccos(np.dot(a0,c0)/a/c)
-    gamma = np.arccos(np.dot(a0,b0)/a/b)
-    # print 'hmat=',hmat
-    # print 'a,b,c = ',a,b,c
-    # print 'alpha,beta,gamma = ',alpha,beta,gamma
-    xhi = a
-    xy = b*np.cos(gamma)
-    xz = c*np.cos(beta)
-    yhi = np.sqrt(b*b -xy*xy)
-    yz = (b*c*np.cos(alpha) -xy*xz)/yhi
-    zhi = np.sqrt(c*c -xz*xz -yz*yz)
-    # print 'xhi-xlo,yhi-ylo,zhi-zlo= ',xhi-xlo,yhi-ylo,zhi-zlo
-    # print 'xy,     xz,     yz     = ',xy/xhi,xz/xhi,yz/yhi
-
-    if xy > xhi/2:
-        xy -= xhi
-    elif xy < -xhi/2:
-        xy += xhi
-
-    if xz > xhi/2:
-        xz -= xhi
-    elif xz < -xhi/2:
-        xz += xhi
-
-    if yz > yhi/2:
-        yz -= yhi
-    elif yz < -yhi/2:
-        yz += yhi
-    # print 'xy,     xz,     yz     = ',xy/xhi,xz/xhi,yz/yhi
-
-    return xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz
-
-def spos_to_lammps_pos(hmat,spos):
-    """
-    Scaled positions in hmat-representation to
-    positions in the lammps basis.
-    """
-    if isinstance(hmat,list):
-        hmat = np.array(hmat)
-        
-    if not isinstance(spos,np.ndarray):
-        if isinstance(spos,list):
-            spos = np.array(spos)
-        else:
-            raise TypeError('spos should be list or numpy.ndarray.')
-    a1 = np.array(hmat[:,0])
-    a2 = np.array(hmat[:,1])
-    a3 = np.array(hmat[:,2])
-    vol = abs(np.dot(a1,np.cross(a2,a3)))
-    a23 = np.cross(a2,a3)
-    a31 = np.cross(a3,a1)
-    a12 = np.cross(a1,a2)
-    amat = np.zeros((3,3),dtype=float)
-    amat[0,:] = a23[:]
-    amat[1,:] = a31[:]
-    amat[2,:] = a12[:]
-    # print 'hmat=',hmat
-    # print 'vol=',vol
-    # print 'a1=',a1
-    # print 'a2=',a2
-    # print 'a3=',a3
-    # print 'amat=',amat
-
-    xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz = hmat_to_lammps(hmat)
-    b1 = np.array((xhi-xlo,0.0,0.0))
-    b2 = np.array((xy,yhi-ylo,0.0))
-    b3 = np.array((xz,yz,zhi-zlo))
-    bmat = np.zeros((3,3),dtype=float)
-    bmat[:,0] = b1[:]
-    bmat[:,1] = b2[:]
-    bmat[:,2] = b3[:]
-    # print 'bmat=',bmat
-    if len(spos.shape) == 1:  # only one atom
-        pos = np.zeros(spos.shape,dtype=float)
-        pos = np.dot(hmat,spos)
-        pos = np.dot(bmat,np.dot(amat,pos))/vol
-    elif len(spos.shape) == 2:  # array of atoms
-        pos = np.zeros(spos.shape,dtype=float)
-        for i,sp in enumerate(spos):
-            pos[i] = np.dot(hmat,sp)
-            pos[i] = np.dot(bmat,np.dot(amat,pos[i]))/vol
-    return pos
+##def hmat_to_lammps(hmat):
+##    """
+##    Convert h-matrix to LAMMPS cell vectors.
+##    Parameters to be output:
+##      xlo, xhi, ylo, yhi, zlo, zhi, xy, xz, yz
+##    LAMMPS cell should be defined as,
+##      a = ( xhi-xlo,       0,       0 )
+##      b = (      xy, yhi-hlo,       0 )
+##      c = (      xz,      yz, zhi-zlo )
+##    See, http://lammps.sandia.gov/doc/Section_howto.html, for detail.
+##    """
+##    import numpy as np
+##    a0 = hmat[:,0]
+##    b0 = hmat[:,1]
+##    c0 = hmat[:,2]
+##    xlo = 0.0
+##    ylo = 0.0
+##    zlo = 0.0
+##    a = np.linalg.norm(a0)
+##    b = np.linalg.norm(b0)
+##    c = np.linalg.norm(c0)
+##    alpha = np.arccos(np.dot(b0,c0)/b/c)
+##    beta  = np.arccos(np.dot(a0,c0)/a/c)
+##    gamma = np.arccos(np.dot(a0,b0)/a/b)
+##    # print 'hmat=',hmat
+##    # print 'a,b,c = ',a,b,c
+##    # print 'alpha,beta,gamma = ',alpha,beta,gamma
+##    xhi = a
+##    xy = b*np.cos(gamma)
+##    xz = c*np.cos(beta)
+##    yhi = np.sqrt(b*b -xy*xy)
+##    yz = (b*c*np.cos(alpha) -xy*xz)/yhi
+##    zhi = np.sqrt(c*c -xz*xz -yz*yz)
+##    # print 'xhi-xlo,yhi-ylo,zhi-zlo= ',xhi-xlo,yhi-ylo,zhi-zlo
+##    # print 'xy,     xz,     yz     = ',xy/xhi,xz/xhi,yz/yhi
+##
+##    if xy > xhi/2:
+##        xy -= xhi
+##    elif xy < -xhi/2:
+##        xy += xhi
+##
+##    if xz > xhi/2:
+##        xz -= xhi
+##    elif xz < -xhi/2:
+##        xz += xhi
+##
+##    if yz > yhi/2:
+##        yz -= yhi
+##    elif yz < -yhi/2:
+##        yz += yhi
+##    # print 'xy,     xz,     yz     = ',xy/xhi,xz/xhi,yz/yhi
+##
+##    return xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz
+##
+##def spos_to_lammps_pos(hmat,spos):
+##    """
+##    Scaled positions in hmat-representation to
+##    positions in the lammps basis.
+##    """
+##    if isinstance(hmat,list):
+##        hmat = np.array(hmat)
+##        
+##    if not isinstance(spos,np.ndarray):
+##        if isinstance(spos,list):
+##            spos = np.array(spos)
+##        else:
+##            raise TypeError('spos should be list or numpy.ndarray.')
+##    a1 = np.array(hmat[:,0])
+##    a2 = np.array(hmat[:,1])
+##    a3 = np.array(hmat[:,2])
+##    vol = abs(np.dot(a1,np.cross(a2,a3)))
+##    a23 = np.cross(a2,a3)
+##    a31 = np.cross(a3,a1)
+##    a12 = np.cross(a1,a2)
+##    amat = np.zeros((3,3),dtype=float)
+##    amat[0,:] = a23[:]
+##    amat[1,:] = a31[:]
+##    amat[2,:] = a12[:]
+##    # print 'hmat=',hmat
+##    # print 'vol=',vol
+##    # print 'a1=',a1
+##    # print 'a2=',a2
+##    # print 'a3=',a3
+##    # print 'amat=',amat
+##
+##    xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz = hmat_to_lammps(hmat)
+##    b1 = np.array((xhi-xlo,0.0,0.0))
+##    b2 = np.array((xy,yhi-ylo,0.0))
+##    b3 = np.array((xz,yz,zhi-zlo))
+##    bmat = np.zeros((3,3),dtype=float)
+##    bmat[:,0] = b1[:]
+##    bmat[:,1] = b2[:]
+##    bmat[:,2] = b3[:]
+##    # print 'bmat=',bmat
+##    if len(spos.shape) == 1:  # only one atom
+##        pos = np.zeros(spos.shape,dtype=float)
+##        pos = np.dot(hmat,spos)
+##        pos = np.dot(bmat,np.dot(amat,pos))/vol
+##    elif len(spos.shape) == 2:  # array of atoms
+##        pos = np.zeros(spos.shape,dtype=float)
+##        for i,sp in enumerate(spos):
+##            pos[i] = np.dot(hmat,sp)
+##            pos[i] = np.dot(bmat,np.dot(amat,pos[i]))/vol
+##    return pos
 
 def to_lammps(hmat,spos):
     """
