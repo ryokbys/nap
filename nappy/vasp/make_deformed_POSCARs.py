@@ -31,10 +31,9 @@ import os,sys
 import copy
 from docopt import docopt
 
-sys.path.append(os.path.dirname(__file__))
-sys.path.append(os.path.dirname(__file__)+'/../')
-from poscar import POSCAR
-from napsys import NAPSystem
+# sys.path.append(os.path.dirname(__file__))
+# sys.path.append(os.path.dirname(__file__)+'/../')
+from nappy.napsys import NAPSystem
 
 _length_digit = 3
 _angle_digit = 3

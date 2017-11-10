@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-27 13:00:41 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-08 22:54:13 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -9,8 +9,8 @@ module NN
   character(len=128):: paramsdir = '.'
 
 !.....parameter file name
-  character(128),parameter:: cpfname= 'in.params.NN'
-  character(128),parameter:: ccfname='in.const.NN'
+  character(128),parameter:: cpfname = 'in.params.NN'
+  character(128),parameter:: ccfname = 'in.const.NN'
 
 !.....logical flag for bias
   logical:: lbias = .false.
@@ -292,9 +292,6 @@ contains
           epi(ia)= epi(ia) +wgt12(ihl1) *(hl1(ihl1,ia)-0.5d0)
         enddo
         epotl=epotl +epi(ia)
-#ifdef __3BODY__
-        write(6,'(a,i8,es22.14)') ' 3-body term:',ia,epi(ia)
-#endif
       enddo
     else if( nl.eq.2 ) then
       do ia=1,natm
@@ -302,9 +299,6 @@ contains
           epi(ia)= epi(ia) +wgt23(ihl2) *(hl2(ihl2,ia)-0.5d0)
         enddo
         epotl=epotl +epi(ia)
-#ifdef __3BODY__
-        write(6,'(a,i8,es22.14)') ' 3-body term:',ia,epi(ia)
-#endif
       enddo
     endif
 
@@ -786,16 +780,6 @@ contains
     endif
     close(50)
 
-#ifdef __DEBUG__
-    if(myid.le.0) then
-      write(6,'(a)') ' DEBUG: ihl0,ihl1,wgt11(ihl0,ihl1)'
-      do ihl0=1,nhl(0)
-        do ihl1=1,nhl(1)
-          write(6,'(2i5,es15.7)') ,ihl0,ihl1,wgt11(ihl0,ihl1)
-        enddo
-      enddo
-    endif
-#endif
 
     deallocate(nwgt)
     return
@@ -1038,17 +1022,6 @@ contains
       enddo
     endif
     close(50)
-
-#ifdef __DEBUG__
-    if(myid.le.0) then
-      write(6,'(a)') ' DEBUG: ihl0,ihl1,wgt11(ihl0,ihl1)'
-      do ihl0=1,nhl(0)
-        do ihl1=1,nhl(1)
-          write(6,'(2i5,es15.7)') ,ihl0,ihl1,wgt11(ihl0,ihl1)
-        enddo
-      enddo
-    endif
-#endif
 
     deallocate(nwgt)
     return
@@ -1438,6 +1411,13 @@ contains
     return
   end subroutine set_paramsdir_NN
 !=======================================================================
+  subroutine pderiv_NN()
+!
+!  Derivative w.r.t. NN parameters, {w}
+!
+    implicit none
+    
+  end subroutine pderiv_NN
 end module NN
 !-----------------------------------------------------------------------
 !     Local Variables:

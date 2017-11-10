@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-11-08 10:53:07 Ryo KOBAYASHI>
+c                     Last-modified: <2017-11-09 10:48:19 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -2846,9 +2846,9 @@ c=======================================================================
       gamma = acos(sprod(3,h(1:3,1),h(1:3,2))/a/b) /pi *180d0
 
       write(6,'(a)') ' Lattice parameters:'
-      write(6,'(a,f10.2,a)') '   a = ',a,' Ang.'
-      write(6,'(a,f10.2,a)') '   b = ',b,' Ang.'
-      write(6,'(a,f10.2,a)') '   c = ',c,' Ang.'
+      write(6,'(a,f10.3,a)') '   a = ',a,' Ang.'
+      write(6,'(a,f10.3,a)') '   b = ',b,' Ang.'
+      write(6,'(a,f10.3,a)') '   c = ',c,' Ang.'
       write(6,'(a,f10.2,a)') '   alpha = ',alpha,' deg.'
       write(6,'(a,f10.2,a)') '   beta  = ',beta,' deg.'
       write(6,'(a,f10.2,a)') '   gamma = ',gamma,' deg.'

@@ -345,6 +345,13 @@ c
      &     xlo_bound,xhi_bound,ylo_bound,yhi_bound,
      &     zlo_bound,zhi_bound
       integer,external:: itotOf
+      real(8),allocatable,save:: rlmp(:,:)
+
+      if( .not. allocated(rlmp) ) allocate(rlmp(3,ntot))
+      if( size(rlmp).ne.3*ntot ) then
+        deallocate(rlmp)
+        allocate(rlmp(3,ntot))
+      endif
 
       open(ionum,file=trim(cfname),status='replace')
       write(ionum,'(a)') 'ITEM: TIMESTEP'
@@ -352,7 +359,7 @@ c
       write(ionum,'(a)') 'ITEM: NUMBER OF ATOMS'
       write(ionum,'(i10)') ntot
       write(ionum,'(a)') 'ITEM: BOX BOUNDS xy xz yz'
-      call hmat2lammps(h,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
+      call pmd2lammps(h,ntot,rtot,rlmp,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
       xlo_bound = xlo +min(0d0, xy, xz, xy+xz)
       xhi_bound = xhi +max(0d0, xy, xz, xy+xz)
       ylo_bound = ylo +min(0d0, yz)
@@ -378,6 +385,142 @@ c
       
       close(ionum)
       end subroutine write_dump
+c=======================================================================
+      subroutine pmd2lammps(h,ntot,rtot,rlmp,
+     &     xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
+c
+c     Convert pmd data format to LAMMPS format not only cell
+c     but also atomic positions.
+c     Parameters to be output:
+c       xlo, xhi, ylo, yhi, zlo, zhi, xy, xz, yz
+c     LAMMPS cell should be defined as,
+c       a = ( xhi-xlo,       0,       0 )
+c       b = (      xy, yhi-hlo,       0 )
+c       c = (      xz,      yz, zhi-zlo )
+c     See, http://lammps.sandia.gov/doc/Section_howto.html, for detail.
+c
+      implicit none
+      integer,intent(in):: ntot
+      real(8),intent(in):: h(3,3),rtot(3,ntot)
+      real(8),intent(out):: xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz
+     &     ,rlmp(3,ntot)
+
+      integer:: i,lxy,lxz,lyz
+      real(8):: a0(3),b0(3),c0(3),a1(3),a2(3),a3(3)
+     &     ,b1(3),b2(3),b3(3),rt(3),amat(3,3),bmat(3,3)
+     &     ,x,y,z,a23(3),a31(3),a12(3),vol
+      real(8):: a,b,c,alpha,beta,gamma
+      real(8),external:: absv,sprod
+      
+      xlo = 0d0
+      ylo = 0d0
+      zlo = 0d0
+      a0(1:3) = h(1:3,1)
+      b0(1:3) = h(1:3,2)
+      c0(1:3) = h(1:3,3)
+      a = absv(3,a0)
+      b = absv(3,b0)
+      c = absv(3,c0)
+      alpha = acos(sprod(3,b0,c0)/b/c)
+      beta  = acos(sprod(3,a0,c0)/a/c)
+      gamma = acos(sprod(3,a0,b0)/a/b)
+      xhi = a
+      xy = b*cos(gamma)
+      xz = c*cos(beta)
+      yhi= sqrt(b*b -xy*xy)
+      yz = (b*c*cos(alpha) -xy*xz)/yhi
+      zhi= sqrt(c*c -xz*xz -yz*yz)
+      x = xhi -xlo
+      y = yhi -ylo
+      z = zhi -zlo
+      lxy = 0
+      if( xy.gt.xhi/2 ) then
+        xy = xy -xhi
+        lxy = -1
+      else if( xy.lt.-xhi/2 ) then
+        xy = xy +xhi
+        lxy = 1
+      endif
+      lxz = 0
+      if( xz.gt.xhi/2 ) then
+        xz = xz -xhi
+        lxz = -1
+      else if( xz.lt.-xhi/2 ) then
+        xz = xz +xhi
+        lxz = 1
+      endif
+      lyz = 0
+      if( yz.gt.yhi/2 ) then
+        yz = yz -yhi
+        lyz = -1
+      else if( yz.lt.-yhi/2 ) then
+        yz = yz +yhi
+        lyz = 1
+      endif
+      
+      a1(1:3) = h(1:3,1)
+      a2(1:3) = h(1:3,2)
+      a3(1:3) = h(1:3,3)
+      call vprod(a2,a3,a23)
+      call vprod(a3,a1,a31)
+      call vprod(a1,a2,a12)
+      vol = abs( sprod(3,a1,a23) )
+      amat(1:3,1:3) = 0d0
+      amat(1,1:3) = a23(1:3)
+      amat(2,1:3) = a31(1:3)
+      amat(3,1:3) = a12(1:3)
+      b1(1:3) = (/ x, 0d0, 0d0 /)
+      b2(1:3) = (/ xy,  y, 0d0 /)
+      b3(1:3) = (/ xz, yz,   z /)
+      bmat(1:3,1:3) = 0d0
+      bmat(1:3,1) = b1(1:3)
+      bmat(1:3,2) = b2(1:3)
+      bmat(1:3,3) = b3(1:3)
+      do i=1,ntot
+        rlmp(1:3,i) = 0d0
+        call shift_pos_for_lammps(rtot(1,i),rlmp(1,i),lxy,lxz,lyz
+     &       ,x,y,z,yz,xz,xy)
+        rt = matmul(h,rlmp(1:3,i))
+        rlmp(1:3,i) = matmul(bmat,matmul(amat,rt))/vol
+      enddo
+      
+      return
+      end subroutine pmd2lammps
+c=======================================================================
+      subroutine shift_pos_for_lammps(r,rn,lxy,lxz,lyz,x,y,z,yz,xz,xy)
+      implicit none
+      real(8),intent(in):: r(3),x,y,z,yz,xz,xy
+      integer,intent(in):: lxy,lxz,lyz
+      real(8),intent(out):: rn(3)
+
+      integer:: i
+      real(8):: xyp
+      real(8),external:: pbc
+
+      xyp = xy -lxy*x
+      rn(1:3) = r(1:3)
+      rn(2) = rn(2) -lyz*r(3)
+      rn(1) = rn(1) -lxz*r(3) +(r(2)*xyp -rn(2)*xy)/x
+      do i=1,3
+        rn(i) = pbc(rn(i))
+      enddo
+      return
+      end subroutine shift_pos_for_lammps
+c=======================================================================
+      function pbc(x)
+      implicit none
+      real(8),intent(in):: x
+      real(8):: pbc
+      
+      if( x.lt.0d0 ) then
+        pbc = x -int(x) +1d0
+      else if( x.ge.1d0 ) then
+        pbc = x -int(x)
+      else
+        pbc = x
+      endif
+      return
+      end function pbc
 c=======================================================================
       subroutine hmat2lammps(h,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
 c
