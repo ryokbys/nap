@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-06 17:56:53 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-11 11:24:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -247,7 +247,7 @@ subroutine write_initial_setting()
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,i4)') 'sample_error',nserr
   do i=1,nserr
-    write(6,'(4x,a23,3(1x,f8.4))') trim(cserr(i)), seerr(i), sferr(i), sserr(i)
+    write(6,'(4x,a23,3(1x,f10.4))') trim(cserr(i)), seerr(i), sferr(i), sserr(i)
   enddo
   write(6,'(a)') ''
   if( trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' ) then
@@ -1565,7 +1565,7 @@ subroutine write_stats(iter)
     natm= smpl%natm
     if( len(trim(crefstrct)).gt.5 ) then
       de= abs(smpl%epot-epotsub*natm+smpl%esub &
-           -(smpl%eref-erefsub))/natm
+           -(smpl%eref-erefsub*natm))/natm
     else
       de= abs(smpl%epot+smpl%esub -smpl%eref)/natm
     endif
@@ -2349,7 +2349,7 @@ subroutine subtract_ref_struct_energy()
     if( trim(samples(ismpl)%cdirname).eq.trim(crefstrct) ) then
       myidrefsub = myid
       isidrefsub = ismpl
-      erefsub = samples(ismpl)%eref
+      erefsub = samples(ismpl)%eref /samples(ismpl)%natm
     endif
   enddo
 
@@ -2359,8 +2359,8 @@ subroutine subtract_ref_struct_energy()
   call mpi_bcast(erefsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
 
   if( myid.eq.0 .and. iprint.ne.0 ) then
-    write(6,'(a,es12.4,a)') ' reference structure energy = ', &
-         erefsub,' eV'
+    write(6,'(a,es12.4,a)') ' Reference structure energy = ', &
+         erefsub,' eV/atom'
   endif
 !!$  print *,'myid,myidrefsubl,myidrefsub,erefsub=',myid,&
 !!$       myidrefsubl,myidrefsub,erefsub

@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-08 10:52:26 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-11 08:55:53 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -849,8 +849,8 @@ contains
         inc= inc +1
         rmin(1,i) = params(inc)
         rmin(i,1) = rmin(1,i)
-        write(6,'(a,2i5,3f8.4)') ' isp,jsp,d0,alp,rmin=', &
-             1,i,d0(1,i),alp(1,i),rmin(1,i)
+!!$        write(6,'(a,2i5,3f8.4)') ' isp,jsp,d0,alp,rmin=', &
+!!$             1,i,d0(1,i),alp(1,i),rmin(1,i)
         interact(1,i) = .true.
         interact(i,1) = .true.
       enddo
@@ -898,8 +898,8 @@ contains
           inc= inc +1
           rmin(i,j) = params(inc)
           rmin(j,i) = rmin(i,j)
-          write(6,'(a,2i5,3f8.4)') ' isp,jsp,d0,alp,rmin=', &
-               i,j,d0(i,j),alp(i,j),rmin(i,j)
+!!$          write(6,'(a,2i5,3f8.4)') ' isp,jsp,d0,alp,rmin=', &
+!!$               i,j,d0(i,j),alp(i,j),rmin(i,j)
           interact(i,j) = .true.
           interact(j,i) = .true.
         enddo

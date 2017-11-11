@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-06 18:06:19 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-11 11:26:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -175,18 +175,18 @@ contains
         eerr = smpl%eerr
 !.....Energy matching
         if( len(trim(crefstrct)).gt.5 ) then
-          ediff= (epot-epotsub*natm+esub -(eref-erefsub))/natm /eerr
+          ediff= (epot-epotsub*natm+esub -(eref-erefsub*natm))/natm /eerr
         else
           ediff= (epot+esub -eref)/natm /eerr
         endif
         ediff= ediff*ediff
         ftmp= ftmp +ediff *swgt
 !!$        write(6,'(a,2i3,a20,6f12.5)') &
-!!$             'myid,ismpl,cdirname,(eref-esub),epot,ediff,esub,epotsub,erefsub=',&
+!!$             'myid,ismpl,cdirname,(eref-erefsub),epot,ediff,esub,epotsub,erefsub=',&
 !!$             myid,ismpl,trim(samples(ismpl)%cdirname),&
-!!$             (eref-esub)/natm,epot/natm,&
-!!$             abs(epot-epotsub -(eref-esub-erefsub))/natm,esub/natm,&
-!!$             epotsub/natm, erefsub/natm
+!!$             (eref-erefsub*natm)/natm,epot/natm,&
+!!$             abs(epot-epotsub*natm+esub -(eref-erefsub*natm))/natm,esub/natm,&
+!!$             epotsub, erefsub
       endif
 !.....Force matching
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
