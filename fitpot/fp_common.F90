@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-11 11:26:20 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-11 16:51:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -9,6 +9,7 @@ module fp_common
 
   real(8),allocatable:: fdiff(:,:)
   real(8):: pdiff(3,3), ptnsr(3,3)
+  real(8):: epotsub
   
   logical:: fp_common_initialized= .false.
 
@@ -74,7 +75,7 @@ contains
     real(8),intent(out):: ftrn,ftst
 
     integer:: ismpl,natm,ia,ixyz,jxyz,idim
-    real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv,esub,epotsub
+    real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv,esub
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3)
     real(8):: ftrnl,ftstl,ftmp
     real(8):: edenom,fdenom
@@ -275,14 +276,16 @@ contains
 !  Evaluate the gradient of loss function value
 !  using pmd (actually one_shot routine.)
 !
-    use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm &
+    use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm,tgrad &
          ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,nsubff,csubffs &
-         ,cmaindir,maxna,lematch,lfmatch,lsmatch
+         ,cmaindir,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
+         ,rcut,rc3
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use EAM,only: set_paramsdir_EAM,set_params_EAM
+    use NN,only: set_paramsdir_NN,set_params_NN
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -290,7 +293,7 @@ contains
     
     integer:: ismpl,i,idim,natm
     real(8),save,allocatable:: gs(:),gtrnl(:),frcs(:,:)
-    real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub
+    real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3)
     real(8):: ediff,eerr,eref,swgt
     type(mdsys):: smpl
     logical:: lcalcgrad = .true. 
@@ -303,6 +306,11 @@ contains
     if( lfmatch ) then
       if( myid.eq.0 ) then
         print *,'WARNING: FORCE-MATCHING IS NOT AVAILABLE IN GRAD_W_PMD().'
+      endif
+    endif
+    if( lsmatch ) then
+      if( myid.eq.0 ) then
+        print *,'WARNING: STRESS-MATCHING IS NOT AVAILABLE IN GRAD_W_PMD().'
       endif
     endif
 
@@ -339,11 +347,18 @@ contains
         call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_EAM(ndim,x)
+      else if( trim(cpot).eq.'NN' ) then
+        call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_NN(ndim,x,rcut,rc3)
       endif
-      call run_pmd(smpl,lcalcgrad,ndim,gs,nff,cffs,epot,frcs)
+!.....Although epot, frcs, and strs are calculated,
+!.....only gs is required.
+      call run_pmd(smpl,lcalcgrad,ndim,gs,nff,cffs,epot,frcs,strs)
 !!$      print *, 'ismpl,epot @grad_w_pmd =',ismpl,epot
-      samples(ismpl)%epot = epot
-      samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
+!!$      samples(ismpl)%epot = epot
+!!$      samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
+!!$      samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
 
       swgt= smpl%wgt
       if( lematch ) then
@@ -351,8 +366,14 @@ contains
         esub= smpl%esub
         eerr= smpl%eerr
 !.....Energy matching
-        ediff= (epot+esub -eref) /natm /eerr
+        if( len(trim(crefstrct)).gt.5 ) then
+          ediff= (epot-epotsub*natm+esub -(eref-erefsub*natm))/natm /eerr
+        else
+          ediff= (epot+esub -eref)/natm /eerr
+        endif
         ediff= 2d0 *ediff /natm /eerr *swgt
+!.....TODO: parameter derivatives w.r.t. not only energy,
+!.....but also forces and stresses
         gtrnl(1:ndim)= gtrnl(1:ndim) +gs(1:ndim)*ediff
       endif
 !!$      write(6,'(a,i5,5es15.7)') 'ismpl,ediff,gs(7),gtrnl(7),epot,eref=',&

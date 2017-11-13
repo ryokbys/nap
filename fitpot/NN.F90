@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-26 15:11:42 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-13 21:43:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -314,7 +314,7 @@ contains
     if( l1st ) then
       call count_nterms()
       if( myid.eq.0 ) then
-        write(6,*) ' nterm_trn, nterm_tst = ',nterm_trn, nterm_tst
+        write(6,'(a,2(2x,i0))') ' nterm_trn, nterm_tst = ',nterm_trn, nterm_tst
       endif
     endif
     
@@ -380,6 +380,8 @@ contains
          ,mpi_sum,mpi_world,ierr)
     ftrn = ftrn /swgt2trn
     ftst = ftst /swgt2tst
+    if( nterm_trn.eq.0 ) ftrn = 0d0
+    if( nterm_tst.eq.0 ) ftst = 0d0
 
 !!$    if( l1st ) then
 !!$      fetrng= 0d0

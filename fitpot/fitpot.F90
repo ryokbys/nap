@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-11 11:24:06 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-13 21:34:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -2062,6 +2062,15 @@ subroutine subtract_FF()
   real(8),save,allocatable:: frcs(:,:)
 
   if( l1st ) then
+    if( myid.eq.0 .and. iprint.ne.0 ) then
+      print '(/,a)',' Force field to be subtracted:'
+      do i=1,nsubff
+        print *,'  i,FF = ',i,trim(csubffs(i))
+      enddo
+    endif
+    
+    if( .not.allocated(frcs) ) allocate(frcs(3,maxna))
+
     do i=1,nsubff
       if( index(trim(csubffs(i)),'Morse').ne.0 ) then
         luse_Morse = .true.
@@ -2072,14 +2081,6 @@ subroutine subtract_FF()
         luse_Coulomb = .true.
       endif
     enddo
-    if( myid.eq.0 .and. iprint.ne.0 ) then
-      print '(/,a)',' Force field to be subtracted:'
-      do i=1,nsubff
-        print *,'  i,FF = ',i,trim(csubffs(i))
-      enddo
-    endif
-
-    if( .not.allocated(frcs) ) allocate(frcs(3,maxna))
 
 !.....Only at the 1st call, perform pmd to get esubs
     do ismpl=isid0,isid1
@@ -2087,10 +2088,12 @@ subroutine subtract_FF()
       if( luse_Morse ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'&
              //trim(samples(ismpl)%cdirname)//'/pmd')
-      else if( luse_Morse_repul ) then
+      endif
+      if( luse_Morse_repul ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'&
              //trim(samples(ismpl)%cdirname)//'/pmd')
-      else if( luse_Coulomb ) then
+      endif
+      if( luse_Coulomb ) then
         call set_paramsdir_Coulomb(trim(cmaindir)//'/'&
              //trim(samples(ismpl)%cdirname)//'/pmd')
       endif

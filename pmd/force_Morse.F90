@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-11 08:55:53 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-13 21:36:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -583,7 +583,7 @@ contains
       d0(1:msp,1:msp)= 0d0
       rmin(1:msp,1:msp)= 0d0
       alp(1:msp,1:msp)= 0d0
-      write(6,'(/,a)') ' Morse parameters:'
+      if( iprint.ne.0 ) write(6,'(/,a)') ' Morse parameters:'
       do while(.true.)
         read(ioprms,*,end=10) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
