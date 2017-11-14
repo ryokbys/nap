@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-11-09 10:48:19 Ryo KOBAYASHI>
+c                     Last-modified: <2017-11-14 12:59:07 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -56,7 +56,7 @@ c-----output file names
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
-     &     luse_Buckingham,luse_Bonny_WRe
+     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
 
       call initialize_pmdvars(nspmax)
 
@@ -243,7 +243,8 @@ c.....Set initial temperature if needed
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham,luse_Bonny_WRe)
+     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham,luse_Bonny_WRe,
+     &     luse_SRIM)
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
@@ -271,7 +272,7 @@ c.....Calc forces
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,
+     &     luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,luse_SRIM,
      &     lcell_updated)
       lstrs = .false.
       epot= epot0
@@ -547,7 +548,7 @@ c-------Calc forces
      &       luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
      &       ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
      &       ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul
-     &       ,luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe
+     &       ,luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,luse_SRIM
      &       ,lcell_updated)
         lstrs = .false.
 
@@ -898,7 +899,7 @@ c
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
-     &     luse_Buckingham,luse_Bonny_WRe
+     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
       logical:: lcell_updated = .false.
       
 c      write(6,'(a,200es10.2)') 'chgtot in pmd_core = ',
@@ -973,7 +974,7 @@ c     &     chg(1:natm+10)
      &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
      &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
      &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham,
-     &     luse_Bonny_WRe)
+     &     luse_Bonny_WRe,luse_SRIM)
 
 c      print *,' lvc,ifcoulomb = ',lvc,ifcoulomb
 c      write(6,'(a,500es10.2)') ' chg before bacopy = ',
@@ -999,7 +1000,7 @@ c-----Make pair list
      &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
      &     ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
      &     ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,
+     &     luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,luse_SRIM,
      &     lcell_updated)
 c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
 c     &     ,epot,chg(1:natm)
