@@ -1,6 +1,6 @@
 module SRIM
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-14 16:15:19 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-14 17:12:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of SRIM repulsive potential.
 !  See
@@ -118,9 +118,9 @@ contains
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: xij(3),rij,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
-    real(8):: x,y,z,xi(3),epotl,epott,tmp,dtmp,drhoi,drhoj
-    real(8),allocatable,save:: rho(:)
+    real(8):: x,y,z,xi(3),epotl,epott,tmp,tmp2,dtmp
     real(8),allocatable,save:: strsl(:,:,:)
+    real(8),external:: fcut1,dfcut1
 
     real(8),save:: srim_rc2
 
@@ -166,15 +166,18 @@ contains
         rij = sqrt(rij)
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
-        tmp = 0.5d0 *vnucl(is,js,rij)
-        epi(i)= epi(i) +tmp
-        epi(j)= epi(j) +tmp
+        tmp = vnucl(is,js,rij)
+        tmp2 = 0.5d0 *tmp *fcut1(rij,srim_rc)
         if(j.le.natm) then
-          epotl=epotl +tmp +tmp
+          epi(i)= epi(i) +tmp2
+          epi(j)= epi(j) +tmp2
+          epotl=epotl +tmp2 +tmp2
         else
-          epotl=epotl +tmp
+          epi(i)= epi(i) +tmp2
+          epotl=epotl +tmp2
         endif
-        dtmp = dvnucl(is,js,rij)
+        dtmp = dvnucl(is,js,rij)*fcut1(rij,srim_rc) &
+             +tmp *dfcut1(rij,srim_rc)
         aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
 !.....Atomic stress for 2-body terms
