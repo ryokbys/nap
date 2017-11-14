@@ -1,10 +1,13 @@
 module SRIM
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-14 12:57:38 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-14 16:15:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of SRIM repulsive potential.
-!  See Ziegler, Biersack, Littmark (ZBL) The Stopping and Range of Ions
-!  in Matter (SRIM), 1985.
+!  See
+!   [1] Ziegler, Biersack, Littmark (ZBL) The Stopping and Range of Ions
+!       in Matter (SRIM), 1985.
+!   [2] M.Z. Hossain, J.B. Freund, and H.T. Johnson, Nuclear Inst.
+!       and Methods in Physics Research, B 267, 1061 (2009).
 !-----------------------------------------------------------------------
   implicit none
 
@@ -18,6 +21,20 @@ module SRIM
   logical:: interact(msp,msp)
   real(8):: qnucl(msp)
   real(8):: srim_rc
+
+!.....ZBL parameters
+  real(8):: srim_aa = 0.4683766d0
+  real(8):: srim_gamma = 0.23d0
+  real(8):: srim_alpha(1:4) = (/ &
+       0.18180d0, &
+       0.50990d0, &
+       0.28020d0, &
+       0.02817d0 /)
+  real(8):: srim_beta(1:4) = (/ &
+       3.20d0, &
+       0.94230d0, &
+       0.40290d0, &
+       0.20160d0 /)
 
 contains
 !=======================================================================
@@ -53,7 +70,7 @@ contains
                  //' skip reading the line.'
           endif
           qnucl(isp) = qnucli
-          if( iprint.ne.0 ) write(6,'(a,i4,f0.3)') '   isp,qnucl = ',isp,qnucli
+          if( iprint.ne.0 ) write(6,'(a,i4,2x,f0.3)') '   isp,qnucl = ',isp,qnucli
         endif
       enddo
 10    close(ioprms)
@@ -65,6 +82,15 @@ contains
           interact(jsp,isp) = .true.
         enddo
       enddo
+      if( iprint.ne.0 ) then
+        do isp=1,msp
+          do jsp=isp,msp
+            if( interact(isp,jsp) ) then
+              write(6,'(a,2i3,l2)') '   isp,jsp,interact = ',isp,jsp,interact(isp,jsp)
+            endif
+          enddo
+        enddo
+      endif
     endif
     
     call mpi_bcast(srim_rc,1,mpi_real8,0,mpi_world,ierr)
@@ -188,7 +214,7 @@ contains
 
     qi = qnucl(is)
     qj = qnucl(js)
-    rs = 0.4683766d0  /(qi**(2d0/3) +qj**(2d0/3))
+    rs = srim_aa  /(qi**srim_gamma +qj**srim_gamma)
     vnucl = qi*qj/rij *xi(rij/rs)
     return
   end function vnucl
@@ -205,9 +231,8 @@ contains
 
     qi = qnucl(is)
     qj = qnucl(js)
-    rs = 0.4683766d0  /(qi**(2d0/3) +qj**(2d0/3))
-    dvnucl = qi*qj/rij* ( -1d0/rij*xi(rij/rs) &
-         +dxi(rij/rs)/rs )
+    rs = srim_aa  /(qi**srim_gamma +qj**srim_gamma)
+    dvnucl = -qi*qj/rij* ( 1d0/rij*xi(rij/rs) -dxi(rij/rs)/rs )
     return
   end function dvnucl
 !=======================================================================
@@ -215,11 +240,16 @@ contains
     implicit none
     real(8),intent(in):: x
     real(8):: xi
+    integer:: i
 
-    xi= 0.1818d0*exp(-3.2d0*x) &
-         +0.5099d0*exp(-0.9423d0*x) &
-         +0.2802d0*exp(-0.4029d0*x) &
-         +0.02817d0*exp(-0.2016d0*x)
+    xi = 0d0
+    do i=1,4
+      xi = xi +srim_alpha(i)*exp(-srim_beta(i)*x)
+    enddo
+!!$    xi= 0.1818d0*exp(-3.2d0*x) &
+!!$         +0.5099d0*exp(-0.9423d0*x) &
+!!$         +0.2802d0*exp(-0.4029d0*x) &
+!!$         +0.02817d0*exp(-0.2016d0*x)
     return
   end function xi
 !=======================================================================
@@ -227,11 +257,16 @@ contains
     implicit none
     real(8),intent(in):: x
     real(8):: dxi
+    integer:: i
 
-    dxi= -0.58176d0*exp(-3.2d0*x) &
-         -0.48047877d0*exp(-0.9423d0*x) &
-         -0.11289258d0*exp(-0.4029d0*x) &
-         -0.005679072d0*exp(-0.2016d0*x)
+    dxi = 0d0
+    do i=1,4
+      dxi = dxi -srim_beta(i)*srim_alpha(i)*exp(-srim_beta(i)*x)
+    enddo
+!!$    dxi= -0.58176d0*exp(-3.2d0*x) &
+!!$         -0.48047877d0*exp(-0.9423d0*x) &
+!!$         -0.11289258d0*exp(-0.4029d0*x) &
+!!$         -0.005679072d0*exp(-0.2016d0*x)
     return
   end function dxi
   

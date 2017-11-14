@@ -863,7 +863,7 @@ subroutine set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
   if( force_on('vcMorse',numff,cffs) ) luse_vcMorse = .true.
   if( force_on('Buckingham',numff,cffs) ) luse_Buckingham = .true.
   if( force_on('Bonny_WRe',numff,cffs) ) luse_Bonny_WRe = .true.
-  if( force_on('SRIm',numff,cffs) ) luse_SRIM = .true.
+  if( force_on('SRIM',numff,cffs) ) luse_SRIM = .true.
 !.....Coulomb forces should be exclusive each other
   if( force_on('screened_Coulomb',numff,cffs) ) then
     ifcoulomb = 1
