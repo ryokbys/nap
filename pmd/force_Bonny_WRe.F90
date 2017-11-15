@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-15 13:47:58 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-15 13:51:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -13,6 +13,9 @@ module Bonny_WRe
   integer,parameter:: msp = 9
 
   logical:: interact(msp,msp)
+
+!.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
+  real(8),parameter:: acc  = 14.3998554737d0
 
   real(8):: qnucl(1:2) = (/ &
        74.0d0, & ! 1, W
@@ -532,7 +535,7 @@ contains
     qj = qnucl(js)
 !!$    rs = 0.4683766d0  /sqrt(qi**(2d0/3) +qj**(2d0/3))
     rs = 0.4683766d0  /(qi**(0.23d0) +qj**(0.23d0))
-    vnucl = qi*qj/rij *xi(rij/rs)
+    vnucl = acc *qi*qj/rij *xi(rij/rs)
     return
   end function vnucl
 !=======================================================================
@@ -550,7 +553,7 @@ contains
     qj = qnucl(js)
 !!$    rs = 0.4683766d0  /sqrt(qi**(2d0/3) +qj**(2d0/3))
     rs = 0.4683766d0  /(qi**(0.23d0) +qj**(0.23d0))
-    dvnucl = qi*qj/rij* ( -1d0/rij*xi(rij/rs) &
+    dvnucl = acc* qi*qj/rij* ( -1d0/rij*xi(rij/rs) &
          +dxi(rij/rs)/rs )
     return
   end function dvnucl
