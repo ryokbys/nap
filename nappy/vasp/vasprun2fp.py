@@ -20,6 +20,7 @@ Options:
              Otherwise all the constratins are removed. [default: False]
 """
 
+import os
 from ase.io import read
 from docopt import docopt
 

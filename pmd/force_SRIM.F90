@@ -1,13 +1,15 @@
 module SRIM
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-15 14:15:50 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-17 14:16:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
-!  Parallel implementation of SRIM repulsive potential.
-!  See
+!  Parallel implementation of SRIM repulsive potential with switching
+!  function zeta(x).
+!  See:
 !   [1] Ziegler, Biersack, Littmark (ZBL) The Stopping and Range of Ions
 !       in Matter (SRIM), 1985.
 !   [2] M.Z. Hossain, J.B. Freund, and H.T. Johnson, Nuclear Inst.
 !       and Methods in Physics Research, B 267, 1061 (2009).
+!   [3] G. Bonny et al., JAP 121, 165107 (2017) for switching function.
 !-----------------------------------------------------------------------
   implicit none
 
@@ -26,6 +28,8 @@ module SRIM
   logical:: interact(msp,msp)
   real(8):: qnucl(msp)
   real(8):: srim_rc
+  real(8):: r_inner(msp)
+  real(8):: r_outer(msp)
 
 !.....ZBL parameters
   real(8):: srim_aa = 0.4683766d0
@@ -48,35 +52,34 @@ contains
     include "mpif.h"
     integer,intent(in):: myid,mpi_world,iprint
 
-    integer:: isp,jsp,ierr,ndata
-    real(8):: qnucli
+    integer:: isp,jsp,ierr
+    real(8):: qnucli,ri,ro
     character(len=128):: cline,fname
     real(8),parameter:: qtiny = 1d-10
 
-    ndata = 0
     if( myid.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
       interact(1:msp,1:msp) = .false.
       qnucl(1:msp) = 0d0
-
+      srim_rc = 0d0
+      
       if( iprint.ne.0 ) write(6,'(/,a)') ' SRIM parameters:'
       do while(.true.)
         read(ioprms,*,end=10) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
         backspace(ioprms)
-        if( ndata.eq.0 ) then
-          read(ioprms,*) ndata, srim_rc
-          if( iprint.ne.0 ) write(6,'(a,f0.3)') '   Cutoff radius = ',srim_rc
-        else
-          read(ioprms,*) isp, qnucli
-          if( isp.gt.msp ) then
-            write(6,*) ' Warning @read_params: since isp is greater than msp,'&
-                 //' skip reading the line.'
-          endif
-          qnucl(isp) = qnucli
-          if( iprint.ne.0 ) write(6,'(a,i4,2x,f0.3)') '   isp,qnucl = ',isp,qnucli
+        read(ioprms,*) isp, qnucli, ri, ro
+        if( isp.gt.msp ) then
+          write(6,*) ' Warning @read_params: since isp is greater than msp,'&
+               //' skip reading the line.'
         endif
+        qnucl(isp) = qnucli
+        r_inner(isp) = ri
+        r_outer(isp) = ro
+        srim_rc = max(srim_rc,ro)
+        if( iprint.ne.0 ) write(6,'(a,i4,3(2x,f0.3))') &
+             '   isp,qnucl,ri,ro = ',isp,qnucli,ri,ro
       enddo
 10    close(ioprms)
       do isp=1,msp
@@ -97,9 +100,12 @@ contains
         enddo
       endif
     endif
-    
+
     call mpi_bcast(srim_rc,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qnucl,msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(r_inner,msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(r_outer,msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(srim_rc,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
     return
   end subroutine read_params_SRIM
@@ -171,7 +177,7 @@ contains
         rij = sqrt(rij)
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
-        tmp = vnucl(is,js,rij)
+        tmp = vij(is,js,rij)
         tmp2 = 0.5d0 *tmp *fcut1(rij,srim_rc)
         if(j.le.natm) then
           epi(i)= epi(i) +tmp2
@@ -181,7 +187,7 @@ contains
           epi(i)= epi(i) +tmp2
           epotl=epotl +tmp2
         endif
-        dtmp = dvnucl(is,js,rij)*fcut1(rij,srim_rc) &
+        dtmp = dvij(is,js,rij)*fcut1(rij,srim_rc) &
              +tmp *dfcut1(rij,srim_rc)
         aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
@@ -209,6 +215,49 @@ contains
     epot= epot +epott
 
   end subroutine force_SRIM
+!=======================================================================
+  function vij(is,js,rij)
+!
+! Main two-body function.
+!
+    implicit none
+    integer,intent(in):: is,js
+    real(8),intent(in):: rij
+    real(8):: vij
+    real(8):: ri,ro,veqt
+
+    ri = (r_inner(is)+r_inner(js))/2
+    ro = (r_outer(is)+r_outer(js))/2
+    if( rij.lt.ri ) then
+      vij = vnucl(is,js,rij)
+    else if( rij.ge.ri .and. rij.lt.ro ) then
+      vij = zeta((ro+ri-2d0*rij)/(ro-ri)) &
+           *vnucl(is,js,rij)
+    endif
+    return
+  end function vij
+!=======================================================================
+  function dvij(is,js,rij)
+!
+!  Derivative of the main two-body function.
+!
+    implicit none
+    integer,intent(in):: is,js
+    real(8),intent(in):: rij
+    real(8):: dvij
+    real(8):: ri,ro
+
+    ri = (r_inner(is)+r_inner(js))/2
+    ro = (r_outer(is)+r_outer(js))/2
+    if( rij.lt.ri ) then
+      dvij = dvnucl(is,js,rij)
+    else if( rij.ge.ri .and. rij.lt.ro ) then
+      dvij = dzeta((ro+ri-2d0*rij)/(ro-ri))*(-2d0/(ro-ri)) &
+           *vnucl(is,js,rij) &
+           +zeta((ro+ri-2d0*rij)/(ro-ri))*dvnucl(is,js,rij)
+    endif
+    return
+  end function dvij
 !=======================================================================
   function vnucl(is,js,rij)
 !
@@ -277,6 +326,25 @@ contains
 !!$         -0.005679072d0*exp(-0.2016d0*x)
     return
   end function dxi
+!=======================================================================
+  function zeta(x)
+    implicit none
+    real(8),intent(in):: x
+    real(8):: zeta
+
+    zeta = (3d0*x**5 -10d0*x**3 +15d0*x +8d0)/16d0
+    return
+  end function zeta
+!=======================================================================
+  function dzeta(x)
+    implicit none
+    real(8),intent(in):: x
+    real(8):: dzeta
+
+    dzeta = (15d0*x**4 -30d0*x**2 +15d0)/16d0
+    return
+  end function dzeta
+!=======================================================================
   
 end module SRIM
 !-----------------------------------------------------------------------
