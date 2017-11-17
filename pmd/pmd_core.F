@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-11-14 12:59:07 Ryo KOBAYASHI>
+c                     Last-modified: <2017-11-17 10:29:43 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -339,7 +339,7 @@ c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
      &         ,"   = ",temp(ifmv),' K'
           tave= tave +temp(ifmv)*ndof(ifmv)
         enddo
-        tave= tave/nave
+        tave= tave/(nave-3)
         write(6,'(1x,a,f0.2,a)') "  Temperature     = ",tave,' K'
         if( prss.ge.0d0 ) then
           ctmp = '(tensile)'
@@ -663,7 +663,7 @@ c-------output energies
             nave= nave +ndof(ifmv)
             tave= tave +temp(ifmv)*ndof(ifmv)
           enddo
-          tave= tave/nave
+          tave= tave/(nave-3)
 
           if(czload_type.eq.'atoms') then
             call get_forces_on_base(natm,ra,aa,tag,h,acon(1),ftop,fbot
@@ -813,7 +813,7 @@ c          call system("mkdir -p "//cnum)
      &         ,"   = ",temp(ifmv),' K'
           tave= tave +temp(ifmv)*ndof(ifmv)
         enddo
-        tave= tave/nave
+        tave= tave/(nave-3)
         write(6,'(1x,a,f0.2,a)') "  Temperature     = ",tave,' K'
         if( prss.ge.0d0 ) then
           ctmp = '(tensile)'

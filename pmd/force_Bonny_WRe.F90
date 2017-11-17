@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-15 13:51:38 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-15 14:15:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -16,6 +16,8 @@ module Bonny_WRe
 
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
   real(8),parameter:: acc  = 14.3998554737d0
+!.....permittivity of vacuum
+  real(8),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
 
   real(8):: qnucl(1:2) = (/ &
        74.0d0, & ! 1, W

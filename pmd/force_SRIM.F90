@@ -1,6 +1,6 @@
 module SRIM
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-14 17:12:35 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-15 14:15:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of SRIM repulsive potential.
 !  See
@@ -17,6 +17,11 @@ module SRIM
   
 !.....Max num of species
   integer,parameter:: msp = 9
+
+!.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
+  real(8),parameter:: acc  = 14.3998554737d0
+!.....permittivity of vacuum
+  real(8),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
 
   logical:: interact(msp,msp)
   real(8):: qnucl(msp)

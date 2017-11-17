@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Convert from vasprun.xml in DIR direcotry
-to erg.ref, frc.ref, pos, and POSCAR files.
+to erg.ref, frc.ref, and pos files.
 Note that reading a lot of vasprun.xml takes a lot of time.
 
 Usage:
@@ -20,8 +20,7 @@ Options:
              Otherwise all the constratins are removed. [default: False]
 """
 
-import os,sys
-from ase.io import read,write
+from ase.io import read
 from docopt import docopt
 
 __author__ = "Ryo KOBAYASHI"
@@ -58,7 +57,7 @@ def write_pos(atoms,fname="pos",specorder=[]):
 def output_for_fitpot(atoms,keep_const,dirname='./',specorder=[]):
     if not keep_const:
         del atoms.constraints
-    write(dirname+'/POSCAR',images=atoms,format='vasp',direct=True,vasp5=True)
+    #write(dirname+'/POSCAR',images=atoms,format='vasp',direct=True,vasp5=True)
     try:
         epot = atoms.get_potential_energy()
     except:
