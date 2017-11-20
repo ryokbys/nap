@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-13 21:34:51 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-17 16:37:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -688,7 +688,7 @@ subroutine read_vars()
       read(15,*) vars(i),vranges(1:2,i)
 !    print *, vars(i),vranges(1:2,i)
     enddo
-    if( cinitv.eq.'gaussian' ) then
+    if( trim(cinitv).eq.'gaussian' .or. trim(cinitv).eq.'gauss' ) then
       rs0 = get_seed()
       call set_seed(vinitrs)
       do i=1,nvars
