@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-13 21:43:50 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-27 17:22:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -1606,19 +1606,28 @@ contains
     use variables
     use parallel
     implicit none
+    logical,save:: l1st = .true.
 
 !.....if the standardize already done, skip
     if( lstandard ) return
     
     if( cnormalize(1:3).eq.'var' ) then
-!!$      if(myid.eq.0) print *,'normalize w.r.t. variance'
+      if(myid.eq.0 .and. l1st) print *,'Normalize w.r.t. variance.'
       call standardize_var()
     else if( cnormalize(1:3).eq.'max' ) then
-      if(myid.eq.0) print *,'normalize w.r.t. max not implemented'
+      if(myid.eq.0 .and. l1st) print *,'Normalize w.r.t. max not implemented'
       call mpi_finalize(ierr)
       stop
-      !call standardize_max()
+!     call standardize_max()
+    else if( trim(cnormalize).eq.'none' &
+         .or. trim(cnormalize).eq.'None' ) then
+      if( myid.eq.0 .and. l1st) print *,'Not to standardize weights in NN.'
+    else
+      if( myid.eq.0 .and. l1st) print *,'No such standardize method:', &
+           trim(cnormalize)
     endif
+
+    l1st = .false.
   end subroutine NN_standardize
 !=======================================================================
   subroutine standardize_max()
@@ -1754,7 +1763,7 @@ contains
     use parallel
     implicit none
     integer:: ismpl,ia,natm,ihl0,ihl1,iv
-    real(8):: sgm,sgmi
+    real(8),save:: sgm,sgmi
     logical,save:: l1st= .true.
 
     if( l1st ) then

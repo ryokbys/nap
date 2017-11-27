@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-17 16:37:23 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-27 17:22:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -137,7 +137,6 @@ program fitpot
     endif
   endif
 
-!!$  if( myid.eq.0 ) write(6,'(a,100f7.3)')  ' vars beofre stats: ',vars(1:nvars)
   call write_stats(niter)
 
 !!$  call write_energy_relation('subtracted')
