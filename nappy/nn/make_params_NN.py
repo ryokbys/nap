@@ -18,6 +18,7 @@ import sys
 from docopt import docopt
 import random,math
 import yaml
+import math
 
 _constfname = 'in.const.NN'
 _paramfname = 'in.params.NN'
@@ -51,9 +52,9 @@ def _num2type(num):
             return k
     return None
 
-_selected_triplet = [
-    (3, 1, 1), (3, 1, 2), (3, 1, 3), (3, 2, 2), (3, 2, 3), (3, 3, 3),
-]
+# _selected_triplet = [
+#     (3, 1, 1), (3, 1, 2), (3, 1, 3), (3, 2, 2), (3, 2, 3), (3, 3, 3),
+# ]
 
 
 class Pair(object):
@@ -114,14 +115,14 @@ def get_triplets(nsp):
     for i in range(1,nsp+1):
         for j in range(i,nsp+1):
             pairs.append([i,j])
-    return pairs
+    #return pairs
     triplets= []
     for i in range(1,nsp+1):
         tmp= [i]
         for pair in pairs:
-            if _selected_triplet and \
-               not (tmp[0],pair[0],pair[1]) in _selected_triplet:
-                continue
+            # if _selected_triplet and \
+            #    not (tmp[0],pair[0],pair[1]) in _selected_triplet:
+            #     continue
             triplet = Triplet(tmp[0],pair[0],pair[1])
             triplets.append(triplet)
             #triplets.append(tmp+pair)
@@ -161,7 +162,7 @@ def get_inputs():
     print('type_use =',type_use)
     print('Selected symmetry functions:')
     for t in type_use:
-        print(t)
+        print(' - '+t)
     
     #...check types
     if len(type_use) < 1:
@@ -212,11 +213,9 @@ def get_gauss_params(isp1,isp2):
     print('Gaussian peaks are : ')
     for r in rs:
         print(' {0:8.3f}'.format(r),end='')
-    print('\n')
     print('Gaussian width parameters [1/Ang]'
           +' (several values separated by white-space):')
     etas = [ float(eta) for eta in sys.stdin.readline().split() ]
-    print('\n')
     print('Number of Gaussian width parameters = {0:d}'.format(len(etas)))
     return rs, etas
 
@@ -235,11 +234,16 @@ def get_Morse_params(isp1,isp2):
     return ds,alps,rs
 
 def get_angular_params(isp1,isp2,isp3):
-    angs = []
+    print('\nDetermine angular parameters for {0:d}-{1:d}-{2:d}:'.format(isp1,isp2,isp3))
+    print('Special angles [degree] (space-separation):')
+    angs = [ math.cos(float(a)/180*math.pi) for a in sys.stdin.readline().split() ]
+    print('Number of anguler parameters = {0:d}'.format(len(angs)))
     return angs
 
 def get_nsf2(pairs):
     nsf2 = 0
+    if pairs is None:
+        return nsf2
     for pair in pairs:
         for it,t in enumerate(pair.symfuncs):
             n = 1
@@ -259,9 +263,7 @@ def get_nsf3(triplets):
         return nsf3
     for triplet in triplets:
         for it,t in enumerate(triplet.symfuncs):
-            n = 1
-            for sfps in triplet.sfparams[it]:
-                n *= len(sfps)
+            n = len(triplet.sfparams[it])
             nsf3 += n
     return nsf3
     
@@ -281,38 +283,39 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
         for il in range(nl+1):
             f.write(' {0:5d}'.format(nhl[il]))
         f.write('\n')
-    
-        for pair in pairs:
-            ia,ja = pair.get_isps()
-            for isf,sf in enumerate(pair.symfuncs):
-                if sf == 'Gaussian':
-                    rs,etas = pair.sfparams[isf]
-                    for eta in etas:
-                        for r in rs:
-                            f.write(' {0:3d}'.format(_type2num[sf]) \
-                                    +' {0:3d} {1:3d}'.format(ia,ja) \
-                                    +' {0:10.4f} {1:10.4f}\n'.format(eta,r))
-                elif sf == 'cosine':
-                    rk = pair.sfparams[isf]
-                    for r in rk:
-                        f.write(' {0:3d}'.format(_type2num[sf]) \
-                                +' {0:3d} {1:3d}'.format(ia,ja) \
-                                +' {0:10.4f}\n'.format(r))
-                elif sf == 'polynomial':
-                    a1s = pair.sfparams[isf]
-                    for a1 in a1s:
-                        f.write(' {0:3d}'.format(_type2num[sf]) \
-                                +' {0:3d} {1:3d}'.format(ia,ja) \
-                                +' {0:10.4f}\n'.format(a1))
-                elif sf == 'Morse':
-                    ds,alps,rs = pair.sfparams[isf]
-                    for d in ds:
-                        for alp in alps:
+
+        if nsf2 > 0:
+            for pair in pairs:
+                ia,ja = pair.get_isps()
+                for isf,sf in enumerate(pair.symfuncs):
+                    if sf == 'Gaussian':
+                        rs,etas = pair.sfparams[isf]
+                        for eta in etas:
                             for r in rs:
                                 f.write(' {0:3d}'.format(_type2num[sf]) \
                                         +' {0:3d} {1:3d}'.format(ia,ja) \
-                                        +' {0:10.4f} {1:10.4f}'.format(d,alp) \
-                                        +' {0:10.4f}\n'.format(r))
+                                        +' {0:10.4f} {1:10.4f}\n'.format(eta,r))
+                    elif sf == 'cosine':
+                        rk = pair.sfparams[isf]
+                        for r in rk:
+                            f.write(' {0:3d}'.format(_type2num[sf]) \
+                                    +' {0:3d} {1:3d}'.format(ia,ja) \
+                                    +' {0:10.4f}\n'.format(r))
+                    elif sf == 'polynomial':
+                        a1s = pair.sfparams[isf]
+                        for a1 in a1s:
+                            f.write(' {0:3d}'.format(_type2num[sf]) \
+                                    +' {0:3d} {1:3d}'.format(ia,ja) \
+                                    +' {0:10.4f}\n'.format(a1))
+                    elif sf == 'Morse':
+                        ds,alps,rs = pair.sfparams[isf]
+                        for d in ds:
+                            for alp in alps:
+                                for r in rs:
+                                    f.write(' {0:3d}'.format(_type2num[sf]) \
+                                            +' {0:3d} {1:3d}'.format(ia,ja) \
+                                            +' {0:10.4f} {1:10.4f}'.format(d,alp) \
+                                            +' {0:10.4f}\n'.format(r))
         if nsf3 > 0:
             for triple in triplets:
                 ia,ja,ka = triple.get_isps()
@@ -378,6 +381,7 @@ if __name__ == "__main__":
                 b3_exists = True
     
         nsp = inputs['nsp']
+        pairs = None
         if b2_exists:
             ncmb2= nsp+ ncomb(nsp,2)
             pairs = get_pairs(nsp)
@@ -398,14 +402,15 @@ if __name__ == "__main__":
             if len(triplets) != ncmb3:
                 print('Since len(triplets) != ncmb3, set ncmb3 = len(triplets)')
                 ncmb3 = len(triplets)
-    
-        for pair in pairs:
-            isp1,isp2 = pair.get_isps()
-            for t in inputs['type_use']:
-                if t in _type_2body:
-                    pair.set_symfunc(t)
-                    sfparam = get_params(t,isp1,isp2)
-                    pair.set_sfparam(sfparam)
+
+        if b2_exists:
+            for pair in pairs:
+                isp1,isp2 = pair.get_isps()
+                for t in inputs['type_use']:
+                    if t in _type_2body:
+                        pair.set_symfunc(t)
+                        sfparam = get_params(t,isp1,isp2)
+                        pair.set_sfparam(sfparam)
             
         if b3_exists:
             for triplet in triplets:
@@ -418,7 +423,7 @@ if __name__ == "__main__":
     nsf2 = get_nsf2(pairs)
     nsf3 = get_nsf3(triplets)
 
-    print(' nsf2, nsf3 = ',nsf2,nsf3)
+    print('Number of pairs, triplets = ',nsf2,nsf3)
     
     create_param_files(inputs,nsf2,pairs,nsf3,triplets)
     if not load:
