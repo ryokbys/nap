@@ -1,6 +1,6 @@
 module SRIM
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-17 14:16:15 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-28 21:37:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of SRIM repulsive potential with switching
 !  function zeta(x).
@@ -178,7 +178,7 @@ contains
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
         tmp = vij(is,js,rij)
-        tmp2 = 0.5d0 *tmp *fcut1(rij,srim_rc)
+        tmp2 = 0.5d0 *tmp
         if(j.le.natm) then
           epi(i)= epi(i) +tmp2
           epi(j)= epi(j) +tmp2
@@ -187,8 +187,9 @@ contains
           epi(i)= epi(i) +tmp2
           epotl=epotl +tmp2
         endif
-        dtmp = dvij(is,js,rij)*fcut1(rij,srim_rc) &
-             +tmp *dfcut1(rij,srim_rc)
+!!$        dtmp = dvij(is,js,rij)*fcut1(rij,srim_rc) &
+!!$             +tmp *dfcut1(rij,srim_rc)
+        dtmp = dvij(is,js,rij)
         aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
 !.....Atomic stress for 2-body terms
@@ -228,6 +229,7 @@ contains
 
     ri = (r_inner(is)+r_inner(js))/2
     ro = (r_outer(is)+r_outer(js))/2
+    vij = 0d0
     if( rij.lt.ri ) then
       vij = vnucl(is,js,rij)
     else if( rij.ge.ri .and. rij.lt.ro ) then
@@ -245,16 +247,18 @@ contains
     integer,intent(in):: is,js
     real(8),intent(in):: rij
     real(8):: dvij
-    real(8):: ri,ro
+    real(8):: ri,ro,x
 
     ri = (r_inner(is)+r_inner(js))/2
     ro = (r_outer(is)+r_outer(js))/2
+    dvij = 0d0
     if( rij.lt.ri ) then
       dvij = dvnucl(is,js,rij)
     else if( rij.ge.ri .and. rij.lt.ro ) then
-      dvij = dzeta((ro+ri-2d0*rij)/(ro-ri))*(-2d0/(ro-ri)) &
+      x = (ro+ri-2d0*rij)/(ro-ri)
+      dvij = dzeta(x)*(-2d0/(ro-ri)) &
            *vnucl(is,js,rij) &
-           +zeta((ro+ri-2d0*rij)/(ro-ri))*dvnucl(is,js,rij)
+           +zeta(x)*dvnucl(is,js,rij)
     endif
     return
   end function dvij
