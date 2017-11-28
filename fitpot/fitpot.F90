@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-27 17:22:42 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-28 14:23:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -492,6 +492,7 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
   read(ionum,*) tmp,tmp,tmp
   read(ionum,*) tmp,tmp,tmp
   read(ionum,*) natm
+  smpl%h(1:3,1:3) = smpl%h(1:3,1:3)*smpl%h0
   smpl%natm= natm
   allocate(smpl%ra(3,natm),smpl%fa(3,natm) &
        ,smpl%tag(natm) &

@@ -2794,7 +2794,7 @@ contains
     if( myid.eq.0 ) then
       write(6,*) ''
       write(6,'(a)') ' The best one in this GA simulation run:'
-      write(6,'(a,i8,1x,f0.4)') '   ID, f-value: ',iidbest,fbest
+      write(6,'(a,i0,2x,f0.4)') '   ID, f-value: ',iidbest,fbest
 !!$      write(6,'(a,100f7.3)')  '   Variables: ',xbest(1:ndim)
       write(6,*) ''
     endif
