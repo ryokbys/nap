@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-08 10:22:19 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-28 12:49:29 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -271,6 +271,9 @@ contains
           write(6,*) 'Error@read_params: ifcoulomb does not match '&
                //'with Coulomb type: '//trim(c1st)
           stop
+        endif
+        if( iprint.ne.0 ) then
+          write(6,'(/,a)') ' Screened Coulomb parameters:'
         endif
         vid_bvs(1:nsp)= 0d0
         do while(.true.)
@@ -768,8 +771,8 @@ contains
            *sqrt(sum_anion/sum_cation)
     enddo
 
-!.....Overwrite charges for debugging...
-    vc_bvs(1:4) = (/ 1.27443, 0.78466, 1.10968, 3.20338/)
+!!$!.....Overwrite charges for debugging...
+!!$    vc_bvs(1:4) = (/ 1.27443, 0.78466, 1.10968, 3.20338/)
 
     if( myid.eq.0 .and. iprint.gt.0 ) then
       do is=1,nsp

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-11-17 10:29:43 Ryo KOBAYASHI>
+c                     Last-modified: <2017-11-28 12:39:47 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -326,8 +326,8 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
       if(myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,*) ''
         write(6,'(1x,a)') "Initial values:"
-        write(6,'(1x,a,f0.4,a)') "  Kinetic energy  = ",ekin,' eV'
-        write(6,'(1x,a,f0.4,a)') "  Potential energy= ",epot0,' eV'
+        write(6,'(1x,a,f16.5,a)') "  Kinetic energy  = ",ekin,' eV'
+        write(6,'(1x,a,f16.5,a)') "  Potential energy= ",epot0,' eV'
         nave= 0
         tave= 0d0
         do ifmv=1,9
@@ -335,18 +335,18 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
           temp(ifmv)= ekl(ifmv) /ndof(ifmv) /fkb *2d0
 c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
           nave= nave +ndof(ifmv)
-          write(6,'(1x,a,i1,a,f0.2,a)') "  Temperature ",ifmv
+          write(6,'(1x,a,i1,a,f16.5,a)') "  Temperature ",ifmv
      &         ,"   = ",temp(ifmv),' K'
           tave= tave +temp(ifmv)*ndof(ifmv)
         enddo
         tave= tave/(nave-3)
-        write(6,'(1x,a,f0.2,a)') "  Temperature     = ",tave,' K'
+        write(6,'(1x,a,f16.5,a)') "  Temperature     = ",tave,' K'
         if( prss.ge.0d0 ) then
           ctmp = '(tensile)'
         else
           ctmp = '(compressive)'
         endif
-        write(6,'(1x,a,f0.3,a)') "  Pressure        = ",
+        write(6,'(1x,a,f16.5,a)') "  Pressure        = ",
      &       prss,' GPa '//trim(ctmp)
         write(6,'(1x,a,6(1x,f0.3))') '  Stress tensor   ='
      &       ,stnsr(1,1)*up2gpa,stnsr(2,2)*up2gpa,stnsr(3,3)*up2gpa
@@ -801,32 +801,32 @@ c          call system("mkdir -p "//cnum)
       if( myid_md.eq.0 .and. iprint.ne. 0 ) then
         write(6,*) ''
         write(6,'(1x,a)') "Final values:"
-        write(6,'(1x,a,f0.4,a)') "  Kinetic energy  = ",ekin,' eV'
-        write(6,'(1x,a,f0.4,a)') "  Potential energy= ",epot,' eV'
+        write(6,'(1x,a,f16.5,a)') "  Kinetic energy  = ",ekin,' eV'
+        write(6,'(1x,a,f16.5,a)') "  Potential energy= ",epot,' eV'
         nave= 0
         tave= 0d0
         do ifmv=1,9
           if( ndof(ifmv).le.0 ) cycle
           temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
           nave= nave +ndof(ifmv)
-          write(6,'(1x,a,i1,a,f0.2,a)') "  Temperature ",ifmv
+          write(6,'(1x,a,i1,a,f16.5,a)') "  Temperature ",ifmv
      &         ,"   = ",temp(ifmv),' K'
           tave= tave +temp(ifmv)*ndof(ifmv)
         enddo
         tave= tave/(nave-3)
-        write(6,'(1x,a,f0.2,a)') "  Temperature     = ",tave,' K'
+        write(6,'(1x,a,f16.5,a)') "  Temperature     = ",tave,' K'
         if( prss.ge.0d0 ) then
           ctmp = '(tensile)'
         else
           ctmp = '(compressive)'
         endif
-        write(6,'(1x,a,f0.3,a)') "  Pressure        = ",
+        write(6,'(1x,a,f16.5,a)') "  Pressure        = ",
      &       prss,' GPa '//trim(ctmp)
         if( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &       trim(cpctl).eq.'vv-Berendsen' ) then
           call cell_info(h)
-          write(6,'(a,f0.2,a)') ' Cell volume = ',vol,' Ang^3'
+          write(6,'(a,f16.5,a)')  '  Cell volume     = ',vol,' Ang^3'
         endif
         write(6,*) ''
         write(6,'(1x,a,f10.2)') "Time for space decomp = ",tspdcmp
