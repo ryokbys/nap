@@ -82,26 +82,6 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
          luse_vcMorse,l1st)
   endif
 
-!.....Exclusive choice of different Coulomb force-fields
-  if( ifcoulomb.eq.1 ) then ! screened Coulomb
-    call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-         ,chg,h,hi,tcom &
-         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
-         ,ifcoulomb,l1st)
-  else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
-    call force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-         ,chg,h,hi,tcom &
-         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
-         ,ifcoulomb,l1st,lcell_updated)
-  else if( ifcoulomb.eq.3 ) then ! long-range Coulomb
-    call force_long_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-         ,chg,chi,h,hi,tcom &
-         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
-         ,ifcoulomb,l1st,lcell_updated)
-  endif
 
   if( luse_LJ ) call force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
@@ -181,6 +161,27 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   if( luse_SRIM ) call force_SRIM(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+
+!.....Exclusive choice of different Coulomb force-fields
+  if( ifcoulomb.eq.1 ) then ! screened Coulomb
+    call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
+         ,chg,h,hi,tcom &
+         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
+         ,ifcoulomb,l1st)
+  else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
+    call force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
+         ,chg,h,hi,tcom &
+         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
+         ,ifcoulomb,l1st,lcell_updated)
+  else if( ifcoulomb.eq.3 ) then ! long-range Coulomb
+    call force_long_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
+         ,chg,chi,h,hi,tcom &
+         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
+         ,ifcoulomb,l1st,lcell_updated)
+  endif
 
 !.....convert forces from hmat-coordinates to Cartesian coordinates
   do i=1,natm

@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-08 22:54:13 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-30 21:22:17 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -18,6 +18,10 @@ module NN
   logical:: lcharge = .false.
 !.....logical flag for electron temperature
   logical:: letemp = .false.
+
+!.....Max num of species
+  integer,parameter:: msp = 9
+  logical:: interact(msp,msp)
   
 !.....parameters
   integer:: nwgt1,nwgt2
@@ -59,6 +63,7 @@ module NN
   integer:: nprms
   real(8),allocatable:: prms(:)
   logical:: lprmset_NN = .false.
+
   
 contains
   subroutine force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -78,10 +83,10 @@ contains
     logical:: lstrs
 
 !.....local
-    integer:: i,j,k,l,m,n,is,ierr,ia,ja &
+    integer:: i,j,k,l,m,n,is,js,ierr,ia,ja &
          ,ihl0,ihl1,ihl2,jj
     real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp
-    real(8),allocatable,save:: strsl(:,:,:)
+    real(8),allocatable,save:: strsl(:,:,:),aal(:,:)
 
 !    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
 
@@ -152,13 +157,20 @@ contains
 
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
+      if( allocated(aal) ) deallocate(aal)
+      allocate(aal(3,namax))
     endif
 
     if( size(strsl).lt.3*3*namax ) then
       deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif
+    if( size(aal).lt.3*namax ) then
+      deallocate(aal)
+      allocate(aal(3,namax))
+    endif
     strsl(1:3,1:3,1:namax) = 0d0
+    aal(1:3,1:namax) = 0d0
 
 !  Since natm and nn can change every step of MD,
 !  if natm/nnltmp becomes nal/nnl, they should be updated and
@@ -311,15 +323,16 @@ contains
           tmp= wgt12(ihl1)*hl1i*(1d0-hl1i)
           do jj=1,lspr(0,ia)
             ja= lspr(jj,ia)
+            js = int(tag(ja))
             do ihl0=1,nhl(0)
               if( igsf(ihl0,jj,ia).eq.0 ) cycle
-              aa(1:3,ja)=aa(1:3,ja) &
+              aal(1:3,ja)=aal(1:3,ja) &
                    -tmp*wgt11(ihl0,ihl1)*dgsf(1:3,ihl0,jj,ia)
             enddo
           enddo
           !.....atom ia
           do ihl0= 1,nhl(0)
-            aa(1:3,ia)=aa(1:3,ia) &
+            aal(1:3,ia)=aal(1:3,ia) &
                  -tmp*wgt11(ihl0,ihl1)*dgsf(1:3,ihl0,0,ia)
           enddo
         enddo
@@ -336,14 +349,14 @@ contains
               ja= lspr(jj,ia)
               do ihl0=1,nhl(0)
                 if( igsf(ihl0,jj,ia).eq.0 ) cycle
-                aa(1:3,ja)=aa(1:3,ja) &
+                aal(1:3,ja)=aal(1:3,ja) &
                      -tmp2 *tmp1 &
                      *wgt21(ihl0,ihl1)*dgsf(1:3,ihl0,jj,ia)
               enddo
             enddo
 !.....atom ia
             do ihl0= 1,nhl(0)
-              aa(1:3,ia)=aa(1:3,ia) &
+              aal(1:3,ia)=aal(1:3,ia) &
                    -tmp2*tmp1*wgt21(ihl0,ihl1)*dgsf(1:3,ihl0,0,ia)
             enddo
           enddo
@@ -352,7 +365,8 @@ contains
     endif
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_world,aa,3)
+         ,nn,mpi_world,aal,3)
+    aa(1:3,1:natm) = aa(1:3,1:natm) +aal(1:3,1:natm)
 
     if( lstrs ) then
       call compute_stress(namax,natm,tag,ra,nnmax,strsl,h &
@@ -407,6 +421,7 @@ contains
         fcij= fc(dij,rc)
         dfcij= dfc(dij,rc)
         do isf=iaddr2(1,is,js),iaddr2(2,is,js)
+!!$          print *,'ia,is,ja,js,isf,itype=',ia,is,ja,js,isf,itype(isf)
           if( itype(isf).eq.1 ) then ! Gaussian
             eta= cnst(1,isf)
             rs=  cnst(2,isf)
@@ -464,6 +479,7 @@ contains
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           ks= int(tag(ka))
+!!$          if( .not.interact(is,ks) ) cycle
           if( iaddr3(1,is,js,ks).lt.0 ) cycle
           if( ka.eq.ia .or. ka.le.ja ) cycle
           xk(1:3)= ra(1:3,ka)

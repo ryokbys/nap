@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-28 12:49:29 Ryo KOBAYASHI>
+!                     Last modified: <2017-11-30 20:20:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -275,7 +275,7 @@ contains
         if( iprint.ne.0 ) then
           write(6,'(/,a)') ' Screened Coulomb parameters:'
         endif
-        vid_bvs(1:nsp)= 0d0
+        vid_bvs(1:msp)= 0d0
         do while(.true.)
           read(ioprms,*,end=10) cline
           if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
@@ -286,7 +286,7 @@ contains
           if( mode.eq.1 ) then
             backspace(ioprms)
             read(ioprms,*) isp, cname, vid, rad, npq
-            if( isp.gt.nsp ) then
+            if( isp.gt.msp ) then
               write(6,*) ' Warning @read_params: since isp is greater than nsp,'&
                    //' skip reading the line.'
               cycle
