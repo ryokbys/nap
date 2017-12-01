@@ -57,5 +57,5 @@ fitpot.o: ${mods} NN.o
 NN.o: ${mods}
 mod_minimize.o: mod_random.o
 
-fp_common.o fp_common.mod: fp_common.F90
+fp_common.o fp_common.mod: fp_common.F90 mod_parallel.o mod_minimize.o
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<

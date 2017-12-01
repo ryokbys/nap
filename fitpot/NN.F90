@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-27 17:22:32 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-01 19:34:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -284,7 +284,7 @@ contains
 !=======================================================================
   subroutine NN_func(ndim,x,ftrn,ftst)
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
-         ,lfmatch,nfunc,tcomm,mdsys,erefmin &
+         ,lematch,lfmatch,nfunc,tcomm,mdsys,erefmin &
          ,cmaindir,cevaltype,swgt2trn,swgt2tst
     use parallel
     use minimize
@@ -340,11 +340,13 @@ contains
       esub= smpl%esub
       eerr = smpl%eerr
       swgt = smpl%wgt
-      ediff= (smpl%epot -(eref-esub))/natm /eerr
+      if( lematch ) then
+        ediff= (smpl%epot -(eref-esub))/natm /eerr
 !!$      print *,'ismpl,eref,eref/natm,epot,epot/natm=',ismpl,eref, eref/natm,&
 !!$           smpl%epot, smpl%epot/natm
-      ediff= ediff*ediff
-      ftmp= ftmp +ediff *swgt
+        ediff= ediff*ediff
+        ftmp= ftmp +ediff *swgt
+      endif
 !!$      fetrnl= fetrnl +ediff *swgt
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
         ferr = smpl%ferr
@@ -576,24 +578,24 @@ contains
           enddo
         enddo
       enddo
-    else if( nfcal.lt.natm ) then
-      do ia=1,natm
-        if( smpl%ifcal(ia).eq.0 ) cycle
-        do ihl1=1,mhl(1)
-          w2= wgt12(ihl1)
-          do ihl0=1,mhl(0)
-            w1= wgt11(ihl0,ihl1)
-            do ja=1,natm
-              h1= sds%hl1(ja,ihl1)
-              dh1= h1*(1d0-h1)
-              t= w1*w2 *dh1
-              dg(1:3)=sds%dgsf(1:3,ia,ja,ihl0)
-              smpl%fa(1:3,ia)= smpl%fa(1:3,ia) &
-                   -t *dg(1:3)
-            enddo
-          enddo
-        enddo
-      enddo
+!!$    else if( nfcal.lt.natm ) then
+!!$      do ia=1,natm
+!!$        if( smpl%ifcal(ia).eq.0 ) cycle
+!!$        do ihl1=1,mhl(1)
+!!$          w2= wgt12(ihl1)
+!!$          do ihl0=1,mhl(0)
+!!$            w1= wgt11(ihl0,ihl1)
+!!$            do ja=1,natm
+!!$              h1= sds%hl1(ja,ihl1)
+!!$              dh1= h1*(1d0-h1)
+!!$              t= w1*w2 *dh1
+!!$              dg(1:3)=sds%dgsf(1:3,ia,ja,ihl0)
+!!$              smpl%fa(1:3,ia)= smpl%fa(1:3,ia) &
+!!$                   -t *dg(1:3)
+!!$            enddo
+!!$          enddo
+!!$        enddo
+!!$      enddo
     else
       do ihl1=1,mhl(1)
         w2= wgt12(ihl1)
@@ -887,44 +889,47 @@ contains
     ediff= 2d0 *ediff /natm /eerr *swgt ! *wgtidv /natm
     gs(1:nvars)= 0d0
     iv= nhl(0)*mhl(1) +nhl(1)
-    do ihl1=nhl(1),1,-1
-      tmp= 0d0
-      do ia=1,natm
-        h1= sds%hl1(ia,ihl1)
-        tmp= tmp +(h1-0.5d0)
-      enddo
-      gs(iv)= gs(iv) +ediff*tmp
-      iv= iv -1
-    enddo
-    if( allocated(mskgfs) ) then
-      do ihl0=nhl(0),1,-1
-        do ihl1=mhl(1),1,-1
-          tmp= 0d0
-          if( mskgfs(ihl0).ne.0 ) goto 20
-          w2= wgt12(ihl1)
-          do ia=1,natm
-            h1= sds%hl1(ia,ihl1)
-            tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
-          enddo
-20        continue
-          gs(iv)= gs(iv) +ediff*tmp
-          iv= iv -1
+
+    if( lematch ) then
+      do ihl1=nhl(1),1,-1
+        tmp= 0d0
+        do ia=1,natm
+          h1= sds%hl1(ia,ihl1)
+          tmp= tmp +(h1-0.5d0)
         enddo
+        gs(iv)= gs(iv) +ediff*tmp
+        iv= iv -1
       enddo
-    else
-      do ihl0=nhl(0),1,-1
-        do ihl1=mhl(1),1,-1
-          tmp= 0d0
-          w2= wgt12(ihl1)
-          do ia=1,natm
-            h1= sds%hl1(ia,ihl1)
-            tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
+      if( allocated(mskgfs) ) then
+        do ihl0=nhl(0),1,-1
+          do ihl1=mhl(1),1,-1
+            tmp= 0d0
+            if( mskgfs(ihl0).ne.0 ) goto 20
+            w2= wgt12(ihl1)
+            do ia=1,natm
+              h1= sds%hl1(ia,ihl1)
+              tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
+            enddo
+  20        continue
+            gs(iv)= gs(iv) +ediff*tmp
+            iv= iv -1
           enddo
-          gs(iv)= gs(iv) +ediff*tmp
-          iv= iv -1
         enddo
-      enddo
-    endif
+      else
+        do ihl0=nhl(0),1,-1
+          do ihl1=mhl(1),1,-1
+            tmp= 0d0
+            w2= wgt12(ihl1)
+            do ia=1,natm
+              h1= sds%hl1(ia,ihl1)
+              tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
+            enddo
+            gs(iv)= gs(iv) +ediff*tmp
+            iv= iv -1
+          enddo
+        enddo
+      endif
+    endif  ! lematch
 
     if( .not. lfmatch ) return
     nfcal= smpl%nfcal
@@ -934,6 +939,7 @@ contains
     ferri= 1d0/ferr
     dn3i= 1d0/(3*nfcal)
     do ia=1,natm
+      if( smpl%ifcal(ia).eq.0 ) cycle
       do ixyz=1,3
         fdiff(ixyz,ia)= (smpl%fa(ixyz,ia) &
              -(smpl%fref(ixyz,ia)-smpl%fsub(ixyz,ia))) !*ferri *ferri *2 *dn3i
