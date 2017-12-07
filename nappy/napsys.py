@@ -18,7 +18,7 @@ Options:
   --out-format=OUTFMT
               Format of the output file. [default: None]
   --specorder=SPECORDER
-              Order of species. [default: Al,Mg,Si]
+              Order of species. [default: None]
   --scale=SCALE
               Scale the cell. [default: None]
   --periodic-copy=COPIES
@@ -353,6 +353,10 @@ class NAPSystem(object):
                 buff= f.readline().split()
                 if not self.specorder:
                     self.specorder = spcs
+                else:
+                    for s in spcs:
+                        if s not in self.specorder:
+                            self.specorder.append(s)
             num_species= np.array([ int(n) for n in buff])
             try:
                 spcs
@@ -1610,6 +1614,8 @@ if __name__ == "__main__":
     outfname= args['OUTFILE']
     scalefactor= args['--scale']
     specorder= args['--specorder'].split(',')
+    if specorder == 'None' or 'None' in specorder:
+        specorder = []
     copies= [ int(i) for i in args['--periodic-copy'].split(',') ]
     charges= args['--charges']
     if charges == 'None':
