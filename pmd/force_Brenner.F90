@@ -270,7 +270,7 @@ contains
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
          ,MPI_SUM,mpi_md_world,ierr)
-    epot= epot +epotl
+    epot= epot +epott
 
   end subroutine force_Brenner
 !=======================================================================

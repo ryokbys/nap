@@ -588,7 +588,13 @@ You need to specify the species order correctly with --specorder option.
                 if iatm < natm:
                     data= line.split()
                     ai= Atom()
-                    ai.set_sid(int(data[1]))
+                    if data[1].isdigit():
+                        ai.set_sid(int(data[1]))
+                    else:
+                        symbol = data[1]
+                        if symbol not in self.specorder:
+                            ValueError('Symbol {0:s} is not in specorder.'.format(symbol))
+                        ai.set_sid(self.specorder.index(symbol)+1)
                     if self.specorder:
                         symbol = self.specorder[ai.sid-1]
                     if symbol and ai.symbol != symbol:
