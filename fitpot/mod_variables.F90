@@ -82,6 +82,7 @@ module variables
     real(8),allocatable:: fabs(:)
     real(8),allocatable:: va(:,:),strsi(:,:,:),eki(:,:,:),epi(:)&
          ,chg(:),chi(:),fsub(:,:),eatm(:)
+    real(8),allocatable:: gwe(:),gwf(:,:,:),gws(:,:)
     character(len=2),allocatable:: symbols(:)
     integer:: naps(mspcs)  ! num of atoms per species
     integer:: iclass       ! 1: training,  2: test

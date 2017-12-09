@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-13 21:36:59 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-09 22:17:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -1050,10 +1050,10 @@ contains
     
   end subroutine make_pair_desc
 !=======================================================================
-  subroutine pderiv_Morse(namax,natm,tag,ra,nnmax,chg &
-       ,h,rc,lspr,epot,iprint,ndimp,pderiv)
+  subroutine gradw_Morse(namax,natm,tag,ra,nnmax &
+       ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws)
 !
-!  Derivative w.r.t. parameters {w}.
+!  Gradient w.r.t. weights.
 !  Note: This routine is always called in single run,
 !  thus no need of parallel implementation.
 !
@@ -1061,16 +1061,15 @@ contains
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),h(3,3),rc &
-         ,tag(namax),chg(namax)
+    real(8),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
     real(8),intent(inout):: epot
     integer,intent(in):: ndimp
-    real(8),intent(inout):: pderiv(ndimp)
+    real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,inc,nspt
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,dedr &
          ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
-         ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2
+         ,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2
     type(atdesc):: atdi,atdj
     real(8),external:: fcut1,sprod
 
@@ -1079,8 +1078,6 @@ contains
     galp(1:msp,1:msp) = 0d0
     gd0(1:msp,1:msp) = 0d0
     grmin(1:msp,1:msp) = 0d0
-
-!!$    write(6,'(a,30es16.8)') ' chg @pderiv = ',chg(1:natm)
     
 !.....Loop over resident atoms
     do i=1,natm
@@ -1128,23 +1125,23 @@ contains
 !!$!.....Not parallel
 !!$    epot= epotl
 
-!.....galp,gd0,grmin to pderiv
-    inc = 0
-    nspt = nprms/3 +1
-    do is=2,nspt
-      inc = inc + 1
-      pderiv(inc) = gd0(1,is)
-      inc = inc + 1
-      pderiv(inc) = galp(1,is)
-      inc = inc + 1
-      pderiv(inc) = grmin(1,is)
-    enddo
+!!$!.....galp,gd0,grmin to pderiv
+!!$    inc = 0
+!!$    nspt = nprms/3 +1
+!!$    do is=2,nspt
+!!$      inc = inc + 1
+!!$      pderiv(inc) = gd0(1,is)
+!!$      inc = inc + 1
+!!$      pderiv(inc) = galp(1,is)
+!!$      inc = inc + 1
+!!$      pderiv(inc) = grmin(1,is)
+!!$    enddo
     
     return
-  end subroutine pderiv_Morse
+  end subroutine gradw_Morse
 !=======================================================================
-  subroutine pderiv_vcMorse(namax,natm,tag,ra,nnmax,chg &
-       ,h,rc,lspr,epot,iprint,ndimp,pderiv)
+  subroutine gradw_vcMorse(namax,natm,tag,ra,nnmax,chg &
+       ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws)
 !
 !  Derivative w.r.t.parameters {w}.
 !  Note: This routine is always called in single run,
@@ -1158,7 +1155,7 @@ contains
          ,tag(namax),chg(namax)
     real(8),intent(inout):: epot
     integer,intent(in):: ndimp
-    real(8),intent(inout):: pderiv(ndimp)
+    real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,inc
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,dedr &
@@ -1224,22 +1221,22 @@ contains
 !!$!.....Not parallel
 !!$    epot= epotl
 
-!.....gwalp,gwd,gwrmin to pderiv
-    inc = 0
-    do i=0,ndesc*2
-      inc = inc + 1
-      pderiv(inc) = gwalp(i)
-    enddo
-    do i=0,ndesc*2
-      inc = inc + 1
-      pderiv(inc) = gwd(i)
-    enddo
-    do i=0,ndesc*2
-      inc = inc + 1
-      pderiv(inc) = gwrmin(i)
-    enddo
+!!$!.....gwalp,gwd,gwrmin to pderiv
+!!$    inc = 0
+!!$    do i=0,ndesc*2
+!!$      inc = inc + 1
+!!$      pderiv(inc) = gwalp(i)
+!!$    enddo
+!!$    do i=0,ndesc*2
+!!$      inc = inc + 1
+!!$      pderiv(inc) = gwd(i)
+!!$    enddo
+!!$    do i=0,ndesc*2
+!!$      inc = inc + 1
+!!$      pderiv(inc) = gwrmin(i)
+!!$    enddo
     return
-  end subroutine pderiv_vcMorse
+  end subroutine gradw_vcMorse
 !=======================================================================
 
 end module Morse

@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-11 16:51:49 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-09 21:47:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -83,7 +83,7 @@ contains
     type(mdsys):: smpl
     logical:: l1st = .true.
     logical:: lcalcgrad = .false.
-    real(8),save,allocatable:: gdummy(:),frcs(:,:)
+    real(8),save,allocatable:: frcs(:,:)
     character(len=128):: cdirname,ctype
 
     logical,external:: string_in_arr
@@ -96,7 +96,6 @@ contains
     tf0= mpi_wtime()
 
     if( l1st ) then
-      if( .not.allocated(gdummy) ) allocate(gdummy(ndim))
       if( .not.fp_common_initialized ) call init()
       if( .not.allocated(fdiff) ) allocate(fdiff(3,maxna),frcs(3,maxna))
     endif
@@ -143,7 +142,7 @@ contains
         call set_params_NN(ndim,x,rcut,rc3)
       endif
 !!$      print *,'myid,ismpl,cdirname,natm=',myid,ismpl,trim(cdirname),natm,' before pmd'
-      call run_pmd(smpl,lcalcgrad,ndim,gdummy,nff,cffs,epot,frcs,strs)
+      call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs)
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
       samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)

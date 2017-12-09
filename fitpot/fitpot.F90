@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-29 12:43:57 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-09 21:46:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -32,6 +32,9 @@ program fitpot
     call write_initial_setting()
   endif
   call sync_input()
+
+  call read_vars()
+  allocate(gvar(nvars),dvar(nvars))
 
   if( nnode.gt.nsmpl ) then
     if( myid.eq.0 ) then
@@ -65,9 +68,6 @@ program fitpot
   call read_ref_data()
   call get_base_energies()
   call set_max_num_atoms()
-
-  call read_vars()
-  allocate(gvar(nvars),dvar(nvars))
 
 !.....Subtract atomic energy
   if( trim(cpot).ne.'vcMorse' ) then
@@ -500,7 +500,8 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
        ,smpl%eki(3,3,natm),smpl%epi(natm) &
        ,smpl%chg(natm),smpl%chi(natm),smpl%fsub(3,natm) &
-       ,smpl%symbols(natm),smpl%eatm(natm))
+       ,smpl%symbols(natm),smpl%eatm(natm) &
+       ,smpl%gwe(nvars),smpl%gwf(nvars,3,natm),smpl%gws(nvars,6))
   smpl%chg(1:natm) = 0d0
   smpl%esub= 0d0
   smpl%fsub(1:3,1:natm)= 0d0
@@ -2097,7 +2098,7 @@ subroutine subtract_FF()
         call set_paramsdir_Coulomb(trim(cmaindir)//'/'&
              //trim(samples(ismpl)%cdirname)//'/pmd')
       endif
-      call run_pmd(samples(ismpl),lcalcgrad,nvars,gvar,&
+      call run_pmd(samples(ismpl),lcalcgrad,nvars,&
            nsubff,csubffs,epot,frcs,strs)
 !!$      print *,'myid,ismpl,epot=',myid,ismpl,epot
       samples(ismpl)%esub = epot
@@ -2177,7 +2178,7 @@ subroutine restore_FF()
   
 end subroutine restore_FF
 !=======================================================================
-subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
+subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs, &
      strs)
 !
 !  Run pmd and get energy and forces of the system.
@@ -2189,7 +2190,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
   include "../pmd/params_unit.h"
   type(mdsys),intent(inout):: smpl
   integer,intent(in):: ndimp,nff
-  real(8),intent(inout):: pderiv(ndimp),epot,frcs(3,maxna)
+  real(8),intent(inout):: epot,frcs(3,maxna)
   real(8),intent(out):: strs(3,3)
   logical,intent(in):: lcalcgrad
   character(len=20),intent(in):: cffs(nff)
@@ -2269,7 +2270,8 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,pderiv,nff,cffs,epot,frcs, &
        ,smpl%chg,smpl%chi &
        ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
        ,nismax,am,dt,nff,cffs,rc,rbuf,ptnsr,epot,ekin &
-       ,ifcoulomb,iprint_pmd,lcalcgrad,ndimp,pderiv,lvc)
+       ,ifcoulomb,iprint_pmd,lcalcgrad,ndimp &
+       ,smpl%gwe,smpl%gwf,smpl%gws,lvc)
   strs(1:3,1:3) = ptnsr(1:3,1:3)*up2gpa*(-1d0)
 !!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
 !!$  print *,'smpl%natm =',smpl%natm
@@ -2348,6 +2350,7 @@ subroutine subtract_ref_struct_energy()
   implicit none
   integer:: ismpl,myidrefsubl
 
+  myidrefsub = -1
   do ismpl=isid0,isid1
     if( trim(samples(ismpl)%cdirname).eq.trim(crefstrct) ) then
       myidrefsub = myid
@@ -2359,8 +2362,13 @@ subroutine subtract_ref_struct_energy()
   myidrefsubl = myidrefsub
   call mpi_allreduce(myidrefsubl,myidrefsub,1,mpi_integer,mpi_max,&
        mpi_world,ierr)
-  call mpi_bcast(erefsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
 
+  if( myidrefsub.lt.0 ) then
+    print *,'Error: No reference sample, '//trim(crefstrct)
+    call mpi_finalize()
+    stop
+  endif
+  call mpi_bcast(erefsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
   if( myid.eq.0 .and. iprint.ne.0 ) then
     write(6,'(a,es12.4,a)') ' Reference structure energy = ', &
          erefsub,' eV/atom'

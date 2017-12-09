@@ -1152,16 +1152,16 @@ subroutine suppress_fq(namax,natm,fq,myid,mpi_md_world)
   return
 end subroutine suppress_fq
 !=======================================================================
-subroutine get_pderiv(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
+subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
      ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
      ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
      ,numff,cffs,ifcoulomb,iprint,l1st,luse_vcMorse,lvc &
-     ,ndimp,pderiv)
+     ,ndimp,gwe,gwf,gws)
 !
 !  Compute derivative of potential energy (and forces) 
 !  w.r.t. potential parameters.
 !
-  use Morse,only: pderiv_vcMorse
+  use Morse,only: gradw_vcMorse, gradw_Morse
   implicit none
   integer,intent(in):: namax,natm,nnmax,nismax,iprint
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
@@ -1179,13 +1179,13 @@ subroutine get_pderiv(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
   logical,intent(inout):: lvc
   logical,intent(in):: lstrs
   integer,intent(in):: ndimp
-  real(8),intent(out):: pderiv(ndimp)
+  real(8),intent(out):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
 
-  if( luse_vcMorse ) call pderiv_vcMorse(namax,natm,tag,ra,nnmax,chg &
-       ,h,rc,lspr,epot,iprint,ndimp,pderiv)
+  if( luse_vcMorse ) call gradw_vcMorse(namax,natm,tag,ra,nnmax,chg &
+       ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws)
   
   
-end subroutine get_pderiv
+end subroutine get_gradw
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"

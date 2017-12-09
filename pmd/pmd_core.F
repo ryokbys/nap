@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-11-28 12:39:47 Ryo KOBAYASHI>
+c                     Last-modified: <2017-12-09 22:17:40 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -866,12 +866,13 @@ c=======================================================================
      &     ,ekitot,epitot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,numff,cffs,rc,rbuf,stnsr,epot
-     &     ,ekin,ifcoulomb,iprint,lcalcgrad,ndimp,pderiv,lvc)
+     &     ,ekin,ifcoulomb,iprint,lcalcgrad,ndimp,gwe
+     &     ,gwf,gws,lvc)
 c
 c  In case that only one shot force calculation is required.
 c
       use pmdvars
-      use Morse,only: pderiv_vcMorse
+      use Morse,only: gradw_Morse,gradw_vcMorse
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -887,7 +888,7 @@ c
       character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: lcalcgrad
       integer,intent(in):: ndimp
-      real(8),intent(inout):: pderiv(ndimp)
+      real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,ntot),gws(ndimp,6)
       logical,intent(inout):: lvc
 
       integer:: i,ierr,is,nspl,nxyz
@@ -1006,11 +1007,11 @@ c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
 c     &     ,epot,chg(1:natm)
 
       if( lcalcgrad ) then
-c        write(6,'(a,200es10.2)') 'chg before pderiv_vcMorse = '
-c     &       ,chg(1:natm)
 c.....Do not update epot here, so use epott instead.
-        if( luse_vcMorse ) call pderiv_vcMorse(namax,natm,tag,ra,nnmax
-     &       ,chg,h,rc,lspr,epott,iprint,ndimp,pderiv)
+        if( luse_Morse ) call gradw_Morse(namax,natm,tag,ra,nnmax,
+     &       h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
+        if( luse_vcMorse ) call gradw_vcMorse(namax,natm,tag,ra,nnmax
+     &       ,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
       endif
 
       if( iprint.ne.0 ) then
