@@ -1,12 +1,12 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-12-11 17:00:54 Ryo KOBAYASHI>
+c                     Last-modified: <2017-12-11 21:42:50 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
       subroutine pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
-     &     ,nspmax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp
+     &     ,nspmax,am,dt,ciofmt,ifpmd,rc,rbuf,ifdmp,dmp
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
      &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,stnsr,epot
      &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
@@ -18,7 +18,7 @@ c-----------------------------------------------------------------------
       include "mpif.h"
       include "./params_unit.h"
       integer,intent(in):: ntot,maxstp,nerg,npmd,myid_md,mpi_md_world
-     &     ,nspmax,ifpmd,ifdmp,minstp,ntdst,ifsort,numff
+     &     ,nspmax,ifpmd,ifdmp,minstp,ntdst,ifsort !,numff
      &     ,iprint,nodes_md,nx,ny,nz,n_conv,nrmtrans
       integer,intent(inout):: ifcoulomb
       integer,intent(out):: nstp_done
@@ -31,7 +31,7 @@ c-----------------------------------------------------------------------
      &     ,chgtot(ntot),chitot(ntot)
       character,intent(in):: ciofmt*6, cpctl*20, ctctl*20
      &     ,czload_type*5
-      character(len=20),intent(in):: cffs(numff)
+!      character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: ltdst,lstrs0,lcellfix(3,3)
       logical,intent(inout):: lvc
 
@@ -238,17 +238,8 @@ c.....Set initial temperature if needed
       tcpu1= mpi_wtime()
       tcom = 0d0
 
-c      call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
-c     &     iprint,h,rc,numff,cffs,
-c     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-c     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-c     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-c     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
-c     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-c     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham,luse_Bonny_WRe,
-c     &     luse_SRIM)
       call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
-     &     iprint,h,rc,numff,cffs,lvc,ifcoulomb)
+     &     iprint,h,rc,lvc,ifcoulomb)
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
@@ -267,21 +258,10 @@ c.....Calc forces
       lcell_updated = ( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &     trim(cpctl).eq.'vv-Berendsen')
-c      call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
-c     &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
-c     &     ,lspr,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
-c     &     ,numff,cffs,ifcoulomb,iprint,.true.,
-c     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-c     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-c     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-c     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
-c     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-c     &     luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,luse_SRIM,
-c     &     lcell_updated)
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &     ,lspr,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
-     &     ,numff,cffs,ifcoulomb,iprint,.true.,lvc,lcell_updated)
+     &     ,ifcoulomb,iprint,.true.,lvc,lcell_updated)
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -547,21 +527,10 @@ c.....Copy RA of boundary atoms determined by 'bacopy'
           lstrs = lstrs0
         endif
 c-------Calc forces
-c        call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
-c     &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
-c     &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
-c     &       ,numff,cffs,ifcoulomb,iprint,.false.,
-c     &       luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-c     &       luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-c     &       luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
-c     &       ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
-c     &       ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul
-c     &       ,luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,luse_SRIM
-c     &       ,lcell_updated)
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
-     &       ,numff,cffs,ifcoulomb,iprint,.false.,lvc,lcell_updated)
+     &       ,ifcoulomb,iprint,.false.,lvc,lcell_updated)
         lstrs = .false.
 
 c.....Second kick of velocities
@@ -877,7 +846,7 @@ c=======================================================================
       subroutine one_shot(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
-     &     ,nspmax,am,dt,numff,cffs,rc,rbuf,stnsr,epot
+     &     ,nspmax,am,dt,rc,rbuf,stnsr,epot
      &     ,ekin,ifcoulomb,iprint,lcalcgrad,ndimp,gwe
      &     ,gwf,gws,lvc)
 c
@@ -891,7 +860,7 @@ c
       include "mpif.h"
       include "./params_unit.h"
       integer,intent(in):: ntot,myid_md,mpi_md_world
-     &     ,nspmax,numff
+     &     ,nspmax  !,numff
      &     ,iprint,nodes_md,nx,ny,nz
       integer,intent(inout):: ifcoulomb
       real(8),intent(in):: hunit
@@ -900,7 +869,7 @@ c
      &     ,epitot(ntot),rc,rbuf,h(3,3,0:1),stnsr(3,3)
      &     ,epot,ekin,am(nspmax),dt
      &     ,chgtot(ntot),chitot(ntot)
-      character(len=20),intent(in):: cffs(numff)
+c      character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: lcalcgrad
       integer,intent(in):: ndimp
       real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,ntot),gws(ndimp,6)
@@ -982,17 +951,8 @@ c-----get total number of species
 c      write(6,'(a,500es10.2)') ' chg before init_force = ',
 c     &     chg(1:natm+10)
       if( iprint.ge.10 ) print *,'init_force,myid_md=',myid_md
-c      call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
-c     &     iprint,h,rc,numff,cffs,
-c     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-c     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-c     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-c     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
-c     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-c     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham,
-c     &     luse_Bonny_WRe,luse_SRIM)
       call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
-     &     iprint,h,rc,numff,cffs,lvc,ifcoulomb)
+     &     iprint,h,rc,lvc,ifcoulomb)
 
 c      print *,' lvc,ifcoulomb = ',lvc,ifcoulomb
 c      write(6,'(a,500es10.2)') ' chg before bacopy = ',
@@ -1009,21 +969,10 @@ c-----Make pair list
       lstrs = .true.
 
       if( iprint.ge.10 ) print *,'get_force,myid_md=',myid_md
-c      call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
-c     &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
-c     &     ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
-c     &     ,numff,cffs,ifcoulomb,iprint,.true.,
-c     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-c     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-c     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
-c     &     ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
-c     &     ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-c     &     luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,luse_SRIM,
-c     &     lcell_updated)
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &     ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
-     &     ,numff,cffs,ifcoulomb,iprint,.true.,lvc,lcell_updated)
+     &     ,ifcoulomb,iprint,.true.,lvc,lcell_updated)
 c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
 c     &     ,epot,chg(1:natm)
 

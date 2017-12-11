@@ -304,7 +304,8 @@ c
 c     Read forces
 c     There is no limit of number of force-fields to be specified.
 c
-      use pmdio
+c.....use pmdio
+      use force, only: num_forces, force_list
       implicit none
       integer,intent(in):: ionum
 
@@ -317,8 +318,11 @@ c
       ndat = num_data(trim(ctmp),' ')
       if( ndat.lt.2 ) write(6,'(a)') 'There is no force-field'//
      &     ' specified.'
-      numff = ndat -1
-      allocate(cffs(numff))
+c      numff = ndat -1
+      num_forces = ndat -1
+c      allocate(cffs(numff))
+      allocate(force_list(num_forces))
       backspace(ionum)
-      read(ionum,*) ctmp, (cffs(i),i=1,numff)
+c      read(ionum,*) ctmp, (cffs(i),i=1,numff)
+      read(ionum,*) ctmp, (force_list(i),i=1,num_forces)
       end subroutine read_force_field

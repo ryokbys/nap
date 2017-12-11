@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-21 17:37:56 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-11 21:49:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -80,8 +80,8 @@ module pmdio
   character(len=128):: cpmdfin = 'pmdfin'
   character(len=6):: ciofmt='ascii '
   character(len=20):: cforce='none'
-  integer:: numff = 0 ! number of force-fields
-  character(len=20),allocatable:: cffs(:)  ! force-fields
+!!$  integer:: numff = 0 ! number of force-fields
+!!$  character(len=20),allocatable:: cffs(:)  ! force-fields
 !.....max. num. of species
   integer,parameter:: nspmax= 9
 !.....mass

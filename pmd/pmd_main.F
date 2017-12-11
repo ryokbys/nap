@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-12-11 17:01:04 Ryo KOBAYASHI>
+c                     Last-modified: <2017-12-11 21:49:01 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -21,7 +21,8 @@ c-----------------------------------------------------------------------
       use pmdio
       use pmdmpi
       use version
-      use force, only: force_on
+c      use force, only: force_on
+      use force, only: num_forces, force_list, use_force
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -68,11 +69,18 @@ c.....Set fmv as default value before reading 'in.pmd'
       call bcast_params()
 
 c.....Set Coulomb flag here
-      if( force_on('screened_Coulomb',numff,cffs) ) then
+c      if( force_on('screened_Coulomb',numff,cffs) ) then
+c        ifcoulomb = 1
+c      else if( force_on('Ewald_Coulomb',numff,cffs) ) then
+c        ifcoulomb = 2
+c      else if( force_on('long_Coulomb',numff,cffs) ) then
+c        ifcoulomb = 3
+c      endif
+      if( use_force('screened_Coulomb') ) then
         ifcoulomb = 1
-      else if( force_on('Ewald_Coulomb',numff,cffs) ) then
+      else if( use_force('Ewald_Coulomb') ) then
         ifcoulomb = 2
-      else if( force_on('long_Coulomb',numff,cffs) ) then
+      else if( use_force('long_Coulomb') ) then
         ifcoulomb = 3
       endif
 
@@ -111,7 +119,7 @@ c.....call pmd_core to perfom MD
       call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot,nstp,nerg,npmd
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
-     &     ,nspmax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp
+     &     ,nspmax,am,dt,ciofmt,ifpmd,rc,rbuf,ifdmp,dmp
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
      &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,stnsr,epot
      &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
@@ -132,7 +140,7 @@ c.....write energy, forces and stresses only for fitpot
         call time_stamp(' Job finished')
       endif
 
-      deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot,cffs)
+      deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot)
       call mpi_finalize(ierr)
         
       end program pmd
@@ -268,6 +276,7 @@ c=======================================================================
       subroutine bcast_params()
       use pmdio
       use pmdmpi
+      use force
       implicit none
       include 'mpif.h'
 
@@ -316,17 +325,18 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(lstrs0,1,mpi_logical,0,mpi_md_world,ierr)
 c.....Force-fields
       call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
-      call mpi_bcast(numff,1,mpi_integer,0,mpi_md_world,ierr)
-      if( numff.eq.0 ) then
+      call mpi_bcast(num_forces,1,mpi_integer,0,mpi_md_world,ierr)
+      if( num_forces.eq.0 ) then
         if( myid_md.eq.0 ) write(6,'(a)')
      &       ' Error: no force-field specified'
         call mpi_finalize(ierr)
         stop
       endif
       if( myid_md.ne.0 ) then
-        allocate(cffs(numff))
+        allocate(force_list(num_forces))
       endif
-      call mpi_bcast(cffs,20*numff,mpi_character,0,mpi_md_world,ierr)
+      call mpi_bcast(force_list,128*num_forces,mpi_character
+     &     ,0,mpi_md_world,ierr)
       call mpi_bcast(ifcoulomb,1,mpi_integer,0,mpi_md_world,ierr)
       call mpi_bcast(schg,nspmax,mpi_real8,0,mpi_md_world
      &     ,ierr)

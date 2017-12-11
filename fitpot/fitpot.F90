@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-09 21:46:12 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-11 22:24:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -2186,6 +2186,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs, &
 !
   use variables,only: rcut,mdsys,maxna,iprint,lsmatch
   use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
+  use force, only: num_forces, force_list
   implicit none
   include "../pmd/params_unit.h"
   type(mdsys),intent(inout):: smpl
@@ -2203,6 +2204,7 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs, &
        ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv
   logical:: ltdst,lstrs,lcellfix(3,3),lvc
   character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5
+  logical:: update_force_list
 
   logical,external:: string_in_arr
 
@@ -2263,13 +2265,37 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs, &
 !.....in case of vcMorse.
     endif
   enddo
+
+!.....Set force_list in the force module
+  update_force_list = .false.
+  if( .not.allocated(force_list) ) then
+    update_force_list = .true.
+  else if( nff.ne.num_forces ) then
+    update_force_list = .true.
+  else
+    do i=1,nff
+      if( trim(cffs(i)).ne.trim(force_list(i)) ) then
+        update_force_list = .true.
+        exit
+      endif
+    enddo
+  endif
+!.....Update force_list if needed
+  if( update_force_list ) then
+    if( allocated(force_list) ) deallocate(force_list)
+    num_forces = nff
+    allocate(force_list(num_forces))
+    do i=1,num_forces
+      force_list(i) = trim(cffs(i))
+    enddo
+  endif
   
 !.....one_shot force calculation
   call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
        ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
        ,smpl%chg,smpl%chi &
        ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
-       ,nismax,am,dt,nff,cffs,rc,rbuf,ptnsr,epot,ekin &
+       ,nismax,am,dt,rc,rbuf,ptnsr,epot,ekin &
        ,ifcoulomb,iprint_pmd,lcalcgrad,ndimp &
        ,smpl%gwe,smpl%gwf,smpl%gws,lvc)
   strs(1:3,1:3) = ptnsr(1:3,1:3)*up2gpa*(-1d0)

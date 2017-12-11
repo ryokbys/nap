@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-12-11 21:24:21 Ryo KOBAYASHI>
+!                     Last-modified: <2017-12-11 21:44:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 
@@ -11,13 +11,13 @@ contains
   subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
-       ,numff,cffs,ifcoulomb,iprint,l1st &
+       ,ifcoulomb,iprint,l1st &
        ,lvc,lcell_updated)
-  !-----------------------------------------------------------------------
-  !  Wrapper routine for force calculations.
-  !  Every force calculation routine is called from this subroutine and
-  !  new force routine should also be implemented in this subroutine.
-  !-----------------------------------------------------------------------
+!-----------------------------------------------------------------------
+!  Wrapper routine for force calculations.
+!  Every force calculation routine is called from this subroutine and
+!  new force routine should also be implemented in this subroutine.
+!-----------------------------------------------------------------------
     use RK_FeH,only:force_RK_FeH
     use Ramas_FeH,only:force_Ramas_FeH,force_Ackland_Fe
     use RK_WHe,only:force_RK_WHe
@@ -45,21 +45,15 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
          ,myparity(3),nnn(6),mpi_md_world,myid_md,nex(3)
-    integer,intent(in):: lspr(0:nnmax,namax),numff
+    integer,intent(in):: lspr(0:nnmax,namax) !,numff
     integer,intent(inout):: ifcoulomb
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),tag(namax)
     real(8),intent(inout):: tcom,rc
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
          ,chg(namax),chi(namax),stnsr(3,3)
-    character(len=20),intent(in):: cffs(numff)
+!!$    character(len=20),intent(in):: cffs(numff)
     logical,intent(in):: l1st,lstrs,lcell_updated
-!!$    logical,intent(inout):: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, &
-!!$         luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si, &
-!!$         luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN, &
-!!$         luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM, &
-!!$         luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse, &
-!!$         luse_Buckingham,luse_Bonny_WRe,luse_SRIM
     logical,intent(inout):: lvc
   
     integer:: ierr,is,i
@@ -71,11 +65,6 @@ contains
     strs(1:3,1:3,1:namax)= 0d0
     stnsr(1:3,1:3) = 0d0
     
-  !!$  print *,'myid,namax,natm=',myid_md,namax,natm
-  !!$  do i=1,natm
-  !!$    print '(a,2i5,9f8.3)','myid,i,strs=',myid_md,i,strs(1:3,1,i)
-  !!$  enddo
-  
   !.....If varaible charge, optimize charges before any force calc
     if( lvc ) then
       if( l1st .and. myid_md.eq.0 .and. iprint.ne.0 ) then
@@ -194,13 +183,12 @@ contains
     enddo
   
   end subroutine get_force
-  !=======================================================================
+!=======================================================================
   subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
-       iprint,h,rc,numff,cffs &
-       ,lvc,ifcoulomb)
-  !
-  !  Initialization routine is separated from main get_force routine.
-  !
+       iprint,h,rc,lvc,ifcoulomb)
+!
+!  Initialization routine is separated from main get_force routine.
+!
     use Coulomb, only: initialize_coulomb
     use Morse, only: read_params_vcMorse, lprmset_Morse, &
          read_element_descriptors,read_params_Morse,&
@@ -210,40 +198,27 @@ contains
     use Buckingham, only: init_Buckingham, read_params_Buckingham, lprmset_Buckingham
     use SRIM, only: read_params_SRIM
     implicit none
-    integer,intent(in):: namax,natm,myid_md,mpi_md_world,iprint,numff
+    integer,intent(in):: namax,natm,myid_md,mpi_md_world,iprint !,numff
     real(8),intent(in):: tag(namax),h(3,3),rc
-    character(len=20),intent(in):: cffs(numff)
+!!$    character(len=20),intent(in):: cffs(numff)
     integer,intent(inout):: ifcoulomb
     real(8),intent(inout):: chg(namax),chi(namax)
-!!$    logical,intent(inout):: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, &
-!!$         luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si, &
-!!$         luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN, &
-!!$         luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM, &
-!!$         luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse, &
-!!$         luse_Buckingham,luse_Bonny_WRe,luse_SRIM
     logical,intent(inout):: lvc
 
     integer:: i
 
-!.....Make force_list
-    if( allocated(force_list) .and. size(force_list).ne.numff ) then
-      deallocate(force_list)
-    endif
-    if( .not.allocated(force_list) ) then
-      allocate(force_list(numff))
-    endif
-    num_forces = numff
-    do i=1,numff
-      force_list(i) = trim(cffs(i))
-    enddo
+!!$!.....Make force_list
+!!$    if( allocated(force_list) .and. size(force_list).ne.numff ) then
+!!$      deallocate(force_list)
+!!$    endif
+!!$    if( .not.allocated(force_list) ) then
+!!$      allocate(force_list(numff))
+!!$    endif
+!!$    num_forces = numff
+!!$    do i=1,numff
+!!$      force_list(i) = trim(cffs(i))
+!!$    enddo
   
-!!$    call set_force_flags(luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
-!!$         luse_RK_FeH,luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si, &
-!!$         luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe, &
-!!$         luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe, &
-!!$         luse_SM_Al,luse_EAM,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul, &
-!!$         luse_vcMorse,luse_Buckingham,luse_Bonny_WRe,luse_SRIM, &
-!!$         ifcoulomb,numff,cffs,myid_md,iprint)
     call set_force_flags(ifcoulomb,myid_md,iprint)
   
   !.....vcMorse requires charge optimization, 
@@ -318,7 +293,7 @@ contains
     endif
     
   end subroutine init_force
-  !=======================================================================
+!=======================================================================
   subroutine copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
        ,lsrc,myparity,nn,sv,mpi_md_world,rho)
   !-----------------------------------------------------------------------
@@ -385,7 +360,7 @@ contains
     endif
   
   end subroutine copy_rho_ba
-  !=======================================================================
+!=======================================================================
   subroutine copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
        ,lsrc,myparity,nn,sv,mpi_md_world,strs)
   !-----------------------------------------------------------------------
@@ -453,7 +428,7 @@ contains
     endif
   
   end subroutine copy_strs_ba
-  !=======================================================================
+!=======================================================================
   subroutine copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex &
        ,lsrc,myparity,nn,sv,mpi_md_world,x,ndim)
   !-----------------------------------------------------------------------
@@ -543,7 +518,7 @@ contains
     endif
   
   end subroutine copy_dba_fwd
-  !=======================================================================
+!=======================================================================
   subroutine copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
        ,lsrc,myparity,nn,mpi_md_world,x,ndim)
   !-----------------------------------------------------------------------
@@ -651,7 +626,7 @@ contains
   
   !      deallocate(dbuf,dbufr)
   end subroutine copy_dba_bk
-  !=======================================================================
+!=======================================================================
   subroutine reduce_dba_bk(natm,namax,tag,x,ndim)
   !-----------------------------------------------------------------------
   !  Send-back or reduce reaction on cached-atoms.
@@ -671,7 +646,7 @@ contains
     enddo
   
   end subroutine reduce_dba_bk
-  !=======================================================================
+!=======================================================================
   subroutine distribute_dba(natm,namax,tag,x,ndim)
   !-----------------------------------------------------------------------
   !  Distribute some values to the cached (boundary) atoms.
@@ -691,7 +666,7 @@ contains
     enddo
   
   end subroutine distribute_dba
-  !=======================================================================
+!=======================================================================
   function hvsd(x)
   !
   !  Heaviside's stepwise function
@@ -708,7 +683,7 @@ contains
     return 
   
   end function hvsd
-  !=======================================================================
+!=======================================================================
   function fcut1(r,rc)
   !
   !     Cutof function type-1
@@ -732,7 +707,7 @@ contains
     endif
     return
   end function fcut1
-  !=======================================================================
+!=======================================================================
   function dfcut1(r,rc)
   !
   !     Derivative of the cutoff function type-1
@@ -752,7 +727,7 @@ contains
     endif
     return
   end function dfcut1
-  !=======================================================================
+!=======================================================================
   function fcut2(r,rc)
   !
   !     Cutoff function type-2
@@ -768,7 +743,7 @@ contains
       fcut2 = 0d0
     endif
   end function fcut2
-  !=======================================================================
+!=======================================================================
   function dfcut2(r,rc)
   !
   !     Derivative of the cutoff function type-2
@@ -786,7 +761,7 @@ contains
       dfcut2 = 0d0
     endif
   end function dfcut2
-  !=======================================================================
+!=======================================================================
   function force_on(force_name,numff,cffs)
     implicit none
     character(len=*),intent(in):: force_name
@@ -823,12 +798,6 @@ contains
   end function use_force
 !=======================================================================
   subroutine set_force_flags( &
-!!$       luse_LJ,luse_Ito3_WHe,luse_RK_WHe, &
-!!$       luse_RK_FeH,luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si, &
-!!$       luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe, &
-!!$       luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe, &
-!!$       luse_SM_Al,luse_EAM,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul, &
-!!$       luse_vcMorse,luse_Buckingham,luse_Bonny_WRe,luse_SRIM, &
        ifcoulomb,myid,iprint)
   !     
   !     Set flags for forces whether or not using them.
@@ -836,75 +805,6 @@ contains
     implicit none
     integer,intent(in):: myid,iprint !,numff
     integer,intent(inout):: ifcoulomb
-!!$    character(len=20),intent(in):: cffs(numff)
-!!$    logical,intent(inout):: luse_LJ,luse_Ito3_WHe,luse_RK_WHe &
-!!$         ,luse_RK_FeH,luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si &
-!!$         ,luse_EDIP_Si,luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe &
-!!$         ,luse_Branicio_AlN,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe &
-!!$         ,luse_SM_Al,luse_EAM,luse_linreg,luse_NN,luse_Morse &
-!!$         ,luse_Morse_repul,luse_vcMorse,luse_Buckingham &
-!!$         ,luse_Bonny_WRe,luse_SRIM
-!!$  
-!!$    logical,external:: force_on
-  
-!!$    luse_LJ = .false.
-!!$    luse_Ito3_WHe = .false.
-!!$    luse_RK_WHe = .false.
-!!$    luse_RK_FeH = .false.
-!!$    luse_Ramas_FeH = .false.
-!!$    luse_Ackland_Fe = .false.
-!!$    luse_SW_Si = .false.
-!!$    luse_EDIP_Si = .false.
-!!$    luse_Brenner = .false.
-!!$    luse_Brenner_vdW = .false.
-!!$    luse_Lu_WHe = .false.
-!!$    luse_Branicio_AlN = .false.
-!!$    luse_Mishin_Al = .false.
-!!$    luse_AFS_W = .false.
-!!$    luse_SC_Fe = .false.
-!!$    luse_SM_Al = .false.
-!!$    luse_EAM = .false.
-!!$    luse_linreg = .false.
-!!$    luse_NN = .false.
-!!$    luse_Morse = .false.
-!!$    luse_Morse_repul = .false.
-!!$    luse_vcMorse = .false.
-!!$    luse_Buckingham = .false.
-!!$    luse_Bonny_WRe = .false.
-!!$    luse_SRIM = .false.
-!!$    if( force_on('LJ_Ar',numff,cffs) ) luse_LJ = .true.
-!!$    if( force_on('Ito3_WHe',numff,cffs) ) luse_Ito3_WHe = .true.
-!!$    if( force_on('RK_WHe',numff,cffs) ) luse_RK_WHe = .true.
-!!$    if( force_on('RK_FeH',numff,cffs) ) luse_RK_FeH = .true.
-!!$    if( force_on('Ramas_FeH',numff,cffs) ) luse_Ramas_FeH = .true.
-!!$    if( force_on('Ackland_Fe',numff,cffs) ) luse_Ackland_Fe = .true.
-!!$    if( force_on('SW_Si',numff,cffs) ) luse_SW_Si = .true.
-!!$    if( force_on('EDIP_Si',numff,cffs) ) luse_EDIP_Si = .true.
-!!$    if( force_on('Brenner',numff,cffs) ) luse_Brenner = .true.
-!!$    if( force_on('Brenner_vdW',numff,cffs) ) luse_Brenner_vdW = .true.
-!!$    if( force_on('Lu_WHe',numff,cffs) ) luse_Lu_WHe = .true.
-!!$    if( force_on('Branicio_AlN',numff,cffs) ) luse_Branicio_AlN=.true.
-!!$    if( force_on('Mishin_Al',numff,cffs) ) luse_Mishin_Al = .true.
-!!$    if( force_on('AFS_W',numff,cffs) ) luse_AFS_W = .true.
-!!$    if( force_on('SC_Fe',numff,cffs) ) luse_SC_Fe = .true.
-!!$    if( force_on('SM_Al',numff,cffs) ) luse_SM_Al = .true.
-!!$    if( force_on('EAM',numff,cffs) ) luse_EAM = .true.
-!!$    if( force_on('linreg',numff,cffs) ) luse_linreg = .true.
-!!$    if( force_on('NN',numff,cffs) ) luse_NN = .true.
-!!$    if( force_on('Morse',numff,cffs) ) luse_Morse = .true.
-!!$    if( force_on('Morse_repul',numff,cffs) ) luse_Morse_repul = .true.
-!!$    if( force_on('vcMorse',numff,cffs) ) luse_vcMorse = .true.
-!!$    if( force_on('Buckingham',numff,cffs) ) luse_Buckingham = .true.
-!!$    if( force_on('Bonny_WRe',numff,cffs) ) luse_Bonny_WRe = .true.
-!!$    if( force_on('SRIM',numff,cffs) ) luse_SRIM = .true.
-!!$  !.....Coulomb forces should be exclusive each other
-!!$    if( force_on('screened_Coulomb',numff,cffs) ) then
-!!$      ifcoulomb = 1
-!!$    else if( force_on('Ewald_Coulomb',numff,cffs) ) then
-!!$      ifcoulomb = 2
-!!$    else if( force_on('long_Coulomb',numff,cffs) ) then
-!!$      ifcoulomb = 3
-!!$    endif
   
     if( myid.eq.0 .and. iprint.ne.0 ) then
       write(6,'(/,a)') ' Use the following force-fields:'
@@ -940,16 +840,16 @@ contains
     endif
   
   end subroutine set_force_flags
-  !=======================================================================
+!=======================================================================
   subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
        lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
        tcom,myid,mpi_md_world,iprint,ifcoulomb,l1st)
-  !
-  !  Charge optimization/equilibration by damped dynamics.
-  !  Since not only Coulomb interaction but also other force-fields can
-  !  depend on atomic charges, this routine is separated out from the
-  !  force_Coulomb.F90.
-  !
+!
+!  Charge optimization/equilibration by damped dynamics.
+!  Since not only Coulomb interaction but also other force-fields can
+!  depend on atomic charges, this routine is separated out from the
+!  force_Coulomb.F90.
+!
     use Coulomb, only: qforce_long
     use Morse, only: qforce_vcMorse
     implicit none
@@ -1108,7 +1008,7 @@ contains
   
     return
   end subroutine dampopt_charge
-  !=======================================================================
+!=======================================================================
   subroutine get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
   !
   !  Get an average FQ that is an average chemical potential.
@@ -1140,7 +1040,7 @@ contains
     
     return
   end subroutine get_average_fq
-  !=======================================================================
+!=======================================================================
   subroutine suppress_fq(namax,natm,fq,myid,mpi_md_world)
   !
   ! Scale fqs in order to suppress too large fq values
@@ -1179,29 +1079,29 @@ contains
   
     return
   end subroutine suppress_fq
-  !=======================================================================
+!=======================================================================
   subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
-       ,numff,cffs,ifcoulomb,iprint,l1st,lvc &
+       ,ifcoulomb,iprint,l1st,lvc &
        ,ndimp,gwe,gwf,gws)
-  !
-  !  Compute derivative of potential energy (and forces) 
-  !  w.r.t. potential parameters.
-  !
+!
+!  Compute derivative of potential energy (and forces) 
+!  w.r.t. potential parameters.
+!
     use Morse,only: gradw_vcMorse, gradw_Morse
     implicit none
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nnn(6),mpi_md_world,myid_md,nex(3)
-    integer,intent(in):: lspr(0:nnmax,namax),numff
+    integer,intent(in):: lspr(0:nnmax,namax) !,numff
     integer,intent(inout):: ifcoulomb
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,acon(nismax),tag(namax)
     real(8),intent(inout):: tcom,rc
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
          ,chg(namax),chi(namax)
-    character(len=20),intent(in):: cffs(numff)
+!!$    character(len=20),intent(in):: cffs(numff)
     logical,intent(in):: l1st
     logical,intent(inout):: lvc
     logical,intent(in):: lstrs
