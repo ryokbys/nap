@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-09 22:17:58 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-11 12:46:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -76,6 +76,7 @@ contains
   subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
+    use force, only: dfcut1, fcut1
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -95,7 +96,6 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
          ,d0ij,alpij,rminij
-    real(8),external:: fcut1,dfcut1
 
     if( l1st ) then
 !!$      call init_Morse(natm,tag,mpi_md_world)
@@ -199,6 +199,7 @@ contains
 !
 !  Repulsive-only Morse potential
 !
+    use force, only: dfcut1, fcut1
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -218,7 +219,6 @@ contains
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
          ,d0ij,alpij,rminij
 !!$    real(8),allocatable,save:: strsl(:,:,:)
-    real(8),external:: fcut1,dfcut1
 
     if( l1st ) then
 !!$      call init_Morse(natm,tag,mpi_md_world)
@@ -318,6 +318,7 @@ contains
 !  Variable-charge Morse potential.
 !  Morse parameters depend on atomic charges which vary time to time.
 !
+    use force, only: dfcut1, fcut1
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -331,12 +332,13 @@ contains
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
+    real(8),external:: sprod
+
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,chgi,chgj,tmp2,diji,rcore
 !!$    real(8),allocatable,save:: strsl(:,:,:)
     type(atdesc):: atdi,atdj
-    real(8),external:: fcut1,dfcut1,sprod
     real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:)&
          ,dxdi(:),dxdj(:),at(:)
     if( .not.allocated(xi) ) allocate(xi(3),xj(3),xij(3),rij(3),&
@@ -461,6 +463,7 @@ contains
 !  Variable-charge Morse potential.
 !  Morse parameters depend on atomic charges which vary time to time.
 !
+    use force, only: dfcut1, fcut1
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -477,7 +480,7 @@ contains
     real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij,rcore &
          ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2,diji
     type(atdesc):: atdi,atdj
-    real(8),external:: fcut1,sprod
+    real(8),external:: sprod
     real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:) &
          ,dxdi(:),dxdj(:),at(:)
 
@@ -1057,6 +1060,7 @@ contains
 !  Note: This routine is always called in single run,
 !  thus no need of parallel implementation.
 !
+    use force, only: dfcut1, fcut1
     implicit none
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint
@@ -1071,7 +1075,7 @@ contains
          ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2
     type(atdesc):: atdi,atdj
-    real(8),external:: fcut1,sprod
+    real(8),external:: sprod
 
     epotl= 0d0
 
@@ -1147,6 +1151,7 @@ contains
 !  Note: This routine is always called in single run,
 !  thus no need of parallel implementation.
 !
+    use force, only: dfcut1, fcut1
     implicit none
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint
@@ -1162,7 +1167,7 @@ contains
          ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2
     type(atdesc):: atdi,atdj
-    real(8),external:: fcut1,sprod
+    real(8),external:: sprod
 
     epotl= 0d0
 

@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-11-07 14:17:01 Ryo KOBAYASHI>
+c                     Last-modified: <2017-12-11 17:01:04 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -21,6 +21,7 @@ c-----------------------------------------------------------------------
       use pmdio
       use pmdmpi
       use version
+      use force, only: force_on
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -33,7 +34,6 @@ c.....Epot threshold for disl core extraction [Hartree]
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr
      &     ,nstp_done
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin
-      logical,external:: force_on
 
 c-----initialize the MPI environment
       call mpi_init(ierr)

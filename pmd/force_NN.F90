@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-30 21:22:17 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-11 12:42:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -69,6 +69,7 @@ contains
   subroutine force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
+    use force, only: copy_dba_bk
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -1316,11 +1317,13 @@ contains
   subroutine compute_stress(namax,natm,tag,ra,nnmax,strs,h &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rc,lspr &
        ,mpi_world,myid)
+    use force, only: copy_dba_bk
     implicit none
     integer,intent(in):: namax,natm,nnmax,nb,nbmax,lsb(0:nbmax,6)&
          ,lsrc(6),myparity(3),nn(6),mpi_world,myid,lspr(0:nnmax,namax)&
          ,nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3),rc,tcom
+    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3),rc
+    real(8),intent(inout):: tcom
     real(8),intent(out):: strs(3,3,namax)
 
     integer:: ia,ja,ixyz,jxyz,ihl0,ihl1,ihl2,jj,is,js

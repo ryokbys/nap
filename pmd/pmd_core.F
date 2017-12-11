@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-12-09 22:17:40 Ryo KOBAYASHI>
+c                     Last-modified: <2017-12-11 17:00:54 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -13,12 +13,14 @@ c-----------------------------------------------------------------------
      &     ,nstp_done,lvc)
       use pmdvars
       use zload
+      use force
       implicit none
       include "mpif.h"
       include "./params_unit.h"
       integer,intent(in):: ntot,maxstp,nerg,npmd,myid_md,mpi_md_world
      &     ,nspmax,ifpmd,ifdmp,minstp,ntdst,ifsort,numff
-     &     ,iprint,nodes_md,nx,ny,nz,n_conv,ifcoulomb,nrmtrans
+     &     ,iprint,nodes_md,nx,ny,nz,n_conv,nrmtrans
+      integer,intent(inout):: ifcoulomb
       integer,intent(out):: nstp_done
       real(8),intent(in):: hunit,tinit,tfin
      &     ,trlx,srlx,stbeta,strfin,dmp,eps_conv
@@ -51,12 +53,12 @@ c-----output file names
       integer,external:: itotOf,ifmvOf
       logical:: ltot_updated = .true.
 
-      logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
-     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
-     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
+c      logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+c     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+c     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
+c     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
+c     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
+c     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
 
       call initialize_pmdvars(nspmax)
 
@@ -99,7 +101,7 @@ c-----reduced node origin
       sorg(3)= anzi*myz
 
 c     check number of parallel node and vc_gaussian
-      if( nxyz.gt.1 .and. ifcoulomb.eq.3 ) then
+      if( nxyz.gt.1 .and. use_force('long_Coulomb') ) then
         write(6,'(a)') ' [Error] vc_gaussian potential is '
      &       //'not available in parallel.'
         call mpi_finalize(ierr)
@@ -236,15 +238,17 @@ c.....Set initial temperature if needed
       tcpu1= mpi_wtime()
       tcom = 0d0
 
+c      call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
+c     &     iprint,h,rc,numff,cffs,
+c     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+c     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+c     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
+c     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
+c     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
+c     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham,luse_Bonny_WRe,
+c     &     luse_SRIM)
       call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
-     &     iprint,h,rc,numff,cffs,
-     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
-     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham,luse_Bonny_WRe,
-     &     luse_SRIM)
+     &     iprint,h,rc,numff,cffs,lvc,ifcoulomb)
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
@@ -263,17 +267,21 @@ c.....Calc forces
       lcell_updated = ( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &     trim(cpctl).eq.'vv-Berendsen')
+c      call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
+c     &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
+c     &     ,lspr,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
+c     &     ,numff,cffs,ifcoulomb,iprint,.true.,
+c     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+c     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+c     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
+c     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
+c     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
+c     &     luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,luse_SRIM,
+c     &     lcell_updated)
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &     ,lspr,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
-     &     ,numff,cffs,ifcoulomb,iprint,.true.,
-     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
-     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,luse_SRIM,
-     &     lcell_updated)
+     &     ,numff,cffs,ifcoulomb,iprint,.true.,lvc,lcell_updated)
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -539,17 +547,21 @@ c.....Copy RA of boundary atoms determined by 'bacopy'
           lstrs = lstrs0
         endif
 c-------Calc forces
+c        call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
+c     &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
+c     &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
+c     &       ,numff,cffs,ifcoulomb,iprint,.false.,
+c     &       luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+c     &       luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+c     &       luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
+c     &       ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
+c     &       ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul
+c     &       ,luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,luse_SRIM
+c     &       ,lcell_updated)
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
-     &       ,numff,cffs,ifcoulomb,iprint,.false.,
-     &       luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-     &       luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-     &       luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
-     &       ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
-     &       ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul
-     &       ,luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,luse_SRIM
-     &       ,lcell_updated)
+     &       ,numff,cffs,ifcoulomb,iprint,.false.,lvc,lcell_updated)
         lstrs = .false.
 
 c.....Second kick of velocities
@@ -872,13 +884,16 @@ c
 c  In case that only one shot force calculation is required.
 c
       use pmdvars
+      use force
       use Morse,only: gradw_Morse,gradw_vcMorse
+      use force
       implicit none
       include "mpif.h"
       include "./params_unit.h"
       integer,intent(in):: ntot,myid_md,mpi_md_world
      &     ,nspmax,numff
-     &     ,iprint,nodes_md,nx,ny,nz,ifcoulomb
+     &     ,iprint,nodes_md,nx,ny,nz
+      integer,intent(inout):: ifcoulomb
       real(8),intent(in):: hunit
       real(8),intent(inout):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
      &     ,atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot)
@@ -895,12 +910,12 @@ c
       real(8):: aai(3),epott
       logical:: lstrs = .false.
 
-      logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
-     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
-     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
+c      logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+c     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+c     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
+c     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
+c     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
+c     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
       logical:: lcell_updated = .false.
       
 c      write(6,'(a,200es10.2)') 'chgtot in pmd_core = ',
@@ -967,15 +982,17 @@ c-----get total number of species
 c      write(6,'(a,500es10.2)') ' chg before init_force = ',
 c     &     chg(1:natm+10)
       if( iprint.ge.10 ) print *,'init_force,myid_md=',myid_md
+c      call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
+c     &     iprint,h,rc,numff,cffs,
+c     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+c     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+c     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
+c     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
+c     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
+c     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham,
+c     &     luse_Bonny_WRe,luse_SRIM)
       call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
-     &     iprint,h,rc,numff,cffs,
-     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
-     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,ifcoulomb,luse_Buckingham,
-     &     luse_Bonny_WRe,luse_SRIM)
+     &     iprint,h,rc,numff,cffs,lvc,ifcoulomb)
 
 c      print *,' lvc,ifcoulomb = ',lvc,ifcoulomb
 c      write(6,'(a,500es10.2)') ' chg before bacopy = ',
@@ -992,26 +1009,30 @@ c-----Make pair list
       lstrs = .true.
 
       if( iprint.ge.10 ) print *,'get_force,myid_md=',myid_md
+c      call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
+c     &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
+c     &     ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
+c     &     ,numff,cffs,ifcoulomb,iprint,.true.,
+c     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
+c     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
+c     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
+c     &     ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
+c     &     ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
+c     &     luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,luse_SRIM,
+c     &     lcell_updated)
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &     ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
-     &     ,numff,cffs,ifcoulomb,iprint,.true.,
-     &     luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN
-     &     ,luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM
-     &     ,luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,
-     &     luse_vcMorse,lvc,luse_Buckingham,luse_Bonny_WRe,luse_SRIM,
-     &     lcell_updated)
+     &     ,numff,cffs,ifcoulomb,iprint,.true.,lvc,lcell_updated)
 c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
 c     &     ,epot,chg(1:natm)
 
       if( lcalcgrad ) then
 c.....Do not update epot here, so use epott instead.
-        if( luse_Morse ) call gradw_Morse(namax,natm,tag,ra,nnmax,
-     &       h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
-        if( luse_vcMorse ) call gradw_vcMorse(namax,natm,tag,ra,nnmax
-     &       ,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
+        if( use_force('Mores') ) call gradw_Morse(namax,natm,tag,
+     &       ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
+        if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra
+     &       ,nnmax,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
       endif
 
       if( iprint.ne.0 ) then

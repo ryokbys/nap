@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-23 18:56:18 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-11 12:48:17 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -269,6 +269,7 @@ contains
 !-----------------------------------------------------------------------
 !  See only EAM part of Streitz and Mintmire, PRB 50(16), 11996 (1994)
 !-----------------------------------------------------------------------
+    use force, only: copy_dba_fwd
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -442,10 +443,10 @@ contains
 ! Calculate rho_ij from rij and rcij.
 ! The type of rho form is given by TYPE_RHO global variable.
 !
+    use force, only: fcut1
     real(8),intent(in):: rij
     integer,intent(in):: is,js
     character(len=*),intent(in):: ctype
-    real(8),external:: fcut1
     real(8):: rhoij
 
     if( trim(ctype).eq.'exp1' ) then
@@ -456,12 +457,12 @@ contains
   end function rhoij
 !=======================================================================
   function drhoij(rij,rcij,is,js,ctype)
+    use force, only: fcut1, dfcut1
     integer,intent(in):: is,js
     real(8),intent(in):: rij,rcij
     character(len=*),intent(in):: ctype 
     real(8):: drhoij
     real(8):: r
-    real(8),external:: fcut1,dfcut1
     
     if( trim(ctype).eq.'exp1' ) then
       r = rij -ea_re(is,js)
@@ -503,12 +504,12 @@ contains
   end function dfrho
 !=======================================================================
   function phi(rij,rcij,is,js,ctype)
+    use force, only: fcut1
     integer,intent(in):: is,js
     real(8),intent(in):: rij,rcij
     character(len=*),intent(in):: ctype 
     real(8):: phi
     real(8):: r
-    real(8),external:: fcut1,hvsd
     
     if( trim(ctype).eq.'SM' ) then
       r = rij -ea_re(is,js)
@@ -522,12 +523,12 @@ contains
   end function phi
 !=======================================================================
   function dphi(rij,rcij,is,js,ctype)
+    use force, only: fcut1,dfcut1
     integer,intent(in):: is,js
     real(8),intent(in):: rij,rcij
     character(len=*),intent(in):: ctype 
     real(8):: dphi,tmp
     real(8):: r
-    real(8),external:: fcut1,dfcut1
 
     if( trim(ctype).eq.'SM' ) then
       r = rij -ea_re(is,js)

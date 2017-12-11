@@ -11,6 +11,7 @@ contains
 !-----------------------------------------------------------------------
 !  See Mishin et al. PRB 59(5) (1999) 3393--3407.
 !-----------------------------------------------------------------------
+    use force, only: copy_dba_fwd
     implicit none
     include "mpif.h"
     include "./params_unit.h"

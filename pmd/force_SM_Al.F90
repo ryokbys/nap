@@ -13,6 +13,7 @@ contains
 !  This is implementation of only Al-Al potential in the literature,
 !  and non-variable charge implementation.
 !-----------------------------------------------------------------------
+    use force, only: copy_dba_fwd
     implicit none
     include "mpif.h"
     include "./params_unit.h"

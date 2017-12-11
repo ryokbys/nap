@@ -11,6 +11,7 @@ contains
 !    - rho of boundary atoms are sent to the neighbor nodes
 !    - only force on i is calculated, not necessary to send-back
 !-----------------------------------------------------------------------
+    use force, only: copy_dba_bk, copy_dba_fwd
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -220,6 +221,7 @@ contains
 !    - rho of boundary atoms are sent to the neighbor nodes
 !    - only force on i is calculated, not necessary to send-back
 !-----------------------------------------------------------------------
+    use force, only: copy_dba_bk, copy_dba_fwd
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -411,13 +413,13 @@ contains
   end function dfphi
 !=======================================================================
   function fvphi(r,rs)
+    use force, only: hvsd
     implicit none 
     include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r,rs
     real(8):: fvphi
     integer:: i
-    real(8),external:: hvsd
 
     fvphi=0d0
     if( r.le.r1 ) then
@@ -434,13 +436,13 @@ contains
   end function fvphi
 !=======================================================================
   function dfvphi(r,rs)
+    use force, only: hvsd
     implicit none 
     include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r,rs
     real(8):: dfvphi
     integer:: i
-    real(8),external:: hvsd
 
     dfvphi= 0d0
     if( r.le.r1 ) then
@@ -462,13 +464,13 @@ contains
 !
 !  Cubic spline function for calculating rho
 !
+    use force, only: hvsd
     implicit none 
     include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: fpsi
     integer:: i
-    real(8),external:: hvsd
 
     fpsi=0d0
     do i=1,3
@@ -482,13 +484,13 @@ contains
 !
 !  1st derivative of the cubic spline func of calculation of rho
 !
+    use force, only: hvsd
     implicit none 
     include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: dfpsi
     integer:: i
-    real(8),external:: hvsd
 
     dfpsi=0d0
     do i=1,3
@@ -528,6 +530,7 @@ contains
   end function dfemb
 !=======================================================================
   function rho_feh(r)
+    use force, only: hvsd
     implicit none
     include './params_unit.h'
     include './params_Ramas_FeH.h'
@@ -535,7 +538,6 @@ contains
     real(8):: rho_feh
 
     integer:: i
-    real(8),external:: hvsd
 
     rho_feh= 0d0
     do i=1,6
@@ -546,13 +548,13 @@ contains
   end function rho_feh
 !=======================================================================
   function drho_feh(r)
+    use force, only: hvsd
     implicit none
     include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: drho_feh
     integer:: i
-    real(8),external:: hvsd
 
     drho_feh=0d0
     do i=1,6
@@ -564,6 +566,7 @@ contains
   end function drho_feh
 !=======================================================================
   function rho_hfe(r)
+    use force, only: hvsd
     implicit none
     include './params_unit.h'
     include './params_Ramas_FeH.h'
@@ -571,7 +574,6 @@ contains
     real(8):: rho_hfe
 
     integer:: i
-    real(8),external:: hvsd
 
     rho_hfe= 0d0
     do i=1,5
@@ -582,13 +584,13 @@ contains
   end function rho_hfe
 !=======================================================================
   function drho_hfe(r)
+    use force, only: hvsd
     implicit none
     include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r
     real(8):: drho_hfe
     integer:: i
-    real(8),external:: hvsd
 
     drho_hfe=0d0
     do i=1,5
@@ -791,13 +793,13 @@ contains
   end function s_hh
 !=======================================================================
   function fvphi_feh(r,rs)
+    use force, only: hvsd
     implicit none 
     include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r,rs
     real(8):: fvphi_feh
     integer:: i
-    real(8),external:: hvsd
     real(8):: rr,r4
 
     fvphi_feh=0d0
@@ -821,13 +823,13 @@ contains
   end function fvphi_feh
 !=======================================================================
   function dfvphi_feh(r,rs)
+    use force, only: hvsd
     implicit none 
     include './params_unit.h'
     include './params_Ramas_FeH.h'
     real(8),intent(in):: r,rs
     real(8):: dfvphi_feh
     integer:: i
-    real(8),external:: hvsd
     real(8):: r4,r3,rr
 
     dfvphi_feh= 0d0

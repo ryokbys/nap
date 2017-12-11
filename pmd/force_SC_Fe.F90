@@ -9,6 +9,7 @@ contains
 !    - rho of boundary atoms are sent to the neighbor nodes
 !    - only force on i is calculated, not necessary to send-back
 !-----------------------------------------------------------------------
+    use force, only: copy_dba_fwd
     implicit none
     include "mpif.h"
     include "./params_unit.h"

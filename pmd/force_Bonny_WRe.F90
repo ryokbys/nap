@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-15 14:15:56 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-11 17:03:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -141,6 +141,7 @@ contains
   subroutine force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+    use force, only: copy_dba_fwd
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -309,10 +310,10 @@ contains
 !
 ! Calculate rho of atom j at distance rij.
 !
+    use force, only: hvsd
     real(8),intent(in):: rij
     integer,intent(in):: js
     real(8):: rhoij
-    real(8),external:: hvsd
 
     rhoij = 0d0
     if( js.eq.1 ) then  ! Only in case of W, scaling with S
@@ -324,11 +325,11 @@ contains
   end function rhoij
 !=======================================================================
   function drhoij(js,rij)
+    use force, only: hvsd
     implicit none
     real(8),intent(in):: rij
     integer,intent(in):: js
     real(8):: drhoij
-    real(8),external:: hvsd
 
     drhoij = 0d0
     if( js.eq.1 ) then
@@ -343,11 +344,11 @@ contains
 !
 !  rho_j(rij) from Marinica et al., JAP 121 (2017)
 !
+    use force, only: hvsd
     implicit none
     real(8),intent(in):: rij
     real(8):: rhospln,ri
     integer:: i
-    real(8),external:: hvsd
 
     rhospln = 0d0
     if( rij.le.rhospln_rc ) then
@@ -370,11 +371,11 @@ contains
 !
 !  rho_j(rij) from Marinica et al., JAP 121 (2017)
 !
+    use force, only: hvsd
     implicit none
     real(8),intent(in):: rij
     real(8):: drhospln,ri
     integer:: i
-    real(8),external:: hvsd
 
     drhospln = 0d0
     if( rij.le.rhospln_rc ) then
@@ -561,13 +562,13 @@ contains
   end function dvnucl
 !=======================================================================
   function veq(is,js,rij)
+    use force, only: hvsd
     implicit none
     integer,intent(in):: is,js
     real(8),intent(in):: rij
     real(8):: veq
     real(8):: rk
     integer:: i
-    real(8),external:: hvsd
 
     veq = 0d0
     if( rij.gt.bonny_rc(is,js) ) return
@@ -591,13 +592,13 @@ contains
   end function veq
 !=======================================================================
   function dveq(is,js,rij)
+    use force, only: hvsd
     implicit none
     integer,intent(in):: is,js
     real(8),intent(in):: rij
     real(8):: dveq
     real(8):: rk
     integer:: i
-    real(8),external:: hvsd
 
     dveq = 0d0
     if( rij.gt.bonny_rc(is,js) ) return
@@ -623,11 +624,11 @@ contains
   end function dveq
 !=======================================================================
   function vspln(rij)
+    use force, only: hvsd
     implicit none
     real(8),intent(in):: rij
     real(8):: vspln,ri
     integer:: i
-    real(8),external:: hvsd
 
     vspln = 0d0
     do i=1,n_vspln
@@ -639,11 +640,11 @@ contains
   end function vspln
 !=======================================================================
   function dvspln(rij)
+    use force, only: hvsd
     implicit none
     real(8),intent(in):: rij
     real(8):: dvspln,ri
     integer:: i
-    real(8),external:: hvsd
 
     dvspln = 0d0
     do i=1,n_vspln

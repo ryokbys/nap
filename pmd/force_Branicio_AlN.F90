@@ -9,6 +9,7 @@ contains
 !      Ref: Branicio et al., J. Mech. Phys. Solids 56 (2008) pp.1955.
 !    - 2010.04.02 by R.K.
 !-----------------------------------------------------------------------
+    use force, only: copy_dba_bk
     implicit none
     include "mpif.h"
     include "./params_unit.h"
