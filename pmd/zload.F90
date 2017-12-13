@@ -1,6 +1,6 @@
 module zload
   implicit none
-
+  save
 !.....initial z top and bottom positions
   real(8):: ztop0, zbot0, zlen0, dzl
   integer:: nztop, nzbot

@@ -1,11 +1,11 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-13 11:20:00 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-13 21:31:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
   implicit none
-
+  save
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.EAM'
 

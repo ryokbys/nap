@@ -1,18 +1,20 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-09 21:47:02 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-13 23:32:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
 !
   implicit none
-
-  real(8),allocatable:: fdiff(:,:)
-  real(8):: pdiff(3,3), ptnsr(3,3)
+  save
+  real(8),allocatable:: fdiff(:,:),frcs(:,:),gtrnl(:)
+  real(8):: pdiff(6), ptnsr(3,3)
   real(8):: epotsub
   
   logical:: fp_common_initialized= .false.
 
+  integer,parameter:: ivoigt(3,3)= &
+       reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
 contains
 !=======================================================================
   subroutine init()
@@ -74,22 +76,22 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: ftrn,ftst
 
-    integer:: ismpl,natm,ia,ixyz,jxyz,idim
+    integer:: ismpl,natm,ia,ixyz,jxyz,idim,k
     real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv,esub
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3)
     real(8):: ftrnl,ftstl,ftmp
     real(8):: edenom,fdenom
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     type(mdsys):: smpl
-    logical:: l1st = .true.
-    logical:: lcalcgrad = .false.
-    real(8),save,allocatable:: frcs(:,:)
+    logical,save:: l1st = .true.
+    logical,parameter:: lcalcgrad = .false.
     character(len=128):: cdirname,ctype
 
     logical,external:: string_in_arr
 
     nfunc= nfunc +1
 
+!!$    print *,'func_w_pmd: 01'
     tc0= mpi_wtime()
     call mpi_bcast(x,ndim,mpi_real8,0,mpi_world,ierr)
     tcl= mpi_wtime() -tc0
@@ -100,6 +102,7 @@ contains
       if( .not.allocated(fdiff) ) allocate(fdiff(3,maxna),frcs(3,maxna))
     endif
 
+!!$    print *,'func_w_pmd: 02'
     if( .not. lematch .and. .not.lfmatch .and. .not.lsmatch ) then
       if( myid.eq.0 ) then
         print *,'Nothing to be fitted.'
@@ -109,9 +112,11 @@ contains
     endif
 
 !!$    print *,'myid,isid0,isid1=',myid,isid0,isid1
+!!$    print *,'func_w_pmd: 03'
     ftrnl = 0d0
     ftstl = 0d0
     do ismpl=isid0,isid1
+!!$      print *,'func_w_pmd: 04,ismpl,size(samples)=',ismpl,size(samples)
       smpl = samples(ismpl)
       natm= smpl%natm
       cdirname = trim(smpl%cdirname)
@@ -141,7 +146,8 @@ contains
              //'/pmd')
         call set_params_NN(ndim,x,rcut,rc3)
       endif
-!!$      print *,'myid,ismpl,cdirname,natm=',myid,ismpl,trim(cdirname),natm,' before pmd'
+!!$      print *,'func_w_pmd: 04-1, ismpl,lcalcgrad,ndim,nff='&
+!!$           ,ismpl,lcalcgrad,ndim,nff
       call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs)
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
@@ -154,6 +160,7 @@ contains
       endif
     enddo
 
+!!$    print *,'func_w_pmd: 05'
     if( len(trim(crefstrct)).gt.5 ) then
       if( myid.eq.myidrefsub ) then
         epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
@@ -164,6 +171,7 @@ contains
     endif
 
     do ismpl=isid0,isid1
+!!$      print *,'func_w_pmd: 06,ismpl=',ismpl
       smpl = samples(ismpl)
       natm = smpl%natm
       epot = smpl%epot
@@ -227,10 +235,11 @@ contains
         serri = 1d0/serr
         do ixyz=1,3
           do jxyz=ixyz,3
-            pdiff(ixyz,jxyz)= (smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
+            k = ivoigt(ixyz,jxyz)
+            pdiff(k)= (smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
                  -smpl%sref(ixyz,jxyz)) *serri
-            pdiff(ixyz,jxyz)= pdiff(ixyz,jxyz)*pdiff(ixyz,jxyz)/6
-            ftmp= ftmp +pdiff(ixyz,jxyz) *swgt
+            pdiff(k)= pdiff(k)*pdiff(k)/6
+            ftmp= ftmp +pdiff(k) *swgt
           enddo
         enddo
       endif  ! stress matching
@@ -247,6 +256,7 @@ contains
 !    tfunc= tfunc +mpi_wtime() -tf0
     tfl = mpi_wtime() -tf0
 
+!!$    print *,'func_w_pmd: 07'
 !!$    print *,'myid,ftrnl=',myid,ftrnl
     tc0= mpi_wtime()
     ftrn= 0d0
@@ -278,7 +288,7 @@ contains
     use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm,tgrad &
          ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,nsubff,csubffs &
          ,cmaindir,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
-         ,rcut,rc3
+         ,rcut,rc3,myidrefsub,isidrefsub,iprint
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb
@@ -290,33 +300,28 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gtrn(ndim)
     
-    integer:: ismpl,i,idim,natm
-    real(8),save,allocatable:: gs(:),gtrnl(:),frcs(:,:)
-    real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3)
-    real(8):: ediff,eerr,eref,swgt
+    integer:: ismpl,i,idim,natm,k,ia,ixyz,jxyz
+    real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3),dn3i
+    real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri
     type(mdsys):: smpl
-    logical:: lcalcgrad = .true. 
+    logical,parameter:: lcalcgrad = .true. 
     character(len=128):: cdirname,ctype
 
-    logical,external:: string_in_arr 
+    logical,external:: string_in_arr
 
-    if( .not.allocated(gs) ) allocate(gs(ndim),gtrnl(ndim),frcs(3,maxna))
-
-    if( lfmatch ) then
-      if( myid.eq.0 ) then
-        print *,'WARNING: FORCE-MATCHING IS NOT AVAILABLE IN GRAD_W_PMD().'
-      endif
-    endif
-    if( lsmatch ) then
-      if( myid.eq.0 ) then
-        print *,'WARNING: STRESS-MATCHING IS NOT AVAILABLE IN GRAD_W_PMD().'
-      endif
-    endif
+!!$    print *,'grad_w_pmd'
+    if( .not.allocated(gtrnl) ) allocate(gtrnl(ndim))
 
     ngrad= ngrad +1
     tg0= mpi_wtime()
 
-    gtrnl(1:ndim) = 0d0
+    if( .not. lematch .and. .not.lfmatch .and. .not.lsmatch ) then
+      if( myid.eq.0 ) then
+        print *,'Nothing to be fitted.'
+      endif
+      call mpi_finalize(ierr)
+      stop
+    endif
 
     do ismpl=isid0,isid1
       smpl = samples(ismpl)
@@ -353,34 +358,76 @@ contains
       endif
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.
-      call run_pmd(smpl,lcalcgrad,ndim,gs,nff,cffs,epot,frcs,strs)
-!!$      print *, 'ismpl,epot @grad_w_pmd =',ismpl,epot
-!!$      samples(ismpl)%epot = epot
-!!$      samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
-!!$      samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
+!!$      print *,'ismpl,cpot,ctype,=',ismpl,trim(cpot) &
+!!$           ,trim(ctype)
+      call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs)
+    enddo  ! ismpl
 
+    if( len(trim(crefstrct)).gt.5 ) then
+!!$      print *,'Going to get epotsub...'
+      if( myid.eq.myidrefsub ) then
+        epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
+        epotsub = epotsub /samples(isidrefsub)%natm
+      endif
+      call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
+    endif
+
+!!$    print *,'Going to compute derivative of loss function'
+    gtrnl(1:ndim) = 0d0
+    do ismpl=isid0,isid1
+!!$      print *,'isid0,isid1,ismpl,size(samples)=',isid0,isid1,ismpl,size(samples)
+      smpl= samples(ismpl)
+      natm= smpl%natm
+      epot= smpl%epot
       swgt= smpl%wgt
+!!$      print *,'ismpl,natm,epot=',ismpl,natm,epot
+!.....Derivative of energy term w.r.t. weights
       if( lematch ) then
         eref= smpl%eref
         esub= smpl%esub
         eerr= smpl%eerr
-!.....Energy matching
         if( len(trim(crefstrct)).gt.5 ) then
           ediff= (epot-epotsub*natm+esub -(eref-erefsub*natm))/natm /eerr
         else
           ediff= (epot+esub -eref)/natm /eerr
         endif
-        ediff= 2d0 *ediff /natm /eerr *swgt
-!.....TODO: parameter derivatives w.r.t. not only energy,
-!.....but also forces and stresses
-        gtrnl(1:ndim)= gtrnl(1:ndim) +gs(1:ndim)*ediff
+        gtrnl(1:ndim) = gtrnl(1:ndim) &
+             +2d0*ediff*smpl%gwe(1:ndim)/natm/eerr *swgt
+!!$        print *,'ismpl,ediff,gwe=',ismpl,ediff,smpl%gwe(1:ndim)
       endif
-!!$      write(6,'(a,i5,5es15.7)') 'ismpl,ediff,gs(7),gtrnl(7),epot,eref=',&
-!!$           ismpl,ediff,gs(7),gtrnl(7),epot,eref
-!!$      print *,'ismpl,epot,eref,ediff=',ismpl,epot,eref,ediff
-!!$      print *,'gs =',gs(1:ndim)
-!.....TODO: force matching
-    enddo  ! ismpl
+!.....Derivative of force term w.r.t. weights
+      if( lfmatch ) then
+        frcs(1:3,1:natm)= smpl%fa(1:3,1:natm)
+        ferr= smpl%ferr
+        ferri= 1d0/ferr
+        dn3i= 1d0/3/smpl%nfcal
+        do ia=1,natm
+          if( smpl%ifcal(ia).eq.0 ) cycle
+          do ixyz=1,3
+            fdiff(ixyz,ia)= (frcs(ixyz,ia) +smpl%fsub(ixyz,ia) &
+                 -(smpl%fref(ixyz,ia))) *ferri
+            gtrnl(1:ndim)= gtrnl(1:ndim) +2d0*fdiff(ixyz,ia) &
+                 *smpl%gwf(1:ndim,ixyz,ia) *dn3i *swgt *ferri
+          enddo
+        enddo
+!!$        print *,'ismpl,ediff,gwf=',ismpl,ediff,smpl%gwf(1:ndim,1,1)
+      endif
+!.....Derivative of stress w.r.t. weights
+      if( lsmatch ) then
+        serr= smpl%serr
+        serri= 1d0/serr
+        do ixyz=1,3
+          do jxyz=ixyz,3
+            k = ivoigt(ixyz,jxyz)
+            pdiff(k) = (smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
+                 -smpl%sref(ixyz,jxyz)) *serri
+            gtrnl(1:ndim)= gtrnl(1:ndim) +2d0*pdiff(k) &
+                 *smpl%gws(1:ndim,k)/6 *serri
+          enddo
+        enddo
+!!$        print *,'ismpl,ediff,gws=',ismpl,ediff,smpl%gws(1:ndim,1)
+      endif
+    enddo
 
     tgl= mpi_wtime() -tg0
 
@@ -398,7 +445,6 @@ contains
     tgrad= tgrad +tgg
     
     return
-    
   end subroutine grad_w_pmd
 !=======================================================================
   function ndat_in_line(ionum,delim) result(ndat)

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-12-13 11:11:19 Ryo KOBAYASHI>
+c                     Last-modified: <2017-12-13 23:33:15 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -879,17 +879,9 @@ c      character(len=20),intent(in):: cffs(numff)
       integer:: i,ierr,is,nspl,nxyz
       real(8):: aai(3),epott
       logical:: lstrs = .false.
-
-c      logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-c     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-c     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-c     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
-c     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
-c     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
       logical:: lcell_updated = .false.
-      
-c      write(6,'(a,200es10.2)') 'chgtot in pmd_core = ',
-c     &     chgtot(1:ntot)
+
+c      print *,'one_shot: 01'
       call initialize_pmdvars(nspmax)
 
       nxyz = nx*ny*nz
@@ -918,14 +910,13 @@ c     &     chgtot(1:ntot)
         write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
         write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
         write(6,*) ''
-c        do i=1,ntot
-c          write(6,'(i8,3f12.5)') i,rtot(1:3,i)
-c        enddo
       endif
+c      print *,'one_shot: 02'
       call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
 c      write(6,'(a,200es10.2)') 'chg after space_decomp = ',chg(1:natm)
 
+c      print *,'one_shot: 03'
 c.....Some conversions
       nsp= 0
       do i=1,natm
@@ -949,15 +940,12 @@ c-----get total number of species
       tcpu1= mpi_wtime()
       tcom = 0d0
 
-c      write(6,'(a,500es10.2)') ' chg before init_force = ',
-c     &     chg(1:natm+10)
+c      print *,'one_shot: 04'
       if( iprint.ge.10 ) print *,'init_force,myid_md=',myid_md
       call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
      &     iprint,h,rc,lvc,ifcoulomb)
 
-c      print *,' lvc,ifcoulomb = ',lvc,ifcoulomb
-c      write(6,'(a,500es10.2)') ' chg before bacopy = ',
-c     &     chg(1:natm)
+c      print *,'one_shot: 05'
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
@@ -969,6 +957,7 @@ c-----Make pair list
      &     ,anxi,anyi,anzi,lspr,iprint,.true.)
       lstrs = .true.
 
+c      print *,'one_shot: 06'
       if( iprint.ge.10 ) print *,'get_force,myid_md,lcalcgrad='
      &     ,myid_md,lcalcgrad
       if( .not.lcalcgrad ) then
@@ -976,22 +965,20 @@ c-----Make pair list
      &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
      &       ,ifcoulomb,iprint,.true.,lvc,lcell_updated)
-c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
-c     &     ,epot,chg(1:natm)
       else  ! lcalcgrad = .true.
-c.....Do not update epot here, so use epott instead.
         epot = 0d0
         if( use_force('Morse') ) call gradw_Morse(namax,natm,tag,
      &         ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws,
      &         lematch,lfmatch,lsmatch)
-        if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra
-     &       ,nnmax,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
+c        if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra
+c     &       ,nnmax,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
       endif
 
       if( iprint.ne.0 ) then
         write(6,'(a,es15.7)') ' potential energy = ',epot
       endif
 
+c      print *,'one_shot: 07'
       call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 
       if( iprint.ne.0 ) then

@@ -1,5 +1,5 @@
 module variables
-
+  implicit none 
   save
   integer:: nsmpl
   integer:: niter= 1

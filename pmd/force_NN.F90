@@ -1,11 +1,11 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-13 11:18:54 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-13 21:31:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
 !-----------------------------------------------------------------------
-
+  save
   character(len=128):: paramsdir = '.'
 
 !.....parameter file name
@@ -56,7 +56,7 @@ module NN
   real(8):: rc3nn = 3.0d0
 
 !.....num of atoms and neighbors for dgsf array
-  integer,save:: nal, nnl, nalmax,nnlmax,nnltmp
+  integer:: nal, nnl, nalmax,nnlmax,nnltmp
   logical:: lrealloc = .false.
 
 !.....parameters given from outside (fitpot)

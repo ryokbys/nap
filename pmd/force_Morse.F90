@@ -1,12 +1,13 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-13 11:12:56 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-13 23:30:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
 !    - Currently no cutoff tail treatment is done. (170310)
 !-----------------------------------------------------------------------
   implicit none
+  save
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.Morse'
   character(len=128),parameter:: configfname = 'in.config.Morse'
@@ -24,6 +25,9 @@ module Morse
 !.....Morse parameters
   real(8):: alp(msp,msp),d0(msp,msp),rmin(msp,msp)
   logical:: interact(msp,msp)
+
+  integer,parameter:: ivoigt(3,3)= &
+       reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
 
   real(8),allocatable:: strsl(:,:,:)
   real(8),allocatable:: ge_alp(:,:),ge_d0(:,:),ge_rmin(:,:)
@@ -718,8 +722,6 @@ contains
         inc= inc +1
         rmin(1,i) = params(inc)
         rmin(i,1) = rmin(1,i)
-!!$        write(6,'(a,2i5,3f8.4)') ' isp,jsp,d0,alp,rmin=', &
-!!$             1,i,d0(1,i),alp(1,i),rmin(1,i)
         interact(1,i) = .true.
         interact(i,1) = .true.
       enddo
@@ -1072,19 +1074,28 @@ contains
     logical,intent(in):: lematch,lfmatch,lsmatch
 
     integer:: i,j,k,l,m,n,jj,ierr,is,js,ixyz,jxyz,inc,nspt &
-         ,ivoigt(3,3),ne,nf,ns
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,dedr,rc2,dij2 &
+         ,ne,nf,ns
+    real(8):: dij,dedr,rc2,dij2 &
          ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2 &
-         ,dxdi(3),dxdj(3),diji
+         ,diji
+    real(8),allocatable,save:: xi(:),xj(:),xij(:),rij(:),dxdi(:),dxdj(:)
     real(8),external:: sprod,fcut1,dfcut1
 
     if( .not. allocated(ge_alp) ) then
       allocate(ge_alp(msp,msp),ge_d0(msp,msp),ge_rmin(msp,msp))
-      allocate(gf_alp(msp,msp,3,natm),gf_d0(msp,msp,3,natm), &
-           gf_rmin(msp,msp,3,natm))
       allocate(gs_alp(msp,msp,6),gs_d0(msp,msp,6), &
            gs_rmin(msp,msp,6))
+    endif
+    if( .not.allocated(xi) ) then
+      allocate(xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3))
+    endif
+
+    if( .not.allocated(gf_alp) &
+         .or. size(gf_alp).ne.msp*msp*3*natm ) then
+      if( allocated(gf_alp) ) deallocate(gf_alp,gf_d0,gf_rmin)
+      allocate(gf_alp(msp,msp,3,natm),gf_d0(msp,msp,3,natm), &
+           gf_rmin(msp,msp,3,natm))
     endif
 
 !.....Set nsp by max isp of atoms in the system
@@ -1092,17 +1103,19 @@ contains
     do i=1,natm
       nsp = max(nsp,int(tag(i)))
     enddo
+!!$    print *,'nsp=',nsp
 
-    ivoigt(1:3,1:3) = 0
-    ivoigt(1,1) = 1
-    ivoigt(2,2) = 2
-    ivoigt(3,3) = 3
-    ivoigt(2,3) = 4
-    ivoigt(3,2) = 4
-    ivoigt(1,3) = 5
-    ivoigt(3,1) = 5
-    ivoigt(1,2) = 6
-    ivoigt(2,1) = 6
+!!$    ivoigt(1:3,1:3) = 0
+!!$    ivoigt(1,1) = 1
+!!$    ivoigt(2,2) = 2
+!!$    ivoigt(3,3) = 3
+!!$    ivoigt(2,3) = 4
+!!$    ivoigt(3,2) = 4
+!!$    ivoigt(1,3) = 5
+!!$    ivoigt(3,1) = 5
+!!$    ivoigt(1,2) = 6
+!!$    ivoigt(2,1) = 6
+!!$    print '(a,9i3)',' ivoigt=',ivoigt(1:3,1:3)
     rc2 = rc*rc
 
     ge_alp(1:msp,1:msp) = 0d0
@@ -1139,9 +1152,6 @@ contains
         alpij= alp(is,js)
         rminij=rmin(is,js)
         texp = exp(alpij*(rminij-dij))
-!!$        write(6,'(a,4i5,4es15.7)') 'i,is,j,js,d0ij,alpij,rminij,texp=',&
-!!$             i,is,j,js,d0ij,alpij,rminij,texp
-!!$        write(6,'(a,13f8.3)') 'pdij=',pdij(0:nprm)
 !.....Potential
         tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
         tmp2 = tmp *fcut1(dij,rc)
@@ -1213,12 +1223,12 @@ contains
       enddo
     enddo
 
-    do is=1,nsp
-      do js=is,nsp
-        write(6,'(a,2i4,3es12.4)') 'is,js,ge_alp,d0,rmin=', &
-             is,js,ge_alp(is,js),ge_d0(is,js),ge_rmin(is,js)
-      enddo
-    enddo
+!!$    do is=1,nsp
+!!$      do js=is,nsp
+!!$        write(6,'(a,2i4,3es12.4)') ' is,js,ge_alp,d0,rmin=', &
+!!$             is,js,ge_alp(is,js),ge_d0(is,js),ge_rmin(is,js)
+!!$      enddo
+!!$    enddo
 
 !.....Tidy up gradient arrays
     gwe(1:ndimp) = 0d0
@@ -1228,6 +1238,7 @@ contains
     if( lematch ) then
       do is=1,nsp
         do js=is,nsp
+          if( .not. interact(is,js) ) cycle
           ne = ne + 1
           gwe(ne) = gwe(ne) +ge_d0(is,js)
           if( is.ne.js ) gwe(ne) = gwe(ne) +ge_d0(js,is)
@@ -1244,7 +1255,8 @@ contains
       do i=1,natm
         nf = 0
         do is=1,nsp
-          do js=1,nsp
+          do js=is,nsp
+            if( .not. interact(is,js) ) cycle
             nf = nf + 1
             gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_d0(is,js,1:3,i)
             if( is.ne.js ) gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_d0(js,is,1:3,i)
@@ -1262,7 +1274,8 @@ contains
       do i=1,natm
         ns = 0
         do is=1,nsp
-          do js=1,nsp
+          do js=is,nsp
+            if( .not. interact(is,js) ) cycle
             ns = ns + 1
             do k=1,6
               gws(ns,k)=gws(ns,k) +gs_d0(is,js,k)

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-11 22:24:22 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-13 23:39:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1149,7 +1149,7 @@ subroutine check_grad()
   use parallel
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
-  integer:: iv
+  integer:: iv,i
   real(8):: ftrn0,ftst0,ftmp,dv,vmax,ftst,ftmp1,ftmp2
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
   real(8),parameter:: dev  = 1d-6
@@ -1161,8 +1161,11 @@ subroutine check_grad()
     call NN_init()
     call NN_func(nvars,vars,ftrn0,ftst0)
     call NN_grad(nvars,vars,ganal)
-  else if( trim(cpot).eq.'vcMorse' ) then
+  else
+    print *,'calling func_w_pmd...'
     call func_w_pmd(nvars,vars,ftrn0,ftst)
+    ganal(1:nvars) = 0d0
+    print *,'calling grad_w_pmd,nvars,vars=',nvars,vars(1:nvars)
     call grad_w_pmd(nvars,vars,ganal)
   endif
 
@@ -1175,22 +1178,23 @@ subroutine check_grad()
   dv= vmax *dev
   if( myid.eq.0 ) then
     print *,''
-    print *,'deviation [dv] =',dv
+    print *,'Deviation [dv] =',dv
   endif
+!.....Loop over variables for numerical derivative
   do iv=1,nvars
     vars(1:nvars)= vars0(1:nvars)
     dv = max(abs(vars(iv)*dev),dev)
     vars(iv)= vars(iv) +dv/2
     if( trim(cpot).eq.'NN' ) then
       call NN_func(nvars,vars,ftmp1,ftst)
-    else if( trim(cpot).eq.'vcMorse' ) then
+    else
       call func_w_pmd(nvars,vars,ftmp1,ftst)
     endif
     vars(1:nvars)= vars0(1:nvars)
     vars(iv)= vars(iv) -dv/2
     if( trim(cpot).eq.'NN' ) then
       call NN_func(nvars,vars,ftmp2,ftst)
-    else if( trim(cpot).eq.'vcMorse' ) then
+    else
       call func_w_pmd(nvars,vars,ftmp2,ftst)
     endif
     gnumer(iv)= (ftmp1-ftmp2)/dv
@@ -1233,7 +1237,7 @@ subroutine test()
     call NN_grad(nvars,vars,g)
   else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse') then
     call func_w_pmd(nvars,vars,ftrn,ftst)
-!!$    call grad_w_pmd(nvars,vars,g)
+    call grad_w_pmd(nvars,vars,g)
   endif
 
 !!$  print *,'write_stats, myid=',myid
@@ -2178,15 +2182,14 @@ subroutine restore_FF()
   
 end subroutine restore_FF
 !=======================================================================
-subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs, &
-     strs)
+subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs)
 !
 !  Run pmd and get energy and forces of the system.
 !  TODO: stress should be returned as well.
 !
-  use variables,only: rcut,mdsys,maxna,iprint,lsmatch
+  use variables,only: rcut,mdsys,maxna,iprint,lematch,lfmatch,lsmatch
   use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
-  use force, only: num_forces, force_list
+  use force
   implicit none
   include "../pmd/params_unit.h"
   type(mdsys),intent(inout):: smpl
@@ -2289,15 +2292,16 @@ subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs, &
       force_list(i) = trim(cffs(i))
     enddo
   endif
-  
+
 !.....one_shot force calculation
   call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
        ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
        ,smpl%chg,smpl%chi &
        ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
        ,nismax,am,dt,rc,rbuf,ptnsr,epot,ekin &
-       ,ifcoulomb,iprint_pmd,lcalcgrad,ndimp &
-       ,smpl%gwe,smpl%gwf,smpl%gws,lvc)
+       ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp &
+       ,smpl%gwe,smpl%gwf,smpl%gws &
+       ,lematch,lfmatch,lsmatch)
   strs(1:3,1:3) = ptnsr(1:3,1:3)*up2gpa*(-1d0)
 !!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
 !!$  print *,'smpl%natm =',smpl%natm

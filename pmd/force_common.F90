@@ -198,18 +198,6 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
 
   integer:: i
 
-!!$!.....Make force_list
-!!$    if( allocated(force_list) .and. size(force_list).ne.numff ) then
-!!$      deallocate(force_list)
-!!$    endif
-!!$    if( .not.allocated(force_list) ) then
-!!$      allocate(force_list(numff))
-!!$    endif
-!!$    num_forces = numff
-!!$    do i=1,numff
-!!$      force_list(i) = trim(cffs(i))
-!!$    enddo
-
   call set_force_flags(ifcoulomb,myid_md,iprint)
 
 !.....vcMorse requires charge optimization, 
