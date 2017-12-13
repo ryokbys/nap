@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-11 17:03:38 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-13 11:20:33 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -8,6 +8,8 @@ module Bonny_WRe
 !  Species 1 should be W and 2 should be Re.
 !-----------------------------------------------------------------------
   implicit none
+
+  real(8),external:: hvsd
 
 !.....Max num of species
   integer,parameter:: msp = 9
@@ -141,7 +143,6 @@ contains
   subroutine force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
-    use force, only: copy_dba_fwd
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -310,7 +311,6 @@ contains
 !
 ! Calculate rho of atom j at distance rij.
 !
-    use force, only: hvsd
     real(8),intent(in):: rij
     integer,intent(in):: js
     real(8):: rhoij
@@ -325,7 +325,6 @@ contains
   end function rhoij
 !=======================================================================
   function drhoij(js,rij)
-    use force, only: hvsd
     implicit none
     real(8),intent(in):: rij
     integer,intent(in):: js
@@ -344,7 +343,6 @@ contains
 !
 !  rho_j(rij) from Marinica et al., JAP 121 (2017)
 !
-    use force, only: hvsd
     implicit none
     real(8),intent(in):: rij
     real(8):: rhospln,ri
@@ -371,7 +369,6 @@ contains
 !
 !  rho_j(rij) from Marinica et al., JAP 121 (2017)
 !
-    use force, only: hvsd
     implicit none
     real(8),intent(in):: rij
     real(8):: drhospln,ri
@@ -562,7 +559,6 @@ contains
   end function dvnucl
 !=======================================================================
   function veq(is,js,rij)
-    use force, only: hvsd
     implicit none
     integer,intent(in):: is,js
     real(8),intent(in):: rij
@@ -592,7 +588,6 @@ contains
   end function veq
 !=======================================================================
   function dveq(is,js,rij)
-    use force, only: hvsd
     implicit none
     integer,intent(in):: is,js
     real(8),intent(in):: rij
@@ -624,7 +619,6 @@ contains
   end function dveq
 !=======================================================================
   function vspln(rij)
-    use force, only: hvsd
     implicit none
     real(8),intent(in):: rij
     real(8):: vspln,ri
@@ -640,7 +634,6 @@ contains
   end function vspln
 !=======================================================================
   function dvspln(rij)
-    use force, only: hvsd
     implicit none
     real(8),intent(in):: rij
     real(8):: dvspln,ri

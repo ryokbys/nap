@@ -8,7 +8,6 @@ contains
 !                                                     2013.07.08 by R.K.
 !   - See, X.-C. Li et al., J. Nuclear Mater. 426 (2012) 31--37
 !-----------------------------------------------------------------------
-    use force, only: copy_dba_bk
     implicit none
     include "mpif.h"
     include "./params_unit.h"

@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-11 12:46:44 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-13 11:12:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -23,10 +23,12 @@ module Morse
   integer:: nsp
 !.....Morse parameters
   real(8):: alp(msp,msp),d0(msp,msp),rmin(msp,msp)
-  real(8):: galp(msp,msp),gd0(msp,msp),grmin(msp,msp)
   logical:: interact(msp,msp)
 
   real(8),allocatable:: strsl(:,:,:)
+  real(8),allocatable:: ge_alp(:,:),ge_d0(:,:),ge_rmin(:,:)
+  real(8),allocatable:: gf_alp(:,:,:,:),gf_d0(:,:,:,:),gf_rmin(:,:,:,:)
+  real(8),allocatable:: gs_alp(:,:,:),gs_d0(:,:,:),gs_rmin(:,:,:)
   
 !.....Atomic descriptor
   type atdesc
@@ -76,7 +78,6 @@ contains
   subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
-    use force, only: dfcut1, fcut1
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -96,6 +97,7 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
          ,d0ij,alpij,rminij
+    real(8),external:: fcut1,dfcut1
 
     if( l1st ) then
 !!$      call init_Morse(natm,tag,mpi_md_world)
@@ -199,7 +201,6 @@ contains
 !
 !  Repulsive-only Morse potential
 !
-    use force, only: dfcut1, fcut1
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -218,6 +219,7 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
          ,d0ij,alpij,rminij
+    real(8),external:: fcut1,dfcut1
 !!$    real(8),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
@@ -318,7 +320,6 @@ contains
 !  Variable-charge Morse potential.
 !  Morse parameters depend on atomic charges which vary time to time.
 !
-    use force, only: dfcut1, fcut1
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -332,7 +333,7 @@ contains
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
-    real(8),external:: sprod
+    real(8),external:: sprod,fcut1,dfcut1
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
@@ -463,7 +464,6 @@ contains
 !  Variable-charge Morse potential.
 !  Morse parameters depend on atomic charges which vary time to time.
 !
-    use force, only: dfcut1, fcut1
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -480,7 +480,7 @@ contains
     real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij,rcore &
          ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2,diji
     type(atdesc):: atdi,atdj
-    real(8),external:: sprod
+    real(8),external:: sprod,fcut1,dfcut1
     real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:) &
          ,dxdi(:),dxdj(:),at(:)
 
@@ -1054,13 +1054,13 @@ contains
   end subroutine make_pair_desc
 !=======================================================================
   subroutine gradw_Morse(namax,natm,tag,ra,nnmax &
-       ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws)
+       ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws &
+       ,lematch,lfmatch,lsmatch)
 !
 !  Gradient w.r.t. weights.
 !  Note: This routine is always called in single run,
 !  thus no need of parallel implementation.
 !
-    use force, only: dfcut1, fcut1
     implicit none
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint
@@ -1069,26 +1069,58 @@ contains
     real(8),intent(inout):: epot
     integer,intent(in):: ndimp
     real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
+    logical,intent(in):: lematch,lfmatch,lsmatch
 
-    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,inc,nspt
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,dedr &
+    integer:: i,j,k,l,m,n,jj,ierr,is,js,ixyz,jxyz,inc,nspt &
+         ,ivoigt(3,3),ne,nf,ns
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij,dedr,rc2,dij2 &
          ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
-         ,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2
-    type(atdesc):: atdi,atdj
-    real(8),external:: sprod
+         ,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2 &
+         ,dxdi(3),dxdj(3),diji
+    real(8),external:: sprod,fcut1,dfcut1
 
-    epotl= 0d0
+    if( .not. allocated(ge_alp) ) then
+      allocate(ge_alp(msp,msp),ge_d0(msp,msp),ge_rmin(msp,msp))
+      allocate(gf_alp(msp,msp,3,natm),gf_d0(msp,msp,3,natm), &
+           gf_rmin(msp,msp,3,natm))
+      allocate(gs_alp(msp,msp,6),gs_d0(msp,msp,6), &
+           gs_rmin(msp,msp,6))
+    endif
 
-    galp(1:msp,1:msp) = 0d0
-    gd0(1:msp,1:msp) = 0d0
-    grmin(1:msp,1:msp) = 0d0
+!.....Set nsp by max isp of atoms in the system
+    nsp = 0
+    do i=1,natm
+      nsp = max(nsp,int(tag(i)))
+    enddo
+
+    ivoigt(1:3,1:3) = 0
+    ivoigt(1,1) = 1
+    ivoigt(2,2) = 2
+    ivoigt(3,3) = 3
+    ivoigt(2,3) = 4
+    ivoigt(3,2) = 4
+    ivoigt(1,3) = 5
+    ivoigt(3,1) = 5
+    ivoigt(1,2) = 6
+    ivoigt(2,1) = 6
+    rc2 = rc*rc
+
+    ge_alp(1:msp,1:msp) = 0d0
+    ge_d0(1:msp,1:msp) = 0d0
+    ge_rmin(1:msp,1:msp) = 0d0
+    gf_alp(1:msp,1:msp,1:3,1:natm) = 0d0
+    gf_d0(1:msp,1:msp,1:3,1:natm) = 0d0
+    gf_rmin(1:msp,1:msp,1:3,1:natm) = 0d0
+    gs_alp(1:msp,1:msp,1:6) = 0d0
+    gs_d0(1:msp,1:msp,1:6) = 0d0
+    gs_rmin(1:msp,1:msp,1:6) = 0d0
     
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is=int(tag(i))
-      do k=1,lspr(0,i)
-        j=lspr(k,i)
+      do jj=1,lspr(0,i)
+        j=lspr(jj,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
         js= int(tag(j))
@@ -1097,8 +1129,12 @@ contains
         xj(1:3)= ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-        if( dij.gt.rc ) cycle
+        dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij2.gt.rc2 ) cycle
+        dij= sqrt(dij2)
+        diji = 1d0/dij
+        dxdi(1:3)= -rij(1:3)*diji
+        dxdj(1:3)=  rij(1:3)*diji
         d0ij = d0(is,js)
         alpij= alp(is,js)
         rminij=rmin(is,js)
@@ -1109,38 +1145,144 @@ contains
 !.....Potential
         tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
         tmp2 = tmp *fcut1(dij,rc)
-        if( j.le.natm ) then
-          epotl = epotl +tmp2 +tmp2
-        else
-          epotl = epotl +tmp2
-        endif
+        if( lematch ) then
+!!$          if( j.le.natm ) then
+!!$            epotl = epotl +tmp2 +tmp2
+!!$          else
+!!$            epotl = epotl +tmp2
+!!$          endif
 !.....Derivative of potential energy w.r.t. {w}
-        dedd0 = ((texp -1d0)**2 -1d0)
-        dedalp = 2d0*d0ij*(texp-1d0)*texp*(rminij-dij)
-        dedrmin = 2d0*d0ij*(texp-1d0)*texp*alpij
-        gd0(is,js) = gd0(is,js) +dedd0
-        galp(is,js) = galp(is,js) +dedalp
-        grmin(is,js) = grmin(is,js) +dedrmin
-!!$        write(6,'(a,2i5,3es15.7)') 'i,j,gwalp(6),dedalp,pdij(6)=', &
-!!$             i,j,gwalp(6),dedalp,pdij(6)
+          dedd0 = ((texp -1d0)**2 -1d0)
+          dedalp = 2d0*d0ij*(texp-1d0)*texp*(rminij-dij)
+          dedrmin = 2d0*d0ij*(texp-1d0)*texp*alpij
+          ge_d0(is,js) = ge_d0(is,js) +dedd0
+          ge_alp(is,js) = ge_alp(is,js) +dedalp
+          ge_rmin(is,js) = ge_rmin(is,js) +dedrmin
+        endif
+        if( lfmatch ) then
+!.....Force
+          dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) *fcut1(dij,rc) &
+               + tmp*dfcut1(dij,rc)
+!!$          aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
+!!$          aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
+!.....Derivative of forces
+          gf_d0(is,js,1:3,i)= gf_d0(is,js,1:3,i) -dxdi(1:3)*dedr/d0ij
+          gf_alp(is,js,1:3,i)= gf_alp(is,js,1:3,i) -dxdi(1:3) *2d0*d0ij*texp &
+               *((1d0-texp) -alpij*(rminij-dij)*texp)
+          gf_rmin(is,js,1:3,i)= gf_rmin(is,js,1:3,i) -dxdi(1:3) *2d0*d0ij &
+               *texp*alpij*alpij*(2d0*texp -1d0)
+          if( j.le.natm ) then
+            gf_d0(is,js,1:3,j)= gf_d0(is,js,1:3,j) -dxdj(1:3)*dedr/d0ij
+            gf_alp(is,js,1:3,j)= gf_alp(is,js,1:3,j) -dxdj(1:3) *2d0*d0ij*texp &
+                 *((1d0-texp) -alpij*(rminij-dij)*texp)
+            gf_rmin(is,js,1:3,j)= gf_rmin(is,js,1:3,j) -dxdj(1:3) *2d0*d0ij &
+                 *texp*alpij*alpij*(2d0*texp -1d0)
+          endif
+        endif
+!.....Stress
+        if( lsmatch ) then
+!.....Derivative of stress
+          do ixyz=1,3
+            do jxyz=1,3
+              k = ivoigt(ixyz,jxyz)
+!!$              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+!!$                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+!!$              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+!!$                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+              gs_d0(is,js,k)= gs_d0(is,js,k) &
+                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))/d0ij
+              gs_alp(is,js,k)= gs_alp(is,js,k) &
+                   -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *2d0*d0ij*texp &
+                   *((1d0-texp) -alpij*(rminij-dij)*texp)
+              gs_rmin(is,js,k)= gs_rmin(is,js,k) &
+                   -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *2d0*d0ij &
+                   *texp*alpij*alpij*(2d0*texp -1d0)
+              if( j.le.natm ) then
+                gs_d0(is,js,k)= gs_d0(is,js,k) &
+                     -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))/d0ij
+                gs_alp(is,js,k)= gs_alp(is,js,k) &
+                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *2d0*d0ij*texp &
+                     *((1d0-texp) -alpij*(rminij-dij)*texp)
+                gs_rmin(is,js,k)= gs_rmin(is,js,k) &
+                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *2d0*d0ij &
+                     *texp*alpij*alpij*(2d0*texp -1d0)
+              endif
+            enddo
+          enddo
+        endif
       enddo
     enddo
 
-!!$!.....Not parallel
-!!$    epot= epotl
+    do is=1,nsp
+      do js=is,nsp
+        write(6,'(a,2i4,3es12.4)') 'is,js,ge_alp,d0,rmin=', &
+             is,js,ge_alp(is,js),ge_d0(is,js),ge_rmin(is,js)
+      enddo
+    enddo
 
-!!$!.....galp,gd0,grmin to pderiv
-!!$    inc = 0
-!!$    nspt = nprms/3 +1
-!!$    do is=2,nspt
-!!$      inc = inc + 1
-!!$      pderiv(inc) = gd0(1,is)
-!!$      inc = inc + 1
-!!$      pderiv(inc) = galp(1,is)
-!!$      inc = inc + 1
-!!$      pderiv(inc) = grmin(1,is)
-!!$    enddo
-    
+!.....Tidy up gradient arrays
+    gwe(1:ndimp) = 0d0
+    gwf(1:ndimp,1:3,1:natm) = 0d0
+    gws(1:ndimp,1:6) = 0d0
+    ne = 0
+    if( lematch ) then
+      do is=1,nsp
+        do js=is,nsp
+          ne = ne + 1
+          gwe(ne) = gwe(ne) +ge_d0(is,js)
+          if( is.ne.js ) gwe(ne) = gwe(ne) +ge_d0(js,is)
+          ne = ne + 1
+          gwe(ne) = gwe(ne) +ge_alp(is,js)
+          if( is.ne.js ) gwe(ne) = gwe(ne) +ge_alp(js,is)
+          ne = ne + 1
+          gwe(ne) = gwe(ne) +ge_rmin(is,js)
+          if( is.ne.js ) gwe(ne) = gwe(ne) +ge_rmin(js,is)
+        enddo
+      enddo
+    endif
+    if( lfmatch ) then
+      do i=1,natm
+        nf = 0
+        do is=1,nsp
+          do js=1,nsp
+            nf = nf + 1
+            gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_d0(is,js,1:3,i)
+            if( is.ne.js ) gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_d0(js,is,1:3,i)
+            nf = nf + 1
+            gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_alp(is,js,1:3,i)
+            if( is.ne.js ) gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_alp(js,is,1:3,i)
+            nf = nf + 1
+            gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_rmin(is,js,1:3,i)
+            if( is.ne.js ) gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_rmin(js,is,1:3,i)
+          enddo
+        enddo
+      enddo
+    endif
+    if( lsmatch ) then
+      do i=1,natm
+        ns = 0
+        do is=1,nsp
+          do js=1,nsp
+            ns = ns + 1
+            do k=1,6
+              gws(ns,k)=gws(ns,k) +gs_d0(is,js,k)
+              if( is.ne.js ) gws(ns,k)=gws(ns,k) +gs_d0(js,is,k)
+            enddo
+            ns = ns + 1
+            do k=1,6
+              gws(ns,k)=gws(ns,k) +gs_alp(is,js,k)
+              if( is.ne.js ) gws(ns,k)=gws(ns,k) +gs_alp(js,is,k)
+            enddo
+            ns = ns + 1
+            do k=1,6
+              gws(ns,k)=gws(ns,k) +gs_rmin(is,js,k)
+              if( is.ne.js ) gws(ns,k)=gws(ns,k) +gs_rmin(js,is,k)
+            enddo
+          enddo
+        enddo
+      enddo
+    endif
+
     return
   end subroutine gradw_Morse
 !=======================================================================
@@ -1151,7 +1293,6 @@ contains
 !  Note: This routine is always called in single run,
 !  thus no need of parallel implementation.
 !
-    use force, only: dfcut1, fcut1
     implicit none
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint
@@ -1167,7 +1308,7 @@ contains
          ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2
     type(atdesc):: atdi,atdj
-    real(8),external:: sprod
+    real(8),external:: sprod,fcut1,dfcut1
 
     epotl= 0d0
 

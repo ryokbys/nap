@@ -13,7 +13,6 @@ contains
 !-----------------------------------------------------------------------
 !  See Ito's manuscript 2013-08-06
 !-----------------------------------------------------------------------
-    use force, only: copy_dba_bk, copy_dba_fwd
     implicit none
     include "mpif.h"
     include "params_unit.h"

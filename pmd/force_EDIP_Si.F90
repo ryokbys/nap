@@ -9,7 +9,6 @@ contains
 !      Ref: PRB 58, 2539 (1998), J.F.Just et al.
 !    - 2010.03.31 by R.K.
 !-----------------------------------------------------------------------
-    use force, only: copy_dba_bk
     implicit none
     include "mpif.h"
     include "./params_unit.h"

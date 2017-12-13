@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-12-11 21:42:50 Ryo KOBAYASHI>
+c                     Last-modified: <2017-12-13 11:11:19 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -847,15 +847,15 @@ c=======================================================================
      &     ,ekitot,epitot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,rc,rbuf,stnsr,epot
-     &     ,ekin,ifcoulomb,iprint,lcalcgrad,ndimp,gwe
-     &     ,gwf,gws,lvc)
+     &     ,ekin,ifcoulomb,lvc,iprint,lcalcgrad,ndimp,gwe
+     &     ,gwf,gws,lematch,lfmatch,lsmatch)
 c
-c  In case that only one shot force calculation is required.
+c  In case that only one shot force calculation is required,
+c  especially called from fitpot.
 c
       use pmdvars
       use force
       use Morse,only: gradw_Morse,gradw_vcMorse
-      use force
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -874,6 +874,7 @@ c      character(len=20),intent(in):: cffs(numff)
       integer,intent(in):: ndimp
       real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,ntot),gws(ndimp,6)
       logical,intent(inout):: lvc
+      logical,intent(in):: lematch,lfmatch,lsmatch 
 
       integer:: i,ierr,is,nspl,nxyz
       real(8):: aai(3),epott
@@ -968,18 +969,21 @@ c-----Make pair list
      &     ,anxi,anyi,anzi,lspr,iprint,.true.)
       lstrs = .true.
 
-      if( iprint.ge.10 ) print *,'get_force,myid_md=',myid_md
-      call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
-     &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
-     &     ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
-     &     ,ifcoulomb,iprint,.true.,lvc,lcell_updated)
+      if( iprint.ge.10 ) print *,'get_force,myid_md,lcalcgrad='
+     &     ,myid_md,lcalcgrad
+      if( .not.lcalcgrad ) then
+        call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
+     &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
+     &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
+     &       ,ifcoulomb,iprint,.true.,lvc,lcell_updated)
 c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
 c     &     ,epot,chg(1:natm)
-
-      if( lcalcgrad ) then
+      else  ! lcalcgrad = .true.
 c.....Do not update epot here, so use epott instead.
-        if( use_force('Mores') ) call gradw_Morse(namax,natm,tag,
-     &       ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
+        epot = 0d0
+        if( use_force('Morse') ) call gradw_Morse(namax,natm,tag,
+     &         ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws,
+     &         lematch,lfmatch,lsmatch)
         if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra
      &       ,nnmax,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
       endif

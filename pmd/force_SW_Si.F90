@@ -35,7 +35,6 @@ contains
 !    - 2010.03.29 by R.K.
 !      1st version.
 !-----------------------------------------------------------------------
-    use force, only: copy_dba_bk
     implicit none
     include "mpif.h"
     include "./params_unit.h"

@@ -14,7 +14,6 @@ contains
 !    - Philo. Mag. A, vol.56(1), 1987, pp.15--30
 !    - Philo. Mag. A, vol.50(1), 1984, pp.45--55
 !-----------------------------------------------------------------------
-    use force, only: copy_dba_fwd, copy_dba_bk
     implicit none
     include "mpif.h"
     include "./params_unit.h"

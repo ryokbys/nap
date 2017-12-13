@@ -9,7 +9,6 @@ contains
 !   - Use 1st generation Brenner potential,
 !       see, D.W.Brenner, PRB 42 (1990) pp.9458-9471
 !-----------------------------------------------------------------------
-    use force, only: copy_dba_bk
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -287,7 +286,6 @@ contains
 !       see, A.J.Heim et.al, cond-mat (25 Jun 2008)
 !   - Note: this mixed potential would return wrong C-C bond length
 !-----------------------------------------------------------------------
-    use force, only: copy_dba_bk
     implicit none
     include "mpif.h"
     include "./params_unit.h"

@@ -14,7 +14,6 @@ contains
 !  Parallel implementation of LJ force calculation
 !    - only force on i is considered, no need to send back
 !-----------------------------------------------------------------------
-    use force, only: copy_dba_bk
     implicit none
     include "mpif.h"
     include "./params_unit.h"
