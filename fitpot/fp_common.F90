@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-13 23:32:44 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-15 12:02:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -8,9 +8,10 @@ module fp_common
   implicit none
   save
   real(8),allocatable:: fdiff(:,:),frcs(:,:),gtrnl(:)
+  real(8),allocatable:: gwe(:),gwf(:,:,:),gws(:,:)
   real(8):: pdiff(6), ptnsr(3,3)
   real(8):: epotsub
-  
+
   logical:: fp_common_initialized= .false.
 
   integer,parameter:: ivoigt(3,3)= &
@@ -23,7 +24,7 @@ contains
 
     integer:: ismpl,nterms
     real(8):: swgtrn,swgtst
-    
+
 !.....set nominator for sample weights
     swgtrn = 0d0
     swgtst = 0d0
@@ -33,6 +34,7 @@ contains
       else if(samples(ismpl)%iclass.eq.2 ) then
         swgtst = swgtst +samples(ismpl)%wgt
       endif
+!!$      print *,'ismpl,wgt,swgtrn=',ismpl,samples(ismpl)%wgt,swgtrn
     enddo
     swgt2trn = 0d0
     swgt2tst = 0d0
@@ -177,24 +179,20 @@ contains
       epot = smpl%epot
       ftmp = 0d0
       swgt = smpl%wgt
+!.....Energy matching
       if( lematch ) then
         eref= smpl%eref
         esub= smpl%esub
         eerr = smpl%eerr
-!.....Energy matching
         if( len(trim(crefstrct)).gt.5 ) then
           ediff= (epot-epotsub*natm+esub -(eref-erefsub*natm))/natm /eerr
         else
           ediff= (epot+esub -eref)/natm /eerr
         endif
+!!$        print *,'ismpl,epot,esub,eref,ediff,natm,eerr,swgt=' &
+!!$             ,ismpl,epot,esub,eref,ediff,natm,eerr,swgt
         ediff= ediff*ediff
         ftmp= ftmp +ediff *swgt
-!!$        write(6,'(a,2i3,a20,6f12.5)') &
-!!$             'myid,ismpl,cdirname,(eref-erefsub),epot,ediff,esub,epotsub,erefsub=',&
-!!$             myid,ismpl,trim(samples(ismpl)%cdirname),&
-!!$             (eref-erefsub*natm)/natm,epot/natm,&
-!!$             abs(epot-epotsub*natm+esub -(eref-erefsub*natm))/natm,esub/natm,&
-!!$             epotsub, erefsub
       endif
 !.....Force matching
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
@@ -216,19 +214,6 @@ contains
 
 !.....Stress matching
       if( lsmatch ) then
-!!$!.....Make current ptnsr of the system
-!!$        smpl%cptnsr(1:3,1:3)= 0d0
-!!$        do ia=1,natm
-!!$          do jxyz=1,3
-!!$            do ixyz=1,3
-!!$              smpl%cptnsr(ixyz,jxyz)=smpl%cptnsr(ixyz,jxyz) &
-!!$                   +smpl%strsi(ixyz,jxyz,ia)
-!!$            enddo
-!!$          enddo
-!!$        enddo
-
-!!$!  vol = 1d0
-!!$        smpl%cptnsr(1:3,1:3) = smpl%cptnsr(1:3,1:3) !/vol
 
 !.....Compare these ptnsr elements with sref elements
         serr = smpl%serr
@@ -299,7 +284,7 @@ contains
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gtrn(ndim)
-    
+
     integer:: ismpl,i,idim,natm,k,ia,ixyz,jxyz
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3),dn3i
     real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri
@@ -311,6 +296,8 @@ contains
 
 !!$    print *,'grad_w_pmd'
     if( .not.allocated(gtrnl) ) allocate(gtrnl(ndim))
+    if( .not.allocated(gwe) ) allocate(gwe(ndim),gwf(ndim,3,maxna)&
+         ,gws(ndim,6))
 
     ngrad= ngrad +1
     tg0= mpi_wtime()
@@ -360,11 +347,15 @@ contains
 !.....only gs is required.
 !!$      print *,'ismpl,cpot,ctype,=',ismpl,trim(cpot) &
 !!$           ,trim(ctype)
-      call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs)
+      call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs&
+           ,gwe,gwf,gws)
+      samples(ismpl)%gwe(1:ndim)= gwe(1:ndim)
+      samples(ismpl)%gwf(1:ndim,1:3,1:natm)= gwf(1:ndim,1:3,1:natm)
+      samples(ismpl)%gws(1:ndim,1:6)= gws(1:ndim,1:6)
+!!$      print '(a,i3,9es11.3)',' ismpl,gwe=',ismpl,smpl%gwe(1:ndim)
     enddo  ! ismpl
 
     if( len(trim(crefstrct)).gt.5 ) then
-!!$      print *,'Going to get epotsub...'
       if( myid.eq.myidrefsub ) then
         epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
         epotsub = epotsub /samples(isidrefsub)%natm
@@ -372,11 +363,12 @@ contains
       call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
     endif
 
-!!$    print *,'Going to compute derivative of loss function'
     gtrnl(1:ndim) = 0d0
     do ismpl=isid0,isid1
-!!$      print *,'isid0,isid1,ismpl,size(samples)=',isid0,isid1,ismpl,size(samples)
       smpl= samples(ismpl)
+!.....Since g calc is time consuming,
+!.....not calculate g for test set.
+      if( smpl%iclass.ne.1 ) cycle
       natm= smpl%natm
       epot= smpl%epot
       swgt= smpl%wgt
@@ -393,7 +385,10 @@ contains
         endif
         gtrnl(1:ndim) = gtrnl(1:ndim) &
              +2d0*ediff*smpl%gwe(1:ndim)/natm/eerr *swgt
-!!$        print *,'ismpl,ediff,gwe=',ismpl,ediff,smpl%gwe(1:ndim)
+        print *,'ismpl,epot,esub,eref,ediff,natm,eerr,swgt=' &
+             ,ismpl,epot,esub,eref,ediff,natm,eerr,swgt
+        print '(a,10es11.3)','gwe  =',gwe(1:ndim)
+        print '(a,10es11.3)','gtrnl=',gtrnl(1:ndim)
       endif
 !.....Derivative of force term w.r.t. weights
       if( lfmatch ) then
@@ -433,6 +428,8 @@ contains
 
     tc0= mpi_wtime()
     gtrn(1:ndim) = 0d0
+!.....TODO: allreduce may be redundant,  only reducing to node-0 is enough
+!           if the minimization routine is wrtten so...
     call mpi_allreduce(gtrnl,gtrn,ndim,mpi_real8,mpi_sum,mpi_world,ierr)
     tcl= mpi_wtime() -tc0
 
@@ -443,9 +440,322 @@ contains
     call mpi_reduce(tgl,tgg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     tcomm= tcomm +tcg
     tgrad= tgrad +tgg
-    
+
     return
   end subroutine grad_w_pmd
+!=======================================================================
+  subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs,&
+       gwe,gwf,gws)
+!
+!  Run pmd and get energy and forces of the system.
+!
+    use variables,only: rcut,mdsys,maxna,iprint,lematch,lfmatch,lsmatch
+    use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
+    use force
+    implicit none
+    include "../pmd/params_unit.h"
+    type(mdsys),intent(inout):: smpl
+    integer,intent(in):: ndimp,nff
+    real(8),intent(inout):: epot,frcs(3,maxna)
+    real(8),intent(out):: strs(3,3)
+    logical,intent(in):: lcalcgrad
+    character(len=20),intent(in):: cffs(nff)
+    real(8),intent(out),optional:: gwe(ndimp),gwf(ndimp,3,maxna),&
+         gws(ndimp,6)
+
+    logical,save:: l1st = .true.
+
+    integer:: i,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
+         nismax,nstps_done,ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
+    real(8):: am(9),dt,rc,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
+         ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv
+    logical:: ltdst,lstrs,lcellfix(3,3),lvc
+    character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5
+    logical:: update_force_list
+
+    logical,external:: string_in_arr
+
+    if( l1st ) then
+!.....Create MPI COMM for pmd only for the 1st time
+      call create_mpi_comm_pmd()
+      l1st = .false.
+    endif
+
+    maxstp = 0
+    nismax = 9
+    nerg = 1
+    npmd = 1
+    am(1:9) = 1d0  ! Since no dynamics, no need of mass
+    dt = 5d0
+    ciofmt = 'ascii'
+    ifpmd = 0
+    rc = rcut
+    rbuf = 0.0d0
+    ifdmp = 0  ! no damping as well
+    dmp = 0.99d0
+    minstp = 0
+    tinit = 0d0
+    tfin = 0d0
+    ctctl = 'none'
+    ttgt(1:9) = 300d0
+    trlx = 100d0
+    ltdst = .false.
+    ntdst = 1
+!!$  lstrs = lsmatch
+    cpctl = 'none'
+    stgt(1:3,1:3) = 0d0
+    ptgt = 0d0
+    srlx = 100d0
+    stbeta = 1d-1
+    strfin = 0d0
+    fmv(1:3,0) = (/ 0d0, 0d0, 0d0 /)
+    fmv(1:3,1:9) = 1d0
+    ptnsr(1:3,1:3) = 0d0
+    ekin = 0d0
+    n_conv = 1
+    czload_type = 'no'
+    eps_conv = 1d-3
+    ifsort = 1
+    lcellfix(1:3,1:3) = .false.
+    nx = 1
+    ny = 1
+    nz = 1
+    iprint_pmd = max(0,iprint-10)
+    ifcoulomb = 0
+
+    lvc = .false.
+    do i=1,nff
+      if( trim(cffs(i)).eq.'long_Coulomb' .or. &
+           trim(cffs(i)).eq.'vcMorse' ) then
+        if( .not. smpl%charge_set ) lvc = .true.
+!.....Even if lvc is .false., lvc will be set true at the begining of init_force
+!.....in case of vcMorse.
+      endif
+    enddo
+
+!.....Set force_list in the force module
+    update_force_list = .false.
+    if( .not.allocated(force_list) ) then
+      update_force_list = .true.
+    else if( nff.ne.num_forces ) then
+      update_force_list = .true.
+    else
+      do i=1,nff
+        if( trim(cffs(i)).ne.trim(force_list(i)) ) then
+          update_force_list = .true.
+          exit
+        endif
+      enddo
+    endif
+!.....Update force_list if needed
+    if( update_force_list ) then
+      if( allocated(force_list) ) deallocate(force_list)
+      num_forces = nff
+      allocate(force_list(num_forces))
+      do i=1,num_forces
+        force_list(i) = trim(cffs(i))
+      enddo
+    endif
+
+!.....one_shot force calculation
+    call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
+         ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
+         ,smpl%chg,smpl%chi &
+         ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
+         ,nismax,am,dt,rc,rbuf,ptnsr,epot,ekin &
+         ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp &
+         ,gwe,gwf,gws &
+         ,lematch,lfmatch,lsmatch)
+    strs(1:3,1:3) = ptnsr(1:3,1:3)*up2gpa*(-1d0)
+!!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
+!!$  print *,'smpl%natm =',smpl%natm
+!!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)
+
+    if( lvc ) smpl%charge_set = .true.
+
+    return
+  end subroutine run_pmd
+!=======================================================================
+  subroutine create_mpi_comm_pmd()
+!
+!  Create MPI COMM for pmd.
+!  To create a MPI COMM on each node, first create a MPI GROUP for world,
+!  then create a MPI GROUP for this node, and then create the MPI COMM
+!  from the GROUP for this node. This is how to create sub communicator
+!  in the MPI.
+!
+    use parallel
+    implicit none
+
+    integer:: n = 1
+    integer:: iranks(1)
+    integer:: mpi_group_world,mpi_group_pmd
+
+!!$  call mpi_comm_group(mpi_world, mpi_group_world,ierr)
+    iranks(1) = myid
+!!$  call mpi_group_incl(mpi_group_world, 1, iranks, mpi_group_pmd,ierr)
+!!$  call mpi_comm_create_group(mpi_world, mpi_group_pmd, 0, mpi_comm_pmd,ierr)
+!!$  print *,'myid,iranks(1),mpi_group_pmd,mpi_comm_pmd=',&
+!!$       myid,iranks(1),mpi_group_pmd,mpi_comm_pmd
+
+    call mpi_comm_split(mpi_world,myid,myid,mpi_comm_pmd,ierr)
+
+    call mpi_comm_size(mpi_comm_pmd,nnode_pmd,ierr)
+    call mpi_comm_rank(mpi_comm_pmd,myid_pmd,ierr)
+    call mpi_comm_group(mpi_comm_pmd,mpi_group_pmd,ierr)
+!!$  print *,'myid,mpi_world,myid_pmd,mpi_comm_pmd,mpi_group_pmd = ',&
+!!$       myid,mpi_world,myid_pmd,mpi_comm_pmd,mpi_group_pmd
+
+!!$  call mpi_group_free(mpi_group_world,ierr)
+!!$  call mpi_group_free(mpi_group_pmd,ierr)
+    if( myid.eq.0 ) then
+      write(6,'(a)') ''
+      write(6,'(a)') ' MPI_COMM_PMD was created at each node '// &
+           'for pmd calculations.'
+      write(6,'(a)') ''
+    endif
+
+  end subroutine create_mpi_comm_pmd
+!=======================================================================
+  subroutine subtract_FF()
+!
+!  Subtract energies and forces from other force-fields.
+!  This uses force-fields implemented in pmd and the NN potential made
+!  should also be used with those force-fields, of course.
+!  This routine should be called for each force-field specified, so
+!  it could be called several times if several force-fields are taken
+!  into account.
+!
+    use variables
+    use parallel
+    use Coulomb,only: set_paramsdir_Coulomb
+    use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
+    implicit none
+
+    integer:: i,ismpl,natm
+    logical:: lcalcgrad = .false.
+    logical:: luse_Morse = .false.
+    logical:: luse_Morse_repul = .false.
+    logical:: luse_Coulomb = .false.
+    logical,save:: l1st = .true.
+    real(8):: epot,strs(3,3)
+    real(8),save,allocatable:: frcs(:,:)
+
+    if( l1st ) then
+      if( myid.eq.0 .and. iprint.ne.0 ) then
+        print '(/,a)',' Force field to be subtracted:'
+        do i=1,nsubff
+          print *,'  i,FF = ',i,trim(csubffs(i))
+        enddo
+      endif
+
+      if( .not.allocated(frcs) ) allocate(frcs(3,maxna))
+
+      do i=1,nsubff
+        if( index(trim(csubffs(i)),'Morse').ne.0 ) then
+          luse_Morse = .true.
+        else if( index(trim(csubffs(i)),'Morse_repul').ne.0 ) then
+          luse_Morse_repul = .true.
+        else if( index(trim(csubffs(i)),'Coulomb').ne.0 .or. &
+             index(trim(csubffs(i)),'vcGaussian').ne.0 ) then
+          luse_Coulomb = .true.
+        endif
+      enddo
+
+!.....Only at the 1st call, perform pmd to get esubs
+      do ismpl=isid0,isid1
+        natm = samples(ismpl)%natm
+        if( luse_Morse ) then
+          call set_paramsdir_Morse(trim(cmaindir)//'/'&
+               //trim(samples(ismpl)%cdirname)//'/pmd')
+        endif
+        if( luse_Morse_repul ) then
+          call set_paramsdir_Morse(trim(cmaindir)//'/'&
+               //trim(samples(ismpl)%cdirname)//'/pmd')
+        endif
+        if( luse_Coulomb ) then
+          call set_paramsdir_Coulomb(trim(cmaindir)//'/'&
+               //trim(samples(ismpl)%cdirname)//'/pmd')
+        endif
+        call run_pmd(samples(ismpl),lcalcgrad,nvars,&
+             nsubff,csubffs,epot,frcs,strs)
+!!$      print *,'myid,ismpl,epot=',myid,ismpl,epot
+        samples(ismpl)%esub = epot
+        samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
+        samples(ismpl)%ssub(1:3,1:3) = strs(1:3,1:3)
+      enddo
+
+!!$    allocate(esubl(nsmpl),esubg(nsmpl))
+!!$    esubl(1:nsmpl) = 0d0
+!!$    do ismpl=isid0,isid1
+!!$      esubl(ismpl) = samples(ismpl)%esub
+!!$    enddo
+!!$    esubg(1:nsmpl) = 0d0
+!!$    call mpi_reduce(esubl,esubg,nsmpl,mpi_real8,mpi_sum,0,mpi_world,ierr)
+!!$
+!!$    if( myid.eq.0 ) then
+!!$      esubg(1:nsmpl)= esubg(1:nsmpl)/nalist(1:nsmpl)
+!!$      open(92,file='out.erg.subtract',status='replace')
+!!$      do ismpl=1,nsmpl
+!!$        write(92,'(i8,es15.7,2x,a)') ismpl,esubg(ismpl),trim(cdirlist(ismpl))
+!!$      enddo
+!!$      close(92)
+!!$    endif
+!!$    deallocate(esubl,esubg)
+    endif
+
+!!$!.....After the 1st call, subtract esubs calculated at the 1st call
+!!$  do ismpl=isid0,isid1
+!!$!.....Subtract energy and forces from eref and fref, respectively
+!!$    write(6,'(a,i8,1x,a,3es15.7)') 'ismpl,cdirname,eref,epot,esub=',ismpl,&
+!!$         trim(samples(ismpl)%cdirname),samples(ismpl)%eref,&
+!!$         samples(ismpl)%epot,samples(ismpl)%esub
+!!$    samples(ismpl)%eref = samples(ismpl)%eref -samples(ismpl)%esub
+!!$    samples(ismpl)%epot = samples(ismpl)%epot -samples(ismpl)%esub
+!!$    do i=1,samples(ismpl)%natm
+!!$      samples(ismpl)%fref(1:3,i) = samples(ismpl)%fref(1:3,i) &
+!!$           -samples(ismpl)%fsub(1:3,i)
+!!$      samples(ismpl)%fa(1:3,i) = samples(ismpl)%fa(1:3,i) &
+!!$           -samples(ismpl)%fsub(1:3,i)
+!!$    enddo
+!!$    write(6,'(a,i8,1x,a,2es15.7)') ' ismpl,cdirname,eref=',ismpl, &
+!!$         trim(samples(ismpl)%cdirname),samples(ismpl)%eref
+!!$!.....TODO: stress should also come here.
+!!$
+!!$  enddo
+
+    l1st = .false.
+    return
+  end subroutine subtract_FF
+!=======================================================================
+  subroutine restore_FF()
+!
+!  Restore subtracted energies and forces
+!
+    use variables
+    use parallel
+    implicit none
+
+    integer:: i,ismpl
+
+!!$  print *,'restore_FF'
+    do ismpl=isid0,isid1
+!!$    write(6,*) 'ismpl,eref,epot,esub=',ismpl,samples(ismpl)%eref,&
+!!$         samples(ismpl)%epot,samples(ismpl)%esub
+      samples(ismpl)%eref = samples(ismpl)%eref +samples(ismpl)%esub
+      samples(ismpl)%epot = samples(ismpl)%epot +samples(ismpl)%esub
+!!$    write(6,*) 'ismpl,eref,epot,esub=',ismpl,samples(ismpl)%eref,&
+!!$         samples(ismpl)%epot,samples(ismpl)%esub
+      do i=1,samples(ismpl)%natm
+        samples(ismpl)%fref(1:3,i) = samples(ismpl)%fref(1:3,i) &
+             +samples(ismpl)%fsub(1:3,i)
+        samples(ismpl)%fa(1:3,i) = samples(ismpl)%fa(1:3,i) &
+             +samples(ismpl)%fsub(1:3,i)
+      enddo
+!.....TODO: stress should also come here.
+    enddo
+
+  end subroutine restore_FF
 !=======================================================================
   function ndat_in_line(ionum,delim) result(ndat)
     implicit none

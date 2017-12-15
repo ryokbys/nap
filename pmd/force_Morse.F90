@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-13 23:30:34 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-15 15:27:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -151,12 +151,6 @@ contains
         alpij= alp(is,js)
         rminij=rmin(is,js)
         texp = exp(alpij*(rminij-dij))
-!!$        if( i.eq.1 ) then
-!!$          write(6,'(a,4i6,10es12.4)') 'i,j,is,js,dij,d0ij,alpij,rminij,texp='&
-!!$               ,i,j,is,js,dij,d0ij,alpij,rminij,texp
-!!$          write(6,'(a,3(2x,3f10.5))') 'xi,xj,rij='&
-!!$               ,xi(1:3),xj(1:3),rij(1:3)
-!!$        endif
 !.....potential
         tmp= d0ij*((texp-1d0)**2 -1d0)
         tmp2 = 0.5d0 *tmp *fcut1(dij,rc)
@@ -1078,7 +1072,7 @@ contains
     real(8):: dij,dedr,rc2,dij2 &
          ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2 &
-         ,diji
+         ,diji,factor
     real(8),allocatable,save:: xi(:),xj(:),xij(:),rij(:),dxdi(:),dxdj(:)
     real(8),external:: sprod,fcut1,dfcut1
 
@@ -1103,19 +1097,7 @@ contains
     do i=1,natm
       nsp = max(nsp,int(tag(i)))
     enddo
-!!$    print *,'nsp=',nsp
 
-!!$    ivoigt(1:3,1:3) = 0
-!!$    ivoigt(1,1) = 1
-!!$    ivoigt(2,2) = 2
-!!$    ivoigt(3,3) = 3
-!!$    ivoigt(2,3) = 4
-!!$    ivoigt(3,2) = 4
-!!$    ivoigt(1,3) = 5
-!!$    ivoigt(3,1) = 5
-!!$    ivoigt(1,2) = 6
-!!$    ivoigt(2,1) = 6
-!!$    print '(a,9i3)',' ivoigt=',ivoigt(1:3,1:3)
     rc2 = rc*rc
 
     ge_alp(1:msp,1:msp) = 0d0
@@ -1161,13 +1143,22 @@ contains
 !!$          else
 !!$            epotl = epotl +tmp2
 !!$          endif
+          if( j.le.natm ) then
+            factor = 1d0
+          else
+            factor = 0.5d0
+          endif
 !.....Derivative of potential energy w.r.t. {w}
-          dedd0 = ((texp -1d0)**2 -1d0)
-          dedalp = 2d0*d0ij*(texp-1d0)*texp*(rminij-dij)
-          dedrmin = 2d0*d0ij*(texp-1d0)*texp*alpij
+          dedd0 = ((texp -1d0)**2 -1d0) *factor
+          dedalp = 2d0*d0ij*(texp-1d0)*texp*(rminij-dij) *factor
+          dedrmin = 2d0*d0ij*(texp-1d0)*texp*alpij *factor
           ge_d0(is,js) = ge_d0(is,js) +dedd0
           ge_alp(is,js) = ge_alp(is,js) +dedalp
           ge_rmin(is,js) = ge_rmin(is,js) +dedrmin
+!!$          if( (is.eq.1.and.js.eq.2) .or. (is.eq.2.and.js.eq.1) ) then
+!!$            print '(a,4i5,5es11.3)','i,is,j,js,alpij*(rminij-dij),texp,dedd0,ge_d0='&
+!!$                 ,i,is,j,js,alpij*(rminij-dij),texp,dedd0,ge_d0(is,js)
+!!$          endif
         endif
         if( lfmatch ) then
 !.....Force
@@ -1178,15 +1169,15 @@ contains
 !.....Derivative of forces
           gf_d0(is,js,1:3,i)= gf_d0(is,js,1:3,i) -dxdi(1:3)*dedr/d0ij
           gf_alp(is,js,1:3,i)= gf_alp(is,js,1:3,i) -dxdi(1:3) *2d0*d0ij*texp &
-               *((1d0-texp) -alpij*(rminij-dij)*texp)
+               *((1d0-texp) +alpij*(rminij-dij)*(1d0-2d0*texp))
           gf_rmin(is,js,1:3,i)= gf_rmin(is,js,1:3,i) -dxdi(1:3) *2d0*d0ij &
-               *texp*alpij*alpij*(2d0*texp -1d0)
+               *texp*alpij*alpij*( 1d0 -2d0*texp)
           if( j.le.natm ) then
             gf_d0(is,js,1:3,j)= gf_d0(is,js,1:3,j) -dxdj(1:3)*dedr/d0ij
             gf_alp(is,js,1:3,j)= gf_alp(is,js,1:3,j) -dxdj(1:3) *2d0*d0ij*texp &
-                 *((1d0-texp) -alpij*(rminij-dij)*texp)
+                 *((1d0-texp) +alpij*(rminij-dij)*(1d0-2d0*texp))
             gf_rmin(is,js,1:3,j)= gf_rmin(is,js,1:3,j) -dxdj(1:3) *2d0*d0ij &
-                 *texp*alpij*alpij*(2d0*texp -1d0)
+                 *texp*alpij*alpij*(1d0 -2d0*texp)
           endif
         endif
 !.....Stress
@@ -1203,19 +1194,19 @@ contains
                    -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))/d0ij
               gs_alp(is,js,k)= gs_alp(is,js,k) &
                    -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *2d0*d0ij*texp &
-                   *((1d0-texp) -alpij*(rminij-dij)*texp)
+                   *((1d0-texp) -alpij*(rminij-dij)*(1d0-2d0*texp))
               gs_rmin(is,js,k)= gs_rmin(is,js,k) &
                    -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *2d0*d0ij &
-                   *texp*alpij*alpij*(2d0*texp -1d0)
+                   *texp*alpij*alpij*(1d0 -2d0*texp)
               if( j.le.natm ) then
                 gs_d0(is,js,k)= gs_d0(is,js,k) &
                      -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))/d0ij
                 gs_alp(is,js,k)= gs_alp(is,js,k) &
                      -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *2d0*d0ij*texp &
-                     *((1d0-texp) -alpij*(rminij-dij)*texp)
+                     *((1d0-texp) -alpij*(rminij-dij)*(1d0-2d0*texp))
                 gs_rmin(is,js,k)= gs_rmin(is,js,k) &
                      -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *2d0*d0ij &
-                     *texp*alpij*alpij*(2d0*texp -1d0)
+                     *texp*alpij*alpij*(1d0 -2d0*texp)
               endif
             enddo
           enddo
@@ -1225,6 +1216,7 @@ contains
 
 !!$    do is=1,nsp
 !!$      do js=is,nsp
+!!$        if( .not.interact(is,js) ) cycle
 !!$        write(6,'(a,2i4,3es12.4)') ' is,js,ge_alp,d0,rmin=', &
 !!$             is,js,ge_alp(is,js),ge_d0(is,js),ge_rmin(is,js)
 !!$      enddo
@@ -1234,14 +1226,16 @@ contains
     gwe(1:ndimp) = 0d0
     gwf(1:ndimp,1:3,1:natm) = 0d0
     gws(1:ndimp,1:6) = 0d0
-    ne = 0
     if( lematch ) then
+      ne = 0
       do is=1,nsp
         do js=is,nsp
           if( .not. interact(is,js) ) cycle
           ne = ne + 1
           gwe(ne) = gwe(ne) +ge_d0(is,js)
           if( is.ne.js ) gwe(ne) = gwe(ne) +ge_d0(js,is)
+          print '(a,2i4,3es11.3)','is,js,ge_d0(is,js),(js,is),gwe='&
+               ,is,js,ge_d0(is,js),ge_d0(js,is),gwe(ne)
           ne = ne + 1
           gwe(ne) = gwe(ne) +ge_alp(is,js)
           if( is.ne.js ) gwe(ne) = gwe(ne) +ge_alp(js,is)

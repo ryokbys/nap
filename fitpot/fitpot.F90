@@ -1,11 +1,12 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-13 23:39:25 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-15 15:25:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
   use minimize
   use version
+  use fp_common, only: subtract_FF, restore_FF
   implicit none
   integer:: ismpl,ihour,imin,isec
   real(8):: tmp
@@ -1152,7 +1153,7 @@ subroutine check_grad()
   integer:: iv,i
   real(8):: ftrn0,ftst0,ftmp,dv,vmax,ftst,ftmp1,ftmp2
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
-  real(8),parameter:: dev  = 1d-6
+  real(8),parameter:: dev  = 1d-5
   real(8),parameter:: tiny = 1d-6
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
@@ -1162,10 +1163,7 @@ subroutine check_grad()
     call NN_func(nvars,vars,ftrn0,ftst0)
     call NN_grad(nvars,vars,ganal)
   else
-    print *,'calling func_w_pmd...'
     call func_w_pmd(nvars,vars,ftrn0,ftst)
-    ganal(1:nvars) = 0d0
-    print *,'calling grad_w_pmd,nvars,vars=',nvars,vars(1:nvars)
     call grad_w_pmd(nvars,vars,ganal)
   endif
 
@@ -1178,7 +1176,7 @@ subroutine check_grad()
   dv= vmax *dev
   if( myid.eq.0 ) then
     print *,''
-    print *,'Deviation [dv] =',dv
+    print '(a,es12.4)',' Deviation for numerical derivative =',dv
   endif
 !.....Loop over variables for numerical derivative
   do iv=1,nvars
@@ -1198,10 +1196,9 @@ subroutine check_grad()
       call func_w_pmd(nvars,vars,ftmp2,ftst)
     endif
     gnumer(iv)= (ftmp1-ftmp2)/dv
-!!$    write(6,'(a,i5,10es15.7)') 'iv,var1,var2,ftmp1,ftmp2,gnumer = ', &
-!!$         iv,vars0(iv)+dev/2,&
-!!$         vars0(iv)-dev/2,ftmp1,ftmp2,gnumer(iv)
-!!$    print *,''
+    write(6,'(a,i5,10es15.7)') 'iv,dv,ftmp1,ftmp2,gnumer = ', &
+         iv,dv,ftmp1,ftmp2,gnumer(iv)
+    print *,''
   enddo
 
   if( myid.eq.0 ) then
@@ -2041,317 +2038,6 @@ subroutine get_uniq_iarr(n,m,iarr)
   enddo
   return
 end subroutine get_uniq_iarr
-!=======================================================================
-subroutine subtract_FF()
-!
-!  Subtract energies and forces from other force-fields.
-!  This uses force-fields implemented in pmd and the NN potential made
-!  should also be used with those force-fields, of course.
-!  This routine should be called for each force-field specified, so
-!  it could be called several times if several force-fields are taken
-!  into account.
-!
-  use variables
-  use parallel
-  use Coulomb,only: set_paramsdir_Coulomb
-  use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
-  implicit none
-
-  integer:: i,ismpl,natm
-  logical:: lcalcgrad = .false.
-  logical:: luse_Morse = .false.
-  logical:: luse_Morse_repul = .false.
-  logical:: luse_Coulomb = .false.
-  logical,save:: l1st = .true.
-  real(8):: epot,strs(3,3)
-  real(8),save,allocatable:: frcs(:,:)
-
-  if( l1st ) then
-    if( myid.eq.0 .and. iprint.ne.0 ) then
-      print '(/,a)',' Force field to be subtracted:'
-      do i=1,nsubff
-        print *,'  i,FF = ',i,trim(csubffs(i))
-      enddo
-    endif
-    
-    if( .not.allocated(frcs) ) allocate(frcs(3,maxna))
-
-    do i=1,nsubff
-      if( index(trim(csubffs(i)),'Morse').ne.0 ) then
-        luse_Morse = .true.
-      else if( index(trim(csubffs(i)),'Morse_repul').ne.0 ) then
-        luse_Morse_repul = .true.
-      else if( index(trim(csubffs(i)),'Coulomb').ne.0 .or. &
-           index(trim(csubffs(i)),'vcGaussian').ne.0 ) then
-        luse_Coulomb = .true.
-      endif
-    enddo
-
-!.....Only at the 1st call, perform pmd to get esubs
-    do ismpl=isid0,isid1
-      natm = samples(ismpl)%natm
-      if( luse_Morse ) then
-        call set_paramsdir_Morse(trim(cmaindir)//'/'&
-             //trim(samples(ismpl)%cdirname)//'/pmd')
-      endif
-      if( luse_Morse_repul ) then
-        call set_paramsdir_Morse(trim(cmaindir)//'/'&
-             //trim(samples(ismpl)%cdirname)//'/pmd')
-      endif
-      if( luse_Coulomb ) then
-        call set_paramsdir_Coulomb(trim(cmaindir)//'/'&
-             //trim(samples(ismpl)%cdirname)//'/pmd')
-      endif
-      call run_pmd(samples(ismpl),lcalcgrad,nvars,&
-           nsubff,csubffs,epot,frcs,strs)
-!!$      print *,'myid,ismpl,epot=',myid,ismpl,epot
-      samples(ismpl)%esub = epot
-      samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
-      samples(ismpl)%ssub(1:3,1:3) = strs(1:3,1:3)
-    enddo
-
-!!$    allocate(esubl(nsmpl),esubg(nsmpl))
-!!$    esubl(1:nsmpl) = 0d0
-!!$    do ismpl=isid0,isid1
-!!$      esubl(ismpl) = samples(ismpl)%esub
-!!$    enddo
-!!$    esubg(1:nsmpl) = 0d0
-!!$    call mpi_reduce(esubl,esubg,nsmpl,mpi_real8,mpi_sum,0,mpi_world,ierr)
-!!$
-!!$    if( myid.eq.0 ) then
-!!$      esubg(1:nsmpl)= esubg(1:nsmpl)/nalist(1:nsmpl)
-!!$      open(92,file='out.erg.subtract',status='replace')
-!!$      do ismpl=1,nsmpl
-!!$        write(92,'(i8,es15.7,2x,a)') ismpl,esubg(ismpl),trim(cdirlist(ismpl))
-!!$      enddo
-!!$      close(92)
-!!$    endif
-!!$    deallocate(esubl,esubg)
-  endif
-
-!!$!.....After the 1st call, subtract esubs calculated at the 1st call
-!!$  do ismpl=isid0,isid1
-!!$!.....Subtract energy and forces from eref and fref, respectively
-!!$    write(6,'(a,i8,1x,a,3es15.7)') 'ismpl,cdirname,eref,epot,esub=',ismpl,&
-!!$         trim(samples(ismpl)%cdirname),samples(ismpl)%eref,&
-!!$         samples(ismpl)%epot,samples(ismpl)%esub
-!!$    samples(ismpl)%eref = samples(ismpl)%eref -samples(ismpl)%esub
-!!$    samples(ismpl)%epot = samples(ismpl)%epot -samples(ismpl)%esub
-!!$    do i=1,samples(ismpl)%natm
-!!$      samples(ismpl)%fref(1:3,i) = samples(ismpl)%fref(1:3,i) &
-!!$           -samples(ismpl)%fsub(1:3,i)
-!!$      samples(ismpl)%fa(1:3,i) = samples(ismpl)%fa(1:3,i) &
-!!$           -samples(ismpl)%fsub(1:3,i)
-!!$    enddo
-!!$    write(6,'(a,i8,1x,a,2es15.7)') ' ismpl,cdirname,eref=',ismpl, &
-!!$         trim(samples(ismpl)%cdirname),samples(ismpl)%eref
-!!$!.....TODO: stress should also come here.
-!!$
-!!$  enddo
-
-  l1st = .false.
-  return
-end subroutine subtract_FF
-!=======================================================================
-subroutine restore_FF()
-!
-!  Restore subtracted energies and forces
-!
-  use variables
-  use parallel
-  implicit none
-
-  integer:: i,ismpl
-
-!!$  print *,'restore_FF'
-  do ismpl=isid0,isid1
-!!$    write(6,*) 'ismpl,eref,epot,esub=',ismpl,samples(ismpl)%eref,&
-!!$         samples(ismpl)%epot,samples(ismpl)%esub
-    samples(ismpl)%eref = samples(ismpl)%eref +samples(ismpl)%esub
-    samples(ismpl)%epot = samples(ismpl)%epot +samples(ismpl)%esub
-!!$    write(6,*) 'ismpl,eref,epot,esub=',ismpl,samples(ismpl)%eref,&
-!!$         samples(ismpl)%epot,samples(ismpl)%esub
-    do i=1,samples(ismpl)%natm
-      samples(ismpl)%fref(1:3,i) = samples(ismpl)%fref(1:3,i) &
-           +samples(ismpl)%fsub(1:3,i)
-      samples(ismpl)%fa(1:3,i) = samples(ismpl)%fa(1:3,i) &
-           +samples(ismpl)%fsub(1:3,i)
-    enddo
-!.....TODO: stress should also come here.
-  enddo
-  
-end subroutine restore_FF
-!=======================================================================
-subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs)
-!
-!  Run pmd and get energy and forces of the system.
-!  TODO: stress should be returned as well.
-!
-  use variables,only: rcut,mdsys,maxna,iprint,lematch,lfmatch,lsmatch
-  use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
-  use force
-  implicit none
-  include "../pmd/params_unit.h"
-  type(mdsys),intent(inout):: smpl
-  integer,intent(in):: ndimp,nff
-  real(8),intent(inout):: epot,frcs(3,maxna)
-  real(8),intent(out):: strs(3,3)
-  logical,intent(in):: lcalcgrad
-  character(len=20),intent(in):: cffs(nff)
-
-  logical,save:: l1st = .true.
-
-  integer:: i,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
-       nismax,nstps_done,ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
-  real(8):: am(9),dt,rc,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
-       ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv
-  logical:: ltdst,lstrs,lcellfix(3,3),lvc
-  character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5
-  logical:: update_force_list
-
-  logical,external:: string_in_arr
-
-  if( l1st ) then
-!.....Create MPI COMM for pmd only for the 1st time
-    call create_mpi_comm_pmd()
-    l1st = .false.
-  endif
-
-  maxstp = 0
-  nismax = 9
-  nerg = 1
-  npmd = 1
-  am(1:9) = 1d0  ! Since no dynamics, no need of mass
-  dt = 5d0
-  ciofmt = 'ascii'
-  ifpmd = 0
-  rc = rcut
-  rbuf = 0.0d0
-  ifdmp = 0  ! no damping as well
-  dmp = 0.99d0
-  minstp = 0
-  tinit = 0d0
-  tfin = 0d0
-  ctctl = 'none'
-  ttgt(1:9) = 300d0
-  trlx = 100d0
-  ltdst = .false.
-  ntdst = 1
-!!$  lstrs = lsmatch
-  cpctl = 'none'
-  stgt(1:3,1:3) = 0d0
-  ptgt = 0d0
-  srlx = 100d0
-  stbeta = 1d-1
-  strfin = 0d0
-  fmv(1:3,0) = (/ 0d0, 0d0, 0d0 /)
-  fmv(1:3,1:9) = 1d0
-  ptnsr(1:3,1:3) = 0d0
-  ekin = 0d0
-  n_conv = 1
-  czload_type = 'no'
-  eps_conv = 1d-3
-  ifsort = 1
-  lcellfix(1:3,1:3) = .false.
-  nx = 1
-  ny = 1
-  nz = 1
-  iprint_pmd = max(0,iprint-10)
-  ifcoulomb = 0
-  
-  lvc = .false.
-  do i=1,nff
-    if( trim(cffs(i)).eq.'long_Coulomb' .or. &
-         trim(cffs(i)).eq.'vcMorse' ) then
-      if( .not. smpl%charge_set ) lvc = .true.
-!.....Even if lvc is .false., lvc will be set true at the begining of init_force
-!.....in case of vcMorse.
-    endif
-  enddo
-
-!.....Set force_list in the force module
-  update_force_list = .false.
-  if( .not.allocated(force_list) ) then
-    update_force_list = .true.
-  else if( nff.ne.num_forces ) then
-    update_force_list = .true.
-  else
-    do i=1,nff
-      if( trim(cffs(i)).ne.trim(force_list(i)) ) then
-        update_force_list = .true.
-        exit
-      endif
-    enddo
-  endif
-!.....Update force_list if needed
-  if( update_force_list ) then
-    if( allocated(force_list) ) deallocate(force_list)
-    num_forces = nff
-    allocate(force_list(num_forces))
-    do i=1,num_forces
-      force_list(i) = trim(cffs(i))
-    enddo
-  endif
-
-!.....one_shot force calculation
-  call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
-       ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
-       ,smpl%chg,smpl%chi &
-       ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
-       ,nismax,am,dt,rc,rbuf,ptnsr,epot,ekin &
-       ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp &
-       ,smpl%gwe,smpl%gwf,smpl%gws &
-       ,lematch,lfmatch,lsmatch)
-  strs(1:3,1:3) = ptnsr(1:3,1:3)*up2gpa*(-1d0)
-!!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
-!!$  print *,'smpl%natm =',smpl%natm
-!!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)
-
-  if( lvc ) smpl%charge_set = .true.
-
-  return
-end subroutine run_pmd
-!=======================================================================
-subroutine create_mpi_comm_pmd()
-!
-!  Create MPI COMM for pmd.
-!  To create a MPI COMM on each node, first create a MPI GROUP for world,
-!  then create a MPI GROUP for this node, and then create the MPI COMM
-!  from the GROUP for this node. This is how to create sub communicator
-!  in the MPI.
-!
-  use parallel
-  implicit none
-
-  integer:: n = 1
-  integer:: iranks(1)
-  integer:: mpi_group_world,mpi_group_pmd
-
-!!$  call mpi_comm_group(mpi_world, mpi_group_world,ierr)
-  iranks(1) = myid
-!!$  call mpi_group_incl(mpi_group_world, 1, iranks, mpi_group_pmd,ierr)
-!!$  call mpi_comm_create_group(mpi_world, mpi_group_pmd, 0, mpi_comm_pmd,ierr)
-!!$  print *,'myid,iranks(1),mpi_group_pmd,mpi_comm_pmd=',&
-!!$       myid,iranks(1),mpi_group_pmd,mpi_comm_pmd
-
-  call mpi_comm_split(mpi_world,myid,myid,mpi_comm_pmd,ierr)
-
-  call mpi_comm_size(mpi_comm_pmd,nnode_pmd,ierr)
-  call mpi_comm_rank(mpi_comm_pmd,myid_pmd,ierr)
-  call mpi_comm_group(mpi_comm_pmd,mpi_group_pmd,ierr)
-!!$  print *,'myid,mpi_world,myid_pmd,mpi_comm_pmd,mpi_group_pmd = ',&
-!!$       myid,mpi_world,myid_pmd,mpi_comm_pmd,mpi_group_pmd
-  
-!!$  call mpi_group_free(mpi_group_world,ierr)
-!!$  call mpi_group_free(mpi_group_pmd,ierr)
-  if( myid.eq.0 ) then
-    write(6,'(a)') ''
-    write(6,'(a)') ' MPI_COMM_PMD was created at each node '// &
-         'for pmd calculations.'
-    write(6,'(a)') ''
-  endif
-  
-end subroutine create_mpi_comm_pmd
 !=======================================================================
 subroutine subtract_atomic_energy()
   use variables
