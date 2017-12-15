@@ -236,7 +236,8 @@ def get_Morse_params(isp1,isp2):
 def get_angular_params(isp1,isp2,isp3):
     print('\nDetermine angular parameters for {0:d}-{1:d}-{2:d}:'.format(isp1,isp2,isp3))
     print('Special angles [degree] (space-separation):')
-    angs = [ math.cos(float(a)/180*math.pi) for a in sys.stdin.readline().split() ]
+    # angs = [ math.cos(float(a)/180*math.pi) for a in sys.stdin.readline().split() ]
+    angs = [ float(a) for a in sys.stdin.readline().split() ]
     print('Number of anguler parameters = {0:d}'.format(len(angs)))
     return angs
 
@@ -320,7 +321,7 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
             for triple in triplets:
                 ia,ja,ka = triple.get_isps()
                 for isf,sf in enumerate(triple.symfuncs):
-                    angs = triple.sfparams[isf]
+                    angs = [ math.cos(a/180*math.pi) for a in triple.sfparams[isf] ]
                     for ang in angs:
                         f.write(' {0:3d}'.format(_type2num[sf]) \
                                 +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
