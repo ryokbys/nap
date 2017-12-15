@@ -88,15 +88,51 @@ module minimize
   real(8):: pso_vinimax = 0.1d0
 
   real(8):: fupper_lim = 1d+5
+  real(8),allocatable:: ranges(:,:)
 
 contains
 !=======================================================================
-  subroutine steepest_descent(ndim,x,f,g,d,xtol,gtol,ftol,maxiter &
+  subroutine set_ranges(ndim,xranges)
+    implicit none
+    integer,intent(in):: ndim
+    real(8),intent(in):: xranges(2,ndim)
+
+    if( .not. allocated(ranges) ) allocate(ranges(2,ndim))
+    if( size(ranges).ne.2*ndim ) then
+      deallocate(ranges)
+      allocate(ranges(2,ndim))
+    endif
+    return
+  end subroutine set_ranges
+!=======================================================================
+  subroutine wrap_ranges(ndim,x)
+    implicit none
+    integer,intent(in):: ndim
+    real(8),intent(inout):: x(ndim)
+
+    integer:: i
+
+    if( .not.allocated(ranges) ) then
+      print *,'Error: ranges is not allocated yet...'
+      stop
+    endif
+
+    do i=1,ndim
+      if( x(i).lt.ranges(1,ndim) ) then
+        x(i) = ranges(1,ndim)
+      else if( x(i).gt.ranges(2,ndim) ) then
+        x(i) = ranges(2,ndim)
+      endif
+    enddo
+    return
+  end subroutine wrap_ranges
+!=======================================================================
+  subroutine steepest_descent(ndim,x,f,g,d,xranges,xtol,gtol,ftol,maxiter &
        ,iprint,iflag,myid,func,grad)
     implicit none
     integer,intent(in):: ndim,maxiter,iprint,myid
     integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol
+    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: f,x(ndim),g(ndim),d(ndim)
 !!$    real(8):: func,grad
     interface
@@ -115,7 +151,10 @@ contains
     integer:: iter,i,niter
     real(8):: alpha,fp,gnorm,ftst
 
+    if( .not.allocated(ranges) ) call set_ranges(ndim,xranges)
+
     iter= 0
+    call wrap_ranges(ndim,x)
     call func(ndim,x,f,ftst)
     if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
       do i=1,ndim
@@ -168,6 +207,7 @@ contains
       endif
       if( iflag/100.ne.0 ) return
       x(1:ndim)= x(1:ndim) +alpha*d(1:ndim)
+      call wrap_ranges(ndim,x)
       call func(ndim,x,f,ftst)
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
         do i=1,ndim
@@ -220,7 +260,7 @@ contains
     return
   end subroutine steepest_descent
 !=======================================================================
-  subroutine cg(ndim,x,f,g,u,xtol,gtol,ftol,maxiter,iprint,iflag,myid &
+  subroutine cg(ndim,x,f,g,u,xranges,xtol,gtol,ftol,maxiter,iprint,iflag,myid &
        ,func,grad,cfmethod,niter_eval,sub_eval)
 !
 !  Conjugate gradient minimization
@@ -228,7 +268,7 @@ contains
     implicit none
     integer,intent(in):: ndim,maxiter,iprint,myid,niter_eval
     integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol
+    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: f,x(ndim),g(ndim),u(ndim)
     character(len=*),intent(in):: cfmethod
     interface
@@ -261,10 +301,13 @@ contains
     if( .not.allocated(gpena) ) allocate(gpena(ndim),gp(ndim)&
          ,y(ndim),xp(ndim),s(ndim),dx(ndim),uu(ndim))
 
+    if( .not.allocated(ranges) ) call set_ranges(ndim,xranges)
+
     iter= 0
     nftol= 0
     nxtol= 0
     gpena(1:ndim)= 0d0
+    call wrap_ranges(ndim,x)
     call func(ndim,x,f,ftst)
     call grad(ndim,x,g)
 !.....penalty
@@ -339,14 +382,17 @@ contains
 
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
         call soft_threshold(ndim,x,uu,alpha)
+        call wrap_ranges(ndim,x)
       else if( trim(cpena).eq.'ridge' ) then
         x(1:ndim)= x(1:ndim) +alpha*uu(1:ndim)
+        call wrap_ranges(ndim,x)
         do i=1,ndim
           pval= pval +pwgt*x(i)*x(i)
           gpena(i)= 2d0*pwgt*x(i)
         enddo
       else
         x(1:ndim)= x(1:ndim) +alpha*uu(1:ndim)
+        call wrap_ranges(ndim,x)
       endif
 
       dx(1:ndim)= x(1:ndim) -xp(1:ndim)
@@ -414,7 +460,7 @@ contains
     return
   end subroutine cg
 !=======================================================================
-  subroutine qn(ndim,x0,f,g,u,xtol,gtol,ftol,maxiter &
+  subroutine qn(ndim,x0,f,g,u,xranges,xtol,gtol,ftol,maxiter &
        ,iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
 !
 !  Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
@@ -422,7 +468,7 @@ contains
     implicit none
     integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
     integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol
+    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
     character(len=*),intent(in):: cfmethod
     interface
@@ -451,7 +497,8 @@ contains
     if( .not.allocated(gg) ) then
       if(myid.eq.0) then
         print *,''
-        print *, '********************* QN(BFGS) *********************'
+        print *, '******************************* QN(BFGS) '&
+             //'*******************************'
         estmem = (ndim*ndim +ndim*6)*8
         mem= estmem/1000/1000
         if( mem.eq.0 ) then
@@ -467,6 +514,9 @@ contains
          ,s(ndim),y(ndim),gp(ndim),ggy(ndim),gpena(ndim))
     endif
 
+    if( .not.allocated(ranges) ) call set_ranges(ndim,xranges)
+
+
 !.....initialize alpha (line minimization factor)
     alpha = 1d0
 
@@ -478,6 +528,7 @@ contains
     do i=1,ndim
       gg(i,i)= 1d0
     enddo
+    call wrap_ranges(ndim,x0)
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
 !.....penalty
@@ -527,6 +578,7 @@ contains
 
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
+    call wrap_ranges(ndim,x)
     vnorm= sqrt(sprod(ndim,x,x))
     dxnorm = 0d0
 
@@ -631,6 +683,7 @@ contains
       gpena(1:ndim)= 0d0
       if( trim(cpena).eq.'lasso' ) then
         call soft_threshold(ndim,x,u,alpha)
+        call wrap_ranges(ndim,x)
         do i=1,ndim
           absx= abs(x(i))
           pval= pval +pwgt*absx
@@ -639,6 +692,7 @@ contains
         enddo
       else if( trim(cpena).eq.'glasso' ) then
         call soft_threshold(ndim,x,u,alpha)
+        call wrap_ranges(ndim,x)
         glval(0:ngl)= 0d0
         do i=1,ndim
           ig= iglid(i)
@@ -662,12 +716,14 @@ contains
         enddo
       else if( trim(cpena).eq.'ridge' ) then
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+        call wrap_ranges(ndim,x)
         do i=1,ndim
           pval= pval +pwgt*x(i)*x(i)
           gpena(i)= 2d0*pwgt*x(i)
         enddo
       else
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+        call wrap_ranges(ndim,x)
       endif
       dx(1:ndim)= x(1:ndim) -x0(1:ndim)
       x0(1:ndim)= x(1:ndim)
@@ -803,7 +859,7 @@ contains
     return
   end subroutine qn
 !=======================================================================
-  subroutine lbfgs(ndim,x0,f,g,u,xtol,gtol,ftol,maxiter &
+  subroutine lbfgs(ndim,x0,f,g,u,xranges,xtol,gtol,ftol,maxiter &
        ,iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
 !
 !  Limited memory BFGS(Broyden-Fletcher-Goldfarb-Shanno).
@@ -812,7 +868,7 @@ contains
     implicit none
     integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
     integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol
+    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
     character(len=*),intent(in):: cfmethod
     interface
@@ -859,12 +915,15 @@ contains
          ,a(0:mstore),rho(0:mstore))
     endif
 
+    if( .not.allocated(ranges) ) call set_ranges(ndim,xranges)
+
     s(1:ndim,0:mstore)= 0d0
     y(1:ndim,0:mstore)= 0d0
     rho(0:mstore)= 0d0
     a(0:mstore)= 0d0
 
     nftol= 0
+    call wrap_ranges(ndim,x0)
 !.....initial G = I
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
@@ -957,6 +1016,7 @@ contains
       gpena(1:ndim)= 0d0
       if( trim(cpena).eq.'lasso' ) then
         call soft_threshold(ndim,x,u,alpha)
+        call wrap_ranges(ndim,x)
         do i=1,ndim
           absx= abs(x(i))
           pval= pval +pwgt*absx
@@ -965,6 +1025,7 @@ contains
         enddo
       else if( trim(cpena).eq.'glasso' ) then
         call soft_threshold(ndim,x,u,alpha)
+        call wrap_ranges(ndim,x)
         glval(0:ngl)= 0d0
         do i=1,ndim
           ig= iglid(i)
@@ -988,12 +1049,14 @@ contains
         enddo
       else if( trim(cpena).eq.'ridge' ) then
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+        call wrap_ranges(ndim,x)
         do i=1,ndim
           pval= pval +pwgt*x(i)*x(i)
           gpena(i)= 2d0*pwgt*x(i)
         enddo
       else
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
+        call wrap_ranges(ndim,x)
       endif
       x0(1:ndim)= x(1:ndim)
       call grad(ndim,x,g)
@@ -1500,8 +1563,10 @@ contains
       x1(1:ndim)= x0(1:ndim)
       if( trim(cpena).eq.'lasso' .or.trim(cpena).eq.'glasso') then
         call soft_threshold(ndim,x1,d,alphai)
+        call wrap_ranges(ndim,x1)
       else
         x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
+        call wrap_ranges(ndim,x1)
       endif
       call func(ndim,x1,fi,ftsti)
 !!$      if( myid.eq.0 ) print *,'iter,alphai,fi=',iter,alphai,fi

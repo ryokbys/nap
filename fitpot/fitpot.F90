@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-15 15:25:50 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-15 17:17:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -763,13 +763,13 @@ subroutine qn_wrapper()
   if( trim(cpot).eq.'NN' ) then
 !.....NN specific code hereafter
     call NN_init()
-    call qn(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
+    call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
          ,niter_eval,write_stats)
     call NN_analyze("fin")
     
   else if( trim(cpot).eq.'vcMorse' ) then
-    call qn(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
+    call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
   endif
@@ -789,7 +789,7 @@ subroutine lbfgs_wrapper()
 
   !.....NN specific code hereafter
   call NN_init()
-  call lbfgs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
+  call lbfgs(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
        ,niter_eval,write_stats)
   call NN_analyze("fin")
@@ -812,7 +812,7 @@ subroutine sd_wrapper()
 
   !.....NN specific code hereafter
   call NN_init()
-  call steepest_descent(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
+  call steepest_descent(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad)
 
   return
@@ -830,7 +830,7 @@ subroutine cg_wrapper()
 
   !.....NN specific code hereafter
   call NN_init()
-  call cg(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
+  call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
        ,write_stats)
   call NN_analyze("fin")
