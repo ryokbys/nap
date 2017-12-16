@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-15 15:27:19 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-16 09:52:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -1072,7 +1072,7 @@ contains
     real(8):: dij,dedr,rc2,dij2 &
          ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2 &
-         ,diji,factor
+         ,diji,factor,fc1,dfc1,dr,dedrd0,dedralp,dedrrmin
     real(8),allocatable,save:: xi(:),xj(:),xij(:),rij(:),dxdi(:),dxdj(:)
     real(8),external:: sprod,fcut1,dfcut1
 
@@ -1133,11 +1133,14 @@ contains
         d0ij = d0(is,js)
         alpij= alp(is,js)
         rminij=rmin(is,js)
-        texp = exp(alpij*(rminij-dij))
+        dr = rminij-dij
+        texp = exp(alpij*dr)
 !.....Potential
-        tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
-        tmp2 = tmp *fcut1(dij,rc)
+        fc1 = fcut1(dij,rc)
+        dfc1= dfcut1(dij,rc)
+!!$        tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
         if( lematch ) then
+!!$        tmp2 = tmp *fc1
 !!$          if( j.le.natm ) then
 !!$            epotl = epotl +tmp2 +tmp2
 !!$          else
@@ -1149,35 +1152,35 @@ contains
             factor = 0.5d0
           endif
 !.....Derivative of potential energy w.r.t. {w}
-          dedd0 = ((texp -1d0)**2 -1d0) *factor
-          dedalp = 2d0*d0ij*(texp-1d0)*texp*(rminij-dij) *factor
-          dedrmin = 2d0*d0ij*(texp-1d0)*texp*alpij *factor
+          dedd0 = ((texp -1d0)**2 -1d0) *fc1 *factor 
+          dedalp = 2d0*d0ij*(texp-1d0)*texp*dr *fc1*factor
+          dedrmin = 2d0*d0ij*(texp-1d0)*texp*alpij *fc1*factor
           ge_d0(is,js) = ge_d0(is,js) +dedd0
           ge_alp(is,js) = ge_alp(is,js) +dedalp
           ge_rmin(is,js) = ge_rmin(is,js) +dedrmin
-!!$          if( (is.eq.1.and.js.eq.2) .or. (is.eq.2.and.js.eq.1) ) then
-!!$            print '(a,4i5,5es11.3)','i,is,j,js,alpij*(rminij-dij),texp,dedd0,ge_d0='&
-!!$                 ,i,is,j,js,alpij*(rminij-dij),texp,dedd0,ge_d0(is,js)
-!!$          endif
+        endif
+!.....Pre-compute some factors required in force and stress derivatives
+        if( lfmatch .or. lsmatch ) then
+          dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) *fc1 &
+               + dfc1 *d0ij*((texp-1d0)**2-1d0)
+          dedrd0  = dedr/d0ij
+          dedralp = 2d0*d0ij*texp*((1d0-texp) +alpij*dr*(1d0-2d0*texp))*fc1 &
+               +dfc1*(2d0*d0ij*(texp-1d0)*texp*dr)
+          dedrrmin= 2d0*d0ij*texp*alpij*alpij*( 1d0 -2d0*texp)*fc1 &
+               +dfc1*(2d0*d0ij*(texp-1d0)*texp*alpij)
         endif
         if( lfmatch ) then
 !.....Force
-          dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) *fcut1(dij,rc) &
-               + tmp*dfcut1(dij,rc)
 !!$          aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
 !!$          aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....Derivative of forces
-          gf_d0(is,js,1:3,i)= gf_d0(is,js,1:3,i) -dxdi(1:3)*dedr/d0ij
-          gf_alp(is,js,1:3,i)= gf_alp(is,js,1:3,i) -dxdi(1:3) *2d0*d0ij*texp &
-               *((1d0-texp) +alpij*(rminij-dij)*(1d0-2d0*texp))
-          gf_rmin(is,js,1:3,i)= gf_rmin(is,js,1:3,i) -dxdi(1:3) *2d0*d0ij &
-               *texp*alpij*alpij*( 1d0 -2d0*texp)
+          gf_d0(is,js,1:3,i)= gf_d0(is,js,1:3,i) -dxdi(1:3) *dedrd0
+          gf_alp(is,js,1:3,i)= gf_alp(is,js,1:3,i) -dxdi(1:3) *dedralp
+          gf_rmin(is,js,1:3,i)= gf_rmin(is,js,1:3,i) -dxdi(1:3) *dedrrmin
           if( j.le.natm ) then
-            gf_d0(is,js,1:3,j)= gf_d0(is,js,1:3,j) -dxdj(1:3)*dedr/d0ij
-            gf_alp(is,js,1:3,j)= gf_alp(is,js,1:3,j) -dxdj(1:3) *2d0*d0ij*texp &
-                 *((1d0-texp) +alpij*(rminij-dij)*(1d0-2d0*texp))
-            gf_rmin(is,js,1:3,j)= gf_rmin(is,js,1:3,j) -dxdj(1:3) *2d0*d0ij &
-                 *texp*alpij*alpij*(1d0 -2d0*texp)
+            gf_d0(is,js,1:3,j)= gf_d0(is,js,1:3,j) -dxdj(1:3)*dedrd0
+            gf_alp(is,js,1:3,j)= gf_alp(is,js,1:3,j) -dxdj(1:3) *dedralp
+            gf_rmin(is,js,1:3,j)= gf_rmin(is,js,1:3,j) -dxdj(1:3) *dedrrmin
           endif
         endif
 !.....Stress
@@ -1191,22 +1194,18 @@ contains
 !!$              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
 !!$                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
               gs_d0(is,js,k)= gs_d0(is,js,k) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))/d0ij
+                   -0.5d0 *rij(ixyz)*(-dxdi(jxyz)) *dedrd0
               gs_alp(is,js,k)= gs_alp(is,js,k) &
-                   -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *2d0*d0ij*texp &
-                   *((1d0-texp) -alpij*(rminij-dij)*(1d0-2d0*texp))
+                   -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *dedralp
               gs_rmin(is,js,k)= gs_rmin(is,js,k) &
-                   -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *2d0*d0ij &
-                   *texp*alpij*alpij*(1d0 -2d0*texp)
+                   -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *dedrrmin
               if( j.le.natm ) then
                 gs_d0(is,js,k)= gs_d0(is,js,k) &
-                     -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))/d0ij
+                     -0.5d0 *rij(ixyz)*(-dxdi(jxyz)) *dedrd0
                 gs_alp(is,js,k)= gs_alp(is,js,k) &
-                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *2d0*d0ij*texp &
-                     *((1d0-texp) -alpij*(rminij-dij)*(1d0-2d0*texp))
+                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *dedralp
                 gs_rmin(is,js,k)= gs_rmin(is,js,k) &
-                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *2d0*d0ij &
-                     *texp*alpij*alpij*(1d0 -2d0*texp)
+                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *dedrrmin
               endif
             enddo
           enddo
@@ -1234,8 +1233,8 @@ contains
           ne = ne + 1
           gwe(ne) = gwe(ne) +ge_d0(is,js)
           if( is.ne.js ) gwe(ne) = gwe(ne) +ge_d0(js,is)
-          print '(a,2i4,3es11.3)','is,js,ge_d0(is,js),(js,is),gwe='&
-               ,is,js,ge_d0(is,js),ge_d0(js,is),gwe(ne)
+!!$          print '(a,2i4,3es11.3)','is,js,ge_d0(is,js),(js,is),gwe='&
+!!$               ,is,js,ge_d0(is,js),ge_d0(js,is),gwe(ne)
           ne = ne + 1
           gwe(ne) = gwe(ne) +ge_alp(is,js)
           if( is.ne.js ) gwe(ne) = gwe(ne) +ge_alp(js,is)
@@ -1313,7 +1312,8 @@ contains
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,inc
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,dedr &
          ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
-         ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2
+         ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2 &
+         ,dr
     type(atdesc):: atdi,atdj
     real(8),external:: sprod,fcut1,dfcut1
 
@@ -1351,7 +1351,8 @@ contains
         d0ij = max(d0ij, 0d0)
         rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
         alpij= max(alpij, prefbeta/(rminij -rc))
-        texp = exp(alpij*(rminij-dij))
+        dr = rminij-dij
+        texp = exp(alpij*dr)
 !!$        write(6,'(a,4i5,4es15.7)') 'i,is,j,js,d0ij,alpij,rminij,texp=',&
 !!$             i,is,j,js,d0ij,alpij,rminij,texp
 !!$        write(6,'(a,13f8.3)') 'pdij=',pdij(0:nprm)
@@ -1361,7 +1362,7 @@ contains
         epotl = epotl +tmp2
 !.....Derivative of potential energy w.r.t. {w}
         dedd0 = ((texp -1d0)**2 -1d0)
-        dedalp = 2d0*d0ij*(texp-1d0)*texp*(rminij-dij)
+        dedalp = 2d0*d0ij*(texp-1d0)*texp*dr
         dedrmin = 2d0*d0ij*(texp-1d0)*texp*alpij
         gwd(0:nprm) = gwd(0:nprm) +0.5d0 *dedd0 *pdij(0:nprm)
         gwalp(0:nprm) = gwalp(0:nprm) +0.5d0 *dedalp *pdij(0:nprm)

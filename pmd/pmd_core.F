@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-12-13 23:33:15 Ryo KOBAYASHI>
+c                     Last-modified: <2017-12-16 13:07:30 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -968,8 +968,10 @@ c      print *,'one_shot: 06'
       else  ! lcalcgrad = .true.
         epot = 0d0
         if( use_force('Morse') ) call gradw_Morse(namax,natm,tag,
-     &         ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws,
-     &         lematch,lfmatch,lsmatch)
+     &       ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws,
+     &       lematch,lfmatch,lsmatch)
+c.....Derivative of stress should be divided by the cell volume
+        gws(1:ndimp,1:6) = gws(1:ndimp,1:6) /vol
 c        if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra
 c     &       ,nnmax,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
       endif
@@ -981,16 +983,10 @@ c     &       ,nnmax,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
 c      print *,'one_shot: 07'
       call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 
-      if( iprint.ne.0 ) then
-        write(6,'(a,es15.7)') ' after sa2stnsr'
-      endif
       call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
      &     ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
      &     ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
       
-      if( iprint.ne.0 ) then
-        write(6,'(a,es15.7)') ' after after space_comp'
-      endif
 c.....revert forces to the unit eV/A before going out 
       if( myid_md.eq.0 ) then
         do i=1,ntot
@@ -1003,16 +999,13 @@ c          atot(1:3,i) = aai(1:3)/acon(is)
         enddo
       endif
 
-      if( iprint.ne.0 ) then
-        write(6,'(a,es15.7)') ' deallocating...'
-      endif
 c.....deallocate all the arrays allocated 
       deallocate(acon,fack)
       deallocate(fekin,fa2v)
       deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
      &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
 
-      if( iprint.ne.0 ) then
+      if( iprint.ge.10 ) then
         write(6,'(a)') ' one_shot done.'
         write(6,*) ''
       endif

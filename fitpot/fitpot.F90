@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-15 17:17:44 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-15 18:18:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -768,10 +768,15 @@ subroutine qn_wrapper()
          ,niter_eval,write_stats)
     call NN_analyze("fin")
     
-  else if( trim(cpot).eq.'vcMorse' ) then
+  else if( trim(cpot).eq.'Morse' ) then
     call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
+  else
+    if( myid.eq.0 ) then
+      print *,'Warning: BFGS is not available for '&
+           //trim(cpot)
+    endif
   endif
 
   return
@@ -1196,13 +1201,14 @@ subroutine check_grad()
       call func_w_pmd(nvars,vars,ftmp2,ftst)
     endif
     gnumer(iv)= (ftmp1-ftmp2)/dv
-    write(6,'(a,i5,10es15.7)') 'iv,dv,ftmp1,ftmp2,gnumer = ', &
-         iv,dv,ftmp1,ftmp2,gnumer(iv)
-    print *,''
+!!$    write(6,'(a,i5,10es15.7)') 'iv,dv,ftmp1,ftmp2,gnumer = ', &
+!!$         iv,dv,ftmp1,ftmp2,gnumer(iv)
+!!$    print *,''
   enddo
 
   if( myid.eq.0 ) then
-    write(6,'(a)') '----------------- check_grad ------------------------'
+    write(6,'(a)') '------------------------------ check_grad '&
+         //'------------------------------'
     write(6,'(a)') '     #,          x,    analytical,'// &
          '     numerical,'// &
          '      error [%]'
@@ -1211,7 +1217,8 @@ subroutine check_grad()
            ganal(iv) ,gnumer(iv), &
            abs((ganal(iv)-gnumer(iv))/(gnumer(iv)+tiny))*100
     enddo
-    write(6,'(a)') '-----------------------------------------------------'
+    write(6,'(a)') '----------------------------------------'&
+         //'--------------------------------'
     print *, 'Finished check_grad'
   endif
 end subroutine check_grad

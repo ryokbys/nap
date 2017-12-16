@@ -102,6 +102,8 @@ contains
       deallocate(ranges)
       allocate(ranges(2,ndim))
     endif
+    
+    ranges(1:2,1:ndim) = xranges(1:2,1:ndim)
     return
   end subroutine set_ranges
 !=======================================================================
@@ -113,15 +115,15 @@ contains
     integer:: i
 
     if( .not.allocated(ranges) ) then
-      print *,'Error: ranges is not allocated yet...'
+      print *,'ERROR: ranges is not allocated yet...'
       stop
     endif
 
     do i=1,ndim
-      if( x(i).lt.ranges(1,ndim) ) then
-        x(i) = ranges(1,ndim)
-      else if( x(i).gt.ranges(2,ndim) ) then
-        x(i) = ranges(2,ndim)
+      if( x(i).lt.ranges(1,i) ) then
+        x(i) = ranges(1,i)
+      else if( x(i).gt.ranges(2,i) ) then
+        x(i) = ranges(2,i)
       endif
     enddo
     return
@@ -528,6 +530,7 @@ contains
     do i=1,ndim
       gg(i,i)= 1d0
     enddo
+
     call wrap_ranges(ndim,x0)
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
@@ -770,7 +773,7 @@ contains
         nftol = 0
         if( nxtol.ge.numtol ) then
           if( myid.eq.0 ) then
-            print *,'>>> QN converged because of xtol over ' &
+            print '(a,i0,a)',' >>> QN converged because xdiff < xtol over ' &
                  ,numtol,' times.'
             write(6,'(a,2es13.5)') '   dxnorm,xtol=',dxnorm,xtol
           endif
@@ -784,7 +787,7 @@ contains
         nftol = 0
         if( ngtol.ge.numtol ) then
           if( myid.eq.0 ) then
-            print *,'>>> QN converged because of gtol over ' &
+            print '(a,i0,a)','>>> QN converged because gdiff < gtol over ' &
                  ,numtol,' times.'
             write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
           endif
@@ -798,7 +801,7 @@ contains
         ngtol = 0
         if( nftol.ge.numtol ) then
           if( myid.eq.0 ) then
-            print *,'>>> QN converged because of ftol over ' &
+            print '(a,i0,a)','>>> QN converged because fdiff < ftol over ' &
                  ,numtol,' times.'
             write(6,'(a,2es13.5)') '   abs(f-fp),ftol=',abs(f-fp), ftol
           endif
@@ -1188,7 +1191,7 @@ contains
     iter= iter +1
     if( iter.gt.MAXITER ) then
       if( myid.eq.0 ) then
-        print *,'[Error] iter.gt.MAXITER in get_bracket'
+        print *,'WARNING: iter.gt.MAXITER in get_bracket'
         print *,'  Search direction may not be a descent direction.'
       endif
       iflag= iflag +1000
@@ -1197,7 +1200,7 @@ contains
     endif
     if( abs(b-a).lt.1d-12) then
       if( myid.eq.0 ) then
-        print *,'[Error] a and b is too close in get_bracket'
+        print *,'WARNING: a and b is too close in get_bracket'
         print *,'  Search direction may not be a descent direction.'
       endif
       iflag= iflag +2000
@@ -1284,7 +1287,7 @@ contains
     iter= iter +1
     if( iter.gt.MAXITER ) then
       if( myid.eq.0 ) then
-        print *,' [Error] iter.gt.MAXITER in quad_interpolate !!!'
+        print *,' WARNING: iter.gt.MAXITER in quad_interpolate !!!'
         print *,'   iter,MAXITER= ',iter,MAXITER
       endif
       iflag= iflag +100
@@ -1430,7 +1433,7 @@ contains
     iter= iter +1
     if( iter.gt.MAXITER ) then
       if( myid.eq.0 ) then
-        print *,'[Error] iter.gt.MAXITER in golden_section.'
+        print *,'WARNING: iter.gt.MAXITER in golden_section.'
         print *,'  iter,MAXITER = ',iter,MAXITER
       endif
       iflag= iflag +100
@@ -1610,7 +1613,7 @@ contains
     enddo
 
     if(myid.eq.0 .and. iprint.gt.0 ) &
-         print *,'[Error] iter.gt.MAXITER in armijo_search.'
+         print *,'WARNING: iter.gt.MAXITER in armijo_search.'
     iflag= iflag +100
     niter= iter
     if( myid.eq.0 .and. iprint.gt.0 ) then

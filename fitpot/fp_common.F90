@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-15 12:02:46 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-16 15:38:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -385,10 +385,10 @@ contains
         endif
         gtrnl(1:ndim) = gtrnl(1:ndim) &
              +2d0*ediff*smpl%gwe(1:ndim)/natm/eerr *swgt
-        print *,'ismpl,epot,esub,eref,ediff,natm,eerr,swgt=' &
-             ,ismpl,epot,esub,eref,ediff,natm,eerr,swgt
-        print '(a,10es11.3)','gwe  =',gwe(1:ndim)
-        print '(a,10es11.3)','gtrnl=',gtrnl(1:ndim)
+!!$        print *,'ismpl,epot,esub,eref,ediff,natm,eerr,swgt=' &
+!!$             ,ismpl,epot,esub,eref,ediff,natm,eerr,swgt
+!!$        print '(a,10es11.3)','gwe  =',gwe(1:ndim)
+!!$        print '(a,10es11.3)','gtrnl=',gtrnl(1:ndim)
       endif
 !.....Derivative of force term w.r.t. weights
       if( lfmatch ) then
@@ -411,14 +411,18 @@ contains
       if( lsmatch ) then
         serr= smpl%serr
         serri= 1d0/serr
+        pdiff(1:6) = 0d0
         do ixyz=1,3
           do jxyz=ixyz,3
             k = ivoigt(ixyz,jxyz)
-            pdiff(k) = (smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
-                 -smpl%sref(ixyz,jxyz)) *serri
-            gtrnl(1:ndim)= gtrnl(1:ndim) +2d0*pdiff(k) &
-                 *smpl%gws(1:ndim,k)/6 *serri
+            pdiff(k) = pdiff(k) +( smpl%strs(ixyz,jxyz) &
+                 +smpl%ssub(ixyz,jxyz) &
+                 -smpl%sref(ixyz,jxyz) ) *serri
           enddo
+        enddo
+        do k=1,6
+          gtrnl(1:ndim)= gtrnl(1:ndim) +2d0*pdiff(k) &
+               *smpl%gws(1:ndim,k)/6 *serri *swgt
         enddo
 !!$        print *,'ismpl,ediff,gws=',ismpl,ediff,smpl%gws(1:ndim,1)
       endif
@@ -469,7 +473,7 @@ contains
          nismax,nstps_done,ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
     real(8):: am(9),dt,rc,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
          ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv
-    logical:: ltdst,lstrs,lcellfix(3,3),lvc
+    logical:: ltdst,lcellfix(3,3),lvc
     character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5
     logical:: update_force_list
 
@@ -501,7 +505,6 @@ contains
     trlx = 100d0
     ltdst = .false.
     ntdst = 1
-!!$  lstrs = lsmatch
     cpctl = 'none'
     stgt(1:3,1:3) = 0d0
     ptgt = 0d0
@@ -521,15 +524,19 @@ contains
     ny = 1
     nz = 1
     iprint_pmd = max(0,iprint-10)
-    ifcoulomb = 0
 
     lvc = .false.
     do i=1,nff
       if( trim(cffs(i)).eq.'long_Coulomb' .or. &
            trim(cffs(i)).eq.'vcMorse' ) then
+        ifcoulomb = 3
         if( .not. smpl%charge_set ) lvc = .true.
 !.....Even if lvc is .false., lvc will be set true at the begining of init_force
 !.....in case of vcMorse.
+      else if( trim(cffs(i)).eq.'screened_Coulomb' ) then
+        ifcoulomb = 1
+      else if( trim(cffs(i)).eq.'Ewald_Coulomb' ) then
+        ifcoulomb = 1
       endif
     enddo
 
@@ -566,7 +573,8 @@ contains
          ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp &
          ,gwe,gwf,gws &
          ,lematch,lfmatch,lsmatch)
-    strs(1:3,1:3) = ptnsr(1:3,1:3)*up2gpa*(-1d0)
+    strs(1:3,1:3) = ptnsr(1:3,1:3) *up2gpa*(-1d0)
+    if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
 !!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
 !!$  print *,'smpl%natm =',smpl%natm
 !!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)
