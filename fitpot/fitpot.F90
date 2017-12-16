@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-15 18:18:34 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-16 22:09:27 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -706,6 +706,7 @@ subroutine read_vars()
     close(15)
   endif
   call mpi_bcast(vars,nvars,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(vranges,2*nvars,mpi_real8,0,mpi_world,ierr)
 
 end subroutine read_vars
 !=======================================================================

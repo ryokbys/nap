@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-16 15:38:08 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-16 21:56:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -300,6 +300,9 @@ contains
          ,gws(ndim,6))
 
     ngrad= ngrad +1
+    tc0= mpi_wtime()
+    call mpi_bcast(x,ndim,mpi_real8,0,mpi_world,ierr)
+    tcl= mpi_wtime() -tc0
     tg0= mpi_wtime()
 
     if( .not. lematch .and. .not.lfmatch .and. .not.lsmatch ) then
@@ -435,7 +438,7 @@ contains
 !.....TODO: allreduce may be redundant,  only reducing to node-0 is enough
 !           if the minimization routine is wrtten so...
     call mpi_allreduce(gtrnl,gtrn,ndim,mpi_real8,mpi_sum,mpi_world,ierr)
-    tcl= mpi_wtime() -tc0
+    tcl= tcl +mpi_wtime() -tc0
 
     gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
 

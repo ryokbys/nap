@@ -532,8 +532,10 @@ contains
     enddo
 
     call wrap_ranges(ndim,x0)
+!!$    print '(a,i3,10es11.3)','myid,x0=',myid,x0(1:ndim)
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
+!!$    print '(a,i3,10es11.3)','myid,g=',myid,g(1:ndim)
 !.....penalty
     pval= 0d0
     gpena(1:ndim)= 0d0
@@ -582,6 +584,7 @@ contains
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
     call wrap_ranges(ndim,x)
+!!$    print '(a,i3,10es11.3)','myid,x=',myid,x(1:ndim)
     vnorm= sqrt(sprod(ndim,x,x))
     dxnorm = 0d0
 
@@ -730,7 +733,10 @@ contains
       endif
       dx(1:ndim)= x(1:ndim) -x0(1:ndim)
       x0(1:ndim)= x(1:ndim)
+!!$      print *,''
+!!$      print '(a,2i4,30es11.3)','myid,iter,x=',myid,iter,x(1:ndim)
       call grad(ndim,x,g)
+!!$      print '(a,2i4,10es11.3)','myid,iter,g=',myid,iter,g(1:ndim)
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
       vnorm= sqrt(sprod(ndim,x,x))
