@@ -18,6 +18,7 @@ Options:
                 Num of measuring lane. In case of 1, it is identical to non-staggered measuring. [default: 1]
   -s, --shift SHIFT
                 Shift of each staggered lane. [default: 20]
+  --sid SID     Species ID. [default: 0]
 """
 
 import numpy as np
@@ -44,11 +45,15 @@ def get_ids(nsys,ids):
     return atom_ids
 
     
-def get_msd(files,ids0,nmeasure,nshift):
-    ids = ids0
-    if 0 in ids0:
+def get_msd(files,ids0,nmeasure,nshift,sid=0):
+    if sid != 0:
         nsys = NAPSystem(fname=files[0])
-        ids = [ i for i in range(len(nsys.atoms))]
+        ids = [ i for i,a in enumerate(nsys.atoms) if a.sid == sid ]
+    else:
+        ids = ids0
+        if 0 in ids0:
+            nsys = NAPSystem(fname=files[0])
+            ids = [ i for i in range(len(nsys.atoms))]
     p0= np.zeros((nmeasure,len(ids),3))
     pp= np.zeros((len(ids),3))
     msd= np.zeros((len(files),nmeasure,3))
@@ -121,7 +126,9 @@ if __name__ == "__main__":
 
     files = args['FILES']
     ids = args['--id']
-    ids = [ int(i) for i in ids.split(',') ]
+    sid = int(args['--sid'])
+    if sid == 0:
+        ids = [ int(i) for i in ids.split(',') ]
     nmeasure = int(args['--measure'])
     nshift = int(args['--shift'])
     
@@ -136,7 +143,7 @@ if __name__ == "__main__":
     # for i in range(len(files)):
     #     print i,files[i]
     
-    msd = get_msd(files,ids,nmeasure,nshift)
+    msd = get_msd(files,ids,nmeasure,nshift,sid)
 
     #...make output data files
     outfname='out.msd'
