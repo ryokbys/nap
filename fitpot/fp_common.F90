@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-16 21:56:40 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-18 22:28:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -133,7 +133,8 @@ contains
              //'/pmd')
         if( string_in_arr('screened_Coulomb',nsubff,csubffs) ) then
           ctype = 'BVS'
-        else if( string_in_arr('long_Coulomb',nsubff,csubffs) ) then
+        else if( string_in_arr('Ewald_long',nsubff,csubffs) .or.&
+             string_in_arr('Ewald',nsubff,csubffs) ) then
           ctype = 'full_Morse'
         else
           ctype = 'full_Morse'
@@ -331,7 +332,8 @@ contains
              //'/pmd')
         if( string_in_arr('screened_Coulomb',nsubff,csubffs) ) then
           ctype = 'BVS'
-        else if( string_in_arr('long_Coulomb',nsubff,csubffs) ) then
+        else if( string_in_arr('Ewald_long',nsubff,csubffs) .or.&
+             string_in_arr('Ewald',nsubff,csubffs) ) then
           ctype = 'full_Morse'
         else
           ctype = 'full_Morse'
@@ -530,7 +532,7 @@ contains
 
     lvc = .false.
     do i=1,nff
-      if( trim(cffs(i)).eq.'long_Coulomb' .or. &
+      if( trim(cffs(i)).eq.'Ewald_long' .or. &
            trim(cffs(i)).eq.'vcMorse' ) then
         ifcoulomb = 3
         if( .not. smpl%charge_set ) lvc = .true.
@@ -538,8 +540,8 @@ contains
 !.....in case of vcMorse.
       else if( trim(cffs(i)).eq.'screened_Coulomb' ) then
         ifcoulomb = 1
-      else if( trim(cffs(i)).eq.'Ewald_Coulomb' ) then
-        ifcoulomb = 1
+      else if( trim(cffs(i)).eq.'Ewald' ) then
+        ifcoulomb = 2
       endif
     enddo
 
@@ -696,44 +698,8 @@ contains
         samples(ismpl)%ssub(1:3,1:3) = strs(1:3,1:3)
       enddo
 
-!!$    allocate(esubl(nsmpl),esubg(nsmpl))
-!!$    esubl(1:nsmpl) = 0d0
-!!$    do ismpl=isid0,isid1
-!!$      esubl(ismpl) = samples(ismpl)%esub
-!!$    enddo
-!!$    esubg(1:nsmpl) = 0d0
-!!$    call mpi_reduce(esubl,esubg,nsmpl,mpi_real8,mpi_sum,0,mpi_world,ierr)
-!!$
-!!$    if( myid.eq.0 ) then
-!!$      esubg(1:nsmpl)= esubg(1:nsmpl)/nalist(1:nsmpl)
-!!$      open(92,file='out.erg.subtract',status='replace')
-!!$      do ismpl=1,nsmpl
-!!$        write(92,'(i8,es15.7,2x,a)') ismpl,esubg(ismpl),trim(cdirlist(ismpl))
-!!$      enddo
-!!$      close(92)
-!!$    endif
-!!$    deallocate(esubl,esubg)
     endif
 
-!!$!.....After the 1st call, subtract esubs calculated at the 1st call
-!!$  do ismpl=isid0,isid1
-!!$!.....Subtract energy and forces from eref and fref, respectively
-!!$    write(6,'(a,i8,1x,a,3es15.7)') 'ismpl,cdirname,eref,epot,esub=',ismpl,&
-!!$         trim(samples(ismpl)%cdirname),samples(ismpl)%eref,&
-!!$         samples(ismpl)%epot,samples(ismpl)%esub
-!!$    samples(ismpl)%eref = samples(ismpl)%eref -samples(ismpl)%esub
-!!$    samples(ismpl)%epot = samples(ismpl)%epot -samples(ismpl)%esub
-!!$    do i=1,samples(ismpl)%natm
-!!$      samples(ismpl)%fref(1:3,i) = samples(ismpl)%fref(1:3,i) &
-!!$           -samples(ismpl)%fsub(1:3,i)
-!!$      samples(ismpl)%fa(1:3,i) = samples(ismpl)%fa(1:3,i) &
-!!$           -samples(ismpl)%fsub(1:3,i)
-!!$    enddo
-!!$    write(6,'(a,i8,1x,a,2es15.7)') ' ismpl,cdirname,eref=',ismpl, &
-!!$         trim(samples(ismpl)%cdirname),samples(ismpl)%eref
-!!$!.....TODO: stress should also come here.
-!!$
-!!$  enddo
 
     l1st = .false.
     return
