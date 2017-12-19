@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-12-16 13:07:30 Ryo KOBAYASHI>
+c                     Last-modified: <2017-12-19 15:22:25 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -986,7 +986,7 @@ c      print *,'one_shot: 07'
       call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
      &     ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
      &     ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
-      
+
 c.....revert forces to the unit eV/A before going out 
       if( myid_md.eq.0 ) then
         do i=1,ntot
@@ -999,6 +999,14 @@ c          atot(1:3,i) = aai(1:3)/acon(is)
         enddo
       endif
 
+      if( iprint.ne.0 .and. myid_md.eq.0 .and. lvc ) then
+        print *,'Atomic charges:'
+        do i=1,ntot
+          print '(a,i5,es11.3,4f7.3)','ia,epi,chg,frc=',i
+     &         ,epitot(i),chgtot(i),atot(1:3,i)
+        enddo
+      endif
+      
 c.....deallocate all the arrays allocated 
       deallocate(acon,fack)
       deallocate(fekin,fa2v)
@@ -2523,12 +2531,13 @@ c.....count max number of atoms in a node
             nmin = min(nmin,n)
           enddo
           namax = max(int(nmax*1.2),200)
-          nbmax = namax*27
+          nbmax = max(namax*27,nbmax)
           namax = namax +nbmax
           if( iprint.ne.0 ) then
             write(6,'(a,i10)') ' Min number of local atoms = ',nmin
             write(6,'(a,i10)') ' Max number of local atoms = ',nmax
-            write(6,'(a,i10)')   '   nbmax = nmax*1.2*27       = ',nbmax
+            write(6,'(a,i10)')   '   nbmax = max(nmax*1.2*27,nbmax) = '
+     &           ,nbmax
             write(6,'(a,i10)')   '   namax = nmax*1.2 + nbmax  = ',namax
             write(6,'(a,i10,a)') ' Memory for main routine   = '
      &           ,namax*(3*4 +3*3*5 +1 +nnmax/2)*8/1000/1000,' MB'
@@ -2802,12 +2811,12 @@ c=======================================================================
       gamma = acos(sprod(3,h(1:3,1),h(1:3,2))/a/b) /pi *180d0
 
       write(6,'(a)') ' Lattice parameters:'
-      write(6,'(a,f10.3,a)') '   a = ',a,' Ang.'
-      write(6,'(a,f10.3,a)') '   b = ',b,' Ang.'
-      write(6,'(a,f10.3,a)') '   c = ',c,' Ang.'
-      write(6,'(a,f10.2,a)') '   alpha = ',alpha,' deg.'
-      write(6,'(a,f10.2,a)') '   beta  = ',beta,' deg.'
-      write(6,'(a,f10.2,a)') '   gamma = ',gamma,' deg.'
+      write(6,'(a,f10.3,a,f7.2,a)') '   a = ',a,' Ang.,  alpha = '
+     &     ,alpha,' deg.'
+      write(6,'(a,f10.3,a,f7.2,a)') '   b = ',b,' Ang.,  beta  = '
+     &     ,beta,' deg.'
+      write(6,'(a,f10.3,a,f7.2,a)') '   c = ',c,' Ang.,  gamma = '
+     &     ,gamma,' deg.'
 
       end subroutine cell_info
 c-----------------------------------------------------------------------

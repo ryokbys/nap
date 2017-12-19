@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-12-13 11:10:45 Ryo KOBAYASHI>
+c                     Last-modified: <2017-12-18 22:25:04 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -78,9 +78,9 @@ c        ifcoulomb = 3
 c      endif
       if( use_force('screened_Coulomb') ) then
         ifcoulomb = 1
-      else if( use_force('Ewald_Coulomb') ) then
+      else if( use_force('Ewald') ) then
         ifcoulomb = 2
-      else if( use_force('long_Coulomb') ) then
+      else if( use_force('Ewald_long') ) then
         ifcoulomb = 3
       endif
 
@@ -99,9 +99,6 @@ c        call system('cp pmd0000 pmd0000.orig')
           stop
         endif
 
-c.....If needed, read atomic charges from chg0000 file
-c.....but even if not needed, allocate ntot long array
-c.....for the simplicty of the code
         allocate(chgtot(ntot),chitot(ntot))
         chitot(1:ntot) = 0d0
         call set_atomic_charges(ntot,chgtot,tagtot,nspmax,schg)

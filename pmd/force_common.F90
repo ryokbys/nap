@@ -26,8 +26,8 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use EAM,only:force_EAM
   use linreg,only:force_linreg
   use NN,only:force_NN
-  use Coulomb, only: force_screened_Coulomb, force_Ewald_Coulomb &
-       ,initialize_coulomb, force_long_Coulomb
+  use Coulomb, only: force_screened_Coulomb, force_Ewald &
+       ,initialize_coulomb, force_Ewald_long
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
   use Buckingham,only:force_Buckingham
   use Bonny_WRe,only: force_Bonny_WRe
@@ -153,17 +153,17 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
          ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
          ,ifcoulomb,l1st)
   else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
-    call force_Ewald_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-         ,chg,h,hi,tcom &
-         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
-         ,ifcoulomb,l1st,lcell_updated)
-  else if( ifcoulomb.eq.3 ) then ! long-range Coulomb
-    call force_long_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
+    call force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
-         ,ifcoulomb,l1st,lcell_updated)
+         ,ifcoulomb,l1st,lcell_updated,lvc)
+  else if( ifcoulomb.eq.3 ) then ! long-range Coulomb
+    call force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
+         ,chg,chi,h,hi,tcom &
+         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
+         ,ifcoulomb,l1st,lcell_updated,lvc)
   endif
 
 !.....convert forces from hmat-coordinates to Cartesian coordinates
@@ -203,8 +203,8 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
 !.....vcMorse requires charge optimization, 
 !.....everywhen atomic positions or potential parameters change
   if( use_force('vcMorse') ) then
-    if( use_force('long_Coulomb') ) then
-      if( myid_md.eq.0 .and. iprint.ne.0 ) print *,'Use long_Coulomb,' &
+    if( use_force('Ewald_long') ) then
+      if( myid_md.eq.0 .and. iprint.ne.0 ) print *,'Use Ewald_long,' &
            //' because vcMorse is chosen.'
       ifcoulomb = 3
     endif
@@ -213,8 +213,8 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
 
 !.....Coulomb interaction
   if( use_force('screened_Coulomb') .or. &
-       use_force('Ewald_Coulomb') .or. &
-       use_force('long_Coulomb') ) then
+       use_force('Ewald') .or. &
+       use_force('Ewald_long') ) then
     call initialize_coulomb(natm,tag,chg,chi,myid_md &
          ,mpi_md_world,ifcoulomb,iprint,h,rc,lvc)
   endif
@@ -798,8 +798,8 @@ subroutine set_force_flags(ifcoulomb,myid,iprint)
     if( use_force('SRIM') ) print *,'  SRIM'
 !.....Coulomb forces should be exclusive each other
     if( use_force('screened_Coulomb') ) print *,'  screened_Coulomb'
-    if( use_force('Ewald_Coulomb') ) print *,'  Ewald_Coulomb'
-    if( use_force('long_Coulomb') ) print *,'  long_Coulomb'
+    if( use_force('Ewald') ) print *,'  Ewald'
+    if( use_force('Ewald_long') ) print *,'  Ewald_long'
   endif
 
 end subroutine set_force_flags
@@ -814,7 +814,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 !  force_Coulomb.F90.
 !
   use force
-  use Coulomb, only: qforce_long
+  use Coulomb, only: qforce_long,qforce_short,qforce_self
   use Morse, only: qforce_vcMorse
   implicit none
   integer,intent(in):: namax,natm,myid,mpi_md_world,iprint,ifcoulomb &
@@ -826,7 +826,8 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
        ,nnn(6),nex(3),lsex(nbmax,6)
 
   integer:: istp,i,istp_pos,istp_conv
-  real(8):: eclong,epot,epotp,afq,eMorse,fqnorm,vqnorm,dt,alpha,p
+  real(8):: eclong,epot,epotp,afq,eMorse,fqnorm,vqnorm,dt,alpha,p &
+       ,ecoul,ecshort,eself
   real(8),save,allocatable:: vq(:),fq(:)
 
   character(len=128),parameter:: algorithm = 'damping'
@@ -854,12 +855,26 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 
 !.....Gather forces on charges
   fq(1:natm) = 0d0
+  ecshort = 0d0
   eclong = 0d0
+  eself = 0d0
   istp = 0
 
-  call qforce_long(namax,natm,tag,ra,chg,chi,h,tcom,mpi_md_world, &
-       myid,iprint,ifcoulomb,fq,eclong)
-  epot = eclong
+  if( ifcoulomb.eq.3 ) then
+    call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+    call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
+         myid,iprint,ifcoulomb,fq,eclong,eself)
+  else if( ifcoulomb.eq.2 ) then
+    call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+    call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint,ifcoulomb &
+         ,rc,fq,ecshort)
+    print *,'fq after short=',fq(1:natm)
+    call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
+         myid,iprint,ifcoulomb,fq,eclong,eself)
+    print *,'fq after long=',fq(1:natm)
+    print *,''
+  endif
+  epot = eself +ecshort + eclong
 
   if( myid.eq.0 .and. iprint.ge.20 ) then
     write(6,'(a)') ' After qforce_long:'
@@ -927,10 +942,29 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
          ,nex,mpi_md_world,chg)
 
 !.....get new qforces
+    eclong = 0d0
+    ecshort = 0d0
+    eself = 0d0
     fq(1:natm) = 0d0
-    call qforce_long(namax,natm,tag,ra,chg,chi,h,tcom,mpi_md_world, &
-         myid,iprint,ifcoulomb,fq,eclong)
-    epot = eclong
+    if( ifcoulomb.eq.3 ) then
+      call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+      call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
+           myid,iprint,ifcoulomb,fq,eclong,eself)
+    else if( ifcoulomb.eq.2 ) then
+      call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+      print *,'fq after self=',fq(1:natm)
+      call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint,ifcoulomb &
+           ,rc,fq,ecshort)
+      print *,'fq after short=',fq(1:natm)
+      call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
+           myid,iprint,ifcoulomb,fq,eclong,eself)
+      print *,'fq after long=',fq(1:natm)
+      print *,''
+    endif
+    epot = eself +ecshort + eclong
+!!$    call qforce_long(namax,natm,tag,ra,chg,chi,h,tcom,mpi_md_world, &
+!!$         myid,iprint,ifcoulomb,fq,eclong)
+!!$    epot = eclong
     if( myid.eq.0 .and. iprint.ge.20 ) then
       write(6,'(a)') ' After qforce_long:'
       write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,20))
@@ -960,7 +994,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       istp_conv = istp_conv +1
       if( istp_conv.gt.nstp_conv ) then
         if( myid.eq.0 .and. iprint.ge.10 ) then
-          write(6,'(a,i4,a)') ' Dampopt_charge converged with ', &
+          write(6,'(a,i0,a)') ' Dampopt_charge converged at ', &
                istp,' steps.'
         endif
         exit
