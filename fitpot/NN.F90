@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-07 12:19:35 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-19 22:21:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -230,8 +230,11 @@ contains
       swgt2tst = swgt2tst*2d0
     endif
     if( myid.eq.0 ) then
-      write(6,'(a,es15.7)') ' swgt2trn = ',swgt2trn
-      write(6,'(a,es15.7)') ' swgt2tst = ',swgt2tst
+      write(6,'(a)') ' Weights to divide evaluation value:'
+      write(6,'(a,f10.1)') '   for training: ',swgt2trn
+      write(6,'(a,f10.1)') '   for test:     ',swgt2tst
+!!$      write(6,'(a,es15.7)') ' swgt2trn = ',swgt2trn
+!!$      write(6,'(a,es15.7)') ' swgt2tst = ',swgt2tst
     endif
 
     if( myid.eq.0 ) then
