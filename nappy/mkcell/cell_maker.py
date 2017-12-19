@@ -3,13 +3,12 @@
 Make typical crystalline structures of conventional cell.
 
 Usage:
-  cell_maker.py (sc|bcc|fcc|hcp|diamond) [options]
+  cell_maker.py (sc|bcc|fcc|hcp|diamond|nacl) [options]
 
 Options:
   -h, --help  Show this help message and exit.
-  --nx=NX    Num of copies of a unit cell in x-direction. [default: 1]
-  --ny=NY    Num of copies of a unit cell in y-direction. [default: 1]
-  --nz=NZ    Num of copies of a unit cell in z-direction. [default: 1]
+  --size=SIZE
+              Number of copies of the unit cell, int the format, nx,ny,nz. [default: 1,1,1]
   -l, --lattice-constant=LATCONST
              Lattice constant of an axis. [default: 5.472]
   -o OUTFILE
@@ -187,15 +186,41 @@ def make_2D_triangle(latconst=3.8,size=(1,1,1)):
     s.add_vacuum(2.*latconst, 0.0, 10.*latconst*np.sqrt(3))
     return s
 
+def make_nacl(latconst=1.0):
+    specorder = ['Na','Cl']
+    s = NAPSystem(specorder=specorder)
+    #...lattice
+    a1= np.array([ 1.0, 0.0, 0.0 ])
+    a2= np.array([ 0.0, 1.0, 0.0 ])
+    a3= np.array([ 0.0, 0.0, 1.0 ])
+    s.set_lattice(latconst,a1,a2,a3)
+    positions=[(0.00, 0.00, 0.00),
+               (0.50, 0.00, 0.00),
+               (0.00, 0.50, 0.00),
+               (0.00, 0.00, 0.50),
+               (0.50, 0.50, 0.00),
+               (0.50, 0.00, 0.50),
+               (0.00, 0.50, 0.50),
+               (0.50, 0.50, 0.50),]
+    species = ['Na','Cl','Cl','Cl','Na','Na','Na','Cl']
+    for i,p in enumerate(positions):
+        atom= Atom()
+        atom.set_pos(p[0],p[1],p[2])
+        atom.set_symbol(species[i])
+        s.add_atom(atom)
+    return s
+
+
 #=======================================================================
 if __name__ == "__main__":
 
     args= docopt(__doc__)
     #print args
 
-    nx= int(args['--nx'])
-    ny= int(args['--ny'])
-    nz= int(args['--nz'])
+    # nx= int(args['--nx'])
+    # ny= int(args['--ny'])
+    # nz= int(args['--nz'])
+    nx,ny,nz = [ int(x) for x in args['--size'].split(',') ]
     latconst= float(args['--lattice-constant'])
     ofname= args['-o']
 
@@ -210,6 +235,8 @@ if __name__ == "__main__":
         struct= make_hcp(latconst)
     elif args['diamond']:
         struct= make_diamond(latconst)
+    elif args['nacl']:
+        struct = make_nacl(latconst)
 
     if struct is None:
         print "Something wrong: structure is not created..."
