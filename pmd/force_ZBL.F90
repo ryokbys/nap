@@ -1,8 +1,8 @@
-module SRIM
+module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-11-28 21:37:34 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-20 17:39:53 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
-!  Parallel implementation of SRIM repulsive potential with switching
+!  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
 !  See:
 !   [1] Ziegler, Biersack, Littmark (ZBL) The Stopping and Range of Ions
@@ -14,7 +14,7 @@ module SRIM
   implicit none
 
   character(len=128):: paramsdir = '.'
-  character(len=128),parameter:: paramsfname = 'in.params.SRIM'
+  character(len=128),parameter:: paramsfname = 'in.params.ZBL'
   integer,parameter:: ioprms = 20
   
 !.....Max num of species
@@ -27,19 +27,19 @@ module SRIM
 
   logical:: interact(msp,msp)
   real(8):: qnucl(msp)
-  real(8):: srim_rc
+  real(8):: zbl_rc
   real(8):: r_inner(msp)
   real(8):: r_outer(msp)
 
 !.....ZBL parameters
-  real(8):: srim_aa = 0.4683766d0
-  real(8):: srim_gamma = 0.23d0
-  real(8):: srim_alpha(1:4) = (/ &
+  real(8):: zbl_aa = 0.4683766d0
+  real(8):: zbl_gamma = 0.23d0
+  real(8):: zbl_alpha(1:4) = (/ &
        0.18180d0, &
        0.50990d0, &
        0.28020d0, &
        0.02817d0 /)
-  real(8):: srim_beta(1:4) = (/ &
+  real(8):: zbl_beta(1:4) = (/ &
        3.20d0, &
        0.94230d0, &
        0.40290d0, &
@@ -47,7 +47,7 @@ module SRIM
 
 contains
 !=======================================================================
-  subroutine read_params_SRIM(myid,mpi_world,iprint)
+  subroutine read_params_ZBL(myid,mpi_world,iprint)
     implicit none
     include "mpif.h"
     integer,intent(in):: myid,mpi_world,iprint
@@ -62,9 +62,9 @@ contains
       open(ioprms,file=trim(fname),status='old')
       interact(1:msp,1:msp) = .false.
       qnucl(1:msp) = 0d0
-      srim_rc = 0d0
+      zbl_rc = 0d0
       
-      if( iprint.ne.0 ) write(6,'(/,a)') ' SRIM parameters:'
+      if( iprint.ne.0 ) write(6,'(/,a)') ' ZBL parameters:'
       do while(.true.)
         read(ioprms,*,end=10) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
@@ -77,7 +77,7 @@ contains
         qnucl(isp) = qnucli
         r_inner(isp) = ri
         r_outer(isp) = ro
-        srim_rc = max(srim_rc,ro)
+        zbl_rc = max(zbl_rc,ro)
         if( iprint.ne.0 ) write(6,'(a,i4,3(2x,f0.3))') &
              '   isp,qnucl,ri,ro = ',isp,qnucli,ri,ro
       enddo
@@ -101,16 +101,16 @@ contains
       endif
     endif
 
-    call mpi_bcast(srim_rc,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(zbl_rc,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qnucl,msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(r_inner,msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(r_outer,msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(srim_rc,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(zbl_rc,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
     return
-  end subroutine read_params_SRIM
+  end subroutine read_params_ZBL
 !=======================================================================
-  subroutine force_SRIM(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_ZBL(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
     implicit none
@@ -133,21 +133,21 @@ contains
     real(8),allocatable,save:: strsl(:,:,:)
     real(8),external:: fcut1,dfcut1
 
-    real(8),save:: srim_rc2
+    real(8),save:: zbl_rc2
 
     if( l1st ) then
-      if( rc.lt.srim_rc ) then
+      if( rc.lt.zbl_rc ) then
         if( myid_md.eq.0 .and. iprint.gt.0 ) then
-          print '(/,a)',' Input cutoff radius is smaller than rc of SRIM potential.'
+          print '(/,a)',' Input cutoff radius is smaller than rc of ZBL potential.'
           print '(a,f0.3)', '   Input rc     = ',rc
-          print '(a,f0.3)', '   Potential rc = ',srim_rc
+          print '(a,f0.3)', '   Potential rc = ',zbl_rc
         endif
         call mpi_finalize(ierr)
         stop
       endif
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
-      srim_rc2 = srim_rc*srim_rc
+      zbl_rc2 = zbl_rc*zbl_rc
     endif
 
     if( size(strsl).lt.3*3*namax ) then
@@ -173,7 +173,7 @@ contains
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         rij= xij(1)**2+ xij(2)**2 +xij(3)**2
-        if( rij.gt.srim_rc2 ) cycle
+        if( rij.gt.zbl_rc2 ) cycle
         rij = sqrt(rij)
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
@@ -187,8 +187,8 @@ contains
           epi(i)= epi(i) +tmp2
           epotl=epotl +tmp2
         endif
-!!$        dtmp = dvij(is,js,rij)*fcut1(rij,srim_rc) &
-!!$             +tmp *dfcut1(rij,srim_rc)
+!!$        dtmp = dvij(is,js,rij)*fcut1(rij,zbl_rc) &
+!!$             +tmp *dfcut1(rij,zbl_rc)
         dtmp = dvij(is,js,rij)
         aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
@@ -215,7 +215,7 @@ contains
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
 
-  end subroutine force_SRIM
+  end subroutine force_ZBL
 !=======================================================================
   function vij(is,js,rij)
 !
@@ -275,7 +275,7 @@ contains
 
     qi = qnucl(is)
     qj = qnucl(js)
-    rs = srim_aa  /(qi**srim_gamma +qj**srim_gamma)
+    rs = zbl_aa  /(qi**zbl_gamma +qj**zbl_gamma)
     vnucl = qi*qj/rij *xi(rij/rs)
     return
   end function vnucl
@@ -292,7 +292,7 @@ contains
 
     qi = qnucl(is)
     qj = qnucl(js)
-    rs = srim_aa  /(qi**srim_gamma +qj**srim_gamma)
+    rs = zbl_aa  /(qi**zbl_gamma +qj**zbl_gamma)
     dvnucl = -qi*qj/rij* ( 1d0/rij*xi(rij/rs) -dxi(rij/rs)/rs )
     return
   end function dvnucl
@@ -305,7 +305,7 @@ contains
 
     xi = 0d0
     do i=1,4
-      xi = xi +srim_alpha(i)*exp(-srim_beta(i)*x)
+      xi = xi +zbl_alpha(i)*exp(-zbl_beta(i)*x)
     enddo
 !!$    xi= 0.1818d0*exp(-3.2d0*x) &
 !!$         +0.5099d0*exp(-0.9423d0*x) &
@@ -322,7 +322,7 @@ contains
 
     dxi = 0d0
     do i=1,4
-      dxi = dxi -srim_beta(i)*srim_alpha(i)*exp(-srim_beta(i)*x)
+      dxi = dxi -zbl_beta(i)*zbl_alpha(i)*exp(-zbl_beta(i)*x)
     enddo
 !!$    dxi= -0.58176d0*exp(-3.2d0*x) &
 !!$         -0.48047877d0*exp(-0.9423d0*x) &
@@ -350,7 +350,7 @@ contains
   end function dzeta
 !=======================================================================
   
-end module SRIM
+end module ZBL
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"

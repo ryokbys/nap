@@ -31,7 +31,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
   use Buckingham,only:force_Buckingham
   use Bonny_WRe,only: force_Bonny_WRe
-  use SRIM,only: force_SRIM
+  use ZBL,only: force_ZBL
   implicit none
   integer,intent(in):: namax,natm,nnmax,nismax,iprint
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
@@ -141,7 +141,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   if( use_force('Bonny_WRe') ) call force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
-  if( use_force('SRIM') ) call force_SRIM(namax,natm,tag,ra,nnmax,aa,strs &
+  if( use_force('ZBL') ) call force_ZBL(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
 
@@ -187,7 +187,7 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
   use EAM, only: init_EAM, read_params_EAM, update_params_EAM, lprmset_EAM
   use NN, only: read_const_NN, read_params_NN, update_params_NN, lprmset_NN
   use Buckingham, only: init_Buckingham, read_params_Buckingham, lprmset_Buckingham
-  use SRIM, only: read_params_SRIM
+  use ZBL, only: read_params_ZBL
   implicit none
   integer,intent(in):: namax,natm,myid_md,mpi_md_world,iprint !,numff
   real(8),intent(in):: tag(namax),h(3,3),rc
@@ -266,9 +266,9 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
       call read_params_Buckingham(myid_md,mpi_md_world,iprint)
     endif
   endif
-!.....SRIM
-  if( use_force('SRIM') ) then
-    call read_params_SRIM(myid_md,mpi_md_world,iprint)
+!.....ZBL
+  if( use_force('ZBL') ) then
+    call read_params_ZBL(myid_md,mpi_md_world,iprint)
   endif
 
 end subroutine init_force
@@ -795,7 +795,7 @@ subroutine set_force_flags(ifcoulomb,myid,iprint)
     if( use_force('vcMorse') ) print *,'  vcMorse'
     if( use_force('Buckingham') ) print *,'  Buckingham'
     if( use_force('Bonny_WRe') ) print *,'  Bonny_WRe'
-    if( use_force('SRIM') ) print *,'  SRIM'
+    if( use_force('ZBL') ) print *,'  ZBL'
 !.....Coulomb forces should be exclusive each other
     if( use_force('screened_Coulomb') ) print *,'  screened_Coulomb'
     if( use_force('Ewald') ) print *,'  Ewald'
