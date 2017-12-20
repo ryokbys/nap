@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-12-19 15:22:25 Ryo KOBAYASHI>
+c                     Last-modified: <2017-12-20 15:47:16 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -229,8 +229,11 @@ c.....Set initial temperature if needed
           if( ttgt(ifmv).lt.0d0 ) then
             tfac(ifmv)= -1d0
           else
-            tfac(ifmv)= sqrt(2d0*tgmm*(fkb*ev2j)*ttgt(ifmv)/dt)
-     &           *m2ang/s2fs
+c            tfac(ifmv)= sqrt(2d0*tgmm*(fkb*ev2j)*ttgt(ifmv)/dt)
+c     &           *m2ang/s2fs
+            tfac(ifmv)= dsqrt(2d0*tgmm*fkb*ttgt(ifmv)/dt)
+            print *,'ifmv,ttgt,fkb,dt,tfac='
+     &           ,ifmv,ttgt(ifmv),fkb,dt,tfac(ifmv)
           endif
         enddo
       endif
@@ -538,7 +541,7 @@ c.....Second kick of velocities
 c.....Langevin thermostat with Mannella integrator
           hscl(1:3)= 0d0
           do l=1,3
-            hscl(l)= sqrt(h(1,l,0)**2 +h(2,l,0)**2 +h(3,l,0)**2)
+            hscl(l)= dsqrt(h(1,l,0)**2 +h(2,l,0)**2 +h(3,l,0)**2)
           enddo
           do i=1,natm
 c            ifmv= int(mod(tag(i)*10,10d0))
@@ -550,11 +553,14 @@ c            ifmv= int(mod(tag(i)*10,10d0))
               va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
               ami= am(is)
               aai(1:3)= 0d0
-              tmp= tfac(ifmv) /sqrt(ami*amu2kg) !*dt
+              tmp= tfac(ifmv)*dsqrt(ami) !/sqrt(ami*amu2kg) !*dt
+c              if( i.eq.1 ) print *,'ifmv,tfac,ami,tgmm,tmp='
+c     &             ,ifmv,tfac(ifmv),ami,tgmm,tmp
               do l=1,3
-                aai(l)= -va(l,i)*tgmm +tmp*box_muller()/hscl(l)
+                aai(l)= -va(l,i)*tgmm*ami +tmp*box_muller()/hscl(l)
               enddo
-              va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(is)*dt
+c.....To compensate the factor 1/2 in fa2v, multiply 2 here.
+              va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(is)*dt *2d0
 c.....accumulate energy difference
               vi(1:3)= h(1:3,1,0)*va(1,i)
      &             +h(1:3,2,0)*va(2,i)
@@ -603,9 +609,9 @@ c.....target temperatures are forced to be set intermediate temperatures
             if(ndof(ifmv).le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
             temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
             if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
-              tfac(ifmv)= sqrt(1d0 +dt/trlx*100d0 )
+              tfac(ifmv)= dsqrt(1d0 +dt/trlx*100d0 )
             else
-              tfac(ifmv)= sqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv))
+              tfac(ifmv)= dsqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv))
      &             /temp(ifmv))
             endif
           enddo
@@ -970,10 +976,10 @@ c      print *,'one_shot: 06'
         if( use_force('Morse') ) call gradw_Morse(namax,natm,tag,
      &       ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws,
      &       lematch,lfmatch,lsmatch)
-c.....Derivative of stress should be divided by the cell volume
-        gws(1:ndimp,1:6) = gws(1:ndimp,1:6) /vol
 c        if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra
 c     &       ,nnmax,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
+c.....Derivative of stress should be divided by the cell volume
+        gws(1:ndimp,1:6) = gws(1:ndimp,1:6) /vol
       endif
 
       if( iprint.ne.0 ) then
@@ -1271,7 +1277,7 @@ c      print *,'va(1:3,imax)=',va(1:3,imax)
       vmax= 0d0
       call mpi_allreduce(vmaxl,vmax,1,mpi_real8
      &     ,mpi_max,mpi_md_world,ierr)
-      vmax=sqrt(vmax)
+      vmax=dsqrt(vmax)
 
       end subroutine get_ekin
 c=======================================================================
@@ -2425,8 +2431,8 @@ c=======================================================================
      &     ,mpi_sum,mpi_md_world,ierr)
       call mpi_allreduce(fdotvl,fdotv,1,mpi_real8
      &     ,mpi_sum,mpi_md_world,ierr)
-      vnorm = sqrt(vnorm)
-      fnorm = sqrt(fnorm)
+      vnorm = dsqrt(vnorm)
+      fnorm = dsqrt(fnorm)
       do i=1,natm
         do ixyz=1,3
           va(ixyz,i) = (1d0 -alp_fire)*va(ixyz,i)
@@ -2803,9 +2809,9 @@ c=======================================================================
       write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2)
       write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3)
 
-      a = sqrt(sprod(3,h(1:3,1),h(1:3,1)))
-      b = sqrt(sprod(3,h(1:3,2),h(1:3,2)))
-      c = sqrt(sprod(3,h(1:3,3),h(1:3,3)))
+      a = dsqrt(sprod(3,h(1:3,1),h(1:3,1)))
+      b = dsqrt(sprod(3,h(1:3,2),h(1:3,2)))
+      c = dsqrt(sprod(3,h(1:3,3),h(1:3,3)))
       alpha = acos(sprod(3,h(1:3,2),h(1:3,3))/b/c) /pi *180d0
       beta  = acos(sprod(3,h(1:3,1),h(1:3,3))/a/c) /pi *180d0
       gamma = acos(sprod(3,h(1:3,1),h(1:3,2))/a/b) /pi *180d0
