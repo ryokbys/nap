@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-13 11:20:33 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-20 21:55:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -219,7 +219,7 @@ contains
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij=sqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
+        rij=dsqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
         if( rij.gt.rcmax ) cycle
         rho(i) = rho(i) +rhoij(js,rij)
       enddo
@@ -244,7 +244,7 @@ contains
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij=sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
+        rij=dsqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
         if( rij.gt.rcmax ) cycle
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
@@ -402,7 +402,7 @@ contains
              +A2_W*rho*rho +A3_W*rho*rho*rho
       endif
     else if( is.eq.2 ) then  ! Re
-      frho = A_Re*sqrt(rho) +B_Re*rho +C_Re*rho*rho
+      frho = A_Re*dsqrt(rho) +B_Re*rho +C_Re*rho*rho
     endif
     
   end function frho
@@ -420,7 +420,7 @@ contains
         dfrho = A1_W +2d0*A2_W*rho +3d0*A3_W*rho*rho
       endif
     else if( is.eq.2 ) then  ! Re
-      dfrho = 0.5d0*A_Re/sqrt(rho) +B_Re +2d0*C_Re*rho
+      dfrho = 0.5d0*A_Re/dsqrt(rho) +B_Re +2d0*C_Re*rho
     endif
     
   end function dfrho
@@ -457,7 +457,7 @@ contains
     real(8),intent(in):: rho
     real(8):: fspln
 
-    fspln = fspln_a1*sqrt(rho) +fspln_a2*rho*rho
+    fspln = fspln_a1*dsqrt(rho) +fspln_a2*rho*rho
     return
   end function fspln
 !=======================================================================
@@ -469,7 +469,7 @@ contains
     real(8),intent(in):: rho
     real(8):: dfspln
 
-    dfspln = 0.5d0*fspln_a1/sqrt(rho) +2d0*fspln_a2*rho
+    dfspln = 0.5d0*fspln_a1/dsqrt(rho) +2d0*fspln_a2*rho
     return
   end function dfspln
 !=======================================================================
@@ -534,6 +534,7 @@ contains
     qi = qnucl(is)
     qj = qnucl(js)
 !!$    rs = 0.4683766d0  /sqrt(qi**(2d0/3) +qj**(2d0/3))
+!!$    rs = 0.4683766d0  /(qi**(2d0/3) +qj**(2d0/3))
     rs = 0.4683766d0  /(qi**(0.23d0) +qj**(0.23d0))
     vnucl = acc *qi*qj/rij *xi(rij/rs)
     return
@@ -552,6 +553,7 @@ contains
     qi = qnucl(is)
     qj = qnucl(js)
 !!$    rs = 0.4683766d0  /sqrt(qi**(2d0/3) +qj**(2d0/3))
+!!$    rs = 0.4683766d0  /(qi**(2d0/3) +qj**(2d0/3))
     rs = 0.4683766d0  /(qi**(0.23d0) +qj**(0.23d0))
     dvnucl = acc* qi*qj/rij* ( -1d0/rij*xi(rij/rs) &
          +dxi(rij/rs)/rs )
