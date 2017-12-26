@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-19 16:05:47 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-26 10:58:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -41,7 +41,7 @@ module Coulomb
   real(8),parameter:: fbvs = 0.74d0
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
-  real(8),parameter:: qthd = 1d-8
+  real(8),parameter:: qthd = 1d-12
 
 !.....Gaussian width of Ewald sum [default: 1.0 (Angstrom)]
   real(8):: sgm_ew = 1d0
@@ -958,8 +958,10 @@ contains
 !!$    vc_bvs(1:4) = (/ 1.27443, 0.78466, 1.10968, 3.20338/)
 
     if( myid.eq.0 .and. iprint.gt.0 ) then
+      print *,''
+      print *,'Charges fixed from ideal valences and composition:'
       do is=1,nsp
-        write(6,'(a,i3,2f7.3)') ' isp, V_ideal, V_actual = '&
+        write(6,'(a,i3,2f7.3)') '   isp, V_ideal, V_actual = '&
              ,is,vid_bvs(is),vc_bvs(is)
       enddo
     endif

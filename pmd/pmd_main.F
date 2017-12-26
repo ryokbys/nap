@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-12-18 22:25:04 Ryo KOBAYASHI>
+c                     Last-modified: <2017-12-21 12:29:58 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -101,7 +101,8 @@ c        call system('cp pmd0000 pmd0000.orig')
 
         allocate(chgtot(ntot),chitot(ntot))
         chitot(1:ntot) = 0d0
-        call set_atomic_charges(ntot,chgtot,tagtot,nspmax,schg)
+        call set_atomic_charges(ntot,chgtot,tagtot,nspmax
+     &       ,chgfix,schg,myid_md,iprint)
 
 c.....Make ntot and ?tot() not null in nodes myid_md != 0
       else
@@ -319,8 +320,10 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(am,nspmax,mpi_real8,0,mpi_md_world,ierr)
       call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(nrmtrans,6,mpi_integer,0,mpi_md_world,ierr)
-      call mpi_bcast(lvc,1,mpi_logical,0,mpi_md_world,ierr)
       call mpi_bcast(lstrs0,1,mpi_logical,0,mpi_md_world,ierr)
+c.....Charge related
+      call mpi_bcast(lvc,1,mpi_logical,0,mpi_md_world,ierr)
+      call mpi_bcast(chgfix,20,mpi_character,0,mpi_md_world,ierr)
 c.....Force-fields
       call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(num_forces,1,mpi_integer,0,mpi_md_world,ierr)
@@ -386,18 +389,25 @@ c.....Write stress tensor, negative as compressive, positive as tensile
 
       end subroutine write_force
 c=======================================================================
-      subroutine set_atomic_charges(ntot,chg,tag,nspmax,schg)
+      subroutine set_atomic_charges(ntot,chg,tag,nspmax
+     &     ,chgfix,schg,myid,iprint)
       implicit none 
-      integer,intent(in):: ntot,nspmax
+      integer,intent(in):: ntot,nspmax,myid,iprint
       real(8),intent(in):: tag(ntot),schg(nspmax)
+      character(len=*),intent(in):: chgfix
       real(8),intent(out):: chg(ntot)
 
       integer:: i,is
 
-      do i=1,ntot
-        is = int(tag(i))
-        chg(i)= schg(is)
-      enddo
+      if( trim(chgfix).eq.'input' ) then
+        if( myid.eq.0 .and. iprint.ne.0 ) then
+          print *,'Charges are set from input.'
+        endif
+        do i=1,ntot
+          is = int(tag(i))
+          chg(i)= schg(is)
+        enddo
+      endif
       
       end subroutine set_atomic_charges
 c-----------------------------------------------------------------------

@@ -176,6 +176,9 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
 c        call read_c1(ionum,cforce)
         call read_force_field(ionum)
         return
+      elseif( trim(cname).eq.'fix_charge' ) then
+        call read_c1(ionum,chgfix)
+        return
       elseif( trim(cname).eq.'charge_optimize' .or.
      &       trim(cname).eq.'variable_charge' ) then
         call read_l1(ionum,lvc)

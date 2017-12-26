@@ -372,11 +372,11 @@ c
       write(ionum,'(a)') 'ITEM: ATOMS id type x y z ekin epot'
      &     //' sxx syy szz syz sx sxy chg chi'
       do i=1,ntot
-        xi(1:3)= rtot(1:3,i)
-        ri(1:3)= h(1:3,1,0)*xi(1) +h(1:3,2,0)*xi(2) +h(1:3,3,0)*xi(3)
+c        xi(1:3)= rtot(1:3,i)
+c        ri(1:3)= h(1:3,1,0)*xi(1) +h(1:3,2,0)*xi(2) +h(1:3,3,0)*xi(3)
         eki = ekitot(1,1,i) +ekitot(2,2,i) +ekitot(3,3,i)
         write(ionum,'(i8,i3,3f12.5,2f11.3,6es11.3,f9.4,f9.2)')
-     &       itotOf(tagtot(i)),int(tagtot(i)),ri(1:3),eki,
+     &       itotOf(tagtot(i)),int(tagtot(i)),rlmp(1:3,i),eki,
      &       epitot(i),
      &       stot(1,1,i),stot(2,2,i),stot(3,3,i),
      &       stot(2,3,i),stot(3,1,i),stot(1,2,i),

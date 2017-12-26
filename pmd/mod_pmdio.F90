@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-11 21:49:25 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-21 12:24:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -71,6 +71,8 @@ module pmdio
   logical:: lcellfix(1:3,1:3)= .false.
 !.....charge optimize or variable charge
   logical:: lvc = .false.
+!.....Charge setting
+  character(len=20):: chgfix='input'
 !.....print level
 !  0:quiet, 1:normal,
 !  >10:fitpot data
