@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-20 21:55:22 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-27 22:09:16 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -123,20 +123,22 @@ module Bonny_WRe
         /)
 
 !.....W-Re parameters
-  integer,parameter:: n_veq_WRe = 5
+  integer,parameter:: n_veq_WRe = 6
   real(8),parameter:: veq_WRe_a(1:5) = (/ &
        -2.335000000d+1,  &
         2.456959229d+1,  &
        -2.585878138d0,   &
         3.457586051d0,   &
-       -7.013105493d-1   &
+       -7.013105493d-1,  &
+       -0.25133241d0
        /)
   real(8),parameter:: veq_WRe_r(1:5) = (/ &
        2.650d0, &
        2.700d0, &
        3.075d0, &
        3.450d0, &
-       3.825d0  &
+       3.825d0, &
+       4.200d0
        /)
   
 contains
