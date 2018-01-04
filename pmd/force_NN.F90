@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-13 21:31:38 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-30 17:08:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -399,8 +399,9 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
-         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse
+         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,rc2
 
+    rc2 = rc*rc
     gsf(1:nsf,1:nal)= 0d0
     dgsf(1:3,1:nsf,0:nnl,1:nal)= 0d0
     igsf(1:nsf,0:nnl,1:nal) = 0
@@ -413,8 +414,9 @@ contains
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-        if( dij.ge.rc ) cycle
+        dij= rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij.ge.rc2 ) cycle
+        dij = sqrt(dij)
         js= int(tag(ja))
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)

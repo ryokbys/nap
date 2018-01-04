@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-18 22:28:52 Ryo KOBAYASHI>
+!                     Last modified: <2017-12-20 10:21:04 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -215,18 +215,20 @@ contains
 
 !.....Stress matching
       if( lsmatch ) then
-
 !.....Compare these ptnsr elements with sref elements
         serr = smpl%serr
         serri = 1d0/serr
+        pdiff(1:6) = 0d0
         do ixyz=1,3
           do jxyz=ixyz,3
             k = ivoigt(ixyz,jxyz)
-            pdiff(k)= (smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
+            pdiff(k)= pdiff(k) +(smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
                  -smpl%sref(ixyz,jxyz)) *serri
-            pdiff(k)= pdiff(k)*pdiff(k)/6
-            ftmp= ftmp +pdiff(k) *swgt
           enddo
+        enddo
+        do k=1,6
+          pdiff(k)= pdiff(k)*pdiff(k)
+          ftmp= ftmp +pdiff(k) *swgt /6
         enddo
       endif  ! stress matching
 
@@ -392,8 +394,6 @@ contains
              +2d0*ediff*smpl%gwe(1:ndim)/natm/eerr *swgt
 !!$        print *,'ismpl,epot,esub,eref,ediff,natm,eerr,swgt=' &
 !!$             ,ismpl,epot,esub,eref,ediff,natm,eerr,swgt
-!!$        print '(a,10es11.3)','gwe  =',gwe(1:ndim)
-!!$        print '(a,10es11.3)','gtrnl=',gtrnl(1:ndim)
       endif
 !.....Derivative of force term w.r.t. weights
       if( lfmatch ) then
@@ -427,7 +427,7 @@ contains
         enddo
         do k=1,6
           gtrnl(1:ndim)= gtrnl(1:ndim) +2d0*pdiff(k) &
-               *smpl%gws(1:ndim,k)/6 *serri *swgt
+               *smpl%gws(1:ndim,k)/6 *swgt *serri
         enddo
 !!$        print *,'ismpl,ediff,gws=',ismpl,ediff,smpl%gws(1:ndim,1)
       endif

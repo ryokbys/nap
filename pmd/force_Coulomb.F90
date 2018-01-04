@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-26 10:58:38 Ryo KOBAYASHI>
+!                     Last modified: <2018-01-04 18:05:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -49,7 +49,8 @@ module Coulomb
 !.....Accuracy controlling parameter for Ewald sum
 !.....See, http://www.jncasr.ac.in/ccms/sbs2007/lecturenotes/5day10nov/SBS_Ewald.pdf
 !.....Exp(-pacc) = 1e-7 when pacc= 18.0
-  real(8),parameter:: pacc   = 18d0
+!  real(8),parameter:: pacc   = 18d0
+  real(8),parameter:: pacc = 9.21d0  ! exp(-pacc) = 1e-4
 !.....real-space cell volume
   real(8):: vol
 !.....k-space variables
@@ -563,7 +564,7 @@ contains
     integer:: i,j,ik,is,js,k1,k2,k3,ierr,jj,ixyz,jxyz
     real(8):: elrl,esrl,epotl,epott,qi,qj,tmp,ftmp &
          ,bdotr,terfc,diji,dij,ss2i,sgmsq2,rc2,q2tot,q2loc,bb2,sqpi &
-         ,e0,q2,sgmi,sgmi2
+         ,e0,q2,sgmi
     real(8),save:: eself,eselfl
     real(8),allocatable,save:: ri(:),bk(:),bk1(:),bk2(:),bk3(:)&
          ,bb(:),dxdi(:),dxdj(:),rij(:),xij(:),xj(:),xi(:)
@@ -592,10 +593,9 @@ contains
       do i=1,natm
         is = int(tag(i))
         sgmi = sgm(is)
-        sgmi2= sgmi2
         q2 = chg(i)*chg(i)
         e0 = vcg_e0(is)
-        tmp = vcg_jii(is) +acc /sqrt(pi) /sgmi2
+        tmp = vcg_jii(is) +acc /sqrt(pi) /sgmi
         eselfl = eselfl +e0 +chi(i)*chg(i) +0.5d0*tmp*q2
       enddo
 !!$      call mpi_allreduce(eselfl,eself,1,mpi_real8 &
@@ -606,9 +606,8 @@ contains
         do i=1,natm
           is = int(tag(i))
           sgmi = sgm(is)
-          sgmi2= sgmi*sgmi
           q2 = chg(i)*chg(i)
-          eselfl = eselfl +q2 /sgmi2
+          eselfl = eselfl +q2 /sgmi
         enddo
         eselfl = eselfl *acc/sqrt(2d0*pi)
 !!$        eselfl = q2tot *acc /sqrt(2d0*pi) /sgm_ew
@@ -889,7 +888,7 @@ contains
       qi = chg(i)
       q2 = qi*qi
       sgmi = sgm(is)
-      tmp = vcg_jii(is)
+      tmp = vcg_jii(is) +acc/sqrt(pi) /sgmi
       eself = eself +vcg_e0(is) +chi(i)*qi +0.5d0*tmp*q2
       fq(i) = fq(i) -(chi(i) +tmp*qi)
     enddo

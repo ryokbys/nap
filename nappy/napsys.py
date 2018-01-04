@@ -145,6 +145,14 @@ class NAPSystem(object):
         gamma = np.arcsin(tc)
         return alpha,beta,gamma
 
+    def get_reciprocal_vectors(self):
+        a1,a2,a3 = self.get_lattice_vectors()
+        v = np.dot(a1,np.cross(a2,a3))
+        b1 = 2.0 *np.pi *np.cross(a2,a3)/v
+        b2 = 2.0 *np.pi *np.cross(a3,a1)/v
+        b3 = 2.0 *np.pi *np.cross(a1,a2)/v
+        return b1,b2,b3
+
     def add_atom(self,atom):
         if self.specorder and atom.symbol:
             atom.set_sid(self.specorder.index(atom.symbol)+1)

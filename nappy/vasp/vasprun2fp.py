@@ -113,8 +113,9 @@ if __name__ == "__main__":
             continue
         try:
             atoms= read('vasprun.xml',index=index,format='vasp-xml')
-        except:
+        except Exception as e:
             print ' Failed to read vasprun.xml, so skip it.'
+            print e
             continue
 
         if sequence:  # MD sequence
