@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-12-13 20:51:44 Ryo KOBAYASHI>
+!                     Last-modified: <2018-01-10 12:41:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -24,7 +24,19 @@ contains
     enddo
     return
   end function use_force
+!=======================================================================
+  subroutine write_forces(myid)
+    implicit none
+    integer,intent(in):: myid
+    integer:: i
 
+    if( myid.eq.0 ) then
+      write(6,'(/,a)') ' Use the following force-fields:'
+      do i=1,num_forces
+        write(6,'(a)') '   '//trim(force_list(i))
+      enddo
+    endif
+  end subroutine write_forces
 end module force
 !-----------------------------------------------------------------------
 !     Local Variables:

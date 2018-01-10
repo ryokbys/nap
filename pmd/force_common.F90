@@ -55,6 +55,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   epi(1:namax)= 0d0
   strs(1:3,1:3,1:namax)= 0d0
   stnsr(1:3,1:3) = 0d0
+  print *,'ifcoulomb@get_force = ',ifcoulomb
 
 !.....If varaible charge, optimize charges before any force calc
   if( lvc ) then
@@ -198,7 +199,8 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
 
   integer:: i
 
-  call set_force_flags(ifcoulomb,myid_md,iprint)
+!!$  call set_force_flags(ifcoulomb,myid_md,iprint)
+  if( iprint.ne.0 ) call write_forces(myid_md)
 
 !.....vcMorse requires charge optimization, 
 !.....everywhen atomic positions or potential parameters change

@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-20 10:21:04 Ryo KOBAYASHI>
+!                     Last modified: <2018-01-10 12:56:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -531,6 +531,7 @@ contains
     iprint_pmd = max(0,iprint-10)
 
     lvc = .false.
+    ifcoulomb = 0
     do i=1,nff
       if( trim(cffs(i)).eq.'Ewald_long' .or. &
            trim(cffs(i)).eq.'vcMorse' ) then
@@ -669,7 +670,8 @@ contains
           luse_Morse = .true.
         else if( index(trim(csubffs(i)),'Morse_repul').ne.0 ) then
           luse_Morse_repul = .true.
-        else if( index(trim(csubffs(i)),'Coulomb').ne.0 .or. &
+        else if( index(trim(csubffs(i)),'Ewald').ne.0 .or. &
+             index(trim(csubffs(i)),'Coulomb').ne.0 .or. &
              index(trim(csubffs(i)),'vcGaussian').ne.0 ) then
           luse_Coulomb = .true.
         endif
