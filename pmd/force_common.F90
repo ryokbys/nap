@@ -55,7 +55,6 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   epi(1:namax)= 0d0
   strs(1:3,1:3,1:namax)= 0d0
   stnsr(1:3,1:3) = 0d0
-  print *,'ifcoulomb@get_force = ',ifcoulomb
 
 !.....If varaible charge, optimize charges before any force calc
   if( lvc ) then
@@ -65,6 +64,12 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
     call dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
          lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
          tcom,myid_md,mpi_md_world,iprint,ifcoulomb,l1st)
+    if( l1st .and. myid_md.eq.0 .and. iprint.ge.20 ) then
+      write(6,'(/a)') ' Charges:'
+      do i=1,min(natm,100)
+        write(6,'(a,i5,i3,f8.3)') '   i,is,chg(i) = ',i,int(tag(i)),chg(i)
+      enddo
+    endif
   endif
 
   if( use_force('LJ') ) call force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h &
@@ -865,22 +870,20 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   if( ifcoulomb.eq.3 ) then
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
     call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
-         myid,iprint,ifcoulomb,fq,eclong,eself)
+         myid,iprint,ifcoulomb,fq,eclong)
   else if( ifcoulomb.eq.2 ) then
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
     call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint,ifcoulomb &
          ,rc,fq,ecshort)
-    print *,'fq after short=',fq(1:natm)
     call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
-         myid,iprint,ifcoulomb,fq,eclong,eself)
-    print *,'fq after long=',fq(1:natm)
-    print *,''
+         myid,iprint,ifcoulomb,fq,eclong)
   endif
   epot = eself +ecshort + eclong
+!!$  write(6,'(a,i6,4es12.4)') 'istp,eself,eshort,elong,epot= ',0,eself,ecshort,eclong,epot
 
   if( myid.eq.0 .and. iprint.ge.20 ) then
     write(6,'(a)') ' After qforce_long:'
-    write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,20))
+    write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,10))
   endif
 
   if( use_force('vcMorse') ) then
@@ -890,14 +893,14 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     epot = epot + eMorse
 !!$    if( myid.eq.0 .and. iprint.ge.20 ) then
 !!$      write(6,'(a)') ' After qforce_vcMorse:'
-!!$      write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,20))
+!!$      write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,10))
 !!$    endif
   endif
 
   call suppress_fq(namax,natm,fq,myid,mpi_md_world)
 !!$  if( myid.eq.0 .and. iprint.ge.20 ) then
 !!$    write(6,'(a)') ' After log(fq):'
-!!$    write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,20))
+!!$    write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,10))
 !!$  endif
   call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
   if( afq*0d0.ne.0d0 ) return   ! NaN
@@ -910,10 +913,11 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   dt = dt_dampopt
   do istp=1,nstp_dampopt
     epotp = epot
-    if( myid.eq.0 .and. iprint.ge.20 ) then
-      write(6,'(a,i5,20es11.3)') ' istp,chgs = ',istp,chg(1:min(natm,5))&
-           ,fq(1:min(natm,5)),vq(1:min(natm,5))
-    endif
+!!$    if( myid.eq.0 .and. iprint.ge.20 ) then
+!!$      write(6,'(a,i5,20es11.3)') ' istp,chgs,fqs,vqs = ' &
+!!$           ,istp,chg(1:min(natm,5)) &
+!!$           ,fq(1:min(natm,5)),vq(1:min(natm,5))
+!!$    endif
 !.....first update of velocity
     vq(1:natm) = vq(1:natm) +0.5d0*dt/amassq*fq(1:natm)
 
@@ -951,41 +955,31 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     if( ifcoulomb.eq.3 ) then
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)
       call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
-           myid,iprint,ifcoulomb,fq,eclong,eself)
+           myid,iprint,ifcoulomb,fq,eclong)
     else if( ifcoulomb.eq.2 ) then
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)
-      print *,'fq after self=',fq(1:natm)
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint,ifcoulomb &
            ,rc,fq,ecshort)
-      print *,'fq after short=',fq(1:natm)
       call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
-           myid,iprint,ifcoulomb,fq,eclong,eself)
-      print *,'fq after long=',fq(1:natm)
-      print *,''
+           myid,iprint,ifcoulomb,fq,eclong)
     endif
+!!$    write(6,'(a,i6,4es12.4)') 'istp,eself,eshort,elong,epot= ',istp,eself,ecshort,eclong,epot
     epot = eself +ecshort + eclong
-!!$    call qforce_long(namax,natm,tag,ra,chg,chi,h,tcom,mpi_md_world, &
-!!$         myid,iprint,ifcoulomb,fq,eclong)
-!!$    epot = eclong
-    if( myid.eq.0 .and. iprint.ge.20 ) then
-      write(6,'(a)') ' After qforce_long:'
-      write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,20))
-    endif
     if( use_force('vcMorse') ) then
       eMorse = 0d0
       call qforce_vcMorse(namax,natm,tag,ra,fq,nnmax,chg &
            ,h,tcom,rc,lspr,mpi_md_world,myid,eMorse,iprint,.false.)
       epot = epot + eMorse
-      if( myid.eq.0 .and. iprint.ge.20 ) then
-        write(6,'(a)') ' After qforce_vcMorse:'
-        write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,20))
-      endif
     endif
 
     call suppress_fq(namax,natm,fq,myid,mpi_md_world)
     call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
     if( afq*0d0.ne.0d0 ) return   ! NaN
     fq(1:natm) = fq(1:natm) -afq
+    if( myid.eq.0 .and. iprint.ge.20 ) then
+      write(6,'(a,i5,2es12.4,20es11.3)') ' istp,epot,de,fqs= ',istp &
+           ,epot,abs(epot-epotp),fq(1:min(natm,10))
+    endif
 
 !.....second update of velocity
     vq(1:natm) = vq(1:natm) +0.5d0*dt/amassq*fq(1:natm)

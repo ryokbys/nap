@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-01-04 18:05:47 Ryo KOBAYASHI>
+!                     Last modified: <2018-01-11 17:20:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -195,20 +195,28 @@ contains
       chi(i) = vcg_chi(is)
     enddo
 
-    sgm_min = 1d+30
-    do i=1,nsp
-      sgm_min = min(sgm(i),sgm_min)
-    enddo
-    bkmax  = sqrt(2d0*pacc) /sgm_min
+    if( myid.eq.0 .and. iprint.ne.0 ) then
+      print *,'Sigmas are overwritten by rc/sqrt(2*pacc),'
+      print *,'since the current implementation cannot treat species-dependent sigma.'
+    endif
+    sgm_ew = rc/sqrt(2d0*pacc)
+    sgm(1:msp) = sgm_ew
+!!$    sgm_min = 1d+30
+!!$    do i=1,nsp
+!!$      sgm_min = min(sgm(i),sgm_min)
+!!$    enddo
+!!$    bkmax  = sqrt(2d0*pacc) /sgm_min
+    bkmax  = 2d0*pacc /rc
     if( myid.eq.0 .and. iprint.ne.0 ) then
       write(6,'(/,a)') ' Ewald sum parameters:'
       write(6,'(a,f12.4)') '   1/(4*pi*eps0)        = ', acc
       write(6,'(a,f12.4)') '   Accuracy parameter p = ', pacc
-      write(6,'(a)')       '   Gaussian simgas:'
-      do i=1,nsp
-        write(6,'(a,f12.4)') '     ',sgm(i)
-      enddo
-      write(6,'(a,f12.4)') '   Minimum sigma        = ', sgm_min
+      write(6,'(a,f12.4)') '   Gaussian width sgm   = ', sgm_ew
+!!$      write(6,'(a)')       '   Gaussian simgas:'
+!!$      do i=1,nsp
+!!$        write(6,'(a,f12.4)') '     ',sgm(i)
+!!$      enddo
+!!$      write(6,'(a,f12.4)') '   Minimum sigma        = ', sgm_min
       write(6,'(a,f12.4)') '   real-space cutoff    = ', rc
       write(6,'(a,f12.4)') '   k-space cutoff       = ', bkmax
     endif
@@ -244,9 +252,10 @@ contains
           bk(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
           bb2 = absv(3,bk)
           bb2 = bb2*bb2
-          do isp=1,nsp
-            pflr(ik,isp)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm(isp)**2 *bb2)
-          enddo
+          pflr(ik,1:nsp)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm_ew**2 *bb2)
+!!$          do isp=1,nsp
+!!$            pflr(ik,isp)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm(isp)**2 *bb2)
+!!$          enddo
         enddo
       enddo
     enddo
@@ -587,34 +596,7 @@ contains
 
     strsl(1:3,1:3,1:namax) = 0d0
 
-!.....Compute self term. If charge per atom is fixed, it is constant.
-    if( lvc ) then  ! variable charge
-      eselfl = 0d0
-      do i=1,natm
-        is = int(tag(i))
-        sgmi = sgm(is)
-        q2 = chg(i)*chg(i)
-        e0 = vcg_e0(is)
-        tmp = vcg_jii(is) +acc /sqrt(pi) /sgmi
-        eselfl = eselfl +e0 +chi(i)*chg(i) +0.5d0*tmp*q2
-      enddo
-!!$      call mpi_allreduce(eselfl,eself,1,mpi_real8 &
-!!$           ,mpi_sum,mpi_md_world,ierr)
-    else  ! fixed charge
-      if( l1st ) then
-        eselfl = 0d0
-        do i=1,natm
-          is = int(tag(i))
-          sgmi = sgm(is)
-          q2 = chg(i)*chg(i)
-          eselfl = eselfl +q2 /sgmi
-        enddo
-        eselfl = eselfl *acc/sqrt(2d0*pi)
-!!$        eselfl = q2tot *acc /sqrt(2d0*pi) /sgm_ew
-!!$        call mpi_allreduce(eselfl,eself,1,mpi_real8 &
-!!$             ,mpi_sum,mpi_md_world,ierr)
-      endif
-    endif
+    call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
 
     call Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
          ,lspr,epi,esrl,iprint,ifcoulomb,lstrs,rc)
@@ -630,12 +612,12 @@ contains
 
     if( l1st .and. myid.eq.0 ) then
       print *,'Ewald energy term by term:'
-      print '(a,f12.4)','   Self term         = ',-eselfl
+      print '(a,f12.4)','   Self term         = ',eselfl
       print '(a,f12.4)','   Short-range term  = ',esrl
       print '(a,f12.4)','   Long-range term   = ',elrl
     endif
 
-    epotl = esrl +elrl -eselfl
+    epotl = esrl +elrl +eselfl
 !.....Gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
@@ -685,44 +667,231 @@ contains
 
     strsl(1:3,1:3,1:namax) = 0d0
 
+    call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
+    
+    call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
+         lspr,epi,elrl,iprint,ifcoulomb,mpi_md_world,lstrs,lcell_updated)
+
+    if( lstrs ) then
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$           ,nn,mpi_md_world,strsl,9)
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
+
+    if( l1st .and. myid.eq.0 ) then
+      print *,'Ewald energy term by term:'
+      print '(a,f12.4)','   Self term         = ',eselfl
+      print '(a,f12.4)','   Long-range term   = ',elrl
+    endif
+
+    epotl = elrl +eselfl
+!.....Gather epot
+    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+         ,mpi_sum,mpi_md_world,ierr)
+    epot= epot +epott
+
+    return
+  end subroutine force_Ewald_long
+!=======================================================================
+  subroutine Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
+       ,lspr,epi,esrl,iprint,ifcoulomb,lstrs,rc)
+    implicit none
+    integer,intent(in):: namax,natm,nnmax,iprint,ifcoulomb, &
+         lspr(0:nnmax,namax)
+    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+         h(3,3),hi(3,3),rc
+    logical,intent(in):: lstrs
+    real(8),intent(inout):: aa(3,namax),strsl(3,3,namax), &
+         epi(namax),esrl
+
+    integer:: i,j,jj,is,js,ixyz,jxyz
+    real(8):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc
+    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+
+!.....Compute direct sum
+    rc2 = rc*rc
+    sgmsq2 = sqrt(2d0)*sgm_ew
+    ss2i = 1d0 /sgmsq2
+    sqpi = 1d0 /sqrt(pi)
+    esrl = 0d0
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is= int(tag(i))
+      qi = chg(i)
+!!$      sgmi = sgm(is)
+!!$      if( abs(qi).lt.qthd ) cycle
+      do jj=1,lspr(0,i)
+        j = lspr(jj,i)
+        if( j.eq.0 ) exit
+        if( j.le.i ) cycle
+        js = int(tag(j))
+        qj = chg(j)
+!!$        if( abs(qj).lt.qthd ) cycle
+        xj(1:3) = ra(1:3,j)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij.gt.rc2 ) cycle
+!!$        sgmj = sgm(js)
+!!$        gmmij = 1d0 /sqrt(2d0*(sgmi**2+sgmj**2))
+        dij = sqrt(dij)
+        diji = 1d0/dij
+        dxdi(1:3)= -rij(1:3)*diji
+        dxdj(1:3)=  rij(1:3)*diji
+        terfc = erfc(dij*ss2i)
+!!$        terfc = erfc(gmmij,dij)
+!.....potential
+        tmp = 0.5d0 *acc *qi*qj*diji *terfc
+        if( j.le.natm ) then
+          epi(i)= epi(i) +tmp
+          epi(j)= epi(j) +tmp
+          esrl = esrl +tmp +tmp
+        else
+          epi(i)= epi(i) +tmp
+          esrl = esrl +tmp
+        endif
+!.....force
+        ftmp = -acc *qj*qi*diji *( diji *terfc &
+             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) )
+        aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
+        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
+!.....stress
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+            enddo
+          enddo
+        endif
+      enddo
+    enddo
+!!$    write(6,*) ' esrl = ',esrl
+
+  end subroutine Ewald_short
+!=======================================================================
+  subroutine Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
+       lspr,epi,elrl,iprint,ifcoulomb,mpi_md_world,lstrs,lcell_updated)
+!
+!  Long-range term of Ewald sum.
+!  Not parallelized and not suitable for large system as it is too slow.
+!
+    implicit none
+    include 'mpif.h'
+    integer,intent(in):: namax,natm,nnmax,iprint,ifcoulomb, &
+         mpi_md_world,lspr(0:nnmax,namax)
+    real(8),intent(in):: tag(namax),ra(3,namax),chg(namax),&
+         h(3,3),hi(3,3)
+    logical,intent(in):: lstrs,lcell_updated
+    real(8),intent(inout):: aa(3,namax),epi(namax),&
+         elrl,strsl(3,3,namax)
+
+    integer:: i,is,ik,k1,k2,k3,ierr,ixyz,jxyz
+    real(8):: qi,xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3),bdotr, &
+         tmp,cs,sn,texp,bb2,bk
+    real(8),external:: sprod,absv
+    real(8):: emat(3,3)
+
+!.....Compute reciprocal vectors
+    if( lcell_updated ) call get_recip_vectors(h)
+!.....Compute structure factor of the local processor
+    call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint,mpi_md_world)
+
+!.....Compute long-range contribution to potential energy
+    elrl = 0d0
+!.....Long-range contribution to forces and stress
+    emat(1:3,1) = (/ 1d0, 0d0, 0d0 /)
+    emat(1:3,2) = (/ 0d0, 1d0, 0d0 /)
+    emat(1:3,3) = (/ 0d0, 0d0, 1d0 /)
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is= int(tag(i))
+      qi = chg(i)
+!!$      if( abs(qi).lt.qthd ) cycle
+      ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
+      ik = 0
+      do k1= -kmax1,kmax1
+        bk1(1:3) = k1 *b1(1:3)
+        do k2= -kmax2,kmax2
+          bk2(1:3) = k2 *b2(1:3)
+          do k3= -kmax3,kmax3
+            if( .not. lkuse(k3,k2,k1) ) cycle
+            ik= ik +1
+            bk3(1:3) = k3 *b3(1:3)
+            bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
+            bdotr = sprod(3,bb,ri)
+            cs = cos(bdotr)
+            sn = sin(bdotr)
+!.....Potential energy per atom
+            tmp = 0.5d0 *acc /vol *qi *pflr(ik,is) &
+                 *( cs*qcos(ik) +sn*qsin(ik) )
+            epi(i) = epi(i) +tmp
+            elrl = elrl +tmp
+!.....Forces
+            aa(1:3,i)= aa(1:3,i) -acc/vol *qi*bb(1:3) *pflr(ik,is) &
+                 *( -sn*qcos(ik) +cs*qsin(ik) )
+!.....Stress
+            if( lstrs ) then
+              bk = absv(3,bb)
+!!$              tmp = 0.5d0 *acc/vol**2 &
+!!$                   *pflr(ik,is) *(qcos(ik)**2 +qsin(ik)**2)
+              do ixyz=1,3
+                do jxyz=1,3
+                  strsl(ixyz,jxyz,i) = strsl(ixyz,jxyz,i) +tmp &
+                       *( bb(ixyz)*bb(jxyz)/bk*(bk *sgm(is)**2 +2d0/bk) &
+                       -emat(ixyz,jxyz))
+                enddo
+              enddo
+
+            endif
+          enddo  ! k3
+        enddo  ! k2
+      enddo  ! k1
+    enddo  ! ia
+
+  end subroutine Ewald_long
+!=======================================================================
+  subroutine Ewald_self(namax,natm,tag,chg,chi,&
+       epi,eselfl,iprint,lvc)
+    implicit none
+    integer,intent(in):: namax,natm,iprint
+    logical,intent(in):: lvc
+    real(8),intent(in):: tag(namax),chg(namax),chi(namax)
+    real(8),intent(inout):: epi(namax),eselfl
+
+    integer:: i,is
+    real(8):: sgmi,qi,q2,e0,tmp
+
 !.....Compute self term. If charge per atom is fixed, it is constant.
     if( lvc ) then  ! variable charge
       eselfl = 0d0
       do i=1,natm
         is = int(tag(i))
         sgmi = sgm(is)
-        q2 = chg(i)*chg(i)
+        qi = chg(i)
+        q2 = qi*qi
         e0 = vcg_e0(is)
-        tmp = vcg_jii(is) +acc /sqrt(pi) /sgmi
-        eselfl = eselfl +e0 +chi(i)*chg(i) +0.5d0*tmp*q2
+        tmp = vcg_jii(is) -acc *sqrt(2d0/pi) /sgmi
+        eselfl = eselfl +e0 +chi(i)*qi +0.5d0*tmp*q2
+        epi(i) = epi(i) +e0 +chi(i)*qi +0.5d0*tmp*q2
+!!$        write(6,'(a,2i4,3es12.4)') '  i,is,jii,chi*chg,tmp*q2/2=',&
+!!$             i,is,vcg_jii(is), &
+!!$             chi(i)*qi,0.5d0*tmp*q2
       enddo
-      call mpi_allreduce(eselfl,eself,1,mpi_real8 &
-           ,mpi_sum,mpi_md_world,ierr)
     else  ! fixed charge
-      if( l1st ) then
-        eselfl = 0d0
-        do i=1,natm
-          is = int(tag(i))
-          sgmi = sgm(is)
-          q2 = chg(i)*chg(i)
-          eselfl = eselfl +0.5d0 *q2 *acc /sqrt(pi) /sgmi
-        enddo
-!!$        eselfl = q2tot *acc /sqrt(2d0*pi) /sgm_ew
-        call mpi_allreduce(eselfl,eself,1,mpi_real8 &
-             ,mpi_sum,mpi_md_world,ierr)
-      endif
+      eselfl = 0d0
+      do i=1,natm
+        is = int(tag(i))
+        sgmi = sgm(is)
+        q2 = chg(i)*chg(i)
+        eselfl = eselfl -q2 /sgmi *acc/sqrt(2d0*pi)
+        epi(i) = epi(i) -q2 /sgmi *acc/sqrt(2d0*pi)
+      enddo
     endif
 
-    call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
-         lspr,epi,elrl,iprint,ifcoulomb,mpi_md_world,lstrs,lcell_updated)
-
-    epotl = elrl +eself
-!.....TODO: still non-parallelized
-    epott = epotl
-    epot= epot +epott
-
-    return
-  end subroutine force_Ewald_long
+  end subroutine Ewald_self
 !=======================================================================
   subroutine qforce_short(namax,natm,tag,ra,nnmax,chg,h &
        ,lspr,iprint,ifcoulomb,rc,fq,esr)
@@ -751,28 +920,28 @@ contains
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
       qi = chg(i)
-      if( abs(qi).lt.qthd ) cycle
-      sgmi = sgm(is)
+!!$      if( abs(qi).lt.qthd ) cycle
+!!$      sgmi = sgm(is)
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
         if( j.eq.0 ) exit
         if( j.le.i ) cycle
         js = int(tag(j))
         qj = chg(j)
-        if( abs(qj).lt.qthd ) cycle
+!!$        if( abs(qj).lt.qthd ) cycle
         xj(1:3) = ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.gt.rc2 ) cycle
-        sgmj = sgm(js)
-        gmmij = 1d0 /sqrt(2d0*(sgmi**2+sgmj**2))
+!!$        sgmj = sgm(js)
+!!$        gmmij = 1d0 /sqrt(2d0*(sgmi**2+sgmj**2))
         dij = sqrt(dij)
         diji = 1d0/dij
-!!$        dxdi(1:3)= -rij(1:3)*diji
-!!$        dxdj(1:3)=  rij(1:3)*diji
-!!$        terfc = erfc(dij*ss2i)
-        terfc = erfc(gmmij*dij)
+        dxdi(1:3)= -rij(1:3)*diji
+        dxdj(1:3)=  rij(1:3)*diji
+        terfc = erfc(dij*ss2i)
+!!$        terfc = erfc(gmmij*dij)
 !.....potential
         tmp = 0.5d0 *acc *qi*qj*diji *terfc
         if( j.le.natm ) then
@@ -790,7 +959,7 @@ contains
   end subroutine qforce_short
 !=======================================================================
   subroutine qforce_long(namax,natm,tag,ra,chg,h, &
-       tcom,mpi_md_world,myid,iprint,ifcoulomb,fq,elr,eself)
+       tcom,mpi_md_world,myid,iprint,ifcoulomb,fq,elr)
 !
 !  Derivative of Ewald long-range term w.r.t. charges
 !
@@ -798,28 +967,17 @@ contains
     include 'mpif.h'
     integer,intent(in):: namax,natm,mpi_md_world,myid,iprint,ifcoulomb
     real(8),intent(in):: tag(namax),ra(3,namax),chg(namax),h(3,3)
-    real(8),intent(inout):: tcom,fq(namax),elr,eself
+    real(8),intent(inout):: tcom,fq(namax),elr
 
     integer:: i,ik,k1,k2,k3,is,ierr
     real(8):: prefac,bk1(3),bk2(3),bk3(3),bb(3),bb2,xi(3),ri(3), &
          sgmi,sgmi2,qi,bdotr,texp,cs,sn,elrl,eselfl,q2,epotl,tmp
     real(8),external:: sprod
 
-!.....Self term from long-range Ewald
-    do i=1,natm
-      is = int(tag(i))
-      qi = chg(i)
-      q2 = qi*qi
-      sgmi = sgm(is)
-      tmp = 1d0/sqrt(pi)/sgmi
-      eself = eself +0.5d0*tmp*q2
-      fq(i) = fq(i) -tmp*qi
-    enddo
-
 !.....Compute reciprocal vectors
     call get_recip_vectors(h)
     prefac = 1d0 /(2d0*vol*eps0)
-    print *,'prefac=',prefac
+!!$    print *,'prefac=',prefac
 !.....Compute structure factor
     call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint,mpi_md_world)
 
@@ -888,7 +1046,7 @@ contains
       qi = chg(i)
       q2 = qi*qi
       sgmi = sgm(is)
-      tmp = vcg_jii(is) +acc/sqrt(pi) /sgmi
+      tmp = vcg_jii(is) -acc*sqrt(2d0/pi) /sgmi
       eself = eself +vcg_e0(is) +chi(i)*qi +0.5d0*tmp*q2
       fq(i) = fq(i) -(chi(i) +tmp*qi)
     enddo
@@ -1119,162 +1277,6 @@ contains
 
     deallocate(bbs)
   end subroutine setup_kspace
-!=======================================================================
-  subroutine Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-       ,lspr,epi,esrl,iprint,ifcoulomb,lstrs,rc)
-    implicit none
-    integer,intent(in):: namax,natm,nnmax,iprint,ifcoulomb, &
-         lspr(0:nnmax,namax)
-    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
-         h(3,3),hi(3,3),rc
-    logical,intent(in):: lstrs
-    real(8),intent(inout):: aa(3,namax),strsl(3,3,namax), &
-         epi(namax),esrl
-
-    integer:: i,j,jj,is,js,ixyz,jxyz
-    real(8):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc
-    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
-
-!.....Compute direct sum
-    rc2 = rc*rc
-    sgmsq2 = sqrt(2d0)*sgm_ew
-    ss2i = 1d0 /sgmsq2
-    sqpi = 1d0 /sqrt(pi)
-    esrl = 0d0
-    do i=1,natm
-      xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
-      qi = chg(i)
-!!$      if( abs(qi).lt.qthd ) cycle
-      do jj=1,lspr(0,i)
-        j = lspr(jj,i)
-        if( j.eq.0 ) exit
-        if( j.le.i ) cycle
-        js = int(tag(j))
-        qj = chg(j)
-!!$        if( abs(qj).lt.qthd ) cycle
-        xj(1:3) = ra(1:3,j)
-        xij(1:3)= xj(1:3)-xi(1:3)
-        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij = rij(1)**2 +rij(2)**2 +rij(3)**2
-        if( dij.gt.rc2 ) cycle
-        dij = sqrt(dij)
-        diji = 1d0/dij
-        dxdi(1:3)= -rij(1:3)*diji
-        dxdj(1:3)=  rij(1:3)*diji
-        terfc = erfc(dij*ss2i)
-!.....potential
-        tmp = 0.5d0 *acc *qi*qj*diji *terfc
-        if( j.le.natm ) then
-          epi(i)= epi(i) +tmp
-          epi(j)= epi(j) +tmp
-          esrl = esrl +tmp +tmp
-        else
-          epi(i)= epi(i) +tmp
-          esrl = esrl +tmp
-        endif
-!.....force
-        ftmp = -acc *qj*qi*diji *( diji *terfc &
-             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) )
-        aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
-        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
-!.....stress
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-            enddo
-          enddo
-        endif
-      enddo
-    enddo
-!!$    write(6,*) ' esrl = ',esrl
-
-  end subroutine Ewald_short
-!=======================================================================
-  subroutine Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
-       lspr,epi,elrl,iprint,ifcoulomb,mpi_md_world,lstrs,lcell_updated)
-!
-!  Long-range term of Ewald sum.
-!  Not parallelized and not suitable for large system as it is too slow.
-!
-    implicit none
-    include 'mpif.h'
-    integer,intent(in):: namax,natm,nnmax,iprint,ifcoulomb, &
-         mpi_md_world,lspr(0:nnmax,namax)
-    real(8),intent(in):: tag(namax),ra(3,namax),chg(namax),&
-         h(3,3),hi(3,3)
-    logical,intent(in):: lstrs,lcell_updated
-    real(8),intent(inout):: aa(3,namax),epi(namax),&
-         elrl,strsl(3,3,namax)
-
-    integer:: i,is,ik,k1,k2,k3,ierr,ixyz,jxyz
-    real(8):: qi,xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3),bdotr, &
-         tmp,cs,sn,texp,bb2,bk
-    real(8),external:: sprod,absv
-    real(8):: emat(3,3)
-
-!.....Compute reciprocal vectors
-    if( lcell_updated ) call get_recip_vectors(h)
-!.....Compute structure factor of the local processor
-    call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint,mpi_md_world)
-
-!.....Compute long-range contribution to potential energy
-    elrl = 0d0
-!.....Long-range contribution to forces and stress
-    emat(1:3,1) = (/ 1d0, 0d0, 0d0 /)
-    emat(1:3,2) = (/ 0d0, 1d0, 0d0 /)
-    emat(1:3,3) = (/ 0d0, 0d0, 1d0 /)
-    do i=1,natm
-      xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
-      qi = chg(i)
-!!$      if( abs(qi).lt.qthd ) cycle
-      ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
-      ik = 0
-      do k1= -kmax1,kmax1
-        bk1(1:3) = k1 *b1(1:3)
-        do k2= -kmax2,kmax2
-          bk2(1:3) = k2 *b2(1:3)
-          do k3= -kmax3,kmax3
-            if( .not. lkuse(k3,k2,k1) ) cycle
-            ik= ik +1
-            bk3(1:3) = k3 *b3(1:3)
-            bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-            bdotr = sprod(3,bb,ri)
-            cs = cos(bdotr)
-            sn = sin(bdotr)
-!.....Potential energy per atom
-            tmp = 0.5d0 *acc /vol *qi *pflr(ik,is) &
-                 *( cs*qcos(ik) +sn*qsin(ik) )
-            epi(i) = epi(i) +tmp
-            elrl = elrl +tmp
-!.....Forces
-            aa(1:3,i)= aa(1:3,i) -acc/vol *qi*bb(1:3) *pflr(ik,is) &
-                 *( -sn*qcos(ik) +cs*qsin(ik) )
-!.....Stress
-            if( lstrs ) then
-              bk = absv(3,bb)
-!!$              tmp = 0.5d0 *acc/vol**2 &
-!!$                   *pflr(ik,is) *(qcos(ik)**2 +qsin(ik)**2)
-              do ixyz=1,3
-                do jxyz=1,3
-                  strsl(ixyz,jxyz,i) = strsl(ixyz,jxyz,i) +tmp &
-                       *( bb(ixyz)*bb(jxyz)/bk*(bk *sgm(is)**2 +2d0/bk) &
-                       -emat(ixyz,jxyz))
-                enddo
-              enddo
-
-            endif
-          enddo  ! k3
-        enddo  ! k2
-      enddo  ! k1
-    enddo  ! ia
-
-  end subroutine Ewald_long
 !=======================================================================
   subroutine cgopt_charge(natm,h,ra,tag,chg,chi)
 !

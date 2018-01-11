@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-10 12:56:40 Ryo KOBAYASHI>
+c                     Last-modified: <2018-01-11 17:17:50 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -1005,10 +1005,10 @@ c          atot(1:3,i) = aai(1:3)/acon(is)
         enddo
       endif
 
-      if( iprint.ne.0 .and. myid_md.eq.0 .and. lvc ) then
+      if( iprint.ne.20 .and. myid_md.eq.0 .and. lvc ) then
         print *,'Atomic charges:'
         do i=1,ntot
-          print '(a,i5,es11.3,4f7.3)','ia,epi,chg,frc=',i
+          print '(a,i5,es11.3,4f7.3)','   ia,epi,chg,frc=',i
      &         ,epitot(i),chgtot(i),atot(1:3,i)
         enddo
       endif
