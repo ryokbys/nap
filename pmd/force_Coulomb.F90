@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-01-11 17:20:48 Ryo KOBAYASHI>
+!                     Last modified: <2018-01-12 18:13:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -65,7 +65,8 @@ module Coulomb
   real(8),parameter:: threshold_kmax = 1d-4
 
 !.....Variable-charge potential variables
-  real(8):: vcg_chi(msp),vcg_jii(msp),vcg_e0(msp)
+  real(8):: vcg_chi(msp),vcg_jii(msp),vcg_e0(msp) &
+       ,qlower(msp),qupper(msp)
 
 contains
   subroutine initialize_coulomb(natm,tag,chg,chi, &
@@ -195,10 +196,10 @@ contains
       chi(i) = vcg_chi(is)
     enddo
 
-    if( myid.eq.0 .and. iprint.ne.0 ) then
-      print *,'Sigmas are overwritten by rc/sqrt(2*pacc),'
-      print *,'since the current implementation cannot treat species-dependent sigma.'
-    endif
+!!$    if( myid.eq.0 .and. iprint.ne.0 ) then
+!!$      print *,'Sigmas are overwritten by rc/sqrt(2*pacc),'
+!!$      print *,'since the current implementation cannot treat species-dependent sigma.'
+!!$    endif
     sgm_ew = rc/sqrt(2d0*pacc)
     sgm(1:msp) = sgm_ew
 !!$    sgm_min = 1d+30
@@ -387,7 +388,7 @@ contains
     integer,intent(in):: myid,mpi_world,ifcoulomb,iprint
 
     integer:: isp,ierr
-    real(8):: dchi,djii,dsgm,de0
+    real(8):: dchi,djii,de0,qlow,qup
     character(len=128):: cline,c1st,fname
     character(len=5):: cname
 
@@ -408,17 +409,18 @@ contains
         read(ioprms,*,end=20) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
         backspace(ioprms)
-        read(ioprms,*,end=20) isp, dchi,djii,dsgm,de0
+        read(ioprms,*,end=20) isp, cname, dchi,djii,de0,qlow,qup
         if( isp.gt.nsp .and. iprint.gt.0 ) then
           write(6,'(a,i2)') ' [WARNING] isp.gt.nsp !!!  isp = ',isp
         else
           vcg_chi(isp) = dchi
           vcg_jii(isp) = djii
-          sgm(isp) = dsgm
           vcg_e0(isp) = de0
+          qlower(isp) = qlow
+          qupper(isp) = qup
           if( iprint.gt.0 ) then
-            write(6,'(a,i3,10f10.4)') '   isp,chi,Jii,sgm,e0 = ', &
-                 isp,dchi,djii,dsgm,de0
+            write(6,'(a,i3,1x,a,3f10.4,2f5.1)') '   isp,name,chi,Jii,e0,qlower,qupper = ', &
+                 isp,trim(cname),dchi,djii,de0,qlow,qup
           endif
         endif
       enddo  ! do while
@@ -428,6 +430,8 @@ contains
     call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_e0,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
 
   end subroutine read_params_vc
 !=======================================================================
@@ -874,6 +878,7 @@ contains
         q2 = qi*qi
         e0 = vcg_e0(is)
         tmp = vcg_jii(is) -acc *sqrt(2d0/pi) /sgmi
+!!$        tmp = vcg_jii(is)
         eselfl = eselfl +e0 +chi(i)*qi +0.5d0*tmp*q2
         epi(i) = epi(i) +e0 +chi(i)*qi +0.5d0*tmp*q2
 !!$        write(6,'(a,2i4,3es12.4)') '  i,is,jii,chi*chg,tmp*q2/2=',&
@@ -943,15 +948,15 @@ contains
         terfc = erfc(dij*ss2i)
 !!$        terfc = erfc(gmmij*dij)
 !.....potential
-        tmp = 0.5d0 *acc *qi*qj*diji *terfc
+        tmp = 0.5d0 *acc *diji *terfc
         if( j.le.natm ) then
-          esr = esr +tmp +tmp
+          esr = esr +2d0*tmp*qi*qj
         else
-          esr = esr +tmp
+          esr = esr +tmp*qi*qj
         endif
 !.....Force on charge
-        fq(i) = fq(i) -tmp/qi
-        fq(j) = fq(j) -tmp/qj
+        fq(i) = fq(i) -tmp*qj
+        fq(j) = fq(j) -tmp*qi
       enddo
     enddo
 
@@ -1047,6 +1052,7 @@ contains
       q2 = qi*qi
       sgmi = sgm(is)
       tmp = vcg_jii(is) -acc*sqrt(2d0/pi) /sgmi
+!!$      tmp = vcg_jii(is)
       eself = eself +vcg_e0(is) +chi(i)*qi +0.5d0*tmp*q2
       fq(i) = fq(i) -(chi(i) +tmp*qi)
     enddo

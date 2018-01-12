@@ -66,9 +66,13 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
          tcom,myid_md,mpi_md_world,iprint,ifcoulomb,l1st)
     if( l1st .and. myid_md.eq.0 .and. iprint.ge.20 ) then
       write(6,'(/a)') ' Charges:'
-      do i=1,min(natm,100)
+      tmp = 0d0
+      do i=1,natm
+        tmp = tmp +chg(i)
+        if( i.gt.100 ) cycle
         write(6,'(a,i5,i3,f8.3)') '   i,is,chg(i) = ',i,int(tag(i)),chg(i)
       enddo
+      write(6,'(a,f0.3)') ' Total charge = ',tmp
     endif
   endif
 
@@ -821,7 +825,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 !  force_Coulomb.F90.
 !
   use force
-  use Coulomb, only: qforce_long,qforce_short,qforce_self
+  use Coulomb, only: qforce_long,qforce_short,qforce_self,qlower,qupper
   use Morse, only: qforce_vcMorse
   implicit none
   integer,intent(in):: namax,natm,myid,mpi_md_world,iprint,ifcoulomb &
@@ -832,18 +836,20 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
        ,nnn(6),nex(3),lsex(nbmax,6)
 
-  integer:: istp,i,istp_pos,istp_conv
+  integer:: istp,i,istp_pos,istp_conv,is
   real(8):: eclong,epot,epotp,afq,eMorse,fqnorm,vqnorm,dt,alpha,p &
        ,ecoul,ecshort,eself
   real(8),save,allocatable:: vq(:),fq(:)
+  logical,save,allocatable:: lqfix(:) 
 
-  character(len=128),parameter:: algorithm = 'damping'
-!!$  character(len=128),parameter:: algorithm = 'FIRE'
+!!$  character(len=128),parameter:: algorithm = 'damping'
+  character(len=128),parameter:: algorithm = 'FIRE'
 
   integer,parameter:: nstp_dampopt = 1000
   real(8),parameter:: dt_dampopt = 0.001  ! 0.005 fs
   real(8),parameter:: ecrit_dampopt = 1.0d-4
   real(8),parameter:: amassq = 0.002
+  real(8),parameter:: qtot = 0d0
 !.....Simple velocity damping
   real(8),parameter:: fdamp = 0.95
 !.....FIRE parameters 
@@ -855,9 +861,11 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   real(8),parameter:: falpha = 0.99d0
   real(8),parameter:: dtmax  = dt_dampopt*10
 
+  integer,external:: count_fixed
+
   if( l1st ) then
-    if( allocated(vq) ) deallocate(vq,fq)
-    allocate(vq(namax),fq(namax))
+    if( allocated(vq) ) deallocate(vq,fq,lqfix)
+    allocate(vq(namax),fq(namax),lqfix(namax))
   endif
 
 !.....Gather forces on charges
@@ -867,6 +875,22 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   eself = 0d0
   istp = 0
 
+  lqfix(1:namax) = .false.
+  call impose_qtot(namax,natm,chg,qtot,lqfix,myid,mpi_md_world)
+  do i=1,natm
+    is = int(tag(i))
+    if( chg(i).gt.qupper(is) ) then
+      chg(i) = qupper(is)
+      lqfix(i) = .true.
+    else if( chg(i).lt.qlower(is) ) then
+      chg(i) = qlower(is)
+      lqfix(i) = .true.
+    endif
+  enddo
+  if( count_fixed(namax,natm,lqfix,myid,mpi_md_world).eq.0 ) then
+    if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because all Qs fixed.'
+    return
+  endif
   if( ifcoulomb.eq.3 ) then
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
     call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
@@ -879,10 +903,9 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
          myid,iprint,ifcoulomb,fq,eclong)
   endif
   epot = eself +ecshort + eclong
-!!$  write(6,'(a,i6,4es12.4)') 'istp,eself,eshort,elong,epot= ',0,eself,ecshort,eclong,epot
 
   if( myid.eq.0 .and. iprint.ge.20 ) then
-    write(6,'(a)') ' After qforce_long:'
+    write(6,'(a,i6,4es12.4)') ' istp,eself,eshort,elong,epot= ',0,eself,ecshort,eclong,epot
     write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,10))
   endif
 
@@ -896,14 +919,27 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 !!$      write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,10))
 !!$    endif
   endif
-
+!.....Set fq(i)=0, if lqfix(i)
+  do i=1,natm
+    if( lqfix(i) ) then
+      fq(i) = 0d0
+      vq(i) = 0d0
+    endif
+  enddo
   call suppress_fq(namax,natm,fq,myid,mpi_md_world)
 !!$  if( myid.eq.0 .and. iprint.ge.20 ) then
 !!$    write(6,'(a)') ' After log(fq):'
 !!$    write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,10))
 !!$  endif
-  call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
-  if( afq*0d0.ne.0d0 ) return   ! NaN
+  call get_average_fq(namax,natm,fq,afq,lqfix,myid,mpi_md_world)
+  if( afq*0d0.ne.0d0 ) then
+    if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because afq == NaN'
+    return   ! NaN
+  endif
+  do i=1,natm
+    if( lqfix(i) ) cycle
+    fq(i) = fq(i) -afq
+  enddo
   fq(1:natm) = fq(1:natm) -afq
 
   vq(1:natm) = 0d0
@@ -952,6 +988,22 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     ecshort = 0d0
     eself = 0d0
     fq(1:natm) = 0d0
+    call impose_qtot(namax,natm,chg,qtot,lqfix,myid,mpi_md_world)
+    do i=1,natm
+      if( lqfix(i) ) cycle
+      is = int(tag(i))
+      if( chg(i).gt.qupper(is) ) then
+        chg(i) = qupper(is)
+        lqfix(i) = .true.
+      else if( chg(i).lt.qlower(is) ) then
+        chg(i) = qlower(is)
+        lqfix(i) = .true.
+      endif
+    enddo
+    if( count_fixed(namax,natm,lqfix,myid,mpi_md_world).eq.0 ) then
+      if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because all Qs fixed.'
+      return
+    endif
     if( ifcoulomb.eq.3 ) then
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)
       call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
@@ -963,7 +1015,6 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
            myid,iprint,ifcoulomb,fq,eclong)
     endif
-!!$    write(6,'(a,i6,4es12.4)') 'istp,eself,eshort,elong,epot= ',istp,eself,ecshort,eclong,epot
     epot = eself +ecshort + eclong
     if( use_force('vcMorse') ) then
       eMorse = 0d0
@@ -972,11 +1023,27 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       epot = epot + eMorse
     endif
 
+!.....Set fq(i)=0, if lqfix(i)
+    do i=1,natm
+      if( lqfix(i) ) then
+        fq(i) = 0d0
+        vq(i) = 0d0
+      endif
+    enddo
     call suppress_fq(namax,natm,fq,myid,mpi_md_world)
-    call get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
-    if( afq*0d0.ne.0d0 ) return   ! NaN
-    fq(1:natm) = fq(1:natm) -afq
+    call get_average_fq(namax,natm,fq,afq,lqfix,myid,mpi_md_world)
+    if( afq*0d0.ne.0d0 ) then
+      if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because afq == NaN'
+      return   ! NaN
+    endif
+!!$    if( afq*0d0.ne.0d0 ) return   ! NaN
+    do i=1,natm
+      if( lqfix(i) ) cycle
+      fq(i) = fq(i) -afq
+    enddo
+!!$    fq(1:natm) = fq(1:natm) -afq
     if( myid.eq.0 .and. iprint.ge.20 ) then
+      write(6,'(a,i6,4es12.4)') ' istp,eself,eshort,elong,epot= ',istp,eself,ecshort,eclong,epot
       write(6,'(a,i5,2es12.4,20es11.3)') ' istp,epot,de,fqs= ',istp &
            ,epot,abs(epot-epotp),fq(1:min(natm,10))
     endif
@@ -1003,7 +1070,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   return
 end subroutine dampopt_charge
 !=======================================================================
-subroutine get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
+subroutine get_average_fq(namax,natm,fq,afq,lqfix,myid,mpi_md_world)
 !
 !  Get an average FQ that is an average chemical potential.
 !
@@ -1011,29 +1078,88 @@ subroutine get_average_fq(namax,natm,fq,afq,myid,mpi_md_world)
   include "mpif.h"
   integer,intent(in):: namax,natm,myid,mpi_md_world
   real(8),intent(in):: fq(namax)
+  logical,intent(in):: lqfix(namax) 
   real(8),intent(out):: afq
 
   integer:: i,ierr
-  integer,save:: ntot
+  integer:: nonfix,nonfixl
   real(8):: afql
   logical,save:: l1st = .true.
 
-  if( l1st ) then
-    ntot = 0
-    call mpi_allreduce(natm,ntot,1,mpi_integer, &
-         mpi_sum,mpi_md_world,ierr)
-  endif
-
+  nonfixl = 0
   afql = 0d0
   do i=1,natm
+    if( lqfix(i) ) cycle
+    nonfixl = nonfixl +1
     afql = afql +fq(i)
   enddo
+  nonfix = 0
   afq = 0d0
+  call mpi_allreduce(nonfixl,nonfix,1,mpi_integer, &
+       mpi_sum,mpi_md_world,ierr)
   call mpi_allreduce(afql,afq,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
-  afq = afq/ntot
+  afq = afq/nonfix
 
   return
 end subroutine get_average_fq
+!=======================================================================
+subroutine impose_qtot(namax,natm,chg,qtot,lqfix,myid,mpi_md_world)
+!
+!  Impose total charge to qtot.
+!
+  implicit none
+  include 'mpif.h'
+  integer,intent(in):: namax,natm,myid,mpi_md_world
+  real(8),intent(in):: qtot
+  real(8),intent(inout):: chg(namax)
+  logical,intent(in):: lqfix(namax)
+
+  integer:: i,nonfixl,nonfix,ierr
+  real(8):: ql,qg,dq,qdist
+
+  ql = 0d0
+  nonfixl = 0
+  do i=1,natm
+    ql = ql +chg(i)
+    if( lqfix(i) ) cycle
+    nonfixl = nonfixl + 1
+  enddo
+  nonfix = 0
+  call mpi_allreduce(nonfixl,nonfix,1,mpi_integer, &
+       mpi_sum,mpi_md_world,ierr)
+  if( nonfix.eq.0 ) return  ! no atom for charge to be distributed
+  qg = 0d0
+  call mpi_allreduce(ql,qg,1,mpi_real8, &
+       mpi_sum,mpi_md_world,ierr)
+  dq = qg -qtot
+  qdist = dq /nonfix
+!!$  call mpi_bcast(qdist,1,mpi_real8,0,mpi_md_world,ierr)
+
+  do i=1,natm
+    if( lqfix(i) ) cycle
+    chg(i) = chg(i) -qdist
+  enddo
+  
+end subroutine impose_qtot
+!=======================================================================
+function count_fixed(namax,natm,lqfix,myid,mpi_md_world)
+  implicit none
+  include 'mpif.h'
+  integer,intent(in):: namax,natm,myid,mpi_md_world
+  logical,intent(in):: lqfix(namax)
+  integer:: count_fixed
+  integer:: i,nfixl,nfix,ierr
+
+  nfixl = 0
+  do i=1,natm
+    if( lqfix(i) ) nfixl = nfixl + 1
+  enddo
+  nfix = 0
+  call mpi_allreduce(nfixl,nfix,1,mpi_integer, &
+       mpi_sum,mpi_md_world,ierr)
+  count_fixed = nfix
+  return
+end function count_fixed
 !=======================================================================
 subroutine suppress_fq(namax,natm,fq,myid,mpi_md_world)
 !
