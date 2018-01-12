@@ -861,7 +861,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   real(8),parameter:: falpha = 0.99d0
   real(8),parameter:: dtmax  = dt_dampopt*10
 
-  integer,external:: count_fixed
+  integer,external:: count_nonfixed
 
   if( l1st ) then
     if( allocated(vq) ) deallocate(vq,fq,lqfix)
@@ -887,7 +887,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       lqfix(i) = .true.
     endif
   enddo
-  if( count_fixed(namax,natm,lqfix,myid,mpi_md_world).eq.0 ) then
+  if( count_nonfixed(namax,natm,lqfix,myid,mpi_md_world).eq.0 ) then
     if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because all Qs fixed.'
     return
   endif
@@ -914,10 +914,6 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     call qforce_vcMorse(namax,natm,tag,ra,fq,nnmax,chg &
          ,h,tcom,rc,lspr,mpi_md_world,myid,eMorse,iprint,.true.)
     epot = epot + eMorse
-!!$    if( myid.eq.0 .and. iprint.ge.20 ) then
-!!$      write(6,'(a)') ' After qforce_vcMorse:'
-!!$      write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,10))
-!!$    endif
   endif
 !.....Set fq(i)=0, if lqfix(i)
   do i=1,natm
@@ -927,10 +923,6 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     endif
   enddo
   call suppress_fq(namax,natm,fq,myid,mpi_md_world)
-!!$  if( myid.eq.0 .and. iprint.ge.20 ) then
-!!$    write(6,'(a)') ' After log(fq):'
-!!$    write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,10))
-!!$  endif
   call get_average_fq(namax,natm,fq,afq,lqfix,myid,mpi_md_world)
   if( afq*0d0.ne.0d0 ) then
     if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because afq == NaN'
@@ -949,11 +941,6 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   dt = dt_dampopt
   do istp=1,nstp_dampopt
     epotp = epot
-!!$    if( myid.eq.0 .and. iprint.ge.20 ) then
-!!$      write(6,'(a,i5,20es11.3)') ' istp,chgs,fqs,vqs = ' &
-!!$           ,istp,chg(1:min(natm,5)) &
-!!$           ,fq(1:min(natm,5)),vq(1:min(natm,5))
-!!$    endif
 !.....first update of velocity
     vq(1:natm) = vq(1:natm) +0.5d0*dt/amassq*fq(1:natm)
 
@@ -1000,7 +987,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
         lqfix(i) = .true.
       endif
     enddo
-    if( count_fixed(namax,natm,lqfix,myid,mpi_md_world).eq.0 ) then
+    if( count_nonfixed(namax,natm,lqfix,myid,mpi_md_world).eq.0 ) then
       if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because all Qs fixed.'
       return
     endif
@@ -1036,12 +1023,10 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because afq == NaN'
       return   ! NaN
     endif
-!!$    if( afq*0d0.ne.0d0 ) return   ! NaN
     do i=1,natm
       if( lqfix(i) ) cycle
       fq(i) = fq(i) -afq
     enddo
-!!$    fq(1:natm) = fq(1:natm) -afq
     if( myid.eq.0 .and. iprint.ge.20 ) then
       write(6,'(a,i6,4es12.4)') ' istp,eself,eshort,elong,epot= ',istp,eself,ecshort,eclong,epot
       write(6,'(a,i5,2es12.4,20es11.3)') ' istp,epot,de,fqs= ',istp &
@@ -1142,24 +1127,25 @@ subroutine impose_qtot(namax,natm,chg,qtot,lqfix,myid,mpi_md_world)
   
 end subroutine impose_qtot
 !=======================================================================
-function count_fixed(namax,natm,lqfix,myid,mpi_md_world)
+function count_nonfixed(namax,natm,lqfix,myid,mpi_md_world)
   implicit none
   include 'mpif.h'
   integer,intent(in):: namax,natm,myid,mpi_md_world
   logical,intent(in):: lqfix(namax)
-  integer:: count_fixed
-  integer:: i,nfixl,nfix,ierr
+  integer:: count_nonfixed
+  integer:: i,nonfixl,nonfix,ierr
 
-  nfixl = 0
+  nonfixl = 0
   do i=1,natm
-    if( lqfix(i) ) nfixl = nfixl + 1
+    if( lqfix(i) ) cycle
+    nonfixl = nonfixl + 1
   enddo
-  nfix = 0
-  call mpi_allreduce(nfixl,nfix,1,mpi_integer, &
+  nonfix = 0
+  call mpi_allreduce(nonfixl,nonfix,1,mpi_integer, &
        mpi_sum,mpi_md_world,ierr)
-  count_fixed = nfix
+  count_nonfixed = nonfix
   return
-end function count_fixed
+end function count_nonfixed
 !=======================================================================
 subroutine suppress_fq(namax,natm,fq,myid,mpi_md_world)
 !

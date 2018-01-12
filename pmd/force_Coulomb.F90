@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-01-12 18:13:49 Ryo KOBAYASHI>
+!                     Last modified: <2018-01-12 18:25:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -419,7 +419,7 @@ contains
           qlower(isp) = qlow
           qupper(isp) = qup
           if( iprint.gt.0 ) then
-            write(6,'(a,i3,1x,a,3f10.4,2f5.1)') '   isp,name,chi,Jii,e0,qlower,qupper = ', &
+            write(6,'(a,i3,a3,3f10.4,2f5.1)') '   isp,name,chi,Jii,e0,qlower,qupper = ', &
                  isp,trim(cname),dchi,djii,de0,qlow,qup
           endif
         endif
