@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-01-22 18:26:53 Ryo KOBAYASHI>
+!                     Last-modified: <2018-01-22 18:55:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -88,7 +88,9 @@ contains
     integer,intent(in):: namax,natm,myid,mpi_world,iprint
     real(8),intent(in):: dtmd,h(3,3)
 
-    integer:: ierr
+    integer:: ierr,ix,iy,iz
+    real(8):: t
+    character(len=128):: c1st
     
 !.....Read parameter file
     call read_ttm_params(myid,mpi_world,iprint)
@@ -110,8 +112,14 @@ contains
       goto 999
     else if( rsurf.lt.lsurf ) then
       if( myid.eq.0 ) then
-        print *,'ERROR: rsurf < lsurf which should not occur !'
-        print *,'  lsurf,rsuf = ',lsurf,rsurf
+        print *,'ERROR: rsurf < lsurf, which should not occur !'
+        print *,'  lsurf,rsurf = ',lsurf,rsurf
+      endif
+      goto 999
+    else if( rsurf.gt.nx ) then
+      if( myid.eq.0 ) then
+        print *,'ERROR: rsurf > nx, which should not occur !'
+        print *,'  rsurf,nx = ',rsurf,nx
       endif
       goto 999
     endif
@@ -124,9 +132,29 @@ contains
 
 !.....Set initial Te distribution
     if( trim(cTe_init).eq.'exp' ) then
-      
+      te(:,:,:) = 0d0
+      if( lsurf.le.0 ) then
+        if( myid.eq.0 ) then
+          print *,'ERROR: Initial Te distribution cannot be set with exp'&
+               //' with lsurf <= 0.'
+        endif
+        goto 999
+      endif
+      do ix=lsurf,rsurf
+        te(ix,:,:) = I_0 *exp(-dx*(ix-lsurf+1)/lskin)
+      enddo
     else if( trim(cTe_init).eq.'read' ) then
-
+      if( myid.eq.0 ) then
+        open(ioTein,file=trim(paramsdir)//'/'//trim(cTe_infile),status='old')
+        do while(.true.)
+          read(ioTein,*,end=10) c1st
+          if( c1st(1:1).eq.'!' .or. c1st(1:1).eq.'#' ) cycle
+          backspace(ioTein)
+          read(ioTein,*) ix,iy,iz,t
+          te(ix,iy,iz) = t
+        enddo
+10      close(ioTein)
+      endif
     endif
       
     return
