@@ -173,6 +173,8 @@ And also configurations of atoms at each 10 steps out of 100 steps are written i
 Input files needed to run pmd
 ==================================
 
+``pmd`` must be executed in the directory where these files exist.
+
 in.pmd
   Input file that describes simulation setting.
 
@@ -181,8 +183,7 @@ pmdini
 
 .. image:: ./figs/pmd.png
 
-``pmd`` must be executed in the directory where these files exist.
-After running ``pmd`` , there appear some output files and directories.
+After running ``pmd`` , some output files appear in the same directory.
 
 ----------
 
@@ -204,7 +205,7 @@ Make an initial atom-configuration file
 ========================================
 Please refer :ref:`pmd-file` for details of atom-configuration file.
 
-One has to make an initial atom-configuration file, ``pmdini``, to run ``pmd`` .
+One has to make an initial atom-configuration file, ``pmdini``, to run ``pmd``.
 There are already some programs that make initial atom-configuration files
 of some systems ( ``mkconf/mkconf_????.F`` ).
 So you can make your own initial atom-configuration file by looking at those program codes.
@@ -222,7 +223,6 @@ you can make an atom-configuration file as,
 Here, *Si_disl* is chosen.
 
 Then you get an atom-configuration file ``pmdini``.
-Note that the number of digits should be four and they should be ``0000``.
 
 .. note::
 
@@ -322,8 +322,8 @@ The following files appear when you perform ``pmd`` :
 
   ``out.erg``
         Total, kinetic, and potential energies.
-  ``pmd_###``
-        Atom-configurations at a certain MD step. ``###`` means the MD step.
+  ``pmd_##``
+        Atom-configurations at a certain MD step. ``##`` means the MD step.
 
 
 

@@ -31,7 +31,8 @@ pmc= prec_mc.o util_rnd.o mk_lspr.o read_input.o pmd_core.o util_vec.o \
 	common_parallel.o sort.o
 comb= node_conv.o util_tag.o util_pmd.o util_vec.o
 
-mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o mod_version.o mod_force.o
+mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o mod_version.o mod_force.o \
+	mod_ttm.o
 args= iargc.o getarg.o
 
 force_common= force_common.o

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-15 17:52:13 Ryo KOBAYASHI>
+c                     Last-modified: <2018-01-22 18:26:52 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -14,6 +14,7 @@ c-----------------------------------------------------------------------
       use pmdvars
       use zload
       use force
+      use ttm,only: init_ttm,langevin_ttm
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -37,7 +38,7 @@ c-----------------------------------------------------------------------
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
       integer:: ihour,imin,isec
-      real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epotp,
+      real(8):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp,
      &     htmp(3,3),prss
       real(8),external:: box_muller,sprod
       logical:: lconverged = .false.
@@ -223,7 +224,6 @@ c.....Set initial temperature if needed
       endif
 
       if( trim(ctctl).eq.'Langevin' ) then
-        dt2= dt/2
         tgmm= 1d0/trlx
         do ifmv=1,9
           if( ttgt(ifmv).lt.0d0 ) then
@@ -236,6 +236,8 @@ c     &           *m2ang/s2fs
      &           ,ifmv,ttgt(ifmv),fkb,dt,tfac(ifmv)
           endif
         enddo
+      else if( trim(ctctl).eq.'ttm' ) then
+        call init_ttm(namax,natm,h,dt,myid_md,mpi_md_world,iprint)
       endif
 
       tcpu1= mpi_wtime()
@@ -576,6 +578,9 @@ c.....accumulate energy difference
             call rm_trans_motion(natm,tag,va,nspmax,am
      &           ,mpi_md_world,myid_md,0)
           endif
+        else if( trim(ctctl).eq.'ttm' ) then
+          call langevin_ttm(namax,natm,va,aa,tag,eki,am,h
+     &         ,nspmax,fa2v,fekin,ediff,dt)
         else
           do i=1,natm
             is = int(tag(i))
