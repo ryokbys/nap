@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-01-12 18:25:00 Ryo KOBAYASHI>
+!                     Last modified: <2018-01-15 18:01:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -20,24 +20,37 @@ module Coulomb
   character(len=128),parameter:: paramsfname = 'in.params.Coulomb'
   real(8),parameter:: pi = 3.14159265398979d0
 
+  character(len=128):: cchgs,cdist,cterms
+!.....Input Keywords: charges, charge_dist, terms
+!.....Keywords for charges: fixed, fixed_bvs, variable/qeq
+!.....Keywords for charge_dist: point, gaussian
+!.....Keywords for terms: full, short/screened, long
+
   integer,parameter:: ioprms = 20
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
   real(8),parameter:: acc  = 14.3998554737d0
 !.....permittivity of vacuum
   real(8),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
 
-  logical,allocatable:: interact(:,:)
 
   integer,parameter:: msp = 9
   integer:: nsp
+!.....Species charge
+  real(8):: schg(msp)
+!  logical,allocatable:: interact(:,:)
+  logical:: interact(msp,msp)
 !.....ideal valence charges of species
-  real(8),allocatable:: vid_bvs(:)
+  real(8):: vid_bvs(msp)
+!  real(8),allocatable:: vid_bvs(:)
 !.....principal quantum numbers of species
-  integer,allocatable:: npq_bvs(:)
+  integer:: npq_bvs(msp)
+!  integer,allocatable:: npq_bvs(:)
 !.....covalent radius
-  real(8),allocatable:: rad_bvs(:)
+  real(8):: rad_bvs(msp)
+!  real(8),allocatable:: rad_bvs(:)
 !.....screening length
-  real(8),allocatable:: rho_bvs(:,:)
+  real(8):: rho_bvs(msp,msp)
+!  real(8),allocatable:: rho_bvs(:,:)
   real(8),parameter:: fbvs = 0.74d0
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
@@ -65,17 +78,19 @@ module Coulomb
   real(8),parameter:: threshold_kmax = 1d-4
 
 !.....Variable-charge potential variables
-  real(8):: vcg_chi(msp),vcg_jii(msp),vcg_e0(msp) &
+  real(8):: vcg_chi(msp),vcg_jii(msp),vcg_e0(msp),vcg_sgm(msp) &
        ,qlower(msp),qupper(msp)
+  real(8),parameter:: vcg_lambda = 0.5d0
 
 contains
-  subroutine initialize_coulomb(natm,tag,chg,chi, &
+  subroutine initialize_coulomb(natm,nspin,tag,chg,chi, &
        myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc)
 !
 !  Allocate and initialize parameters to be used.
 !
     include "mpif.h"
-    integer,intent(in):: myid,mpi_md_world,natm,ifcoulomb,iprint
+    integer,intent(in):: myid,mpi_md_world,natm,nspin &
+         ,ifcoulomb,iprint
     real(8),intent(in):: tag(natm),rc,h(3,3),chg(natm)
     real(8),intent(inout):: chi(natm)
     logical,intent(in):: lvc 
@@ -84,16 +99,17 @@ contains
 
 !!$    print *,'ifcoulomb @initialize_coulomb = ',ifcoulomb
 
+    
 !.....Get umber of species
-    nspl = 0
-    do i=1,natm
-      nspl = max(int(tag(i)),nspl)
-    enddo
-    call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max &
-         ,mpi_md_world,ierr)
+    nsp = nspin
+!!$    nspl = 0
+!!$    do i=1,natm
+!!$      nspl = max(int(tag(i)),nspl)
+!!$    enddo
+!!$    call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max &
+!!$         ,mpi_md_world,ierr)
 
     if( ifcoulomb.eq.1 ) then  ! screened Coulomb
-      if( .not.allocated(interact) ) allocate(interact(msp,msp))
       call read_params(myid,mpi_md_world,ifcoulomb,iprint,lvc)
     else
       if( lvc ) then
@@ -107,6 +123,39 @@ contains
     endif
 
   end subroutine initialize_coulomb
+!=======================================================================
+  subroutine initialize_coulombx(natm,nspin,tag,chg,chi, &
+       myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc)
+!
+!  Allocate and initialize parameters to be used.
+!
+    include "mpif.h"
+    integer,intent(in):: myid,mpi_md_world,natm,nspin &
+         ,ifcoulomb,iprint
+    real(8),intent(in):: tag(natm),rc,h(3,3),chg(natm)
+    real(8),intent(inout):: chi(natm)
+    logical,intent(in):: lvc 
+
+    integer:: i,ierr,nspl
+
+!!$    print *,'ifcoulomb @initialize_coulomb = ',ifcoulomb
+
+    
+!.....Get umber of species
+    nsp = nspin
+
+    call read_paramsx(myid,mpi_md_world,iprint)
+
+    if( trim(cchgs).eq.'variable' ) then
+!.....Variable-charge Coulomb with Gaussian distribution charges
+!     which ends-up long-range-only Ewald summation
+      call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
+           natm,tag,chi,chg,lvc)
+    else
+      call init_fc_Ewald(h,rc,myid)
+    endif
+
+  end subroutine initialize_coulombx
 !=======================================================================
   subroutine init_fc_Ewald(h,rc,myid)
 !
@@ -196,28 +245,35 @@ contains
       chi(i) = vcg_chi(is)
     enddo
 
-!!$    if( myid.eq.0 .and. iprint.ne.0 ) then
-!!$      print *,'Sigmas are overwritten by rc/sqrt(2*pacc),'
-!!$      print *,'since the current implementation cannot treat species-dependent sigma.'
-!!$    endif
-    sgm_ew = rc/sqrt(2d0*pacc)
-    sgm(1:msp) = sgm_ew
-!!$    sgm_min = 1d+30
-!!$    do i=1,nsp
-!!$      sgm_min = min(sgm(i),sgm_min)
-!!$    enddo
-!!$    bkmax  = sqrt(2d0*pacc) /sgm_min
-    bkmax  = 2d0*pacc /rc
+    if( ifcoulomb.eq.2 ) then
+      sgm_ew = rc/sqrt(2d0*pacc)
+      sgm(1:msp) = sgm_ew
+      bkmax  = 2d0*pacc /rc
+      if( myid.eq.0 .and. iprint.ne.0 ) then
+        print *,'Sigmas are overwritten by rc/sqrt(2*pacc),'
+        print *,'since the full Ewald cannot treat species-dependent sigma.'
+      endif
+    else
+      sgm(1:msp) = vcg_sgm(1:msp)
+      sgm_min = 1d+30
+      do i=1,nsp
+        sgm_min = min(sgm(i),sgm_min)
+      enddo
+      bkmax  = sqrt(2d0*pacc) /sgm_min
+    endif
     if( myid.eq.0 .and. iprint.ne.0 ) then
       write(6,'(/,a)') ' Ewald sum parameters:'
       write(6,'(a,f12.4)') '   1/(4*pi*eps0)        = ', acc
       write(6,'(a,f12.4)') '   Accuracy parameter p = ', pacc
-      write(6,'(a,f12.4)') '   Gaussian width sgm   = ', sgm_ew
-!!$      write(6,'(a)')       '   Gaussian simgas:'
-!!$      do i=1,nsp
-!!$        write(6,'(a,f12.4)') '     ',sgm(i)
-!!$      enddo
-!!$      write(6,'(a,f12.4)') '   Minimum sigma        = ', sgm_min
+      if( ifcoulomb.eq.2 ) then
+        write(6,'(a,f12.4)') '   Gaussian width sgm   = ', sgm_ew
+      else
+        write(6,'(a)')       '   Gaussian simgas:'
+        do i=1,nsp
+          write(6,'(a,f12.4)') '     ',sgm(i)
+        enddo
+        write(6,'(a,f12.4)') '   Minimum sigma        = ', sgm_min
+      endif
       write(6,'(a,f12.4)') '   real-space cutoff    = ', rc
       write(6,'(a,f12.4)') '   k-space cutoff       = ', bkmax
     endif
@@ -253,10 +309,9 @@ contains
           bk(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
           bb2 = absv(3,bk)
           bb2 = bb2*bb2
-          pflr(ik,1:nsp)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm_ew**2 *bb2)
-!!$          do isp=1,nsp
-!!$            pflr(ik,isp)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm(isp)**2 *bb2)
-!!$          enddo
+          do isp=1,nsp
+            pflr(ik,isp)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm(isp)**2 *bb2)
+          enddo
         enddo
       enddo
     enddo
@@ -301,9 +356,9 @@ contains
     character(len=128):: cline,c1st,fname
     character(len=5):: cname
     
-    if( allocated(rad_bvs) ) deallocate(rad_bvs,npq_bvs,vid_bvs,rho_bvs)
-    allocate(rad_bvs(msp),npq_bvs(msp),vid_bvs(msp) &
-         ,rho_bvs(msp,msp))
+!!$    if( allocated(rad_bvs) ) deallocate(rad_bvs,npq_bvs,vid_bvs,rho_bvs)
+!!$    allocate(rad_bvs(msp),npq_bvs(msp),vid_bvs(msp) &
+!!$         ,rho_bvs(msp,msp))
     if( myid.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
@@ -388,7 +443,7 @@ contains
     integer,intent(in):: myid,mpi_world,ifcoulomb,iprint
 
     integer:: isp,ierr
-    real(8):: dchi,djii,de0,qlow,qup
+    real(8):: dchi,djii,sgmt,de0,qlow,qup
     character(len=128):: cline,c1st,fname
     character(len=5):: cname
 
@@ -409,31 +464,175 @@ contains
         read(ioprms,*,end=20) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
         backspace(ioprms)
-        read(ioprms,*,end=20) isp, cname, dchi,djii,de0,qlow,qup
+        read(ioprms,*,end=20) isp, cname, dchi,djii,sgmt,de0,qlow,qup
         if( isp.gt.nsp .and. iprint.gt.0 ) then
           write(6,'(a,i2)') ' [WARNING] isp.gt.nsp !!!  isp = ',isp
         else
           vcg_chi(isp) = dchi
           vcg_jii(isp) = djii
           vcg_e0(isp) = de0
+          vcg_sgm(isp) = sgmt
           qlower(isp) = qlow
           qupper(isp) = qup
           if( iprint.gt.0 ) then
-            write(6,'(a,i3,a3,3f10.4,2f5.1)') '   isp,name,chi,Jii,e0,qlower,qupper = ', &
-                 isp,trim(cname),dchi,djii,de0,qlow,qup
+            write(6,'(a,i3,a3,3f10.4,2f5.1)') '   isp,name,chi,Jii,sgm,e0,qlower,qupper = ', &
+                 isp,trim(cname),dchi,djii,vcg_sgm(isp),de0,qlow,qup
           endif
         endif
       enddo  ! do while
 20    close(ioprms)
     endif  ! myid
-    call mpi_bcast(sgm,nsp,mpi_real8,0,mpi_world,ierr)
+!!$    call mpi_bcast(sgm,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_e0,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vcg_sgm,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
 
   end subroutine read_params_vc
+!=======================================================================
+  subroutine read_paramsx(myid,mpi_world,iprint)
+!
+!  Read parameter file for any Coulomb potential.
+!
+    include "mpif.h"
+    integer,intent(in):: myid,mpi_world,iprint
+
+    integer,external:: num_data
+    
+    character(len=128):: cmode,cline,ctmp,fname
+    character(len=3):: cname
+    integer:: i,ierr,jerr,isp,jsp,npq
+    real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup
+
+    if( myid.eq.0 ) then
+!.....Initialization
+      interact(1:msp,1:msp) = .true.
+!.....File name
+      fname = trim(paramsdir)//'/'//trim(paramsfname)
+      open(ioprms,file=trim(fname),status='old')
+!.....Start reading
+      do while(.true.)
+        read(ioprms,*,end=10) cline
+        if( num_data(cline,' ').eq.0 ) cycle
+        if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
+!.....Detect keyword
+        if( trim(cline).eq.'charges' ) then
+          cmode = 'charges'
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cchgs
+          if(  trim(cchgs).ne.'fixed' .and. &
+               trim(cchgs).ne.'fixed_bvs' .and. &
+               trim(cchgs).ne.'variable' .and. &
+               trim(cchgs).ne.'qeq' ) then
+            print *,'ERROR: charges should have an argument of'//&
+                 ' either fixed, fixed_bvs, variable or qeq.'
+            stop
+          endif
+          cycle
+        else if( trim(cline).eq.'charge_dist' ) then
+          cmode = 'charge_dist'
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cdist
+          if(  trim(cdist).ne.'point' .and. &
+               trim(cdist).ne.'gaussian' ) then
+            print *,'ERROR: charge_dist should have an argument of'//&
+                 ' either point or gaussian.'
+            stop
+          endif
+          cycle
+        else if( trim(cline).eq.'terms' ) then
+          cmode = 'terms'
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cterms
+          if(  trim(cterms).ne.'full' .and. &
+               trim(cterms).ne.'short' .and. &
+               trim(cterms).ne.'screened' .and. &
+               trim(cterms).ne.'long' ) then
+            print *,'ERROR: terms should have an argument of '//&
+                 'either full, short/screened or long.'
+            stop
+          endif
+          cycle
+        else if( trim(cline).eq.'interactions' ) then
+          cmode = 'interactions'
+          interact(1:msp,1:msp) = .false.
+        endif
+!.....Not a keyword, a certain mode should be already selected.
+        if( trim(cmode).eq.'charges' ) then
+          if( trim(cchgs).eq.'fixed' ) then
+            read(ioprms,*) isp, chgi
+            schg(isp) = chgi
+          else if( trim(cchgs).eq.'fixed_bvs' ) then
+            read(ioprms,*) isp,cname,vid,rad,npq
+            if( isp.gt.nsp .and. iprint.gt.0 ) then
+              print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
+            endif
+            vid_bvs(isp) = vid
+            rad_bvs(isp) = rad
+            npq_bvs(isp) = npq
+            if( iprint.ne.0 ) then
+              write(6,'(a,i3,a5,2f7.3,i4)') ' isp,cname,vid,rad,npq =' &
+                   ,isp,trim(cname),vid,rad,npq
+            endif
+          else if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') then
+            read(ioprms,*) isp, cname, dchi,djii,sgmt,de0,qlow,qup
+            if( isp.gt.nsp .and. iprint.gt.0 ) then
+              print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
+            endif
+            vcg_chi(isp) = dchi
+            vcg_jii(isp) = djii
+            vcg_e0(isp) = de0
+            vcg_sgm(isp) = sgmt
+            qlower(isp) = qlow
+            qupper(isp) = qup
+            if( iprint.gt.0 ) then
+              write(6,'(a,i3,a3,3f10.4,2f5.1)') '   isp,name,chi,Jii,sgm,e0,qlower,qupper = ', &
+                   isp,trim(cname),dchi,djii,vcg_sgm(isp),de0,qlow,qup
+            endif
+          endif
+!!$        else if( trim(cmode).eq.'charge_dist' ) then
+!!$        else if( trim(cmode).eq.'terms' ) then
+        else if( trim(cmode).eq.'interactions' ) then
+          read(ioprms,*) isp,jsp
+          interact(isp,jsp) = .true.
+          interact(jsp,isp) = .true.
+        endif
+      enddo ! while(.true.)
+
+!.....Corrections
+      if( trim(cdist).eq.'gaussian' ) then
+        if( trim(cterms).eq.'full' .or. trim(cterms).eq.'screened' .or. &
+             trim(cterms).eq.'short' ) then
+          cterms = 'long'
+          print *,'WARNING: terms was corrected to long, because charge_dist is gaussian.'
+        endif
+      endif
+      
+10    close(ioprms)
+    endif  ! myid.eq.0
+
+!.....Broadcast data just read from the file
+    call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vcg_e0,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vcg_sgm,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vid_bvs,msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rad_bvs,msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(npq_bvs,msp,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(rho_bvs,msp*msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
+
+    if( myid.eq.0 .and. iprint.ne.0 ) then
+      write(6,'(a)') ' Finished reading '//trim(fname)
+      write(6,*) ''
+    endif
+    
+    return
+  end subroutine read_paramsx
 !=======================================================================
   subroutine force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,h,hi,tcom &

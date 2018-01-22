@@ -156,19 +156,19 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
 
 !.....Exclusive choice of different Coulomb force-fields
-  if( ifcoulomb.eq.1 ) then ! screened Coulomb
+  if( use_force('screened_Coulomb') ) then ! screened Coulomb
     call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
          ,ifcoulomb,l1st)
-  else if( ifcoulomb.eq.2 ) then  ! Ewald Coulomb
+  else if( use_force('Ewald') ) then  ! Ewald Coulomb
     call force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
          ,ifcoulomb,l1st,lcell_updated,lvc)
-  else if( ifcoulomb.eq.3 ) then ! long-range Coulomb
+  else if( use_force('Ewald_long') ) then ! long-range Coulomb
     call force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
@@ -184,13 +184,13 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
 
 end subroutine get_force
 !=======================================================================
-subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
+subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
      iprint,h,rc,lvc,ifcoulomb)
 !
 !  Initialization routine is separated from main get_force routine.
 !
   use force
-  use Coulomb, only: initialize_coulomb
+  use Coulomb, only: initialize_coulomb, initialize_coulombx
   use Morse, only: read_params_vcMorse, lprmset_Morse, &
        read_element_descriptors,read_params_Morse,&
        update_params_Morse
@@ -199,7 +199,7 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
   use Buckingham, only: init_Buckingham, read_params_Buckingham, lprmset_Buckingham
   use ZBL, only: read_params_ZBL
   implicit none
-  integer,intent(in):: namax,natm,myid_md,mpi_md_world,iprint !,numff
+  integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint !,numff
   real(8),intent(in):: tag(namax),h(3,3),rc
 !!$    character(len=20),intent(in):: cffs(numff)
   integer,intent(inout):: ifcoulomb
@@ -208,7 +208,6 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
 
   integer:: i
 
-!!$  call set_force_flags(ifcoulomb,myid_md,iprint)
   if( iprint.ne.0 ) call write_forces(myid_md)
 
 !.....vcMorse requires charge optimization, 
@@ -226,7 +225,10 @@ subroutine init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world, &
   if( use_force('screened_Coulomb') .or. &
        use_force('Ewald') .or. &
        use_force('Ewald_long') ) then
-    call initialize_coulomb(natm,tag,chg,chi,myid_md &
+    call initialize_coulomb(natm,nsp,tag,chg,chi,myid_md &
+         ,mpi_md_world,ifcoulomb,iprint,h,rc,lvc)
+  else if( use_force('Coulomb') ) then
+    call initialize_coulombx(natm,nsp,tag,chg,chi,myid_md &
          ,mpi_md_world,ifcoulomb,iprint,h,rc,lvc)
   endif
 
@@ -771,50 +773,6 @@ function force_on(force_name,numff,cffs)
 
 end function force_on
 !=======================================================================
-subroutine set_force_flags(ifcoulomb,myid,iprint)
-!     
-!     Set flags for forces whether or not using them.
-!
-  use force
-  implicit none
-  integer,intent(in):: myid,iprint !,numff
-  integer,intent(inout):: ifcoulomb
-
-  if( myid.eq.0 .and. iprint.ne.0 ) then
-    write(6,'(/,a)') ' Use the following force-fields:'
-    if( use_force('LJ') ) print *,'  LJ_Ar'
-    if( use_force('Ito3_WHe') ) print *,'  Ito3_WHe'
-    if( use_force('RK_WHe') ) print *,'  RK_WHe'
-    if( use_force('RK_FeH') ) print *,'  RK_FeH'
-    if( use_force('Ramas_FeH') ) print *,'  Ramas_FeH'
-    if( use_force('Ackland_Fe') ) print *,'  Ackland_Fe'
-    if( use_force('SW_Si') ) print *,'  SW_Si'
-    if( use_force('EDIP_Si') ) print *,'  EDIP_Si'
-    if( use_force('Brenner') ) print *,'  Brenner'
-    if( use_force('Brenner_vdW') ) print *,'  Brenner_vdW'
-    if( use_force('Lu_WHe') ) print *,'  Lu_WHe'
-    if( use_force('Branicio_AlN') ) print *,'  Branicio_AlN'
-    if( use_force('Mishin_Al') ) print *,'  Mishin_Al'
-    if( use_force('AFS_W') ) print *,'  AFS_W'
-    if( use_force('SC_Fe') ) print *,'  SC_Fe'
-    if( use_force('SM_Al') ) print *,'  SM_Al'
-    if( use_force('EAM') ) print *,'  EAM'
-    if( use_force('linreg') ) print *,'  linreg'
-    if( use_force('NN') ) print *,'  NN'
-    if( use_force('Morse') ) print *,'  Morse'
-    if( use_force('Morse_repul') ) print *,'  Morse_repul'
-    if( use_force('vcMorse') ) print *,'  vcMorse'
-    if( use_force('Buckingham') ) print *,'  Buckingham'
-    if( use_force('Bonny_WRe') ) print *,'  Bonny_WRe'
-    if( use_force('ZBL') ) print *,'  ZBL'
-!.....Coulomb forces should be exclusive each other
-    if( use_force('screened_Coulomb') ) print *,'  screened_Coulomb'
-    if( use_force('Ewald') ) print *,'  Ewald'
-    if( use_force('Ewald_long') ) print *,'  Ewald_long'
-  endif
-
-end subroutine set_force_flags
-!=======================================================================
 subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
      lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
      tcom,myid,mpi_md_world,iprint,ifcoulomb,l1st)
@@ -891,11 +849,11 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because all Qs fixed.'
     return
   endif
-  if( ifcoulomb.eq.3 ) then
+  if( use_force('Ewald_long') ) then
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
     call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
          myid,iprint,ifcoulomb,fq,eclong)
-  else if( ifcoulomb.eq.2 ) then
+  else if( use_force('Ewald') ) then
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
     call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint,ifcoulomb &
          ,rc,fq,ecshort)
@@ -991,11 +949,11 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because all Qs fixed.'
       return
     endif
-    if( ifcoulomb.eq.3 ) then
+    if( use_force('Ewald_long') ) then
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)
       call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
            myid,iprint,ifcoulomb,fq,eclong)
-    else if( ifcoulomb.eq.2 ) then
+    else if( use_force('Ewald') ) then
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint,ifcoulomb &
            ,rc,fq,ecshort)

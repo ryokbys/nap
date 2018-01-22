@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-11 17:17:50 Ryo KOBAYASHI>
+c                     Last-modified: <2018-01-15 17:52:13 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -241,7 +241,7 @@ c     &           *m2ang/s2fs
       tcpu1= mpi_wtime()
       tcom = 0d0
 
-      call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
+      call init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world,
      &     iprint,h,rc,lvc,ifcoulomb)
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
@@ -948,7 +948,7 @@ c-----get total number of species
 
 c      print *,'one_shot: 04'
       if( iprint.ge.10 ) print *,'init_force,myid_md=',myid_md
-      call init_force(namax,natm,tag,chg,chi,myid_md,mpi_md_world,
+      call init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world,
      &     iprint,h,rc,lvc,ifcoulomb)
 
 c      print *,'one_shot: 05'
@@ -1552,6 +1552,7 @@ c  automatically selected according to the size of the system.
 c  
 c  Note: parallelized to smaller than rcut should not happen.
 c-----------------------------------------------------------------------
+      use force
       implicit none
       include 'mpif.h'
       integer,intent(in):: namax,nbmax,nn(6)
@@ -1574,22 +1575,22 @@ c.....integer:: status(MPI_STATUS_SIZE)
 
       if( l1st ) then
         if( allocated(dbuf) ) deallocate(dbuf,dbufr)
-        if( ifcoulomb .eq. 0 ) then
-          allocate(dbuf(4,nbmax),dbufr(4,nbmax))
-        else
+        if( use_charge() ) then
           allocate(dbuf(6,nbmax),dbufr(6,nbmax))
+        else
+          allocate(dbuf(4,nbmax),dbufr(4,nbmax))
         endif
       endif
 
-      if( ifcoulomb .eq. 0 ) then
-        if( size(dbuf).lt.4*nbmax ) then
-          deallocate(dbuf,dbufr)
-          allocate(dbuf(4,nbmax),dbufr(4,nbmax))
-        endif
-      else
+      if( use_charge() ) then
         if( size(dbuf).lt.6*nbmax ) then
           deallocate(dbuf,dbufr)
           allocate(dbuf(6,nbmax),dbufr(6,nbmax))
+        endif
+      else
+        if( size(dbuf).lt.4*nbmax ) then
+          deallocate(dbuf,dbufr)
+          allocate(dbuf(4,nbmax),dbufr(4,nbmax))
         endif
       endif
       
@@ -1673,7 +1674,7 @@ c-------Error trap
         if( nex(kd).gt.1 ) then
           do kdd= -1,0
             ku= 2*kd+kdd
-            if( ifcoulomb.eq.0 ) then
+            if( .not. use_charge() ) then
               do i=1,lsb(0,ku)
                 j= lsb(i,ku)
                 iex= lsex(i,ku)
@@ -1707,7 +1708,7 @@ c---------Store the # of received boundary atoms in LSRC
             lsrc(ku)=nrc
 
 c---------Exchange ra and tag
-            if( ifcoulomb.eq.0 ) then
+            if( .not. use_charge() ) then
               do i=1,nsd
                 j= lsb(i,ku)
                 dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
@@ -1845,6 +1846,7 @@ c    which were listed by 'bacopy'.
 c  Different number of data are copied depending on whether 
 c    using atomic charges or not.
 c-----------------------------------------------------------------------
+      use force
       implicit none
       include 'mpif.h'
       integer,intent(in):: namax,nbmax,nn(6),natm,nb
@@ -1864,7 +1866,7 @@ c      integer:: status(MPI_STATUS_SIZE)
 
       if( l1st ) then
         if( allocated(dbuf) ) deallocate(dbuf,dbufr)
-        if( ifcoulomb .eq. 0 ) then
+        if( .not. use_charge() ) then
           allocate(dbuf(4,nbmax),dbufr(4,nbmax))
         else
           allocate(dbuf(6,nbmax),dbufr(6,nbmax))
@@ -1872,7 +1874,7 @@ c      integer:: status(MPI_STATUS_SIZE)
         l1st=.false.
       endif
 
-      if( ifcoulomb .eq. 0 ) then
+      if( .not. use_charge() ) then
         if( size(dbuf).lt.4*nbmax ) then
           deallocate(dbuf,dbufr)
           allocate(dbuf(4,nbmax),dbufr(4,nbmax))
@@ -1902,7 +1904,7 @@ c-------To calculate the communication time
         if( nex(kd).gt.1 ) then
           do kdd= -1,0
             ku= 2*kd+kdd
-            if( ifcoulomb .eq. 0 ) then
+            if( .not. use_charge() ) then
               do i=1,lsb(0,ku)
                 j= lsb(i,ku)
                 iex= lsex(i,ku)
@@ -1931,7 +1933,7 @@ c-------To calculate the communication time
             nrc=lsrc(ku)
 
 c---------Exchange ra and tag
-            if( ifcoulomb .eq. 0 ) then  ! in case of no charge
+            if( .not. use_charge() ) then  ! in case of no charge
               do i=1,nsd
                 j= lsb(i,ku)
                 dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)

@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-01-10 12:41:42 Ryo KOBAYASHI>
+!                     Last-modified: <2018-01-15 17:50:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -24,6 +24,18 @@ contains
     enddo
     return
   end function use_force
+!=======================================================================
+  function use_charge()
+    logical:: use_charge
+    integer:: i
+
+    use_charge = .false.
+    if(  use_force('screened_Coulomb') .or. &
+         use_force('Ewald') .or. &
+         use_force('Ewald_long') .or. &
+         use_force('Coulomb') ) use_charge = .true.
+    return
+  end function use_charge
 !=======================================================================
   subroutine write_forces(myid)
     implicit none

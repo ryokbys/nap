@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2017-12-21 12:29:58 Ryo KOBAYASHI>
+c                     Last-modified: <2018-01-15 17:44:24 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -21,7 +21,6 @@ c-----------------------------------------------------------------------
       use pmdio
       use pmdmpi
       use version
-c      use force, only: force_on
       use force
       implicit none
       include "mpif.h"
@@ -69,13 +68,6 @@ c.....Set fmv as default value before reading 'in.pmd'
       call bcast_params()
 
 c.....Set Coulomb flag here
-c      if( force_on('screened_Coulomb',numff,cffs) ) then
-c        ifcoulomb = 1
-c      else if( force_on('Ewald_Coulomb',numff,cffs) ) then
-c        ifcoulomb = 2
-c      else if( force_on('long_Coulomb',numff,cffs) ) then
-c        ifcoulomb = 3
-c      endif
       if( use_force('screened_Coulomb') ) then
         ifcoulomb = 1
       else if( use_force('Ewald') ) then
