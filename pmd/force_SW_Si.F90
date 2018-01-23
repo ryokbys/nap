@@ -307,7 +307,7 @@ contains
     inquire(file='in.params.SW_Si',exist=lexist)
     if( .not. lexist ) then
       if( myid.eq.0 ) then
-        write(6,'(a)') ' [Warning] in.params.SW_Si does not exist !!!.'
+        write(6,'(a)') ' WARNING: in.params.SW_Si does not exist !!!.'
         write(6,'(a)') '           Default parameters will be used.'
       endif
       return

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-22 18:26:52 Ryo KOBAYASHI>
+c                     Last-modified: <2018-01-23 15:49:13 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -14,7 +14,8 @@ c-----------------------------------------------------------------------
       use pmdvars
       use zload
       use force
-      use ttm,only: init_ttm,langevin_ttm
+      use ttm,only: init_ttm,langevin_ttm,output_Te,t_ttm,
+     &     calc_Ta,update_Te,assign_atom2cell
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -539,7 +540,7 @@ c-------Calc forces
         lstrs = .false.
 
 c.....Second kick of velocities
-        if( ctctl.eq.'Langevin' ) then
+        if( trim(ctctl).eq.'Langevin' ) then
 c.....Langevin thermostat with Mannella integrator
           hscl(1:3)= 0d0
           do l=1,3
@@ -579,6 +580,7 @@ c.....accumulate energy difference
      &           ,mpi_md_world,myid_md,0)
           endif
         else if( trim(ctctl).eq.'ttm' ) then
+          call assign_atom2cell(namax,natm,ra,sorg)
           call langevin_ttm(namax,natm,va,aa,tag,eki,am,h
      &         ,nspmax,fa2v,fekin,ediff,dt)
         else
@@ -598,6 +600,11 @@ c.....Calc kinetic energy
         vmaxold= vmax
         call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl
      &       ,vmax,mpi_md_world)
+
+        if( trim(ctctl).eq.'ttm' ) then
+          call calc_Ta(namax,natm,eki,myid_md,mpi_md_world)
+          call update_Te(myid_md,mpi_md_world)
+        endif
 
         call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
      &       ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
@@ -682,8 +689,8 @@ c.....write temperature
               write(iostrs,'(i8,3es15.7)') istp,strnow,ftop,fbot
               call flush(iostrs)
             endif
-
-          endif
+          endif   ! myid_md.eq.0
+          
 c---------output step, time, and temperature
           tcpu= mpi_wtime() -tcpu1
           if(myid_md.eq.0) then
@@ -706,6 +713,10 @@ c---------output step, time, and temperature
      &             " istp,time,temp,epot,prss="
      &             ,istp,tcpu,tave,epot,prss
             endif
+          endif
+
+          if( trim(ctctl).eq.'ttm' ) then
+            call output_Te(istp,myid_md,iprint)
           endif
             
 #ifdef __DISL__
@@ -823,6 +834,9 @@ c          call system("mkdir -p "//cnum)
         write(6,*) ''
         write(6,'(1x,a,f10.2)') "Time for space decomp = ",tspdcmp
         write(6,'(1x,a,f10.2)') "Time for comm         = ",tcom
+        if( trim(ctctl).eq.'ttm' ) then
+          write(6,'(1x,a,f10.2)') "Time for ttm          = ",t_ttm
+        endif
 
         ihour = int(tcpu/3600)
         imin  = int((tcpu-ihour*3600)/60)

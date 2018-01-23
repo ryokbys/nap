@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-01-22 18:55:09 Ryo KOBAYASHI>
+!                     Last-modified: <2018-01-23 15:54:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -20,7 +20,8 @@ module ttm
   integer,parameter:: ioprms = 30
   integer,parameter:: ioTein = 31
   integer,parameter:: ioTeout = 32
-  
+
+  real(8):: t_ttm
 !.....TTM mesh divisions
   integer:: nx,ny,nz,nxyz
 !.....Mesh size in reduced unit [0:1)
@@ -57,12 +58,12 @@ module ttm
   integer:: lsurf = -1  ! left surface
   integer:: rsurf = -1  ! right surface
 !.....Surface movement along x: no, plane (can move as a yz-plane surface)
-  character(len=128):: surfmove = 'plane'
+  character(len=128):: surfmove = 'no'
 !.....Minimum Te when surface moves
   real(8):: Te_min = 300d0
 
 !.....Temperature distribution
-  real(8),allocatable:: te(:,:,:),tep(:,:,:),ta(:),tap(:)
+  real(8),allocatable:: te(:,:,:),tep(:,:,:),ta(:),tap(:),tex(:)
   integer,allocatable:: nac(:),nacp(:)
   real(8),allocatable:: eksum(:),ekpsum(:)
   integer,allocatable:: nacl(:),nacpl(:)
@@ -89,9 +90,11 @@ contains
     real(8),intent(in):: dtmd,h(3,3)
 
     integer:: ierr,ix,iy,iz
-    real(8):: t
+    real(8):: t,t0
     character(len=128):: c1st
-    
+
+    t_ttm = 0d0
+    t0 = mpi_wtime()
 !.....Read parameter file
     call read_ttm_params(myid,mpi_world,iprint)
     call sync_params(myid,mpi_world,iprint)
@@ -102,6 +105,13 @@ contains
     dy = h(2,2)/ny
     dz = h(3,3)/nz
     nxyz = nx*ny*nz
+
+    if( myid.eq.0 .and. iprint.ne.0 ) then
+      print *,'TTM parameters:'
+      print '(a,3i5,i8)','   nx,ny,nz,nxyz = ',nx,ny,nz,nxyz
+      print '(a,3es12.4)','   dx,dy,dz = ',dx,dy,dz
+      print '(a,2i5)','   lsurf,rsurf = ',lsurf,rsurf
+    endif
     
 !.....Error check
     if( nxyz.le.0 ) then
@@ -127,12 +137,13 @@ contains
 !.....Allocate initialize arrays
     allocate(nac(nxyz),nacp(nxyz),eksum(nxyz),ekpsum(nxyz), &
          nacl(nxyz),nacpl(nxyz),eksuml(nxyz),ekpsuml(nxyz), &
-         sgm(nxyz),te(nx,ny,nz),tep(nx,ny,nz),ta(nxyz),tap(nxyz))
+         sgm(nxyz),te(0:nx+1,0:ny+1,0:nz+1),tep(0:nx+1,0:ny+1,0:nz+1), &
+         ta(nxyz),tap(nxyz),tex(nx))
     allocate(a2c(namax),aai(3,namax))
 
 !.....Set initial Te distribution
+    te(:,:,:) = 0d0
     if( trim(cTe_init).eq.'exp' ) then
-      te(:,:,:) = 0d0
       if( lsurf.le.0 ) then
         if( myid.eq.0 ) then
           print *,'ERROR: Initial Te distribution cannot be set with exp'&
@@ -141,7 +152,7 @@ contains
         goto 999
       endif
       do ix=lsurf,rsurf
-        te(ix,:,:) = I_0 *exp(-dx*(ix-lsurf+1)/lskin)
+        te(ix,1:ny,1:nz) = I_0 *exp(-dx*(ix-lsurf+1)/lskin)
       enddo
     else if( trim(cTe_init).eq.'read' ) then
       if( myid.eq.0 ) then
@@ -156,7 +167,15 @@ contains
 10      close(ioTein)
       endif
     endif
-      
+    do ix=1,nx
+      do iy=1,ny
+        do iz=1,nz
+          print *,'ix,iy,iz,te=',ix,iy,iz,te(ix,iy,iz)
+        enddo
+      enddo
+    enddo
+
+    t_ttm = t_ttm +mpi_wtime() -t0
     return
 
 999 call mpi_finalize(ierr)
@@ -306,7 +325,9 @@ contains
     real(8),intent(in):: eki(3,3,namax)
 
     integer:: i,ic,ierr
-    real(8):: ek
+    real(8):: ek,t0
+
+    t0 = mpi_wtime()
     
     nacl(1:nxyz) = 0
     nacpl(1:nxyz) = 0
@@ -326,10 +347,10 @@ contains
     nacp(1:nxyz) = 0
     eksum(1:nxyz) = 0
     ekpsum(1:nxyz) = 0
-    call mpi_reduce(nac,nacl,nxyz,mpi_integer,0,mpi_world,ierr)
-    call mpi_reduce(nacp,nacpl,nxyz,mpi_integer,0,mpi_world,ierr)
-    call mpi_reduce(eksum,eksuml,nxyz,mpi_real8,0,mpi_world,ierr)
-    call mpi_reduce(ekpsum,ekpsuml,nxyz,mpi_real8,0,mpi_world,ierr)
+    call mpi_reduce(nac,nacl,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(nacp,nacpl,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(eksum,eksuml,nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(ekpsum,ekpsuml,nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
 !.....Compute Ta and Tap only at node-0
     if( myid.eq.0 ) then
       do ic=1,nxyz
@@ -339,7 +360,8 @@ contains
         tap(ic) = ekpsum(ic) /3 /fkb /nacp(ic)
       enddo
     endif
-    
+
+    t_ttm = t_ttm +mpi_wtime() -t0
     return
   end subroutine calc_Ta
 !=======================================================================
@@ -348,33 +370,30 @@ contains
 !  Update Te by solving the diffusion equation.
 !
     integer,intent(in):: myid,mpi_world
-    
-    integer:: ic,ix,ixp,ixm,iy,iyp,iym,iz,izp,izm,ierr
-    
-    do ic=1,nxyz
-      call ic2ixyz(ic,ix,iy,iz)
-      ixp = ix +1
-      ixm = ix -1
-      if( ixp.gt.nx ) ixp = ixp -nx
-      if( ixp.lt.1 ) ixp = ixp +nx
-      iyp = iy +1
-      iym = iy -1
-      if( iyp.gt.ny ) iyp = iyp -ny
-      if( iyp.lt.1 ) iyp = iyp +ny
-      izp = iz +1
-      izm = iz -1
-      if( izp.gt.nz ) izp = izp -nz
-      if( izp.lt.1 ) izp = izp +nz
 
-      tep(ix,iy,iz) = te(ix,iy,iz) &
-           +rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,ixp,ixm,iy,iyp,iym,iz,izp,izm) &
-           +cete(ix,iy,iz)*d2te(ix,ixp,ixm,iy,iyp,iym,iz,izp,izm) ) &
-           -gp*(te(ix,iy,iz) -ta(ic)) +gs*tap(ic)
-    enddo
-    te(:,:,:) = tep(:,:,:)
+    integer:: ic,ix,iy,iz,ierr
+    real(8):: t0
+
+    t0 = mpi_wtime()
+
+    if( myid.eq.0 ) then
+      call set_BC()
+
+      do ic=1,nxyz
+        call ic2ixyz(ic,ix,iy,iz)
+
+        tep(ix,iy,iz) = te(ix,iy,iz) &
+             +dt *(rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,iy,iz) &
+             +cete(ix,iy,iz)*d2te(ix,iy,iz) ) &
+             -gp*(te(ix,iy,iz) -ta(ic)) +gs*tap(ic) )
+      enddo
+      te(:,:,:) = tep(:,:,:)
+    endif
 !.....Broadcast Te distribution to all the nodes.
 !.....There could be smarter way to reduce networking cost.
-    call mpi_bcast(te,nx*ny*nz,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real8,0,mpi_world,ierr)
+
+    t_ttm = t_ttm +mpi_wtime()-t0
 
     return
   end subroutine update_Te
@@ -421,10 +440,17 @@ contains
     
   end function dcete
 !=======================================================================
-  function dte2(ix,ixp,ixm,iy,iyp,iym,iz,izp,izm)
-    integer,intent(in):: ix,ixp,ixm,iy,iyp,iym,iz,izp,izm
+  function dte2(ix,iy,iz)
+    integer,intent(in):: ix,iy,iz
 
+    integer:: ixp,ixm,iyp,iym,izp,izm
     real(8):: dte2
+    ixp = ix +1
+    ixm = ix -1
+    iyp = iy +1
+    iym = iy -1
+    izp = iz +1
+    izm = iz -1
 
     dte2 = 0d0
     dte2 = (te(ixp,iy,iz)**2 -2d0*te(ixp,iy,iz)*te(ixm,iy,iz) &
@@ -436,10 +462,17 @@ contains
     return
   end function dte2
 !=======================================================================
-  function d2te(ix,ixp,ixm,iy,iyp,iym,iz,izp,izm)
-    integer,intent(in):: ix,ixp,ixm,iy,iyp,iym,iz,izp,izm
+  function d2te(ix,iy,iz)
+    integer,intent(in):: ix,iy,iz
 
+    integer:: ixp,ixm,iyp,iym,izp,izm
     real(8):: d2te
+    ixp = ix +1
+    ixm = ix -1
+    iyp = iy +1
+    iym = iy -1
+    izp = iz +1
+    izm = iz -1
 
     d2te = (te(ixp,iy,iz) -2d0*te(ix,iy,iz) &
          +te(ixm,iy,iz)) /dx/dx &
@@ -526,6 +559,65 @@ contains
     ic = (iz-1)*nx*ny +(iy-1)*nx +ix
     return
   end subroutine ixyz2ic
+!=======================================================================
+  subroutine output_Te(istp,myid,iprint)
+    integer,intent(in):: istp,myid,iprint
+
+    integer:: ix,iy,iz
+    character(len=128):: cnum
+
+    if( myid.eq.0 ) then
+!!$!.....Average over y-z plane
+!!$      tex(:) = 0d0
+!!$      do ix=1,nx
+!!$        do iy=1,ny
+!!$          do iz=1,nz
+!!$            tex(ix) = tex(ix) +te(ix,iy,iz)
+!!$          enddo
+!!$        enddo
+!!$        tex(ix) = tex(ix) /(ny*nz)
+!!$      enddo
+
+!.....Output
+      if( iprint.ne.0 ) then
+        write(cnum,'(i0)') istp
+        open(ioTeout,file=trim(cTe_outfile)//'_'//trim(cnum),status='replace')
+        write(ioTeout,'(a)') '# ix,   iy,   iz,   te(ix,iy,iz)'
+        do ix=1,nx
+          do iy=1,ny
+            do iz=1,nz
+              write(ioTeout,'(3i6,es15.7)') ix,iy,iz,te(ix,iy,iz)
+            enddo
+          enddo
+        enddo
+        close(ioTeout)
+      endif
+    endif
+  end subroutine output_Te
+!=======================================================================
+  subroutine set_BC()
+!
+!  Set boundary condition
+!
+    if( lsurf.le.0 .and. rsurf.le.0 ) then
+!.....Periodic for x,y,z
+      te(0,1:ny,1:nz) = te(nx,1:ny,1:nz)
+      te(nx+1,1:ny,1:nz) = te(1,1:ny,1:nz)
+      te(1:nx,0,1:nz) = te(1:nx,ny,1:nz)
+      te(1:nx,ny+1,1:nz) = te(1:nx,1,1:nz)
+      te(1:nx,1:ny,0) = te(1:nx,1:ny,nz)
+      te(1:nx,1:ny,nz+1) = te(1:nx,1:ny,1)
+    else
+!.....Free boundary for x
+      te(lsurf-1,1:ny,1:nz) = te(lsurf,1:ny,1:nz)
+      te(rsurf+1,1:ny,1:nz) = te(rsurf,1:ny,1:nz)
+!.....Periodic for y and z
+      te(lsurf:rsurf,0,1:nz) = te(lsurf:rsurf,ny,1:nz)
+      te(lsurf:rsurf,ny+1,1:nz) = te(lsurf:rsurf,1,1:nz)
+      te(lsurf:rsurf,1:ny,0) = te(lsurf:rsurf,1:ny,nz)
+      te(lsurf:rsurf,1:ny,nz+1) = te(lsurf:rsurf,1:ny,1)
+    endif
+  end subroutine set_BC
 end module ttm
 !-----------------------------------------------------------------------
 !     Local Variables:
