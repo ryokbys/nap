@@ -321,7 +321,7 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
             for triple in triplets:
                 ia,ja,ka = triple.get_isps()
                 for isf,sf in enumerate(triple.symfuncs):
-                    angs = [ math.cos(a/180*math.pi) for a in triple.sfparams[isf] ]
+                    angs = [ -math.cos(a/180*math.pi) for a in triple.sfparams[isf] ]
                     for ang in angs:
                         f.write(' {0:3d}'.format(_type2num[sf]) \
                                 +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
