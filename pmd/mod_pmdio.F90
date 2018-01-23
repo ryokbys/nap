@@ -1,9 +1,11 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-21 12:24:57 Ryo KOBAYASHI>
+!                     Last modified: <2018-01-23 17:29:13 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
+
+  character(len=20),parameter:: cinpmd='in.pmd'
 
   integer:: ntot
 !.....data of total system

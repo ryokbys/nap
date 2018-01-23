@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-01-23 15:54:46 Ryo KOBAYASHI>
+!                     Last-modified: <2018-01-23 21:55:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -76,7 +76,7 @@ module ttm
 !.....Gammas
   real(8):: gmmp, gmms
 !.....gp, gs
-  real(8):: gp, gs
+  real(8),allocatable:: gp(:),gs(:)
 
   real(8),allocatable:: aai(:,:)
 
@@ -89,7 +89,7 @@ contains
     integer,intent(in):: namax,natm,myid,mpi_world,iprint
     real(8),intent(in):: dtmd,h(3,3)
 
-    integer:: ierr,ix,iy,iz
+    integer:: ierr,ix,iy,iz,mem
     real(8):: t,t0
     character(len=128):: c1st
 
@@ -100,17 +100,23 @@ contains
     call sync_params(myid,mpi_world,iprint)
 
 !.....Set some
+    nxyz = nx*ny*nz
     dt = dtmd
     dx = h(1,1)/nx
     dy = h(2,2)/ny
     dz = h(3,3)/nz
-    nxyz = nx*ny*nz
+    vcell = dx*dy*dz
 
     if( myid.eq.0 .and. iprint.ne.0 ) then
+      print *,''
       print *,'TTM parameters:'
       print '(a,3i5,i8)','   nx,ny,nz,nxyz = ',nx,ny,nz,nxyz
-      print '(a,3es12.4)','   dx,dy,dz = ',dx,dy,dz
+      print '(a,4es12.4)','   dx,dy,dz,vcell = ',dx,dy,dz,vcell
       print '(a,2i5)','   lsurf,rsurf = ',lsurf,rsurf
+      print '(a,2es12.4)','   gmmp,gmms = ',gmmp,gmms
+      print '(a,a)','   Ce_Tdep = ',trim(Ce_Tdep)
+      mem = 4 * 4*nxyz + 11 * 8*nxyz + 4 * 8*namax
+      print '(a,f0.3,a)',' Memory for TTM = ',dble(mem)/1000/1000,' MByte'
     endif
     
 !.....Error check
@@ -138,7 +144,7 @@ contains
     allocate(nac(nxyz),nacp(nxyz),eksum(nxyz),ekpsum(nxyz), &
          nacl(nxyz),nacpl(nxyz),eksuml(nxyz),ekpsuml(nxyz), &
          sgm(nxyz),te(0:nx+1,0:ny+1,0:nz+1),tep(0:nx+1,0:ny+1,0:nz+1), &
-         ta(nxyz),tap(nxyz),tex(nx))
+         ta(nxyz),tap(nxyz),tex(nx),gp(nxyz),gs(nxyz))
     allocate(a2c(namax),aai(3,namax))
 
 !.....Set initial Te distribution
@@ -167,13 +173,6 @@ contains
 10      close(ioTein)
       endif
     endif
-    do ix=1,nx
-      do iy=1,ny
-        do iz=1,nz
-          print *,'ix,iy,iz,te=',ix,iy,iz,te(ix,iy,iz)
-        enddo
-      enddo
-    enddo
 
     t_ttm = t_ttm +mpi_wtime() -t0
     return
@@ -304,14 +303,17 @@ contains
     real(8),intent(in):: ra(3,namax),sorg(3)
 
     integer:: i,ix,iy,iz,ic
-    real(8):: xi(3)
+    real(8):: xi(3),udx,udy,udz
 
+    udx = 1d0/nx
+    udy = 1d0/ny
+    udz = 1d0/nz
     a2c(:) = 0
     do i=1,natm
       xi(1:3) = ra(1:3,i) +sorg(1:3)
-      ix = int(xi(1)/dx) +1
-      iy = int(xi(2)/dy) +1
-      iz = int(xi(3)/dz) +1
+      ix = int(xi(1)/udx) +1
+      iy = int(xi(2)/udy) +1
+      iz = int(xi(3)/udz) +1
       call ixyz2ic(ix,iy,iz,ic)
       a2c(i) = ic
     enddo
@@ -324,15 +326,15 @@ contains
     integer,intent(in):: namax,natm,myid,mpi_world
     real(8),intent(in):: eki(3,3,namax)
 
-    integer:: i,ic,ierr
+    integer:: i,ic,ierr,ix,iy,iz
     real(8):: ek,t0
 
     t0 = mpi_wtime()
-    
+
     nacl(1:nxyz) = 0
     nacpl(1:nxyz) = 0
-    eksuml(1:nxyz) = 0
-    ekpsuml(1:nxyz) = 0
+    eksuml(1:nxyz) = 0d0
+    ekpsuml(1:nxyz) = 0d0
     do i=1,natm
       ek = eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
       ic = a2c(i)
@@ -345,20 +347,35 @@ contains
     enddo
     nac(1:nxyz) = 0
     nacp(1:nxyz) = 0
-    eksum(1:nxyz) = 0
-    ekpsum(1:nxyz) = 0
-    call mpi_reduce(nac,nacl,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
-    call mpi_reduce(nacp,nacpl,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
-    call mpi_reduce(eksum,eksuml,nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
-    call mpi_reduce(ekpsum,ekpsuml,nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    eksum(1:nxyz) = 0d0
+    ekpsum(1:nxyz) = 0d0
+    call mpi_reduce(nacl,nac,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(nacpl,nacp,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(eksuml,eksum,nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(ekpsuml,ekpsum,nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
 !.....Compute Ta and Tap only at node-0
     if( myid.eq.0 ) then
+      gp(:) = 0d0
+      gs(:) = 0d0
       do ic=1,nxyz
         if( nac(ic).eq.0 ) cycle
-        ta(ic) = eksum(ic) /3 /fkb /nac(ic)
+        call ic2ixyz(ic,ix,iy,iz)
+!!$        if( iy.eq.1 .and. iz.eq.1 ) then
+!!$          print *,'ix,nac(ic)=',ix,nac(ic)
+!!$        endif
+        ta(ic) = eksum(ic) *2d0/3 /fkb /nac(ic)
+        gp(ic) = 3d0 *nac(ic) *fkb *gmmp /vcell
         if( nacp(ic).eq.0 ) cycle
-        tap(ic) = ekpsum(ic) /3 /fkb /nacp(ic)
+        tap(ic) = ekpsum(ic) *2d0/3 /fkb /nacp(ic)
+        gp(ic) = 3d0 *nacp(ic) *fkb *gmms /vcell
       enddo
+!!$      do ix=1,nx
+!!$        iy = 1
+!!$        iz = 1
+!!$        call ixyz2ic(ix,iy,iz,ic)
+!!$        print *,'ix,iy,iz,ic,ta,eksum,eksuml=',ix,iy,iz,ic,ta(ic) &
+!!$             ,eksum(ic),eksuml(ic)
+!!$      enddo
     endif
 
     t_ttm = t_ttm +mpi_wtime() -t0
@@ -381,11 +398,20 @@ contains
 
       do ic=1,nxyz
         call ic2ixyz(ic,ix,iy,iz)
-
+        tep(ix,iy,iz) = 0d0
+        if( ix.lt.lsurf ) cycle
+        if( ix.gt.rsurf ) cycle
+        if( iy.eq.1 .and. iz.eq.1 ) then
+          print '(a,i5,10es11.3)','ix,cete,dcete,dte2,d2te,ta,tap,gp,gs=' &
+               ,ix&
+               ,cete(ix,iy,iz),dcete(ix,iy,iz),dte2(ix,iy,iz)&
+               ,d2te(ix,iy,iz),ta(ic),tap(ic),gp(ic),gs(ic) &
+               ,te(ix,iy,iz),ta(ic)
+        endif
         tep(ix,iy,iz) = te(ix,iy,iz) &
              +dt *(rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,iy,iz) &
              +cete(ix,iy,iz)*d2te(ix,iy,iz) ) &
-             -gp*(te(ix,iy,iz) -ta(ic)) +gs*tap(ic) )
+             -gp(ic)*(te(ix,iy,iz) -ta(ic)) +gs(ic)*tap(ic) )
       enddo
       te(:,:,:) = tep(:,:,:)
     endif
@@ -547,7 +573,7 @@ contains
     integer,intent(out):: ix,iy,iz
 
     iz = (ic-1) / (nx*ny) +1
-    iy = mod(mod(ic-1, nx*ny),nx) +1
+    iy = mod(ic-1,nx*ny)/nx +1
     ix = mod(ic-1,nx) +1
     return
   end subroutine ic2ixyz

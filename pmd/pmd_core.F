@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-23 15:49:13 Ryo KOBAYASHI>
+c                     Last-modified: <2018-01-23 21:47:41 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -2567,7 +2567,7 @@ c.....count max number of atoms in a node
      &           ,nbmax
             write(6,'(a,i10)')   '   namax = nmax*1.2 + nbmax  = ',namax
             write(6,'(a,i10,a)') ' Memory for main routine   = '
-     &           ,namax*(3*4 +3*3*5 +1 +nnmax/2)*8/1000/1000,' MB'
+     &           ,namax*(3*4 +3*3*5 +1 +nnmax/2)*8/1000/1000,' MByte'
           endif
         endif
         call mpi_bcast(namax,1,mpi_integer,0,mpi_md_world,ierr)

@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-15 17:44:24 Ryo KOBAYASHI>
+c                     Last-modified: <2018-01-23 17:35:40 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -60,9 +60,10 @@ c.....Set fmv as default value before reading 'in.pmd'
         call time_stamp(' Job started')
         write(6,*) ''
         write(6,'(a,i0)') ' Number of processes in MPI = ',nodes_md
-        call read_input(10,'in.pmd')
+        call read_input(10,trim(cinpmd))
         call check_cmin(cmin,ifdmp)
-        call write_initial_setting()
+c        call write_initial_setting()
+        call write_inpmd(10,trim(cinpmd))
       endif
 
       call bcast_params()
@@ -263,6 +264,30 @@ c.....velocity multiplying factor
      &       //'---------------------------------------'
 
       end subroutine write_initial_setting
+c=======================================================================
+      subroutine write_inpmd(ionum,cfname)
+      integer,intent(in):: ionum
+      character(len=*),intent(in):: cfname
+
+      character(len=128):: cline
+      
+      write(6,*) ''
+      write(6,'(a)') '---------------------------------'
+     &       //'---------------------------------------'
+      write(6,'(a)') '                           in.pmd'
+      write(6,'(a)') '---------------------------------'
+     &       //'---------------------------------------'
+
+      open(ionum,file=trim(cfname),status='old')
+      do while(.true.)
+        read(ionum,'(a)',end=10) cline
+        write(6,'(a)') cline
+      enddo
+ 10   close(ionum)
+      write(6,'(a)') '---------------------------------'
+     &       //'---------------------------------------'
+      
+      end subroutine write_inpmd
 c=======================================================================
       subroutine bcast_params()
       use pmdio
