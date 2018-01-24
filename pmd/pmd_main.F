@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-23 17:35:40 Ryo KOBAYASHI>
+c                     Last-modified: <2018-01-24 23:01:52 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -67,6 +67,9 @@ c        call write_initial_setting()
       endif
 
       call bcast_params()
+
+c.....Check ensemble
+      call check_ensemble()
 
 c.....Set Coulomb flag here
       if( use_force('screened_Coulomb') ) then
@@ -427,6 +430,40 @@ c=======================================================================
       endif
       
       end subroutine set_atomic_charges
+c=======================================================================
+      subroutine check_ensemble()
+      use pmdio
+      implicit none
+
+      logical:: l_temp
+      character:: c_2*1,c_3*1,c_ensemble*3
+
+      c_2 = 'V'
+      c_3 = 'E'
+
+      l_temp = .false.
+      
+      if(  trim(ctctl).eq.'Langeven' .or.
+     &     trim(ctctl).eq.'Berendsen' .or.
+     &     trim(ctctl).eq.'ttm' ) then
+        l_temp = .true.
+        c_3 = 'T'
+      endif
+
+      if(  trim(cpctl).eq.'Berendsen' .or.
+     &     trim(cpctl).eq.'vc-Berendsen' ) then
+        c_2 = 'p'
+        if( .not. l_temp ) c_3 = 'H'
+      else if( trim(cpctl).eq.'vv-Berendsen' ) then
+        c_2 = 'P'
+        if( .not. l_temp ) c_3 = 'H'
+      endif
+
+      c_ensemble = 'N'//c_2//c_3
+      print *,''
+      print *,'Ensemble = ',trim(c_ensemble)
+      
+      end subroutine check_ensemble
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"
