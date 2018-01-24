@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-01-23 21:55:01 Ryo KOBAYASHI>
+!                     Last-modified: <2018-01-24 17:38:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -14,7 +14,7 @@ module ttm
   include "./params_unit.h"
   
   character(len=128):: paramsdir = '.'
-  character(len=128),parameter:: cfparams = 'in.params.ttm'
+  character(len=128),parameter:: cfparams = 'in.ttm'
   character(len=128),parameter:: cTe_infile = 'in.Te'
   character(len=128),parameter:: cTe_outfile = 'out.Te'
   integer,parameter:: ioprms = 30
@@ -84,7 +84,7 @@ contains
 !=======================================================================
   subroutine init_ttm(namax,natm,h,dtmd,myid,mpi_world,iprint)
 !
-!  Read parameters for TTM from in.params.ttm and initialize
+!  Read parameters for TTM from in.ttm and initialize
 !
     integer,intent(in):: namax,natm,myid,mpi_world,iprint
     real(8),intent(in):: dtmd,h(3,3)
@@ -112,7 +112,7 @@ contains
       print *,'TTM parameters:'
       print '(a,3i5,i8)','   nx,ny,nz,nxyz = ',nx,ny,nz,nxyz
       print '(a,4es12.4)','   dx,dy,dz,vcell = ',dx,dy,dz,vcell
-      print '(a,2i5)','   lsurf,rsurf = ',lsurf,rsurf
+      print '(a,2i5,es12.4)','   lsurf,rsurf = ',lsurf,rsurf,lskin
       print '(a,2es12.4)','   gmmp,gmms = ',gmmp,gmms
       print '(a,a)','   Ce_Tdep = ',trim(Ce_Tdep)
       mem = 4 * 4*nxyz + 11 * 8*nxyz + 4 * 8*namax
@@ -382,14 +382,15 @@ contains
     return
   end subroutine calc_Ta
 !=======================================================================
-  subroutine update_Te(myid,mpi_world)
+  subroutine update_Te(tnow,myid,mpi_world)
 !
 !  Update Te by solving the diffusion equation.
 !
     integer,intent(in):: myid,mpi_world
+    real(8),intent(in):: tnow
 
     integer:: ic,ix,iy,iz,ierr
-    real(8):: t0
+    real(8):: t0,ce,xi
 
     t0 = mpi_wtime()
 
@@ -401,18 +402,33 @@ contains
         tep(ix,iy,iz) = 0d0
         if( ix.lt.lsurf ) cycle
         if( ix.gt.rsurf ) cycle
-        if( iy.eq.1 .and. iz.eq.1 ) then
-          print '(a,i5,10es11.3)','ix,cete,dcete,dte2,d2te,ta,tap,gp,gs=' &
-               ,ix&
-               ,cete(ix,iy,iz),dcete(ix,iy,iz),dte2(ix,iy,iz)&
-               ,d2te(ix,iy,iz),ta(ic),tap(ic),gp(ic),gs(ic) &
-               ,te(ix,iy,iz),ta(ic)
-        endif
+!!$        if( iy.eq.1 .and. iz.eq.1 ) then
+!!$          print '(a,i5,10es11.3)','ix,cete,dcete,dte2,d2te,ta,tap,gp,gs=' &
+!!$               ,ix&
+!!$               ,cete(ix,iy,iz),dcete(ix,iy,iz),dte2(ix,iy,iz)&
+!!$               ,d2te(ix,iy,iz),ta(ic),tap(ic),gp(ic),gs(ic) &
+!!$               ,te(ix,iy,iz),ta(ic)
+!!$        endif
+        ce = cete(ix,iy,iz)
         tep(ix,iy,iz) = te(ix,iy,iz) &
-             +dt *(rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,iy,iz) &
-             +cete(ix,iy,iz)*d2te(ix,iy,iz) ) &
+             +dt/ce/rho_e *(rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,iy,iz) &
+             +ce*d2te(ix,iy,iz) ) &
              -gp(ic)*(te(ix,iy,iz) -ta(ic)) +gs(ic)*tap(ic) )
+
       enddo
+      if( tnow.lt.tau_pulse ) then
+        do ic=1,nxyz
+          call ic2ixyz(ic,ix,iy,iz)
+          if( ix.lt.lsurf ) cycle
+          if( ix.gt.rsurf ) cycle
+          ce = cete(ix,iy,iz)
+          xi = (ix-lsurf)*dx
+!!$          if( iy.eq.1 .and. iz.eq.1 ) then
+!!$            print *,'ix,xi,exp(-xi/lskin)=',ix,xi,exp(-xi/lskin)
+!!$          endif
+          tep(ix,iy,iz) = tep(ix,iy,iz) +I_0 *min(1d0,exp(-xi/lskin))/ce/rho_e*dt
+        enddo
+      endif
       te(:,:,:) = tep(:,:,:)
     endif
 !.....Broadcast Te distribution to all the nodes.

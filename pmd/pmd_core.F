@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-23 21:47:41 Ryo KOBAYASHI>
+c                     Last-modified: <2018-01-24 16:54:29 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -381,6 +381,9 @@ c      write(cnum(1:4),'(i4.4)') 0
         endif
       endif
       
+      if( trim(ctctl).eq.'ttm' ) then
+        call output_Te(0,myid_md,iprint)
+      endif
 
 c-----initialize the counter for output
       iocntpmd=0
@@ -603,7 +606,7 @@ c.....Calc kinetic energy
 
         if( trim(ctctl).eq.'ttm' ) then
           call calc_Ta(namax,natm,eki,myid_md,mpi_md_world)
-          call update_Te(myid_md,mpi_md_world)
+          call update_Te(istp*dt,myid_md,mpi_md_world)
         endif
 
         call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
