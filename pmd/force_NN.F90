@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-30 17:08:47 Ryo KOBAYASHI>
+!                     Last modified: <2018-01-24 15:56:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -478,6 +478,8 @@ contains
         enddo
 
         if( dij.gt.rc3 ) cycle
+        fcij= fc(dij,rc3)
+        dfcij= dfc(dij,rc3)
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           ks= int(tag(ka))
@@ -492,8 +494,8 @@ contains
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
             almbd= cnst(1,isf)
             t2= (abs(almbd)+1d0)**2
-            fcik= fc(dik,rc)
-            dfcik= dfc(dik,rc)
+            fcik= fc(dik,rc3)
+            dfcik= dfc(dik,rc3)
             driki(1:3)= -rik(1:3)/dik
             drikk(1:3)= -driki(1:3)
             !.....function value
@@ -509,8 +511,8 @@ contains
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
             dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
             dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik
-            dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*spijk/dij**3/dik
-            dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*spijk/dik**3/dij
+            dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij**2
+            dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik**2
             dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
