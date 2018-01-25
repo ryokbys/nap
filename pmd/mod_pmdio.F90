@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-01-23 17:29:13 Ryo KOBAYASHI>
+!                     Last modified: <2018-01-25 21:12:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -94,4 +94,7 @@ module pmdio
   real(8):: schg(1:nspmax)= 0d0
 !.....zload type
   character(len=5):: czload_type= 'no'
+
+!.....Boundary condition: p = periodic, f = free, w = wall
+  character(len=3):: boundary = 'ppp'
 end module pmdio

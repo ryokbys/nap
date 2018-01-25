@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-01-24 17:38:39 Ryo KOBAYASHI>
+!                     Last-modified: <2018-01-25 21:04:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -58,7 +58,7 @@ module ttm
   integer:: lsurf = -1  ! left surface
   integer:: rsurf = -1  ! right surface
 !.....Surface movement along x: no, plane (can move as a yz-plane surface)
-  character(len=128):: surfmove = 'no'
+  character(len=128):: surfmove = 'plane'
 !.....Minimum Te when surface moves
   real(8):: Te_min = 300d0
 
@@ -66,8 +66,6 @@ module ttm
   real(8),allocatable:: te(:,:,:),tep(:,:,:),ta(:),tap(:),tex(:)
   integer,allocatable:: nac(:),nacp(:)
   real(8),allocatable:: eksum(:),ekpsum(:)
-  integer,allocatable:: nacl(:),nacpl(:)
-  real(8),allocatable:: eksuml(:),ekpsuml(:)
 !.....Atom to cell correspondance
   integer,allocatable:: a2c(:)
 
@@ -142,7 +140,6 @@ contains
     
 !.....Allocate initialize arrays
     allocate(nac(nxyz),nacp(nxyz),eksum(nxyz),ekpsum(nxyz), &
-         nacl(nxyz),nacpl(nxyz),eksuml(nxyz),ekpsuml(nxyz), &
          sgm(nxyz),te(0:nx+1,0:ny+1,0:nz+1),tep(0:nx+1,0:ny+1,0:nz+1), &
          ta(nxyz),tap(nxyz),tex(nx),gp(nxyz),gs(nxyz))
     allocate(a2c(namax),aai(3,namax))
@@ -328,7 +325,13 @@ contains
 
     integer:: i,ic,ierr,ix,iy,iz
     real(8):: ek,t0
+    integer,allocatable:: nacl(:),nacpl(:)
+    real(8),allocatable:: eksuml(:),ekpsuml(:)
 
+    if( .not. allocated(nacl) ) then
+      allocate(nacl(nxyz),nacpl(nxyz),eksuml(nxyz),ekpsuml(nxyz))
+    endif
+    
     t0 = mpi_wtime()
 
     nacl(1:nxyz) = 0
@@ -376,6 +379,10 @@ contains
 !!$        print *,'ix,iy,iz,ic,ta,eksum,eksuml=',ix,iy,iz,ic,ta(ic) &
 !!$             ,eksum(ic),eksuml(ic)
 !!$      enddo
+    endif
+
+    if( trim(surfmove).eq.'plane' ) then
+      call update_surface_plane(myid,mpi_world)
     endif
 
     t_ttm = t_ttm +mpi_wtime() -t0
@@ -660,6 +667,62 @@ contains
       te(lsurf:rsurf,1:ny,nz+1) = te(lsurf:rsurf,1:ny,1)
     endif
   end subroutine set_BC
+!=======================================================================
+  subroutine update_surface_plane(myid,mpi_world)
+!
+!  Update surface position according to number of atoms in the cells.
+!
+    integer,intent(in):: myid,mpi_world
+    integer:: ic,icl,icr,ix,iy,iz,ierr
+    integer,allocatable,save:: nacl(:,:),nacr(:,:)
+    logical:: lupdate,rupdate 
+
+    if( .not. allocated(nacl) ) then
+      allocate(nacl(ny,nz),nacr(ny,nz))
+    endif
+
+    if( myid.eq.0 ) then
+
+!.....Count number of atoms in the cells next to lsurf/rsurf
+      nacl(:,:) = 0
+      nacr(:,:) = 0
+      do iy=1,ny
+        do iz=1,nz
+          if( lsurf-1.ge.1 ) then
+            call ixyz2ic(lsurf-1,iy,iz,icl)
+            nacl(iy,iz) = nac(icl)
+          endif
+          if( rsurf+1.le.nx ) then
+            call ixyz2ic(rsurf+1,iy,iz,icr)
+            nacr(iy,iz) = nac(icr)
+          endif
+        enddo
+      enddo
+!.....Check whether all the cells in y-z plane contains at least 2 atoms
+      lupdate = .true.
+      rupdate = .true.
+      do iy=1,ny
+        do iz=1,nz
+          if( nacl(iy,iz) .lt. 2 ) lupdate = .false.
+          if( nacr(iy,iz) .lt. 2 ) rupdate = .false.
+        enddo
+      enddo
+!.....Update surface if needed
+      if( lupdate ) then
+        lsurf = lsurf - 1
+        te(lsurf,:,:) = te(lsurf+1,:,:)
+      endif
+      if( rupdate ) then
+        rsurf = rsurf + 1
+        te(rsurf,:,:) = te(rsurf-1,:,:)
+      endif
+    endif
+!.....Broadcast Te distribution to all the nodes.
+!.....There could be smarter way to reduce networking cost.
+    call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rsurf,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(lskin,1,mpi_real8,0,mpi_world,ierr)
+  end subroutine update_surface_plane
 end module ttm
 !-----------------------------------------------------------------------
 !     Local Variables:
