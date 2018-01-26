@@ -44,7 +44,7 @@ c=======================================================================
       integer,intent(in):: ionum
       character(len=*),intent(in):: cname
 
-      character(len=128):: ctmp
+      character(len=128):: ctmp,cval
       integer:: ndata,nrow,is,itmp
       
       if( trim(cname).eq.'time_interval' ) then
@@ -66,6 +66,15 @@ c=======================================================================
         return
       elseif( trim(cname).eq.'num_out_pmd' ) then
         call read_i1(ionum,npmd)
+        return
+      elseif( trim(cname).eq.'boundary' ) then
+        backspace(ionum)
+        read(ionum,*) ctmp, cval
+        if( len(trim(cval)).ne.3 ) then
+          print *,'WARNING: input format for boundary is wrong...'
+          return
+        endif
+        boundary = trim(cval)
         return
       elseif( trim(cname).eq.'flag_sort' ) then
         call read_i1(ionum,ifsort)

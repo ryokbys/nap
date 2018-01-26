@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2017-10-21 17:43:57 Ryo KOBAYASHI>
+!                     Last-modified: <2018-01-26 12:10:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -1139,7 +1139,8 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   real(8):: hunit,h(3,3,0:1),am(nismax),dt,rc,dmp,tinit,tfin,ttgt(9)&
        ,trlx,stgt(3,3),ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3) &
        ,epot,ekin,eps_conv,rbuf
-  character:: ciofmt*6,cforce*20,ctctl*20,cpctl*20,czload_type*5,csi*1
+  character:: ciofmt*6,cforce*20,ctctl*20,cpctl*20,czload_type*5,csi*1&
+       ,boundary*3
   character(len=20):: cffs(1)
   logical:: ltdst,lstrs,lcellfix(3,3),lvc
 
@@ -1241,6 +1242,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   iprint = 0
   ifcoulomb = 0
   lvc = .false.
+  boundary = 'ppp'
 
 !.....call pmd_core to perfom MD
 !!$  print *,'nstps_pmd = ',nstps_pmd
@@ -1252,7 +1254,8 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl,stgt,ptgt &
        ,srlx,stbeta,strfin,lstrs,lcellfix &
        ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb &
-       ,czload_type,eps_conv,ifsort,iprint,nstps_done,lvc)
+       ,czload_type,eps_conv,ifsort,iprint,nstps_done,lvc&
+       ,boundary)
 !!$  print *,'nstps_pmd,minstp,nstps_done = ' &
 !!$       ,nstps_pmd,minstp,nstps_done
   if( myid_md.eq.0 ) then

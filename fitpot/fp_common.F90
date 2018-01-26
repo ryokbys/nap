@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-01-10 12:56:15 Ryo KOBAYASHI>
+!                     Last modified: <2018-01-26 12:13:45 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -479,7 +479,7 @@ contains
     real(8):: am(9),dt,rc,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
          ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv
     logical:: ltdst,lcellfix(3,3),lvc
-    character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5
+    character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5,boundary*3
     logical:: update_force_list
 
     logical,external:: string_in_arr
@@ -522,6 +522,7 @@ contains
     ekin = 0d0
     n_conv = 1
     czload_type = 'no'
+    boundary = 'ppp'
     eps_conv = 1d-3
     ifsort = 1
     lcellfix(1:3,1:3) = .false.
@@ -578,7 +579,7 @@ contains
          ,nismax,am,dt,rc,rbuf,ptnsr,epot,ekin &
          ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp &
          ,gwe,gwf,gws &
-         ,lematch,lfmatch,lsmatch)
+         ,lematch,lfmatch,lsmatch,boundary)
     strs(1:3,1:3) = ptnsr(1:3,1:3) *up2gpa*(-1d0)
     if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
 !!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot

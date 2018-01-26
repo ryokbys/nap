@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-24 16:54:29 Ryo KOBAYASHI>
+c                     Last-modified: <2018-01-26 15:04:15 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -10,12 +10,13 @@ c-----------------------------------------------------------------------
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
      &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,stnsr,epot
      &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
-     &     ,nstp_done,lvc)
+     &     ,nstp_done,lvc,boundary)
       use pmdvars
       use zload
       use force
       use ttm,only: init_ttm,langevin_ttm,output_Te,t_ttm,
      &     calc_Ta,update_Te,assign_atom2cell
+      use pmdmpi,only: nid2xyz,xyz2nid
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -32,7 +33,7 @@ c-----------------------------------------------------------------------
      &     ,epot,ekin,am(nspmax),stgt(3,3),ptgt,ttgt(9)
      &     ,chgtot(ntot),chitot(ntot)
       character,intent(in):: ciofmt*6, cpctl*20, ctctl*20
-     &     ,czload_type*5
+     &     ,czload_type*5,boundary*3
 !      character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: ltdst,lstrs0,lcellfix(3,3)
       logical,intent(inout):: lvc
@@ -94,9 +95,10 @@ c-----error trap
         stop
       endif
 c-----vector node indices: range [0:nx-1]
-      myx=myid_md/(ny*nz)
-      myy=mod(myid_md/nz,ny)
-      myz=mod(myid_md,nz)
+c      myx=myid_md/(ny*nz)
+c      myy=mod(myid_md/nz,ny)
+c      myz=mod(myid_md,nz)
+      call nid2xyz(myid_md,myx,myy,myz)
 c-----reduced node origin
       sorg(1)= anxi*myx
       sorg(2)= anyi*myy
@@ -249,9 +251,10 @@ c     &           *m2ang/s2fs
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
-      call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
+      call bacopy(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,.true.)
+     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,.true.
+     &     ,boundary)
 c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr,iprint,.true.)
@@ -267,7 +270,7 @@ c.....Calc forces
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &     ,lspr,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
-     &     ,ifcoulomb,iprint,.true.,lvc,lcell_updated)
+     &     ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -514,9 +517,9 @@ c.....Move atoms that cross the boundary
           call bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi
      &         ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world)
 c.....Copy RA of boundary atoms
-          call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax,natm,nb
+          call bacopy(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax,natm,nb
      &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv,nex
-     &         ,mpi_md_world,iprint,ifcoulomb,chg,chi,.false.)
+     &         ,mpi_md_world,iprint,ifcoulomb,chg,chi,.false.,boundary)
 c.....Make pair list
           call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h
      &         ,hi,anxi,anyi,anzi,lspr,iprint,.false.)
@@ -527,9 +530,9 @@ c          if(myid_md.eq.0) write(6,'(a,i10)')
 c     &         " Next update step will be ",istpe
         else
 c.....Copy RA of boundary atoms determined by 'bacopy'
-          call bacopy_fixed_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
+          call bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &         ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc
-     &         ,sv,nex,mpi_md_world,ifcoulomb,chg,chi)
+     &         ,sv,nex,mpi_md_world,ifcoulomb,chg,chi,boundary)
         endif
         
         if(ifpmd.gt.0.and. mod(istp,noutpmd).eq.0 )then
@@ -539,7 +542,7 @@ c-------Calc forces
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
-     &       ,ifcoulomb,iprint,.false.,lvc,lcell_updated)
+     &       ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
         lstrs = .false.
 
 c.....Second kick of velocities
@@ -876,7 +879,7 @@ c=======================================================================
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,rc,rbuf,stnsr,epot
      &     ,ekin,ifcoulomb,lvc,iprint,lcalcgrad,ndimp,gwe
-     &     ,gwf,gws,lematch,lfmatch,lsmatch)
+     &     ,gwf,gws,lematch,lfmatch,lsmatch,boundary)
 c
 c  In case that only one shot force calculation is required,
 c  especially called from fitpot.
@@ -902,7 +905,8 @@ c      character(len=20),intent(in):: cffs(numff)
       integer,intent(in):: ndimp
       real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,ntot),gws(ndimp,6)
       logical,intent(inout):: lvc
-      logical,intent(in):: lematch,lfmatch,lsmatch 
+      logical,intent(in):: lematch,lfmatch,lsmatch
+      character(len=3),intent(in):: boundary
 
       integer:: i,ierr,is,nspl,nxyz
       real(8):: aai(3),epott
@@ -977,9 +981,10 @@ c      print *,'one_shot: 05'
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
-      call bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
+      call bacopy(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,.true.)
+     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,.true.
+     &     ,boundary)
 c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr,iprint,.true.)
@@ -992,7 +997,7 @@ c      print *,'one_shot: 06'
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
-     &       ,ifcoulomb,iprint,.true.,lvc,lcell_updated)
+     &       ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
       else  ! lcalcgrad = .true.
         epot = 0d0
         if( use_force('Morse') ) call gradw_Morse(namax,natm,tag,
@@ -1241,7 +1246,7 @@ c-----Set up the node parity table
       endif
 
       return
-      end
+      end subroutine ntset
 c=======================================================================
       subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl
      &     ,vmax,mpi_md_world)
@@ -1427,146 +1432,10 @@ c.....check whether the size of the system is large enough
 
       end subroutine check_size_and_parallel
 c=======================================================================
-      subroutine bacopy(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
-     &     ,anxi,anyi,anzi,nn,tag,rc,myid,myparity,lsrc,sv
-     &     ,mpi_md_world)
-c-----------------------------------------------------------------------
-c     Exchanges boundary-atom data among neighbor nodes: tag and ra
-c-----------------------------------------------------------------------
-      implicit none
-      include 'mpif.h'
-      integer,intent(in):: namax,nbmax,nn(6)
-     &     ,myid,myparity(3),mpi_md_world
-      integer,intent(inout):: natm,nb,lsb(0:nbmax,6),lsrc(6)
-      real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
-      real(8),intent(inout):: tag(namax),ra(3,namax),tcom
-
-c      integer:: status(MPI_STATUS_SIZE)
-      integer:: i,j,kd,kdd,kul,kuh,ku,ierr
-      integer:: nav,maxna,maxb,inode,nsd,nrc,nbnew
-      real(8):: tcom1,tcom2,vala,valb,valc,rca,rcb,rcc,xi(3)
-      logical,external:: bbd
-      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
-      logical,save:: l1st=.true.
-
-      if( l1st ) then
-        allocate(dbuf(4,nbmax),dbufr(4,nbmax))
-        l1st=.false.
-      endif
-
-c-----reset the num of "received" boundary atoms
-      nbnew=0
-
-c-----calculate the cut-off lengths
-      vala=dsqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/vol
-      valb=dsqrt(sgm(1,2)**2+sgm(2,2)**2+sgm(3,2)**2)/vol
-      valc=dsqrt(sgm(1,3)**2+sgm(2,3)**2+sgm(3,3)**2)/vol
-      rca=rc*vala
-      rcb=rc*valb
-      rcc=rc*valc
-
-c-----loop over x, y, & z directions
-      do 100 kd=1,3
-
-c-------No. of to-be-copied atoms, LSB(0,)
-        do kdd= -1,0
-          lsb(0,2*kd+kdd)=0
-        enddo
-c-------Scan all the residents & copies
-        do i=1,natm+nbnew
-          xi(1:3)= ra(1:3,i)
-c---------For low & high directions
-          kul=2*kd-1
-          kuh=2*kd
-c---------Lower neighbor
-          if (bbd(xi(1),xi(2),xi(3),rca,rcb,rcc
-     &         ,kul,anxi,anyi,anzi)) then
-            lsb(0,kul)=lsb(0,kul)+1
-            lsb(lsb(0,kul),kul)=i
-          endif
-c---------Higher neighbor
-          if(bbd(xi(1),xi(2),xi(3),rca,rcb,rcc
-     &           ,kuh,anxi,anyi,anzi)) then
-            lsb(0,kuh)=lsb(0,kuh)+1
-            lsb(lsb(0,kuh),kuh)=i
-          endif
-        enddo
-c-------Error trap
-        do kdd= -1,0
-          ku=2*kd+kdd
-          call MPI_ALLREDUCE(lsb(0,ku),maxb,1,MPI_INTEGER,MPI_MAX,
-     &         mpi_md_world,ierr)
-          if (maxb.gt.nbmax) then
-            if (myid.eq.0) then
-              write(*,*)'Buffer or list overflowed at bacopy'
-              write(*,*)'LSB(0) NBMAX =',maxb,nbmax
-            endif
-            call MPI_FINALIZE(ierr)
-            stop
-          endif
-        enddo
-
-c-------To calculate the communication time
-        tcom1=MPI_WTIME()
-
-        do 200 kdd= -1,0
-          ku=2*kd+kdd
-          inode=nn(ku)
-          nsd=lsb(0,ku)
-
-          call mespasi(inode,myparity(kd),nsd,nrc,1,1,10
-     &         ,mpi_md_world)
-c---------Store the # of received boundary atoms in LSRC
-          lsrc(ku)=nrc
-
-c---------Exchange ra and tag
-          do i=1,nsd
-            j= lsb(i,ku)
-            dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-            dbuf(4,i)  = tag(j)
-          enddo
-          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*4,nrc*4,21
-     &         ,mpi_md_world)
-          do i=1,nrc
-            ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
-            tag(natm+nbnew+i)   = dbufr(4,i)
-          enddo
-
-          call MPI_BARRIER(mpi_md_world,ierr)
-c---------increase the # of received boundary atoms
-          nbnew=nbnew+nrc
-c          write(6,'(a,2i8)') " nbnew,nrc=",nbnew,nrc
-200     continue
-
-c-------Add the communication time to COMT
-        tcom2=MPI_WTIME()
-        tcom=tcom+tcom2-tcom1
-
-c-------Error trap
-        nav=natm+nbnew
-        call MPI_ALLREDUCE(nav,maxna,1,MPI_INTEGER,MPI_MAX
-     &       ,mpi_md_world,ierr)
-        if (maxna.gt.namax) then
-          if (myid.eq.0) then
-            write(*,*)'NAMAX overflowed at bacopy'
-            write(*,*)'N+NB NAMAX = ',maxna,namax
-          endif
-          call MPI_FINALIZE(ierr)
-          stop
-        endif
-
-100   continue
-
-c-----num. of received boundary atoms
-      nb=nbnew
-
-c      print *, 'bacopy: nb=',nb
-
-      end subroutine bacopy
-c=======================================================================
-      subroutine bacopy_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
+      subroutine bacopy(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,l1st)
+     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,l1st
+     &     ,boundary)
 c-----------------------------------------------------------------------
 c  Exchanges boundary-atom data among neighbor nodes: tag and ra
 c  Normal data passing and repeating the cell are mixed, and
@@ -1575,6 +1444,7 @@ c
 c  Note: parallelized to smaller than rcut should not happen.
 c-----------------------------------------------------------------------
       use force
+      use pmdmpi,only: nx,ny,nz,nid2xyz
       implicit none
       include 'mpif.h'
       integer,intent(in):: namax,nbmax,nn(6)
@@ -1586,9 +1456,10 @@ c-----------------------------------------------------------------------
       integer,intent(in):: ifcoulomb
       real(8),intent(inout):: chg(namax),chi(namax)
       logical,intent(in):: l1st
+      character(len=3):: boundary
 
 c.....integer:: status(MPI_STATUS_SIZE)
-      integer:: i,j,kd,kdd,kul,kuh,ku,ierr,iex
+      integer:: i,j,kd,kdd,kul,kuh,ku,ierr,iex,ix,iy,iz
       integer:: nav,maxna,maxb,inode,nsd,nrc,nbnew
       real(8):: tcom1,tcom2,xi(3),rcv(3),asgm
       logical,external:: bbd
@@ -1615,8 +1486,9 @@ c.....integer:: status(MPI_STATUS_SIZE)
           allocate(dbuf(4,nbmax),dbufr(4,nbmax))
         endif
       endif
-      
 
+      call nid2xyz(myid,ix,iy,iz)
+      
 c-----reset the num of "received" boundary atoms
       nbnew=0
 
@@ -1633,6 +1505,18 @@ c-----calculate the cut-off lengths
 
 c-----loop over x, y, & z directions
       do 100 kd=1,3
+
+c.....Depending on boundary condition and cell position,
+c.....maybe able to skip this kd.
+        if( boundary(kd:kd).ne.'p' )  then
+          if( kd.eq.1 ) then
+            if( ix.eq.0 .or. ix.eq.nx-1 ) cycle
+          else if( kd.eq.2 ) then
+            if( iy.eq.0 .or. iy.eq.ny-1 ) cycle
+          else if( kd.eq.3 ) then
+            if( iz.eq.0 .or. iz.eq.nz-1 ) cycle
+          endif
+        endif
 
 c-------No. of to-be-copied atoms, LSB(0,)
         do kdd= -1,0
@@ -1788,79 +1672,12 @@ c-------Error trap
 c-----num. of received boundary atoms
       nb=nbnew
 
-      end subroutine bacopy_new
+      end subroutine bacopy
 c=======================================================================
-      subroutine bacopy_fixed(tcom,sgm,vol,lsb,nbmax,ra,namax,natm,nb
-     &     ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
-     &     ,mpi_md_world)
-c-----------------------------------------------------------------------
-c  Exchanges boundary-atom data among neighbor nodes: tag and ra
-c  This doesnt search using position, just send & recv data of atoms
-c    which were listed by 'bacopy'.
-c-----------------------------------------------------------------------
-      implicit none
-      include 'mpif.h'
-      integer,intent(in):: namax,nbmax,nn(6),natm,nb
-     &     ,myid_md,myparity(3),mpi_md_world
-      integer,intent(inout):: lsb(0:nbmax,6),lsrc(6)
-      real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
-      real(8),intent(inout):: tag(namax),ra(3,namax),tcom
-
-c      integer:: status(MPI_STATUS_SIZE)
-      integer:: i,j,kd,kdd,ku,ierr
-      integer:: inode,nsd,nrc,nbnew
-      real(8):: tcom1,tcom2
-      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
-      logical,save:: l1st=.true.
-
-      if( l1st ) then
-        allocate(dbuf(4,nbmax),dbufr(4,nbmax))
-        l1st=.false.
-      endif
-
-      nbnew= 0
-
-c-----loop over x, y, & z directions
-      do 100 kd=1,3
-
-c-------To calculate the communication time
-        tcom1=MPI_WTIME()
-
-        do 200 kdd= -1,0
-          ku=2*kd+kdd
-          inode=nn(ku)
-          nsd=lsb(0,ku)
-          nrc=lsrc(ku)
-
-c---------Exchange ra and tag
-          do i=1,nsd
-            j= lsb(i,ku)
-            dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-            dbuf(4,i)  = tag(j)
-          enddo
-          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*4,nrc*4,21
-     &         ,mpi_md_world)
-          do i=1,nrc
-            ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
-            tag(natm+nbnew+i)   = dbufr(4,i)
-          enddo
-
-          call MPI_BARRIER(mpi_md_world,ierr)
-          nbnew=nbnew +nrc
-200     continue
-
-c-------Add the communication time to COMT
-        tcom2=MPI_WTIME()
-        tcom=tcom+tcom2-tcom1
-
-100   continue
-
-      end subroutine bacopy_fixed
-c=======================================================================
-      subroutine bacopy_fixed_new(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
+      subroutine bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
      &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv
      &     ,nex
-     &     ,mpi_md_world,ifcoulomb,chg,chi)
+     &     ,mpi_md_world,ifcoulomb,chg,chi,boundary)
 c-----------------------------------------------------------------------
 c  Exchanges boundary-atom data among neighbor nodes: tag and ra
 c  This doesnt search using position, just send & recv data of atoms
@@ -1869,6 +1686,7 @@ c  Different number of data are copied depending on whether
 c    using atomic charges or not.
 c-----------------------------------------------------------------------
       use force
+      use pmdmpi,only: nx,ny,nz,nid2xyz
       implicit none
       include 'mpif.h'
       integer,intent(in):: namax,nbmax,nn(6),natm,nb
@@ -1878,9 +1696,10 @@ c-----------------------------------------------------------------------
       real(8),intent(inout):: tag(namax),ra(3,namax),tcom
       integer,intent(in):: ifcoulomb
       real(8),intent(inout):: chg(namax),chi(namax)
+      character(len=3),intent(in):: boundary
 
 c      integer:: status(MPI_STATUS_SIZE)
-      integer:: i,j,kd,kdd,ku,ierr,iex
+      integer:: i,j,kd,kdd,ku,ierr,iex,ix,iy,iz
       integer:: inode,nsd,nrc,nbnew
       real(8):: tcom1,tcom2 !,rcv(3),asgm
       real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
@@ -1908,6 +1727,8 @@ c      integer:: status(MPI_STATUS_SIZE)
         endif
       endif
       
+      call nid2xyz(myid_md,ix,iy,iz)
+
       nbnew= 0
 
 cc-----calculate the cut-off lengths
@@ -1919,6 +1740,18 @@ c      enddo
 
 c-----loop over x, y, & z directions
       do 100 kd=1,3
+
+c.....Depending on boundary condition and cell position,
+c.....maybe able to skip this kd.
+        if( boundary(kd:kd).ne.'p' )  then
+          if( kd.eq.1 ) then
+            if( ix.eq.0 .or. ix.eq.nx-1 ) cycle
+          else if( kd.eq.2 ) then
+            if( iy.eq.0 .or. iy.eq.ny-1 ) cycle
+          else if( kd.eq.3 ) then
+            if( iz.eq.0 .or. iz.eq.nz-1 ) cycle
+          endif
+        endif
 
 c-------To calculate the communication time
         tcom1=MPI_WTIME()
@@ -1996,16 +1829,17 @@ c-------Add the communication time to COMT
 
 100   continue
 
-      end subroutine bacopy_fixed_new
+      end subroutine bacopy_fixed
 c=======================================================================
       subroutine bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax
      &     ,natm,nb,nn,myid_md,myparity,lsrc
-     &     ,nex,mpi_md_world,chg)
+     &     ,nex,mpi_md_world,chg,boundary)
 c-----------------------------------------------------------------------
 c  Exchange only chg of boundary-atom
 c  This doesnt search using position, just send & recv data of atoms
 c    which were listed by 'bacopy'.
 c-----------------------------------------------------------------------
+      use pmdmpi,only: nx,ny,nz,nid2xyz
       implicit none
       include 'mpif.h'
       integer,intent(in):: namax,nbmax,nn(6),natm,nb
@@ -2013,8 +1847,9 @@ c-----------------------------------------------------------------------
       integer,intent(inout):: lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6)
       real(8),intent(inout):: tcom
       real(8),intent(inout):: chg(namax)
+      character(len=3),intent(in):: boundary
 
-      integer:: i,j,kd,kdd,ku,ierr,iex
+      integer:: i,j,kd,kdd,ku,ierr,iex,ix,iy,iz
       integer:: inode,nsd,nrc,nbnew
       real(8):: tcom1,tcom2 !,rcv(3),asgm
       real(8),save,allocatable:: dbuf(:),dbufr(:)
@@ -2024,6 +1859,8 @@ c-----------------------------------------------------------------------
         allocate(dbuf(nbmax),dbufr(nbmax))
         l1st=.false.
       endif
+
+      call nid2xyz(myid_md,ix,iy,iz)
 
       nbnew= 0
 
@@ -2036,6 +1873,18 @@ c      enddo
 
 c-----loop over x, y, & z directions
       do 100 kd=1,3
+
+c.....Depending on boundary condition and cell position,
+c.....maybe able to skip this kd.
+        if( boundary(kd:kd).ne.'p' )  then
+          if( kd.eq.1 ) then
+            if( ix.eq.0 .or. ix.eq.nx-1 ) cycle
+          else if( kd.eq.2 ) then
+            if( iy.eq.0 .or. iy.eq.ny-1 ) cycle
+          else if( kd.eq.3 ) then
+            if( iz.eq.0 .or. iz.eq.nz-1 ) cycle
+          endif
+        endif
 
 c-------To calculate the communication time
         tcom1=MPI_WTIME()

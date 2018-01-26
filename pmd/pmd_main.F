@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-24 23:01:52 Ryo KOBAYASHI>
+c                     Last-modified: <2018-01-26 12:05:48 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -69,7 +69,7 @@ c        call write_initial_setting()
       call bcast_params()
 
 c.....Check ensemble
-      call check_ensemble()
+      if( myid_md.eq.0 ) call check_ensemble()
 
 c.....Set Coulomb flag here
       if( use_force('screened_Coulomb') ) then
@@ -117,7 +117,7 @@ c.....call pmd_core to perfom MD
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
      &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,stnsr,epot
      &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
-     &     ,nstp_done,lvc)
+     &     ,nstp_done,lvc,boundary)
 
       if( myid_md.eq.0 ) then
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
@@ -341,6 +341,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(nrmtrans,6,mpi_integer,0,mpi_md_world,ierr)
       call mpi_bcast(lstrs0,1,mpi_logical,0,mpi_md_world,ierr)
+      call mpi_bcast(boundary,3,mpi_character,0,mpi_md_world,ierr)
 c.....Charge related
       call mpi_bcast(lvc,1,mpi_logical,0,mpi_md_world,ierr)
       call mpi_bcast(chgfix,20,mpi_character,0,mpi_md_world,ierr)

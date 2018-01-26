@@ -1,6 +1,6 @@
 module pmdmpi
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-19 11:01:44 Ryo KOBAYASHI>
+!                     Last modified: <2018-01-26 11:49:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Module that includes variables and parameters used for parallel
 ! computation with mpi for spatial decomposition MD simulation.
@@ -74,6 +74,31 @@ contains
     enddo
 
 !.....TODO: assign nodes taking the ratio al1:al2:al3 into account...
-    
+
   end subroutine assign_num_nodes
+!=======================================================================
+  subroutine nid2xyz(id,ix,iy,iz)
+!
+!     Convert continuous node-id and cell position (kx,ky,kz)
+!
+    integer,intent(in):: id
+    integer,intent(out):: ix,iy,iz
+
+    ix = id/(ny*nz)
+    iy = mod(id/nz,ny)
+    iz = mod(id,nz)
+    return
+  end subroutine nid2xyz
+!=======================================================================
+  subroutine xyz2nid(ix,iy,iz,id)
+!
+!     Convert cell position (kx,ky,kz) to continuous node-id
+!
+    integer,intent(in):: ix,iy,iz
+    integer,intent(out):: id
+
+    id = ix*(ny*nz) +iy*nz +iz
+    return
+  end subroutine xyz2nid
+!=======================================================================
 end module pmdmpi

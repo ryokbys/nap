@@ -2,7 +2,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
      ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr &
      ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
      ,ifcoulomb,iprint,l1st &
-     ,lvc,lcell_updated)
+     ,lvc,lcell_updated,boundary)
 !-----------------------------------------------------------------------
 !  Wrapper routine for force calculations.
 !  Every force calculation routine is called from this subroutine and
@@ -46,6 +46,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
 !!$    character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: l1st,lstrs,lcell_updated
   logical,intent(inout):: lvc
+  character(len=3),intent(in):: boundary
 
   integer:: ierr,is,i
   real(8):: at(3),tmp
@@ -63,7 +64,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
     endif
     call dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
          lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
-         tcom,myid_md,mpi_md_world,iprint,ifcoulomb,l1st)
+         tcom,myid_md,mpi_md_world,iprint,ifcoulomb,l1st,boundary)
     if( l1st .and. myid_md.eq.0 .and. iprint.ge.20 ) then
       write(6,'(/a)') ' Charges:'
       tmp = 0d0
@@ -775,7 +776,7 @@ end function force_on
 !=======================================================================
 subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
      lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
-     tcom,myid,mpi_md_world,iprint,ifcoulomb,l1st)
+     tcom,myid,mpi_md_world,iprint,ifcoulomb,l1st,boundary)
 !
 !  Charge optimization/equilibration by damped dynamics.
 !  Since not only Coulomb interaction but also other force-fields can
@@ -793,6 +794,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   logical,intent(in):: l1st
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
        ,nnn(6),nex(3),lsex(nbmax,6)
+  character(len=3),intent(in):: boundary
 
   integer:: istp,i,istp_pos,istp_conv,is
   real(8):: eclong,epot,epotp,afq,eMorse,fqnorm,vqnorm,dt,alpha,p &
@@ -926,7 +928,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     chg(1:natm)= chg(1:natm) +vq(1:natm)*dt
     call bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
          ,natm,nb,nnn,myid,myparity,lsrc &
-         ,nex,mpi_md_world,chg)
+         ,nex,mpi_md_world,chg,boundary)
 
 !.....get new qforces
     eclong = 0d0
