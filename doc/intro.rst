@@ -16,8 +16,7 @@ The main features of *pmd* are the following:
 * NVT ensemble simulation using Berendsen thermostat;
 * NpT ensemble simulation using Berendsen thermo- and baro-stat;
 * non-equilibrium MD (NEMD) for heat flux simulation;
-* capable of fitting potential parameters with minimization algorithms such as steepest descent, 
-  conjuget gradient, and quasi-Newton (BFGS).
+* two-temperature model MD (TTM-MD) for laser-ablation simulation.
 
 Since this program has been developed for the purpose of personal research tool,
 there are not so many functionalities. 

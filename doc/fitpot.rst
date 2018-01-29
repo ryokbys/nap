@@ -16,6 +16,32 @@ by using ``fitpot`` program included in **NAP** package.
 
    ``fitpot`` program now is specific to **Neural-network (NN)** potential and cannot produce other potential parameters.
 
+What does ``fitpot`` do?
+===============================
+
+In the ``fitpot``, the following loss function value is to be minimized by optimizing potential parameters.
+
+.. math::
+
+    \mathcal{L}(\{w\}) = \frac{1}{\eta N_s} \sum_s^{N_s} \left( \frac{E^{\mathrm{NN},s}-E^{\mathrm{DFT},s}}{N^s_\mathrm{a}\varepsilon_\mathrm{e}}\right)^2 +\sum_i^{N^s_\mathrm{a}} \sum_\alpha^{xyz} \frac{1}{3N^s_\mathrm{a}}\left( \frac{F^{\mathrm{NN},s}_{i\alpha} -F^{\mathrm{DFT},s}_{i\alpha}}{\varepsilon_\mathrm{f}}\right)^2
+
+in case of fitting energies and forces.
+Here, :math:`s` is the sample number, :math:`N_s` the number of samples, :math:`N^s_\mathrm{a}` the number of atoms in the sample :math:`s`, :math:`\varepsilon_\mathrm{e/f}` is the error criteria for energy or force, :math:`\eta` the parameter corresponding to how many properties are fitted (in this case :math:`\eta = 2` because energy and force are used.)
+
+To minimize the above loss function, there are some methods available in ``fitpot``, for example:
+
+* Gradient-based methods:
+
+  * Steepest decent (SD)
+  * Quasi-Newton method (BFGS)
+  * Conjugate gradient (CG)
+
+* Non-gradient global optimization methods:
+
+  * Genetic algorithm (GA)
+  * Particle swarm optimization (PSO)
+  * Differential evolution (DE)
+
 
 
 Compilation

@@ -978,6 +978,7 @@ You need to specify the species order correctly with --specorder option.
         # print 'rcx,rcy,rcz=',rcx,rcy,rcz
 
         #...make a linked-cell list
+        self.assign_pbc()
         for i in range(len(self.atoms)):
             pi= self.atoms[i].pos
             # print pi

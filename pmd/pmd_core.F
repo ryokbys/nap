@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-26 15:04:15 Ryo KOBAYASHI>
+c                     Last-modified: <2018-01-29 15:57:36 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -235,8 +235,8 @@ c.....Set initial temperature if needed
 c            tfac(ifmv)= sqrt(2d0*tgmm*(fkb*ev2j)*ttgt(ifmv)/dt)
 c     &           *m2ang/s2fs
             tfac(ifmv)= dsqrt(2d0*tgmm*fkb*ttgt(ifmv)/dt)
-            print *,'ifmv,ttgt,fkb,dt,tfac='
-     &           ,ifmv,ttgt(ifmv),fkb,dt,tfac(ifmv)
+c            print *,'ifmv,ttgt,fkb,dt,tfac='
+c     &           ,ifmv,ttgt(ifmv),fkb,dt,tfac(ifmv)
           endif
         enddo
       else if( trim(ctctl).eq.'ttm' ) then

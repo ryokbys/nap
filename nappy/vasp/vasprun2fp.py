@@ -112,6 +112,8 @@ if __name__ == "__main__":
             print ' Since there is newer erg.ref, skip it.'
             continue
         try:
+            #...Since there is a bug in vasp, species "r" needs to be replaced by "Zr"
+            os.system("sed -i'' -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
             atoms= read('vasprun.xml',index=index,format='vasp-xml')
         except Exception as e:
             print ' Failed to read vasprun.xml, so skip it.'

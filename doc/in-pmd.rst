@@ -65,6 +65,8 @@ Example of *in.pmd*
     mass  1    28.0855
     mass  2     4.0
 
+    boundary   ppp
+
 Here, lines begin with ``!`` or ``#`` are treated as comment lines.
 
 
@@ -92,8 +94,8 @@ Parameters users can set in ``in.pmd`` are following:
 * :ref:`temperature_control`
 * :ref:`temperature_target`
 * :ref:`temperature_relax_time`
-* :ref:`stress_control`
 * :ref:`pressure_target`
+* :ref:`stress_control`
 * :ref:`stress_target`
 * :ref:`stress_relax_time`
 * :ref:`zload_type`
@@ -102,6 +104,7 @@ Parameters users can set in ``in.pmd`` are following:
 * :ref:`cutoff_radius`
 * :ref:`flag_temp_dist`
 * :ref:`num_temp_dist`
+* :ref:`boundary`
 
 
 ------------------------
@@ -527,6 +530,22 @@ num_temp_dist
 
 Number of bins along *x*-direction where the temperature is calculated.
 This value must be a multiple of ``num_nodes_x``.
+
+
+------------------------
+
+.. _boundary:
+
+boundary
+------------------------------
+
+* Default: ``ppp``
+
+Boundary conditions for each axis, 123.
+
+* ``p``: periodic boundary condition
+* ``f``: free boundary condition
+
 
 
 
