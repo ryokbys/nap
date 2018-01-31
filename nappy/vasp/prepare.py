@@ -35,6 +35,13 @@ Options:
               [default: scf]
   --nsw NSW   Number of MD/relaxation steps. [default: 0]
   --isif ISIF  Directly specify ISIF value. [default: 2]
+  --ismear ISMEAR
+              Specify smearing type. [default: 0]
+  --sigma SIGMA
+              Sigma (temperature) of smearing. [default: 0.01]
+  --extra-nbands REXTNBANDS
+              Ratio of extra number of bands multiplied to the estimated number of bands.
+              [default: 1.0]
 """
 from __future__ import print_function
 
@@ -133,9 +140,9 @@ def write_KPOINTS(fname,type,ndiv):
         f.close()
 
 def write_INCAR(fname,encut,nbands,break_symmetry,
-                spin_polarized,metal,ediff,
+                spin_polarized,ediff,
                 high_spin,species,natms,valences,
-                mode=None,nsw=0,isif=2):
+                mode=None,nsw=0,isif=2,ismear=0,sigma=0.01):
     from datetime import datetime as dt
     tdate = dt.now()
     dstr = tdate.strftime('%Y-%m-%d')
@@ -182,12 +189,14 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
         f.write("NELM   =  100\n")
         f.write("NBANDS = {0:4d}\n".format(nbands))
         f.write("\n")
-        if metal:
-            f.write("ISMEAR =   2\n")
-            f.write("SIGMA  =   0.2\n")
-        else:
-            f.write("ISMEAR =   0\n")
-            f.write("SIGMA  =   0.01\n")
+        # if metal:
+        #     f.write("ISMEAR =   2\n")
+        #     f.write("SIGMA  =   0.2\n")
+        # else:
+        #     f.write("ISMEAR =   0\n")
+        #     f.write("SIGMA  =   0.01\n")
+        f.write("ISMEAR =   {0:d}\n".format(ismear))
+        f.write("SIGMA  =   {0:8.4f}\n".format(sigma))
     
         f.write("\n")
         if 'scf' in mode:
@@ -260,9 +269,10 @@ def prepare_potcar(poscar,potcar_dir,potcar_postfix=''):
     return None
 
 def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
-                 metal,potcar_dir,potcar_postfix,
+                 potcar_dir,potcar_postfix,
                  encut=None,ediff=None,
-                 mode=None,nsw=0,isif=None,high_spin=False):
+                 mode=None,nsw=0,isif=None,high_spin=False,
+                 ismear=0,sigma=0.01,extra_nbands=1.0):
     print(' Pitch of k points = {0:5.1f}'.format(pitch))
 
     poscar= nappy.vasp.poscar.POSCAR(poscar_fname)
@@ -314,12 +324,13 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
     ndiv= [k1,k2,k3]
 
     nbands = estimate_nbands(nele)
+    nbands = int(nbands*extra_nbands)
 
     write_KPOINTS(_KPOINTS_name,_KPOINTS_type,ndiv)
     write_INCAR(_INCAR_name,encut,nbands,break_symmetry,
-                spin_polarized,metal,ediff,
+                spin_polarized,ediff,
                 high_spin,species,natms,valences,
-                mode=mode,nsw=nsw,isif=isif)
+                mode=mode,nsw=nsw,isif=isif,ismear=ismear,sigma=sigma)
 
 #=======================================================================
 
@@ -341,6 +352,9 @@ if __name__ == '__main__':
     mode = args['--mode']
     nsw  = int(args['--nsw'])
     isif = int(args['--isif'])
+    ismear = int(args['--ismear'])
+    sigma = float(args['--sigma'])
+    rextnb = float(args['--extra-nbands'])
 
     if encut[0].isdigit():
         encut = float(encut)
@@ -350,8 +364,14 @@ if __name__ == '__main__':
     if high_spin:
         spin_polarized = True
 
+    if metal:  # if metal is specified, ismear and sigma are overwritten
+        ismear = 2
+        sigma = 0.2
+        print('Since metal==True, ISMEAR and SIGMA are overwritten.')
+
     prepare_vasp(poscar_fname,pitch,leven,spin_polarized,break_symmetry,
-                 metal,potcar_dir,potcar_postfix,
+                 potcar_dir,potcar_postfix,
                  encut=encut,ediff=ediff,
                  mode=mode,nsw=nsw,isif=isif,
-                 high_spin=high_spin)
+                 high_spin=high_spin,
+                 ismear=ismear,sigma=sigma,extra_nbands=rextnb)
