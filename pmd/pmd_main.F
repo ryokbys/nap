@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-26 12:05:48 Ryo KOBAYASHI>
+c                     Last-modified: <2018-02-01 11:12:09 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -64,6 +64,15 @@ c.....Set fmv as default value before reading 'in.pmd'
         call check_cmin(cmin,ifdmp)
 c        call write_initial_setting()
         call write_inpmd(10,trim(cinpmd))
+c.....Set x-boundary free if TTM
+        if( trim(ctctl).eq.'ttm' ) then
+          if( boundary(1:1).ne.'f' ) then
+            print *,''
+            print *,'Since TTM, free boundary condition is set'
+     &           //' for x direction.'
+          endif
+          boundary(1:1) = 'f'
+        endif
       endif
 
       call bcast_params()

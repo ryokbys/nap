@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-01-25 21:04:57 Ryo KOBAYASHI>
+!                     Last-modified: <2018-02-02 18:02:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -25,7 +25,7 @@ module ttm
 !.....TTM mesh divisions
   integer:: nx,ny,nz,nxyz
 !.....Mesh size in reduced unit [0:1)
-  real(8):: dx,dy,dz
+  real(8):: dx,dy,dz,area,darea
 !.....Time step in fs == dt in MD by default
   real(8):: dt
 !.....Volume per mesh cell Ang^3 == dx*dy*dz
@@ -104,12 +104,15 @@ contains
     dy = h(2,2)/ny
     dz = h(3,3)/nz
     vcell = dx*dy*dz
+    area = h(2,2)*h(3,3)
+    darea = dy*dz
 
     if( myid.eq.0 .and. iprint.ne.0 ) then
       print *,''
       print *,'TTM parameters:'
       print '(a,3i5,i8)','   nx,ny,nz,nxyz = ',nx,ny,nz,nxyz
       print '(a,4es12.4)','   dx,dy,dz,vcell = ',dx,dy,dz,vcell
+      print '(a,2es12.4)','   area,darea = ',area,darea
       print '(a,2i5,es12.4)','   lsurf,rsurf = ',lsurf,rsurf,lskin
       print '(a,2es12.4)','   gmmp,gmms = ',gmmp,gmms
       print '(a,a)','   Ce_Tdep = ',trim(Ce_Tdep)
@@ -154,9 +157,9 @@ contains
         endif
         goto 999
       endif
-      do ix=lsurf,rsurf
-        te(ix,1:ny,1:nz) = I_0 *exp(-dx*(ix-lsurf+1)/lskin)
-      enddo
+!!$      do ix=lsurf,rsurf
+!!$        te(ix,1:ny,1:nz) = I_0 *exp(-dx*(ix-lsurf+1)/lskin)
+!!$      enddo
     else if( trim(cTe_init).eq.'read' ) then
       if( myid.eq.0 ) then
         open(ioTein,file=trim(paramsdir)//'/'//trim(cTe_infile),status='old')
@@ -343,6 +346,7 @@ contains
       ic = a2c(i)
       nacl(ic) = nacl(ic) + 1
       eksuml(ic) = eksuml(ic) +ek
+!!$      if( ic.eq.4 ) print *,'i,ek,eksum=',i,ek,eksuml(ic)
       if( ek.gt.ekth ) then
         nacpl(ic) = nacpl(ic) +1
         ekpsuml(ic) = ekpsuml(ic) +ek
@@ -368,6 +372,7 @@ contains
 !!$        endif
         ta(ic) = eksum(ic) *2d0/3 /fkb /nac(ic)
         gp(ic) = 3d0 *nac(ic) *fkb *gmmp /vcell
+!!$        if( ic.eq.4 ) print *,'Ta: ic,eksum,nac,ta,gp=',ic,eksum(ic),nac(ic),ta(ic),gp(ic)
         if( nacp(ic).eq.0 ) cycle
         tap(ic) = ekpsum(ic) *2d0/3 /fkb /nacp(ic)
         gp(ic) = 3d0 *nacp(ic) *fkb *gmms /vcell
@@ -409,16 +414,10 @@ contains
         tep(ix,iy,iz) = 0d0
         if( ix.lt.lsurf ) cycle
         if( ix.gt.rsurf ) cycle
-!!$        if( iy.eq.1 .and. iz.eq.1 ) then
-!!$          print '(a,i5,10es11.3)','ix,cete,dcete,dte2,d2te,ta,tap,gp,gs=' &
-!!$               ,ix&
-!!$               ,cete(ix,iy,iz),dcete(ix,iy,iz),dte2(ix,iy,iz)&
-!!$               ,d2te(ix,iy,iz),ta(ic),tap(ic),gp(ic),gs(ic) &
-!!$               ,te(ix,iy,iz),ta(ic)
-!!$        endif
         ce = cete(ix,iy,iz)
         tep(ix,iy,iz) = te(ix,iy,iz) &
-             +dt/ce/rho_e *(rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,iy,iz) &
+             +dt/ce/rho_e &
+             *(rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,iy,iz) &
              +ce*d2te(ix,iy,iz) ) &
              -gp(ic)*(te(ix,iy,iz) -ta(ic)) +gs(ic)*tap(ic) )
 
@@ -430,10 +429,9 @@ contains
           if( ix.gt.rsurf ) cycle
           ce = cete(ix,iy,iz)
           xi = (ix-lsurf)*dx
-!!$          if( iy.eq.1 .and. iz.eq.1 ) then
-!!$            print *,'ix,xi,exp(-xi/lskin)=',ix,xi,exp(-xi/lskin)
-!!$          endif
-          tep(ix,iy,iz) = tep(ix,iy,iz) +I_0 *min(1d0,exp(-xi/lskin))/ce/rho_e*dt
+!.....TODO: check consistency of units
+          tep(ix,iy,iz) = tep(ix,iy,iz) &
+               +I_0*darea *min(1d0,exp(-xi/lskin))/ce/rho_e*dt
         enddo
       endif
       te(:,:,:) = tep(:,:,:)
@@ -542,7 +540,7 @@ contains
          ,fa2v(nspmax),fekin(nspmax),dtmd,h(3,3),eki(3,3,namax)
     real(8),intent(inout):: va(3,namax),ediff(nspmax)
 
-    integer:: ic,i,l,is,ifmv,ix,iy,iz
+    integer:: ic,i,l,is,ifmv,ix,iy,iz,naccp
     real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3)
     integer,external:: ifmvOf
     real(8),external:: box_muller,sprod
@@ -558,7 +556,6 @@ contains
       hscl(l)= dsqrt(h(1,l)**2 +h(2,l)**2 +h(3,l)**2)
     enddo
     do i=1,natm
-!            ifmv= int(mod(tag(i)*10,10d0))
       ifmv = ifmvOf(tag(i))
       is = int(tag(i))
       if( ifmv.eq.0 ) then

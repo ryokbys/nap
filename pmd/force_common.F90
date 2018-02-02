@@ -64,7 +64,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
     endif
     call dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
          lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
-         tcom,myid_md,mpi_md_world,iprint,ifcoulomb,l1st,boundary)
+         tcom,myid_md,mpi_md_world,iprint,l1st,boundary)
     if( l1st .and. myid_md.eq.0 .and. iprint.ge.20 ) then
       write(6,'(/a)') ' Charges:'
       tmp = 0d0
@@ -162,19 +162,19 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
          ,chg,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
-         ,ifcoulomb,l1st)
+         ,l1st)
   else if( use_force('Ewald') ) then  ! Ewald Coulomb
     call force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
-         ,ifcoulomb,l1st,lcell_updated,lvc)
+         ,l1st,lcell_updated,lvc)
   else if( use_force('Ewald_long') ) then ! long-range Coulomb
     call force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
-         ,ifcoulomb,l1st,lcell_updated,lvc)
+         ,l1st,lcell_updated,lvc)
   endif
 
 !.....convert forces from hmat-coordinates to Cartesian coordinates
@@ -776,7 +776,7 @@ end function force_on
 !=======================================================================
 subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
      lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
-     tcom,myid,mpi_md_world,iprint,ifcoulomb,l1st,boundary)
+     tcom,myid,mpi_md_world,iprint,l1st,boundary)
 !
 !  Charge optimization/equilibration by damped dynamics.
 !  Since not only Coulomb interaction but also other force-fields can
@@ -787,7 +787,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   use Coulomb, only: qforce_long,qforce_short,qforce_self,qlower,qupper
   use Morse, only: qforce_vcMorse
   implicit none
-  integer,intent(in):: namax,natm,myid,mpi_md_world,iprint,ifcoulomb &
+  integer,intent(in):: namax,natm,myid,mpi_md_world,iprint &
        ,nnmax,lspr(0:nnmax,namax)
   real(8),intent(in):: chi(namax),h(3,3),tag(namax),ra(3,namax),rc
   real(8),intent(inout):: chg(namax),tcom
@@ -854,13 +854,13 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   if( use_force('Ewald_long') ) then
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
     call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
-         myid,iprint,ifcoulomb,fq,eclong)
+         myid,iprint,fq,eclong)
   else if( use_force('Ewald') ) then
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
-    call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint,ifcoulomb &
+    call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
          ,rc,fq,ecshort)
     call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
-         myid,iprint,ifcoulomb,fq,eclong)
+         myid,iprint,fq,eclong)
   endif
   epot = eself +ecshort + eclong
 
@@ -954,13 +954,13 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     if( use_force('Ewald_long') ) then
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)
       call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
-           myid,iprint,ifcoulomb,fq,eclong)
+           myid,iprint,fq,eclong)
     else if( use_force('Ewald') ) then
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)
-      call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint,ifcoulomb &
+      call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshort)
       call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
-           myid,iprint,ifcoulomb,fq,eclong)
+           myid,iprint,fq,eclong)
     endif
     epot = eself +ecshort + eclong
     if( use_force('vcMorse') ) then

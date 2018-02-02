@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-01-15 18:01:47 Ryo KOBAYASHI>
+!                     Last modified: <2018-01-31 16:44:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -634,10 +634,97 @@ contains
     return
   end subroutine read_paramsx
 !=======================================================================
+  subroutine force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
+       ,chg,chi,h,hi,tcom &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint &
+       ,l1st,lcell_updated,lvc)
+!
+!  Coulomb potential and force computation using Ewald sum method.
+!  Currently, the efficiency when parallel computation is not taken into account.
+!  So it is not appropriate to use this routine for large system.
+!
+    implicit none
+    include "mpif.h"
+    include "./params_unit.h"
+
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
+    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+         ,nn(6),lspr(0:nnmax,namax),nex(3)
+    integer,intent(in):: mpi_md_world,myid
+    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
+         ,acon(nismax),tag(namax),sv(3,6),chi(namax)
+    real(8),intent(inout):: chg(namax)
+    real(8),intent(inout):: tcom
+    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: lstrs,l1st,lcell_updated,lvc
+
+    integer:: i,j,ik,is,js,k1,k2,k3,ierr,jj,ixyz,jxyz
+    real(8):: elrl,esrl,epotl,epott,qi,qj,tmp,ftmp &
+         ,bdotr,terfc,diji,dij,ss2i,sgmsq2,rc2,q2tot,q2loc,bb2,sqpi &
+         ,e0,q2,sgmi
+    real(8),save:: eself,eselfl
+    real(8),allocatable,save:: ri(:),bk(:),bk1(:),bk2(:),bk3(:)&
+         ,bb(:),dxdi(:),dxdj(:),rij(:),xij(:),xj(:),xi(:)
+    real(8),allocatable,save:: strsl(:,:,:)
+    real(8),external:: sprod,absv
+
+    if( l1st ) then
+      if( .not.allocated(ri) ) then
+        allocate(ri(3),bk(3),bk1(3),bk2(3),bk3(3),bb(3),dxdi(3) &
+             ,dxdj(3),rij(3),xij(3),xj(3),xi(3))
+      endif
+      if( allocated(strsl) ) deallocate(strsl)
+      allocate(strsl(3,3,namax))
+    endif
+
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
+    endif
+
+    strsl(1:3,1:3,1:namax) = 0d0
+
+    if(  trim(cterms).eq.'full' .or. &
+         trim(cterms).eq.'short' .or. &
+         trim(cterms).eq.'screened' ) then
+      call Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
+           ,lspr,epi,esrl,iprint,lstrs,rc)
+    endif
+
+    if(  trim(cterms).eq.'full' .or. &
+         trim(cterms).eq.'long' ) then
+      call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
+
+      call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
+           lspr,epi,elrl,iprint,mpi_md_world,lstrs,lcell_updated)
+    endif
+
+    if( lstrs ) then
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$           ,nn,mpi_md_world,strsl,9)
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
+
+    if( l1st .and. myid.eq.0 ) then
+      print *,'Ewald energy term by term:'
+      print '(a,f12.4)','   Self term         = ',eselfl
+      print '(a,f12.4)','   Short-range term  = ',esrl
+      print '(a,f12.4)','   Long-range term   = ',elrl
+    endif
+
+    epotl = esrl +elrl +eselfl
+!.....Gather epot
+    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+         ,mpi_sum,mpi_md_world,ierr)
+    epot= epot +epott
+
+  end subroutine force_Coulomb
+!=======================================================================
   subroutine force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,ifcoulomb&
+       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint &
        ,l1st)
     implicit none
     include "mpif.h"
@@ -646,7 +733,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
-    integer,intent(in):: mpi_md_world,myid,ifcoulomb
+    integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,acon(nismax),tag(namax),sv(3,6)
     real(8),intent(inout):: chg(namax)
@@ -658,7 +745,7 @@ contains
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
          ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp &
-         ,qi,qj,radi,radj,rhoij,terfc,texp
+         ,qi,qj,radi,radj,rhoij,terfc,texp,sqpi
     real(8),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
@@ -678,7 +765,7 @@ contains
     epotl= 0d0
     strsl(1:3,1:3,1:namax) = 0d0
 !!$    write(6,'(a,30f7.3)') 'chgs =',chg(1:natm)
-
+    sqpi = 1d0/sqrt(pi)
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -717,7 +804,7 @@ contains
         endif
 !.....force
         texp = exp(-(dij/rhoij)**2)
-        dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij /sqrt(pi) *texp)
+        dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp)
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
@@ -751,7 +838,7 @@ contains
   subroutine force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,chi,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,ifcoulomb &
+       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint &
        ,l1st,lcell_updated,lvc)
 !
 !  Coulomb potential and force computation using Ewald sum method.
@@ -765,7 +852,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
-    integer,intent(in):: mpi_md_world,myid,ifcoulomb
+    integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,acon(nismax),tag(namax),sv(3,6),chi(namax)
     real(8),intent(inout):: chg(namax)
@@ -802,10 +889,10 @@ contains
     call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
 
     call Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-         ,lspr,epi,esrl,iprint,ifcoulomb,lstrs,rc)
+         ,lspr,epi,esrl,iprint,lstrs,rc)
 
     call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
-         lspr,epi,elrl,iprint,ifcoulomb,mpi_md_world,lstrs,lcell_updated)
+         lspr,epi,elrl,iprint,mpi_md_world,lstrs,lcell_updated)
 
     if( lstrs ) then
 !!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
@@ -831,7 +918,7 @@ contains
   subroutine force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,chi,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,ifcoulomb &
+       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint &
        ,l1st,lcell_updated,lvc)
 !
 !  Long-range only Coulomb potential with Gaussian distribution charges.
@@ -845,7 +932,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
-    integer,intent(in):: mpi_md_world,myid,ifcoulomb
+    integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,acon(nismax),tag(namax),sv(3,6),chi(namax)
     real(8),intent(inout):: chg(namax)
@@ -873,7 +960,7 @@ contains
     call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
     
     call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
-         lspr,epi,elrl,iprint,ifcoulomb,mpi_md_world,lstrs,lcell_updated)
+         lspr,epi,elrl,iprint,mpi_md_world,lstrs,lcell_updated)
 
     if( lstrs ) then
 !!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
@@ -897,9 +984,9 @@ contains
   end subroutine force_Ewald_long
 !=======================================================================
   subroutine Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-       ,lspr,epi,esrl,iprint,ifcoulomb,lstrs,rc)
+       ,lspr,epi,esrl,iprint,lstrs,rc)
     implicit none
-    integer,intent(in):: namax,natm,nnmax,iprint,ifcoulomb, &
+    integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
     real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
          h(3,3),hi(3,3),rc
@@ -976,14 +1063,14 @@ contains
   end subroutine Ewald_short
 !=======================================================================
   subroutine Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
-       lspr,epi,elrl,iprint,ifcoulomb,mpi_md_world,lstrs,lcell_updated)
+       lspr,epi,elrl,iprint,mpi_md_world,lstrs,lcell_updated)
 !
 !  Long-range term of Ewald sum.
 !  Not parallelized and not suitable for large system as it is too slow.
 !
     implicit none
     include 'mpif.h'
-    integer,intent(in):: namax,natm,nnmax,iprint,ifcoulomb, &
+    integer,intent(in):: namax,natm,nnmax,iprint, &
          mpi_md_world,lspr(0:nnmax,namax)
     real(8),intent(in):: tag(namax),ra(3,namax),chg(namax),&
          h(3,3),hi(3,3)
@@ -1098,12 +1185,12 @@ contains
   end subroutine Ewald_self
 !=======================================================================
   subroutine qforce_short(namax,natm,tag,ra,nnmax,chg,h &
-       ,lspr,iprint,ifcoulomb,rc,fq,esr)
+       ,lspr,iprint,rc,fq,esr)
 !
 !  Compute q-force of short-range term of Ewald sum.
 !
     implicit none
-    integer,intent(in):: namax,natm,nnmax,iprint,ifcoulomb, &
+    integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
     real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
          h(3,3),rc
@@ -1163,13 +1250,13 @@ contains
   end subroutine qforce_short
 !=======================================================================
   subroutine qforce_long(namax,natm,tag,ra,chg,h, &
-       tcom,mpi_md_world,myid,iprint,ifcoulomb,fq,elr)
+       tcom,mpi_md_world,myid,iprint,fq,elr)
 !
 !  Derivative of Ewald long-range term w.r.t. charges
 !
     implicit none
     include 'mpif.h'
-    integer,intent(in):: namax,natm,mpi_md_world,myid,iprint,ifcoulomb
+    integer,intent(in):: namax,natm,mpi_md_world,myid,iprint
     real(8),intent(in):: tag(namax),ra(3,namax),chg(namax),h(3,3)
     real(8),intent(inout):: tcom,fq(namax),elr
 

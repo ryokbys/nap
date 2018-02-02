@@ -375,7 +375,7 @@ c
 c        xi(1:3)= rtot(1:3,i)
 c        ri(1:3)= h(1:3,1,0)*xi(1) +h(1:3,2,0)*xi(2) +h(1:3,3,0)*xi(3)
         eki = ekitot(1,1,i) +ekitot(2,2,i) +ekitot(3,3,i)
-        write(ionum,'(i8,i3,3f12.5,2f11.3,6es11.3,f9.4,f9.2)')
+        write(ionum,'(i8,i3,3f12.5,8es11.3,f9.4,f9.2)')
      &       itotOf(tagtot(i)),int(tagtot(i)),rlmp(1:3,i),eki,
      &       epitot(i),
      &       stot(1,1,i),stot(2,2,i),stot(3,3,i),
@@ -488,6 +488,7 @@ c
       end subroutine pmd2lammps
 c=======================================================================
       subroutine shift_pos_for_lammps(r,rn,lxy,lxz,lyz,x,y,z,yz,xz,xy)
+      use pmdio,only: boundary
       implicit none
       real(8),intent(in):: r(3),x,y,z,yz,xz,xy
       integer,intent(in):: lxy,lxz,lyz
@@ -502,7 +503,9 @@ c=======================================================================
       rn(2) = rn(2) -lyz*r(3)
       rn(1) = rn(1) -lxz*r(3) +(r(2)*xyp -rn(2)*xy)/x
       do i=1,3
-        rn(i) = pbc(rn(i))
+        if( boundary(i:i).eq.'p' ) then
+          rn(i) = pbc(rn(i))
+        endif
       enddo
       return
       end subroutine shift_pos_for_lammps

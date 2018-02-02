@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-01-29 15:57:36 Ryo KOBAYASHI>
+c                     Last-modified: <2018-02-02 17:52:45 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -357,9 +357,15 @@ c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
      &         ,istp,tcpu,tave,epot,vol
      &         ,prss
         else
-          write(6,'(a,i8,2f10.2,es15.6,es11.3)')
-     &         " istp,time,temp,epot,prss="
-     &         ,istp,tcpu,tave,epot,prss
+          if( tave.ge.10000.0 ) then
+            write(6,'(a,i8,f11.2,es11.3,es15.6,es11.3)')
+     &           " istp,time,temp,epot,prss="
+     &           ,istp,tcpu,tave,epot,prss
+          else
+            write(6,'(a,i8,2f11.2,es15.6,es11.3)')
+     &           " istp,time,temp,epot,prss="
+     &           ,istp,tcpu,tave,epot,prss
+          endif
         endif
       endif
 
@@ -385,6 +391,8 @@ c      write(cnum(1:4),'(i4.4)') 0
       endif
       
       if( trim(ctctl).eq.'ttm' ) then
+        call assign_atom2cell(namax,natm,ra,sorg)
+        call calc_Ta(namax,natm,eki,myid_md,mpi_md_world)
         call output_Te(0,myid_md,iprint)
       endif
 
@@ -398,10 +406,17 @@ c.....write out energies
         write(ioerg,'(a)') '# istp,  etot-epot0[eV],  ekin,'
      &       //'  epot-epot0,  temp[K],  vol[Ang^3],  pressure[GPa]'
         write(ioerg,'(a,es16.7e3,a)') '#  Epot0 =',epot0,' [eV]'
-        write(ioerg,'(i10,3es16.7e3,f10.2,2es16.7e3)') istp
-     &       ,ekin+epot0-epot0,ekin,epot0-epot0,tave
-     &       ,vol
-     &       ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
+        if( tave.gt.10000d0) then
+          write(ioerg,'(i10,3es16.7e3,es11.3,2es16.7e3)') istp
+     &         ,ekin+epot0-epot0,ekin,epot0-epot0,tave
+     &         ,vol
+     &         ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
+        else
+          write(ioerg,'(i10,3es16.7e3,f11.2,2es16.7e3)') istp
+     &         ,ekin+epot0-epot0,ekin,epot0-epot0,tave
+     &         ,vol
+     &         ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
+        endif
         call flush(ioerg)
 c.....write out temperatures
         open(iotemp,file='out.temperature',status='replace')
@@ -452,9 +467,6 @@ c-------first kick of velocities
         do i=1,natm
           is = int(tag(i))
           va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
-c          if( i.eq.52 ) then
-c            print *,'i,is,aa(1:3,i),va(1:3,i)=',i,is,aa(1:3,i),va(1:3,i)
-c          endif
         enddo
 
         if( ifdmp.eq.2 ) then
@@ -515,7 +527,8 @@ c.....if making new pair list is needed.
      &       (ifpmd.gt.0.and.mod(istp,noutpmd).eq.0) ) then
 c.....Move atoms that cross the boundary
           call bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi
-     &         ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world)
+     &         ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world
+     &         ,boundary)
 c.....Copy RA of boundary atoms
           call bacopy(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax,natm,nb
      &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv,nex
@@ -682,9 +695,15 @@ c-------output energies
           
           if(myid_md.eq.0) then
 c.....write energies
-            write(ioerg,'(i10,3es16.7e3,f10.2,2es16.7e3)') istp
-     &           ,ekin+epot-epot0,ekin,epot-epot0,tave
-     &           ,vol,prss
+            if( tave.gt.10000d0 ) then
+              write(ioerg,'(i10,3es16.7e3,es11.3,2es16.7e3)') istp
+     &             ,ekin+epot-epot0,ekin,epot-epot0,tave
+     &             ,vol,prss
+            else
+              write(ioerg,'(i10,3es16.7e3,f11.2,2es16.7e3)') istp
+     &             ,ekin+epot-epot0,ekin,epot-epot0,tave
+     &             ,vol,prss
+            endif
             call flush(ioerg)
 c.....write temperature
             write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff0(1:9)
@@ -715,9 +734,15 @@ c---------output step, time, and temperature
      &             ,stnsr(3,3)*up2gpa ,stnsr(2,3)*up2gpa
      &             ,stnsr(1,3)*up2gpa ,stnsr(1,2)*up2gpa
             elseif( iprint.ne.0 ) then
-              write(6,'(a,i8,2f10.2,es15.6,es11.3)')
-     &             " istp,time,temp,epot,prss="
-     &             ,istp,tcpu,tave,epot,prss
+              if( tave.ge.10000.0 ) then
+                write(6,'(a,i8,f11.2,es11.3,es15.6,es11.3)')
+     &               " istp,time,temp,epot,prss="
+     &               ,istp,tcpu,tave,epot,prss
+              else
+                write(6,'(a,i8,2f11.2,es15.6,es11.3)')
+     &               " istp,time,temp,epot,prss="
+     &               ,istp,tcpu,tave,epot,prss
+              endif
             endif
           endif
 
@@ -1506,18 +1531,6 @@ c-----calculate the cut-off lengths
 c-----loop over x, y, & z directions
       do 100 kd=1,3
 
-c.....Depending on boundary condition and cell position,
-c.....maybe able to skip this kd.
-        if( boundary(kd:kd).ne.'p' )  then
-          if( kd.eq.1 ) then
-            if( ix.eq.0 .or. ix.eq.nx-1 ) cycle
-          else if( kd.eq.2 ) then
-            if( iy.eq.0 .or. iy.eq.ny-1 ) cycle
-          else if( kd.eq.3 ) then
-            if( iz.eq.0 .or. iz.eq.nz-1 ) cycle
-          endif
-        endif
-
 c-------No. of to-be-copied atoms, LSB(0,)
         do kdd= -1,0
           lsb(0,2*kd+kdd)= 0
@@ -1561,6 +1574,32 @@ c---------Higher neighbor
             endif
           enddo
         endif                   ! if(nex.gt.1)
+
+c.....Depending on boundary condition and cell position,
+c.....number of to-be-sent atoms is set 0.
+        if( boundary(kd:kd).ne.'p' )  then
+          kul = 2*kd -1
+          kuh = 2*kd
+          if( kd.eq.1 ) then
+            if( ix.eq.0 ) then
+              lsb(0,kul) = 0
+            else if (ix.eq.nx-1 ) then
+              lsb(0,kuh) = 0
+            endif
+          else if( kd.eq.2 ) then
+            if( iy.eq.0 ) then
+              lsb(0,kul) = 0
+            else if (iy.eq.ny-1 ) then
+              lsb(0,kuh) = 0
+            endif
+          else if( kd.eq.3 ) then
+            if( iz.eq.0 ) then
+              lsb(0,kul) = 0
+            else if ( iz.eq.nz-1 ) then
+              lsb(0,kuh) = 0
+            endif
+          endif
+        endif
 
 c-------Error trap
         do kdd= -1,0
@@ -1741,18 +1780,6 @@ c      enddo
 c-----loop over x, y, & z directions
       do 100 kd=1,3
 
-c.....Depending on boundary condition and cell position,
-c.....maybe able to skip this kd.
-        if( boundary(kd:kd).ne.'p' )  then
-          if( kd.eq.1 ) then
-            if( ix.eq.0 .or. ix.eq.nx-1 ) cycle
-          else if( kd.eq.2 ) then
-            if( iy.eq.0 .or. iy.eq.ny-1 ) cycle
-          else if( kd.eq.3 ) then
-            if( iz.eq.0 .or. iz.eq.nz-1 ) cycle
-          endif
-        endif
-
 c-------To calculate the communication time
         tcom1=MPI_WTIME()
 
@@ -1874,18 +1901,6 @@ c      enddo
 c-----loop over x, y, & z directions
       do 100 kd=1,3
 
-c.....Depending on boundary condition and cell position,
-c.....maybe able to skip this kd.
-        if( boundary(kd:kd).ne.'p' )  then
-          if( kd.eq.1 ) then
-            if( ix.eq.0 .or. ix.eq.nx-1 ) cycle
-          else if( kd.eq.2 ) then
-            if( iy.eq.0 .or. iy.eq.ny-1 ) cycle
-          else if( kd.eq.3 ) then
-            if( iz.eq.0 .or. iz.eq.nz-1 ) cycle
-          endif
-        endif
-
 c-------To calculate the communication time
         tcom1=MPI_WTIME()
 
@@ -1931,7 +1946,8 @@ c-------Add the communication time to COMT
       end subroutine bacopy_chg_fixed
 c=======================================================================
       subroutine bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi
-     &     ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world)
+     &     ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world
+     &     ,boundary)
 c-----------------------------------------------------------------------
 c  Exchange atoms between neighbor nodes and atomic data as well.
 c
@@ -1939,6 +1955,7 @@ c  MVQUE(0:NBMAX,6):
 c    MVQUE(0,ku) is the # of to-be-moved atoms to neighbor ku;
 c    MVQUE(i,ku) is the adress, in IS, of atom i
 c----------------------------------------------------------------------
+      use pmdmpi,only: nid2xyz,nx,ny,nz
       implicit none
       include 'mpif.h'
       integer,intent(in):: namax,nbmax
@@ -1947,9 +1964,10 @@ c----------------------------------------------------------------------
       integer,intent(inout):: natm
       real(8),intent(inout):: tcom,ra(3,namax),va(3,namax),tag(namax)
      &     ,chg(namax),chi(namax)
+      character(len=3),intent(in):: boundary
 
 c      integer:: status(MPI_STATUS_SIZE)
-      integer:: i,j,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is
+      integer:: i,j,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is,ix,iy,iz
       integer:: mvque(0:nbmax,6),newim
       real(8):: tcom1,tcom2,xi(3)
       logical,external:: bmv
@@ -1960,6 +1978,8 @@ c      integer:: status(MPI_STATUS_SIZE)
         allocate(dbuf(9,nbmax),dbufr(9,nbmax))
         l1st=.false.
       endif
+
+      call nid2xyz(myid_md,ix,iy,iz)
 
 c-----newim: num. of new immigrants
       newim= 0
@@ -1983,6 +2003,40 @@ c-------num of to-be-moved atoms
             endif
           endif
         enddo
+
+c.....Depending on boundary condition and cell position,
+c.....number of to-be-moved atoms is set 0.
+        if( boundary(kd:kd).ne.'p' )  then
+          if( kd.eq.1 ) then
+            if( ix.eq.0 ) then
+              mvque(0,kul) = 0
+            else if (ix.eq.nx-1 ) then
+              mvque(0,kuh) = 0
+            endif
+          else if( kd.eq.2 ) then
+            if( iy.eq.0 ) then
+              mvque(0,kul) = 0
+            else if (iy.eq.ny-1 ) then
+              mvque(0,kuh) = 0
+            endif
+          else if( kd.eq.3 ) then
+            if( iz.eq.0 ) then
+              mvque(0,kul) = 0
+            else if ( iz.eq.nz-1 ) then
+              mvque(0,kuh) = 0
+            endif
+          endif
+        endif
+c
+c        if( kd.eq.1 ) then
+c          if( ix.eq.0 .and. mvque(0,kul).gt.0 ) then
+c            print *,' myid,kd,ix,mvque(0,kul)=',myid_md
+c     &           ,kd,ix,mvque(0,kul)
+c          else if( ix.eq.nx-1 .and. mvque(0,kuh).gt.0 ) then
+c            print *,' myid,kd,ix,mvque(0,kuh)=',myid_md
+c     &           ,kd,ix,mvque(0,kuh)
+c          endif
+c        endif
 
 c-------Error trap
         if (mvque(0,kul).gt.nbmax) then
