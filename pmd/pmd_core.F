@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-02-02 17:52:45 Ryo KOBAYASHI>
+c                     Last-modified: <2018-02-05 16:14:13 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -239,6 +239,15 @@ c            print *,'ifmv,ttgt,fkb,dt,tfac='
 c     &           ,ifmv,ttgt(ifmv),fkb,dt,tfac(ifmv)
           endif
         enddo
+        if( myid_md.eq.0 ) then
+          print *,''
+          print *,'Langevin thermostat parameters:'
+          print '(a,f10.2)','   Relaxation time = ',trlx
+          do ifmv=1,9
+            print '(a,i3,f10.2,es15.4)','   ifmv,ttgt,tfac = '
+     &           ,ifmv,ttgt(ifmv),tfac(ifmv)
+          enddo
+        endif
       else if( trim(ctctl).eq.'ttm' ) then
         call init_ttm(namax,natm,h,dt,myid_md,mpi_md_world,iprint)
       endif

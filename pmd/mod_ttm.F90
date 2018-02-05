@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-02-02 18:02:40 Ryo KOBAYASHI>
+!                     Last-modified: <2018-02-05 16:20:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -28,10 +28,14 @@ module ttm
   real(8):: dx,dy,dz,area,darea
 !.....Time step in fs == dt in MD by default
   real(8):: dt
+!.....Number of inner loop in TTM
+  integer:: nstp_inner = 1
 !.....Volume per mesh cell Ang^3 == dx*dy*dz
   real(8):: vcell
 !.....Threshold kinetic energy in energy unit (or should be threshold velocity?)
   real(8):: ekth = 8.0d0
+!.....Te of right edge, if negative, use free boundary
+  real(8):: Te_right = -1.0
 
 !.....Ce dependence on Te: none, polynomial or tanh
   character(len=128):: Ce_Tdep = 'none'
@@ -48,7 +52,7 @@ module ttm
 
 !.....Pulse shape: exp or read (from cTe_init)
   character(len=128):: cTe_init = 'exp'
-!.....Laser intensity at the surface top in eV/(fs*Ang^2) unit
+!.....Laser power at the surface top in eV/(fs*Ang^2) unit
   real(8):: I_0 = 5d+4
 !.....Pulse duration in fs
   real(8):: tau_pulse = 100d0
@@ -88,7 +92,7 @@ contains
     real(8),intent(in):: dtmd,h(3,3)
 
     integer:: ierr,ix,iy,iz,mem
-    real(8):: t,t0
+    real(8):: t,t0,dtmax,tmp
     character(len=128):: c1st
 
     t_ttm = 0d0
@@ -97,9 +101,12 @@ contains
     call read_ttm_params(myid,mpi_world,iprint)
     call sync_params(myid,mpi_world,iprint)
 
+!.....Convert fluence to energy density
+    I_0 = I_0 /lskin
+
 !.....Set some
     nxyz = nx*ny*nz
-    dt = dtmd
+    dt = dtmd /nstp_inner
     dx = h(1,1)/nx
     dy = h(2,2)/ny
     dz = h(3,3)/nz
@@ -110,6 +117,7 @@ contains
     if( myid.eq.0 .and. iprint.ne.0 ) then
       print *,''
       print *,'TTM parameters:'
+      print '(a,i5)','   inner_loop = ',nstp_inner
       print '(a,3i5,i8)','   nx,ny,nz,nxyz = ',nx,ny,nz,nxyz
       print '(a,4es12.4)','   dx,dy,dz,vcell = ',dx,dy,dz,vcell
       print '(a,2es12.4)','   area,darea = ',area,darea
@@ -140,6 +148,19 @@ contains
       endif
       goto 999
     endif
+
+!!$!.....Check dt for TTM
+!!$    t = 10d0
+!!$    tmp = c_0 +(a_0 +a_1*t +a_2*t**2 +a_3*t**3 +a_4*t**4)&
+!!$         *exp(-(A_exp*t)**2)
+!!$    dtmax = 0.5d0/(D_e*rho_e*tmp) /(1d0/dx**2 +1d0/dy**2 +1d0/dz**2)
+!!$    print *,'dt_ttm,dtmax = ',dt,dtmax
+!!$    if( dt.gt.dtmax ) then
+!!$      if( myid.eq.0 ) then
+!!$        print *,'ERROR: dt > dtmax, you may have to change TTM mesh size.'
+!!$        print *,'dt,dtmax = ',dt,dtmax
+!!$      endif
+!!$    endif
     
 !.....Allocate initialize arrays
     allocate(nac(nxyz),nacp(nxyz),eksum(nxyz),ekpsum(nxyz), &
@@ -203,6 +224,9 @@ contains
           endif
           backspace(ioprms)
           read(ioprms,*) c1st, nx, ny, nz
+        else if( trim(c1st).eq.'inner_loop' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, nstp_inner
         else if( trim(c1st).eq.'gamma_p' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, gmmp
@@ -221,6 +245,9 @@ contains
         else if( trim(c1st).eq.'Te_init' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, cTe_init
+        else if( trim(c1st).eq.'Te_right' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, Te_right
         else if( trim(c1st).eq.'pulse_duration' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, tau_pulse
@@ -241,7 +268,7 @@ contains
         else if( trim(c1st).eq.'surface_move' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, surfmove
-        else if( trim(c1st).eq.'laser_intensity' ) then
+        else if( trim(c1st).eq.'laser_power' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, I_0
         else if( trim(c1st).eq.'Te_min' ) then
@@ -271,6 +298,7 @@ contains
     call mpi_bcast(nx,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(ny,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nz,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(nstp_inner,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(gmmp,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(gmms,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(ekth,1,mpi_real8,0,mpi_world,ierr)
@@ -278,6 +306,7 @@ contains
     call mpi_bcast(d_e,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(tau_pulse,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(cTe_init,128,mpi_character,0,mpi_world,ierr)
+    call mpi_bcast(Te_right,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(ce_Tdep,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(c_0,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(a_0,1,mpi_real8,0,mpi_world,ierr)
@@ -401,40 +430,44 @@ contains
     integer,intent(in):: myid,mpi_world
     real(8),intent(in):: tnow
 
-    integer:: ic,ix,iy,iz,ierr
+    integer:: ic,ix,iy,iz,ierr,istp
     real(8):: t0,ce,xi
 
     t0 = mpi_wtime()
 
     if( myid.eq.0 ) then
-      call set_BC()
+      do istp = 1,nstp_inner
+        call set_BC()
 
-      do ic=1,nxyz
-        call ic2ixyz(ic,ix,iy,iz)
-        tep(ix,iy,iz) = 0d0
-        if( ix.lt.lsurf ) cycle
-        if( ix.gt.rsurf ) cycle
-        ce = cete(ix,iy,iz)
-        tep(ix,iy,iz) = te(ix,iy,iz) &
-             +dt/ce/rho_e &
-             *(rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,iy,iz) &
-             +ce*d2te(ix,iy,iz) ) &
-             -gp(ic)*(te(ix,iy,iz) -ta(ic)) +gs(ic)*tap(ic) )
-
-      enddo
-      if( tnow.lt.tau_pulse ) then
         do ic=1,nxyz
           call ic2ixyz(ic,ix,iy,iz)
+          tep(ix,iy,iz) = 0d0
           if( ix.lt.lsurf ) cycle
           if( ix.gt.rsurf ) cycle
           ce = cete(ix,iy,iz)
-          xi = (ix-lsurf)*dx
-!.....TODO: check consistency of units
-          tep(ix,iy,iz) = tep(ix,iy,iz) &
-               +I_0*darea *min(1d0,exp(-xi/lskin))/ce/rho_e*dt
+          tep(ix,iy,iz) = te(ix,iy,iz) &
+               +dt/ce/rho_e &
+               *(rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,iy,iz) &
+               +ce*d2te(ix,iy,iz) ) &
+               -gp(ic)*(te(ix,iy,iz) -ta(ic)) +gs(ic)*tap(ic) )
+
         enddo
-      endif
-      te(:,:,:) = tep(:,:,:)
+        if( tnow.lt.tau_pulse ) then
+          do ic=1,nxyz
+            call ic2ixyz(ic,ix,iy,iz)
+            if( ix.lt.lsurf ) cycle
+            if( ix.gt.rsurf ) cycle
+            ce = cete(ix,iy,iz)
+            xi = (ix-lsurf)*dx
+!.....TODO: check consistency of units
+            tep(ix,iy,iz) = tep(ix,iy,iz) &
+                 +I_0 *min(1d0,exp(-xi/lskin))/ce/rho_e*dt
+!!$          print *,'ic,I_0,darea,other=',ic,I_0,darea&
+!!$               ,min(1d0,exp(-xi/lskin))/ce/rho_e*dt,1d0/ce,1d0/rho_e
+          enddo
+        endif
+        te(:,:,:) = tep(:,:,:)
+      enddo
     endif
 !.....Broadcast Te distribution to all the nodes.
 !.....There could be smarter way to reduce networking cost.
@@ -458,7 +491,7 @@ contains
     if( trim(Ce_Tdep).eq.'none' ) then
       cete = c_0
     else if( trim(Ce_Tdep).eq.'polynomial' ) then
-      t = te(ix,iy,iz)
+      t = te(ix,iy,iz)/1000
       cete = c_0 +(a_0 +a_1*t +a_2*t**2 +a_3*t**3 +a_4*t**4)&
            *exp(-(A_exp*t)**2)
     else if( trim(Ce_Tdep).eq.'tanh' ) then
@@ -548,6 +581,8 @@ contains
     do ic=1,nxyz
       call ic2ixyz(ic,ix,iy,iz)
       sgm(ic) = dsqrt(2d0*gmmp*fkb*te(ix,iy,iz)/dtmd)
+!!$      if( ic.eq.4 ) print *,'ic,sgm,gmmp,fkb*Te=',ic,sgm(ic)&
+!!$           ,gmmp,fkb*te(ix,iy,iz)
     enddo
     
 !.....Langevin thermostat with Mannella integrator
@@ -565,6 +600,9 @@ contains
         ami= am(is)
         ic = a2c(i)
         sgmi = sgm(ic) *dsqrt(ami)
+!!$        if( ic.eq.4 ) then
+!!$          print *,'ia,ic,ami,sgmi=',i,ic,ami,sgmi
+!!$        endif
         ek = eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
         gmmi = gmmp
         if( ek.gt.ekth ) gmmi = gmmi + gmms
@@ -609,7 +647,7 @@ contains
   subroutine output_Te(istp,myid,iprint)
     integer,intent(in):: istp,myid,iprint
 
-    integer:: ix,iy,iz
+    integer:: ix,iy,iz,ic
     character(len=128):: cnum
 
     if( myid.eq.0 ) then
@@ -628,11 +666,12 @@ contains
       if( iprint.ne.0 ) then
         write(cnum,'(i0)') istp
         open(ioTeout,file=trim(cTe_outfile)//'_'//trim(cnum),status='replace')
-        write(ioTeout,'(a)') '# ix,   iy,   iz,   te(ix,iy,iz)'
+        write(ioTeout,'(a)') '# ix,   iy,   iz,   te(ix,iy,iz),   ta(ic)'
         do ix=1,nx
           do iy=1,ny
             do iz=1,nz
-              write(ioTeout,'(3i6,es15.7)') ix,iy,iz,te(ix,iy,iz)
+              call ixyz2ic(ix,iy,iz,ic)
+              write(ioTeout,'(3i6,2es15.5)') ix,iy,iz,te(ix,iy,iz),ta(ic)
             enddo
           enddo
         enddo
@@ -653,10 +692,14 @@ contains
       te(1:nx,ny+1,1:nz) = te(1:nx,1,1:nz)
       te(1:nx,1:ny,0) = te(1:nx,1:ny,nz)
       te(1:nx,1:ny,nz+1) = te(1:nx,1:ny,1)
-    else
+    else  ! Laser-ablation situation
 !.....Free boundary for x
       te(lsurf-1,1:ny,1:nz) = te(lsurf,1:ny,1:nz)
-      te(rsurf+1,1:ny,1:nz) = te(rsurf,1:ny,1:nz)
+      if( Te_right.lt.0d0 ) then
+        te(rsurf+1,1:ny,1:nz) = te(rsurf,1:ny,1:nz)
+      else
+        te(rsurf+1,1:ny,1:nz) = Te_right
+      endif
 !.....Periodic for y and z
       te(lsurf:rsurf,0,1:nz) = te(lsurf:rsurf,ny,1:nz)
       te(lsurf:rsurf,ny+1,1:nz) = te(lsurf:rsurf,1,1:nz)

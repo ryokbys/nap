@@ -11,8 +11,6 @@ and uses spatial decomposition technique for the parallelization, and cell-list 
 * Assistant Professor in the department of mechanical engineering, Nagoya Institute of Technology. (Nov, 2017)
 
 # Compilation and usage
-See the manual web site below,
-http://ryokbys.web.nitech.ac.jp/contents/pmd_usage
 
 For the short test, whether or not you can use this program in your environment,
 
