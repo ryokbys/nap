@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-02-05 16:20:18 Ryo KOBAYASHI>
+!                     Last-modified: <2018-02-05 19:03:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -63,6 +63,7 @@ module ttm
   integer:: rsurf = -1  ! right surface
 !.....Surface movement along x: no, plane (can move as a yz-plane surface)
   character(len=128):: surfmove = 'plane'
+  integer:: nstp_surfmove = 100
 !.....Minimum Te when surface moves
   real(8):: Te_min = 300d0
 
@@ -348,17 +349,17 @@ contains
     enddo
   end subroutine assign_atom2cell
 !=======================================================================
-  subroutine calc_Ta(namax,natm,eki,myid,mpi_world)
+  subroutine calc_Ta(namax,natm,eki,istp,myid,mpi_world)
 !
 !  Compute and set Ta and Tap array from atomic kinetic energies.
 !
-    integer,intent(in):: namax,natm,myid,mpi_world
+    integer,intent(in):: namax,natm,myid,mpi_world,istp
     real(8),intent(in):: eki(3,3,namax)
 
     integer:: i,ic,ierr,ix,iy,iz
     real(8):: ek,t0
-    integer,allocatable:: nacl(:),nacpl(:)
-    real(8),allocatable:: eksuml(:),ekpsuml(:)
+    integer,allocatable,save:: nacl(:),nacpl(:)
+    real(8),allocatable,save:: eksuml(:),ekpsuml(:)
 
     if( .not. allocated(nacl) ) then
       allocate(nacl(nxyz),nacpl(nxyz),eksuml(nxyz),ekpsuml(nxyz))
@@ -393,6 +394,8 @@ contains
     if( myid.eq.0 ) then
       gp(:) = 0d0
       gs(:) = 0d0
+      ta(:) = 0d0
+      tap(:) = 0d0
       do ic=1,nxyz
         if( nac(ic).eq.0 ) cycle
         call ic2ixyz(ic,ix,iy,iz)
@@ -415,7 +418,8 @@ contains
 !!$      enddo
     endif
 
-    if( trim(surfmove).eq.'plane' ) then
+    if( trim(surfmove).eq.'plane' .and. &
+         mod(istp,nstp_surfmove).eq.0) then
       call update_surface_plane(myid,mpi_world)
     endif
 
@@ -462,8 +466,10 @@ contains
 !.....TODO: check consistency of units
             tep(ix,iy,iz) = tep(ix,iy,iz) &
                  +I_0 *min(1d0,exp(-xi/lskin))/ce/rho_e*dt
-!!$          print *,'ic,I_0,darea,other=',ic,I_0,darea&
-!!$               ,min(1d0,exp(-xi/lskin))/ce/rho_e*dt,1d0/ce,1d0/rho_e
+!!$            if( ic.eq.126 ) then
+!!$              print *,'ic,I_0,ce,other=',ic,I_0,ce &
+!!$                   ,min(1d0,exp(-xi/lskin))/ce/rho_e*dt,1d0/ce,1d0/rho_e
+!!$            endif
           enddo
         endif
         te(:,:,:) = tep(:,:,:)
@@ -666,12 +672,14 @@ contains
       if( iprint.ne.0 ) then
         write(cnum,'(i0)') istp
         open(ioTeout,file=trim(cTe_outfile)//'_'//trim(cnum),status='replace')
-        write(ioTeout,'(a)') '# ix,   iy,   iz,   te(ix,iy,iz),   ta(ic)'
+        write(ioTeout,'(a)') '# ix,   iy,   iz,   te(ix,iy,iz),   ta(ic),'&
+             //'  nac(ic)'
         do ix=1,nx
           do iy=1,ny
             do iz=1,nz
               call ixyz2ic(ix,iy,iz,ic)
-              write(ioTeout,'(3i6,2es15.5)') ix,iy,iz,te(ix,iy,iz),ta(ic)
+              write(ioTeout,'(3i6,2es15.5,i6)') ix,iy,iz,te(ix,iy,iz) &
+                   ,ta(ic),nac(ic)
             enddo
           enddo
         enddo

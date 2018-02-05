@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2017-12-19 15:22:35 Ryo KOBAYASHI>
+!                    Last modified: <2018-02-05 18:50:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -88,6 +88,9 @@ module pmdvars
   integer:: nn(6),myparity(3),lsrc(6),nex(3),myx,myy,myz
   real(8):: sv(3,6),sorg(3),anxi,anyi,anzi
 
+!.....Number of ifmv
+  integer:: nfmv
+
 contains
   subroutine initialize_pmdvars(nspmax)
     integer,intent(in):: nspmax
@@ -98,4 +101,23 @@ contains
     endif
     
   end subroutine initialize_pmdvars
+!=======================================================================
+  subroutine calc_nfmv(ntot,tagtot,myid,mpi_world)
+    include 'mpif.h'
+    integer,intent(in):: ntot,myid,mpi_world
+    real(8),intent(in):: tagtot(ntot)
+
+    integer:: ia,nfmvl,ierr
+    integer,external:: ifmvOf
+
+    if( myid.eq.0 ) then
+      nfmv = 0
+      do ia=1,ntot
+        nfmv = max(nfmv,ifmvOf(tagtot(ia)))
+      enddo
+      print '(a,i0)',' Number of ifmvs = ',nfmv
+    endif
+    call mpi_bcast(nfmv,1,mpi_integer,0,mpi_world,ierr)
+    
+  end subroutine calc_nfmv
 end module pmdvars

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-02-05 16:14:13 Ryo KOBAYASHI>
+c                     Last-modified: <2018-02-05 21:12:50 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -64,12 +64,12 @@ c     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
 c     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
 
       call initialize_pmdvars(nspmax)
+      call calc_nfmv(ntot,tagtot,myid_md,mpi_md_world)
 
 c.....multiply damping factor 1st to avoid doing every step
       if( ifdmp.eq.1 ) then
         fmv(1:3,0:9)= fmv(1:3,0:9) *dmp
       endif
-
 
 c.....Set 0d0 to z of fmv(9) in case of z-loading
       if( czload_type.eq.'atoms' .or. czload_type.eq.'box' ) then
@@ -132,6 +132,7 @@ c.....perform space decomposition after reading atomic configuration
       if( myid_md.eq.0 .and. iprint.ne.0 ) then
         call cell_info(h)
       endif
+      print *,'myid,natm=',myid_md,natm
 c.....Some conversions
       nsp= 0
       do i=1,natm
@@ -243,7 +244,7 @@ c     &           ,ifmv,ttgt(ifmv),fkb,dt,tfac(ifmv)
           print *,''
           print *,'Langevin thermostat parameters:'
           print '(a,f10.2)','   Relaxation time = ',trlx
-          do ifmv=1,9
+          do ifmv=1,nfmv
             print '(a,i3,f10.2,es15.4)','   ifmv,ttgt,tfac = '
      &           ,ifmv,ttgt(ifmv),tfac(ifmv)
           enddo
@@ -401,7 +402,7 @@ c      write(cnum(1:4),'(i4.4)') 0
       
       if( trim(ctctl).eq.'ttm' ) then
         call assign_atom2cell(namax,natm,ra,sorg)
-        call calc_Ta(namax,natm,eki,myid_md,mpi_md_world)
+        call calc_Ta(namax,natm,eki,istp,myid_md,mpi_md_world)
         call output_Te(0,myid_md,iprint)
       endif
 
@@ -630,7 +631,7 @@ c.....Calc kinetic energy
      &       ,vmax,mpi_md_world)
 
         if( trim(ctctl).eq.'ttm' ) then
-          call calc_Ta(namax,natm,eki,myid_md,mpi_md_world)
+          call calc_Ta(namax,natm,eki,istp,myid_md,mpi_md_world)
           call update_Te(istp*dt,myid_md,mpi_md_world)
         endif
 
@@ -2413,10 +2414,10 @@ c
       include 'mpif.h'
       integer,intent(in):: ntot,myid_md,mpi_md_world,nx,ny,nz,nxyz
      &     ,iprint
-      real(8),intent(in):: tagtot(ntot),vtot(3,ntot),chgtot(ntot)
+      real(8),intent(in):: vtot(3,ntot),chgtot(ntot)
      &     ,chitot(ntot)
       real(8),intent(in):: hunit,h(3,3,0:1)
-      real(8),intent(inout):: rtot(3,ntot)
+      real(8),intent(inout):: rtot(3,ntot),tagtot(ntot)
 
       integer:: istat(mpi_status_size)
       integer:: i,j,ixyz,n,ierr
@@ -2465,12 +2466,18 @@ c.....count max number of atoms in a node
      &             rtot(2,i).ge.syogt .and.
      &             rtot(2,i).lt.syogt+1d0/ny .and.
      &             rtot(3,i).ge.szogt .and.
-     &             rtot(3,i).lt.szogt+1d0/nz ) then
+     &             rtot(3,i).lt.szogt+1d0/nz .and.
+     &             tagtot(i).gt.0d0) then
                 n = n+1
+c.....Set the tag negative if the atom is assigned to a certain cell
+                tagtot(i) = -tagtot(i)
               endif
             enddo
             nmax = max(nmax,n)
             nmin = min(nmin,n)
+            print '(a,4i6,3es12.4,3i6)'
+     &           ,'ixyz,myxt,myyt,myzt,sxogt,syogt,szogt,n,nmax,nmin='
+     &           ,ixyz,myxt,myyt,myzt,sxogt,syogt,szogt,n,nmax,nmin
           enddo
           namax = max(int(nmax*1.2),200)
           nbmax = max(namax*27,nbmax)
@@ -2484,7 +2491,11 @@ c.....count max number of atoms in a node
             write(6,'(a,i10,a)') ' Memory for main routine   = '
      &           ,namax*(3*4 +3*3*5 +1 +nnmax/2)*8/1000/1000,' MByte'
           endif
-        endif
+c.....Reset the tags positive
+          do i=1,ntot
+            tagtot(i) = abs(tagtot(i))
+          enddo
+        endif ! myid.eq.0
         call mpi_bcast(namax,1,mpi_integer,0,mpi_md_world,ierr)
         call mpi_bcast(nbmax,1,mpi_integer,0,mpi_md_world,ierr)
 c.....allocate memory for local arrays of length namax
@@ -2516,13 +2527,15 @@ c.....allocate memory for local arrays of length namax
      &           rtot(2,i).ge.syogt .and.
      &           rtot(2,i).lt.syogt+1d0/ny .and.
      &           rtot(3,i).ge.szogt .and.
-     &           rtot(3,i).lt.szogt+1d0/nz ) then
+     &           rtot(3,i).lt.szogt+1d0/nz .and.
+     &           tagtot(i).gt.0d0 ) then
               natm = natm +1
               tag(natm)= tagtot(i)
               ra(1:3,natm)= rtot(1:3,i)
               va(1:3,natm)= vtot(1:3,i)
               chg(natm)= chgtot(i)
               chi(natm)= chitot(i)
+              tagtot(i) = -tagtot(i)
             endif
           enddo
           if( ixyz.ne.0 ) then
@@ -2542,6 +2555,10 @@ c.....allocate memory for local arrays of length namax
         enddo
 c        write(6,'(a,f10.3)') ' time space_decomp = ',mpi_wtime() -t0
         tspdcmp = mpi_wtime() -t0
+c.....Reset the tags positive
+        do i=1,ntot
+          tagtot(i) = abs(tagtot(i))
+        enddo
       else ! myid_md.ne.0
         call mpi_recv(natm,1,mpi_integer,0,myid_md+1
      &       ,mpi_md_world,istat,ierr)
