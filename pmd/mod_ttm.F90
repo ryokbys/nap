@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-02-05 19:03:30 Ryo KOBAYASHI>
+!                     Last-modified: <2018-02-06 11:27:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -333,7 +333,9 @@ contains
     real(8),intent(in):: ra(3,namax),sorg(3)
 
     integer:: i,ix,iy,iz,ic
-    real(8):: xi(3),udx,udy,udz
+    real(8):: xi(3),udx,udy,udz,t0
+
+    t0 = mpi_wtime()
 
     udx = 1d0/nx
     udy = 1d0/ny
@@ -347,19 +349,23 @@ contains
       call ixyz2ic(ix,iy,iz,ic)
       a2c(i) = ic
     enddo
+
+    t_ttm = t_ttm +mpi_wtime()-t0
+    
   end subroutine assign_atom2cell
 !=======================================================================
-  subroutine calc_Ta(namax,natm,eki,istp,myid,mpi_world)
+  subroutine calc_Ta(namax,natm,eki,tag,fmv,istp,myid,mpi_world)
 !
 !  Compute and set Ta and Tap array from atomic kinetic energies.
 !
     integer,intent(in):: namax,natm,myid,mpi_world,istp
-    real(8),intent(in):: eki(3,3,namax)
+    real(8),intent(in):: eki(3,3,namax),tag(namax),fmv(3,0:9)
 
-    integer:: i,ic,ierr,ix,iy,iz
+    integer:: i,ic,ierr,ix,iy,iz,l,ifmv,idof
     real(8):: ek,t0
     integer,allocatable,save:: nacl(:),nacpl(:)
     real(8),allocatable,save:: eksuml(:),ekpsuml(:)
+    integer,external:: ifmvOf
 
     if( .not. allocated(nacl) ) then
       allocate(nacl(nxyz),nacpl(nxyz),eksuml(nxyz),ekpsuml(nxyz))
@@ -374,11 +380,16 @@ contains
     do i=1,natm
       ek = eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
       ic = a2c(i)
-      nacl(ic) = nacl(ic) + 1
+      ifmv = ifmvOf(tag(i))
+      idof = 0
+      do l=1,3
+        idof = idof +nint(fmv(l,ifmv))
+      enddo
+      nacl(ic) = nacl(ic) + idof
       eksuml(ic) = eksuml(ic) +ek
 !!$      if( ic.eq.4 ) print *,'i,ek,eksum=',i,ek,eksuml(ic)
       if( ek.gt.ekth ) then
-        nacpl(ic) = nacpl(ic) +1
+        nacpl(ic) = nacpl(ic) +idof
         ekpsuml(ic) = ekpsuml(ic) +ek
       endif
     enddo
@@ -402,12 +413,13 @@ contains
 !!$        if( iy.eq.1 .and. iz.eq.1 ) then
 !!$          print *,'ix,nac(ic)=',ix,nac(ic)
 !!$        endif
-        ta(ic) = eksum(ic) *2d0/3 /fkb /nac(ic)
-        gp(ic) = 3d0 *nac(ic) *fkb *gmmp /vcell
+!.....Degree of freedom per atom (3 in case of 3D) is included in nac
+        ta(ic) = eksum(ic) *2d0 /fkb /nac(ic)
+        gp(ic) = nac(ic) *fkb *gmmp /vcell
 !!$        if( ic.eq.4 ) print *,'Ta: ic,eksum,nac,ta,gp=',ic,eksum(ic),nac(ic),ta(ic),gp(ic)
         if( nacp(ic).eq.0 ) cycle
-        tap(ic) = ekpsum(ic) *2d0/3 /fkb /nacp(ic)
-        gp(ic) = 3d0 *nacp(ic) *fkb *gmms /vcell
+        tap(ic) = ekpsum(ic) *2d0 /fkb /nacp(ic)
+        gp(ic) = nacp(ic) *fkb *gmms /vcell
       enddo
 !!$      do ix=1,nx
 !!$        iy = 1
@@ -580,9 +592,11 @@ contains
     real(8),intent(inout):: va(3,namax),ediff(nspmax)
 
     integer:: ic,i,l,is,ifmv,ix,iy,iz,naccp
-    real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3)
+    real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0
     integer,external:: ifmvOf
     real(8),external:: box_muller,sprod
+
+    t0 = mpi_wtime()
 
     do ic=1,nxyz
       call ic2ixyz(ic,ix,iy,iz)
@@ -630,6 +644,8 @@ contains
       endif
     enddo
 
+    t_ttm = t_ttm +mpi_wtime()-t0
+    return
   end subroutine langevin_ttm
 !=======================================================================
   subroutine ic2ixyz(ic,ix,iy,iz)

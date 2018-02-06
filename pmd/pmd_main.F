@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-02-01 11:12:09 Ryo KOBAYASHI>
+c                     Last-modified: <2018-02-05 21:18:59 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -293,7 +293,7 @@ c=======================================================================
       open(ionum,file=trim(cfname),status='old')
       do while(.true.)
         read(ionum,'(a)',end=10) cline
-        write(6,'(a)') cline
+        write(6,'(a)') trim(cline)
       enddo
  10   close(ionum)
       write(6,'(a)') '---------------------------------'

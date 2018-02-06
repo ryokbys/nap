@@ -101,6 +101,9 @@ class Atom(object):
     def set_id(self,id):
         self.id= id
 
+    def set_ifmv(self,ifmv):
+        self.ifmv = ifmv
+    
     def set_aux(self,key,value):
         self.aux[key] = value
         

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-02-05 21:12:50 Ryo KOBAYASHI>
+c                     Last-modified: <2018-02-06 21:27:42 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -128,11 +128,10 @@ c        rtot(1:3,i) = rtot(1:3,i) +0.1d0
 c      enddo
 c.....perform space decomposition after reading atomic configuration
       call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
-     &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
+     &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,rc,rbuf,iprint)
       if( myid_md.eq.0 .and. iprint.ne.0 ) then
         call cell_info(h)
       endif
-      print *,'myid,natm=',myid_md,natm
 c.....Some conversions
       nsp= 0
       do i=1,natm
@@ -402,7 +401,7 @@ c      write(cnum(1:4),'(i4.4)') 0
       
       if( trim(ctctl).eq.'ttm' ) then
         call assign_atom2cell(namax,natm,ra,sorg)
-        call calc_Ta(namax,natm,eki,istp,myid_md,mpi_md_world)
+        call calc_Ta(namax,natm,eki,tag,fmv,istp,myid_md,mpi_md_world)
         call output_Te(0,myid_md,iprint)
       endif
 
@@ -631,7 +630,7 @@ c.....Calc kinetic energy
      &       ,vmax,mpi_md_world)
 
         if( trim(ctctl).eq.'ttm' ) then
-          call calc_Ta(namax,natm,eki,istp,myid_md,mpi_md_world)
+          call calc_Ta(namax,natm,eki,tag,fmv,istp,myid_md,mpi_md_world)
           call update_Te(istp*dt,myid_md,mpi_md_world)
         endif
 
@@ -980,7 +979,7 @@ c     &     chgtot(1:ntot)
       endif
 c      print *,'one_shot: 02'
       call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
-     &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
+     &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,rc,rbuf,iprint)
 c      write(6,'(a,200es10.2)') 'chg after space_decomp = ',chg(1:natm)
 
 c      print *,'one_shot: 03'
@@ -2405,7 +2404,8 @@ c     &     ,ierr)
       end subroutine vfire
 c=======================================================================
       subroutine space_decomp(hunit,h,ntot,tagtot,rtot,vtot
-     &     ,chgtot,chitot,myid_md,mpi_md_world,nx,ny,nz,nxyz,iprint)
+     &     ,chgtot,chitot,myid_md,mpi_md_world,nx,ny,nz,nxyz
+     &     ,rcut,rbuf,iprint)
 c
 c  Decompose the system and scatter atoms to every process.
 c
@@ -2415,7 +2415,7 @@ c
       integer,intent(in):: ntot,myid_md,mpi_md_world,nx,ny,nz,nxyz
      &     ,iprint
       real(8),intent(in):: vtot(3,ntot),chgtot(ntot)
-     &     ,chitot(ntot)
+     &     ,chitot(ntot),rcut,rbuf
       real(8),intent(in):: hunit,h(3,3,0:1)
       real(8),intent(inout):: rtot(3,ntot),tagtot(ntot)
 
@@ -2475,21 +2475,23 @@ c.....Set the tag negative if the atom is assigned to a certain cell
             enddo
             nmax = max(nmax,n)
             nmin = min(nmin,n)
-            print '(a,4i6,3es12.4,3i6)'
-     &           ,'ixyz,myxt,myyt,myzt,sxogt,syogt,szogt,n,nmax,nmin='
-     &           ,ixyz,myxt,myyt,myzt,sxogt,syogt,szogt,n,nmax,nmin
+c            print '(a,4i6,3es12.4,3i6)'
+c     &           ,'ixyz,myxt,myyt,myzt,sxogt,syogt,szogt,n,nmax,nmin='
+c     &           ,ixyz,myxt,myyt,myzt,sxogt,syogt,szogt,n,nmax,nmin
           enddo
           namax = max(int(nmax*1.2),200)
-          nbmax = max(namax*27,nbmax)
+c          nbmax = max(namax*27,nbmax)
+          call estimate_nbmax(nmax,h,nx,ny,nz,rcut,rbuf,nbmax)
           namax = namax +nbmax
           if( iprint.ne.0 ) then
             write(6,'(a,i10)') ' Min number of local atoms = ',nmin
             write(6,'(a,i10)') ' Max number of local atoms = ',nmax
-            write(6,'(a,i10)')   '   nbmax = max(nmax*1.2*27,nbmax) = '
-     &           ,nbmax
+            write(6,'(a,i10)')   '   nbmax = ',nbmax
             write(6,'(a,i10)')   '   namax = nmax*1.2 + nbmax  = ',namax
+            write(6,'(a,i10)')   '   nnmax = ',nnmax
             write(6,'(a,i10,a)') ' Memory for main routine   = '
-     &           ,namax*(3*4 +3*3*5 +1 +nnmax/2)*8/1000/1000,' MByte'
+     &           ,int(dble(namax)*(3*4 +3*3*5 +1 +nnmax/2)
+     &           *8/1000/1000),' MByte'
           endif
 c.....Reset the tags positive
           do i=1,ntot
@@ -2778,6 +2780,30 @@ c=======================================================================
      &     ,gamma,' deg.'
 
       end subroutine cell_info
+c=======================================================================
+      subroutine estimate_nbmax(nmax,h,nx,ny,nz,rcut,rbuf,nbmax)
+      implicit none
+      integer,intent(in):: nmax,nx,ny,nz
+      real(8),intent(in):: rcut,rbuf,h(3,3)
+      integer,intent(inout):: nbmax
+
+      integer:: nest
+      real(8):: alx,aly,alz,area,vol,density
+
+      alx = dsqrt(h(1,1)**2 +h(2,1)**2 +h(3,1)**2)/nx
+      aly = dsqrt(h(1,2)**2 +h(2,2)**2 +h(3,2)**2)/ny
+      alz = dsqrt(h(1,3)**2 +h(2,3)**2 +h(3,3)**2)/nz
+c.....Estimated volume and area, which is not correct in case of
+c.....non-orthogonal cell
+      vol = alx*aly*alz
+      density = dble(nmax)/vol
+      area = alx*aly*2 +alx*alz*2 +aly*alz*2
+c.....Estimated number of atoms in the margin region.
+c.....Factor 2 is just for a surplus
+      nest = density *area*(rcut+rbuf) *2
+      nbmax = max(nbmax,nest)
+      
+      end subroutine estimate_nbmax
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"
