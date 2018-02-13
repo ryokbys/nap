@@ -50,7 +50,7 @@ contains
 
 !-----local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl
-    real(8):: rij,rik,riji,riki,rij2,rik2,rc2,src2,src
+    real(8):: rij,rik,riji,riki,rij2,rik2,rc2,src,src2
     real(8):: tmp,tmp1,tmp2,vexp,df2,drij,csn,tcsn,tcsn2,dhrij,dhrik &
          ,dhcsn,vol,voli,volj,volk
     real(8):: drik,dcsni,dcsnj,dcsnk,drijc,drikc,x,y,z,bl
@@ -58,13 +58,14 @@ contains
     real(8),save:: swli,a8d3r3
     real(8),save,allocatable:: aa2(:,:),aa3(:,:)
     real(8),save,allocatable,dimension(:):: xi,xj,xk,xij,xik,at,bli
+    real(8),allocatable,save:: strsl(:,:,:)
 !-----1st call
     logical,save:: l1st=.true.
 
 !-----only at 1st call
     if( l1st ) then
       call read_params(myid,mpi_world)
-      allocate(aa2(3,namax),aa3(3,namax))
+      allocate(aa2(3,namax),aa3(3,namax),strsl(3,3,namax))
       allocate(xi(3),xj(3),xk(3),xij(3),xik(3),at(3),bli(namax))
 !-------check rc
       if( myid.le.0 ) then
@@ -90,16 +91,17 @@ contains
 
     epotl= 0d0
     epi(1:natm+nb)= 0d0
-    strs(1:3,1:3,1:namax)= 0d0
+    strsl(1:3,1:3,1:natm+nb)= 0d0
 
 !-----2 body term
     epotl2= 0d0
     aa2(1:3,1:natm+nb)=0d0
+    src2 = swrc*swrc
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
-      bl= 0d0
-      nbl= 0
+!!$      bl= 0d0
+!!$      nbl= 0
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
@@ -110,11 +112,10 @@ contains
              +h(1:3,3)*xj(3) )*swli
         rij2= xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
         src= swrc
-        src2= src*src
         if( rij2.ge.src2 ) cycle
         rij= dsqrt(rij2)
-        nbl=nbl +1
-        bl=bl +rij
+!!$        nbl=nbl +1
+!!$        bl=bl +rij
         riji= 1d0/rij
         drijc= 1d0/(rij-src)
         vexp=exp(swc*drijc)
@@ -127,13 +128,13 @@ contains
           epotl2= epotl2 +tmp
         endif
 !---------force
-        df2= swe *swa*vexp*(-swp*swb*(riji**(swp+1d0)) &
-             +swq*(riji**(swq+1d0)) &
-             -(swb*(riji**swp) -riji**swq)*swc*drijc*drijc)
+        df2= -swli*swe*swa*vexp*(swp*swb*(riji**(swp+1d0)) &
+             -swq*(riji**(swq+1d0)) &
+             +(swb*(riji**swp) -riji**swq)*swc*drijc*drijc)
         do ixyz=1,3
           drij= -xij(ixyz)*riji
-          aa2(ixyz,i)= aa2(ixyz,i) +df2*drij
-          aa2(ixyz,j)= aa2(ixyz,j) -df2*drij
+          aa2(ixyz,i)= aa2(ixyz,i) -df2*drij
+          aa2(ixyz,j)= aa2(ixyz,j) +df2*drij
         enddo
 !-----------Stress
 !!$        vol= a8d3r3*rij**3
@@ -143,12 +144,10 @@ contains
             drij= -xij(ixyz)*riji
             tmp= 0.5d0*(-df2*drij)
             do jxyz=1,3
-              strs(ixyz,jxyz,i)= strs(ixyz,jxyz,i) &
-                   -xij(jxyz)*tmp !*voli
-              strs(ixyz,jxyz,j)= strs(ixyz,jxyz,j) &
-                   -xij(jxyz)*tmp !*voli
-!!$              write(6,'(a,4i5,2es12.4)') 'i,j,ixyz,jxyz,vol,val='&
-!!$                   ,i,j,ixyz,jxyz,vol,-xij(jxyz)*tmp*voli
+              strsl(ixyz,jxyz,i)= strsl(ixyz,jxyz,i) &
+                   -xij(jxyz)*tmp
+              strsl(ixyz,jxyz,j)= strsl(ixyz,jxyz,j) &
+                   -xij(jxyz)*tmp
             enddo
           enddo
         else
@@ -156,10 +155,8 @@ contains
             drij= -xij(ixyz)*riji
             tmp= 0.5d0*(-df2*drij)
             do jxyz=1,3
-              strs(ixyz,jxyz,i)= strs(ixyz,jxyz,i) &
-                   -xij(jxyz)*tmp! *voli
-!!$              write(6,'(a,4i5,2es12.4)') 'i,j,ixyz,jxyz,vol,val='&
-!!$                   ,i,j,ixyz,jxyz,vol,-xij(jxyz)*tmp*voli
+              strsl(ixyz,jxyz,i)= strsl(ixyz,jxyz,i) &
+                   -xij(jxyz)*tmp
             enddo
           enddo
         endif
@@ -225,27 +222,27 @@ contains
           dhrik= -sws *swt *vexp *tcsn2 *drikc*drikc
           dhcsn= 2d0 *sws *vexp *tcsn 
           do l=1,3
-            drij= -xij(l)*riji
-            drik= -xik(l)*riki
-            dcsnj= -xij(l)*csn*(riji*riji) +xik(l)*(riji*riki)
-            dcsnk= -xik(l)*csn*(riki*riki) +xij(l)*(riji*riki)
+            drij= -xij(l)*riji*swli
+            drik= -xik(l)*riki*swli
+            dcsnj= (-xij(l)*csn*(riji*riji) +xik(l)*(riji*riki))*swli
+            dcsnk= (-xik(l)*csn*(riki*riki) +xij(l)*(riji*riki))*swli
             dcsni= -dcsnj -dcsnk
-            aa3(l,i)=aa3(l,i) +swe*(dhcsn*dcsni +dhrij*drij &
+            aa3(l,i)=aa3(l,i) -swe*(dhcsn*dcsni +dhrij*drij &
                  +dhrik*drik)
 !
             tmp1= swe*(dhcsn*dcsnj +dhrij*(-drij))
-            aa3(l,j)=aa3(l,j) +tmp1
+            aa3(l,j)=aa3(l,j) -tmp1
 !
             tmp2= swe*(dhcsn*dcsnk +dhrik*(-drik))
-            aa3(l,k)=aa3(l,k) +tmp2
+            aa3(l,k)=aa3(l,k) -tmp2
 !-------------Stress
             do jxyz=1,3
-              strs(l,jxyz,i)=strs(l,jxyz,i) &
+              strsl(l,jxyz,i)=strsl(l,jxyz,i) &
                    -xij(jxyz)*(-tmp1) & !*volj &
                    -xik(jxyz)*(-tmp2) !*volk
-              strs(l,jxyz,j)=strs(l,jxyz,j) &
+              strsl(l,jxyz,j)=strsl(l,jxyz,j) &
                    -xij(jxyz)*(-tmp1) !*volj
-              strs(l,jxyz,k)=strs(l,jxyz,k) &
+              strsl(l,jxyz,k)=strsl(l,jxyz,k) &
                    -xik(jxyz)*(-tmp2) !*volk
             enddo
           enddo
@@ -254,42 +251,21 @@ contains
     enddo
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_world,strs,9)
+         ,nn,mpi_world,strsl,9)
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa3,3)
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,epi,1)
-!!$!-----send back (3-body)forces, stresses, and potentials on immigrants
-!!$    if( myid.ge.0 ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-!!$           ,nn,mpi_world,strs,9)
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-!!$           ,nn,mpi_world,aa3,3)
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-!!$           ,nn,mpi_world,epi,1)
-!!$    else
-!!$      call reduce_dba_bk(natm,namax,tag,aa3,3)
-!!$      call reduce_dba_bk(natm,namax,tag,strs,9)
-!!$      call reduce_dba_bk(natm,namax,tag,epi,1)
-!!$    endif
-!!$    write(6,'(a)') 'stresses:'
-!!$    do i=1,natm
-!!$      write(6,'(i6,9f10.3)') i,strs(1:3,1:3,i)
-!!$    enddo
 
 !-----sum
-    aa(1:3,1:natm)= -aa2(1:3,1:natm) -aa3(1:3,1:natm)
-
+    aa(1:3,1:natm)= aa2(1:3,1:natm) +aa3(1:3,1:natm)
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
     epotl= epotl2 +epotl3
-    if( myid.ge.0 ) then
-      call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
-           ,MPI_SUM,mpi_world,ierr)
-      epot= epot +epott
-    else
-      epot= epot +epotl
-    endif
+    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+         ,MPI_SUM,mpi_world,ierr)
+    epot= epot +epott
     return
 
   end subroutine force_SW_Si
