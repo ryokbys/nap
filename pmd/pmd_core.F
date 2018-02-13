@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-02-06 21:27:42 Ryo KOBAYASHI>
+c                     Last-modified: <2018-02-08 13:09:51 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -363,8 +363,7 @@ c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
      &       trim(cpctl).eq.'vv-Berendsen') then
           write(6,'(a,i8,2f10.2,es15.6,2es11.3)')
      &         " istp,time,temp,vol,prss="
-     &         ,istp,tcpu,tave,epot,vol
-     &         ,prss
+     &         ,istp,tcpu,tave,epot,vol,prss
         else
           if( tave.ge.10000.0 ) then
             write(6,'(a,i8,f11.2,es11.3,es15.6,es11.3)')
@@ -400,7 +399,7 @@ c      write(cnum(1:4),'(i4.4)') 0
       endif
       
       if( trim(ctctl).eq.'ttm' ) then
-        call assign_atom2cell(namax,natm,ra,sorg)
+        call assign_atom2cell(namax,natm,ra,sorg,boundary)
         call calc_Ta(namax,natm,eki,tag,fmv,istp,myid_md,mpi_md_world)
         call output_Te(0,myid_md,iprint)
       endif
@@ -608,7 +607,7 @@ c.....accumulate energy difference
      &           ,mpi_md_world,myid_md,0)
           endif
         else if( trim(ctctl).eq.'ttm' ) then
-          call assign_atom2cell(namax,natm,ra,sorg)
+          call assign_atom2cell(namax,natm,ra,sorg,boundary)
           call langevin_ttm(namax,natm,va,aa,tag,eki,am,h
      &         ,nspmax,fa2v,fekin,ediff,dt)
         else
@@ -2185,9 +2184,12 @@ c
      &     ,sgm(3,3),dt,vol,srlx,stbeta
       real(8),intent(out):: ah(3,3),stnsr(3,3)
       character(len=*):: cpctl
+
+c.....Max change rate
+      real(8),parameter:: rmax = 0.02d0
       
       integer:: i,ixyz,jxyz,ierr
-      real(8):: prss,fac
+      real(8):: prss,fac,tmp
 
       call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 
@@ -2201,8 +2203,16 @@ c.....now ah is scaling factor for h-mat
         ah(1,1)= 1d0
         ah(2,2)= 1d0
         ah(3,3)= 1d0
-        ah(1:3,1:3)= ah(1:3,1:3)
-     &       -stbeta*dt/3/srlx*( stgt(1:3,1:3)-stnsr(1:3,1:3) )
+c.....Limit change rate of h (ah) to 5%
+        do ixyz=1,3
+          do jxyz=1,3
+            tmp = stbeta*dt/3/srlx*( stgt(ixyz,jxyz)-stnsr(ixyz,jxyz) )
+            tmp = min(max(tmp,-rmax),rmax)
+            ah(ixyz,jxyz) = ah(ixyz,jxyz) -tmp
+          enddo
+        enddo
+c        ah(1:3,1:3)= ah(1:3,1:3)
+c     &       -stbeta*dt/3/srlx*( stgt(1:3,1:3)-stnsr(1:3,1:3) )
 c.....Berendsen for variable-volume not variable-cell
       else if( trim(cpctl).eq.'vv-Berendsen' ) then
         ah(1:3,1:3)= 0d0
@@ -2211,6 +2221,8 @@ c.....Berendsen for variable-volume not variable-cell
         ah(3,3)= 1d0
         prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
         fac = 1.0 -stbeta/dt/3/srlx *(ptgt-prss)
+c.....Limit change rate of h (ah) to 5%
+        fac = min(max(fac,1d0-rmax),1d0+rmax)
         ah(1:3,1:3) = ah(1:3,1:3)*fac
       endif
 

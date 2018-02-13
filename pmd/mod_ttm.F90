@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-02-06 11:27:02 Ryo KOBAYASHI>
+!                     Last-modified: <2018-02-08 17:37:27 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -63,7 +63,7 @@ module ttm
   integer:: rsurf = -1  ! right surface
 !.....Surface movement along x: no, plane (can move as a yz-plane surface)
   character(len=128):: surfmove = 'plane'
-  integer:: nstp_surfmove = 100
+  integer:: nstp_surfmove = 10
 !.....Minimum Te when surface moves
   real(8):: Te_min = 300d0
 
@@ -325,14 +325,15 @@ contains
     return
   end subroutine sync_params
 !=======================================================================
-  subroutine assign_atom2cell(namax,natm,ra,sorg)
+  subroutine assign_atom2cell(namax,natm,ra,sorg,boundary)
 !
 !  Assign atoms to TTM mesh cell
 !
     integer,intent(in):: namax,natm
     real(8),intent(in):: ra(3,namax),sorg(3)
+    character(len=3),intent(in):: boundary
 
-    integer:: i,ix,iy,iz,ic
+    integer:: i,ix,iy,iz,ic,l
     real(8):: xi(3),udx,udy,udz,t0
 
     t0 = mpi_wtime()
@@ -343,9 +344,17 @@ contains
     a2c(:) = 0
     do i=1,natm
       xi(1:3) = ra(1:3,i) +sorg(1:3)
+      do l=1,3
+        if( boundary(l:l).eq.'p' ) then
+          xi(l) = mod(xi(l),1d0)
+        endif
+      enddo
       ix = int(xi(1)/udx) +1
       iy = int(xi(2)/udy) +1
       iz = int(xi(3)/udz) +1
+      if( boundary(1:1).eq.'f' ) then
+        ix = min(max(ix,1),nx)
+      endif
       call ixyz2ic(ix,iy,iz,ic)
       a2c(i) = ic
     enddo
@@ -738,47 +747,61 @@ contains
 !
     integer,intent(in):: myid,mpi_world
     integer:: ic,icl,icr,ix,iy,iz,ierr
-    integer,allocatable,save:: nacl(:,:),nacr(:,:)
-    logical:: lupdate,rupdate 
+    integer,allocatable,save:: nacl(:,:,:),nacr(:,:,:)
+    logical:: lupdm,lupdp,rupdm,rupdp
 
     if( .not. allocated(nacl) ) then
-      allocate(nacl(ny,nz),nacr(ny,nz))
+      allocate(nacl(nx,ny,nz),nacr(nx,ny,nz))
     endif
 
     if( myid.eq.0 ) then
 
 !.....Count number of atoms in the cells next to lsurf/rsurf
-      nacl(:,:) = 0
-      nacr(:,:) = 0
-      do iy=1,ny
-        do iz=1,nz
+      nacl(:,:,:) = 0
+      nacr(:,:,:) = 0
+      do iz=1,nz
+        do iy=1,ny
           if( lsurf-1.ge.1 ) then
-            call ixyz2ic(lsurf-1,iy,iz,icl)
-            nacl(iy,iz) = nac(icl)
+            do ix=lsurf-1,lsurf
+              call ixyz2ic(ix,iy,iz,icl)
+              nacl(ix,iy,iz) = nac(icl)
+            enddo
           endif
           if( rsurf+1.le.nx ) then
-            call ixyz2ic(rsurf+1,iy,iz,icr)
-            nacr(iy,iz) = nac(icr)
+            do ix=rsurf,rsurf+1
+              call ixyz2ic(ix,iy,iz,icr)
+              nacr(ix,iy,iz) = nac(icr)
+            enddo
           endif
         enddo
       enddo
 !.....Check whether all the cells in y-z plane contains at least 2 atoms
-      lupdate = .true.
-      rupdate = .true.
-      do iy=1,ny
-        do iz=1,nz
-          if( nacl(iy,iz) .lt. 2 ) lupdate = .false.
-          if( nacr(iy,iz) .lt. 2 ) rupdate = .false.
+      lupdm = .true.
+      lupdp = .true.
+      rupdm = .true.
+      rupdp = .true.
+      do iz=1,nz
+        do iy=1,ny
+          if( nacl(lsurf-1,iy,iz) .lt. 2 ) lupdm = .false.
+          if( nacl(lsurf  ,iy,iz) .ge. 2 ) lupdp = .false.
+          if( nacr(rsurf+1,iy,iz) .lt. 2 ) rupdp = .false.
+          if( nacr(rsurf  ,iy,iz) .ge. 2 ) rupdm = .false.
         enddo
       enddo
 !.....Update surface if needed
-      if( lupdate ) then
+      if( lupdm ) then
         lsurf = lsurf - 1
         te(lsurf,:,:) = te(lsurf+1,:,:)
+      else if( lupdp ) then
+        lsurf = lsurf + 1
+        te(lsurf-1,:,:) = 0d0
       endif
-      if( rupdate ) then
+      if( rupdp ) then
         rsurf = rsurf + 1
         te(rsurf,:,:) = te(rsurf-1,:,:)
+      else if( lupdm ) then
+        rsurf = rsurf - 1
+        te(rsurf+1,:,:) = 0d0
       endif
     endif
 !.....Broadcast Te distribution to all the nodes.

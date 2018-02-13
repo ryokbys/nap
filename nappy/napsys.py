@@ -943,6 +943,29 @@ You need to specify the species order correctly with --specorder option.
         rij = np.dot(hmat,xij)
         rij2 = rij[0]**2 +rij[1]**2 +rij[2]**2
         return np.sqrt(rij2)
+
+    def get_angle(self,i,j,k):
+        """
+        Compute angle in degree between bonds i-j and i-k.
+        """
+        if i > len(self.atoms):
+            raise ValueError('i > natms, i,natms = ',i,len(self.atoms))
+        if j > len(self.atoms):
+            raise ValueError('j > natms, j,natms = ',j,len(self.atoms))
+        if k > len(self.atoms):
+            raise ValueError('k > natms, k,natms = ',k,len(self.atoms))
+        xi = self.atoms[i].pos
+        xj = self.atoms[j].pos
+        xk = self.atoms[k].pos
+        xij = xj-xi -np.round(xj-xi)
+        xik = xk-xi -np.round(xk-xi)
+        hmat = self.get_hmat()
+        rij = np.dot(hmat,xij)
+        rik = np.dot(hmat,xik)
+        dij = np.linalg.norm(rij)
+        dik = np.linalg.norm(rik)
+        angle = np.arccos(np.dot(rij,rik)/dij/dik) /np.pi *180.0
+        return angle
         
     def make_pair_list(self,rcut=3.0):
         rc2= rcut**2

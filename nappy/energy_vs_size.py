@@ -96,10 +96,12 @@ if __name__ == '__main__':
         replace_1st_line(al,fname)
         os.system(mdexec +' > out.pmd')
         erg= float(commands.getoutput("grep 'Potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
+        prss= float(commands.getoutput("grep 'Pressure' out.pmd | tail -n1 | awk '{print $3}'"))
         vol= get_vol(al,hmat)
-        print ' {0:10.4f} {1:10.4f} {2:15.7f}'.format(al,vol,erg)
-        outfile1.write(' {0:10.4f} {1:10.4f} {2:15.7f}\n'.format(al,vol,erg))
-        logfile.write(' {0:10.4f} {1:10.4f} {2:15.7f}\n'.format(al,vol,erg))
+        text = ' {0:10.4f} {1:10.4f} {2:15.7f} {3:12.4f}'.format(al,vol,erg,prss)
+        print text
+        outfile1.write(text+'\n')
+        logfile.write(text+'\n')
     outfile1.close()
 
     #...revert pmdini
