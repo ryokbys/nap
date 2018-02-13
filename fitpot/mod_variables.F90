@@ -46,7 +46,7 @@ module variables
   real(8):: force_limit = 100d0
 
 !.....max num of species
-  integer,parameter:: mspcs = 4
+  integer,parameter:: mspcs = 9
   real(8):: ebase(mspcs)
   real(8):: swgt2trn,swgt2tst
 
