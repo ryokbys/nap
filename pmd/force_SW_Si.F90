@@ -51,9 +51,9 @@ contains
 !-----local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl
     real(8):: rij,rik,riji,riki,rij2,rik2,rc2,src,src2
-    real(8):: tmp,tmp1,tmp2,vexp,df2,drij,csn,tcsn,tcsn2,dhrij,dhrik &
-         ,dhcsn,vol,voli,volj,volk
-    real(8):: drik,dcsni,dcsnj,dcsnk,drijc,drikc,x,y,z,bl
+    real(8):: tmp,tmp1(3),tmp2(3),vexp,df2,csn,tcsn,tcsn2,dhrij,dhrik &
+         ,dhcsn,vol,voli,volj,volk,drij(3)
+    real(8):: drik(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl
     real(8):: epotl,epotl2,epotl3,epott
     real(8),save:: swli,a8d3r3
     real(8),save,allocatable:: aa2(:,:),aa3(:,:)
@@ -122,44 +122,38 @@ contains
 !---------potential
         tmp= 0.5d0*swe *swa*vexp*(swb*riji**swp -riji**swq)
         epi(i)= epi(i) +tmp
+!!$        if( i.eq.1 ) print *,'i,j,rij,tmp,epi=',i,j,rij,tmp,epi(i)
         epotl2= epotl2 +tmp
         if( j.le.natm ) then
           epi(j)= epi(j) +tmp
           epotl2= epotl2 +tmp
         endif
 !---------force
-        df2= -swli*swe*swa*vexp*(swp*swb*(riji**(swp+1d0)) &
+        df2= -swe*swa*vexp*(swp*swb*(riji**(swp+1d0)) &
              -swq*(riji**(swq+1d0)) &
              +(swb*(riji**swp) -riji**swq)*swc*drijc*drijc)
-        do ixyz=1,3
-          drij= -xij(ixyz)*riji
-          aa2(ixyz,i)= aa2(ixyz,i) -df2*drij
-          aa2(ixyz,j)= aa2(ixyz,j) +df2*drij
-        enddo
+        drij(1:3) = -xij(1:3)*riji*swli
+        aa2(1:3,i)= aa2(1:3,i) -df2*drij(1:3)
+        aa2(1:3,j)= aa2(1:3,j) +df2*drij(1:3)
 !-----------Stress
-!!$        vol= a8d3r3*rij**3
-!!$        voli= 1d0/vol
         if( j.le.natm ) then
-          do ixyz=1,3
-            drij= -xij(ixyz)*riji
-            tmp= 0.5d0*(-df2*drij)
-            do jxyz=1,3
-              strsl(ixyz,jxyz,i)= strsl(ixyz,jxyz,i) &
-                   -xij(jxyz)*tmp
-              strsl(ixyz,jxyz,j)= strsl(ixyz,jxyz,j) &
-                   -xij(jxyz)*tmp
-            enddo
+          do jxyz=1,3
+            strsl(1:3,jxyz,i)= strsl(1:3,jxyz,i) &
+                 -0.5d0*xij(jxyz)*swl*(-df2*drij(1:3))
+            strsl(1:3,jxyz,j)= strsl(1:3,jxyz,j) &
+                 -0.5d0*xij(jxyz)*swl*(-df2*drij(1:3))
           enddo
         else
-          do ixyz=1,3
-            drij= -xij(ixyz)*riji
-            tmp= 0.5d0*(-df2*drij)
-            do jxyz=1,3
-              strsl(ixyz,jxyz,i)= strsl(ixyz,jxyz,i) &
-                   -xij(jxyz)*tmp
-            enddo
+          do jxyz=1,3
+            strsl(1:3,jxyz,i)= strsl(1:3,jxyz,i) &
+                 -0.5d0*xij(jxyz)*swl*(-df2*drij(1:3))
           enddo
         endif
+
+!!$        if( i.eq.1 ) then
+!!$          print '(a,2i5,7es12.4)','i,j,rij,aa2,strs= ',i,j,rij,aa2(1:3,i)&
+!!$               ,strsl(1,1,i),strsl(2,2,i),strsl(3,3,i)
+!!$        endif
       enddo
 !!$      write(6,'(i6,9f10.3)') i,strs(1:3,1:3,i)
     enddo
@@ -182,7 +176,7 @@ contains
              +h(1:3,3)*xj(3) )*swli
         rij2= xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
         src= swrc
-        src2= src*src
+!!$        src2= src*src
         if( rij2.ge.src2 ) cycle
         rij= dsqrt(rij2)
         riji= 1d0/rij
@@ -200,7 +194,7 @@ contains
                +h(1:3,3)*xk(3) )*swli
           rik2= xik(1)*xik(1)+xik(2)*xik(2)+xik(3)*xik(3)
           src= swrc
-          src2= src*src
+!!$          src2= src*src
           if( rik2.ge.src2 ) cycle
           rik=dsqrt(rik2)
           riki= 1d0/rik
@@ -221,31 +215,30 @@ contains
           dhrij= -sws *swt *vexp *tcsn2 *drijc*drijc
           dhrik= -sws *swt *vexp *tcsn2 *drikc*drikc
           dhcsn= 2d0 *sws *vexp *tcsn 
-          do l=1,3
-            drij= -xij(l)*riji*swli
-            drik= -xik(l)*riki*swli
-            dcsnj= (-xij(l)*csn*(riji*riji) +xik(l)*(riji*riki))*swli
-            dcsnk= (-xik(l)*csn*(riki*riki) +xij(l)*(riji*riki))*swli
-            dcsni= -dcsnj -dcsnk
-            aa3(l,i)=aa3(l,i) -swe*(dhcsn*dcsni +dhrij*drij &
-                 +dhrik*drik)
-!
-            tmp1= swe*(dhcsn*dcsnj +dhrij*(-drij))
-            aa3(l,j)=aa3(l,j) -tmp1
-!
-            tmp2= swe*(dhcsn*dcsnk +dhrik*(-drik))
-            aa3(l,k)=aa3(l,k) -tmp2
+          drij(1:3)= -xij(1:3)*riji*swli
+          drik(1:3)= -xik(1:3)*riki*swli
+          dcsnj(1:3)= (-xij(1:3)*csn*(riji*riji) +xik(1:3)*(riji*riki))*swli
+          dcsnk(1:3)= (-xik(1:3)*csn*(riki*riki) +xij(1:3)*(riji*riki))*swli
+          dcsni(1:3)= -dcsnj(1:3) -dcsnk(1:3)
+!!$          aa3(1:3,i)=aa3(1:3,i) -swe*(dhcsn*dcsni(1:3) +dhrij*drij(1:3) &
+!!$                 +dhrik*drik(1:3))
+
+          tmp1(1:3)= swe*(dhcsn*dcsnj(1:3) +dhrij*(-drij(1:3)))
+          tmp2(1:3)= swe*(dhcsn*dcsnk(1:3) +dhrik*(-drik(1:3)))
+          aa3(1:3,i)= aa3(1:3,i) +(tmp1(1:3)+tmp2(1:3))
+          aa3(1:3,j)= aa3(1:3,j) -tmp1(1:3)
+          aa3(1:3,k)= aa3(1:3,k) -tmp2(1:3)
 !-------------Stress
-            do jxyz=1,3
-              strsl(l,jxyz,i)=strsl(l,jxyz,i) &
-                   -xij(jxyz)*(-tmp1) & !*volj &
-                   -xik(jxyz)*(-tmp2) !*volk
-              strsl(l,jxyz,j)=strsl(l,jxyz,j) &
-                   -xij(jxyz)*(-tmp1) !*volj
-              strsl(l,jxyz,k)=strsl(l,jxyz,k) &
-                   -xik(jxyz)*(-tmp2) !*volk
-            enddo
+          do jxyz=1,3
+            strsl(1:3,jxyz,i)=strsl(1:3,jxyz,i) &
+                 -0.5d0*xij(jxyz)*swl*tmp1(1:3) & !*volj &
+                 -0.5d0*xik(jxyz)*swl*tmp2(1:3) !*volk
+            strsl(1:3,jxyz,j)=strsl(1:3,jxyz,j) &
+                 -0.5d0*xij(jxyz)*swl*tmp1(1:3) !*volj
+            strsl(1:3,jxyz,k)=strsl(1:3,jxyz,k) &
+                 -0.5d0*xik(jxyz)*swl*tmp2(1:3) !*volk
           enddo
+
         enddo
       enddo
     enddo
@@ -259,15 +252,16 @@ contains
 
 !-----sum
     aa(1:3,1:natm)= aa2(1:3,1:natm) +aa3(1:3,1:natm)
+!!$    aa(1:3,1:natm)= aa3(1:3,1:natm)
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
     epotl= epotl2 +epotl3
+!!$    epotl= epotl3
     call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
          ,MPI_SUM,mpi_world,ierr)
     epot= epot +epott
     return
-
   end subroutine force_SW_Si
 !=======================================================================
   subroutine read_params(myid,mpi_world)

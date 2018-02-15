@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-01-26 12:13:45 Ryo KOBAYASHI>
+!                     Last modified: <2018-02-14 16:33:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -49,7 +49,7 @@ contains
     swgt2trn = swgt2trn*nterms
     swgt2tst = swgt2tst*nterms
     if( myid.eq.0 ) then
-      write(6,'(a)') ' Weights to divide evaluation value:'
+      write(6,'(a)') ' Weights to divide loss function:'
       write(6,'(a,f10.1)') '   for training: ',swgt2trn
       write(6,'(a,f10.1)') '   for test:     ',swgt2tst
     endif
