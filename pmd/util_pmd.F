@@ -340,12 +340,14 @@ c
       integer,intent(in):: ionum
       character(len=*),intent(in) :: cfname
 
-      integer:: i
-      real(8):: xi(3),ri(3),eki,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,
+      integer:: i,k,l
+      real(8):: xi(3),ri(3),eki,epi,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,
      &     xlo_bound,xhi_bound,ylo_bound,yhi_bound,
-     &     zlo_bound,zhi_bound
+     &     zlo_bound,zhi_bound,st(3,3)
       integer,external:: itotOf
       real(8),allocatable,save:: rlmp(:,:)
+
+      real(8),parameter:: tiny = 1d-14
 
       if( .not. allocated(rlmp) ) allocate(rlmp(3,ntot))
       if( size(rlmp).ne.3*ntot ) then
@@ -375,11 +377,20 @@ c
 c        xi(1:3)= rtot(1:3,i)
 c        ri(1:3)= h(1:3,1,0)*xi(1) +h(1:3,2,0)*xi(2) +h(1:3,3,0)*xi(3)
         eki = ekitot(1,1,i) +ekitot(2,2,i) +ekitot(3,3,i)
+        epi = epitot(i)
+        st(1:3,1:3) = stot(1:3,1:3,i)
+        if( eki.lt.tiny ) eki = 0d0
+        if( abs(epi).lt.tiny ) epi = 0d0
+        do l=1,3
+          do k=l,3
+            if( abs(st(l,k)).lt.tiny ) st(l,k) = 0d0
+          enddo
+        enddo
         write(ionum,'(i8,i3,3f12.5,8es11.3,f9.4,f9.2)')
      &       itotOf(tagtot(i)),int(tagtot(i)),rlmp(1:3,i),eki,
-     &       epitot(i),
-     &       stot(1,1,i),stot(2,2,i),stot(3,3,i),
-     &       stot(2,3,i),stot(3,1,i),stot(1,2,i),
+     &       epi,
+     &       st(1,1),st(2,2),st(3,3),
+     &       st(2,3),st(1,3),st(1,2),
      &       chgtot(i),chitot(i)
       enddo
       
