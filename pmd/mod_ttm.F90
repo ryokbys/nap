@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-02-08 17:37:27 Ryo KOBAYASHI>
+!                     Last-modified: <2018-02-20 18:01:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -628,6 +628,8 @@ contains
         va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dtmd
         ami= am(is)
         ic = a2c(i)
+        call ic2ixyz(ic,ix,iy,iz)
+        if( ix.lt.lsurf ) cycle
         sgmi = sgm(ic) *dsqrt(ami)
 !!$        if( ic.eq.4 ) then
 !!$          print *,'ia,ic,ami,sgmi=',i,ic,ami,sgmi

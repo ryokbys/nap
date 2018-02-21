@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-02-08 13:09:51 Ryo KOBAYASHI>
+c                     Last-modified: <2018-02-20 16:34:44 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -65,6 +65,7 @@ c     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
 
       call initialize_pmdvars(nspmax)
       call calc_nfmv(ntot,tagtot,myid_md,mpi_md_world)
+      call set_use_charge()
 
 c.....multiply damping factor 1st to avoid doing every step
       if( ifdmp.eq.1 ) then
@@ -948,6 +949,7 @@ c      character(len=20),intent(in):: cffs(numff)
 
 c      print *,'one_shot: 01'
       call initialize_pmdvars(nspmax)
+      call set_use_charge()
 
       nxyz = nx*ny*nz
       anxi= 1d0/nx
@@ -1501,14 +1503,14 @@ c.....integer:: status(MPI_STATUS_SIZE)
 
       if( l1st ) then
         if( allocated(dbuf) ) deallocate(dbuf,dbufr)
-        if( use_charge() ) then
+        if( luse_charge ) then
           allocate(dbuf(6,nbmax),dbufr(6,nbmax))
         else
           allocate(dbuf(4,nbmax),dbufr(4,nbmax))
         endif
       endif
 
-      if( use_charge() ) then
+      if( luse_charge ) then
         if( size(dbuf).lt.6*nbmax ) then
           deallocate(dbuf,dbufr)
           allocate(dbuf(6,nbmax),dbufr(6,nbmax))
@@ -1627,7 +1629,7 @@ c-------Error trap
         if( nex(kd).gt.1 ) then
           do kdd= -1,0
             ku= 2*kd+kdd
-            if( .not. use_charge() ) then
+            if( .not. luse_charge ) then
               do i=1,lsb(0,ku)
                 j= lsb(i,ku)
                 iex= lsex(i,ku)
@@ -1661,7 +1663,7 @@ c---------Store the # of received boundary atoms in LSRC
             lsrc(ku)=nrc
 
 c---------Exchange ra and tag
-            if( .not. use_charge() ) then
+            if( .not. luse_charge ) then
               do i=1,nsd
                 j= lsb(i,ku)
                 dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
@@ -1754,7 +1756,7 @@ c      integer:: status(MPI_STATUS_SIZE)
 
       if( l1st ) then
         if( allocated(dbuf) ) deallocate(dbuf,dbufr)
-        if( .not. use_charge() ) then
+        if( .not. luse_charge ) then
           allocate(dbuf(4,nbmax),dbufr(4,nbmax))
         else
           allocate(dbuf(6,nbmax),dbufr(6,nbmax))
@@ -1762,7 +1764,7 @@ c      integer:: status(MPI_STATUS_SIZE)
         l1st=.false.
       endif
 
-      if( .not. use_charge() ) then
+      if( .not. luse_charge ) then
         if( size(dbuf).lt.4*nbmax ) then
           deallocate(dbuf,dbufr)
           allocate(dbuf(4,nbmax),dbufr(4,nbmax))
@@ -1794,7 +1796,7 @@ c-------To calculate the communication time
         if( nex(kd).gt.1 ) then
           do kdd= -1,0
             ku= 2*kd+kdd
-            if( .not. use_charge() ) then
+            if( .not. luse_charge ) then
               do i=1,lsb(0,ku)
                 j= lsb(i,ku)
                 iex= lsex(i,ku)
@@ -1823,7 +1825,7 @@ c-------To calculate the communication time
             nrc=lsrc(ku)
 
 c---------Exchange ra and tag
-            if( .not. use_charge() ) then  ! in case of no charge
+            if( .not. luse_charge ) then  ! in case of no charge
               do i=1,nsd
                 j= lsb(i,ku)
                 dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
