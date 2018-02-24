@@ -24,6 +24,8 @@ from nappy.napsys import NAPSystem
 __author__ = "RYO KOBAYASHI"
 __version__ = "170830"
 
+_graph_name = 'graph.erg-vs-vol.'
+
 def read_erg(fname='erg.ref'):
     with open(fname,'r') as f:
         erg = float(f.readline().split()[0])
@@ -124,7 +126,8 @@ def uniq(arr):
             uniq_arr.append(a)
     return uniq_arr
     
-def draw_graph(systems,uniq_names,graph_format='png'):
+def draw_graph(systems,uniq_names,graph_format='png',
+               graph_name='graph.png'):
     """
     Draw a graph of erv-vs-vol of given systems.
     """
@@ -166,7 +169,7 @@ def draw_graph(systems,uniq_names,graph_format='png'):
     plt.xlabel('Volume (Ang^3/atom)')
     plt.ylabel('Energy (eV/atom)')
     plt.legend(loc='best')
-    plt.savefig('graph.'+graph_format, format=graph_format,
+    plt.savefig(graph_name, format=graph_format,
                 dpi=300, bbox_inches='tight')
     return
 
@@ -221,8 +224,10 @@ if __name__ == "__main__":
 
     statistics(systems)
 
-    draw_graph(systems,uniq_names,graph_format)
+    graph_name = 'graph.erg-vs-vol.'+graph_format
+    draw_graph(systems,uniq_names,graph_format=graph_format,
+               graph_name=graph_name)
 
     print('Outputs:')
-    print('  - graph.'+graph_format)
+    print('  - '+graph_name)
     

@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 """
-Evaluate the fitpot result.
+Make graphs from fitpot results.
 
 Usage:
-  evaluate_result.py histogram [options] DATAFILE
+  evaluate_result.py [options]
 
 Options:
   -h,--help  Show this message and exit.
+  --histogram
+             Make histogram of 
   -w,--width=WIDTH
              Width of the bin in histogram in eV. [default: 0.0005]
 """
@@ -15,13 +17,81 @@ from __future__ import print_function
 import os,sys
 from docopt import docopt
 import numpy as np
-
+import matplotlib.pyplot as plt
+from matplotlib import colors
 
 __author__ = "RYO KOBAYASHI"
 __version__ = ""
 
+def make_energy_graph():
 
-def histogram(fname="",width=0.0005):
+    try:
+        import seaborn as sns
+        sns.set(context='poster',style='ticks')
+    except:
+        pass
+
+    fnametrn = 'out.erg.trn.fin'
+    fnametst = 'out.erg.tst.fin'
+    if not os.path.exists(fnametrn):
+        raise IOError('File does not exist: '+fnametrn)
+    if not os.path.exists(fnametst):
+        raise IOError('File does not exist: '+fnametst)
+
+    epottrn = []
+    ereftrn = []
+    with open(fnametrn,'r') as f:
+        lines = f.readlines()
+    for line in lines:
+        if line[0] == '#':
+            continue
+        data = line.split()
+        ereftrn.append(float(data[0]))
+        epottrn.append(float(data[1]))
+
+    epottst = []
+    ereftst = []
+    with open(fnametst,'r') as f:
+        lines = f.readlines()
+    for line in lines:
+        if line[0] == '#':
+            continue
+        data = line.split()
+        ereftst.append(float(data[0]))
+        epottst.append(float(data[1]))
+
+    emax = -1.0e+30
+    emax = max(max(ereftrn),emax)
+    emax = max(max(epottrn),emax)
+    emin = 1.0e+30
+    emin = min(min(ereftrn),emin)
+    emin = min(min(epottrn),emin)
+    if ereftst:
+        emax = max(max(ereftst),emax)
+        emin = min(min(ereftst),emin)
+    if epottst:
+        emax = max(max(epottst),emax)
+        emin = min(max(epottst),emin)
+
+    erange = [emin,emax]
+    cmap = plt.get_cmap('tab10')
+    makersize = 5
+    size = 8
+    plt.figure(figsize=(size,size))
+    plt.plot(erange,erange,'--',color='black',linewidth=1.0)
+    plt.plot(ereftrn,epottrn,'o',color=cmap(0),mec='white',mew=0.5,
+             ms=makersize,label='training')
+    plt.plot(ereftst,epottst,'o',color=cmap(1),mec='white',mew=0.5,
+             ms=makersize,label='test')
+    plt.xlabel('DFT energy (eV/atom)')
+    plt.ylabel('Model potential energy (eV/atom)')
+    plt.savefig('graph.energy.png',format='png',dpi=300,bbox_inches='tight')
+    return
+
+def histogram(fname,width=0.0005):
+
+    if not os.path.exists(fname):
+        raise IOError('File does not exist: '+fname)
     
     with open(fname,'r') as f:
         lines = f.readlines()
@@ -51,9 +121,12 @@ def histogram(fname="",width=0.0005):
 if __name__ == "__main__":
 
     args = docopt(__doc__)
-    dfile = args['DATAFILE']
+    # dfile = args['DATAFILE']
     width = float(args['--width'])
-    hist = args['histogram']
+    hist = args['--histogram']
 
-    if hist:
-        histogram(dfile,width)
+    make_energy_graph()
+    
+    # if hist:
+    #     histogram(dfile,width)
+
