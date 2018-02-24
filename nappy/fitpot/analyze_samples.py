@@ -22,7 +22,7 @@ import glob
 from nappy.napsys import NAPSystem
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "170830"
+__version__ = "180224"
 
 _graph_name = 'graph.erg-vs-vol.'
 

@@ -21,9 +21,9 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 
 __author__ = "RYO KOBAYASHI"
-__version__ = ""
+__version__ = "180224"
 
-def make_energy_graph():
+def make_graph(key='erg'):
 
     try:
         import seaborn as sns
@@ -31,8 +31,8 @@ def make_energy_graph():
     except:
         pass
 
-    fnametrn = 'out.erg.trn.fin'
-    fnametst = 'out.erg.tst.fin'
+    fnametrn = 'out.{0:s}.trn.fin'.format(key)
+    fnametst = 'out.{0:s}.tst.fin'.format(key)
     if not os.path.exists(fnametrn):
         raise IOError('File does not exist: '+fnametrn)
     if not os.path.exists(fnametst):
@@ -83,9 +83,20 @@ def make_energy_graph():
              ms=makersize,label='training')
     plt.plot(ereftst,epottst,'o',color=cmap(1),mec='white',mew=0.5,
              ms=makersize,label='test')
-    plt.xlabel('DFT energy (eV/atom)')
-    plt.ylabel('Model potential energy (eV/atom)')
-    plt.savefig('graph.energy.png',format='png',dpi=300,bbox_inches='tight')
+    if key == 'erg':
+        plt.xlabel('DFT energy (eV/atom)')
+        plt.ylabel('Model-potential energy (eV/atom)')
+    elif key == 'frc':
+        plt.xlabel('DFT force (eV/Ang)')
+        plt.ylabel('Model-potential force (eV/Ang)')
+    elif key == 'strs':
+        plt.xlabel('DFT stress (GPa)')
+        plt.ylabel('Model-potential stress (GPa)')
+    
+    plt.legend(loc='best')
+    fname = 'graph.{0:s}.png'.format(key)
+    plt.savefig(fname,format='png',dpi=300,bbox_inches='tight')
+    print('- {0:s}'.format(fname))
     return
 
 def histogram(fname,width=0.0005):
@@ -125,7 +136,9 @@ if __name__ == "__main__":
     width = float(args['--width'])
     hist = args['--histogram']
 
-    make_energy_graph()
+    make_graph(key='erg')
+    make_graph(key='frc')
+    make_graph(key='strs')
     
     # if hist:
     #     histogram(dfile,width)
