@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-02-20 18:01:40 Ryo KOBAYASHI>
+!                     Last-modified: <2018-02-22 11:24:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -484,13 +484,8 @@ contains
             if( ix.gt.rsurf ) cycle
             ce = cete(ix,iy,iz)
             xi = (ix-lsurf)*dx
-!.....TODO: check consistency of units
             tep(ix,iy,iz) = tep(ix,iy,iz) &
                  +I_0 *min(1d0,exp(-xi/lskin))/ce/rho_e*dt
-!!$            if( ic.eq.126 ) then
-!!$              print *,'ic,I_0,ce,other=',ic,I_0,ce &
-!!$                   ,min(1d0,exp(-xi/lskin))/ce/rho_e*dt,1d0/ce,1d0/rho_e
-!!$            endif
           enddo
         endif
         te(:,:,:) = tep(:,:,:)
