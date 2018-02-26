@@ -151,7 +151,7 @@ So you can look at the evoluation of these energies using ``gnuplot`` command as
 ::
 
     $ gnuplot
-    gnuplot> plot 'out.erg' us 1:2 w l, 'out.erg' us 1:3 w l, 'out.erg' us 1:4 w l
+    gnuplot> plot 'out.erg' us 1:3 w l, 'out.erg' us 1:4 w l, 'out.erg' us 1:5 w l
 
 In this case, since you are performing *NVE* -MD simulation at 300K of diamond-Si,
 the total energy conserves conpensating the deviations of kinetic and potential energies.
@@ -321,7 +321,7 @@ If you want to perform it background,
 The following files appear when you perform ``pmd`` :
 
   ``out.erg``
-        Total, kinetic, and potential energies.
+        Total, kinetic, potential energies, and temperature, volume, pressure.
   ``pmd_##``
         Atom-configurations at a certain MD step. ``##`` means the MD step.
 

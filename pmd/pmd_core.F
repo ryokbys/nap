@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-02-26 13:49:12 Ryo KOBAYASHI>
+c                     Last-modified: <2018-02-26 14:56:04 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -55,6 +55,10 @@ c-----output file names
       character:: cnum*128, ctmp*128
       integer,external:: itotOf,ifmvOf
       logical:: ltot_updated = .true.
+c.....Formats for output
+      character(len=20):: cfistp  = 'i10' !or larger
+      character(len=20):: cfstime = 'es18.10'
+      character(len=20):: cftave  = 'f12.2' ! or 'es12.4' for high-T
 
 c      logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
 c     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
@@ -66,6 +70,8 @@ c     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
       call initialize_pmdvars(nspmax)
       call calc_nfmv(ntot,tagtot,myid_md,mpi_md_world)
       call set_use_charge()
+
+      write(cfistp(2:3),'(i2.2)') int(log10(dble(maxstp)))+2
 
 c.....multiply damping factor 1st to avoid doing every step
       if( ifdmp.eq.1 ) then
@@ -320,6 +326,7 @@ c-----calc kinetic energy
       prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
 
       istp= 0
+      simtime = 0d0
       istps= istp
       ts= istps*dt
       te= rbuf/(2d0*vmax/dt) +istp*dt
@@ -357,23 +364,12 @@ c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
      &       ,stnsr(1,1)*up2gpa,stnsr(2,2)*up2gpa,stnsr(3,3)*up2gpa
      &       ,stnsr(2,3)*up2gpa,stnsr(3,1)*up2gpa,stnsr(1,2)*up2gpa
         write(6,*) ''
-        if( trim(cpctl).eq.'Berendsen' .or.
-     &       trim(cpctl).eq.'vc-Berendsen' .or.
-     &       trim(cpctl).eq.'vv-Berendsen') then
-          write(6,'(a,i8,2f10.2,es15.6,2es11.3)')
-     &         " istp,time,temp,vol,prss="
-     &         ,istp,tcpu,tave,epot,vol,prss
-        else
-          if( tave.ge.10000.0 ) then
-            write(6,'(a,i8,f11.2,es11.3,es15.6,es11.3)')
-     &           " istp,time,temp,epot,prss="
-     &           ,istp,tcpu,tave,epot,prss
-          else
-            write(6,'(a,i8,2f11.2,es15.6,es11.3)')
-     &           " istp,time,temp,epot,prss="
-     &           ,istp,tcpu,tave,epot,prss
-          endif
-        endif
+
+        if( tave.gt.10000d0 ) cftave = 'es12.4'
+        write(6,'(a,'//cfistp//','//cfstime//','//cftave
+     &       //',es15.6,2es11.3)')
+     &       " istp,time,temp,epot,vol,prss="
+     &       ,istp,simtime,tave,epot,vol,prss
       endif
 
 c.....output initial configuration including epi, eki, and strs
@@ -410,20 +406,16 @@ c-----initialize the counter for output
       if(myid_md.eq.0) then
 c.....write out energies
         open(ioerg,file="out.erg",status='replace')
-        write(ioerg,'(a)') '# istp,  etot-epot0[eV],  ekin,'
+        write(ioerg,'(a)') '# istp,  simtime[fs],'
+     &       //'     etot-epot0[eV],  ekin,'
      &       //'  epot-epot0,  temp[K],  vol[Ang^3],  pressure[GPa]'
         write(ioerg,'(a,es16.7e3,a)') '#  Epot0 =',epot0,' [eV]'
-        if( tave.gt.10000d0) then
-          write(ioerg,'(i10,3es16.7e3,es11.3,2es16.7e3)') istp
-     &         ,ekin+epot0-epot0,ekin,epot0-epot0,tave
-     &         ,vol
-     &         ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
-        else
-          write(ioerg,'(i10,3es16.7e3,f11.2,2es16.7e3)') istp
-     &         ,ekin+epot0-epot0,ekin,epot0-epot0,tave
-     &         ,vol
-     &         ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
-        endif
+        if( tave.gt.10000d0) cftave = 'es12.4'
+        write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3'
+     &       //','//cftave//',2es16.7e3)') istp
+     &       ,simtime,ekin+epot0-epot0,ekin,epot-epot0,tave
+     &       ,vol
+     &       ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
         call flush(ioerg)
 c.....write out temperatures
         open(iotemp,file='out.temperature',status='replace')
@@ -455,7 +447,6 @@ c.....Set al
       al(3)= h(3,3,0)
 
       
-      simtime = 0d0
       i_conv = 0
       lconverged = .false.
 c-----velocity-Verlet loop starts---------------------------------------
@@ -699,17 +690,14 @@ c-------output energies
           call mpi_reduce(ediff,ediff0,9
      &         ,mpi_double_precision,mpi_sum,0,mpi_md_world,ierr)
           
-          if(myid_md.eq.0) then
+          if( myid_md.eq.0 .and. iprint.gt.0 ) then
 c.....write energies
-            if( tave.gt.10000d0 ) then
-              write(ioerg,'(i10,3es16.7e3,es11.3,2es16.7e3)') istp
-     &             ,ekin+epot-epot0,ekin,epot-epot0,tave
-     &             ,vol,prss
-            else
-              write(ioerg,'(i10,3es16.7e3,f11.2,2es16.7e3)') istp
-     &             ,ekin+epot-epot0,ekin,epot-epot0,tave
-     &             ,vol,prss
-            endif
+            if( tave.gt.10000d0) cftave = 'es12.4'
+            write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3'
+     &           //','//cftave//',2es16.7e3)') istp
+     &           ,simtime,ekin+epot0-epot0,ekin,epot-epot0,tave
+     &           ,vol
+     &           ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
             call flush(ioerg)
 c.....write temperature
             write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff0(1:9)
@@ -724,14 +712,16 @@ c.....write temperature
           
 c---------output step, time, and temperature
           tcpu= mpi_wtime() -tcpu1
-          if(myid_md.eq.0) then
+          if( myid_md.eq.0 .and. iprint.gt.0 ) then
+            if( tave.gt.10000d0 ) cftave = 'es12.4'
+            write(6,'(a,'//cfistp//','//cfstime//','//cftave
+     &           //',es15.6,2es11.3)')
+     &           " istp,time,temp,epot,vol,prss="
+     &           ,istp,simtime,tave,epot,vol,prss
             if( trim(cpctl).eq.'Berendsen' .or.
      &           trim(cpctl).eq.'vc-Berendsen' .or.
      &           trim(cpctl).eq.'vv-Berendsen' .and.
      &           iprint.ne.0 ) then
-              write(6,'(a,i8,2f10.2,es15.6,2es11.3)')
-     &             " istp,time,temp,epot,vol,prss="
-     &             ,istp,tcpu,tave,epot,vol,prss
               write(6,'(a)') ' H-matrix:' !,h(1:3,1:3,0)
               write(6,'(3f15.7)') h(1:3,1:3,0)
               
@@ -739,16 +729,6 @@ c---------output step, time, and temperature
      &             ,stnsr(1,1)*up2gpa ,stnsr(2,2)*up2gpa
      &             ,stnsr(3,3)*up2gpa ,stnsr(2,3)*up2gpa
      &             ,stnsr(1,3)*up2gpa ,stnsr(1,2)*up2gpa
-            elseif( iprint.ne.0 ) then
-              if( tave.ge.10000.0 ) then
-                write(6,'(a,i8,f11.2,es11.3,es15.6,es11.3)')
-     &               " istp,time,temp,epot,prss="
-     &               ,istp,tcpu,tave,epot,prss
-              else
-                write(6,'(a,i8,2f11.2,es15.6,es11.3)')
-     &               " istp,time,temp,epot,prss="
-     &               ,istp,tcpu,tave,epot,prss
-              endif
             endif
           endif
 
