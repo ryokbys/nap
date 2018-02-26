@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-02-20 16:34:44 Ryo KOBAYASHI>
+c                     Last-modified: <2018-02-26 13:49:12 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -261,10 +261,8 @@ c     &           ,ifmv,ttgt(ifmv),fkb,dt,tfac(ifmv)
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
-      call bacopy(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
-     &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,.true.
-     &     ,boundary)
+      call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb
+     &     ,.true.,boundary)
 c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr,iprint,.true.)
@@ -539,9 +537,8 @@ c.....Move atoms that cross the boundary
      &         ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world
      &         ,boundary)
 c.....Copy RA of boundary atoms
-          call bacopy(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax,natm,nb
-     &         ,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv,nex
-     &         ,mpi_md_world,iprint,ifcoulomb,chg,chi,.false.,boundary)
+          call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb
+     &     ,.false.,boundary)
 c.....Make pair list
           call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h
      &         ,hi,anxi,anyi,anzi,lspr,iprint,.false.)
@@ -1016,10 +1013,8 @@ c      print *,'one_shot: 05'
 c-----copy RA of boundary atoms
       call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi
      &     ,nx,ny,nz,myid_md)
-      call bacopy(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
-     &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,.true.
-     &     ,boundary)
+      call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb
+     &     ,.true.,boundary)
 c-----Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
      &     ,anxi,anyi,anzi,lspr,iprint,.true.)
@@ -1467,9 +1462,7 @@ c.....check whether the size of the system is large enough
 
       end subroutine check_size_and_parallel
 c=======================================================================
-      subroutine bacopy(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
-     &     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid,myparity
-     &     ,lsrc,sv,nex,mpi_md_world,iprint,ifcoulomb,chg,chi,l1st
+      subroutine bacopy(rc,myid,mpi_md_world,iprint,ifcoulomb,l1st
      &     ,boundary)
 c-----------------------------------------------------------------------
 c  Exchanges boundary-atom data among neighbor nodes: tag and ra
@@ -1478,23 +1471,19 @@ c  automatically selected according to the size of the system.
 c  
 c  Note: parallelized to smaller than rcut should not happen.
 c-----------------------------------------------------------------------
+      use pmdvars
       use force
       use pmdmpi,only: nx,ny,nz,nid2xyz
       implicit none
       include 'mpif.h'
-      integer,intent(in):: namax,nbmax,nn(6)
-     &     ,myid,myparity(3),mpi_md_world,iprint
-      integer,intent(inout):: natm,nb,lsb(0:nbmax,6),lsex(nbmax,6)
-     &     ,lsrc(6),nex(3)
-      real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
-      real(8),intent(inout):: tag(namax),ra(3,namax),tcom
+      integer,intent(in):: myid,mpi_md_world,iprint
+      real(8),intent(in):: rc
       integer,intent(in):: ifcoulomb
-      real(8),intent(inout):: chg(namax),chi(namax)
       logical,intent(in):: l1st
       character(len=3):: boundary
 
 c.....integer:: status(MPI_STATUS_SIZE)
-      integer:: i,j,kd,kdd,kul,kuh,ku,ierr,iex,ix,iy,iz
+      integer:: i,j,kd,kdd,kul,kuh,ku,ierr,iex,ix,iy,iz,itmp
       integer:: nav,maxna,maxb,inode,nsd,nrc,nbnew
       real(8):: tcom1,tcom2,xi(3),rcv(3),asgm
       logical,external:: bbd
@@ -1612,19 +1601,24 @@ c.....number of to-be-sent atoms is set 0.
         endif
 
 c-------Error trap
+        itmp = nbnew
         do kdd= -1,0
           ku=2*kd+kdd
-          call MPI_ALLREDUCE(lsb(0,ku),maxb,1,MPI_INTEGER,MPI_MAX,
-     &         mpi_md_world,ierr)
-          if (maxb.gt.nbmax) then
-            if (myid.eq.0) then
-              write(*,*)'Buffer or list overflowed at bacopy'
-              write(*,*)'LSB(0) NBMAX =',maxb,nbmax
-            endif
-            call MPI_FINALIZE(ierr)
-            stop
-          endif
+          itmp = itmp +lsb(0,ku)
         enddo
+        call mpi_allreduce(itmp,maxb,1,mpi_integer,mpi_max,
+     &       mpi_md_world,ierr)
+        if(maxb.gt.nbmax) then
+          if (myid.eq.0 .and. iprint.ne.0 ) then
+            print *,'namax and array updated since nbmax changed'
+     &           //'from ',nbmax,' to ',int(maxb*1.5)
+c            write(*,*)'Buffer or list overflowed at bacopy'
+c            write(*,*)'LSB(0) NBMAX =',maxb,nbmax
+          endif
+c          call mpi_finalize(ierr)
+c          stop
+          call realloc_namax_related(nalmax,int(maxb*1.5),iprint)
+        endif
 
         if( nex(kd).gt.1 ) then
           do kdd= -1,0
@@ -1651,8 +1645,7 @@ c-------Error trap
             nbnew= nbnew +lsb(0,ku)
           enddo
         else
-c-------To calculate the communication time
-          tcom1=MPI_WTIME()
+          tcom1=mpi_wtime()
           do 200 kdd= -1,0
             ku=2*kd+kdd
             inode=nn(ku)
@@ -1676,6 +1669,7 @@ c---------Exchange ra and tag
                 tag(natm+nbnew+i)   = dbufr(4,i)
               enddo
             else
+c.....Exchange ra, tag, chg and chi in case of using charge.
               do i=1,nsd
                 j= lsb(i,ku)
                 dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
@@ -1693,7 +1687,7 @@ c---------Exchange ra and tag
               enddo
             endif
 
-            call MPI_BARRIER(mpi_md_world,ierr)
+            call mpi_barrier(mpi_md_world,ierr)
 c---------increase the # of received boundary atoms
             nbnew=nbnew+nrc
 
@@ -1705,14 +1699,14 @@ c-------Add the communication time to COMT
 
 c-------Error trap
         nav=natm+nbnew
-        call MPI_ALLREDUCE(nav,maxna,1,MPI_INTEGER,MPI_MAX
+        call mpi_allreduce(nav,maxna,1,mpi_integer,mpi_max
      &       ,mpi_md_world,ierr)
         if (maxna.gt.namax) then
           if (myid.eq.0) then
             write(*,*)'NAMAX overflowed at bacopy'
             write(*,*)'N+NB NAMAX = ',maxna,namax
           endif
-          call MPI_FINALIZE(ierr)
+          call mpi_finalize(ierr)
           stop
         endif
 
@@ -1964,7 +1958,7 @@ c
 c  MVQUE(0:NBMAX,6):
 c    MVQUE(0,ku) is the # of to-be-moved atoms to neighbor ku;
 c    MVQUE(i,ku) is the adress, in IS, of atom i
-c----------------------------------------------------------------------
+c-----------------------------------------------------------------------
       use pmdmpi,only: nid2xyz,nx,ny,nz
       implicit none
       include 'mpif.h'
@@ -2097,12 +2091,13 @@ c-----------Eliminate the record of a moved-out atom
           newim=newim+nrc
           call MPI_BARRIER(mpi_md_world,ierr)
 
-200     continue
+ 200    continue
 
         tcom2=MPI_WTIME()
         tcom=tcom+tcom2-tcom1 
 
-100   continue
+ 100  continue
+
 
 c-----Compression
       ipt=0
@@ -2119,6 +2114,9 @@ c-----Compression
       enddo
 c-----Update # of resident atoms
       natm=ipt
+
+c.....Update max natm globally
+c      nalmax = max(natm,nalmax)
 
       return
       end subroutine bamove
@@ -2435,7 +2433,7 @@ c
 
       integer:: istat(mpi_status_size)
       integer:: i,j,ixyz,n,ierr
-      integer:: myxt,myyt,myzt,nmax,nmin
+      integer:: myxt,myyt,myzt,nmin
       real(8):: sxogt,syogt,szogt
       real(8):: t0
 
@@ -2464,7 +2462,7 @@ c.....wrap atom position inside [0:1)
           enddo
 
 c.....count max number of atoms in a node
-          nmax = 0
+          nalmax = 0
           nmin = 1000000000
           do ixyz=0,nxyz-1
             myxt = ixyz/(ny*nz)
@@ -2487,21 +2485,19 @@ c.....Set the tag negative if the atom is assigned to a certain cell
                 tagtot(i) = -tagtot(i)
               endif
             enddo
-            nmax = max(nmax,n)
+            nalmax = max(nalmax,n)
             nmin = min(nmin,n)
-c            print '(a,4i6,3es12.4,3i6)'
-c     &           ,'ixyz,myxt,myyt,myzt,sxogt,syogt,szogt,n,nmax,nmin='
-c     &           ,ixyz,myxt,myyt,myzt,sxogt,syogt,szogt,n,nmax,nmin
           enddo
-          namax = max(int(nmax*1.2),200)
+          namax = max(int(nalmax*1.2),200)
 c          nbmax = max(namax*27,nbmax)
-          call estimate_nbmax(nmax,h,nx,ny,nz,rcut,rbuf,nbmax)
+          call estimate_nbmax(nalmax,h,nx,ny,nz,rcut,rbuf,nbmax)
           namax = namax +nbmax
           if( iprint.ne.0 ) then
             write(6,'(a,i10)') ' Min number of local atoms = ',nmin
-            write(6,'(a,i10)') ' Max number of local atoms = ',nmax
+            write(6,'(a,i10)') ' Max number of local atoms = ',nalmax
             write(6,'(a,i10)')   '   nbmax = ',nbmax
-            write(6,'(a,i10)')   '   namax = nmax*1.2 + nbmax  = ',namax
+            write(6,'(a,i10)')   '   namax = nalmax*1.2 + nbmax  = '
+     &           ,namax
             write(6,'(a,i10)')   '   nnmax = ',nnmax
             write(6,'(a,i10,a)') ' Memory for main routine   = '
      &           ,int(dble(namax)*(3*4 +3*3*5 +1 +nnmax/2)
@@ -2514,13 +2510,14 @@ c.....Reset the tags positive
         endif ! myid.eq.0
         call mpi_bcast(namax,1,mpi_integer,0,mpi_md_world,ierr)
         call mpi_bcast(nbmax,1,mpi_integer,0,mpi_md_world,ierr)
-c.....allocate memory for local arrays of length namax
-        allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax)
-     &       ,strs(3,3,namax),stt(3,3,namax),tag(namax)
-     &       ,lspr(0:nnmax,namax),epi(namax),eki(3,3,namax)
-     &       ,stp(3,3,namax),stn(3,3,namax)
-     &       ,chg(namax),chi(namax)
-     &       ,lsb(0:nbmax,6),lsex(nbmax,6))
+cc.....allocate memory for local arrays of length namax
+c        allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax)
+c     &       ,strs(3,3,namax),stt(3,3,namax),tag(namax)
+c     &       ,lspr(0:nnmax,namax),epi(namax),eki(3,3,namax)
+c     &       ,stp(3,3,namax),stn(3,3,namax)
+c     &       ,chg(namax),chi(namax)
+c     &       ,lsb(0:nbmax,6),lsex(nbmax,6))
+        call alloc_namax_related()
         eki(1:3,1:3,1:namax) = 0d0
       endif
 
@@ -2795,9 +2792,9 @@ c=======================================================================
 
       end subroutine cell_info
 c=======================================================================
-      subroutine estimate_nbmax(nmax,h,nx,ny,nz,rcut,rbuf,nbmax)
+      subroutine estimate_nbmax(nalmax,h,nx,ny,nz,rcut,rbuf,nbmax)
       implicit none
-      integer,intent(in):: nmax,nx,ny,nz
+      integer,intent(in):: nalmax,nx,ny,nz
       real(8),intent(in):: rcut,rbuf,h(3,3)
       integer,intent(inout):: nbmax
 
@@ -2810,7 +2807,10 @@ c=======================================================================
 c.....Estimated volume and area, which is not correct in case of
 c.....non-orthogonal cell
       vol = alx*aly*alz
-      density = dble(nmax)/vol
+c.....Density cannot be obtained from nalmax
+c.....because sometimes the system contains vacuum.
+c.....Density = 0.1 means 1 atom in 10 Ang^3 which is dense enough.
+      density = 0.1d0
       area = alx*aly*2 +alx*alz*2 +aly*alz*2
 c.....Estimated number of atoms in the margin region.
 c.....Factor 2 is just for a surplus
@@ -2818,6 +2818,203 @@ c.....Factor 2 is just for a surplus
       nbmax = max(nbmax,nest)
       
       end subroutine estimate_nbmax
+!=======================================================================
+      subroutine alloc_namax_related()
+c     
+c     Allocated arrays related to NAMAX.
+c
+      use pmdvars
+      implicit none
+      
+      allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax)
+     &     ,strs(3,3,namax),stt(3,3,namax),tag(namax)
+     &     ,lspr(0:nnmax,namax),epi(namax),eki(3,3,namax)
+     &     ,stp(3,3,namax),stn(3,3,namax)
+     &     ,chg(namax),chi(namax)
+     &     ,lsb(0:nbmax,6),lsex(nbmax,6))
+      return
+      end subroutine alloc_namax_related
+!=======================================================================
+      subroutine realloc_namax_related(newnalmax,newnbmax,iprint)
+c     
+c     Reallocated namax-related arrays everywhen namax needed to be
+c     updated
+c
+      use pmdvars
+      implicit none
+      integer,intent(in):: iprint,newnalmax,newnbmax
+
+      integer:: ierr,newnamax,ndim
+      real(8),allocatable:: arr(:)
+      integer,allocatable:: iarr(:)
+      
+      if( .not. allocated(ra) ) then
+        print *,'Error: Arrays are not allocated yet!'
+        call mpi_finalize(ierr)
+        stop
+      endif
+
+      newnamax = int(newnalmax*1.2) + newnbmax
+c.....No need of updating arrays
+      if( newnamax .lt. namax ) return
+
+c.....Since the arrays already have data,
+c.....those data must be restored after reallocation.
+c.....The hard coding here is too messy but I do not know how to avoid..
+
+c.....ra
+      ndim = size(ra)
+      allocate(arr(ndim))
+      call copy_arr(ndim,ra,arr)
+      deallocate(ra)
+      allocate(ra(3,newnamax))
+      call copy_arr(ndim,arr,ra)
+
+c.....va
+      ndim = size(va)
+      allocate(arr(ndim))
+      call copy_arr(ndim,va,arr)
+      deallocate(va)
+      allocate(va(3,newnamax))
+      call copy_arr(ndim,arr,va)
+      
+c.....aa
+      ndim = size(aa)
+      allocate(arr(ndim))
+      call copy_arr(ndim,aa,arr)
+      deallocate(aa)
+      allocate(aa(3,newnamax))
+      call copy_arr(ndim,arr,aa)
+
+c.....ra0
+      ndim = size(ra0)
+      allocate(arr(ndim))
+      call copy_arr(ndim,ra0,arr)
+      deallocate(ra0)
+      allocate(ra0(3,newnamax))
+      call copy_arr(ndim,arr,ra0)
+
+c.....strs
+      ndim = size(strs)
+      allocate(arr(ndim))
+      call copy_arr(ndim,strs,arr)
+      deallocate(strs)
+      allocate(strs(3,3,newnamax))
+      call copy_arr(ndim,arr,strs)
+
+c.....stt
+      ndim = size(stt)
+      allocate(arr(ndim))
+      call copy_arr(ndim,stt,arr)
+      deallocate(stt)
+      allocate(stt(3,3,newnamax))
+      call copy_arr(ndim,arr,stt)
+
+c.....tag
+      ndim = size(tag)
+      allocate(arr(ndim))
+      call copy_arr(ndim,tag,arr)
+      deallocate(tag)
+      allocate(tag(newnamax))
+      call copy_arr(ndim,arr,tag)
+
+c.....lspr
+      ndim = size(lspr)
+      allocate(iarr(ndim))
+      call copy_iarr(ndim,lspr,iarr)
+      deallocate(lspr)
+      allocate(lspr(0:nnmax,newnamax))
+      call copy_iarr(ndim,iarr,lspr)
+
+c.....epi
+      ndim = size(epi)
+      allocate(arr(ndim))
+      call copy_arr(ndim,epi,arr)
+      deallocate(epi)
+      allocate(epi(newnamax))
+      call copy_arr(ndim,arr,epi)
+
+c.....eki
+      ndim = size(eki)
+      allocate(arr(ndim))
+      call copy_arr(ndim,eki,arr)
+      deallocate(eki)
+      allocate(eki(3,3,newnamax))
+      call copy_arr(ndim,arr,eki)
+
+c.....stp
+      ndim = size(stp)
+      allocate(arr(ndim))
+      call copy_arr(ndim,stp,arr)
+      deallocate(stp)
+      allocate(stp(3,3,newnamax))
+      call copy_arr(ndim,arr,stp)
+
+c.....stn
+      ndim = size(stn)
+      allocate(arr(ndim))
+      call copy_arr(ndim,stn,arr)
+      deallocate(stn)
+      allocate(stn(3,3,newnamax))
+      call copy_arr(ndim,arr,stn)
+
+c.....chg
+      ndim = size(chg)
+      allocate(arr(ndim))
+      call copy_arr(ndim,chg,arr)
+      deallocate(chg)
+      allocate(chg(newnamax))
+      call copy_arr(ndim,arr,chg)
+
+c.....chi
+      ndim = size(chi)
+      allocate(arr(ndim))
+      call copy_arr(ndim,chi,arr)
+      deallocate(chi)
+      allocate(chi(newnamax))
+      call copy_arr(ndim,arr,chi)
+
+c.....lsb
+      ndim = size(lsb)
+      allocate(iarr(ndim))
+      call copy_iarr(ndim,lsb,iarr)
+      deallocate(lsb)
+      allocate(lsb(0:nbmax,6))
+      call copy_iarr(ndim,iarr,lsb)
+
+c.....lsex
+      ndim = size(lsex)
+      allocate(iarr(ndim))
+      call copy_iarr(ndim,lsex,iarr)
+      deallocate(lsex)
+      allocate(lsex(nbmax,6))
+      call copy_iarr(ndim,iarr,lsex)
+
+c.....Update NAMAX and NBMAX
+      namax = newnamax
+      nalmax= newnalmax
+      nbmax = newnbmax
+
+      return
+      end subroutine realloc_namax_related
+!=======================================================================
+      subroutine copy_arr(ndim,srcarr,destarr)
+      integer,intent(in):: ndim
+      real(8),intent(in):: srcarr(ndim)
+      real(8),intent(out):: destarr(ndim)
+
+      destarr(:) = srcarr(:)
+      return
+      end subroutine copy_arr
+!=======================================================================
+      subroutine copy_iarr(ndim,srcarr,destarr)
+      integer,intent(in):: ndim
+      integer,intent(in):: srcarr(ndim)
+      integer,intent(out):: destarr(ndim)
+
+      destarr(:) = srcarr(:)
+      return
+      end subroutine copy_iarr
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"
