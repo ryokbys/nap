@@ -14,16 +14,15 @@ Options:
 """
 from __future__ import print_function
 
-import os,sys
+import os
 from docopt import docopt
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import colors
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "180224"
 
-def make_graph(key='erg'):
+def make_fit_graph(key='erg'):
 
     try:
         import seaborn as sns
@@ -77,12 +76,13 @@ def make_graph(key='erg'):
     cmap = plt.get_cmap('tab10')
     makersize = 5
     size = 8
+    plt.clf()
     plt.figure(figsize=(size,size))
     plt.plot(erange,erange,'--',color='black',linewidth=1.0)
     plt.plot(ereftrn,epottrn,'o',color=cmap(0),mec='white',mew=0.5,
-             ms=makersize,label='training')
+             ms=makersize,label='training data')
     plt.plot(ereftst,epottst,'o',color=cmap(1),mec='white',mew=0.5,
-             ms=makersize,label='test')
+             ms=makersize,label='test data')
     if key == 'erg':
         plt.xlabel('DFT energy (eV/atom)')
         plt.ylabel('Model-potential energy (eV/atom)')
@@ -98,6 +98,54 @@ def make_graph(key='erg'):
     plt.savefig(fname,format='png',dpi=300,bbox_inches='tight')
     print('- {0:s}'.format(fname))
     return
+
+def make_iter_graph():
+    if not os.path.exists('out.fitpot'):
+        raise RuntimeError('File not exist: out.fitpot')
+    if not os.path.exists('out.iter') or \
+       os.path.getmtime('out.iter') < os.path.getmtime('out.fitpot'):
+        os.system('grep "iter,ftrn" out.fitpot > out.iter')
+
+    try:
+        import seaborn as sns
+        sns.set(context='poster',style='ticks')
+    except:
+        pass
+
+    with open('out.iter','r') as f:
+        lines = f.readlines()
+
+    iters = []
+    ftrns = []
+    ftsts = []
+    for line in lines:
+        if line[0] == '#':
+            continue
+        data = line.split()
+        iters.append(int(data[1]))
+        ftrns.append(float(data[2]))
+        ftsts.append(float(data[3]))
+
+    plot_test = True
+    for f in ftsts:
+        if f < 1.0e-8:
+            plot_test = False
+
+    #...Plotting
+    plt.clf()
+    cmap = plt.get_cmap('tab10')
+    plt.plot(iters,ftrns,'-',color=cmap(0),label='traning data')
+    if plot_test:
+        plt.plot(iters,ftsts,'-',color=cmap(1),label='test data')
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss function value')
+    plt.yscale('log')
+    plt.legend(loc='best')
+    fname = 'graph.iter.png'
+    plt.savefig(fname,format='png',dpi=300,bbox_inches='tight')
+    print('- {0:s}'.format(fname))
+    return
+
 
 def histogram(fname,width=0.0005):
 
@@ -136,9 +184,11 @@ if __name__ == "__main__":
     width = float(args['--width'])
     hist = args['--histogram']
 
-    make_graph(key='erg')
-    make_graph(key='frc')
-    make_graph(key='strs')
+    make_fit_graph(key='erg')
+    make_fit_graph(key='frc')
+    make_fit_graph(key='strs')
+
+    make_iter_graph()
     
     # if hist:
     #     histogram(dfile,width)

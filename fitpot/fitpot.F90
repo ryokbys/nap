@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-16 22:09:27 Ryo KOBAYASHI>
+!                     Last modified: <2018-02-26 17:16:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1498,7 +1498,7 @@ subroutine write_stress_relation(cadd)
       if( iclist(ismpl).eq.1 ) then
         do ixyz=1,3
           do jxyz=ixyz,3
-            write(94,'(2es15.7,2x,a,i6,i3,3es12.3e3)') srefg(ixyz,jxyz,ismpl) &
+            write(94,'(2es15.6e3,2x,a,i6,i3,3es12.3e3)') srefg(ixyz,jxyz,ismpl) &
                  ,strsg(ixyz,jxyz,ismpl) &
                  ,trim(cdirlist(ismpl)),ixyz,jxyz &
                  ,abs(srefg(ixyz,jxyz,ismpl)-strsg(ixyz,jxyz,ismpl))&
@@ -1508,7 +1508,7 @@ subroutine write_stress_relation(cadd)
       else if( iclist(ismpl).eq.2 ) then
         do ixyz=1,3
           do jxyz=ixyz,3
-            write(95,'(2es15.7,2x,a,i6,i3,3es12.3e3)') srefg(ixyz,jxyz,ismpl) &
+            write(95,'(2es15.6e3,2x,a,i6,i3,3es12.3e3)') srefg(ixyz,jxyz,ismpl) &
                  ,strsg(ixyz,jxyz,ismpl) &
                  ,trim(cdirlist(ismpl)),ixyz,jxyz &
                  ,abs(srefg(ixyz,jxyz,ismpl)-strsg(ixyz,jxyz,ismpl))&
