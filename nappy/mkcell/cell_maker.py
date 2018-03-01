@@ -10,7 +10,7 @@ Options:
   --size=SIZE
               Number of copies of the unit cell, int the format, nx,ny,nz. [default: 1,1,1]
   -l, --lattice-constant=LATCONST
-             Lattice constant of an axis. [default: 5.472]
+             Lattice constant of an axis. [default: 5.427]
   -o OUTFILE
              Output file name. Format is detected automatically. [default: POSCAR]
 """
