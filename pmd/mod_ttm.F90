@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-02-22 11:24:28 Ryo KOBAYASHI>
+!                     Last-modified: <2018-02-27 18:19:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -54,6 +54,8 @@ module ttm
   character(len=128):: cTe_init = 'exp'
 !.....Laser power at the surface top in eV/(fs*Ang^2) unit
   real(8):: I_0 = 5d+4
+!.....Start time of laser injection
+  real(8):: t0_laser = 0d0
 !.....Pulse duration in fs
   real(8):: tau_pulse = 100d0
 !.....Surface skin length in Ang
@@ -249,6 +251,9 @@ contains
         else if( trim(c1st).eq.'Te_right' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, Te_right
+        else if( trim(c1st).eq.'t0_laser' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, t0_laser
         else if( trim(c1st).eq.'pulse_duration' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, tau_pulse
@@ -305,6 +310,7 @@ contains
     call mpi_bcast(ekth,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_e,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(d_e,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(t0_laser,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(tau_pulse,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(cTe_init,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(Te_right,1,mpi_real8,0,mpi_world,ierr)
@@ -477,7 +483,8 @@ contains
                -gp(ic)*(te(ix,iy,iz) -ta(ic)) +gs(ic)*tap(ic) )
 
         enddo
-        if( tnow.lt.tau_pulse ) then
+        if( tnow.ge.t0_laser .and. &
+             tnow.lt.(t0_laser +tau_pulse) ) then
           do ic=1,nxyz
             call ic2ixyz(ic,ix,iy,iz)
             if( ix.lt.lsurf ) cycle
@@ -740,72 +747,72 @@ contains
 !=======================================================================
   subroutine update_surface_plane(myid,mpi_world)
 !
-!  Update surface position according to number of atoms in the cells.
+!  Update left surface position according to number of atoms in the cells.
+!  Criterion for lsurf:
+!    - all the cells of nx have atoms less than a certain density (vacuum)
+!    - right-most vacuum cell
 !
     integer,intent(in):: myid,mpi_world
-    integer:: ic,icl,icr,ix,iy,iz,ierr
-    integer,allocatable,save:: nacl(:,:,:),nacr(:,:,:)
-    logical:: lupdm,lupdp,rupdm,rupdp
 
-    if( .not. allocated(nacl) ) then
-      allocate(nacl(nx,ny,nz),nacr(nx,ny,nz))
+    integer:: ix,iy,iz,icl,ivac_right,ierr,lsurf_new
+    real(8):: densx
+    logical:: lupdate
+    logical,allocatable,save:: lexists(:)
+    real(8),save:: volyz
+
+!.....Number density in (Ang^{-3}); 1 in sphere of radius, rc=3.78 Ang
+    real(8),parameter:: density = 0.00442 
+
+    if( .not. allocated(lexists) ) then
+      allocate(lexists(nx))
+      volyz = vcell*ny*nz
     endif
 
-    if( myid.eq.0 ) then
+    if( myid.ne.0 ) goto 10
 
-!.....Count number of atoms in the cells next to lsurf/rsurf
-      nacl(:,:,:) = 0
-      nacr(:,:,:) = 0
-      do iz=1,nz
-        do iy=1,ny
-          if( lsurf-1.ge.1 ) then
-            do ix=lsurf-1,lsurf
-              call ixyz2ic(ix,iy,iz,icl)
-              nacl(ix,iy,iz) = nac(icl)
-            enddo
-          endif
-          if( rsurf+1.le.nx ) then
-            do ix=rsurf,rsurf+1
-              call ixyz2ic(ix,iy,iz,icr)
-              nacr(ix,iy,iz) = nac(icr)
-            enddo
-          endif
+    lexists(:) = .false.
+    do ix=1,nx
+      densx = 0d0
+      do iy=1,ny
+        do iz=1,nz
+          call ixyz2ic(ix,iy,iz,icl)
+          densx = densx +dble(nac(icl))
         enddo
       enddo
-!.....Check whether all the cells in y-z plane contains at least 2 atoms
-      lupdm = .true.
-      lupdp = .true.
-      rupdm = .true.
-      rupdp = .true.
-      do iz=1,nz
-        do iy=1,ny
-          if( nacl(lsurf-1,iy,iz) .lt. 2 ) lupdm = .false.
-          if( nacl(lsurf  ,iy,iz) .ge. 2 ) lupdp = .false.
-          if( nacr(rsurf+1,iy,iz) .lt. 2 ) rupdp = .false.
-          if( nacr(rsurf  ,iy,iz) .ge. 2 ) rupdm = .false.
-        enddo
+      densx = densx/volyz/3
+      if( densx .gt. density ) lexists(ix) = .true.
+    enddo
+
+!.....Right-most layer of vacuum
+    ivac_right = 0
+    do ix=1,rsurf
+      if( .not. lexists(ix) ) ivac_right = ix
+    enddo
+
+!.....Update lsurf
+    lupdate = .false.
+    lsurf_new = max(ivac_right-1, 1)  ! not to take 0
+    if( lsurf_new .gt. lsurf ) then
+      do ix=lsurf,lsurf_new-1
+        te(ix,:,:) = 0d0
       enddo
-!.....Update surface if needed
-      if( lupdm ) then
-        lsurf = lsurf - 1
-        te(lsurf,:,:) = te(lsurf+1,:,:)
-      else if( lupdp ) then
-        lsurf = lsurf + 1
-        te(lsurf-1,:,:) = 0d0
-      endif
-      if( rupdp ) then
-        rsurf = rsurf + 1
-        te(rsurf,:,:) = te(rsurf-1,:,:)
-      else if( lupdm ) then
-        rsurf = rsurf - 1
-        te(rsurf+1,:,:) = 0d0
-      endif
+    else if( lsurf_new .lt. lsurf ) then
+      do ix=lsurf_new,lsurf-1
+        te(ix,:,:) = te(lsurf,:,:)
+      enddo
     endif
+    lsurf = lsurf_new
+
+10  continue
 !.....Broadcast Te distribution to all the nodes.
 !.....There could be smarter way to reduce networking cost.
     call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rsurf,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(lskin,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(lsurf,1,mpi_integer,0,mpi_world,ierr)
+
+    if( lsurf.eq.rsurf ) then
+      if( myid.eq.0 ) print *,'Warning: lsurf.eq.rsurf!'
+    endif
+    return
   end subroutine update_surface_plane
 end module ttm
 !-----------------------------------------------------------------------
