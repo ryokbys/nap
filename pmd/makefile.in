@@ -54,6 +54,7 @@ params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 # Post process programs
 #
 pmd2akr= pmd2akr.o read_input.o util_pmd.o sort.o
+voids=  mod_pmdio.o voids.o util_pmd.o mk_lspr.o util_tag.o util_vec.o
 
 #-----------------------------------------------------------------------
 # Make rule entries
@@ -73,6 +74,9 @@ pmc: ${mods} ${pmc} ${forces}
 
 # smd: ${mods} ${smd} ${forces} ${params}
 #   ${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${smd}
+
+voids: ${voids} ${args}
+	${MPIFC} ${MPIFLAGS} -o $@ ${voids} ${args}
 
 combine: ${comb} ${mods}
 	${MPIFC} ${MPIFLAGS} -o $@  ${mods} ${comb}
