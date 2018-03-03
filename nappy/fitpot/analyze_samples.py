@@ -11,6 +11,8 @@ Options:
   -h, --help  Show this message and exit.
   --graph-format FORMAT
               Specify a graph format. [default: png]
+  --energy-limit ELIM
+              Extract sample names of which the energy has large than ELIM. [default: none]
 """
 from __future__ import print_function
 
@@ -173,6 +175,24 @@ def draw_graph(systems,uniq_names,graph_format='png',
                 dpi=300, bbox_inches='tight')
     return
 
+def get_high_energy_samples(systems,elim=1.0):
+    emin = 0.0
+    for s in systems:
+        nsys = s['nsys']
+        natm = len(nsys.atoms)
+        erg = s['erg']/natm
+        emin = min(emin,erg)
+    print('Minimum energy = ',emin)
+    dnames = []
+    for s in systems:
+        nsys = s['nsys']
+        natm = len(nsys.atoms)
+        erg = s['erg']/natm
+        if np.abs(erg-emin) > elim:
+            dnames.append(s['dname'])
+    print('Num of samples over ELIM = ',len(dnames))
+    return dnames
+
 def arrange_dirs(dirs):
 
     #...If the dirname contains '/' at the end, remove it.
@@ -220,6 +240,7 @@ if __name__ == "__main__":
         s['frcs'] = frcs
         s['strs'] = strs
         s['name'] = name
+        s['dname'] = d
         systems.append(s)
 
     statistics(systems)
@@ -228,6 +249,16 @@ if __name__ == "__main__":
     draw_graph(systems,uniq_names,graph_format=graph_format,
                graph_name=graph_name)
 
-    print('Outputs:')
-    print('  - '+graph_name)
+    print('')
+    print('- '+graph_name)
+
+    elim = args['--energy-limit']
+    if elim != 'none':
+        print('')
+        elim = float(elim)
+        dnames = get_high_energy_samples(systems,elim)
+        with open('out.high_energy_samples','w') as f:
+            for d in dnames:
+                f.write('{0:s}\n'.format(d))
+        print('- out.high_energy_samples')
     
