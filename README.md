@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="256" src="./doc/figs/logo_nap_256.npg">
+  <img width="256" src="doc/figs/logo_nap_256.png">
 </p>
 
 # What's NAP
