@@ -3,15 +3,16 @@
 </p>
 
 # What's NAP
-**Nagoya Atomistic-simulation Package (NAP)** consists of several programs and utilities:
+**Nagoya Atomistic-simulation Package (NAP)** includes several programs and utilities:
 - parallel molecular dynamics simulation (*pmd*)
 - potential parameter fitting (*fitpot*)
 - python modules for pre/post-processes (*nappy*)
+
 The program, *pmd* , includes various interatomic potentials for metals and semiconductors,
 and uses spatial decomposition technique for the parallelization, and cell-list method for efficient neighbor search.
 
 # Who made this?
-* Ryo KOBAYASHI
+* [Ryo KOBAYASHI](http://ryokbys.web.nitech.ac.jp/index.html)
 * Assistant Professor in the department of mechanical engineering, Nagoya Institute of Technology. (Nov, 2017)
 
 # Compilation and usage
