@@ -14,3 +14,6 @@ Ang_to_cm = Ang_to_m *100
 amu_to_kg = 1.660539040e-27
 kg_to_amu = 1.0 /amu_to_kg
 amu_to_g = amu_to_kg *1000
+
+kB = 8.6173303e-5  # eV/K
+K_to_eV = kB

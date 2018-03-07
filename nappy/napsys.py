@@ -38,6 +38,7 @@ import numpy as np
 from docopt import docopt
 
 from atom import Atom, get_symbol_from_number, get_number_from_symbol
+from units import kB
 
 #...constants
 _maxnn = 100
@@ -80,11 +81,49 @@ class NAPSystem(object):
         self.set_charges(charges)
 
     def set_lattice(self, alc, a1, a2, a3):
+        """
+        Set lattice by specifying lattice constant and 3 vectors.
+
+        Args:
+          alc (float): lattice constant
+          a1 (float vector of 3 components): a1 vector
+          a2 (float vector of 3 components): a2 vector
+          a3 (float vector of 3 components): a3 vector
+        """
         self.alc = alc
         self.a1[:] = a1[:]
         self.a2[:] = a2[:]
         self.a3[:] = a3[:]
+        return None
 
+    def set_lattice_parameters(self,a,b,c,alpha,beta,gamma):
+        """
+        Set lattice by specifying lattice parameters, a,b,c,alpha,beta,gamma.
+
+        Args:
+          a (float): lattice parameter *a*
+          b (float): lattice parameter *b*
+          c (float): lattice parameter *c*
+          alpha (float): angle in degree
+          beta (float): angle in degree
+          gamma (float): angle in degree
+        """
+        self.alc = 1.0
+        alpha_r = np.radians(alpha)
+        beta_r = np.radians(beta)
+        gamma_r = np.radians(gamma)
+        val = (np.cos(alpha_r) * np.cos(beta_r) - np.cos(gamma_r))\
+            / (np.sin(alpha_r) * np.sin(beta_r))
+        val = max(abs(val),1.0)
+        gamma_star = np.arccos(val)
+        self.a1[:] = [float(a), 0.0, 0.0]
+        self.a2[:] = [b*np.cos(gamma_r),
+                      b*np.sin(gamma_r), 0.0]
+        self.a3[:] = [c*np.cos(beta_r),
+                      -c*np.sin(beta_r)*np.cos(gamma_star),
+                      c*np.sin(beta_r)*np.sin(gamma_star)]
+        return None
+        
     def get_hmat(self):
         """
         Be careful about the definition of H-matrix here.
@@ -98,7 +137,7 @@ class NAPSystem(object):
         hmat[:, 1] = self.a2 * self.alc
         hmat[:, 2] = self.a3 * self.alc
         return hmat
-
+    
     def set_hmat(self, hmat):
         self.alc = 1.0
         self.a1[:] = hmat[:, 0]
@@ -110,12 +149,21 @@ class NAPSystem(object):
         return np.linalg.inv(hmat)
 
     def set_specorder(self,*specorder):
+        #...Check if the number of species is relevant
+        maxsid = 0
+        for ai in self.atoms:
+            maxsid = max(maxsid,ai.sid)
+        if len(specorder) < maxsid:
+            txt = 'Number of species is not sufficient.' \
+                  +'Must be greater than {0:d}'.format(maxsid)
+            raise ValueError(txt)
         self.specorder = specorder
         for ai in self.atoms:
-            try:
-                ai.sid = self.specorder.index(ai.symbol) +1
-            except ValueError:
-                ai.sid = 1
+            ai.symbol = specorder[ai.sid-1]
+            # try:
+            #     ai.sid = self.specorder.index(ai.symbol) +1
+            # except ValueError:
+            #     ai.sid = 1
                 
     def get_lattice_vectors(self):
         return self.a1*self.alc, self.a2*self.alc, self.a3*self.alc
@@ -543,6 +591,18 @@ You need to specify the species order correctly with --specorder option.
         xy = 0.0
         xz = 0.0
         yz = 0.0
+        aux_exists = {
+            'ekin': -1,
+            'epot': -1,
+            'sxx': -1,
+            'syy': -1,
+            'szz': -1,
+            'syz': -1,
+            'sxz': -1,
+            'sxy': -1,
+            'chg': -1,
+            'chi': -1
+        }
         for line in f.readlines():
             if 'ITEM' in line:
                 if 'NUMBER OF ATOMS' in line:
@@ -553,6 +613,10 @@ You need to specify the species order correctly with --specorder option.
                     continue
                 elif 'ATOMS' in line:
                     mode= 'ATOMS'
+                    aux_names = [ name for i,name in enumerate(line.split()) if i > 1 ]
+                    for ia,a in enumerate(aux_names):
+                        if a in aux_exists.keys():
+                            aux_exists[a] = ia
                     continue
                 elif 'TIMESTEP' in line:
                     mode= 'TIMESTEP'
@@ -618,6 +682,31 @@ You need to specify the species order correctly with --specorder option.
                     z = self._pbc(z)
                     ai.set_pos(x,y,z)
                     ai.set_vel(0.0,0.0,0.0)
+                    for k,v in aux_exists.items():
+                        if v >= 0:
+                            if k == 'ekin':
+                                eki = float(data[v])
+                                ai.set_ekin(float(data[v]))
+                                ai.set_aux(key='temperature',
+                                           value=eki*2.0/3/kB)
+                            elif k == 'epot':
+                                ai.set_epot(float(data[v]))
+                            elif k == 'chg':
+                                ai.set_aux(key=k,value=float(data[v]))
+                            elif k == 'chi':
+                                ai.set_aux(key=k,value=float(data[v]))
+                            elif k == 'sxx':
+                                ai.strs[0] = float(data[v])
+                            elif k == 'syy':
+                                ai.strs[1] = float(data[v])
+                            elif k == 'szz':
+                                ai.strs[2] = float(data[v])
+                            elif k == 'syz' or k == 'szy':
+                                ai.strs[3] = float(data[v])
+                            elif k == 'sxz' or k == 'szx':
+                                ai.strs[4] = float(data[v])
+                            elif k == 'sxy' or k == 'syx':
+                                ai.strs[5] = float(data[v])
                     self.atoms.append(ai)
                 iatm += 1
         # print self.alc
@@ -688,7 +777,6 @@ You need to specify the species order correctly with --specorder option.
     def read_lammps_data(self,fname="data.lammps",atom_style='atomic'):
         f=open(fname,'r')
         mode= 'None'
-        ixyz= 0
         iatm= 0
         symbol = None
         self.atoms= []
@@ -729,7 +817,7 @@ You need to specify the species order correctly with --specorder option.
                     hmati= np.linalg.inv(hmat)
                     continue
             elif mode == 'Atoms':
-                if len(data) > 5 and iatm < natm:
+                if len(data) >= 5 and iatm < natm:
                     idat = 0
                     ai = Atom()
                     idat += 1
@@ -1180,7 +1268,7 @@ You need to specify the species order correctly with --specorder option.
         try:
             from ase import Atoms
         except ImportError:
-            raise ImportError('ASE Atoms was not loaded.')
+            raise ImportError('Cannot load ase Atoms.')
 
         cell = np.array([self.a1, self.a2, self.a3])
         cell *= self.alc
