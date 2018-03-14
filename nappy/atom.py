@@ -86,6 +86,11 @@ class Atom(object):
     def set_strs(self,xx,yy,zz,yz,xz,xy):
         self.strs= np.array([xx,yy,zz,yz,xz,xy],dtype=float)
 
+    def get_pressure(self):
+        p = 0.0
+        p = (self.strs[0] +self.strs[1] +self.strs[2])/3
+        return p
+        
     def set_epot(self,epot):
         self.epot = epot
 
