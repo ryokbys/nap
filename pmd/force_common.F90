@@ -27,7 +27,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use linreg,only:force_linreg
   use NN,only:force_NN
   use Coulomb, only: force_screened_Coulomb, force_Ewald &
-       ,initialize_coulomb, force_Ewald_long
+       ,initialize_coulomb, force_Ewald_long, force_Coulomb
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
   use Buckingham,only:force_Buckingham
   use Bonny_WRe,only: force_Bonny_WRe
@@ -77,6 +77,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
     endif
   endif
 
+!.....Non-exclusive (additive) choice of force-fields
   if( use_force('LJ') ) call force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
@@ -171,6 +172,12 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
          ,l1st,lcell_updated,lvc)
   else if( use_force('Ewald_long') ) then ! long-range Coulomb
     call force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
+         ,chg,chi,h,hi,tcom &
+         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
+         ,l1st,lcell_updated,lvc)
+  else if( use_force('Coulomb') ) then  ! Coulomb
+    call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
@@ -784,7 +791,8 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 !  force_Coulomb.F90.
 !
   use force
-  use Coulomb, only: qforce_long,qforce_short,qforce_self,qlower,qupper
+  use Coulomb, only: qforce_long,qforce_short,qforce_self,qlower,qupper&
+       ,cterms,avmu,conv_eps
   use Morse, only: qforce_vcMorse
   implicit none
   integer,intent(in):: namax,natm,myid,mpi_md_world,iprint &
@@ -797,7 +805,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   character(len=3),intent(in):: boundary
 
   integer:: istp,i,istp_pos,istp_conv,is
-  real(8):: eclong,epot,epotp,afq,eMorse,fqnorm,vqnorm,dt,alpha,p &
+  real(8):: eclong,epot,epotp,eMorse,fqnorm,vqnorm,dt,alpha,p &
        ,ecoul,ecshort,eself
   real(8),save,allocatable:: vq(:),fq(:)
   logical,save,allocatable:: lqfix(:) 
@@ -807,7 +815,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 
   integer,parameter:: nstp_dampopt = 1000
   real(8),parameter:: dt_dampopt = 0.001  ! 0.005 fs
-  real(8),parameter:: ecrit_dampopt = 1.0d-4
+!!$  real(8),parameter:: ecrit_dampopt = 1.0d-4
   real(8),parameter:: amassq = 0.002
   real(8),parameter:: qtot = 0d0
 !.....Simple velocity damping
@@ -829,7 +837,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   endif
 
 !.....Gather forces on charges
-  fq(1:natm) = 0d0
+  fq(1:namax) = 0d0
   ecshort = 0d0
   eclong = 0d0
   eself = 0d0
@@ -848,26 +856,29 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     endif
   enddo
   if( count_nonfixed(namax,natm,lqfix,myid,mpi_md_world).eq.0 ) then
-    if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because all Qs fixed.'
+    if( myid.eq.0 .and. iprint.gt.1 ) &
+         print *,'WARNING: exited from dampopt_charge because all Qs are '&
+         //'fixed at upper/lower bounds.'
     return
   endif
-  if( use_force('Ewald_long') ) then
+!!$  if( use_force('Ewald_long') ) then
+  if( trim(cterms).eq.'long' ) then
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
     call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
          myid,iprint,fq,eclong)
-  else if( use_force('Ewald') ) then
+!!$  else if( use_force('Ewald') ) then
+  else if( trim(cterms).eq.'full' ) then
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
     call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
          ,rc,fq,ecshort)
     call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
          myid,iprint,fq,eclong)
+  else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
+    call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+    call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
+         ,rc,fq,ecshort)
   endif
   epot = eself +ecshort + eclong
-
-  if( myid.eq.0 .and. iprint.ge.20 ) then
-    write(6,'(a,i6,4es12.4)') ' istp,eself,eshort,elong,epot= ',0,eself,ecshort,eclong,epot
-    write(6,'(a,i5,20es11.3)') ' istp,fqs = ',istp,fq(1:min(natm,10))
-  endif
 
   if( use_force('vcMorse') ) then
     eMorse = 0d0
@@ -883,16 +894,21 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     endif
   enddo
   call suppress_fq(namax,natm,fq,myid,mpi_md_world)
-  call get_average_fq(namax,natm,fq,afq,lqfix,myid,mpi_md_world)
-  if( afq*0d0.ne.0d0 ) then
-    if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because afq == NaN'
+  call get_average_fq(namax,natm,fq,avmu,lqfix,myid,mpi_md_world)
+  if( myid.eq.0 .and. iprint.ge.20 ) then
+    write(6,'(a,i6,4es12.4)') ' istp,eself,eshort,elong,epot= ',0,eself,ecshort,eclong,epot
+    write(6,'(a,i5,20es11.3)') ' istp,avmu,fqs = ',istp,avmu,fq(1:min(natm,10))
+  endif
+
+  if( avmu*0d0.ne.0d0 ) then
+    if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because avmu == NaN'
     return   ! NaN
   endif
   do i=1,natm
     if( lqfix(i) ) cycle
-    fq(i) = fq(i) -afq
+    fq(i) = fq(i) -avmu
   enddo
-  fq(1:natm) = fq(1:natm) -afq
+  fq(1:natm) = fq(1:natm) -avmu
 
   vq(1:natm) = 0d0
   istp_pos = 0
@@ -934,7 +950,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     eclong = 0d0
     ecshort = 0d0
     eself = 0d0
-    fq(1:natm) = 0d0
+    fq(1:namax) = 0d0
     call impose_qtot(namax,natm,chg,qtot,lqfix,myid,mpi_md_world)
     do i=1,natm
       if( lqfix(i) ) cycle
@@ -948,19 +964,27 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       endif
     enddo
     if( count_nonfixed(namax,natm,lqfix,myid,mpi_md_world).eq.0 ) then
-      if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because all Qs fixed.'
+      if( myid.eq.0 .and. iprint.gt.1 ) &
+           print *,'WARNING: exited from dampopt_charge because all Qs are '&
+           //'fixed at upper/lower bounds.'
       return
     endif
-    if( use_force('Ewald_long') ) then
+!!$    if( use_force('Ewald_long') ) then
+    if( trim(cterms).eq.'long' ) then
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)
       call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
            myid,iprint,fq,eclong)
-    else if( use_force('Ewald') ) then
+!!$    else if( use_force('Ewald') ) then
+    else if( trim(cterms).eq.'full' ) then
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshort)
       call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
            myid,iprint,fq,eclong)
+    else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
+      call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+      call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
+           ,rc,fq,ecshort)
     endif
     epot = eself +ecshort + eclong
     if( use_force('vcMorse') ) then
@@ -978,19 +1002,19 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       endif
     enddo
     call suppress_fq(namax,natm,fq,myid,mpi_md_world)
-    call get_average_fq(namax,natm,fq,afq,lqfix,myid,mpi_md_world)
-    if( afq*0d0.ne.0d0 ) then
-      if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because afq == NaN'
+    call get_average_fq(namax,natm,fq,avmu,lqfix,myid,mpi_md_world)
+    if( avmu*0d0.ne.0d0 ) then
+      if( myid.eq.0 ) print *,'WARNING: exited from dampopt_charge because avmu == NaN'
       return   ! NaN
     endif
     do i=1,natm
       if( lqfix(i) ) cycle
-      fq(i) = fq(i) -afq
+      fq(i) = fq(i) -avmu
     enddo
     if( myid.eq.0 .and. iprint.ge.20 ) then
       write(6,'(a,i6,4es12.4)') ' istp,eself,eshort,elong,epot= ',istp,eself,ecshort,eclong,epot
-      write(6,'(a,i5,2es12.4,20es11.3)') ' istp,epot,de,fqs= ',istp &
-           ,epot,abs(epot-epotp),fq(1:min(natm,10))
+      write(6,'(a,i5,2es12.4,20es11.3)') ' istp,epot,de,avmu,fqs= ',istp &
+           ,epot,abs(epot-epotp),avmu,fq(1:min(natm,10))
     endif
 
 !.....second update of velocity
@@ -998,7 +1022,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 
 !.....check convergence
     if( istp.gt.nstp_min .and. &
-         abs(epot-epotp).lt.ecrit_dampopt ) then
+         abs(epot-epotp).lt.conv_eps ) then
       istp_conv = istp_conv +1
       if( istp_conv.gt.nstp_conv ) then
         if( myid.eq.0 .and. iprint.ge.10 ) then
@@ -1015,7 +1039,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   return
 end subroutine dampopt_charge
 !=======================================================================
-subroutine get_average_fq(namax,natm,fq,afq,lqfix,myid,mpi_md_world)
+subroutine get_average_fq(namax,natm,fq,avmu,lqfix,myid,mpi_md_world)
 !
 !  Get an average FQ that is an average chemical potential.
 !
@@ -1024,26 +1048,26 @@ subroutine get_average_fq(namax,natm,fq,afq,lqfix,myid,mpi_md_world)
   integer,intent(in):: namax,natm,myid,mpi_md_world
   real(8),intent(in):: fq(namax)
   logical,intent(in):: lqfix(namax) 
-  real(8),intent(out):: afq
+  real(8),intent(out):: avmu
 
   integer:: i,ierr
   integer:: nonfix,nonfixl
-  real(8):: afql
+  real(8):: avmul
   logical,save:: l1st = .true.
 
   nonfixl = 0
-  afql = 0d0
+  avmul = 0d0
   do i=1,natm
     if( lqfix(i) ) cycle
     nonfixl = nonfixl +1
-    afql = afql +fq(i)
+    avmul = avmul +fq(i)
   enddo
   nonfix = 0
-  afq = 0d0
+  avmu = 0d0
   call mpi_allreduce(nonfixl,nonfix,1,mpi_integer, &
        mpi_sum,mpi_md_world,ierr)
-  call mpi_allreduce(afql,afq,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
-  afq = afq/nonfix
+  call mpi_allreduce(avmul,avmu,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+  avmu = avmu/nonfix
 
   return
 end subroutine get_average_fq

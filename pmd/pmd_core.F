@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-02-26 14:56:04 Ryo KOBAYASHI>
+c                     Last-modified: <2018-03-16 11:50:48 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -15,7 +15,7 @@ c-----------------------------------------------------------------------
       use zload
       use force
       use ttm,only: init_ttm,langevin_ttm,output_Te,t_ttm,
-     &     calc_Ta,update_Te,assign_atom2cell
+     &     calc_Ta,update_Te,assign_atom2cell,output_energy_balance
       use pmdmpi,only: nid2xyz,xyz2nid
       implicit none
       include "mpif.h"
@@ -71,7 +71,11 @@ c     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
       call calc_nfmv(ntot,tagtot,myid_md,mpi_md_world)
       call set_use_charge()
 
-      write(cfistp(2:3),'(i2.2)') int(log10(dble(maxstp)))+2
+      if( maxstp.le.0 ) then
+        cfistp = 'i2'
+      else
+        write(cfistp(2:3),'(i2.2)') int(log10(dble(maxstp)))+2
+      endif
 
 c.....multiply damping factor 1st to avoid doing every step
       if( ifdmp.eq.1 ) then
@@ -413,7 +417,7 @@ c.....write out energies
         if( tave.gt.10000d0) cftave = 'es12.4'
         write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3'
      &       //','//cftave//',2es16.7e3)') istp
-     &       ,simtime,ekin+epot0-epot0,ekin,epot-epot0,tave
+     &       ,simtime,ekin+epot0-epot0,ekin,epot0-epot0,tave
      &       ,vol
      &       ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
         call flush(ioerg)
@@ -580,15 +584,17 @@ c     &             ,ifmv,tfac(ifmv),ami,tgmm,tmp
               enddo
 c.....To compensate the factor 1/2 in fa2v, multiply 2 here.
               va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(is)*dt *2d0
+              if( iprint.gt.1 ) then
 c.....accumulate energy difference
-              vi(1:3)= h(1:3,1,0)*va(1,i)
-     &             +h(1:3,2,0)*va(2,i)
-     &             +h(1:3,3,0)*va(3,i)
-              vl(1:3)= h(1:3,1,0)*aai(1)
-     &             +h(1:3,2,0)*aai(2)
-     &             +h(1:3,3,0)*aai(3)
-              ediff(ifmv)= ediff(ifmv) +fekin(is)
-     &             *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
+                vi(1:3)= h(1:3,1,0)*va(1,i)
+     &               +h(1:3,2,0)*va(2,i)
+     &               +h(1:3,3,0)*va(3,i)
+                vl(1:3)= h(1:3,1,0)*aai(1)*fa2v(is)*dt *2d0
+     &               +h(1:3,2,0)*aai(2)*fa2v(is)*dt *2d0
+     &               +h(1:3,3,0)*aai(3)*fa2v(is)*dt *2d0
+                ediff(ifmv)= ediff(ifmv) +fekin(is)
+     &               *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
+              endif
             endif
           enddo
           if( mod(istp,nrmtrans).eq.0 ) then
@@ -598,7 +604,7 @@ c.....accumulate energy difference
         else if( trim(ctctl).eq.'ttm' ) then
           call assign_atom2cell(namax,natm,ra,sorg,boundary)
           call langevin_ttm(namax,natm,va,aa,tag,eki,am,h
-     &         ,nspmax,fa2v,fekin,ediff,dt)
+     &         ,nspmax,fa2v,fekin,ediff,dt,mpi_md_world,iprint)
         else
           do i=1,natm
             is = int(tag(i))
@@ -685,17 +691,19 @@ c-------output energies
      &           ,sorg,myid_md,mpi_md_world)
           endif
 
-          ediff(1:9)= ediff(1:9) /nouterg
-          ediff0(1:9)= 0d0
-          call mpi_reduce(ediff,ediff0,9
-     &         ,mpi_double_precision,mpi_sum,0,mpi_md_world,ierr)
+          if( iprint.ne.0 ) then
+            ediff(1:9)= ediff(1:9) /nouterg
+            ediff0(1:9)= 0d0
+            call mpi_reduce(ediff,ediff0,9
+     &           ,mpi_double_precision,mpi_sum,0,mpi_md_world,ierr)
+          endif
           
           if( myid_md.eq.0 .and. iprint.gt.0 ) then
 c.....write energies
             if( tave.gt.10000d0) cftave = 'es12.4'
             write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3'
      &           //','//cftave//',2es16.7e3)') istp
-     &           ,simtime,ekin+epot0-epot0,ekin,epot-epot0,tave
+     &           ,simtime,ekin+epot-epot0,ekin,epot-epot0,tave
      &           ,vol
      &           ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
             call flush(ioerg)
@@ -734,6 +742,9 @@ c---------output step, time, and temperature
 
           if( trim(ctctl).eq.'ttm' ) then
             call output_Te(istp,myid_md,iprint)
+            if( iprint.gt.1 ) then
+              call output_energy_balance(istp,myid_md,iprint)
+            endif
           endif
             
 #ifdef __DISL__
@@ -1463,7 +1474,7 @@ c-----------------------------------------------------------------------
       character(len=3):: boundary
 
 c.....integer:: status(MPI_STATUS_SIZE)
-      integer:: i,j,kd,kdd,kul,kuh,ku,ierr,iex,ix,iy,iz,itmp
+      integer:: i,j,kd,kdd,kul,kuh,ku,ierr,iex,ix,iy,iz,itmp,istatus
       integer:: nav,maxna,maxb,inode,nsd,nrc,nbnew
       real(8):: tcom1,tcom2,xi(3),rcv(3),asgm
       logical,external:: bbd
@@ -1591,7 +1602,7 @@ c-------Error trap
         if(maxb.gt.nbmax) then
           if (myid.eq.0 .and. iprint.ne.0 ) then
             print *,'namax and array updated since nbmax changed'
-     &           //'from ',nbmax,' to ',int(maxb*1.5)
+     &           //' from ',nbmax,' to ',int(maxb*1.5)
 c            write(*,*)'Buffer or list overflowed at bacopy'
 c            write(*,*)'LSB(0) NBMAX =',maxb,nbmax
           endif
@@ -2824,7 +2835,7 @@ c
       implicit none
       integer,intent(in):: iprint,newnalmax,newnbmax
 
-      integer:: ierr,newnamax,ndim
+      integer:: ierr,newnamax,ndim,l,m,inc
       real(8),allocatable:: arr(:)
       integer,allocatable:: iarr(:)
       
@@ -2849,6 +2860,7 @@ c.....ra
       deallocate(ra)
       allocate(ra(3,newnamax))
       call copy_arr(ndim,arr,ra)
+      deallocate(arr)
 
 c.....va
       ndim = size(va)
@@ -2857,6 +2869,7 @@ c.....va
       deallocate(va)
       allocate(va(3,newnamax))
       call copy_arr(ndim,arr,va)
+      deallocate(arr)
       
 c.....aa
       ndim = size(aa)
@@ -2865,6 +2878,7 @@ c.....aa
       deallocate(aa)
       allocate(aa(3,newnamax))
       call copy_arr(ndim,arr,aa)
+      deallocate(arr)
 
 c.....ra0
       ndim = size(ra0)
@@ -2873,6 +2887,7 @@ c.....ra0
       deallocate(ra0)
       allocate(ra0(3,newnamax))
       call copy_arr(ndim,arr,ra0)
+      deallocate(arr)
 
 c.....strs
       ndim = size(strs)
@@ -2881,6 +2896,7 @@ c.....strs
       deallocate(strs)
       allocate(strs(3,3,newnamax))
       call copy_arr(ndim,arr,strs)
+      deallocate(arr)
 
 c.....stt
       ndim = size(stt)
@@ -2889,6 +2905,7 @@ c.....stt
       deallocate(stt)
       allocate(stt(3,3,newnamax))
       call copy_arr(ndim,arr,stt)
+      deallocate(arr)
 
 c.....tag
       ndim = size(tag)
@@ -2897,6 +2914,7 @@ c.....tag
       deallocate(tag)
       allocate(tag(newnamax))
       call copy_arr(ndim,arr,tag)
+      deallocate(arr)
 
 c.....lspr
       ndim = size(lspr)
@@ -2905,6 +2923,7 @@ c.....lspr
       deallocate(lspr)
       allocate(lspr(0:nnmax,newnamax))
       call copy_iarr(ndim,iarr,lspr)
+      deallocate(iarr)
 
 c.....epi
       ndim = size(epi)
@@ -2913,6 +2932,7 @@ c.....epi
       deallocate(epi)
       allocate(epi(newnamax))
       call copy_arr(ndim,arr,epi)
+      deallocate(arr)
 
 c.....eki
       ndim = size(eki)
@@ -2921,6 +2941,7 @@ c.....eki
       deallocate(eki)
       allocate(eki(3,3,newnamax))
       call copy_arr(ndim,arr,eki)
+      deallocate(arr)
 
 c.....stp
       ndim = size(stp)
@@ -2929,6 +2950,7 @@ c.....stp
       deallocate(stp)
       allocate(stp(3,3,newnamax))
       call copy_arr(ndim,arr,stp)
+      deallocate(arr)
 
 c.....stn
       ndim = size(stn)
@@ -2937,6 +2959,7 @@ c.....stn
       deallocate(stn)
       allocate(stn(3,3,newnamax))
       call copy_arr(ndim,arr,stn)
+      deallocate(arr)
 
 c.....chg
       ndim = size(chg)
@@ -2945,6 +2968,7 @@ c.....chg
       deallocate(chg)
       allocate(chg(newnamax))
       call copy_arr(ndim,arr,chg)
+      deallocate(arr)
 
 c.....chi
       ndim = size(chi)
@@ -2953,22 +2977,39 @@ c.....chi
       deallocate(chi)
       allocate(chi(newnamax))
       call copy_arr(ndim,arr,chi)
+      deallocate(arr)
 
 c.....lsb
       ndim = size(lsb)
       allocate(iarr(ndim))
       call copy_iarr(ndim,lsb,iarr)
       deallocate(lsb)
-      allocate(lsb(0:nbmax,6))
-      call copy_iarr(ndim,iarr,lsb)
+      allocate(lsb(0:newnbmax,6))
+      inc = 0
+      do l=1,6
+        do m=0,nbmax
+          inc=inc+1
+          lsb(m,l) = iarr(inc)
+        enddo
+      enddo
+c      call copy_iarr(ndim,iarr,lsb)
+      deallocate(iarr)
 
 c.....lsex
       ndim = size(lsex)
       allocate(iarr(ndim))
       call copy_iarr(ndim,lsex,iarr)
       deallocate(lsex)
-      allocate(lsex(nbmax,6))
-      call copy_iarr(ndim,iarr,lsex)
+      allocate(lsex(newnbmax,6))
+      inc = 0
+      do l=1,6
+        do m=1,nbmax
+          inc=inc+1
+          lsex(m,l) = iarr(inc)
+        enddo
+      enddo
+c      call copy_iarr(ndim,iarr,lsex)
+      deallocate(iarr)
 
 c.....Update NAMAX and NBMAX
       namax = newnamax

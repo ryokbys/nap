@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-02-27 11:06:58 Ryo KOBAYASHI>
+c                     Last-modified: <2018-03-15 10:32:05 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -22,6 +22,7 @@ c-----------------------------------------------------------------------
       use pmdmpi
       use version
       use force
+      use Coulomb, only: cterms
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -89,10 +90,13 @@ c.....Check ensemble
 c.....Set Coulomb flag here
       if( use_force('screened_Coulomb') ) then
         ifcoulomb = 1
+        cterms = 'screened'
       else if( use_force('Ewald') ) then
         ifcoulomb = 2
+        cterms = 'full'
       else if( use_force('Ewald_long') ) then
         ifcoulomb = 3
+        cterms = 'long'
       endif
 
 c.....only 0th-node reads pmdini file

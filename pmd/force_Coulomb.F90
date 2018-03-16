@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-01-31 16:44:32 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-16 17:09:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -56,8 +56,10 @@ module Coulomb
 !.....charge threshold for Coulomb interaction [default: 0.01]
   real(8),parameter:: qthd = 1d-12
 
-!.....Gaussian width of Ewald sum [default: 1.0 (Angstrom)]
-  real(8):: sgm_ew = 1d0
+!.....Gaussian width of Ewald sum
+!.....default is 0.141421356 (Angstrom)], which corresponds to alpha = 0.2 A^{-1}
+!.....See, C.J. Fennell and J.D. Gezelter, J. Chem. Phys. 124, 234104 (2006).
+  real(8):: sgm_ew = 3.5355339d0
   real(8):: sgm(msp)
 !.....Accuracy controlling parameter for Ewald sum
 !.....See, http://www.jncasr.ac.in/ccms/sbs2007/lecturenotes/5day10nov/SBS_Ewald.pdf
@@ -81,6 +83,10 @@ module Coulomb
   real(8):: vcg_chi(msp),vcg_jii(msp),vcg_e0(msp),vcg_sgm(msp) &
        ,qlower(msp),qupper(msp)
   real(8),parameter:: vcg_lambda = 0.5d0
+!.....Average mu (chemical potential)
+  real(8):: avmu
+!.....Convergence criterion for QEq
+  real(8):: conv_eps = 1.0d-6
 
 contains
   subroutine initialize_coulomb(natm,nspin,tag,chg,chi, &
@@ -93,7 +99,7 @@ contains
          ,ifcoulomb,iprint
     real(8),intent(in):: tag(natm),rc,h(3,3),chg(natm)
     real(8),intent(inout):: chi(natm)
-    logical,intent(in):: lvc 
+    logical,intent(inout):: lvc 
 
     integer:: i,ierr,nspl
 
@@ -115,6 +121,7 @@ contains
       if( lvc ) then
 !.....Variable-charge Coulomb with Gaussian distribution charges
 !     which ends-up long-range-only Ewald summation
+        call read_params(myid,mpi_md_world,ifcoulomb,iprint,lvc)
         call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
              natm,tag,chi,chg,lvc)
       else
@@ -132,11 +139,11 @@ contains
     include "mpif.h"
     integer,intent(in):: myid,mpi_md_world,natm,nspin &
          ,ifcoulomb,iprint
-    real(8),intent(in):: tag(natm),rc,h(3,3),chg(natm)
-    real(8),intent(inout):: chi(natm)
-    logical,intent(in):: lvc 
+    real(8),intent(in):: tag(natm),rc,h(3,3)
+    real(8),intent(inout):: chi(natm),chg(natm)
+    logical,intent(inout):: lvc 
 
-    integer:: i,ierr,nspl
+    integer:: i,is,ierr,nspl
 
 !!$    print *,'ifcoulomb @initialize_coulomb = ',ifcoulomb
 
@@ -146,7 +153,14 @@ contains
 
     call read_paramsx(myid,mpi_md_world,iprint)
 
-    if( trim(cchgs).eq.'variable' ) then
+    if( trim(cchgs).eq.'fixed' ) then
+      do i=1,natm
+        is = int(tag(i))
+        chg(i) = schg(is)
+      enddo
+    endif
+    
+    if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
 !.....Variable-charge Coulomb with Gaussian distribution charges
 !     which ends-up long-range-only Ewald summation
       call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
@@ -232,48 +246,55 @@ contains
     integer,intent(in):: natm
     real(8),intent(in):: h(3,3),rc,tag(natm),chg(natm)
     real(8),intent(inout):: chi(natm)
-    logical,intent(in):: lvc
+    logical,intent(inout):: lvc
 
     integer:: i,isp,ik,k1,k2,k3,is
-    real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min
+    real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min,sgm_rcmd
     real(8),external:: absv
 
-    call read_params(myid,mpi_world,ifcoulomb,iprint,lvc)
+    lvc = .true.
 
     do i=1,natm
       is = int(tag(i))
       chi(i) = vcg_chi(is)
     enddo
 
-    if( ifcoulomb.eq.2 ) then
-      sgm_ew = rc/sqrt(2d0*pacc)
-      sgm(1:msp) = sgm_ew
-      bkmax  = 2d0*pacc /rc
-      if( myid.eq.0 .and. iprint.ne.0 ) then
-        print *,'Sigmas are overwritten by rc/sqrt(2*pacc),'
-        print *,'since the full Ewald cannot treat species-dependent sigma.'
-      endif
-    else
-      sgm(1:msp) = vcg_sgm(1:msp)
-      sgm_min = 1d+30
-      do i=1,nsp
-        sgm_min = min(sgm(i),sgm_min)
+!!$    if( ifcoulomb.eq.2 ) then
+!!$      sgm_ew = rc/sqrt(2d0*pacc)
+!!$      sgm(1:msp) = sgm_ew
+!!$      bkmax  = 2d0*pacc /rc
+!!$      if( myid.eq.0 .and. iprint.ne.0 ) then
+!!$        print *,'Sigmas are overwritten by rc/sqrt(2*pacc),'
+!!$        print *,'since the full Ewald cannot treat species-dependent sigma.'
+!!$      endif
+!!$    else
+!!$      sgm(1:msp) = vcg_sgm(1:msp)
+!!$      sgm_min = 1d+30
+!!$      do i=1,nsp
+!!$        sgm_min = min(sgm(i),sgm_min)
+!!$      enddo
+!!$      bkmax  = sqrt(2d0*pacc) /sgm_min
+!!$    endif
+
+!.....Current implementation does not allow species-dpendent sigma.
+    vcg_sgm(1:msp) = sgm_ew
+    sgm(1:msp) = sgm_ew
+!.....If long-range term exists, self interaction should be added to Jii.
+    if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
+      do is=1,msp
+        vcg_jii(is) = vcg_jii(is) -acc*sqrt(2d0/pi) /vcg_sgm(is)
       enddo
-      bkmax  = sqrt(2d0*pacc) /sgm_min
     endif
+!.....Detect minimum sigma to determine k-max
+    sgm_min = sgm_ew
+    bkmax  = sqrt(2d0*pacc) /sgm_min
     if( myid.eq.0 .and. iprint.ne.0 ) then
       write(6,'(/,a)') ' Ewald sum parameters:'
       write(6,'(a,f12.4)') '   1/(4*pi*eps0)        = ', acc
       write(6,'(a,f12.4)') '   Accuracy parameter p = ', pacc
-      if( ifcoulomb.eq.2 ) then
-        write(6,'(a,f12.4)') '   Gaussian width sgm   = ', sgm_ew
-      else
-        write(6,'(a)')       '   Gaussian simgas:'
-        do i=1,nsp
-          write(6,'(a,f12.4)') '     ',sgm(i)
-        enddo
-        write(6,'(a,f12.4)') '   Minimum sigma        = ', sgm_min
-      endif
+      write(6,'(a,f12.4)') '   Gaussian simga       = ', sgm_ew
+      sgm_rcmd = rc/sqrt(2d0*pacc)
+      write(6,'(a,f12.4)') '   Recommended sigma    = ', sgm_rcmd
       write(6,'(a,f12.4)') '   real-space cutoff    = ', rc
       write(6,'(a,f12.4)') '   k-space cutoff       = ', bkmax
     endif
@@ -504,11 +525,18 @@ contains
     character(len=128):: cmode,cline,ctmp,fname
     character(len=3):: cname
     integer:: i,ierr,jerr,isp,jsp,npq
-    real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup
+    real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
+         ,vcgjiimin,sgmlim
 
     if( myid.eq.0 ) then
 !.....Initialization
       interact(1:msp,1:msp) = .true.
+      vcg_chi(1:msp) = 0d0
+      vcg_jii(1:msp) = 0d0
+      vcg_e0(1:msp) = 0d0
+      vcg_sgm(1:msp) = 0d0
+      qlower(1:msp) = 0d0
+      qupper(1:msp) = 0d0
 !.....File name
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
@@ -558,9 +586,19 @@ contains
         else if( trim(cline).eq.'interactions' ) then
           cmode = 'interactions'
           interact(1:msp,1:msp) = .false.
+          cycle
+        else if( trim(cline).eq.'sigma' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, sgm_ew
+          cycle
+        else if( trim(cline).eq.'conv_eps' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, conv_eps
+          cycle
         endif
 !.....Not a keyword, a certain mode should be already selected.
         if( trim(cmode).eq.'charges' ) then
+          backspace(ioprms)
           if( trim(cchgs).eq.'fixed' ) then
             read(ioprms,*) isp, chgi
             schg(isp) = chgi
@@ -577,24 +615,24 @@ contains
                    ,isp,trim(cname),vid,rad,npq
             endif
           else if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') then
-            read(ioprms,*) isp, cname, dchi,djii,sgmt,de0,qlow,qup
+            read(ioprms,*) isp, cname, dchi,djii,de0,qlow,qup
             if( isp.gt.nsp .and. iprint.gt.0 ) then
               print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
             endif
             vcg_chi(isp) = dchi
             vcg_jii(isp) = djii
             vcg_e0(isp) = de0
-            vcg_sgm(isp) = sgmt
             qlower(isp) = qlow
             qupper(isp) = qup
             if( iprint.gt.0 ) then
-              write(6,'(a,i3,a3,3f10.4,2f5.1)') '   isp,name,chi,Jii,sgm,e0,qlower,qupper = ', &
+              write(6,'(a,i3,a3,4f10.4,2f5.1)') '   isp,name,chi,Jii,sgm,e0,qlower,qupper = ', &
                    isp,trim(cname),dchi,djii,vcg_sgm(isp),de0,qlow,qup
             endif
           endif
 !!$        else if( trim(cmode).eq.'charge_dist' ) then
 !!$        else if( trim(cmode).eq.'terms' ) then
         else if( trim(cmode).eq.'interactions' ) then
+          backspace(ioprms)
           read(ioprms,*) isp,jsp
           interact(isp,jsp) = .true.
           interact(jsp,isp) = .true.
@@ -611,13 +649,32 @@ contains
       endif
       
 10    close(ioprms)
+
+!.....In case of variable charge, sigma has a lower bound w.r.t. min(Jii)
+      if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
+        vcgjiimin = 1d+30
+        do isp=1,nsp
+          vcgjiimin = min(vcgjiimin,vcg_jii(isp))
+        enddo
+        sgmlim = acc*sqrt(2d0/pi)/vcgjiimin
+        if( sgm_ew.lt.sgmlim ) then
+          if( iprint.ne.0 ) then
+            print *,'WARNING: Since sgm_ew is too small, sgm_ew is replaced by ',sgmlim
+            print *,'         which is determined by acc*sqrt(2/pi)/Jii.'
+          endif
+          sgm_ew = sgmlim
+        endif
+      endif
+
     endif  ! myid.eq.0
 
 !.....Broadcast data just read from the file
+    call mpi_bcast(schg,msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_e0,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vcg_sgm,nsp,mpi_real8,0,mpi_world,ierr)
+!!$    call mpi_bcast(vcg_sgm,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vid_bvs,msp,mpi_real8,0,mpi_world,ierr)
@@ -685,6 +742,10 @@ contains
 
     strsl(1:3,1:3,1:namax) = 0d0
 
+    if( lvc .or. trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
+      call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
+    endif
+
     if(  trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'short' .or. &
          trim(cterms).eq.'screened' ) then
@@ -694,8 +755,6 @@ contains
 
     if(  trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'long' ) then
-      call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
-
       call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
            lspr,epi,elrl,iprint,mpi_md_world,lstrs,lcell_updated)
     endif
@@ -713,7 +772,12 @@ contains
       print '(a,f12.4)','   Long-range term   = ',elrl
     endif
 
+
     epotl = esrl +elrl +eselfl
+    if( iprint.gt.1 .and. myid.eq.0 ) then
+      print *,'Coulomb energies (self,short,long,full)='&
+           ,eselfl,esrl,elrl,epotl,avmu
+    endif
 !.....Gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
@@ -997,6 +1061,7 @@ contains
     integer:: i,j,jj,is,js,ixyz,jxyz
     real(8):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc
     real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+    real(8),external:: fcut1,dfcut1
 
 !.....Compute direct sum
     rc2 = rc*rc
@@ -1031,7 +1096,7 @@ contains
         terfc = erfc(dij*ss2i)
 !!$        terfc = erfc(gmmij,dij)
 !.....potential
-        tmp = 0.5d0 *acc *qi*qj*diji *terfc
+        tmp = 0.5d0 *acc *qi*qj*diji *terfc *fcut1(dij,rc)
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp
           epi(j)= epi(j) +tmp
@@ -1042,7 +1107,8 @@ contains
         endif
 !.....force
         ftmp = -acc *qj*qi*diji *( diji *terfc &
-             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) )
+             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) ) *fcut1(dij,rc) &
+             +acc *qi*qj*diji *terfc *dfcut1(dij,rc)
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
@@ -1130,7 +1196,7 @@ contains
               do ixyz=1,3
                 do jxyz=1,3
                   strsl(ixyz,jxyz,i) = strsl(ixyz,jxyz,i) +tmp &
-                       *( bb(ixyz)*bb(jxyz)/bk*(bk *sgm(is)**2 +2d0/bk) &
+                       *( bb(ixyz)*bb(jxyz)/bk*(bk *sgm_ew**2 +2d0/bk) &
                        -emat(ixyz,jxyz))
                 enddo
               enddo
@@ -1154,31 +1220,27 @@ contains
     integer:: i,is
     real(8):: sgmi,qi,q2,e0,tmp
 
-!.....Compute self term. If charge per atom is fixed, it is constant.
+!.....Compute self term.
     if( lvc ) then  ! variable charge
       eselfl = 0d0
       do i=1,natm
         is = int(tag(i))
-        sgmi = sgm(is)
         qi = chg(i)
         q2 = qi*qi
         e0 = vcg_e0(is)
-        tmp = vcg_jii(is) -acc *sqrt(2d0/pi) /sgmi
-!!$        tmp = vcg_jii(is)
-        eselfl = eselfl +e0 +chi(i)*qi +0.5d0*tmp*q2
-        epi(i) = epi(i) +e0 +chi(i)*qi +0.5d0*tmp*q2
-!!$        write(6,'(a,2i4,3es12.4)') '  i,is,jii,chi*chg,tmp*q2/2=',&
-!!$             i,is,vcg_jii(is), &
-!!$             chi(i)*qi,0.5d0*tmp*q2
+        tmp = e0 +chi(i)*qi +0.5d0*vcg_jii(is)*q2
+        eselfl = eselfl +tmp
+        epi(i) = epi(i) +tmp
       enddo
-    else  ! fixed charge
+    else if( trim(cterms).eq.'full' .or. &
+         trim(cterms).eq.'long') then ! fixed charge
+!....If charge per atom is fixed, it is constant, though.
       eselfl = 0d0
       do i=1,natm
         is = int(tag(i))
-        sgmi = sgm(is)
         q2 = chg(i)*chg(i)
-        eselfl = eselfl -q2 /sgmi *acc/sqrt(2d0*pi)
-        epi(i) = epi(i) -q2 /sgmi *acc/sqrt(2d0*pi)
+        eselfl = eselfl -q2 /sgm_ew *acc/sqrt(2d0*pi)
+        epi(i) = epi(i) -q2 /sgm_ew *acc/sqrt(2d0*pi)
       enddo
     endif
 
@@ -1200,6 +1262,7 @@ contains
     real(8):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc&
          ,sgmi,sgmj,gmmij
     real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+    real(8),external:: fcut1
 
 !.....Compute direct sum
     rc2 = rc*rc
@@ -1234,15 +1297,15 @@ contains
         terfc = erfc(dij*ss2i)
 !!$        terfc = erfc(gmmij*dij)
 !.....potential
-        tmp = 0.5d0 *acc *diji *terfc
+        tmp = 0.5d0 *acc *diji *terfc *fcut1(dij,rc)
         if( j.le.natm ) then
           esr = esr +2d0*tmp*qi*qj
         else
           esr = esr +tmp*qi*qj
         endif
 !.....Force on charge
-        fq(i) = fq(i) -tmp*qj
-        fq(j) = fq(j) -tmp*qi
+        fq(i) = fq(i) -tmp*qj*2d0
+        fq(j) = fq(j) -tmp*qi*2d0
       enddo
     enddo
 
@@ -1287,7 +1350,7 @@ contains
           do i=1,natm
             xi(1:3)= ra(1:3,i)
             is= int(tag(i))
-            sgmi = sgm(is)
+            sgmi = sgm_ew
             sgmi2= sgmi*sgmi
             qi = chg(i)
             ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
@@ -1312,7 +1375,7 @@ contains
           enddo
         enddo
       enddo
-    enddo  ! ia
+    enddo
 
 !!$    epotl = eselfl +elrl
 !!$    call mpi_allreduce(epotl,epot,1,mpi_real8, &
@@ -1336,11 +1399,9 @@ contains
       is = int(tag(i))
       qi = chg(i)
       q2 = qi*qi
-      sgmi = sgm(is)
-      tmp = vcg_jii(is) -acc*sqrt(2d0/pi) /sgmi
-!!$      tmp = vcg_jii(is)
-      eself = eself +vcg_e0(is) +chi(i)*qi +0.5d0*tmp*q2
-      fq(i) = fq(i) -(chi(i) +tmp*qi)
+      sgmi = sgm_ew
+      eself = eself +vcg_e0(is) +chi(i)*qi +0.5d0*vcg_jii(is)*q2
+      fq(i) = fq(i) -(chi(i) +vcg_jii(is)*qi)
     enddo
 
   end subroutine qforce_self
