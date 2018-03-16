@@ -211,6 +211,18 @@ class NAPSystem(object):
         Remove an atom of ID ia from the atoms list.
         """
         self.atoms.pop(ia)
+        return None
+
+    def remove_atoms(self,dellist):
+        """
+        Remove atoms of given list of IDs from the system.
+        """
+        dellist.sort(reverse=True)
+        for ia in dellist:
+            if ia >= len(self.atoms):
+                continue
+            self.atoms.pop(ia)
+        return None
 
     def reset_ids(self):
         for i in range(len(self.atoms)):
