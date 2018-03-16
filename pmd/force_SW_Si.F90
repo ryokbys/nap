@@ -64,11 +64,11 @@ contains
 
 !-----only at 1st call
     if( l1st ) then
-      call read_params(myid,mpi_world)
+      call read_params(myid,mpi_world,iprint)
       allocate(aa2(3,namax),aa3(3,namax),strsl(3,3,namax))
       allocate(xi(3),xj(3),xk(3),xij(3),xik(3),at(3),bli(namax))
 !-------check rc
-      if( myid.le.0 ) then
+      if( myid.eq.0 .and. iprint.gt.0 ) then
         write(6,'(a,es12.4)') ' rc of input         =',rc
         write(6,'(a,es12.4)') ' rc of this potential=',swrc*swl
       endif
@@ -264,11 +264,11 @@ contains
     return
   end subroutine force_SW_Si
 !=======================================================================
-  subroutine read_params(myid,mpi_world)
+  subroutine read_params(myid,mpi_world,iprint)
     implicit none
     include 'mpif.h'
 
-    integer,intent(in):: myid,mpi_world
+    integer,intent(in):: myid,mpi_world,iprint
     integer:: itmp,ierr
     real(8):: rctmp
     logical:: lexist
@@ -276,7 +276,7 @@ contains
 !.....read parameters at the 1st call
     inquire(file='in.params.SW_Si',exist=lexist)
     if( .not. lexist ) then
-      if( myid.eq.0 ) then
+      if( myid.eq.0 .and. iprint.gt.0 ) then
         write(6,'(a)') ' WARNING: in.params.SW_Si does not exist !!!.'
         write(6,'(a)') '           Default parameters will be used.'
       endif

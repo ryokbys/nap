@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-02-27 18:19:32 Ryo KOBAYASHI>
+!                     Last-modified: <2018-03-08 21:35:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -84,6 +84,9 @@ module ttm
   real(8),allocatable:: gp(:),gs(:)
 
   real(8),allocatable:: aai(:,:)
+
+!.....For energy difference
+  real(8):: ein_e, ein_a
 
 contains
 !=======================================================================
@@ -434,14 +437,15 @@ contains
 !!$        if( ic.eq.4 ) print *,'Ta: ic,eksum,nac,ta,gp=',ic,eksum(ic),nac(ic),ta(ic),gp(ic)
         if( nacp(ic).eq.0 ) cycle
         tap(ic) = ekpsum(ic) *2d0 /fkb /nacp(ic)
-        gp(ic) = nacp(ic) *fkb *gmms /vcell
+        gs(ic) = nacp(ic) *fkb *gmms /vcell
       enddo
 !!$      do ix=1,nx
 !!$        iy = 1
 !!$        iz = 1
 !!$        call ixyz2ic(ix,iy,iz,ic)
-!!$        print *,'ix,iy,iz,ic,ta,eksum,eksuml=',ix,iy,iz,ic,ta(ic) &
-!!$             ,eksum(ic),eksuml(ic)
+!!$        print '(a,4i4,4es12.4)','ix,iy,iz,ic,ta,eksum,gp,gs=' &
+!!$             ,ix,iy,iz,ic,ta(ic) &
+!!$             ,eksum(ic),gp(ic),gs(ic)
 !!$      enddo
     endif
 
@@ -462,10 +466,11 @@ contains
     real(8),intent(in):: tnow
 
     integer:: ic,ix,iy,iz,ierr,istp
-    real(8):: t0,ce,xi
+    real(8):: t0,ce,xi,pterm,sterm
 
     t0 = mpi_wtime()
 
+    ein_e = 0d0
     if( myid.eq.0 ) then
       do istp = 1,nstp_inner
         call set_BC()
@@ -476,12 +481,14 @@ contains
           if( ix.lt.lsurf ) cycle
           if( ix.gt.rsurf ) cycle
           ce = cete(ix,iy,iz)
+          pterm = -gp(ic)*(te(ix,iy,iz) -ta(ic))
+          sterm = gs(ic)*tap(ic)
           tep(ix,iy,iz) = te(ix,iy,iz) &
                +dt/ce/rho_e &
                *(rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,iy,iz) &
                +ce*d2te(ix,iy,iz) ) &
-               -gp(ic)*(te(ix,iy,iz) -ta(ic)) +gs(ic)*tap(ic) )
-
+               +pterm +sterm )
+          ein_e = ein_e +(pterm+sterm)*dt *vcell
         enddo
         if( tnow.ge.t0_laser .and. &
              tnow.lt.(t0_laser +tau_pulse) ) then
@@ -593,17 +600,18 @@ contains
   end function d2te
 !=======================================================================
   subroutine langevin_ttm(namax,natm,va,aa,tag,eki,am,h, &
-       nspmax,fa2v,fekin,ediff,dtmd)
+       nspmax,fa2v,fekin,ediff,dtmd,mpi_world,iprint)
 !
 !  Langevin thermostat for atomic system.
 !
-    integer,intent(in):: namax,natm,nspmax
+    integer,intent(in):: namax,natm,nspmax,mpi_world,iprint
     real(8),intent(in):: aa(3,namax),tag(namax),am(nspmax) &
          ,fa2v(nspmax),fekin(nspmax),dtmd,h(3,3),eki(3,3,namax)
     real(8),intent(inout):: va(3,namax),ediff(nspmax)
 
-    integer:: ic,i,l,is,ifmv,ix,iy,iz,naccp
+    integer:: ic,i,l,is,ifmv,ix,iy,iz,naccp,ierr,isp
     real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0
+    real(8):: ediffl(nspmax)
     integer,external:: ifmvOf
     real(8),external:: box_muller,sprod
 
@@ -617,6 +625,7 @@ contains
     enddo
     
 !.....Langevin thermostat with Mannella integrator
+    ediffl(1:nspmax) = 0d0
     hscl(1:3)= 0d0
     do l=1,3
       hscl(l)= dsqrt(h(1,l)**2 +h(2,l)**2 +h(3,l)**2)
@@ -645,17 +654,29 @@ contains
         enddo
 !.....To compensate the factor 1/2 in fa2v, multiply 2 here.
         va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(is)*dtmd *2d0
+        if( iprint.gt.1 ) then
 !.....accumulate energy difference
-        vi(1:3)= h(1:3,1)*va(1,i) &
-             +h(1:3,2)*va(2,i) &
-             +h(1:3,3)*va(3,i)
-        vl(1:3)= h(1:3,1)*aai(1) &
-             +h(1:3,2)*aai(2) &
-             +h(1:3,3)*aai(3)
-        ediff(ifmv)= ediff(ifmv) +fekin(is) &
-             *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
+          vi(1:3)= h(1:3,1)*va(1,i) &
+               +h(1:3,2)*va(2,i) &
+               +h(1:3,3)*va(3,i)
+          vl(1:3)= h(1:3,1)*aai(1)*fa2v(is)*dtmd *2d0 &
+               +h(1:3,2)*aai(2)*fa2v(is)*dtmd *2d0 &
+               +h(1:3,3)*aai(3)*fa2v(is)*dtmd *2d0
+          ediffl(ifmv)= ediffl(ifmv) +fekin(is) &
+               *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
+        endif
       endif
     enddo
+
+    if( iprint.gt.1 ) then
+      ediff(1:nspmax) = 0d0
+      call mpi_reduce(ediffl,ediff,nspmax &
+           ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+      ein_a = 0d0
+      do isp=1,nspmax
+        ein_a = ein_a +ediff(isp)
+      enddo
+    endif
 
     t_ttm = t_ttm +mpi_wtime()-t0
     return
@@ -814,6 +835,16 @@ contains
     endif
     return
   end subroutine update_surface_plane
+!=======================================================================
+  subroutine output_energy_balance(istp,myid,iprint)
+!
+!  Output in/out of energy at electronic and atomic systems
+!
+    integer,intent(in):: istp, myid, iprint
+
+    write(6,'(a,i8,2es12.4)') 'istp,ein_e,ein_a= ',istp, ein_e, ein_a
+    
+  end subroutine output_energy_balance
 end module ttm
 !-----------------------------------------------------------------------
 !     Local Variables:

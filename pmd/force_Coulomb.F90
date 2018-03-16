@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-16 17:09:56 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-16 23:22:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -765,7 +765,7 @@ contains
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
 
-    if( l1st .and. myid.eq.0 ) then
+    if( l1st .and. myid.eq.0 .and. iprint.gt.0 ) then
       print *,'Ewald energy term by term:'
       print '(a,f12.4)','   Self term         = ',eselfl
       print '(a,f12.4)','   Short-range term  = ',esrl
