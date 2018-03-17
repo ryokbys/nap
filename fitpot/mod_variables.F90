@@ -94,7 +94,9 @@ module variables
   type(mdsys),allocatable:: samples(:)
   integer:: nvars
   real(8),allocatable:: vars(:),vranges(:,:),gvar(:),dvar(:)
-  real(8):: rcut,rc3,rc_other
+  real(8):: rcut,rc3
+!.....Cutoff for other FFs that are subtracted [default: 5.0 Ang]
+  real(8):: rc_other = 5.0
 
   real(8):: time0,tcomm,tfunc,tgrad
   integer:: nfunc,ngrad
