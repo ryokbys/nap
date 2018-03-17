@@ -1,4 +1,11 @@
 module SW_Si
+!-----------------------------------------------------------------------
+!                     Last modified: <2018-03-17 11:18:45 Ryo KOBAYASHI>
+!-----------------------------------------------------------------------
+
+  integer,parameter:: ioprms = 50
+  character(len=128):: paramsdir = '.'
+  character(len=128),parameter:: paramsfname = 'in.params.SW'
 !-----Si mass (to be multiplied by umass)
   real(8),parameter:: am_si = 28.0855d0
 !.....length scaling factor for matching this potential to VASP
@@ -23,6 +30,21 @@ module SW_Si
 !-----si-si-si
   real(8):: sws   = 21.d0
   real(8):: swt   = 1.2d0
+
+  integer,parameter:: msp = 9
+  integer:: nsp
+
+  logical:: interact(msp,msp)
+  logical:: interact3(msp,msp,msp)
+  real(8):: aswe,aswl
+  real(8):: aswa(msp,msp)
+  real(8):: aswb(msp,msp)
+  real(8):: aswp(msp,msp)
+  real(8):: aswq(msp,msp)
+  real(8):: aswc(msp,msp)
+  real(8):: aswrc(msp,msp)
+  real(8):: asws(msp,msp,msp)
+  real(8):: aswt(msp,msp,msp)
 
 contains
   subroutine force_SW_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -50,9 +72,9 @@ contains
 
 !-----local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl
-    real(8):: rij,rik,riji,riki,rij2,rik2,rc2,src,src2
+    real(8):: rij,rik,riji,riki,rij2,rik2,rc2,src,src2,srcij,srcij2,srcik,srcik2
     real(8):: tmp,tmp1(3),tmp2(3),vexp,df2,csn,tcsn,tcsn2,dhrij,dhrik &
-         ,dhcsn,vol,voli,volj,volk,drij(3)
+         ,dhcsn,vol,voli,volj,volk,drij(3),rcmax
     real(8):: drik(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl
     real(8):: epotl,epotl2,epotl3,epott
     real(8),save:: swli,a8d3r3
@@ -64,20 +86,26 @@ contains
 
 !-----only at 1st call
     if( l1st ) then
-      call read_params(myid,mpi_world,iprint)
+      call read_params_SW(myid,mpi_world,iprint)
       allocate(aa2(3,namax),aa3(3,namax),strsl(3,3,namax))
       allocate(xi(3),xj(3),xk(3),xij(3),xik(3),at(3),bli(namax))
 !-------check rc
+      rcmax = 0d0
+      do is=1,msp
+        do js=1,msp
+          rcmax = max(rcmax,aswrc(is,js)*aswl)
+        enddo
+      enddo
       if( myid.eq.0 .and. iprint.gt.0 ) then
         write(6,'(a,es12.4)') ' rc of input         =',rc
-        write(6,'(a,es12.4)') ' rc of this potential=',swrc*swl
+        write(6,'(a,es12.4)') ' rc of this potential=',rcmax
       endif
-      if( rc .lt. swrc*swl ) then
+      if( rc .lt. rcmax ) then
 !!$      if( int(rc*100d0) &
 !!$           .ne.int(swrc*swl*100d0) ) then
         if( myid.eq.0 ) then
-          write(6,'(1x,a)') "!!! Cutoff radius is not appropriate !!!"
-          write(6,'(1x,a,es12.4)') "rc should be longer than ", swrc*swl
+          write(6,'(1x,a)') "ERROR: Cutoff radius is not appropriate !!!"
+          write(6,'(1x,a,es12.4)') "  rc should be longer than ", rcmax
         endif
         call mpi_finalize(ierr)
         stop
@@ -96,31 +124,33 @@ contains
 !-----2 body term
     epotl2= 0d0
     aa2(1:3,1:natm+nb)=0d0
-    src2 = swrc*swrc
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
-!!$      bl= 0d0
-!!$      nbl= 0
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
         js= int(tag(j))
+        if( .not. interact(is,js) ) cycle
         xj= ra(1:3,j)-xi(1:3)
+!!$        xij(1:3)= ( h(1:3,1)*xj(1) +h(1:3,2)*xj(2) &
+!!$             +h(1:3,3)*xj(3) ) *swli
         xij(1:3)= ( h(1:3,1)*xj(1) +h(1:3,2)*xj(2) &
-             +h(1:3,3)*xj(3) )*swli
+             +h(1:3,3)*xj(3) ) /aswl
         rij2= xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
-        src= swrc
+!!$        src= swrc
+        src= aswrc(is,js)
+        src2 = src*src
         if( rij2.ge.src2 ) cycle
         rij= dsqrt(rij2)
-!!$        nbl=nbl +1
-!!$        bl=bl +rij
         riji= 1d0/rij
         drijc= 1d0/(rij-src)
-        vexp=exp(swc*drijc)
+!!$        vexp=exp(swc*drijc)
+        vexp=exp(aswc(is,js)*drijc)
 !---------potential
-        tmp= 0.5d0*swe *swa*vexp*(swb*riji**swp -riji**swq)
+        tmp= 0.5d0 *aswe *aswa(is,js) *vexp &
+             *(aswb(is,js)*riji**aswp(is,js) -riji**aswq(is,js))
         epi(i)= epi(i) +tmp
 !!$        if( i.eq.1 ) print *,'i,j,rij,tmp,epi=',i,j,rij,tmp,epi(i)
         epotl2= epotl2 +tmp
@@ -129,24 +159,26 @@ contains
           epotl2= epotl2 +tmp
         endif
 !---------force
-        df2= -swe*swa*vexp*(swp*swb*(riji**(swp+1d0)) &
-             -swq*(riji**(swq+1d0)) &
-             +(swb*(riji**swp) -riji**swq)*swc*drijc*drijc)
-        drij(1:3) = -xij(1:3)*riji*swli
+        df2= -aswe*aswa(is,js)*vexp*(aswp(is,js)*aswb(is,js) &
+             *(riji**(aswp(is,js)+1d0)) &
+             -aswq(is,js)*(riji**(aswq(is,js)+1d0)) &
+             +(aswb(is,js)*(riji**aswp(is,js))&
+             -riji**aswq(is,js))*aswc(is,js)*drijc*drijc)
+        drij(1:3) = -xij(1:3)*riji /aswl
         aa2(1:3,i)= aa2(1:3,i) -df2*drij(1:3)
         aa2(1:3,j)= aa2(1:3,j) +df2*drij(1:3)
 !-----------Stress
         if( j.le.natm ) then
           do jxyz=1,3
             strsl(1:3,jxyz,i)= strsl(1:3,jxyz,i) &
-                 -0.5d0*xij(jxyz)*swl*(-df2*drij(1:3))
+                 -0.5d0*xij(jxyz)*aswl*(-df2*drij(1:3))
             strsl(1:3,jxyz,j)= strsl(1:3,jxyz,j) &
-                 -0.5d0*xij(jxyz)*swl*(-df2*drij(1:3))
+                 -0.5d0*xij(jxyz)*aswl*(-df2*drij(1:3))
           enddo
         else
           do jxyz=1,3
             strsl(1:3,jxyz,i)= strsl(1:3,jxyz,i) &
-                 -0.5d0*xij(jxyz)*swl*(-df2*drij(1:3))
+                 -0.5d0*xij(jxyz)*aswl*(-df2*drij(1:3))
           enddo
         endif
 
@@ -173,70 +205,67 @@ contains
         js= int(tag(j))
         xj(1:3)= ra(1:3,j) -xi(1:3)
         xij(1:3)= ( h(1:3,1)*xj(1) +h(1:3,2)*xj(2) &
-             +h(1:3,3)*xj(3) )*swli
+             +h(1:3,3)*xj(3) ) /aswl
         rij2= xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
-        src= swrc
-!!$        src2= src*src
-        if( rij2.ge.src2 ) cycle
+        srcij= aswrc(is,js)
+        srcij2= srcij*srcij
+        if( rij2.ge.srcij2 ) cycle
         rij= dsqrt(rij2)
         riji= 1d0/rij
-        drijc= 1d0/(rij-src)
-!!$        vol= a8d3r3*rij**3
-!!$        volj= 1d0/vol
+        drijc= 1d0/(rij-srcij)
 !---------atom (k)
         do m=1,lspr(0,i)
           k=lspr(m,i)
           if(k.eq.0) exit
           if( k.le.j .or. k.eq.i ) cycle
           ks= int(tag(k))
+          if( .not. interact3(is,js,ks) ) cycle
           xk(1:3)= ra(1:3,k) -xi(1:3)
           xik(1:3)= ( h(1:3,1)*xk(1) +h(1:3,2)*xk(2) &
-               +h(1:3,3)*xk(3) )*swli
+               +h(1:3,3)*xk(3) ) /aswl
           rik2= xik(1)*xik(1)+xik(2)*xik(2)+xik(3)*xik(3)
-          src= swrc
-!!$          src2= src*src
-          if( rik2.ge.src2 ) cycle
+          srcik= aswrc(is,js)
+          srcik2= srcik*srcik
+          if( rik2.ge.srcik2 ) cycle
           rik=dsqrt(rik2)
           riki= 1d0/rik
-          drikc= 1d0/(rik-src)
-!!$          vol= a8d3r3*rik**3
-!!$          volk= 1d0/vol
+          drikc= 1d0/(rik-srcik)
 !-----------common term
           csn=(xij(1)*xik(1) +xij(2)*xik(2) +xij(3)*xik(3)) &
                * (riji*riki)
           tcsn = csn +1d0/3d0
           tcsn2= tcsn*tcsn
-          vexp= dexp(swt*drijc +swt*drikc)
+          vexp= dexp(aswt(is,js,ks)*drijc +aswt(is,js,ks)*drikc)
 !-----------potential
-          tmp= swe *sws *vexp *tcsn2
+          tmp= aswe *asws(is,js,ks) *vexp *tcsn2
           epi(i)= epi(i) +tmp
           epotl3= epotl3 +tmp
 !-----------force
-          dhrij= -sws *swt *vexp *tcsn2 *drijc*drijc
-          dhrik= -sws *swt *vexp *tcsn2 *drikc*drikc
+          dhrij= -asws(is,js,ks) *aswt(is,js,ks) *vexp *tcsn2 *drijc*drijc
+          dhrik= -asws(is,js,ks) *aswt(is,js,ks) *vexp *tcsn2 *drikc*drikc
           dhcsn= 2d0 *sws *vexp *tcsn 
-          drij(1:3)= -xij(1:3)*riji*swli
-          drik(1:3)= -xik(1:3)*riki*swli
-          dcsnj(1:3)= (-xij(1:3)*csn*(riji*riji) +xik(1:3)*(riji*riki))*swli
-          dcsnk(1:3)= (-xik(1:3)*csn*(riki*riki) +xij(1:3)*(riji*riki))*swli
+          drij(1:3)= -xij(1:3)*riji /aswl
+          drik(1:3)= -xik(1:3)*riki /aswl
+          dcsnj(1:3)= (-xij(1:3)*csn*(riji*riji) +xik(1:3)*(riji*riki)) /aswl
+          dcsnk(1:3)= (-xik(1:3)*csn*(riki*riki) +xij(1:3)*(riji*riki)) /aswl
           dcsni(1:3)= -dcsnj(1:3) -dcsnk(1:3)
 !!$          aa3(1:3,i)=aa3(1:3,i) -swe*(dhcsn*dcsni(1:3) +dhrij*drij(1:3) &
 !!$                 +dhrik*drik(1:3))
 
-          tmp1(1:3)= swe*(dhcsn*dcsnj(1:3) +dhrij*(-drij(1:3)))
-          tmp2(1:3)= swe*(dhcsn*dcsnk(1:3) +dhrik*(-drik(1:3)))
+          tmp1(1:3)= aswe*(dhcsn*dcsnj(1:3) +dhrij*(-drij(1:3)))
+          tmp2(1:3)= aswe*(dhcsn*dcsnk(1:3) +dhrik*(-drik(1:3)))
           aa3(1:3,i)= aa3(1:3,i) +(tmp1(1:3)+tmp2(1:3))
           aa3(1:3,j)= aa3(1:3,j) -tmp1(1:3)
           aa3(1:3,k)= aa3(1:3,k) -tmp2(1:3)
 !-------------Stress
           do jxyz=1,3
             strsl(1:3,jxyz,i)=strsl(1:3,jxyz,i) &
-                 -0.5d0*xij(jxyz)*swl*tmp1(1:3) & !*volj &
-                 -0.5d0*xik(jxyz)*swl*tmp2(1:3) !*volk
+                 -0.5d0*xij(jxyz)*aswl*tmp1(1:3) & !*volj &
+                 -0.5d0*xik(jxyz)*aswl*tmp2(1:3) !*volk
             strsl(1:3,jxyz,j)=strsl(1:3,jxyz,j) &
-                 -0.5d0*xij(jxyz)*swl*tmp1(1:3) !*volj
+                 -0.5d0*xij(jxyz)*aswl*tmp1(1:3) !*volj
             strsl(1:3,jxyz,k)=strsl(1:3,jxyz,k) &
-                 -0.5d0*xik(jxyz)*swl*tmp2(1:3) !*volk
+                 -0.5d0*xik(jxyz)*aswl*tmp2(1:3) !*volk
           enddo
 
         enddo
@@ -258,63 +287,170 @@ contains
 !-----gather epot
     epotl= epotl2 +epotl3
 !!$    epotl= epotl3
-    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
-         ,MPI_SUM,mpi_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+         ,mpi_sum,mpi_world,ierr)
     epot= epot +epott
     return
   end subroutine force_SW_Si
 !=======================================================================
-  subroutine read_params(myid,mpi_world,iprint)
+  subroutine read_params_SW(myid,mpi_world,iprint)
     implicit none
     include 'mpif.h'
-
     integer,intent(in):: myid,mpi_world,iprint
-    integer:: itmp,ierr
-    real(8):: rctmp
+
+    integer:: itmp,ierr,isp,jsp,ksp,nd
+    real(8):: rctmp,tswa,tswb,tswp,tswq,tswc,tswrc,tsws,tswt
     logical:: lexist
+    character(len=128):: cfname,ctmp,cline
+
+    integer,external:: num_data
 
 !.....read parameters at the 1st call
-    inquire(file='in.params.SW_Si',exist=lexist)
-    if( .not. lexist ) then
-      if( myid.eq.0 .and. iprint.gt.0 ) then
-        write(6,'(a)') ' WARNING: in.params.SW_Si does not exist !!!.'
-        write(6,'(a)') '           Default parameters will be used.'
-      endif
-      return
-    endif
     if( myid.eq.0 ) then
-      open(50,file='in.params.SW_Si',status='old')
-      read(50,*) itmp,rctmp
-      if( itmp.ne.nprms ) then
-        write(6,'(a)') ' [Error] itmp.ne.nprms'
-        write(6,'(a,i3)') '  itmp =',itmp
-        stop
+!.....Initialize parameters
+      interact(1:msp,1:msp) = .false.
+      interact(1,1) = .true.
+      aswe = swe
+      aswl = swl
+      aswa(1,1) = swa
+      aswb(1,1) = swb
+      aswp(1,1) = swp
+      aswq(1,1) = swq
+      aswc(1,1) = swc
+      aswrc(1,1) = swrc
+      interact3(1:msp,1:msp,1:msp) = .false.
+      interact3(1,1,1) = .true.
+      asws(1,1,1) = sws
+      aswt(1,1,1) = swt
+!.....Check whether the file exists      
+      cfname = trim(paramsdir)//'/'//trim(paramsfname)
+      inquire(file=cfname,exist=lexist)
+      if( .not. lexist ) then
+        if( iprint.gt.0 ) then
+          write(6,'(a)') ' WARNING: in.params.SW_Si does not exist !!!.'
+          write(6,'(a)') '           Default parameters will be used.'
+        endif
+        return
       endif
-      read(50,*) swe
-      read(50,*) swl
-      read(50,*) swa
-      read(50,*) swb
-      read(50,*) swp
-      read(50,*) swq
-      read(50,*) swc
-      read(50,*) swrc
-      read(50,*) sws
-      read(50,*) swt
-      close(50)
+!.....Read file if exists
+      if( iprint.ne.0 ) write(6,'(/,a)') ' SW parameters read from file:'
+      open(ioprms,file=cfname,status='old')
+      do while(.true.)
+        read(ioprms,'(a)',end=10) cline
+        nd = num_data(cline,' ')
+        if( nd.eq.0 ) cycle
+        if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
+        isp = 0
+        jsp = 0
+        ksp = 0
+        if( index(cline,'unit').ne.0 .and. nd.eq.3 ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, aswe, aswl
+          if( iprint.ne.0 ) &
+               write(6,'(a,2es14.4)') '   unit (energy,length) = ',aswe,aswl
+        else if( nd.eq.8 ) then  ! two body
+          backspace(ioprms)
+          read(ioprms,*) isp,jsp,tswa,tswb,tswp,tswq,tswc,tswrc
+          if( isp.gt.msp .or. jsp.gt.msp ) then
+            if( iprint.ne.0 ) then
+              write(6,*) 'WARNING@read_params_SW: isp/jsp greater than msp, ' &
+                   //'so skip the line.'
+            endif
+            cycle
+          endif
+          if( iprint.ne.0 ) &
+               write(6,'(2i4,6es14.4)') isp,jsp,tswa,tswb,tswp,tswq,tswc,tswrc
+          interact(isp,jsp) = .true.
+          aswa(isp,jsp) = tswa
+          aswb(isp,jsp) = tswb
+          aswp(isp,jsp) = tswp
+          aswq(isp,jsp) = tswq
+          aswc(isp,jsp) = tswc
+          aswrc(isp,jsp) = tswrc
+!.....Symmetrize if needed
+          if( isp.ne.jsp ) then
+            interact(isp,jsp) = interact(jsp,isp)
+            aswa(isp,jsp) = aswa(jsp,isp)
+            aswb(isp,jsp) = aswb(jsp,isp)
+            aswp(isp,jsp) = aswp(jsp,isp)
+            aswq(isp,jsp) = aswq(jsp,isp)
+            aswc(isp,jsp) = aswc(jsp,isp)
+            aswrc(isp,jsp) = aswrc(jsp,isp)
+          endif
+        else if( nd.eq.5 ) then  ! three body
+          backspace(ioprms)
+          read(ioprms,*) isp,jsp,ksp,tsws,tswt
+          if( isp.gt.msp .or. jsp.gt.msp .or. ksp.gt.msp ) then
+            if( iprint.ne.0 ) &
+                 write(6,*) 'WARNING@read_params_SW: isp/jsp/ksp greater than msp, ' &
+                 //'so skip the line.'
+            cycle
+          endif
+          if( iprint.ne.0 ) write(6,'(3i4,6es14.4)') isp,jsp,ksp,tsws,tswt
+          interact3(isp,jsp,ksp) = .true.
+          asws(isp,jsp,ksp) = tsws
+          aswt(isp,jsp,ksp) = tswt
+!.....Symmetrize if needed
+          if( jsp.ne.ksp ) then
+            interact3(isp,ksp,jsp) = interact3(isp,jsp,ksp)
+            asws(isp,ksp,jsp) = asws(isp,jsp,ksp)
+            aswt(isp,ksp,jsp) = aswt(isp,jsp,ksp)
+          endif
+        else
+          if( iprint.ne.0 ) then
+            write(6,*) 'WARNING@read_params_SW: number of entry wrong, ' &
+                 //'so skip the line.'
+          endif
+          cycle
+        endif
+      enddo
+10    close(ioprms)
+      
+!!$      read(50,*) itmp,rctmp
+!!$      if( itmp.ne.nprms ) then
+!!$        write(6,'(a)') ' [Error] itmp.ne.nprms'
+!!$        write(6,'(a,i3)') '  itmp =',itmp
+!!$        stop
+!!$      endif
+!!$      read(50,*) swe
+!!$      read(50,*) swl
+!!$      read(50,*) swa
+!!$      read(50,*) swb
+!!$      read(50,*) swp
+!!$      read(50,*) swq
+!!$      read(50,*) swc
+!!$      read(50,*) swrc
+!!$      read(50,*) sws
+!!$      read(50,*) swt
+!!$      close(50)
     endif
 
-    call mpi_bcast(swe,1,mpi_double_precision,0,mpi_world,ierr)
-    call mpi_bcast(swl,1,mpi_double_precision,0,mpi_world,ierr)
-    call mpi_bcast(swa,1,mpi_double_precision,0,mpi_world,ierr)
-    call mpi_bcast(swb,1,mpi_double_precision,0,mpi_world,ierr)
-    call mpi_bcast(swp,1,mpi_double_precision,0,mpi_world,ierr)
-    call mpi_bcast(swq,1,mpi_double_precision,0,mpi_world,ierr)
-    call mpi_bcast(swc,1,mpi_double_precision,0,mpi_world,ierr)
-    call mpi_bcast(swrc,1,mpi_double_precision,0,mpi_world,ierr)
-    call mpi_bcast(sws,1,mpi_double_precision,0,mpi_world,ierr)
-    call mpi_bcast(swt,1,mpi_double_precision,0,mpi_world,ierr)
+    call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(aswe,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(aswl,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(aswa,msp*msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(aswb,msp*msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(aswp,msp*msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(aswq,msp*msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(aswc,msp*msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(aswrc,msp*msp,mpi_real8,0,mpi_world,ierr)
+
+    call mpi_bcast(interact3,msp*msp*msp,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(asws,msp*msp*msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(aswt,msp*msp*msp,mpi_real8,0,mpi_world,ierr)
+
+!!$    call mpi_bcast(swe,1,mpi_double_precision,0,mpi_world,ierr)
+!!$    call mpi_bcast(swl,1,mpi_double_precision,0,mpi_world,ierr)
+!!$    call mpi_bcast(swa,1,mpi_double_precision,0,mpi_world,ierr)
+!!$    call mpi_bcast(swb,1,mpi_double_precision,0,mpi_world,ierr)
+!!$    call mpi_bcast(swp,1,mpi_double_precision,0,mpi_world,ierr)
+!!$    call mpi_bcast(swq,1,mpi_double_precision,0,mpi_world,ierr)
+!!$    call mpi_bcast(swc,1,mpi_double_precision,0,mpi_world,ierr)
+!!$    call mpi_bcast(swrc,1,mpi_double_precision,0,mpi_world,ierr)
+!!$    call mpi_bcast(sws,1,mpi_double_precision,0,mpi_world,ierr)
+!!$    call mpi_bcast(swt,1,mpi_double_precision,0,mpi_world,ierr)
     return
-  end subroutine read_params
+  end subroutine read_params_SW
 end module SW_Si
 !-----------------------------------------------------------------------
 !     Local Variables:
