@@ -114,6 +114,9 @@ c=======================================================================
      &       trim(cname).eq.'additive_force_field' ) then
         call read_force_field(ionum)
         return
+      elseif( trim(cname).eq.'rcut_other_FF' ) then
+        call read_r1(ionum,rc_other)
+        return
       elseif( trim(cname).eq.'gradient' ) then
         call read_l1(ionum,lgrad)
         return

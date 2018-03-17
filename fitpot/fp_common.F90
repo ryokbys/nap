@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-02-14 16:33:48 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-17 12:26:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -151,7 +151,7 @@ contains
       endif
 !!$      print *,'func_w_pmd: 04-1, ismpl,lcalcgrad,ndim,nff='&
 !!$           ,ismpl,lcalcgrad,ndim,nff
-      call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs)
+      call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut)
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
       samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
@@ -354,7 +354,7 @@ contains
 !.....only gs is required.
 !!$      print *,'ismpl,cpot,ctype,=',ismpl,trim(cpot) &
 !!$           ,trim(ctype)
-      call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs&
+      call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut &
            ,gwe,gwf,gws)
       samples(ismpl)%gwe(1:ndim)= gwe(1:ndim)
       samples(ismpl)%gwf(1:ndim,1:3,1:natm)= gwf(1:ndim,1:3,1:natm)
@@ -453,18 +453,20 @@ contains
     return
   end subroutine grad_w_pmd
 !=======================================================================
-  subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs,&
+  subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs,rc,&
        gwe,gwf,gws)
 !
 !  Run pmd and get energy and forces of the system.
 !
-    use variables,only: rcut,mdsys,maxna,iprint,lematch,lfmatch,lsmatch
+    use variables,only: mdsys,maxna,iprint,lematch,lfmatch,lsmatch&
+         ,rc_other
     use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
     use force
     implicit none
     include "../pmd/params_unit.h"
     type(mdsys),intent(inout):: smpl
     integer,intent(in):: ndimp,nff
+    real(8),intent(in):: rc
     real(8),intent(inout):: epot,frcs(3,maxna)
     real(8),intent(out):: strs(3,3)
     logical,intent(in):: lcalcgrad
@@ -476,7 +478,7 @@ contains
 
     integer:: i,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
          nismax,nstps_done,ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
-    real(8):: am(9),dt,rc,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
+    real(8):: am(9),dt,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
          ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv
     logical:: ltdst,lcellfix(3,3),lvc
     character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5,boundary*3
@@ -498,7 +500,6 @@ contains
     dt = 5d0
     ciofmt = 'ascii'
     ifpmd = 0
-    rc = rcut
     rbuf = 0.0d0
     ifdmp = 0  ! no damping as well
     dmp = 0.99d0
@@ -694,7 +695,7 @@ contains
                //trim(samples(ismpl)%cdirname)//'/pmd')
         endif
         call run_pmd(samples(ismpl),lcalcgrad,nvars,&
-             nsubff,csubffs,epot,frcs,strs)
+             nsubff,csubffs,epot,frcs,strs,rc_other)
 !!$      print *,'myid,ismpl,epot=',myid,ismpl,epot
         samples(ismpl)%esub = epot
         samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)

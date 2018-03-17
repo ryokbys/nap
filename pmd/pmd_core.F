@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-03-16 23:25:29 Ryo KOBAYASHI>
+c                     Last-modified: <2018-03-17 12:15:39 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -2817,6 +2817,7 @@ c
       use pmdvars
       implicit none
       
+
       allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax)
      &     ,strs(3,3,namax),stt(3,3,namax),tag(namax)
      &     ,lspr(0:nnmax,namax),epi(namax),eki(3,3,namax)
