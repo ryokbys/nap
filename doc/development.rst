@@ -204,7 +204,7 @@ And if you want to perform simulation that includes a combination of elements th
 you have to implement the force calculation routine by yourself.
 Every force routine is defined in a separated module such as ``force_SW_Si.F90``, 
 which indicates the force routine of Stillinger-Weber type for Si system, and
-is called via ``get_force`` subroutine in ``parallel_MD.F`` file.
+is called via ``get_force`` subroutine in ``force_common.F`` file.
 Thus you can write your own force routine by following ``get_force``
 and ``force_SW_Si`` subroutines.
 
@@ -221,7 +221,7 @@ Each force subroutine has to have the same arguments and order and should be pro
 ASE interface
 ==============================
 
-There is a python script that connects pmd to ASE (atomistic simulation environment).
+There is a python script that connects pmd to **ASE (atomistic simulation environment)**.
 This enable us small calculation of pmd much easier.
 The following code shows how to use ``nappy/interface/ase/pmdrun.py`` with ase program.
 
@@ -238,7 +238,7 @@ The following code shows how to use ``nappy/interface/ase/pmdrun.py`` with ase p
   print atoms.get_potential_energy()
   print atoms.get_forces()
 
-When ``atoms.get_potential_energy()`` is called, pmd program is performed on the background and ASE gets results from the calculation.
+When ``atoms.get_potential_energy()`` is called, pmd program is performed background and ASE gets calculation results from ``out.pmd`` file.
 
 ---------
 
@@ -247,5 +247,5 @@ Versioning and tagging
 
 The **NAP** uses Git for version controlling.
 Developers are recommended to make new branches to modify codes, and merge the change to the master branch.
-Tags are named like `rev170605` which means the *revision* of the date 2017-06-05. If you need to make new tag at the same date, which would not happen often, you can name the tags like `rev170605_1` or something like this by adding some suffix after an underscore.
+Tags are named like ``rev170605`` which means the *revision* of the date 2017-06-05. If you need to make new tag at the same date, which would not happen often, you can name the tags like ``rev170605_1`` or something like this by adding some suffix after an underscore.
 

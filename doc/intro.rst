@@ -8,13 +8,14 @@ And *pmd* is a part of the **Nagoya atomistic-simulation package (NAP)**.
 
 The main features of *pmd* are the following:
 
-* some interatomic potentials for solid state systems that does not include long-range one such as Coulombic potential are available;
+* several interatomic potentials for solid state systems are available;
 * **neural-network (NN) interatomic potential** for metal alloy systems;
+* **QEq** or **variable charge** Coulombic potential;
 * parallel computation using spatial decomposition technique;
 * efficient searching of neighbor atoms using linked-list cell method;
 * structure relaxation using simple velocity damping or **FIRE** algorithm;
-* NVT ensemble simulation using Berendsen thermostat;
-* NpT ensemble simulation using Berendsen thermo- and baro-stat;
+* thermostats: Berendsen and Langevin;
+* barostat: Berendsen;
 * non-equilibrium MD (NEMD) for heat flux simulation;
 * two-temperature model MD (TTM-MD) for laser-ablation simulation.
 
