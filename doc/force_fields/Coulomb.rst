@@ -67,3 +67,7 @@ Here, ``charges variable`` requires some following lines that have
 - ``qlow``: lower limit of the charge of the species
 - ``qup``: upper limit of the charge of the species
 
+``conv_eps``
+  Convergence criterion of the charge optimization. 
+  Usually it should be very small to achieve good energy conservation.
+

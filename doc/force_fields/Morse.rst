@@ -3,7 +3,16 @@
 Morse potential
 ========================================
 
-Morse potential requires a parameter file ``in.params.Morse`` that has the following format.
+Potential form of the Morse potential is,
+
+.. math::
+   :nowrap:
+
+   \begin{equation*}
+   E_{ij}(R_{ij}) = D_{ij} \left\{ [\exp (\alpha_{ij} (R_{0,ij} -R_{ij}))-1]^2 -1\right\}
+   \end{equation*}
+
+The potential requires a parameter file ``in.params.Morse`` that has the following format.
 
 ::
 
