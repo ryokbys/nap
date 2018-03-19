@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-19 22:21:44 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-19 13:02:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -26,6 +26,7 @@ module NNd
   real(8),allocatable:: wgt11(:,:),wgt12(:)
   real(8),allocatable:: wgt21(:,:),wgt22(:,:),wgt23(:)
   real(8):: gsfmean,gsfvar
+  real(8),allocatable:: gsfmeans(:),gsfvars(:)
 
   type smpldata
     real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
@@ -170,12 +171,8 @@ contains
 
     allocate(fdiff(3,maxna))
 
-    gsfmean= get_mean_input()
-    gsfvar = get_variance_input(gsfmean)
-    if(myid.eq.0) then
-      write(6,'(a,es12.3)') ' mean of input     = ',gsfmean
-      write(6,'(a,es12.3)') ' variance of input = ',gsfvar
-    endif
+    allocate(gsfmeans(nhl(0)),gsfvars(nhl(0)))
+    call get_mean_gsf()
 
     if( (cpena.eq.'glasso' .or. cpena.eq.'lasso' .or. &
          cfmethod.eq.'gfs') .and. &
@@ -230,7 +227,7 @@ contains
       swgt2tst = swgt2tst*2d0
     endif
     if( myid.eq.0 ) then
-      write(6,'(a)') ' Weights to divide evaluation value:'
+      write(6,'(a)') ' Weights to divide loss function:'
       write(6,'(a,f10.1)') '   for training: ',swgt2trn
       write(6,'(a,f10.1)') '   for test:     ',swgt2tst
 !!$      write(6,'(a,es15.7)') ' swgt2trn = ',swgt2trn
@@ -288,7 +285,7 @@ contains
   subroutine NN_func(ndim,x,ftrn,ftst)
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
          ,lematch,lfmatch,nfunc,tcomm,mdsys,erefmin &
-         ,cmaindir,cevaltype,swgt2trn,swgt2tst
+         ,cmaindir,cevaltype,swgt2trn,swgt2tst,iprint
     use parallel
     use minimize
     implicit none
@@ -297,7 +294,7 @@ contains
     real(8),intent(out):: ftrn,ftst
 
     integer:: ismpl,natm,ia,ixyz,idim
-    real(8):: dn3i,ediff,fscale,eref,swgt,wgtidv,esub
+    real(8):: dn3i,ediff,fscale,eref,swgt,wgtidv,esub,epot
     real(8):: eerr,ferr,ferri
     real(8):: flocal,ftrnl,ftstl,ftmp
     real(8):: fetrnl,fetrng,fftrnl,fftrng,fstrnl,fstrng
@@ -316,9 +313,9 @@ contains
 
     if( l1st ) then
       call count_nterms()
-      if( myid.eq.0 ) then
-        write(6,'(a,2(2x,i0))') ' nterm_trn, nterm_tst = ',nterm_trn, nterm_tst
-      endif
+!!$      if( myid.eq.0 .and. iprint.gt.0 ) then
+!!$        write(6,'(a,2(2x,i0))') ' nterm_trn, nterm_tst = ',nterm_trn, nterm_tst
+!!$      endif
     endif
     
     do ismpl=isid0,isid1
@@ -343,10 +340,11 @@ contains
       esub= smpl%esub
       eerr = smpl%eerr
       swgt = smpl%wgt
+      epot = smpl%epot
+      print *,'ismpl,eref,eref/natm,epot,epot/natm=',ismpl,eref, eref/natm,&
+           epot, epot/natm
       if( lematch ) then
-        ediff= (smpl%epot -(eref-esub))/natm /eerr
-!!$      print *,'ismpl,eref,eref/natm,epot,epot/natm=',ismpl,eref, eref/natm,&
-!!$           smpl%epot, smpl%epot/natm
+        ediff= (epot -(eref-esub))/natm /eerr
         ediff= ediff*ediff
         ftmp= ftmp +ediff *swgt
       endif
@@ -522,7 +520,7 @@ contains
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
     integer:: natm,ia,ja,ihl0,ihl1,nfcal
-    real(8):: tmp,w1,w2,h1,dh1,ddh,t,dg(3)
+    real(8):: tmp,w1,w2,h1,dh1,ddh,t,dg(3),epi
 
     natm= smpl%natm
     sds%hl1(1:natm,1:nhl(1))= 0d0
@@ -553,10 +551,14 @@ contains
           sds%hl1(ia,ihl1)= sigmoid(tmp)
         enddo
       endif
+      epi = 0d0
       do ihl1=1,nhl(1)
-        smpl%epot= smpl%epot &
-             +wgt12(ihl1)*(sds%hl1(ia,ihl1)-0.5d0)
+        epi = epi +wgt12(ihl1)*(sds%hl1(ia,ihl1)-0.5d0)
+!!$        smpl%epot= smpl%epot &
+!!$             
       enddo
+      smpl%epot = smpl%epot +epi
+      print *,'ia,epi = ',ia,epi
     enddo
 
     !.....forces
@@ -1542,39 +1544,81 @@ contains
     endif
   end subroutine read_symmetry_functions
 !=======================================================================
-  function get_mean_input()
+  subroutine get_mean_gsf()
 !
 ! Compute the mean of input symmetric functions.
 !
     use variables
     use parallel
     implicit none 
-    real(8):: get_mean_input
     integer:: nsuml,nsumg,ismpl,natm,ihl0,ia
-    real(8):: gmeanl,gmean
+    real(8):: gmeanl,gmean,tmp,gvarl
+    real(8),allocatable:: gsfml(:),gsfvl(:)
 
-    !.....compute mean value
+    allocate(gsfml(nhl(0)),gsfvl(nhl(0)))
+
+
+!.....compute mean value
+    gsfml(1:nhl(0)) = 0d0
+    gsfvl(1:nhl(0)) = 0d0
+    gsfmeans(1:nhl(0)) = 0d0
+    gsfvars(1:nhl(0)) = 0d0
     gmeanl= 0d0
+    gvarl = 0d0
     nsuml= 0
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
+      nsuml= nsuml +natm
       !.....sum up gsf
       do ihl0=1,nhl(0)
         do ia=1,natm
-          gmeanl= gmeanl +sds(ismpl)%gsf(ia,ihl0)
-          nsuml= nsuml +1
+          tmp = sds(ismpl)%gsf(ia,ihl0)
+          gsfml(ihl0) = gsfml(ihl0) +tmp
+          gsfvl(ihl0) = gsfvl(ihl0) +tmp*tmp
+          gmeanl= gmeanl +tmp
+          gvarl = gvarl +tmp*tmp
+!!$          nsuml= nsuml +1
         enddo
       enddo
     enddo
-    gmean= 0d0
     nsumg= 0
-    call mpi_allreduce(gmeanl,gmean,1,mpi_double_precision &
+!!$    call mpi_allreduce(gmeanl,gsfmean,1,mpi_real8 &
+!!$         ,mpi_sum,mpi_world,ierr)
+!!$    call mpi_allreduce(gvarl,gsfvar,1,mpi_real8 &
+!!$         ,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(gsfml,gsfmeans,nhl(0),mpi_real8 &
+         ,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(gsfvl,gsfvars,nhl(0),mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(nsuml,nsumg,1,mpi_integer &
          ,mpi_sum,mpi_world,ierr)
-    get_mean_input = gmean/nsumg
+    gsfmeans(1:nhl(0))= gsfmeans(1:nhl(0))/nsumg
+    gsfvars(1:nhl(0))= gsfvars(1:nhl(0))/nsumg &
+         -gsfmeans(1:nhl(0))**2
+    
+    gsfmean= 0d0
+    gsfvar = 0d0
+    do ihl0=1,nhl(0)
+      gsfmean= gsfmean +gsfmeans(ihl0)
+      gsfvar= gsfvar +gsfvars(ihl0)
+    enddo
+    gsfmean= gsfmean/nhl(0)
+    gsfvar = gsfvar/nhl(0)
+!!$    gsfvar = get_variance_input(gsfmean)
+    if( myid.eq.0 .and. iprint.gt.0 ) then
+      write(6,'(a,es12.3)') ' mean of input symmetry functions = ',gsfmean
+      write(6,'(a,es12.3)') ' var  of input symmetry functions = ',gsfvar
+      if( iprint.ge.10 ) then
+        do ihl0=1,nhl(0)
+          write(6,'(a,i5,2es14.4e3)') '   ihl0,gsfmean,gsfvar=' &
+               ,ihl0,gsfmeans(ihl0),gsfvars(ihl0)
+        enddo
+      endif
+    endif
+
+    deallocate(gsfml,gsfvl)
     return
-  end function get_mean_input
+  end subroutine get_mean_gsf
 !=======================================================================
   function get_variance_input(gmean)
     use variables
@@ -1768,7 +1812,7 @@ contains
 !
 !  Standardize of inputs is requied when you use lasso or ridge.
 !
-    use variables, only: nsmpl,samples,nvars,nalist,vars
+    use variables, only: nsmpl,samples,nvars,nalist,vars,vranges
     use parallel
     implicit none
     integer:: ismpl,ia,natm,ihl0,ihl1,iv
