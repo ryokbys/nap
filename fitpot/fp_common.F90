@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-17 12:26:12 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-19 16:10:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -700,6 +700,10 @@ contains
         samples(ismpl)%esub = epot
         samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
         samples(ismpl)%ssub(1:3,1:3) = strs(1:3,1:3)
+!!$        print *,'ismpl,esub=',ismpl,epot
+!!$        do i=1,natm
+!!$          print *,'ia,fsub=',i,frcs(1:3,i)
+!!$        enddo
       enddo
 
     endif

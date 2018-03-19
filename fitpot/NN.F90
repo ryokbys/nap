@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-19 13:09:08 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-19 16:10:29 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -341,8 +341,6 @@ contains
       eerr = smpl%eerr
       swgt = smpl%wgt
       epot = smpl%epot
-      print *,'ismpl,eref,eref/natm,epot,epot/natm=',ismpl,eref, eref/natm,&
-           epot, epot/natm
       if( lematch ) then
         ediff= (epot -(eref-esub))/natm /eerr
         ediff= ediff*ediff
@@ -558,7 +556,6 @@ contains
 !!$             
       enddo
       smpl%epot = smpl%epot +epi
-      print *,'ia,epi = ',ia,epi
     enddo
 
     !.....forces
@@ -1736,6 +1733,8 @@ contains
         do ia=1,natm
           sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
           sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
+          sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0)= &
+               sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0) /gmax(ihl0)
         enddo
       enddo
     enddo
@@ -1792,6 +1791,8 @@ contains
         do ia=1,natm
           sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
           sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
+          sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0)= &
+               sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0) /gmax(ihl0)
         enddo
       enddo
     enddo
@@ -1836,6 +1837,8 @@ contains
           do ia=1,natm
             sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
             sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) *sgmi
+            sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0)= &
+                 sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0) *sgmi
           enddo
         enddo
       enddo

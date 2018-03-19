@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-03-17 12:15:39 Ryo KOBAYASHI>
+c                     Last-modified: <2018-03-19 15:35:31 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -881,6 +881,7 @@ c.....revert forces to the unit eV/A before going out pmd_core
           aai(1:3)= h(1:3,1,0)*atot(1,i)
      &         +h(1:3,2,0)*atot(2,i)
      &         +h(1:3,3,0)*atot(3,i)
+          atot(1:3,i) = aai(1:3)
 c          atot(1:3,i) = aai(1:3)/acon(is)
         enddo
       endif
