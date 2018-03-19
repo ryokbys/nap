@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-16 23:22:51 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-19 13:33:36 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -766,6 +766,7 @@ contains
     endif
 
     if( l1st .and. myid.eq.0 .and. iprint.gt.0 ) then
+      print *,''
       print *,'Ewald energy term by term:'
       print '(a,f12.4)','   Self term         = ',eselfl
       print '(a,f12.4)','   Short-range term  = ',esrl
@@ -774,10 +775,10 @@ contains
 
 
     epotl = esrl +elrl +eselfl
-    if( iprint.gt.1 .and. myid.eq.0 ) then
-      print *,'Coulomb energies (self,short,long,full)='&
-           ,eselfl,esrl,elrl,epotl,avmu
-    endif
+!!$    if( iprint.gt.1 .and. myid.eq.0 ) then
+!!$      print '(a,5es14.4e3)',' Coulomb energies (self,short,long,full)='&
+!!$           ,eselfl,esrl,elrl,epotl,avmu
+!!$    endif
 !.....Gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)

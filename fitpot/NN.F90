@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-19 13:02:49 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-19 13:09:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -1687,7 +1687,7 @@ contains
 !
 !  Standardize of inputs is recommended when you use lasso or ridge.
 !
-    use variables, only: nsmpl,samples,nvars,nalist,vars
+    use variables, only: nsmpl,samples,nvars,nalist,vars,vranges
     use parallel
     implicit none
     integer:: nsuml,nsumg,ismpl,ia,natm,ihl0,ihl1,iv
@@ -1745,6 +1745,7 @@ contains
       do ihl1=1,mhl(1)
         iv=iv+1
         vars(iv)= vars(iv)*gmax(ihl0)
+        vranges(1:2,iv)= vranges(1:2,iv)*gmax(ihl0)
       enddo
     enddo
 
@@ -1756,7 +1757,7 @@ contains
 !
 !  Standardize of inputs by dividing by L2 norm
 !
-    use variables, only: nsmpl,samples,nvars,nalist,vars
+    use variables, only: nsmpl,samples,nvars,nalist,vars,vranges
     use parallel
     implicit none
     integer:: nsuml,nsumg,ismpl,ia,natm,ihl0,ihl1,iv
@@ -1800,6 +1801,7 @@ contains
       do ihl1=1,mhl(1)
         iv=iv+1
         vars(iv)= vars(iv)*gmax(ihl0)
+        vranges(1:2,iv)= vranges(1:2,iv)*gmax(ihl0)
       enddo
     enddo
 
@@ -1844,6 +1846,7 @@ contains
       do ihl1=1,mhl(1)
         iv=iv+1
         vars(iv)= vars(iv)*sgm
+        vranges(1:2,iv)= vranges(1:2,iv)*sgm
       enddo
     enddo
 
@@ -1873,6 +1876,7 @@ contains
         do ihl1=1,mhl(1)
           iv=iv+1
           vars(iv)= vars(iv)/sgm
+          vranges(1:2,iv)= vranges(1:2,iv)/sgm
         enddo
       enddo
     else if( cnormalize.eq.'max' ) then

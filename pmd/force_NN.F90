@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-01-24 15:56:39 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-19 13:30:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -300,17 +300,21 @@ contains
     epotl= 0d0
     if( nl.eq.1 ) then
       do ia=1,natm
+        tmp = 0d0
         do ihl1=1,nhl(1)
-          epi(ia)= epi(ia) +wgt12(ihl1) *(hl1(ihl1,ia)-0.5d0)
+          tmp = tmp +wgt12(ihl1) *(hl1(ihl1,ia)-0.5d0)
         enddo
-        epotl=epotl +epi(ia)
+        epi(ia) = epi(ia) +tmp
+        epotl=epotl +tmp
       enddo
     else if( nl.eq.2 ) then
       do ia=1,natm
+        tmp = 0d0
         do ihl2=1,nhl(2)
-          epi(ia)= epi(ia) +wgt23(ihl2) *(hl2(ihl2,ia)-0.5d0)
+          tmp = tmp +wgt23(ihl2) *(hl2(ihl2,ia)-0.5d0)
         enddo
-        epotl=epotl +epi(ia)
+        epi(ia)= epi(ia) +tmp
+        epotl=epotl +tmp
       enddo
     endif
 
