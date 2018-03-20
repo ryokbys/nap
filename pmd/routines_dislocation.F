@@ -143,7 +143,7 @@ c
       implicit none
       include 'mpif.h'
       include './params_unit.h'
-      include './params_LJ_Ar.h'
+      include './params_LJ.h'
 c.....Arguments
       integer,intent(in):: namax,natm,nb,nnmax,myid_md,mpi_md_world
      &     ,nodes_md

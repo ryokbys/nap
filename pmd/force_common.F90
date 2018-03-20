@@ -13,7 +13,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use Ramas_FeH,only:force_Ramas_FeH,force_Ackland_Fe
   use RK_WHe,only:force_RK_WHe
   use Ito3_WHe,only:force_Ito3_WHe
-  use LJ_Ar,only:force_LJ_Ar
+  use LJ,only:force_LJ,force_LJ_repul
   use SW_Si,only:force_SW_Si
   use EDIP_Si,only:force_EDIP_Si
   use Brenner,only:force_brenner,force_brenner_vdW
@@ -78,9 +78,12 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   endif
 
 !.....Non-exclusive (additive) choice of force-fields
-  if( use_force('LJ') ) call force_LJ_Ar(namax,natm,tag,ra,nnmax,aa,strs,h &
+  if( use_force('LJ') ) call force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+  if( use_force('LJ_repul') ) call force_LJ_repul(namax,natm,tag,ra,nnmax &
+       ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
   if( use_force('Ito3_WHe') ) call force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
@@ -206,6 +209,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use NN, only: read_const_NN, read_params_NN, update_params_NN, lprmset_NN
   use Buckingham, only: init_Buckingham, read_params_Buckingham, lprmset_Buckingham
   use ZBL, only: read_params_ZBL
+  use LJ, only: read_params_LJ_repul
   implicit none
   integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint !,numff
   real(8),intent(in):: tag(namax),h(3,3),rc
@@ -291,6 +295,11 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   if( use_force('ZBL') ) then
     call read_params_ZBL(myid_md,mpi_md_world,iprint)
   endif
+!.....LJ_repul
+  if( use_force('LJ_repul') ) then
+    call read_params_LJ_repul(myid_md,mpi_md_world,iprint)
+  endif
+  
 
 end subroutine init_force
 !=======================================================================
