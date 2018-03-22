@@ -21,7 +21,7 @@ Options:
 """
 
 import os
-from ase.io import read
+from ase.io import read,write
 from docopt import docopt
 
 __author__ = "Ryo KOBAYASHI"
@@ -72,6 +72,9 @@ def output_for_fitpot(atoms,keep_const,dirname='./',specorder=[]):
         for frc in frcs:
             f.write("{0:12.7f} {1:12.7f} {2:12.7f}\n".format(frc[0],frc[1],frc[2]))
     write_pos(atoms,fname=dirname+'/pos',specorder=specorder)
+    if not os.path.exists(dirname+'/POSCAR'):
+        write(dirname+'/POSCAR',images=atoms,format='vasp',
+              direct=True,vasp5=True,sort=True)
     with open(dirname+'/strs.ref','w') as f:
         strs = atoms.get_stress()
         for s in strs:

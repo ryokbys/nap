@@ -19,7 +19,7 @@ some_changes = ['positions', 'numbers', 'cell',]
 
 class PMD(FileIOCalculator):
     """
-    Class for PMD calculations.
+    Class for PMD calculation for ASE.
 
     calc = PMD(label='pmd')
     """
@@ -80,8 +80,14 @@ class PMD(FileIOCalculator):
         Parameters
         ==========
         label: str
-            Prefix to use for filenames (in.label, erg.label, ...).
-            Default is 'pmd'.
+            Prefix to use for filenames (in.label, erg.label, ...). [Default: 'pmd']
+        command: str
+            Command string to execute pmd. [Default: 'pmd > out.pmd']
+        force_type: str or tuple/list
+            Force fields to be used, which must be set. [Default: None]
+        specorder: list
+            Order of species. This is probably very important, since the order of species
+            is usually fixed in pmd whereas not in ASE atoms object. [Default: None]
 
         Examples
         ========

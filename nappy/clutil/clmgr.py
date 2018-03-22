@@ -333,7 +333,7 @@ Please wait until the other clmgr stops or stop it manually.
         os.chdir(cwd)
         return jobs        
 
-    def plural_jobs_per_submission(self,dryrun=False,limit_seconds=-1):
+    def plural_jobs_per_submission(self,dryrun=False,seconds=-1):
         """
         Assign all the jobs by grouping some jobs to one submission.
         Run groupped submission at ~/.nappy/clmgr/tmpdir/ without specific
@@ -353,8 +353,8 @@ Please wait until the other clmgr stops or stop it manually.
         #...Num nodes per submission
         limit_nodes = self.machine.qattr['num_nodes']
         limit_sec = self.machine.qattr['limit_sec']
-        if limit_seconds > 0:
-            limit_sec = min(limit_sec,limit_seconds)
+        if seconds > 0:
+            limit_sec = min(limit_sec,seconds)
             logger.info('Limit second is modified from machine default value'
                         +' to {0:d}.'.format(limit_sec))
         max_ctime = 0.0
@@ -399,13 +399,10 @@ Please wait until the other clmgr stops or stop it manually.
             sum_nodes += nnodes
             dirs.append(d)
             ctime = calc.estimate_calctime(nprocs=npara)
-            max_ctime = max(max_ctime,ctime)
-            if ctime > limit_sec:
-                logger.info('Since the estimated calctime {0:s}'.format(d)
-                            +' seems to be longer than the limit_sec,'
-                            +' the maximum calucation time of the queue is applied.')
+            max_ctime = min(max(max_ctime,ctime),limit_sec)
+            if seconds > 0:
                 max_ctime = limit_sec
-            max_ctime = max(max_ctime,3600)
+            #...max_ctime = max(max_ctime,3600)
             self.mpi_command_dict['npara'] = npara
             self.mpi_command_dict['rankfile'] = './rankfile'
             commands += "cd {0:s}\n".format(d) \
@@ -418,8 +415,12 @@ Please wait until the other clmgr stops or stop it manually.
             job_info['NNODES'] = sum_nodes
             job_info['NPROCS'] = npn *sum_nodes
             job_info['COMMANDS'] = commands
-            hours = max(int(max_ctime /3600),1)
-            job_info['WALLTIME'] = '{0:d}:00:00'.format(hours)
+            # hours = max(int(max_ctime /3600),1)
+            hours,minutes,seconds = sec2hms(max_ctime)
+            # job_info['WALLTIME'] = '{0:d}:00:00'.format(hours)
+            job_info['WALLTIME'] = '{0:d}:{1:02d}:{2:02d}'.format(hours,
+                                                                  minutes,
+                                                                  seconds)
             job = {}
             job['info'] = copy.copy(job_info)
             job['dirs'] = copy.copy(dirs)
@@ -598,9 +599,9 @@ if __name__ == "__main__":
     clmgr.find_dirs_to_work(dirs)
     clmgr.avoid_conflict()
     if multiple_jobs_per_submission:
-        jobs = clmgr.plural_jobs_per_submission(dryrun=dry,limit_seconds=limit_sec)
+        jobs = clmgr.plural_jobs_per_submission(dryrun=dry,seconds=limit_sec)
     else:
-        jobs = clmgr.single_job_per_submission(dryrun=dry,limit_seconds=limit_sec)
+        jobs = clmgr.single_job_per_submission(dryrun=dry,seconds=limit_sec)
 
     logger.info("")
     logger.info("Directories treated in this clmgr {0:d} ".format(os.getpid())

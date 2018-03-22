@@ -8,6 +8,7 @@ import vasp
 import scheduler
 import clutil
 import espresso
+import mkcell
 
 _nappy_dir = '.nappy'
 
