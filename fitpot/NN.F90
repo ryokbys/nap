@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-21 23:35:03 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-22 18:39:24 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -1605,7 +1605,7 @@ contains
     if( myid.eq.0 .and. iprint.gt.0 ) then
       write(6,'(a,es12.3)') ' mean of input symmetry functions = ',gsfmean
       write(6,'(a,es12.3)') ' var  of input symmetry functions = ',gsfvar
-      if( iprint.ge.10 ) then
+      if( iprint.gt.0 ) then
         do ihl0=1,nhl(0)
           write(6,'(a,i5,2es14.4e3)') '   ihl0,gsfmean,gsfvar=' &
                ,ihl0,gsfmeans(ihl0),gsfvars(ihl0)
