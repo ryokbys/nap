@@ -1,6 +1,6 @@
-module SW_Si
+module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-17 11:18:45 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-22 17:53:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 
   integer,parameter:: ioprms = 50
@@ -47,7 +47,7 @@ module SW_Si
   real(8):: aswt(msp,msp,msp)
 
 contains
-  subroutine force_SW_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_SW(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint)
 !-----------------------------------------------------------------------
@@ -280,7 +280,7 @@ contains
          ,nn,mpi_world,epi,1)
 
 !-----sum
-    aa(1:3,1:natm)= aa2(1:3,1:natm) +aa3(1:3,1:natm)
+    aa(1:3,1:natm)= aa(1:3,1:natm) +aa2(1:3,1:natm) +aa3(1:3,1:natm)
 !!$    aa(1:3,1:natm)= aa3(1:3,1:natm)
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
@@ -290,8 +290,9 @@ contains
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
     epot= epot +epott
+    if( iprint.gt.2 ) print *,'SW epot = ',epott
     return
-  end subroutine force_SW_Si
+  end subroutine force_SW
 !=======================================================================
   subroutine read_params_SW(myid,mpi_world,iprint)
     implicit none
@@ -451,7 +452,7 @@ contains
 !!$    call mpi_bcast(swt,1,mpi_double_precision,0,mpi_world,ierr)
     return
   end subroutine read_params_SW
-end module SW_Si
+end module SW
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"

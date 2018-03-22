@@ -232,6 +232,7 @@ contains
     epott= 0d0
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
+    if( iprint.gt.2 ) print *,'LJ_repul epot = ',epott
 
   end subroutine force_LJ_repul
 !=======================================================================
@@ -272,6 +273,8 @@ contains
         if( nd.eq. 4 ) then
           backspace(ioprms)
           read(ioprms,*) isp,jsp, repij, rcij
+          if( iprint.ne.0 ) write(6,'(a,2i4,f8.4,f6.2)') &
+               '   isp,jsp,repij,rcij = ',isp,jsp,repij,rcij
           interact(isp,jsp) = .true.
           repul(isp,jsp) = repij
           rclj(isp,jsp) = rcij
@@ -296,6 +299,17 @@ contains
     call mpi_bcast(rclj,msp*msp,mpi_real8,0,mpi_world,ierr)
     return
   end subroutine read_params_LJ_repul
+!=======================================================================
+  subroutine set_paramsdir_LJ(dname)
+!
+!  Accessor routine to set paramsdir.
+!
+    implicit none
+    character(len=*),intent(in):: dname
+
+    paramsdir = trim(dname)
+    return
+  end subroutine set_paramsdir_LJ
 end module LJ
 !-----------------------------------------------------------------------
 !     Local Variables:

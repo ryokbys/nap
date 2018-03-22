@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-19 13:30:59 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-22 17:53:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -383,6 +383,7 @@ contains
     if( myid.ge.0 ) then
       call mpi_allreduce(epotl,epott,1,mpi_double_precision &
            ,mpi_sum,mpi_world,ierr)
+      if( iprint.gt.2 ) print *,'NN epot = ',epott
       epot= epot +epott
     else
       epot= epot +epotl

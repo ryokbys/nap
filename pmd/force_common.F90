@@ -14,7 +14,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use RK_WHe,only:force_RK_WHe
   use Ito3_WHe,only:force_Ito3_WHe
   use LJ,only:force_LJ,force_LJ_repul
-  use SW_Si,only:force_SW_Si
+  use SW,only:force_SW
   use EDIP_Si,only:force_EDIP_Si
   use Brenner,only:force_brenner,force_brenner_vdW
   use Lu_WHe,only:force_Lu_WHe
@@ -100,7 +100,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,nnmax,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn &
        ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
        ,iprint)
-  if( use_force('SW_Si') ) call force_SW_Si(namax,natm,tag,ra,nnmax,aa,strs &
+  if( use_force('SW') ) call force_SW(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
   if( use_force('EDIP_Si') ) call force_EDIP_Si(namax,natm,tag,ra,nnmax,aa &
@@ -804,6 +804,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
        ,cterms,avmu,conv_eps
   use Morse, only: qforce_vcMorse
   implicit none
+  include "mpif.h"
   integer,intent(in):: namax,natm,myid,mpi_md_world,iprint &
        ,nnmax,lspr(0:nnmax,namax)
   real(8),intent(in):: chi(namax),h(3,3),tag(namax),ra(3,namax),rc
@@ -813,7 +814,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
        ,nnn(6),nex(3),lsex(nbmax,6)
   character(len=3),intent(in):: boundary
 
-  integer:: istp,i,istp_pos,istp_conv,is
+  integer:: istp,i,istp_pos,istp_conv,is,ntot,ierr
   real(8):: eclong,epot,epotp,eMorse,fqnorm,vqnorm,dt,alpha,p &
        ,ecoul,ecshort,eself
   real(8),save,allocatable:: vq(:),fq(:)
@@ -845,6 +846,9 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     allocate(vq(namax),fq(namax),lqfix(namax))
   endif
 
+  call mpi_allreduce(natm,ntot,1,mpi_integer, &
+       mpi_sum,mpi_md_world,ierr)
+  
 !.....Gather forces on charges
   fq(1:namax) = 0d0
   ecshort = 0d0
@@ -1031,10 +1035,10 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 
 !.....check convergence
     if( istp.gt.nstp_min .and. &
-         abs(epot-epotp).lt.conv_eps ) then
+         abs(epot-epotp)/ntot.lt.conv_eps ) then
       istp_conv = istp_conv +1
       if( istp_conv.gt.nstp_conv ) then
-        if( myid.eq.0 .and. iprint.ge.10 ) then
+        if( myid.eq.0 .and. iprint.ge.1 ) then
           write(6,'(a,i0,a)') ' Dampopt_charge converged at ', &
                istp,' steps.'
         endif

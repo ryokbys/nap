@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-19 16:10:49 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-20 20:51:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -646,6 +646,7 @@ contains
     use parallel
     use Coulomb,only: set_paramsdir_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
+    use LJ,only: set_paramsdir_LJ
     implicit none
 
     integer:: i,ismpl,natm
@@ -653,6 +654,7 @@ contains
     logical:: luse_Morse = .false.
     logical:: luse_Morse_repul = .false.
     logical:: luse_Coulomb = .false.
+    logical:: luse_LJ_repul = .false.
     logical,save:: l1st = .true.
     real(8):: epot,strs(3,3)
     real(8),save,allocatable:: frcs(:,:)
@@ -676,6 +678,8 @@ contains
              index(trim(csubffs(i)),'Coulomb').ne.0 .or. &
              index(trim(csubffs(i)),'vcGaussian').ne.0 ) then
           luse_Coulomb = .true.
+        else if( index(trim(csubffs(i)),'LJ_repul').ne.0 ) then
+          luse_LJ_repul = .true.
         endif
       enddo
 
@@ -692,6 +696,10 @@ contains
         endif
         if( luse_Coulomb ) then
           call set_paramsdir_Coulomb(trim(cmaindir)//'/'&
+               //trim(samples(ismpl)%cdirname)//'/pmd')
+        endif
+        if( luse_LJ_repul ) then
+          call set_paramsdir_LJ(trim(cmaindir)//'/'&
                //trim(samples(ismpl)%cdirname)//'/pmd')
         endif
         call run_pmd(samples(ismpl),lcalcgrad,nvars,&

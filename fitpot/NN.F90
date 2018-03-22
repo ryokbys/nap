@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-19 16:10:29 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-21 23:35:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -1662,10 +1662,10 @@ contains
     if( lstandard ) return
     
     if( cnormalize(1:3).eq.'var' ) then
-      if(myid.eq.0 .and. l1st) print *,'Normalize w.r.t. variance.'
+      if(myid.eq.0 .and. l1st) print *,'Standardize w.r.t. variance.'
       call standardize_var()
     else if( cnormalize(1:3).eq.'max' ) then
-      if(myid.eq.0 .and. l1st) print *,'Normalize w.r.t. max not implemented'
+      if(myid.eq.0 .and. l1st) print *,'Standardize w.r.t. max not implemented'
       call mpi_finalize(ierr)
       stop
 !     call standardize_max()
@@ -1733,8 +1733,10 @@ contains
         do ia=1,natm
           sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
           sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
-          sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0)= &
-               sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0) /gmax(ihl0)
+          if( allocated(sds(ismpl)%dgsf)  ) then
+            sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0)= &
+                 sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0) /gmax(ihl0)
+          endif
         enddo
       enddo
     enddo
@@ -1791,8 +1793,10 @@ contains
         do ia=1,natm
           sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
           sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) /gmax(ihl0)
-          sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0)= &
-               sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0) /gmax(ihl0)
+          if( allocated(sds(ismpl)%dgsf) ) then
+            sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0)= &
+                 sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0) /gmax(ihl0)
+          endif
         enddo
       enddo
     enddo
@@ -1837,8 +1841,10 @@ contains
           do ia=1,natm
             sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
             sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) *sgmi
-            sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0)= &
-                 sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0) *sgmi
+            if( allocated(sds(ismpl)%dgsf) ) then
+              sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0)= &
+                   sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0) *sgmi
+            endif
           enddo
         enddo
       enddo
