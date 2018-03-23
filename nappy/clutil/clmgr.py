@@ -333,7 +333,7 @@ Please wait until the other clmgr stops or stop it manually.
         os.chdir(cwd)
         return jobs        
 
-    def plural_jobs_per_submission(self,dryrun=False,seconds=-1):
+    def plural_jobs_per_submission(self,dryrun=False,limit_seconds=-1):
         """
         Assign all the jobs by grouping some jobs to one submission.
         Run groupped submission at ~/.nappy/clmgr/tmpdir/ without specific
@@ -353,8 +353,8 @@ Please wait until the other clmgr stops or stop it manually.
         #...Num nodes per submission
         limit_nodes = self.machine.qattr['num_nodes']
         limit_sec = self.machine.qattr['limit_sec']
-        if seconds > 0:
-            limit_sec = min(limit_sec,seconds)
+        if limit_seconds > 0:
+            limit_sec = min(limit_sec,limit_seconds)
             logger.info('Limit second is modified from machine default value'
                         +' to {0:d}.'.format(limit_sec))
         max_ctime = 0.0
@@ -400,7 +400,7 @@ Please wait until the other clmgr stops or stop it manually.
             dirs.append(d)
             ctime = calc.estimate_calctime(nprocs=npara)
             max_ctime = min(max(max_ctime,ctime),limit_sec)
-            if seconds > 0:
+            if limit_seconds > 0:
                 max_ctime = limit_sec
             #...max_ctime = max(max_ctime,3600)
             self.mpi_command_dict['npara'] = npara
@@ -599,9 +599,9 @@ if __name__ == "__main__":
     clmgr.find_dirs_to_work(dirs)
     clmgr.avoid_conflict()
     if multiple_jobs_per_submission:
-        jobs = clmgr.plural_jobs_per_submission(dryrun=dry,seconds=limit_sec)
+        jobs = clmgr.plural_jobs_per_submission(dryrun=dry,limit_seconds=limit_sec)
     else:
-        jobs = clmgr.single_job_per_submission(dryrun=dry,seconds=limit_sec)
+        jobs = clmgr.single_job_per_submission(dryrun=dry,limit_seconds=limit_sec)
 
     logger.info("")
     logger.info("Directories treated in this clmgr {0:d} ".format(os.getpid())
