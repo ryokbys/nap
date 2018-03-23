@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-22 18:39:24 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-23 18:57:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -32,9 +32,11 @@ module NNd
     real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
     real(8),allocatable:: hl1(:,:),hl2(:,:)
     real(8),allocatable:: gsfo(:,:)
+    real(8),allocatable:: smthnss(:,:,:)
   end type smpldata
 
   type(smpldata),allocatable:: sds(:)
+  integer:: nsnal, nsnag
 
   real(8),allocatable:: fdiff(:,:)
   real(8),allocatable:: gmax(:),gmin(:)
@@ -156,8 +158,10 @@ contains
 
 !.....training set
     allocate(sds(isid0:isid1))
+    nsnal = 0
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
+      nsnal = nsnal + natm
       allocate( sds(ismpl)%gsf(natm,nhl(0)) )
       if( lfmatch ) allocate( sds(ismpl)%dgsf(3,natm,natm,nhl(0)) )
       if( nl.eq.1 ) then
@@ -167,6 +171,11 @@ contains
              sds(ismpl)%hl2(natm,nhl(2)))
       endif
     enddo
+    nsnag = 0
+    call mpi_allreduce(nsnal,nsnag,1,mpi_integer,mpi_sum,mpi_world,ierr)
+    if( myid.eq.0 .and. iprint.ne.0 ) then
+      print *,'sum_s sum_i 1 = ',nsnag
+    endif
     call read_symmetry_functions()
 
     allocate(fdiff(3,maxna))
@@ -218,9 +227,9 @@ contains
     enddo
     swgt2trn = 0d0
     swgt2tst = 0d0
-    call mpi_allreduce(swgtrn,swgt2trn,1,mpi_double_precision,mpi_sum &
+    call mpi_allreduce(swgtrn,swgt2trn,1,mpi_real8,mpi_sum &
          ,mpi_world,ierr)
-    call mpi_allreduce(swgtst,swgt2tst,1,mpi_double_precision,mpi_sum &
+    call mpi_allreduce(swgtst,swgt2tst,1,mpi_real8,mpi_sum &
          ,mpi_world,ierr)
     if( lfmatch ) then
       swgt2trn = swgt2trn*2d0
@@ -286,8 +295,8 @@ contains
     use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
          ,lematch,lfmatch,nfunc,tcomm,mdsys,erefmin &
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,iprint
+    use minimize,only: cpena,pwgt
     use parallel
-    use minimize
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -300,13 +309,14 @@ contains
     real(8):: fetrnl,fetrng,fftrnl,fftrng,fstrnl,fstrng
     real(8):: edenom,fdenom
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
+    real(8):: fsmth
     type(mdsys):: smpl
     logical:: l1st = .true.
 
     nfunc= nfunc +1
 
     tc0= mpi_wtime()
-    call mpi_bcast(x,ndim,mpi_double_precision,0,mpi_world,ierr)
+    call mpi_bcast(x,ndim,mpi_real8,0,mpi_world,ierr)
     tcl= mpi_wtime() -tc0
     tf0= mpi_wtime()
     call vars2wgts(ndim,x)
@@ -375,35 +385,27 @@ contains
     tc0= mpi_wtime()
     ftrn= 0d0
     ftst = 0d0
-    call mpi_allreduce(ftrnl,ftrn,1,mpi_double_precision &
+    call mpi_allreduce(ftrnl,ftrn,1,mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
-    call mpi_allreduce(ftstl,ftst,1,mpi_double_precision &
+    call mpi_allreduce(ftstl,ftst,1,mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
     ftrn = ftrn /swgt2trn
     ftst = ftst /swgt2tst
     if( nterm_trn.eq.0 ) ftrn = 0d0
     if( nterm_tst.eq.0 ) ftst = 0d0
 
-!!$    if( l1st ) then
-!!$      fetrng= 0d0
-!!$      fftrng= 0d0
-!!$      fstrng= 0d0
-!!$      call mpi_allreduce(fetrnl,fetrng,1,mpi_double_precision &
-!!$           ,mpi_sum,mpi_world,ierr)
-!!$      call mpi_allreduce(fftrnl,fftrng,1,mpi_double_precision &
-!!$           ,mpi_sum,mpi_world,ierr)
-!!$      if( myid.eq.0 ) then
-!!$        write(6,'(a,3es12.4)') ' term values: energy,force,stress = ', &
-!!$             fetrng,fftrng,fstrng
-!!$      endif
-!!$    endif
+!.....Add smoothness penalty if required
+    if( trim(cpena).eq.'smooth' ) then
+      call NN_smooth_func(ndim,fsmth,pwgt)
+      ftrn = ftrn +fsmth
+    endif
     
     tcl = tcl + (mpi_wtime() -tc0)
 
 !.....only the bottle-neck times are taken into account
-    call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
+    call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0 &
          ,mpi_world,ierr)
-    call mpi_reduce(tfl,tfg,1,mpi_double_precision,mpi_max,0 &
+    call mpi_reduce(tfl,tfg,1,mpi_real8,mpi_max,0 &
          ,mpi_world,ierr)
     tcomm= tcomm +tcg
     tfunc= tfunc +tfg
@@ -414,7 +416,6 @@ contains
   subroutine NN_fs(ndim,x,ftrn,ftst)
     use variables
     use parallel
-    use minimize
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -431,7 +432,7 @@ contains
     nfunc=nfunc +1
 
     tc0= mpi_wtime()
-    call mpi_bcast(x,ndim,mpi_double_precision,0,mpi_world,ierr)
+    call mpi_bcast(x,ndim,mpi_real8,0,mpi_world,ierr)
     tcl= mpi_wtime() -tc0
     tf0= mpi_wtime()
     call vars2wgts(ndim,x)
@@ -492,18 +493,18 @@ contains
     tc0= mpi_wtime()
     ftrn= 0d0
     ftst= 0d0
-    call mpi_allreduce(ftrnl,ftrn,1,mpi_double_precision &
+    call mpi_allreduce(ftrnl,ftrn,1,mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
-    call mpi_allreduce(ftstl,ftst,1,mpi_double_precision &
+    call mpi_allreduce(ftstl,ftst,1,mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
     ftrn= ftrn /swgt2trn
     ftst= ftst /swgt2tst
     tcl = tcl + (mpi_wtime() -tc0)
 
 !.....only the bottle-neck times are taken into account
-    call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
+    call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0 &
          ,mpi_world,ierr)
-    call mpi_reduce(tfl,tfg,1,mpi_double_precision,mpi_max,0 &
+    call mpi_reduce(tfl,tfg,1,mpi_real8,mpi_max,0 &
          ,mpi_world,ierr)
     tcomm= tcomm +tcg
     tfunc= tfunc +tfg
@@ -756,7 +757,7 @@ contains
     use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm &
          ,samples,mdsys,swgt2trn,swgt2tst
     use parallel
-    use minimize
+    use minimize,only: cpena,pwgt
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -764,12 +765,14 @@ contains
 !!$    real(8):: NN_grad(ndim)
     
     integer:: ismpl,i,idim
-    real(8),save,allocatable:: gs(:),gtrnl(:)
+    real(8),save,allocatable:: gs(:),gtrnl(:),gsmth(:)
     real(8):: gmax,vmax
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0
     type(mdsys):: smpl
 
-    if( .not.allocated(gs) ) allocate(gs(ndim),gtrnl(ndim))
+    if( .not.allocated(gs) ) then
+      allocate(gs(ndim),gtrnl(ndim),gsmth(ndim))
+    endif
 
     ngrad= ngrad +1
     tg0= mpi_wtime()
@@ -793,17 +796,23 @@ contains
     tc0= mpi_wtime()
 !!$    NN_grad(1:ndim)= 0d0
     gtrn(1:ndim) = 0d0
-    call mpi_allreduce(gtrnl,gtrn,ndim,mpi_double_precision &
+    call mpi_allreduce(gtrnl,gtrn,ndim,mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
     tcl= mpi_wtime() -tc0
 !    tcomm= tcomm +mpi_wtime() -tc0
 
     gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
 
+!.....Add derivative of smoothness term if required
+    if( trim(cpena).eq.'smooth' ) then
+      call NN_smooth_grad(ndim,gsmth,pwgt)
+      gtrn(1:ndim) = gtrn(1:ndim) +gsmth(1:ndim)
+    endif
+
 !.....only the bottle-neck times are taken into account
-    call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
+    call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0 &
          ,mpi_world,ierr)
-    call mpi_reduce(tgl,tgg,1,mpi_double_precision,mpi_max,0 &
+    call mpi_reduce(tgl,tgg,1,mpi_real8,mpi_max,0 &
          ,mpi_world,ierr)
     tcomm= tcomm +tcg
     tgrad= tgrad +tgg
@@ -847,16 +856,16 @@ contains
     tc0= mpi_wtime()
 
     gtrn(1:ndim)= 0d0
-    call mpi_allreduce(gsl,gtrn,ndim,mpi_double_precision &
+    call mpi_allreduce(gsl,gtrn,ndim,mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
     tcl = mpi_wtime() -tc0
 
     gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
 
 !.....only the bottle-neck times are taken into account
-    call mpi_reduce(tcl,tcg,1,mpi_double_precision,mpi_max,0 &
+    call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0 &
          ,mpi_world,ierr)
-    call mpi_reduce(tgl,tgg,1,mpi_double_precision,mpi_max,0 &
+    call mpi_reduce(tgl,tgg,1,mpi_real8,mpi_max,0 &
          ,mpi_world,ierr)
     tcomm= tcomm +tcg
     tgrad= tgrad +tgg
@@ -1643,7 +1652,7 @@ contains
     enddo
     varg = 0d0
     nsumg= 0
-    call mpi_allreduce(varl,varg,1,mpi_double_precision &
+    call mpi_allreduce(varl,varg,1,mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(nsuml,nsumg,1,mpi_integer &
          ,mpi_sum,mpi_world,ierr)
@@ -1708,9 +1717,9 @@ contains
 
     gmax(1:nhl(0))= 0d0
     gmin(1:nhl(0))= 1d+30
-    call mpi_allreduce(gmaxl,gmax,nhl(0),mpi_double_precision &
+    call mpi_allreduce(gmaxl,gmax,nhl(0),mpi_real8 &
          ,mpi_max,mpi_world,ierr)
-    call mpi_allreduce(gminl,gmin,nhl(0),mpi_double_precision &
+    call mpi_allreduce(gminl,gmin,nhl(0),mpi_real8 &
          ,mpi_min,mpi_world,ierr)
 
 !!$    if( myid.eq.0 ) then
@@ -1778,7 +1787,7 @@ contains
     enddo
 
     gmax(1:nhl(0))= 0d0
-    call mpi_allreduce(gmaxl,gmax,nhl(0),mpi_double_precision &
+    call mpi_allreduce(gmaxl,gmax,nhl(0),mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
     do ihl0=1,nhl(0)
       gmax(ihl0)= sqrt(gmax(ihl0))
@@ -2054,7 +2063,7 @@ contains
     enddo
 
     sumv(1:mhl(0))= 0d0
-    call mpi_reduce(sumvl,sumv,mhl(0),mpi_double_precision &
+    call mpi_reduce(sumvl,sumv,mhl(0),mpi_real8 &
          ,mpi_sum,0,mpi_world,ierr)
     
   end subroutine eval_1st_layer
@@ -2086,5 +2095,145 @@ contains
          ,mpi_sum,mpi_world,ierr)
     
   end subroutine count_nterms
+!=======================================================================
+  subroutine NN_smooth_func(ndim,fsmth,pwgt)
+!
+!  Compute squared sum of second-derivatives of E w.r.t. G
+!  See the memo 180323.
+!
+    use variables,only: samples,mdsys,iprint
+    use parallel
+    implicit none
+    integer,intent(in):: ndim
+    real(8),intent(in):: pwgt
+    real(8),intent(out):: fsmth
+
+    integer:: ia,j,ih0m,ih0n,ismpl,natm
+    real(8):: fsmthl,tmp,sj
+    type(mdsys):: smpl
+    type(smpldata):: sd
+    logical,save:: l1st = .true.
+
+    if( l1st ) then
+      do ismpl=isid0,isid1
+        natm = samples(ismpl)%natm
+        allocate(sds(ismpl)%smthnss(nhl(0),nhl(0),natm))
+      enddo
+      l1st = .false.
+    endif
+    
+!.....Assume that broadcasting x and converting to weights are done in NN_func.
+
+    fsmthl = 0d0
+
+    do ismpl=isid0,isid1
+!.....Error trap
+      if( nl.eq.2 ) then
+        if( myid.eq.0 ) then
+          print *,'ERROR: Smooth func is not implemented for nl.eq.2 !'
+        endif
+        call mpi_finalize(ierr)
+        stop
+      endif
+!.....Initialize some variables
+      smpl = samples(ismpl)
+      if( smpl%iclass.ne.1 ) cycle  ! Do not need to compute for test samples
+      sd = sds(ismpl)
+      natm = smpl%natm
+
+!.....Sigmoid values should be already computed in NN_func
+      do ia=1,natm
+        do ih0m=1,nhl(0)
+          do ih0n=1,nhl(0)
+            tmp = 0d0
+            do j=1,nhl(1)
+              sj = sd%hl1(ia,j)
+              tmp = tmp +wgt12(j)*wgt11(ih0m,j)*wgt11(ih0n,j) &
+                   *sj*(1d0-sj)*(1d0-2d0*sj)
+            enddo
+            sds(ismpl)%smthnss(ih0m,ih0n,ia) = tmp
+            fsmthl = fsmthl +tmp*tmp
+          enddo
+        enddo
+      enddo
+    enddo
+
+    fsmth = 0d0
+    call mpi_allreduce(fsmthl,fsmth,1,mpi_real8 &
+         ,mpi_sum,mpi_world,ierr)
+    if( nsnag.eq.0 ) then
+      print *,'ERROR: nsnag == 0 !!'
+      call mpi_finalize(ierr)
+      stop
+    endif
+    fsmth = fsmth/nsnag *pwgt
+
+    return
+  end subroutine NN_smooth_func
+!=======================================================================
+  subroutine NN_smooth_grad(ndim,gsmth,pwgt)
+!
+!  Compute derivatives of |S|^2 (smooth func) w.r.t. NN weights
+!
+    use variables,only: samples,mdsys,iprint
+    use parallel
+    implicit none
+    integer,intent(in):: ndim
+    real(8),intent(in):: pwgt
+    real(8),intent(out):: gsmth(ndim)
+
+    integer:: ismpl,iv,j,mu,nu,ia,natm
+    real(8):: gsmthl(ndim),sj,tmp,wjmu,wjnu,sterm,gmu
+    type(mdsys):: smpl
+    type(smpldata):: sd
+
+    gsmthl(1:ndim) = 0d0
+    do ismpl=isid0,isid1
+      smpl = samples(ismpl)
+      if( smpl%iclass.ne.1 ) cycle  ! No need to compute for test samples
+      sd = sds(ismpl)
+      natm = smpl%natm
+
+      do ia=1,natm
+        iv = nhl(0)*mhl(1) +nhl(1)
+        do j= nhl(1),1,-1
+          tmp = 0d0
+          sj = sd%hl1(ia,j)
+          sterm = sj*(1d0-sj)*(1d0-2d0*sj)
+          do mu= 1,nhl(0)
+            wjmu = wgt11(mu,j)
+            do nu= 1,nhl(0)
+              wjnu = wgt11(nu,j)
+              tmp = tmp +2d0*sd%smthnss(mu,nu,ia) *wjmu*wjnu*sterm
+            enddo
+          enddo
+          gsmthl(iv) = gsmthl(iv) +tmp
+          iv= iv -1
+        enddo
+        do mu= nhl(0),1,-1
+          gmu = sd%gsf(ia,mu)
+          do j= mhl(1),1,-1
+            sj = sd%hl1(ia,j)
+            wjmu = wgt11(mu,j)
+            tmp = 0d0
+            sterm = wgt12(j) *sj*(1d0-sj) &
+                   *(2d0*(1d0-2d0*sj) +wjmu*gmu*(1d0-6d0*sj+6d0*sj*sj))
+            do nu= 1,nhl(0)
+              wjnu = wgt11(nu,j)
+              tmp = tmp +2d0*sd%smthnss(mu,nu,ia) *wjnu*sterm
+            enddo
+            gsmthl(iv) = gsmthl(iv) +tmp
+            iv= iv -1
+          enddo
+        enddo
+      enddo
+    enddo
+
+    gsmth(1:ndim) = 0d0
+    call mpi_allreduce(gsmthl,gsmth,ndim,mpi_real8,mpi_sum &
+         ,mpi_world,ierr)
+    gsmth(1:ndim) = gsmth(1:ndim) *pwgt/nsnag
+    return
+  end subroutine NN_smooth_grad
 !=======================================================================
 end module NNd

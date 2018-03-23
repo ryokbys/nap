@@ -3,10 +3,11 @@ module minimize
 !.....number of convergence criteria achieved
   integer:: numtol = 1
   
-!.....penalty: lasso or ridge
+!.....penalty: lasso or ridge or smooth
   character(len=128):: cpena= 'none'
   character(len=128):: clinmin= 'armijo'
   real(8):: pwgt = 1d-15
+
 !.....group lasso
   integer:: ngl
   integer,allocatable:: iglid(:)
@@ -590,7 +591,7 @@ contains
 
     iter= 0
     if( myid.eq.0 ) then
-      if( iprint.eq.1 ) then
+      if( iprint.ge.1 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
           write(6,'(a,i8,7es13.5)') &
@@ -600,18 +601,6 @@ contains
           write(6,'(a,i8,7es13.5)') &
                ' iter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
                ,iter,f,ftst,vnorm,gnorm,dxnorm,f
-        endif
-        call flush(6)
-      else if( iprint.ge.2 ) then
-        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
-             .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,15es13.5)') &
-               ' iter,ftrn,ftst,p,vnorm,gnorm,dxnorm,x(1:5)=' &
-               ,iter,f,ftst,pval,vnorm,gnorm,dxnorm,x(1:5)
-        else
-          write(6,'(a,i8,15es13.5)') &
-               ' iter,frn,ftst,vnorm,gnorm,dxnorm,x(1:5)=' &
-               ,iter,f,ftst,vnorm,gnorm,dxnorm,x(1:5)
         endif
         call flush(6)
       endif
@@ -744,7 +733,7 @@ contains
 !!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
-        if( iprint.eq.1 ) then
+        if( iprint.ge.1 ) then
           if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
                .or.trim(cpena).eq.'ridge' ) then
             write(6,'(a,i8,7es13.5)') &
@@ -756,18 +745,6 @@ contains
                  ' iter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
                  ,iter,f,ftst &
                  ,vnorm,gnorm,dxnorm,f-fp
-          endif
-          call flush(6)
-        else if( iprint.ge.2 ) then
-          if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
-               .or. trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,15es13.5)') &
-                 ' iter,ftrn,ftst,p,vnorm,gnorm,dxnorm,f-fp,x(1:5)=' &
-                 ,iter,f,ftst,pval,vnorm,gnorm,dxnorm,f-fp,x(1:5)
-          else
-            write(6,'(a,i8,15es13.5)') &
-                 ' iter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp,x(1:5)=' &
-                 ,iter,f,ftst,vnorm,gnorm,dxnorm,f-fp,x(1:5)
           endif
           call flush(6)
         endif
@@ -945,23 +922,13 @@ contains
 
     iter= 0
     if( myid.eq.0 ) then
-      if( iprint.eq.1 ) then
+      if( iprint.ge.1 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
           write(6,'(a,i8,3es13.5)') ' iter,f,p,gnorm=',iter,f &
                ,pval,gnorm
         else
           write(6,'(a,i8,2es13.5)') ' iter,f,gnorm=',iter,f,gnorm
-        endif
-        call flush(6)
-      else if( iprint.ge.2 ) then
-        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
-             .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,12es13.5)') ' iter,f,p,gnorm,x(1:5)=' &
-               ,iter,f,pval,gnorm,x(1:5)
-        else
-          write(6,'(a,i8,12es13.5)') ' iter,f,gnorm,x(1:5)=' &
-               ,iter,f,gnorm,x(1:5)
         endif
         call flush(6)
       endif
@@ -1072,7 +1039,7 @@ contains
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
       if( myid.eq.0 ) then
-        if( iprint.eq.1 ) then
+        if( iprint.ge.1 ) then
           if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
                .or.trim(cpena).eq.'ridge' ) then
             write(6,'(a,i8,4es13.5)') ' iter,f,p,gnorm,f-fp=',iter,f &
@@ -1080,16 +1047,6 @@ contains
           else
             write(6,'(a,i8,3es13.5)') ' iter,f,gnorm,f-fp=',iter,f &
                  ,gnorm,f-fp
-          endif
-          call flush(6)
-        else if( iprint.ge.2 ) then
-          if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
-               .or. trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,13es13.5)') ' iter,f,p,gnorm,f-fp,x(1:5)=' &
-                 ,iter,f,pval,gnorm,f-fp,x(1:5)
-          else
-            write(6,'(a,i8,13es13.5)') ' iter,f,gnorm,f-fp,x(1:5)=' &
-                 ,iter,f,gnorm,f-fp,x(1:5)
           endif
           call flush(6)
         endif
