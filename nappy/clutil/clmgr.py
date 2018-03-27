@@ -178,6 +178,10 @@ Please wait until the other clmgr stops or stop it manually.
             import nappy.vasp
             self.calc_module = nappy.vasp
             self.Calculator = nappy.vasp.VASP
+        elif calculator in ('pmd',):
+            import nappy.pmd
+            self.calc_module = nappy.pmd
+            self.Calculator = nappy.pmd.PMD
         else:
             self.logger.debug('? calculator = '+calculator)
             raise ValueError('calculator is not defined, calculator = '+calculator)
@@ -190,11 +194,16 @@ Please wait until the other clmgr stops or stop it manually.
         if basedirs is None:
             basedirs = ['.',]
 
-        #...Look for dirs that include POSCAR file.
-        #...Among these dirs, look for dirs that include INCAR, KPOINTS, POTCAR as well
+        if self.calculator in ('vasp',):
+            keyfile = 'POSCAR'
+        elif self.calculator in ('pmd',):
+            keyfile = 'pmdini'
+
+        #...Look for dirs that include the keyfile.
+        #...Among these dirs, look for dirs that are ready to run the calculation.
         self.dirs_to_work = []
         for basedir in basedirs:
-            for path in find(basedir+'/','POSCAR'):
+            for path in find(basedir+'/',keyfile):
                 # logger.debug("find: path = {}".format(path))
                 d = os.path.dirname(os.path.abspath(path))
                 calc = self.Calculator(d)
