@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-27 15:12:07 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-27 15:48:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -53,8 +53,8 @@ module NN
   integer:: max_nexp
 
 !.....cutoff region width ratio to rc
-  real(8):: rcw2 = 0.9d0
-  real(8):: rcw3 = 0.5d0
+  real(8):: rcw2 = 0.0d0
+  real(8):: rcw3 = 0.0d0
   real(8):: rcnn = 4.0d0
   real(8):: rc3nn = 3.0d0
 
@@ -458,10 +458,10 @@ contains
         js= int(tag(ja))
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
-        fcij= fc0(dij,rc)
-        dfcij= dfc0(dij,rc)
-!!$        fcij= fc1(dij,rc,rcs2)
-!!$        dfcij= dfc1(dij,rc,rcs2)
+!!$        fcij= fc0(dij,rc)
+!!$        dfcij= dfc0(dij,rc)
+        fcij= fc1(dij,rc,rcs2)
+        dfcij= dfc1(dij,rc,rcs2)
         do isf=iaddr2(1,is,js),iaddr2(2,is,js)
 !!$          print *,'ia,is,ja,js,isf,itype=',ia,is,ja,js,isf,itype(isf)
           if( itype(isf).eq.1 ) then ! Gaussian
@@ -518,10 +518,10 @@ contains
         enddo
 
         if( dij.gt.rc3 ) cycle
-        fcij= fc0(dij,rc3)
-        dfcij= dfc0(dij,rc3)
-!!$        fcij= fc1(dij,rc3,rcs3)
-!!$        dfcij= dfc1(dij,rc3,rcs3)
+!!$        fcij= fc0(dij,rc3)
+!!$        dfcij= dfc0(dij,rc3)
+        fcij= fc1(dij,rc3,rcs3)
+        dfcij= dfc1(dij,rc3,rcs3)
 !!$        texpij = exp(-eta3*dij**2)
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
@@ -534,10 +534,10 @@ contains
           dik2= rik(1)**2 +rik(2)**2 +rik(3)**2
           if( dik2.ge.rc32 ) cycle
           dik= sqrt(dik2)
-          fcik= fc0(dik,rc3)
-          dfcik= dfc0(dik,rc3)
-!!$          fcik= fc1(dik,rc3,rcs3)
-!!$          dfcik= dfc1(dik,rc3,rcs3)
+!!$          fcik= fc0(dik,rc3)
+!!$          dfcik= dfc0(dik,rc3)
+          fcik= fc1(dik,rc3,rcs3)
+          dfcik= dfc1(dik,rc3,rcs3)
 !!$          texpik= exp(-eta3*dik**2)
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
             almbd= cnst(1,isf)
@@ -1248,12 +1248,14 @@ contains
 !  Currently available options are:
 !    - "bias:" with an argument .true. (T) or .false. (F)
 !    - "charge:" with an argument .true. (T) or .false. (F)
+!    - "rcw2:" or "rcw3:" the ratio to rc or rc3 for minimum r where the cutoff starts working.
 !
     implicit none
     character(len=*),intent(in):: cline
     integer,intent(in):: iprint
     integer,intent(out):: ierr
 
+    real(8):: ropt
     character(len=10):: c1,copt
     logical:: lopt
     integer,external:: num_data
@@ -1273,6 +1275,18 @@ contains
         ierr = 2
       endif
       lcharge = lopt
+    else if( index(cline,'rcw').ne.0 ) then
+      read(cline,*) c1,copt,ropt
+      if( trim(copt).eq.'rcw2:' ) then
+        rcw2 = ropt
+      else if( trim(copt).eq.'rcw3:' ) then
+        rcw3 = ropt
+      else
+        print *, 'Error: copt is not "rcw2:" or "rcw3:" !!!'
+        ierr = 2
+      endif
+!!$      rcw2 = 0d0
+!!$      rcw3 = 0d0
     endif
     
   end subroutine parse_option
