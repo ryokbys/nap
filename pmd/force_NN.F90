@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-22 17:53:34 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-27 15:12:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -12,6 +12,8 @@ module NN
   character(128),parameter:: cpfname = 'in.params.NN'
   character(128),parameter:: ccfname = 'in.const.NN'
 
+  real(8),parameter:: pi= 3.14159265358979d0
+  
 !.....logical flag for bias
   logical:: lbias = .false.
 !.....logical flag for charge
@@ -51,7 +53,8 @@ module NN
   integer:: max_nexp
 
 !.....cutoff region width ratio to rc
-  real(8):: rcw = 0.9d0
+  real(8):: rcw2 = 0.9d0
+  real(8):: rcw3 = 0.5d0
   real(8):: rcnn = 4.0d0
   real(8):: rc3nn = 3.0d0
 
@@ -87,6 +90,10 @@ contains
          ,ihl0,ihl1,ihl2,jj
     real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp
     real(8),allocatable,save:: strsl(:,:,:),aal(:,:)
+
+    integer:: itot
+    integer,external:: itotOf
+    character(len=8):: cnum
 
 !    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
 
@@ -159,7 +166,14 @@ contains
       allocate(strsl(3,3,namax))
       if( allocated(aal) ) deallocate(aal)
       allocate(aal(3,namax))
-    endif
+
+!!$      do i=1,natm
+!!$        itot = itotOf(tag(i))
+!!$        write(cnum,'(i0)') itot
+!!$        open(40+itot,file='out.gsf_'//trim(cnum))
+!!$      enddo
+      
+    endif ! l1st
 
     if( size(strsl).lt.3*3*namax ) then
       deallocate(strsl)
@@ -223,6 +237,12 @@ contains
       gsf(nhl(0),1:natm) = 1d0
       dgsf(1:3,nhl(0),:,:) = 0d0
     endif
+
+!!$    do i=1,natm
+!!$      itot = itotOf(tag(i))
+!!$      write(cnum,'(i0)') itot
+!!$      write(40+itot,'(50es12.4)') (gsf(ihl0,i),ihl0=1,nhl(0))
+!!$    enddo
 
     if( iprint.gt.10 .and. mod(iprint,10).eq.1 .and. myid.le.0 ) then
       open(80,file='out.NN.gsf',status='replace',form='unformatted')
@@ -404,9 +424,22 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
-         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,rc2
+         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,dik2
+    real(8),save:: rc2,rc32,rcs2,rcs3,eta3
+    logical,save:: l1st = .true.
 
-    rc2 = rc*rc
+    
+    real(8):: texpij,texpik
+
+    if( l1st ) then
+      rc2 = rc*rc
+      rc32 = rc3*rc3
+      rcs2 = rc*rcw2
+      rcs3 = rc3*rcw3
+      eta3 = 0.5d0 /(rc3/2)**2
+      l1st = .false.
+    endif
+
     gsf(1:nsf,1:nal)= 0d0
     dgsf(1:3,1:nsf,0:nnl,1:nal)= 0d0
     igsf(1:nsf,0:nnl,1:nal) = 0
@@ -425,8 +458,10 @@ contains
         js= int(tag(ja))
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
-        fcij= fc(dij,rc)
-        dfcij= dfc(dij,rc)
+        fcij= fc0(dij,rc)
+        dfcij= dfc0(dij,rc)
+!!$        fcij= fc1(dij,rc,rcs2)
+!!$        dfcij= dfc1(dij,rc,rcs2)
         do isf=iaddr2(1,is,js),iaddr2(2,is,js)
 !!$          print *,'ia,is,ja,js,isf,itype=',ia,is,ja,js,isf,itype(isf)
           if( itype(isf).eq.1 ) then ! Gaussian
@@ -450,7 +485,7 @@ contains
             tcos= (1d0+cos(dij*a1))
             gsf(isf,ia)= gsf(isf,ia) +tcos*fcij
             !.....derivative
-            dgdr= -a1*sin(dij*a1)*fcij +tcos*dfc(dij,rc)
+            dgdr= -a1*sin(dij*a1)*fcij +tcos*dfcij
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
             igsf(isf,0,ia) = 1
@@ -461,7 +496,7 @@ contains
             tpoly= 1d0*dij**(-a1)
             gsf(isf,ia)= gsf(isf,ia) +tpoly*fcij
             !.....derivative
-            dgdr= -a1*dij**(-a1-1d0)*fcij +tpoly*dfc(dij,rc)
+            dgdr= -a1*dij**(-a1-1d0)*fcij +tpoly*dfcij
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
             igsf(isf,0,ia) = 1
@@ -483,32 +518,43 @@ contains
         enddo
 
         if( dij.gt.rc3 ) cycle
-        fcij= fc(dij,rc3)
-        dfcij= dfc(dij,rc3)
+        fcij= fc0(dij,rc3)
+        dfcij= dfc0(dij,rc3)
+!!$        fcij= fc1(dij,rc3,rcs3)
+!!$        dfcij= dfc1(dij,rc3,rcs3)
+!!$        texpij = exp(-eta3*dij**2)
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           ks= int(tag(ka))
-!!$          if( .not.interact(is,ks) ) cycle
           if( iaddr3(1,is,js,ks).lt.0 ) cycle
           if( ka.eq.ia .or. ka.le.ja ) cycle
           xk(1:3)= ra(1:3,ka)
           xik(1:3)= xk(1:3)-xi(1:3)
           rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
-          dik= sqrt(rik(1)**2 +rik(2)**2 +rik(3)**2)
-          if( dik.ge.rc3 ) cycle
+          dik2= rik(1)**2 +rik(2)**2 +rik(3)**2
+          if( dik2.ge.rc32 ) cycle
+          dik= sqrt(dik2)
+          fcik= fc0(dik,rc3)
+          dfcik= dfc0(dik,rc3)
+!!$          fcik= fc1(dik,rc3,rcs3)
+!!$          dfcik= dfc1(dik,rc3,rcs3)
+!!$          texpik= exp(-eta3*dik**2)
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
             almbd= cnst(1,isf)
             t2= (abs(almbd)+1d0)**2
-            fcik= fc(dik,rc3)
-            dfcik= dfc(dik,rc3)
             driki(1:3)= -rik(1:3)/dik
             drikk(1:3)= -driki(1:3)
             !.....function value
             spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
             cs= spijk/dij/dik
             t1= (almbd +cs)**2
-            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik 
+!!$            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik *texpij *texpik
+            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik
             !.....derivative
+!!$            dgdij= dfcij *fcik *t1/t2 *texpij *texpik &
+!!$                 +fcij*fcik*t1/t2 *texpij*texpik *(-2d0*eta3*dij)
+!!$            dgdik= fcij *dfcik *t1/t2 *texpij *texpik &
+!!$                 +fcij*fcik*t1/t2 *texpij*texpik *(-2d0*eta3*dik)
             dgdij= dfcij *fcik *t1/t2
             dgdik= fcij *dfcik *t1/t2
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) &
@@ -532,37 +578,64 @@ contains
 
   end subroutine eval_sf
 !=======================================================================
-  function fc(r,rc)
+  function fc0(r,rc)
+!
+!  Cutoff function identical to the original Behler and Parrinello one.
+!
     implicit none
     real(8),intent(in):: r,rc
-    real(8):: fc,rs
-    real(8),parameter:: pi= 3.14159265358979d0
-    rs= rc*rcw
-    if( r.le.rs ) then
-      fc= 1d0
-    else if( r.gt.rs .and. r.le.rc ) then
-      fc= 0.5d0 *(cos((r-rs)/(rc-rs)*pi)+1d0)
+    real(8):: fc0
+
+    if( r.le.rc ) then
+      fc0= 0.5d0 *(cos(pi*r/rc)+1d0)
     else
-      fc= 0d0
+      fc0= 0d0
     endif
     return
-  end function fc
+  end function fc0
 !=======================================================================
-  function dfc(r,rc)
+  function dfc0(r,rc)
     implicit none
     real(8),intent(in):: r,rc
-    real(8):: dfc,rs
-    real(8),parameter:: pi= 3.14159265358979d0
-    rs= rc*rcw
-    if( r.le.rs ) then
-      dfc= 0d0
-    else if( r.gt.rs .and. r.le.rc ) then
-      dfc= -pi/2/(rc-rs) *sin((r-rs)/(rc-rs)*pi)
+    real(8):: dfc0
+
+    if( r.le.rc ) then
+      dfc0= -pi/2/rc *sin(pi*r/rc)
     else
-      dfc= 0d0
+      dfc0= 0d0
     endif
     return
-  end function dfc
+  end function dfc0
+!=======================================================================
+  function fc1(r,rc,rcs)
+    implicit none
+    real(8),intent(in):: r,rc,rcs
+    real(8):: fc1
+
+    if( r.le.rcs ) then
+      fc1= 1d0
+    else if( r.gt.rcs .and. r.le.rc ) then
+      fc1= 0.5d0 *(cos((r-rcs)/(rc-rcs)*pi)+1d0)
+    else
+      fc1= 0d0
+    endif
+    return
+  end function fc1
+!=======================================================================
+  function dfc1(r,rc,rcs)
+    implicit none
+    real(8),intent(in):: r,rc,rcs
+    real(8):: dfc1
+
+    if( r.le.rcs ) then
+      dfc1= 0d0
+    else if( r.gt.rcs .and. r.le.rc ) then
+      dfc1= -pi/2/(rc-rcs) *sin((r-rcs)/(rc-rcs)*pi)
+    else
+      dfc1= 0d0
+    endif
+    return
+  end function dfc1
 !=======================================================================
   function sigmoid(x)
     implicit none
