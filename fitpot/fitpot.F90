@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-19 16:11:13 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-24 18:01:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -557,7 +557,7 @@ subroutine read_ref_data()
     nfrefdat = ndat_in_line(14,' ')
 !!$    print *,'ismpl,cdirname =',ismpl,trim(cdir)
     do i=1,natm
-      nftot= nftot + 1
+      nftot= nftot + 3
       if( nfrefdat.eq.3 ) then
         read(14,*) ftmp(1:3)
         ifcal = 1
@@ -580,7 +580,7 @@ subroutine read_ref_data()
     do i=1,natm
       if( samples(ismpl)%ifcal(i).eq.1 ) then
         samples(ismpl)%nfcal = samples(ismpl)%nfcal +1
-        nfrc = nfrc +1
+        nfrc = nfrc +3
       endif
     enddo
 

@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-23 18:57:50 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-27 15:17:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -32,7 +32,7 @@ module NNd
     real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
     real(8),allocatable:: hl1(:,:),hl2(:,:)
     real(8),allocatable:: gsfo(:,:)
-    real(8),allocatable:: smthnss(:,:,:)
+    real(8),allocatable:: rghnss(:,:,:)
   end type smpldata
 
   type(smpldata),allocatable:: sds(:)
@@ -309,7 +309,7 @@ contains
     real(8):: fetrnl,fetrng,fftrnl,fftrng,fstrnl,fstrng
     real(8):: edenom,fdenom
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
-    real(8):: fsmth
+    real(8):: frgh
     type(mdsys):: smpl
     logical:: l1st = .true.
 
@@ -394,10 +394,10 @@ contains
     if( nterm_trn.eq.0 ) ftrn = 0d0
     if( nterm_tst.eq.0 ) ftst = 0d0
 
-!.....Add smoothness penalty if required
-    if( trim(cpena).eq.'smooth' ) then
-      call NN_smooth_func(ndim,fsmth,pwgt)
-      ftrn = ftrn +fsmth
+!.....Add roughness penalty if required
+    if( trim(cpena).eq.'rough' ) then
+      call NN_rough_func(ndim,frgh,pwgt)
+      ftrn = ftrn +frgh
     endif
     
     tcl = tcl + (mpi_wtime() -tc0)
@@ -765,13 +765,13 @@ contains
 !!$    real(8):: NN_grad(ndim)
     
     integer:: ismpl,i,idim
-    real(8),save,allocatable:: gs(:),gtrnl(:),gsmth(:)
+    real(8),save,allocatable:: gs(:),gtrnl(:),grgh(:)
     real(8):: gmax,vmax
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0
     type(mdsys):: smpl
 
     if( .not.allocated(gs) ) then
-      allocate(gs(ndim),gtrnl(ndim),gsmth(ndim))
+      allocate(gs(ndim),gtrnl(ndim),grgh(ndim))
     endif
 
     ngrad= ngrad +1
@@ -803,10 +803,10 @@ contains
 
     gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
 
-!.....Add derivative of smoothness term if required
-    if( trim(cpena).eq.'smooth' ) then
-      call NN_smooth_grad(ndim,gsmth,pwgt)
-      gtrn(1:ndim) = gtrn(1:ndim) +gsmth(1:ndim)
+!.....Add derivative of roughness term if required
+    if( trim(cpena).eq.'rough' ) then
+      call NN_rough_grad(ndim,grgh,pwgt)
+      gtrn(1:ndim) = gtrn(1:ndim) +grgh(1:ndim)
     endif
 
 !.....only the bottle-neck times are taken into account
@@ -2096,7 +2096,7 @@ contains
     
   end subroutine count_nterms
 !=======================================================================
-  subroutine NN_smooth_func(ndim,fsmth,pwgt)
+  subroutine NN_rough_func(ndim,frgh,pwgt)
 !
 !  Compute squared sum of second-derivatives of E w.r.t. G
 !  See the memo 180323.
@@ -2106,31 +2106,34 @@ contains
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: pwgt
-    real(8),intent(out):: fsmth
+    real(8),intent(out):: frgh
 
     integer:: ia,j,ih0m,ih0n,ismpl,natm
-    real(8):: fsmthl,tmp,sj
+    real(8):: frghl,tmp,sj
     type(mdsys):: smpl
     type(smpldata):: sd
     logical,save:: l1st = .true.
 
     if( l1st ) then
+      if( myid.eq.0 ) then
+        print *,'Roughness penalty is applied with the weight, ',pwgt
+      endif
       do ismpl=isid0,isid1
         natm = samples(ismpl)%natm
-        allocate(sds(ismpl)%smthnss(nhl(0),nhl(0),natm))
+        allocate(sds(ismpl)%rghnss(nhl(0),nhl(0),natm))
       enddo
       l1st = .false.
     endif
     
 !.....Assume that broadcasting x and converting to weights are done in NN_func.
 
-    fsmthl = 0d0
+    frghl = 0d0
 
     do ismpl=isid0,isid1
 !.....Error trap
       if( nl.eq.2 ) then
         if( myid.eq.0 ) then
-          print *,'ERROR: Smooth func is not implemented for nl.eq.2 !'
+          print *,'ERROR: Roughness func is not implemented for nl.eq.2 !'
         endif
         call mpi_finalize(ierr)
         stop
@@ -2145,49 +2148,51 @@ contains
       do ia=1,natm
         do ih0m=1,nhl(0)
           do ih0n=1,nhl(0)
+!!$            sds(ismpl)%rghnss(ih0m,ih0n,ia) = 0d0
+!!$            if( ih0m.eq.ih0n ) cycle
             tmp = 0d0
             do j=1,nhl(1)
               sj = sd%hl1(ia,j)
               tmp = tmp +wgt12(j)*wgt11(ih0m,j)*wgt11(ih0n,j) &
                    *sj*(1d0-sj)*(1d0-2d0*sj)
             enddo
-            sds(ismpl)%smthnss(ih0m,ih0n,ia) = tmp
-            fsmthl = fsmthl +tmp*tmp
+            sds(ismpl)%rghnss(ih0m,ih0n,ia) = tmp
+            frghl = frghl +tmp*tmp
           enddo
         enddo
       enddo
     enddo
 
-    fsmth = 0d0
-    call mpi_allreduce(fsmthl,fsmth,1,mpi_real8 &
+    frgh = 0d0
+    call mpi_allreduce(frghl,frgh,1,mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
     if( nsnag.eq.0 ) then
       print *,'ERROR: nsnag == 0 !!'
       call mpi_finalize(ierr)
       stop
     endif
-    fsmth = fsmth/nsnag *pwgt
+    frgh = frgh/nsnag *pwgt
 
     return
-  end subroutine NN_smooth_func
+  end subroutine NN_rough_func
 !=======================================================================
-  subroutine NN_smooth_grad(ndim,gsmth,pwgt)
+  subroutine NN_rough_grad(ndim,grgh,pwgt)
 !
-!  Compute derivatives of |S|^2 (smooth func) w.r.t. NN weights
+!  Compute derivatives of |S|^2 (rough func) w.r.t. NN weights
 !
     use variables,only: samples,mdsys,iprint
     use parallel
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: pwgt
-    real(8),intent(out):: gsmth(ndim)
+    real(8),intent(out):: grgh(ndim)
 
     integer:: ismpl,iv,j,mu,nu,ia,natm
-    real(8):: gsmthl(ndim),sj,tmp,wjmu,wjnu,sterm,gmu
+    real(8):: grghl(ndim),sj,tmp,wjmu,wjnu,sterm,gmu
     type(mdsys):: smpl
     type(smpldata):: sd
 
-    gsmthl(1:ndim) = 0d0
+    grghl(1:ndim) = 0d0
     do ismpl=isid0,isid1
       smpl = samples(ismpl)
       if( smpl%iclass.ne.1 ) cycle  ! No need to compute for test samples
@@ -2204,10 +2209,10 @@ contains
             wjmu = wgt11(mu,j)
             do nu= 1,nhl(0)
               wjnu = wgt11(nu,j)
-              tmp = tmp +2d0*sd%smthnss(mu,nu,ia) *wjmu*wjnu*sterm
+              tmp = tmp +2d0*sd%rghnss(mu,nu,ia) *wjmu*wjnu*sterm
             enddo
           enddo
-          gsmthl(iv) = gsmthl(iv) +tmp
+          grghl(iv) = grghl(iv) +tmp
           iv= iv -1
         enddo
         do mu= nhl(0),1,-1
@@ -2219,21 +2224,22 @@ contains
             sterm = wgt12(j) *sj*(1d0-sj) &
                    *(2d0*(1d0-2d0*sj) +wjmu*gmu*(1d0-6d0*sj+6d0*sj*sj))
             do nu= 1,nhl(0)
+!!$              if( mu.eq.nu ) cycle
               wjnu = wgt11(nu,j)
-              tmp = tmp +2d0*sd%smthnss(mu,nu,ia) *wjnu*sterm
+              tmp = tmp +2d0*sd%rghnss(mu,nu,ia) *wjnu*sterm
             enddo
-            gsmthl(iv) = gsmthl(iv) +tmp
+            grghl(iv) = grghl(iv) +tmp
             iv= iv -1
           enddo
         enddo
       enddo
     enddo
 
-    gsmth(1:ndim) = 0d0
-    call mpi_allreduce(gsmthl,gsmth,ndim,mpi_real8,mpi_sum &
+    grgh(1:ndim) = 0d0
+    call mpi_allreduce(grghl,grgh,ndim,mpi_real8,mpi_sum &
          ,mpi_world,ierr)
-    gsmth(1:ndim) = gsmth(1:ndim) *pwgt/nsnag
+    grgh(1:ndim) = grgh(1:ndim) *pwgt/nsnag
     return
-  end subroutine NN_smooth_grad
+  end subroutine NN_rough_grad
 !=======================================================================
 end module NNd
