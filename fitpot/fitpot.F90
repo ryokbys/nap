@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-24 18:01:47 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-29 17:33:45 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1987,7 +1987,7 @@ subroutine set_sample_errors()
       if( idx.ne.0 ) then
         samples(ismpl)%eerr= seerr(iserr)
         samples(ismpl)%ferr= sferr(iserr)
-        samples(ismpl)%serr= sferr(iserr)
+        samples(ismpl)%serr= sserr(iserr)
       endif
     enddo
   enddo
