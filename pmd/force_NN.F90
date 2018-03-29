@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-27 15:48:03 Ryo KOBAYASHI>
+!                     Last modified: <2018-03-29 15:43:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -287,7 +287,8 @@ contains
             hl1(ihl1,ia)= sigmoid(tmp)
             print *,"ihl1,hl1=",ihl1,hl1(ihl1,ia)
           enddo
-        endif  ! end of debug
+        endif
+!.....end dodebug
         do ihl1=1,mhl(1)
           tmp= 0d0
           do ihl0=1,nhl(0)
@@ -421,10 +422,10 @@ contains
 !    real(8),intent(out):: gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal)
 
     integer:: isf,ia,jj,ja,kk,ka,is,js,ks
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,fcij,eta,rs,texp,driji(3), &
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij,dij2,fcij,eta,rs,texp,driji(3), &
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
-         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,dik2
+         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,dik2,tmp
     real(8),save:: rc2,rc32,rcs2,rcs3,eta3
     logical,save:: l1st = .true.
 
@@ -452,9 +453,9 @@ contains
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij= rij(1)**2 +rij(2)**2 +rij(3)**2
-        if( dij.ge.rc2 ) cycle
-        dij = sqrt(dij)
+        dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij2.ge.rc2 ) cycle
+        dij = sqrt(dij2)
         js= int(tag(ja))
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
@@ -462,8 +463,8 @@ contains
 !!$        dfcij= dfc0(dij,rc)
         fcij= fc1(dij,rc,rcs2)
         dfcij= dfc1(dij,rc,rcs2)
+!!$        goto 10
         do isf=iaddr2(1,is,js),iaddr2(2,is,js)
-!!$          print *,'ia,is,ja,js,isf,itype=',ia,is,ja,js,isf,itype(isf)
           if( itype(isf).eq.1 ) then ! Gaussian
             eta= cnst(1,isf)
             rs=  cnst(2,isf)
@@ -517,12 +518,12 @@ contains
           endif
         enddo
 
-        if( dij.gt.rc3 ) cycle
+10      if( dij.gt.rc3 ) cycle
 !!$        fcij= fc0(dij,rc3)
 !!$        dfcij= dfc0(dij,rc3)
         fcij= fc1(dij,rc3,rcs3)
         dfcij= dfc1(dij,rc3,rcs3)
-!!$        texpij = exp(-eta3*dij**2)
+        texpij = exp(-eta3*dij2)
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           ks= int(tag(ka))
@@ -538,7 +539,7 @@ contains
 !!$          dfcik= dfc0(dik,rc3)
           fcik= fc1(dik,rc3,rcs3)
           dfcik= dfc1(dik,rc3,rcs3)
-!!$          texpik= exp(-eta3*dik**2)
+          texpik= exp(-eta3*dik2)
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
             almbd= cnst(1,isf)
             t2= (abs(almbd)+1d0)**2
@@ -548,20 +549,21 @@ contains
             spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
             cs= spijk/dij/dik
             t1= (almbd +cs)**2
-!!$            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik *texpij *texpik
-            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik
+            tmp = t1/t2 *texpij *texpik
+            gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik 
+!!$            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik
             !.....derivative
-!!$            dgdij= dfcij *fcik *t1/t2 *texpij *texpik &
-!!$                 +fcij*fcik*t1/t2 *texpij*texpik *(-2d0*eta3*dij)
-!!$            dgdik= fcij *dfcik *t1/t2 *texpij *texpik &
-!!$                 +fcij*fcik*t1/t2 *texpij*texpik *(-2d0*eta3*dik)
-            dgdij= dfcij *fcik *t1/t2
-            dgdik= fcij *dfcik *t1/t2
+            dgdij= dfcij *fcik *tmp &
+                 +tmp *(-2d0*eta3*dij) *fcij*fcik 
+            dgdik= fcij *dfcik *tmp &
+                 +tmp *(-2d0*eta3*dik) *fcij*fcik 
+!!$            dgdij= dfcij *fcik *t1/t2
+!!$            dgdik= fcij *dfcik *t1/t2
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) &
                  +dgdij*driji(1:3) +dgdik*driki(1:3)
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
             dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
-            dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik
+            dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik *texpij*texpik
             dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij**2
             dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik**2
             dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
@@ -573,6 +575,7 @@ contains
             igsf(isf,kk,ia) = 1
           enddo
         enddo
+20      continue
       enddo
     enddo
 
@@ -1524,13 +1527,67 @@ contains
     return
   end subroutine set_paramsdir_NN
 !=======================================================================
-  subroutine pderiv_NN()
+  subroutine gradw_NN(namax,natm,tag,ra,nnmax &
+       ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws &
+       ,lematch,lfmatch,lsmatch)
 !
-!  Derivative w.r.t. NN parameters, {w}
-!
+!  Gradient w.r.t. NN weights, {w}
+!  Note: This routine is always called in single run,
+!  thus no need of parallel implementation.
+!  Currently only 1 hidden layer is implemented.
+!=======================================================================
+!  Since force_NN and gradw_NN requires different gsfs for different
+!  systems in case of fitpot, it is not easy to implement those system-dependent
+!  gradw_NN... So for now, coding of gradw_NN is pending (180328).
+!  If it is the object-oriented language like python or Java,
+!  this may not be the problem, but it is Fortran...
+!=======================================================================
     implicit none
-    
-  end subroutine pderiv_NN
+    integer,intent(in):: namax,natm,nnmax,iprint
+    integer,intent(in):: lspr(0:nnmax,namax)
+    real(8),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
+    real(8),intent(inout):: epot
+    integer,intent(in):: ndimp
+    real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
+    logical,intent(in):: lematch,lfmatch,lsmatch
+
+!!$    if( lematch ) then
+!!$      iv= nhl(0)*mhl(1) +nhl(1)
+!!$!.....2nd layer
+!!$      do ihl1=nhl(1),1,-1
+!!$        tmp= 0d0
+!!$        do ia=1,natm
+!!$          h1= sds%hl1(ia,ihl1)
+!!$          tmp= tmp +(h1-0.5d0)
+!!$        enddo
+!!$        gs(iv)= gs(iv) +ediff*tmp
+!!$        iv= iv -1
+!!$      enddo
+!!$!.....1st layer
+!!$      do ihl0=nhl(0),1,-1
+!!$        do ihl1=mhl(1),1,-1
+!!$          tmp= 0d0
+!!$          w2= wgt12(ihl1)
+!!$          do ia=1,natm
+!!$            h1= sds%hl1(ia,ihl1)
+!!$            tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
+!!$          enddo
+!!$          gs(iv)= gs(iv) +ediff*tmp
+!!$          iv= iv -1
+!!$        enddo
+!!$      enddo
+!!$
+!!$    endif
+
+    if( lfmatch ) then
+
+    endif
+
+    if( lsmatch ) then
+
+    endif
+
+  end subroutine gradw_NN
 end module NN
 !-----------------------------------------------------------------------
 !     Local Variables:
