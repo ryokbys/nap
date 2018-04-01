@@ -166,7 +166,7 @@ def draw_graph(systems,uniq_names,graph_format='png',
             erg = s['erg'] /natm
             ergs.append(erg)
             vols.append(nsys.volume()/natm)
-        plt.plot(vols,ergs,'o',color=color,mec='white',mew=0.5,
+        plt.plot(vols,ergs,'o',color=color,mec='black',mew=0.5,
                  ms=markersize,label=name)
     plt.xlabel('Volume (Ang^3/atom)')
     plt.ylabel('Energy (eV/atom)')

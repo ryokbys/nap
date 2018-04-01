@@ -25,8 +25,8 @@ _paramfname = 'in.params.NN'
 _logfname = 'log.make_params_NN'
 
 #...initial range of parameters
-_pmin = -0.01
-_pmax =  0.01
+_pmin = -20.0
+_pmax =  20.0
 
 _type_avail = ('Gaussian','cosine','polynomial','Morse','angular')
 _type_2body = ('Gaussian','cosine','polynomial','Morse',)

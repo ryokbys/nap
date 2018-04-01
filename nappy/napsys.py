@@ -663,9 +663,9 @@ You need to specify the species order correctly with --specorder option.
                     yhi = yhi_bound -max(0.0,yz)
                     zlo = zlo_bound
                     zhi = zhi_bound
-                    self.a1 = np.array([xhi-xlo,xy,xz],dtype=float)
-                    self.a2 = np.array([0.0,yhi-ylo,yz],dtype=float)
-                    self.a3 = np.array([0.0,0.0,zhi-zlo],dtype=float)
+                    self.a1 = np.array([xhi-xlo, 0., 0.],dtype=float)
+                    self.a2 = np.array([xy, yhi-ylo, 0.],dtype=float)
+                    self.a3 = np.array([xz, yz, zhi-zlo],dtype=float)
                     hmat = self.get_hmat()
                     hmati= np.linalg.inv(hmat)
             elif mode == 'ATOMS':
