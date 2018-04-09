@@ -11,6 +11,7 @@ Options:
               Specify pairs used in FITPOT_VAR_FILE in the format hyphen-connected
               and comma-separated, e.g.) 1-1,2-1. [default: all] 
   --bvs       Specify BVS parameter set. This sets pairs as 1-1,1-2,...,1-nspeics.
+  -i          Inverse conversion, that is in.params.Morse to in.vars.fitpot.
 """
 from __future__ import print_function
 
@@ -43,27 +44,8 @@ def ndat2nsp(ndat):
     else:
         raise ValueError(' NSP cannot be determined from NDAT.')
     return nsp
-    
 
-if __name__ == "__main__":
-
-    args = docopt(__doc__)
-    infname = args['FITPOT_VAR_FILE']
-    pairs = args['--pairs']
-    bvs = args['--bvs']
-    if bvs:
-        msg = ' BVS parameters are to be extracted, which means only pairs ' \
-              +'including oxygen are used.'
-        print(msg)
-    elif pairs == 'all':
-        print(' All the pairs are to be extracted.')
-    else:
-        pairs = [ (pair.split('-')[0],pair.split('-')[1])
-                  for pair in pairs.split(',') ]
-        print(' Pairs to be extracted:')
-        for pair in pairs:
-            print('   {0:d}-{1:d}'.format(pair[0],pair[1]))
-
+def fp2morse(infname,pairs,bvs):
     ds = []
     alps = []
     rs = []
@@ -108,5 +90,58 @@ if __name__ == "__main__":
             f.write(' {0:3d} {1:3d}'.format(pairs[l][0],pairs[l][1]))
             f.write(' {0:7.3f} {1:7.3f} {2:7.3f}\n'.format(ds[l],alps[l],rs[l]))
             
-    print(' Check in.params.Morse.')
-    
+    print(' Wrote in.params.Morse.')
+    return
+
+def morse2fp(outfname,bvs):
+    with open('in.params.Morse','r') as f:
+        lines = f.readlines()
+    params = {}
+    for line in lines:
+        if line[0] in ('#','!'):
+            continue
+        data = line.split()
+        isp = int(data[0])
+        jsp = int(data[1])
+        D = float(data[2])
+        alpha = float(data[3])
+        rs = float(data[4])
+        params[(isp,jsp)] = (D,alpha,rs)
+    #...Write in.vars.fitpot file
+    with open(outfname,'w') as f:
+        f.write('  {0:d}   6.00   3.00\n'.format(len(params)*3))
+        for k,v in params.items():
+            isp = k[0]
+            jsp = k[1]
+            D, alpha, rs = v
+            f.write(' {0:8.4f}   0.000   8.000\n'.format(D))
+            f.write(' {0:8.4f}   1.000   3.000\n'.format(alpha))
+            f.write(' {0:8.4f}   1.000   3.000\n'.format(rs))
+    print(' Wrote '+outfname)
+    return
+
+
+if __name__ == "__main__":
+
+    args = docopt(__doc__)
+    infname = args['FITPOT_VAR_FILE']
+    pairs = args['--pairs']
+    bvs = args['--bvs']
+    inverse = args['-i']
+    if bvs:
+        msg = ' BVS parameters are to be extracted, which means only pairs ' \
+              +'including oxygen are used.'
+        print(msg)
+    elif pairs == 'all':
+        print(' All the pairs are to be extracted.')
+    else:
+        pairs = [ (pair.split('-')[0],pair.split('-')[1])
+                  for pair in pairs.split(',') ]
+        print(' Pairs to be extracted:')
+        for pair in pairs:
+            print('   {0:d}-{1:d}'.format(pair[0],pair[1]))
+
+    if not inverse:
+        fp2morse(infname,pairs,bvs)
+    elif inverse:
+        morse2fp(infname,bvs)
