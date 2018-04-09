@@ -46,6 +46,25 @@ def get_ids(nsys,ids):
 
     
 def get_msd(files,ids0,nmeasure,nshift,sid=0):
+    """
+    Compute MSD specified species-ID from sequential structure FILES.
+    
+    Input:
+
+      - files: list
+            List of files used for the MSD calculation.
+      - ids0: list
+            List of atom-IDs whose MSDs are to be computed.
+      - nmeasure: int
+            Number of staggered lanes to compute MSD for better statistics.
+      - nshift: int
+            Number of files to be skipped for each staggered lane.
+      - sid: int
+            Species-ID. If it is 0, no species-ID is specified. [defalut: 0]
+
+    Output:
+      - msd: Numpy array of dimension, (len(files),nmeasure,3).
+    """
     if sid != 0:
         nsys = NAPSystem(fname=files[0])
         ids = [ i for i,a in enumerate(nsys.atoms) if a.sid == sid ]

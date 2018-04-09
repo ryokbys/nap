@@ -38,6 +38,8 @@ class POSCAR(object):
         #.....2nd line: multiplying factor
         self.afac= float(f.readline().split()[0])
         #.....3rd-5th lines: lattice vectors
+        # NOTE (180409): The definition of the hmat here is different from hmat in NAPSystem.
+        # The hmat in NAPSystem is transpose of this.
         data= f.readline().split()
         self.h[0]= [ float(x) for x in data ]
         data= f.readline().split()
