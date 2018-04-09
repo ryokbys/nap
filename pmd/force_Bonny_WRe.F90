@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-28 17:41:31 Ryo KOBAYASHI>
+!                     Last modified: <2018-04-05 14:49:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -212,6 +212,7 @@ contains
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is = int(tag(i))
+      if( is.gt.2 ) cycle
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
@@ -235,6 +236,7 @@ contains
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is = int(tag(i))
+      if( is.gt.2 ) cycle
       dfi = dfrho(is,rho(i))
       do k=1,lspr(0,i)
         j=lspr(k,i)

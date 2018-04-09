@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-20 17:39:53 Ryo KOBAYASHI>
+!                     Last modified: <2018-04-05 14:38:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -54,10 +54,12 @@ contains
 
     integer:: isp,jsp,ierr
     real(8):: qnucli,ri,ro
-    character(len=128):: cline,fname
+    character(len=128):: cline,fname,cmode
     real(8),parameter:: qtiny = 1d-10
+    integer,external:: num_data
 
     if( myid.eq.0 ) then
+      cmode = ''
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
       interact(1:msp,1:msp) = .false.
@@ -67,29 +69,49 @@ contains
       if( iprint.ne.0 ) write(6,'(/,a)') ' ZBL parameters:'
       do while(.true.)
         read(ioprms,*,end=10) cline
+        if( num_data(cline,' ').eq.0 ) cycle
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
-        backspace(ioprms)
-        read(ioprms,*) isp, qnucli, ri, ro
-        if( isp.gt.msp ) then
-          write(6,*) ' Warning @read_params: since isp is greater than msp,'&
-               //' skip reading the line.'
+!.....Mode detection
+        if( trim(cline).eq.'parameters' ) then
+          cmode = trim(cline)
+          cycle
+        else if( trim(cline).eq.'interactions' ) then
+          cmode = trim(cline)
+          interact(1:msp,1:msp) = .false.
+          cycle
         endif
-        qnucl(isp) = qnucli
-        r_inner(isp) = ri
-        r_outer(isp) = ro
-        zbl_rc = max(zbl_rc,ro)
-        if( iprint.ne.0 ) write(6,'(a,i4,3(2x,f0.3))') &
-             '   isp,qnucl,ri,ro = ',isp,qnucli,ri,ro
-      enddo
-10    close(ioprms)
-      do isp=1,msp
-        if( abs(qnucl(isp)).lt.qtiny ) cycle
-        do jsp=isp,msp
-          if( abs(qnucl(jsp)).lt.qtiny ) cycle
+!.....Read parameters depending on the mode
+        if( trim(cmode).eq.'parameters' ) then
+          backspace(ioprms)
+          read(ioprms,*) isp, qnucli, ri, ro
+          if( isp.gt.msp ) then
+            write(6,*) ' Warning @read_params: since isp is greater than msp,'&
+                 //' skip reading the line.'
+          endif
+          qnucl(isp) = qnucli
+          r_inner(isp) = ri
+          r_outer(isp) = ro
+          zbl_rc = max(zbl_rc,ro)
+          if( iprint.ne.0 ) then
+            write(6,'(a,i4,3(2x,f0.3))') &
+                 '   isp,qnucl,ri,ro = ',isp,qnucli,ri,ro
+          endif
+        else if( trim(cmode).eq.'interactions' ) then
+          backspace(ioprms)
+          read(ioprms,*) isp, jsp
           interact(isp,jsp) = .true.
           interact(jsp,isp) = .true.
-        enddo
+        endif
       enddo
+10    close(ioprms)
+!!$      do isp=1,msp
+!!$        if( abs(qnucl(isp)).lt.qtiny ) cycle
+!!$        do jsp=isp,msp
+!!$          if( abs(qnucl(jsp)).lt.qtiny ) cycle
+!!$          interact(isp,jsp) = .true.
+!!$          interact(jsp,isp) = .true.
+!!$        enddo
+!!$      enddo
       if( iprint.ne.0 ) then
         do isp=1,msp
           do jsp=isp,msp
