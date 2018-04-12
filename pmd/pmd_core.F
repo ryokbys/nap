@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-03-19 15:35:31 Ryo KOBAYASHI>
+c                     Last-modified: <2018-04-12 14:48:49 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -901,8 +901,8 @@ c=======================================================================
      &     ,ekitot,epitot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,rc,rbuf,stnsr,epot
-     &     ,ekin,ifcoulomb,lvc,iprint,lcalcgrad,ndimp,gwe
-     &     ,gwf,gws,lematch,lfmatch,lsmatch,boundary)
+     &     ,ekin,ifcoulomb,lvc,iprint,lcalcgrad,ndimp,maxisp
+     &     ,gwe,gwf,gws,lematch,lfmatch,lsmatch,boundary)
 c
 c  In case that only one shot force calculation is required,
 c  especially called from fitpot.
@@ -910,6 +910,7 @@ c
       use pmdvars
       use force
       use Morse,only: gradw_Morse,gradw_vcMorse
+      use Coulomb,only: gradw_Coulomb
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -925,13 +926,13 @@ c
      &     ,chgtot(ntot),chitot(ntot)
 c      character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: lcalcgrad
-      integer,intent(in):: ndimp
+      integer,intent(in):: ndimp,maxisp
       real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,ntot),gws(ndimp,6)
       logical,intent(inout):: lvc
       logical,intent(in):: lematch,lfmatch,lsmatch
       character(len=3),intent(in):: boundary
 
-      integer:: i,ierr,is,nspl,nxyz
+      integer:: i,ierr,is,nspl,nxyz,iprm0
       real(8):: aai(3),epott
       logical:: lstrs = .false.
       logical:: lcell_updated = .false.
@@ -1022,9 +1023,25 @@ c      print *,'one_shot: 06'
      &       ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
       else  ! lcalcgrad = .true.
         epot = 0d0
-        if( use_force('Morse') ) call gradw_Morse(namax,natm,tag,
-     &       ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws,
-     &       lematch,lfmatch,lsmatch)
+        gwe(1:ndimp) = 0d0
+        gwf(1:ndimp,1:3,1:natm) = 0d0
+        gws(1:ndimp,1:6) = 0d0
+        if( use_force('Morse')
+     &       .and. use_force('screened_Coulomb') ) then
+          iprm0 = 0
+          call gradw_Coulomb(namax,natm,nb,tag,ra,chg,
+     &         nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws,
+     &         lematch,lfmatch,lsmatch,iprm0,myid_md,mpi_md_world)
+          iprm0 = maxisp
+          call gradw_Morse(namax,natm,tag,
+     &         ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws,
+     &         lematch,lfmatch,lsmatch,iprm0)
+        else if( use_force('Morse') ) then
+          iprm0 = 0
+          call gradw_Morse(namax,natm,tag,
+     &         ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws,
+     &         lematch,lfmatch,lsmatch,iprm0)
+        endif
 c        if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra
 c     &       ,nnmax,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
 c.....Derivative of stress should be divided by the cell volume

@@ -45,8 +45,10 @@ module variables
 !.....Atomic forces over this value will not be used for fitting
   real(8):: force_limit = 100d0
 
-!.....max num of species
+!.....Max limit of number of species
   integer,parameter:: mspcs = 9
+!.....Max value of species-ID
+  integer:: maxisp
   real(8):: ebase(mspcs)
   real(8):: swgt2trn,swgt2tst
 
@@ -84,6 +86,7 @@ module variables
          ,chg(:),chi(:),fsub(:,:),eatm(:)
     real(8),allocatable:: gwe(:),gwf(:,:,:),gws(:,:)
     character(len=2),allocatable:: symbols(:)
+    integer:: ispmax       ! Max isp in the sample
     integer:: naps(mspcs)  ! num of atoms per species
     integer:: iclass       ! 1: training,  2: test
     logical:: charge_set = .false.

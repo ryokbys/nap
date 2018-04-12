@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-22 17:53:10 Ryo KOBAYASHI>
+!                     Last modified: <2018-04-12 14:50:45 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -18,6 +18,7 @@ module Coulomb
 
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.Coulomb'
+  logical:: params_read = .false.
   real(8),parameter:: pi = 3.14159265398979d0
 
   character(len=128):: cchgs,cdist,cterms
@@ -34,7 +35,9 @@ module Coulomb
 
 
   integer,parameter:: msp = 9
-  integer:: nsp
+  integer:: nsp = 1
+!.....Flag for existence of the species
+  logical:: ispflag(msp)
 !.....Species charge
   real(8):: schg(msp)
 !  logical,allocatable:: interact(:,:)
@@ -51,7 +54,7 @@ module Coulomb
 !.....screening length
   real(8):: rho_bvs(msp,msp)
 !  real(8),allocatable:: rho_bvs(:,:)
-  real(8),parameter:: fbvs = 0.74d0
+  real(8):: fbvs = 0.74d0
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
   real(8),parameter:: qthd = 1d-12
@@ -88,6 +91,8 @@ module Coulomb
 !.....Convergence criterion for QEq
   real(8):: conv_eps = 1.0d-6
 
+  integer,parameter:: ivoigt(3,3)= &
+       reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
 contains
   subroutine initialize_coulomb(natm,nspin,tag,chg,chi, &
        myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc)
@@ -352,6 +357,8 @@ contains
     real(8):: vid,rad,dchi,djii,dsgm,de0
     integer:: npq,isp,jsp,ierr,mode
 
+    if( params_read ) return
+
     if( ifcoulomb.eq.1 ) then  ! screened_bvs
       call read_params_sc(myid,mpi_world,ifcoulomb,iprint)
     else if( lvc ) then  ! variable-charge
@@ -361,6 +368,7 @@ contains
       call mpi_finalize(ierr)
       stop
     endif  ! lvc
+    params_read = .true.
 
   end subroutine read_params
 !=======================================================================
@@ -376,7 +384,7 @@ contains
     real(8):: vid,rad
     character(len=128):: cline,c1st,fname
     character(len=5):: cname
-    
+
 !!$    if( allocated(rad_bvs) ) deallocate(rad_bvs,npq_bvs,vid_bvs,rho_bvs)
 !!$    allocate(rad_bvs(msp),npq_bvs(msp),vid_bvs(msp) &
 !!$         ,rho_bvs(msp,msp))
@@ -385,6 +393,7 @@ contains
       open(ioprms,file=trim(fname),status='old')
       mode = 1
       interact(1:msp,1:msp) = .false.
+      ispflag(1:msp) = .false.
 !.....1st line for check the Coulomb computation type
       read(ioprms,*) c1st
       if( trim(c1st).ne.'screened_bvs' ) then
@@ -415,6 +424,7 @@ contains
             write(6,'(a,i3,a5,2f7.3,i4)') ' isp,cname,vid,rad,npq =' &
                  ,isp,trim(cname),vid,rad,npq
           endif
+          ispflag(isp) = .true.
           vid_bvs(isp) = vid
           rad_bvs(isp) = rad
           npq_bvs(isp) = npq
@@ -446,12 +456,16 @@ contains
       enddo
     endif  ! myid
 
-    call mpi_bcast(vid_bvs,msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rad_bvs,msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(npq_bvs,msp,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(rho_bvs,msp*msp,mpi_real8 &
-         ,0,mpi_world,ierr)
-    call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
+!.....To avoid MPI call when it is called in fitpot.
+    if( mpi_world.ge.0 ) then
+      call mpi_bcast(ispflag,msp,mpi_logical,0,mpi_world,ierr)
+      call mpi_bcast(vid_bvs,msp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(rad_bvs,msp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(npq_bvs,msp,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(rho_bvs,msp*msp,mpi_real8 &
+           ,0,mpi_world,ierr)
+      call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
+    endif
 !.....end of screend_bvs
   end subroutine read_params_sc
 !=======================================================================
@@ -528,9 +542,12 @@ contains
     real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
          ,vcgjiimin,sgmlim
 
+    if( params_read ) return
+
     if( myid.eq.0 ) then
 !.....Initialization
       interact(1:msp,1:msp) = .true.
+      ispflag(1:msp) = .false.
       vcg_chi(1:msp) = 0d0
       vcg_jii(1:msp) = 0d0
       vcg_e0(1:msp) = 0d0
@@ -602,11 +619,13 @@ contains
           if( trim(cchgs).eq.'fixed' ) then
             read(ioprms,*) isp, chgi
             schg(isp) = chgi
+            ispflag(isp) = .true.
           else if( trim(cchgs).eq.'fixed_bvs' ) then
             read(ioprms,*) isp,cname,vid,rad,npq
             if( isp.gt.nsp .and. iprint.gt.0 ) then
               print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
             endif
+            ispflag(isp) = .true.
             vid_bvs(isp) = vid
             rad_bvs(isp) = rad
             npq_bvs(isp) = npq
@@ -619,6 +638,7 @@ contains
             if( isp.gt.nsp .and. iprint.gt.0 ) then
               print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
             endif
+            ispflag(isp) = .true.
             vcg_chi(isp) = dchi
             vcg_jii(isp) = djii
             vcg_e0(isp) = de0
@@ -666,6 +686,18 @@ contains
         endif
       endif
 
+!.....Set screening length
+      if( trim(cterms).eq.'screened' .or. trim(cterms).eq.'short' ) then
+        do isp=1,nsp
+          do jsp=1,nsp
+            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+!!$            rho_bvs(isp,jsp) = 2d0
+            if( iprint.gt.0 .and. interact(isp,jsp) .and. jsp.ge.isp ) then
+              write(6,'(a,2i5,f10.4)') ' isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
+            endif
+          enddo
+        enddo
+      endif
     endif  ! myid.eq.0
 
 !.....Broadcast data just read from the file
@@ -682,11 +714,13 @@ contains
     call mpi_bcast(npq_bvs,msp,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(rho_bvs,msp*msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(ispflag,msp,mpi_logical,0,mpi_world,ierr)
 
     if( myid.eq.0 .and. iprint.ne.0 ) then
       write(6,'(a)') ' Finished reading '//trim(fname)
       write(6,*) ''
     endif
+    params_read = .true.
     
     return
   end subroutine read_paramsx
@@ -718,7 +752,7 @@ contains
 
     integer:: i,j,ik,is,js,k1,k2,k3,ierr,jj,ixyz,jxyz
     real(8):: elrl,esrl,epotl,epott,qi,qj,tmp,ftmp &
-         ,bdotr,terfc,diji,dij,ss2i,sgmsq2,rc2,q2tot,q2loc,bb2,sqpi &
+         ,bdotr,terfc,diji,dij,ss2i,sgmsq2,rc2,q2tot,q2loc,bb2 &
          ,e0,q2,sgmi
     real(8),save:: eself,eselfl
     real(8),allocatable,save:: ri(:),bk(:),bk1(:),bk2(:),bk3(:)&
@@ -788,6 +822,132 @@ contains
   end subroutine force_Coulomb
 !=======================================================================
   subroutine force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
+       ,chg,h,hi,tcom &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint &
+       ,l1st)
+!
+!  Screened Coulomb implementation used in BVS potential with
+!  smoothing using vrc and dVdrc where
+!    V_smooth(r) = V(r) -V(rc) -(r-rc)*dVdrc
+!
+    implicit none
+    include "mpif.h"
+    include "./params_unit.h"
+!!$    include "params_BVS_Morse.h"
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
+    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+         ,nn(6),lspr(0:nnmax,namax),nex(3)
+    integer,intent(in):: mpi_md_world,myid
+    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
+         ,acon(nismax),tag(namax),sv(3,6)
+    real(8),intent(inout):: chg(namax)
+    real(8),intent(inout):: tcom
+    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: lstrs,l1st
+
+
+    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
+         ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp &
+         ,qi,qj,radi,radj,rhoij,terfc,texp,sqpi &
+         ,vrc,dvdrc,terfcc
+    real(8),allocatable,save:: strsl(:,:,:)
+
+    if( l1st ) then
+      call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint)
+      if( allocated(strsl) ) deallocate(strsl)
+      allocate(strsl(3,3,namax))
+!!$      do i=1,natm
+!!$        print *,'i,chg(i)=',i,chg(i)
+!!$      enddo
+    endif
+
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
+    endif
+
+    epotl= 0d0
+    strsl(1:3,1:3,1:namax) = 0d0
+!!$    write(6,'(a,30f7.3)') 'chgs =',chg(1:natm)
+    sqpi = 1d0/sqrt(pi)
+!.....Loop over resident atoms
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is= int(tag(i))
+      if( .not. ispflag(is) ) cycle
+!!$      nconnect(i) = 0
+      qi= chg(i)
+      do k=1,lspr(0,i)
+        j=lspr(k,i)
+        if(j.eq.0) exit
+        if(j.le.i) cycle
+        js= int(tag(j))
+        if( .not.interact(is,js) ) cycle
+        qj= chg(j)
+        xj(1:3)= ra(1:3,j)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
+        if( dij.gt.rc ) cycle
+!!$        nconnect(i)= nconnect(i) +1
+        diji= 1d0/dij
+        dxdi(1:3)= -rij(1:3)*diji
+        dxdj(1:3)=  rij(1:3)*diji
+        rhoij = rho_bvs(is,js)
+        terfc = erfc(dij/rhoij)
+        terfcc = erfc(rc/rhoij)
+        vrc = acc*qi*qj/rc *terfcc
+        dvdrc = -acc *qi*qj/rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
+!.....potential
+        tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
+!!$        tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc )
+!!$        if( i.eq.1 .and. j.eq.6 ) then
+!!$          print *,'i,is,qi,j,js,qj,tmp=',i,is,qi,j,js,qj,tmp
+!!$        endif
+        if( j.le.natm ) then
+          epi(i)= epi(i) +tmp
+          epi(j)= epi(j) +tmp
+          epotl = epotl +tmp +tmp
+        else
+          epi(i)= epi(i) +tmp
+          epotl = epotl +tmp
+        endif
+!.....force
+        texp = exp(-(dij/rhoij)**2)
+        dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
+        aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
+        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
+!.....stress
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+            enddo
+          enddo
+        endif
+      enddo
+    enddo
+
+    if( lstrs ) then
+!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$           ,nn,mpi_md_world,strsl,9)
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
+
+!-----gather epot
+    call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
+         ,MPI_SUM,mpi_md_world,ierr)
+    epot= epot +epott
+!!$    write(6,'(a,es15.7)') ' epott screened Coulomb = ',epott
+
+  end subroutine force_screened_Coulomb
+!=======================================================================
+  subroutine force_screened_Coulomb_old(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint &
@@ -899,7 +1059,7 @@ contains
     epot= epot +epott
 !!$    write(6,'(a,es15.7)') ' screened Coulomb epott = ',epott
 
-  end subroutine force_screened_Coulomb
+  end subroutine force_screened_Coulomb_old
 !=======================================================================
   subroutine force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,chi,h,hi,tcom &
@@ -1412,9 +1572,6 @@ contains
 !
 ! Reset actual charges of atoms using effective charge information
 ! in order to keep charge neutrality in the system.
-! It is not necessary when performing screened Coulomb, but required
-! for non-screened Coulomb such as Ewald sum method. So it may be
-! natural to set neutral charges even when using screened Coulomb...
 !
 ! This would be called only once at the beginning.
 !
@@ -1486,9 +1643,6 @@ contains
       else
         chg(i)= vc_bvs(is)
       endif
-!!$      if( i.le.natm ) then
-!!$        write(6,'(a,2i5,f10.4)') ' i,is,chg=',i,is,chg(i)
-!!$      endif
     enddo
 
     deallocate(nbvsl,nbvs,vc_bvs)
@@ -1810,6 +1964,237 @@ contains
     paramsdir = trim(dname)
     return
   end subroutine set_paramsdir_Coulomb
+!=======================================================================
+  subroutine set_params_Coulomb(ndimp,prms_in,ctype)
+!
+!  Accessor routine to set Coulomb parameters from outside.
+!  This is supposed to be called only on serial run.
+!
+    integer,intent(in):: ndimp
+    real(8),intent(in):: prms_in(ndimp)
+    character(len=*),intent(in):: ctype
+
+    integer:: isp,jsp,ns,inc,ifcoulomb,ipr,myid,mpiw,maxisp
+
+    if( trim(ctype).eq.'BVS' ) then
+!.....Need to read in.params.XX file before going further
+      if( .not. params_read ) then
+        ifcoulomb = 1
+        ipr = 0
+        myid = 0
+        mpiw = -1
+        call read_params_sc(myid,mpiw,ifcoulomb,ipr)
+        params_read = .true.
+      endif
+
+      ns = 0
+      do isp=1,msp
+        if( ispflag(isp) ) ns = ns + 1
+      enddo
+
+      if( ns.ne.ndimp ) then
+        print *,'ERROR @set_params_Coulomb: ns.ne.ndimp !!!'
+        stop
+      endif
+
+      inc = 0
+      maxisp = 0
+      do isp=1,msp
+        if( ispflag(isp) ) then
+          inc = inc + 1
+          rad_bvs(isp) = prms_in(inc)
+          maxisp = max(maxisp,isp)
+        endif
+      enddo
+
+      nsp = max(nsp,maxisp)
+!.....Reset fbvs to 1
+      fbvs = 1.0d0
+!.....Reset screening length
+      do isp=1,nsp
+        do jsp=1,nsp
+          rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+!!$          print *,'isp,jsp,rho_bvs=',isp,jsp,rho_bvs(isp,jsp)
+        enddo
+      enddo
+    endif
+    
+  end subroutine set_params_Coulomb
+!=======================================================================
+  subroutine gradw_Coulomb(namax,natm,nb,tag,ra,chg,nnmax &
+       ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws &
+       ,lematch,lfmatch,lsmatch,iprm0,myid,mpi_world)
+!
+!  Gradient w.r.t. weights.
+!  Note: This routine is always called in single run,
+!  thus no need of parallel implementation.
+!  - iprm0: The starting point -1 in parameter array for this FF.
+!
+    implicit none
+    include "./params_unit.h"
+    integer,intent(in):: namax,natm,nb,nnmax,iprint,iprm0 &
+         ,myid,mpi_world
+    integer,intent(in):: lspr(0:nnmax,namax)
+    real(8),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
+    real(8),intent(inout):: epot,chg(namax)
+    integer,intent(in):: ndimp
+    real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
+    logical,intent(in):: lematch,lfmatch,lsmatch
+
+    integer:: i,j,k,isp,jsp,ne,nf,ns,maxisp,ixyz,jxyz,jj
+    real(8):: rc2,xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3) &
+         ,dedr,ddedrho,dedrho,dij,dij2,diji,fac,rhoij,qi,qj,sqpi &
+         ,terfc,terfcc,tmp,vrc
+    real(8),allocatable:: ge_rho(:),gf_rho(:,:,:),gs_rho(:,:)
+
+    if( .not.allocated(ge_rho) ) then
+      allocate(ge_rho(msp),gs_rho(msp,6),gf_rho(msp,3,natm))
+    endif
+    if( size(gf_rho).ne.msp*3*natm ) then
+      if( allocated(gf_rho) ) deallocate(gf_rho)
+      allocate(gf_rho(msp,3,natm))
+    endif
+
+    call set_charge_BVS(natm,nb,tag,chg,myid,mpi_world,iprint)
+    
+!.....Max isp
+    maxisp = 0
+    do i=1,natm
+      maxisp = max(maxisp,int(tag(i)))
+    enddo
+
+    rc2 = rc*rc
+
+    ge_rho(1:msp) = 0d0
+    gf_rho(1:msp,1:3,1:natm) = 0d0
+    gs_rho(1:msp,1:6) = 0d0
+
+!.....Loop over resident atoms
+    do i=1,natm
+      xi(1:3) = ra(1:3,i)
+      isp = int(tag(i))
+      if( .not. ispflag(isp) ) cycle
+      qi = chg(i)
+      do jj=1,lspr(0,i)
+        j= lspr(jj,i)
+        if( j.eq.0 ) exit
+        if( j.le.i ) cycle
+        jsp = int(tag(j))
+!.....Check if two species interact
+        if( .not. interact(isp,jsp) ) cycle
+        xj(1:3) = ra(1:3,j)
+        xij(1:3) = xj(1:3) -xi(1:3)
+        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij2.gt.rc2 ) cycle
+        dij= sqrt(dij2)
+        diji = 1d0/dij
+        dxdi(1:3)= -rij(1:3)*diji
+        dxdj(1:3)=  rij(1:3)*diji
+        rhoij = rho_bvs(isp,jsp)
+        terfc = erfc(dij/rhoij)
+        terfcc = erfc(rc/rhoij)
+        qj = chg(j)
+        if( lematch ) then
+          if( j.le.natm ) then
+            fac = 1d0
+          else
+            fac = 0.5
+          endif
+          vrc = acc*qi*qj/rc *terfcc
+!.....Derivative of potential energy wrt {w}
+          dedrho = dvdrho(dij,rhoij,qi,qj) -dvdrho(rc,rhoij,qi,qj) &
+               -(dij-rc)*ddvdrho(rc,rhoij,qi,qj)
+          ge_rho(isp) = ge_rho(isp) +dedrho*fac
+          ge_rho(jsp) = ge_rho(jsp) +dedrho*fac
+        endif
+!.....Pre-compute some factors required in force and stress derivatives
+        if( lfmatch .or. lsmatch ) then
+          dedr = -acc *qi*qj*diji *(terfc*diji +2d0/rhoij *sqpi *exp(-(dij/rhoij)**2))
+          ddedrho = ddvdrho(dij,rhoij,qi,qj) -ddvdrho(rc,rhoij,qi,qj)
+        endif
+        if( lfmatch ) then
+          gf_rho(isp,1:3,i) = gf_rho(isp,1:3,i) -dxdi(1:3)*ddedrho
+          gf_rho(jsp,1:3,i) = gf_rho(jsp,1:3,i) -dxdi(1:3)*ddedrho
+          if( j.le.natm ) then
+            gf_rho(isp,1:3,j) = gf_rho(isp,1:3,j) -dxdj(1:3)*ddedrho
+            gf_rho(jsp,1:3,j) = gf_rho(jsp,1:3,j) -dxdj(1:3)*ddedrho
+          endif
+        endif
+        if( lsmatch ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              k = ivoigt(ixyz,jxyz)
+              gs_rho(isp,k) = gs_rho(isp,k) &
+                   -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *ddedrho
+              gs_rho(jsp,k) = gs_rho(jsp,k) &
+                   -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *ddedrho
+              if( j.le.natm ) then
+                gs_rho(isp,k) = gs_rho(isp,k) &
+                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *ddedrho
+                gs_rho(jsp,k) = gs_rho(jsp,k) &
+                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *ddedrho
+              endif
+            enddo
+          enddo
+        endif
+      enddo
+    enddo
+
+!.....Tidy up gradient arrays
+    if( lematch ) then
+      ne = iprm0
+      do isp=1,maxisp
+        if( .not. ispflag(isp) ) cycle
+        ne = ne + 1
+        gwe(ne) = gwe(ne) +ge_rho(isp)
+      enddo
+    endif
+    if( lfmatch ) then
+      do i=1,natm
+        nf = iprm0
+        do isp=1,maxisp
+          if( .not. ispflag(isp) ) cycle
+          nf = nf + 1
+          gwf(nf,1:3,i) = gwf(nf,1:3,i) +gf_rho(isp,1:3,i)
+        enddo
+      enddo
+    endif
+    if( lsmatch ) then
+      do i=1,natm
+        ns = iprm0
+        do isp=1,maxisp
+          if( .not.ispflag(isp) ) cycle
+          ns = ns + 1
+          gws(ns,1:6) = gws(ns,1:6) +gs_rho(isp,1:6)
+        enddo
+      enddo
+    endif
+    return
+  end subroutine gradw_Coulomb
+!=======================================================================
+  function dvdrho(r,rho,qi,qj)
+!
+!  Derivative screend Coulomb wrt rho.
+!
+    real(8),intent(in):: r,rho,qi,qj
+    real(8):: dvdrho
+
+    dvdrho = acc *qi*qj*2d0 /rho**2 /sqrt(pi) *exp(-(r/rho)**2)
+    return
+  end function dvdrho
+!=======================================================================
+  function ddvdrho(r,rho,qi,qj)
+!
+!  Derivative of dvdr wrt rho.
+!  See the memo on 2018-04-11.
+!
+    real(8),intent(in):: r,rho,qi,qj
+    real(8):: ddvdrho
+
+    ddvdrho = -4d0*acc*qi*qj*r *exp(-(r/rho)**2) /sqrt(pi) /rho**4
+    return
+  end function ddvdrho
 end module Coulomb
 !-----------------------------------------------------------------------
 !     Local Variables:

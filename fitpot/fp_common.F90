@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-20 20:51:07 Ryo KOBAYASHI>
+!                     Last modified: <2018-04-12 11:42:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -66,10 +66,10 @@ contains
          ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys,erefmin &
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
          ,nff,cffs,nsubff,csubffs,cmaindir,maxna,rcut,rc3 &
-         ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint
+         ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint,maxisp
     use parallel
     use minimize
-    use Coulomb,only: set_paramsdir_Coulomb
+    use Coulomb,only: set_paramsdir_Coulomb, set_params_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN,only: set_paramsdir_NN,set_params_NN
@@ -148,6 +148,13 @@ contains
         call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_NN(ndim,x,rcut,rc3)
+      else if( trim(cpot).eq.'BVS' ) then
+        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_Coulomb(maxisp,x(1:maxisp),cpot)
+        call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot)
       endif
 !!$      print *,'func_w_pmd: 04-1, ismpl,lcalcgrad,ndim,nff='&
 !!$           ,ismpl,lcalcgrad,ndim,nff
@@ -276,10 +283,10 @@ contains
     use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm,tgrad &
          ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,nsubff,csubffs &
          ,cmaindir,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
-         ,rcut,rc3,myidrefsub,isidrefsub,iprint
+         ,rcut,rc3,myidrefsub,isidrefsub,iprint,maxisp
     use parallel
     use minimize
-    use Coulomb,only: set_paramsdir_Coulomb
+    use Coulomb,only: set_paramsdir_Coulomb,set_params_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN,only: set_paramsdir_NN,set_params_NN
@@ -349,6 +356,13 @@ contains
         call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_NN(ndim,x,rcut,rc3)
+      else if( trim(cpot).eq.'BVS' ) then
+        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_Coulomb(maxisp,x(1:maxisp),cpot)
+        call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot)
       endif
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.
@@ -459,7 +473,7 @@ contains
 !  Run pmd and get energy and forces of the system.
 !
     use variables,only: mdsys,maxna,iprint,lematch,lfmatch,lsmatch&
-         ,rc_other
+         ,rc_other,maxisp
     use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
     use force
     implicit none
@@ -578,7 +592,7 @@ contains
          ,smpl%chg,smpl%chi &
          ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
          ,nismax,am,dt,rc,rbuf,ptnsr,epot,ekin &
-         ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp &
+         ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
          ,gwe,gwf,gws &
          ,lematch,lfmatch,lsmatch,boundary)
     strs(1:3,1:3) = ptnsr(1:3,1:3) *up2gpa*(-1d0)
@@ -764,7 +778,7 @@ contains
     return
 
   end function ndat_in_line
-  
+!=======================================================================
 end module fp_common
 !-----------------------------------------------------------------------
 ! Local Variables:

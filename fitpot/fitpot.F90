@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-29 17:33:45 Ryo KOBAYASHI>
+!                     Last modified: <2018-04-12 11:44:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -87,9 +87,16 @@ program fitpot
   endif
 
 !.....Set cffs only for pmd calculation
-  nff = 1
-  allocate(cffs(nff))
-  cffs(1) = trim(cpot)
+  if( trim(cpot).eq.'BVS' ) then
+    nff = 2
+    allocate(cffs(nff))
+    cffs(1) = 'Morse'
+    cffs(2) = 'screened_Coulomb'
+  else
+    nff = 1
+    allocate(cffs(nff))
+    cffs(1) = trim(cpot)
+  endif
   
   select case (trim(cfmethod))
     case ('sd','SD')
@@ -519,7 +526,7 @@ subroutine read_ref_data()
   use parallel
   use fp_common,only: ndat_in_line
   implicit none 
-  integer:: ismpl,i,is,jflag,natm,nfrc,nftot,nfrcg,nftotg
+  integer:: ismpl,i,is,jflag,natm,nfrc,nftot,nfrcg,nftotg,ispmax,ispmaxl
   integer:: imax,ifsmpl,nfsmplmax,nfrefdat,ifcal
   character(len=128):: cdir
   real(8):: erefminl,ftmp(3),fmax,ptnsr(3,3)
@@ -528,6 +535,7 @@ subroutine read_ref_data()
   erefminl= 0d0
   nftot= 0
   nfrc = 0
+  ispmaxl = 0
   do ismpl=isid0,isid1
     cdir=samples(ismpl)%cdirname
     open(13,file=trim(cmaindir)//'/'//trim(cdir) &
@@ -536,11 +544,15 @@ subroutine read_ref_data()
     close(13)
 !.....Count numbers of each species
     samples(ismpl)%naps(1:mspcs) = 0
+    ispmax = 0
     do i=1,samples(ismpl)%natm
       is= int(samples(ismpl)%tag(i))
+      ispmax = max(ispmax,is)
       samples(ismpl)%naps(is) = samples(ismpl)%naps(is) +1
 !!$      samples(ismpl)%eref= samples(ismpl)%eref  !-eatom(is)
     enddo
+    ispmaxl = max(ispmaxl,ispmax)
+    samples(ismpl)%ispmax = ispmax
     samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 1
 !!$    erefminl= min(erefminl,samples(ismpl)%eref/samples(ismpl)%natm)
 !    write(6,*) 'ismpl,naps=',ismpl,samples(ismpl)%naps(1:mspcs)
@@ -605,18 +617,19 @@ subroutine read_ref_data()
 
   nfrcg= 0
   nftotg= 0
-  call mpi_reduce(nfrc,nfrcg,1,mpi_integer,mpi_sum,0 &
-       ,mpi_world,ierr)
-  call mpi_reduce(nftot,nftotg,1,mpi_integer,mpi_sum,0 &
-       ,mpi_world,ierr)
+  maxisp = 0
+  call mpi_reduce(nfrc,nfrcg,1,mpi_integer,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(nftot,nftotg,1,mpi_integer,mpi_sum,0,mpi_world,ierr)
+  call mpi_allreduce(ispmaxl,maxisp,1,mpi_integer,mpi_max,0,mpi_world,ierr)
 
   if(myid.eq.0) then
 !    write(6,'(a,es12.4)') ' erefmin = ',erefmin
+    print *,'Finished read_ref_data.'
     if( lfmatch ) then
       write(6,'(a,i8)') ' Number of forces to be used = ',nfrcg
       write(6,'(a,i8)') ' Total number of forces      = ',nftotg
     endif
-    print *,'Finished read_ref_data.'
+    write(6,'(a,i0)') ' Number of species in all samples = ',maxisp
   endif
 
 end subroutine read_ref_data
@@ -1240,9 +1253,13 @@ subroutine test()
     call NN_init()
     call NN_func(nvars,vars,ftrn,ftst)
     call NN_grad(nvars,vars,g)
-  else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse') then
+  else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
+       .or. trim(cpot).eq.'BVS' ) then
     call func_w_pmd(nvars,vars,ftrn,ftst)
     call grad_w_pmd(nvars,vars,g)
+  else
+    print *,'ERROR @test: '//trim(cpot)//' is not available for test().'
+    stop
   endif
 
 !!$  print *,'write_stats, myid=',myid

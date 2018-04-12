@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-26 10:58:45 Ryo KOBAYASHI>
+!                     Last modified: <2018-04-12 11:36:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -190,7 +190,8 @@ contains
     call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
- 
+!!$    write(6,'(a,es15.7)') ' epott Morse = ',epott
+    return
   end subroutine force_Morse
 !=======================================================================
   subroutine force_Morse_repul(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -693,7 +694,7 @@ contains
 !.....Different operations for different potential type
 !.....for example, only O-X interactions in BVS potential,
 !.....whereas all the pair interactions for normal Morse potential
-    if( trim(ctype).eq.'BVS' ) then
+    if( trim(ctype).eq.'bvs' .or. trim(ctype).eq.'BVS' ) then
 !!$    if( nprms.ne.3*(nsp-1) ) then
 !!$      print *,'ERROR: nprms.ne.3*(nsp-1), nprms,nsp=',nprms,nsp
 !!$      stop
@@ -825,7 +826,7 @@ contains
 !.....Different operations for different potential type
 !.....for example, only O-X interactions in BVS potential,
 !.....whereas all the pair interactions for normal Morse potential
-    if( trim(ctype).eq.'BVS' ) then
+    if( trim(ctype).eq.'bvs' .or. trim(ctype).eq.'BVS' ) then
 !!$    if( nprms.ne.3*(nsp-1) ) then
 !!$      print *,'ERROR: nprms.ne.3*(nsp-1), nprms,nsp=',nprms,nsp
 !!$      stop
@@ -1051,15 +1052,16 @@ contains
 !=======================================================================
   subroutine gradw_Morse(namax,natm,tag,ra,nnmax &
        ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws &
-       ,lematch,lfmatch,lsmatch)
+       ,lematch,lfmatch,lsmatch,iprm0)
 !
 !  Gradient w.r.t. weights.
 !  Note: This routine is always called in single run,
 !  thus no need of parallel implementation.
+!  - iprm0: The starting point -1 in parameter array for this FF.
 !
     implicit none
     include "./params_unit.h"
-    integer,intent(in):: namax,natm,nnmax,iprint
+    integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
     real(8),intent(inout):: epot
@@ -1222,11 +1224,8 @@ contains
 !!$    enddo
 
 !.....Tidy up gradient arrays
-    gwe(1:ndimp) = 0d0
-    gwf(1:ndimp,1:3,1:natm) = 0d0
-    gws(1:ndimp,1:6) = 0d0
     if( lematch ) then
-      ne = 0
+      ne = iprm0
       do is=1,nsp
         do js=is,nsp
           if( .not. interact(is,js) ) cycle
@@ -1246,7 +1245,7 @@ contains
     endif
     if( lfmatch ) then
       do i=1,natm
-        nf = 0
+        nf = iprm0
         do is=1,nsp
           do js=is,nsp
             if( .not. interact(is,js) ) cycle
@@ -1265,7 +1264,7 @@ contains
     endif
     if( lsmatch ) then
       do i=1,natm
-        ns = 0
+        ns = iprm0
         do is=1,nsp
           do js=is,nsp
             if( .not. interact(is,js) ) cycle
