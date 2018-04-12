@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-04-12 11:44:52 Ryo KOBAYASHI>
+!                     Last modified: <2018-04-12 15:17:33 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -782,7 +782,7 @@ subroutine qn_wrapper()
          ,niter_eval,write_stats)
     call NN_analyze("fin")
     
-  else if( trim(cpot).eq.'Morse' ) then
+  else if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' ) then
     call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
