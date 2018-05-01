@@ -98,9 +98,10 @@ class Triplet(object):
 
 def ncomb(n,m):
     '''
-    Calculate nCm.
+    Calculate nCm = n!/m!/(n-m)!.
     '''
-    return math.factorial(n)/math.factorial(m)
+    d = max(n-m,1)
+    return math.factorial(n)/math.factorial(m)/ math.factorial(d)
 
 def get_pairs(nsp):
     pairs= []
@@ -213,6 +214,7 @@ def get_gauss_params(isp1,isp2):
     print('Gaussian peaks are : ')
     for r in rs:
         print(' {0:8.3f}'.format(r),end='')
+    print('')
     print('Gaussian width parameters [1/Ang]'
           +' (several values separated by white-space):')
     etas = [ float(eta) for eta in sys.stdin.readline().split() ]
