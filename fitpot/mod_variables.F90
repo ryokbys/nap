@@ -90,6 +90,9 @@ module variables
     integer:: naps(mspcs)  ! num of atoms per species
     integer:: iclass       ! 1: training,  2: test
     logical:: charge_set = .false.
+!.....Related to descriptors
+    integer:: nsf,nal,nnl
+    real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:),igsf(:,:,:)
   end type mdsys
   real(8):: erefmin
 

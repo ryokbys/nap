@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-04-12 15:17:33 Ryo KOBAYASHI>
+!                     Last modified: <2018-05-01 11:34:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -191,7 +191,6 @@ program fitpot
     write(6,'(a,f15.3,a,i3,"h",i2.2,"m",i2.2,"s")') &
          ' Time      = ', tmp, &
          ' sec  = ', ihour,imin,isec
-    write(6,*) ''
     call time_stamp(' Job finished')
   endif
   call mpi_finalize(ierr)
@@ -782,7 +781,8 @@ subroutine qn_wrapper()
          ,niter_eval,write_stats)
     call NN_analyze("fin")
     
-  else if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' ) then
+  else if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
+       .or. trim(cpot).eq.'linreg' ) then
     call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -915,7 +915,8 @@ subroutine ga_wrapper()
   external:: write_stats,write_energy_relation
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' ) then
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' .or. &
+       trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
     call ga(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats,write_energy_relation)
@@ -938,7 +939,8 @@ subroutine de_wrapper()
   external:: write_stats, write_energy_relation
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' ) then
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' .or. &
+       trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
     call de(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats, write_energy_relation)
@@ -961,7 +963,8 @@ subroutine pso_wrapper()
   external:: write_stats
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' ) then
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' .or. &
+       trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
     call pso(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -1254,7 +1257,7 @@ subroutine test()
     call NN_func(nvars,vars,ftrn,ftst)
     call NN_grad(nvars,vars,g)
   else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
-       .or. trim(cpot).eq.'BVS' ) then
+       .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
     call func_w_pmd(nvars,vars,ftrn,ftst)
     call grad_w_pmd(nvars,vars,g)
   else

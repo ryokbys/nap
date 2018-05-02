@@ -1,15 +1,22 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-13 11:18:44 Ryo KOBAYASHI>
+!                     Last modified: <2018-05-02 09:32:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
 !    - 2015.02.03 by R.K. extended to multiple species
 !-----------------------------------------------------------------------
+  implicit none
+  save
+  
+  character(len=128):: paramsdir = '.'
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.linreg'
   character(128),parameter:: ccfname='in.const.linreg'
   character(128),parameter:: cmbfname='in.comb.linreg'
+
+  logical:: lprmset_linreg = .false.
+
 !.....parameters
   real(8),allocatable:: coeff(:)
 !.....constants
@@ -46,7 +53,7 @@ module linreg
           /)
 
 contains
-  subroutine force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_linreg_old(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint)
     implicit none
@@ -149,6 +156,93 @@ contains
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
+    epot= epot +epott
+    
+    return
+  end subroutine force_linreg_old
+!=======================================================================
+  subroutine force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
+       ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
+    use descriptor
+    implicit none
+    include "mpif.h"
+    include "./params_unit.h"
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
+    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+         ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
+    real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
+         ,h(3,3),hi(3,3),sv(3,6)
+    real(8),intent(inout):: tcom,rcin
+    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: l1st 
+    logical:: lstrs
+
+!.....local
+    integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ielem &
+         ,iwgt,isf,ja,jj
+    real(8):: b_na,at(3),epotl,wgt,aexp,bnai,apot,epott,tmp
+    real(8),save,allocatable:: aal(:,:)
+
+    if( l1st ) then
+      if( allocated(aal) ) deallocate(aal)
+      allocate(aal(3,namax))
+    endif
+
+    if( size(aal).lt.3*namax ) then
+      deallocate(aal)
+      allocate(aal(3,namax))
+    endif
+    aal(1:3,1:namax) = 0d0
+    epotl= 0d0
+
+    call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr &
+         ,myid,mpi_world,iprint)
+
+    call calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr,rcin &
+         ,myid,mpi_world,l1st,iprint)
+
+    if( iprint.gt.10 .and. mod(iprint,10).eq.1 .and. myid.le.0 ) then
+      call write_descs(80,natm,namax,nnmax,lspr,tag)
+    endif
+
+!.....Energy
+    do ia=1,natm
+      do isf=1,nsf
+        wgt = coeff(isf)
+        tmp = wgt*gsf(isf,ia)
+        epotl = epotl +tmp
+        epi(ia) = epi(ia) +tmp
+      enddo
+    enddo
+
+!.....Force
+    do ia=1,natm
+!!$      is = int(tag(ia))
+      do jj=1,lspr(0,ia)
+        ja = lspr(jj,ia)
+        js = int(tag(ja))
+        do isf=1,nsf
+          if( igsf(isf,jj,ia).eq.0 ) cycle
+          wgt = coeff(isf)
+          aal(1:3,ja) = aal(1:3,ja) &
+               -wgt*dgsf(1:3,isf,jj,ia)
+        enddo
+      enddo
+!.....Atom-ia
+      do isf=1,nsf
+        wgt = coeff(isf)
+        aal(1:3,ia) = aal(1:3,ia) &
+             -wgt*dgsf(1:3,isf,0,ia)
+      enddo
+    enddo
+
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,aal,3)
+    aa(1:3,1:natm) = aa(1:3,1:natm) +aal(1:3,1:natm)
+
+!-----gather epot
+    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
     epot= epot +epott
     
     return
@@ -529,21 +623,127 @@ contains
     return
   end subroutine read_params
 !=======================================================================
-  function factorial(n,m)
-!  compute factorial of n, m-times.
+  subroutine read_params_linreg(myid,mpi_world,iprint)
+    use descriptor,only: nsf
     implicit none
-    integer,intent(in):: n,m
-    real(8):: factorial
+    include 'mpif.h'
 
-    integer:: i
+    integer,intent(in):: myid,mpi_world,iprint
+    integer:: itmp,ierr,i,j
+    logical:: lexist
+    character(len=128):: fname
 
-    factorial= 1
-    do i=0,m-1
-      factorial= factorial*(n-i)
-    enddo
+    if( myid.eq.0 ) then
+      fname = trim(paramsdir)//'/'//trim(cpfname)
+!.....read parameters at the 1st call
+      inquire(file=trim(fname),exist=lexist)
+      if( .not. lexist ) then
+        write(6,'(a)') ' [Error] '//cpfname//' does not exist !!!.'
+        write(6,'(a)') '   The linreg potential needs '//cpfname//'.'
+!!$        call mpi_finalize(ierr)
+        stop
+      endif
+      open(50,file=trim(cpfname),status='old')
+      read(50,*) itmp
+      if( itmp.ne.nsf ) then
+        write(6,'(a)') ' [Error] nsf in in.params.linreg ' // &
+             'and in.params.desc are inconsistent.'
+!!$        call mpi_finalize(ierr)
+        stop
+      endif
+    endif
+
+    allocate(coeff(nsf))
+    if( myid.eq.0 ) then
+      do i=1,nsf
+        read(50,*) coeff(i)
+      enddo
+      close(50)
+    endif
+    call mpi_bcast(coeff,nsf,mpi_real8,0,mpi_world,ierr)
+    
+
     return
-  end function factorial
+  end subroutine read_params_linreg
+!=======================================================================
+  subroutine set_paramsdir_linreg(dname)
+!
+!  Accessor routine to set paramsdir.
+!
+    implicit none
+    character(len=*),intent(in):: dname
 
+    paramsdir = trim(dname)
+    return
+  end subroutine set_paramsdir_linreg
+!=======================================================================
+  subroutine set_params_linreg(ndimp,params_in)
+!
+!  Accesor routine to set linreg parameters from outside.
+!  It is supposed to be called from fitpot in a seriral process.
+!
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params_in(ndimp)
+
+    if( .not. allocated(coeff) ) then
+      allocate(coeff(ndimp))
+    endif
+
+    coeff(1:ndimp) = params_in(1:ndimp)
+    lprmset_linreg = .true.
+    return
+  end subroutine set_params_linreg
+!=======================================================================
+  subroutine gradw_linreg(namax,natm,tag,ra,nnmax,h,rcin,lspr &
+       ,iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
+!
+!  Derivative of linreg pot w.r.t parameters.
+!  - iprm0: The starting point -1 in parameter array for this FF.
+!
+    use descriptor
+    implicit none
+    integer,intent(in):: namax,natm,nnmax,ndimp,iprint,lspr(0:nnmax,namax)&
+         ,iprm0
+    real(8),intent(in):: tag(namax),ra(3,namax),h(3,3),rcin
+    real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
+    logical,intent(in):: lematch,lfmatch,lsmatch
+
+    integer:: i,ia,ja,jj,isf,ne,nf,jra
+    integer,external:: itotOf
+
+    if( lematch ) then
+      do ia=1,natm
+        ne = iprm0
+        do isf=1,nsf
+          ne = ne + 1
+          gwe(ne) = gwe(ne) +gsf(isf,ia)
+        enddo
+      enddo
+    endif
+    if( lfmatch ) then
+      do ia=1,natm
+!.....ja != ia
+        do jj=0,lspr(0,ia)
+          if( jj.eq.0 ) then
+            ja = ia
+          else
+            ja = lspr(jj,ia)
+          endif
+          jra = itotOf(tag(ja))
+          nf = iprm0
+          do isf=1,nsf
+            nf = nf + 1
+!!$            if( igsf(isf,jj,ia).eq.0 ) cycle
+            gwf(nf,1:3,jra) = gwf(nf,1:3,jra) -dgsf(1:3,isf,jj,ia)
+          enddo
+        enddo
+      enddo
+    endif
+    if( lsmatch ) then
+!.....No stress matching inf linreg now
+    endif
+    return
+  end subroutine gradw_linreg
 end module linreg
 !-----------------------------------------------------------------------
 !     Local Variables:

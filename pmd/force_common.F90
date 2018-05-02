@@ -137,7 +137,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
   if( use_force('linreg') ) call force_linreg(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
   if( use_force('NN') ) call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
@@ -210,6 +210,8 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use Buckingham, only: init_Buckingham, read_params_Buckingham, lprmset_Buckingham
   use ZBL, only: read_params_ZBL
   use LJ, only: read_params_LJ_repul
+  use linreg, only: read_params_linreg,lprmset_linreg
+  use descriptor, only: read_params_desc,init_desc
   implicit none
   integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint !,numff
   real(8),intent(in):: tag(namax),h(3,3),rc
@@ -299,7 +301,18 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   if( use_force('LJ_repul') ) then
     call read_params_LJ_repul(myid_md,mpi_md_world,iprint)
   endif
-  
+!.....Linear regression
+  if( use_force('linreg') ) then
+    call init_desc()
+    if( .not.lprmset_linreg ) then
+!.....Read both in.params.desc and in.params.linreg
+      call read_params_desc(myid_md,mpi_md_world,iprint,rc)
+      call read_params_linreg(myid_md,mpi_md_world,iprint)
+    else
+!.....Read only in.params.desc
+      call read_params_desc(myid_md,mpi_md_world,iprint,rc)
+    endif
+  endif
 
 end subroutine init_force
 !=======================================================================

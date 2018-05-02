@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-04-12 11:42:05 Ryo KOBAYASHI>
+!                     Last modified: <2018-05-01 17:34:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -9,6 +9,7 @@ module fp_common
   save
   real(8),allocatable:: fdiff(:,:),frcs(:,:),gtrnl(:)
   real(8),allocatable:: gwe(:),gwf(:,:,:),gws(:,:)
+  real(8),allocatable:: gwesub(:)
   real(8):: pdiff(6), ptnsr(3,3)
   real(8):: epotsub
 
@@ -73,14 +74,16 @@ contains
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN,only: set_paramsdir_NN,set_params_NN
+    use linreg,only: set_paramsdir_linreg,set_params_linreg
+    use descriptor,only: set_paramsdir_desc,get_descs,get_ints
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: ftrn,ftst
 
-    integer:: ismpl,natm,ia,ixyz,jxyz,idim,k
+    integer:: ismpl,natm,ia,ixyz,jxyz,idim,k,nsf,nal,nnl
     real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv,esub
-    real(8):: eerr,ferr,ferri,serr,serri,strs(3,3)
+    real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),fref
     real(8):: ftrnl,ftstl,ftmp
     real(8):: edenom,fdenom
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
@@ -148,6 +151,12 @@ contains
         call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_NN(ndim,x,rcut,rc3)
+      else if( trim(cpot).eq.'linreg' ) then
+        call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_paramsdir_linreg(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_linreg(ndim,x)
       else if( trim(cpot).eq.'BVS' ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -162,6 +171,20 @@ contains
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
       samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
+      if( trim(cpot).eq.'linreg' ) then
+        call get_ints(nsf,nal,nnl)
+        samples(ismpl)%nsf = nsf
+        samples(ismpl)%nal = nal
+        samples(ismpl)%nnl = nnl
+!!$        print *,trim(cdirname),nsf,nal,nnl
+        if( .not. allocated(samples(ismpl)%gsf) ) then
+          allocate(samples(ismpl)%gsf(nsf,nal) &
+               ,samples(ismpl)%dgsf(3,nsf,0:nnl,nal) &
+               ,samples(ismpl)%igsf(nsf,0:nnl,nal) )
+        endif
+        call get_descs(nsf,nal,nnl,samples(ismpl)%gsf &
+             ,samples(ismpl)%dgsf,samples(ismpl)%igsf)
+      endif
       if( iprint.ge.10 ) then
         write(6,'(a,2i4,1x,a,7es12.4)') ' myid,ismpl,cdirname,epot,strs= ', &
              myid,ismpl,trim(cdirname), &
@@ -213,6 +236,9 @@ contains
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia)+smpl%fsub(ixyz,ia) &
                  -(smpl%fref(ixyz,ia))) *ferri
+!!$            fref = smpl%fref(ixyz,ia)
+!!$            fdiff(ixyz,ia)= (frcs(ixyz,ia)+smpl%fsub(ixyz,ia) &
+!!$                 -fref) /(abs(fref) +ferr)
             fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
             ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt
           enddo
@@ -290,14 +316,16 @@ contains
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN,only: set_paramsdir_NN,set_params_NN
+    use linreg,only: set_paramsdir_linreg,set_params_linreg
+    use descriptor,only: set_paramsdir_desc,set_descs
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gtrn(ndim)
 
-    integer:: ismpl,i,idim,natm,k,ia,ixyz,jxyz
+    integer:: ismpl,i,idim,natm,k,ia,ixyz,jxyz,nsf,nal,nnl
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3),dn3i
-    real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri
+    real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,fref
     type(mdsys):: smpl
     logical,parameter:: lcalcgrad = .true. 
     character(len=128):: cdirname,ctype
@@ -308,6 +336,9 @@ contains
     if( .not.allocated(gtrnl) ) allocate(gtrnl(ndim))
     if( .not.allocated(gwe) ) allocate(gwe(ndim),gwf(ndim,3,maxna)&
          ,gws(ndim,6))
+    if( len(trim(crefstrct)).gt.5 ) then
+      if( .not.allocated(gwesub) ) allocate(gwesub(ndim))
+    endif
 
     ngrad= ngrad +1
     tc0= mpi_wtime()
@@ -356,6 +387,16 @@ contains
         call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_NN(ndim,x,rcut,rc3)
+      else if( trim(cpot).eq.'linreg' ) then
+        call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_paramsdir_linreg(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_linreg(ndim,x)
+        nsf = smpl%nsf
+        nal = smpl%nal
+        nnl = smpl%nnl
+        call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
       else if( trim(cpot).eq.'BVS' ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -380,8 +421,10 @@ contains
       if( myid.eq.myidrefsub ) then
         epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
         epotsub = epotsub /samples(isidrefsub)%natm
+        gwesub(1:ndim) = samples(isidrefsub)%gwe(1:ndim)
       endif
       call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
+      call mpi_bcast(gwesub,ndim,mpi_real8,myidrefsub,mpi_world,ierr)
     endif
 
     gtrnl(1:ndim) = 0d0
@@ -401,11 +444,14 @@ contains
         eerr= smpl%eerr
         if( len(trim(crefstrct)).gt.5 ) then
           ediff= (epot-epotsub*natm+esub -(eref-erefsub*natm))/natm /eerr
+          gtrnl(1:ndim) = gtrnl(1:ndim) &
+               +2d0*ediff/natm/eerr *swgt &
+               *(smpl%gwe(1:ndim) -gwesub(1:ndim))
         else
           ediff= (epot+esub -eref)/natm /eerr
+          gtrnl(1:ndim) = gtrnl(1:ndim) &
+               +2d0*ediff*smpl%gwe(1:ndim)/natm/eerr *swgt
         endif
-        gtrnl(1:ndim) = gtrnl(1:ndim) &
-             +2d0*ediff*smpl%gwe(1:ndim)/natm/eerr *swgt
 !!$        print *,'ismpl,epot,esub,eref,ediff,natm,eerr,swgt=' &
 !!$             ,ismpl,epot,esub,eref,ediff,natm,eerr,swgt
       endif
@@ -422,6 +468,11 @@ contains
                  -(smpl%fref(ixyz,ia))) *ferri
             gtrnl(1:ndim)= gtrnl(1:ndim) +2d0*fdiff(ixyz,ia) &
                  *smpl%gwf(1:ndim,ixyz,ia) *dn3i *swgt *ferri
+!!$            fref = smpl%fref(ixyz,ia)
+!!$            fdiff(ixyz,ia)= (frcs(ixyz,ia) +smpl%fsub(ixyz,ia) &
+!!$                 -fref) /(abs(fref)+ferr)
+!!$            gtrnl(1:ndim)= gtrnl(1:ndim) +2d0*fdiff(ixyz,ia) &
+!!$                 *smpl%gwf(1:ndim,ixyz,ia) *dn3i *swgt /(abs(fref)+ferr)
           enddo
         enddo
 !!$        print *,'ismpl,ediff,gwf=',ismpl,ediff,smpl%gwf(1:ndim,1,1)

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-04-12 14:48:49 Ryo KOBAYASHI>
+c                     Last-modified: <2018-05-02 09:31:34 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -911,6 +911,7 @@ c
       use force
       use Morse,only: gradw_Morse,gradw_vcMorse
       use Coulomb,only: gradw_Coulomb
+      use linreg,only: gradw_linreg
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -1021,6 +1022,9 @@ c      print *,'one_shot: 06'
      &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
      &       ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
+        if( iprint.ne.0 ) then
+          write(6,'(a,es15.7)') ' potential energy = ',epot
+        endif
       else  ! lcalcgrad = .true.
         epot = 0d0
         gwe(1:ndimp) = 0d0
@@ -1041,15 +1045,15 @@ c      print *,'one_shot: 06'
           call gradw_Morse(namax,natm,tag,
      &         ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws,
      &         lematch,lfmatch,lsmatch,iprm0)
+        else if( use_force('linreg') ) then
+          iprm0 = 0
+          call gradw_linreg(namax,natm,tag,ra,nnmax,h,rc,lspr,
+     &         iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
         endif
 c        if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra
 c     &       ,nnmax,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
 c.....Derivative of stress should be divided by the cell volume
         gws(1:ndimp,1:6) = gws(1:ndimp,1:6) /vol
-      endif
-
-      if( iprint.ne.0 ) then
-        write(6,'(a,es15.7)') ' potential energy = ',epot
       endif
 
 c      print *,'one_shot: 07'

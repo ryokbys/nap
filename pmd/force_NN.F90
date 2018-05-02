@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-29 15:43:54 Ryo KOBAYASHI>
+!                     Last modified: <2018-04-27 16:06:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -48,9 +48,6 @@ module NN
   integer,parameter:: max_ncnst= 2
   integer:: ncnst_type(200)
   integer:: ncomb_type(200)
-
-!.....max exponent of the basis function
-  integer:: max_nexp
 
 !.....cutoff region width ratio to rc
   real(8):: rcw2 = 0.0d0
