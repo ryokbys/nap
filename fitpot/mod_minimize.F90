@@ -108,23 +108,24 @@ contains
     return
   end subroutine set_ranges
 !=======================================================================
-  subroutine wrap_ranges(ndim,x)
+  subroutine wrap_ranges(ndim,x,xranges)
     implicit none
     integer,intent(in):: ndim
+    real(8),intent(in):: xranges(2,ndim)
     real(8),intent(inout):: x(ndim)
 
     integer:: i
 
-    if( .not.allocated(ranges) ) then
-      print *,'ERROR: ranges is not allocated yet...'
-      stop
-    endif
+!!$    if( .not.allocated(ranges) ) then
+!!$      print *,'ERROR: ranges is not allocated yet...'
+!!$      stop
+!!$    endif
 
     do i=1,ndim
-      if( x(i).lt.ranges(1,i) ) then
-        x(i) = ranges(1,i)
-      else if( x(i).gt.ranges(2,i) ) then
-        x(i) = ranges(2,i)
+      if( x(i).lt.xranges(1,i) ) then
+        x(i) = xranges(1,i)
+      else if( x(i).gt.xranges(2,i) ) then
+        x(i) = xranges(2,i)
       endif
     enddo
     return
@@ -154,10 +155,9 @@ contains
     integer:: iter,i,niter
     real(8):: alpha,fp,gnorm,ftst
 
-    if( .not.allocated(ranges) ) call set_ranges(ndim,xranges)
 
     iter= 0
-    call wrap_ranges(ndim,x)
+    call wrap_ranges(ndim,x,xranges)
     call func(ndim,x,f,ftst)
     if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
       do i=1,ndim
@@ -205,12 +205,12 @@ contains
              ,iprint,iflag,myid,func)
       else ! armijo (default)
         alpha= 1d0
-        call armijo_search(ndim,x,d,f,ftst,g,alpha,iprint &
+        call armijo_search(ndim,x,xranges,d,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
       if( iflag/100.ne.0 ) return
       x(1:ndim)= x(1:ndim) +alpha*d(1:ndim)
-      call wrap_ranges(ndim,x)
+      call wrap_ranges(ndim,x,xranges)
       call func(ndim,x,f,ftst)
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
         do i=1,ndim
@@ -304,13 +304,12 @@ contains
     if( .not.allocated(gpena) ) allocate(gpena(ndim),gp(ndim)&
          ,y(ndim),xp(ndim),s(ndim),dx(ndim),uu(ndim))
 
-    if( .not.allocated(ranges) ) call set_ranges(ndim,xranges)
 
     iter= 0
     nftol= 0
     nxtol= 0
     gpena(1:ndim)= 0d0
-    call wrap_ranges(ndim,x)
+    call wrap_ranges(ndim,x,xranges)
     call func(ndim,x,f,ftst)
     call grad(ndim,x,g)
 !.....penalty
@@ -359,7 +358,7 @@ contains
              ,iprint,iflag,myid,func)
       else ! armijo (default)
         alpha= 1d0
-        call armijo_search(ndim,x,uu,f,ftst,g,alpha,iprint &
+        call armijo_search(ndim,x,xranges,uu,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
 
@@ -385,17 +384,17 @@ contains
 
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
         call soft_threshold(ndim,x,uu,alpha)
-        call wrap_ranges(ndim,x)
+        call wrap_ranges(ndim,x,xranges)
       else if( trim(cpena).eq.'ridge' ) then
         x(1:ndim)= x(1:ndim) +alpha*uu(1:ndim)
-        call wrap_ranges(ndim,x)
+        call wrap_ranges(ndim,x,xranges)
         do i=1,ndim
           pval= pval +pwgt*x(i)*x(i)
           gpena(i)= 2d0*pwgt*x(i)
         enddo
       else
         x(1:ndim)= x(1:ndim) +alpha*uu(1:ndim)
-        call wrap_ranges(ndim,x)
+        call wrap_ranges(ndim,x,xranges)
       endif
 
       dx(1:ndim)= x(1:ndim) -xp(1:ndim)
@@ -517,7 +516,6 @@ contains
          ,s(ndim),y(ndim),gp(ndim),ggy(ndim),gpena(ndim))
     endif
 
-    if( .not.allocated(ranges) ) call set_ranges(ndim,xranges)
 
 
 !.....initialize alpha (line minimization factor)
@@ -532,7 +530,7 @@ contains
       gg(i,i)= 1d0
     enddo
 
-    call wrap_ranges(ndim,x0)
+    call wrap_ranges(ndim,x0,xranges)
 !!$    print '(a,i3,10es11.3)','myid,x0=',myid,x0(1:ndim)
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
@@ -584,7 +582,7 @@ contains
 
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
-    call wrap_ranges(ndim,x)
+    call wrap_ranges(ndim,x,xranges)
 !!$    print '(a,i3,10es11.3)','myid,x=',myid,x(1:ndim)
     vnorm= sqrt(sprod(ndim,x,x))
     dxnorm = 0d0
@@ -643,7 +641,7 @@ contains
 !.....use the history of previous alpha by multiplying 2
 !.....avoiding constant decrease, but alpha should not be greater than 1.
         alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-        call armijo_search(ndim,x,u,f,ftst,g,alpha,iprint &
+        call armijo_search(ndim,x,xranges,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
 !!$      if(myid.eq.0) print *,'armijo steps, alpha=',niter,alpha
@@ -678,7 +676,7 @@ contains
       gpena(1:ndim)= 0d0
       if( trim(cpena).eq.'lasso' ) then
         call soft_threshold(ndim,x,u,alpha)
-        call wrap_ranges(ndim,x)
+        call wrap_ranges(ndim,x,xranges)
         do i=1,ndim
           absx= abs(x(i))
           pval= pval +pwgt*absx
@@ -687,7 +685,7 @@ contains
         enddo
       else if( trim(cpena).eq.'glasso' ) then
         call soft_threshold(ndim,x,u,alpha)
-        call wrap_ranges(ndim,x)
+        call wrap_ranges(ndim,x,xranges)
         glval(0:ngl)= 0d0
         do i=1,ndim
           ig= iglid(i)
@@ -711,14 +709,14 @@ contains
         enddo
       else if( trim(cpena).eq.'ridge' ) then
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
-        call wrap_ranges(ndim,x)
+        call wrap_ranges(ndim,x,xranges)
         do i=1,ndim
           pval= pval +pwgt*x(i)*x(i)
           gpena(i)= 2d0*pwgt*x(i)
         enddo
       else
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
-        call wrap_ranges(ndim,x)
+        call wrap_ranges(ndim,x,xranges)
       endif
       dx(1:ndim)= x(1:ndim) -x0(1:ndim)
       x0(1:ndim)= x(1:ndim)
@@ -901,15 +899,13 @@ contains
          ,a(0:mstore),rho(0:mstore))
     endif
 
-    if( .not.allocated(ranges) ) call set_ranges(ndim,xranges)
-
     s(1:ndim,0:mstore)= 0d0
     y(1:ndim,0:mstore)= 0d0
     rho(0:mstore)= 0d0
     a(0:mstore)= 0d0
 
     nftol= 0
-    call wrap_ranges(ndim,x0)
+    call wrap_ranges(ndim,x0,xranges)
 !.....initial G = I
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
@@ -960,7 +956,7 @@ contains
       else ! armijo (default)
         alpha= 1d0
 !!$        write(6,'(a,10es11.3)') 'u before armijo=',u(1:10)
-        call armijo_search(ndim,x,u,f,ftst,g,alpha,iprint &
+        call armijo_search(ndim,x,xranges,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
 
@@ -992,7 +988,7 @@ contains
       gpena(1:ndim)= 0d0
       if( trim(cpena).eq.'lasso' ) then
         call soft_threshold(ndim,x,u,alpha)
-        call wrap_ranges(ndim,x)
+        call wrap_ranges(ndim,x,xranges)
         do i=1,ndim
           absx= abs(x(i))
           pval= pval +pwgt*absx
@@ -1001,7 +997,7 @@ contains
         enddo
       else if( trim(cpena).eq.'glasso' ) then
         call soft_threshold(ndim,x,u,alpha)
-        call wrap_ranges(ndim,x)
+        call wrap_ranges(ndim,x,xranges)
         glval(0:ngl)= 0d0
         do i=1,ndim
           ig= iglid(i)
@@ -1025,14 +1021,14 @@ contains
         enddo
       else if( trim(cpena).eq.'ridge' ) then
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
-        call wrap_ranges(ndim,x)
+        call wrap_ranges(ndim,x,xranges)
         do i=1,ndim
           pval= pval +pwgt*x(i)*x(i)
           gpena(i)= 2d0*pwgt*x(i)
         enddo
       else
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
-        call wrap_ranges(ndim,x)
+        call wrap_ranges(ndim,x,xranges)
       endif
       x0(1:ndim)= x(1:ndim)
       call grad(ndim,x,g)
@@ -1443,7 +1439,7 @@ contains
 
   end subroutine golden_section
 !=======================================================================
-  subroutine armijo_search(ndim,x0,d,f,ftst,g,alpha,iprint &
+  subroutine armijo_search(ndim,x0,xranges,d,f,ftst,g,alpha,iprint &
        ,iflag,myid,func,niter)
 !  
 !  1D search using Armijo rule.
@@ -1451,7 +1447,7 @@ contains
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag,niter
-    real(8),intent(in):: x0(ndim),g(ndim),d(ndim)
+    real(8),intent(in):: x0(ndim),g(ndim),d(ndim),xranges(2,ndim)
     real(8),intent(inout):: f,alpha,ftst
     interface
       subroutine func(n,x,ftrn,ftst)
@@ -1529,10 +1525,10 @@ contains
       x1(1:ndim)= x0(1:ndim)
       if( trim(cpena).eq.'lasso' .or.trim(cpena).eq.'glasso') then
         call soft_threshold(ndim,x1,d,alphai)
-        call wrap_ranges(ndim,x1)
+        call wrap_ranges(ndim,x1,xranges)
       else
         x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
-        call wrap_ranges(ndim,x1)
+        call wrap_ranges(ndim,x1,xranges)
       endif
       call func(ndim,x1,fi,ftsti)
 !!$      if( myid.eq.0 ) print *,'iter,alphai,fi=',iter,alphai,fi
@@ -1783,7 +1779,7 @@ contains
     
   end subroutine fs
 !=======================================================================
-  subroutine gfs(ndim,x,f,g,d,xtol,gtol,ftol,maxiter &
+  subroutine gfs(ndim,x,f,g,d,xtol,gtol,ftol,xranges,maxiter &
        ,iprint,iflag,myid,func,grad,cfmethod,niter_eval &
        ,sub_eval,analyze)
 !
@@ -1792,7 +1788,7 @@ contains
     implicit none
     integer,intent(in):: ndim,maxiter,iprint,myid,niter_eval
     integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol
+    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: f,x(ndim),g(ndim),d(ndim)
     character(len=*),intent(in):: cfmethod
 !!$    real(8):: func,grad
@@ -1989,7 +1985,7 @@ contains
                ,iprint,iflag,myid,func)
         else ! armijo (default)
           alpha= 1d0
-          call armijo_search(ndim,xt,u,f,ftst,g,alpha,iprint &
+          call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
                ,iflag,myid,func,niter)
 !.....if something wrong with armijo search, try opposite direction
           if( iflag/100.ne.0 ) then
@@ -1997,7 +1993,7 @@ contains
 !            iflag= iflag -(iflag/100)*100
             alpha= -1d0
             if(myid.eq.0) print *,'trying opposite direction...'
-            call armijo_search(ndim,xt,u,f,ftst,g,alpha,iprint &
+            call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
                  ,iflag,myid,func,niter)
           endif
         endif

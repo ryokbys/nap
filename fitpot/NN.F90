@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-27 15:17:46 Ryo KOBAYASHI>
+!                     Last modified: <2018-05-08 18:47:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -25,7 +25,6 @@ module NNd
   integer,allocatable:: nwgt(:)
   real(8),allocatable:: wgt11(:,:),wgt12(:)
   real(8),allocatable:: wgt21(:,:),wgt22(:,:),wgt23(:)
-  real(8):: gsfmean,gsfvar
   real(8),allocatable:: gsfmeans(:),gsfvars(:)
 
   type smpldata
@@ -52,7 +51,6 @@ contains
     use variables
     use parallel
     use minimize
-    use fp_common,only: ndat_in_line
     implicit none 
     integer:: itmp,i,nw,natm,ismpl,ihl0,ihl1,itmp2,ndat
     real(8):: swgtrn,swgtst,dtmp
@@ -1567,8 +1565,8 @@ contains
 !.....compute mean value
     gsfml(1:nhl(0)) = 0d0
     gsfvl(1:nhl(0)) = 0d0
-    gsfmeans(1:nhl(0)) = 0d0
-    gsfvars(1:nhl(0)) = 0d0
+    gsfms(1:nhl(0)) = 0d0
+    gsfvs(1:nhl(0)) = 0d0
     gmeanl= 0d0
     gvarl = 0d0
     nsuml= 0
@@ -1592,21 +1590,21 @@ contains
 !!$         ,mpi_sum,mpi_world,ierr)
 !!$    call mpi_allreduce(gvarl,gsfvar,1,mpi_real8 &
 !!$         ,mpi_sum,mpi_world,ierr)
-    call mpi_allreduce(gsfml,gsfmeans,nhl(0),mpi_real8 &
+    call mpi_allreduce(gsfml,gsfms,nhl(0),mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
-    call mpi_allreduce(gsfvl,gsfvars,nhl(0),mpi_real8 &
+    call mpi_allreduce(gsfvl,gsfvs,nhl(0),mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(nsuml,nsumg,1,mpi_integer &
          ,mpi_sum,mpi_world,ierr)
-    gsfmeans(1:nhl(0))= gsfmeans(1:nhl(0))/nsumg
-    gsfvars(1:nhl(0))= gsfvars(1:nhl(0))/nsumg &
-         -gsfmeans(1:nhl(0))**2
+    gsfms(1:nhl(0))= gsfms(1:nhl(0))/nsumg
+    gsfvs(1:nhl(0))= gsfvs(1:nhl(0))/nsumg &
+         -gsfms(1:nhl(0))**2
     
     gsfmean= 0d0
     gsfvar = 0d0
     do ihl0=1,nhl(0)
-      gsfmean= gsfmean +gsfmeans(ihl0)
-      gsfvar= gsfvar +gsfvars(ihl0)
+      gsfmean= gsfmean +gsfms(ihl0)
+      gsfvar= gsfvar +gsfvs(ihl0)
     enddo
     gsfmean= gsfmean/nhl(0)
     gsfvar = gsfvar/nhl(0)
@@ -1617,7 +1615,7 @@ contains
       if( iprint.gt.0 ) then
         do ihl0=1,nhl(0)
           write(6,'(a,i5,2es14.4e3)') '   ihl0,gsfmean,gsfvar=' &
-               ,ihl0,gsfmeans(ihl0),gsfvars(ihl0)
+               ,ihl0,gsfms(ihl0),gsfvs(ihl0)
         enddo
       endif
     endif
@@ -1767,7 +1765,7 @@ contains
 !
 !  Standardize of inputs by dividing by L2 norm
 !
-    use variables, only: nsmpl,samples,nvars,nalist,vars,vranges
+    use variables, only: nsmpl,samples,nvars,nalist,vars,vranges,gsfvar
     use parallel
     implicit none
     integer:: nsuml,nsumg,ismpl,ia,natm,ihl0,ihl1,iv
@@ -1828,7 +1826,8 @@ contains
 !
 !  Standardize of inputs is requied when you use lasso or ridge.
 !
-    use variables, only: nsmpl,samples,nvars,nalist,vars,vranges
+    use variables, only: nsmpl,samples,nvars,nalist,vars,vranges,gsfvar&
+         ,sgms,sgmis,gsfvs
     use parallel
     implicit none
     integer:: ismpl,ia,natm,ihl0,ihl1,iv
@@ -1841,6 +1840,15 @@ contains
         allocate(sds(ismpl)%gsfo(natm,nhl(0)))
       enddo
 
+      if( .not.allocated(sgms) ) then
+        allocate(sgms(nhl(0)),sgmis(nhl(0)))
+      endif
+
+      do ihl0=1,nhl(0)
+        sgms(ihl0) = sqrt(gsfvs(ihl0))
+        sgmis(ihl0)= 1d0/sgms(ihl0)
+      enddo
+
       sgm = sqrt(gsfvar)
       sgmi= 1d0/sgm
 !.....standardize G values
@@ -1849,10 +1857,10 @@ contains
         do ihl0=1,nhl(0)
           do ia=1,natm
             sds(ismpl)%gsfo(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0)
-            sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) *sgmi
+            sds(ismpl)%gsf(ia,ihl0)= sds(ismpl)%gsf(ia,ihl0) *sgmis(ihl0)
             if( allocated(sds(ismpl)%dgsf) ) then
               sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0)= &
-                   sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0) *sgmi
+                   sds(ismpl)%dgsf(1:3,ia,1:natm,ihl0) *sgmis(ihl0)
             endif
           enddo
         enddo
@@ -1863,8 +1871,8 @@ contains
     do ihl0=1,nhl(0)
       do ihl1=1,mhl(1)
         iv=iv+1
-        vars(iv)= vars(iv)*sgm
-        vranges(1:2,iv)= vranges(1:2,iv)*sgm
+        vars(iv)= vars(iv)*sgms(ihl0)
+        vranges(1:2,iv)= vranges(1:2,iv)*sgms(ihl0)
       enddo
     enddo
 
@@ -1893,8 +1901,8 @@ contains
       do ihl0=1,nhl(0)
         do ihl1=1,mhl(1)
           iv=iv+1
-          vars(iv)= vars(iv)/sgm
-          vranges(1:2,iv)= vranges(1:2,iv)/sgm
+          vars(iv)= vars(iv) *sgmis(ihl0)
+          vranges(1:2,iv)= vranges(1:2,iv) *sgmis(ihl0)
         enddo
       enddo
     else if( cnormalize.eq.'max' ) then

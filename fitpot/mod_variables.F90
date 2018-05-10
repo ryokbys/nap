@@ -23,6 +23,7 @@ module variables
   logical:: lsmatch= .false.  ! stress matching
   integer:: nsmpl_outfrc = 20000
   character(len=128):: cnormalize= 'variance'
+  logical:: lnormalized = .false.
   character(len=128):: cpot= 'NN'
   logical:: lgrad  = .true.
   logical:: lgscale= .false.
@@ -92,9 +93,13 @@ module variables
     logical:: charge_set = .false.
 !.....Related to descriptors
     integer:: nsf,nal,nnl
-    real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:),igsf(:,:,:)
+    real(8),allocatable:: gsf(:,:),gsfo(:,:) &
+         ,dgsf(:,:,:,:),igsf(:,:,:)
   end type mdsys
   real(8):: erefmin
+  real(8):: gsfmean,gsfvar
+  real(8),allocatable:: gsfms(:),gsfvs(:),sgms(:),sgmis(:)
+  real(8),parameter:: sgm_min = 1d-3
 
   integer:: nsmpl_trn,nsmpl_tst
   type(mdsys),allocatable:: samples(:)

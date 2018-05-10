@@ -1,15 +1,17 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-05-01 11:34:41 Ryo KOBAYASHI>
+!                     Last modified: <2018-05-08 17:52:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
+  use NNd,only:NN_init,NN_func,NN_grad
+  use fp_common,only: func_w_pmd, grad_w_pmd
   use minimize
   use version
-  use fp_common, only: subtract_FF, restore_FF
+  use fp_common, only: subtract_FF, restore_FF, normalize
   implicit none
   integer:: ismpl,ihour,imin,isec
-  real(8):: tmp
+  real(8):: tmp,fval0,ftrn0,ftst0
 
   call mpi_init(ierr)
   time0= mpi_wtime()
@@ -97,38 +99,53 @@ program fitpot
     allocate(cffs(nff))
     cffs(1) = trim(cpot)
   endif
+
+!.....Initial computations of all samples
+  if( trim(cpot).eq.'NN' ) then
+    call NN_init()
+    call NN_func(nvars,vars,ftrn0,ftst0)
+  else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
+       .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
+    call func_w_pmd(nvars,vars,ftrn0,ftst0)
+    if( trim(cpot).eq.'linreg' .and. .not.cnormalize(1:2).eq.'no' ) then
+      call normalize()
+    endif
+  else
+    print *,'ERROR: '//trim(cpot)//' is not available.'
+    stop
+  endif
   
   select case (trim(cfmethod))
     case ('sd','SD')
-      call sd_wrapper()
+      call sd_wrapper(ftrn0,ftst0)
     case ('cg','CG')
-      call cg_wrapper()
+      call cg_wrapper(ftrn0,ftst0)
     case ('bfgs','BFGS','dfp','DFP')
-      call qn_wrapper()
+      call qn_wrapper(ftrn0,ftst0)
     case ('lbfgs','LBFGS','L-BFGS')
-      call lbfgs_wrapper()
+      call lbfgs_wrapper(ftrn0,ftst0)
     case ('sa','SA')
-      call sa_wrapper()
+      call sa_wrapper(ftrn0,ftst0)
     case ('ga','GA')
-      call ga_wrapper()
+      call ga_wrapper(ftrn0,ftst0)
     case ('de','DE')
-      call de_wrapper()
+      call de_wrapper(ftrn0,ftst0)
     case ('pso','PSO')
-      call pso_wrapper()
+      call pso_wrapper(ftrn0,ftst0)
     case ('md','metadynamics')
-      call md_wrapper()
+      call md_wrapper(ftrn0,ftst0)
     case ('random_search','random')
-      call random_search_wrapper()
+      call random_search_wrapper(ftrn0,ftst0)
     case ('fs','FS')
-      call fs_wrapper()
+      call fs_wrapper(ftrn0,ftst0)
     case ('gfs')
-      call gfs_wrapper()
+      call gfs_wrapper(ftrn0,ftst0)
     case ('sgd','SGD')
-      call sgd()
+      call sgd(ftrn0,ftst0)
     case ('check_grad')
-      call check_grad()
+      call check_grad(ftrn0,ftst0)
     case ('test','TEST')
-      call test()
+      call test(ftrn0,ftst0)
     case default
       if(myid.eq.0) print *,'unknown fitting_method:',trim(cfmethod)
       call mpi_finalize(ierr)
@@ -726,6 +743,7 @@ subroutine write_vars(cadd)
   use variables
   use parallel
   use NNd, only: NN_standardize, NN_restore_standard
+  use fp_common,only: normalize, restore_normalize
   implicit none
   character(len=*),intent(in):: cadd
   integer:: i
@@ -737,6 +755,8 @@ subroutine write_vars(cadd)
      trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
      trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
     call NN_restore_standard()
+  else if( trim(cpot).eq.'linreg' ) then
+    call restore_normalize()
   endif
 
 !!$  cfname= trim(cmaindir)//'/'//trim(cparfile)//'.'//trim(cadd)
@@ -758,24 +778,27 @@ subroutine write_vars(cadd)
      trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
      trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
     call NN_standardize()
+  else if( trim(cpot).eq.'linreg' ) then
+    call normalize()
   endif
 
 end subroutine write_vars
 !=======================================================================
-subroutine qn_wrapper()
+subroutine qn_wrapper(ftrn0,ftst0)
   use variables
   use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
   external:: write_stats
 
   if( trim(cpot).eq.'NN' ) then
 !.....NN specific code hereafter
-    call NN_init()
+!!$    call NN_init()
     call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
          ,niter_eval,write_stats)
@@ -796,18 +819,19 @@ subroutine qn_wrapper()
   return
 end subroutine qn_wrapper
 !=======================================================================
-subroutine lbfgs_wrapper()
+subroutine lbfgs_wrapper(ftrn0,ftst0)
   use variables
   use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
   external:: write_stats
 
   !.....NN specific code hereafter
-  call NN_init()
+!!$  call NN_init()
   call lbfgs(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
        ,niter_eval,write_stats)
@@ -817,7 +841,7 @@ subroutine lbfgs_wrapper()
   return
 end subroutine lbfgs_wrapper
 !=======================================================================
-subroutine sd_wrapper()
+subroutine sd_wrapper(ftrn0,ftst0)
 !
 !  Steepest descent minimization
 !
@@ -826,29 +850,31 @@ subroutine sd_wrapper()
   use parallel
   use minimize
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
 
   !.....NN specific code hereafter
-  call NN_init()
+!!$  call NN_init()
   call steepest_descent(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad)
 
   return
 end subroutine sd_wrapper
 !=======================================================================
-subroutine cg_wrapper()
+subroutine cg_wrapper(ftrn0,ftst0)
   use variables
   use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
   external:: write_stats
 
   !.....NN specific code hereafter
-  call NN_init()
+!!$  call NN_init()
   call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
        ,write_stats)
@@ -858,12 +884,13 @@ subroutine cg_wrapper()
   return
 end subroutine cg_wrapper
 !=======================================================================
-subroutine sa_wrapper()
+subroutine sa_wrapper(ftrn0,ftst0)
   use variables
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
   external:: write_stats
@@ -881,12 +908,13 @@ subroutine sa_wrapper()
   return
 end subroutine sa_wrapper
 !=======================================================================
-subroutine md_wrapper()
+subroutine md_wrapper(ftrn0,ftst0)
   use variables
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
   external:: write_stats
@@ -904,12 +932,13 @@ subroutine md_wrapper()
   return
 end subroutine md_wrapper
 !=======================================================================
-subroutine ga_wrapper()
+subroutine ga_wrapper(ftrn0,ftst0)
   use variables
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
   external:: write_stats,write_energy_relation
@@ -928,12 +957,13 @@ subroutine ga_wrapper()
   return
 end subroutine ga_wrapper
 !=======================================================================
-subroutine de_wrapper()
+subroutine de_wrapper(ftrn0,ftst0)
   use variables
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
   external:: write_stats, write_energy_relation
@@ -952,12 +982,13 @@ subroutine de_wrapper()
   return
 end subroutine de_wrapper
 !=======================================================================
-subroutine pso_wrapper()
+subroutine pso_wrapper(ftrn0,ftst0)
   use variables
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
   external:: write_stats
@@ -976,12 +1007,13 @@ subroutine pso_wrapper()
   return
 end subroutine pso_wrapper
 !=======================================================================
-subroutine random_search_wrapper()
+subroutine random_search_wrapper(ftrn0,ftst0)
   use variables
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
   external:: write_stats
@@ -998,7 +1030,7 @@ subroutine random_search_wrapper()
   
 end subroutine random_search_wrapper
 !=======================================================================
-subroutine sgd()
+subroutine sgd(ftrn0,ftst0)
 !
 ! Stochastic gradient decent (SGD)
 !
@@ -1009,6 +1041,7 @@ subroutine sgd()
   use minimize
   use random
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer,parameter:: niter_time= 1
   real(8),parameter:: alpha0  = 1d-2
   real(8),parameter:: dalpha  = 0.001d0
@@ -1050,7 +1083,7 @@ subroutine sgd()
   v(1:nvars)= 0d0
   gamma = gmmin
 
-  call NN_init()
+!!$  call NN_init()
   do iter=1,niter
     if(mod(iter,niter_eval).eq.0) then
       call NN_func(nvars,vars,ftrn,ftst)
@@ -1084,7 +1117,7 @@ subroutine sgd()
     u(1:nvars)= -g(1:nvars)
     if( csgdupdate.eq.'armijo' ) then
       alpha= r0sgd
-      call armijo_search(nvars,vars,u,ftrn,ftst,g,alpha,iprint &
+      call armijo_search(nvars,vars,vranges,u,ftrn,ftst,g,alpha,iprint &
            ,iflag,myid,NN_fs,narmijo)
       vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
       alpha1= alpha1*(1d0-dalpha)
@@ -1126,17 +1159,18 @@ subroutine sgd()
   deallocate(ismplsgd,g,u,gp,v,g2m,v2m)
 end subroutine sgd
 !=======================================================================
-subroutine fs_wrapper()
+subroutine fs_wrapper(ftrn0,ftst0)
   use variables
   use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
 
   !.....NN specific code hereafter
-  call NN_init()
+!!$  call NN_init()
   call fs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,NN_func,NN_grad)
   call NN_analyze("fin")
@@ -1145,19 +1179,20 @@ subroutine fs_wrapper()
   return
 end subroutine fs_wrapper
 !=======================================================================
-subroutine gfs_wrapper()
+subroutine gfs_wrapper(ftrn0,ftst0)
   use variables
   use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
   external:: write_stats,analyze_wrapper
 
   !.....NN specific code hereafter
-  call NN_init()
-  call gfs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
+!!$  call NN_init()
+  call gfs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,vranges,niter &
        ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
        ,write_stats,analyze_wrapper)
   call NN_analyze("fin")
@@ -1166,14 +1201,15 @@ subroutine gfs_wrapper()
   return
 end subroutine gfs_wrapper
 !=======================================================================
-subroutine check_grad()
+subroutine check_grad(ftrn0,ftst0)
   use variables
   use NNd,only:NN_init,NN_func,NN_grad
   use parallel
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: iv,i
-  real(8):: ftrn0,ftst0,ftmp,dv,vmax,ftst,ftmp1,ftmp2
+  real(8):: ftmp,dv,vmax,ftst,ftmp1,ftmp2
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
   real(8),parameter:: dev  = 1d-5
   real(8),parameter:: tiny = 1d-6
@@ -1181,11 +1217,11 @@ subroutine check_grad()
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
 
   if( trim(cpot).eq.'NN' ) then
-    call NN_init()
-    call NN_func(nvars,vars,ftrn0,ftst0)
+!!$    call NN_init()
+!!$    call NN_func(nvars,vars,ftrn0,ftst0)
     call NN_grad(nvars,vars,ganal)
   else
-    call func_w_pmd(nvars,vars,ftrn0,ftst)
+!!$    call func_w_pmd(nvars,vars,ftrn0,ftst)
     call grad_w_pmd(nvars,vars,ganal)
   endif
 
@@ -1240,25 +1276,25 @@ subroutine check_grad()
   endif
 end subroutine check_grad
 !=======================================================================
-subroutine test()
+subroutine test(ftrn0,ftst0)
   use variables
   use NNd,only:NN_init,NN_func,NN_grad
   use parallel
   use fp_common,only: func_w_pmd, grad_w_pmd
-  implicit none 
+  implicit none
+  real(8),intent(in):: ftrn0,ftst0
   integer:: iv
-  real(8):: ftrn,ftst
   real(8),allocatable:: g(:)
 
   allocate(g(nvars))
 
   if( trim(cpot).eq.'NN' ) then
-    call NN_init()
-    call NN_func(nvars,vars,ftrn,ftst)
+!!$    call NN_init()
+!!$    call NN_func(nvars,vars,ftrn,ftst)
     call NN_grad(nvars,vars,g)
   else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
        .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
-    call func_w_pmd(nvars,vars,ftrn,ftst)
+!!$    call func_w_pmd(nvars,vars,ftrn,ftst)
     call grad_w_pmd(nvars,vars,g)
   else
     print *,'ERROR @test: '//trim(cpot)//' is not available for test().'
@@ -1269,7 +1305,7 @@ subroutine test()
   call write_stats(0)
 
   if( myid.eq.0 ) then
-    print *,'func values (training,test) =',ftrn,ftst
+    print *,'func values (training,test) =',ftrn0,ftst0
 !!$    print *,'grad values (training):'
 !!$    do iv=1,nvars
 !!$      print *,'iv,grad(iv)=',iv,g(iv)
