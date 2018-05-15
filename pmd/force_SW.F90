@@ -1,6 +1,6 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-03-27 10:15:50 Ryo KOBAYASHI>
+!                     Last modified: <2018-05-15 14:31:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 
   integer,parameter:: ioprms = 50
@@ -331,7 +331,7 @@ contains
           write(6,'(a)') ' WARNING: in.params.SW_Si does not exist !!!.'
           write(6,'(a)') '           Default parameters will be used.'
         endif
-        return
+        goto 20
       endif
 !.....Read file if exists
       if( iprint.ne.0 ) write(6,'(/,a)') ' SW parameters read from file:'
@@ -426,6 +426,7 @@ contains
 !!$      close(50)
     endif
 
+20  continue
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(aswe,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(aswl,1,mpi_real8,0,mpi_world,ierr)
