@@ -224,7 +224,7 @@ def read_params_Coulomb(infname='in.params.Coulomb'):
                 params[mode].append((isp,name,vid,rad,npq))
             elif mode == 'interactions':
                 isp = int(data[0])
-                jsp = int(data[0])
+                jsp = int(data[1])
                 params[mode].append((isp,jsp))
             else:
                 raise ValueError('Something wrong with mode: ',mode)

@@ -32,7 +32,7 @@ _kb2gpa = 160.2176487
 def get_tag(symbol,atom_id,specorder):
     sid= specorder.index(symbol)+1
     tag= float(sid) +0.1 +atom_id*1e-14
-    return '{0:16.14f}'.format(tag)
+    return '{0:17.14f}'.format(tag)
 
 def write_pos(atoms,fname="pos",specorder=[]):
     cell= atoms.cell
