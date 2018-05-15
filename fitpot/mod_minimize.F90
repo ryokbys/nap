@@ -1246,8 +1246,8 @@ contains
     iter= iter +1
     if( iter.gt.MAXITER ) then
       if( myid.eq.0 ) then
-        print *,' WARNING: iter.gt.MAXITER in quad_interpolate !!!'
-        print *,'   iter,MAXITER= ',iter,MAXITER
+        print *,'WARNING: iter.gt.MAXITER in quad_interpolate !!!'
+        print *,'  iter,MAXITER= ',iter,MAXITER
       endif
       iflag= iflag +100
       return
@@ -1478,7 +1478,7 @@ contains
     xigd= sprod(ndim,g,d)*armijo_xi
     if( xigd.gt.0d0 ) then
       iflag= iflag + 100
-      if( myid.eq.0 .and. iprint.gt.0 ) print *,' WARNING: g*d > 0.0'
+      if( myid.eq.0 .and. iprint.gt.0 ) print *,'WARNING: g*d > 0.0'
       return
     endif
     alphai= alpha

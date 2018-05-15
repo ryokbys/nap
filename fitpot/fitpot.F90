@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-05-08 17:52:49 Ryo KOBAYASHI>
+!                     Last modified: <2018-05-15 17:21:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -700,14 +700,14 @@ subroutine read_vars()
   real(8):: rs0
   character(len=128):: fname
 
-  if( trim(cpot).eq.'NN' ) then
-    fname = cparfile
-  else
-    fname = 'in.vars.fitpot'
-  endif
+!!$  if( trim(cpot).eq.'NN' ) then
+!!$    fname = cparfile
+!!$  else
+!!$    fname = 'in.vars.fitpot'
+!!$  endif
 
   if( myid.eq.0 ) then
-    open(15,file=trim(fname),status='old')
+    open(15,file=trim(cparfile),status='old')
     read(15,*) nvars, rcut, rc3
   endif
   call mpi_bcast(nvars,1,mpi_integer,0,mpi_world,ierr)
@@ -730,7 +730,7 @@ subroutine read_vars()
            //' to give normal distribution'
       write(6,'(a,2es10.2)') '   with mu and sgm =',vinitmu,vinitsgm
     else
-      write(6,'(a)') ' Potential parameters are read from file: '//trim(fname)
+      write(6,'(a)') ' Potential parameters are read from file: '//trim(cparfile)
     endif
     close(15)
   endif

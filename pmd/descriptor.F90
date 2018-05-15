@@ -400,6 +400,7 @@ contains
           print *,'ERROR: Cutoff radius in in.pmd shorter than that in in.params.desc'
           print *,'  rcin,rc2,rc3 = ',rcin,rc2,rc3
         endif
+        stop
       endif
 !.....Read numbers of species and symmetry functions
       read(51,*) nsp, nsf
