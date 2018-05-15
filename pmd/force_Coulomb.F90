@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-04-12 14:50:45 Ryo KOBAYASHI>
+!                     Last modified: <2018-04-12 18:13:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -54,7 +54,8 @@ module Coulomb
 !.....screening length
   real(8):: rho_bvs(msp,msp)
 !  real(8),allocatable:: rho_bvs(:,:)
-  real(8):: fbvs = 0.74d0
+!!$  real(8):: fbvs = 0.74d0
+  real(8):: fbvs = 1.0d0
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
   real(8),parameter:: qthd = 1d-12
@@ -2095,12 +2096,12 @@ contains
         terfc = erfc(dij/rhoij)
         terfcc = erfc(rc/rhoij)
         qj = chg(j)
+        if( j.le.natm ) then
+          fac = 1d0
+        else
+          fac = 0.5
+        endif
         if( lematch ) then
-          if( j.le.natm ) then
-            fac = 1d0
-          else
-            fac = 0.5
-          endif
           vrc = acc*qi*qj/rc *terfcc
 !.....Derivative of potential energy wrt {w}
           dedrho = dvdrho(dij,rhoij,qi,qj) -dvdrho(rc,rhoij,qi,qj) &
@@ -2126,15 +2127,9 @@ contains
             do jxyz=1,3
               k = ivoigt(ixyz,jxyz)
               gs_rho(isp,k) = gs_rho(isp,k) &
-                   -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *ddedrho
+                   -fac *rij(ixyz) *(-dxdi(jxyz)) *ddedrho
               gs_rho(jsp,k) = gs_rho(jsp,k) &
-                   -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *ddedrho
-              if( j.le.natm ) then
-                gs_rho(isp,k) = gs_rho(isp,k) &
-                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *ddedrho
-                gs_rho(jsp,k) = gs_rho(jsp,k) &
-                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *ddedrho
-              endif
+                   -fac *rij(ixyz) *(-dxdi(jxyz)) *ddedrho
             enddo
           enddo
         endif

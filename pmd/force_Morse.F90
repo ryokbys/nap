@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-04-12 11:36:02 Ryo KOBAYASHI>
+!                     Last modified: <2018-04-13 17:57:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -1141,6 +1141,11 @@ contains
         fc1 = fcut1(dij,rc)
         dfc1= dfcut1(dij,rc)
 !!$        tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
+        if( j.le.natm ) then
+          factor = 1d0
+        else
+          factor = 0.5d0
+        endif
         if( lematch ) then
 !!$        tmp2 = tmp *fc1
 !!$          if( j.le.natm ) then
@@ -1148,11 +1153,6 @@ contains
 !!$          else
 !!$            epotl = epotl +tmp2
 !!$          endif
-          if( j.le.natm ) then
-            factor = 1d0
-          else
-            factor = 0.5d0
-          endif
 !.....Derivative of potential energy w.r.t. {w}
           dedd0 = ((texp -1d0)**2 -1d0) *fc1 *factor 
           dedalp = 2d0*d0ij*(texp-1d0)*texp*dr *fc1*factor
@@ -1196,19 +1196,19 @@ contains
 !!$              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
 !!$                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
               gs_d0(is,js,k)= gs_d0(is,js,k) &
-                   -0.5d0 *rij(ixyz)*(-dxdi(jxyz)) *dedrd0
+                   -factor *rij(ixyz)*(-dxdi(jxyz)) *dedrd0
               gs_alp(is,js,k)= gs_alp(is,js,k) &
-                   -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *dedralp
+                   -factor *rij(ixyz) *(-dxdi(jxyz)) *dedralp
               gs_rmin(is,js,k)= gs_rmin(is,js,k) &
-                   -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *dedrrmin
-              if( j.le.natm ) then
-                gs_d0(is,js,k)= gs_d0(is,js,k) &
-                     -0.5d0 *rij(ixyz)*(-dxdi(jxyz)) *dedrd0
-                gs_alp(is,js,k)= gs_alp(is,js,k) &
-                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *dedralp
-                gs_rmin(is,js,k)= gs_rmin(is,js,k) &
-                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *dedrrmin
-              endif
+                   -factor *rij(ixyz) *(-dxdi(jxyz)) *dedrrmin
+!!$              if( j.le.natm ) then
+!!$                gs_d0(is,js,k)= gs_d0(is,js,k) &
+!!$                     -0.5d0 *rij(ixyz)*(-dxdi(jxyz)) *dedrd0
+!!$                gs_alp(is,js,k)= gs_alp(is,js,k) &
+!!$                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *dedralp
+!!$                gs_rmin(is,js,k)= gs_rmin(is,js,k) &
+!!$                     -0.5d0 *rij(ixyz) *(-dxdi(jxyz)) *dedrrmin
+!!$              endif
             enddo
           enddo
         endif
