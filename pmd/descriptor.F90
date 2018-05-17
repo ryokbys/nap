@@ -12,7 +12,7 @@ module descriptor
 
   integer:: nsf
   integer,allocatable:: itype(:)
-  real(8),allocatable:: cnst(:,:)
+  real(8),allocatable:: cnst(:,:),rcs(:),rcs2(:)
 !.....symmetry function values and their derivatives
   real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
 !.....start and end points of symmetry function IDs for each species pair
@@ -29,6 +29,7 @@ module descriptor
   real(8):: rc3 = 3.0d0
   real(8):: rcw2 = 0.0d0
   real(8):: rcw3 = 0.0d0
+  real(8):: rcmax,rcmax2
 
   integer:: nalmax,nnlmax,nal,nnl
 
@@ -154,7 +155,7 @@ contains
 !  and their derivatives wrt positions for multi-species system.
 !
 !  Cutoff radii from outside are written as rc2o and rc3o,
-!  which could be different from rc2 and rc3 given from params file.
+!  which could be different from rcs given from params file.
 !  Smaller values would be adopted.
 !
     implicit none
@@ -174,10 +175,12 @@ contains
     real(8):: texpij,texpik
 
     if( l1st ) then
-      if( rc.lt.rc2 .or. rc.lt.rc3 ) then
+!.....Check all the rcs and compare them with rc
+      if( rc.lt.rcmax ) then
+!!$      if( rc.lt.rc2 .or. rc.lt.rc3 ) then
         if( myid.eq.0 ) then
-          print *,'ERROR: cutoff radius rc is smaller than rc2 or rc3.'
-          print *,'  rc2,rc3,rc = ',rc2,rc3,rc
+          print *,'ERROR: cutoff radius rc is smaller than rcmax.'
+          print *,'  rc,rcmax = ',rc,rcmax
         endif
         call mpi_finalize(ierr)
         stop
@@ -203,18 +206,18 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
-        if( dij2.ge.rc22 ) cycle
+        if( dij2.ge.rcmax2 ) cycle
         dij = sqrt(dij2)
         js= int(tag(ja))
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
 !!$        fcij= fc0(dij,rc2)
 !!$        dfcij= dfc0(dij,rc2)
-        fcij= fc1(dij,rc2,rcs2)
-        dfcij= dfc1(dij,rc2,rcs2)
-!!$        goto 10
         do isf=iaddr2(1,is,js),iaddr2(2,is,js)
+          if( dij.ge.rcs(isf) ) cycle
           if( itype(isf).eq.1 ) then ! Gaussian
+            fcij= fc1(dij,rcs(isf))
+            dfcij= dfc1(dij,rcs(isf))
             eta= cnst(1,isf)
             rs=  cnst(2,isf)
             !.....function value
@@ -230,6 +233,8 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           else if( itype(isf).eq.2 ) then ! cosine
+            fcij= fc1(dij,rcs(isf))
+            dfcij= dfc1(dij,rcs(isf))
             a1= cnst(1,isf)
             !.....func value
             tcos= (1d0+cos(dij*a1))
@@ -241,6 +246,8 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           else if( itype(isf).eq.3 ) then ! polynomial
+            fcij= fc1(dij,rcs(isf))
+            dfcij= dfc1(dij,rcs(isf))
             a1= cnst(1,isf)
             !.....func value
             tpoly= 1d0*dij**(-a1)
@@ -252,6 +259,8 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           else if( itype(isf).eq.4 ) then ! Morse-type
+            fcij= fc1(dij,rcs(isf))
+            dfcij= dfc1(dij,rcs(isf))
             a1= cnst(1,isf)
             a2= cnst(2,isf)
             !.....func value
@@ -267,12 +276,9 @@ contains
           endif
         enddo
 
-10      if( dij.gt.rc3 ) cycle
 !!$        fcij= fc0(dij,rc3)
 !!$        dfcij= dfc0(dij,rc3)
-        fcij= fc1(dij,rc3,rcs3)
-        dfcij= dfc1(dij,rc3,rcs3)
-        texpij = exp(-eta3*dij2)
+!!$        texpij = exp(-eta3*dij2)
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           ks= int(tag(ka))
@@ -282,14 +288,18 @@ contains
           xik(1:3)= xk(1:3)-xi(1:3)
           rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik2= rik(1)**2 +rik(2)**2 +rik(3)**2
-          if( dik2.ge.rc32 ) cycle
+!!$          if( dik2.ge.rc32 ) cycle
           dik= sqrt(dik2)
 !!$          fcik= fc0(dik,rc3)
 !!$          dfcik= dfc0(dik,rc3)
-          fcik= fc1(dik,rc3,rcs3)
-          dfcik= dfc1(dik,rc3,rcs3)
-          texpik= exp(-eta3*dik2)
+!!$          texpik= exp(-eta3*dik2)
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
+            if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
+!.....fcij's can be computed after rcs is determined
+            fcij= fc1(dij,rcs(isf))
+            dfcij= dfc1(dij,rcs(isf))
+            fcik= fc1(dik,rcs(isf))
+            dfcik= dfc1(dik,rcs(isf))
             almbd= cnst(1,isf)
             t2= (abs(almbd)+1d0)**2
             driki(1:3)= -rik(1:3)/dik
@@ -298,6 +308,9 @@ contains
             spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
             cs= spijk/dij/dik
             t1= (almbd +cs)**2
+            eta3 = 0.5d0 /(rcs(isf)/2)**2
+            texpij = exp(-eta3*dij2)
+            texpik = exp(-eta3*dik2)
             tmp = t1/t2 *texpij *texpik
             gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik 
 !!$            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik
@@ -330,10 +343,11 @@ contains
 
   end subroutine calc_desc
 !=======================================================================
-  function fc1(r,rc,rcs)
+  function fc1(r,rc)
     implicit none
-    real(8),intent(in):: r,rc,rcs
+    real(8),intent(in):: r,rc
     real(8):: fc1
+    real(8),parameter:: rcs = 0d0
 
     if( r.le.rcs ) then
       fc1= 1d0
@@ -345,10 +359,11 @@ contains
     return
   end function fc1
 !=======================================================================
-  function dfc1(r,rc,rcs)
+  function dfc1(r,rc)
     implicit none
-    real(8),intent(in):: r,rc,rcs
+    real(8),intent(in):: r,rc
     real(8):: dfc1
+    real(8),parameter:: rcs = 0d0
 
     if( r.le.rcs ) then
       dfc1= 0d0
@@ -360,12 +375,12 @@ contains
     return
   end function dfc1
 !=======================================================================
-  subroutine read_params_desc(myid,mpi_world,iprint,rcin)
+  subroutine read_params_desc(myid,mpi_world,iprint)
     implicit none
     include 'mpif.h'
 
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: rcin
+!!$    real(8),intent(in):: rcin
 
     integer:: ierr,i,j,k,nc,ncoeff,nsp &
          ,ihl0,ihl1,ihl2,icmb(3),nsf1,nsf2,iap,jap,kap,ndat
@@ -389,25 +404,34 @@ contains
 !.....num of symmetry functions, num of node in 1st hidden layer
 10    read(51,'(a)') ctmp
       if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) then
-        call parse_option(ctmp,iprint,ierr)
+!        call parse_option(ctmp,iprint,ierr)
         goto 10
       else
         backspace(51)
       endif
-!.....Check rc's given by in.params.desc and by in.pmd
-      if( rc2.gt.rcin .or. rc3.gt.rcin ) then
-        if( myid.eq.0 ) then
-          print *,'ERROR: Cutoff radius in in.pmd shorter than that in in.params.desc'
-          print *,'  rcin,rc2,rc3 = ',rcin,rc2,rc3
-        endif
-        stop
-      endif
+!!$!.....Check rc's given by in.params.desc and by in.pmd
+!!$      if( rc2.gt.rcin .or. rc3.gt.rcin ) then
+!!$        if( myid.eq.0 ) then
+!!$          print *,'ERROR: Cutoff radius in in.pmd shorter than that in in.params.desc'
+!!$          print *,'  rcin,rc2,rc3 = ',rcin,rc2,rc3
+!!$        endif
+!!$        stop
+!!$      endif
 !.....Read numbers of species and symmetry functions
       read(51,*) nsp, nsf
-      if( .not.allocated(itype) ) then
-        allocate(itype(nsf),cnst(max_ncnst,nsf))
-        allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
-      endif
+    endif
+
+!.....Bcast nsp and nsf before allocating arrays
+    call mpi_bcast(nsp,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(nsf,1,mpi_integer,0,mpi_world,ierr)
+
+!.....Allocate arrays of lenths, nsp and/or nsf
+    if( .not.allocated(itype) ) then
+      allocate(itype(nsf),cnst(max_ncnst,nsf),rcs(nsf),rcs2(nsf))
+      allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
+    endif
+    
+    if( myid.eq.0 ) then
       iaddr2(1:2,1:nsp,1:nsp)= -1
       iaddr3(1:2,1:nsp,1:nsp,1:nsp)= -1
       nsf1= 0
@@ -417,7 +441,7 @@ contains
       kap= 0
       do i=1,nsf
         read(51,*) itype(i),(icmb(k),k=1,ncomb_type(itype(i))) &
-             ,(cnst(j,i),j=1,ncnst_type(itype(i)))
+             ,rcs(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
         if( itype(i).le.100 ) then
           if( icmb(1).ne.iap .or. icmb(2).ne.jap ) then
             iaddr2(1,icmb(1),icmb(2))= i
@@ -455,8 +479,17 @@ contains
     call mpi_bcast(cnst,max_ncnst*nsf,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(iaddr2,2*nsp*nsp,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(iaddr3,2*nsp*nsp*nsp,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(rcs,nsf,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rc2,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rc3,1,mpi_real8,0,mpi_world,ierr)
+
+!.....Compute maximum rcut in all descriptors
+    rcmax = 0d0
+    do i=1,nsf
+      rcmax = max(rcmax,rcs(i))
+      rcs2(i) = rcs(i)**2
+    enddo
+    rcmax2 = rcmax**2
     
     return
   end subroutine read_params_desc
@@ -625,3 +658,7 @@ contains
     return
   end subroutine set_descs
 end module descriptor
+!-----------------------------------------------------------------------
+!     Local Variables:
+!     compile-command: "make pmd"
+!     End:
