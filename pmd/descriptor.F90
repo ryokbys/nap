@@ -170,9 +170,9 @@ contains
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
          dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,dik2,tmp
-    real(8),save:: rc22,rc32,rcs2,rcs3,eta3
+!!$    real(8),save:: rc22,rc32,rcs2,rcs3,eta3
     
-    real(8):: texpij,texpik
+    real(8):: texpij,texpik,eta3
 
     if( l1st ) then
 !.....Check all the rcs and compare them with rc
@@ -185,12 +185,12 @@ contains
         call mpi_finalize(ierr)
         stop
       endif
-!.....Define squares
-      rc22 = rc2*rc2
-      rc32 = rc3*rc3
-      rcs2 = rc2*rcw2
-      rcs3 = rc3*rcw3
-      eta3 = 0.5d0 /(rc3/2)**2
+!!$!.....Define squares
+!!$      rc22 = rc2*rc2
+!!$      rc32 = rc3*rc3
+!!$      rcs2 = rc2*rcw2
+!!$      rcs3 = rc3*rcw3
+!!$      eta3 = 0.5d0 /(rc3/2)**2
     endif
 
     gsf(1:nsf,1:nal)= 0d0

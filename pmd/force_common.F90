@@ -26,6 +26,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use EAM,only:force_EAM
   use linreg,only:force_linreg
   use NN,only:force_NN
+  use NN2,only: force_NN2
   use Coulomb, only: force_screened_Coulomb, force_Ewald &
        ,initialize_coulomb, force_Ewald_long, force_Coulomb
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
@@ -141,6 +142,9 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   if( use_force('NN') ) call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+  if( use_force('NN2') ) call force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
   if( use_force('Morse') ) call force_Morse(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
@@ -212,6 +216,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use LJ, only: read_params_LJ_repul
   use linreg, only: read_params_linreg,lprmset_linreg
   use descriptor, only: read_params_desc,init_desc
+  use NN2, only: read_params_NN2,lprmset_NN2
   implicit none
   integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint !,numff
   real(8),intent(in):: tag(namax),h(3,3),rc
@@ -284,6 +289,16 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
     else
 !.....This code is not parallelized, and only for fitpot
       call update_params_NN()
+    endif
+  else if( use_force('NN2') ) then
+    call init_desc()
+    if( .not.lprmset_NN2 ) then
+!.....Read both in.params.desc and in.params.linreg
+      call read_params_desc(myid_md,mpi_md_world,iprint)
+      call read_params_NN2(myid_md,mpi_md_world,iprint)
+    else
+!.....Read only in.params.desc
+      call read_params_desc(myid_md,mpi_md_world,iprint)
     endif
   endif
 !.....Buckingham

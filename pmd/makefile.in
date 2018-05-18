@@ -13,15 +13,17 @@ MPIFC= @FC@
 MPIFLAGS= @FCFLAGS@
 #-----------------------------------------------------------------------
 # suffixes
-.SUFFIXES: .o .f .F .f90 .F90
+.SUFFIXES: .o .f .F .f90 .F90 .mod
 .f.o: 
 	${MPIFC} -c ${MPIFLAGS} $<
 .F.o: 
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 .f90.o: 
 	${MPIFC} -c ${MPIFLAGS} $<
-.F90.o: 
+.F90.mod:
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
+.F90.o: 
+	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} -o $@ $<
 
 pmd= read_input.o util_vec.o util_rnd.o \
 	util_tag.o lasubs.o util_pmd.o mk_lspr.o \
@@ -41,7 +43,7 @@ forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
 	force_Ito3_WHe.o force_LJ.o force_SW.o force_EDIP_Si.o \
 	force_Brenner.o force_Lu_WHe.o force_Branicio_AlN.o \
 	force_Mishin_Al.o force_AFS_W.o force_SC_Fe.o \
-	force_SM_Al.o force_linreg.o force_NN.o \
+	force_SM_Al.o force_linreg.o force_NN.o force_NN2.o \
 	force_Morse.o force_Coulomb.o force_EAM.o force_Buckingham.o \
 	force_Bonny_WRe.o force_ZBL.o
 params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
@@ -77,27 +79,6 @@ pmc: ${mods} ${pmc} ${forces}
 
 voids: ${voids} ${args}
 	${MPIFC} ${MPIFLAGS} -o $@ ${voids} ${args}
-
-combine: ${comb} ${mods}
-	${MPIFC} ${MPIFLAGS} -o $@  ${mods} ${comb}
-
-pmd2akr: ${pmd2akr} ${mods}
-	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${pmd2akr}
-
-akr2cna: akr2cna.o sort.o
-	${MPIFC} ${MPIFLAGS} -o $@ akr2cna.o sort.o
-
-akr2csp: akr2csp.o
-	${MPIFC} ${MPIFLAGS} -o $@ akr2csp.o
-
-akr2pot: akr2pot.o
-	${MPIFC} ${MPIFLAGS} -o $@ akr2pot.o
-
-akr2ddm: akr2ddm.o
-	${MPIFC} ${MPIFLAGS} -o $@ akr2ddm.o
-
-akr2ddplot: akr2ddplot.o
-	${MPIFC} ${MPIFLAGS} -o $@ akr2ddplot.o
 
 cna2disl: cna2disl.o
 	${MPIFC} ${MPIFLAGS} -o $@ cna2disl.o
