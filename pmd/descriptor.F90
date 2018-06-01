@@ -15,6 +15,7 @@ module descriptor
   real(8),allocatable:: cnst(:,:),rcs(:),rcs2(:)
 !.....symmetry function values and their derivatives
   real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
+  logical:: lupdate_gsf = .true.
 !.....start and end points of symmetry function IDs for each species pair
   integer,allocatable:: iaddr2(:,:,:),iaddr3(:,:,:,:)
 !.....symmetry function IDs for each pair
@@ -62,6 +63,8 @@ contains
 
     integer:: i,nnltmp,ierr
     logical,save:: lrealloc = .false.
+
+    if( .not. lupdate_gsf ) return
 
     if( l1st ) then
     
@@ -173,6 +176,8 @@ contains
 !!$    real(8),save:: rc22,rc32,rcs2,rcs3,eta3
     
     real(8):: texpij,texpik,eta3
+
+    if( .not.lupdate_gsf ) return
 
     if( l1st ) then
 !.....Check all the rcs and compare them with rc
@@ -640,6 +645,8 @@ contains
     real(8),intent(in):: gsfo(nsfo,nalo),dgsfo(3,nsfo,0:nnlo,nalo)&
          ,igsfo(nsfo,0:nnlo,nalo)
 
+    integer:: isf
+
     if( nsf.ne.nsfo .or. nal.ne.nalo .or. nnl.ne.nnlo )  then
 !!$      print *,'ERROR: nsf or nal or nnl is different.'
 !!$      print *,'nsf,nsfo=',nsf,nsfo
@@ -651,10 +658,15 @@ contains
       nnl = nnlo
       allocate( gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal) &
            ,igsf(nsf,0:nnl,nal) )
+!!$      print *,'WARNING: gsfs are reallocated...'
     endif
     gsf(:,:) = gsfo(:,:)
     dgsf(:,:,:,:) = dgsfo(:,:,:,:)
     igsf(:,:,:) = igsfo(:,:,:)
+!!$    print *,'gsf(:,1) after set:'
+!!$    do isf=1,nsf
+!!$      print *,'isf,gsf(isf,1)=',isf,gsf(isf,1)
+!!$    enddo
     return
   end subroutine set_descs
 end module descriptor

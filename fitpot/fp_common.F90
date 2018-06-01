@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-05-08 18:54:26 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-01 14:54:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -67,21 +67,25 @@ contains
          ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys,erefmin &
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
          ,nff,cffs,nsubff,csubffs,cmaindir,maxna,rcut,rc3 &
-         ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint,maxisp
+         ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint,maxisp &
+         ,nn_nl,nn_nhl
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb, set_params_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN,only: set_paramsdir_NN,set_params_NN
+    use NN2,only: set_paramsdir_NN2,set_params_NN2,nl,nhl,nlmax,get_NN2_hl1 &
+         ,set_NN2_hl1
     use linreg,only: set_paramsdir_linreg,set_params_linreg
-    use descriptor,only: set_paramsdir_desc,get_descs,get_ints
+    use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
+         ,lupdate_gsf
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: ftrn,ftst
 
-    integer:: ismpl,natm,ia,ixyz,jxyz,idim,k,nsf,nal,nnl
+    integer:: ismpl,natm,ia,ixyz,jxyz,idim,k,nsf,nal,nnl,isf,i
     real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv,esub
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),fref
     real(8):: ftrnl,ftstl,ftmp
@@ -105,6 +109,7 @@ contains
     if( l1st ) then
       if( .not.fp_common_initialized ) call init()
       if( .not.allocated(fdiff) ) allocate(fdiff(3,maxna),frcs(3,maxna))
+      if( trim(cpot).eq.'NN2' .or. trim(cpot).eq.'linreg') lupdate_gsf = .true.
     endif
 
 !!$    print *,'func_w_pmd: 02'
@@ -157,6 +162,24 @@ contains
         call set_paramsdir_linreg(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_linreg(ndim,x)
+        if( .not. lupdate_gsf ) then
+          nsf = smpl%nsf
+          nal = smpl%nal
+          nnl = smpl%nnl
+          call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
+        endif
+      else if( trim(cpot).eq.'NN2' ) then
+        call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_paramsdir_NN2(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_NN2(ndim,x,nn_nl,nn_nhl)
+        if( .not. lupdate_gsf ) then
+          nsf = smpl%nsf
+          nal = smpl%nal
+          nnl = smpl%nnl
+          call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
+        endif
       else if( trim(cpot).eq.'BVS' ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -171,7 +194,7 @@ contains
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
       samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
-      if( trim(cpot).eq.'linreg' ) then
+      if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
         call get_ints(nsf,nal,nnl)
         samples(ismpl)%nsf = nsf
         samples(ismpl)%nal = nal
@@ -185,6 +208,20 @@ contains
         endif
         call get_descs(nsf,nal,nnl,samples(ismpl)%gsf &
              ,samples(ismpl)%dgsf,samples(ismpl)%igsf)
+      endif
+      if( trim(cpot).eq.'NN2' ) then
+        if( .not. allocated(samples(ismpl)%hl1) ) then
+          allocate(samples(ismpl)%hl1(nhl(1),nal))
+        else if( size(samples(ismpl)%hl1) .ne. nhl(1)*nal ) then
+!!$          print *,'possible? ismpl=',ismpl
+          deallocate(samples(ismpl)%hl1)
+          allocate(samples(ismpl)%hl1(nhl(1),nal))
+        endif
+        call get_NN2_hl1(samples(ismpl)%hl1)
+!!$        print *,'hl1 after get_NN2_hl1:'
+!!$        do i=1,nhl(1)
+!!$          print *,'i,hl1(i,1)=',samples(ismpl)%hl1(i,1)
+!!$        enddo
       endif
       if( iprint.ge.10 ) then
         write(6,'(a,2i4,1x,a,7es12.4)') ' myid,ismpl,cdirname,epot,strs= ', &
@@ -299,6 +336,7 @@ contains
     tfunc= tfunc +tfg
 !!$    print *,'myid,tfunc=',myid,tfunc
     l1st = .false.
+    if( trim(cpot).eq.'NN2' .or. trim(cpot).eq.'linreg' ) lupdate_gsf = .false.
 
   end subroutine func_w_pmd
 !=======================================================================
@@ -310,13 +348,15 @@ contains
     use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm,tgrad &
          ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,nsubff,csubffs &
          ,cmaindir,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
-         ,rcut,rc3,myidrefsub,isidrefsub,iprint,maxisp
+         ,rcut,rc3,myidrefsub,isidrefsub,iprint,maxisp,gscl &
+         ,nn_nl,nn_nhl
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb,set_params_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN,only: set_paramsdir_NN,set_params_NN
+    use NN2,only: set_paramsdir_NN2,set_params_NN2,set_NN2_hl1
     use linreg,only: set_paramsdir_linreg,set_params_linreg
     use descriptor,only: set_paramsdir_desc,set_descs
     implicit none
@@ -388,12 +428,22 @@ contains
         call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_NN(ndim,x,rcut,rc3)
-      else if( trim(cpot).eq.'linreg' ) then
+      else if( trim(cpot).eq.'linreg') then
         call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_paramsdir_linreg(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_linreg(ndim,x)
+        nsf = smpl%nsf
+        nal = smpl%nal
+        nnl = smpl%nnl
+        call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
+      else if( trim(cpot).eq.'NN2') then
+        call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_paramsdir_NN2(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_NN2(ndim,x,nn_nl,nn_nhl)
         nsf = smpl%nsf
         nal = smpl%nal
         nnl = smpl%nnl
@@ -509,6 +559,8 @@ contains
     tcl= tcl +mpi_wtime() -tc0
 
     gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
+!!$!.....GSCL==1.0 by default, but users can change
+!!$    gtrn(:) = gtrn(:) *gscl
 
 !.....only the bottle-neck times are taken into account
     call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
@@ -899,6 +951,7 @@ contains
     use variables,only: lnormalized,cnormalize,iprint
     use parallel
     implicit none
+
     logical,save:: l1st = .true.
 
 !.....If already done, skip
@@ -907,9 +960,9 @@ contains
     if( l1st ) call get_mean_gsf()
 
     if( cnormalize(1:3).eq.'var' ) then
-      if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) &
-           print *,'Normalize descriptors wrt variance.'
       call normalize_var()
+      if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) &
+           print *,'Descriptors were normalized wrt variance.'
     else if( cnormalize(1:2).eq.'no' ) then
 10    continue
     else
@@ -926,8 +979,9 @@ contains
     use variables, only: nsmpl,samples,nvars,nalist,vars,vranges&
          ,lnormalized,cpot,gsfvar,gsfvs,gsfms,sgms,sgmis,sgm_min
     use parallel
+    use NN2, only: nl,nhl,mhl
     implicit none
-    integer:: ismpl,ia,natm,isf,i
+    integer:: ismpl,ia,natm,isf,i,iv,ihl0,ihl1
     integer,save:: nsf
     real(8),save:: sgm,sgmi
     logical,save:: l1st = .true.
@@ -949,10 +1003,6 @@ contains
                ,myid,ismpl,trim(samples(ismpl)%cdirname)
           stop
         endif
-!!$        samples(ismpl)%gsf(:,:)= samples(ismpl)%gsf(:,:) *sgmi
-!!$        samples(ismpl)%dgsf(:,:,:,:)= &
-!!$             samples(ismpl)%dgsf(:,:,:,:) *sgmi
-
         do isf=1,nsf
           samples(ismpl)%gsf(isf,:)= samples(ismpl)%gsf(isf,:) &
                *sgmis(isf)
@@ -964,10 +1014,17 @@ contains
 
     if( trim(cpot).eq.'linreg' ) then
       do i=1,nvars
-!!$        print '(i5,4es12.4)', i,sgms(i),vars(i),vranges(1:2,i)
         vars(i) = vars(i) *sgms(i)
         vranges(1:2,i) = vranges(1:2,i) *sgms(i)
-!!$        print '(i5,4es12.4)', i,sgms(i),vars(i),vranges(1:2,i)
+      enddo
+    else if( trim(cpot).eq.'NN2' ) then
+      iv = 0
+      do ihl0=1,nhl(0)
+        do ihl1=1,mhl(1)
+          iv = iv + 1
+          vars(iv) = vars(iv) *sgms(ihl0)
+          vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
+        enddo
       enddo
     endif
 
@@ -983,8 +1040,9 @@ contains
     use variables, only: nsmpl,samples,nvars,nalist,vars,vranges&
          ,lnormalized,cnormalize,cpot,gsfvar,sgms,sgmis
     use parallel
+    use NN2,only: nhl,mhl
     implicit none
-    integer:: i
+    integer:: i,iv,ihl0,ihl1
     real(8):: sgmi
 
     if( .not. lnormalized ) return
@@ -994,6 +1052,16 @@ contains
         do i=1,nvars
           vars(i) = vars(i) *sgmis(i)
           vranges(:,i) = vranges(:,i) *sgmis(i)
+        enddo
+      else if( trim(cpot).eq.'NN2' ) then
+        iv = 0
+        do ihl0=1,nhl(0)
+          sgmi = sgmis(ihl0)
+          do ihl1=1,mhl(1)
+            iv=iv+1
+            vars(iv)= vars(iv) *sgmi
+            vranges(1:2,iv)= vranges(1:2,iv) *sgmi
+          enddo
         enddo
       endif
     endif

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-05-15 17:21:51 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-01 10:23:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -105,9 +105,11 @@ program fitpot
     call NN_init()
     call NN_func(nvars,vars,ftrn0,ftst0)
   else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
-       .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
+       .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' &
+       .or. trim(cpot).eq.'NN2' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
-    if( trim(cpot).eq.'linreg' .and. .not.cnormalize(1:2).eq.'no' ) then
+    if( (trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) &
+         .and. .not.cnormalize(1:2).eq.'no' ) then
       call normalize()
     endif
   else
@@ -749,14 +751,16 @@ subroutine write_vars(cadd)
   integer:: i
   character(len=128):: cfname
 
-  if( trim(cpot).eq.'NN' .and. .not. &
-    (trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' .or. &
-     trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' .or. &
-     trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
-     trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
-    call NN_restore_standard()
-  else if( trim(cpot).eq.'linreg' ) then
-    call restore_normalize()
+  if( cnormalize(1:2).ne.'no' ) then
+    if( trim(cpot).eq.'NN' .and. .not. &
+         (trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' .or. &
+         trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' .or. &
+         trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
+         trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
+      call NN_restore_standard()
+    else if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
+      call restore_normalize()
+    endif
   endif
 
 !!$  cfname= trim(cmaindir)//'/'//trim(cparfile)//'.'//trim(cadd)
@@ -772,14 +776,16 @@ subroutine write_vars(cadd)
 !    print *, 'wrote '//trim(cfname)
   endif
 
-  if( trim(cpot).eq.'NN' .and. .not. &
-    (trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' .or. &
-     trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' .or. &
-     trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
-     trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
-    call NN_standardize()
-  else if( trim(cpot).eq.'linreg' ) then
-    call normalize()
+  if( cnormalize(1:2).ne.'no' ) then
+    if( trim(cpot).eq.'NN' .and. .not. &
+         (trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' .or. &
+         trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' .or. &
+         trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
+         trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
+      call NN_standardize()
+    else if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
+      call normalize()
+    endif
   endif
 
 end subroutine write_vars
@@ -805,7 +811,7 @@ subroutine qn_wrapper(ftrn0,ftst0)
     call NN_analyze("fin")
     
   else if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
-       .or. trim(cpot).eq.'linreg' ) then
+       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
     call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -1236,6 +1242,13 @@ subroutine check_grad(ftrn0,ftst0)
     print *,''
     print '(a,es12.4)',' Deviation for numerical derivative =',dv
   endif
+  if( myid.eq.0 ) then
+    write(6,'(a)') '------------------------------ check_grad '&
+         //'------------------------------'
+    write(6,'(a)') '     #,          x,    analytical,'// &
+         '     numerical,'// &
+         '      error [%]'
+  endif
 !.....Loop over variables for numerical derivative
   do iv=1,nvars
     vars(1:nvars)= vars0(1:nvars)
@@ -1254,22 +1267,17 @@ subroutine check_grad(ftrn0,ftst0)
       call func_w_pmd(nvars,vars,ftmp2,ftst)
     endif
     gnumer(iv)= (ftmp1-ftmp2)/dv
+    if( myid.eq.0 ) then
+      write(6,'(i6,es12.4,2es15.4,f15.3)') iv,vars0(iv), &
+           ganal(iv) ,gnumer(iv), &
+           abs((ganal(iv)-gnumer(iv))/(gnumer(iv)+tiny))*100
+    endif
 !!$    write(6,'(a,i5,10es15.7)') 'iv,dv,ftmp1,ftmp2,gnumer = ', &
 !!$         iv,dv,ftmp1,ftmp2,gnumer(iv)
 !!$    print *,''
   enddo
 
   if( myid.eq.0 ) then
-    write(6,'(a)') '------------------------------ check_grad '&
-         //'------------------------------'
-    write(6,'(a)') '     #,          x,    analytical,'// &
-         '     numerical,'// &
-         '      error [%]'
-    do iv=1,nvars
-      write(6,'(i6,es12.4,2es15.4,f15.3)') iv,vars0(iv), &
-           ganal(iv) ,gnumer(iv), &
-           abs((ganal(iv)-gnumer(iv))/(gnumer(iv)+tiny))*100
-    enddo
     write(6,'(a)') '----------------------------------------'&
          //'--------------------------------'
     print *, 'Finished check_grad'
@@ -1937,6 +1945,10 @@ subroutine sync_input()
 
   call mpi_bcast(nsmpl_outfrc,1,mpi_integer,0,mpi_world,ierr)
 
+!.....NN related variables
+  call mpi_bcast(nn_nl,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nn_nhl,nn_nlmax+1,mpi_integer,0,mpi_world,ierr)
+
 !.....Force-fields to be subtracted from reference values
   call mpi_bcast(nsubff,1,mpi_integer,0,mpi_world,ierr)
   if( myid.gt.0 ) then
@@ -1964,7 +1976,7 @@ subroutine get_node2sample()
   mynsmpl= nspn(myid+1)
   call mpi_allreduce(mynsmpl,maxmynsmpl,1,mpi_integer,mpi_max &
        ,mpi_world,ierr)
-  if( myid.eq.0 ) print *,'Max num of samples per node = ',maxmynsmpl
+  if( myid.eq.0 ) print '(a,i0)',' Max num of samples per node = ',maxmynsmpl
 
   !.....compute start and end of sample-id of this process
   isid0= 0

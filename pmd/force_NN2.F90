@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-05-18 13:16:37 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-01 10:29:29 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -8,6 +8,7 @@ module NN2
 !  To separate the symmetry function calculations in descriptor.F90,
 !  the module was re-created as NN2.
 !-----------------------------------------------------------------------
+  implicit none 
   save
   character(len=128):: paramsdir = '.'
 
@@ -37,35 +38,12 @@ module NN2
 !.....number of nodes in each layer
 !.....  nhl includes bias nodes whereas mhl does not
   integer:: nhl(0:nlmax+1),mhl(0:nlmax+1)
-!!$  integer,allocatable:: itype(:)
-!!$  real(8),allocatable:: cnst(:,:)
   real(8),allocatable:: hl1(:,:),hl2(:,:)
-!!$!.....symmetry function values and their derivatives
-!!$  real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
-!!$!.....start and end points of symmetry function IDs for each species pair
-!!$  integer,allocatable:: iaddr2(:,:,:),iaddr3(:,:,:,:)
-!!$!.....symmetry function IDs for each pair
-!!$  integer(2),allocatable:: igsf(:,:,:)
-!!$!.....function types and num of constatns for types
-!!$  integer,parameter:: max_ncnst= 2
-!!$  integer:: ncnst_type(200)
-!!$  integer:: ncomb_type(200)
-
-!!$!.....cutoff region width ratio to rc
-!!$  real(8):: rcw2 = 0.0d0
-!!$  real(8):: rcw3 = 0.0d0
-!!$  real(8):: rcnn = 4.0d0
-!!$  real(8):: rc3nn = 3.0d0
-
-!!$!.....num of atoms and neighbors for dgsf array
-!!$  integer:: nal, nnl, nalmax,nnlmax,nnltmp
-  logical:: lrealloc = .false.
 
 !.....parameters given from outside (fitpot)
   integer:: nprms
   real(8),allocatable:: prms(:)
   logical:: lprmset_NN2 = .false.
-
   
 contains
   subroutine force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -95,12 +73,11 @@ contains
     integer,external:: itotOf
     character(len=8):: cnum
 
-    call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr &
-         ,myid,mpi_world,iprint)
+    call make_gsf_arrays(l1st,namax,natm &
+         ,tag,nnmax,lspr,myid,mpi_world,iprint)
 
     if( l1st ) then
 
-      lrealloc = .false.
       if( nl.eq.1 ) then
         if( allocated(hl1) ) deallocate(hl1)
         allocate( hl1(nhl(1),nal) )
@@ -127,15 +104,15 @@ contains
     strsl(1:3,1:3,1:namax) = 0d0
     aal(1:3,1:namax) = 0d0
 
-    call calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr,rcin &
-         ,myid,mpi_world,l1st,iprint)
-
+    call calc_desc(namax,natm,nb,nnmax,h &
+         ,tag,ra,lspr,rcin,myid,mpi_world,l1st,iprint)
 
     if( lbias ) then
 !.....set bias node to 1
       gsf(nhl(0),1:natm) = 1d0
       dgsf(1:3,nhl(0),:,:) = 0d0
     endif
+
 
 !.....initialize hidden-layer node values
     if( nl.eq.1 ) then
@@ -151,8 +128,6 @@ contains
         hl2(nhl(2),1:natm)= 1d0
       endif
     endif
-
-    
 !.....2nd, calculate the node values by summing contributions from
 !.....  symmetry functions
     if( nl.eq.1 ) then
@@ -182,9 +157,8 @@ contains
           hl2(ihl2,ia)= sigmoid(tmp)
         enddo
       enddo
-
     endif
-    
+
 !.....Calculate the energy of atom by summing up the node values
     epotl= 0d0
     if( nl.eq.1 ) then
@@ -223,7 +197,7 @@ contains
                    -tmp*wgt11(ihl0,ihl1)*dgsf(1:3,ihl0,jj,ia)
             enddo
           enddo
-          !.....atom ia
+!.....atom ia
           do ihl0= 1,nhl(0)
             aal(1:3,ia)=aal(1:3,ia) &
                  -tmp*wgt11(ihl0,ihl1)*dgsf(1:3,ihl0,0,ia)
@@ -271,9 +245,9 @@ contains
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
-    if( iprint.gt.2 ) print *,'NN epot = ',epott
+    if( iprint.gt.2 ) print *,'NN2 epot = ',epott
     epot= epot +epott
-    
+
     return
   end subroutine force_NN2
 !=======================================================================
@@ -433,15 +407,24 @@ contains
     return
   end subroutine read_params_NN2
 !=======================================================================
-  subroutine set_params_NN2(nprms_in,prms_in)
+  subroutine set_params_NN2(nprms_in,prms_in,nl_in,nhl_in)
 !
 !  Accessor routine to set NN parameters from outside.
 !  Curretnly this routine is supposed to be called only on serial run.
 !
     implicit none 
-    integer,intent(in):: nprms_in
+    integer,intent(in):: nprms_in,nl_in,nhl_in(0:nl_in)
     real(8),intent(in):: prms_in(nprms_in)
 
+    nl = nl_in
+    if( nl.eq.0 ) then
+      print *,'ERROR: nl==0 which should not happen.'
+      stop
+    endif
+    nhl(0:nl) = nhl_in(0:nl_in)
+    nhl(nl+1) = 1
+    mhl(0:nl+1) = nhl(0:nl+1)
+    
     nprms = nprms_in
     if( .not.allocated(prms) ) allocate(prms(nprms))
     prms(1:nprms) = prms_in(1:nprms_in)
@@ -701,39 +684,46 @@ contains
   end subroutine set_paramsdir_NN2
 !=======================================================================
   subroutine gradw_NN2(namax,natm,tag,ra,nnmax &
-       ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws &
-       ,lematch,lfmatch,lsmatch)
-!
+       ,h,rc,lspr,iprint,ndimp,gwe,gwf,gws &
+       ,lematch,lfmatch,lsmatch,iprm0)
+!=======================================================================
 !  Gradient w.r.t. NN weights, {w}
 !  Note: This routine is always called in single run,
 !  thus no need of parallel implementation.
 !  Currently only 1 hidden layer is implemented.
 !=======================================================================
-!  Since force_NN and gradw_NN requires different gsfs for different
-!  systems in case of fitpot, it is not easy to implement those system-dependent
-!  gradw_NN... So for now, coding of gradw_NN is pending (180328).
-!  If it is the object-oriented language like python or Java,
-!  this may not be the problem, but it is Fortran...
-!=======================================================================
+    use descriptor,only: gsf,dgsf,igsf,nsf
     implicit none
-    integer,intent(in):: namax,natm,nnmax,iprint
+    integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
-    real(8),intent(inout):: epot
     integer,intent(in):: ndimp
     real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
     logical,intent(in):: lematch,lfmatch,lsmatch
 
-!!$    if( lematch ) then
-!!$      iv= nhl(0)*mhl(1) +nhl(1)
+    integer:: iv,ia,ihl0,ihl1
+    real(8):: g,h1,tmp,w2
+
+    do ia=1,natm
+      do ihl1=1,mhl(1)
+        tmp = 0d0
+        do ihl0=1,nhl(0)
+          tmp = tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
+        enddo
+        hl1(ihl1,ia) = sigmoid(tmp)
+      enddo
+    enddo
+
+    if( lematch ) then
+!!$      iv= iprm0 +nhl(0)*mhl(1) +nhl(1)
 !!$!.....2nd layer
 !!$      do ihl1=nhl(1),1,-1
 !!$        tmp= 0d0
 !!$        do ia=1,natm
-!!$          h1= sds%hl1(ia,ihl1)
+!!$          h1= hl1(ihl1,ia)
 !!$          tmp= tmp +(h1-0.5d0)
 !!$        enddo
-!!$        gs(iv)= gs(iv) +ediff*tmp
+!!$        gwe(iv)= gwe(iv) +tmp
 !!$        iv= iv -1
 !!$      enddo
 !!$!.....1st layer
@@ -742,15 +732,33 @@ contains
 !!$          tmp= 0d0
 !!$          w2= wgt12(ihl1)
 !!$          do ia=1,natm
-!!$            h1= sds%hl1(ia,ihl1)
-!!$            tmp= tmp +w2 *h1*(1d0-h1) *sds%gsf(ia,ihl0)
+!!$            h1= hl1(ihl1,ia)
+!!$            tmp= tmp +w2 *h1*(1d0-h1) *gsf(ihl0,ia)
 !!$          enddo
-!!$          gs(iv)= gs(iv) +ediff*tmp
+!!$          gwe(iv)= gwe(iv) +tmp
 !!$          iv= iv -1
 !!$        enddo
 !!$      enddo
-!!$
-!!$    endif
+
+      do ia=1,natm
+        iv = iprm0
+        do ihl0=1,nhl(0)
+          g = gsf(ihl0,ia)
+          do ihl1=1,mhl(1)
+            w2 = wgt12(ihl1)
+            h1 = hl1(ihl1,ia)
+            iv = iv + 1
+            gwe(iv) = gwe(iv) +w2 *h1*(1d0-h1) *g
+          enddo
+        enddo
+        do ihl1=1,nhl(1)
+          h1 = hl1(ihl1,ia)
+          iv = iv + 1
+          gwe(iv) = gwe(iv) + (h1 -0.5d0)
+        enddo
+      enddo
+
+    endif
 
     if( lfmatch ) then
 
@@ -761,6 +769,39 @@ contains
     endif
 
   end subroutine gradw_NN2
+!=======================================================================
+  subroutine get_NN2_hl1(hl1o)
+!
+!  Access to hl1 from outside
+!
+    use descriptor,only: nal
+    real(8),intent(out):: hl1o(nhl(1),nal)
+
+    hl1o(1:nhl(1),1:nal) = hl1(1:nhl(1),1:nal)
+    return
+  end subroutine get_NN2_hl1
+!=======================================================================
+  subroutine set_NN2_hl1(hl1o)
+!
+!  Set hl1 from outside
+!
+    use descriptor,only: nal
+    real(8),intent(in):: hl1o(nhl(1),nal)
+
+    integer:: ihl1
+
+    if( size(hl1o).ne.size(hl1) ) then
+      print *,'ERROR: size of hl1o and hl1 different !'
+      print *,'  size(hl1o),size(hl1)=',size(hl1o),size(hl1)
+      stop
+    endif
+    hl1(:,:) = hl1o(:,:)
+!!$    print *,'hl1 after set, nhl(1),mhl(1)=',nhl(1),mhl(1)
+!!$    do ihl1=1,nhl(1)
+!!$      print *,'ihl1,hl1(ihl1,1)=',ihl1,hl1(ihl1,1)
+!!$    enddo
+    return
+  end subroutine set_NN2_hl1
 end module NN2
 !-----------------------------------------------------------------------
 !     Local Variables:

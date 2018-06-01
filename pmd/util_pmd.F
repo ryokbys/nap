@@ -165,10 +165,11 @@ c=======================================================================
       read(ionum,*) hunit
       read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       h(1:3,1:3,0:1)= h(1:3,1:3,0:1)*hunit
-      read(ionum,*) ntot
-      allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot)
-     &     ,ekitot(3,3,ntot),stot(3,3,ntot),atot(3,ntot))
-      do i=1,ntot
+      read(ionum,*) ntot0
+      ntot = ntot0
+      allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0)
+     &     ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0))
+      do i=1,ntot0
         read(ionum,*) tagtot(i),rtot(1:3,i),vtot(1:3,i)
      &       ,ekitot(1,1,i),epitot(i)
      &       ,stot(1,1,i),stot(2,2,i),stot(3,3,i)
@@ -219,15 +220,16 @@ c-----natm: num. of particles in this node
       read(ionum) hunit
       read(ionum) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       h(1:3,1:3,0:1)= h(1:3,1:3,0:1)*hunit
-      read(ionum) ntot
-      allocate(tagtot(ntot),rtot(3,ntot),atot(3,ntot)
-     &     ,vtot(3,ntot),epitot(ntot)
-     &     ,ekitot(3,3,ntot),stot(3,3,ntot))
+      read(ionum) ntot0
+      ntot = ntot0
+      allocate(tagtot(ntot0),rtot(3,ntot0),atot(3,ntot0)
+     &     ,vtot(3,ntot0),epitot(ntot0)
+     &     ,ekitot(3,3,ntot0),stot(3,3,ntot0))
       read(ionum) (tagtot(i),rtot(1:3,i),vtot(1:3,i)
      &     ,ekitot(1,1,i),epitot(i)
      &     ,stot(1,1,i),stot(2,2,i),stot(3,3,i)
      &     ,stot(2,3,i),stot(3,1,i),stot(1,2,i)
-     &     ,i=1,ntot)
+     &     ,i=1,ntot0)
       close(ionum)
 
       end subroutine read_pmdtot_bin

@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-05-02 09:32:31 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-01 13:09:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -205,6 +205,11 @@ contains
     if( iprint.gt.10 .and. mod(iprint,10).eq.1 .and. myid.le.0 ) then
       call write_descs(80,natm,namax,nnmax,lspr,tag)
     endif
+
+!!$    print *,'gsf:'
+!!$    do isf=1,nsf
+!!$      print *,'isf,gsf(isf,1)=',isf,gsf(isf,1)
+!!$    enddo
 
 !.....Energy
     do ia=1,natm

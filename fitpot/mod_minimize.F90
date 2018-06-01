@@ -513,7 +513,7 @@ contains
         endif
       endif
       allocate(gg(ndim,ndim),x(ndim),dx(ndim) &
-         ,s(ndim),y(ndim),gp(ndim),ggy(ndim),gpena(ndim))
+           ,s(ndim),y(ndim),gp(ndim),ggy(ndim),gpena(ndim))
     endif
 
 
@@ -633,9 +633,13 @@ contains
           call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
                ,iprint,iflag,myid,func)
         endif
-      else if ( trim(clinmin).eq.'golden') then
+      else if( trim(clinmin).eq.'golden') then
         call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
+      else if( trim(clinmin).eq.'onestep' ) then
+        alpha = min(alpha*2d0, 1d0)
+        call onestep(ndim,x,xranges,u,f,ftst,g,alpha,iprint &
+             ,iflag,myid,func,niter)
       else ! armijo (default)
 !.....To enhance the convergence in Armijo search,
 !.....use the history of previous alpha by multiplying 2
@@ -730,22 +734,20 @@ contains
       dxnorm= sqrt(sprod(ndim,dx,dx))
 !!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
 !!$      gnorm= gnorm/ndim
-      if( myid.eq.0 ) then
-        if( iprint.ge.1 ) then
-          if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
-               .or.trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,7es13.5)') &
-                 ' iter,ftrn,ftst,p,vnorm,gnorm,dxnorm,f-fp=',&
-                 iter,f,ftst &
-                 ,pval,vnorm,gnorm,dxnorm,f-fp
-          else
-            write(6,'(a,i8,6es13.5)') &
-                 ' iter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
-                 ,iter,f,ftst &
-                 ,vnorm,gnorm,dxnorm,f-fp
-          endif
-          call flush(6)
+      if( myid.eq.0 .and. iprint.gt.0 ) then
+        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
+             .or.trim(cpena).eq.'ridge' ) then
+          write(6,'(a,i8,7es13.5)') &
+               ' iter,ftrn,ftst,p,vnorm,gnorm,dxnorm,f-fp=',&
+               iter,f,ftst &
+               ,pval,vnorm,gnorm,dxnorm,f-fp
+        else
+          write(6,'(a,i8,6es13.5)') &
+               ' iter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
+               ,iter,f,ftst &
+               ,vnorm,gnorm,dxnorm,f-fp
         endif
+        call flush(6)
       endif
 !.....check convergence 
       if( dxnorm.lt.xtol ) then
@@ -795,7 +797,7 @@ contains
         ngtol = 0
         nftol = 0
       endif
-      
+
       s(1:ndim)= alpha *u(1:ndim)
       y(1:ndim)= g(1:ndim) -gp(1:ndim)
       ynorm= sprod(ndim,y,y)
@@ -836,7 +838,7 @@ contains
       enddo
     enddo
 
-    
+
 !!$    if( myid.eq.0 ) print *,'maxiter exceeded in qn'
 !!$    iflag= iflag +10
     x0(1:ndim)= x(1:ndim)
@@ -1554,7 +1556,7 @@ contains
           pval= pval +pwgt*x1(i)*x1(i)
         enddo
       endif
-      if( myid.eq.0 .and. iprint.ge.10 ) write(6,'(a,i5,3es15.7)') &
+      if( myid.eq.0 .and. iprint.gt.2 ) write(6,'(a,i5,3es15.7)') &
            ' armijo: iter,fi+pval-(f0+pval0),xigd*alphai,alphai=',&
            iter,fi+pval-(f0+pval0),xigd*alphai,alphai
       if( fi+pval-(f0+pval0).le.xigd*alphai ) then
@@ -1571,22 +1573,82 @@ contains
       alphai= alphai*armijo_tau
     enddo
 
-    if(myid.eq.0 .and. iprint.gt.0 ) &
-         print *,'WARNING: iter.gt.MAXITER in armijo_search.'
     iflag= iflag +100
     niter= iter
     if( myid.eq.0 .and. iprint.gt.0 ) then
-      write(6,'(a,es13.5)') '  alphai   = ',alphai
-      write(6,'(a,es13.5)') '  xigd    = ',xigd
-      write(6,'(a,es13.5)') '  norm(g) = ',sqrt(sprod(ndim,g,g))
+      print *,'WARNING: iter.gt.MAXITER in armijo_search.'
+      write(6,'(a,es13.5)') '   alphai   = ',alphai
+      write(6,'(a,es13.5)') '   xigd    = ',xigd
+      write(6,'(a,es13.5)') '   norm(g) = ',sqrt(sprod(ndim,g,g))
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' .or. &
            trim(cpena).eq.'ridge' ) then
-        write(6,'(a,es13.5)') '  pval    = ',pval
+        write(6,'(a,es13.5)') '   pval    = ',pval
       endif
     endif
     return
 
   end subroutine armijo_search
+!=======================================================================
+  subroutine onestep(ndim,x0,xranges,d,f,ftst,g,alpha,iprint &
+       ,iflag,myid,func,niter)
+!
+!  Simply move onestep towards current direction with max length
+!  that can decreases function value.
+!
+    implicit none
+    integer,intent(in):: ndim,iprint,myid
+    integer,intent(inout):: iflag,niter
+    real(8),intent(in):: x0(ndim),g(ndim),d(ndim),xranges(2,ndim)
+    real(8),intent(inout):: f,alpha,ftst
+    interface
+      subroutine func(n,x,ftrn,ftst)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+    end interface
+
+!.....Decreasing factor of step length
+    real(8),parameter:: facalp = 0.5d0
+    integer,parameter:: maxiter = 10
+    integer:: iter,i,ig
+    real(8):: alphai,alphap,f0,fi,fp,ftsti
+    real(8),allocatable:: x1(:)
+    logical,save:: l1st = .true.
+
+    if( l1st ) then
+      l1st = .false.
+    endif
+    if( .not.allocated(x1) ) allocate(x1(ndim))
+    f0 = f
+    alphai = alpha
+    do iter=1,maxiter
+      x1(1:ndim) = x0(1:ndim) +alphai*d(1:ndim)
+      call wrap_ranges(ndim,x1,xranges)
+      call func(ndim,x1,fi,ftsti)
+      if( myid.eq.0 .and. iprint.gt.2 ) &
+           print *,'  iter,alphai,fi-f0 = ',iter,alphai,fi-f0
+      if( fi-f0.lt.0d0 ) then
+        f = fi
+        alpha = alphai
+        ftst = ftsti
+        niter = iter
+        return
+      endif
+      fp = fi
+      alphap = alphai
+      alphai = alphai *facalp
+    enddo
+
+    iflag = iflag + 100
+    niter = iter
+    if( myid.eq.0 .and. iprint.gt.0 ) then
+      print *, 'WARNING: iter.gt.MAXITER in onestep,'
+      print *, '         which means the search direction could be wrong.'
+      write(6,'(a,es13.5)') '   alphai = ',alphai
+    endif
+    return
+  end subroutine onestep
 !=======================================================================
   function sprod(n,a,b)
     implicit none

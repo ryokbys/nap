@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-05-08 18:47:51 Ryo KOBAYASHI>
+!                     Last modified: <2018-05-18 17:29:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -1559,8 +1559,7 @@ contains
     real(8):: gmeanl,gmean,tmp,gvarl
     real(8),allocatable:: gsfml(:),gsfvl(:)
 
-    allocate(gsfml(nhl(0)),gsfvl(nhl(0)))
-
+    allocate(gsfml(nhl(0)),gsfvl(nhl(0)),gsfms(nhl(0)),gsfvs(nhl(0)))
 
 !.....compute mean value
     gsfml(1:nhl(0)) = 0d0
@@ -1585,6 +1584,7 @@ contains
         enddo
       enddo
     enddo
+
     nsumg= 0
 !!$    call mpi_allreduce(gmeanl,gsfmean,1,mpi_real8 &
 !!$         ,mpi_sum,mpi_world,ierr)
@@ -1596,6 +1596,7 @@ contains
          ,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(nsuml,nsumg,1,mpi_integer &
          ,mpi_sum,mpi_world,ierr)
+
     gsfms(1:nhl(0))= gsfms(1:nhl(0))/nsumg
     gsfvs(1:nhl(0))= gsfvs(1:nhl(0))/nsumg &
          -gsfms(1:nhl(0))**2

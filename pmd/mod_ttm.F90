@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-03-08 21:35:39 Ryo KOBAYASHI>
+!                     Last-modified: <2018-05-28 20:51:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -17,6 +17,7 @@ module ttm
   character(len=128),parameter:: cfparams = 'in.ttm'
   character(len=128),parameter:: cTe_infile = 'in.Te'
   character(len=128),parameter:: cTe_outfile = 'out.Te'
+  
   integer,parameter:: ioprms = 30
   integer,parameter:: ioTein = 31
   integer,parameter:: ioTeout = 32
@@ -66,6 +67,9 @@ module ttm
 !.....Surface movement along x: no, plane (can move as a yz-plane surface)
   character(len=128):: surfmove = 'plane'
   integer:: nstp_surfmove = 10
+!.....Threshold density: default = 0.025 Ang^{-3} (1/2 of ideal Si diamond density)
+!     ex) 8 /5.427^3 = 0.05
+  real(8):: dthresh = 0.025d0
 !.....Minimum Te when surface moves
   real(8):: Te_min = 300d0
 
@@ -86,7 +90,8 @@ module ttm
   real(8),allocatable:: aai(:,:)
 
 !.....For energy difference
-  real(8):: ein_e, ein_a
+  real(8):: ein_e, ein_a, eout_e, eout_a
+  real(8),allocatable:: dein(:),deout(:)
 
 contains
 !=======================================================================
@@ -277,6 +282,9 @@ contains
         else if( trim(c1st).eq.'surface_move' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, surfmove
+        else if( trim(c1st).eq.'threshold_density' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, dthresh
         else if( trim(c1st).eq.'laser_power' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, I_0
@@ -471,6 +479,7 @@ contains
     t0 = mpi_wtime()
 
     ein_e = 0d0
+    eout_e = 0d0
     if( myid.eq.0 ) then
       do istp = 1,nstp_inner
         call set_BC()
@@ -488,7 +497,9 @@ contains
                *(rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,iy,iz) &
                +ce*d2te(ix,iy,iz) ) &
                +pterm +sterm )
-          ein_e = ein_e +(pterm+sterm)*dt *vcell
+!!$          ein_e = ein_e +(pterm+sterm)*dt *vcell
+          ein_e = ein_e +(gp(ic)*ta(ic)+sterm)*dt *vcell
+          eout_e = eout_e -gp(ic)*te(ix,iy,iz)*dt *vcell
         enddo
         if( tnow.ge.t0_laser .and. &
              tnow.lt.(t0_laser +tau_pulse) ) then
@@ -610,22 +621,30 @@ contains
     real(8),intent(inout):: va(3,namax),ediff(nspmax)
 
     integer:: ic,i,l,is,ifmv,ix,iy,iz,naccp,ierr,isp
-    real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0
-    real(8):: ediffl(nspmax)
+    real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0,vt(3)&
+         ,aain(3),aaout(3),vin(3),vout(3)
+    real(8):: ediffl(nspmax),deinl(nspmax),deoutl(nspmax)
     integer,external:: ifmvOf
     real(8),external:: box_muller,sprod
+    logical,save:: l1st = .true.
+
+    if( l1st ) then
+      allocate(dein(nspmax),deout(nspmax))
+    endif
 
     t0 = mpi_wtime()
 
     do ic=1,nxyz
       call ic2ixyz(ic,ix,iy,iz)
       sgm(ic) = dsqrt(2d0*gmmp*fkb*te(ix,iy,iz)/dtmd)
-!!$      if( ic.eq.4 ) print *,'ic,sgm,gmmp,fkb*Te=',ic,sgm(ic)&
-!!$           ,gmmp,fkb*te(ix,iy,iz)
+      if( ic.lt.20 ) print *,'ic,sgm,Te,fkb*Te=',ic,sgm(ic)&
+           ,te(ix,iy,iz),fkb*te(ix,iy,iz)
     enddo
     
 !.....Langevin thermostat with Mannella integrator
     ediffl(1:nspmax) = 0d0
+    deinl(1:nspmax) = 0d0
+    deoutl(1:nspmax) = 0d0
     hscl(1:3)= 0d0
     do l=1,3
       hscl(l)= dsqrt(h(1,l)**2 +h(2,l)**2 +h(3,l)**2)
@@ -637,6 +656,7 @@ contains
         va(1:3,i)= 0d0
       else
         va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dtmd
+        vt(1:3) = va(1:3,i)
         ami= am(is)
         ic = a2c(i)
         call ic2ixyz(ic,ix,iy,iz)
@@ -649,35 +669,60 @@ contains
         gmmi = gmmp
         if( ek.gt.ekth ) gmmi = gmmi + gmms
         aai(1:3)= 0d0
+        aain(1:3)= 0d0
+        aaout(1:3)= 0d0
         do l=1,3
-          aai(l)= -va(l,i)*gmmi*ami +sgmi*box_muller()/hscl(l)
+!!$          aai(l)= -va(l,i)*gmmi*ami +sgmi*box_muller()/hscl(l)
+          aain(l) = sgmi*box_muller()/hscl(l)
+          aaout(l) = -va(l,i)*gmmi*ami
+          aai(l) = aaout(l) +aain(l)
         enddo
 !.....To compensate the factor 1/2 in fa2v, multiply 2 here.
         va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(is)*dtmd *2d0
         if( iprint.gt.1 ) then
 !.....accumulate energy difference
-          vi(1:3)= h(1:3,1)*va(1,i) &
-               +h(1:3,2)*va(2,i) &
-               +h(1:3,3)*va(3,i)
+          vi(1:3)= h(1:3,1)*vt(1) &
+               +h(1:3,2)*vt(2) &
+               +h(1:3,3)*vt(3)
           vl(1:3)= h(1:3,1)*aai(1)*fa2v(is)*dtmd *2d0 &
                +h(1:3,2)*aai(2)*fa2v(is)*dtmd *2d0 &
                +h(1:3,3)*aai(3)*fa2v(is)*dtmd *2d0
+          vin(1:3)= h(1:3,1)*aain(1)*fa2v(is)*dtmd *2d0 &
+               +h(1:3,2)*aain(2)*fa2v(is)*dtmd *2d0 &
+               +h(1:3,3)*aain(3)*fa2v(is)*dtmd *2d0
+          vout(1:3)= h(1:3,1)*aaout(1)*fa2v(is)*dtmd *2d0 &
+               +h(1:3,2)*aaout(2)*fa2v(is)*dtmd *2d0 &
+               +h(1:3,3)*aaout(3)*fa2v(is)*dtmd *2d0
           ediffl(ifmv)= ediffl(ifmv) +fekin(is) &
                *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
+          deinl(ifmv)= deinl(ifmv) +fekin(is) &
+               *(2d0*sprod(3,vi,vin)+sprod(3,vin,vin))
+          deoutl(ifmv)= deoutl(ifmv) +fekin(is) &
+               *(2d0*sprod(3,vi,vout)+sprod(3,vout,vout))
         endif
       endif
     enddo
 
     if( iprint.gt.1 ) then
       ediff(1:nspmax) = 0d0
+      dein(1:nspmax) = 0d0
+      deout(1:nspmax) = 0d0
       call mpi_reduce(ediffl,ediff,nspmax &
            ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+      call mpi_reduce(deinl,dein,nspmax &
+           ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+      call mpi_reduce(deoutl,deout,nspmax &
+           ,mpi_real8,mpi_sum,0,mpi_world,ierr)
       ein_a = 0d0
+      eout_a = 0d0
       do isp=1,nspmax
-        ein_a = ein_a +ediff(isp)
+!!$        ein_a = ein_a +ediff(isp)
+        ein_a = ein_a +dein(isp)
+        eout_a = eout_a +deout(isp)
       enddo
     endif
 
+    l1st = .false.
     t_ttm = t_ttm +mpi_wtime()-t0
     return
   end subroutine langevin_ttm
@@ -776,32 +821,30 @@ contains
     integer,intent(in):: myid,mpi_world
 
     integer:: ix,iy,iz,icl,ivac_right,ierr,lsurf_new
-    real(8):: densx
     logical:: lupdate
     logical,allocatable,save:: lexists(:)
+    real(8),allocatable,save:: densx(:)
     real(8),save:: volyz
 
-!.....Number density in (Ang^{-3}); 1 in sphere of radius, rc=3.78 Ang
-    real(8),parameter:: density = 0.00442 
-
     if( .not. allocated(lexists) ) then
-      allocate(lexists(nx))
+      allocate(lexists(nx),densx(nx))
       volyz = vcell*ny*nz
     endif
 
     if( myid.ne.0 ) goto 10
 
     lexists(:) = .false.
+    densx(:) = 0d0
     do ix=1,nx
-      densx = 0d0
       do iy=1,ny
         do iz=1,nz
           call ixyz2ic(ix,iy,iz,icl)
-          densx = densx +dble(nac(icl))
+!.....Since nac is not a number of atoms, but DOF in a cell, divid by 3
+          densx(ix) = densx(ix) +dble(nac(icl))/3
         enddo
       enddo
-      densx = densx/volyz/3
-      if( densx .gt. density ) lexists(ix) = .true.
+      densx(ix) = densx(ix)/volyz
+      if( densx(ix) .gt. dthresh ) lexists(ix) = .true.
     enddo
 
 !.....Right-most layer of vacuum
@@ -812,7 +855,7 @@ contains
 
 !.....Update lsurf
     lupdate = .false.
-    lsurf_new = max(ivac_right-1, 1)  ! not to take 0
+    lsurf_new = max(ivac_right+1, 1)  ! not to take 0
     if( lsurf_new .gt. lsurf ) then
       do ix=lsurf,lsurf_new-1
         te(ix,:,:) = 0d0
@@ -833,6 +876,10 @@ contains
     if( lsurf.eq.rsurf ) then
       if( myid.eq.0 ) print *,'Warning: lsurf.eq.rsurf!'
     endif
+    if( myid.eq.0 ) then
+      print *, 'lsurf,ivac_right,densx= ',lsurf,ivac_right&
+           ,densx(1:4),densx(nx)
+    endif
     return
   end subroutine update_surface_plane
 !=======================================================================
@@ -842,9 +889,139 @@ contains
 !
     integer,intent(in):: istp, myid, iprint
 
-    write(6,'(a,i8,2es12.4)') 'istp,ein_e,ein_a= ',istp, ein_e, ein_a
+    if( myid.eq.0 ) then
+      write(6,'(a,i8,4es12.4)') 'istp,eio_e,eio_a= ',istp, &
+           ein_e, eout_e, ein_a, eout_a
+    endif
     
   end subroutine output_energy_balance
+!=======================================================================
+  subroutine remove_ablated_atoms(simtime,namax,natm,tag,ra,va,&
+       chg,chi,h,sorg)
+!
+!  Remove atoms evapolated from left surface by laser ablation.
+!  Store the following removed-atom data:
+!    - ID, time, position (y,z), velocity (x,y,z)
+!
+    use pmdmpi
+    integer,intent(in):: namax
+    integer,intent(inout):: natm
+    real(8),intent(inout):: tag(namax),ra(3,namax),va(3,namax)&
+         ,chg(namax),chi(namax)
+    real(8),intent(in):: h(3,3),simtime,sorg(3)
+    
+    integer:: ix,iy,iz,inc,nabl,n,ia,ja,inc2,ierr,itot,iyz,n0
+    real(8):: r(3),rt(3),v(3)
+    logical:: lremove 
+    integer,save:: ntmp = 1000
+    integer,parameter:: nmpi = 4
+    logical,save:: l1st = .true.
+    integer,allocatable,save:: list(:)
+    real(8),allocatable,save:: tagabl(:),rabl(:,:),vabl(:,:)
+    integer:: istat(mpi_status_size),itag
+
+    integer,external:: itotOf
+
+    if( l1st ) then
+      if( myid_md.eq.0 ) then
+        print *,'# ABLATED: ID, time, position (x,y), velocity (x,y,z)'
+      endif
+      allocate(tagabl(ntmp),rabl(3,ntmp),vabl(3,ntmp),list(ntmp))
+      l1st = .false.
+    endif
+
+    call nid2xyz(myid_md,ix,iy,iz)
+
+!.....Only left-most node is concerned
+    if( ix.eq.0 ) then
+      inc = 0
+      do ia=1,natm
+        if( ra(1,ia).lt.0d0 ) then
+          inc = inc + 1
+        endif
+      enddo
+      nabl = inc
+      if( myid_md.eq.0 ) then
+        do iyz = 1,ny*nz-1 ! node-ID of ix = 0
+          itag = iyz
+          call mpi_recv(n,1,mpi_integer,iyz,itag,mpi_md_world,istat,ierr)
+          nabl = nabl + n
+        enddo
+      else  ! myid_md.ne.0
+        itag = myid_md
+        call mpi_send(inc,1,mpi_integer,0,itag,mpi_md_world,ierr)
+      endif
+
+      if( nabl.gt.ntmp ) then
+        ntmp = nabl *1.5
+        deallocate(tagabl,rabl,vabl,list)
+        allocate(tagabl(ntmp),rabl(3,ntmp),vabl(3,ntmp),list(ntmp))
+      endif
+
+!.....Actually list up to-be-removed atoms
+      inc = 0
+      list(:) = 0
+      do ia=1,natm
+        if( ra(1,ia).lt.0d0 ) then
+          inc = inc + 1
+          list(inc) = ia
+          tagabl(inc) = tag(ia)
+          rt(1:3) = ra(1:3,ia) +sorg(1:3)
+          r(1:3) = h(1:3,1)*rt(1) +h(1:3,2)*rt(2) +h(1:3,3)*rt(3)
+          v(1:3) = h(1:3,1)*va(1,ia) +h(1:3,2)*va(2,ia) +h(1:3,3)*va(3,ia)
+          rabl(1:3,inc) = r(1:3)
+          vabl(1:3,inc) = v(1:3)
+        endif
+      enddo
+!.....Gather to-be-removed atoms for writing out
+      n0 = inc + 1
+      if( myid_md.eq.0 ) then
+        do iyz = 1,ny*nz-1
+          itag = iyz*nmpi -nmpi
+          call mpi_recv(n,1,mpi_integer,iyz,itag,mpi_md_world,istat,ierr)
+          call mpi_recv(tagabl(n0),n,mpi_real8,iyz,itag+1,mpi_md_world,istat,ierr)
+          call mpi_recv(rabl(1,n0),3*n,mpi_real8,iyz,itag+2,mpi_md_world,istat,ierr)
+          call mpi_recv(vabl(1,n0),3*n,mpi_real8,iyz,itag+3,mpi_md_world,istat,ierr)
+          n0 = n0 + n
+        enddo
+      else  ! myid_md.ne.0
+        itag = myid_md*nmpi -nmpi
+        call mpi_send(inc,1,mpi_integer,0,itag,mpi_md_world,ierr)
+        call mpi_send(tagabl,inc,mpi_real8,0,itag+1,mpi_md_world,ierr)
+        call mpi_send(rabl,3*inc,mpi_real8,0,itag+2,mpi_md_world,ierr)
+        call mpi_send(vabl,3*inc,mpi_real8,0,itag+3,mpi_md_world,ierr)
+      endif
+!.....Write out only at node-0
+      if( myid_md.eq.0 ) then
+        do ia = 1,nabl
+          itot = itotOf(tagabl(ia))
+          print '(a,i10,6es13.5)','ABLATED: ',itot,simtime,rabl(2:3,ia),vabl(1:3,ia)
+        enddo
+      endif
+!.....Remove atoms from the ra,va,tag,...
+      inc2 = 0
+      do ia=1,natm
+        lremove = .false.
+        do ja=1,inc
+          if( ia.eq.list(ja) ) then
+            lremove = .true.
+!!$            print *,' remove itot,myid=',itotOf(tag(ia)),myid_md
+            exit
+          endif
+        enddo
+        if( .not. lremove ) then
+          inc2 = inc2 + 1
+          ra(1:3,inc2) = ra(1:3,ia)
+          va(1:3,inc2) = va(1:3,ia)
+          tag(inc2) = tag(ia)
+          chg(inc2) = tag(ia)
+          chi(inc2) = tag(ia)
+        endif
+      enddo
+      natm = inc2
+    endif
+    
+  end subroutine remove_ablated_atoms
 end module ttm
 !-----------------------------------------------------------------------
 !     Local Variables:

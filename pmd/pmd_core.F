@@ -1,9 +1,9 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-05-02 09:31:34 Ryo KOBAYASHI>
+c                     Last-modified: <2018-05-29 23:48:42 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
-      subroutine pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
+      subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,ciofmt,ifpmd,rc,rbuf,ifdmp,dmp
@@ -15,23 +15,24 @@ c-----------------------------------------------------------------------
       use zload
       use force
       use ttm,only: init_ttm,langevin_ttm,output_Te,t_ttm,
-     &     calc_Ta,update_Te,assign_atom2cell,output_energy_balance
+     &     calc_Ta,update_Te,assign_atom2cell,output_energy_balance,
+     &     remove_ablated_atoms
       use pmdmpi,only: nid2xyz,xyz2nid
       implicit none
       include "mpif.h"
       include "./params_unit.h"
-      integer,intent(in):: ntot,maxstp,nerg,npmd,myid_md,mpi_md_world
+      integer,intent(in):: ntot0,maxstp,nerg,npmd,myid_md,mpi_md_world
      &     ,nspmax,ifpmd,ifdmp,minstp,ntdst,ifsort !,numff
      &     ,iprint,nodes_md,nx,ny,nz,n_conv,nrmtrans
       integer,intent(inout):: ifcoulomb
       integer,intent(out):: nstp_done
       real(8),intent(in):: hunit,tinit,tfin
      &     ,trlx,srlx,stbeta,strfin,dmp,eps_conv
-      real(8),intent(inout):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
-     &     ,atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot)
-     &     ,epitot(ntot),dt,rc,rbuf,h(3,3,0:1),stnsr(3,3),fmv(3,0:9)
+      real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
+     &     ,atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0)
+     &     ,epitot(ntot0),dt,rc,rbuf,h(3,3,0:1),stnsr(3,3),fmv(3,0:9)
      &     ,epot,ekin,am(nspmax),stgt(3,3),ptgt,ttgt(9)
-     &     ,chgtot(ntot),chitot(ntot)
+     &     ,chgtot(ntot0),chitot(ntot0)
       character,intent(in):: ciofmt*6, cpctl*20, ctctl*20
      &     ,czload_type*5,boundary*3
 !      character(len=20),intent(in):: cffs(numff)
@@ -68,7 +69,7 @@ c     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
 c     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
 
       call initialize_pmdvars(nspmax)
-      call calc_nfmv(ntot,tagtot,myid_md,mpi_md_world)
+      call calc_nfmv(ntot0,tagtot,myid_md,mpi_md_world)
       call set_use_charge()
 
       if( maxstp.le.0 ) then
@@ -134,11 +135,11 @@ c-----output every these steps, NOUTERG, NOUTPMD
       else
         noutpmd = maxstp +1
       endif
-c      do i=1,ntot
+c      do i=1,ntot0
 c        rtot(1:3,i) = rtot(1:3,i) +0.1d0
 c      enddo
 c.....perform space decomposition after reading atomic configuration
-      call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
+      call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,rc,rbuf,iprint)
       if( myid_md.eq.0 .and. iprint.ne.0 ) then
         call cell_info(h)
@@ -197,7 +198,7 @@ c-----get total number of particles
      &     ,mpi_md_world,ierr)
       if(myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,*) ''
-        write(6,'(a,i0)') " Number of total atoms = ",ntot
+        write(6,'(a,i0)') " Number of total atoms = ",ntot0
         write(6,'(a,i0)') " Number of species     = ",nsp
       endif
 c.....get_num_dof is called once in a MD run
@@ -379,11 +380,11 @@ c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
 c.....output initial configuration including epi, eki, and strs
 c      write(cnum(1:4),'(i4.4)') 0
       write(cnum,'(i0)') 0
-      call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
+      call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot
      &     ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
      &     ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
       if( myid_md.eq.0 ) then
-        if( ifsort.eq.1 ) call sort_by_tag(ntot,tagtot,rtot,vtot
+        if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot
      &       ,ekitot,epitot,stot,chgtot,chitot)
         if( ifpmd.eq.1 ) then  ! pmd format
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' )
@@ -421,12 +422,12 @@ c.....write out energies
      &       ,vol
      &       ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
         call flush(ioerg)
-c.....write out temperatures
-        open(iotemp,file='out.temperature',status='replace')
-        write(iotemp,'(a)') '# istp, temperature[0-9]'
-        ediff(1:9)= 0d0
-        write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff(1:9)
-        call flush(iotemp)
+cc.....write out temperatures
+c        open(iotemp,file='out.temperature',status='replace')
+c        write(iotemp,'(a)') '# istp, temperature[0-9]'
+c        ediff(1:9)= 0d0
+c        write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff(1:9)
+c        call flush(iotemp)
         
 c.....write out tensile forces
         if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
@@ -527,6 +528,10 @@ c.....Update pair list and boundary atoms
 c.....if making new pair list is needed.
         if( istp.ge.istpe .or.
      &       (ifpmd.gt.0.and.mod(istp,noutpmd).eq.0) ) then
+          if( trim(ctctl).eq.'ttm' ) then
+            call remove_ablated_atoms(simtime,namax,natm
+     &           ,tag,ra,va,chg,chi,h,sorg)
+          endif
 c.....Move atoms that cross the boundary
           call bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi
      &         ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world
@@ -708,8 +713,8 @@ c.....write energies
      &           ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
             call flush(ioerg)
 c.....write temperature
-            write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff0(1:9)
-            call flush(iotemp)
+c            write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff0(1:9)
+c            call flush(iotemp)
             ediff(1:9)= 0d0
 
             if(czload_type.eq.'atoms') then
@@ -787,12 +792,12 @@ c---------decide pmd-file name
 c          write(cnum(1:4),'(i4.4)') iocntpmd
           write(cnum,'(i0)') istp
 c          call system("mkdir -p "//cnum)
-          call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
+          call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot
      &         ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
      &         ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
           ltot_updated = .true.
           if( myid_md.eq.0 ) then
-            if( ifsort.eq.1 ) call sort_by_tag(ntot,tagtot,rtot,vtot
+            if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot
      &           ,ekitot,epitot,stot,chgtot,chitot)
             if( ifpmd.eq.1 ) then  ! pmd format
               if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' )
@@ -811,7 +816,7 @@ c          call system("mkdir -p "//cnum)
       enddo ! end of istp
 
       if( .not. ltot_updated ) then
-        call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
+        call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot
      &       ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
      &       ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
       endif
@@ -821,7 +826,7 @@ c          call system("mkdir -p "//cnum)
 
       if(myid_md.eq.0) then
         close(ioerg)
-        close(iotemp)
+c        close(iotemp)
         if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
           close(iostrs)
         endif
@@ -876,7 +881,7 @@ c          call system("mkdir -p "//cnum)
 
 c.....revert forces to the unit eV/A before going out pmd_core
       if( myid_md.eq.0 ) then
-        do i=1,ntot
+        do i=1,ntot0
           is= int(tagtot(i))
           aai(1:3)= h(1:3,1,0)*atot(1,i)
      &         +h(1:3,2,0)*atot(2,i)
@@ -897,7 +902,7 @@ c.....deallocate all the arrays allocated in pmd_core
 
       end subroutine pmd_core
 c=======================================================================
-      subroutine one_shot(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
+      subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,rc,rbuf,stnsr,epot
@@ -912,23 +917,24 @@ c
       use Morse,only: gradw_Morse,gradw_vcMorse
       use Coulomb,only: gradw_Coulomb
       use linreg,only: gradw_linreg
+      use NN2,only: gradw_NN2
       implicit none
       include "mpif.h"
       include "./params_unit.h"
-      integer,intent(in):: ntot,myid_md,mpi_md_world
+      integer,intent(in):: ntot0,myid_md,mpi_md_world
      &     ,nspmax  !,numff
      &     ,iprint,nodes_md,nx,ny,nz
       integer,intent(inout):: ifcoulomb
       real(8),intent(in):: hunit
-      real(8),intent(inout):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
-     &     ,atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot)
-     &     ,epitot(ntot),rc,rbuf,h(3,3,0:1),stnsr(3,3)
+      real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
+     &     ,atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0)
+     &     ,epitot(ntot0),rc,rbuf,h(3,3,0:1),stnsr(3,3)
      &     ,epot,ekin,am(nspmax),dt
-     &     ,chgtot(ntot),chitot(ntot)
+     &     ,chgtot(ntot0),chitot(ntot0)
 c      character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: lcalcgrad
       integer,intent(in):: ndimp,maxisp
-      real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,ntot),gws(ndimp,6)
+      real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,ntot0),gws(ndimp,6)
       logical,intent(inout):: lvc
       logical,intent(in):: lematch,lfmatch,lsmatch
       character(len=3),intent(in):: boundary
@@ -956,9 +962,9 @@ c-----reduced node origin
       sorg(3)= anzi*myz
 c.....perform space decomposition after reading atomic configuration
 c      write(6,'(a,30es10.2)') 'chgtot before space_decomp = ',
-c     &     chgtot(1:ntot)
+c     &     chgtot(1:ntot0)
       if( iprint.ne.0 ) then
-        write(6,'(a,i8)') ' number of total atoms = ',ntot
+        write(6,'(a,i8)') ' number of total atoms = ',ntot0
         write(6,'(a)') " h-matrix:"
         write(6,'("   | ",3f12.3," |")') h(1,1:3,0)
         write(6,'("   | ",3f12.3," |")') h(2,1:3,0)
@@ -970,7 +976,7 @@ c     &     chgtot(1:ntot)
         write(6,*) ''
       endif
 c      print *,'one_shot: 02'
-      call space_decomp(hunit,h,ntot,tagtot,rtot,vtot,chgtot,chitot
+      call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nx,ny,nz,nxyz,rc,rbuf,iprint)
 c      write(6,'(a,200es10.2)') 'chg after space_decomp = ',chg(1:natm)
 
@@ -1049,6 +1055,10 @@ c      print *,'one_shot: 06'
           iprm0 = 0
           call gradw_linreg(namax,natm,tag,ra,nnmax,h,rc,lspr,
      &         iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
+        else if( use_force('NN2') ) then
+          iprm0 = 0
+          call gradw_NN2(namax,natm,tag,ra,nnmax,h,rc,lspr,
+     &         iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
         endif
 c        if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra
 c     &       ,nnmax,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
@@ -1059,13 +1069,13 @@ c.....Derivative of stress should be divided by the cell volume
 c      print *,'one_shot: 07'
       call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 
-      call space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
+      call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot
      &     ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs
      &     ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
 
 c.....revert forces to the unit eV/A before going out 
       if( myid_md.eq.0 ) then
-        do i=1,ntot
+        do i=1,ntot0
           is= int(tagtot(i))
           aai(1:3)= h(1:3,1,0)*atot(1,i)
      &         +h(1:3,2,0)*atot(2,i)
@@ -1077,7 +1087,7 @@ c          atot(1:3,i) = aai(1:3)/acon(is)
 
       if( iprint.ge.20 .and. myid_md.eq.0 .and. lvc ) then
         print *,'Atomic charges:'
-        do i=1,ntot
+        do i=1,ntot0
           print '(a,i5,es11.3,4f7.3)','   ia,epi,chg,frc=',i
      &         ,epitot(i),chgtot(i),atot(1:3,i)
         enddo
@@ -1595,19 +1605,22 @@ c.....number of to-be-sent atoms is set 0.
           if( kd.eq.1 ) then
             if( ix.eq.0 ) then
               lsb(0,kul) = 0
-            else if (ix.eq.nx-1 ) then
+            endif
+            if (ix.eq.nx-1 ) then
               lsb(0,kuh) = 0
             endif
           else if( kd.eq.2 ) then
             if( iy.eq.0 ) then
               lsb(0,kul) = 0
-            else if (iy.eq.ny-1 ) then
+            endif
+            if (iy.eq.ny-1 ) then
               lsb(0,kuh) = 0
             endif
           else if( kd.eq.3 ) then
             if( iz.eq.0 ) then
               lsb(0,kul) = 0
-            else if ( iz.eq.nz-1 ) then
+            endif
+            if ( iz.eq.nz-1 ) then
               lsb(0,kuh) = 0
             endif
           endif
@@ -2027,19 +2040,22 @@ c.....number of to-be-moved atoms is set 0.
           if( kd.eq.1 ) then
             if( ix.eq.0 ) then
               mvque(0,kul) = 0
-            else if (ix.eq.nx-1 ) then
+            endif
+            if (ix.eq.nx-1 ) then
               mvque(0,kuh) = 0
             endif
           else if( kd.eq.2 ) then
             if( iy.eq.0 ) then
               mvque(0,kul) = 0
-            else if (iy.eq.ny-1 ) then
+            endif
+            if (iy.eq.ny-1 ) then
               mvque(0,kuh) = 0
             endif
           else if( kd.eq.3 ) then
             if( iz.eq.0 ) then
               mvque(0,kul) = 0
-            else if ( iz.eq.nz-1 ) then
+            endif
+            if ( iz.eq.nz-1 ) then
               mvque(0,kuh) = 0
             endif
           endif
@@ -2428,7 +2444,7 @@ c      call mpi_bcast(alp_fire,1,mpi_real8,0,mpi_md_world
 c     &     ,ierr)
       end subroutine vfire
 c=======================================================================
-      subroutine space_decomp(hunit,h,ntot,tagtot,rtot,vtot
+      subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot
      &     ,chgtot,chitot,myid_md,mpi_md_world,nx,ny,nz,nxyz
      &     ,rcut,rbuf,iprint)
 c
@@ -2437,12 +2453,12 @@ c
       use pmdvars
       implicit none
       include 'mpif.h'
-      integer,intent(in):: ntot,myid_md,mpi_md_world,nx,ny,nz,nxyz
+      integer,intent(in):: ntot0,myid_md,mpi_md_world,nx,ny,nz,nxyz
      &     ,iprint
-      real(8),intent(in):: vtot(3,ntot),chgtot(ntot)
-     &     ,chitot(ntot),rcut,rbuf
+      real(8),intent(in):: vtot(3,ntot0),chgtot(ntot0)
+     &     ,chitot(ntot0),rcut,rbuf
       real(8),intent(in):: hunit,h(3,3,0:1)
-      real(8),intent(inout):: rtot(3,ntot),tagtot(ntot)
+      real(8),intent(inout):: rtot(3,ntot0),tagtot(ntot0)
 
       integer:: istat(mpi_status_size)
       integer:: i,j,ixyz,n,ierr
@@ -2456,7 +2472,7 @@ c.....at 1st call
       if( .not. allocated(ra) ) then
         if( myid_md.eq.0 ) then
 c.....wrap atom position inside [0:1)
-          do i =1,ntot
+          do i =1,ntot0
             if( rtot(1,i).lt.0d0 ) then
               rtot(1,i) = rtot(1,i) +1d0
             else if( rtot(1,i).ge.1d0 ) then
@@ -2485,7 +2501,7 @@ c.....count max number of atoms in a node
             syogt = dble(myyt)/ny
             szogt = dble(myzt)/nz
             n = 0
-            do i=1,ntot
+            do i=1,ntot0
               if(  rtot(1,i).ge.sxogt .and.
      &             rtot(1,i).lt.sxogt+1d0/nx .and.
      &             rtot(2,i).ge.syogt .and.
@@ -2517,7 +2533,7 @@ c          nbmax = max(namax*27,nbmax)
      &           *8/1000/1000),' MByte'
           endif
 c.....Reset the tags positive
-          do i=1,ntot
+          do i=1,ntot0
             tagtot(i) = abs(tagtot(i))
           enddo
         endif ! myid.eq.0
@@ -2547,7 +2563,7 @@ c     &       ,lsb(0:nbmax,6),lsex(nbmax,6))
           syogt = dble(myyt)/ny
           szogt = dble(myzt)/nz
           natm = 0
-          do i=1,ntot
+          do i=1,ntot0
             if(  rtot(1,i).ge.sxogt .and.
      &           rtot(1,i).lt.sxogt+1d0/nx .and.
      &           rtot(2,i).ge.syogt .and.
@@ -2582,7 +2598,7 @@ c     &       ,lsb(0:nbmax,6),lsex(nbmax,6))
 c        write(6,'(a,f10.3)') ' time space_decomp = ',mpi_wtime() -t0
         tspdcmp = mpi_wtime() -t0
 c.....Reset the tags positive
-        do i=1,ntot
+        do i=1,ntot0
           tagtot(i) = abs(tagtot(i))
         enddo
       else ! myid_md.ne.0
@@ -2603,24 +2619,25 @@ c.....Reset the tags positive
 
       end subroutine space_decomp
 c=======================================================================
-      subroutine space_comp(ntot,tagtot,rtot,vtot,atot,epitot,ekitot
-     &     ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs,chg,chi
-     &     ,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+      subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot
+     &     ,ekitot,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs,chg
+     &     ,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
 c
 c  Opposite to space_decomp, gather atoms from every process
 c  to create the total system for output.
 c
+      use pmdio,only: ntot
       implicit none
       include 'mpif.h'
-      integer,intent(in):: ntot,natm,nxyz,myid_md,mpi_md_world
+      integer,intent(in):: ntot0,natm,nxyz,myid_md,mpi_md_world
       real(8),intent(in):: va(3,natm),aa(3,natm),epi(natm),eki(3,3,natm)
      &     ,strs(3,3,natm),tag(natm),sorg(3),chg(natm),chi(natm)
       real(8),intent(inout):: ra(3,natm),tspdcmp
-      real(8),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
-     &     ,atot(3,ntot),epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot)
-     &     ,chgtot(ntot),chitot(ntot)
-      integer,parameter:: nmpi = 8
-      integer:: n0,ixyz,natmt,i,ierr
+      real(8),intent(out):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
+     &     ,atot(3,ntot0),epitot(ntot0),ekitot(3,3,ntot0)
+     &     ,stot(3,3,ntot0),chgtot(ntot0),chitot(ntot0)
+      integer,parameter:: nmpi = 10
+      integer:: n0,ixyz,natmt,i,ierr,ntott
       integer:: istat(mpi_status_size),itag
       real(8):: t0
 
@@ -2637,11 +2654,13 @@ c
         stot(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
         chgtot(1:natm) = chg(1:natm)
         chitot(1:natm) = chi(1:natm)
+        ntott = natm
         n0 = n0 +1
         do ixyz=1,nxyz-1
           itag = ixyz*nmpi -nmpi
           call mpi_recv(natmt,1,mpi_integer,ixyz,itag
      &         ,mpi_md_world,istat,ierr)
+          ntott = ntott + natmt
           call mpi_recv(tagtot(n0),natmt,mpi_real8
      &         ,ixyz,itag+1,mpi_md_world,istat,ierr)
           call mpi_recv(rtot(1,n0),3*natmt,mpi_real8
@@ -2663,6 +2682,13 @@ c
           n0 = n0 + natmt
         enddo
         tspdcmp = tspdcmp +(mpi_wtime()-t0)
+c.....Update ntot
+        ntot = ntott
+        if( ntot.gt.ntot0 ) then
+          print *,'ERROR: ntot is greater than ntot0,'
+     &         //' which should not happen !'
+          stop
+        endif
 c        write(6,'(a,f10.3)') ' time space_comp = ',mpi_wtime() -t0
       else ! myid_md.ne.0
         itag = myid_md*nmpi -nmpi

@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-03-15 10:32:05 Ryo KOBAYASHI>
+c                     Last-modified: <2018-05-25 15:09:59 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -114,22 +114,22 @@ c        call system('cp pmd0000 pmd0000.orig')
           stop
         endif
 
-        allocate(chgtot(ntot),chitot(ntot))
-        chitot(1:ntot) = 0d0
-        call set_atomic_charges(ntot,chgtot,tagtot,nspmax
+        allocate(chgtot(ntot0),chitot(ntot0))
+        chitot(1:ntot0) = 0d0
+        call set_atomic_charges(ntot0,chgtot,tagtot,nspmax
      &       ,chgfix,schg,myid_md,iprint)
 
 c.....Make ntot and ?tot() not null in nodes myid_md != 0
       else
-        ntot = 1
-        allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot)
-     &       ,ekitot(3,3,ntot),stot(3,3,ntot),atot(3,ntot)
-     &       ,chgtot(ntot),chitot(ntot))
-        chitot(1:ntot) = 0d0
+        ntot0 = 1
+        allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0)
+     &       ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0)
+     &       ,chgtot(ntot0),chitot(ntot0))
+        chitot(1:ntot0) = 0d0
       endif
 
 c.....call pmd_core to perfom MD
-      call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot
+      call pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot,nstp,nerg,npmd
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,ciofmt,ifpmd,rc,rbuf,ifdmp,dmp

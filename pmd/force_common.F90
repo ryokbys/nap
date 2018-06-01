@@ -216,7 +216,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use LJ, only: read_params_LJ_repul
   use linreg, only: read_params_linreg,lprmset_linreg
   use descriptor, only: read_params_desc,init_desc
-  use NN2, only: read_params_NN2,lprmset_NN2
+  use NN2, only: read_params_NN2,lprmset_NN2,update_params_NN2
   implicit none
   integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint !,numff
   real(8),intent(in):: tag(namax),h(3,3),rc
@@ -299,6 +299,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
     else
 !.....Read only in.params.desc
       call read_params_desc(myid_md,mpi_md_world,iprint)
+      call update_params_NN2()
     endif
   endif
 !.....Buckingham

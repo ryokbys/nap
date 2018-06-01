@@ -27,7 +27,7 @@ module variables
   character(len=128):: cpot= 'NN'
   logical:: lgrad  = .true.
   logical:: lgscale= .false.
-  real(8):: gscl   = 0.1d0
+  real(8):: gscl   = 1d0
   integer:: nfpsmpl= -10
   real(8):: seqcoef= 1d-2
   integer:: iprint = 1
@@ -95,6 +95,8 @@ module variables
     integer:: nsf,nal,nnl
     real(8),allocatable:: gsf(:,:),gsfo(:,:) &
          ,dgsf(:,:,:,:),igsf(:,:,:)
+!.....Specific to NN
+    real(8),allocatable:: hl1(:,:)
   end type mdsys
   real(8):: erefmin
   real(8):: gsfmean,gsfvar
@@ -134,5 +136,10 @@ module variables
   integer:: myidrefsub = -1
   integer:: isidrefsub = -1
   real(8):: erefsub = 0d0
+
+!.....Constants for NN2 potential
+  integer,parameter:: nn_nlmax = 2
+  integer:: nn_nl = 0
+  integer:: nn_nhl(0:nn_nlmax)
 
 end module variables

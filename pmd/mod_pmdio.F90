@@ -1,13 +1,13 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-01-25 21:12:38 Ryo KOBAYASHI>
+!                     Last modified: <2018-05-25 15:03:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
 
   character(len=20),parameter:: cinpmd='in.pmd'
 
-  integer:: ntot
+  integer:: ntot0,ntot
 !.....data of total system
   real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
        ,ekitot(:,:,:),tagtot(:),atot(:,:),chgtot(:),chitot(:)
