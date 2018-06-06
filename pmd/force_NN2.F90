@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-01 10:29:29 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-06 18:24:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -416,6 +416,8 @@ contains
     integer,intent(in):: nprms_in,nl_in,nhl_in(0:nl_in)
     real(8),intent(in):: prms_in(nprms_in)
 
+    integer:: nps,i
+
     nl = nl_in
     if( nl.eq.0 ) then
       print *,'ERROR: nl==0 which should not happen.'
@@ -424,6 +426,18 @@ contains
     nhl(0:nl) = nhl_in(0:nl_in)
     nhl(nl+1) = 1
     mhl(0:nl+1) = nhl(0:nl+1)
+
+    nps = 0
+    do i=1,nl+1
+      nps = nps +mhl(i)*nhl(i-1)
+    enddo
+
+    if( nps.ne.nprms_in ) then
+      print *,'ERROR: nl_in,nhl_in,nprms_in not consistent !!'
+      print *,'  Check in.vars.fitpot or in.params.NN2 and'&
+           //' NN_num_nodes parameters in in.fitpot.'
+      stop
+    endif
     
     nprms = nprms_in
     if( .not.allocated(prms) ) allocate(prms(nprms))
@@ -692,7 +706,7 @@ contains
 !  thus no need of parallel implementation.
 !  Currently only 1 hidden layer is implemented.
 !=======================================================================
-    use descriptor,only: gsf,dgsf,igsf,nsf
+    use descriptor,only: gsf,dgsf,igsf,nsf,nnl,nal
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
@@ -701,16 +715,20 @@ contains
     real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
     logical,intent(in):: lematch,lfmatch,lsmatch
 
-    integer:: iv,ia,ihl0,ihl1
-    real(8):: g,h1,tmp,w2
+    integer:: iv,ia,ihl0,ihl1,jj,ja,jra
+    real(8):: g,h1,tmp,w2,w1
+    integer,external:: itotOf
+    real(8),allocatable:: dgsf2(:,:,:,:)
+!!$    real(8),allocatable:: gwft(:,:,:)
 
+!.....TO CHECK: Need to make hl1 every time?
     do ia=1,natm
       do ihl1=1,mhl(1)
-        tmp = 0d0
+        tmp= 0d0
         do ihl0=1,nhl(0)
-          tmp = tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
+          tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
         enddo
-        hl1(ihl1,ia) = sigmoid(tmp)
+        hl1(ihl1,ia)= sigmoid(tmp)
       enddo
     enddo
 
@@ -757,11 +775,81 @@ contains
           gwe(iv) = gwe(iv) + (h1 -0.5d0)
         enddo
       enddo
-
     endif
 
     if( lfmatch ) then
-
+!!$      if( .not.allcated(gwft) ) then
+!!$        allocate(gwft(ndimp,3,namax))
+!!$      else if( size(gwft).ne.ndimp*3*namax ) then
+!!$        deallocate(gwft)
+!!$        allocate(gwft(ndimp,3,namax))
+!!$      endif
+!!$      gwft(:,:,:) = 0d0
+!.....Make dgsf2 array
+      if( .not.allocated(dgsf2) ) then
+        allocate(dgsf2(3,nnl,mhl(1),nal))
+      else if( size(dgsf2).ne.3*nnl*mhl(1)*nal ) then
+        deallocate(dgsf2)
+        allocate(dgsf2(3,nnl,mhl(1),nal))
+      endif
+      dgsf2(:,:,:,:) = 0d0
+      do ia=1,natm
+        do ihl0=1,nhl(0)
+          do ihl1=1,mhl(1)
+            w1 = wgt11(ihl0,ihl1)
+            do jj=0,lspr(0,ia)  ! Notice: from 0 (ja==ia) not 1
+              dgsf2(1:3,jj,ihl1,ia) = dgsf2(1:3,jj,ihl1,ia) &
+                   +w1 *dgsf(1:3,ihl0,jj,ia)
+            enddo
+          enddo
+        enddo
+      enddo
+!.....Compute derivative of forces w.r.t. weights
+      do ia=1,natm
+        iv = iprm0
+!.....Weights between layer 0 and 1
+        do ihl0=1,nhl(0)
+          g = gsf(ihl0,ia)
+          do ihl1=1,mhl(1)
+            w1 = wgt11(ihl0,ihl1)
+            w2 = wgt12(ihl1)
+            h1 = hl1(ihl1,ia)
+            iv = iv +1
+            do jj=0,lspr(0,ia)  ! Notice: from 0 not 1
+              if( jj.eq.0 ) then
+                ja = ia
+              else
+                ja = lspr(jj,ia)
+              endif
+              jra = itotOf(tag(ja))
+              gwf(iv,1:3,jra) = gwf(iv,1:3,jra) &
+                   -w2*h1*(1d0-h1) &
+                   *( (1d0-2d0*h1) *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
+                   +dgsf(1:3,ihl0,jj,ia) )
+            enddo
+          enddo
+        enddo
+!.....Weights between layer 1 and output
+        do ihl1=1,mhl(1)
+          w2 = wgt12(ihl1)
+          h1 = hl1(ihl1,ia)
+          iv = iv +1
+          do jj=0,lspr(0,ia)
+            if( jj.eq.0 ) then
+              ja = ia
+            else
+              ja = lspr(jj,ia)
+            endif
+            jra = itotOf(tag(ja))
+            do ihl0=1,nhl(0)
+              w1 = wgt11(ihl0,ihl1)
+              gwf(iv,1:3,jra) = gwf(iv,1:3,jra) -w1 *h1*(1d0 -h1) &
+                   *dgsf(1:3,ihl0,jj,ia)
+            enddo
+          enddo
+        enddo
+      enddo
+!.....Copy back derivatives of forces on atoms outside of the node
     endif
 
     if( lsmatch ) then

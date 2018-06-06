@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-05-29 23:48:42 Ryo KOBAYASHI>
+c                     Last-modified: <2018-06-06 18:07:08 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -1005,7 +1005,7 @@ c-----get total number of species
       tcom = 0d0
 
 c      print *,'one_shot: 04'
-      if( iprint.ge.10 ) print *,'init_force,myid_md=',myid_md
+c      if( iprint.ge.10 ) print *,'init_force,myid_md=',myid_md
       call init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world,
      &     iprint,h,rc,lvc,ifcoulomb)
 
@@ -1021,8 +1021,8 @@ c-----Make pair list
       lstrs = .true.
 
 c      print *,'one_shot: 06'
-      if( iprint.ge.10 ) print *,'get_force,myid_md,lcalcgrad='
-     &     ,myid_md,lcalcgrad
+c      if( iprint.ge.10 ) print *,'get_force,myid_md,lcalcgrad='
+c     &     ,myid_md,lcalcgrad
       if( .not.lcalcgrad ) then
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
