@@ -14,7 +14,7 @@ Each FF reads one or some parameter files in the working directory, which are us
 
 Available FFs are listed below:
 
-- :doc:`force_fields/neural_network`
+- :doc:`Neural netwok <force_fields/NN2>`
 - :doc:`force_fields/Coulomb`
 - :doc:`force_fields/Morse`
 - :doc:`force_fields/SW`
