@@ -42,8 +42,12 @@ def get_groups(smpldirs):
     for i,s in enumerate(smpldirs):
         if i%ms == 0:
             print('.',end=".")
-        with open(s+'/erg.ref','r') as f:
-            erg = float(f.readline())
+        try:
+            with open(s+'/erg.ref','r') as f:
+                erg = float(f.readline())
+        except:
+            print('Failed to read erg.ref, so skip '+s)
+            continue
         key = s[:-6]
         if not key in groups:
             groups[key] = []
@@ -94,9 +98,9 @@ if __name__ == "__main__":
     print('number of samples to be reduced = ',len(highsmpls))
     print('check '+outfname+' and run the following commands:')
     print('')
-    obsdir = get_obsolete_dirname()
-    print('  mkdir '+obsdir)
-    print('  for d in `cat '+outfname+'`; do mv $d '+obsdir 
-          +'/; done')
-    print('')
+    # obsdir = get_obsolete_dirname()
+    # print('  mkdir '+obsdir)
+    # print('  for d in `cat '+outfname+'`; do mv $d '+obsdir 
+    #       +'/; done')
+    # print('')
 
