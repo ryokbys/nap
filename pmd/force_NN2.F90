@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-06 18:24:37 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-07 14:38:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -787,10 +787,10 @@ contains
 !!$      gwft(:,:,:) = 0d0
 !.....Make dgsf2 array
       if( .not.allocated(dgsf2) ) then
-        allocate(dgsf2(3,nnl,mhl(1),nal))
+        allocate(dgsf2(3,0:nnl,mhl(1),nal))
       else if( size(dgsf2).ne.3*nnl*mhl(1)*nal ) then
         deallocate(dgsf2)
-        allocate(dgsf2(3,nnl,mhl(1),nal))
+        allocate(dgsf2(3,0:nnl,mhl(1),nal))
       endif
       dgsf2(:,:,:,:) = 0d0
       do ia=1,natm
