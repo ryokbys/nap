@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-08 10:59:08 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-08 17:25:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -25,7 +25,7 @@ module Coulomb
 !.....Input Keywords: charges, charge_dist, terms
 !.....Keywords for charges: fixed, fixed_bvs, variable/qeq
 !.....Keywords for charge_dist: point, gaussian
-!.....Keywords for terms: full, short/screened, long, direct_cut
+!.....Keywords for terms: full, short, long, direct_cut, screened_cut
 
   integer,parameter:: ioprms = 20
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
@@ -61,10 +61,13 @@ module Coulomb
   real(8),parameter:: qthd = 1d-12
 
 !.....Gaussian width of Ewald sum
-!.....default is 0.141421356 (Angstrom)], which corresponds to alpha = 0.2 A^{-1}
-!.....See, C.J. Fennell and J.D. Gezelter, J. Chem. Phys. 124, 234104 (2006).
   real(8):: sgm_ew = 3.5355339d0
   real(8):: sgm(msp)
+!.....Rho value for screened_cut
+!     Default value = 5.0 (Ang), which corresponds to alpha = 0.2 A^{-1}
+!     See, C.J. Fennell and J.D. Gezelter, J. Chem. Phys. 124, 234104 (2006).
+  real(8):: rho_screened_cut = 1.5811388d0
+  
 !.....Accuracy controlling parameter for Ewald sum
 !.....See, http://www.jncasr.ac.in/ccms/sbs2007/lecturenotes/5day10nov/SBS_Ewald.pdf
 !.....Exp(-pacc) = 1e-7 when pacc= 18.0
@@ -110,7 +113,7 @@ contains
     integer:: i,ierr,nspl
 
 !!$    print *,'ifcoulomb @initialize_coulomb = ',ifcoulomb
-
+    rho_bvs(1:msp,1:msp) = 0d0
     
 !.....Get umber of species
     nsp = nspin
@@ -131,7 +134,7 @@ contains
         call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
              natm,tag,chi,chg,lvc)
       else
-        call init_fc_Ewald(h,rc,myid)
+        call init_fc_Ewald(h,rc,myid,iprint)
       endif
     endif
 
@@ -151,8 +154,7 @@ contains
 
     integer:: i,is,ierr,nspl
 
-!!$    print *,'ifcoulomb @initialize_coulomb = ',ifcoulomb
-
+    rho_bvs(1:msp,1:msp) = 0d0
     
 !.....Get umber of species
     nsp = nspin
@@ -172,17 +174,17 @@ contains
       call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
            natm,tag,chi,chg,lvc)
     else
-      call init_fc_Ewald(h,rc,myid)
+      call init_fc_Ewald(h,rc,myid,iprint)
     endif
 
   end subroutine initialize_coulombx
 !=======================================================================
-  subroutine init_fc_Ewald(h,rc,myid)
+  subroutine init_fc_Ewald(h,rc,myid,iprint)
 !
 !  Ewald sum with fixed charge.
 !
     implicit none 
-    integer,intent(in):: myid
+    integer,intent(in):: myid,iprint
     real(8),intent(in):: h(3,3),rc
 
     integer:: i,ik,k1,k2,k3,isp
@@ -192,7 +194,7 @@ contains
     sgm_ew = rc/sqrt(2d0*pacc)
     sgm(1:msp) = sgm_ew
     bkmax  = 2d0*pacc /rc
-    if( myid.eq.0 ) then
+    if( myid.eq.0 .and. iprint.gt.0 ) then
       write(6,'(/,a)') ' Ewald sum parameters:'
       write(6,'(a,f12.4)') '   1/(4*pi*eps0)        = ', acc
       write(6,'(a,f12.4)') '   Accuracy parameter p = ', pacc
@@ -202,7 +204,7 @@ contains
 
     if( .not. (trim(cterms).eq.'full' .or. trim(cterms).eq.'long') ) return
     call get_recip_vectors(h)
-    if( myid.eq.0 ) then
+    if( myid.eq.0 .and. iprint.gt.0 ) then
       write(6,'(a,f12.4)') '   k-space cutoff       = ', bkmax
       write(6,'(a)') ' Reciprocal vectors:'
       write(6,'(a,3es12.3)') '   b1 = ',b1(1:3)
@@ -211,7 +213,7 @@ contains
     endif
 !.....kmax# is constant during MD run even if h-matrix can change...
     call setup_kspace()
-    if( myid.eq.0 ) then
+    if( myid.eq.0 .and. iprint.gt.1 ) then
       write(6,'(a)') ' Number of k-points for Ewald sum:'
       write(6,'(a,i8)') '   kmax1 = ',kmax1
       write(6,'(a,i8)') '   kmax2 = ',kmax2
@@ -596,11 +598,11 @@ contains
           read(ioprms,*) ctmp, cterms
           if(  trim(cterms).ne.'full' .and. &
                trim(cterms).ne.'short' .and. &
-               trim(cterms).ne.'screened' .and. &
                trim(cterms).ne.'long' .and. &
-               trim(cterms).ne.'direct_cut' ) then
+               trim(cterms).ne.'direct_cut' .and. &
+               trim(cterms).ne.'screened_cut') then
             print *,'ERROR: terms should have an argument of '//&
-                 'either direct_cut, full, short, screened or long.'
+                 'either direct_cut, screened_cut, full, short, or long.'
             stop
           endif
           cycle
@@ -665,7 +667,7 @@ contains
 
 !.....Corrections
       if( trim(cdist).eq.'gaussian' ) then
-        if( trim(cterms).eq.'full' .or. trim(cterms).eq.'screened' .or. &
+        if(  trim(cterms).eq.'full' .or. &
              trim(cterms).eq.'short' ) then
           cterms = 'long'
           print *,'WARNING: terms was corrected to long, because charge_dist is gaussian.'
@@ -691,7 +693,7 @@ contains
       endif
 
 !.....Set screening length
-      if( trim(cterms).eq.'screened' .or. trim(cterms).eq.'short' ) then
+      if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
         do isp=1,nsp
           do jsp=1,nsp
             rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
@@ -788,8 +790,7 @@ contains
     endif
 
     if(  trim(cterms).eq.'full' .or. &
-         trim(cterms).eq.'short' .or. &
-         trim(cterms).eq.'screened' ) then
+         trim(cterms).eq.'short' ) then
       call Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc)
     endif
@@ -804,6 +805,10 @@ contains
       call force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc)
     endif
+    if( trim(cterms).eq.'screened_cut' ) then
+      call force_screened_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
+           ,lspr,epi,esrl,iprint,lstrs,rc)
+    endif
 
     if( lstrs ) then
 !!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
@@ -812,11 +817,16 @@ contains
     endif
 
     if( l1st .and. myid.eq.0 .and. iprint.gt.0 ) then
-      print *,''
-      print *,'Ewald energy term by term:'
-      print '(a,f12.4)','   Self term         = ',eselfl
-      print '(a,f12.4)','   Short-range term  = ',esrl
-      print '(a,f12.4)','   Long-range term   = ',elrl
+      if( trim(cterms).eq.'direct_cut' ) then
+        print *,''
+        print '(a,f12.4)',' Direct Coulomb energy = ',esrl
+      else
+        print *,''
+        print *,'Ewald energy term by term:'
+        print '(a,f12.4)','   Self term         = ',eselfl
+        print '(a,f12.4)','   Short-range term  = ',esrl
+        print '(a,f12.4)','   Long-range term   = ',elrl
+      endif
     endif
 
 
@@ -1300,6 +1310,95 @@ contains
     enddo
 
   end subroutine force_direct_cut
+!=======================================================================
+  subroutine force_screened_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
+       ,lspr,epi,esrl,iprint,lstrs,rc)
+!
+!  Screened Coulomb with cutoff that uses rho_bvs.
+!  smoothing using vrc and dVdrc where
+!    V_smooth(r) = V(r) -V(rc) -(r-rc)*dVdrc
+!
+    implicit none
+    include "mpif.h"
+    include "./params_unit.h"
+!!$    include "params_BVS_Morse.h"
+    integer,intent(in):: namax,natm,nnmax,iprint, &
+         lspr(0:nnmax,namax)
+    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc,tag(namax)
+    real(8),intent(inout):: chg(namax)
+    real(8),intent(inout):: strsl(3,3,namax),aa(3,namax)&
+         ,epi(namax),esrl
+    logical,intent(in):: lstrs
+
+    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
+         ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp &
+         ,qi,qj,radi,radj,rhoij,terfc,texp,sqpi &
+         ,vrc,dvdrc,terfcc,rc2
+
+    if( rho_bvs(1,1).lt.0.1 ) then
+      rho_bvs(1:msp,1:msp) = rho_screened_cut
+    endif
+
+    esrl= 0d0
+    sqpi = 1d0/sqrt(pi)
+    rc2 = rc*rc
+!.....Loop over resident atoms
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is= int(tag(i))
+      qi= chg(i)
+      do k=1,lspr(0,i)
+        j=lspr(k,i)
+        if(j.eq.0) exit
+        if(j.le.i) cycle
+        js= int(tag(j))
+        if( .not.interact(is,js) ) cycle
+        qj= chg(j)
+        xj(1:3)= ra(1:3,j)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij= rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij.gt.rc2 ) cycle
+        dij = sqrt(dij)
+        diji= 1d0/dij
+        dxdi(1:3)= -rij(1:3)*diji
+        dxdj(1:3)=  rij(1:3)*diji
+        rhoij = rho_bvs(is,js)
+        terfc = erfc(dij/rhoij)
+        terfcc = erfc(rc/rhoij)
+        vrc = acc*qi*qj/rc *terfcc
+        dvdrc = -acc *qi*qj/rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
+!.....potential
+        tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
+        if( j.le.natm ) then
+          epi(i)= epi(i) +tmp
+          epi(j)= epi(j) +tmp
+          esrl = esrl +tmp +tmp
+        else
+          epi(i)= epi(i) +tmp
+          esrl = esrl +tmp
+        endif
+!.....force
+        texp = exp(-(dij/rhoij)**2)
+        dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
+        aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
+        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
+!.....stress
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+            enddo
+          enddo
+        endif
+      enddo
+    enddo
+
+  end subroutine force_screened_cut
 !=======================================================================
   subroutine Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
        ,lspr,epi,esrl,iprint,lstrs,rc)
