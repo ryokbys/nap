@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-04-12 18:13:01 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-08 10:59:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -25,7 +25,7 @@ module Coulomb
 !.....Input Keywords: charges, charge_dist, terms
 !.....Keywords for charges: fixed, fixed_bvs, variable/qeq
 !.....Keywords for charge_dist: point, gaussian
-!.....Keywords for terms: full, short/screened, long
+!.....Keywords for terms: full, short/screened, long, direct_cut
 
   integer,parameter:: ioprms = 20
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
@@ -198,10 +198,12 @@ contains
       write(6,'(a,f12.4)') '   Accuracy parameter p = ', pacc
       write(6,'(a,f12.4)') '   Gaussian width sgm   = ', sgm_ew
       write(6,'(a,f12.4)') '   real-space cutoff    = ', rc
-      write(6,'(a,f12.4)') '   k-space cutoff       = ', bkmax
     endif
+
+    if( .not. (trim(cterms).eq.'full' .or. trim(cterms).eq.'long') ) return
     call get_recip_vectors(h)
     if( myid.eq.0 ) then
+      write(6,'(a,f12.4)') '   k-space cutoff       = ', bkmax
       write(6,'(a)') ' Reciprocal vectors:'
       write(6,'(a,3es12.3)') '   b1 = ',b1(1:3)
       write(6,'(a,3es12.3)') '   b2 = ',b2(1:3)
@@ -595,9 +597,10 @@ contains
           if(  trim(cterms).ne.'full' .and. &
                trim(cterms).ne.'short' .and. &
                trim(cterms).ne.'screened' .and. &
-               trim(cterms).ne.'long' ) then
+               trim(cterms).ne.'long' .and. &
+               trim(cterms).ne.'direct_cut' ) then
             print *,'ERROR: terms should have an argument of '//&
-                 'either full, short/screened or long.'
+                 'either direct_cut, full, short, screened or long.'
             stop
           endif
           cycle
@@ -768,6 +771,9 @@ contains
       endif
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
+      if( trim(cchgs).eq.'fixed_bvs' ) then
+        call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint)
+      endif
     endif
 
     if( size(strsl).lt.3*3*namax ) then
@@ -792,6 +798,11 @@ contains
          trim(cterms).eq.'long' ) then
       call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
            lspr,epi,elrl,iprint,mpi_md_world,lstrs,lcell_updated)
+    endif
+
+    if( trim(cterms).eq.'direct_cut' ) then
+      call force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
+           ,lspr,epi,esrl,iprint,lstrs,rc)
     endif
 
     if( lstrs ) then
@@ -1209,6 +1220,86 @@ contains
 
     return
   end subroutine force_Ewald_long
+!=======================================================================
+  subroutine force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
+       ,lspr,epi,esrl,iprint,lstrs,rc)
+!
+!  Direct Coulomb interaction with cutoff radius.
+!  Coulomb potential is shifted by v(rc) and modified by the term (r-rc)*v'(rc).
+!  Thus the potential form is:
+!    v_cut(r) = v(r) -v(rc) -(r-rc)*v'(rc)
+!  where v(r) is the direct Coulomb potential
+!    v(r) = k*qi*qj*(1/r)
+!
+    implicit none
+    integer,intent(in):: namax,natm,nnmax,iprint, &
+         lspr(0:nnmax,namax)
+    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+         h(3,3),hi(3,3),rc
+    logical,intent(in):: lstrs
+    real(8),intent(inout):: aa(3,namax),strsl(3,3,namax), &
+         epi(namax),esrl
+
+    integer:: i,j,jj,is,js,ixyz,jxyz
+    real(8):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc&
+         ,dvdrc,vrc
+    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+    real(8),external:: fcut1,dfcut1
+
+!.....Compute direct sum
+    rc2 = rc*rc
+    esrl = 0d0
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is= int(tag(i))
+      qi = chg(i)
+      do jj=1,lspr(0,i)
+        j = lspr(jj,i)
+        if( j.eq.0 ) exit
+        if( j.le.i ) cycle
+        js = int(tag(j))
+        qj = chg(j)
+        xj(1:3) = ra(1:3,j)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij.gt.rc2 ) cycle
+        dij = sqrt(dij)
+        diji = 1d0/dij
+        dxdi(1:3)= -rij(1:3)*diji
+        dxdj(1:3)=  rij(1:3)*diji
+        terfc = erfc(dij*ss2i)
+        vrc = acc*qi*qj/rc
+        dvdrc = -acc*qi*qj /rc**2
+!.....potential
+        tmp = 0.5d0 *acc *qi*qj*diji -vrc -dvdrc*(dij-rc)
+        if( j.le.natm ) then
+          epi(i)= epi(i) +tmp
+          epi(j)= epi(j) +tmp
+          esrl = esrl +tmp +tmp
+        else
+          epi(i)= epi(i) +tmp
+          esrl = esrl +tmp
+        endif
+!.....force
+        ftmp = -acc *qi*qj*diji*diji -dvdrc
+        aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
+        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
+!.....stress
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+            enddo
+          enddo
+        endif
+      enddo
+    enddo
+
+  end subroutine force_direct_cut
 !=======================================================================
   subroutine Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
        ,lspr,epi,esrl,iprint,lstrs,rc)
