@@ -20,8 +20,8 @@ import random,math
 import yaml
 import math
 
-_constfname = 'in.const.NN'
-_paramfname = 'in.params.NN'
+_descfname = 'in.params.desc'
+_paramfname = 'in.params.NN2'
 _logfname = 'log.make_params_NN'
 
 #...initial range of parameters
@@ -276,16 +276,20 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
     nl = inputs['nl']
     nsp = inputs['nsp']
     nhl = inputs['nhl']
-
-    with open(_constfname,'w') as f:
+    rc2 = inputs['rc2']
+    rc3 = inputs['rc3']
+    
+    with open(_descfname,'w') as f:
+        nsf = nsf2 + nsf3
         nhl[0] = nsf2 +nsf3
 
-        f.write(' {0:5d} {1:5d}'.format(nl,nsp))
+        #f.write(' {0:5d} {1:5d}'.format(nl,nsp))
+        f.write(' {0:5d} {1:5d}\n'.format(nsp,nsf))
         # print('nl = ',nl)
         # print('nhl= ',nhl)
-        for il in range(nl+1):
-            f.write(' {0:5d}'.format(nhl[il]))
-        f.write('\n')
+        # for il in range(nl+1):
+        #     f.write(' {0:5d}'.format(nhl[il]))
+        # f.write('\n')
 
         if nsf2 > 0:
             for pair in pairs:
@@ -297,18 +301,21 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
                             for r in rs:
                                 f.write(' {0:3d}'.format(_type2num[sf]) \
                                         +' {0:3d} {1:3d}'.format(ia,ja) \
+                                        +' {0:6.2f}'.format(rc2) \
                                         +' {0:10.4f} {1:10.4f}\n'.format(eta,r))
                     elif sf == 'cosine':
                         rk = pair.sfparams[isf]
                         for r in rk:
                             f.write(' {0:3d}'.format(_type2num[sf]) \
                                     +' {0:3d} {1:3d}'.format(ia,ja) \
+                                    +' {0:6.2f}'.format(rc2) \
                                     +' {0:10.4f}\n'.format(r))
                     elif sf == 'polynomial':
                         a1s = pair.sfparams[isf]
                         for a1 in a1s:
                             f.write(' {0:3d}'.format(_type2num[sf]) \
                                     +' {0:3d} {1:3d}'.format(ia,ja) \
+                                    +' {0:6.2f}'.format(rc2) \
                                     +' {0:10.4f}\n'.format(a1))
                     elif sf == 'Morse':
                         ds,alps,rs = pair.sfparams[isf]
@@ -318,6 +325,7 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
                                     f.write(' {0:3d}'.format(_type2num[sf]) \
                                             +' {0:3d} {1:3d}'.format(ia,ja) \
                                             +' {0:10.4f} {1:10.4f}'.format(d,alp) \
+                                            +' {0:6.2f}'.format(rc2) \
                                             +' {0:10.4f}\n'.format(r))
         if nsf3 > 0:
             for triple in triplets:
@@ -327,17 +335,17 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
                     for ang in angs:
                         f.write(' {0:3d}'.format(_type2num[sf]) \
                                 +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
+                                +' {0:6.2f}'.format(rc3) \
                                 +' {0:10.4f}\n'.format(ang))
         f.close()
 
-    rc2 = inputs['rc2']
-    rc3 = inputs['rc3']
     with open(_paramfname,'w') as g:
         if nl == 1:
             nc= nhl[0]*nhl[1] +nhl[1]
+            g.write(' {0:4d} {1:6d} {2:4d}\n'.format(nl,nsf,nhl[1]))
         elif nl == 2:
             nc= nhl[0]*nhl[1] +nhl[1]*nhl[2] +nhl[2]
-        g.write(' {0:6d} {1:10.3f} {2:10.3f}\n'.format(nc,rc2,rc3))
+            g.write(' {0:4d} {1:4d} {2:3d} {3:3d}\n'.format(nl,nsf,nhl[1],nhl[2]))
         for ic in range(nc):
             g.write(' {0:10.6f}'.format(random.uniform(_pmin,_pmax)))
             g.write(' {0:10.4f} {1:10.4f}\n'.format(_pmin,_pmax))
@@ -431,4 +439,4 @@ if __name__ == "__main__":
     create_param_files(inputs,nsf2,pairs,nsf3,triplets)
     if not load:
         save_config('out.conf.make_params_NN',inputs,pairs,triplets)
-    print('\nCheck '+_constfname+' and '+_paramfname)
+    print('\nCheck '+_descfname+' and '+_paramfname)
