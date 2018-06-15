@@ -18,6 +18,7 @@ Options:
                 Number of species in the system. [default: 1]
     --no-average
                 Not to take average over files.
+    --plot      Plot figures. [default: False]
 """
 
 import os,sys
@@ -25,7 +26,6 @@ import numpy as np
 from docopt import docopt
 from napsys import NAPSystem
 from gaussian_smear import gsmear
-
 
 def norm(vector):
     norm= 0.0
@@ -114,6 +114,38 @@ def rdf_average(infiles,nspcs,nr,ffmt='pmd',dr=0.1,rmax=3.0,average=True):
         agr /= nsum
     return rd,agr
 
+def plot_figures(nspcs,rd,agr):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    sns.set(context='talk',style='ticks')
+
+    plt.figure(figsize=(8,6))
+    x = rd
+    y = agr[0,0,:]
+    plt.plot(x,y,'r-',label='Total RDF')
+    plt.xlabel('Distance (A)')
+    plt.ylabel('RDF')
+    plt.legend()
+    plt.savefig("graph_rdf_total.png", format='png', dpi=300, bbox_inches='tight')
+
+    plt.clf()
+    fig, axes = plt.subplots(nspcs,nspcs,figsize=(15,10),sharex=True)
+    for i in range(nspcs):
+        isp = i + 1
+        for j in range(nspcs):
+            jsp = j + 1
+            if j < i:
+                axes[i,j].axis('off')
+                continue
+            ax = axes[i,j]
+            y = agr[isp,jsp,:]
+            ax.plot(x,y,'r-')
+            ax.set_title('{0:d}-{1:d}'.format(isp,jsp))
+            if isp==jsp:
+                ax.set_xlabel('Distance (A)')
+    plt.savefig("graph_rdfs.png", format='png', dpi=300, bbox_inches='tight')
+    return
+
 ################################################## main routine
 
 if __name__ == "__main__":
@@ -129,6 +161,7 @@ if __name__ == "__main__":
     nspcs = int(args['--num-species'])
     no_average = args['--no-average']
     average = not no_average
+    plot = args['--plot']
 
     nr= int(rmax/dr) +1
     rd,agr= rdf_average(infiles,nspcs,nr,ffmt=ffmt,dr=dr,rmax=rmax,
@@ -160,7 +193,14 @@ if __name__ == "__main__":
                 outfile.write(' {0:12.4e}'.format(agr[isid,jsid,i]))
         outfile.write('\n')
     outfile.close()
-    print ' Check '+ofname+' with gnuplot, like'
-    print ''
-    print " > plot "+ofname+"  us 1:2  w l"
-    print ''
+
+    if plot:
+        plot_figures(nspcs,rd,agr)
+        print ''
+        print ' RDF graphes are plotted.'
+        print ' Check graph_rdf.png'
+    else:
+        print ' Check '+ofname+' with gnuplot, like'
+        print ''
+        print " > plot "+ofname+"  us 1:2  w l"
+        print ''
