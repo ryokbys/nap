@@ -227,7 +227,12 @@ contains
         call armijo_search(ndim,x,xranges,d,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
-      if( iflag/100.ne.0 ) return
+      if( iflag/100.ne.0 ) then
+        if( myid.eq.0 ) then
+          print *,'ERROR: iflag/100.ne.0 in SD !!!'
+        endif
+        return
+      endif
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
         call soft_threshold(ndim,x,d,alpha)
       else
@@ -237,9 +242,10 @@ contains
       xp(:) = x(:)
       dxnorm = sqrt(sprod(ndim,dx,dx))
       call wrap_ranges(ndim,x,xranges)
-      call func(ndim,x,f,ftst)
+!!$      call func(ndim,x,f,ftst)
       call grad(ndim,x,g)
       call penalty(cpena,ndim,fpena,gpena,x)
+      f = f -fpena
       if( trim(cpena).eq.'ridge' ) g(:) = g(:) +gpena(:)
       gnorm= sqrt(sprod(ndim,g,g))
       d(1:ndim)= -g(1:ndim)
@@ -580,22 +586,15 @@ contains
     enddo
 
     call wrap_ranges(ndim,x0,xranges)
-!!$    print '(a,i3,10es11.3)','myid,x0=',myid,x0(1:ndim)
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
-!!$    print '(a,i3,10es11.3)','myid,g=',myid,g(1:ndim)
     call penalty(cpena,ndim,pval,gpena,x0)
-    
-!!$    if( myid.eq.0 ) then
-!!$      do i=1,ndim
-!!$        write(6,'(a,i6,2es15.7)') 'i,g,gpena=',i,g(i),gpena(i)
-!!$      enddo
-!!$    endif
-    g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+    f = f + pval
+    if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
 
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
-    call wrap_ranges(ndim,x,xranges)
+!!$    call wrap_ranges(ndim,x,xranges)
 !!$    print '(a,i3,10es11.3)','myid,x=',myid,x(1:ndim)
     vnorm= sqrt(sprod(ndim,x,x))
     dxnorm = 0d0
@@ -606,7 +605,8 @@ contains
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
           write(6,'(a,i8,7es13.5)') &
-               ' iter,ftrn,ftst,p,vnorm,gnorm,dxnorm,f-fp=',iter,f,ftst &
+               ' iter,ftrn,ftst,fpena,vnorm,gnorm,dxnorm,f-fp=' &
+               ,iter,f-pval,ftst &
                ,pval,vnorm,gnorm,dxnorm,f
         else
           write(6,'(a,i8,7es13.5)') &
@@ -692,20 +692,16 @@ contains
 !.....Update x
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
         call soft_threshold(ndim,x,u,alpha)
-        call wrap_ranges(ndim,x,xranges)
       else
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
-        call wrap_ranges(ndim,x,xranges)
       endif
+      call wrap_ranges(ndim,x,xranges)
       call penalty(cpena,ndim,pval,gpena,x)
       
       dx(1:ndim)= x(1:ndim) -x0(1:ndim)
       x0(1:ndim)= x(1:ndim)
-!!$      print *,''
-!!$      print '(a,2i4,30es11.3)','myid,iter,x=',myid,iter,x(1:ndim)
       call grad(ndim,x,g)
-!!$      print '(a,2i4,10es11.3)','myid,iter,g=',myid,iter,g(1:ndim)
-      g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+      if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
       vnorm= sqrt(sprod(ndim,x,x))
       dxnorm= sqrt(sprod(ndim,dx,dx))
@@ -715,8 +711,8 @@ contains
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or.trim(cpena).eq.'ridge' ) then
           write(6,'(a,i8,7es13.5)') &
-               ' iter,ftrn,ftst,p,vnorm,gnorm,dxnorm,f-fp=',&
-               iter,f,ftst &
+               ' iter,ftrn,ftst,fpena,vnorm,gnorm,dxnorm,f-fp=',&
+               iter,f-pval,ftst &
                ,pval,vnorm,gnorm,dxnorm,f-fp
         else
           write(6,'(a,i8,6es13.5)') &
@@ -1551,7 +1547,7 @@ contains
 !.....Increasing factor of step length
     real(8),parameter:: facinc = 2.0d0
     integer:: iter,i,ig,iterp
-    real(8):: alphai,alphap,f0,fi,fp,ftsti,ftstp,fpena
+    real(8):: alphai,alphap,f0,fi,fp,ftsti,ftstp,fpi
     real(8),save,allocatable:: x1(:),gpena(:)
     logical,save:: l1st = .true.
 
@@ -1573,8 +1569,8 @@ contains
       endif
       call wrap_ranges(ndim,x1,xranges)
       call func(ndim,x1,fi,ftsti)
-      call penalty(cpena,ndim,fpena,gpena,x1)
-      fi = fi +fpena
+      call penalty(cpena,ndim,fpi,gpena,x1)
+      fi = fi +fpi
       if( myid.eq.0 .and. iprint.gt.2 ) then
         print '(a,i8,4es12.4)','   iter,alphai,fi,fi-f0,fi-fp = ' &
              ,iter,alphai,fi,fi-f0,fi-fp
@@ -1588,6 +1584,7 @@ contains
       else  ! if fi > f0, decrease alpha
 !!$        fp = min(fi,f0)
 !!$        ftstp = ftsti
+        fp = fi
         alphap = alphai
         alphai = alphai *facdec
         iterp = iter
