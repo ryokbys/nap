@@ -5,7 +5,7 @@ module minimize
   
 !.....penalty: lasso or ridge or smooth
   character(len=128):: cpena= 'none'
-  character(len=128):: clinmin= 'armijo'
+  character(len=128):: clinmin= 'onestep'
   real(8):: pwgt = 1d-15
 
 !.....group lasso
@@ -16,6 +16,8 @@ module minimize
   integer,allocatable:: mskgfs(:),msktmp(:)
   integer:: nitergfs=100
 
+!.....Max iteration for line minimization
+  integer:: niter_linmin   = 15
 !.....Armijo parameters
   real(8):: armijo_xi      = 1.0d-4
   real(8):: armijo_tau     = 0.5d0
@@ -152,41 +154,51 @@ contains
       end subroutine grad
     end interface
 
-    integer:: iter,i,niter
-    real(8):: alpha,fp,gnorm,ftst
+    integer:: iter,i,niter,nxtol,ngtol,nftol
+    real(8):: alpha,fp,gnorm,gpnorm,dxnorm,ftst,fpena
+    real(8),save,allocatable:: gpena(:),dx(:),xp(:)
 
+    if( .not.allocated(gpena) ) then
+      allocate(gpena(ndim),dx(ndim),xp(ndim))
+    endif
 
     iter= 0
     call wrap_ranges(ndim,x,xranges)
     call func(ndim,x,f,ftst)
-    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
-      do i=1,ndim
-        f= f +pwgt*abs(x(i))
-      enddo
-    else if( trim(cpena).eq.'ridge' ) then
-      do i=1,ndim
-        f= f +pwgt*x(i)*x(i)
-      enddo
-    endif
     call grad(ndim,x,g)
+    call penalty(cpena,ndim,fpena,gpena,x)
+    if( trim(cpena).eq.'ridge' ) g(:) = g(:) +gpena(:)
     gnorm= sqrt(sprod(ndim,g,g))
     d(1:ndim)= -g(1:ndim)
-!!$    g(1:ndim)= -g(1:ndim)/gnorm
-!!$    gnorm= gnorm/ndim
     if( myid.eq.0 ) then
       if( iprint.eq.1 ) then
-        write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
-             ,iter,f,gnorm
+        if( trim(cpena).ne.'none' ) then
+          gpnorm = sqrt(sprod(ndim,gpena,gpena))
+          write(6,'(a,i8,10es13.4)') ' iter,f,fp,gnorm,gpnorm=' &
+               ,iter,f,fpena,gnorm,gpnorm
+        else
+          write(6,'(a,i8,10es13.4)') ' iter,f,gnorm=' &
+               ,iter,f,gnorm
+        endif
         flush(6)
       else if( iprint.ge.2 ) then
-        write(6,'(a,i8,10es15.7)') ' iter,x,f,gnorm=' &
-             ,iter,x(1:ndim),f,gnorm
+        if( trim(cpena).ne.'none' ) then
+          gpnorm = sqrt(sprod(ndim,gpena,gpena))
+          write(6,'(a,i8,10es13.4)') ' iter,f,fp,gnorm,gpnorm,x=' &
+               ,iter,f,fpena,gnorm,gpnorm,x(1:min(ndim,6))
+        else
+          write(6,'(a,i8,10es12.3)') ' iter,f,gnorm,x=' &
+               ,iter,f,gnorm,x(1:min(ndim,8))
+        endif
         flush(6)
       endif
     endif
+    f = f +fpena
 
+    alpha = 1d0
     do iter=1,maxiter
       fp= f
+      xp(:) = x(:)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
         call quad_interpolate(ndim,x,d,f,ftst,xtol,gtol,ftol,alpha &
@@ -203,60 +215,97 @@ contains
       else if ( trim(clinmin).eq.'golden') then
         call golden_section(ndim,x,d,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
+      else if( trim(clinmin).eq.'onestep' ) then
+!.....Increase alpha a bit every step,
+!.....alpha is to be decreased in subroutine onestep to decrease func value.
+        alpha = min(alpha*2d0, 1d0)
+!!$        alpha = 1d0
+        call onestep(ndim,x,xranges,d,f,ftst,alpha,iprint &
+             ,iflag,myid,func,niter)
       else ! armijo (default)
         alpha= 1d0
         call armijo_search(ndim,x,xranges,d,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
       if( iflag/100.ne.0 ) return
-      x(1:ndim)= x(1:ndim) +alpha*d(1:ndim)
+      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
+        call soft_threshold(ndim,x,d,alpha)
+      else
+        x(1:ndim)= x(1:ndim) +alpha*d(1:ndim)
+      endif
+      dx(:) = x(:) -xp(:)
+      xp(:) = x(:)
+      dxnorm = sqrt(sprod(ndim,dx,dx))
       call wrap_ranges(ndim,x,xranges)
       call func(ndim,x,f,ftst)
-      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
-        do i=1,ndim
-          f= f +pwgt*abs(x(i))
-        enddo
-      else if( trim(cpena).eq.'ridge' ) then
-        do i=1,ndim
-          f= f +pwgt*x(i)*x(i)
-        enddo
-      endif
       call grad(ndim,x,g)
+      call penalty(cpena,ndim,fpena,gpena,x)
+      if( trim(cpena).eq.'ridge' ) g(:) = g(:) +gpena(:)
       gnorm= sqrt(sprod(ndim,g,g))
       d(1:ndim)= -g(1:ndim)
 !!$      g(1:ndim)= -g(1:ndim)/gnorm
 !!$      gnorm= gnorm/ndim
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
-          write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
-               ,iter,f,gnorm
+          if( trim(cpena).ne.'none' ) then
+            gpnorm = sqrt(sprod(ndim,gpena,gpena))
+            write(6,'(a,i8,10es13.4)') ' iter,f,fp,gnorm,gpnorm=' &
+                 ,iter,f,fpena,gnorm,gpnorm
+          else
+            write(6,'(a,i8,10es13.4)') ' iter,f,gnorm=' &
+                 ,iter,f,gnorm
+          endif
         else if( iprint.ge.2 ) then
-          write(6,'(a,i8,10es15.7)') ' iter,x,f,gnorm=' &
-               ,iter,x(1:ndim),f,gnorm
+          if( trim(cpena).ne.'none' ) then
+            gpnorm = sqrt(sprod(ndim,gpena,gpena))
+            write(6,'(a,i8,10es13.4)') ' iter,f,fp,gnorm,gpnorm,x=' &
+                 ,iter,f,fpena,gnorm,gpnorm,x(1:min(ndim,6))
+          else
+            write(6,'(a,i8,10es12.3)') ' iter,f,gnorm,x=' &
+                 ,iter,f,gnorm,x(1:min(ndim,6))
+          endif
         endif
       endif
+      f = f +fpena
 !.....check convergence 
-!!$      if( abs(alpha).lt.xtol ) then
-!!$        if( myid.eq.0 ) then
-!!$          print *,'>>> SD converged wrt xtol'
-!!$          write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
-!!$        endif
-!!$        iflag= iflag +1
-!!$        return
-      if( gnorm.lt.gtol ) then
-        if( myid.eq.0 ) then
-          print *,'>>> SD converged wrt gtol'
-          write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+      if( dxnorm.lt.xtol ) then
+        nxtol = nxtol +1
+        if( nxtol.ge.numtol ) then
+          if( myid.eq.0 ) then
+            print *,'>>> SD converged wrt xtol'
+            write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
+          endif
+          iflag= iflag +1
+          return
         endif
-        iflag= iflag +2
-        return
-!!$      else if( abs(f-fp)/abs(fp).lt.ftol ) then
-!!$        if( myid.eq.0 ) then
-!!$          print *,'>>> Sd converged wrt ftol'
-!!$          write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp)/abs(fp),ftol
-!!$        endif
-!!$        iflag= iflag +3
-!!$        return
+      else
+        nxtol = 0
+      endif
+      if( gnorm.lt.gtol ) then
+        ngtol = ngtol +1
+        if( ngtol.ge.numtol ) then
+          if( myid.eq.0 ) then
+            print *,'>>> SD converged wrt gtol'
+            write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
+          endif
+          iflag= iflag +2
+          return
+        endif
+      else
+        ngtol = 0
+      endif
+      if( abs(f-fp).lt.ftol ) then
+        nftol = nftol + 1
+        if( nftol.ge.numtol ) then
+          if( myid.eq.0 ) then
+            print *,'>>> Sd converged wrt ftol'
+            write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp)/abs(fp),ftol
+          endif
+          iflag= iflag +3
+          return
+        endif
+      else
+        nftol = 0
       endif
     enddo
     
@@ -313,7 +362,7 @@ contains
     call func(ndim,x,f,ftst)
     call grad(ndim,x,g)
 !.....penalty
-    call penalty(cpena,pwgt,ndim,f,g,pval,gpena,x)
+    call penalty(cpena,ndim,pval,gpena,x)
     g(1:ndim)= g(1:ndim) +gpena(1:ndim)
     gnorm= sprod(ndim,g,g)
     sgnorm= sqrt(gnorm)
@@ -535,44 +584,8 @@ contains
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
 !!$    print '(a,i3,10es11.3)','myid,g=',myid,g(1:ndim)
-!.....penalty
-    pval= 0d0
-    gpena(1:ndim)= 0d0
-    if( trim(cpena).eq.'lasso' ) then
-      do i=1,ndim
-        absx= abs(x0(i))
-        pval= pval +pwgt*absx
-        sgnx= sign(1d0,x0(i))
-        if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
-      enddo
-    else if( trim(cpena).eq.'glasso' ) then
-      glval(0:ngl)= 0d0
-      do i=1,ndim
-        ig= iglid(i)
-        if(ig.gt.0) glval(ig)= glval(ig) +x0(i)*x0(i)
-      enddo
-      glval(0)= 1d0
-      do ig=1,ngl
-        glval(ig)= sqrt(glval(ig))
-        pval= pval +pwgt*glval(ig)
-      enddo
-      do i=1,ndim
-        ig= iglid(i)
-        if( ig.eq.0 ) then ! i is not in a group
-          absx= abs(x0(i))
-          sgnx= sign(1d0,x0(i))
-          if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
-          pval= pval +pwgt*absx
-        else if( ig.gt.0 ) then ! i is in a group
-          if( glval(ig).gt.xtiny) gpena(i)= pwgt*x0(i)/glval(ig)
-        endif
-      enddo
-    else if( trim(cpena).eq.'ridge' ) then
-      do i=1,ndim
-        pval= pval +pwgt*x0(i)*x0(i)
-        gpena(i)= 2d0*pwgt*x0(i)
-      enddo
-    endif
+    call penalty(cpena,ndim,pval,gpena,x0)
+    
 !!$    if( myid.eq.0 ) then
 !!$      do i=1,ndim
 !!$        write(6,'(a,i6,2es15.7)') 'i,g,gpena=',i,g(i),gpena(i)
@@ -638,7 +651,7 @@ contains
              ,iprint,iflag,myid,func)
       else if( trim(clinmin).eq.'onestep' ) then
         alpha = min(alpha*2d0, 1d0)
-        call onestep(ndim,x,xranges,u,f,ftst,g,alpha,iprint &
+        call onestep(ndim,x,xranges,u,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
       else ! armijo (default)
 !.....To enhance the convergence in Armijo search,
@@ -676,52 +689,16 @@ contains
 !.....evaluate statistics at every niter_eval
       if( mod(iter,niter_eval).eq.0 ) &
            call sub_eval(iter)
-      pval= 0d0
-      gpena(1:ndim)= 0d0
-      if( trim(cpena).eq.'lasso' ) then
+!.....Update x
+      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
         call soft_threshold(ndim,x,u,alpha)
         call wrap_ranges(ndim,x,xranges)
-        do i=1,ndim
-          absx= abs(x(i))
-          pval= pval +pwgt*absx
-          sgnx= sign(1d0,x(i))
-          if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
-        enddo
-      else if( trim(cpena).eq.'glasso' ) then
-        call soft_threshold(ndim,x,u,alpha)
-        call wrap_ranges(ndim,x,xranges)
-        glval(0:ngl)= 0d0
-        do i=1,ndim
-          ig= iglid(i)
-          if( ig.gt.0 ) glval(ig)= glval(ig) +x(i)*x(i)
-        enddo
-        glval(0)= 1d0
-        do ig=1,ngl
-          glval(ig)= sqrt(glval(ig))
-          pval= pval +pwgt*glval(ig)
-        enddo
-        do i=1,ndim
-          ig= iglid(i)
-          if( ig.eq.0 ) then ! i is not in a group
-            absx= abs(x(i))
-            sgnx= sign(1d0,x(i))
-            if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
-            pval= pval +pwgt*absx
-          else if( ig.gt.0 ) then ! i is in a group
-            if( glval(ig).gt.xtiny) gpena(i)= pwgt*x(i)/glval(ig)
-          endif
-        enddo
-      else if( trim(cpena).eq.'ridge' ) then
-        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
-        call wrap_ranges(ndim,x,xranges)
-        do i=1,ndim
-          pval= pval +pwgt*x(i)*x(i)
-          gpena(i)= 2d0*pwgt*x(i)
-        enddo
       else
         x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
         call wrap_ranges(ndim,x,xranges)
       endif
+      call penalty(cpena,ndim,pval,gpena,x)
+      
       dx(1:ndim)= x(1:ndim) -x0(1:ndim)
       x0(1:ndim)= x(1:ndim)
 !!$      print *,''
@@ -912,7 +889,7 @@ contains
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
 !.....penalty
-    call penalty(cpena,pwgt,ndim,f,g,pval,gpena,x0)
+    call penalty(cpena,ndim,pval,gpena,x0)
     g(1:ndim)= g(1:ndim) +gpena(1:ndim)
 
     gnorm= sqrt(sprod(ndim,g,g))
@@ -1220,7 +1197,6 @@ contains
     real(8),parameter:: STP0    = 1d-1
     real(8),parameter:: STPMAX  = 1d+1
     real(8),parameter:: TINY    = 1d-15
-    integer,parameter:: MAXITER = 100
 
     interface
       subroutine func(n,x,ftrn,ftst)
@@ -1246,10 +1222,10 @@ contains
     iter= 0
 10  continue
     iter= iter +1
-    if( iter.gt.MAXITER ) then
+    if( iter.gt.niter_linmin ) then
       if( myid.eq.0 ) then
-        print *,'WARNING: iter.gt.MAXITER in quad_interpolate !!!'
-        print *,'  iter,MAXITER= ',iter,MAXITER
+        print *,'WARNING: iter.gt.NITER_LINMIN in quad_interpolate !!!'
+        print *,'  iter,niter_linmin= ',iter,niter_linmin
       endif
       iflag= iflag +100
       return
@@ -1372,7 +1348,6 @@ contains
     real(8),parameter:: STP0 = 1d-1
     real(8),parameter:: GR   = 0.61803398875d0
     real(8),parameter:: GR2  = 1d0 -GR
-    integer,parameter:: MAXITER= 100
 
     integer:: iter
     real(8):: a,b1,b2,c,fa,fb1,fb2,fc,xl
@@ -1392,10 +1367,10 @@ contains
     iter= 0
 10  continue
     iter= iter +1
-    if( iter.gt.MAXITER ) then
+    if( iter.gt.niter_linmin ) then
       if( myid.eq.0 ) then
-        print *,'WARNING: iter.gt.MAXITER in golden_section.'
-        print *,'  iter,MAXITER = ',iter,MAXITER
+        print *,'WARNING: iter.gt.NITER_LINMIN in golden_section.'
+        print *,'  iter,niter_linmin = ',iter,niter_linmin
       endif
       iflag= iflag +100
       return
@@ -1471,7 +1446,7 @@ contains
         write(6,'(a)') ' Armijo rule parameters:'
         write(6,'(a,es12.4)') '   c       = ',armijo_xi
         write(6,'(a,f10.4)') '   tau     = ',armijo_tau
-        write(6,'(a,i5)')   '   maxiter = ',armijo_maxiter
+        write(6,'(a,i5)')   '   maxiter = ',niter_linmin
       endif
       l1st = .false.
     endif
@@ -1484,54 +1459,17 @@ contains
       return
     endif
     alphai= alpha
-    pval0= 0d0
-    gpena(1:ndim)= 0d0
-    if( trim(cpena).eq.'lasso' ) then
-      do i=1,ndim
-        absx= abs(x0(i))
-        sgnx= sign(1d0,x0(i))
-        if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
-        pval0= pval0 +pwgt*absx
-      enddo
-    else if( trim(cpena).eq.'glasso' ) then
-      glval(0:ngl)= 0d0
-      do i=1,ndim
-        ig= iglid(i)
-        if( ig.gt.0 ) glval(ig)= glval(ig) +x0(i)*x0(i)
-      enddo
-      glval(0)= 1d0
-      do ig=1,ngl
-        glval(ig)= sqrt(glval(ig))
-        pval0= pval0 +pwgt*glval(ig)
-      enddo
-      do i=1,ndim
-        ig= iglid(i)
-        if( ig.eq.0 ) then ! i is not in a group
-          absx= abs(x0(i))
-          sgnx= sign(1d0,x0(i))
-          if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
-          pval0= pval0 +pwgt*absx
-        else if( ig.gt.0 ) then ! i is in a group
-          if( glval(ig).gt.xtiny) gpena(i)= pwgt*x0(i)/glval(ig)
-        endif
-      enddo
-    else if( trim(cpena).eq.'ridge' ) then
-      do i=1,ndim
-        pval0= pval0 +pwgt*x0(i)*x0(i)
-        gpena(i)= 2d0*pwgt*x0(i)
-      enddo
-    endif
+    call penalty(cpena,ndim,pval,gpena,x0)
 
     f0= f
-    do iter=1,armijo_maxiter
+    do iter=1,niter_linmin
       x1(1:ndim)= x0(1:ndim)
       if( trim(cpena).eq.'lasso' .or.trim(cpena).eq.'glasso') then
         call soft_threshold(ndim,x1,d,alphai)
-        call wrap_ranges(ndim,x1,xranges)
       else
         x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
-        call wrap_ranges(ndim,x1,xranges)
       endif
+      call wrap_ranges(ndim,x1,xranges)
       call func(ndim,x1,fi,ftsti)
 !!$      if( myid.eq.0 ) print *,'iter,alphai,fi=',iter,alphai,fi
       pval= 0d0
@@ -1576,7 +1514,7 @@ contains
     iflag= iflag +100
     niter= iter
     if( myid.eq.0 .and. iprint.gt.0 ) then
-      print *,'WARNING: iter.gt.MAXITER in armijo_search.'
+      print *,'WARNING: iter.gt.NITER_LINMIN in armijo_search.'
       write(6,'(a,es13.5)') '   alphai   = ',alphai
       write(6,'(a,es13.5)') '   xigd    = ',xigd
       write(6,'(a,es13.5)') '   norm(g) = ',sqrt(sprod(ndim,g,g))
@@ -1589,7 +1527,7 @@ contains
 
   end subroutine armijo_search
 !=======================================================================
-  subroutine onestep(ndim,x0,xranges,d,f,ftst,g,alpha,iprint &
+  subroutine onestep(ndim,x0,xranges,d,f,ftst,alpha,iprint &
        ,iflag,myid,func,niter)
 !
 !  Simply move onestep towards current direction with max length
@@ -1598,7 +1536,7 @@ contains
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag,niter
-    real(8),intent(in):: x0(ndim),g(ndim),d(ndim),xranges(2,ndim)
+    real(8),intent(in):: x0(ndim),d(ndim),xranges(2,ndim)
     real(8),intent(inout):: f,alpha,ftst
     interface
       subroutine func(n,x,ftrn,ftst)
@@ -1609,41 +1547,57 @@ contains
     end interface
 
 !.....Decreasing factor of step length
-    real(8),parameter:: facalp = 0.5d0
-    integer,parameter:: maxiter = 10
-    integer:: iter,i,ig
-    real(8):: alphai,alphap,f0,fi,fp,ftsti
-    real(8),allocatable:: x1(:)
+    real(8),parameter:: facdec = 0.2d0
+!.....Increasing factor of step length
+    real(8),parameter:: facinc = 2.0d0
+    integer:: iter,i,ig,iterp
+    real(8):: alphai,alphap,f0,fi,fp,ftsti,ftstp,fpena
+    real(8),save,allocatable:: x1(:),gpena(:)
     logical,save:: l1st = .true.
 
     if( l1st ) then
       l1st = .false.
+      if( myid.eq.0 .and. iprint.gt.1 ) &
+           print *,'onestep, alpha=',alpha
     endif
-    if( .not.allocated(x1) ) allocate(x1(ndim))
+    if( .not.allocated(x1) ) allocate(x1(ndim),gpena(ndim))
     f0 = f
+    fp = f0
     alphai = alpha
-    do iter=1,maxiter
-      x1(1:ndim) = x0(1:ndim) +alphai*d(1:ndim)
+    do iter=1,niter_linmin
+      x1(:) = x0(:)
+      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
+        call soft_threshold(ndim,x1,d,alphai)
+      else
+        x1(1:ndim) = x1(1:ndim) +alphai*d(1:ndim)
+      endif
       call wrap_ranges(ndim,x1,xranges)
       call func(ndim,x1,fi,ftsti)
-      if( myid.eq.0 .and. iprint.gt.2 ) &
-           print *,'  iter,alphai,fi-f0 = ',iter,alphai,fi-f0
-      if( fi-f0.lt.0d0 ) then
+      call penalty(cpena,ndim,fpena,gpena,x1)
+      fi = fi +fpena
+      if( myid.eq.0 .and. iprint.gt.2 ) then
+        print '(a,i8,4es12.4)','   iter,alphai,fi,fi-f0,fi-fp = ' &
+             ,iter,alphai,fi,fi-f0,fi-fp
+      endif
+      if( fi.lt.f0 ) then
         f = fi
         alpha = alphai
         ftst = ftsti
         niter = iter
         return
+      else  ! if fi > f0, decrease alpha
+!!$        fp = min(fi,f0)
+!!$        ftstp = ftsti
+        alphap = alphai
+        alphai = alphai *facdec
+        iterp = iter
       endif
-      fp = fi
-      alphap = alphai
-      alphai = alphai *facalp
     enddo
 
     iflag = iflag + 100
     niter = iter
     if( myid.eq.0 .and. iprint.gt.0 ) then
-      print *, 'WARNING: iter.gt.MAXITER in onestep,'
+      print *, 'WARNING: iter.gt.NITER_LINMIN in onestep,'
       print *, '         which means the search direction could be wrong.'
       write(6,'(a,es13.5)') '   alphai = ',alphai
     endif
@@ -1680,7 +1634,9 @@ contains
       xad= x(i) +alpha*d(i)
       sgn=sign(1d0,xad) 
       val= max(abs(xad)-alpha*pwgt,0d0)
+!!$      val= max(abs(xad)-pwgt,0d0)
       x(i)= sgn*val
+!!$      print *,'i,xad,sgn,val,xi=',i,xad,sgn,val,x(i)
     enddo
     return
   end subroutine soft_threshold
@@ -2374,7 +2330,7 @@ contains
     
   end subroutine sa
 !=======================================================================
-  subroutine penalty(cpena,pwgt,ndim,f,g,fp,gp,x)
+  subroutine penalty(cpena,ndim,fp,gp,x)
 !
 ! Calculate penalty term and its derivative.
 ! lasso and ridge are available.
@@ -2382,7 +2338,7 @@ contains
     implicit none
     character(len=*),intent(in):: cpena
     integer,intent(in):: ndim
-    real(8),intent(in):: pwgt,f,g(ndim),x(ndim)
+    real(8),intent(in):: x(ndim)
     real(8),intent(out):: fp,gp(ndim)
 
     integer:: i,ig

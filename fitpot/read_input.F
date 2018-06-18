@@ -165,6 +165,9 @@ c=======================================================================
       elseif( trim(cname).eq.'armijo_maxiter' ) then
         call read_i1(ionum,armijo_maxiter)
         return
+      elseif( trim(cname).eq.'niter_linmin' ) then
+        call read_i1(ionum,niter_linmin)
+        return
       elseif( trim(cname).eq.'sa_temp_control' ) then
         call read_c1(ionum,sa_tctrl)
         return

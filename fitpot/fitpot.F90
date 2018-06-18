@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-06 18:13:12 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-16 17:23:13 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -853,6 +853,7 @@ subroutine sd_wrapper(ftrn0,ftst0)
 !
   use variables
   use NNd,only:NN_init,NN_func,NN_grad
+  use fp_common,only: func_w_pmd, grad_w_pmd
   use parallel
   use minimize
   implicit none
@@ -861,9 +862,8 @@ subroutine sd_wrapper(ftrn0,ftst0)
   real(8):: fval
 
   !.....NN specific code hereafter
-!!$  call NN_init()
-  call steepest_descent(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
-       ,iprint,iflag,myid,NN_func,NN_grad)
+  call steepest_descent(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol &
+       ,ftol,niter,iprint,iflag,myid,func_w_pmd,grad_w_pmd)
 
   return
 end subroutine sd_wrapper
@@ -1094,7 +1094,7 @@ subroutine sgd(ftrn0,ftst0)
     if(mod(iter,niter_eval).eq.0) then
       call NN_func(nvars,vars,ftrn,ftst)
       call NN_grad(nvars,vars,g)
-      call penalty(cpena,pwgt,nvars,f,g,fp,gp,vars)
+      call penalty(cpena,nvars,fp,gp,vars)
       g(1:nvars)= g(1:nvars) +gp(1:nvars)
       gnorm= sqrt(sprod(nvars,g,g))
       if( myid.eq.0 ) then
@@ -1116,7 +1116,7 @@ subroutine sgd(ftrn0,ftst0)
     enddo
     call NN_fs(nvars,vars,ftrn,ftst)
     call NN_gs(nvars,vars,g)
-    call penalty(cpena,pwgt,nvars,ftrn,g,fp,gp,vars)
+    call penalty(cpena,nvars,fp,gp,vars)
     gnorm= sqrt(sprod(nvars,g,g))
     gpnorm= sqrt(sprod(nvars,gp,gp))
     g(1:nvars)= g(1:nvars) +gp(1:nvars)

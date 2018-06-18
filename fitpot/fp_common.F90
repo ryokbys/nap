@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-01 14:54:02 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-15 17:23:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -960,9 +960,9 @@ contains
     if( l1st ) call get_mean_gsf()
 
     if( cnormalize(1:3).eq.'var' ) then
-      call normalize_var()
       if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) &
-           print *,'Descriptors were normalized wrt variance.'
+           print *,'Normalize descriptors wrt variance.'
+      call normalize_var()
     else if( cnormalize(1:2).eq.'no' ) then
 10    continue
     else
