@@ -184,11 +184,11 @@ contains
       else if( iprint.ge.2 ) then
         if( trim(cpena).ne.'none' ) then
           gpnorm = sqrt(sprod(ndim,gpena,gpena))
-          write(6,'(a,i8,10es13.4)') ' iter,f,fp,gnorm,gpnorm,x=' &
-               ,iter,f,fpena,gnorm,gpnorm,x(1:min(ndim,6))
+          write(6,'(a,i5,i4,10es13.4)') ' iter,niter,f,fp,gnorm,gpnorm,x=' &
+               ,iter,niter,f,fpena,gnorm,gpnorm,x(1:min(ndim,6))
         else
-          write(6,'(a,i8,10es12.3)') ' iter,f,gnorm,x=' &
-               ,iter,f,gnorm,x(1:min(ndim,8))
+          write(6,'(a,i5,i4,10es12.3)') ' iter,niter,f,gnorm,x=' &
+               ,iter,niter,f,gnorm,x(1:min(ndim,8))
         endif
         flush(6)
       endif
@@ -222,8 +222,8 @@ contains
 !!$        alpha = 1d0
         call onestep(ndim,x,xranges,d,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
-      else ! armijo (default)
-        alpha= 1d0
+      else if( trim(clinmin).eq.'armijo' ) then
+        alpha = min(alpha*2d0, 1d0)
         call armijo_search(ndim,x,xranges,d,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
@@ -233,6 +233,7 @@ contains
         endif
         return
       endif
+!.....Update x
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
         call soft_threshold(ndim,x,d,alpha)
       else
@@ -245,7 +246,6 @@ contains
 !!$      call func(ndim,x,f,ftst)
       call grad(ndim,x,g)
       call penalty(cpena,ndim,fpena,gpena,x)
-      f = f -fpena
       if( trim(cpena).eq.'ridge' ) g(:) = g(:) +gpena(:)
       gnorm= sqrt(sprod(ndim,g,g))
       d(1:ndim)= -g(1:ndim)
@@ -255,24 +255,23 @@ contains
         if( iprint.eq.1 ) then
           if( trim(cpena).ne.'none' ) then
             gpnorm = sqrt(sprod(ndim,gpena,gpena))
-            write(6,'(a,i8,10es13.4)') ' iter,f,fp,gnorm,gpnorm=' &
-                 ,iter,f,fpena,gnorm,gpnorm
+            write(6,'(a,i5,i4,10es13.4)') ' iter,niter,f,fp,gnorm,gpnorm=' &
+                 ,iter,niter,f-fpena,fpena,gnorm,gpnorm
           else
-            write(6,'(a,i8,10es13.4)') ' iter,f,gnorm=' &
-                 ,iter,f,gnorm
+            write(6,'(a,i5,i4,10es13.4)') ' iter,niter,f,gnorm=' &
+                 ,iter,niter,f,gnorm
           endif
         else if( iprint.ge.2 ) then
           if( trim(cpena).ne.'none' ) then
             gpnorm = sqrt(sprod(ndim,gpena,gpena))
-            write(6,'(a,i8,10es13.4)') ' iter,f,fp,gnorm,gpnorm,x=' &
-                 ,iter,f,fpena,gnorm,gpnorm,x(1:min(ndim,6))
+            write(6,'(a,i5,i4,10es13.4)') ' iter,niter,f,fp,gnorm,gpnorm,x=' &
+                 ,iter,niter,f-fpena,fpena,gnorm,gpnorm,x(1:min(ndim,6))
           else
-            write(6,'(a,i8,10es12.3)') ' iter,f,gnorm,x=' &
-                 ,iter,f,gnorm,x(1:min(ndim,6))
+            write(6,'(a,i5,i4,10es12.3)') ' iter,niter,f,gnorm,x=' &
+                 ,iter,niter,f,gnorm,x(1:min(ndim,6))
           endif
         endif
       endif
-      f = f +fpena
 !.....check convergence 
       if( dxnorm.lt.xtol ) then
         nxtol = nxtol +1
@@ -600,18 +599,19 @@ contains
     dxnorm = 0d0
 
     iter= 0
+    niter = 0
     if( myid.eq.0 ) then
       if( iprint.ge.1 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,7es13.5)') &
-               ' iter,ftrn,ftst,fpena,vnorm,gnorm,dxnorm,f-fp=' &
-               ,iter,f-pval,ftst &
+          write(6,'(a,i5,i4,7es13.5)') &
+               ' iter,niter,ftrn,ftst,fpena,vnorm,gnorm,dxnorm,f-fp=' &
+               ,iter,niter,f-pval,ftst &
                ,pval,vnorm,gnorm,dxnorm,f
         else
-          write(6,'(a,i8,7es13.5)') &
-               ' iter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
-               ,iter,f,ftst,vnorm,gnorm,dxnorm,f
+          write(6,'(a,i5,i4,6es13.5,i4)') &
+               ' iter,niter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
+               ,iter,niter,f,ftst,vnorm,gnorm,dxnorm,f
         endif
         call flush(6)
       endif
@@ -623,9 +623,8 @@ contains
       do i=1,ndim
         u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
       enddo
-      unorm = sqrt(sprod(ndim,u,u))
-      u(1:ndim) = u(1:ndim) /unorm
 !!$      unorm = sqrt(sprod(ndim,u,u))
+!!$      u(1:ndim) = u(1:ndim) /unorm
 !!$      print *,'qn: iter,gnorm,unorm = ',iter,gnorm,unorm
 !!$      print *,' u =',u(1:10)
 !!$      print *,' g =',g(1:10)
@@ -650,10 +649,11 @@ contains
         call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else if( trim(clinmin).eq.'onestep' ) then
-        alpha = min(alpha*2d0, 1d0)
+        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+!!$        alpha = min(alpha*2d0, 1d0)
         call onestep(ndim,x,xranges,u,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
-      else ! armijo (default)
+      else if( trim(clinmin).eq.'armijo' ) then
 !.....To enhance the convergence in Armijo search,
 !.....use the history of previous alpha by multiplying 2
 !.....avoiding constant decrease, but alpha should not be greater than 1.
@@ -666,13 +666,13 @@ contains
         if( ltwice ) then
           x0(1:ndim)= x(1:ndim)
           if(myid.eq.0) then
-            print *,'>>> line_search failed twice continuously.'
+            print *,'>>> Line_minimization failed twice continuously.'
           endif
           return
         else
           ltwice= .true.
           if(myid.eq.0) then
-            print *,'>>> gg initialized because alpha was not found.'
+            print *,'>>> Initialize gg because alpha was not found.'
           endif
           alpha= 1d0  ! reset alpha to 1
           gg(1:ndim,1:ndim)= 0d0
@@ -710,14 +710,14 @@ contains
       if( myid.eq.0 .and. iprint.gt.0 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or.trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,7es13.5)') &
-               ' iter,ftrn,ftst,fpena,vnorm,gnorm,dxnorm,f-fp=',&
-               iter,f-pval,ftst &
+          write(6,'(a,i5,i4,7es13.5)') &
+               ' iter,niter,ftrn,ftst,fpena,vnorm,gnorm,dxnorm,f-fp=',&
+               iter,niter,f-pval,ftst &
                ,pval,vnorm,gnorm,dxnorm,f-fp
         else
-          write(6,'(a,i8,6es13.5)') &
-               ' iter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
-               ,iter,f,ftst &
+          write(6,'(a,i5,i4,6es13.5)') &
+               ' iter,niter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
+               ,iter,niter,f,ftst &
                ,vnorm,gnorm,dxnorm,f-fp
         endif
         call flush(6)
@@ -777,7 +777,7 @@ contains
       if( ynorm.lt.1d-14 .or. dxnorm.lt.xtol .or. gnorm.lt.gtol &
            .or. abs(f-fp).lt.ftol ) then
         if(myid.eq.0) then
-          print *,'>>> gg initialized'
+          print *,'>>> Initialize gg'
         endif
         gg(1:ndim,1:ndim)= 0d0
         do i=1,ndim
@@ -1542,6 +1542,8 @@ contains
       end subroutine func
     end interface
 
+!.....Precision
+    real(8),parameter:: tiny = 1d-15
 !.....Decreasing factor of step length
     real(8),parameter:: facdec = 0.2d0
 !.....Increasing factor of step length
@@ -1588,6 +1590,16 @@ contains
         alphap = alphai
         alphai = alphai *facdec
         iterp = iter
+        if( alphai.lt.tiny ) then
+          if( myid.eq.0 .and. iprint.gt.0 ) then
+            print *,'WARNING: alpha.lt.tiny in onestep,'
+            print *,'         which means the search direction could be wrong.'
+            print *,'   iter,alphai,fi=',iter,alphai,fi
+          endif
+          iflag = iflag + 100
+          niter = iter
+          return
+        endif
       endif
     enddo
 
