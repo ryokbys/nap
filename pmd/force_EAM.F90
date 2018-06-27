@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-12-13 21:31:20 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-27 17:40:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -262,7 +262,7 @@ contains
 !=======================================================================
   subroutine force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of SM paper.
 !    - smoothing is applied to both 2- and many-body terms
@@ -279,7 +279,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,acon(nismax),rc,tag(namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st

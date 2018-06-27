@@ -1,6 +1,6 @@
 module Buckingham
 !-----------------------------------------------------------------------
-!                     Last modified: <2017-10-22 19:33:57 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-27 17:42:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Buckingham calculation
 !    - only force on i is considered, no need to send back
@@ -22,7 +22,7 @@ module Buckingham
 contains
   subroutine force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -31,7 +31,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
-         ,acon(nismax),tag(namax),sv(3,6)
+         ,tag(namax),sv(3,6)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st 

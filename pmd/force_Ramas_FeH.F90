@@ -3,7 +3,7 @@ module Ramas_FeH
 contains
   subroutine force_Ramas_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint) 
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint) 
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM Ackland model for Fe (iron) and H.
 !    - See Philos. Mag. 83(35) (2003) 3977--3994
@@ -20,7 +20,7 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,acon(nismax),rc,tag(namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
@@ -213,7 +213,7 @@ contains
 !=======================================================================
   subroutine force_Ackland_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,mpi_md_world &
-       ,myid_md,epi,epot,nismax,acon,lstrs,iprint) 
+       ,myid_md,epi,epot,nismax,lstrs,iprint) 
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM Ackland model for Fe (iron).
 !    - See Philos. Mag. 83(35) (2003) 3977--3994
@@ -229,7 +229,7 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,acon(nismax),rc,tag(namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
@@ -366,11 +366,6 @@ contains
     do i=1,natm
       at(1:3)= aa(1:3,i)
       aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-    enddo
-!.....multiply 0.5d0*dt**2/am(i)
-    do i=1,natm
-      is= int(tag(i))
-      aa(1:3,i)= acon(is)*aa(1:3,i)
     enddo
 
 !.....gather epot

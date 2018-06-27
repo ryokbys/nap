@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-01 13:09:57 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-27 17:41:24 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -55,14 +55,14 @@ module linreg
 contains
   subroutine force_linreg_old(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_world,myid,epi,epot,nismax,lstrs,iprint)
     implicit none
     include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
+    real(8),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: tcom,rc
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -163,7 +163,7 @@ contains
 !=======================================================================
   subroutine force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use descriptor
     implicit none
     include "mpif.h"
@@ -171,7 +171,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
+    real(8),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: tcom,rcin
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)

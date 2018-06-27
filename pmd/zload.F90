@@ -103,7 +103,7 @@ contains
 
   end subroutine zload_atoms
 !=======================================================================
-  subroutine get_forces_on_base(natm,ra,aa,tag,h,acon,ftop,fbot &
+  subroutine get_forces_on_base(natm,ra,aa,tag,h,fa2v,ftop,fbot &
        ,sorg,myid,mpi_md_world)
 !
 !  Compute forces on atoms at top and bottom bases,
@@ -113,7 +113,7 @@ contains
     include 'mpif.h'
     integer,intent(in):: natm,myid,mpi_md_world
     real(8),intent(in):: ra(3,natm),aa(3,natm),tag(natm),h(3,3,0:1) &
-         ,acon,sorg(3)
+         ,fa2v,sorg(3)
     real(8),intent(out):: ftop,fbot
     integer:: i,ifmv,ierr
     real(8):: ftopl,fbotl
@@ -137,8 +137,8 @@ contains
          ,mpi_sum,mpi_md_world,ierr)
 
 !.....force on top/bottom in eV/A
-    ftopl= ftop /acon
-    fbotl= fbot /acon
+    ftopl= ftop /fa2v
+    fbotl= fbot /fa2v
     ftop = h(3,1,0)*ftopl +h(3,2,0)*ftopl +h(3,3,0)*ftopl
     fbot = h(3,1,0)*fbotl +h(3,2,0)*fbotl +h(3,3,0)*fbotl
 

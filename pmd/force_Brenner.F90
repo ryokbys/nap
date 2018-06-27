@@ -2,7 +2,7 @@ module Brenner
 contains
   subroutine force_Brenner(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
 ! Parallel implementation of the Brenner potential and forces
 !                                               since 2009.04.27 by R.K.
@@ -17,7 +17,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,acon(nismax),tag(namax),rc
+         ,tag(namax),rc
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
@@ -276,7 +276,7 @@ contains
 !=======================================================================
   subroutine force_Brenner_vdW(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
 ! Parallel implementation of the Brenner potential and forces
 !                                               since 2009.04.27 by R.K.
@@ -295,7 +295,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,acon(nismax),tag(namax),rc
+         ,tag(namax),rc
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
@@ -587,11 +587,6 @@ contains
     do i=1,natm
       at(1:3)= aa(1:3,i)
       aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-    enddo
-!-----multiply 0.5d0*dt**2/am(i)
-    do i=1,natm
-      is= int(tag(i))
-      aa(1:3,i)= acon(is)*aa(1:3,i)
     enddo
 
 !-----gather epot

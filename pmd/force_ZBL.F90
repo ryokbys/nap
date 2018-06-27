@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-04-05 14:38:20 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-27 17:42:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -134,7 +134,7 @@ contains
 !=======================================================================
   subroutine force_ZBL(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -143,7 +143,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,acon(nismax),rc,tag(namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st

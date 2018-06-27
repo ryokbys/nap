@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-04-13 17:57:32 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-27 17:42:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -81,7 +81,7 @@ module Morse
 contains
   subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -91,7 +91,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,acon(nismax),tag(namax),sv(3,6)
+         ,tag(namax),sv(3,6)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -196,7 +196,7 @@ contains
 !=======================================================================
   subroutine force_Morse_repul(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
 !
 !  Repulsive-only Morse potential
 !
@@ -208,7 +208,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,acon(nismax),tag(namax),sv(3,6)
+         ,tag(namax),sv(3,6)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -314,7 +314,7 @@ contains
 !=======================================================================
   subroutine force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs,chg &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
 !
 !  Variable-charge Morse potential.
 !  Morse parameters depend on atomic charges which vary time to time.
@@ -327,7 +327,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,acon(nismax),tag(namax),sv(3,6),chg(namax)
+         ,tag(namax),sv(3,6),chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st

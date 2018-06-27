@@ -3,7 +3,7 @@ module Ito3_WHe
 contains
   subroutine force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ito's new potential for W and He (IWHe)
 !    - smoothing is applied to 2-body potential for W-He and He-He
@@ -22,7 +22,7 @@ contains
          ,nn(6),mpi_md_world,myid,nex(3)
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,acon(nismax),rc,tag(namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs

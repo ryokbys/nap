@@ -1,6 +1,6 @@
 subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
      ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr &
-     ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
+     ,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
      ,ifcoulomb,iprint,l1st &
      ,lvc,lcell_updated,boundary)
 !-----------------------------------------------------------------------
@@ -40,7 +40,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   integer,intent(in):: lspr(0:nnmax,namax) !,numff
   integer,intent(inout):: ifcoulomb
   real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-       ,acon(nismax),tag(namax)
+       ,tag(namax)
   real(8),intent(inout):: tcom,rc
   real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
        ,chg(namax),chi(namax),stnsr(3,3)
@@ -81,113 +81,113 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
 !.....Non-exclusive (additive) choice of force-fields
   if( use_force('LJ') ) call force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('LJ_repul') ) call force_LJ_repul(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Ito3_WHe') ) call force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('RK_WHe') ) call force_RK_WHe(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('RK_FeH') ) call force_RK_FeH(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('Ramas_FeH') ) call force_Ramas_FeH(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc &
-       ,lspr,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('Ackland_Fe') ) call force_Ackland_Fe(namax,natm,tag,ra &
        ,nnmax,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn &
-       ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
+       ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
        ,iprint)
   if( use_force('SW') ) call force_SW(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('EDIP_Si') ) call force_EDIP_Si(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('Brenner') ) call force_Brenner(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('Brenner_vdW') ) call force_Brenner_vdW(namax,natm,tag,ra &
        ,nnmax,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn &
-       ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
+       ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
        ,iprint)
   if( use_force('Lu_WHe') ) call force_Lu_Whe(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('Branicio_AlN') ) call force_Branicio_AlN(namax,natm,tag,ra &
        ,nnmax,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn &
-       ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
+       ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
        ,iprint)
   if( use_force('Mishin_Al') ) call force_Mishin_Al(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc &
-       ,lspr,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('AFS_W') ) call force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('SC_Fe') ) call force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('SM_Al') ) call force_SM_Al(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('EAM') ) call force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('linreg') ) call force_linreg(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('NN') ) call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('NN2') ) call force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Morse') ) call force_Morse(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Morse_repul') ) call force_Morse_repul(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('vcMorse') ) call force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Buckingham') ) call force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Bonny_WRe') ) call force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('ZBL') ) call force_ZBL(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
 
 !.....Exclusive choice of different Coulomb force-fields
   if( use_force('screened_Coulomb') ) then ! screened Coulomb
     call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
+         ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st)
   else if( use_force('Ewald') ) then  ! Ewald Coulomb
     call force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
+         ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   else if( use_force('Ewald_long') ) then ! long-range Coulomb
     call force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
+         ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   else if( use_force('Coulomb') ) then  ! Coulomb
     call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom &
          ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-         ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint &
+         ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   endif
 
@@ -1214,7 +1214,7 @@ end subroutine suppress_fq
 !=======================================================================
 subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
      ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-     ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs &
+     ,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
      ,ifcoulomb,iprint,l1st,lvc &
      ,ndimp,gwe,gwf,gws)
 !
@@ -1230,7 +1230,7 @@ subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
   integer,intent(in):: lspr(0:nnmax,namax) !,numff
   integer,intent(inout):: ifcoulomb
   real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-       ,acon(nismax),tag(namax)
+       ,tag(namax)
   real(8),intent(inout):: tcom,rc
   real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
        ,chg(namax),chi(namax)

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-06-06 18:07:08 Ryo KOBAYASHI>
+c                     Last-modified: <2018-06-27 17:36:00 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -180,10 +180,8 @@ c.....NEMD setting
 
 
 c-----setup
-      allocate(acon(nspmax),fack(nspmax))
-c      call setup(nspmax,am,acon,fack,dt)
       allocate(fekin(nspmax),fa2v(nspmax))
-      call setup2(nspmax,am,fekin,fa2v,dt)
+      call setup3(nspmax,am,fekin,fa2v,dt)
 c-----set HI and SGM
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
       if( myid_md.eq.0 ) then
@@ -288,7 +286,7 @@ c.....Calc forces
      &     trim(cpctl).eq.'vv-Berendsen')
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
-     &     ,lspr,mpi_md_world,myid_md,epi,epot0,nspmax,acon,lstrs
+     &     ,lspr,mpi_md_world,myid_md,epi,epot0,nspmax,lstrs
      &     ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
       lstrs = .false.
       epot= epot0
@@ -477,8 +475,7 @@ c-------first kick of velocities
      &         ,finc_fire,fdec_fire,nmin_fire
      &         ,natm,va,aa,myid_md,mpi_md_world,dt,iprint)
 c.....Update dt-related variables
-c          call setup(nspmax,am,acon,fack,dt)
-          call setup2(nspmax,am,fekin,fa2v,dt)
+          call setup3(nspmax,am,fekin,fa2v,dt)
         endif
 
 c-------multiply fmv or damping
@@ -560,7 +557,7 @@ c.....Copy RA of boundary atoms determined by 'bacopy'
 c-------Calc forces
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
-     &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
+     &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,lstrs
      &       ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
         lstrs = .false.
 
@@ -692,7 +689,7 @@ c-------output energies
           tave= tave/(nave-3)
 
           if(czload_type.eq.'atoms') then
-            call get_forces_on_base(natm,ra,aa,tag,h,acon(1),ftop,fbot
+            call get_forces_on_base(natm,ra,aa,tag,h,fa2v(1),ftop,fbot
      &           ,sorg,myid_md,mpi_md_world)
           endif
 
@@ -887,7 +884,6 @@ c.....revert forces to the unit eV/A before going out pmd_core
      &         +h(1:3,2,0)*atot(2,i)
      &         +h(1:3,3,0)*atot(3,i)
           atot(1:3,i) = aai(1:3)
-c          atot(1:3,i) = aai(1:3)/acon(is)
         enddo
       endif
 
@@ -895,7 +891,6 @@ c.....deallocate all the arrays allocated in pmd_core
       if( ltdst ) then
         deallocate(tdst,nadst)
       endif
-      deallocate(acon,fack)
       deallocate(fekin,fa2v)
       deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
      &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
@@ -988,10 +983,8 @@ c-------species of atom-i
         nsp= max(int(tag(i)),nsp)
       enddo
 c-----setup
-      allocate(acon(nspmax),fack(nspmax))
-c      call setup(nspmax,am,acon,fack,dt)
       allocate(fekin(nspmax),fa2v(nspmax))
-      call setup2(nspmax,am,fekin,fa2v,dt)
+      call setup3(nspmax,am,fekin,fa2v,dt)
 c-----set HI and SGM
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 c-----ntset
@@ -1026,7 +1019,7 @@ c     &     ,myid_md,lcalcgrad
       if( .not.lcalcgrad ) then
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
-     &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,acon,lstrs
+     &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,lstrs
      &       ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
         if( iprint.ne.0 ) then
           write(6,'(a,es15.7)') ' potential energy = ',epot
@@ -1081,7 +1074,6 @@ c.....revert forces to the unit eV/A before going out
      &         +h(1:3,2,0)*atot(2,i)
      &         +h(1:3,3,0)*atot(3,i)
           atot(1:3,i) = aai(1:3)
-c          atot(1:3,i) = aai(1:3)/acon(is)
         enddo
       endif
 
@@ -1094,7 +1086,6 @@ c          atot(1:3,i) = aai(1:3)/acon(is)
       endif
       
 c.....deallocate all the arrays allocated 
-      deallocate(acon,fack)
       deallocate(fekin,fa2v)
       deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
      &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
@@ -1170,6 +1161,33 @@ c        print *,'i,fekin(i),fa2v(i)=',i,fekin(i),fa2v(i)
       enddo
 
       end subroutine setup2
+c=======================================================================
+      subroutine setup3(nspmax,am,fekin,fa2v,dt)
+      implicit none
+      include "params_unit.h"
+      integer,intent(in):: nspmax
+      real(8),intent(in):: dt
+      real(8),intent(in):: am(nspmax)
+      real(8),intent(out):: fekin(nspmax),fa2v(nspmax)
+
+      integer:: i
+
+c.....Factors for the following quantities
+c.....Force: eV/Ang
+c.....Acceleration: Ang/fs/fs
+c.....Velocity: Ang/fs
+c.....Position: Ang
+c.....Energy: eV = 1.0/1.602e-19 [J = kg*m**2/s**2]
+      do i=1,nspmax
+c        fa2v(i) = 0.5d0 *ume2ump *bohr2ang**2 /atu2fs**2 /am(i)
+c        fekin(i)=  0.5d0 *(am(i)*ump2ume) *ang2bohr**2 /fs2atu**2
+        fa2v(i) = 0.5d0 *ev2j *(kg2ump *m2ang**2/s2fs**2) /am(i)
+        fekin(i)= 0.5d0 *(am(i)*ump2kg) *ang2m**2 /fs2s**2 *j2ev
+c        acon(i)=  ev2j *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg)
+c        print *,'i,fekin(i),fa2v(i)=',i,fekin(i),fa2v(i)
+      enddo
+
+      end subroutine setup3
 c=======================================================================
       subroutine boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 c-----------------------------------------------------------------------
@@ -2303,8 +2321,8 @@ c=======================================================================
 
 c      facv(1:nspmax)=dsqrt(tinit*fkb*ev2j /(am(1:nspmax)*amu2kg))
 c     &     *m2ang /s2fs
-      facv(1:nspmax) = dsqrt(tinit*fkb
-     &     *(ume2ump* bohr2ang**2/atu2fs**2) /am(1:nspmax))
+      facv(1:nspmax) = dsqrt(tinit *k2j
+     &     *(kg2ump* m2ang**2/s2fs**2) /am(1:nspmax))
       
 c-----velocities in Maxwell-Boltzmann distribution
       do i=1,natm

@@ -2,7 +2,7 @@ module AFS_W
 contains
   subroutine force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ackland potential for W based on 
 !  Finnis and Sinclair potential.
@@ -23,7 +23,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,acon(nismax),rc,tag(namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs

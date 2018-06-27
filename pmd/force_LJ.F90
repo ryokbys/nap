@@ -25,7 +25,7 @@ module LJ
 contains
   subroutine force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of LJ force calculation
 !    - only force on i is considered, no need to send back
@@ -38,7 +38,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
-         ,acon(nismax),tag(namax),sv(3,6)
+         ,tag(namax),sv(3,6)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
@@ -137,7 +137,7 @@ contains
 !=======================================================================
   subroutine force_LJ_repul(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
 !
 !  LJ potential of only repulsive term
 !
@@ -149,7 +149,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
-         ,acon(nismax),tag(namax),sv(3,6)
+         ,tag(namax),sv(3,6)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st 

@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-08 17:25:49 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-27 17:43:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -734,7 +734,7 @@ contains
   subroutine force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,chi,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint &
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc)
 !
 !  Coulomb potential and force computation using Ewald sum method.
@@ -750,7 +750,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,acon(nismax),tag(namax),sv(3,6),chi(namax)
+         ,tag(namax),sv(3,6),chi(namax)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -846,7 +846,7 @@ contains
   subroutine force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint &
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st)
 !
 !  Screened Coulomb implementation used in BVS potential with
@@ -862,7 +862,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,acon(nismax),tag(namax),sv(3,6)
+         ,tag(namax),sv(3,6)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -972,7 +972,7 @@ contains
   subroutine force_screened_Coulomb_old(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint &
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st)
     implicit none
     include "mpif.h"
@@ -983,7 +983,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,acon(nismax),tag(namax),sv(3,6)
+         ,tag(namax),sv(3,6)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -1086,7 +1086,7 @@ contains
   subroutine force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,chi,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint &
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc)
 !
 !  Coulomb potential and force computation using Ewald sum method.
@@ -1102,7 +1102,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,acon(nismax),tag(namax),sv(3,6),chi(namax)
+         ,tag(namax),sv(3,6),chi(namax)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -1166,7 +1166,7 @@ contains
   subroutine force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,chi,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,acon,lstrs,iprint &
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc)
 !
 !  Long-range only Coulomb potential with Gaussian distribution charges.
@@ -1182,7 +1182,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,acon(nismax),tag(namax),sv(3,6),chi(namax)
+         ,tag(namax),sv(3,6),chi(namax)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)

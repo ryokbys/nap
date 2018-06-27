@@ -33,9 +33,16 @@
       real(8),parameter:: ump  = 1.660538921d-27
       real(8),parameter:: ume2ump = ume/ump
       real(8),parameter:: ump2ume = ump/ume
+      real(8),parameter:: ump2kg = ump
+      real(8),parameter:: kg2ump = 1d0/ump
 !-----unified atomic mass unit
       real(8),parameter:: umass= ump
       real(8),parameter:: amu2kg= umass
       real(8),parameter:: kg2amu= 1d0/umass
 !-----Boltzmann factor in eV/K
       real(8),parameter:: fkb  = 8.6173324d-5
+      real(8),parameter:: k2ev = fkb
+      real(8),parameter:: ev2k = 1d0 /k2ev
+      real(8),parameter:: k2j  = k2ev *ev2j
+      real(8),parameter:: j2k  = j2ev *ev2k
+      

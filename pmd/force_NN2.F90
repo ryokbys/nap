@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-07 14:38:01 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-27 17:41:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -48,7 +48,7 @@ module NN2
 contains
   subroutine force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint,l1st)
+       ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use descriptor,only: gsf,dgsf,igsf,nsf,nal,calc_desc,make_gsf_arrays
     implicit none
     include "mpif.h"
@@ -56,7 +56,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
+    real(8),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: tcom,rcin
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)

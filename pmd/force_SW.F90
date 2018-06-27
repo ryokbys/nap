@@ -1,6 +1,6 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-05-15 14:31:50 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-27 17:38:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 
   integer,parameter:: ioprms = 50
@@ -49,7 +49,7 @@ module SW
 contains
   subroutine force_SW(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_world,myid,epi,epot,nismax,acon,lstrs,iprint)
+       ,mpi_world,myid,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of SW(Si) force calculation for pmd
 !    - 2014.04.07 by R.K.
@@ -64,7 +64,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax),acon(nismax) &
+    real(8),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -328,7 +328,7 @@ contains
       inquire(file=cfname,exist=lexist)
       if( .not. lexist ) then
         if( iprint.gt.0 ) then
-          write(6,'(a)') ' WARNING: in.params.SW_Si does not exist !!!.'
+          write(6,'(a)') ' WARNING: in.params.SW does not exist !!!.'
           write(6,'(a)') '           Default parameters will be used.'
         endif
         goto 20

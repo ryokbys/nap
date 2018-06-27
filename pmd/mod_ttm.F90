@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-05-28 20:51:54 Ryo KOBAYASHI>
+!                     Last-modified: <2018-06-26 15:05:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -396,7 +396,7 @@ contains
     if( .not. allocated(nacl) ) then
       allocate(nacl(nxyz),nacpl(nxyz),eksuml(nxyz),ekpsuml(nxyz))
     endif
-    
+
     t0 = mpi_wtime()
 
     nacl(1:nxyz) = 0
@@ -413,7 +413,6 @@ contains
       enddo
       nacl(ic) = nacl(ic) + idof
       eksuml(ic) = eksuml(ic) +ek
-!!$      if( ic.eq.4 ) print *,'i,ek,eksum=',i,ek,eksuml(ic)
       if( ek.gt.ekth ) then
         nacpl(ic) = nacpl(ic) +idof
         ekpsuml(ic) = ekpsuml(ic) +ek
@@ -436,25 +435,14 @@ contains
       do ic=1,nxyz
         if( nac(ic).eq.0 ) cycle
         call ic2ixyz(ic,ix,iy,iz)
-!!$        if( iy.eq.1 .and. iz.eq.1 ) then
-!!$          print *,'ix,nac(ic)=',ix,nac(ic)
-!!$        endif
 !.....Degree of freedom per atom (3 in case of 3D) is included in nac
+!.....CHECK: This factor 3 looks causing the difference of energy in/out between at/el systems.
         ta(ic) = eksum(ic) *2d0 /fkb /nac(ic)
-        gp(ic) = nac(ic) *fkb *gmmp /vcell
-!!$        if( ic.eq.4 ) print *,'Ta: ic,eksum,nac,ta,gp=',ic,eksum(ic),nac(ic),ta(ic),gp(ic)
+        gp(ic) = nac(ic) *fkb *gmmp /vcell ! /3
         if( nacp(ic).eq.0 ) cycle
         tap(ic) = ekpsum(ic) *2d0 /fkb /nacp(ic)
-        gs(ic) = nacp(ic) *fkb *gmms /vcell
+        gs(ic) = nacp(ic) *fkb *gmms /vcell ! /3
       enddo
-!!$      do ix=1,nx
-!!$        iy = 1
-!!$        iz = 1
-!!$        call ixyz2ic(ix,iy,iz,ic)
-!!$        print '(a,4i4,4es12.4)','ix,iy,iz,ic,ta,eksum,gp,gs=' &
-!!$             ,ix,iy,iz,ic,ta(ic) &
-!!$             ,eksum(ic),gp(ic),gs(ic)
-!!$      enddo
     endif
 
     if( trim(surfmove).eq.'plane' .and. &
@@ -615,14 +603,15 @@ contains
 !
 !  Langevin thermostat for atomic system.
 !
+    include "params_unit.h"
     integer,intent(in):: namax,natm,nspmax,mpi_world,iprint
     real(8),intent(in):: aa(3,namax),tag(namax),am(nspmax) &
          ,fa2v(nspmax),fekin(nspmax),dtmd,h(3,3),eki(3,3,namax)
     real(8),intent(inout):: va(3,namax),ediff(nspmax)
 
-    integer:: ic,i,l,is,ifmv,ix,iy,iz,naccp,ierr,isp
+    integer:: ic,i,l,ifmv,ix,iy,iz,naccp,ierr,isp
     real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0,vt(3)&
-         ,aain(3),aaout(3),vin(3),vout(3)
+         ,aain(3),aaout(3),vin(3),vout(3),v0(3)
     real(8):: ediffl(nspmax),deinl(nspmax),deoutl(nspmax)
     integer,external:: ifmvOf
     real(8),external:: box_muller,sprod
@@ -637,8 +626,8 @@ contains
     do ic=1,nxyz
       call ic2ixyz(ic,ix,iy,iz)
       sgm(ic) = dsqrt(2d0*gmmp*fkb*te(ix,iy,iz)/dtmd)
-      if( ic.lt.20 ) print *,'ic,sgm,Te,fkb*Te=',ic,sgm(ic)&
-           ,te(ix,iy,iz),fkb*te(ix,iy,iz)
+!!$      if( ic.lt.20 ) print *,'ic,sgm,Te,fkb*Te=',ic,sgm(ic)&
+!!$           ,te(ix,iy,iz),fkb*te(ix,iy,iz)
     enddo
     
 !.....Langevin thermostat with Mannella integrator
@@ -651,20 +640,18 @@ contains
     enddo
     do i=1,natm
       ifmv = ifmvOf(tag(i))
-      is = int(tag(i))
+      isp = int(tag(i))
       if( ifmv.eq.0 ) then
         va(1:3,i)= 0d0
       else
-        va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dtmd
+        v0(1:3) = va(1:3,i)
+        va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(isp)*dtmd
         vt(1:3) = va(1:3,i)
-        ami= am(is)
+        ami= am(isp)
         ic = a2c(i)
         call ic2ixyz(ic,ix,iy,iz)
-        if( ix.lt.lsurf ) cycle
+        if( ix.lt.lsurf ) continue
         sgmi = sgm(ic) *dsqrt(ami)
-!!$        if( ic.eq.4 ) then
-!!$          print *,'ia,ic,ami,sgmi=',i,ic,ami,sgmi
-!!$        endif
         ek = eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
         gmmi = gmmp
         if( ek.gt.ekth ) gmmi = gmmi + gmms
@@ -672,33 +659,37 @@ contains
         aain(1:3)= 0d0
         aaout(1:3)= 0d0
         do l=1,3
-!!$          aai(l)= -va(l,i)*gmmi*ami +sgmi*box_muller()/hscl(l)
           aain(l) = sgmi*box_muller()/hscl(l)
-          aaout(l) = -va(l,i)*gmmi*ami
+          aaout(l) = -v0(l)*gmmi*ami
           aai(l) = aaout(l) +aain(l)
         enddo
 !.....To compensate the factor 1/2 in fa2v, multiply 2 here.
-        va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(is)*dtmd *2d0
+        va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(isp)*dtmd *2d0
         if( iprint.gt.1 ) then
 !.....accumulate energy difference
-          vi(1:3)= h(1:3,1)*vt(1) &
-               +h(1:3,2)*vt(2) &
-               +h(1:3,3)*vt(3)
-          vl(1:3)= h(1:3,1)*aai(1)*fa2v(is)*dtmd *2d0 &
-               +h(1:3,2)*aai(2)*fa2v(is)*dtmd *2d0 &
-               +h(1:3,3)*aai(3)*fa2v(is)*dtmd *2d0
-          vin(1:3)= h(1:3,1)*aain(1)*fa2v(is)*dtmd *2d0 &
-               +h(1:3,2)*aain(2)*fa2v(is)*dtmd *2d0 &
-               +h(1:3,3)*aain(3)*fa2v(is)*dtmd *2d0
-          vout(1:3)= h(1:3,1)*aaout(1)*fa2v(is)*dtmd *2d0 &
-               +h(1:3,2)*aaout(2)*fa2v(is)*dtmd *2d0 &
-               +h(1:3,3)*aaout(3)*fa2v(is)*dtmd *2d0
-          ediffl(ifmv)= ediffl(ifmv) +fekin(is) &
+!!$          vi(1:3)= h(1:3,1)*vt(1) &
+!!$               +h(1:3,2)*vt(2) &
+!!$               +h(1:3,3)*vt(3)
+          vi(1:3)= h(1:3,1)*v0(1) &
+               +h(1:3,2)*v0(2) &
+               +h(1:3,3)*v0(3)
+          vl(1:3)= h(1:3,1)*aai(1)*fa2v(isp)*dtmd *2d0 &
+               +h(1:3,2)*aai(2)*fa2v(isp)*dtmd *2d0 &
+               +h(1:3,3)*aai(3)*fa2v(isp)*dtmd *2d0
+          vin(1:3)= h(1:3,1)*aain(1)*fa2v(isp)*dtmd *2d0 &
+               +h(1:3,2)*aain(2)*fa2v(isp)*dtmd *2d0 &
+               +h(1:3,3)*aain(3)*fa2v(isp)*dtmd *2d0
+          vout(1:3)= h(1:3,1)*aaout(1)*fa2v(isp)*dtmd *2d0 &
+               +h(1:3,2)*aaout(2)*fa2v(isp)*dtmd *2d0 &
+               +h(1:3,3)*aaout(3)*fa2v(isp)*dtmd *2d0
+          ediffl(isp)= ediffl(isp) +fekin(isp) &
                *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
-          deinl(ifmv)= deinl(ifmv) +fekin(is) &
+          deinl(isp)= deinl(isp) +fekin(isp) &
                *(2d0*sprod(3,vi,vin)+sprod(3,vin,vin))
-          deoutl(ifmv)= deoutl(ifmv) +fekin(is) &
-               *(2d0*sprod(3,vi,vout)+sprod(3,vout,vout))
+!!$          deoutl(isp)= deoutl(isp) +fekin(isp) &
+!!$               *(2d0*sprod(3,vi,vout)+sprod(3,vout,vout))
+          deoutl(isp)= deoutl(isp) +fekin(isp)*2d0 &
+               *sprod(3,vout,vout)/(gmmi/fs2atu)/(dtmd*fs2atu)
         endif
       endif
     enddo
@@ -748,7 +739,8 @@ contains
   subroutine output_Te(istp,myid,iprint)
     integer,intent(in):: istp,myid,iprint
 
-    integer:: ix,iy,iz,ic
+    integer:: ix,iy,iz,ic,n
+    real(8):: ave
     character(len=128):: cnum
 
     if( myid.eq.0 ) then
@@ -779,6 +771,23 @@ contains
           enddo
         enddo
         close(ioTeout)
+!.....Average Te, too.
+        ave = 0d0
+        n = 0
+        do ix=1,nx
+          do iy=1,ny
+            do iz=1,nz
+              call ixyz2ic(ix,iy,iz,ic)
+              if( nac(ic).eq.0 ) continue
+              ave = ave +te(ix,iy,iz)
+              n = n + 1
+!!$              write(ioTeout,'(3i6,2es15.5,i6)') ix,iy,iz,te(ix,iy,iz) &
+!!$                   ,ta(ic),nac(ic)
+            enddo
+          enddo
+        enddo
+        ave = ave /n
+        print *,'istp,te_ave=',istp,ave
       endif
     endif
   end subroutine output_Te

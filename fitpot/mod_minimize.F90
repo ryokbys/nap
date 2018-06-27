@@ -271,6 +271,7 @@ contains
                  ,iter,niter,f,gnorm,x(1:min(ndim,6))
           endif
         endif
+        call flush(6)
       endif
 !.....check convergence 
       if( dxnorm.lt.xtol ) then

@@ -117,3 +117,6 @@ force_Mishin_Al.o: params_Mishin_Al.h
 
 descriptor.o descriptor.mod : descriptor.F90
 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
+
+zload.o zload.mod : zload.F90
+	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
