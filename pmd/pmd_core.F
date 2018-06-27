@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-06-27 17:36:00 Ryo KOBAYASHI>
+c                     Last-modified: <2018-06-27 18:02:29 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -181,7 +181,7 @@ c.....NEMD setting
 
 c-----setup
       allocate(fekin(nspmax),fa2v(nspmax))
-      call setup3(nspmax,am,fekin,fa2v,dt)
+      call setup(nspmax,am,fekin,fa2v,dt)
 c-----set HI and SGM
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
       if( myid_md.eq.0 ) then
@@ -475,7 +475,7 @@ c-------first kick of velocities
      &         ,finc_fire,fdec_fire,nmin_fire
      &         ,natm,va,aa,myid_md,mpi_md_world,dt,iprint)
 c.....Update dt-related variables
-          call setup3(nspmax,am,fekin,fa2v,dt)
+          call setup(nspmax,am,fekin,fa2v,dt)
         endif
 
 c-------multiply fmv or damping
@@ -984,7 +984,7 @@ c-------species of atom-i
       enddo
 c-----setup
       allocate(fekin(nspmax),fa2v(nspmax))
-      call setup3(nspmax,am,fekin,fa2v,dt)
+      call setup(nspmax,am,fekin,fa2v,dt)
 c-----set HI and SGM
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 c-----ntset
@@ -1097,72 +1097,7 @@ c.....deallocate all the arrays allocated
       return
       end subroutine one_shot
 c=======================================================================
-      subroutine setup(nspmax,am,acon,fack,dt)
-      implicit none
-      include "params_unit.h"
-      integer,intent(in):: nspmax
-      real(8),intent(in):: dt
-      real(8),intent(in):: am(nspmax)
-      real(8),intent(out):: acon(nspmax),fack(nspmax)
-
-      integer:: i
-      real(8):: tmp
-
-c      am(1:nspmax)= am(1:nspmax)
-
-c.....umass*Ang^2/fs^2 ---> kg*m^2/sec^2 (=Joule)
-      tmp= amu2kg *ang2m**2 /fs2s**2
-c      write(6,'(a,es12.4,a,es12.4,a)') ' umass*Ang^2/fs^2 ='
-c     &     ,tmp,' Joule =',tmp*j2ev,' eV'
-
-c-----prefactors for normalized accelerration
-      do i=1,nspmax
-        acon(i)=  ev2j *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg) *m2ang**2
-c        acon(i)=  ev2j *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg)
-c        print *,'i,acon(i)=',i,acon(i)
-      enddo
-
-c-----prefactors for kinetic energy in eV
-      do i=1,nspmax
-        fack(i)= 0.5d0*(am(i)*amu2kg)/(dt*fs2s)**2 *ang2m**2 *j2ev
-      enddo
-
-      end subroutine setup
-c=======================================================================
-      subroutine setup2(nspmax,am,fekin,fa2v,dt)
-      implicit none
-      include "params_unit.h"
-      integer,intent(in):: nspmax
-      real(8),intent(in):: dt
-      real(8),intent(in):: am(nspmax)
-      real(8),intent(out):: fekin(nspmax),fa2v(nspmax)
-
-      integer:: i
-      real(8):: tmp
-
-c      am(1:nspmax)= am(1:nspmax)
-
-c.....umass*Ang^2/fs^2 ---> kg*m^2/sec^2 (=Joule)
-      tmp= amu2kg *ang2m**2 /fs2s**2
-c      write(6,'(a,es12.4,a,es12.4,a)') ' umass*Ang^2/fs^2 ='
-c     &     ,tmp,' Joule =',tmp*j2ev,' eV'
-
-c.....Factors for the following quantities
-c.....Force: eV/Ang = (me*bohr**2/atu**2)/Ang
-c.....Acceleration: Ang/fs/fs
-c.....Velocity: Ang/fs
-c.....Position: Ang
-c.....Energy: eV = (me*bohr*bohr/atu/atu)
-      do i=1,nspmax
-        fa2v(i) = 0.5d0 *ume2ump *bohr2ang**2 /atu2fs**2 /am(i)
-        fekin(i)=  0.5d0 *(am(i)*ump2ume) *ang2bohr**2 /fs2atu**2
-c        acon(i)=  ev2j *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg)
-c        print *,'i,fekin(i),fa2v(i)=',i,fekin(i),fa2v(i)
-      enddo
-
-      end subroutine setup2
-c=======================================================================
-      subroutine setup3(nspmax,am,fekin,fa2v,dt)
+      subroutine setup(nspmax,am,fekin,fa2v,dt)
       implicit none
       include "params_unit.h"
       integer,intent(in):: nspmax
@@ -1179,15 +1114,11 @@ c.....Velocity: Ang/fs
 c.....Position: Ang
 c.....Energy: eV = 1.0/1.602e-19 [J = kg*m**2/s**2]
       do i=1,nspmax
-c        fa2v(i) = 0.5d0 *ume2ump *bohr2ang**2 /atu2fs**2 /am(i)
-c        fekin(i)=  0.5d0 *(am(i)*ump2ume) *ang2bohr**2 /fs2atu**2
         fa2v(i) = 0.5d0 *ev2j *(kg2ump *m2ang**2/s2fs**2) /am(i)
         fekin(i)= 0.5d0 *(am(i)*ump2kg) *ang2m**2 /fs2s**2 *j2ev
-c        acon(i)=  ev2j *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg)
-c        print *,'i,fekin(i),fa2v(i)=',i,fekin(i),fa2v(i)
       enddo
 
-      end subroutine setup3
+      end subroutine setup
 c=======================================================================
       subroutine boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 c-----------------------------------------------------------------------
@@ -1354,7 +1285,6 @@ c.....Tensor form eki
           enddo
         enddo
         v2= eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
-c        eki(1:3,1:3,i)=eki(1:3,1:3,i)*fack(is)
         eki(1:3,1:3,i)=eki(1:3,1:3,i)*fekin(is)
         ekinl=ekinl +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
 c.....ekin of each ifmv
