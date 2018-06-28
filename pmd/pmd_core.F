@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-06-27 18:02:29 Ryo KOBAYASHI>
+c                     Last-modified: <2018-06-28 11:20:55 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -242,11 +242,13 @@ c.....Set initial temperature if needed
           if( ttgt(ifmv).lt.0d0 ) then
             tfac(ifmv)= -1d0
           else
+c.....TFAC should have [sqrt(ue/fs**2)] = [ue/Ang/sqrt(ump)] unit
 c            tfac(ifmv)= sqrt(2d0*tgmm*(fkb*ev2j)*ttgt(ifmv)/dt)
 c     &           *m2ang/s2fs
-            tfac(ifmv)= dsqrt(2d0*tgmm*fkb*ttgt(ifmv)/dt)
-c            print *,'ifmv,ttgt,fkb,dt,tfac='
-c     &           ,ifmv,ttgt(ifmv),fkb,dt,tfac(ifmv)
+c            tfac(ifmv)= dsqrt(2d0*tgmm*fkb*ttgt(ifmv)/dt)
+            tfac(ifmv)= dsqrt(2d0*tgmm*ttgt(ifmv)/dt *k2ue)
+            print *,'ifmv,ttgt,dt,tfac,k2ue='
+     &           ,ifmv,ttgt(ifmv),dt,tfac(ifmv),k2ue
           endif
         enddo
         if( myid_md.eq.0 ) then
@@ -398,7 +400,8 @@ c      write(cnum(1:4),'(i4.4)') 0
       
       if( trim(ctctl).eq.'ttm' ) then
         call assign_atom2cell(namax,natm,ra,sorg,boundary)
-        call calc_Ta(namax,natm,eki,tag,fmv,istp,myid_md,mpi_md_world)
+        call calc_Ta(namax,natm,eki,tag,fmv,istp
+     &       ,myid_md,mpi_md_world,iprint)
         call output_Te(0,myid_md,iprint)
       endif
 
@@ -578,11 +581,15 @@ c            ifmv= int(mod(tag(i)*10,10d0))
               va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
               ami= am(is)
               aai(1:3)= 0d0
-              tmp= tfac(ifmv)*dsqrt(ami) !/sqrt(ami*amu2kg) !*dt
-c              if( i.eq.1 ) print *,'ifmv,tfac,ami,tgmm,tmp='
-c     &             ,ifmv,tfac(ifmv),ami,tgmm,tmp
+c.....Here unit of TMP should be [eV/Ang],
+c     whereas TFAC is [eu/Ang/sqrt(ump)], so need to multiply ue2ev
+              tmp= tfac(ifmv)*dsqrt(ami)*ue2ev
+c.....Here the unit of va*tgmm*ami is [ump*(Ang)/fs**2 = ue/(Ang)],
+c.....where (Ang) is actually scaled to unitless,
+c.....but this should be [eV/Ang], so need to multiply ue2ev.
               do l=1,3
-                aai(l)= -va(l,i)*tgmm*ami +tmp*box_muller()/hscl(l)
+                aai(l)= -va(l,i)*tgmm*ami*ue2ev
+     &               +tmp*box_muller()/hscl(l)
               enddo
 c.....To compensate the factor 1/2 in fa2v, multiply 2 here.
               va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(is)*dt *2d0
@@ -626,8 +633,9 @@ c.....Calc kinetic energy
      &       ,vmax,mpi_md_world)
 
         if( trim(ctctl).eq.'ttm' ) then
-          call calc_Ta(namax,natm,eki,tag,fmv,istp,myid_md,mpi_md_world)
-          call update_Te(istp*dt,myid_md,mpi_md_world)
+          call calc_Ta(namax,natm,eki,tag,fmv,istp
+     &         ,myid_md,mpi_md_world,iprint)
+          call update_Te(istp*dt,myid_md,mpi_md_world,iprint)
         endif
 
         call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm

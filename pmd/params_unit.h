@@ -10,12 +10,15 @@
       real(8),parameter:: ut   = 1d-15
       real(8),parameter:: fs2s = ut
       real(8),parameter:: s2fs = 1d0/ut
-      real(8),parameter:: atu  = 2.418884326505d-17  ! atomic time unit
+      real(8),parameter:: atu  = 2.418884326505d-17 ! atomic time unit
+      real(8),parameter:: s2atu = 1d0/atu
       real(8),parameter:: fs2atu = ut/atu
       real(8),parameter:: atu2fs = 1d0/fs2atu
 !-----energy
       real(8),parameter:: ev2j = 1.60217657d-19
       real(8),parameter:: j2ev = 1d0/ev2j
+      real(8),parameter:: ht2ev = 27.2114d0
+      real(8),parameter:: ev2ht = 1d0/ht2ev
 !-----length
       real(8),parameter:: ang  = 1.0d-10
       real(8),parameter:: ang2m= ang
@@ -45,4 +48,11 @@
       real(8),parameter:: ev2k = 1d0 /k2ev
       real(8),parameter:: k2j  = k2ev *ev2j
       real(8),parameter:: j2k  = j2ev *ev2k
+!-----special energy unit = [ump*Ang**2/fs**2]
+      real(8),parameter:: j2ue  = kg2ump*m2ang**2/s2fs**2
+      real(8),parameter:: ue2j  = 1d0/j2ue
+      real(8),parameter:: ev2ue = ev2j *j2ue
+      real(8),parameter:: ue2ev = 1d0/ev2ue
+      real(8),parameter:: k2ue  = k2j*j2ue
+      real(8),parameter:: ue2k  = ue2j*j2k
       

@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-06-26 15:05:37 Ryo KOBAYASHI>
+!                     Last-modified: <2018-06-28 11:21:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -380,11 +380,11 @@ contains
     
   end subroutine assign_atom2cell
 !=======================================================================
-  subroutine calc_Ta(namax,natm,eki,tag,fmv,istp,myid,mpi_world)
+  subroutine calc_Ta(namax,natm,eki,tag,fmv,istp,myid,mpi_world,iprint)
 !
 !  Compute and set Ta and Tap array from atomic kinetic energies.
 !
-    integer,intent(in):: namax,natm,myid,mpi_world,istp
+    integer,intent(in):: namax,natm,myid,mpi_world,istp,iprint
     real(8),intent(in):: eki(3,3,namax),tag(namax),fmv(3,0:9)
 
     integer:: i,ic,ierr,ix,iy,iz,l,ifmv,idof
@@ -447,18 +447,18 @@ contains
 
     if( trim(surfmove).eq.'plane' .and. &
          mod(istp,nstp_surfmove).eq.0) then
-      call update_surface_plane(myid,mpi_world)
+      call update_surface_plane(myid,mpi_world,iprint)
     endif
 
     t_ttm = t_ttm +mpi_wtime() -t0
     return
   end subroutine calc_Ta
 !=======================================================================
-  subroutine update_Te(tnow,myid,mpi_world)
+  subroutine update_Te(tnow,myid,mpi_world,iprint)
 !
 !  Update Te by solving the diffusion equation.
 !
-    integer,intent(in):: myid,mpi_world
+    integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: tnow
 
     integer:: ic,ix,iy,iz,ierr,istp
@@ -625,7 +625,7 @@ contains
 
     do ic=1,nxyz
       call ic2ixyz(ic,ix,iy,iz)
-      sgm(ic) = dsqrt(2d0*gmmp*fkb*te(ix,iy,iz)/dtmd)
+      sgm(ic) = dsqrt(2d0*gmmp*te(ix,iy,iz)/dtmd *k2ue )
 !!$      if( ic.lt.20 ) print *,'ic,sgm,Te,fkb*Te=',ic,sgm(ic)&
 !!$           ,te(ix,iy,iz),fkb*te(ix,iy,iz)
     enddo
@@ -658,9 +658,12 @@ contains
         aai(1:3)= 0d0
         aain(1:3)= 0d0
         aaout(1:3)= 0d0
+!.....SGMI should be [eV/Ang] whereas it is [ue/Ang]
+!     and V0*GMMI*AMI is also [ue/Ang],
+!     so need to multiply ue2ev
         do l=1,3
-          aain(l) = sgmi*box_muller()/hscl(l)
-          aaout(l) = -v0(l)*gmmi*ami
+          aain(l) = sgmi*box_muller()/hscl(l) *ue2ev
+          aaout(l) = -v0(l)*gmmi*ami *ue2ev
           aai(l) = aaout(l) +aain(l)
         enddo
 !.....To compensate the factor 1/2 in fa2v, multiply 2 here.
@@ -686,10 +689,10 @@ contains
                *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
           deinl(isp)= deinl(isp) +fekin(isp) &
                *(2d0*sprod(3,vi,vin)+sprod(3,vin,vin))
-!!$          deoutl(isp)= deoutl(isp) +fekin(isp) &
-!!$               *(2d0*sprod(3,vi,vout)+sprod(3,vout,vout))
-          deoutl(isp)= deoutl(isp) +fekin(isp)*2d0 &
-               *sprod(3,vout,vout)/(gmmi/fs2atu)/(dtmd*fs2atu)
+          deoutl(isp)= deoutl(isp) +fekin(isp) &
+               *(2d0*sprod(3,vi,vout)+sprod(3,vout,vout))
+!!$          deoutl(isp)= deoutl(isp) +fekin(isp)*2d0 &
+!!$               *sprod(3,vout,vout)/(gmmi/fs2atu)/(dtmd*fs2atu)
         endif
       endif
     enddo
@@ -771,7 +774,10 @@ contains
           enddo
         enddo
         close(ioTeout)
-!.....Average Te, too.
+      endif
+
+      if( iprint.gt.1 ) then
+!.....Average Te
         ave = 0d0
         n = 0
         do ix=1,nx
@@ -820,14 +826,14 @@ contains
     endif
   end subroutine set_BC
 !=======================================================================
-  subroutine update_surface_plane(myid,mpi_world)
+  subroutine update_surface_plane(myid,mpi_world,iprint)
 !
 !  Update left surface position according to number of atoms in the cells.
 !  Criterion for lsurf:
 !    - all the cells of nx have atoms less than a certain density (vacuum)
 !    - right-most vacuum cell
 !
-    integer,intent(in):: myid,mpi_world
+    integer,intent(in):: myid,mpi_world,iprint
 
     integer:: ix,iy,iz,icl,ivac_right,ierr,lsurf_new
     logical:: lupdate
@@ -885,7 +891,7 @@ contains
     if( lsurf.eq.rsurf ) then
       if( myid.eq.0 ) print *,'Warning: lsurf.eq.rsurf!'
     endif
-    if( myid.eq.0 ) then
+    if( myid.eq.0 .and. iprint.gt.1 ) then
       print *, 'lsurf,ivac_right,densx= ',lsurf,ivac_right&
            ,densx(1:4),densx(nx)
     endif
@@ -933,7 +939,7 @@ contains
 
     if( l1st ) then
       if( myid_md.eq.0 ) then
-        print *,'# ABLATED: ID, time, position (x,y), velocity (x,y,z)'
+        print '(a)','# ABLATED: ID, time, position (x,y), velocity (x,y,z)'
       endif
       allocate(tagabl(ntmp),rabl(3,ntmp),vabl(3,ntmp),list(ntmp))
       l1st = .false.
