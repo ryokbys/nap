@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-06-28 11:21:52 Ryo KOBAYASHI>
+!                     Last-modified: <2018-07-05 11:30:43 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -17,10 +17,12 @@ module ttm
   character(len=128),parameter:: cfparams = 'in.ttm'
   character(len=128),parameter:: cTe_infile = 'in.Te'
   character(len=128),parameter:: cTe_outfile = 'out.Te'
+  character(len=128),parameter:: cergio = 'out.eio_ttm'
   
   integer,parameter:: ioprms = 30
   integer,parameter:: ioTein = 31
   integer,parameter:: ioTeout = 32
+  integer,parameter:: ioergio = 33
 
   real(8):: t_ttm
 !.....TTM mesh divisions
@@ -116,8 +118,8 @@ contains
     I_0 = I_0 /lskin
 
 !.....Set some
+    call set_inner_dt(dtmd)
     nxyz = nx*ny*nz
-    dt = dtmd /nstp_inner
     dx = h(1,1)/nx
     dy = h(2,2)/ny
     dz = h(3,3)/nz
@@ -212,6 +214,13 @@ contains
 999 call mpi_finalize(ierr)
     stop
   end subroutine init_ttm
+!=======================================================================
+  subroutine set_inner_dt(dtmd)
+    real(8),intent(in):: dtmd
+
+    dt = dtmd /nstp_inner
+    return
+  end subroutine set_inner_dt
 !=======================================================================
   subroutine read_ttm_params(myid,mpi_world,iprint)
     integer,intent(in):: myid,mpi_world,iprint
@@ -485,7 +494,6 @@ contains
                *(rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,iy,iz) &
                +ce*d2te(ix,iy,iz) ) &
                +pterm +sterm )
-!!$          ein_e = ein_e +(pterm+sterm)*dt *vcell
           ein_e = ein_e +(gp(ic)*ta(ic)+sterm)*dt *vcell
           eout_e = eout_e -gp(ic)*te(ix,iy,iz)*dt *vcell
         enddo
@@ -629,7 +637,7 @@ contains
 !!$      if( ic.lt.20 ) print *,'ic,sgm,Te,fkb*Te=',ic,sgm(ic)&
 !!$           ,te(ix,iy,iz),fkb*te(ix,iy,iz)
     enddo
-    
+
 !.....Langevin thermostat with Mannella integrator
     ediffl(1:nspmax) = 0d0
     deinl(1:nspmax) = 0d0
@@ -644,17 +652,15 @@ contains
       if( ifmv.eq.0 ) then
         va(1:3,i)= 0d0
       else
-        v0(1:3) = va(1:3,i)
-        va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(isp)*dtmd
-        vt(1:3) = va(1:3,i)
-        ami= am(isp)
         ic = a2c(i)
         call ic2ixyz(ic,ix,iy,iz)
         if( ix.lt.lsurf ) continue
+        vt(1:3) = va(1:3,i)
+        ami= am(isp)
         sgmi = sgm(ic) *dsqrt(ami)
         ek = eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
         gmmi = gmmp
-        if( ek.gt.ekth ) gmmi = gmmi + gmms
+        if( ek.gt.ekth ) gmmi = gmmp + gmms
         aai(1:3)= 0d0
         aain(1:3)= 0d0
         aaout(1:3)= 0d0
@@ -663,58 +669,48 @@ contains
 !     so need to multiply ue2ev
         do l=1,3
           aain(l) = sgmi*box_muller()/hscl(l) *ue2ev
-          aaout(l) = -v0(l)*gmmi*ami *ue2ev
+          aaout(l) = -vt(l)*gmmi*ami *ue2ev
           aai(l) = aaout(l) +aain(l)
         enddo
 !.....To compensate the factor 1/2 in fa2v, multiply 2 here.
         va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(isp)*dtmd *2d0
-        if( iprint.gt.1 ) then
 !.....accumulate energy difference
-!!$          vi(1:3)= h(1:3,1)*vt(1) &
-!!$               +h(1:3,2)*vt(2) &
-!!$               +h(1:3,3)*vt(3)
-          vi(1:3)= h(1:3,1)*v0(1) &
-               +h(1:3,2)*v0(2) &
-               +h(1:3,3)*v0(3)
-          vl(1:3)= h(1:3,1)*aai(1)*fa2v(isp)*dtmd *2d0 &
-               +h(1:3,2)*aai(2)*fa2v(isp)*dtmd *2d0 &
-               +h(1:3,3)*aai(3)*fa2v(isp)*dtmd *2d0
-          vin(1:3)= h(1:3,1)*aain(1)*fa2v(isp)*dtmd *2d0 &
-               +h(1:3,2)*aain(2)*fa2v(isp)*dtmd *2d0 &
-               +h(1:3,3)*aain(3)*fa2v(isp)*dtmd *2d0
-          vout(1:3)= h(1:3,1)*aaout(1)*fa2v(isp)*dtmd *2d0 &
-               +h(1:3,2)*aaout(2)*fa2v(isp)*dtmd *2d0 &
-               +h(1:3,3)*aaout(3)*fa2v(isp)*dtmd *2d0
-          ediffl(isp)= ediffl(isp) +fekin(isp) &
-               *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
-          deinl(isp)= deinl(isp) +fekin(isp) &
-               *(2d0*sprod(3,vi,vin)+sprod(3,vin,vin))
-          deoutl(isp)= deoutl(isp) +fekin(isp) &
-               *(2d0*sprod(3,vi,vout)+sprod(3,vout,vout))
-!!$          deoutl(isp)= deoutl(isp) +fekin(isp)*2d0 &
-!!$               *sprod(3,vout,vout)/(gmmi/fs2atu)/(dtmd*fs2atu)
-        endif
+        vi(1:3)= h(1:3,1)*vt(1) &
+             +h(1:3,2)*vt(2) &
+             +h(1:3,3)*vt(3)
+        vl(1:3)= h(1:3,1)*aai(1)*fa2v(isp)*dtmd *2d0 &
+             +h(1:3,2)*aai(2)*fa2v(isp)*dtmd *2d0 &
+             +h(1:3,3)*aai(3)*fa2v(isp)*dtmd *2d0
+        vin(1:3)= h(1:3,1)*aain(1)*fa2v(isp)*dtmd *2d0 &
+             +h(1:3,2)*aain(2)*fa2v(isp)*dtmd *2d0 &
+             +h(1:3,3)*aain(3)*fa2v(isp)*dtmd *2d0
+        vout(1:3)= h(1:3,1)*aaout(1)*fa2v(isp)*dtmd *2d0 &
+             +h(1:3,2)*aaout(2)*fa2v(isp)*dtmd *2d0 &
+             +h(1:3,3)*aaout(3)*fa2v(isp)*dtmd *2d0
+        ediffl(isp)= ediffl(isp) +fekin(isp) &
+             *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
+        deinl(isp)= deinl(isp) +fekin(isp) &
+             *(2d0*sprod(3,vi,vin)+sprod(3,vin,vin))
+        deoutl(isp)= deoutl(isp) +fekin(isp) &
+             *(2d0*sprod(3,vi,vout)+sprod(3,vout,vout))
       endif
     enddo
 
-    if( iprint.gt.1 ) then
-      ediff(1:nspmax) = 0d0
-      dein(1:nspmax) = 0d0
-      deout(1:nspmax) = 0d0
-      call mpi_reduce(ediffl,ediff,nspmax &
-           ,mpi_real8,mpi_sum,0,mpi_world,ierr)
-      call mpi_reduce(deinl,dein,nspmax &
-           ,mpi_real8,mpi_sum,0,mpi_world,ierr)
-      call mpi_reduce(deoutl,deout,nspmax &
-           ,mpi_real8,mpi_sum,0,mpi_world,ierr)
-      ein_a = 0d0
-      eout_a = 0d0
-      do isp=1,nspmax
-!!$        ein_a = ein_a +ediff(isp)
-        ein_a = ein_a +dein(isp)
-        eout_a = eout_a +deout(isp)
-      enddo
-    endif
+    ediff(1:nspmax) = 0d0
+    dein(1:nspmax) = 0d0
+    deout(1:nspmax) = 0d0
+    call mpi_reduce(ediffl,ediff,nspmax &
+         ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(deinl,dein,nspmax &
+         ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(deoutl,deout,nspmax &
+         ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    ein_a = 0d0
+    eout_a = 0d0
+    do isp=1,nspmax
+      ein_a = ein_a +dein(isp)
+      eout_a = eout_a +deout(isp)
+    enddo
 
     l1st = .false.
     t_ttm = t_ttm +mpi_wtime()-t0
@@ -898,15 +894,22 @@ contains
     return
   end subroutine update_surface_plane
 !=======================================================================
-  subroutine output_energy_balance(istp,myid,iprint)
+  subroutine output_energy_balance(istp,simtime,myid,iprint)
 !
 !  Output in/out of energy at electronic and atomic systems
 !
     integer,intent(in):: istp, myid, iprint
+    real(8),intent(in):: simtime
+    logical:: lopen
 
     if( myid.eq.0 ) then
-      write(6,'(a,i8,4es12.4)') 'istp,eio_e,eio_a= ',istp, &
-           ein_e, eout_e, ein_a, eout_a
+      inquire(unit=ioergio, opened=lopen)
+      if( .not. lopen ) then
+        open(ioergio,file=trim(cergio),status='replace')
+        write(ioergio,'(a)') '# istp, time, ein_el, eout_el, ein_at, eout_at'
+      endif
+      write(ioergio,'(i8,5es15.7)') istp, simtime, ein_e, eout_e, ein_a, eout_a
+      call flush(ioergio)
     endif
     
   end subroutine output_energy_balance

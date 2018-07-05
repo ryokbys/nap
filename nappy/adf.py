@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 """
 Calculate the angular distribution function (ADF) from files.
-Ensemble averaging over atoms in a file or files are taken.
+Take an average over atoms in a file or files.
 
 Usage:
     adf.py [options] ID0 ID1 ID2 INFILE [INFILE...]
 
 ID0, ID1, and ID2 are species-IDs consisting bonds around the angle,
-like ID1-ID0-ID2.
+like ID1-ID0-ID2. Species-ID==0 means any species.
 
 Options:
     -h, --help  Show this help message and exit.
@@ -100,7 +100,6 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
 
     asys.make_pair_list(rcut=rcut)
 
-    natme= asys.num_atoms()
     na= int(180.0/dang)+1
     print " rcut,dang,na=",rcut,dang,na
     anda= np.zeros(na,dtype=np.float)

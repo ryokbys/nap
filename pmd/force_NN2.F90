@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-27 17:41:48 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-05 12:37:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -29,7 +29,7 @@ module NN2
   logical:: interact(msp,msp)
   
 !.....parameters
-  integer:: nwgt1,nwgt2
+  integer:: nwgt1,nwgt2,nwtot
   real(8),allocatable:: wgt11(:,:),wgt12(:)
   real(8),allocatable:: wgt21(:,:),wgt22(:,:),wgt23(:)
 !.....constants
@@ -44,6 +44,9 @@ module NN2
   integer:: nprms
   real(8),allocatable:: prms(:)
   logical:: lprmset_NN2 = .false.
+
+!.....Group ID for weights
+  integer,allocatable:: iglid(:)
   
 contains
   subroutine force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -281,7 +284,7 @@ contains
 
     integer,intent(in):: myid,mpi_world,iprint
 
-    integer:: ierr,i,j,k,nc,ncoeff &
+    integer:: ierr,i,j,k,nc &
          ,ihl0,ihl1,ihl2,icmb(3)
     integer,allocatable:: nwgt(:)
     logical:: lexist
@@ -365,7 +368,7 @@ contains
     do i=1,nl+1
       nc= nc +nwgt(i)
     enddo
-    ncoeff = nc
+    nwtot = nc
 !.....different number of weights and number of layers
     if( nl.eq.1 ) then
       allocate(wgt11(nhl(0),mhl(1)),wgt12(nhl(1)))
@@ -403,6 +406,9 @@ contains
     endif
     close(50)
 
+!.....Allocate Group-LASSO/FS related variable, which is not used in pmd
+    if( .not. allocated(iglid) ) allocate(iglid(nwtot))
+
     deallocate(nwgt)
     return
   end subroutine read_params_NN2
@@ -416,7 +422,7 @@ contains
     integer,intent(in):: nprms_in,nl_in,nhl_in(0:nl_in)
     real(8),intent(in):: prms_in(nprms_in)
 
-    integer:: nps,i
+    integer:: i
 
     nl = nl_in
     if( nl.eq.0 ) then
@@ -427,12 +433,12 @@ contains
     nhl(nl+1) = 1
     mhl(0:nl+1) = nhl(0:nl+1)
 
-    nps = 0
+    nwtot = 0
     do i=1,nl+1
-      nps = nps +mhl(i)*nhl(i-1)
+      nwtot = nwtot +mhl(i)*nhl(i-1)
     enddo
 
-    if( nps.ne.nprms_in ) then
+    if( nwtot.ne.nprms_in ) then
       print *,'ERROR: nl_in,nhl_in,nprms_in not consistent !!'
       print *,'  Check in.vars.fitpot or in.params.NN2 and'&
            //' NN_num_nodes parameters in in.fitpot.'
@@ -442,6 +448,10 @@ contains
     nprms = nprms_in
     if( .not.allocated(prms) ) allocate(prms(nprms))
     prms(1:nprms) = prms_in(1:nprms_in)
+
+!.....Allocate Group-LASSO/FS related variable, which is not used in pmd
+    if( .not. allocated(iglid) .or. size(iglid).ne.nwtot ) &
+         allocate(iglid(nwtot))
 
     lprmset_NN2 = .true.
     return
@@ -706,7 +716,7 @@ contains
 !  thus no need of parallel implementation.
 !  Currently only 1 hidden layer is implemented.
 !=======================================================================
-    use descriptor,only: gsf,dgsf,igsf,nsf,nnl,nal
+    use descriptor,only: gsf,dgsf,igsf,nsf,nnl,nal,mskgfs
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
@@ -733,48 +743,49 @@ contains
     enddo
 
     if( lematch ) then
-!!$      iv= iprm0 +nhl(0)*mhl(1) +nhl(1)
-!!$!.....2nd layer
-!!$      do ihl1=nhl(1),1,-1
-!!$        tmp= 0d0
-!!$        do ia=1,natm
-!!$          h1= hl1(ihl1,ia)
-!!$          tmp= tmp +(h1-0.5d0)
-!!$        enddo
-!!$        gwe(iv)= gwe(iv) +tmp
-!!$        iv= iv -1
-!!$      enddo
-!!$!.....1st layer
-!!$      do ihl0=nhl(0),1,-1
-!!$        do ihl1=mhl(1),1,-1
-!!$          tmp= 0d0
-!!$          w2= wgt12(ihl1)
-!!$          do ia=1,natm
-!!$            h1= hl1(ihl1,ia)
-!!$            tmp= tmp +w2 *h1*(1d0-h1) *gsf(ihl0,ia)
-!!$          enddo
-!!$          gwe(iv)= gwe(iv) +tmp
-!!$          iv= iv -1
-!!$        enddo
-!!$      enddo
 
-      do ia=1,natm
-        iv = iprm0
-        do ihl0=1,nhl(0)
-          g = gsf(ihl0,ia)
-          do ihl1=1,mhl(1)
-            w2 = wgt12(ihl1)
+      if( allocated(mskgfs) ) then
+        do ia=1,natm
+          iv = iprm0
+          do ihl0=1,nhl(0)
+            g = gsf(ihl0,ia)
+            do ihl1=1,mhl(1)
+              if( mskgfs(ihl0).ne.0 ) then
+                iv = iv + 1
+                gwe(iv) = gwe(iv) +0d0
+              else
+                w2 = wgt12(ihl1)
+                h1 = hl1(ihl1,ia)
+                iv = iv + 1
+                gwe(iv) = gwe(iv) +w2 *h1*(1d0-h1) *g
+              endif
+            enddo
+          enddo
+          do ihl1=1,nhl(1)
             h1 = hl1(ihl1,ia)
             iv = iv + 1
-            gwe(iv) = gwe(iv) +w2 *h1*(1d0-h1) *g
+            gwe(iv) = gwe(iv) + (h1 -0.5d0)
           enddo
         enddo
-        do ihl1=1,nhl(1)
-          h1 = hl1(ihl1,ia)
-          iv = iv + 1
-          gwe(iv) = gwe(iv) + (h1 -0.5d0)
+      else  ! not masking
+        do ia=1,natm
+          iv = iprm0
+          do ihl0=1,nhl(0)
+            g = gsf(ihl0,ia)
+            do ihl1=1,mhl(1)
+              w2 = wgt12(ihl1)
+              h1 = hl1(ihl1,ia)
+              iv = iv + 1
+              gwe(iv) = gwe(iv) +w2 *h1*(1d0-h1) *g
+            enddo
+          enddo
+          do ihl1=1,nhl(1)
+            h1 = hl1(ihl1,ia)
+            iv = iv + 1
+            gwe(iv) = gwe(iv) + (h1 -0.5d0)
+          enddo
         enddo
-      enddo
+      endif
     endif
 
     if( lfmatch ) then
@@ -814,19 +825,24 @@ contains
             w1 = wgt11(ihl0,ihl1)
             w2 = wgt12(ihl1)
             h1 = hl1(ihl1,ia)
-            iv = iv +1
-            do jj=0,lspr(0,ia)  ! Notice: from 0 not 1
-              if( jj.eq.0 ) then
-                ja = ia
-              else
-                ja = lspr(jj,ia)
-              endif
-              jra = itotOf(tag(ja))
-              gwf(iv,1:3,jra) = gwf(iv,1:3,jra) &
-                   -w2*h1*(1d0-h1) &
-                   *( (1d0-2d0*h1) *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
-                   +dgsf(1:3,ihl0,jj,ia) )
-            enddo
+            if( allocated(mskgfs) .and. mskgfs(ihl0).ne.0 ) then
+!.....Do nothing here, and just increment iv
+              iv = iv + 1
+            else
+              iv = iv +1
+              do jj=0,lspr(0,ia)  ! Notice: from 0 not 1
+                if( jj.eq.0 ) then
+                  ja = ia
+                else
+                  ja = lspr(jj,ia)
+                endif
+                jra = itotOf(tag(ja))
+                gwf(iv,1:3,jra) = gwf(iv,1:3,jra) &
+                     -w2*h1*(1d0-h1) &
+                     *( (1d0-2d0*h1) *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
+                     +dgsf(1:3,ihl0,jj,ia) )
+              enddo
+            endif
           enddo
         enddo
 !.....Weights between layer 1 and output
@@ -890,6 +906,36 @@ contains
 !!$    enddo
     return
   end subroutine set_NN2_hl1
+!=======================================================================
+  subroutine init_NN2_fitpot(cpena,cfmethod)
+!
+!  Initialize some only required for fitpot.
+!
+    use descriptor,only: ngl,glval
+    character(len=*),intent(in):: cpena,cfmethod
+
+    integer:: i,ihl0,ihl1
+    
+!.....Make groups for group LASSO/FS
+    if( trim(cpena).eq.'glasso' &
+         .or. trim(cfmethod).eq.'gfs') then
+      ngl= nhl(0)
+      if( .not.allocated(iglid) ) allocate(iglid(nwtot),glval(0:ngl))
+      iglid(1:nwtot)= 0
+      i= 0
+      do ihl0=1,nhl(0)
+        do ihl1=1,nhl(1)
+          i= i +1
+          iglid(i)= ihl0
+        enddo
+      enddo
+!.....weights not connected to symmetry functions are not penalized in g-lasso
+      do i=nhl(0)*nhl(1)+1,nwtot
+        iglid(i)= -1
+      enddo
+    endif
+    
+  end subroutine init_NN2_fitpot
 end module NN2
 !-----------------------------------------------------------------------
 !     Local Variables:

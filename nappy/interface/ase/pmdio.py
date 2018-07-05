@@ -97,6 +97,9 @@ def get_atom_conf_txt(atoms,specorder=[]):
     txt+='  1.00000  \n'
     # cell vectors
     cell= atoms.get_cell()
+    a = np.linalg.norm(cell[0,:])
+    b = np.linalg.norm(cell[1,:])
+    c = np.linalg.norm(cell[2,:])
     txt += ' {0:12.7f}'.format(cell[0,0]) \
            +' {0:12.7f}'.format(cell[0,1]) \
            +' {0:12.7f}\n'.format(cell[0,2])
@@ -114,7 +117,8 @@ def get_atom_conf_txt(atoms,specorder=[]):
     # extract unique constraints from atoms.constraints
     fmvs,ifmvs = get_fmvs(atoms)
     # atom positions
-    spos= atoms.get_scaled_positions()
+    spos = atoms.get_scaled_positions()
+    vels = atoms.get_velocities()
     if not specorder:
         specorder = uniq(atoms.get_chemical_symbols())
         specorder.sort()
@@ -122,10 +126,14 @@ def get_atom_conf_txt(atoms,specorder=[]):
         atom= atoms[i]
         ifmv = ifmvs[i]
         txt += ' {0:s}'.format(get_tag(specorder,atom.symbol,i+1,ifmv))
+        #...Scaled positions
         txt += ' {0:23.14e} {1:23.14e} {2:23.14e}'.format(spos[i,0],
                                                           spos[i,1],
                                                           spos[i,2])
-        txt += '  0.0  0.0  0.0'
+        #...Scaled velocities
+        txt += ' {0:15.7e} {1:15.7e} {2:15.7e}'.format(vels[i,0]/a,
+                                                       vels[i,1]/b,
+                                                       vels[i,2]/c)
         txt += '  0.0  0.0'
         txt += '  0.0  0.0  0.0  0.0  0.0  0.0\n'
     return txt

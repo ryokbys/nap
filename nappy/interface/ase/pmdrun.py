@@ -68,6 +68,7 @@ class PMD(FileIOCalculator):
         'mass': [28.0855,4.0,],
         'zload_type': 'none',
         'final_strain': 0.0,
+        'boundary': 'ppp',
     }
 
     def __init__(self, restart=None, ignore_bad_restart_file=False,
@@ -286,7 +287,8 @@ def get_input_txt(params,fmvs):
            'stress_control','pressure_target','stress_target',
            'stress_relax_time','flag_compute_stress','',
            'mass','',
-           'zload_type','final_strain','']
+           'zload_type','final_strain','',
+           'boundary']
 
     int_keys=['num_nodes_x','num_nodes_y','num_nodes_z',
               'num_iteration','num_out_energy','flag_out_pmd',
@@ -300,7 +302,7 @@ def get_input_txt(params,fmvs):
                 'converge_eps','final_strain']
     str_keys=['io_format','force_type','temperature_control',
               'stress_control','flag_temp_dist',
-              'flag_compute_stress','zload_type']
+              'flag_compute_stress','zload_type','boundary']
 
     for key in order:
         

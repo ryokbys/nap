@@ -358,6 +358,11 @@ subroutine copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
     l1st=.false.
   endif
 
+  if( size(dbuf).ne.nbmax ) then
+    deallocate(dbuf,dbufr)
+    allocate(dbuf(nbmax),dbufr(nbmax))
+  endif
+
   nbnew= 0
 
 !-----loop over z, y, & x directions
@@ -420,10 +425,18 @@ subroutine copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
 
   logical,save:: l1st=.true.
   real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+  integer,save:: narrsize
 
   if( l1st ) then
+    narrsize = 9*nbmax
     allocate(dbuf(9,nbmax),dbufr(9,nbmax))
     l1st=.false.
+  endif
+
+  if( size(dbuf).ne.narrsize ) then
+    deallocate(dbuf,dbufr)
+    narrsize = 9*nbmax
+    allocate(dbuf(9,nbmax),dbufr(9,nbmax))
   endif
 
   nbnew= 0
@@ -488,18 +501,21 @@ subroutine copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex &
   real(8):: tcom1,tcom2
   logical,save:: l1st=.true.
   real(8),allocatable,save:: dbuf(:,:),dbufr(:,:)
-  integer,save:: mdim
+  integer,save:: maxdim
+  integer,save:: maxbmax
 
   if( l1st ) then
-    mdim= ndim
-    allocate(dbuf(mdim,nbmax),dbufr(mdim,nbmax))
+    maxdim = ndim
+    maxbmax = nbmax
+    allocate(dbuf(maxdim,maxbmax),dbufr(ndim,maxbmax))
     l1st=.false.
   endif
 
-  if( ndim.gt.mdim ) then
+  if( ndim.gt.maxdim .or. nbmax.gt.maxbmax ) then
+    maxdim = max(ndim,maxdim)
+    maxbmax = max(nbmax,maxbmax)
     deallocate(dbuf,dbufr)
-    mdim= ndim
-    allocate(dbuf(mdim,nbmax),dbufr(mdim,nbmax))
+    allocate(dbuf(maxdim,maxbmax),dbufr(maxdim,maxbmax))
   endif
 
   nbnew= 0
@@ -534,8 +550,8 @@ subroutine copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex &
           j=lsb(i,ku)
           dbuf(1:ndim,i)= x(1:ndim,j)
         enddo
-        call mespasd(inode,myparity(kd),dbuf,dbufr,ndim*nsd &
-             ,ndim*nrc,21,mpi_md_world)
+        call mespasd(inode,myparity(kd),dbuf,dbufr,maxdim*nsd &
+             ,maxdim*nrc,21,mpi_md_world)
         do i=1,nrc
           x(1:ndim,natm+nbnew+i)= dbufr(1:ndim,i)
         enddo
@@ -575,18 +591,21 @@ subroutine copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
   real(8):: tcom1,tcom2
   real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
   logical,save:: l1st=.true.
-  integer,save:: mdim
+  integer,save:: maxdim
+  integer,save:: maxbmax
 
   if( l1st ) then
-    mdim= ndim
-    allocate(dbuf(mdim,nbmax),dbufr(mdim,nbmax))
+    maxdim = ndim
+    maxbmax = nbmax
+    allocate(dbuf(maxdim,maxbmax),dbufr(ndim,maxbmax))
     l1st=.false.
   endif
 
-  if( ndim.gt.mdim ) then
+  if( ndim.gt.maxdim .or. nbmax.gt.maxbmax ) then
+    maxdim = max(ndim,maxdim)
+    maxbmax = max(nbmax,maxbmax)
     deallocate(dbuf,dbufr)
-    mdim= ndim
-    allocate(dbuf(mdim,nbmax),dbufr(mdim,nbmax))
+    allocate(dbuf(maxdim,maxbmax),dbufr(maxdim,maxbmax))
   endif
 
 !-----natmx
@@ -626,11 +645,11 @@ subroutine copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
 !---------num. of to-be-sent particles
         nsd= lsrc(ku)
 !          nsd3= ndim*nsd
-        nsd3= mdim*nsd
+        nsd3= maxdim*nsd
 !---------num. of to-be-recieved particles
         nrc= lsb(0,ku)
 !          nrc3= ndim*nrc
-        nrc3= mdim*nrc
+        nrc3= maxdim*nrc
 
 !---------to-be-sent-back particles
         do i=1,nsd

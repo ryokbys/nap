@@ -8,12 +8,7 @@ module minimize
   character(len=128):: clinmin= 'onestep'
   real(8):: pwgt = 1d-15
 
-!.....group lasso
-  integer:: ngl
-  integer,allocatable:: iglid(:)
-  real(8),allocatable:: glval(:)
-!.....group fs and mask
-  integer,allocatable:: mskgfs(:),msktmp(:)
+!.....Group FS inner loop
   integer:: nitergfs=100
 
 !.....Max iteration for line minimization
@@ -825,6 +820,8 @@ contains
 !  Limited memory BFGS(Broyden-Fletcher-Goldfarb-Shanno).
 !  See, https://en.wikipedia.org/wiki/Limited-memory_BFGS
 !
+    use NN2,only: iglid
+    use descriptor,only: glval
     implicit none
     integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
     integer,intent(inout):: iflag
@@ -1417,7 +1414,9 @@ contains
        ,iflag,myid,func,niter)
 !  
 !  1D search using Armijo rule.
-!    
+!
+    use NN2,only: iglid
+    use descriptor,only: glval
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag,niter
@@ -1656,6 +1655,8 @@ contains
 !
 !  Forward Stagewise (FS) regression
 !
+    use NN2,only: iglid
+    use descriptor,only: glval
     implicit none
     integer,intent(in):: ndim,maxiter,iprint,myid
     integer,intent(inout):: iflag
@@ -1813,6 +1814,8 @@ contains
 !
 !  Grouped Forward Stepwise (grouped FS) regression
 !
+    use NN2,only: iglid
+    use descriptor,only: ngl,mskgfs,msktmp,glval
     implicit none
     integer,intent(in):: ndim,maxiter,iprint,myid,niter_eval
     integer,intent(inout):: iflag
@@ -1858,11 +1861,14 @@ contains
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim) &
          ,v(ndim),y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
          ,aa(ndim,ndim),cc(ndim,ndim))
-    if( .not.allocated(mskgfs) ) then
-      allocate(mskgfs(ngl),msktmp(ngl),gmaxgl(ngl))
-      mskgfs(1:ngl)= 1
-      msktmp(1:ngl)= mskgfs(1:ngl)
+    if( .not. allocated(gmaxgl) ) then
+      allocate(gmaxgl(ngl))
     endif
+    if( .not.allocated(mskgfs) ) then
+      allocate(mskgfs(ngl),msktmp(ngl))
+    endif
+    mskgfs(1:ngl)= 1
+    msktmp(1:ngl)= mskgfs(1:ngl)
     
     xt(1:ndim)= x(1:ndim)
     do i=1,ndim
@@ -1891,7 +1897,7 @@ contains
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
           write(6,'(a,i8,2es13.5)') ' itergfs,f,gnorm=',itergfs,f,gnorm
-        else if( iprint.eq.2 ) then
+        else if( iprint.gt.1 ) then
           write(6,'(a,i8,12es13.5)') ' itergfs,f,gnorm,x(1:5)=' &
                ,itergfs,f,gnorm,xt(1:5)
         endif
@@ -1924,7 +1930,7 @@ contains
         endif
       enddo
       if( igmm.eq.0 ) then
-        if(myid.eq.0) then
+        if(myid.eq.0 .and. iprint.gt.0 ) then
           print *,'igmm.eq.0 !!!'
           print *,'Nothing to do here, and going out from FS.'
         endif
@@ -1933,7 +1939,8 @@ contains
       endif
 !.....remove mask of bases with large variations
       mskgfs(igmm)= 0
-      if(myid.eq.0) print '(a,i5,es12.4,100i2)',' igmm,gmm,mskgfs= ' &
+      if(myid.eq.0 .and. iprint.gt.0 ) &
+           print '(a,i5,es12.4,100i2)',' igmm,gmm,mskgfs= ' &
            ,igmm,gmm,mskgfs(1:min(ngl,100))
       nmsks= 0
       do ig=1,ngl
@@ -1941,7 +1948,8 @@ contains
         nmsks= nmsks +1
       enddo
       nbases= ngl -nmsks
-      if( myid.eq.0 ) print '(a,4i8)','iter,ngl,nmsks,nbases=' &
+      if( myid.eq.0 .and. iprint.gt.0 ) &
+           print '(a,4i8)','iter,ngl,nmsks,nbases=' &
            ,iter,ngl,nmsks,nbases
       if( nbases > nbasesp .and. nbases.gt.1 ) then
         call analyze(nbasesp)
@@ -1964,7 +1972,7 @@ contains
       if( myid.eq.0 ) then
         if( iprint.eq.1 ) then
           write(6,'(a,i8,2es13.5)') ' iter,f,gnorm=',iter,f,gnorm
-        else if( iprint.eq.2 ) then
+        else if( iprint.gt.1 ) then
           write(6,'(a,i8,12es13.5)') ' iter,f,gnorm,x(1:5)=' &
                ,iter,f,gnorm,x(1:5)
         endif
@@ -2067,7 +2075,7 @@ contains
 
 !.....check convergence
         if( gnorm.lt.gtol ) then
-          if( myid.eq.0 ) then
+          if( myid.eq.0 .and. iprint.gt.0 ) then
             print *,'>>> QM in gFS converged wrt gtol'
             write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
           endif
@@ -2077,7 +2085,7 @@ contains
         else if( abs(f-fp)/abs(fp).lt.ftol) then
           nftol= nftol +1
           if( nftol.gt.numtol ) then
-            if( myid.eq.0 ) then
+            if( myid.eq.0 .and. iprint.gt.0 ) then
               print *,'>>> gFS may be converged because of ftol ' // &
                    'over 10 times.'
             endif
@@ -2085,7 +2093,7 @@ contains
             iflag= iflag +3
             exit
           else
-            if( myid.eq.0 ) then
+            if( myid.eq.0 .and. iprint.gt.0 ) then
               print *,'>>> gg initialized because |f-fp|/|fp|<ftol '
             endif
             gg(1:ndim,1:ndim)= 0d0
@@ -2100,7 +2108,7 @@ contains
         y(1:ndim)= g(1:ndim) -gp(1:ndim)
         ynorm= sprod(ndim,y,y)
         if( ynorm.lt.1d-14 ) then
-          if(myid.eq.0) then
+          if(myid.eq.0 .and. iprint.gt.0 ) then
             print *,'>>> gg initialized because y*y < 1d-14'
             print *,'  ynorm=',ynorm
             print *,'  alpha=',alpha
@@ -2143,7 +2151,7 @@ contains
       if( iter.gt.maxiter ) exit
     enddo
 
-999 if( myid.eq.0 ) print *,'maxiter exceeded in gfs'
+999 if( myid.eq.0 .and. iprint.gt.0 ) print *,'maxiter exceeded in gfs'
     iflag= iflag +10
     x(1:ndim)= xt(1:ndim)
     return
@@ -2345,6 +2353,8 @@ contains
 ! Calculate penalty term and its derivative.
 ! lasso and ridge are available.
 !
+    use NN2,only: iglid
+    use descriptor,only: glval
     implicit none
     character(len=*),intent(in):: cpena
     integer,intent(in):: ndim

@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-05-25 15:03:47 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-05 11:27:04 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -20,6 +20,7 @@ module pmdio
   integer:: npmd = 10
   integer:: ifsort= 1
   real(8):: dt = 1d0
+  real(8):: vardt_len = 0.1d0  ! Length criterion for variable time-step
   real(8):: rc = 5.0d0
   real(8):: rbuf= 0d0
   integer:: ifdmp= 0 ! 0:none, 1:damped-MD, 2:FIRE

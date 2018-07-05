@@ -1284,12 +1284,17 @@ You need to specify the species order correctly with --specorder option.
 
         cell = np.array([self.a1, self.a2, self.a3])
         cell *= self.alc
-        spos = [ a.pos for a in self.atoms ]
-        symbols = [ a.symbol for a in self.atoms ]
+        a = np.linalg.norm(cell[0,:])
+        b = np.linalg.norm(cell[1,:])
+        c = np.linalg.norm(cell[2,:])
+        spos = [ at.pos for at in self.atoms ]
+        vels = [ [at.vel[0]*a, at.vel[1]*b, at.vel[2]*c]  for at in self.atoms ]
+        symbols = [ at.symbol for at in self.atoms ]
         atoms = Atoms(symbols=symbols,
                       cell=cell,
                       scaled_positions=spos,
                       pbc=True)
+        atoms.set_velocities(vels)
         return atoms
 
     @classmethod

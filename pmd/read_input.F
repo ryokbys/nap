@@ -50,6 +50,9 @@ c=======================================================================
       if( trim(cname).eq.'time_interval' ) then
         call read_r1(ionum,dt)
         return
+      elseif( trim(cname).eq.'vardt_length_scale' ) then
+        call read_r1(ionum,vardt_len)
+        return
       elseif( trim(cname).eq.'num_iteration' .or.
      &       trim(cname).eq.'num_steps' ) then
         call read_i1(ionum,nstp)

@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-15 17:23:30 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-30 22:00:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -875,21 +875,22 @@ contains
     use variables
     use parallel
     implicit none 
-    integer:: nsuml,nsumg,ismpl,natm,isf,ia,nsf
-    real(8):: gmeanl,gmean,tmp,gvarl
-    real(8),allocatable:: gsfml(:),gsfvl(:)
+    real(8),parameter:: tiny = 1d-15
+    integer:: nsuml,nsumg,ismpl,natm,isf,jsf,ia,nsf
+    real(8):: gmeanl,gmean,tmp,gvarl,dgi,dgj
+    real(8),allocatable:: gsfml(:),gsfvl(:),gsfcl(:,:),gsfvsq(:),gsfsl(:)
 
     nsf = samples(isid0)%nsf
-    allocate(gsfml(nsf),gsfvl(nsf))
+    allocate(gsfml(nsf),gsfvl(nsf),gsfcl(nsf,nsf),&
+         gsfvsq(nsf),gsfsl(nsf))
     if( .not. allocated(gsfms) ) then
-      allocate(gsfms(nsf),gsfvs(nsf))
+      allocate(gsfms(nsf),gsfvs(nsf),gsfss(nsf),gsfcorr(nsf,nsf))
     endif
 
 !.....compute mean value
     gsfml(1:nsf) = 0d0
     gsfvl(1:nsf) = 0d0
-    gsfms(1:nsf) = 0d0
-    gsfvs(1:nsf) = 0d0
+    gsfsl(1:nsf) = 0d0
     gmeanl= 0d0
     gvarl = 0d0
     nsuml= 0
@@ -901,7 +902,7 @@ contains
         do isf=1,nsf
           tmp = samples(ismpl)%gsf(isf,ia)
           gsfml(isf) = gsfml(isf) +tmp
-          gsfvl(isf) = gsfvl(isf) +tmp*tmp
+          gsfsl(isf) = gsfsl(isf) +tmp*tmp
           gmeanl= gmeanl +tmp
           gvarl = gvarl +tmp*tmp
 !!$          nsuml= nsuml +1
@@ -909,19 +910,62 @@ contains
       enddo
     enddo
     nsumg= 0
-!!$    call mpi_allreduce(gmeanl,gsfmean,1,mpi_real8 &
-!!$         ,mpi_sum,mpi_world,ierr)
-!!$    call mpi_allreduce(gvarl,gsfvar,1,mpi_real8 &
-!!$         ,mpi_sum,mpi_world,ierr)
+    gsfms(1:nsf) = 0d0
+    gsfvs(1:nsf) = 0d0
+    gsfss(1:nsf) = 0d0
     call mpi_allreduce(gsfml,gsfms,nsf,mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(gsfvl,gsfvs,nsf,mpi_real8 &
          ,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(gsfsl,gsfss,nsf,mpi_real8 &
+         ,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(nsuml,nsumg,1,mpi_integer &
          ,mpi_sum,mpi_world,ierr)
     gsfms(1:nsf)= gsfms(1:nsf)/nsumg
-    gsfvs(1:nsf)= gsfvs(1:nsf)/nsumg &
+    gsfvs(1:nsf)= gsfss(1:nsf)/nsumg &
          -gsfms(1:nsf)**2
+
+!.....Correlation coefficients
+    gsfcl(:,:) = 0d0
+    do ismpl=isid0,isid1
+      do ia=1,natm
+        do isf=1,nsf-1
+          dgi = samples(ismpl)%gsf(isf,ia) - gsfms(isf)
+          do jsf=isf+1,nsf
+            dgj = samples(ismpl)%gsf(jsf,ia) - gsfms(jsf)
+            gsfcl(jsf,isf) = gsfcl(jsf,isf) +dgi*dgj
+          enddo
+        enddo
+      enddo
+    enddo
+    gsfcorr(:,:) = 0d0
+    call mpi_allreduce(gsfcl,gsfcorr,nsf*nsf,mpi_real8 &
+         ,mpi_sum,mpi_world,ierr)
+    do isf=1,nsf
+      gsfvsq(isf) = sqrt(gsfvs(isf)*nsumg)
+      gsfcorr(isf,isf) = 1d0
+    enddo
+    do isf=1,nsf-1
+      do jsf=isf+1,nsf
+!!$        if( abs(gsfcorr(jsf,isf)).lt.tiny ) then
+!!$          gsfcorr(jsf,isf) = 0d0
+!!$        else
+          gsfcorr(jsf,isf) = gsfcorr(jsf,isf) &
+               / gsfvsq(isf) /gsfvsq(jsf)
+!!$        endif
+        gsfcorr(isf,jsf) = gsfcorr(jsf,isf)
+      enddo
+    enddo
+!.....Output correlation
+    if( myid.eq.0 .and. iprint.gt.0 ) then
+      open(20,file='out.correlation',status='replace')
+      do isf=1,nsf
+        do jsf=1,nsf
+          write(20,'(2i6,f10.5)') isf,jsf,gsfcorr(isf,jsf)
+        enddo
+      enddo
+      close(20)
+    endif
     
     gsfmean= 0d0
     gsfvar = 0d0
@@ -943,7 +987,7 @@ contains
       endif
     endif
 
-    deallocate(gsfml,gsfvl)
+    deallocate(gsfml,gsfvl,gsfcl,gsfvsq,gsfsl)
     return
   end subroutine get_mean_gsf
 !=======================================================================
@@ -963,8 +1007,10 @@ contains
       if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) &
            print *,'Normalize descriptors wrt variance.'
       call normalize_var()
-    else if( cnormalize(1:2).eq.'no' ) then
-10    continue
+    else if( cnormalize(1:4).eq.'norm' ) then
+      if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) &
+           print *,'Normalize descriptors wrt norm.'
+      call normalize_norm()
     else
       if( myid.eq.0 .and. iprint.ne.0 ) &
            print *,'WARNING: no such normalization, '//trim(cnormalize)
@@ -977,7 +1023,7 @@ contains
 !  Normalize inputs (descriptors)
 !
     use variables, only: nsmpl,samples,nvars,nalist,vars,vranges&
-         ,lnormalized,cpot,gsfvar,gsfvs,gsfms,sgms,sgmis,sgm_min
+         ,lnormalized,cpot,gsfvar,gsfvs,gsfms,sgms,sgmis,sgm_min,iprint
     use parallel
     use NN2, only: nl,nhl,mhl
     implicit none
@@ -1010,6 +1056,11 @@ contains
                samples(ismpl)%dgsf(:,isf,:,:) *sgmis(isf)
         enddo
       enddo
+      if( myid.eq.0 .and. iprint.gt.1 ) then
+        do isf=1,nsf
+          print '(a,i5,2es12.4)','isf,sgm,sgmi=',isf,sgms(isf),sgmis(isf)
+        enddo
+      endif
     endif
 
     if( trim(cpot).eq.'linreg' ) then
@@ -1033,6 +1084,69 @@ contains
     
   end subroutine normalize_var
 !=======================================================================
+  subroutine normalize_norm()
+!
+!  Normalize inputs (descriptors)
+!
+    use variables, only: nsmpl,samples,nvars,nalist,vars,vranges&
+         ,lnormalized,cpot,gsfvar,sgms,sgmis,gsfss,sq_min,iprint
+    use parallel
+    use NN2, only: nl,nhl,mhl
+    implicit none
+    integer:: ismpl,ia,natm,isf,i,iv,ihl0,ihl1
+    integer,save:: nsf
+    logical,save:: l1st = .true.
+
+    if( l1st ) then
+      nsf = samples(isid0)%nsf
+      if( .not. allocated(sgms) ) allocate(sgms(nsf),sgmis(nsf))
+      do isf=1,nsf
+        sgms(isf) = max(sqrt(gsfss(isf)),sq_min)
+        sgmis(isf)= 1d0/sgms(isf)
+      enddo
+!.....standardize G values
+      do ismpl=isid0,isid1
+        natm= samples(ismpl)%natm
+        if( .not. allocated(samples(ismpl)%gsf) ) then
+          print *,'ERROR: gsf not allocated, myid,ismpl,cdirname='&
+               ,myid,ismpl,trim(samples(ismpl)%cdirname)
+          stop
+        endif
+        do isf=1,nsf
+          samples(ismpl)%gsf(isf,:)= samples(ismpl)%gsf(isf,:) &
+               *sgmis(isf)
+          samples(ismpl)%dgsf(:,isf,:,:)= &
+               samples(ismpl)%dgsf(:,isf,:,:) *sgmis(isf)
+        enddo
+      enddo
+      if( myid.eq.0 .and. iprint.gt.1 ) then
+        do isf=1,nsf
+          print '(a,i5,2es12.4)','isf,sgm,sgmi=',isf,sgms(isf),sgmis(isf)
+        enddo
+      endif
+    endif
+
+    if( trim(cpot).eq.'linreg' ) then
+      do i=1,nvars
+        vars(i) = vars(i) *sgms(i)
+        vranges(1:2,i) = vranges(1:2,i) *sgms(i)
+      enddo
+    else if( trim(cpot).eq.'NN2' ) then
+      iv = 0
+      do ihl0=1,nhl(0)
+        do ihl1=1,mhl(1)
+          iv = iv + 1
+          vars(iv) = vars(iv) *sgms(ihl0)
+          vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
+        enddo
+      enddo
+    endif
+
+    l1st = .false.
+    lnormalized = .true.
+    
+  end subroutine normalize_norm
+!=======================================================================
   subroutine restore_normalize()
 !
 !  Restore weights by inverse normalization
@@ -1047,7 +1161,7 @@ contains
 
     if( .not. lnormalized ) return
 
-    if( cnormalize(1:3).eq.'var' ) then
+    if( cnormalize(1:3).eq.'var' .or. cnormalize(1:4).eq.'norm' ) then
       if( trim(cpot).eq.'linreg' ) then
         do i=1,nvars
           vars(i) = vars(i) *sgmis(i)

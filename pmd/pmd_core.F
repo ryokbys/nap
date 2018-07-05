@@ -1,12 +1,12 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-06-28 11:20:55 Ryo KOBAYASHI>
+c                     Last-modified: <2018-07-05 12:52:34 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
       subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
-     &     ,nspmax,am,dt,ciofmt,ifpmd,rc,rbuf,ifdmp,dmp
+     &     ,nspmax,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,ifdmp,dmp
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
      &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,stnsr,epot
      &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
@@ -16,7 +16,7 @@ c-----------------------------------------------------------------------
       use force
       use ttm,only: init_ttm,langevin_ttm,output_Te,t_ttm,
      &     calc_Ta,update_Te,assign_atom2cell,output_energy_balance,
-     &     remove_ablated_atoms
+     &     remove_ablated_atoms,set_inner_dt
       use pmdmpi,only: nid2xyz,xyz2nid
       implicit none
       include "mpif.h"
@@ -27,7 +27,7 @@ c-----------------------------------------------------------------------
       integer,intent(inout):: ifcoulomb
       integer,intent(out):: nstp_done
       real(8),intent(in):: hunit,tinit,tfin
-     &     ,trlx,srlx,stbeta,strfin,dmp,eps_conv
+     &     ,trlx,srlx,stbeta,strfin,dmp,eps_conv,vardt_len
       real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
      &     ,atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0)
      &     ,epitot(ntot0),dt,rc,rbuf,h(3,3,0:1),stnsr(3,3),fmv(3,0:9)
@@ -42,7 +42,7 @@ c-----------------------------------------------------------------------
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
       integer:: ihour,imin,isec
       real(8):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp,
-     &     htmp(3,3),prss
+     &     htmp(3,3),prss,dtmax
       real(8),external:: box_muller,sprod
       logical:: lconverged = .false.
       logical:: lstrs = .false.
@@ -76,6 +76,16 @@ c     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
         cfistp = 'i2'
       else
         write(cfistp(2:3),'(i2.2)') int(log10(dble(maxstp)))+2
+      endif
+
+c.....Variable time-step
+      if( dt.lt.0d0 ) then
+        dtmax = abs(dt)
+        lvardt = .true.
+        if( myid_md.eq.0 .and. iprint.gt.0 ) then
+          print '(a,f8.3,a)',' Use variable time-step: dtmax = '
+     &         ,dtmax,' fs'
+        endif
       endif
 
 c.....multiply damping factor 1st to avoid doing every step
@@ -148,8 +158,6 @@ c.....Some conversions
       nsp= 0
       do i=1,natm
         ra(1:3,i)= ra(1:3,i) -sorg(1:3)
-c-------scaling
-        va(1:3,i)= va(1:3,i) !*dt
 c-------species of atom-i
         nsp= max(int(tag(i)),nsp)
         if(nsp.gt.nspmax) then
@@ -181,7 +189,7 @@ c.....NEMD setting
 
 c-----setup
       allocate(fekin(nspmax),fa2v(nspmax))
-      call setup(nspmax,am,fekin,fa2v,dt)
+      call setup(nspmax,am,fekin,fa2v)
 c-----set HI and SGM
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
       if( myid_md.eq.0 ) then
@@ -467,6 +475,31 @@ c.....In case of isobaric MD, lstrs has to be always TRUE.
           lstrs = .false.
         endif
 
+c.....Variable time-step
+        if( lvardt ) then
+          dt = min( dtmax, vardt_len/vmax )
+          if( myid_md.eq.0 ) then
+            if( iprint.gt.10 ) then
+              print *,'dt,vmax,vardt_len/vmax = ',dt,vmax,vardt_len/vmax
+            else if( iprint.gt.1 ) then
+              print '(a,f8.5,a)',' update dt to ',dt,' fs'
+            endif
+          endif
+c.....Update dt-related values
+          if( trim(ctctl).eq.'Langevin' ) then
+            tgmm = 1d0/trlx
+            do ifmv=1,9
+              if( ttgt(ifmv).lt.0d0 ) then
+                tfac(ifmv)= -1d0
+              else
+                tfac(ifmv)= dsqrt(2d0*tgmm*ttgt(ifmv)/dt *k2ue)
+              endif
+            enddo
+          else if( trim(ctctl).eq.'ttm' ) then
+            call set_inner_dt(dt)
+          endif
+        endif
+
 c-------first kick of velocities
         do i=1,natm
           is = int(tag(i))
@@ -477,8 +510,6 @@ c-------first kick of velocities
           call vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire
      &         ,finc_fire,fdec_fire,nmin_fire
      &         ,natm,va,aa,myid_md,mpi_md_world,dt,iprint)
-c.....Update dt-related variables
-          call setup(nspmax,am,fekin,fa2v,dt)
         endif
 
 c-------multiply fmv or damping
@@ -565,6 +596,16 @@ c-------Calc forces
         lstrs = .false.
 
 c.....Second kick of velocities
+        do i=1,natm
+          is = int(tag(i))
+          va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
+        enddo
+
+c.....Calc kinetic energy
+        vmaxold= vmax
+        call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl
+     &       ,vmax,mpi_md_world)
+        
         if( trim(ctctl).eq.'Langevin' ) then
 c.....Langevin thermostat with Mannella integrator
           hscl(1:3)= 0d0
@@ -575,10 +616,7 @@ c.....Langevin thermostat with Mannella integrator
 c            ifmv= int(mod(tag(i)*10,10d0))
             ifmv = ifmvOf(tag(i))
             is = int(tag(i))
-            if( ifmv.eq.0 .or. tfac(ifmv).lt.0d0 ) then
-              va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
-            else
-              va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
+            if( .not. (ifmv.eq.0 .or. tfac(ifmv).lt.0d0) ) then
               ami= am(is)
               aai(1:3)= 0d0
 c.....Here unit of TMP should be [eV/Ang],
@@ -591,8 +629,6 @@ c.....but this should be [eV/Ang], so need to multiply ue2ev.
                 aai(l)= -va(l,i)*tgmm*ami*ue2ev
      &               +tmp*box_muller()/hscl(l)
               enddo
-c.....To compensate the factor 1/2 in fa2v, multiply 2 here.
-              va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(is)*dt *2d0
               if( iprint.gt.1 ) then
 c.....accumulate energy difference
                 vi(1:3)= h(1:3,1,0)*va(1,i)
@@ -604,45 +640,16 @@ c.....accumulate energy difference
                 ediff(ifmv)= ediff(ifmv) +fekin(is)
      &               *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
               endif
+c.....To compensate the factor 1/2 in fa2v, multiply 2 here.
+              va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(is)*dt *2d0
             endif
           enddo
           if( mod(istp,nrmtrans).eq.0 ) then
             call rm_trans_motion(natm,tag,va,nspmax,am
      &           ,mpi_md_world,myid_md,0)
           endif
-        else if( trim(ctctl).eq.'ttm' ) then
-          call assign_atom2cell(namax,natm,ra,sorg,boundary)
-          call langevin_ttm(namax,natm,va,aa,tag,eki,am,h
-     &         ,nspmax,fa2v,fekin,ediff,dt,mpi_md_world,iprint)
-        else
-          do i=1,natm
-            is = int(tag(i))
-            va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
-c            if( i.eq.52 ) then
-c              print *,'i,is,aa(1:3,i),va(1:3,i)=',
-c     &             i,is,aa(1:3,i),va(1:3,i)
-c            endif
-          enddo
-        endif
-
-        
-
-c.....Calc kinetic energy
-        vmaxold= vmax
-        call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl
-     &       ,vmax,mpi_md_world)
-
-        if( trim(ctctl).eq.'ttm' ) then
-          call calc_Ta(namax,natm,eki,tag,fmv,istp
-     &         ,myid_md,mpi_md_world,iprint)
-          call update_Te(istp*dt,myid_md,mpi_md_world,iprint)
-        endif
-
-        call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
-     &       ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
-        prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
 c-------temperature control by Berendsen thermostat
-        if( trim(ctctl).eq.'Berendsen' ) then
+        else if( trim(ctctl).eq.'Berendsen' ) then
           tfac(1:9)= 0d0
 c.....if final temperature is assigned,
 c.....target temperatures are forced to be set intermediate temperatures
@@ -672,7 +679,19 @@ c.....accumulate energy difference
             call rm_trans_motion(natm,tag,va,nspmax,am
      &           ,mpi_md_world,myid_md,0)
           endif
+        else if( trim(ctctl).eq.'ttm' ) then
+          call assign_atom2cell(namax,natm,ra,sorg,boundary)
+          call calc_Ta(namax,natm,eki,tag,fmv,istp
+     &         ,myid_md,mpi_md_world,iprint)
+          call langevin_ttm(namax,natm,va,aa,tag,eki,am,h
+     &         ,nspmax,fa2v,fekin,ediff,dt,mpi_md_world,iprint)
+          call update_Te(istp*dt,myid_md,mpi_md_world,iprint)
         endif
+
+        call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
+     &       ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
+        prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
+        
 
 c.....temperature distribution along x
         if( ltdst ) call calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra
@@ -752,9 +771,7 @@ c---------output step, time, and temperature
 
           if( trim(ctctl).eq.'ttm' ) then
             call output_Te(istp,myid_md,iprint)
-            if( iprint.gt.1 ) then
-              call output_energy_balance(istp,myid_md,iprint)
-            endif
+            call output_energy_balance(istp,simtime,myid_md,iprint)
           endif
             
 #ifdef __DISL__
@@ -873,7 +890,7 @@ c        close(iotemp)
         write(6,'(1x,a,f10.2)') "Time for space decomp = ",tspdcmp
         write(6,'(1x,a,f10.2)') "Time for comm         = ",tcom
         if( trim(ctctl).eq.'ttm' ) then
-          write(6,'(1x,a,f10.2)') "Time for ttm          = ",t_ttm
+          write(6,'(1x,a,f10.2)') "Time for TTM          = ",t_ttm
         endif
 
         ihour = int(tcpu/3600)
@@ -992,7 +1009,7 @@ c-------species of atom-i
       enddo
 c-----setup
       allocate(fekin(nspmax),fa2v(nspmax))
-      call setup(nspmax,am,fekin,fa2v,dt)
+      call setup(nspmax,am,fekin,fa2v)
 c-----set HI and SGM
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 c-----ntset
@@ -1105,11 +1122,10 @@ c.....deallocate all the arrays allocated
       return
       end subroutine one_shot
 c=======================================================================
-      subroutine setup(nspmax,am,fekin,fa2v,dt)
+      subroutine setup(nspmax,am,fekin,fa2v)
       implicit none
       include "params_unit.h"
       integer,intent(in):: nspmax
-      real(8),intent(in):: dt
       real(8),intent(in):: am(nspmax)
       real(8),intent(out):: fekin(nspmax),fa2v(nspmax)
 
@@ -1592,7 +1608,7 @@ c-------Error trap
      &       mpi_md_world,ierr)
         if(maxb.gt.nbmax) then
           if (myid.eq.0 .and. iprint.ne.0 ) then
-            print *,'namax and array updated since nbmax changed'
+            print *,'Updated namax and array since nbmax changed'
      &           //' from ',nbmax,' to ',int(maxb*1.5)
 c            write(*,*)'Buffer or list overflowed at bacopy'
 c            write(*,*)'LSB(0) NBMAX =',maxb,nbmax

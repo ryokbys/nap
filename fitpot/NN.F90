@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-05-18 17:29:02 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-05 12:22:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -512,7 +512,7 @@ contains
 !=======================================================================
   subroutine calc_ef1(smpl,sds)
     use variables
-    use minimize, only: mskgfs
+    use descriptor, only: mskgfs
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
@@ -620,7 +620,7 @@ contains
 !=======================================================================
   subroutine calc_ef2(smpl,sds)
     use variables
-    use minimize, only: mskgfs
+    use descriptor, only: mskgfs
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
@@ -873,7 +873,7 @@ contains
 !=======================================================================
   subroutine grad1(smpl,sds,gs)
     use variables
-    use minimize, only: mskgfs
+    use descriptor, only: mskgfs
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds
@@ -1147,7 +1147,7 @@ contains
 !=======================================================================
   subroutine grad2(smpl,sds,gs)
     use variables
-    use minimize, only: mskgfs
+    use descriptor, only: mskgfs
     implicit none
     type(mdsys),intent(inout):: smpl
     type(smpldata),intent(inout):: sds

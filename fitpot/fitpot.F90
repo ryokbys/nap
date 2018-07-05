@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-16 17:23:13 Ryo KOBAYASHI>
+!                     Last modified: <2018-06-30 22:02:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -109,7 +109,7 @@ program fitpot
        .or. trim(cpot).eq.'NN2' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
     if( (trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) &
-         .and. .not.cnormalize(1:2).eq.'no' ) then
+         .and. .not.cnormalize(1:4).eq.'none' ) then
       call normalize()
     endif
   else
@@ -325,6 +325,8 @@ subroutine get_dir_list(ionum)
   integer,intent(in):: ionum
   integer:: is,ndat
   logical:: lerror = .false.
+  integer,external:: num_data
+  character(len=128):: ctmp 
 
   if( .not. allocated(cdirlist)) allocate(cdirlist(nsmpl))
   if( .not. allocated(iclist)) allocate(iclist(nsmpl))
@@ -342,7 +344,9 @@ subroutine get_dir_list(ionum)
       print *,'Sample list was given by input.'
       open(ionum,file=trim(csmplist),status='old')
     endif
-    ndat = ndat_in_line(ionum,' ')
+    read(ionum,'(a)',end=998) ctmp
+    backspace(ionum)
+    ndat = num_data(trim(ctmp),' ')
     if( ndat.eq.1 ) then
       do is=1,nsmpl
         read(ionum,*,end=998) cdirlist(is)
@@ -751,7 +755,7 @@ subroutine write_vars(cadd)
   integer:: i
   character(len=128):: cfname
 
-  if( cnormalize(1:2).ne.'no' ) then
+  if( cnormalize(1:4).ne.'none' ) then
     if( trim(cpot).eq.'NN' .and. .not. &
          (trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' .or. &
          trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' .or. &
@@ -776,7 +780,7 @@ subroutine write_vars(cadd)
 !    print *, 'wrote '//trim(cfname)
   endif
 
-  if( cnormalize(1:2).ne.'no' ) then
+  if( cnormalize(1:4).ne.'none' ) then
     if( trim(cpot).eq.'NN' .and. .not. &
          (trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' .or. &
          trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' .or. &

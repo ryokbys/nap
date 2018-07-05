@@ -34,6 +34,11 @@ module descriptor
 
   integer:: nalmax,nnlmax,nal,nnl
 
+!.....For group LASSO/FS in minimization
+  integer:: ngl
+  real(8),allocatable:: glval(:)
+  integer,allocatable:: mskgfs(:),msktmp(:)
+
 contains
   subroutine init_desc()
 !
@@ -429,11 +434,15 @@ contains
 !.....Bcast nsp and nsf before allocating arrays
     call mpi_bcast(nsp,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf,1,mpi_integer,0,mpi_world,ierr)
+    ngl = nsf
 
 !.....Allocate arrays of lenths, nsp and/or nsf
     if( .not.allocated(itype) ) then
       allocate(itype(nsf),cnst(max_ncnst,nsf),rcs(nsf),rcs2(nsf))
       allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
+!.....Also allocate group-LASSO/FS related variables,
+!     which are not used in pmd but in fitpot
+      allocate(mskgfs(ngl),msktmp(ngl),glval(0:ngl))
     endif
     
     if( myid.eq.0 ) then

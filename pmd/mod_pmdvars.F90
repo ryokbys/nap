@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2018-03-17 13:54:24 Ryo KOBAYASHI>
+!                    Last modified: <2018-07-05 11:27:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -90,6 +90,9 @@ module pmdvars
 
 !.....Number of ifmv
   integer:: nfmv
+
+!.....Variable time-step
+  logical:: lvardt = .false.
 
 contains
   subroutine initialize_pmdvars(nspmax)

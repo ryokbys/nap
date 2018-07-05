@@ -1,6 +1,6 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-27 17:38:49 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-05 15:28:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 
   integer,parameter:: ioprms = 50
@@ -73,7 +73,7 @@ contains
 !-----local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl
     real(8):: rij,rik,riji,riki,rij2,rik2,rc2,src,src2,srcij,srcij2,srcik,srcik2
-    real(8):: tmp,tmp1(3),tmp2(3),vexp,df2,csn,tcsn,tcsn2,dhrij,dhrik &
+    real(8):: tmp,tmpj(3),tmpk(3),vexp,df2,csn,tcsn,tcsn2,dhrij,dhrik &
          ,dhcsn,vol,voli,volj,volk,drij(3),rcmax
     real(8):: drik(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl
     real(8):: epotl,epotl2,epotl3,epott
@@ -133,7 +133,7 @@ contains
         if(j.le.i) cycle
         js= int(tag(j))
         if( .not. interact(is,js) ) cycle
-        xj= ra(1:3,j)-xi(1:3)
+        xj(1:3)= ra(1:3,j)-xi(1:3)
 !!$        xij(1:3)= ( h(1:3,1)*xj(1) +h(1:3,2)*xj(2) &
 !!$             +h(1:3,3)*xj(3) ) *swli
         xij(1:3)= ( h(1:3,1)*xj(1) +h(1:3,2)*xj(2) &
@@ -224,7 +224,7 @@ contains
           xik(1:3)= ( h(1:3,1)*xk(1) +h(1:3,2)*xk(2) &
                +h(1:3,3)*xk(3) ) /aswl
           rik2= xik(1)*xik(1)+xik(2)*xik(2)+xik(3)*xik(3)
-          srcik= aswrc(is,js)
+          srcik= aswrc(is,ks)
           srcik2= srcik*srcik
           if( rik2.ge.srcik2 ) cycle
           rik=dsqrt(rik2)
@@ -243,7 +243,7 @@ contains
 !-----------force
           dhrij= -asws(is,js,ks) *aswt(is,js,ks) *vexp *tcsn2 *drijc*drijc
           dhrik= -asws(is,js,ks) *aswt(is,js,ks) *vexp *tcsn2 *drikc*drikc
-          dhcsn= 2d0 *sws *vexp *tcsn 
+          dhcsn= 2d0 *asws(is,js,ks) *vexp *tcsn 
           drij(1:3)= -xij(1:3)*riji /aswl
           drik(1:3)= -xik(1:3)*riki /aswl
           dcsnj(1:3)= (-xij(1:3)*csn*(riji*riji) +xik(1:3)*(riji*riki)) /aswl
@@ -251,21 +251,20 @@ contains
           dcsni(1:3)= -dcsnj(1:3) -dcsnk(1:3)
 !!$          aa3(1:3,i)=aa3(1:3,i) -swe*(dhcsn*dcsni(1:3) +dhrij*drij(1:3) &
 !!$                 +dhrik*drik(1:3))
-
-          tmp1(1:3)= aswe*(dhcsn*dcsnj(1:3) +dhrij*(-drij(1:3)))
-          tmp2(1:3)= aswe*(dhcsn*dcsnk(1:3) +dhrik*(-drik(1:3)))
-          aa3(1:3,i)= aa3(1:3,i) +(tmp1(1:3)+tmp2(1:3))
-          aa3(1:3,j)= aa3(1:3,j) -tmp1(1:3)
-          aa3(1:3,k)= aa3(1:3,k) -tmp2(1:3)
+          tmpj(1:3)= aswe*(dhcsn*dcsnj(1:3) +dhrij*(-drij(1:3)))
+          tmpk(1:3)= aswe*(dhcsn*dcsnk(1:3) +dhrik*(-drik(1:3)))
+          aa3(1:3,i)= aa3(1:3,i) +(tmpj(1:3)+tmpk(1:3))
+          aa3(1:3,j)= aa3(1:3,j) -tmpj(1:3)
+          aa3(1:3,k)= aa3(1:3,k) -tmpk(1:3)
 !-------------Stress
           do jxyz=1,3
             strsl(1:3,jxyz,i)=strsl(1:3,jxyz,i) &
-                 -0.5d0*xij(jxyz)*aswl*tmp1(1:3) & !*volj &
-                 -0.5d0*xik(jxyz)*aswl*tmp2(1:3) !*volk
+                 -0.5d0*xij(jxyz)*aswl*tmpj(1:3) & !*volj &
+                 -0.5d0*xik(jxyz)*aswl*tmpk(1:3) !*volk
             strsl(1:3,jxyz,j)=strsl(1:3,jxyz,j) &
-                 -0.5d0*xij(jxyz)*aswl*tmp1(1:3) !*volj
+                 -0.5d0*xij(jxyz)*aswl*tmpj(1:3) !*volj
             strsl(1:3,jxyz,k)=strsl(1:3,jxyz,k) &
-                 -0.5d0*xik(jxyz)*aswl*tmp2(1:3) !*volk
+                 -0.5d0*xik(jxyz)*aswl*tmpk(1:3) !*volk
           enddo
 
         enddo
@@ -281,7 +280,6 @@ contains
 
 !-----sum
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa2(1:3,1:natm) +aa3(1:3,1:natm)
-!!$    aa(1:3,1:natm)= aa3(1:3,1:natm)
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
