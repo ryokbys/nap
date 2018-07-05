@@ -9,7 +9,7 @@ module minimize
   real(8):: pwgt = 1d-15
 
 !.....Group FS inner loop
-  integer:: nitergfs=100
+  integer:: ninnergfs=100
 
 !.....Max iteration for line minimization
   integer:: niter_linmin   = 15
@@ -820,8 +820,7 @@ contains
 !  Limited memory BFGS(Broyden-Fletcher-Goldfarb-Shanno).
 !  See, https://en.wikipedia.org/wiki/Limited-memory_BFGS
 !
-    use NN2,only: iglid
-    use descriptor,only: glval
+    use descriptor,only: glval,ngl,iglid
     implicit none
     integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
     integer,intent(inout):: iflag
@@ -1415,8 +1414,7 @@ contains
 !  
 !  1D search using Armijo rule.
 !
-    use NN2,only: iglid
-    use descriptor,only: glval
+    use descriptor,only: glval,ngl,iglid
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag,niter
@@ -1655,8 +1653,7 @@ contains
 !
 !  Forward Stagewise (FS) regression
 !
-    use NN2,only: iglid
-    use descriptor,only: glval
+    use descriptor,only: glval,ngl,iglid
     implicit none
     integer,intent(in):: ndim,maxiter,iprint,myid
     integer,intent(inout):: iflag
@@ -1810,12 +1807,11 @@ contains
 !=======================================================================
   subroutine gfs(ndim,x,f,g,d,xtol,gtol,ftol,xranges,maxiter &
        ,iprint,iflag,myid,func,grad,cfmethod,niter_eval &
-       ,sub_eval,analyze)
+       ,sub_eval)
 !
 !  Grouped Forward Stepwise (grouped FS) regression
 !
-    use NN2,only: iglid
-    use descriptor,only: ngl,mskgfs,msktmp,glval
+    use descriptor,only: ngl,mskgfs,msktmp,glval,iglid
     implicit none
     integer,intent(in):: ndim,maxiter,iprint,myid,niter_eval
     integer,intent(inout):: iflag
@@ -1837,18 +1833,15 @@ contains
       subroutine sub_eval(iter)
         integer,intent(in):: iter
       end subroutine sub_eval
-      subroutine analyze(num)
-        integer,intent(in):: num
-      end subroutine analyze
     end interface
 
     integer:: iter,i,imax,ig,itmp,j,igmm,itergfs,niter
     real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,tmp,gmm,ftst
     real(8),allocatable,save:: xt(:),gmaxgl(:),u(:)
-    real(8),save,allocatable:: gg(:,:),v(:),y(:),gp(:) &
-         ,ggy(:),ygg(:),aa(:,:),cc(:,:)
+    real(8),save,allocatable:: gg(:,:),y(:),gp(:) &
+         ,ggy(:),ygg(:),s(:)  !,aa(:,:),cc(:,:),v(:)
     integer:: nmsks,imsk,nftol,nbases,nbasesp
-    real(8):: ynorm,svy,svyi,tmp1,tmp2,b
+    real(8):: ynorm,tmp1,tmp2,b,sy,syi  !,svy,svyi
 
     if( trim(cpena).eq.'lasso' .and. trim(cpena).eq.'glasso' ) then
       if(myid.eq.0) then
@@ -1859,8 +1852,8 @@ contains
 
     if( .not.allocated(xt) ) allocate(xt(ndim),u(ndim))
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim) &
-         ,v(ndim),y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
-         ,aa(ndim,ndim),cc(ndim,ndim))
+         ,y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
+         ,s(ndim))  !,v(ndim),aa(ndim,ndim),cc(ndim,ndim)
     if( .not. allocated(gmaxgl) ) then
       allocate(gmaxgl(ngl))
     endif
@@ -1873,8 +1866,9 @@ contains
     xt(1:ndim)= x(1:ndim)
     do i=1,ndim
       ig= iglid(i)
-      if( ig.gt.0 ) xt(i)= 1d-14
+      if( ig.gt.0 ) xt(i)= 0d0
     enddo
+    x(1:ndim)= xt(1:ndim)
 
     nmsks= 0
     do ig=1,ngl
@@ -1883,9 +1877,9 @@ contains
     enddo
     nbasesp= ngl -nmsks
 
+    call sub_eval(0)
 !.....do loop until the conversion criterion is achieved
-    iter= 0
-    do while(.true.)
+    do iter=1,maxiter
 !.....First, calc of gradient needs to be done with no masks
 !     because it is used to find another new basis
       msktmp(1:ngl)= mskgfs(1:ngl)
@@ -1894,20 +1888,11 @@ contains
       call grad(ndim,xt,g)
       mskgfs(1:ngl)= msktmp(1:ngl)
       gnorm= sqrt(sprod(ndim,g,g))
-      if( myid.eq.0 ) then
-        if( iprint.eq.1 ) then
-          write(6,'(a,i8,2es13.5)') ' itergfs,f,gnorm=',itergfs,f,gnorm
-        else if( iprint.gt.1 ) then
-          write(6,'(a,i8,12es13.5)') ' itergfs,f,gnorm,x(1:5)=' &
-               ,itergfs,f,gnorm,xt(1:5)
-        endif
-        call flush(6)
-      endif
 
       if( nmsks.eq.0 ) then
         if( myid.eq.0 ) then
           print *,'ngl=',ngl
-          print *,'nmsks is already 0, and while loop should be finished.'
+          print *,'nmsks is already 0, and finsh the WHILE loop.'
         endif
         exit
       endif
@@ -1930,32 +1915,32 @@ contains
         endif
       enddo
       if( igmm.eq.0 ) then
-        if(myid.eq.0 .and. iprint.gt.0 ) then
+        if( myid.eq.0 .and. iprint.gt.0 ) then
           print *,'igmm.eq.0 !!!'
           print *,'Nothing to do here, and going out from FS.'
         endif
-        x(1:ndim)= xt(1:ndim)
         return
       endif
 !.....remove mask of bases with large variations
       mskgfs(igmm)= 0
-      if(myid.eq.0 .and. iprint.gt.0 ) &
-           print '(a,i5,es12.4,100i2)',' igmm,gmm,mskgfs= ' &
-           ,igmm,gmm,mskgfs(1:min(ngl,100))
+      if( myid.eq.0 ) then
+        if( iprint.gt.0 ) then
+          print '(a,i5,es12.4,i5,es12.4)',' iter,f,igmm,gmm= ',iter,f,igmm,gmm
+          call flush(6)
+        endif
+      endif
       nmsks= 0
       do ig=1,ngl
         if( mskgfs(ig).eq.0 ) cycle
         nmsks= nmsks +1
       enddo
       nbases= ngl -nmsks
-      if( myid.eq.0 .and. iprint.gt.0 ) &
-           print '(a,4i8)','iter,ngl,nmsks,nbases=' &
-           ,iter,ngl,nmsks,nbases
       if( nbases > nbasesp .and. nbases.gt.1 ) then
-        call analyze(nbasesp)
+!!$        call analyze(nbasesp)
         nbasesp= nbases
       endif
 
+      x(1:ndim)= xt(1:ndim)
 !.....preparation for BFGS
       gg(1:ndim,1:ndim)= 0d0
       do i=1,ndim
@@ -1967,25 +1952,12 @@ contains
         if( ig.le.0 ) cycle
         if( mskgfs(ig).ne.0 ) g(i)= 0d0
       enddo
-      call cap_grad(ndim,g)
+!!$      call cap_grad(ndim,g)
       gnorm= sqrt(sprod(ndim,g,g))
-      if( myid.eq.0 ) then
-        if( iprint.eq.1 ) then
-          write(6,'(a,i8,2es13.5)') ' iter,f,gnorm=',iter,f,gnorm
-        else if( iprint.gt.1 ) then
-          write(6,'(a,i8,12es13.5)') ' iter,f,gnorm,x(1:5)=' &
-               ,iter,f,gnorm,x(1:5)
-        endif
-        call flush(6)
-      endif
       nftol= 0
       iflag= 0
-      if( mod(iter,niter_eval).eq.0 ) &
-           call sub_eval(iter)
 !.....BFGS loop begins
-      do itergfs=1,nitergfs
-        iter= iter +1
-        if( iter.gt.maxiter ) exit
+      do itergfs=1,ninnergfs
         u(1:ndim)= 0d0
         do i=1,ndim
           u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
@@ -2001,8 +1973,6 @@ contains
         enddo
         fp= f
         gp(1:ndim)= g(1:ndim)
-        if( mod(iter,niter_eval).eq.0 ) &
-             call sub_eval(iter)
 !.....line minimization
         if( trim(clinmin).eq.'quadratic' ) then
           call quad_interpolate(ndim,xt,u,f,ftst,xtol,gtol,ftol,alpha &
@@ -2019,30 +1989,27 @@ contains
         else if ( trim(clinmin).eq.'golden') then
           call golden_section(ndim,xt,u,f,ftst,xtol,gtol,ftol,alpha &
                ,iprint,iflag,myid,func)
-        else ! armijo (default)
-          alpha= 1d0
+        else if( trim(clinmin).eq.'armijo' ) then
+          alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
           call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
                ,iflag,myid,func,niter)
 !.....if something wrong with armijo search, try opposite direction
           if( iflag/100.ne.0 ) then
-!.....Reset iflag when we do opposite direction search.
-!            iflag= iflag -(iflag/100)*100
             alpha= -1d0
             if(myid.eq.0) print *,'trying opposite direction...'
             call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
                  ,iflag,myid,func,niter)
           endif
+        else   ! onestep (default)
+          alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+          call onestep(ndim,xt,xranges,u,f,ftst,alpha,iprint &
+               ,iflag,myid,func,niter)
         endif
 !.....get out of bfgs loop
         if( iflag/100.ne.0 ) then
           if( itergfs.eq.1 ) then
-!!$            if( myid.eq.0 ) then
-!!$              print *,'Armijo failed at 1st step of FS, so going out of FS.'
-!!$            endif
-!!$            x(1:ndim)= xt(1:ndim)
-!!$            return
             if( myid.eq.0 ) then
-              print *,"Armijo failed at 1st step of FS,"&
+              print *,"Line minimizaitonat failed 1st step of FS,"&
                    //" but keep going forward..."
             endif
 !!$!.....Set mask as 2, which means this basis will be not included
@@ -2061,7 +2028,7 @@ contains
             u(i)= 0d0
           endif
         enddo
-        call cap_grad(ndim,g)
+!!$        call cap_grad(ndim,g)
         gnorm= sqrt(sprod(ndim,g,g))
         if( myid.eq.0 ) then
           if( iprint.eq.1 ) then
@@ -2076,7 +2043,7 @@ contains
 !.....check convergence
         if( gnorm.lt.gtol ) then
           if( myid.eq.0 .and. iprint.gt.0 ) then
-            print *,'>>> QM in gFS converged wrt gtol'
+            print *,'>>> QN in gFS converged wrt gtol'
             write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
           endif
           x(1:ndim)= xt(1:ndim)
@@ -2086,14 +2053,14 @@ contains
           nftol= nftol +1
           if( nftol.gt.numtol ) then
             if( myid.eq.0 .and. iprint.gt.0 ) then
-              print *,'>>> gFS may be converged because of ftol ' // &
-                   'over 10 times.'
+              print '(a,i2,a)',' >>> QN in gFS may be converged because ' // &
+                   'of ftol over ',numtol,' times.'
             endif
             x(1:ndim)= xt(1:ndim)
             iflag= iflag +3
             exit
           else
-            if( myid.eq.0 .and. iprint.gt.0 ) then
+            if( myid.eq.0 .and. iprint.gt.1 ) then
               print *,'>>> gg initialized because |f-fp|/|fp|<ftol '
             endif
             gg(1:ndim,1:ndim)= 0d0
@@ -2104,14 +2071,15 @@ contains
           endif
         endif
 
-        v(1:ndim)= alpha *u(1:ndim)
+!!$        v(1:ndim)= alpha *u(1:ndim)
+        s(1:ndim)= alpha *u(1:ndim)
         y(1:ndim)= g(1:ndim) -gp(1:ndim)
         ynorm= sprod(ndim,y,y)
         if( ynorm.lt.1d-14 ) then
-          if(myid.eq.0 .and. iprint.gt.0 ) then
-            print *,'>>> gg initialized because y*y < 1d-14'
-            print *,'  ynorm=',ynorm
-            print *,'  alpha=',alpha
+          if(myid.eq.0 .and. iprint.gt.1 ) then
+            print *,'>>> Initialize gg because y*y < 1d-14'
+!!$            print *,'  ynorm=',ynorm
+!!$            print *,'  alpha=',alpha
           endif
           gg(1:ndim,1:ndim)= 0d0
           do i=1,ndim
@@ -2120,38 +2088,65 @@ contains
           cycle
         endif
 
-!.....update G matrix, gg, according to BFGS
-        svy= sprod(ndim,v,y)
-        svyi= 1d0/svy
+!!$!.....update G matrix, gg, according to BFGS
+!!$        svy= sprod(ndim,v,y)
+!!$        svyi= 1d0/svy
+!!$        do i=1,ndim
+!!$          tmp1= 0d0
+!!$          tmp2= 0d0
+!!$          do j=1,ndim
+!!$            aa(j,i)= v(j)*v(i) *svyi
+!!$            tmp1= tmp1 +gg(i,j)*y(j)
+!!$            tmp2= tmp2 +y(j)*gg(j,i)
+!!$          enddo
+!!$          ggy(i)= tmp1
+!!$          ygg(i)= tmp2
+!!$        enddo
+!!$        cc(1:ndim,1:ndim)= 0d0
+!!$        do j=1,ndim
+!!$          do i=1,ndim
+!!$            cc(i,j)=cc(i,j) +(v(i)*ygg(j) +ggy(i)*v(j)) *svyi
+!!$          enddo
+!!$        enddo
+!!$        b= 1d0
+!!$        do i=1,ndim
+!!$          b=b +y(i)*ggy(i) *svyi
+!!$        enddo
+!!$        aa(1:ndim,1:ndim)= aa(1:ndim,1:ndim) *b
+!!$        gg(1:ndim,1:ndim)=gg(1:ndim,1:ndim) +aa(1:ndim,1:ndim) &
+!!$             -cc(1:ndim,1:ndim)
+!!$      enddo
+
+!.....update matrix gg
+        sy= sprod(ndim,s,y)
+        syi= 1d0/sy
         do i=1,ndim
           tmp1= 0d0
           tmp2= 0d0
           do j=1,ndim
-            aa(j,i)= v(j)*v(i) *svyi
-            tmp1= tmp1 +gg(i,j)*y(j)
-            tmp2= tmp2 +y(j)*gg(j,i)
+            tmp1= tmp1 +gg(j,i)*y(j)
           enddo
-          ggy(i)= tmp1
-          ygg(i)= tmp2
-        enddo
-        cc(1:ndim,1:ndim)= 0d0
-        do j=1,ndim
-          do i=1,ndim
-            cc(i,j)=cc(i,j) +(v(i)*ygg(j) +ggy(i)*v(j)) *svyi
-          enddo
+          ggy(i)= tmp1 *syi
         enddo
         b= 1d0
         do i=1,ndim
-          b=b +y(i)*ggy(i) *svyi
+          b=b +y(i)*ggy(i)
         enddo
-        aa(1:ndim,1:ndim)= aa(1:ndim,1:ndim) *b
-        gg(1:ndim,1:ndim)=gg(1:ndim,1:ndim) +aa(1:ndim,1:ndim) &
-             -cc(1:ndim,1:ndim)
+        b= b*syi
+!.....without temporary matrix aa
+        do j=1,ndim
+          do i=1,ndim
+            gg(i,j)=gg(i,j) +s(j)*s(i)*b &
+                 -(s(i)*ggy(j) +ggy(i)*s(j))
+          enddo
+        enddo
       enddo
-      if( iter.gt.maxiter ) exit
+      x(1:ndim)= xt(1:ndim)
+      call sub_eval(iter)
     enddo
 
-999 if( myid.eq.0 .and. iprint.gt.0 ) print *,'maxiter exceeded in gfs'
+999 if( myid.eq.0 .and. iprint.gt.0 ) &
+         print *,'iter exceeds maxiter in gfs'
     iflag= iflag +10
     x(1:ndim)= xt(1:ndim)
     return
@@ -2353,8 +2348,7 @@ contains
 ! Calculate penalty term and its derivative.
 ! lasso and ridge are available.
 !
-    use NN2,only: iglid
-    use descriptor,only: glval
+    use descriptor,only: glval,ngl,iglid
     implicit none
     character(len=*),intent(in):: cpena
     integer,intent(in):: ndim
@@ -3689,3 +3683,7 @@ contains
 !=======================================================================
   
 end module
+!-----------------------------------------------------------------------
+! Local Variables:
+! compile-command: "make fitpot"
+! End:

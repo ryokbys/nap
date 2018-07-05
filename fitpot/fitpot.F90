@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-30 22:02:48 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-05 18:30:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -9,6 +9,8 @@ program fitpot
   use minimize
   use version
   use fp_common, only: subtract_FF, restore_FF, normalize
+  use NN2,only: set_iglid_NN2
+  use linreg,only: set_iglid_linreg
   implicit none
   integer:: ismpl,ihour,imin,isec
   real(8):: tmp,fval0,ftrn0,ftst0
@@ -115,6 +117,13 @@ program fitpot
   else
     print *,'ERROR: '//trim(cpot)//' is not available.'
     stop
+  endif
+
+!.....NN2 only, and should be called after func_w_pmd
+  if( trim(cpot).eq.'NN2' ) then
+    call set_iglid_NN2(cpena,cfmethod)
+  else if( trim(cpot).eq.'linreg' ) then
+    call set_iglid_linreg(cpena,cfmethod)
   endif
   
   select case (trim(cfmethod))
@@ -1191,22 +1200,25 @@ end subroutine fs_wrapper
 !=======================================================================
 subroutine gfs_wrapper(ftrn0,ftst0)
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
+  use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
-  external:: write_stats,analyze_wrapper
+  external:: write_stats
 
-  !.....NN specific code hereafter
-!!$  call NN_init()
-  call gfs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,vranges,niter &
-       ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
-       ,write_stats,analyze_wrapper)
-  call NN_analyze("fin")
-!!$  call NN_restore_standard()
+  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
+    call gfs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,vranges,niter &
+         ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
+         ,niter_eval,write_stats)
+  else
+    if( myid.eq.0 ) then
+      print *,'Warning: Group FS is not available for '&
+           //trim(cpot)
+    endif
+  endif
 
   return
 end subroutine gfs_wrapper
@@ -1828,17 +1840,6 @@ subroutine write_eliminated_vars()
   if(myid.eq.0) write(6,'(a,i6,a,i6)') ' num of 0-vars = ',i0,'/',nvars
 end subroutine write_eliminated_vars
 !=======================================================================
-subroutine analyze_wrapper(num)
-  use NNd
-  implicit none 
-  integer,intent(in):: num
-  character(len=5):: cadd
-
-  write(cadd,'(i5.5)') num
-  call NN_analyze(cadd)
-
-end subroutine analyze_wrapper
-!=======================================================================
 subroutine sync_input()
   use variables
   use parallel
@@ -1849,7 +1850,7 @@ subroutine sync_input()
   call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(niter,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(niter_eval,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(nitergfs,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(ninnergfs,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(iprint,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(cfmethod,128,mpi_character,0,mpi_world,ierr)

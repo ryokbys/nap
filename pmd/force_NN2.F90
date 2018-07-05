@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-05 12:37:46 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-05 17:35:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -45,8 +45,6 @@ module NN2
   real(8),allocatable:: prms(:)
   logical:: lprmset_NN2 = .false.
 
-!.....Group ID for weights
-  integer,allocatable:: iglid(:)
   
 contains
   subroutine force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -278,7 +276,7 @@ contains
 !
 !  Assume that the descriptor information is already read.
 !
-    use descriptor,only: nsf
+    use descriptor,only: nsf,iglid
     implicit none
     include 'mpif.h'
 
@@ -418,6 +416,7 @@ contains
 !  Accessor routine to set NN parameters from outside.
 !  Curretnly this routine is supposed to be called only on serial run.
 !
+    use descriptor,only: iglid
     implicit none 
     integer,intent(in):: nprms_in,nl_in,nhl_in(0:nl_in)
     real(8),intent(in):: prms_in(nprms_in)
@@ -907,11 +906,11 @@ contains
     return
   end subroutine set_NN2_hl1
 !=======================================================================
-  subroutine init_NN2_fitpot(cpena,cfmethod)
+  subroutine set_iglid_NN2(cpena,cfmethod)
 !
 !  Initialize some only required for fitpot.
 !
-    use descriptor,only: ngl,glval
+    use descriptor,only: ngl,glval,iglid
     character(len=*),intent(in):: cpena,cfmethod
 
     integer:: i,ihl0,ihl1
@@ -919,8 +918,7 @@ contains
 !.....Make groups for group LASSO/FS
     if( trim(cpena).eq.'glasso' &
          .or. trim(cfmethod).eq.'gfs') then
-      ngl= nhl(0)
-      if( .not.allocated(iglid) ) allocate(iglid(nwtot),glval(0:ngl))
+      if( .not.allocated(iglid) ) allocate(iglid(nwtot))
       iglid(1:nwtot)= 0
       i= 0
       do ihl0=1,nhl(0)
@@ -935,7 +933,7 @@ contains
       enddo
     endif
     
-  end subroutine init_NN2_fitpot
+  end subroutine set_iglid_NN2
 end module NN2
 !-----------------------------------------------------------------------
 !     Local Variables:

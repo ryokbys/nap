@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-27 17:41:24 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-05 17:35:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -749,6 +749,28 @@ contains
     endif
     return
   end subroutine gradw_linreg
+!=======================================================================
+  subroutine set_iglid_linreg(cpena,cfmethod)
+!
+!  Initialize some only required for fitpot.
+!
+    use descriptor,only: ngl,glval,iglid,nsf
+    character(len=*),intent(in):: cpena,cfmethod
+
+    integer:: i,isf
+    
+!.....Make groups for group LASSO/FS
+    if( trim(cpena).eq.'glasso' &
+         .or. trim(cfmethod).eq.'gfs') then
+      if( .not.allocated(iglid) ) allocate(iglid(nsf))
+      iglid(1:nsf)= 0
+      i= 0
+      do isf=1,nsf
+        iglid(isf)= isf
+      enddo
+    endif
+    
+  end subroutine set_iglid_linreg
 end module linreg
 !-----------------------------------------------------------------------
 !     Local Variables:

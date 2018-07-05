@@ -1,6 +1,6 @@
 module NNd
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-05 12:22:59 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-05 17:29:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 !  Since the module name "NN" conflicts with the same name in pmd/,
@@ -51,6 +51,7 @@ contains
     use variables
     use parallel
     use minimize
+    use descriptor,only: glval,ngl,iglid
     implicit none 
     integer:: itmp,i,nw,natm,ismpl,ihl0,ihl1,itmp2,ndat
     real(8):: swgtrn,swgtst,dtmp

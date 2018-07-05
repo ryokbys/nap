@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-07-05 12:52:34 Ryo KOBAYASHI>
+c                     Last-modified: <2018-07-05 17:02:20 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -767,6 +767,7 @@ c---------output step, time, and temperature
      &             ,stnsr(3,3)*up2gpa ,stnsr(2,3)*up2gpa
      &             ,stnsr(1,3)*up2gpa ,stnsr(1,2)*up2gpa
             endif
+            call flush(6)
           endif
 
           if( trim(ctctl).eq.'ttm' ) then

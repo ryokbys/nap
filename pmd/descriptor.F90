@@ -37,7 +37,7 @@ module descriptor
 !.....For group LASSO/FS in minimization
   integer:: ngl
   real(8),allocatable:: glval(:)
-  integer,allocatable:: mskgfs(:),msktmp(:)
+  integer,allocatable:: mskgfs(:),msktmp(:),iglid(:)
 
 contains
   subroutine init_desc()
