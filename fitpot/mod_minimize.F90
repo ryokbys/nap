@@ -6,6 +6,7 @@ module minimize
 !.....penalty: lasso or ridge or smooth
   character(len=128):: cpena= 'none'
   character(len=128):: clinmin= 'onestep'
+  character(len=128):: cfsmode= 'normal'  ! [normal,corr]
   real(8):: pwgt = 1d-15
 
 !.....Group FS inner loop
@@ -1812,6 +1813,7 @@ contains
 !  Grouped Forward Stepwise (grouped FS) regression
 !
     use descriptor,only: ngl,mskgfs,msktmp,glval,iglid
+    use variables,only: gsfcorr
     implicit none
     integer,intent(in):: ndim,maxiter,iprint,myid,niter_eval
     integer,intent(inout):: iflag
@@ -1835,10 +1837,10 @@ contains
       end subroutine sub_eval
     end interface
 
-    integer:: iter,i,imax,ig,itmp,j,igmm,itergfs,niter
+    integer:: iter,i,imax,ig,jg,itmp,j,igmm,itergfs,niter
     real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,tmp,gmm,ftst
     real(8),allocatable,save:: xt(:),gmaxgl(:),u(:)
-    real(8),save,allocatable:: gg(:,:),y(:),gp(:) &
+    real(8),save,allocatable:: gg(:,:),y(:),gp(:),rg(:) &
          ,ggy(:),ygg(:),s(:)  !,aa(:,:),cc(:,:),v(:)
     integer:: nmsks,imsk,nftol,nbases,nbasesp
     real(8):: ynorm,tmp1,tmp2,b,sy,syi  !,svy,svyi
@@ -1850,7 +1852,15 @@ contains
       endif
     endif
 
-    if( .not.allocated(xt) ) allocate(xt(ndim),u(ndim))
+    if( .not. allocated(gsfcorr) ) then
+      if( myid.eq.0 ) then
+        print *,'ERROR@gfs: gsfcorr not allocated!'
+        print *,'  normalize_input should be norm/variance.'
+      endif
+      return
+    endif
+
+    if( .not.allocated(xt) ) allocate(xt(ndim),u(ndim),rg(ngl))
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim) &
          ,y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
          ,s(ndim))  !,v(ndim),aa(ndim,ndim),cc(ndim,ndim)
@@ -1875,7 +1885,7 @@ contains
       if( mskgfs(ig).eq.0 ) cycle
       nmsks= nmsks +1
     enddo
-    nbasesp= ngl -nmsks
+    nbasesp = ngl -nmsks
 
     call sub_eval(0)
 !.....do loop until the conversion criterion is achieved
@@ -1905,6 +1915,20 @@ contains
                +g(i)*g(i)
         endif
       enddo
+
+      if( trim(cfsmode).eq.'corr' .and. nbasesp.gt.0 ) then
+        rg(:) = 0d0
+        do ig=1,ngl
+          do jg=1,ngl
+            if( jg.eq.ig ) cycle
+            if( mskgfs(jg).ne.0 ) cycle
+            rg(ig) = rg(ig) +gsfcorr(ig,jg)
+          enddo
+          rg(ig) = rg(ig) /nbasesp
+          gmaxgl(ig) = gmaxgl(ig) *(1d0- rg(ig))
+!!$          gmaxgl(ig) = gmaxgl(ig) *(- log(rg(ig)))
+        enddo
+      endif
       gmm= 0d0
       igmm= 0
       do ig=1,ngl
@@ -1974,22 +1998,7 @@ contains
         fp= f
         gp(1:ndim)= g(1:ndim)
 !.....line minimization
-        if( trim(clinmin).eq.'quadratic' ) then
-          call quad_interpolate(ndim,xt,u,f,ftst,xtol,gtol,ftol,alpha &
-               ,iprint,iflag,myid,func)
-!.....if quad interpolation failed, perform golden section
-          if( iflag/100.ne.0 ) then
-            iflag= iflag -(iflag/100)*100
-            if(myid.eq.0) then
-              print *,'Since quad_interpolate failed, call golden_section.'
-            endif
-            call golden_section(ndim,xt,u,f,ftst,xtol,gtol,ftol,alpha &
-                 ,iprint,iflag,myid,func)
-          endif
-        else if ( trim(clinmin).eq.'golden') then
-          call golden_section(ndim,xt,u,f,ftst,xtol,gtol,ftol,alpha &
-               ,iprint,iflag,myid,func)
-        else if( trim(clinmin).eq.'armijo' ) then
+        if( trim(clinmin).eq.'armijo' ) then
           alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
           call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
                ,iflag,myid,func,niter)
@@ -2071,15 +2080,12 @@ contains
           endif
         endif
 
-!!$        v(1:ndim)= alpha *u(1:ndim)
         s(1:ndim)= alpha *u(1:ndim)
         y(1:ndim)= g(1:ndim) -gp(1:ndim)
         ynorm= sprod(ndim,y,y)
         if( ynorm.lt.1d-14 ) then
           if(myid.eq.0 .and. iprint.gt.1 ) then
             print *,'>>> Initialize gg because y*y < 1d-14'
-!!$            print *,'  ynorm=',ynorm
-!!$            print *,'  alpha=',alpha
           endif
           gg(1:ndim,1:ndim)= 0d0
           do i=1,ndim
@@ -2087,35 +2093,6 @@ contains
           enddo
           cycle
         endif
-
-!!$!.....update G matrix, gg, according to BFGS
-!!$        svy= sprod(ndim,v,y)
-!!$        svyi= 1d0/svy
-!!$        do i=1,ndim
-!!$          tmp1= 0d0
-!!$          tmp2= 0d0
-!!$          do j=1,ndim
-!!$            aa(j,i)= v(j)*v(i) *svyi
-!!$            tmp1= tmp1 +gg(i,j)*y(j)
-!!$            tmp2= tmp2 +y(j)*gg(j,i)
-!!$          enddo
-!!$          ggy(i)= tmp1
-!!$          ygg(i)= tmp2
-!!$        enddo
-!!$        cc(1:ndim,1:ndim)= 0d0
-!!$        do j=1,ndim
-!!$          do i=1,ndim
-!!$            cc(i,j)=cc(i,j) +(v(i)*ygg(j) +ggy(i)*v(j)) *svyi
-!!$          enddo
-!!$        enddo
-!!$        b= 1d0
-!!$        do i=1,ndim
-!!$          b=b +y(i)*ggy(i) *svyi
-!!$        enddo
-!!$        aa(1:ndim,1:ndim)= aa(1:ndim,1:ndim) *b
-!!$        gg(1:ndim,1:ndim)=gg(1:ndim,1:ndim) +aa(1:ndim,1:ndim) &
-!!$             -cc(1:ndim,1:ndim)
-!!$      enddo
 
 !.....update matrix gg
         sy= sprod(ndim,s,y)

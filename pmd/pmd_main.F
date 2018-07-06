@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-07-05 12:43:31 Ryo KOBAYASHI>
+c                     Last-modified: <2018-07-06 17:31:24 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -329,6 +329,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(nstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(minstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(dt,1,MPI_REAL8,0,mpi_md_world,ierr)
+      call mpi_bcast(vardt_len,1,MPI_REAL8,0,mpi_md_world,ierr)
       call mpi_bcast(rc,1,MPI_REAL8,0,mpi_md_world,ierr)
       call mpi_bcast(rbuf,1,MPI_REAL8,0,mpi_md_world,ierr)
       call mpi_bcast(cmin,20,mpi_character,0,mpi_md_world,ierr)
