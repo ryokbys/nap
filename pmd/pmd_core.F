@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-07-05 17:02:20 Ryo KOBAYASHI>
+c                     Last-modified: <2018-07-07 10:09:08 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -477,6 +477,7 @@ c.....In case of isobaric MD, lstrs has to be always TRUE.
 
 c.....Variable time-step
         if( lvardt ) then
+          call get_vmax(namax,natm,va,h,vmax,mpi_md_world)
           dt = min( dtmax, vardt_len/vmax )
           if( myid_md.eq.0 ) then
             if( iprint.gt.10 ) then
@@ -1333,6 +1334,32 @@ c      print *,'va(1:3,imax)=',va(1:3,imax)
       vmax=dsqrt(vmax)
 
       end subroutine get_ekin
+c=======================================================================
+      subroutine get_vmax(namax,natm,va,h,vmax,mpi_md_world)
+      implicit none 
+      include "mpif.h"
+      integer,intent(in):: namax,natm,mpi_md_world
+      real(8),intent(in):: va(3,namax),h(3,3)
+      real(8),intent(out):: vmax
+
+      integer:: i,ierr
+      real(8):: vx,vy,vz,v(3),v2,vmaxl
+
+      vmaxl = 0d0
+      do i=1,natm
+        vx = va(1,i)
+        vy = va(2,i)
+        vz = va(3,i)
+        v(1:3) = h(1:3,1)*vx +h(1:3,2)*vy +h(1:3,3)*vz
+        v2 = v(1)*v(1) +v(2)*v(2) +v(3)*v(3)
+        vmaxl = max(vmaxl,v2)
+      enddo
+      vmax= 0d0
+      call mpi_allreduce(vmaxl,vmax,1,mpi_real8
+     &     ,mpi_max,mpi_md_world,ierr)
+      vmax=dsqrt(vmax)
+      return
+      end subroutine get_vmax
 c=======================================================================
       subroutine calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra,eki
      &     ,istp,nouterg,myid_md,mpi_md_world,sorg)

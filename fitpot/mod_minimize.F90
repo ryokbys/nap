@@ -6,7 +6,7 @@ module minimize
 !.....penalty: lasso or ridge or smooth
   character(len=128):: cpena= 'none'
   character(len=128):: clinmin= 'onestep'
-  character(len=128):: cfsmode= 'normal'  ! [normal,corr]
+  character(len=128):: cfsmode= 'corr'  ! [normal,corr]
   real(8):: pwgt = 1d-15
 
 !.....Group FS inner loop
@@ -1839,10 +1839,10 @@ contains
 
     integer:: iter,i,imax,ig,jg,itmp,j,igmm,itergfs,niter
     real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,tmp,gmm,ftst
-    real(8),allocatable,save:: xt(:),gmaxgl(:),u(:)
+    real(8),allocatable,save:: xt(:),gmaxgl(:),u(:),gmaxgl0(:)
     real(8),save,allocatable:: gg(:,:),y(:),gp(:),rg(:) &
          ,ggy(:),ygg(:),s(:)  !,aa(:,:),cc(:,:),v(:)
-    integer:: nmsks,imsk,nftol,nbases,nbasesp
+    integer:: nmsks,imsk,nftol,nbases
     real(8):: ynorm,tmp1,tmp2,b,sy,syi  !,svy,svyi
 
     if( trim(cpena).eq.'lasso' .and. trim(cpena).eq.'glasso' ) then
@@ -1865,7 +1865,7 @@ contains
          ,y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
          ,s(ndim))  !,v(ndim),aa(ndim,ndim),cc(ndim,ndim)
     if( .not. allocated(gmaxgl) ) then
-      allocate(gmaxgl(ngl))
+      allocate(gmaxgl(ngl),gmaxgl0(ngl))
     endif
     if( .not.allocated(mskgfs) ) then
       allocate(mskgfs(ngl),msktmp(ngl))
@@ -1885,7 +1885,7 @@ contains
       if( mskgfs(ig).eq.0 ) cycle
       nmsks= nmsks +1
     enddo
-    nbasesp = ngl -nmsks
+    nbases = ngl -nmsks
 
     call sub_eval(0)
 !.....do loop until the conversion criterion is achieved
@@ -1894,10 +1894,16 @@ contains
 !     because it is used to find another new basis
       msktmp(1:ngl)= mskgfs(1:ngl)
       mskgfs(1:ngl)= 0
+      xt(:) = 0d0
       call func(ndim,xt,f,ftst)
       call grad(ndim,xt,g)
       mskgfs(1:ngl)= msktmp(1:ngl)
       gnorm= sqrt(sprod(ndim,g,g))
+      if( iter.eq.1 ) then
+        do ig=1,ngl
+          print *,'ig,g*g=',ig,g(ig)*g(ig)
+        enddo
+      endif
 
       if( nmsks.eq.0 ) then
         if( myid.eq.0 ) then
@@ -1915,8 +1921,14 @@ contains
                +g(i)*g(i)
         endif
       enddo
+      if( iter.eq.1 ) then
+        gmaxgl0(:) = gmaxgl(:)
+      else
+        gmaxgl(:) = gmaxgl0(:)
+      endif
 
-      if( trim(cfsmode).eq.'corr' .and. nbasesp.gt.0 ) then
+      print *,'iter,cfsmode,nbases=',iter,trim(cfsmode),nbases
+      if( trim(cfsmode).eq.'corr' .and. nbases.gt.0 ) then
         rg(:) = 0d0
         do ig=1,ngl
           do jg=1,ngl
@@ -1924,9 +1936,10 @@ contains
             if( mskgfs(jg).ne.0 ) cycle
             rg(ig) = rg(ig) +gsfcorr(ig,jg)
           enddo
-          rg(ig) = rg(ig) /nbasesp
+          rg(ig) = rg(ig) /nbases
           gmaxgl(ig) = gmaxgl(ig) *(1d0- rg(ig))
 !!$          gmaxgl(ig) = gmaxgl(ig) *(- log(rg(ig)))
+          print *,'ig,rg,gmaxgl=',ig,rg(ig),gmaxgl(ig)
         enddo
       endif
       gmm= 0d0
@@ -1959,10 +1972,6 @@ contains
         nmsks= nmsks +1
       enddo
       nbases= ngl -nmsks
-      if( nbases > nbasesp .and. nbases.gt.1 ) then
-!!$        call analyze(nbasesp)
-        nbasesp= nbases
-      endif
 
       x(1:ndim)= xt(1:ndim)
 !.....preparation for BFGS
