@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-07-05 11:30:43 Ryo KOBAYASHI>
+!                     Last-modified: <2018-07-09 22:46:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -621,7 +621,7 @@ contains
     real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0,vt(3)&
          ,aain(3),aaout(3),vin(3),vout(3),v0(3)
     real(8):: ediffl(nspmax),deinl(nspmax),deoutl(nspmax)
-    integer,external:: ifmvOf
+    integer,external:: ifmvOf,itotOf
     real(8),external:: box_muller,sprod
     logical,save:: l1st = .true.
 
@@ -654,7 +654,7 @@ contains
       else
         ic = a2c(i)
         call ic2ixyz(ic,ix,iy,iz)
-        if( ix.lt.lsurf ) continue
+        if( ix.lt.lsurf ) cycle
         vt(1:3) = va(1:3,i)
         ami= am(isp)
         sgmi = sgm(ic) *dsqrt(ami)
@@ -888,8 +888,8 @@ contains
       if( myid.eq.0 ) print *,'Warning: lsurf.eq.rsurf!'
     endif
     if( myid.eq.0 .and. iprint.gt.1 ) then
-      print *, 'lsurf,ivac_right,densx= ',lsurf,ivac_right&
-           ,densx(1:4),densx(nx)
+      print '(a,2i4,5es12.4)', 'lsurf,ivac_right,densx= ' &
+           ,lsurf,ivac_right,densx(max(1,lsurf-2):lsurf+2)
     endif
     return
   end subroutine update_surface_plane
