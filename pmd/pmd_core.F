@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-07-07 10:09:08 Ryo KOBAYASHI>
+c                     Last-modified: <2018-07-11 10:07:26 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -42,7 +42,7 @@ c-----------------------------------------------------------------------
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
       integer:: ihour,imin,isec
       real(8):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp,
-     &     htmp(3,3),prss,dtmax
+     &     htmp(3,3),prss,dtmax,vmaxt,rbufres
       real(8),external:: box_muller,sprod
       logical:: lconverged = .false.
       logical:: lstrs = .false.
@@ -86,6 +86,7 @@ c.....Variable time-step
           print '(a,f8.3,a)',' Use variable time-step: dtmax = '
      &         ,dtmax,' fs'
         endif
+        dt = dtmax
       endif
 
 c.....multiply damping factor 1st to avoid doing every step
@@ -255,11 +256,9 @@ c            tfac(ifmv)= sqrt(2d0*tgmm*(fkb*ev2j)*ttgt(ifmv)/dt)
 c     &           *m2ang/s2fs
 c            tfac(ifmv)= dsqrt(2d0*tgmm*fkb*ttgt(ifmv)/dt)
             tfac(ifmv)= dsqrt(2d0*tgmm*ttgt(ifmv)/dt *k2ue)
-            print *,'ifmv,ttgt,dt,tfac,k2ue='
-     &           ,ifmv,ttgt(ifmv),dt,tfac(ifmv),k2ue
           endif
         enddo
-        if( myid_md.eq.0 ) then
+        if( myid_md.eq.0 .and. iprint.gt.0 ) then
           print *,''
           print *,'Langevin thermostat parameters:'
           print '(a,f10.2)','   Relaxation time = ',trlx
@@ -340,13 +339,7 @@ c-----calc kinetic energy
 
       istp= 0
       simtime = 0d0
-      istps= istp
-      ts= istps*dt
-      te= rbuf/(2d0*vmax/dt) +istp*dt
-      istpe= int(te/dt)
-c.....Considering vmax==0d0, make istpe small only for the first step
-      if( istpe.gt.100 ) istpe=100
-c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
+      rbufres = rbuf
 
       if(myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,*) ''
@@ -518,6 +511,9 @@ c-------multiply fmv or damping
           l= int(mod(tag(i)*10,10d0))
           va(1:3,i)=va(1:3,i) *fmv(1:3,l)
         enddo
+c        call get_vmax(namax,natm,va,h,vmaxt,mpi_md_world)
+c        print '(a,i5,2es12.4)','myid,vmax,vmaxt='
+c     &       ,myid_md,vmax,vmaxt
 
 c-------update positions
         do i=1,natm
@@ -552,13 +548,12 @@ c.....Reset matrices
         endif
         simtime = simtime +dt
 
-c.....Update te considering change of vmax
-        te=(te-ts)*vmaxold/vmax +ts
-        istpe= int(te/dt)
+c.....Update rbufres considering change of vmax
+        rbufres = rbufres -vmax*dt*2d0
 
 c.....Update pair list and boundary atoms
 c.....if making new pair list is needed.
-        if( istp.ge.istpe .or.
+        if( rbufres.le.0d0 .or.
      &       (ifpmd.gt.0.and.mod(istp,noutpmd).eq.0) ) then
           if( trim(ctctl).eq.'ttm' ) then
             call remove_ablated_atoms(simtime,namax,natm
@@ -574,11 +569,7 @@ c.....Copy RA of boundary atoms
 c.....Make pair list
           call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h
      &         ,hi,anxi,anyi,anzi,lspr,iprint,.false.)
-          ts= istp*dt
-          te=rbuf/(2d0*vmax/dt) +ts
-          istpe= int(te/dt)
-c          if(myid_md.eq.0) write(6,'(a,i10)')
-c     &         " Next update step will be ",istpe
+          rbufres = rbuf
         else
 c.....Copy RA of boundary atoms determined by 'bacopy'
           call bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax
@@ -2009,6 +2000,11 @@ c      integer:: status(MPI_STATUS_SIZE)
         l1st=.false.
       endif
 
+      if( size(dbuf).ne.9*nbmax ) then
+        deallocate(dbuf,dbufr)
+        allocate(dbuf(9,nbmax),dbufr(9,nbmax))
+      endif
+
       call nid2xyz(myid_md,ix,iy,iz)
 
 c-----newim: num. of new immigrants
@@ -2640,8 +2636,16 @@ c
       integer:: n0,ixyz,natmt,i,ierr,ntott
       integer:: istat(mpi_status_size),itag
       real(8):: t0
+      real(8),allocatable,save:: ratmp(:,:)
 
       t0 = mpi_wtime()
+
+      if( .not. allocated(ratmp) ) then
+        allocate(ratmp(3,natm))
+      else if( size(ratmp).lt.3*natm ) then
+        deallocate(ratmp)
+        allocate(ratmp(3,natm))
+      endif
 
       if( myid_md.eq.0 ) then
         n0 = natm
@@ -2698,14 +2702,14 @@ c        write(6,'(a,f10.3)') ' time space_comp = ',mpi_wtime() -t0
      &       ,mpi_md_world,ierr)
 c.....positions should be shifted before passing data
         do i=1,natm
-          ra(1:3,i) = ra(1:3,i) + sorg(1:3)
+          ratmp(1:3,i) = ra(1:3,i) + sorg(1:3)
         enddo
-        call mpi_send(ra,3*natm,mpi_real8,0,itag+2
+        call mpi_send(ratmp,3*natm,mpi_real8,0,itag+2
      &       ,mpi_md_world,ierr)
-c.....positions should be reverted after passing data
-        do i=1,natm
-          ra(1:3,i) = ra(1:3,i) - sorg(1:3)
-        enddo
+cc.....positions should be reverted after passing data
+c        do i=1,natm
+c          ra(1:3,i) = ra(1:3,i) - sorg(1:3)
+c        enddo
         call mpi_send(va,3*natm,mpi_real8,0,itag+3
      &       ,mpi_md_world,ierr)
         call mpi_send(epi,natm,mpi_real8,0,itag+4

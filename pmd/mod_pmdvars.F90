@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2018-07-05 11:27:23 Ryo KOBAYASHI>
+!                    Last modified: <2018-07-11 09:57:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -35,7 +35,7 @@ module pmdvars
   integer:: nxmlt
 !.....Search time and expiration time
   real(8):: ts,te
-  integer:: istps,istpe
+  integer:: istpe
 !.....simulation box
   real(8):: hi(3,3),vol,sgm(3,3),al(3),avol
   real(8):: ht(3,3,0:1),hti(3,3),dh
