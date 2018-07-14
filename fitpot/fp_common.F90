@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-30 22:00:37 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-12 16:37:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -922,8 +922,8 @@ contains
     call mpi_allreduce(nsuml,nsumg,1,mpi_integer &
          ,mpi_sum,mpi_world,ierr)
     gsfms(1:nsf)= gsfms(1:nsf)/nsumg
-    gsfvs(1:nsf)= gsfss(1:nsf)/nsumg &
-         -gsfms(1:nsf)**2
+    gsfss(1:nsf)= gsfss(1:nsf)/nsumg
+    gsfvs(1:nsf)= gsfss(1:nsf) -gsfms(1:nsf)**2
 
 !.....Correlation coefficients
     gsfcl(:,:) = 0d0
@@ -1011,6 +1011,9 @@ contains
       if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) &
            print *,'Normalize descriptors wrt norm.'
       call normalize_norm()
+    else if( cnormalize(1:4).eq.'none' ) then
+      if( myid.eq.0 .and. iprint.ne.0 ) &
+           print *,'No normalizatino of descriptors.'
     else
       if( myid.eq.0 .and. iprint.ne.0 ) &
            print *,'WARNING: no such normalization, '//trim(cnormalize)

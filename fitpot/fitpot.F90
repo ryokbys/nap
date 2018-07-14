@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-05 18:30:22 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-12 12:25:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -110,8 +110,7 @@ program fitpot
        .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' &
        .or. trim(cpot).eq.'NN2' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
-    if( (trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) &
-         .and. .not.cnormalize(1:4).eq.'none' ) then
+    if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
       call normalize()
     endif
   else

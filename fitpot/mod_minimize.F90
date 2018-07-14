@@ -6,7 +6,7 @@ module minimize
 !.....penalty: lasso or ridge or smooth
   character(len=128):: cpena= 'none'
   character(len=128):: clinmin= 'onestep'
-  character(len=128):: cfsmode= 'corr'  ! [normal,corr]
+  character(len=128):: cfsmode= 'grad'  ! [grad,grad0corr,df0corr]
   real(8):: pwgt = 1d-15
 
 !.....Group FS inner loop
@@ -1837,12 +1837,12 @@ contains
       end subroutine sub_eval
     end interface
 
-    integer:: iter,i,imax,ig,jg,itmp,j,igmm,itergfs,niter
-    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,tmp,gmm,ftst
+    integer:: iter,i,imax,ig,jg,itmp,j,igmm,itergfs,niter,inc,jnc
+    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,f0,tmp,gmm,ftst
     real(8),allocatable,save:: xt(:),gmaxgl(:),u(:),gmaxgl0(:)
     real(8),save,allocatable:: gg(:,:),y(:),gp(:),rg(:) &
-         ,ggy(:),ygg(:),s(:)  !,aa(:,:),cc(:,:),v(:)
-    integer:: nmsks,imsk,nftol,nbases
+         ,ggy(:),ygg(:),s(:),g0(:)  !,aa(:,:),cc(:,:),v(:)
+    integer:: nmsks,imsk,nftol,nbases,nvar
     real(8):: ynorm,tmp1,tmp2,b,sy,syi  !,svy,svyi
 
     if( trim(cpena).eq.'lasso' .and. trim(cpena).eq.'glasso' ) then
@@ -1860,7 +1860,7 @@ contains
       return
     endif
 
-    if( .not.allocated(xt) ) allocate(xt(ndim),u(ndim),rg(ngl))
+    if( .not.allocated(xt) ) allocate(xt(ndim),u(ndim),rg(ngl),g0(ndim))
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim) &
          ,y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
          ,s(ndim))  !,v(ndim),aa(ndim,ndim),cc(ndim,ndim)
@@ -1872,7 +1872,7 @@ contains
     endif
     mskgfs(1:ngl)= 1
     msktmp(1:ngl)= mskgfs(1:ngl)
-    
+
     xt(1:ndim)= x(1:ndim)
     do i=1,ndim
       ig= iglid(i)
@@ -1887,23 +1887,54 @@ contains
     enddo
     nbases = ngl -nmsks
 
-    call sub_eval(0)
-!.....do loop until the conversion criterion is achieved
-    do iter=1,maxiter
-!.....First, calc of gradient needs to be done with no masks
-!     because it is used to find another new basis
-      msktmp(1:ngl)= mskgfs(1:ngl)
-      mskgfs(1:ngl)= 0
-      xt(:) = 0d0
+!.....cfsmode==df0corr, loss-func decrease of each descriptor
+    if( trim(cfsmode).eq.'df0corr' ) then
       call func(ndim,xt,f,ftst)
       call grad(ndim,xt,g)
-      mskgfs(1:ngl)= msktmp(1:ngl)
-      gnorm= sqrt(sprod(ndim,g,g))
-      if( iter.eq.1 ) then
-        do ig=1,ngl
-          print *,'ig,g*g=',ig,g(ig)*g(ig)
+      fp = f
+      gp(:) = g(:)
+      print *,'initial f = ',fp
+      do ig=1,ngl
+        u(:) = -gp(:)
+        g(:) = gp(:)
+        do i=1,ndim
+          if( ig.eq.i ) cycle
+          u(i) = 0d0
+          g(i) = 0d0
         enddo
+        f = fp
+!!$      alpha = 1d0
+!!$      call onestep(ndim,xt,xranges,u,f,ftst,alpha,iprint &
+!!$           ,iflag,myid,func,niter)
+        alpha = min(max(alpha,xtol*10d0)*2d0, 1d0)
+        call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
+             ,iflag,myid,func,niter)
+        print *,'ig,f,f-fp=',ig,f,f-fp
+        gmaxgl0(ig) = -(f-fp)
+      enddo
+    else if( trim(cfsmode).eq.'grad0corr' ) then
+      call func(ndim,xt,f,ftst)
+      call grad(ndim,xt,g)
+      f0 = f
+      g0(:) = g(:)
+    endif
+
+    call sub_eval(0)
+    do iter=1,maxiter
+      fp = f
+      if( trim(cfsmode).eq.'grad' ) then
+!.....First, calc of gradient needs to be done with no masks
+!     because it is used to find another new basis
+        msktmp(1:ngl)= mskgfs(1:ngl)
+        mskgfs(1:ngl)= 0
+        call func(ndim,xt,f,ftst)
+        call grad(ndim,xt,g)
+!.....do loop until the conversion criterion is achieved
+        mskgfs(1:ngl)= msktmp(1:ngl)
+      else if( trim(cfsmode).eq.'grad0corr' ) then
+        g(:) = g0(:)
       endif
+      gnorm= sqrt(sprod(ndim,g,g))
 
       if( nmsks.eq.0 ) then
         if( myid.eq.0 ) then
@@ -1921,26 +1952,41 @@ contains
                +g(i)*g(i)
         endif
       enddo
-      if( iter.eq.1 ) then
-        gmaxgl0(:) = gmaxgl(:)
-      else
+      if( trim(cfsmode).eq.'grad0corr' ) then
+        if( iter.eq.1 ) then
+          gmaxgl0(:) = gmaxgl(:)
+        else
+          gmaxgl(:) = gmaxgl0(:)
+        endif
+      else if( trim(cfsmode).eq.'df0corr' ) then
         gmaxgl(:) = gmaxgl0(:)
       endif
-
-      print *,'iter,cfsmode,nbases=',iter,trim(cfsmode),nbases
-      if( trim(cfsmode).eq.'corr' .and. nbases.gt.0 ) then
+      if( (trim(cfsmode).eq.'grad0corr' .or. &
+           trim(cfsmode).eq.'df0corr') .and. nbases.gt.0 ) then
         rg(:) = 0d0
         do ig=1,ngl
-          do jg=1,ngl
-            if( jg.eq.ig ) cycle
-            if( mskgfs(jg).ne.0 ) cycle
-            rg(ig) = rg(ig) +gsfcorr(ig,jg)
-          enddo
-          rg(ig) = rg(ig) /nbases
+          if( mskgfs(ig).ne.0 ) then
+            do jg=1,ngl
+              if( jg.eq.ig ) cycle
+              if( mskgfs(jg).ne.0 ) cycle
+!!$            rg(ig) = rg(ig) +gsfcorr(ig,jg)
+              rg(ig) = max(rg(ig),gsfcorr(ig,jg))
+            enddo
+          endif
+          if( myid.eq.0 .and. iprint.gt.2 ) then
+            print '(a,i5,3es12.4)','ig,rg,gmax,gmax*(1-rg)=',ig,rg(ig),gmaxgl(ig) &
+                 ,gmaxgl(ig)*(1d0 -rg(ig))
+          endif
+!!$          rg(ig) = rg(ig) /nbases
           gmaxgl(ig) = gmaxgl(ig) *(1d0- rg(ig))
 !!$          gmaxgl(ig) = gmaxgl(ig) *(- log(rg(ig)))
-          print *,'ig,rg,gmaxgl=',ig,rg(ig),gmaxgl(ig)
         enddo
+      else
+        if( myid.eq.0 .and. iprint.gt.2 ) then
+          do ig=1,ngl
+            print '(a,i5,es12.4)','ig,gmaxgl=',ig,gmaxgl(ig)
+          enddo
+        endif
       endif
       gmm= 0d0
       igmm= 0
@@ -1974,6 +2020,9 @@ contains
       nbases= ngl -nmsks
 
       x(1:ndim)= xt(1:ndim)
+      xt(:) = 0d0
+      call func(ndim,xt,f,ftst)
+      call grad(ndim,xt,g)
 !.....preparation for BFGS
       gg(1:ndim,1:ndim)= 0d0
       do i=1,ndim
@@ -1992,8 +2041,21 @@ contains
 !.....BFGS loop begins
       do itergfs=1,ninnergfs
         u(1:ndim)= 0d0
+!!$        do i=1,ndim
+!!$          u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
+!!$        enddo
+        inc = 0
         do i=1,ndim
-          u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
+          ig = iglid(i)
+          if( ig.gt.0 .and. mskgfs(ig).ne.0 ) cycle
+          inc = inc + 1
+          jnc = 0
+          do j=1,ndim
+            jg = iglid(j)
+            if( jg.gt.0 .and. mskgfs(jg).ne.0 ) cycle
+            jnc = jnc + 1
+            u(i)= u(i) -gg(inc,jnc)*g(j)
+          enddo
         enddo
 !.....mask some u that have small contributions
         do i=1,ndim
@@ -2037,23 +2099,20 @@ contains
           exit
         endif
         xt(1:ndim)= xt(1:ndim) +alpha*u(1:ndim)
+        call wrap_ranges(ndim,xt,xranges)
         call grad(ndim,xt,g)
         do i=1,ndim
           ig= iglid(i)
           if( ig.le.0 ) cycle
           if( mskgfs(ig).ne.0 ) then
             g(i)= 0d0
-            u(i)= 0d0
           endif
         enddo
 !!$        call cap_grad(ndim,g)
         gnorm= sqrt(sprod(ndim,g,g))
         if( myid.eq.0 ) then
-          if( iprint.eq.1 ) then
+          if( iprint.gt.0 ) then
             write(6,'(a,i8,2es13.5)') ' itergfs,f,gnorm=',itergfs,f,gnorm
-          else if( iprint.eq.2 ) then
-            write(6,'(a,i8,12es13.5)') ' itergfs,f,gnorm,x(1:5)=' &
-                 ,itergfs,f,gnorm,xt(1:5)
           endif
           call flush(6)
         endif
@@ -2069,10 +2128,10 @@ contains
           exit
         else if( abs(f-fp)/abs(fp).lt.ftol) then
           nftol= nftol +1
-          if( nftol.gt.numtol ) then
+          if( nftol.ge.numtol ) then
             if( myid.eq.0 .and. iprint.gt.0 ) then
               print '(a,i2,a)',' >>> QN in gFS may be converged because ' // &
-                   'of ftol over ',numtol,' times.'
+                   'of ftol ',numtol,' times consecutively.'
             endif
             x(1:ndim)= xt(1:ndim)
             iflag= iflag +3
@@ -2088,9 +2147,23 @@ contains
             cycle
           endif
         endif
+        nftol = 0
 
-        s(1:ndim)= alpha *u(1:ndim)
-        y(1:ndim)= g(1:ndim) -gp(1:ndim)
+!.....BFGS treatment with reduced number of variables
+
+        inc = 0
+        s(:) = 0d0
+        y(:) = 0d0
+        do i=1,ndim
+          ig = iglid(i)
+          if( ig.gt.0 .and. mskgfs(ig).ne.0 ) cycle
+          inc = inc + 1
+          s(inc) = alpha *u(i)
+          y(inc) = g(i) -gp(i)
+        enddo
+        nvar = inc
+!!$        s(1:ndim)= alpha *u(1:ndim)
+!!$        y(1:ndim)= g(1:ndim) -gp(1:ndim)
         ynorm= sprod(ndim,y,y)
         if( ynorm.lt.1d-14 ) then
           if(myid.eq.0 .and. iprint.gt.1 ) then
@@ -2104,24 +2177,30 @@ contains
         endif
 
 !.....update matrix gg
-        sy= sprod(ndim,s,y)
+!!$        sy= sprod(ndim,s,y)
+        sy= sprod(nvar,s,y)
         syi= 1d0/sy
-        do i=1,ndim
+!!$        do i=1,ndim
+        do i=1,nvar
           tmp1= 0d0
           tmp2= 0d0
-          do j=1,ndim
+!!$          do j=1,ndim
+          do j=1,nvar
             tmp1= tmp1 +gg(j,i)*y(j)
           enddo
           ggy(i)= tmp1 *syi
         enddo
         b= 1d0
-        do i=1,ndim
+!!$        do i=1,ndim
+        do i=1,nvar
           b=b +y(i)*ggy(i)
         enddo
         b= b*syi
 !.....without temporary matrix aa
-        do j=1,ndim
-          do i=1,ndim
+!!$        do j=1,ndim
+!!$          do i=1,ndim
+        do j=1,nvar
+          do i=1,nvar
             gg(i,j)=gg(i,j) +s(j)*s(i)*b &
                  -(s(i)*ggy(j) +ggy(i)*s(j))
           enddo

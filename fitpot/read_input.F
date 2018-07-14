@@ -147,8 +147,11 @@ c=======================================================================
       elseif( trim(cname).eq.'test_ratio' ) then
         call read_r1(ionum,ratio_test)
         return
-      elseif( trim(cname).eq.'num_inner_gfs' ) then
+      elseif( trim(cname).eq.'fs_num_inner' ) then
         call read_i1(ionum,ninnergfs)
+        return
+      elseif( trim(cname).eq.'fs_mode' ) then
+        call read_c1(ionum,cfsmode)
         return
       elseif( trim(cname).eq.'eps_energy' ) then
         call read_r1(ionum,epse)

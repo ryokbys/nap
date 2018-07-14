@@ -78,6 +78,7 @@ Parameters users can set in ``in.pmd`` are following:
 * :ref:`io_format`
 * :ref:`print_level`
 * :ref:`time_interval`
+* :ref:`vardt_length_scale`
 * :ref:`num_iteration`
 * :ref:`min_iteration`
 * :ref:`num_out_energy`
@@ -149,9 +150,6 @@ How much information is written out during the run.
 1:
   Normal information for MD simulation run.
 
-10:
-  Info for fitpot is written out such as ``out.NN.gsf``, ``out.NN.dgsf``, ``erg0000`` and ``frc0000``.
-
 100:
   Debug info is written out.
 
@@ -165,6 +163,26 @@ time_interval
 * Default: 1.0
 
 Time interval in the unit of **femto second**.
+If negative, it activates *variable time-step mode* and its absolute value is the maximum time interval :math:`\Delta t_{\max}` in the mode.
+
+------------------------
+
+.. _vardt_length_scale: 
+
+vardt_length_scale
+------------------------------
+
+* Default: 0.1
+
+The specific length :math:`L^*` of the *variable time-step mode* where the time interval is determined as 
+
+.. math::
+   :nowrap:
+
+   \begin{equation}
+      \Delta t = \min \left( \Delta t_\mathrm{max}, \frac{L^*}{v_\mathrm{max}}\right).
+   \end{equation}
+
 
 
 ------------------------

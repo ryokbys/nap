@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-05 17:35:32 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-13 10:09:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -182,18 +182,19 @@ contains
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ielem &
          ,iwgt,isf,ja,jj
     real(8):: b_na,at(3),epotl,wgt,aexp,bnai,apot,epott,tmp
-    real(8),save,allocatable:: aal(:,:)
+    real(8),save,allocatable:: aal(:,:),strsl(:,:,:)
 
     if( l1st ) then
-      if( allocated(aal) ) deallocate(aal)
-      allocate(aal(3,namax))
+      if( allocated(aal) ) deallocate(aal,strsl)
+      allocate(aal(3,namax),strsl(3,3,namax))
     endif
 
     if( size(aal).lt.3*namax ) then
-      deallocate(aal)
-      allocate(aal(3,namax))
+      deallocate(aal,strsl)
+      allocate(aal(3,namax),strsl(3,3,namax))
     endif
     aal(1:3,1:namax) = 0d0
+    strsl(1:3,1:3,1:natm+nb) = 0d0
     epotl= 0d0
 
     call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr &
@@ -226,7 +227,6 @@ contains
 !!$      is = int(tag(ia))
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-        js = int(tag(ja))
         do isf=1,nsf
           if( igsf(isf,jj,ia).eq.0 ) cycle
           wgt = coeff(isf)

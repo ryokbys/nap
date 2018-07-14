@@ -102,8 +102,8 @@ module variables
   real(8):: gsfmean,gsfvar
   real(8),allocatable:: gsfms(:),gsfvs(:),sgms(:),sgmis(:)
   real(8),allocatable:: gsfcorr(:,:),gsfss(:)
-  real(8),parameter:: sgm_min = 1d-3
-  real(8),parameter:: sq_min = 1d-8
+  real(8),parameter:: sgm_min = 1d-2
+  real(8),parameter:: sq_min = 1d-2
 
   integer:: nsmpl_trn,nsmpl_tst
   type(mdsys),allocatable:: samples(:)
