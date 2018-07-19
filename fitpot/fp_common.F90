@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-12 16:37:55 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-17 10:26:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -1061,7 +1061,7 @@ contains
       enddo
       if( myid.eq.0 .and. iprint.gt.1 ) then
         do isf=1,nsf
-          print '(a,i5,2es12.4)','isf,sgm,sgmi=',isf,sgms(isf),sgmis(isf)
+          print '(a,i5,2es12.4)','   isf,sgm,sgmi=',isf,sgms(isf),sgmis(isf)
         enddo
       endif
     endif
@@ -1124,7 +1124,7 @@ contains
       enddo
       if( myid.eq.0 .and. iprint.gt.1 ) then
         do isf=1,nsf
-          print '(a,i5,2es12.4)','isf,sgm,sgmi=',isf,sgms(isf),sgmis(isf)
+          print '(a,i5,2es12.4)','   isf,sgm,sgmi=',isf,sgms(isf),sgmis(isf)
         enddo
       endif
     endif

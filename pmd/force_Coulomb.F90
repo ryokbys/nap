@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-27 17:43:28 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-18 10:48:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -426,7 +426,7 @@ contains
             cycle
           endif
           if( iprint.ne.0 ) then
-            write(6,'(a,i3,a5,2f7.3,i4)') ' isp,cname,vid,rad,npq =' &
+            write(6,'(a,i3,a5,2f7.3,i4)') '   isp,cname,vid,rad,npq =' &
                  ,isp,trim(cname),vid,rad,npq
           endif
           ispflag(isp) = .true.
@@ -455,7 +455,7 @@ contains
           rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
 !!$            rho_bvs(isp,jsp) = 2d0
           if( iprint.gt.0 .and. interact(isp,jsp) .and. jsp.ge.isp ) then
-            write(6,'(a,2i5,f10.4)') ' isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
+            write(6,'(a,2i5,f10.4)') '   isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
           endif
         enddo
       enddo

@@ -1592,7 +1592,7 @@ contains
         if( alphai.lt.tiny ) then
           if( myid.eq.0 .and. iprint.gt.0 ) then
             print *,'WARNING: alpha.lt.tiny in onestep,'
-            print *,'         which means the search direction could be wrong.'
+            print *,'         which means the search direction would be wrong.'
             print *,'   iter,alphai,fi=',iter,alphai,fi
           endif
           iflag = iflag + 100
@@ -1606,7 +1606,7 @@ contains
     niter = iter
     if( myid.eq.0 .and. iprint.gt.0 ) then
       print *, 'WARNING: iter.gt.NITER_LINMIN in onestep,'
-      print *, '         which means the search direction could be wrong.'
+      print *, '         which means the search direction would be wrong.'
       write(6,'(a,es13.5)') '   alphai = ',alphai
     endif
     return
@@ -1837,7 +1837,8 @@ contains
       end subroutine sub_eval
     end interface
 
-    integer:: iter,i,imax,ig,jg,itmp,j,igmm,itergfs,niter,inc,jnc
+    integer:: iter,i,imax,ig,jg,itmp,j,igmm,itergfs,niter,inc,jnc&
+         ,nfailinmin
     real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,f0,tmp,gmm,ftst
     real(8),allocatable,save:: xt(:),gmaxgl(:),u(:),gmaxgl0(:)
     real(8),save,allocatable:: gg(:,:),y(:),gp(:),rg(:) &
@@ -1888,7 +1889,7 @@ contains
     nbases = ngl -nmsks
 
 !.....cfsmode==df0corr, loss-func decrease of each descriptor
-    if( trim(cfsmode).eq.'df0corr' ) then
+    if( index(cfsmode,'df0').ne.0 ) then
       call func(ndim,xt,f,ftst)
       call grad(ndim,xt,g)
       fp = f
@@ -1912,7 +1913,7 @@ contains
         print *,'ig,f,f-fp=',ig,f,f-fp
         gmaxgl0(ig) = -(f-fp)
       enddo
-    else if( trim(cfsmode).eq.'grad0corr' ) then
+    else if( index(cfsmode,'grad0').ne.0 ) then
       call func(ndim,xt,f,ftst)
       call grad(ndim,xt,g)
       f0 = f
@@ -1922,17 +1923,17 @@ contains
     call sub_eval(0)
     do iter=1,maxiter
       fp = f
-      if( trim(cfsmode).eq.'grad' ) then
+      if( index(cfsmode,'grad0').ne.0 ) then
+        g(:) = g0(:)
+      else if( index(cfsmode,'grad').ne.0 ) then
 !.....First, calc of gradient needs to be done with no masks
 !     because it is used to find another new basis
         msktmp(1:ngl)= mskgfs(1:ngl)
         mskgfs(1:ngl)= 0
         call func(ndim,xt,f,ftst)
         call grad(ndim,xt,g)
-!.....do loop until the conversion criterion is achieved
+!.....Restore mask
         mskgfs(1:ngl)= msktmp(1:ngl)
-      else if( trim(cfsmode).eq.'grad0corr' ) then
-        g(:) = g0(:)
       endif
       gnorm= sqrt(sprod(ndim,g,g))
 
@@ -1961,30 +1962,28 @@ contains
       else if( trim(cfsmode).eq.'df0corr' ) then
         gmaxgl(:) = gmaxgl0(:)
       endif
-      if( (trim(cfsmode).eq.'grad0corr' .or. &
-           trim(cfsmode).eq.'df0corr') .and. nbases.gt.0 ) then
+      if( index(cfsmode,'corr').ne.0  .and. nbases.gt.0 ) then
         rg(:) = 0d0
         do ig=1,ngl
           if( mskgfs(ig).ne.0 ) then
             do jg=1,ngl
               if( jg.eq.ig ) cycle
               if( mskgfs(jg).ne.0 ) cycle
-!!$            rg(ig) = rg(ig) +gsfcorr(ig,jg)
+!.....Adopt maximum correlation as rg
               rg(ig) = max(rg(ig),gsfcorr(ig,jg))
             enddo
           endif
           if( myid.eq.0 .and. iprint.gt.2 ) then
-            print '(a,i5,3es12.4)','ig,rg,gmax,gmax*(1-rg)=',ig,rg(ig),gmaxgl(ig) &
+            print '(a,i5,3es12.4)','  ig,rg,gmax,gmax*(1-rg)=',ig,rg(ig),gmaxgl(ig) &
                  ,gmaxgl(ig)*(1d0 -rg(ig))
           endif
-!!$          rg(ig) = rg(ig) /nbases
+!.....Scale gmaxgl w.r.t. rg
           gmaxgl(ig) = gmaxgl(ig) *(1d0- rg(ig))
-!!$          gmaxgl(ig) = gmaxgl(ig) *(- log(rg(ig)))
         enddo
       else
         if( myid.eq.0 .and. iprint.gt.2 ) then
           do ig=1,ngl
-            print '(a,i5,es12.4)','ig,gmaxgl=',ig,gmaxgl(ig)
+            print '(a,i5,es12.4)','  ig,gmaxgl=',ig,gmaxgl(ig)
           enddo
         endif
       endif
@@ -2028,16 +2027,17 @@ contains
       do i=1,ndim
         gg(i,i)= 1d0
       enddo
-!.....mask some g that have small contributions
+!.....Mask some g's
       do i=1,ndim
         ig= iglid(i)
         if( ig.le.0 ) cycle
         if( mskgfs(ig).ne.0 ) g(i)= 0d0
       enddo
-!!$      call cap_grad(ndim,g)
+
       gnorm= sqrt(sprod(ndim,g,g))
       nftol= 0
       iflag= 0
+      nfailinmin = 0
 !.....BFGS loop begins
       do itergfs=1,ninnergfs
         u(1:ndim)= 0d0
@@ -2057,7 +2057,7 @@ contains
             u(i)= u(i) -gg(inc,jnc)*g(j)
           enddo
         enddo
-!.....mask some u that have small contributions
+!.....mask u
         do i=1,ndim
           ig= iglid(i)
           if( ig.le.0 ) cycle
@@ -2095,8 +2095,29 @@ contains
 !!$!.....Set mask as 2, which means this basis will be not included
 !!$!     and not taken into consideration anymore.
 !!$            mskgfs(igmm)= 2
+          else ! itergsf.ne.1
+            nfailinmin = nfailinmin +1
+            if( nfailinmin.eq.1 ) then
+              if( myid.eq.0 .and. iprint.gt.1 ) then
+                print *,'>>> Initialize gg because alpha was not found.'
+              endif
+              gg(:,:) = 0d0
+              do i=1,ndim
+                gg(i,i) = 1d0
+              enddo
+              f = fp
+              iflag = iflag -100*(iflag/100)
+              alpha = 1d0
+              cycle
+            else ! nfailnmin > 1
+              if( myid.eq.0 ) then
+                print *,'>>> Line minimization failed twice consecutively.'
+              endif
+              exit
+            endif
           endif
-          exit
+        else ! iflag/100.eq.0
+          nfailinmin = 0
         endif
         xt(1:ndim)= xt(1:ndim) +alpha*u(1:ndim)
         call wrap_ranges(ndim,xt,xranges)
@@ -2108,13 +2129,13 @@ contains
             g(i)= 0d0
           endif
         enddo
-!!$        call cap_grad(ndim,g)
+
         gnorm= sqrt(sprod(ndim,g,g))
         if( myid.eq.0 ) then
           if( iprint.gt.0 ) then
             write(6,'(a,i8,2es13.5)') ' itergfs,f,gnorm=',itergfs,f,gnorm
+            call flush(6)
           endif
-          call flush(6)
         endif
 
 !.....check convergence
