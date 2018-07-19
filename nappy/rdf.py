@@ -128,6 +128,8 @@ def plot_figures(nspcs,rd,agr):
     plt.legend()
     plt.savefig("graph_rdf_total.png", format='png', dpi=300, bbox_inches='tight')
 
+    if nspcs == 1:
+        return
     plt.clf()
     fig, axes = plt.subplots(nspcs,nspcs,figsize=(15,10),sharex=True)
     for i in range(nspcs):
@@ -143,6 +145,8 @@ def plot_figures(nspcs,rd,agr):
             ax.set_title('{0:d}-{1:d}'.format(isp,jsp))
             if isp==jsp:
                 ax.set_xlabel('Distance (A)')
+            if isp==1 and jsp==1:
+                ax.set_ylabel('RDF')
     plt.savefig("graph_rdfs.png", format='png', dpi=300, bbox_inches='tight')
     return
 
@@ -198,7 +202,10 @@ if __name__ == "__main__":
         plot_figures(nspcs,rd,agr)
         print ''
         print ' RDF graphes are plotted.'
-        print ' Check graph_rdf.png'
+        if nspcs == 1:
+            print ' Check graph_rdf_total.png'
+        else:
+            print ' Check graph_rdf_total.png and graph_rdfs.png'
     else:
         print ' Check '+ofname+' with gnuplot, like'
         print ''
