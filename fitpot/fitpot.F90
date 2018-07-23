@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-12 12:25:59 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-20 13:16:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1860,6 +1860,7 @@ subroutine sync_input()
   call mpi_bcast(cpot,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cpena,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(clinmin,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cfsmode,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cnormalize,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(crefstrct,128,mpi_character,0,mpi_world,ierr)
 

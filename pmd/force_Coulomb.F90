@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-18 10:48:47 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-19 18:38:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -547,7 +547,7 @@ contains
     real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
          ,vcgjiimin,sgmlim
 
-    if( params_read ) return
+!!$    if( params_read ) return
 
     if( myid.eq.0 ) then
 !.....Initialization
@@ -693,12 +693,21 @@ contains
       endif
 
 !.....Set screening length
-      if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
+      if( trim(cchgs).eq.'fixed_bvs' ) then
         do isp=1,nsp
           do jsp=1,nsp
             rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+          enddo
+        enddo
+      else
+        rho_bvs(:,:) = rho_screened_cut
+      endif
+      if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
+        do isp=1,nsp
+          do jsp=isp,nsp
+!!$            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
 !!$            rho_bvs(isp,jsp) = 2d0
-            if( iprint.gt.0 .and. interact(isp,jsp) .and. jsp.ge.isp ) then
+            if( iprint.gt.0 .and. interact(isp,jsp) ) then
               write(6,'(a,2i5,f10.4)') ' isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
             endif
           enddo
@@ -1336,9 +1345,9 @@ contains
          ,qi,qj,radi,radj,rhoij,terfc,texp,sqpi &
          ,vrc,dvdrc,terfcc,rc2
 
-    if( rho_bvs(1,1).lt.0.1 ) then
-      rho_bvs(1:msp,1:msp) = rho_screened_cut
-    endif
+!!$    if( rho_bvs(1,1).lt.0.1 ) then
+!!$      rho_bvs(1:msp,1:msp) = rho_screened_cut
+!!$    endif
 
     esrl= 0d0
     sqpi = 1d0/sqrt(pi)

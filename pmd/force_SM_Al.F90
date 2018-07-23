@@ -27,15 +27,18 @@ contains
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
-    integer:: i,j,k,l,m,n,ierr,is
+    integer:: i,j,k,l,m,n,ierr,is,ixyz,jxyz
     real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,dphi,at(3)
     real(8):: x,y,z,xi(3),epotl,epott,tmp
     logical,save:: l1st=.true.
-    real(8),allocatable,save:: sqrho(:)
+    real(8),allocatable,save:: sqrho(:),strsl(:,:,:)
     real(8),save:: exrc,phic,dphic
 
     if( l1st ) then
+      if( allocated(sqrho) ) deallocate(sqrho)
       allocate(sqrho(namax+nbmax))
+      if( allocated(strsl) ) deallocate(strsl)
+      allocate(strsl(3,3,namax))
 !-----smoothing embeded term
       exrc= exp(-ea_bt*(rc-ea_re))
 !-----smoothing 2-body term
@@ -47,8 +50,17 @@ contains
       l1st=.false.
     endif
 
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
+    endif
+    if( size(sqrho).lt.namax+nbmax ) then
+      deallocate(sqrho)
+      allocate(sqrho(namax+nbmax))
+    endif
     epotl= 0d0
     sqrho(1:natm)= 0d0
+    strsl(1:3,1:3,1:namax) = 0d0
 
 !-----rho(i)
     do i=1,natm
@@ -106,15 +118,42 @@ contains
              -dphic
         aa(1:3,i)=aa(1:3,i) -dphi*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dphi*drdxi(1:3)
+!.....Atomic stress for 2-body terms
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                   -0.5d0*dphi*xij(ixyz)*(-drdxi(jxyz))
+              strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                   -0.5d0*dphi*xij(ixyz)*(-drdxi(jxyz))
+            enddo
+          enddo
+        endif
 !---------embedded term
         drhoij= -ea_bt*exp(-ea_bt*r) +ea_bt*exrc
         dfj= -0.5d0*ea_a/sqrho(j)
-        aa(1:3,i)=aa(1:3,i) -(dfi+dfj)*drhoij*drdxi(1:3)
-        aa(1:3,j)=aa(1:3,j) +(dfi+dfj)*drhoij*drdxi(1:3)
+        tmp = (dfi+dfj)*drhoij
+        aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
+        aa(1:3,j)=aa(1:3,j) +tmp*drdxi(1:3)
+!.....Atomic stress of many-body contributions
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+              strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+            enddo
+          enddo
+        endif
       enddo
       epi(i)=epi(i) -ea_a*sqrho(i)
       epotl=epotl -ea_a*sqrho(i)
     enddo
+
+    if( lstrs ) then
+      strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
 
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
