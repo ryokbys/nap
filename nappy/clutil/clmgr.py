@@ -315,6 +315,9 @@ Please wait until the other clmgr stops or stop it manually.
                                                                   seconds)
             self.mpi_command_dict['npara'] = npara
             job_info['NPROCS'] = npara
+            # if self.mpi_command_dict.has_key('rankfile'):
+            #     make_rankfile(0,nnodes,npn1,d)
+            #     self.mpi_command_dict['rankfile'] = './rankfile'
             command = self.machine.get_mpi_command(**self.mpi_command_dict)
             job_info['COMMANDS'] = command
             script = self.sched.script_single(job_info)
@@ -559,7 +562,10 @@ nprocs_per_node: 12
 
         The arguments should correspond to this mpi_command.
         """
-        return self.machine_conf['mpi_command'].format(**kwarg)
+        command = self.machine_conf['mpi_command'].format(**kwarg)
+        if '--vcoordfile None' in command:
+            command = command.replace('--vcoordfile None','')
+        return command
 
     def check_mpi_command(self,**kwarg):
         keys = self.mpi_command_keys()

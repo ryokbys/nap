@@ -224,7 +224,7 @@ def script_single(job_info):
     - JOB_NAME
     - QUEUE
     - NNODES
-    - NPROCS_NODE
+    - NPROCS
     - WORKDIR
     - COMMANDS
 
@@ -241,7 +241,7 @@ def script_plural(job_info):
     - JOB_NAME
     - QUEUE
     - NNODES
-    - NPROCS_NODE
+    - NPROCS
     - WORKDIR
     - COMMANDS
 
