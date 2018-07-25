@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-07-11 10:07:26 Ryo KOBAYASHI>
+c                     Last-modified: <2018-07-25 17:33:08 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -2746,36 +2746,40 @@ c
       if( .not. allocated(itag) .or. natm.gt.nsave ) then
         if( allocated(itag) ) deallocate(itag,buf)
         nsave = natm
-        allocate(itag(natm),buf(20,natm))
+        allocate(itag(natm),buf(28,natm))
       endif
 
       do i=1,natm
         buf(1:3,i)= ra(1:3,i)
         buf(4:6,i)= va(1:3,i)
-        buf(7,i)= eki(1,1,i)
-        buf(8,i)= epi(i)
-        buf(9:11,i) = strs(1:3,1,i)
-        buf(12:14,i)= strs(1:3,2,i)
-        buf(15:17,i)= strs(1:3,3,i)
-        buf(18,i)= tag(i)
-        buf(19,i)= chg(i)
-        buf(20,i)= chi(i)
+        buf(7,i)= epi(i)
+        buf(8:10,i)= eki(1:3,1,i)
+        buf(11:13,i)= eki(1:3,2,i)
+        buf(14:16,i)= eki(1:3,3,i)
+        buf(17:19,i) = strs(1:3,1,i)
+        buf(20:22,i)= strs(1:3,2,i)
+        buf(23:25,i)= strs(1:3,3,i)
+        buf(26,i)= tag(i)
+        buf(27,i)= chg(i)
+        buf(28,i)= chi(i)
         itag(i)= itotOf(tag(i))
       enddo
 
-      call heapsort_itag(natm,natm,itag,20,buf)
+      call heapsort_itag(natm,natm,itag,28,buf)
 
       do i=1,natm
         ra(1:3,i)= buf(1:3,i)
         va(1:3,i)= buf(4:6,i)
-        eki(1,1,i)= buf(7,i)
-        epi(i)= buf(8,i)
-        strs(1:3,1,i)= buf(9:11,i)
-        strs(1:3,2,i)= buf(12:14,i)
-        strs(1:3,3,i)= buf(15:17,i)
-        tag(i)= buf(18,i)
-        chg(i)= buf(19,i)
-        chi(i)= buf(20,i)
+        epi(i)= buf(7,i)
+        eki(1:3,1,i)= buf(8:10,i)
+        eki(1:3,2,i)= buf(11:13,i)
+        eki(1:3,3,i)= buf(14:16,i)
+        strs(1:3,1,i)= buf(17:19,i)
+        strs(1:3,2,i)= buf(20:22,i)
+        strs(1:3,3,i)= buf(23:25,i)
+        tag(i)= buf(26,i)
+        chg(i)= buf(27,i)
+        chi(i)= buf(28,i)
       enddo
 
       end subroutine sort_by_tag

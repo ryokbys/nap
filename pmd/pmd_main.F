@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-07-25 16:57:54 Ryo KOBAYASHI>
+c                     Last-modified: <2018-07-25 17:11:50 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -509,6 +509,7 @@ c.....
         real(8):: urnd
         end function urnd
       end interface
+c      real(8),external:: urnd
 
       if( myid_md.eq.0 ) then
 c.....Find a center atom ICNTR
