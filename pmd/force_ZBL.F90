@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-27 17:42:57 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-25 14:33:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -62,7 +62,7 @@ contains
       cmode = ''
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
-      interact(1:msp,1:msp) = .false.
+      interact(1:msp,1:msp) = .true.
       qnucl(1:msp) = 0d0
       zbl_rc = 0d0
       
@@ -93,7 +93,7 @@ contains
           r_outer(isp) = ro
           zbl_rc = max(zbl_rc,ro)
           if( iprint.ne.0 ) then
-            write(6,'(a,i4,3(2x,f0.3))') &
+            write(6,'(a,i4,3(2x,f7.3))') &
                  '   isp,qnucl,ri,ro = ',isp,qnucli,ri,ro
           endif
         else if( trim(cmode).eq.'interactions' ) then
@@ -112,7 +112,7 @@ contains
 !!$          interact(jsp,isp) = .true.
 !!$        enddo
 !!$      enddo
-      if( iprint.ne.0 ) then
+      if( iprint.gt.1 ) then
         do isp=1,msp
           do jsp=isp,msp
             if( interact(isp,jsp) ) then

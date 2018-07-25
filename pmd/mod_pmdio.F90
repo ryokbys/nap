@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-05 11:27:04 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-25 16:09:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -98,4 +98,9 @@ module pmdio
 
 !.....Boundary condition: p = periodic, f = free, w = wall
   character(len=3):: boundary = 'ppp'
+
+!.....PKA for radiation damage
+  real(8):: pka_energy = 0.d0 ! in eV
+  real(8):: pka_theta = 0.d0  ! in degree
+  real(8):: pka_phi = 0.d0    ! in degree
 end module pmdio

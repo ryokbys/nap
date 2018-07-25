@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-07-06 17:31:24 Ryo KOBAYASHI>
+c                     Last-modified: <2018-07-25 16:57:54 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -126,6 +126,11 @@ c.....Make ntot and ?tot() not null in nodes myid_md != 0
      &       ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0)
      &       ,chgtot(ntot0),chitot(ntot0))
         chitot(1:ntot0) = 0d0
+      endif
+
+c.....Add PKA velocity to some atom
+      if( pka_energy .gt. 1d-3 ) then
+        call add_pka_velocity(myid_md)
       endif
 
 c.....call pmd_core to perfom MD
@@ -485,6 +490,57 @@ c=======================================================================
       print *,'Ensemble = ',trim(c_ensemble)
       
       end subroutine check_ensemble
+c=======================================================================
+      subroutine add_pka_velocity(myid_md)
+c.....
+c.....Add PKA velocity to some atom from a given PKA energy
+c.....
+      use pmdio
+      implicit none
+      include './params_unit.h'
+      integer,intent(in):: myid_md
+      real(8),parameter:: pi= 3.14159265358979d0
+
+      integer:: i,icntr,is
+      real(8):: dmin,d,theta,phi,rx,ry,rz,vel
+      interface
+        function urnd(dseed0)
+        real(8),intent(in),optional:: dseed0
+        real(8):: urnd
+        end function urnd
+      end interface
+
+      if( myid_md.eq.0 ) then
+c.....Find a center atom ICNTR
+        icntr = 0
+        dmin = 1d+10
+        do i=1,ntot0
+          d = (rtot(1,i)-0.5d0)**2
+     &         +(rtot(2,i)-0.5d0)**2
+     &         +(rtot(3,i)-0.5d0)**2
+          if( d .lt. dmin ) then
+            icntr = i
+            dmin = d
+          endif
+        enddo
+
+
+c.....Add PKA velocity at ICNTR atom
+c.....Get random theta and phi
+        theta = 90d0 *urnd() /180d0 *pi
+        phi = 90d0 *urnd() /180d0 *pi
+        rx = sin(theta)*cos(phi)
+        ry = sin(theta)*sin(phi)
+        rz = cos(theta)
+        is = int(tagtot(icntr))
+c.....[eV] to [Ang/fs]
+        vel = sqrt(pka_energy*ev2j *2 /(am(is)*ump2kg)) *m2ang /s2fs
+        vtot(1,icntr) = vtot(1,icntr) +rx*vel
+        vtot(2,icntr) = vtot(2,icntr) +ry*vel
+        vtot(3,icntr) = vtot(3,icntr) +rz*vel
+
+      endif
+      end subroutine add_pka_velocity
 c-----------------------------------------------------------------------
 c     Local Variables:
 c     compile-command: "make pmd"

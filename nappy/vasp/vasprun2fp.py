@@ -74,7 +74,7 @@ def output_for_fitpot(atoms,keep_const,dirname='./',specorder=[]):
     write_pos(atoms,fname=dirname+'/pos',specorder=specorder)
     if not os.path.exists(dirname+'/POSCAR'):
         write(dirname+'/POSCAR',images=atoms,format='vasp',
-              direct=True,vasp5=True,sort=True)
+              direct=True,vasp5=True,sort=False)
     with open(dirname+'/strs.ref','w') as f:
         strs = atoms.get_stress()
         for s in strs:
