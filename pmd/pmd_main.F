@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-07-25 17:11:50 Ryo KOBAYASHI>
+c                     Last-modified: <2018-07-26 18:07:11 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -129,7 +129,7 @@ c.....Make ntot and ?tot() not null in nodes myid_md != 0
       endif
 
 c.....Add PKA velocity to some atom
-      if( pka_energy .gt. 1d-3 ) then
+      if( pka_energy .gt. 0d0 ) then
         call add_pka_velocity(myid_md)
       endif
 
@@ -367,6 +367,7 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(nrmtrans,6,mpi_integer,0,mpi_md_world,ierr)
       call mpi_bcast(lstrs0,1,mpi_logical,0,mpi_md_world,ierr)
       call mpi_bcast(boundary,3,mpi_character,0,mpi_md_world,ierr)
+      call mpi_bcast(pka_energy,1,mpi_real8,0,mpi_md_world,ierr)
 c.....Charge related
       call mpi_bcast(lvc,1,mpi_logical,0,mpi_md_world,ierr)
       call mpi_bcast(chgfix,20,mpi_character,0,mpi_md_world,ierr)
@@ -502,7 +503,7 @@ c.....
       real(8),parameter:: pi= 3.14159265358979d0
 
       integer:: i,icntr,is
-      real(8):: dmin,d,theta,phi,rx,ry,rz,vel
+      real(8):: dmin,d,theta,phi,rx,ry,rz,vel,vx,vy,vz
       interface
         function urnd(dseed0)
         real(8),intent(in),optional:: dseed0
@@ -525,7 +526,6 @@ c.....Find a center atom ICNTR
           endif
         enddo
 
-
 c.....Add PKA velocity at ICNTR atom
 c.....Get random theta and phi
         theta = 90d0 *urnd() /180d0 *pi
@@ -535,10 +535,17 @@ c.....Get random theta and phi
         rz = cos(theta)
         is = int(tagtot(icntr))
 c.....[eV] to [Ang/fs]
-        vel = sqrt(pka_energy*ev2j *2 /(am(is)*ump2kg)) *m2ang /s2fs
-        vtot(1,icntr) = vtot(1,icntr) +rx*vel
-        vtot(2,icntr) = vtot(2,icntr) +ry*vel
-        vtot(3,icntr) = vtot(3,icntr) +rz*vel
+        vel = sqrt(pka_energy*ev2j *2d0 /(am(is)*ump2kg)) *m2ang /s2fs
+        vx = rx*vel
+        vy = ry*vel
+        vz = rz*vel
+c.....Assume an orthogonal simulation box
+        vx = vx /h(1,1,0)
+        vy = vy /h(2,2,0)
+        vz = vz /h(3,3,0)
+        vtot(1,icntr) = vtot(1,icntr) +vx
+        vtot(2,icntr) = vtot(2,icntr) +vy
+        vtot(3,icntr) = vtot(3,icntr) +vz
 
       endif
       end subroutine add_pka_velocity
