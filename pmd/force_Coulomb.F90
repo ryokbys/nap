@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-19 18:38:21 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-26 21:01:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -59,6 +59,11 @@ module Coulomb
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
   real(8),parameter:: qthd = 1d-12
+
+!.....Inner cutoff
+  real(8):: r_inner(msp)
+  real(8):: r_outer(msp)
+  logical:: l_inner_cut = .false. 
 
 !.....Gaussian width of Ewald sum
   real(8):: sgm_ew = 3.5355339d0
@@ -545,7 +550,7 @@ contains
     character(len=3):: cname
     integer:: i,ierr,jerr,isp,jsp,npq
     real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
-         ,vcgjiimin,sgmlim
+         ,vcgjiimin,sgmlim, rin,rout
 
 !!$    if( params_read ) return
 
@@ -610,6 +615,12 @@ contains
           cmode = 'interactions'
           interact(1:msp,1:msp) = .false.
           cycle
+        else if( trim(cline).eq.'inner_cutoff' ) then
+          cmode = 'inner_cutoff'
+          l_inner_cut = .true.
+          r_inner(:) = 0d0
+          r_outer(:) = 0d0
+          cycle
         else if( trim(cline).eq.'sigma' ) then
           backspace(ioprms)
           read(ioprms,*) ctmp, sgm_ew
@@ -662,6 +673,14 @@ contains
           read(ioprms,*) isp,jsp
           interact(isp,jsp) = .true.
           interact(jsp,isp) = .true.
+        else if( trim(cmode).eq.'inner_cutoff' ) then
+          backspace(ioprms)
+          read(ioprms,*) isp, rin, rout
+          if( isp.gt.nsp .and. iprint.gt.0 ) then
+            print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
+          endif
+          r_inner(isp) = rin
+          r_outer(isp) = rout
         endif
       enddo ! while(.true.)
 
@@ -1263,7 +1282,6 @@ contains
     real(8):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc&
          ,dvdrc,vrc
     real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
-    real(8),external:: fcut1,dfcut1
 
 !.....Compute direct sum
     rc2 = rc*rc
@@ -1343,7 +1361,9 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
          ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp &
          ,qi,qj,radi,radj,rhoij,terfc,texp,sqpi &
-         ,vrc,dvdrc,terfcc,rc2
+         ,vrc,dvdrc,terfcc,rc2 &
+         ,rin,rout,fc,dfc
+    real(8),external:: fcut1,dfcut1
 
 !!$    if( rho_bvs(1,1).lt.0.1 ) then
 !!$      rho_bvs(1:msp,1:msp) = rho_screened_cut
@@ -1378,8 +1398,18 @@ contains
         terfcc = erfc(rc/rhoij)
         vrc = acc*qi*qj/rc *terfcc
         dvdrc = -acc *qi*qj/rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
-!.....potential
+        texp = exp(-(dij/rhoij)**2)
+        dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
         tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
+        if( l_inner_cut ) then
+          rout = (r_outer(is)+r_outer(js))/2
+          rin  = (r_inner(is)+r_inner(js))/2
+          fc = 1d0 -fcut1(dij,rin,rout)
+          dfc = -dfcut1(dij,rin,rout)
+          dedr = dedr*fc +2d0*tmp*dfc
+          tmp = tmp *fc
+        endif
+!.....potential
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp
           epi(j)= epi(j) +tmp
@@ -1389,8 +1419,6 @@ contains
           esrl = esrl +tmp
         endif
 !.....force
-        texp = exp(-(dij/rhoij)**2)
-        dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
@@ -1458,7 +1486,7 @@ contains
         terfc = erfc(dij*ss2i)
 !!$        terfc = erfc(gmmij,dij)
 !.....potential
-        tmp = 0.5d0 *acc *qi*qj*diji *terfc *fcut1(dij,rc)
+        tmp = 0.5d0 *acc *qi*qj*diji *terfc *fcut1(dij,0d0,rc)
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp
           epi(j)= epi(j) +tmp
@@ -1469,8 +1497,8 @@ contains
         endif
 !.....force
         ftmp = -acc *qj*qi*diji *( diji *terfc &
-             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) ) *fcut1(dij,rc) &
-             +acc *qi*qj*diji *terfc *dfcut1(dij,rc)
+             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) ) *fcut1(dij,0d0,rc) &
+             +acc *qi*qj*diji *terfc *dfcut1(dij,0d0,rc)
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
@@ -1659,7 +1687,7 @@ contains
         terfc = erfc(dij*ss2i)
 !!$        terfc = erfc(gmmij*dij)
 !.....potential
-        tmp = 0.5d0 *acc *diji *terfc *fcut1(dij,rc)
+        tmp = 0.5d0 *acc *diji *terfc *fcut1(dij,0d0,rc)
         if( j.le.natm ) then
           esr = esr +2d0*tmp*qi*qj
         else

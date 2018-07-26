@@ -741,44 +741,43 @@ function hvsd(x)
 
 end function hvsd
 !=======================================================================
-function fcut1(r,rc)
+function fcut1(r,rin,rout)
 !
 !     Cutof function type-1
-!     f(r) = 1                                  for r <= rs
-!          = 1/2 *[1+cos(pi*(r-rs)/(rc-rs))]    for rs < r <= rc
-!          = 0                                  for rc < r
+!     f(r) = 1                                  for r <= rin
+!          = 1/2 *[1+cos(pi*(r-rs)/(rc-rs))]    for rin < r <= rout
+!          = 0                                  for rout < r
 !
-  real(8),intent(in):: r,rc
+  real(8),intent(in):: r,rin,rout
   real(8),parameter:: pi = 3.14159265358979d0
-  real(8),parameter:: rsr= 0.9d0  ! rs ratio to rc
+!!$  real(8),parameter:: rsr= 0.9d0  ! rs ratio to rc
   real(8):: fcut1
-  real(8):: rs
 
-  rs = rc*rsr
-  if( r.le.rs ) then
+!  rs = rc*rsr
+  if( r.le.rin ) then
     fcut1 = 1d0
-  else if( rs.lt.r .and. r.le.rc ) then
-    fcut1 = 0.5d0 *(1d0 +cos(pi*(r-rs)/(rc-rs)))
+  else if( rin.lt.r .and. r.le.rout ) then
+    fcut1 = 0.5d0 *(1d0 +cos(pi*(r-rin)/(rout-rin)))
   else
     fcut1 = 0d0
   endif
   return
 end function fcut1
 !=======================================================================
-function dfcut1(r,rc)
+function dfcut1(r,rin,rout)
 !
 !     Derivative of the cutoff function type-1
 !
-  real(8),intent(in):: r,rc
+  real(8),intent(in):: r,rin,rout
   real(8),parameter:: pi = 3.14159265358979d0
-  real(8),parameter:: rsr= 0.9d0  ! rs ratio to rc
-  real(8):: dfcut1,rs
+!!$  real(8),parameter:: rsr= 0.9d0  ! rs ratio to rc
+  real(8):: dfcut1
 
-  rs = rc *rsr
-  if( r.le.rs ) then
+!!$  rs = rc *rsr
+  if( r.le.rin ) then
     dfcut1 = 0d0
-  else if( rs.lt.r .and. r.le.rc ) then
-    dfcut1 = -0.5d0 *pi/(rc-rs) *sin(pi*(r-rs)/(rc-rs))
+  else if( rin.lt.r .and. r.le.rout ) then
+    dfcut1 = -0.5d0 *pi/(rout-rin) *sin(pi*(r-rin)/(rout-rin))
   else
     dfcut1 = 0d0
   endif

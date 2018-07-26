@@ -196,7 +196,7 @@ contains
 !.....Potential
         diji6 = 1d0/(dij2*dij2*dij2)
         diji12 = diji6*diji6
-        tmp = 0.5d0 *repij *diji12 *fcut1(dij,rcij)
+        tmp = 0.5d0 *repij *diji12 *fcut1(dij,0d0,rcij)
         if( j.le.natm ) then
           epi(i) = epi(i) +tmp
           epi(j) = epi(j) +tmp
@@ -206,8 +206,8 @@ contains
           epotl = epotl +tmp
         endif
 !.....Force
-        dvdr = -12d0*repij*diji12*diji *fcut1(dij,rcij) &
-             -repij*diji12 *dfcut1(dij,rcij)
+        dvdr = -12d0*repij*diji12*diji *fcut1(dij,0d0,rcij) &
+             -repij*diji12 *dfcut1(dij,0d0,rcij)
         aa(1:3,i) = aa(1:3,i) -dxdi(1:3)*dvdr
         aa(1:3,j) = aa(1:3,j) -dxdj(1:3)*dvdr
 !.....Stress

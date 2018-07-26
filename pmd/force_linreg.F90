@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-13 10:09:28 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-26 20:31:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -156,6 +156,7 @@ contains
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,mpi_double_precision &
          ,mpi_sum,mpi_world,ierr)
+    if( iprint.gt.2 ) print *,'linreg epot = ',epott
     epot= epot +epott
     
     return

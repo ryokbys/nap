@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-27 17:42:15 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-26 18:39:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -153,7 +153,7 @@ contains
         texp = exp(alpij*(rminij-dij))
 !.....potential
         tmp= d0ij*((texp-1d0)**2 -1d0)
-        tmp2 = 0.5d0 *tmp *fcut1(dij,rc)
+        tmp2 = 0.5d0 *tmp *fcut1(dij,0d0,rc)
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp2
           epi(j)= epi(j) +tmp2
@@ -163,8 +163,8 @@ contains
           epotl = epotl +tmp2
         endif
 !.....force
-        dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) *fcut1(dij,rc) &
-             + tmp*dfcut1(dij,rc)
+        dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) *fcut1(dij,0d0,rc) &
+             + tmp*dfcut1(dij,0d0,rc)
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
@@ -265,7 +265,7 @@ contains
         texp = exp(2d0*alpij*(rminij-dij))
 !.....potential
         tmp= d0ij*texp
-        tmp2 = 0.5d0 *tmp *fcut1(dij,rc)
+        tmp2 = 0.5d0 *tmp *fcut1(dij,0d0,rc)
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp2
           epi(j)= epi(j) +tmp2
@@ -279,8 +279,8 @@ contains
 !!$               ,i,j,is,js,dij,d0ij,alpij,rminij,texp,tmp2
 !!$        endif
 !.....force
-        dedr= -2d0 *alpij *d0ij *texp *fcut1(dij,rc) &
-             + tmp*dfcut1(dij,rc)
+        dedr= -2d0 *alpij *d0ij *texp *fcut1(dij,0d0,rc) &
+             + tmp*dfcut1(dij,0d0,rc)
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
@@ -408,15 +408,15 @@ contains
           rcore = rminij -ln_ecore/alpij
           texp = -dij*dij +rcore*rcore +ecore
           tmp= d0ij*((texp-1d0)**2 -1d0)
-          dedr= -4d0 *dij *d0ij *(texp-1d0) *fcut1(dij,rc) &
-               + tmp *dfcut1(dij,rc)
+          dedr= -4d0 *dij *d0ij *(texp-1d0) *fcut1(dij,0d0,rc) &
+               + tmp *dfcut1(dij,0d0,rc)
         else
           tmp= d0ij*((texp-1d0)**2 -1d0)
-          dedr= -2d0 *alpij *d0ij *texp *(texp-1d0) *fcut1(dij,rc) &
-               + tmp *dfcut1(dij,rc)
+          dedr= -2d0 *alpij *d0ij *texp *(texp-1d0) *fcut1(dij,0d0,rc) &
+               + tmp *dfcut1(dij,0d0,rc)
         endif
 !.....potential
-        tmp2 = 0.5d0 *tmp *fcut1(dij,rc)
+        tmp2 = 0.5d0 *tmp *fcut1(dij,0d0,rc)
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp2
           epi(j)= epi(j) +tmp2
@@ -545,12 +545,12 @@ contains
         endif
         dedd0 = (texp -1d0)**2 -1d0
         fq(i) = fq(i) +(dd0dq*dedd0 +dalpdq*dedalp +drmindq*dedrmin) &
-             *fcut1(dij,rc)
+             *fcut1(dij,0d0,rc)
 !!$        print '(a,4i5,7es11.3)','i,is,j,js,dd0dq,dedd0,dalpdq,dedalp,drmindq,dedrmin,fqi='&
 !!$             ,i,is,j,js,dd0dq,dedd0,dalpdq,dedalp,drmindq,dedrmin,fq(i)
 !.....potential
         tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
-        tmp2 = tmp *fcut1(dij,rc)
+        tmp2 = tmp *fcut1(dij,0d0,rc)
         if( j.le.natm ) then
           epotl = epotl +tmp2 +tmp2
         else
@@ -1138,8 +1138,8 @@ contains
         dr = rminij-dij
         texp = exp(alpij*dr)
 !.....Potential
-        fc1 = fcut1(dij,rc)
-        dfc1= dfcut1(dij,rc)
+        fc1 = fcut1(dij,0d0,rc)
+        dfc1= dfcut1(dij,0d0,rc)
 !!$        tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
         if( j.le.natm ) then
           factor = 1d0
@@ -1357,7 +1357,7 @@ contains
 !!$        write(6,'(a,13f8.3)') 'pdij=',pdij(0:nprm)
 !.....Potential
         tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
-        tmp2 = tmp *fcut1(dij,rc)
+        tmp2 = tmp *fcut1(dij,0d0,rc)
         epotl = epotl +tmp2
 !.....Derivative of potential energy w.r.t. {w}
         dedd0 = ((texp -1d0)**2 -1d0)

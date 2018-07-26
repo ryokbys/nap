@@ -600,6 +600,10 @@ contains
       r_inner(isp) = opt1
       r_outer(isp) = opt2
       l_inner_cut = .true.
+      if( iprint.gt.0 ) then
+        print '(a,i3,2f7.2)','   inner_cutoff   ' &
+             ,isp,r_inner(isp),r_outer(isp)
+      endif
     endif
     
   end subroutine parse_option

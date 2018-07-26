@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-27 17:40:56 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-26 18:49:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -452,7 +452,7 @@ contains
 
     if( trim(ctype).eq.'exp1' ) then
       rhoij = ea_xi(is)*exp(-ea_beta(is,js)*(rij-ea_re(is,js))) &
-           *fcut1(rij,ea_rc(is,js))
+           *fcut1(rij,0d0,ea_rc(is,js))
     endif
     return
   end function rhoij
@@ -466,8 +466,9 @@ contains
     
     if( trim(ctype).eq.'exp1' ) then
       r = rij -ea_re(is,js)
-      drhoij= -ea_xi(is)*ea_beta(is,js)*exp(-ea_beta(is,js)*r)*fcut1(rij,rcij) &
-           +ea_xi(is)*exp(-ea_beta(is,js)*r)*dfcut1(rij,rcij)
+      drhoij= -ea_xi(is)*ea_beta(is,js)*exp(-ea_beta(is,js)*r)&
+           *fcut1(rij,0d0,rcij) &
+           +ea_xi(is)*exp(-ea_beta(is,js)*r)*dfcut1(rij,0d0,rcij)
     endif
     return
   end function drhoij
@@ -514,7 +515,7 @@ contains
       r = rij -ea_re(is,js)
       phi = 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &
            -ea_c(is,js)*(1d0+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
-      phi = phi*fcut1(rij,rcij)
+      phi = phi*fcut1(rij,0d0,rcij)
     else if( trim(ctype).eq.'Bonny' ) then
 
     endif
@@ -535,10 +536,10 @@ contains
       tmp = 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &
            -ea_c(is,js)*(1d0+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
       dphi= -ea_beta(is,js)*ea_b(is,js) &
-           *exp(-0.5d0*ea_beta(is,js)*r)*fcut1(rij,rcij)  &
+           *exp(-0.5d0*ea_beta(is,js)*r)*fcut1(rij,0d0,rcij)  &
            + ea_c(is,js)*ea_alp(is,js)*ea_alp(is,js)*r &
-           *exp(-ea_alp(is,js)*r)*fcut1(rij,rcij) &
-           + tmp*dfcut1(rij,rcij)
+           *exp(-ea_alp(is,js)*r)*fcut1(rij,0d0,rcij) &
+           + tmp*dfcut1(rij,0d0,rcij)
       
     endif
     return

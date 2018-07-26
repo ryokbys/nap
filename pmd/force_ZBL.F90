@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-25 14:33:59 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-26 20:31:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -235,6 +235,7 @@ contains
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
+    if( iprint.gt.2 ) print *,'ZBL epot = ',epott
     epot= epot +epott
 
   end subroutine force_ZBL
