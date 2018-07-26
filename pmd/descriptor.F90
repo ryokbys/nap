@@ -9,6 +9,7 @@ module descriptor
   character(128),parameter:: cpfname = 'in.params.desc'
 
   real(8),parameter:: pi = 3.14159265358979d0
+  integer,parameter:: msp = 9  ! hard-coded max-num of species
 
   integer:: nsf
   integer,allocatable:: itype(:)
@@ -31,6 +32,10 @@ module descriptor
   real(8):: rcw2 = 0.0d0
   real(8):: rcw3 = 0.0d0
   real(8):: rcmax,rcmax2
+!.....Switching radius for inner cutoff
+  real(8):: r_inner(msp)
+  real(8):: r_outer(msp)
+  logical:: l_inner_cut = .false.
 
   integer:: nalmax,nnlmax,nal,nnl
 
@@ -226,8 +231,9 @@ contains
         do isf=iaddr2(1,is,js),iaddr2(2,is,js)
           if( dij.ge.rcs(isf) ) cycle
           if( itype(isf).eq.1 ) then ! Gaussian
-            fcij= fc1(dij,rcs(isf))
-            dfcij= dfc1(dij,rcs(isf))
+!!$            fcij= fc1(dij,rcs(isf))
+!!$            dfcij= dfc1(dij,rcs(isf))
+            call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
             eta= cnst(1,isf)
             rs=  cnst(2,isf)
             !.....function value
@@ -243,8 +249,9 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           else if( itype(isf).eq.2 ) then ! cosine
-            fcij= fc1(dij,rcs(isf))
-            dfcij= dfc1(dij,rcs(isf))
+!!$            fcij= fc1(dij,rcs(isf))
+!!$            dfcij= dfc1(dij,rcs(isf))
+            call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
             a1= cnst(1,isf)
             !.....func value
             tcos= (1d0+cos(dij*a1))
@@ -256,8 +263,9 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           else if( itype(isf).eq.3 ) then ! polynomial
-            fcij= fc1(dij,rcs(isf))
-            dfcij= dfc1(dij,rcs(isf))
+!!$            fcij= fc1(dij,rcs(isf))
+!!$            dfcij= dfc1(dij,rcs(isf))
+            call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
             a1= cnst(1,isf)
             !.....func value
             tpoly= 1d0*dij**(-a1)
@@ -269,8 +277,9 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           else if( itype(isf).eq.4 ) then ! Morse-type
-            fcij= fc1(dij,rcs(isf))
-            dfcij= dfc1(dij,rcs(isf))
+!!$            fcij= fc1(dij,rcs(isf))
+!!$            dfcij= dfc1(dij,rcs(isf))
+            call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
             a1= cnst(1,isf)
             a2= cnst(2,isf)
             !.....func value
@@ -306,10 +315,33 @@ contains
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
             if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
 !.....fcij's can be computed after rcs is determined
-            fcij= fc1(dij,rcs(isf))
-            dfcij= dfc1(dij,rcs(isf))
-            fcik= fc1(dik,rcs(isf))
-            dfcik= dfc1(dik,rcs(isf))
+            call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
+            call get_fc_dfc(dik,is,ks,isf,fcik,dfcik)
+!!$            if( l_inner_cut ) then
+!!$              rout_ij = (r_outer(is)+r_outer(js))/2
+!!$              rout_ik = (r_outer(is)+r_outer(ks))/2
+!!$              if( dij.gt.rout_ij ) then
+!!$                fcij= fc1(dij,rout_ij,rcs(isf))
+!!$                dfcij= dfc1(dij,rout_ij,rcs(isf))
+!!$              else
+!!$                rin_ij = (r_inner(is)+r_inner(js))/2
+!!$                fcij= 1d0 -fc1(dij,rin_ij,rout_ij)
+!!$                dfcij= -dfc1(dij,rin_ij,rout_ij)
+!!$              endif
+!!$              if( dik.gt.rout_ik ) then
+!!$                fcik= fc1(dik,rout_ij,rcs(isf))
+!!$                dfcik= dfc1(dik,rout_ij,rcs(isf))
+!!$              else
+!!$                rin_ik = (r_inner(is)+r_inner(ks))/2
+!!$                fcik= 1d0 -fc1(dik,rin_ik,rout_ik)
+!!$                dfcik= -dfc1(dik,rin_ij,rout_ik)
+!!$              endif
+!!$            else
+!!$              fcij= fc1(dij,0d0,rcs(isf))
+!!$              dfcij= dfc1(dij,0d0,rcs(isf))
+!!$              fcik= fc1(dik,0d0,rcs(isf))
+!!$              dfcik= dfc1(dik,0d0,rcs(isf))
+!!$            endif
             almbd= cnst(1,isf)
             t2= (abs(almbd)+1d0)**2
             driki(1:3)= -rik(1:3)/dik
@@ -353,37 +385,63 @@ contains
 
   end subroutine calc_desc
 !=======================================================================
-  function fc1(r,rc)
+  function fc1(r,rin,rout)
     implicit none
-    real(8),intent(in):: r,rc
+    real(8),intent(in):: r,rin,rout
     real(8):: fc1
-    real(8),parameter:: rcs = 0d0
 
-    if( r.le.rcs ) then
+    if( r.le.rin ) then
       fc1= 1d0
-    else if( r.gt.rcs .and. r.le.rc ) then
-      fc1= 0.5d0 *(cos((r-rcs)/(rc-rcs)*pi)+1d0)
+    else if( r.gt.rin .and. r.le.rout ) then
+      fc1= 0.5d0 *(cos((r-rin)/(rout-rin)*pi)+1d0)
     else
       fc1= 0d0
     endif
     return
   end function fc1
 !=======================================================================
-  function dfc1(r,rc)
+  function dfc1(r,rin,rout)
     implicit none
-    real(8),intent(in):: r,rc
+    real(8),intent(in):: r,rin,rout
     real(8):: dfc1
-    real(8),parameter:: rcs = 0d0
 
-    if( r.le.rcs ) then
+    if( r.le.rin ) then
       dfc1= 0d0
-    else if( r.gt.rcs .and. r.le.rc ) then
-      dfc1= -pi/2/(rc-rcs) *sin((r-rcs)/(rc-rcs)*pi)
+    else if( r.gt.rin .and. r.le.rout ) then
+      dfc1= -0.5d0*pi/(rout-rin) *sin((r-rin)/(rout-rin)*pi)
     else
       dfc1= 0d0
     endif
     return
   end function dfc1
+!=======================================================================
+  subroutine get_fc_dfc(r,isp,jsp,isf,fc,dfc)
+!
+!  Calculate cutoff/switching function depending on r and r_outer
+!
+    real(8),intent(in):: r
+    integer,intent(in):: isp,jsp,isf
+    real(8),intent(out):: fc,dfc
+
+    real(8):: rin,rout
+    
+    if( l_inner_cut ) then
+      rout = (r_outer(isp)+r_outer(jsp))/2
+      if( r.gt.rout ) then
+        fc= fc1(r,rout,rcs(isf))
+        dfc= dfc1(r,rout,rcs(isf))
+      else
+        rin = (r_inner(isp)+r_inner(jsp))/2
+        fc= 1d0 -fc1(r,rin,rout)
+        dfc= -dfc1(r,rin,rout)
+      endif
+    else
+      fc= fc1(r,0d0,rcs(isf))
+      dfc= dfc1(r,0d0,rcs(isf))
+    endif
+    
+    return
+  end subroutine get_fc_dfc
 !=======================================================================
   subroutine read_params_desc(myid,mpi_world,iprint)
     implicit none
@@ -399,7 +457,6 @@ contains
     integer,external:: num_data
 
     if( myid.eq.0 ) then
-
 !.....read constants at the 1st call
       fname = trim(paramsdir)//'/'//trim(cpfname)
       inquire(file=trim(fname),exist=lexist)
@@ -414,7 +471,7 @@ contains
 !.....num of symmetry functions, num of node in 1st hidden layer
 10    read(51,'(a)') ctmp
       if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) then
-!        call parse_option(ctmp,iprint,ierr)
+        call parse_option(ctmp,iprint,ierr)
         goto 10
       else
         backspace(51)
@@ -512,38 +569,37 @@ contains
 !
 !  Parse options from a comment line.
 !  Lines starting from ! or # are treated as comment lines,
-!  but options can be given at the comment lines.
+!  and options can be given at the comment lines.
 !  The option words should be put after these comment characters with
 !  one or more spaces between them for example,
 !
-!  rc2:  4.0
+!  inner_cutoff:  1  1.0  2.0
 !
 !  Currently available options are:
-!    - "rc2:" or "rc3:" cutoff radii for 2- or 3-body.
+!    - "inner_cutoff:", species, inner- and outer-cutoff radius of
+!      the switching function.
 !
     implicit none
     character(len=*),intent(in):: cline
     integer,intent(in):: iprint
     integer,intent(out):: ierr
 
-    real(8):: ropt
+    integer:: iopt1,isp
+    real(8):: opt1, opt2
     character(len=10):: c1,copt
     logical:: lopt
-    integer,external:: num_data
 
     ierr = 0
-    if( index(cline,'rc').ne.0 ) then
-      read(cline,*) c1,copt,ropt
-      if( trim(copt).eq.'rc2:' ) then
-        rc2 = ropt
-      else if( trim(copt).eq.'rc3:' ) then
-        rc3 = ropt
-      else
-        print *, 'Error: copt is not "rc2:" or "rc3:" !!!'
-        ierr = 2
+    if( index(cline,'inner_cutoff:').ne.0 ) then
+      read(cline,*) c1, copt, iopt1, opt1, opt2
+      isp = iopt1
+      if( isp.gt.msp ) then
+        print *,'ERROR: isp.gt.msp @parse_option !!!'
+        stop
       endif
-!!$      rcw2 = 0d0
-!!$      rcw3 = 0d0
+      r_inner(isp) = opt1
+      r_outer(isp) = opt2
+      l_inner_cut = .true.
     endif
     
   end subroutine parse_option
