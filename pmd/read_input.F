@@ -210,6 +210,9 @@ c        call read_c1(ionum,cforce)
       elseif( trim(cname).eq.'pka_phi') then
         call read_r1(ionum,pka_phi)
         return
+      elseif( trim(cname).eq.'metadynamics') then
+        call read_l1(ionum,lmetaD)
+        return
 #ifdef __WALL__
       elseif( trim(cname).eq.'wall_pos_top' ) then
         call read_r1(ionum,wtop)

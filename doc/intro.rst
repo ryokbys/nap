@@ -16,8 +16,9 @@ The main features of *pmd* are the following:
 * structure relaxation using simple velocity damping or **FIRE** algorithm;
 * thermostats: Berendsen and Langevin;
 * barostat: Berendsen;
-* non-equilibrium MD (NEMD) for heat flux simulation;
-* two-temperature model MD (TTM-MD) for laser-ablation simulation.
+* **variable-timestep** MD for high-energy ion-bombardment simulation;
+* **non-equilibrium MD (NEMD)** for heat flux simulation;
+* **two-temperature model MD (TTM-MD)** for laser-ablation simulation.
 
 Since this program has been developed for the purpose of personal research tool,
 there are not so many functionalities. 

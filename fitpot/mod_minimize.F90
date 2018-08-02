@@ -1842,7 +1842,7 @@ contains
     real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,f0,tmp,gmm,ftst
     real(8),allocatable,save:: xt(:),gmaxgl(:),u(:),gmaxgl0(:)
     real(8),save,allocatable:: gg(:,:),y(:),gp(:),rg(:) &
-         ,ggy(:),ygg(:),s(:),g0(:)  !,aa(:,:),cc(:,:),v(:)
+         ,ggy(:),ygg(:),s(:),g0(:),gpena(:)  !,aa(:,:),cc(:,:),v(:)
     integer:: nmsks,imsk,nftol,nbases,nvar
     real(8):: ynorm,tmp1,tmp2,b,sy,syi  !,svy,svyi
 
@@ -1851,6 +1851,7 @@ contains
         print *,'>>> gfs does not work with lasso or glasso.'
         print *,'>>> so gfs neglects lasso and glasso.'
       endif
+      cpena = 'none'
     endif
 
     if( .not. allocated(gsfcorr) ) then
@@ -1864,7 +1865,7 @@ contains
     if( .not.allocated(xt) ) allocate(xt(ndim),u(ndim),rg(ngl),g0(ndim))
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim) &
          ,y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
-         ,s(ndim))  !,v(ndim),aa(ndim,ndim),cc(ndim,ndim)
+         ,s(ndim),gpena(ndim))  !,v(ndim),aa(ndim,ndim),cc(ndim,ndim)
     if( .not. allocated(gmaxgl) ) then
       allocate(gmaxgl(ngl),gmaxgl0(ngl))
     endif
@@ -2022,6 +2023,12 @@ contains
       xt(:) = 0d0
       call func(ndim,xt,f,ftst)
       call grad(ndim,xt,g)
+!.....Penalty
+      if( trim(cpena).eq.'ridge' ) then
+        call penalty(cpena,ndim,pval,gpena,xt)
+        f = f +pval
+        g(1:ndim) = g(1:ndim) +gpena(1:ndim)
+      endif
 !.....preparation for BFGS
       gg(1:ndim,1:ndim)= 0d0
       do i=1,ndim
@@ -2040,6 +2047,7 @@ contains
       nfailinmin = 0
 !.....BFGS loop begins
       do itergfs=1,ninnergfs
+
         u(1:ndim)= 0d0
 !!$        do i=1,ndim
 !!$          u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
@@ -2122,6 +2130,8 @@ contains
         xt(1:ndim)= xt(1:ndim) +alpha*u(1:ndim)
         call wrap_ranges(ndim,xt,xranges)
         call grad(ndim,xt,g)
+        call penalty(cpena,ndim,pval,gpena,xt)
+        if( trim(cpena).eq.'ridge' ) g(1:ndim) = g(1:ndim) +gpena(1:ndim)
         do i=1,ndim
           ig= iglid(i)
           if( ig.le.0 ) cycle

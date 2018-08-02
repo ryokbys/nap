@@ -163,7 +163,7 @@ time_interval
 * Default: 1.0
 
 Time interval in the unit of **femto second**.
-If negative, it activates *variable time-step mode* and its absolute value is the maximum time interval :math:`\Delta t_{\max}` in the mode.
+If negative, it activates *variable time-step mode* and its absolute value is the maximum time interval :math:`\Delta t_{\max}` in the mode. Appropriate range of dt_max would be 2.0 to 5.0 depending on the minimum mass of ion in the system.
 
 ------------------------
 

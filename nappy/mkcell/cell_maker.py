@@ -7,7 +7,7 @@ Usage:
 
 Options:
   -h, --help  Show this help message and exit.
-  --size=SIZE
+  -s, --size=SIZE
               Number of copies of the unit cell, int the format, nx,ny,nz. [default: 1,1,1]
   -l, --lattice-constant=LATCONST
              Lattice constant of an axis. [default: 5.427]

@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-26 18:00:52 Ryo KOBAYASHI>
+!                     Last modified: <2018-07-30 15:24:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -103,4 +103,7 @@ module pmdio
   real(8):: pka_energy = -1.d0 ! in eV
   real(8):: pka_theta = 0.d0  ! in degree
   real(8):: pka_phi = 0.d0    ! in degree
+
+!.....Metadynamics
+  logical:: lmetaD = .false. 
 end module pmdio

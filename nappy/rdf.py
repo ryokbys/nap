@@ -10,7 +10,7 @@ Options:
     -h, --help  Show this help message and exit.
     -d DR       Width of the bin. [default: 0.1]
     -r RMAX     Cutoff radius of radial distribution. [default: 5.0]
-    -s FMT      Input file format. If is not *pmd*, users must specify it. [default: pmd]
+    -f FMT      Input file format. If is not *pmd*, users must specify it. [default: pmd]
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
     -o OUT      Output file name. [default: out.rdf]
@@ -160,7 +160,7 @@ if __name__ == "__main__":
     dr= float(args['-d'])
     rmax= float(args['-r'])
     sigma= int(args['--gsmear'])
-    ffmt= args['-s']
+    ffmt= args['-f']
     ofname= args['-o']
     nspcs = int(args['--num-species'])
     no_average = args['--no-average']
@@ -207,7 +207,7 @@ if __name__ == "__main__":
         else:
             print ' Check graph_rdf_total.png and graph_rdfs.png'
     else:
-        print ' Check '+ofname+' with gnuplot, like'
+        print ' Check {0:s} with gnuplot, like'.format(ofname)
         print ''
-        print " > plot "+ofname+"  us 1:2  w l"
+        print " > plot '{0:s}' us 1:2  w l".format(ofname)
         print ''

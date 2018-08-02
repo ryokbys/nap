@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-07-25 17:33:08 Ryo KOBAYASHI>
+c                     Last-modified: <2018-08-02 15:43:37 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -10,7 +10,7 @@ c-----------------------------------------------------------------------
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
      &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,stnsr,epot
      &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
-     &     ,nstp_done,lvc,boundary)
+     &     ,nstp_done,lvc,boundary,lmetaD)
       use pmdvars
       use zload
       use force
@@ -18,6 +18,8 @@ c-----------------------------------------------------------------------
      &     calc_Ta,update_Te,assign_atom2cell,output_energy_balance,
      &     remove_ablated_atoms,set_inner_dt
       use pmdmpi,only: nid2xyz,xyz2nid
+      use metadynamics,only: init_metaD,update_metaD,force_metaD
+     &     ,write_metaD_potential
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -36,7 +38,7 @@ c-----------------------------------------------------------------------
       character,intent(in):: ciofmt*6, cpctl*20, ctctl*20
      &     ,czload_type*5,boundary*3
 !      character(len=20),intent(in):: cffs(numff)
-      logical,intent(in):: ltdst,lstrs0,lcellfix(3,3)
+      logical,intent(in):: ltdst,lstrs0,lcellfix(3,3),lmetaD
       logical,intent(inout):: lvc
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
@@ -72,6 +74,18 @@ c     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
       call calc_nfmv(ntot0,tagtot,myid_md,mpi_md_world)
       call set_use_charge()
 
+      nsp = 0
+      do i=1,ntot0
+        nsp = max(int(tagtot(i)),nsp)
+      enddo
+      if( nsp.gt.nspmax ) then
+        if( myid_md.eq.0 ) then
+          print *,'ERROR: nsp.gt.nspmax !!!'
+        endif
+        call mpi_finalize(ierr)
+        stop
+      endif
+
       if( maxstp.le.0 ) then
         cfistp = 'i2'
       else
@@ -83,6 +97,7 @@ c.....Variable time-step
         dtmax = abs(dt)
         lvardt = .true.
         if( myid_md.eq.0 .and. iprint.gt.0 ) then
+          print *,''
           print '(a,f8.3,a)',' Use variable time-step: dtmax = '
      &         ,dtmax,' fs'
         endif
@@ -97,7 +112,8 @@ c.....multiply damping factor 1st to avoid doing every step
 c.....Set 0d0 to z of fmv(9) in case of z-loading
       if( czload_type.eq.'atoms' .or. czload_type.eq.'box' ) then
         fmv(3,9) = 0d0
-        if( myid_md.eq.0 ) then
+        if( myid_md.eq.0 .and. iprint.gt.0 ) then
+          print *,''
           write(6,'(a)') 'Set fmv(3,9)=0d0, because czload_type='
      &         //czload_type
         endif
@@ -156,17 +172,15 @@ c.....perform space decomposition after reading atomic configuration
         call cell_info(h)
       endif
 c.....Some conversions
-      nsp= 0
       do i=1,natm
         ra(1:3,i)= ra(1:3,i) -sorg(1:3)
-c-------species of atom-i
-        nsp= max(int(tag(i)),nsp)
-        if(nsp.gt.nspmax) then
-          write(6,'(a)') " Error: nsp.gt.nspmax!!"
-          call mpi_finalize(ierr)
-          stop
-        endif
       enddo
+
+c.....Call init_metaD after setting namax
+      if( lmetaD ) then
+        call init_metaD(maxstp,nsp,namax,nodes_md
+     &       ,myid_md,mpi_md_world,iprint)
+      endif
 
 #ifdef __FITPOT__
 c.....check whether order of atoms and total-id of atoms match
@@ -235,11 +249,11 @@ c.....Set ifmv of top and bottom atoms for z-loading if needed
 c.....Set initial temperature if needed
       if( tinit.gt.1d-5 ) then
         call setv(h,natm,tag,va,nspmax,am,tinit,dt)
-        if( nrmtrans.gt.0 ) call rm_trans_motion(natm,tag,va,nspmax,am
-     &       ,mpi_md_world,myid_md,iprint)
       elseif( abs(tinit).le.1d-5 ) then
         va(1:3,1:natm)= 0d0
       endif
+      if( nrmtrans.gt.0 ) call rm_trans_motion(natm,tag,va,nspmax,am
+     &     ,mpi_md_world,myid_md,iprint)
 
       if( ifdmp.eq.2 ) then
         va(1:3,1:natm) = 0d0
@@ -459,6 +473,12 @@ c.....Set al
 c-----velocity-Verlet loop starts---------------------------------------
       do istp=1,maxstp
 
+c.....Metadynamics
+        if( lmetaD ) then
+          call update_metaD(istp,namax,natm,nsp,tag,ra,h,nnmax,lspr
+     &         ,myid_md,mpi_md_world,iprint)
+        endif
+
 c.....In case of isobaric MD, lstrs has to be always TRUE.
         if( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
@@ -586,6 +606,12 @@ c-------Calc forces
      &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,lstrs
      &       ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
         lstrs = .false.
+c.....Force from metadynamics
+        if( lmetaD ) then
+          call force_metaD(istp,namax,natm,tag,ra,aa,h,hi,epot
+     &         ,nnmax,lspr,myid_md,mpi_md_world,iprint)
+        endif
+        
 
 c.....Second kick of velocities
         do i=1,natm
@@ -636,10 +662,6 @@ c.....To compensate the factor 1/2 in fa2v, multiply 2 here.
               va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(is)*dt *2d0
             endif
           enddo
-          if( mod(istp,nrmtrans).eq.0 ) then
-            call rm_trans_motion(natm,tag,va,nspmax,am
-     &           ,mpi_md_world,myid_md,0)
-          endif
 c-------temperature control by Berendsen thermostat
         else if( trim(ctctl).eq.'Berendsen' ) then
           tfac(1:9)= 0d0
@@ -667,10 +689,6 @@ c.....accumulate energy difference
             is= int(tag(i))
             ediff(ifmv)= ediff(ifmv) +(tfac(ifmv)**2-1d0)*fekin(is)
           enddo
-          if( mod(istp,nrmtrans).eq.0 ) then
-            call rm_trans_motion(natm,tag,va,nspmax,am
-     &           ,mpi_md_world,myid_md,0)
-          endif
         else if( trim(ctctl).eq.'ttm' ) then
           call assign_atom2cell(namax,natm,ra,sorg,boundary)
           call calc_Ta(namax,natm,eki,tag,fmv,istp
@@ -683,6 +701,11 @@ c.....accumulate energy difference
         call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
      &       ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
         prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
+
+        if( nrmtrans.gt.0 .and. mod(istp,nrmtrans).eq.0 ) then
+          call rm_trans_motion(natm,tag,va,nspmax,am
+     &         ,mpi_md_world,myid_md,iprint)
+        endif
         
 
 c.....temperature distribution along x
@@ -903,6 +926,11 @@ c.....revert forces to the unit eV/A before going out pmd_core
      &         +h(1:3,3,0)*atot(3,i)
           atot(1:3,i) = aai(1:3)
         enddo
+      endif
+
+c.....Output metadynamics potential
+      if( lmetaD ) then
+        call write_metaD_potential(maxstp,nsp,myid_md,iprint)
       endif
 
 c.....deallocate all the arrays allocated in pmd_core
@@ -2362,10 +2390,10 @@ c-----set center of mass motion to zero
         va(3,i)=va(3,i)-sumpz/amtot
       enddo
 
-c      if( myid_md.eq.0 .and. iprint.ne.0 ) then
-c        write(6,'(a,3es12.4)') ' sumpx,y,z/amtot='
-c     &       ,sumpx/amtot,sumpy/amtot,sumpz/amtot
-c      endif
+      if( myid_md.eq.0 .and. iprint.gt.2 ) then
+        write(6,'(a,3es12.4)') ' sumpx,y,z/amtot='
+     &       ,sumpx/amtot,sumpy/amtot,sumpz/amtot
+      endif
 
       end subroutine rm_trans_motion
 c=======================================================================
