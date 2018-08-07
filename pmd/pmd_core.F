@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-08-02 15:43:37 Ryo KOBAYASHI>
+c                     Last-modified: <2018-08-07 16:49:22 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -73,18 +73,6 @@ c     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
       call initialize_pmdvars(nspmax)
       call calc_nfmv(ntot0,tagtot,myid_md,mpi_md_world)
       call set_use_charge()
-
-      nsp = 0
-      do i=1,ntot0
-        nsp = max(int(tagtot(i)),nsp)
-      enddo
-      if( nsp.gt.nspmax ) then
-        if( myid_md.eq.0 ) then
-          print *,'ERROR: nsp.gt.nspmax !!!'
-        endif
-        call mpi_finalize(ierr)
-        stop
-      endif
 
       if( maxstp.le.0 ) then
         cfistp = 'i2'
@@ -176,12 +164,6 @@ c.....Some conversions
         ra(1:3,i)= ra(1:3,i) -sorg(1:3)
       enddo
 
-c.....Call init_metaD after setting namax
-      if( lmetaD ) then
-        call init_metaD(maxstp,nsp,namax,nodes_md
-     &       ,myid_md,mpi_md_world,iprint)
-      endif
-
 #ifdef __FITPOT__
 c.....check whether order of atoms and total-id of atoms match
       do ia=1,natm
@@ -213,10 +195,21 @@ c-----set HI and SGM
 c-----ntset
       call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
-c-----get total number of particles
+c-----get total number of species
+      nspl = 0
+      do i=1,natm
+        nspl = max(int(tag(i)),nspl)
+      enddo
       nspl = nsp
-      call mpi_allreduce(nspl,nsp,1,MPI_INTEGER,mpi_max
+      call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max
      &     ,mpi_md_world,ierr)
+      if( nsp.gt.nspmax ) then
+        if( myid_md.eq.0 ) then
+          print *,'ERROR: nsp.gt.nspmax !!!'
+        endif
+        call mpi_finalize(ierr)
+        stop
+      endif
       if(myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,*) ''
         write(6,'(a,i0)') " Number of total atoms = ",ntot0
@@ -224,6 +217,12 @@ c-----get total number of particles
       endif
 c.....get_num_dof is called once in a MD run
       call get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world,iprint)
+
+c.....Call init_metaD after setting namax and nsp
+      if( lmetaD ) then
+        call init_metaD(maxstp,nsp,namax,nodes_md
+     &       ,myid_md,mpi_md_world,iprint)
+      endif
 
 c.....Setup for FIRE
       if( ifdmp.eq.2 ) then

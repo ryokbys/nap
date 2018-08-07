@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-07-30 15:25:38 Ryo KOBAYASHI>
+c                     Last-modified: <2018-08-07 09:58:12 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -393,6 +393,8 @@ c.....NEMD
       if( ltdst ) then
         call mpi_bcast(ntdst,1,mpi_integer,0,mpi_md_world,ierr)
       endif
+c.....Metadynamics
+      call mpi_bcast(lmetaD,1,mpi_logical,0,mpi_md_world,ierr)
 
       end subroutine bcast_params
 c=======================================================================
