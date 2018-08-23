@@ -19,7 +19,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use Brenner,only:force_brenner,force_brenner_vdW
   use Lu_WHe,only:force_Lu_WHe
   use Branicio_AlN,only:force_Branicio_AlN
-  use Mishin_Al,only:force_Mishin_Al
+  use Mishin,only:force_Mishin_Al,force_Mishin_Ni
   use AFS_W,only:force_AFS_W
   use SC_Fe,only:force_SC_Fe
   use SM_Al,only:force_SM_Al
@@ -123,7 +123,10 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,iprint)
   if( use_force('Mishin_Al') ) call force_Mishin_Al(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc &
-       ,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
+       ,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+  if( use_force('Mishin_Ni') ) call force_Mishin_Ni(namax,natm,tag,ra,nnmax &
+       ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc &
+       ,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('AFS_W') ) call force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)

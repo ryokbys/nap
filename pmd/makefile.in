@@ -42,14 +42,14 @@ force_common= force_common.o
 forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
 	force_Ito3_WHe.o force_LJ.o force_SW.o force_EDIP_Si.o \
 	force_Brenner.o force_Lu_WHe.o force_Branicio_AlN.o \
-	force_Mishin_Al.o force_AFS_W.o force_SC_Fe.o \
+	force_Mishin.o force_AFS_W.o force_SC_Fe.o \
 	force_SM_Al.o force_linreg.o force_NN.o force_NN2.o \
 	force_Morse.o force_Coulomb.o force_EAM.o force_Buckingham.o \
 	force_Bonny_WRe.o force_ZBL.o
 params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 	params_EDIP_Si.h \
 	params_Brenner.h params_Lu_WHe.h params_Branicio_AlN.h \
-	params_Mishin_Al.h params_AFS_W.h params_SC_Fe.h \
+	params_Mishin_Al.h params_Mishin_Ni.h params_AFS_W.h params_SC_Fe.h \
 	params_SM_Al.h
 
 #-----------------------------------------------------------------------
@@ -113,7 +113,7 @@ force_EDIP_Si.o: params_EDIP_Si.h
 force_Brenner.o: params_Brenner.h
 force_Lu_WHe.o: params_Lu_WHe.h
 force_Branicio_AlN.o: params_Branicio_AlN.h
-force_Mishin_Al.o: params_Mishin_Al.h
+force_Mishin.o: params_Mishin_Al.h params_Mishin_Ni.h
 
 descriptor.o descriptor.mod : descriptor.F90
 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<

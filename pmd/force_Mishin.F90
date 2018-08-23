@@ -1,16 +1,28 @@
-module Mishin_Al
-contains
-  subroutine force_Mishin_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
+module Mishin
 !-----------------------------------------------------------------------
 !  Parallel implementation of force and potential energy calculation
-!  of EAM for Al by Mishin et al.
+!  of EAM for Al and Ni by Mishin et al.
 !    - rho of boundary atoms are sent to the neighbor nodes
 !    - only force on i is calculated, not necessary to send-back
 !-----------------------------------------------------------------------
 !  See Mishin et al. PRB 59(5) (1999) 3393--3407.
 !-----------------------------------------------------------------------
+  implicit none
+  save
+
+  real(8):: rc_eam
+  integer,parameter:: neamd = 25
+
+  real(8):: rtbl(neamd)
+  real(8):: rhotbl(neamd)
+  real(8):: rhoprm(4,neamd-1)
+  real(8):: vprm(4,neamd-1)
+  real(8):: fprm(4,neamd-1)
+  
+contains
+  subroutine force_Mishin_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -23,22 +35,98 @@ contains
          ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical:: lstrs
+    logical,intent(in):: lstrs,l1st
 
-    integer:: i,j,k,l,m,n,ierr,is
+    if( l1st ) then
+      rtbl(1:neamd) = rtbl_Al(1:neamd)
+      rhotbl(1:neamd) = rhotbl_Al(1:neamd)
+      rhoprm(1:4,1:neamd-1) = rhoprm_Al(1:4,1:neamd-1)
+      vprm(1:4,1:neamd-1) = vprm_Al(1:4,1:neamd-1)
+      fprm(1:4,1:neamd-1) = fprm_Al(1:4,1:neamd-1)
+      rc_eam = rc_eam_Al
+    endif
+
+    call force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+    return
+  end subroutine force_Mishin_Al
+!=======================================================================
+  subroutine force_Mishin_Ni(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+    implicit none
+    include "mpif.h"
+    include "./params_unit.h"
+    include "params_Mishin_Ni.h"
+    integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
+         ,iprint
+    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+         ,nn(6),mpi_md_world,myid_md,nex(3)
+    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+         ,rc,tag(namax)
+    real(8),intent(inout):: tcom
+    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: lstrs,l1st
+
+    if( l1st ) then
+      rtbl(1:neamd) = rtbl_Ni(1:neamd)
+      rhotbl(1:neamd) = rhotbl_Ni(1:neamd)
+      rhoprm(1:4,1:neamd-1) = rhoprm_Ni(1:4,1:neamd-1)
+      vprm(1:4,1:neamd-1) = vprm_Ni(1:4,1:neamd-1)
+      fprm(1:4,1:neamd-1) = fprm_Ni(1:4,1:neamd-1)
+      rc_eam = rc_eam_Ni
+    endif
+
+    call force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+    return
+  end subroutine force_Mishin_Ni
+!=======================================================================
+  subroutine force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+    implicit none
+    include "mpif.h"
+    include "./params_unit.h"
+    include "params_Mishin_Al.h"
+    integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
+         ,iprint
+    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+         ,nn(6),mpi_md_world,myid_md,nex(3)
+    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+         ,rc,tag(namax)
+    real(8),intent(inout):: tcom
+    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: lstrs,l1st
+
+    integer:: i,j,k,l,m,n,ierr,is,ixyz,jxyz
     real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,dphi,at(3)
     real(8):: x,y,z,xi(3),epotl,epott,tmp
 !.....Saved variables
-    logical,save:: l1st=.true.
     real(8),allocatable,save:: rho(:)
+    real(8),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
+      if( allocated(rho) ) deallocate(rho)
       allocate(rho(namax+nbmax))
-      l1st=.false.
+      if( allocated(strsl) ) deallocate(strsl)
+      allocate(strsl(3,3,namax))
+    endif
+
+    if( size(rho).lt.namax+nbmax ) then
+      deallocate(rho)
+      allocate(rho(namax+nbmax))
+    endif
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
     endif
 
     epotl= 0d0
     rho(1:natm)= 0d0
+    strsl(1:3,1:3,1:namax) = 0d0
 
 !-----rho(i)
     do i=1,natm
@@ -93,16 +181,43 @@ contains
         dphi= calc_dv(rij)
         aa(1:3,i)=aa(1:3,i) -dphi*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dphi*drdxi(1:3)
+!.....Atomic stress of 2-body terms
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                   -0.5d0*dphi*xij(ixyz)*(-drdxi(jxyz))
+              strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                   -0.5d0*dphi*xij(ixyz)*(-drdxi(jxyz))
+            enddo
+          enddo
+        endif
 !.....Embeded term
         drhoij= calc_drho(rij)
         dfj= calc_df(rho(j))
-        aa(1:3,i)=aa(1:3,i) -(dfi+dfj)*drhoij*drdxi(1:3)
-        aa(1:3,j)=aa(1:3,j) +(dfi+dfj)*drhoij*drdxi(1:3)
+        tmp = (dfi+dfj)*drhoij
+        aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
+        aa(1:3,j)=aa(1:3,j) +tmp*drdxi(1:3)
+!.....Atomic stress of many-body contributions
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+              strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+            enddo
+          enddo
+        endif
       enddo
       tmp= calc_f(rho(i))
       epi(i)=epi(i) +tmp
       epotl=epotl +tmp
     enddo
+
+    if( lstrs ) then
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
 
 !-----gather epot
     if( myid_md.ge.0 ) then
@@ -114,7 +229,7 @@ contains
     endif
 
 !      deallocate(sqrho)
-  end subroutine force_Mishin_Al
+  end subroutine force_Mishin
 !=======================================================================
   function calc_rho(r)
     implicit none
@@ -126,7 +241,7 @@ contains
     integer:: i
     real(8):: a(4)
 
-    call check_range(r,neamd,rtbl,'calc_rho')
+!!$    call check_range(r,neamd,rtbl,'calc_rho')
     if( r.ge.rtbl(neamd) ) then
       calc_rho= 0d0
       return
@@ -228,15 +343,15 @@ contains
     real(8):: a(4)
 
     if( rho.ge.rhotbl(neamd) ) then
-      calc_f= 0d0
-      return
+      a(1:4) = fprm(1:4,neamd-1)
+    else
+      do i=1,neamd-1
+        if( rho.lt.rhotbl(i+1) ) then
+          a(1:4)= fprm(1:4,i)
+          exit
+        endif
+      enddo
     endif
-    do i=1,neamd-1
-      if( rho.lt.rhotbl(i+1) ) then
-        a(1:4)= fprm(1:4,i)
-        exit
-      endif
-    enddo
 
     calc_f= a(1) +a(2)*rho +a(3)*rho*rho +a(4)*rho*rho*rho
     return
@@ -253,15 +368,15 @@ contains
     real(8):: a(4)
 
     if( rho.ge.rhotbl(neamd) ) then
-      calc_df= 0d0
-      return
+      a(1:4)= fprm(1:4,neamd-1)
+    else
+      do i=1,neamd-1
+        if( rho.lt.rhotbl(i+1) ) then
+          a(1:4)= fprm(1:4,i)
+          exit
+        endif
+      enddo
     endif
-    do i=1,neamd-1
-      if( rho.lt.rhotbl(i+1) ) then
-        a(1:4)= fprm(1:4,i)
-        exit
-      endif
-    enddo
 
     calc_df= a(2) +2d0*a(3)*rho +3d0*a(4)*rho*rho
     return
@@ -280,7 +395,7 @@ contains
 
   end subroutine check_range
 !=======================================================================
-end module Mishin_Al
+end module Mishin
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"
