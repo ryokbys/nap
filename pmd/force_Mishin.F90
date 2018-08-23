@@ -239,11 +239,18 @@ contains
     real(8):: calc_rho
 
     integer:: i
-    real(8):: a(4)
+    real(8):: a(4),r0,rho0,drho0
 
 !!$    call check_range(r,neamd,rtbl,'calc_rho')
     if( r.ge.rtbl(neamd) ) then
       calc_rho= 0d0
+      return
+    else if( r.le.rtbl(1) ) then
+      a(1:4)= rhoprm(1:4,1)
+      r0 = rtbl(1)
+      rho0 = a(1) +a(2)*r0 +a(3)*r0*r0 +a(4)*r0*r0*r0
+      drho0 = a(2) +2d0*a(3)*r0 +3d0*a(4)*r0*r0
+      calc_rho = rho0 +(r-r0)*drho0
       return
     endif
     do i=1,neamd-1
@@ -265,10 +272,15 @@ contains
     real(8):: calc_drho
 
     integer:: i
-    real(8):: a(4)
+    real(8):: a(4),r0
 
     if( r.ge.rtbl(neamd) ) then
       calc_drho= 0d0
+      return
+    else if( r.le.rtbl(1) ) then
+      a(1:4)= rhoprm(1:4,1)
+      r0 = rtbl(1)
+      calc_drho = a(2) +2d0*a(3)*r0 +3d0*a(4)*r0*r0
       return
     endif
     do i=1,neamd-1
@@ -290,10 +302,17 @@ contains
     real(8):: calc_v
 
     integer:: i
-    real(8):: a(4)
+    real(8):: a(4),r0,v0,dv0
 
     if( r.ge.rtbl(neamd) ) then
       calc_v= 0d0
+      return
+    else if( r.le.rtbl(1) ) then
+      a(1:4)= vprm(1:4,1)
+      r0 = rtbl(1)
+      v0 = a(1) +a(2)*r0 +a(3)*r0*r0 +a(4)*r0*r0*r0
+      dv0 = a(2) +2d0*a(3)*r0 +3d0*a(4)*r0*r0
+      calc_v= v0 +(r -r0)*dv0
       return
     endif
     do i=1,neamd-1
@@ -315,10 +334,15 @@ contains
     real(8):: calc_dv
 
     integer:: i
-    real(8):: a(4)
+    real(8):: a(4),r0
 
     if( r.ge.rtbl(neamd) ) then
       calc_dv= 0d0
+      return
+    else if( r.le.rtbl(1) ) then
+      a(1:4)= vprm(1:4,1)
+      r0 = rtbl(1)
+      calc_dv = a(2) +2d0*a(3)*r0 +3d0*a(4)*r0*r0
       return
     endif
     do i=1,neamd-1
@@ -340,10 +364,16 @@ contains
     real(8):: calc_f
 
     integer:: i
-    real(8):: a(4)
+    real(8):: a(4),rho0,f0,df0
 
     if( rho.ge.rhotbl(neamd) ) then
       a(1:4) = fprm(1:4,neamd-1)
+    else if( rho.le.rhotbl(1) ) then
+      a(1:4)= fprm(1:4,1)
+      rho0 = rhotbl(1)
+      f0 = a(1) +a(2)*rho0 +a(3)*rho0*rho0 +a(4)*rho0*rho0*rho0
+      df0 = a(2) +2d0*a(3)*rho0 +3d0*a(4)*rho0*rho0
+      calc_f = f0 +(rho -rho0)*df0
     else
       do i=1,neamd-1
         if( rho.lt.rhotbl(i+1) ) then
@@ -365,10 +395,14 @@ contains
     real(8):: calc_df
 
     integer:: i
-    real(8):: a(4)
+    real(8):: a(4),rho0
 
     if( rho.ge.rhotbl(neamd) ) then
       a(1:4)= fprm(1:4,neamd-1)
+    else if( rho.le.rhotbl(1) ) then
+      a(1:4)= fprm(1:4,1)
+      rho0 = rhotbl(1)
+      calc_df = a(2) +2d0*a(3)*rho0 +3d0*a(4)*rho0*rho0
     else
       do i=1,neamd-1
         if( rho.lt.rhotbl(i+1) ) then

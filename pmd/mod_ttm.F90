@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-07-09 22:46:39 Ryo KOBAYASHI>
+!                     Last-modified: <2018-08-23 14:51:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -24,6 +24,8 @@ module ttm
   integer,parameter:: ioTeout = 32
   integer,parameter:: ioergio = 33
 
+  real(8),parameter:: pi = 3.14159265358979d0
+
   real(8):: t_ttm
 !.....TTM mesh divisions
   integer:: nx,ny,nz,nxyz
@@ -40,7 +42,7 @@ module ttm
 !.....Te of right edge, if negative, use free boundary
   real(8):: Te_right = -1.0
 
-!.....Ce dependence on Te: none, polynomial or tanh
+!.....Ce dependence on Te: none, polynomial, tanh, linear
   character(len=128):: Ce_Tdep = 'none'
   real(8):: rho_e = 0.005
   real(8):: d_e = 20000d0
@@ -52,15 +54,27 @@ module ttm
   real(8):: a_3 = 0d0
   real(8):: a_4 = 0d0
   real(8):: A_exp = 0d0
+!.....Coefficients for linear, (Ce(Te) = gmm_ce * Te ), in eV/(Ang^3*K^2)
+  real(8):: gmm_ce = 6.648d-9
 
-!.....Pulse shape: exp or read (from cTe_init)
+!.....Te distribution shape: exp or read (from cTe_init)
   character(len=128):: cTe_init = 'exp'
-!.....Laser power at the surface top in eV/(fs*Ang^2) unit
-  real(8):: I_0 = 5d+4
+!.....T-dependence of pulse shape: abrupt or gaussian
+  character(len=128):: ctype_pulse = 'abrupt'
+!.....Function shape of thermal diffusivity, kappa: DCrho or B2
+! B2: from Eq.(B2) in PRB68,064114 (2003)
+  character(len=128):: ctype_kappa = 'DCrho'
+!.....Prefactor in case of kappa_type = B2, in eV/(fs*Ang*K)
+  real(8):: k0 = 6.2422d-7
+!.....Absobed laser fluence in eV/Ang^2 unit
+  real(8):: fluence = 0d0
+  real(8):: I_0
 !.....Start time of laser injection
   real(8):: t0_laser = 0d0
 !.....Pulse duration in fs
   real(8):: tau_pulse = 100d0
+!.....Pulse sigma in case of Gaussian
+  real(8):: sgm_pulse
 !.....Surface skin length in Ang
   real(8):: lskin = 100d0
 !.....Surface position (positive integer)
@@ -101,6 +115,7 @@ contains
 !
 !  Read parameters for TTM from in.ttm and initialize
 !
+    include 'params_unit.h'
     integer,intent(in):: namax,natm,myid,mpi_world,iprint
     real(8),intent(in):: dtmd,h(3,3)
 
@@ -114,8 +129,24 @@ contains
     call read_ttm_params(myid,mpi_world,iprint)
     call sync_params(myid,mpi_world,iprint)
 
-!.....Convert fluence to energy density
-    I_0 = I_0 /lskin
+!.....Convert fluence to intensity
+    if( trim(ctype_pulse).eq.'abrupt' ) then
+      I_0 = fluence /lskin /tau_pulse
+    else if( trim(ctype_pulse).eq.'gaussian' ) then
+      I_0 = fluence /lskin /tau_pulse *sqrt(4d0 *log(2d0) /pi)
+      sgm_pulse = tau_pulse /sqrt(8d0 *log(2d0))
+    else
+      if( myid.eq.0 ) then
+        print *,'ERROR: pulse_type should be either abrupt or gaussian.'
+      endif
+      call mpi_finalize(ierr)
+      stop
+    endif
+
+!.....Conversion of Ce if needed
+    if( trim(Ce_Tdep).eq.'linear' ) then
+      gmm_ce = gmm_ce /rho_e
+    endif
 
 !.....Set some
     call set_inner_dt(dtmd)
@@ -130,6 +161,8 @@ contains
     if( myid.eq.0 .and. iprint.ne.0 ) then
       print *,''
       print *,'TTM parameters:'
+      print '(a,es12.4,a,es12.4,a)','   fluence = ',fluence,' eV/A^2, = ' &
+           ,fluence*ev2j/ang2m**2,' J/m^2'
       print '(a,i5)','   inner_loop = ',nstp_inner
       print '(a,3i5,i8)','   nx,ny,nz,nxyz = ',nx,ny,nz,nxyz
       print '(a,4es12.4)','   dx,dy,dz,vcell = ',dx,dy,dz,vcell
@@ -262,6 +295,9 @@ contains
         else if( trim(c1st).eq.'D_e' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, d_e
+        else if( trim(c1st).eq.'kappa_type' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, ctype_kappa
         else if( trim(c1st).eq.'Te_init' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, cTe_init
@@ -271,6 +307,9 @@ contains
         else if( trim(c1st).eq.'t0_laser' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, t0_laser
+        else if( trim(c1st).eq.'pulse_type' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, ctype_pulse
         else if( trim(c1st).eq.'pulse_duration' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, tau_pulse
@@ -288,15 +327,18 @@ contains
           endif
           backspace(ioprms)
           read(ioprms,*) c1st, a_0,a_1,a_2,a_3,a_4,A_exp
+        else if( trim(c1st).eq.'Ce_linear_gamma' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, gmm_ce
         else if( trim(c1st).eq.'surface_move' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, surfmove
         else if( trim(c1st).eq.'threshold_density' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, dthresh
-        else if( trim(c1st).eq.'laser_power' ) then
+        else if( trim(c1st).eq.'laser_fluence' ) then
           backspace(ioprms)
-          read(ioprms,*) c1st, I_0
+          read(ioprms,*) c1st, fluence
         else if( trim(c1st).eq.'Te_min' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, Te_min
@@ -330,7 +372,9 @@ contains
     call mpi_bcast(ekth,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_e,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(d_e,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(ctype_kappa,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(t0_laser,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(ctype_pulse,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(tau_pulse,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(cTe_init,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(Te_right,1,mpi_real8,0,mpi_world,ierr)
@@ -342,8 +386,9 @@ contains
     call mpi_bcast(a_3,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(a_4,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(A_exp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(gmm_ce,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(surfmove,1,mpi_logical,0,mpi_world,ierr)
-    call mpi_bcast(I_0,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(fluence,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(Te_min,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(lsurf,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(rsurf,1,mpi_integer,0,mpi_world,ierr)
@@ -471,7 +516,7 @@ contains
     real(8),intent(in):: tnow
 
     integer:: ic,ix,iy,iz,ierr,istp
-    real(8):: t0,ce,xi,pterm,sterm
+    real(8):: t0,ce,xi,pterm,sterm,kappa,dkappa
 
     t0 = mpi_wtime()
 
@@ -487,27 +532,49 @@ contains
           if( ix.lt.lsurf ) cycle
           if( ix.gt.rsurf ) cycle
           ce = cete(ix,iy,iz)
+          if( trim(ctype_kappa).eq.'DCrho' ) then
+            kappa = d_e *ce *rho_e
+            dkappa = d_e *dcete(ix,iy,iz) *rho_e
+          else if( trim(ctype_kappa).eq.'B2' ) then
+            kappa = k0 *te(ix,iy,iz) /max(ta(ic),100d0)
+            dkappa = k0 /max(ta(ic),100d0)
+          endif
           pterm = -gp(ic)*(te(ix,iy,iz) -ta(ic))
           sterm = gs(ic)*tap(ic)
           tep(ix,iy,iz) = te(ix,iy,iz) &
                +dt/ce/rho_e &
-               *(rho_e*d_e *( dcete(ix,iy,iz)*dte2(ix,iy,iz) &
-               +ce*d2te(ix,iy,iz) ) &
+               *( dkappa*dte2(ix,iy,iz) +kappa*d2te(ix,iy,iz) &
                +pterm +sterm )
           ein_e = ein_e +(gp(ic)*ta(ic)+sterm)*dt *vcell
           eout_e = eout_e -gp(ic)*te(ix,iy,iz)*dt *vcell
         enddo
-        if( tnow.ge.t0_laser .and. &
-             tnow.lt.(t0_laser +tau_pulse) ) then
-          do ic=1,nxyz
-            call ic2ixyz(ic,ix,iy,iz)
-            if( ix.lt.lsurf ) cycle
-            if( ix.gt.rsurf ) cycle
-            ce = cete(ix,iy,iz)
-            xi = (ix-lsurf)*dx
-            tep(ix,iy,iz) = tep(ix,iy,iz) &
-                 +I_0 *min(1d0,exp(-xi/lskin))/ce/rho_e*dt
-          enddo
+        if( trim(ctype_pulse).eq.'abrupt' ) then
+          if( tnow.ge.t0_laser .and. &
+               tnow.lt.(t0_laser +tau_pulse) ) then
+            do ic=1,nxyz
+              call ic2ixyz(ic,ix,iy,iz)
+              if( ix.lt.lsurf ) cycle
+              if( ix.gt.rsurf ) cycle
+              ce = cete(ix,iy,iz)
+              xi = (ix-lsurf)*dx
+              tep(ix,iy,iz) = tep(ix,iy,iz) &
+                   +I_0 *min(1d0,exp(-xi/lskin))/ce/rho_e*dt
+            enddo
+          endif
+        else if( trim(ctype_pulse).eq.'gaussian' ) then
+          if( tnow.ge.t0_laser .and. &
+               tnow.lt.(t0_laser +tau_pulse*2) ) then
+            do ic=1,nxyz
+              call ic2ixyz(ic,ix,iy,iz)
+              if( ix.lt.lsurf ) cycle
+              if( ix.gt.rsurf ) cycle
+              ce = cete(ix,iy,iz)
+              xi = (ix-lsurf)*dx
+              tep(ix,iy,iz) = tep(ix,iy,iz) &
+                   +I_0 *min(1d0,exp(-xi/lskin))/ce/rho_e*dt &
+                   *exp(-(tnow -(t0_laser+tau_pulse))**2 /2d0/sgm_pulse**2)
+            enddo
+          endif
         endif
         te(:,:,:) = tep(:,:,:)
       enddo
@@ -539,6 +606,8 @@ contains
            *exp(-(A_exp*t)**2)
     else if( trim(Ce_Tdep).eq.'tanh' ) then
       cete = 3d0 *tanh(2d-4 *t)
+    else if( trim(Ce_Tdep).eq.'linear' ) then
+      cete = gmm_ce *te(ix,iy,iz)
     endif
     return
   end function cete
