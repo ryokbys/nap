@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-08-23 14:51:08 Ryo KOBAYASHI>
+!                     Last-modified: <2018-08-28 15:31:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -45,7 +45,7 @@ module ttm
 !.....Ce dependence on Te: none, polynomial, tanh, linear
   character(len=128):: Ce_Tdep = 'none'
   real(8):: rho_e = 0.005
-  real(8):: d_e = 20000d0
+  real(8):: d_e = 20d0
   real(8):: c_0 = 1e-4
 !.....Coefficients for polynomial Ce(Te)
   real(8):: a_0 = 0d0
@@ -56,6 +56,10 @@ module ttm
   real(8):: A_exp = 0d0
 !.....Coefficients for linear, (Ce(Te) = gmm_ce * Te ), in eV/(Ang^3*K^2)
   real(8):: gmm_ce = 6.648d-9
+!.....Minimum Ce value for computational stability, in eV/K
+  real(8):: ce_min = 1d-6
+!.....Minimum atomic temperature for calculating kappa, in K
+  real(8):: ta_min = 10.0
 
 !.....Te distribution shape: exp or read (from cTe_init)
   character(len=128):: cTe_init = 'exp'
@@ -65,7 +69,7 @@ module ttm
 ! B2: from Eq.(B2) in PRB68,064114 (2003)
   character(len=128):: ctype_kappa = 'DCrho'
 !.....Prefactor in case of kappa_type = B2, in eV/(fs*Ang*K)
-  real(8):: k0 = 6.2422d-7
+  real(8):: kappa0 = 6.2422d-7
 !.....Absobed laser fluence in eV/Ang^2 unit
   real(8):: fluence = 0d0
   real(8):: I_0
@@ -108,6 +112,10 @@ module ttm
 !.....For energy difference
   real(8):: ein_e, ein_a, eout_e, eout_a
   real(8),allocatable:: dein(:),deout(:)
+
+!.....DEBUGGING
+!.....Cut interaction bewteen atom and electron systems
+  logical:: lcut_interact = .false.
 
 contains
 !=======================================================================
@@ -163,6 +171,7 @@ contains
       print *,'TTM parameters:'
       print '(a,es12.4,a,es12.4,a)','   fluence = ',fluence,' eV/A^2, = ' &
            ,fluence*ev2j/ang2m**2,' J/m^2'
+      print '(a,es12.4,a)','   intensity = ',I_0,' eV/A^3/fs'
       print '(a,i5)','   inner_loop = ',nstp_inner
       print '(a,3i5,i8)','   nx,ny,nz,nxyz = ',nx,ny,nz,nxyz
       print '(a,4es12.4)','   dx,dy,dz,vcell = ',dx,dy,dz,vcell
@@ -298,6 +307,9 @@ contains
         else if( trim(c1st).eq.'kappa_type' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, ctype_kappa
+        else if( trim(c1st).eq.'kappa_0' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, kappa0
         else if( trim(c1st).eq.'Te_init' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, cTe_init
@@ -351,6 +363,9 @@ contains
         else if( trim(c1st).eq.'surface_skin_length' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, lskin
+        else if( trim(c1st).eq.'cut_interaction' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, lcut_interact
         else
           print *,'There is no TTM keyword: ',trim(c1st)
         endif
@@ -373,6 +388,7 @@ contains
     call mpi_bcast(rho_e,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(d_e,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(ctype_kappa,128,mpi_character,0,mpi_world,ierr)
+    call mpi_bcast(kappa0,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(t0_laser,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(ctype_pulse,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(tau_pulse,1,mpi_real8,0,mpi_world,ierr)
@@ -387,12 +403,15 @@ contains
     call mpi_bcast(a_4,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(A_exp,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(gmm_ce,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(ce_min,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(ta_min,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(surfmove,1,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(fluence,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(Te_min,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(lsurf,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(rsurf,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(lskin,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(lcut_interact,1,mpi_logical,0,mpi_world,ierr)
     return
   end subroutine sync_params
 !=======================================================================
@@ -536,17 +555,37 @@ contains
             kappa = d_e *ce *rho_e
             dkappa = d_e *dcete(ix,iy,iz) *rho_e
           else if( trim(ctype_kappa).eq.'B2' ) then
-            kappa = k0 *te(ix,iy,iz) /max(ta(ic),100d0)
-            dkappa = k0 /max(ta(ic),100d0)
+            kappa = kappa0 *te(ix,iy,iz) /max(ta(ic),ta_min)
+            dkappa = kappa0 /max(ta(ic),ta_min)
+!!$            kappa = kappa0 *te(ix,iy,iz) /300d0
+!!$            dkappa = kappa0 /300d0
           endif
           pterm = -gp(ic)*(te(ix,iy,iz) -ta(ic))
           sterm = gs(ic)*tap(ic)
+          if( lcut_interact ) then
+            pterm = 0d0
+            sterm = 0d0
+          else
+            ein_e = ein_e +(gp(ic)*ta(ic)+sterm)*dt *vcell
+            eout_e = eout_e -gp(ic)*te(ix,iy,iz)*dt *vcell
+          endif
+!!$          if( ix.eq.11 .and. iy.eq.1 .and. iz.eq.1 ) then
+!!$            print '(a,3i3,8es10.2)',' ix,iy,iz,te,ce,kappa,dkappa,dte2,d2te,pterm,sterm = '&
+!!$                 ,ix,iy,iz,te(ix,iy,iz),ce,kappa,dkappa,dte2(ix,iy,iz),d2te(ix,iy,iz)&
+!!$                 ,pterm,sterm
+!!$            print '(a,3i3,2es10.2)',' ix,iy,iz,dt,dTe=',ix,iy,iz,dt&
+!!$                 ,dt/(ce*rho_e) &
+!!$                 *( dkappa*dte2(ix,iy,iz) +kappa*d2te(ix,iy,iz) &
+!!$                 +pterm +sterm )
+!!$            print '(a,7es10.2)',' te(...)=',te(ix,iy,iz),te(ix-1,iy,iz)-te(ix,iy,iz) &
+!!$                 ,te(ix+1,iy,iz)-te(ix,iy,iz) &
+!!$                 ,te(ix,iy-1,iz)-te(ix,iy,iz),te(ix,iy+1,iz)-te(ix,iy,iz) &
+!!$                 ,te(ix,iy,iz-1)-te(ix,iy,iz),te(ix,iy,iz+1)-te(ix,iy,iz)
+!!$          endif
           tep(ix,iy,iz) = te(ix,iy,iz) &
-               +dt/ce/rho_e &
+               +dt/(ce*rho_e) &
                *( dkappa*dte2(ix,iy,iz) +kappa*d2te(ix,iy,iz) &
                +pterm +sterm )
-          ein_e = ein_e +(gp(ic)*ta(ic)+sterm)*dt *vcell
-          eout_e = eout_e -gp(ic)*te(ix,iy,iz)*dt *vcell
         enddo
         if( trim(ctype_pulse).eq.'abrupt' ) then
           if( tnow.ge.t0_laser .and. &
@@ -558,7 +597,7 @@ contains
               ce = cete(ix,iy,iz)
               xi = (ix-lsurf)*dx
               tep(ix,iy,iz) = tep(ix,iy,iz) &
-                   +I_0 *min(1d0,exp(-xi/lskin))/ce/rho_e*dt
+                   +I_0 *min(1d0,exp(-xi/lskin))/(ce*rho_e)*dt
             enddo
           endif
         else if( trim(ctype_pulse).eq.'gaussian' ) then
@@ -571,8 +610,8 @@ contains
               ce = cete(ix,iy,iz)
               xi = (ix-lsurf)*dx
               tep(ix,iy,iz) = tep(ix,iy,iz) &
-                   +I_0 *min(1d0,exp(-xi/lskin))/ce/rho_e*dt &
-                   *exp(-(tnow -(t0_laser+tau_pulse))**2 /2d0/sgm_pulse**2)
+                   +I_0 *min(1d0,exp(-xi/lskin))/(ce*rho_e)*dt &
+                   *exp(-(tnow -(t0_laser+tau_pulse))**2 /(2d0*sgm_pulse**2))
             enddo
           endif
         endif
@@ -603,11 +642,11 @@ contains
     else if( trim(Ce_Tdep).eq.'polynomial' ) then
       t = te(ix,iy,iz)/1000
       cete = c_0 +(a_0 +a_1*t +a_2*t**2 +a_3*t**3 +a_4*t**4)&
-           *exp(-(A_exp*t)**2)
+           *exp(-(A_exp*t)**2) +ce_min
     else if( trim(Ce_Tdep).eq.'tanh' ) then
-      cete = 3d0 *tanh(2d-4 *t)
+      cete = 3d0 *tanh(2d-4 *t) +ce_min
     else if( trim(Ce_Tdep).eq.'linear' ) then
-      cete = gmm_ce *te(ix,iy,iz)
+      cete = gmm_ce *te(ix,iy,iz) +ce_min
     endif
     return
   end function cete
@@ -646,11 +685,11 @@ contains
 
     dte2 = 0d0
     dte2 = (te(ixp,iy,iz)**2 -2d0*te(ixp,iy,iz)*te(ixm,iy,iz) &
-         +te(ixm,iy,iz))/4/dx/dx &
+         +te(ixm,iy,iz)**2 )/4/dx/dx &
          + (te(ix,iyp,iz)**2 -2d0*te(ix,iyp,iz)*te(ix,iym,iz) &
-         +te(ix,iym,iz))/4/dy/dy &
+         +te(ix,iym,iz)**2 )/4/dy/dy &
          + (te(ix,iy,izp)**2 -2d0*te(ix,iy,izp)*te(ix,iy,izm) &
-         +te(ix,iy,izm))/4/dz/dz
+         +te(ix,iy,izm)**2 )/4/dz/dz
     return
   end function dte2
 !=======================================================================
@@ -696,9 +735,14 @@ contains
 
     if( l1st ) then
       allocate(dein(nspmax),deout(nspmax))
+      l1st = .false.
     endif
 
     t0 = mpi_wtime()
+    ein_a = 0d0
+    eout_a = 0d0
+
+    if( lcut_interact ) return
 
     do ic=1,nxyz
       call ic2ixyz(ic,ix,iy,iz)
@@ -774,14 +818,11 @@ contains
          ,mpi_real8,mpi_sum,0,mpi_world,ierr)
     call mpi_reduce(deoutl,deout,nspmax &
          ,mpi_real8,mpi_sum,0,mpi_world,ierr)
-    ein_a = 0d0
-    eout_a = 0d0
     do isp=1,nspmax
       ein_a = ein_a +dein(isp)
       eout_a = eout_a +deout(isp)
     enddo
 
-    l1st = .false.
     t_ttm = t_ttm +mpi_wtime()-t0
     return
   end subroutine langevin_ttm
@@ -884,9 +925,9 @@ contains
         te(rsurf+1,1:ny,1:nz) = Te_right
       endif
 !.....Periodic for y and z
-      te(lsurf:rsurf,0,1:nz) = te(lsurf:rsurf,ny,1:nz)
+      te(lsurf:rsurf,0,1:nz)    = te(lsurf:rsurf,ny,1:nz)
       te(lsurf:rsurf,ny+1,1:nz) = te(lsurf:rsurf,1,1:nz)
-      te(lsurf:rsurf,1:ny,0) = te(lsurf:rsurf,1:ny,nz)
+      te(lsurf:rsurf,1:ny,0)    = te(lsurf:rsurf,1:ny,nz)
       te(lsurf:rsurf,1:ny,nz+1) = te(lsurf:rsurf,1:ny,1)
     endif
   end subroutine set_BC

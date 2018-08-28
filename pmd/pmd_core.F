@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-08-07 16:49:22 Ryo KOBAYASHI>
+c                     Last-modified: <2018-08-28 11:37:11 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -44,7 +44,7 @@ c-----------------------------------------------------------------------
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
       integer:: ihour,imin,isec
       real(8):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp,
-     &     htmp(3,3),prss,dtmax,vmaxt,rbufres
+     &     htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow
       real(8),external:: box_muller,sprod
       logical:: lconverged = .false.
       logical:: lstrs = .false.
@@ -694,7 +694,7 @@ c.....accumulate energy difference
      &         ,myid_md,mpi_md_world,iprint)
           call langevin_ttm(namax,natm,va,aa,tag,eki,am,h
      &         ,nspmax,fa2v,fekin,ediff,dt,mpi_md_world,iprint)
-          call update_Te(istp*dt,myid_md,mpi_md_world,iprint)
+          call update_Te(simtime,myid_md,mpi_md_world,iprint)
         endif
 
         call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
