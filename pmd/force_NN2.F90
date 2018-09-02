@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-05 17:35:42 Ryo KOBAYASHI>
+!                     Last modified: <2018-08-30 18:15:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -94,6 +94,14 @@ contains
 
     endif ! l1st
 
+    if( allocated(hl1) .and. size(hl1).lt.nhl(1)*nal ) then
+      deallocate(hl1)
+      allocate(hl1(nhl(1),nal))
+    endif
+    if( allocated(hl2) .and. size(hl2).lt.nhl(1)*nal ) then
+      deallocate(hl1,hl2)
+      allocate(hl1(nhl(1),nal),hl2(nhl(2),nal))
+    endif
     if( size(strsl).lt.3*3*namax ) then
       deallocate(strsl)
       allocate(strsl(3,3,namax))
@@ -426,6 +434,8 @@ contains
     nl = nl_in
     if( nl.eq.0 ) then
       print *,'ERROR: nl==0 which should not happen.'
+      print *,'  Probably NN_num_layers and NN_num_nodes are not set in in.fitpot.'
+      print *,'  Those should be consistent with the number of NN weigts to be optimized.'
       stop
     endif
     nhl(0:nl) = nhl_in(0:nl_in)
@@ -731,6 +741,10 @@ contains
 !!$    real(8),allocatable:: gwft(:,:,:)
 
 !.....TO CHECK: Need to make hl1 every time?
+    if( size(hl1).ne.nhl(1)*nal ) then
+      deallocate(hl1)
+      allocate(hl1(nhl(1),nal))
+    endif
     do ia=1,natm
       do ihl1=1,mhl(1)
         tmp= 0d0
@@ -742,7 +756,6 @@ contains
     enddo
 
     if( lematch ) then
-
       if( allocated(mskgfs) ) then
         do ia=1,natm
           iv = iprm0
@@ -796,6 +809,7 @@ contains
 !!$      endif
 !!$      gwft(:,:,:) = 0d0
 !.....Make dgsf2 array
+!!$      print *,'nal,nnl,nhl(0:)=',nal,nnl,nhl(0:1)
       if( .not.allocated(dgsf2) ) then
         allocate(dgsf2(3,0:nnl,mhl(1),nal))
       else if( size(dgsf2).ne.3*nnl*mhl(1)*nal ) then

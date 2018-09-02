@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-17 10:26:25 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-02 23:31:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -100,7 +100,6 @@ contains
 
     nfunc= nfunc +1
 
-!!$    print *,'func_w_pmd: 01'
     tc0= mpi_wtime()
     call mpi_bcast(x,ndim,mpi_real8,0,mpi_world,ierr)
     tcl= mpi_wtime() -tc0
@@ -126,7 +125,6 @@ contains
     ftrnl = 0d0
     ftstl = 0d0
     do ismpl=isid0,isid1
-!!$      print *,'func_w_pmd: 04,ismpl,size(samples)=',ismpl,size(samples)
       smpl = samples(ismpl)
       natm= smpl%natm
       cdirname = trim(smpl%cdirname)
@@ -199,39 +197,30 @@ contains
         samples(ismpl)%nsf = nsf
         samples(ismpl)%nal = nal
         samples(ismpl)%nnl = nnl
-!!$        print *,trim(cdirname),nsf,nal,nnl
         if( .not. allocated(samples(ismpl)%gsf) ) then
           allocate(samples(ismpl)%gsf(nsf,nal) &
-!!$               ,samples(ismpl)%gsfo(nsf,nal) &
                ,samples(ismpl)%dgsf(3,nsf,0:nnl,nal) &
                ,samples(ismpl)%igsf(nsf,0:nnl,nal) )
         endif
+!!$        print *,'func: cdirname,nsf,nal,nnl=',trim(cdirname),nsf,nal,nnl
         call get_descs(nsf,nal,nnl,samples(ismpl)%gsf &
              ,samples(ismpl)%dgsf,samples(ismpl)%igsf)
       endif
-      if( trim(cpot).eq.'NN2' ) then
-        if( .not. allocated(samples(ismpl)%hl1) ) then
-          allocate(samples(ismpl)%hl1(nhl(1),nal))
-        else if( size(samples(ismpl)%hl1) .ne. nhl(1)*nal ) then
-!!$          print *,'possible? ismpl=',ismpl
-          deallocate(samples(ismpl)%hl1)
-          allocate(samples(ismpl)%hl1(nhl(1),nal))
-        endif
-        call get_NN2_hl1(samples(ismpl)%hl1)
+!!$      if( trim(cpot).eq.'NN2' ) then
+!!$        if( .not. allocated(samples(ismpl)%hl1) ) then
+!!$          allocate(samples(ismpl)%hl1(nhl(1),nal))
+!!$        else if( size(samples(ismpl)%hl1) .ne. nhl(1)*nal ) then
+!!$          deallocate(samples(ismpl)%hl1)
+!!$          allocate(samples(ismpl)%hl1(nhl(1),nal))
+!!$        endif
+!!$        call get_NN2_hl1(samples(ismpl)%hl1)
 !!$        print *,'hl1 after get_NN2_hl1:'
 !!$        do i=1,nhl(1)
 !!$          print *,'i,hl1(i,1)=',samples(ismpl)%hl1(i,1)
 !!$        enddo
-      endif
-      if( iprint.ge.10 ) then
-        write(6,'(a,2i4,1x,a,7es12.4)') ' myid,ismpl,cdirname,epot,strs= ', &
-             myid,ismpl,trim(cdirname), &
-             epot,strs(1,1),strs(2,2),strs(3,3), &
-             strs(2,3),strs(1,3),strs(1,2)
-      endif
+!!$      endif
     enddo
 
-!!$    print *,'func_w_pmd: 05'
     if( len(trim(crefstrct)).gt.5 ) then
       if( myid.eq.myidrefsub ) then
         epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
@@ -242,8 +231,8 @@ contains
     endif
 
     do ismpl=isid0,isid1
-!!$      print *,'func_w_pmd: 06,ismpl=',ismpl
       smpl = samples(ismpl)
+      cdirname= smpl%cdirname
       natm = smpl%natm
       epot = smpl%epot
       ftmp = 0d0
@@ -262,6 +251,10 @@ contains
 !!$             ,ismpl,epot,esub,eref,ediff,natm,eerr,swgt
         ediff= ediff*ediff
         ftmp= ftmp +ediff *swgt
+        if( iprint.gt.2 ) then
+          write(6,'(a,2i4,1x,a,7es12.4)') ' myid,ismpl,cdirname,(epot+esub)/natm= ', &
+               myid,ismpl,trim(cdirname),(epot+esub)/natm
+        endif
       endif
 !.....Force matching
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
@@ -373,7 +366,6 @@ contains
 
     logical,external:: string_in_arr
 
-!!$    print *,'grad_w_pmd'
     if( .not.allocated(gtrnl) ) allocate(gtrnl(ndim))
     if( .not.allocated(gwe) ) allocate(gwe(ndim),gwf(ndim,3,maxna)&
          ,gws(ndim,6))
@@ -447,6 +439,7 @@ contains
         nsf = smpl%nsf
         nal = smpl%nal
         nnl = smpl%nnl
+!!$        print *,'myid,ismpl,nsf,nal,nnl,nn_nl=',myid,ismpl,nsf,nal,nnl,nn_nl
         call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
       else if( trim(cpot).eq.'BVS' ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
@@ -487,7 +480,7 @@ contains
       natm= smpl%natm
       epot= smpl%epot
       swgt= smpl%wgt
-!!$      print *,'ismpl,natm,epot=',ismpl,natm,epot
+!!$      print *,'myid,ismpl,natm,epot=',myid,ismpl,natm,epot
 !.....Derivative of energy term w.r.t. weights
       if( lematch ) then
         eref= smpl%eref
@@ -881,8 +874,11 @@ contains
     real(8),allocatable:: gsfml(:),gsfvl(:),gsfcl(:,:),gsfvsq(:),gsfsl(:)
 
     nsf = samples(isid0)%nsf
-    allocate(gsfml(nsf),gsfvl(nsf),gsfcl(nsf,nsf),&
-         gsfvsq(nsf),gsfsl(nsf))
+    print *,'myid,isid0,nsf=',myid,isid0,nsf
+    if( .not.allocated(gsfml) ) then
+      allocate(gsfml(nsf),gsfvl(nsf),gsfcl(nsf,nsf),&
+           gsfvsq(nsf),gsfsl(nsf))
+    endif
     if( .not. allocated(gsfms) ) then
       allocate(gsfms(nsf),gsfvs(nsf),gsfss(nsf),gsfcorr(nsf,nsf))
     endif
@@ -905,7 +901,6 @@ contains
           gsfsl(isf) = gsfsl(isf) +tmp*tmp
           gmeanl= gmeanl +tmp
           gvarl = gvarl +tmp*tmp
-!!$          nsuml= nsuml +1
         enddo
       enddo
     enddo
@@ -921,13 +916,16 @@ contains
          ,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(nsuml,nsumg,1,mpi_integer &
          ,mpi_sum,mpi_world,ierr)
-    gsfms(1:nsf)= gsfms(1:nsf)/nsumg
-    gsfss(1:nsf)= gsfss(1:nsf)/nsumg
-    gsfvs(1:nsf)= gsfss(1:nsf) -gsfms(1:nsf)**2
+    do isf=1,nsf
+      gsfms(isf)= gsfms(isf)/nsumg
+      gsfss(isf)= gsfss(isf)/nsumg
+      gsfvs(isf)= gsfss(isf) -gsfms(isf)**2
+    enddo
 
 !.....Correlation coefficients
     gsfcl(:,:) = 0d0
     do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
       do ia=1,natm
         do isf=1,nsf-1
           dgi = samples(ismpl)%gsf(isf,ia) - gsfms(isf)
@@ -947,12 +945,8 @@ contains
     enddo
     do isf=1,nsf-1
       do jsf=isf+1,nsf
-!!$        if( abs(gsfcorr(jsf,isf)).lt.tiny ) then
-!!$          gsfcorr(jsf,isf) = 0d0
-!!$        else
-          gsfcorr(jsf,isf) = gsfcorr(jsf,isf) &
+        gsfcorr(jsf,isf) = gsfcorr(jsf,isf) &
                / gsfvsq(isf) /gsfvsq(jsf)
-!!$        endif
         gsfcorr(isf,jsf) = gsfcorr(jsf,isf)
       enddo
     enddo
@@ -961,7 +955,7 @@ contains
       open(20,file='out.correlation',status='replace')
       do isf=1,nsf
         do jsf=1,nsf
-          write(20,'(2i6,f10.5)') isf,jsf,gsfcorr(isf,jsf)
+          write(20,'(2i6,2es12.4)') isf,jsf,gsfcorr(isf,jsf)
         enddo
       enddo
       close(20)

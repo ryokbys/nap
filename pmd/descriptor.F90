@@ -254,10 +254,10 @@ contains
             call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
             a1= cnst(1,isf)
             !.....func value
-            tcos= (1d0+cos(dij*a1))
+            tcos= 0.5d0*(1d0+cos(dij*a1))
             gsf(isf,ia)= gsf(isf,ia) +tcos*fcij
             !.....derivative
-            dgdr= -a1*sin(dij*a1)*fcij +tcos*dfcij
+            dgdr= -0.5d0*a1*sin(dij*a1)*fcij +tcos*dfcij
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
             igsf(isf,0,ia) = 1
@@ -700,6 +700,10 @@ contains
     real(8),intent(out):: gsfo(nsfo,nalo),dgsfo(3,nsfo,0:nnlo,nalo)&
          ,igsfo(nsfo,0:nnlo,nalo)
 
+    if( size(gsf).ne.size(gsfo) ) then
+      print *,'ERROR: size of gsf and gsfo different !'
+      stop
+    endif
     gsfo(:,:) = gsf(:,:)
     dgsfo(:,:,:,:) = dgsf(:,:,:,:)
     igsfo(:,:,:) = igsf(:,:,:)

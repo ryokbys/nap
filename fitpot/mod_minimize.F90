@@ -1839,7 +1839,8 @@ contains
 
     integer:: iter,i,imax,ig,jg,itmp,j,igmm,itergfs,niter,inc,jnc&
          ,nfailinmin
-    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,f0,tmp,gmm,ftst
+    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,f0,tmp,gmm &
+         ,ftst,ftstp
     real(8),allocatable,save:: xt(:),gmaxgl(:),u(:),gmaxgl0(:)
     real(8),save,allocatable:: gg(:,:),y(:),gp(:),rg(:) &
          ,ggy(:),ygg(:),s(:),g0(:),gpena(:)  !,aa(:,:),cc(:,:),v(:)
@@ -1921,9 +1922,14 @@ contains
       g0(:) = g(:)
     endif
 
+    if( myid.eq.0 .and. iprint.gt.0 ) then
+      print '(a,i6,2es12.4)',' iter,ftrn,ftst=',0,f,ftst
+    endif
     call sub_eval(0)
+    
     do iter=1,maxiter
       fp = f
+      ftstp = ftst
       if( index(cfsmode,'grad0').ne.0 ) then
         g(:) = g0(:)
       else if( index(cfsmode,'grad').ne.0 ) then
@@ -1992,6 +1998,7 @@ contains
       igmm= 0
       do ig=1,ngl
 !.....Do not take mskgfs==2 into account !
+!!$        print *,'ig,mskgfs,gmaxgl=',ig,mskgfs(ig),gmaxgl(ig)
         if( mskgfs(ig).eq.1 .and. gmaxgl(ig).gt.gmm ) then
           gmm= gmaxgl(ig)
           igmm= ig
@@ -2142,7 +2149,7 @@ contains
 
         gnorm= sqrt(sprod(ndim,g,g))
         if( myid.eq.0 ) then
-          if( iprint.gt.0 ) then
+          if( iprint.gt.1 ) then
             write(6,'(a,i8,2es13.5)') ' itergfs,f,gnorm=',itergfs,f,gnorm
             call flush(6)
           endif
@@ -2238,6 +2245,9 @@ contains
         enddo
       enddo
       x(1:ndim)= xt(1:ndim)
+      if( myid.eq.0 .and. iprint.gt.0 ) then
+        print '(a,i6,2es12.4)',' iter,ftrn,ftst=',iter,f,ftst
+      endif
       call sub_eval(iter)
     enddo
 
