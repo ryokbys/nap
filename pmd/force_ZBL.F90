@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-26 20:31:57 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-03 15:36:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -371,6 +371,17 @@ contains
     dzeta = (15d0*x**4 -30d0*x**2 +15d0)/16d0
     return
   end function dzeta
+!=======================================================================
+  subroutine set_paramsdir_ZBL(dname)
+!
+!  Accessor routine to set paramsdir.
+!
+    implicit none
+    character(len=*),intent(in):: dname
+
+    paramsdir = trim(dname)
+    return
+  end subroutine set_paramsdir_ZBL
 !=======================================================================
   
 end module ZBL

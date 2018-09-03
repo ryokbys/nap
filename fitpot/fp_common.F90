@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-02 23:31:09 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-03 15:37:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -758,6 +758,7 @@ contains
     use Coulomb,only: set_paramsdir_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use LJ,only: set_paramsdir_LJ
+    use ZBL,only: set_paramsdir_ZBL
     implicit none
 
     integer:: i,ismpl,natm
@@ -766,6 +767,7 @@ contains
     logical:: luse_Morse_repul = .false.
     logical:: luse_Coulomb = .false.
     logical:: luse_LJ_repul = .false.
+    logical:: luse_ZBL = .false.
     logical,save:: l1st = .true.
     real(8):: epot,strs(3,3)
     real(8),save,allocatable:: frcs(:,:)
@@ -791,6 +793,8 @@ contains
           luse_Coulomb = .true.
         else if( index(trim(csubffs(i)),'LJ_repul').ne.0 ) then
           luse_LJ_repul = .true.
+        else if( index(trim(csubffs(i)),'ZBL').ne.0 ) then
+          luse_ZBL = .true.
         endif
       enddo
 
@@ -811,6 +815,10 @@ contains
         endif
         if( luse_LJ_repul ) then
           call set_paramsdir_LJ(trim(cmaindir)//'/'&
+               //trim(samples(ismpl)%cdirname)//'/pmd')
+        endif
+        if( luse_ZBL ) then
+          call set_paramsdir_ZBL(trim(cmaindir)//'/'&
                //trim(samples(ismpl)%cdirname)//'/pmd')
         endif
         call run_pmd(samples(ismpl),lcalcgrad,nvars,&
@@ -874,7 +882,7 @@ contains
     real(8),allocatable:: gsfml(:),gsfvl(:),gsfcl(:,:),gsfvsq(:),gsfsl(:)
 
     nsf = samples(isid0)%nsf
-    print *,'myid,isid0,nsf=',myid,isid0,nsf
+!!$    print *,'myid,isid0,nsf=',myid,isid0,nsf
     if( .not.allocated(gsfml) ) then
       allocate(gsfml(nsf),gsfvl(nsf),gsfcl(nsf,nsf),&
            gsfvsq(nsf),gsfsl(nsf))

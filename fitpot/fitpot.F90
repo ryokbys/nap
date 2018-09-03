@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-08-31 14:18:29 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-03 11:45:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1487,6 +1487,8 @@ subroutine write_force_relation(cadd)
   if( myid.eq.0 ) then
     open(92,file=trim(cfname)//'.trn.'//trim(cadd),status='replace')
     open(93,file=trim(cfname)//'.tst.'//trim(cadd),status='replace')
+    write(92,'(a)') '# fref, fpot, cdirname, ia, ixyz, diff, error, fsub'
+    write(93,'(a)') '# fref, fpot, cdirname, ia, ixyz, diff, error, fsub'
     do ismpl=1,nsmpl
       if( iclist(ismpl).eq.1 ) then
         natm= nalist(ismpl)

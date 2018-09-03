@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-26 21:01:23 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-03 13:00:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -107,6 +107,7 @@ contains
        myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc)
 !
 !  Allocate and initialize parameters to be used.
+!  This is called when force is either screened_Coulomb/Ewald/Ewald_long.
 !
     include "mpif.h"
     integer,intent(in):: myid,mpi_md_world,natm,nspin &
@@ -149,6 +150,7 @@ contains
        myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc)
 !
 !  Allocate and initialize parameters to be used.
+!  This is called when force is 'Coulomb'
 !
     include "mpif.h"
     integer,intent(in):: myid,mpi_md_world,natm,nspin &
@@ -629,6 +631,10 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, conv_eps
           cycle
+        else if( trim(cline).eq.'fbvs' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, fbvs
+          cycle
         endif
 !.....Not a keyword, a certain mode should be already selected.
         if( trim(cmode).eq.'charges' ) then
@@ -711,30 +717,13 @@ contains
         endif
       endif
 
-!.....Set screening length
-      if( trim(cchgs).eq.'fixed_bvs' ) then
-        do isp=1,nsp
-          do jsp=1,nsp
-            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
-          enddo
-        enddo
-      else
-        rho_bvs(:,:) = rho_screened_cut
-      endif
-      if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
-        do isp=1,nsp
-          do jsp=isp,nsp
-!!$            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
-!!$            rho_bvs(isp,jsp) = 2d0
-            if( iprint.gt.0 .and. interact(isp,jsp) ) then
-              write(6,'(a,2i5,f10.4)') ' isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
-            endif
-          enddo
-        enddo
-      endif
     endif  ! myid.eq.0
 
 !.....Broadcast data just read from the file
+    call mpi_bcast(cterms,128,mpi_character,0,mpi_world,ierr)
+    call mpi_bcast(cdist,128,mpi_character,0,mpi_world,ierr)
+    call mpi_bcast(cchgs,128,mpi_character,0,mpi_world,ierr)
+    
     call mpi_bcast(schg,msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
@@ -746,9 +735,35 @@ contains
     call mpi_bcast(vid_bvs,msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rad_bvs,msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(npq_bvs,msp,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(rho_bvs,msp*msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(ispflag,msp,mpi_logical,0,mpi_world,ierr)
+    
+    call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(conv_eps,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
+
+!.....Set screening length
+    rho_bvs(:,:) = 0d0
+    if( trim(cchgs).eq.'fixed_bvs' ) then
+      do isp=1,nsp
+        do jsp=1,nsp
+          rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+        enddo
+      enddo
+    else
+      rho_bvs(:,:) = rho_screened_cut
+    endif
+    if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
+      do isp=1,nsp
+        do jsp=isp,nsp
+!!$            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+!!$            rho_bvs(isp,jsp) = 2d0
+          if( iprint.gt.0 .and. interact(isp,jsp) ) then
+            write(6,'(a,2i5,f10.4)') ' isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
+          endif
+        enddo
+      enddo
+    endif
 
     if( myid.eq.0 .and. iprint.ne.0 ) then
       write(6,'(a)') ' Finished reading '//trim(fname)
