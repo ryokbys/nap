@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-08-28 11:37:11 Ryo KOBAYASHI>
+c                     Last-modified: <2018-09-03 16:06:22 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -200,7 +200,6 @@ c-----get total number of species
       do i=1,natm
         nspl = max(int(tag(i)),nspl)
       enddo
-      nspl = nsp
       call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max
      &     ,mpi_md_world,ierr)
       if( nsp.gt.nspmax ) then
@@ -1004,7 +1003,7 @@ c.....perform space decomposition after reading atomic configuration
 c      write(6,'(a,30es10.2)') 'chgtot before space_decomp = ',
 c     &     chgtot(1:ntot0)
       if( iprint.ne.0 ) then
-        write(6,'(a,i8)') ' number of total atoms = ',ntot0
+        write(6,'(a,i8)') ' Number of total atoms = ',ntot0
         write(6,'(a)') " h-matrix:"
         write(6,'("   | ",3f12.3," |")') h(1,1:3,0)
         write(6,'("   | ",3f12.3," |")') h(2,1:3,0)
@@ -1027,6 +1026,10 @@ c.....Some conversions
 c-------species of atom-i
         nsp= max(int(tag(i)),nsp)
       enddo
+c-----get total number of species
+      nspl = nsp
+      call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max
+     &     ,mpi_md_world,ierr)
 c-----setup
       allocate(fekin(nspmax),fa2v(nspmax))
       call setup(nspmax,am,fekin,fa2v)
@@ -1034,10 +1037,6 @@ c-----set HI and SGM
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 c-----ntset
       call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
-c-----get total number of species
-      nspl = nsp
-      call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max
-     &     ,mpi_md_world,ierr)
 
       tcpu1= mpi_wtime()
       tcom = 0d0
