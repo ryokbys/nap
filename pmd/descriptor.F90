@@ -500,6 +500,7 @@ contains
 !.....Also allocate group-LASSO/FS related variables,
 !     which are not used in pmd but in fitpot
       allocate(mskgfs(ngl),msktmp(ngl),glval(0:ngl))
+      mskgfs(1:ngl) = 0d0
     endif
     
     if( myid.eq.0 ) then

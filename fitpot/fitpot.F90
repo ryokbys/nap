@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-03 11:45:08 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-04 15:02:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -731,7 +731,6 @@ subroutine read_vars()
   if( myid.eq.0 ) then
     do i=1,nvars
       read(15,*) vars(i),vranges(1:2,i)
-!    print *, vars(i),vranges(1:2,i)
     enddo
     if( trim(cinitv).eq.'gaussian' .or. trim(cinitv).eq.'gauss' ) then
       rs0 = get_seed()
@@ -1250,7 +1249,8 @@ subroutine check_grad(ftrn0,ftst0)
   vmax= 0d0
   do iv=1,nvars
     vmax= max(vmax,abs(vars0(iv)))
-!!$    if( myid.eq.0) write(6,'(a,i6,es12.4)') ' iv,vars(iv)=',iv,vars0(iv)
+!!$    if( myid.eq.0) write(6,'(a,i6,2es12.4)') ' iv,vars,ganal=',iv,vars0(iv)&
+!!$         ,ganal(iv)
   enddo
   dv= vmax *dev
   if( myid.eq.0 ) then
@@ -1329,7 +1329,7 @@ subroutine test(ftrn0,ftst0)
   call write_stats(0)
 
   if( myid.eq.0 ) then
-    print *,'func values (training,test) =',ftrn0,ftst0
+    print '(a,2es15.7)','Loss func values (training,test) =',ftrn0,ftst0
 !!$    print *,'grad values (training):'
 !!$    do iv=1,nvars
 !!$      print *,'iv,grad(iv)=',iv,g(iv)
@@ -1907,6 +1907,7 @@ subroutine sync_input()
   call mpi_bcast(de_frac,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(de_lambda,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(de_cross_rate,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(de_temp,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(de_wmin,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(de_wmax,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(de_fitness,128,mpi_character,0,mpi_world,ierr)

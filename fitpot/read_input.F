@@ -231,6 +231,9 @@ c=======================================================================
       elseif( trim(cname).eq.'de_crossover_rate' ) then
         call read_r1(ionum,de_cross_rate)
         return
+      elseif( trim(cname).eq.'de_temperature' ) then
+        call read_r1(ionum,de_temp)
+        return
       elseif( trim(cname).eq.'de_wmin' ) then
         call read_r1(ionum,de_wmin)
         return

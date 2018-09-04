@@ -65,6 +65,7 @@ module minimize
     integer:: iid  ! ID for this individual
     type(gene),allocatable:: genes(:)
     real(8):: fvalue  ! Loss function value of the individual
+    real(8):: ftst    ! Loss function value for test set of the individual.
     real(8):: fitness ! Fittness value of the individual
     real(8),allocatable:: vel(:)
   end type individual
@@ -78,6 +79,7 @@ module minimize
   real(8):: de_cross_rate = 0.5d0
   real(8):: de_wmin    = 0.4d0
   real(8):: de_wmax    = 0.8d0
+  real(8):: de_temp    = 1d0
 
 !.....Particle swarm optimization variables.............................
   integer:: pso_nindivs = 10
@@ -2828,17 +2830,18 @@ contains
         print '(a,i4)',' Number of bits        = ',ga_nbits
         print '(a,i4)',' Number of offsprings  = ',ga_noffsp
         print *,''
+        call wrap_ranges(ndim,xbest,xranges)
       endif
       l1st = .false.
     endif
 
     if( myid.eq.0 ) then
       open(io_indivs,file=cf_indivs,status='replace')
-      write(io_indivs,'(a)') '# iid, fval, vars...'
+      write(io_indivs,'(a)') '# iid, ftrn, ftst, vars...'
       open(io_steps,file=cf_steps,status='replace')
-      write(io_steps,'(a)') '# iter, iid, ftrn'
+      write(io_steps,'(a)') '# iter, iid, ftrn, ftst'
     endif
-100 format(i6,es14.6,100f9.4)
+100 format(i6,2es14.6,100f9.4)
 
     iter = 0
     
@@ -2862,6 +2865,7 @@ contains
       call indiv2vars(indivs(i),ndim,xtmp)
       call func(ndim,xtmp,ftrn,ftst)
       iid = iid + 1
+      if( iprint.gt.1 ) print *,'iid,ftrn,ftst=',iid,ftrn,ftst
 !.....Detect NaN and replace it with 1d+10
       if( ftrn*0d0 .ne. 0d0 ) then
         if( myid.eq.0 .and. iprint.ne.0 ) then
@@ -2873,9 +2877,10 @@ contains
         ftrn = fupper_lim
       endif
       indivs(i)%fvalue = ftrn
+      indivs(i)%ftst = ftst
       indivs(i)%fitness = 1d0/ftrn
       indivs(i)%iid = iid
-      if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,100))
+      if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,ftst,xtmp(1:min(ndim,100))
       if( ftrn.lt.fbest ) then
         fbest = ftrn
         iidbest = iid
@@ -2889,7 +2894,8 @@ contains
            " iter,fbest,fvals= ",&
            iter,fbest,(indivs(i)%fvalue,i=1,min(ndim,10))
       do i=1,ga_nindivs
-        write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
+        write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
+             ,indivs(i)%ftst
       enddo
     endif
 
@@ -2911,6 +2917,7 @@ contains
         call indiv2vars(offsprings(i),ndim,xtmp)
         call func(ndim,xtmp,ftrn,ftst)
         iid = iid + 1
+        if( iprint.gt.1 ) print *,'iid,ftrn,ftst=',iid,ftrn,ftst
 !.....Detect NaN and replace it with 1d+10
         if( ftrn*0d0 .ne. 0d0 ) then
           if( myid.eq.0 .and. iprint.ne.0 ) then
@@ -2922,10 +2929,14 @@ contains
         if( ftrn.gt.fupper_lim ) then
           ftrn = fupper_lim
         endif
+        if( ftst.gt.fupper_lim ) then
+          ftst = fupper_lim
+        endif
         offsprings(i)%fvalue = ftrn
+        offsprings(i)%ftst = ftst
         offsprings(i)%fitness = 1d0/ftrn
         offsprings(i)%iid = iid
-        if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,xtmp(1:min(ndim,100))
+        if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,ftst,xtmp(1:min(ndim,100))
         if( ftrn.lt.fbest ) then
           fbest = ftrn
           iidbest = iid
@@ -2947,7 +2958,8 @@ contains
            " iter,fbest,fvals= ",&
            iter,fbest,(indivs(i)%fvalue,i=1,min(ndim,10))
         do i=1,ga_nindivs
-          write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
+          write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
+               ,indivs(i)%ftst
         enddo
         flush(io_indivs)
         flush(io_steps)
@@ -3059,7 +3071,7 @@ contains
 
     do i=1,ga_nbits
       if( urnd().lt.rate ) then
-        g%bits(i) = mod(g%bits(i)+1,2)
+        g%bits(i) = mod(int(g%bits(i))+1,2)
       endif
     enddo
     return
@@ -3074,6 +3086,20 @@ contains
     v = g%vmin +dble(dec)*(g%vmax-g%vmin)/(2**ga_nbits-1)
     return
   end subroutine gene2var
+!=======================================================================
+  subroutine wrap_gene(g)
+!
+!  Wrap gene into the given variable range.
+!
+    type(gene),intent(inout):: g
+    real(8):: v
+
+    call gene2var(g,v)
+    v = min(v,g%vmax)
+    v = max(v,g%vmin)
+    g%val = v
+    return
+  end subroutine wrap_gene
 !=======================================================================
   subroutine var2gene(v,g)
     real(8),intent(in):: v
@@ -3124,6 +3150,7 @@ contains
           offspring%genes(i)%bits(j) = g2%bits(j)
         end if
       end do
+      call wrap_gene(offspring%genes(i))
 !!$      print '(a,i4,2x,100i1)','i,bits=',i,&
 !!$           (mod(offspring%genes(i)%bits(j),10),j=1,ga_nbits)
     end do
@@ -3261,9 +3288,10 @@ contains
     end interface
 
     integer:: i,j,k,l,m,n,iter,i1,i2,ip,iq,ir,is
-    real(8):: ftrn,ftst,fracl,fracg,lmdl,lmdg,w
+    real(8):: ftrn,ftst,fracl,fracg,lmdl,lmdg,w,fdiff,prob,ftbest&
+         ,xtbest(ndim)
     logical,save:: l1st = .true.
-    integer:: iid,iidbest
+    integer:: iid,iidbest,iidtbest
     type(individual),allocatable:: indivs(:),offsprings(:)
     real(8),allocatable,dimension(:):: xtmp,xi,xp,xq,xr,xs,xbestl,xbestg&
          ,xl,xg,xd
@@ -3304,6 +3332,7 @@ contains
         print '(a,f8.4)',' fracl                 =',fracl
         print '(a,f8.4)',' lmdg                  =',lmdg
         print '(a,f8.4)',' lmdl                  =',lmdl
+        print '(a,es12.4)',' Pseudo Temperature    =',de_temp
 
         print *,''
       endif
@@ -3312,17 +3341,18 @@ contains
 
     if( myid.eq.0 ) then
       open(io_indivs,file=cf_indivs,status='replace')
-      write(io_indivs,'(a)') '# iid, fval, vars...'
+      write(io_indivs,'(a)') '# iid, ftrn, ftst, vars...'
       open(io_steps,file=cf_steps,status='replace')
-      write(io_steps,'(a)') '# iter, iid, ftrn'
+      write(io_steps,'(a)') '# iter, iid, ftrn, ftst'
     endif
-10  format(i6,es14.6,100f9.4)
+10  format(i6,2es14.6,100f9.4)
 
     iter = 0
 
 !.....Create population that includes some individuals
     iid = 0
     fbest = 1d+30
+    ftbest = 1d+30
     do i=1,de_nindivs
       do j=1,ndim
         indivs(i)%genes(j)%vmin = xranges(1,j)
@@ -3351,17 +3381,22 @@ contains
         ftrn = fupper_lim
       endif
       indivs(i)%fvalue = ftrn
+      indivs(i)%ftst = ftst
       if( ftrn*0d0.ne.0d0 ) then
         indivs(i)%fitness = 0d0
       else
         indivs(i)%fitness = 1d0/ftrn
       endif
       indivs(i)%iid = iid
-      if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,xtmp(1:min(ndim,100))
+      if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,ftst,xtmp(1:min(ndim,100))
       if( ftrn.lt.fbest ) then
         fbest = ftrn
         iidbest = iid
         xbest(1:ndim) = xtmp(1:ndim)
+      else if( ftst.lt.ftbest ) then
+        ftbest = ftst
+        iidtbest = iid
+        xtbest(1:ndim) = xtmp(1:ndim)
       endif
 
       if( iprint.ge.2 ) then
@@ -3378,7 +3413,8 @@ contains
            " iter,fbest,w,fvals= ",&
            iter,fbest,w,(indivs(i)%fvalue,i=1,min(de_nindivs,10))
       do i=1,de_nindivs
-        write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
+        write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
+             ,indivs(i)%ftst
       enddo
     endif
 
@@ -3475,17 +3511,21 @@ contains
 !!$          offsprings(i)%fitness = 1d0/ftrn
 !!$        endif
 !!$        print *,'i,fvalue,ftrn=',i,indivs(i)%fvalue,ftrn
-        if( ftrn.le.indivs(i)%fvalue .or. indivs(i)%fvalue*0d0.ne.0d0 ) then
+        fdiff = ftrn -indivs(i)%fvalue
+        prob = min(1d0,exp(-fdiff/de_temp))
+!!$        if( ftrn.le.indivs(i)%fvalue .or. indivs(i)%fvalue*0d0.ne.0d0 ) then
+        if( urnd().le.prob .or. indivs(i)%fvalue*0d0.ne.0d0 ) then
           do j=1,ndim
             indivs(i)%genes(j)%val = xtmp(j)
           enddo
           if( ftrn.gt.fupper_lim ) ftrn = fupper_lim
           indivs(i)%fvalue = ftrn
+          indivs(i)%ftst = ftst
           indivs(i)%fitness = 1d0/ftrn
         else
           cycle
         endif
-        if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,xtmp(1:min(ndim,100))
+        if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,ftst,xtmp(1:min(ndim,100))
         if( ftrn.lt.fbest ) then
           fbest = ftrn
           iidbest = iid
@@ -3495,6 +3535,14 @@ contains
             call sub_ergrel(cadd)
           endif
           call sub_eval(iid)
+        else if( ftst.lt.ftbest ) then
+          ftbest = ftst
+          iidtbest = iid
+          xtbest(1:ndim) = xtmp(1:ndim)
+          xtmp(1:ndim) = xbest(1:ndim)
+          xbest(1:ndim) = xtbest(1:ndim)
+          call sub_eval(iid)
+          xbest(1:ndim) = xtmp(1:ndim)
         endif
       enddo  ! loop over individuals
 
@@ -3503,7 +3551,8 @@ contains
              " iter,fbest,w,fvals= ",&
              iter,fbest,w,(indivs(i)%fvalue,i=1,min(de_nindivs,10))
         do i=1,de_nindivs
-          write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
+          write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
+               ,indivs(i)%ftst
         enddo
         flush(io_indivs)
         flush(io_steps)
@@ -3630,13 +3679,13 @@ contains
 
     if( myid.eq.0 ) then
       open(io_indivs,file=cf_indivs,status='replace')
-      write(io_indivs,'(a)') '# iid, fval, vars...'
+      write(io_indivs,'(a)') '# iid, ftrn, ftst, vars...'
       open(io_fvalues,file=cf_fvalues,status='replace')
-      write(io_fvalues,'(a)') '# iter, iid, ftrn'
+      write(io_fvalues,'(a)') '# iter, iid, fvals...'
       open(io_steps,file=cf_steps,status='replace')
-      write(io_steps,'(a)') '# iter, iid, ftrn'
+      write(io_steps,'(a)') '# iter, iid, ftrn, ftst'
     endif
-10  format(i6,es14.6,100f9.4)
+10  format(i6,2es14.6,100f9.4)
 
     iter = 0
 
@@ -3672,6 +3721,7 @@ contains
         ftrn = fupper_lim
       endif
       indivs(i)%fvalue = ftrn
+      indivs(i)%ftst = ftst
       fpbest(i) = ftrn
       xpbest(1:ndim,i) = xtmp(1:ndim)
       if( ftrn*0d0.ne.0d0 ) then
@@ -3680,7 +3730,7 @@ contains
         indivs(i)%fitness = 1d0/ftrn
       endif
       indivs(i)%iid = iid
-      if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,xtmp(1:min(ndim,100))
+      if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,ftst,xtmp(1:min(ndim,100))
       if( ftrn.lt.fbest ) then
         fbest = ftrn
         iidbest = iid
@@ -3695,7 +3745,8 @@ contains
       write(io_fvalues,'(2i8, 100es12.4)') iter, indivs(i)%iid, &
            (indivs(i)%fvalue,i=1,pso_nindivs)
       do i=1,pso_nindivs
-        write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
+        write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue,&
+             indivs(i)%ftst
       enddo
     endif
 
@@ -3731,7 +3782,7 @@ contains
         endif
         indivs(i)%fvalue = ftrn
         indivs(i)%iid = iid
-        if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,xtmp(1:min(ndim,100))
+        if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,ftst,xtmp(1:min(ndim,100))
 !.....Check the global best and update if needed
         if( ftrn.lt.fbest ) then
           fbest = ftrn
@@ -3754,7 +3805,8 @@ contains
         write(io_fvalues,'(2i8, 100es12.4)') iter, indivs(i)%iid, &
              (indivs(i)%fvalue,i=1,pso_nindivs)
         do i=1,pso_nindivs
-          write(io_steps,'(2i8,es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue
+          write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
+               ,indivs(i)%ftst
         enddo
         flush(io_indivs)
         flush(io_steps)

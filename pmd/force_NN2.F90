@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-08-30 18:15:03 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-04 15:01:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -885,6 +885,7 @@ contains
 
     endif
 
+    return
   end subroutine gradw_NN2
 !=======================================================================
   subroutine get_NN2_hl1(hl1o)

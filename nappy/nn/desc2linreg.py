@@ -34,7 +34,7 @@ def create_linreg_input(nsf,desc,wmax,fname='in.params.linreg'):
     with open(fname,'w') as f:
         f.write(' {0:4d}  {1:7.3f}  {2:7.3f}\n'.format(nsf,rc2,rc3))
         for i in range(nsf):
-            w = (random.random() -0.5)*2.0 *wmax
+            w = (random.random() -0.5)*2.0 *min(1.0e-2,wmax)
             f.write('  {0:12.4e}  {1:12.4e}  {2:12.4e}\n'.format(w,-wmax,wmax))
     print(' Wrote {0:s}'.format(fname))
     return None

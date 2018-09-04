@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-03 15:37:15 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-04 15:01:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -137,7 +137,8 @@ contains
       else if( trim(cpot).eq.'Morse' ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        if( string_in_arr('screened_Coulomb',nsubff,csubffs) ) then
+        if( string_in_arr('screened_Coulomb',nsubff,csubffs) .or. &
+            string_in_arr('Coulomb',nsubff,csubffs) ) then
           ctype = 'BVS'
         else if( string_in_arr('Ewald_long',nsubff,csubffs) .or.&
              string_in_arr('Ewald',nsubff,csubffs) ) then
@@ -403,7 +404,8 @@ contains
       else if( trim(cpot).eq.'Morse' ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        if( string_in_arr('screened_Coulomb',nsubff,csubffs) ) then
+        if( string_in_arr('screened_Coulomb',nsubff,csubffs) .or. &
+            string_in_arr('Coulomb',nsubff,csubffs) ) then
           ctype = 'BVS'
         else if( string_in_arr('Ewald_long',nsubff,csubffs) .or.&
              string_in_arr('Ewald',nsubff,csubffs) ) then
@@ -439,7 +441,6 @@ contains
         nsf = smpl%nsf
         nal = smpl%nal
         nnl = smpl%nnl
-!!$        print *,'myid,ismpl,nsf,nal,nnl,nn_nl=',myid,ismpl,nsf,nal,nnl,nn_nl
         call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
       else if( trim(cpot).eq.'BVS' ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&

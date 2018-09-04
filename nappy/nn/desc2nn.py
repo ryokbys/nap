@@ -40,7 +40,7 @@ def create_nn2_input(nsf,num_layer,num_nodes,wmax,fname='in.params.nn2'):
             f.write(' {0:5d}'.format(num_nodes[i]))
         f.write('\n')
         for i in range(nwgts):
-            w = (random.random() -0.5)*2.0 *wmax
+            w = (random.random() -0.5)*2.0 *min(1.0e-2,wmax)
             f.write('  {0:12.4e}  {1:12.4e}  {2:12.4e}\n'.format(w,-wmax,wmax))
     print(' Wrote {0:s}'.format(fname))
     return None
