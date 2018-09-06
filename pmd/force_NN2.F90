@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-04 15:01:44 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-05 16:34:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -756,48 +756,30 @@ contains
     enddo
 
     if( lematch ) then
-      if( allocated(mskgfs) ) then
-        do ia=1,natm
-          iv = iprm0
-          do ihl0=1,nhl(0)
-            g = gsf(ihl0,ia)
+      do ia=1,natm
+        iv = iprm0
+        do ihl0=1,nhl(0)
+          g = gsf(ihl0,ia)
+          if( allocated(mskgfs) .and. mskgfs(ihl0).ne.0 ) then
             do ihl1=1,mhl(1)
-              if( mskgfs(ihl0).ne.0 ) then
-                iv = iv + 1
-                gwe(iv) = gwe(iv) +0d0
-              else
-                w2 = wgt12(ihl1)
-                h1 = hl1(ihl1,ia)
-                iv = iv + 1
-                gwe(iv) = gwe(iv) +w2 *h1*(1d0-h1) *g
-              endif
+              iv = iv + 1
+              gwe(iv) = gwe(iv) +0d0
             enddo
-          enddo
-          do ihl1=1,nhl(1)
-            h1 = hl1(ihl1,ia)
-            iv = iv + 1
-            gwe(iv) = gwe(iv) + (h1 -0.5d0)
-          enddo
-        enddo
-      else  ! not masking
-        do ia=1,natm
-          iv = iprm0
-          do ihl0=1,nhl(0)
-            g = gsf(ihl0,ia)
+          else
             do ihl1=1,mhl(1)
               w2 = wgt12(ihl1)
               h1 = hl1(ihl1,ia)
               iv = iv + 1
               gwe(iv) = gwe(iv) +w2 *h1*(1d0-h1) *g
             enddo
-          enddo
-          do ihl1=1,nhl(1)
-            h1 = hl1(ihl1,ia)
-            iv = iv + 1
-            gwe(iv) = gwe(iv) + (h1 -0.5d0)
-          enddo
+          endif
         enddo
-      endif
+        do ihl1=1,nhl(1)
+          h1 = hl1(ihl1,ia)
+          iv = iv + 1
+          gwe(iv) = gwe(iv) + (h1 -0.5d0)
+        enddo
+      enddo
     endif
 
     if( lfmatch ) then
@@ -834,14 +816,16 @@ contains
 !.....Weights between layer 0 and 1
         do ihl0=1,nhl(0)
           g = gsf(ihl0,ia)
-          do ihl1=1,mhl(1)
-            w1 = wgt11(ihl0,ihl1)
-            w2 = wgt12(ihl1)
-            h1 = hl1(ihl1,ia)
-            if( allocated(mskgfs) .and. mskgfs(ihl0).ne.0 ) then
+          if( allocated(mskgfs) .and. mskgfs(ihl0).ne.0 ) then
 !.....Do nothing here, and just increment iv
+            do ihl1=1,mhl(1)
               iv = iv + 1
-            else
+            enddo
+          else
+            do ihl1=1,mhl(1)
+              w1 = wgt11(ihl0,ihl1)
+              w2 = wgt12(ihl1)
+              h1 = hl1(ihl1,ia)
               iv = iv +1
               do jj=0,lspr(0,ia)  ! Notice: from 0 not 1
                 if( jj.eq.0 ) then
@@ -855,8 +839,8 @@ contains
                      *( (1d0-2d0*h1) *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
                      +dgsf(1:3,ihl0,jj,ia) )
               enddo
-            endif
-          enddo
+            enddo
+          endif
         enddo
 !.....Weights between layer 1 and output
         do ihl1=1,mhl(1)

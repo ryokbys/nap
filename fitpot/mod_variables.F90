@@ -38,7 +38,7 @@ module variables
 !.....training or test
   real(8):: ratio_test= 0.1d0
   logical:: test_assigned = .false.  ! already assigned test set?
-!.....initializing parameters
+!.....initializing parameters: read or gauss/gaussian
   character(len=128):: cinitv= 'read'
   real(8):: vinitsgm = 1d0
   real(8):: vinitmu  = 0d0
