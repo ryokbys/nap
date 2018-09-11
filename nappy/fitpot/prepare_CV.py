@@ -8,10 +8,14 @@ Usage:
 Options:
   -h, --help  Show this message and exit.
   -n N        Number for N-fold CV. [default: 10]
+  -m MAX      Maximum value for the random number. [default: 10000.0]
+  -s SGM      Sigma value for the gaussian distribution of random number. [default: 1.0]
   -b BATCH    Batch file name to be copied to each CV directory. [default: batch.fitpot.sh]
   -p PREFIX   Prefix to be added to the batch title. [default: ]
 """
 from __future__ import print_function
+
+import random
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "180614"
@@ -35,7 +39,7 @@ def paramfname_from_input(fname='in.fitpot'):
             param_file = line.split()[1]
     return param_file
 
-def make_new_input(fname='in.fitpot',dname='CV_0'):
+def make_new_input(fname='in.fitpot',dname='CV_0',randsgm=1.0,randmax=10000.0):
     """
     Make new in.fitpot in the given directory by changing as follows:
       - add "../" before the current main_directory
@@ -58,6 +62,12 @@ def make_new_input(fname='in.fitpot',dname='CV_0'):
                 f.write('{0:s}   {1:s}\n'.format(data[0],tmp))
             elif 'sample_list' in line:
                 f.write('sample_list   dir_list.txt\n')
+            elif 'init_params ' in line:
+                f.write('init_params       gauss\n')
+            elif 'init_params_sgm' in line:
+                f.write('init_params_sgm   {0:12.3e}\n'.format(randsgm))
+            elif 'init_params_rs' in line:
+                f.write('init_params_rs   {0:7.1f}\n'.format(randmax*random.random()))
             else:
                 f.write(line)
     return
@@ -94,6 +104,8 @@ if __name__ == "__main__":
     
     args = docopt(__doc__)
     ncv = int(args['-n'])
+    randmax = float(args['-m'])
+    randsgm = float(args['-s'])
     batchname = args['-b']
     prefix = args['-p']
 
@@ -129,7 +141,7 @@ if __name__ == "__main__":
                 f.write('{0:s}  {1:d}\n'.format(s,ic))
         print('Make {0:s}/{1:s}'.format(dname,fname))
 
-        make_new_input('in.fitpot',dname)
+        make_new_input('in.fitpot',dname,randsgm,randmax)
         make_new_batch(batchname,dname,prefix)
         os.system('cp {0:s} {1:s}/'.format(paramfname,dname))
         

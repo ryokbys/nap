@@ -12,7 +12,8 @@ Options:
   --graph-format FORMAT
               Specify a graph format. [default: png]
   --energy-limit ELIM
-              Extract sample names of which the energy has large than ELIM. [default: none]
+              Extract sample names whose energy difference from the minimum amoung data
+              is larger than ELIM. [default: none]
 """
 from __future__ import print_function
 
