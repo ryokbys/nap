@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-04 15:02:22 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-11 14:36:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -721,6 +721,7 @@ subroutine read_vars()
 !!$  endif
 
   if( myid.eq.0 ) then
+    print *,'Read variables...'
     open(15,file=trim(cparfile),status='old')
     read(15,*) nvars, rcut, rc3
   endif
@@ -729,6 +730,7 @@ subroutine read_vars()
   call mpi_bcast(rc3,1,mpi_real8,0,mpi_world,ierr)
   allocate(vars(nvars),vranges(2,nvars))
   if( myid.eq.0 ) then
+    print '(a,i0)',' Number of variables to be optimized = ',nvars
     do i=1,nvars
       read(15,*) vars(i),vranges(1:2,i)
     enddo

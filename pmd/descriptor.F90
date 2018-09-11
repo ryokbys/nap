@@ -295,9 +295,6 @@ contains
           endif
         enddo
 
-!!$        fcij= fc0(dij,rc3)
-!!$        dfcij= dfc0(dij,rc3)
-!!$        texpij = exp(-eta3*dij2)
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           ks= int(tag(ka))
@@ -307,11 +304,7 @@ contains
           xik(1:3)= xk(1:3)-xi(1:3)
           rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik2= rik(1)**2 +rik(2)**2 +rik(3)**2
-!!$          if( dik2.ge.rc32 ) cycle
           dik= sqrt(dik2)
-!!$          fcik= fc0(dik,rc3)
-!!$          dfcik= dfc0(dik,rc3)
-!!$          texpik= exp(-eta3*dik2)
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
             if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
 !.....fcij's can be computed after rcs is determined

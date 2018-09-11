@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-04 15:01:09 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-10 16:53:43 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -187,8 +187,6 @@ contains
         call set_params_Coulomb(maxisp,x(1:maxisp),cpot)
         call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot)
       endif
-!!$      print *,'func_w_pmd: 04-1, ismpl,lcalcgrad,ndim,nff='&
-!!$           ,ismpl,lcalcgrad,ndim,nff
       call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut)
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)

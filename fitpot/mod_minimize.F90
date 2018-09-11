@@ -1593,8 +1593,8 @@ contains
         iterp = iter
         if( alphai.lt.tiny ) then
           if( myid.eq.0 .and. iprint.gt.0 ) then
-            print *,'WARNING: alpha.lt.tiny in onestep,'
-            print *,'         which means the search direction would be wrong.'
+            print *,'WARNING: alpha < tiny in onestep,'
+            print *,'         The search direction would be wrong.'
             print *,'   iter,alphai,fi=',iter,alphai,fi
           endif
           iflag = iflag + 100
@@ -1607,8 +1607,8 @@ contains
     iflag = iflag + 100
     niter = iter
     if( myid.eq.0 .and. iprint.gt.0 ) then
-      print *, 'WARNING: iter.gt.NITER_LINMIN in onestep,'
-      print *, '         which means the search direction would be wrong.'
+      print *, 'WARNING: iter exceeds NITER_LINMIN in onestep.'
+      print *, '         The search direction would be wrong.'
       write(6,'(a,es13.5)') '   alphai = ',alphai
     endif
     return
@@ -1816,6 +1816,7 @@ contains
 !
     use descriptor,only: ngl,mskgfs,msktmp,glval,iglid
     use variables,only: gsfcorr
+    use random
     implicit none
     integer,intent(in):: ndim,maxiter,iprint,myid,niter_eval
     integer,intent(inout):: iflag
@@ -1848,6 +1849,7 @@ contains
          ,ggy(:),ygg(:),s(:),g0(:),gpena(:)  !,aa(:,:),cc(:,:),v(:)
     integer:: nmsks,imsk,nftol,nbases,nvar
     real(8):: ynorm,tmp1,tmp2,b,sy,syi  !,svy,svyi
+    real(8),parameter:: sgm = 1.0d0
 
     if( trim(cpena).eq.'lasso' .and. trim(cpena).eq.'glasso' ) then
       if(myid.eq.0) then
@@ -2029,7 +2031,18 @@ contains
       nbases= ngl -nmsks
 
       x(1:ndim)= xt(1:ndim)
-      xt(:) = 0d0
+!.....Reset xt before going into the BFGS.
+!     Because it can easily get stuck at the local minimum by starting BFGS
+!     from the minimum of the previous BFGS even if another variable is added.
+!!$!.....Reset all the xt to 0.0
+!!$      xt(:) = 0d0
+!.....Reset xt randomly
+      do i=1,ndim
+        xt(i) = sgm *polarbm()
+        ig = iglid(i)
+        if( ig.le.0 ) cycle
+        if( mskgfs(ig).ne.0 ) xt(i) = 0d0
+      enddo
       call func(ndim,xt,f,ftst)
       call grad(ndim,xt,g)
 !.....Penalty
