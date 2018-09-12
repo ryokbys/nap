@@ -153,6 +153,9 @@ c=======================================================================
       elseif( trim(cname).eq.'fs_mode' ) then
         call read_c1(ionum,cfsmode)
         return
+      elseif( trim(cname).eq.'fs_read_mask' ) then
+        call read_c1(ionum,cread_fsmask)
+        return
       elseif( trim(cname).eq.'eps_energy' ) then
         call read_r1(ionum,epse)
         return

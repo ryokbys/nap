@@ -11,6 +11,7 @@ module minimize
 
 !.....Group FS inner loop
   integer:: ninnergfs=100
+  character(len=128):: cread_fsmask = ''
 
 !.....Max iteration for line minimization
   integer:: niter_linmin   = 15
@@ -1849,6 +1850,7 @@ contains
          ,ggy(:),ygg(:),s(:),g0(:),gpena(:)  !,aa(:,:),cc(:,:),v(:)
     integer:: nmsks,imsk,nftol,nbases,nvar
     real(8):: ynorm,tmp1,tmp2,b,sy,syi  !,svy,svyi
+    character(len=128):: cnum
     real(8),parameter:: sgm = 1.0d0
 
     if( trim(cpena).eq.'lasso' .and. trim(cpena).eq.'glasso' ) then
@@ -1877,7 +1879,12 @@ contains
     if( .not.allocated(mskgfs) ) then
       allocate(mskgfs(ngl),msktmp(ngl))
     endif
-    mskgfs(1:ngl)= 1
+
+    if( trim(cread_fsmask).eq.'' ) then
+      mskgfs(1:ngl)= 1
+    else
+      call read_fsmask(cread_fsmask)
+    endif
     msktmp(1:ngl)= mskgfs(1:ngl)
 
     xt(1:ndim)= x(1:ndim)
@@ -2029,6 +2036,8 @@ contains
         nmsks= nmsks +1
       enddo
       nbases= ngl -nmsks
+      write(cnum,'(i0)') iter
+      call write_fsmask('out.fsmask.'//trim(cnum))
 
       x(1:ndim)= xt(1:ndim)
 !.....Reset xt before going into the BFGS.
@@ -2069,7 +2078,7 @@ contains
       nfailinmin = 0
 !.....BFGS loop begins
       do itergfs=1,ninnergfs
-
+        
         u(1:ndim)= 0d0
 !!$        do i=1,ndim
 !!$          u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
@@ -2273,6 +2282,74 @@ contains
     return
 
   end subroutine gfs
+!=======================================================================
+  subroutine read_fsmask(cfname)
+!
+!  Read mask for gfs from file
+!
+    use descriptor,only: ngl,mskgfs
+    use parallel
+    implicit none
+    character(len=*),intent(in):: cfname
+
+    integer,parameter:: iomask = 40
+    integer:: ndata,i,ierrcode,itmp,ig
+
+    ierrcode = 0
+    if( myid.eq.0 ) then
+      print *,'Read mskgfs from '//trim(cfname)
+      open(iomask,file=trim(cfname),status='old')
+      read(iomask,*) ndata
+      if( ndata.ne.ngl ) then
+        ierrcode = 1
+        close(iomask)
+        goto 999
+      endif
+      do i=1,ndata
+        read(iomask,*,err=99) ig, mskgfs(ig)
+      enddo
+      close(iomask)
+    endif
+
+999 continue
+    itmp = 0
+    call mpi_allreduce(ierrcode,itmp,1,mpi_integer,mpi_max &
+         ,mpi_world,ierr)
+    if( itmp.gt.0 ) then
+      if( myid.eq.0 ) then
+        if( itmp.eq.1 ) print *,'ERROR@read_fsmask: ndata.ne.ngl !'
+        if( itmp.eq.2 ) print *,'ERROR@read_fsmask: something wrong with data !'
+      endif
+      call mpi_finalize(ierr)
+    endif
+    call mpi_bcast(mskgfs,ngl,mpi_integer,0,mpi_world,ierr)
+    return
+
+99  ierrcode = 2
+    close(iomask)
+    goto 999
+  end subroutine read_fsmask
+!=======================================================================
+  subroutine write_fsmask(cfname)
+    use parallel
+    use descriptor,only: ngl,mskgfs
+    implicit none 
+    character(len=*),intent(in):: cfname
+
+    integer,parameter:: iomask = 41
+    integer:: i
+
+    if( myid.eq.0 ) then
+      open(iomask,file=trim(cfname),status='replace')
+      write(iomask,'(i6)') ngl
+      do i=1,ngl
+        write(iomask,'(i7,i3)') i, mskgfs(i)
+      enddo
+      close(iomask)
+    endif
+    call mpi_barrier(mpi_world,ierr)
+    return
+  end subroutine write_fsmask
 !=======================================================================
   subroutine cap_grad(ndim,g)
 !
