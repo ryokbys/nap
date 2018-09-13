@@ -1988,7 +1988,7 @@ contains
               if( jg.eq.ig ) cycle
               if( mskgfs(jg).ne.0 ) cycle
 !.....Adopt maximum correlation as rg
-              rg(ig) = max(rg(ig),gsfcorr(ig,jg))
+              rg(ig) = max(rg(ig),abs(gsfcorr(ig,jg)))
             enddo
           endif
           if( myid.eq.0 .and. iprint.gt.2 ) then

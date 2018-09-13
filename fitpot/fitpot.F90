@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-12 11:01:34 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-13 11:13:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -487,7 +487,7 @@ subroutine read_samples()
   use variables
   use parallel
   implicit none
-  integer:: is
+  integer:: is,natot
   character*128:: cdir
   integer,allocatable:: nal(:)
 
@@ -504,9 +504,16 @@ subroutine read_samples()
   enddo
   call mpi_reduce(nal,nalist,nsmpl,mpi_integer,mpi_sum &
        ,0,mpi_world,ierr)
-  
-  if( myid.eq.0 ) write(6,'(/,a)') ' Finished read_samples'
+
   call mpi_barrier(mpi_world,ierr)
+  if( myid.eq.0 ) then
+    write(6,'(/,a)') ' Finished read_samples'
+    natot = 0
+    do is=1,nsmpl
+      natot = natot +nalist(is)
+    enddo
+    print '(a,i0)',' Total number of atoms = ',natot
+  endif
   deallocate(nal)
   return
 end subroutine read_samples
@@ -518,7 +525,7 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
   character(len=*),intent(in):: fname
   type(mdsys),intent(inout):: smpl
 
-  integer:: i,natm
+  integer:: i,natm,natotl,natotg
   real(8):: tmp
 
   open(ionum,file=trim(fname),status='old')
@@ -652,12 +659,12 @@ subroutine read_ref_data()
   call mpi_reduce(nftot,nftotg,1,mpi_integer,mpi_sum,0,mpi_world,ierr)
   call mpi_allreduce(ispmaxl,maxisp,1,mpi_integer,mpi_max,0,mpi_world,ierr)
 
-  if(myid.eq.0) then
+  if( myid.eq.0 ) then
 !    write(6,'(a,es12.4)') ' erefmin = ',erefmin
-    print *,'Finished read_ref_data.'
+    print '(/,a)',' Finished read_ref_data.'
     if( lfmatch ) then
-      write(6,'(a,i8)') ' Number of forces to be used = ',nfrcg
-      write(6,'(a,i8)') ' Total number of forces      = ',nftotg
+      write(6,'(a,i0)') ' Number of forces to be used = ',nfrcg
+      write(6,'(a,i0)') ' Total number of forces      = ',nftotg
     endif
     write(6,'(a,i0)') ' Number of species in all samples = ',maxisp
   endif
