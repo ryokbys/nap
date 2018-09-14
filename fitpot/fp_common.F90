@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-10 16:53:43 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-14 17:53:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -68,7 +68,7 @@ contains
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
          ,nff,cffs,nsubff,csubffs,cmaindir,maxna,rcut,rc3 &
          ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint,maxisp &
-         ,nn_nl,nn_nhl
+         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb, set_params_Coulomb
@@ -76,7 +76,7 @@ contains
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN,only: set_paramsdir_NN,set_params_NN
     use NN2,only: set_paramsdir_NN2,set_params_NN2,nl,nhl,nlmax,get_NN2_hl1 &
-         ,set_NN2_hl1
+         ,set_NN2_hl1,set_sigtype_NN2
     use linreg,only: set_paramsdir_linreg,set_params_linreg
     use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
          ,lupdate_gsf
@@ -173,6 +173,7 @@ contains
         call set_paramsdir_NN2(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_NN2(ndim,x,nn_nl,nn_nhl)
+        call set_sigtype_NN2(nn_sigtype)
         if( .not. lupdate_gsf ) then
           nsf = smpl%nsf
           nal = smpl%nal
@@ -248,7 +249,15 @@ contains
         endif
 !!$        print *,'ismpl,epot,esub,eref,ediff,natm,eerr,swgt=' &
 !!$             ,ismpl,epot,esub,eref,ediff,natm,eerr,swgt
-        ediff= ediff*ediff
+        if( trim(ctype_loss).eq.'LS' ) then
+          ediff= ediff*ediff
+        else ! Huber as default
+          if( abs(ediff).gt.1.d0 ) then
+            ediff = 2d0*abs(ediff) -1d0
+          else
+            ediff = ediff *ediff
+          endif
+        endif
         ftmp= ftmp +ediff *swgt
         if( iprint.gt.2 ) then
           write(6,'(a,2i4,1x,a,7es12.4)') ' myid,ismpl,cdirname,(epot+esub)/natm= ', &
@@ -269,7 +278,15 @@ contains
 !!$            fref = smpl%fref(ixyz,ia)
 !!$            fdiff(ixyz,ia)= (frcs(ixyz,ia)+smpl%fsub(ixyz,ia) &
 !!$                 -fref) /(abs(fref) +ferr)
-            fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
+            if( trim(ctype_loss).eq.'LS' ) then
+              fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
+            else ! Huber as default
+              if( abs(fdiff(ixyz,ia)).gt.1d0 ) then
+                fdiff(ixyz,ia) = 2d0*abs(fdiff(ixyz,ia)) -1d0
+              else
+                fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
+              endif
+            endif
             ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt
           enddo
         enddo
@@ -289,10 +306,21 @@ contains
                  -smpl%sref(ixyz,jxyz)) *serri
           enddo
         enddo
-        do k=1,6
-          pdiff(k)= pdiff(k)*pdiff(k)
-          ftmp= ftmp +pdiff(k) *swgt /6
-        enddo
+        if( trim(ctype_loss).eq.'LS' ) then
+          do k=1,6
+            pdiff(k)= pdiff(k)*pdiff(k)
+            ftmp= ftmp +pdiff(k) *swgt /6
+          enddo
+        else  ! Huber as default
+          do k=1,6
+            if( abs(pdiff(k)).gt.1d0 ) then
+              pdiff(k) = 2d0*abs(pdiff(k)) -1d0
+            else
+              pdiff(k)= pdiff(k)*pdiff(k)
+            endif
+            ftmp= ftmp +pdiff(k) *swgt /6
+          enddo
+        endif
       endif  ! stress matching
 
       if( smpl%iclass.eq.1 ) then
@@ -341,7 +369,7 @@ contains
          ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,nsubff,csubffs &
          ,cmaindir,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
          ,rcut,rc3,myidrefsub,isidrefsub,iprint,maxisp,gscl &
-         ,nn_nl,nn_nhl
+         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb,set_params_Coulomb
@@ -358,7 +386,7 @@ contains
 
     integer:: ismpl,i,idim,natm,k,ia,ixyz,jxyz,nsf,nal,nnl
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3),dn3i
-    real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,fref
+    real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,fref,tmp
     type(mdsys):: smpl
     logical,parameter:: lcalcgrad = .true. 
     character(len=128):: cdirname,ctype
@@ -487,13 +515,31 @@ contains
         eerr= smpl%eerr
         if( len(trim(crefstrct)).gt.5 ) then
           ediff= (epot-epotsub*natm+esub -(eref-erefsub*natm))/natm /eerr
+          if( trim(ctype_loss).eq.'LS' ) then
+            tmp = 2d0 *ediff
+          else  ! Huber
+            if( abs(ediff).gt.1d0 ) then
+              tmp = 2d0 *sign(1d0,ediff)
+            else
+              tmp = 2d0 *ediff
+            endif
+          endif
           gtrnl(1:ndim) = gtrnl(1:ndim) &
-               +2d0*ediff/natm/eerr *swgt &
+               +tmp/natm/eerr *swgt &
                *(smpl%gwe(1:ndim) -gwesub(1:ndim))
         else
           ediff= (epot+esub -eref)/natm /eerr
+          if( trim(ctype_loss).eq.'LS' ) then
+            tmp = 2d0 *ediff
+          else  ! Huber
+            if( abs(ediff).gt.1d0 ) then
+              tmp = 2d0 *sign(1d0,ediff)
+            else
+              tmp = 2d0 *ediff
+            endif
+          endif
           gtrnl(1:ndim) = gtrnl(1:ndim) &
-               +2d0*ediff*smpl%gwe(1:ndim)/natm/eerr *swgt
+               +tmp*smpl%gwe(1:ndim)/natm/eerr *swgt
         endif
 !!$        print *,'ismpl,epot,esub,eref,ediff,natm,eerr,swgt=' &
 !!$             ,ismpl,epot,esub,eref,ediff,natm,eerr,swgt
@@ -509,7 +555,16 @@ contains
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia) +smpl%fsub(ixyz,ia) &
                  -(smpl%fref(ixyz,ia))) *ferri
-            gtrnl(1:ndim)= gtrnl(1:ndim) +2d0*fdiff(ixyz,ia) &
+            if( trim(ctype_loss).eq.'LS' ) then
+              tmp = 2d0 *fdiff(ixyz,ia)
+            else  ! Huber
+              if( abs(fdiff(ixyz,ia)).gt.1d0 ) then
+                tmp = 2d0 *sign(1d0,fdiff(ixyz,ia))
+              else
+                tmp = 2d0 *fdiff(ixyz,ia)
+              endif
+            endif
+            gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
                  *smpl%gwf(1:ndim,ixyz,ia) *dn3i *swgt *ferri
 !!$            fref = smpl%fref(ixyz,ia)
 !!$            fdiff(ixyz,ia)= (frcs(ixyz,ia) +smpl%fsub(ixyz,ia) &
@@ -534,6 +589,15 @@ contains
           enddo
         enddo
         do k=1,6
+          if( trim(ctype_loss).eq.'LS' ) then
+            tmp = 2d0 *pdiff(k)
+          else  ! Huber
+            if( abs(pdiff(k)).gt.1d0 ) then
+              tmp = 2d0 *sign(1d0,pdiff(k))
+            else
+              tmp = 2d0 *pdiff(k)
+            endif
+          endif
           gtrnl(1:ndim)= gtrnl(1:ndim) +2d0*pdiff(k) &
                *smpl%gws(1:ndim,k)/6 *swgt *serri
         enddo
@@ -559,7 +623,10 @@ contains
     call mpi_reduce(tgl,tgg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     tcomm= tcomm +tcg
     tgrad= tgrad +tgg
-
+!!$    print *,'gtrn in grad_w_pmd:'
+!!$    do i=1,ndim
+!!$      print *,'i,x(i),gtrn(i)=',i,x(i),gtrn(i)
+!!$    enddo
     return
   end subroutine grad_w_pmd
 !=======================================================================
@@ -962,7 +1029,7 @@ contains
       open(20,file='out.correlation',status='replace')
       do isf=1,nsf
         do jsf=1,nsf
-          write(20,'(2i6,2es12.4)') isf,jsf,gsfcorr(isf,jsf)
+          write(20,'(2i6,2es13.4e3)') isf,jsf,gsfcorr(isf,jsf)
         enddo
       enddo
       close(20)

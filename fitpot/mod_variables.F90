@@ -45,6 +45,8 @@ module variables
   real(8):: vinitrs  = 12345d0
 !.....Atomic forces over this value will not be used for fitting
   real(8):: force_limit = 100d0
+!.....Loss function type: LS (least-square), Huber
+  character(len=128):: ctype_loss = 'LS'
 
 !.....Max limit of number of species
   integer,parameter:: mspcs = 9
@@ -143,5 +145,6 @@ module variables
   integer,parameter:: nn_nlmax = 2
   integer:: nn_nl = 0
   integer:: nn_nhl(0:nn_nlmax)
+  integer:: nn_sigtype = 2
 
 end module variables

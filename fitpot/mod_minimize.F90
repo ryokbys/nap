@@ -12,6 +12,7 @@ module minimize
 !.....Group FS inner loop
   integer:: ninnergfs=100
   character(len=128):: cread_fsmask = ''
+  character(len=128):: cfs_xrefresh = 'random' ! [zero, random, none]
 
 !.....Max iteration for line minimization
   integer:: niter_linmin   = 15
@@ -1809,7 +1810,7 @@ contains
     
   end subroutine fs
 !=======================================================================
-  subroutine gfs(ndim,x,f,g,d,xtol,gtol,ftol,xranges,maxiter &
+  subroutine gfs(ndim,x,f,ftst,g,d,xtol,gtol,ftol,xranges,maxiter &
        ,iprint,iflag,myid,func,grad,cfmethod,niter_eval &
        ,sub_eval)
 !
@@ -1822,7 +1823,7 @@ contains
     integer,intent(in):: ndim,maxiter,iprint,myid,niter_eval
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
-    real(8),intent(inout):: f,x(ndim),g(ndim),d(ndim)
+    real(8),intent(inout):: f,ftst,x(ndim),g(ndim),d(ndim)
     character(len=*),intent(in):: cfmethod
 !!$    real(8):: func,grad
     interface
@@ -1844,14 +1845,15 @@ contains
     integer:: iter,i,imax,ig,jg,itmp,j,igmm,itergfs,niter,inc,jnc&
          ,nfailinmin
     real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,f0,tmp,gmm &
-         ,ftst,ftstp
-    real(8),allocatable,save:: xt(:),gmaxgl(:),u(:),gmaxgl0(:)
+         ,ftstp,fpgfs,frefb
+    real(8),allocatable,save:: xt(:),xtb(:),gmaxgl(:),u(:),gmaxgl0(:)
     real(8),save,allocatable:: gg(:,:),y(:),gp(:),rg(:) &
          ,ggy(:),ygg(:),s(:),g0(:),gpena(:)  !,aa(:,:),cc(:,:),v(:)
-    integer:: nmsks,imsk,nftol,nbases,nvar
+    integer:: nmsks,imsk,nftol,nbases,nvar,nrefresh
     real(8):: ynorm,tmp1,tmp2,b,sy,syi  !,svy,svyi
     character(len=128):: cnum
-    real(8),parameter:: sgm = 1.0d0
+    real(8),parameter:: sgm = 1.0d-1
+    integer,parameter:: maxrefresh = 2
 
     if( trim(cpena).eq.'lasso' .and. trim(cpena).eq.'glasso' ) then
       if(myid.eq.0) then
@@ -1869,7 +1871,7 @@ contains
       return
     endif
 
-    if( .not.allocated(xt) ) allocate(xt(ndim),u(ndim),rg(ngl),g0(ndim))
+    if( .not.allocated(xt) ) allocate(xt(ndim),xtb(ndim),u(ndim),rg(ngl),g0(ndim))
     if( .not.allocated(gg) ) allocate(gg(ndim,ndim) &
          ,y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
          ,s(ndim),gpena(ndim))  !,v(ndim),aa(ndim,ndim),cc(ndim,ndim)
@@ -1890,7 +1892,8 @@ contains
     xt(1:ndim)= x(1:ndim)
     do i=1,ndim
       ig= iglid(i)
-      if( ig.gt.0 ) xt(i)= 0d0
+      if( ig.lt.0 ) cycle
+      if( mskgfs(ig).ne.0 ) xt(i)= 0d0
     enddo
     x(1:ndim)= xt(1:ndim)
 
@@ -1907,7 +1910,7 @@ contains
       call grad(ndim,xt,g)
       fp = f
       gp(:) = g(:)
-      print *,'initial f = ',fp
+!!$      print *,'initial f = ',fp
       do ig=1,ngl
         u(:) = -gp(:)
         g(:) = gp(:)
@@ -1923,7 +1926,7 @@ contains
         alpha = min(max(alpha,xtol*10d0)*2d0, 1d0)
         call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
-        print *,'ig,f,f-fp=',ig,f,f-fp
+!!$        print *,'ig,f,f-fp=',ig,f,f-fp
         gmaxgl0(ig) = -(f-fp)
       enddo
     else if( index(cfsmode,'grad0').ne.0 ) then
@@ -1934,12 +1937,13 @@ contains
     endif
 
     if( myid.eq.0 .and. iprint.gt.0 ) then
-      print '(a,i6,2es12.4)',' iter,ftrn,ftst=',0,f,ftst
+      print '(a,i6,2es13.4e3,i6)',' iter,ftrn,ftst,nbases=',0,f,ftst,nbases
     endif
     call sub_eval(0)
-    
+
+!.....Start gFS loop here
     do iter=1,maxiter
-      fp = f
+      fpgfs = f
       ftstp = ftst
       if( index(cfsmode,'grad0').ne.0 ) then
         g(:) = g0(:)
@@ -1966,10 +1970,8 @@ contains
       gmaxgl(1:ngl)= 0d0
       do i=1,ndim
         ig= iglid(i)
-        if( ig.gt.0 ) then
-          gmaxgl(ig)= gmaxgl(ig) &
-               +g(i)*g(i)
-        endif
+        if( ig.le.0 ) cycle
+        gmaxgl(ig)= gmaxgl(ig) +abs(g(i))
       enddo
       if( trim(cfsmode).eq.'grad0corr' ) then
         if( iter.eq.1 ) then
@@ -1991,15 +1993,15 @@ contains
               rg(ig) = max(rg(ig),abs(gsfcorr(ig,jg)))
             enddo
           endif
-          if( myid.eq.0 .and. iprint.gt.2 ) then
-            print '(a,i5,3es12.4)','  ig,rg,gmax,gmax*(1-rg)=',ig,rg(ig),gmaxgl(ig) &
+          if( myid.eq.0 .and. iprint.gt.1 ) then
+            print '(a,i5,3es12.3e3)','  ig,rg,gmax,gmax*(1-rg)=',ig,rg(ig),gmaxgl(ig) &
                  ,gmaxgl(ig)*(1d0 -rg(ig))
           endif
 !.....Scale gmaxgl w.r.t. rg
           gmaxgl(ig) = gmaxgl(ig) *(1d0- rg(ig))
         enddo
       else
-        if( myid.eq.0 .and. iprint.gt.2 ) then
+        if( myid.eq.0 .and. iprint.gt.1 ) then
           do ig=1,ngl
             print '(a,i5,es12.4)','  ig,gmaxgl=',ig,gmaxgl(ig)
           enddo
@@ -2009,7 +2011,7 @@ contains
       igmm= 0
       do ig=1,ngl
 !.....Do not take mskgfs==2 into account !
-!!$        print *,'ig,mskgfs,gmaxgl=',ig,mskgfs(ig),gmaxgl(ig)
+!!$        print *,'myid,ig,mskgfs,gmaxgl=',myid,ig,mskgfs(ig),gmaxgl(ig)
         if( mskgfs(ig).eq.1 .and. gmaxgl(ig).gt.gmm ) then
           gmm= gmaxgl(ig)
           igmm= ig
@@ -2036,24 +2038,46 @@ contains
         nmsks= nmsks +1
       enddo
       nbases= ngl -nmsks
-      write(cnum,'(i0)') iter
+      write(cnum,'(i0)') nbases
       call write_fsmask('out.fsmask.'//trim(cnum))
 
+      nrefresh = 0
+      frefb = 1d+30
+      xtb(:) = xt(:)
+10    continue
+      nrefresh = nrefresh + 1
       x(1:ndim)= xt(1:ndim)
 !.....Reset xt before going into the BFGS.
 !     Because it can easily get stuck at the local minimum by starting BFGS
 !     from the minimum of the previous BFGS even if another variable is added.
-!!$!.....Reset all the xt to 0.0
-!!$      xt(:) = 0d0
+      if( trim(cfs_xrefresh).eq.'zero' ) then
+!.....Reset all the xt connected to bases to 0.0 
+        do i=1,ndim
+          ig = iglid(i)
+          if( ig.le.0 ) then
+            xt(i) = sgm *polarbm()
+          else
+            xt(i)= 0d0
+          endif
+!!$          print *,'i,ig,xt=',i,ig,xt(i)
+        enddo
+      else if( trim(cfs_xrefresh).eq.'random' ) then
 !.....Reset xt randomly
-      do i=1,ndim
-        xt(i) = sgm *polarbm()
-        ig = iglid(i)
-        if( ig.le.0 ) cycle
-        if( mskgfs(ig).ne.0 ) xt(i) = 0d0
-      enddo
+        do i=1,ndim
+          xt(i) = sgm *polarbm()
+          ig = iglid(i)
+          if( ig.le.0 ) cycle
+          if( mskgfs(ig).ne.0 ) xt(i) = 0d0
+        enddo
+      else
+!.....Do nothing, use current variable values.
+      endif
       call func(ndim,xt,f,ftst)
       call grad(ndim,xt,g)
+!!$      print *,'after grad:'
+!!$      do i=1,ndim
+!!$        print *,'i,xt(i),g(i)=',i,xt(i),g(i)
+!!$      enddo
 !.....Penalty
       if( trim(cpena).eq.'ridge' ) then
         call penalty(cpena,ndim,pval,gpena,xt)
@@ -2071,6 +2095,10 @@ contains
         if( ig.le.0 ) cycle
         if( mskgfs(ig).ne.0 ) g(i)= 0d0
       enddo
+!!$      print *,'after mask:'
+!!$      do i=1,ndim
+!!$        print *,'i,xt(i),g(i)=',i,xt(i),g(i)
+!!$      enddo
 
       gnorm= sqrt(sprod(ndim,g,g))
       nftol= 0
@@ -2149,8 +2177,24 @@ contains
               alpha = 1d0
               cycle
             else ! nfailnmin > 1
+              if( f.gt.fpgfs .and. trim(cfs_xrefresh).eq.'random' &
+                   .and. nrefresh.le.maxrefresh ) then
+                if( myid.eq.0 .and. iprint.gt.0 ) then
+                  print *,'>>> Line minimization failed twice consecutively.'
+                  print *,'>>> But refresh x and go back to BFGS, because current f > fpgfs.'
+                endif
+                if( f.lt.frefb ) then
+                  frefb = f
+                  xtb(:) = xt(:)
+                endif
+                goto 10
+              endif
               if( myid.eq.0 ) then
                 print *,'>>> Line minimization failed twice consecutively.'
+              endif
+              if( f.gt.frefb ) then
+                f = frefb
+                xt(:) = xtb(:)
               endif
               exit
             endif
@@ -2181,22 +2225,52 @@ contains
 
 !.....check convergence
         if( gnorm.lt.gtol ) then
+          if( f.gt.fpgfs .and. trim(cfs_xrefresh).eq.'random' &
+               .and. nrefresh.le.maxrefresh ) then
+            if( myid.eq.0 .and. iprint.gt.0 ) then
+              print *,'>>> QN in gFS converged wrt gtol.'
+              print *,'>>> But refresh x and go back to BFGS, because current f > fpgfs.'
+            endif
+            if( f.lt.frefb ) then
+              frefb = f
+              xtb(:) = xt(:)
+            endif
+            goto 10
+          endif
           if( myid.eq.0 .and. iprint.gt.0 ) then
             print *,'>>> QN in gFS converged wrt gtol'
             write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
           endif
-          x(1:ndim)= xt(1:ndim)
           iflag= iflag +2
+          if( f.gt.frefb ) then
+            f = frefb
+            xt(:) = xtb(:)
+          endif
           exit
         else if( abs(f-fp)/abs(fp).lt.ftol) then
           nftol= nftol +1
           if( nftol.ge.numtol ) then
+            if( f.gt.fpgfs .and. trim(cfs_xrefresh).eq.'random' &
+                 .and. nrefresh.le.maxrefresh ) then
+              if( myid.eq.0 .and. iprint.gt.0 ) then
+                print *,'>>> QN in gFS converged wrt ftol.'
+                print *,'>>> But refresh x and go back to BFGS, because current f > fpgfs.'
+              endif
+              if( f.lt.frefb ) then
+                frefb = f
+                xtb(:) = xt(:)
+              endif
+              goto 10
+            endif
             if( myid.eq.0 .and. iprint.gt.0 ) then
               print '(a,i2,a)',' >>> QN in gFS may be converged because ' // &
                    'of ftol ',numtol,' times consecutively.'
             endif
-            x(1:ndim)= xt(1:ndim)
             iflag= iflag +3
+            if( f.gt.frefb ) then
+              f = frefb
+              xt(:) = xtb(:)
+            endif
             exit
           else
             if( myid.eq.0 .and. iprint.gt.1 ) then
@@ -2208,6 +2282,27 @@ contains
             enddo
             cycle
           endif
+        else if( itergfs.eq.ninnergfs ) then
+          if( f.gt.fpgfs .and. trim(cfs_xrefresh).eq.'random' &
+               .and. nrefresh.le.maxrefresh ) then
+            if( myid.eq.0 .and. iprint.gt.0 ) then
+              print *,'>>> iter exceeds ninnergfs in QN.'
+              print *,'>>> But refresh x and go back to BFGS, because current f > fpgfs.'
+            endif
+            if( f.lt.frefb ) then
+              frefb = f
+              xtb(:) = xt(:)
+            endif
+            goto 10
+          endif
+          if( myid.eq.0 .and. iprint.gt.0 ) then
+            print *,'>>> iter exceeds ninnergfs in QN in gFS.'
+          endif
+          if( f.gt.frefb ) then
+            f = frefb
+            xt(:) = xtb(:)
+          endif
+          exit
         endif
         nftol = 0
 
@@ -2267,16 +2362,17 @@ contains
                  -(s(i)*ggy(j) +ggy(i)*s(j))
           enddo
         enddo
-      enddo
+      enddo  ! End of inner BFGS
       x(1:ndim)= xt(1:ndim)
       if( myid.eq.0 .and. iprint.gt.0 ) then
-        print '(a,i6,2es12.4)',' iter,ftrn,ftst=',iter,f,ftst
+        print '(a,i6,2es13.4e3,i6)',' iter,ftrn,ftst,nbases=' &
+             ,iter,f,ftst,nbases
       endif
       call sub_eval(iter)
     enddo
 
 999 if( myid.eq.0 .and. iprint.gt.0 ) &
-         print *,'iter exceeds maxiter in gfs'
+         print *,'iter exceeds maxiter in gFS.'
     iflag= iflag +10
     x(1:ndim)= xt(1:ndim)
     return

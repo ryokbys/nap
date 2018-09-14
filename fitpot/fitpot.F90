@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-13 11:13:18 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-14 17:50:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1213,11 +1213,13 @@ subroutine gfs_wrapper(ftrn0,ftst0)
   implicit none
   real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
-  real(8):: fval
+  real(8):: ftrn,ftst
   external:: write_stats
 
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
-    call gfs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,vranges,niter &
+    ftrn = ftrn0
+    ftst = ftst0
+    call gfs(nvars,vars,ftrn,ftst,gvar,dvar,xtol,gtol,ftol,vranges,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
   else
@@ -1873,6 +1875,7 @@ subroutine sync_input()
   call mpi_bcast(cfsmode,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cnormalize,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(crefstrct,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(ctype_loss,128,mpi_character,0,mpi_world,ierr)
 
   call mpi_bcast(xtol,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ftol,1,mpi_real8,0,mpi_world,ierr)
@@ -1945,6 +1948,7 @@ subroutine sync_input()
 !.....gFS
   call mpi_bcast(ninnergfs,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(cread_fsmask,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cfs_xrefresh,128,mpi_character,0,mpi_world,ierr)
 
   call mpi_bcast(nserr,1,mpi_integer,0,mpi_world,ierr)
   if( myid.gt.0 ) then
@@ -1968,6 +1972,7 @@ subroutine sync_input()
 !.....NN related variables
   call mpi_bcast(nn_nl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(nn_nhl,nn_nlmax+1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nn_sigtype,1,mpi_integer,0,mpi_world,ierr)
 
 !.....Force-fields to be subtracted from reference values
   call mpi_bcast(nsubff,1,mpi_integer,0,mpi_world,ierr)

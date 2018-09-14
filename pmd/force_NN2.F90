@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-11 11:59:20 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-14 17:52:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -39,12 +39,19 @@ module NN2
 !.....  nhl includes bias nodes whereas mhl does not
   integer:: nhl(0:nlmax+1),mhl(0:nlmax+1)
   real(8),allocatable:: hl1(:,:),hl2(:,:)
+  real(8),allocatable:: zl1(:,:),zl2(:,:)
 
 !.....parameters given from outside (fitpot)
   integer:: nprms
   real(8),allocatable:: prms(:)
   logical:: lprmset_NN2 = .false.
 
+!.....Sigmoid function types:
+!     1) 1/(1+exp(-x))
+!     2) 1/(1+exp(-x)) +asig*x
+  integer:: itypesig = 1
+!.....Coefficient of additional term in sigmoid2
+  real(8):: asig = 0.01d0
   
 contains
   subroutine force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -67,7 +74,7 @@ contains
 !.....local
     integer:: i,j,k,l,m,n,is,js,ierr,ia,ja &
          ,ihl0,ihl1,ihl2,jj
-    real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp
+    real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,zl1i,zl2i
     real(8),allocatable,save:: strsl(:,:,:),aal(:,:)
 
     integer:: itot
@@ -80,11 +87,12 @@ contains
     if( l1st ) then
 
       if( nl.eq.1 ) then
-        if( allocated(hl1) ) deallocate(hl1)
-        allocate( hl1(nhl(1),nal) )
+        if( allocated(hl1) ) deallocate(hl1,zl1)
+        allocate( hl1(nhl(1),nal),zl1(nhl(1),nal) )
       else if( nl.eq.2 ) then
-        if( allocated(hl1) ) deallocate(hl1,hl2)
-        allocate( hl1(nhl(1),nal), hl2(nhl(2),nal) )
+        if( allocated(hl1) ) deallocate(hl1,hl2,zl1,zl2)
+        allocate( hl1(nhl(1),nal), hl2(nhl(2),nal) &
+             ,zl1(nhl(1),nal), zl2(nhl(2),nal) )
       endif
 
       if( allocated(strsl) ) deallocate(strsl)
@@ -95,12 +103,13 @@ contains
     endif ! l1st
 
     if( allocated(hl1) .and. size(hl1).lt.nhl(1)*nal ) then
-      deallocate(hl1)
-      allocate(hl1(nhl(1),nal))
+      deallocate(hl1,zl1)
+      allocate(hl1(nhl(1),nal), zl1(nhl(1),nal))
     endif
     if( allocated(hl2) .and. size(hl2).lt.nhl(1)*nal ) then
-      deallocate(hl1,hl2)
-      allocate(hl1(nhl(1),nal),hl2(nhl(2),nal))
+      deallocate(hl1,hl2,zl1,zl2)
+      allocate(hl1(nhl(1),nal), hl2(nhl(2),nal) &
+           ,zl1(nhl(1),nal), zl2(nhl(2),nal))
     endif
     if( size(strsl).lt.3*3*namax ) then
       deallocate(strsl)
@@ -126,12 +135,16 @@ contains
 !.....initialize hidden-layer node values
     if( nl.eq.1 ) then
       hl1(1:nhl(1),1:natm)= 0d0
+      zl1(:,:) = 0d0
       if( lbias ) then
         hl1(nhl(1),1:natm)= 1d0
+        zl1(nhl(1),1:natm)= 1d0
       endif
     else if( nl.eq.2 ) then
       hl1(1:nhl(1),1:natm)= 0d0
       hl2(1:nhl(2),1:natm)= 0d0
+      zl1(:,:) = 0d0
+      zl2(:,:) = 0d0
       if( lbias ) then
         hl1(nhl(1),1:natm)= 1d0
         hl2(nhl(2),1:natm)= 1d0
@@ -146,6 +159,7 @@ contains
           do ihl0=1,nhl(0)
             tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
           enddo
+          zl1(ihl1,ia)= tmp
           hl1(ihl1,ia)= sigmoid(tmp)
         enddo
       enddo
@@ -156,6 +170,7 @@ contains
           do ihl0=1,nhl(0)
             tmp= tmp +wgt21(ihl0,ihl1) *gsf(ihl0,ia)
           enddo
+          zl1(ihl1,ia)= tmp
           hl1(ihl1,ia)= sigmoid(tmp)
         enddo
         do ihl2=1,mhl(2)
@@ -163,6 +178,7 @@ contains
           do ihl1=1,nhl(1)
             tmp= tmp +wgt22(ihl1,ihl2) *(hl1(ihl1,ia)-0.5d0)
           enddo
+          zl2(ihl2,ia)= tmp
           hl2(ihl2,ia)= sigmoid(tmp)
         enddo
       enddo
@@ -174,7 +190,8 @@ contains
       do ia=1,natm
         tmp = 0d0
         do ihl1=1,nhl(1)
-          tmp = tmp +wgt12(ihl1) *(hl1(ihl1,ia)-0.5d0)
+!!$          tmp = tmp +wgt12(ihl1) *(hl1(ihl1,ia)-0.5d0)
+          tmp = tmp +wgt12(ihl1) *(sigmoid(zl1(ihl1,ia))-0.5d0)
         enddo
         epi(ia) = epi(ia) +tmp
         epotl=epotl +tmp
@@ -183,7 +200,8 @@ contains
       do ia=1,natm
         tmp = 0d0
         do ihl2=1,nhl(2)
-          tmp = tmp +wgt23(ihl2) *(hl2(ihl2,ia)-0.5d0)
+!!$          tmp = tmp +wgt23(ihl2) *(hl2(ihl2,ia)-0.5d0)
+          tmp = tmp +wgt23(ihl2) *(sigmoid(zl2(ihl2,ia))-0.5d0)
         enddo
         epi(ia)= epi(ia) +tmp
         epotl=epotl +tmp
@@ -196,7 +214,9 @@ contains
       do ia=1,natm
         do ihl1=1,mhl(1)
           hl1i= hl1(ihl1,ia)
-          tmp= wgt12(ihl1)*hl1i*(1d0-hl1i)
+          zl1i= zl1(ihl1,ia)
+!!$          tmp= wgt12(ihl1)*hl1i*(1d0-hl1i)
+          tmp = wgt12(ihl1) *dsigmoid(zl1i,hl1i)
           do jj=1,lspr(0,ia)
             ja= lspr(jj,ia)
             js = int(tag(ja))
@@ -217,10 +237,14 @@ contains
       do ia=1,natm
         do ihl2=1,mhl(2)
           hl2i= hl2(ihl2,ia)
-          tmp2= wgt23(ihl2) *hl2i*(1d0-hl2i)
+          zl2i= zl2(ihl2,ia)
+!!$          tmp2= wgt23(ihl2) *hl2i*(1d0-hl2i)
+          tmp2= wgt23(ihl2) *dsigmoid(zl2i,hl2i)
           do ihl1=1,mhl(1)
             hl1i= hl1(ihl1,ia)
-            tmp1= wgt22(ihl1,ihl2) *hl1i*(1d0-hl1i)
+            zl1i= zl1(ihl1,ia)
+!!$            tmp1= wgt22(ihl1,ihl2) *hl1i*(1d0-hl1i)
+            tmp1= wgt22(ihl1,ihl2) *dsigmoid(zl1i,hl1i)
             do jj=1,lspr(0,ia)
               ja= lspr(jj,ia)
               do ihl0=1,nhl(0)
@@ -260,25 +284,64 @@ contains
     return
   end subroutine force_NN2
 !=======================================================================
+  subroutine set_sigtype_NN2(itype)
+!
+!  Set sigmoid function type
+!
+    integer,intent(in):: itype
+
+    itypesig = itype
+    return
+  end subroutine set_sigtype_NN2
+!=======================================================================
   function sigmoid(x)
-    implicit none
     real(8),intent(in):: x
     real(8):: sigmoid
 
-    sigmoid= 1d0/(1d0 +exp(-x))
+    select case(itypesig)
+    case(1)
+      sigmoid = 1d0/(1d0 +exp(-x))
+    case(2)
+      sigmoid = 1d0/(1d0 +exp(-x)) +asig*x
+    case default
+      sigmoid = 0d0
+    end select
     return
   end function sigmoid
 !=======================================================================
-  function dsigmoid(x)
-    implicit none
-    real(8),intent(in):: x
-    real(8):: dsigmoid,sx
-
-    sx= sigmoid(x)
-!    dsigmoid= -exp(-x)/(1d0+exp(-x))**2
-    dsigmoid= sx*(1d0-sx)
+  function dsigmoid(x,sx)
+    real(8),intent(in):: x,sx
+    real(8):: dsigmoid
+    real(8):: sxt
+    
+    select case(itypesig)
+    case(1)
+      dsigmoid = sx*(1d0-sx)
+    case(2)
+      sxt = 1d0/(1d0 +exp(-x))
+      dsigmoid = sxt *(1d0-sxt) +asig
+    case default
+      dsigmoid = 0d0
+    end select
     return
   end function dsigmoid
+!=======================================================================
+  function ddsigmoid(x,sx)
+    real(8),intent(in):: x,sx
+    real(8):: ddsigmoid
+    real(8):: sxt
+    
+    select case(itypesig)
+    case(1)
+      ddsigmoid = sx*(1d0-sx)*(1d0-2d0*sx)
+    case(2)
+      sxt = 1d0 /(1d0 +exp(-x))
+      ddsigmoid = sxt *(1d0 -sxt) *(1d0 -2d0*sxt)
+    case default
+      ddsigmoid = 0d0
+    end select
+    return
+  end function ddsigmoid
 !=======================================================================
   subroutine read_params_NN2(myid,mpi_world,iprint)
 !
@@ -338,6 +401,7 @@ contains
     call mpi_bcast(lbias,1,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(lcharge,1,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(letemp,1,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(itypesig,1,mpi_integer,0,mpi_world,ierr)
 
 !.....Determine num of weights
     nhl(nl+1) = 1
@@ -347,11 +411,20 @@ contains
     endif
     if( letemp ) nhl(0) = nhl(0) + 1
     if( myid.eq.0 .and. iprint.ne.0 ) then
-      print *,'lbias  = ',lbias
-      print *,'lcharge= ',lcharge
-      print *,'letemp = ',letemp
-      print *,'nhl = ',nhl(0:nl+1)
-      print *,'mhl = ',mhl(0:nl+1)
+      print *,''
+      print *,'NN potential parameters:'
+      print *,'  lbias  = ',lbias
+      print *,'  lcharge= ',lcharge
+      print *,'  letemp = ',letemp
+      print *,'  nhl = ',nhl(0:nl+1)
+      print *,'  mhl = ',mhl(0:nl+1)
+      if( itypesig.eq.1 ) then
+        print *,'  activation function: 1) 1/(1+exp(-x))'
+      else if( itypesig.eq.2 ) then
+        print *,'  activation function: 2) 1/(1+exp(-x)) +asig*x'
+      else
+        print *,'  activation function: unknown'
+      endif
     endif
 
 !.....calc number of weights
@@ -569,7 +642,7 @@ contains
 !  Currently available options are:
 !    - "bias:" with an argument .true. (T) or .false. (F)
 !    - "charge:" with an argument .true. (T) or .false. (F)
-!    - "rcw2:" or "rcw3:" the ratio to rc or rc3 for minimum r where the cutoff starts working.
+!    - "sigtype:" sigmoid type: 1 or 2.
 !
     implicit none
     character(len=*),intent(in):: cline
@@ -580,6 +653,7 @@ contains
     character(len=10):: c1,copt
     logical:: lopt
     integer,external:: num_data
+    integer:: iopt
 
     ierr = 0
     if( index(cline,'bias:').ne.0 ) then
@@ -596,6 +670,13 @@ contains
         ierr = 2
       endif
       lcharge = lopt
+    else if( index(cline,'sigtype:').ne.0 ) then
+      read(cline,*) c1,copt,iopt
+      if( trim(copt).ne.'sigtype:' ) then
+        print *, 'Error: copt is not "sigtype:" !!!'
+        ierr = 2
+      endif
+      itypesig = iopt
     endif
     
   end subroutine parse_option
@@ -614,7 +695,7 @@ contains
 
     integer:: ia,ja,ixyz,jxyz,ihl0,ihl1,ihl2,jj,is,js
     real(8):: xi(3),xj(3),xji(3),rij(3),rji(3),dji,sji,sii&
-         ,hl2i,tmp2i,hl1i,tmp1i,stmp(3,3)
+         ,hl2i,tmp2i,hl1i,tmp1i,stmp(3,3),zl1i,zl2i
 
     if( nl.eq.1 ) then
       do ia=1,natm
@@ -632,7 +713,9 @@ contains
           js = int(tag(ja))
           do ihl1=1,mhl(1)
             hl1i= hl1(ihl1,ia)
-            tmp1i= wgt12(ihl1)*hl1i*(1d0-hl1i)
+            zl1i= zl1(ihl1,ia)
+!!$            tmp1i= wgt12(ihl1)*hl1i*(1d0-hl1i)
+            tmp1i= wgt12(ihl1)* dsigmoid(zl1i,hl1i)
 !!$            do ihl0=iaddr2(1,is,js),iaddr2(2,is,js)
             do ihl0=1,nhl(0)
               if( igsf(ihl0,jj,ia).eq.0 ) cycle
@@ -670,10 +753,14 @@ contains
           js = int(tag(ja))
           do ihl2=1,mhl(2)
             hl2i= hl2(ihl2,ia)
-            tmp2i= wgt23(ihl2) *hl2i*(1d0-hl2i)
+            zl2i= zl2(ihl2,ia)
+!!$            tmp2i= wgt23(ihl2) *hl2i*(1d0-hl2i)
+            tmp2i= wgt23(ihl2) *dsigmoid(zl2i,hl2i)
             do ihl1=1,mhl(1)
               hl1i= hl1(ihl1,ia)
-              tmp1i= wgt22(ihl1,ihl2) *hl1i*(1d0-hl1i)
+              zl1i= zl1(ihl1,ia)
+!!$              tmp1i= wgt22(ihl1,ihl2) *hl1i*(1d0-hl1i)
+              tmp1i= wgt22(ihl1,ihl2) *dsigmoid(zl1i,hl1i)
 !!$              do ihl0=iaddr2(1,is,js),iaddr2(2,is,js)
               do ihl0=1,nhl(0)
                 if( igsf(ihl0,jj,ia).eq.0 ) cycle
@@ -735,15 +822,15 @@ contains
     logical,intent(in):: lematch,lfmatch,lsmatch
 
     integer:: iv,ia,ihl0,ihl1,jj,ja,jra
-    real(8):: g,h1,tmp,w2,w1
+    real(8):: g,h1,z1,tmp,w2,w1,ds,dds
     integer,external:: itotOf
     real(8),allocatable:: dgsf2(:,:,:,:)
 !!$    real(8),allocatable:: gwft(:,:,:)
 
 !.....TO CHECK: Need to make hl1 every time?
     if( size(hl1).ne.nhl(1)*nal ) then
-      deallocate(hl1)
-      allocate(hl1(nhl(1),nal))
+      deallocate(hl1,zl1)
+      allocate(hl1(nhl(1),nal), zl1(nhl(1),nal))
     endif
     do ia=1,natm
       do ihl1=1,mhl(1)
@@ -751,6 +838,7 @@ contains
         do ihl0=1,nhl(0)
           tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
         enddo
+        zl1(ihl1,ia)= tmp
         hl1(ihl1,ia)= sigmoid(tmp)
       enddo
     enddo
@@ -760,19 +848,21 @@ contains
         iv = iprm0
         do ihl0=1,nhl(0)
           g = gsf(ihl0,ia)
-          if( allocated(mskgfs) .and. mskgfs(ihl0).ne.0 ) then
-            do ihl1=1,mhl(1)
-              iv = iv + 1
-              gwe(iv) = gwe(iv) +0d0
-            enddo
-          else
+!!$          if( allocated(mskgfs) .and. mskgfs(ihl0).ne.0 ) then
+!!$            do ihl1=1,mhl(1)
+!!$              iv = iv + 1
+!!$              gwe(iv) = gwe(iv) +0d0
+!!$            enddo
+!!$          else
             do ihl1=1,mhl(1)
               w2 = wgt12(ihl1)
               h1 = hl1(ihl1,ia)
+              z1 = zl1(ihl1,ia)
               iv = iv + 1
-              gwe(iv) = gwe(iv) +w2 *h1*(1d0-h1) *g
+!!$              gwe(iv) = gwe(iv) +w2 *h1*(1d0-h1) *g
+              gwe(iv) = gwe(iv) +w2 *g *dsigmoid(z1,h1)
             enddo
-          endif
+!!$          endif
         enddo
         do ihl1=1,nhl(1)
           h1 = hl1(ihl1,ia)
@@ -816,16 +906,19 @@ contains
 !.....Weights between layer 0 and 1
         do ihl0=1,nhl(0)
           g = gsf(ihl0,ia)
-          if( allocated(mskgfs) .and. mskgfs(ihl0).ne.0 ) then
-!.....Do nothing here, and just increment iv
-            do ihl1=1,mhl(1)
-              iv = iv + 1
-            enddo
-          else
+!!$          if( allocated(mskgfs) .and. mskgfs(ihl0).ne.0 ) then
+!!$!.....Do nothing here, and just increment iv
+!!$            do ihl1=1,mhl(1)
+!!$              iv = iv + 1
+!!$            enddo
+!!$          else
             do ihl1=1,mhl(1)
               w1 = wgt11(ihl0,ihl1)
               w2 = wgt12(ihl1)
               h1 = hl1(ihl1,ia)
+              z1 = zl1(ihl1,ia)
+              ds = dsigmoid(z1,h1)
+              dds= ddsigmoid(z1,h1)
               iv = iv +1
               do jj=0,lspr(0,ia)  ! Notice: from 0 not 1
                 if( jj.eq.0 ) then
@@ -834,18 +927,23 @@ contains
                   ja = lspr(jj,ia)
                 endif
                 jra = itotOf(tag(ja))
+!!$                gwf(iv,1:3,jra) = gwf(iv,1:3,jra) &
+!!$                     -w2*h1*(1d0-h1) &
+!!$                     *( (1d0-2d0*h1) *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
+!!$                     +dgsf(1:3,ihl0,jj,ia) )
                 gwf(iv,1:3,jra) = gwf(iv,1:3,jra) &
-                     -w2*h1*(1d0-h1) &
-                     *( (1d0-2d0*h1) *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
-                     +dgsf(1:3,ihl0,jj,ia) )
+                     -w2 *(dds *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
+                     +ds*dgsf(1:3,ihl0,jj,ia) )
               enddo
             enddo
-          endif
+!!$          endif
         enddo
-!.....Weights between layer 1 and output
+!.....Weights between layer-1 and output
         do ihl1=1,mhl(1)
           w2 = wgt12(ihl1)
           h1 = hl1(ihl1,ia)
+          z1 = zl1(ihl1,ia)
+          tmp = dsigmoid(z1,h1)
           iv = iv +1
           do jj=0,lspr(0,ia)
             if( jj.eq.0 ) then
@@ -856,7 +954,7 @@ contains
             jra = itotOf(tag(ja))
             do ihl0=1,nhl(0)
               w1 = wgt11(ihl0,ihl1)
-              gwf(iv,1:3,jra) = gwf(iv,1:3,jra) -w1 *h1*(1d0 -h1) &
+              gwf(iv,1:3,jra) = gwf(iv,1:3,jra) -w1 *tmp &
                    *dgsf(1:3,ihl0,jj,ia)
             enddo
           enddo

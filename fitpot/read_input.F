@@ -101,6 +101,9 @@ c=======================================================================
       elseif( trim(cname).eq.'stress_match' ) then
         call read_l1(ionum,lsmatch)
         return
+      elseif( trim(cname).eq.'loss_function' ) then
+        call read_c1(ionum,ctype_loss)
+        return
       elseif( trim(cname).eq.'penalty' ) then
         call read_c1(ionum,cpena)
         return
@@ -155,6 +158,9 @@ c=======================================================================
         return
       elseif( trim(cname).eq.'fs_read_mask' ) then
         call read_c1(ionum,cread_fsmask)
+        return
+      elseif( trim(cname).eq.'fs_xrefresh' ) then
+        call read_c1(ionum,cfs_xrefresh)
         return
       elseif( trim(cname).eq.'eps_energy' ) then
         call read_r1(ionum,epse)
@@ -311,6 +317,9 @@ c=======================================================================
         return
       elseif( trim(cname).eq.'NN_num_nodes' ) then
         call read_nn_nhl(ionum)
+        return
+      elseif( trim(cname).eq.'NN_sigtype' ) then
+        call read_i1(ionum,nn_sigtype)
         return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
