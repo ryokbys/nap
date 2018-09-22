@@ -13,6 +13,7 @@ module minimize
   integer:: ninnergfs=100
   character(len=128):: cread_fsmask = ''
   character(len=128):: cfs_xrefresh = 'random' ! [zero, random, none]
+  integer:: maxfsrefresh = 2
 
 !.....Max iteration for line minimization
   integer:: niter_linmin   = 15
@@ -523,8 +524,8 @@ contains
 !  Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
 !
     implicit none
-    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
-    integer,intent(inout):: iflag
+    integer,intent(in):: ndim,iprint,myid,niter_eval
+    integer,intent(inout):: iflag,maxiter
     real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
     character(len=*),intent(in):: cfmethod
@@ -736,6 +737,7 @@ contains
           endif
           x0(1:ndim)= x(1:ndim)
           iflag= iflag +1
+          maxiter = iter
           return
         endif
       else if( gnorm.lt.gtol ) then
@@ -750,6 +752,7 @@ contains
           endif
           x0(1:ndim)= x(1:ndim)
           iflag= iflag +2
+          maxiter = iter
           return
         endif
       else if( abs(f-fp).lt.ftol) then
@@ -764,6 +767,7 @@ contains
           endif
           x0(1:ndim)= x(1:ndim)
           iflag= iflag +3
+          maxiter = iter
           return
         endif
       else
@@ -1514,13 +1518,13 @@ contains
     niter= iter
     if( myid.eq.0 .and. iprint.gt.0 ) then
       print *,'WARNING: iter.gt.NITER_LINMIN in armijo_search.'
-      write(6,'(a,es13.5)') '   alphai   = ',alphai
-      write(6,'(a,es13.5)') '   xigd    = ',xigd
-      write(6,'(a,es13.5)') '   norm(g) = ',sqrt(sprod(ndim,g,g))
-      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' .or. &
-           trim(cpena).eq.'ridge' ) then
-        write(6,'(a,es13.5)') '   pval    = ',pval
-      endif
+!!$      write(6,'(a,es13.5)') '   alphai   = ',alphai
+!!$      write(6,'(a,es13.5)') '   xigd    = ',xigd
+!!$      write(6,'(a,es13.5)') '   norm(g) = ',sqrt(sprod(ndim,g,g))
+!!$      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' .or. &
+!!$           trim(cpena).eq.'ridge' ) then
+!!$        write(6,'(a,es13.5)') '   pval    = ',pval
+!!$      endif
     endif
     return
 
@@ -1596,8 +1600,8 @@ contains
         if( alphai.lt.tiny ) then
           if( myid.eq.0 .and. iprint.gt.0 ) then
             print *,'WARNING: alpha < tiny in onestep,'
-            print *,'         The search direction would be wrong.'
-            print *,'   iter,alphai,fi=',iter,alphai,fi
+!!$            print *,'         The search direction would be wrong.'
+!!$            print *,'   iter,alphai,fi=',iter,alphai,fi
           endif
           iflag = iflag + 100
           niter = iter
@@ -1610,8 +1614,8 @@ contains
     niter = iter
     if( myid.eq.0 .and. iprint.gt.0 ) then
       print *, 'WARNING: iter exceeds NITER_LINMIN in onestep.'
-      print *, '         The search direction would be wrong.'
-      write(6,'(a,es13.5)') '   alphai = ',alphai
+!!$      print *, '         The search direction would be wrong.'
+!!$      write(6,'(a,es13.5)') '   alphai = ',alphai
     endif
     return
   end subroutine onestep
@@ -1820,8 +1824,8 @@ contains
     use variables,only: gsfcorr
     use random
     implicit none
-    integer,intent(in):: ndim,maxiter,iprint,myid,niter_eval
-    integer,intent(inout):: iflag
+    integer,intent(in):: ndim,iprint,myid,niter_eval
+    integer,intent(inout):: iflag,maxiter
     real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: f,ftst,x(ndim),g(ndim),d(ndim)
     character(len=*),intent(in):: cfmethod
@@ -1849,11 +1853,11 @@ contains
     real(8),allocatable,save:: xt(:),xtb(:),gmaxgl(:),u(:),gmaxgl0(:)
     real(8),save,allocatable:: gg(:,:),y(:),gp(:),rg(:) &
          ,ggy(:),ygg(:),s(:),g0(:),gpena(:)  !,aa(:,:),cc(:,:),v(:)
+    logical,allocatable,save:: lexclude(:)
     integer:: nmsks,imsk,nftol,nbases,nvar,nrefresh
     real(8):: ynorm,tmp1,tmp2,b,sy,syi  !,svy,svyi
     character(len=128):: cnum
     real(8),parameter:: sgm = 1.0d-1
-    integer,parameter:: maxrefresh = 2
 
     if( trim(cpena).eq.'lasso' .and. trim(cpena).eq.'glasso' ) then
       if(myid.eq.0) then
@@ -1876,7 +1880,8 @@ contains
          ,y(ndim),gp(ndim),ggy(ndim),ygg(ndim) &
          ,s(ndim),gpena(ndim))  !,v(ndim),aa(ndim,ndim),cc(ndim,ndim)
     if( .not. allocated(gmaxgl) ) then
-      allocate(gmaxgl(ngl),gmaxgl0(ngl))
+      allocate(gmaxgl(ngl),gmaxgl0(ngl),lexclude(ngl))
+      lexclude(:) = .false.
     endif
     if( .not.allocated(mskgfs) ) then
       allocate(mskgfs(ngl),msktmp(ngl))
@@ -1942,9 +1947,9 @@ contains
     call sub_eval(0)
 
 !.....Start gFS loop here
+    fpgfs = f
+    ftstp = ftst
     do iter=1,maxiter
-      fpgfs = f
-      ftstp = ftst
       if( index(cfsmode,'grad0').ne.0 ) then
         g(:) = g0(:)
       else if( index(cfsmode,'grad').ne.0 ) then
@@ -2012,7 +2017,8 @@ contains
       do ig=1,ngl
 !.....Do not take mskgfs==2 into account !
 !!$        print *,'myid,ig,mskgfs,gmaxgl=',myid,ig,mskgfs(ig),gmaxgl(ig)
-        if( mskgfs(ig).eq.1 .and. gmaxgl(ig).gt.gmm ) then
+        if( mskgfs(ig).eq.1 .and. gmaxgl(ig).gt.gmm .and. &
+             .not. lexclude(ig) ) then
           gmm= gmaxgl(ig)
           igmm= ig
         endif
@@ -2028,7 +2034,7 @@ contains
       mskgfs(igmm)= 0
       if( myid.eq.0 ) then
         if( iprint.gt.0 ) then
-          print '(a,i5,es12.4,i5,es12.4)',' iter,f,igmm,gmm= ',iter,f,igmm,gmm
+          print '(a,2i5,es12.4)',' iter,igmm,gmm= ',iter,igmm,gmm
           call flush(6)
         endif
       endif
@@ -2074,10 +2080,6 @@ contains
       endif
       call func(ndim,xt,f,ftst)
       call grad(ndim,xt,g)
-!!$      print *,'after grad:'
-!!$      do i=1,ndim
-!!$        print *,'i,xt(i),g(i)=',i,xt(i),g(i)
-!!$      enddo
 !.....Penalty
       if( trim(cpena).eq.'ridge' ) then
         call penalty(cpena,ndim,pval,gpena,xt)
@@ -2095,10 +2097,6 @@ contains
         if( ig.le.0 ) cycle
         if( mskgfs(ig).ne.0 ) g(i)= 0d0
       enddo
-!!$      print *,'after mask:'
-!!$      do i=1,ndim
-!!$        print *,'i,xt(i),g(i)=',i,xt(i),g(i)
-!!$      enddo
 
       gnorm= sqrt(sprod(ndim,g,g))
       nftol= 0
@@ -2108,9 +2106,6 @@ contains
       do itergfs=1,ninnergfs
         
         u(1:ndim)= 0d0
-!!$        do i=1,ndim
-!!$          u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
-!!$        enddo
         inc = 0
         do i=1,ndim
           ig = iglid(i)
@@ -2153,7 +2148,9 @@ contains
                ,iflag,myid,func,niter)
         endif
 !.....get out of bfgs loop
-        if( iflag/100.ne.0 ) then
+!!$        print '(a,3i4,2es12.4)','iter,itergfs,iflag,ftrn,fpgfs=' &
+!!$             ,iter,itergfs,iflag,f,fpgfs
+        if( itergfs.lt.ninnergfs .and. iflag/100.ne.0 ) then
           if( itergfs.eq.1 ) then
             if( myid.eq.0 ) then
               print *,"Line minimizaitonat failed 1st step of FS,"&
@@ -2177,24 +2174,25 @@ contains
               alpha = 1d0
               cycle
             else ! nfailnmin > 1
-              if( f.gt.fpgfs .and. trim(cfs_xrefresh).eq.'random' &
-                   .and. nrefresh.le.maxrefresh ) then
-                if( myid.eq.0 .and. iprint.gt.0 ) then
-                  print *,'>>> Line minimization failed twice consecutively.'
-                  print *,'>>> But refresh x and go back to BFGS, because current f > fpgfs.'
-                endif
-                if( f.lt.frefb ) then
-                  frefb = f
-                  xtb(:) = xt(:)
-                endif
-                goto 10
-              endif
               if( myid.eq.0 ) then
                 print *,'>>> Line minimization failed twice consecutively.'
               endif
-              if( f.gt.frefb ) then
-                f = frefb
-                xt(:) = xtb(:)
+              if( f.gt.fpgfs .and. trim(cfs_xrefresh).eq.'random' &
+                   .and. nrefresh.le.maxfsrefresh ) then
+                if( myid.eq.0 .and. iprint.gt.0 ) then
+                  print *,'>>> But refresh x and go back to BFGS, ' &
+                       //'because current f > fpgfs.'
+!!$                  print *,'f,fpgfs=',f,fpgfs
+                endif
+                goto 10
+              else if( f.gt.fpgfs ) then
+!.....If f is greater than the previous value,
+!.....selected symmetry function is probably not a good one, so exclude it
+!.....in the following gFS steps.
+                lexclude(igmm) = .true.
+                mskgfs(igmm) = 1
+                if( myid.eq.0 .and. iprint.gt.0 ) &
+                     print *,'>>> Exclude the basis since f > fpgfs, igmm=',igmm
               endif
               exit
             endif
@@ -2225,54 +2223,54 @@ contains
 
 !.....check convergence
         if( gnorm.lt.gtol ) then
+          if( myid.eq.0 .and. iprint.gt.0 ) then
+            print '(a,2es13.5)',' >>> QN in gFS converged; gnorm,gtol= ' &
+                 ,gnorm,gtol
+          endif
           if( f.gt.fpgfs .and. trim(cfs_xrefresh).eq.'random' &
-               .and. nrefresh.le.maxrefresh ) then
+               .and. nrefresh.le.maxfsrefresh ) then
             if( myid.eq.0 .and. iprint.gt.0 ) then
-              print *,'>>> QN in gFS converged wrt gtol.'
               print *,'>>> But refresh x and go back to BFGS, because current f > fpgfs.'
-            endif
-            if( f.lt.frefb ) then
-              frefb = f
-              xtb(:) = xt(:)
+!!$              print *,'f,fpgfs=',f,fpgfs
             endif
             goto 10
-          endif
-          if( myid.eq.0 .and. iprint.gt.0 ) then
-            print *,'>>> QN in gFS converged wrt gtol'
-            write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
+          else if( f.gt.fpgfs ) then
+!.....If f is greater than the previous value,
+!.....selected symmetry function is probably not a good one, so exclude it
+!.....in the following gFS steps.
+            lexclude(igmm) = .true.
+            mskgfs(igmm) = 1
+            if( myid.eq.0 .and. iprint.gt.0 ) &
+                 print *,'>>> Exclude the basis since f > fpgfs, igmm=',igmm
           endif
           iflag= iflag +2
-          if( f.gt.frefb ) then
-            f = frefb
-            xt(:) = xtb(:)
-          endif
           exit
         else if( abs(f-fp)/abs(fp).lt.ftol) then
           nftol= nftol +1
           if( nftol.ge.numtol ) then
-            if( f.gt.fpgfs .and. trim(cfs_xrefresh).eq.'random' &
-                 .and. nrefresh.le.maxrefresh ) then
-              if( myid.eq.0 .and. iprint.gt.0 ) then
-                print *,'>>> QN in gFS converged wrt ftol.'
-                print *,'>>> But refresh x and go back to BFGS, because current f > fpgfs.'
-              endif
-              if( f.lt.frefb ) then
-                frefb = f
-                xtb(:) = xt(:)
-              endif
-              goto 10
-            endif
             if( myid.eq.0 .and. iprint.gt.0 ) then
               print '(a,i2,a)',' >>> QN in gFS may be converged because ' // &
                    'of ftol ',numtol,' times consecutively.'
             endif
-            iflag= iflag +3
-            if( f.gt.frefb ) then
-              f = frefb
-              xt(:) = xtb(:)
+            if( f.gt.fpgfs .and. trim(cfs_xrefresh).eq.'random' &
+                 .and. nrefresh.le.maxfsrefresh ) then
+              if( myid.eq.0 .and. iprint.gt.0 ) then
+                print *,'>>> But refresh x and go back to BFGS, because current f > fpgfs.'
+!!$                print *,'f,fpgfs=',f,fpgfs
+              endif
+              goto 10
+            else if( f.gt.fpgfs ) then
+!.....If f is greater than the previous value,
+!.....selected symmetry function is probably not a good one, so exclude it
+!.....in the following gFS steps.
+              lexclude(igmm) = .true.
+              mskgfs(igmm) = 1
+              if( myid.eq.0 .and. iprint.gt.0 ) &
+                   print *,'>>> Exclude the basis since f > fpgfs, igmm=',igmm
             endif
+            iflag= iflag +3
             exit
-          else
+          else if( itergfs.lt.ninnergfs ) then
             if( myid.eq.0 .and. iprint.gt.1 ) then
               print *,'>>> gg initialized because |f-fp|/|fp|<ftol '
             endif
@@ -2282,32 +2280,32 @@ contains
             enddo
             cycle
           endif
-        else if( itergfs.eq.ninnergfs ) then
+        endif
+        if( itergfs.ge.ninnergfs ) then
+          if( myid.eq.0 .and. iprint.gt.0 ) then
+            print *,'>>> itergfs exceeds fs_num_inner in QN in gFS.'
+          endif
           if( f.gt.fpgfs .and. trim(cfs_xrefresh).eq.'random' &
-               .and. nrefresh.le.maxrefresh ) then
+               .and. nrefresh.le.maxfsrefresh ) then
             if( myid.eq.0 .and. iprint.gt.0 ) then
-              print *,'>>> iter exceeds ninnergfs in QN.'
               print *,'>>> But refresh x and go back to BFGS, because current f > fpgfs.'
-            endif
-            if( f.lt.frefb ) then
-              frefb = f
-              xtb(:) = xt(:)
+!!$              print *,'f,fpgfs=',f,fpgfs
             endif
             goto 10
-          endif
-          if( myid.eq.0 .and. iprint.gt.0 ) then
-            print *,'>>> iter exceeds ninnergfs in QN in gFS.'
-          endif
-          if( f.gt.frefb ) then
-            f = frefb
-            xt(:) = xtb(:)
+          else if( f.gt.fpgfs ) then
+!.....If f is greater than the previous value,
+!.....selected symmetry function is probably not a good one, so exclude it
+!.....in the following gFS steps.
+            lexclude(igmm) = .true.
+            mskgfs(igmm) = 1
+            if( myid.eq.0 .and. iprint.gt.0 ) &
+                 print *,'>>> Exclude the basis since f > fpgfs, igmm=',igmm
           endif
           exit
         endif
         nftol = 0
 
 !.....BFGS treatment with reduced number of variables
-
         inc = 0
         s(:) = 0d0
         y(:) = 0d0
@@ -2323,7 +2321,7 @@ contains
 !!$        y(1:ndim)= g(1:ndim) -gp(1:ndim)
         ynorm= sprod(ndim,y,y)
         if( ynorm.lt.1d-14 ) then
-          if(myid.eq.0 .and. iprint.gt.1 ) then
+          if( myid.eq.0 .and. iprint.gt.1 ) then
             print *,'>>> Initialize gg because y*y < 1d-14'
           endif
           gg(1:ndim,1:ndim)= 0d0
@@ -2340,7 +2338,7 @@ contains
 !!$        do i=1,ndim
         do i=1,nvar
           tmp1= 0d0
-          tmp2= 0d0
+!!$          tmp2= 0d0
 !!$          do j=1,ndim
           do j=1,nvar
             tmp1= tmp1 +gg(j,i)*y(j)
@@ -2362,13 +2360,24 @@ contains
                  -(s(i)*ggy(j) +ggy(i)*s(j))
           enddo
         enddo
+!!$        print *,'End of inner BFGS'
       enddo  ! End of inner BFGS
-      x(1:ndim)= xt(1:ndim)
-      if( myid.eq.0 .and. iprint.gt.0 ) then
-        print '(a,i6,2es13.4e3,i6)',' iter,ftrn,ftst,nbases=' &
-             ,iter,f,ftst,nbases
+
+!!$      print '(a,i5,2es12.4)','iter,ftrn,fpgfs=',iter,f,fpgfs
+      if( f.gt.fpgfs .and. .not.lexclude(igmm) ) then
+        print *,'SOMETHING WRONG!!!'
+        print *,'itergfs,ninnergfs=',itergfs,ninnergfs
       endif
-      call sub_eval(iter)
+      if( .not. lexclude(igmm) ) then
+        fpgfs = f
+        ftstp = ftst
+        x(1:ndim)= xt(1:ndim)
+        if( myid.eq.0 .and. iprint.gt.0 ) then
+          print '(a,i6,2es13.4e3,i6)',' iter,ftrn,ftst,nbases=' &
+               ,iter,f,ftst,nbases
+        endif
+        call sub_eval(iter)
+      endif
     enddo
 
 999 if( myid.eq.0 .and. iprint.gt.0 ) &

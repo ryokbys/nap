@@ -46,7 +46,7 @@ module variables
 !.....Atomic forces over this value will not be used for fitting
   real(8):: force_limit = 100d0
 !.....Loss function type: LS (least-square), Huber
-  character(len=128):: ctype_loss = 'LS'
+  character(len=128):: ctype_loss = 'Huber'
 
 !.....Max limit of number of species
   integer,parameter:: mspcs = 9

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-14 17:50:11 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-16 00:55:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1949,6 +1949,7 @@ subroutine sync_input()
   call mpi_bcast(ninnergfs,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(cread_fsmask,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cfs_xrefresh,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(maxfsrefresh,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(nserr,1,mpi_integer,0,mpi_world,ierr)
   if( myid.gt.0 ) then

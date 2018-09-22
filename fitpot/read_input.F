@@ -162,6 +162,9 @@ c=======================================================================
       elseif( trim(cname).eq.'fs_xrefresh' ) then
         call read_c1(ionum,cfs_xrefresh)
         return
+      elseif( trim(cname).eq.'fs_max_num_refresh' ) then
+        call read_i1(ionum,maxfsrefresh)
+        return
       elseif( trim(cname).eq.'eps_energy' ) then
         call read_r1(ionum,epse)
         return
