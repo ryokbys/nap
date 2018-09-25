@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-27 17:42:47 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-25 16:01:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -8,6 +8,8 @@ module Bonny_WRe
 !  Species 1 should be W and 2 should be Re.
 !-----------------------------------------------------------------------
   implicit none
+
+  character(len=128):: paramsdir = ''
 
   real(8),external:: hvsd
 
@@ -696,6 +698,17 @@ contains
     dzeta = (15d0*x**4 -30d0*x**2 +15d0)/16d0
     return
   end function dzeta
+!=======================================================================
+  subroutine set_paramsdir_Bonny(dname)
+!
+!  Accessor routine to set paramsdir.
+!
+    implicit none
+    character(len=*),intent(in):: dname
+
+    paramsdir = trim(dname)
+    return
+  end subroutine set_paramsdir_Bonny
 !=======================================================================
   
 end module Bonny_WRe

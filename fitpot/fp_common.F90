@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-14 17:53:05 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-25 16:18:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -825,6 +825,7 @@ contains
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use LJ,only: set_paramsdir_LJ
     use ZBL,only: set_paramsdir_ZBL
+    use Bonny_WRe,only: set_paramsdir_Bonny
     implicit none
 
     integer:: i,ismpl,natm
@@ -834,6 +835,7 @@ contains
     logical:: luse_Coulomb = .false.
     logical:: luse_LJ_repul = .false.
     logical:: luse_ZBL = .false.
+    logical:: luse_Bonny_WRe = .false.
     logical,save:: l1st = .true.
     real(8):: epot,strs(3,3)
     real(8),save,allocatable:: frcs(:,:)
@@ -861,6 +863,8 @@ contains
           luse_LJ_repul = .true.
         else if( index(trim(csubffs(i)),'ZBL').ne.0 ) then
           luse_ZBL = .true.
+        else if( index(trim(csubffs(i)),'Bonny_WRe').ne.0 ) then
+          luse_Bonny_WRe = .true.
         endif
       enddo
 
@@ -885,6 +889,10 @@ contains
         endif
         if( luse_ZBL ) then
           call set_paramsdir_ZBL(trim(cmaindir)//'/'&
+               //trim(samples(ismpl)%cdirname)//'/pmd')
+        endif
+        if( luse_Bonny_WRe ) then
+          call set_paramsdir_Bonny(trim(cmaindir)//'/'&
                //trim(samples(ismpl)%cdirname)//'/pmd')
         endif
         call run_pmd(samples(ismpl),lcalcgrad,nvars,&
