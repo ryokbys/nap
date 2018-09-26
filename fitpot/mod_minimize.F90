@@ -1942,7 +1942,7 @@ contains
     endif
 
     if( myid.eq.0 .and. iprint.gt.0 ) then
-      print '(a,i6,2es13.4e3,i6)',' iter,ftrn,ftst,nbases=',0,f,ftst,nbases
+      print '(a,i6,2es15.6e3,i6)',' iter,ftrn,ftst,nbases=',0,f,ftst,nbases
     endif
     call sub_eval(0)
 
@@ -2373,7 +2373,7 @@ contains
         ftstp = ftst
         x(1:ndim)= xt(1:ndim)
         if( myid.eq.0 .and. iprint.gt.0 ) then
-          print '(a,i6,2es13.4e3,i6)',' iter,ftrn,ftst,nbases=' &
+          print '(a,i6,2es15.6e3,i6)',' iter,ftrn,ftst,nbases=' &
                ,iter,f,ftst,nbases
         endif
         call sub_eval(iter)
