@@ -98,6 +98,9 @@ c=======================================================================
       elseif( trim(cname).eq.'force_match' ) then
         call read_l1(ionum,lfmatch)
         return
+      elseif( trim(cname).eq.'force_match_species' ) then
+        call read_force_match_species(ionum)
+        return
       elseif( trim(cname).eq.'stress_match' ) then
         call read_l1(ionum,lsmatch)
         return
@@ -492,6 +495,31 @@ c
       backspace(ionum)
       read(ionum,*) ctmp, (csubffs(i),i=1,nsubff)
       end subroutine read_force_field
+c=======================================================================
+      subroutine read_force_match_species(ionum)
+      use variables,only: lsps_frc
+      implicit none
+      integer,intent(in):: ionum
+
+      integer:: i,ndat,nsp_frc
+      character(len=1024):: ctmp
+      integer,external:: num_data
+      integer,allocatable:: isps(:)
+
+      backspace(ionum)
+      read(ionum,'(a)') ctmp
+      ndat = num_data(trim(ctmp),' ')
+      nsp_frc = ndat -1
+      allocate(isps(nsp_frc))
+      backspace(ionum)
+      read(ionum,*) ctmp, (isps(i),i=1,nsp_frc)
+
+      lsps_frc(:) = .false.
+      do i=1,nsp_frc
+        lsps_frc(isps(i)) = .true.
+      enddo
+      deallocate(isps)
+      end subroutine read_force_match_species
 c=======================================================================
       subroutine read_nn_nhl(ionum)
       use variables,only: nn_nhl

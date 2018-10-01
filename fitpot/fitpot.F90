@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-16 00:55:40 Ryo KOBAYASHI>
+!                     Last modified: <2018-09-26 23:48:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -21,6 +21,8 @@ program fitpot
   call mpi_comm_rank(mpi_comm_world,myid,ierr)
   mpi_world= mpi_comm_world
   tcomm= 0d0
+
+  call init_variables()
 
   if( myid.eq.0 ) then
     write(6,'(a)') '========================================================================'
@@ -618,6 +620,8 @@ subroutine read_ref_data()
       samples(ismpl)%fref(1:3,i)= ftmp(1:3)
       samples(ismpl)%fabs(i)= sqrt(ftmp(1)**2 +ftmp(2)**2 +ftmp(3)**2)
       if( samples(ismpl)%fabs(i).gt.force_limit ) ifcal = 0
+      is= int(samples(ismpl)%tag(i))
+      if( .not. lsps_frc(is) ) ifcal = 0
       samples(ismpl)%ifcal(i)= ifcal
 !!$      write(6,'(a,2i5,3es12.4)') 'ismpl,i,samples(ismpl)%fref(1:3,i) = ',&
 !!$           ismpl,i,samples(ismpl)%fref(1:3,i)
@@ -1894,6 +1898,7 @@ subroutine sync_input()
   call mpi_bcast(lsmatch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(lsps_frc,maxnsp,mpi_logical,0,mpi_world,ierr)
 
   call mpi_bcast(fupper_lim,1,mpi_real8,0,mpi_world,ierr)
 !.....Simulated annealing

@@ -16,11 +16,12 @@ module variables
   real(8):: xtol= 1d-4
   real(8):: gtol= 1d-5
   real(8):: ftol= 1d-5
-  integer,parameter:: maxnsp= 4
+  integer,parameter:: maxnsp= 9
   real(8):: eatom(maxnsp)
   logical:: lematch= .true.   ! energy matching
   logical:: lfmatch= .false.  ! force matching
   logical:: lsmatch= .false.  ! stress matching
+  logical:: lsps_frc(maxnsp)
   integer:: nsmpl_outfrc = 20000
   character(len=128):: cnormalize= 'variance'
   logical:: lnormalized = .false.
@@ -146,5 +147,15 @@ module variables
   integer:: nn_nl = 0
   integer:: nn_nhl(0:nn_nlmax)
   integer:: nn_sigtype = 2
+contains
+  subroutine init_variables()
+
+    integer:: i
+
+    do i=1,maxnsp
+      lsps_frc(i) = .true.
+    enddo
+    
+  end subroutine init_variables
 
 end module variables
