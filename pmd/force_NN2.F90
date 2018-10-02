@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-14 17:52:21 Ryo KOBAYASHI>
+!                     Last modified: <2018-10-02 17:32:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -371,7 +371,7 @@ contains
       call mpi_finalize(ierr)
       stop
     endif
-    
+
 !.....Read parameters at the 1st call
     if( myid.eq.0 ) then
       open(50,file=trim(fname),status='old')
@@ -448,6 +448,7 @@ contains
       nc= nc +nwgt(i)
     enddo
     nwtot = nc
+
 !.....different number of weights and number of layers
     if( nl.eq.1 ) then
       allocate(wgt11(nhl(0),mhl(1)),wgt12(nhl(1)))
@@ -459,31 +460,42 @@ contains
       wgt22(1:nhl(1),1:mhl(2)) = 0d0
       wgt23(1:nhl(2)) = 0d0
     endif
-    if( nl.eq.1 ) then
-      do ihl0=1,nhl(0)
-        do ihl1=1,mhl(1)
-          read(50,*) wgt11(ihl0,ihl1)
+
+    if( myid.eq.0 ) then
+      if( nl.eq.1 ) then
+        do ihl0=1,nhl(0)
+          do ihl1=1,mhl(1)
+            read(50,*) wgt11(ihl0,ihl1)
+          enddo
         enddo
-      enddo
-      do ihl1=1,nhl(1)
-        read(50,*) wgt12(ihl1)
-      enddo
-    else if( nl.eq.2 ) then
-      do ihl0=1,nhl(0)
-        do ihl1=1,mhl(1)
-          read(50,*) wgt21(ihl0,ihl1)
+        do ihl1=1,nhl(1)
+          read(50,*) wgt12(ihl1)
         enddo
-      enddo
-      do ihl1=1,nhl(1)
-        do ihl2=1,mhl(2)
-          read(50,*) wgt22(ihl1,ihl2)
+      else if( nl.eq.2 ) then
+        do ihl0=1,nhl(0)
+          do ihl1=1,mhl(1)
+            read(50,*) wgt21(ihl0,ihl1)
+          enddo
         enddo
-      enddo
-      do ihl2=1,nhl(2)
-        read(50,*) wgt23(ihl2)
-      enddo
+        do ihl1=1,nhl(1)
+          do ihl2=1,mhl(2)
+            read(50,*) wgt22(ihl1,ihl2)
+          enddo
+        enddo
+        do ihl2=1,nhl(2)
+          read(50,*) wgt23(ihl2)
+        enddo
+      endif
+      close(50)
     endif
-    close(50)
+    if( nl.eq.1 ) then
+      call mpi_bcast(wgt11,nhl(0)*mhl(1),mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(wgt12,nhl(1),mpi_real8,0,mpi_world,ierr)
+    else if( nl.eq.2 ) then
+      call mpi_bcast(wgt21,nhl(0)*mhl(1),mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(wgt22,nhl(1)*mhl(2),mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(wgt23,nhl(2),mpi_real8,0,mpi_world,ierr)
+    endif
 
 !.....Allocate Group-LASSO/FS related variable, which is not used in pmd
     if( .not. allocated(iglid) ) allocate(iglid(nwtot))

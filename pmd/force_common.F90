@@ -296,7 +296,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   else if( use_force('NN2') ) then
     call init_desc()
     if( .not.lprmset_NN2 ) then
-!.....Read both in.params.desc and in.params.linreg
+!.....Read both in.params.desc and in.params.NN2
       call read_params_desc(myid_md,mpi_md_world,iprint)
       call read_params_NN2(myid_md,mpi_md_world,iprint)
     else
