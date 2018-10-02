@@ -129,6 +129,7 @@ module variables
   real(8),allocatable:: eerrl(:),eerrg(:)
   real(8),allocatable:: ferrl(:),ferrg(:)
   real(8),allocatable:: serrl(:),serrg(:)
+  logical,allocatable:: lfcall(:,:),lfcalg(:,:)
 
 !.....Force-fields which are subtracted from reference values
 !.....and whose parameters to be fitted

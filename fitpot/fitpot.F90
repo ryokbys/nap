@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-26 23:48:08 Ryo KOBAYASHI>
+!                     Last modified: <2018-10-02 15:14:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1454,6 +1454,7 @@ subroutine write_force_relation(cadd)
 
   integer:: ismpl,ia,ixyz,natm,nmax,nmaxl
   logical:: l1st = .true.
+  logical:: lfcal
   
   cfname= 'out.frc'
 
@@ -1466,26 +1467,34 @@ subroutine write_force_relation(cadd)
 
   if( .not. allocated(frefl) ) allocate(frefl(3,nmax,nsmpl)&
        ,frefg(3,nmax,nsmpl),fal(3,nmax,nsmpl),fag(3,nmax,nsmpl)&
-       ,ferrl(nsmpl),ferrg(nsmpl),fsubl(3,nmax,nsmpl),fsubg(3,nmax,nsmpl))
+       ,ferrl(nsmpl),ferrg(nsmpl),fsubl(3,nmax,nsmpl) &
+       ,fsubg(3,nmax,nsmpl),lfcall(nmax,nsmpl),lfcalg(nmax,nsmpl))
 
   if( l1st ) then
     frefl(1:3,1:nmax,1:nsmpl)= 0d0
     fsubl(1:3,1:nmax,1:nsmpl)= 0d0
     ferrl(1:nsmpl) = 0d0
+    lfcall(1:nmax,1:nsmpl) = .true.
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
       frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm)
       fsubl(1:3,1:natm,ismpl)= samples(ismpl)%fsub(1:3,1:natm)
       ferrl(ismpl) = samples(ismpl)%ferr
+      do ia=1,natm
+        lfcall(ia,ismpl) = samples(ismpl)%ifcal(ia).eq.1
+      enddo
     enddo
     frefg(1:3,1:nmax,1:nsmpl)= 0d0
     fsubg(1:3,1:nmax,1:nsmpl)= 0d0
     ferrg(1:nsmpl) = 0d0
+    lfcalg(1:nmax,1:nsmpl) = .true.
     call mpi_reduce(frefl,frefg,3*nmax*nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
     call mpi_reduce(fsubl,fsubg,3*nmax*nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
     call mpi_reduce(ferrl,ferrg,nsmpl,mpi_real8,mpi_sum &
+         ,0,mpi_world,ierr)
+    call mpi_reduce(lfcall,lfcalg,nmax*nsmpl,mpi_logical,mpi_land &
          ,0,mpi_world,ierr)
   endif
 
@@ -1508,23 +1517,25 @@ subroutine write_force_relation(cadd)
       if( iclist(ismpl).eq.1 ) then
         natm= nalist(ismpl)
         do ia=1,natm
+          lfcal = lfcalg(ia,ismpl)
           do ixyz=1,3
-            write(92,'(2es15.7,2x,a,i6,i3,3es12.3e3)') frefg(ixyz,ia,ismpl) &
+            write(92,'(2es15.7,2x,a,i6,i3,3es12.3e3,l3)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
                  ,trim(cdirlist(ismpl)),ia,ixyz &
                  ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
-                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl)
+                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),lfcal
           enddo
         enddo
       else if( iclist(ismpl).eq.2 ) then
         natm= nalist(ismpl)
         do ia=1,natm
+          lfcal = lfcalg(ia,ismpl)
           do ixyz=1,3
-            write(93,'(2es15.7,2x,a,i6,i3,3es12.3e3)') frefg(ixyz,ia,ismpl) &
+            write(93,'(2es15.7,2x,a,i6,i3,3es12.3e3,l3)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
                  ,trim(cdirlist(ismpl)),ia,ixyz &
                  ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
-                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl)
+                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),lfcal
           enddo
         enddo
       endif

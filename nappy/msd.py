@@ -167,6 +167,7 @@ if __name__ == "__main__":
     #...make output data files
     outfname='out.msd'
     with open(outfname,'w') as f:
+        f.write('#   data_ID,      msd_total,      msd_x,          msd_y,          msd_z\n')
         for ifile in range(len(files)-(nmeasure-1)*nshift):
             if ifile == 0:
                 f.write(' {:10d}'.format(ifile)
