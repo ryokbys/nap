@@ -13,7 +13,7 @@ Options:
               Number of hidden layers. [default: 1]
   -n, --num-nodes=NUM_NODES
               Number of nodes in hidden layers. [default: 10]
-  -m MAX      Max value of the weights that are randomly determined. [default: 1.0e-2]
+  -m MAX      Max value of the weights that are randomly determined. [default: 1.0e+10]
 """
 from __future__ import print_function
 

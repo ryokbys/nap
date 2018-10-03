@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-09-03 16:06:22 Ryo KOBAYASHI>
+c                     Last-modified: <2018-10-03 15:28:16 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -628,6 +628,12 @@ c.....Langevin thermostat with Mannella integrator
           do l=1,3
             hscl(l)= dsqrt(h(1,l,0)**2 +h(2,l,0)**2 +h(3,l,0)**2)
           enddo
+c.....If final temperature is assigned,
+c.....target temperatures are forced to be set intermediate temperatures
+          if( tfin.gt.0d0 ) then
+            ttgt(1:9) = tinit +(tfin-tinit)*istp/maxstp
+            tfac(1:9) = dsqrt(2d0*tgmm*ttgt(1:9)/dt *k2ue)
+          endif
           do i=1,natm
 c            ifmv= int(mod(tag(i)*10,10d0))
             ifmv = ifmvOf(tag(i))

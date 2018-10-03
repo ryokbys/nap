@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-10-02 15:14:06 Ryo KOBAYASHI>
+!                     Last modified: <2018-10-03 11:27:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -2018,7 +2018,7 @@ subroutine get_node2sample()
   mynsmpl= nspn(myid+1)
   call mpi_allreduce(mynsmpl,maxmynsmpl,1,mpi_integer,mpi_max &
        ,mpi_world,ierr)
-  if( myid.eq.0 ) print '(a,i0)',' Max num of samples per node = ',maxmynsmpl
+  if( myid.eq.0 ) print '(a,i0)',' Max num of samples per process = ',maxmynsmpl
 
   !.....compute start and end of sample-id of this process
   isid0= 0
