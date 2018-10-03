@@ -173,7 +173,7 @@ c-----make a linked cell list, LSCL
      &         //' too small system !!!'
           stop
         endif
-        lcyz= lcy*lcx
+        lcyz= lcy*lcz
         lcxyz= lcx*lcyz
         rcx= 1d0/lcx
         rcy= 1d0/lcy
