@@ -2249,7 +2249,7 @@ contains
           nftol= nftol +1
           if( nftol.ge.numtol ) then
             if( myid.eq.0 .and. iprint.gt.0 ) then
-              print '(a,i2,a)',' >>> QN in gFS may be converged because ' // &
+              print '(a,i2,a)',' >>> QN in gFS is probably converged because ' // &
                    'of ftol ',numtol,' times consecutively.'
             endif
             if( f.gt.fpgfs .and. trim(cfs_xrefresh).eq.'random' &

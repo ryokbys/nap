@@ -85,9 +85,9 @@ def get_msd(files,ids0,nmeasure,nshift,sid=0):
         hmat[1]= nsys.a2 *nsys.alc
         hmat[2]= nsys.a3 *nsys.alc
         for ia,idi in enumerate(ids):
-            #...human-readable ID to computer-oriented ID
-            i= idi - 1
-            ai= nsys.atoms[i]
+            # #...human-readable ID to computer-oriented ID
+            # i= idi - 1
+            ai= nsys.atoms[idi]
             pi= ai.pos
             if ifile == 0:
                 pp[ia,:]= pi[:]
