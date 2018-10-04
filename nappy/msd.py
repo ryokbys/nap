@@ -54,7 +54,7 @@ def get_msd(files,ids0,nmeasure,nshift,sid=0):
       - files: list
             List of files used for the MSD calculation.
       - ids0: list
-            List of atom-IDs whose MSDs are to be computed.
+            List of atom-IDs (starting from 1) whose MSDs are to be computed.
       - nmeasure: int
             Number of staggered lanes to compute MSD for better statistics.
       - nshift: int
@@ -69,10 +69,12 @@ def get_msd(files,ids0,nmeasure,nshift,sid=0):
         nsys = NAPSystem(fname=files[0])
         ids = [ i for i,a in enumerate(nsys.atoms) if a.sid == sid ]
     else:
-        ids = ids0
         if 0 in ids0:
             nsys = NAPSystem(fname=files[0])
             ids = [ i for i in range(len(nsys.atoms))]
+        else:
+            ids = [ i-1 for i in ids0 ]
+        
     p0= np.zeros((nmeasure,len(ids),3))
     pp= np.zeros((len(ids),3))
     msd= np.zeros((len(files),nmeasure,3))
