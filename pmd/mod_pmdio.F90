@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-30 15:24:39 Ryo KOBAYASHI>
+!                     Last modified: <2018-10-08 12:51:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -66,6 +66,8 @@ module pmdio
 !.....barostat
   character(len=20):: cpctl='none'
   real(8):: ptgt   = 0d0
+  real(8):: pini   = 0d0
+  real(8):: pfin   = 0d0
   real(8):: srlx   = 100d0
   real(8):: stbeta = 1d0
   real(8):: strfin = 0.0d0

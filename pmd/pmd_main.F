@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-08-07 09:58:12 Ryo KOBAYASHI>
+c                     Last-modified: <2018-10-08 12:07:22 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -139,9 +139,9 @@ c.....call pmd_core to perfom MD
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,ifdmp,dmp
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
-     &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,stnsr,epot
-     &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
-     &     ,nstp_done,lvc,boundary,lmetaD)
+     &     ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv
+     &     ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort
+     &     ,iprint,nstp_done,lvc,boundary,lmetaD)
 
       if( myid_md.eq.0 ) then
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
@@ -357,6 +357,8 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(shrst,1,mpi_real8,0,mpi_md_world,ierr)
       call mpi_bcast(cpctl,20,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(ptgt,1,mpi_real8,0,mpi_md_world,ierr)
+      call mpi_bcast(pini,1,mpi_real8,0,mpi_md_world,ierr)
+      call mpi_bcast(pfin,1,mpi_real8,0,mpi_md_world,ierr)
       call mpi_bcast(srlx,1,mpi_real8,0,mpi_md_world,ierr)
       call mpi_bcast(stgt,9,mpi_real8,0,mpi_md_world,ierr)
       call mpi_bcast(lcellfix,9,mpi_logical,0,mpi_md_world,ierr)

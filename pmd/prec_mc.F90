@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-01-26 12:10:38 Ryo KOBAYASHI>
+!                     Last-modified: <2018-10-08 12:51:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -1138,7 +1138,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,ifdmp,ifcoulomb,numff,nrmtrans
   real(8):: hunit,h(3,3,0:1),am(nismax),dt,rc,dmp,tinit,tfin,ttgt(9)&
        ,trlx,stgt(3,3),ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3) &
-       ,epot,ekin,eps_conv,rbuf
+       ,epot,ekin,eps_conv,rbuf,pini,pfin
   character:: ciofmt*6,cforce*20,ctctl*20,cpctl*20,czload_type*5,csi*1&
        ,boundary*3
   character(len=20):: cffs(1)
@@ -1227,6 +1227,8 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   cpctl = 'none'
   stgt(1:3,1:3) = 0d0
   ptgt = 0d0
+  pini = 0d0
+  pfin = 0d0
   srlx = 100d0
   stbeta = 1d-1
   strfin = 0d0
@@ -1252,7 +1254,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
        ,nismax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp,minstp &
        ,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl,stgt,ptgt &
-       ,srlx,stbeta,strfin,lstrs,lcellfix &
+       ,pini,pfin,srlx,stbeta,strfin,lstrs,lcellfix &
        ,fmv,ptnsr,epot,ekin,n_conv,ifcoulomb &
        ,czload_type,eps_conv,ifsort,iprint,nstps_done,lvc&
        ,boundary)

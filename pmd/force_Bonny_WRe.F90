@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-25 16:01:21 Ryo KOBAYASHI>
+!                     Last modified: <2018-10-05 16:42:33 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -36,7 +36,7 @@ module Bonny_WRe
   real(8),parameter:: bonny_rc(1:2,1:2) = reshape( &
        (/ 5.460d0, 3.825d0 , &  ! 1-1 W-W, 1-2 W-Re
           3.825d0, 5.460d0 /) &  ! 2-1 Re-W, 2-2 Re-Re
-       , shape(bonny_rc) )
+          , shape(bonny_rc) )
 
 !.....Pure W parameters
   real(8),parameter:: gauge_C = 1.848055990d0
@@ -163,7 +163,7 @@ contains
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: xij(3),rij,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
-    real(8):: x,y,z,xi(3),epotl,epott,tmp,dtmp,drhoi,drhoj
+    real(8):: x,y,z,xi(3),epotl,epott,tmp,dtmp,drhoi,drhoj,d
     real(8),allocatable,save:: rho(:)
     real(8),allocatable,save:: strsl(:,:,:)
 
@@ -277,6 +277,7 @@ contains
           enddo
         endif
 !.....Embedded term
+        if( rho(i).lt.1d-10 .or. rho(j).lt.1d-10 ) cycle
         drhoi = drhoij(is,rij)
         drhoj = drhoij(js,rij)
         dfj = dfrho(js,rho(j))

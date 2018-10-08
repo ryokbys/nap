@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-10-03 11:27:54 Ryo KOBAYASHI>
+!                     Last modified: <2018-10-05 15:51:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1344,7 +1344,7 @@ subroutine test(ftrn0,ftst0)
   call write_stats(0)
 
   if( myid.eq.0 ) then
-    print '(a,2es15.7)','Loss func values (training,test) =',ftrn0,ftst0
+    print '(a,2es15.7)',' Loss func values (training,test) =',ftrn0,ftst0
 !!$    print *,'grad values (training):'
 !!$    do iv=1,nvars
 !!$      print *,'iv,grad(iv)=',iv,g(iv)

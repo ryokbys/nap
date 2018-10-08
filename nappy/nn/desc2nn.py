@@ -25,7 +25,7 @@ __author__ = "RYO KOBAYASHI"
 __version__ = "180807"
 
 
-def create_nn2_input(nsf,num_layer,num_nodes,wmax,fname='in.params.nn2'):
+def create_nn2_input(nsf,num_layer,num_nodes,wmax,fname='in.params.NN2'):
     Ni = [nsf]
     for i in range(len(num_nodes)):
         Ni.append(num_nodes[i])

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-10-03 15:28:16 Ryo KOBAYASHI>
+c                     Last-modified: <2018-10-08 13:00:17 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -8,9 +8,9 @@ c-----------------------------------------------------------------------
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
      &     ,nspmax,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,ifdmp,dmp
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
-     &     ,stgt,ptgt,srlx,stbeta,strfin,lstrs0,lcellfix,fmv,stnsr,epot
-     &     ,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort,iprint
-     &     ,nstp_done,lvc,boundary,lmetaD)
+     &     ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv
+     &     ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,eps_conv,ifsort
+     &     ,iprint,nstp_done,lvc,boundary,lmetaD)
       use pmdvars
       use zload
       use force
@@ -33,7 +33,7 @@ c-----------------------------------------------------------------------
       real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
      &     ,atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0)
      &     ,epitot(ntot0),dt,rc,rbuf,h(3,3,0:1),stnsr(3,3),fmv(3,0:9)
-     &     ,epot,ekin,am(nspmax),stgt(3,3),ptgt,ttgt(9)
+     &     ,epot,ekin,am(nspmax),stgt(3,3),ptgt,pini,pfin,ttgt(9)
      &     ,chgtot(ntot0),chitot(ntot0)
       character,intent(in):: ciofmt*6, cpctl*20, ctctl*20
      &     ,czload_type*5,boundary*3
@@ -336,13 +336,24 @@ c-----calc kinetic energy
         endif
         stgt(1:3,1:3)= stgt(1:3,1:3) *gpa2up
       else if( trim(cpctl).eq.'vv-Berendsen' ) then
-        if(myid_md.eq.0 .and. iprint.ne.0 ) then
-          write(6,*) ''
-          write(6,'(a)') ' Variable-volume Berendsen is chosen'
-          write(6,'(a,f0.3,a)')
-     &       '   Target pressure = ',ptgt,' GPa'
+        if( abs(pini-pfin).gt. 0.1d0 ) then
+          if(myid_md.eq.0 .and. iprint.ne.0 ) then
+            write(6,*) ''
+            write(6,'(a)') ' Variable-volume Berendsen is chosen'
+            write(6,'(a,f0.3,a,f0.3,a)')
+     &           '   Target pressure from = ',pini,' GPa to '
+     &           ,pfin,' GPa'
+          endif
+          ptgt = pini *gpa2up
+        else
+          if(myid_md.eq.0 .and. iprint.ne.0 ) then
+            write(6,*) ''
+            write(6,'(a)') ' Variable-volume Berendsen is chosen'
+            write(6,'(a,f0.3,a)')
+     &           '   Target pressure = ',ptgt,' GPa'
+          endif
+          ptgt = ptgt *gpa2up
         endif
-        ptgt = ptgt *gpa2up
       endif
 
       call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
@@ -702,6 +713,9 @@ c.....accumulate energy difference
           call update_Te(simtime,myid_md,mpi_md_world,iprint)
         endif
 
+        if( abs(pini-pfin).gt.0.1d0 ) then
+          ptgt = ( pini +(pfin-pini)*istp/maxstp ) *gpa2up
+        endif
         call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm
      &       ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
         prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa

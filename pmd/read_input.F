@@ -151,6 +151,12 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
       elseif( trim(cname).eq.'pressure_target' ) then
         call read_r1(ionum,ptgt)
         return
+      elseif( trim(cname).eq.'initial_pressure_target' ) then
+        call read_r1(ionum,pini)
+        return
+      elseif( trim(cname).eq.'final_pressure_target' ) then
+        call read_r1(ionum,pfin)
+        return
       elseif( trim(cname).eq.'stress_target' ) then
         call read_rs(ionum,3,3,stgt(1:3,1:3))
         return
