@@ -24,6 +24,18 @@ __version__ = "181008"
 
 _kB = 8.6173303e-5
 
+def make_gnuplot_file(outDT,Eact,D0):
+    txt = """
+    set xl '1000/T (1/K)'
+    set yl 'log(D [m^2/sec])'
+    f(x) = {0:.3f} -{1:.3f} /8.617e-5 *(x/1000)
+    plot '{2:s}' us (1000.0/$1):(log($2)) w p pt 7 t 'data', f(x) t 'fitted'
+    """.format(D0,Eact,outDT)
+    with open('plot.gp','w') as f:
+        f.write(txt)
+    print(' Wrote plot.gp')
+    return None
+
 if __name__ == "__main__":
 
     args = docopt(__doc__)
@@ -58,4 +70,7 @@ if __name__ == "__main__":
     a,b = np.linalg.lstsq(A, logDs, rcond=None)[0]
     
     Eact = a *(-_kB)
-    print(' Activation energy = {0:.3f} eV'.format(Eact))
+    print(' Ea = {0:.3f} eV'.format(Eact))
+    print(' D0 = {0:.4e} '.format(b))
+
+    make_gnuplot_file(outfname,Eact,b)

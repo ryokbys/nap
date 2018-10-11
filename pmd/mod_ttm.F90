@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-08-28 15:31:18 Ryo KOBAYASHI>
+!                     Last-modified: <2018-10-10 10:30:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -35,7 +35,7 @@ module ttm
   real(8):: dt
 !.....Number of inner loop in TTM
   integer:: nstp_inner = 1
-!.....Volume per mesh cell Ang^3 == dx*dy*dz
+!.....Volume and area per mesh cell Ang^3 == dx*dy*dz
   real(8):: vcell
 !.....Threshold kinetic energy in energy unit (or should be threshold velocity?)
   real(8):: ekth = 8.0d0
@@ -63,8 +63,8 @@ module ttm
 
 !.....Te distribution shape: exp or read (from cTe_init)
   character(len=128):: cTe_init = 'exp'
-!.....T-dependence of pulse shape: abrupt or gaussian
-  character(len=128):: ctype_pulse = 'abrupt'
+!.....T-dependence of pulse shape: stepwise or gaussian
+  character(len=128):: ctype_pulse = 'stepwise'
 !.....Function shape of thermal diffusivity, kappa: DCrho or B2
 ! B2: from Eq.(B2) in PRB68,064114 (2003)
   character(len=128):: ctype_kappa = 'DCrho'
@@ -123,7 +123,6 @@ contains
 !
 !  Read parameters for TTM from in.ttm and initialize
 !
-    include 'params_unit.h'
     integer,intent(in):: namax,natm,myid,mpi_world,iprint
     real(8),intent(in):: dtmd,h(3,3)
 
@@ -137,11 +136,22 @@ contains
     call read_ttm_params(myid,mpi_world,iprint)
     call sync_params(myid,mpi_world,iprint)
 
+!.....Set some
+    call set_inner_dt(dtmd)
+    nxyz = nx*ny*nz
+    dx = h(1,1)/nx
+    dy = h(2,2)/ny
+    dz = h(3,3)/nz
+    vcell = dx*dy*dz
+    area = h(2,2)*h(3,3)
+    darea = dy*dz
+
 !.....Convert fluence to intensity
-    if( trim(ctype_pulse).eq.'abrupt' ) then
-      I_0 = fluence /lskin /tau_pulse
+    if( trim(ctype_pulse).eq.'stepwise' ) then
+      I_0 = fluence /lskin /tau_pulse *darea *(2d0/(3d0*rho_e*vcell*fkb))
     else if( trim(ctype_pulse).eq.'gaussian' ) then
-      I_0 = fluence /lskin /tau_pulse *sqrt(4d0 *log(2d0) /pi)
+      I_0 = fluence /lskin /tau_pulse *sqrt(4d0 *log(2d0) /pi) *darea &
+           *(2d0/(3d0*rho_e*vcell*fkb))
       sgm_pulse = tau_pulse /sqrt(8d0 *log(2d0))
     else
       if( myid.eq.0 ) then
@@ -156,23 +166,15 @@ contains
       gmm_ce = gmm_ce /rho_e
     endif
 
-!.....Set some
-    call set_inner_dt(dtmd)
-    nxyz = nx*ny*nz
-    dx = h(1,1)/nx
-    dy = h(2,2)/ny
-    dz = h(3,3)/nz
-    vcell = dx*dy*dz
-    area = h(2,2)*h(3,3)
-    darea = dy*dz
-
     if( myid.eq.0 .and. iprint.ne.0 ) then
       print *,''
       print *,'TTM parameters:'
-      print '(a,es12.4,a,es12.4,a)','   fluence = ',fluence,' eV/A^2, = ' &
+      print '(a,es12.4,a,es12.4,a)','   Fluence = ',fluence,' eV/A^2, = ' &
            ,fluence*ev2j/ang2m**2,' J/m^2'
-      print '(a,es12.4,a)','   intensity = ',I_0,' eV/A^3/fs'
+      print '(a,es12.4,a)','   Intensity = ',I_0/darea,' eV/A^2/fs'
+      print '(a,f0.1,a)','   Total incident energy = ',fluence*area,' eV'
       print '(a,i5)','   inner_loop = ',nstp_inner
+      print '(a,2es12.4)','   dtmd, dt = ',dtmd,dt
       print '(a,3i5,i8)','   nx,ny,nz,nxyz = ',nx,ny,nz,nxyz
       print '(a,4es12.4)','   dx,dy,dz,vcell = ',dx,dy,dz,vcell
       print '(a,2es12.4)','   area,darea = ',area,darea
@@ -535,9 +537,16 @@ contains
     real(8),intent(in):: tnow
 
     integer:: ic,ix,iy,iz,ierr,istp
-    real(8):: t0,ce,xi,pterm,sterm,kappa,dkappa
+    real(8):: t0,ce,xi,pterm,sterm,kappa,dkappa,pulsefactor
+    real(8),save:: ein_pulse
+    logical,save:: l1st = .true.
 
     t0 = mpi_wtime()
+
+    if( l1st ) then
+      ein_pulse = 0d0
+      l1st = .false.
+    endif
 
     ein_e = 0d0
     eout_e = 0d0
@@ -587,7 +596,7 @@ contains
                *( dkappa*dte2(ix,iy,iz) +kappa*d2te(ix,iy,iz) &
                +pterm +sterm )
         enddo
-        if( trim(ctype_pulse).eq.'abrupt' ) then
+        if( trim(ctype_pulse).eq.'stepwise' ) then
           if( tnow.ge.t0_laser .and. &
                tnow.lt.(t0_laser +tau_pulse) ) then
             do ic=1,nxyz
@@ -595,28 +604,47 @@ contains
               if( ix.lt.lsurf ) cycle
               if( ix.gt.rsurf ) cycle
               ce = cete(ix,iy,iz)
-              xi = (ix-lsurf)*dx
+!.....To think the cell position is the center of the cell, add 0.5
+              xi = (ix-lsurf+0.5d0)*dx
+!!$              tep(ix,iy,iz) = tep(ix,iy,iz) &
+!!$                   +I_0 *min(1d0,exp(-xi/lskin))/(ce*rho_e)*dt
               tep(ix,iy,iz) = tep(ix,iy,iz) &
-                   +I_0 *min(1d0,exp(-xi/lskin))/(ce*rho_e)*dt
+                   +I_0 *min(1d0,exp(-xi/lskin))*dt*dx
+              ein_pulse = ein_pulse +I_0 *min(1d0,exp(-xi/lskin))*dt*dx
             enddo
           endif
         else if( trim(ctype_pulse).eq.'gaussian' ) then
           if( tnow.ge.t0_laser .and. &
                tnow.lt.(t0_laser +tau_pulse*2) ) then
+            pulsefactor = exp(-(tnow -(t0_laser+tau_pulse))**2 /(2d0*sgm_pulse**2))
             do ic=1,nxyz
               call ic2ixyz(ic,ix,iy,iz)
               if( ix.lt.lsurf ) cycle
               if( ix.gt.rsurf ) cycle
               ce = cete(ix,iy,iz)
-              xi = (ix-lsurf)*dx
+!.....To think the cell position is the center of the cell, add 0.5
+              xi = (ix-lsurf+0.5d0)*dx
+!!$              tep(ix,iy,iz) = tep(ix,iy,iz) &
+!!$                   +I_0 *min(1d0,exp(-xi/lskin))/(ce*rho_e)*dt &
+!!$                   *exp(-(tnow -(t0_laser+tau_pulse))**2 /(2d0*sgm_pulse**2))
               tep(ix,iy,iz) = tep(ix,iy,iz) &
-                   +I_0 *min(1d0,exp(-xi/lskin))/(ce*rho_e)*dt &
-                   *exp(-(tnow -(t0_laser+tau_pulse))**2 /(2d0*sgm_pulse**2))
+                   +I_0 *min(1d0,exp(-xi/lskin))*dt*dx *pulsefactor
+              ein_pulse = ein_pulse +I_0 *min(1d0,exp(-xi/lskin))*dt*dx &
+                   *pulsefactor
             enddo
           endif
         endif
         te(:,:,:) = tep(:,:,:)
       enddo
+      if(iprint.gt.1) then
+        if( (trim(ctype_pulse).eq.'gaussian' .and. &
+             (tnow.ge.t0_laser .and. tnow.le.(t0_laser+tau_pulse*2)) ) &
+             .or. (trim(ctype_pulse).eq.'stepwise' .and. &
+             (tnow.ge.t0_laser .and. tnow.le.t0_laser+tau_pulse) ) ) then
+          print '(a,2es13.4e3)','tnow,ein_pulse=',tnow &
+               ,ein_pulse*3d0/2 *rho_e*vcell*fkb
+        endif
+      endif
     endif
 !.....Broadcast Te distribution to all the nodes.
 !.....There could be smarter way to reduce networking cost.
@@ -845,11 +873,12 @@ contains
     return
   end subroutine ixyz2ic
 !=======================================================================
-  subroutine output_Te(istp,myid,iprint)
+  subroutine output_Te(istp,tnow,myid,iprint)
     integer,intent(in):: istp,myid,iprint
+    real(8),intent(in):: tnow
 
     integer:: ix,iy,iz,ic,n
-    real(8):: ave
+    real(8):: ave,eetot
     character(len=128):: cnum
 
     if( myid.eq.0 ) then
@@ -884,6 +913,7 @@ contains
 
       if( iprint.gt.1 ) then
 !.....Average Te
+        eetot = 0d0
         ave = 0d0
         n = 0
         do ix=1,nx
@@ -892,6 +922,7 @@ contains
               call ixyz2ic(ix,iy,iz,ic)
               if( nac(ic).eq.0 ) continue
               ave = ave +te(ix,iy,iz)
+              eetot = eetot +3d0/2 *rho_e*vcell*te(ix,iy,iz)
               n = n + 1
 !!$              write(ioTeout,'(3i6,2es15.5,i6)') ix,iy,iz,te(ix,iy,iz) &
 !!$                   ,ta(ic),nac(ic)
@@ -899,7 +930,7 @@ contains
           enddo
         enddo
         ave = ave /n
-        print *,'istp,te_ave=',istp,ave
+        print *,'istp,tnow,te_ave,Ee_tot=',istp,tnow,ave,eetot*fkb
       endif
     endif
   end subroutine output_Te

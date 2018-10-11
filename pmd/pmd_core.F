@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-10-08 13:00:17 Ryo KOBAYASHI>
+c                     Last-modified: <2018-10-11 10:35:39 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c This file includes core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -382,7 +382,7 @@ c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
         enddo
         tave= tave/(nave-3)
         write(6,'(1x,a,f16.5,a)') "  Temperature     = ",tave,' K'
-        if( prss.ge.0d0 ) then
+        if( prss.lt.0d0 ) then
           ctmp = '(tensile)'
         else
           ctmp = '(compressive)'
@@ -426,7 +426,7 @@ c      write(cnum(1:4),'(i4.4)') 0
         call assign_atom2cell(namax,natm,ra,sorg,boundary)
         call calc_Ta(namax,natm,eki,tag,fmv,istp
      &       ,myid_md,mpi_md_world,iprint)
-        call output_Te(0,myid_md,iprint)
+        call output_Te(0,simtime,myid_md,iprint)
       endif
 
 c-----initialize the counter for output
@@ -804,7 +804,7 @@ c---------output step, time, and temperature
           endif
 
           if( trim(ctctl).eq.'ttm' ) then
-            call output_Te(istp,myid_md,iprint)
+            call output_Te(istp,simtime,myid_md,iprint)
             call output_energy_balance(istp,simtime,myid_md,iprint)
           endif
             
@@ -907,7 +907,7 @@ c        close(iotemp)
         enddo
         tave= tave/(nave-3)
         write(6,'(1x,a,f16.5,a)') "  Temperature     = ",tave,' K'
-        if( prss.ge.0d0 ) then
+        if( prss.lt.0d0 ) then
           ctmp = '(tensile)'
         else
           ctmp = '(compressive)'
