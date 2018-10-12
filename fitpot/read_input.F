@@ -330,6 +330,11 @@ c=======================================================================
       elseif( trim(cname).eq.'NN_sigtype' ) then
         call read_i1(ionum,nn_sigtype)
         return
+      elseif( trim(cname).eq.'interactions' ) then
+        backspace(ionum)
+        read(ionum,*) ctmp,nrow
+        call read_interactions(ionum,nrow,mspcs,interact)
+        return
 c      elseif( trim(cname).eq.'' ) then
 c        call read_i1(ionum,nz)
 c        return
@@ -542,4 +547,17 @@ c=======================================================================
       
       return
       end subroutine read_nn_nhl
+c=======================================================================
+      subroutine read_interactions(ionum,nrow,msp,interact)
+      integer,intent(in):: ionum,nrow,msp
+      logical,intent(inout):: interact(msp,msp)
+      integer:: irow,isp,jsp
 
+      interact(:,:) = .false.
+      do irow=1,nrow
+        read(ionum,*) isp,jsp
+        interact(isp,jsp) = .true.
+        interact(jsp,isp) = interact(isp,jsp)
+      enddo
+      return
+      end subroutine read_interactions

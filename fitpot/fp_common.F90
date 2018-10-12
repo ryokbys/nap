@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-25 16:18:06 Ryo KOBAYASHI>
+!                     Last modified: <2018-10-12 18:54:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -68,7 +68,7 @@ contains
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
          ,nff,cffs,nsubff,csubffs,cmaindir,maxna,rcut,rc3 &
          ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint,maxisp &
-         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss
+         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss,interact
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb, set_params_Coulomb
@@ -146,7 +146,7 @@ contains
         else
           ctype = 'full_Morse'
         endif
-        call set_params_Morse(ndim,x,ctype)
+        call set_params_Morse(ndim,x,ctype,interact)
       else if( trim(cpot).eq.'EAM' ) then
         call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -186,7 +186,7 @@ contains
         call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_Coulomb(maxisp,x(1:maxisp),cpot)
-        call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot)
+        call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot,interact)
       endif
       call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut)
       samples(ismpl)%epot = epot
@@ -369,7 +369,7 @@ contains
          ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,nsubff,csubffs &
          ,cmaindir,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
          ,rcut,rc3,myidrefsub,isidrefsub,iprint,maxisp,gscl &
-         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss
+         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss,interact
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb,set_params_Coulomb
@@ -439,7 +439,7 @@ contains
         else
           ctype = 'full_Morse'
         endif
-        call set_params_Morse(ndim,x,ctype)
+        call set_params_Morse(ndim,x,ctype,interact)
       else if( trim(cpot).eq.'EAM' ) then
         call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -474,7 +474,7 @@ contains
         call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_Coulomb(maxisp,x(1:maxisp),cpot)
-        call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot)
+        call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot,interact)
       endif
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.

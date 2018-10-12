@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-03 16:45:49 Ryo KOBAYASHI>
+!                     Last modified: <2018-10-12 18:52:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -675,7 +675,7 @@ contains
     return
   end subroutine set_paramsdir_Morse
 !=======================================================================
-  subroutine set_params_Morse(ndimp,params_in,ctype)
+  subroutine set_params_Morse(ndimp,params_in,ctype,interact_in)
 !
 !  Accessor routine to set Morse parameters from outside.
 !  Curretnly this routine is supposed to be called only on serial run.
@@ -683,95 +683,127 @@ contains
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
     character(len=*),intent(in):: ctype
+    logical,intent(in):: interact_in(msp,msp)
 
-    integer:: i,j,inc,itmp,nspt
+    integer:: i,j,inc,itmp,nspt,nint
 
     nprms = ndimp
     if( .not.allocated(params) ) allocate(params(nprms))
     params(1:nprms) = params_in(1:ndimp)
     lprmset_Morse = .true.
 
-!.....Different operations for different potential type
-!.....for example, only O-X interactions in BVS potential,
-!.....whereas all the pair interactions for normal Morse potential
-    if( trim(ctype).eq.'bvs' .or. trim(ctype).eq.'BVS' ) then
-!!$    if( nprms.ne.3*(nsp-1) ) then
-!!$      print *,'ERROR: nprms.ne.3*(nsp-1), nprms,nsp=',nprms,nsp
-!!$      stop
-!!$    endif
-      nspt = nprms/3 +1
-
-      d0(1:nspt,1:nspt)= 0d0
-      alp(1:nspt,1:nspt)= 0d0
-      rmin(1:nspt,1:nspt)= 0d0
-      interact(1:nspt,1:nspt) = .false.
-
-      inc = 0
-      do i=2,nspt
-        inc= inc +1
-        d0(1,i) = params(inc)
-        d0(i,1) = d0(1,i)
-        inc= inc +1
-        alp(1,i) = params(inc)
-        alp(i,1) = alp(1,i)
-        inc= inc +1
-        rmin(1,i) = params(inc)
-        rmin(i,1) = rmin(1,i)
-        interact(1,i) = .true.
-        interact(i,1) = .true.
+    interact(:,:) = interact_in(:,:)
+    nint = 0
+    do i=1,msp
+      do j=i,msp
+        if( .not.interact(i,j) ) cycle
+        nint = nint +1
       enddo
-      
-    else  ! All the pair interactions for normal Morse potential
-!.....Number of pairs should be, 1 or 3, 6, 10, 15, 21, 28, 36, 45
-      itmp = nprms/3
-      if( itmp.eq.1 ) then
-        nspt = 1
-      else if( itmp.eq.3 ) then
-        nspt = 2
-      else if( itmp.eq.6 ) then
-        nspt = 3
-      else if( itmp.eq.10 ) then
-        nspt = 4
-      else if( itmp.eq.15 ) then
-        nspt = 5
-      else if( itmp.eq.21 ) then
-        nspt = 6
-      else if( itmp.eq.28 ) then
-        nspt = 7
-      else if( itmp.eq.36 ) then
-        nspt = 8
-      else if( itmp.eq.45 ) then
-        nspt = 9
-      else
-        print *,'ERROR: number of pairs wrong.'
-        print *,'  number of pairs extracted from nprms = ',itmp
-        stop
-      endif
-
-      d0(1:nspt,1:nspt)= 0d0
-      alp(1:nspt,1:nspt)= 0d0
-      rmin(1:nspt,1:nspt)= 0d0
-      interact(1:nspt,1:nspt) = .false.
-
-      inc = 0
-      do i=1,nspt
-        do j=i,nspt
-          inc= inc +1
-          d0(i,j) = params(inc)
-          d0(j,i) = d0(i,j)
-          inc= inc +1
-          alp(i,j) = params(inc)
-          alp(j,i) = alp(i,j)
-          inc= inc +1
-          rmin(i,j) = params(inc)
-          rmin(j,i) = rmin(i,j)
-!!$          write(6,'(a,2i5,3f8.4)') ' isp,jsp,d0,alp,rmin=', &
-!!$               i,j,d0(i,j),alp(i,j),rmin(i,j)
-          interact(i,j) = .true.
-          interact(j,i) = .true.
-        enddo
-      enddo
+    enddo
+    if( nint*3.ne.nprms ) then
+      write(0,*) 'ERROR @set_params_Morse: nint*3.ne.nprms !!!'
+      write(6,*) 'ERROR @set_params_Morse: nint*3.ne.nprms !!!'
+      write(6,*) 'Probably you need to set interactions correctly...'
+      stop
     endif
+
+    d0(:,:)= 0d0
+    alp(:,:)= 0d0
+    rmin(:,:)= 0d0
+
+    inc = 0
+    do i=1,msp
+      do j=i,msp
+        if( .not.interact(i,j) ) cycle
+        inc= inc +1
+        d0(i,j) = params(inc)
+        d0(j,i) = d0(i,j)
+        inc= inc +1
+        alp(i,j) = params(inc)
+        alp(j,i) = alp(i,j)
+        inc= inc +1
+        rmin(i,j) = params(inc)
+        rmin(j,i) = rmin(i,j)
+      enddo
+    enddo
+
+! !.....Different operations for different potential type
+! !.....for example, only O-X interactions in BVS potential,
+! !.....whereas all the pair interactions for normal Morse potential
+!     if( trim(ctype).eq.'bvs' .or. trim(ctype).eq.'BVS' ) then
+!       nspt = nprms/3 +1
+! 
+!       d0(1:nspt,1:nspt)= 0d0
+!       alp(1:nspt,1:nspt)= 0d0
+!       rmin(1:nspt,1:nspt)= 0d0
+!       interact(1:nspt,1:nspt) = .false.
+! 
+!       inc = 0
+!       do i=2,nspt
+!         inc= inc +1
+!         d0(1,i) = params(inc)
+!         d0(i,1) = d0(1,i)
+!         inc= inc +1
+!         alp(1,i) = params(inc)
+!         alp(i,1) = alp(1,i)
+!         inc= inc +1
+!         rmin(1,i) = params(inc)
+!         rmin(i,1) = rmin(1,i)
+!         interact(1,i) = .true.
+!         interact(i,1) = .true.
+!       enddo
+! 
+!     else  ! All the pair interactions for normal Morse potential
+! !.....Number of pairs should be, 1 or 3, 6, 10, 15, 21, 28, 36, 45
+!       itmp = nprms/3
+!       if( itmp.eq.1 ) then
+!         nspt = 1
+!       else if( itmp.eq.3 ) then
+!         nspt = 2
+!       else if( itmp.eq.6 ) then
+!         nspt = 3
+!       else if( itmp.eq.10 ) then
+!         nspt = 4
+!       else if( itmp.eq.15 ) then
+!         nspt = 5
+!       else if( itmp.eq.21 ) then
+!         nspt = 6
+!       else if( itmp.eq.28 ) then
+!         nspt = 7
+!       else if( itmp.eq.36 ) then
+!         nspt = 8
+!       else if( itmp.eq.45 ) then
+!         nspt = 9
+!       else
+!         print *,'ERROR: number of pairs wrong.'
+!         print *,'  number of pairs extracted from nprms = ',itmp
+!         stop
+!       endif
+! 
+!       d0(1:nspt,1:nspt)= 0d0
+!       alp(1:nspt,1:nspt)= 0d0
+!       rmin(1:nspt,1:nspt)= 0d0
+!       interact(1:nspt,1:nspt) = .false.
+! 
+!       inc = 0
+!       do i=1,nspt
+!         do j=i,nspt
+!           inc= inc +1
+!           d0(i,j) = params(inc)
+!           d0(j,i) = d0(i,j)
+!           inc= inc +1
+!           alp(i,j) = params(inc)
+!           alp(j,i) = alp(i,j)
+!           inc= inc +1
+!           rmin(i,j) = params(inc)
+!           rmin(j,i) = rmin(i,j)
+! !!$          write(6,'(a,2i5,3f8.4)') ' isp,jsp,d0,alp,rmin=', &
+! !!$               i,j,d0(i,j),alp(i,j),rmin(i,j)
+!           interact(i,j) = .true.
+!           interact(j,i) = .true.
+!         enddo
+!       enddo
+!     endif
 
     return
   end subroutine set_params_Morse

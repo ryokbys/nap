@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 """
-Convert fitpot parameters to in.params.Morse for pmd.
+Conversion between fitpot parameter file and `in.params.Morse` for pmd.
+The fitpot parameter file should include the keyword `fitpot` in its name.
+And the Morse parameter file should include `Morse` in its name.
 
 Usage:
-  fp2morse.py [options] FITPOT_VAR_FILE
+  fpvars2morse.py [options]
 
 Options:
   -h, --help  Show this message and exit.
   --pairs PAIRS
               Specify pairs used in FITPOT_VAR_FILE in the format hyphen-connected
               and comma-separated, e.g.) 1-1,2-1. [default: all] 
-  --bvs       Specify BVS parameter set. This sets pairs as 1-1,1-2,...,1-nspeics.
-  -i          Inverse conversion, that is in.params.Morse to in.vars.fitpot.
+  -i INFILE   Input file name. [default: in.vars.fitpot]
+  -o OUTFILE  Output file name. [default: in.params.Morse]
 """
 from __future__ import print_function
 
@@ -45,64 +47,59 @@ def ndat2nsp(ndat):
         raise ValueError(' NSP cannot be determined from NDAT.')
     return nsp
 
-def fp2morse(infname,pairs,bvs):
+def fp2morse(infname,outfname,pairs):
     ds = []
     alps = []
     rs = []
     with open(infname,'r') as f:
         lines = f.readlines()
-        ndat = int(lines[0].split()[0])
-        if bvs:
-            pairs = []
-            nsp = ndat/3 +1
-            for j in range(nsp):
+    
+    ndat = int(lines[0].split()[0])
+    if pairs == 'all':
+        nsp = ndat2nsp(ndat)
+        pairs = []
+        for i in range(nsp):
+            ia = i + 1
+            for j in range(i,nsp):
                 ja = j + 1
-                if ja == 1:
-                    continue
-                pairs.append((1,ja))
-        elif pairs == 'all':
-            nsp = ndat2nsp(ndat)
-            pairs = []
-            for i in range(nsp):
-                ia = i + 1
-                for j in range(i,nsp):
-                    ja = j + 1
-                    pairs.append((ia,ja))
-        n = 0
-        for i in range(1,len(lines)):
-            n += 1
-            if n > ndat: break
-            ds.append(float(lines[3*(i-1)+1].split()[0]))
-            n += 1
-            if n > ndat: break
-            alps.append(float(lines[3*(i-1)+2].split()[0]))
-            n += 1
-            if n > ndat: break
-            rs.append(float(lines[3*(i-1)+3].split()[0]))
+                pairs.append((ia,ja))
+    n = 0
+    for i in range(1,len(lines)):
+        n += 1
+        if n > ndat: break
+        ds.append(float(lines[3*(i-1)+1].split()[0]))
+        n += 1
+        if n > ndat: break
+        alps.append(float(lines[3*(i-1)+2].split()[0]))
+        n += 1
+        if n > ndat: break
+        rs.append(float(lines[3*(i-1)+3].split()[0]))
 
     
     # print(' ds  = ',ds)
     # print(' alps= ',alps)
     # print(' rs  = ',rs)
-    with open('in.params.Morse','w') as f:
+    with open(outfname,'w') as f:
         f.write('# is, js,  D,      alpha,  rmin\n')
         for l in range(len(ds)):
             f.write(' {0:3d} {1:3d}'.format(pairs[l][0],pairs[l][1]))
             f.write(' {0:7.3f} {1:7.3f} {2:7.3f}\n'.format(ds[l],alps[l],rs[l]))
             
-    print(' Wrote in.params.Morse.')
+    print(' Wrote '+outfname)
     return
 
-def morse2fp(outfname,bvs):
-    with open('in.params.Morse','r') as f:
+def morse2fp(infname,outfname):
+    with open(infname,'r') as f:
         lines = f.readlines()
     params = {}
+    pairs = []
     for line in lines:
         if line[0] in ('#','!'):
             continue
         data = line.split()
         isp = int(data[0])
         jsp = int(data[1])
+        pairs.append((isp,jsp))
         D = float(data[2])
         alpha = float(data[3])
         rs = float(data[4])
@@ -114,34 +111,39 @@ def morse2fp(outfname,bvs):
             isp = k[0]
             jsp = k[1]
             D, alpha, rs = v
-            f.write(' {0:8.4f}   0.000   8.000\n'.format(D))
+            f.write(' {0:8.4f}   0.100   8.000\n'.format(D))
             f.write(' {0:8.4f}   1.000   3.000\n'.format(alpha))
             f.write(' {0:8.4f}   1.000   3.000\n'.format(rs))
     print(' Wrote '+outfname)
+    print('')
+    print(' Following lines should be written in in.fitpot.')
+    print('interactions   {0:d}'.format(len(pairs)))
+    for p in pairs:
+        print('  {0:d}  {1:d}'.format(p[0],p[1]))
     return
 
 
 if __name__ == "__main__":
 
     args = docopt(__doc__)
-    infname = args['FITPOT_VAR_FILE']
     pairs = args['--pairs']
-    bvs = args['--bvs']
-    inverse = args['-i']
-    if bvs:
-        msg = ' BVS parameters are to be extracted, which means only pairs ' \
-              +'including oxygen are used.'
-        print(msg)
-    elif pairs == 'all':
-        print(' All the pairs are to be extracted.')
+    infname = args['-i']
+    outfname = args['-o']
+    
+    if 'fitpot' in infname and 'Morse' in outfname:
+        if pairs == 'all':
+            print(' All the pairs are to be extracted.')
+        else:
+            pairs = [ (int(pair.split('-')[0]),int(pair.split('-')[1]))
+                      for pair in pairs.split(',') ]
+            print(' Pairs to be extracted:')
+            for pair in pairs:
+                print('   {0:d}-{1:d}'.format(pair[0],pair[1]))
+        fp2morse(infname,outfname,pairs)
+    elif 'Morse' in infname and 'fitpot' in outfname:
+        morse2fp(infname,outfname)
     else:
-        pairs = [ (pair.split('-')[0],pair.split('-')[1])
-                  for pair in pairs.split(',') ]
-        print(' Pairs to be extracted:')
-        for pair in pairs:
-            print('   {0:d}-{1:d}'.format(pair[0],pair[1]))
-
-    if not inverse:
-        fp2morse(infname,pairs,bvs)
-    elif inverse:
-        morse2fp(infname,bvs)
+        msg = 'Input and output file names should include ' \
+              +'either fitpot or Morse.'
+        raise ValueError(msg)
+    

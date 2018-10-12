@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-03 13:00:03 Ryo KOBAYASHI>
+!                     Last modified: <2018-10-12 23:22:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -71,7 +71,7 @@ module Coulomb
 !.....Rho value for screened_cut
 !     Default value = 5.0 (Ang), which corresponds to alpha = 0.2 A^{-1}
 !     See, C.J. Fennell and J.D. Gezelter, J. Chem. Phys. 124, 234104 (2006).
-  real(8):: rho_screened_cut = 1.5811388d0
+  real(8):: rho_screened_cut = 5.0d0
   
 !.....Accuracy controlling parameter for Ewald sum
 !.....See, http://www.jncasr.ac.in/ccms/sbs2007/lecturenotes/5day10nov/SBS_Ewald.pdf
@@ -635,6 +635,10 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, fbvs
           cycle
+        else if( trim(cline).eq.'rho_screened_cut' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, rho_screened_cut
+          cycle
         endif
 !.....Not a keyword, a certain mode should be already selected.
         if( trim(cmode).eq.'charges' ) then
@@ -741,6 +745,7 @@ contains
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(conv_eps,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rho_screened_cut,1,mpi_real8,0,mpi_world,ierr)
 
 !.....Set screening length
     rho_bvs(:,:) = 0d0

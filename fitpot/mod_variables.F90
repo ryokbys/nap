@@ -60,6 +60,7 @@ module variables
   integer:: maxisp
   real(8):: ebase(mspcs)
   real(8):: swgt2trn,swgt2tst
+  logical:: interact(mspcs,mspcs)
 
 !.....max num of atoms among reference data
   integer:: maxna = 0
@@ -158,6 +159,7 @@ contains
     do i=1,maxnsp
       lsps_frc(i) = .true.
     enddo
+    interact(:,:) = .true.
     
   end subroutine init_variables
 
