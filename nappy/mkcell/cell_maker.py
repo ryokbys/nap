@@ -43,11 +43,11 @@ def make_sc(latconst=1.0):
     return s
 
 
-def make_bcc(latconst=1.0):
+def make_bcc(latconst=1.0,specorder=_default_specorder):
     """
     Make a cell of bcc structure with z along [001].
     """
-    s= NAPSystem(specorder=_default_specorder)
+    s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.0, 0.0 ])
@@ -58,7 +58,7 @@ def make_bcc(latconst=1.0):
     for p in positions:
         atom= Atom()
         atom.set_pos(p[0],p[1],p[2])
-        atom.set_symbol(_default_specorder[0])
+        atom.set_symbol(specorder[0])
         s.add_atom(atom)
     return s
 
@@ -111,11 +111,11 @@ def make_bcc111(latconst=1.0):
         s.add_atom(atom)
     return s
 
-def make_fcc(latconst=1.0):
+def make_fcc(latconst=1.0,specorder=_default_specorder):
     """
     Make a cell of fcc structure.
     """
-    s= NAPSystem(specorder=_default_specorder)
+    s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.0, 0.0 ])
@@ -128,7 +128,7 @@ def make_fcc(latconst=1.0):
     for p in positions:
         atom= Atom()
         atom.set_pos(p[0],p[1],p[2])
-        atom.set_symbol(_default_specorder[0])
+        atom.set_symbol(specorder[0])
         s.add_atom(atom)
     return s
 

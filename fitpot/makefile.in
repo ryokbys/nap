@@ -23,7 +23,7 @@ MPIFLAGS= @FCFLAGS@ -I${PMDDIR}
 .F90.o: 
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
-fitpotobj= NN.o read_input.o fitpot.o
+fitpotobj= NN.o read_input.o fitpot.o read_params.o
 mods= mod_variables.o mod_parallel.o mod_minimize.o mod_random.o fp_common.o
 args= iargc.o getarg.o
 

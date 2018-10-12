@@ -295,11 +295,11 @@ Please wait until the other clmgr stops or stop it manually.
                                                      limit_npn=npn/2)
             #nprocs = nnodes *npn1
             ctime = calc.estimate_calctime(nprocs=npara)
-            if ctime > limit_sec:
-                logger.info('Since the estimated calctime {0:s}'.format(d)
-                            +' seems to be longer than the limit_sec,'
-                            +' the maximum calucation time of the queue is applied.')
-                ctime = limit_sec
+            # if ctime > limit_sec:
+            #     logger.info('Since the estimated calctime {0:s}'.format(d)
+            #                 +' seems to be longer than the limit_sec,'
+            #                 +' the maximum calucation time of the queue is applied.')
+            #     ctime = limit_sec
 
             ctime = max(ctime,3600)
             job_info = {}  # initialize job_info
@@ -412,8 +412,6 @@ Please wait until the other clmgr stops or stop it manually.
             dirs.append(d)
             ctime = calc.estimate_calctime(nprocs=npara)
             max_ctime = min(max(max_ctime,ctime),limit_sec)
-            if limit_seconds > 0:
-                max_ctime = limit_sec
             #...max_ctime = max(max_ctime,3600)
             self.mpi_command_dict['npara'] = npara
             self.mpi_command_dict['rankfile'] = './rankfile'

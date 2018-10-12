@@ -116,6 +116,9 @@ c=======================================================================
       elseif( trim(cname).eq.'potential' ) then
         call read_c1(ionum,cpot)
         return
+      elseif( trim(cname).eq.'rcut' ) then
+        call read_r1(ionum,rcut)
+        return
       elseif( trim(cname).eq.'subtract_force_field' .or.
      &       trim(cname).eq.'additive_force_field' ) then
         call read_force_field(ionum)

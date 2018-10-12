@@ -343,7 +343,10 @@ def get_input_txt(params,fmvs):
         elif key in int_keys:
             txt += '{0:25s} {1:3d}\n'.format(key,params[key])
         elif key in float_keys:
-            txt += '{0:25s} {1:6.1f}\n'.format(key,params[key])
+            if key == 'cutoff_radius' or key == 'damping_coeff':
+                txt += '{0:25s} {1:8.4f}\n'.format(key,params[key])
+            else:
+                txt += '{0:25s} {1:6.1f}\n'.format(key,params[key])
         elif key in str_keys:
             txt += '{0:25s} {1:s}\n'.format(key,params[key])
         else:
