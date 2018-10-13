@@ -8,7 +8,7 @@ Usage:
 Options:
   -h, --help  Show this message and exit.
   -i IFNAME   Input file name. [default: in.params.desc]
-  -o OFNAME   Output file name. [default: in.params.nn2]
+  -o OFNAME   Output file name. [default: in.params.NN2]
   -l, --num-layer=NUM_LAYER
               Number of hidden layers. [default: 1]
   -n, --num-nodes=NUM_NODES

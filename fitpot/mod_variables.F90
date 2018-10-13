@@ -27,7 +27,7 @@ module variables
   logical:: lnormalized = .false.
   character(len=128):: cpot= 'NN'
 !.....Cutoff for FF that is to be optimized [default: 5.0 Ang]
-  real(8):: rcut   = 5.0d0
+  real(8):: rcut   = 6.0d0
   real(8):: rc3    = 5.0d0
 !.....Cutoff for other FFs that are subtracted [default: 5.0 Ang]
   real(8):: rc_other = 5.0

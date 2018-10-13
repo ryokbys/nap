@@ -211,7 +211,7 @@ subroutine write_vars_NN2(cfname)
     open(ionum,file=trim(cfname),status='replace')
     write(ionum,'(a,i2)') '!  sigtype: ',nn_sigtype
     write(ionum,'(a)') '!  '
-    write(ionum,'(i4i5)') nn_nl, (nn_nhl(i),i=0,nn_nl)
+    write(ionum,'(4i5)') nn_nl, (nn_nhl(i),i=0,nn_nl)
 !!$    write(ionum,'(i10,2es15.4)') nvars,rcut,rc3
     do i=1,nvars
       write(ionum,'(es23.14e3,2es12.4)') vars(i),vranges(1:2,i)
