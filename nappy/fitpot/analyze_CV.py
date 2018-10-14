@@ -30,14 +30,31 @@ def extract_varfname(fname='out.fitpot'):
                 return paramfname
     raise EOFError('{0:s} does not include the line contains param_file.'.format(fname))
 
-def weight_norm(fname='in.vars.fitpot'):
+def weight_norm(fname='in.params.NN2'):
     with open(fname,'r') as f:
         lines = f.readlines()
-        nwgts = int(lines[0].split()[0])
-    wgts = np.zeros(nwgts,dtype=float)
-    for il in range(1,nwgts+1):
-        data = lines[il].split()
-        wgts[il-1] = float(data[0])
+    nhl = []
+    nl = 0
+    wgts = []
+    for il,line in enumerate(lines):
+        if line[0] == '!' or line[0] == '#':
+            continue
+        data = line.split()
+        if nl == 0:
+            nl = int(data[0])
+            nhl.append(int(data[1]))
+            nhl.append(int(data[2]))
+            nhl.append(1)
+            if len(data) == 4:
+                raise ValueError('Not available for nl==2.')
+            nwgts = 0
+            for i in range(1,nl+1+1):
+                nwgts += nhl[i-1]*nhl[i]
+        else:
+            data = line.split()
+            wgts.append(float(data[0]))
+            if len(wgts) > nwgts:
+                return np.linalg.norm(wgts)
     return np.linalg.norm(wgts)
 
 if __name__ == "__main__":
@@ -86,23 +103,26 @@ if __name__ == "__main__":
     trnarray = np.array(data_trn)
     tstarray = np.array(data_tst)
     wgtarray = np.array(wgt_norm)
-    print('Mean, std, max, and min:')
+    print('Mean, median, max, and min:')
     dmean = trnarray.mean()
+    dmed = np.median(trnarray)
     dstd = trnarray.std()
     dmax = trnarray.max()
     dmin = trnarray.min()
-    print('  Training= {0:12.5f} {1:12.5f} {2:12.5f} {3:12.5f}'.format(dmean,dstd,
+    print('  Training= {0:12.5f} {1:12.5f} {2:12.5f} {3:12.5f}'.format(dmean,dmed,
                                                                        dmax,dmin))
     dmean = tstarray.mean()
+    dmed = np.median(tstarray)
     dstd  = tstarray.std()
     dmax  = tstarray.max()
     dmin  = tstarray.min()
-    print('  Test=     {0:12.5f} {1:12.5f} {2:12.5f} {3:12.5f}'.format(dmean,dstd,
+    print('  Test=     {0:12.5f} {1:12.5f} {2:12.5f} {3:12.5f}'.format(dmean,dmed,
                                                                        dmax,dmin))
     
     dmean = wgtarray.mean()
+    dmed = np.median(wgtarray)
     dstd  = wgtarray.std()
     dmax  = wgtarray.max()
     dmin  = wgtarray.min()
-    print('  Weight=     {0:12.4e} {1:12.4e} {2:12.4e} {3:12.4e}'.format(dmean,dstd,
+    print('  Weight=     {0:12.4e} {1:12.4e} {2:12.4e} {3:12.4e}'.format(dmean,dmed,
                                                                          dmax,dmin))

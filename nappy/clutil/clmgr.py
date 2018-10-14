@@ -295,13 +295,12 @@ Please wait until the other clmgr stops or stop it manually.
                                                      limit_npn=npn/2)
             #nprocs = nnodes *npn1
             ctime = calc.estimate_calctime(nprocs=npara)
-            # if ctime > limit_sec:
-            #     logger.info('Since the estimated calctime {0:s}'.format(d)
-            #                 +' seems to be longer than the limit_sec,'
-            #                 +' the maximum calucation time of the queue is applied.')
-            #     ctime = limit_sec
-
-            ctime = max(ctime,3600)
+            if ctime > limit_sec:
+                logger.info('Since the estimated calctime {0:s}'.format(d)
+                            +' seems to be longer than the limit_sec,'
+                            +' the maximum calucation time of the queue is applied.')
+                ctime = limit_sec
+            # ctime = max(ctime,3600)
             job_info = {}  # initialize job_info
             job_info['JOB_NAME'] = 'clmgr{0:d}_{1:d}'.format(pid,i)
             job_info['QUEUE'] = queue

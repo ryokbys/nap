@@ -13,7 +13,6 @@ Options:
 from __future__ import print_function
 
 import os,sys
-import subprocess
 from docopt import docopt
 import numpy as np
 
@@ -40,10 +39,10 @@ def read_outcv(fname='out.cv'):
 def get_stats(arr):
     nparr = np.array(arr)
     mean = nparr.mean()
-    std = nparr.std()
+    med = np.median(nparr)
     dmax = nparr.max()
     dmin = nparr.min()
-    return mean,std,dmax,dmin
+    return mean,med,dmax,dmin
 
 if __name__ == "__main__":
 
