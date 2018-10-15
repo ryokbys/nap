@@ -12,29 +12,29 @@ import incar
 import poscar
 import potcar
 
-import yaml
+import json
 
 
 def get_conf_path():
     return nappy.get_nappy_dir()+'/vasp.conf'
 
 def get_exec_path():
-    import yaml
     conf_path = get_conf_path()
     with open(conf_path,'r') as f:
-        config = yaml.load(f)
+        config = json.load(f)
     if not config.has_key('exec_path'):
         msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the VASP executable in {0}.
-It should be in YAML format like,
+It should be in JSON format like,
 ::
 
-  exec_path:  /home/username/bin/vasp535-openmpi
-
+  {
+    exec_path:  /home/username/bin/vasp535-openmpi
+  }
 
 """.format(get_conf_path())
-        raise RuntimeError('config does not have exec_path.')
+        raise RuntimeError(msg)
     return config['exec_path']
 
 def parse_KPOINTS(fname='KPOINTS'):
@@ -260,10 +260,12 @@ class VASP:
             msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the VASP executable in {0}.
-It should be in YAML format like,
+It should be in JSON format like,
 ::
 
-  exec_path:  /home/username/bin/vasp535-openmpi
+  {
+    "exec_path":  "/home/username/bin/vasp535-openmpi"
+  }
 
 
 """.format(get_conf_path())
@@ -283,10 +285,12 @@ It should be in YAML format like,
             msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the VASP executable in {0}.
-It should be in YAML format like,
+It should be in JSON format like,
 ::
 
-  exec_path:  /home/username/bin/vasp535-openmpi
+  {
+    "exec_path":  "/home/username/bin/vasp535-openmpi"
+  }
 
 
 """.format(get_conf_path())
@@ -299,7 +303,7 @@ It should be in YAML format like,
         Load config from `~/.nappy/vasp.conf` file.
         """
         with open(get_conf_path(),'r') as f:
-            self.config = yaml.load(f)
+            self.config = json.load(f)
 
         return None
         

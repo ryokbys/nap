@@ -10,14 +10,14 @@ Options
     -h, --help  Show this help message and exit.
     -n, --num-clusters=N
                 Number of clusters to be obtained. [default: 1]
-    -l, --load=YAML
-                Load `Y` from a given YAML file. [default: None]
+    -l, --load=JSON
+                Load `Y` from a given JSON file. [default: None]
 """
 
 import os,sys
 import numpy as np
 import scipy.cluster.hierarchy as sch
-import yaml
+import JSON
 from docopt import docopt
 sys.path.append(os.path.dirname(__file__)+'/..')
 import pmdsys
@@ -87,14 +87,14 @@ if __name__ == '__main__':
         print ' Performing cluster analysis...'
         Y= sch.linkage(D, method='centroid')
         #...Save Y
-        with open('cluster.yaml','w') as f:
-            yaml.dump(Y.tolist(),f)
+        with open('cluster.json','w') as f:
+            json.dump(Y.tolist(),f)
         # print Y
 
     else:
         print ' loading {0}...'.format(yafname)
         with open(yafname,'r') as f:
-            loaded= yaml.load(f)
+            loaded= json.load(f)
         Y= np.array(loaded)
     
     #...Get the list of cluster info

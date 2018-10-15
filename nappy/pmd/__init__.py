@@ -9,25 +9,26 @@ import math
 
 import nappy
 
-import yaml
+import json
 
 
 def get_conf_path():
     return nappy.get_nappy_dir()+'/pmd.conf'
 
 def get_exec_path():
-    import yaml
     conf_path = get_conf_path()
     with open(conf_path,'r') as f:
-        config = yaml.load(f)
+        config = json.load(f)
     if not config.has_key('exec_path'):
         msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the PMD executable in {0}.
-It should be in YAML format like,
+It should be in JSON format like,
 ::
 
-  exec_path:  /home/username/bin/pmd
+  {
+    "exec_path":  "/home/username/bin/pmd"
+  }
 
 
 """.format(get_conf_path())
@@ -137,10 +138,12 @@ class PMD:
             msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the PMD executable in {0}.
-It should be in YAML format like,
+It should be in JSON format like,
 ::
 
-  exec_path:  /home/username/bin/pmd
+  {
+    exec_path:  /home/username/bin/pmd
+  }
 
 
 """.format(get_conf_path())
@@ -160,10 +163,12 @@ It should be in YAML format like,
             msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the PMD executable in {0}.
-It should be in YAML format like,
+It should be in JSON format like,
 ::
 
-  exec_path:  /home/username/bin/pmd
+  {
+    "exec_path":  "/home/username/bin/pmd"
+  }
 
 
 """.format(get_conf_path())
@@ -176,7 +181,7 @@ It should be in YAML format like,
         Load config from `~/.nappy/pmd.conf` file.
         """
         with open(get_conf_path(),'r') as f:
-            self.config = yaml.load(f)
+            self.config = json.load(f)
 
         return None
         

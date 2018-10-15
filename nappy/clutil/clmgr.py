@@ -495,7 +495,7 @@ nprocs_per_node: 12
         # Check existence of the machine configuration file
         if not os.path.exists(self._machine_file):
             self.logger.warn("Please create a machine-attribute file at "+_clmgr_dir)
-            self.logger.warn("which is like this (in YAML format):")
+            self.logger.warn("which is like this (in JSON format):")
             self.logger.warn(self._sample_machine_file)
             raise RuntimeError('No '+self._machine_file)
 
@@ -503,11 +503,11 @@ nprocs_per_node: 12
 
         
     def load(self):
-        import yaml
+        import json
         
         #...Read and check scheduler and queue from _machine_file
         with open(self._machine_file,'r') as f:
-            self.machine_conf = yaml.load(f)
+            self.machine_conf = json.load(f)
         
         if not self.machine_conf.has_key('scheduler') \
            or len(self.machine_conf['scheduler']) < 1:

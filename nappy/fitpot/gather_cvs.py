@@ -44,6 +44,19 @@ def get_stats(arr):
     dmin = nparr.min()
     return mean,med,dmax,dmin
 
+def figure_of_merit(trns,tsts):
+    """
+    Compute figure of merit (FOM) that is defined as,
+      FOM = median(tst_i *min(1.0,tst_i/trn_i))
+    """
+    medtst = np.median(tsts)
+    rates = []
+    for i in range(len(trns)):
+        rates.append(tsts[i]/trns[i])
+    medrate = np.median(rates)
+    fom = medtst *medrate
+    return fom
+
 if __name__ == "__main__":
 
     args = docopt(__doc__)
@@ -54,6 +67,7 @@ if __name__ == "__main__":
     f_trn = open('out.cvs.trn','w')
     f_tst = open('out.cvs.tst','w')
     f_wgt = open('out.cvs.wgt','w')
+    f_fom = open('out.cvs.fom','w')
     for d in dirs:
         trns,tsts,wgts = read_outcv(d+'/out.cv')
         dval = d.replace(prefix,'')
@@ -75,17 +89,21 @@ if __name__ == "__main__":
                     +'{0:13.5e} {1:13.5e} {2:13.5e}\n'.format(wgt_stats[1],
                                                               wgt_stats[2],
                                                               wgt_stats[3]))
-
+        fom = figure_of_merit(trns,tsts)
+        f_fom.write('{0:s} {1:13.5e}\n'.format(dval,fom))
     f_all.close()
     f_trn.close()
     f_tst.close()
     f_wgt.close()
+    f_fom.close()
     os.system('sort -g -k1,1 -o {0:s} {0:s}'.format('out.cvs.all'))
     os.system('sort -g -k1,1 -o {0:s} {0:s}'.format('out.cvs.trn'))
     os.system('sort -g -k1,1 -o {0:s} {0:s}'.format('out.cvs.tst'))
     os.system('sort -g -k1,1 -o {0:s} {0:s}'.format('out.cvs.wgt'))
+    os.system('sort -g -k1,1 -o {0:s} {0:s}'.format('out.cvs.fom'))
     print('Check the following output files:')
     print('  - out.cvs.all')
     print('  - out.cvs.trn')
     print('  - out.cvs.tst')
     print('  - out.cvs.wgt')
+    print('  - out.cvs.fom')

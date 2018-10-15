@@ -17,7 +17,7 @@ from __future__ import print_function
 import sys
 from docopt import docopt
 import random,math
-import yaml
+import json
 import math
 
 _descfname = 'in.params.desc'
@@ -359,11 +359,11 @@ def save_config(fname,inputs,pairs,triplets):
     conf['pairs'] = pairs
     conf['triplets'] = triplets
     with open(fname,'w') as f:
-        f.write(yaml.dump(conf))
+        f.write(json.dump(conf))
 
 def load_config(fname):
     with open(fname,'r') as f:
-        dic = yaml.load(f)
+        dic = json.load(f)
     inputs = dic['inputs']
     pairs = dic['pairs']
     triplets = dic['triplets']
