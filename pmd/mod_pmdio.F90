@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-10-08 12:51:47 Ryo KOBAYASHI>
+!                     Last modified: <2018-10-18 13:45:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -50,16 +50,16 @@ module pmdio
 !.....factors on each moving direction
   real(8):: fmv(3,0:9)
   data fmv &
-       / 0d0, 0d0, 0d0, &
-         1d0, 1d0, 1d0, &
-         1d0, 1d0, 1d0, &
-         1d0, 1d0, 1d0, &
-         1d0, 1d0, 1d0, &
-         1d0, 1d0, 1d0, &
-         1d0, 1d0, 1d0, &
-         1d0, 1d0, 1d0, &
-         1d0, 1d0, 1d0, &
-         1d0, 1d0, 1d0  &
+       / 0d0, 0d0, 0d0, & ! 0
+         1d0, 1d0, 1d0, & ! 1
+         1d0, 1d0, 1d0, & ! 2
+         1d0, 1d0, 1d0, & ! 3
+         1d0, 1d0, 1d0, & ! 4
+         1d0, 1d0, 1d0, & ! 5
+         1d0, 1d0, 1d0, & ! 6
+         1d0, 1d0, 1d0, & ! 7
+         1d0, 1d0, 1d0, & ! 8
+         1d0, 1d0, 1d0  & ! 9
          /
 !.....whether compute stress or not
   logical:: lstrs0 = .true.
@@ -95,8 +95,6 @@ module pmdio
   real(8):: am(1:nspmax)= 12.0d0
 !.....charges
   real(8):: schg(1:nspmax)= 0d0
-!.....zload type
-  character(len=5):: czload_type= 'no'
 
 !.....Boundary condition: p = periodic, f = free, w = wall
   character(len=3):: boundary = 'ppp'
@@ -108,4 +106,9 @@ module pmdio
 
 !.....Metadynamics
   logical:: lmetaD = .false. 
+
+!.....zload type
+  character(len=128):: czload_type= 'none'
+!.....top and bottom skin width in which atoms are fixed and/or controlled
+  real(8):: zskin_width = 5.0d0
 end module pmdio

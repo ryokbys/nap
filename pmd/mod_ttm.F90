@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-10-10 10:30:25 Ryo KOBAYASHI>
+!                     Last-modified: <2018-10-19 17:24:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -70,6 +70,11 @@ module ttm
   character(len=128):: ctype_kappa = 'DCrho'
 !.....Prefactor in case of kappa_type = B2, in eV/(fs*Ang*K)
   real(8):: kappa0 = 6.2422d-7
+!.....Type of coupling constant: energy_balance or constant
+  character(len=128):: ctype_coupling = 'energy_balance'
+!.....e-ph coupling constant in case of constant coupling factor in eV/(fs*A^3*K)
+!.....Parameter for Ni from Zhigilei et al., J.Phys.Chem. C 113 (2009)
+  real(8):: e_ph_const = 2.247e-9
 !.....Absobed laser fluence in eV/Ang^2 unit
   real(8):: fluence = 0d0
   real(8):: I_0
@@ -163,7 +168,7 @@ contains
 
 !.....Conversion of Ce if needed
     if( trim(Ce_Tdep).eq.'linear' ) then
-      gmm_ce = gmm_ce /rho_e
+      gmm_ce = gmm_ce !/rho_e
     endif
 
     if( myid.eq.0 .and. iprint.ne.0 ) then
@@ -327,6 +332,12 @@ contains
         else if( trim(c1st).eq.'pulse_duration' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, tau_pulse
+        else if( trim(c1st).eq.'coupling_type' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, ctype_coupling
+        else if( trim(c1st).eq.'coupling_constant' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, e_ph_const
         else if( trim(c1st).eq.'Ce_T-depend' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, ce_Tdep
@@ -394,6 +405,8 @@ contains
     call mpi_bcast(t0_laser,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(ctype_pulse,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(tau_pulse,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(ctype_coupling,128,mpi_character,0,mpi_world,ierr)
+    call mpi_bcast(e_ph_const,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(cTe_init,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(Te_right,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(ce_Tdep,128,mpi_character,0,mpi_world,ierr)
@@ -518,6 +531,10 @@ contains
         tap(ic) = ekpsum(ic) *2d0 /fkb /nacp(ic)
         gs(ic) = nacp(ic) *fkb *gmms /vcell ! /3
       enddo
+      if( trim(ctype_coupling).eq.'constant' ) then
+        gp(:) = e_ph_const
+        gs(:) = 0d0
+      endif
     endif
 
     if( trim(surfmove).eq.'plane' .and. &

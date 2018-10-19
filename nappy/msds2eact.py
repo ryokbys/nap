@@ -64,7 +64,7 @@ if __name__ == "__main__":
     print(' Wrote {0:s}'.format(outfname))
     
     Tinvs = [ 1.0/T for T in Ts ]
-    logDs = [ np.log(D) for D in Ds ]
+    logDs = np.array([ np.log(D) for D in Ds ])
     A = np.array([Tinvs, np.ones(len(Tinvs))])
     A = A.T
     a,b = np.linalg.lstsq(A, logDs, rcond=None)[0]

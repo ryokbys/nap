@@ -55,8 +55,8 @@ class Atom(object):
     Define attributions of an atom.
     """
 
-    def __init__(self):
-        self.pos= np.zeros((3,))
+    def __init__(self,pos=[0.,0.,0.],sid=1,symbol=None):
+        self.pos= np.array(pos)
         self.vel= np.zeros((3,))
         self.frc= np.zeros((3,))
         self.strs= np.zeros((6,))
@@ -64,8 +64,11 @@ class Atom(object):
         self.ekin = 0.0
         self.id= 0
         self.ifmv= 1
-        self.sid= 1
-        self.symbol = get_symbol_from_number(self.sid)
+        self.sid= sid
+        if symbol:
+            self.symbol = symbol
+        else:
+            self.symbol = get_symbol_from_number(self.sid)
         self.aux= {}
 
     def set_pos(self,x,y,z):

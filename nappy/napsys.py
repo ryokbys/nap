@@ -21,8 +21,12 @@ Options:
               Order of species. [default: None]
   --scale=SCALE
               Scale the cell. [default: None]
+  --shift=SHIFT
+              Shift original atom positions within a periodic system. [default: 0.0,0.0,0.0]
   --periodic-copy=COPIES
               Number of copies of a,b,and c directions. [default: 1,1,1]
+  --cycle-coord=NCYCLE
+              Number of cyclic shift of coordinates, e.g. x-y-z to y-z-x. [default: 0]
   --charges=CHARGES
               Charges of species. Charges should be numbers separated by comma.
               If it is None, no charge is set.
@@ -203,6 +207,8 @@ class NAPSystem(object):
 
     def add_atom(self,atom):
         if self.specorder and atom.symbol:
+            if atom.symbol not in self.specorder:
+                self.specorder.append(atom.symbol)
             atom.set_sid(self.specorder.index(atom.symbol)+1)
         self.atoms.append(atom)
 
@@ -242,12 +248,18 @@ class NAPSystem(object):
     def num_species(self):
         num_species= []
         max_nsp= 0
-        for ai in self.atoms:
-            max_nsp= max(max_nsp,ai.sid)
-        for i in range(max_nsp):
-            num_species.append(0)
-        for ai in self.atoms:
-            num_species[ai.sid-1] += 1
+        if len(self.specorder) > 0:
+            for i in range(len(self.specorder)):
+                num_species.append(0)
+            for ai in self.atoms:
+                num_species[self.specorder.index(ai.symbol)] += 1
+        else:
+            for ai in self.atoms:
+                max_nsp= max(max_nsp,ai.sid)
+            for i in range(max_nsp):
+                num_species.append(0)
+            for ai in self.atoms:
+                num_species[ai.sid-1] += 1
         return num_species
 
     def volume(self):
@@ -267,12 +279,31 @@ class NAPSystem(object):
             spos[ia,:] = a.pos
         return spos
 
+    
     def get_symbols(self):
         symbols = []
         for a in self.atoms:
             symbols.append(a.symbol)
         return symbols
 
+    def set_symbols(self,symbols):
+        """
+        Set symbols of all atoms and append new symbols
+        if they are not in the current specorder.
+        """
+        if len(symbols) != len(self.atoms):
+            raise RuntimeError('len(symbols) != len(self.atoms)')
+        for i,a in enumerate(self.atoms):
+            a.set_symbol(symbols[i])
+        for s in symbols:
+            if s not in self.specorder:
+                self.specorder.append(s)
+        #...Reset sids
+        for i,a in enumerate(self.atoms):
+            s = a.symbol
+            a.set_sid(self.specorder.index(s)+1)
+        return None
+    
     def get_charges(self):
         return self.charges
 
@@ -1206,6 +1237,34 @@ You need to specify the species order correctly with --specorder option.
         n3= int(np.ceil(length/l3))
         return n1,n2,n3
 
+    def shift_atoms(self,sx,sy,sz):
+        """
+        Shift all the atoms by (sx,sy,sz) in scaled unit.
+        """
+        for ai in self.atoms:
+            newpos = [ ai.pos[0]+sx, ai.pos[1]+sy, ai.pos[2]+sz ]
+            ai.set_pos(*newpos)
+        return
+
+    def cycle_coord(self,ncycle=0):
+        """
+        Cyclic shift of coordinates, e.g. x-y-z to y-z-x.
+        """
+        ncycle = ncycle % 3
+        if ncycle == 0:
+            return None
+        for icycle in range(ncycle):
+            a1,a2,a3 = self.get_lattice_vectors()
+            spos = self.get_scaled_positions()
+            a1 = [ a1[1], a1[2], a1[0] ]
+            a2 = [ a2[1], a2[2], a2[0] ]
+            a3 = [ a3[1], a3[2], a3[0] ]
+            self.set_lattice(1.0, a2, a3, a1)
+            for i,ai in enumerate(self.atoms):
+                p = spos[i]
+                ai.set_pos(p[1],p[2],p[0])
+        return None
+        
     def repeat(self,n1,n2,n3,n1m=0,n2m=0,n3m=0):
         if n1 == n2 == n3 == 1:
             return None
@@ -1707,16 +1766,16 @@ def unitvec_to_hi(a1,a2,a3):
     return np.linalg.inv(h)
 
 
-def analyze(psys):
+def analyze(nsys):
     import elements
     from units import amu_to_g, Ang_to_cm
-    a1 = psys.a1 *psys.alc
-    a2 = psys.a2 *psys.alc
-    a3 = psys.a3 *psys.alc
+    a1 = nsys.a1 *nsys.alc
+    a2 = nsys.a2 *nsys.alc
+    a3 = nsys.a3 *nsys.alc
     a = np.linalg.norm(a1)
     b = np.linalg.norm(a2)
     c = np.linalg.norm(a3)
-    vol = psys.volume()
+    vol = nsys.volume()
     alpha = np.arccos(np.dot(a2,a3)/b/c)/np.pi*180.0
     beta  = np.arccos(np.dot(a1,a3)/a/c)/np.pi*180.0
     gamma = np.arccos(np.dot(a1,a2)/a/b)/np.pi*180.0
@@ -1736,12 +1795,12 @@ def analyze(psys):
     print 'beta  = {0:7.2f} deg.'.format(beta)
     print 'gamma = {0:7.2f} deg.'.format(gamma)
     print 'volume= {0:10.3f} A^3'.format(vol)
-    print 'number of atoms   = ',psys.num_atoms()
-    if psys.specorder:
+    print 'number of atoms   = ',nsys.num_atoms()
+    if nsys.specorder:
         print 'number of atoms per species:'
-        nspcs = psys.num_species()
+        nspcs = nsys.num_species()
         mass = 0.0
-        for i,s in enumerate(psys.specorder):
+        for i,s in enumerate(nsys.specorder):
             print '   {0:s}: {1:d}'.format(s,nspcs[i])
             mass += nspcs[i]*elements.elements[s]['mass']
         print 'density = {0:7.2f} g/cm^3'.format(mass*amu_to_g
@@ -1756,6 +1815,8 @@ if __name__ == "__main__":
     infname= args['INFILE']
     outfname= args['OUTFILE']
     scalefactor= args['--scale']
+    shift= [ float(s) for s in args['--shift'].split(',') ]
+    ncycle= int(args['--cycle-coord'])
     specorder= args['--specorder'].split(',')
     if specorder == 'None' or 'None' in specorder:
         specorder = []
@@ -1766,8 +1827,13 @@ if __name__ == "__main__":
     else:
         charges = [ float(c) for c in charges.split(',') ]
 
-    psys= NAPSystem(fname=infname,ffmt=infmt,specorder=specorder,charges=charges)
+    nsys= NAPSystem(fname=infname,ffmt=infmt,specorder=specorder,
+                    charges=charges)
 
+    nsys.shift_atoms(*shift)
+    if ncycle > 0:
+        nsys.cycle_coord(ncycle)
+    
     #...Periodic copy if needed
     copy_needed = False
     for c in copies:
@@ -1777,36 +1843,16 @@ if __name__ == "__main__":
         elif c < 1:
             raise ValueError('Periodic copy was wrong. It should be >= 1.')
     if copy_needed:
-        psys.repeat(copies[0],copies[1],copies[2])
+        nsys.repeat(copies[0],copies[1],copies[2])
 
     if args['analyze']:
-        analyze(psys)
+        analyze(nsys)
 
     elif args['convert']:
         if scalefactor != "None":
-            psys.alc *= float(scalefactor)
+            nsys.alc *= float(scalefactor)
 
-        psys.write(fname=outfname,fmt=outfmt)
-    
-        # if outfmt == 'None':
-        #     outfmt= parse_filename(outfname)
-    
-        # if outfmt == 'pmd':
-        #     psys.write_pmd(outfname)
-        # elif outfmt == 'smd':
-        #     psys.write_pmd(outfname)
-        # elif outfmt == 'akr':
-        #     psys.write_akr(outfname)
-        # elif outfmt == 'POSCAR':
-        #     psys.write_POSCAR(outfname)
-        # elif outfmt == 'dump':
-        #     psys.write_dump(outfname)
-        # elif outfmt == 'lammps':
-        #     psys.write_lammps_data(outfname)
-        # elif outfmt == 'xsf':
-        #     psys.write_xsf(outfname)
-        # else:
-        #     print 'Cannot detect output file format.'
+        nsys.write(fname=outfname,fmt=outfmt)
 
     else:
         raise NotImplementedError()

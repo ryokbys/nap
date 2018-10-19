@@ -292,7 +292,7 @@ Please wait until the other clmgr stops or stop it manually.
             os.chdir(d)
             calc = self.Calculator(d)
             nnodes,npn1,npara = calc.estimate_nprocs(max_npn=npn,
-                                                     limit_npn=npn/2)
+                                                     limit_npn=npn*3/4)
             #nprocs = nnodes *npn1
             ctime = calc.estimate_calctime(nprocs=npara)
             if ctime > limit_sec:
