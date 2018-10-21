@@ -1,12 +1,20 @@
 module zload
+!-----------------------------------------------------------------------
+!  Module for loading on plane perpendicular to z-axis
+!                     Last-modified: <2018-10-21 20:05:57 Ryo KOBAYASHI>
+!-----------------------------------------------------------------------
   implicit none
   save
 !.....initial z top and bottom positions
-  real(8):: ztop0, zbot0, zlen0, xlen0, dzl, dxl
+  real(8):: ztop0, zbot0, zlen0, dlen0, dzl, dl
   integer:: nztop, nzbot
 !.....variables that change during z-loading simulation
   real(8):: zlen, ztop, zbot
-  real(8):: xlen
+  real(8):: dlen
+!.....unit vector of shear direction (ux,uy)
+  real(8):: uvx, uvy
+!.....deviation along a1,a2 vectors in case of shear
+  real(8):: d1,d2
   
 contains
   subroutine set_zload_atoms(natm,ra,tag,h,fmv,sorg,strfin,nstp &
@@ -109,29 +117,38 @@ contains
 
   end subroutine zload_atoms
 !=======================================================================
-  subroutine set_xshear(natm,ra,tag,h,fmv,sorg,strfin,nstp &
-       ,zskin_width,myid_md,mpi_md_world,iprint)
+  subroutine set_shear(natm,ra,tag,h,fmv,sorg,strfin,nstp &
+       ,zskin_width,zshear_angle,myid_md,mpi_md_world,iprint)
 !
-!     Choose atoms to be applied xshear loading.
-!     ifmv's of top and bottom atoms within zskin_width in z-direction
-!     are set to 9.
+!  Choose atoms to be applied shear loading.
+!  ifmv's of top and bottom atoms within zskin_width in z-direction
+!  are set to 9.
 !
     implicit none
     include 'mpif.h'
     integer,intent(in):: natm,myid_md,mpi_md_world,nstp,iprint
-    real(8),intent(in):: ra(3,natm),sorg(3),strfin,h(3,3),zskin_width
+    real(8),intent(in):: ra(3,natm),sorg(3),strfin,h(3,3),zskin_width &
+         ,zshear_angle
     real(8),intent(inout):: tag(natm),fmv(3,0:9)
     integer:: ierr,i,nztopl,nzbotl
-    real(8):: ztopl,zbotl,dxlfin,zskin
+    real(8):: ztopl,zbotl,dlfin,zskin,angle
+    real(8):: x1,y1,x2,y2,amati(2,2),det
     real(8),external:: absv
+    real(8),parameter:: pi = 3.14159265358979d0
 
     if( myid_md.eq.0 .and. iprint.gt.0 ) then
       print *,''
-      print *,'Setup xshear'
+      print *,'Setup shear'
     endif
 
-!.....Set x-fmv of 9th to zero, which means no motion along x
-    fmv(1,9) = 0d0
+!.....Set fmv of 9th to zero, which means no motion except z
+    fmv(1:2,9) = 0d0
+
+!.....Unit vector along shear from zshear_angle
+    angle = mod(zshear_angle,180.0)
+    angle = angle/180.0 *pi
+    uvx = cos(angle)
+    uvy = sin(angle)
 
 !.....Detect initial top and bottom positions
     ztopl = 0d0
@@ -147,14 +164,28 @@ contains
     call mpi_allreduce(zbotl,zbot0,1,mpi_real8,mpi_min &
          ,mpi_md_world,ierr)
     zlen0 = (ztop0 -zbot0)*absv(3,h(1:3,3))
-    dxlfin = zlen0 *strfin
-    dxl= (dxlfin /nstp /2) /absv(3,h(1:3,1))
-    xlen0 = 0d0
-    xlen = xlen0
+    dlfin = zlen0 *strfin
+    dl= (dlfin /nstp /2)
+!.....Conversion of shear from x,y to a1,a2
+    x1 = h(1,1)
+    y1 = h(2,1)
+    x2 = h(1,2)
+    y2 = h(2,2)
+    det = x1*y2 -x2*y1
+    amati(1,1) =  y2 /det
+    amati(1,2) = -x2 /det
+    amati(2,1) = -y1 /det
+    amati(2,2) =  x1 /det
+    d1 = amati(1,1) *uvx*dl +amati(1,2)*uvy*dl
+    d2 = amati(2,1) *uvx*dl +amati(2,2)*uvy*dl
+   
+    dlen0 = 0d0
+    dlen = dlen0
     ztop = ztop0
     zbot = zbot0
     if( myid_md.eq.0 .and. iprint.gt.0 ) then
-      write(6,'(a,3es12.4)') ' zlen0,xlen0,dxl = ',zlen0,xlen0,dxl
+      write(6,'(a,3es12.4)') ' zlen0,dlen0,dl = ',zlen0,dlen0,dl
+      write(6,'(a,5es12.3)') ' angle,uvx,uvy,d1,d2 = ',angle,uvx,uvy,d1,d2
     endif
 
 !.....Define top and bottom atoms z-motions of which are controlled
@@ -179,15 +210,15 @@ contains
       write(6,'(a,2i8)') ' nztop, nzbot = ',nztop,nzbot
     endif
 
-  end subroutine set_xshear
+  end subroutine set_shear
 !=======================================================================
-  subroutine xshear_atoms(natm,ra,tag,nstp,strfin,strnow &
+  subroutine shear_atoms(natm,ra,tag,nstp,strfin,strnow &
        ,sorg,myid_md,mpi_md_world)
 !
-!  Apply shear by moving atoms of top-z layers towards x-direction.
+!  Apply shear by moving atoms of top-z layers within the plane normal to z.
 !
 !  ifmv of top and bottom atoms should be 9.
-!  And the x-motions of those atoms are controled.
+!  And the xy-motions of those atoms are controled.
 !     
     implicit none
     include 'mpif.h'
@@ -200,16 +231,18 @@ contains
     do i=1,natm
       ifmv= int(mod(tag(i)*10,10d0))
       if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5d0 ) then  !top
-        ra(1,i)= ra(1,i) +dxl
+        ra(1,i)= ra(1,i) +d1
+        ra(2,i)= ra(2,i) +d2
       else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5d0 ) then  !bottom
-        ra(1,i)= ra(1,i) -dxl
+        ra(1,i)= ra(1,i) -d1
+        ra(2,i)= ra(2,i) -d2
       endif
     enddo
-    xlen= xlen +2d0*dxl
-    strnow= (xlen-xlen0)/zlen0
+    dlen= dlen +2d0*dl
+    strnow= (dlen-dlen0)/zlen0
 !!$    if( myid_md.eq.0 ) write(6,'(a,2es12.3e3)') ' xlen,strnow=',xlen,strnow
 
-  end subroutine xshear_atoms
+  end subroutine shear_atoms
 !=======================================================================
   subroutine get_forces_on_base(natm,ra,aa,tag,h,ftop,fbot &
        ,sorg,myid,mpi_md_world,iprint,czload_type)
@@ -227,27 +260,42 @@ contains
     real(8),intent(out):: ftop,fbot
     character(len=*),intent(in):: czload_type
     integer:: i,is,ifmv,ierr,ixyz
-    real(8):: ftopl,fbotl,xyarea,a(3),b(3),axb(3)
+    real(8):: ftopl,fbotl,xyarea,a(3),b(3),axb(3),fx,fy
     real(8),external:: absv
 
     ftopl= 0d0
     fbotl= 0d0
     if( trim(czload_type).eq.'atoms' ) then
-      ixyz = 3
-    else if( trim(czload_type).eq.'xshear' ) then
-      ixyz = 1
-    endif
-    do i=1,natm
-      ifmv= int(mod(tag(i)*10,10d0))
+      do i=1,natm
+        ifmv= int(mod(tag(i)*10,10d0))
 !.....Scaled force to real force to get eV/Ang unit
-      if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5d0 ) then !top layer
-        ftopl=ftopl +(h(ixyz,1)*aa(1,i) +h(ixyz,2)*aa(2,i) &
-             +h(ixyz,3)*aa(3,i) )
-      else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5d0 ) then !bottom
-        fbotl=fbotl +(h(ixyz,1)*aa(1,i) +h(ixyz,2)*aa(2,i) &
-             +h(ixyz,3)*aa(3,i) )
-      endif
-    enddo
+        if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5d0 ) then !top layer
+          ftopl=ftopl +(h(3,1)*aa(1,i) +h(3,2)*aa(2,i) &
+               +h(3,3)*aa(3,i) )
+        else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5d0 ) then !bottom
+          fbotl=fbotl +(h(3,1)*aa(1,i) +h(3,2)*aa(2,i) &
+               +h(3,3)*aa(3,i) )
+        endif
+      enddo
+    else if( trim(czload_type).eq.'shear' ) then
+      do i=1,natm
+        ifmv= int(mod(tag(i)*10,10d0))
+!.....Scaled force to real force to get eV/Ang unit
+        if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5d0 ) then !top layer
+          fx=h(1,1)*aa(1,i) +h(1,2)*aa(2,i) &
+               +h(1,3)*aa(3,i)
+          fy=h(1,1)*aa(1,i) +h(1,2)*aa(2,i) &
+               +h(1,3)*aa(3,i)
+          ftopl = ftopl +(fx*uvx +fy*uvy)
+        else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5d0 ) then !bottom
+          fx=h(1,1)*aa(1,i) +h(1,2)*aa(2,i) &
+               +h(1,3)*aa(3,i)
+          fy=h(1,1)*aa(1,i) +h(1,2)*aa(2,i) &
+               +h(1,3)*aa(3,i)
+          fbotl = fbotl +(fx*uvx +fy*uvy)
+        endif
+      enddo
+    endif
 
     ftop= 0d0
     fbot= 0d0

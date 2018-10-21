@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-10-19 17:24:20 Ryo KOBAYASHI>
+!                     Last-modified: <2018-10-20 10:26:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -70,11 +70,7 @@ module ttm
   character(len=128):: ctype_kappa = 'DCrho'
 !.....Prefactor in case of kappa_type = B2, in eV/(fs*Ang*K)
   real(8):: kappa0 = 6.2422d-7
-!.....Type of coupling constant: energy_balance or constant
-  character(len=128):: ctype_coupling = 'energy_balance'
-!.....e-ph coupling constant in case of constant coupling factor in eV/(fs*A^3*K)
-!.....Parameter for Ni from Zhigilei et al., J.Phys.Chem. C 113 (2009)
-  real(8):: e_ph_const = 2.247e-9
+
 !.....Absobed laser fluence in eV/Ang^2 unit
   real(8):: fluence = 0d0
   real(8):: I_0
@@ -101,14 +97,21 @@ module ttm
 !.....Temperature distribution
   real(8),allocatable:: te(:,:,:),tep(:,:,:),ta(:),tap(:),tex(:)
   integer,allocatable:: nac(:),nacp(:)
-  real(8),allocatable:: eksum(:),ekpsum(:)
+  real(8),allocatable:: eksum(:),ekpsum(:),vac(:,:),ekti(:)
 !.....Atom to cell correspondance
   integer,allocatable:: a2c(:)
 
+!.....Type of coupling constant: constant_gp or constang_gmmp
+  character(len=128):: ctype_coupling = 'constant_gmmp'
+!.....e-ph coupling constant, g, in case of constant gp in eV/(fs*A^3*K)
+!.....Parameter for Ni from Zhigilei et al., J.Phys.Chem. C 113 (2009)
+  real(8):: e_ph_const = 2.247e-9
+!.....Friction coefficient, gamma, in 1/fs (inverse of relaxation time)
+  real(8):: gamma_p = 0.001
+  real(8):: gamma_s = 0.1
+  real(8),allocatable:: gmmp(:), gmms(:)
 !.....Sigma of random force in Langevin thermostat
   real(8),allocatable:: sgm(:)
-!.....Gammas
-  real(8):: gmmp, gmms
 !.....gp, gs
   real(8),allocatable:: gp(:),gs(:)
 
@@ -184,7 +187,11 @@ contains
       print '(a,4es12.4)','   dx,dy,dz,vcell = ',dx,dy,dz,vcell
       print '(a,2es12.4)','   area,darea = ',area,darea
       print '(a,2i5,es12.4)','   lsurf,rsurf = ',lsurf,rsurf,lskin
-      print '(a,2es12.4)','   gmmp,gmms = ',gmmp,gmms
+      if( trim(ctype_coupling).eq.'constant_gp' ) then
+        print '(a,2es12.4)','   e_ph_const = ',e_ph_const
+      else if( trim(ctype_coupling).eq.'constant_gmmp' ) then
+        print '(a,2es12.4)','   gamma_p,gamma_s = ',gamma_p,gamma_s
+      endif
       print '(a,a)','   Ce_Tdep = ',trim(Ce_Tdep)
       mem = 4 * 4*nxyz + 11 * 8*nxyz + 4 * 8*namax
       print '(a,f0.3,a)',' Memory for TTM = ',dble(mem)/1000/1000,' MByte'
@@ -227,8 +234,20 @@ contains
 !.....Allocate initialize arrays
     allocate(nac(nxyz),nacp(nxyz),eksum(nxyz),ekpsum(nxyz), &
          sgm(nxyz),te(0:nx+1,0:ny+1,0:nz+1),tep(0:nx+1,0:ny+1,0:nz+1), &
-         ta(nxyz),tap(nxyz),tex(nx),gp(nxyz),gs(nxyz))
-    allocate(a2c(namax),aai(3,namax))
+         ta(nxyz),tap(nxyz),tex(nx),gp(nxyz),gs(nxyz),&
+         gmmp(nxyz),gmms(nxyz),vac(3,nxyz))
+    allocate(a2c(namax),aai(3,namax),ekti(namax))
+
+    if( trim(ctype_coupling).eq.'constant_gp' ) then
+      gp(:) = e_ph_const
+      gs(:) = 0d0
+    else if( trim(ctype_coupling).eq.'constant_gmmp' ) then
+      gmmp(:) = gamma_p
+      gmms(:) = gamma_s
+    else
+      print *,'ERROR: no such coupling style: '//trim(ctype_coupling)
+      goto 999
+    endif
 
 !.....Set initial Te distribution
     te(:,:,:) = 0d0
@@ -298,10 +317,10 @@ contains
           read(ioprms,*) c1st, nstp_inner
         else if( trim(c1st).eq.'gamma_p' ) then
           backspace(ioprms)
-          read(ioprms,*) c1st, gmmp
+          read(ioprms,*) c1st, gamma_p
         else if( trim(c1st).eq.'gamma_s' ) then
           backspace(ioprms)
-          read(ioprms,*) c1st, gmms
+          read(ioprms,*) c1st, gamma_s
         else if( trim(c1st).eq.'ekth' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, ekth
@@ -395,8 +414,8 @@ contains
     call mpi_bcast(ny,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nz,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nstp_inner,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(gmmp,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(gmms,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(gamma_p,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(gamma_s,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(ekth,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_e,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(d_e,1,mpi_real8,0,mpi_world,ierr)
@@ -468,31 +487,61 @@ contains
     
   end subroutine assign_atom2cell
 !=======================================================================
-  subroutine calc_Ta(namax,natm,eki,tag,fmv,istp,myid,mpi_world,iprint)
+  subroutine calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
+       ,istp,myid,mpi_world,iprint)
 !
 !  Compute and set Ta and Tap array from atomic kinetic energies.
 !
-    integer,intent(in):: namax,natm,myid,mpi_world,istp,iprint
-    real(8),intent(in):: eki(3,3,namax),tag(namax),fmv(3,0:9)
+    integer,intent(in):: namax,natm,nspmax,myid,mpi_world,istp,iprint
+    real(8),intent(in):: tag(namax),fmv(3,0:9),va(3,namax),h(3,3) &
+         ,fekin(nspmax)
 
-    integer:: i,ic,ierr,ix,iy,iz,l,ifmv,idof
-    real(8):: ek,t0
+    integer:: i,ic,ierr,is,ix,iy,iz,l,ifmv,idof
+    real(8):: ek,t0,vat(3),vatr(3)
     integer,allocatable,save:: nacl(:),nacpl(:)
-    real(8),allocatable,save:: eksuml(:),ekpsuml(:)
+    real(8),allocatable,save:: eksuml(:),ekpsuml(:),vacl(:,:)
     integer,external:: ifmvOf
 
     if( .not. allocated(nacl) ) then
-      allocate(nacl(nxyz),nacpl(nxyz),eksuml(nxyz),ekpsuml(nxyz))
+      allocate(nacl(nxyz),nacpl(nxyz),eksuml(nxyz),ekpsuml(nxyz)&
+           ,vacl(3,nxyz))
     endif
 
     t0 = mpi_wtime()
 
+!.....First distinguish center of mass vectors of cells
+    vacl(:,:) = 0d0
+    nacl(:) = 0
+    do i=1,natm
+      ic = a2c(i)
+      vacl(1:3,ic) = vacl(1:3,ic) +va(1:3,i)
+      nacl(ic) = nacl(ic) + 1
+    enddo
+    vac(:,:) = 0d0
+!.....NACL and NAC are temporal here, used just for normalization
+    nac(:) = 0
+    call mpi_reduce(vacl,vac,3*nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(nacl,nac,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
+    do ic=1,nxyz
+      if( nac(ic).eq.0 ) cycle
+      vac(:13,ic) = vac(1:3,ic) /nac(ic)
+    enddo
+    call mpi_bcast(vac,3*nxyz,mpi_real8,0,mpi_world,ierr)
+
+!.....Compute Ekin per atom using thermal part of velocities
+    do i=1,natm
+      ic = a2c(i)
+      is = int(tag(i))
+      vat(1:3) = va(1:3,i) -vac(1:3,ic)
+      vatr(1:3) = h(1:3,1)*vat(1) +h(1:3,2)*vat(2) +h(1:3,3)*vat(3)
+      ekti(i) = (vatr(1)**2 +vatr(2)**2 +vatr(3)**2) *fekin(is)
+    enddo
+    
     nacl(1:nxyz) = 0
     nacpl(1:nxyz) = 0
     eksuml(1:nxyz) = 0d0
     ekpsuml(1:nxyz) = 0d0
     do i=1,natm
-      ek = eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
       ic = a2c(i)
       ifmv = ifmvOf(tag(i))
       idof = 0
@@ -500,10 +549,10 @@ contains
         idof = idof +nint(fmv(l,ifmv))
       enddo
       nacl(ic) = nacl(ic) + idof
-      eksuml(ic) = eksuml(ic) +ek
+      eksuml(ic) = eksuml(ic) +ekti(i)
       if( ek.gt.ekth ) then
         nacpl(ic) = nacpl(ic) +idof
-        ekpsuml(ic) = ekpsuml(ic) +ek
+        ekpsuml(ic) = ekpsuml(ic) +ekti(i)
       endif
     enddo
     nac(1:nxyz) = 0
@@ -516,24 +565,44 @@ contains
     call mpi_reduce(ekpsuml,ekpsum,nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
 !.....Compute Ta and Tap only at node-0
     if( myid.eq.0 ) then
-      gp(:) = 0d0
-      gs(:) = 0d0
-      ta(:) = 0d0
-      tap(:) = 0d0
-      do ic=1,nxyz
-        if( nac(ic).eq.0 ) cycle
-        call ic2ixyz(ic,ix,iy,iz)
+      if( trim(ctype_coupling).eq.'constant_gmmp' ) then
+        gp(:) = 0d0
+        gs(:) = 0d0
+        ta(:) = 0d0
+        tap(:) = 0d0
+        do ic=1,nxyz
+          if( nac(ic).eq.0 ) cycle
+!!$          call ic2ixyz(ic,ix,iy,iz)
 !.....Degree of freedom per atom (3 in case of 3D) is included in nac
 !.....CHECK: This factor 3 looks causing the difference of energy in/out between at/el systems.
-        ta(ic) = eksum(ic) *2d0 /fkb /nac(ic)
-        gp(ic) = nac(ic) *fkb *gmmp /vcell ! /3
-        if( nacp(ic).eq.0 ) cycle
-        tap(ic) = ekpsum(ic) *2d0 /fkb /nacp(ic)
-        gs(ic) = nacp(ic) *fkb *gmms /vcell ! /3
-      enddo
-      if( trim(ctype_coupling).eq.'constant' ) then
-        gp(:) = e_ph_const
-        gs(:) = 0d0
+          ta(ic) = eksum(ic) *2d0 /fkb /nac(ic)
+          gp(ic) = nac(ic) *fkb *gmmp(ic) /vcell ! /3
+          if( nacp(ic).eq.0 ) cycle
+          tap(ic) = ekpsum(ic) *2d0 /fkb /nacp(ic)
+          gs(ic) = nacp(ic) *fkb *gmms(ic) /vcell ! /3
+        enddo
+      else if( trim(ctype_coupling).eq.'constant_gp' ) then
+!.....See Eq.(A5) in PRB 68 (2003) pp.064114
+        gmmp(:) = 0d0
+        gmms(:) = 0d0
+        ta(:) = 0d0
+        tap(:) = 0d0
+        do ic=1,nxyz
+          if( nac(ic).eq.0 ) cycle
+          call ic2ixyz(ic,ix,iy,iz)
+          ta(ic) = eksum(ic) *2d0 /fkb /nac(ic)
+          if( tap(ic)*0d0 .ne. 0d0 ) then
+            print *,'ERROR: tap==NaN !!!'
+            print *,'   ic,ix,iy,iz=',ic,ix,iy,iz
+            stop
+          endif
+!.....The definition from PRB 68 (2003) seems to have malfunctioning
+!.....in case (Te-Ta) < 0.0, which causes sqrt(negative) for sigma calculation
+!.....in Langevin_ttm,
+!          gmmp(ic) = gp(ic)*vcell*(te(ix,iy,iz)-ta(ic))/2/eksum(ic)
+!.....Here inverse of constant_gmmp will be used.
+          gmmp(ic) = vcell*gp(ic) /fkb /nac(ic)
+        enddo
       endif
     endif
 
@@ -554,7 +623,7 @@ contains
     real(8),intent(in):: tnow
 
     integer:: ic,ix,iy,iz,ierr,istp
-    real(8):: t0,ce,xi,pterm,sterm,kappa,dkappa,pulsefactor
+    real(8):: t0,ce,dce,xi,pterm,sterm,kappa,dkappa,pulsefactor
     real(8),save:: ein_pulse
     logical,save:: l1st = .true.
 
@@ -577,9 +646,10 @@ contains
           if( ix.lt.lsurf ) cycle
           if( ix.gt.rsurf ) cycle
           ce = cete(ix,iy,iz)
+          dce = dcete(ix,iy,iz)
           if( trim(ctype_kappa).eq.'DCrho' ) then
             kappa = d_e *ce *rho_e
-            dkappa = d_e *dcete(ix,iy,iz) *rho_e
+            dkappa = d_e *dce *rho_e
           else if( trim(ctype_kappa).eq.'B2' ) then
             kappa = kappa0 *te(ix,iy,iz) /max(ta(ic),ta_min)
             dkappa = kappa0 /max(ta(ic),ta_min)
@@ -595,21 +665,8 @@ contains
             ein_e = ein_e +(gp(ic)*ta(ic)+sterm)*dt *vcell
             eout_e = eout_e -gp(ic)*te(ix,iy,iz)*dt *vcell
           endif
-!!$          if( ix.eq.11 .and. iy.eq.1 .and. iz.eq.1 ) then
-!!$            print '(a,3i3,8es10.2)',' ix,iy,iz,te,ce,kappa,dkappa,dte2,d2te,pterm,sterm = '&
-!!$                 ,ix,iy,iz,te(ix,iy,iz),ce,kappa,dkappa,dte2(ix,iy,iz),d2te(ix,iy,iz)&
-!!$                 ,pterm,sterm
-!!$            print '(a,3i3,2es10.2)',' ix,iy,iz,dt,dTe=',ix,iy,iz,dt&
-!!$                 ,dt/(ce*rho_e) &
-!!$                 *( dkappa*dte2(ix,iy,iz) +kappa*d2te(ix,iy,iz) &
-!!$                 +pterm +sterm )
-!!$            print '(a,7es10.2)',' te(...)=',te(ix,iy,iz),te(ix-1,iy,iz)-te(ix,iy,iz) &
-!!$                 ,te(ix+1,iy,iz)-te(ix,iy,iz) &
-!!$                 ,te(ix,iy-1,iz)-te(ix,iy,iz),te(ix,iy+1,iz)-te(ix,iy,iz) &
-!!$                 ,te(ix,iy,iz-1)-te(ix,iy,iz),te(ix,iy,iz+1)-te(ix,iy,iz)
-!!$          endif
           tep(ix,iy,iz) = te(ix,iy,iz) &
-               +dt/(ce*rho_e) &
+               +dt/((ce+te(ix,iy,iz)*dce)*rho_e) &
                *( dkappa*dte2(ix,iy,iz) +kappa*d2te(ix,iy,iz) &
                +pterm +sterm )
         enddo
@@ -627,6 +684,11 @@ contains
 !!$                   +I_0 *min(1d0,exp(-xi/lskin))/(ce*rho_e)*dt
               tep(ix,iy,iz) = tep(ix,iy,iz) &
                    +I_0 *min(1d0,exp(-xi/lskin))*dt*dx
+              if( tep(ix,iy,iz)*0d0 .ne. 0d0 ) then
+                print *,'ERROR: tep==NaN !!!'
+                print *,'  ic,ix,iy,iz=',ic,ix,iy,iz
+                stop
+              endif
               ein_pulse = ein_pulse +I_0 *min(1d0,exp(-xi/lskin))*dt*dx
             enddo
           endif
@@ -689,6 +751,7 @@ contains
       cete = c_0 +(a_0 +a_1*t +a_2*t**2 +a_3*t**3 +a_4*t**4)&
            *exp(-(A_exp*t)**2) +ce_min
     else if( trim(Ce_Tdep).eq.'tanh' ) then
+      t = te(ix,iy,iz)
       cete = 3d0 *tanh(2d-4 *t) +ce_min
     else if( trim(Ce_Tdep).eq.'linear' ) then
       cete = gmm_ce *te(ix,iy,iz) +ce_min
@@ -711,6 +774,11 @@ contains
       texp = exp(-(A_exp*t)**2)
       dcete = (a_1 +2d0*a_2*t +3d0*a_3*t**2 +4d0*a_4*t**3)*texp &
            -2d0*A_exp*t *(a_0 +a_1*t +a_2*t**2 +a_3*t**3 +a_4*t**4)*texp
+    else if( trim(Ce_Tdep).eq.'tanh' ) then
+      t = te(ix,iy,iz)
+      dcete = 3d0*2d-4 *(1d0 -tanh(2d-4 *t)**2)
+    else if( trim(Ce_Tdep).eq.'linear' ) then
+      dcete = gmm_ce
     endif
     return
     
@@ -759,15 +827,15 @@ contains
     return
   end function d2te
 !=======================================================================
-  subroutine langevin_ttm(namax,natm,va,aa,tag,eki,am,h, &
-       nspmax,fa2v,fekin,ediff,dtmd,mpi_world,iprint)
+  subroutine langevin_ttm(namax,natm,va,aa,tag,am,h, &
+       nspmax,fa2v,fekin,ediff,dtmd,myid,mpi_world,iprint)
 !
 !  Langevin thermostat for atomic system.
 !
     include "params_unit.h"
-    integer,intent(in):: namax,natm,nspmax,mpi_world,iprint
+    integer,intent(in):: namax,natm,nspmax,myid,mpi_world,iprint
     real(8),intent(in):: aa(3,namax),tag(namax),am(nspmax) &
-         ,fa2v(nspmax),fekin(nspmax),dtmd,h(3,3),eki(3,3,namax)
+         ,fa2v(nspmax),fekin(nspmax),dtmd,h(3,3)
     real(8),intent(inout):: va(3,namax),ediff(nspmax)
 
     integer:: ic,i,l,ifmv,ix,iy,iz,naccp,ierr,isp
@@ -791,7 +859,7 @@ contains
 
     do ic=1,nxyz
       call ic2ixyz(ic,ix,iy,iz)
-      sgm(ic) = dsqrt(2d0*gmmp*te(ix,iy,iz)/dtmd *k2ue )
+      sgm(ic) = dsqrt(2d0*gmmp(ic)*te(ix,iy,iz)/dtmd *k2ue )
 !!$      if( ic.lt.20 ) print *,'ic,sgm,Te,fkb*Te=',ic,sgm(ic)&
 !!$           ,te(ix,iy,iz),fkb*te(ix,iy,iz)
     enddo
@@ -813,12 +881,12 @@ contains
         ic = a2c(i)
         call ic2ixyz(ic,ix,iy,iz)
         if( ix.lt.lsurf ) cycle
-        vt(1:3) = va(1:3,i)
+        vt(1:3) = va(1:3,i) -vac(1:3,ic)
         ami= am(isp)
         sgmi = sgm(ic) *dsqrt(ami)
-        ek = eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
-        gmmi = gmmp
-        if( ek.gt.ekth ) gmmi = gmmp + gmms
+        ek = ekti(i)
+        gmmi = gmmp(ic)
+        if( ek.gt.ekth ) gmmi = gmmp(ic) + gmms(ic)
         aai(1:3)= 0d0
         aain(1:3)= 0d0
         aaout(1:3)= 0d0
@@ -832,6 +900,17 @@ contains
         enddo
 !.....To compensate the factor 1/2 in fa2v, multiply 2 here.
         va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(isp)*dtmd *2d0
+        if( va(1,i)*0d0.ne.0d0 .or. va(2,i)*0d0.ne.0d0 &
+             .or. va(3,i)*0d0.ne.0d0 ) then
+          if( myid.eq.0 ) then
+            print *,'ERROR: va==NaN !!!'
+            print *,'  ic,i,va(:)=',ic,i,va(1:3,i)
+            print *,'  aain,aaout=',aain(1:3),aaout(1:3)
+            print *,'  sgmi=',sgmi
+            print *,'  gmmp(ic),te(ix,iy,iz)=',gmmp(ic),te(ix,iy,iz)
+          endif
+          stop
+        endif
 !.....accumulate energy difference
         vi(1:3)= h(1:3,1)*vt(1) &
              +h(1:3,2)*vt(2) &

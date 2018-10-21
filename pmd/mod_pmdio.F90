@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-10-18 13:45:59 Ryo KOBAYASHI>
+!                     Last modified: <2018-10-21 19:36:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -107,8 +107,10 @@ module pmdio
 !.....Metadynamics
   logical:: lmetaD = .false. 
 
-!.....zload type
+!.....zload type: zload or shear
   character(len=128):: czload_type= 'none'
 !.....top and bottom skin width in which atoms are fixed and/or controlled
   real(8):: zskin_width = 5.0d0
+!.....Shear angle from x in degree, shear direction is on xy-plane
+  real(8):: zshear_angle = 0d0
 end module pmdio

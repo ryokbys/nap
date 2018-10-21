@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-10-18 13:34:01 Ryo KOBAYASHI>
+c                     Last-modified: <2018-10-21 19:56:42 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -10,7 +10,8 @@ c-----------------------------------------------------------------------
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
      &     ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv
      &     ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width
-     &     ,eps_conv,ifsort,iprint,nstp_done,lvc,boundary,lmetaD)
+     &     ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary
+     &     ,lmetaD)
       use pmdvars
       use zload
       use force
@@ -30,7 +31,7 @@ c-----------------------------------------------------------------------
       integer,intent(out):: nstp_done
       real(8),intent(in):: hunit,tinit,tfin
      &     ,trlx,srlx,stbeta,strfin,dmp,eps_conv,vardt_len
-     &     ,zskin_width
+     &     ,zskin_width,zshear_angle
       real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
      &     ,atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0)
      &     ,epitot(ntot0),dt,rc,rbuf,h(3,3,0:1),stnsr(3,3),fmv(3,0:9)
@@ -108,7 +109,7 @@ c.....Set 0d0 to z of fmv(9) in case of z-loading
           write(6,'(a)') 'Set fmv(3,9)=0d0, because czload_type='
      &         //trim(czload_type)
         endif
-      else if( trim(czload_type).eq.'xshear' ) then
+      else if( trim(czload_type).eq.'shear' ) then
         fmv(1,9) = 0d0
         fmv(3,9) = 0d0
         if( myid_md.eq.0 .and. iprint.gt.0 ) then
@@ -253,9 +254,9 @@ c.....Set ifmv of top and bottom atoms for z-loading if needed
       if( trim(czload_type) .eq. 'atoms' ) then
         call set_zload_atoms(natm,ra,tag,h,fmv,sorg,strfin,maxstp
      &       ,zskin_width,myid_md,mpi_md_world,iprint)
-      else if( trim(czload_type).eq.'xshear' ) then
-        call set_xshear(natm,ra,tag,h,fmv,sorg,strfin,maxstp
-     &       ,zskin_width,myid_md,mpi_md_world,iprint)
+      else if( trim(czload_type).eq.'shear' ) then
+        call set_shear(natm,ra,tag,h,fmv,sorg,strfin,maxstp
+     &       ,zskin_width,zshear_angle,myid_md,mpi_md_world,iprint)
       endif
 
 c.....Set initial temperature if needed
@@ -438,8 +439,8 @@ c      write(cnum(1:4),'(i4.4)') 0
       
       if( trim(ctctl).eq.'ttm' ) then
         call assign_atom2cell(namax,natm,ra,sorg,boundary)
-        call calc_Ta(namax,natm,eki,tag,fmv,istp
-     &       ,myid_md,mpi_md_world,iprint)
+        call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin
+     &       ,istp,myid_md,mpi_md_world,iprint)
         call output_Te(0,simtime,myid_md,iprint)
       endif
 
@@ -470,14 +471,14 @@ c        call flush(iotemp)
         
 c.....write out tensile forces
         if(trim(czload_type).eq.'atoms' .or. trim(czload_type).eq.'box'
-     &       .or. trim(czload_type).eq.'xshear' ) then
+     &       .or. trim(czload_type).eq.'shear' ) then
           open(iostrs,file='out.zload',status='replace')
           write(iostrs,'(a)') '#  istp,   strnow,      ftop,     fbot'
         endif
       endif
 
       if( trim(czload_type).eq.'atoms' .or.
-     &     trim(czload_type).eq.'xshear' ) then
+     &     trim(czload_type).eq.'shear' ) then
         call get_forces_on_base(natm,ra,aa,tag,h,ftop
      &       ,fbot,sorg,myid_md,mpi_md_world,iprint,czload_type)
         if( myid_md.eq.0 ) then
@@ -581,8 +582,8 @@ c-------update positions
      &         ,sorg,myid_md,mpi_md_world)
         else if( trim(czload_type).eq.'box' ) then
           call zload_box(natm,maxstp,istp,dt,strfin,strnow,h,myid_md)
-        else if( trim(czload_type).eq.'xshear' ) then
-          call xshear_atoms(natm,ra,tag,maxstp,strfin,strnow
+        else if( trim(czload_type).eq.'shear' ) then
+          call shear_atoms(natm,ra,tag,maxstp,strfin,strnow
      &         ,sorg,myid_md,mpi_md_world)
         endif
 
@@ -734,10 +735,10 @@ c.....accumulate energy difference
           enddo
         else if( trim(ctctl).eq.'ttm' ) then
           call assign_atom2cell(namax,natm,ra,sorg,boundary)
-          call calc_Ta(namax,natm,eki,tag,fmv,istp
-     &         ,myid_md,mpi_md_world,iprint)
-          call langevin_ttm(namax,natm,va,aa,tag,eki,am,h
-     &         ,nspmax,fa2v,fekin,ediff,dt,mpi_md_world,iprint)
+          call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin
+     &         ,istp,myid_md,mpi_md_world,iprint)
+          call langevin_ttm(namax,natm,va,aa,tag,am,h
+     &         ,nspmax,fa2v,fekin,ediff,dt,myid_md,mpi_md_world,iprint)
           call update_Te(simtime,myid_md,mpi_md_world,iprint)
         endif
 
@@ -777,7 +778,7 @@ c-------output energies
           tave= tave/(nave-3)
 
           if( trim(czload_type).eq.'atoms'
-     &         .or. trim(czload_type).eq.'xshear' ) then
+     &         .or. trim(czload_type).eq.'shear' ) then
             call get_forces_on_base(natm,ra,aa,tag,h,ftop
      &           ,fbot,sorg,myid_md,mpi_md_world,iprint,czload_type)
           endif
@@ -804,7 +805,7 @@ c            call flush(iotemp)
             ediff(1:9)= 0d0
 
             if( trim(czload_type).eq.'atoms' .or.
-     &           trim(czload_type).eq.'xshear' ) then
+     &           trim(czload_type).eq.'shear' ) then
               write(iostrs,'(i8,3es15.7)') istp,strnow,ftop,fbot
               call flush(iostrs)
             endif
