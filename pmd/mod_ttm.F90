@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-10-20 10:26:22 Ryo KOBAYASHI>
+!                     Last-modified: <2018-10-21 22:33:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -524,7 +524,7 @@ contains
     call mpi_reduce(nacl,nac,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
     do ic=1,nxyz
       if( nac(ic).eq.0 ) cycle
-      vac(:13,ic) = vac(1:3,ic) /nac(ic)
+      vac(1:3,ic) = vac(1:3,ic) /nac(ic)
     enddo
     call mpi_bcast(vac,3*nxyz,mpi_real8,0,mpi_world,ierr)
 

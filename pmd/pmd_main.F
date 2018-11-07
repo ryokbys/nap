@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-10-21 19:37:27 Ryo KOBAYASHI>
+c                     Last-modified: <2018-11-07 16:41:58 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -520,18 +520,26 @@ c.....
 c      real(8),external:: urnd
 
       if( myid_md.eq.0 ) then
+        if( iatom_pka.le.0 ) then
 c.....Find a center atom ICNTR
-        icntr = 0
-        dmin = 1d+10
-        do i=1,ntot0
-          d = (rtot(1,i)-0.5d0)**2
-     &         +(rtot(2,i)-0.5d0)**2
-     &         +(rtot(3,i)-0.5d0)**2
-          if( d .lt. dmin ) then
-            icntr = i
-            dmin = d
+          icntr = 0
+          dmin = 1d+10
+          do i=1,ntot0
+            d = (rtot(1,i)-0.5d0)**2
+     &           +(rtot(2,i)-0.5d0)**2
+     &           +(rtot(3,i)-0.5d0)**2
+            if( d .lt. dmin ) then
+              icntr = i
+              dmin = d
+            endif
+          enddo
+        else
+          if( iatom_pka.gt.ntot0 ) then
+            print *,'ERROR: iatom_pka.gt.ntot0 !'
+            stop
           endif
-        enddo
+          icntr = iatom_pka
+        endif
 
 c.....Add PKA velocity at ICNTR atom
 c.....Get random theta and phi

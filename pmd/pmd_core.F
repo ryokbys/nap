@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-10-21 19:56:42 Ryo KOBAYASHI>
+c                     Last-modified: <2018-11-01 12:20:10 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -458,7 +458,7 @@ c.....write out energies
         if( tave.gt.10000d0) cftave = 'es12.4'
         write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3'
      &       //','//cftave//',2es16.7e3)') istp
-     &       ,simtime,ekin+epot0-epot0,ekin,epot0-epot0,tave
+     &       ,simtime,ekin+epot0,ekin,epot0,tave
      &       ,vol
      &       ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
         call flush(ioerg)
@@ -795,7 +795,7 @@ c.....write energies
             if( tave.gt.10000d0) cftave = 'es12.4'
             write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3'
      &           //','//cftave//',2es16.7e3)') istp
-     &           ,simtime,ekin+epot-epot0,ekin,epot-epot0,tave
+     &           ,simtime,ekin+epot,ekin,epot,tave
      &           ,vol
      &           ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
             call flush(ioerg)

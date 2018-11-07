@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-10-21 19:36:18 Ryo KOBAYASHI>
+!                     Last modified: <2018-11-07 16:38:53 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -100,6 +100,7 @@ module pmdio
   character(len=3):: boundary = 'ppp'
 
 !.....PKA for radiation damage
+  integer:: iatom_pka = -1
   real(8):: pka_energy = -1.d0 ! in eV
   real(8):: pka_theta = 0.d0  ! in degree
   real(8):: pka_phi = 0.d0    ! in degree

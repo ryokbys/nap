@@ -213,6 +213,9 @@ c        call read_c1(ionum,cforce)
       elseif( trim(cname).eq.'print_level' ) then
         call read_i1(ionum,iprint)
         return
+      elseif( trim(cname).eq.'pka_atom') then
+        call read_i1(ionum,iatom_pka)
+        return
       elseif( trim(cname).eq.'pka_energy') then
         call read_r1(ionum,pka_energy)
         return

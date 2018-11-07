@@ -158,6 +158,9 @@ the total energy conserves conpensating the deviations of kinetic and potential 
 
 .. image:: ./figs/graph_energy-steps.png
 
+.. note::
+   The format ot ``out.erg`` is a bit changed from that of before 2018-11-01 versions. The total and potential energies are raw values not being subtracted the initial values.
+
 And also configurations of atoms at each 10 steps out of 100 steps are written in files, e.g.)
 ``pmd_0``, ``pmd_10``,..., ``pmd_100``.
 
