@@ -767,6 +767,45 @@ contains
 !!$    enddo
     return
   end subroutine set_descs
+!=======================================================================
+  subroutine get_dsgnmat_force(dgsfa,mpi_world)
+!
+!  Special routine to compute the contribution of each descriptors
+!  to force and return design matrix of force-matching,
+!  which is used only in fitpot.
+!
+    use pmdvars,only: natm,namax,nbmax,nb,lsb,nex,lsrc,myparity,nn &
+         ,lspr,tcom
+    integer,intent(in):: mpi_world
+    real(8),allocatable,intent(out):: dgsfa(:,:,:)
+
+    integer:: ia,jj,ja,isf
+
+    if( allocated(dgsfa) ) then
+      if( size(dgsfa).ne.3*nsf*namax ) then
+        deallocate(dgsfa)
+        allocate(dgsfa(3,nsf,namax))
+      endif
+    else
+      allocate(dgsfa(3,nsf,namax))
+    endif
+
+    dgsfa(1:3,1:nsf,1:namax) = 0d0
+    do ia=1,natm
+      do jj=1,lspr(0,ia)
+        ja = lspr(jj,ia)
+        do isf=1,nsf
+          dgsfa(1:3,isf,ja) = dgsfa(1:3,isf,ja) +dgsf(1:3,isf,jj,ia)
+        enddo
+      enddo
+      do isf=1,nsf
+        dgsfa(1:3,isf,ia) = dgsfa(1:3,isf,ia) +dgsf(1:3,isf,0,ia)
+      enddo
+    enddo
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,dgsfa,3*nsf)
+    return
+  end subroutine get_dsgnmat_force
 end module descriptor
 !-----------------------------------------------------------------------
 !     Local Variables:

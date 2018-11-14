@@ -1556,7 +1556,7 @@ contains
 !.....Increasing factor of step length
     real(8),parameter:: facinc = 2.0d0
     integer:: iter,i,ig,iterp
-    real(8):: alphai,alphap,f0,fi,fp,ftsti,ftstp,fpi
+    real(8):: alphai,alphap,f0,fi,fp,ftsti,ftstp,fpi,fti
     real(8),save,allocatable:: x1(:),gpena(:)
     logical,save:: l1st = .true.
 
@@ -1577,12 +1577,12 @@ contains
         x1(1:ndim) = x1(1:ndim) +alphai*d(1:ndim)
       endif
       call wrap_ranges(ndim,x1,xranges)
-      call func(ndim,x1,fi,ftsti)
+      call func(ndim,x1,fti,ftsti)
       call penalty(cpena,ndim,fpi,gpena,x1)
-      fi = fi +fpi
+      fi = fti +fpi
       if( myid.eq.0 .and. iprint.gt.2 ) then
-        print '(a,i8,4es12.4)','   iter,alphai,fi,fi-f0,fi-fp = ' &
-             ,iter,alphai,fi,fi-f0,fi-fp
+        print '(a,i8,5es12.4)','   iter,alphai,fi,fti,fi-f0,fi-fp = ' &
+             ,iter,alphai,fi,fti,fi-f0,fi-fp
       endif
       if( fi.lt.f0 ) then
         f = fi
@@ -1650,9 +1650,14 @@ contains
       xad= x(i) +alpha*d(i)
       sgn=sign(1d0,xad) 
       val= max(abs(xad)-alpha*pwgt,0d0)
-!!$      val= max(abs(xad)-pwgt,0d0)
       x(i)= sgn*val
-!!$      print *,'i,xad,sgn,val,xi=',i,xad,sgn,val,x(i)
+!!$      if( xad.lt.-pwgt ) then
+!!$        x(i) = xad +pwgt
+!!$      else if( xad.gt.pwgt ) then
+!!$        x(i) = xad -pwgt
+!!$      else
+!!$        x(i) = 0d0
+!!$      endif
     enddo
     return
   end subroutine soft_threshold

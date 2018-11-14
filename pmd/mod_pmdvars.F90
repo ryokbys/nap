@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2018-07-11 09:57:37 Ryo KOBAYASHI>
+!                    Last modified: <2018-11-11 00:11:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -123,4 +123,24 @@ contains
     call mpi_bcast(nfmv,1,mpi_integer,0,mpi_world,ierr)
     
   end subroutine calc_nfmv
+!=======================================================================
+  subroutine get_lspr(nao,nno,lspro)
+!
+!   Accessor method for lspr.
+!
+    integer,intent(out):: nao,nno
+    integer,allocatable,intent(out):: lspro(:,:)
+
+    nao = namax
+    nno = nnmax
+    if( allocated(lspro) ) then
+      if( size(lspro).ne.(nnmax+1)*namax) then
+        deallocate(lspro)
+        allocate(lspro(0:nno,nao))
+      endif
+    else
+      allocate(lspro(0:nno,nao))
+    endif
+    
+  end subroutine get_lspr
 end module pmdvars

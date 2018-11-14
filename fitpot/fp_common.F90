@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-10-12 18:54:25 Ryo KOBAYASHI>
+!                     Last modified: <2018-11-14 12:50:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -125,9 +125,8 @@ contains
     ftrnl = 0d0
     ftstl = 0d0
     do ismpl=isid0,isid1
-      smpl = samples(ismpl)
-      natm= smpl%natm
-      cdirname = trim(smpl%cdirname)
+      natm= samples(ismpl)%natm
+      cdirname = trim(samples(ismpl)%cdirname)
       if( trim(cpot).eq.'vcMorse' ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -162,10 +161,11 @@ contains
              //'/pmd')
         call set_params_linreg(ndim,x)
         if( .not. lupdate_gsf ) then
-          nsf = smpl%nsf
-          nal = smpl%nal
-          nnl = smpl%nnl
-          call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
+          nsf = samples(ismpl)%nsf
+          nal = samples(ismpl)%nal
+          nnl = samples(ismpl)%nnl
+          call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
+               samples(ismpl)%dgsf,samples(ismpl)%igsf)
         endif
       else if( trim(cpot).eq.'NN2' ) then
         call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
@@ -175,10 +175,11 @@ contains
         call set_params_NN2(ndim,x,nn_nl,nn_nhl)
         call set_sigtype_NN2(nn_sigtype)
         if( .not. lupdate_gsf ) then
-          nsf = smpl%nsf
-          nal = smpl%nal
-          nnl = smpl%nnl
-          call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
+          nsf = samples(ismpl)%nsf
+          nal = samples(ismpl)%nal
+          nnl = samples(ismpl)%nnl
+          call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
+               samples(ismpl)%dgsf,samples(ismpl)%igsf)
         endif
       else if( trim(cpot).eq.'BVS' ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
@@ -188,7 +189,7 @@ contains
         call set_params_Coulomb(maxisp,x(1:maxisp),cpot)
         call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot,interact)
       endif
-      call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut)
+      call run_pmd(samples(ismpl),lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut)
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
       samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
@@ -639,6 +640,7 @@ contains
          ,rc_other,maxisp
     use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
     use force
+    use descriptor,only: get_dsgnmat_force
     implicit none
     include "../pmd/params_unit.h"
     type(mdsys),intent(inout):: smpl
@@ -760,6 +762,7 @@ contains
          ,lematch,lfmatch,lsmatch,boundary)
     strs(1:3,1:3) = ptnsr(1:3,1:3) *up2gpa*(-1d0)
     if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
+    if( lfmatch ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)
 !!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
 !!$  print *,'smpl%natm =',smpl%natm
 !!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)
@@ -949,11 +952,14 @@ contains
 !
     use variables
     use parallel
+    use pmdvars,only: get_lspr
     implicit none 
     real(8),parameter:: tiny = 1d-15
-    integer:: nsuml,nsumg,ismpl,natm,isf,jsf,ia,nsf
-    real(8):: gmeanl,gmean,tmp,gvarl,dgi,dgj
+    integer:: nsuml,nsumg,ismpl,natm,isf,jsf,ia,nsf,ndat,ixyz
+    real(8):: gmeanl,gmean,tmp,gvarl,dgi,dgj,gtmp
     real(8),allocatable:: gsfml(:),gsfvl(:),gsfcl(:,:),gsfvsq(:),gsfsl(:)
+    character(len=128):: cnum
+!    real(8),allocatable:: dgsft(:,:,)
 
     nsf = samples(isid0)%nsf
 !!$    print *,'myid,isid0,nsf=',myid,isid0,nsf
@@ -1004,6 +1010,66 @@ contains
       gsfvs(isf)= gsfss(isf) -gsfms(isf)**2
     enddo
 
+!.....Output basis function matrix
+!.....Since it could be very large, write out only when iprint > 1 and nnode==1.
+    if( myid.eq.0 .and. iprint.gt.1 .and. nnode.eq.1 ) then
+      print *,'Write out.dsgnmat_atm'
+      write(cnum,'(i0)') nsf
+      open(21,file='out.dsgnmat_atm')
+      write(21,'(2i10)') nsumg,nsf
+      do ismpl=isid0,isid1
+        natm = samples(ismpl)%natm
+        do ia=1,natm
+          write(21,'('//trim(cnum)//'es12.3e3)') (samples(ismpl)%gsf(isf,ia),isf=1,nsf)
+        enddo
+      enddo
+      close(21)
+!.....Design matrix for lasso ()
+      if( lematch ) then
+        print *,'Write out.dsgnmat_erg'
+        open(22,file='out.dsgnmat_erg')
+!.....Since now it is only nnode==1, isid1==nsmpl
+        write(22,'(a)') '# y_i, (x_{ij},j=1,nsf) of energy matching'
+        write(22,'(2i8)') isid1,nsf
+        do ismpl=isid0,isid1
+          write(22,'(es12.3e3)',advance='no') samples(ismpl)%eref
+          do isf=1,nsf
+            gtmp = 0d0
+            do ia=1,natm
+              gtmp = gtmp +samples(ismpl)%gsf(isf,ia)
+            enddo
+            write(22,'(es12.3e3)',advance='no') gtmp
+          enddo
+          write(22,*) ''
+        enddo
+        close(22)
+      endif
+
+!.....Design matrix for force-matching
+      if( lfmatch ) then
+        print *,'Write out.dsgnmat_frc'
+        open(23,file='out.dsgnmat_frc')
+        write(23,'(a)') '# y_i, (x_{ij},j=1,nsf) of force matching'
+        ndat = 0
+        do ismpl=isid0,isid1
+          ndat = ndat +3*samples(ismpl)%natm
+        enddo
+        write(23,'(2i8)') ndat,nsf
+        do ismpl=isid0,isid1
+          do ia=1,samples(ismpl)%natm
+            do ixyz=1,3
+              write(23,'(es12.3e3)',advance='no') samples(ismpl)%fref(ixyz,ia)
+              do isf=1,nsf
+                write(23,'(es12.3e3)',advance='no') -samples(ismpl)%dgsfa(ixyz,isf,ia)
+              enddo
+              write(23,*) ''
+            enddo
+          enddo
+        enddo
+        close(23)
+      endif
+    endif
+
 !.....Correlation coefficients
     gsfcl(:,:) = 0d0
     do ismpl=isid0,isid1
@@ -1034,6 +1100,7 @@ contains
     enddo
 !.....Output correlation
     if( myid.eq.0 .and. iprint.gt.0 ) then
+      print *,'Write out.correlation'
       open(20,file='out.correlation',status='replace')
       do isf=1,nsf
         do jsf=1,nsf
@@ -1062,6 +1129,7 @@ contains
         enddo
       endif
     endif
+
 
     deallocate(gsfml,gsfvl,gsfcl,gsfvsq,gsfsl)
     return

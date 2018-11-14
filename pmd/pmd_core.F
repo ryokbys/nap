@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-11-01 12:20:10 Ryo KOBAYASHI>
+c                     Last-modified: <2018-11-11 11:10:03 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -1182,8 +1182,8 @@ c.....revert forces to the unit eV/A before going out
       
 c.....deallocate all the arrays allocated 
       deallocate(fekin,fa2v)
-      deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
-     &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
+c      deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
+c     &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
 
       if( iprint.ge.10 ) then
         write(6,'(a)') ' one_shot done.'
@@ -2950,7 +2950,22 @@ c
       use pmdvars
       implicit none
       
-
+      if( allocated(ra) ) deallocate(ra)
+      if( allocated(va) ) deallocate(va)
+      if( allocated(aa) ) deallocate(aa)
+      if( allocated(ra0) ) deallocate(ra0)
+      if( allocated(strs) ) deallocate(strs)
+      if( allocated(stt) ) deallocate(stt)
+      if( allocated(tag) ) deallocate(tag)
+      if( allocated(lspr) ) deallocate(lspr)
+      if( allocated(epi) ) deallocate(epi)
+      if( allocated(eki) ) deallocate(eki)
+      if( allocated(stp) ) deallocate(stp)
+      if( allocated(stn) ) deallocate(stn)
+      if( allocated(chg) ) deallocate(chg)
+      if( allocated(chi) ) deallocate(chi)
+      if( allocated(lsb) ) deallocate(lsb)
+      if( allocated(lsex) ) deallocate(lsex)
       allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax)
      &     ,strs(3,3,namax),stt(3,3,namax),tag(namax)
      &     ,lspr(0:nnmax,namax),epi(namax),eki(3,3,namax)

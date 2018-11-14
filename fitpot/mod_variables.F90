@@ -106,6 +106,8 @@ module variables
          ,dgsf(:,:,:,:),igsf(:,:,:)
 !.....Specific to NN
     real(8),allocatable:: hl1(:,:)
+!.....Design-matrix for force-matching
+    real(8),allocatable:: dgsfa(:,:,:)
   end type mdsys
   real(8):: erefmin
   real(8):: gsfmean,gsfvar
