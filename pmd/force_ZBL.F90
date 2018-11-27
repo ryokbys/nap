@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-03 15:36:42 Ryo KOBAYASHI>
+!                     Last modified: <2018-11-27 16:52:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -12,6 +12,7 @@ module ZBL
 !   [3] G. Bonny et al., JAP 121, 165107 (2017) for switching function.
 !-----------------------------------------------------------------------
   implicit none
+  save
 
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.ZBL'
@@ -25,11 +26,11 @@ module ZBL
 !.....permittivity of vacuum
   real(8),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
 
-  logical:: interact(msp,msp)
+  logical:: interact(1:msp,1:msp) = .false.
   real(8):: qnucl(msp)
   real(8):: zbl_rc
-  real(8):: r_inner(msp)
-  real(8):: r_outer(msp)
+  real(8):: r_inner(1:msp) = -1d0
+  real(8):: r_outer(1:msp) = -1d0
 
 !.....ZBL parameters
   real(8):: zbl_aa = 0.4683766d0
@@ -48,13 +49,14 @@ module ZBL
 contains
 !=======================================================================
   subroutine read_params_ZBL(myid,mpi_world,iprint)
+    use force, only: loverlay
     implicit none
     include "mpif.h"
     integer,intent(in):: myid,mpi_world,iprint
 
     integer:: isp,jsp,ierr
     real(8):: qnucli,ri,ro
-    character(len=128):: cline,fname,cmode
+    character(len=128):: cline,fname,cmode,ctmp
     real(8),parameter:: qtiny = 1d-10
     integer,external:: num_data
 
@@ -79,6 +81,10 @@ contains
           cmode = trim(cline)
           interact(1:msp,1:msp) = .false.
           cycle
+        else if( trim(cline).eq.'overlay' ) then
+          cmode = trim(cline)
+          backspace(ioprms)
+          read(ioprms,*) ctmp, loverlay
         endif
 !.....Read parameters depending on the mode
         if( trim(cmode).eq.'parameters' ) then
@@ -129,6 +135,7 @@ contains
     call mpi_bcast(r_outer,msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(zbl_rc,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(loverlay,1,mpi_logical,0,mpi_world,ierr)
     return
   end subroutine read_params_ZBL
 !=======================================================================

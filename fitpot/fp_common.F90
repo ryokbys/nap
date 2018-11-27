@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-11-14 12:50:57 Ryo KOBAYASHI>
+!                     Last modified: <2018-11-26 13:08:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -1028,11 +1028,16 @@ contains
       if( lematch ) then
         print *,'Write out.dsgnmat_erg'
         open(22,file='out.dsgnmat_erg')
+        open(25,file='out.esubs')
 !.....Since now it is only nnode==1, isid1==nsmpl
         write(22,'(a)') '# y_i, (x_{ij},j=1,nsf) of energy matching'
         write(22,'(2i8)') isid1,nsf
+        write(25,'(a)') '# esub'
+        write(25,'(2i8)') isid1
         do ismpl=isid0,isid1
-          write(22,'(es12.3e3)',advance='no') samples(ismpl)%eref
+          write(22,'(es12.3e3)',advance='no') samples(ismpl)%eref &
+               -samples(ismpl)%esub
+          write(25,'(es12.3e3)') samples(ismpl)%esub
           do isf=1,nsf
             gtmp = 0d0
             do ia=1,natm
@@ -1043,6 +1048,7 @@ contains
           write(22,*) ''
         enddo
         close(22)
+        close(25)
       endif
 
 !.....Design matrix for force-matching
@@ -1050,15 +1056,20 @@ contains
         print *,'Write out.dsgnmat_frc'
         open(23,file='out.dsgnmat_frc')
         write(23,'(a)') '# y_i, (x_{ij},j=1,nsf) of force matching'
+        open(26,file='out.fsubs')
+        write(26,'(a)') '# fsub'
         ndat = 0
         do ismpl=isid0,isid1
           ndat = ndat +3*samples(ismpl)%natm
         enddo
         write(23,'(2i8)') ndat,nsf
+        write(26,'(2i8)') ndat
         do ismpl=isid0,isid1
           do ia=1,samples(ismpl)%natm
             do ixyz=1,3
-              write(23,'(es12.3e3)',advance='no') samples(ismpl)%fref(ixyz,ia)
+              write(23,'(es12.3e3)',advance='no') samples(ismpl)%fref(ixyz,ia) &
+                   -samples(ismpl)%fsub(ixyz,ia)
+              write(26,'(es12.3e3)') samples(ismpl)%fsub(ixyz,ia)
               do isf=1,nsf
                 write(23,'(es12.3e3)',advance='no') -samples(ismpl)%dgsfa(ixyz,isf,ia)
               enddo
@@ -1067,6 +1078,7 @@ contains
           enddo
         enddo
         close(23)
+        close(26)
       endif
     endif
 

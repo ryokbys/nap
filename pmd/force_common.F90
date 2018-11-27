@@ -58,7 +58,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   strs(1:3,1:3,1:namax)= 0d0
   stnsr(1:3,1:3) = 0d0
 
-!.....If varaible charge, optimize charges before any force calc
+!.....If varaible charge, optimize charges before any charge-dependent potential
   if( lvc ) then
     if( l1st .and. myid_md.eq.0 .and. iprint.ne.0 ) then
       write(6,'(/a)') ' Charges are to be equilibrated.'
@@ -166,6 +166,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   if( use_force('ZBL') ) call force_ZBL(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+  
 
 !.....Exclusive choice of different Coulomb force-fields
   if( use_force('screened_Coulomb') ) then ! screened Coulomb

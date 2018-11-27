@@ -167,10 +167,11 @@ contains
 !  Evaluate descriptors (symmetry functions)
 !  and their derivatives wrt positions for multi-species system.
 !
-!  Cutoff radii from outside are written as rc2o and rc3o,
-!  which could be different from rcs given from params file.
-!  Smaller values would be adopted.
+!  - Cutoff radii are set in each symmetry functions.
+!  - If the overlay option is set, use inner and outer cutoff of ZBL potential.
 !
+    use force,only: loverlay
+    use ZBL,only: interact,r_inner,r_outer,zeta,dzeta
     implicit none
     include "mpif.h"
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
@@ -182,8 +183,9 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,dij2,fcij,eta,rs,texp,driji(3), &
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
-         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,dik2,tmp, &
-         xjk(3),rjk(3),djk,djk2,fcjk,dfcjk,drjkj(3),drjkk(3),dgdjk
+         dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,dik2,tmp,dtmp, &
+         xjk(3),rjk(3),djk,djk2,fcjk,dfcjk,drjkj(3),drjkk(3),dgdjk, &
+         ri,ro,xs,z,dz
 
     real(8):: texpij,texpik,eta3
 
@@ -228,6 +230,14 @@ contains
         drijj(1:3)= -driji(1:3)
 !!$        fcij= fc0(dij,rc2)
 !!$        dfcij= dfc0(dij,rc2)
+        if( loverlay ) then
+          ri = (r_inner(is)+r_inner(js))/2
+          ro = (r_outer(is)+r_outer(js))/2
+          if( dij.lt.ri ) cycle
+          xs = (ro+ri-2d0*dij)/(ro-ri)
+          z = zeta(xs)
+          dz = dzeta(xs)
+        endif
         do isf=iaddr2(1,is,js),iaddr2(2,is,js)
           if( dij.ge.rcs(isf) ) cycle
           if( itype(isf).eq.1 ) then ! Gaussian
@@ -238,12 +248,19 @@ contains
             rs=  cnst(2,isf)
 !.....function value
             texp= exp(-eta*(dij-rs)**2)
-            gsf(isf,ia)= gsf(isf,ia) +texp*fcij
+            dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfcij
+            tmp = texp*fcij
+            if( loverlay ) then
+              if( dij.lt.ro ) then
+                dgdr = tmp*dz*2d0/(ro-ri) +dgdr*(1d0-z)
+                tmp = tmp *(1d0-z)
+              endif
+            endif
+            gsf(isf,ia)= gsf(isf,ia) +tmp
 !.....derivative
 ! dgsf(ixyz,isf,jj,ia): derivative of isf-th basis of atom-ia
 ! by ixyz coordinate of atom-jj.
 ! jj=0 means derivative by atom-ia.
-            dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfcij
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
             igsf(isf,0,ia) = 1
@@ -255,9 +272,16 @@ contains
             a1= cnst(1,isf)
 !.....func value
             tcos= 0.5d0*(1d0+cos(dij*a1))
-            gsf(isf,ia)= gsf(isf,ia) +tcos*fcij
-!.....derivative
             dgdr= -0.5d0*a1*sin(dij*a1)*fcij +tcos*dfcij
+            tmp = tcos*fcij
+            if( loverlay ) then
+              if( dij.lt.ro ) then
+                dgdr = tmp*dz*2d0/(ro-ri) +dgdr*(1d0-z)
+                tmp = tmp *(1d0-z)
+              endif
+            endif
+            gsf(isf,ia)= gsf(isf,ia) +tmp
+!.....derivative
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
             igsf(isf,0,ia) = 1
@@ -269,9 +293,16 @@ contains
             a1= cnst(1,isf)
 !.....func value
             tpoly= 1d0*dij**(-a1)
-            gsf(isf,ia)= gsf(isf,ia) +tpoly*fcij
-!.....derivative
             dgdr= -a1*dij**(-a1-1d0)*fcij +tpoly*dfcij
+            tmp = tpoly*fcij
+            if( loverlay ) then
+              if( dij.lt.ro ) then
+                dgdr = tmp*dz*2d0/(ro-ri) +dgdr*(1d0-z)
+                tmp = tmp *(1d0-z)
+              endif
+            endif
+            gsf(isf,ia)= gsf(isf,ia) +tmp
+!.....derivative
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
             igsf(isf,0,ia) = 1
@@ -285,9 +316,16 @@ contains
 !.....func value
             texp= exp(-a1*(dij-a2))
             tmorse= ((1d0-texp)**2 -1d0)
-            gsf(isf,ia)= gsf(isf,ia) +tmorse*fcij
-!.....derivative
             dgdr= 2d0*a1*(1d0-texp)*texp*fcij +tmorse*dfcij
+            tmp = tmorse*fcij
+            if( loverlay ) then
+              if( dij.lt.ro ) then
+                dgdr = tmp*dz*2d0/(ro-ri) +dgdr*(1d0-z)
+                tmp = tmp *(1d0-z)
+              endif
+            endif
+            gsf(isf,ia)= gsf(isf,ia) +tmp
+!.....derivative
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
             igsf(isf,0,ia) = 1
@@ -351,7 +389,7 @@ contains
               igsf(isf,0,ia) = 1
               igsf(isf,jj,ia) = 1
               igsf(isf,kk,ia) = 1
-            else if( itype(isf).eq.102 ) then  ! Behler's angular SF
+            else if( itype(isf).eq.102 ) then  ! Behler's angular SF that includes fc(rjk)
               if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) .or. &
                    djk.ge.rcs(isf) ) cycle
 !.....fcij's can be computed after rcs is determined

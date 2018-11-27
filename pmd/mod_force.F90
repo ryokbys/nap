@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-02-20 17:45:44 Ryo KOBAYASHI>
+!                     Last-modified: <2018-11-27 16:12:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -14,6 +14,9 @@ module force
   logical:: luse_force(N_FORCES)
 
   logical:: luse_charge
+
+!.....Overlay ZBL potential to others
+  logical:: loverlay = .false.
   
 
 contains

@@ -248,16 +248,7 @@ def get_nsf2(pairs):
     if pairs is None:
         return nsf2
     for pair in pairs:
-        for it,t in enumerate(pair.symfuncs):
-            n = 1
-            if t == 'Gaussian':
-                for sfps in pair.sfparams[it]:
-                    if isinstance(sfps,list) or isinstance(sfps,tuple):
-                        n *= len(sfps)
-            elif t == 'polynomial' or 'cosine':
-                n = len(pair.sfparams[it])
-
-            nsf2 += n
+        nsf2 += len(pair.sfparams)
     return nsf2
 
 def get_nsf3(triplets):
@@ -265,9 +256,7 @@ def get_nsf3(triplets):
     if triplets is None:
         return nsf3
     for triplet in triplets:
-        for it,t in enumerate(triplet.symfuncs):
-            n = len(triplet.sfparams[it])
-            nsf3 += n
+        nsf3 += len(triplet.sfparams)
     return nsf3
     
 def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
@@ -294,49 +283,52 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
         if nsf2 > 0:
             for pair in pairs:
                 ia,ja = pair.get_isps()
-                for isf,sf in enumerate(pair.symfuncs):
-                    if sf == 'Gaussian':
-                        rs,etas = pair.sfparams[isf]
-                        for eta in etas:
-                            for r in rs:
-                                f.write(' {0:3d}'.format(_type2num[sf]) \
-                                        +' {0:3d} {1:3d}'.format(ia,ja) \
-                                        +' {0:6.2f}'.format(rc2) \
-                                        +' {0:10.4f} {1:10.4f}\n'.format(eta,r))
-                    elif sf == 'cosine':
-                        rk = pair.sfparams[isf]
-                        for r in rk:
-                            f.write(' {0:3d}'.format(_type2num[sf]) \
-                                    +' {0:3d} {1:3d}'.format(ia,ja) \
-                                    +' {0:6.2f}'.format(rc2) \
-                                    +' {0:10.4f}\n'.format(r))
-                    elif sf == 'polynomial':
-                        a1s = pair.sfparams[isf]
-                        for a1 in a1s:
-                            f.write(' {0:3d}'.format(_type2num[sf]) \
-                                    +' {0:3d} {1:3d}'.format(ia,ja) \
-                                    +' {0:6.2f}'.format(rc2) \
-                                    +' {0:10.4f}\n'.format(a1))
-                    elif sf == 'Morse':
-                        ds,alps,rs = pair.sfparams[isf]
-                        for d in ds:
-                            for alp in alps:
-                                for r in rs:
-                                    f.write(' {0:3d}'.format(_type2num[sf]) \
-                                            +' {0:3d} {1:3d}'.format(ia,ja) \
-                                            +' {0:10.4f} {1:10.4f}'.format(d,alp) \
-                                            +' {0:6.2f}'.format(rc2) \
-                                            +' {0:10.4f}\n'.format(r))
+                for isf,sf in enumerate(pair.sfparams):
+                    t = sf[0]
+                    if t == 'Gaussian':
+                        if len(sf) != 3:
+                            raise RuntimeError('Num of Gaussian params is wrong.')
+                        eta,rs = sf[1],sf[2]
+                        f.write(' {0:3d}'.format(_type2num[t]) \
+                                +' {0:3d} {1:3d}'.format(ia,ja) \
+                                +' {0:6.2f}'.format(rc2) \
+                                +' {0:10.4f} {1:10.4f}\n'.format(eta,rs))
+                    elif t == 'cosine':
+                        if len(sf) != 2:
+                            raise RuntimeError('Num of cosine params is wrong.')
+                        r = sf[1]
+                        f.write(' {0:3d}'.format(_type2num[t]) \
+                                +' {0:3d} {1:3d}'.format(ia,ja) \
+                                +' {0:6.2f}'.format(rc2) \
+                                +' {0:10.4f}\n'.format(r))
+                    elif t == 'polynomial':
+                        if len(sf) != 2:
+                            raise RuntimeError('Num of polynomial params is wrong.')
+                        a1 = sf[1]
+                        f.write(' {0:3d}'.format(_type2num[t]) \
+                                +' {0:3d} {1:3d}'.format(ia,ja) \
+                                +' {0:6.2f}'.format(rc2) \
+                                +' {0:10.4f}\n'.format(a1))
+                    elif t == 'Morse':
+                        if len(sf) != 4:
+                            raise RuntimeError('Num of Morse params is wrong.')
+                        d,alp,r = sf[1],sf[2],sf[3]
+                        f.write(' {0:3d}'.format(_type2num[t]) \
+                                +' {0:3d} {1:3d}'.format(ia,ja) \
+                                +' {0:6.2f}'.format(rc2) \
+                                +' {0:10.4f} {1:10.4f}'.format(d,alp) \
+                                +' {0:10.4f}\n'.format(r))
         if nsf3 > 0:
             for triple in triplets:
                 ia,ja,ka = triple.get_isps()
-                for isf,sf in enumerate(triple.symfuncs):
-                    angs = [ -math.cos(a/180*math.pi) for a in triple.sfparams[isf] ]
-                    for ang in angs:
-                        f.write(' {0:3d}'.format(_type2num[sf]) \
-                                +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
-                                +' {0:6.2f}'.format(rc3) \
-                                +' {0:10.4f}\n'.format(ang))
+                for isf,sf in enumerate(triple.sfparams):
+                    t = sf[0]
+                    a = sf[1]
+                    ang = -math.cos(a/180*math.pi)
+                    f.write(' {0:3d}'.format(_type2num[t]) \
+                            +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
+                            +' {0:6.2f}'.format(rc3) \
+                            +' {0:10.4f}\n'.format(ang))
         f.close()
 
     with open(_paramfname,'w') as g:

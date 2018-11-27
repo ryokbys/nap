@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-11-11 11:10:03 Ryo KOBAYASHI>
+c                     Last-modified: <2018-11-26 15:24:54 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -452,8 +452,8 @@ c-----initialize the counter for output
 c.....write out energies
         open(ioerg,file="out.erg",status='replace')
         write(ioerg,'(a)') '# istp,  simtime[fs],'
-     &       //'     etot-epot0[eV],  ekin,'
-     &       //'  epot-epot0,  temp[K],  vol[Ang^3],  pressure[GPa]'
+     &       //'     etot[eV],  ekin,'
+     &       //'  epot,  temp[K],  vol[Ang^3],  pressure[GPa]'
         write(ioerg,'(a,es16.7e3,a)') '#  Epot0 =',epot0,' [eV]'
         if( tave.gt.10000d0) cftave = 'es12.4'
         write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3'

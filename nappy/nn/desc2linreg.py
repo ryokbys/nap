@@ -13,6 +13,7 @@ Options:
 """
 from __future__ import print_function
 
+import numpy as np
 from docopt import docopt
 import random
 import nappy.nn.desc as desc
@@ -27,9 +28,9 @@ def create_linreg_input(nsf,desc,wmax,fname='in.params.linreg'):
     for d in descs:
         sftype = d[0]
         if sftype == 'angular':
-            rc3 = max(rc3,d[4])
+            rc3 = np.ceil(max(rc3,d[4]))
         elif sftype == 'gauss':
-            rc2 = max(rc2,d[3])
+            rc2 = np.ceil(max(rc2,d[3]))
     
     with open(fname,'w') as f:
         f.write(' {0:4d}  {1:7.3f}  {2:7.3f}\n'.format(nsf,rc2,rc3))
