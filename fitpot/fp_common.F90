@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-11-26 13:08:54 Ryo KOBAYASHI>
+!                     Last modified: <2018-11-27 18:40:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -17,6 +17,11 @@ module fp_common
 
   integer,parameter:: ivoigt(3,3)= &
        reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
+
+!.....Store loverlay and r_inner/outer arrays
+  logical:: overlay
+  real(8),allocatable:: ri_zbl(:),ro_zbl(:)
+  
 contains
 !=======================================================================
   subroutine init()
@@ -641,6 +646,7 @@ contains
     use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
     use force
     use descriptor,only: get_dsgnmat_force
+    use ZBL,only: r_inner,r_outer
     implicit none
     include "../pmd/params_unit.h"
     type(mdsys),intent(inout):: smpl
@@ -750,6 +756,14 @@ contains
         force_list(i) = trim(cffs(i))
       enddo
     endif
+!.....Overlay setting
+    if( overlay ) then
+!.....Set loverlay variable in force module
+      loverlay = overlay
+!.....Set r_inner/outer arrays in force_ZBL
+      r_inner(:) = ri_zbl(:)
+      r_outer(:) = ro_zbl(:)
+    endif
 
 !.....one_shot force calculation
     call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
@@ -827,8 +841,9 @@ contains
     use Coulomb,only: set_paramsdir_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use LJ,only: set_paramsdir_LJ
-    use ZBL,only: set_paramsdir_ZBL
+    use ZBL,only: set_paramsdir_ZBL, r_inner, r_outer
     use Bonny_WRe,only: set_paramsdir_Bonny
+    use force,only: loverlay
     implicit none
 
     integer:: i,ismpl,natm
@@ -908,6 +923,14 @@ contains
 !!$        do i=1,natm
 !!$          print *,'ia,fsub=',i,frcs(1:3,i)
 !!$        enddo
+        if( luse_ZBL ) then
+          overlay = loverlay
+          if( .not. allocated(ri_zbl) ) then
+            allocate(ri_zbl(size(r_inner)),ro_zbl(size(r_outer)))
+            ri_zbl(:) = r_inner(:)
+            ro_zbl(:) = r_outer(:)
+          endif
+        endif
       enddo
 
     endif

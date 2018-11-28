@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-11-27 17:42:31 Ryo KOBAYASHI>
+!                     Last modified: <2018-11-28 12:16:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -582,6 +582,7 @@ contains
                  ' either fixed, fixed_bvs, variable or qeq.'
             stop
           endif
+          if( iprint.gt.1 ) print *,trim(ctmp),' '//trim(cchgs)
           cycle
         else if( trim(cline).eq.'charge_dist' ) then
           cmode = 'charge_dist'
@@ -593,6 +594,7 @@ contains
                  ' either point or gaussian.'
             stop
           endif
+          if( iprint.gt.1 ) print *,trim(ctmp),' '//trim(cdist)
           cycle
         else if( trim(cline).eq.'terms' ) then
           cmode = 'terms'
@@ -607,6 +609,7 @@ contains
                  'either direct_cut, screened_cut, full, short, or long.'
             stop
           endif
+          if( iprint.gt.1 ) print *,trim(ctmp),' '//trim(cterms)
           cycle
         else if( trim(cline).eq.'interactions' ) then
           cmode = 'interactions'
@@ -627,6 +630,7 @@ contains
         else if( trim(cline).eq.'rho_screened_cut' ) then
           backspace(ioprms)
           read(ioprms,*) ctmp, rho_screened_cut
+          if( iprint.gt.1 ) print *,trim(ctmp),rho_screened_cut
           cycle
         endif
 !.....Not a keyword, a certain mode should be already selected.
@@ -636,6 +640,7 @@ contains
             read(ioprms,*) isp, chgi
             schg(isp) = chgi
             ispflag(isp) = .true.
+            if( iprint.gt.1 ) print *,'fixed charge:',isp,chgi
           else if( trim(cchgs).eq.'fixed_bvs' ) then
             read(ioprms,*) isp,cname,vid,rad,npq
             if( isp.gt.nsp .and. iprint.gt.0 ) then
@@ -813,6 +818,9 @@ contains
     endif
 
     strsl(1:3,1:3,1:namax) = 0d0
+    elrl = 0d0
+    esrl = 0d0
+    eselfl = 0d0
 
     if( lvc .or. trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
       call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
@@ -1347,7 +1355,8 @@ contains
 !    V_smooth(r) = V(r) -V(rc) -(r-rc)*dVdrc
 !
     use force,only: loverlay
-    use ZBL,only: interact,r_inner,r_outer,zeta,dzeta
+    use ZBL,only: r_inner,r_outer,zeta,dzeta
+    use ZBL,only: interact_zbl => interact
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -1408,7 +1417,7 @@ contains
           ro = (r_outer(is)+r_outer(js))/2
           ri  = (r_inner(is)+r_inner(js))/2
           if( dij.lt.ri ) cycle
-          if( dij.lt.ro ) then
+          if( dij.lt.ro .and. interact_zbl(is,js) ) then
             xs = (ro+ri-2d0*dij)/(ro-ri)
             z = zeta(xs)
             dz = dzeta(xs)
