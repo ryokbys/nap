@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-26 20:31:09 Ryo KOBAYASHI>
+!                     Last modified: <2018-11-28 13:26:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -183,6 +183,7 @@ contains
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ielem &
          ,iwgt,isf,ja,jj
     real(8):: b_na,at(3),epotl,wgt,aexp,bnai,apot,epott,tmp
+    real(8):: xi(3),xj(3),xji(3),sji,rji(3),dji,rcin2
     real(8),save,allocatable:: aal(:,:),strsl(:,:,:)
 
     if( l1st ) then
@@ -224,6 +225,7 @@ contains
     enddo
 
 !.....Force
+    rcin2 = rcin*rcin
     do ia=1,natm
 !!$      is = int(tag(ia))
       do jj=1,lspr(0,ia)
@@ -241,11 +243,43 @@ contains
         aal(1:3,ia) = aal(1:3,ia) &
              -wgt*dgsf(1:3,isf,0,ia)
       enddo
+!.....Stress
+      if( .not.lstrs ) cycle
+      xi(1:3)= ra(1:3,ia)
+      is = int(tag(ia))
+      do jj=1,lspr(0,ia)
+        ja = lspr(jj,ia)
+        xj(1:3) = ra(1:3,ja)
+        xji(1:3) = xj(1:3)-xi(1:3)
+        rji(1:3) = h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
+        dji = rji(1)**2 +rji(2)**2 +rji(3)**2
+!!$        print *,'dji,rcin2=',dji,rcin2
+        if( dji.ge.rcin2 ) cycle
+        dji = sqrt(dji)
+        js = int(tag(ja))
+        do isf=1,nsf
+          if( igsf(isf,jj,ia).eq.0 ) cycle
+          wgt = coeff(isf)
+!!$          print *,'ia,jj,ja,isf,wgt=',ia,jj,ja,isf,wgt
+          do ixyz=1,3
+            do jxyz=1,3
+              sji = -wgt*dgsf(jxyz,isf,jj,ia)*rji(ixyz)
+              strsl(ixyz,jxyz,ja) = strsl(ixyz,jxyz,ja) +sji
+              strsl(ixyz,jxyz,ia) = strsl(ixyz,jxyz,ia) +sji
+            enddo
+          enddo
+        enddo
+      enddo
     enddo
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aal,3)
     aa(1:3,1:natm) = aa(1:3,1:natm) +aal(1:3,1:natm)
+    if( lstrs ) then
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+           ,nn,mpi_world,strsl,9)
+      strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)*0.5d0
+    endif
 
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)

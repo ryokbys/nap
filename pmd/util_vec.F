@@ -42,3 +42,4 @@ c  vector product ab of vectors a and b, (ab = a x b)
       ab(3)= a(1)*b(2) -a(2)*b(1)
       return
       end subroutine vprod
+

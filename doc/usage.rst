@@ -80,6 +80,11 @@ _____________________
   
   The optimization option ``-O4`` is thought to be the best for this system.
 
+.. note::
+
+  Compilation with LLVM version gcc is not tested. Use Homebrew version gcc and openmpi.
+
+
 
 Intel Fortran Compiler
 ______________________

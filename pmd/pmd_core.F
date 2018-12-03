@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-11-27 18:40:37 Ryo KOBAYASHI>
+c                     Last-modified: <2018-12-03 21:28:51 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -11,7 +11,7 @@ c-----------------------------------------------------------------------
      &     ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv
      &     ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width
      &     ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary
-     &     ,lmetaD)
+     &     ,lmetaD,lconst)
       use pmdvars
       use zload
       use force
@@ -21,6 +21,8 @@ c-----------------------------------------------------------------------
       use pmdmpi,only: nid2xyz,xyz2nid
       use metadynamics,only: init_metaD,update_metaD,force_metaD
      &     ,write_metaD_potential
+      use constraints,only: init_const, update_const, update_const_vel
+     &     ,update_const_pos
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -41,7 +43,7 @@ c-----------------------------------------------------------------------
      &     ,boundary*3
       character(len=*),intent(in):: czload_type
 !      character(len=20),intent(in):: cffs(numff)
-      logical,intent(in):: ltdst,lstrs0,lcellfix(3,3),lmetaD
+      logical,intent(in):: ltdst,lstrs0,lcellfix(3,3),lmetaD,lconst
       logical,intent(inout):: lvc
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
@@ -234,6 +236,8 @@ c.....Call init_metaD after setting namax and nsp
         call init_metaD(maxstp,nsp,namax,nodes_md
      &       ,myid_md,mpi_md_world,iprint)
       endif
+c.....Initialize constraints if needed
+      if( lconst ) call init_const(myid_md,mpi_md_world,nodes_md,iprint)
 
 c.....Setup for FIRE
       if( ifdmp.eq.2 ) then
@@ -330,6 +334,11 @@ c.....Calc forces
 c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
 c     &     ,epot,chg(1:natm)
 
+c.....Constraints
+      if( lconst ) then
+        call update_const(namax,natm,tag,ra,h,0,maxstp)
+      endif
+
 #ifdef __DISL__
       call perf_disl_pos_by_pot(epith,natm,ra,h,epi,sorg
      &     ,nodes_md,myid_md,mpi_md_world,0,21)
@@ -411,7 +420,7 @@ c          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
 
         if( tave.gt.10000d0 ) cftave = 'es12.4'
         write(6,'(a,'//cfistp//','//cfstime//','//cftave
-     &       //',es15.6,2es11.3)')
+     &       //',es13.4,2es11.3)')
      &       " istp,time,temp,epot,vol,prss="
      &       ,istp,simtime,tave,epot,vol,prss
       endif
@@ -570,11 +579,14 @@ c        call get_vmax(namax,natm,va,h,vmaxt,mpi_md_world)
 c        print '(a,i5,2es12.4)','myid,vmax,vmaxt='
 c     &       ,myid_md,vmax,vmaxt
 
-c-------update positions
-        do i=1,natm
-          is = int(tag(i))
-          ra(1:3,i)=ra(1:3,i) +va(1:3,i)*dt
-        enddo
+c.....Update positions
+        if( lconst ) then
+          call update_const_pos(namax,natm,h,hi,tag,ra,va,dt,nspmax,am)
+        else
+          do i=1,natm
+            ra(1:3,i)=ra(1:3,i) +va(1:3,i)*dt
+          enddo
+        endif
         ltot_updated = .false.
 
         if( trim(czload_type).eq.'atoms' ) then
@@ -649,7 +661,11 @@ c.....Force from metadynamics
           call force_metaD(istp,namax,natm,tag,ra,aa,h,hi,epot
      &         ,nnmax,lspr,myid_md,mpi_md_world,iprint)
         endif
-        
+
+c.....Update some variables in constraints if needed
+        if( lconst ) then
+          call update_const(namax,natm,tag,ra,h,istp,maxstp)
+        endif
 
 c.....Second kick of velocities
         do i=1,natm
@@ -657,6 +673,11 @@ c.....Second kick of velocities
           va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
         enddo
 
+c.....Constraints for velocities
+        if( lconst ) then
+          call update_const_vel(namax,natm,h,hi,tag,va,dt,nspmax,am)
+        endif
+        
 c.....Calc kinetic energy
         vmaxold= vmax
         call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl
@@ -740,7 +761,8 @@ c.....accumulate energy difference
           call langevin_ttm(namax,natm,va,aa,tag,am,h
      &         ,nspmax,fa2v,fekin,ediff,dt,myid_md,mpi_md_world,iprint)
           call update_Te(simtime,myid_md,mpi_md_world,iprint)
-        endif
+        endif  ! end of thermostat
+
 
         if( abs(pini-pfin).gt.0.1d0 ) then
           ptgt = ( pini +(pfin-pini)*istp/maxstp ) *gpa2up
@@ -816,7 +838,7 @@ c---------output step, time, and temperature
           if( myid_md.eq.0 .and. iprint.gt.0 ) then
             if( tave.gt.10000d0 ) cftave = 'es12.4'
             write(6,'(a,'//cfistp//','//cfstime//','//cftave
-     &           //',es15.6,2es11.3)')
+     &           //',es13.4,2es11.3)')
      &           " istp,time,temp,epot,vol,prss="
      &           ,istp,simtime,tave,epot,vol,prss
             if( trim(cpctl).eq.'Berendsen' .or.

@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-11-07 16:38:53 Ryo KOBAYASHI>
+!                     Last modified: <2018-11-30 13:05:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -107,6 +107,8 @@ module pmdio
 
 !.....Metadynamics
   logical:: lmetaD = .false. 
+!.....Constraints
+  logical:: lconst = .false. 
 
 !.....zload type: zload or shear
   character(len=128):: czload_type= 'none'
