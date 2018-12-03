@@ -12,9 +12,10 @@ Options:
   --specorder=SPECORDER
              Specify the order of species needed to convert POSCAR to pos. [default: Al,Mg,Si]
   --index=INDEX
-             Convert a snapshot of INDEX. [default: -1]
+             Convert a snapshot of INDEX. Comma separated indices can be specified. [default: -1]
   --sequence
              Extract all the sequence of MD or relaxation stored in vasprun.xml.
+             If the index is specified as a list of indices, this option will be omitted.
   --keep-constraints
              Keep constraints originally set to the system. 
              Otherwise all the constratins are removed. [default: False]
@@ -57,8 +58,11 @@ def write_pos(atoms,fname="pos",specorder=[]):
 
 def output_for_fitpot(atoms,keep_const,dirname='./',specorder=[]):
     if not keep_const:
-        del atoms.constraints
-    #write(dirname+'/POSCAR',images=atoms,format='vasp',direct=True,vasp5=True)
+        try:
+            del atoms.constraints
+        except:
+            print 'del atoms.constraints for ',type(atoms),' failed.'
+            #write(dirname+'/POSCAR',images=atoms,format='vasp',direct=True,vasp5=True)
     try:
         epot = atoms.get_potential_energy()
     except:
@@ -87,16 +91,34 @@ if __name__ == "__main__":
     args=docopt(__doc__)
     dirs= args['DIR']
     specorder= args['--specorder'].split(',')
-    index= int(args['--index'])
     sequence = args['--sequence']
     keep_const = args['--keep-constraints']
+    
+    index= args['--index']
+    if ',' in index:
+        index = [ int(x) for x in index.split(',') ]
+    elif ':' in index:
+        index = [ int(x) for x in index.split(':') ]
+        index = slice(*index)
+    else:
+        index = int(index)
 
     print ' specorder = ',specorder
-    if sequence:
+    if type(index) is list:
+        print ' The following steps are to be extracted: ',
+        for i in index:
+            print i,
+        print ''
+        ase_index = ':'
+    elif type(index) is slice:
+        print ' The sliced steps are to be extracted: '
+        ase_index = index
+    elif sequence:
         print ' All the sequence are to be extracted.'
-        index = ':'
+        ase_index = ':'
     else:
-        print ' index   = ',index
+        ase_index = index
+        print ' index   = ',ase_index
     print ' keep_const   = ',keep_const
 
     ndirs= len(dirs)
@@ -117,14 +139,26 @@ if __name__ == "__main__":
         try:
             #...Since there is a bug in vasp, species "r" needs to be replaced by "Zr"
             os.system("sed -i'' -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
-            atoms= read('vasprun.xml',index=index,format='vasp-xml')
+            atoms= read('vasprun.xml',index=ase_index,format='vasp-xml')
         except Exception as e:
             print ' Failed to read vasprun.xml, so skip it.'
             print e
             continue
 
-        if sequence:  # MD sequence
-            print(' Extracting sequence...')
+        if type(index) is list:
+            print ' Extracting specified steps from ',len(atoms),' steps in total'
+            n = 0
+            for j,a in enumerate(atoms):
+                if j not in index:
+                    continue
+                dirname = '{0:05d}/'.format(n)
+                print('  {0:s}'.format(dirname))
+                os.system('mkdir -p {0:s}'.format(dirname))
+                output_for_fitpot(a,keep_const,dirname=dirname,
+                                  specorder=specorder)
+                n += 1
+        elif sequence or type(index) is slice:  # Whole MD sequence
+            print ' Extracting sequence of ',len(atoms),' steps'
             for j,a in enumerate(atoms):
                 dirname = '{0:05d}/'.format(j)
                 print('  {0:s}'.format(dirname))
