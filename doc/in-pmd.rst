@@ -333,7 +333,7 @@ converge_eps
 
 * Default: 1d-4
 
-Convergence criterion in eV.
+Convergence criterion in eV. If it is negative value, not to stop because of convergence.
 
 
 ------------------------

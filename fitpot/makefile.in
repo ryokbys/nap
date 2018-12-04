@@ -33,7 +33,7 @@ pmdobj= ${PMDDIR}/mod_pmdvars.o ${PMDDIR}/mod_pmdmpi.o ${PMDDIR}/mod_pmdio.o \
     ${PMDDIR}/force_*.o ${PMDDIR}/sort.o ${PMDDIR}/mk_lspr.o \
     ${PMDDIR}/util_pmd.o ${PMDDIR}/lasubs.o ${PMDDIR}/util_vec.o \
     ${PMDDIR}/common_parallel.o ${PMDDIR}/pmd_core.o ${PMDDIR}/descriptor.o \
-    ${PMDDIR}/metadynamics.o
+    ${PMDDIR}/metadynamics.o ${PMDDIR}/mod_constraints.o ${PMDDIR}/mod_vector.o
 
 ${PMDDIR}/%.o: ${PMDDIR}/%.F90
 	@[ -d ${PMDDIR} ]
