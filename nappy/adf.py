@@ -13,7 +13,7 @@ Options:
     -h, --help  Show this help message and exit.
     -w DEG      Width of the angular degree. [default: 1.0]
     -r RCUT     Cutoff radius of the bonding pair. [default: 3.0]
-    -s FMT      Input file format. If is not *akr*, users must specify it. [default: akr]
+    -f FMT      Input file format. [default: POSCAR]
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
     -o OUT      Output file name [default: out.adf]
@@ -93,15 +93,15 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
     if not (n1==1 and n2==1 and n3==1):
         print ' system to be repeated, n1,n2,n3=',n1,n2,n3
         asys.repeat(n1,n2,n3)
-    print ' a1=',asys.a1
-    print ' a2=',asys.a2
-    print ' a3=',asys.a3
+    # print ' a1=',asys.a1
+    # print ' a2=',asys.a2
+    # print ' a3=',asys.a3
     asys.assign_pbc()
 
     asys.make_pair_list(rcut=rcut)
 
     na= int(180.0/dang)+1
-    print " rcut,dang,na=",rcut,dang,na
+    # print " rcut,dang,na=",rcut,dang,na
     anda= np.zeros(na,dtype=np.float)
     angd= np.array([ dang*ia for ia in range(na) ])
     nsum= 0
@@ -117,7 +117,7 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
     # anda /= nsum
     return angd,anda,natm0
 
-def adf_average(infiles,ffmt='akr',dang=1.0,rcut=3.0,
+def adf_average(infiles,ffmt='POSCAR',dang=1.0,rcut=3.0,
                 id0=0,id1=0,id2=0):
     na= int(180.0/dang) +1
     df= np.zeros(na,dtype=float)
@@ -128,7 +128,7 @@ def adf_average(infiles,ffmt='akr',dang=1.0,rcut=3.0,
             print "[Error] File, {0}, does not exist !!!".format(infname)
             sys.exit()
         asys= NAPSystem(fname=infname,ffmt=ffmt)
-        print ' infname=',infname
+        print ' File = ',infname
         angd,df,n= adf(asys,dang,rcut,id0,id1,id2)
         aadf += df
         nsum += n
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     rcut= float(args['-r'])
     flag_plot= args['-p']
     sigma= int(args['--gsmear'])
-    ffmt= args['-s']
+    ffmt= args['-f']
     ofname= args['-o']
 
     na= int(180.0/dang) +1
@@ -170,3 +170,4 @@ if __name__ == "__main__":
     for i in range(na):
         outfile.write(' {0:10.4f} {1:15.7f}\n'.format(angd[i],agr[i]))
     outfile.close()
+    print ' Wrote '+ofname

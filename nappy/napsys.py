@@ -303,7 +303,7 @@ class NAPSystem(object):
             s = a.symbol
             a.set_sid(self.specorder.index(s)+1)
         return None
-    
+
     def get_charges(self):
         return self.charges
 
