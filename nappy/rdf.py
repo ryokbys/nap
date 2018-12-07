@@ -67,7 +67,7 @@ def rdf(asys,nspcs,dr,rmax):
     natm0= asys.num_atoms()
     vol= asys.volume()
     rho= float(natm0)/vol
-    print ' natm0,vol,rho=',natm0,vol,rho
+    # print ' natm0,vol,rho=',natm0,vol,rho
 
     n1,n2,n3= asys.get_expansion_num(2.0*rmax)
     if not (n1==1 and n2==1 and n3==1):
@@ -103,7 +103,7 @@ def rdf_average(infiles,nspcs,nr,ffmt='pmd',dr=0.1,rmax=3.0,average=True):
             print "[Error] File, {0}, does not exist !!!".format(infname)
             sys.exit()
         asys= NAPSystem(fname=infname,ffmt=ffmt)
-        print ' infname=',infname
+        print ' File =',infname
         rd,gr,n= rdf(asys,nspcs,dr,rmax)
         nsum += n
         agr += gr
