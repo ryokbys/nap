@@ -2,7 +2,7 @@
 """
 NN_io includes some functions related to input/output of NN potential.
 """
-
+from __future__ import print_function
 
 def read_const(fname):
     """
@@ -34,7 +34,7 @@ def read_const(fname):
             combs.append((ia,ja,ka))
             consts.append(buf[4:])
     f.close()
-    print ' reading {0:s} done.'.format(fname)
+    print(' reading {0:s} done.'.format(fname))
     return nl,nsp,nhl,itypes,combs,consts
 
 def write_const(fname,nl,nsp,nhl,itypes,combs,consts):
@@ -68,7 +68,7 @@ def read_params(fname):
         buf= f.readline().split()
         prms.append(buf[0:3])
     f.close()
-    print ' reading {0:s} done.'.format(fname)
+    print(' reading {0:s} done.'.format(fname))
     return nprm,rcut,rcut3,prms
 
 def write_params(fname,nprm,rcut,rcut3,prms):
@@ -85,6 +85,6 @@ def read_NN_analysis(fname):
         buf= line.split()
         nnanal.append((int(buf[1]),float(buf[2])))
     f.close()
-    print ' reading {0:s} done.'.format(fname)
+    print(' reading {0:s} done.'.format(fname))
     return nnanal
 

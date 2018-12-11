@@ -9,6 +9,7 @@ OUTPUT:
   * POSCAR
   * FORCE_CONSTANTS
 """
+from __future__ import print_function
 
 import os,sys,math,copy
 import optparse
@@ -30,7 +31,7 @@ def calc_extention_ratio(hmat,rcut):
     a2[:]= hmat[1,:]
     a3[:]= hmat[2,:]
     vol= abs(np.dot(a1,np.cross(a2,a3)))
-    print ' vol of unit cell=',vol
+    print(' vol of unit cell=',vol)
     a23= np.cross(a2,a3)
     a31= np.cross(a3,a1)
     a12= np.cross(a1,a2)
@@ -67,16 +68,16 @@ parser.add_option("--pmdexec",dest="pmdexec",type="string",
 (options,args)= parser.parse_args()
 
 displace= options.displace
-print ' displacement = ',displace,' Ang.'
+print(' displacement = ',displace,' Ang.')
 rcut= options.rcut
-print ' rcut         = ',rcut,' Ang.'
+print(' rcut         = ',rcut,' Ang.')
 pmdexec= options.pmdexec
 infname= args[0]
 
 sys0= NAPSystem()
 sys0.read_pmd(infname)
 sys0.write_POSCAR()
-print ' POSCAR was written.'
+print(' POSCAR was written.')
 
 natm0= sys0.num_atoms()
 
@@ -89,8 +90,8 @@ n1,n2,n3= calc_extention_ratio(h0,rcut)
 r1= 2*n1+1
 r2= 2*n2+1
 r3= 2*n3+1
-print ' num of cells in each axis=',r1,r2,r3
-print ' num of atoms in extended system=',natm0*r1*r2*r3
+print(' num of cells in each axis=',r1,r2,r3)
+print(' num of atoms in extended system=',natm0*r1*r2*r3)
 
 sysext= NAPSystem()
 sysext.set_lattice( sys0.alc

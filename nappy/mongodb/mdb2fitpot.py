@@ -14,6 +14,7 @@ Options:
     -o, --offset=<offnset>
                  Offset number of 5-digit directory name. [default: 0]
 """
+from __future__ import print_function
 
 __author__    = "Ryo KOBAYASHI"
 __email__     = "ryo.kbys@gmail.com"
@@ -127,7 +128,7 @@ def main(conf,dirname='sample',query='{}',offset=0):
             dbinfo['forces']= forces
             unicode_to_ascii(dbinfo)
             yaml.dump(dbinfo,f)
-        print '.',
+        print('.',end='')
 
 
 if __name__ == '__main__':
@@ -139,7 +140,6 @@ if __name__ == '__main__':
     offset= int(args['--offset'])
     
     query= json.loads(query)
-    # print query
 
     conf= read_db_config(confname)
     main(conf,dirname,query,offset)

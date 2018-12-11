@@ -12,6 +12,7 @@ Options:
     -x=<x>      Position of x data (start from 1) [default: 1]
     -y=<y>      Position of y data (start from 1) [default: 1]
 """
+from __future__ import print_function
 
 import os,sys,math
 import numpy as np
@@ -49,7 +50,6 @@ def gsmear_file(infname,sigma,xp,yp):
         if line[0] == "#":
             continue
         nline += 1
-    #print ' num of data points in the file=',nline
     infile.seek(0)
     xd= np.zeros(nline,dtype=np.float)
     yd= np.zeros(nline,dtype=np.float)
@@ -81,17 +81,5 @@ if __name__ == "__main__":
         outfile.write(' {0:15.2f} {1:15.7f}\n'.format(xd[il],gdat[il]))
     outfile.close()
     
-    print ' write '+infname+'.smeared'
-    print ' GAUSSIAN_SMEAR done '
-    
-    # dtotal= 0.0
-    # gtotal= 0.0
-    # for ix in range(nline):
-    #     if ix == 0 or ix == nline-1:
-    #         dtotal += data[ix][1]*dx/2
-    #         gtotal += data[ix][1]*dx/2
-    #     else:
-    #         dtotal += data[ix][1]*dx
-    #         gtotal += data[ix][1]*dx
-    # print ' dtotal=',dtotal
-    # print ' gtotal=',gtotal
+    print(' write '+infname+'.smeared')
+    print(' GAUSSIAN_SMEAR done ')

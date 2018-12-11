@@ -13,6 +13,7 @@ Options
     -l, --load=JSON
                 Load `Y` from a given JSON file. [default: None]
 """
+from __future__ import print_function
 
 import os,sys
 import numpy as np
@@ -71,7 +72,7 @@ if __name__ == '__main__':
     if yafname == 'None':
     
         #...Read out.adf and out.rdf of all the directories.
-        print ' Reading rdf and adf files...'
+        print(' Reading rdf and adf files...')
         rdfs= []
         adfs= []
         for dir in dirs:
@@ -79,12 +80,12 @@ if __name__ == '__main__':
             adfs.append(read_df(dir+'/'+_adfname))
         
         #...Compute distances bewteen all pairs of samples and make a distance matrix.
-        print ' Computing a distance matrix...'
+        print(' Computing a distance matrix...')
         D= get_dist_matrix(rdfs,adfs)
         # print D
     
         #...Perform cluster analysis.
-        print ' Performing cluster analysis...'
+        print(' Performing cluster analysis...')
         Y= sch.linkage(D, method='centroid')
         #...Save Y
         with open('cluster.json','w') as f:
@@ -92,14 +93,14 @@ if __name__ == '__main__':
         # print Y
 
     else:
-        print ' loading {0}...'.format(yafname)
+        print(' loading {0}...'.format(yafname))
         with open(yafname,'r') as f:
             loaded= json.load(f)
         Y= np.array(loaded)
     
     #...Get the list of cluster info
     threshold= Y[-nclst,2] +_tiny
-    print ' threshold =',threshold
+    print(' threshold =',threshold)
     lsclst= sch.fcluster(Y, threshold, criterion='distance')
     
     #...Write results
@@ -116,4 +117,4 @@ if __name__ == '__main__':
     with open('out.selected','w') as f:
         for dir in selected:
             f.write(' {0}\n'.format(dir))
-    print ' done.'
+    print(' done.')

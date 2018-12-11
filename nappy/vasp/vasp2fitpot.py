@@ -23,6 +23,7 @@ Options:
     --idoffset=I
                  offset of species ID converted from vasprun.xml to pos. [default: 1]
 """
+from __future__ import print_function
 
 __author__    = "Ryo KOBAYASHI"
 __email__     = "ryo.kbys@gmail.com"
@@ -120,7 +121,7 @@ if __name__ == "__main__":
             aSys.write_pmd(dirname+'/'+_fname_pos)
             write_ergref(dirname+'/'+_fname_erg,energy)
             write_frcref(dirname+'/'+_fname_frc,forces)
-            print ' write ',dirname,_fname_pos,_fname_erg,_fname_frc
+            print(' write ',dirname,_fname_pos,_fname_erg,_fname_frc)
     else: # only final structure is needed
         aSys= structure2aSys(vasprun.final_structure,idoffset)
         energy= vasprun.ionic_steps[-1]['electronic_steps'][-1]['e_fr_energy']
@@ -128,5 +129,5 @@ if __name__ == "__main__":
         aSys.write_pmd(_fname_pos)
         write_ergref(_fname_erg,energy)
         write_frcref(_fname_frc,forces)
-        print ' write ',_fname_pos,_fname_erg,_fname_frc
+        print(' write ',_fname_pos,_fname_erg,_fname_frc)
     

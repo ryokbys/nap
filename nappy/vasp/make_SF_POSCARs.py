@@ -17,6 +17,7 @@ options:
                  maximum of the range to be shfited [default: 1.0]
     --ndiv=<n>   number of division in each direction [default: 10]
 """
+from __future__ import print_function
 
 __author__ = "Ryo KOBAYASHI"
 __version__ = "0.1"
@@ -88,7 +89,6 @@ def _pbc(x):
 if __name__ == "__main__":
 
     args= docopt(__doc__)
-    # print args
 
     zmin= float(args['--zmin'])
     zmax= float(args['--zmax'])
@@ -100,13 +100,13 @@ if __name__ == "__main__":
         dr.append((float(args['DX'][i]),float(args['DY'][i])))
 
     if not sfplane in ('x','y','z'):
-        print ' --plane must be x, y, or z !!!'
-        print ' Now --plane=',sfplane
+        print(' --plane must be x, y, or z !!!')
+        print(' Now --plane=',sfplane)
         exit
 
     if zmin < 0.0 or zmin > 1.0 or zmax < 0.0 or zmax > 1.0 or zmax < zmin:
-        print ' Should be 0.0 <= zmin < zmax < 1.0 !!!'
-        print ' zmin, zmax = ',zmin, zmax
+        print(' Should be 0.0 <= zmin < zmax < 1.0 !!!')
+        print(' zmin, zmax = ',zmin, zmax)
         exit
 
     poscar= POSCAR()

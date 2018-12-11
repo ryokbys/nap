@@ -18,8 +18,11 @@ Options:
                 Number of species in the system. [default: 1]
     --no-average
                 Not to take average over files.
+    --no-normalize
+                Not to normalize by the density.
     --plot      Plot figures. [default: False]
 """
+from __future__ import print_function
 
 import os,sys
 import numpy as np
@@ -62,23 +65,18 @@ def compute_ndr(ia,isid,dr,rmax,asys,nspcs):
         ndr[isid,jsid,ir] = ndr[isid,jsid,ir] +1
     return ndr
 
-def rdf(asys,nspcs,dr,rmax):
+def rdf(asys,nspcs,dr,rmax,normalize=True):
 
     natm0= asys.num_atoms()
     vol= asys.volume()
     rho= float(natm0)/vol
-    # print ' natm0,vol,rho=',natm0,vol,rho
 
     n1,n2,n3= asys.get_expansion_num(2.0*rmax)
     if not (n1==1 and n2==1 and n3==1):
-        print ' system to be repeated, n1,n2,n3=',n1,n2,n3
+        print(' system to be repeated, n1,n2,n3=',n1,n2,n3)
         asys.repeat(n1,n2,n3)
-    # print ' a1=',asys.a1
-    # print ' a2=',asys.a2
-    # print ' a3=',asys.a3
 
     nr= int(rmax/dr)+1
-    # print " rmax,dr,nr=",rmax,dr,nr
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     rd= [ dr*ir+dr/2 for ir in range(nr) ]
     for ia in range(natm0):
@@ -87,29 +85,29 @@ def rdf(asys,nspcs,dr,rmax):
         for ir in range(nr):
             nadr[:,:,ir] += ndr[:,:,ir]
     #nadr /= nsrc
-    #print nadr
+
     #...normalize
-    for ir in range(1,nr):
-        r= dr *ir
-        nadr[:,:,ir]= nadr[:,:,ir]/(4.0*np.pi*rho*r*r*dr)
-    #print nadr
+    if normalize:
+        for ir in range(1,nr):
+            r= dr *ir
+            nadr[:,:,ir]= nadr[:,:,ir]/(4.0*np.pi*rho*r*r*dr)
+
     return rd,nadr,natm0
 
-def rdf_average(infiles,nspcs,nr,ffmt='pmd',dr=0.1,rmax=3.0,average=True):
+def rdf_average(infiles,nspcs,nr,ffmt='pmd',dr=0.1,rmax=3.0,average=True,
+                normalize=True):
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     nsum= 0
     for infname in infiles:
         if not os.path.exists(infname):
-            print "[Error] File, {0}, does not exist !!!".format(infname)
+            print("[Error] File, {0}, does not exist !!!".format(infname))
             sys.exit()
         asys= NAPSystem(fname=infname,ffmt=ffmt)
-        print ' File =',infname
-        rd,gr,n= rdf(asys,nspcs,dr,rmax)
+        print(' File =',infname)
+        rd,gr,n= rdf(asys,nspcs,dr,rmax,normalize=normalize)
         nsum += n
         agr += gr
     # agr /= len(infiles)
-    #print ' nsum=',nsum
-    #print agr
     if average:
         agr /= nsum
     return rd,agr
@@ -164,15 +162,17 @@ if __name__ == "__main__":
     ofname= args['-o']
     nspcs = int(args['--num-species'])
     no_average = args['--no-average']
+    no_normalize = args['--no-normalize']
     average = not no_average
+    normalize = not no_normalize
     plot = args['--plot']
 
     nr= int(rmax/dr) +1
     rd,agr= rdf_average(infiles,nspcs,nr,ffmt=ffmt,dr=dr,rmax=rmax,
-                        average=average)
+                        average=average,normalize=normalize)
 
     if not sigma == 0:
-        print ' Gaussian smearing...'
+        print(' Gaussian smearing...')
         #...Smearing of total RDF
         agrt= gsmear(rd,agr[0,0],sigma)
         agr[0,0,:] = agrt[:]
@@ -200,14 +200,14 @@ if __name__ == "__main__":
 
     if plot:
         plot_figures(nspcs,rd,agr)
-        print ''
-        print ' RDF graphes are plotted.'
+        print('')
+        print(' RDF graphes are plotted.')
         if nspcs == 1:
-            print ' Check graph_rdf_total.png'
+            print(' Check graph_rdf_total.png')
         else:
-            print ' Check graph_rdf_total.png and graph_rdfs.png'
+            print(' Check graph_rdf_total.png and graph_rdfs.png')
     else:
-        print ' Check {0:s} with gnuplot, like'.format(ofname)
-        print ''
-        print " > plot '{0:s}' us 1:2  w l".format(ofname)
-        print ''
+        print(' Check {0:s} with gnuplot, like'.format(ofname))
+        print('')
+        print(" > plot '{0:s}' us 1:2  w l".format(ofname))
+        print('')

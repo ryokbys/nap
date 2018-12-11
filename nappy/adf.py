@@ -19,6 +19,7 @@ Options:
     -o OUT      Output file name [default: out.adf]
     -p          Plot a graph on the screen. [default: False]
 """
+from __future__ import print_function
 
 import os,sys
 import numpy as np
@@ -44,9 +45,6 @@ def adf_atom(ia,dang,rcut,asys,id1=0,id2=0):
     natm= asys.num_atoms()
     rcut2= rcut*rcut
     pi= asys.atoms[ia].pos
-    # if ia==2:
-    #     print asys.nlspr[ia]
-    #     print asys.lspr[ia]
     for ji in range(asys.nlspr[ia]):
         ja= asys.lspr[ia,ji]
         if ja == ia:
@@ -81,7 +79,7 @@ def adf_atom(ia,dang,rcut,asys,id1=0,id2=0):
             else:
                 rad= np.arccos(cs)
             deg= rad/np.pi *180.0
-            # print ia,ja,ka,deg
+
             nda[int(deg/dang)] += 1
     return nda
 
@@ -91,17 +89,14 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
 
     n1,n2,n3= asys.get_expansion_num(2.0*rcut)
     if not (n1==1 and n2==1 and n3==1):
-        print ' system to be repeated, n1,n2,n3=',n1,n2,n3
+        print(' system to be repeated, n1,n2,n3=',n1,n2,n3)
         asys.repeat(n1,n2,n3)
-    # print ' a1=',asys.a1
-    # print ' a2=',asys.a2
-    # print ' a3=',asys.a3
     asys.assign_pbc()
 
     asys.make_pair_list(rcut=rcut)
 
     na= int(180.0/dang)+1
-    # print " rcut,dang,na=",rcut,dang,na
+
     anda= np.zeros(na,dtype=np.float)
     angd= np.array([ dang*ia for ia in range(na) ])
     nsum= 0
@@ -109,12 +104,8 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
         if id0==0 or asys.atoms[ia].sid==id0:
             nsum += 1
             adfa= adf_atom(ia,dang,rcut,asys,id1,id2)
-            # print 'ia=',ia
-            # print adfa
             for iang in range(na):
                 anda[iang]= anda[iang] +adfa[iang]
-    # print 'nsum=',nsum
-    # anda /= nsum
     return angd,anda,natm0
 
 def adf_average(infiles,ffmt='POSCAR',dang=1.0,rcut=3.0,
@@ -125,10 +116,10 @@ def adf_average(infiles,ffmt='POSCAR',dang=1.0,rcut=3.0,
     nsum= 0
     for infname in infiles:
         if not os.path.exists(infname):
-            print "[Error] File, {0}, does not exist !!!".format(infname)
+            print("[Error] File, {0}, does not exist !!!".format(infname))
             sys.exit()
         asys= NAPSystem(fname=infname,ffmt=ffmt)
-        print ' File = ',infname
+        print(' File = ',infname)
         angd,df,n= adf(asys,dang,rcut,id0,id1,id2)
         aadf += df
         nsum += n
@@ -159,7 +150,7 @@ if __name__ == "__main__":
                           rcut=rcut,id0=id0,id1=id1,id2=id2)
 
     if not sigma == 0:
-        print ' Gaussian smearing...'
+        print(' Gaussian smearing...')
         agr= gsmear(angd,agr,sigma)
 
     if flag_plot:
@@ -170,4 +161,4 @@ if __name__ == "__main__":
     for i in range(na):
         outfile.write(' {0:10.4f} {1:15.7f}\n'.format(angd[i],agr[i]))
     outfile.close()
-    print ' Wrote '+ofname
+    print(' Wrote '+ofname)

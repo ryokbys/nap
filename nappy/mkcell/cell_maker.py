@@ -14,6 +14,7 @@ Options:
   -o OUTFILE
              Output file name. Format is detected automatically. [default: POSCAR]
 """
+from __future__ import print_function
 
 import sys
 import numpy as np
@@ -263,7 +264,6 @@ def make_nacl(latconst=1.0):
 if __name__ == "__main__":
 
     args= docopt(__doc__)
-    #print args
 
     # nx= int(args['--nx'])
     # ny= int(args['--ny'])
@@ -291,7 +291,7 @@ if __name__ == "__main__":
         struct = make_nacl(latconst)
 
     if struct is None:
-        print "Something wrong: structure is not created..."
+        print("Something wrong: structure is not created...")
         sys.exit()
 
     struct.repeat(nx,ny,nz)

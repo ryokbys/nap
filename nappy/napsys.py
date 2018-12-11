@@ -33,6 +33,8 @@ Options:
               If it is set and the output format accepts, charges are written.
               [default: None]
 """
+from __future__ import print_function
+from __future__ import division
 
 import math
 import sys, copy
@@ -557,7 +559,7 @@ You need to specify the species order correctly with --specorder option.
                 if ai.symbol == spc:
                     outorder.append(ia)
         if len(outorder) != len(self.atoms):
-            print 'len(outorder),len(self.atoms)=', len(outorder),len(self.atoms)
+            print('len(outorder),len(self.atoms)=', len(outorder),len(self.atoms))
             raise RuntimeError(' len(outorder) != len(self.atoms)')
         for ia in outorder:
             ai = self.atoms[ia]
@@ -635,6 +637,9 @@ You need to specify the species order correctly with --specorder option.
         xz = 0.0
         yz = 0.0
         aux_exists = {
+            'x': -1, 'y': -1, 'z': -1,
+            'xu': -1, 'yu': -1, 'zu': -1,
+            'fx': -1, 'fy': -1, 'fz': -1,
             'ekin': -1,
             'epot': -1,
             'sxx': -1,
@@ -714,9 +719,14 @@ You need to specify the species order correctly with --specorder option.
                         symbol = self.specorder[ai.sid-1]
                     if symbol and ai.symbol != symbol:
                         ai.set_symbol(symbol)
-                    x0= float(data[2])
-                    y0= float(data[3])
-                    z0= float(data[4])
+                    ix = max( aux_exists['x'], aux_exists['xu'])
+                    iy = max( aux_exists['y'], aux_exists['yu'])
+                    iz = max( aux_exists['z'], aux_exists['zu'])
+                    if ix < 0 or iy < 0 or iz < 0:
+                        raise ValueError('Not enough coordinate info.\nPlease check the dump file format.')
+                    x0= float(data[ix])
+                    y0= float(data[iy])
+                    z0= float(data[iz])
                     x = hmati[0,0]*x0 +hmati[0,1]*y0 +hmati[0,2]*z0
                     y = hmati[1,0]*x0 +hmati[1,1]*y0 +hmati[1,2]*z0
                     z = hmati[2,0]*x0 +hmati[2,1]*y0 +hmati[2,2]*z0
@@ -1198,9 +1208,9 @@ You need to specify the species order correctly with --specorder option.
                 self.lspr[ia,n]= ja
                 self.nlspr[ia] += 1
                 if self.nlspr[ia] >= _maxnn:
-                    print ' [Error] self.nlspr[{0}] >= _maxnn !!!'.format(ia)
-                    print self.nlspr[ia]
-                    print self.lspr[ia]
+                    print(' [Error] self.nlspr[{0}] >= _maxnn !!!'.format(ia))
+                    print(self.nlspr[ia])
+                    print(self.lspr[ia])
                     sys.exit()
         ja= lscl[ja]
         self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2)
@@ -1779,32 +1789,32 @@ def analyze(nsys):
     alpha = np.arccos(np.dot(a2,a3)/b/c)/np.pi*180.0
     beta  = np.arccos(np.dot(a1,a3)/a/c)/np.pi*180.0
     gamma = np.arccos(np.dot(a1,a2)/a/b)/np.pi*180.0
-    print 'a1 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a1[0],
+    print('a1 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a1[0],
                                                                  a1[1],
-                                                                 a1[2])
-    print 'a2 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a2[0],
+                                                                 a1[2]))
+    print('a2 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a2[0],
                                                                  a2[1],
-                                                                 a2[2])
-    print 'a3 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a3[0],
+                                                                 a2[2]))
+    print('a3 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a3[0],
                                                                  a3[1],
-                                                                 a3[2])
-    print 'a = {0:10.3f} A'.format(a)
-    print 'b = {0:10.3f} A'.format(b)
-    print 'c = {0:10.3f} A'.format(c)
-    print 'alpha = {0:7.2f} deg.'.format(alpha)
-    print 'beta  = {0:7.2f} deg.'.format(beta)
-    print 'gamma = {0:7.2f} deg.'.format(gamma)
-    print 'volume= {0:10.3f} A^3'.format(vol)
-    print 'number of atoms   = ',nsys.num_atoms()
+                                                                 a3[2]))
+    print('a = {0:10.3f} A'.format(a))
+    print('b = {0:10.3f} A'.format(b))
+    print('c = {0:10.3f} A'.format(c))
+    print('alpha = {0:7.2f} deg.'.format(alpha))
+    print('beta  = {0:7.2f} deg.'.format(beta))
+    print('gamma = {0:7.2f} deg.'.format(gamma))
+    print('volume= {0:10.3f} A^3'.format(vol))
+    print('number of atoms   = ',nsys.num_atoms())
     if nsys.specorder:
-        print 'number of atoms per species:'
+        print('number of atoms per species:')
         nspcs = nsys.num_species()
         mass = 0.0
         for i,s in enumerate(nsys.specorder):
-            print '   {0:s}: {1:d}'.format(s,nspcs[i])
+            print('   {0:s}: {1:d}'.format(s,nspcs[i]))
             mass += nspcs[i]*elements.elements[s]['mass']
-        print 'density = {0:7.2f} g/cm^3'.format(mass*amu_to_g
-                                                 /(vol*Ang_to_cm**3) )
+        print('density = {0:7.2f} g/cm^3'.format(mass*amu_to_g
+                                                 /(vol*Ang_to_cm**3) ))
 
 if __name__ == "__main__":
 

@@ -9,6 +9,7 @@ USAGE:
 INPUT: (these files must be in the working directory)
     - POSCAR (for the cell information)
 """
+from __future__ import print_function
 
 import os,optparse
 from atom_system import AtomSystem
@@ -32,8 +33,8 @@ if __name__ == '__main__':
     
     aSys= AtomSystem()
     if not os.path.exists(infname):
-        print '[Error] File does not exist !!!'
-        print infname
+        print('[Error] File does not exist !!!')
+        print(infname)
         exit()
     aSys.read_POSCAR(infname)
 

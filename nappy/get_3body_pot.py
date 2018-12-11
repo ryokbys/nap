@@ -6,6 +6,7 @@ pmd must be compiled with '-D__PCHECK__'.
 OUTPUT:
   * out.3body
 """
+from __future__ import print_function
 
 import os,sys,math,copy
 import optparse
@@ -35,7 +36,7 @@ def write_banner():
                                                  _/
                                             _/_/          
     """
-    print str
+    print(str)
 
 ################################################ Main routine ##########
 
@@ -65,15 +66,15 @@ parser.add_option("--pmdexec",dest="pmdexec",type="string",
 write_banner()
 
 nsmpl= options.nsmpl
-print ' num of points = ',nsmpl
+print(' num of points = ',nsmpl)
 rcut= options.rcut
-print ' rcut          = ',rcut,' Ang.'
+print(' rcut          = ',rcut,' Ang.')
 amin= options.amin
-print ' amin          = ',amin
+print(' amin          = ',amin)
 amax= options.amax
-print ' amax          = ',amax
+print(' amax          = ',amax)
 distance= options.distance
-print ' distance      = ',distance,' Ang.'
+print(' distance      = ',distance,' Ang.')
 pmdexec= options.pmdexec
 
 asys= NAPSystem()
@@ -103,7 +104,7 @@ da  = (amax-amin)/nsmpl
 
 fout= open('out.3body','w')
 for ip in range(nsmpl+1):
-    print '.',
+    print('.',end='')
     ang= amin +da*ip
     x= hd*np.cos(ang/180*np.pi)
     y= hd*np.sin(ang/180*np.pi)
@@ -115,4 +116,4 @@ for ip in range(nsmpl+1):
     fout.write(' {0:12.3f} {1:22.14e}\n'.format(ang,apot))
 
 fout.close()
-print ' program done.'
+print(' program done.')

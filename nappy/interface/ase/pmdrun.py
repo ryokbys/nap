@@ -1,6 +1,7 @@
 """
 ASE interface to pmd.
 """
+from __future__ import print_function
 
 import os
 import subprocess
@@ -125,7 +126,6 @@ class PMD(FileIOCalculator):
 
     def calculate(self, atoms=None, properties=['energy'],
                   system_changes=some_changes):
-        # print 'pmdrun:calculate'
         Calculator.calculate(self, atoms, properties, system_changes)
         self.write_input(self.atoms, properties, system_changes)
 
@@ -165,8 +165,6 @@ class PMD(FileIOCalculator):
                  stress_target=stress_target,
                  flag_sort=1)
         Calculator.calculate(self, atoms, properties, system_changes)
-        # print 'type(atoms),type(self.atoms)= ',type(atoms),type(self.atoms)
-        # print 'self.atoms = ',self.atoms
         self.write_input(self.atoms, properties, system_changes)
 
         olddir = os.getcwd()
@@ -213,7 +211,7 @@ class PMD(FileIOCalculator):
         if not os.path.exists(frcfname):
             raise RuntimeError(frcfname+' does not exists.')
         if not os.path.exists(strfname):
-            print 'Warning: '+strfname+' does not exists.'
+            print('Warning: '+strfname+' does not exists.')
 
         self.results={ k : None for k in self.implemented_properties}
 
@@ -230,10 +228,10 @@ class PMD(FileIOCalculator):
                     num_step_relax = int(line.split()[4])
                     break
             if not relax_converged:
-                print ''
-                print '** Warning: pmd relaxation does not' +\
-                    ' seem to be converged**'
-                print ''
+                print('')
+                print('** Warning: pmd relaxation does not' +\
+                    ' seem to be converged**')
+                print('')
             self.results['num_step_relax'] = num_step_relax
         fout.close()
 
@@ -263,7 +261,6 @@ class PMD(FileIOCalculator):
             self.results['relaxed_scaled_positions'] \
                 = tmpatoms.get_scaled_positions()
             self.results['relaxed_cell'] = tmpatoms.get_cell()
-        # print 'pmdrun:read_results, results=',self.results.keys()
 
     def get_relaxed_scaled_positions(self):
         return self.results['relaxed_scaled_positions']

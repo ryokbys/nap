@@ -5,6 +5,7 @@ Compute 2-body potential energy from 2 atom system.
 OUTPUT:
   * out.2body
 """
+from __future__ import print_function
 
 import os,sys,math,copy
 import optparse
@@ -33,7 +34,7 @@ def write_banner():
                                                  _/
                                             _/_/
     """
-    print str
+    print(str)
 
 ################################################ Main routine ##########
 
@@ -63,15 +64,15 @@ parser.add_option("--pmdexec",dest="pmdexec",type="string",
 write_banner()
 
 nsmpl= options.nsmpl
-print ' num of points = ',nsmpl
+print(' num of points = ',nsmpl)
 rcut= options.rcut
-print ' rcut          = ',rcut,' Ang.'
+print(' rcut          = ',rcut,' Ang.')
 rmin= options.rmin
-print ' rmin          = ',rmin,' Ang.'
+print(' rmin          = ',rmin,' Ang.')
 sid1= options.sid1
-print ' sid1          = ',sid1
+print(' sid1          = ',sid1)
 sid2= options.sid2
-print ' sid2          = ',sid2
+print(' sid2          = ',sid2)
 pmdexec= options.pmdexec
 
 asys= NAPSystem()
@@ -100,7 +101,7 @@ os.system('cp pmdini pmdorig')
 
 fout= open('out.2body','w')
 for ip in range(nsmpl+1):
-    print '.',
+    print('.',end='')
     d= hmin +hd*ip
     asys.atoms[1].pos[0] = d
     asys.write_pmd('pmdini')
@@ -111,4 +112,4 @@ for ip in range(nsmpl+1):
 fout.close()
 #....restore pmdini
 os.system('cp pmdorig pmdini')
-print ' program done.'
+print(' program done.')

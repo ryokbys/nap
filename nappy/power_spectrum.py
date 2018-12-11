@@ -9,6 +9,7 @@ Staggered measuring of auto correlation for the statistical purpose.
 Velocity data must be stored at 1st-3rd auxiliary data of each atomic
 data in akr files.
 """
+from __future__ import print_function
 
 import os,sys,glob,time,math
 import numpy as np
@@ -57,18 +58,18 @@ sid= options.sid
 tval= options.tval
 trlx= options.trlx
 
-print ' idfile=',idfile
-print ' id=',id
-print ' nmeasure=',nmeasure
-print ' nshift=',nshift
-print ' sid=',sid
-print ' tval=',tval
-print ' len(args)=',len(args)
+print(' idfile=',idfile)
+print(' id=',id)
+print(' nmeasure=',nmeasure)
+print(' nshift=',nshift)
+print(' sid=',sid)
+print(' tval=',tval)
+print(' len(args)=',len(args))
 # sys.exit()
 
 if len(args) < 1:
-    print ' [Error] number of arguments wrong.'
-    print usage
+    print(' [Error] number of arguments wrong.')
+    print(usage)
     sys.exit()
 
 #...parse arguments
@@ -79,10 +80,10 @@ infiles.sort()
 
 #...compute sampling time-window from nmeasure and nshift
 ntwindow= len(infiles) -(nmeasure-1)*nshift
-print ' ntwindow=',ntwindow
+print(' ntwindow=',ntwindow)
 if ntwindow <= 0:
-    print ' [Error] ntwindow <= 0 !!!'
-    print '  Chech the parameters nmeasure and nshift, and input files.'
+    print(' [Error] ntwindow <= 0 !!!')
+    print('  Chech the parameters nmeasure and nshift, and input files.')
     sys.exit()
 
 
@@ -100,17 +101,17 @@ for ia in range(natm):
     elif system.atoms[ia].sid == sid:
         psid[ia] = 1
         nas += 1
-print ' num of all atoms = ',natm
-print ' num of atoms to be considered = ',nas
+print(' num of all atoms = ',natm)
+print(' num of atoms to be considered = ',nas)
 
-print ' accumurating data',
+print(' accumurating data',end='')
 actmp= np.zeros((nmeasure,ntwindow,3))
 acorr= np.zeros((ntwindow,3))
 v02= np.zeros((nmeasure,natm,3))
 v2= np.zeros((ntwindow,nmeasure,natm,3))
 hmat= np.zeros((3,3))
 for ifile in range(len(infiles)):
-    print '.',
+    print('.',end='')
     sys.stdout.flush()
     infile= infiles[ifile]
     system= NAPSystem()
@@ -137,10 +138,10 @@ for ifile in range(len(infiles)):
                 v2[ifile-im*nshift,im,ia,0] = vi[0]*v02[im,ia,0]
                 v2[ifile-im*nshift,im,ia,1] = vi[1]*v02[im,ia,1]
                 v2[ifile-im*nshift,im,ia,2] = vi[2]*v02[im,ia,2]
-print ' '
+print(' ')
 
 #.....output auto correlation function
-print ' writing dat.autocorr...'
+print(' writing dat.autocorr...')
 acfname='dat.autocorr'
 acfile= open(acfname,'w')
 acfile.write('#      t [fs],   Cvv(t)x,    Cvv(t)y,    Cvv(t)z,   Cvv(t)\n')
@@ -172,7 +173,7 @@ for it in range(len(infiles)-(nmeasure-1)*nshift):
 acfile.close()
 
 #.....output power spectrum
-print ' writing dat.power...'
+print(' writing dat.power...')
 psfname='dat.power'
 psfile= open(psfname,'w')
 mmax= ntwindow/2
@@ -190,4 +191,4 @@ for mw in range(mmax):
                  +' {0:15.7f}'.format(ps[2]) \
                  +' {0:15.7f}\n'.format(ps[0]+ps[1]+ps[2]) )
 psfile.close()
-print ' power_spectrum.py finished correctly ;)'
+print(' power_spectrum.py finished correctly ;)')

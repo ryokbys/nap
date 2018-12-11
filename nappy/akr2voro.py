@@ -1,10 +1,12 @@
 #!/bin/env python
 
+from __future__ import print_function
+
 import sys,os
 from napsys import NAPSystem
 
 infname= sys.argv[1]
-print 'input file: ',infname
+print('input file: ',infname)
 aSys= NAPSystem()
 aSys.read_akr(infname)
 natm= len(aSys.atoms)
@@ -24,13 +26,13 @@ for ia in range(natm):
     f.write('\n')
 f.close()
 
-print 'Use voro++ as follows:'
+print('Use voro++ as follows:')
 cmd= 'voro++ -p -c " %i %q %v %s %A"' \
     +' 0.0 {0:5.1f}'.format(alc*ax) \
     +' 0.0 {0:5.1f}'.format(alc*ay) \
     +' 0.0 {0:5.1f}'.format(alc*az) \
     +' {0:s}'.format(outfname)
 
-print '$ '+cmd
+print('$ '+cmd)
 os.system(cmd)
 

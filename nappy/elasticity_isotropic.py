@@ -17,6 +17,7 @@ Options:
               Path to *pmd*. [default: ~/src/nap/pmd/pmd]
   --relax     Relax internal coordinates. [default: False]
 """
+from __future__ import print_function
 
 import sys,os,commands
 import numpy as np
@@ -135,7 +136,7 @@ if __name__ == '__main__':
             erg44= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))        
             e44s[it] = erg44
 
-        print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(dlts[it],e11s[it],e12s[it],e44s[it])
+        print(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(dlts[it],e11s[it],e12s[it],e44s[it]))
         outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlts[it],e11s[it],e12s[it],e44s[it]))
     outfile1.close()
 
@@ -179,13 +180,13 @@ if __name__ == '__main__':
     sij = np.linalg.inv(cij)
 
     #...output results
-    print '{0:=^72}'.format(' RESULTS ')
+    print('{0:=^72}'.format(' RESULTS '))
 
-    print ' Cij [GPa]:'
+    print(' Cij [GPa]:')
     for i in range(6):
         for j in range(6):
-            print ' {0:8.2f}'.format(cij[i,j]),
-        print ''
+            print(' {0:8.2f}'.format(cij[i,j]),end='')
+        print('')
 
     c112233 = cij[0,0]+cij[1,1]+cij[2,2]
     c122331 = cij[0,1]+cij[0,2]+cij[1,2]
@@ -201,17 +202,17 @@ if __name__ == '__main__':
     gvrh = (gv+gr)/2
     prto2 = (3.0*kvrh -2.0*gvrh)/(6.0*kvrh +2.0*gvrh)
 
-    print ''
+    print('')
     # print ' Definition of the following values, see ' \
     #     +'https://materialsproject.org/wiki/index.php/Elasticity_calculations'
     # print ' K_V   = {0:10.3f} GPa'.format(kv)
     # print ' K_R   = {0:10.3f} GPa'.format(kr)
     # print ' G_V   = {0:10.3f} GPa'.format(gr)
     # print ' G_R   = {0:10.3f} GPa'.format(gv)
-    print ' Bulk modulus    = {0:10.3f} GPa'.format(kvrh)
-    print ' shear modulus   = {0:10.3f} GPa'.format(gvrh)
-    print ' Poisson\'s ratio = {0:10.3f}'.format(prto2)
+    print(' Bulk modulus    = {0:10.3f} GPa'.format(kvrh))
+    print(' shear modulus   = {0:10.3f} GPa'.format(gvrh))
+    print(' Poisson\'s ratio = {0:10.3f}'.format(prto2))
     
 
-    print '{0:=^72}'.format(' OUTPUT ')
-    print ' * '+outfname
+    print('{0:=^72}'.format(' OUTPUT '))
+    print(' * '+outfname)

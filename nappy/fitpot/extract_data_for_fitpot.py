@@ -14,6 +14,7 @@ options:
     --offset=<nof>  offset number of directory name [default: 0]
     
 """
+from __future__ import print_function
 
 import os,shutil
 import commands
@@ -31,7 +32,7 @@ if __name__ == "__main__":
     offset= int(args['--offset'])
     
     if not os.path.isdir(dir):
-        print ' {0} is not a directory !!!'.format(dir)
+        print(' {0} is not a directory !!!'.format(dir))
         exit
 
     _fpos="pos"
@@ -40,7 +41,7 @@ if __name__ == "__main__":
     numDir= offset
     
     sdirs= commands.getoutput('find {0} -name "{1}" | xargs -n 1 dirname'.format(dir,_fpos)).split("\n")
-    print ' {0:d} dirs will be extracted...'.format(len(sdirs))
+    print(' {0:d} dirs will be extracted...'.format(len(sdirs)))
 
     for sdir in sdirs:
         #...only if the directory contains erg.ref and frc.ref files
@@ -49,7 +50,7 @@ if __name__ == "__main__":
             continue
         numDir += 1
         ndname='{0:05d}'.format(numDir)
-        print '.',
+        print('.',end='')
         os.mkdir(ndname)
         shutil.copy('{0}/{1}'.format(sdir,_fpos),ndname)
         shutil.copy('{0}/{1}'.format(sdir,_ferg),ndname)

@@ -12,6 +12,7 @@ Options:
   -t THRESHOLD
              Threshold value multiplied to max edge for omitting criterion of edge. [default: 0.01]
 """
+from __future__ import print_function
 
 import math
 import numpy as np
@@ -36,12 +37,12 @@ def read_NN_config():
     nhl[1]=int(buff[3])
     if nl == 2:
         nhl[2]= int(buff[4])
-    print 'num of species=',nsp
-    print 'num of layers =',nl
-    print 'num of neurons-{0:d} ='.format(0),nhl[0]
-    print 'num of neurons-{0:d} ='.format(1),nhl[1]
+    print('num of species=',nsp)
+    print('num of layers =',nl)
+    print('num of neurons-{0:d} ='.format(0),nhl[0])
+    print('num of neurons-{0:d} ='.format(1),nhl[1])
     if nl == 2:
-        print 'num of neurons-{0:d} ='.format(2),nhl[2]
+        print('num of neurons-{0:d} ='.format(2),nhl[2])
     n2=0
     n3=0
     ngauss= 0
@@ -64,38 +65,38 @@ def read_NN_config():
             n3 += 1
             nangle += 1
     fcnst.close()
-    print 'read in.const.NN'
-    print 'num of 2body terms=',n2
-    print 'num of 3body terms=',n3
+    print('read in.const.NN')
+    print('num of 2body terms=',n2)
+    print('num of 3body terms=',n3)
     
     ncmb2= nsp +comb(nsp,2)
     ncmb3= ncmb2*nsp
-    print 'num of 2body pairs   =',ncmb2
-    print 'num of 3body triplets=',ncmb3
+    print('num of 2body pairs   =',ncmb2)
+    print('num of 3body triplets=',ncmb3)
     nhl[0]= n2*ncmb2 +n3*ncmb3
-    print 'num of 2body and 3body inputs =',n2*ncmb2, n3*ncmb3
+    print('num of 2body and 3body inputs =',n2*ncmb2, n3*ncmb3)
     if nl == 1:
-        print 'num of input neurons =',nhl[0]*nhl[1] +nhl[1]
+        print('num of input neurons =',nhl[0]*nhl[1] +nhl[1])
     elif nl == 2:
-        print 'num of input neurons =',nhl[0]*nhl[1] +nhl[1]*nhl[2] +nhl[2]
+        print('num of input neurons =',nhl[0]*nhl[1] +nhl[1]*nhl[2] +nhl[2])
 
     fcmb= open(_combfname,'r')
     cmb2= np.zeros((ncmb2,2),dtype=int)
     cmb3= np.zeros((ncmb3,3),dtype=int)
-    print 'pairs:'
+    print('pairs:')
     for i2 in range(ncmb2):
         buff= fcmb.readline().split()
         cmb2[i2,0]= int(buff[0])
         cmb2[i2,1]= int(buff[1])
-        print '  ',i2,': {0:1d}-{1:1d}'.format(cmb2[i2,0],cmb2[i2,1])
-    print 'triplets:'
+        print('  ',i2,': {0:1d}-{1:1d}'.format(cmb2[i2,0],cmb2[i2,1]))
+    print('triplets:')
     for i3 in range(ncmb3):
         buff= fcmb.readline().split()
         cmb3[i3,0]= int(buff[0])
         cmb3[i3,1]= int(buff[1])
         cmb3[i3,2]= int(buff[2])
-        print '  ',i3,':', \
-            ' {0:1d}-{1:1d}-{2:1d}'.format(cmb3[i3,0],cmb3[i3,1],cmb3[i3,2])
+        print('  ',i3,':', \
+            ' {0:1d}-{1:1d}-{2:1d}'.format(cmb3[i3,0],cmb3[i3,1],cmb3[i3,2]))
     fcmb.close()
     return nl,nsp,nhl,n2,n3,cmb2,cmb3,ngauss,ncos,npoly,nangle
     
@@ -131,7 +132,7 @@ def read_NN_params(nl,nhl):
         
     
     fparam.close()
-    print 'read in.params.NN'
+    print('read in.params.NN')
     #for ihl0 in range(n2+n3):
     #    print ihl0,': ',wgt11[ihl0,0:nhl[1]+1]
     # for ihl1 in range(nhl[1]):
@@ -219,7 +220,7 @@ def draw(nl,nsp,nhl,n2,n3,cmb2,cmb3,ngauss,ncos,npoly,nagnle,
                 maxedge= max(maxedge,np.abs(wgt22[ihl1,ihl2]))
         for ihl2 in range(nhl[2]):
             maxedge= max(maxedge,np.abs(wgt23[ihl2]))
-    print 'max of edge value= ',maxedge
+    print('max of edge value= ',maxedge)
         
     colors= []
     elabels= {}

@@ -15,6 +15,7 @@ Options:
   -p          Plot a graph on the screen.
   --cmd=CMD   VASP execution command. [default: \"~/bin/vasp > out.vasp\"]
 """
+from __future__ import print_function
 
 import sys,os,commands
 import numpy as np
@@ -125,7 +126,7 @@ if __name__ == '__main__':
     os.system("mkdir -p "+dname)
     os.system("cp INCAR OSZICAR OUTCAR vasprun.xml {0}/".format(dname))
     #erg0= float(commands.getoutput("grep 'potential energy' out.pmd | head -n1 | awk '{print $3}'"))
-    print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(0.0,erg0,erg0,erg0)
+    print(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(0.0,erg0,erg0,erg0))
     outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
     logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
     ddlt= dltmax/niter
@@ -174,7 +175,7 @@ if __name__ == '__main__':
         os.system("mkdir -p "+dname)
         os.system("cp INCAR OSZICAR OUTCAR vasprun.xml {0}/".format(dname))
 
-        print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(dlt,erg11,erg12,erg44)
+        print(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(dlt,erg11,erg12,erg44))
         outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlt,erg11,erg12,erg44))
         logfile.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(dlt,erg11,erg12,erg44))
     outfile1.close()
@@ -213,18 +214,9 @@ if __name__ == '__main__':
     c44= popt44[0]/vol*2 *160.218
 
     #...output results
-    # print '{0:=^72}'.format(' RESULTS ')
-    # print ' C11     = {0:10.3f} GPa'.format(c11)
-    # print ' C11-C12 = {0:10.3f} GPa'.format(c11_c12)
-    # print ' C12     = {0:10.3f} GPa'.format(c12)
-    # print ' C44     = {0:10.3f} GPa'.format(c44)
     ymod= c44*(2.0*c44+3.0*c12)/(c11+c44)
     prto= c12/2.0/(c11+c44)
     smod= ymod/2.0/(1.0+prto)
-    # print ' Following values maybe only valid for isotropic materials...'
-    # print ' Young\'s modulus = {0:10.3f} GPa'.format(ymod)
-    # print ' Poisson\'s ratio = {0:10.3f}'.format(prto)
-    # print ' shear modulus   = {0:10.3f} GPa'.format(smod)
     str= '{0:=^72}\n'.format(' RESULTS ') \
          +' C11     = {0:10.3f} GPa\n'.format(c11) \
          +' C11-C12 = {0:10.3f} GPa\n'.format(c11_c12) \
@@ -233,7 +225,7 @@ if __name__ == '__main__':
          +' Young\'s modulus = {0:10.3f} GPa\n'.format(ymod) \
          +' shear modulus   = {0:10.3f} GPa\n'.format(smod) \
          +' Poisson\'s ratio = {0:10.3f}\n'.format(prto)
-    print str
+    print(str)
     logfile.write(str)
     logfile.close()
 
@@ -250,7 +242,7 @@ if __name__ == '__main__':
         plt.savefig(graphname,dpi=150)
         plt.show()
 
-    print '{0:=^72}'.format(' OUTPUT ')
-    print ' * '+outfname
-    print ' * '+logfname
-    print ' * '+graphname
+    print('{0:=^72}'.format(' OUTPUT '))
+    print(' * '+outfname)
+    print(' * '+logfname)
+    print(' * '+graphname)

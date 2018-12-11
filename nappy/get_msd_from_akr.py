@@ -8,6 +8,7 @@ This utility assumes that the cell is fixed during the simulation.
 
 Staggered measuring of MSD for for the statistical purpose.
 """
+from __future__ import print_function
 
 import os,sys,glob,time
 import numpy as np
@@ -51,8 +52,8 @@ def anint(x):
         return 0.0
 
 if len(args) < 1:
-    print ' [Error] number of arguments wrong.'
-    print usage
+    print(' [Error] number of arguments wrong.')
+    print(usage)
     sys.exit()
 
 #...parse arguments
@@ -64,8 +65,8 @@ for file in args:
 #...compute sampling time-window from nmeasure and nshift
 ntwindow= len(infiles) -(nmeasure-1)*nshift
 if ntwindow <= 0:
-    print ' [Error] ntwindow <= 0 !!!'
-    print '  Chech the parameters nmeasure and nshift, and input files.'
+    print(' [Error] ntwindow <= 0 !!!')
+    print('  Chech the parameters nmeasure and nshift, and input files.')
     sys.exit()
 
 

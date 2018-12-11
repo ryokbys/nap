@@ -20,6 +20,7 @@ Options:
               and bulk modulus.
   --cmd=CMD   VASP execution command. [default: \"vasp > out.vasp\"]
 """
+from __future__ import print_function
 
 import sys,os,commands,copy
 from docopt import docopt
@@ -107,8 +108,8 @@ if __name__ == '__main__':
     mvz= args['-z']
 
     if show_graph and _no_pyplot:
-        print "matplotlib.pyplot is not available in this sysytem."
-        print "Run this script without -p option."
+        print("matplotlib.pyplot is not available in this sysytem.")
+        print("Run this script without -p option.")
         sys.exit()
 
     strain= strain/100
@@ -151,7 +152,7 @@ if __name__ == '__main__':
         os.system("mkdir -p "+dname)
         os.system("cp INCAR OSZICAR OUTCAR vasprun.xml {0}/".format(dname))
         vol= get_vol(al,hmat)
-        print ' {0:10.4f} {1:10.4f} {2:15.7f}'.format(al,vol,erg)
+        print(' {0:10.4f} {1:10.4f} {2:15.7f}'.format(al,vol,erg))
         outfile1.write(' {0:10.4f} {1:10.4f} {2:15.7f}\n'.format(al,vol,erg))
         logfile.write(' {0:10.4f} {1:10.4f} {2:15.7f}\n'.format(al,vol,erg))
     outfile1.close()
@@ -160,11 +161,11 @@ if __name__ == '__main__':
         replace_1st_line(al_orig)
     else:
         replace_hmat(hmat_orig)
-        print ' energy_vs_size finished because mvx,y,z=False.'
+        print(' energy_vs_size finished because mvx,y,z=False.')
         sys.exit()
 
     if not perform_ls:
-        print ' energy_vs_size finished without performing least square fitting...'
+        print(' energy_vs_size finished without performing least square fitting...')
         sys.exit()
 
     #...prepare for Murnaghan fitting
@@ -187,17 +188,17 @@ if __name__ == '__main__':
     plsq= leastsq(residuals,p0,args=(yarr,xarr))
 
     #...output results
-    print ' plsq=',plsq[0]
-    print '{0:=^72}'.format(' RESULTS ')
+    print(' plsq=',plsq[0])
+    print('{0:=^72}'.format(' RESULTS '))
     logfile.write('{0:=^72}\n'.format(' RESULTS '))
     a1= hmat_orig[0:3,0]
     a2= hmat_orig[0:3,1]
     a3= hmat_orig[0:3,2]
     uvol= np.dot(a1,np.cross(a2,a3))
     lc= (plsq[0][2]/uvol)**(1.0/3)
-    print ' Lattice constant = {0:10.4f} Ang.'.format(lc)
-    print ' Cohesive energy  = {0:10.3f} eV'.format(plsq[0][3]/natm)
-    print ' Bulk modulus     = {0:10.2f} GPa'.format(plsq[0][0]*1.602e+2)
+    print(' Lattice constant = {0:10.4f} Ang.'.format(lc))
+    print(' Cohesive energy  = {0:10.3f} eV'.format(plsq[0][3]/natm))
+    print(' Bulk modulus     = {0:10.2f} GPa'.format(plsq[0][0]*1.602e+2))
     logfile.write(' Lattice constant = {0:10.4f} Ang.\n'.format(lc))
     logfile.write(' Cohesive energy  = {0:10.3f} eV\n'.format(plsq[0][3]/natm))
     logfile.write(' Bulk modulus     = {0:10.2f} GPa\n'.format(plsq[0][0]*1.602e+2))
@@ -210,7 +211,7 @@ if __name__ == '__main__':
         plt.savefig('graph.energy_vs_size.eps',dpi=150)
         plt.show()
 
-    print '{0:=^72}'.format(' OUTPUT ')
-    print ' * out.energy_vs_size'
-    print ' * log.energy_vs_size'
-    print ' * graph.energy_vs_size.eps'
+    print('{0:=^72}'.format(' OUTPUT '))
+    print(' * out.energy_vs_size')
+    print(' * log.energy_vs_size')
+    print(' * graph.energy_vs_size.eps')

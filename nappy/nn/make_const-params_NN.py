@@ -4,6 +4,7 @@ Make in.const.NN and in.params.NN to be used in NN potential.
 And the file storing combination information, 
 in.comb.NN, is also written.
 """
+from __future__ import print_function
 
 import random,math
 
@@ -124,29 +125,29 @@ def get_comb(nsp):
 if __name__ == "__main__":
 
     if not nl in (1,2):
-        print " [Error] nl is not 1 nor 2, nl=",nl
+        print(" [Error] nl is not 1 nor 2, nl=",nl)
         exit()
 
-    print 'rrs = ',rrs
-    print 'reta = ',reta
-    print 'rk = ',rk
-    print 'rsf3 = ',rsf3
+    print('rrs = ',rrs)
+    print('reta = ',reta)
+    print('rk = ',rk)
+    print('rsf3 = ',rsf3)
 
     #....compute num of combinations
     ncmb2= nsp+ ncomb(nsp,2)/2
     ncmb3= ncmb2*nsp
 
-    print ' ncmb2, ncmb3 = ',ncmb2,ncmb3
+    print(' ncmb2, ncmb3 = ',ncmb2,ncmb3)
 
     pairs,triplets= get_comb(nsp)
-    print ' pairs=',pairs
-    print ' triplets=',triplets
+    print(' pairs=',pairs)
+    print(' triplets=',triplets)
     if len(pairs) != ncmb2:
-        print '[Error] len(pairs) != ncmb2'
-        print 'len(pairs),ncmb2=',len(pairs),ncmb2
+        print('[Error] len(pairs) != ncmb2')
+        print('len(pairs),ncmb2=',len(pairs),ncmb2)
         exit()
     if len(triplets) != ncmb3:
-        print 'Since len(triplets) != ncmb3, set ncmb3 = len(triplets)'
+        print('Since len(triplets) != ncmb3, set ncmb3 = len(triplets)')
         ncmb3 = len(triplets)
     
     #.....num of 2-body Gaussian-type symmetry functions
@@ -154,7 +155,7 @@ if __name__ == "__main__":
     nsf2+= len(rk)
     nsf3= len(rsf3)
 
-    print ' nsf2, nsf3 = ',nsf2,nsf3
+    print(' nsf2, nsf3 = ',nsf2,nsf3)
     
     f= open(constfname,'w')
     nsf= nsf2+nsf3

@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import sys,os,time,optparse
 import numpy as np
 import math,copy
@@ -110,7 +112,7 @@ def make_polycrystal(grns,uc,n1,n2,n3):
         pi= grain.point
         api= np.dot(hmat,pi)
         for ix in range(-n1/2-1,n1/2+2):
-            print 'ix=',ix
+            print('ix=',ix)
             for iy in range(-n2/2-1,n2/2+2):
                 for iz in range(-n3/2-1,n3/2+2):
                     for m in range(len(uc.atoms)):
@@ -183,9 +185,7 @@ def make_polycrystal(grns,uc,n1,n2,n3):
                 ls_remove.append(ia)
                 ls_remove.append(ja)
     #...one of two will survive
-    #print ls_remove
     count= [ ls_remove.count(ls_remove[i]) for i in range(len(ls_remove))]
-    #print count
     for i in range(0,len(ls_remove),2):
         if count[i] > count[i+1]:
             ls_remove[i+1]= -1
@@ -210,7 +210,7 @@ if __name__ == '__main__':
                       help="number of grains in the system.")
     (options,args)= parser.parse_args()
 
-    print '{0:=^72}'.format(' make_polycrystal_py ')
+    print('{0:=^72}'.format(' make_polycrystal_py '))
     t0= time.time()
 
     n1= int(args[0])
@@ -218,8 +218,8 @@ if __name__ == '__main__':
     n3= int(args[2])
     ngrain= options.ng
     
-    print "number of grains= {0:3d}".format(ngrain)
-    print "number of unit cells= {0:3d} {1:3d} {2:3d}".format(n1,n2,n3)
+    print("number of grains= {0:3d}".format(ngrain))
+    print("number of unit cells= {0:3d} {1:3d} {2:3d}".format(n1,n2,n3))
 
 #     n1= 10
 #     n2= 10
@@ -239,8 +239,8 @@ if __name__ == '__main__':
         ai[0]= 0.0
         ai[1]= random()*math.pi*2 -math.pi
         ai[2]= 0.0
-        print 'point=',pi
-        print 'angle=',ai
+        print('point=',pi)
+        print('angle=',ai)
         gi= Grain(pi,ai)
         grains.append(gi)
     uc= cell_maker.make_bcc()
@@ -250,5 +250,5 @@ if __name__ == '__main__':
     system= make_polycrystal(grains,uc,n1,n2,n3)
     system.write_pmd('pmdini')
 
-    print '{0:=^72}'.format(' finished correctly ')
-    print '   Elapsed time = {0:12.2f}'.format(time.time()-t0)
+    print('{0:=^72}'.format(' finished correctly '))
+    print('   Elapsed time = {0:12.2f}'.format(time.time()-t0))

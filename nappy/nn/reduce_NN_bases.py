@@ -11,6 +11,7 @@ OUTPUT:
   * in.const.NN.new
   * in.params.NN.new
 """
+from __future__ import print_function
 
 import optparse
 import NN_io
@@ -42,8 +43,8 @@ if __name__ == '__main__':
     nnanal= NN_io.read_NN_analysis(innnanal)
     
     if nhl[0] != len(nnanal):
-        print '[Error] nhl[0] != len(nnanal)'
-        print '  nhl[0],len(nnanal)=',nhl[0],len(nnanal)
+        print('[Error] nhl[0] != len(nnanal)')
+        print('  nhl[0],len(nnanal)=',nhl[0],len(nnanal))
         exit()
 
     focnst= open(outcnst,'w')
@@ -53,7 +54,7 @@ if __name__ == '__main__':
     for ihl0 in range(nhl[0]):
         if nnanal[ihl0][1] > threshold:
             nsfnew += 1
-    print 'num of bases to survive=',nsfnew
+    print('num of bases to survive=',nsfnew)
     nsfold= nhl[0]
     nhl[0]= nsfnew
     npnew= 0

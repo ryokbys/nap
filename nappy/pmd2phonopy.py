@@ -18,6 +18,7 @@ Options:
                 Name of the executable. [default: pmd]
     -p, --plot  Show band graph with phonopy.
 """
+from __future__ import print_function
 
 import os,sys,math,copy,re
 from docopt import docopt
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     sys0= NAPSystem()
     sys0.read_pmd(infname)
     sys0.write_POSCAR()
-    print ' POSCAR was written.'
+    print(' POSCAR was written.')
     
     natm0= sys0.num_atoms()
     

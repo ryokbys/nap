@@ -10,9 +10,11 @@ Usage:
 Options:
   -h,--help  Show this message and exit.
   --specorder=SPECORDER
-             Specify the order of species needed to convert POSCAR to pos. [default: Al,Mg,Si]
+             Specify the order of species needed to convert POSCAR to pos. [default: None]
   --index=INDEX
-             Convert a snapshot of INDEX. Comma separated indices can be specified. [default: -1]
+             Convert a snapshot of INDEX. Comma separated indices can be specified. 
+             If three digits are separated by colons like 0:1000:10, indices of slices 
+             of initial(0), final(1000) and skip(10) are spcified. [default: -1]
   --sequence
              Extract all the sequence of MD or relaxation stored in vasprun.xml.
              If the index is specified as a list of indices, this option will be omitted.
@@ -20,6 +22,7 @@ Options:
              Keep constraints originally set to the system. 
              Otherwise all the constratins are removed. [default: False]
 """
+from __future__ import print_function
 
 import os
 from ase.io import read,write
@@ -61,12 +64,12 @@ def output_for_fitpot(atoms,keep_const,dirname='./',specorder=[]):
         try:
             del atoms.constraints
         except:
-            print 'del atoms.constraints for ',type(atoms),' failed.'
+            print('del atoms.constraints for ',type(atoms),' failed.')
             #write(dirname+'/POSCAR',images=atoms,format='vasp',direct=True,vasp5=True)
     try:
         epot = atoms.get_potential_energy()
     except:
-        print ' Failed to get_potential_energy(), so skip it.'
+        print(' Failed to get_potential_energy(), so skip it.')
         return None
     with open(dirname+'/erg.ref','w') as f:
         f.write("{0:12.7f}\n".format(epot))
@@ -93,6 +96,10 @@ if __name__ == "__main__":
     specorder= args['--specorder'].split(',')
     sequence = args['--sequence']
     keep_const = args['--keep-constraints']
+
+    if specorder == 'None':
+        raise ValueError('specorder must be specified.')
+    print(' specorder = ',specorder)
     
     index= args['--index']
     if ',' in index:
@@ -103,50 +110,49 @@ if __name__ == "__main__":
     else:
         index = int(index)
 
-    print ' specorder = ',specorder
     if type(index) is list:
-        print ' The following steps are to be extracted: ',
+        print(' The following steps are to be extracted: ',end='')
         for i in index:
-            print i,
-        print ''
+            print(i,end='')
+        print('')
         ase_index = ':'
     elif type(index) is slice:
-        print ' The sliced steps are to be extracted: '
+        print(' The sliced steps are to be extracted: ')
         ase_index = index
     elif sequence:
-        print ' All the sequence are to be extracted.'
+        print(' All the sequence are to be extracted.')
         ase_index = ':'
     else:
         ase_index = index
-        print ' index   = ',ase_index
-    print ' keep_const   = ',keep_const
+        print(' index   = ',ase_index)
+    print(' keep_const   = ',keep_const)
 
     ndirs= len(dirs)
-    print ' number of directories = ',ndirs
+    print(' number of directories = ',ndirs)
 
     cwd=os.getcwd()
     for i,d in enumerate(dirs):
         os.chdir(cwd)
-        print '{0:5d}/{1:d}: '.format(i+1,ndirs)+d
+        print('{0:5d}/{1:d}: '.format(i+1,ndirs)+d)
         os.chdir(d)
         if not os.path.exists('vasprun.xml'):
-            print ' No vasprun.xml, so skip.'
+            print(' No vasprun.xml, so skip.')
             continue
         if os.path.exists('erg.ref') and \
            os.stat('erg.ref').st_mtime > os.stat('vasprun.xml').st_mtime:
-            print ' Since there is newer erg.ref, skip it.'
+            print(' Since there is newer erg.ref, skip it.')
             continue
         try:
             #...Since there is a bug in vasp, species "r" needs to be replaced by "Zr"
             os.system("sed -i'' -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
             atoms= read('vasprun.xml',index=ase_index,format='vasp-xml')
         except Exception as e:
-            print ' Failed to read vasprun.xml, so skip it.'
-            print e
+            print(' Failed to read vasprun.xml, so skip it.')
+            print(e)
             continue
 
         if type(index) is list:
-            print ' Extracting specified steps from ',len(atoms),' steps in total'
+            print(' Extracting specified steps from ',len(atoms),' steps in total')
             n = 0
             for j,a in enumerate(atoms):
                 if j not in index:
@@ -158,7 +164,7 @@ if __name__ == "__main__":
                                   specorder=specorder)
                 n += 1
         elif sequence or type(index) is slice:  # Whole MD sequence
-            print ' Extracting sequence of ',len(atoms),' steps'
+            print(' Extracting sequence of ',len(atoms),' steps')
             for j,a in enumerate(atoms):
                 dirname = '{0:05d}/'.format(j)
                 print('  {0:s}'.format(dirname))
