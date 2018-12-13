@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-12-13 15:37:11 Ryo KOBAYASHI>
+!                     Last modified: <2018-12-13 18:17:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1541,34 +1541,45 @@ subroutine write_stats(iter)
   integer,intent(in):: iter
   integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst,nfcal,ixyz,jxyz
   type(mdsys)::smpl
-  real(8):: de,df,epotsub,ds
+  real(8):: de,df,ds
   real(8):: demaxl_trn,demax_trn,desuml_trn,desum_trn,rmse_trn
   real(8):: demaxl_tst,demax_tst,desuml_tst,desum_tst,rmse_tst
   real(8):: dfmaxl_trn,dfmax_trn,dfsuml_trn,dfsum_trn
   real(8):: dfmaxl_tst,dfmax_tst,dfsuml_tst,dfsum_tst
   real(8):: dsmaxl_trn,dsmax_trn,dssuml_trn,dssum_trn
   real(8):: dsmaxl_tst,dsmax_tst,dssuml_tst,dssum_tst
+  real(8),save:: etrndnm,etstdnm
+  real(8),save:: ftrndnm,ftstdnm
+  real(8),save:: strndnm,ststdnm
+  real(8):: er2trn,er2tst,fr2trn,fr2tst,sr2trn,sr2tst
   real(8),save:: rmse_tst_best= 1d+30
+  real(8),save:: epotsub
   character(len=128):: cnum
   logical,save:: l1st = .true.
 
   if( l1st ) then
     if( myid.eq.0 ) then
       write(6,*) '# ENERGY: ITER, TIME, ' &
-           //'RMSE(TRAINING), MAX(TRAINING), ' &
-           //'RMSE(TEST), RMSE(TEST)'
+           //'RMSE(TRAINING), RMSE(TEST), ' &
+           //'MAX(TRAINING), MAX(TEST), ' &
+           //'R^2(TRAINING), R^2(TEST), ' 
       write(6,*) '# FORCE:  ITER, TIME, ' &
-           //'RMSE(TRAINING), MAX(TRAINING), ' &
-           //'RMSE(TEST), RMSE(TEST)'
+           //'RMSE(TRAINING), RMSE(TEST), ' &
+           //'MAX(TRAINING), MAX(TEST), ' &
+           //'R^2(TRAINING), R^2(TEST)'
+      if( lsmatch ) then
+        write(6,*) '# STRESS:  ITER, TIME, ' &
+             //'RMSE(TRAINING), RMSE(TEST), ' &
+             //'MAX(TRAINING), MAX(TEST), ' &
+             //'R^2(TRAINING), R^2(TEST)'
+      endif
     endif
+
+    call get_r2denom(etrndnm,etstdnm,ftrndnm,ftstdnm,strndnm,ststdnm)
   endif
   l1st = .false.
 
-!!$!.....Restore subtracted energies and forces to get original reference values
-!!$  if( nsubff.gt.0 ) then
-!!$    call restore_FF()
-!!$  endif
-
+  epotsub = 0d0
   if( len(trim(crefstrct)).gt.5 ) then
     if( myid.eq.myidrefsub ) then
       epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
@@ -1584,12 +1595,8 @@ subroutine write_stats(iter)
   do ismpl=isid0,isid1
     smpl= samples(ismpl)
     natm= smpl%natm
-    if( len(trim(crefstrct)).gt.5 ) then
-      de= abs(smpl%epot-epotsub*natm+smpl%esub &
-           -(smpl%eref-erefsub*natm))/natm
-    else
-      de= abs(smpl%epot+smpl%esub -smpl%eref)/natm
-    endif
+    de= abs(smpl%epot-epotsub*natm+smpl%esub &
+         -(smpl%eref-erefsub*natm))/natm
     if( smpl%iclass.eq.1 ) then
       demaxl_trn= max(demaxl_trn,de)
       desuml_trn=desuml_trn +de*de
@@ -1614,11 +1621,18 @@ subroutine write_stats(iter)
   else
     rmse_tst= 0.d0
   endif
+  er2trn = 0d0
+  if( etrndnm.gt.1d-15 ) er2trn = 1d0 -desum_trn/etrndnm
+  er2tst = 0d0
+  if( etstdnm.gt.1d-15 ) er2tst = 1d0 -desum_tst/etstdnm
+  
   if( myid.eq.0 ) then
 !!$    write(6,'(a,2i6)') ' nsmpl_trn, nsmpl_tst = ',nsmpl_trn,nsmpl_tst
-    write(6,'(a,i8,f15.2,4(1x,f12.7))') ' ENERGY: ' &
+    write(6,'(a,i8,f15.2,6(1x,f12.7))') ' ENERGY: ' &
          ,iter,mpi_wtime()-time0 &
-         ,rmse_trn,demax_trn,rmse_tst,demax_tst
+         ,rmse_trn,rmse_tst &
+         ,demax_trn,demax_tst &
+         ,er2trn,er2tst
 !!$    if( rmse_tst < rmse_tst_best ) then
 !!$      rmse_tst_best= rmse_tst
 !!$      call write_vars('best')
@@ -1686,10 +1700,16 @@ subroutine write_stats(iter)
   else
     rmse_tst= 0d0
   endif
+  fr2trn = 0d0
+  if( ftrndnm.gt.1d-15 ) fr2trn = 1d0 -dfsum_trn/ftrndnm
+  fr2tst = 0d0
+  if( ftstdnm.gt.1d-15 ) fr2tst = 1d0 -dfsum_tst/ftstdnm
   if( myid.eq.0 ) then
-    write(6,'(a,i8,f15.2,4(1x,f12.7))') ' FORCE:  ' &
+    write(6,'(a,i8,f15.2,6(1x,f12.7))') ' FORCE:  ' &
          ,iter,mpi_wtime()-time0 &
-         ,rmse_trn,dfmax_trn,rmse_tst,dfmax_tst
+         ,rmse_trn,rmse_tst &
+         ,dfmax_trn,dfmax_tst &
+         ,fr2trn,fr2tst
 !    call write_vars('tmp')
   endif
 
@@ -1709,7 +1729,7 @@ subroutine write_stats(iter)
           ds = abs(smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
                -smpl%sref(ixyz,jxyz))
           dsmaxl_trn = max(dsmaxl_trn,ds)
-          dssuml_trn = dssuml_trn +ds
+          dssuml_trn = dssuml_trn +ds*ds
           ntrnl = ntrnl +1
         enddo
       enddo
@@ -1719,7 +1739,7 @@ subroutine write_stats(iter)
           ds = abs(smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
                -smpl%sref(ixyz,jxyz))
           dsmaxl_tst = max(dsmaxl_tst,ds)
-          dssuml_tst = dssuml_tst +ds
+          dssuml_tst = dssuml_tst +ds*ds
           ntstl = ntstl +1
         enddo
       enddo
@@ -1747,14 +1767,227 @@ subroutine write_stats(iter)
   else
     rmse_tst = 0d0
   endif
+  sr2trn = 0d0
+  if( strndnm.gt.1d-15 ) sr2trn = 1d0 -dssum_trn/strndnm
+  sr2tst = 0d0
+  if( ststdnm.gt.1d-15 ) sr2tst = 1d0 -dssum_tst/ststdnm
   if( myid.eq.0 ) then
-    write(6,'(a,i8,f15.2,4(1x,f12.7))') ' STRESS: ' &
+    write(6,'(a,i8,f15.2,6(1x,f12.7))') ' STRESS: ' &
          ,iter,mpi_wtime()-time0 &
-         ,rmse_trn,dsmax_trn,rmse_tst,dsmax_tst
+         ,rmse_trn,rmse_tst &
+         ,dsmax_trn,dsmax_tst &
+         ,sr2trn,sr2tst
   endif
 
   return
 end subroutine write_stats
+!=======================================================================
+subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
+  use variables
+  use parallel
+  implicit none 
+  real(8),intent(out):: etrn,etst,ftrn,ftst,strn,stst
+  integer:: ismpl,ia,l,ixyz,jxyz,natm,nfcal,ntrn,ntst,ntrnl,ntstl
+  type(mdsys)::smpl
+  real(8):: eref
+  real(8):: esumltrn,esumltst,esumtrn,esumtst,emtrn,emtst
+  real(8):: fsumltrn,fsumltst,fsumtrn,fsumtst,fmtrn,fmtst
+  real(8):: ssumltrn,ssumltst,ssumtrn,ssumtst,smtrn,smtst
+
+!.....Energy
+  esumltrn= 0d0
+  esumltst= 0d0
+  do ismpl=isid0,isid1
+    smpl= samples(ismpl)
+    eref = smpl%eref
+    natm = smpl%natm
+    if( smpl%iclass.eq.1 ) then
+      esumltrn = esumltrn +eref/natm
+    else if( smpl%iclass.eq.2 ) then
+      esumltst = esumltst +eref/natm
+    endif
+  enddo
+  esumtrn = 0d0
+  esumtst = 0d0
+  call mpi_reduce(esumltrn,esumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(esumltst,esumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  emtrn = esumtrn/nsmpl_trn
+  if( nsmpl_tst.ne.0 ) then
+    emtst = esumtst/nsmpl_tst
+  else
+    emtst = 0d0
+  endif
+  call mpi_bcast(emtrn,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(emtst,1,mpi_real8,0,mpi_world,ierr)
+
+!.....Energy variance
+  esumltrn = 0d0
+  esumltst = 0d0
+  do ismpl=isid0,isid1
+    smpl= samples(ismpl)
+    eref = smpl%eref
+    natm = smpl%natm
+    if( smpl%iclass.eq.1 ) then
+      esumltrn = esumltrn +(eref/natm -emtrn)**2
+    else if( smpl%iclass.eq.2 ) then
+      esumltst = esumltst +(eref/natm -emtst)**2
+    endif
+  enddo
+  etrn = 0d0
+  etst = 0d0
+  call mpi_allreduce(esumltrn,etrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
+  call mpi_allreduce(esumltst,etst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+
+!.....Force
+  fsumltrn = 0d0
+  fsumltst = 0d0
+  ntrnl = 0
+  ntstl = 0
+  do ismpl=isid0,isid1
+    smpl= samples(ismpl)
+    nfcal= smpl%nfcal
+    if( nfcal.eq.0 ) cycle
+    natm = smpl%natm
+    if( smpl%iclass.eq.1 ) then
+      do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
+        do l=1,3
+          fsumltrn = fsumltrn +smpl%fref(l,ia)
+          ntrnl=ntrnl +1
+        enddo
+      enddo
+    else if( smpl%iclass.eq.2 ) then
+      do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
+        do l=1,3
+          fsumltst = fsumltst +smpl%fref(l,ia)
+          ntstl=ntstl +1
+        enddo
+      enddo
+    endif
+  enddo
+  fsumtrn = 0d0
+  fsumtst = 0d0
+  call mpi_reduce(fsumltrn,fsumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(fsumltst,fsumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  ntrn = 0
+  ntst = 0
+  call mpi_reduce(ntrnl,ntrn,1 &
+       ,mpi_integer,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(ntstl,ntst,1 &
+       ,mpi_integer,mpi_sum,0,mpi_world,ierr)
+  fmtrn = fsumtrn/ntrn
+  if( ntst.ne.0 ) then
+    fmtst = fsumtst/ntst
+  else
+    fmtst = 0d0
+  endif
+  call mpi_bcast(fmtrn,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(fmtst,1,mpi_real8,0,mpi_world,ierr)
+
+!.....Force variance
+  fsumltrn = 0d0
+  fsumltst = 0d0
+  do ismpl=isid0,isid1
+    smpl= samples(ismpl)
+    nfcal= smpl%nfcal
+    if( nfcal.eq.0 ) cycle
+    natm = smpl%natm
+    if( smpl%iclass.eq.1 ) then
+      do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
+        do l=1,3
+          fsumltrn = fsumltrn +(smpl%fref(l,ia) -fmtrn)**2
+        enddo
+      enddo
+    else if( smpl%iclass.eq.2 ) then
+      do ia=1,natm
+        if( smpl%ifcal(ia).eq.0 ) cycle
+        do l=1,3
+          fsumltst = fsumltst +(smpl%fref(l,ia) -fmtst)**2
+          ntstl=ntstl +1
+        enddo
+      enddo
+    endif
+  enddo
+  ftrn = 0d0
+  ftst = 0d0
+  call mpi_allreduce(fsumltrn,ftrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
+  call mpi_allreduce(fsumltst,ftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+
+  strn = 0d0
+  stst = 0d0
+  if( .not.lsmatch ) return
+!.....Stress
+  ssumltrn = 0d0
+  ssumltst = 0d0
+  ntrnl = 0
+  ntstl = 0
+  do ismpl=isid0,isid1
+    smpl = samples(ismpl)
+    if( smpl%iclass.eq.1 ) then
+      do ixyz=1,3
+        do jxyz=1,3
+          ssumltrn = ssumltrn +smpl%sref(ixyz,jxyz)
+          ntrnl = ntrnl +1
+        enddo
+      enddo
+    else if( smpl%iclass.eq.2 ) then
+      do ixyz=1,3
+        do jxyz=1,3
+          ssumltst = ssumltst +smpl%sref(ixyz,jxyz)
+          ntstl = ntstl +1
+        enddo
+      enddo
+    endif
+  enddo
+  ssumtrn = 0d0
+  ssumtst = 0d0
+  call mpi_reduce(ssumltrn,ssumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(ssumltst,ssumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  ntrn = 0
+  ntst = 0
+  call mpi_reduce(ntrnl,ntrn,1 &
+       ,mpi_integer,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(ntstl,ntst,1 &
+       ,mpi_integer,mpi_sum,0,mpi_world,ierr)
+  smtrn = ssumtrn/ntrn
+  if( ntst.ne.0 ) then
+    smtst = ssumtst/ntst
+  else
+    smtst = 0d0
+  endif
+  call mpi_bcast(smtrn,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(smtst,1,mpi_real8,0,mpi_world,ierr)
+
+!.....Stress variance
+  ssumltrn = 0d0
+  ssumltst = 0d0
+  ntrnl = 0
+  ntstl = 0
+  do ismpl=isid0,isid1
+    smpl = samples(ismpl)
+    if( smpl%iclass.eq.1 ) then
+      do ixyz=1,3
+        do jxyz=1,3
+          ssumltrn = ssumltrn +(smpl%sref(ixyz,jxyz) -smtrn)**2
+          ntrnl = ntrnl +1
+        enddo
+      enddo
+    else if( smpl%iclass.eq.2 ) then
+      do ixyz=1,3
+        do jxyz=1,3
+          ssumltst = ssumltst +(smpl%sref(ixyz,jxyz) -smtst)**2
+          ntstl = ntstl +1
+        enddo
+      enddo
+    endif
+  enddo
+  call mpi_allreduce(ssumltrn,strn,1,mpi_real8,mpi_sum,mpi_world,ierr)
+  call mpi_allreduce(ssumltst,stst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+  
+  return
+end subroutine get_r2denom
 !=======================================================================
 subroutine write_eliminated_vars()
   use variables
