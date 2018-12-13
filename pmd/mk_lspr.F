@@ -109,7 +109,7 @@ c          ic=is(i)
 2         continue
           if (j.eq.i) goto 3
 c          jc=is(j)
-          jc= int(tag(i))
+          jc= int(tag(j))
           xij(1:3)= ra(1:3,j) -xi(1:3)
           rij(1)= h(1,1)*xij(1) +h(1,2)*xij(2) +h(1,3)*xij(3)
           rij(2)= h(2,1)*xij(1) +h(2,2)*xij(2) +h(2,3)*xij(3)
@@ -242,7 +242,7 @@ c-----Scan resident cells
 
 2         continue
           if (j.eq.i) goto 3
-          jc= int(tag(i))
+          jc= int(tag(j))
           xij(1:3)= ra(1:3,j)-xi(1:3) -anint(ra(1:3,j)-xi(1:3))
           rij(1:3)=h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
           rij2= rij(1)**2 +rij(2)**2 +rij(3)**2

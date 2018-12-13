@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-11-23 10:22:51 Ryo KOBAYASHI>
+!                     Last modified: <2018-12-13 15:37:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1562,6 +1562,7 @@ subroutine write_stats(iter)
            //'RMSE(TEST), RMSE(TEST)'
     endif
   endif
+  l1st = .false.
 
 !!$!.....Restore subtracted energies and forces to get original reference values
 !!$  if( nsubff.gt.0 ) then
@@ -1693,6 +1694,7 @@ subroutine write_stats(iter)
   endif
 
 !.....stress
+  if( .not. lsmatch ) return
   dsmaxl_trn = 0d0
   dssuml_trn = 0d0
   dsmaxl_tst = 0d0
@@ -1751,7 +1753,7 @@ subroutine write_stats(iter)
          ,rmse_trn,dsmax_trn,rmse_tst,dsmax_tst
   endif
 
-  l1st = .false.
+  return
 end subroutine write_stats
 !=======================================================================
 subroutine write_eliminated_vars()
