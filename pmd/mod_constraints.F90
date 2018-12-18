@@ -168,7 +168,11 @@ contains
 
     call get_indice(namax,natm,tag)
     do ic=1,nconst
-      dij(ic) = dini(ic) +(dfin(ic)-dini(ic))*istp/maxstp
+      if( maxstp.lt.1 ) then
+        dij(ic) = dini(ic)
+      else
+        dij(ic) = dini(ic) +(dfin(ic)-dini(ic))*istp/(maxstp-1)
+      endif
       dij2(ic)= dij(ic)**2
       dtol2(ic) = dij(ic)*tol
       dtol2(ic) = dtol2(ic)**2
@@ -176,8 +180,8 @@ contains
       j = idcs(2,ic)
       rio(:,ic) = ra(1:3,i)
       rjo(:,ic) = ra(1:3,j)
-!!$      print '(a,5i4,6f7.3)','ic,i0,j0,i,j,rio,rjo=',ic,idcs0(1:2,ic),i,j &
-!!$           ,rio(1:3,ic),rjo(1:3,ic)
+!!$      print '(a,5i4,6f7.3)','ic,i0,j0,i,j,dij,dij2=',ic,idcs0(1:2,ic),i,j &
+!!$           ,dij(ic),dij2(ic)
     enddo
 
     return
@@ -219,9 +223,9 @@ contains
       rij(1:3) = rjs(1:3,ic) -ris(1:3,ic)
       rij(1:3) = rij(1:3) -anint(rij(1:3))
       rij = abc2cart(h,rij)
-      dd = norm(rij)
+      dd = norm2(rij)
       if( abs(dd-dij2(ic)).gt.dtol2(ic) ) not_conv = .true. 
-!!$      print '(a,5es11.3,2x,3l)','rij,dd,dij2,not_conv = ',rij(1:3),dd,dij2(ic),not_conv
+!!$      print '(a,5es11.3,2x,3l)','rij,dd,dij2,not_conv = ',rij(1:3),sqrt(dd),sqrt(dij2(ic)),not_conv
     enddo
     if( .not. not_conv ) goto 10
 
@@ -238,7 +242,7 @@ contains
         rij(1:3) = rjs(1:3,ic) -ris(1:3,ic)
         rij(1:3) = rij(1:3) -anint(rij(1:3))
         rij = abc2cart(h,rij)
-        dd = norm(rij)
+        dd = norm2(rij)
         gmk = amij *(dd-dij2(ic)) /dot(rij,rijo(:,ic))
         rijos = cart2abc(hi,rijo)
         ris(1:3,ic) = ris(1:3,ic) +gmk/(2d0*ami)*rijos(1:3)
@@ -249,7 +253,7 @@ contains
         rij(1:3) = rjs(1:3,ic) -ris(1:3,ic)
         rij(1:3) = rij(1:3) -anint(rij(1:3))
         rij = abc2cart(h,rij)
-        dd = norm(rij)
+        dd = norm2(rij)
 !!$        print '(a,i6,3es12.4)','iter,gmk,dd-dij2,dtol2=',iter,gmk,abs(dd-dij2(ic)),dtol2(ic)
         if( abs(dd-dij2(ic)).gt.dtol2(ic) ) not_conv = .true. 
       enddo
@@ -297,7 +301,7 @@ contains
         rij(1:3) = rij(1:3) -anint(rij(1:3))
         rij = abc2cart(h,rij)
         sgm = dot(vij,rij)
-!!$        print *,'iter,vij,rij,sgm,vtol=',iter,norm(vij),norm(rij) &
+!!$        print *,'iter,vij,rij,sgm,vtol=',iter,norm2(vij),norm2(rij) &
 !!$             ,abs(sgm),vtol
         if( abs(sgm).gt.vtol ) then
           not_conv = .true.

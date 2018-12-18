@@ -119,6 +119,8 @@ def get_atom_conf_txt(atoms,specorder=[]):
     # atom positions
     spos = atoms.get_scaled_positions()
     vels = atoms.get_velocities()
+    if np.size(vels) != 3*len(atoms):
+        vels = np.zeros((len(atoms),3))
     if not specorder:
         specorder = uniq(atoms.get_chemical_symbols())
         specorder.sort()

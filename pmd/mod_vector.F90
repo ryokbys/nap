@@ -44,13 +44,15 @@ contains
     return
   end function cross
 !=======================================================================
-  function norm(r)
+  function norm2(r)
     real(8):: r(:)
-    real(8):: norm
+    real(8):: norm2
     integer:: i
+
+    norm2 = 0d0
     do i=1,ubound(r,1)
-      norm = norm +r(i)*r(i)
+      norm2 = norm2 +r(i)*r(i)
     enddo
     return
-  end function norm
+  end function norm2
 end module vector
