@@ -17,13 +17,14 @@ Options:
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
     -o OUT      Output file name [default: out.adf]
-    -p          Plot a graph on the screen. [default: False]
+    --no-average
+                Not to take average over files.
+    --plot      Plot figures. [default: False]
 """
 from __future__ import print_function
 
 import os,sys
 import numpy as np
-import matplotlib.pyplot as plt
 from docopt import docopt
 from napsys import NAPSystem
 from gaussian_smear import gsmear
@@ -109,7 +110,7 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
     return angd,anda,natm0
 
 def adf_average(infiles,ffmt='POSCAR',dang=1.0,rcut=3.0,
-                id0=0,id1=0,id2=0):
+                id0=0,id1=0,id2=0,no_average=False):
     na= int(180.0/dang) +1
     df= np.zeros(na,dtype=float)
     aadf= np.zeros(na,dtype=float)
@@ -124,8 +125,18 @@ def adf_average(infiles,ffmt='POSCAR',dang=1.0,rcut=3.0,
         aadf += df
         nsum += n
     #aadf /= len(infiles)
-    aadf /= nsum
+    if not no_average:
+        aadf /= nsum
     return angd,aadf
+
+def plot_figures(angd,agr):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    sns.set(context='talk',style='ticks')
+    plt.plot(angd,agr,'-')
+    plt.xlabel('Angle (degree)')
+    plt.ylabel('ADF')
+    plt.savefig("graph_adf.png", format='png', dpi=300, bbox_inches='tight')
 
 ################################################## main routine
 
@@ -140,22 +151,26 @@ if __name__ == "__main__":
     dang= float(args['-w'])
     drad= np.pi *dang/180.0
     rcut= float(args['-r'])
-    flag_plot= args['-p']
     sigma= int(args['--gsmear'])
+    no_average = args['--no-average']
     ffmt= args['-f']
     ofname= args['-o']
+    flag_plot= args['--plot']
 
     na= int(180.0/dang) +1
     angd,agr= adf_average(infiles,ffmt=ffmt,dang=dang,
-                          rcut=rcut,id0=id0,id1=id1,id2=id2)
+                          rcut=rcut,id0=id0,id1=id1,id2=id2,
+                          no_average=no_average)
 
     if not sigma == 0:
         print(' Gaussian smearing...')
         agr= gsmear(angd,agr,sigma)
 
     if flag_plot:
-        plt.plot(angd, agr, '-', linewidth=1)
-        plt.show()
+        plot_figures(angd,agr)
+        print('')
+        print(' RDF graphes are plotted.')
+        print(' Check graph_adf.png')
         
     outfile= open(ofname,'w')
     for i in range(na):
