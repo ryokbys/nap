@@ -118,18 +118,28 @@ c          jc=is(j)
           rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
 
 c          if (rij2.lt.rcij2(ic,jc)) then
-          if(rij2.lt.rc2) then
+          if( rij2.lt.rc2 ) then
             lspr(0,i)= lspr(0,i)+1
-            lspr(0,j)= lspr(0,j)+1
-            if(lspr(0,i).gt.nnmax .or. lspr(0,j).gt.nnmax) then
-              write(6,'(a)') " Error: lspr(0,i) or lspr(0,j) > nnmax"
-              write(6,'(a,3i5)') "  nnmax, lspr(0,i), lspr(0,j) = "
-     &             ,nnmax,lspr(0,i),lspr(0,j)
+            if( lspr(0,i).gt.nnmax ) then
+              write(6,'(a)') " Error: lspr(0,i)  > nnmax"
+              write(6,'(a,3i5)') "  nnmax, lspr(0,i) = "
+     &             ,nnmax,lspr(0,i)
               call mpi_finalize(ierr)
               stop
             endif
             lspr(lspr(0,i),i)=j
-            lspr(lspr(0,j),j)=i
+c.....Store i in j's neighbor list
+            if( j.le.natm ) then
+              lspr(0,j)= lspr(0,j)+1
+              if( lspr(0,j).gt.nnmax ) then
+                write(6,'(a)') " Error: lspr(0,j) > nnmax"
+                write(6,'(a,3i5)') "  nnmax, lspr(0,j) = "
+     &               ,nnmax,lspr(0,j)
+                call mpi_finalize(ierr)
+                stop
+              endif
+              lspr(lspr(0,j),j)=i
+            endif
           endif
 
 c---------Continue until j= 0
@@ -260,15 +270,25 @@ c          if (j.eq.i) goto 3
               endif
             enddo
             lspr(0,i)= lspr(0,i) +1
-            lspr(0,j)= lspr(0,j) +1
-            if(lspr(0,i).gt.nnmax .or. lspr(0,j).gt.nnmax) then
-              write(6,'(a)') " [Error] lspr(0,i) or lspr(0,j) > nnmax"
-              print *, '   i,nnmax,lspr(0,i),lspr(0,j) ='
-     &             ,i,nnmax,lspr(0,i),lspr(0,j)
+            if(lspr(0,i).gt.nnmax ) then
+              write(6,'(a)') " [Error] lspr(0,i) > nnmax"
+              print *, '   i,nnmax,lspr(0,i) ='
+     &             ,i,nnmax,lspr(0,i)
               stop
             endif
             lspr(lspr(0,i),i)=j
-            lspr(lspr(0,j),j)=i
+c.....Store i in j's neighbor list
+            if( j.le.natm ) then
+              lspr(0,j)= lspr(0,j)+1
+              if( lspr(0,j).gt.nnmax ) then
+                write(6,'(a)') " Error: lspr(0,j) > nnmax"
+                write(6,'(a,3i5)') "  nnmax, lspr(0,j) = "
+     &               ,nnmax,lspr(0,j)
+                call mpi_finalize(ierr)
+                stop
+              endif
+              lspr(lspr(0,j),j)=i
+            endif
           endif
 
 c---------Continue until j= 0
@@ -372,15 +392,24 @@ c          if( ja.eq.ia ) cycle
           rij= xij(1)**2 +xij(2)**2 +xij(3)**2
           if( rij.lt.rc2 ) then
             lspr(0,ia)= lspr(0,ia) +1
-            lspr(0,ja)= lspr(0,ja) +1
-            if( lspr(0,ia).gt.nnmax .or. lspr(0,ja).gt.nnmax) then
-              write(6,'(a)') ' [Error] lspr(0,ia) or lspr(0,ja) > nnmax'
-              write(6,'(a,3i4)') ' nnmax,lspr(0,ia),lspr(0,ja)='
-     &             ,nnmax,lspr(0,ia),lspr(0,ja)
+            if( lspr(0,ia).gt.nnmax ) then
+              write(6,'(a)') ' [Error] lspr(0,ia) > nnmax'
+              write(6,'(a,3i4)') ' nnmax,lspr(0,ia)='
+     &             ,nnmax,lspr(0,ia)
               stop
             endif
             lspr(lspr(0,ia),ia)= ja
-            lspr(lspr(0,ja),ja)= ia
+c.....Store i in j's neighbor list
+            if( ja.le.natm ) then
+              lspr(0,ja)= lspr(0,ja)+1
+              if( lspr(0,ja).gt.nnmax ) then
+                write(6,'(a)') " Error: lspr(0,ja) > nnmax"
+                write(6,'(a,3i5)') "  nnmax, lspr(0,ja) = "
+     &               ,nnmax,lspr(0,ja)
+                stop
+              endif
+              lspr(lspr(0,ja),ja)=ia
+            endif
           endif
         enddo
       enddo
