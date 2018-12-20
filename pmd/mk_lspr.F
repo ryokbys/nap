@@ -106,8 +106,9 @@ c          ic=is(i)
 
           j=lshd(m1)
 
-2         continue
-          if (j.eq.i) goto 3
+ 2        continue
+          if( j.le.i ) goto 3
+c          if (j.eq.i) goto 3
 c          jc=is(j)
           jc= int(tag(j))
           xij(1:3)= ra(1:3,j) -xi(1:3)
@@ -118,15 +119,17 @@ c          jc=is(j)
 
 c          if (rij2.lt.rcij2(ic,jc)) then
           if(rij2.lt.rc2) then
-            lspr(0,i)=lspr(0,i)+1
-            if(lspr(0,i).gt.nnmax) then
-              write(6,'(a)') " Error: lspr(0,i).gt.nnmax"
-              write(6,'(a,2i5)') "  lspr(0,i), nnmax = "
-     &             ,lspr(0,i),nnmax
+            lspr(0,i)= lspr(0,i)+1
+            lspr(0,j)= lspr(0,j)+1
+            if(lspr(0,i).gt.nnmax .or. lspr(0,j).gt.nnmax) then
+              write(6,'(a)') " Error: lspr(0,i) or lspr(0,j) > nnmax"
+              write(6,'(a,3i5)') "  nnmax, lspr(0,i), lspr(0,j) = "
+     &             ,nnmax,lspr(0,i),lspr(0,j)
               call mpi_finalize(ierr)
               stop
             endif
             lspr(lspr(0,i),i)=j
+            lspr(lspr(0,j),j)=i
           endif
 
 c---------Continue until j= 0
@@ -241,7 +244,8 @@ c-----Scan resident cells
           j=lshd(m1)
 
 2         continue
-          if (j.eq.i) goto 3
+c          if (j.eq.i) goto 3
+          if( j.le.i ) goto 3
           jc= int(tag(j))
           xij(1:3)= ra(1:3,j)-xi(1:3) -anint(ra(1:3,j)-xi(1:3))
           rij(1:3)=h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -255,13 +259,16 @@ c-----Scan resident cells
                 stop
               endif
             enddo
-            lspr(0,i)=lspr(0,i)+1
-            if(lspr(0,i).gt.nnmax) then
-              write(6,'(a)') " [Error] lspr(0,i).gt.nnmax !!!"
-              print *, '   i,lspr(0,i),nnmax =',i,lspr(0,i),nnmax
+            lspr(0,i)= lspr(0,i) +1
+            lspr(0,j)= lspr(0,j) +1
+            if(lspr(0,i).gt.nnmax .or. lspr(0,j).gt.nnmax) then
+              write(6,'(a)') " [Error] lspr(0,i) or lspr(0,j) > nnmax"
+              print *, '   i,nnmax,lspr(0,i),lspr(0,j) ='
+     &             ,i,nnmax,lspr(0,i),lspr(0,j)
               stop
             endif
             lspr(lspr(0,i),i)=j
+            lspr(lspr(0,j),j)=i
           endif
 
 c---------Continue until j= 0
@@ -358,18 +365,22 @@ c.....Search neighbor atoms and make the list
       do ia=1,natm
         xi(1:3)= ra(1:3,ia)
         do ja=1,naex
-          if( ja.eq.ia ) cycle
+c          if( ja.eq.ia ) cycle
+          if( ja.le.ia ) cycle
           sij(1:3)= ra(1:3,ja)-xi(1:3)
           xij(1:3)= h(1:3,1)*sij(1) +h(1:3,2)*sij(2) +h(1:3,3)*sij(3)
           rij= xij(1)**2 +xij(2)**2 +xij(3)**2
           if( rij.lt.rc2 ) then
             lspr(0,ia)= lspr(0,ia) +1
-            if( lspr(0,ia).gt.nnmax ) then
-              write(6,'(a)') ' [Error] lspr(0,ia).gt.nnmax !!!'
-              write(6,'(a,2i4)') ' lspr(0,ia),nnmax=',lspr(0,ia),nnmax
+            lspr(0,ja)= lspr(0,ja) +1
+            if( lspr(0,ia).gt.nnmax .or. lspr(0,ja).gt.nnmax) then
+              write(6,'(a)') ' [Error] lspr(0,ia) or lspr(0,ja) > nnmax'
+              write(6,'(a,3i4)') ' nnmax,lspr(0,ia),lspr(0,ja)='
+     &             ,nnmax,lspr(0,ia),lspr(0,ja)
               stop
             endif
             lspr(lspr(0,ia),ia)= ja
+            lspr(lspr(0,ja),ja)= ia
           endif
         enddo
       enddo
