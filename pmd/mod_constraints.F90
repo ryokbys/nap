@@ -25,10 +25,13 @@ module constraints
   
 contains
 !=======================================================================
-  subroutine init_const(myid,mpi_world,nnode,iprint)
+  subroutine init_const(myid,mpi_world,nnode,iprint,h)
+    use vector
     integer,intent(in):: myid,mpi_world,nnode,iprint
+    real(8),intent(in):: h(3,3)
 
     integer:: ierr,ic
+    real(8):: alen(3),dlim
 
     if( nnode.gt.1 ) then
       print *,'ERROR: contraints does not work in parallel mode.'
@@ -41,6 +44,21 @@ contains
     if( trim(ctype_const).ne.'bonds' ) then
       print *,'ERROR: No such contraint available: '//trim(ctype_const)
       stop
+    endif
+
+    if( trim(ctype_const).eq.'bonds' ) then
+      alen(1) = norm2(h(:,1))
+      alen(2) = norm2(h(:,2))
+      alen(3) = norm2(h(:,3))
+      dlim = min(alen(1),alen(2))
+      dlim = min(dlim,alen(3))
+      do ic=1,nconst
+        if( dfin(ic).lt.dlim ) then
+          print *,'ERROR: a bond constraint too long w.r.t. '&
+               //'simulation cell.'
+          stop 2
+        endif
+      enddo
     endif
 
     if( myid.eq.0 .and. iprint.ne.0 ) then

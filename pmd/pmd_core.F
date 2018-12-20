@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-12-03 22:21:36 Ryo KOBAYASHI>
+c                     Last-modified: <2018-12-19 13:08:10 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -237,7 +237,8 @@ c.....Call init_metaD after setting namax and nsp
      &       ,myid_md,mpi_md_world,iprint)
       endif
 c.....Initialize constraints if needed
-      if( lconst ) call init_const(myid_md,mpi_md_world,nodes_md,iprint)
+      if( lconst ) call init_const(myid_md,mpi_md_world,nodes_md
+     &     ,iprint,h)
 
 c.....Setup for FIRE
       if( ifdmp.eq.2 ) then
@@ -391,8 +392,10 @@ c-----calc kinetic energy
       if(myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,*) ''
         write(6,'(1x,a)') "Initial values:"
-        write(6,'(1x,a,f16.5,a)') "  Kinetic energy  = ",ekin,' eV'
-        write(6,'(1x,a,f16.5,a)') "  Potential energy= ",epot0,' eV'
+        write(6,'(1x,a,f16.5,a,f10.3,a)') "  Kinetic energy  = ",ekin
+     &       ,' eV = ',ekin/ntot0,' eV/atom'
+        write(6,'(1x,a,f16.5,a,f10.3,a)') "  Potential energy= ",epot0
+     &       ,' eV = ',epot0/ntot0,' eV/atom'
         nave= 0
         tave= 0d0
         do ifmv=1,9
@@ -946,8 +949,10 @@ c        close(iotemp)
       if( myid_md.eq.0 .and. iprint.ne. 0 ) then
         write(6,*) ''
         write(6,'(1x,a)') "Final values:"
-        write(6,'(1x,a,f16.5,a)') "  Kinetic energy  = ",ekin,' eV'
-        write(6,'(1x,a,f16.5,a)') "  Potential energy= ",epot,' eV'
+        write(6,'(1x,a,f16.5,a,f10.3,a)') "  Kinetic energy  = ",ekin
+     &       ,' eV = ',ekin/ntot0,' eV/atom'
+        write(6,'(1x,a,f16.5,a,f10.3,a)') "  Potential energy= ",epot
+     &       ,' eV = ',epot/ntot0,' eV/atom'
         nave= 0
         tave= 0d0
         do ifmv=1,9

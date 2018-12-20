@@ -1789,31 +1789,31 @@ def analyze(nsys):
     alpha = np.arccos(np.dot(a2,a3)/b/c)/np.pi*180.0
     beta  = np.arccos(np.dot(a1,a3)/a/c)/np.pi*180.0
     gamma = np.arccos(np.dot(a1,a2)/a/b)/np.pi*180.0
-    print('a1 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a1[0],
-                                                                 a1[1],
-                                                                 a1[2]))
-    print('a2 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a2[0],
-                                                                 a2[1],
-                                                                 a2[2]))
-    print('a3 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a3[0],
-                                                                 a3[1],
-                                                                 a3[2]))
-    print('a = {0:10.3f} A'.format(a))
-    print('b = {0:10.3f} A'.format(b))
-    print('c = {0:10.3f} A'.format(c))
-    print('alpha = {0:7.2f} deg.'.format(alpha))
-    print('beta  = {0:7.2f} deg.'.format(beta))
-    print('gamma = {0:7.2f} deg.'.format(gamma))
-    print('volume= {0:10.3f} A^3'.format(vol))
-    print('number of atoms   = ',nsys.num_atoms())
+    print(' a1 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a1[0],
+                                                                  a1[1],
+                                                                  a1[2]))
+    print(' a2 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a2[0],
+                                                                  a2[1],
+                                                                  a2[2]))
+    print(' a3 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a3[0],
+                                                                  a3[1],
+                                                                  a3[2]))
+    print(' a = {0:10.3f} A'.format(a))
+    print(' b = {0:10.3f} A'.format(b))
+    print(' c = {0:10.3f} A'.format(c))
+    print(' alpha = {0:7.2f} deg.'.format(alpha))
+    print(' beta  = {0:7.2f} deg.'.format(beta))
+    print(' gamma = {0:7.2f} deg.'.format(gamma))
+    print(' volume= {0:10.3f} A^3'.format(vol))
+    print(' number of atoms   = ',nsys.num_atoms())
     if nsys.specorder:
-        print('number of atoms per species:')
+        print(' number of atoms per species:')
         nspcs = nsys.num_species()
         mass = 0.0
         for i,s in enumerate(nsys.specorder):
             print('   {0:s}: {1:d}'.format(s,nspcs[i]))
             mass += nspcs[i]*elements.elements[s]['mass']
-        print('density = {0:7.2f} g/cm^3'.format(mass*amu_to_g
+        print(' density = {0:7.2f} g/cm^3'.format(mass*amu_to_g
                                                  /(vol*Ang_to_cm**3) ))
 
 if __name__ == "__main__":
@@ -1851,7 +1851,7 @@ if __name__ == "__main__":
             copy_needed = True
             break
         elif c < 1:
-            raise ValueError('Periodic copy was wrong. It should be >= 1.')
+            raise ValueError(' Periodic copy was wrong. It should be >= 1.')
     if copy_needed:
         nsys.repeat(copies[0],copies[1],copies[2])
 
