@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-11-28 13:26:34 Ryo KOBAYASHI>
+!                     Last modified: <2018-12-26 15:56:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -678,8 +678,8 @@ contains
 !.....read parameters at the 1st call
       inquire(file=trim(fname),exist=lexist)
       if( .not. lexist ) then
-        write(6,'(a)') ' [Error] '//cpfname//' does not exist !!!.'
-        write(6,'(a)') '   The linreg potential needs '//cpfname//'.'
+        write(6,'(a)') ' [Error] '//trim(cpfname)//' does not exist !!!.'
+        write(6,'(a)') '   The linreg potential needs '//trim(cpfname)//'.'
 !!$        call mpi_finalize(ierr)
         stop
       endif

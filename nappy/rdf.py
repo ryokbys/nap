@@ -10,7 +10,7 @@ Options:
     -h, --help  Show this help message and exit.
     -d DR       Width of the bin. [default: 0.1]
     -r RMAX     Cutoff radius of radial distribution. [default: 5.0]
-    -f FMT      Input file format. If is not *pmd*, users must specify it. [default: pmd]
+    -f FMT      Input file format. If is not *pmd*, users must specify it. [default: None]
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
     -o OUT      Output file name. [default: out.rdf]
@@ -94,7 +94,7 @@ def rdf(asys,nspcs,dr,rmax,normalize=True):
 
     return rd,nadr,natm0
 
-def rdf_average(infiles,nspcs,nr,ffmt='pmd',dr=0.1,rmax=3.0,average=True,
+def rdf_average(infiles,nspcs,nr,ffmt=None,dr=0.1,rmax=3.0,average=True,
                 normalize=True):
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     nsum= 0
