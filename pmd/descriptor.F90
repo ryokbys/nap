@@ -54,7 +54,10 @@ contains
     ncnst_type(2) = 1   ! cosine
     ncnst_type(3) = 1   ! polynomial
     ncnst_type(4) = 2   ! Morse
-    ncnst_type(101) = 1 ! angular
+    ncnst_type(101) = 1 ! angular1 (SW-type, not includes fc(rjk))
+    ncnst_type(102) = 1 ! angular2 (Behler-type, includes fc(rjk))
+    ncnst_type(103) = 1 ! cos(cos(thijk))
+    ncnst_type(104) = 1 ! sin(cos(thijk))
     ncomb_type(1:100) = 2    ! pair
     ncomb_type(101:200) = 3  ! triplet
 
@@ -185,7 +188,7 @@ contains
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
          dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,dik2,tmp,dtmp, &
          xjk(3),rjk(3),djk,djk2,fcjk,dfcjk,drjkj(3),drjkk(3),dgdjk, &
-         ri,ro,xs,z,dz
+         ri,ro,xs,z,dz,an
 
     real(8):: texpij,texpik,eta3
 
@@ -333,6 +336,7 @@ contains
           endif
         enddo
 
+!.....3-body forms
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           ks= int(tag(ka))
@@ -348,10 +352,16 @@ contains
           rjk(1:3)= h(1:3,1)*xjk(1) +h(1:3,2)*xjk(2) +h(1:3,3)*xjk(3)
           djk2= rjk(1)**2 +rjk(2)**2 +rjk(3)**2
           djk= sqrt(djk2)
+!.....Cosine is common for all the angular SFs
+          spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
+          cs= spijk/dij/dik
+          dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij**2
+          dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik**2
+          dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
             if( itype(isf).eq.101 ) then ! my angular SF
               if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
-!.....fcij's can be computed after rcs is determined
+!.....fcij's should be computed after rcs is determined
               call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
               call get_fc_dfc(dik,is,ks,isf,fcik,dfcik)
               almbd= cnst(1,isf)
@@ -359,8 +369,6 @@ contains
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
 !.....function value
-              spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
-              cs= spijk/dij/dik
               t1= (almbd +cs)**2
               eta3 = 0.5d0 /(rcs(isf)/2)**2
               texpij = exp(-eta3*dij2)
@@ -380,9 +388,6 @@ contains
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
               dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik *texpij*texpik
-              dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij**2
-              dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik**2
-              dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
               dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
@@ -392,7 +397,7 @@ contains
             else if( itype(isf).eq.102 ) then  ! Behler's angular SF that includes fc(rjk)
               if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) .or. &
                    djk.ge.rcs(isf) ) cycle
-!.....fcij's can be computed after rcs is determined
+!.....fcij's should be computed after rcs is determined
               call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
               call get_fc_dfc(dik,is,ks,isf,fcik,dfcik)
               call get_fc_dfc(djk,js,ks,isf,fcjk,dfcjk)
@@ -403,8 +408,6 @@ contains
               drjkj(1:3)= -rjk(1:3)/djk
               drjkk(1:3)= -drjkj(1:3)
 !.....function value
-              spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
-              cs= spijk/dij/dik
               t1= (almbd +cs)**2
               eta3 = 0.5d0 /(rcs(isf)/2)**2
 !!$              texpij = exp(-eta3*dij2)
@@ -429,9 +432,59 @@ contains
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) &
                     +dgdik*drikk(1:3)+dgdjk*drjkk(1:3)
               dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik*fcjk *texp
-              dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij**2
-              dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik**2
-              dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
+!!$              dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij**2
+!!$              dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik**2
+!!$              dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
+              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
+              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
+              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
+              igsf(isf,0,ia) = 1
+              igsf(isf,jj,ia) = 1
+              igsf(isf,kk,ia) = 1
+            else if( itype(isf).eq.103 ) then ! cos(cos(thijk)*n*pi) w/o fc(rjk)
+              if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
+!.....fcij's should be computed after rcs is determined
+              call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
+              call get_fc_dfc(dik,is,ks,isf,fcik,dfcik)
+              an = cnst(1,isf)
+              driki(1:3)= -rik(1:3)/dik
+              drikk(1:3)= -driki(1:3)
+!.....Function value
+              tmp = cos(cs*an*pi)
+              gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik
+!.....Derivative
+              dgdij= tmp*dfcij*fcik
+              dgdik= tmp*fcij*dfcik
+              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia)&
+                   +dgdij*driji(1:3) +dgdik*driki(1:3)
+              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
+              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
+              dgcs= -an*pi*sin(cs*an*pi) *fcij*fcik
+              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
+              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
+              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
+              igsf(isf,0,ia) = 1
+              igsf(isf,jj,ia) = 1
+              igsf(isf,kk,ia) = 1
+            else if( itype(isf).eq.104 ) then ! sin(cos(thijk)*n*pi) w/o fc(rjk)
+              if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
+!.....fcij's should be computed after rcs is determined
+              call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
+              call get_fc_dfc(dik,is,ks,isf,fcik,dfcik)
+              an = cnst(1,isf)
+              driki(1:3)= -rik(1:3)/dik
+              drikk(1:3)= -driki(1:3)
+!.....Function value
+              tmp = sin(cs*an*pi)
+              gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik
+!.....Derivative
+              dgdij= tmp*dfcij*fcik
+              dgdik= tmp*fcij*dfcik
+              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia)&
+                   +dgdij*driji(1:3) +dgdik*driki(1:3)
+              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
+              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
+              dgcs= an*pi*cos(cs*an*pi) *fcij*fcik
               dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)

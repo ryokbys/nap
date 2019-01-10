@@ -45,7 +45,7 @@ forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
 	force_Mishin.o force_AFS_W.o force_SC_Fe.o \
 	force_SM_Al.o force_linreg.o force_NN.o force_NN2.o \
 	force_Morse.o force_Coulomb.o force_EAM.o force_Buckingham.o \
-	force_Bonny_WRe.o force_ZBL.o
+	force_Bonny_WRe.o force_ZBL.o force_cspline.o
 params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 	params_EDIP_Si.h \
 	params_Brenner.h params_Lu_WHe.h params_Branicio_AlN.h \

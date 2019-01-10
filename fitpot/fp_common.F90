@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-11-27 18:40:03 Ryo KOBAYASHI>
+!                     Last modified: <2019-01-10 18:45:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -843,6 +843,7 @@ contains
     use LJ,only: set_paramsdir_LJ
     use ZBL,only: set_paramsdir_ZBL, r_inner, r_outer
     use Bonny_WRe,only: set_paramsdir_Bonny
+    use cspline,only: set_paramsdir_cspline
     use force,only: loverlay
     implicit none
 
@@ -854,6 +855,7 @@ contains
     logical:: luse_LJ_repul = .false.
     logical:: luse_ZBL = .false.
     logical:: luse_Bonny_WRe = .false.
+    logical:: luse_cspline = .false.
     logical,save:: l1st = .true.
     real(8):: epot,strs(3,3)
     real(8),save,allocatable:: frcs(:,:)
@@ -883,6 +885,8 @@ contains
           luse_ZBL = .true.
         else if( index(trim(csubffs(i)),'Bonny_WRe').ne.0 ) then
           luse_Bonny_WRe = .true.
+        else if( index(trim(csubffs(i)),'cspline').ne.0 ) then
+          luse_cspline = .true.
         endif
       enddo
 
@@ -911,6 +915,10 @@ contains
         endif
         if( luse_Bonny_WRe ) then
           call set_paramsdir_Bonny(trim(cmaindir)//'/'&
+               //trim(samples(ismpl)%cdirname)//'/pmd')
+        endif
+        if( luse_cspline ) then
+          call set_paramsdir_cspline(trim(cmaindir)//'/'&
                //trim(samples(ismpl)%cdirname)//'/pmd')
         endif
         call run_pmd(samples(ismpl),lcalcgrad,nvars,&

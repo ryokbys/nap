@@ -33,6 +33,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use Buckingham,only:force_Buckingham
   use Bonny_WRe,only: force_Bonny_WRe
   use ZBL,only: force_ZBL,r_inner
+  use cspline,only: force_cspline
   implicit none
   integer,intent(in):: namax,natm,nnmax,nismax,iprint
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
@@ -164,6 +165,9 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('ZBL') ) call force_ZBL(namax,natm,tag,ra,nnmax,aa,strs &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+  if( use_force('cspline') ) call force_cspline(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   
@@ -333,6 +337,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
       call read_params_desc(myid_md,mpi_md_world,iprint)
     endif
   endif
+
 
 end subroutine init_force
 !=======================================================================
