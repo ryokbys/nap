@@ -18,7 +18,6 @@ import sys
 from docopt import docopt
 import random,math
 import json
-import math
 
 _descfname = 'in.params.desc'
 _paramfname = 'in.params.NN2'
@@ -28,15 +27,20 @@ _logfname = 'log.make_params_NN'
 _pmin = -20.0
 _pmax =  20.0
 
-_type_avail = ('Gaussian','cosine','polynomial','Morse','angular')
+_type_avail = ('Gaussian','cosine','polynomial','Morse','angular',
+               'angular1','angular2','angular3','angular4')
 _type_2body = ('Gaussian','cosine','polynomial','Morse',)
-_type_3body = ('angular')
+_type_3body = ('angular','angular1','angular2','angular3','angular4')
 _type2num = {
     'Gaussian': 1,
     'cosine': 2,
     'polynomial': 3,
     'Morse': 4,
     'angular': 101,
+    'angular1': 101,
+    'angular2': 102,
+    'angular3': 103,
+    'angular4': 104,
 }
 _nparam_type = {
     'Gaussian': 2,
@@ -44,6 +48,10 @@ _nparam_type = {
     'polynomial': 1,
     'Morse': 3,
     'angular': 2,
+    'angular1': 2,
+    'angular2': 2,
+    'angular3': 2,
+    'angular4': 2,
 }
 
 def _num2type(num):
@@ -323,12 +331,19 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
                 ia,ja,ka = triple.get_isps()
                 for isf,sf in enumerate(triple.sfparams):
                     t = sf[0]
-                    a = sf[1]
-                    ang = -math.cos(a/180*math.pi)
-                    f.write(' {0:3d}'.format(_type2num[t]) \
-                            +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
-                            +' {0:6.2f}'.format(rc3) \
-                            +' {0:10.4f}\n'.format(ang))
+                    if t in ('angular','angular1','angular2'):
+                        a = sf[1]
+                        ang = -math.cos(a/180*math.pi)
+                        f.write(' {0:3d}'.format(_type2num[t]) \
+                                +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
+                                +' {0:6.2f}'.format(rc3) \
+                                +' {0:10.4f}\n'.format(ang))
+                    elif t in ('angular3','angular4'):
+                        a = sf[1]
+                        f.write(' {0:3d}'.format(_type2num[t]) \
+                                +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
+                                +' {0:6.2f}'.format(rc3) \
+                                +' {0:10.4f}\n'.format(a))
         f.close()
 
     with open(_paramfname,'w') as g:

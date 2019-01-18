@@ -53,6 +53,21 @@ def read_desc(fname='in.params.desc'):
                 rc = float(data[4])
                 almbd = float(data[5])
                 descs.append(('angular',isp,jsp,ksp,rc,almbd))
+            elif itype == 102: # angular2
+                ksp = int(data[3])
+                rc = float(data[4])
+                almbd = float(data[5])
+                descs.append(('angular2',isp,jsp,ksp,rc,almbd))
+            elif itype == 103: # angular3
+                ksp = int(data[3])
+                rc = float(data[4])
+                a1 = float(data[5])
+                descs.append(('angular3',isp,jsp,ksp,rc,a1))
+            elif itype == 104: # angular4
+                ksp = int(data[3])
+                rc = float(data[4])
+                a1 = float(data[5])
+                descs.append(('angular4',isp,jsp,ksp,rc,a1))
     return nsp,nsf,descs,r_inner
 
 def write_desc(nsp,nsf,descs,r_inner,fname='in.params.desc'):

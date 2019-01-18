@@ -55,19 +55,19 @@ def get_prob_dist(ndivs,nsys,sid,sgm):
             rai = ra*i -pi[0]
             rai = rai if abs(rai) < 0.5 else rai -1.0*np.sign(rai)
             da = la*rai
-            if abs(da) > 2*sgm:
+            if abs(da) > 2.5*sgm:
                 continue
             for j in range(ndivs[1]):
                 rbi = rb*j -pi[1]
                 rbi = rbi if abs(rbi) < 0.5 else rbi -1.0*np.sign(rbi)
                 db = lb*rbi
-                if abs(db) > 2*sgm:
+                if abs(db) > 2.5*sgm:
                     continue
                 for k in range(ndivs[2]):
                     rci = rc*k -pi[2]
                     rci = rci if abs(rci) < 0.5 else rci -1.0*np.sign(rci)
                     dc = lc*rci
-                    if abs(dc) > 2*sgm:
+                    if abs(dc) > 2.5*sgm:
                         continue
                     dr2 = da*da +db*db +dc*dc
                     pdist[i,j,k] = pdist[i,j,k] \
@@ -94,21 +94,18 @@ def write_CHGCAR(nsys,pdist,fname='CHGCAR'):
                     if n % 5 == 4:
                         f.write('\n')
                     n += 1
+    os.system('rm '+poscar)
     return None
 
 def normalize_pdist(pdist,nsys,sid):
     print(' Normalize pdist...')
-    shape = np.shape(pdist)
     s = 0.0
-    print('   Max in pdist = ',np.max(pdist))
-    for i in range(shape[0]):
-        for j in range(shape[1]):
-            for k in range(shape[2]):
-                s += pdist[i,j,k]
-    print('   Sum of pdist = ',s)
+    s = np.sum(pdist)
     na = nsys.num_atoms(sid=sid)
-    print('   Num of atoms considered = ',na)
     pdist *= float(na)/s
+    #print('   Max in pdist = ',np.max(pdist))
+    #print('   Sum of pdist = ',np.sum(pdist))
+    #print('   Num of atoms considered = ',na)
     return pdist
     
 if __name__ == "__main__":

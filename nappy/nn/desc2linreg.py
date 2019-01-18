@@ -23,13 +23,13 @@ __version__ = "180807"
 
 
 def create_linreg_input(nsf,desc,wmax,fname='in.params.linreg'):
-    rc3 = 1.0
     rc2 = 2.0
+    rc3 = 1.0
     for d in descs:
         sftype = d[0]
-        if sftype == 'angular':
+        if 'angular' in sftype:
             rc3 = np.ceil(max(rc3,d[4]))
-        elif sftype == 'gauss':
+        elif sftype in ('gauss','cosine'):
             rc2 = np.ceil(max(rc2,d[3]))
     
     with open(fname,'w') as f:
