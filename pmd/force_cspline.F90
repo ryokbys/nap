@@ -11,9 +11,9 @@ module cspline
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.cspline'
   integer,parameter:: ionum = 50
-  integer,parameter:: nspmax = 9
-  integer:: idpair(nspmax,nspmax)
-  integer:: idtriplet(nspmax,nspmax,nspmax)
+  integer:: nspmax
+  integer,allocatable:: idpair(:,:)
+  integer,allocatable:: idtriplet(:,:,:)
   
   integer:: nspl = 0 ! # of splines
 
@@ -48,18 +48,22 @@ contains
 
     integer:: ispln,jj,ia,ja,kk,ka,ierr,is,js,ks,ispl,jxyz
     real(8):: rcmax,rcmax2,epotl,xi(3),xj(3),xij(3),rij(3),drij(3) &
-         ,xk(3),xik(3),rik(3),drik(3),dcsdj(3),dcsdk(3),tmpj(3) &
+         ,xk(3),xik(3),rik(3),rjk(3),drik(3),dcsdj(3),dcsdk(3),tmpj(3) &
          ,tmpk(3),csn,dfcij,dfcik,dgcs,dgdij,dgdik,dij,dij2,diji &
          ,dik,diki,dik2,epotl2,epotl3,fcij,fcik,gijk,phi,dphi,rc2,rct &
-         ,rct2,tmp
-    
+         ,rct2,tmp,eta3,texpij,texpik,texpjk,tmpjk(3),djk2,djk,fcjk,dfcjk &
+         ,drjk(3),dgdjk,xjk(3)
+    character(len=128):: ctype
     real(8),save,allocatable:: aa2(:,:),aa3(:,:),strsl(:,:,:)
-    logical,save:: l3b
+    logical,save:: l3b,l2b
     logical:: l3b_exist
     type(spline):: spl
 
 !.....Only at the 1st call
     if( l1st ) then
+      nspmax = nismax
+      if( allocated(idpair) ) deallocate(idpair,idtriplet)
+      allocate(idpair(nspmax,nspmax),idtriplet(nspmax,nspmax,nspmax))
       call read_params_cspline(myid_md,mpi_md_world,iprint)
 !.....Check rc
       rcmax = 0d0
@@ -70,12 +74,23 @@ contains
       rcmax2 = rcmax*rcmax
       if( rc.lt.rcmax ) then
         if( myid_md.eq.0 ) then
-          print *,'ERROR: Cutoff radius is not appropriate !!!'
+          print *,'ERROR: Cutoff radius is not appropriate in force_cspline.'
           print *,'  rc, rcmax = ',rc,rcmax
         endif
         call mpi_finalize(ierr)
         stop 1
       endif
+!.....Check whether 2-body terms exist
+      l2b = .false.
+      do is=1,nismax
+        do js=1,nismax
+          if( idpair(is,js).gt.0 ) then
+            l2b = .true.
+            goto 10
+          endif
+        enddo
+      enddo
+10    continue
 !.....Check whether 3-body terms exist
       l3b = .false.
       do is=1,nismax
@@ -83,13 +98,13 @@ contains
           do ks=1,nismax
             if( idtriplet(is,js,ks).gt.0 ) then
               l3b = .true.
-              goto 10
+              goto 11
             endif
           enddo
         enddo
       enddo
-10    continue
-      
+11    continue
+
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
       if( allocated(aa2) ) deallocate(aa2,aa3)
@@ -112,6 +127,7 @@ contains
 !.....2-body term
     epotl2 = 0d0
     aa2(1:3,1:natm+nb) = 0d0
+    if( .not. l2b ) goto 20
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
       is = int(tag(ia))
@@ -121,13 +137,14 @@ contains
         if( ja.le.ia ) cycle
         js = int(tag(ja))
         ispl = idpair(is,js)
+        if( ispl.le.0 ) cycle
         spl = spls(ispl)
         rc2 = spl%rcut
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2= rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-        if( dij2.gt.rc**2 ) cycle
+        if( dij2.gt.rc2*rc2 ) cycle
         dij = sqrt(dij2)
         diji= 1d0/dij
         call eval_spline(dij,spl%npnts,spl%pnts,spl%coefs,phi,dphi)
@@ -151,11 +168,12 @@ contains
         enddo
       enddo
     enddo
+20  continue
 
 !.....3-body term
     epotl3 = 0d0
-    if( .not. l3b ) goto 20
     aa3(1:3,1:natm+nb) = 0d0
+    if( .not. l3b ) goto 21
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
       is = int(tag(ia))
@@ -191,45 +209,129 @@ contains
           dik2= rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
           if( dik2.gt.rct2 ) cycle
           dik = sqrt(dik2)
-          csn = (rij(1)*rik(1) +rij(2)*rij(2) +rij(3)*rij(3))/(dij*dik)
+          csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3))/(dij*dik)
           call eval_spline(csn,spl%npnts,spl%pnts,spl%coefs,phi,dphi)
           fcij = fc1(dij,0d0,rct)
           dfcij = dfc1(dij,0d0,rct)
           fcik = fc1(dik,0d0,rct)
           dfcik = dfc1(dik,0d0,rct)
-          gijk = phi *fcij *fcik
+          ctype = spl%ctype
+          if( trim(ctype).eq.'angular'&
+               .or. trim(ctype).eq.'angular1' ) then
+            eta3 = 0.5d0 /(rct/2)**2
+            texpij = exp(-eta3 /dij2)
+            texpik = exp(-eta3 /dik2)
+            tmp = phi *texpij *texpik
+            gijk = tmp *fcij *fcik
 !.....Potential
-          epi(ia)= epi(ia) +gijk
-          epotl3 = epotl3  +gijk
+            epi(ia)= epi(ia) +gijk
+            epotl3 = epotl3  +gijk
 !.....Force
-          drij(1:3) = -rij(1:3)/dij
-          drik(1:3) = -rik(1:3)/dik
-          dgdij = dfcij*fcik*tmp
-          dgdik = dfcik*fcij*tmp
-          dgcs = dphi*fcij*fcik
-          dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*csn/dij**2
-          dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*csn/dik**2
+            drij(1:3) = -rij(1:3)/dij
+            drik(1:3) = -rik(1:3)/dik
+            dgdij = dfcij*fcik*tmp +tmp*(-2d0*eta3*dij)*fcij*fcik
+            dgdik = dfcik*fcij*tmp +tmp*(-2d0*eta3*dik)*fcij*fcik
+            dgcs = dphi *texpij*texpik *fcij*fcik
+            dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*csn/dij**2
+            dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*csn/dik**2
 !!$          dcsdi(1:3)= -dcsdj(1:3)  -dcsdk(1:3)
-          tmpj(1:3)= dgcs*dcsdj(1:3) -drij(1:3)*dgdij
-          tmpk(1:3)= dgcs*dcsdk(1:3) -drik(1:3)*dgdik
-          aa3(1:3,ja)= aa3(1:3,ja) -tmpj(1:3)
-          aa3(1:3,ka)= aa3(1:3,ka) -tmpk(1:3)
-          aa3(1:3,ia)= aa3(1:3,ia) +tmpj(1:3)+tmpk(1:3)
+            tmpj(1:3)= dgcs*dcsdj(1:3) -drij(1:3)*dgdij
+            tmpk(1:3)= dgcs*dcsdk(1:3) -drik(1:3)*dgdik
+            aa3(1:3,ja)= aa3(1:3,ja) -tmpj(1:3)
+            aa3(1:3,ka)= aa3(1:3,ka) -tmpk(1:3)
+            aa3(1:3,ia)= aa3(1:3,ia) +tmpj(1:3)+tmpk(1:3)
 !.....Stress
-          if( lstrs ) then
-            do jxyz=1,3
-              strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
-                   -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
-              strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
-                   -0.5d0*rij(jxyz)*tmpj(1:3)
-              strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
-                   -0.5d0*rik(jxyz)*tmpk(1:3)
-            enddo
+            if( lstrs ) then
+              do jxyz=1,3
+                strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
+                     -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
+                strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
+                     -0.5d0*rij(jxyz)*tmpj(1:3)
+                strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
+                     -0.5d0*rik(jxyz)*tmpk(1:3)
+              enddo
+            endif
+          else if( trim(ctype).eq.'angular2' ) then
+            xjk(1:3)= xk(1:3)-xj(1:3)
+            rjk(1:3)= h(1:3,1)*xjk(1) +h(1:3,2)*xjk(2) +h(1:3,3)*xjk(3)
+            djk2= rjk(1)*rjk(1) +rjk(2)*rjk(2) +rjk(3)*rjk(3)
+            if( djk2.gt.rct2 ) cycle
+            djk= sqrt(djk2)
+            fcjk = fc1(djk,0d0,rct)
+            dfcjk = dfc1(djk,0d0,rct)
+            eta3 = 0.5d0 /(rct/2)**2
+            texpij = exp(-eta3 /dij2)
+            texpik = exp(-eta3 /dik2)
+            texpjk = exp(-eta3 /djk2)
+            tmp = phi *texpij *texpik *texpjk
+            gijk = tmp *fcij *fcik *fcjk
+!.....Potential
+            epi(ia)= epi(ia) +gijk
+            epotl3 = epotl3  +gijk
+!.....Force
+            drij(1:3) = -rij(1:3)/dij
+            drik(1:3) = -rik(1:3)/dik
+            drjk(1:3) = -rjk(1:3)/djk
+            dgdij = dfcij*fcik*fcjk*tmp +tmp*(-2d0*eta3*dij)*fcij*fcik*fcjk
+            dgdik = dfcik*fcij*fcjk*tmp +tmp*(-2d0*eta3*dik)*fcij*fcik*fcjk
+            dgdjk = dfcjk*fcij*fcik*tmp +tmp*(-2d0*eta3*djk)*fcij*fcik*fcjk
+            dgcs = dphi *texpij*texpik*texpjk *fcij*fcik*fcjk
+            dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*csn/dij**2
+            dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*csn/dik**2
+!!$          dcsdi(1:3)= -dcsdj(1:3)  -dcsdk(1:3)
+            tmpj(1:3)= dgcs*dcsdj(1:3) -drij(1:3)*dgdij
+            tmpk(1:3)= dgcs*dcsdk(1:3) -drik(1:3)*dgdik
+            tmpjk(1:3)= drjk(1:3)*dgdjk
+            aa3(1:3,ja)= aa3(1:3,ja) -tmpj(1:3) -tmpjk(1:3)
+            aa3(1:3,ka)= aa3(1:3,ka) -tmpk(1:3) +tmpjk(1:3)
+            aa3(1:3,ia)= aa3(1:3,ia) +tmpj(1:3)+tmpk(1:3)
+!.....Stress
+            if( lstrs ) then
+              do jxyz=1,3
+                strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
+                     -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
+                strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
+                     -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rjk(jxyz)*tmpjk(1:3)
+                strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
+                     -0.5d0*rik(jxyz)*tmpk(1:3) -0.5d0*rjk(jxyz)*tmpjk(1:3)
+              enddo
+            endif
+          else if( trim(ctype).eq.'angular3' &
+               .or. trim(ctype).eq.'angular4' ) then
+            gijk = phi *fcij *fcik
+!.....Potential
+            epi(ia)= epi(ia) +gijk
+            epotl3 = epotl3  +gijk
+!.....Force
+            drij(1:3) = -rij(1:3)/dij
+            drik(1:3) = -rik(1:3)/dik
+            dgdij = dfcij*fcik*tmp
+            dgdik = dfcik*fcij*tmp
+            dgcs = dphi*fcij*fcik
+            dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*csn/dij**2
+            dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*csn/dik**2
+!!$          dcsdi(1:3)= -dcsdj(1:3)  -dcsdk(1:3)
+            tmpj(1:3)= dgcs*dcsdj(1:3) -drij(1:3)*dgdij
+            tmpk(1:3)= dgcs*dcsdk(1:3) -drik(1:3)*dgdik
+            aa3(1:3,ja)= aa3(1:3,ja) -tmpj(1:3)
+            aa3(1:3,ka)= aa3(1:3,ka) -tmpk(1:3)
+            aa3(1:3,ia)= aa3(1:3,ia) +tmpj(1:3)+tmpk(1:3)
+!.....Stress
+            if( lstrs ) then
+              do jxyz=1,3
+                strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
+                     -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
+                strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
+                     -0.5d0*rij(jxyz)*tmpj(1:3)
+                strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
+                     -0.5d0*rik(jxyz)*tmpk(1:3)
+              enddo
+            endif
           endif
         enddo
       enddo
     enddo
-20  continue
+21  continue
 
 !.....Sum up forces and stress
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa2(1:3,1:natm) +aa3(1:3,1:natm)
@@ -370,6 +472,7 @@ contains
 
       open(ionum,file=trim(fname),status='old')
       read(ionum,*) nspl
+      if( allocated(spls)) deallocate(spls)
       allocate(spls(nspl))
       ispl = 0
       do while(.true.)
@@ -480,7 +583,10 @@ contains
     integer:: i,ierr,npnts
 
     call mpi_bcast(nspl,1,mpi_integer,0,mpi_world,ierr)
-    if( myid.ne.0 ) allocate(spls(nspl))
+    if( myid.ne.0 ) then
+      if( allocated(spls) ) deallocate(spls)
+      allocate(spls(nspl))
+    endif
     do i=1,nspl
       call mpi_bcast(spls(i)%ctype,128,mpi_character,0,mpi_world,ierr)
       call mpi_bcast(spls(i)%isp,1,mpi_integer,0,mpi_world,ierr)

@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-12-19 13:08:10 Ryo KOBAYASHI>
+c                     Last-modified: <2019-01-17 12:17:35 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -300,7 +300,8 @@ c            tfac(ifmv)= dsqrt(2d0*tgmm*fkb*ttgt(ifmv)/dt)
           enddo
         endif
       else if( trim(ctctl).eq.'ttm' ) then
-        call init_ttm(namax,natm,h,dt,myid_md,mpi_md_world,iprint)
+        call init_ttm(namax,natm,h,dt,lvardt,myid_md,mpi_md_world
+     &       ,iprint)
       endif
 
       tcpu1= mpi_wtime()
@@ -763,7 +764,7 @@ c.....accumulate energy difference
      &         ,istp,myid_md,mpi_md_world,iprint)
           call langevin_ttm(namax,natm,va,aa,tag,am,h
      &         ,nspmax,fa2v,fekin,ediff,dt,myid_md,mpi_md_world,iprint)
-          call update_Te(simtime,myid_md,mpi_md_world,iprint)
+          call update_Te(simtime,dt,myid_md,mpi_md_world,iprint)
         endif  ! end of thermostat
 
 
@@ -790,7 +791,8 @@ c          call rm_trans_motion()
 c        endif
 
 c-------output energies
-        if(mod(istp,nouterg).eq.0) then
+        if( mod(istp,nouterg).eq.0 .or.
+     &       (ifpmd.gt.0.and. mod(istp,noutpmd).eq.0) ) then
           iocnterg=iocnterg+1
           nave= 0
           tave= 0d0

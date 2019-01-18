@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-10-21 22:33:09 Ryo KOBAYASHI>
+!                     Last-modified: <2019-01-17 12:23:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -32,6 +32,7 @@ module ttm
 !.....Mesh size in reduced unit [0:1)
   real(8):: dx,dy,dz,area,darea
 !.....Time step in fs == dt in MD by default
+  real(8):: dt_inner = -1.0
   real(8):: dt
 !.....Number of inner loop in TTM
   integer:: nstp_inner = 1
@@ -127,12 +128,13 @@ module ttm
 
 contains
 !=======================================================================
-  subroutine init_ttm(namax,natm,h,dtmd,myid,mpi_world,iprint)
+  subroutine init_ttm(namax,natm,h,dtmd,lvardt,myid,mpi_world,iprint)
 !
 !  Read parameters for TTM from in.ttm and initialize
 !
     integer,intent(in):: namax,natm,myid,mpi_world,iprint
     real(8),intent(in):: dtmd,h(3,3)
+    logical,intent(in):: lvardt 
 
     integer:: ierr,ix,iy,iz,mem
     real(8):: t,t0,dtmax,tmp
@@ -179,10 +181,15 @@ contains
       print *,'TTM parameters:'
       print '(a,es12.4,a,es12.4,a)','   Fluence = ',fluence,' eV/A^2, = ' &
            ,fluence*ev2j/ang2m**2,' J/m^2'
+      print '(a,f0.3,a)','   Pulse duration = ',tau_pulse,' ps'
       print '(a,es12.4,a)','   Intensity = ',I_0/darea,' eV/A^2/fs'
       print '(a,f0.1,a)','   Total incident energy = ',fluence*area,' eV'
       print '(a,i5)','   inner_loop = ',nstp_inner
-      print '(a,2es12.4)','   dtmd, dt = ',dtmd,dt
+      if( .not. lvardt ) then
+        print '(a,2es12.4)','   dtmd, dt = ',dtmd,dt
+      else
+        print '(a,2es12.4,a)','   dtmd, dt = ',dtmd,dt,' fs (but it is variable)'
+      endif
       print '(a,3i5,i8)','   nx,ny,nz,nxyz = ',nx,ny,nz,nxyz
       print '(a,4es12.4)','   dx,dy,dz,vcell = ',dx,dy,dz,vcell
       print '(a,2es12.4)','   area,darea = ',area,darea
@@ -286,7 +293,17 @@ contains
   subroutine set_inner_dt(dtmd)
     real(8),intent(in):: dtmd
 
+!.....If dt_inner is specified, nstp_inner and dt are determined from dt_inner and dtmd.
+!.....Since the upper limit of dt is given by dx**2/(2*kappa),
+!.....dt_inner should be determined regardless to dtmd and
+!.....this would be appropriate especially in case of variable time-step.
+    if( dt_inner .gt. 0d0 ) then
+      nstp_inner = max(int(dtmd /dt_inner),1)
+    endif
     dt = dtmd /nstp_inner
+!.....Change dt_inner to match dt and use this dt_inner afterward
+    dt_inner = dt
+    
     return
   end subroutine set_inner_dt
 !=======================================================================
@@ -315,6 +332,9 @@ contains
         else if( trim(c1st).eq.'inner_loop' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, nstp_inner
+        else if( trim(c1st).eq.'inner_dt' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, dt_inner
         else if( trim(c1st).eq.'gamma_p' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, gamma_p
@@ -398,6 +418,9 @@ contains
         else if( trim(c1st).eq.'cut_interaction' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, lcut_interact
+        else if( trim(c1st).eq.'Ta_min' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, ta_min
         else
           print *,'There is no TTM keyword: ',trim(c1st)
         endif
@@ -414,6 +437,7 @@ contains
     call mpi_bcast(ny,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nz,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nstp_inner,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(dt_inner,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(gamma_p,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(gamma_s,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(ekth,1,mpi_real8,0,mpi_world,ierr)
@@ -615,15 +639,16 @@ contains
     return
   end subroutine calc_Ta
 !=======================================================================
-  subroutine update_Te(tnow,myid,mpi_world,iprint)
+  subroutine update_Te(tnow,dtmd,myid,mpi_world,iprint)
 !
 !  Update Te by solving the diffusion equation.
 !
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: tnow
+    real(8),intent(in):: tnow,dtmd
 
     integer:: ic,ix,iy,iz,ierr,istp
-    real(8):: t0,ce,dce,xi,pterm,sterm,kappa,dkappa,pulsefactor
+    real(8):: t0,ce,dce,xi,pterm,sterm,kappa,dkappa,pulsefactor&
+         ,dtemp
     real(8),save:: ein_pulse
     logical,save:: l1st = .true.
 
@@ -637,6 +662,7 @@ contains
     ein_e = 0d0
     eout_e = 0d0
     if( myid.eq.0 ) then
+10    continue
       do istp = 1,nstp_inner
         call set_BC()
 
@@ -653,8 +679,6 @@ contains
           else if( trim(ctype_kappa).eq.'B2' ) then
             kappa = kappa0 *te(ix,iy,iz) /max(ta(ic),ta_min)
             dkappa = kappa0 /max(ta(ic),ta_min)
-!!$            kappa = kappa0 *te(ix,iy,iz) /300d0
-!!$            dkappa = kappa0 /300d0
           endif
           pterm = -gp(ic)*(te(ix,iy,iz) -ta(ic))
           sterm = gs(ic)*tap(ic)
@@ -665,10 +689,16 @@ contains
             ein_e = ein_e +(gp(ic)*ta(ic)+sterm)*dt *vcell
             eout_e = eout_e -gp(ic)*te(ix,iy,iz)*dt *vcell
           endif
-          tep(ix,iy,iz) = te(ix,iy,iz) &
-               +dt/((ce+te(ix,iy,iz)*dce)*rho_e) &
+          dtemp = dt/((ce+te(ix,iy,iz)*dce)*rho_e) &
                *( dkappa*dte2(ix,iy,iz) +kappa*d2te(ix,iy,iz) &
                +pterm +sterm )
+          tep(ix,iy,iz) = te(ix,iy,iz) +dtemp
+          if( tep(ix,iy,iz).lt.0d0 ) then
+            dt_inner = dt_inner/2
+            print *,'WARNING: Since Te<0, made dt_inner half, dt_inner=',dt_inner
+            call set_inner_dt(dtmd)
+            goto 10  ! Go back and redo inner loop with the half dt_inner
+          endif
         enddo
         if( trim(ctype_pulse).eq.'stepwise' ) then
           if( tnow.ge.t0_laser .and. &
@@ -723,6 +753,14 @@ contains
           print '(a,2es13.4e3)','tnow,ein_pulse=',tnow &
                ,ein_pulse*3d0/2 *rho_e*vcell*fkb
         endif
+        do ic=1,nxyz
+          call ic2ixyz(ic,ix,iy,iz)
+          if( te(ix,iy,iz).lt.0d0 ) then
+            print *,'ERROR: te(ix,iy,iz) < 0 !!'
+            print *,'ic,ix,iy,iz,te=',ic,ix,iy,iz,te(ix,iy,iz)
+            stop 1
+          endif
+        enddo
       endif
     endif
 !.....Broadcast Te distribution to all the nodes.
