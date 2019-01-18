@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-01-10 18:45:51 Ryo KOBAYASHI>
+!                     Last modified: <2019-01-18 17:28:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -73,7 +73,7 @@ contains
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
          ,nff,cffs,nsubff,csubffs,cmaindir,maxna,rcut,rc3 &
          ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint,maxisp &
-         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss,interact
+         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss,interact,memgsf,cfmethod
     use parallel
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb, set_params_Coulomb
@@ -99,6 +99,7 @@ contains
     type(mdsys):: smpl
     logical,save:: l1st = .true.
     logical,parameter:: lcalcgrad = .false.
+    logical:: lfdsgnmat
     character(len=128):: cdirname,ctype
 
     logical,external:: string_in_arr
@@ -109,6 +110,8 @@ contains
     call mpi_bcast(x,ndim,mpi_real8,0,mpi_world,ierr)
     tcl= mpi_wtime() -tc0
     tf0= mpi_wtime()
+
+    lfdsgnmat = .false.  ! Initialize lfdsgnmat
 
     if( l1st ) then
       if( .not.fp_common_initialized ) call init()
@@ -132,6 +135,7 @@ contains
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
       cdirname = trim(samples(ismpl)%cdirname)
+!!$      print *,'ismpl,cdirname=',ismpl,trim(cdirname)
       if( trim(cpot).eq.'vcMorse' ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -172,6 +176,10 @@ contains
           call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
                samples(ismpl)%dgsf,samples(ismpl)%igsf)
         endif
+!.....Set lfdsgnmat=.true. to make run_pmd() compute dsgnmat_force related data
+        if( l1st .and. lfmatch .and. trim(cfmethod).eq.'test' ) then
+          lfdsgnmat = .true.
+        endif
       else if( trim(cpot).eq.'NN2' ) then
         call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -194,7 +202,8 @@ contains
         call set_params_Coulomb(maxisp,x(1:maxisp),cpot)
         call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot,interact)
       endif
-      call run_pmd(samples(ismpl),lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut)
+      call run_pmd(samples(ismpl),lcalcgrad,ndim,nff,cffs,epot,frcs,strs &
+           ,rcut,lfdsgnmat)
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
       samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
@@ -204,6 +213,9 @@ contains
         samples(ismpl)%nal = nal
         samples(ismpl)%nnl = nnl
         if( .not. allocated(samples(ismpl)%gsf) ) then
+          memgsf = memgsf +nsf*nal +3*nsf*(nnl+1)*nal +nsf*(nnl+1) +nal
+!!$          if( iprint.gt.1 ) print '(a,2i5,f9.2)',' myid,ismpl,memgsf(MB) = ' &
+!!$               ,myid,ismpl,memgsf
           allocate(samples(ismpl)%gsf(nsf,nal) &
                ,samples(ismpl)%dgsf(3,nsf,0:nnl,nal) &
                ,samples(ismpl)%igsf(nsf,0:nnl,nal) )
@@ -394,7 +406,8 @@ contains
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3),dn3i
     real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,fref,tmp
     type(mdsys):: smpl
-    logical,parameter:: lcalcgrad = .true. 
+    logical,parameter:: lcalcgrad = .true.
+    logical,parameter:: lfdsgnmat = .false.
     character(len=128):: cdirname,ctype
 
     logical,external:: string_in_arr
@@ -487,11 +500,10 @@ contains
 !!$      print *,'ismpl,cpot,ctype,=',ismpl,trim(cpot) &
 !!$           ,trim(ctype)
       call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut &
-           ,gwe,gwf,gws)
+           ,lfdsgnmat,gwe,gwf,gws)
       samples(ismpl)%gwe(1:ndim)= gwe(1:ndim)
       samples(ismpl)%gwf(1:ndim,1:3,1:natm)= gwf(1:ndim,1:3,1:natm)
       samples(ismpl)%gws(1:ndim,1:6)= gws(1:ndim,1:6)
-!!$      print '(a,i3,9es11.3)',' ismpl,gwe=',ismpl,smpl%gwe(1:ndim)
     enddo  ! ismpl
 
     if( len(trim(crefstrct)).gt.5 ) then
@@ -513,7 +525,6 @@ contains
       natm= smpl%natm
       epot= smpl%epot
       swgt= smpl%wgt
-!!$      print *,'myid,ismpl,natm,epot=',myid,ismpl,natm,epot
 !.....Derivative of energy term w.r.t. weights
       if( lematch ) then
         eref= smpl%eref
@@ -547,8 +558,6 @@ contains
           gtrnl(1:ndim) = gtrnl(1:ndim) &
                +tmp*smpl%gwe(1:ndim)/natm/eerr *swgt
         endif
-!!$        print *,'ismpl,epot,esub,eref,ediff,natm,eerr,swgt=' &
-!!$             ,ismpl,epot,esub,eref,ediff,natm,eerr,swgt
       endif
 !.....Derivative of force term w.r.t. weights
       if( lfmatch ) then
@@ -572,14 +581,8 @@ contains
             endif
             gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
                  *smpl%gwf(1:ndim,ixyz,ia) *dn3i *swgt *ferri
-!!$            fref = smpl%fref(ixyz,ia)
-!!$            fdiff(ixyz,ia)= (frcs(ixyz,ia) +smpl%fsub(ixyz,ia) &
-!!$                 -fref) /(abs(fref)+ferr)
-!!$            gtrnl(1:ndim)= gtrnl(1:ndim) +2d0*fdiff(ixyz,ia) &
-!!$                 *smpl%gwf(1:ndim,ixyz,ia) *dn3i *swgt /(abs(fref)+ferr)
           enddo
         enddo
-!!$        print *,'ismpl,ediff,gwf=',ismpl,ediff,smpl%gwf(1:ndim,1,1)
       endif
 !.....Derivative of stress w.r.t. weights
       if( lsmatch ) then
@@ -607,7 +610,6 @@ contains
           gtrnl(1:ndim)= gtrnl(1:ndim) +2d0*pdiff(k) &
                *smpl%gws(1:ndim,k)/6 *swgt *serri
         enddo
-!!$        print *,'ismpl,ediff,gws=',ismpl,ediff,smpl%gws(1:ndim,1)
       endif
     enddo
 
@@ -629,15 +631,11 @@ contains
     call mpi_reduce(tgl,tgg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     tcomm= tcomm +tcg
     tgrad= tgrad +tgg
-!!$    print *,'gtrn in grad_w_pmd:'
-!!$    do i=1,ndim
-!!$      print *,'i,x(i),gtrn(i)=',i,x(i),gtrn(i)
-!!$    enddo
     return
   end subroutine grad_w_pmd
 !=======================================================================
-  subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs,rc,&
-       gwe,gwf,gws)
+  subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs,rc &
+       ,lfdsgnmat,gwe,gwf,gws)
 !
 !  Run pmd and get energy and forces of the system.
 !
@@ -654,7 +652,7 @@ contains
     real(8),intent(in):: rc
     real(8),intent(inout):: epot,frcs(3,maxna)
     real(8),intent(out):: strs(3,3)
-    logical,intent(in):: lcalcgrad
+    logical,intent(in):: lcalcgrad,lfdsgnmat
     character(len=20),intent(in):: cffs(nff)
     real(8),intent(out),optional:: gwe(ndimp),gwf(ndimp,3,maxna),&
          gws(ndimp,6)
@@ -776,7 +774,7 @@ contains
          ,lematch,lfmatch,lsmatch,boundary)
     strs(1:3,1:3) = ptnsr(1:3,1:3) *up2gpa*(-1d0)
     if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
-    if( lfmatch ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)
+    if( lfdsgnmat ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)
 !!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
 !!$  print *,'smpl%natm =',smpl%natm
 !!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)
@@ -856,6 +854,7 @@ contains
     logical:: luse_ZBL = .false.
     logical:: luse_Bonny_WRe = .false.
     logical:: luse_cspline = .false.
+    logical:: lfdsgnmat = .false.  ! Never compute dsgnmat for subtracted FFs
     logical,save:: l1st = .true.
     real(8):: epot,strs(3,3)
     real(8),save,allocatable:: frcs(:,:)
@@ -922,7 +921,7 @@ contains
                //trim(samples(ismpl)%cdirname)//'/pmd')
         endif
         call run_pmd(samples(ismpl),lcalcgrad,nvars,&
-             nsubff,csubffs,epot,frcs,strs,rc_other)
+             nsubff,csubffs,epot,frcs,strs,rc_other,lfdsgnmat)
 !!$      print *,'myid,ismpl,epot=',myid,ismpl,epot
         samples(ismpl)%esub = epot
         samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
@@ -986,7 +985,7 @@ contains
     use pmdvars,only: get_lspr
     implicit none 
     real(8),parameter:: tiny = 1d-15
-    integer:: nsuml,nsumg,ismpl,natm,isf,jsf,ia,nsf,ndat,ixyz
+    integer:: nsuml,nsumg,ismpl,natm,isf,jsf,ia,nsf,ixyz
     real(8):: gmeanl,gmean,tmp,gvarl,dgi,dgj,gtmp
     real(8),allocatable:: gsfml(:),gsfvl(:),gsfcl(:,:),gsfvsq(:),gsfsl(:)
     character(len=128):: cnum
@@ -1041,77 +1040,6 @@ contains
       gsfvs(isf)= gsfss(isf) -gsfms(isf)**2
     enddo
 
-!.....Output basis function matrix
-!.....Since it could be very large, write out only when iprint > 1 and nnode==1.
-    if( myid.eq.0 .and. iprint.gt.1 .and. nnode.eq.1 ) then
-      print *,'Write out.dsgnmat_atm'
-      write(cnum,'(i0)') nsf
-      open(21,file='out.dsgnmat_atm')
-      write(21,'(2i10)') nsumg,nsf
-      do ismpl=isid0,isid1
-        natm = samples(ismpl)%natm
-        do ia=1,natm
-          write(21,'('//trim(cnum)//'es12.3e3)') (samples(ismpl)%gsf(isf,ia),isf=1,nsf)
-        enddo
-      enddo
-      close(21)
-!.....Design matrix for lasso ()
-      if( lematch ) then
-        print *,'Write out.dsgnmat_erg'
-        open(22,file='out.dsgnmat_erg')
-        open(25,file='out.esubs')
-!.....Since now it is only nnode==1, isid1==nsmpl
-        write(22,'(a)') '# y_i, (x_{ij},j=1,nsf) of energy matching'
-        write(22,'(2i8)') isid1,nsf
-        write(25,'(a)') '# esub'
-        write(25,'(2i8)') isid1
-        do ismpl=isid0,isid1
-          write(22,'(es12.3e3)',advance='no') samples(ismpl)%eref &
-               -samples(ismpl)%esub
-          write(25,'(es12.3e3)') samples(ismpl)%esub
-          do isf=1,nsf
-            gtmp = 0d0
-            do ia=1,natm
-              gtmp = gtmp +samples(ismpl)%gsf(isf,ia)
-            enddo
-            write(22,'(es12.3e3)',advance='no') gtmp
-          enddo
-          write(22,*) ''
-        enddo
-        close(22)
-        close(25)
-      endif
-
-!.....Design matrix for force-matching
-      if( lfmatch ) then
-        print *,'Write out.dsgnmat_frc'
-        open(23,file='out.dsgnmat_frc')
-        write(23,'(a)') '# y_i, (x_{ij},j=1,nsf) of force matching'
-        open(26,file='out.fsubs')
-        write(26,'(a)') '# fsub'
-        ndat = 0
-        do ismpl=isid0,isid1
-          ndat = ndat +3*samples(ismpl)%natm
-        enddo
-        write(23,'(2i8)') ndat,nsf
-        write(26,'(2i8)') ndat
-        do ismpl=isid0,isid1
-          do ia=1,samples(ismpl)%natm
-            do ixyz=1,3
-              write(23,'(es12.3e3)',advance='no') samples(ismpl)%fref(ixyz,ia) &
-                   -samples(ismpl)%fsub(ixyz,ia)
-              write(26,'(es12.3e3)') samples(ismpl)%fsub(ixyz,ia)
-              do isf=1,nsf
-                write(23,'(es12.3e3)',advance='no') -samples(ismpl)%dgsfa(ixyz,isf,ia)
-              enddo
-              write(23,*) ''
-            enddo
-          enddo
-        enddo
-        close(23)
-        close(26)
-      endif
-    endif
 
 !.....Correlation coefficients
     gsfcl(:,:) = 0d0
@@ -1177,6 +1105,101 @@ contains
     deallocate(gsfml,gsfvl,gsfcl,gsfvsq,gsfsl)
     return
   end subroutine get_mean_gsf
+!=======================================================================
+  subroutine write_dsgnmats()
+!
+!  Write design matrices of atoms, energies, forces.
+!  Only available for nnode==1 and iprint > 1.
+!
+    use variables
+    use parallel
+    implicit none
+
+    integer:: nsf,natm,nasum,ndat,ismpl,isf,ia,ixyz
+    character(len=128):: cnum
+    real(8):: gtmp
+
+    nsf = samples(isid0)%nsf
+
+    nasum = 0
+    do ismpl=isid0,isid1
+      natm= samples(ismpl)%natm
+      nasum= nasum +natm
+    enddo
+
+    write(6,'(a)',advance='no') ' Writing out.dsgnmat_atm... '
+    write(cnum,'(i0)') nsf
+    open(21,file='out.dsgnmat_atm')
+    write(21,'(2i10)') nasum,nsf
+    do ismpl=isid0,isid1
+      natm = samples(ismpl)%natm
+      do ia=1,natm
+        write(21,'('//trim(cnum)//'es12.3e3)') (samples(ismpl)%gsf(isf,ia),isf=1,nsf)
+      enddo
+    enddo
+    close(21)
+    print *,'done'
+
+!.....Design matrix for lasso ()
+    if( lematch ) then
+      write(6,'(a)',advance='no') ' Writing out.dsgnmat_erg... '
+      open(22,file='out.dsgnmat_erg')
+      open(25,file='out.esubs')
+!.....Since now it is only nnode==1, isid1==nsmpl
+      write(22,'(a)') '# y_i, (x_{ij},j=1,nsf) of energy matching'
+      write(22,'(2i8)') isid1,nsf
+      write(25,'(a)') '# esub'
+      write(25,'(2i8)') isid1
+      do ismpl=isid0,isid1
+        write(22,'(es12.3e3)',advance='no') samples(ismpl)%eref &
+             -samples(ismpl)%esub
+        write(25,'(es12.3e3)') samples(ismpl)%esub
+        do isf=1,nsf
+          gtmp = 0d0
+          do ia=1,natm
+            gtmp = gtmp +samples(ismpl)%gsf(isf,ia)
+          enddo
+          write(22,'(es12.3e3)',advance='no') gtmp
+        enddo
+        write(22,*) ''
+      enddo
+      close(22)
+      close(25)
+      print *,'done'
+    endif
+
+!.....Design matrix for force-matching
+    if( lfmatch ) then
+      write(6,'(a)',advance='no') ' Writing out.dsgnmat_frc... '
+      open(23,file='out.dsgnmat_frc')
+      write(23,'(a)') '# y_i, (x_{ij},j=1,nsf) of force matching'
+      open(26,file='out.fsubs')
+      write(26,'(a)') '# fsub'
+      ndat = 0
+      do ismpl=isid0,isid1
+        ndat = ndat +3*samples(ismpl)%natm
+      enddo
+      write(23,'(2i8)') ndat,nsf
+      write(26,'(2i8)') ndat
+      do ismpl=isid0,isid1
+        do ia=1,samples(ismpl)%natm
+          do ixyz=1,3
+            write(23,'(es12.3e3)',advance='no') samples(ismpl)%fref(ixyz,ia) &
+                 -samples(ismpl)%fsub(ixyz,ia)
+            write(26,'(es12.3e3)') samples(ismpl)%fsub(ixyz,ia)
+            do isf=1,nsf
+              write(23,'(es12.3e3)',advance='no') -samples(ismpl)%dgsfa(ixyz,isf,ia)
+            enddo
+            write(23,*) ''
+          enddo
+        enddo
+      enddo
+      close(23)
+      close(26)
+      print *,'done'
+    endif
+
+  end subroutine write_dsgnmats
 !=======================================================================
   subroutine normalize()
     use variables,only: lnormalized,cnormalize,iprint

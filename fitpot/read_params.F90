@@ -32,9 +32,9 @@ subroutine write_vars(cadd)
          trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
          trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
       call NN_restore_standard()
-    else if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
+    else if( lnormalize ) then
       call restore_normalize()
-    endif
+     endif
   endif
 
 !!$  cfname= trim(cmaindir)//'/'//trim(cparfile)//'.'//trim(cadd)
@@ -53,7 +53,7 @@ subroutine write_vars(cadd)
          trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
          trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
       call NN_standardize()
-    else if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
+    else if( lnormalize ) then
       call normalize()
     endif
   endif
@@ -78,6 +78,7 @@ subroutine read_vars_fitpot()
     print *,'Read parameters to be optimized from '//trim(cparfile)
     open(ionum,file=trim(cparfile),status='old')
     read(ionum,*) nvars, rcut, rc3
+    rcut = max(rcut,rc3)
   endif
   call mpi_bcast(nvars,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(rcut,1,mpi_real8,0,mpi_world,ierr)

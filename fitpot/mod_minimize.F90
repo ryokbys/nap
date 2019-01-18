@@ -1,4 +1,5 @@
 module minimize
+  implicit none 
   save
 !.....number of convergence criteria achieved
   integer:: numtol = 1
@@ -134,14 +135,102 @@ contains
     return
   end subroutine wrap_ranges
 !=======================================================================
-  subroutine steepest_descent(ndim,x,f,g,d,xranges,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,grad)
+  subroutine write_status(ionum,myid,iprint,cpena,iter,niter &
+       ,ftrn,ftst,pval,vnorm,gnorm,dxnorm,fprev)
+    integer,intent(in):: ionum,myid,iprint,iter,niter
+    character(len=128),intent(in):: cpena
+    real(8),intent(in)::ftrn,ftst,pval,vnorm,gnorm,dxnorm,fprev
+    
+    if( myid.eq.0 ) then
+      if( iprint.ge.1 ) then
+        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
+             .or. trim(cpena).eq.'ridge' ) then
+          write(6,'(a,i5,i4,7es13.5)') &
+               ' iter,niter,ftrn,ftst,fpena,vnorm,gnorm,dxnorm,f-fp=' &
+               ,iter,niter,ftrn-pval,ftst &
+               ,pval,vnorm,gnorm,dxnorm,ftrn-fprev
+        else
+          write(6,'(a,i5,i4,6es13.5,i4)') &
+               ' iter,niter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
+               ,iter,niter,ftrn,ftst,vnorm,gnorm,dxnorm,ftrn-fprev
+        endif
+        call flush(6)
+      endif
+    endif
+  end subroutine write_status
+!=======================================================================
+  subroutine check_converge(myid,iprint,xtol,gtol,ftol &
+       ,dxnorm,gnorm,fdiff,nxtol,ngtol,nftol,iflag,lconverged)
+    integer,intent(in):: myid,iprint
+    real(8),intent(in):: xtol,gtol,ftol,dxnorm,gnorm,fdiff
+    integer,intent(inout):: nxtol,ngtol,nftol,iflag
+    logical,intent(out):: lconverged
+
+    lconverged = .false.
+    if( dxnorm.lt.xtol ) then
+      nxtol = nxtol +1
+      ngtol = 0
+      nftol = 0
+      if( nxtol.ge.numtol ) then
+        if( myid.eq.0 .and. iprint.gt.0 ) then
+          print '(a,i0,a)',' >>> QN converged because xdiff < xtol over ' &
+               ,numtol,' times.'
+          write(6,'(a,2es13.5)') '   dxnorm,xtol=',dxnorm,xtol
+        endif
+        iflag= iflag +1
+        lconverged = .true.
+!!$        x0(1:ndim)= x(1:ndim)
+!!$        maxiter = iter
+        return
+      endif
+    else if( gnorm.lt.gtol ) then
+      ngtol = ngtol +1
+      nxtol = 0
+      nftol = 0
+      if( ngtol.ge.numtol ) then
+        if( myid.eq.0 ) then
+          print '(a,i0,a)',' >>> QN converged because gdiff < gtol over ' &
+               ,numtol,' times.'
+          write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
+        endif
+        iflag= iflag +2
+        lconverged = .true.
+!!$        x0(1:ndim)= x(1:ndim)
+!!$        maxiter = iter
+        return
+      endif
+    else if( fdiff.lt.ftol) then
+      nftol= nftol +1
+      nxtol = 0
+      ngtol = 0
+      if( nftol.ge.numtol ) then
+        if( myid.eq.0 ) then
+          print '(a,i0,a)',' >>> QN converged because fdiff < ftol over ' &
+               ,numtol,' times.'
+          write(6,'(a,2es13.5)') '   fdiff,ftol=',fdiff, ftol
+        endif
+        iflag= iflag +3
+        lconverged = .true.
+!!$        x0(1:ndim)= x(1:ndim)
+!!$        maxiter = iter
+        return
+      endif
+    else
+      nxtol = 0
+      ngtol = 0
+      nftol = 0
+    endif
+    return
+  end subroutine check_converge
+!=======================================================================
+  subroutine steepest_descent(ndim,x0,f,g,d,xranges,xtol,gtol,ftol,maxiter &
+       ,iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
     implicit none
-    integer,intent(in):: ndim,maxiter,iprint,myid
-    integer,intent(inout):: iflag
+    integer,intent(in):: ndim,iprint,myid,niter_eval
+    integer,intent(inout):: iflag,maxiter
     real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
-    real(8),intent(inout):: f,x(ndim),g(ndim),d(ndim)
-!!$    real(8):: func,grad
+    real(8),intent(inout):: f,x0(ndim),g(ndim),d(ndim)
+    character(len=*),intent(in):: cfmethod
     interface
       subroutine func(n,x,ftrn,ftst)
         integer,intent(in):: n
@@ -153,48 +242,40 @@ contains
         real(8),intent(in):: x(n)
         real(8),intent(out):: gtrn(n)
       end subroutine grad
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
     end interface
 
     integer:: iter,i,niter,nxtol,ngtol,nftol
-    real(8):: alpha,fp,gnorm,gpnorm,dxnorm,ftst,fpena
-    real(8),save,allocatable:: gpena(:),dx(:),xp(:)
+    real(8):: alpha,fp,gnorm,gpnorm,dxnorm,vnorm,ftst,pval
+    real(8),save,allocatable:: gpena(:),dx(:),xp(:),x(:)
+    logical:: lconverged = .false. 
+
+    if( myid.eq.0 ) then
+      print *,''
+      print *, '********************** Steepest Descent (SD) '&
+           //  '**********************'
+    endif
 
     if( .not.allocated(gpena) ) then
-      allocate(gpena(ndim),dx(ndim),xp(ndim))
+      allocate(gpena(ndim),dx(ndim),xp(ndim),x(ndim))
     endif
 
     iter= 0
+    niter = 0
+    x(:) = x0(:)
     call wrap_ranges(ndim,x,xranges)
     call func(ndim,x,f,ftst)
     call grad(ndim,x,g)
-    call penalty(cpena,ndim,fpena,gpena,x)
+    call penalty(cpena,ndim,pval,gpena,x)
+    f = f +pval
     if( trim(cpena).eq.'ridge' ) g(:) = g(:) +gpena(:)
     gnorm= sqrt(sprod(ndim,g,g))
+    vnorm= sqrt(sprod(ndim,x,x))
     d(1:ndim)= -g(1:ndim)
-    if( myid.eq.0 ) then
-      if( iprint.eq.1 ) then
-        if( trim(cpena).ne.'none' ) then
-          gpnorm = sqrt(sprod(ndim,gpena,gpena))
-          write(6,'(a,i8,10es13.4)') ' iter,f,fp,gnorm,gpnorm=' &
-               ,iter,f,fpena,gnorm,gpnorm
-        else
-          write(6,'(a,i8,10es13.4)') ' iter,f,gnorm=' &
-               ,iter,f,gnorm
-        endif
-        flush(6)
-      else if( iprint.ge.2 ) then
-        if( trim(cpena).ne.'none' ) then
-          gpnorm = sqrt(sprod(ndim,gpena,gpena))
-          write(6,'(a,i5,i4,10es13.4)') ' iter,niter,f,fp,gnorm,gpnorm,x=' &
-               ,iter,niter,f,fpena,gnorm,gpnorm,x(1:min(ndim,6))
-        else
-          write(6,'(a,i5,i4,10es12.3)') ' iter,niter,f,gnorm,x=' &
-               ,iter,niter,f,gnorm,x(1:min(ndim,8))
-        endif
-        flush(6)
-      endif
-    endif
-    f = f +fpena
+    call write_status(6,myid,iprint,cpena,iter,niter &
+         ,f,ftst,pval,vnorm,gnorm,dxnorm,f)
 
     alpha = 1d0
     do iter=1,maxiter
@@ -220,7 +301,6 @@ contains
 !.....Increase alpha a bit every step,
 !.....alpha is to be decreased in subroutine onestep to decrease func value.
         alpha = min(alpha*2d0, 1d0)
-!!$        alpha = 1d0
         call onestep(ndim,x,xranges,d,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
       else if( trim(clinmin).eq.'armijo' ) then
@@ -234,6 +314,9 @@ contains
         endif
         return
       endif
+!.....evaluate statistics at every niter_eval
+      if( mod(iter,niter_eval).eq.0 ) &
+           call sub_eval(iter)
 !.....Update x
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
         call soft_threshold(ndim,x,d,alpha)
@@ -244,91 +327,38 @@ contains
       xp(:) = x(:)
       dxnorm = sqrt(sprod(ndim,dx,dx))
       call wrap_ranges(ndim,x,xranges)
-!!$      call func(ndim,x,f,ftst)
       call grad(ndim,x,g)
-      call penalty(cpena,ndim,fpena,gpena,x)
+      call penalty(cpena,ndim,pval,gpena,x)
       if( trim(cpena).eq.'ridge' ) g(:) = g(:) +gpena(:)
       gnorm= sqrt(sprod(ndim,g,g))
       d(1:ndim)= -g(1:ndim)
 !!$      g(1:ndim)= -g(1:ndim)/gnorm
 !!$      gnorm= gnorm/ndim
-      if( myid.eq.0 ) then
-        if( iprint.eq.1 ) then
-          if( trim(cpena).ne.'none' ) then
-            gpnorm = sqrt(sprod(ndim,gpena,gpena))
-            write(6,'(a,i5,i4,10es13.4)') ' iter,niter,f,fp,gnorm,gpnorm=' &
-                 ,iter,niter,f-fpena,fpena,gnorm,gpnorm
-          else
-            write(6,'(a,i5,i4,10es13.4)') ' iter,niter,f,gnorm=' &
-                 ,iter,niter,f,gnorm
-          endif
-        else if( iprint.ge.2 ) then
-          if( trim(cpena).ne.'none' ) then
-            gpnorm = sqrt(sprod(ndim,gpena,gpena))
-            write(6,'(a,i5,i4,10es13.4)') ' iter,niter,f,fp,gnorm,gpnorm,x=' &
-                 ,iter,niter,f-fpena,fpena,gnorm,gpnorm,x(1:min(ndim,6))
-          else
-            write(6,'(a,i5,i4,10es12.3)') ' iter,niter,f,gnorm,x=' &
-                 ,iter,niter,f,gnorm,x(1:min(ndim,6))
-          endif
-        endif
-        call flush(6)
-      endif
-!.....check convergence 
-      if( dxnorm.lt.xtol ) then
-        nxtol = nxtol +1
-        if( nxtol.ge.numtol ) then
-          if( myid.eq.0 ) then
-            print *,'>>> SD converged wrt xtol'
-            write(6,'(a,2es15.7)') '   alpha,xtol=',alpha,xtol
-          endif
-          iflag= iflag +1
-          return
-        endif
-      else
-        nxtol = 0
-      endif
-      if( gnorm.lt.gtol ) then
-        ngtol = ngtol +1
-        if( ngtol.ge.numtol ) then
-          if( myid.eq.0 ) then
-            print *,'>>> SD converged wrt gtol'
-            write(6,'(a,2es15.7)') '   gnorm,gtol=',gnorm,gtol
-          endif
-          iflag= iflag +2
-          return
-        endif
-      else
-        ngtol = 0
-      endif
-      if( abs(f-fp).lt.ftol ) then
-        nftol = nftol + 1
-        if( nftol.ge.numtol ) then
-          if( myid.eq.0 ) then
-            print *,'>>> Sd converged wrt ftol'
-            write(6,'(a,2es15.7)') '   f-fp,ftol=',abs(f-fp)/abs(fp),ftol
-          endif
-          iflag= iflag +3
-          return
-        endif
-      else
-        nftol = 0
+      vnorm= sqrt(sprod(ndim,x,x))
+      call write_status(6,myid,iprint,cpena,iter,niter &
+           ,f,ftst,pval,vnorm,gnorm,dxnorm,fp)
+      call check_converge(myid,iprint,xtol,gtol,ftol &
+           ,dxnorm,gnorm,abs(f-fp),nxtol,ngtol,nftol,iflag,lconverged)
+      if( lconverged ) then
+        x0(:) = x(:)
+        maxiter = iter
+        return
       endif
     enddo
-    
+
+    x0(:) = x(:)
     return
   end subroutine steepest_descent
 !=======================================================================
-  subroutine cg(ndim,x,f,g,u,xranges,xtol,gtol,ftol,maxiter,iprint,iflag,myid &
+  subroutine cg(ndim,x0,f,g,u,xranges,xtol,gtol,ftol,maxiter,iprint,iflag,myid &
        ,func,grad,cfmethod,niter_eval,sub_eval)
 !
 !  Conjugate gradient minimization
 !
-    implicit none
-    integer,intent(in):: ndim,maxiter,iprint,myid,niter_eval
-    integer,intent(inout):: iflag
+    integer,intent(in):: ndim,iprint,myid,niter_eval
+    integer,intent(inout):: iflag,maxiter
     real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
-    real(8),intent(inout):: f,x(ndim),g(ndim),u(ndim)
+    real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
     character(len=*),intent(in):: cfmethod
     interface
       subroutine func(n,x,ftrn,ftst)
@@ -349,56 +379,52 @@ contains
     real(8),parameter:: t_DL   = 0.2d0
     logical:: ltwice = .false.
 
-    integer:: i,iter,nftol,nxtol,niter
-    real(8):: alpha,fp,gnorm,gnormp,beta,pval,sgnorm,ftst,dxnorm,unorm
-    real(8),save,allocatable:: gpena(:),gp(:),y(:),xp(:),s(:),dx(:),uu(:)
+    integer:: i,iter,nftol,ngtol,nxtol,niter
+    real(8):: alpha,fp,gnorm,gnormp,vnorm,beta,pval,sgnorm,ftst,dxnorm,unorm
+    real(8),save,allocatable:: gpena(:),gp(:),y(:),xp(:),s(:),dx(:),uu(:),x(:)
+    logical:: lconverged = .false. 
 
     if( myid.eq.0 ) then
-      print *,'entering CG routine...'
+      print *,''
+      print *, '********************** Conjugate Gradient (CG) '&
+           //  '**********************'
     endif
 
     if( .not.allocated(gpena) ) allocate(gpena(ndim),gp(ndim)&
-         ,y(ndim),xp(ndim),s(ndim),dx(ndim),uu(ndim))
+         ,y(ndim),xp(ndim),s(ndim),dx(ndim),uu(ndim),x(ndim))
 
-
+!.....Initialize alpha (line minimization factor)
+    alpha = 1d0
+    
     iter= 0
+    niter = 0
     nftol= 0
     nxtol= 0
     gpena(1:ndim)= 0d0
+    x(:) = x0(:)
     call wrap_ranges(ndim,x,xranges)
     call func(ndim,x,f,ftst)
     call grad(ndim,x,g)
 !.....penalty
     call penalty(cpena,ndim,pval,gpena,x)
-    g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+    f = f + pval
+    if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
     gnorm= sprod(ndim,g,g)
     sgnorm= sqrt(gnorm)
-!!$    g(1:ndim)= g(1:ndim)/sqrt(gnorm)
-!!$    gnorm= gnorm/ndim
-    if( myid.eq.0 ) then
-      if( iprint.eq.1 ) then
-        write(6,'(a,i8,10es15.7)') ' iter,f,gnorm=' &
-             ,iter,f,sgnorm
-      else if( iprint.ge.2 ) then
-        write(6,'(a,i8,10es15.7)') ' iter,x,f,gnorm=' &
-             ,iter,f,sgnorm,x(1:5)
-      endif
-    endif
+    call write_status(6,myid,iprint,cpena,iter,niter &
+         ,f,ftst,pval,vnorm,sgnorm,dxnorm,f)
     u(1:ndim)= -g(1:ndim)
 
     call sub_eval(0)
     do iter=1,maxiter
       fp= f
       xp(1:ndim)= x(1:ndim)
-!.....normalize u-vector only for line search
-      unorm = sqrt(sprod(ndim,u,u))
-      uu(1:ndim) = u(1:ndim)/unorm
-!.....evaluate statistics at every niter_eval
-      if( mod(iter,niter_eval).eq.0 ) &
-           call sub_eval(iter)
+!!$!.....normalize u-vector only for line search
+!!$      unorm = sqrt(sprod(ndim,u,u))
+!!$      uu(1:ndim) = u(1:ndim)/unorm
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
-        call quad_interpolate(ndim,x,uu,f,ftst,xtol,gtol,ftol &
+        call quad_interpolate(ndim,x,u,f,ftst,xtol,gtol,ftol &
              ,alpha,iprint,iflag,myid,func)
 !.....if quad interpolation failed, perform golden section
         if( iflag/100.ne.0 ) then
@@ -406,15 +432,22 @@ contains
           if(myid.eq.0) then
             print *,'since quad_interpolate failed, call golden_section.'
           endif
-          call golden_section(ndim,x,uu,f,ftst,xtol,gtol,ftol &
+          call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol &
                ,alpha,iprint,iflag,myid,func)
         endif
       else if ( trim(clinmin).eq.'golden') then
-        call golden_section(ndim,x,uu,f,ftst,xtol,gtol,ftol,alpha &
+        call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
+      else if( trim(clinmin).eq.'onestep' ) then
+        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+        call onestep(ndim,x,xranges,u,f,ftst,alpha,iprint &
+             ,iflag,myid,func,niter)
       else ! armijo (default)
-        alpha= 1d0
-        call armijo_search(ndim,x,xranges,uu,f,ftst,g,alpha,iprint &
+!.....To enhance the convergence in Armijo search,
+!.....use the history of previous alpha by multiplying 2
+!.....avoiding constant decrease, but alpha should not be greater than 1.
+        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+        call armijo_search(ndim,x,xranges,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
 
@@ -427,8 +460,9 @@ contains
         else
           ltwice= .true.
           if(myid.eq.0) then
-            print *,'>>> gg initialized because alpha was not found.'
+            print *,'>>> Initialize gg because alpha was not found.'
           endif
+          alpha = 1d0
           u(1:ndim)= -g(1:ndim)
           f= fp
           iflag= iflag -100*(iflag/100)
@@ -437,30 +471,26 @@ contains
       else
         ltwice=.false.
       endif
+!.....evaluate statistics at every niter_eval
+      if( mod(iter,niter_eval).eq.0 ) &
+           call sub_eval(iter)
 
-      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'LASSO' ) then
-        call soft_threshold(ndim,x,uu,alpha)
-        call wrap_ranges(ndim,x,xranges)
-      else if( trim(cpena).eq.'ridge' ) then
-        x(1:ndim)= x(1:ndim) +alpha*uu(1:ndim)
-        call wrap_ranges(ndim,x,xranges)
-        do i=1,ndim
-          pval= pval +pwgt*x(i)*x(i)
-          gpena(i)= 2d0*pwgt*x(i)
-        enddo
+!.....Update x
+      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
+        call soft_threshold(ndim,x,u,alpha)
       else
-        x(1:ndim)= x(1:ndim) +alpha*uu(1:ndim)
-        call wrap_ranges(ndim,x,xranges)
+        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       endif
+      call wrap_ranges(ndim,x,xranges)
+      call penalty(cpena,ndim,pval,gpena,x)
 
       dx(1:ndim)= x(1:ndim) -xp(1:ndim)
       gnormp= gnorm
       gp(1:ndim)= g(1:ndim)
       call grad(ndim,x,g)
-      g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+      if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sprod(ndim,g,g)
       sgnorm= sqrt(gnorm)
-      dxnorm= sqrt(sprod(ndim,dx,dx))
       if( icgbtype.eq.2 ) then
 !.....Polak-Ribiere-Polyak (PRP)
         y(1:ndim)= g(1:ndim) -gp(1:ndim)
@@ -484,37 +514,20 @@ contains
         beta= gnorm/gnormp
       endif
       u(1:ndim)= -g(1:ndim) +beta*u(1:ndim)
-      if( myid.eq.0 ) then
-        if( iprint.eq.1 ) then
-          write(6,'(a,i8,10es15.7)') ' iter,f,gnorm,beta=' &
-               ,iter,f,sgnorm,beta
-        else if( iprint.ge.2 ) then
-          write(6,'(a,i8,10es15.7)') ' iter,f,gnorm,beta,x=' &
-               ,iter,f,sgnorm,beta,x(1:5)
-        endif
-      endif
-!.....check convergence 
-      if( dxnorm.lt.xtol ) then
-        if( myid.eq.0 ) then
-          print *,'>>> CG converged wrt xtol'
-          write(6,'(a,2es15.7)') '   dxnorm,xtol=',dxnorm,xtol
-        endif
-        iflag= iflag +2
+      vnorm= sqrt(sprod(ndim,x,x))
+      dxnorm= sqrt(sprod(ndim,dx,dx))
+      call write_status(6,myid,iprint,cpena,iter,niter &
+           ,f,ftst,pval,vnorm,sgnorm,dxnorm,fp)
+      call check_converge(myid,iprint,xtol,gtol,ftol &
+           ,dxnorm,sgnorm,abs(f-fp),nxtol,ngtol,nftol,iflag,lconverged)
+      if( lconverged ) then
+        x0(:) = x(:)
+        maxiter = iter
         return
-      else if( abs(f-fp).lt.ftol ) then
-        nftol= nftol +1
-        if( nftol.gt.numtol ) then
-          if( myid.eq.0 ) then
-            print *,'>>> CG converged wrt ftol'
-            write(6,'(a,2es15.7)') '   f-fp,ftol=' &
-                 ,abs(f-fp),ftol
-          endif
-          iflag= iflag +3
-          return
-        endif
       endif
     enddo
-    
+
+    x0(:) = x(:)
     return
   end subroutine cg
 !=======================================================================
@@ -523,7 +536,6 @@ contains
 !
 !  Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
 !
-    implicit none
     integer,intent(in):: ndim,iprint,myid,niter_eval
     integer,intent(inout):: iflag,maxiter
     real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
@@ -551,6 +563,7 @@ contains
     real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,vnorm,pval &
          ,sgnx,absx,estmem,ftst,unorm,dxnorm
     integer:: i,j,iter,nftol,ngtol,nxtol,ig,mem,niter
+    logical:: lconverged = .false. 
 
     if( .not.allocated(gg) ) then
       if(myid.eq.0) then
@@ -602,22 +615,8 @@ contains
 
     iter= 0
     niter = 0
-    if( myid.eq.0 ) then
-      if( iprint.ge.1 ) then
-        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
-             .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i5,i4,7es13.5)') &
-               ' iter,niter,ftrn,ftst,fpena,vnorm,gnorm,dxnorm,f-fp=' &
-               ,iter,niter,f-pval,ftst &
-               ,pval,vnorm,gnorm,dxnorm,f
-        else
-          write(6,'(a,i5,i4,6es13.5,i4)') &
-               ' iter,niter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
-               ,iter,niter,f,ftst,vnorm,gnorm,dxnorm,f
-        endif
-        call flush(6)
-      endif
-    endif
+    call write_status(6,myid,iprint,cpena,iter,niter &
+         ,f,ftst,pval,vnorm,gnorm,dxnorm,f)
 
     call sub_eval(0)
     do iter=1,maxiter
@@ -707,73 +706,14 @@ contains
       gnorm= sqrt(sprod(ndim,g,g))
       vnorm= sqrt(sprod(ndim,x,x))
       dxnorm= sqrt(sprod(ndim,dx,dx))
-!!$      g(1:ndim)= g(1:ndim)/sqrt(gnorm)
-!!$      gnorm= gnorm/ndim
-      if( myid.eq.0 .and. iprint.gt.0 ) then
-        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
-             .or.trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i5,i4,7es13.5)') &
-               ' iter,niter,ftrn,ftst,fpena,vnorm,gnorm,dxnorm,f-fp=',&
-               iter,niter,f-pval,ftst &
-               ,pval,vnorm,gnorm,dxnorm,f-fp
-        else
-          write(6,'(a,i5,i4,6es13.5)') &
-               ' iter,niter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
-               ,iter,niter,f,ftst &
-               ,vnorm,gnorm,dxnorm,f-fp
-        endif
-        call flush(6)
-      endif
-!.....check convergence 
-      if( dxnorm.lt.xtol ) then
-        nxtol = nxtol +1
-        ngtol = 0
-        nftol = 0
-        if( nxtol.ge.numtol ) then
-          if( myid.eq.0 ) then
-            print '(a,i0,a)',' >>> QN converged because xdiff < xtol over ' &
-                 ,numtol,' times.'
-            write(6,'(a,2es13.5)') '   dxnorm,xtol=',dxnorm,xtol
-          endif
-          x0(1:ndim)= x(1:ndim)
-          iflag= iflag +1
-          maxiter = iter
-          return
-        endif
-      else if( gnorm.lt.gtol ) then
-        ngtol = ngtol +1
-        nxtol = 0
-        nftol = 0
-        if( ngtol.ge.numtol ) then
-          if( myid.eq.0 ) then
-            print '(a,i0,a)','>>> QN converged because gdiff < gtol over ' &
-                 ,numtol,' times.'
-            write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
-          endif
-          x0(1:ndim)= x(1:ndim)
-          iflag= iflag +2
-          maxiter = iter
-          return
-        endif
-      else if( abs(f-fp).lt.ftol) then
-        nftol= nftol +1
-        nxtol = 0
-        ngtol = 0
-        if( nftol.ge.numtol ) then
-          if( myid.eq.0 ) then
-            print '(a,i0,a)','>>> QN converged because fdiff < ftol over ' &
-                 ,numtol,' times.'
-            write(6,'(a,2es13.5)') '   abs(f-fp),ftol=',abs(f-fp), ftol
-          endif
-          x0(1:ndim)= x(1:ndim)
-          iflag= iflag +3
-          maxiter = iter
-          return
-        endif
-      else
-        nxtol = 0
-        ngtol = 0
-        nftol = 0
+      call write_status(6,myid,iprint,cpena,iter,niter &
+           ,f,ftst,pval,vnorm,gnorm,dxnorm,fp)
+      call check_converge(myid,iprint,xtol,gtol,ftol &
+           ,dxnorm,gnorm,abs(f-fp),nxtol,ngtol,nftol,iflag,lconverged)
+      if( lconverged ) then
+        x0(:) = x(:)
+        maxiter = iter
+        return
       endif
 
       s(1:ndim)= alpha *u(1:ndim)
@@ -816,288 +756,9 @@ contains
       enddo
     enddo
 
-
-!!$    if( myid.eq.0 ) print *,'maxiter exceeded in qn'
-!!$    iflag= iflag +10
     x0(1:ndim)= x(1:ndim)
     return
   end subroutine qn
-!=======================================================================
-  subroutine lbfgs(ndim,x0,f,g,u,xranges,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
-!
-!  Limited memory BFGS(Broyden-Fletcher-Goldfarb-Shanno).
-!  See, https://en.wikipedia.org/wiki/Limited-memory_BFGS
-!
-    use descriptor,only: glval,ngl,iglid
-    implicit none
-    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
-    integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
-    real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
-    character(len=*),intent(in):: cfmethod
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine grad(n,x,gtrn)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: gtrn(n)
-      end subroutine grad
-      subroutine sub_eval(iter)
-        integer,intent(in):: iter
-      end subroutine sub_eval
-    end interface
-    real(8),parameter:: xtiny  = 1d-14
-    logical:: ltwice = .false.
-!!$    real(8),external:: sprod
-    real(8),save,allocatable:: x(:),s(:,:),y(:,:)&
-         ,gp(:),xp(:),gpena(:),a(:),rho(:)
-    real(8):: tmp1,tmp2,dsy,dsyi,fp,alpha,gnorm,ynorm,pval,sgnx,absx&
-         ,beta,estmem,ftst
-    integer:: i,j,k,l,m,n,iter,nftol,ig,mem,niter
-
-    if( .not.allocated(x) ) then
-      if(myid.eq.0) then
-        print *, ''
-        print *, '**** L-BFGS starts ****'
-        print *,'history length in L-BFGS =',mstore
-        estmem= (ndim*(mstore+1)*2 +ndim*4 +(mstore+1)*2)*8
-        mem= estmem/1000/1000
-        if( mem.eq.0 ) then
-          mem= estmem/1000
-          print *,'memory for L-BFGS =',mem,'kB'
-        else
-          print *,'memory for L-BFGS =',mem,'MB'
-        endif
-      endif
-      allocate(x(ndim) &
-         ,s(ndim,0:mstore),y(ndim,0:mstore) &
-         ,gp(ndim),gpena(ndim),xp(ndim) &
-         ,a(0:mstore),rho(0:mstore))
-    endif
-
-    s(1:ndim,0:mstore)= 0d0
-    y(1:ndim,0:mstore)= 0d0
-    rho(0:mstore)= 0d0
-    a(0:mstore)= 0d0
-
-    nftol= 0
-    call wrap_ranges(ndim,x0,xranges)
-!.....initial G = I
-    call func(ndim,x0,f,ftst)
-    call grad(ndim,x0,g)
-!.....penalty
-    call penalty(cpena,ndim,pval,gpena,x0)
-    g(1:ndim)= g(1:ndim) +gpena(1:ndim)
-
-    gnorm= sqrt(sprod(ndim,g,g))
-    x(1:ndim)= x0(1:ndim)
-
-    iter= 0
-    if( myid.eq.0 ) then
-      if( iprint.ge.1 ) then
-        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
-             .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i8,3es13.5)') ' iter,f,p,gnorm=',iter,f &
-               ,pval,gnorm
-        else
-          write(6,'(a,i8,2es13.5)') ' iter,f,gnorm=',iter,f,gnorm
-        endif
-        call flush(6)
-      endif
-    endif
-
-    call sub_eval(0)
-    u(1:ndim)= -g(1:ndim)
-    do iter=1,maxiter
-!.....store previous func and grad values
-      fp= f
-      gp(1:ndim)= g(1:ndim)
-      xp(1:ndim)= x(1:ndim)
-!.....line minimization
-      if( trim(clinmin).eq.'quadratic' ) then
-        call quad_interpolate(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
-             ,iprint,iflag,myid,func)
-!.....if quad interpolation failed, perform golden section
-        if( iflag/100.ne.0 ) then
-          iflag= iflag -(iflag/100)*100
-          if(myid.eq.0) then
-            print *,'since quad_interpolate failed, call golden_section.'
-          endif
-          call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
-               ,iprint,iflag,myid,func)
-        endif
-      else if ( trim(clinmin).eq.'golden') then
-        call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
-             ,iprint,iflag,myid,func)
-      else ! armijo (default)
-        alpha= 1d0
-!!$        write(6,'(a,10es11.3)') 'u before armijo=',u(1:10)
-        call armijo_search(ndim,x,xranges,u,f,ftst,g,alpha,iprint &
-             ,iflag,myid,func,niter)
-      endif
-
-!!$      if(myid.eq.0) print *,'alpha=',alpha
-      if( iflag/100.ne.0 ) then
-        if( ltwice ) then
-          x0(1:ndim)= x(1:ndim)
-          if(myid.eq.0) then
-            print *,'   line_search failed twice continuously...'
-          endif
-          return
-        else
-          ltwice= .true.
-          if(myid.eq.0) then
-            print *,'   gg initialized because alpha was not found.'
-          endif
-          u(1:ndim)= -g(1:ndim)
-          f= fp
-          iflag= iflag -100*(iflag/100)
-          cycle
-        endif
-      else
-        ltwice=.false.
-      endif
-!.....evaluate statistics at every niter_eval
-      if( mod(iter,niter_eval).eq.0 ) &
-           call sub_eval(iter)
-      pval= 0d0
-      gpena(1:ndim)= 0d0
-      if( trim(cpena).eq.'lasso' ) then
-        call soft_threshold(ndim,x,u,alpha)
-        call wrap_ranges(ndim,x,xranges)
-        do i=1,ndim
-          absx= abs(x(i))
-          pval= pval +pwgt*absx
-          sgnx= sign(1d0,x(i))
-          if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
-        enddo
-      else if( trim(cpena).eq.'glasso' ) then
-        call soft_threshold(ndim,x,u,alpha)
-        call wrap_ranges(ndim,x,xranges)
-        glval(0:ngl)= 0d0
-        do i=1,ndim
-          ig= iglid(i)
-          if( ig.gt.0 ) glval(ig)= glval(ig) +x(i)*x(i)
-        enddo
-        glval(0)= 1d0
-        do ig=1,ngl
-          glval(ig)= sqrt(glval(ig))
-          pval= pval +pwgt*glval(ig)
-        enddo
-        do i=1,ndim
-          ig= iglid(i)
-          if( ig.eq.0 ) then ! i is not in a group
-            absx= abs(x(i))
-            sgnx= sign(1d0,x(i))
-            if( absx.gt.xtiny ) gpena(i)= pwgt*sgnx
-            pval= pval +pwgt*absx
-          else if( ig.gt.0 ) then ! i is in a group
-            if( glval(ig).gt.xtiny) gpena(i)= pwgt*x(i)/glval(ig)
-          endif
-        enddo
-      else if( trim(cpena).eq.'ridge' ) then
-        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
-        call wrap_ranges(ndim,x,xranges)
-        do i=1,ndim
-          pval= pval +pwgt*x(i)*x(i)
-          gpena(i)= 2d0*pwgt*x(i)
-        enddo
-      else
-        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
-        call wrap_ranges(ndim,x,xranges)
-      endif
-      x0(1:ndim)= x(1:ndim)
-      call grad(ndim,x,g)
-      g(1:ndim)= g(1:ndim) +gpena(1:ndim)
-      gnorm= sqrt(sprod(ndim,g,g))
-      if( myid.eq.0 ) then
-        if( iprint.ge.1 ) then
-          if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
-               .or.trim(cpena).eq.'ridge' ) then
-            write(6,'(a,i8,4es13.5)') ' iter,f,p,gnorm,f-fp=',iter,f &
-                 ,pval,gnorm,f-fp
-          else
-            write(6,'(a,i8,3es13.5)') ' iter,f,gnorm,f-fp=',iter,f &
-                 ,gnorm,f-fp
-          endif
-          call flush(6)
-        endif
-      endif
-!.....check convergence 
-      if( gnorm.lt.gtol ) then
-        if( myid.eq.0 ) then
-          print *,'>>> QN converged wrt gtol'
-          write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
-        endif
-        x0(1:ndim)= x(1:ndim)
-        iflag= iflag +2
-        return
-      else if( abs(f-fp)/abs(fp).lt.ftol) then
-        nftol= nftol +1
-        if( nftol.gt.10 ) then
-          if( myid.eq.0 ) then
-            print *,'>>> QN may be converged because of ftol ' // &
-                 'over 10 times.'
-!!$            write(6,'(a,2es13.5)') '   f-fp/fp,ftol=' &
-!!$                 ,abs(f-fp)/abs(fp),ftol
-          endif
-          x0(1:ndim)= x(1:ndim)
-          iflag= iflag +3
-          return
-        endif
-      endif
-      
-!.....limited-memory BFGS procedure
-!.....compute rho,s,y
-      s(1:ndim,0)= x(1:ndim) -xp(1:ndim)
-      y(1:ndim,0)= g(1:ndim) -gp(1:ndim)
-      dsy= sprod(ndim,s(1,0),y(1,0))
-      rho(0)= 1d0/dsy
-      ynorm= sprod(ndim,y(1,0),y(1,0))
-!.....shift the history values
-      do m=mstore-1,0,-1
-        rho(m+1)= rho(m)
-        s(1:ndim,m+1)= s(1:ndim,m)
-        y(1:ndim,m+1)= y(1:ndim,m)
-      enddo
-      if( ynorm.lt.1d-14 ) then
-        if(myid.eq.0) then
-          print *,'>>> gg initialized because y*y < 1d-14'
-        endif
-        u(1:ndim)= -g(1:ndim)
-        cycle
-      endif
-
-      if( iter.eq.1 ) then
-        u(1:ndim)= -g(1:ndim)
-        cycle
-      endif
-      u(1:ndim)= -g(1:ndim)
-      do m=1,mstore
-        a(m)= rho(m)*sprod(ndim,s(1,m),u)
-        u(1:ndim)= u(1:ndim) -a(m)*y(1:ndim,m)
-      enddo
-      m=min(mstore,iter)
-      dsy= sprod(ndim,y(1,m),s(1,m))
-      ynorm= sprod(ndim,y(1,m),y(1,m))
-      u(1:ndim)= dsy/ynorm *u(1:ndim)
-      do m=mstore,1,-1
-        beta= rho(m)*sprod(ndim,y(1,m),u)
-        u(1:ndim)= u(1:ndim) +s(1:ndim,m)*(a(m)-beta)
-      enddo
-
-    enddo
-    
-!!$    if( myid.eq.0 ) print *,'maxiter exceeded in qn'
-!!$    iflag= iflag +10
-    x0(1:ndim)= x(1:ndim)
-    return
-  end subroutine lbfgs
 !=======================================================================
   subroutine get_bracket(ndim,x0,d,a,b,c,fa,fb,fc,fta,ftb,ftc &
        ,iprint,iflag,myid,func)
@@ -3332,7 +2993,7 @@ contains
     type(individual),intent(in):: ind1,ind2
     type(individual),intent(inout):: offspring
     
-    integer:: i
+    integer:: i,j
     type(gene):: g1,g2
     real(8):: v1,v2,r1
     
@@ -3372,7 +3033,7 @@ contains
 
     integer:: i,j,k,l,m,n,ibest
     integer:: islct(nindivs)
-    real(8):: fbestl
+    real(8):: fbestl,prnd,ptot
 
     integer,save:: nall
     real(8),save,allocatable:: probs(:)

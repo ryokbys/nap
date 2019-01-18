@@ -348,15 +348,14 @@ Default: *test*
 The method used to fit parameters to the sample data.
 Available methods are the following:
 
+*sd/SD* :
+   Steepest descent algorithm which requires gradient information.
+
 *cg/CG* :
-   Conjugate gradient algorithm which requires gradient information. **CG seems to be slower than BFGS and L-BFGS.**
+   Conjugate gradient algorithm which requires gradient information.
 
 *bfgs/BFGS* :
    Quasi-Newton method with BFGS. This requires gradient information.
-
-*lbfgs/LBFGS* :
-   Limited-memory version of BFGS. This requires gradient information.
-   In case of optimizing a lot of parameters, this should be used instead of *BFGS*.
 
 *check_grad* :
    Comparison of analytical derivative and numerical derivative.

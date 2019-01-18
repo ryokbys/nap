@@ -1,14 +1,14 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-12-13 18:17:11 Ryo KOBAYASHI>
+!                     Last modified: <2019-01-19 08:17:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
   use NNd,only:NN_init,NN_func,NN_grad
-  use fp_common,only: func_w_pmd, grad_w_pmd
+  use fp_common,only: func_w_pmd, grad_w_pmd, write_dsgnmats &
+       ,subtract_FF, restore_FF, normalize
   use minimize
   use version
-  use fp_common, only: subtract_FF, restore_FF, normalize
   use NN2,only: set_iglid_NN2
   use linreg,only: set_iglid_linreg
   implicit none
@@ -104,6 +104,11 @@ program fitpot
     cffs(1) = trim(cpot)
   endif
 
+  if( trim(cfmethod).ne.'test'  .and. &
+       (trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2') ) then
+    lnormalize = .true.
+  endif
+
 !.....Initial computations of all samples
   if( trim(cpot).eq.'NN' ) then
     call NN_init()
@@ -112,9 +117,9 @@ program fitpot
        .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' &
        .or. trim(cpot).eq.'NN2' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
-    if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
-      call normalize()
-    endif
+    if( trim(cpot).eq.'linreg' .and. trim(cfmethod).eq.'test' ) &
+         call write_dsgnmats()
+    if( lnormalize ) call normalize()
   else
     print *,'ERROR: '//trim(cpot)//' is not available.'
     stop
@@ -134,8 +139,6 @@ program fitpot
       call cg_wrapper(ftrn0,ftst0)
     case ('bfgs','BFGS','dfp','DFP')
       call qn_wrapper(ftrn0,ftst0)
-    case ('lbfgs','LBFGS','L-BFGS')
-      call lbfgs_wrapper(ftrn0,ftst0)
     case ('sa','SA')
       call sa_wrapper(ftrn0,ftst0)
     case ('ga','GA')
@@ -751,28 +754,6 @@ subroutine qn_wrapper(ftrn0,ftst0)
   return
 end subroutine qn_wrapper
 !=======================================================================
-subroutine lbfgs_wrapper(ftrn0,ftst0)
-  use variables
-  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
-  use parallel
-  use minimize
-  implicit none
-  real(8),intent(in):: ftrn0,ftst0
-  integer:: i,m
-  real(8):: fval
-  external:: write_stats
-
-  !.....NN specific code hereafter
-!!$  call NN_init()
-  call lbfgs(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
-       ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
-       ,niter_eval,write_stats)
-  call NN_analyze("fin")
-!!$  call NN_restore_standard()
-
-  return
-end subroutine lbfgs_wrapper
-!=======================================================================
 subroutine sd_wrapper(ftrn0,ftst0)
 !
 !  Steepest descent minimization
@@ -786,10 +767,11 @@ subroutine sd_wrapper(ftrn0,ftst0)
   real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
   real(8):: fval
+  external:: write_stats
 
-  !.....NN specific code hereafter
   call steepest_descent(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol &
-       ,ftol,niter,iprint,iflag,myid,func_w_pmd,grad_w_pmd)
+       ,ftol,niter,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
+       ,niter_eval,write_stats)
 
   return
 end subroutine sd_wrapper
@@ -799,6 +781,7 @@ subroutine cg_wrapper(ftrn0,ftst0)
   use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
+  use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
   integer:: i,m
@@ -806,12 +789,23 @@ subroutine cg_wrapper(ftrn0,ftst0)
   external:: write_stats
 
   !.....NN specific code hereafter
-!!$  call NN_init()
-  call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
-       ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
-       ,write_stats)
-  call NN_analyze("fin")
-!!$  call NN_restore_standard()
+  if( trim(cpot).eq.'NN' ) then
+    call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+         ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
+         ,write_stats)
+    call NN_analyze("fin")
+
+  else if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
+       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2') then
+    call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+         ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
+         ,niter_eval,write_stats)
+  else
+    if( myid.eq.0 ) then
+      print *,'Warning: CG is not available for '&
+           //trim(cpot)
+    endif
+  endif
   
   return
 end subroutine cg_wrapper

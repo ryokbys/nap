@@ -24,11 +24,12 @@ module variables
   logical:: lsps_frc(maxnsp)
   integer:: nsmpl_outfrc = 20000
   character(len=128):: cnormalize= 'variance'
-  logical:: lnormalized = .false.
+  logical:: lnormalize  = .false.  ! whether of not to normalize vars
+  logical:: lnormalized = .false.  ! whether or not vars already normalized
   character(len=128):: cpot= 'NN'
 !.....Cutoff for FF that is to be optimized [default: 5.0 Ang]
   real(8):: rcut   = 6.0d0
-  real(8):: rc3    = 5.0d0
+  real(8):: rc3    = 3.0d0
 !.....Cutoff for other FFs that are subtracted [default: 5.0 Ang]
   real(8):: rc_other = 5.0
   logical:: lgrad  = .true.
@@ -109,6 +110,7 @@ module variables
 !.....Design-matrix for force-matching
     real(8),allocatable:: dgsfa(:,:,:)
   end type mdsys
+  integer:: memgsf = 0
   real(8):: erefmin
   real(8):: gsfmean,gsfvar
   real(8),allocatable:: gsfms(:),gsfvs(:),sgms(:),sgmis(:)
