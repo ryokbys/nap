@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2019-01-22 16:36:10 Ryo KOBAYASHI>
+c                     Last-modified: <2019-01-22 17:15:26 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -69,16 +69,17 @@ c        call write_inpmd(10,trim(cinpmd))
 c.....Set x-boundary free if TTM
           if( boundary(1:1).ne.'f' ) then
             print *,''
-            print *,'Since TTM, free boundary condition is set'
+            print *,'Since the two-temperature model (TTM) MD...'
+            print *,'  - Free boundary condition is set'
      &           //' for x direction.'
           endif
           boundary(1:1) = 'f'
 c.....Damping off if TTM
-          if( ifdmp.ne.0 ) then
-            print *,''
-            print *,'Since TTM, set damping off.'
-          endif
+          print *,'  - Set damping off.'
           ifdmp = 0
+c.....Set nrmtrans to 0
+          print *,'  - Set removal of translation off.'
+          nrmtrans = 0
         endif
       endif
 
