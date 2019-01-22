@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2019-01-17 12:17:35 Ryo KOBAYASHI>
+c                     Last-modified: <2019-01-22 16:01:17 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -270,7 +270,7 @@ c.....Set initial temperature if needed
       elseif( abs(tinit).le.1d-5 ) then
         va(1:3,1:natm)= 0d0
       endif
-      if( nrmtrans.gt.0 ) call rm_trans_motion(natm,tag,va,nspmax,am
+      if( nrmtrans.ge.0 ) call rm_trans_motion(natm,tag,va,nspmax,am
      &     ,mpi_md_world,myid_md,iprint)
 
       if( ifdmp.eq.2 ) then

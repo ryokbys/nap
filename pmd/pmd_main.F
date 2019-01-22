@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2018-11-30 13:06:22 Ryo KOBAYASHI>
+c                     Last-modified: <2019-01-22 16:36:10 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -63,8 +63,8 @@ c.....Set fmv as default value before reading 'in.pmd'
         write(6,'(a,i0)') ' Number of processes in MPI = ',nodes_md
         call read_input(10,trim(cinpmd))
         call check_cmin(cmin,ifdmp)
-c        call write_initial_setting()
-        call write_inpmd(10,trim(cinpmd))
+        call write_initial_setting()
+c        call write_inpmd(10,trim(cinpmd))
         if( trim(ctctl).eq.'ttm' ) then
 c.....Set x-boundary free if TTM
           if( boundary(1:1).ne.'f' ) then
@@ -217,54 +217,64 @@ c=======================================================================
       write(6,*) ''
       write(6,'(a)') '---------------------------------'
      &       //'---------------------------------------'
-      write(6,'(a)') '           Initial settings   '
+      write(6,'(a)') '           Initial setting   '
       write(6,'(a)') '---------------------------------'
      &       //'---------------------------------------'
-      write(6,'(2x,a25,2x,a)') 'io_format',ciofmt
+      write(6,'(2x,a,5x,i0)')   'num_nodes_x',nx
+      write(6,'(2x,a,5x,i0)')   'num_nodes_y',ny
+      write(6,'(2x,a,5x,i0)')   'num_nodes_z',nz
       write(6,'(2x,a)') ''
-      write(6,'(2x,a25,i8)')   'num_nodes_x',nx
-      write(6,'(2x,a25,i8)')   'num_nodes_y',ny
-      write(6,'(2x,a25,i8)')   'num_nodes_z',nz
+      write(6,'(2x,a,5x,a)') 'io_format',ciofmt
+      write(6,'(2x,a,5x,i0)') 'print_level',iprint
       write(6,'(2x,a)') ''
-      write(6,'(2x,a25,es11.3)') 'time_interval',dt
-      write(6,'(2x,a25,i8)')   'num_iteration',nstp
-      write(6,'(2x,a25,i8)')   'num_out_energy',nerg
+      write(6,'(2x,a,5x,f0.3)') 'time_interval',dt
+      write(6,'(2x,a,5x,i0)')   'num_iteration',nstp
+      write(6,'(2x,a,5x,i0)')   'num_out_energy',nerg
       write(6,'(2x,a)') ''
-      write(6,'(2x,a25,i8)')   'flag_out_pmd',ifpmd
-      write(6,'(2x,a25,i8)')   'num_out_pmd',npmd
+      write(6,'(2x,a,5x,i0)')   'flag_out_pmd',ifpmd
+      write(6,'(2x,a,5x,i0)')   'num_out_pmd',npmd
       write(6,'(2x,a)') ''
-      write(6,'(2x,a25,10(2x,a))') 'force_type',
+      write(6,'(2x,a,10(2x,a))') 'force_type   ',
      &     (trim(force_list(i)),i=1,num_forces)
       if( lvc ) then
-        write(6,'(2x,a25,l8)') 'charge_optimize',lvc
+        write(6,'(2x,a,5x,l0)') 'charge_optimize',lvc
       endif
-      write(6,'(2x,a25,es15.7)') 'cutoff_radius',rc
-      write(6,'(2x,a25,es15.7)') 'cutoff_buffer',rbuf
+      write(6,'(2x,a,5x,f6.3)') 'cutoff_radius',rc
+      write(6,'(2x,a,5x,f6.3)') 'cutoff_buffer',rbuf
       write(6,'(2x,a)') ''
       if( cmin.ne.'' ) then
-        write(6,'(2x,a25,2x,a)') 'minimization',cmin
+        write(6,'(2x,a,5x,a)') 'minimization',trim(cmin)
       endif
-      write(6,'(2x,a25,i8)') 'flag_damping',ifdmp
-      write(6,'(2x,a25,es11.3)') 'damping_coeff',dmp
-      write(6,'(2x,a25,i8)')   'min_iteration',minstp
+      write(6,'(2x,a,5x,i0)') 'flag_damping',ifdmp
+      write(6,'(2x,a,5x,f0.4)') 'damping_coeff',dmp
+      write(6,'(2x,a,5x,f0.4)') 'converge_eps',eps_conv
+      write(6,'(2x,a,5x,i0)')   'converge_num',n_conv
+      write(6,'(2x,a,5x,i0)')   'min_iteration',minstp
       write(6,'(2x,a)') ''
 c.....temperature control
-      write(6,'(2x,a25,f12.4)') 'initial_temperature',tinit
-      if( tfin.ge.0d0 ) then
-        write(6,'(2x,a25,f12.4)') 'final_temperature',tfin
-      endif
-      write(6,'(2x,a25,2x,a)') 'temperature_control',ctctl
-      do i=1,9
-        write(6,'(2x,a25,i3,f12.4)') 'temperature_target',i,ttgt(i)
-      enddo
-      write(6,'(2x,a25,f12.4)') 'temperature_relax_time',trlx
-      write(6,'(2x,a)') ''
+      write(6,'(2x,a,5x,f0.4)') 'initial_temperature',tinit
+      write(6,'(2x,a,5x,a)') 'temperature_control',trim(ctctl)
+      if( trim(ctctl).eq.'Berendsen' .or.
+     &     trim(ctctl).eq.'Langevin' )  then
+        if( tfin.ge.0d0 ) then
+          write(6,'(2x,a,5x,f0.4)') 'final_temperature',tfin
+        else
+          do i=1,9
+            write(6,'(2x,a,i3,f8.1)') 'temperature_target',i,ttgt(i)
+          enddo
+        endif
+        write(6,'(2x,a,5x,f0.1)') 'temperature_relax_time',trlx
+        if( ltdst ) then
 c.....temperature distribution
-      write(6,'(2x,a25,l8)') 'flag_temp_dist',ltdst
-      write(6,'(2x,a25,i8)') 'num_temp_dist',ntdst
+          write(6,'(2x,a)') ''
+          write(6,'(2x,a,5x,l0)') 'flag_temp_dist',ltdst
+          write(6,'(2x,a,5x,i0)') 'num_temp_dist',ntdst
+        endif
+      endif
+      write(6,'(2x,a,5x,i0)') 'remove_translation',nrmtrans
       write(6,'(2x,a)') ''
 c.....pressure control
-      write(6,'(2x,a25,2x,a)') 'stress_control',cpctl
+      write(6,'(2x,a,5x,a)') 'stress_control',trim(cpctl)
       if( trim(cpctl).eq.'Berendsen' .or.
      &     trim(cpctl).eq.'vc-Berendsen' ) then
         write(6,'(2x,a)') 'stress_target'
@@ -273,21 +283,44 @@ c.....pressure control
         write(6,'(5x,3es11.3)') stgt(3,1:3)
         write(6,'(2x,a)') ''
       else if( trim(cpctl).eq.'vv-Berendsen' ) then
-        write(6,'(2x,a25,f12.3)') 'pressure_target',ptgt
+        write(6,'(2x,a,5x,f0.3)') 'pressure_target',ptgt
       endif
+      write(6,*) ''
 c.....strain control
-      write(6,'(2x,a25,f12.4)') 'final_strain',strfin
+      write(6,'(2x,a,5x,a)') 'zload_type',trim(czload_type)
+      if( trim(czload_type).ne.'none' ) then
+        write(6,'(2x,a,5x,f0.3)') 'zload_skin_width',zskin_width
+        write(6,'(2x,a,5x,f0.3)') 'zload_shear_angle',zshear_angle
+        write(6,'(2x,a,5x,f0.3)') 'final_strain',strfin
+      endif
       write(6,'(2x,a)') ''
 c.....velocity multiplying factor
       write(6,'(2x,a)') 'factor_direction'
       do i=0,9
-        write(6,'(4x,i2,3es11.3)') i,fmv(1:3,i)
+        write(6,'(5x,i3,3f8.3)') i,fmv(1:3,i)
       enddo
       write(6,'(2x,a)') ''
+c.....Mass
       write(6,'(2x,a)') 'mass'
       do i=1,nspmax
-        write(6,'(4x,i2,f10.3)') i,am(i)
+        write(6,'(5x,i3,f10.4)') i,am(i)
       enddo
+      write(6,'(2x,a)') ''
+c.....Boundary condition
+      write(6,'(2x,a,5x,a)') 'boundary',trim(boundary)
+      write(6,'(2x,a)') ''
+c.....Charge
+      write(6,'(2x,a)') 'charge'
+      do i=1,nspmax
+        write(6,'(5x,i3,f10.5)') i,schg(i)
+      enddo
+      write(6,'(2x,a,5x,a)') 'fix_charge',trim(chgfix)
+      write(6,'(2x,a,5x,l0)') 'variable_charge',lvc
+      write(6,'(2x,a)') ''
+
+      if( lmetaD ) write(6,'(2x,a,5x,l0)') 'metadynamics',lmetaD
+      if( lconst ) write(6,'(2x,a,5x,l0)') 'constraints',lconst
+
       write(6,'(a)') '---------------------------------'
      &       //'---------------------------------------'
 

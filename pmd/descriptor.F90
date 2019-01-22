@@ -26,11 +26,7 @@ module descriptor
   integer:: ncnst_type(200)
   integer:: ncomb_type(200)
 
-!.....cutoff radii for 2- or 3-body
-  real(8):: rc2 = 4.0d0
-  real(8):: rc3 = 3.0d0
-  real(8):: rcw2 = 0.0d0
-  real(8):: rcw3 = 0.0d0
+!.....Maximum cutoff radius
   real(8):: rcmax,rcmax2
 !.....Switching radius for inner cutoff
   real(8):: r_inner(msp)
@@ -197,7 +193,6 @@ contains
     if( l1st ) then
 !.....Check all the rcs and compare them with rc
       if( rc.lt.rcmax ) then
-!!$      if( rc.lt.rc2 .or. rc.lt.rc3 ) then
         if( myid.eq.0 ) then
           print *,'ERROR: cutoff radius rc is smaller than rcmax.'
           print *,'  rc,rcmax = ',rc,rcmax
@@ -205,12 +200,6 @@ contains
         call mpi_finalize(ierr)
         stop
       endif
-!!$!.....Define squares
-!!$      rc22 = rc2*rc2
-!!$      rc32 = rc3*rc3
-!!$      rcs2 = rc2*rcw2
-!!$      rcs3 = rc3*rcw3
-!!$      eta3 = 0.5d0 /(rc3/2)**2
     endif
 
     gsf(1:nsf,1:nal)= 0d0
@@ -231,8 +220,6 @@ contains
         js= int(tag(ja))
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
-!!$        fcij= fc0(dij,rc2)
-!!$        dfcij= dfc0(dij,rc2)
         if( loverlay ) then
           ri = (r_inner(is)+r_inner(js))/2
           ro = (r_outer(is)+r_outer(js))/2
@@ -591,14 +578,6 @@ contains
       else
         backspace(51)
       endif
-!!$!.....Check rc's given by in.params.desc and by in.pmd
-!!$      if( rc2.gt.rcin .or. rc3.gt.rcin ) then
-!!$        if( myid.eq.0 ) then
-!!$          print *,'ERROR: Cutoff radius in in.pmd shorter than that in in.params.desc'
-!!$          print *,'  rcin,rc2,rc3 = ',rcin,rc2,rc3
-!!$        endif
-!!$        stop
-!!$      endif
 !.....Read numbers of species and symmetry functions
       read(51,*) nsp, nsf
     endif
@@ -667,8 +646,6 @@ contains
     call mpi_bcast(iaddr2,2*nsp*nsp,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(iaddr3,2*nsp*nsp*nsp,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(rcs,nsf,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rc2,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rc3,1,mpi_real8,0,mpi_world,ierr)
 
 !.....Compute maximum rcut in all descriptors
     rcmax = 0d0

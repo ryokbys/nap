@@ -136,23 +136,23 @@ contains
   end subroutine wrap_ranges
 !=======================================================================
   subroutine write_status(ionum,myid,iprint,cpena,iter,niter &
-       ,ftrn,ftst,pval,vnorm,gnorm,dxnorm,fprev)
+       ,ftrn,ftst,pval,xnorm,gnorm,dxnorm,fprev)
     integer,intent(in):: ionum,myid,iprint,iter,niter
     character(len=128),intent(in):: cpena
-    real(8),intent(in)::ftrn,ftst,pval,vnorm,gnorm,dxnorm,fprev
+    real(8),intent(in)::ftrn,ftst,pval,xnorm,gnorm,dxnorm,fprev
     
     if( myid.eq.0 ) then
       if( iprint.ge.1 ) then
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i5,i4,7es13.5)') &
-               ' iter,niter,ftrn,ftst,fpena,vnorm,gnorm,dxnorm,f-fp=' &
+          write(6,'(a,i5,i4,2es13.5,5es12.4)') &
+               ' iter,niter,ftrn,ftst,penalty,|x|,|g|,|dx|,|df|=' &
                ,iter,niter,ftrn-pval,ftst &
-               ,pval,vnorm,gnorm,dxnorm,ftrn-fprev
+               ,pval,xnorm,gnorm,dxnorm,abs(ftrn-fprev)
         else
-          write(6,'(a,i5,i4,6es13.5,i4)') &
-               ' iter,niter,ftrn,ftst,vnorm,gnorm,dxnorm,f-fp=' &
-               ,iter,niter,ftrn,ftst,vnorm,gnorm,dxnorm,ftrn-fprev
+          write(6,'(a,i5,i4,2es13.5,4es12.4,i4)') &
+               ' iter,niter,ftrn,ftst,|x|,|g|,|dx|,|df|=' &
+               ,iter,niter,ftrn,ftst,xnorm,gnorm,dxnorm,abs(ftrn-fprev)
         endif
         call flush(6)
       endif
@@ -300,11 +300,13 @@ contains
       else if( trim(clinmin).eq.'onestep' ) then
 !.....Increase alpha a bit every step,
 !.....alpha is to be decreased in subroutine onestep to decrease func value.
-        alpha = min(alpha*2d0, 1d0)
+!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+        alpha = max(alpha,xtol*2d0)*2d0
         call onestep(ndim,x,xranges,d,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
       else if( trim(clinmin).eq.'armijo' ) then
-        alpha = min(alpha*2d0, 1d0)
+!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+        alpha = max(alpha,xtol*2d0)*2d0
         call armijo_search(ndim,x,xranges,d,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
@@ -411,6 +413,7 @@ contains
     if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
     gnorm= sprod(ndim,g,g)
     sgnorm= sqrt(gnorm)
+    vnorm= sqrt(sprod(ndim,x,x))
     call write_status(6,myid,iprint,cpena,iter,niter &
          ,f,ftst,pval,vnorm,sgnorm,dxnorm,f)
     u(1:ndim)= -g(1:ndim)
@@ -439,14 +442,16 @@ contains
         call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else if( trim(clinmin).eq.'onestep' ) then
-        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+        alpha = max(alpha,xtol*2d0)*2d0
         call onestep(ndim,x,xranges,u,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
       else ! armijo (default)
 !.....To enhance the convergence in Armijo search,
 !.....use the history of previous alpha by multiplying 2
 !.....avoiding constant decrease, but alpha should not be greater than 1.
-        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+        alpha = max(alpha,xtol*2d0)*2d0
         call armijo_search(ndim,x,xranges,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
@@ -624,12 +629,6 @@ contains
       do i=1,ndim
         u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
       enddo
-!!$      unorm = sqrt(sprod(ndim,u,u))
-!!$      u(1:ndim) = u(1:ndim) /unorm
-!!$      print *,'qn: iter,gnorm,unorm = ',iter,gnorm,unorm
-!!$      print *,' u =',u(1:10)
-!!$      print *,' g =',g(1:10)
-!!$      print *,' gg=',gg(1:5,1:5)
 !.....store previous func and grad values
       fp= f
       gp(1:ndim)= g(1:ndim)
@@ -650,15 +649,16 @@ contains
         call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
       else if( trim(clinmin).eq.'onestep' ) then
-        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-!!$        alpha = min(alpha*2d0, 1d0)
+!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+        alpha = max(alpha,xtol*2d0)*2d0
         call onestep(ndim,x,xranges,u,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
       else if( trim(clinmin).eq.'armijo' ) then
 !.....To enhance the convergence in Armijo search,
 !.....use the history of previous alpha by multiplying 2
 !.....avoiding constant decrease, but alpha should not be greater than 1.
-        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+        alpha = max(alpha,xtol*2d0)*2d0
         call armijo_search(ndim,x,xranges,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
@@ -1126,6 +1126,7 @@ contains
     call penalty(cpena,ndim,pval,gpena,x0)
 
     f0= f
+    fp= f0
     do iter=1,niter_linmin
       x1(1:ndim)= x0(1:ndim)
       if( trim(cpena).eq.'lasso' .or.trim(cpena).eq.'glasso') then
@@ -1135,37 +1136,15 @@ contains
       endif
       call wrap_ranges(ndim,x1,xranges)
       call func(ndim,x1,fi,ftsti)
-!!$      if( myid.eq.0 ) print *,'iter,alphai,fi=',iter,alphai,fi
-      pval= 0d0
-      if( trim(cpena).eq.'lasso' ) then
-        do i=1,ndim
-          pval= pval +pwgt*abs(x1(i))
-        enddo
-      else if( trim(cpena).eq.'glasso' ) then
-        pval= 0d0
-        glval(0:ngl)= 0d0
-        do i=1,ndim
-          ig= iglid(i)
-          if( ig.gt.0 ) glval(ig)= glval(ig) +x1(i)*x1(i)
-          if( ig.eq.0 ) pval= pval +pwgt*abs(x1(i))
-        enddo
-        do ig=1,ngl
-          glval(ig)= sqrt(glval(ig))
-          pval= pval +pwgt*glval(ig)
-        enddo
-      else if( trim(cpena).eq.'ridge' ) then
-        do i=1,ndim
-          pval= pval +pwgt*x1(i)*x1(i)
-        enddo
-      endif
-      if( myid.eq.0 .and. iprint.gt.2 ) write(6,'(a,i5,3es15.7)') &
-           ' armijo: iter,fi+pval-(f0+pval0),xigd*alphai,alphai=',&
-           iter,fi+pval-(f0+pval0),xigd*alphai,alphai
-      if( fi+pval-(f0+pval0).le.xigd*alphai ) then
+      call penalty(cpena,ndim,pval,gpena,x1)
+      fi = fi +pval
+      if( myid.eq.0 .and. iprint.gt.2 ) write(6,'(a,i5,5es12.4)') &
+           ' armijo: iter,fi,fi-f0,fi-fp,xigd*alphai,alphai=',&
+           iter,fi,fi-fp,xigd*alphai,alphai
+      if( fi-fp.le.xigd*alphai ) then
         f= fi
         alpha= alphai
         ftst= ftsti
-!!$        if(myid.eq.0) print *,'armijo finishes with iter=',iter
         niter = iter
         return
       endif

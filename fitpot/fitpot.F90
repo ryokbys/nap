@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-01-19 08:17:15 Ryo KOBAYASHI>
+!                     Last modified: <2019-01-19 13:18:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1777,6 +1777,10 @@ subroutine write_stats(iter)
 end subroutine write_stats
 !=======================================================================
 subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
+!
+!  Compute denominator for R^2 score.
+!  It is called only once at the 1st call of the subroutine write_stats.
+!
   use variables
   use parallel
   implicit none 
