@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2019-01-22 17:15:26 Ryo KOBAYASHI>
+c                     Last-modified: <2019-01-22 17:19:58 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -238,7 +238,7 @@ c=======================================================================
       write(6,'(2x,a,10(2x,a))') 'force_type   ',
      &     (trim(force_list(i)),i=1,num_forces)
       if( lvc ) then
-        write(6,'(2x,a,5x,l0)') 'charge_optimize',lvc
+        write(6,'(2x,a,5x,l2)') 'charge_optimize',lvc
       endif
       write(6,'(2x,a,5x,f6.3)') 'cutoff_radius',rc
       write(6,'(2x,a,5x,f6.3)') 'cutoff_buffer',rbuf
@@ -268,7 +268,7 @@ c.....temperature control
         if( ltdst ) then
 c.....temperature distribution
           write(6,'(2x,a)') ''
-          write(6,'(2x,a,5x,l0)') 'flag_temp_dist',ltdst
+          write(6,'(2x,a,5x,l2)') 'flag_temp_dist',ltdst
           write(6,'(2x,a,5x,i0)') 'num_temp_dist',ntdst
         endif
       endif
@@ -316,11 +316,11 @@ c.....Charge
         write(6,'(5x,i3,f10.5)') i,schg(i)
       enddo
       write(6,'(2x,a,5x,a)') 'fix_charge',trim(chgfix)
-      write(6,'(2x,a,5x,l0)') 'variable_charge',lvc
+      write(6,'(2x,a,5x,l2)') 'variable_charge',lvc
       write(6,'(2x,a)') ''
 
-      if( lmetaD ) write(6,'(2x,a,5x,l0)') 'metadynamics',lmetaD
-      if( lconst ) write(6,'(2x,a,5x,l0)') 'constraints',lconst
+      if( lmetaD ) write(6,'(2x,a,5x,l2)') 'metadynamics',lmetaD
+      if( lconst ) write(6,'(2x,a,5x,l2)') 'constraints',lconst
 
       write(6,'(a)') '---------------------------------'
      &       //'---------------------------------------'
