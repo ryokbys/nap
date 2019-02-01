@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-01-18 17:28:11 Ryo KOBAYASHI>
+!                     Last modified: <2019-02-01 14:16:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -1070,7 +1070,7 @@ contains
       enddo
     enddo
 !.....Output correlation
-    if( myid.eq.0 .and. iprint.gt.0 ) then
+    if( myid.eq.0 .and. iprint.gt.2 ) then
       print *,'Write out.correlation'
       open(20,file='out.correlation',status='replace')
       do isf=1,nsf

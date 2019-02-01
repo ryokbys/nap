@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-01-19 13:18:47 Ryo KOBAYASHI>
+!                     Last modified: <2019-02-01 14:24:17 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -39,6 +39,9 @@ program fitpot
     call write_initial_setting()
   endif
   call sync_input()
+
+!.....NN and NN2 are both pointing NN2
+  if( trim(cpot).eq.'NN' ) cpot = 'NN2'
 
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
@@ -110,10 +113,10 @@ program fitpot
   endif
 
 !.....Initial computations of all samples
-  if( trim(cpot).eq.'NN' ) then
-    call NN_init()
-    call NN_func(nvars,vars,ftrn0,ftst0)
-  else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
+!!$  if( trim(cpot).eq.'NN' ) then
+!!$    call NN_init()
+!!$    call NN_func(nvars,vars,ftrn0,ftst0)
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
        .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' &
        .or. trim(cpot).eq.'NN2' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
@@ -731,16 +734,15 @@ subroutine qn_wrapper(ftrn0,ftst0)
   real(8):: fval
   external:: write_stats
 
-  if( trim(cpot).eq.'NN' ) then
-!.....NN specific code hereafter
-!!$    call NN_init()
-    call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
-         ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
-         ,niter_eval,write_stats)
-    call NN_analyze("fin")
-    
-  else if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
-       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
+!!$  if( trim(cpot).eq.'NN' ) then
+!!$    call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+!!$         ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
+!!$         ,niter_eval,write_stats)
+!!$    call NN_analyze("fin")
+!!$    
+  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
+       .or. trim(cpot).eq.'linreg' &
+       .or. trim(cpot).eq.'NN2' ) then
     call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -788,15 +790,16 @@ subroutine cg_wrapper(ftrn0,ftst0)
   real(8):: fval
   external:: write_stats
 
-  !.....NN specific code hereafter
-  if( trim(cpot).eq.'NN' ) then
-    call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
-         ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
-         ,write_stats)
-    call NN_analyze("fin")
-
-  else if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
-       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2') then
+!!$  !.....NN specific code hereafter
+!!$  if( trim(cpot).eq.'NN' ) then
+!!$    call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+!!$         ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
+!!$         ,write_stats)
+!!$    call NN_analyze("fin")
+!!$
+  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
+       .or. trim(cpot).eq.'linreg' &
+       .or. trim(cpot).eq.'NN2' ) then
     call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -821,8 +824,8 @@ subroutine sa_wrapper(ftrn0,ftst0)
   real(8):: fval
   external:: write_stats
 
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' ) then
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
+       .or. trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' ) then
     call sa(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -846,7 +849,7 @@ subroutine md_wrapper(ftrn0,ftst0)
   external:: write_stats
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' ) then
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' ) then
     call metadynamics(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -870,7 +873,7 @@ subroutine ga_wrapper(ftrn0,ftst0)
   external:: write_stats,write_energy_relation
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' .or. &
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' .or. &
        trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
     call ga(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
@@ -895,7 +898,7 @@ subroutine de_wrapper(ftrn0,ftst0)
   external:: write_stats, write_energy_relation
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' .or. &
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' .or. &
        trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
     call de(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
@@ -920,7 +923,7 @@ subroutine pso_wrapper(ftrn0,ftst0)
   external:: write_stats
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' .or. &
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' .or. &
        trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
     call pso(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
@@ -945,7 +948,7 @@ subroutine random_search_wrapper(ftrn0,ftst0)
   external:: write_stats
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN' ) then
+       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' ) then
     call random_search(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)
