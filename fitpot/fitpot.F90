@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-02-01 14:24:17 Ryo KOBAYASHI>
+!                     Last modified: <2019-02-06 11:44:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -37,11 +37,16 @@ program fitpot
     write(6,'(a,i6)') ' Number of processes in MPI = ',nnode
     call read_input(10,'in.fitpot')
     call write_initial_setting()
+!.....WARNING when LASSO
+    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
+      print *,'WARNING: Currently LASSO is not working correctly...'
+    endif
   endif
   call sync_input()
 
 !.....NN and NN2 are both pointing NN2
   if( trim(cpot).eq.'NN' ) cpot = 'NN2'
+
 
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
@@ -120,8 +125,8 @@ program fitpot
        .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' &
        .or. trim(cpot).eq.'NN2' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
-    if( trim(cpot).eq.'linreg' .and. trim(cfmethod).eq.'test' ) &
-         call write_dsgnmats()
+    if( trim(cpot).eq.'linreg' .and. trim(cfmethod).eq.'test' &
+         .and. iprint.gt.2 ) call write_dsgnmats()
     if( lnormalize ) call normalize()
   else
     print *,'ERROR: '//trim(cpot)//' is not available.'
@@ -243,11 +248,12 @@ subroutine write_initial_setting()
   write(6,'(a)') '------------------------------------------------------------------------'
   write(6,'(a)') '                          Initial setting                               '
   write(6,'(a)') '------------------------------------------------------------------------'
-  write(6,'(2x,a25,2x,i5)') 'num_samples',nsmpl
-  write(6,'(2x,a25,2x,i10)') 'num_iteration',niter
+  write(6,'(2x,a25,2x,i0)') 'num_samples',nsmpl
+  write(6,'(2x,a25,2x,i0)') 'num_iteration',niter
   write(6,'(2x,a25,2x,a)') 'fitting_method',trim(cfmethod)
   write(6,'(2x,a25,2x,a)') 'main_directory',trim(cmaindir)
   write(6,'(2x,a25,2x,a)') 'param_file',trim(cparfile)
+  write(6,'(2x,a25,2x,a)') 'loss_function',trim(ctype_loss)
 !!$  write(6,'(2x,a25,2x,a)') 'run_mode',trim(crunmode)
   write(6,'(2x,a25,2x,es12.3)') 'xtol',xtol
   write(6,'(2x,a25,2x,es12.3)') 'ftol',ftol
@@ -286,7 +292,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
   write(6,'(2x,a25,2x,a)') 'line_minimization',trim(clinmin)
   write(6,'(a)') ''
-  write(6,'(2x,a25,2x,i4)') 'sample_error',nserr
+  write(6,'(2x,a25,2x,i0)') 'sample_error',nserr
   do i=1,nserr
     write(6,'(4x,a23,3(1x,f10.4))') trim(cserr(i)), seerr(i), sferr(i), sserr(i)
   enddo
@@ -1225,11 +1231,11 @@ subroutine test(ftrn0,ftst0)
 
   allocate(g(nvars))
 
-  if( trim(cpot).eq.'NN' ) then
+!!$  if( trim(cpot).eq.'NN' ) then
 !!$    call NN_init()
 !!$    call NN_func(nvars,vars,ftrn,ftst)
-    call NN_grad(nvars,vars,g)
-  else if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
+!!$    call NN_grad(nvars,vars,g)
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
        .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' &
        .or. trim(cpot).eq.'NN2' ) then
 !!$    call func_w_pmd(nvars,vars,ftrn,ftst)
@@ -1580,6 +1586,7 @@ subroutine write_stats(iter)
   if( len(trim(crefstrct)).gt.5 ) then
     if( myid.eq.myidrefsub ) then
       epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
+!!$      epotsub = samples(isidrefsub)%epot
       epotsub = epotsub /samples(isidrefsub)%natm
     endif
     call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
@@ -1594,6 +1601,8 @@ subroutine write_stats(iter)
     natm= smpl%natm
     de= abs(smpl%epot-epotsub*natm+smpl%esub &
          -(smpl%eref-erefsub*natm))/natm
+!!$    de= abs(smpl%epot-epotsub*natm &
+!!$         -(smpl%eref-erefsub*natm-smpl%esub))/natm
     if( smpl%iclass.eq.1 ) then
       demaxl_trn= max(demaxl_trn,de)
       desuml_trn=desuml_trn +de*de
@@ -1655,10 +1664,9 @@ subroutine write_stats(iter)
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
           df= abs(smpl%fa(l,ia)+smpl%fsub(l,ia) -smpl%fref(l,ia))
+!!$          df= abs(smpl%fa(l,ia) -(smpl%fref(l,ia) -smpl%fsub(l,ia)))
           dfmaxl_trn= max(dfmaxl_trn,df)
           dfsuml_trn=dfsuml_trn +df*df
-!!$          write(6,'(a,3i5,3es12.4)')  'ismpl,ia,l,fa,fref,dfsuml_trn=',&
-!!$               ismpl,ia,l,smpl%fa(l,ia),smpl%fref(l,ia),dfsuml_trn
           ntrnl=ntrnl +1
         enddo
       enddo
@@ -1667,6 +1675,7 @@ subroutine write_stats(iter)
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
           df= abs(smpl%fa(l,ia)+smpl%fsub(l,ia) -smpl%fref(l,ia))
+!!$          df= abs(smpl%fa(l,ia) -(smpl%fref(l,ia)) -smpl%fsub(l,ia))
           dfmaxl_tst= max(dfmaxl_tst,df)
           dfsuml_tst=dfsuml_tst +df*df
           ntstl=ntstl +1
@@ -1783,6 +1792,8 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
 !
 !  Compute denominator for R^2 score.
 !  It is called only once at the 1st call of the subroutine write_stats.
+!  Subtract fixed FF from the reference values (erg,frc,strs),
+!  to evaluate R^2 in the range of subtracted data.
 !
   use variables
   use parallel
@@ -1790,7 +1801,7 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
   real(8),intent(out):: etrn,etst,ftrn,ftst,strn,stst
   integer:: ismpl,ia,l,ixyz,jxyz,natm,nfcal,ntrn,ntst,ntrnl,ntstl
   type(mdsys)::smpl
-  real(8):: eref
+  real(8):: eref,esub
   real(8):: esumltrn,esumltst,esumtrn,esumtst,emtrn,emtst
   real(8):: fsumltrn,fsumltst,fsumtrn,fsumtst,fmtrn,fmtst
   real(8):: ssumltrn,ssumltst,ssumtrn,ssumtst,smtrn,smtst
@@ -1801,11 +1812,12 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
   do ismpl=isid0,isid1
     smpl= samples(ismpl)
     eref = smpl%eref
+    esub = smpl%esub
     natm = smpl%natm
     if( smpl%iclass.eq.1 ) then
-      esumltrn = esumltrn +eref/natm
+      esumltrn = esumltrn +(eref-esub)/natm
     else if( smpl%iclass.eq.2 ) then
-      esumltst = esumltst +eref/natm
+      esumltst = esumltst +(eref-esub)/natm
     endif
   enddo
   esumtrn = 0d0
@@ -1827,11 +1839,12 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
   do ismpl=isid0,isid1
     smpl= samples(ismpl)
     eref = smpl%eref
+    esub = smpl%esub
     natm = smpl%natm
     if( smpl%iclass.eq.1 ) then
-      esumltrn = esumltrn +(eref/natm -emtrn)**2
+      esumltrn = esumltrn +((eref-esub)/natm -emtrn)**2
     else if( smpl%iclass.eq.2 ) then
-      esumltst = esumltst +(eref/natm -emtst)**2
+      esumltst = esumltst +((eref-esub)/natm -emtst)**2
     endif
   enddo
   etrn = 0d0
@@ -1853,7 +1866,7 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
-          fsumltrn = fsumltrn +smpl%fref(l,ia)
+          fsumltrn = fsumltrn +(smpl%fref(l,ia)-smpl%fsub(l,ia))
           ntrnl=ntrnl +1
         enddo
       enddo
@@ -1861,7 +1874,7 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
-          fsumltst = fsumltst +smpl%fref(l,ia)
+          fsumltst = fsumltst +(smpl%fref(l,ia)-smpl%fsub(l,ia))
           ntstl=ntstl +1
         enddo
       enddo
@@ -1898,14 +1911,14 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
-          fsumltrn = fsumltrn +(smpl%fref(l,ia) -fmtrn)**2
+          fsumltrn = fsumltrn +((smpl%fref(l,ia)-smpl%fsub(l,ia)) -fmtrn)**2
         enddo
       enddo
     else if( smpl%iclass.eq.2 ) then
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
-          fsumltst = fsumltst +(smpl%fref(l,ia) -fmtst)**2
+          fsumltst = fsumltst +((smpl%fref(l,ia)-smpl%fsub(l,ia)) -fmtst)**2
           ntstl=ntstl +1
         enddo
       enddo
@@ -1929,14 +1942,14 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     if( smpl%iclass.eq.1 ) then
       do ixyz=1,3
         do jxyz=1,3
-          ssumltrn = ssumltrn +smpl%sref(ixyz,jxyz)
+          ssumltrn = ssumltrn +(smpl%sref(ixyz,jxyz)-smpl%ssub(ixyz,jxyz))
           ntrnl = ntrnl +1
         enddo
       enddo
     else if( smpl%iclass.eq.2 ) then
       do ixyz=1,3
         do jxyz=1,3
-          ssumltst = ssumltst +smpl%sref(ixyz,jxyz)
+          ssumltst = ssumltst +(smpl%sref(ixyz,jxyz)-smpl%ssub(ixyz,jxyz))
           ntstl = ntstl +1
         enddo
       enddo
@@ -1971,14 +1984,14 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     if( smpl%iclass.eq.1 ) then
       do ixyz=1,3
         do jxyz=1,3
-          ssumltrn = ssumltrn +(smpl%sref(ixyz,jxyz) -smtrn)**2
+          ssumltrn = ssumltrn +((smpl%sref(ixyz,jxyz)-smpl%sref(ixyz,jxyz)) -smtrn)**2
           ntrnl = ntrnl +1
         enddo
       enddo
     else if( smpl%iclass.eq.2 ) then
       do ixyz=1,3
         do jxyz=1,3
-          ssumltst = ssumltst +(smpl%sref(ixyz,jxyz) -smtst)**2
+          ssumltst = ssumltst +((smpl%sref(ixyz,jxyz)-smpl%sref(ixyz,jxyz)) -smtst)**2
           ntstl = ntstl +1
         enddo
       enddo

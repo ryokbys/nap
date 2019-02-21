@@ -1192,9 +1192,7 @@ contains
 !.....Precision
     real(8),parameter:: tiny = 1d-15
 !.....Decreasing factor of step length
-    real(8),parameter:: facdec = 0.2d0
-!.....Increasing factor of step length
-    real(8),parameter:: facinc = 2.0d0
+    real(8),parameter:: facdec = 0.5d0
     integer:: iter,i,ig,iterp
     real(8):: alphai,alphap,f0,fi,fp,ftsti,ftstp,fpi,fti
     real(8),save,allocatable:: x1(:),gpena(:)
@@ -1288,7 +1286,7 @@ contains
 
     do i=1,ndim
       xad= x(i) +alpha*d(i)
-      sgn=sign(1d0,xad) 
+      sgn= sign(1d0,xad)   ! sign(a,b) = |a| * (sign of b)
       val= max(abs(xad)-alpha*pwgt,0d0)
       x(i)= sgn*val
 !!$      if( xad.lt.-pwgt ) then

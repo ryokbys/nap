@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-02-01 14:16:49 Ryo KOBAYASHI>
+!                     Last modified: <2019-02-05 15:39:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -267,14 +267,14 @@ contains
         endif
 !!$        print *,'ismpl,epot,esub,eref,ediff,natm,eerr,swgt=' &
 !!$             ,ismpl,epot,esub,eref,ediff,natm,eerr,swgt
-        if( trim(ctype_loss).eq.'LS' ) then
-          ediff= ediff*ediff
-        else ! Huber as default
+        if( trim(ctype_loss).eq.'Huber' ) then
           if( abs(ediff).gt.1.d0 ) then
             ediff = 2d0*abs(ediff) -1d0
           else
             ediff = ediff *ediff
           endif
+        else ! LS as default
+          ediff= ediff*ediff
         endif
         ftmp= ftmp +ediff *swgt
         if( iprint.gt.2 ) then
@@ -296,14 +296,14 @@ contains
 !!$            fref = smpl%fref(ixyz,ia)
 !!$            fdiff(ixyz,ia)= (frcs(ixyz,ia)+smpl%fsub(ixyz,ia) &
 !!$                 -fref) /(abs(fref) +ferr)
-            if( trim(ctype_loss).eq.'LS' ) then
-              fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
-            else ! Huber as default
+            if( trim(ctype_loss).eq.'Huber' ) then
               if( abs(fdiff(ixyz,ia)).gt.1d0 ) then
                 fdiff(ixyz,ia) = 2d0*abs(fdiff(ixyz,ia)) -1d0
               else
                 fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
               endif
+            else ! LS as default
+              fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
             endif
             ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt
           enddo
@@ -324,18 +324,18 @@ contains
                  -smpl%sref(ixyz,jxyz)) *serri
           enddo
         enddo
-        if( trim(ctype_loss).eq.'LS' ) then
-          do k=1,6
-            pdiff(k)= pdiff(k)*pdiff(k)
-            ftmp= ftmp +pdiff(k) *swgt /6
-          enddo
-        else  ! Huber as default
+        if( trim(ctype_loss).eq.'Huber' ) then
           do k=1,6
             if( abs(pdiff(k)).gt.1d0 ) then
               pdiff(k) = 2d0*abs(pdiff(k)) -1d0
             else
               pdiff(k)= pdiff(k)*pdiff(k)
             endif
+            ftmp= ftmp +pdiff(k) *swgt /6
+          enddo
+        else  ! LS as default
+          do k=1,6
+            pdiff(k)= pdiff(k)*pdiff(k)
             ftmp= ftmp +pdiff(k) *swgt /6
           enddo
         endif
@@ -854,7 +854,7 @@ contains
     logical:: luse_ZBL = .false.
     logical:: luse_Bonny_WRe = .false.
     logical:: luse_cspline = .false.
-    logical:: lfdsgnmat = .false.  ! Never compute dsgnmat for subtracted FFs
+    logical:: lfdsgnmat = .false.  ! Not to compute dsgnmat for subtracted FFs
     logical,save:: l1st = .true.
     real(8):: epot,strs(3,3)
     real(8),save,allocatable:: frcs(:,:)
@@ -1038,6 +1038,7 @@ contains
       gsfms(isf)= gsfms(isf)/nsumg
       gsfss(isf)= gsfss(isf)/nsumg
       gsfvs(isf)= gsfss(isf) -gsfms(isf)**2
+      gsfss(isf)= sqrt(gsfss(isf))
     enddo
 
 
@@ -1095,7 +1096,7 @@ contains
       write(6,'(a,es12.3)') ' var  of input symmetry functions = ',gsfvar
       if( iprint.gt.1 ) then
         do isf=1,nsf
-          write(6,'(a,i5,2es14.4e3)') '   isf,mean,variance = ' &
+          write(6,'(a,i5,2es14.4e3)') '   isf,mean,variance= ' &
                ,isf,gsfms(isf),gsfvs(isf)
         enddo
       endif
@@ -1213,10 +1214,11 @@ contains
 
     if( l1st ) call get_mean_gsf()
 
-    if( cnormalize(1:3).eq.'var' ) then
+    if( cnormalize(1:3).eq.'std' .or. cnormalize(1:8).eq.'standard' .or. &
+        cnormalize(1:3).eq.'var' .or. cnormalize(1:8).eq.'variance' ) then
       if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) &
-           print *,'Normalize descriptors wrt variance.'
-      call normalize_var()
+           print *,'Normalize descriptors wrt standard deviation.'
+      call normalize_std()
     else if( cnormalize(1:4).eq.'norm' ) then
       if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) &
            print *,'Normalize descriptors wrt norm.'
@@ -1231,9 +1233,9 @@ contains
     l1st = .false.
   end subroutine normalize
 !=======================================================================
-  subroutine normalize_var()
+  subroutine normalize_std()
 !
-!  Normalize inputs (descriptors)
+!  Normalize inputs (descriptors) wrt standard deviation.
 !
     use variables, only: nsmpl,samples,nvars,nalist,vars,vranges&
          ,lnormalized,cpot,gsfvar,gsfvs,gsfms,sgms,sgmis,sgm_min,iprint
@@ -1242,14 +1244,20 @@ contains
     implicit none
     integer:: ismpl,ia,natm,isf,i,iv,ihl0,ihl1
     integer,save:: nsf
-    real(8),save:: sgm,sgmi
+    real(8):: sgm,sgmi,sgmax,sgmin
     logical,save:: l1st = .true.
 
     if( l1st ) then
       nsf = samples(isid0)%nsf
       if( .not. allocated(sgms) ) allocate(sgms(nsf),sgmis(nsf))
+      sgmax= 0d0
       do isf=1,nsf
-        sgms(isf) = max(sqrt(gsfvs(isf)),sgm_min)
+        sgmax= max(gsfvs(isf),sgmax)
+      enddo
+      sgmax= sqrt(sgmax)
+      sgmin= sgmax*sgm_min
+      do isf=1,nsf
+        sgms(isf) = max(sqrt(gsfvs(isf)),sgmin)
         sgmis(isf)= 1d0/sgms(isf)
       enddo
       sgm = sqrt(gsfvar)
@@ -1295,7 +1303,7 @@ contains
     l1st = .false.
     lnormalized = .true.
     
-  end subroutine normalize_var
+  end subroutine normalize_std
 !=======================================================================
   subroutine normalize_norm()
 !
@@ -1307,14 +1315,20 @@ contains
     use NN2, only: nl,nhl,mhl
     implicit none
     integer:: ismpl,ia,natm,isf,i,iv,ihl0,ihl1
+    real(8):: sqmax,sqmin
     integer,save:: nsf
     logical,save:: l1st = .true.
 
     if( l1st ) then
       nsf = samples(isid0)%nsf
       if( .not. allocated(sgms) ) allocate(sgms(nsf),sgmis(nsf))
+      sqmax = 0d0
       do isf=1,nsf
-        sgms(isf) = max(sqrt(gsfss(isf)),sq_min)
+        sqmax = max(gsfss(isf),sqmax)
+      enddo
+      sqmin = sqmax*sq_min
+      do isf=1,nsf
+        sgms(isf) = max(gsfss(isf),sqmin)
         sgmis(isf)= 1d0/sgms(isf)
       enddo
 !.....standardize G values
@@ -1374,7 +1388,8 @@ contains
 
     if( .not. lnormalized ) return
 
-    if( cnormalize(1:3).eq.'var' .or. cnormalize(1:4).eq.'norm' ) then
+    if( cnormalize(1:3).eq.'std' .or. cnormalize(1:3).eq.'var' .or. &
+         cnormalize(1:4).eq.'norm' ) then
       if( trim(cpot).eq.'linreg' ) then
         do i=1,nvars
           vars(i) = vars(i) *sgmis(i)

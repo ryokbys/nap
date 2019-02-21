@@ -23,7 +23,7 @@ module variables
   logical:: lsmatch= .false.  ! stress matching
   logical:: lsps_frc(maxnsp)
   integer:: nsmpl_outfrc = 20000
-  character(len=128):: cnormalize= 'variance'
+  character(len=128):: cnormalize= 'std'
   logical:: lnormalize  = .false.  ! whether of not to normalize vars
   logical:: lnormalized = .false.  ! whether or not vars already normalized
   character(len=128):: cpot= 'NN'
