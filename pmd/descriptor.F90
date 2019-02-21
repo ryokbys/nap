@@ -184,7 +184,7 @@ contains
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
          dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,dik2,tmp,dtmp, &
          xjk(3),rjk(3),djk,djk2,fcjk,dfcjk,drjkj(3),drjkk(3),dgdjk, &
-         ri,ro,xs,z,dz,an
+         ri,ro,xs,z,dz,an,gijk
 
     real(8):: texpij,texpik,eta3
 
@@ -345,6 +345,7 @@ contains
           dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij**2
           dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik**2
           dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
+          gijk = 0d0
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
             if( itype(isf).eq.101 ) then ! my angular SF
               if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
@@ -361,7 +362,8 @@ contains
               texpij = exp(-eta3*dij2)
               texpik = exp(-eta3*dik2)
               tmp = t1/t2 *texpij *texpik
-              gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik 
+              gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik
+              gijk = gijk +tmp*fcij*fcik
 !!$            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik
 !.....derivative
               dgdij= dfcij *fcik *tmp &
@@ -479,11 +481,11 @@ contains
               igsf(isf,jj,ia) = 1
               igsf(isf,kk,ia) = 1
             endif
-          enddo
-        enddo
+          enddo ! isf=1,...
+        enddo ! kk=1,...
 20      continue
-      enddo
-    enddo
+      enddo ! jj=1,...
+    enddo ! ia=1,...
 
   end subroutine calc_desc
 !=======================================================================

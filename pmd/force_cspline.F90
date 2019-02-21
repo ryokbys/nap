@@ -47,12 +47,13 @@ contains
     logical,intent(in):: lstrs,l1st
 
     integer:: ispln,jj,ia,ja,kk,ka,ierr,is,js,ks,ispl,jxyz
-    real(8):: rcmax,rcmax2,epotl,xi(3),xj(3),xij(3),rij(3),drij(3) &
+    real(8):: epotl,xi(3),xj(3),xij(3),rij(3),drij(3) &
          ,xk(3),xik(3),rik(3),rjk(3),drik(3),dcsdj(3),dcsdk(3),tmpj(3) &
          ,tmpk(3),csn,dfcij,dfcik,dgcs,dgdij,dgdik,dij,dij2,diji &
          ,dik,diki,dik2,epotl2,epotl3,fcij,fcik,gijk,phi,dphi,rc2,rct &
          ,rct2,tmp,eta3,texpij,texpik,texpjk,tmpjk(3),djk2,djk,fcjk,dfcjk &
          ,drjk(3),dgdjk,xjk(3)
+    real(8),save:: rcmax,rcmax2
     character(len=128):: ctype
     real(8),save,allocatable:: aa2(:,:),aa3(:,:),strsl(:,:,:)
     logical,save:: l3b,l2b
@@ -65,6 +66,9 @@ contains
       if( allocated(idpair) ) deallocate(idpair,idtriplet)
       allocate(idpair(nspmax,nspmax),idtriplet(nspmax,nspmax,nspmax))
       call read_params_cspline(myid_md,mpi_md_world,iprint)
+      if( iprint.gt.1 .and. myid_md.eq.0 ) then
+        call write_cspline_curves()
+      endif
 !.....Check rc
       rcmax = 0d0
       do ispl=1,nspl
@@ -147,7 +151,7 @@ contains
         if( dij2.gt.rc2*rc2 ) cycle
         dij = sqrt(dij2)
         diji= 1d0/dij
-        call eval_spline(dij,spl%npnts,spl%pnts,spl%coefs,phi,dphi)
+        call eval_spline(dij,spl%npnts,spl%pnts,spl%vals,spl%coefs,phi,dphi)
 !.....Potential
         epi(ia)= epi(ia) +phi*0.5d0
         epotl2 = epotl2 +phi*0.5d0
@@ -210,7 +214,7 @@ contains
           if( dik2.gt.rct2 ) cycle
           dik = sqrt(dik2)
           csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3))/(dij*dik)
-          call eval_spline(csn,spl%npnts,spl%pnts,spl%coefs,phi,dphi)
+          call eval_spline(csn,spl%npnts,spl%pnts,spl%vals,spl%coefs,phi,dphi)
           fcij = fc1(dij,0d0,rct)
           dfcij = dfc1(dij,0d0,rct)
           fcik = fc1(dik,0d0,rct)
@@ -219,8 +223,8 @@ contains
           if( trim(ctype).eq.'angular'&
                .or. trim(ctype).eq.'angular1' ) then
             eta3 = 0.5d0 /(rct/2)**2
-            texpij = exp(-eta3 /dij2)
-            texpik = exp(-eta3 /dik2)
+            texpij = exp(-eta3 *dij2)
+            texpik = exp(-eta3 *dik2)
             tmp = phi *texpij *texpik
             gijk = tmp *fcij *fcik
 !.....Potential
@@ -237,6 +241,9 @@ contains
 !!$          dcsdi(1:3)= -dcsdj(1:3)  -dcsdk(1:3)
             tmpj(1:3)= dgcs*dcsdj(1:3) -drij(1:3)*dgdij
             tmpk(1:3)= dgcs*dcsdk(1:3) -drik(1:3)*dgdik
+!!$            print *,'dgdij,dgdik,dgcs=',dgdij,dgdik,dgcs
+!!$            print *,'tmpj(:)=',tmpj(:)
+!!$            print *,'tmpk(:)=',tmpk(:)
             aa3(1:3,ja)= aa3(1:3,ja) -tmpj(1:3)
             aa3(1:3,ka)= aa3(1:3,ka) -tmpk(1:3)
             aa3(1:3,ia)= aa3(1:3,ia) +tmpj(1:3)+tmpk(1:3)
@@ -260,9 +267,9 @@ contains
             fcjk = fc1(djk,0d0,rct)
             dfcjk = dfc1(djk,0d0,rct)
             eta3 = 0.5d0 /(rct/2)**2
-            texpij = exp(-eta3 /dij2)
-            texpik = exp(-eta3 /dik2)
-            texpjk = exp(-eta3 /djk2)
+            texpij = exp(-eta3 *dij2)
+            texpik = exp(-eta3 *dik2)
+            texpjk = exp(-eta3 *djk2)
             tmp = phi *texpij *texpik *texpjk
             gijk = tmp *fcij *fcik *fcjk
 !.....Potential
@@ -333,6 +340,13 @@ contains
     enddo
 21  continue
 
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_md_world,strsl,9)
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_md_world,aa3,3)
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_md_world,epi,1)
+
 !.....Sum up forces and stress
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa2(1:3,1:natm) +aa3(1:3,1:natm)
     strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
@@ -344,23 +358,36 @@ contains
     return
   end subroutine force_cspline
 !=======================================================================
-  subroutine eval_spline(r,npnts,pnts,coefs,spl,dspl)
+  subroutine eval_spline(r,npnts,pnts,vals,coefs,spl,dspl)
     real(8),intent(in):: r
     integer,intent(in):: npnts
-    real(8),intent(in):: pnts(npnts),coefs(4,npnts-1)
+    real(8),intent(in):: pnts(npnts),vals(npnts),coefs(4,npnts-1)
     real(8),intent(inout):: spl,dspl
 
-    integer:: i,ip
-    real(8):: a(4),r2
+    integer:: i
+    real(8):: a(4),r2,rt
 
-    do i=2,npnts
-      if( r.lt.pnts(i) ) exit
-    enddo
-    ip = i -1
-    a(:) = coefs(:,ip)
-    r2 = r*r
-    spl = a(1) +a(2)*r +a(3)*r2 +a(4)*r*r2
-    dspl = a(2) +2d0*a(3)*r +3d0*a(4)*r2
+    if( r.ge.pnts(npnts) ) then ! outside the right edge of the range
+      a(:) = coefs(:,npnts-1)
+      rt = pnts(npnts) ! right-most data point
+      r2 = rt*rt
+      dspl = a(2) +2d0*a(3)*rt +3d0*a(4)*r2 ! gradient of the right-most data point
+      spl = vals(npnts) +dspl*(r -rt) ! extrapolation
+    else if( r.lt.pnts(1) ) then ! outside left edge of the range
+      a(:) = coefs(:,1)
+      rt = pnts(1)  ! left-most data point
+      r2 = rt*rt
+      dspl = a(2) +2d0*a(3)*rt +3d0*a(4)*r2
+      spl = vals(1) +dspl*(r -rt)
+    else
+      do i=2,npnts
+        if( r.lt.pnts(i) ) exit
+      enddo
+      a(:) = coefs(:,i-1)
+      r2 = r*r
+      spl = a(1) +a(2)*r +a(3)*r2 +a(4)*r*r2
+      dspl = a(2) +2d0*a(3)*r +3d0*a(4)*r2
+    endif
     return
   end subroutine eval_spline
 !=======================================================================
@@ -504,7 +531,7 @@ contains
 !.....Natural(left) and clamped(right) BCs for radial
 !!$            call comp_coefs(npnts,spls(ispl)%pnts,spls(ispl)%vals &
 !!$                 ,spls(i)%coefs,'natural','clamped')
-            call comp_coefs(spls(ispl),'natural','clamped')
+            call comp_coefs(spls(ispl),'natural','clamped',iprint)
 !!$            if( ispl.eq.1 ) then
 !!$              print *,' ispl=',ispl
 !!$              do i=1,npnts-1
@@ -532,7 +559,7 @@ contains
 !.....Natural and natural BCs for angular with cosine points
 !!$            call comp_coefs(npnts,spls(ispl)%pnts,spls(ispl)%vals &
 !!$                 ,spls(ispl)%coefs,'natural','natural')
-            call comp_coefs(spls(ispl),'natural','natural')
+            call comp_coefs(spls(ispl),'natural','natural',iprint)
           endif
         endif
       enddo
@@ -561,6 +588,82 @@ contains
     print *,'ERROR: while reading spline data...'
     stop 1
   end subroutine read_params_cspline
+!=======================================================================
+  subroutine write_cspline_curves()
+!
+!  Write out.cspline file that contains spline curve data for each pair.
+!
+    integer,parameter:: ndpnts = 100
+    integer:: is,js,ks,ispl,i
+    real(8):: rmin,rmax,dr,ri,phi,dphi,da
+    type(spline):: spl
+    character(len=128),parameter:: cfrad = 'out.cspline.radial'
+    character(len=128),parameter:: cfang = 'out.cspline.angular'
+    integer,parameter:: iorad = 51
+    integer,parameter:: ioang = 52
+
+    rmin = 1d+10
+    rmax = -1d0
+    do is=1,nspmax
+      do js=is,nspmax
+        ispl = idpair(is,js)
+        if( ispl.le.0 ) cycle
+        spl = spls(ispl)
+!!$        print *,'is,js,ispl=',is,js,ispl
+!!$        do i=1,spl%npnts
+!!$          if( i.eq.spl%npnts ) then
+!!$            print *,'i,pnts,vals=',i,spl%pnts(i),spl%vals(i)
+!!$          else
+!!$            print *,'i,pnts,vals=',i,spl%pnts(i),spl%vals(i),spl%coefs(1:4,i)
+!!$          endif
+!!$        enddo
+!!$        print *,'rmin,rmax=',spl%pnts(1),spl%pnts(spl%npnts)
+        rmin = min(rmin,spl%pnts(1))
+        rmax = max(rmax,spl%pnts(spl%npnts))
+      enddo
+    enddo
+    print *,'total rmin,rmax=',rmin,rmax
+
+    open(iorad,file=trim(cfrad),status='replace')
+    dr = (rmax-rmin)/(ndpnts-1)
+    do i=1,ndpnts
+      ri = rmin +dr*(i-1)
+      write(iorad,'(2x,f7.3)',advance='no') ri
+      do is=1,nspmax
+        do js=is,nspmax
+          ispl = idpair(is,js)
+          if( ispl.le.0 ) cycle
+          spl = spls(ispl)
+          call eval_spline(ri,spl%npnts,spl%pnts,spl%vals,spl%coefs,phi,dphi)
+          write(iorad,'(2x,es12.3e3)',advance='no') phi
+        enddo
+      enddo
+      write(iorad,*) ''
+    enddo
+    close(iorad)
+
+    open(ioang,file=trim(cfang),status='replace')
+    da = (1.0-(-1.0))/(ndpnts-1)
+    do i=1,ndpnts
+      ri = -1d0 +da*(i-1)
+      write(ioang,'(2x,f7.3)',advance='no') ri
+      do is=1,nspmax
+        do js=1,nspmax
+          do ks=1,nspmax
+            ispl = idtriplet(is,js,ks)
+            if( ispl.le.0 ) cycle
+!!$            print *,'is,js,ks,ispl=',is,js,ks,ispl
+            spl = spls(ispl)
+            call eval_spline(ri,spl%npnts,spl%pnts,spl%vals,spl%coefs,phi,dphi)
+            write(ioang,'(2x,es12.3e3)',advance='no') phi
+          enddo
+        enddo
+      enddo
+      write(ioang,*) ''
+    enddo
+    close(ioang)
+    
+  end subroutine write_cspline_curves
 !=======================================================================
   subroutine alloc_spline(spl)
     type(spline),intent(inout):: spl
@@ -603,11 +706,11 @@ contains
     enddo
   end subroutine bcast_splines
 !=======================================================================
-  subroutine comp_coefs(spl,bcl,bcr)
+  subroutine comp_coefs(spl,bcl,bcr,iprint)
 !
 !  Compute 4 coefficients for each section.
 !  Left and right boundary conditions are specified in bcl and bcr.
-!  bcl, bcr should be:
+!  bcl, bcr should either be:
 !    - 'natural': 2nd derivative = 0.0
 !    - 'clamped': 1st derivative = 0.0
 !
@@ -616,6 +719,7 @@ contains
 !!$    real(8),intent(in):: pnts(npnts),vals(npnts)
 !!$    real(8),intent(out):: coefs(4,npnts-1)
     character(len=7),intent(in):: bcl,bcr
+    integer,intent(in):: iprint
 
     integer:: i,j,npnts,n,ndim,ibase
     real(8),allocatable:: vb(:),vx(:),amat(:,:),amati(:,:),dat(:,:)
@@ -626,9 +730,12 @@ contains
     ndim = 4*n
     allocate(dat(2,npnts),vb(ndim),amat(ndim,ndim),vx(ndim)&
          ,amati(ndim,ndim))
+!!$    if( iprint.gt.1 ) print *,'Left & right BC for c-spline: ' &
+!!$         ,trim(bcl),' ',trim(bcr)
     do i=1,npnts
       dat(1,i) = spl%pnts(i)
       dat(2,i) = spl%vals(i)
+!!$      if( iprint.gt.1 ) print *,'i,pnt,val=',i,dat(1:2,i)
     enddo
 
 !.....Create vector b
