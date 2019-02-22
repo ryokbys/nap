@@ -6,7 +6,7 @@ module minimize
   
 !.....penalty: lasso or ridge or smooth
   character(len=128):: cpena= 'none'
-  character(len=128):: clinmin= 'onestep'
+  character(len=128):: clinmin= 'backtrack'
   character(len=128):: cfsmode= 'grad'  ! [grad,grad0corr,df0corr]
   real(8):: pwgt = 1d-15
 
@@ -248,8 +248,9 @@ contains
     end interface
 
     integer:: iter,i,niter,nxtol,ngtol,nftol
-    real(8):: alpha,fp,gnorm,gpnorm,dxnorm,vnorm,ftst,pval
-    real(8),save,allocatable:: gpena(:),dx(:),xp(:),x(:)
+    real(8):: alpha,fp,gnorm,gpnorm,dxnorm,vnorm,ftst,pval,tmp1,tmp2
+    real(8),save,allocatable:: gpena(:),dx(:),xp(:),x(:) &
+         ,s(:),y(:),gprev(:)
     logical:: lconverged = .false. 
 
     if( myid.eq.0 ) then
@@ -259,7 +260,8 @@ contains
     endif
 
     if( .not.allocated(gpena) ) then
-      allocate(gpena(ndim),dx(ndim),xp(ndim),x(ndim))
+      allocate(gpena(ndim),dx(ndim),xp(ndim),x(ndim) &
+           ,s(ndim),y(ndim),gprev(ndim))
     endif
 
     iter= 0
@@ -297,17 +299,28 @@ contains
       else if ( trim(clinmin).eq.'golden') then
         call golden_section(ndim,x,d,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
-      else if( trim(clinmin).eq.'onestep' ) then
-!.....Increase alpha a bit every step,
-!.....alpha is to be decreased in subroutine onestep to decrease func value.
-!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-        alpha = max(alpha,xtol*2d0)*2d0
-        call onestep(ndim,x,xranges,d,f,ftst,alpha,iprint &
-             ,iflag,myid,func,niter)
+      else if( trim(clinmin).eq.'two-point' ) then
+!.....Like backtrack, but once alpha is defined, not to perform line minimization
+!     no matter the func value gets larger.
+!.....Currently this does NOT work well...
+        if( iter.le.1 ) then  ! only 1st call, perform line minimization a bit
+          call backtrack(ndim,x,xranges,d,f,ftst,alpha,iprint &
+               ,iflag,myid,func,niter)
+        else
+          alpha = sprod(ndim,s,s)/sprod(ndim,s,y)
+          alpha = max(min(alpha,1d0),xtol)
+        endif
       else if( trim(clinmin).eq.'armijo' ) then
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
         alpha = max(alpha,xtol*2d0)*2d0
         call armijo_search(ndim,x,xranges,d,f,ftst,g,alpha,iprint &
+             ,iflag,myid,func,niter)
+      else ! Default = backtrack
+!.....Increase alpha a bit every step,
+!.....alpha is to be decreased in subroutine backtrack to decrease func value.
+!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+        alpha = max(alpha,xtol*2d0)*2d0
+        call backtrack(ndim,x,xranges,d,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
       if( iflag/100.ne.0 ) then
@@ -325,13 +338,16 @@ contains
       else
         x(1:ndim)= x(1:ndim) +alpha*d(1:ndim)
       endif
+      s(1:ndim) = alpha*d(1:ndim)
       dx(:) = x(:) -xp(:)
       xp(:) = x(:)
       dxnorm = sqrt(sprod(ndim,dx,dx))
       call wrap_ranges(ndim,x,xranges)
+      gprev(:) = g(:)
       call grad(ndim,x,g)
       call penalty(cpena,ndim,pval,gpena,x)
       if( trim(cpena).eq.'ridge' ) g(:) = g(:) +gpena(:)
+      y(:) = g(:) -gprev(:)
       gnorm= sqrt(sprod(ndim,g,g))
       d(1:ndim)= -g(1:ndim)
 !!$      g(1:ndim)= -g(1:ndim)/gnorm
@@ -441,18 +457,18 @@ contains
       else if ( trim(clinmin).eq.'golden') then
         call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
-      else if( trim(clinmin).eq.'onestep' ) then
-!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-        alpha = max(alpha,xtol*2d0)*2d0
-        call onestep(ndim,x,xranges,u,f,ftst,alpha,iprint &
-             ,iflag,myid,func,niter)
-      else ! armijo (default)
+      else if( trim(clinmin).eq.'armijo' ) then
 !.....To enhance the convergence in Armijo search,
 !.....use the history of previous alpha by multiplying 2
 !.....avoiding constant decrease, but alpha should not be greater than 1.
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
         alpha = max(alpha,xtol*2d0)*2d0
         call armijo_search(ndim,x,xranges,u,f,ftst,g,alpha,iprint &
+             ,iflag,myid,func,niter)
+      else ! backtrack (default)
+!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+        alpha = max(alpha,xtol*2d0)*2d0
+        call backtrack(ndim,x,xranges,u,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
 
@@ -648,11 +664,6 @@ contains
       else if( trim(clinmin).eq.'golden') then
         call golden_section(ndim,x,u,f,ftst,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid,func)
-      else if( trim(clinmin).eq.'onestep' ) then
-!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-        alpha = max(alpha,xtol*2d0)*2d0
-        call onestep(ndim,x,xranges,u,f,ftst,alpha,iprint &
-             ,iflag,myid,func,niter)
       else if( trim(clinmin).eq.'armijo' ) then
 !.....To enhance the convergence in Armijo search,
 !.....use the history of previous alpha by multiplying 2
@@ -660,6 +671,11 @@ contains
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
         alpha = max(alpha,xtol*2d0)*2d0
         call armijo_search(ndim,x,xranges,u,f,ftst,g,alpha,iprint &
+             ,iflag,myid,func,niter)
+      else ! backtrack (default)
+!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
+        alpha = max(alpha,xtol*2d0)*2d0
+        call backtrack(ndim,x,xranges,u,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
 !!$      if(myid.eq.0) print *,'armijo steps, alpha=',niter,alpha
@@ -1170,7 +1186,7 @@ contains
 
   end subroutine armijo_search
 !=======================================================================
-  subroutine onestep(ndim,x0,xranges,d,f,ftst,alpha,iprint &
+  subroutine backtrack(ndim,x0,xranges,d,f,ftst,alpha,iprint &
        ,iflag,myid,func,niter)
 !
 !  Simply move onestep towards current direction with max length
@@ -1201,7 +1217,7 @@ contains
     if( l1st ) then
       l1st = .false.
       if( myid.eq.0 .and. iprint.gt.1 ) &
-           print *,'onestep, alpha=',alpha
+           print *,'backtrack, alpha=',alpha
     endif
     if( .not.allocated(x1) ) allocate(x1(ndim),gpena(ndim))
     f0 = f
@@ -1237,7 +1253,7 @@ contains
         iterp = iter
         if( alphai.lt.tiny ) then
           if( myid.eq.0 .and. iprint.gt.0 ) then
-            print *,'WARNING: alpha < tiny in onestep,'
+            print *,'WARNING: alpha < tiny in backtrack,'
 !!$            print *,'         The search direction would be wrong.'
 !!$            print *,'   iter,alphai,fi=',iter,alphai,fi
           endif
@@ -1251,12 +1267,12 @@ contains
     iflag = iflag + 100
     niter = iter
     if( myid.eq.0 .and. iprint.gt.0 ) then
-      print *, 'WARNING: iter exceeds NITER_LINMIN in onestep.'
+      print *, 'WARNING: iter exceeds NITER_LINMIN in backtrack.'
 !!$      print *, '         The search direction would be wrong.'
 !!$      write(6,'(a,es13.5)') '   alphai = ',alphai
     endif
     return
-  end subroutine onestep
+  end subroutine backtrack
 !=======================================================================
   function sprod(n,a,b)
     implicit none
@@ -1569,7 +1585,7 @@ contains
         enddo
         f = fp
 !!$      alpha = 1d0
-!!$      call onestep(ndim,xt,xranges,u,f,ftst,alpha,iprint &
+!!$      call backtrack(ndim,xt,xranges,u,f,ftst,alpha,iprint &
 !!$           ,iflag,myid,func,niter)
         alpha = min(max(alpha,xtol*10d0)*2d0, 1d0)
         call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
@@ -1785,9 +1801,9 @@ contains
             call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
                  ,iflag,myid,func,niter)
           endif
-        else   ! onestep (default)
+        else   ! backtrack (default)
           alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-          call onestep(ndim,xt,xranges,u,f,ftst,alpha,iprint &
+          call backtrack(ndim,xt,xranges,u,f,ftst,alpha,iprint &
                ,iflag,myid,func,niter)
         endif
 !.....get out of bfgs loop
