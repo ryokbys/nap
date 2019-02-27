@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-02-06 11:44:18 Ryo KOBAYASHI>
+!                     Last modified: <2019-02-27 16:35:29 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -92,7 +92,7 @@ program fitpot
       call subtract_atomic_energy()
     endif
   endif
-  
+
   if( nswgt.gt.0 ) call set_sample_weights()
 
 !.....Subtract energy and forces of other force-fields
@@ -112,7 +112,7 @@ program fitpot
     cffs(1) = trim(cpot)
   endif
 
-  if( trim(cfmethod).ne.'test'  .and. &
+  if( (trim(cfmethod).ne.'test' .or. trim(cfmethod).ne.'dsgnmat') .and. &
        (trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2') ) then
     lnormalize = .true.
   endif
@@ -125,8 +125,8 @@ program fitpot
        .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' &
        .or. trim(cpot).eq.'NN2' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
-    if( trim(cpot).eq.'linreg' .and. trim(cfmethod).eq.'test' &
-         .and. iprint.gt.2 ) call write_dsgnmats()
+!!$    if( trim(cpot).eq.'linreg' .and. trim(cfmethod).eq.'test' &
+!!$         .and. iprint.gt.2 ) call write_dsgnmats()
     if( lnormalize ) call normalize()
   else
     print *,'ERROR: '//trim(cpot)//' is not available.'
@@ -139,40 +139,50 @@ program fitpot
   else if( trim(cpot).eq.'linreg' ) then
     call set_iglid_linreg(cpena,cfmethod)
   endif
-  
+
   select case (trim(cfmethod))
-    case ('sd','SD')
-      call sd_wrapper(ftrn0,ftst0)
-    case ('cg','CG')
-      call cg_wrapper(ftrn0,ftst0)
-    case ('bfgs','BFGS','dfp','DFP')
-      call qn_wrapper(ftrn0,ftst0)
-    case ('sa','SA')
-      call sa_wrapper(ftrn0,ftst0)
-    case ('ga','GA')
-      call ga_wrapper(ftrn0,ftst0)
-    case ('de','DE')
-      call de_wrapper(ftrn0,ftst0)
-    case ('pso','PSO')
-      call pso_wrapper(ftrn0,ftst0)
-    case ('md','metadynamics')
-      call md_wrapper(ftrn0,ftst0)
-    case ('random_search','random')
-      call random_search_wrapper(ftrn0,ftst0)
-    case ('fs','FS')
-      call fs_wrapper(ftrn0,ftst0)
-    case ('gfs')
-      call gfs_wrapper(ftrn0,ftst0)
-    case ('sgd','SGD')
-      call sgd(ftrn0,ftst0)
-    case ('check_grad')
-      call check_grad(ftrn0,ftst0)
-    case ('test','TEST')
-      call test(ftrn0,ftst0)
-    case default
-      if(myid.eq.0) print *,'unknown fitting_method:',trim(cfmethod)
-      call mpi_finalize(ierr)
-      stop
+  case ('dsgnmat')
+    if( trim(cpot).ne.'linreg' ) then
+      if( myid.eq.0 ) print *,'dsgnmat is only available for linreg' &
+           //' and not for '//trim(cpot)
+    else if( nnode.ne.1 ) then
+      if( myid.eq.0 ) print *,'dsgnmat is not available for parallel run.'
+    else
+      call write_dsgnmats()
+    endif
+    goto 99
+  case ('sd','SD')
+    call sd_wrapper(ftrn0,ftst0)
+  case ('cg','CG')
+    call cg_wrapper(ftrn0,ftst0)
+  case ('bfgs','BFGS','dfp','DFP')
+    call qn_wrapper(ftrn0,ftst0)
+  case ('sa','SA')
+    call sa_wrapper(ftrn0,ftst0)
+  case ('ga','GA')
+    call ga_wrapper(ftrn0,ftst0)
+  case ('de','DE')
+    call de_wrapper(ftrn0,ftst0)
+  case ('pso','PSO')
+    call pso_wrapper(ftrn0,ftst0)
+  case ('md','metadynamics')
+    call md_wrapper(ftrn0,ftst0)
+  case ('random_search','random')
+    call random_search_wrapper(ftrn0,ftst0)
+  case ('fs','FS')
+    call fs_wrapper(ftrn0,ftst0)
+  case ('gfs')
+    call gfs_wrapper(ftrn0,ftst0)
+  case ('sgd','SGD')
+    call sgd(ftrn0,ftst0)
+  case ('check_grad')
+    call check_grad(ftrn0,ftst0)
+  case ('test','TEST')
+    call test(ftrn0,ftst0)
+  case default
+    if(myid.eq.0) print *,'unknown fitting_method:',trim(cfmethod)
+    call mpi_finalize(ierr)
+    stop
   end select
 
   if( myid.eq.0 ) then
@@ -197,7 +207,7 @@ program fitpot
 !!$  if( nsubff.gt.0 ) then
 !!$    call restore_FF()
 !!$  endif
-  
+
   call write_vars('fin')
   call write_energy_relation('fin')
   if( nsmpl.lt.nsmpl_outfrc ) then
@@ -218,7 +228,7 @@ program fitpot
 !!$  tmp= tcomm
 !!$  call mpi_reduce(tmp,tcomm,1,mpi_real8,mpi_max &
 !!$       ,0,mpi_world,ierr)
-  if( myid.eq.0 ) then
+99 if( myid.eq.0 ) then
     write(6,'(a,i0)') ' Number of func calls = ',nfunc
     write(6,'(a,i0)') ' Number of grad calls = ',ngrad
     write(6,'(a,f15.3,a)') ' Time func = ', tfunc,' sec'

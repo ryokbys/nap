@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-02-05 15:39:08 Ryo KOBAYASHI>
+!                     Last modified: <2019-02-27 16:56:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -177,7 +177,7 @@ contains
                samples(ismpl)%dgsf,samples(ismpl)%igsf)
         endif
 !.....Set lfdsgnmat=.true. to make run_pmd() compute dsgnmat_force related data
-        if( l1st .and. lfmatch .and. trim(cfmethod).eq.'test' ) then
+        if( l1st .and. lfmatch .and. trim(cfmethod).eq.'dsgnmat' ) then
           lfdsgnmat = .true.
         endif
       else if( trim(cpot).eq.'NN2' ) then
@@ -1110,7 +1110,7 @@ contains
   subroutine write_dsgnmats()
 !
 !  Write design matrices of atoms, energies, forces.
-!  Only available for nnode==1 and iprint > 1.
+!  Only available for nnode==1.
 !
     use variables
     use parallel

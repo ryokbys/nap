@@ -10,7 +10,7 @@ Options:
     -h, --help  Show this help message and exit.
     -d DR       Width of the bin. [default: 0.1]
     -r RMAX     Cutoff radius of radial distribution. [default: 5.0]
-    -f FMT      Input file format. If is not *pmd*, users must specify it. [default: None]
+    -f FMT      Input file format. If is not *pmd*, users must specify it. [default: pmd]
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
     -o OUT      Output file name. [default: out.rdf]
