@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-02-27 16:56:19 Ryo KOBAYASHI>
+!                     Last modified: <2019-02-27 21:14:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -1155,6 +1155,7 @@ contains
         write(22,'(es12.3e3)',advance='no') samples(ismpl)%eref &
              -samples(ismpl)%esub
         write(25,'(es12.3e3)') samples(ismpl)%esub
+        natm = samples(ismpl)%natm
         do isf=1,nsf
           gtmp = 0d0
           do ia=1,natm
@@ -1183,7 +1184,8 @@ contains
       write(23,'(2i8)') ndat,nsf
       write(26,'(2i8)') ndat
       do ismpl=isid0,isid1
-        do ia=1,samples(ismpl)%natm
+        natm = samples(ismpl)%natm
+        do ia=1,natm
           do ixyz=1,3
             write(23,'(es12.3e3)',advance='no') samples(ismpl)%fref(ixyz,ia) &
                  -samples(ismpl)%fsub(ixyz,ia)
@@ -1225,7 +1227,7 @@ contains
       call normalize_norm()
     else if( cnormalize(1:4).eq.'none' ) then
       if( myid.eq.0 .and. iprint.ne.0 ) &
-           print *,'No normalizatino of descriptors.'
+           print *,'No normalization of descriptors.'
     else
       if( myid.eq.0 .and. iprint.ne.0 ) &
            print *,'WARNING: no such normalization, '//trim(cnormalize)

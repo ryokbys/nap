@@ -36,9 +36,9 @@ set log y
 f(x) = 10.0**({0:.3f} -{1:.3f} /8.617e-5 *(x/1000))
 plot '{2:s}' us (1000.0/$1):2:3 w yerr lc 'blue' pt 7 t 'data', f(x) t 'fitted' lc 'blue'
 """.format(D0,Eact,outDT)
-    with open('plot.gp','w') as f:
+    with open('plot_D-T.gp','w') as f:
         f.write(txt)
-    print(' Wrote plot.gp')
+    print(' Wrote plot_D-T.gp')
     return None
 
 if __name__ == "__main__":
