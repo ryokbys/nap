@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-01-17 12:23:03 Ryo KOBAYASHI>
+!                     Last-modified: <2019-03-04 18:39:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -695,8 +695,8 @@ contains
           tep(ix,iy,iz) = te(ix,iy,iz) +dtemp
           if( tep(ix,iy,iz).lt.0d0 ) then
             dt_inner = dt_inner/2
-            print *,'WARNING: Since Te<0, made dt_inner half, dt_inner=',dt_inner
             call set_inner_dt(dtmd)
+            print *,'WARNING: Since Te<0, changed dt_inner and nstp_inner=',dt_inner,nstp_inner
             goto 10  ! Go back and redo inner loop with the half dt_inner
           endif
         enddo

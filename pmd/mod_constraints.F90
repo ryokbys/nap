@@ -53,9 +53,11 @@ contains
       dlim = min(alen(1),alen(2))
       dlim = min(dlim,alen(3))
       do ic=1,nconst
-        if( dfin(ic).lt.dlim ) then
+        if( dfin(ic).gt.dlim/2 ) then
           print *,'ERROR: a bond constraint too long w.r.t. '&
                //'simulation cell.'
+          print *,'       bond distance should be shorter than ' &
+               //'a half of the cell size'
           stop 2
         endif
       enddo

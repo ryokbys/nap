@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2019-01-22 16:01:17 Ryo KOBAYASHI>
+c                     Last-modified: <2019-03-05 16:18:21 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -11,7 +11,7 @@ c-----------------------------------------------------------------------
      &     ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv
      &     ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width
      &     ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary
-     &     ,lmetaD,lconst)
+     &     ,lmetaD,lconst,lfrcmod)
       use pmdvars
       use zload
       use force
@@ -23,6 +23,7 @@ c-----------------------------------------------------------------------
      &     ,write_metaD_potential
       use constraints,only: init_const, update_const, update_const_vel
      &     ,update_const_pos
+      use frcmod,only: init_frcmod, modify_forces
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -44,6 +45,7 @@ c-----------------------------------------------------------------------
       character(len=*),intent(in):: czload_type
 !      character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: ltdst,lstrs0,lcellfix(3,3),lmetaD,lconst
+     &     ,lfrcmod
       logical,intent(inout):: lvc
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
@@ -239,6 +241,9 @@ c.....Call init_metaD after setting namax and nsp
 c.....Initialize constraints if needed
       if( lconst ) call init_const(myid_md,mpi_md_world,nodes_md
      &     ,iprint,h)
+c.....Initialize frcmod if needed
+      if( lfrcmod ) call init_frcmod(myid_md,mpi_md_world,nodes_md
+     &     ,iprint)
 
 c.....Setup for FIRE
       if( ifdmp.eq.2 ) then
@@ -339,6 +344,10 @@ c     &     ,epot,chg(1:natm)
 c.....Constraints
       if( lconst ) then
         call update_const(namax,natm,tag,ra,h,0,maxstp)
+      endif
+c.....Force_modify
+      if( lfrcmod ) then
+        call modify_forces(namax,natm,aa,tag,ra,h,nnmax,lspr)
       endif
 
 #ifdef __DISL__
@@ -665,11 +674,13 @@ c.....Force from metadynamics
           call force_metaD(istp,namax,natm,tag,ra,aa,h,hi,epot
      &         ,nnmax,lspr,myid_md,mpi_md_world,iprint)
         endif
-
 c.....Update some variables in constraints if needed
         if( lconst ) then
           call update_const(namax,natm,tag,ra,h,istp,maxstp)
         endif
+c.....Force_modify
+        if( lfrcmod ) call modify_forces(namax,natm,aa,tag,ra
+     &       ,h,nnmax,lspr)
 
 c.....Second kick of velocities
         do i=1,natm

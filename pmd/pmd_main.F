@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2019-01-22 17:19:58 Ryo KOBAYASHI>
+c                     Last-modified: <2019-03-05 14:36:02 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -143,7 +143,7 @@ c.....call pmd_core to perfom MD
      &     ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv
      &     ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width
      &     ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary
-     &     ,lmetaD,lconst)
+     &     ,lmetaD,lconst,lfrcmod)
 
       if( myid_md.eq.0 ) then
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then

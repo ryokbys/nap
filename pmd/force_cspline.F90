@@ -498,7 +498,11 @@ contains
       endif
 
       open(ionum,file=trim(fname),status='old')
-      read(ionum,*) nspl
+1     read(ionum,'(a)',end=10) ctmp
+      if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) goto 1 ! skip comment line
+      ndat = num_data(trim(ctmp),' ')
+      if( ndat.lt.1 ) goto 1 ! skip blank line
+      read(ctmp,*) nspl
       if( allocated(spls)) deallocate(spls)
       allocate(spls(nspl))
       ispl = 0
@@ -506,7 +510,7 @@ contains
         read(ionum,'(a)',end=10) ctmp
         if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) cycle ! skip comment line
         ndat = num_data(trim(ctmp),' ')
-        if( ndat.lt.0 ) cycle  ! skip blank line
+        if( ndat.lt.1 ) cycle  ! skip blank line
         if( ndat.gt.2 ) then  ! 1st line of a spline data
           backspace(ionum)
           read(ionum,*) ctmp2
