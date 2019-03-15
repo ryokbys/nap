@@ -43,7 +43,7 @@ def read_out_msd(fname='out.msd',dt=1.0,offset=0):
         msds.append(msd-msd0)
     return np.array(ts),np.array(msds)
 
-def msd2diff(ts,msds,fac):
+def msd2D(ts,msds,fac,dim=3):
     """
     Compute diffusion coefficient from time [fs] vs MSD [m^2] data 
     by solving least square problem using numpy.
@@ -56,10 +56,10 @@ def msd2diff(ts,msds,fac):
     a = p[0]
     b = p[1]
     # fac = 1.0e-16 /1.e-15
-    a = a *fac
+    a = a *fac /(2.0*dim)
     b = b *fac
     # print(res[0],xvar,np.mean(A[:,0]),len(ts))
-    std = np.sqrt(res[0]/len(ts)/xvar) *fac 
+    std = np.sqrt(res[0]/len(ts)/xvar) *fac /(2.0*dim)
     return a,b,std
 
 if __name__ == "__main__":
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     #...Assuming input MSD unit in A^2/fs and output in cm^2/s
     fac = 1.0e-16 /1.0e-15
     #...Least square
-    a,b,std = msd2diff(ts,msds,fac)
+    a,b,std = msd2D(ts,msds,fac)
     print(' Diffusion coefficient = {0:12.4e}'.format(a)+
           ' +/- {0:12.4e} [cm^2/s]'.format(std))
 
@@ -93,7 +93,7 @@ if __name__ == "__main__":
         fvals = np.array([ (t*a+b)/fac for t in ts ])
         plt.plot(ts*tfac,msds/tfac,'b-',label='MSD data')
         plt.plot(ts*tfac,fvals/tfac,'r-',label='Fitted curve')
-        plt.savefig("graph_msd2diff.png", format='png',
+        plt.savefig("graph_msd2D.png", format='png',
                     dpi=300, bbox_inches='tight')
-        print(' Wrote graph_msd2diff.png')
+        print(' Wrote graph_msd2D.png')
         

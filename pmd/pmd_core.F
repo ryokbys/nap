@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2019-03-05 16:18:21 Ryo KOBAYASHI>
+c                     Last-modified: <2019-03-14 15:27:35 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -11,7 +11,7 @@ c-----------------------------------------------------------------------
      &     ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv
      &     ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width
      &     ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary
-     &     ,lmetaD,lconst,lfrcmod)
+     &     ,lmetaD,lconst,lrdcfrc)
       use pmdvars
       use zload
       use force
@@ -23,7 +23,7 @@ c-----------------------------------------------------------------------
      &     ,write_metaD_potential
       use constraints,only: init_const, update_const, update_const_vel
      &     ,update_const_pos
-      use frcmod,only: init_frcmod, modify_forces
+      use rdcfrc,only: init_rdcfrc, reduce_forces, finalize_rdcfrc
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -45,7 +45,7 @@ c-----------------------------------------------------------------------
       character(len=*),intent(in):: czload_type
 !      character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: ltdst,lstrs0,lcellfix(3,3),lmetaD,lconst
-     &     ,lfrcmod
+     &     ,lrdcfrc
       logical,intent(inout):: lvc
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
@@ -241,8 +241,8 @@ c.....Call init_metaD after setting namax and nsp
 c.....Initialize constraints if needed
       if( lconst ) call init_const(myid_md,mpi_md_world,nodes_md
      &     ,iprint,h)
-c.....Initialize frcmod if needed
-      if( lfrcmod ) call init_frcmod(myid_md,mpi_md_world,nodes_md
+c.....Initialize rdcfrc if needed
+      if( lrdcfrc ) call init_rdcfrc(myid_md,mpi_md_world,nodes_md
      &     ,iprint)
 
 c.....Setup for FIRE
@@ -346,8 +346,8 @@ c.....Constraints
         call update_const(namax,natm,tag,ra,h,0,maxstp)
       endif
 c.....Force_modify
-      if( lfrcmod ) then
-        call modify_forces(namax,natm,aa,tag,ra,h,nnmax,lspr)
+      if( lrdcfrc ) then
+        call reduce_forces(namax,natm,aa,tag,ra,h,nnmax,lspr)
       endif
 
 #ifdef __DISL__
@@ -679,7 +679,7 @@ c.....Update some variables in constraints if needed
           call update_const(namax,natm,tag,ra,h,istp,maxstp)
         endif
 c.....Force_modify
-        if( lfrcmod ) call modify_forces(namax,natm,aa,tag,ra
+        if( lrdcfrc ) call reduce_forces(namax,natm,aa,tag,ra
      &       ,h,nnmax,lspr)
 
 c.....Second kick of velocities
@@ -1020,6 +1020,10 @@ c.....revert forces to the unit eV/A before going out pmd_core
 c.....Output metadynamics potential
       if( lmetaD ) then
         call write_metaD_potential(maxstp,nsp,myid_md,iprint)
+      endif
+
+      if( lrdcfrc ) then
+        call finalize_rdcfrc()
       endif
 
 c.....deallocate all the arrays allocated in pmd_core
