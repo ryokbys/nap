@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-11-28 12:16:39 Ryo KOBAYASHI>
+!                     Last modified: <2019-03-22 17:40:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -25,7 +25,7 @@ module Coulomb
 !.....Input Keywords: charges, charge_dist, terms
 !.....Keywords for charges: fixed, fixed_bvs, variable/qeq
 !.....Keywords for charge_dist: point, gaussian
-!.....Keywords for terms: full, short, long, direct_cut, screened_cut
+!.....Keywords for terms: full, short, long, direct, direct_cut, screened_cut
 
   integer,parameter:: ioprms = 20
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
@@ -72,7 +72,7 @@ module Coulomb
 !.....See, http://www.jncasr.ac.in/ccms/sbs2007/lecturenotes/5day10nov/SBS_Ewald.pdf
 !.....Exp(-pacc) = 1e-7 when pacc= 18.0
 !  real(8),parameter:: pacc   = 18d0
-  real(8),parameter:: pacc = 9.21d0  ! exp(-pacc) = 1e-4
+  real(8):: pacc = 9.21034d0  ! exp(-pacc) = 1e-4
 !.....real-space cell volume
   real(8):: vol
 !.....k-space variables
@@ -215,12 +215,12 @@ contains
     endif
 !.....kmax# is constant during MD run even if h-matrix can change...
     call setup_kspace()
-    if( myid.eq.0 .and. iprint.gt.1 ) then
+    if( myid.eq.0 .and. iprint.gt.0 ) then
       write(6,'(a)') ' Number of k-points for Ewald sum:'
-      write(6,'(a,i8)') '   kmax1 = ',kmax1
-      write(6,'(a,i8)') '   kmax2 = ',kmax2
-      write(6,'(a,i8)') '   kmax3 = ',kmax3
-      write(6,'(a,i8)') '   total = ',nk
+      write(6,'(a,i0)') '   kmax1 = ',kmax1
+      write(6,'(a,i0)') '   kmax2 = ',kmax2
+      write(6,'(a,i0)') '   kmax3 = ',kmax3
+      write(6,'(a,i0)') '   total = ',nk
     endif
     if( allocated(qcos) ) deallocate(qcosl,qcos,qsinl,qsin,pflr)
     allocate(qcosl(nk),qcos(nk),qsinl(nk),qsin(nk),pflr(nk,msp))
@@ -237,7 +237,7 @@ contains
           bk(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
           bb2 = absv(3,bk)
           bb2 = bb2*bb2
-          pflr(ik,1:nsp)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm_ew**2 *bb2)
+          pflr(ik,1:msp)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm_ew**2 *bb2)
         enddo
       enddo
     enddo
@@ -603,6 +603,7 @@ contains
           if(  trim(cterms).ne.'full' .and. &
                trim(cterms).ne.'short' .and. &
                trim(cterms).ne.'long' .and. &
+               trim(cterms).ne.'direct' .and. &
                trim(cterms).ne.'direct_cut' .and. &
                trim(cterms).ne.'screened_cut') then
             print *,'ERROR: terms should have an argument of '//&
@@ -626,6 +627,10 @@ contains
         else if( trim(cline).eq.'fbvs' ) then
           backspace(ioprms)
           read(ioprms,*) ctmp, fbvs
+          cycle
+        else if( trim(cline).eq.'pacc' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, pacc
           cycle
         else if( trim(cline).eq.'rho_screened_cut' ) then
           backspace(ioprms)
@@ -728,6 +733,7 @@ contains
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(ispflag,msp,mpi_logical,0,mpi_world,ierr)
     
+    call mpi_bcast(pacc,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(conv_eps,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
@@ -838,6 +844,10 @@ contains
            lspr,epi,elrl,iprint,mpi_md_world,lstrs,lcell_updated)
     endif
 
+    if( trim(cterms).eq.'direct' ) then
+      call force_direct(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
+           ,lspr,epi,esrl,iprint,lstrs,rc)
+    endif
     if( trim(cterms).eq.'direct_cut' ) then
       call force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc)
@@ -854,7 +864,7 @@ contains
     endif
 
     if( l1st .and. myid.eq.0 .and. iprint.gt.0 ) then
-      if( trim(cterms).eq.'direct_cut' ) then
+      if( cterms(1:6).eq.'direct' ) then
         print *,''
         print '(a,f12.4)',' Direct Coulomb energy = ',esrl
       else
@@ -866,12 +876,7 @@ contains
       endif
     endif
 
-
     epotl = esrl +elrl +eselfl
-!!$    if( iprint.gt.1 .and. myid.eq.0 ) then
-!!$      print '(a,5es14.4e3)',' Coulomb energies (self,short,long,full)='&
-!!$           ,eselfl,esrl,elrl,epotl,avmu
-!!$    endif
 !.....Gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
@@ -1268,6 +1273,76 @@ contains
     return
   end subroutine force_Ewald_long
 !=======================================================================
+  subroutine force_direct(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
+       ,lspr,epi,esrl,iprint,lstrs,rc)
+!
+!  Direct Coulomb interaction with cutoff radius without any cutoff treatment.
+!
+    implicit none
+    integer,intent(in):: namax,natm,nnmax,iprint, &
+         lspr(0:nnmax,namax)
+    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+         h(3,3),hi(3,3),rc
+    logical,intent(in):: lstrs
+    real(8),intent(inout):: aa(3,namax),strsl(3,3,namax), &
+         epi(namax),esrl
+
+    integer:: i,j,jj,is,js,ixyz,jxyz
+    real(8):: rc2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp
+    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+
+!.....Compute direct sum
+    rc2 = rc*rc
+    esrl = 0d0
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is= int(tag(i))
+      qi = chg(i)
+      do jj=1,lspr(0,i)
+        j = lspr(jj,i)
+        if( j.eq.0 ) exit
+        if( j.le.i ) cycle
+        js = int(tag(j))
+        qj = chg(j)
+        xj(1:3) = ra(1:3,j)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij.gt.rc2 ) cycle
+        dij = sqrt(dij)
+        diji = 1d0/dij
+        dxdi(1:3)= -rij(1:3)*diji
+        dxdj(1:3)=  rij(1:3)*diji
+!.....potential
+        tmp = 0.5d0 *acc *qi*qj*diji
+        if( j.le.natm ) then
+          epi(i)= epi(i) +tmp
+          epi(j)= epi(j) +tmp
+          esrl = esrl +tmp +tmp
+        else
+          epi(i)= epi(i) +tmp
+          esrl = esrl +tmp
+        endif
+!.....force
+        ftmp = -acc *qi*qj*diji*diji
+        aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
+        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
+!.....stress
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+            enddo
+          enddo
+        endif
+      enddo
+    enddo
+
+  end subroutine force_direct
+!=======================================================================
   subroutine force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
        ,lspr,epi,esrl,iprint,lstrs,rc)
 !
@@ -1288,7 +1363,7 @@ contains
          epi(namax),esrl
 
     integer:: i,j,jj,is,js,ixyz,jxyz
-    real(8):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc&
+    real(8):: rc2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc&
          ,dvdrc,vrc
     real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
 
@@ -1479,30 +1554,25 @@ contains
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
       qi = chg(i)
-!!$      sgmi = sgm(is)
-!!$      if( abs(qi).lt.qthd ) cycle
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
         if( j.eq.0 ) exit
         if( j.le.i ) cycle
         js = int(tag(j))
         qj = chg(j)
-!!$        if( abs(qj).lt.qthd ) cycle
         xj(1:3) = ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.gt.rc2 ) cycle
-!!$        sgmj = sgm(js)
-!!$        gmmij = 1d0 /sqrt(2d0*(sgmi**2+sgmj**2))
         dij = sqrt(dij)
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
         terfc = erfc(dij*ss2i)
-!!$        terfc = erfc(gmmij,dij)
 !.....potential
-        tmp = 0.5d0 *acc *qi*qj*diji *terfc *fcut1(dij,0d0,rc)
+        tmp = 0.5d0 *acc *qi*qj*diji *terfc
+!!$        tmp = 0.5d0 *acc *qi*qj*diji *terfc *fcut1(dij,0d0,rc)
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp
           epi(j)= epi(j) +tmp
@@ -1512,9 +1582,11 @@ contains
           esrl = esrl +tmp
         endif
 !.....force
+!!$        ftmp = -acc *qj*qi*diji *( diji *terfc &
+!!$             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) ) *fcut1(dij,0d0,rc) &
+!!$             +acc *qi*qj*diji *terfc *dfcut1(dij,0d0,rc)
         ftmp = -acc *qj*qi*diji *( diji *terfc &
-             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) ) *fcut1(dij,0d0,rc) &
-             +acc *qi*qj*diji *terfc *dfcut1(dij,0d0,rc)
+             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) )
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
@@ -1553,6 +1625,8 @@ contains
     integer:: i,is,ik,k1,k2,k3,ierr,ixyz,jxyz
     real(8):: qi,xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3),bdotr, &
          tmp,cs,sn,texp,bb2,bk
+    real(8):: bdk1,bdk2,bdk3,cs1,sn1,cs2,sn2,cs3,sn3,cs10,cs20,cs30, &
+         cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm,sn3m,sn3mm
     real(8),external:: sprod,absv
     real(8):: emat(3,3)
 
@@ -1574,31 +1648,96 @@ contains
 !!$      if( abs(qi).lt.qthd ) cycle
       ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
       ik = 0
+      bdk1 = sprod(3,b1,ri)
+      bdk2 = sprod(3,b2,ri)
+      bdk3 = sprod(3,b3,ri)
+      cs10 = cos(bdk1)
+      cs20 = cos(bdk2)
+      cs30 = cos(bdk3)
+      cs1m = 0d0
+      cs1mm= 0d0
+      sn1m = 0d0
+      sn1mm= 0d0
+      cs2m = 0d0
+      cs2mm= 0d0
+      sn2m = 0d0
+      sn2mm= 0d0
+      cs3m = 0d0
+      cs3mm= 0d0
+      sn3m = 0d0
+      sn3mm= 0d0
       do k1= -kmax1,kmax1
         bk1(1:3) = k1 *b1(1:3)
+        if( k1.lt.-kmax1+2 ) then
+          cs1 = cos(k1*bdk1)
+          sn1 = sin(k1*bdk1)
+          if( k1.eq.-kmax1   ) then
+            cs1mm= cs1
+            sn1mm= sn1
+          else if( k1.eq.-kmax1+1 ) then
+            cs1m = cs1
+            sn1m = sn1
+          endif
+        else
+          cs1 = 2d0*cs1m*cs10 -cs1mm
+          sn1 = 2d0*sn1m*cs10 -sn1mm
+        endif
         do k2= -kmax2,kmax2
           bk2(1:3) = k2 *b2(1:3)
+          if( k2.lt.-kmax2+2 ) then
+            cs2 = cos(k2*bdk2)
+            sn2 = sin(k2*bdk2)
+            if( k2.eq.-kmax2 ) then
+              cs2mm = cs2
+              sn2mm = sn2
+            else if( k2.eq.-kmax2+1 ) then
+              cs2m = cs2
+              sn2m = sn2
+            endif
+          else
+            cs2 = 2d0*cs2m*cs20 -cs2mm
+            sn2 = 2d0*sn2m*cs20 -sn2mm
+          endif
           do k3= -kmax3,kmax3
-            if( .not. lkuse(k3,k2,k1) ) cycle
-            ik= ik +1
             bk3(1:3) = k3 *b3(1:3)
+            if( k3.lt.-kmax3+2 ) then
+              cs3 = cos(k3*bdk3)
+              sn3 = sin(k3*bdk3)
+              if( k3.eq.-kmax3 ) then
+                cs3mm = cs3
+                sn3mm = sn3
+              else if( k3.eq.-kmax3+1 ) then
+                cs3m = cs3
+                sn3m = sn3
+              endif
+            else
+              cs3 = 2d0*cs3m*cs30 -cs3mm
+              sn3 = 2d0*sn3m*cs30 -sn3mm
+            endif
+            if( .not. lkuse(k3,k2,k1) ) goto 10
+            ik= ik +1
             bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-            bdotr = sprod(3,bb,ri)
-            cs = cos(bdotr)
-            sn = sin(bdotr)
+!.....Since the computations of cos and sin are rather heavy,
+!     compute cos and sin of each direction are computed iterative form
+!     and compute cos(bb*ri)=cos(bk1*ri +bk2*ri +bk3*ri),
+!     and compute it using cos(bk1*ri)'s and sin(bk1*ri)'s
+            cs = cs1*cs2*cs3 -cs1*sn2*sn3 -sn1*cs2*sn3 -sn1*sn2*cs3
+            sn = cs1*cs2*sn3 +cs1*sn2*cs3 +sn1*cs2*cs3 -sn1*sn2*sn3
 !.....Potential energy per atom
+!!$            tmp = 0.5d0 *acc /vol *qi *pflr(ik,is) &
+!!$                 *( cs*qcos(ik) +sn*qsin(ik) )
             tmp = 0.5d0 *acc /vol *qi *pflr(ik,is) &
                  *( cs*qcos(ik) +sn*qsin(ik) )
             epi(i) = epi(i) +tmp
             elrl = elrl +tmp
 !.....Forces
+!!$            aa(1:3,i)= aa(1:3,i) -acc/vol *qi*bb(1:3) *pflr(ik,is) &
+!!$                 *0.5d0*( -sn*qcos(ik) +cs*qsin(ik) )
             aa(1:3,i)= aa(1:3,i) -acc/vol *qi*bb(1:3) *pflr(ik,is) &
                  *( -sn*qcos(ik) +cs*qsin(ik) )
 !.....Stress
             if( lstrs ) then
               bk = absv(3,bb)
-!!$              tmp = 0.5d0 *acc/vol**2 &
-!!$                   *pflr(ik,is) *(qcos(ik)**2 +qsin(ik)**2)
               do ixyz=1,3
                 do jxyz=1,3
                   strsl(ixyz,jxyz,i) = strsl(ixyz,jxyz,i) +tmp &
@@ -1606,12 +1745,30 @@ contains
                        -emat(ixyz,jxyz))
                 enddo
               enddo
-
+            endif  ! lstress
+            
+10          if( k3.ge.-kmax3+2 ) then
+              cs3mm= cs3m
+              cs3m = cs3
+              sn3mm= sn3m
+              sn3m = sn3
             endif
           enddo  ! k3
+          if( k2.ge.-kmax2+2 ) then
+            cs2mm= cs2m
+            cs2m = cs2
+            sn2mm= sn2m
+            sn2m = sn2
+          endif
         enddo  ! k2
+        if( k1.ge.-kmax1+2 ) then
+          cs1mm= cs1m
+          cs1m = cs1
+          sn1mm= sn1m
+          sn1m = sn1
+        endif
       enddo  ! k1
-    enddo  ! ia
+    enddo  ! i
 
   end subroutine Ewald_long
 !=======================================================================
@@ -1927,32 +2084,136 @@ contains
 
     integer:: ik,k1,k2,k3,is,i,ierr
     real(8):: bk1(3),bk2(3),bk3(3),bb(3),xi(3),qi&
-         ,ri(3),bdotr
+         ,ri(3),bdotr,cs,sn
+    real(8):: bdk1,bdk2,bdk3,cs1,sn1,cs2,sn2,cs3,sn3,cs10,cs20,cs30, &
+         cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm,sn3m,sn3mm
     real(8),external:: sprod
 
 !.....Compute structure factor of the local processor
     qcosl(1:nk) = 0d0
     qsinl(1:nk) = 0d0
-    ik = 0
-    do k1= -kmax1,kmax1
-      bk1(1:3) = k1 *b1(1:3)
-      do k2= -kmax2,kmax2
-        bk2(1:3) = k2 *b2(1:3)
-        do k3= -kmax3,kmax3
-          if( .not. lkuse(k3,k2,k1) ) cycle
-          ik= ik +1
-          bk3(1:3) = k3 *b3(1:3)
-          bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-          do i=1,natm
-            xi(1:3)= ra(1:3,i)
-            qi = chg(i)
-            ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
-            bdotr = sprod(3,bb,ri)
-            qcosl(ik) = qcosl(ik) +qi*cos(bdotr)
-            qsinl(ik) = qsinl(ik) +qi*sin(bdotr)
-          enddo
-        enddo
-      enddo
+!!$    ik = 0
+!!$    do k1= -kmax1,kmax1
+!!$      bk1(1:3) = k1 *b1(1:3)
+!!$      do k2= -kmax2,kmax2
+!!$        bk2(1:3) = k2 *b2(1:3)
+!!$        do k3= -kmax3,kmax3
+!!$          if( .not. lkuse(k3,k2,k1) ) cycle
+!!$          ik= ik +1
+!!$          bk3(1:3) = k3 *b3(1:3)
+!!$          bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
+!!$          do i=1,natm
+!!$            xi(1:3)= ra(1:3,i)
+!!$            qi = chg(i)
+!!$            ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
+!!$            bdotr = sprod(3,bb,ri)
+!!$            qcosl(ik) = qcosl(ik) +qi*cos(bdotr)
+!!$            qsinl(ik) = qsinl(ik) +qi*sin(bdotr)
+!!$          enddo
+!!$        enddo
+!!$      enddo
+!!$    enddo  ! ia
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      qi = chg(i)
+      ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
+      ik = 0
+      bdk1 = sprod(3,b1,ri)
+      bdk2 = sprod(3,b2,ri)
+      bdk3 = sprod(3,b3,ri)
+      cs10 = cos(bdk1)
+      cs20 = cos(bdk2)
+      cs30 = cos(bdk3)
+      cs1m = 0d0
+      cs1mm= 0d0
+      sn1m = 0d0
+      sn1mm= 0d0
+      cs2m = 0d0
+      cs2mm= 0d0
+      sn2m = 0d0
+      sn2mm= 0d0
+      cs3m = 0d0
+      cs3mm= 0d0
+      sn3m = 0d0
+      sn3mm= 0d0
+      do k1= -kmax1,kmax1
+!!$        bk1(1:3) = k1 *b1(1:3)
+        if( k1.lt.-kmax1+2 ) then
+          cs1 = cos(k1*bdk1)
+          sn1 = sin(k1*bdk1)
+          if( k1.eq.-kmax1   ) then
+            cs1mm= cs1
+            sn1mm= sn1
+          else if( k1.eq.-kmax1+1 ) then
+            cs1m = cs1
+            sn1m = sn1
+          endif
+        else
+          cs1 = 2d0*cs1m*cs10 -cs1mm
+          sn1 = 2d0*sn1m*cs10 -sn1mm
+        endif
+        do k2= -kmax2,kmax2
+!!$          bk2(1:3) = k2 *b2(1:3)
+          if( k2.lt.-kmax2+2 ) then
+            cs2 = cos(k2*bdk2)
+            sn2 = sin(k2*bdk2)
+            if( k2.eq.-kmax2 ) then
+              cs2mm = cs2
+              sn2mm = sn2
+            else if( k2.eq.-kmax2+1 ) then
+              cs2m = cs2
+              sn2m = sn2
+            endif
+          else
+            cs2 = 2d0*cs2m*cs20 -cs2mm
+            sn2 = 2d0*sn2m*cs20 -sn2mm
+          endif
+          do k3= -kmax3,kmax3
+            if( k3.lt.-kmax3+2 ) then
+              cs3 = cos(k3*bdk3)
+              sn3 = sin(k3*bdk3)
+              if( k3.eq.-kmax3 ) then
+                cs3mm = cs3
+                sn3mm = sn3
+              else if( k3.eq.-kmax3+1 ) then
+                cs3m = cs3
+                sn3m = sn3
+              endif
+            else
+              cs3 = 2d0*cs3m*cs30 -cs3mm
+              sn3 = 2d0*sn3m*cs30 -sn3mm
+            endif
+            if( .not. lkuse(k3,k2,k1) ) goto 10
+            ik= ik +1
+!!$            bk3(1:3) = k3 *b3(1:3)
+!!$            bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
+!!$            bdotr = sprod(3,bb,ri)
+            cs = cs1*cs2*cs3 -cs1*sn2*sn3 -sn1*cs2*sn3 -sn1*sn2*cs3
+            sn = cs1*cs2*sn3 +cs1*sn2*cs3 +sn1*cs2*cs3 -sn1*sn2*sn3
+            qcosl(ik) = qcosl(ik) +qi*cs
+            qsinl(ik) = qsinl(ik) +qi*sn
+            
+10          if( k3.ge.-kmax3+2 ) then
+              cs3mm= cs3m
+              cs3m = cs3
+              sn3mm= sn3m
+              sn3m = sn3
+            endif
+          enddo ! k3
+          if( k2.ge.-kmax2+2 ) then
+            cs2mm= cs2m
+            cs2m = cs2
+            sn2mm= sn2m
+            sn2m = sn2
+          endif
+        enddo ! k2
+        if( k1.ge.-kmax1+2 ) then
+          cs1mm= cs1m
+          cs1m = cs1
+          sn1mm= sn1m
+          sn1m = sn1
+        endif
+      enddo ! k1
     enddo  ! ia
 !.....Allreduce qcos and qsin, which would be stupid and time consuming
     qcos(1:nk) = 0d0
