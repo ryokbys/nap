@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-03-22 17:40:30 Ryo KOBAYASHI>
+!                     Last modified: <2019-03-23 23:02:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -135,7 +135,7 @@ contains
         call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
              natm,tag,chi,chg,lvc)
       else
-        call init_fc_Ewald(h,rc,myid,iprint)
+        call init_fc_Ewald(h,rc,myid,mpi_md_world,iprint)
       endif
     endif
 
@@ -176,17 +176,17 @@ contains
       call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
            natm,tag,chi,chg,lvc)
     else
-      call init_fc_Ewald(h,rc,myid,iprint)
+      call init_fc_Ewald(h,rc,myid,mpi_md_world,iprint)
     endif
 
   end subroutine initialize_coulombx
 !=======================================================================
-  subroutine init_fc_Ewald(h,rc,myid,iprint)
+  subroutine init_fc_Ewald(h,rc,myid,mpi_world,iprint)
 !
 !  Ewald sum with fixed charge.
 !
     implicit none 
-    integer,intent(in):: myid,iprint
+    integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: h(3,3),rc
 
     integer:: i,ik,k1,k2,k3,isp
@@ -222,6 +222,10 @@ contains
       write(6,'(a,i0)') '   kmax3 = ',kmax3
       write(6,'(a,i0)') '   total = ',nk
     endif
+!!$    print *,'myid,lkuse(:)=',myid,lkuse(:,:,:)
+!!$    print *,'myid,b1(1:3)=',myid,b1(1:3)
+!!$    print *,'myid,b2(1:3)=',myid,b2(1:3)
+!!$    print *,'myid,b3(1:3)=',myid,b3(1:3)
     if( allocated(qcos) ) deallocate(qcosl,qcos,qsinl,qsin,pflr)
     allocate(qcosl(nk),qcos(nk),qsinl(nk),qsin(nk),pflr(nk,msp))
 !.....prefactor for long-range term
@@ -773,7 +777,7 @@ contains
 !=======================================================================
   subroutine force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,chi,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,sorg &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc)
 !
@@ -790,7 +794,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),chi(namax)
+         ,tag(namax),sv(3,6),chi(namax),sorg(3)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -841,7 +845,7 @@ contains
     if(  trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'long' ) then
       call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
-           lspr,epi,elrl,iprint,mpi_md_world,lstrs,lcell_updated)
+           lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs,lcell_updated)
     endif
 
     if( trim(cterms).eq.'direct' ) then
@@ -1127,7 +1131,7 @@ contains
 !=======================================================================
   subroutine force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,chi,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,sorg &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc)
 !
@@ -1144,7 +1148,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),chi(namax)
+         ,tag(namax),sv(3,6),chi(namax),sorg(3)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -1182,7 +1186,7 @@ contains
          ,lspr,epi,esrl,iprint,lstrs,rc)
 
     call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
-         lspr,epi,elrl,iprint,mpi_md_world,lstrs,lcell_updated)
+         lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs,lcell_updated)
 
     if( lstrs ) then
 !!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
@@ -1207,7 +1211,7 @@ contains
 !=======================================================================
   subroutine force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,chi,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,sorg &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc)
 !
@@ -1224,7 +1228,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),chi(namax)
+         ,tag(namax),sv(3,6),chi(namax),sorg(3)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -1250,7 +1254,7 @@ contains
     call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
     
     call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
-         lspr,epi,elrl,iprint,mpi_md_world,lstrs,lcell_updated)
+         lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs,lcell_updated)
 
     if( lstrs ) then
 !!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
@@ -1602,12 +1606,11 @@ contains
         endif
       enddo
     enddo
-!!$    write(6,*) ' esrl = ',esrl
 
   end subroutine Ewald_short
 !=======================================================================
   subroutine Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
-       lspr,epi,elrl,iprint,mpi_md_world,lstrs,lcell_updated)
+       lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs,lcell_updated)
 !
 !  Long-range term of Ewald sum.
 !  Not parallelized and not suitable for large system as it is too slow.
@@ -1615,25 +1618,27 @@ contains
     implicit none
     include 'mpif.h'
     integer,intent(in):: namax,natm,nnmax,iprint, &
-         mpi_md_world,lspr(0:nnmax,namax)
+         myid,mpi_md_world,lspr(0:nnmax,namax)
     real(8),intent(in):: tag(namax),ra(3,namax),chg(namax),&
-         h(3,3),hi(3,3)
+         h(3,3),hi(3,3),sorg(3)
     logical,intent(in):: lstrs,lcell_updated
     real(8),intent(inout):: aa(3,namax),epi(namax),&
          elrl,strsl(3,3,namax)
 
-    integer:: i,is,ik,k1,k2,k3,ierr,ixyz,jxyz
+    integer:: i,is,ik,k1,k2,k3,ierr,ixyz,jxyz,itot
     real(8):: qi,xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3),bdotr, &
          tmp,cs,sn,texp,bb2,bk
     real(8):: bdk1,bdk2,bdk3,cs1,sn1,cs2,sn2,cs3,sn3,cs10,cs20,cs30, &
          cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm,sn3m,sn3mm
     real(8),external:: sprod,absv
     real(8):: emat(3,3)
+    integer,external:: itotOf
 
 !.....Compute reciprocal vectors
     if( lcell_updated ) call get_recip_vectors(h)
 !.....Compute structure factor of the local processor
-    call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint,mpi_md_world)
+    call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint &
+         ,myid,mpi_md_world,sorg)
 
 !.....Compute long-range contribution to potential energy
     elrl = 0d0
@@ -1642,8 +1647,9 @@ contains
     emat(1:3,2) = (/ 0d0, 1d0, 0d0 /)
     emat(1:3,3) = (/ 0d0, 0d0, 1d0 /)
     do i=1,natm
-      xi(1:3)= ra(1:3,i)
+      xi(1:3)= ra(1:3,i) +sorg(1:3)
       is= int(tag(i))
+      itot = itotOf(tag(i))
       qi = chg(i)
 !!$      if( abs(qi).lt.qthd ) cycle
       ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
@@ -1654,6 +1660,10 @@ contains
       cs10 = cos(bdk1)
       cs20 = cos(bdk2)
       cs30 = cos(bdk3)
+!!$      if( itot.eq.19 .or. itot.eq.21 ) then
+!!$        print '(a,3i4,7es11.3)','myid,i,itot,xi,qi,cs10,cs20,cs30=' &
+!!$             ,myid,i,itot,xi(1:3),qi,cs10,cs20,cs30
+!!$      endif
       cs1m = 0d0
       cs1mm= 0d0
       sn1m = 0d0
@@ -1735,6 +1745,11 @@ contains
 !!$                 *0.5d0*( -sn*qcos(ik) +cs*qsin(ik) )
             aa(1:3,i)= aa(1:3,i) -acc/vol *qi*bb(1:3) *pflr(ik,is) &
                  *( -sn*qcos(ik) +cs*qsin(ik) )
+!!$            if( itot.eq.19 .or. itot.eq.21 ) then
+!!$              print '(a,4i4,7es11.3)','myid,i,itot,ik,aa,qcos,qsin,cs,sn=' &
+!!$                   ,myid,i,itot,ik,aa(1:3,i) &
+!!$                   ,qcos(ik),qsin(ik),cs,sn
+!!$            endif
 !.....Stress
             if( lstrs ) then
               bk = absv(3,bb)
@@ -1769,6 +1784,10 @@ contains
         endif
       enddo  ! k1
     enddo  ! i
+
+!!$    do i=1,natm
+!!$      print '(a,3i5,3es12.4)','myid,i,itot,aa=',myid,i,itotOf(tag(i)),aa(1:3,i)
+!!$    enddo
 
   end subroutine Ewald_long
 !=======================================================================
@@ -1876,14 +1895,14 @@ contains
   end subroutine qforce_short
 !=======================================================================
   subroutine qforce_long(namax,natm,tag,ra,chg,h, &
-       tcom,mpi_md_world,myid,iprint,fq,elr)
+       sorg,tcom,mpi_md_world,myid,iprint,fq,elr)
 !
 !  Derivative of Ewald long-range term w.r.t. charges
 !
     implicit none
     include 'mpif.h'
     integer,intent(in):: namax,natm,mpi_md_world,myid,iprint
-    real(8),intent(in):: tag(namax),ra(3,namax),chg(namax),h(3,3)
+    real(8),intent(in):: tag(namax),ra(3,namax),chg(namax),h(3,3),sorg(3)
     real(8),intent(inout):: tcom,fq(namax),elr
 
     integer:: i,ik,k1,k2,k3,is,ierr
@@ -1896,7 +1915,8 @@ contains
     prefac = 1d0 /(2d0*vol*eps0)
 !!$    print *,'prefac=',prefac
 !.....Compute structure factor
-    call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint,mpi_md_world)
+    call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint &
+         ,myid,mpi_md_world,sorg)
 
     ik = 0
     elr = 0d0
@@ -2072,15 +2092,15 @@ contains
   end subroutine get_recip_vectors
 !=======================================================================
   subroutine calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint&
-       ,mpi_md_world)
+       ,myid,mpi_md_world,sorg)
 !
 !  Compute qcos and qsin needed for calculation of Ewald long-range term.
 !
     implicit none
     include 'mpif.h'
-    integer,intent(in):: namax,natm,iprint,mpi_md_world
+    integer,intent(in):: namax,natm,iprint,myid,mpi_md_world
     real(8),intent(in):: tag(namax),ra(3,namax),chg(namax) &
-         ,h(3,3)
+         ,h(3,3),sorg(3)
 
     integer:: ik,k1,k2,k3,is,i,ierr
     real(8):: bk1(3),bk2(3),bk3(3),bb(3),xi(3),qi&
@@ -2088,6 +2108,7 @@ contains
     real(8):: bdk1,bdk2,bdk3,cs1,sn1,cs2,sn2,cs3,sn3,cs10,cs20,cs30, &
          cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm,sn3m,sn3mm
     real(8),external:: sprod
+    real(8):: qcmax,qsmax,qclmax,qslmax
 
 !.....Compute structure factor of the local processor
     qcosl(1:nk) = 0d0
@@ -2113,8 +2134,12 @@ contains
 !!$        enddo
 !!$      enddo
 !!$    enddo  ! ia
+!!$    print *,'myid,b1=',myid,b1(1:3)
+!!$    print *,'myid,b2=',myid,b2(1:3)
+!!$    print *,'myid,b3=',myid,b3(1:3)
+!!$    print *,'myid,sorg=',myid,sorg(1:3)
     do i=1,natm
-      xi(1:3)= ra(1:3,i)
+      xi(1:3)= ra(1:3,i) +sorg(1:3)
       qi = chg(i)
       ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
       ik = 0
@@ -2215,13 +2240,26 @@ contains
         endif
       enddo ! k1
     enddo  ! ia
-!.....Allreduce qcos and qsin, which would be stupid and time consuming
+!.....Allreduce qcos and qsin, which could be inefficient and time consuming
     qcos(1:nk) = 0d0
     qsin(1:nk) = 0d0
     call mpi_allreduce(qcosl,qcos,nk,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
     call mpi_allreduce(qsinl,qsin,nk,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
+
+!!$    qcmax = 0d0
+!!$    qsmax = 0d0
+!!$    qclmax = 0d0
+!!$    qslmax = 0d0
+!!$    do ik=1,nk
+!!$      qcmax = max(qcos(ik),qcmax)
+!!$      qsmax = max(qsin(ik),qsmax)
+!!$      qclmax = max(qcosl(ik),qclmax)
+!!$      qslmax = max(qsinl(ik),qslmax)
+!!$    enddo
+!!$    print '(a,i2,10es11.3)','myid,qcmax,qclmax,qsmax,qslmax=',myid &
+!!$         ,qcmax,qclmax,qsmax,qslmax
     return
   end subroutine calc_qcos_qsin
 !=======================================================================

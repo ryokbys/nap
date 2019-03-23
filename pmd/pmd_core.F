@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2019-03-14 15:27:35 Ryo KOBAYASHI>
+c                     Last-modified: <2019-03-23 22:59:34 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -333,7 +333,7 @@ c.....Calc forces
      &     trim(cpctl).eq.'vv-Berendsen')
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
-     &     ,lspr,mpi_md_world,myid_md,epi,epot0,nspmax,lstrs
+     &     ,lspr,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,lstrs
      &     ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
       lstrs = .false.
       epot= epot0
@@ -446,7 +446,7 @@ c      write(cnum(1:4),'(i4.4)') 0
      &     ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
       if( myid_md.eq.0 ) then
         if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot
-     &       ,ekitot,epitot,stot,chgtot,chitot)
+     &       ,atot,ekitot,epitot,stot,chgtot,chitot)
         if( ifpmd.eq.1 ) then  ! pmd format
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' )
      &         then
@@ -666,7 +666,7 @@ c.....Copy RA of boundary atoms determined by 'bacopy'
 c-------Calc forces
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
-     &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,lstrs
+     &       ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,lstrs
      &       ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
         lstrs = .false.
 c.....Force from metadynamics
@@ -923,7 +923,7 @@ c          call system("mkdir -p "//cnum)
           ltot_updated = .true.
           if( myid_md.eq.0 ) then
             if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot
-     &           ,ekitot,epitot,stot,chgtot,chitot)
+     &           ,atot,ekitot,epitot,stot,chgtot,chitot)
             if( ifpmd.eq.1 ) then  ! pmd format
               if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' )
      &             then
@@ -1158,7 +1158,7 @@ c     &     ,myid_md,lcalcgrad
       if( .not.lcalcgrad ) then
         call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
-     &       ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,lstrs
+     &       ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,lstrs
      &       ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
         if( iprint.ne.0 ) then
           write(6,'(a,es15.7)') ' potential energy = ',epot
@@ -2758,6 +2758,7 @@ c
       integer:: istat(mpi_status_size),itag
       real(8):: t0
       real(8),allocatable,save:: ratmp(:,:)
+      integer,external:: itotOf
 
       t0 = mpi_wtime()
 
@@ -2827,10 +2828,6 @@ c.....positions should be shifted before passing data
         enddo
         call mpi_send(ratmp,3*natm,mpi_real8,0,itag+2
      &       ,mpi_md_world,ierr)
-cc.....positions should be reverted after passing data
-c        do i=1,natm
-c          ra(1:3,i) = ra(1:3,i) - sorg(1:3)
-c        enddo
         call mpi_send(va,3*natm,mpi_real8,0,itag+3
      &       ,mpi_md_world,ierr)
         call mpi_send(epi,natm,mpi_real8,0,itag+4
@@ -2846,17 +2843,19 @@ c        enddo
         call mpi_send(chi,natm,mpi_real8,0,itag+9
      &       ,mpi_md_world,ierr)
       endif
+      call mpi_barrier(mpi_md_world,ierr)
 
       end subroutine space_comp
 c=======================================================================
-      subroutine sort_by_tag(natm,tag,ra,va,eki,epi,strs,chg,chi)
+      subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi)
 c
 c  Sort by tag for output.
 c  
       implicit none
       integer,intent(in):: natm
-      real(8),intent(inout):: ra(3,natm),va(3,natm),eki(3,3,natm)
-     &     ,epi(natm),strs(3,3,natm),tag(natm),chg(natm),chi(natm)
+      real(8),intent(inout):: ra(3,natm),va(3,natm),aa(3,natm)
+     &     ,eki(3,3,natm),epi(natm),strs(3,3,natm),tag(natm)
+     &     ,chg(natm),chi(natm)
 
       integer,allocatable:: itag(:)
       real(8),allocatable:: buf(:,:)
@@ -2867,7 +2866,7 @@ c
       if( .not. allocated(itag) .or. natm.gt.nsave ) then
         if( allocated(itag) ) deallocate(itag,buf)
         nsave = natm
-        allocate(itag(natm),buf(28,natm))
+        allocate(itag(natm),buf(31,natm))
       endif
 
       do i=1,natm
@@ -2883,10 +2882,11 @@ c
         buf(26,i)= tag(i)
         buf(27,i)= chg(i)
         buf(28,i)= chi(i)
+        buf(29:31,i)= aa(1:3,i)
         itag(i)= itotOf(tag(i))
       enddo
 
-      call heapsort_itag(natm,natm,itag,28,buf)
+      call heapsort_itag(natm,natm,itag,31,buf)
 
       do i=1,natm
         ra(1:3,i)= buf(1:3,i)
@@ -2901,6 +2901,7 @@ c
         tag(i)= buf(26,i)
         chg(i)= buf(27,i)
         chi(i)= buf(28,i)
+        aa(1:3,i)= buf(29:31,i)
       enddo
 
       end subroutine sort_by_tag

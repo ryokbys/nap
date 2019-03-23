@@ -1,6 +1,6 @@
 subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
      ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr &
-     ,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
+     ,sorg,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
      ,ifcoulomb,iprint,l1st &
      ,lvc,lcell_updated,boundary)
 !-----------------------------------------------------------------------
@@ -41,7 +41,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   integer,intent(in):: lspr(0:nnmax,namax) !,numff
   integer,intent(inout):: ifcoulomb
   real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-       ,tag(namax)
+       ,tag(namax),sorg(3)
   real(8),intent(inout):: tcom,rc
   real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
        ,chg(namax),chi(namax),stnsr(3,3)
@@ -66,7 +66,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
     endif
     call dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
          lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
-         tcom,myid_md,mpi_md_world,iprint,l1st,boundary)
+         sorg,tcom,myid_md,mpi_md_world,iprint,l1st,boundary)
     if( l1st .and. myid_md.eq.0 .and. iprint.ge.20 ) then
       write(6,'(/a)') ' Charges:'
       tmp = 0d0
@@ -182,19 +182,19 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   else if( use_force('Ewald') ) then  ! Ewald Coulomb
     call force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom &
-         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   else if( use_force('Ewald_long') ) then ! long-range Coulomb
     call force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom &
-         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   else if( use_force('Coulomb') ) then  ! Coulomb
     call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom &
-         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+         ,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   endif
@@ -848,7 +848,7 @@ end function force_on
 !=======================================================================
 subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
      lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
-     tcom,myid,mpi_md_world,iprint,l1st,boundary)
+     sorg,tcom,myid,mpi_md_world,iprint,l1st,boundary)
 !
 !  Charge optimization/equilibration by damped dynamics.
 !  Since not only Coulomb interaction but also other force-fields can
@@ -863,7 +863,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   include "mpif.h"
   integer,intent(in):: namax,natm,myid,mpi_md_world,iprint &
        ,nnmax,lspr(0:nnmax,namax)
-  real(8),intent(in):: chi(namax),h(3,3),tag(namax),ra(3,namax),rc
+  real(8),intent(in):: chi(namax),h(3,3),tag(namax),ra(3,namax),rc,sorg(3)
   real(8),intent(inout):: chg(namax),tcom
   logical,intent(in):: l1st
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
@@ -933,14 +933,14 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 !!$  if( use_force('Ewald_long') ) then
   if( trim(cterms).eq.'long' ) then
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
-    call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
+    call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_md_world, &
          myid,iprint,fq,eclong)
 !!$  else if( use_force('Ewald') ) then
   else if( trim(cterms).eq.'full' ) then
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
     call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
          ,rc,fq,ecshort)
-    call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
+    call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_md_world, &
          myid,iprint,fq,eclong)
   else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
@@ -1041,14 +1041,14 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 !!$    if( use_force('Ewald_long') ) then
     if( trim(cterms).eq.'long' ) then
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)
-      call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
+      call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_md_world, &
            myid,iprint,fq,eclong)
 !!$    else if( use_force('Ewald') ) then
     else if( trim(cterms).eq.'full' ) then
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshort)
-      call qforce_long(namax,natm,tag,ra,chg,h,tcom,mpi_md_world, &
+      call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_md_world, &
            myid,iprint,fq,eclong)
     else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)

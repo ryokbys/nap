@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2019-03-14 15:31:27 Ryo KOBAYASHI>
+c                     Last-modified: <2019-03-23 22:41:08 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -35,6 +35,7 @@ c.....Epot threshold for disl core extraction [Hartree]
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr
      &     ,nstp_done
       real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin
+      integer,external:: itotOf
 
 c-----initialize the MPI environment
       call mpi_init(ierr)
@@ -453,13 +454,14 @@ c=======================================================================
       integer:: i,n0,ixyz,ierr
       real(8):: at(3),ptmp(6)
       integer,parameter:: nmpi = 2
+      integer,external:: itotOf
 
 
 c.....Write out forces
       open(ionum,file='frc'//trim(cpostfix),status='replace')
       write(ionum,'(i10)') ntot
       do i=1,ntot
-        write(ionum,'(3f12.6)') atot(1:3,i)
+        write(ionum,'(3f12.6,i8)') atot(1:3,i),itotOf(tagtot(i))
       enddo
       close(ionum)
 

@@ -99,32 +99,24 @@ contains
           epotl= epotl +tmp
         endif
 !---------stress
-        do ixyz=1,3
-          do jxyz=1,3
-            strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
-                 -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
-            strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
-                 -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
+        if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
+                   -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
+              strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
+                   -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
+            enddo
           enddo
-        enddo
+        endif
       enddo
     enddo
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_md_world,strs,9)
-!!$    if( myid.ge.0 ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
-!!$           ,nn,mpi_md_world,strs,9)
-!!$    else
-!!$      call reduce_dba_bk(natm,namax,tag,strs,9)
-!!$    endif
+    if( lstrs ) then
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+           ,nn,mpi_md_world,strs,9)
+    endif
 
-!!$!-----atomic level stress in [eV/Ang^3] assuming 1 Ang thick
-!!$    do i=1,natm
-!!$      strs(1:3,1:3,i)= strs(1:3,1:3,i) /avol
-!!$    enddo
-
-!    print *, ' force_LJ_Ar 2'
 !-----gather epot
     if( myid.ge.0 ) then
       call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
