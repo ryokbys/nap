@@ -4,14 +4,22 @@ module descriptor
 !=======================================================================
   implicit none
   save
+!!$ putting mpif.h inclusion here could cause some conflicts
+!!$  include "mpif.h"
   character(len=128):: paramsdir = '.'
   
   character(128),parameter:: cpfname = 'in.params.desc'
+  integer,parameter:: ionum = 51
 
   real(8),parameter:: pi = 3.14159265358979d0
   integer,parameter:: msp = 9  ! hard-coded max-num of species
 
-  integer:: nsf
+!.....Memory used in byte
+  integer:: mem
+!.....Time consumed
+  real(8):: time
+
+  integer:: nsf,nsf2,nsf3,nsff
   integer,allocatable:: itype(:)
   real(8),allocatable:: cnst(:,:),rcs(:),rcs2(:)
 !.....symmetry function values and their derivatives
@@ -35,6 +43,10 @@ module descriptor
 
   integer:: nalmax,nnlmax,nal,nnl
 
+!.....Chebyshev
+  logical:: lcheby = .false.
+  real(8),allocatable:: ts_cheby(:),dts_cheby(:),wgtsp(:)
+
 !.....For group LASSO/FS in minimization
   integer:: ngl
   real(8),allocatable:: glval(:)
@@ -50,12 +62,16 @@ contains
     ncnst_type(2) = 1   ! cosine
     ncnst_type(3) = 1   ! polynomial
     ncnst_type(4) = 2   ! Morse
-    ncnst_type(101) = 1 ! angular1 (SW-type, not includes fc(rjk))
-    ncnst_type(102) = 1 ! angular2 (Behler-type, includes fc(rjk))
+    ncnst_type(101) = 1 ! angular1 (SW-type, not including fc(rjk))
+    ncnst_type(102) = 1 ! angular2 (Behler-type, including fc(rjk))
     ncnst_type(103) = 1 ! cos(cos(thijk))
     ncnst_type(104) = 1 ! sin(cos(thijk))
+    ncnst_type(105) = 2 ! exp(-eta*(cos(thijk)-rs)**2)
     ncomb_type(1:100) = 2    ! pair
     ncomb_type(101:200) = 3  ! triplet
+
+    time = 0d0
+    mem = 0
 
   end subroutine init_desc
 !=======================================================================
@@ -113,16 +129,19 @@ contains
         write(6,'(a,f10.3,a)') ' igsf size = ', &
              dble(nsf*(nnlmax+1)*nalmax*2)/1000/1000,' MB'
       endif
-      if( allocated(gsf) ) deallocate(gsf,dgsf,igsf)
+      if( allocated(gsf) ) then
+        mem = mem -8*size(gsf) -8*size(dgsf) -4*size(igsf)
+        deallocate(gsf,dgsf,igsf)
+      endif
       allocate( gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal) &
            ,igsf(nsf,0:nnl,nal) )
+      mem = mem +8*size(gsf) +8*size(dgsf) +4*size(igsf)
 
       lrealloc = .false.
-
     endif
 
 !  Since natm and nn can change every step of MD,
-!  if natm/nnltmp becomes nal/nnl, they should be updated and
+!  if natm/nnltmp becomes >nal/nnl, they should be updated and
 !  gsf/dgsf as well.
     if( natm.gt.nal ) then
       nal = int(natm*1.1)
@@ -151,9 +170,11 @@ contains
       lrealloc=.true.
     endif
     if( allocated(dgsf).and.lrealloc ) then
+      mem = mem -8*size(gsf) -8*size(dgsf) -4*size(igsf)
       deallocate( gsf,dgsf,igsf )
       allocate( gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal) &
            ,igsf(nsf,0:nnl,nal))
+      mem = mem +8*size(gsf) +8*size(dgsf) +4*size(igsf)
       lrealloc=.false.
     endif
     
@@ -161,6 +182,24 @@ contains
   end subroutine make_gsf_arrays
 !=======================================================================
   subroutine calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
+       ,myid,mpi_world,l1st,iprint)
+
+    integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
+    integer,intent(in):: myid,mpi_world,iprint
+    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    logical,intent(in):: l1st 
+
+    if( lcheby ) then
+      call calc_desc_cheby(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
+           ,myid,mpi_world,l1st,iprint)
+    else ! default
+      call calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
+           ,myid,mpi_world,l1st,iprint)
+    endif
+    return
+  end subroutine calc_desc
+!=======================================================================
+  subroutine calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
        ,myid,mpi_world,l1st,iprint)
 !
 !  Evaluate descriptors (symmetry functions)
@@ -171,7 +210,7 @@ contains
 !
     use force,only: loverlay
     use ZBL,only: interact,r_inner,r_outer,zeta,dzeta
-    implicit none
+!!$    implicit none
     include "mpif.h"
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
@@ -480,6 +519,32 @@ contains
               igsf(isf,0,ia) = 1
               igsf(isf,jj,ia) = 1
               igsf(isf,kk,ia) = 1
+            else if( itype(isf).eq.105 ) then ! exp(-eta*(cos(thijk)-c)**2) w/o fc(rjk)
+              if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
+!.....fcij's should be computed after rcs is determined
+              call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
+              call get_fc_dfc(dik,is,ks,isf,fcik,dfcik)
+              eta = cnst(1,isf)
+              rs = cnst(2,isf)
+              driki(1:3)= -rik(1:3)/dik
+              drikk(1:3)= -driki(1:3)
+!.....Function value
+              tmp = exp(-eta*(cs-rs)**2)
+              gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik
+!.....Derivative
+              dgdij= tmp*dfcij*fcik
+              dgdik= tmp*fcij*dfcik
+              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia)&
+                   +dgdij*driji(1:3) +dgdik*driki(1:3)
+              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
+              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
+              dgcs= -2d0*eta*(cs-rs)*tmp *fcij*fcik
+              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
+              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
+              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
+              igsf(isf,0,ia) = 1
+              igsf(isf,jj,ia) = 1
+              igsf(isf,kk,ia) = 1
             endif
           enddo ! isf=1,...
         enddo ! kk=1,...
@@ -487,7 +552,139 @@ contains
       enddo ! jj=1,...
     enddo ! ia=1,...
 
-  end subroutine calc_desc
+    return
+  end subroutine calc_desc_default
+!=======================================================================
+  subroutine calc_desc_cheby(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
+       ,myid,mpi_world,l1st,iprint)
+!-----------------------------------------------------------------------
+!  Evaluate descriptors (Chebyshev polynomials)
+!  and their derivatives wrt positions.
+!-----------------------------------------------------------------------    
+!  See Artrith et al., PRB96, 014112 (2017)
+!-----------------------------------------------------------------------
+    include "mpif.h"
+    integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
+    integer,intent(in):: myid,mpi_world,iprint
+    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    logical,intent(in):: l1st
+
+    integer:: ia,ja,ka,jj,kk,is,js,ks,n,isf,ierr,isf0
+    real(8):: x,xi(3),xj(3),xij(3),rij(3),dij,dij2,xk(3),xik(3) &
+         ,rik(3),dik,dik2,driji(3),drijj(3),driki(3),drikk(3) &
+         ,fcij,dfcij,fcik,dfcik,spijk,cs,dcsdj(3),dcsdk(3),dcsdi(3) &
+         ,dgdcs,dgdij,dgdik,dgdr,wgt
+
+    if( .not.lupdate_gsf ) return
+
+    if( l1st ) then
+!.....Check the maximumx cutoff and given rc
+      if( rc.lt.rcmax ) then
+        if( myid.eq.0 ) then
+          print *,'ERROR: cutoff radius rc is smaller than rcmax.'
+          print *,'  rc,rcmax = ',rc,rcmax
+        endif
+        call mpi_finalize(ierr)
+        stop
+      endif
+    endif
+
+    gsf(1:nsf,1:nal)= 0d0
+    dgsf(1:3,1:nsf,0:nnl,1:nal)= 0d0
+    igsf(1:nsf,0:nnl,1:nal) = 0
+
+    do ia=1,natm
+      xi(1:3)= ra(1:3,ia)
+      is= int(tag(ia))
+      do jj=1,lspr(0,ia)
+        ja= lspr(jj,ia)
+        if( ja.eq.ia ) cycle
+        xj(1:3)= ra(1:3,ja)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij2.ge.rcmax2 ) cycle
+        dij = sqrt(dij2)
+        js= int(tag(ja))
+        driji(1:3)= -rij(1:3)/dij
+        drijj(1:3)= -driji(1:3)
+        x = 2d0*dij/rcs(1)-1d0
+        call chebyshev(x,nsf2,ts_cheby,dts_cheby)
+!.....Since rcut is common in all the 2body terms,
+!     this can be called outside the isf-loop.
+        call get_fc_dfc(dij,is,js,1,fcij,dfcij)
+        do isf=1,nsf2*nsff  ! isf=[1,nsf2] for 2-body
+          n = 1 +(isf-1)/nsff
+          wgt = 1d0
+          if( mod(isf-1,nsff).eq.1 ) wgt = wgtsp(js)
+          gsf(isf,ia) = gsf(isf,ia) +ts_cheby(n)*fcij *wgt
+!.....Derivative
+!     dgsf(ixyz,isf,jj,ia): derivative of isf-th basis of atom-ia
+!     by ixyz coordinate of atom-jj.
+!     jj=0 means derivative by atom-ia.
+          dgdr = (2d0/rcs(1)*dts_cheby(n)*fcij +ts_cheby(n)*dfcij) *wgt
+          dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
+          dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
+          igsf(isf,0,ia) = 1
+          igsf(isf,jj,ia)= 1
+        enddo
+
+!.....3-body terms
+        if( .not. nsf3.gt.0 ) cycle
+        isf0 = nsf2*nsff
+!.....Skip 3-body if dij > rcij for 3-body which is common for all the 3-body terms
+        if( dij2.ge.rcs2(isf0+1) ) cycle
+!.....Reset fcij and dfcij with rcij for 3-body
+        call get_fc_dfc(dij,is,js,isf0+1,fcij,dfcij)
+        do kk=1,lspr(0,ia)
+          ka= lspr(kk,ia)
+          ks= int(tag(ka))
+          if( ka.eq.ia .or. ka.le.ja ) cycle
+          xk(1:3)= ra(1:3,ka)
+          xik(1:3)= xk(1:3)-xi(1:3)
+          rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
+          dik2= rik(1)**2 +rik(2)**2 +rik(3)**2
+          if( dij2.gt.rcs2(isf0+1) ) cycle
+          dik= sqrt(dik2)
+          spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
+          cs= spijk/dij/dik
+          dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij**2
+          dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik**2
+          dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
+          driki(1:3)= -rik(1:3)/dik
+          drikk(1:3)= -driki(1:3)
+          call get_fc_dfc(dik,is,ks,isf0+1,fcik,dfcik)
+          call chebyshev(cs,nsf3,ts_cheby,dts_cheby)
+          do isf=isf0+1,isf0+nsf3*nsff  ! isf=[isf0+1,isf0+nsf3] for 3-body
+            n = 1 +(isf-isf0-1)/nsff
+            wgt = 1d0
+            if( mod(isf-1,nsff).eq.1 ) wgt = wgtsp(js)*wgtsp(ks)
+            gsf(isf,ia) = gsf(isf,ia) +ts_cheby(n)*fcij*fcik *wgt
+            dgdij = ts_cheby(n)*dfcij*fcik *wgt
+            dgdik = ts_cheby(n)*fcij*dfcik *wgt
+            dgdcs = dts_cheby(n)*fcij*fcik *wgt
+            dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdcs*dcsdj(1:3) &
+                 +dgdij*drijj(1:3)
+            dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdcs*dcsdk(1:3) &
+                 +dgdik*drikk(1:3)
+            dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgdcs*dcsdi(1:3) &
+                 +dgdij*driji(1:3) +dgdik*driki(1:3)
+            igsf(isf,0,ia) = 1
+            igsf(isf,jj,ia) = 1
+            igsf(isf,kk,ia) = 1
+          enddo
+        enddo ! kk=1,...
+      enddo ! jj=1,...
+    enddo ! ia=1,natm
+
+!!$    do ia=1,natm
+!!$      do isf=1,nsf
+!!$        print *,'ia,isf,gsf=',ia,isf,gsf(isf,ia)
+!!$      enddo
+!!$    enddo
+
+    return    
+  end subroutine calc_desc_cheby
 !=======================================================================
   function fc1(r,rin,rout)
     implicit none
@@ -554,10 +751,11 @@ contains
     integer,intent(in):: myid,mpi_world,iprint
 !!$    real(8),intent(in):: rcin
 
-    integer:: ierr,i,j,k,nc,ncoeff,nsp &
-         ,ihl0,ihl1,ihl2,icmb(3),nsf1,nsf2,iap,jap,kap,ndat
+    integer:: ierr,i,j,k,nc,ncoeff,nsp,isp &
+         ,ihl0,ihl1,ihl2,icmb(3),iap,jap,kap,ndat
+    real(8):: rcut2,rcut3
     logical:: lexist
-    character:: ctmp*128,fname*128
+    character(len=128):: ctmp,fname,cline,cmode
     integer,external:: num_data
 
     if( myid.eq.0 ) then
@@ -571,75 +769,142 @@ contains
         call mpi_finalize(ierr)
         stop
       endif
-      open(51,file=trim(fname),status='old')
+      open(ionum,file=trim(fname),status='old')
 !.....num of symmetry functions, num of node in 1st hidden layer
-10    read(51,'(a)') ctmp
+10    read(ionum,'(a)') ctmp
       if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) then
         call parse_option(ctmp,iprint,ierr)
         goto 10
       else
-        backspace(51)
+        backspace(ionum)
       endif
 !.....Read numbers of species and symmetry functions
-      read(51,*) nsp, nsf
+      read(ionum,*) nsp, nsf
     endif
 
 !.....Bcast nsp and nsf before allocating arrays
     call mpi_bcast(nsp,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(lcheby,1,mpi_logical,0,mpi_world,ierr)
     ngl = nsf
 
 !.....Allocate arrays of lenths, nsp and/or nsf
     if( .not.allocated(itype) ) then
       allocate(itype(nsf),cnst(max_ncnst,nsf),rcs(nsf),rcs2(nsf))
+      mem = mem +4*size(itype) +4*size(cnst) +8*size(rcs)*2
       allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
+      mem = mem +4*size(iaddr2) +4*size(iaddr3)
+      if( lcheby ) then
+        allocate(wgtsp(nsp))
+        mem = mem + 8*size(wgtsp)
+      endif
 !.....Also allocate group-LASSO/FS related variables,
 !     which are not used in pmd but in fitpot
       allocate(mskgfs(ngl),msktmp(ngl),glval(0:ngl))
+      mem = mem +8*ngl +8*ngl +8*(ngl+1)
       mskgfs(1:ngl) = 0d0
     endif
-    
+
     if( myid.eq.0 ) then
-      iaddr2(1:2,1:nsp,1:nsp)= -1
-      iaddr3(1:2,1:nsp,1:nsp,1:nsp)= -1
-      nsf1= 0
-      nsf2= 0
-      iap= 0
-      jap= 0
-      kap= 0
-      do i=1,nsf
-        read(51,*) itype(i),(icmb(k),k=1,ncomb_type(itype(i))) &
-             ,rcs(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
-        if( itype(i).le.100 ) then
-          if( icmb(1).ne.iap .or. icmb(2).ne.jap ) then
-            iaddr2(1,icmb(1),icmb(2))= i
-            iaddr2(1,icmb(2),icmb(1))= i
+      if( lcheby ) then
+!-----------------------------------------------------------------------
+!  Input file format for chebyshev (in.params.desc)
+!-----------------------------------------------------------------------
+!  ! Chebyshev:   T
+!     2   100         ! nsp, nsf
+!  2-body   30   5.00   ! 2-body, num of series (nsf2), rcut
+!  3-body   20   4.00   ! 3-body, num of series (nsf3), rcut
+!  Weight  Artrith    ! type of species-weight
+!     1   1.0         ! In case of Artrith, specify (species,weight) pair
+!     2  -1.0
+!     3   2.0
+!     ...
+!-----------------------------------------------------------------------
+!  Thus, users can specify different num of series and rcut for 2- and 3-body.
+!  Note that the NSF should be identical to the total number of series.
+!  If NSP==1, NSF=NSF2+NSF3, but if NSP>1, NSF=(NSF2+NSF3)*2.
+!  Using a factor, NSFF, NSF=(NSF2+NSF3)*NSFF,
+!  where NSFF=1 for NSP==1, and NSFF=2 for NSP>1.
+!-----------------------------------------------------------------------
+        nsff = 1
+        nsf2 = 0
+        nsf3 = 0
+        if( nsp.gt.1 ) nsff = 2
+        cmode = 'none'
+        do while(.true.)
+          read(ionum,'(a)',end=30) cline
+          if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
+          if( index(cline,'Weight').ne.0 .or. &
+               index(cline,'weight').ne.0 ) then ! read Weight control
+            cmode = 'Weight'  ! currently only Artrith type is available
+          else if( index(cline,'2-body').ne.0 ) then
+            cmode = 'none'
+            read(cline,*) ctmp, nsf2, rcut2
+          else if( index(cline,'3-body').ne.0 ) then
+            cmode = 'none'
+            read(cline,*) ctmp, nsf3, rcut3
+          else
+            if( trim(cmode).eq.'Weight' ) then
+              read(ionum,*,end=30) isp, wgtsp(isp)
+            endif
           endif
-          iaddr2(2,icmb(1),icmb(2))= i
-          iaddr2(2,icmb(2),icmb(1))= i
-          nsf1= nsf1 +1
-          iap= icmb(1)
-          jap= icmb(2)
-        else if( itype(i).le.200 ) then
-          if( icmb(1).ne.iap .or. icmb(2).ne.jap .or. &
-               icmb(3).ne.kap ) then
-            iaddr3(1,icmb(1),icmb(2),icmb(3))= i
-            iaddr3(1,icmb(1),icmb(3),icmb(2))= i
-          endif
-          iaddr3(2,icmb(1),icmb(2),icmb(3))= i
-          iaddr3(2,icmb(1),icmb(3),icmb(2))= i
-          nsf2= nsf2 +1
-          iap= icmb(1)
-          jap= icmb(2)
-          kap= icmb(3)
+        enddo
+30      continue
+!.....Check nsf vs nsf2,nsf3
+        if( nsf.ne.nsff*(nsf2+nsf3) ) then
+          print *,'ERROR: nsf != (nsf2+nsf3)*nsff with nsff,nsp=',nsff,nsp
+          stop 1
         endif
-      enddo
-      if( nsf.ne.nsf1+nsf2 ) then
-        print *,'[Error] nsf.ne.nsf1+nsf2 !!!'
+!.....Set rcs for all isf
+        do i=1,nsf2*nsff
+          rcs(i) = rcut2
+        enddo
+        do i=nsf2*nsff+1,nsf
+          rcs(i) = rcut3
+        enddo
+      else
+        iaddr2(1:2,1:nsp,1:nsp)= -1
+        iaddr3(1:2,1:nsp,1:nsp,1:nsp)= -1
+        nsf2= 0
+        nsf3= 0
+        iap= 0
+        jap= 0
+        kap= 0
+        do i=1,nsf
+          read(ionum,*,end=20) itype(i),(icmb(k),k=1,ncomb_type(itype(i))) &
+               ,rcs(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
+          if( itype(i).le.100 ) then
+            if( icmb(1).ne.iap .or. icmb(2).ne.jap ) then
+              iaddr2(1,icmb(1),icmb(2))= i
+              iaddr2(1,icmb(2),icmb(1))= i
+            endif
+            iaddr2(2,icmb(1),icmb(2))= i
+            iaddr2(2,icmb(2),icmb(1))= i
+            nsf2= nsf2 +1
+            iap= icmb(1)
+            jap= icmb(2)
+          else if( itype(i).le.200 ) then
+            if( icmb(1).ne.iap .or. icmb(2).ne.jap .or. &
+                 icmb(3).ne.kap ) then
+              iaddr3(1,icmb(1),icmb(2),icmb(3))= i
+              iaddr3(1,icmb(1),icmb(3),icmb(2))= i
+            endif
+            iaddr3(2,icmb(1),icmb(2),icmb(3))= i
+            iaddr3(2,icmb(1),icmb(3),icmb(2))= i
+            nsf3= nsf3 +1
+            iap= icmb(1)
+            jap= icmb(2)
+            kap= icmb(3)
+          endif
+20      enddo
+      endif
+
+      if( nsf.ne.nsf2+nsf3 ) then
+        print *,'[Error] nsf.ne.nsf2+nsf3 !!!'
 !        call mpi_finalize(ierr)
         stop
       endif
-      close(51)
+      close(ionum)
     endif
 
 !!$    call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
@@ -648,6 +913,14 @@ contains
     call mpi_bcast(iaddr2,2*nsp*nsp,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(iaddr3,2*nsp*nsp*nsp,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(rcs,nsf,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(nsf2,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(nsff,1,mpi_integer,0,mpi_world,ierr)
+
+    if( lcheby ) then
+      allocate(ts_cheby(0:max(nsf2,nsf3)),dts_cheby(0:max(nsf2,nsf3)))
+      mem = mem +8*size(ts_cheby)*2
+    endif
 
 !.....Compute maximum rcut in all descriptors
     rcmax = 0d0
@@ -656,7 +929,7 @@ contains
       rcs2(i) = rcs(i)**2
     enddo
     rcmax2 = rcmax**2
-    
+
     return
   end subroutine read_params_desc
 !=======================================================================
@@ -673,6 +946,9 @@ contains
 !  Currently available options are:
 !    - "inner_cutoff:", species, inner- and outer-cutoff radius of
 !      the switching function.
+!      ex) inner_cutoff:  1  1.0  2.0
+!    - "Chebyshev:", toggle switch for Chebyshev polynomial series
+!      ex) Chebyshev:  T 
 !
     implicit none
     character(len=*),intent(in):: cline
@@ -698,6 +974,13 @@ contains
       if( iprint.gt.0 ) then
         print '(a,i3,2f7.2)','   inner_cutoff   ' &
              ,isp,r_inner(isp),r_outer(isp)
+      endif
+    else if( index(cline,'Chebyshev:').ne.0 .or. &
+         index(cline,'chebyshev:').ne.0 ) then
+      read(cline,*) c1, copt, lopt
+      lcheby = lopt
+      if( iprint.gt.0 ) then
+        print '(a)', '   Chebyshev series for descriptors.'
       endif
     endif
     
@@ -807,7 +1090,7 @@ contains
 !=======================================================================
   subroutine set_descs(nsfo,nalo,nnlo,gsfo,dgsfo,igsfo)
 !
-!  Set descriptors from outside, which is called from fitpot.
+!  Set descriptors from outside (fitpot).
 !
     integer,intent(in):: nsfo,nalo,nnlo
     real(8),intent(in):: gsfo(nsfo,nalo),dgsfo(3,nsfo,0:nnlo,nalo)&
@@ -876,6 +1159,43 @@ contains
          ,nn,mpi_world,dgsfa,3*nsf)
     return
   end subroutine get_dsgnmat_force
+!=======================================================================
+  subroutine chebyshev(x,nmax,ts,dts)
+!
+!  Compute Chebyshev polynomial series at x Tn(x) up to nmax order.
+!  Derivative of Tn(x), dTn(x)/dx, is also computed.
+!  Returns ts and dts, which correspond to Tn(x) and dTn(x)
+!
+    real(8),intent(in):: x
+    integer,intent(in):: nmax
+    real(8),intent(out):: ts(0:nmax),dts(0:nmax)
+
+    integer:: n
+
+    ts(0) = 1d0
+    ts(1) = x
+    dts(0)= 0d0
+    dts(1)= 1d0
+    do n=2,nmax
+      ts(n) = 2d0*x*ts(n-1) -ts(n-2)
+      dts(n)= 2d0*(ts(n-1) +x*dts(n-1)) -dts(n-2)
+    enddo
+    return
+  end subroutine chebyshev
+!=======================================================================
+  function mem_descriptor()
+    integer:: mem_descriptor
+
+    mem_descriptor = mem
+    return
+  end function mem_descriptor
+!=======================================================================
+  function time_descriptor()
+    real(8):: time_descriptor
+
+    time_descriptor = time
+    return
+  end function time_descriptor
 end module descriptor
 !-----------------------------------------------------------------------
 !     Local Variables:

@@ -28,9 +28,9 @@ _pmin = -20.0
 _pmax =  20.0
 
 _type_avail = ('Gaussian','cosine','polynomial','Morse','angular',
-               'angular1','angular2','angular3','angular4')
+               'angular1','angular2','angular3','angular4','angular5')
 _type_2body = ('Gaussian','cosine','polynomial','Morse',)
-_type_3body = ('angular','angular1','angular2','angular3','angular4')
+_type_3body = ('angular','angular1','angular2','angular3','angular4','angular5')
 _type2num = {
     'Gaussian': 1,
     'cosine': 2,
@@ -41,6 +41,7 @@ _type2num = {
     'angular2': 102,
     'angular3': 103,
     'angular4': 104,
+    'angular5': 105,
 }
 _nparam_type = {
     'Gaussian': 2,
@@ -52,6 +53,7 @@ _nparam_type = {
     'angular2': 2,
     'angular3': 2,
     'angular4': 2,
+    'angular5': 3,
 }
 
 def _num2type(num):
@@ -344,6 +346,13 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
                                 +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
                                 +' {0:6.2f}'.format(rc3) \
                                 +' {0:10.4f}\n'.format(a))
+                    elif t in ('angular5'):
+                        eta = sf[1]
+                        rs = sf[2]
+                        f.write(' {0:3d}'.format(_type2num[t]) \
+                                +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
+                                +' {0:6.2f}'.format(rc3) \
+                                +' {0:10.4f} {1:10.4f}\n'.format(eta,rs))
         f.close()
 
     with open(_paramfname,'w') as g:

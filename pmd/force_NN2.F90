@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-10-02 17:32:56 Ryo KOBAYASHI>
+!                     Last modified: <2019-04-11 23:27:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -16,6 +16,9 @@ module NN2
   character(128),parameter:: cpfname = 'in.params.NN2'
 
   real(8),parameter:: pi= 3.14159265358979d0
+
+  integer:: mem
+  real(8):: time
   
 !.....logical flag for bias
   logical:: lbias = .false.
@@ -344,9 +347,20 @@ contains
   end function ddsigmoid
 !=======================================================================
   subroutine read_params_NN2(myid,mpi_world,iprint)
-!
+!-----------------------------------------------------------------------
 !  Assume that the descriptor information is already read.
-!
+!  Input file format is as follows:
+!-----------------------------------------------------------------------
+!  ! comments or options
+!  NL, NHL(0:NL)
+!  WGT(i),  LOWER(i),  UPPER(i)
+!  ...
+!-----------------------------------------------------------------------
+!  - NL: number of hidden-layer (1 or 2)
+!  - NHL: number of nodes in 0th, 1st, and 2nd layers
+!  - WGT(i): weight of the i-th edge
+!  - LOWER,UPPER: lower and upper limit of the weight
+!-----------------------------------------------------------------------
     use descriptor,only: nsf,iglid
     implicit none
     include 'mpif.h'
@@ -1043,6 +1057,21 @@ contains
     endif
     
   end subroutine set_iglid_NN2
+!=======================================================================
+  function mem_NN2()
+    integer:: mem_NN2
+
+    mem_NN2 = mem
+    return
+  end function mem_NN2
+!=======================================================================
+  function time_NN2()
+    real(8):: time_NN2
+
+    time_NN2 = time
+    return
+  end function time_NN2
+
 end module NN2
 !-----------------------------------------------------------------------
 !     Local Variables:
