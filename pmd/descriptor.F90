@@ -796,6 +796,9 @@ contains
       mem = mem +4*size(iaddr2) +4*size(iaddr3)
       if( lcheby ) then
         allocate(wgtsp(nsp))
+        do i=1,nsp
+          wgtsp(i)= dble(i)
+        enddo
         mem = mem + 8*size(wgtsp)
       endif
 !.....Also allocate group-LASSO/FS related variables,
@@ -852,7 +855,7 @@ contains
 30      continue
 !.....Check nsf vs nsf2,nsf3
         if( nsf.ne.nsff*(nsf2+nsf3) ) then
-          print *,'ERROR: nsf != (nsf2+nsf3)*nsff with nsff,nsp=',nsff,nsp
+          print *,'ERROR@read_params_desc: nsf != (nsf2+nsf3)*nsff with nsff,nsp=',nsff,nsp
           stop 1
         endif
 !.....Set rcs for all isf
@@ -897,13 +900,13 @@ contains
             kap= icmb(3)
           endif
 20      enddo
+        if( nsf.ne.nsf2+nsf3 ) then
+          print *,'ERROR@read_params_desc: nsf.ne.nsf2+nsf3 !!!'
+!        call mpi_finalize(ierr)
+          stop
+        endif
       endif
 
-      if( nsf.ne.nsf2+nsf3 ) then
-        print *,'[Error] nsf.ne.nsf2+nsf3 !!!'
-!        call mpi_finalize(ierr)
-        stop
-      endif
       close(ionum)
     endif
 
@@ -917,7 +920,7 @@ contains
     call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsff,1,mpi_integer,0,mpi_world,ierr)
 
-    if( lcheby ) then
+    if( lcheby .and. .not. allocated(ts_cheby) ) then
       allocate(ts_cheby(0:max(nsf2,nsf3)),dts_cheby(0:max(nsf2,nsf3)))
       mem = mem +8*size(ts_cheby)*2
     endif
