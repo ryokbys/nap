@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-02-27 21:14:51 Ryo KOBAYASHI>
+!                     Last modified: <2019-04-19 13:01:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -607,8 +607,8 @@ contains
               tmp = 2d0 *pdiff(k)
             endif
           endif
-          gtrnl(1:ndim)= gtrnl(1:ndim) +2d0*pdiff(k) &
-               *smpl%gws(1:ndim,k)/6 *swgt *serri
+          gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
+               *smpl%gws(1:ndim,k) *swgt *serri /6
         enddo
       endif
     enddo
@@ -1217,7 +1217,7 @@ contains
     if( l1st ) call get_mean_gsf()
 
     if( cnormalize(1:3).eq.'std' .or. cnormalize(1:8).eq.'standard' .or. &
-        cnormalize(1:3).eq.'var' .or. cnormalize(1:8).eq.'variance' ) then
+        cnormalize(1:3).eq.'var' ) then
       if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) &
            print *,'Normalize descriptors wrt standard deviation.'
       call normalize_std()

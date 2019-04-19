@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-04-11 23:27:25 Ryo KOBAYASHI>
+!                     Last modified: <2019-04-19 23:36:24 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -436,6 +436,7 @@ contains
         print *,'  activation function: 1) 1/(1+exp(-x))'
       else if( itypesig.eq.2 ) then
         print *,'  activation function: 2) 1/(1+exp(-x)) +asig*x'
+        print '(a,f7.4)','                          asig = ',asig
       else
         print *,'  activation function: unknown'
       endif
@@ -848,10 +849,9 @@ contains
     logical,intent(in):: lematch,lfmatch,lsmatch
 
     integer:: iv,ia,ihl0,ihl1,jj,ja,jra
-    real(8):: g,h1,z1,tmp,w2,w1,ds,dds
+    real(8):: g,h1,z1,tmp,w2,w1,ds,dds,ftmp(3),xi(3),xj(3),xij(3),rij(3)
     integer,external:: itotOf
     real(8),allocatable:: dgsf2(:,:,:,:)
-!!$    real(8),allocatable:: gwft(:,:,:)
 
 !.....TO CHECK: Need to make hl1 every time?
     if( size(hl1).ne.nhl(1)*nal ) then
@@ -874,21 +874,13 @@ contains
         iv = iprm0
         do ihl0=1,nhl(0)
           g = gsf(ihl0,ia)
-!!$          if( allocated(mskgfs) .and. mskgfs(ihl0).ne.0 ) then
-!!$            do ihl1=1,mhl(1)
-!!$              iv = iv + 1
-!!$              gwe(iv) = gwe(iv) +0d0
-!!$            enddo
-!!$          else
-            do ihl1=1,mhl(1)
-              w2 = wgt12(ihl1)
-              h1 = hl1(ihl1,ia)
-              z1 = zl1(ihl1,ia)
-              iv = iv + 1
-!!$              gwe(iv) = gwe(iv) +w2 *h1*(1d0-h1) *g
-              gwe(iv) = gwe(iv) +w2 *g *dsigmoid(z1,h1)
-            enddo
-!!$          endif
+          do ihl1=1,mhl(1)
+            w2 = wgt12(ihl1)
+            h1 = hl1(ihl1,ia)
+            z1 = zl1(ihl1,ia)
+            iv = iv + 1
+            gwe(iv) = gwe(iv) +w2 *g *dsigmoid(z1,h1)
+          enddo
         enddo
         do ihl1=1,nhl(1)
           h1 = hl1(ihl1,ia)
@@ -898,16 +890,8 @@ contains
       enddo
     endif
 
-    if( lfmatch ) then
-!!$      if( .not.allcated(gwft) ) then
-!!$        allocate(gwft(ndimp,3,namax))
-!!$      else if( size(gwft).ne.ndimp*3*namax ) then
-!!$        deallocate(gwft)
-!!$        allocate(gwft(ndimp,3,namax))
-!!$      endif
-!!$      gwft(:,:,:) = 0d0
+    if( lfmatch .or. lsmatch ) then
 !.....Make dgsf2 array
-!!$      print *,'nal,nnl,nhl(0:)=',nal,nnl,nhl(0:1)
       if( .not.allocated(dgsf2) ) then
         allocate(dgsf2(3,0:nnl,mhl(1),nal))
       else if( size(dgsf2).ne.3*nnl*mhl(1)*nal ) then
@@ -926,44 +910,38 @@ contains
           enddo
         enddo
       enddo
-!.....Compute derivative of forces w.r.t. weights
+    endif
+
+    if( lfmatch .and. .not.lsmatch ) then
+!.....Copy back derivatives of forces on atoms outside of the node!.....Compute derivative of forces w.r.t. weights
       do ia=1,natm
         iv = iprm0
 !.....Weights between layer 0 and 1
         do ihl0=1,nhl(0)
           g = gsf(ihl0,ia)
-!!$          if( allocated(mskgfs) .and. mskgfs(ihl0).ne.0 ) then
-!!$!.....Do nothing here, and just increment iv
-!!$            do ihl1=1,mhl(1)
-!!$              iv = iv + 1
-!!$            enddo
-!!$          else
-            do ihl1=1,mhl(1)
-              w1 = wgt11(ihl0,ihl1)
-              w2 = wgt12(ihl1)
-              h1 = hl1(ihl1,ia)
-              z1 = zl1(ihl1,ia)
-              ds = dsigmoid(z1,h1)
-              dds= ddsigmoid(z1,h1)
-              iv = iv +1
-              do jj=0,lspr(0,ia)  ! Notice: from 0 not 1
-                if( jj.eq.0 ) then
-                  ja = ia
-                else
-                  ja = lspr(jj,ia)
-                endif
-                jra = itotOf(tag(ja))
-!!$                gwf(iv,1:3,jra) = gwf(iv,1:3,jra) &
-!!$                     -w2*h1*(1d0-h1) &
-!!$                     *( (1d0-2d0*h1) *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
-!!$                     +dgsf(1:3,ihl0,jj,ia) )
-                gwf(iv,1:3,jra) = gwf(iv,1:3,jra) &
-                     -w2 *(dds *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
-                     +ds*dgsf(1:3,ihl0,jj,ia) )
-              enddo
-            enddo
+          do ihl1=1,mhl(1)
+            w1 = wgt11(ihl0,ihl1)
+            w2 = wgt12(ihl1)
+            h1 = hl1(ihl1,ia)
+            z1 = zl1(ihl1,ia)
+            ds = dsigmoid(z1,h1)
+            dds= ddsigmoid(z1,h1)
+            iv = iv +1
+            do jj=0,lspr(0,ia)  ! Notice: from 0 not 1
+              if( jj.eq.0 ) then
+                ja = ia
+              else
+                ja = lspr(jj,ia)
+              endif
+              jra = itotOf(tag(ja))
+              ftmp(1:3) = -w2 *(dds *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
+                   +ds*dgsf(1:3,ihl0,jj,ia) )
+!.....Derivative of forces wrt weights
+              gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+            enddo  ! jj=
+          enddo  ! ihl1=
 !!$          endif
-        enddo
+        enddo  ! ihl0=
 !.....Weights between layer-1 and output
         do ihl1=1,mhl(1)
           w2 = wgt12(ihl1)
@@ -980,16 +958,103 @@ contains
             jra = itotOf(tag(ja))
             do ihl0=1,nhl(0)
               w1 = wgt11(ihl0,ihl1)
-              gwf(iv,1:3,jra) = gwf(iv,1:3,jra) -w1 *tmp &
-                   *dgsf(1:3,ihl0,jj,ia)
-            enddo
-          enddo
-        enddo
-      enddo
-!.....Copy back derivatives of forces on atoms outside of the node
+              ftmp(1:3) = -w1 *tmp *dgsf(1:3,ihl0,jj,ia)
+!.....Derivative of force
+              gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+            enddo  ! ihl0=
+          enddo  ! jj=
+        enddo  ! ihl1=
+      enddo  ! ia=
     endif
 
+! Since stress-matching causes considerable increase of computational cost,
+! only compute stress contribution when stress-matching is ON.
+! But even if force-matching is OFF, force contribution is computed,
+! because the addictional cost for force contribution is not very much.
     if( lsmatch ) then
+!.....Compute derivative of forces w.r.t. weights
+      do ia=1,natm
+        iv = iprm0
+        xi(1:3) = ra(1:3,ia)
+!.....Weights between layer 0 and 1
+        do ihl0=1,nhl(0)
+          g = gsf(ihl0,ia)
+          do ihl1=1,mhl(1)
+            w1 = wgt11(ihl0,ihl1)
+            w2 = wgt12(ihl1)
+            h1 = hl1(ihl1,ia)
+            z1 = zl1(ihl1,ia)
+            ds = dsigmoid(z1,h1)
+            dds= ddsigmoid(z1,h1)
+            iv = iv +1
+            do jj=0,lspr(0,ia)  ! Notice: from 0 not 1
+              if( jj.eq.0 ) then
+                ja = ia
+              else
+                ja = lspr(jj,ia)
+                xj(1:3) = ra(1:3,ja)
+                xij(1:3) = xj(1:3) -xi(1:3)
+                rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+              endif
+              jra = itotOf(tag(ja))
+              ftmp(1:3) = -w2 *(dds *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
+                   +ds*dgsf(1:3,ihl0,jj,ia) )
+!.....Derivative of forces wrt weights
+              gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+!.....Derivative of stress wrt weights
+              if( jj.eq.0 ) cycle
+              gws(iv,1) = gws(iv,1) +rij(1)*ftmp(1)
+              gws(iv,2) = gws(iv,2) +rij(2)*ftmp(2)
+              gws(iv,3) = gws(iv,3) +rij(3)*ftmp(3)
+              gws(iv,4) = gws(iv,4) +rij(2)*ftmp(3)
+              gws(iv,5) = gws(iv,5) +rij(1)*ftmp(3)
+              gws(iv,6) = gws(iv,6) +rij(1)*ftmp(2)
+            enddo  ! jj=
+          enddo  ! ihl1=
+!!$          endif
+        enddo  ! ihl0=
+!.....Weights between layer-1 and output
+        do ihl1=1,mhl(1)
+          w2 = wgt12(ihl1)
+          h1 = hl1(ihl1,ia)
+          z1 = zl1(ihl1,ia)
+          tmp = dsigmoid(z1,h1)
+          iv = iv +1
+          do jj=0,lspr(0,ia)
+            if( jj.eq.0 ) then
+              ja = ia
+            else
+              ja = lspr(jj,ia)
+              xj(1:3) = ra(1:3,ja)
+              xij(1:3) = xj(1:3) -xi(1:3)
+              rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+            endif
+            jra = itotOf(tag(ja))
+            if( jj.eq.0 ) then
+              do ihl0=1,nhl(0)
+                w1 = wgt11(ihl0,ihl1)
+                ftmp(1:3) = -w1 *tmp *dgsf(1:3,ihl0,jj,ia)
+!.....Derivative of force
+                gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+              enddo  ! ihl0=
+            else
+              do ihl0=1,nhl(0)
+                w1 = wgt11(ihl0,ihl1)
+                ftmp(1:3) = -w1 *tmp *dgsf(1:3,ihl0,jj,ia)
+!.....Derivative of force
+                gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+!.....Derivative of stress
+                gws(iv,1) = gws(iv,1) +rij(1)*ftmp(1)
+                gws(iv,2) = gws(iv,2) +rij(2)*ftmp(2)
+                gws(iv,3) = gws(iv,3) +rij(3)*ftmp(3)
+                gws(iv,4) = gws(iv,4) +rij(2)*ftmp(3)
+                gws(iv,5) = gws(iv,5) +rij(1)*ftmp(3)
+                gws(iv,6) = gws(iv,6) +rij(1)*ftmp(2)
+              enddo  ! ihl0=
+            endif
+          enddo  ! jj=
+        enddo  ! ihl1=
+      enddo  ! ia=
 
     endif
 

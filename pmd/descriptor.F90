@@ -189,6 +189,8 @@ contains
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
     logical,intent(in):: l1st 
 
+    if( .not.lupdate_gsf ) return
+
     if( lcheby ) then
       call calc_desc_cheby(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
            ,myid,mpi_world,l1st,iprint)
@@ -226,8 +228,6 @@ contains
          ri,ro,xs,z,dz,an,gijk
 
     real(8):: texpij,texpik,eta3
-
-    if( .not.lupdate_gsf ) return
 
     if( l1st ) then
 !.....Check all the rcs and compare them with rc
@@ -575,8 +575,6 @@ contains
          ,fcij,dfcij,fcik,dfcik,spijk,cs,dcsdj(3),dcsdk(3),dcsdi(3) &
          ,dgdcs,dgdij,dgdik,dgdr,wgt
 
-    if( .not.lupdate_gsf ) return
-
     if( l1st ) then
 !.....Check the maximumx cutoff and given rc
       if( rc.lt.rcmax ) then
@@ -811,7 +809,7 @@ contains
     if( myid.eq.0 ) then
       if( lcheby ) then
 !-----------------------------------------------------------------------
-!  Input file format for chebyshev (in.params.desc)
+!  Input file format for Chebyshev (in.params.desc)
 !-----------------------------------------------------------------------
 !  ! Chebyshev:   T
 !     2   100         ! nsp, nsf
