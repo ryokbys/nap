@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-04-19 23:36:24 Ryo KOBAYASHI>
+!                     Last modified: <2019-04-20 00:01:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -913,7 +913,8 @@ contains
     endif
 
     if( lfmatch .and. .not.lsmatch ) then
-!.....Copy back derivatives of forces on atoms outside of the node!.....Compute derivative of forces w.r.t. weights
+!.....Copy back derivatives of forces on atoms outside of the node
+!.....Compute derivative of forces w.r.t. weights
       do ia=1,natm
         iv = iprm0
 !.....Weights between layer 0 and 1
