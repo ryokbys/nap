@@ -53,7 +53,7 @@ import nappy.vasp.poscar
 import nappy.vasp.potcar
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "170206"
+__version__ = "190425"
 
 _magnetic_elements = ('Cr','Mn','Fe','Co','Ni')
 
@@ -184,6 +184,10 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
         f.write("EDIFF  =  {0:7.1e}\n".format(ediff))
         f.write("ALGO   =  Normal\n")
         f.write("PREC   =  Normal\n")
+        if 'md' in mode:
+            f.write("LWAVE  =  F  ! Not to write wave function data into file.\n")
+            f.write("LCHARG =  F  ! Not to write charge distribution into file.\n")
+            f.write("NWRITE =  0  ! Reduce verbosity\n")
         f.write("\n")
         f.write("NELMIN =  4\n")
         f.write("NELM   =  100\n")
@@ -210,7 +214,17 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
             f.write("IBRION = {0:4d}\n".format(0))
             f.write("NSW    = {0:4d}\n".format(nsw))
             f.write("POTIM  = 1.0\n") 
-            f.write("SMASS  = 0.4\n") 
+            f.write("SMASS  = 0.4\n")
+            f.write("MDALGO = 3   ! 0:NVE, 1:Andersen thermostat, 2:Nose-Hoover, 3:Langevin\n")
+            gmms = [ 10.0 for i in range(len(species)) ]
+            f.write("LANGEVIN_GAMMA = ")
+            for g in gmms:
+                f.write("{0:4.1f} ".format(g))
+            f.write("\n")
+            if 'cell' in mode or 'shape' in mode:
+                f.write("LANGEVIN_GAMMA_L = 10.0\n")
+            f.write("TEBEG  = 1000.0\n")
+            f.write("# TEEND  = 1000.0\n")
         else:
             raise ValueError('mode is wrong, mode = ',mode)
 
