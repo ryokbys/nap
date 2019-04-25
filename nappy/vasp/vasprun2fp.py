@@ -82,12 +82,18 @@ def output_for_fitpot(atoms,keep_const,dirname='./',specorder=[]):
     if not os.path.exists(dirname+'/POSCAR'):
         write(dirname+'/POSCAR',images=atoms,format='vasp',
               direct=True,vasp5=True,sort=False)
-    with open(dirname+'/strs.ref','w') as f:
+    try:
         strs = atoms.get_stress()
+    except:
+        with open(dirname+'/WARNING','w') as f:
+            f.write(' Since failed to get stress tensor, put 0.0s into strs.ref file.\n')
+        strs = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    with open(dirname+'/strs.ref','w') as f:
         for s in strs:
             f.write(" {0:15.7f}".format(s*_kb2gpa)) # converting from kBar to GPa
         f.write('\n')
-    
+    return None
+        
 
 if __name__ == "__main__":
 
@@ -125,10 +131,11 @@ if __name__ == "__main__":
     else:
         ase_index = index
         print(' index   = ',ase_index)
-    print(' keep_const   = ',keep_const)
+    if keep_const:
+        print(' Keep constraints originaly set to the system.')
 
     ndirs= len(dirs)
-    print(' number of directories = ',ndirs)
+    print(' Number of directories to be processed = ',ndirs)
 
     cwd=os.getcwd()
     for i,d in enumerate(dirs):
