@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-12-26 15:56:44 Ryo KOBAYASHI>
+!                     Last modified: <2019-04-25 11:30:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -750,6 +750,7 @@ contains
 
     integer:: i,ia,ja,jj,isf,ne,nf,jra
     integer,external:: itotOf
+    real(8):: ftmp(3),xi(3),xj(3),xij(3),rij(3)
 
     if( lematch ) then
       do ia=1,natm
@@ -760,7 +761,8 @@ contains
         enddo
       enddo
     endif
-    if( lfmatch ) then
+    
+    if( lfmatch .and. .not.lsmatch ) then
       do ia=1,natm
 !.....ja != ia
         do jj=0,lspr(0,ia)
@@ -779,8 +781,52 @@ contains
         enddo
       enddo
     endif
+    
+! Since stress-matching could cause considerable increase of computational cost,
+! only compute stress contribution when stress-matching is ON.
+! But even if force-matching is OFF, force contribution is computed,
+! because the addictional cost for force contribution is not very much.
     if( lsmatch ) then
-!.....No stress matching inf linreg now
+      do ia=1,natm
+        xi(1:3) = ra(1:3,ia)
+!.....ja != ia
+        do jj=0,lspr(0,ia)
+          if( jj.eq.0 ) then
+            ja = ia
+          else
+            ja = lspr(jj,ia)
+            xj(1:3) = ra(1:3,ja)
+            xij(1:3) = xj(1:3) -xi(1:3)
+            rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+          endif
+          jra = itotOf(tag(ja))
+          if( jj.eq.0 ) then
+            nf = iprm0
+            do isf=1,nsf
+              nf = nf + 1
+              ftmp(1:3) = -dgsf(1:3,isf,jj,ia)
+!.....Force
+              gwf(nf,1:3,jra) = gwf(nf,1:3,jra) +ftmp(1:3)
+!.....No stress contribution for jj==0
+            enddo
+          else
+            nf = iprm0
+            do isf=1,nsf
+              nf = nf + 1
+              ftmp(1:3) = -dgsf(1:3,isf,jj,ia)
+!.....Force
+              gwf(nf,1:3,jra) = gwf(nf,1:3,jra) +ftmp(1:3)
+!.....Stress
+              gws(nf,1) = gws(nf,1) +rij(1)*ftmp(1)
+              gws(nf,2) = gws(nf,2) +rij(2)*ftmp(2)
+              gws(nf,3) = gws(nf,3) +rij(3)*ftmp(3)
+              gws(nf,4) = gws(nf,4) +rij(2)*ftmp(3)
+              gws(nf,5) = gws(nf,5) +rij(1)*ftmp(3)
+              gws(nf,6) = gws(nf,6) +rij(1)*ftmp(2)
+            enddo
+          endif
+        enddo
+      enddo
     endif
     return
   end subroutine gradw_linreg
