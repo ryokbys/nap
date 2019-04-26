@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-04-19 13:01:25 Ryo KOBAYASHI>
+!                     Last modified: <2019-04-26 13:28:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -278,8 +278,8 @@ contains
         endif
         ftmp= ftmp +ediff *swgt
         if( iprint.gt.2 ) then
-          write(6,'(a,2i4,1x,a,7es12.4)') ' myid,ismpl,cdirname,(epot+esub)/natm= ', &
-               myid,ismpl,trim(cdirname),(epot+esub)/natm
+          write(6,'(a,2i4,1x,a,7es11.3)') ' myid,ismpl,cdirname,epot,eref,esub,(epot+esub)/natm= ', &
+               myid,ismpl,trim(cdirname),epot,eref,esub,(epot+esub)/natm
         endif
       endif
 !.....Force matching

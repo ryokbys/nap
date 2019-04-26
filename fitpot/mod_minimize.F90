@@ -18,6 +18,10 @@ module minimize
 
 !.....Max iteration for line minimization
   integer:: niter_linmin   = 15
+!.....Decreasing factor, should be < 1.0
+  real(8):: fac_dec        = 0.2d0
+!.....Increasing factor, should be > 1.0
+  real(8):: fac_inc        = 5.0d0
 !.....Armijo parameters
   real(8):: armijo_xi      = 1.0d-4
   real(8):: armijo_tau     = 0.5d0
@@ -167,6 +171,9 @@ contains
     logical,intent(out):: lconverged
 
     lconverged = .false.
+    if( myid.eq.0 .and. iprint.gt.1 ) then
+      print '(a,3es12.4)','  dxnorm,gnorm,fdiff=',dxnorm,gnorm,fdiff
+    endif
     if( dxnorm.lt.xtol ) then
       nxtol = nxtol +1
       ngtol = 0
@@ -312,14 +319,16 @@ contains
         endif
       else if( trim(clinmin).eq.'armijo' ) then
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-        alpha = max(alpha,xtol*2d0)*2d0
+!!$        alpha = max(alpha,xtol/gnorm)*2d0
+        alpha = alpha *fac_inc
         call armijo_search(ndim,x,xranges,d,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       else ! Default = backtrack
 !.....Increase alpha a bit every step,
 !.....alpha is to be decreased in subroutine backtrack to decrease func value.
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-        alpha = max(alpha,xtol*2d0)*2d0
+!!$        alpha = max(alpha,xtol/gnorm)*2d0
+        alpha = alpha *fac_inc
         call backtrack(ndim,x,xranges,d,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
@@ -462,12 +471,14 @@ contains
 !.....use the history of previous alpha by multiplying 2
 !.....avoiding constant decrease, but alpha should not be greater than 1.
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-        alpha = max(alpha,xtol*2d0)*2d0
+!!$        alpha = max(alpha,xtol/gnorm)*2d0
+        alpha = alpha *fac_inc
         call armijo_search(ndim,x,xranges,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       else ! backtrack (default)
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-        alpha = max(alpha,xtol*2d0)*2d0
+!!$        alpha = max(alpha,xtol/gnorm)*2d0
+        alpha = alpha *fac_inc
         call backtrack(ndim,x,xranges,u,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
@@ -669,12 +680,14 @@ contains
 !.....use the history of previous alpha by multiplying 2
 !.....avoiding constant decrease, but alpha should not be greater than 1.
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-        alpha = max(alpha,xtol*2d0)*2d0
+!!$        alpha = max(alpha,xtol)*2d0
+        alpha = alpha *fac_inc
         call armijo_search(ndim,x,xranges,u,f,ftst,g,alpha,iprint &
              ,iflag,myid,func,niter)
       else ! backtrack (default)
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-        alpha = max(alpha,xtol*2d0)*2d0
+!        alpha = max(alpha,xtol)*2d0
+        alpha = alpha *fac_inc
         call backtrack(ndim,x,xranges,u,f,ftst,alpha,iprint &
              ,iflag,myid,func,niter)
       endif
@@ -1207,8 +1220,6 @@ contains
 
 !.....Precision
     real(8),parameter:: tiny = 1d-15
-!.....Decreasing factor of step length
-    real(8),parameter:: facdec = 0.5d0
     integer:: iter,i,ig,iterp
     real(8):: alphai,alphap,f0,fi,fp,ftsti,ftstp,fpi,fti
     real(8),save,allocatable:: x1(:),gpena(:)
@@ -1249,7 +1260,7 @@ contains
 !!$        ftstp = ftsti
         fp = fi
         alphap = alphai
-        alphai = alphai *facdec
+        alphai = alphai *fac_dec
         iterp = iter
         if( alphai.lt.tiny ) then
           if( myid.eq.0 .and. iprint.gt.0 ) then
