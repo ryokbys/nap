@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-04-16 16:08:16 Ryo KOBAYASHI>
+!                     Last modified: <2019-04-26 17:32:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1580,15 +1580,21 @@ subroutine write_stats(iter)
            //'RMSE(TRAINING), RMSE(TEST), ' &
            //'MAX(TRAINING), MAX(TEST), ' &
            //'R^2(TRAINING), R^2(TEST)'
-      if( lsmatch ) then
-        write(6,*) '# STRESS:  ITER, TIME, ' &
-             //'RMSE(TRAINING), RMSE(TEST), ' &
-             //'MAX(TRAINING), MAX(TEST), ' &
-             //'R^2(TRAINING), R^2(TEST)'
-      endif
+      write(6,*) '# STRESS:  ITER, TIME, ' &
+           //'RMSE(TRAINING), RMSE(TEST), ' &
+           //'MAX(TRAINING), MAX(TEST), ' &
+           //'R^2(TRAINING), R^2(TEST)'
     endif
 
     call get_r2denom(etrndnm,etstdnm,ftrndnm,ftstdnm,strndnm,ststdnm)
+    if( myid.eq.0 .and. iprint.gt.1 ) then
+      print '(a,2es12.4)',' Denominator (energy) for trn, tst = ' &
+           ,etrndnm, etstdnm
+      print '(a,2es12.4)',' Denominator (force) for trn, tst  = ' &
+           ,ftrndnm, ftstdnm
+      print '(a,2es12.4)',' Denominator (stress) for trn, tst = ' &
+           ,strndnm, ststdnm
+    endif
   endif
   l1st = .false.
 
@@ -1730,7 +1736,6 @@ subroutine write_stats(iter)
   endif
 
 !.....stress
-  if( .not. lsmatch ) return
   dsmaxl_trn = 0d0
   dssuml_trn = 0d0
   dsmaxl_tst = 0d0
@@ -1793,6 +1798,10 @@ subroutine write_stats(iter)
          ,rmse_trn,rmse_tst &
          ,dsmax_trn,dsmax_tst &
          ,sr2trn,sr2tst
+    if( iprint.gt.1 ) then
+      print *,' dssum_trn,strndnm,sr2trn=',dssum_trn,strndnm,sr2trn
+      print *,' dssum_tst,ststdnm,sr2tst=',dssum_tst,ststdnm,sr2tst
+    endif
   endif
 
   return
@@ -1811,60 +1820,58 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
   real(8),intent(out):: etrn,etst,ftrn,ftst,strn,stst
   integer:: ismpl,ia,l,ixyz,jxyz,natm,nfcal,ntrn,ntst,ntrnl,ntstl
   type(mdsys)::smpl
-  real(8):: eref,esub
+  real(8):: eref,esub,tmp
   real(8):: esumltrn,esumltst,esumtrn,esumtst,emtrn,emtst
+  real(8):: e2sumltrn,e2sumltst,e2sumtrn,e2sumtst,e2mtrn,e2mtst
   real(8):: fsumltrn,fsumltst,fsumtrn,fsumtst,fmtrn,fmtst
+  real(8):: f2sumltrn,f2sumltst,f2sumtrn,f2sumtst,f2mtrn,f2mtst
   real(8):: ssumltrn,ssumltst,ssumtrn,ssumtst,smtrn,smtst
+  real(8):: s2sumltrn,s2sumltst,s2sumtrn,s2sumtst,s2mtrn,s2mtst
 
 !.....Energy
   esumltrn= 0d0
   esumltst= 0d0
+  e2sumltrn= 0d0
+  e2sumltst= 0d0
   do ismpl=isid0,isid1
     smpl= samples(ismpl)
     eref = smpl%eref
     esub = smpl%esub
     natm = smpl%natm
+    tmp = (eref-esub)/natm
     if( smpl%iclass.eq.1 ) then
-      esumltrn = esumltrn +(eref-esub)/natm
+      esumltrn = esumltrn +tmp
+      e2sumltrn= e2sumltrn +tmp*tmp
     else if( smpl%iclass.eq.2 ) then
-      esumltst = esumltst +(eref-esub)/natm
+      esumltst = esumltst +tmp
+      e2sumltst= e2sumltst +tmp*tmp
     endif
   enddo
   esumtrn = 0d0
+  e2sumtrn = 0d0
   esumtst = 0d0
+  e2sumtst = 0d0
   call mpi_reduce(esumltrn,esumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(e2sumltrn,e2sumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(esumltst,esumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(e2sumltst,e2sumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
   emtrn = esumtrn/nsmpl_trn
+  e2mtrn = e2sumtrn/nsmpl_trn
   if( nsmpl_tst.ne.0 ) then
     emtst = esumtst/nsmpl_tst
+    e2mtst = e2sumtst/nsmpl_tst
   else
     emtst = 0d0
+    e2mtst= 0d0
   endif
-  call mpi_bcast(emtrn,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(emtst,1,mpi_real8,0,mpi_world,ierr)
-
-!.....Energy variance
-  esumltrn = 0d0
-  esumltst = 0d0
-  do ismpl=isid0,isid1
-    smpl= samples(ismpl)
-    eref = smpl%eref
-    esub = smpl%esub
-    natm = smpl%natm
-    if( smpl%iclass.eq.1 ) then
-      esumltrn = esumltrn +((eref-esub)/natm -emtrn)**2
-    else if( smpl%iclass.eq.2 ) then
-      esumltst = esumltst +((eref-esub)/natm -emtst)**2
-    endif
-  enddo
-  etrn = 0d0
-  etst = 0d0
-  call mpi_allreduce(esumltrn,etrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
-  call mpi_allreduce(esumltst,etst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+  etrn = (e2mtrn -emtrn**2)*nsmpl_trn
+  etst = (e2mtst -emtst**2)*nsmpl_tst
 
 !.....Force
   fsumltrn = 0d0
+  f2sumltrn = 0d0
   fsumltst = 0d0
+  f2sumltst = 0d0
   ntrnl = 0
   ntstl = 0
   do ismpl=isid0,isid1
@@ -1876,7 +1883,9 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
-          fsumltrn = fsumltrn +(smpl%fref(l,ia)-smpl%fsub(l,ia))
+          tmp = smpl%fref(l,ia)-smpl%fsub(l,ia)
+          fsumltrn = fsumltrn +tmp
+          f2sumltrn= f2sumltrn +tmp*tmp
           ntrnl=ntrnl +1
         enddo
       enddo
@@ -1884,16 +1893,22 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
-          fsumltst = fsumltst +(smpl%fref(l,ia)-smpl%fsub(l,ia))
+          tmp = smpl%fref(l,ia)-smpl%fsub(l,ia)
+          fsumltst = fsumltst +tmp
+          f2sumltst= f2sumltst +tmp*tmp
           ntstl=ntstl +1
         enddo
       enddo
     endif
   enddo
   fsumtrn = 0d0
+  f2sumtrn = 0d0
   fsumtst = 0d0
+  f2sumtst = 0d0
   call mpi_reduce(fsumltrn,fsumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(f2sumltrn,f2sumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(fsumltst,fsumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(f2sumltst,f2sumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
   ntrn = 0
   ntst = 0
   call mpi_reduce(ntrnl,ntrn,1 &
@@ -1901,50 +1916,25 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
   call mpi_reduce(ntstl,ntst,1 &
        ,mpi_integer,mpi_sum,0,mpi_world,ierr)
   fmtrn = fsumtrn/ntrn
+  f2mtrn= f2sumtrn/ntrn
   if( ntst.ne.0 ) then
     fmtst = fsumtst/ntst
+    f2mtst= f2sumtst/ntst
   else
     fmtst = 0d0
+    f2mtst= 0d0
   endif
-  call mpi_bcast(fmtrn,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(fmtst,1,mpi_real8,0,mpi_world,ierr)
-
-!.....Force variance
-  fsumltrn = 0d0
-  fsumltst = 0d0
-  do ismpl=isid0,isid1
-    smpl= samples(ismpl)
-    nfcal= smpl%nfcal
-    if( nfcal.eq.0 ) cycle
-    natm = smpl%natm
-    if( smpl%iclass.eq.1 ) then
-      do ia=1,natm
-        if( smpl%ifcal(ia).eq.0 ) cycle
-        do l=1,3
-          fsumltrn = fsumltrn +((smpl%fref(l,ia)-smpl%fsub(l,ia)) -fmtrn)**2
-        enddo
-      enddo
-    else if( smpl%iclass.eq.2 ) then
-      do ia=1,natm
-        if( smpl%ifcal(ia).eq.0 ) cycle
-        do l=1,3
-          fsumltst = fsumltst +((smpl%fref(l,ia)-smpl%fsub(l,ia)) -fmtst)**2
-          ntstl=ntstl +1
-        enddo
-      enddo
-    endif
-  enddo
-  ftrn = 0d0
-  ftst = 0d0
-  call mpi_allreduce(fsumltrn,ftrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
-  call mpi_allreduce(fsumltst,ftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+  ftrn = (f2mtrn -fmtrn**2) *ntrn
+  ftst = (f2mtst -fmtst**2) *ntst
+  
 
   strn = 0d0
   stst = 0d0
-  if( .not.lsmatch ) return
 !.....Stress
   ssumltrn = 0d0
+  s2sumltrn = 0d0
   ssumltst = 0d0
+  s2sumltst = 0d0
   ntrnl = 0
   ntstl = 0
   do ismpl=isid0,isid1
@@ -1952,23 +1942,31 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     if( smpl%iclass.eq.1 ) then
       do ixyz=1,3
         do jxyz=1,3
-          ssumltrn = ssumltrn +(smpl%sref(ixyz,jxyz)-smpl%ssub(ixyz,jxyz))
+          tmp = smpl%sref(ixyz,jxyz)-smpl%ssub(ixyz,jxyz)
+          ssumltrn = ssumltrn +tmp
+          s2sumltrn= s2sumltrn +tmp*tmp
           ntrnl = ntrnl +1
         enddo
       enddo
     else if( smpl%iclass.eq.2 ) then
       do ixyz=1,3
         do jxyz=1,3
-          ssumltst = ssumltst +(smpl%sref(ixyz,jxyz)-smpl%ssub(ixyz,jxyz))
+          tmp = smpl%sref(ixyz,jxyz)-smpl%ssub(ixyz,jxyz)
+          ssumltst = ssumltst +tmp
+          s2sumltst= s2sumltst +tmp*tmp
           ntstl = ntstl +1
         enddo
       enddo
     endif
   enddo
   ssumtrn = 0d0
+  s2sumtrn = 0d0
   ssumtst = 0d0
+  s2sumtst = 0d0
   call mpi_reduce(ssumltrn,ssumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(s2sumltrn,s2sumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(ssumltst,ssumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(s2sumltst,s2sumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
   ntrn = 0
   ntst = 0
   call mpi_reduce(ntrnl,ntrn,1 &
@@ -1976,39 +1974,16 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
   call mpi_reduce(ntstl,ntst,1 &
        ,mpi_integer,mpi_sum,0,mpi_world,ierr)
   smtrn = ssumtrn/ntrn
+  s2mtrn= s2sumtrn/ntrn
   if( ntst.ne.0 ) then
     smtst = ssumtst/ntst
+    s2mtst= s2sumtst/ntst
   else
     smtst = 0d0
+    s2mtst= 0d0
   endif
-  call mpi_bcast(smtrn,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(smtst,1,mpi_real8,0,mpi_world,ierr)
-
-!.....Stress variance
-  ssumltrn = 0d0
-  ssumltst = 0d0
-  ntrnl = 0
-  ntstl = 0
-  do ismpl=isid0,isid1
-    smpl = samples(ismpl)
-    if( smpl%iclass.eq.1 ) then
-      do ixyz=1,3
-        do jxyz=1,3
-          ssumltrn = ssumltrn +((smpl%sref(ixyz,jxyz)-smpl%sref(ixyz,jxyz)) -smtrn)**2
-          ntrnl = ntrnl +1
-        enddo
-      enddo
-    else if( smpl%iclass.eq.2 ) then
-      do ixyz=1,3
-        do jxyz=1,3
-          ssumltst = ssumltst +((smpl%sref(ixyz,jxyz)-smpl%sref(ixyz,jxyz)) -smtst)**2
-          ntstl = ntstl +1
-        enddo
-      enddo
-    endif
-  enddo
-  call mpi_allreduce(ssumltrn,strn,1,mpi_real8,mpi_sum,mpi_world,ierr)
-  call mpi_allreduce(ssumltst,stst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+  strn = (s2mtrn -smtrn**2) *ntrn
+  stst = (s2mtst -smtst**2) *ntst
   
   return
 end subroutine get_r2denom
