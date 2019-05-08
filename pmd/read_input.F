@@ -85,6 +85,9 @@ c=======================================================================
       elseif( trim(cname).eq.'cutoff_radius' ) then
         call read_r1(ionum,rc)
         return
+      elseif( trim(cname).eq.'cutoff_radius_1nn' ) then
+        call read_r1(ionum,rc1nn)
+        return
       elseif( trim(cname).eq.'cutoff_buffer' ) then
         call read_r1(ionum,rbuf)
         return
@@ -233,6 +236,10 @@ c        call read_c1(ionum,cforce)
         return
       elseif( trim(cname).eq.'reduced_force') then
         call read_l1(ionum,lrdcfrc)
+        return
+      elseif( trim(cname).eq.'cna') then
+        backspace(ionum)
+        read(ionum,*) ctmp, lcna, iter_cna
         return
 #ifdef __WALL__
       elseif( trim(cname).eq.'wall_pos_top' ) then

@@ -10,7 +10,7 @@ module rdcfrc
   real(8),parameter:: pi = 3.14159265358979d0
 
 !.....Type of selection of atoms whose forces are to be reduced.
-!.....Available types: species, ID, neigh_XXXXX
+!.....Available types: species, ID, neigh_XXXXX, cna
   character(len=128):: ctype_fmod = 'species' ! default
   
 !.....alpha: factor to be multiplied to forces
@@ -114,6 +114,13 @@ contains
         print '(a)','  IDs of atoms whose forces are to be modified: '
         write(cnum,'(i0)') nids
         print '(a,'//trim(cnum)//'(x,i0))', '  ',(ids_fmod(i),i=1,nids)
+      else if( trim(ctype_fmod).eq.'cna' ) then
+        if( is_rdcfrc.ge.0 ) then
+          print '(a,i0)','  CNA-ID whose forces are to be reduced: ', is_rdcfrc
+        else
+          print '(a,i0)','  Forces of all atoms are to be reduced, ' &
+               //'except those of CNA-ID = ',abs(is_rdcfrc)
+        endif
       else  ! default: species
         print '(a,i3)','  species: ',is_rdcfrc
       endif
@@ -148,6 +155,9 @@ contains
           allocate(ids_fmod(nids))
           backspace(ioprms)
           read(ioprms,*) c1st, (ids_fmod(i),i=1,nids)
+        else if( trim(c1st).eq.'cna_id' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, is_rdcfrc
         else if( trim(c1st).eq.'alpha' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, alpha
@@ -186,11 +196,12 @@ contains
 !
 !  Reduce forces on atoms that are selected in some way...
 !
+    use structure,only: idcna
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),tag(namax),h(3,3)
     real(8),intent(inout):: aa(3,namax)
 
-    integer:: ia,is,i,itot
+    integer:: ia,is,i,itot,icna
     real(8):: beta
     integer,external:: itotOf
 
@@ -236,6 +247,22 @@ contains
           endif
         enddo
       enddo
+    else if( trim(ctype_fmod).eq.'cna' ) then
+      if( .not. allocated(idcna) ) then
+        print *,'ERROR@reduce_forces: idcna is not allocated !!!'
+        stop
+      endif
+      if( is_rdcfrc.ge.0 ) then
+        do ia=1,natm
+          icna = idcna(ia)
+          if( icna.eq.is_rdcfrc ) aa(1:3,ia) = alpha *aa(1:3,ia)
+        enddo
+      else
+        do ia=1,natm
+          icna = idcna(ia)
+          if( icna.ne.abs(is_rdcfrc) ) aa(1:3,ia) = alpha *aa(1:3,ia)
+        enddo
+      endif
     else ! default: species
       do ia=1,natm
         is = int(tag(ia))

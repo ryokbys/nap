@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-03-14 15:26:01 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-08 15:06:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -22,6 +22,7 @@ module pmdio
   real(8):: dt = 1d0
   real(8):: vardt_len = 0.1d0  ! Length criterion for variable time-step
   real(8):: rc = 5.0d0
+  real(8):: rc1nn = 2.5d0
   real(8):: rbuf= 0d0
   integer:: ifdmp= 0 ! 0:none, 1:damped-MD, 2:FIRE
   character(len=20):: cmin= ''
@@ -120,4 +121,8 @@ module pmdio
   real(8):: zskin_width = 5.0d0
 !.....Shear angle from x in degree, shear direction is on xy-plane
   real(8):: zshear_angle = 0d0
+
+!.....Structure analysis
+  logical:: lcna = .false.
+  integer:: iter_cna = 1
 end module pmdio

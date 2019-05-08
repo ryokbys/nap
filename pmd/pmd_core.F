@@ -1,17 +1,17 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2019-04-11 13:59:24 Ryo KOBAYASHI>
+c                     Last-modified: <2019-05-08 16:02:34 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
       subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
-     &     ,nspmax,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,ifdmp,dmp
+     &     ,nspmax,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp
      &     ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl
      &     ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv
      &     ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width
      &     ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary
-     &     ,lmetaD,lconst,lrdcfrc)
+     &     ,lmetaD,lconst,lrdcfrc,lcna,iter_cna)
       use pmdvars
       use zload
       use force
@@ -24,12 +24,13 @@ c-----------------------------------------------------------------------
       use constraints,only: init_const, update_const, update_const_vel
      &     ,update_const_pos
       use rdcfrc,only: init_rdcfrc, reduce_forces, finalize_rdcfrc
+      use structure,only: cna
       implicit none
       include "mpif.h"
       include "./params_unit.h"
       integer,intent(in):: ntot0,maxstp,nerg,npmd,myid_md,mpi_md_world
      &     ,nspmax,ifpmd,ifdmp,minstp,ntdst,ifsort !,numff
-     &     ,iprint,nodes_md,nx,ny,nz,n_conv,nrmtrans
+     &     ,iprint,nodes_md,nx,ny,nz,n_conv,nrmtrans,iter_cna
       integer,intent(inout):: ifcoulomb
       integer,intent(out):: nstp_done
       real(8),intent(in):: hunit,tinit,tfin
@@ -37,15 +38,15 @@ c-----------------------------------------------------------------------
      &     ,zskin_width,zshear_angle
       real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
      &     ,atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0)
-     &     ,epitot(ntot0),dt,rc,rbuf,h(3,3,0:1),stnsr(3,3),fmv(3,0:9)
-     &     ,epot,ekin,am(nspmax),stgt(3,3),ptgt,pini,pfin,ttgt(9)
-     &     ,chgtot(ntot0),chitot(ntot0)
+     &     ,epitot(ntot0),dt,rc,rbuf,rc1nn,h(3,3,0:1),stnsr(3,3)
+     &     ,fmv(3,0:9),epot,ekin,am(nspmax),stgt(3,3),ptgt,pini
+     &     ,pfin,ttgt(9),chgtot(ntot0),chitot(ntot0)
       character,intent(in):: ciofmt*6, cpctl*20, ctctl*20
      &     ,boundary*3
       character(len=*),intent(in):: czload_type
 !      character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: ltdst,lstrs0,lcellfix(3,3),lmetaD,lconst
-     &     ,lrdcfrc
+     &     ,lrdcfrc,lcna
       logical,intent(inout):: lvc
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
@@ -320,8 +321,8 @@ c-----copy RA of boundary atoms
       call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb
      &     ,.true.,boundary)
 c-----Make pair list
-      call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
-     &     ,anxi,anyi,anzi,lspr,iprint,.true.)
+      call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,rc1nn
+     &     ,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.true.)
       
 c.....Calc forces
       lstrs = lstrs0 .or.
@@ -341,6 +342,15 @@ c.....Calc forces
 c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
 c     &     ,epot,chg(1:natm)
 
+c.....Structure analysis
+      if( lcna ) then
+        if( rc1nn.gt.(rc+rbuf)/2 .and. myid_md.eq.0 ) then
+          print *,' WARNING: rc1nn > (rc+rbuf)/2, '
+     &         //'which may cause problem in CNA.'
+          print *,'   rc,rbuf,rc1nn =',rc,rbuf,rc1nn
+        endif
+        call cna(namax,natm,nb,nnmax,ls1nn,tag)
+      endif
 c.....Constraints
       if( lconst ) then
         call update_const(namax,natm,tag,ra,h,0,maxstp)
@@ -650,8 +660,8 @@ c.....Copy RA of boundary atoms
           call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb
      &     ,.false.,boundary)
 c.....Make pair list
-          call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h
-     &         ,hi,anxi,anyi,anzi,lspr,iprint,.false.)
+          call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf
+     &         ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.false.)
           rbufres = rbuf
         else
 c.....Copy RA of boundary atoms determined by 'bacopy'
@@ -669,6 +679,10 @@ c-------Calc forces
      &       ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,lstrs
      &       ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
         lstrs = .false.
+c.....Structure analysis
+        if( lcna .and. mod(istp,iter_cna).eq.0 ) then
+          call cna(namax,natm,nb,nnmax,ls1nn,tag)
+        endif
 c.....Force from metadynamics
         if( lmetaD ) then
           call force_metaD(istp,namax,natm,tag,ra,aa,h,hi,epot
@@ -1031,7 +1045,7 @@ c.....deallocate all the arrays allocated in pmd_core
         deallocate(tdst,nadst)
       endif
       deallocate(fekin,fa2v)
-      deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
+      deallocate(ra,va,aa,ra0,strs,stt,tag,lspr,ls1nn
      &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
 
       end subroutine pmd_core
@@ -1039,7 +1053,7 @@ c=======================================================================
       subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot
      &     ,ekitot,epitot,chgtot,chitot
      &     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz
-     &     ,nspmax,am,dt,rc,rbuf,stnsr,epot
+     &     ,nspmax,am,dt,rc,rbuf,rc1nn,stnsr,epot
      &     ,ekin,ifcoulomb,lvc,iprint,lcalcgrad,ndimp,maxisp
      &     ,gwe,gwf,gws,lematch,lfmatch,lsmatch,boundary)
 c
@@ -1062,7 +1076,7 @@ c
       real(8),intent(in):: hunit
       real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
      &     ,atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0)
-     &     ,epitot(ntot0),rc,rbuf,h(3,3,0:1),stnsr(3,3)
+     &     ,epitot(ntot0),rc,rbuf,rc1nn,h(3,3,0:1),stnsr(3,3)
      &     ,epot,ekin,am(nspmax),dt
      &     ,chgtot(ntot0),chitot(ntot0)
 c      character(len=20),intent(in):: cffs(numff)
@@ -1148,8 +1162,8 @@ c-----copy RA of boundary atoms
       call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb
      &     ,.true.,boundary)
 c-----Make pair list
-      call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h,hi
-     &     ,anxi,anyi,anzi,lspr,iprint,.true.)
+      call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf
+     &     ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.true.)
       lstrs = .true.
 
 c      print *,'one_shot: 06'
@@ -3003,6 +3017,7 @@ c
       if( allocated(stt) ) deallocate(stt)
       if( allocated(tag) ) deallocate(tag)
       if( allocated(lspr) ) deallocate(lspr)
+      if( allocated(ls1nn) ) deallocate(ls1nn)
       if( allocated(epi) ) deallocate(epi)
       if( allocated(eki) ) deallocate(eki)
       if( allocated(stp) ) deallocate(stp)
@@ -3013,7 +3028,8 @@ c
       if( allocated(lsex) ) deallocate(lsex)
       allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax)
      &     ,strs(3,3,namax),stt(3,3,namax),tag(namax)
-     &     ,lspr(0:nnmax,namax),epi(namax),eki(3,3,namax)
+     &     ,lspr(0:nnmax,namax),ls1nn(0:nnmax,namax)
+     &     ,epi(namax),eki(3,3,namax)
      &     ,stp(3,3,namax),stn(3,3,namax)
      &     ,chg(namax),chi(namax)
      &     ,lsb(0:nbmax,6),lsex(nbmax,6))
@@ -3117,6 +3133,15 @@ c.....lspr
       deallocate(lspr)
       allocate(lspr(0:nnmax,newnamax))
       call copy_iarr(ndim,iarr,lspr)
+      deallocate(iarr)
+
+c.....ls1nn
+      ndim = size(ls1nn)
+      allocate(iarr(ndim))
+      call copy_iarr(ndim,ls1nn,iarr)
+      deallocate(ls1nn)
+      allocate(ls1nn(0:nnmax,newnamax))
+      call copy_iarr(ndim,iarr,ls1nn)
       deallocate(iarr)
 
 c.....epi

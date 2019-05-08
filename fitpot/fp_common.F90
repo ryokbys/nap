@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-04-26 13:28:42 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-08 15:12:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -662,7 +662,8 @@ contains
     integer:: i,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
          nismax,nstps_done,ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
     real(8):: am(9),dt,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
-         ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv
+         ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv &
+         ,rc1nn
     logical:: ltdst,lcellfix(3,3),lvc
     character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5,boundary*3
     logical:: update_force_list
@@ -684,6 +685,7 @@ contains
     ciofmt = 'ascii'
     ifpmd = 0
     rbuf = 0.0d0
+    rc1nn = 3.0d0
     ifdmp = 0  ! no damping as well
     dmp = 0.99d0
     minstp = 0
@@ -768,7 +770,7 @@ contains
          ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
          ,smpl%chg,smpl%chi &
          ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
-         ,nismax,am,dt,rc,rbuf,ptnsr,epot,ekin &
+         ,nismax,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
          ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
          ,gwe,gwf,gws &
          ,lematch,lfmatch,lsmatch,boundary)

@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2018-11-11 00:11:26 Ryo KOBAYASHI>
+!                    Last modified: <2019-05-08 15:16:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -47,7 +47,7 @@ module pmdvars
 !.....real*8 identifier which includes species, index of FMV, total id
   real(8),allocatable:: tag(:)
 !!$    real(8):: tag(namax)
-  integer,allocatable:: lspr(:,:)
+  integer,allocatable:: lspr(:,:),ls1nn(:,:)
 !!$    integer:: lspr(0:nnmax,namax)
 !.....potential and kinetic energy per atoms
   real(8),allocatable:: epi(:),eki(:,:,:),stp(:,:,:)
