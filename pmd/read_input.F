@@ -237,9 +237,9 @@ c        call read_c1(ionum,cforce)
       elseif( trim(cname).eq.'reduced_force') then
         call read_l1(ionum,lrdcfrc)
         return
-      elseif( trim(cname).eq.'cna') then
+      elseif( trim(cname).eq.'structure_analysis') then
         backspace(ionum)
-        read(ionum,*) ctmp, lcna, iter_cna
+        read(ionum,*) ctmp, cstruct, istruct
         return
 #ifdef __WALL__
       elseif( trim(cname).eq.'wall_pos_top' ) then

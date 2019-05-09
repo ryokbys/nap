@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2019-05-08 16:02:34 Ryo KOBAYASHI>
+c                     Last-modified: <2019-05-09 11:17:01 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -11,7 +11,7 @@ c-----------------------------------------------------------------------
      &     ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv
      &     ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width
      &     ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary
-     &     ,lmetaD,lconst,lrdcfrc,lcna,iter_cna)
+     &     ,lmetaD,lconst,lrdcfrc,cstruct,istruct)
       use pmdvars
       use zload
       use force
@@ -24,13 +24,13 @@ c-----------------------------------------------------------------------
       use constraints,only: init_const, update_const, update_const_vel
      &     ,update_const_pos
       use rdcfrc,only: init_rdcfrc, reduce_forces, finalize_rdcfrc
-      use structure,only: cna
+      use structure,only: cna,acna
       implicit none
       include "mpif.h"
       include "./params_unit.h"
       integer,intent(in):: ntot0,maxstp,nerg,npmd,myid_md,mpi_md_world
      &     ,nspmax,ifpmd,ifdmp,minstp,ntdst,ifsort !,numff
-     &     ,iprint,nodes_md,nx,ny,nz,n_conv,nrmtrans,iter_cna
+     &     ,iprint,nodes_md,nx,ny,nz,n_conv,nrmtrans,istruct
       integer,intent(inout):: ifcoulomb
       integer,intent(out):: nstp_done
       real(8),intent(in):: hunit,tinit,tfin
@@ -43,10 +43,10 @@ c-----------------------------------------------------------------------
      &     ,pfin,ttgt(9),chgtot(ntot0),chitot(ntot0)
       character,intent(in):: ciofmt*6, cpctl*20, ctctl*20
      &     ,boundary*3
-      character(len=*),intent(in):: czload_type
+      character(len=*),intent(in):: czload_type,cstruct
 !      character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: ltdst,lstrs0,lcellfix(3,3),lmetaD,lconst
-     &     ,lrdcfrc,lcna
+     &     ,lrdcfrc
       logical,intent(inout):: lvc
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
@@ -343,13 +343,15 @@ c      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
 c     &     ,epot,chg(1:natm)
 
 c.....Structure analysis
-      if( lcna ) then
+      if( trim(cstruct).eq.'CNA' ) then
         if( rc1nn.gt.(rc+rbuf)/2 .and. myid_md.eq.0 ) then
           print *,' WARNING: rc1nn > (rc+rbuf)/2, '
      &         //'which may cause problem in CNA.'
           print *,'   rc,rbuf,rc1nn =',rc,rbuf,rc1nn
         endif
         call cna(namax,natm,nb,nnmax,ls1nn,tag)
+      else if( trim(cstruct).eq.'a-CNA' ) then
+        call acna(namax,natm,nb,nnmax,lspr,h,ra,tag)
       endif
 c.....Constraints
       if( lconst ) then
@@ -680,8 +682,12 @@ c-------Calc forces
      &       ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
         lstrs = .false.
 c.....Structure analysis
-        if( lcna .and. mod(istp,iter_cna).eq.0 ) then
+        if( trim(cstruct).eq.'CNA'
+     &       .and. mod(istp,istruct).eq.0 ) then
           call cna(namax,natm,nb,nnmax,ls1nn,tag)
+        else if( trim(cstruct).eq.'a-CNA'
+     &         .and. mod(istp,istruct).eq.0 ) then
+          call acna(namax,natm,nb,nnmax,lspr,h,ra,tag)
         endif
 c.....Force from metadynamics
         if( lmetaD ) then

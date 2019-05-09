@@ -5,7 +5,7 @@ subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc,rc1nn &
      ,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
   implicit none
   integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
-  integer,intent(out):: lspr(0:nnmax,natm),ls1nn(0:nnmax,natm)
+  integer,intent(out):: lspr(0:nnmax,namax),ls1nn(0:nnmax,namax)
   real(8),intent(in):: ra(3,namax),rc,rc1nn,anxi,anyi,anzi &
        ,hi(3,3),h(3,3),tag(namax)
   logical,intent(in):: l1st
@@ -19,7 +19,6 @@ subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc,rc1nn &
   integer,save:: lcx,lcy,lcz,lcx2,lcy2,lcz2,lcyz2,lcxyz2
 
   if( l1st ) then
-    print *,'rc,rc1nn=',rc,rc1nn
     rc2= rc**2
     rc1nn2 = rc1nn**2
 !-----make a linked cell list, LSCL
@@ -52,8 +51,8 @@ subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc,rc1nn &
   endif
 
 !-----reset pair list, LSPR
-  lspr(0,1:natm)= 0
-  ls1nn(0,1:natm)= 0
+  lspr(0,:)= 0
+  ls1nn(0,:)= 0
 
 !-----reset headers
   lshd(1:lcxyz2)= 0
@@ -85,23 +84,29 @@ subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc,rc1nn &
 
 !-----make a pair list, LSPR
 !-----Scan resident cells
-  do mz=1,lcz
-    do my=1,lcy
-      do mx=1,lcx
+!!$  do mz=1,lcz
+!!$    do my=1,lcy
+!!$      do mx=1,lcx
+  do mz=0,lcz+1
+    do my=0,lcy+1
+      do mx=0,lcx+1
         m= mx*lcyz2 +my*lcz2 +mz +1
-        if (lshd(m).eq.0) goto 5
+        if(lshd(m).eq.0) goto 5
         do kuz= -1,1
+          m1z= mz +kuz
+          if( m1z.lt.0 .or. m1z.gt.lcz+1 ) cycle
           do kuy= -1,1
+            m1y= my +kuy
+            if( m1y.lt.0 .or. m1y.gt.lcy+1 ) cycle
             do kux= -1,1
               m1x= mx +kux
-              m1y= my +kuy
-              m1z= mz +kuz
+              if( m1x.lt.0 .or. m1x.gt.lcx+1 ) cycle
               m1=m1x*lcyz2 +m1y*lcz2 +m1z +1
-              if (lshd(m1).eq.0) goto 6
+              if(lshd(m1).eq.0) goto 6
 
               i=lshd(m)
 1             continue
-              if (natm.lt.i) goto 4
+!              if (natm.lt.i) goto 4
 
               ic= int(tag(i))
               xi(1:3)= ra(1:3,i)
@@ -122,25 +127,34 @@ subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc,rc1nn &
               if( rij2.lt.rc2 ) then
                 lspr(0,i)= lspr(0,i) +1
                 if( lspr(0,i).gt.nnmax ) then
-                  write(6,'(a)') " Error: lspr(0,i)  > nnmax"
-                  write(6,'(a,3i5)') "  nnmax, lspr(0,i) = " &
+                  write(6,'(a)') " ERROR: lspr(0,i)  > nnmax"
+                  write(6,'(a,3i5)') "   nnmax, lspr(0,i) = " &
                        ,nnmax,lspr(0,i)
                   call mpi_finalize(ierr)
                   stop
                 endif
                 lspr(lspr(0,i),i)=j
-!.....Store i in j's neighbor list
-                if( j.le.natm ) then
-                  lspr(0,j)= lspr(0,j)+1
-                  if( lspr(0,j).gt.nnmax ) then
-                    write(6,'(a)') " Error: lspr(0,j) > nnmax"
-                    write(6,'(a,3i5)') "  nnmax, lspr(0,j) = " &
-                         ,nnmax,lspr(0,j)
-                    call mpi_finalize(ierr)
-                    stop
-                  endif
-                  lspr(lspr(0,j),j)=i
+!!$!.....Store i in j's neighbor list
+!!$                if( j.le.natm ) then
+!!$                  lspr(0,j)= lspr(0,j)+1
+!!$                  if( lspr(0,j).gt.nnmax ) then
+!!$                    write(6,'(a)') " Error: lspr(0,j) > nnmax"
+!!$                    write(6,'(a,3i5)') "  nnmax, lspr(0,j) = " &
+!!$                         ,nnmax,lspr(0,j)
+!!$                    call mpi_finalize(ierr)
+!!$                    stop
+!!$                  endif
+!!$                  lspr(lspr(0,j),j)=i
+!!$                endif
+                lspr(0,j)= lspr(0,j)+1
+                if( lspr(0,j).gt.nnmax ) then
+                  write(6,'(a)') " ERROR: lspr(0,j) > nnmax"
+                  write(6,'(a,3i5)') "   nnmax, lspr(0,j) = " &
+                       ,nnmax,lspr(0,j)
+                  call mpi_finalize(ierr)
+                  stop
                 endif
+                lspr(lspr(0,j),j)=i
                 if( rij2.lt.rc1nn2 ) then
                   ls1nn(0,i)= ls1nn(0,i) +1
                   ls1nn(ls1nn(0,i),i)= j
@@ -177,7 +191,7 @@ subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,rc1nn,h,hi &
 !
   implicit none
   integer,intent(in):: namax,natm,nnmax,iprint
-  integer,intent(out):: lspr(0:nnmax,natm),ls1nn(0:nnmax,natm)
+  integer,intent(out):: lspr(0:nnmax,namax),ls1nn(0:nnmax,namax)
   real(8),intent(in):: ra(3,namax),rc,rc1nn &
        ,hi(3,3),h(3,3),tag(namax)
   logical,intent(in):: l1st

@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-08 15:06:44 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-09 10:13:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -122,7 +122,7 @@ module pmdio
 !.....Shear angle from x in degree, shear direction is on xy-plane
   real(8):: zshear_angle = 0d0
 
-!.....Structure analysis
-  logical:: lcna = .false.
-  integer:: iter_cna = 1
+!.....Structure analysis: CNA, a-CNA
+  character(len=128):: cstruct = 'none'
+  integer:: istruct = 1
 end module pmdio
