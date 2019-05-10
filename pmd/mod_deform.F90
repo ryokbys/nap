@@ -1,7 +1,7 @@
 module deform
 !-----------------------------------------------------------------------
 !  Module for applying deformation to the simulation cell.
-!                     Last-modified: <2019-05-10 14:15:11 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-10 16:15:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -20,7 +20,7 @@ contains
 
     if( myid.eq.0 .and. iprint.gt.0 ) then
       print '(a)',' Deformation'
-      print '(a)','   Ration of h-matrix deformation:'
+      print '(a)','   Ratio of h-matrix deformation:'
       print '(3x,3es12.3)',dhratio(1,1:3)
       print '(3x,3es12.3)',dhratio(2,1:3)
       print '(3x,3es12.3)',dhratio(3,1:3)
