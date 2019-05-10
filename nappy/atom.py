@@ -37,19 +37,6 @@ def get_number_from_symbol(symbol):
     return element['number']
 
 
-def write_info_of_element(*symbols):
-    for s in symbols:
-        try:
-            element = elements.elements[s]
-        except:
-            raise ValueError('No symbol {0:s}'.format(s))
-        print('Element: {0:s}'.format(s))
-        print('  name: {0:s}'.format(element['name']))
-        print('  atomic number: {0:d}'.format(element['number']))
-        print('  mass: {0:8.3f}'.format(element['mass']))
-        print('  abundance: {0:s}'.format(element['abundance']))
-        print('')
-
 
 class Atom(object):
     """
@@ -124,6 +111,20 @@ class Atom(object):
         self.sid= int(tag)
         self.ifmv= int((tag-self.sid)*10)
         self.id= int(((tag-self.sid)*10 -self.ifmv)*1e+14)
+
+def write_info_of_element(*symbols):
+    for s in symbols:
+        try:
+            element = elements.elements[s]
+        except:
+            raise ValueError('No symbol {0:s}'.format(s))
+        print('Element: {0:s}'.format(s))
+        print('  name: {0:s}'.format(element['name']))
+        print('  atomic number: {0:d}'.format(element['number']))
+        print('  mass: {0:8.3f}'.format(element['mass']))
+        print('  abundance: {0:s}'.format(element['abundance']))
+        print('')
+    return None
 
 if __name__ == '__main__':
     

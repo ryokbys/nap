@@ -3,7 +3,7 @@
 Make typical crystalline structures of conventional cell.
 
 Usage:
-  cell_maker.py (sc|bcc|bcc110|bcc111|fcc|hcp|diamond|nacl) [options]
+  cell_maker.py (sc|bcc|bcc110|bcc111|fcc|fcc110|hcp|diamond|nacl) [options]
 
 Options:
   -h, --help  Show this help message and exit.
@@ -68,7 +68,7 @@ def make_bcc110(latconst=1.0):
     Make a cell of bcc structure with z along [110].
     """
     s= NAPSystem(specorder=_default_specorder)
-    #...lattice                                                                                                                        
+    #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.414, 0.0 ])
     a3= np.array([ 0.0, 0.0, 1.414 ])
@@ -85,7 +85,8 @@ def make_bcc110(latconst=1.0):
     return s
 
 def make_bcc111(latconst=1.0):
-    """                                                                                                                  Make a cell of bcc structure with z along [111].
+    """
+    Make a cell of bcc structure with z along [111].
     """
     s= NAPSystem(specorder=_default_specorder)
     #...lattice
@@ -133,6 +134,31 @@ def make_fcc(latconst=1.0,specorder=_default_specorder):
         s.add_atom(atom)
     return s
 
+
+def make_fcc110(latconst=1.0,specorder=_default_specorder):
+    """
+    Make a cell of fcc structure with z along [110].
+    """
+    s= NAPSystem(specorder=specorder)
+    #...lattice
+    a1= np.array([ 1.0, 0.0, 0.0 ])
+    a2= np.array([ 0.0, 1.414, 0.0 ])
+    a3= np.array([ 0.0, 0.0, 1.414 ])
+    s.set_lattice(latconst,a1,a2,a3)
+    positions=[(0.00, 0.00, 0.00),
+               (0.00, 0.50, 0.00),
+               (0.00, 0.00, 0.50),
+               (0.00, 0.50, 0.50),
+               (0.50, 0.25, 0.25),
+               (0.50, 0.25, 0.75),
+               (0.50, 0.75, 0.25),
+               (0.50, 0.75, 0.75)]
+    for p in positions:
+        atom= Atom()
+        atom.set_pos(p[0],p[1],p[2])
+        atom.set_symbol(specorder[0])
+        s.add_atom(atom)
+    return s
 
 def make_honeycomb(latconst=1.0):
     """
@@ -283,6 +309,8 @@ if __name__ == "__main__":
         struct= make_bcc111(latconst)
     elif args['fcc']:
         struct= make_fcc(latconst)
+    elif args['fcc110']:
+        struct= make_fcc110(latconst)
     elif args['hcp']:
         struct= make_hcp(latconst)
     elif args['diamond']:

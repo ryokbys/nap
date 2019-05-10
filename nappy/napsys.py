@@ -250,18 +250,21 @@ class NAPSystem(object):
     def num_species(self):
         num_species= []
         max_nsp= 0
-        if len(self.specorder) > 0:
-            for i in range(len(self.specorder)):
-                num_species.append(0)
-            for ai in self.atoms:
-                num_species[self.specorder.index(ai.symbol)] += 1
-        else:
-            for ai in self.atoms:
-                max_nsp= max(max_nsp,ai.sid)
-            for i in range(max_nsp):
-                num_species.append(0)
-            for ai in self.atoms:
-                num_species[ai.sid-1] += 1
+        try:
+            if len(self.specorder) > 0:
+                for i in range(len(self.specorder)):
+                    num_species.append(0)
+                for ai in self.atoms:
+                    num_species[self.specorder.index(ai.symbol)] += 1
+            else:
+                for ai in self.atoms:
+                    max_nsp= max(max_nsp,ai.sid)
+                for i in range(max_nsp):
+                    num_species.append(0)
+                for ai in self.atoms:
+                    num_species[ai.sid-1] += 1
+        except:
+            num_species.append(len(self.atoms))
         return num_species
 
     def volume(self):
