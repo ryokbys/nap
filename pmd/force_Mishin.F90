@@ -44,6 +44,15 @@ contains
       vprm(1:4,1:neamd-1) = vprm_Al(1:4,1:neamd-1)
       fprm(1:4,1:neamd-1) = fprm_Al(1:4,1:neamd-1)
       rc_eam = rc_eam_Al
+      if( myid_md.eq.0 ) then
+        write(6,'(a)') ' use force_Mishin_Al'
+        write(6,'(a,es12.4)') '   rc of input    =',rc
+        write(6,'(a,es12.4)') '   rc of this pot =',rc_eam
+      endif
+      if( rc.lt.rc_eam ) then
+        if( myid_md.eq.0 ) print *,'ERROR: rc < rc_eam !!!'
+        stop 1
+      endif
     endif
 
     call force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -76,6 +85,16 @@ contains
       vprm(1:4,1:neamd-1) = vprm_Ni(1:4,1:neamd-1)
       fprm(1:4,1:neamd-1) = fprm_Ni(1:4,1:neamd-1)
       rc_eam = rc_eam_Ni
+      if( myid_md.eq.0 ) then
+        print *,''
+        write(6,'(a)') ' force_Mishin_Ni:'
+        write(6,'(a,es12.4)') '   rc of input    =',rc
+        write(6,'(a,es12.4)') '   rc of this pot =',rc_eam
+      endif
+      if( rc.lt.rc_eam ) then
+        if( myid_md.eq.0 ) print *,'ERROR: rc < rc_eam !!!'
+        stop 1
+      endif
     endif
 
     call force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &

@@ -1,6 +1,6 @@
 module structure
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-09 13:20:46 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-09 13:31:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Routines of structure analyses.
 !-----------------------------------------------------------------------
@@ -197,7 +197,7 @@ contains
     integer,intent(inout):: lspr(0:nnmax,namax)
 
     integer:: i,j,l,m,n,ii,iii,ni,jj,kk,nj,il,jl,n1,n2,iil,nn1,im,iim &
-         ,ib1,ib2,iib1,iib2,itmp,lm
+         ,ib1,ib2,iib1,iib2,itmp,lm,istart
     real(8):: tmp,xi(3),xj(3),xij(3),rij(3),dij,dsum,dsum1,dsum2
     real(8),allocatable,save:: dists(:,:),rcfccs(:),rcbccs(:)
     integer,allocatable,save:: lsnn(:,:)
@@ -282,11 +282,11 @@ contains
       rcbccs(i) = (1d0+sqrt(2d0))/4 *( 2d0/sqrt(3d0)*dsum1/8 +dsum2/6)
     enddo
 
-!.....Use nearest 12 neighbors to identify FCC and HCP
+!.....Use ~12 neighbors to identify FCC and HCP
     lsnn(0,:) = 0
     do i=1,natm+nbndr
       do jj=1,min(nnsortmax,lspr(0,i))
-        if( dists(jj,i).gt.rcfccs(i) ) cycle
+        if( dists(jj,i).gt.rcfccs(i) ) exit
         lsnn(0,i) = lsnn(0,i) + 1
         lsnn(jj,i) = lspr(jj,i)
       enddo
@@ -294,11 +294,11 @@ contains
     call cna_indices(namax,natm,nbndr,nnsortmax,lsnn)
     call assign_struct_cna(namax,natm,nbndr,nnsortmax,lsnn)
 
-!.....Use 14 neighbors to identify BCC
-    lsnn(0,:) = 0
+!.....Use ~14 neighbors to identify BCC
     do i=1,natm+nbndr
-      do jj=1,min(nnsortmax,lspr(0,i))
-        if( dists(jj,i).gt.rcbccs(i) ) cycle
+      istart = lsnn(0,i)+1
+      do jj=istart,min(nnsortmax,lspr(0,i))
+        if( dists(jj,i).gt.rcbccs(i) ) exit
         lsnn(0,i) = lsnn(0,i) + 1
         lsnn(jj,i) = lspr(jj,i)
       enddo

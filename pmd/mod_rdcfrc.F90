@@ -114,7 +114,7 @@ contains
         print '(a)','  IDs of atoms whose forces are to be modified: '
         write(cnum,'(i0)') nids
         print '(a,'//trim(cnum)//'(x,i0))', '  ',(ids_fmod(i),i=1,nids)
-      else if( trim(ctype_fmod).eq.'cna' ) then
+      else if( trim(ctype_fmod).eq.'CNA' ) then
         if( is_rdcfrc.ge.0 ) then
           print '(a,i0)','  CNA-ID whose forces are to be reduced: ', is_rdcfrc
         else
@@ -247,10 +247,10 @@ contains
           endif
         enddo
       enddo
-    else if( trim(ctype_fmod).eq.'cna' ) then
+    else if( trim(ctype_fmod).eq.'CNA' ) then
       if( .not. allocated(idcna) ) then
-        print *,'ERROR@reduce_forces: idcna is not allocated !!!'
-        stop
+        print *,'ERROR @reduce_forces: idcna is not allocated !!!'
+        stop 1
       endif
       if( is_rdcfrc.ge.0 ) then
         do ia=1,natm
