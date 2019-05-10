@@ -1111,7 +1111,7 @@ You need to specify the species order correctly with --specorder option.
         angle = np.arccos(np.dot(rij,rik)/dij/dik) /np.pi *180.0
         return angle
         
-    def make_pair_list(self,rcut=3.0):
+    def make_pair_list(self,rcut=3.0,maxnn=_maxnn):
         rc2= rcut**2
         h= np.zeros((3,3))
         h[:,0]= self.a1 *self.alc
@@ -1160,7 +1160,7 @@ You need to specify the species order correctly with --specorder option.
 
         #...make a pair list
         self.nlspr= np.zeros((self.num_atoms(),),dtype=int)
-        self.lspr= np.zeros((self.num_atoms(),_maxnn),dtype=int)
+        self.lspr= np.zeros((self.num_atoms(),maxnn),dtype=int)
         self.lspr[:]= -1
         # self.lspr= []
         # for i in range(len(self.atoms)):
@@ -1191,12 +1191,12 @@ You need to specify the species order correctly with --specorder option.
                         m1= m1x*lcyz +m1y*lcz +m1z
                         ja= lshd[m1]
                         if ja== -1: continue
-                        self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2)
+                        self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2,maxnn)
         #...after makeing lspr
         # for ia in range(len(self.atoms)):
         #     print ia,self.lspr[ia]
 
-    def scan_j_in_cell(self,ia,pi,ja,lscl,h,rc2):
+    def scan_j_in_cell(self,ia,pi,ja,lscl,h,rc2,maxnn):
         if ja == ia: ja = lscl[ja]
         if ja == -1: return 0
         if not ja in self.lspr[ia]:
@@ -1210,13 +1210,13 @@ You need to specify the species order correctly with --specorder option.
                 n= self.nlspr[ia]
                 self.lspr[ia,n]= ja
                 self.nlspr[ia] += 1
-                if self.nlspr[ia] >= _maxnn:
-                    print(' [Error] self.nlspr[{0}] >= _maxnn !!!'.format(ia))
+                if self.nlspr[ia] >= maxnn:
+                    print(' [Error] self.nlspr[{0}] >= maxnn !!!'.format(ia))
                     print(self.nlspr[ia])
                     print(self.lspr[ia])
                     sys.exit()
         ja= lscl[ja]
-        self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2)
+        self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2,maxnn)
 
     def _pbc(self,x):
         if x < 0.:

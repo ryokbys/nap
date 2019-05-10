@@ -19,6 +19,7 @@ Options:
 """
 from __future__ import print_function
 
+import sys
 from docopt import docopt
 import numpy as np
 from random import random
@@ -234,7 +235,7 @@ def make_polycrystal(grns,uc,n1,n2,n3,two_dim=False):
     print(' Making pair list in order to remove close atoms...')
     print(' Number of atoms: ',system.num_atoms())
     system.make_pair_list(RCUT)
-    system.write('POSCAR_tmp')
+    system.write('POSCAR_orig')
     short_pairs = []
     # dmin2= dmin**2
     # xij= np.zeros((3,))
@@ -246,6 +247,8 @@ def make_polycrystal(grns,uc,n1,n2,n3,two_dim=False):
         lst= system.lspr[ia]
         for j in range(nlst):
             ja= lst[j]
+            if ja > ia:
+                continue
             dij = system.get_distance(ia,ja)
             if dij < dmin:
                 short_pairs.append((ia,ja,dij))
@@ -347,22 +350,31 @@ if __name__ == '__main__':
         ai= np.zeros((3,))
         pi[0]= random()
         pi[1]= random()
-        pi[2]= random()
         if two_dim:
+            pi[2]= 0.0
             ai[0]= 0.0
             ai[1]= 0.0
             ai[2]= random()*np.pi*2 -np.pi
         else:
+            pi[2]= random()
             ai[0]= random()*np.pi*2 -np.pi
             ai[1]= random()*np.pi/2 -np.pi/2
             ai[2]= random()*np.pi*2 -np.pi
-        print(' point=',pi)
-        print(' angle=',ai)
+        print(' point,angle =',pi,ai)
         gi= Grain(pi,ai)
         grains.append(gi)
-    unitcell= makestruct(latconst)
-    unitcell.write('POSCAR_uc')
-    system= make_polycrystal(grains,unitcell,nx,ny,nz,two_dim)
+    uc= makestruct(latconst)
+    uc.write('POSCAR_uc')
+    gsys = NAPSystem(specorder=['H'])
+    gsys.set_lattice(uc.alc, uc.a1*nx, uc.a2*ny, uc.a3*nz)
+    for g in grains:
+        pi = g.point
+        a = Atom()
+        a.set_pos(pi[0],pi[1],pi[2])
+        a.set_symbol('H')
+        gsys.add_atom(a)
+    gsys.write('POSCAR_gpoints')
+    system= make_polycrystal(grains,uc,nx,ny,nz,two_dim)
     system.write(ofname)
 
     print(' Elapsed time = {0:12.2f}'.format(time.time()-t0))
