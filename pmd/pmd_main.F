@@ -1,6 +1,6 @@
       program pmd
 c-----------------------------------------------------------------------
-c                     Last-modified: <2019-05-08 17:25:53 Ryo KOBAYASHI>
+c                     Last-modified: <2019-05-10 14:02:42 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Spatial decomposition parallel molecular dynamics program.
 c Core part is separated to pmd_core.F.
@@ -144,7 +144,7 @@ c.....call pmd_core to perfom MD
      &     ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv
      &     ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width
      &     ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary
-     &     ,lmetaD,lconst,lrdcfrc,cstruct,istruct)
+     &     ,lmetaD,lconst,lrdcfrc,cstruct,istruct,cdeform,dhratio)
 
       if( myid_md.eq.0 ) then
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
@@ -440,7 +440,9 @@ c.....Constratins
       call mpi_bcast(lconst,1,mpi_logical,0,mpi_md_world,ierr)
 c.....Reduced force
       call mpi_bcast(lrdcfrc,1,mpi_logical,0,mpi_md_world,ierr)
-
+c.....Deformation
+      call mpi_bcast(cdeform,128,mpi_character,0,mpi_md_world,ierr)
+      call mpi_bcast(dhratio,9,mpi_real8,0,mpi_md_world,ierr)
 c.....Structure analysis
       call mpi_bcast(cstruct,128,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(istruct,1,mpi_integer,0,mpi_md_world,ierr)

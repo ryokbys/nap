@@ -163,7 +163,8 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
       elseif( trim(cname).eq.'stress_target' ) then
         call read_rs(ionum,3,3,stgt(1:3,1:3))
         return
-      elseif( trim(cname).eq.'stress_relax_time' ) then
+      elseif( trim(cname).eq.'stress_relax_time' .or.
+     &       trim(cname).eq.'pressure_relax_time' ) then
         call read_r1(ionum,srlx)
         return
       elseif( trim(cname).eq.'stress_control' ) then
@@ -174,6 +175,12 @@ c        if( ndata.ne.3 ) write(6,'(a)') ' [Error] ndata.ne.3 !!!'
         return
       elseif( trim(cname).eq.'cell_fix' ) then
         call read_ls(ionum,3,3,lcellfix)
+        return
+      elseif( trim(cname).eq.'deformation' ) then
+        call read_c1(ionum,cdeform)
+        return
+      elseif( trim(cname).eq.'deform_ratio' ) then
+        call read_rs(ionum,3,3,dhratio(1:3,1:3))
         return
       elseif( trim(cname).eq.'zload_type' ) then
         call read_c1(ionum,czload_type)
@@ -234,7 +241,8 @@ c        call read_c1(ionum,cforce)
       elseif( trim(cname).eq.'constraints') then
         call read_l1(ionum,lconst)
         return
-      elseif( trim(cname).eq.'reduced_force') then
+      elseif( trim(cname).eq.'reduced_force' .or.
+     &       trim(cname).eq.'reduce_force' ) then
         call read_l1(ionum,lrdcfrc)
         return
       elseif( trim(cname).eq.'structure_analysis') then

@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-09 10:13:56 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-10 14:01:17 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -121,6 +121,10 @@ module pmdio
   real(8):: zskin_width = 5.0d0
 !.....Shear angle from x in degree, shear direction is on xy-plane
   real(8):: zshear_angle = 0d0
+
+!.....Deformation
+  character(len=128):: cdeform= 'none'
+  real(8):: dhratio(3,3)
 
 !.....Structure analysis: CNA, a-CNA
   character(len=128):: cstruct = 'none'

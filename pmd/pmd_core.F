@@ -1,5 +1,5 @@
 c-----------------------------------------------------------------------
-c                     Last-modified: <2019-05-09 11:17:01 Ryo KOBAYASHI>
+c                     Last-modified: <2019-05-10 14:14:50 Ryo KOBAYASHI>
 c-----------------------------------------------------------------------
 c Core subroutines/functions needed for pmd.
 c-----------------------------------------------------------------------
@@ -11,7 +11,7 @@ c-----------------------------------------------------------------------
      &     ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv
      &     ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width
      &     ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary
-     &     ,lmetaD,lconst,lrdcfrc,cstruct,istruct)
+     &     ,lmetaD,lconst,lrdcfrc,cstruct,istruct,cdeform,dhratio)
       use pmdvars
       use zload
       use force
@@ -25,6 +25,7 @@ c-----------------------------------------------------------------------
      &     ,update_const_pos
       use rdcfrc,only: init_rdcfrc, reduce_forces, finalize_rdcfrc
       use structure,only: cna,acna
+      use deform,only: init_deform, apply_deform
       implicit none
       include "mpif.h"
       include "./params_unit.h"
@@ -35,7 +36,7 @@ c-----------------------------------------------------------------------
       integer,intent(out):: nstp_done
       real(8),intent(in):: hunit,tinit,tfin
      &     ,trlx,srlx,stbeta,strfin,dmp,eps_conv,vardt_len
-     &     ,zskin_width,zshear_angle
+     &     ,zskin_width,zshear_angle,dhratio(3,3)
       real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
      &     ,atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0)
      &     ,epitot(ntot0),dt,rc,rbuf,rc1nn,h(3,3,0:1),stnsr(3,3)
@@ -43,7 +44,7 @@ c-----------------------------------------------------------------------
      &     ,pfin,ttgt(9),chgtot(ntot0),chitot(ntot0)
       character,intent(in):: ciofmt*6, cpctl*20, ctctl*20
      &     ,boundary*3
-      character(len=*),intent(in):: czload_type,cstruct
+      character(len=*),intent(in):: czload_type,cstruct,cdeform
 !      character(len=20),intent(in):: cffs(numff)
       logical,intent(in):: ltdst,lstrs0,lcellfix(3,3),lmetaD,lconst
      &     ,lrdcfrc
@@ -212,6 +213,11 @@ c-----set HI and SGM
 c-----ntset
       call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
+c.....Deformation setup
+      if( trim(cdeform).ne.'none' ) then
+        call init_deform(maxstp,h,dhratio,myid_md,iprint)
+      endif
+
 c-----get total number of species
       nspl = 0
       do i=1,natm
@@ -329,13 +335,13 @@ c.....Calc forces
      &     ( trim(cpctl).eq.'Berendsen' .or.
      &       trim(cpctl).eq.'vc-Berendsen' .or.
      &     trim(cpctl).eq.'vv-Berendsen')
-      lcell_updated = ( trim(cpctl).eq.'Berendsen' .or.
-     &       trim(cpctl).eq.'vc-Berendsen' .or.
-     &     trim(cpctl).eq.'vv-Berendsen')
+c.....Cell is new at the first call of get_force
+      lcell_updated = .true.
       call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr
      &     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &     ,lspr,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,lstrs
      &     ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
+      lcell_updated = .false.
       lstrs = .false.
       epot= epot0
       epotp = 0d0
@@ -638,11 +644,19 @@ c     h(1:3,1:3,0)= matmul(ah,h(1:3,1:3,0))
               endif
             enddo
           enddo
-c.....Reset matrices
-          call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
+          lcell_updated = .true.
         endif
+
+        if( trim(cdeform).ne.'none' ) then
+          call apply_deform(h)
+          lcell_updated = .true.
+        endif
+        
         simtime = simtime +dt
 
+c.....Reset matrices
+        if( lcell_updated ) call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
+        
 c.....Update rbufres considering change of vmax
         rbufres = rbufres -vmax*dt*2d0
 
@@ -680,6 +694,7 @@ c-------Calc forces
      &       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc
      &       ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,lstrs
      &       ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
+        lcell_updated = .false.
         lstrs = .false.
 c.....Structure analysis
         if( trim(cstruct).eq.'CNA'
@@ -2351,8 +2366,8 @@ c
       real(8),intent(out):: ah(3,3),stnsr(3,3)
       character(len=*):: cpctl
 
-c.....Max change rate
-      real(8),parameter:: rmax = 0.02d0
+c.....Max change rate (2%)
+      real(8),parameter:: RMAX = 0.02d0
       
       integer:: i,ixyz,jxyz,ierr
       real(8):: prss,fac,tmp
@@ -2369,11 +2384,11 @@ c.....now ah is scaling factor for h-mat
         ah(1,1)= 1d0
         ah(2,2)= 1d0
         ah(3,3)= 1d0
-c.....Limit change rate of h (ah) to 5%
+c.....Limit change rate of h (ah) to RMAX
         do ixyz=1,3
           do jxyz=1,3
             tmp = stbeta*dt/3/srlx*( stgt(ixyz,jxyz)-stnsr(ixyz,jxyz) )
-            tmp = min(max(tmp,-rmax),rmax)
+            tmp = min(max(tmp,-RMAX),RMAX)
             ah(ixyz,jxyz) = ah(ixyz,jxyz) -tmp
           enddo
         enddo
@@ -2387,8 +2402,8 @@ c.....Berendsen for variable-volume not variable-cell
         ah(3,3)= 1d0
         prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
         fac = 1.0 -stbeta/dt/3/srlx *(ptgt-prss)
-c.....Limit change rate of h (ah) to 5%
-        fac = min(max(fac,1d0-rmax),1d0+rmax)
+c.....Limit change rate of h (ah) to RMAX
+        fac = min(max(fac,1d0-RMAX),1d0+RMAX)
         ah(1:3,1:3) = ah(1:3,1:3)*fac
       endif
 
