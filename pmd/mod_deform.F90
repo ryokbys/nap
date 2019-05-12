@@ -1,7 +1,7 @@
 module deform
 !-----------------------------------------------------------------------
 !  Module for applying deformation to the simulation cell.
-!                     Last-modified: <2019-05-10 16:15:08 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-12 22:16:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -27,12 +27,16 @@ contains
     endif
     
 !.....Determine deformation increament from the initial and final size
-    do i=1,3
-      do j=1,3
-        hmatfin(j,i) = hmat(j,i)*dhratio(j,i)
-        dhmat(j,i) = (hmatfin(j,i) -hmat(j,i)) /nstp
+    if( nstp.eq.0 ) then
+      dhmat(:,:) = 0d0
+    else
+      do i=1,3
+        do j=1,3
+          hmatfin(j,i) = hmat(j,i)*dhratio(j,i)
+          dhmat(j,i) = (hmatfin(j,i) -hmat(j,i)) /nstp
+        enddo
       enddo
-    enddo
+    endif
 
     if( myid.eq.0 .and. iprint.gt.0 ) then
       print '(a)','   Increment of h-matrix deformation:'
