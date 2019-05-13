@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-12 22:01:45 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-13 22:52:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -32,19 +32,19 @@ program pmd
   real(8),parameter:: epith = -0.1410d0
 #endif
 
-  integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr &
-       ,nstp_done
+  integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,nstp_done
+  integer:: mpicolor,mpikey,ierr,jerr,itmp,nprocs
   real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin
   integer,external:: itotOf
 
 !-----initialize the MPI environment
   call mpi_init(ierr)
 !-----total number of MD-nodes
-  call mpi_comm_size(MPI_COMM_WORLD, nodes_md, ierr)
+  call mpi_comm_size(MPI_COMM_WORLD,nprocs,ierr)
 !-----my rank in MD-nodes
-  call mpi_comm_rank(MPI_COMM_WORLD, myid_md, ierr)
-  mpi_md_world= MPI_COMM_WORLD
-
+  call mpi_comm_rank(MPI_COMM_WORLD,myid_md,ierr)
+  call mpi_comm_dup(MPI_COMM_WORLD,mpicomm,ierr)
+  mpi_md_world = mpicomm
 
 !.....Set fmv as default value before reading 'in.pmd'
   call set_fmv(fmv)
@@ -61,7 +61,7 @@ program pmd
     write(6,*) ''
     call time_stamp(' Job started')
     write(6,*) ''
-    write(6,'(a,i0)') ' Number of processes in MPI = ',nodes_md
+    write(6,'(a,i0)') ' Number of processes in MPI = ',nprocs
     call read_input(10,trim(cinpmd))
     call check_cmin(cmin,ifdmp)
     call write_initial_setting()
@@ -86,21 +86,6 @@ program pmd
 
   call bcast_params()
 
-!.....Check ensemble
-  if( myid_md.eq.0 ) call check_ensemble()
-
-!.....Set Coulomb flag here
-  if( use_force('screened_Coulomb') ) then
-    ifcoulomb = 1
-    cterms = 'screened'
-  else if( use_force('Ewald') ) then
-    ifcoulomb = 2
-    cterms = 'full'
-  else if( use_force('Ewald_long') ) then
-    ifcoulomb = 3
-    cterms = 'long'
-  endif
-
 !.....only 0th-node reads pmdini file
   if( myid_md.eq.0 ) then
 !        call system('cp pmd0000 pmd0000.orig')
@@ -121,6 +106,11 @@ program pmd
     call set_atomic_charges(ntot0,chgtot,tagtot,nspmax &
          ,chgfix,schg,myid_md,iprint)
 
+!.....Determine nx,ny,nz using rc and hmat info
+    if( .not. (nx.gt.0 .and. ny.gt.0 .and. nz.gt.0 ) ) then
+      call determine_division(h,myid_md,nprocs,rc,nx,ny,nz,iprint)
+    endif
+
 !.....Make ntot and ?tot() not null in nodes myid_md != 0
   else
     ntot0 = 1
@@ -128,6 +118,54 @@ program pmd
          ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0) &
          ,chgtot(ntot0),chitot(ntot0))
     chitot(1:ntot0) = 0d0
+  endif
+
+!.....Broadcast determined nx,ny,nz to reset MPI communicator if needed.
+  call mpi_bcast(nx,1,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(ny,1,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(nz,1,mpi_integer,0,mpicomm,ierr)
+  if( nx*ny*nz .ne. nprocs ) then
+    nodes_md = nx*ny*nz
+    if( myid_md.eq.0 .and. iprint.gt.0 ) then
+      print '(a)',' WARNING: Since nxyz != nprocs, use less processes than prepared.'
+      print '(a,5(2x,i0))','          nx,ny,nz,nxyz,nprocs=',nx,ny,nz,nodes_md,nprocs
+    endif
+    mpikey = myid_md
+    if( myid_md.lt.nodes_md ) then
+      mpicolor = 0
+    else
+      mpicolor = 1
+    endif
+    call mpi_comm_split(mpicomm,mpicolor,mpikey,mpi_md_world,jerr)
+    call mpi_comm_size(mpi_md_world,itmp,ierr)
+    if( myid_md.lt.nodes_md .and. itmp.ne.nodes_md ) &
+         stop 'ERROR: itmp.ne.nodes_md in mpi_comm_size'
+    call mpi_comm_rank(mpi_md_world,itmp,ierr)
+    if( myid_md.lt.nodes_md .and. itmp.ne.myid_md ) &
+         stop 'ERROR: itmp.ne.myid in mpi_comm_rank'
+!!$    print *,' myid,itmp,jerr,color,mpi_md_world,mpicomm=',myid_md,itmp &
+!!$         ,jerr,mpicolor,mpi_md_world,mpicomm
+  else
+    nodes_md = nprocs
+    mpi_md_world = mpicomm  ! it is already set
+  endif
+
+!.....If the node is not used, skip to the end and wait the other nodes
+  if( myid_md .ge. nodes_md ) goto 1
+
+!.....Check ensemble
+  if( myid_md.eq.0 ) call check_ensemble()
+
+!.....Set Coulomb flag here
+  if( use_force('screened_Coulomb') ) then
+    ifcoulomb = 1
+    cterms = 'screened'
+  else if( use_force('Ewald') ) then
+    ifcoulomb = 2
+    cterms = 'full'
+  else if( use_force('Ewald_long') ) then
+    ifcoulomb = 3
+    cterms = 'long'
   endif
 
 !.....Add PKA velocity to some atom
@@ -161,6 +199,9 @@ program pmd
     call time_stamp(' Job finished')
   endif
 
+1 continue
+  call mpi_barrier(mpicomm,ierr)
+  call mpi_comm_free(mpi_md_world,ierr)
   deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot)
   call mpi_finalize(ierr)
 
@@ -364,57 +405,56 @@ subroutine bcast_params()
   if( myid_md.eq.0 ) write(6,'(/,a)') ' Broadcast data to be shared' &
        //' with all the nodes.'
 !-----Broadcast input parameters to all nodes
-  call mpi_bcast(nx,1,MPI_INTEGER,0,mpi_md_world,ierr)
-  call mpi_bcast(ny,1,MPI_INTEGER,0,mpi_md_world,ierr)
-  call mpi_bcast(nz,1,MPI_INTEGER,0,mpi_md_world,ierr)
-  call mpi_bcast(nstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
-  call mpi_bcast(minstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
-  call mpi_bcast(dt,1,MPI_REAL8,0,mpi_md_world,ierr)
-  call mpi_bcast(vardt_len,1,MPI_REAL8,0,mpi_md_world,ierr)
-  call mpi_bcast(rc,1,MPI_REAL8,0,mpi_md_world,ierr)
-  call mpi_bcast(rc1nn,1,MPI_REAL8,0,mpi_md_world,ierr)
-  call mpi_bcast(rbuf,1,MPI_REAL8,0,mpi_md_world,ierr)
-  call mpi_bcast(cmin,20,mpi_character,0,mpi_md_world,ierr)
-  call mpi_bcast(dmp,1,MPI_REAL8,0,mpi_md_world,ierr)
-  call mpi_bcast(eps_conv,1,MPI_REAL8,0, &
-       mpi_md_world,ierr)
-  call mpi_bcast(n_conv,1,mpi_integer,0,mpi_md_world,ierr)
-  call mpi_bcast(tinit,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(tfin,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(ctctl,20,mpi_character,0,mpi_md_world,ierr)
-  call mpi_bcast(ttgt,9,MPI_REAL8,0,mpi_md_world,ierr)
-  call mpi_bcast(trlx,1,MPI_REAL8,0,mpi_md_world,ierr)
-  call mpi_bcast(nerg,1,MPI_INTEGER,0,mpi_md_world,ierr)
-  call mpi_bcast(ifpmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
-  call mpi_bcast(npmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
-  call mpi_bcast(ifsort,1,mpi_integer,0,mpi_md_world,ierr)
-  call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpi_md_world,ierr)
-  call mpi_bcast(iprint,1,mpi_integer,0,mpi_md_world,ierr)
-  call mpi_bcast(fmv,30,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(shrst,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(cpctl,20,mpi_character,0,mpi_md_world,ierr)
-  call mpi_bcast(ptgt,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(pini,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(pfin,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(srlx,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(stgt,9,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(lcellfix,9,mpi_logical,0,mpi_md_world,ierr)
-  call mpi_bcast(czload_type,128,mpi_character,0,mpi_md_world,ierr)
-  call mpi_bcast(zskin_width,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(zshear_angle,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(strfin,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(am,nspmax,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
-  call mpi_bcast(nrmtrans,6,mpi_integer,0,mpi_md_world,ierr)
-  call mpi_bcast(lstrs0,1,mpi_logical,0,mpi_md_world,ierr)
-  call mpi_bcast(boundary,3,mpi_character,0,mpi_md_world,ierr)
-  call mpi_bcast(pka_energy,1,mpi_real8,0,mpi_md_world,ierr)
+!!$  call mpi_bcast(nx,1,MPI_INTEGER,0,mpicomm,ierr)
+!!$  call mpi_bcast(ny,1,MPI_INTEGER,0,mpicomm,ierr)
+!!$  call mpi_bcast(nz,1,MPI_INTEGER,0,mpicomm,ierr)
+  call mpi_bcast(nstp,1,MPI_INTEGER,0,mpicomm,ierr)
+  call mpi_bcast(minstp,1,MPI_INTEGER,0,mpicomm,ierr)
+  call mpi_bcast(dt,1,MPI_REAL8,0,mpicomm,ierr)
+  call mpi_bcast(vardt_len,1,MPI_REAL8,0,mpicomm,ierr)
+  call mpi_bcast(rc,1,MPI_REAL8,0,mpicomm,ierr)
+  call mpi_bcast(rc1nn,1,MPI_REAL8,0,mpicomm,ierr)
+  call mpi_bcast(rbuf,1,MPI_REAL8,0,mpicomm,ierr)
+  call mpi_bcast(cmin,20,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(dmp,1,MPI_REAL8,0,mpicomm,ierr)
+  call mpi_bcast(eps_conv,1,MPI_REAL8,0,mpicomm,ierr)
+  call mpi_bcast(n_conv,1,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(tinit,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(tfin,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(ctctl,20,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(ttgt,9,MPI_REAL8,0,mpicomm,ierr)
+  call mpi_bcast(trlx,1,MPI_REAL8,0,mpicomm,ierr)
+  call mpi_bcast(nerg,1,MPI_INTEGER,0,mpicomm,ierr)
+  call mpi_bcast(ifpmd,1,MPI_INTEGER,0,mpicomm,ierr)
+  call mpi_bcast(npmd,1,MPI_INTEGER,0,mpicomm,ierr)
+  call mpi_bcast(ifsort,1,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpicomm,ierr)
+  call mpi_bcast(iprint,1,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(fmv,30,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(shrst,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(cpctl,20,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(ptgt,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(pini,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(pfin,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(srlx,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(stgt,9,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(lcellfix,9,mpi_logical,0,mpicomm,ierr)
+  call mpi_bcast(czload_type,128,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(zskin_width,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(zshear_angle,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(strfin,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(am,nspmax,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(ciofmt,6,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(nrmtrans,6,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(lstrs0,1,mpi_logical,0,mpicomm,ierr)
+  call mpi_bcast(boundary,3,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(pka_energy,1,mpi_real8,0,mpicomm,ierr)
 !.....Charge related
-  call mpi_bcast(lvc,1,mpi_logical,0,mpi_md_world,ierr)
-  call mpi_bcast(chgfix,20,mpi_character,0,mpi_md_world,ierr)
+  call mpi_bcast(lvc,1,mpi_logical,0,mpicomm,ierr)
+  call mpi_bcast(chgfix,20,mpi_character,0,mpicomm,ierr)
 !.....Force-fields
-  call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
-  call mpi_bcast(num_forces,1,mpi_integer,0,mpi_md_world,ierr)
+  call mpi_bcast(cforce,20,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(num_forces,1,mpi_integer,0,mpicomm,ierr)
   if( num_forces.eq.0 ) then
     if( myid_md.eq.0 ) write(6,'(a)') &
          ' Error: no force-field specified'
@@ -425,27 +465,27 @@ subroutine bcast_params()
     allocate(force_list(num_forces))
   endif
   call mpi_bcast(force_list,128*num_forces,mpi_character &
-       ,0,mpi_md_world,ierr)
-  call mpi_bcast(ifcoulomb,1,mpi_integer,0,mpi_md_world,ierr)
-  call mpi_bcast(schg,nspmax,mpi_real8,0,mpi_md_world &
+       ,0,mpicomm,ierr)
+  call mpi_bcast(ifcoulomb,1,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(schg,nspmax,mpi_real8,0,mpicomm &
        ,ierr)
 !.....NEMD
-  call mpi_bcast(ltdst,1,mpi_logical,0,mpi_md_world,ierr)
+  call mpi_bcast(ltdst,1,mpi_logical,0,mpicomm,ierr)
   if( ltdst ) then
-    call mpi_bcast(ntdst,1,mpi_integer,0,mpi_md_world,ierr)
+    call mpi_bcast(ntdst,1,mpi_integer,0,mpicomm,ierr)
   endif
 !.....Metadynamics
-  call mpi_bcast(lmetaD,1,mpi_logical,0,mpi_md_world,ierr)
+  call mpi_bcast(lmetaD,1,mpi_logical,0,mpicomm,ierr)
 !.....Constratins
-  call mpi_bcast(lconst,1,mpi_logical,0,mpi_md_world,ierr)
+  call mpi_bcast(lconst,1,mpi_logical,0,mpicomm,ierr)
 !.....Reduced force
-  call mpi_bcast(lrdcfrc,1,mpi_logical,0,mpi_md_world,ierr)
+  call mpi_bcast(lrdcfrc,1,mpi_logical,0,mpicomm,ierr)
 !.....Deformation
-  call mpi_bcast(cdeform,128,mpi_character,0,mpi_md_world,ierr)
-  call mpi_bcast(dhratio,9,mpi_real8,0,mpi_md_world,ierr)
+  call mpi_bcast(cdeform,128,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(dhratio,9,mpi_real8,0,mpicomm,ierr)
 !.....Structure analysis
-  call mpi_bcast(cstruct,128,mpi_character,0,mpi_md_world,ierr)
-  call mpi_bcast(istruct,1,mpi_integer,0,mpi_md_world,ierr)
+  call mpi_bcast(cstruct,128,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(istruct,1,mpi_integer,0,mpicomm,ierr)
 
 end subroutine bcast_params
 !=======================================================================
@@ -501,7 +541,7 @@ subroutine set_atomic_charges(ntot,chg,tag,nspmax &
   integer:: i,is
 
   if( trim(chgfix).eq.'input' ) then
-    if( myid.eq.0 .and. iprint.ne.0 ) then
+    if( myid.eq.0 .and. iprint.ne.1 ) then
       print *,'Charges are set from input.'
     endif
     do i=1,ntot
@@ -611,6 +651,86 @@ subroutine add_pka_velocity(myid_md)
 
   endif
 end subroutine add_pka_velocity
+!=======================================================================
+subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
+!
+!  Determine parallel division along a1,a2,a3.
+!
+  use vector,only: dot
+  implicit none
+  integer,intent(in):: nnode,myid,iprint
+  real(8),intent(in):: h(3,3),rc
+  integer,intent(inout):: nx,ny,nz
+
+  integer:: imax,nd(3),ndnew(3),nnew
+  real(8):: al0(3),al(3)
+
+!.....If serial run, NX,NY,NZ should all be 1.
+  if( nnode.eq.1 ) then
+    nx = 1
+    ny = 1
+    nz = 1
+    goto 10
+  endif
+
+!.....Lengths of each axis
+  al0(1) = sqrt(dot(h(1:3,1),h(1:3,1)))
+  al0(2) = sqrt(dot(h(1:3,2),h(1:3,2)))
+  al0(3) = sqrt(dot(h(1:3,3),h(1:3,3)))
+
+  nd(1) = 1
+  nd(2) = 1
+  nd(3) = 1 
+  al(1:3) = al0(1:3) /nd(1:3)
+  if( al(1).lt.rc .and. al(2).lt.rc .and. al(3).lt.rc ) then
+    nx = 1
+    ny = 1
+    nz = 1
+    goto 10
+  endif
+
+!.....Loop until total num of division exceeds num of MPI parallel nodes
+  do
+!.....Increase num of division of the axis of which divided length is the longest
+!.....Check whether 
+    imax = 1
+    if( al(2).gt.al(1) ) imax = 2
+    if( imax.eq.1 ) then
+      if( al(3).gt.al(1) ) imax = 3
+    else ! imax==2
+      if( al(3).gt.al(2) ) imax = 3
+    endif
+    ndnew(1:3) = nd(1:3)
+    ndnew(imax) = ndnew(imax) +1
+
+!.....New total num of divisions
+    nnew = ndnew(1)*ndnew(2)*ndnew(3)
+    al(1:3) = al0(1:3) /ndnew(1:3)
+
+!.....Check whether the total num exceeds num of MPI parallel
+    if( nnew.gt.nnode ) then
+      exit  ! use previous nd(:)
+    else if( nnew.eq.nnode ) then
+      nd(1:3) = ndnew(1:3)  ! use current ndnew(:)
+      exit
+!.....Check whether the minimum divided length is shorter than cutoff radius         
+    else if( al(1).lt.rc .and. al(2).lt.rc .and. al(3).lt.rc ) then
+      exit  ! use previous nd(:)
+    endif
+
+    nd(1:3) = ndnew(1:3)
+  enddo
+
+  nx = nd(1)
+  ny = nd(2)
+  nz = nd(3)
+
+10 if( iprint.gt.0 ) print '(a,3(1x,i0))',' Number of spatial divisions ' &
+        //'automatically set, NX,NY,NZ=',nx,ny,nz
+  
+  return
+
+end subroutine determine_division
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"

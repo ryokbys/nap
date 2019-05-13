@@ -1,6 +1,6 @@
 module pmdmpi
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-01-26 11:49:46 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-13 22:38:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Module that includes variables and parameters used for parallel
 ! computation with mpi for spatial decomposition MD simulation.
@@ -8,10 +8,13 @@ module pmdmpi
   implicit none
   save
 
+  integer:: mpicomm
   integer:: myid_md,nodes_md,mpi_md_world
-  integer:: nx = 1
-  integer:: ny = 1
-  integer:: nz = 1
+!.....NX,NY,NZ: if either one of these is negative, they are automatically
+!     determined using rc and hmat information.
+  integer:: nx = -1
+  integer:: ny = -1
+  integer:: nz = -1
 
 contains
   function get_factor(n)
