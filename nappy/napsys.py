@@ -160,16 +160,19 @@ class NAPSystem(object):
         for ai in self.atoms:
             maxsid = max(maxsid,ai.sid)
         if len(specorder) < maxsid:
-            txt = 'Number of species is not sufficient.' \
-                  +'Must be greater than {0:d}'.format(maxsid)
+            txt = 'Number of species is not sufficient,' \
+                  +' and must be greater than or equal {0:d}'.format(maxsid)
             raise ValueError(txt)
-        self.specorder = specorder
-        for ai in self.atoms:
-            ai.symbol = specorder[ai.sid-1]
-            # try:
-            #     ai.sid = self.specorder.index(ai.symbol) +1
-            # except ValueError:
-            #     ai.sid = 1
+        #...Operation could be different case by case
+        if set(self.specorder) == set(specorder): # Only re-ordering
+            for i,ai in enumerate(self.atoms):
+                sym = ai.symbol
+                ai.set_sid(specorder.index(sym)+1)
+                self.specorder = specorder
+        else: # Re-define specorder
+            self.specorder = specorder
+            for ai in self.atoms:
+                ai.symbol = specorder[ai.sid-1]
                 
     def get_lattice_vectors(self):
         return self.a1*self.alc, self.a2*self.alc, self.a3*self.alc

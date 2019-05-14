@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-04-26 17:32:37 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-14 18:49:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1798,10 +1798,10 @@ subroutine write_stats(iter)
          ,rmse_trn,rmse_tst &
          ,dsmax_trn,dsmax_tst &
          ,sr2trn,sr2tst
-    if( iprint.gt.1 ) then
-      print *,' dssum_trn,strndnm,sr2trn=',dssum_trn,strndnm,sr2trn
-      print *,' dssum_tst,ststdnm,sr2tst=',dssum_tst,ststdnm,sr2tst
-    endif
+!!$    if( iprint.gt.1 ) then
+!!$      print *,' dssum_trn,strndnm,sr2trn=',dssum_trn,strndnm,sr2trn
+!!$      print *,' dssum_tst,ststdnm,sr2tst=',dssum_tst,ststdnm,sr2tst
+!!$    endif
   endif
 
   return
@@ -1816,8 +1816,9 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
 !
   use variables
   use parallel
-  implicit none 
+  implicit none
   real(8),intent(out):: etrn,etst,ftrn,ftst,strn,stst
+  
   integer:: ismpl,ia,l,ixyz,jxyz,natm,nfcal,ntrn,ntst,ntrnl,ntstl
   type(mdsys)::smpl
   real(8):: eref,esub,tmp
@@ -1838,7 +1839,8 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     eref = smpl%eref
     esub = smpl%esub
     natm = smpl%natm
-    tmp = (eref-esub)/natm
+!!$    tmp = (eref-esub)/natm
+    tmp = eref/natm
     if( smpl%iclass.eq.1 ) then
       esumltrn = esumltrn +tmp
       e2sumltrn= e2sumltrn +tmp*tmp
@@ -1864,6 +1866,10 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     emtst = 0d0
     e2mtst= 0d0
   endif
+  if( iprint.gt.1 ) then
+    print *,'emtrn,emtrn^2,e2mtrn,nsmpl_trn =',emtrn,emtrn**2,e2mtrn,nsmpl_trn
+    print *,'emtst,emtst^2,e2mtst,nsmpl_tst =',emtst,emtst**2,e2mtst,nsmpl_tst
+  endif
   etrn = (e2mtrn -emtrn**2)*nsmpl_trn
   etst = (e2mtst -emtst**2)*nsmpl_tst
 
@@ -1883,7 +1889,8 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
-          tmp = smpl%fref(l,ia)-smpl%fsub(l,ia)
+!!$          tmp = smpl%fref(l,ia)-smpl%fsub(l,ia)
+          tmp = smpl%fref(l,ia)
           fsumltrn = fsumltrn +tmp
           f2sumltrn= f2sumltrn +tmp*tmp
           ntrnl=ntrnl +1
@@ -1893,7 +1900,8 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
       do ia=1,natm
         if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
-          tmp = smpl%fref(l,ia)-smpl%fsub(l,ia)
+!!$          tmp = smpl%fref(l,ia)-smpl%fsub(l,ia)
+          tmp = smpl%fref(l,ia)
           fsumltst = fsumltst +tmp
           f2sumltst= f2sumltst +tmp*tmp
           ntstl=ntstl +1
@@ -1924,6 +1932,10 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     fmtst = 0d0
     f2mtst= 0d0
   endif
+  if( iprint.gt.1 ) then
+    print *,'fmtrn,fmtrn^2,f2mtrn,ntrn =',fmtrn,fmtrn**2,f2mtrn,ntrn
+    print *,'fmtst,fmtst^2,f2mtst,ntst =',fmtst,fmtst**2,f2mtst,ntst
+  endif
   ftrn = (f2mtrn -fmtrn**2) *ntrn
   ftst = (f2mtst -fmtst**2) *ntst
   
@@ -1942,7 +1954,8 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     if( smpl%iclass.eq.1 ) then
       do ixyz=1,3
         do jxyz=1,3
-          tmp = smpl%sref(ixyz,jxyz)-smpl%ssub(ixyz,jxyz)
+!!$          tmp = smpl%sref(ixyz,jxyz)-smpl%ssub(ixyz,jxyz)
+          tmp = smpl%sref(ixyz,jxyz)
           ssumltrn = ssumltrn +tmp
           s2sumltrn= s2sumltrn +tmp*tmp
           ntrnl = ntrnl +1
@@ -1951,7 +1964,8 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     else if( smpl%iclass.eq.2 ) then
       do ixyz=1,3
         do jxyz=1,3
-          tmp = smpl%sref(ixyz,jxyz)-smpl%ssub(ixyz,jxyz)
+!!$          tmp = smpl%sref(ixyz,jxyz)-smpl%ssub(ixyz,jxyz)
+          tmp = smpl%sref(ixyz,jxyz)
           ssumltst = ssumltst +tmp
           s2sumltst= s2sumltst +tmp*tmp
           ntstl = ntstl +1
@@ -1981,6 +1995,10 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
   else
     smtst = 0d0
     s2mtst= 0d0
+  endif
+  if( iprint.gt.1 ) then
+    print *,'smtrn,smtrn^2,s2mtrn,ntrn =',smtrn,smtrn**2,s2mtrn,ntrn
+    print *,'smtst,smtst^2,s2mtst,ntst =',smtst,smtst**2,s2mtst,ntst
   endif
   strn = (s2mtrn -smtrn**2) *ntrn
   stst = (s2mtst -smtst**2) *ntst
