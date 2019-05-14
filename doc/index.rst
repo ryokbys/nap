@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 :author: Ryo KOBAYASHI
-:date: Last modified: <2017-09-30 19:44:18 Ryo KOBAYASHI>
+:date: Last modified: <2019-05-14 09:50:10 Ryo KOBAYASHI>
 
 ==========
 nap manual
@@ -40,7 +40,7 @@ Contents:
   clmgr
   fitpot
   development
-
+  faq
 
 -------------
 

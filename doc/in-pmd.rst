@@ -115,11 +115,12 @@ Parameters users can set in ``in.pmd`` are following:
 num_nodes_{x,y,z}
 ------------------------------
 
-* Default: 1
+* Default: -1
 
 Number of division in x, y, or z direction.
-The product of these, :math:`xyz`, should be the same as the number of divided atom-configuration files
-and computer nodes specified when executing ``mpirun`` or ``mpiexec`` command.
+If one of these is non-positive (<=0), these numbers are automatically estimated from the system size and 
+the number of MPI processes used.
+If all of these are positive, specified values are used. The product of these, :math:`xyz`, should be the same as the number of divided atom-configuration files and computer nodes specified when executing ``mpirun`` or ``mpiexec`` command.
 
 
 ------------------------
