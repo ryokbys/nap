@@ -1,6 +1,6 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-09-22 22:12:17 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-15 17:15:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 
   integer,parameter:: ioprms = 50
@@ -182,12 +182,7 @@ contains
           enddo
         endif
 
-!!$        if( i.eq.1 ) then
-!!$          print '(a,2i5,7es12.4)','i,j,rij,aa2,strs= ',i,j,rij,aa2(1:3,i)&
-!!$               ,strsl(1,1,i),strsl(2,2,i),strsl(3,3,i)
-!!$        endif
       enddo
-!!$      write(6,'(i6,9f10.3)') i,strs(1:3,1:3,i)
     enddo
 
 !-----3 body term
@@ -249,8 +244,6 @@ contains
           dcsnj(1:3)= (-xij(1:3)*csn*(riji*riji) +xik(1:3)*(riji*riki)) /aswl
           dcsnk(1:3)= (-xik(1:3)*csn*(riki*riki) +xij(1:3)*(riji*riki)) /aswl
           dcsni(1:3)= -dcsnj(1:3) -dcsnk(1:3)
-!!$          aa3(1:3,i)=aa3(1:3,i) -swe*(dhcsn*dcsni(1:3) +dhrij*drij(1:3) &
-!!$                 +dhrik*drik(1:3))
           tmpj(1:3)= aswe*(dhcsn*dcsnj(1:3) +dhrij*(-drij(1:3)))
           tmpk(1:3)= aswe*(dhcsn*dcsnk(1:3) +dhrik*(-drik(1:3)))
           aa3(1:3,i)= aa3(1:3,i) +(tmpj(1:3)+tmpk(1:3))

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-12 22:14:13 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-15 16:22:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -382,7 +382,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        trim(cpctl).eq.'vc-Berendsen' ) then
     if(myid_md.eq.0 .and. iprint.ne.0 ) then
       write(6,*) ''
-      write(6,'(a)') ' Variable-cell Berendsen is chosen'
+      write(6,'(a)') ' Barostat: variable-cell Berendsen'
       write(6,'(a,6f10.3)') '   Target stress [GPa]: ' &
            ,stgt(1,1),stgt(2,2),stgt(3,3) &
            ,stgt(2,3),stgt(3,1),stgt(1,2)
@@ -392,7 +392,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     if( abs(pini-pfin).gt. 0.1d0 ) then
       if(myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,*) ''
-        write(6,'(a)') ' Variable-volume Berendsen is chosen'
+        write(6,'(a)') ' Barostat: variable-volume Berendsen'
         write(6,'(a,f0.3,a,f0.3,a)') &
              '   Target pressure from = ',pini,' GPa to ' &
              ,pfin,' GPa'
@@ -401,7 +401,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     else
       if(myid_md.eq.0 .and. iprint.ne.0 ) then
         write(6,*) ''
-        write(6,'(a)') ' Variable-volume Berendsen is chosen'
+        write(6,'(a)') ' Barostat: variable-volume Berendsen'
         write(6,'(a,f0.3,a)') &
              '   Target pressure = ',ptgt,' GPa'
       endif
@@ -637,7 +637,9 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       htmp(1:3,1:3) = matmul(ah,h(1:3,1:3,0))
       do i=1,3
         do j=1,3
-          if( .not. lcellfix(i,j) ) then
+!.....NOTE: The definition of lcellfix from input and
+!.....that of h-matrix actually used are in relation of transpose.
+          if( .not. lcellfix(j,i) ) then
             h(i,j,0) = htmp(i,j)
           else
             h(i,j,0) = h(i,j,0)
@@ -896,8 +898,14 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
              trim(cpctl).eq.'vc-Berendsen' .or. &
              trim(cpctl).eq.'vv-Berendsen' .and. &
              iprint.ne.0 ) then
-          write(6,'(a)') ' H-matrix:' !,h(1:3,1:3,0)
-          write(6,'(3f15.7)') h(1:3,1:3,0)
+!!$          write(6,'(a)') ' Cell-matrix:' !,h(1:3,1:3,0)
+!!$          write(6,'(3f15.7)') h(1,1:3,0)
+!!$          write(6,'(3f15.7)') h(2,1:3,0)
+!!$          write(6,'(3f15.7)') h(3,1:3,0)
+          write(6,'(a)') ' Lattice vectors:' !,h(1:3,1:3,0)
+          write(6,'(a,"[ ",3f12.3," ]")') '   a = ',h(1:3,1,0)
+          write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
+          write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
 
           write(6,'(a,6f10.3)') ' Stress (GPa):' &
                ,stnsr(1,1)*up2gpa ,stnsr(2,2)*up2gpa &
@@ -932,7 +940,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
         if( myid_md.eq.0 .and. iprint.ne.0 ) then
           write(6,'(/,a,i6,a,es10.3,a,i3,a)') &
                ' Damped MD converged with ',istp, &
-               ' steps, since ediff < ', &
+               ' steps, since dE < ', &
                eps_conv,', ',n_conv,' times'
           write(6,'(a,3es20.10)') '  epot,epotp,epot-epotp = ' &
                ,epot,epotp,epot-epotp
@@ -2378,8 +2386,8 @@ subroutine force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
   real(8):: prss,fac,tmp
 
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
-
-!      print '(a,9f8.3)','stnsr = ',stnsr(1:3,1:3)
+!!$  print '(a,6f8.3)','stnsr= ',stnsr(1,1),stnsr(2,2),stnsr(3,3) &
+!!$       ,stnsr(3,2),stnsr(1,3),stnsr(1,2)
 
 !.....Berendsen for variable-cell
   if( trim(cpctl).eq.'Berendsen' .or. &
@@ -2438,7 +2446,8 @@ subroutine sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
     enddo
   enddo
 
-  stl(1:3,1:3) = stk(1:3,1:3) +stp(1:3,1:3)
+!!$  stl(1:3,1:3) = stk(1:3,1:3) +stp(1:3,1:3)
+  stl(1:3,1:3) = stp(1:3,1:3)
   stg(1:3,1:3)= 0d0
   call mpi_allreduce(stl,stg,9,mpi_real8,mpi_sum &
        ,mpi_md_world,ierr)
@@ -2975,11 +2984,11 @@ subroutine cell_info(h)
   real(8),external:: sprod
 
   write(6,*) ''
-  write(6,'(a)') " Cell-matrix:"
-  write(6,'("   | ",3f12.3," |")') h(1,1:3)
-  write(6,'("   | ",3f12.3," |")') h(2,1:3)
-  write(6,'("   | ",3f12.3," |")') h(3,1:3)
-  write(6,'(a)') " which means the following lattice vectors:"
+!!$  write(6,'(a)') " Cell-matrix:"
+!!$  write(6,'("   | ",3f12.3," |")') h(1,1:3)
+!!$  write(6,'("   | ",3f12.3," |")') h(2,1:3)
+!!$  write(6,'("   | ",3f12.3," |")') h(3,1:3)
+  write(6,'(a)') " Lattice vectors:"
   write(6,'(a,"[ ",3f12.3," ]")') '   a = ',h(1:3,1)
   write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2)
   write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3)
@@ -2992,11 +3001,11 @@ subroutine cell_info(h)
   gamma = acos(sprod(3,h(1:3,1),h(1:3,2))/a/b) /pi *180d0
 
   write(6,'(a)') ' Lattice parameters:'
-  write(6,'(a,f10.3,a,f7.2,a)') '   a = ',a,' Ang.,  alpha = ' &
+  write(6,'(a,f10.3,a,f7.2,a)') '   |a| = ',a,' Ang.,  alpha = ' &
        ,alpha,' deg.'
-  write(6,'(a,f10.3,a,f7.2,a)') '   b = ',b,' Ang.,  beta  = ' &
+  write(6,'(a,f10.3,a,f7.2,a)') '   |b| = ',b,' Ang.,  beta  = ' &
        ,beta,' deg.'
-  write(6,'(a,f10.3,a,f7.2,a)') '   c = ',c,' Ang.,  gamma = ' &
+  write(6,'(a,f10.3,a,f7.2,a)') '   |c| = ',c,' Ang.,  gamma = ' &
        ,gamma,' deg.'
 
 end subroutine cell_info

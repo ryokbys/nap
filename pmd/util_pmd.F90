@@ -374,7 +374,7 @@ subroutine write_dump(ionum,cfname)
   write(ionum,'(3f15.4)') ylo_bound, yhi_bound, xz
   write(ionum,'(3f15.4)') zlo_bound, zhi_bound, yz
   write(ionum,'(a)') 'ITEM: ATOMS id type x y z ekin epot' &
-       //' sxx syy szz syz sx sxy chg chi'
+       //' sxx syy szz syz sxz sxy chg chi'
   do i=1,ntot
 !        xi(1:3)= rtot(1:3,i)
 !        ri(1:3)= h(1:3,1,0)*xi(1) +h(1:3,2,0)*xi(2) +h(1:3,3,0)*xi(3)
@@ -631,3 +631,7 @@ subroutine time_stamp(prefix)
        'on '//trim(cdate)
   return
 end subroutine time_stamp
+!-----------------------------------------------------------------------
+!     Local Variables:
+!     compile-command: "make pmd"
+!     End:

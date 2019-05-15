@@ -201,16 +201,14 @@ contains
         aa(1:3,i)=aa(1:3,i) -dphi*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dphi*drdxi(1:3)
 !.....Atomic stress of 2-body terms
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*dphi*xij(ixyz)*(-drdxi(jxyz))
-              strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*dphi*xij(ixyz)*(-drdxi(jxyz))
-            enddo
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                 -0.5d0*dphi*xij(ixyz)*(-drdxi(jxyz))
+            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                 -0.5d0*dphi*xij(ixyz)*(-drdxi(jxyz))
           enddo
-        endif
+        enddo
 !.....Embeded term
         drhoij= calc_drho(rij)
         dfj= calc_df(rho(j))
@@ -218,25 +216,21 @@ contains
         aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +tmp*drdxi(1:3)
 !.....Atomic stress of many-body contributions
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
-              strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
-            enddo
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                 -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                 -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
           enddo
-        endif
+        enddo
       enddo
       tmp= calc_f(rho(i))
       epi(i)=epi(i) +tmp
       epotl=epotl +tmp
     enddo
 
-    if( lstrs ) then
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
+    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
     if( myid_md.ge.0 ) then

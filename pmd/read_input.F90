@@ -356,7 +356,7 @@ subroutine read_ls(ionum,ndata,nrow,lval)
   logical,intent(out):: lval(ndata,nrow)
 
   do n=1,nrow
-    read(ionum,*) (lval(i,n),i=1,ndata)
+    read(ionum,*) (lval(n,i),i=1,ndata)
 !        write(6,'(1x,100es15.3)') (rval(i,n),i=1,ndata)
   enddo
 

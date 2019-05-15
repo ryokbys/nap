@@ -53,7 +53,7 @@ contains
          ,dik,diki,dik2,epotl2,epotl3,fcij,fcik,gijk,phi,dphi,rc2,rct &
          ,rct2,tmp,eta3,texpij,texpik,texpjk,tmpjk(3),djk2,djk,fcjk,dfcjk &
          ,drjk(3),dgdjk,xjk(3)
-    real(8),save:: rcmax,rcmax2
+    real(8),save:: rcmax,rcmax2,rctmax,rctmax2
     character(len=128):: ctype
     real(8),save,allocatable:: aa2(:,:),aa3(:,:),strsl(:,:,:)
     logical,save:: l3b,l2b
@@ -71,11 +71,16 @@ contains
       endif
 !.....Check rc
       rcmax = 0d0
+      rctmax = 0d0
       do ispl=1,nspl
         spl = spls(ispl)
         rcmax = max(rcmax,spl%rcut)
+        if( spl%ksp.gt.0 .and. rctmax.lt.spl%rcut ) then
+          rctmax = spl%rcut
+        endif
       enddo
       rcmax2 = rcmax*rcmax
+      rctmax2= rctmax*rctmax
       if( rc.lt.rcmax ) then
         if( myid_md.eq.0 ) then
           print *,'ERROR: Cutoff radius is not appropriate in force_cspline.'
@@ -167,9 +172,13 @@ contains
         do jxyz=1,3
           strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
                -0.5d0*rij(jxyz)*(-dphi*drij(1:3))
-          strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
-               -0.5d0*rij(jxyz)*(-dphi*drij(1:3))
         enddo
+        if( ja.le.natm ) then
+          do jxyz=1,3
+            strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
+                 -0.5d0*rij(jxyz)*(-dphi*drij(1:3))
+          enddo
+        endif
       enddo
     enddo
 20  continue
@@ -196,7 +205,7 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2= rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-        if( dij2.gt.rcmax2 ) cycle
+        if( dij2.gt.rctmax2 ) cycle
         dij= sqrt(dij2)
         do kk=jj+1,lspr(0,ia)
           ka= lspr(kk,ia)
@@ -238,26 +247,21 @@ contains
             dgcs = dphi *texpij*texpik *fcij*fcik
             dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*csn/dij**2
             dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*csn/dik**2
-!!$          dcsdi(1:3)= -dcsdj(1:3)  -dcsdk(1:3)
             tmpj(1:3)= dgcs*dcsdj(1:3) -drij(1:3)*dgdij
             tmpk(1:3)= dgcs*dcsdk(1:3) -drik(1:3)*dgdik
-!!$            print *,'dgdij,dgdik,dgcs=',dgdij,dgdik,dgcs
-!!$            print *,'tmpj(:)=',tmpj(:)
-!!$            print *,'tmpk(:)=',tmpk(:)
             aa3(1:3,ja)= aa3(1:3,ja) -tmpj(1:3)
             aa3(1:3,ka)= aa3(1:3,ka) -tmpk(1:3)
             aa3(1:3,ia)= aa3(1:3,ia) +tmpj(1:3)+tmpk(1:3)
 !.....Stress
-            if( lstrs ) then
-              do jxyz=1,3
-                strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
-                     -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
-                strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
-                     -0.5d0*rij(jxyz)*tmpj(1:3)
-                strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
-                     -0.5d0*rik(jxyz)*tmpk(1:3)
-              enddo
-            endif
+            do jxyz=1,3
+              strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
+                   -0.5d0*rij(jxyz)*tmpj(1:3) &
+                   -0.5d0*rik(jxyz)*tmpk(1:3)
+              strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
+                   -0.5d0*rij(jxyz)*tmpj(1:3)
+              strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
+                   -0.5d0*rik(jxyz)*tmpk(1:3)
+            enddo
           else if( trim(ctype).eq.'angular2' ) then
             xjk(1:3)= xk(1:3)-xj(1:3)
             rjk(1:3)= h(1:3,1)*xjk(1) +h(1:3,2)*xjk(2) +h(1:3,3)*xjk(3)
@@ -293,16 +297,14 @@ contains
             aa3(1:3,ka)= aa3(1:3,ka) -tmpk(1:3) +tmpjk(1:3)
             aa3(1:3,ia)= aa3(1:3,ia) +tmpj(1:3)+tmpk(1:3)
 !.....Stress
-            if( lstrs ) then
-              do jxyz=1,3
-                strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
-                     -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
-                strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
-                     -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rjk(jxyz)*tmpjk(1:3)
-                strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
-                     -0.5d0*rik(jxyz)*tmpk(1:3) -0.5d0*rjk(jxyz)*tmpjk(1:3)
-              enddo
-            endif
+            do jxyz=1,3
+              strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
+                   -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
+              strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
+                   -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rjk(jxyz)*tmpjk(1:3)
+              strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
+                   -0.5d0*rik(jxyz)*tmpk(1:3) -0.5d0*rjk(jxyz)*tmpjk(1:3)
+            enddo
           else if( trim(ctype).eq.'angular3' &
                .or. trim(ctype).eq.'angular4' ) then
             gijk = phi *fcij *fcik
@@ -317,23 +319,21 @@ contains
             dgcs = dphi*fcij*fcik
             dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*csn/dij**2
             dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*csn/dik**2
-!!$          dcsdi(1:3)= -dcsdj(1:3)  -dcsdk(1:3)
             tmpj(1:3)= dgcs*dcsdj(1:3) -drij(1:3)*dgdij
             tmpk(1:3)= dgcs*dcsdk(1:3) -drik(1:3)*dgdik
             aa3(1:3,ja)= aa3(1:3,ja) -tmpj(1:3)
             aa3(1:3,ka)= aa3(1:3,ka) -tmpk(1:3)
             aa3(1:3,ia)= aa3(1:3,ia) +tmpj(1:3)+tmpk(1:3)
 !.....Stress
-            if( lstrs ) then
-              do jxyz=1,3
-                strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
-                     -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
-                strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
-                     -0.5d0*rij(jxyz)*tmpj(1:3)
-                strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
-                     -0.5d0*rik(jxyz)*tmpk(1:3)
-              enddo
-            endif
+            do jxyz=1,3
+              strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
+                   -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
+              strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
+                   -0.5d0*rij(jxyz)*tmpj(1:3)
+              strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
+                   -0.5d0*rik(jxyz)*tmpk(1:3)
+            enddo
+
           endif
         enddo
       enddo
@@ -367,7 +367,7 @@ contains
     integer:: i
     real(8):: a(4),r2,rt
 
-    if( r.ge.pnts(npnts) ) then ! outside the right edge of the range
+    if( r.gt.pnts(npnts) ) then ! outside the right edge of the range
       a(:) = coefs(:,npnts-1)
       rt = pnts(npnts) ! right-most data point
       r2 = rt*rt
@@ -381,7 +381,7 @@ contains
       spl = vals(1) +dspl*(r -rt)
     else
       do i=2,npnts
-        if( r.lt.pnts(i) ) exit
+        if( r.le.pnts(i) ) exit
       enddo
       a(:) = coefs(:,i-1)
       r2 = r*r

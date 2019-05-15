@@ -687,7 +687,7 @@ subroutine copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
 !-----check
   if(nsdbk.ne.nb) then
     write(6,'(a,2i8)') "nsdbk,nb=",nsdbk,nb
-    stop "error: nsdbk.ne.nb!!"
+    stop "ERROR: nsdbk.ne.nb!!"
   endif
 
 !      deallocate(dbuf,dbufr)

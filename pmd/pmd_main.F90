@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-13 22:52:28 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-15 15:26:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -324,9 +324,18 @@ subroutine write_initial_setting()
     write(6,'(5x,3es11.3)') stgt(1,1:3)
     write(6,'(5x,3es11.3)') stgt(2,1:3)
     write(6,'(5x,3es11.3)') stgt(3,1:3)
+    write(6,'(2x,a)') 'cell_fix'
+    write(6,'(5x,3(2x,l))') lcellfix(1,1:3)
+    write(6,'(5x,3(2x,l))') lcellfix(2,1:3)
+    write(6,'(5x,3(2x,l))') lcellfix(3,1:3)
     write(6,'(2x,a)') ''
+    
   else if( trim(cpctl).eq.'vv-Berendsen' ) then
     write(6,'(2x,a,5x,f0.3)') 'pressure_target',ptgt
+    write(6,'(2x,a)') 'cell_fix'
+    write(6,'(5x,3(2x,l))') lcellfix(1,1:3)
+    write(6,'(5x,3(2x,l))') lcellfix(2,1:3)
+    write(6,'(5x,3(2x,l))') lcellfix(3,1:3)
   endif
   write(6,*) ''
 !.....strain control
