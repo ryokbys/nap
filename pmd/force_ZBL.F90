@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-11-27 16:52:23 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-16 11:01:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -50,6 +50,7 @@ contains
 !=======================================================================
   subroutine read_params_ZBL(myid,mpi_world,iprint)
     use force, only: loverlay
+    use util, only: num_data
     implicit none
     include "mpif.h"
     integer,intent(in):: myid,mpi_world,iprint
@@ -58,7 +59,7 @@ contains
     real(8):: qnucli,ri,ro
     character(len=128):: cline,fname,cmode,ctmp
     real(8),parameter:: qtiny = 1d-10
-    integer,external:: num_data
+!!$    integer,external:: num_data
 
     if( myid.eq.0 ) then
       cmode = ''

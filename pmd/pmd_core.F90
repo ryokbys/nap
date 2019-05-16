@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-15 16:22:14 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-16 11:06:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -12,6 +12,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
      ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width &
      ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary &
      ,lmetaD,lconst,lrdcfrc,cstruct,istruct,cdeform,dhratio)
+  use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump
   use pmdvars
   use zload
   use force
@@ -2446,8 +2447,8 @@ subroutine sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
     enddo
   enddo
 
-!!$  stl(1:3,1:3) = stk(1:3,1:3) +stp(1:3,1:3)
-  stl(1:3,1:3) = stp(1:3,1:3)
+  stl(1:3,1:3) = stk(1:3,1:3) +stp(1:3,1:3)
+!!$  stl(1:3,1:3) = stp(1:3,1:3)
   stg(1:3,1:3)= 0d0
   call mpi_allreduce(stl,stg,9,mpi_real8,mpi_sum &
        ,mpi_md_world,ierr)

@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-07-26 18:49:31 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-16 10:31:13 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -69,7 +69,6 @@ contains
     integer:: isp,jsp,ierr
     real(8):: a,b,c,re,alp,beta,xi,rc
     character(len=128):: cline,fname,c1,c2,c3
-    logical,external:: is_numeric 
 
     if( myid_md.eq.0 ) then
       ea_a(1:msp) = 0d0

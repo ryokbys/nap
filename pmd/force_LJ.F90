@@ -232,12 +232,13 @@ contains
 !
 !  Read input for LJ_repul force
 !
+    use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
     character(len=128):: cline,cfname
     integer:: isp,jsp,nd,ierr
     logical:: lexist
     real(8):: repij,rcij
-    integer,external:: num_data
+!!$    integer,external:: num_data
 
     if( myid.eq.0 ) then
 !.....Initialization

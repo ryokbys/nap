@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-03-23 23:02:52 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-16 10:54:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -542,10 +542,11 @@ contains
 !
 !  Read parameter file for any Coulomb potential.
 !
+    use util, only: num_data
     include "mpif.h"
     integer,intent(in):: myid,mpi_world,iprint
 
-    integer,external:: num_data
+!!$    integer,external:: num_data
     
     character(len=128):: cmode,cline,ctmp,fname
     character(len=3):: cname

@@ -1,6 +1,6 @@
 module metadynamics
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-08-02 17:16:32 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-16 11:01:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Metadynamics module mainly for creating samples for fitpot.
 !-----------------------------------------------------------------------
@@ -123,8 +123,9 @@ contains
   end subroutine init_metaD
 !=======================================================================
   subroutine read_metaD(myid,mpi_world,iprint)
+    use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
-    integer,external:: num_data
+!!$    integer,external:: num_data
 
     character(len=128):: c1st, cmode, cline
     integer:: ia,ja,ib,nd

@@ -1,6 +1,6 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-15 17:15:03 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-16 11:01:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 
   integer,parameter:: ioprms = 50
@@ -286,6 +286,7 @@ contains
   end subroutine force_SW
 !=======================================================================
   subroutine read_params_SW(myid,mpi_world,iprint)
+    use util, only: num_data
     implicit none
     include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
@@ -295,7 +296,7 @@ contains
     logical:: lexist
     character(len=128):: cfname,ctmp,cline
 
-    integer,external:: num_data
+!!$    integer,external:: num_data
 
 !.....read parameters at the 1st call
     if( myid.eq.0 ) then

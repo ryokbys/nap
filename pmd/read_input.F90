@@ -369,12 +369,13 @@ subroutine read_force_field(ionum)
 !
 !.....use pmdio
   use force, only: num_forces, force_list
+  use util, only: num_data
   implicit none
   integer,intent(in):: ionum
 
   integer:: i,ndat
   character(len=1024):: ctmp
-  integer,external:: num_data
+!!$  integer,external:: num_data
 
   backspace(ionum)
   read(ionum,'(a)') ctmp

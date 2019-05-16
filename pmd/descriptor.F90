@@ -63,7 +63,7 @@ contains
     ncnst_type(3) = 1   ! polynomial
     ncnst_type(4) = 2   ! Morse
     ncnst_type(101) = 1 ! angular1 (SW-type, not including fc(rjk))
-    ncnst_type(102) = 1 ! angular2 (Behler-type, including fc(rjk))
+    ncnst_type(102) = 2 ! angular2 (Behler-type, including fc(rjk))
     ncnst_type(103) = 1 ! cos(cos(thijk))
     ncnst_type(104) = 1 ! sin(cos(thijk))
     ncnst_type(105) = 2 ! exp(-eta*(cos(thijk)-rs)**2)
@@ -227,7 +227,7 @@ contains
          xjk(3),rjk(3),djk,djk2,fcjk,dfcjk,drjkj(3),drjkk(3),dgdjk, &
          ri,ro,xs,z,dz,an,gijk
 
-    real(8):: texpij,texpik,eta3
+    real(8):: texpij,texpik,eta3,zang,twozeta
 
     if( l1st ) then
 !.....Check all the rcs and compare them with rc
@@ -373,11 +373,6 @@ contains
           rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik2= rik(1)**2 +rik(2)**2 +rik(3)**2
           dik= sqrt(dik2)
-!.....djk is required for Behler's angular SF (itype(isf)==102)
-          xjk(1:3)= xk(1:3)-xj(1:3)
-          rjk(1:3)= h(1:3,1)*xjk(1) +h(1:3,2)*xjk(2) +h(1:3,3)*xjk(3)
-          djk2= rjk(1)**2 +rjk(2)**2 +rjk(3)**2
-          djk= sqrt(djk2)
 !.....Cosine is common for all the angular SFs
           spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
           cs= spijk/dij/dik
@@ -386,7 +381,7 @@ contains
           dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
           gijk = 0d0
           do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
-            if( itype(isf).eq.101 ) then ! my angular SF
+            if( itype(isf).eq.101 ) then ! RK's original angular SF
               if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
 !.....fcij's should be computed after rcs is determined
               call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
@@ -397,10 +392,12 @@ contains
               drikk(1:3)= -driki(1:3)
 !.....function value
               t1= (almbd +cs)**2
-              eta3 = 0.5d0 /(rcs(isf)/2)**2
-              texpij = exp(-eta3*dij2)
-              texpik = exp(-eta3*dik2)
-              tmp = t1/t2 *texpij *texpik
+              eta3 = 0.5d0 /rcs(isf)**2
+!!$              texpij = exp(-eta3*dij2)
+!!$              texpik = exp(-eta3*dik2)
+              texp = exp(-eta3*(dij2+dik2))
+!!$              tmp = t1/t2 *texpij *texpik
+              tmp = t1/t2 *texp
               gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik
               gijk = gijk +tmp*fcij*fcik
 !!$            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik
@@ -415,34 +412,42 @@ contains
                    +dgdij*driji(1:3) +dgdik*driki(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
-              dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik *texpij*texpik
+!!$              dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik *texpij*texpik
+              dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik *texp 
               dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
               igsf(isf,0,ia) = 1
               igsf(isf,jj,ia) = 1
               igsf(isf,kk,ia) = 1
-            else if( itype(isf).eq.102 ) then  ! Behler's angular SF that includes fc(rjk)
+            else if( itype(isf).eq.102 ) then  ! Similar to Behler's angular SF that includes fc(rjk)
               if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) .or. &
                    djk.ge.rcs(isf) ) cycle
+!.....djk is required for Behler's angular SF (itype(isf)==102)
+              xjk(1:3)= xk(1:3)-xj(1:3)
+              rjk(1:3)= h(1:3,1)*xjk(1) +h(1:3,2)*xjk(2) +h(1:3,3)*xjk(3)
+              djk2= rjk(1)**2 +rjk(2)**2 +rjk(3)**2
+              djk= sqrt(djk2)
 !.....fcij's should be computed after rcs is determined
               call get_fc_dfc(dij,is,js,isf,fcij,dfcij)
               call get_fc_dfc(dik,is,ks,isf,fcik,dfcik)
               call get_fc_dfc(djk,js,ks,isf,fcjk,dfcjk)
               almbd= cnst(1,isf)
-              t2= (abs(almbd)+1d0)**2
+              zang= cnst(2,isf)
+!!$              t2= (abs(almbd)+1d0)**eta
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
               drjkj(1:3)= -rjk(1:3)/djk
               drjkk(1:3)= -drjkj(1:3)
 !.....function value
-              t1= (almbd +cs)**2
-              eta3 = 0.5d0 /(rcs(isf)/2)**2
+              twozeta = 2d0**(-zang)
+              t1= (almbd +cs)**zang *twozeta
+              eta3 = 0.5d0 /rcs(isf)**2
 !!$              texpij = exp(-eta3*dij2)
 !!$              texpik = exp(-eta3*dik2)
 !!$              texpjk = exp(-eta3*djk2)
               texp = exp(-eta3*(dij2+dik2+djk2))
-              tmp = t1/t2 *texp
+              tmp = t1 *texp
 !.....This part is different from itype(isf)==101 by the factor fcjk
               gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik *fcjk
 !!$            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik
@@ -459,7 +464,7 @@ contains
                     +dgdij*drijj(1:3)+dgdjk*drjkj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) &
                     +dgdik*drikk(1:3)+dgdjk*drjkk(1:3)
-              dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik*fcjk *texp
+              dgcs= zang*(almbd +cs)**(zang-1d0) *twozeta *fcij*fcik*fcjk *texp
 !!$              dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij**2
 !!$              dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik**2
 !!$              dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
@@ -743,6 +748,7 @@ contains
   end subroutine get_fc_dfc
 !=======================================================================
   subroutine read_params_desc(myid,mpi_world,iprint)
+    use util, only: num_data
     implicit none
     include 'mpif.h'
 
@@ -754,7 +760,6 @@ contains
     real(8):: rcut2,rcut3
     logical:: lexist
     character(len=128):: ctmp,fname,cline,cmode
-    integer,external:: num_data
 
     if( myid.eq.0 ) then
 !.....read constants at the 1st call

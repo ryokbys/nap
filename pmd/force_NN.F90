@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-27 17:41:36 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-16 11:01:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -658,6 +658,7 @@ contains
   end function dsigmoid
 !=======================================================================
   subroutine read_params(myid,mpi_world,iprint)
+    use util,only: num_data
     implicit none
     include 'mpif.h'
 
@@ -668,7 +669,7 @@ contains
     integer,allocatable:: nwgt(:)
     logical:: lexist
     character:: ctmp*128,fname*128
-    integer,external:: num_data
+!!$    integer,external:: num_data
 
 !.....initialize some
     ncnst_type(1)= 2   ! Gaussian
@@ -884,6 +885,7 @@ contains
   end subroutine read_params
 !=======================================================================
   subroutine read_const_NN(myid,mpi_world,iprint)
+    use util, only: num_data
     implicit none
     include 'mpif.h'
 
@@ -893,7 +895,7 @@ contains
          ,ihl0,ihl1,ihl2,icmb(3),nsf,nsf1,nsf2,iap,jap,kap,ndat
     logical:: lexist
     character:: ctmp*128,fname*128
-    integer,external:: num_data
+!!$    integer,external:: num_data
 
 !.....initialize some
     ncnst_type(1)= 2   ! Gaussian
@@ -1018,6 +1020,7 @@ contains
   end subroutine read_const_NN
 !=======================================================================
   subroutine read_params_NN(myid,iprint)
+    use util, only: num_data
     implicit none
     include 'mpif.h'
 
@@ -1028,7 +1031,7 @@ contains
     integer,allocatable:: nwgt(:)
     logical:: lexist
     character:: ctmp*128,fname*128
-    integer,external:: num_data
+!!$    integer,external:: num_data
 
 !.....read parameters at the 1st call
     fname = trim(paramsdir)//'/'//trim(cpfname)
@@ -1250,6 +1253,7 @@ contains
 !    - "charge:" with an argument .true. (T) or .false. (F)
 !    - "rcw2:" or "rcw3:" the ratio to rc or rc3 for minimum r where the cutoff starts working.
 !
+    use util, only: num_data
     implicit none
     character(len=*),intent(in):: cline
     integer,intent(in):: iprint
@@ -1258,7 +1262,7 @@ contains
     real(8):: ropt
     character(len=10):: c1,copt
     logical:: lopt
-    integer,external:: num_data
+!!$    integer,external:: num_data
 
     ierr = 0
     if( index(cline,'bias:').ne.0 ) then

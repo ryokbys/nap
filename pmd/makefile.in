@@ -26,12 +26,11 @@ MPIFLAGS= @FCFLAGS@
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} -o $@ $<
 
 pmd= read_input.o util_vec.o util_rnd.o \
-	util_tag.o lasubs.o util_pmd.o mk_lspr.o \
+	util_tag.o lasubs.o mk_lspr.o \
 	common_parallel.o sort.o pmd_main.o pmd_core.o 
 pmc= prec_mc.o util_rnd.o mk_lspr.o read_input.o pmd_core.o util_vec.o \
-	util_tag.o lasubs.o util_pmd.o \
-	common_parallel.o sort.o
-comb= node_conv.o util_tag.o util_pmd.o util_vec.o
+	util_tag.o lasubs.o common_parallel.o sort.o
+comb= node_conv.o util_tag.o util_vec.o
 
 mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o mod_version.o mod_force.o \
 	mod_ttm.o descriptor.o metadynamics.o mod_constraints.o mod_vector.o \
@@ -56,8 +55,8 @@ params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 #-----------------------------------------------------------------------
 # Post process programs
 #
-pmd2akr= pmd2akr.o read_input.o util_pmd.o sort.o
-voids=  mod_pmdio.o voids.o util_pmd.o mk_lspr.o util_tag.o util_vec.o
+# pmd2akr= pmd2akr.o read_input.o util_pmd.o sort.o
+# voids=  mod_pmdio.o voids.o util_pmd.o mk_lspr.o util_tag.o util_vec.o
 
 #-----------------------------------------------------------------------
 # Make rule entries
@@ -87,14 +86,14 @@ cna2disl: cna2disl.o
 rdpmd: read_pmd.o ${mods}
 	${MPIFC} ${MPIFLAGS} -o $@ read_pmd.o ${mods}
 
-boxsize: change_pmd_boxsize.o ${mods} util_pmd.o
-	${MPIFC} ${MPIFLAGS} -o $@ change_pmd_boxsize.o ${mods} util_pmd.o
+# boxsize: change_pmd_boxsize.o ${mods} util_pmd.o
+# 	${MPIFC} ${MPIFLAGS} -o $@ change_pmd_boxsize.o ${mods} util_pmd.o
 
-sortpmd: sort_pmd.o ${mods} util_pmd.o sort.o
-	${MPIFC} ${MPIFLAGS} -o $@ sort_pmd.o ${mods} util_pmd.o sort.o
+# sortpmd: sort_pmd.o ${mods} util_pmd.o sort.o
+# 	${MPIFC} ${MPIFLAGS} -o $@ sort_pmd.o ${mods} util_pmd.o sort.o
 
-intstl: put_interstitials.o ${mod} util_pmd.o mk_lspr.o 
-	${MPIFC} ${MPIFLAGS} -o $@ ${mods} util_pmd.o mk_lspr.o put_interstitials.o
+# intstl: put_interstitials.o ${mod} util_pmd.o mk_lspr.o 
+# 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} util_pmd.o mk_lspr.o put_interstitials.o
 
 
 #.....Dependencies
@@ -115,14 +114,21 @@ force_Brenner.o: params_Brenner.h
 force_Lu_WHe.o: params_Lu_WHe.h
 force_Branicio_AlN.o: params_Branicio_AlN.h
 force_Mishin.o: params_Mishin_Al.h params_Mishin_Ni.h
-mod_constraints.o: mod_vector.o
-mod_rdcfrc.o: mod_structure.o
+force_Coulomb.o: mod_util.o
+force_LJ.o: mod_util.o
+force_NN2.o: mod_util.o
+force_SW.o: mod_util.o
+force_ZBL.o: mod_util.o
+force_cspline.o: mod_util.o
+mod_constraints.o: mod_vector.o mod_util.o
+mod_rdcfrc.o: mod_structure.o mod_util.o
+mod_ttm.o: mod_util.o
 
-descriptor.o descriptor.mod : descriptor.F90 force_ZBL.o
+descriptor.o descriptor.mod : descriptor.F90 force_ZBL.o mod_util.o
 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
 
 zload.o zload.mod : zload.F90
 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
 
-metadynamics.o metadynamics.mod : metadynamics.F90
+metadynamics.o metadynamics.mod : metadynamics.F90 mod_util.o
 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<

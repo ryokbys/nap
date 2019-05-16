@@ -81,8 +81,9 @@ contains
   end subroutine init_const
 !=======================================================================
   subroutine read_const_params(myid,mpi_world,iprint)
+    use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
-    integer,external:: num_data
+!!$    integer,external:: num_data
 
     integer:: i,j,ic
     real(8):: d,di,df

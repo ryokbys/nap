@@ -50,7 +50,7 @@ _nparam_type = {
     'Morse': 3,
     'angular': 2,
     'angular1': 2,
-    'angular2': 2,
+    'angular2': 3,
     'angular3': 2,
     'angular4': 2,
     'angular5': 3,
@@ -333,13 +333,22 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
                 ia,ja,ka = triple.get_isps()
                 for isf,sf in enumerate(triple.sfparams):
                     t = sf[0]
-                    if t in ('angular','angular1','angular2'):
+                    if t in ('angular','angular1'):
                         a = sf[1]
                         ang = -math.cos(a/180*math.pi)
                         f.write(' {0:3d}'.format(_type2num[t]) \
                                 +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
                                 +' {0:6.2f}'.format(rc3) \
                                 +' {0:10.4f}\n'.format(ang))
+                    elif t in ('angular2'):
+                        a = sf[1]
+                        ang = -math.cos(a/180*math.pi)
+                        zeta = sf[2]
+                        f.write(' {0:3d}'.format(_type2num[t]) \
+                                +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
+                                +' {0:6.2f}'.format(rc3) \
+                                +' {0:10.4f}'.format(ang) \
+                                +' {0:10.4f}\n'.format(zeta))
                     elif t in ('angular3','angular4'):
                         a = sf[1]
                         f.write(' {0:3d}'.format(_type2num[t]) \

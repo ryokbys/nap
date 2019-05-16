@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-15 15:26:35 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-16 10:52:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -23,6 +23,7 @@ program pmd
   use version
   use force
   use Coulomb, only: cterms
+  use util, only: time_stamp
   implicit none
   include "mpif.h"
   include "./params_unit.h"

@@ -129,9 +129,10 @@ contains
   end subroutine init_rdcfrc
 !=======================================================================
   subroutine read_rdcfrc_params(myid,mpi_world,iprint)
+    use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
     
-    integer,external:: num_data
+!!$    integer,external:: num_data
     character(len=128):: cfname,c1st
     integer:: i
     

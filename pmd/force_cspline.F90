@@ -25,6 +25,7 @@ module cspline
     real(8):: rcut
     real(8),allocatable:: pnts(:),vals(:)
     real(8),allocatable:: coefs(:,:)
+    real(8):: aux  ! auxiliary data
   end type spline
   type(spline),allocatable:: spls(:)
 
@@ -52,7 +53,7 @@ contains
          ,tmpk(3),csn,dfcij,dfcik,dgcs,dgdij,dgdik,dij,dij2,diji &
          ,dik,diki,dik2,epotl2,epotl3,fcij,fcik,gijk,phi,dphi,rc2,rct &
          ,rct2,tmp,eta3,texpij,texpik,texpjk,tmpjk(3),djk2,djk,fcjk,dfcjk &
-         ,drjk(3),dgdjk,xjk(3)
+         ,drjk(3),dgdjk,xjk(3),texp
     real(8),save:: rcmax,rcmax2,rctmax,rctmax2
     character(len=128):: ctype
     real(8),save,allocatable:: aa2(:,:),aa3(:,:),strsl(:,:,:)
@@ -231,10 +232,12 @@ contains
           ctype = spl%ctype
           if( trim(ctype).eq.'angular'&
                .or. trim(ctype).eq.'angular1' ) then
-            eta3 = 0.5d0 /(rct/2)**2
-            texpij = exp(-eta3 *dij2)
-            texpik = exp(-eta3 *dik2)
-            tmp = phi *texpij *texpik
+            eta3 = 0.5d0 /rct**2
+            texp = exp( -eta3 *(dij2+dik2))
+!!$            texpij = exp(-eta3 *dij2)
+!!$            texpik = exp(-eta3 *dik2)
+!!$            tmp = phi *texpij *texpik
+            tmp = phi *texp
             gijk = tmp *fcij *fcik
 !.....Potential
             epi(ia)= epi(ia) +gijk
@@ -244,7 +247,7 @@ contains
             drik(1:3) = -rik(1:3)/dik
             dgdij = dfcij*fcik*tmp +tmp*(-2d0*eta3*dij)*fcij*fcik
             dgdik = dfcik*fcij*tmp +tmp*(-2d0*eta3*dik)*fcij*fcik
-            dgcs = dphi *texpij*texpik *fcij*fcik
+            dgcs = dphi *texp *fcij*fcik
             dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*csn/dij**2
             dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*csn/dik**2
             tmpj(1:3)= dgcs*dcsdj(1:3) -drij(1:3)*dgdij
@@ -270,11 +273,13 @@ contains
             djk= sqrt(djk2)
             fcjk = fc1(djk,0d0,rct)
             dfcjk = dfc1(djk,0d0,rct)
-            eta3 = 0.5d0 /(rct/2)**2
-            texpij = exp(-eta3 *dij2)
-            texpik = exp(-eta3 *dik2)
-            texpjk = exp(-eta3 *djk2)
-            tmp = phi *texpij *texpik *texpjk
+            eta3 = 0.5d0 /rct**2
+            texp = exp( -eta3 *(dij2+dik2+djk2))
+!!$            texpij = exp(-eta3 *dij2)
+!!$            texpik = exp(-eta3 *dik2)
+!!$            texpjk = exp(-eta3 *djk2)
+!!$            tmp = phi *texpij *texpik *texpjk
+            tmp = phi *texp
             gijk = tmp *fcij *fcik *fcjk
 !.....Potential
             epi(ia)= epi(ia) +gijk
@@ -286,7 +291,8 @@ contains
             dgdij = dfcij*fcik*fcjk*tmp +tmp*(-2d0*eta3*dij)*fcij*fcik*fcjk
             dgdik = dfcik*fcij*fcjk*tmp +tmp*(-2d0*eta3*dik)*fcij*fcik*fcjk
             dgdjk = dfcjk*fcij*fcik*tmp +tmp*(-2d0*eta3*djk)*fcij*fcik*fcjk
-            dgcs = dphi *texpij*texpik*texpjk *fcij*fcik*fcjk
+!!$            dgcs = dphi *texpij*texpik*texpjk *fcij*fcik*fcjk
+            dgcs = dphi *texp *fcij*fcik*fcjk
             dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*csn/dij**2
             dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*csn/dik**2
 !!$          dcsdi(1:3)= -dcsdj(1:3)  -dcsdk(1:3)
@@ -477,6 +483,7 @@ contains
 !  Read knot positions and potential values of each knot.
 !  Coefficients are computed from these values.
 !
+    use util, only: num_data
     include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
 
@@ -484,7 +491,7 @@ contains
     real(8):: rcut
     logical:: lexist
     character(len=128):: fname,ctmp,ctmp2,ctype
-    integer,external:: num_data
+!!$    integer,external:: num_data
     
     
     if( myid.eq.0 ) then

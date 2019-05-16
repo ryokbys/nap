@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-03-04 18:39:34 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-16 11:01:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -308,8 +308,9 @@ contains
   end subroutine set_inner_dt
 !=======================================================================
   subroutine read_ttm_params(myid,mpi_world,iprint)
+    use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
-    integer,external:: num_data
+!!$    integer,external:: num_data
 
     character(len=128):: c1st,fname
     
