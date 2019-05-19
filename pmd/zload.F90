@@ -1,7 +1,7 @@
 module zload
 !-----------------------------------------------------------------------
 !  Module for loading on plane perpendicular to z-axis
-!                     Last-modified: <2018-10-21 20:05:57 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-17 13:33:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -24,6 +24,7 @@ contains
 !     ifmv's of top and bottom atoms within zskin_width in z-direction
 !     are set to 9.
 !
+    use util,only: replaceTag
     implicit none
     include 'mpif.h'
     integer,intent(in):: natm,myid_md,mpi_md_world,nstp,iprint
@@ -124,6 +125,7 @@ contains
 !  ifmv's of top and bottom atoms within zskin_width in z-direction
 !  are set to 9.
 !
+    use util,only: replaceTag
     implicit none
     include 'mpif.h'
     integer,intent(in):: natm,myid_md,mpi_md_world,nstp,iprint

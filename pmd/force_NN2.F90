@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-16 11:01:42 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-17 13:25:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -61,6 +61,7 @@ contains
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use descriptor,only: gsf,dgsf,igsf,nsf,nal,calc_desc,make_gsf_arrays
+    use util,only: itotOf
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -81,7 +82,7 @@ contains
     real(8),allocatable,save:: strsl(:,:,:),aal(:,:)
 
     integer:: itot
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
     character(len=8):: cnum
 
     call make_gsf_arrays(l1st,namax,natm &
@@ -842,6 +843,7 @@ contains
 !  Currently only 1 hidden layer is implemented.
 !=======================================================================
     use descriptor,only: gsf,dgsf,igsf,nsf,nnl,nal,mskgfs
+    use util,only: itotOf
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
@@ -852,7 +854,7 @@ contains
 
     integer:: iv,ia,ihl0,ihl1,jj,ja,jra
     real(8):: g,h1,z1,tmp,w2,w1,ds,dds,ftmp(3),xi(3),xj(3),xij(3),rij(3)
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
     real(8),allocatable:: dgsf2(:,:,:,:)
 
 !.....TO CHECK: Need to make hl1 every time?

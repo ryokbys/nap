@@ -1,6 +1,6 @@
 module NN
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-16 11:01:42 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-17 13:25:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with 1 hidden
 !  layer. It is available for plural number of species.
@@ -69,6 +69,7 @@ contains
   subroutine force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
+    use util,only: itotOf
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -89,7 +90,7 @@ contains
     real(8),allocatable,save:: strsl(:,:,:),aal(:,:)
 
     integer:: itot
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
     character(len=8):: cnum
 
 !    real(8),allocatable:: aml(:,:,:,:),bml(:,:,:,:)
@@ -1313,6 +1314,7 @@ contains
   subroutine write_dgsf(ionum,natm,namax,nnmax,lspr,tag,nsf)
 !   Write out dgsf data.
 !   Buffer atom indices are replaced to resident atom ones.
+    use util,only: itotOf
     implicit none
     integer,intent(in):: ionum
     integer,intent(in):: natm,namax,nnmax,nsf,lspr(0:nnmax,namax)
@@ -1322,7 +1324,7 @@ contains
     integer:: ia,jj,ja,jra,isf
     real(8),allocatable:: dgsfo(:,:,:,:)
     integer(2),allocatable:: igsfo(:,:,:)
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
 
     allocate(dgsfo(3,natm,nsf,natm),igsfo(nsf,natm,natm))
 !.....reduce d(i)gsf data of buffer atoms to those of resident atoms

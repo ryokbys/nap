@@ -19,7 +19,7 @@ function itotOf(tag)
   real(8),intent(in):: tag
   integer:: itotOf
   real(8):: tmp
-  integer,external:: ispOf,ifmvOf
+
   tmp= tag -ispOf(tag) -ifmvOf(tag)*1d-1
   itotOf= nint(tmp*1d+14)
   return
@@ -31,7 +31,6 @@ subroutine replaceTag(ctx,ival,tag)
   integer,intent(in):: ival
   real(8),intent(inout):: tag
 
-  integer,external:: ifmvOf
   integer:: ifmv
 
   if( trim(ctx) .eq. 'isp' ) then

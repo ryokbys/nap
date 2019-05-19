@@ -198,13 +198,14 @@ contains
 !  Reduce forces on atoms that are selected in some way...
 !
     use structure,only: idcna
+    use util,only: itotOf
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),tag(namax),h(3,3)
     real(8),intent(inout):: aa(3,namax)
 
     integer:: ia,is,i,itot,icna
     real(8):: beta
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
 
     if( ctype_fmod(1:5).eq.'neigh' ) then
       if( .not. allocated(ann) ) allocate(ann(namax))

@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-16 11:01:42 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-17 13:31:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -517,6 +517,7 @@ contains
 !
 !  Compute and set Ta and Tap array from atomic kinetic energies.
 !
+    use util,only: ifmvOf
     integer,intent(in):: namax,natm,nspmax,myid,mpi_world,istp,iprint
     real(8),intent(in):: tag(namax),fmv(3,0:9),va(3,namax),h(3,3) &
          ,fekin(nspmax)
@@ -525,7 +526,7 @@ contains
     real(8):: ek,t0,vat(3),vatr(3)
     integer,allocatable,save:: nacl(:),nacpl(:)
     real(8),allocatable,save:: eksuml(:),ekpsuml(:),vacl(:,:)
-    integer,external:: ifmvOf
+!!$    integer,external:: ifmvOf
 
     if( .not. allocated(nacl) ) then
       allocate(nacl(nxyz),nacpl(nxyz),eksuml(nxyz),ekpsuml(nxyz)&
@@ -871,6 +872,7 @@ contains
 !
 !  Langevin thermostat for atomic system.
 !
+    use util,only: itotOf, ifmvOf
     include "params_unit.h"
     integer,intent(in):: namax,natm,nspmax,myid,mpi_world,iprint
     real(8),intent(in):: aa(3,namax),tag(namax),am(nspmax) &
@@ -881,7 +883,7 @@ contains
     real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0,vt(3)&
          ,aain(3),aaout(3),vin(3),vout(3),v0(3)
     real(8):: ediffl(nspmax),deinl(nspmax),deoutl(nspmax)
-    integer,external:: ifmvOf,itotOf
+!!$    integer,external:: ifmvOf,itotOf
     real(8),external:: box_muller,sprod
     logical,save:: l1st = .true.
 
@@ -1198,6 +1200,7 @@ contains
 !    - ID, time, position (y,z), velocity (x,y,z)
 !
     use pmdmpi
+    use util,only: itotOf
     integer,intent(in):: namax
     integer,intent(inout):: natm
     real(8),intent(inout):: tag(namax),ra(3,namax),va(3,namax)&
@@ -1214,7 +1217,7 @@ contains
     real(8),allocatable,save:: tagabl(:),rabl(:,:),vabl(:,:)
     integer:: istat(mpi_status_size),itag
 
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
 
     if( l1st ) then
       if( myid_md.eq.0 ) then

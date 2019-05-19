@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-16 11:06:06 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-17 13:48:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -140,8 +140,19 @@ contains
     character(len=*),intent(in):: cfname
 
     integer:: ia,ib,l,i
+    character(len=128):: ctmp 
 
     open(ionum,file=trim(cfname),status='old')
+!.....Comment lines at the top of pmdini could contain options.
+    do while(.true.)
+      read(ionum,'(a)') ctmp
+      if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) then
+        call parse_option(ctmp)
+      else
+        backspace(ionum)
+        exit
+      endif
+    enddo
     read(ionum,*) hunit
     read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
     h(1:3,1:3,0:1)= h(1:3,1:3,0:1)*hunit
@@ -240,6 +251,7 @@ contains
 !
 !     Write atomic configuration in LAMMPS-dump format file.
 !
+    use util,only: itotOf
     implicit none 
     integer,intent(in):: ionum
     character(len=*),intent(in) :: cfname
@@ -248,7 +260,7 @@ contains
     real(8):: xi(3),ri(3),eki,epi,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz, &
          xlo_bound,xhi_bound,ylo_bound,yhi_bound, &
          zlo_bound,zhi_bound,st(3,3)
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
     real(8),allocatable,save:: rlmp(:,:)
 
     real(8),parameter:: tiny = 1d-14
@@ -478,5 +490,65 @@ contains
     return
   end subroutine hmat2lammps
 !=======================================================================
+  subroutine parse_option(cline)
+!
+!  Parse options from a comment line.
+!  Lines starting from ! or # are treated as comment lines,
+!  and options can be given at the comment lines.
+!  The option words should be put after these comment characters with
+!  one or more spaces between them for example,
+!
+!  specorder: Al Mg Si
+!
+!  Currently available options are:
+!    - "specorder:", Species order. The number of species limited up to 9.
+!
+    use util, only: num_data
+    implicit none
+    character(len=*),intent(in):: cline
+
+    integer:: iopt1,isp,num
+    real(8):: opt1, opt2
+    character(len=10):: c1,copt
+    logical:: lopt
+
+    if( index(cline,'specorder:').ne.0 ) then
+      num = num_data(trim(cline),' ')
+      if( num.gt.11 ) stop 'ERROR: number of species exceeds the limit.'
+      read(cline,*) c1, copt, cspname(1:num-2)
+      if( iprint.gt.1 ) then
+        print '(a,10(2x,a))','  Species order: ', &
+             (trim(cspname(isp)),isp=1,nspmax)
+      else if( iprint.gt.0 ) then
+        print '(a,10(2x,a))','  Species order: ', &
+             (trim(cspname(isp)),isp=1,num-2)
+      endif
+    endif
+    
+  end subroutine parse_option
+!=======================================================================
+  function csp2isp(csp)
+!
+!  Convert cspi to isp using cspname array.
+!  If not found, return -1.
+!
+    character(len=*),intent(in):: csp
+    integer:: csp2isp
+
+    integer:: isp
+
+    csp2isp = -1
+    do isp=1,nspmax
+      if( trim(csp).eq.trim(cspname(isp)) ) then
+        csp2isp = isp
+        return
+      endif
+    enddo
+    return
+  end function csp2isp
 
 end module pmdio
+!-----------------------------------------------------------------------
+!     Local Variables:
+!     compile-command: "make pmd"
+!     End:

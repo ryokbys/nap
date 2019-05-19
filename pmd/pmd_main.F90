@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-16 10:52:46 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-17 13:47:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -23,7 +23,7 @@ program pmd
   use version
   use force
   use Coulomb, only: cterms
-  use util, only: time_stamp
+  use util, only: time_stamp, itotOf
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -36,7 +36,7 @@ program pmd
   integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,nstp_done
   integer:: mpicolor,mpikey,ierr,jerr,itmp,nprocs
   real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin
-  integer,external:: itotOf
+!!$  integer,external:: itotOf
 
 !-----initialize the MPI environment
   call mpi_init(ierr)
@@ -121,6 +121,9 @@ program pmd
     chitot(1:ntot0) = 0d0
   endif
 
+!.....Broadcast species data read from pmdini  
+  call mpi_bcast(cspname,3*nspmax,mpi_character,0,mpicomm,ierr)
+
 !.....Broadcast determined nx,ny,nz to reset MPI communicator if needed.
   call mpi_bcast(nx,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(ny,1,mpi_integer,0,mpicomm,ierr)
@@ -177,8 +180,8 @@ program pmd
 !.....call pmd_core to perfom MD
   call pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,ekitot,epitot,chgtot,chitot,nstp,nerg,npmd &
-       ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
-       ,nspmax,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
+       ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,nspmax,cspname &
+       ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
        ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl &
        ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv &
        ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width &
@@ -454,6 +457,7 @@ subroutine bcast_params()
   call mpi_bcast(zshear_angle,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(strfin,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(am,nspmax,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(cspname,nspmax*3,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(ciofmt,6,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(nrmtrans,6,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(lstrs0,1,mpi_logical,0,mpicomm,ierr)
@@ -501,6 +505,7 @@ end subroutine bcast_params
 !=======================================================================
 subroutine write_force(ionum,cpostfix,h,epot,ntot &
      ,tagtot,atot,stnsr)
+  use util,only: itotOf
   implicit none
   include "./params_unit.h"
   integer,intent(in):: ionum,ntot
@@ -511,7 +516,7 @@ subroutine write_force(ionum,cpostfix,h,epot,ntot &
   integer:: i,n0,ixyz,ierr
   real(8):: at(3),ptmp(6)
   integer,parameter:: nmpi = 2
-  integer,external:: itotOf
+!!$  integer,external:: itotOf
 
 
 !.....Write out forces

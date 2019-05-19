@@ -1,12 +1,12 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-16 11:06:44 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-17 13:30:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
 subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
      ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd &
-     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
-     ,nspmax,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
+     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,nspmax,cspname &
+     ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
      ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl &
      ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv &
      ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width &
@@ -27,6 +27,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use rdcfrc,only: init_rdcfrc, reduce_forces, finalize_rdcfrc
   use structure,only: cna,acna
   use deform,only: init_deform, apply_deform
+  use util,only: itotOf, ifmvOf
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -45,6 +46,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,pfin,ttgt(9),chgtot(ntot0),chitot(ntot0)
   character,intent(in):: ciofmt*6, cpctl*20, ctctl*20 &
        ,boundary*3
+  character(len=3),intent(in):: cspname(nspmax) 
   character(len=*),intent(in):: czload_type,cstruct,cdeform
 !      character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: ltdst,lstrs0,lcellfix(3,3),lmetaD,lconst &
@@ -66,7 +68,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   real(8):: strnow,ftop,fbot
 !-----output file names
   character:: cnum*128, ctmp*128
-  integer,external:: itotOf,ifmvOf
+!!$  integer,external:: itotOf,ifmvOf
   logical:: ltot_updated = .true.
 !.....Formats for output
   character(len=20):: cfistp  = 'i10' !or larger
@@ -1083,7 +1085,7 @@ end subroutine pmd_core
 subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
      ,ekitot,epitot,chgtot,chitot &
      ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
-     ,nspmax,am,dt,rc,rbuf,rc1nn,stnsr,epot &
+     ,nspmax,cspname,am,dt,rc,rbuf,rc1nn,stnsr,epot &
      ,ekin,ifcoulomb,lvc,iprint,lcalcgrad,ndimp,maxisp &
      ,gwe,gwf,gws,lematch,lfmatch,lsmatch,boundary)
 !
@@ -1115,7 +1117,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,ntot0),gws(ndimp,6)
   logical,intent(inout):: lvc
   logical,intent(in):: lematch,lfmatch,lsmatch
-  character(len=3),intent(in):: boundary
+  character(len=3),intent(in):: boundary,cspname(nspmax)
 
   integer:: i,ierr,is,nspl,nxyz,iprm0
   real(8):: aai(3),epott
@@ -1433,6 +1435,7 @@ end subroutine ntset
 !=======================================================================
 subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
      ,vmax,mpi_md_world)
+  use util,only: ifmvOf
   implicit none 
   include "mpif.h"
   integer,intent(in):: namax,natm,mpi_md_world,nspmax
@@ -1442,7 +1445,7 @@ subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
 !-----locals
   integer:: i,ierr,is,ixyz,jxyz,imax,ifmv
   real(8):: ekinl,x,y,z,v(3),v2,vmaxl,ekll(9)
-  integer,external:: ifmvOf
+!!$  integer,external:: ifmvOf
 
   ekinl=0d0
   eki(1:3,1:3,1:natm)= 0d0
@@ -2794,6 +2797,7 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
 !  to create the total system for output.
 !
   use pmdio,only: ntot
+  use util,only: itotOf
   implicit none
   include 'mpif.h'
   integer,intent(in):: ntot0,natm,nxyz,myid_md,mpi_md_world
@@ -2808,7 +2812,7 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
   integer:: istat(mpi_status_size),itag
   real(8):: t0
   real(8),allocatable,save:: ratmp(:,:)
-  integer,external:: itotOf
+!!$  integer,external:: itotOf
 
   t0 = mpi_wtime()
 
@@ -2901,6 +2905,7 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi)
 !
 !  Sort by tag for output.
 !  
+  use util,only: itotOf
   implicit none
   integer,intent(in):: natm
   real(8),intent(inout):: ra(3,natm),va(3,natm),aa(3,natm) &
@@ -2911,7 +2916,7 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi)
   real(8),allocatable:: buf(:,:)
   integer:: i
   integer,save:: nsave = 0
-  integer,external:: itotOf
+!!$  integer,external:: itotOf
 
   if( .not. allocated(itag) .or. natm.gt.nsave ) then
     if( allocated(itag) ) deallocate(itag,buf)

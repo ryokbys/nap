@@ -1,6 +1,6 @@
 module Buckingham
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-06-27 17:42:31 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-17 13:25:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Buckingham calculation
 !    - only force on i is considered, no need to send back
@@ -23,6 +23,7 @@ contains
   subroutine force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
+    use util,only: itotOf
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -43,7 +44,7 @@ contains
          ,a,rho,c
     real(8),allocatable,save:: strsl(:,:,:)
 
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
 
     if( l1st ) then
       if( allocated(strsl) ) deallocate(strsl)

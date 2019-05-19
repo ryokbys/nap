@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-14 18:49:07 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-16 11:47:36 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -11,6 +11,7 @@ program fitpot
   use version
   use NN2,only: set_iglid_NN2
   use linreg,only: set_iglid_linreg
+  use util,only: time_stamp
   implicit none
   integer:: ismpl,ihour,imin,isec
   real(8):: tmp,fval0,ftrn0,ftst0
@@ -346,6 +347,7 @@ subroutine get_dir_list(ionum)
   use variables
   use parallel
   use fp_common,only: ndat_in_line
+  use util,only: num_data
   implicit none
   interface
     subroutine shuffle_dirlist(nsmpl,cdirlist,iclist)
@@ -357,7 +359,7 @@ subroutine get_dir_list(ionum)
   integer,intent(in):: ionum
   integer:: is,ndat
   logical:: lerror = .false.
-  integer,external:: num_data
+!!$  integer,external:: num_data
   character(len=128):: ctmp 
 
   if( .not. allocated(cdirlist)) allocate(cdirlist(nsmpl))

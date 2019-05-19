@@ -483,7 +483,8 @@ contains
 !  Read knot positions and potential values of each knot.
 !  Coefficients are computed from these values.
 !
-    use util, only: num_data
+    use util, only: num_data, is_numeric
+    use pmdio,only: csp2isp
     include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
 
@@ -491,6 +492,7 @@ contains
     real(8):: rcut
     logical:: lexist
     character(len=128):: fname,ctmp,ctmp2,ctype
+    character(len=3):: cspi,cspj,cspk
 !!$    integer,external:: num_data
     
     
@@ -529,8 +531,10 @@ contains
               stop 1
             endif
             backspace(ionum)
-            read(ionum,*) ctype, isp, jsp, rcut, npnts
+            read(ionum,*) ctype, cspi, cspj, rcut, npnts
             spls(ispl)%ctype = ctype
+            isp = csp2isp(cspi)
+            jsp = csp2isp(cspj)
             spls(ispl)%isp = isp
             spls(ispl)%jsp = jsp
             spls(ispl)%rcut = rcut
@@ -556,8 +560,11 @@ contains
               stop 1
             endif
             backspace(ionum)
-            read(ionum,*) ctype, isp, jsp, ksp, rcut, npnts
+            read(ionum,*) ctype, cspi, cspj, cspk, rcut, npnts
             spls(ispl)%ctype = ctype
+            isp = csp2isp(cspi)
+            jsp = csp2isp(cspj)
+            ksp = csp2isp(cspk)
             spls(ispl)%isp = isp
             spls(ispl)%jsp = jsp
             spls(ispl)%ksp = ksp
@@ -585,7 +592,14 @@ contains
       isp = spls(i)%isp
       jsp = spls(i)%jsp
       ksp = spls(i)%ksp
-      if( ksp .lt. 0 ) then  ! radial
+      if( isp .lt. 0 .or. jsp.lt.0 ) then
+!.....Do nothing if isp or jsp < 0, which means that the potential has
+!     nothing to do with the system considered.
+        if( myid.eq.0 .and. iprint.gt.0 ) then
+          print *,'The following spline data is not used in this system, spline-ID: ',i
+        endif
+        continue
+      else if( ksp .lt. 0 ) then  ! radial
         idpair(isp,jsp) = i
         idpair(jsp,isp) = i
       else  ! angular

@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2019-05-08 15:16:19 Ryo KOBAYASHI>
+!                    Last modified: <2019-05-17 13:29:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -106,12 +106,13 @@ contains
   end subroutine initialize_pmdvars
 !=======================================================================
   subroutine calc_nfmv(ntot,tagtot,myid,mpi_world)
+    use util,only: ifmvOf
     include 'mpif.h'
     integer,intent(in):: ntot,myid,mpi_world
     real(8),intent(in):: tagtot(ntot)
 
     integer:: ia,nfmvl,ierr
-    integer,external:: ifmvOf
+!!$    integer,external:: ifmvOf
 
     if( myid.eq.0 ) then
       nfmv = 0

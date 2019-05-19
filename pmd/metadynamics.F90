@@ -1,6 +1,6 @@
 module metadynamics
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-16 11:01:42 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-17 13:26:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Metadynamics module mainly for creating samples for fitpot.
 !-----------------------------------------------------------------------
@@ -307,13 +307,14 @@ contains
 !=======================================================================
   subroutine update_bonds(namax,natm,nsp,tag,ra,h &
            ,myid,mpi_world,iprint,ihist)
+    use util,only: itotOf
     integer,intent(in):: namax,natm,nsp
     integer,intent(in):: myid,mpi_world,iprint,ihist
     real(8),intent(in):: tag(natm),ra(3,natm),h(3,3)
 
     integer:: ia,ja,iat,jat,i,itot,ib,idiv1,idiv2
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,rbonds(2),d1,d2,tmp
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
 
     do ib=1,nbond
       ia = ibonds(1,ib)
@@ -360,13 +361,14 @@ contains
 !=======================================================================
   subroutine update_bonds_from_atoms(namax,natm,nsp,tag,ra,h &
        ,nnmax,lspr,myid,mpi_world,iprint,ihist)
+    use util,only: itotOf
     integer,intent(in):: namax,natm,nsp,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint,ihist
     real(8),intent(in):: tag(natm),ra(3,natm),h(3,3)
 
     integer:: i,j,ia,ja,jat,iat
     real(8):: xi(3),xj(3),xij(3),rij(3),dij
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
 
     do i=1,natm4bnd
       iat = iatm4bnd(i)
@@ -385,10 +387,11 @@ contains
   end subroutine update_bonds_from_atoms
 !=======================================================================
   function ia_from_itot(itot,natm,tag)
+    use util,only: itotOf
     integer,intent(in):: itot,natm
     real(8),intent(in):: tag(natm)
     integer:: ia_from_itot
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
     integer:: ia
 
     ia_from_itot = 0
@@ -541,6 +544,7 @@ contains
 !
 !  CV is bonds.
 !
+    use util,only: itotOf
     integer,intent(in):: namax,natm,myid,mpi_world,iprint,nnmax &
          ,lspr(0:nnmax,namax),ihist
     real(8),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
@@ -550,7 +554,7 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,dxdi(3),dxdj(3),fval,dfval &
          ,epotl,at(3),rbonds(2)
     real(8),save,allocatable:: aal(:,:),dbdr(:)
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
 
     if( .not.allocated(dbdr) ) allocate(dbdr(nbond))
 
@@ -722,6 +726,7 @@ contains
 !
 !  CV is bonds_from_atoms
 !
+    use util,only: itotOf
     integer,intent(in):: namax,natm,myid,mpi_world,iprint,nnmax &
          ,lspr(0:nnmax,namax),ihist
     real(8),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
@@ -732,7 +737,7 @@ contains
          ,epotl,at(3),texp,tmp
     logical:: l_jat_in_lspr 
     real(8),save,allocatable:: aal(:,:)
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
 
     if( .not. allocated(aal) ) then
       allocate(aal(3,namax))

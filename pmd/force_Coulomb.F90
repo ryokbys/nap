@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-16 10:54:34 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-17 13:25:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -1616,6 +1616,7 @@ contains
 !  Long-range term of Ewald sum.
 !  Not parallelized and not suitable for large system as it is too slow.
 !
+    use util,only: itotOf
     implicit none
     include 'mpif.h'
     integer,intent(in):: namax,natm,nnmax,iprint, &
@@ -1633,7 +1634,7 @@ contains
          cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm,sn3m,sn3mm
     real(8),external:: sprod,absv
     real(8):: emat(3,3)
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
 
 !.....Compute reciprocal vectors
     if( lcell_updated ) call get_recip_vectors(h)

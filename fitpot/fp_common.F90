@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-08 15:12:19 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-16 11:45:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -658,14 +658,16 @@ contains
          gws(ndimp,6)
 
     logical,save:: l1st = .true.
+    integer,parameter:: nismax = 9
 
     integer:: i,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
-         nismax,nstps_done,ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
-    real(8):: am(9),dt,rbuf,dmp,tinit,tfin,ttgt(9),trlx,stgt(3,3),&
+         nstps_done,ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
+    real(8):: am(nismax),dt,rbuf,dmp,tinit,tfin,ttgt(nismax),trlx,stgt(3,3),&
          ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv &
          ,rc1nn
     logical:: ltdst,lcellfix(3,3),lvc
     character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5,boundary*3
+    character(len=3):: cspname(nismax)
     logical:: update_force_list
 
     logical,external:: string_in_arr
@@ -677,10 +679,9 @@ contains
     endif
 
     maxstp = 0
-    nismax = 9
     nerg = 1
     npmd = 1
-    am(1:9) = 1d0  ! Since no dynamics, no need of mass
+    am(1:nismax) = 1d0  ! Since no dynamics, no need of mass
     dt = 5d0
     ciofmt = 'ascii'
     ifpmd = 0
@@ -692,7 +693,7 @@ contains
     tinit = 0d0
     tfin = 0d0
     ctctl = 'none'
-    ttgt(1:9) = 300d0
+    ttgt(1:nismax) = 300d0
     trlx = 100d0
     ltdst = .false.
     ntdst = 1
@@ -770,7 +771,7 @@ contains
          ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
          ,smpl%chg,smpl%chi &
          ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
-         ,nismax,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
+         ,nismax,cspname,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
          ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
          ,gwe,gwf,gws &
          ,lematch,lfmatch,lsmatch,boundary)
@@ -1416,11 +1417,12 @@ contains
   end subroutine restore_normalize
 !=======================================================================
   function ndat_in_line(ionum,delim) result(ndat)
+    use util, only: num_data
     implicit none
     integer,intent(in):: ionum
     character(len=1),intent(in):: delim
     integer:: ndat
-    integer,external:: num_data
+!!$    integer,external:: num_data
     character:: ctmp*128
 
     read(ionum,'(a)') ctmp

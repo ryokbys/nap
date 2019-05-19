@@ -157,9 +157,10 @@ contains
 !  Convert itot of constrained atoms (k1,k2) to current indice (i1,i2).
 !  NOTE: This is not applicable to parallel MD...
 !
+    use util,only: itotOf
     integer,intent(in):: namax,natm
     real(8),intent(in):: tag(namax)
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
     integer:: ia,ic
     
 !.....At first, find out two atoms that are constrained
@@ -180,9 +181,10 @@ contains
 !=======================================================================
   subroutine update_const(namax,natm,tag,ra,h,istp,maxstp)
     use vector
+    use util,only: itotOf
     integer,intent(in):: namax,natm,istp,maxstp
     real(8),intent(in):: tag(namax),ra(1:3,namax),h(3,3)
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
 
     integer:: ic,i,j
     real(8):: ri(3),rj(3)
@@ -213,6 +215,7 @@ contains
 !  Constraints on positions
 !
     use vector
+    use util,only: itotOf
     integer,intent(in):: namax,natm,nspmax
     real(8),intent(in):: h(3,3),hi(3,3),tag(namax),dt,am(nspmax)
     real(8),intent(inout):: ra(3,namax),va(3,namax)
@@ -220,7 +223,7 @@ contains
     integer:: i,j,ia,ic,is,js,iter
     real(8):: rij(3),rijos(3),vij(3),ami,amj,amij,dd,gmk
     logical:: not_conv
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
 
 !.....Normal velocity Verlet update of positions
     do ia=1,natm

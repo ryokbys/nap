@@ -297,10 +297,11 @@ end subroutine read_chgtot_bin
 !=======================================================================
 subroutine write_chgtot_ascii(ionum,cfname)
   use pmdio
+  use util,only: itotOf
   implicit none
   integer,intent(in):: ionum
   character(len=*),intent(in) :: cfname
-  integer,external:: itotOf
+!!$  integer,external:: itotOf
 
   integer:: ia,ib,l,i
 
@@ -316,10 +317,11 @@ end subroutine write_chgtot_ascii
 !=======================================================================
 subroutine write_chgtot_bin(ionum,cfname)
   use pmdio
+  use util,only: itotOf
   implicit none
   integer,intent(in):: ionum
   character(len=*),intent(in) :: cfname
-  integer,external:: itotOf
+!!$  integer,external:: itotOf
 
   integer:: ia,ib,l,i
 
@@ -338,6 +340,7 @@ subroutine write_dump(ionum,cfname)
 !     Write atomic configuration in LAMMPS-dump format file.
 !
   use pmdio
+  use util,only: itotOf
   implicit none 
   integer,intent(in):: ionum
   character(len=*),intent(in) :: cfname
@@ -346,7 +349,7 @@ subroutine write_dump(ionum,cfname)
   real(8):: xi(3),ri(3),eki,epi,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz, &
        xlo_bound,xhi_bound,ylo_bound,yhi_bound, &
        zlo_bound,zhi_bound,st(3,3)
-  integer,external:: itotOf
+!!$  integer,external:: itotOf
   real(8),allocatable,save:: rlmp(:,:)
 
   real(8),parameter:: tiny = 1d-14

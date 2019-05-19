@@ -382,12 +382,13 @@ c=======================================================================
 c
 c  Read sample errors
 c
+      use util,only: num_data
       implicit none
       integer,intent(in):: ionum,nrow
       real(8),intent(out):: eerr(nrow),ferr(nrow),serr(nrow)
       character(len=*),intent(out):: cval(nrow)
 
-      integer,external:: num_data
+c      integer,external:: num_data
       integer:: irow,ndat
       character(len=1024):: ctmp 
       
@@ -412,12 +413,13 @@ c=======================================================================
 c
 c  Read sample weights
 c
+      use util,only: num_data
       implicit none
       integer,intent(in):: ionum,nrow
       real(8),intent(out):: erg0(nrow),temp(nrow)
       character(len=*),intent(out):: cval(nrow)
 
-      integer,external:: num_data
+c      integer,external:: num_data
       integer:: irow,ndat
       character(len=1024):: ctmp
 
@@ -491,12 +493,13 @@ c     Read forces
 c     There is no limit of number of force-fields to be specified.
 c
       use variables,only: nsubff,csubffs
+      use util,only: num_data
       implicit none
       integer,intent(in):: ionum
 
       integer:: i,ndat
       character(len=1024):: ctmp
-      integer,external:: num_data
+c      integer,external:: num_data
 
       backspace(ionum)
       read(ionum,'(a)') ctmp
@@ -509,12 +512,13 @@ c
 c=======================================================================
       subroutine read_force_match_species(ionum)
       use variables,only: lsps_frc
+      use util,only: num_data
       implicit none
       integer,intent(in):: ionum
 
       integer:: i,ndat,nsp_frc
       character(len=1024):: ctmp
-      integer,external:: num_data
+c      integer,external:: num_data
       integer,allocatable:: isps(:)
 
       backspace(ionum)
@@ -534,12 +538,13 @@ c=======================================================================
 c=======================================================================
       subroutine read_nn_nhl(ionum)
       use variables,only: nn_nhl
+      use util,only: num_data
       implicit none
       integer,intent(in):: ionum
 
       integer:: nl,ndat,i
       character(len=1024):: ctmp
-      integer,external:: num_data
+c      integer,external:: num_data
 
       backspace(ionum)
       read(ionum,'(a)') ctmp

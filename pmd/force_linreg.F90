@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-04-25 11:30:20 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-18 21:18:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -674,6 +674,7 @@ contains
     character(len=128):: fname
 
     if( myid.eq.0 ) then
+      if( iprint.gt.1 ) print *,'read_params_linreg...'
       fname = trim(paramsdir)//'/'//trim(cpfname)
 !.....read parameters at the 1st call
       inquire(file=trim(fname),exist=lexist)
@@ -741,6 +742,7 @@ contains
 !  - iprm0: The starting point -1 in parameter array for this FF.
 !
     use descriptor
+    use util,only: itotOf
     implicit none
     integer,intent(in):: namax,natm,nnmax,ndimp,iprint,lspr(0:nnmax,namax)&
          ,iprm0
@@ -749,7 +751,7 @@ contains
     logical,intent(in):: lematch,lfmatch,lsmatch
 
     integer:: i,ia,ja,jj,isf,ne,nf,jra
-    integer,external:: itotOf
+!!$    integer,external:: itotOf
     real(8):: ftmp(3),xi(3),xj(3),xij(3),rij(3)
 
     if( lematch ) then

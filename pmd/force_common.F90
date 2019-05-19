@@ -698,11 +698,12 @@ subroutine reduce_dba_bk(natm,namax,tag,x,ndim)
 !  Send-back or reduce reaction on cached-atoms.
 !  This routine works only on small MD not on parallel version.
 !-----------------------------------------------------------------------
+  use util,only: itotOf
   implicit none
   integer,intent(in):: namax,natm,ndim
   real(8),intent(in):: tag(namax)
   real(8),intent(inout):: x(ndim,namax)
-  integer,external:: itotOf
+!!$  integer,external:: itotOf
   integer:: ia,ja
 
   do ia=natm+1,namax
@@ -718,11 +719,12 @@ subroutine distribute_dba(natm,namax,tag,x,ndim)
 !  Distribute some values to the cached (boundary) atoms.
 !  This routine works only on small MD not on parallel version.
 !-----------------------------------------------------------------------
+  use util,only: itotOf
   implicit none
   integer,intent(in):: namax,natm,ndim
   real(8),intent(in):: tag(namax)
   real(8),intent(inout):: x(ndim,namax)
-  integer,external:: itotOf
+!!$  integer,external:: itotOf
   integer:: ia,ja
 
   do ia=natm+1,namax
