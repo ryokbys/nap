@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-17 13:48:57 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-19 22:45:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -100,6 +100,7 @@ module pmdio
   real(8):: schg(1:nspmax)= 0d0
 !.....species name
   character(len=3):: cspname(nspmax) = 'x'
+  logical:: has_cspname = .false.
 
 !.....Boundary condition: p = periodic, f = free, w = wall
   character(len=3):: boundary = 'ppp'
@@ -256,12 +257,13 @@ contains
     integer,intent(in):: ionum
     character(len=*),intent(in) :: cfname
 
-    integer:: i,k,l
+    integer:: i,k,l,is
     real(8):: xi(3),ri(3),eki,epi,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz, &
          xlo_bound,xhi_bound,ylo_bound,yhi_bound, &
          zlo_bound,zhi_bound,st(3,3)
 !!$    integer,external:: itotOf
     real(8),allocatable,save:: rlmp(:,:)
+    character(len=3):: csp
 
     real(8),parameter:: tiny = 1d-14
 
@@ -302,12 +304,23 @@ contains
           if( abs(st(l,k)).lt.tiny ) st(l,k) = 0d0
         enddo
       enddo
-      write(ionum,'(i8,i3,3f12.5,8es11.3,f9.4,f9.2)') &
-           itotOf(tagtot(i)),int(tagtot(i)),rlmp(1:3,i),eki, &
-           epi, &
-           st(1,1),st(2,2),st(3,3), &
-           st(2,3),st(1,3),st(1,2), &
-           chgtot(i),chitot(i)
+      if( has_cspname ) then
+        is = int(tagtot(i))
+        csp = cspname(is)
+        write(ionum,'(i8,a4,3f12.5,8es11.3,f9.4,f9.2)') &
+             itotOf(tagtot(i)),trim(csp),rlmp(1:3,i),eki, &
+             epi, &
+             st(1,1),st(2,2),st(3,3), &
+             st(2,3),st(1,3),st(1,2), &
+             chgtot(i),chitot(i)
+      else
+        write(ionum,'(i8,i3,3f12.5,8es11.3,f9.4,f9.2)') &
+             itotOf(tagtot(i)),int(tagtot(i)),rlmp(1:3,i),eki, &
+             epi, &
+             st(1,1),st(2,2),st(3,3), &
+             st(2,3),st(1,3),st(1,2), &
+             chgtot(i),chitot(i)
+      endif
     enddo
 
     close(ionum)
@@ -516,13 +529,13 @@ contains
       num = num_data(trim(cline),' ')
       if( num.gt.11 ) stop 'ERROR: number of species exceeds the limit.'
       read(cline,*) c1, copt, cspname(1:num-2)
-      if( iprint.gt.1 ) then
-        print '(a,10(2x,a))','  Species order: ', &
-             (trim(cspname(isp)),isp=1,nspmax)
-      else if( iprint.gt.0 ) then
-        print '(a,10(2x,a))','  Species order: ', &
-             (trim(cspname(isp)),isp=1,num-2)
+      if( iprint.gt.0 ) then
+        print '(a)',' Species order read from pmdini option: '
+        do isp=1,num-2
+          print '(i5,": ",a4)',isp,trim(cspname(isp))
+        enddo
       endif
+      has_cspname = .true.
     endif
     
   end subroutine parse_option

@@ -368,44 +368,57 @@ class NAPSystem(object):
             raise IOError('Cannot detect input file format: '+fmt)
 
     def read_pmd(self,fname='pmdini'):
-        f=open(fname,'r')
-        # 1st: lattice constant
-        self.alc= float(f.readline().split()[0])
-        # 2nd-4th: cell vectors
-        # for i in range(3):
-        #     data= f.readline().split()
-        #     self.a1[i]= float(data[0])
-        #     self.a2[i]= float(data[1])
-        #     self.a3[i]= float(data[2])
-        self.a1= np.array([float(x) for x in f.readline().split()])
-        self.a2= np.array([float(x) for x in f.readline().split()])
-        self.a3= np.array([float(x) for x in f.readline().split()])
-        # 5th-7th: velocity of cell vectors
-        tmp= f.readline().split()
-        tmp= f.readline().split()
-        tmp= f.readline().split()
-        # 8st: num of atoms
-        natm= int(f.readline().split()[0])
-        # 9th-: atom positions
-        self.atoms= []
-        symbol = None
-        for i in range(natm):
-            data= [float(x) for x in f.readline().split()]
-            ai= Atom()
-            ai.decode_tag(data[0])
-            if self.specorder:
-                symbol = self.specorder[ai.sid-1]
-            if symbol and ai.symbol != symbol:
-                ai.set_symbol(symbol)
-            ai.set_pos(data[1],data[2],data[3]) # position
-            ai.set_vel(data[4],data[5],data[6]) # velocity
-            ai.set_ekin(data[7])
-            ai.set_epot(data[8])
-            ai.set_strs(data[9],data[10],data[11],
-                        data[12],data[13],data[14])
-            self.atoms.append(ai)
-        f.close()
-
+        with open(fname,'r') as f:
+            iline = 0
+            self.atoms= []
+            symbol = None
+            for line in f.readlines():
+                if line[0] in ('#','!'):  # comment line
+                    if 'specorder:' in line:
+                        data = line.split()
+                        specorder = [ d for d in data[2:len(data)]]
+                        if self.specorder and set(self.specorder)!=set(specorder):
+                            print(' WARNING: specorders are inconsistent, '
+                                  +'use one in the file.')
+                        self.specorder = specorder
+                else:
+                    iline = iline +1
+                    data = line.split()
+                    # 1st: lattice constant
+                    if iline == 1:
+                        self.alc= float(data[0])
+                    # 2nd-4th: cell vectors
+                    elif iline == 2:
+                        self.a1= np.array([float(x) for x in data])
+                    elif iline == 3:
+                        self.a2= np.array([float(x) for x in data])
+                    elif iline == 4:
+                        self.a3= np.array([float(x) for x in data])
+                    # 5th-7th: velocity of cell vectors
+                    elif 5 <= iline <= 7:
+                        pass
+                    # 8st: num of atoms
+                    elif iline == 8:
+                        natm = int(data[0])
+                    # 9th-: atom positions
+                    else:
+                        if len(data) < 15:
+                            continue
+                        fdata = [float(x) for x in data]
+                        ai= Atom()
+                        ai.decode_tag(fdata[0])
+                        if self.specorder:
+                            symbol = self.specorder[ai.sid-1]
+                        if symbol and ai.symbol != symbol:
+                            ai.set_symbol(symbol)
+                        ai.set_pos(fdata[1],fdata[2],fdata[3]) # position
+                        ai.set_vel(fdata[4],fdata[5],fdata[6]) # velocity
+                        ai.set_ekin(fdata[7])
+                        ai.set_epot(fdata[8])
+                        ai.set_strs(fdata[9],fdata[10],fdata[11],
+                                    fdata[12],fdata[13],fdata[14])
+                        self.atoms.append(ai)
+    
     def write_pmd(self,fname='pmdini'):
         f=open(fname,'w')
         # lattice constant
@@ -819,8 +832,8 @@ You need to specify the species order correctly with --specorder option.
             ekin= ai.ekin
             epot= ai.epot
             sti= ai.strs
-            # f.write("{0:8d} {1:3d} ".format(i+1,ai.sid))
             f.write("{0:8d} {1:3s} ".format(i+1,ai.symbol))
+            # f.write("{0:8d} {1:3d} ".format(i+1,ai.sid))
             f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(pos[0],pos[1],pos[2]))
             f.write("{0:8.3f} {1:8.3f} {2:8.3f} ".format(vx,vy,vz))
             f.write("{0:11.3e} {1:11.3e} ".format(ekin,epot))

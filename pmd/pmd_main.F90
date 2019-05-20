@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-17 13:47:48 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-19 22:44:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -123,6 +123,7 @@ program pmd
 
 !.....Broadcast species data read from pmdini  
   call mpi_bcast(cspname,3*nspmax,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(has_cspname,1,mpi_logical,0,mpicomm,ierr)
 
 !.....Broadcast determined nx,ny,nz to reset MPI communicator if needed.
   call mpi_bcast(nx,1,mpi_integer,0,mpicomm,ierr)

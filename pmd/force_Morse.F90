@@ -1,11 +1,12 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-10-12 18:52:50 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-19 23:56:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
 !    - Currently no cutoff tail treatment is done. (170310)
 !-----------------------------------------------------------------------
+  use pmdio,only: csp2isp, nspmax
   implicit none
   save
   character(len=128):: paramsdir = '.'
@@ -20,11 +21,11 @@ module Morse
   integer,parameter:: ioprmsvc = 23
 
 !.....Max number of species available in this potential
-  integer,parameter:: msp = 9
+!!$  integer,parameter:: nspmax = 9
   integer:: nsp
 !.....Morse parameters
-  real(8):: alp(msp,msp),d0(msp,msp),rmin(msp,msp)
-  logical:: interact(msp,msp)
+  real(8):: alp(nspmax,nspmax),d0(nspmax,nspmax),rmin(nspmax,nspmax)
+  logical:: interact(nspmax,nspmax)
 
   integer,parameter:: ivoigt(3,3)= &
        reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
@@ -100,7 +101,8 @@ contains
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
-         ,d0ij,alpij,rminij
+         ,d0ij,alpij,rminij,dij2
+    real(8),save:: rc2
     real(8),external:: fcut1,dfcut1
 
     if( l1st ) then
@@ -108,6 +110,7 @@ contains
 !!$      call read_params_Morse(myid,mpi_md_world,iprint)
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
+      rc2 = rc*rc
     endif
 
     if( size(strsl).lt.3*3*namax ) then
@@ -142,8 +145,9 @@ contains
         xj(1:3)= ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-        if( dij.gt.rc ) cycle
+        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij2.gt.rc2 ) cycle
+        dij= sqrt(dij2)
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
@@ -168,22 +172,18 @@ contains
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-            enddo
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
           enddo
-        endif
+        enddo
       enddo
     enddo
 
-    if( lstrs ) then
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
+    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     
 !-----gather epot
     epott= 0d0
@@ -336,9 +336,10 @@ contains
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
-         ,chgi,chgj,tmp2,diji,rcore
+         ,chgi,chgj,tmp2,diji,rcore,dij2
 !!$    real(8),allocatable,save:: strsl(:,:,:)
     type(atdesc):: atdi,atdj
+    real(8),save:: rc2
     real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:)&
          ,dxdi(:),dxdj(:),at(:)
     if( .not.allocated(xi) ) allocate(xi(3),xj(3),xij(3),rij(3),&
@@ -350,6 +351,7 @@ contains
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
       prefbeta = log(1d0 -sqrt(1d0 -beta))
+      rc2 = rc*rc
     endif
 
     if( size(strsl).lt.3*3*namax ) then
@@ -383,8 +385,10 @@ contains
         xj(1:3)= ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-        if( dij.gt.rc ) cycle
+        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij2.gt.rc2 ) cycle
+        dij= sqrt(dij2)
+!!$        if( dij.gt.rc ) cycle
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
@@ -576,38 +580,43 @@ contains
     integer,intent(in):: myid_md,mpi_md_world,iprint
     integer:: i,j,isp,jsp,id,ierr
     character(len=128):: cline,fname
+    character(len=3):: cspi,cspj
     real(8):: d,r,a
 
     if( myid_md.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
-      interact(1:msp,1:msp) = .false.
-      d0(1:msp,1:msp)= 0d0
-      rmin(1:msp,1:msp)= 0d0
-      alp(1:msp,1:msp)= 0d0
+      interact(1:nspmax,1:nspmax) = .false.
+      d0(1:nspmax,1:nspmax)= 0d0
+      rmin(1:nspmax,1:nspmax)= 0d0
+      alp(1:nspmax,1:nspmax)= 0d0
       if( iprint.ne.0 ) write(6,'(/,a)') ' Morse parameters:'
       do while(.true.)
         read(ioprms,*,end=10) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
         backspace(ioprms)
-        read(ioprms,*) isp,jsp,d,a,r
-        if( isp.gt.msp .or. jsp.gt.msp ) then
-          write(6,*) ' Warning @read_params: since isp/jsp is greater than msp,'&
-               //' skip reading the line.'
-          cycle
-        endif
-        d0(isp,jsp) = d
-        rmin(isp,jsp) = r
-        alp(isp,jsp) = a
-        interact(isp,jsp) = .true.
-        if( iprint.ne.0 ) then
-          write(6,'(a,2i3,3f7.3)') '   is,js,D,alpha,rmin = ',isp,jsp,d,a,r
-        endif
+!!$        read(ioprms,*) isp,jsp,d,a,r
+        read(ioprms,*) cspi,cspj,d,a,r
+        isp = csp2isp(cspi)
+        jsp = csp2isp(cspj)
+        if( isp.gt.0 .and. jsp.gt.0 ) then
+          d0(isp,jsp) = d
+          rmin(isp,jsp) = r
+          alp(isp,jsp) = a
+          interact(isp,jsp) = .true.
+          if( iprint.gt.0 ) then
+            write(6,'(a,2i3,3f7.3)') '   is,js,D,alpha,rmin = ',isp,jsp,d,a,r
+          endif
 !.....Symmetrize parameters
-        d0(jsp,isp) = d0(isp,jsp)
-        rmin(jsp,isp)= rmin(isp,jsp)
-        alp(jsp,isp)= alp(isp,jsp)
-        interact(jsp,isp)= interact(isp,jsp)
+          d0(jsp,isp) = d0(isp,jsp)
+          rmin(jsp,isp)= rmin(isp,jsp)
+          alp(jsp,isp)= alp(isp,jsp)
+          interact(jsp,isp)= interact(isp,jsp)
+        else
+          if( iprint.gt.0 ) then
+            print *,' Morse parameter read but not used: cspi,cspj=',cspi,cspj
+          endif
+        endif
       enddo
 
 10    close(ioprms)
@@ -617,10 +626,10 @@ contains
 !!$      endif
     endif
 
-    call mpi_bcast(d0,msp*msp,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(rmin,msp*msp,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(alp,msp*msp,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_md_world,ierr)
+    call mpi_bcast(d0,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(rmin,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(alp,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
 
   end subroutine read_params_Morse
 !=======================================================================
@@ -683,7 +692,7 @@ contains
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
     character(len=*),intent(in):: ctype
-    logical,intent(in):: interact_in(msp,msp)
+    logical,intent(in):: interact_in(nspmax,nspmax)
 
     integer:: i,j,inc,itmp,nspt,nint
 
@@ -694,8 +703,8 @@ contains
 
     interact(:,:) = interact_in(:,:)
     nint = 0
-    do i=1,msp
-      do j=i,msp
+    do i=1,nspmax
+      do j=i,nspmax
         if( .not.interact(i,j) ) cycle
         nint = nint +1
       enddo
@@ -712,8 +721,8 @@ contains
     rmin(:,:)= 0d0
 
     inc = 0
-    do i=1,msp
-      do j=i,msp
+    do i=1,nspmax
+      do j=i,nspmax
         if( .not.interact(i,j) ) cycle
         inc= inc +1
         d0(i,j) = params(inc)
@@ -955,7 +964,7 @@ contains
     real(8):: eion1,eion2,eaff,atrad,enpaul
 
     if( allocated(atdescs) ) deallocate(atdescs)
-    allocate(atdescs(msp))
+    allocate(atdescs(nspmax))
     
     if( myid_md.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(descfname)
@@ -969,11 +978,11 @@ contains
           backspace(iodesc)
           read(iodesc,*) itmp, ctmp, eion1, eion2, eaff, atrad, enpaul
           isp = isp + 1
-          if( isp.gt.msp ) then
+          if( isp.gt.nspmax ) then
             if( iprint.ne.0 ) then
-              write(6,*) trim(fname)//' has more entries than MSP.' &
+              write(6,*) trim(fname)//' has more entries than NSPMAX.' &
                    //' So skip reading it.'
-              write(6,*) '  MSP = ',msp
+              write(6,*) '  NSPMAX = ',nspmax
             endif
             goto 10
           endif
@@ -1111,19 +1120,19 @@ contains
     real(8),external:: sprod,fcut1,dfcut1
 
     if( .not. allocated(ge_alp) ) then
-      allocate(ge_alp(msp,msp),ge_d0(msp,msp),ge_rmin(msp,msp))
-      allocate(gs_alp(msp,msp,6),gs_d0(msp,msp,6), &
-           gs_rmin(msp,msp,6))
+      allocate(ge_alp(nspmax,nspmax),ge_d0(nspmax,nspmax),ge_rmin(nspmax,nspmax))
+      allocate(gs_alp(nspmax,nspmax,6),gs_d0(nspmax,nspmax,6), &
+           gs_rmin(nspmax,nspmax,6))
     endif
     if( .not.allocated(xi) ) then
       allocate(xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3))
     endif
 
     if( .not.allocated(gf_alp) &
-         .or. size(gf_alp).ne.msp*msp*3*natm ) then
+         .or. size(gf_alp).ne.nspmax*nspmax*3*natm ) then
       if( allocated(gf_alp) ) deallocate(gf_alp,gf_d0,gf_rmin)
-      allocate(gf_alp(msp,msp,3,natm),gf_d0(msp,msp,3,natm), &
-           gf_rmin(msp,msp,3,natm))
+      allocate(gf_alp(nspmax,nspmax,3,natm),gf_d0(nspmax,nspmax,3,natm), &
+           gf_rmin(nspmax,nspmax,3,natm))
     endif
 
 !.....Set nsp by max isp of atoms in the system
@@ -1134,15 +1143,15 @@ contains
 
     rc2 = rc*rc
 
-    ge_alp(1:msp,1:msp) = 0d0
-    ge_d0(1:msp,1:msp) = 0d0
-    ge_rmin(1:msp,1:msp) = 0d0
-    gf_alp(1:msp,1:msp,1:3,1:natm) = 0d0
-    gf_d0(1:msp,1:msp,1:3,1:natm) = 0d0
-    gf_rmin(1:msp,1:msp,1:3,1:natm) = 0d0
-    gs_alp(1:msp,1:msp,1:6) = 0d0
-    gs_d0(1:msp,1:msp,1:6) = 0d0
-    gs_rmin(1:msp,1:msp,1:6) = 0d0
+    ge_alp(1:nspmax,1:nspmax) = 0d0
+    ge_d0(1:nspmax,1:nspmax) = 0d0
+    ge_rmin(1:nspmax,1:nspmax) = 0d0
+    gf_alp(1:nspmax,1:nspmax,1:3,1:natm) = 0d0
+    gf_d0(1:nspmax,1:nspmax,1:3,1:natm) = 0d0
+    gf_rmin(1:nspmax,1:nspmax,1:3,1:natm) = 0d0
+    gs_alp(1:nspmax,1:nspmax,1:6) = 0d0
+    gs_d0(1:nspmax,1:nspmax,1:6) = 0d0
+    gs_rmin(1:nspmax,1:nspmax,1:6) = 0d0
     
 !.....Loop over resident atoms
     do i=1,natm

@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-17 13:25:46 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-20 00:00:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -13,6 +13,7 @@ module Coulomb
 !  For Ewald Coulomb potential:
 !    - ...
 !-----------------------------------------------------------------------
+  use pmdio,only: csp2isp, nspmax
   implicit none
   save
 
@@ -34,25 +35,25 @@ module Coulomb
   real(8),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
 
 
-  integer,parameter:: msp = 9
+!!$  integer,parameter:: nspmax = 9
   integer:: nsp = 1
 !.....Flag for existence of the species
-  logical:: ispflag(msp)
+  logical:: ispflag(nspmax)
 !.....Species charge
-  real(8):: schg(msp)
+  real(8):: schg(nspmax)
 !  logical,allocatable:: interact(:,:)
-  logical:: interact(msp,msp)
+  logical:: interact(nspmax,nspmax)
 !.....ideal valence charges of species
-  real(8):: vid_bvs(msp)
+  real(8):: vid_bvs(nspmax)
 !  real(8),allocatable:: vid_bvs(:)
 !.....principal quantum numbers of species
-  integer:: npq_bvs(msp)
+  integer:: npq_bvs(nspmax)
 !  integer,allocatable:: npq_bvs(:)
 !.....covalent radius
-  real(8):: rad_bvs(msp)
+  real(8):: rad_bvs(nspmax)
 !  real(8),allocatable:: rad_bvs(:)
 !.....screening length
-  real(8):: rho_bvs(msp,msp)
+  real(8):: rho_bvs(nspmax,nspmax)
 !  real(8),allocatable:: rho_bvs(:,:)
 !!$  real(8):: fbvs = 0.74d0
   real(8):: fbvs = 1.0d0
@@ -62,7 +63,7 @@ module Coulomb
 
 !.....Gaussian width of Ewald sum
   real(8):: sgm_ew = 3.5355339d0
-  real(8):: sgm(msp)
+  real(8):: sgm(nspmax)
 !.....Rho value for screened_cut
 !     Default value = 5.0 (Ang), which corresponds to alpha = 0.2 A^{-1}
 !     See, C.J. Fennell and J.D. Gezelter, J. Chem. Phys. 124, 234104 (2006).
@@ -87,8 +88,8 @@ module Coulomb
   real(8),parameter:: threshold_kmax = 1d-4
 
 !.....Variable-charge potential variables
-  real(8):: vcg_chi(msp),vcg_jii(msp),vcg_e0(msp),vcg_sgm(msp) &
-       ,qlower(msp),qupper(msp)
+  real(8):: vcg_chi(nspmax),vcg_jii(nspmax),vcg_e0(nspmax),vcg_sgm(nspmax) &
+       ,qlower(nspmax),qupper(nspmax)
   real(8),parameter:: vcg_lambda = 0.5d0
 !.....Average mu (chemical potential)
   real(8):: avmu
@@ -114,7 +115,7 @@ contains
     integer:: i,ierr,nspl
 
 !!$    print *,'ifcoulomb @initialize_coulomb = ',ifcoulomb
-    rho_bvs(1:msp,1:msp) = 0d0
+    rho_bvs(1:nspmax,1:nspmax) = 0d0
     
 !.....Get umber of species
     nsp = nspin
@@ -156,7 +157,7 @@ contains
 
     integer:: i,is,ierr,nspl
 
-    rho_bvs(1:msp,1:msp) = 0d0
+    rho_bvs(1:nspmax,1:nspmax) = 0d0
     
 !.....Get umber of species
     nsp = nspin
@@ -194,7 +195,7 @@ contains
     real(8),external:: absv
 
     sgm_ew = rc/sqrt(2d0*pacc)
-    sgm(1:msp) = sgm_ew
+    sgm(1:nspmax) = sgm_ew
     bkmax  = 2d0*pacc /rc
     if( myid.eq.0 .and. iprint.gt.0 ) then
       write(6,'(/,a)') ' Ewald sum parameters:'
@@ -227,7 +228,7 @@ contains
 !!$    print *,'myid,b2(1:3)=',myid,b2(1:3)
 !!$    print *,'myid,b3(1:3)=',myid,b3(1:3)
     if( allocated(qcos) ) deallocate(qcosl,qcos,qsinl,qsin,pflr)
-    allocate(qcosl(nk),qcos(nk),qsinl(nk),qsin(nk),pflr(nk,msp))
+    allocate(qcosl(nk),qcos(nk),qsinl(nk),qsin(nk),pflr(nk,nspmax))
 !.....prefactor for long-range term
     ik = 0
     do k1= -kmax1,kmax1
@@ -241,7 +242,7 @@ contains
           bk(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
           bb2 = absv(3,bk)
           bb2 = bb2*bb2
-          pflr(ik,1:msp)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm_ew**2 *bb2)
+          pflr(ik,1:nspmax)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm_ew**2 *bb2)
         enddo
       enddo
     enddo
@@ -277,14 +278,14 @@ contains
 
 !!$    if( ifcoulomb.eq.2 ) then
 !!$      sgm_ew = rc/sqrt(2d0*pacc)
-!!$      sgm(1:msp) = sgm_ew
+!!$      sgm(1:nspmax) = sgm_ew
 !!$      bkmax  = 2d0*pacc /rc
 !!$      if( myid.eq.0 .and. iprint.ne.0 ) then
 !!$        print *,'Sigmas are overwritten by rc/sqrt(2*pacc),'
 !!$        print *,'since the full Ewald cannot treat species-dependent sigma.'
 !!$      endif
 !!$    else
-!!$      sgm(1:msp) = vcg_sgm(1:msp)
+!!$      sgm(1:nspmax) = vcg_sgm(1:nspmax)
 !!$      sgm_min = 1d+30
 !!$      do i=1,nsp
 !!$        sgm_min = min(sgm(i),sgm_min)
@@ -293,11 +294,11 @@ contains
 !!$    endif
 
 !.....Current implementation does not allow species-dpendent sigma.
-    vcg_sgm(1:msp) = sgm_ew
-    sgm(1:msp) = sgm_ew
+    vcg_sgm(1:nspmax) = sgm_ew
+    sgm(1:nspmax) = sgm_ew
 !.....If long-range term exists, self interaction should be added to Jii.
     if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
-      do is=1,msp
+      do is=1,nspmax
         vcg_jii(is) = vcg_jii(is) -acc*sqrt(2d0/pi) /vcg_sgm(is)
       enddo
     endif
@@ -332,7 +333,7 @@ contains
       write(6,*) ''
     endif
     if( allocated(qcos) ) deallocate(qcos,qsin,qcosl,qsinl,pflr)
-    allocate(qcosl(nk),qcos(nk),qsinl(nk),qsin(nk),pflr(nk,msp))
+    allocate(qcosl(nk),qcos(nk),qsinl(nk),qsin(nk),pflr(nk,nspmax))
 !.....prefactor for long-range term
     ik = 0
     do k1= -kmax1,kmax1
@@ -395,16 +396,17 @@ contains
     real(8):: vid,rad
     character(len=128):: cline,c1st,fname
     character(len=5):: cname
+    character(len=3):: cspi,cspj
 
 !!$    if( allocated(rad_bvs) ) deallocate(rad_bvs,npq_bvs,vid_bvs,rho_bvs)
-!!$    allocate(rad_bvs(msp),npq_bvs(msp),vid_bvs(msp) &
-!!$         ,rho_bvs(msp,msp))
+!!$    allocate(rad_bvs(nspmax),npq_bvs(nspmax),vid_bvs(nspmax) &
+!!$         ,rho_bvs(nspmax,nspmax))
     if( myid.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
       mode = 1
-      interact(1:msp,1:msp) = .false.
-      ispflag(1:msp) = .false.
+      interact(1:nspmax,1:nspmax) = .false.
+      ispflag(1:nspmax) = .false.
 !.....1st line for check the Coulomb computation type
       read(ioprms,*) c1st
       if( trim(c1st).ne.'screened_bvs' ) then
@@ -412,10 +414,10 @@ contains
              //'with the Coulomb type: '//trim(c1st)
         stop
       endif
-      if( iprint.ne.0 ) then
+      if( iprint.gt.0 ) then
         write(6,'(/,a)') ' Screened Coulomb parameters:'
       endif
-      vid_bvs(1:msp)= 0d0
+      vid_bvs(1:nspmax)= 0d0
       do while(.true.)
         read(ioprms,*,end=10) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
@@ -425,28 +427,29 @@ contains
         endif
         if( mode.eq.1 ) then
           backspace(ioprms)
-          read(ioprms,*) isp, cname, vid, rad, npq
-          if( isp.gt.msp ) then
-            write(6,*) ' Warning @read_params: since isp is greater than nsp,'&
-                 //' skip reading the line.'
-            cycle
+!!$          read(ioprms,*) isp, cname, vid, rad, npq
+          read(ioprms,*) cspi, vid, rad, npq
+          isp = csp2isp(trim(cspi))
+          if( isp.gt.0 ) then
+            if( iprint.ne.0 ) then
+              write(6,'(a,a5,2f7.3,i4)') '   cspi,vid,rad,npq =' &
+                   ,trim(cspi),vid,rad,npq
+            endif
+            ispflag(isp) = .true.
+            vid_bvs(isp) = vid
+            rad_bvs(isp) = rad
+            npq_bvs(isp) = npq
           endif
-          if( iprint.ne.0 ) then
-            write(6,'(a,i3,a5,2f7.3,i4)') '   isp,cname,vid,rad,npq =' &
-                 ,isp,trim(cname),vid,rad,npq
-          endif
-          ispflag(isp) = .true.
-          vid_bvs(isp) = vid
-          rad_bvs(isp) = rad
-          npq_bvs(isp) = npq
         else if( mode.eq.2 ) then
           backspace(ioprms)
-          read(ioprms,*) isp, jsp
-          interact(isp,jsp) = .true.
-          interact(jsp,isp) = interact(isp,jsp)
-!!$            if( iprint.gt.0 ) then
-!!$              write(6,'(a,2i5,l3)') ' isp,jsp,interact= ',isp,jsp,interact(isp,jsp)
-!!$            endif
+!!$          read(ioprms,*) isp, jsp
+          read(ioprms,*) cspi,cspj
+          isp = csp2isp(trim(cspi))
+          jsp = csp2isp(trim(cspj))
+          if( isp.gt.0 .and. jsp.gt.0 ) then
+            interact(isp,jsp) = .true.
+            interact(jsp,isp) = interact(isp,jsp)
+          endif
         endif
       enddo
 10    close(ioprms)
@@ -469,13 +472,13 @@ contains
 
 !.....To avoid MPI call when it is called in fitpot.
     if( mpi_world.ge.0 ) then
-      call mpi_bcast(ispflag,msp,mpi_logical,0,mpi_world,ierr)
-      call mpi_bcast(vid_bvs,msp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(rad_bvs,msp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(npq_bvs,msp,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(rho_bvs,msp*msp,mpi_real8 &
+      call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
+      call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(rho_bvs,nspmax*nspmax,mpi_real8 &
            ,0,mpi_world,ierr)
-      call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
+      call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
     endif
 !.....end of screend_bvs
   end subroutine read_params_sc
@@ -492,9 +495,10 @@ contains
     real(8):: dchi,djii,sgmt,de0,qlow,qup
     character(len=128):: cline,c1st,fname
     character(len=5):: cname
+    character(len=3):: cspi,cspj
 
 !!$      if( allocated(vcg_chi) ) deallocate(vcg_chi,vcg_jii,sgm,vcg_e0)
-!!$      allocate( vcg_chi(msp), vcg_jii(msp), sgm(msp), vcg_e0(msp))
+!!$      allocate( vcg_chi(nspmax), vcg_jii(nspmax), sgm(nspmax), vcg_e0(nspmax))
     if( myid.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
@@ -510,10 +514,10 @@ contains
         read(ioprms,*,end=20) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
         backspace(ioprms)
-        read(ioprms,*,end=20) isp, cname, dchi,djii,sgmt,de0,qlow,qup
-        if( isp.gt.nsp .and. iprint.gt.0 ) then
-          write(6,'(a,i2)') ' [WARNING] isp.gt.nsp !!!  isp = ',isp
-        else
+!!$        read(ioprms,*,end=20) isp, cname, dchi,djii,sgmt,de0,qlow,qup
+        read(ioprms,*,end=20) cspi, dchi,djii,sgmt,de0,qlow,qup
+        isp = csp2isp(trim(cspi))
+        if( isp.gt.0 ) then
           vcg_chi(isp) = dchi
           vcg_jii(isp) = djii
           vcg_e0(isp) = de0
@@ -521,8 +525,9 @@ contains
           qlower(isp) = qlow
           qupper(isp) = qup
           if( iprint.gt.0 ) then
-            write(6,'(a,i3,a3,3f10.4,2f5.1)') '   isp,name,chi,Jii,sgm,e0,qlower,qupper = ', &
-                 isp,trim(cname),dchi,djii,vcg_sgm(isp),de0,qlow,qup
+            write(6,'(a,a3,3f10.4,2f5.1)') &
+                 '   cspi,chi,Jii,sgm,e0,qlower,qupper = ' &
+                 ,trim(cspi),dchi,djii,vcg_sgm(isp),de0,qlow,qup
           endif
         endif
       enddo  ! do while
@@ -549,7 +554,7 @@ contains
 !!$    integer,external:: num_data
     
     character(len=128):: cmode,cline,ctmp,fname
-    character(len=3):: cname
+    character(len=3):: cname,csp,cspj,cspi
     integer:: i,ierr,jerr,isp,jsp,npq
     real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
          ,vcgjiimin,sgmlim, rin,rout
@@ -558,14 +563,14 @@ contains
 
     if( myid.eq.0 ) then
 !.....Initialization
-      interact(1:msp,1:msp) = .true.
-      ispflag(1:msp) = .false.
-      vcg_chi(1:msp) = 0d0
-      vcg_jii(1:msp) = 0d0
-      vcg_e0(1:msp) = 0d0
-      vcg_sgm(1:msp) = 0d0
-      qlower(1:msp) = 0d0
-      qupper(1:msp) = 0d0
+      interact(1:nspmax,1:nspmax) = .true.
+      ispflag(1:nspmax) = .false.
+      vcg_chi(1:nspmax) = 0d0
+      vcg_jii(1:nspmax) = 0d0
+      vcg_e0(1:nspmax) = 0d0
+      vcg_sgm(1:nspmax) = 0d0
+      qlower(1:nspmax) = 0d0
+      qupper(1:nspmax) = 0d0
 !.....File name
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
@@ -619,7 +624,7 @@ contains
           cycle
         else if( trim(cline).eq.'interactions' ) then
           cmode = 'interactions'
-          interact(1:msp,1:msp) = .false.
+          interact(1:nspmax,1:nspmax) = .false.
           cycle
         else if( trim(cline).eq.'sigma' ) then
           backspace(ioprms)
@@ -647,46 +652,75 @@ contains
         if( trim(cmode).eq.'charges' ) then
           backspace(ioprms)
           if( trim(cchgs).eq.'fixed' ) then
-            read(ioprms,*) isp, chgi
-            schg(isp) = chgi
-            ispflag(isp) = .true.
-            if( iprint.gt.1 ) print *,'fixed charge:',isp,chgi
+!!$            read(ioprms,*) isp, chgi
+            read(ioprms,*) csp, chgi
+            isp = csp2isp(trim(csp))
+            if( isp.gt.0 ) then
+              schg(isp) = chgi
+              ispflag(isp) = .true.
+              if( iprint.gt.1 ) print *,'fixed charge:',isp,chgi
+            else
+              if( iprint.gt.1 ) then
+                print *,'fixed charge read but not used: ',isp,chgi
+              endif
+            end if
           else if( trim(cchgs).eq.'fixed_bvs' ) then
-            read(ioprms,*) isp,cname,vid,rad,npq
-            if( isp.gt.nsp .and. iprint.gt.0 ) then
-              print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
-            endif
-            ispflag(isp) = .true.
-            vid_bvs(isp) = vid
-            rad_bvs(isp) = rad
-            npq_bvs(isp) = npq
-            if( iprint.ne.0 ) then
-              write(6,'(a,i3,a5,2f7.3,i4)') ' isp,cname,vid,rad,npq =' &
-                   ,isp,trim(cname),vid,rad,npq
+            read(ioprms,*) csp,vid,rad,npq
+!!$            if( isp.gt.nsp .and. iprint.gt.0 ) then
+!!$              print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
+!!$            endif
+            isp = csp2isp(trim(csp))
+            if( isp.gt.0 ) then
+              ispflag(isp) = .true.
+              vid_bvs(isp) = vid
+              rad_bvs(isp) = rad
+              npq_bvs(isp) = npq
+              if( iprint.gt.0 ) then
+                write(6,'(a,a5,2f7.3,i4)') ' csp,vid,rad,npq =' &
+                     ,trim(csp),vid,rad,npq
+              endif
+            else
+              if( iprint.gt.1 ) then
+                print *,'fixed_bvs charge read but not used: ',trim(csp)
+              endif
             endif
           else if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') then
-            read(ioprms,*) isp, cname, dchi,djii,de0,qlow,qup
-            if( isp.gt.nsp .and. iprint.gt.0 ) then
-              print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
-            endif
-            ispflag(isp) = .true.
-            vcg_chi(isp) = dchi
-            vcg_jii(isp) = djii
-            vcg_e0(isp) = de0
-            qlower(isp) = qlow
-            qupper(isp) = qup
-            if( iprint.gt.0 ) then
-              write(6,'(a,i3,a3,4f10.4,2f5.1)') '   isp,name,chi,Jii,sgm,e0,qlower,qupper = ', &
-                   isp,trim(cname),dchi,djii,vcg_sgm(isp),de0,qlow,qup
+            read(ioprms,*) csp, dchi,djii,de0,qlow,qup
+            isp = csp2isp(trim(csp))
+            if( isp.gt.0 ) then
+              ispflag(isp) = .true.
+              vcg_chi(isp) = dchi
+              vcg_jii(isp) = djii
+              vcg_e0(isp) = de0
+              qlower(isp) = qlow
+              qupper(isp) = qup
+              if( iprint.gt.0 ) then
+                write(6,'(a,i3,a3,4f10.4,2f5.1)') &
+                     '   csp,chi,Jii,sgm,e0,qlower,qupper = ', &
+                     trim(csp),dchi,djii,vcg_sgm(isp),de0,qlow,qup
+              endif
+            else
+              if( iprint.gt.1 ) then
+                print *,'variable charge read but not used: ',trim(csp)
+              endif
             endif
           endif
 !!$        else if( trim(cmode).eq.'charge_dist' ) then
 !!$        else if( trim(cmode).eq.'terms' ) then
         else if( trim(cmode).eq.'interactions' ) then
           backspace(ioprms)
-          read(ioprms,*) isp,jsp
-          interact(isp,jsp) = .true.
-          interact(jsp,isp) = .true.
+!!$          read(ioprms,*) isp,jsp
+!!$          interact(isp,jsp) = .true.
+!!$          interact(jsp,isp) = .true.
+          read(ioprms,*) cspi,cspj
+          isp = csp2isp(trim(cspi))
+          jsp = csp2isp(trim(cspj))
+          if( isp.gt.0 .and. jsp.gt.0 ) then
+            interact(isp,jsp) = .true.
+            interact(jsp,isp) = .true.
+          else
+            print *,'interacion read but not used: ',isp,jsp
+          endif
         endif
       enddo ! while(.true.)
 
@@ -724,7 +758,7 @@ contains
     call mpi_bcast(cdist,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(cchgs,128,mpi_character,0,mpi_world,ierr)
     
-    call mpi_bcast(schg,msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(schg,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_e0,nsp,mpi_real8,0,mpi_world,ierr)
@@ -732,11 +766,11 @@ contains
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vid_bvs,msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rad_bvs,msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(npq_bvs,msp,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
-    call mpi_bcast(ispflag,msp,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
     
     call mpi_bcast(pacc,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
@@ -919,17 +953,17 @@ contains
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
          ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp &
-         ,qi,qj,radi,radj,rhoij,terfc,texp,sqpi &
-         ,vrc,dvdrc,terfcc
+         ,qi,qj,radi,radj,rhoij,terfc,texp &
+         ,vrc,dvdrc,terfcc,dij2
+    real(8),save:: rc2,sqpi
     real(8),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
       call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint)
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
-!!$      do i=1,natm
-!!$        print *,'i,chg(i)=',i,chg(i)
-!!$      enddo
+      rc2 = rc*rc
+      sqpi = 1d0/sqrt(pi)
     endif
 
     if( size(strsl).lt.3*3*namax ) then
@@ -939,14 +973,12 @@ contains
 
     epotl= 0d0
     strsl(1:3,1:3,1:namax) = 0d0
-!!$    write(6,'(a,30f7.3)') 'chgs =',chg(1:natm)
-    sqpi = 1d0/sqrt(pi)
+
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
       if( .not. ispflag(is) ) cycle
-!!$      nconnect(i) = 0
       qi= chg(i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
@@ -958,9 +990,9 @@ contains
         xj(1:3)= ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-        if( dij.gt.rc ) cycle
-!!$        nconnect(i)= nconnect(i) +1
+        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij2.gt.rc2 ) cycle
+        dij= sqrt(dij2)
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
@@ -971,10 +1003,6 @@ contains
         dvdrc = -acc *qi*qj/rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
 !.....potential
         tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
-!!$        tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc )
-!!$        if( i.eq.1 .and. j.eq.6 ) then
-!!$          print *,'i,is,qi,j,js,qj,tmp=',i,is,qi,j,js,qj,tmp
-!!$        endif
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp
           epi(j)= epi(j) +tmp
@@ -989,31 +1017,25 @@ contains
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-            enddo
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
           enddo
-        endif
+        enddo
       enddo
     enddo
 
-    if( lstrs ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-!!$           ,nn,mpi_md_world,strsl,9)
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
+    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
 !!$    write(6,'(a,es15.7)') ' epott screened Coulomb = ',epott
-
+    return
   end subroutine force_screened_Coulomb
 !=======================================================================
   subroutine force_screened_Coulomb_old(namax,natm,tag,ra,nnmax,aa,strs &
@@ -1458,7 +1480,7 @@ contains
     real(8),external:: fcut1,dfcut1
 
 !!$    if( rho_bvs(1,1).lt.0.1 ) then
-!!$      rho_bvs(1:msp,1:msp) = rho_screened_cut
+!!$      rho_bvs(1:nspmax,1:nspmax) = rho_screened_cut
 !!$    endif
 
     esrl= 0d0
@@ -2021,7 +2043,7 @@ contains
 !!$    return
 !!$!.....END DEBUGGING
 
-    allocate(nbvsl(msp),nbvs(msp),vc_bvs(msp))
+    allocate(nbvsl(nspmax),nbvs(nspmax),vc_bvs(nspmax))
     nbvsl(1:nsp) = 0
     nbvs(1:nsp) = 0
     do i=1,natm
@@ -2533,7 +2555,7 @@ contains
       endif
 
       ns = 0
-      do isp=1,msp
+      do isp=1,nspmax
         if( ispflag(isp) ) ns = ns + 1
       enddo
 
@@ -2544,7 +2566,7 @@ contains
 
       inc = 0
       maxisp = 0
-      do isp=1,msp
+      do isp=1,nspmax
         if( ispflag(isp) ) then
           inc = inc + 1
           rad_bvs(isp) = prms_in(inc)
@@ -2593,11 +2615,11 @@ contains
     real(8),allocatable:: ge_rho(:),gf_rho(:,:,:),gs_rho(:,:)
 
     if( .not.allocated(ge_rho) ) then
-      allocate(ge_rho(msp),gs_rho(msp,6),gf_rho(msp,3,natm))
+      allocate(ge_rho(nspmax),gs_rho(nspmax,6),gf_rho(nspmax,3,natm))
     endif
-    if( size(gf_rho).ne.msp*3*natm ) then
+    if( size(gf_rho).ne.nspmax*3*natm ) then
       if( allocated(gf_rho) ) deallocate(gf_rho)
-      allocate(gf_rho(msp,3,natm))
+      allocate(gf_rho(nspmax,3,natm))
     endif
 
     call set_charge_BVS(natm,nb,tag,chg,myid,mpi_world,iprint)
@@ -2610,9 +2632,9 @@ contains
 
     rc2 = rc*rc
 
-    ge_rho(1:msp) = 0d0
-    gf_rho(1:msp,1:3,1:natm) = 0d0
-    gs_rho(1:msp,1:6) = 0d0
+    ge_rho(1:nspmax) = 0d0
+    gf_rho(1:nspmax,1:3,1:natm) = 0d0
+    gs_rho(1:nspmax,1:6) = 0d0
 
 !.....Loop over resident atoms
     do i=1,natm

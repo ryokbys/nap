@@ -26,15 +26,15 @@ MPIFLAGS= @FCFLAGS@
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} -o $@ $<
 
 pmd= read_input.o util_vec.o util_rnd.o \
-	util_tag.o lasubs.o mk_lspr.o \
+	lasubs.o mk_lspr.o \
 	common_parallel.o sort.o pmd_main.o pmd_core.o 
 pmc= prec_mc.o util_rnd.o mk_lspr.o read_input.o pmd_core.o util_vec.o \
-	util_tag.o lasubs.o common_parallel.o sort.o
-comb= node_conv.o util_tag.o util_vec.o
+	lasubs.o common_parallel.o sort.o
+comb= node_conv.o util_vec.o
 
 mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o mod_version.o mod_force.o \
 	mod_ttm.o descriptor.o metadynamics.o mod_constraints.o mod_vector.o \
-	mod_rdcfrc.o mod_structure.o mod_deform.o
+	mod_rdcfrc.o mod_structure.o mod_deform.o mod_util.o
 args= iargc.o getarg.o
 
 force_common= force_common.o
@@ -56,7 +56,7 @@ params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 # Post process programs
 #
 # pmd2akr= pmd2akr.o read_input.o util_pmd.o sort.o
-# voids=  mod_pmdio.o voids.o util_pmd.o mk_lspr.o util_tag.o util_vec.o
+# voids=  mod_pmdio.o voids.o util_pmd.o mk_lspr.o util_vec.o
 
 #-----------------------------------------------------------------------
 # Make rule entries
