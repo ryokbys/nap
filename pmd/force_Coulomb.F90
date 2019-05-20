@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-20 00:00:08 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-20 14:13:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -934,6 +934,7 @@ contains
 !  smoothing using vrc and dVdrc where
 !    V_smooth(r) = V(r) -V(rc) -(r-rc)*dVdrc
 !
+    use util, only: itotOf
     implicit none
     include "mpif.h"
     include "./params_unit.h"

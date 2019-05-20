@@ -68,17 +68,17 @@ def _num2type(num):
 
 
 class Pair(object):
-    def __init__(self,isp1,isp2):
-        self.isp1 = isp1
-        self.isp2 = isp2
+    def __init__(self,csp1,csp2):
+        self.csp1 = csp1
+        self.csp2 = csp2
         self.symfuncs = []
         self.sfparams = []
 
     def __repr__(self):
-        return "Pair({0:d},{1:d})".format(self.isp1,self.isp2)
+        return "Pair({0:s},{1:s})".format(self.csp1,self.csp2)
 
-    def get_isps(self):
-        return self.isp1,self.isp2
+    def get_csps(self):
+        return self.csp1,self.csp2
 
     def set_symfunc(self,symfunc):
         self.symfuncs.append(symfunc)
@@ -87,18 +87,18 @@ class Pair(object):
         self.sfparams.append(sfparam)
 
 class Triplet(object):
-    def __init__(self,isp1,isp2,isp3):
-        self.isp1 = isp1
-        self.isp2 = isp2
-        self.isp3 = isp3
+    def __init__(self,csp1,csp2,csp3):
+        self.csp1 = csp1
+        self.csp2 = csp2
+        self.csp3 = csp3
         self.symfuncs = []
         self.sfparams = []
 
     def __repr__(self):
-        return "Triplet({0:d},{1:d},{2:d})".format(self.isp1,self.isp2,self.isp3)
+        return "Triplet({0:s},{1:s},{2:s})".format(self.csp1,self.csp2,self.csp3)
 
-    def get_isps(self):
-        return self.isp1,self.isp2,self.isp3
+    def get_csps(self):
+        return self.csp1,self.csp2,self.csp3
 
     def set_symfunc(self,symfunc):
         self.symfuncs.append(symfunc)
@@ -113,28 +113,36 @@ def ncomb(n,m):
     d = max(n-m,1)
     return math.factorial(n)/math.factorial(m)/ math.factorial(d)
 
-def get_pairs(nsp):
+def get_pairs(specorder=[]):
+    if len(specorder) < 1:
+        raise ValueError('Specorder has to be specified.')
     pairs= []
-    for i in range(1,nsp+1):
-        for j in range(i,nsp+1):
-            pair = Pair(i,j)
+    for i in range(len(specorder)):
+        cspi = specorder[i]
+        for j in range(i,len(specorder)):
+            cspj = specorder[j]
+            pair = Pair(cspi,cspj)
             pairs.append(pair)
     return pairs
 
-def get_triplets(nsp):
+def get_triplets(specorder=[]):
+    if len(specorder) < 1:
+        raise ValueError('Specorder has to be specified.')
     pairs= []
-    for i in range(1,nsp+1):
-        for j in range(i,nsp+1):
-            pairs.append([i,j])
+    for i in range(len(specorder)):
+        cspi = specorder[i]
+        for j in range(len(specorder)):
+            cspj = specorder[j]
+            pairs.append([cspi,cspj])
     #return pairs
     triplets= []
-    for i in range(1,nsp+1):
-        tmp= [i]
+    for i in range(len(specorder)):
+        tmp= specorder[i]
         for pair in pairs:
             # if _selected_triplet and \
             #    not (tmp[0],pair[0],pair[1]) in _selected_triplet:
             #     continue
-            triplet = Triplet(tmp[0],pair[0],pair[1])
+            triplet = Triplet(tmp,pair[0],pair[1])
             triplets.append(triplet)
             #triplets.append(tmp+pair)
     return triplets
@@ -184,29 +192,29 @@ def get_inputs():
     
     return inputs
 
-def get_params(sfname,isp1,isp2,isp3=None):
+def get_params(sfname,csp1,csp2,csp3=None):
     if sfname == 'Gaussian':
-        rs,etas = get_gauss_params(isp1,isp2)
+        rs,etas = get_gauss_params(csp1,csp2)
         return rs,etas
     elif sfname == 'cosine':
-        rk = get_cosine_params(isp1,isp2)
+        rk = get_cosine_params(csp1,csp2)
         return rk
     elif sfname == 'polynomial':
-        a1s = get_polynomial_params(isp1,isp2)
+        a1s = get_polynomial_params(csp1,csp2)
         return a1s
     elif sfname == 'Morse':
-        ds,alps,rs = get_Morse_params(isp1,isp2)
+        ds,alps,rs = get_Morse_params(csp1,csp2)
         return ds,alps,rs
     elif sfname == 'angular':
-        if not isp3:
-            raise ValueError('isp3 is required for 3-body term.')
-        ang = get_angular_params(isp1,isp2,isp3)
+        if not csp3:
+            raise ValueError('csp3 is required for 3-body term.')
+        ang = get_angular_params(csp1,csp2,csp3)
         return ang
     else:
         raise ValueError('No such symmetry function: '+sfname)
 
-def get_gauss_params(isp1,isp2):
-    print('\nDetermine Gaussian parameters for {0:d}-{1:d}:'.format(isp1,isp2))
+def get_gauss_params(csp1,csp2):
+    print('\nDetermine Gaussian parameters for {0:s}-{1:s}:'.format(csp1,csp2))
     print('Minimum interaction distance [Ang]:')
     rmin = float(sys.stdin.readline())
     print('Maximum interaction distance [Ang]:')
@@ -231,22 +239,22 @@ def get_gauss_params(isp1,isp2):
     print('Number of Gaussian width parameters = {0:d}'.format(len(etas)))
     return rs, etas
 
-def get_cosine_params(isp1,isp2):
+def get_cosine_params(csp1,csp2):
     rk = []
     return rk
 
-def get_polynomial_params(isp1,isp2):
+def get_polynomial_params(csp1,csp2):
     a1s = []
     return a1s
 
-def get_Morse_params(isp1,isp2):
+def get_Morse_params(csp1,csp2):
     ds = []
     alps = []
     rs = []
     return ds,alps,rs
 
-def get_angular_params(isp1,isp2,isp3):
-    print('\nDetermine angular parameters for {0:d}-{1:d}-{2:d}:'.format(isp1,isp2,isp3))
+def get_angular_params(csp1,csp2,csp3):
+    print('\nDetermine angular parameters for {0:s}-{1:s}-{2:s}:'.format(csp1,csp2,csp3))
     print('Special angles [degree] (space-separation):')
     # angs = [ math.cos(float(a)/180*math.pi) for a in sys.stdin.readline().split() ]
     angs = [ float(a) for a in sys.stdin.readline().split() ]
@@ -292,74 +300,74 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
 
         if nsf2 > 0:
             for pair in pairs:
-                ia,ja = pair.get_isps()
+                cspi,cspj = pair.get_csps()
                 for isf,sf in enumerate(pair.sfparams):
                     t = sf[0]
                     if t == 'Gaussian':
                         if len(sf) != 3:
                             raise RuntimeError('Num of Gaussian params is wrong.')
                         eta,rs = sf[1],sf[2]
-                        f.write(' {0:3d}'.format(_type2num[t]) \
-                                +' {0:3d} {1:3d}'.format(ia,ja) \
+                        f.write(' {0:3d} '.format(_type2num[t]) \
+                                +' {0:<3s} {1:<3s}'.format(cspi,cspj) \
                                 +' {0:6.2f}'.format(rc2) \
                                 +' {0:10.4f} {1:10.4f}\n'.format(eta,rs))
                     elif t == 'cosine':
                         if len(sf) != 2:
                             raise RuntimeError('Num of cosine params is wrong.')
                         r = sf[1]
-                        f.write(' {0:3d}'.format(_type2num[t]) \
-                                +' {0:3d} {1:3d}'.format(ia,ja) \
+                        f.write(' {0:3d} '.format(_type2num[t]) \
+                                +' {0:<3s} {1:<3s}'.format(cspi,cspj) \
                                 +' {0:6.2f}'.format(rc2) \
                                 +' {0:10.4f}\n'.format(r))
                     elif t == 'polynomial':
                         if len(sf) != 2:
                             raise RuntimeError('Num of polynomial params is wrong.')
                         a1 = sf[1]
-                        f.write(' {0:3d}'.format(_type2num[t]) \
-                                +' {0:3d} {1:3d}'.format(ia,ja) \
+                        f.write(' {0:3d} '.format(_type2num[t]) \
+                                +' {0:<3s} {1:<3s}'.format(cspi,cspj) \
                                 +' {0:6.2f}'.format(rc2) \
                                 +' {0:10.4f}\n'.format(a1))
                     elif t == 'Morse':
                         if len(sf) != 4:
                             raise RuntimeError('Num of Morse params is wrong.')
                         d,alp,r = sf[1],sf[2],sf[3]
-                        f.write(' {0:3d}'.format(_type2num[t]) \
-                                +' {0:3d} {1:3d}'.format(ia,ja) \
+                        f.write(' {0:3d} '.format(_type2num[t]) \
+                                +' {0:<3s} {1:<3s}'.format(cspi,cspj) \
                                 +' {0:6.2f}'.format(rc2) \
                                 +' {0:10.4f} {1:10.4f}'.format(d,alp) \
                                 +' {0:10.4f}\n'.format(r))
         if nsf3 > 0:
             for triple in triplets:
-                ia,ja,ka = triple.get_isps()
+                cspi,cspj,cspk = triple.get_csps()
                 for isf,sf in enumerate(triple.sfparams):
                     t = sf[0]
                     if t in ('angular','angular1'):
                         a = sf[1]
                         ang = -math.cos(a/180*math.pi)
-                        f.write(' {0:3d}'.format(_type2num[t]) \
-                                +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
+                        f.write(' {0:3d} '.format(_type2num[t]) \
+                                +' {0:<3s} {1:<3s} {2:<3s}'.format(cspi,cspj,cspk) \
                                 +' {0:6.2f}'.format(rc3) \
                                 +' {0:10.4f}\n'.format(ang))
                     elif t in ('angular2'):
                         a = sf[1]
                         ang = -math.cos(a/180*math.pi)
                         zeta = sf[2]
-                        f.write(' {0:3d}'.format(_type2num[t]) \
-                                +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
+                        f.write(' {0:3d} '.format(_type2num[t]) \
+                                +' {0:<3s} {1:<3s} {2:<3s}'.format(cspi,cspj,cspk) \
                                 +' {0:6.2f}'.format(rc3) \
                                 +' {0:10.4f}'.format(ang) \
                                 +' {0:10.4f}\n'.format(zeta))
                     elif t in ('angular3','angular4'):
                         a = sf[1]
-                        f.write(' {0:3d}'.format(_type2num[t]) \
-                                +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
+                        f.write(' {0:3d} '.format(_type2num[t]) \
+                                +' {0:<3s} {1:<3s} {2:<3s}'.format(cspi,cspj,cspk) \
                                 +' {0:6.2f}'.format(rc3) \
                                 +' {0:10.4f}\n'.format(a))
                     elif t in ('angular5'):
                         eta = sf[1]
                         rs = sf[2]
-                        f.write(' {0:3d}'.format(_type2num[t]) \
-                                +' {0:3d} {1:3d} {2:3d}'.format(ia,ja,ka) \
+                        f.write(' {0:3d} '.format(_type2num[t]) \
+                                +' {0:<3s} {1:<3s} {2:<3s}'.format(cspi,cspj,cspk) \
                                 +' {0:6.2f}'.format(rc3) \
                                 +' {0:10.4f} {1:10.4f}\n'.format(eta,rs))
         f.close()
@@ -441,20 +449,20 @@ if __name__ == "__main__":
 
         if b2_exists:
             for pair in pairs:
-                isp1,isp2 = pair.get_isps()
+                csp1,csp2 = pair.get_csps()
                 for t in inputs['type_use']:
                     if t in _type_2body:
                         pair.set_symfunc(t)
-                        sfparam = get_params(t,isp1,isp2)
+                        sfparam = get_params(t,csp1,csp2)
                         pair.set_sfparam(sfparam)
             
         if b3_exists:
             for triplet in triplets:
-                isp1,isp2,isp3 = triplet.get_isps()
+                csp1,csp2,csp3 = triplet.get_csps()
                 for t in inputs['type_use']:
                     if t in _type_3body:
                         triplet.set_symfunc(t)
-                        sfparam = get_params(t,isp1,isp2,isp3)
+                        sfparam = get_params(t,csp1,csp2,csp3)
                         triplet.set_sfparam(sfparam)
     nsf2 = get_nsf2(pairs)
     nsf3 = get_nsf3(triplets)

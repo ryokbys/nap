@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-19 23:56:42 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-20 14:13:17 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -83,6 +83,7 @@ contains
   subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
+    use util,only: itotOf
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -146,6 +147,7 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
+!!$        if( i.eq.1 ) print *,'  j,js,xj,rij,dij=',j,js,xj(1:3),rij(1:3),sqrt(dij2)
         if( dij2.gt.rc2 ) cycle
         dij= sqrt(dij2)
         diji= 1d0/dij

@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-19 22:45:32 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-20 13:38:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -177,9 +177,18 @@ contains
     integer,intent(in):: ionum
     character(len=*),intent(in) :: cfname
 
-    integer:: ia,ib,l,i
+    integer:: ia,ib,l,i,msp
 
     open(ionum,file=cfname,status='replace')
+    if( has_cspname ) then
+      msp = 0
+      do i=1,ntot
+        msp = max(msp,int(tagtot(i)))
+      enddo
+      write(ionum,'(a)') '!'
+      write(ionum,'(a,9(2x,a))') '!  specorder: ',(trim(cspname(i)),i=1,msp)
+      write(ionum,'(a)') '!'
+    endif
     write(ionum,'(es23.14e3)') hunit
     write(ionum,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3) &
          ,ib=1,3),l=0,1)
