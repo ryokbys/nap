@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-20 13:38:40 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-20 16:37:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -99,8 +99,8 @@ module pmdio
 !.....charges
   real(8):: schg(1:nspmax)= 0d0
 !.....species name
-  character(len=3):: cspname(nspmax) = 'x'
-  logical:: has_cspname = .false.
+  character(len=3):: specorder(nspmax) = 'x'
+  logical:: has_specorder = .false.
 
 !.....Boundary condition: p = periodic, f = free, w = wall
   character(len=3):: boundary = 'ppp'
@@ -180,13 +180,13 @@ contains
     integer:: ia,ib,l,i,msp
 
     open(ionum,file=cfname,status='replace')
-    if( has_cspname ) then
+    if( has_specorder ) then
       msp = 0
       do i=1,ntot
         msp = max(msp,int(tagtot(i)))
       enddo
       write(ionum,'(a)') '!'
-      write(ionum,'(a,9(2x,a))') '!  specorder: ',(trim(cspname(i)),i=1,msp)
+      write(ionum,'(a,9(2x,a))') '!  specorder: ',(trim(specorder(i)),i=1,msp)
       write(ionum,'(a)') '!'
     endif
     write(ionum,'(es23.14e3)') hunit
@@ -313,9 +313,9 @@ contains
           if( abs(st(l,k)).lt.tiny ) st(l,k) = 0d0
         enddo
       enddo
-      if( has_cspname ) then
+      if( has_specorder ) then
         is = int(tagtot(i))
-        csp = cspname(is)
+        csp = specorder(is)
         write(ionum,'(i8,a4,3f12.5,8es11.3,f9.4,f9.2)') &
              itotOf(tagtot(i)),trim(csp),rlmp(1:3,i),eki, &
              epi, &
@@ -537,23 +537,24 @@ contains
     if( index(cline,'specorder:').ne.0 ) then
       num = num_data(trim(cline),' ')
       if( num.gt.11 ) stop 'ERROR: number of species exceeds the limit.'
-      read(cline,*) c1, copt, cspname(1:num-2)
+      read(cline,*) c1, copt, specorder(1:num-2)
       if( iprint.gt.0 ) then
         print '(a)',' Species order read from pmdini option: '
         do isp=1,num-2
-          print '(i5,": ",a4)',isp,trim(cspname(isp))
+          print '(i5,": ",a4)',isp,trim(specorder(isp))
         enddo
       endif
-      has_cspname = .true.
+      has_specorder = .true.
     endif
     
   end subroutine parse_option
 !=======================================================================
-  function csp2isp(csp)
+  function csp2isp(csp,spcs)
 !
-!  Convert cspi to isp using cspname array.
+!  Convert cspi to isp.
 !  If not found, return -1.
 !
+    character(len=3),intent(in):: spcs(nspmax)
     character(len=*),intent(in):: csp
     integer:: csp2isp
 
@@ -561,7 +562,7 @@ contains
 
     csp2isp = -1
     do isp=1,nspmax
-      if( trim(csp).eq.trim(cspname(isp)) ) then
+      if( trim(csp).eq.trim(spcs(isp)) ) then
         csp2isp = isp
         return
       endif

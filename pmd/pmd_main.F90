@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-19 22:44:48 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-20 16:56:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -122,8 +122,8 @@ program pmd
   endif
 
 !.....Broadcast species data read from pmdini  
-  call mpi_bcast(cspname,3*nspmax,mpi_character,0,mpicomm,ierr)
-  call mpi_bcast(has_cspname,1,mpi_logical,0,mpicomm,ierr)
+  call mpi_bcast(specorder,3*nspmax,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(has_specorder,1,mpi_logical,0,mpicomm,ierr)
 
 !.....Broadcast determined nx,ny,nz to reset MPI communicator if needed.
   call mpi_bcast(nx,1,mpi_integer,0,mpicomm,ierr)
@@ -181,7 +181,7 @@ program pmd
 !.....call pmd_core to perfom MD
   call pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,ekitot,epitot,chgtot,chitot,nstp,nerg,npmd &
-       ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,nspmax,cspname &
+       ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,nspmax,specorder &
        ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
        ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl &
        ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv &
@@ -458,7 +458,7 @@ subroutine bcast_params()
   call mpi_bcast(zshear_angle,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(strfin,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(am,nspmax,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(cspname,nspmax*3,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(specorder,nspmax*3,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(ciofmt,6,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(nrmtrans,6,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(lstrs0,1,mpi_logical,0,mpicomm,ierr)

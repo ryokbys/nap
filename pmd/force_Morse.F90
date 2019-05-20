@@ -1,12 +1,12 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-20 14:13:17 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-20 16:36:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
 !    - Currently no cutoff tail treatment is done. (170310)
 !-----------------------------------------------------------------------
-  use pmdio,only: csp2isp, nspmax
+  use pmdio,only: csp2isp,nspmax
   implicit none
   save
   character(len=128):: paramsdir = '.'
@@ -574,12 +574,13 @@ contains
 
   end subroutine qforce_vcMorse
 !=======================================================================
-  subroutine read_params_Morse(myid_md,mpi_md_world,iprint)
+  subroutine read_params_Morse(myid_md,mpi_md_world,iprint,specorder)
 !
 !  Read pair parameters for Morse potential from file
 !
     include 'mpif.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
+    character(len=3),intent(in):: specorder(nspmax)
     integer:: i,j,isp,jsp,id,ierr
     character(len=128):: cline,fname
     character(len=3):: cspi,cspj
@@ -599,8 +600,8 @@ contains
         backspace(ioprms)
 !!$        read(ioprms,*) isp,jsp,d,a,r
         read(ioprms,*) cspi,cspj,d,a,r
-        isp = csp2isp(cspi)
-        jsp = csp2isp(cspj)
+        isp = csp2isp(cspi,specorder)
+        jsp = csp2isp(cspj,specorder)
         if( isp.gt.0 .and. jsp.gt.0 ) then
           d0(isp,jsp) = d
           rmin(isp,jsp) = r

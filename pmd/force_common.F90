@@ -1,6 +1,6 @@
 subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
      ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr &
-     ,sorg,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
+     ,sorg,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs &
      ,ifcoulomb,iprint,l1st &
      ,lvc,lcell_updated,boundary)
 !-----------------------------------------------------------------------
@@ -48,7 +48,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
 !!$    character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: l1st,lstrs,lcell_updated
   logical,intent(inout):: lvc
-  character(len=3),intent(in):: boundary
+  character(len=3),intent(in):: boundary, specorder(nismax)
 
   integer:: ierr,is,i
   real(8):: at(3),tmp
@@ -169,7 +169,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('cspline') ) call force_cspline(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
   
 
 !.....Exclusive choice of different Coulomb force-fields
@@ -208,7 +208,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
 end subroutine get_force
 !=======================================================================
 subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
-     iprint,h,rc,lvc,ifcoulomb)
+     iprint,h,rc,lvc,ifcoulomb,specorder)
 !
 !  Initialization routine is separated from main get_force routine.
 !
@@ -225,9 +225,11 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use linreg, only: read_params_linreg,lprmset_linreg
   use descriptor, only: read_params_desc,init_desc
   use NN2, only: read_params_NN2,lprmset_NN2,update_params_NN2
+  use pmdio,only: nspmax
   implicit none
   integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint !,numff
   real(8),intent(in):: tag(namax),h(3,3),rc
+  character(len=3),intent(in):: specorder(nspmax)
 !!$    character(len=20),intent(in):: cffs(numff)
   integer,intent(inout):: ifcoulomb
   real(8),intent(inout):: chg(namax),chi(namax)
@@ -253,10 +255,10 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
        use_force('Ewald') .or. &
        use_force('Ewald_long') ) then
     call initialize_coulomb(natm,nsp,tag,chg,chi,myid_md &
-         ,mpi_md_world,ifcoulomb,iprint,h,rc,lvc)
+         ,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
   else if( use_force('Coulomb') ) then
     call initialize_coulombx(natm,nsp,tag,chg,chi,myid_md &
-         ,mpi_md_world,ifcoulomb,iprint,h,rc,lvc)
+         ,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
   endif
 
 !.....vcMorse
@@ -269,7 +271,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
 !.....Morse
   if( use_force('Morse') .or. use_force('Morse_repul') ) then
     if( .not.lprmset_Morse ) then
-      call read_params_Morse(myid_md,mpi_md_world,iprint)
+      call read_params_Morse(myid_md,mpi_md_world,iprint,specorder)
 !!$    else
 !!$!.....This code is not parallelized, and only for fitpot
 !!$      if( ifcoulomb.eq.1 ) then
@@ -302,11 +304,11 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
     call init_desc()
     if( .not.lprmset_NN2 ) then
 !.....Read both in.params.desc and in.params.NN2
-      call read_params_desc(myid_md,mpi_md_world,iprint)
+      call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
       call read_params_NN2(myid_md,mpi_md_world,iprint)
     else
 !.....Read only in.params.desc
-      call read_params_desc(myid_md,mpi_md_world,iprint)
+      call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
       call update_params_NN2()
     endif
   endif
@@ -330,11 +332,11 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
     call init_desc()
     if( .not.lprmset_linreg ) then
 !.....Read both in.params.desc and in.params.linreg
-      call read_params_desc(myid_md,mpi_md_world,iprint)
+      call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
       call read_params_linreg(myid_md,mpi_md_world,iprint)
     else
 !.....Read only in.params.desc
-      call read_params_desc(myid_md,mpi_md_world,iprint)
+      call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
     endif
   endif
 

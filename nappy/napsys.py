@@ -421,6 +421,13 @@ class NAPSystem(object):
     
     def write_pmd(self,fname='pmdini'):
         f=open(fname,'w')
+        if self.specorder and len(self.specorder)> 0:
+            f.write("!\n")
+            f.write("!  specorder: ")
+            for s in self.specorder:
+                f.write(" {0:<3s}".format(s))
+            f.write("\n")
+            f.write("!\n")
         # lattice constant
         f.write(" {0:15.9f}\n".format(self.alc))
         # cell vectors

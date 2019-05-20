@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-20 14:13:05 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-20 16:48:13 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -13,7 +13,7 @@ module Coulomb
 !  For Ewald Coulomb potential:
 !    - ...
 !-----------------------------------------------------------------------
-  use pmdio,only: csp2isp, nspmax
+  use pmdio,only: csp2isp,nspmax
   implicit none
   save
 
@@ -100,7 +100,7 @@ module Coulomb
        reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
 contains
   subroutine initialize_coulomb(natm,nspin,tag,chg,chi, &
-       myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc)
+       myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
 !
 !  Allocate and initialize parameters to be used.
 !  This is called when force is either screened_Coulomb/Ewald/Ewald_long.
@@ -109,6 +109,7 @@ contains
     integer,intent(in):: myid,mpi_md_world,natm,nspin &
          ,ifcoulomb,iprint
     real(8),intent(in):: tag(natm),rc,h(3,3),chg(natm)
+    character(len=3),intent(in):: specorder(nspmax)
     real(8),intent(inout):: chi(natm)
     logical,intent(inout):: lvc 
 
@@ -127,12 +128,14 @@ contains
 !!$         ,mpi_md_world,ierr)
 
     if( ifcoulomb.eq.1 ) then  ! screened Coulomb
-      call read_params(myid,mpi_md_world,ifcoulomb,iprint,lvc)
+      call read_params(myid,mpi_md_world,ifcoulomb,iprint,lvc &
+           ,specorder)
     else
       if( lvc ) then
 !.....Variable-charge Coulomb with Gaussian distribution charges
 !     which ends-up long-range-only Ewald summation
-        call read_params(myid,mpi_md_world,ifcoulomb,iprint,lvc)
+        call read_params(myid,mpi_md_world,ifcoulomb,iprint,lvc &
+             ,specorder)
         call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
              natm,tag,chi,chg,lvc)
       else
@@ -143,7 +146,8 @@ contains
   end subroutine initialize_coulomb
 !=======================================================================
   subroutine initialize_coulombx(natm,nspin,tag,chg,chi, &
-       myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc)
+       myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc, &
+       specorder)
 !
 !  Allocate and initialize parameters to be used.
 !  This is called when force is 'Coulomb'
@@ -152,6 +156,7 @@ contains
     integer,intent(in):: myid,mpi_md_world,natm,nspin &
          ,ifcoulomb,iprint
     real(8),intent(in):: tag(natm),rc,h(3,3)
+    character(len=3),intent(in):: specorder(nspmax)
     real(8),intent(inout):: chi(natm),chg(natm)
     logical,intent(inout):: lvc 
 
@@ -162,7 +167,7 @@ contains
 !.....Get umber of species
     nsp = nspin
 
-    call read_paramsx(myid,mpi_md_world,iprint)
+    call read_paramsx(myid,mpi_md_world,iprint,specorder)
 
     if( trim(cchgs).eq.'fixed' ) then
       do i=1,natm
@@ -356,12 +361,14 @@ contains
     
   end subroutine init_vc_Ewald
 !=======================================================================
-  subroutine read_params(myid,mpi_world,ifcoulomb,iprint,lvc)
+  subroutine read_params(myid,mpi_world,ifcoulomb,iprint,lvc &
+       ,specorder)
 !
 !  Read parameters
 !
     include "mpif.h"
     integer,intent(in):: myid,mpi_world,ifcoulomb,iprint
+    character(len=3),intent(in):: specorder(nspmax)
     character(len=128):: cline,c1st,fname
     character(len=5):: cname
     logical,intent(in):: lvc
@@ -372,9 +379,11 @@ contains
     if( params_read ) return
 
     if( ifcoulomb.eq.1 ) then  ! screened_bvs
-      call read_params_sc(myid,mpi_world,ifcoulomb,iprint)
+      call read_params_sc(myid,mpi_world,ifcoulomb,iprint &
+           ,specorder)
     else if( lvc ) then  ! variable-charge
-      call read_params_vc(myid,mpi_world,ifcoulomb,iprint)
+      call read_params_vc(myid,mpi_world,ifcoulomb,iprint &
+           ,specorder)
     else
       print *,'ERROR: something wrong about force_Coulomb setting.'
       call mpi_finalize(ierr)
@@ -384,13 +393,15 @@ contains
 
   end subroutine read_params
 !=======================================================================
-  subroutine read_params_sc(myid,mpi_world,ifcoulomb,iprint)
+  subroutine read_params_sc(myid,mpi_world,ifcoulomb,iprint, &
+       specorder)
 !
 !  Read params for screened_Coulomb.
 !
     implicit none 
     include "mpif.h"
     integer,intent(in):: myid,mpi_world,ifcoulomb,iprint
+    character(len=3),intent(in):: specorder(nspmax)
     
     integer:: mode,ierr,isp,jsp,npq
     real(8):: vid,rad
@@ -429,7 +440,7 @@ contains
           backspace(ioprms)
 !!$          read(ioprms,*) isp, cname, vid, rad, npq
           read(ioprms,*) cspi, vid, rad, npq
-          isp = csp2isp(trim(cspi))
+          isp = csp2isp(trim(cspi),specorder)
           if( isp.gt.0 ) then
             if( iprint.ne.0 ) then
               write(6,'(a,a5,2f7.3,i4)') '   cspi,vid,rad,npq =' &
@@ -444,8 +455,8 @@ contains
           backspace(ioprms)
 !!$          read(ioprms,*) isp, jsp
           read(ioprms,*) cspi,cspj
-          isp = csp2isp(trim(cspi))
-          jsp = csp2isp(trim(cspj))
+          isp = csp2isp(trim(cspi),specorder)
+          jsp = csp2isp(trim(cspj),specorder)
           if( isp.gt.0 .and. jsp.gt.0 ) then
             interact(isp,jsp) = .true.
             interact(jsp,isp) = interact(isp,jsp)
@@ -483,13 +494,15 @@ contains
 !.....end of screend_bvs
   end subroutine read_params_sc
 !=======================================================================
-  subroutine read_params_vc(myid,mpi_world,ifcoulomb,iprint)
+  subroutine read_params_vc(myid,mpi_world,ifcoulomb,iprint, &
+       specorder)
 !
 !  Read params for variable-charge.
 !
     implicit none 
     include "mpif.h"
     integer,intent(in):: myid,mpi_world,ifcoulomb,iprint
+    character(len=3),intent(in):: specorder(nspmax) 
 
     integer:: isp,ierr
     real(8):: dchi,djii,sgmt,de0,qlow,qup
@@ -516,7 +529,7 @@ contains
         backspace(ioprms)
 !!$        read(ioprms,*,end=20) isp, cname, dchi,djii,sgmt,de0,qlow,qup
         read(ioprms,*,end=20) cspi, dchi,djii,sgmt,de0,qlow,qup
-        isp = csp2isp(trim(cspi))
+        isp = csp2isp(trim(cspi),specorder)
         if( isp.gt.0 ) then
           vcg_chi(isp) = dchi
           vcg_jii(isp) = djii
@@ -543,13 +556,14 @@ contains
 
   end subroutine read_params_vc
 !=======================================================================
-  subroutine read_paramsx(myid,mpi_world,iprint)
+  subroutine read_paramsx(myid,mpi_world,iprint,specorder)
 !
 !  Read parameter file for any Coulomb potential.
 !
     use util, only: num_data
     include "mpif.h"
     integer,intent(in):: myid,mpi_world,iprint
+    character(len=3),intent(in):: specorder(nspmax)
 
 !!$    integer,external:: num_data
     
@@ -654,7 +668,7 @@ contains
           if( trim(cchgs).eq.'fixed' ) then
 !!$            read(ioprms,*) isp, chgi
             read(ioprms,*) csp, chgi
-            isp = csp2isp(trim(csp))
+            isp = csp2isp(trim(csp),specorder)
             if( isp.gt.0 ) then
               schg(isp) = chgi
               ispflag(isp) = .true.
@@ -669,7 +683,7 @@ contains
 !!$            if( isp.gt.nsp .and. iprint.gt.0 ) then
 !!$              print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
 !!$            endif
-            isp = csp2isp(trim(csp))
+            isp = csp2isp(trim(csp),specorder)
             if( isp.gt.0 ) then
               ispflag(isp) = .true.
               vid_bvs(isp) = vid
@@ -686,7 +700,7 @@ contains
             endif
           else if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') then
             read(ioprms,*) csp, dchi,djii,de0,qlow,qup
-            isp = csp2isp(trim(csp))
+            isp = csp2isp(trim(csp),specorder)
             if( isp.gt.0 ) then
               ispflag(isp) = .true.
               vcg_chi(isp) = dchi
@@ -713,8 +727,8 @@ contains
 !!$          interact(isp,jsp) = .true.
 !!$          interact(jsp,isp) = .true.
           read(ioprms,*) cspi,cspj
-          isp = csp2isp(trim(cspi))
-          jsp = csp2isp(trim(cspj))
+          isp = csp2isp(trim(cspi),specorder)
+          jsp = csp2isp(trim(cspj),specorder)
           if( isp.gt.0 .and. jsp.gt.0 ) then
             interact(isp,jsp) = .true.
             interact(jsp,isp) = .true.
@@ -2533,7 +2547,7 @@ contains
     return
   end subroutine set_paramsdir_Coulomb
 !=======================================================================
-  subroutine set_params_Coulomb(ndimp,prms_in,ctype)
+  subroutine set_params_Coulomb(ndimp,prms_in,ctype,specorder)
 !
 !  Accessor routine to set Coulomb parameters from outside.
 !  This is supposed to be called only on serial run.
@@ -2541,6 +2555,7 @@ contains
     integer,intent(in):: ndimp
     real(8),intent(in):: prms_in(ndimp)
     character(len=*),intent(in):: ctype
+    character(len=3),intent(in):: specorder(nspmax)
 
     integer:: isp,jsp,ns,inc,ifcoulomb,ipr,myid,mpiw,maxisp
 
@@ -2551,7 +2566,7 @@ contains
         ipr = 0
         myid = 0
         mpiw = -1
-        call read_params_sc(myid,mpiw,ifcoulomb,ipr)
+        call read_params_sc(myid,mpiw,ifcoulomb,ipr,specorder)
         params_read = .true.
       endif
 

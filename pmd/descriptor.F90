@@ -2,6 +2,7 @@ module descriptor
 !=======================================================================
 ! Descriptor module
 !=======================================================================
+  use pmdio, only: csp2isp, nspmax
   implicit none
   save
 !!$ putting mpif.h inclusion here could cause some conflicts
@@ -808,13 +809,13 @@ contains
     return
   end subroutine get_fc_dfc
 !=======================================================================
-  subroutine read_params_desc(myid,mpi_world,iprint)
+  subroutine read_params_desc(myid,mpi_world,iprint,specorder)
     use util, only: num_data
-    use pmdio, only: csp2isp,nspmax
     implicit none
     include 'mpif.h'
 
     integer,intent(in):: myid,mpi_world,iprint
+    character(len=3),intent(in):: specorder(nspmax)
 !!$    real(8),intent(in):: rcin
 
     integer:: ierr,i,j,k,nc,ncoeff,nsp,isp,jsp,ksp,isf,ityp &
@@ -991,14 +992,15 @@ contains
           read(ionum,*,end=20) ityp,(ccmb(k),k=1,ncomb_type(ityp)) &
                ,rcut,(cnst(j),j=1,ncnst_type(ityp))
           descs(isf)%itype = ityp
-          isp = csp2isp(trim(ccmb(1)))
-          jsp = csp2isp(trim(ccmb(2)))
+          isp = csp2isp(trim(ccmb(1)),specorder)
+          jsp = csp2isp(trim(ccmb(2)),specorder)
           descs(isf)%isp = isp
           descs(isf)%jsp = jsp
           descs(isf)%rcut = rcut
           descs(isf)%rcut2 = rcut*rcut
           descs(isf)%nprm = ncnst_type(ityp)
-          allocate(descs(isf)%prms(descs(isf)%nprm))
+          if( .not.allocated(descs(isf)%prms) ) &
+               allocate(descs(isf)%prms(descs(isf)%nprm))
           do j=1,descs(isf)%nprm
             descs(isf)%prms(j) = cnst(j)
           enddo
@@ -1010,7 +1012,7 @@ contains
             ilsf2(ilsf2(0,is1,is2),is1,is2) = isf
           else if( ityp.le.200 ) then  ! 3-body
             nsf3 = nsf3 + 1
-            ksp = csp2isp(trim(ccmb(3)))
+            ksp = csp2isp(trim(ccmb(3)),specorder)
             descs(isf)%ksp = ksp
             is1 = min(jsp,ksp)
             is2 = max(jsp,ksp)

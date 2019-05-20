@@ -1,11 +1,11 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-17 13:30:38 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-20 16:45:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
 subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
      ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd &
-     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,nspmax,cspname &
+     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,nspmax,specorder &
      ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
      ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl &
      ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv &
@@ -46,7 +46,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,pfin,ttgt(9),chgtot(ntot0),chitot(ntot0)
   character,intent(in):: ciofmt*6, cpctl*20, ctctl*20 &
        ,boundary*3
-  character(len=3),intent(in):: cspname(nspmax) 
+  character(len=3),intent(in):: specorder(nspmax) 
   character(len=*),intent(in):: czload_type,cstruct,cdeform
 !      character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: ltdst,lstrs0,lcellfix(3,3),lmetaD,lconst &
@@ -323,7 +323,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   tcom = 0d0
 
   call init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
-       iprint,h,rc,lvc,ifcoulomb)
+       iprint,h,rc,lvc,ifcoulomb,specorder)
 !-----copy RA of boundary atoms
   call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
        ,nx,ny,nz,myid_md)
@@ -342,7 +342,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   lcell_updated = .true.
   call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-       ,lspr,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,lstrs &
+       ,lspr,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
        ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
   lcell_updated = .false.
   lstrs = .false.
@@ -697,7 +697,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !-------Calc forces
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-         ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,lstrs &
+         ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
     lcell_updated = .false.
     lstrs = .false.
@@ -1085,7 +1085,7 @@ end subroutine pmd_core
 subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
      ,ekitot,epitot,chgtot,chitot &
      ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
-     ,nspmax,cspname,am,dt,rc,rbuf,rc1nn,stnsr,epot &
+     ,nspmax,specorder,am,dt,rc,rbuf,rc1nn,stnsr,epot &
      ,ekin,ifcoulomb,lvc,iprint,lcalcgrad,ndimp,maxisp &
      ,gwe,gwf,gws,lematch,lfmatch,lsmatch,boundary)
 !
@@ -1117,7 +1117,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,ntot0),gws(ndimp,6)
   logical,intent(inout):: lvc
   logical,intent(in):: lematch,lfmatch,lsmatch
-  character(len=3),intent(in):: boundary,cspname(nspmax)
+  character(len=3),intent(in):: boundary,specorder(nspmax)
 
   integer:: i,ierr,is,nspl,nxyz,iprm0
   real(8):: aai(3),epott
@@ -1185,7 +1185,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !      print *,'one_shot: 04'
 !      if( iprint.ge.10 ) print *,'init_force,myid_md=',myid_md
   call init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
-       iprint,h,rc,lvc,ifcoulomb)
+       iprint,h,rc,lvc,ifcoulomb,specorder)
 
 !      print *,'one_shot: 05'
 !-----copy RA of boundary atoms
@@ -1204,7 +1204,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   if( .not.lcalcgrad ) then
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-         ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,lstrs &
+         ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
     if( iprint.ne.0 ) then
       write(6,'(a,es15.7)') ' potential energy = ',epot

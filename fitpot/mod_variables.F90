@@ -1,4 +1,5 @@
 module variables
+  use pmdio,only: nspmax
   implicit none 
   save
   integer:: nsmpl
@@ -16,12 +17,11 @@ module variables
   real(8):: xtol= 1d-4
   real(8):: gtol= 1d-5
   real(8):: ftol= 1d-5
-  integer,parameter:: maxnsp= 9
-  real(8):: eatom(maxnsp)
+  real(8):: eatom(nspmax)
   logical:: lematch= .true.   ! energy matching
   logical:: lfmatch= .false.  ! force matching
   logical:: lsmatch= .false.  ! stress matching
-  logical:: lsps_frc(maxnsp)
+  logical:: lsps_frc(nspmax)
   integer:: nsmpl_outfrc = 20000
   character(len=128):: cnormalize= 'std'
   logical:: lnormalize  = .false.  ! whether of not to normalize vars
@@ -55,13 +55,11 @@ module variables
 !.....Loss function type: LS (least-square), Huber
   character(len=128):: ctype_loss = 'LS'
 
-!.....Max limit of number of species
-  integer,parameter:: mspcs = 9
 !.....Max value of species-ID
   integer:: maxisp
-  real(8):: ebase(mspcs)
+  real(8):: ebase(nspmax)
   real(8):: swgt2trn,swgt2tst
-  logical:: interact(mspcs,mspcs)
+  logical:: interact(nspmax,nspmax)
 
 !.....max num of atoms among reference data
   integer:: maxna = 0
@@ -96,9 +94,10 @@ module variables
     real(8),allocatable:: va(:,:),strsi(:,:,:),eki(:,:,:),epi(:)&
          ,chg(:),chi(:),fsub(:,:),eatm(:)
     real(8),allocatable:: gwe(:),gwf(:,:,:),gws(:,:)
-    character(len=2),allocatable:: symbols(:)
+    character(len=3),dimension(nspmax):: specorder = (/'x1','x2','x3', &
+         'x4','x5','x6','x7','x8','x9'/)
     integer:: ispmax       ! Max isp in the sample
-    integer:: naps(mspcs)  ! num of atoms per species
+    integer:: naps(nspmax)  ! num of atoms per species
     integer:: iclass       ! 1: training,  2: test
     logical:: charge_set = .false.
 !.....Related to descriptors
@@ -160,7 +159,7 @@ contains
 
     integer:: i
 
-    do i=1,maxnsp
+    do i=1,nspmax
       lsps_frc(i) = .true.
     enddo
     interact(:,:) = .true.

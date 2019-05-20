@@ -2,6 +2,7 @@ module cspline
 !-----------------------------------------------------------------------
 !  Parallel implementation of cubic spline force field.
 !-----------------------------------------------------------------------
+  use pmdio,only: csp2isp, nspmax
   implicit none
   save
 
@@ -11,7 +12,6 @@ module cspline
 !.....parameter file name
   character(128),parameter:: cpfname= 'in.params.cspline'
   integer,parameter:: ionum = 50
-  integer:: nspmax
   integer,allocatable:: idpair(:,:)
   integer,allocatable:: idtriplet(:,:,:)
   
@@ -34,7 +34,7 @@ contains
 !=======================================================================
   subroutine force_cspline(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+       ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
     include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
@@ -43,6 +43,7 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
+    character(len=3),intent(in):: specorder(nspmax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
@@ -63,10 +64,9 @@ contains
 
 !.....Only at the 1st call
     if( l1st ) then
-      nspmax = nismax
       if( allocated(idpair) ) deallocate(idpair,idtriplet)
       allocate(idpair(nspmax,nspmax),idtriplet(nspmax,nspmax,nspmax))
-      call read_params_cspline(myid_md,mpi_md_world,iprint)
+      call read_params_cspline(myid_md,mpi_md_world,iprint,specorder)
       if( iprint.gt.1 .and. myid_md.eq.0 ) then
         call write_cspline_curves()
       endif
@@ -478,15 +478,15 @@ contains
     return
   end subroutine set_paramsdir_cspline
 !=======================================================================
-  subroutine read_params_cspline(myid,mpi_world,iprint)
+  subroutine read_params_cspline(myid,mpi_world,iprint,specorder)
 !
 !  Read knot positions and potential values of each knot.
 !  Coefficients are computed from these values.
 !
     use util, only: num_data, is_numeric
-    use pmdio,only: csp2isp
     include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
+    character(len=3),intent(in):: specorder(nspmax)
 
     integer:: i,ierr,isp,jsp,ksp,ndat,npnts,ispl
     real(8):: rcut
@@ -533,8 +533,8 @@ contains
             backspace(ionum)
             read(ionum,*) ctype, cspi, cspj, rcut, npnts
             spls(ispl)%ctype = ctype
-            isp = csp2isp(cspi)
-            jsp = csp2isp(cspj)
+            isp = csp2isp(cspi,specorder)
+            jsp = csp2isp(cspj,specorder)
             spls(ispl)%isp = isp
             spls(ispl)%jsp = jsp
             spls(ispl)%rcut = rcut
@@ -562,9 +562,9 @@ contains
             backspace(ionum)
             read(ionum,*) ctype, cspi, cspj, cspk, rcut, npnts
             spls(ispl)%ctype = ctype
-            isp = csp2isp(cspi)
-            jsp = csp2isp(cspj)
-            ksp = csp2isp(cspk)
+            isp = csp2isp(cspi,specorder)
+            jsp = csp2isp(cspj,specorder)
+            ksp = csp2isp(cspk,specorder)
             spls(ispl)%isp = isp
             spls(ispl)%jsp = jsp
             spls(ispl)%ksp = ksp

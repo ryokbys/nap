@@ -1,10 +1,10 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-16 11:47:36 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-20 17:17:33 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
-  use NNd,only:NN_init,NN_func,NN_grad
+!!$  use NNd,only:NN_init,NN_func,NN_grad
   use fp_common,only: func_w_pmd, grad_w_pmd, write_dsgnmats &
        ,subtract_FF, restore_FF, normalize
   use minimize
@@ -171,11 +171,13 @@ program fitpot
   case ('random_search','random')
     call random_search_wrapper(ftrn0,ftst0)
   case ('fs','FS')
-    call fs_wrapper(ftrn0,ftst0)
+!!$    call fs_wrapper(ftrn0,ftst0)
+    if( myid.eq.0 ) print *,'FS is not available in the current version.'
   case ('gfs')
     call gfs_wrapper(ftrn0,ftst0)
   case ('sgd','SGD')
-    call sgd(ftrn0,ftst0)
+!!$    call sgd(ftrn0,ftst0)
+    if( myid.eq.0 ) print *,'SGD is not available in the current version.'
   case ('check_grad')
     call check_grad(ftrn0,ftst0)
   case ('test','TEST')
@@ -272,7 +274,7 @@ subroutine write_initial_setting()
   if( len(trim(crefstrct)).gt.5 ) then
     write(6,'(2x,a25,2x,a)') 'reference_structure',trim(crefstrct)
   else
-    do i=1,maxnsp
+    do i=1,nspmax
       write(6,'(2x,a25,2x,i2,es15.7)') 'atom_energy',i,eatom(i)
     enddo
   endif
@@ -546,15 +548,32 @@ end subroutine read_samples
 !=======================================================================
 subroutine read_pos(ionum,fname,ismpl,smpl)
   use variables
+  use util,only: num_data
   implicit none 
   integer,intent(in):: ionum,ismpl
   character(len=*),intent(in):: fname
   type(mdsys),intent(inout):: smpl
 
-  integer:: i,natm,natotl,natotg
+  integer:: i,natm,natotl,natotg,num
   real(8):: tmp
+  character(len=128):: cline
+  character(len=10):: c1,copt
 
   open(ionum,file=trim(fname),status='old')
+  do while(.true.)
+    read(ionum,'(a)') cline
+    if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) then
+      if( index(cline,'specorder:').ne.0 ) then
+        num = num_data(trim(cline),' ')
+        if( num.gt.11 ) stop 'ERROR: number of species exceeds the limit.'
+        read(cline,*) c1, copt, smpl%specorder(1:num-2)
+!!$        print *,'specorder = ',smpl%specorder(1:num-2)
+      endif
+    else
+      backspace(ionum)
+      exit
+    endif
+  enddo
   read(ionum,*) smpl%h0
   read(ionum,*) smpl%h(1:3,1)
   read(ionum,*) smpl%h(1:3,2)
@@ -571,7 +590,7 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
        ,smpl%eki(3,3,natm),smpl%epi(natm) &
        ,smpl%chg(natm),smpl%chi(natm),smpl%fsub(3,natm) &
-       ,smpl%symbols(natm),smpl%eatm(natm) &
+       ,smpl%eatm(natm) &
        ,smpl%gwe(nvars),smpl%gwf(nvars,3,natm),smpl%gws(nvars,6))
   smpl%chg(1:natm) = 0d0
   smpl%esub= 0d0
@@ -606,7 +625,7 @@ subroutine read_ref_data()
     read(13,*) samples(ismpl)%eref
     close(13)
 !.....Count numbers of each species
-    samples(ismpl)%naps(1:mspcs) = 0
+    samples(ismpl)%naps(1:nspmax) = 0
     ispmax = 0
     do i=1,samples(ismpl)%natm
       is= int(samples(ismpl)%tag(i))
@@ -618,7 +637,7 @@ subroutine read_ref_data()
     samples(ismpl)%ispmax = ispmax
     samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 1
 !!$    erefminl= min(erefminl,samples(ismpl)%eref/samples(ismpl)%natm)
-!    write(6,*) 'ismpl,naps=',ismpl,samples(ismpl)%naps(1:mspcs)
+!    write(6,*) 'ismpl,naps=',ismpl,samples(ismpl)%naps(1:nspmax)
 
     open(14,file=trim(cmaindir)//'/'//trim(cdir) &
          //'/frc.ref',status='old')
@@ -706,17 +725,17 @@ subroutine get_base_energies()
   use variables
   use parallel
   implicit none
-  integer:: ismpl,naps(mspcs),natm,ispcs,ielem
-  real(8):: ebl(mspcs),erg
+  integer:: ismpl,naps(nspmax),natm,ispcs,ielem
+  real(8):: ebl(nspmax),erg
   
-  ebl(1:mspcs) = 0d0
+  ebl(1:nspmax) = 0d0
   do ismpl=isid0,isid1
-    naps(1:mspcs) = samples(ismpl)%naps(1:mspcs)
+    naps(1:nspmax) = samples(ismpl)%naps(1:nspmax)
     natm = samples(ismpl)%natm
 !!$    write(6,*) ' ismpl,eref =',ismpl,samples(ismpl)%eref
-!!$    write(6,*) ' ismpl,naps =',ismpl,naps(1:mspcs)
+!!$    write(6,*) ' ismpl,naps =',ismpl,naps(1:nspmax)
     ielem = 0
-    do ispcs=1,mspcs
+    do ispcs=1,nspmax
       if( naps(ispcs).eq.natm ) then
         ! this system is unary system
         erg = samples(ismpl)%eref/natm
@@ -727,13 +746,13 @@ subroutine get_base_energies()
     if( ielem.ne.0 ) ebl(ielem) = min(ebl(ielem),erg)
   enddo
 
-  ebase(1:mspcs) = 0d0
-  call mpi_allreduce(ebl,ebase,mspcs,mpi_real8,mpi_min &
+  ebase(1:nspmax) = 0d0
+  call mpi_allreduce(ebl,ebase,nspmax,mpi_real8,mpi_min &
        ,mpi_world,ierr)
 
   if(myid.eq.0) then
     write(6,'(a)') ' Base energies obtained from unary systems:'
-    do ispcs=1,mspcs
+    do ispcs=1,nspmax
       write(6,'(a,i3,es12.4)') '   is, ebase(is) =',ispcs,ebase(ispcs)
     enddo
   endif
@@ -742,7 +761,7 @@ end subroutine get_base_energies
 !=======================================================================
 subroutine qn_wrapper(ftrn0,ftst0)
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+!!$  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
@@ -779,7 +798,7 @@ subroutine sd_wrapper(ftrn0,ftst0)
 !  Steepest descent minimization
 !
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad
+!!$  use NNd,only:NN_init,NN_func,NN_grad
   use fp_common,only: func_w_pmd, grad_w_pmd
   use parallel
   use minimize
@@ -798,7 +817,7 @@ end subroutine sd_wrapper
 !=======================================================================
 subroutine cg_wrapper(ftrn0,ftst0)
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+!!$  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   use fp_common,only: func_w_pmd, grad_w_pmd
@@ -982,8 +1001,8 @@ subroutine sgd(ftrn0,ftst0)
 ! Stochastic gradient decent (SGD)
 !
   use variables
-  use NNd,only:NN_init,NN_fs,NN_gs,NN_func,NN_grad,NN_analyze &
-       ,NN_restore_standard
+!!$  use NNd,only:NN_init,NN_fs,NN_gs,NN_func,NN_grad,NN_analyze &
+!!$       ,NN_restore_standard
   use parallel
   use minimize
   use random
@@ -1033,8 +1052,8 @@ subroutine sgd(ftrn0,ftst0)
 !!$  call NN_init()
   do iter=1,niter
     if(mod(iter,niter_eval).eq.0) then
-      call NN_func(nvars,vars,ftrn,ftst)
-      call NN_grad(nvars,vars,g)
+!!$      call NN_func(nvars,vars,ftrn,ftst)
+!!$      call NN_grad(nvars,vars,g)
       call penalty(cpena,nvars,fp,gp,vars)
       g(1:nvars)= g(1:nvars) +gp(1:nvars)
       gnorm= sqrt(sprod(nvars,g,g))
@@ -1055,8 +1074,8 @@ subroutine sgd(ftrn0,ftst0)
     do i=1,nsgdbsize
       ismplsgd(i)= ismplsgd(i)+isid0-1
     enddo
-    call NN_fs(nvars,vars,ftrn,ftst)
-    call NN_gs(nvars,vars,g)
+!!$    call NN_fs(nvars,vars,ftrn,ftst)
+!!$    call NN_gs(nvars,vars,g)
     call penalty(cpena,nvars,fp,gp,vars)
     gnorm= sqrt(sprod(nvars,g,g))
     gpnorm= sqrt(sprod(nvars,gp,gp))
@@ -1064,8 +1083,8 @@ subroutine sgd(ftrn0,ftst0)
     u(1:nvars)= -g(1:nvars)
     if( csgdupdate.eq.'armijo' ) then
       alpha= r0sgd
-      call armijo_search(nvars,vars,vranges,u,ftrn,ftst,g,alpha,iprint &
-           ,iflag,myid,NN_fs,narmijo)
+!!$      call armijo_search(nvars,vars,vranges,u,ftrn,ftst,g,alpha,iprint &
+!!$           ,iflag,myid,NN_fs,narmijo)
       vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
       alpha1= alpha1*(1d0-dalpha)
     else if( csgdupdate.eq.'momentum' ) then
@@ -1093,14 +1112,14 @@ subroutine sgd(ftrn0,ftst0)
     endif
   enddo
 
-  call NN_func(nvars,vars,ftrn,ftst)
-  call NN_grad(nvars,vars,g)
+!!$  call NN_func(nvars,vars,ftrn,ftst)
+!!$  call NN_grad(nvars,vars,g)
   gnorm= 0d0
   do iv=1,nvars
     gnorm= gnorm +g(iv)*g(iv)
   enddo
 
-  call NN_analyze("fin")
+!!$  call NN_analyze("fin")
 !!$  call NN_restore_standard()
 
   deallocate(ismplsgd,g,u,gp,v,g2m,v2m)
@@ -1108,7 +1127,7 @@ end subroutine sgd
 !=======================================================================
 subroutine fs_wrapper(ftrn0,ftst0)
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
+!!$  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
@@ -1118,9 +1137,9 @@ subroutine fs_wrapper(ftrn0,ftst0)
 
   !.....NN specific code hereafter
 !!$  call NN_init()
-  call fs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
-       ,iprint,iflag,myid,NN_func,NN_grad)
-  call NN_analyze("fin")
+!!$  call fs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
+!!$       ,iprint,iflag,myid,NN_func,NN_grad)
+!!$  call NN_analyze("fin")
 !!$  call NN_restore_standard()
 
   return
@@ -1155,7 +1174,7 @@ end subroutine gfs_wrapper
 !=======================================================================
 subroutine check_grad(ftrn0,ftst0)
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad
+!!$  use NNd,only:NN_init,NN_func,NN_grad
   use parallel
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
@@ -1168,14 +1187,14 @@ subroutine check_grad(ftrn0,ftst0)
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
 
-  if( trim(cpot).eq.'NN' ) then
+!!$  if( trim(cpot).eq.'NN' ) then
 !!$    call NN_init()
 !!$    call NN_func(nvars,vars,ftrn0,ftst0)
-    call NN_grad(nvars,vars,ganal)
-  else
+!!$    call NN_grad(nvars,vars,ganal)
+!!$  else
 !!$    call func_w_pmd(nvars,vars,ftrn0,ftst)
     call grad_w_pmd(nvars,vars,ganal)
-  endif
+!!$  endif
 
   vars0(1:nvars)= vars(1:nvars)
   vmax= 0d0
@@ -1201,18 +1220,18 @@ subroutine check_grad(ftrn0,ftst0)
     vars(1:nvars)= vars0(1:nvars)
     dv = max(abs(vars(iv)*dev),dev)
     vars(iv)= vars(iv) +dv/2
-    if( trim(cpot).eq.'NN' ) then
-      call NN_func(nvars,vars,ftmp1,ftst)
-    else
+!!$    if( trim(cpot).eq.'NN' ) then
+!!$      call NN_func(nvars,vars,ftmp1,ftst)
+!!$    else
       call func_w_pmd(nvars,vars,ftmp1,ftst)
-    endif
+!!$    endif
     vars(1:nvars)= vars0(1:nvars)
     vars(iv)= vars(iv) -dv/2
-    if( trim(cpot).eq.'NN' ) then
-      call NN_func(nvars,vars,ftmp2,ftst)
-    else
+!!$    if( trim(cpot).eq.'NN' ) then
+!!$      call NN_func(nvars,vars,ftmp2,ftst)
+!!$    else
       call func_w_pmd(nvars,vars,ftmp2,ftst)
-    endif
+!!$    endif
     gnumer(iv)= (ftmp1-ftmp2)/dv
     if( myid.eq.0 ) then
       write(6,'(i6,es12.4,2es15.4,f15.3)') iv,vars0(iv), &
@@ -1233,7 +1252,7 @@ end subroutine check_grad
 !=======================================================================
 subroutine test(ftrn0,ftst0)
   use variables
-  use NNd,only:NN_init,NN_func,NN_grad
+!!$  use NNd,only:NN_init,NN_func,NN_grad
   use parallel
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
@@ -1551,7 +1570,7 @@ end subroutine write_stress_relation
 subroutine write_stats(iter)
   use variables
   use parallel
-  use NNd
+!!$  use NNd
   implicit none
   integer,intent(in):: iter
   integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst,nfcal,ixyz,jxyz
@@ -2051,7 +2070,7 @@ subroutine sync_input()
   call mpi_bcast(xtol,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ftol,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(gtol,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(eatom,maxnsp,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(eatom,nspmax,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(gscl,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nfpsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(pwgt,1,mpi_real8,0,mpi_world,ierr)
@@ -2066,8 +2085,8 @@ subroutine sync_input()
   call mpi_bcast(lsmatch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
-  call mpi_bcast(lsps_frc,maxnsp,mpi_logical,0,mpi_world,ierr)
-  call mpi_bcast(interact,mspcs*mspcs,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(lsps_frc,nspmax,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
 
   call mpi_bcast(fupper_lim,1,mpi_real8,0,mpi_world,ierr)
 !.....Simulated annealing

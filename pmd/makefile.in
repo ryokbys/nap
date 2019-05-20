@@ -124,6 +124,7 @@ mod_constraints.o: mod_vector.o mod_util.o
 mod_rdcfrc.o: mod_structure.o mod_util.o
 mod_ttm.o: mod_util.o
 mod_pmdio.o: mod_util.o
+mod_pmdvars.o: mod_util.o
 
 descriptor.o descriptor.mod : descriptor.F90 force_ZBL.o mod_util.o
 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<

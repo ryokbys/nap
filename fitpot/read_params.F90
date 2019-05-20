@@ -18,7 +18,7 @@ end subroutine read_vars
 subroutine write_vars(cadd)
   use variables
   use parallel
-  use NNd, only: NN_standardize, NN_restore_standard
+!!$  use NNd, only: NN_standardize, NN_restore_standard
   use fp_common,only: normalize, restore_normalize
   implicit none
   character(len=*),intent(in):: cadd
@@ -26,13 +26,14 @@ subroutine write_vars(cadd)
   character(len=128):: cfname
 
   if( cnormalize(1:4).ne.'none' ) then
-    if( trim(cpot).eq.'NN' .and. .not. &
-         (trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' .or. &
-         trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' .or. &
-         trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
-         trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
-      call NN_restore_standard()
-    else if( lnormalize ) then
+!!$    if( trim(cpot).eq.'NN' .and. .not. &
+!!$         (trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' .or. &
+!!$         trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' .or. &
+!!$         trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
+!!$         trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
+!!$      call NN_restore_standard()
+!!$    else if( lnormalize ) then
+    if( lnormalize ) then
       call restore_normalize()
      endif
   endif
@@ -47,13 +48,14 @@ subroutine write_vars(cadd)
   endif
 
   if( cnormalize(1:4).ne.'none' ) then
-    if( trim(cpot).eq.'NN' .and. .not. &
-         (trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' .or. &
-         trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' .or. &
-         trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
-         trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
-      call NN_standardize()
-    else if( lnormalize ) then
+!!$    if( trim(cpot).eq.'NN' .and. .not. &
+!!$         (trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' .or. &
+!!$         trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' .or. &
+!!$         trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' .or. &
+!!$         trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO') ) then
+!!$      call NN_standardize()
+!!$    else if( lnormalize ) then
+    if( lnormalize ) then
       call normalize()
     endif
   endif

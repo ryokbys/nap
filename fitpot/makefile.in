@@ -23,7 +23,8 @@ MPIFLAGS= @FCFLAGS@ -I${PMDDIR}
 .F90.o: 
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
 
-fitpotobj= NN.o read_input.o fitpot.o read_params.o
+# fitpotobj= NN.o read_input.o fitpot.o read_params.o
+fitpotobj= read_input.o fitpot.o read_params.o
 mods= mod_variables.o mod_parallel.o mod_minimize.o mod_random.o fp_common.o
 args= iargc.o getarg.o
 
@@ -56,8 +57,9 @@ fitpot: ${mods} ${fitpotobj} ${pmdobj}
 
 #.....Dependencies
 read_input.o: ${mods}
-fitpot.o: ${mods} NN.o
-NN.o: ${mods}
+# fitpot.o: ${mods} NN.o
+fitpot.o: ${mods}
+# NN.o: ${mods}
 mod_minimize.o: mod_random.o
 
 fp_common.o fp_common.mod: fp_common.F90 mod_parallel.o mod_minimize.o

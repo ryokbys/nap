@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-16 11:45:11 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-20 17:39:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -199,7 +199,8 @@ contains
              //'/pmd')
         call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_Coulomb(maxisp,x(1:maxisp),cpot)
+        call set_params_Coulomb(maxisp,x(1:maxisp),cpot, &
+             samples(ismpl)%specorder)
         call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot,interact)
       endif
       call run_pmd(samples(ismpl),lcalcgrad,ndim,nff,cffs,epot,frcs,strs &
@@ -492,7 +493,8 @@ contains
              //'/pmd')
         call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_Coulomb(maxisp,x(1:maxisp),cpot)
+        call set_params_Coulomb(maxisp,x(1:maxisp),cpot &
+             ,samples(ismpl)%specorder)
         call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot,interact)
       endif
 !.....Although epot, frcs, and strs are calculated,
@@ -645,6 +647,7 @@ contains
     use force
     use descriptor,only: get_dsgnmat_force
     use ZBL,only: r_inner,r_outer
+    use pmdio, only: nspmax
     implicit none
     include "../pmd/params_unit.h"
     type(mdsys),intent(inout):: smpl
@@ -658,16 +661,14 @@ contains
          gws(ndimp,6)
 
     logical,save:: l1st = .true.
-    integer,parameter:: nismax = 9
 
     integer:: i,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
          nstps_done,ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
-    real(8):: am(nismax),dt,rbuf,dmp,tinit,tfin,ttgt(nismax),trlx,stgt(3,3),&
+    real(8):: am(nspmax),dt,rbuf,dmp,tinit,tfin,ttgt(nspmax),trlx,stgt(3,3),&
          ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv &
          ,rc1nn
     logical:: ltdst,lcellfix(3,3),lvc
     character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5,boundary*3
-    character(len=3):: cspname(nismax)
     logical:: update_force_list
 
     logical,external:: string_in_arr
@@ -677,11 +678,13 @@ contains
       call create_mpi_comm_pmd()
       l1st = .false.
     endif
+!!$    print *,'cdirname,specorder= ',trim(smpl%cdirname) &
+!!$         ,(smpl%specorder(i),i=1,2)
 
     maxstp = 0
     nerg = 1
     npmd = 1
-    am(1:nismax) = 1d0  ! Since no dynamics, no need of mass
+    am(1:nspmax) = 1d0  ! Since no dynamics, no need of mass
     dt = 5d0
     ciofmt = 'ascii'
     ifpmd = 0
@@ -693,7 +696,7 @@ contains
     tinit = 0d0
     tfin = 0d0
     ctctl = 'none'
-    ttgt(1:nismax) = 300d0
+    ttgt(1:nspmax) = 300d0
     trlx = 100d0
     ltdst = .false.
     ntdst = 1
@@ -771,7 +774,7 @@ contains
          ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
          ,smpl%chg,smpl%chi &
          ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
-         ,nismax,cspname,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
+         ,nspmax,smpl%specorder,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
          ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
          ,gwe,gwf,gws &
          ,lematch,lfmatch,lsmatch,boundary)
