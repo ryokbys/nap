@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-20 17:17:33 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-21 18:49:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -13,7 +13,7 @@ program fitpot
   use linreg,only: set_iglid_linreg
   use util,only: time_stamp
   implicit none
-  integer:: ismpl,ihour,imin,isec
+  integer:: i,ismpl,ihour,imin,isec
   real(8):: tmp,fval0,ftrn0,ftst0
 
   call mpi_init(ierr)
@@ -42,6 +42,7 @@ program fitpot
     if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
       print *,'WARNING: Currently LASSO is not working correctly...'
     endif
+
   endif
   call sync_input()
 
@@ -275,7 +276,9 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,a)') 'reference_structure',trim(crefstrct)
   else
     do i=1,nspmax
-      write(6,'(2x,a25,2x,i2,es15.7)') 'atom_energy',i,eatom(i)
+      if( trim(specorder(i)).ne.'x' ) then
+        write(6,'(2x,a25,2x,i2,a4,es15.7)') 'atom_energy',i,specorder(i),eatom(i)
+      endif
     enddo
   endif
   write(6,'(2x,a25,2x,l3)') 'energy_match',lematch
@@ -293,6 +296,9 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,a)') 'normalize_input',trim(cnormalize)
   if( lfmatch ) then
     write(6,'(2x,a25,2x,f0.2)') 'force_limit',force_limit
+  endif
+  if( nspcs_neglect.gt.0 ) then
+    write(6,'(2x,a25,9(2x,4a))') 'force_neglect_species',(cspcs_neglect(i),i=1,nspcs_neglect)
   endif
 
   if( nswgt.gt.0 ) then
@@ -612,6 +618,7 @@ subroutine read_ref_data()
   integer:: imax,ifsmpl,nfsmplmax,nfrefdat,ifcal
   character(len=128):: cdir
   real(8):: erefminl,ftmp(3),fmax,ptnsr(3,3)
+  character(len=3):: cspi 
 
   jflag= 0
   erefminl= 0d0
@@ -664,7 +671,8 @@ subroutine read_ref_data()
       samples(ismpl)%fabs(i)= sqrt(ftmp(1)**2 +ftmp(2)**2 +ftmp(3)**2)
       if( samples(ismpl)%fabs(i).gt.force_limit ) ifcal = 0
       is= int(samples(ismpl)%tag(i))
-      if( .not. lsps_frc(is) ) ifcal = 0
+      cspi = samples(ismpl)%specorder(is)
+      if( csp_in_neglect(cspi) ) ifcal = 0
       samples(ismpl)%ifcal(i)= ifcal
 !!$      write(6,'(a,2i5,3es12.4)') 'ismpl,i,samples(ismpl)%fref(1:3,i) = ',&
 !!$           ismpl,i,samples(ismpl)%fref(1:3,i)
@@ -2071,6 +2079,7 @@ subroutine sync_input()
   call mpi_bcast(ftol,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(gtol,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(eatom,nspmax,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(specorder,3*nspmax,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(gscl,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nfpsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(pwgt,1,mpi_real8,0,mpi_world,ierr)
@@ -2085,7 +2094,8 @@ subroutine sync_input()
   call mpi_bcast(lsmatch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
-  call mpi_bcast(lsps_frc,nspmax,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(nspcs_neglect,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(cspcs_neglect,3*nspmax,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
 
   call mpi_bcast(fupper_lim,1,mpi_real8,0,mpi_world,ierr)
@@ -2338,15 +2348,21 @@ end subroutine get_uniq_iarr
 subroutine subtract_atomic_energy()
   use variables
   use parallel
+  use pmdio,only: csp2isp
   implicit none
-  integer:: ismpl,is,i
+  integer:: ismpl,is,i,isp
   type(mdsys):: smpl
+  character(len=3):: csp 
 
   do ismpl=isid0,isid1
     smpl = samples(ismpl)
     do i=1,smpl%natm
+!.....Convert species-ID in the sample (IS) to that in fitpot (ISP).
       is= int(smpl%tag(i))
-      samples(ismpl)%eref= samples(ismpl)%eref -eatom(is)
+      csp = smpl%specorder(is)
+      isp = csp2isp(trim(csp),specorder)
+!.....EATOM stores atomic energy according to the order of specorder in fitpot.
+      samples(ismpl)%eref= samples(ismpl)%eref -eatom(isp)
     enddo
   enddo
 

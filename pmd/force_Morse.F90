@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-20 16:36:02 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-22 10:46:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -26,6 +26,9 @@ module Morse
 !.....Morse parameters
   real(8):: alp(nspmax,nspmax),d0(nspmax,nspmax),rmin(nspmax,nspmax)
   logical:: interact(nspmax,nspmax)
+
+!.....Smooth cutoff
+  real(8):: vrcs(nspmax,nspmax), dvdrcs(nspmax,nspmax)
 
   integer,parameter:: ivoigt(3,3)= &
        reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
@@ -102,7 +105,7 @@ contains
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
-         ,d0ij,alpij,rminij,dij2
+         ,d0ij,alpij,rminij,dij2,vrc,dvdrc
     real(8),save:: rc2
     real(8),external:: fcut1,dfcut1
 
@@ -112,6 +115,24 @@ contains
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
       rc2 = rc*rc
+!.....Initialize smooth cutoff
+      vrcs(:,:) = 0d0
+      dvdrcs(:,:) = 0d0
+      do is=1,nspmax
+        do js=is,nspmax
+          rminij = rmin(is,js)
+          if( rmin(is,js).lt.0d0 ) cycle
+          alpij = alp(is,js)
+          d0ij = d0(is,js)
+          texp = exp( alpij*(rminij -rc))
+          vrc = d0ij*( (texp-1d0)**2 -1d0 )
+          vrcs(is,js) = vrc
+          vrcs(js,is) = vrc
+          dvdrc = 2d0 *alpij *d0ij *texp *(1d0-texp)
+          dvdrcs(is,js) = dvdrc
+          dvdrcs(js,is) = dvdrc
+        enddo
+      enddo
     endif
 
     if( size(strsl).lt.3*3*namax ) then
@@ -156,10 +177,13 @@ contains
         d0ij = d0(is,js)
         alpij= alp(is,js)
         rminij=rmin(is,js)
+        vrc = vrcs(is,js)
+        dvdrc = dvdrcs(is,js)
         texp = exp(alpij*(rminij-dij))
 !.....potential
         tmp= d0ij*((texp-1d0)**2 -1d0)
-        tmp2 = 0.5d0 *tmp *fcut1(dij,0d0,rc)
+!!$        tmp2 = 0.5d0 *tmp *fcut1(dij,0d0,rc)
+        tmp2 = 0.5d0 *(tmp -vrc -dvdrc*(dij-rc))
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp2
           epi(j)= epi(j) +tmp2
@@ -169,8 +193,9 @@ contains
           epotl = epotl +tmp2
         endif
 !.....force
-        dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) *fcut1(dij,0d0,rc) &
-             + tmp*dfcut1(dij,0d0,rc)
+!!$        dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) *fcut1(dij,0d0,rc) &
+!!$             + tmp*dfcut1(dij,0d0,rc)
+        dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) -dvdrc
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
@@ -721,7 +746,7 @@ contains
 
     d0(:,:)= 0d0
     alp(:,:)= 0d0
-    rmin(:,:)= 0d0
+    rmin(:,:)= -1d0
 
     inc = 0
     do i=1,nspmax

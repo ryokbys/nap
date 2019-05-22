@@ -43,7 +43,9 @@ subroutine set_variable(ionum,cname)
   character(len=*),intent(in):: cname
 
   character(len=128):: ctmp
+  character(len=3):: csp 
   integer:: ndata,nrow,is,itmp
+  real(8):: tmp
 
   if( trim(cname).eq.'num_samples' ) then
     call read_i1(ionum,nsmpl)
@@ -87,7 +89,8 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'atom_energy' ) then
     backspace(ionum)
-    read(ionum,*) ctmp,itmp,eatom(itmp)
+    read(ionum,*) ctmp,csp,tmp
+    call read_atom_energy(csp,tmp)
     return
   elseif( trim(cname).eq.'reference_structure' ) then
     call read_c1(ionum,crefstrct)
@@ -98,8 +101,8 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'force_match' ) then
     call read_l1(ionum,lfmatch)
     return
-  elseif( trim(cname).eq.'force_match_species' ) then
-    call read_force_match_species(ionum)
+  elseif( trim(cname).eq.'force_neglect_species' ) then
+    call read_force_neglect_species(ionum)
     return
   elseif( trim(cname).eq.'stress_match' ) then
     call read_l1(ionum,lsmatch)
@@ -510,31 +513,23 @@ subroutine read_force_field(ionum)
   read(ionum,*) ctmp, (csubffs(i),i=1,nsubff)
 end subroutine read_force_field
 !=======================================================================
-subroutine read_force_match_species(ionum)
-  use variables,only: lsps_frc
+subroutine read_force_neglect_species(ionum)
+  use variables,only: cspcs_neglect,nspcs_neglect
   use util,only: num_data
   implicit none
   integer,intent(in):: ionum
 
-  integer:: i,ndat,nsp_frc
+  integer:: i,ndat
   character(len=1024):: ctmp
-!      integer,external:: num_data
-  integer,allocatable:: isps(:)
 
   backspace(ionum)
   read(ionum,'(a)') ctmp
   ndat = num_data(trim(ctmp),' ')
-  nsp_frc = ndat -1
-  allocate(isps(nsp_frc))
+  nspcs_neglect = ndat -1
   backspace(ionum)
-  read(ionum,*) ctmp, (isps(i),i=1,nsp_frc)
+  read(ionum,*) ctmp, (cspcs_neglect(i),i=1,nspcs_neglect)
 
-  lsps_frc(:) = .false.
-  do i=1,nsp_frc
-    lsps_frc(isps(i)) = .true.
-  enddo
-  deallocate(isps)
-end subroutine read_force_match_species
+end subroutine read_force_neglect_species
 !=======================================================================
 subroutine read_nn_nhl(ionum)
   use variables,only: nn_nhl
@@ -569,3 +564,29 @@ subroutine read_interactions(ionum,nrow,msp,interact)
   enddo
   return
 end subroutine read_interactions
+!=======================================================================
+subroutine read_atom_energy(csp,eatm)
+  use variables
+  character(len=3),intent(in):: csp
+  real(8),intent(in):: eatm
+
+  integer:: i
+
+!.....Store atomic energy if the species already exists in specorder
+  do i=1,nspmax
+    if( trim(csp).eq.trim(specorder(i)) ) then
+      eatom(i) = eatm
+      return
+    endif
+  enddo
+!.....Create new species in specorder and store atomic energy
+  do i=1,nspmax
+    if( trim(specorder(i)).eq.'x' ) then
+      specorder(i) = trim(csp)
+      eatom(i) = eatm
+      return
+    endif
+  enddo
+  print *,'Atom energy is not used: ',csp,eatm
+  return
+end subroutine read_atom_energy

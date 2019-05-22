@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-20 16:56:14 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-22 15:02:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -24,6 +24,7 @@ program pmd
   use force
   use Coulomb, only: cterms
   use util, only: time_stamp, itotOf
+  use element
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -36,6 +37,8 @@ program pmd
   integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,nstp_done
   integer:: mpicolor,mpikey,ierr,jerr,itmp,nprocs
   real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin
+  character(len=3):: csp
+  type(atom):: elem
 !!$  integer,external:: itotOf
 
 !-----initialize the MPI environment
@@ -46,6 +49,8 @@ program pmd
   call mpi_comm_rank(MPI_COMM_WORLD,myid_md,ierr)
   call mpi_comm_dup(MPI_COMM_WORLD,mpicomm,ierr)
   mpi_md_world = mpicomm
+
+  call init_element()
 
 !.....Set fmv as default value before reading 'in.pmd'
   call set_fmv(fmv)
@@ -62,7 +67,37 @@ program pmd
     write(6,*) ''
     call time_stamp(' Job started')
     write(6,*) ''
+
+!.....Read atom configuration file 1st
+    if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
+      write(6,*) 'Read pmdini in binary mode.'
+      call read_pmdtot_bin(20,trim(cpmdini))
+    else if( trim(ciofmt).eq.'ascii' ) then
+      write(6,*) 'Read pmdini in ascii mode.'
+      call read_pmdtot_ascii(20,trim(cpmdini))
+    else
+      write(6,*) 'Error: io_format must be either ascii, ' &
+           //'bin or binary.'
+      stop
+    endif
+
+!.....Set mass of species if specorder is already set.
+!.....This could be overwritten by mass entry in in.pmd
+    if( has_specorder ) then
+      do is=1,nspmax
+        csp = specorder(is)
+        if( trim(csp).ne.'x' ) then
+          elem = get_element(trim(csp))
+          am(is) = elem%mass
+        endif
+      enddo
+    endif
+  endif
+
+  if( myid_md.eq.0 ) then
+    write(6,*) ''
     write(6,'(a,i0)') ' Number of processes in MPI = ',nprocs
+!.....Read in.pmd after reading the atom configuration file.
     call read_input(10,trim(cinpmd))
     call check_cmin(cmin,ifdmp)
     call write_initial_setting()
@@ -87,25 +122,12 @@ program pmd
 
   call bcast_params()
 
-!.....only 0th-node reads pmdini file
-  if( myid_md.eq.0 ) then
-!        call system('cp pmd0000 pmd0000.orig')
-    if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-      write(6,*) 'Read pmdini in binary mode.'
-      call read_pmdtot_bin(20,trim(cpmdini))
-    else if( trim(ciofmt).eq.'ascii' ) then
-      write(6,*) 'Read pmdini in ascii mode.'
-      call read_pmdtot_ascii(20,trim(cpmdini))
-    else
-      write(6,*) 'Error: io_format must be either ascii, ' &
-           //'bin or binary.'
-      stop
-    endif
 
+  if( myid_md.eq.0 ) then
     allocate(chgtot(ntot0),chitot(ntot0))
     chitot(1:ntot0) = 0d0
-    call set_atomic_charges(ntot0,chgtot,tagtot,nspmax &
-         ,chgfix,schg,myid_md,iprint)
+!!$    call set_atomic_charges(ntot0,chgtot,tagtot,nspmax &
+!!$         ,chgfix,schg,myid_md,iprint)
 
 !.....Determine nx,ny,nz using rc and hmat info
     if( .not. (nx.gt.0 .and. ny.gt.0 .and. nz.gt.0 ) ) then
@@ -360,19 +382,19 @@ subroutine write_initial_setting()
 !.....Mass
   write(6,'(2x,a)') 'mass'
   do i=1,nspmax
-    write(6,'(5x,i3,f10.4)') i,am(i)
+    if( trim(specorder(i)).ne.'x' ) write(6,'(5x,i3,f10.4)') i,am(i)
   enddo
   write(6,'(2x,a)') ''
 !.....Boundary condition
   write(6,'(2x,a,5x,a)') 'boundary',trim(boundary)
   write(6,'(2x,a)') ''
 !.....Charge
-  write(6,'(2x,a)') 'charge'
-  do i=1,nspmax
-    write(6,'(5x,i3,f10.5)') i,schg(i)
-  enddo
-  write(6,'(2x,a,5x,a)') 'fix_charge',trim(chgfix)
-  write(6,'(2x,a,5x,l2)') 'variable_charge',lvc
+!!$  write(6,'(2x,a)') 'charge'
+!!$  do i=1,nspmax
+!!$    if( trim(specorder(i)).ne.'x' ) write(6,'(5x,i3,f10.5)') i,schg(i)
+!!$  enddo
+!!$  write(6,'(2x,a,5x,a)') 'fix_charge',trim(chgfix)
+!!$  write(6,'(2x,a,5x,l2)') 'variable_charge',lvc
   write(6,'(2x,a)') ''
 
   if( lmetaD ) write(6,'(2x,a,5x,l2)') 'metadynamics',lmetaD

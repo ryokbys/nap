@@ -45,7 +45,9 @@ subroutine set_variable(ionum,cname)
   character(len=*),intent(in):: cname
 
   character(len=128):: ctmp,cval
+  character(len=3):: csp
   integer:: ndata,nrow,is,itmp
+  real(8):: tmp
 
   if( trim(cname).eq.'time_interval' ) then
     call read_r1(ionum,dt)
@@ -196,7 +198,9 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'mass' ) then
     backspace(ionum)
-    read(ionum,*) ctmp,is,am(is)
+    read(ionum,*) ctmp,csp,tmp
+    is = csp2isp(csp,specorder)
+    if( is.gt.0 ) am(is) = tmp
     return
   elseif( trim(cname).eq.'charge' ) then
     backspace(ionum)

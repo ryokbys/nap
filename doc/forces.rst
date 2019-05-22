@@ -10,7 +10,7 @@ Plural FFs can be specified as a space-separated list,
 
    force_type    NN Morse Coulomb
 
-Each FF reads one or some parameter files in the working directory, which are usually named like ``in.params.Coulomb`` or so, specified by FF. For example, **NN** requires two files, ``in.const.NN`` and ``in.params.NN``.
+Each FF reads one or some parameter files in the working directory, which are usually named like ``in.params.Coulomb`` or so, specified by FF. For example, **NN** requires two files, ``in.params.NN`` (file for weights in NN) and ``in.params.desc`` (file for descriptor information).
 
 Available FFs are listed below:
 
@@ -19,3 +19,4 @@ Available FFs are listed below:
 - :doc:`force_fields/Morse`
 - :doc:`force_fields/SW`
 - Lennard-Jones (Ar)
+- Linear regression

@@ -36,7 +36,7 @@ pmdobj= ${PMDDIR}/mod_pmdvars.o ${PMDDIR}/mod_pmdmpi.o ${PMDDIR}/mod_pmdio.o \
     ${PMDDIR}/common_parallel.o ${PMDDIR}/pmd_core.o ${PMDDIR}/descriptor.o \
     ${PMDDIR}/metadynamics.o ${PMDDIR}/mod_constraints.o ${PMDDIR}/mod_vector.o \
 		${PMDDIR}/mod_rdcfrc.o ${PMDDIR}/mod_structure.o ${PMDDIR}/mod_deform.o \
-		${PMDDIR}/mod_util.o
+		${PMDDIR}/mod_util.o ${PMDDIR}/mod_element.o
 
 ${PMDDIR}/%.o: ${PMDDIR}/%.F90
 	@[ -d ${PMDDIR} ]

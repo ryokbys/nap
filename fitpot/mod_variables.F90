@@ -17,11 +17,16 @@ module variables
   real(8):: xtol= 1d-4
   real(8):: gtol= 1d-5
   real(8):: ftol= 1d-5
+!.....This specorder is the one for whole fitpot process not for each sample.
+  character(len=3),dimension(nspmax):: specorder = &
+       (/'x','x','x','x','x','x','x','x','x'/)
   real(8):: eatom(nspmax)
   logical:: lematch= .true.   ! energy matching
   logical:: lfmatch= .false.  ! force matching
   logical:: lsmatch= .false.  ! stress matching
-  logical:: lsps_frc(nspmax)
+!.....Forces of species listed in it are to be neglected
+  character(len=3):: cspcs_neglect(nspmax)
+  integer:: nspcs_neglect = 0
   integer:: nsmpl_outfrc = 20000
   character(len=128):: cnormalize= 'std'
   logical:: lnormalize  = .false.  ! whether of not to normalize vars
@@ -78,6 +83,7 @@ module variables
   integer:: nswgt = 0
   character(len=128),allocatable:: cswgt(:)
   real(8),allocatable:: swerg0(:),swdenom(:)
+
   
   type mdsys
     character(len=128):: cdirname
@@ -94,8 +100,9 @@ module variables
     real(8),allocatable:: va(:,:),strsi(:,:,:),eki(:,:,:),epi(:)&
          ,chg(:),chi(:),fsub(:,:),eatm(:)
     real(8),allocatable:: gwe(:),gwf(:,:,:),gws(:,:)
-    character(len=3),dimension(nspmax):: specorder = (/'x1','x2','x3', &
-         'x4','x5','x6','x7','x8','x9'/)
+!.....This specorder is for this sample
+    character(len=3),dimension(nspmax):: specorder  &
+         = (/'x','x','x','x','x','x','x','x','x'/)
     integer:: ispmax       ! Max isp in the sample
     integer:: naps(nspmax)  ! num of atoms per species
     integer:: iclass       ! 1: training,  2: test
@@ -159,11 +166,27 @@ contains
 
     integer:: i
 
-    do i=1,nspmax
-      lsps_frc(i) = .true.
-    enddo
     interact(:,:) = .true.
+    cspcs_neglect(:) = 'x'
     
   end subroutine init_variables
+!=======================================================================
+  function csp_in_neglect(csp)
+!
+!  Return whether or not the given csp is in the neglect_list.
+!
+    character(len=*),intent(in):: csp
 
+    logical:: csp_in_neglect
+    integer:: i
+
+    csp_in_neglect = .false.
+    do i=1,nspmax
+      if( trim(csp).eq.trim(cspcs_neglect(i)) ) then
+        csp_in_neglect = .true.
+        return
+      endif
+    enddo
+    return
+  end function csp_in_neglect
 end module variables

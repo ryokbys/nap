@@ -418,13 +418,6 @@ contains
           do ksf=1,ilsf3(0,is,is1,is2)
             isf = ilsf3(ksf,is,is1,is2)
             desci = descs(isf)
-!!$            ksp = desci%ksp
-!!$            if( ksp.lt.1 ) cycle
-!!$            isp = desci%isp
-!!$            if( isp.ne.is ) cycle
-!!$            jsp = desci%jsp
-!!$            if( .not. ((jsp.eq.js.and.ksp.eq.ks) &
-!!$                 .or.(jsp.eq.ks.and.ksp.eq.js)) ) cycle
             ityp = desci%itype
             rcut = desci%rcut
             rcut2= desci%rcut2
@@ -435,14 +428,12 @@ contains
 !.....fcij's should be computed after rcs is determined
               call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
               call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
-!!$              almbd= cnst(1,isf)
               almbd= desci%prms(1)
               t2= (abs(almbd)+1d0)**2
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
 !.....function value
               t1= (almbd +cs)**2
-!!$              eta3 = 0.5d0 /rcs(isf)**2
               eta3 = 0.5d0 /rcut**2
               texp = exp(-eta3*(dij2+dik2))
               tmp = t1/t2 *texp
@@ -454,13 +445,10 @@ contains
                    +tmp *(-2d0*eta3*dij) *fcij*fcik 
               dgdik= fcij *dfcik *tmp &
                    +tmp *(-2d0*eta3*dik) *fcij*fcik 
-!!$            dgdij= dfcij *fcik *t1/t2
-!!$            dgdik= fcij *dfcik *t1/t2
               dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) &
                    +dgdij*driji(1:3) +dgdik*driki(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
-!!$              dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik *texpij*texpik
               dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik *texp 
               dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
@@ -482,11 +470,8 @@ contains
               call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
               call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
               call get_fc_dfc(djk,js,ks,rcut,fcjk,dfcjk)
-!!$              almbd= cnst(1,isf)
-!!$              zang= cnst(2,isf)
               almbd= desci%prms(1)
               zang = desci%prms(2)
-!!$              t2= (abs(almbd)+1d0)**eta
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
               drjkj(1:3)= -rjk(1:3)/djk
@@ -494,7 +479,6 @@ contains
 !.....function value
               twozeta = 2d0**(-zang)
               t1= (almbd +cs)**zang *twozeta
-!!$              eta3 = 0.5d0 /rcs(isf)**2
               eta3 = 0.5d0 /rcut**2
               texp = exp(-eta3*(dij2+dik2+djk2))
               tmp = t1 *texp
@@ -515,9 +499,6 @@ contains
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) &
                     +dgdik*drikk(1:3)+dgdjk*drjkk(1:3)
               dgcs= zang*(almbd +cs)**(zang-1d0) *twozeta *fcij*fcik*fcjk *texp
-!!$              dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij**2
-!!$              dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik**2
-!!$              dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
               dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)

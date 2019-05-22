@@ -34,7 +34,7 @@ comb= node_conv.o util_vec.o
 
 mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o mod_version.o mod_force.o \
 	mod_ttm.o descriptor.o metadynamics.o mod_constraints.o mod_vector.o \
-	mod_rdcfrc.o mod_structure.o mod_deform.o mod_util.o
+	mod_rdcfrc.o mod_structure.o mod_deform.o mod_util.o mod_element.o
 args= iargc.o getarg.o
 
 force_common= force_common.o
