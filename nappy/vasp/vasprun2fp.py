@@ -29,7 +29,7 @@ from ase.io import read,write
 from docopt import docopt
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "170620"
+__version__ = "190522"
 
 _kb2gpa = 160.2176487
 
@@ -38,10 +38,18 @@ def get_tag(symbol,atom_id,specorder):
     tag= float(sid) +0.1 +atom_id*1e-14
     return '{0:17.14f}'.format(tag)
 
-def write_pos(atoms,fname="pos",specorder=[]):
+def write_pos(atoms,fname="pos",specorder=None):
+    if not specorder:
+        raise ValueError('Specorder must be specified explicitly.')
     cell= atoms.cell
     pos= atoms.get_scaled_positions()
     with open(fname,'w') as f:
+        f.write('!\n')
+        f.write('!  specorder: ')
+        for s in specorder:
+            f.write(' {0:<3s}'.format(s))
+        f.write('\n')
+        f.write('!\n')
         f.write('   1.000  \n')
         f.write(' {0:22.14e} {1:22.14e} {2:22.14e}\n'.format(cell[0,0],cell[0,1],cell[0,2]))
         f.write(' {0:22.14e} {1:22.14e} {2:22.14e}\n'.format(cell[1,0],cell[1,1],cell[1,2]))

@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-11-27 16:12:32 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-22 16:08:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -93,10 +93,11 @@ contains
     integer:: i
 
     if( myid.eq.0 ) then
-      write(6,'(/,a)') ' Use the following force-fields:'
+      write(6,'(a)',advance='no') ' Use the following force-fields:'
       do i=1,num_forces
-        write(6,'(a)') '   '//trim(force_list(i))
+        write(6,'(2x,a)',advance='no') trim(force_list(i))
       enddo
+      print *,''
     endif
   end subroutine write_forces
 end module force

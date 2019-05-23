@@ -29,18 +29,30 @@ from scipy.optimize import leastsq
 _infname = 'pmdini'
 
 def read_pmd(fname="pmdini"):
-    f=open(fname,'r')
-    #...read 1st line and get current lattice size
-    al= float(f.readline().split()[0])
+    with open(fname,'r') as f:
+        lines = f.readlines()
+    nl = 0
     hmat= np.zeros((3,3))
-    hmat[0]= [ float(x) for x in f.readline().split() ]
-    hmat[1]= [ float(x) for x in f.readline().split() ]
-    hmat[2]= [ float(x) for x in f.readline().split() ]
-    f.readline()
-    f.readline()
-    f.readline()
-    natm= int(f.readline().split()[0])
-    f.close()
+    for line in lines:
+        if line[0] in ('#','!'):
+            continue
+        nl += 1
+        #...read 1st line and get current lattice size
+        if( nl==1 ):
+            al= float(line.split()[0])
+        elif( nl==2 ):
+            hmat[0]= [ float(x) for x in line.split() ]
+        elif( nl==3 ):
+            hmat[1]= [ float(x) for x in line.split() ]
+        elif( nl==4 ):
+            hmat[2]= [ float(x) for x in line.split() ]
+        elif( nl in (5,6,7) ):
+            continue
+        elif( nl==8 ):
+            natm= int(line.split()[0])
+        else:
+            break
+
     return (al,hmat,natm)
 
 def get_vol(al,hmat):
@@ -50,16 +62,21 @@ def get_vol(al,hmat):
     return np.dot(a1,np.cross(a2,a3))
 
 def replace_1st_line(x,fname="pmdini"):
-    f=open(fname,'r')
-    ini= f.readlines()
-    f.close()
-    g=open(fname,'w')
-    for l in range(len(ini)):
-        if l == 0:
-            g.write(' {0:10.4f}\n'.format(x))
-        else:
-            g.write(ini[l])
-    g.close()
+    with open(fname,'r') as f:
+        orig_txt = f.readlines()
+
+    with open(fname,'w') as g:
+        nl = 0
+        for line in orig_txt:
+            if line[0] in ('#','!'):
+                g.write(line)
+            else:
+                nl += 1
+                if nl == 1:
+                    g.write(' {0:10.4f}\n'.format(x))
+                else:
+                    g.write(line)
+    return None
 
 def residuals(p,y,x):
     b,bp,v0,ev0= p

@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-22 15:02:07 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-23 11:24:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -126,6 +126,7 @@ program pmd
   if( myid_md.eq.0 ) then
     allocate(chgtot(ntot0),chitot(ntot0))
     chitot(1:ntot0) = 0d0
+    chgtot(1:ntot0) = 0d0
 !!$    call set_atomic_charges(ntot0,chgtot,tagtot,nspmax &
 !!$         ,chgfix,schg,myid_md,iprint)
 
@@ -141,6 +142,7 @@ program pmd
          ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0) &
          ,chgtot(ntot0),chitot(ntot0))
     chitot(1:ntot0) = 0d0
+    chgtot(1:ntot0) = 0d0
   endif
 
 !.....Broadcast species data read from pmdini  
@@ -504,8 +506,7 @@ subroutine bcast_params()
   call mpi_bcast(force_list,128*num_forces,mpi_character &
        ,0,mpicomm,ierr)
   call mpi_bcast(ifcoulomb,1,mpi_integer,0,mpicomm,ierr)
-  call mpi_bcast(schg,nspmax,mpi_real8,0,mpicomm &
-       ,ierr)
+  call mpi_bcast(schg,nspmax,mpi_real8,0,mpicomm,ierr)
 !.....NEMD
   call mpi_bcast(ltdst,1,mpi_logical,0,mpicomm,ierr)
   if( ltdst ) then

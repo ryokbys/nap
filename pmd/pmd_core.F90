@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-20 16:45:09 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-22 16:22:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1123,6 +1123,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   real(8):: aai(3),epott
   logical:: lstrs = .false.
   logical:: lcell_updated = .false.
+  character(len=3):: csp
 
 !      print *,'one_shot: 01'
   call initialize_pmdvars(nspmax)
@@ -1143,17 +1144,19 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....perform space decomposition after reading atomic configuration
 !      write(6,'(a,30es10.2)') 'chgtot before space_decomp = ',
 !     &     chgtot(1:ntot0)
-  if( iprint.ne.0 ) then
+  if( iprint.gt.0 ) then
+    print *,''
+    write(6,'(a)',advance='no') ' Species order: '
+    do is=1,nspmax
+      csp = specorder(is)
+      if( trim(csp).ne.'x' ) write(6,'(1x,3a)',advance='no') csp
+    enddo
+    print *,''
     write(6,'(a,i8)') ' Number of total atoms = ',ntot0
-    write(6,'(a)') " h-matrix:"
-    write(6,'("   | ",3f12.3," |")') h(1,1:3,0)
-    write(6,'("   | ",3f12.3," |")') h(2,1:3,0)
-    write(6,'("   | ",3f12.3," |")') h(3,1:3,0)
-    write(6,'(a)') " which means the following lattice vectors:"
+    write(6,'(a)') " Lattice vectors:"
     write(6,'(a,"[ ",3f12.3," ]")') '   a = ',h(1:3,1,0)
     write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
     write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
-    write(6,*) ''
   endif
 !      print *,'one_shot: 02'
   call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,chgtot,chitot &
@@ -1206,10 +1209,11 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
          ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
-    if( iprint.ne.0 ) then
-      write(6,'(a,es15.7)') ' potential energy = ',epot
+    if( iprint.gt.0 ) then
+      write(6,'(a,es15.7)') ' Potential energy = ',epot
     endif
   else  ! lcalcgrad = .true.
+    if( iprint.gt.0 ) print *,'Computing gradient...'
     epot = 0d0
     gwe(1:ndimp) = 0d0
     gwf(1:ndimp,1:3,1:natm) = 0d0
@@ -1245,11 +1249,13 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 
 !      print *,'one_shot: 07'
+  if( iprint.gt.0 ) print *,'Compute stresses...'
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 
   call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
        ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs &
        ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+  if( iprint.gt.0 ) print *,'Compute stresses done'
 
 !.....revert forces to the unit eV/A before going out 
   if( myid_md.eq.0 ) then

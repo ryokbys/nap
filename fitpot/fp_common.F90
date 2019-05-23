@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-20 17:39:40 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-22 17:05:27 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -438,6 +438,7 @@ contains
       smpl = samples(ismpl)
       natm= smpl%natm
       cdirname = smpl%cdirname
+      if( iprint.gt.20 ) print *,'myid,ismpl,cdirname=',myid,ismpl,trim(cdirname)
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
@@ -778,6 +779,7 @@ contains
          ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
          ,gwe,gwf,gws &
          ,lematch,lfmatch,lsmatch,boundary)
+
     strs(1:3,1:3) = ptnsr(1:3,1:3) *up2gpa*(-1d0)
     if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
     if( lfdsgnmat ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)
