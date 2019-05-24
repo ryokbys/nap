@@ -1243,9 +1243,9 @@ You need to specify the species order correctly with --specorder option.
 
     def _pbc(self,x):
         if x < 0.:
-            return x +1.0
+            return x -int(x-1.0)
         elif x >= 1.0:
-            return x -1.0
+            return x -int(x)
         else:
             return x
 

@@ -491,7 +491,7 @@ contains
     integer:: i,ierr,isp,jsp,ksp,ndat,npnts,ispl
     real(8):: rcut
     logical:: lexist
-    character(len=128):: fname,ctmp,ctmp2,ctype
+    character(len=128):: fname,ctmp,ctmp1,ctmp2,ctype
     character(len=3):: cspi,cspj,cspk
 !!$    integer,external:: num_data
     
@@ -511,7 +511,23 @@ contains
       if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) goto 1 ! skip comment line
       ndat = num_data(trim(ctmp),' ')
       if( ndat.lt.1 ) goto 1 ! skip blank line
-      read(ctmp,*) nspl
+!.....Check if the first entry is a number or a keyword
+      read(ctmp,*) ctmp1
+      if( is_numeric(trim(ctmp1)) ) then
+        read(ctmp,*) nspl
+      else  ! No entry of num of splines, count num of keywords in the file
+        backspace(ionum)
+        nspl = 0
+        do while(.true.)
+          read(ionum,*,end=20) ctmp1
+          if( trim(ctmp1).eq.'radial' .or. trim(ctmp1(1:7)).eq.'angular' ) nspl = nspl +1
+        enddo
+20      rewind(ionum)
+      endif
+      if( iprint.gt.0 ) then
+        print *,''
+        print '(a,i5)',' Number of spline entries: ',nspl
+      endif
       if( allocated(spls)) deallocate(spls)
       allocate(spls(nspl))
       ispl = 0
@@ -532,6 +548,8 @@ contains
             endif
             backspace(ionum)
             read(ionum,*) ctype, cspi, cspj, rcut, npnts
+            if( iprint.gt.0 ) print '(a,i3,a10,2a5,f7.2)', '   ispl,type,ci,cj,rcut=    '&
+                 ,ispl, trim(ctype), trim(cspi), trim(cspj), rcut
             spls(ispl)%ctype = ctype
             isp = csp2isp(cspi,specorder)
             jsp = csp2isp(cspj,specorder)
@@ -561,6 +579,8 @@ contains
             endif
             backspace(ionum)
             read(ionum,*) ctype, cspi, cspj, cspk, rcut, npnts
+            if( iprint.gt.0 ) print '(a,i3,a10,3a5,f7.2)', '   ispl,type,ci,cj,ck,rcut= '&
+                 ,ispl, trim(ctype), trim(cspi), trim(cspj), trim(cspk), rcut
             spls(ispl)%ctype = ctype
             isp = csp2isp(cspi,specorder)
             jsp = csp2isp(cspj,specorder)

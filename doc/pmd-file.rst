@@ -32,9 +32,13 @@ Here, line numbers are shown for the ease of explanation.
 
 Line 1-3:
   Lines begin with ``!`` are treated as comment lines.
-  There are some keywords available that are used to specify some additional data to ``pmd`` when they are at a comment line at the beginning.
+  There are some keywords that are used to specify some additional data to ``pmd`` when they are at a comment line at the beginning.
 
   - ``specorder:`` specifies the species order used in ``pmd``.
+
+.. note::
+
+   **specorder** must be specified in the current ``pmd`` (since *rev190515*), as the masses and the interatomic potentials are determined using this information.
 
 Line 4:
   Superficial or apparent lattie constant. This value is to be multiplied to the cell vectors below to obtain absolute cell vectors.

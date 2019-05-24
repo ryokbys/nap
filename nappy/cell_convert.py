@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Change unit vectors from the one of the given system.
+Change unit vectors of the system.
 
 Usage:
   cell_convert.py [options] INFILE
@@ -23,12 +23,7 @@ from napsys import NAPSystem
 __author__ = 'Ryo KOBAYASHI'
 __version__ = '160510'
 
-if __name__ == '__main__':
-    
-    args = docopt(__doc__,version=__version__)
-    infile = args['INFILE']
-    specorder = args['--specorder'].split(',')
-
+def to_given_vector(infile,specorder,a1new,a2new,a3new):
     psys = NAPSystem(fname=infile,specorder=specorder)
     psys.assign_pbc()
     psys.a1 = psys.a1 *psys.alc
@@ -41,7 +36,7 @@ if __name__ == '__main__':
     
     pos = psys.get_real_positions()
     spos = psys.get_scaled_positions()
-    for i in range(min(len(psys.atoms),100)):
+    for i in range(min(len(psys.atoms),10)):
         a = psys.atoms[i]
         print('{0:5d} {1:s}'.format(a.id,a.symbol)
               +' {0:12.5f} {1:12.5f} {2:12.5f}'.format(spos[i,0],
@@ -53,18 +48,18 @@ if __name__ == '__main__':
     
     # print(psys.get_scaled_positions())
     # print(psys.get_real_positions())
-    sa1new = np.zeros(3,dtype=float)
-    sa2new = np.zeros(3,dtype=float)
-    sa3new = np.zeros(3,dtype=float)
+    # sa1new = np.zeros(3,dtype=float)
+    # sa2new = np.zeros(3,dtype=float)
+    # sa3new = np.zeros(3,dtype=float)
     #tmp = raw_input('Input new a1 vector: ')
     #a1new[:] = [ float(x) for x in tmp.split(',') ]
-    sa1new[:] = [ 0.5, 0.5, 0.0]
+    # sa1new[:] = [ 0.5, 0.5, 0.0]
     #tmp = raw_input('Input new a2 vector: ')
     #a2new[:] = [ float(x) for x in tmp.split(',') ]
-    sa2new[:] = [ 0.0, 1.0, 0.0 ]
+    # sa2new[:] = [ 0.0, 1.0, 0.0 ]
     #tmp = raw_input('Input new a3 vector: ')
     #a3new[:] = [ float(x) for x in tmp.split(',') ]
-    sa3new[:] = [ 0.5, 0.5, 1.0 ]
+    # sa3new[:] = [ 0.5, 0.5, 1.0 ]
     hmat = psys.get_hmat()
     a1new = np.dot(hmat,sa1new)
     a2new = np.dot(hmat,sa2new)
@@ -168,3 +163,12 @@ if __name__ == '__main__':
         psnew.assign_pbc()
     psnew.write_POSCAR(infile+'.new')
     print('Check '+infile+'.new')
+    
+
+if __name__ == '__main__':
+    
+    args = docopt(__doc__,version=__version__)
+    infile = args['INFILE']
+    specorder = args['--specorder'].split(',')
+
+    to_given_vector(infile,specorder,a1,a2,a3)

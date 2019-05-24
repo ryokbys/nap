@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-23 11:24:47 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-24 10:17:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -384,7 +384,7 @@ subroutine write_initial_setting()
 !.....Mass
   write(6,'(2x,a)') 'mass'
   do i=1,nspmax
-    if( trim(specorder(i)).ne.'x' ) write(6,'(5x,i3,f10.4)') i,am(i)
+    if( trim(specorder(i)).ne.'x' ) write(6,'(5x,i3,a4,f10.4)') i,specorder(i),am(i)
   enddo
   write(6,'(2x,a)') ''
 !.....Boundary condition
