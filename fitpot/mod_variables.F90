@@ -20,6 +20,7 @@ module variables
 !.....This specorder is the one for whole fitpot process not for each sample.
   character(len=3),dimension(nspmax):: specorder = &
        (/'x','x','x','x','x','x','x','x','x'/)
+  integer:: nsp = 0  ! number of species used
   real(8):: eatom(nspmax)
   logical:: lematch= .true.   ! energy matching
   logical:: lfmatch= .false.  ! force matching

@@ -339,7 +339,10 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'interactions' ) then
     backspace(ionum)
     read(ionum,*) ctmp,nrow
-    call read_interactions(ionum,nrow,nspmax,interact)
+    call read_interactions(ionum,nrow)
+    return
+  elseif( trim(cname).eq.'specorder' ) then
+    call read_specorder(ionum)
     return
 !      elseif( trim(cname).eq.'' ) then
 !        call read_i1(ionum,nz)
@@ -551,16 +554,36 @@ subroutine read_nn_nhl(ionum)
   return
 end subroutine read_nn_nhl
 !=======================================================================
-subroutine read_interactions(ionum,nrow,msp,interact)
-  integer,intent(in):: ionum,nrow,msp
-  logical,intent(inout):: interact(msp,msp)
+subroutine read_interactions(ionum,nrow)
+  use variables
+  integer,intent(in):: ionum,nrow
+
   integer:: irow,isp,jsp
+  character(len=3):: cspi,cspj
 
   interact(:,:) = .false.
   do irow=1,nrow
-    read(ionum,*) isp,jsp
-    interact(isp,jsp) = .true.
-    interact(jsp,isp) = interact(isp,jsp)
+    read(ionum,*) cspi,cspj
+    isp = -1
+    jsp = -1
+    do i=1,nspmax
+      if( trim(cspi).eq.trim(specorder(i)) ) isp=i
+      if( trim(cspj).eq.trim(specorder(i)) ) jsp=i
+    enddo
+!.....Store interaction if the species already exist
+    if( isp.gt.0 .and. jsp.gt.0 ) then
+      interact(isp,jsp) = .true.
+      interact(jsp,isp) = .true.
+      cycle
+    else
+      print *,'Interaction pair ('//trim(cspi)//','//trim(cspj)//&
+           ') is not used, since either one of them is not in specorder.'
+      print '(a,10a4)',' specorder=',(trim(specorder(i)),i=1,nsp)
+      cycle
+    endif
+    
+!!$    interact(isp,jsp) = .true.
+!!$    interact(jsp,isp) = interact(isp,jsp)
   enddo
   return
 end subroutine read_interactions
@@ -570,23 +593,41 @@ subroutine read_atom_energy(csp,eatm)
   character(len=3),intent(in):: csp
   real(8),intent(in):: eatm
 
-  integer:: i
+  integer:: i,isp
 
 !.....Store atomic energy if the species already exists in specorder
+  isp = -1
   do i=1,nspmax
     if( trim(csp).eq.trim(specorder(i)) ) then
-      eatom(i) = eatm
-      return
+      isp = i
+      exit
     endif
   enddo
-!.....Create new species in specorder and store atomic energy
-  do i=1,nspmax
-    if( trim(specorder(i)).eq.'x' ) then
-      specorder(i) = trim(csp)
-      eatom(i) = eatm
-      return
-    endif
-  enddo
-  print *,'Atom energy is not used: ',csp,eatm
+  if( isp.gt.0 ) then
+    eatom(isp) = eatm
+  else
+    print *,'Atom energy is not used since it is not in specorder: ',csp,eatm
+  endif
   return
 end subroutine read_atom_energy
+!=======================================================================
+subroutine read_specorder(ionum)
+!
+!  Read specorder
+!
+  use util,only: num_data
+  use variables
+  implicit none 
+  integer,intent(in):: ionum
+
+  character(len=1024):: ctmp
+  character(len=128):: c1
+  integer:: ndat, i
+
+  backspace(ionum)
+  read(ionum,'(a)') ctmp
+  ndat = num_data(trim(ctmp),' ')
+  nsp = ndat -1
+  read(ctmp,*) c1, (specorder(i),i=1,nsp)
+  
+end subroutine read_specorder

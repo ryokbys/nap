@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-24 10:17:35 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-24 16:56:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -102,6 +102,7 @@ program pmd
     call check_cmin(cmin,ifdmp)
     call write_initial_setting()
 !        call write_inpmd(10,trim(cinpmd))
+    if( num_forces.eq.0 ) stop ' ERROR: no force-field specified'
     if( trim(ctctl).eq.'ttm' ) then
 !.....Set x-boundary free if TTM
       if( boundary(1:1).ne.'f' ) then
@@ -493,18 +494,19 @@ subroutine bcast_params()
   call mpi_bcast(chgfix,20,mpi_character,0,mpicomm,ierr)
 !.....Force-fields
   call mpi_bcast(cforce,20,mpi_character,0,mpicomm,ierr)
-  call mpi_bcast(num_forces,1,mpi_integer,0,mpicomm,ierr)
-  if( num_forces.eq.0 ) then
-    if( myid_md.eq.0 ) write(6,'(a)') &
-         ' Error: no force-field specified'
-    call mpi_finalize(ierr)
-    stop
-  endif
-  if( myid_md.ne.0 ) then
-    allocate(force_list(num_forces))
-  endif
-  call mpi_bcast(force_list,128*num_forces,mpi_character &
-       ,0,mpicomm,ierr)
+  call bcast_force()
+!!$  call mpi_bcast(num_forces,1,mpi_integer,0,mpicomm,ierr)
+!!$  if( num_forces.eq.0 ) then
+!!$    if( myid_md.eq.0 ) write(6,'(a)') &
+!!$         ' Error: no force-field specified'
+!!$    call mpi_finalize(ierr)
+!!$    stop
+!!$  endif
+!!$  if( myid_md.ne.0 ) then
+!!$    allocate(force_list(num_forces))
+!!$  endif
+!!$  call mpi_bcast(force_list,128*num_forces,mpi_character &
+!!$       ,0,mpicomm,ierr)
   call mpi_bcast(ifcoulomb,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(schg,nspmax,mpi_real8,0,mpicomm,ierr)
 !.....NEMD

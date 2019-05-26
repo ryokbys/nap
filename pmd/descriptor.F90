@@ -13,7 +13,7 @@ module descriptor
   integer,parameter:: ionum = 51
 
   real(8),parameter:: pi = 3.14159265358979d0
-  integer,parameter:: msp = 9  ! hard-coded max-num of species
+!!$  integer,parameter:: msp = 9  ! hard-coded max-num of species
 
   type desc
     integer:: itype
@@ -51,10 +51,6 @@ module descriptor
 
 !.....Maximum cutoff radius
   real(8):: rcmax,rcmax2
-!.....Switching radius for inner cutoff
-  real(8):: r_inner(msp)
-  real(8):: r_outer(msp)
-  logical:: l_inner_cut = .false.
 
   integer:: nalmax,nnlmax,nal,nnl
 
@@ -225,8 +221,8 @@ contains
 !  - Cutoff radii are set in each symmetry functions.
 !  - If the overlay option is set, use inner and outer cutoff of ZBL potential.
 !
-    use force,only: loverlay
-    use ZBL,only: interact,r_inner,r_outer,zeta,dzeta
+    use force,only: loverlay,overlays
+    use ZBL,only: interact,zeta,dzeta
 !!$    implicit none
     include "mpif.h"
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
@@ -276,8 +272,8 @@ contains
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
         if( loverlay ) then
-          ri = (r_inner(is)+r_inner(js))/2
-          ro = (r_outer(is)+r_outer(js))/2
+          ri = overlays(is,js)%rin
+          ro = overlays(is,js)%rout
           if( dij.lt.ri ) cycle
           xs = (ro+ri-2d0*dij)/(ro-ri)
           z = zeta(xs)
@@ -766,19 +762,20 @@ contains
 !
 !  Calculate cutoff/switching function depending on r and r_outer
 !
+    use force,only: loverlay, overlays
     real(8),intent(in):: r
     integer,intent(in):: isp,jsp
     real(8),intent(out):: fc,dfc,rcut
 
     real(8):: rin,rout
     
-    if( l_inner_cut ) then
-      rout = (r_outer(isp)+r_outer(jsp))/2
+    if( loverlay ) then
+      rout = overlays(isp,jsp)%rout
       if( r.gt.rout ) then
         fc= fc1(r,rout,rcut)
         dfc= dfc1(r,rout,rcut)
       else
-        rin = (r_inner(isp)+r_inner(jsp))/2
+        rin = overlays(isp,jsp)%rin
         fc= 1d0 -fc1(r,rin,rout)
         dfc= -dfc1(r,rin,rout)
       endif
@@ -1016,7 +1013,7 @@ contains
     call mpi_bcast(nsf2,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
 
-!!$    call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
+!!$    call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
 !!$    call mpi_bcast(itype,nsf,mpi_integer,0,mpi_world,ierr)
 !!$    call mpi_bcast(cnst,max_ncnst*nsf,mpi_real8,0,mpi_world,ierr)
 !!$    call mpi_bcast(iaddr2,2*nsp*nsp,mpi_integer,0,mpi_world,ierr)
@@ -1051,12 +1048,9 @@ contains
 !  The option words should be put after these comment characters with
 !  one or more spaces between them for example,
 !
-!  inner_cutoff:  1  1.0  2.0
+!    Chebyshev:  T
 !
 !  Currently available options are:
-!    - "inner_cutoff:", species, inner- and outer-cutoff radius of
-!      the switching function.
-!      ex) inner_cutoff:  1  1.0  2.0
 !    - "Chebyshev:", toggle switch for Chebyshev polynomial series
 !      ex) Chebyshev:  T 
 !
@@ -1071,21 +1065,7 @@ contains
     logical:: lopt
 
     ierr = 0
-    if( index(cline,'inner_cutoff:').ne.0 ) then
-      read(cline,*) c1, copt, iopt1, opt1, opt2
-      isp = iopt1
-      if( isp.gt.msp ) then
-        print *,'ERROR: isp.gt.msp @parse_option !!!'
-        stop
-      endif
-      r_inner(isp) = opt1
-      r_outer(isp) = opt2
-      l_inner_cut = .true.
-      if( iprint.gt.0 ) then
-        print '(a,i3,2f7.2)','   inner_cutoff   ' &
-             ,isp,r_inner(isp),r_outer(isp)
-      endif
-    else if( index(cline,'Chebyshev:').ne.0 .or. &
+    if( index(cline,'Chebyshev:').ne.0 .or. &
          index(cline,'chebyshev:').ne.0 ) then
       read(cline,*) c1, copt, lopt
       lcheby = lopt

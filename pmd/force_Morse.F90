@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-22 10:46:20 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-26 21:55:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -738,9 +738,15 @@ contains
       enddo
     enddo
     if( nint*3.ne.nprms ) then
-      write(0,*) 'ERROR @set_params_Morse: nint*3.ne.nprms !!!'
       write(6,*) 'ERROR @set_params_Morse: nint*3.ne.nprms !!!'
+      write(6,*) '  nint,nprms= ',nint,nprms
       write(6,*) 'Probably you need to set interactions correctly...'
+      write(6,*) 'interact:'
+      do i=1,nspmax
+        do j=i,nspmax
+          write(6,'(a,2i5,l4)') '  i,j,interact(i,j)=',i,j,interact(i,j)
+        enddo
+      enddo
       stop
     endif
 

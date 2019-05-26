@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-16 11:01:42 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-24 16:44:04 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -82,10 +82,6 @@ contains
           cmode = trim(cline)
           interact(1:msp,1:msp) = .false.
           cycle
-        else if( trim(cline).eq.'overlay' ) then
-          cmode = trim(cline)
-          backspace(ioprms)
-          read(ioprms,*) ctmp, loverlay
         endif
 !.....Read parameters depending on the mode
         if( trim(cmode).eq.'parameters' ) then
@@ -136,7 +132,6 @@ contains
     call mpi_bcast(r_outer,msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(zbl_rc,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
-    call mpi_bcast(loverlay,1,mpi_logical,0,mpi_world,ierr)
     return
   end subroutine read_params_ZBL
 !=======================================================================
@@ -158,7 +153,7 @@ contains
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xij(3),rij,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
+    real(8):: xij(3),rij,rij2,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
     real(8):: x,y,z,xi(3),epotl,epott,tmp,tmp2,dtmp
     real(8),allocatable,save:: strsl(:,:,:)
     real(8),external:: fcut1,dfcut1
@@ -202,9 +197,9 @@ contains
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij= xij(1)**2+ xij(2)**2 +xij(3)**2
-        if( rij.gt.zbl_rc2 ) cycle
-        rij = sqrt(rij)
+        rij2= xij(1)**2+ xij(2)**2 +xij(3)**2
+        if( rij2.gt.zbl_rc2 ) cycle
+        rij = sqrt(rij2)
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
         tmp = vij(is,js,rij)
@@ -217,8 +212,6 @@ contains
           epi(i)= epi(i) +tmp2
           epotl=epotl +tmp2
         endif
-!!$        dtmp = dvij(is,js,rij)*fcut1(rij,zbl_rc) &
-!!$             +tmp *dfcut1(rij,zbl_rc)
         dtmp = dvij(is,js,rij)
         aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
@@ -250,7 +243,7 @@ contains
 !=======================================================================
   function vij(is,js,rij)
 !
-! Main two-body function.
+!   Main two-body function.
 !
     implicit none
     integer,intent(in):: is,js

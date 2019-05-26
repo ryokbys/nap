@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-22 17:04:06 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-26 22:12:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -272,6 +272,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,es12.3)') 'xtol',xtol
   write(6,'(2x,a25,2x,es12.3)') 'ftol',ftol
   write(6,'(2x,a25,2x,es12.3)') 'gtol',gtol
+  write(6,'(2x,a25,10(2x,a3))') 'specorder',(trim(specorder(i)),i=1,nsp)
   if( len(trim(crefstrct)).gt.5 ) then
     write(6,'(2x,a25,2x,a)') 'reference_structure',trim(crefstrct)
   else
@@ -520,10 +521,13 @@ end subroutine count_training_test
 subroutine read_samples()
   use variables
   use parallel
+  use pmdio,only: csp2isp
   implicit none
-  integer:: is,natot
+
+  integer:: is,natot,isp,jsp
   character*128:: cdir
   integer,allocatable:: nal(:)
+  logical:: lint
 
   if( .not. allocated(nalist) ) allocate(nalist(nsmpl))
   allocate(nal(nsmpl))
@@ -535,6 +539,17 @@ subroutine read_samples()
     call read_pos(12,trim(cmaindir)//'/'//trim(cdir) &
          //'/pos',is,samples(is))
     nal(is)= samples(is)%natm
+!.....Specorder in fitpot and that in sample should be the same
+    do isp=1,nspmax
+      if( trim(specorder(isp)).ne.trim(samples(is)%specorder(isp)) ) then
+        print '(a)','ERROR: specorder in the sample is different from that in fitpot.'
+        print '(a)','   specorder in fitpot and the sample, '//trim(cdir)
+        do jsp=1,nspmax
+          print '(i5,2a5)',jsp,specorder(jsp),samples(is)%specorder(jsp)
+        enddo
+        stop
+      endif
+    enddo
   enddo
   call mpi_reduce(nal,nalist,nsmpl,mpi_integer,mpi_sum &
        ,0,mpi_world,ierr)

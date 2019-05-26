@@ -37,6 +37,7 @@ end subroutine read_input
 subroutine set_variable(ionum,cname)
   use pmdio
   use pmdmpi
+  use force,only: overlay_type, overlay_force
 #ifdef __WALL__
   use wall
 #endif
@@ -253,6 +254,16 @@ subroutine set_variable(ionum,cname)
     backspace(ionum)
     read(ionum,*) ctmp, cstruct, istruct
     return
+  elseif( trim(cname).eq.'overlay') then
+    call read_overlay(ionum)
+    return
+  elseif( trim(cname).eq.'overlay_type') then
+    call read_c1(ionum,overlay_type)
+    return
+  elseif( trim(cname).eq.'overlay_force') then
+    call read_c1(ionum,overlay_force)
+    return
+    
 #ifdef __WALL__
   elseif( trim(cname).eq.'wall_pos_top' ) then
     call read_r1(ionum,wtop)
@@ -394,3 +405,46 @@ subroutine read_force_field(ionum)
 !      read(ionum,*) ctmp, (cffs(i),i=1,numff)
   read(ionum,*) ctmp, (force_list(i),i=1,num_forces)
 end subroutine read_force_field
+!=======================================================================
+subroutine read_overlay(ionum)
+!
+!  Read overlay of a given pair
+!
+  use pmdio, only: csp2isp, specorder, nspmax
+  use force, only: overlays, loverlay
+  use util, only: num_data
+  implicit none 
+  integer,intent(in):: ionum
+  
+  character(len=1024):: ctmp
+  character(len=128):: ctmp1
+  integer:: isp,jsp,ndat
+  character(len=3):: cspi, cspj
+  real(8):: rin, rout
+
+  backspace(ionum)
+  read(ionum,'(a)') ctmp
+  ndat = num_data(trim(ctmp),' ')
+  if( ndat.lt.5 ) stop 'ERROR: wrong format for overlay entry.'
+  if( .not. loverlay ) then
+    loverlay = .true.
+    allocate(overlays(nspmax,nspmax))
+  end if
+  read(ctmp,*) ctmp1, cspi, cspj, rin, rout
+  isp = csp2isp(cspi,specorder)
+  jsp = csp2isp(cspj,specorder)
+  if( isp.gt.0 .and. jsp.gt.0 ) then
+    overlays(isp,jsp)%csp1 = cspi
+    overlays(isp,jsp)%csp2 = cspj
+    overlays(isp,jsp)%rin  = rin
+    overlays(isp,jsp)%rout = rout
+    overlays(jsp,isp)%csp1 = cspj
+    overlays(jsp,isp)%csp2 = cspi
+    overlays(jsp,isp)%rin  = rin
+    overlays(jsp,isp)%rout = rout
+  else
+    print *,'Overlay for '//trim(cspi)//' and '//trim(cspj)//' is not set, '//&
+         'because the specified species-pair is not found in the system.'
+  endif
+  
+end subroutine read_overlay

@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-22 16:08:14 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-24 16:55:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -15,9 +15,16 @@ module force
 
   logical:: luse_charge
 
-!.....Overlay ZBL potential to others
+!.....Overlay main potential with a nuclear repulsive one, usually ZBL.
   logical:: loverlay = .false.
-  
+!.....Overlay type: pair or atom
+  character(len=128):: overlay_type = 'pair'
+  character(len=128):: overlay_force = 'ZBL'
+  type overlay
+    character(len=3):: csp1,csp2
+    real(8):: rin,rout
+  end type overlay
+  type(overlay),allocatable:: overlays(:,:)
 
 contains
 !=======================================================================
@@ -100,6 +107,23 @@ contains
       print *,''
     endif
   end subroutine write_forces
+!=======================================================================
+  subroutine bcast_force()
+!
+!   Broadcast variables related to mod_force.
+!
+    use pmdmpi
+    include 'mpif.h'
+    integer:: ierr
+
+    call mpi_bcast(num_forces,1,mpi_integer,0,mpicomm,ierr)
+    if( .not.allocated(force_list) ) then
+      allocate(force_list(num_forces))
+    endif
+    call mpi_bcast(force_list,128*num_forces,mpi_character &
+         ,0,mpicomm,ierr)
+    
+  end subroutine bcast_force
 end module force
 !-----------------------------------------------------------------------
 !     Local Variables:

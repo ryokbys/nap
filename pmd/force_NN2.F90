@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-17 13:25:41 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-24 14:17:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
