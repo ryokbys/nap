@@ -56,13 +56,13 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'vardt_length_scale' ) then
     call read_r1(ionum,vardt_len)
     return
-  elseif( trim(cname).eq.'namax' ) then
+  elseif( trim(cname).eq.'max_num_atoms' ) then
     call read_i1(ionum,namax)
     return
-  elseif( trim(cname).eq.'nbmax' ) then
+  elseif( trim(cname).eq.'max_num_boundary_atoms' ) then
     call read_i1(ionum,nbmax)
     return
-  elseif( trim(cname).eq.'nnmax' ) then
+  elseif( trim(cname).eq.'max_num_neighbors' ) then
     call read_i1(ionum,nnmax)
     return
   elseif( trim(cname).eq.'num_iteration' .or. &

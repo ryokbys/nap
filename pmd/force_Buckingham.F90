@@ -1,6 +1,6 @@
 module Buckingham
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-17 13:25:49 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-01 22:24:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Buckingham calculation
 !    - only force on i is considered, no need to send back
@@ -21,7 +21,7 @@ module Buckingham
   
 contains
   subroutine force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
     implicit none
@@ -32,7 +32,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
-         ,tag(namax),sv(3,6)
+         ,tag(namax),sv(3,6),dlspr(0:3,nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st 
@@ -69,11 +69,14 @@ contains
         if(j.le.i) cycle
         js = int(tag(j))
         if( .not.interact(is,js) ) cycle
-        x= ra(1,j) -xi(1)
-        y= ra(2,j) -xi(2)
-        z= ra(3,j) -xi(3)
-        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij= sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
+!!$        x= ra(1,j) -xi(1)
+!!$        y= ra(2,j) -xi(2)
+!!$        z= ra(3,j) -xi(3)
+!!$        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
+!!$        rij= sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
+        rij = dlspr(0,k,i)
+        if( rij.ge.rc) exit
+        xij(1:3) = dlspr(1:3,k,i)
         riji= 1d0/rij
         dxdi(1:3)= -xij(1:3)*riji
         dxdj(1:3)=  xij(1:3)*riji

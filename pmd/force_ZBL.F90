@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-31 17:02:21 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-01 22:27:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -160,7 +160,7 @@ contains
   end subroutine read_params_ZBL
 !=======================================================================
   subroutine force_ZBL(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
@@ -170,7 +170,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax)
+         ,rc,tag(namax),dlspr(0:3,nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -217,13 +217,16 @@ contains
         if(j.le.i) cycle
         js = int(tag(j))
         if( .not. interact(is,js) ) cycle
-        x= ra(1,j) -xi(1)
-        y= ra(2,j) -xi(2)
-        z= ra(3,j) -xi(3)
-        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij2= xij(1)**2+ xij(2)**2 +xij(3)**2
-        if( rij2.gt.zbl_rc2 ) cycle
-        rij = sqrt(rij2)
+!!$        x= ra(1,j) -xi(1)
+!!$        y= ra(2,j) -xi(2)
+!!$        z= ra(3,j) -xi(3)
+!!$        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
+!!$        rij2= xij(1)**2+ xij(2)**2 +xij(3)**2
+!!$        if( rij2.gt.zbl_rc2 ) cycle
+!!$        rij = sqrt(rij2)
+        rij = dlspr(0,k,i)
+        if( rij.ge.zbl_rc ) exit
+        xij(1:3) = dlspr(1:3,k,i)
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
         tmp = vij(is,js,rij)

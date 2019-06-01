@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-30 23:31:05 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-02 05:10:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -18,7 +18,7 @@ module pmdio
 !.....max. num. of boundary-particles
   integer:: nbmax = 10000
 !.....max. num. of neighbors
-  integer:: nnmax = 1000
+  integer:: nnmax = 100
 
   integer:: nstp = 0
   integer:: minstp = 0

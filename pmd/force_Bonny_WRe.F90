@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2018-10-05 16:42:33 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-01 22:25:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -145,7 +145,7 @@ module Bonny_WRe
   
 contains
   subroutine force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
@@ -155,7 +155,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax)
+         ,rc,tag(namax),dlspr(0:3,nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -220,11 +220,12 @@ contains
         if(j.eq.0) exit
         js = int(tag(j))
         if( .not. interact(is,js) ) cycle
-        x= ra(1,j) -xi(1)
-        y= ra(2,j) -xi(2)
-        z= ra(3,j) -xi(3)
-        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij=dsqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
+!!$        x= ra(1,j) -xi(1)
+!!$        y= ra(2,j) -xi(2)
+!!$        z= ra(3,j) -xi(3)
+!!$        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
+!!$        rij=dsqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
+        rij = dlspr(0,k,i)
         if( rij.gt.rcmax ) cycle
         rho(i) = rho(i) +rhoij(js,rij)
       enddo
@@ -246,12 +247,14 @@ contains
         if(j.le.i) cycle
         js = int(tag(j))
         if( .not. interact(is,js) ) cycle
-        x= ra(1,j) -xi(1)
-        y= ra(2,j) -xi(2)
-        z= ra(3,j) -xi(3)
-        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij=dsqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
+!!$        x= ra(1,j) -xi(1)
+!!$        y= ra(2,j) -xi(2)
+!!$        z= ra(3,j) -xi(3)
+!!$        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
+!!$        rij=dsqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
+        rij = dlspr(0,k,i)
         if( rij.gt.rcmax ) cycle
+        xij(1:3) = dlspr(1:3,k,i)
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
         tmp = 0.5d0 *vij(is,js,rij)

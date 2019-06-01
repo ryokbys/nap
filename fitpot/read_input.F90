@@ -38,6 +38,7 @@ subroutine set_variable(ionum,cname)
   use variables
   use minimize
   use random
+  use pmdio,only: nnmax
   implicit none
   integer,intent(in):: ionum
   character(len=*),intent(in):: cname
@@ -52,6 +53,9 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'sample_list' ) then
     call read_c1(ionum,csmplist)
+    return
+  elseif( trim(cname).eq.'max_num_neighbors' ) then
+    call read_i1(ionum,nnmax)
     return
   elseif( trim(cname).eq.'num_iteration' ) then
     call read_i1(ionum,niter)

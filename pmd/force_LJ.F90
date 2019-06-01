@@ -24,7 +24,7 @@ module LJ
   
 contains
   subroutine force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of LJ force calculation
@@ -38,7 +38,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
-         ,tag(namax),sv(3,6)
+         ,tag(namax),sv(3,6),dlspr(0:3,nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
@@ -73,11 +73,14 @@ contains
         j=lspr(k,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
-        x= ra(1,j) -xi(1)
-        y= ra(2,j) -xi(2)
-        z= ra(3,j) -xi(3)
-        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij= sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
+!!$        x= ra(1,j) -xi(1)
+!!$        y= ra(2,j) -xi(2)
+!!$        z= ra(3,j) -xi(3)
+!!$        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
+!!$        rij= sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
+        rij = dlspr(0,k,i)
+        if( rij.ge.rc ) exit
+        xij(1:3) = dlspr(1:3,k,i)
         riji= 1d0/rij
         dxdi(1:3)= -xij(1:3)*riji
         dxdj(1:3)=  xij(1:3)*riji
@@ -128,7 +131,7 @@ contains
   end subroutine force_LJ
 !=======================================================================
   subroutine force_LJ_repul(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
 !
 !  LJ potential of only repulsive term
@@ -141,7 +144,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
-         ,tag(namax),sv(3,6)
+         ,tag(namax),sv(3,6),dlspr(0:3,nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st 
@@ -176,12 +179,15 @@ contains
         if( j.le.i ) cycle
         js = int(tag(j))
         rcij = rclj(is,js)
-        rij(1:3) = ra(1:3,j) -xi(1:3)
-        xij(1:3) = h(1:3,1,0)*rij(1) +h(1:3,2,0)*rij(2) +h(1:3,3,0)*rij(3)
-        dij2 = xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
-        if( dij2.gt.rcij*rcij ) cycle
+!!$        rij(1:3) = ra(1:3,j) -xi(1:3)
+!!$        xij(1:3) = h(1:3,1,0)*rij(1) +h(1:3,2,0)*rij(2) +h(1:3,3,0)*rij(3)
+!!$        dij2 = xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
+!!$        if( dij2.gt.rcij*rcij ) cycle
+!!$        dij = sqrt(dij2)
+        dij = dlspr(0,jj,i)
+        if( dij.ge.rcij ) cycle
+        xij(1:3) = dlspr(1:3,jj,i)
         repij = repul(is,js)
-        dij = sqrt(dij2)
         diji = 1d0/dij
         dxdi(1:3) = -xij(1:3)*diji
         dxdj(1:3) =  xij(1:3)*diji

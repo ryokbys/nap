@@ -25,7 +25,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use SM_Al,only:force_SM_Al
   use EAM,only:force_EAM
   use linreg,only:force_linreg
-  use NN,only:force_NN
+!!$  use NN,only:force_NN
   use NN2,only: force_NN2
   use Coulomb, only: force_screened_Coulomb, force_Ewald &
        ,initialize_coulomb, force_Ewald_long, force_Coulomb
@@ -86,10 +86,10 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
 
 !.....Non-exclusive (additive) choice of force-fields
   if( use_force('LJ') ) call force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h &
-       ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('LJ_repul') ) call force_LJ_repul(namax,natm,tag,ra,nnmax &
-       ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Ito3_WHe') ) call force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
@@ -148,9 +148,9 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   if( use_force('linreg') ) call force_linreg(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-  if( use_force('NN') ) call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+!!$  if( use_force('NN') ) call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+!!$       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+!!$       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('NN2') ) call force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
@@ -164,10 +164,10 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Buckingham') ) call force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Bonny_WRe') ) call force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('ZBL') ) then
     if( loverlay ) then
@@ -176,7 +176,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
            ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     else
       call force_ZBL(namax,natm,tag,ra,nnmax,aa,strs &
-           ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+           ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
            ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     endif
   endif
@@ -231,7 +231,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
        read_element_descriptors,read_params_Morse,&
        update_params_Morse
   use EAM, only: init_EAM, read_params_EAM, update_params_EAM, lprmset_EAM
-  use NN, only: read_const_NN, read_params_NN, update_params_NN, lprmset_NN
+!!$  use NN, only: read_const_NN, read_params_NN, update_params_NN, lprmset_NN
   use Buckingham, only: init_Buckingham, read_params_Buckingham, lprmset_Buckingham
   use ZBL, only: read_params_ZBL
   use LJ, only: read_params_LJ_repul
@@ -305,15 +305,16 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
     endif
   endif
 !.....NN
-  if( use_force('NN') ) then
-    call read_const_NN(myid_md,mpi_md_world,iprint)
-    if( .not.lprmset_NN ) then
-      call read_params_NN(myid_md,iprint)
-    else
-!.....This code is not parallelized, and only for fitpot
-      call update_params_NN()
-    endif
-  else if( use_force('NN2') ) then
+!!$  if( use_force('NN') ) then
+!!$    call read_const_NN(myid_md,mpi_md_world,iprint)
+!!$    if( .not.lprmset_NN ) then
+!!$      call read_params_NN(myid_md,iprint)
+!!$    else
+!!$!.....This code is not parallelized, and only for fitpot
+!!$      call update_params_NN()
+!!$    endif
+!!$  else if( use_force('NN2') ) then
+  if( use_force('NN2') ) then
     call init_desc()
     if( .not.lprmset_NN2 ) then
 !.....Read both in.params.desc and in.params.NN2

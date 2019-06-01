@@ -132,6 +132,9 @@ subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc,rc1nn &
                   write(6,'(a)') " ERROR: lspr(0,i)  > nnmax"
                   write(6,'(a,3i5)') "   nnmax, lspr(0,i) = " &
                        ,nnmax,lspr(0,i)
+                  write(6,'(a)') " You should rerun pmd with increased nnmax " &
+                       //"with the following in.pmd option,"
+                  write(6,'(a,i5)') "   max_num_neighbors   ",nnmax+100
                   call mpi_finalize(ierr)
                   stop
                 endif
@@ -156,6 +159,9 @@ subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc,rc1nn &
                   write(6,'(a)') " ERROR: lspr(0,j) > nnmax"
                   write(6,'(a,3i5)') "   nnmax, lspr(0,j) = " &
                        ,nnmax,lspr(0,j)
+                  write(6,'(a)') " You should rerun pmd with increased nnmax " &
+                       //"with the following in.pmd option,"
+                  write(6,'(a,i5)') "   max_num_neighbors   ",nnmax+100
                   call mpi_finalize(ierr)
                   stop
                 endif
