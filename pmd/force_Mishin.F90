@@ -21,7 +21,7 @@ module Mishin
   
 contains
   subroutine force_Mishin_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
@@ -32,7 +32,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax)
+         ,rc,tag(namax),dlspr(0:3,nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
@@ -56,13 +56,13 @@ contains
     endif
 
     call force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     return
   end subroutine force_Mishin_Al
 !=======================================================================
   subroutine force_Mishin_Ni(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
@@ -73,7 +73,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax)
+         ,rc,tag(namax),dlspr(0:3,nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
@@ -98,13 +98,13 @@ contains
     endif
 
     call force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     return
   end subroutine force_Mishin_Ni
 !=======================================================================
   subroutine force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
@@ -115,7 +115,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax)
+         ,rc,tag(namax),dlspr(0:3,nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
@@ -153,11 +153,7 @@ contains
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
-        x= ra(1,j) -xi(1)
-        y= ra(2,j) -xi(2)
-        z= ra(3,j) -xi(3)
-        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij=sqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
+        rij = dlspr(0,k,i)
         if( rij.gt.rc_eam ) cycle
         rho(i)= rho(i) +calc_rho(rij)
       enddo
@@ -165,13 +161,6 @@ contains
 
     call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
          lsrc,myparity,nn,sv,mpi_md_world,rho,1)
-!!$    if( myid_md.ge.0 ) then
-!!$!-----copy rho of boundary atoms
-!!$      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
-!!$           ,mpi_md_world,rho)
-!!$    else
-!!$      call distribute_dba(natm,namax,tag,rho,1)
-!!$    endif
 
 !-----dE/dr_i
     do i=1,natm
@@ -181,12 +170,9 @@ contains
         j=lspr(k,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
-        x= ra(1,j) -xi(1)
-        y= ra(2,j) -xi(2)
-        z= ra(3,j) -xi(3)
-        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij=sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
-        if( rij.gt.rc_eam ) cycle
+        rij = dlspr(0,k,i)
+        if( rij.gt.rc_eam ) exit
+        xij(1:3) = dlspr(1:3,k,i)
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
         tmp= 0.5d0 *calc_v(rij)

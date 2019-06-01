@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-24 16:44:04 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-31 17:02:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -11,6 +11,8 @@ module ZBL
 !       and Methods in Physics Research, B 267, 1061 (2009).
 !   [3] G. Bonny et al., JAP 121, 165107 (2017) for switching function.
 !-----------------------------------------------------------------------
+  use pmdio,only: nspmax
+  use force,only: loverlay
   implicit none
   save
 
@@ -19,14 +21,14 @@ module ZBL
   integer,parameter:: ioprms = 20
   
 !.....Max num of species
-  integer,parameter:: msp = 9
+  integer,parameter:: msp = nspmax
 
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
   real(8),parameter:: acc  = 14.3998554737d0
 !.....permittivity of vacuum
   real(8),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
 
-  logical:: interact(1:msp,1:msp) = .false.
+  logical:: interact(1:msp,1:msp) = .true.
   real(8):: qnucl(msp)
   real(8):: zbl_rc
   real(8):: r_inner(1:msp) = -1d0
@@ -47,6 +49,28 @@ module ZBL
        0.20160d0 /)
 
 contains
+!=======================================================================
+  subroutine init_ZBL(iprint)
+    use pmdio,only: csp2isp,specorder
+    use element,only: nelem,elements
+    integer,intent(in):: iprint
+
+    integer:: isp,iz
+    character(len=3):: csp
+
+!.....Set qnucl from specorder
+    do isp=1,nspmax
+      csp = trim(specorder(isp))
+      if( trim(csp).eq.'x' ) cycle
+      do iz=1,nelem
+        if( trim(csp).eq.trim(elements(iz)%symbol) ) then
+          qnucl(isp) = dble(iz)
+          exit
+        endif
+      enddo
+    enddo
+    return
+  end subroutine init_ZBL
 !=======================================================================
   subroutine read_params_ZBL(myid,mpi_world,iprint)
     use force, only: loverlay
@@ -216,22 +240,18 @@ contains
         aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
 !.....Atomic stress for 2-body terms
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
-              strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
-            enddo
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                 -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                 -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
           enddo
-        endif
+        enddo
       enddo
     enddo
 
-    if( lstrs ) then
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
+    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
@@ -240,6 +260,130 @@ contains
     epot= epot +epott
 
   end subroutine force_ZBL
+!=======================================================================
+  subroutine force_ZBL_overlay(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+!
+!  ZBL potential used as overlaying potential for close ion-ion distance.
+!  
+!  Since the energy of atom-i is defined using alpha_i, and the force-ji
+!  and force-ij is not symmetry (I think), the loop over i and j has to be
+!  fully taken.
+!
+    use force,only: ol_ranges,ol_alphas,ol_dalphas,ol_pair
+    implicit none
+    include "mpif.h"
+    include "./params_unit.h"
+    integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
+         ,iprint
+    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+         ,nn(6),mpi_md_world,myid_md,nex(3)
+    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+         ,rc,tag(namax),dlspr(0:3,nnmax,namax)
+    real(8),intent(inout):: tcom
+    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: l1st
+    logical:: lstrs
+
+    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
+    real(8):: xij(3),rij,rij2,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
+    real(8):: x,y,z,xi(3),epotl,epott,tmp,tmp2,dtmp,tmp2i,tmp2j &
+         ,dtmpi,dtmpj,alpi,ri,ro,dij
+    real(8),allocatable,save:: strsl(:,:,:),epit(:)
+    real(8),external:: fcut1,dfcut1
+
+    if( l1st ) then
+      if( allocated(strsl) ) deallocate(strsl,epit)
+      allocate(strsl(3,3,namax),epit(namax))
+    endif
+
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl,epit)
+      allocate(strsl(3,3,namax),epit(namax))
+    endif
+    
+    epotl= 0d0
+    epit(:) = 0d0
+    strsl(1:3,1:3,1:namax) = 0d0
+
+!-----dE/dr_i
+    do i=1,natm+nb  ! loop over not only residents but also immigrants
+      is = int(tag(i))
+      alpi = ol_alphas(0,i)
+      do k=1,lspr(0,i)
+        j=lspr(k,i)
+        if(j.eq.0) exit
+        js = int(tag(j))
+        if( .not. interact(is,js) ) cycle
+        dij = dlspr(0,k,i)
+        if( dij.gt.ro ) cycle
+        xij(1:3) = dlspr(1:3,k,i)
+!!$        rij = sqrt(rij2)
+        drdxi(1:3)= -xij(1:3)/dij
+!.....2-body term, taking overlay into account
+        tmp = vij(is,js,dij) 
+        tmp2i= 0.5d0 *tmp *(1d0 -alpi)
+        epit(i)= epit(i) +tmp2i
+        epotl=epotl +tmp2i
+!.....Force
+        dtmp = 0.5d0 *dvij(is,js,dij) *(1d0 -alpi)
+        aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
+        aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
+!.....Atomic stress for 2-body terms
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                 -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                 -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+          enddo
+        enddo
+      enddo  ! k=
+!.....Derivatives wrt alphas, which requires energy per atom, epit
+      do k=1,lspr(0,i)
+        j= lspr(k,i)
+        js = int(tag(j))
+        if( .not. interact(is,js) ) cycle
+        ri = ol_pair(1,is,js)
+        ro = ol_pair(2,is,js)
+!!$        x= ra(1,j) -xi(1)
+!!$        y= ra(2,j) -xi(2)
+!!$        z= ra(3,j) -xi(3)
+!!$        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
+!!$        rij2= xij(1)**2+ xij(2)**2 +xij(3)**2
+!!$        if( rij2.gt.ro*ro ) cycle
+!!$        rij = sqrt(rij2)
+        dij = dlspr(0,k,i)
+        xij(1:3) = dlspr(1:3,k,i)
+        drdxi(1:3)= -xij(1:3)/dij
+!.....Force
+        if( dij.le.ri ) cycle
+        dtmp = -epit(i) *alpi/ol_alphas(k,i) *ol_dalphas(k,i)
+        aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
+        aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
+!.....Stress
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                 -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                 -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+          enddo
+        enddo
+      enddo
+      epi(i) = epi(i) +epit(i)
+    enddo  ! i=
+
+    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+
+!-----gather epot
+    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+         ,mpi_sum,mpi_md_world,ierr)
+    if( iprint.gt.2 ) print *,'ZBL epot = ',epott
+    epot= epot +epott
+
+  end subroutine force_ZBL_overlay
 !=======================================================================
   function vij(is,js,rij)
 !

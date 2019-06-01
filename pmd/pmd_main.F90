@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-24 16:56:14 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-30 23:46:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -206,7 +206,7 @@ program pmd
 !.....call pmd_core to perfom MD
   call pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,ekitot,epitot,chgtot,chitot,nstp,nerg,npmd &
-       ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,nspmax,specorder &
+       ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,specorder &
        ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
        ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl &
        ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv &
@@ -444,9 +444,9 @@ subroutine bcast_params()
   if( myid_md.eq.0 ) write(6,'(/,a)') ' Broadcast data to be shared' &
        //' with all the nodes.'
 !-----Broadcast input parameters to all nodes
-!!$  call mpi_bcast(nx,1,MPI_INTEGER,0,mpicomm,ierr)
-!!$  call mpi_bcast(ny,1,MPI_INTEGER,0,mpicomm,ierr)
-!!$  call mpi_bcast(nz,1,MPI_INTEGER,0,mpicomm,ierr)
+  call mpi_bcast(namax,1,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(nbmax,1,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(nnmax,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(nstp,1,MPI_INTEGER,0,mpicomm,ierr)
   call mpi_bcast(minstp,1,MPI_INTEGER,0,mpicomm,ierr)
   call mpi_bcast(dt,1,MPI_REAL8,0,mpicomm,ierr)

@@ -1,9 +1,11 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-24 16:55:10 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-31 22:27:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
+  use pmdio,only: nspmax
   implicit none
   save
+  real(8),parameter:: pi = 3.14159265358979d0
   integer:: num_forces = -1
   character(len=128),allocatable:: force_list(:)
 
@@ -17,14 +19,12 @@ module force
 
 !.....Overlay main potential with a nuclear repulsive one, usually ZBL.
   logical:: loverlay = .false.
+
 !.....Overlay type: pair or atom
-  character(len=128):: overlay_type = 'pair'
-  character(len=128):: overlay_force = 'ZBL'
-  type overlay
-    character(len=3):: csp1,csp2
-    real(8):: rin,rout
-  end type overlay
-  type(overlay),allocatable:: overlays(:,:)
+  character(len=128):: ol_type = 'pair'
+  character(len=128):: ol_force = 'ZBL'
+  real(8):: ol_ranges(2,nspmax)
+  real(8),allocatable:: ol_alphas(:,:),ol_dalphas(:,:)
 
 contains
 !=======================================================================
@@ -122,8 +122,109 @@ contains
     endif
     call mpi_bcast(force_list,128*num_forces,mpi_character &
          ,0,mpicomm,ierr)
-    
+
+!.....Overlay
+    call mpi_bcast(loverlay,1,mpi_logical,0,mpicomm,ierr)
+    call mpi_bcast(ol_type,128,mpi_character,0,mpicomm,ierr)
+    call mpi_bcast(ol_force,128,mpi_character,0,mpicomm,ierr)
+    call mpi_bcast(ol_ranges,2*nspmax,mpi_real8,0,mpicomm,ierr)
+      
   end subroutine bcast_force
+!=======================================================================
+  function ol_pair(ir,isp,jsp)
+!
+!  Return rin(ir==1), rout(ir==2) for pair (isp,jsp).
+!
+    integer:: ir,isp,jsp
+    real(8):: ol_pair
+
+    ol_pair = (ol_ranges(ir,isp)+ol_ranges(ir,jsp)) /2
+    return
+  end function ol_pair
+!=======================================================================
+  subroutine ol_allocate(namax,nnmax)
+    integer,intent(in):: namax,nnmax
+    
+    if( .not.allocated(ol_alphas) ) then
+      allocate(ol_alphas(0:nnmax,namax),ol_dalphas(nnmax,namax))
+    else if( size(ol_alphas).ne.(nnmax+1)*namax ) then
+      deallocate(ol_alphas,ol_dalphas)
+      allocate(ol_alphas(0:nnmax,namax),ol_dalphas(nnmax,namax))
+    endif
+    return
+  end subroutine ol_allocate
+!=======================================================================
+  subroutine get_fol_dfol(r,isp,jsp,fol,dfol)
+    real(8),intent(in):: r
+    integer,intent(in):: isp,jsp
+    real(8),intent(out):: fol,dfol
+
+    real(8):: ri,ro,x
+
+    ri = ol_pair(1,isp,jsp)
+    ro = ol_pair(2,isp,jsp)
+
+    if( r.ge.ro ) then
+      fol = 1d0
+      dfol = 0d0
+    else if( r.ge.ri .and. r.lt.ro ) then
+      x = (r-ro)/(ri-ro)*pi
+      fol = 0.5d0 *(1d0 +cos(x))
+      dfol = 0.5d0*pi /(ri-ro) *sin(x)
+    else
+      fol = 0d0
+      dfol = 0d0
+    endif
+    
+    return
+  end subroutine get_fol_dfol
+!=======================================================================
+  subroutine calc_overlay(namax,natm,nb,nnmax,h,tag,ra,lspr &
+       ,dlspr,l1st,iprint)
+!
+!  Compute overlay coefficients of each pair and atom.
+!
+    integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
+    integer,intent(in):: iprint
+    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax) &
+         ,dlspr(0:3,nnmax,namax)
+    logical,intent(in):: l1st
+
+    integer:: ia,ja,jj,is,js
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij2,dij,ri,ro,fol,dfol
+
+!.....Check rcut of lspr, which should be larger than 2*rout.
+
+    call ol_allocate(namax,nnmax)
+    ol_alphas(1:nnmax,:) = 0d0
+    ol_alphas(0,:) = 1d0
+    ol_dalphas(:,:) = 1d0
+
+    do ia=1,natm+nb
+!!$      xi(1:3) = ra(1:3,ia)
+      is = int(tag(ia))
+      do jj=1,lspr(0,ia)
+        ja = lspr(jj,ia)
+        js = int(tag(ja))
+!!$        xj(1:3)= ra(1:3,ja)
+!!$        xij(1:3)= xj(1:3) -xi(1:3)
+!!$        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) *h(1:3,3)*xij(3)
+!!$        dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
+!!$        dij = sqrt(dij2)
+        dij = dlspr(0,jj,ia)
+        ri = ol_pair(2,is,js)
+        ro = ol_pair(2,is,js)
+        call get_fol_dfol(dij,is,js,fol,dfol)
+        ol_alphas(jj,ia)= fol
+        ol_alphas(0,ia) = ol_alphas(0,ia) *fol
+        ol_dalphas(jj,ia)= dfol
+        
+      enddo  ! jj=...
+    enddo  ! ia=...
+
+    return
+  end subroutine calc_overlay
+  
 end module force
 !-----------------------------------------------------------------------
 !     Local Variables:

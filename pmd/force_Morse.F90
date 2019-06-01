@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-26 21:55:55 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-31 22:29:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -84,7 +84,7 @@ module Morse
 
 contains
   subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
     implicit none
@@ -96,7 +96,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6)
+         ,tag(namax),sv(3,6),dlspr(0:3,nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -143,16 +143,6 @@ contains
     epotl= 0d0
     strsl(1:3,1:3,1:namax) = 0d0
 
-!!$    do i=1,natm+nb
-!!$      write(6,'(a,i5,3f10.5)') 'i,ra(1:3,i)=',i,ra(1:3,i)
-!!$    enddo
-
-!!$    is = 1
-!!$    do js=2,4
-!!$      write(6,'(a,3i3,3f8.3)') 'myid,is,js,alp,d0,rmin=',myid,is,js,alp(is,js)&
-!!$           ,d0(is,js),rmin(is,js)
-!!$    enddo
-
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -165,13 +155,16 @@ contains
 !.....Check if these two species interact
         if( .not. interact(is,js) ) cycle
         xj(1:3)= ra(1:3,j)
-        xij(1:3)= xj(1:3)-xi(1:3)
-        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
+!!$        xij(1:3)= xj(1:3)-xi(1:3)
+!!$        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+!!$        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
 !!$        if( i.eq.1 ) print *,'  j,js,xj,rij,dij=',j,js,xj(1:3),rij(1:3),sqrt(dij2)
-        if( dij2.gt.rc2 ) cycle
-        dij= sqrt(dij2)
+!!$        if( dij2.gt.rc2 ) cycle
+!!$        dij= sqrt(dij2)
+        dij = dlspr(0,k,i)
+        if( dij.gt.rc ) exit
         diji= 1d0/dij
+        rij(1:3) = dlspr(1:3,k,i)
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
         d0ij = d0(is,js)
@@ -182,7 +175,6 @@ contains
         texp = exp(alpij*(rminij-dij))
 !.....potential
         tmp= d0ij*((texp-1d0)**2 -1d0)
-!!$        tmp2 = 0.5d0 *tmp *fcut1(dij,0d0,rc)
         tmp2 = 0.5d0 *(tmp -vrc -dvdrc*(dij-rc))
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp2
@@ -193,8 +185,6 @@ contains
           epotl = epotl +tmp2
         endif
 !.....force
-!!$        dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) *fcut1(dij,0d0,rc) &
-!!$             + tmp*dfcut1(dij,0d0,rc)
         dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) -dvdrc
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr

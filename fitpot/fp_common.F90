@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-22 17:05:27 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-30 23:42:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -775,7 +775,7 @@ contains
          ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
          ,smpl%chg,smpl%chi &
          ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
-         ,nspmax,smpl%specorder,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
+         ,smpl%specorder,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
          ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
          ,gwe,gwf,gws &
          ,lematch,lfmatch,lsmatch,boundary)
@@ -990,7 +990,6 @@ contains
 !
     use variables
     use parallel
-    use pmdvars,only: get_lspr
     implicit none 
     real(8),parameter:: tiny = 1d-15
     integer:: nsuml,nsumg,ismpl,natm,isf,jsf,ia,nsf,ixyz

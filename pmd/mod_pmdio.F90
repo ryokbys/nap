@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-22 14:48:45 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-30 23:31:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -12,6 +12,13 @@ module pmdio
   real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
        ,ekitot(:,:,:),tagtot(:),atot(:,:),chgtot(:),chitot(:)
   real(8):: hunit,h(3,3,0:1)
+
+!.....max. num. of atoms in a node
+  integer:: namax = 20000
+!.....max. num. of boundary-particles
+  integer:: nbmax = 10000
+!.....max. num. of neighbors
+  integer:: nnmax = 1000
 
   integer:: nstp = 0
   integer:: minstp = 0

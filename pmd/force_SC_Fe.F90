@@ -42,10 +42,6 @@ contains
     epotl= 0d0
     sqrho(1:natm)= 0d0
 
-!c-----make pair list for 2-body term
-!      call mk_lspr(namax,natm,nb,nnmax,tag,ra,rc,h,hi
-!     &     ,anxi,anyi,anzi,lspr)
-
 !-----rho(i)
     do i=1,natm
       xi(1:3)= ra(1:3,i)

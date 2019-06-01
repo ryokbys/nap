@@ -62,8 +62,8 @@ Example of *in.pmd*
       0.00d0   0.00d0   0.00d0
     pressure_target     1.00
 
-    mass  1    28.0855
-    mass  2     4.0
+    mass  Si    28.0855
+    mass  He     4.0
 
     boundary   ppp
 
@@ -105,6 +105,7 @@ Parameters users can set in ``in.pmd`` are following:
 * :ref:`cutoff_radius`
 * :ref:`flag_temp_dist`
 * :ref:`num_temp_dist`
+* :ref:`mass`
 * :ref:`boundary`
 
 
@@ -549,6 +550,23 @@ num_temp_dist
 
 Number of bins along *x*-direction where the temperature is calculated.
 This value must be a multiple of ``num_nodes_x``.
+
+
+------------------------
+
+.. _mass:
+
+mass
+------------------------------
+
+* Default: masses of given species are set automatically.
+
+Mass of specified species in atomic mass unit.
+Species name and its mass should follow the ``mass`` entry.
+::
+
+   mass   Si  28.0855
+   mass   He   4.00
 
 
 ------------------------

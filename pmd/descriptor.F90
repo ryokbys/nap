@@ -192,12 +192,12 @@ contains
     return
   end subroutine make_gsf_arrays
 !=======================================================================
-  subroutine calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
+  subroutine calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr,dlspr,rc &
        ,myid,mpi_world,l1st,iprint)
 
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,dlspr(0:3,nnmax,namax)
     logical,intent(in):: l1st 
 
     if( .not.lupdate_gsf ) return
@@ -206,13 +206,13 @@ contains
       call calc_desc_cheby(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
            ,myid,mpi_world,l1st,iprint)
     else ! default
-      call calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
+      call calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,dlspr,rc &
            ,myid,mpi_world,l1st,iprint)
     endif
     return
   end subroutine calc_desc
 !=======================================================================
-  subroutine calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
+  subroutine calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,dlspr,rc &
        ,myid,mpi_world,l1st,iprint)
 !
 !  Evaluate descriptors (symmetry functions)
@@ -221,13 +221,12 @@ contains
 !  - Cutoff radii are set in each symmetry functions.
 !  - If the overlay option is set, use inner and outer cutoff of ZBL potential.
 !
-    use force,only: loverlay,overlays
     use ZBL,only: interact,zeta,dzeta
 !!$    implicit none
     include "mpif.h"
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,dlspr(0:3,nnmax,namax)
     logical,intent(in):: l1st 
 
     integer:: isf,ia,jj,ja,kk,ka,is,js,ks,ierr,i,isp,jsp,ksp,ityp,is1,is2,ksf
@@ -263,111 +262,65 @@ contains
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
         xj(1:3)= ra(1:3,ja)
-        xij(1:3)= xj(1:3)-xi(1:3)
-        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
-        if( dij2.ge.rcmax2 ) cycle
-        dij = sqrt(dij2)
+        dij = dlspr(0,jj,ia)
+        if( dij.ge.rcmax ) exit
+        rij(1:3) = dlspr(1:3,jj,ia)
+        dij2 = dij*dij
         js= int(tag(ja))
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
-        if( loverlay ) then
-          ri = overlays(is,js)%rin
-          ro = overlays(is,js)%rout
-          if( dij.lt.ri ) cycle
-          xs = (ro+ri-2d0*dij)/(ro-ri)
-          z = zeta(xs)
-          dz = dzeta(xs)
-        endif
-!!$        do isf=iaddr2(1,is,js),iaddr2(2,is,js)
-!!$          if( dij.ge.rcs(isf) ) cycle
         is1 = min(is,js)
         is2 = max(is,js)
         do ksf=1,ilsf2(0,is1,is2)
           isf = ilsf2(ksf,is1,is2)
           desci = descs(isf)
-!!$          ksp = desci%ksp
-!!$          if( ksp.gt.0 ) cycle
-!!$          isp = desci%isp
-!!$          jsp = desci%jsp
-!!$          if( .not. ((isp.eq.is.and.jsp.eq.js) &
-!!$               .or. (isp.eq.js.and.jsp.eq.is) )) cycle
           ityp = desci%itype
           rcut = desci%rcut
           if( dij.ge.rcut ) cycle
-!!$          if( itype(isf).eq.1 ) then ! Gaussian
           if( ityp.eq.1 ) then ! Gaussian
             call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-!!$            eta= cnst(1,isf)
-!!$            rs=  cnst(2,isf)
             eta= desci%prms(1)
             rs = desci%prms(2)
 !.....function value
             texp= exp(-eta*(dij-rs)**2)
             dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfcij
             tmp = texp*fcij
-            if( loverlay ) then
-              if( dij.lt.ro ) then
-                dgdr = tmp*dz*2d0/(ro-ri) +dgdr*(1d0-z)
-                tmp = tmp *(1d0-z)
-              endif
-            endif
             gsf(isf,ia)= gsf(isf,ia) +tmp
 !.....derivative
 ! dgsf(ixyz,isf,jj,ia): derivative of isf-th basis of atom-ia
-! by ixyz coordinate of atom-jj.
-! jj=0 means derivative by atom-ia.
+! by ixyz coordinate of atom-jj. jj=0 means derivative by atom-ia.
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
-!!$          else if( itype(isf).eq.2 ) then ! cosine
           else if( ityp.eq.2 ) then ! cosine
             call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-!!$            a1= cnst(1,isf)
             a1 = desci%prms(1)
 !.....func value
             tcos= 0.5d0*(1d0+cos(dij*a1))
             dgdr= -0.5d0*a1*sin(dij*a1)*fcij +tcos*dfcij
             tmp = tcos*fcij
-            if( loverlay ) then
-              if( dij.lt.ro ) then
-                dgdr = tmp*dz*2d0/(ro-ri) +dgdr*(1d0-z)
-                tmp = tmp *(1d0-z)
-              endif
-            endif
             gsf(isf,ia)= gsf(isf,ia) +tmp
 !.....derivative
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
-!!$          else if( itype(isf).eq.3 ) then ! polynomial
           else if( ityp.eq.3 ) then ! polynomial
             call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-!!$            a1= cnst(1,isf)
             a1= desci%prms(1)
 !.....func value
             tpoly= 1d0*dij**(-a1)
             dgdr= -a1*dij**(-a1-1d0)*fcij +tpoly*dfcij
             tmp = tpoly*fcij
-            if( loverlay ) then
-              if( dij.lt.ro ) then
-                dgdr = tmp*dz*2d0/(ro-ri) +dgdr*(1d0-z)
-                tmp = tmp *(1d0-z)
-              endif
-            endif
             gsf(isf,ia)= gsf(isf,ia) +tmp
 !.....derivative
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
             dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
-!!$          else if( itype(isf).eq.4 ) then ! Morse-type
           else if( ityp.eq.4 ) then ! Morse-type
             call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-!!$            a1= cnst(1,isf)
-!!$            a2= cnst(2,isf)
             a1= desci%prms(1)
             a2= desci%prms(2)
 !.....func value
@@ -375,12 +328,6 @@ contains
             tmorse= ((1d0-texp)**2 -1d0)
             dgdr= 2d0*a1*(1d0-texp)*texp*fcij +tmorse*dfcij
             tmp = tmorse*fcij
-            if( loverlay ) then
-              if( dij.lt.ro ) then
-                dgdr = tmp*dz*2d0/(ro-ri) +dgdr*(1d0-z)
-                tmp = tmp *(1d0-z)
-              endif
-            endif
             gsf(isf,ia)= gsf(isf,ia) +tmp
 !.....derivative
             dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
@@ -394,21 +341,18 @@ contains
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           ks= int(tag(ka))
-!!$          if( iaddr3(1,is,js,ks).lt.0 ) cycle
           if( ka.eq.ia .or. ka.le.ja ) cycle
           xk(1:3)= ra(1:3,ka)
-          xik(1:3)= xk(1:3)-xi(1:3)
-          rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
-          dik2= rik(1)**2 +rik(2)**2 +rik(3)**2
-          dik= sqrt(dik2)
+          dik = dlspr(0,kk,ia)
+          dik2 = dik*dik
+          rik(1:3) = dlspr(1:3,kk,ia)
 !.....Cosine is common for all the angular SFs
           spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
           cs= spijk/dij/dik
-          dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij**2
-          dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik**2
+          dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij2
+          dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik2
           dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
           gijk = 0d0
-!!$          do isf=iaddr3(1,is,js,ks),iaddr3(2,is,js,ks)
           is1 = min(js,ks)
           is2 = max(js,ks)
           do ksf=1,ilsf3(0,is,is1,is2)
@@ -418,9 +362,7 @@ contains
             rcut = desci%rcut
             rcut2= desci%rcut2
             if( dij.ge.rcut .or. dik.ge.rcut ) cycle
-!!$            if( itype(isf).eq.101 ) then ! RK's original angular SF
             if( ityp.eq.101 ) then ! RK's original angular SF
-!!$              if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
 !.....fcij's should be computed after rcs is determined
               call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
               call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
@@ -435,7 +377,6 @@ contains
               tmp = t1/t2 *texp
               gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik
               gijk = gijk +tmp*fcij*fcik
-!!$            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik
 !.....derivative
               dgdij= dfcij *fcik *tmp &
                    +tmp *(-2d0*eta3*dij) *fcij*fcik 
@@ -452,10 +393,7 @@ contains
               igsf(isf,0,ia) = 1
               igsf(isf,jj,ia) = 1
               igsf(isf,kk,ia) = 1
-!!$            else if( itype(isf).eq.102 ) then  ! Similar to Behler's angular SF that includes fc(rjk)
             else if( ityp.eq.102 ) then  ! Similar to Behler's angular SF that includes fc(rjk)
-!!$              if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) .or. &
-!!$                   djk.ge.rcs(isf) ) cycle
 !.....djk is required for Behler's angular SF (itype(isf)==102)
               xjk(1:3)= xk(1:3)-xj(1:3)
               rjk(1:3)= h(1:3,1)*xjk(1) +h(1:3,2)*xjk(2) +h(1:3,3)*xjk(3)
@@ -480,7 +418,6 @@ contains
               tmp = t1 *texp
 !.....This part is different from itype(isf)==101 by the factor fcjk
               gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik *fcjk
-!!$            gsf(isf,ia)= gsf(isf,ia) +t1/t2 *fcij*fcik
 !.....derivative
               dgdij= dfcij *fcik*fcjk *tmp &
                    +tmp *(-2d0*eta3*dij) *fcij*fcik*fcjk
@@ -501,13 +438,10 @@ contains
               igsf(isf,0,ia) = 1
               igsf(isf,jj,ia) = 1
               igsf(isf,kk,ia) = 1
-!!$            else if( itype(isf).eq.103 ) then ! cos(cos(thijk)*n*pi) w/o fc(rjk)
             else if( ityp.eq.103 ) then ! cos(cos(thijk)*n*pi) w/o fc(rjk)
-!!$              if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
 !.....fcij's should be computed after rcs is determined
               call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
               call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
-!!$              an = cnst(1,isf)
               an = desci%prms(1)
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
@@ -528,13 +462,10 @@ contains
               igsf(isf,0,ia) = 1
               igsf(isf,jj,ia) = 1
               igsf(isf,kk,ia) = 1
-!!$            else if( itype(isf).eq.104 ) then ! sin(cos(thijk)*n*pi) w/o fc(rjk)
             else if( ityp.eq.104 ) then ! sin(cos(thijk)*n*pi) w/o fc(rjk)
-!!$              if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
 !.....fcij's should be computed after rcs is determined
               call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
               call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
-!!$              an = cnst(1,isf)
               an = desci%prms(1)
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
@@ -555,14 +486,10 @@ contains
               igsf(isf,0,ia) = 1
               igsf(isf,jj,ia) = 1
               igsf(isf,kk,ia) = 1
-!!$            else if( itype(isf).eq.105 ) then ! exp(-eta*(cos(thijk)-c)**2) w/o fc(rjk)
             else if( ityp.eq.105 ) then ! exp(-eta*(cos(thijk)-c)**2) w/o fc(rjk)
-!!$              if( dij.ge.rcs(isf) .or. dik.ge.rcs(isf) ) cycle
 !.....fcij's should be computed after rcs is determined
               call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
               call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
-!!$              eta = cnst(1,isf)
-!!$              rs = cnst(2,isf)
               eta= desci%prms(1)
               rs = desci%prms(2)
               driki(1:3)= -rik(1:3)/dik
@@ -762,27 +689,14 @@ contains
 !
 !  Calculate cutoff/switching function depending on r and r_outer
 !
-    use force,only: loverlay, overlays
     real(8),intent(in):: r
     integer,intent(in):: isp,jsp
     real(8),intent(out):: fc,dfc,rcut
 
     real(8):: rin,rout
     
-    if( loverlay ) then
-      rout = overlays(isp,jsp)%rout
-      if( r.gt.rout ) then
-        fc= fc1(r,rout,rcut)
-        dfc= dfc1(r,rout,rcut)
-      else
-        rin = overlays(isp,jsp)%rin
-        fc= 1d0 -fc1(r,rin,rout)
-        dfc= -dfc1(r,rin,rout)
-      endif
-    else
-      fc= fc1(r,0d0,rcut)
-      dfc= dfc1(r,0d0,rcut)
-    endif
+    fc= fc1(r,0d0,rcut)
+    dfc= dfc1(r,0d0,rcut)
     
     return
   end subroutine get_fc_dfc
@@ -1239,7 +1153,8 @@ contains
 !  to force and return design matrix of force-matching,
 !  which is used only in fitpot.
 !
-    use pmdvars,only: natm,namax,nbmax,nb,lsb,nex,lsrc,myparity,nn &
+    use pmdio,only: namax,nbmax
+    use pmdvars,only: natm,nb,lsb,nex,lsrc,myparity,nn &
          ,lspr,tcom
     integer,intent(in):: mpi_world
     real(8),allocatable,intent(out):: dgsfa(:,:,:)

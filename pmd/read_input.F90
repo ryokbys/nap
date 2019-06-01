@@ -37,7 +37,7 @@ end subroutine read_input
 subroutine set_variable(ionum,cname)
   use pmdio
   use pmdmpi
-  use force,only: overlay_type, overlay_force
+  use force,only: ol_type, ol_force
 #ifdef __WALL__
   use wall
 #endif
@@ -55,6 +55,15 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'vardt_length_scale' ) then
     call read_r1(ionum,vardt_len)
+    return
+  elseif( trim(cname).eq.'namax' ) then
+    call read_i1(ionum,namax)
+    return
+  elseif( trim(cname).eq.'nbmax' ) then
+    call read_i1(ionum,nbmax)
+    return
+  elseif( trim(cname).eq.'nnmax' ) then
+    call read_i1(ionum,nnmax)
     return
   elseif( trim(cname).eq.'num_iteration' .or. &
        trim(cname).eq.'num_steps' ) then
@@ -258,10 +267,10 @@ subroutine set_variable(ionum,cname)
     call read_overlay(ionum)
     return
   elseif( trim(cname).eq.'overlay_type') then
-    call read_c1(ionum,overlay_type)
+    call read_c1(ionum,ol_type)
     return
   elseif( trim(cname).eq.'overlay_force') then
-    call read_c1(ionum,overlay_force)
+    call read_c1(ionum,ol_force)
     return
     
 #ifdef __WALL__
@@ -288,7 +297,7 @@ subroutine set_variable(ionum,cname)
 
 !      write(6,'(a)') " [Error] No match: "//trim(cname)//" !!!"
 !      stop
-  write(6,'(a)') ' [Warning] No match: '//trim(cname)//' !!!'
+  write(6,'(a)') ' Warning: No such in.pmd entry, '//trim(cname)//' !!!'
   return
 
 end subroutine set_variable
@@ -411,39 +420,29 @@ subroutine read_overlay(ionum)
 !  Read overlay of a given pair
 !
   use pmdio, only: csp2isp, specorder, nspmax
-  use force, only: overlays, loverlay
+  use force, only: ol_ranges, loverlay
   use util, only: num_data
   implicit none 
   integer,intent(in):: ionum
   
   character(len=1024):: ctmp
   character(len=128):: ctmp1
-  integer:: isp,jsp,ndat
-  character(len=3):: cspi, cspj
+  integer:: isp,ndat
+  character(len=3):: cspi
   real(8):: rin, rout
 
   backspace(ionum)
   read(ionum,'(a)') ctmp
   ndat = num_data(trim(ctmp),' ')
-  if( ndat.lt.5 ) stop 'ERROR: wrong format for overlay entry.'
-  if( .not. loverlay ) then
-    loverlay = .true.
-    allocate(overlays(nspmax,nspmax))
-  end if
-  read(ctmp,*) ctmp1, cspi, cspj, rin, rout
+  if( ndat.lt.4 ) stop 'ERROR: wrong format for overlay entry.'
+  loverlay = .true.
+  read(ctmp,*) ctmp1, cspi, rin, rout
   isp = csp2isp(cspi,specorder)
-  jsp = csp2isp(cspj,specorder)
-  if( isp.gt.0 .and. jsp.gt.0 ) then
-    overlays(isp,jsp)%csp1 = cspi
-    overlays(isp,jsp)%csp2 = cspj
-    overlays(isp,jsp)%rin  = rin
-    overlays(isp,jsp)%rout = rout
-    overlays(jsp,isp)%csp1 = cspj
-    overlays(jsp,isp)%csp2 = cspi
-    overlays(jsp,isp)%rin  = rin
-    overlays(jsp,isp)%rout = rout
+  if( isp.gt.0 ) then
+    ol_ranges(1,isp) = rin
+    ol_ranges(2,isp) = rout
   else
-    print *,'Overlay for '//trim(cspi)//' and '//trim(cspj)//' is not set, '//&
+    print *,'Overlay for '//trim(cspi)//' is not set, '//&
          'because the specified species-pair is not found in the system.'
   endif
   

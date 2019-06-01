@@ -1,6 +1,6 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-16 11:01:42 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-01 00:09:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 
   integer,parameter:: ioprms = 50
@@ -48,7 +48,7 @@ module SW
 
 contains
   subroutine force_SW(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of SW(Si) force calculation for pmd
@@ -65,7 +65,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax) &
-         ,h(3,3),hi(3,3),sv(3,6),rc
+         ,h(3,3),hi(3,3),sv(3,6),rc,dlspr(0:3,nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
@@ -133,26 +133,17 @@ contains
         if(j.le.i) cycle
         js= int(tag(j))
         if( .not. interact(is,js) ) cycle
-        xj(1:3)= ra(1:3,j)-xi(1:3)
-!!$        xij(1:3)= ( h(1:3,1)*xj(1) +h(1:3,2)*xj(2) &
-!!$             +h(1:3,3)*xj(3) ) *swli
-        xij(1:3)= ( h(1:3,1)*xj(1) +h(1:3,2)*xj(2) &
-             +h(1:3,3)*xj(3) ) /aswl
-        rij2= xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
-!!$        src= swrc
         src= aswrc(is,js)
-        src2 = src*src
-        if( rij2.ge.src2 ) cycle
-        rij= dsqrt(rij2)
+        rij = dlspr(0,k,i) /aswl
+        if( rij.ge.src ) cycle
+        xij(1:3) = dlspr(1:3,k,i) /aswl
         riji= 1d0/rij
         drijc= 1d0/(rij-src)
-!!$        vexp=exp(swc*drijc)
         vexp=exp(aswc(is,js)*drijc)
 !---------potential
         tmp= 0.5d0 *aswe *aswa(is,js) *vexp &
              *(aswb(is,js)*riji**aswp(is,js) -riji**aswq(is,js))
         epi(i)= epi(i) +tmp
-!!$        if( i.eq.1 ) print *,'i,j,rij,tmp,epi=',i,j,rij,tmp,epi(i)
         epotl2= epotl2 +tmp
         if( j.le.natm ) then
           epi(j)= epi(j) +tmp
@@ -198,14 +189,11 @@ contains
         if(j.eq.0) exit
         if( j.eq.i ) cycle
         js= int(tag(j))
-        xj(1:3)= ra(1:3,j) -xi(1:3)
-        xij(1:3)= ( h(1:3,1)*xj(1) +h(1:3,2)*xj(2) &
-             +h(1:3,3)*xj(3) ) /aswl
-        rij2= xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
         srcij= aswrc(is,js)
-        srcij2= srcij*srcij
-        if( rij2.ge.srcij2 ) cycle
         rij= dsqrt(rij2)
+        rij = dlspr(0,n,i) /aswl
+        if( rij.ge.srcij ) cycle
+        xij(1:3) = dlspr(1:3,n,i) /aswl
         riji= 1d0/rij
         drijc= 1d0/(rij-srcij)
 !---------atom (k)
@@ -215,14 +203,10 @@ contains
           if( k.le.j .or. k.eq.i ) cycle
           ks= int(tag(k))
           if( .not. interact3(is,js,ks) ) cycle
-          xk(1:3)= ra(1:3,k) -xi(1:3)
-          xik(1:3)= ( h(1:3,1)*xk(1) +h(1:3,2)*xk(2) &
-               +h(1:3,3)*xk(3) ) /aswl
-          rik2= xik(1)*xik(1)+xik(2)*xik(2)+xik(3)*xik(3)
           srcik= aswrc(is,ks)
-          srcik2= srcik*srcik
-          if( rik2.ge.srcik2 ) cycle
-          rik=dsqrt(rik2)
+          rik = dlspr(0,m,i) /aswl
+          if( rik.ge.srcik ) cycle
+          xik(1:3) = dlspr(1:3,m,i) /aswl
           riki= 1d0/rik
           drikc= 1d0/(rik-srcik)
 !-----------common term

@@ -1,18 +1,19 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-22 16:22:12 Ryo KOBAYASHI>
+!                     Last-modified: <2019-05-31 21:50:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
 subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
      ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd &
-     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,nspmax,specorder &
+     ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,specorder &
      ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
      ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl &
      ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv &
      ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width &
      ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary &
      ,lmetaD,lconst,lrdcfrc,cstruct,istruct,cdeform,dhratio)
-  use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump
+  use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump &
+       ,namax,nbmax,nnmax,nspmax
   use pmdvars
   use zload
   use force
@@ -32,7 +33,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   include "mpif.h"
   include "./params_unit.h"
   integer,intent(in):: ntot0,maxstp,nerg,npmd,myid_md,mpi_md_world &
-       ,nspmax,ifpmd,ifdmp,minstp,ntdst,ifsort & !,numff &
+       ,ifpmd,ifdmp,minstp,ntdst,ifsort & !,numff &
        ,iprint,nodes_md,nx,ny,nz,n_conv,nrmtrans,istruct
   integer,intent(inout):: ifcoulomb
   integer,intent(out):: nstp_done
@@ -331,7 +332,11 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,.true.,boundary)
 !-----Make pair list
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,rc1nn &
-       ,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.true.)
+       ,h,hi,anxi,anyi,anzi,lspr,dlspr,ls1nn,iprint,.true.)
+
+!!$  call check_lspr(namax,natm,nb,nnmax,lspr,dlspr)
+  call sort_lspr(namax,natm,nb,nnmax,lspr,dlspr)
+!!$  call check_lspr(namax,natm,nb,nnmax,lspr,dlspr)
 
 !.....Calc forces
   lstrs = lstrs0 .or. &
@@ -342,7 +347,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   lcell_updated = .true.
   call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-       ,lspr,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
+       ,lspr,dlspr,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
        ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
   lcell_updated = .false.
   lstrs = .false.
@@ -682,13 +687,18 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
            ,.false.,boundary)
 !.....Make pair list
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf &
-           ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.false.)
+           ,rc1nn,h,hi,anxi,anyi,anzi,lspr,dlspr,ls1nn,iprint,.false.)
       rbufres = rbuf
+!.....Sort lspr and dlspr
+      call sort_lspr(namax,natm,nb,nnmax,lspr,dlspr)
     else
 !.....Copy RA of boundary atoms determined by 'bacopy'
       call bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax &
            ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc &
            ,sv,nex,mpi_md_world,ifcoulomb,chg,chi,boundary)
+!.....Update distances and sort lspr and dlspr
+      call calc_neigh_dist(namax,natm,nb,nnmax,h,ra,lspr,dlspr)
+      call sort_lspr(namax,natm,nb,nnmax,lspr,dlspr)
     endif
 
     if(ifpmd.gt.0.and. mod(istp,noutpmd).eq.0 )then
@@ -697,7 +707,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !-------Calc forces
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-         ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
+         ,lspr,dlspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
     lcell_updated = .false.
     lstrs = .false.
@@ -1085,13 +1095,14 @@ end subroutine pmd_core
 subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
      ,ekitot,epitot,chgtot,chitot &
      ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
-     ,nspmax,specorder,am,dt,rc,rbuf,rc1nn,stnsr,epot &
+     ,specorder,am,dt,rc,rbuf,rc1nn,stnsr,epot &
      ,ekin,ifcoulomb,lvc,iprint,lcalcgrad,ndimp,maxisp &
      ,gwe,gwf,gws,lematch,lfmatch,lsmatch,boundary)
 !
 !  In case that only one shot force calculation is required,
 !  especially called from fitpot.
 !
+  use pmdio,only: namax,nbmax,nnmax,nspmax
   use pmdvars
   use force
   use Morse,only: gradw_Morse,gradw_vcMorse
@@ -1102,7 +1113,6 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   include "mpif.h"
   include "./params_unit.h"
   integer,intent(in):: ntot0,myid_md,mpi_md_world &
-       ,nspmax  & !,numff &
        ,iprint,nodes_md,nx,ny,nz
   integer,intent(inout):: ifcoulomb
   real(8),intent(in):: hunit
@@ -1198,8 +1208,9 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,.true.,boundary)
 !-----Make pair list
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf &
-       ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.true.)
+       ,rc1nn,h,hi,anxi,anyi,anzi,lspr,dlspr,ls1nn,iprint,.true.)
   lstrs = .true.
+  call sort_lspr(namax,natm,nb,nnmax,lspr,dlspr)
 
 !      print *,'one_shot: 06'
 !      if( iprint.ge.10 ) print *,'get_force,myid_md,lcalcgrad='
@@ -1207,7 +1218,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   if( .not.lcalcgrad ) then
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-         ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
+         ,lspr,dlspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
     if( iprint.gt.0 ) then
       write(6,'(a,es15.7)') ' Potential energy = ',epot
@@ -1658,6 +1669,7 @@ subroutine bacopy(rc,myid,mpi_md_world,iprint,ifcoulomb,l1st &
 !  
 !  Note: parallelized to smaller than rcut should not happen.
 !-----------------------------------------------------------------------
+  use pmdio,only: namax,nbmax
   use pmdvars
   use force
   use pmdmpi,only: nx,ny,nz,nid2xyz
@@ -2626,6 +2638,7 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
 !
 !  Decompose the system and scatter atoms to every process.
 !
+  use pmdio,only: namax,nbmax,nnmax
   use pmdvars
   implicit none
   include 'mpif.h'
@@ -3053,6 +3066,7 @@ subroutine alloc_namax_related()
 !     
 !     Allocated arrays related to NAMAX.
 !
+  use pmdio,only: namax,nbmax,nnmax
   use pmdvars
   implicit none
 
@@ -3064,6 +3078,7 @@ subroutine alloc_namax_related()
   if( allocated(stt) ) deallocate(stt)
   if( allocated(tag) ) deallocate(tag)
   if( allocated(lspr) ) deallocate(lspr)
+  if( allocated(dlspr) ) deallocate(dlspr)
   if( allocated(ls1nn) ) deallocate(ls1nn)
   if( allocated(epi) ) deallocate(epi)
   if( allocated(eki) ) deallocate(eki)
@@ -3075,7 +3090,7 @@ subroutine alloc_namax_related()
   if( allocated(lsex) ) deallocate(lsex)
   allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax) &
        ,strs(3,3,namax),stt(3,3,namax),tag(namax) &
-       ,lspr(0:nnmax,namax),ls1nn(0:nnmax,namax) &
+       ,lspr(0:nnmax,namax),dlspr(0:3,nnmax,namax),ls1nn(0:nnmax,namax) &
        ,epi(namax),eki(3,3,namax) &
        ,stp(3,3,namax),stn(3,3,namax) &
        ,chg(namax),chi(namax) &
@@ -3088,6 +3103,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax,iprint)
 !     Reallocated namax-related arrays everywhen namax needed to be
 !     updated
 !
+  use pmdio,only: namax,nbmax,nnmax
   use pmdvars
   implicit none
   integer,intent(in):: iprint,newnalmax,newnbmax
@@ -3181,6 +3197,15 @@ subroutine realloc_namax_related(newnalmax,newnbmax,iprint)
   allocate(lspr(0:nnmax,newnamax))
   call copy_iarr(ndim,iarr,lspr)
   deallocate(iarr)
+
+!.....dlspr
+  ndim = size(dlspr)
+  allocate(arr(ndim))
+  call copy_arr(ndim,dlspr,arr)
+  deallocate(dlspr)
+  allocate(dlspr(0:3,nnmax,newnamax))
+  call copy_arr(ndim,arr,dlspr)
+  deallocate(arr)
 
 !.....ls1nn
   ndim = size(ls1nn)
@@ -3302,6 +3327,34 @@ subroutine copy_iarr(ndim,srcarr,destarr)
   destarr(:) = srcarr(:)
   return
 end subroutine copy_iarr
+!=======================================================================
+subroutine calc_neigh_dist(namax,natm,nb,nnmax,h,ra,lspr,dlspr)
+!
+!  Compute distances between neighbors and store them in dlspr
+!
+  integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
+  real(8),intent(in):: h(3,3),ra(3,namax)
+  real(8),intent(inout):: dlspr(0:3,nnmax,namax)
+
+  integer:: i,j,jj
+  real(8):: xi(3),xij(3),rij(3),dij,dij2
+
+  dlspr(:,:,:) = 0d0
+
+  do i=1,natm+nb
+    xi(1:3) = ra(1:3,i)
+    do jj=1,lspr(0,i)
+      j = lspr(jj,i)
+      xij(1:3) = ra(1:3,j) -xi(1:3)
+      rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+      dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+      dij = dsqrt(dij2)
+      dlspr(0,jj,i) = dij
+      dlspr(1:3,jj,i)= rij(1:3)
+    enddo
+  enddo
+  return
+end subroutine calc_neigh_dist
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"

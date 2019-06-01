@@ -1,17 +1,11 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2019-05-17 13:29:46 Ryo KOBAYASHI>
+!                    Last modified: <2019-05-31 13:43:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
 ! PARAMETERS
 !=======================================================================
-!.....max. num. of atoms in a node
-  integer:: namax = 20000
-!.....max. num. of boundary-particles
-  integer:: nbmax = 10000
-!.....max. num. of neighbors
-  integer:: nnmax = 2000
 
 !.....output #
   integer,parameter:: ioerg = 11
@@ -48,6 +42,7 @@ module pmdvars
   real(8),allocatable:: tag(:)
 !!$    real(8):: tag(namax)
   integer,allocatable:: lspr(:,:),ls1nn(:,:)
+  real(8),allocatable:: dlspr(:,:,:)
 !!$    integer:: lspr(0:nnmax,namax)
 !.....potential and kinetic energy per atoms
   real(8),allocatable:: epi(:),eki(:,:,:),stp(:,:,:)
@@ -129,6 +124,7 @@ contains
 !
 !   Accessor method for lspr.
 !
+    use pmdio,only: namax,nnmax
     integer,intent(out):: nao,nno
     integer,allocatable,intent(out):: lspro(:,:)
 

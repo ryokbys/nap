@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-24 14:17:31 Ryo KOBAYASHI>
+!                     Last modified: <2019-05-31 22:07:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -58,7 +58,7 @@ module NN2
   
 contains
   subroutine force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr,dlspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use descriptor,only: gsf,dgsf,igsf,nsf,nal,calc_desc,make_gsf_arrays
     use util,only: itotOf
@@ -69,7 +69,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax) &
-         ,h(3,3),hi(3,3),sv(3,6)
+         ,h(3,3),hi(3,3),sv(3,6),dlspr(0:3,nnmax,namax)
     real(8),intent(inout):: tcom,rcin
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -79,7 +79,7 @@ contains
     integer:: i,j,k,l,m,n,is,js,ierr,ia,ja &
          ,ihl0,ihl1,ihl2,jj
     real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,zl1i,zl2i
-    real(8),allocatable,save:: strsl(:,:,:),aal(:,:)
+    real(8),allocatable,save:: strsl(:,:,:),aal(:,:),epit(:)
 
     integer:: itot
 !!$    integer,external:: itotOf
@@ -99,10 +99,8 @@ contains
              ,zl1(nhl(1),nal), zl2(nhl(2),nal) )
       endif
 
-      if( allocated(strsl) ) deallocate(strsl)
-      allocate(strsl(3,3,namax))
-      if( allocated(aal) ) deallocate(aal)
-      allocate(aal(3,namax))
+      if( allocated(strsl) ) deallocate(strsl,aal,epit)
+      allocate(strsl(3,3,namax),aal(3,namax),epit(namax))
 
     endif ! l1st
 
@@ -115,19 +113,17 @@ contains
       allocate(hl1(nhl(1),nal), hl2(nhl(2),nal) &
            ,zl1(nhl(1),nal), zl2(nhl(2),nal))
     endif
-    if( size(strsl).lt.3*3*namax ) then
-      deallocate(strsl)
-      allocate(strsl(3,3,namax))
+    if( size(strsl).ne.3*3*namax ) then
+      deallocate(strsl,aal,epit)
+      allocate(strsl(3,3,namax),aal(3,namax),epit(namax))
     endif
-    if( size(aal).lt.3*namax ) then
-      deallocate(aal)
-      allocate(aal(3,namax))
-    endif
+
     strsl(1:3,1:3,1:namax) = 0d0
     aal(1:3,1:namax) = 0d0
+    epit(:) = 0d0
 
     call calc_desc(namax,natm,nb,nnmax,h &
-         ,tag,ra,lspr,rcin,myid,mpi_world,l1st,iprint)
+         ,tag,ra,lspr,dlspr,rcin,myid,mpi_world,l1st,iprint)
 
     if( lbias ) then
 !.....set bias node to 1
@@ -274,7 +270,7 @@ contains
 
     if( lstrs ) then
       call compute_stress(namax,natm,tag,ra,nnmax,strsl,h &
-           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rcin,lspr &
+           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rcin,lspr,dlspr &
            ,mpi_world,myid)
       strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
@@ -712,14 +708,15 @@ contains
   end subroutine parse_option
 !=======================================================================
   subroutine compute_stress(namax,natm,tag,ra,nnmax,strs,h &
-       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rc,lspr &
+       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rc,lspr,dlspr &
        ,mpi_world,myid)
     use descriptor,only: igsf,dgsf
     implicit none
     integer,intent(in):: namax,natm,nnmax,nb,nbmax,lsb(0:nbmax,6)&
          ,lsrc(6),myparity(3),nn(6),mpi_world,myid,lspr(0:nnmax,namax)&
          ,nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3),rc
+    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3),rc &
+         ,dlspr(0:3,nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: strs(3,3,namax)
 
@@ -735,11 +732,14 @@ contains
         do jj=1,lspr(0,ia)
           ja= lspr(jj,ia)
           xj(1:3)= ra(1:3,ja)
-          xji(1:3)= xj(1:3)-xi(1:3)
-          rji(1:3)= h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
-          rij(1:3)= -rji(1:3)
-          dji= sqrt(rji(1)**2 +rji(2)**2 +rji(3)**2)
-          if( dji.ge.rc ) cycle
+!!$          xji(1:3)= xj(1:3)-xi(1:3)
+!!$          rji(1:3)= h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
+!!$          rij(1:3)= -rji(1:3)
+!!$          dji= sqrt(rji(1)**2 +rji(2)**2 +rji(3)**2)
+          dji = dlspr(0,jj,ia)
+          if( dji.ge.rc ) exit
+          rji(1:3) = dlspr(1:3,jj,ia)
+!!$          rij(1:3) = -rji(1:3)
           js = int(tag(ja))
           do ihl1=1,mhl(1)
             hl1i= hl1(ihl1,ia)
@@ -775,11 +775,13 @@ contains
         do jj=1,lspr(0,ia)
           ja= lspr(jj,ia)
           xj(1:3)= ra(1:3,ja)
-          xji(1:3)= xj(1:3)-xi(1:3)
-          rji(1:3)= h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
-          rij(1:3)= -rji(1:3)
-          dji= sqrt(rji(1)**2 +rji(2)**2 +rji(3)**2)
-          if( dji.ge.rc ) cycle
+!!$          xji(1:3)= xj(1:3)-xi(1:3)
+!!$          rji(1:3)= h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
+!!$          rij(1:3)= -rji(1:3)
+!!$          dji= sqrt(rji(1)**2 +rji(2)**2 +rji(3)**2)
+          dji = dlspr(0,jj,ia)
+          if( dji.ge.rc ) exit
+          rji(1:3) = dlspr(1:3,jj,ia)
           js = int(tag(ja))
           do ihl2=1,mhl(2)
             hl2i= hl2(ihl2,ia)
@@ -800,10 +802,10 @@ contains
                     sji= -tmp2i *tmp1i &
                          *wgt21(ihl0,ihl1) *dgsf(jxyz,ihl0,jj,ia) &
                          *rji(ixyz)
-!.....derivative of gsf of atom-i by atom-i
-                    sii= tmp2i *tmp1i &
-                         *wgt21(ihl0,ihl1) *dgsf(jxyz,ihl0,jj,ia) &
-                         *rij(ixyz)
+!!$!.....derivative of gsf of atom-i by atom-i
+!!$                    sii= tmp2i *tmp1i &
+!!$                         *wgt21(ihl0,ihl1) *dgsf(jxyz,ihl0,jj,ia) &
+!!$                         *rij(ixyz)
                     strs(ixyz,jxyz,ja) = strs(ixyz,jxyz,ja) +sji
                     strs(ixyz,jxyz,ia) = strs(ixyz,jxyz,ia) +sii
                   enddo

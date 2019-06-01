@@ -16,10 +16,14 @@ Options:
               Lattice constant of an axis. [default: 5.427]
   -o OUTFILE  Output file name. Format is detected automatically. [default: POSCAR]
   --two-dim   Whether or not 2D system. In the case of 2D, the system is a thin-sliced supercell with z-axis as the thinest direction.
+  --min-gdist=MIN_GDIST
+              Minimum grain-center distance in reduced unit. Note that the x,y-lengths are assumed to be comparable, 
+              otherwise the distance in the reduced unit looses its sense. [default: 0.1]
+  --angle-range=ANGLE_RANGE
+              Range of angle for grains to be distributed within. [default: 180.0]
 """
 from __future__ import print_function
 
-import sys
 from docopt import docopt
 import numpy as np
 from random import random
@@ -313,6 +317,60 @@ def make_polycrystal(grns,uc,n1,n2,n3,two_dim=False):
         system.atoms.pop(ia)
     return system
 
+def get_grains(ng,gdmin,angrange0,angrange1,two_dim):
+    """
+    Get specified number of grains with conditions of minimum distance and angle range.
+    """
+    dang = (angrange1-angrange0) /180.0 *np.pi /ng
+    grains= []
+    ig = 0
+    dmin = 1e+30
+    while True:
+        if ig >= ng: break
+        pi= np.zeros((3,))
+        ai= np.zeros((3,))
+        pi[0]= random()
+        pi[1]= random()
+        if two_dim:
+            too_close = False
+            dminl = 1e+30
+            for i,gi in enumerate(grains):
+                dlt = pi - gi.point
+                dlt = dlt - np.round(dlt)
+                d = np.sqrt( dlt[0]**2+dlt[1]**2 )
+                dminl = min(d,dminl)
+                if d < gdmin:
+                    too_close = True
+                    break
+            if too_close:
+                continue
+            dmin = min(dminl,dmin)
+            pi[2]= 0.0
+            ai[0]= 0.0
+            ai[1]= 0.0
+            ai[2]= angrange0 +dang*ig +random()*dang
+                    
+        else:
+            pi[2]= random()
+            too_close = False
+            for gi in grains:
+                dlt = pi - gi.point
+                dlt = dlt - np.round(dlt)
+                d = np.sqrt( dlt[0]**2+dlt[1]**2+dlt[2]**2 )
+                if d < gdmin:
+                    too_close
+                    break
+            if too_close:
+                continue
+            ai[0]= random()*np.pi*2 -np.pi
+            ai[1]= random()*np.pi/2 -np.pi/2
+            ai[2]= random()*np.pi*2 -np.pi
+        print(' point,angle =',pi,ai)
+        gi= Grain(pi,ai)
+        grains.append(gi)
+        ig += 1
+    print(' Minimum distance between grains and limit = ',dmin,gdmin)
+    return grains
 
 if __name__ == '__main__':
 
@@ -323,6 +381,13 @@ if __name__ == '__main__':
     latconst= float(args['--lattice-constant'])
     struct = args['--struct']
     two_dim = args['--two-dim']
+    gdistmin = float(args['--min-gdist'])
+    anglerange = float(args['--angle-range'])
+
+    #...Set angle range within [-180.0:180.0]
+    angrange1 = anglerange % 360.0
+    angrange0 = max(0.0, angrange1-180.0)
+    angrange1 = angrange1 -angrange0
 
     print(' {0:=^72}'.format(' make_polycrystal_py '))
     t0= time.time()
@@ -344,25 +409,8 @@ if __name__ == '__main__':
     else:
         raise ValueError('No such structure available: ',struct)
 
-    grains= []
-    for i in range(ngrain):
-        pi= np.zeros((3,))
-        ai= np.zeros((3,))
-        pi[0]= random()
-        pi[1]= random()
-        if two_dim:
-            pi[2]= 0.0
-            ai[0]= 0.0
-            ai[1]= 0.0
-            ai[2]= random()*np.pi*2 -np.pi
-        else:
-            pi[2]= random()
-            ai[0]= random()*np.pi*2 -np.pi
-            ai[1]= random()*np.pi/2 -np.pi/2
-            ai[2]= random()*np.pi*2 -np.pi
-        print(' point,angle =',pi,ai)
-        gi= Grain(pi,ai)
-        grains.append(gi)
+
+    grains= get_grains(ngrain,gdistmin,angrange0,angrange1,two_dim)
     uc= makestruct(latconst)
     uc.write('POSCAR_uc')
     gsys = NAPSystem(specorder=['H'])
