@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-30 23:46:47 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-03 12:44:13 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -35,8 +35,8 @@ program pmd
 #endif
 
   integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,nstp_done
-  integer:: mpicolor,mpikey,ierr,jerr,itmp,nprocs
-  real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin
+  integer:: mpicolor,mpikey,ierr,jerr,itmp,nprocs,nnmax_est
+  real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin,rmin
   character(len=3):: csp
   type(atom):: elem
 !!$  integer,external:: itotOf
@@ -92,9 +92,7 @@ program pmd
         endif
       enddo
     endif
-  endif
 
-  if( myid_md.eq.0 ) then
     write(6,*) ''
     write(6,'(a,i0)') ' Number of processes in MPI = ',nprocs
 !.....Read in.pmd after reading the atom configuration file.
@@ -118,6 +116,18 @@ program pmd
 !.....Set nrmtrans to 0
       print *,'  - Set removal of translation off.'
       nrmtrans = 0
+    endif
+
+!.....Correct nnmax if the given nnmax is too small compared to
+!.....the estimated one
+!.....Now assume the minimum interatomic distance is about 2.0A
+    rmin = 2.0d0
+    nnmax_est = (rc+rbuf)**3 /rmin**3 !*dsqrt(2d0)*pi/6
+    if( nnmax.lt.nnmax_est ) then
+      print *,'NNMAX is replaced since it is too small w.r.t. '// &
+           'given cutoff radius.'
+      print '(a,2(2x,i0))','    nnmax_orig, nnmax_new = ',nnmax,nnmax_est
+      nnmax = nnmax_est
     endif
   endif
 
@@ -635,7 +645,6 @@ subroutine add_pka_velocity(myid_md)
   implicit none
   include './params_unit.h'
   integer,intent(in):: myid_md
-  real(8),parameter:: pi= 3.14159265358979d0
 
   integer:: i,icntr,is
   real(8):: dmin,d,theta,phi,rx,ry,rz,vel,vx,vy,vz

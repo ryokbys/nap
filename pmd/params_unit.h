@@ -5,7 +5,8 @@
 !    unit of energy = 1 eV = 1.60217657e-19 Joule
 !    unit of mass = unified atomic mass unit
 !    unit of force = 1 eV/1Angstrom
-!
+!.....Pi
+      real(8),parameter:: pi = 3.14159265358979d0
 !-----time
       real(8),parameter:: ut   = 1d-15
       real(8),parameter:: fs2s = ut

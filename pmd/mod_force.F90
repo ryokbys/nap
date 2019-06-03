@@ -1,11 +1,11 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-31 22:27:41 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-03 12:35:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax
   implicit none
   save
-  real(8),parameter:: pi = 3.14159265358979d0
+  
   integer:: num_forces = -1
   character(len=128),allocatable:: force_list(:)
 
@@ -155,6 +155,7 @@ contains
   end subroutine ol_allocate
 !=======================================================================
   subroutine get_fol_dfol(r,isp,jsp,fol,dfol)
+    real(8),parameter:: pi = 3.14159265358979d0
     real(8),intent(in):: r
     integer,intent(in):: isp,jsp
     real(8),intent(out):: fol,dfol

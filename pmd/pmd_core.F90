@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-31 21:50:34 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-03 12:36:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -2486,7 +2486,6 @@ subroutine setv(h,natm,tag,va,nspmax,am,tinit,dt)
   real(8),intent(out):: va(3,natm)
   integer:: i,l,is
   real(8):: dseed,sumvx,sumvy,sumvz,tmp,facv(nspmax)
-  real(8),parameter:: pi = 3.14159265358979d0
   real(8),external:: box_muller
 
 !      facv(1:nspmax)=dsqrt(tinit*fkb*ev2j /(am(1:nspmax)*amu2kg))
