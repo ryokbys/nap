@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-06 00:16:46 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-06 18:26:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax
   implicit none
@@ -155,7 +155,8 @@ contains
   end subroutine ol_allocate
 !=======================================================================
   subroutine get_fol_dfol(r,isp,jsp,fol,dfol)
-    real(8),parameter:: pi = 3.14159265358979d0
+    include "params_unit.h"
+!!$    real(8),parameter:: pi = 3.14159265358979d0
     real(8),intent(in):: r
     integer,intent(in):: isp,jsp
     real(8),intent(out):: fol,dfol
@@ -171,7 +172,7 @@ contains
     else if( r.ge.ri .and. r.lt.ro ) then
       x = (r-ro)/(ri-ro)*pi
       fol = 0.5d0 *(1d0 +cos(x))
-      dfol = 0.5d0*pi /(ri-ro) *sin(x)
+      dfol = -0.5d0*pi /(ri-ro) *sin(x)
     else
       fol = 0d0
       dfol = 0d0
@@ -208,16 +209,13 @@ contains
         js = int(tag(ja))
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3) -xi(1:3)
-        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) *h(1:3,3)*xij(3)
-        dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
-        dij = sqrt(dij2)
-        ri = ol_pair(2,is,js)
-        ro = ol_pair(2,is,js)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2= rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        dij = dsqrt(dij2)
         call get_fol_dfol(dij,is,js,fol,dfol)
         ol_alphas(jj,ia)= fol
         ol_alphas(0,ia) = ol_alphas(0,ia) *fol
         ol_dalphas(jj,ia)= dfol
-        
       enddo  ! jj=...
     enddo  ! ia=...
 

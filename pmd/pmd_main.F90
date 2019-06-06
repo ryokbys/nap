@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-03 12:44:13 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-06 14:40:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -92,6 +92,9 @@ program pmd
         endif
       enddo
     endif
+
+    call cell_info(h)
+    call spcs_info()
 
     write(6,*) ''
     write(6,'(a,i0)') ' Number of processes in MPI = ',nprocs
@@ -781,6 +784,59 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
   return
 
 end subroutine determine_division
+!=======================================================================
+subroutine cell_info(h)
+  implicit none
+  real(8),intent(in):: h(3,3)
+
+  real(8):: a,b,c,alpha,beta,gamma
+  real(8),parameter:: pi = 3.14159265358979d0
+  real(8),external:: sprod
+
+  write(6,*) ''
+!!$  write(6,'(a)') " Cell-matrix:"
+!!$  write(6,'("   | ",3f12.3," |")') h(1,1:3)
+!!$  write(6,'("   | ",3f12.3," |")') h(2,1:3)
+!!$  write(6,'("   | ",3f12.3," |")') h(3,1:3)
+  write(6,'(a)') " Lattice vectors:"
+  write(6,'(a,"[ ",3f12.3," ]")') '   a = ',h(1:3,1)
+  write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2)
+  write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3)
+
+  a = dsqrt(sprod(3,h(1:3,1),h(1:3,1)))
+  b = dsqrt(sprod(3,h(1:3,2),h(1:3,2)))
+  c = dsqrt(sprod(3,h(1:3,3),h(1:3,3)))
+  alpha = acos(sprod(3,h(1:3,2),h(1:3,3))/b/c) /pi *180d0
+  beta  = acos(sprod(3,h(1:3,1),h(1:3,3))/a/c) /pi *180d0
+  gamma = acos(sprod(3,h(1:3,1),h(1:3,2))/a/b) /pi *180d0
+
+  write(6,'(a)') ' Lattice parameters:'
+  write(6,'(a,f10.3,a,f7.2,a)') '   |a| = ',a,' Ang.,  alpha = ' &
+       ,alpha,' deg.'
+  write(6,'(a,f10.3,a,f7.2,a)') '   |b| = ',b,' Ang.,  beta  = ' &
+       ,beta,' deg.'
+  write(6,'(a,f10.3,a,f7.2,a)') '   |c| = ',c,' Ang.,  gamma = ' &
+       ,gamma,' deg.'
+
+end subroutine cell_info
+!=======================================================================
+subroutine spcs_info()
+  use pmdio
+
+  integer:: nsps(nspmax),ia,is
+
+  nsps(:) = 0
+  do ia=1,ntot
+    is = int(tagtot(ia))
+    nsps(is) = nsps(is) +1
+  enddo
+  write(6,'(a)') ' Number of each species in the initial configuration'
+  do is=1,nspmax
+    if( trim(specorder(is)).eq.'x' ) cycle
+    write(6,'(a,i0)') '   '//specorder(is)//':  ',nsps(is)
+  enddo
+  
+end subroutine spcs_info
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"

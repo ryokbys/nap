@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-06 11:14:47 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-06 13:08:29 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -184,6 +184,7 @@ contains
         dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) -dvdrc
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
+        if( .not.lstrs ) cycle
 !.....stress
         do ixyz=1,3
           do jxyz=1,3
@@ -196,14 +197,16 @@ contains
       enddo
     enddo
 
-    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    if( lstrs ) then
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
     
 !-----gather epot
     epott= 0d0
     call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
-!!$    write(6,'(a,es15.7)') ' epott Morse = ',epott
+    if( iprint.gt.2 ) write(6,'(a,es15.7)') ' epot Morse = ',epott
     return
   end subroutine force_Morse
 !=======================================================================

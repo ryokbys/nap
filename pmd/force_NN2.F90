@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-06 00:43:45 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-06 22:43:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -79,7 +79,7 @@ contains
     integer:: i,j,k,l,m,n,is,js,ierr,ia,ja &
          ,ihl0,ihl1,ihl2,jj
     real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,zl1i,zl2i
-    real(8),allocatable,save:: strsl(:,:,:),aal(:,:),epit(:)
+    real(8),allocatable,save:: strsl(:,:,:),aal(:,:)
 
     integer:: itot
 !!$    integer,external:: itotOf
@@ -99,8 +99,8 @@ contains
              ,zl1(nhl(1),nal), zl2(nhl(2),nal) )
       endif
 
-      if( allocated(strsl) ) deallocate(strsl,aal,epit)
-      allocate(strsl(3,3,namax),aal(3,namax),epit(namax))
+      if( allocated(strsl) ) deallocate(strsl,aal)
+      allocate(strsl(3,3,namax),aal(3,namax))
 
     endif ! l1st
 
@@ -114,13 +114,12 @@ contains
            ,zl1(nhl(1),nal), zl2(nhl(2),nal))
     endif
     if( size(strsl).ne.3*3*namax ) then
-      deallocate(strsl,aal,epit)
-      allocate(strsl(3,3,namax),aal(3,namax),epit(namax))
+      deallocate(strsl,aal)
+      allocate(strsl(3,3,namax),aal(3,namax))
     endif
 
     strsl(1:3,1:3,1:namax) = 0d0
     aal(1:3,1:namax) = 0d0
-    epit(:) = 0d0
 
     call calc_desc(namax,natm,nb,nnmax,h &
          ,tag,ra,lspr,rcin,myid,mpi_world,l1st,iprint)
@@ -283,6 +282,281 @@ contains
 
     return
   end subroutine force_NN2
+!=======================================================================
+  subroutine force_NN2_overlay(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
+       ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
+!
+!  NN2 potential with overlay
+!
+    use descriptor,only: gsf,dgsf,igsf,nsf,nal,calc_desc,make_gsf_arrays
+    use util,only: itotOf
+    use force,only: ol_ranges,ol_alphas,ol_dalphas,ol_pair
+    implicit none
+    include "mpif.h"
+    include "./params_unit.h"
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
+    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+         ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
+    real(8),intent(in):: ra(3,namax),tag(namax) &
+         ,h(3,3),hi(3,3),sv(3,6)
+    real(8),intent(inout):: tcom,rcin
+    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: l1st
+    logical:: lstrs
+
+!.....local
+    integer:: i,j,k,l,m,n,is,js,ierr,ia,ja &
+         ,ihl0,ihl1,ihl2,jj,ixyz,jxyz
+    real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,zl1i,zl2i
+    real(8),allocatable,save:: strsl(:,:,:),aal(:,:),epit(:)
+    real(8):: xij(3),rij(3),dij2,dij,xi(3),alpi,drdxi(3),dtmp,ri,ro
+
+    integer:: itot
+!!$    integer,external:: itotOf
+    character(len=8):: cnum
+
+    call make_gsf_arrays(l1st,namax,natm &
+         ,tag,nnmax,lspr,myid,mpi_world,iprint)
+
+    if( l1st ) then
+
+      if( nl.eq.1 ) then
+        if( allocated(hl1) ) deallocate(hl1,zl1)
+        allocate( hl1(nhl(1),nal),zl1(nhl(1),nal) )
+      else if( nl.eq.2 ) then
+        if( allocated(hl1) ) deallocate(hl1,hl2,zl1,zl2)
+        allocate( hl1(nhl(1),nal), hl2(nhl(2),nal) &
+             ,zl1(nhl(1),nal), zl2(nhl(2),nal) )
+      endif
+
+      if( allocated(strsl) ) deallocate(strsl,aal,epit)
+      allocate(strsl(3,3,namax),aal(3,namax),epit(namax))
+
+    endif ! l1st
+
+    if( allocated(hl1) .and. size(hl1).lt.nhl(1)*nal ) then
+      deallocate(hl1,zl1)
+      allocate(hl1(nhl(1),nal), zl1(nhl(1),nal))
+    endif
+    if( allocated(hl2) .and. size(hl2).lt.nhl(1)*nal ) then
+      deallocate(hl1,hl2,zl1,zl2)
+      allocate(hl1(nhl(1),nal), hl2(nhl(2),nal) &
+           ,zl1(nhl(1),nal), zl2(nhl(2),nal))
+    endif
+    if( size(strsl).ne.3*3*namax ) then
+      deallocate(strsl,aal,epit)
+      allocate(strsl(3,3,namax),aal(3,namax),epit(namax))
+    endif
+
+    strsl(1:3,1:3,1:natm+nb) = 0d0
+    aal(1:3,1:natm+nb) = 0d0
+    epit(1:natm+nb) = 0d0
+
+!!$    return
+
+    call calc_desc(namax,natm,nb,nnmax,h &
+         ,tag,ra,lspr,rcin,myid,mpi_world,l1st,iprint)
+
+    if( lbias ) then
+!.....set bias node to 1
+      gsf(nhl(0),1:natm) = 1d0
+      dgsf(1:3,nhl(0),:,:) = 0d0
+    endif
+
+
+!.....initialize hidden-layer node values
+    if( nl.eq.1 ) then
+      hl1(1:nhl(1),1:natm)= 0d0
+      zl1(:,:) = 0d0
+      if( lbias ) then
+        hl1(nhl(1),1:natm)= 1d0
+        zl1(nhl(1),1:natm)= 1d0
+      endif
+    else if( nl.eq.2 ) then
+      hl1(1:nhl(1),1:natm)= 0d0
+      hl2(1:nhl(2),1:natm)= 0d0
+      zl1(:,:) = 0d0
+      zl2(:,:) = 0d0
+      if( lbias ) then
+        hl1(nhl(1),1:natm)= 1d0
+        hl2(nhl(2),1:natm)= 1d0
+      endif
+    endif
+!.....2nd, calculate the node values by summing contributions from
+!.....  symmetry functions
+    if( nl.eq.1 ) then
+      do ia=1,natm
+        do ihl1=1,mhl(1)
+          tmp= 0d0
+          do ihl0=1,nhl(0)
+            tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
+          enddo
+          zl1(ihl1,ia)= tmp
+          hl1(ihl1,ia)= sigmoid(tmp)
+        enddo
+      enddo
+    else if( nl.eq.2 ) then
+      do ia=1,natm
+        do ihl1=1,mhl(1)
+          tmp= 0d0
+          do ihl0=1,nhl(0)
+            tmp= tmp +wgt21(ihl0,ihl1) *gsf(ihl0,ia)
+          enddo
+          zl1(ihl1,ia)= tmp
+          hl1(ihl1,ia)= sigmoid(tmp)
+        enddo
+        do ihl2=1,mhl(2)
+          tmp= 0d0
+          do ihl1=1,nhl(1)
+            tmp= tmp +wgt22(ihl1,ihl2) *(hl1(ihl1,ia)-0.5d0)
+          enddo
+          zl2(ihl2,ia)= tmp
+          hl2(ihl2,ia)= sigmoid(tmp)
+        enddo
+      enddo
+    endif
+
+!.....Calculate the energy of atom by summing up the node values
+    epotl= 0d0
+    if( nl.eq.1 ) then
+      do ia=1,natm
+        tmp = 0d0
+        alpi = ol_alphas(0,ia)
+        do ihl1=1,nhl(1)
+!!$          tmp = tmp +wgt12(ihl1) *(hl1(ihl1,ia)-0.5d0)
+          tmp = tmp +wgt12(ihl1) *(sigmoid(zl1(ihl1,ia))-0.5d0)
+        enddo
+        epit(ia) = tmp
+        epi(ia) = epi(ia) +tmp *alpi
+        epotl=epotl +tmp *alpi
+      enddo
+    else if( nl.eq.2 ) then
+      do ia=1,natm
+        tmp = 0d0
+        alpi = ol_alphas(0,ia)
+        do ihl2=1,nhl(2)
+!!$          tmp = tmp +wgt23(ihl2) *(hl2(ihl2,ia)-0.5d0)
+          tmp = tmp +wgt23(ihl2) *(sigmoid(zl2(ihl2,ia))-0.5d0)
+        enddo
+        epit(ia)= tmp
+        epi(ia) = epi(ia) +tmp*alpi
+        epotl=epotl +tmp*alpi
+      enddo
+    endif
+
+!.....sum up for forces
+    if( nl.eq.1 ) then
+!.....loop over every energy per atom-i
+      do ia=1,natm
+        alpi = ol_alphas(0,ia)
+        do ihl1=1,mhl(1)
+          hl1i= hl1(ihl1,ia)
+          zl1i= zl1(ihl1,ia)
+!!$          tmp= wgt12(ihl1)*hl1i*(1d0-hl1i)
+          tmp = wgt12(ihl1) *dsigmoid(zl1i,hl1i) *alpi
+          do jj=1,lspr(0,ia)
+            ja= lspr(jj,ia)
+            js = int(tag(ja))
+            do ihl0=1,nhl(0)
+              if( igsf(ihl0,jj,ia).eq.0 ) cycle
+              aal(1:3,ja)=aal(1:3,ja) &
+                   -tmp*wgt11(ihl0,ihl1)*dgsf(1:3,ihl0,jj,ia)
+            enddo
+          enddo
+!.....atom ia
+          do ihl0= 1,nhl(0)
+            aal(1:3,ia)=aal(1:3,ia) &
+                 -tmp*wgt11(ihl0,ihl1)*dgsf(1:3,ihl0,0,ia)
+          enddo
+        enddo
+      enddo
+    else if( nl.eq.2 ) then
+      do ia=1,natm
+        alpi = ol_alphas(0,ia)
+        do ihl2=1,mhl(2)
+          hl2i= hl2(ihl2,ia)
+          zl2i= zl2(ihl2,ia)
+!!$          tmp2= wgt23(ihl2) *hl2i*(1d0-hl2i)
+          tmp2= wgt23(ihl2) *dsigmoid(zl2i,hl2i) *alpi
+          do ihl1=1,mhl(1)
+            hl1i= hl1(ihl1,ia)
+            zl1i= zl1(ihl1,ia)
+!!$            tmp1= wgt22(ihl1,ihl2) *hl1i*(1d0-hl1i)
+            tmp1= wgt22(ihl1,ihl2) *dsigmoid(zl1i,hl1i)
+            do jj=1,lspr(0,ia)
+              ja= lspr(jj,ia)
+              do ihl0=1,nhl(0)
+                if( igsf(ihl0,jj,ia).eq.0 ) cycle
+                aal(1:3,ja)=aal(1:3,ja) &
+                     -tmp2 *tmp1 &
+                     *wgt21(ihl0,ihl1)*dgsf(1:3,ihl0,jj,ia)
+              enddo
+            enddo
+!.....atom ia
+            do ihl0= 1,nhl(0)
+              aal(1:3,ia)=aal(1:3,ia) &
+                   -tmp2*tmp1*wgt21(ihl0,ihl1)*dgsf(1:3,ihl0,0,ia)
+            enddo
+          enddo
+        enddo
+      enddo
+    endif
+
+!.....Derivative wrt.alphas, which requires energy per atom, epit
+    do ia=1,natm
+      is = int(tag(ia))
+      xi(1:3) = ra(1:3,ia)
+      alpi = ol_alphas(0,ia)
+      do jj=1,lspr(0,ia)
+        ja = lspr(jj,ia)
+        js = int(tag(ja))
+        ri = ol_pair(1,is,js)
+        ro = ol_pair(2,is,js)
+        xij(1:3) = ra(1:3,ja) -xi(1:3)
+        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2.le.ri*ri .or. dij2.gt.ro*ro ) cycle
+        dij = dsqrt(dij2)
+        drdxi(1:3)= -rij(1:3)/dij
+!.....Force
+        dtmp = epit(ia) *alpi/ol_alphas(jj,ia) *ol_dalphas(jj,ia)
+        aal(1:3,ia)= aal(1:3,ia) -dtmp*drdxi(1:3)
+        aal(1:3,ja)= aal(1:3,ja) +dtmp*drdxi(1:3)
+!.....Stress
+        if( .not.lstrs ) cycle
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                 -0.5d0*dtmp*rij(ixyz)*(-drdxi(jxyz))
+            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                 -0.5d0*dtmp*rij(ixyz)*(-drdxi(jxyz))
+          enddo
+        enddo
+      enddo
+    enddo
+
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
+         ,lsrc,myparity,nn,mpi_world,aal,3)
+    aa(1:3,1:natm) = aa(1:3,1:natm) +aal(1:3,1:natm)
+
+    if( lstrs ) then
+      call compute_stress(namax,natm,tag,ra,nnmax,strsl,h &
+           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rcin,lspr &
+           ,mpi_world,myid)
+      strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
+
+!!$    epi(1:natm) = epi(1:natm) +epit(1:natm)
+
+!-----gather epot
+    call mpi_allreduce(epotl,epott,1,mpi_double_precision &
+         ,mpi_sum,mpi_world,ierr)
+    if( iprint.gt.2 ) print *,'epot NN2_overlay = ',epott
+    epot= epot +epott
+
+    return
+  end subroutine force_NN2_overlay
 !=======================================================================
   subroutine set_sigtype_NN2(itype)
 !

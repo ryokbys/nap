@@ -26,7 +26,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use EAM,only:force_EAM
   use linreg,only:force_linreg
 !!$  use NN,only:force_NN
-  use NN2,only: force_NN2
+  use NN2,only: force_NN2,force_NN2_overlay
   use Coulomb, only: force_screened_Coulomb, force_Ewald &
        ,initialize_coulomb, force_Ewald_long, force_Coulomb
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
@@ -151,9 +151,17 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
 !!$  if( use_force('NN') ) call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
 !!$       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
 !!$       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-  if( use_force('NN2') ) call force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+  if( use_force('NN2') ) then
+    if( loverlay ) then
+      call force_NN2_overlay(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+           ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+    else
+      call force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+           ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+    endif
+  endif
   if( use_force('Morse') ) call force_Morse(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
@@ -170,15 +178,14 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('ZBL') ) then
-    if( loverlay ) then
-      call force_ZBL_overlay(namax,natm,tag,ra,nnmax,aa,strs &
-           ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-           ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-    else
-      call force_ZBL(namax,natm,tag,ra,nnmax,aa,strs &
-           ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-           ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-    endif
+    call force_ZBL(namax,natm,tag,ra,nnmax,aa,strs &
+         ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+         ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+  endif
+  if( loverlay .and. trim(ol_force).eq.'ZBL' ) then
+    call force_ZBL_overlay(namax,natm,tag,ra,nnmax,aa,strs &
+         ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+         ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   endif
   if( use_force('cspline') ) call force_cspline(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
@@ -233,7 +240,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use EAM, only: init_EAM, read_params_EAM, update_params_EAM, lprmset_EAM
 !!$  use NN, only: read_const_NN, read_params_NN, update_params_NN, lprmset_NN
   use Buckingham, only: init_Buckingham, read_params_Buckingham, lprmset_Buckingham
-  use ZBL, only: read_params_ZBL
+  use ZBL, only: read_params_ZBL, init_ZBL
   use LJ, only: read_params_LJ_repul
   use linreg, only: read_params_linreg,lprmset_linreg
   use descriptor, only: read_params_desc,init_desc
@@ -336,6 +343,8 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
 !.....ZBL
   if( use_force('ZBL') ) then
     call read_params_ZBL(myid_md,mpi_md_world,iprint)
+  else if( loverlay .and. trim(ol_force).eq.'ZBL' ) then
+    call init_ZBL(iprint)
   endif
 !.....LJ_repul
   if( use_force('LJ_repul') ) then

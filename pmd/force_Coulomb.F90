@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-06 00:20:07 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-06 13:08:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -1033,6 +1033,7 @@ contains
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
+        if( .not.lstrs ) cycle
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
@@ -1044,13 +1045,15 @@ contains
       enddo
     enddo
 
-    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    if( lstrs ) then
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
 
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
-!!$    write(6,'(a,es15.7)') ' epott screened Coulomb = ',epott
+    if( iprint.gt.2 ) write(6,'(a,es15.7)') ' epot screened Coulomb = ',epott
     return
   end subroutine force_screened_Coulomb
 !=======================================================================

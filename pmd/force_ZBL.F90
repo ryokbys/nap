@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-06 11:31:53 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-06 22:43:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -239,7 +239,8 @@ contains
         dtmp = dvij(is,js,rij)
         aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
-!.....Atomic stress for 2-body terms
+!.....Atomic stress
+        if( .not.lstrs ) cycle
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
@@ -251,12 +252,14 @@ contains
       enddo
     enddo
 
-    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    if( lstrs ) then
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
 
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
-    if( iprint.gt.2 ) print *,'ZBL epot = ',epott
+    if( iprint.gt.2 ) print *,'epot ZBL = ',epott
     epot= epot +epott
 
   end subroutine force_ZBL
@@ -290,34 +293,35 @@ contains
     real(8):: xij(3),rij,rij2,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
     real(8):: x,y,z,xi(3),epotl,epott,tmp,tmp2,dtmp,tmp2i,tmp2j &
          ,dtmpi,dtmpj,alpi,ri,ro,dij,dij2
-    real(8),allocatable,save:: strsl(:,:,:),epit(:)
+    real(8),allocatable,save:: strsl(:,:,:),epit(:),aal(:,:)
     real(8),external:: fcut1,dfcut1
     real(8),save:: zbl_rc2
 
     if( l1st ) then
-      if( allocated(strsl) ) deallocate(strsl,epit)
-      allocate(strsl(3,3,namax),epit(namax))
-      zbl_rc2 = zbl_rc*zbl_rc
+      if( allocated(strsl) ) deallocate(strsl,epit,aal)
+      allocate(strsl(3,3,namax),epit(namax),aal(3,namax))
+      zbl_rc2 = rc*rc
     endif
 
     if( size(strsl).lt.3*3*namax ) then
-      deallocate(strsl,epit)
-      allocate(strsl(3,3,namax),epit(namax))
+      deallocate(strsl,epit,aal)
+      allocate(strsl(3,3,namax),epit(namax),aal(3,namax))
     endif
     
     epotl= 0d0
-    epit(:) = 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    epit(1:natm+nb) = 0d0
+    strsl(1:3,1:3,1:natm+nb) = 0d0
+    aal(:,1:natm+nb)= 0d0
 
-!-----dE/dr_i
-    do i=1,natm+nb  ! loop over not only residents but also immigrants
+    do i=1,natm
+      xi(1:3) = ra(1:3,i)
       is = int(tag(i))
       alpi = ol_alphas(0,i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
         js = int(tag(j))
-        if( .not. interact(is,js) ) cycle
+!!$        if( .not. interact(is,js) ) cycle
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
@@ -327,15 +331,15 @@ contains
         dij = sqrt(dij2)
         drdxi(1:3)= -xij(1:3)/dij
 !.....2-body term, taking overlay into account
-        tmp = vij(is,js,dij) 
-        tmp2i= 0.5d0 *tmp *(1d0 -alpi)
-        epit(i)= epit(i) +tmp2i
-        epotl=epotl +tmp2i
+        tmp = 0.5d0 *vnucl(is,js,dij) 
+        epit(i)= epit(i) +tmp
+        epotl=epotl +tmp *(1d0-alpi)
 !.....Force
-        dtmp = 0.5d0 *dvij(is,js,dij) *(1d0 -alpi)
-        aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
-        aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
-!.....Atomic stress for 2-body terms
+        dtmp = 0.5d0 *dvnucl(is,js,dij) *(1d0 -alpi)
+        aal(1:3,i)=aal(1:3,i) -dtmp*drdxi(1:3)
+        aal(1:3,j)=aal(1:3,j) +dtmp*drdxi(1:3)
+!.....Stress
+        if( .not.lstrs ) cycle
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
@@ -345,11 +349,18 @@ contains
           enddo
         enddo
       enddo  ! k=
+      epi(i) = epi(i) +epit(i) *(1d0-alpi)
+    enddo
+
 !.....Derivatives wrt alphas, which requires energy per atom, epit
+    do i=1,natm
+      xi(1:3) = ra(1:3,i)
+      is = int(tag(i))
+      alpi = ol_alphas(0,i)
       do k=1,lspr(0,i)
         j= lspr(k,i)
         js = int(tag(j))
-        if( .not. interact(is,js) ) cycle
+!!$        if( .not. interact(is,js) ) cycle
         ri = ol_pair(1,is,js)
         ro = ol_pair(2,is,js)
         x= ra(1,j) -xi(1)
@@ -357,15 +368,15 @@ contains
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         dij2= xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3)
-        if( dij2.gt.ro*ro ) cycle
-        dij = sqrt(dij2)
+        if( dij2.gt.ro*ro .or. dij2.le.ri*ri ) cycle
+        dij = dsqrt(dij2)
         drdxi(1:3)= -xij(1:3)/dij
 !.....Force
-        if( dij.le.ri ) cycle
         dtmp = -epit(i) *alpi/ol_alphas(k,i) *ol_dalphas(k,i)
-        aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
-        aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
+        aal(1:3,i)=aal(1:3,i) -dtmp*drdxi(1:3)
+        aal(1:3,j)=aal(1:3,j) +dtmp*drdxi(1:3)
 !.....Stress
+        if( .not.lstrs ) cycle
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
@@ -375,15 +386,19 @@ contains
           enddo
         enddo
       enddo
-      epi(i) = epi(i) +epit(i)
     enddo  ! i=
 
-    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
+         ,lsrc,myparity,nn,mpi_md_world,aal,3)
+    aa(1:3,1:natm) = aa(1:3,1:natm) +aal(1:3,1:natm)
+
+    if( lstrs ) then
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
-         ,mpi_sum,mpi_md_world,ierr)
-    if( iprint.gt.2 ) print *,'ZBL epot = ',epott
+    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+    if( iprint.gt.2 ) print *,'epot ZBL_overlay = ',epott
     epot= epot +epott
 
   end subroutine force_ZBL_overlay
