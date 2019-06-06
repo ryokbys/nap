@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-03 12:35:39 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-06 00:16:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax
   implicit none
@@ -181,14 +181,13 @@ contains
   end subroutine get_fol_dfol
 !=======================================================================
   subroutine calc_overlay(namax,natm,nb,nnmax,h,tag,ra,lspr &
-       ,dlspr,l1st,iprint)
+       ,l1st,iprint)
 !
 !  Compute overlay coefficients of each pair and atom.
 !
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: iprint
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax) &
-         ,dlspr(0:3,nnmax,namax)
+    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax)
     logical,intent(in):: l1st
 
     integer:: ia,ja,jj,is,js
@@ -202,17 +201,16 @@ contains
     ol_dalphas(:,:) = 1d0
 
     do ia=1,natm+nb
-!!$      xi(1:3) = ra(1:3,ia)
+      xi(1:3) = ra(1:3,ia)
       is = int(tag(ia))
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
         js = int(tag(ja))
-!!$        xj(1:3)= ra(1:3,ja)
-!!$        xij(1:3)= xj(1:3) -xi(1:3)
-!!$        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) *h(1:3,3)*xij(3)
-!!$        dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
-!!$        dij = sqrt(dij2)
-        dij = dlspr(0,jj,ia)
+        xj(1:3)= ra(1:3,ja)
+        xij(1:3)= xj(1:3) -xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) *h(1:3,3)*xij(3)
+        dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
+        dij = sqrt(dij2)
         ri = ol_pair(2,is,js)
         ro = ol_pair(2,is,js)
         call get_fol_dfol(dij,is,js,fol,dfol)

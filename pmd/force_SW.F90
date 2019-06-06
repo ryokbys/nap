@@ -1,6 +1,6 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-01 00:09:56 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-06 01:02:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 
   integer,parameter:: ioprms = 50
@@ -48,7 +48,7 @@ module SW
 
 contains
   subroutine force_SW(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of SW(Si) force calculation for pmd
@@ -65,7 +65,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax) &
-         ,h(3,3),hi(3,3),sv(3,6),rc,dlspr(0:3,nnmax,namax)
+         ,h(3,3),hi(3,3),sv(3,6),rc
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
@@ -77,7 +77,7 @@ contains
          ,dhcsn,vol,voli,volj,volk,drij(3),rcmax
     real(8):: drik(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl
     real(8):: epotl,epotl2,epotl3,epott
-    real(8),save:: swli,a8d3r3
+    real(8),save:: swli,a8d3r3,rcmax2
     real(8),save,allocatable:: aa2(:,:),aa3(:,:)
     real(8),save,allocatable,dimension(:):: xi,xj,xk,xij,xik,at,bli
     real(8),allocatable,save:: strsl(:,:,:)
@@ -96,6 +96,7 @@ contains
           rcmax = max(rcmax,aswrc(is,js)*aswl)
         enddo
       enddo
+      rcmax2= rcmax*rcmax
       if( myid.eq.0 .and. iprint.gt.0 ) then
         write(6,'(a,es12.4)') ' rc of input         =',rc
         write(6,'(a,es12.4)') ' rc of this potential=',rcmax
@@ -134,9 +135,17 @@ contains
         js= int(tag(j))
         if( .not. interact(is,js) ) cycle
         src= aswrc(is,js)
-        rij = dlspr(0,k,i) /aswl
+        xj(1:3)= ra(1:3,j)
+        x = xj(1) -xi(1)
+        y = xj(2) -xi(2)
+        z = xj(3) -xi(3)
+        xij(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)/aswl
+        rij2 = xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
+        rij = dsqrt(rij2)
         if( rij.ge.src ) cycle
-        xij(1:3) = dlspr(1:3,k,i) /aswl
+!!$        rij = dlspr(0,k,i) /aswl
+!!$        if( rij.ge.src ) cycle
+!!$        xij(1:3) = dlspr(1:3,k,i) /aswl
         riji= 1d0/rij
         drijc= 1d0/(rij-src)
         vexp=exp(aswc(is,js)*drijc)
@@ -190,10 +199,17 @@ contains
         if( j.eq.i ) cycle
         js= int(tag(j))
         srcij= aswrc(is,js)
-        rij= dsqrt(rij2)
-        rij = dlspr(0,n,i) /aswl
+        xj(1:3)= ra(1:3,j)
+        x = xj(1) -xi(1)
+        y = xj(2) -xi(2)
+        z = xj(3) -xi(3)
+        xij(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)/aswl
+        rij2 = xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
+        rij = dsqrt(rij2)
         if( rij.ge.srcij ) cycle
-        xij(1:3) = dlspr(1:3,n,i) /aswl
+!!$        rij= dsqrt(rij2)
+!!$        rij = dlspr(0,n,i) /aswl
+!!$        xij(1:3) = dlspr(1:3,n,i) /aswl
         riji= 1d0/rij
         drijc= 1d0/(rij-srcij)
 !---------atom (k)
@@ -204,9 +220,16 @@ contains
           ks= int(tag(k))
           if( .not. interact3(is,js,ks) ) cycle
           srcik= aswrc(is,ks)
-          rik = dlspr(0,m,i) /aswl
+          x = xk(1) -xi(1)
+          y = xk(2) -xi(2)
+          z = xk(3) -xi(3)
+          xik(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)/aswl
+          rik2 = xik(1)*xik(1) +xik(2)*xik(2) +xik(3)*xik(3)
+          rik = dsqrt(rik2)
           if( rik.ge.srcik ) cycle
-          xik(1:3) = dlspr(1:3,m,i) /aswl
+!!$          rik = dlspr(0,m,i) /aswl
+!!$          if( rik.ge.srcik ) cycle
+!!$          xik(1:3) = dlspr(1:3,m,i) /aswl
           riki= 1d0/rik
           drikc= 1d0/(rik-srcik)
 !-----------common term

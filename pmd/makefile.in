@@ -118,7 +118,7 @@ force_Coulomb.o: mod_util.o
 force_LJ.o: mod_util.o
 force_NN2.o: mod_util.o
 force_SW.o: mod_util.o
-force_ZBL.o: mod_util.o
+force_ZBL.o: mod_util.o mod_element.o
 force_cspline.o: mod_util.o
 mod_constraints.o: mod_vector.o mod_util.o
 mod_rdcfrc.o: mod_structure.o mod_util.o

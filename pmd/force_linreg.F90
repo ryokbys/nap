@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-01 00:12:59 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-06 00:59:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -163,9 +163,10 @@ contains
   end subroutine force_linreg_old
 !=======================================================================
   subroutine force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr,dlspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
-    use descriptor
+    use descriptor,only: gsf,dgsf,igsf,nsf,calc_desc,make_gsf_arrays &
+         ,write_descs
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -173,7 +174,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax) &
-         ,h(3,3),hi(3,3),sv(3,6),dlspr(0:3,nnmax,namax)
+         ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: tcom,rcin
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st 
@@ -202,7 +203,7 @@ contains
     call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr &
          ,myid,mpi_world,iprint)
 
-    call calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr,dlspr &
+    call calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr &
          ,rcin,myid,mpi_world,l1st,iprint)
 
     if( iprint.gt.10 .and. mod(iprint,10).eq.1 .and. myid.le.0 ) then
@@ -249,16 +250,16 @@ contains
       is = int(tag(ia))
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-!!$        xj(1:3) = ra(1:3,ja)
-!!$        xji(1:3) = xj(1:3)-xi(1:3)
-!!$        rji(1:3) = h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
-!!$        dji = rji(1)**2 +rji(2)**2 +rji(3)**2
+        xj(1:3) = ra(1:3,ja)
+        xji(1:3) = xj(1:3)-xi(1:3)
+        rji(1:3) = h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
+        dji = rji(1)*rji(1) +rji(2)*rji(2) +rji(3)*rji(3)
 !!$        print *,'dji,rcin2=',dji,rcin2
-!!$        if( dji.ge.rcin2 ) cycle
-!!$        dji = sqrt(dji)
-        dji = dlspr(0,jj,ia)
+        if( dji.ge.rcin2 ) cycle
+        dji = sqrt(dji)
+!!$        dji = dlspr(0,jj,ia)
         if( dji.ge.rcin ) exit
-        rji(1:3) = dlspr(1:3,jj,ia)
+!!$        rji(1:3) = dlspr(1:3,jj,ia)
         js = int(tag(ja))
         do isf=1,nsf
           if( igsf(isf,jj,ia).eq.0 ) cycle
@@ -744,7 +745,7 @@ contains
 !  Derivative of linreg pot w.r.t parameters.
 !  - iprm0: The starting point -1 in parameter array for this FF.
 !
-    use descriptor
+    use descriptor,only: gsf,dgsf,igsf,nsf,calc_desc,make_gsf_arrays
     use util,only: itotOf
     implicit none
     integer,intent(in):: namax,natm,nnmax,ndimp,iprint,lspr(0:nnmax,namax)&

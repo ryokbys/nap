@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-31 22:07:01 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-06 00:43:45 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -58,7 +58,7 @@ module NN2
   
 contains
   subroutine force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr,dlspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use descriptor,only: gsf,dgsf,igsf,nsf,nal,calc_desc,make_gsf_arrays
     use util,only: itotOf
@@ -69,7 +69,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax) &
-         ,h(3,3),hi(3,3),sv(3,6),dlspr(0:3,nnmax,namax)
+         ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: tcom,rcin
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -123,7 +123,7 @@ contains
     epit(:) = 0d0
 
     call calc_desc(namax,natm,nb,nnmax,h &
-         ,tag,ra,lspr,dlspr,rcin,myid,mpi_world,l1st,iprint)
+         ,tag,ra,lspr,rcin,myid,mpi_world,l1st,iprint)
 
     if( lbias ) then
 !.....set bias node to 1
@@ -270,7 +270,7 @@ contains
 
     if( lstrs ) then
       call compute_stress(namax,natm,tag,ra,nnmax,strsl,h &
-           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rcin,lspr,dlspr &
+           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rcin,lspr &
            ,mpi_world,myid)
       strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
@@ -708,21 +708,28 @@ contains
   end subroutine parse_option
 !=======================================================================
   subroutine compute_stress(namax,natm,tag,ra,nnmax,strs,h &
-       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rc,lspr,dlspr &
+       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,rc,lspr &
        ,mpi_world,myid)
     use descriptor,only: igsf,dgsf
     implicit none
     integer,intent(in):: namax,natm,nnmax,nb,nbmax,lsb(0:nbmax,6)&
          ,lsrc(6),myparity(3),nn(6),mpi_world,myid,lspr(0:nnmax,namax)&
          ,nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3),rc &
-         ,dlspr(0:3,nnmax,namax)
+    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3),rc
     real(8),intent(inout):: tcom
     real(8),intent(out):: strs(3,3,namax)
 
     integer:: ia,ja,ixyz,jxyz,ihl0,ihl1,ihl2,jj,is,js
-    real(8):: xi(3),xj(3),xji(3),rij(3),rji(3),dji,sji,sii&
+    real(8):: xi(3),xj(3),xji(3),rij(3),rji(3),dji,dji2,sji,sii&
          ,hl2i,tmp2i,hl1i,tmp1i,stmp(3,3),zl1i,zl2i
+
+    real(8),save:: rcmax2
+    logical,save:: l1st = .true.
+
+    if( l1st ) then
+      rcmax2 = rc*rc
+      l1st = .false.
+    endif
 
     if( nl.eq.1 ) then
       do ia=1,natm
@@ -732,14 +739,12 @@ contains
         do jj=1,lspr(0,ia)
           ja= lspr(jj,ia)
           xj(1:3)= ra(1:3,ja)
-!!$          xji(1:3)= xj(1:3)-xi(1:3)
-!!$          rji(1:3)= h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
-!!$          rij(1:3)= -rji(1:3)
-!!$          dji= sqrt(rji(1)**2 +rji(2)**2 +rji(3)**2)
-          dji = dlspr(0,jj,ia)
-          if( dji.ge.rc ) exit
-          rji(1:3) = dlspr(1:3,jj,ia)
-!!$          rij(1:3) = -rji(1:3)
+          xji(1:3)= xj(1:3)-xi(1:3)
+          rji(1:3)= h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
+          rij(1:3)= -rji(1:3)
+          dji2= rji(1)**2 +rji(2)**2 +rji(3)**2
+          if( dji2.ge.rcmax2 ) cycle
+          dji = dsqrt(dji2)
           js = int(tag(ja))
           do ihl1=1,mhl(1)
             hl1i= hl1(ihl1,ia)
@@ -775,13 +780,12 @@ contains
         do jj=1,lspr(0,ia)
           ja= lspr(jj,ia)
           xj(1:3)= ra(1:3,ja)
-!!$          xji(1:3)= xj(1:3)-xi(1:3)
-!!$          rji(1:3)= h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
-!!$          rij(1:3)= -rji(1:3)
-!!$          dji= sqrt(rji(1)**2 +rji(2)**2 +rji(3)**2)
-          dji = dlspr(0,jj,ia)
-          if( dji.ge.rc ) exit
-          rji(1:3) = dlspr(1:3,jj,ia)
+          xji(1:3)= xj(1:3)-xi(1:3)
+          rji(1:3)= h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
+          rij(1:3)= -rji(1:3)
+          dji2= rji(1)**2 +rji(2)**2 +rji(3)**2
+          if( dji2.ge.rcmax2 ) cycle
+          dji= dsqrt(dji2)
           js = int(tag(ja))
           do ihl2=1,mhl(2)
             hl2i= hl2(ihl2,ia)

@@ -10,7 +10,7 @@ module Mishin
   implicit none
   save
 
-  real(8):: rc_eam
+  real(8):: rc_eam,rcmax2
   integer,parameter:: neamd = 25
 
   real(8):: rtbl(neamd)
@@ -21,7 +21,7 @@ module Mishin
   
 contains
   subroutine force_Mishin_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
@@ -32,7 +32,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax),dlspr(0:3,nnmax,namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
@@ -44,8 +44,10 @@ contains
       vprm(1:4,1:neamd-1) = vprm_Al(1:4,1:neamd-1)
       fprm(1:4,1:neamd-1) = fprm_Al(1:4,1:neamd-1)
       rc_eam = rc_eam_Al
+      rcmax2 = rc_eam*rc_eam
       if( myid_md.eq.0 ) then
-        write(6,'(a)') ' use force_Mishin_Al'
+        print *,''
+        write(6,'(a)') ' force_Mishin_Al:'
         write(6,'(a,es12.4)') '   rc of input    =',rc
         write(6,'(a,es12.4)') '   rc of this pot =',rc_eam
       endif
@@ -56,13 +58,13 @@ contains
     endif
 
     call force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     return
   end subroutine force_Mishin_Al
 !=======================================================================
   subroutine force_Mishin_Ni(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
@@ -73,7 +75,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax),dlspr(0:3,nnmax,namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
@@ -85,6 +87,7 @@ contains
       vprm(1:4,1:neamd-1) = vprm_Ni(1:4,1:neamd-1)
       fprm(1:4,1:neamd-1) = fprm_Ni(1:4,1:neamd-1)
       rc_eam = rc_eam_Ni
+      rcmax2 = rc_eam*rc_eam
       if( myid_md.eq.0 ) then
         print *,''
         write(6,'(a)') ' force_Mishin_Ni:'
@@ -98,13 +101,13 @@ contains
     endif
 
     call force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     return
   end subroutine force_Mishin_Ni
 !=======================================================================
   subroutine force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
@@ -115,14 +118,14 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax),dlspr(0:3,nnmax,namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
     integer:: i,j,k,l,m,n,ierr,is,ixyz,jxyz
-    real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,dphi,at(3)
-    real(8):: x,y,z,xi(3),epotl,epott,tmp
+    real(8):: xij(3),rij(3),dij,dij2,dfi,dfj,drhoij,drdxi(3),drdxj(3) &
+         ,r,dphi,at(3),xi(3),xj(3),epotl,epott,tmp
 !.....Saved variables
     real(8),allocatable,save:: rho(:)
     real(8),allocatable,save:: strsl(:,:,:)
@@ -153,9 +156,13 @@ contains
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
-        rij = dlspr(0,k,i)
-        if( rij.gt.rc_eam ) cycle
-        rho(i)= rho(i) +calc_rho(rij)
+        xj(1:3)= ra(1:3,j)
+        xij(1:3)= xj(1:3) -xi(1:3)
+        rij(1:3)= h(1:3,1,0)*xij(1) +h(1:3,2,0)*xij(2) +h(1:3,3,0)*xij(3)
+        dij2= rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2.gt.rcmax2 ) cycle
+        dij= dsqrt(dij2)
+        rho(i)= rho(i) +calc_rho(dij)
       enddo
     enddo
 
@@ -170,12 +177,15 @@ contains
         j=lspr(k,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
-        rij = dlspr(0,k,i)
-        if( rij.gt.rc_eam ) exit
-        xij(1:3) = dlspr(1:3,k,i)
-        drdxi(1:3)= -xij(1:3)/rij
+        xj(1:3)= ra(1:3,j)
+        xij(1:3)= xj(1:3) -xi(1:3)
+        rij(1:3)= h(1:3,1,0)*xij(1) +h(1:3,2,0)*xij(2) +h(1:3,3,0)*xij(3)
+        dij2= rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2.gt.rcmax2 ) cycle
+        dij= dsqrt(dij2)
+        drdxi(1:3)= -rij(1:3)/dij
 !.....2-body term
-        tmp= 0.5d0 *calc_v(rij)
+        tmp= 0.5d0 *calc_v(dij)
         epi(i)= epi(i) +tmp
         epi(j)= epi(j) +tmp
         if(j.le.natm) then
@@ -183,20 +193,20 @@ contains
         else
           epotl=epotl +tmp
         endif
-        dphi= calc_dv(rij)
+        dphi= calc_dv(dij)
         aa(1:3,i)=aa(1:3,i) -dphi*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dphi*drdxi(1:3)
 !.....Atomic stress of 2-body terms
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                 -0.5d0*dphi*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5d0*dphi*rij(ixyz)*(-drdxi(jxyz))
             strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                 -0.5d0*dphi*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5d0*dphi*rij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
 !.....Embeded term
-        drhoij= calc_drho(rij)
+        drhoij= calc_drho(dij)
         dfj= calc_df(rho(j))
         tmp = (dfi+dfj)*drhoij
         aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
@@ -205,9 +215,9 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                 -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5d0*tmp*rij(ixyz)*(-drdxi(jxyz))
             strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                 -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5d0*tmp*rij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
       enddo

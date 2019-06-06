@@ -2,18 +2,17 @@
 ! Routines for making pair-list.
 !-----------------------------------------------------------------------
 subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc,rc1nn &
-     ,h,hi,anxi,anyi,anzi,lspr,dlspr,ls1nn,iprint,l1st)
+     ,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
   implicit none
   integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
   integer,intent(out):: lspr(0:nnmax,namax),ls1nn(0:nnmax,namax)
   real(8),intent(in):: ra(3,namax),rc,rc1nn,anxi,anyi,anzi &
        ,hi(3,3),h(3,3),tag(namax)
-  real(8),intent(out):: dlspr(0:3,nnmax,namax)
   logical,intent(in):: l1st
 
   integer:: i,j,k,l,m,n
   integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr
-  real(8):: xi(3),xij(3),rij(3),rij2,dij
+  real(8):: xi(3),xij(3),rij(3),rij2
 
   integer,allocatable,save:: lscl(:),lshd(:)
   real(8),save:: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi,rc1nn2
@@ -52,7 +51,6 @@ subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc,rc1nn &
   endif
 
 !-----reset pair list, LSPR
-  dlspr(:,:,:) = 0d0
   lspr(0,:)= 0
   ls1nn(0,:)= 0
 
@@ -139,9 +137,6 @@ subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc,rc1nn &
                   stop
                 endif
                 lspr(lspr(0,i),i)=j
-                dij = dsqrt(rij2)
-                dlspr(0,lspr(0,i),i)= dij
-                dlspr(1:3,lspr(0,i),i)= rij(1:3)  ! vector i ==> j
 !!$!.....Store i in j's neighbor list
 !!$                if( j.le.natm ) then
 !!$                  lspr(0,j)= lspr(0,j)+1
@@ -166,8 +161,6 @@ subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc,rc1nn &
                   stop
                 endif
                 lspr(lspr(0,j),j)=i
-                dlspr(0,lspr(0,j),j)= dij
-                dlspr(1:3,lspr(0,j),j)= -rij(1:3)   ! vector j ==> i
                 if( rij2.lt.rc1nn2 ) then
                   ls1nn(0,i)= ls1nn(0,i) +1
                   ls1nn(ls1nn(0,i),i)= j
@@ -197,7 +190,7 @@ subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc,rc1nn &
 end subroutine mk_lspr_para
 !=======================================================================
 subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,rc1nn,h,hi &
-     ,lspr,dlspr,ls1nn,iprint,l1st)
+     ,lspr,ls1nn,iprint,l1st)
 !
 ! Make lspr in serial implimentation taking the periodic boundary
 ! condition into account.
@@ -207,12 +200,11 @@ subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,rc1nn,h,hi &
   integer,intent(out):: lspr(0:nnmax,namax),ls1nn(0:nnmax,namax)
   real(8),intent(in):: ra(3,namax),rc,rc1nn &
        ,hi(3,3),h(3,3),tag(namax)
-  real(8),intent(out):: dlspr(0:3,nnmax,namax)
   logical,intent(in):: l1st
 
   integer:: i,j,k,l,m,n
   integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr
-  real(8):: xi(3),xij(3),rij(3),rij2,dij
+  real(8):: xi(3),xij(3),rij(3),rij2
 
   integer,allocatable,save:: lscl(:),lshd(:)
   real(8),save:: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi,rc1nn2
@@ -246,7 +238,6 @@ subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,rc1nn,h,hi &
 !-----reset pair list, LSPR
   lspr(0,1:natm)= 0
   ls1nn(0,1:natm)= 0
-  dlspr(:,:,:) = 0d0
 
 !-----reset headers
   lshd(1:lcxyz)= 0
@@ -323,9 +314,6 @@ subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,rc1nn,h,hi &
                   stop
                 endif
                 lspr(lspr(0,i),i)=j
-                dij = dsqrt(rij2)
-                dlspr(0,lspr(0,i),i)= dij
-                dlspr(1:3,lspr(0,i),i)= rij(1:3)
 !.....Store i in j's neighbor list
                 lspr(0,j)= lspr(0,j)+1
                 if( lspr(0,j).gt.nnmax ) then
@@ -336,8 +324,6 @@ subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,rc1nn,h,hi &
                   stop
                 endif
                 lspr(lspr(0,j),j)=i
-                dlspr(0,lspr(0,j),j)= dij
-                dlspr(1:3,lspr(0,j),j)= -rij(1:3)
 !.....1st NN neighbors
                 if( rij2.lt.rc1nn2 ) then
                   ls1nn(0,i)= ls1nn(0,i) +1
@@ -367,7 +353,7 @@ subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,rc1nn,h,hi &
 end subroutine mk_lspr_sngl
 !=======================================================================
 subroutine mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc &
-     ,rc1nn,h,hi,sgm,lspr,dlspr,ls1nn,iprint,l1st)
+     ,rc1nn,h,hi,sgm,lspr,ls1nn,iprint,l1st)
 !
 !  Make pair list, lspr, by brute force approach, because the system
 !  is supposed to be small. Expand the system to take all the atoms 
@@ -377,7 +363,7 @@ subroutine mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc &
   integer,intent(in):: namax,natm,nnmax,nbmax,iprint
   integer,intent(out):: lspr(0:nnmax,natm),nb,ls1nn(0:nnmax,natm)
   real(8),intent(in):: rc,rc1nn,hi(3,3),h(3,3),sgm(3,3)
-  real(8),intent(out):: ra(3,namax),tag(namax),dlspr(0:3,nnmax,namax)
+  real(8),intent(out):: ra(3,namax),tag(namax)
   logical,intent(in):: l1st
 
   integer:: i,j,k,l,m,n,ia,ja,inc,ix,iy,iz
@@ -446,7 +432,6 @@ subroutine mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc &
 !.....Search neighbor atoms and make the list
   lspr(0:nnmax,1:natm)= 0
   ls1nn(0:nnmax,1:natm)= 0
-  dlspr(:,:,:) = 0d0
   do ia=1,natm
     xi(1:3)= ra(1:3,ia)
     do ja=1,naex
@@ -465,8 +450,6 @@ subroutine mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc &
         endif
         lspr(lspr(0,ia),ia)= ja
         rij = dsqrt(rij)
-        dlspr(0,lspr(0,ia),ia)= rij
-        dlspr(1:3,lspr(0,ia),ia)= xij(1:3)
 !.....Store i in j's neighbor list
         lspr(0,ja)= lspr(0,ja)+1
         if( lspr(0,ja).gt.nnmax ) then
@@ -476,8 +459,6 @@ subroutine mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc &
           stop
         endif
         lspr(lspr(0,ja),ja)=ia
-        dlspr(0,lspr(0,ja),ja)= rij
-        dlspr(1:3,lspr(0,ja),ja)= -xij(1:3)
         if( rij.lt.rc1nn ) then
           ls1nn(0,ia)= ls1nn(0,ia) +1
           ls1nn(ls1nn(0,ia),ia)= ja
@@ -497,76 +478,3 @@ end subroutine mk_lspr_brute
 !     Local Variables:
 !     compile-command: "make pmd"
 !     End:
-subroutine sort_lspr(namax,natm,nb,nnmax,lspr,dlspr)
-  integer,intent(in):: namax,nnmax,natm,nb
-  integer,intent(inout):: lspr(0:nnmax,namax)
-  real(8),intent(inout):: dlspr(0:3,nnmax,namax)
-
-  integer:: ia,i,j,l,ir,itmp
-  real(8):: rtmp(0:3)
-
-  do ia=1,natm+nb   ! for all center atom-i
-
-!.....Sort neighbors in ascending order of distance
-    n = lspr(0,ia)
-    l = n/2 +1
-    ir = n
-10  continue
-    if( l.gt.1 ) then  ! still in hiring phase
-      l = l -1
-      rtmp(0:3) = dlspr(0:3,l,ia)
-      itmp = lspr(l,ia)
-    else  ! retirement and promotion phase
-      rtmp(0:3) = dlspr(0:3,ir,ia)
-      itmp = lspr(ir,ia)
-
-      dlspr(0:3,ir,ia) = dlspr(0:3,1,ia)
-      lspr(ir,ia) = lspr(1,ia)
-
-      ir = ir -1
-      if( ir.eq.1 ) then
-        dlspr(0:3,1,ia) = rtmp(0:3)
-        lspr(1,ia) = itmp
-        cycle
-      endif
-      
-    endif
-    i = l
-    j = l+l
-20  if( j.le.ir ) then
-      if( j.lt.ir ) then
-        if( dlspr(0,j,ia).lt.dlspr(0,j+1,ia) ) j=j+1
-      endif
-      if( rtmp(0).lt.dlspr(0,j,ia) ) then
-        dlspr(0:3,i,ia) = dlspr(0:3,j,ia)
-        lspr(i,ia) = lspr(j,ia)
-        i = j
-        j = j+j
-      else
-        j = ir +1
-      endif
-      goto 20
-    endif
-    dlspr(0:3,i,ia) = rtmp(0:3)
-    lspr(i,ia) = itmp
-    goto 10
-    
-  enddo  ! ia=...
-end subroutine sort_lspr
-!=======================================================================
-subroutine check_lspr(namax,natm,nb,nnmax,lspr,dlspr)
-  integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
-  real(8),intent(in):: dlspr(0:3,nnmax,namax)
-
-  integer:: i
-
-  do i=1,min(10,natm)
-    print *,'i=',i
-    do jj=1,lspr(0,i)
-      j = lspr(jj,i)
-      print *,'   jj,j,dlspr=',jj,j,dlspr(0:3,jj,i)
-    enddo
-  enddo
-  
-end subroutine check_lspr
-!=======================================================================

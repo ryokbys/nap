@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2019-05-31 13:43:10 Ryo KOBAYASHI>
+!                    Last modified: <2019-06-06 11:19:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -19,7 +19,7 @@ module pmdvars
   integer:: nouterg,noutpmd,istp &
        ,iocntpmd,iocnterg
   integer:: natm,nb,nsp,nalmax
-  real(8):: tcpu,tcpu1,tcpu2,tcom,tspdcmp
+  real(8):: tcpu,tcpu0,tcpu1,tcpu2,tcom,tspdcmp,tlspr,tdump
   real(8):: epot0,vmaxold,vmax,simtime
   real(8):: tgmm
 !!$  real(8):: tgmm,tfac(9),ediff(9),ediff0(9),temp(9),ekl(9)
@@ -42,7 +42,7 @@ module pmdvars
   real(8),allocatable:: tag(:)
 !!$    real(8):: tag(namax)
   integer,allocatable:: lspr(:,:),ls1nn(:,:)
-  real(8),allocatable:: dlspr(:,:,:)
+!!$  real(8),allocatable:: dlspr(:,:,:)
 !!$    integer:: lspr(0:nnmax,namax)
 !.....potential and kinetic energy per atoms
   real(8),allocatable:: epi(:),eki(:,:,:),stp(:,:,:)

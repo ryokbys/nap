@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-05-17 13:31:40 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-05 12:46:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -24,7 +24,7 @@ module ttm
   integer,parameter:: ioTeout = 32
   integer,parameter:: ioergio = 33
 
-  real(8),parameter:: pi = 3.14159265358979d0
+!!$  real(8),parameter:: pi = 3.14159265358979d0
 
   real(8):: t_ttm
 !.....TTM mesh divisions

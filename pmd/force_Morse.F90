@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-31 22:29:58 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-06 11:14:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -84,7 +84,7 @@ module Morse
 
 contains
   subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
     implicit none
@@ -96,7 +96,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),dlspr(0:3,nnmax,namax)
+         ,tag(namax),sv(3,6)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -155,16 +155,12 @@ contains
 !.....Check if these two species interact
         if( .not. interact(is,js) ) cycle
         xj(1:3)= ra(1:3,j)
-!!$        xij(1:3)= xj(1:3)-xi(1:3)
-!!$        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-!!$        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
-!!$        if( i.eq.1 ) print *,'  j,js,xj,rij,dij=',j,js,xj(1:3),rij(1:3),sqrt(dij2)
-!!$        if( dij2.gt.rc2 ) cycle
-!!$        dij= sqrt(dij2)
-        dij = dlspr(0,k,i)
-        if( dij.gt.rc ) exit
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2.gt.rc2 ) cycle
+        dij= sqrt(dij2)
         diji= 1d0/dij
-        rij(1:3) = dlspr(1:3,k,i)
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
         d0ij = d0(is,js)

@@ -1,5 +1,5 @@
 subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
-     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
+     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr &
      ,sorg,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs &
      ,ifcoulomb,iprint,l1st &
      ,lvc,lcell_updated,boundary)
@@ -41,7 +41,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   integer,intent(in):: lspr(0:nnmax,namax) !,numff
   integer,intent(inout):: ifcoulomb
   real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-       ,tag(namax),sorg(3),dlspr(0:3,nnmax,namax)
+       ,tag(namax),sorg(3)
   real(8),intent(inout):: tcom,rc
   real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
        ,chg(namax),chi(namax),stnsr(3,3)
@@ -61,7 +61,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
 
 !.....Compute overlay coefficient first
   if( loverlay ) then
-    call calc_overlay(namax,natm,nb,nnmax,h,tag,ra,lspr,dlspr,l1st,iprint)
+    call calc_overlay(namax,natm,nb,nnmax,h,tag,ra,lspr,l1st,iprint)
   endif
 
 !.....If varaible charge, optimize charges before any charge-dependent potential
@@ -86,13 +86,13 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
 
 !.....Non-exclusive (additive) choice of force-fields
   if( use_force('LJ') ) call force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h &
-       ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
+       ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('LJ_repul') ) call force_LJ_repul(namax,natm,tag,ra,nnmax &
-       ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
+       ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Ito3_WHe') ) call force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa &
-       ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
+       ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('RK_WHe') ) call force_RK_WHe(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
@@ -108,7 +108,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
        ,iprint)
   if( use_force('SW') ) call force_SW(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('EDIP_Si') ) call force_EDIP_Si(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
@@ -129,10 +129,10 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,iprint)
   if( use_force('Mishin_Al') ) call force_Mishin_Al(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc &
-       ,lspr,dlspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+       ,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Mishin_Ni') ) call force_Mishin_Ni(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc &
-       ,lspr,dlspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+       ,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('AFS_W') ) call force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
@@ -146,16 +146,16 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('linreg') ) call force_linreg(namax,natm,tag,ra,nnmax,aa &
-       ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
+       ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
 !!$  if( use_force('NN') ) call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
 !!$       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
 !!$       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('NN2') ) call force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
+       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Morse') ) call force_Morse(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Morse_repul') ) call force_Morse_repul(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
@@ -164,19 +164,19 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Buckingham') ) call force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Bonny_WRe') ) call force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('ZBL') ) then
     if( loverlay ) then
       call force_ZBL_overlay(namax,natm,tag,ra,nnmax,aa,strs &
-           ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
+           ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
            ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     else
       call force_ZBL(namax,natm,tag,ra,nnmax,aa,strs &
-           ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,dlspr &
+           ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
            ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     endif
   endif
@@ -189,25 +189,25 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   if( use_force('screened_Coulomb') ) then ! screened Coulomb
     call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
-         ,myparity,nnn,sv,rc,lspr,dlspr &
+         ,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st)
   else if( use_force('Ewald') ) then  ! Ewald Coulomb
     call force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
-         ,myparity,nnn,sv,rc,lspr,dlspr,sorg &
+         ,myparity,nnn,sv,rc,lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   else if( use_force('Ewald_long') ) then ! long-range Coulomb
     call force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
-         ,myparity,nnn,sv,rc,lspr,dlspr,sorg &
+         ,myparity,nnn,sv,rc,lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   else if( use_force('Coulomb') ) then  ! Coulomb
     call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
-         ,myparity,nnn,sv,rc,lspr,dlspr,sorg &
+         ,myparity,nnn,sv,rc,lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   endif

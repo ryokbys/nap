@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-02 05:10:48 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-06 11:24:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -23,7 +23,7 @@ module pmdio
   integer:: nstp = 0
   integer:: minstp = 0
   integer:: nerg = 1000
-  integer:: ifpmd= 1
+  integer:: ifpmd= 2    ! 0:none, 1:pmd, 2:dump (default)
   integer:: npmd = 10
   integer:: ifsort= 1
   real(8):: dt = 1d0

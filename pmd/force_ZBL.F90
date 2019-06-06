@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-01 22:27:03 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-06 11:31:53 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -160,7 +160,7 @@ contains
   end subroutine read_params_ZBL
 !=======================================================================
   subroutine force_ZBL(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
@@ -170,7 +170,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax),dlspr(0:3,nnmax,namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -217,16 +217,13 @@ contains
         if(j.le.i) cycle
         js = int(tag(j))
         if( .not. interact(is,js) ) cycle
-!!$        x= ra(1,j) -xi(1)
-!!$        y= ra(2,j) -xi(2)
-!!$        z= ra(3,j) -xi(3)
-!!$        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-!!$        rij2= xij(1)**2+ xij(2)**2 +xij(3)**2
-!!$        if( rij2.gt.zbl_rc2 ) cycle
-!!$        rij = sqrt(rij2)
-        rij = dlspr(0,k,i)
-        if( rij.ge.zbl_rc ) exit
-        xij(1:3) = dlspr(1:3,k,i)
+        x= ra(1,j) -xi(1)
+        y= ra(2,j) -xi(2)
+        z= ra(3,j) -xi(3)
+        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
+        rij2= xij(1)**2+ xij(2)**2 +xij(3)**2
+        if( rij2.gt.zbl_rc2 ) cycle
+        rij = sqrt(rij2)
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
         tmp = vij(is,js,rij)
@@ -265,7 +262,7 @@ contains
   end subroutine force_ZBL
 !=======================================================================
   subroutine force_ZBL_overlay(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
 !
 !  ZBL potential used as overlaying potential for close ion-ion distance.
@@ -283,7 +280,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax),dlspr(0:3,nnmax,namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -292,13 +289,15 @@ contains
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: xij(3),rij,rij2,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
     real(8):: x,y,z,xi(3),epotl,epott,tmp,tmp2,dtmp,tmp2i,tmp2j &
-         ,dtmpi,dtmpj,alpi,ri,ro,dij
+         ,dtmpi,dtmpj,alpi,ri,ro,dij,dij2
     real(8),allocatable,save:: strsl(:,:,:),epit(:)
     real(8),external:: fcut1,dfcut1
+    real(8),save:: zbl_rc2
 
     if( l1st ) then
       if( allocated(strsl) ) deallocate(strsl,epit)
       allocate(strsl(3,3,namax),epit(namax))
+      zbl_rc2 = zbl_rc*zbl_rc
     endif
 
     if( size(strsl).lt.3*3*namax ) then
@@ -319,10 +318,13 @@ contains
         if(j.eq.0) exit
         js = int(tag(j))
         if( .not. interact(is,js) ) cycle
-        dij = dlspr(0,k,i)
-        if( dij.gt.ro ) cycle
-        xij(1:3) = dlspr(1:3,k,i)
-!!$        rij = sqrt(rij2)
+        x= ra(1,j) -xi(1)
+        y= ra(2,j) -xi(2)
+        z= ra(3,j) -xi(3)
+        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
+        dij2= xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3)
+        if( dij2.gt.zbl_rc2 ) cycle
+        dij = sqrt(dij2)
         drdxi(1:3)= -xij(1:3)/dij
 !.....2-body term, taking overlay into account
         tmp = vij(is,js,dij) 
@@ -350,15 +352,13 @@ contains
         if( .not. interact(is,js) ) cycle
         ri = ol_pair(1,is,js)
         ro = ol_pair(2,is,js)
-!!$        x= ra(1,j) -xi(1)
-!!$        y= ra(2,j) -xi(2)
-!!$        z= ra(3,j) -xi(3)
-!!$        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-!!$        rij2= xij(1)**2+ xij(2)**2 +xij(3)**2
-!!$        if( rij2.gt.ro*ro ) cycle
-!!$        rij = sqrt(rij2)
-        dij = dlspr(0,k,i)
-        xij(1:3) = dlspr(1:3,k,i)
+        x= ra(1,j) -xi(1)
+        y= ra(2,j) -xi(2)
+        z= ra(3,j) -xi(3)
+        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
+        dij2= xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3)
+        if( dij2.gt.ro*ro ) cycle
+        dij = sqrt(dij2)
         drdxi(1:3)= -xij(1:3)/dij
 !.....Force
         if( dij.le.ri ) cycle

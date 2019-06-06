@@ -4,6 +4,7 @@ module descriptor
 !=======================================================================
   use pmdio, only: csp2isp, nspmax
   implicit none
+  include 'params_unit.h'
   save
 !!$ putting mpif.h inclusion here could cause some conflicts
 !!$  include "mpif.h"
@@ -12,7 +13,7 @@ module descriptor
   character(128),parameter:: cpfname = 'in.params.desc'
   integer,parameter:: ionum = 51
 
-  real(8),parameter:: pi = 3.14159265358979d0
+!!$  real(8),parameter:: pi = 3.14159265358979d0
 !!$  integer,parameter:: msp = 9  ! hard-coded max-num of species
 
   type desc
@@ -192,12 +193,12 @@ contains
     return
   end subroutine make_gsf_arrays
 !=======================================================================
-  subroutine calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr,dlspr,rc &
+  subroutine calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
        ,myid,mpi_world,l1st,iprint)
 
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,dlspr(0:3,nnmax,namax)
+    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
     logical,intent(in):: l1st 
 
     if( .not.lupdate_gsf ) return
@@ -206,13 +207,13 @@ contains
       call calc_desc_cheby(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
            ,myid,mpi_world,l1st,iprint)
     else ! default
-      call calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,dlspr,rc &
+      call calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
            ,myid,mpi_world,l1st,iprint)
     endif
     return
   end subroutine calc_desc
 !=======================================================================
-  subroutine calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,dlspr,rc &
+  subroutine calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
        ,myid,mpi_world,l1st,iprint)
 !
 !  Evaluate descriptors (symmetry functions)
@@ -226,7 +227,7 @@ contains
     include "mpif.h"
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,dlspr(0:3,nnmax,namax)
+    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
     logical,intent(in):: l1st 
 
     integer:: isf,ia,jj,ja,kk,ka,is,js,ks,ierr,i,isp,jsp,ksp,ityp,is1,is2,ksf
@@ -250,6 +251,7 @@ contains
         call mpi_finalize(ierr)
         stop
       endif
+      rcmax2 = rcmax*rcmax
     endif
 
     gsf(1:nsf,1:nal)= 0d0
@@ -262,10 +264,15 @@ contains
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
         xj(1:3)= ra(1:3,ja)
-        dij = dlspr(0,jj,ia)
-        if( dij.ge.rcmax ) exit
-        rij(1:3) = dlspr(1:3,jj,ia)
-        dij2 = dij*dij
+        xij(1:3)= xj(1:3) -xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij2.ge.rcmax2 ) cycle
+        dij = dsqrt(dij2)
+!!$        dij = dlspr(0,jj,ia)
+!!$        if( dij.ge.rcmax ) exit
+!!$        rij(1:3) = dlspr(1:3,jj,ia)
+!!$        dij2 = dij*dij
         js= int(tag(ja))
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
@@ -343,9 +350,13 @@ contains
           ks= int(tag(ka))
           if( ka.eq.ia .or. ka.le.ja ) cycle
           xk(1:3)= ra(1:3,ka)
-          dik = dlspr(0,kk,ia)
-          dik2 = dik*dik
-          rik(1:3) = dlspr(1:3,kk,ia)
+!!$          dik = dlspr(0,kk,ia)
+!!$          dik2 = dik*dik
+!!$          rik(1:3) = dlspr(1:3,kk,ia)
+          xik(1:3)= xk(1:3) -xi(1:3)
+          rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
+          dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
+          dik= dsqrt(dik2)
 !.....Cosine is common for all the angular SFs
           spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
           cs= spijk/dij/dik

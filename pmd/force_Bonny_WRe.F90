@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-01 22:25:47 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-06 00:30:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -145,7 +145,7 @@ module Bonny_WRe
   
 contains
   subroutine force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,dlspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
@@ -155,19 +155,19 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax),dlspr(0:3,nnmax,namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xij(3),rij,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
-    real(8):: x,y,z,xi(3),epotl,epott,tmp,dtmp,drhoi,drhoj,d
+    real(8):: xij(3),rij(3),dij,dij2,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3) &
+         ,xi(3),xj(3),epotl,epott,tmp,dtmp,drhoi,drhoj,d
     real(8),allocatable,save:: rho(:)
     real(8),allocatable,save:: strsl(:,:,:)
 
-    real(8),save:: rcmax
+    real(8),save:: rcmax,rcmax2
 
     if( l1st ) then
       if( rc.lt.bonny_rc(1,1) ) then
@@ -187,6 +187,7 @@ contains
           rcmax = max(rcmax, bonny_rc(is,js))
         enddo
       enddo
+      rcmax2 = rcmax*rcmax
       if( myid_md.eq.0 .and. iprint.gt.0 )  then
         print '(/,a,f0.3)', ' Max cutoff in Bonny potential = ',rcmax
       endif
@@ -220,14 +221,14 @@ contains
         if(j.eq.0) exit
         js = int(tag(j))
         if( .not. interact(is,js) ) cycle
-!!$        x= ra(1,j) -xi(1)
-!!$        y= ra(2,j) -xi(2)
-!!$        z= ra(3,j) -xi(3)
-!!$        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-!!$        rij=dsqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
-        rij = dlspr(0,k,i)
-        if( rij.gt.rcmax ) cycle
-        rho(i) = rho(i) +rhoij(js,rij)
+        xj(1:3) = ra(1:3,j)
+        xij(1:3)= xj(1:3) -xi(1:3)
+        rij(1:3)= h(1:3,1,0)*xij(1) +h(1:3,2,0)*xij(2) +h(1:3,3,0)*xij(3)
+        dij2=rij(1)*rij(1)+ rij(2)*rij(2) +rij(3)*rij(3)
+!!$        rij = dlspr(0,k,i)
+        if( dij2.gt.rcmax2 ) cycle
+        dij= dsqrt(dij2)
+        rho(i) = rho(i) +rhoij(js,dij)
       enddo
     enddo
 
@@ -247,17 +248,19 @@ contains
         if(j.le.i) cycle
         js = int(tag(j))
         if( .not. interact(is,js) ) cycle
-!!$        x= ra(1,j) -xi(1)
-!!$        y= ra(2,j) -xi(2)
-!!$        z= ra(3,j) -xi(3)
-!!$        xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
+        xj(1:3)= ra(1:3,j)
+        xij(1:3)= xj(1:3) -xi(1:3)
+        rij(1:3)= h(1:3,1,0)*xij(1) +h(1:3,2,0)*xij(2) +h(1:3,3,0)*xij(3)
+        dij2=rij(1)*rij(1)+ rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2.gt.rcmax2 ) cycle
+        dij= dsqrt(dij2)
 !!$        rij=dsqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
-        rij = dlspr(0,k,i)
-        if( rij.gt.rcmax ) cycle
-        xij(1:3) = dlspr(1:3,k,i)
-        drdxi(1:3)= -xij(1:3)/rij
+!!$        rij = dlspr(0,k,i)
+!!$        if( rij.gt.rcmax ) cycle
+!!$        xij(1:3) = dlspr(1:3,k,i)
+        drdxi(1:3)= -rij(1:3)/dij
 !.....2-body term
-        tmp = 0.5d0 *vij(is,js,rij)
+        tmp = 0.5d0 *vij(is,js,dij)
         epi(i)= epi(i) +tmp
         epi(j)= epi(j) +tmp
         if(j.le.natm) then
@@ -265,7 +268,7 @@ contains
         else
           epotl=epotl +tmp
         endif
-        dtmp = dvij(is,js,rij)
+        dtmp = dvij(is,js,dij)
         aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
 !.....Atomic stress for 2-body terms
@@ -273,16 +276,16 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+                   -0.5d0*dtmp*rij(ixyz)*(-drdxi(jxyz))
               strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+                   -0.5d0*dtmp*rij(ixyz)*(-drdxi(jxyz))
             enddo
           enddo
         endif
 !.....Embedded term
         if( rho(i).lt.1d-10 .or. rho(j).lt.1d-10 ) cycle
-        drhoi = drhoij(is,rij)
-        drhoj = drhoij(js,rij)
+        drhoi = drhoij(is,dij)
+        drhoj = drhoij(js,dij)
         dfj = dfrho(js,rho(j))
         tmp = dfi*drhoj + dfj*drhoi
         aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
@@ -292,9 +295,9 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                   -0.5d0*tmp*rij(ixyz)*(-drdxi(jxyz))
               strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                   -0.5d0*tmp*rij(ixyz)*(-drdxi(jxyz))
             enddo
           enddo
         endif

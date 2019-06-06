@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-03 12:36:18 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-06 11:30:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -74,15 +74,10 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Formats for output
   character(len=20):: cfistp  = 'i10' !or larger
   character(len=20):: cfstime = 'es18.10'
+  character(len=20):: cfetime = 'f12.2' ! for elapsed time
   character(len=20):: cftave  = 'f12.2' ! or 'es12.4' for high-T
 
-!      logical:: luse_LJ,luse_Ito3_WHe,luse_RK_WHe,luse_RK_FeH, 
-!     &     luse_Ramas_FeH,luse_Ackland_Fe,luse_SW_Si,luse_EDIP_Si,
-!     &     luse_Brenner,luse_Brenner_vdW,luse_Lu_WHe,luse_Branicio_AlN,
-!     &     luse_Mishin_Al,luse_AFS_W,luse_SC_Fe,luse_SM_Al,luse_EAM,
-!     &     luse_linreg,luse_NN,luse_Morse,luse_Morse_repul,luse_vcMorse,
-!     &     luse_Buckingham,luse_Bonny_WRe,luse_SRIM
-
+  tcpu0= mpi_wtime()
   call initialize_pmdvars(nspmax)
   call calc_nfmv(ntot0,tagtot,myid_md,mpi_md_world)
   call set_use_charge()
@@ -144,9 +139,6 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     stop
   endif
 !-----vector node indices: range [0:nx-1]
-!      myx=myid_md/(ny*nz)
-!      myy=mod(myid_md/nz,ny)
-!      myz=mod(myid_md,nz)
   call nid2xyz(myid_md,myx,myy,myz)
 !-----reduced node origin
   sorg(1)= anxi*myx
@@ -172,9 +164,6 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   else
     noutpmd = maxstp +1
   endif
-!      do i=1,ntot0
-!        rtot(1:3,i) = rtot(1:3,i) +0.1d0
-!      enddo
 !.....perform space decomposition after reading atomic configuration
   call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,chgtot,chitot &
        ,myid_md,mpi_md_world,nx,ny,nz,nxyz,rc,rbuf,iprint)
@@ -322,6 +311,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 
   tcpu1= mpi_wtime()
   tcom = 0d0
+  tlspr = 0d0
+  tdump = 0d0
 
   call init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
        iprint,h,rc,lvc,ifcoulomb,specorder)
@@ -331,12 +322,10 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
        ,.true.,boundary)
 !-----Make pair list
+  tmp = mpi_wtime()
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,rc1nn &
-       ,h,hi,anxi,anyi,anzi,lspr,dlspr,ls1nn,iprint,.true.)
-
-!!$  call check_lspr(namax,natm,nb,nnmax,lspr,dlspr)
-  call sort_lspr(namax,natm,nb,nnmax,lspr,dlspr)
-!!$  call check_lspr(namax,natm,nb,nnmax,lspr,dlspr)
+       ,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.true.)
+  tlspr = tlspr +(mpi_wtime() -tmp)
 
 !.....Calc forces
   lstrs = lstrs0 .or. &
@@ -347,7 +336,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   lcell_updated = .true.
   call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-       ,lspr,dlspr,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
+       ,lspr,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
        ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
   lcell_updated = .false.
   lstrs = .false.
@@ -458,15 +447,17 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     write(6,*) ''
 
     if( tave.gt.10000d0 ) cftave = 'es12.4'
-    write(6,'(a,'//cfistp//','//cfstime//','//cftave &
+    tcpu = mpi_wtime() -tcpu0
+    write(6,'(a,'//cfistp//','//cfetime//','//cftave &
          //',es13.4,2es11.3)') &
-         " istp,time,temp,epot,vol,prss=" &
-         ,istp,simtime,tave,epot,vol,prss
+         " istp,etime,temp,epot,vol,prss=" &
+         ,istp,tcpu,tave,epot,vol,prss
   endif
 
 !.....output initial configuration including epi, eki, and strs
 !      write(cnum(1:4),'(i4.4)') 0
   write(cnum,'(i0)') 0
+  tmp = mpi_wtime()
   call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
        ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs &
        ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
@@ -484,6 +475,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       call write_dump(20,'dump_'//trim(cnum))
     endif
   endif
+  tdump = tdump +(mpi_wtime() -tmp)
 
   if( trim(ctctl).eq.'ttm' ) then
     call assign_atom2cell(namax,natm,ra,sorg,boundary)
@@ -686,19 +678,16 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
            ,.false.,boundary)
 !.....Make pair list
+      tmp = mpi_wtime()
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf &
-           ,rc1nn,h,hi,anxi,anyi,anzi,lspr,dlspr,ls1nn,iprint,.false.)
+           ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.false.)
+      tlspr = tlspr +(mpi_wtime() -tmp)
       rbufres = rbuf
-!.....Sort lspr and dlspr
-      call sort_lspr(namax,natm,nb,nnmax,lspr,dlspr)
     else
 !.....Copy RA of boundary atoms determined by 'bacopy'
       call bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax &
            ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc &
            ,sv,nex,mpi_md_world,ifcoulomb,chg,chi,boundary)
-!.....Update distances and sort lspr and dlspr
-      call calc_neigh_dist(namax,natm,nb,nnmax,h,ra,lspr,dlspr)
-      call sort_lspr(namax,natm,nb,nnmax,lspr,dlspr)
     endif
 
     if(ifpmd.gt.0.and. mod(istp,noutpmd).eq.0 )then
@@ -707,7 +696,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !-------Calc forces
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-         ,lspr,dlspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
+         ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
     lcell_updated = .false.
     lstrs = .false.
@@ -903,10 +892,11 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       tcpu= mpi_wtime() -tcpu1
       if( myid_md.eq.0 .and. iprint.gt.0 ) then
         if( tave.gt.10000d0 ) cftave = 'es12.4'
-        write(6,'(a,'//cfistp//','//cfstime//','//cftave &
+        tcpu = mpi_wtime() -tcpu0
+        write(6,'(a,'//cfistp//','//cfetime//','//cftave &
              //',es13.4,2es11.3)') &
-             " istp,time,temp,epot,vol,prss=" &
-             ,istp,simtime,tave,epot,vol,prss
+             " istp,etime,temp,epot,vol,prss=" &
+             ,istp,tcpu,tave,epot,vol,prss
         if( trim(cpctl).eq.'Berendsen' .or. &
              trim(cpctl).eq.'vc-Berendsen' .or. &
              trim(cpctl).eq.'vv-Berendsen' .and. &
@@ -968,6 +958,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !-------write the particle positions
     if(ifpmd.gt.0.and. &
          (mod(istp,noutpmd).eq.0.or.lconverged) )then
+      tmp = mpi_wtime()
 !---------decide pmd-file name
       iocntpmd=iocntpmd+1
 !          write(cnum(1:4),'(i4.4)') iocntpmd
@@ -991,6 +982,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
           call write_dump(20,'dump_'//trim(cnum))
         endif
       endif
+      tdump = tdump +(mpi_wtime() -tmp)
     endif
 
     if( lconverged ) exit
@@ -1050,6 +1042,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     write(6,*) ''
     write(6,'(1x,a,f10.2)') "Time for space decomp = ",tspdcmp
     write(6,'(1x,a,f10.2)') "Time for comm         = ",tcom
+    write(6,'(1x,a,f10.2)') "Time for neighbor     = ",tlspr
+    write(6,'(1x,a,f10.2)') "Time for dump         = ",tdump
     if( trim(ctctl).eq.'ttm' ) then
       write(6,'(1x,a,f10.2)') "Time for TTM          = ",t_ttm
     endif
@@ -1208,9 +1202,8 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,.true.,boundary)
 !-----Make pair list
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf &
-       ,rc1nn,h,hi,anxi,anyi,anzi,lspr,dlspr,ls1nn,iprint,.true.)
+       ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.true.)
   lstrs = .true.
-  call sort_lspr(namax,natm,nb,nnmax,lspr,dlspr)
 
 !      print *,'one_shot: 06'
 !      if( iprint.ge.10 ) print *,'get_force,myid_md,lcalcgrad='
@@ -1218,7 +1211,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   if( .not.lcalcgrad ) then
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-         ,lspr,dlspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
+         ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
     if( iprint.gt.0 ) then
       write(6,'(a,es15.7)') ' Potential energy = ',epot
@@ -2959,7 +2952,8 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi)
     itag(i)= itotOf(tag(i))
   enddo
 
-  call heapsort_itag(natm,natm,itag,31,buf)
+!!$  call heapsort_itag(natm,natm,itag,31,buf)
+  call qsort_itag(natm,1,natm,itag,31,buf)
 
   do i=1,natm
     ra(1:3,i)= buf(1:3,i)
@@ -3077,7 +3071,6 @@ subroutine alloc_namax_related()
   if( allocated(stt) ) deallocate(stt)
   if( allocated(tag) ) deallocate(tag)
   if( allocated(lspr) ) deallocate(lspr)
-  if( allocated(dlspr) ) deallocate(dlspr)
   if( allocated(ls1nn) ) deallocate(ls1nn)
   if( allocated(epi) ) deallocate(epi)
   if( allocated(eki) ) deallocate(eki)
@@ -3089,7 +3082,7 @@ subroutine alloc_namax_related()
   if( allocated(lsex) ) deallocate(lsex)
   allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax) &
        ,strs(3,3,namax),stt(3,3,namax),tag(namax) &
-       ,lspr(0:nnmax,namax),dlspr(0:3,nnmax,namax),ls1nn(0:nnmax,namax) &
+       ,lspr(0:nnmax,namax),ls1nn(0:nnmax,namax) &
        ,epi(namax),eki(3,3,namax) &
        ,stp(3,3,namax),stn(3,3,namax) &
        ,chg(namax),chi(namax) &
@@ -3197,14 +3190,6 @@ subroutine realloc_namax_related(newnalmax,newnbmax,iprint)
   call copy_iarr(ndim,iarr,lspr)
   deallocate(iarr)
 
-!.....dlspr
-  ndim = size(dlspr)
-  allocate(arr(ndim))
-  call copy_arr(ndim,dlspr,arr)
-  deallocate(dlspr)
-  allocate(dlspr(0:3,nnmax,newnamax))
-  call copy_arr(ndim,arr,dlspr)
-  deallocate(arr)
 
 !.....ls1nn
   ndim = size(ls1nn)
@@ -3326,34 +3311,6 @@ subroutine copy_iarr(ndim,srcarr,destarr)
   destarr(:) = srcarr(:)
   return
 end subroutine copy_iarr
-!=======================================================================
-subroutine calc_neigh_dist(namax,natm,nb,nnmax,h,ra,lspr,dlspr)
-!
-!  Compute distances between neighbors and store them in dlspr
-!
-  integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
-  real(8),intent(in):: h(3,3),ra(3,namax)
-  real(8),intent(inout):: dlspr(0:3,nnmax,namax)
-
-  integer:: i,j,jj
-  real(8):: xi(3),xij(3),rij(3),dij,dij2
-
-  dlspr(:,:,:) = 0d0
-
-  do i=1,natm+nb
-    xi(1:3) = ra(1:3,i)
-    do jj=1,lspr(0,i)
-      j = lspr(jj,i)
-      xij(1:3) = ra(1:3,j) -xi(1:3)
-      rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-      dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-      dij = dsqrt(dij2)
-      dlspr(0,jj,i) = dij
-      dlspr(1:3,jj,i)= rij(1:3)
-    enddo
-  enddo
-  return
-end subroutine calc_neigh_dist
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"
