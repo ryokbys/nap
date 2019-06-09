@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-06 11:24:00 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-07 12:56:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -10,7 +10,8 @@ module pmdio
   integer:: ntot0,ntot
 !.....data of total system
   real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
-       ,ekitot(:,:,:),tagtot(:),atot(:,:),chgtot(:),chitot(:)
+       ,ekitot(:,:,:),tagtot(:),atot(:,:),chgtot(:),chitot(:) &
+       ,alptot(:)
   real(8):: hunit,h(3,3,0:1)
 
 !.....max. num. of atoms in a node
@@ -92,6 +93,11 @@ module pmdio
 !  0:quiet, 1:normal,
 !  >10:fitpot data
   integer:: iprint= 1
+
+!.....Auxiliary data order for dump output
+  character(len=256):: cdumpaux = 'ekin epot sxx syy szz syz sxz sxy chg chi'
+  integer:: ndumpaux
+  character(len=6),allocatable:: cdumpauxarr(:)
 
   character(len=128):: cpmdini = 'pmdini'
   character(len=128):: cpmdfin = 'pmdfin'
@@ -273,13 +279,14 @@ contains
     integer,intent(in):: ionum
     character(len=*),intent(in) :: cfname
 
-    integer:: i,k,l,is
+    integer:: i,j,k,l,is
     real(8):: xi(3),ri(3),eki,epi,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz, &
          xlo_bound,xhi_bound,ylo_bound,yhi_bound, &
          zlo_bound,zhi_bound,st(3,3)
 !!$    integer,external:: itotOf
     real(8),allocatable,save:: rlmp(:,:)
     character(len=3):: csp
+    character(len=6):: caux
 
     real(8),parameter:: tiny = 1d-14
 
@@ -305,8 +312,11 @@ contains
     write(ionum,'(3f15.4)') xlo_bound, xhi_bound, xy
     write(ionum,'(3f15.4)') ylo_bound, yhi_bound, xz
     write(ionum,'(3f15.4)') zlo_bound, zhi_bound, yz
-    write(ionum,'(a)') 'ITEM: ATOMS id type x y z ekin epot' &
-         //' sxx syy szz syz sxz sxy chg chi'
+    write(ionum,'(a)',advance='no') 'ITEM: ATOMS id type x y z'
+    do i=1,ndumpaux
+      write(ionum,'(a)',advance='no') ' '//trim(cdumpauxarr(i))
+    enddo
+    write(ionum,*) ''
     do i=1,ntot
 !        xi(1:3)= rtot(1:3,i)
 !        ri(1:3)= h(1:3,1,0)*xi(1) +h(1:3,2,0)*xi(2) +h(1:3,3,0)*xi(3)
@@ -320,23 +330,59 @@ contains
           if( abs(st(l,k)).lt.tiny ) st(l,k) = 0d0
         enddo
       enddo
+      write(ionum,'(i8)',advance='no') itotOf(tagtot(i))
       if( has_specorder ) then
         is = int(tagtot(i))
         csp = specorder(is)
-        write(ionum,'(i8,a4,3f12.5,8es11.3,f9.4,f9.2)') &
-             itotOf(tagtot(i)),trim(csp),rlmp(1:3,i),eki, &
-             epi, &
-             st(1,1),st(2,2),st(3,3), &
-             st(2,3),st(1,3),st(1,2), &
-             chgtot(i),chitot(i)
+        write(ionum,'(a4)',advance='no') trim(csp)
       else
-        write(ionum,'(i8,i3,3f12.5,8es11.3,f9.4,f9.2)') &
-             itotOf(tagtot(i)),int(tagtot(i)),rlmp(1:3,i),eki, &
-             epi, &
-             st(1,1),st(2,2),st(3,3), &
-             st(2,3),st(1,3),st(1,2), &
-             chgtot(i),chitot(i)
+        write(ionum,'(i3)',advance='no') int(tagtot(i))
       endif
+      write(ionum,'(3f12.5)',advance='no') rlmp(1:3,i)
+      do j=1,ndumpaux
+        caux = cdumpauxarr(j)
+        if( trim(caux).eq.'ekin' ) then
+          write(ionum,'(es11.3)',advance='no') eki
+        else if( trim(caux).eq.'epot' ) then
+          write(ionum,'(es11.3)',advance='no') epi
+        else if( trim(caux).eq.'sxx' ) then
+          write(ionum,'(es11.3)',advance='no') st(1,1)
+        else if( trim(caux).eq.'syy' ) then
+          write(ionum,'(es11.3)',advance='no') st(2,2)
+        else if( trim(caux).eq.'szz' ) then
+          write(ionum,'(es11.3)',advance='no') st(3,3)
+        else if( trim(caux).eq.'syz' .or. trim(caux).eq.'szy' ) then
+          write(ionum,'(es11.3)',advance='no') st(2,3)
+        else if( trim(caux).eq.'sxz' .or. trim(caux).eq.'szx' ) then
+          write(ionum,'(es11.3)',advance='no') st(1,3)
+        else if( trim(caux).eq.'sxy' .or. trim(caux).eq.'syx' ) then
+          write(ionum,'(es11.3)',advance='no') st(1,2)
+        else if( trim(caux).eq.'chg' ) then
+          write(ionum,'(f9.4)',advance='no') chgtot(i)
+        else if( trim(caux).eq.'chi' ) then
+          write(ionum,'(f9.2)',advance='no') chitot(i)
+        else if( trim(caux).eq.'alpha' ) then
+          write(ionum,'(f9.5)',advance='no') alptot(i)
+        endif
+      enddo
+      write(ionum,*) ''
+!!$      if( has_specorder ) then
+!!$        is = int(tagtot(i))
+!!$        csp = specorder(is)
+!!$        write(ionum,'(i8,a4,3f12.5,8es11.3,f9.4,f9.2)') &
+!!$             itotOf(tagtot(i)),trim(csp),rlmp(1:3,i),eki, &
+!!$             epi, &
+!!$             st(1,1),st(2,2),st(3,3), &
+!!$             st(2,3),st(1,3),st(1,2), &
+!!$             chgtot(i),chitot(i)
+!!$      else
+!!$        write(ionum,'(i8,i3,3f12.5,8es11.3,f9.4,f9.2)') &
+!!$             itotOf(tagtot(i)),int(tagtot(i)),rlmp(1:3,i),eki, &
+!!$             epi, &
+!!$             st(1,1),st(2,2),st(3,3), &
+!!$             st(2,3),st(1,3),st(1,2), &
+!!$             chgtot(i),chitot(i)
+!!$      endif
     enddo
 
     close(ionum)
@@ -576,7 +622,21 @@ contains
     enddo
     return
   end function csp2isp
+!=======================================================================
+  subroutine make_cdumpauxarr()
+!
+!  Builld cdumpauxarr if ifpmd==2 (dump output)
+!
+    use util,only: num_data
 
+    integer:: i
+
+    ndumpaux = num_data(trim(cdumpaux),' ')
+    if( allocated(cdumpauxarr) ) deallocate(cdumpauxarr)
+    allocate(cdumpauxarr(ndumpaux))
+    read(cdumpaux,*) (cdumpauxarr(i),i=1,ndumpaux)
+    return
+  end subroutine make_cdumpauxarr
 end module pmdio
 !-----------------------------------------------------------------------
 !     Local Variables:

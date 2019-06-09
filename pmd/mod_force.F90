@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-06 18:26:46 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-08 11:26:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax
   implicit none
@@ -20,8 +20,8 @@ module force
 !.....Overlay main potential with a nuclear repulsive one, usually ZBL.
   logical:: loverlay = .false.
 
-!.....Overlay type: pair or atom
-  character(len=128):: ol_type = 'pair'
+!.....Overlay type: pot or force
+  character(len=128):: ol_type = 'pot'
   character(len=128):: ol_force = 'ZBL'
   real(8):: ol_ranges(2,nspmax)
   real(8),allocatable:: ol_alphas(:,:),ol_dalphas(:,:)
@@ -62,6 +62,7 @@ contains
 
     luse_force(:) = .false.
 
+    ol_ranges(:,:) = -1d0
 !!$    do i=1,num_forces
 !!$      
 !!$    enddo

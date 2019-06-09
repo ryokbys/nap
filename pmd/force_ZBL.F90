@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-06 22:43:25 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-09 22:21:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -274,7 +274,7 @@ contains
 !  and force-ij is not symmetry (I think), the loop over i and j has to be
 !  fully taken.
 !
-    use force,only: ol_ranges,ol_alphas,ol_dalphas,ol_pair
+    use force,only: ol_ranges,ol_alphas,ol_dalphas,ol_pair,ol_type
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -307,7 +307,7 @@ contains
       deallocate(strsl,epit,aal)
       allocate(strsl(3,3,namax),epit(namax),aal(3,namax))
     endif
-    
+
     epotl= 0d0
     epit(1:natm+nb) = 0d0
     strsl(1:3,1:3,1:natm+nb) = 0d0
@@ -462,7 +462,7 @@ contains
     qi = qnucl(is)
     qj = qnucl(js)
     rs = zbl_aa  /(qi**zbl_gamma +qj**zbl_gamma)
-    vnucl = qi*qj/rij *xi(rij/rs)
+    vnucl = acc *qi*qj/rij *xi(rij/rs)
     return
   end function vnucl
 !=======================================================================
@@ -479,7 +479,7 @@ contains
     qi = qnucl(is)
     qj = qnucl(js)
     rs = zbl_aa  /(qi**zbl_gamma +qj**zbl_gamma)
-    dvnucl = -qi*qj/rij* ( 1d0/rij*xi(rij/rs) -dxi(rij/rs)/rs )
+    dvnucl = -acc *qi*qj/rij* ( 1d0/rij*xi(rij/rs) -dxi(rij/rs)/rs )
     return
   end function dvnucl
 !=======================================================================

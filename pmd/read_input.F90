@@ -82,6 +82,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'num_out_pmd' ) then
     call read_i1(ionum,npmd)
     return
+  elseif( trim(cname).eq.'dump_aux_order' ) then
+    call read_dumpaux(ionum)
+    return
   elseif( trim(cname).eq.'boundary' ) then
     backspace(ionum)
     read(ionum,*) ctmp, cval
@@ -447,3 +450,26 @@ subroutine read_overlay(ionum)
   endif
   
 end subroutine read_overlay
+!=======================================================================
+subroutine read_dumpaux(ionum)
+!
+!  Read dump_aux_order entry
+!
+  use pmdio, only: cdumpaux
+  use util, only: num_data
+  implicit none 
+  integer,intent(in):: ionum
+  
+  character(len=1024):: ctmp
+  character(len=20),allocatable:: ctmp1(:)
+  integer:: ndat,i
+
+  backspace(ionum)
+  read(ionum,'(a)') ctmp
+  ndat = num_data(trim(ctmp),' ')
+  allocate(ctmp1(ndat))
+  read(ctmp,*) (ctmp1(i),i=1,ndat)
+!.....Create cdumpaux string without entry keyword, dump_aux_order
+  write(cdumpaux,*) (trim(ctmp1(i))//' ',i=2,ndat)
+  deallocate(ctmp1)
+end subroutine read_dumpaux

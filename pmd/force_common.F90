@@ -26,7 +26,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use EAM,only:force_EAM
   use linreg,only:force_linreg
 !!$  use NN,only:force_NN
-  use NN2,only: force_NN2,force_NN2_overlay
+  use NN2,only: force_NN2,force_NN2_overlay_pot, force_NN2_overlay_frc
   use Coulomb, only: force_screened_Coulomb, force_Ewald &
        ,initialize_coulomb, force_Ewald_long, force_Coulomb
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
@@ -153,9 +153,15 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
 !!$       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('NN2') ) then
     if( loverlay ) then
-      call force_NN2_overlay(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-           ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+      if( ol_type(1:3).eq.'pot' ) then
+        call force_NN2_overlay_pot(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+             ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+             ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+      else if( ol_type(1:5).eq.'force' ) then
+        call force_NN2_overlay_frc(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+             ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+             ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+      endif
     else
       call force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
            ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
@@ -182,7 +188,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   endif
-  if( loverlay .and. trim(ol_force).eq.'ZBL' ) then
+  if( loverlay .and. trim(ol_force).eq.'ZBL' .and. ol_type(1:3).eq.'pot' ) then
     call force_ZBL_overlay(namax,natm,tag,ra,nnmax,aa,strs &
          ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
@@ -255,9 +261,28 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   real(8),intent(inout):: chg(namax),chi(namax)
   logical,intent(inout):: lvc
 
-  integer:: i
+  integer:: i,j
+  real(8):: ri,ro
+  character(len=3):: cspi,cspj
 
   if( iprint.ne.0 ) call write_forces(myid_md)
+
+  if( loverlay ) then
+    if( myid_md.eq.0 .and. iprint.gt.0 ) then
+      print *,'Overlay parameters of pairs:'
+      do i=1,nspmax
+        cspi = specorder(i)
+        if( trim(cspi).eq.'x' ) cycle
+        do j=i,nspmax
+          cspj = specorder(j)
+          if( trim(cspj).eq.'x' ) cycle
+          ri = ol_pair(1,i,j)
+          ro = ol_pair(2,i,j)
+          print '(3x,a,2f7.3)',trim(cspi)//'-'//trim(cspj),ri,ro
+        enddo
+      enddo
+    endif
+  endif
 
 !.....vcMorse requires charge optimization, 
 !.....everywhen atomic positions or potential parameters change

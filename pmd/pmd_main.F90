@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-06 14:40:14 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-08 00:00:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -101,6 +101,9 @@ program pmd
 !.....Read in.pmd after reading the atom configuration file.
     call read_input(10,trim(cinpmd))
     call check_cmin(cmin,ifdmp)
+    if( ifpmd.eq.2 ) then ! if dump output
+      call make_cdumpauxarr()
+    endif
     call write_initial_setting()
 !        call write_inpmd(10,trim(cinpmd))
     if( num_forces.eq.0 ) stop ' ERROR: no force-field specified'
@@ -143,6 +146,10 @@ program pmd
     chgtot(1:ntot0) = 0d0
 !!$    call set_atomic_charges(ntot0,chgtot,tagtot,nspmax &
 !!$         ,chgfix,schg,myid_md,iprint)
+    if( loverlay ) then
+      allocate(alptot(ntot0))
+      alptot(:) = 1d0
+    endif
 
 !.....Determine nx,ny,nz using rc and hmat info
     if( .not. (nx.gt.0 .and. ny.gt.0 .and. nz.gt.0 ) ) then
@@ -157,6 +164,10 @@ program pmd
          ,chgtot(ntot0),chitot(ntot0))
     chitot(1:ntot0) = 0d0
     chgtot(1:ntot0) = 0d0
+    if( loverlay ) then
+      allocate(alptot(ntot0))
+      alptot(:) = 1d0
+    endif
   endif
 
 !.....Broadcast species data read from pmdini  
@@ -319,6 +330,13 @@ subroutine write_initial_setting()
   write(6,'(2x,a)') ''
   write(6,'(2x,a,5x,i0)')   'flag_out_pmd',ifpmd
   write(6,'(2x,a,5x,i0)')   'num_out_pmd',npmd
+  if( ifpmd.eq.2 ) then  ! if dump output
+    write(6,'(2x,a,3x)',advance='no') 'dump_aux_order'
+    do i=1,ndumpaux
+      write(6,'(x,a)',advance='no') trim(cdumpauxarr(i))
+    enddo
+    print *,''
+  endif
   write(6,'(2x,a)') ''
   write(6,'(2x,a,10(2x,a))') 'force_type   ', &
        (trim(force_list(i)),i=1,num_forces)
@@ -562,7 +580,7 @@ subroutine write_force(ionum,cpostfix,h,epot,ntot &
   open(ionum,file='frc'//trim(cpostfix),status='replace')
   write(ionum,'(i10)') ntot
   do i=1,ntot
-    write(ionum,'(3f12.6,i8)') atot(1:3,i),itotOf(tagtot(i))
+    write(ionum,'(3es15.7,i8)') atot(1:3,i),itotOf(tagtot(i))
   enddo
   close(ionum)
 
