@@ -14,8 +14,8 @@ Options:
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
     -o OUT      Output file name. [default: out.rdf]
-    --num-species=NSPCS
-                Number of species in the system. [default: 1]
+    --specorder=SPECORDER
+                Order of species separated by comma, like, --specorder=W,H. [default: None]
     --no-average
                 Not to take average over files.
     --no-normalize
@@ -94,15 +94,16 @@ def rdf(asys,nspcs,dr,rmax,normalize=True):
 
     return rd,nadr,natm0
 
-def rdf_average(infiles,nspcs,nr,ffmt=None,dr=0.1,rmax=3.0,average=True,
+def rdf_average(infiles,nr,specorder,ffmt=None,dr=0.1,rmax=3.0,average=True,
                 normalize=True):
+    nspcs = len(specorder)
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     nsum= 0
     for infname in infiles:
         if not os.path.exists(infname):
             print("[Error] File, {0}, does not exist !!!".format(infname))
             sys.exit()
-        asys= NAPSystem(fname=infname,ffmt=ffmt)
+        asys= NAPSystem(fname=infname,ffmt=ffmt,specorder=specorder)
         print(' File =',infname)
         rd,gr,n= rdf(asys,nspcs,dr,rmax,normalize=normalize)
         nsum += n
@@ -112,11 +113,12 @@ def rdf_average(infiles,nspcs,nr,ffmt=None,dr=0.1,rmax=3.0,average=True,
         agr /= nsum
     return rd,agr
 
-def plot_figures(nspcs,rd,agr):
+def plot_figures(specorder,rd,agr):
     import matplotlib.pyplot as plt
     import seaborn as sns
     sns.set(context='talk',style='ticks')
 
+    nspcs = len(specorder)
     plt.figure(figsize=(8,6))
     x = rd
     y = agr[0,0,:]
@@ -160,15 +162,21 @@ if __name__ == "__main__":
     sigma= int(args['--gsmear'])
     ffmt= args['-f']
     ofname= args['-o']
-    nspcs = int(args['--num-species'])
+    specorder = [ x for x in args['--specorder'].split(',') ]
+    if specorder == ['None']:
+        specorder = []
     no_average = args['--no-average']
     no_normalize = args['--no-normalize']
     average = not no_average
     normalize = not no_normalize
     plot = args['--plot']
 
+    nspcs = len(specorder)
+    if nspcs < 1:
+        raise ValueError('--specorder must be set.')
+
     nr= int(rmax/dr) +1
-    rd,agr= rdf_average(infiles,nspcs,nr,ffmt=ffmt,dr=dr,rmax=rmax,
+    rd,agr= rdf_average(infiles,nr,specorder,ffmt=ffmt,dr=dr,rmax=rmax,
                         average=average,normalize=normalize)
 
     if not sigma == 0:
@@ -199,7 +207,7 @@ if __name__ == "__main__":
     outfile.close()
 
     if plot:
-        plot_figures(nspcs,rd,agr)
+        plot_figures(rd,agr)
         print('')
         print(' RDF graphes are plotted.')
         if nspcs == 1:

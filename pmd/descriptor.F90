@@ -269,10 +269,6 @@ contains
         dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij2.ge.rcmax2 ) cycle
         dij = dsqrt(dij2)
-!!$        dij = dlspr(0,jj,ia)
-!!$        if( dij.ge.rcmax ) exit
-!!$        rij(1:3) = dlspr(1:3,jj,ia)
-!!$        dij2 = dij*dij
         js= int(tag(ja))
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
@@ -350,9 +346,6 @@ contains
           ks= int(tag(ka))
           if( ka.eq.ia .or. ka.le.ja ) cycle
           xk(1:3)= ra(1:3,ka)
-!!$          dik = dlspr(0,kk,ia)
-!!$          dik2 = dik*dik
-!!$          rik(1:3) = dlspr(1:3,kk,ia)
           xik(1:3)= xk(1:3) -xi(1:3)
           rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
@@ -937,6 +930,8 @@ contains
     call bcast_descs(myid,mpi_world,iprint)
     call mpi_bcast(nsf2,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(ilsf2,size(ilsf2),mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(ilsf3,size(ilsf3),mpi_integer,0,mpi_world,ierr)
 
 !!$    call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
 !!$    call mpi_bcast(itype,nsf,mpi_integer,0,mpi_world,ierr)

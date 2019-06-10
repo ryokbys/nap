@@ -657,8 +657,10 @@ You need to specify the species order correctly with --specorder option.
         ixyz= 0
         iatm= 0
         symbol = None
-        self.atoms= []
-        self.alc= 1.0
+        self.atoms = []
+        if not self.specorder:
+            self.specorder = []
+        self.alc = 1.0
         xy = 0.0
         xz = 0.0
         yz = 0.0
@@ -734,15 +736,16 @@ You need to specify the species order correctly with --specorder option.
                 if iatm < natm:
                     data= line.split()
                     ai= Atom()
+                    symbol = None
                     if data[1].isdigit():
                         ai.set_sid(int(data[1]))
+                        if self.specorder:
+                            symbol = self.specorder[ai.sid-1]
                     else:
                         symbol = data[1]
                         if symbol not in self.specorder:
-                            ValueError('Symbol {0:s} is not in specorder.'.format(symbol))
+                            self.specorder.append(symbol)
                         ai.set_sid(self.specorder.index(symbol)+1)
-                    if self.specorder:
-                        symbol = self.specorder[ai.sid-1]
                     if symbol and ai.symbol != symbol:
                         ai.set_symbol(symbol)
                     ix = max( aux_exists['x'], aux_exists['xu'])

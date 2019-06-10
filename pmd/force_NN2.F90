@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-09 23:41:38 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-10 12:42:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -700,7 +700,6 @@ contains
       do ia=1,natm
         tmp = 0d0
         do ihl1=1,nhl(1)
-!!$          tmp = tmp +wgt12(ihl1) *(hl1(ihl1,ia)-0.5d0)
           tmp = tmp +wgt12(ihl1) *(sigmoid(zl1(ihl1,ia))-0.5d0)
         enddo
         epi(ia) = epi(ia) +tmp
@@ -710,7 +709,6 @@ contains
       do ia=1,natm
         tmp = 0d0
         do ihl2=1,nhl(2)
-!!$          tmp = tmp +wgt23(ihl2) *(hl2(ihl2,ia)-0.5d0)
           tmp = tmp +wgt23(ihl2) *(sigmoid(zl2(ihl2,ia))-0.5d0)
         enddo
         epi(ia) = epi(ia) +tmp
@@ -736,8 +734,6 @@ contains
           ri = ol_pair(1,is,js)
           ro = ol_pair(2,is,js)
           alpij = ol_alphas(jj,ia)
-!!$          print '(a,4i5,4es12.4)','ia,is,ja,js,alpij,ri,ro,dij=' &
-!!$               ,ia,is,ja,js,alpij,ri,ro,dij
           if( dij.ge.ro ) then
             tmpij(1:3) = 0d0
             do ihl1=1,mhl(1)
@@ -766,7 +762,6 @@ contains
           else if( dij.lt.ri ) then
             drdxi(1:3) = -rij(1:3)/dij
             tmpij(1:3) = -0.5d0*dvnucl(is,js,dij)*drdxi(1:3)
-!!$            print '(a,2i5,4es12.4)','ia,ja,dij,tmpij(1:3)=',ia,ja,dij,tmpij(1:3)
           endif
           aal(1:3,ja)=aal(1:3,ja) -tmpij(1:3)
           aal(1:3,ia)=aal(1:3,ia) +tmpij(1:3)          
@@ -849,11 +844,8 @@ contains
 !!$      strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 !!$    endif
 
-!!$    epi(1:natm) = epi(1:natm) +epit(1:natm)
-
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_double_precision &
-         ,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
     if( iprint.gt.2 ) print *,'epot NN2_overlay = ',epott
     epot= epot +epott
 
