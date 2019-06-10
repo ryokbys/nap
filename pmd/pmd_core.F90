@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-10 15:23:55 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-10 18:20:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1042,6 +1042,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     endif
     write(6,*) ''
     if( iprint.gt.1 ) then
+      call write_force_times()
       write(6,'(1x,a,f10.2)') "Time for space decomp = ",tspdcmp
       write(6,'(1x,a,f10.2)') "Time for comm         = ",tcom
       write(6,'(1x,a,f10.2)') "Time for neighbor     = ",tlspr

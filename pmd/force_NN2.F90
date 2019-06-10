@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-10 12:42:44 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-10 17:49:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -78,7 +78,7 @@ contains
 !.....local
     integer:: i,j,k,l,m,n,is,js,ierr,ia,ja &
          ,ihl0,ihl1,ihl2,jj
-    real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,zl1i,zl2i
+    real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,zl1i,zl2i,time0
     real(8),allocatable,save:: strsl(:,:,:),aal(:,:)
 
     integer:: itot
@@ -123,6 +123,8 @@ contains
 
     call calc_desc(namax,natm,nb,nnmax,h &
          ,tag,ra,lspr,rcin,myid,mpi_world,l1st,iprint)
+
+    time0 = mpi_wtime()
 
     if( lbias ) then
 !.....set bias node to 1
@@ -280,6 +282,8 @@ contains
     if( iprint.gt.2 ) print *,'NN2 epot = ',epott
     epot= epot +epott
 
+    time = time +(mpi_wtime() -time0)
+
     return
   end subroutine force_NN2
 !=======================================================================
@@ -308,7 +312,7 @@ contains
 !.....local
     integer:: i,j,k,l,m,n,is,js,ierr,ia,ja &
          ,ihl0,ihl1,ihl2,jj,ixyz,jxyz
-    real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,zl1i,zl2i
+    real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,zl1i,zl2i,time0
     real(8),allocatable,save:: strsl(:,:,:),aal(:,:),epit(:)
     real(8):: xij(3),rij(3),dij2,dij,xi(3),alpi,drdxi(3),dtmp,ri,ro
 
@@ -357,6 +361,8 @@ contains
 
     call calc_desc(namax,natm,nb,nnmax,h &
          ,tag,ra,lspr,rcin,myid,mpi_world,l1st,iprint)
+
+    time0 = mpi_wtime()
 
     if( lbias ) then
 !.....set bias node to 1
@@ -555,6 +561,8 @@ contains
     if( iprint.gt.2 ) print *,'epot NN2_overlay = ',epott
     epot= epot +epott
 
+    time = time +(mpi_wtime() -time0)
+
     return
   end subroutine force_NN2_overlay_pot
 !=======================================================================
@@ -588,7 +596,7 @@ contains
     real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,zl1i,zl2i
     real(8),allocatable,save:: strsl(:,:,:),aal(:,:)
     real(8):: xij(3),rij(3),dij2,dij,xi(3),xj(3),alpij,drdxi(3) &
-         ,dtmp,ri,ro,tmpij(3)
+         ,dtmp,ri,ro,tmpij(3),time0
 
     integer:: itot
 !!$    integer,external:: itotOf
@@ -634,6 +642,8 @@ contains
 
     call calc_desc(namax,natm,nb,nnmax,h &
          ,tag,ra,lspr,rcin,myid,mpi_world,l1st,iprint)
+
+    time0 = mpi_wtime()
 
     if( lbias ) then
 !.....set bias node to 1
@@ -848,6 +858,8 @@ contains
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
     if( iprint.gt.2 ) print *,'epot NN2_overlay = ',epott
     epot= epot +epott
+
+    time = time +(mpi_wtime() -time0)
 
     return
   end subroutine force_NN2_overlay_frc

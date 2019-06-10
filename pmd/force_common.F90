@@ -197,7 +197,6 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
   
-
 !.....Exclusive choice of different Coulomb force-fields
   if( use_force('screened_Coulomb') ) then ! screened Coulomb
     call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
@@ -1324,6 +1323,22 @@ subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
        ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws)
 
 end subroutine get_gradw
+!=======================================================================
+subroutine write_force_times()
+!
+!  Write out time spent in each force.
+!
+  use force
+  use NN2,only: time_NN2 => time
+  use descriptor,only: time_desc => time
+  
+!.....Non-exclusive (additive) choice of force-fields
+  if( use_force('NN2') ) then
+    write(6,'(1x,a,f10.2)') "Time for descriptor   = ",time_desc
+    write(6,'(1x,a,f10.2)') "Time for force_NN2    = ",time_NN2
+  endif
+
+end subroutine write_force_times
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"

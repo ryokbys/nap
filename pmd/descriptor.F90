@@ -51,7 +51,7 @@ module descriptor
   real(8):: cnst(max_ncnst)
 
 !.....Maximum cutoff radius
-  real(8):: rcmax,rcmax2
+  real(8):: rcmax,rcmax2,rc3max
 
   integer:: nalmax,nnlmax,nal,nnl
 
@@ -98,13 +98,14 @@ contains
     integer,intent(in):: myid,mpi_world
     real(8),intent(in):: tag(namax)
 
-    integer:: i,nnltmp,ierr
+    integer:: i,nnltmp,ierr,time0
     logical,save:: lrealloc = .false.
 
     if( .not. lupdate_gsf ) return
 
+    time0 = mpi_wtime()
+
     if( l1st ) then
-    
 !  To reduce the memory usage, compute num of atoms and num of neighbors,
 !  and add some margin for those numbers because they can change during
 !  the simulation.
@@ -189,6 +190,8 @@ contains
       mem = mem +8*size(gsf) +8*size(dgsf) +4*size(igsf)
       lrealloc=.false.
     endif
+
+    time = time +(mpi_wtime() -time0)
     
     return
   end subroutine make_gsf_arrays
@@ -199,9 +202,15 @@ contains
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
-    logical,intent(in):: l1st 
+    logical,intent(in):: l1st
+    include "mpif.h"
+
+    real(8):: time0
+
 
     if( .not.lupdate_gsf ) return
+    
+    time0 = mpi_wtime()
 
     if( lcheby ) then
       call calc_desc_cheby(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
@@ -210,6 +219,9 @@ contains
       call calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
            ,myid,mpi_world,l1st,iprint)
     endif
+
+    time = time +(mpi_wtime() -time0)
+    
     return
   end subroutine calc_desc
 !=======================================================================
@@ -230,17 +242,21 @@ contains
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
     logical,intent(in):: l1st 
 
-    integer:: isf,ia,jj,ja,kk,ka,is,js,ks,ierr,i,isp,jsp,ksp,ityp,is1,is2,ksf
+    integer:: isf,ia,jj,ja,kk,ka,is,js,ks,ierr,i,isp,jsp,ksp,ityp,is1,is2 &
+         ,ksf,itypp
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,dij2,fcij,eta,rs,texp,driji(3), &
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
          dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,dik2,tmp,dtmp, &
          xjk(3),rjk(3),djk,djk2,fcjk,dfcjk,drjkj(3),drjkk(3),dgdjk, &
-         ri,ro,xs,z,dz,an,gijk,rcut,rcut2
+         ri,ro,xs,z,dz,an,gijk,rcut,rcut2,rcutp,ttmp
     type(desc):: desci
     real(8):: texpij,texpik,eta3,zang,twozeta
+    real(8),save:: time2, time3
 
     if( l1st ) then
+!!$      time2 = 0d0
+!!$      time3 = 0d0
       if( iprint.gt.1 .and. myid.eq.0 ) print *,'calc_desc_default...'
 !.....Check all the rcs and compare them with rc
       if( rc.lt.rcmax ) then
@@ -257,6 +273,7 @@ contains
     gsf(1:nsf,1:nal)= 0d0
     dgsf(1:3,1:nsf,0:nnl,1:nal)= 0d0
     igsf(1:nsf,0:nnl,1:nal) = 0
+    itypp = -1
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
       is= int(tag(ia))
@@ -274,6 +291,7 @@ contains
         drijj(1:3)= -driji(1:3)
         is1 = min(is,js)
         is2 = max(is,js)
+!!$        ttmp = mpi_wtime()
         do ksf=1,ilsf2(0,is1,is2)
           isf = ilsf2(ksf,is1,is2)
           desci = descs(isf)
@@ -281,7 +299,7 @@ contains
           rcut = desci%rcut
           if( dij.ge.rcut ) cycle
           if( ityp.eq.1 ) then ! Gaussian
-            call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+            if( abs(rcut-rcutp).gt.1d-4) call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
             eta= desci%prms(1)
             rs = desci%prms(2)
 !.....function value
@@ -297,7 +315,7 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           else if( ityp.eq.2 ) then ! cosine
-            call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+            if( abs(rcut-rcutp).gt.1d-4) call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
             a1 = desci%prms(1)
 !.....func value
             tcos= 0.5d0*(1d0+cos(dij*a1))
@@ -310,7 +328,7 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           else if( ityp.eq.3 ) then ! polynomial
-            call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+            if( abs(rcut-rcutp).gt.1d-4) call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
             a1= desci%prms(1)
 !.....func value
             tpoly= 1d0*dij**(-a1)
@@ -323,7 +341,7 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           else if( ityp.eq.4 ) then ! Morse-type
-            call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+            if( abs(rcut-rcutp).gt.1d-4) call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
             a1= desci%prms(1)
             a2= desci%prms(2)
 !.....func value
@@ -338,9 +356,14 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           endif
+          rcutp = rcut
         enddo  ! isf=1,nsf
+!!$        time2 = time2 +(mpi_wtime() -ttmp)
 
 !.....3-body forms
+        if( dij.gt.rc3max ) cycle
+!!$        ttmp = mpi_wtime()
+        rcutp = -1d0
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           ks= int(tag(ka))
@@ -368,8 +391,10 @@ contains
             if( dij.ge.rcut .or. dik.ge.rcut ) cycle
             if( ityp.eq.101 ) then ! RK's original angular SF
 !.....fcij's should be computed after rcs is determined
-              call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-              call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
+              if( abs(rcutp-rcut).gt.1d-4 ) then
+                call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+                call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
+              endif
               almbd= desci%prms(1)
               t2= (abs(almbd)+1d0)**2
               driki(1:3)= -rik(1:3)/dik
@@ -405,9 +430,11 @@ contains
               if( djk2.ge.rcut2 ) cycle
               djk= sqrt(djk2)
 !.....fcij's should be computed after rcs is determined
-              call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-              call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
-              call get_fc_dfc(djk,js,ks,rcut,fcjk,dfcjk)
+              if( abs(rcutp-rcut).gt.1d-4 ) then
+                call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+                call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
+                call get_fc_dfc(djk,js,ks,rcut,fcjk,dfcjk)
+              endif
               almbd= desci%prms(1)
               zang = desci%prms(2)
               driki(1:3)= -rik(1:3)/dik
@@ -444,8 +471,10 @@ contains
               igsf(isf,kk,ia) = 1
             else if( ityp.eq.103 ) then ! cos(cos(thijk)*n*pi) w/o fc(rjk)
 !.....fcij's should be computed after rcs is determined
-              call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-              call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
+              if( abs(rcutp-rcut).gt.1d-4 ) then
+                call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+                call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
+              endif
               an = desci%prms(1)
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
@@ -468,8 +497,10 @@ contains
               igsf(isf,kk,ia) = 1
             else if( ityp.eq.104 ) then ! sin(cos(thijk)*n*pi) w/o fc(rjk)
 !.....fcij's should be computed after rcs is determined
-              call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-              call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
+              if( abs(rcutp-rcut).gt.1d-4 ) then
+                call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+                call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
+              endif
               an = desci%prms(1)
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
@@ -492,8 +523,10 @@ contains
               igsf(isf,kk,ia) = 1
             else if( ityp.eq.105 ) then ! exp(-eta*(cos(thijk)-c)**2) w/o fc(rjk)
 !.....fcij's should be computed after rcs is determined
-              call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-              call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
+              if( abs(rcutp-rcut).gt.1d-4 ) then
+                call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+                call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
+              endif
               eta= desci%prms(1)
               rs = desci%prms(2)
               driki(1:3)= -rik(1:3)/dik
@@ -516,8 +549,10 @@ contains
               igsf(isf,jj,ia) = 1
               igsf(isf,kk,ia) = 1
             endif
+            rcutp = rcut
           enddo ! isf=1,...
         enddo ! kk=1,...
+!!$        time3 = time3 +(mpi_wtime() -ttmp)
 20      continue
       enddo ! jj=1,...
     enddo ! ia=1,...
@@ -716,10 +751,12 @@ contains
 
     integer:: ierr,i,j,k,nc,ncoeff,nsp,isp,jsp,ksp,isf,ityp &
          ,ihl0,ihl1,ihl2,icmb(3),iap,jap,kap,ndat,is1,is2
-    real(8):: rcut2,rcut3,rcut
+    real(8):: rcut2,rcut3,rcut,time0
     logical:: lexist
     character(len=128):: ctmp,fname,cline,cmode
     character(len=3):: ccmb(3)
+
+    time0 = mpi_wtime()
 
     if( myid.eq.0 ) then
       if( iprint.gt.1 ) print *,'read_params_desc...'
@@ -950,12 +987,16 @@ contains
 
 !.....Compute maximum rcut in all descriptors
     rcmax = 0d0
+    rc3max = 0d0
     do isf=1,nsf
       rcut = descs(isf)%rcut
       rcmax = max(rcmax,rcut)
 !!$      rcs2(i) = rcs(i)**2
+      if( descs(isf)%itype.gt.100 ) rc3max = max(rc3max,rcut)
     enddo
     rcmax2 = rcmax**2
+
+    time = time +(mpi_wtime() -time0)
 
     return
   end subroutine read_params_desc
