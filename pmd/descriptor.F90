@@ -241,7 +241,7 @@ contains
     real(8):: texpij,texpik,eta3,zang,twozeta
 
     if( l1st ) then
-      if( iprint.gt.1 ) print *,'calc_desc_default...'
+      if( iprint.gt.1 .and. myid.eq.0 ) print *,'calc_desc_default...'
 !.....Check all the rcs and compare them with rc
       if( rc.lt.rcmax ) then
         if( myid.eq.0 ) then

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-10 12:24:23 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-10 15:23:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -664,6 +664,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....if making new pair list is needed.
     if( rbufres.le.0d0 .or. &
          (ifpmd.gt.0.and.mod(istp,noutpmd).eq.0) ) then
+      if( iprint.gt.1 .and. myid_md.eq.0 ) &
+           print *,'Update boundary atoms and thus pair-list, too.'
       if( trim(ctctl).eq.'ttm' ) then
         call remove_ablated_atoms(simtime,namax,natm &
              ,tag,ra,va,chg,chi,h,sorg)
