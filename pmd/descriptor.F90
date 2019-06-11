@@ -257,7 +257,10 @@ contains
     if( l1st ) then
 !!$      time2 = 0d0
 !!$      time3 = 0d0
-      if( iprint.gt.1 .and. myid.eq.0 ) print *,'calc_desc_default...'
+      if( iprint.gt.1 .and. myid.eq.0 ) then
+        print *,'calc_desc_default...'
+        print '(a,4es12.4)','  rc,rcmax,rcmax2,rc3max=',rc,rcmax,rcmax2,rc3max
+      endif
 !.....Check all the rcs and compare them with rc
       if( rc.lt.rcmax ) then
         if( myid.eq.0 ) then
@@ -298,7 +301,7 @@ contains
           rcut = desci%rcut
           if( dij.ge.rcut ) cycle
           if( ityp.eq.1 ) then ! Gaussian
-            if( abs(rcut-rcutp).gt.1d-4) call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+            call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
             eta= desci%prms(1)
             rs = desci%prms(2)
 !.....function value
@@ -314,7 +317,7 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           else if( ityp.eq.2 ) then ! cosine
-            if( abs(rcut-rcutp).gt.1d-4) call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+            call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
             a1 = desci%prms(1)
 !.....func value
             tcos= 0.5d0*(1d0+cos(dij*a1))
@@ -327,7 +330,7 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           else if( ityp.eq.3 ) then ! polynomial
-            if( abs(rcut-rcutp).gt.1d-4) call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+            call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
             a1= desci%prms(1)
 !.....func value
             tpoly= 1d0*dij**(-a1)
@@ -340,7 +343,7 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           else if( ityp.eq.4 ) then ! Morse-type
-            if( abs(rcut-rcutp).gt.1d-4) call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+            call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
             a1= desci%prms(1)
             a2= desci%prms(2)
 !.....func value
@@ -355,14 +358,12 @@ contains
             igsf(isf,0,ia) = 1
             igsf(isf,jj,ia) = 1
           endif
-          rcutp = rcut
         enddo  ! isf=1,nsf
 !!$        time2 = time2 +(mpi_wtime() -ttmp)
 
 !.....3-body forms
         if( dij.gt.rc3max ) cycle
 !!$        ttmp = mpi_wtime()
-        rcutp = -1d0
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           ks= int(tag(ka))
@@ -390,10 +391,8 @@ contains
             if( dij.ge.rcut .or. dik.ge.rcut ) cycle
             if( ityp.eq.101 ) then ! RK's original angular SF
 !.....fcij's should be computed after rcs is determined
-              if( abs(rcutp-rcut).gt.1d-4 ) then
-                call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-                call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
-              endif
+              call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+              call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
               almbd= desci%prms(1)
               t2= (abs(almbd)+1d0)**2
               driki(1:3)= -rik(1:3)/dik
@@ -429,11 +428,9 @@ contains
               if( djk2.ge.rcut2 ) cycle
               djk= sqrt(djk2)
 !.....fcij's should be computed after rcs is determined
-              if( abs(rcutp-rcut).gt.1d-4 ) then
-                call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-                call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
-                call get_fc_dfc(djk,js,ks,rcut,fcjk,dfcjk)
-              endif
+              call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+              call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
+              call get_fc_dfc(djk,js,ks,rcut,fcjk,dfcjk)
               almbd= desci%prms(1)
               zang = desci%prms(2)
               driki(1:3)= -rik(1:3)/dik
@@ -470,10 +467,8 @@ contains
               igsf(isf,kk,ia) = 1
             else if( ityp.eq.103 ) then ! cos(cos(thijk)*n*pi) w/o fc(rjk)
 !.....fcij's should be computed after rcs is determined
-              if( abs(rcutp-rcut).gt.1d-4 ) then
-                call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-                call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
-              endif
+              call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+              call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
               an = desci%prms(1)
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
@@ -496,10 +491,8 @@ contains
               igsf(isf,kk,ia) = 1
             else if( ityp.eq.104 ) then ! sin(cos(thijk)*n*pi) w/o fc(rjk)
 !.....fcij's should be computed after rcs is determined
-              if( abs(rcutp-rcut).gt.1d-4 ) then
-                call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-                call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
-              endif
+              call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+              call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
               an = desci%prms(1)
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
@@ -522,10 +515,8 @@ contains
               igsf(isf,kk,ia) = 1
             else if( ityp.eq.105 ) then ! exp(-eta*(cos(thijk)-c)**2) w/o fc(rjk)
 !.....fcij's should be computed after rcs is determined
-              if( abs(rcutp-rcut).gt.1d-4 ) then
-                call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
-                call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
-              endif
+              call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+              call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
               eta= desci%prms(1)
               rs = desci%prms(2)
               driki(1:3)= -rik(1:3)/dik
@@ -548,7 +539,7 @@ contains
               igsf(isf,jj,ia) = 1
               igsf(isf,kk,ia) = 1
             endif
-            rcutp = rcut
+
           enddo ! isf=1,...
         enddo ! kk=1,...
 !!$        time3 = time3 +(mpi_wtime() -ttmp)
@@ -1269,6 +1260,20 @@ contains
     time_descriptor = time
     return
   end function time_descriptor
+!=======================================================================
+  subroutine debug_descs()
+!
+!  Write descs for debugging
+!
+    integer:: i,isf
+    
+    do i=1,2
+      do isf=1,nsf
+        print '(a,2i5,2es12.5)','i,isf,rcut,gsf=' &
+             ,i,isf,descs(isf)%rcut,gsf(isf,i)
+      enddo
+    enddo
+  end subroutine debug_descs
 end module descriptor
 !-----------------------------------------------------------------------
 !     Local Variables:

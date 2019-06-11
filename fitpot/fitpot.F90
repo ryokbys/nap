@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-26 22:12:54 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-11 15:09:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -2070,6 +2070,7 @@ subroutine sync_input()
   use parallel
   use minimize
   use random
+  use pmdio,only: nnmax
   implicit none
   
   call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)
@@ -2201,6 +2202,9 @@ subroutine sync_input()
 !.....TODO: check what happens if numff==0...
   call mpi_bcast(csubffs,20*nsubff,mpi_character,0,mpi_world,ierr)
 
+!.....pmdio related
+  call mpi_bcast(nnmax,1,mpi_integer,0,mpi_world,ierr)
+  
 end subroutine sync_input
 !=======================================================================
 subroutine get_node2sample()
