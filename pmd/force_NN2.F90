@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-10 17:49:40 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-10 23:34:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -596,7 +596,7 @@ contains
     real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,zl1i,zl2i
     real(8),allocatable,save:: strsl(:,:,:),aal(:,:)
     real(8):: xij(3),rij(3),dij2,dij,xi(3),xj(3),alpij,drdxi(3) &
-         ,dtmp,ri,ro,tmpij(3),time0
+         ,dtmp,ri,ro,tmpij(3),time0,sij
 
     integer:: itot
 !!$    integer,external:: itotOf
@@ -774,7 +774,14 @@ contains
             tmpij(1:3) = -0.5d0*dvnucl(is,js,dij)*drdxi(1:3)
           endif
           aal(1:3,ja)=aal(1:3,ja) -tmpij(1:3)
-          aal(1:3,ia)=aal(1:3,ia) +tmpij(1:3)          
+          aal(1:3,ia)=aal(1:3,ia) +tmpij(1:3)
+          do ixyz=1,3
+            do jxyz=1,3
+              sij = -tmpij(jxyz)*rij(ixyz)
+              strsl(ixyz,jxyz,ja) = strsl(ixyz,jxyz,ja) +sij
+              strsl(ixyz,jxyz,ia) = strsl(ixyz,jxyz,ia) +sij
+            enddo
+          enddo
 !!$!.....atom ia
 !!$          do ihl0= 1,nhl(0)
 !!$            aal(1:3,ia)=aal(1:3,ia) &
@@ -846,6 +853,11 @@ contains
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
          ,lsrc,myparity,nn,mpi_world,aal,3)
     aa(1:3,1:natm) = aa(1:3,1:natm) +aal(1:3,1:natm)
+
+!-----send back stresses
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
+         ,lsrc,myparity,nn,mpi_world,strsl,9)
+    strs(:,:,1:natm) = strs(:,:,1:natm) +strsl(:,:,1:natm)*0.5d0
 
 !!$    if( lstrs ) then
 !!$      call compute_stress(namax,natm,tag,ra,nnmax,strsl,h &

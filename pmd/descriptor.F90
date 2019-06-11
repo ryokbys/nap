@@ -267,7 +267,6 @@ contains
         call mpi_finalize(ierr)
         stop
       endif
-      rcmax2 = rcmax*rcmax
     endif
 
     gsf(1:nsf,1:nal)= 0d0
