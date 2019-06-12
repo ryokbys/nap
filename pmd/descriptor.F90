@@ -927,6 +927,7 @@ contains
           do j=1,descs(isf)%nprm
             descs(isf)%prms(j) = cnst(j)
           enddo
+          if( isp.lt.0 .or. jsp.lt.0 ) cycle
           if( ityp.le.100 ) then  ! 2-body
             nsf2 = nsf2 + 1
             is1 = min(isp,jsp)
@@ -936,6 +937,7 @@ contains
           else if( ityp.le.200 ) then  ! 3-body
             nsf3 = nsf3 + 1
             ksp = csp2isp(trim(ccmb(3)),specorder)
+            if( ksp.lt.0 ) cycle
             descs(isf)%ksp = ksp
             is1 = min(jsp,ksp)
             is2 = max(jsp,ksp)
@@ -945,11 +947,11 @@ contains
           endif
         enddo  ! isf=1,nsf
 20      close(ionum)
-        if( nsf.ne.nsf2+nsf3 ) then
-          print *,'ERROR@read_params_desc: nsf.ne.nsf2+nsf3 !!!'
- !        call mpi_finalize(ierr)
-          stop
-        endif
+!!$        if( nsf.ne.nsf2+nsf3 ) then
+!!$          print *,'ERROR@read_params_desc: nsf.ne.nsf2+nsf3 !!!'
+!!$ !        call mpi_finalize(ierr)
+!!$          stop
+!!$        endif
       endif ! lcheby
     endif ! myid.eq.0
 

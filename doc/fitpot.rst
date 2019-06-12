@@ -218,29 +218,33 @@ Input file for *fitpot*
 The following code shows an example of the input file ``in.fitpot``.
 ::
 
-   num_samples      14
-   test_ratio       0.1
-   num_iteration    100
-   num_iter_eval    1
-   
-   fitting_method   bfgs
-   main_directory   data_set
-   param_file       in.params.NN
-   normalize_input  none
-   
-   force_match      true
-   potential        NN
+   num_samples       14
+   test_ratio        0.1
+   num_iteration     100
+   num_iter_eval     1
+                     
+   fitting_method    bfgs
+   sample_directory  "../dataset"
+   param_file        in.params.NN
+   normalize_input   none
+                     
+   energy_match       T
+   force_match        T
+   stress_match       T
+   potential         NN2
+                     
+   ftol              1.0e-5
+   xtol              1.0e-4
+                     
+   penalty           none
+   penalty_weight    1d-3
 
-   ftol             1.0e-5
-   xtol             1.0e-4
-   
-   penalty          none
-   penalty_weight   1d-3
-   
    # 1:Al, 2:Mg, 3:Si
-   atom_energy  1  -0.19778
-   atom_energy  2  -0.00074
-   atom_energy  3  -0.80706
+   specorder    Al Mg Si
+
+   atom_energy  Al  -0.19778
+   atom_energy  Mg  -0.00074
+   atom_energy  Si  -0.80706
 
 
 
@@ -255,16 +259,17 @@ Here are input parameters that users can change in *fitpot* program.
 * :ref:`num_iteration`
 * :ref:`num_iter_eval`
 * :ref:`fitting_method`
-* :ref:`main_directory`
+* :ref:`sample_directory`
 * :ref:`param_file`
 * :ref:`ftol`
 * :ref:`xtol`
-* :ref:`force_match`
+* :ref:`energy_match`
 * :ref:`potential`
 * :ref:`random_seed`
 * :ref:`regularize`
 * :ref:`penalty_weight`
 * :ref:`sample_error`
+* :ref:`specorder`
 * :ref:`atom_energy`
 * :ref:`init_params`
 * :ref:`init_params_sgm`
@@ -274,6 +279,8 @@ Here are input parameters that users can change in *fitpot* program.
 * :ref:`sgd_batch_size`
 * :ref:`sgd_rate0`
 
+---------
+
 .. _num_samples:
 
 num_samples
@@ -282,6 +289,7 @@ Default: *no default*
 
 Number of reference samples to be used for training and test.
 
+---------
 
 .. _sample_list:
 
@@ -308,6 +316,7 @@ or with specifying which samples are training (1) or test (2) as,
 
 If whether training or test is specified in the list, `test_ratio` will be neglected.
 
+---------
 
 
 .. _test_ratio:
@@ -319,6 +328,7 @@ Default: *0.1*
 The ratio of test data set :math:`r` within whole data set :math:`N`.
 Thus the number of test data set is :math:`rN`, and the number of training data set is :math:`(1-r)N`.
 
+---------
 
 .. _num_iteration:
 
@@ -329,6 +339,7 @@ Default: *1*
 Number of iterations of a minimization method.
 
 
+---------
 
 .. _num_iter_eval:
 
@@ -338,6 +349,7 @@ Test data set will be evaluated every *num_iter_eval* iterations.
 
 Default: *1*
 
+---------
 
 .. _fitting_method:
 
@@ -364,11 +376,14 @@ Available methods are the following:
 *test/TEST* :
    Just calculate function L and gradient of L w.r.t. fitting parameters.
 
+---------
 
 
-.. _main_directory:
+.. _sample_directory:
 
-main_directory
+---------
+
+sample_directory
 --------------------
 Default: *dataset*
 
@@ -376,6 +391,7 @@ The directory that includes sample data. We call this ``dataset`` in the above i
 
 If you want to use ``..`` to specify the directory relative to the current working directory, e.g. ``../dataset``, you need to enclose with double-quotation marks like ``"../dataset"``.
 
+---------
 
 .. _param_file:
 
@@ -385,6 +401,7 @@ Default: *in.params.NN*
 
 The name of the file that has parameter values in it. This is passed to ``pmd`` program.
 
+---------
 
 .. _ftol:
 
@@ -393,6 +410,8 @@ ftol
 Default: *1.0e-5*
 
 The tolerance of difference of the loss function value.
+
+---------
 
 .. _xtol:
 
@@ -403,30 +422,35 @@ Default: *1.0e-4*
 The tolerance of the change of variables which are optimized.
 If either one of `ftol` or `xtol` is achieved, the optimization stops.
 
+---------
 
-.. _force_match:
+.. _energy_match:
 
-force_match
---------------------
-Default: *False*
+energy_match, force_match, stress_match
+----------------------------------------
+
+Default: *True* for energy, *False* for force and stress
 
 Whether or not to match forces. ( *True* or *False* )
-It is highly recommended to match forces, since forces are important for molecular dynamics.
+It is recommended to match not only energy but also forces, since forces are important for molecular dynamics.
 
 
+---------
 
 .. _potential:
 
-potential
---------------------
-Default: *NN*
+potential or force_field
+--------------------------
+
+Default: *NN2*
 
 The potential whose parameters you are going to fit.
-Now only *NN* potential is available:
+Potentials currently available:
 
-*NN*:
+*NN2*:
    Neural network potential
 
+---------
 
 .. _random_seed:
 
@@ -437,6 +461,8 @@ Default: *12345d0*
 Initial random seed for the uniform random numbers used in the *fitpot*.
 This mainly works to change the choice of training and test sets.
 
+---------
+
 .. _regularize:
 
 regularize
@@ -445,6 +471,7 @@ Whether or not regularize bases obtained in *linreg* and *NN?* potentials. ( *Tr
 
 Default: *False*
 
+---------
 
 .. _penalty:
 
@@ -456,6 +483,7 @@ or *no* which means no penalty term.
 Default: *no*
 
 
+---------
 
 .. _penalty_weight:
 
@@ -466,6 +494,7 @@ cross-validation scoring...
 
 Default: *1.0*
 
+---------
 
 .. _sample_error:
 
@@ -514,24 +543,37 @@ The error values are applied to all the samples that contain *entry_name* in the
    Energy value :math:`E_\text{s}` in eV of the sample weight :math:`\exp (-\Delta E /E_\text{s})`.
    The :math:`\Delta E` is defined as the energy difference (per atom) from the most stable atomic energies.
 
+-----------
 
+.. _specorder:
+
+specorder
+--------------------
+
+Default: *none*
+
+The order of species common in fitpot. 
+This must be specified before ``atom_energy`` entry and must hold for every samples.
+
+-----------
 
 .. _atom_energy:
 
 atom_energy
 --------------------
+
+Default: *0.0* for each species.
+
 A DFT atomic energy that will be subtracted from the energies of sample structures.
 Since the energy values of sample structures include the energies of atoms that are isolated 
 in vacuum or gas phase.
 The atomic energies of all atoms in the system should be specified in the following format:
 ::
 
-  atom_energy   1   -0.808364
-  atom_energy   2   -1.20934
+  atom_energy   Si   -0.808364
+  atom_energy   H    -1.109340
 
-where the first argument is species-ID and the second is the atomic energy of the species.
-
-Default: *0.0*
+where the first argument is species-name and the second is the atomic energy of the species.
 
 
 --------------
@@ -550,6 +592,7 @@ Whether the paramters to be optimized are read from the file or initialized.
 *gaussian*:
    Parameters are initialized with Gaussian distribution according *init_params_sgm* and *init_params_mu*.
 
+---------
 
 .. _init_params_sgm:
 
@@ -559,6 +602,7 @@ Default: *1d0*
 
 Variance of Gaussian distribution of the initial values for parameters.
 
+---------
 
 .. _init_params_mu:
 
@@ -567,6 +611,8 @@ init_params_mu
 Default: *0d0*
 
 Mean value of Gaussian distribution of the initial values for parameters.
+
+---------
 
 .. _init_params_rs:
 
