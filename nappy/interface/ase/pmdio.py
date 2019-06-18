@@ -2,97 +2,22 @@
 Reading and writing of pmd files for ASE Atoms object.
 """
 
-import os
 import numpy as np
-from ase import Atoms
-from ase.constraints import FixAtoms, FixScaled
-
-
-def read_pmd(fname='pmdini',specorder=[],fmvs=[(True,True,True),]):
-    """
-    Import pmd format file.
-
-    fname
-        Name of the file to be read.
-    specorder
-        Order of species appeared in pmd file.
-    fmvs
-        Constraints of motion in bool of x,y,z direction.
-        e.g., fmv = ((True,True,True),(True,True,False),)
-        True means fix and False means free.
-    """
-
-    f = open(fname,'r')
-    # 1st line: lattice_constant
-    lattice_constant = float(f.readline().split()[0])
-    # 2-4 lines: lattice vectors
-    a = []
-    for ii in range(3):
-        s = f.readline().split()
-        floatvect = float(s[0]), float(s[1]), float(s[2])
-        a.append(floatvect)
-    basis_vectors = np.array(a) * lattice_constant
-    # 5-7 lines: velocities of lattice vectors
-    tmp = f.readline()
-    tmp = f.readline()
-    tmp = f.readline()
-    natm = int(f.readline().split()[0])
-    positions = np.zeros((natm,3),dtype=float)
-    symbols = []
-    ifmvs = np.zeros((natm),dtype=int)
-    maxifmv = 0
-    for ia in range(natm):
-        data = f.readline().split()
-        tag = float(data[0])
-        for ii in range(3):
-            positions[ia,ii] = float(data[ii+1])
-        sid,symbol,ifmv,aid = decode_tag(tag,specorder)
-        symbols.append(symbol)
-        ifmvs[ia] = ifmv
-        maxifmv = max(maxifmv,ifmv)
-    f.close()
-    if maxifmv > len(fmvs):
-        #raise ValueError('Length of fmvs are too short.')
-        # temporary treatment for fmvs
-        for i in range(maxifmv-len(fmvs)):
-            fmvs.append([True,True,True])
-
-    atoms = Atoms(symbols=symbols,cell=basis_vectors,pbc=True)
-    atoms.set_scaled_positions(positions)
-    #set constraints
-    constraints = []
-    indices = []
-    for ia in range(natm):
-        if ifmvs[ia] == 0:
-            indices.append(ia)
-        else:
-            ifmv = ifmvs[ia]
-            fmv = fmvs[ifmv-1]
-            if all(fmv):
-                indices.append(ia)
-            elif any(fmv):
-                constraints.append(FixScaled(atoms.get_cell(),ia,fmv))
-    if indices:
-        constraints.append(FixAtoms(indices))
-    if constraints:
-        atoms.set_constraint(constraints)
-    return atoms
-
-
-def write_pmd(atoms,fname='pmdini',specorder=[]):
-    """
-    Write pmd format file from ASE Atoms object.
-    """
-    dname = os.path.dirname(fname)
-    if dname and not os.path.exists(dname):
-        os.system('mkdir -p '+dname)
-    with open(fname,'w') as f:
-        f.write(get_atom_conf_txt(atoms,specorder))
-
+from ase.constraints import FixScaled
 
 def get_atom_conf_txt(atoms,specorder=[]):
+    if not specorder:
+        specorder = uniq(atoms.get_chemical_symbols())
+        specorder.sort()
     # print 'atoms = ',atoms
     txt= ''
+    #...specorder info as comment lines
+    txt= '!\n'
+    txt+='!  specorder '
+    for s in specorder:
+        txt += ' {0:s}'.format(s)
+    txt += '\n'
+    txt += '!\n'
     # no lattice constant in ASE
     txt+='  1.00000  \n'
     # cell vectors

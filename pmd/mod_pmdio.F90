@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-07 12:56:07 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-12 22:40:36 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -10,8 +10,7 @@ module pmdio
   integer:: ntot0,ntot
 !.....data of total system
   real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
-       ,ekitot(:,:,:),tagtot(:),atot(:,:),chgtot(:),chitot(:) &
-       ,alptot(:)
+       ,ekitot(:,:,:),tagtot(:),atot(:,:),chgtot(:),chitot(:)
   real(8):: hunit,h(3,3,0:1)
 
 !.....max. num. of atoms in a node
@@ -47,9 +46,9 @@ module pmdio
        300d0, 300d0, 300d0 /
   real(8):: trlx = 100d0
 !.....Remove translational motion:
-!     N<0: not to remove translation
-!     0: remove translation only at the beginning
-!     N>1: remove translation at the begining and every N step.
+!     N< 0: not to remove translation
+!     N==0: remove translation only at the beginning
+!     N> 1: remove translation at the begining and every N step.
   integer:: nrmtrans = 0
 !.....Coulomb system?
   integer:: ifcoulomb = 0
@@ -95,6 +94,7 @@ module pmdio
   integer:: iprint= 1
 
 !.....Auxiliary data order for dump output
+  logical:: ldumpaux_changed = .false.
   character(len=256):: cdumpaux = 'ekin epot sxx syy szz syz sxz sxy chg chi'
   integer:: ndumpaux
   character(len=6),allocatable:: cdumpauxarr(:)
@@ -339,33 +339,39 @@ contains
         write(ionum,'(i3)',advance='no') int(tagtot(i))
       endif
       write(ionum,'(3f12.5)',advance='no') rlmp(1:3,i)
-      do j=1,ndumpaux
-        caux = cdumpauxarr(j)
-        if( trim(caux).eq.'ekin' ) then
-          write(ionum,'(es11.3)',advance='no') eki
-        else if( trim(caux).eq.'epot' ) then
-          write(ionum,'(es11.3)',advance='no') epi
-        else if( trim(caux).eq.'sxx' ) then
-          write(ionum,'(es11.3)',advance='no') st(1,1)
-        else if( trim(caux).eq.'syy' ) then
-          write(ionum,'(es11.3)',advance='no') st(2,2)
-        else if( trim(caux).eq.'szz' ) then
-          write(ionum,'(es11.3)',advance='no') st(3,3)
-        else if( trim(caux).eq.'syz' .or. trim(caux).eq.'szy' ) then
-          write(ionum,'(es11.3)',advance='no') st(2,3)
-        else if( trim(caux).eq.'sxz' .or. trim(caux).eq.'szx' ) then
-          write(ionum,'(es11.3)',advance='no') st(1,3)
-        else if( trim(caux).eq.'sxy' .or. trim(caux).eq.'syx' ) then
-          write(ionum,'(es11.3)',advance='no') st(1,2)
-        else if( trim(caux).eq.'chg' ) then
-          write(ionum,'(f9.4)',advance='no') chgtot(i)
-        else if( trim(caux).eq.'chi' ) then
-          write(ionum,'(f9.2)',advance='no') chitot(i)
-        else if( trim(caux).eq.'alpha' ) then
-          write(ionum,'(f9.5)',advance='no') alptot(i)
-        endif
-      enddo
-      write(ionum,*) ''
+      if( ldumpaux_changed ) then
+        do j=1,ndumpaux
+          caux = cdumpauxarr(j)
+          if( trim(caux).eq.'ekin' ) then
+            write(ionum,'(es11.3)',advance='no') eki
+          else if( trim(caux).eq.'epot' ) then
+            write(ionum,'(es11.3)',advance='no') epi
+          else if( trim(caux).eq.'sxx' ) then
+            write(ionum,'(es11.3)',advance='no') st(1,1)
+          else if( trim(caux).eq.'syy' ) then
+            write(ionum,'(es11.3)',advance='no') st(2,2)
+          else if( trim(caux).eq.'szz' ) then
+            write(ionum,'(es11.3)',advance='no') st(3,3)
+          else if( trim(caux).eq.'syz' .or. trim(caux).eq.'szy' ) then
+            write(ionum,'(es11.3)',advance='no') st(2,3)
+          else if( trim(caux).eq.'sxz' .or. trim(caux).eq.'szx' ) then
+            write(ionum,'(es11.3)',advance='no') st(1,3)
+          else if( trim(caux).eq.'sxy' .or. trim(caux).eq.'syx' ) then
+            write(ionum,'(es11.3)',advance='no') st(1,2)
+          else if( trim(caux).eq.'chg' ) then
+            write(ionum,'(f9.4)',advance='no') chgtot(i)
+          else if( trim(caux).eq.'chi' ) then
+            write(ionum,'(f9.2)',advance='no') chitot(i)
+          endif
+        enddo
+        write(ionum,*) ''
+      else
+        write(ionum,'(8es11.3,f9.4,f9.2)') &
+             eki,epi, &
+             st(1,1),st(2,2),st(3,3), &
+             st(2,3),st(1,3),st(1,2), &
+             chgtot(i),chitot(i)
+      end if
 !!$      if( has_specorder ) then
 !!$        is = int(tagtot(i))
 !!$        csp = specorder(is)

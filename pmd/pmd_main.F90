@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-11 14:44:43 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-13 16:28:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -146,10 +146,6 @@ program pmd
     chgtot(1:ntot0) = 0d0
 !!$    call set_atomic_charges(ntot0,chgtot,tagtot,nspmax &
 !!$         ,chgfix,schg,myid_md,iprint)
-    if( loverlay ) then
-      allocate(alptot(ntot0))
-      alptot(:) = 1d0
-    endif
 
 !.....Determine nx,ny,nz using rc and hmat info
     if( .not. (nx.gt.0 .and. ny.gt.0 .and. nz.gt.0 ) ) then
@@ -164,10 +160,6 @@ program pmd
          ,chgtot(ntot0),chitot(ntot0))
     chitot(1:ntot0) = 0d0
     chgtot(1:ntot0) = 0d0
-    if( loverlay ) then
-      allocate(alptot(ntot0))
-      alptot(:) = 1d0
-    endif
   endif
 
 !.....Broadcast species data read from pmdini  
@@ -636,7 +628,7 @@ subroutine check_ensemble()
 
   l_temp = .false.
 
-  if(  trim(ctctl).eq.'Langeven' .or. &
+  if(  trim(ctctl).eq.'Langevin' .or. &
        trim(ctctl).eq.'Berendsen' .or. &
        trim(ctctl).eq.'ttm' ) then
     l_temp = .true.
@@ -712,13 +704,22 @@ subroutine add_pka_velocity(myid_md)
     vx = rx*vel
     vy = ry*vel
     vz = rz*vel
+    print *,''
+    print '(a)',' Primary knock-on atom: '
+    print '(a,i0,2x,3es12.4)',      '   atom-id,rtot = ',icntr,rtot(1:3,icntr)
+    print '(a,es12.4,a)','   energy  = ',pka_energy,' eV'
+    print '(a,2f9.3)',   '   theta,phi = ',theta,phi
+    print '(a,4es12.4)', '   vel,vx,vy,vz = ',vel,vx,vy,vz
+    
 !.....Assume an orthogonal simulation box
     vx = vx /h(1,1,0)
     vy = vy /h(2,2,0)
     vz = vz /h(3,3,0)
+    print '(a,3es12.4)','   vtot before = ',vtot(1:3,icntr)
     vtot(1,icntr) = vtot(1,icntr) +vx
     vtot(2,icntr) = vtot(2,icntr) +vy
     vtot(3,icntr) = vtot(3,icntr) +vz
+    print '(a,3es12.4)','   vtot after  = ',vtot(1:3,icntr)
 
   endif
 end subroutine add_pka_velocity
@@ -765,12 +766,13 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
 !.....Increase num of division of the axis of which divided length is the longest
 !.....Check whether 
     imax = 1
-    if( al(2).gt.al(1) ) imax = 2
-    if( imax.eq.1 ) then
-      if( al(3).gt.al(1) ) imax = 3
-    else ! imax==2
-      if( al(3).gt.al(2) ) imax = 3
-    endif
+    if( al(2).gt.al(imax) ) imax = 2
+    if( al(3).gt.al(imax) ) imax = 3
+!!$    if( imax.eq.1 ) then
+!!$      if( al(3).gt.al(1) ) imax = 3
+!!$    else ! imax==2
+!!$      if( al(3).gt.al(2) ) imax = 3
+!!$    endif
     ndnew(1:3) = nd(1:3)
     ndnew(imax) = ndnew(imax) +1
 
@@ -785,7 +787,7 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
       nd(1:3) = ndnew(1:3)  ! use current ndnew(:)
       exit
 !.....Check whether the minimum divided length is shorter than cutoff radius         
-    else if( al(1).lt.rc .and. al(2).lt.rc .and. al(3).lt.rc ) then
+    else if( al(1).lt.rc .or. al(2).lt.rc .or. al(3).lt.rc ) then
       exit  ! use previous nd(:)
     endif
 
@@ -796,9 +798,10 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
   ny = nd(2)
   nz = nd(3)
 
-10 if( iprint.gt.0 ) print '(a,3(1x,i0))',' Number of spatial divisions ' &
+10 if( iprint.gt.0 ) then
+    print '(a,3(1x,i0))',' Number of spatial divisions ' &
         //'automatically set, NX,NY,NZ=',nx,ny,nz
-  
+  endif
   return
 
 end subroutine determine_division

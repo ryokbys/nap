@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-11 14:44:55 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-13 19:07:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -13,7 +13,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
      ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary &
      ,lmetaD,lconst,lrdcfrc,cstruct,istruct,cdeform,dhratio)
   use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump &
-       ,namax,nbmax,nnmax,nspmax,alptot
+       ,namax,nbmax,nnmax,nspmax
   use pmdvars
   use zload
   use force
@@ -461,7 +461,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
   if( myid_md.eq.0 ) then
     if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot &
-         ,atot,ekitot,epitot,stot,chgtot,chitot)
+         ,atot,ekitot,epitot,stot,chgtot,chitot,ifsort)
     if( ifpmd.eq.1 ) then  ! pmd format
       if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
            then
@@ -597,6 +597,9 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       call vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
            ,finc_fire,fdec_fire,nmin_fire &
            ,natm,va,aa,myid_md,mpi_md_world,dt,iprint)
+!.....Restrict dt (use vardt_len here)
+      call get_vmax(namax,natm,va,h,vmax,mpi_md_world)
+      dt = min( dt, vardt_len/vmax )
     endif
 
 !-------multiply fmv or damping
@@ -971,7 +974,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       ltot_updated = .true.
       if( myid_md.eq.0 ) then
         if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot &
-             ,atot,ekitot,epitot,stot,chgtot,chitot)
+             ,atot,ekitot,epitot,stot,chgtot,chitot,ifsort)
         if( ifpmd.eq.1 ) then  ! pmd format
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
                then
@@ -993,6 +996,10 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
          ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs &
          ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+    if( myid_md.eq.0 ) then
+      call sort_by_tag(ntot0,tagtot,rtot,vtot &
+           ,atot,ekitot,epitot,stot,chgtot,chitot,ifsort)
+    endif
   endif
 
   nstp_done = istp
@@ -2846,9 +2853,9 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
 !  Opposite to space_decomp, gather atoms from every process
 !  to create the total system for output.
 !
-  use pmdio,only: ntot,alptot
+  use pmdio,only: ntot
   use util,only: itotOf
-  use force,only: loverlay,ol_alphas
+!!$  use force,only: loverlay,ol_alphas
   implicit none
   include 'mpif.h'
   integer,intent(in):: ntot0,natm,nxyz,myid_md,mpi_md_world
@@ -2862,20 +2869,16 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
   integer:: n0,ixyz,natmt,i,ierr,ntott
   integer:: istat(mpi_status_size),itag
   real(8):: t0
-  real(8),allocatable,save:: ratmp(:,:),alptmp(:)
+  real(8),allocatable,save:: ratmp(:,:)
 !!$  integer,external:: itotOf
 
   t0 = mpi_wtime()
 
   if( .not. allocated(ratmp) ) then
-    allocate(ratmp(3,natm),alptmp(natm))
+    allocate(ratmp(3,natm))
   else if( size(ratmp).lt.3*natm ) then
-    deallocate(ratmp,alptmp)
-    allocate(ratmp(3,natm),alptmp(natm))
-  endif
-
-  if( loverlay ) then
-    alptmp(1:natm) = ol_alphas(0,1:natm)
+    deallocate(ratmp)
+    allocate(ratmp(3,natm))
   endif
 
   if( myid_md.eq.0 ) then
@@ -2889,7 +2892,6 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
     stot(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
     chgtot(1:natm) = chg(1:natm)
     chitot(1:natm) = chi(1:natm)
-    if( loverlay ) alptot(1:natm) = alptmp(1:natm)
     ntott = natm
     n0 = n0 +1
     do ixyz=1,nxyz-1
@@ -2915,10 +2917,6 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
            ,ixyz,itag+8,mpi_md_world,istat,ierr)
       call mpi_recv(chitot(n0),natmt,mpi_real8 &
            ,ixyz,itag+9,mpi_md_world,istat,ierr)
-      if( loverlay ) then
-        call mpi_recv(alptot(n0),natmt,mpi_real8 &
-             ,ixyz,itag+10,mpi_md_world,istat,ierr)
-      endif
       n0 = n0 + natmt
     enddo
     tspdcmp = tspdcmp +(mpi_wtime()-t0)
@@ -2956,24 +2954,21 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
          ,mpi_md_world,ierr)
     call mpi_send(chi,natm,mpi_real8,0,itag+9 &
          ,mpi_md_world,ierr)
-    if( loverlay ) then
-      call mpi_send(alptmp,natm,mpi_real8,0,itag+10 &
-           ,mpi_md_world,ierr)
-    endif
   endif
   call mpi_barrier(mpi_md_world,ierr)
 
 end subroutine space_comp
 !=======================================================================
-subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi)
+subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi,ifsort)
 !
 !  Sort by tag for output.
+!  - ifsort
+!      1: quick sort
+!      2: heap sort
 !  
   use util,only: itotOf
-  use pmdio,only: alptot
-  use force,only: loverlay
   implicit none
-  integer,intent(in):: natm
+  integer,intent(in):: natm,ifsort
   real(8),intent(inout):: ra(3,natm),va(3,natm),aa(3,natm) &
        ,eki(3,3,natm),epi(natm),strs(3,3,natm),tag(natm) &
        ,chg(natm),chi(natm)
@@ -2986,7 +2981,6 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi)
 !!$  integer,external:: itotOf
 
   ndata = 31
-  if( loverlay ) ndata = ndata +1
 
   if( .not. allocated(itag) .or. natm.gt.nsave ) then
     if( allocated(itag) ) deallocate(itag,buf)
@@ -3008,12 +3002,14 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi)
     buf(27,i)= chg(i)
     buf(28,i)= chi(i)
     buf(29:31,i)= aa(1:3,i)
-    if( loverlay ) buf(ndata,i)= alptot(i)
     itag(i)= itotOf(tag(i))
   enddo
 
-!!$  call heapsort_itag(natm,natm,itag,31,buf)
-  call qsort_itag(natm,1,natm,itag,ndata,buf)
+  if( ifsort.eq.2 ) then
+    call heapsort_itag(natm,natm,itag,31,buf)
+  else  ! default 1
+    call qsort_itag(natm,1,natm,itag,ndata,buf)
+  endif
 
   do i=1,natm
     ra(1:3,i)= buf(1:3,i)
@@ -3029,7 +3025,6 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi)
     chg(i)= buf(27,i)
     chi(i)= buf(28,i)
     aa(1:3,i)= buf(29:31,i)
-    if( loverlay ) alptot(i)= buf(ndata,i)
   enddo
 
 end subroutine sort_by_tag

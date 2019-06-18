@@ -53,7 +53,8 @@ subroutine set_variable(ionum,cname)
   if( trim(cname).eq.'time_interval' ) then
     call read_r1(ionum,dt)
     return
-  elseif( trim(cname).eq.'vardt_length_scale' ) then
+  elseif( trim(cname).eq.'vardt_length_scale' .or. &
+       trim(cname).eq.'fire_max_length' ) then
     call read_r1(ionum,vardt_len)
     return
   elseif( trim(cname).eq.'max_num_atoms' ) then
@@ -455,7 +456,7 @@ subroutine read_dumpaux(ionum)
 !
 !  Read dump_aux_order entry
 !
-  use pmdio, only: cdumpaux
+  use pmdio, only: cdumpaux,ldumpaux_changed
   use util, only: num_data
   implicit none 
   integer,intent(in):: ionum
@@ -471,5 +472,6 @@ subroutine read_dumpaux(ionum)
   read(ctmp,*) (ctmp1(i),i=1,ndat)
 !.....Create cdumpaux string without entry keyword, dump_aux_order
   write(cdumpaux,*) (trim(ctmp1(i))//' ',i=2,ndat)
+  ldumpaux_changed = .true.
   deallocate(ctmp1)
 end subroutine read_dumpaux

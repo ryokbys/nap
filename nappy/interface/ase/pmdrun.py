@@ -8,7 +8,8 @@ import subprocess
 import numpy as np
 from ase.calculators.calculator import FileIOCalculator,Calculator
 
-from pmdio import read_pmd,write_pmd,get_fmvs
+from pmdio import get_fmvs
+from nappy.napsys import NAPSystem
 
 __author__  = "Ryo KOBAYASHI"
 __version__ = "160605"
@@ -66,7 +67,7 @@ class PMD(FileIOCalculator):
                           [0.0, 0.0, 0.0]],
         'stress_relax_time': 20.0,
         'flag_compute_stress': 'T',
-        'mass': [28.0855,4.0,],
+        'mass': {'W':183.14, 'H':1.008,},
         'zload_type': 'none',
         'final_strain': 0.0,
         'boundary': 'ppp',
@@ -143,9 +144,9 @@ class PMD(FileIOCalculator):
 
     def relax(self, atoms=None, properties=['energy'],
               system_changes=some_changes,
-              flag_damping=2,
+              flag_damping=1,damping_coeff=0.95,
               converge_eps=1.0e-3,num_iteration=100,min_iteration=5,
-              converge_num=3,time_interval=2.0,
+              converge_num=3,time_interval=0.5,
               initial_temperature=10.0, stress_control='none',
               pressure_target=0.0,
               stress_target=[[0.,0.,0.],[0.,0.,0.],[0.,0.,0.]]):
@@ -154,6 +155,7 @@ class PMD(FileIOCalculator):
         optimize module in ASE.
         """
         self.set(flag_damping=flag_damping,
+                 damping_coeff=damping_coeff,
                  converge_eps=converge_eps,
                  num_iteration=num_iteration,
                  min_iteration=min_iteration,
@@ -186,7 +188,9 @@ class PMD(FileIOCalculator):
 
         if self.label == 'pmd':
             infname = 'in.pmd'
-            write_pmd(atoms,fname='pmdini',specorder=self.specorder)
+            # write_pmd(atoms,fname='pmdini',specorder=self.specorder)
+            nsys = NAPSystem.from_ase_atoms(atoms,specorder=self.specorder)
+            nsys.write_pmd(fname='pmdini')
             
         with open(infname,'w') as f:
             fmvs,ifmvs = get_fmvs(atoms)
@@ -244,7 +248,7 @@ class PMD(FileIOCalculator):
             frcs= np.zeros((num,3))
             for i in range(num):
                 data= [ float(x) for x in f.readline().split() ]
-                frcs[i,:] = data[:]
+                frcs[i,0:3] = data[0:3]
             self.results['forces'] = frcs
 
         if os.path.exists(strfname):
@@ -257,7 +261,9 @@ class PMD(FileIOCalculator):
         
         if relax:
             posfile = 'pmdfin'
-            tmpatoms = read_pmd(fname=posfile,specorder=self.specorder)
+            nsys = NAPSystem(fname=posfile,specorder=self.specorder)
+            #tmpatoms = read_pmd(fname=posfile,specorder=self.specorder)
+            tmpatoms = nsys.to_ase_atoms()
             self.results['relaxed_scaled_positions'] \
                 = tmpatoms.get_scaled_positions()
             self.results['relaxed_cell'] = tmpatoms.get_cell()
@@ -284,6 +290,7 @@ def get_input_txt(params,fmvs):
            'stress_control','pressure_target','stress_target',
            'stress_relax_time','flag_compute_stress','',
            'mass','',
+           'overlay','overlay_type','',
            'zload_type','final_strain','',
            'boundary']
 
@@ -299,7 +306,8 @@ def get_input_txt(params,fmvs):
                 'converge_eps','final_strain']
     str_keys=['io_format','force_type','temperature_control',
               'stress_control','flag_temp_dist',
-              'flag_compute_stress','zload_type','boundary']
+              'flag_compute_stress','zload_type','boundary',
+              'overlay_type']
 
     for key in order:
         
@@ -332,11 +340,15 @@ def get_input_txt(params,fmvs):
                 v = vals[i]
                 txt += '  {0:6.2f} {1:6.2f} {2:6.2f}\n'.format(v[0],v[1],v[2])
         elif key is 'mass':
-            vals = params[key]
-            for i,v in enumerate(vals):
-                txt += '{0:25s} {1:2d} {2:10.4f}\n'.format(key,i+1,v)
+            masses = params[key]
+            for k,v in masses.items():
+                txt += '{0:25s} {1:3s}  {2:10.4f}\n'.format(key,k,v)
         elif key is 'converge_eps':
             txt += '{0:25s} {1:10.1e}\n'.format(key,params[key])
+        elif key is 'overlay':
+            ols = params[key]
+            for k,v in ols.items():
+                txt += '{0:25s} {1:3s}  {2:6.2f} {3:6.2f}\n'.format(key,k,v[0],v[1])
         elif key in int_keys:
             txt += '{0:25s} {1:3d}\n'.format(key,params[key])
         elif key in float_keys:
