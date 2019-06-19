@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-06 13:08:29 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-19 12:28:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -630,7 +630,7 @@ contains
           alp(jsp,isp)= alp(isp,jsp)
           interact(jsp,isp)= interact(isp,jsp)
         else
-          if( iprint.gt.0 ) then
+          if( iprint.gt.1 ) then
             print *,' Morse parameter read but not used: cspi,cspj=',cspi,cspj
           endif
         endif

@@ -77,10 +77,12 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'num_out_energy' ) then
     call read_i1(ionum,nerg)
     return
-  elseif( trim(cname).eq.'flag_out_pmd' ) then
+  elseif( trim(cname).eq.'flag_out_pmd' .or. &
+       trim(cname).eq.'flag_out_pos' ) then
     call read_i1(ionum,ifpmd)
     return
-  elseif( trim(cname).eq.'num_out_pmd' ) then
+  elseif( trim(cname).eq.'num_out_pmd' .or. &
+       trim(cname).eq.'num_out_pos' ) then
     call read_i1(ionum,npmd)
     return
   elseif( trim(cname).eq.'dump_aux_order' ) then

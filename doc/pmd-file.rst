@@ -22,11 +22,11 @@ File format
    9 :  0.00000000000000E+000  0.00000000000000E+000  0.00000000000000E+000
    10:  0.00000000000000E+000  0.00000000000000E+000  0.00000000000000E+000
    11:        55
-   12:  1.10000000000001E+000  1.000E-007  1.000E-007  1.000E-007  3.62E-004  1.60E-004  9.60E-004  2.29E-01 -4.12E+00 -4.70E-03 -3.82E-15 -5.34E-15 -5.34E-15 -4.70E-03 -7.47E-05
-   13:  1.10000000000002E+000  1.666E-001  1.666E-001  1.666E-001  3.62E-004  1.60E-004  9.60E-004  2.29E-01 -4.12E+00 -4.70E-03 -3.82E-15 -5.34E-15 -5.34E-15 -4.70E-03 -7.47E-05
+   12:  1.10000000000001E+000  1.000E-007  1.000E-007  1.000E-007  3.62E-004  1.60E-004  9.60E-004
+   13:  1.10000000000002E+000  1.666E-001  1.666E-001  1.666E-001  3.62E-004  1.60E-004  9.60E-004
    14:  ...
-   15:  1.10000000000054E+000  9.00E-001  9.00E-007  9.00E-001  3.62E-004  1.60E-004  9.60E-004  2.29E-01 -4.12E+00 -4.70E-03 -3.82E-15 -5.34E-15 -5.34E-15 -4.70E-03 -7.47E-05
-   16:  2.10000000000055E+000  5.33E-001  5.33E-001  5.33E-001  3.62E-004  1.60E-004  9.60E-004  2.29E-01 -4.12E+00 -4.70E-03 -3.82E-15 -5.34E-15 -5.34E-15 -4.70E-03 -7.47E-05
+   15:  1.10000000000054E+000  9.00E-001  9.00E-007  9.00E-001  3.62E-004  1.60E-004  9.60E-004
+   16:  2.10000000000055E+000  5.33E-001  5.33E-001  5.33E-001  3.62E-004  1.60E-004  9.60E-004
 
 Here, line numbers are shown for the ease of explanation.
 
@@ -66,8 +66,6 @@ After line 11:
 5-7th column after line 11:
   *x* , *y* , and *z* components of the atom vector that are also normalized.
 
-8-15the column after line 11:
-  Atomic kinetic energy, atomic potential energy, and atomic stress tensor components, 1,2,3,4,5,6.
 
 ----------------
 
@@ -81,13 +79,10 @@ Sample Fortran code
    write(ionum,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3) &
         ,ib=1,3),l=0,1)
    write(ionum,'(i10)') natm
-   write(ionum,'(7es23.14e3,8es22.14)') (tag(i),ra(1:3,i)+sorg(1:3) &
-        ,va(1:3,i)/dt &
-        ,eki(1,1,i)+eki(2,2,i)+eki(3,3,i) &
-        ,epi(i), &
-        ,strs(1,1,i)*up2gpa,strs(2,2,i)*up2gpa,strs(3,3,i)*up2gpa, &
-        ,strs(2,3,i)*up2gpa,strs(1,3,i)*up2gpa,strs(1,2,i)*up2gpa,i=1,natm)
-   close(ionum)
+   do i=1,ntot
+     write(ionum,'(7es23.14e3)') tag(i), rtot(1:3,i), vtot(1:3,i)
+     close(ionum)
+   enddo
 
 Detail explanations of variables are omitted.
 Users can write their own code by following this sample Fortran code.

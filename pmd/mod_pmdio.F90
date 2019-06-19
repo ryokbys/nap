@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-12 22:40:36 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-18 17:35:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -175,10 +175,11 @@ contains
     allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
          ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0))
     do i=1,ntot0
-      read(ionum,*) tagtot(i),rtot(1:3,i),vtot(1:3,i) &
-           ,ekitot(1,1,i),epitot(i) &
-           ,stot(1,1,i),stot(2,2,i),stot(3,3,i) &
-           ,stot(2,3,i),stot(3,1,i),stot(1,2,i)
+!!$      read(ionum,*) tagtot(i),rtot(1:3,i),vtot(1:3,i) &
+!!$           ,ekitot(1,1,i),epitot(i) &
+!!$           ,stot(1,1,i),stot(2,2,i),stot(3,3,i) &
+!!$           ,stot(2,3,i),stot(3,1,i),stot(1,2,i)
+      read(ionum,*) tagtot(i),rtot(1:3,i),vtot(1:3,i)
     enddo
     close(ionum)
 
@@ -207,14 +208,15 @@ contains
          ,ib=1,3),l=0,1)
     write(ionum,'(i10)') ntot
     do i=1,ntot
+!!$      write(ionum,'(7es23.14e3,11es13.4e3)') tagtot(i) &
+!!$           ,rtot(1:3,i) &
+!!$           ,vtot(1:3,i) & !/dt
+!!$           ,ekitot(1,1,i)+ekitot(2,2,i)+ekitot(3,3,i) &
+!!$           ,epitot(i) &
+!!$           ,stot(1,1,i),stot(2,2,i),stot(3,3,i) &
+!!$           ,stot(2,3,i),stot(3,1,i),stot(1,2,i)
       write(ionum,'(7es23.14e3,11es13.4e3)') tagtot(i) &
-           ,rtot(1:3,i) &
-           ,vtot(1:3,i) & !/dt
-           ,ekitot(1,1,i)+ekitot(2,2,i)+ekitot(3,3,i) &
-           ,epitot(i) &
-           ,stot(1,1,i),stot(2,2,i),stot(3,3,i) &
-           ,stot(2,3,i),stot(3,1,i),stot(1,2,i)
-
+           ,rtot(1:3,i),vtot(1:3,i)    ! dt
     enddo
     close(ionum)
 

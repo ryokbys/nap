@@ -19,10 +19,6 @@ Example of *in.pmd*
   #  unit of length= Angstrom
   #  unit of mass  = unified atomic mass unit
   #
-    num_nodes_x       1
-    num_nodes_y       1
-    num_nodes_z       1
-  
     io_format         ascii
     print_level       1
   
@@ -31,11 +27,10 @@ Example of *in.pmd*
     min_iteration     10
     num_out_energy    100
   
-    flag_out_pmd      1
-    num_out_pmd       10
-    flag_sort         1
+    flag_out_pos      1
+    num_out_pos       10
   
-    force_type        NN
+    force_type        Morse Coulomb
     cutoff_radius     5.8d0
     cutoff_buffer     0.2d0
   
@@ -82,8 +77,8 @@ Parameters users can set in ``in.pmd`` are following:
 * :ref:`num_iteration`
 * :ref:`min_iteration`
 * :ref:`num_out_energy`
-* :ref:`flag_out_pmd`
-* :ref:`num_out_pmd`
+* :ref:`flag_out_pos`
+* :ref:`num_out_pos`
 * :ref:`flag_sort`
 * :ref:`force_type`
 * :ref:`flag_damping`
@@ -226,9 +221,9 @@ Number of outputs of energies.
 
 ------------------------
 
-.. _flag_out_pmd:
+.. _flag_out_pos:
 
-flag_out_pmd
+flag_out_pos/flag_out_pmd
 ------------------------------
 
 * Default: 1
@@ -239,16 +234,16 @@ A flag whether or not to write atomic configurations to files at certain steps.
   Not to write.
 
 1:
-  Write *pmd*-format atomic configurations to files ``pmd####`` where ``####`` indicates sequential number of the files.
+  Write *pmd*-format atomic configurations to files ``pmd_####`` where ``####`` indicates sequential number of the files.
 
 2:
-  Write LAMMPS *dump*-fomrat atomic configurations to files ``dump####``.
+  Write LAMMPS *dump*-fomrat atomic configurations to files ``dump_####``.
 
 ------------------------
 
-.. _num_out_pmd:
+.. _num_out_pos:
 
-num_out_pmd
+num_out_pos/num_out_pmd
 ------------------------------
 
 * Default: 10
@@ -281,16 +276,18 @@ A flag whether or not to sort the order of atoms by tag before writing out atomi
 force_type
 ------------------------------
 
-* Default: ``LJ-Ar``
+* Default: None
 
 Choice of the interatomic potential.
 Available potentials are listed below:
 
-* ``LJ_Ar`` : Lennard-Jones potential for Ar system.
+* ``LJ`` : Lennard-Jones potential for Ar system.
 * ``SW_Si`` : Stillinger-Weber potential for Si system.
 * ``EDIP_Si`` : Environment Dependent Interatomic Potential for Si system.
 * ``Ito3_WHe`` : EAM potential for W-He system made by Ito et al. @NIFS.
-* ``NN`` : Neural-network potential that requires two input files ``in.const.NN`` and ``in.params.NN``.
+* ``Morse`` : Morse potential that requires an input files ``in.params.Morse``.
+* ``Coulomb`` : Coulomb potential that requires an input files ``in.params.Coulomb``.
+* ``NN2`` : Neural-network potential that requires two input files ``in.params.desc`` and ``in.params.NN2``.
 
 ------------------------
 

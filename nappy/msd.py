@@ -18,8 +18,9 @@ Options:
                 Num of measuring lane. In case of 1, it is identical to non-staggered measuring. [default: 1]
   -s, --shift SHIFT
                 Shift of each staggered lane. [default: 20]
-  --sid SID     Species ID. [default: 0]
+  --spcs=SPCS   Species name whose MSD is to be computed. [default: None]
 """
+from __future__ import print_function
 
 import numpy as np
 from docopt import docopt
@@ -45,7 +46,7 @@ def get_ids(nsys,ids):
     return atom_ids
 
     
-def get_msd(files,ids0,nmeasure,nshift,sid=0):
+def get_msd(files,ids0,nmeasure,nshift,spcs='None'):
     """
     Compute MSD specified species-ID from sequential structure FILES.
     
@@ -59,15 +60,15 @@ def get_msd(files,ids0,nmeasure,nshift,sid=0):
             Number of staggered lanes to compute MSD for better statistics.
       - nshift: int
             Number of files to be skipped for each staggered lane.
-      - sid: int
-            Species-ID. If it is 0, no species-ID is specified. [defalut: 0]
+      - spcs: string
+            Species name. If it is None, no species is specified. [defalut: None]
 
     Output:
       - msd: Numpy array of dimension, (len(files),nmeasure,3).
     """
-    if sid != 0:
+    if spcs != 'None':
         nsys = NAPSystem(fname=files[0])
-        ids = [ i for i,a in enumerate(nsys.atoms) if a.sid == sid ]
+        ids = [ i for i,a in enumerate(nsys.atoms) if a.symbol == spcs ]
     else:
         if 0 in ids0:
             nsys = NAPSystem(fname=files[0])
@@ -147,8 +148,8 @@ if __name__ == "__main__":
 
     files = args['FILES']
     ids = args['--id']
-    sid = int(args['--sid'])
-    if sid == 0:
+    spcs = args['--spcs']
+    if spcs == 'None':
         ids = [ int(i) for i in ids.split(',') ]
     nmeasure = int(args['--measure'])
     nshift = int(args['--shift'])
@@ -164,7 +165,7 @@ if __name__ == "__main__":
     # for i in range(len(files)):
     #     print i,files[i]
     
-    msd = get_msd(files,ids,nmeasure,nshift,sid)
+    msd = get_msd(files,ids,nmeasure,nshift,spcs)
 
     #...make output data files
     outfname='out.msd'

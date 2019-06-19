@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-06 13:08:55 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-18 22:17:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -817,7 +817,6 @@ contains
 
     if( myid.eq.0 .and. iprint.ne.0 ) then
       write(6,'(a)') ' Finished reading '//trim(fname)
-      write(6,*) ''
     endif
     params_read = .true.
     
@@ -1479,8 +1478,8 @@ contains
 !  smoothing using vrc and dVdrc where
 !    V_smooth(r) = V(r) -V(rc) -(r-rc)*dVdrc
 !
-    use ZBL,only: zeta,dzeta
-    use ZBL,only: interact_zbl => interact
+!!$    use ZBL,only: zeta,dzeta
+!!$    use ZBL,only: interact_zbl => interact
     implicit none
     include "mpif.h"
     include "./params_unit.h"
