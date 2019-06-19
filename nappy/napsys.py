@@ -402,21 +402,30 @@ class NAPSystem(object):
                         natm = int(data[0])
                     # 9th-: atom positions
                     else:
-                        if len(data) < 15:
-                            continue
-                        fdata = [float(x) for x in data]
-                        ai= Atom()
-                        ai.decode_tag(fdata[0])
-                        if self.specorder:
-                            symbol = self.specorder[ai.sid-1]
-                        if symbol and ai.symbol != symbol:
-                            ai.set_symbol(symbol)
-                        ai.set_pos(fdata[1],fdata[2],fdata[3]) # position
-                        ai.set_vel(fdata[4],fdata[5],fdata[6]) # velocity
-                        ai.set_ekin(fdata[7])
-                        ai.set_epot(fdata[8])
-                        ai.set_strs(fdata[9],fdata[10],fdata[11],
-                                    fdata[12],fdata[13],fdata[14])
+                        if len(data) == 15:
+                            fdata = [float(x) for x in data]
+                            ai= Atom()
+                            ai.decode_tag(fdata[0])
+                            if self.specorder:
+                                symbol = self.specorder[ai.sid-1]
+                            if symbol and ai.symbol != symbol:
+                                ai.set_symbol(symbol)
+                            ai.set_pos(fdata[1],fdata[2],fdata[3]) # position
+                            ai.set_vel(fdata[4],fdata[5],fdata[6]) # velocity
+                            ai.set_ekin(fdata[7])
+                            ai.set_epot(fdata[8])
+                            ai.set_strs(fdata[9],fdata[10],fdata[11],
+                                        fdata[12],fdata[13],fdata[14])
+                        else:
+                            fdata = [float(x) for x in data]
+                            ai= Atom()
+                            ai.decode_tag(fdata[0])
+                            if self.specorder:
+                                symbol = self.specorder[ai.sid-1]
+                            if symbol and ai.symbol != symbol:
+                                ai.set_symbol(symbol)
+                            ai.set_pos(fdata[1],fdata[2],fdata[3]) # position
+                            ai.set_vel(fdata[4],fdata[5],fdata[6]) # velocity
                         self.atoms.append(ai)
     
     def write_pmd(self,fname='pmdini'):
@@ -450,6 +459,17 @@ class NAPSystem(object):
         for i in range(len(self.atoms)):
             ai= self.atoms[i]
             ai.set_id(i+1)
+            # f.write(" {0:22.14e} {1:19.15f} {2:19.15f} {3:19.15f}".format(ai.tag(), \
+            #                                                 ai.pos[0],\
+            #                                                 ai.pos[1],\
+            #                                                 ai.pos[2])
+            #         +"  {0:8.4f}  {1:8.4f}  {2:8.4f}".format(ai.vel[0], 
+            #                                                  ai.vel[1],
+            #                                                  ai.vel[2])
+            #         +"  {0:4.1f}  {1:4.1f}".format(0.0, 0.0)
+            #         +"  {0:4.1f}  {1:4.1f}  {2:4.1f}".format(0.0, 0.0, 0.0)
+            #         +"  {0:4.1f}  {1:4.1f}  {2:4.1f}".format(0.0, 0.0, 0.0)
+            #         +"\n")
             f.write(" {0:22.14e} {1:19.15f} {2:19.15f} {3:19.15f}".format(ai.tag(), \
                                                             ai.pos[0],\
                                                             ai.pos[1],\
@@ -457,9 +477,6 @@ class NAPSystem(object):
                     +"  {0:8.4f}  {1:8.4f}  {2:8.4f}".format(ai.vel[0], 
                                                              ai.vel[1],
                                                              ai.vel[2])
-                    +"  {0:4.1f}  {1:4.1f}".format(0.0, 0.0)
-                    +"  {0:4.1f}  {1:4.1f}  {2:4.1f}".format(0.0, 0.0, 0.0)
-                    +"  {0:4.1f}  {1:4.1f}  {2:4.1f}".format(0.0, 0.0, 0.0)
                     +"\n")
         f.close()
 
