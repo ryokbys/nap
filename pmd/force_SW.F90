@@ -1,8 +1,8 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-06 01:02:31 Ryo KOBAYASHI>
+!                     Last modified: <2019-06-22 22:16:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
-
+  use pmdio,only: nspmax, csp2isp
   integer,parameter:: ioprms = 50
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.SW'
@@ -31,7 +31,7 @@ module SW
   real(8):: sws   = 21.d0
   real(8):: swt   = 1.2d0
 
-  integer,parameter:: msp = 9
+  integer,parameter:: msp = nspmax
   integer:: nsp
 
   logical:: interact(msp,msp)
@@ -49,7 +49,7 @@ module SW
 contains
   subroutine force_SW(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_world,myid,epi,epot,nismax,lstrs,iprint)
+       ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of SW(Si) force calculation for pmd
 !    - 2014.04.07 by R.K.
@@ -68,27 +68,27 @@ contains
          ,h(3,3),hi(3,3),sv(3,6),rc
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical:: lstrs
+    character(len=3),intent(in):: specorder(msp)
+    logical,intent(in):: lstrs
 
 !-----local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl
     real(8):: rij,rik,riji,riki,rij2,rik2,rc2,src,src2,srcij,srcij2,srcik,srcik2
     real(8):: tmp,tmpj(3),tmpk(3),vexp,df2,csn,tcsn,tcsn2,dhrij,dhrik &
          ,dhcsn,vol,voli,volj,volk,drij(3),rcmax
-    real(8):: drik(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl
+    real(8):: drik(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl &
+         ,xi(3),xj(3),xk(3),xij(3),xik(3),at(3)
     real(8):: epotl,epotl2,epotl3,epott
     real(8),save:: swli,a8d3r3,rcmax2
     real(8),save,allocatable:: aa2(:,:),aa3(:,:)
-    real(8),save,allocatable,dimension(:):: xi,xj,xk,xij,xik,at,bli
     real(8),allocatable,save:: strsl(:,:,:)
 !-----1st call
     logical,save:: l1st=.true.
 
 !-----only at 1st call
     if( l1st ) then
-      call read_params_SW(myid,mpi_world,iprint)
+      call read_params_SW(myid,mpi_world,iprint,specorder)
       allocate(aa2(3,namax),aa3(3,namax),strsl(3,3,namax))
-      allocate(xi(3),xj(3),xk(3),xij(3),xik(3),at(3),bli(namax))
 !-------check rc
       rcmax = 0d0
       do is=1,msp
@@ -116,6 +116,11 @@ contains
 !!$      avol= 5.427d0**3/8
 !-------finally set l1st
       l1st=.false.
+    endif
+
+    if( size(aa2).ne.3*namax ) then
+      deallocate(aa2,aa3,strsl)
+      allocate(aa2(3,namax),aa3(3,namax),strsl(3,3,namax))
     endif
 
     epotl= 0d0
@@ -220,6 +225,7 @@ contains
           ks= int(tag(k))
           if( .not. interact3(is,js,ks) ) cycle
           srcik= aswrc(is,ks)
+          xk(1:3)= ra(1:3,k)
           x = xk(1) -xi(1)
           y = xk(2) -xi(2)
           z = xk(3) -xi(3)
@@ -285,31 +291,39 @@ contains
 !-----gather epot
     epotl= epotl2 +epotl3
 !!$    epotl= epotl3
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
-         ,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
     epot= epot +epott
     if( iprint.gt.2 ) print *,'SW epot = ',epott
     return
   end subroutine force_SW
 !=======================================================================
-  subroutine read_params_SW(myid,mpi_world,iprint)
+  subroutine read_params_SW(myid,mpi_world,iprint,specorder)
     use util, only: num_data
     implicit none
     include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
+    character(len=3),intent(in):: specorder(msp)
 
     integer:: itmp,ierr,isp,jsp,ksp,nd
     real(8):: rctmp,tswa,tswb,tswp,tswq,tswc,tswrc,tsws,tswt
     logical:: lexist
     character(len=128):: cfname,ctmp,cline
+    character(len=3):: cspi,cspj
 
 !!$    integer,external:: num_data
 
 !.....read parameters at the 1st call
     if( myid.eq.0 ) then
-!.....Initialize parameters
+!.....Interact between only Si
       interact(1:msp,1:msp) = .false.
-      interact(1,1) = .true.
+      interact3(1:msp,1:msp,1:msp) = .false.
+      do isp=1,msp
+        cspi = specorder(isp)
+        if( trim(cspi).ne.'Si' ) cycle
+        interact(isp,isp) = .true.
+        interact3(isp,isp,isp) = .true.
+      enddo
+!.....Initialize parameters
       aswe = swe
       aswl = swl
       aswa(1,1) = swa
@@ -318,8 +332,6 @@ contains
       aswq(1,1) = swq
       aswc(1,1) = swc
       aswrc(1,1) = swrc
-      interact3(1:msp,1:msp,1:msp) = .false.
-      interact3(1,1,1) = .true.
       asws(1,1,1) = sws
       aswt(1,1,1) = swt
 !.....Check whether the file exists      

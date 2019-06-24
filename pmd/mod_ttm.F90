@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-05 12:46:41 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-22 23:11:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -701,7 +701,7 @@ contains
             print *,'WARNING: Since Te<0, changed dt_inner and nstp_inner=',dt_inner,nstp_inner
             goto 10  ! Go back and redo inner loop with the half dt_inner
           endif
-        enddo
+        enddo  ! ic=1,nxyz
         if( trim(ctype_pulse).eq.'stepwise' ) then
           if( tnow.ge.t0_laser .and. &
                tnow.lt.(t0_laser +tau_pulse) ) then
@@ -746,7 +746,7 @@ contains
           endif
         endif
         te(:,:,:) = tep(:,:,:)
-      enddo
+      enddo  ! istp=1,nstp_inner
       if(iprint.gt.1) then
         if( (trim(ctype_pulse).eq.'gaussian' .and. &
              (tnow.ge.t0_laser .and. tnow.le.(t0_laser+tau_pulse*2)) ) &
@@ -1184,7 +1184,8 @@ contains
       inquire(unit=ioergio, opened=lopen)
       if( .not. lopen ) then
         open(ioergio,file=trim(cergio),status='replace')
-        write(ioergio,'(a)') '# istp, time, ein_el, eout_el, ein_at, eout_at'
+        write(ioergio,'(a)') '# istp,   time,          ein_el,' &
+             //'          eout_el,          ein_at,          eout_at'
       endif
       write(ioergio,'(i8,5es15.7)') istp, simtime, ein_e, eout_e, ein_a, eout_a
       call flush(ioergio)

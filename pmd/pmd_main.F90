@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-13 16:28:57 Ryo KOBAYASHI>
+!                     Last-modified: <2019-06-24 05:30:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -734,7 +734,7 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
   real(8),intent(in):: h(3,3),rc
   integer,intent(inout):: nx,ny,nz
 
-  integer:: imax,nd(3),ndnew(3),nnew
+  integer:: imax,nd(3),ndnew(3),nnew,iorder(3),i,j,k,l,m,n
   real(8):: al0(3),al(3)
 
 !.....If serial run, NX,NY,NZ should all be 1.
@@ -755,50 +755,58 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
   nd(3) = 1 
   al(1:3) = al0(1:3) /nd(1:3)
   if( al(1).lt.rc .and. al(2).lt.rc .and. al(3).lt.rc ) then
-    nx = 1
-    ny = 1
-    nz = 1
     goto 10
   endif
 
 !.....Loop until total num of division exceeds num of MPI parallel nodes
   do
 !.....Increase num of division of the axis of which divided length is the longest
-!.....Check whether 
-    imax = 1
-    if( al(2).gt.al(imax) ) imax = 2
-    if( al(3).gt.al(imax) ) imax = 3
-!!$    if( imax.eq.1 ) then
-!!$      if( al(3).gt.al(1) ) imax = 3
-!!$    else ! imax==2
-!!$      if( al(3).gt.al(2) ) imax = 3
-!!$    endif
-    ndnew(1:3) = nd(1:3)
-    ndnew(imax) = ndnew(imax) +1
+    iorder(1:3) = (/1,2,3/)
+    do i=2,1,-1
+      do j=1,i
+        l = iorder(j)
+        m = iorder(j+1)
+        if( al(l).lt.al(m) ) then
+          iorder(j) = m
+          iorder(j+1) = l
+        endif
+      enddo
+    enddo
+
+    do n=1,3
+      imax = iorder(n)
+      ndnew(1:3) = nd(1:3)
+      ndnew(imax) = ndnew(imax) +1
 
 !.....New total num of divisions
-    nnew = ndnew(1)*ndnew(2)*ndnew(3)
-    al(1:3) = al0(1:3) /ndnew(1:3)
+      nnew = ndnew(1)*ndnew(2)*ndnew(3)
+      al(1:3) = al0(1:3) /ndnew(1:3)
 
 !.....Check whether the total num exceeds num of MPI parallel
-    if( nnew.gt.nnode ) then
-      exit  ! use previous nd(:)
-    else if( nnew.eq.nnode ) then
-      nd(1:3) = ndnew(1:3)  ! use current ndnew(:)
-      exit
+      if( nnew.gt.nnode ) then
+        cycle
+      else if( nnew.eq.nnode ) then
+        nd(1:3) = ndnew(1:3)  ! use current ndnew(:)
+        goto 10
 !.....Check whether the minimum divided length is shorter than cutoff radius         
-    else if( al(1).lt.rc .or. al(2).lt.rc .or. al(3).lt.rc ) then
-      exit  ! use previous nd(:)
-    endif
+      else if( (ndnew(1).ne.1.and.al(1).lt.rc) .or. &
+         (ndnew(2).ne.1.and.al(2).lt.rc) .or. &
+         (ndnew(3).ne.1.and.al(3).lt.rc) ) then
+        goto 10  ! use previous nd(:)
+      else
+        exit  ! exit do n=1,3
+      endif
+    enddo
 
     nd(1:3) = ndnew(1:3)
   enddo
 
+10 continue
   nx = nd(1)
   ny = nd(2)
   nz = nd(3)
 
-10 if( iprint.gt.0 ) then
+ if( iprint.gt.0 ) then
     print '(a,3(1x,i0))',' Number of spatial divisions ' &
         //'automatically set, NX,NY,NZ=',nx,ny,nz
   endif
