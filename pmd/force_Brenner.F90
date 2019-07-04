@@ -39,8 +39,10 @@ contains
     if( l1st ) then
 !-------check rc
       if( rc.lt.br_r2 ) then
-        write(6,'(1x,a)') "!!! Cutoff radius is not appropriate !!!"
-        write(6,'(1x,a,es12.4)') "rc should be larger than ",br_r2
+        if( myid_md.eq.0 ) then
+          write(6,'(1x,a)') "!!! Cutoff radius is not appropriate !!!"
+          write(6,'(1x,a,es12.4)') "rc should be larger than ",br_r2
+        endif
         call mpi_finalize(ierr)
         stop
       endif

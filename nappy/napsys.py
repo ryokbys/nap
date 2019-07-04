@@ -1422,6 +1422,9 @@ You need to specify the species order correctly with --specorder option.
             spcorder = specorder
         symbols = ase_atoms.get_chemical_symbols()
         spos = ase_atoms.get_scaled_positions()
+        vels = ase_atoms.get_velocities()
+        cell = ase_atoms.get_cell()
+        celli = np.linalg.inv(cell)
         #...initialize and remake self.specorder
         for s in symbols:
             if s not in spcorder:
@@ -1435,6 +1438,8 @@ You need to specify the species order correctly with --specorder option.
         nap.atoms = []
         #...append each atom from ASE-Atoms
         for ia,spi in enumerate(spos):
+            vi = vels[ia]
+            svi = np.dot(celli,vi)
             si = symbols[ia]
             ai = Atom()
             sid = nap.specorder.index(si)+1
@@ -1442,7 +1447,7 @@ You need to specify the species order correctly with --specorder option.
             ai.set_sid(sid)
             ai.set_symbol(si)
             ai.set_pos(spi[0],spi[1],spi[2])
-            ai.set_vel(0.,0.,0.)
+            ai.set_vel(svi[0],svi[1],svi[2])
             nap.atoms.append(ai)
         return nap
 

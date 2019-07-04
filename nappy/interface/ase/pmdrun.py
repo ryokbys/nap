@@ -314,6 +314,8 @@ def get_input_txt(params,fmvs):
         # special keys first
         if key is '':
             txt += '\n'
+        elif not params.has_key(key):
+            continue
         elif key is 'force_type':
             vals = params[key]
             txt += '{0:25s} '.format('force_type')

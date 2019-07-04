@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-24 05:30:03 Ryo KOBAYASHI>
+!                     Last-modified: <2019-07-04 15:12:13 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -739,9 +739,9 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
 
 !.....If serial run, NX,NY,NZ should all be 1.
   if( nnode.eq.1 ) then
-    nx = 1
-    ny = 1
-    nz = 1
+    nd(1) = 1
+    nd(2) = 1
+    nd(3) = 1 
     goto 10
   endif
 

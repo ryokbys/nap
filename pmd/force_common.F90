@@ -34,6 +34,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use Bonny_WRe,only: force_Bonny_WRe
   use ZBL,only: force_ZBL,force_ZBL_overlay,r_inner
   use cspline,only: force_cspline
+  use tersoff,only: force_tersoff
   implicit none
   integer,intent(in):: namax,natm,nnmax,nismax,iprint
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
@@ -113,6 +114,9 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   if( use_force('EDIP_Si') ) call force_EDIP_Si(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
+  if( use_force('Tersoff') ) call force_tersoff(namax,natm,tag,ra,nnmax,aa &
+       ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint)
   if( use_force('Brenner') ) call force_Brenner(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
@@ -251,6 +255,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use descriptor, only: read_params_desc,init_desc
   use NN2, only: read_params_NN2,lprmset_NN2,update_params_NN2
   use pmdio,only: nspmax
+  use tersoff,only: init_tersoff
   implicit none
   integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint !,numff
   real(8),intent(in):: tag(namax),h(3,3),rc
@@ -385,6 +390,11 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
 !.....Read only in.params.desc
       call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
     endif
+  endif
+
+!.....Tersoff
+  if( use_force('Tersoff') ) then
+    call init_tersoff(myid_md,iprint,specorder)
   endif
 
 
