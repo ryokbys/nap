@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-13 19:07:58 Ryo KOBAYASHI>
+!                     Last-modified: <2019-07-05 14:15:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -19,7 +19,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use force
   use ttm,only: init_ttm,langevin_ttm,output_Te,t_ttm, &
        calc_Ta,update_Te,assign_atom2cell,output_energy_balance, &
-       remove_ablated_atoms,set_inner_dt
+       remove_ablated_atoms,set_inner_dt, te2tei
   use pmdmpi,only: nid2xyz,xyz2nid
   use metadynamics,only: init_metaD,update_metaD,force_metaD &
        ,write_metaD_potential
@@ -304,6 +304,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   else if( trim(ctctl).eq.'ttm' ) then
     call init_ttm(namax,natm,h,dt,lvardt,myid_md,mpi_md_world &
          ,iprint)
+    call assign_atom2cell(namax,natm,ra,sorg,boundary)
+    call te2tei(namax,natm,tei)
   endif
 
   tcpu1= mpi_wtime()
@@ -331,7 +333,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        trim(cpctl).eq.'vv-Berendsen')
 !.....Cell is new at the first call of get_force
   lcell_updated = .true.
-  call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
+  call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
        ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
        ,lspr,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
        ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
@@ -476,7 +478,6 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   tdump = tdump +(mpi_wtime() -tmp)
 
   if( trim(ctctl).eq.'ttm' ) then
-    call assign_atom2cell(namax,natm,ra,sorg,boundary)
     call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
          ,istp,myid_md,mpi_md_world,iprint)
     call output_Te(0,simtime,myid_md,iprint)
@@ -697,7 +698,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       lstrs = lstrs0
     endif
 !-------Calc forces
-    call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
+    call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
          ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
@@ -818,6 +819,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       call langevin_ttm(namax,natm,va,aa,tag,am,h &
            ,nspmax,fa2v,fekin,ediff,dt,myid_md,mpi_md_world,iprint)
       call update_Te(simtime,dt,myid_md,mpi_md_world,iprint)
+      call te2tei(namax,natm,tei)
     endif  ! end of thermostat
 
 
@@ -1220,7 +1222,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !      if( iprint.ge.10 ) print *,'get_force,myid_md,lcalcgrad='
 !     &     ,myid_md,lcalcgrad
   if( .not.lcalcgrad ) then
-    call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
+    call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
          ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
@@ -3099,6 +3101,7 @@ subroutine alloc_namax_related()
   if( allocated(stn) ) deallocate(stn)
   if( allocated(chg) ) deallocate(chg)
   if( allocated(chi) ) deallocate(chi)
+  if( allocated(tei) ) deallocate(tei)
   if( allocated(lsb) ) deallocate(lsb)
   if( allocated(lsex) ) deallocate(lsex)
   allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax) &
@@ -3106,7 +3109,7 @@ subroutine alloc_namax_related()
        ,lspr(0:nnmax,namax),ls1nn(0:nnmax,namax) &
        ,epi(namax),eki(3,3,namax) &
        ,stp(3,3,namax),stn(3,3,namax) &
-       ,chg(namax),chi(namax) &
+       ,chg(namax),chi(namax),tei(namax) &
        ,lsb(0:nbmax,6),lsex(nbmax,6))
   return
 end subroutine alloc_namax_related
@@ -3273,6 +3276,15 @@ subroutine realloc_namax_related(newnalmax,newnbmax,iprint)
   deallocate(chi)
   allocate(chi(newnamax))
   call copy_arr(ndim,arr,chi)
+  deallocate(arr)
+
+!.....tei
+  ndim = size(tei)
+  allocate(arr(ndim))
+  call copy_arr(ndim,tei,arr)
+  deallocate(tei)
+  allocate(tei(newnamax))
+  call copy_arr(ndim,arr,tei)
   deallocate(arr)
 
 !.....lsb

@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-22 23:11:39 Ryo KOBAYASHI>
+!                     Last-modified: <2019-07-05 14:14:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -1320,6 +1320,23 @@ contains
     endif
     
   end subroutine remove_ablated_atoms
+!=======================================================================
+  subroutine te2tei(namax,natm,tei)
+!
+!  Get electronic temperatures of atoms from electronic temperatures on sites.
+!
+    integer,intent(in):: namax,natm
+    real(8),intent(out):: tei(namax)
+
+    integer:: ic,ia,ix,iy,iz
+
+    do ia=1,natm
+      ic = a2c(ia)
+      call ic2ixyz(ic,ix,iy,iz)
+      tei(ia) = te(ix,iy,iz)
+    enddo
+    return
+  end subroutine te2tei
 end module ttm
 !-----------------------------------------------------------------------
 !     Local Variables:

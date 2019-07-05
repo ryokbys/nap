@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2019-06-06 11:19:25 Ryo KOBAYASHI>
+!                    Last modified: <2019-07-05 14:07:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -55,7 +55,7 @@ module pmdvars
   real(8),allocatable:: stn(:,:,:)
 !.....atomic charge and electronegativity
   real(8),allocatable:: chg(:),chi(:)
-!!$    real(8):: stn(3,3,namax)
+  real(8),allocatable:: tei(:)
 
 !.....Shear stress
   real(8):: shrfx

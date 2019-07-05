@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-18 17:35:06 Ryo KOBAYASHI>
+!                     Last modified: <2019-07-05 13:54:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -95,7 +95,7 @@ module pmdio
 
 !.....Auxiliary data order for dump output
   logical:: ldumpaux_changed = .false.
-  character(len=256):: cdumpaux = 'ekin epot sxx syy szz syz sxz sxy chg chi'
+  character(len=256):: cdumpaux = 'ekin epot sxx syy szz syz sxz sxy'
   integer:: ndumpaux
   character(len=6),allocatable:: cdumpauxarr(:)
 
@@ -368,11 +368,9 @@ contains
         enddo
         write(ionum,*) ''
       else
-        write(ionum,'(8es11.3,f9.4,f9.2)') &
-             eki,epi, &
+        write(ionum,'(8es11.3)') eki,epi, &
              st(1,1),st(2,2),st(3,3), &
-             st(2,3),st(1,3),st(1,2), &
-             chgtot(i),chitot(i)
+             st(2,3),st(1,3),st(1,2)
       end if
 !!$      if( has_specorder ) then
 !!$        is = int(tagtot(i))

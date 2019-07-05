@@ -1,4 +1,4 @@
-subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
+subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
      ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr &
      ,sorg,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs &
      ,ifcoulomb,iprint,l1st &
@@ -34,7 +34,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
   use Bonny_WRe,only: force_Bonny_WRe
   use ZBL,only: force_ZBL,force_ZBL_overlay,r_inner
   use cspline,only: force_cspline
-  use tersoff,only: force_tersoff
+  use tersoff,only: force_tersoff, ts_type
   implicit none
   integer,intent(in):: namax,natm,nnmax,nismax,iprint
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
@@ -45,7 +45,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,tag(namax),sorg(3)
   real(8),intent(inout):: tcom,rc
   real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
-       ,chg(namax),chi(namax),stnsr(3,3)
+       ,chg(namax),chi(namax),tei(namax),stnsr(3,3)
 !!$    character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: l1st,lstrs,lcell_updated
   logical,intent(inout):: lvc
@@ -116,7 +116,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,stnsr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('Tersoff') ) call force_tersoff(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint)
+       ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,tei)
   if( use_force('Brenner') ) call force_Brenner(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
@@ -394,7 +394,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
 
 !.....Tersoff
   if( use_force('Tersoff') ) then
-    call init_tersoff(myid_md,iprint,specorder)
+    call init_tersoff(myid_md,mpi_md_world,iprint,specorder)
   endif
 
 
