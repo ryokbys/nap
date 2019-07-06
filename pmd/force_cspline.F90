@@ -129,10 +129,10 @@ contains
       deallocate(aa2,aa3)
       allocate(aa2(3,namax),aa3(3,namax))
     endif
-    strsl(1:3,1:3,1:namax) = 0d0
 
     epotl= 0d0
     epi(1:natm+nb)= 0d0
+    strsl(1:3,1:3,1:natm+nb) = 0d0
 
 !.....2-body term
     epotl2 = 0d0
@@ -170,6 +170,7 @@ contains
         aa2(1:3,ia)= aa2(1:3,ia) -dphi*drij(1:3)
         aa2(1:3,ja)= aa2(1:3,ja) +dphi*drij(1:3)
 !.....Stress
+        if( .not.lstrs ) cycle
         do jxyz=1,3
           strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
                -0.5d0*rij(jxyz)*(-dphi*drij(1:3))
@@ -256,6 +257,7 @@ contains
             aa3(1:3,ka)= aa3(1:3,ka) -tmpk(1:3)
             aa3(1:3,ia)= aa3(1:3,ia) +tmpj(1:3)+tmpk(1:3)
 !.....Stress
+            if( .not.lstrs ) cycle
             do jxyz=1,3
               strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
                    -0.5d0*rij(jxyz)*tmpj(1:3) &
@@ -303,6 +305,7 @@ contains
             aa3(1:3,ka)= aa3(1:3,ka) -tmpk(1:3) +tmpjk(1:3)
             aa3(1:3,ia)= aa3(1:3,ia) +tmpj(1:3)+tmpk(1:3)
 !.....Stress
+            if( .not.lstrs ) cycle
             do jxyz=1,3
               strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
                    -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
@@ -331,6 +334,7 @@ contains
             aa3(1:3,ka)= aa3(1:3,ka) -tmpk(1:3)
             aa3(1:3,ia)= aa3(1:3,ia) +tmpj(1:3)+tmpk(1:3)
 !.....Stress
+            if( .not.lstrs ) cycle
             do jxyz=1,3
               strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
                    -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
@@ -347,15 +351,17 @@ contains
 21  continue
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_md_world,strsl,9)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,aa3,3)
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,epi,1)
 
 !.....Sum up forces and stress
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa2(1:3,1:natm) +aa3(1:3,1:natm)
-    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    if( lstrs ) then
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+           ,nn,mpi_md_world,strsl,9)
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
 
     epotl = epotl2 +epotl3
     call mpi_allreduce(epotl,epot_cspln,1,mpi_real8,mpi_sum &

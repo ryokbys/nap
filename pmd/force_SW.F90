@@ -1,6 +1,6 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-22 22:16:06 Ryo KOBAYASHI>
+!                     Last modified: <2019-07-05 22:16:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax, csp2isp
   integer,parameter:: ioprms = 50
@@ -173,6 +173,7 @@ contains
         aa2(1:3,i)= aa2(1:3,i) -df2*drij(1:3)
         aa2(1:3,j)= aa2(1:3,j) +df2*drij(1:3)
 !-----------Stress
+        if( .not. lstrs ) cycle
         if( j.le.natm ) then
           do jxyz=1,3
             strsl(1:3,jxyz,i)= strsl(1:3,jxyz,i) &
@@ -263,6 +264,7 @@ contains
           aa3(1:3,j)= aa3(1:3,j) -tmpj(1:3)
           aa3(1:3,k)= aa3(1:3,k) -tmpk(1:3)
 !-------------Stress
+          if( .not. lstrs ) cycle
           do jxyz=1,3
             strsl(1:3,jxyz,i)=strsl(1:3,jxyz,i) &
                  -0.5d0*xij(jxyz)*aswl*tmpj(1:3) & !*volj &
@@ -278,15 +280,16 @@ contains
     enddo
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_world,strsl,9)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa3,3)
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,epi,1)
-
-!-----sum
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa2(1:3,1:natm) +aa3(1:3,1:natm)
-    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    
+    if( lstrs ) then
+      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+           ,nn,mpi_world,strsl,9)
+      strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
 
 !-----gather epot
     epotl= epotl2 +epotl3
