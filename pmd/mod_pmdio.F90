@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-07-05 13:54:56 Ryo KOBAYASHI>
+!                     Last modified: <2019-07-08 17:31:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -239,11 +239,12 @@ contains
     allocate(tagtot(ntot0),rtot(3,ntot0),atot(3,ntot0) &
          ,vtot(3,ntot0),epitot(ntot0) &
          ,ekitot(3,3,ntot0),stot(3,3,ntot0))
-    read(ionum) (tagtot(i),rtot(1:3,i),vtot(1:3,i) &
-         ,ekitot(1,1,i),epitot(i) &
-         ,stot(1,1,i),stot(2,2,i),stot(3,3,i) &
-         ,stot(2,3,i),stot(3,1,i),stot(1,2,i) &
-         ,i=1,ntot0)
+!!$    read(ionum) (tagtot(i),rtot(1:3,i),vtot(1:3,i) &
+!!$         ,ekitot(1,1,i),epitot(i) &
+!!$         ,stot(1,1,i),stot(2,2,i),stot(3,3,i) &
+!!$         ,stot(2,3,i),stot(3,1,i),stot(1,2,i) &
+!!$         ,i=1,ntot0)
+    read(ionum) (tagtot(i),rtot(1:3,i),vtot(1:3,i) ,i=1,ntot0)
     close(ionum)
 
   end subroutine read_pmdtot_bin
@@ -262,11 +263,12 @@ contains
     write(ionum) (((h(ia,ib,l)/hunit,ia=1,3),ib=1,3),l=0,1)
     write(ionum) ntot
     do i=1,ntot
-      write(ionum) tagtot(i),rtot(1:3,i),vtot(1:3,i) & !/dt
-           ,ekitot(1,1,i)+ekitot(2,2,i)+ekitot(3,3,i) &
-           ,epitot(i) &
-           ,stot(1,1,i),stot(2,2,i),stot(3,3,i) &
-           ,stot(2,3,i),stot(3,1,i),stot(1,2,i)
+!!$      write(ionum) tagtot(i),rtot(1:3,i),vtot(1:3,i) & !/dt
+!!$           ,ekitot(1,1,i)+ekitot(2,2,i)+ekitot(3,3,i) &
+!!$           ,epitot(i) &
+!!$           ,stot(1,1,i),stot(2,2,i),stot(3,3,i) &
+!!$           ,stot(2,3,i),stot(3,1,i),stot(1,2,i)
+      write(ionum) tagtot(i),rtot(1:3,i),vtot(1:3,i)
     enddo
     close(ionum)
 

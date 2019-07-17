@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-07-06 09:48:52 Ryo KOBAYASHI>
+!                     Last modified: <2019-07-06 10:06:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -194,6 +194,7 @@ contains
         endif
       enddo
       epi(ia) = epi(ia) +ts_f0
+      epotl1 = epotl1 +ts_f0
     enddo
 !!$    print *,'epotl1 =',epotl1
 
