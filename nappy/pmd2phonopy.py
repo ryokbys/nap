@@ -4,16 +4,13 @@ Compute forces of the supercell system created by phonopy and
 create FORCE_SETS file, which includes forces on atoms.
 
 Usage:
-    pmd2phonopy.py [options] PMDFILE
+    pmd2phonopy.py [options] PMDINI
 
 Options:
     -h, --help  Show this help message and exit.
     -c, --cutoff=CUTOFF
                 Cutoff radius of the interatomic potential used for
                 the calculation of forces. [default: 4.0]
-    --pmddir=PMDDIR
-                Path to where ``pmd`` executable exists.
-                [default: ~/src/nap/pmd/]
     --exec=EXEC
                 Name of the executable. [default: pmd]
     -p, --plot  Show band graph with phonopy.
@@ -29,7 +26,7 @@ from atom import Atom
 from napsys import NAPSystem
 
 __author__="Ryo KOBAYASHI"
-__version__="0.1a"
+__version__="190718"
 
 _default_band_conf="""ATOM_NAME = Si
 DIM = 3 3 3
@@ -67,9 +64,8 @@ if __name__ == "__main__":
 
     args= docopt(__doc__)
     rcut= float(args['--cutoff'])
-    pmddir= args['--pmddir']
     execname= args['--exec']
-    infname= args['PMDFILE']
+    infname= args['PMDINI']
     plot= args['--plot']
     #print(args)
     
@@ -89,7 +85,7 @@ if __name__ == "__main__":
 
     # Make displaced POSCARS via phonopy
     os.system("phonopy -d --dim=\"{0:d} {1:d} {2:d}\"".format(n1,n2,n3))
-    with open('disp.yaml','r') as f:
+    with open('phonopy_disp.yaml','r') as f:
         disp= yaml.load(f)
     
     # Make directories for the calculation of those POSCARS
@@ -105,14 +101,13 @@ if __name__ == "__main__":
         psystmp= NAPSystem()
         psystmp.read_POSCAR(poscar)
         os.system("cp in.* {0}/".format(dname))
-        if execname == "pmd":
-            psystmp.write_pmd("{0}/pmdini".format(dname))
-        elif execname == "smd":
-            psystmp.write_pmd("{0}/smd0000".format(dname))
-        os.system("cd {0}/; {1}/{2} > out.{2}; cd ..".format(dname,pmddir,execname))
+        psystmp.write_pmd("{0}/pmdini".format(dname))
+        os.system("cd {0}/; {1} > out.{1}; cd ..".format(dname,execname))
 
     # Make FORCE_SETS file from the pmd results
-    natm= int(disp['natom'])
+    supercell = disp['supercell']
+    #natm= int(disp['natom'])
+    natm = len(supercell['points'])
     ndisps= len(disp['displacements'])
     with open('FORCE_SETS','w') as f:
         f.write("{0:d}\n".format(natm))
@@ -126,7 +121,7 @@ if __name__ == "__main__":
             f.write("{0:22.15f} {1:22.15f} {2:22.15f}\n".format(d[0],d[1],d[2]))
             # forces
             dname="disp-{0:03d}".format(n)
-            g= open(dname+'/frc0000','r')
+            g= open(dname+'/frc.pmd','r')
             g.readline() # skip 1st line, it should be same as natm
             for ia in range(natm):
                 buff= [ float(a) for a in g.readline().split()]
@@ -138,7 +133,7 @@ if __name__ == "__main__":
         print("There is no band.conf, which is configuration file for phonopy band calculation.")
         print("")
         print("Default band.conf is like:")
-        print(__default_band_conf)
+        print(_default_band_conf)
         sys.exit()
 
     # Change DIM parameters in band.conf
@@ -158,5 +153,5 @@ if __name__ == "__main__":
     else:
         os.system("phonopy band.conf")
         
-    print("bandplot --gnuplot band.yaml > out_band")
-    os.system("bandplot --gnuplot band.yaml > out_band")
+    print("phonopy-bandplot --gnuplot band.yaml > out_band")
+    os.system("phonopy-bandplot --gnuplot band.yaml > out_band")

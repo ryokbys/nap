@@ -252,7 +252,7 @@ Users do not need to consider ``DIM``, these values are automatically determined
 
 .. code-block:: bash
 
-  $ python /path/to/pmd2phonopy.py -c 4.0 --pmdexec=/path/to/pmd pmdini
+  $ python /path/to/pmd2phonopy.py -c 4.0 pmdini
 
 
 Then you can get a band output file ``out_band``, so you can see a graph with ``gnuplot`` as,
