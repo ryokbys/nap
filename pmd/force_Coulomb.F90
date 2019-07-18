@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-18 22:17:35 Ryo KOBAYASHI>
+!                     Last modified: <2019-07-18 14:45:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -571,7 +571,7 @@ contains
     character(len=3):: cname,csp,cspj,cspi
     integer:: i,ierr,jerr,isp,jsp,npq
     real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
-         ,vcgjiimin,sgmlim, rin,rout
+         ,vcgjiimin,sgmlim, rin,rout,rhoij
 
 !!$    if( params_read ) return
 
@@ -585,6 +585,7 @@ contains
       vcg_sgm(1:nspmax) = 0d0
       qlower(1:nspmax) = 0d0
       qupper(1:nspmax) = 0d0
+      rho_bvs(:,:) = -1d0
 !.....File name
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
@@ -660,6 +661,16 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, rho_screened_cut
           if( iprint.gt.1 ) print *,trim(ctmp),rho_screened_cut
+          cycle
+        else if( trim(cline).eq.'rhoij_screened_cut' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cspi, cspj, rhoij
+          isp = csp2isp(trim(cspi),specorder)
+          jsp = csp2isp(trim(cspj),specorder)
+          rho_bvs(isp,jsp) = rhoij
+          rho_bvs(jsp,isp) = rhoij
+          if( iprint.gt.1 ) print *,trim(ctmp),trim(cspi) &
+               ,trim(cspj),rhoij
           cycle
         endif
 !.....Not a keyword, a certain mode should be already selected.
@@ -765,6 +776,21 @@ contains
         endif
       endif
 
+!.....Set screening length
+      if( trim(cchgs).eq.'fixed_bvs' ) then
+        do isp=1,nsp
+          do jsp=1,nsp
+            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+          enddo
+        enddo
+      else
+        do isp=1,nsp
+          do jsp=1,nsp
+            if( rho_bvs(isp,jsp).lt.0d0 ) rho_bvs(isp,jsp) = rho_screened_cut
+          enddo
+        enddo
+      endif
+      
     endif  ! myid.eq.0
 
 !.....Broadcast data just read from the file
@@ -791,18 +817,8 @@ contains
     call mpi_bcast(conv_eps,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_screened_cut,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rho_bvs,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
 
-!.....Set screening length
-    rho_bvs(:,:) = 0d0
-    if( trim(cchgs).eq.'fixed_bvs' ) then
-      do isp=1,nsp
-        do jsp=1,nsp
-          rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
-        enddo
-      enddo
-    else
-      rho_bvs(:,:) = rho_screened_cut
-    endif
     if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
       do isp=1,nsp
         do jsp=isp,nsp
