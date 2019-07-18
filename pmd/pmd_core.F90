@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-07-05 22:26:20 Ryo KOBAYASHI>
+!                     Last-modified: <2019-07-18 14:20:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -309,7 +309,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 
 !.....Debug
-  tei(1:natm) = 0d0
+!  tei(1:natm) = 11605d0 *2.0d0
 
   tcpu1= mpi_wtime()
   tcom = 0d0

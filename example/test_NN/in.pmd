@@ -13,7 +13,7 @@ flag_out_pmd                1
 num_out_pmd                10
 flag_sort                   1
 
-force_type                NN
+force_type                NN2
 cutoff_radius                5.8
 cutoff_buffer                0.0
 
