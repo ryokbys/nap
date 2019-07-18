@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-07-04 15:12:13 Ryo KOBAYASHI>
+!                     Last-modified: <2019-07-18 17:41:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -734,7 +734,7 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
   real(8),intent(in):: h(3,3),rc
   integer,intent(inout):: nx,ny,nz
 
-  integer:: imax,nd(3),ndnew(3),nnew,iorder(3),i,j,k,l,m,n
+  integer:: imax,nd(3),ndnew(3),nnew,iorder(3),i,j,k,l,m,n,ncycle
   real(8):: al0(3),al(3)
 
 !.....If serial run, NX,NY,NZ should all be 1.
@@ -773,6 +773,7 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
       enddo
     enddo
 
+    ncycle = 0
     do n=1,3
       imax = iorder(n)
       ndnew(1:3) = nd(1:3)
@@ -784,6 +785,7 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
 
 !.....Check whether the total num exceeds num of MPI parallel
       if( nnew.gt.nnode ) then
+        ncycle = ncycle +1
         cycle
       else if( nnew.eq.nnode ) then
         nd(1:3) = ndnew(1:3)  ! use current ndnew(:)
@@ -798,6 +800,7 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
       endif
     enddo
 
+    if( ncycle.ge.3 ) goto 10
     nd(1:3) = ndnew(1:3)
   enddo
 
