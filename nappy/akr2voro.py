@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 import sys,os
-from napsys import NAPSystem
+from .napsys import NAPSystem
 
 infname= sys.argv[1]
 print('input file: ',infname)

@@ -27,7 +27,7 @@ from scipy.optimize import curve_fit
 import spglib
 
 from ase.io import read
-from nappy.napsys import NAPSystem
+from .nappy.napsys import NAPSystem
 
 __author__  = 'Ryo KOBAYASHI'
 __version__ = '170308'

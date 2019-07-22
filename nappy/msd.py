@@ -25,8 +25,8 @@ from __future__ import print_function
 import numpy as np
 from docopt import docopt
 
-from nappy.napsys import NAPSystem
-from nappy.common import get_key
+from .nappy.napsys import NAPSystem
+from .nappy.common import get_key
 
 def anint(x):
     if x >= 0.5:

@@ -8,12 +8,9 @@ import copy
 import math
 
 import nappy
-import incar
-import poscar
-import potcar
+from . import *
 
 import json
-
 
 def get_conf_path():
     return nappy.get_nappy_dir()+'/vasp.conf'

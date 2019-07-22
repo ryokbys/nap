@@ -14,7 +14,7 @@ import os,sys,glob,time
 import numpy as np
 import optparse
 
-from napsys import NAPSystem
+from .napsys import NAPSystem
 
 usage= '%prog [options] akr0001 akr0002 akr0003 ...'
 

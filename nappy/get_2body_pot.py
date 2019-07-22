@@ -11,8 +11,8 @@ import os,sys,math,copy
 import optparse
 import numpy as np
 
-from atom import Atom
-from napsys import NAPSystem
+from .atom import Atom
+from .napsys import NAPSystem
 
 ################################################# Functions ############
 def get_epot(fname='out.pmd'):
