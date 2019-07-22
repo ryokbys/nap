@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-07-05 15:55:30 Ryo KOBAYASHI>
+!                     Last-modified: <2019-07-22 14:47:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -30,7 +30,7 @@ module ttm
 !.....TTM mesh divisions
   integer:: nx,ny,nz,nxyz
 !.....Mesh size in reduced unit [0:1)
-  real(8):: dx,dy,dz,area,darea
+  real(8):: dx,dy,dz,area,darea,dr2
 !.....Time step in fs == dt in MD by default
   real(8):: dt_inner = -1.0
   real(8):: dt
@@ -41,7 +41,13 @@ module ttm
 !.....Threshold kinetic energy in energy unit (or should be threshold velocity?)
   real(8):: ekth = 8.0d0
 !.....Te of right edge, if negative, use free boundary
-  real(8):: Te_right = -1.0
+  real(8):: Te_right = -1d0
+!.....Minimum Te, which limits the electron system goes too low energy
+  real(8):: Te_min = -100d0
+!.....Maximums in the system
+  real(8):: Te_max = -1d0
+  real(8):: alpha_max = -1d0
+  real(8):: kappa_max, cete_min
 
 !.....Ce dependence on Te: none, polynomial, tanh, linear
   character(len=128):: Ce_Tdep = 'none'
@@ -92,8 +98,6 @@ module ttm
 !.....Threshold density: default = 0.025 Ang^{-3} (1/2 of ideal Si diamond density)
 !     ex) 8 /5.427^3 = 0.05
   real(8):: dthresh = 0.025d0
-!.....Minimum Te when surface moves
-  real(8):: Te_min = 300d0
 
 !.....Temperature distribution
   real(8),allocatable:: te(:,:,:),tep(:,:,:),ta(:),tap(:),tex(:)
@@ -155,17 +159,22 @@ contains
     vcell = dx*dy*dz
     area = h(2,2)*h(3,3)
     darea = dy*dz
+!.....dr2 is used to compute time-step limit
+    dr2 = 1d0/(1d0/dx**2 +1d0/dy**2 +1d0/dz**2)
+!    print *,dr2
 
-!.....Convert fluence to intensity
+!.....Convert fluence to intensity in unit of energy not temperature, here.
+!.....This is going to be converted to temperature by dividing by (rho*Ce)
     if( trim(ctype_pulse).eq.'stepwise' ) then
-      I_0 = fluence /lskin /tau_pulse *darea *(2d0/(3d0*rho_e*vcell*fkb))
+      I_0 = fluence /lskin /tau_pulse *darea !*(2d0/(3d0*rho_e*vcell*fkb))
     else if( trim(ctype_pulse).eq.'gaussian' ) then
-      I_0 = fluence /lskin /tau_pulse *sqrt(4d0 *log(2d0) /pi) *darea &
-           *(2d0/(3d0*rho_e*vcell*fkb))
+!!$      I_0 = fluence /lskin /tau_pulse *sqrt(4d0 *log(2d0) /pi) *darea &
+!!$           *(2d0/(3d0*rho_e*vcell*fkb))
+      I_0 = fluence /lskin /tau_pulse *sqrt(4d0 *log(2d0) /pi) *darea
       sgm_pulse = tau_pulse /sqrt(8d0 *log(2d0))
     else
       if( myid.eq.0 ) then
-        print *,'ERROR: pulse_type should be either abrupt or gaussian.'
+        print *,'ERROR: pulse_type should be either stepwise or gaussian.'
       endif
       call mpi_finalize(ierr)
       stop
@@ -184,6 +193,7 @@ contains
       print '(a,f0.3,a)','   Pulse duration = ',tau_pulse,' ps'
       print '(a,es12.4,a)','   Intensity = ',I_0/darea,' eV/A^2/fs'
       print '(a,f0.1,a)','   Total incident energy = ',fluence*area,' eV'
+      print '(a,f0.4,a)','   Electron density = ',rho_e,' e/A^3'
       print '(a,i5)','   inner_loop = ',nstp_inner
       if( .not. lvardt ) then
         print '(a,2es12.4)','   dtmd, dt = ',dtmd,dt
@@ -200,6 +210,13 @@ contains
         print '(a,2es12.4)','   gamma_p,gamma_s = ',gamma_p,gamma_s
       endif
       print '(a,a)','   Ce_Tdep = ',trim(Ce_Tdep)
+      if( trim(Ce_Tdep).eq.'linear' ) then
+        print '(a,2es12.4)','     gmm_ce,ce_min = ',gmm_ce, ce_min
+      endif
+      if( Te_min.gt.0d0 ) then
+        print *,'    Note that the minimum Te is set:'
+        print '(a,f0.1)','     Minimum Te = ',Te_min
+      endif
       mem = 4 * 4*nxyz + 11 * 8*nxyz + 4 * 8*namax
       print '(a,f0.3,a)',' Memory for TTM = ',dble(mem)/1000/1000,' MByte'
     endif
@@ -292,17 +309,29 @@ contains
 !=======================================================================
   subroutine set_inner_dt(dtmd)
     real(8),intent(in):: dtmd
+    real(8):: tmp
+
+!.....If alpha_max > 0, the upper limit of dt_inner can be determined.
+    if( alpha_max.gt.0d0 ) then
+      tmp = dr2 /(2d0*alpha_max)
+!!$      if( dt_inner.gt.tmp ) dt_inner = tmp
+      dt_inner = tmp
+    endif
 
 !.....If dt_inner is specified, nstp_inner and dt are determined from dt_inner and dtmd.
 !.....Since the upper limit of dt is given by dx**2/(2*kappa),
 !.....dt_inner should be determined regardless to dtmd and
 !.....this would be appropriate especially in case of variable time-step.
     if( dt_inner .gt. 0d0 ) then
-      nstp_inner = max(int(dtmd /dt_inner),1)
+!!$      nstp_inner = max(int(dtmd /dt_inner),1)
+      nstp_inner = int(dtmd /dt_inner) +1
     endif
     dt = dtmd /nstp_inner
 !.....Change dt_inner to match dt and use this dt_inner afterward
     dt_inner = dt
+
+!!$    print '(a,i4,5es12.4)','nstp_inner,dt_inner,alpha,Te,kappa,cete='&
+!!$         ,nstp_inner,dt_inner,alpha_max,Te_max,kappa_max,cete_min
     
     return
   end subroutine set_inner_dt
@@ -644,27 +673,48 @@ contains
   subroutine update_Te(tnow,dtmd,myid,mpi_world,iprint)
 !
 !  Update Te by solving the diffusion equation.
+!  Currently use Euler method for time update.
 !
     integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: tnow,dtmd
 
     integer:: ic,ix,iy,iz,ierr,istp
     real(8):: t0,ce,dce,xi,pterm,sterm,kappa,dkappa,pulsefactor&
-         ,dtemp
-    real(8),save:: ein_pulse
+         ,dtemp,tmp,de,dte_max
+    real(8):: de_surf, dte_surf
+    real(8),save:: ein_pulse,dte_sum
     logical,save:: l1st = .true.
 
     t0 = mpi_wtime()
 
     if( l1st ) then
       ein_pulse = 0d0
+      dte_sum = 0d0
+!.....Get max Te
+      if( myid.eq.0 ) then
+        do ic=1,nxyz
+          call ic2ixyz(ic,ix,iy,iz)
+          if( te(ix,iy,iz).gt.Te_max ) Te_max = te(ix,iy,iz)
+          if( trim(ctype_kappa).eq.'DCrho' ) then
+            kappa = d_e *cete(ix,iy,iz) *rho_e
+          else if( trim(ctype_kappa).eq.'B2' ) then
+            kappa = kappa0 *te(ix,iy,iz)/max(ta(ic),ta_min)
+          endif
+          alpha_max = max(alpha_max,kappa/cete(ix,iy,iz)/rho_e)
+        enddo
+      endif
       l1st = .false.
+    else
+!.....Reset inner dt according to the updated alpha_max
+      if( myid.eq.0 ) call set_inner_dt(dtmd)
     endif
 
     ein_e = 0d0
     eout_e = 0d0
     if( myid.eq.0 ) then
+      
 10    continue
+      dte_max = 0d0
       do istp = 1,nstp_inner
         call set_BC()
 
@@ -695,6 +745,7 @@ contains
                *( dkappa*dte2(ix,iy,iz) +kappa*d2te(ix,iy,iz) &
                +pterm +sterm )
           tep(ix,iy,iz) = te(ix,iy,iz) +dtemp
+          if( Te_min.gt.0d0 ) tep(ix,iy,iz) = max(tep(ix,iy,iz),Te_min)
           if( tep(ix,iy,iz).lt.0d0 ) then
             dt_inner = dt_inner/2
             call set_inner_dt(dtmd)
@@ -704,24 +755,27 @@ contains
         enddo  ! ic=1,nxyz
         if( trim(ctype_pulse).eq.'stepwise' ) then
           if( tnow.ge.t0_laser .and. &
-               tnow.lt.(t0_laser +tau_pulse) ) then
+               tnow.le.(t0_laser +tau_pulse) ) then
             do ic=1,nxyz
               call ic2ixyz(ic,ix,iy,iz)
               if( ix.lt.lsurf ) cycle
               if( ix.gt.rsurf ) cycle
               ce = cete(ix,iy,iz)
+              dce = dcete(ix,iy,iz)
 !.....To think the cell position is the center of the cell, add 0.5
               xi = (ix-lsurf+0.5d0)*dx
-!!$              tep(ix,iy,iz) = tep(ix,iy,iz) &
-!!$                   +I_0 *min(1d0,exp(-xi/lskin))/(ce*rho_e)*dt
-              tep(ix,iy,iz) = tep(ix,iy,iz) &
-                   +I_0 *min(1d0,exp(-xi/lskin))*dt*dx
+              tmp = 1d0 /((ce+te(ix,iy,iz)*dce)*rho_e *vcell)
+              de = I_0 *min(1d0,exp(-xi/lskin))*dt*dx
+              tep(ix,iy,iz) = tep(ix,iy,iz) +de*tmp
+!!$              print '(a,3i3,10es12.4)','ix,iy,iz,te,de,tmp,dte,dte_max=',ix,iy,iz &
+!!$                   ,te(ix,iy,iz),de,tmp,de*tmp,dte_max
+              dte_max = max(de*tmp,dte_max)
               if( tep(ix,iy,iz)*0d0 .ne. 0d0 ) then
                 print *,'ERROR: tep==NaN !!!'
                 print *,'  ic,ix,iy,iz=',ic,ix,iy,iz
                 stop
               endif
-              ein_pulse = ein_pulse +I_0 *min(1d0,exp(-xi/lskin))*dt*dx
+              ein_pulse = ein_pulse +de
             enddo
           endif
         else if( trim(ctype_pulse).eq.'gaussian' ) then
@@ -733,27 +787,46 @@ contains
               if( ix.lt.lsurf ) cycle
               if( ix.gt.rsurf ) cycle
               ce = cete(ix,iy,iz)
+              dce = dcete(ix,iy,iz)
+              tmp = 1d0 /((ce+te(ix,iy,iz)*dce)*rho_e *vcell)
 !.....To think the cell position is the center of the cell, add 0.5
               xi = (ix-lsurf+0.5d0)*dx
-!!$              tep(ix,iy,iz) = tep(ix,iy,iz) &
-!!$                   +I_0 *min(1d0,exp(-xi/lskin))/(ce*rho_e)*dt &
-!!$                   *exp(-(tnow -(t0_laser+tau_pulse))**2 /(2d0*sgm_pulse**2))
-              tep(ix,iy,iz) = tep(ix,iy,iz) &
-                   +I_0 *min(1d0,exp(-xi/lskin))*dt*dx *pulsefactor
-              ein_pulse = ein_pulse +I_0 *min(1d0,exp(-xi/lskin))*dt*dx &
-                   *pulsefactor
+              de = I_0 *min(1d0,exp(-xi/lskin))*dt*dx *pulsefactor
+              tep(ix,iy,iz) = tep(ix,iy,iz) +de*tmp
+              dte_max = max(de*tmp,dte_max)
+              ein_pulse = ein_pulse +de
             enddo
           endif
         endif
         te(:,:,:) = tep(:,:,:)
       enddo  ! istp=1,nstp_inner
+!!$      print *,'I_0,dt,dte_max = ',I_0,dt,dte_max
+!.....Update Te_max and alpha_max
+      Te_max = -1d0
+      alpha_max = -1d0
+      cete_min = 1d30
+      kappa_max = -1d0
+      do ic=1,nxyz
+        call ic2ixyz(ic,ix,iy,iz)
+        ce = cete(ix,iy,iz)
+        if( trim(ctype_kappa).eq.'DCrho' ) then
+          kappa = d_e *ce *rho_e
+        else if( trim(ctype_kappa).eq.'B2' ) then
+          kappa = kappa0 *te(ix,iy,iz) /max(ta(ic),ta_min)
+        endif
+        kappa_max = max(kappa_max,kappa)
+        cete_min = min(ce,cete_min)
+        alpha_max = max(kappa/ce/rho_e,alpha_max)
+        Te_max = max(Te_max,te(ix,iy,iz))
+      enddo
+!!$      print *,'cete_min,Te_max=',cete_min,Te_max
+!.....Output
       if(iprint.gt.1) then
         if( (trim(ctype_pulse).eq.'gaussian' .and. &
              (tnow.ge.t0_laser .and. tnow.le.(t0_laser+tau_pulse*2)) ) &
              .or. (trim(ctype_pulse).eq.'stepwise' .and. &
              (tnow.ge.t0_laser .and. tnow.le.t0_laser+tau_pulse) ) ) then
-          print '(a,2es13.4e3)','tnow,ein_pulse=',tnow &
-               ,ein_pulse*3d0/2 *rho_e*vcell*fkb
+          print '(a,2es13.4e3)',' tnow,ein_pulse=',tnow,ein_pulse
         endif
         do ic=1,nxyz
           call ic2ixyz(ic,ix,iy,iz)
@@ -1166,7 +1239,7 @@ contains
       if( myid.eq.0 ) print *,'Warning: lsurf.eq.rsurf!'
     endif
     if( myid.eq.0 .and. iprint.gt.1 ) then
-      print '(a,2i4,5es12.4)', 'lsurf,ivac_right,densx= ' &
+      print '(a,2i4,5es12.4)', ' lsurf,ivac_right,densx= ' &
            ,lsurf,ivac_right,densx(max(1,lsurf-2):lsurf+2)
     endif
     return

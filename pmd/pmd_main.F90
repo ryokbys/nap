@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-07-18 17:41:21 Ryo KOBAYASHI>
+!                     Last-modified: <2019-07-19 10:32:36 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -108,10 +108,10 @@ program pmd
 !        call write_inpmd(10,trim(cinpmd))
     if( num_forces.eq.0 ) stop ' ERROR: no force-field specified'
     if( trim(ctctl).eq.'ttm' ) then
+      print *,''
+      print *,'Since the two-temperature model (TTM) MD...'
 !.....Set x-boundary free if TTM
       if( boundary(1:1).ne.'f' ) then
-        print *,''
-        print *,'Since the two-temperature model (TTM) MD...'
         print *,'  - Free boundary condition is set' &
              //' for x direction.'
       endif
