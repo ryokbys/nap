@@ -19,7 +19,7 @@ def get_exec_path():
     conf_path = get_conf_path()
     with open(conf_path,'r') as f:
         config = json.load(f)
-    if not config.has_key('exec_path'):
+    if not 'exec_path' in config:
         msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the VASP executable in {0}.
@@ -177,10 +177,10 @@ class VASP:
             
         nel = self.get_num_valence()
         nband = int(max(nel/2*1.5, 8))
-        if self.incar.has_key('NBAND'):
+        if 'NBAND' in self.incar:
             nband = int(self.incar['NBAND'])
 
-        if self.incar.has_key('NSW'):
+        if 'NSW' in self.incar:
             nsw = int(self.incar['NSW'])
             if nsw < 1:
                 nsw = 1
@@ -188,12 +188,12 @@ class VASP:
             nsw = 1
         
         nkpt = parse_KPOINTS()
-        if self.incar.has_key('ISYM') \
+        if 'ISYM') in self.incar\
            and int(self.incar['ISYM']) != 0:
             nkpt = max(math.sqrt(nkpt),1)
 
         encut = 400.0
-        if self.incar.has_key('ENCUT'):
+        if 'ENCUT' in self.incar:
             encut = float(self.incar['ENCUT'])
 
         estime = 2.0e-6 *nband**3 *nkpt *nsw *encut / math.sqrt(nprocs)
@@ -222,11 +222,11 @@ class VASP:
         # If either NPAR or NCORE is specified, NPROCS can be chosen from
         # common multiples of either NPAR or NCORE and less than and equal to NPN.
         npara = 0
-        if self.incar.has_key('NPAR') and self.incar.has_key('NCORE'):
+        if 'NPAR' in self.incar and 'NCORE' in self.incar:
             npara = self.incar['NPAR'] *self.incar['NCORE']
             nnodes = npara /npn +1
-        elif self.incar.has_key('NPAR') or self.incar.has_key('NCORE'):
-            if self.incar.has_key('NPAR'):
+        elif 'NPAR' in self.incar or 'NCORE' in self.incar:
+            if 'NPAR' in self.incar:
                 ntmp = self.incar['NPAR']
             else:
                 ntmp = self.incar['NCORE']
@@ -253,7 +253,7 @@ class VASP:
         """
         Make command text to run VASP using mpirun.
         """
-        if not self.config.has_key('exec_path'):
+        if not 'exec_path' in self.config:
             msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the VASP executable in {0}.
@@ -278,7 +278,7 @@ It should be in JSON format like,
         return None
 
     def get_exec_path(self):
-        if not self.config.has_key('exec_path'):
+        if not 'exec_path' in self.config:
             msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the VASP executable in {0}.

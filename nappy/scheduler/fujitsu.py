@@ -154,7 +154,7 @@ echo "ended at `date`"
 """
 
 def get_command(command_type):
-    if _commands.has_key(command_type):
+    if command_type in _commands:
         return _commands[command_type]
     else:
         return None

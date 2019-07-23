@@ -37,14 +37,13 @@ _fname_erg = "erg.ref"
 _fname_frc = "frc.ref"
 
 import os,sys
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
 
 import numpy as np
 from docopt import docopt
 from pymatgen.io.vasp.outputs import Vasprun
 
-from napsys import NAPSystem
-from atom import Atom
+from nappy.napsys import NAPSystem
+from nappy.atom import Atom
 
 
 

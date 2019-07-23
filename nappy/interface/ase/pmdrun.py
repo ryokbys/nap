@@ -8,7 +8,7 @@ import subprocess
 import numpy as np
 from ase.calculators.calculator import FileIOCalculator,Calculator
 
-from pmdio import get_fmvs
+from .pmdio import get_fmvs
 from nappy.napsys import NAPSystem
 
 __author__  = "Ryo KOBAYASHI"
@@ -314,7 +314,7 @@ def get_input_txt(params,fmvs):
         # special keys first
         if key is '':
             txt += '\n'
-        elif not params.has_key(key):
+        elif key not in params:
             continue
         elif key is 'force_type':
             vals = params[key]

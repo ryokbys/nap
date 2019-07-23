@@ -19,7 +19,7 @@ def get_exec_path():
     conf_path = get_conf_path()
     with open(conf_path,'r') as f:
         config = json.load(f)
-    if not config.has_key('exec_path'):
+    if not 'exec_path' in config:
         msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the PMD executable in {0}.
@@ -134,7 +134,7 @@ class PMD:
         """
         Make command text to run PMD using mpirun.
         """
-        if not self.config.has_key('exec_path'):
+        if not 'exec_path' in self.config:
             msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the PMD executable in {0}.
@@ -159,7 +159,7 @@ It should be in JSON format like,
         return None
 
     def get_exec_path(self):
-        if not self.config.has_key('exec_path'):
+        if not 'exec_path' in self.config:
             msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the PMD executable in {0}.

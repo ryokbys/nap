@@ -112,10 +112,10 @@ class TestPBS(unittest.TestCase):
         self.assertTrue( len(jobdata) != 0 )
 
         job = jobdata[0]
-        self.assertTrue( job.has_key('Job Id') )
-        self.assertTrue( job.has_key('Job_Name') )
-        self.assertTrue( job.has_key('Job_Owner') )
-        self.assertTrue( job.has_key('Resource_List.nodes') )
+        self.assertTrue( 'Job Id' in job )
+        self.assertTrue( 'Job_Name' in job )
+        self.assertTrue( 'Job_Owner' in job )
+        self.assertTrue( 'Resource_List.nodes' in job )
 
 if __name__ == '__main__':
 

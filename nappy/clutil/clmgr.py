@@ -509,20 +509,20 @@ nprocs_per_node: 12
         with open(self._machine_file,'r') as f:
             self.machine_conf = json.load(f)
         
-        if not self.machine_conf.has_key('scheduler') \
+        if not 'scheduler' in self.machine_conf \
            or len(self.machine_conf['scheduler']) < 1:
             self.logger.warn('No valid scheduler in '+self._machine_file)
             raise RuntimeError()
-        if not self.machine_conf.has_key('queues') \
+        if not 'queues' in self.machine_conf \
            or len(self.machine_conf['queues']) < 1:
             self.logger.warn('No valid queues in '+self._machine_file)
             raise RuntimeError()
-        if not self.machine_conf.has_key('nprocs_per_node'):
+        if not 'nprocs_per_node' in self.machine_conf:
             self.logger.warn('No valid nprocs_per_node in '+self._machine_file)
             raise RuntimeError()
 
         # Set default MPI command unless something is specified
-        if not self.machine_conf.has_key('mpi_command'):
+        if not 'mpi_command' in self.machine_conf:
             self.machine_conf['mpi_command'] = self._default_mpi_command
         
         self.scheduler = self.machine_conf['scheduler']
@@ -530,7 +530,7 @@ nprocs_per_node: 12
         self.nprocs_per_node = self.machine_conf['nprocs_per_node']
 
     def set_queue(self,queue):
-        if not self.machine_conf['queues'].has_key(queue):
+        if not queue in self.machine_conf['queues']:
             self.logger.warn('There is no '+queue+' in queues from '+self._machine_file)
             raise RuntimeError()
         self.qattr = self.machine_conf['queues'][queue]

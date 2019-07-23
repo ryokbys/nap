@@ -17,7 +17,7 @@ import numpy as np
 from docopt import docopt
 
 # sys.path.append(os.path.dirname(__file__))
-import .elements
+from . import elements
 
 
 def get_symbol_from_number(number):

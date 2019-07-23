@@ -24,15 +24,14 @@ __version__   = "0.1"
 
 
 import os,sys
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
 
 from docopt import docopt
 from pymongo import MongoClient
 import json
 import yaml
 
-from napsys import NAPSystem
-from atom import Atom
+from nappy.napsys import NAPSystem
+from nappy.atom import Atom
 
 def read_db_config(fname='config.json'):
     """

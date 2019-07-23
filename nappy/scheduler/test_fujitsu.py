@@ -77,12 +77,12 @@ class TestFujitsuFX(unittest.TestCase):
         self.assertTrue( len(jobdata) != 0 )
         
         job = jobdata[0]
-        self.assertTrue( job.has_key('JOB ID') )
-        self.assertTrue( job.has_key('STATE'))
-        self.assertTrue( job.has_key('USER'))
-        self.assertTrue( job.has_key('NODE NUM'))
-        self.assertTrue( job.has_key('CPU NUM'))
-        self.assertTrue( job.has_key('RESOURCE GROUP'))
+        self.assertTrue( 'JOB ID' in job )
+        self.assertTrue( 'STATE' in job )
+        self.assertTrue( 'USER' in job )
+        self.assertTrue( 'NODE NUM' in job )
+        self.assertTrue( 'CPU NUM' in job )
+        self.assertTrue( 'RESOURCE GROUP' in job )
 
 if __name__ == '__main__':        
     unittest.main()

@@ -44,7 +44,7 @@ import numpy as np
 from docopt import docopt
 
 from .atom import Atom, get_symbol_from_number, get_number_from_symbol
-from units import kB
+from .units import kB
 
 #...constants
 _maxnn = 100
@@ -975,7 +975,7 @@ You need to specify the species order correctly with --specorder option.
         f.write("Atoms\n")
         f.write("\n")
         # pos = np.zeros(3,dtype=float)
-        if self.atoms[0].aux.has_key('charge'):
+        if 'charge' in self.atoms[0].aux:
             atom_style = 'charge'
         #print poss
         # poss = spos_to_lammps_pos(hmat,poss)

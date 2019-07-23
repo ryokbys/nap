@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-07-22 14:47:30 Ryo KOBAYASHI>
+!                     Last-modified: <2019-07-22 22:53:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -190,7 +190,7 @@ contains
       print *,'TTM parameters:'
       print '(a,es12.4,a,es12.4,a)','   Fluence = ',fluence,' eV/A^2, = ' &
            ,fluence*ev2j/ang2m**2,' J/m^2'
-      print '(a,f0.3,a)','   Pulse duration = ',tau_pulse,' ps'
+      print '(a,f0.3,a)','   Pulse duration = ',tau_pulse,' fs'
       print '(a,es12.4,a)','   Intensity = ',I_0/darea,' eV/A^2/fs'
       print '(a,f0.1,a)','   Total incident energy = ',fluence*area,' eV'
       print '(a,f0.4,a)','   Electron density = ',rho_e,' e/A^3'
