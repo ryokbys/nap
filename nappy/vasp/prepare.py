@@ -82,24 +82,23 @@ def estimate_ncore(nbands):
     Estimate NCORE value from NBANDS info.
     NCORE specifies how many cores store one orbital (NPAR=cpu/NCORE). 
     VASP master recommends that 
-
         NCORE = 4 - approx. SQRT( # of cores )
-
-    And according to the site below,
-    https://www.nsc.liu.se/~pla/blog/2015/01/12/vasp-how-many-cores/
-    NCORE ~ NBANDS/8 is also a good approximation.
-    And we limit NCORE as a multiplier of 2.
+    But we cannot know how many cores will be used when preparing.
+    Here we use the following original criterion, 
+       NCORE ~ SQRT(NBANDS)/2
     """
-    nb8 = int(nbands/8)
-    if nb8 < 4:
+    nbo = int(math.sqrt(nbands)/2)
+    if nbo < 4:
         ncore = 4
         return ncore
     else:
         ncore = 4
-        for i in range(20):
-            if ncore*2 > nb8:
+        while True:
+            if ncore >= nbo:
                 return ncore
-            ncore *= 2
+            ncore += 2
+            if ncore >= nbands:
+                raise RuntimeError('ncore >= nbands')
     raise RuntimeError('Something is wrong.')
 
 def estimate_nbands(nel):

@@ -188,7 +188,7 @@ class VASP:
             nsw = 1
         
         nkpt = parse_KPOINTS()
-        if 'ISYM') in self.incar\
+        if 'ISYM' in self.incar\
            and int(self.incar['ISYM']) != 0:
             nkpt = max(math.sqrt(nkpt),1)
 

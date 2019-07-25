@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-07-19 10:32:36 Ryo KOBAYASHI>
+!                     Last-modified: <2019-07-24 11:14:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -170,10 +170,15 @@ program pmd
   call mpi_bcast(nx,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(ny,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(nz,1,mpi_integer,0,mpicomm,ierr)
-  if( nx*ny*nz .ne. nprocs ) then
+  if( nx*ny*nz .gt. nprocs ) then
+    if( myid_md.eq.0 ) then
+      print '(a,2i5)',' ERROR: nxyz > nprocs, which should not happen!, nxyz,nprocs = '&
+           ,nx*ny*nz,nprocs
+    endif
+  else if( nx*ny*nz .lt. nprocs ) then
     nodes_md = nx*ny*nz
     if( myid_md.eq.0 .and. iprint.gt.0 ) then
-      print '(a)',' WARNING: Since nxyz != nprocs, use less processes than prepared.'
+      print '(a)',' WARNING: Since nxyz < nprocs, use less processes than prepared.'
       print '(a,5(2x,i0))','          nx,ny,nz,nxyz,nprocs=',nx,ny,nz,nodes_md,nprocs
     endif
     mpikey = myid_md
