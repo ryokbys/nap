@@ -15,7 +15,7 @@ import os,sys,glob,time,math
 import numpy as np
 import optparse
 
-from napsys import NAPSystem
+from nappy.napsys import NAPSystem
 
 ################################################## Functions ###########
 

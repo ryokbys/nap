@@ -43,8 +43,8 @@ from datetime import datetime
 import numpy as np
 from docopt import docopt
 
-from atom import Atom, get_symbol_from_number, get_number_from_symbol
-from units import kB
+from nappy.atom import Atom, get_symbol_from_number, get_number_from_symbol
+from nappy.units import kB
 
 #...constants
 _maxnn = 100

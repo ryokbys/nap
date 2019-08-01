@@ -15,8 +15,8 @@ import os,sys,math,copy
 import optparse
 import numpy as np
 
-from atom import Atom
-from napsys import NAPSystem
+from nappy.atom import Atom
+from nappy.napsys import NAPSystem
 
 ################################################# Functions ############
 

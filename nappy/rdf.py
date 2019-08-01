@@ -28,8 +28,8 @@ import os,sys
 import numpy as np
 from docopt import docopt
 
-from napsys import NAPSystem
-from gaussian_smear import gsmear
+from nappy.napsys import NAPSystem
+from nappy.gaussian_smear import gsmear
 
 def norm(vector):
     norm= 0.0

@@ -24,7 +24,7 @@ import os,sys,copy
 import numpy as np
 from docopt import docopt
 
-from napsys import NAPSystem, parse_filename
+from nappy.napsys import NAPSystem, parse_filename
 
 def isotropic(psys0,strain=0.01):
     fac = 1.0 + strain

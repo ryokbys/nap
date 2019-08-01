@@ -22,8 +22,8 @@ from docopt import docopt
 import numpy as np
 import glob,yaml
 
-from atom import Atom
-from napsys import NAPSystem
+from nappy.atom import Atom
+from nappy.napsys import NAPSystem
 
 __author__="Ryo KOBAYASHI"
 __version__="190718"

@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-07-18 14:45:50 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-01 13:54:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -683,10 +683,10 @@ contains
             if( isp.gt.0 ) then
               schg(isp) = chgi
               ispflag(isp) = .true.
-              if( iprint.gt.1 ) print *,'fixed charge:',isp,chgi
+              if( iprint.gt.0 ) print '(a,a3,i3,f8.4)',' fixed charge: ',trim(csp),isp,chgi
             else
               if( iprint.gt.1 ) then
-                print *,'fixed charge read but not used: ',isp,chgi
+                print '(a,a3,i3,f8.4)',' fixed charge read but not used: ',trim(csp),isp,chgi
               endif
             end if
           else if( trim(cchgs).eq.'fixed_bvs' ) then
