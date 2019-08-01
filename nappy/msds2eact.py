@@ -23,7 +23,7 @@ from docopt import docopt
 import numpy as np
 from scipy import stats
 
-from .nappy.msd2diff import read_out_msd, msd2D
+from nappy.msd2diff import read_out_msd, msd2D
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "181008"
