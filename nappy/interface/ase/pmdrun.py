@@ -8,7 +8,7 @@ import subprocess
 import numpy as np
 from ase.calculators.calculator import FileIOCalculator,Calculator
 
-from pmdio import get_fmvs
+from nappy.interface.ase.pmdio import get_fmvs
 from nappy.napsys import NAPSystem
 
 __author__  = "Ryo KOBAYASHI"
