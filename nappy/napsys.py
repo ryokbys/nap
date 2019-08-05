@@ -227,12 +227,19 @@ class NAPSystem(object):
     def remove_atoms(self,dellist):
         """
         Remove atoms of given list of IDs from the system.
+        Since the list.pop(i) is very slow, ~O(N),
+        actually create a new atoms list by copying the whole list
+        except atoms in dellist.
         """
-        dellist.sort(reverse=True)
-        for ia in dellist:
-            if ia >= len(self.atoms):
-                continue
-            self.atoms.pop(ia)
+        if len(dellist) == 1:
+            self.atoms.pop(dellist[0])
+            return None
+
+        newatoms = []
+        for ia in range(len(self.atoms)):
+            if ia in dellist: continue
+            newatoms.append(self.atoms[ia])
+        self.atoms = newatoms
         return None
 
     def reset_ids(self):
@@ -1288,6 +1295,9 @@ You need to specify the species order correctly with --specorder option.
         l1= np.abs(vol/(np.linalg.norm(np.cross(h[1],h[2]))))
         l2= np.abs(vol/(np.linalg.norm(np.cross(h[2],h[0]))))
         l3= np.abs(vol/(np.linalg.norm(np.cross(h[0],h[1]))))
+        # print('alc,a1,a2,a3=',self.alc,self.a1,self.a2,self.a3)
+        # print('h=',h)
+        # print('vol,l1,l2,l3=',vol,l1,l2,l3)
         n1= int(np.ceil(length/l1))
         n2= int(np.ceil(length/l2))
         n3= int(np.ceil(length/l3))

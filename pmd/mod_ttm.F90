@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-07-22 22:53:09 Ryo KOBAYASHI>
+!                     Last-modified: <2019-08-05 15:32:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -68,8 +68,9 @@ module ttm
 !.....Minimum atomic temperature for calculating kappa, in K
   real(8):: ta_min = 10.0
 
-!.....Te distribution shape: exp or read (from cTe_init)
-  character(len=128):: cTe_init = 'exp'
+!.....Initial Te distribution: exp, homo, or read (from cTe_init)
+  character(len=128):: cTe_init = 'homo'
+  real(8):: Te_init = 300d0
 !.....T-dependence of pulse shape: stepwise or gaussian
   character(len=128):: ctype_pulse = 'stepwise'
 !.....Function shape of thermal diffusivity, kappa: DCrho or B2
@@ -122,6 +123,7 @@ module ttm
 
   real(8),allocatable:: aai(:,:)
 
+  real(8):: etot_e
 !.....For energy difference
   real(8):: ein_e, ein_a, eout_e, eout_a
   real(8),allocatable:: dein(:),deout(:)
@@ -188,10 +190,11 @@ contains
     if( myid.eq.0 .and. iprint.ne.0 ) then
       print *,''
       print *,'TTM parameters:'
-      print '(a,es12.4,a,es12.4,a)','   Fluence = ',fluence,' eV/A^2, = ' &
-           ,fluence*ev2j/ang2m**2,' J/m^2'
+      print '(a,es12.4,a,f8.4,a)','   Fluence = ',fluence,' eV/A^2, = ' &
+           ,fluence*ev2j/(ang2m**2*10000),' J/cm^2'
       print '(a,f0.3,a)','   Pulse duration = ',tau_pulse,' fs'
       print '(a,es12.4,a)','   Intensity = ',I_0/darea,' eV/A^2/fs'
+      print '(a,es12.4,a)','   Penetration depth = ',lskin,' A'
       print '(a,f0.1,a)','   Total incident energy = ',fluence*area,' eV'
       print '(a,f0.4,a)','   Electron density = ',rho_e,' e/A^3'
       print '(a,i5)','   inner_loop = ',nstp_inner
@@ -203,7 +206,7 @@ contains
       print '(a,3i5,i8)','   nx,ny,nz,nxyz = ',nx,ny,nz,nxyz
       print '(a,4es12.4)','   dx,dy,dz,vcell = ',dx,dy,dz,vcell
       print '(a,2es12.4)','   area,darea = ',area,darea
-      print '(a,2i5,es12.4)','   lsurf,rsurf = ',lsurf,rsurf,lskin
+      print '(a,2i5)','   lsurf,rsurf = ',lsurf,rsurf
       if( trim(ctype_coupling).eq.'constant_gp' ) then
         print '(a,2es12.4)','   e_ph_const = ',e_ph_const
       else if( trim(ctype_coupling).eq.'constant_gmmp' ) then
@@ -218,7 +221,7 @@ contains
         print '(a,f0.1)','     Minimum Te = ',Te_min
       endif
       mem = 4 * 4*nxyz + 11 * 8*nxyz + 4 * 8*namax
-      print '(a,f0.3,a)',' Memory for TTM = ',dble(mem)/1000/1000,' MByte'
+      print '(a,f0.3,a)','   Memory for TTM = ',dble(mem)/1000/1000,' MByte'
     endif
     
 !.....Error check
@@ -286,8 +289,13 @@ contains
 !!$      do ix=lsurf,rsurf
 !!$        te(ix,1:ny,1:nz) = I_0 *exp(-dx*(ix-lsurf+1)/lskin)
 !!$      enddo
+    else if( cTe_init(1:4).eq.'homo' ) then  ! homogeneous Te
+      if( myid.eq.0 ) then
+        print '(a,f7.1,a)','   Initial Te =     ',Te_init,' K'
+      endif
     else if( trim(cTe_init).eq.'read' ) then
       if( myid.eq.0 ) then
+        print '(a)','   Initial Te is read from in.Te.'
         open(ioTein,file=trim(paramsdir)//'/'//trim(cTe_infile),status='old')
         do while(.true.)
           read(ioTein,*,end=10) c1st
@@ -386,9 +394,12 @@ contains
         else if( trim(c1st).eq.'kappa_0' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, kappa0
-        else if( trim(c1st).eq.'Te_init' ) then
+        else if( trim(c1st).eq.'initial_Te' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, cTe_init
+        else if( trim(c1st).eq.'Te_init' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, Te_init
         else if( trim(c1st).eq.'Te_right' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, Te_right
@@ -482,6 +493,7 @@ contains
     call mpi_bcast(e_ph_const,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(cTe_init,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(Te_right,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(Te_init,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(ce_Tdep,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(c_0,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(a_0,1,mpi_real8,0,mpi_world,ierr)
@@ -662,7 +674,7 @@ contains
     endif
 
     if( trim(surfmove).eq.'plane' .and. &
-         mod(istp,nstp_surfmove).eq.0) then
+         (istp.eq.0 .or. mod(istp,nstp_surfmove).eq.0) ) then
       call update_surface_plane(myid,mpi_world,iprint)
     endif
 
@@ -711,6 +723,7 @@ contains
 
     ein_e = 0d0
     eout_e = 0d0
+    etot_e = 0d0
     if( myid.eq.0 ) then
       
 10    continue
@@ -818,6 +831,7 @@ contains
         cete_min = min(ce,cete_min)
         alpha_max = max(kappa/ce/rho_e,alpha_max)
         Te_max = max(Te_max,te(ix,iy,iz))
+        etot_e = etot_e +te(ix,iy,iz)*fkb*rho_e*vcell*1.5d0
       enddo
 !!$      print *,'cete_min,Te_max=',cete_min,Te_max
 !.....Output
@@ -1177,18 +1191,20 @@ contains
 !
 !  Update left surface position according to number of atoms in the cells.
 !  Criterion for lsurf:
-!    - all the cells of nx have atoms less than a certain density (vacuum)
+!    - the average density over yz plane is less than a certain density (vacuum)
 !    - right-most vacuum cell
 !
     integer,intent(in):: myid,mpi_world,iprint
 
-    integer:: ix,iy,iz,icl,ivac_right,ierr,lsurf_new
+    integer:: ix,iy,iz,icl,ivac_right,ierr,lsurf_new,lsurf_true,imatt_right
+    real(8):: tmp
     logical:: lupdate
     logical,allocatable,save:: lexists(:)
     real(8),allocatable,save:: densx(:)
     real(8),save:: volyz
+    logical,save:: l1st = .true.
 
-    if( .not. allocated(lexists) ) then
+    if( l1st ) then
       allocate(lexists(nx),densx(nx))
       volyz = vcell*ny*nz
     endif
@@ -1197,37 +1213,61 @@ contains
 
     lexists(:) = .false.
     densx(:) = 0d0
-    do ix=1,nx
+    do ix=nx,1,-1
+      tmp = 0d0
       do iy=1,ny
         do iz=1,nz
           call ixyz2ic(ix,iy,iz,icl)
-!.....Since nac is not a number of atoms, but DOF in a cell, divid by 3
+!.....Since nac is not a number of atoms, but DOF in a cell, so divide it by 3
           densx(ix) = densx(ix) +dble(nac(icl))/3
+!.....Check true lsurf from given Te(:,:,:)
+          tmp = tmp +te(ix,iy,iz)
         enddo
       enddo
       densx(ix) = densx(ix)/volyz
       if( densx(ix) .gt. dthresh ) lexists(ix) = .true.
+!!$      print *,'ix,densx,lexists=',ix,densx(ix),lexists(ix)
+      if( tmp.gt.0d0 ) lsurf_true = ix
     enddo
 
-!.....Right-most layer of vacuum
+!.....Right-most layer of vacuum and right-most layer of material
     ivac_right = 0
-    do ix=1,rsurf
+    imatt_right = 0
+    do ix=1,nx
+      if( lexists(ix) ) imatt_right = ix
       if( .not. lexists(ix) ) ivac_right = ix
     enddo
+!!$    print *,'ivac_right,imatt_right=',ivac_right,imatt_right
 
 !.....Update lsurf
     lupdate = .false.
     lsurf_new = max(ivac_right+1, 1)  ! not to take 0
-    if( lsurf_new .gt. lsurf ) then
-      do ix=lsurf,lsurf_new-1
+!!$    print *,'lsurf,new,true=',lsurf,lsurf_new,lsurf_true
+
+!.....Update Te
+    if( cTe_init(1:4).eq.'homo' .and. l1st ) then  ! the first call in case of homogeneous Te
+      te(:,:,:) = 0d0
+      do ix=lsurf_new,nx
+        te(ix,:,:) = te_init
+      enddo
+    else if( lsurf_new .gt. lsurf_true ) then
+      do ix=lsurf_true,lsurf_new-1
         te(ix,:,:) = 0d0
       enddo
-    else if( lsurf_new .lt. lsurf ) then
-      do ix=lsurf_new,lsurf-1
-        te(ix,:,:) = te(lsurf,:,:)
+    else if( lsurf_new .lt. lsurf_true ) then
+!!$      print *,'lsurf_new.lt.lsurf'
+      do ix=lsurf_new,lsurf_true-1
+        te(ix,:,:) = te(lsurf_true,:,:)
       enddo
     endif
     lsurf = lsurf_new
+
+    if( l1st ) then
+      rsurf = imatt_right
+!!$      do ix=1,nx
+!!$        print *,'ix,te=',ix,te(ix,1,1)
+!!$      enddo
+    endif
 
 10  continue
 !.....Broadcast Te distribution to all the nodes.
@@ -1235,13 +1275,14 @@ contains
     call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(lsurf,1,mpi_integer,0,mpi_world,ierr)
 
-    if( lsurf.eq.rsurf ) then
-      if( myid.eq.0 ) print *,'Warning: lsurf.eq.rsurf!'
+    if( lsurf.ge.rsurf ) then
+      if( myid.eq.0 ) print *,'Warning: lsurf.ge.rsurf, which should not happen!'
     endif
     if( myid.eq.0 .and. iprint.gt.1 ) then
       print '(a,2i4,5es12.4)', ' lsurf,ivac_right,densx= ' &
            ,lsurf,ivac_right,densx(max(1,lsurf-2):lsurf+2)
     endif
+    l1st = .false.
     return
   end subroutine update_surface_plane
 !=======================================================================
@@ -1257,10 +1298,12 @@ contains
       inquire(unit=ioergio, opened=lopen)
       if( .not. lopen ) then
         open(ioergio,file=trim(cergio),status='replace')
-        write(ioergio,'(a)') '# istp,   time,          ein_el,' &
-             //'          eout_el,          ein_at,          eout_at'
+        write(ioergio,'(a)') '# 1:istp, 2:time,        3:ein_el,' &
+             //'       4:eout_el,        5:ein_at,      6:eout_at,' &
+             //'       7:etot_el'
       endif
-      write(ioergio,'(i8,5es15.7)') istp, simtime, ein_e, eout_e, ein_a, eout_a
+      write(ioergio,'(i8,6es15.7)') istp, simtime, ein_e, eout_e, ein_a &
+           ,eout_a ,etot_e
       call flush(ioergio)
     endif
     

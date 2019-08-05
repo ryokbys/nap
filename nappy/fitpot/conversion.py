@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Conversion between fitpot parameter file `in.params.fitpot` and `in.params.XX` for pmd.
+Conversion between fitpot parameter file `in.vars.fitpot` and `in.params.XX` for pmd.
 The fitpot parameter file should include the keyword `fitpot` in its name.
 Another parameter file type is determined from the file name, for example,
 `in.params.Morse` for Morse parameter file.

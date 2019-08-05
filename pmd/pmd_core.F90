@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-07-19 15:39:40 Ryo KOBAYASHI>
+!                     Last-modified: <2019-08-02 19:51:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -279,6 +279,11 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     va(1:3,1:natm) = 0d0
   endif
 
+!-----calc kinetic energy
+  call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
+       ,vmax,mpi_md_world)
+  vmaxold=vmax
+
   if( trim(ctctl).eq.'Langevin' ) then
     tgmm= 1d0/trlx
     do ifmv=1,9
@@ -305,7 +310,10 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     call init_ttm(namax,natm,h,dt,lvardt,myid_md,mpi_md_world &
          ,iprint)
     call assign_atom2cell(namax,natm,ra,sorg,boundary)
+    call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
+         ,0,myid_md,mpi_md_world,iprint)
     call te2tei(namax,natm,tei)
+    call output_Te(0,simtime,myid_md,iprint)
   endif
 
 !.....Debug
@@ -371,11 +379,6 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   call perf_disl_pos_by_pot(epith,natm,ra,h,epi,sorg &
        ,nodes_md,myid_md,mpi_md_world,0,21)
 #endif
-
-!-----calc kinetic energy
-  call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
-       ,vmax,mpi_md_world)
-  vmaxold=vmax
 
   if( trim(cpctl).eq.'Berendsen' .or. &
        trim(cpctl).eq.'vc-Berendsen' ) then
@@ -479,12 +482,6 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     endif
   endif
   tdump = tdump +(mpi_wtime() -tmp)
-
-  if( trim(ctctl).eq.'ttm' ) then
-    call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
-         ,istp,myid_md,mpi_md_world,iprint)
-    call output_Te(0,simtime,myid_md,iprint)
-  endif
 
 !-----initialize the counter for output
   iocntpmd=0
