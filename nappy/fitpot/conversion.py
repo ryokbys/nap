@@ -65,6 +65,35 @@ def fp2morse(infname,outfname,pairs):
     print(' Wrote '+outfname)
     return
 
+def fp2bmh(infname,outfname,pairs):
+    aijs = []
+    alpijs = []
+    with open(infname,'r') as f:
+        lines = f.readlines()
+    
+    ndat = int(lines[0].split()[0])
+    if ndat != len(pairs)*2:
+        raise ValueError('Number of parameters in {0:s} is inconsistent with given pairs.'.format(infname))
+    # n = 0
+    for i in range(1,len(lines)):
+        line = lines[i]
+        data = line.split()
+        if (i-1)%2 == 0:
+            aijs.append(float(data[0]))
+        elif (i-1)%2 == 1:
+            alpijs.append(float(data[0]))
+    
+    # print(' aijs  = ',aijs)
+    # print(' alpijs= ',alpijs)
+    with open(outfname,'w') as f:
+        f.write('# cspi, cspj,    aij,     alpij\n')
+        for l in range(len(ds)):
+            f.write('  {0:4s}  {1:4s}'.format(pairs[l][0],pairs[l][1]))
+            f.write('   {0:7.3f}  {1:7.3f}\n'.format(aijs[l],alpijs[l]))
+            
+    print(' Wrote '+outfname)
+    return
+
 def morse2fp(infname,outfname):
     with open(infname,'r') as f:
         lines = f.readlines()
@@ -104,6 +133,43 @@ def morse2fp(infname,outfname):
     print('{0:-<72}'.format(' '))
     return
 
+def bmh2fp(infname,outfname):
+    with open(infname,'r') as f:
+        lines = f.readlines()
+    params = {}
+    pairs = []
+    for line in lines:
+        if line[0] in ('#','!'):
+            continue
+        data = line.split()
+        if data[0].isdigit():
+            raise ValueError('This BMH parameter file seems too old.\n'
+                             +'Pairs are specified by names, not by integers.')
+        cspi = data[0]
+        cspj = data[1]
+        pairs.append((cspi,cspj))
+        aij = float(data[2])
+        alpij = float(data[3])
+        params[(cspi,cspj)] = (aij,alpij)
+    #...Write in.vars.fitpot file
+    with open(outfname,'w') as f:
+        f.write('  {0:d}   6.00   3.00\n'.format(len(params)*3))
+        for k,v in params.items():
+            cspi = k[0]
+            cspj = k[1]
+            aij, alpij = v
+            f.write(' {0:10.3f}   0.100  1000.0  # A     for {1:s}-{2:s}\n'.format(aij,cspi,cspj))
+            f.write(' {0:10.3f}   0.200   5.000  # alpha for {1:s}-{2:s}\n'.format(alpij,cspi,cspj))
+    print(' Wrote '+outfname)
+    print('')
+    print(' Following lines should be written in in.fitpot.')
+    print('{0:-<72}'.format(' '))
+    print(' interactions   {0:d}'.format(len(pairs)))
+    for p in pairs:
+        print('    {0:s}  {1:s}'.format(p[0],p[1]))
+    print('{0:-<72}'.format(' '))
+    return
+
 
 if __name__ == "__main__":
 
@@ -112,7 +178,7 @@ if __name__ == "__main__":
     infname = args['INFILE']
     outfname = args['OUTFILE']
     
-    if 'fitpot' in infname and 'Morse' in outfname:
+    if 'fitpot' in infname and ('Morse' in outfname or 'BMH' in outfname):
         if pairs == 'None':
             raise ValueError('Morse parameter pairs must be specified.')
         else:
@@ -121,9 +187,14 @@ if __name__ == "__main__":
             print(' Pairs to be extracted:')
             for pair in pairs:
                 print('   {0:s}-{1:s}'.format(pair[0],pair[1]))
-        fp2morse(infname,outfname,pairs)
+        if 'Morse' in outfname:
+            fp2morse(infname,outfname,pairs)
+        elif 'BMH' in outfname:
+            fp2bmh(infname,outfname,pairs)
     elif 'Morse' in infname and 'fitpot' in outfname:
         morse2fp(infname,outfname)
+    elif 'BMH' in infname and 'fitpot' in outfname:
+        bmh2fp(infname,outfname)
     else:
         msg = 'Input and output file names should include ' \
               +'either fitpot or (Morse).'
