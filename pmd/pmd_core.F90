@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-08-02 19:51:35 Ryo KOBAYASHI>
+!                     Last-modified: <2019-08-06 15:08:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -325,7 +325,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   tdump = 0d0
 
   call init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
-       iprint,h,rc,lvc,ifcoulomb,specorder)
+       iprint,h,rc,lvc,ifcoulomb,specorder,am)
 !-----copy RA of boundary atoms
   call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
        ,nx,ny,nz,myid_md)
@@ -1205,7 +1205,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !      print *,'one_shot: 04'
 !      if( iprint.ge.10 ) print *,'init_force,myid_md=',myid_md
   call init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
-       iprint,h,rc,lvc,ifcoulomb,specorder)
+       iprint,h,rc,lvc,ifcoulomb,specorder,am)
 
 !      print *,'one_shot: 05'
 !-----copy RA of boundary atoms

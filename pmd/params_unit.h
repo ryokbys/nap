@@ -56,4 +56,7 @@
       real(8),parameter:: ue2ev = 1d0/ev2ue
       real(8),parameter:: k2ue  = k2j*j2ue
       real(8),parameter:: ue2k  = ue2j*j2k
+!.....Plank constant in eV*fs (6.62607e-34 /1602e-19 /1e-15)
+      real(8),parameter:: plankh = 4.135667733d0
+      
       

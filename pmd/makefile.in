@@ -25,8 +25,7 @@ MPIFLAGS= @FCFLAGS@
 .F90.o: 
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} -o $@ $<
 
-pmd= read_input.o util_vec.o util_rnd.o \
-	lasubs.o mk_lspr.o \
+pmd= read_input.o util_vec.o util_rnd.o lasubs.o mk_lspr.o \
 	common_parallel.o sort.o pmd_main.o pmd_core.o 
 pmc= prec_mc.o util_rnd.o mk_lspr.o read_input.o pmd_core.o util_vec.o \
 	lasubs.o common_parallel.o sort.o
@@ -45,7 +44,8 @@ forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
 	force_Mishin.o force_AFS_W.o force_SC_Fe.o \
 	force_SM_Al.o force_linreg.o force_NN.o force_NN2.o \
 	force_Morse.o force_Coulomb.o force_EAM.o force_Buckingham.o \
-	force_Bonny_WRe.o force_ZBL.o force_cspline.o force_Tersoff.o
+	force_Bonny_WRe.o force_ZBL.o force_cspline.o force_Tersoff.o \
+	force_FPC.o force_BMH.o force_dipole.o
 params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 	params_EDIP_Si.h \
 	params_Brenner.h params_Lu_WHe.h params_Branicio_AlN.h \
@@ -121,6 +121,9 @@ force_SW.o: mod_util.o
 force_ZBL.o: mod_util.o mod_element.o
 force_cspline.o: mod_util.o
 force_Tersoff.o: mod_vector.o
+force_dipole.o: mod_util.o
+force_FPC.o: mod_util.o
+force_BMH.o: mod_util.o
 mod_constraints.o: mod_vector.o mod_util.o
 mod_rdcfrc.o: mod_structure.o mod_util.o
 mod_ttm.o: mod_util.o

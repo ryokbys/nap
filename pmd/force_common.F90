@@ -35,6 +35,9 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
   use ZBL,only: force_ZBL,force_ZBL_overlay,r_inner
   use cspline,only: force_cspline
   use tersoff,only: force_tersoff, ts_type
+  use FPC,only: force_FPC
+  use BMH,only: force_BMH
+  use dipole,only: force_dipole
   implicit none
   integer,intent(in):: namax,natm,nnmax,nismax,iprint
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
@@ -197,7 +200,16 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   endif
+  if( use_force('dipole') ) call force_dipole(namax,natm,tag,ra,nnmax,aa,strs &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
   if( use_force('cspline') ) call force_cspline(namax,natm,tag,ra,nnmax,aa,strs &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
+  if( use_force('BMH') ) call force_BMH(namax,natm,tag,ra,nnmax,aa,strs &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
+  if( use_force('FPC') ) call force_FPC(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
   
@@ -237,7 +249,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
 end subroutine get_force
 !=======================================================================
 subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
-     iprint,h,rc,lvc,ifcoulomb,specorder)
+     iprint,h,rc,lvc,ifcoulomb,specorder,amass)
 !
 !  Initialization routine is separated from main get_force routine.
 !
@@ -256,9 +268,12 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use NN2, only: read_params_NN2,lprmset_NN2,update_params_NN2
   use pmdio,only: nspmax
   use tersoff,only: init_tersoff
+  use dipole,only: read_params_dipole
+  use FPC,only: read_params_FPC, lprmset_FPC
+  use BMH,only: read_params_BMH, lprmset_BMH
   implicit none
   integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint !,numff
-  real(8),intent(in):: tag(namax),h(3,3),rc
+  real(8),intent(in):: tag(namax),h(3,3),rc,amass(nspmax)
   character(len=3),intent(in):: specorder(nspmax)
 !!$    character(len=20),intent(in):: cffs(numff)
   integer,intent(inout):: ifcoulomb
@@ -328,6 +343,23 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
 !!$      else
 !!$        call update_params_Morse('full_Morse')
 !!$      endif
+    endif
+  endif
+!.....dipole
+  if( use_force('dipole') ) then
+    call read_params_dipole(myid_md,mpi_md_world,iprint &
+         ,specorder,amass)
+  endif
+!.....FPC (FP_ceramics)
+  if( use_force('FPC') ) then
+    if( .not.lprmset_FPC ) then
+      call read_params_FPC(myid_md,mpi_md_world,iprint,specorder)
+    endif
+  endif
+!.....BMH
+  if( use_force('BMH') ) then
+    if( .not.lprmset_BMH ) then
+      call read_params_BMH(myid_md,mpi_md_world,iprint,specorder)
     endif
   endif
 !.....EAM

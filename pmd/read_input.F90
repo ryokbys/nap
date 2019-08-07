@@ -415,7 +415,7 @@ subroutine read_force_field(ionum)
 !      numff = ndat -1
   num_forces = ndat -1
 !      allocate(cffs(numff))
-  allocate(force_list(num_forces))
+!!$  allocate(force_list(num_forces))
   backspace(ionum)
 !      read(ionum,*) ctmp, (cffs(i),i=1,numff)
   read(ionum,*) ctmp, (force_list(i),i=1,num_forces)

@@ -1,17 +1,17 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-06-08 11:26:47 Ryo KOBAYASHI>
+!                     Last-modified: <2019-08-06 15:18:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax
   implicit none
   save
   
-  integer:: num_forces = -1
-  character(len=128),allocatable:: force_list(:)
-
 !.....Force index list
-  integer,parameter:: N_FORCES = 29
+  integer,parameter:: N_FORCES = 32
   character(len=128):: force_index_list(N_FORCES)
+
+  integer:: num_forces = -1
+  character(len=128):: force_list(N_FORCES)
 
   logical:: luse_force(N_FORCES)
 
@@ -59,6 +59,9 @@ contains
     force_index_list(27) =  "Ewald"
     force_index_list(28) =  "Ewald_long"
     force_index_list(29) =  "Coulomb"
+    force_index_list(30) =  "FPC"
+    force_index_list(31) =  "cspline"
+    force_index_list(32) =  "Tersoff"
 
     luse_force(:) = .false.
 
@@ -101,7 +104,7 @@ contains
     integer:: i
 
     if( myid.eq.0 ) then
-      write(6,'(a)',advance='no') ' Use the following force-fields:'
+      write(6,'(/,a)',advance='no') ' Use the following force-fields:'
       do i=1,num_forces
         write(6,'(2x,a)',advance='no') trim(force_list(i))
       enddo
@@ -118,10 +121,7 @@ contains
     integer:: ierr
 
     call mpi_bcast(num_forces,1,mpi_integer,0,mpicomm,ierr)
-    if( .not.allocated(force_list) ) then
-      allocate(force_list(num_forces))
-    endif
-    call mpi_bcast(force_list,128*num_forces,mpi_character &
+    call mpi_bcast(force_list,128*N_FORCES,mpi_character &
          ,0,mpicomm,ierr)
 
 !.....Overlay

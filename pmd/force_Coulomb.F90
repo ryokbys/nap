@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-01 13:54:55 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-06 17:06:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -683,10 +683,10 @@ contains
             if( isp.gt.0 ) then
               schg(isp) = chgi
               ispflag(isp) = .true.
-              if( iprint.gt.0 ) print '(a,a3,i3,f8.4)',' fixed charge: ',trim(csp),isp,chgi
+              if( iprint.gt.0 ) print '(a,a3,i3,f8.4)','   fixed charge: ',trim(csp),isp,chgi
             else
               if( iprint.gt.1 ) then
-                print '(a,a3,i3,f8.4)',' fixed charge read but not used: ',trim(csp),isp,chgi
+                print '(a,a3,i3,f8.4)','   fixed charge read but not used: ',trim(csp),isp,chgi
               endif
             end if
           else if( trim(cchgs).eq.'fixed_bvs' ) then
@@ -701,12 +701,12 @@ contains
               rad_bvs(isp) = rad
               npq_bvs(isp) = npq
               if( iprint.gt.0 ) then
-                write(6,'(a,a5,2f7.3,i4)') ' csp,vid,rad,npq =' &
+                write(6,'(a,a5,2f7.3,i4)') '   csp,vid,rad,npq =' &
                      ,trim(csp),vid,rad,npq
               endif
             else
               if( iprint.gt.1 ) then
-                print *,'fixed_bvs charge read but not used: ',trim(csp)
+                print *,'  fixed_bvs charge read but not used: ',trim(csp)
               endif
             endif
           else if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') then
@@ -726,7 +726,7 @@ contains
               endif
             else
               if( iprint.gt.1 ) then
-                print *,'variable charge read but not used: ',trim(csp)
+                print *,'  variable charge read but not used: ',trim(csp)
               endif
             endif
           endif
@@ -744,7 +744,7 @@ contains
             interact(isp,jsp) = .true.
             interact(jsp,isp) = .true.
           else
-            print *,'interacion read but not used: ',isp,jsp
+            print *,'  interacion read but not used: ',isp,jsp
           endif
         endif
       enddo ! while(.true.)
@@ -754,7 +754,7 @@ contains
         if(  trim(cterms).eq.'full' .or. &
              trim(cterms).eq.'short' ) then
           cterms = 'long'
-          print *,'WARNING: terms was corrected to long, because charge_dist is gaussian.'
+          print *,'  WARNING: terms was corrected to long, because charge_dist is gaussian.'
         endif
       endif
       
@@ -769,8 +769,8 @@ contains
         sgmlim = acc*sqrt(2d0/pi)/vcgjiimin
         if( sgm_ew.lt.sgmlim ) then
           if( iprint.ne.0 ) then
-            print *,'WARNING: Since sgm_ew is too small, sgm_ew is replaced by ',sgmlim
-            print *,'         which is determined by acc*sqrt(2/pi)/Jii.'
+            print *,'  WARNING: Since sgm_ew is too small, sgm_ew is replaced by ',sgmlim
+            print *,'           which is determined by acc*sqrt(2/pi)/Jii.'
           endif
           sgm_ew = sgmlim
         endif
@@ -825,7 +825,7 @@ contains
 !!$            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
 !!$            rho_bvs(isp,jsp) = 2d0
           if( myid.eq.0 .and. iprint.gt.0 .and. interact(isp,jsp) ) then
-            write(6,'(a,2i5,f10.4)') ' isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
+            write(6,'(a,2i5,f10.4)') '   isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
           endif
         enddo
       enddo
@@ -939,9 +939,9 @@ contains
       else
         print *,''
         print *,'Ewald energy term by term:'
-        print '(a,f12.4)','   Self term         = ',eselfl
-        print '(a,f12.4)','   Short-range term  = ',esrl
-        print '(a,f12.4)','   Long-range term   = ',elrl
+        print '(a,f12.4," eV")','   Self term         = ',eselfl
+        print '(a,f12.4," eV")','   Short-range term  = ',esrl
+        print '(a,f12.4," eV")','   Long-range term   = ',elrl
       endif
     endif
 

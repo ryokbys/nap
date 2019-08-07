@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-07-24 11:14:02 Ryo KOBAYASHI>
+!                     Last-modified: <2019-08-07 16:08:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -122,6 +122,28 @@ program pmd
 !.....Set nrmtrans to 0
       print *,'  - Set removal of translation off.'
       nrmtrans = 0
+    endif
+
+!.....Some FF requires other FFs
+    if( use_force('FPC') ) then
+      if( .not. use_force('Coulomb') ) then
+        num_forces = num_forces +1
+        force_list(num_forces) = 'Coulomb'
+      endif
+!!$      if( .not. use_force('dipole') ) then
+!!$        num_forces = num_forces +1
+!!$        force_list(num_forces) = 'dipole'
+!!$      endif
+    endif
+    if( use_force('BMH') ) then
+      if( .not. use_force('Coulomb') ) then
+        num_forces = num_forces +1
+        force_list(num_forces) = 'Coulomb'
+      endif
+      if( .not. use_force('dipole') ) then
+        num_forces = num_forces +1
+        force_list(num_forces) = 'dipole'
+      endif
     endif
 
 !.....Correct nnmax if the given nnmax is too small compared to
