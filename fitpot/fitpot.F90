@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-11 15:09:42 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-07 22:04:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -125,7 +125,8 @@ program fitpot
 !!$    call NN_func(nvars,vars,ftrn0,ftst0)
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
        .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' &
-       .or. trim(cpot).eq.'NN2' ) then
+       .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'BMH' &
+       .or. trim(cpot).eq.'Abell' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
 !!$    if( trim(cpot).eq.'linreg' .and. trim(cfmethod).eq.'test' &
 !!$         .and. iprint.gt.2 ) call write_dsgnmats()
@@ -934,7 +935,8 @@ subroutine ga_wrapper(ftrn0,ftst0)
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
        trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' .or. &
-       trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
+       trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' .or. &
+       trim(cpot).eq.'Abell' .or. trim(cpot).eq.'BMH' ) then
     call ga(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats,write_energy_relation)
@@ -959,7 +961,8 @@ subroutine de_wrapper(ftrn0,ftst0)
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
        trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' .or. &
-       trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
+       trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' .or. &
+       trim(cpot).eq.'Abell' .or. trim(cpot).eq.'BMH' ) then
     call de(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats, write_energy_relation)
@@ -984,7 +987,8 @@ subroutine pso_wrapper(ftrn0,ftst0)
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
        trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' .or. &
-       trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' ) then
+       trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' .or. &
+       trim(cpot).eq.'BMH' .or. trim(cpot).eq.'Abell' ) then
     call pso(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)

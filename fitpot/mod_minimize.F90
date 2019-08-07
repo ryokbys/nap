@@ -2706,7 +2706,7 @@ contains
       open(io_steps,file=cf_steps,status='replace')
       write(io_steps,'(a)') '# iter, iid, ftrn, ftst'
     endif
-100 format(i6,2es14.6,100f9.4)
+100 format(i6,2es14.6,100es11.3)
 
     iter = 0
     
@@ -2755,9 +2755,9 @@ contains
     enddo
 
     if( myid.eq.0 ) then
-      write(6,'(a,i8,1x,100es12.4)') &
+      write(6,'(a,i8,1x,100es11.3)') &
            " iter,fbest,fvals= ",&
-           iter,fbest,(indivs(i)%fvalue,i=1,min(ndim,10))
+           iter,fbest,(indivs(i)%fvalue,i=1,min(ga_nindivs,10))
       do i=1,ga_nindivs
         write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
              ,indivs(i)%ftst
@@ -2819,9 +2819,9 @@ contains
       call roulette_selection(ga_nindivs,indivs,ga_noffsp,offsprings,fbest)
 
       if( myid.eq.0 ) then
-        write(6,'(a,i8,1x,100es12.4)') &
+        write(6,'(a,i8,1x,100es11.3)') &
            " iter,fbest,fvals= ",&
-           iter,fbest,(indivs(i)%fvalue,i=1,min(ndim,10))
+           iter,fbest,(indivs(i)%fvalue,i=1,min(ga_nindivs,10))
         do i=1,ga_nindivs
           write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
                ,indivs(i)%ftst
@@ -3210,7 +3210,7 @@ contains
       open(io_steps,file=cf_steps,status='replace')
       write(io_steps,'(a)') '# iter, iid, ftrn, ftst'
     endif
-10  format(i6,2es14.6,100f9.4)
+10  format(i6,2es14.6,100es11.3)
 
     iter = 0
 
@@ -3550,7 +3550,7 @@ contains
       open(io_steps,file=cf_steps,status='replace')
       write(io_steps,'(a)') '# iter, iid, ftrn, ftst'
     endif
-10  format(i6,2es14.6,100f9.4)
+10  format(i6,2es14.6,100es11.3)
 
     iter = 0
 

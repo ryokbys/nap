@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-06 17:06:28 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-07 21:55:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -589,6 +589,7 @@ contains
 !.....File name
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
+      if( iprint.gt.0 ) write(6,'(/,a)') ' Coulomb parameters:'
 !.....Start reading
       do while(.true.)
         read(ioprms,*,end=10) cline

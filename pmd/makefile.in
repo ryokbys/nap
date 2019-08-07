@@ -45,7 +45,7 @@ forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
 	force_SM_Al.o force_linreg.o force_NN.o force_NN2.o \
 	force_Morse.o force_Coulomb.o force_EAM.o force_Buckingham.o \
 	force_Bonny_WRe.o force_ZBL.o force_cspline.o force_Tersoff.o \
-	force_FPC.o force_BMH.o force_dipole.o
+	force_Abell.o force_BMH.o force_dipole.o
 params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 	params_EDIP_Si.h \
 	params_Brenner.h params_Lu_WHe.h params_Branicio_AlN.h \
@@ -122,7 +122,7 @@ force_ZBL.o: mod_util.o mod_element.o
 force_cspline.o: mod_util.o
 force_Tersoff.o: mod_vector.o
 force_dipole.o: mod_util.o
-force_FPC.o: mod_util.o
+force_Abell.o: mod_util.o
 force_BMH.o: mod_util.o
 mod_constraints.o: mod_vector.o mod_util.o
 mod_rdcfrc.o: mod_structure.o mod_util.o

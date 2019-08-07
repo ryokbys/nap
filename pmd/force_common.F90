@@ -35,7 +35,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
   use ZBL,only: force_ZBL,force_ZBL_overlay,r_inner
   use cspline,only: force_cspline
   use tersoff,only: force_tersoff, ts_type
-  use FPC,only: force_FPC
+  use Abell,only: force_Abell
   use BMH,only: force_BMH
   use dipole,only: force_dipole
   implicit none
@@ -209,7 +209,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
   if( use_force('BMH') ) call force_BMH(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
-  if( use_force('FPC') ) call force_FPC(namax,natm,tag,ra,nnmax,aa,strs &
+  if( use_force('Abell') ) call force_Abell(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
   
@@ -269,7 +269,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use pmdio,only: nspmax
   use tersoff,only: init_tersoff
   use dipole,only: read_params_dipole
-  use FPC,only: read_params_FPC, lprmset_FPC
+  use Abell,only: read_params_Abell, lprmset_Abell
   use BMH,only: read_params_BMH, lprmset_BMH
   implicit none
   integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint !,numff
@@ -350,10 +350,10 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
     call read_params_dipole(myid_md,mpi_md_world,iprint &
          ,specorder,amass)
   endif
-!.....FPC (FP_ceramics)
-  if( use_force('FPC') ) then
-    if( .not.lprmset_FPC ) then
-      call read_params_FPC(myid_md,mpi_md_world,iprint,specorder)
+!.....Abell
+  if( use_force('Abell') ) then
+    if( .not.lprmset_Abell ) then
+      call read_params_Abell(myid_md,mpi_md_world,iprint,specorder)
     endif
   endif
 !.....BMH

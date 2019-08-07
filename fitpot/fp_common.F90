@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-30 23:42:18 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-07 22:05:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -78,6 +78,8 @@ contains
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb, set_params_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
+    use BMH,only: set_paramsdir_BMH,set_params_BMH
+    use Abell,only: set_paramsdir_Abell,set_params_Abell
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN,only: set_paramsdir_NN,set_params_NN
     use NN2,only: set_paramsdir_NN2,set_params_NN2,nl,nhl,nlmax,get_NN2_hl1 &
@@ -155,6 +157,14 @@ contains
           ctype = 'full_Morse'
         endif
         call set_params_Morse(ndim,x,ctype,interact)
+      else if( trim(cpot).eq.'BMH' ) then
+        call set_paramsdir_BMH(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_BMH(ndim,x,ctype,interact)
+      else if( trim(cpot).eq.'Abell' ) then
+        call set_paramsdir_Abell(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_Abell(ndim,x,ctype,interact)
       else if( trim(cpot).eq.'EAM' ) then
         call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -393,6 +403,8 @@ contains
     use minimize
     use Coulomb,only: set_paramsdir_Coulomb,set_params_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
+    use BMH,only: set_paramsdir_BMH,set_params_BMH
+    use Abell,only: set_paramsdir_Abell,set_params_Abell
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN,only: set_paramsdir_NN,set_params_NN
     use NN2,only: set_paramsdir_NN2,set_params_NN2,set_NN2_hl1
@@ -461,6 +473,14 @@ contains
           ctype = 'full_Morse'
         endif
         call set_params_Morse(ndim,x,ctype,interact)
+      else if( trim(cpot).eq.'BMH' ) then
+        call set_paramsdir_BMH(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_BMH(ndim,x,ctype,interact)
+      else if( trim(cpot).eq.'Abell' ) then
+        call set_paramsdir_Abell(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_Abell(ndim,x,ctype,interact)
       else if( trim(cpot).eq.'EAM' ) then
         call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -648,7 +668,8 @@ contains
     use force
     use descriptor,only: get_dsgnmat_force
     use ZBL,only: r_inner,r_outer
-    use pmdio, only: nspmax
+    use pmdio, only: nspmax,has_specorder,specorder
+    use element
     implicit none
     include "../pmd/params_unit.h"
     type(mdsys),intent(inout):: smpl
@@ -663,13 +684,14 @@ contains
 
     logical,save:: l1st = .true.
 
-    integer:: i,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
+    integer:: i,is,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
          nstps_done,ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
     real(8):: am(nspmax),dt,rbuf,dmp,tinit,tfin,ttgt(nspmax),trlx,stgt(3,3),&
          ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv &
          ,rc1nn
     logical:: ltdst,lcellfix(3,3),lvc
-    character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5,boundary*3
+    character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5,boundary*3,csp*3
+    type(atom):: elem
     logical:: update_force_list
 
     logical,external:: string_in_arr
@@ -677,6 +699,7 @@ contains
     if( l1st ) then
 !.....Create MPI COMM for pmd only for the 1st time
       call create_mpi_comm_pmd()
+      call init_element()
       l1st = .false.
     endif
 !!$    print *,'cdirname,specorder= ',trim(smpl%cdirname) &
@@ -685,7 +708,16 @@ contains
     maxstp = 0
     nerg = 1
     npmd = 1
-    am(1:nspmax) = 1d0  ! Since no dynamics, no need of mass
+!.....Since at least one of FF requires mass infomation,
+!     set mass info from specorder anyways.
+    am(:) = 12d0
+    do is=1,nspmax
+      csp = smpl%specorder(is)
+      if( trim(csp).ne.'x' ) then
+        elem = get_element(trim(csp))
+        am(is) = elem%mass
+      endif
+    enddo
     dt = 5d0
     ciofmt = 'ascii'
     ifpmd = 0
@@ -740,9 +772,7 @@ contains
 
 !.....Set force_list in the force module
     update_force_list = .false.
-    if( .not.allocated(force_list) ) then
-      update_force_list = .true.
-    else if( nff.ne.num_forces ) then
+    if( nff.ne.num_forces ) then
       update_force_list = .true.
     else
       do i=1,nff
@@ -754,9 +784,7 @@ contains
     endif
 !.....Update force_list if needed
     if( update_force_list ) then
-      if( allocated(force_list) ) deallocate(force_list)
       num_forces = nff
-      allocate(force_list(num_forces))
       do i=1,num_forces
         force_list(i) = trim(cffs(i))
       enddo
@@ -845,6 +873,7 @@ contains
     use variables
     use parallel
     use Coulomb,only: set_paramsdir_Coulomb
+    use dipole,only: set_paramsdir_dipole
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use LJ,only: set_paramsdir_LJ
     use ZBL,only: set_paramsdir_ZBL, r_inner, r_outer
@@ -862,6 +891,7 @@ contains
     logical:: luse_ZBL = .false.
     logical:: luse_Bonny_WRe = .false.
     logical:: luse_cspline = .false.
+    logical:: luse_dipole = .false.
     logical:: lfdsgnmat = .false.  ! Not to compute dsgnmat for subtracted FFs
     logical,save:: l1st = .true.
     real(8):: epot,strs(3,3)
@@ -894,6 +924,8 @@ contains
           luse_Bonny_WRe = .true.
         else if( index(trim(csubffs(i)),'cspline').ne.0 ) then
           luse_cspline = .true.
+        else if( index(trim(csubffs(i)),'dipole').ne.0 ) then
+          luse_dipole = .true.
         endif
       enddo
 
@@ -910,6 +942,10 @@ contains
         endif
         if( luse_Coulomb ) then
           call set_paramsdir_Coulomb(trim(cmaindir)//'/'&
+               //trim(samples(ismpl)%cdirname)//'/pmd')
+        endif
+        if( luse_dipole ) then
+          call set_paramsdir_dipole(trim(cmaindir)//'/'&
                //trim(samples(ismpl)%cdirname)//'/pmd')
         endif
         if( luse_LJ_repul ) then
