@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-07 21:55:34 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-08 11:53:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -951,7 +951,7 @@ contains
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
-    if( iprint.gt.2 ) print *,'Coulomb epot = ',epott
+    if( iprint.gt.2 ) print *,'epot Coulomb = ',epott
 
   end subroutine force_Coulomb
 !=======================================================================

@@ -1,7 +1,9 @@
 module LJ
+  use pmdio, only: csp2isp, nspmax
   implicit none
   include "mpif.h"
   include "./params_unit.h"
+  save
   integer,parameter:: ioprms = 50
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.LJ_repul'
@@ -14,13 +16,13 @@ module LJ
   real(8),parameter:: alcar = 2d0**(1d0/6)*sgmlj *1.41421356d0*0.996d0
 
 !.....Max num of species
-  integer,parameter:: msp = 9
+  integer,parameter:: msp = nspmax
   integer:: nsp
 
   real(8),allocatable:: strsl(:,:,:)
-  real(8),allocatable:: eps(:,:), sgm(:,:)
   logical:: interact(msp,msp)
-  real(8):: repul(msp,msp),  rclj(msp,msp)
+  real(8):: rpl_c(msp,msp), rpl_rc(msp,msp)
+  integer:: rpl_n(msp,msp)
   
 contains
   subroutine force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
@@ -150,16 +152,44 @@ contains
     logical,intent(in):: l1st 
     logical:: lstrs
 
-    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,jj
+    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,jj,nij
     real(8):: xi(3),xij(3),rij(3),dij,dij2,diji,diji6,diji12,dvdr &
-         ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp,rcij,repij
-    real(8),external:: fcut1,dfcut1
+         ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp,rcij&
+         ,vr,vrc,dvdrc,cij
+    real(8),save:: vrcs(msp,msp),dvdrcs(msp,msp)
+!!$    real(8),external:: fcut1,dfcut1
+
+    real(8),save:: rcmax2
 
     if( l1st ) then
-!!$      call init_Morse(natm,tag,mpi_md_world)
-!!$      call read_params_Morse(myid,mpi_md_world,iprint)
+!!$      call init_Morse(natm,tag,mpi_md_world)!
+!$      call read_params_Morse(myid,mpi_md_world,iprint)
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
+      do is=1,msp
+        do js=1,msp
+          if( .not. interact(is,js) ) cycle
+          rcij = rpl_rc(is,js)
+          rcmax2 = max(rcmax2,rcij*rcij)
+        enddo
+      enddo
+      vrcs(:,:) = 0d0
+      dvdrcs(:,:) = 0d0
+      do is=1,msp
+        do js=1,msp
+          if( .not.interact(is,js) ) cycle
+          cij = rpl_c(is,js)
+          nij = rpl_n(is,js)
+          rcij= rpl_rc(is,js)
+          vrc = cij/rcij**nij
+          dvdrc= -nij*cij/rcij**(nij+1)
+          vrcs(is,js) = vrc
+          vrcs(js,is) = vrc
+          dvdrcs(is,js)= dvdrc
+          dvdrcs(js,is)= dvdrc
+!!$          print *,'is,js,cij,nij,rcij,vrc,dvdrc=',is,js,cij,nij,rcij,vrc,dvdrc
+        enddo
+      enddo
     endif
 
     if( size(strsl).lt.3*3*namax ) then
@@ -178,20 +208,23 @@ contains
         if( j.eq.0 ) exit
         if( j.le.i ) cycle
         js = int(tag(j))
-        rcij = rclj(is,js)
+        if( .not. interact(is,js) ) cycle
         rij(1:3) = ra(1:3,j) -xi(1:3)
         xij(1:3) = h(1:3,1,0)*rij(1) +h(1:3,2,0)*rij(2) +h(1:3,3,0)*rij(3)
         dij2 = xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
+        rcij = rpl_rc(is,js)
         if( dij2.gt.rcij*rcij ) cycle
         dij = sqrt(dij2)
-        repij = repul(is,js)
+        cij = rpl_c(is,js)
+        nij = rpl_n(is,js)
         diji = 1d0/dij
         dxdi(1:3) = -xij(1:3)*diji
         dxdj(1:3) =  xij(1:3)*diji
 !.....Potential
-        diji6 = 1d0/(dij2*dij2*dij2)
-        diji12 = diji6*diji6
-        tmp = 0.5d0 *repij *diji12 *fcut1(dij,0d0,rcij)
+        vr = cij*diji**nij
+        vrc = vrcs(is,js)
+        dvdrc = dvdrcs(is,js)
+        tmp = 0.5d0 *(vr -vrc -(dij -rcij)*dvdrc)
         if( j.le.natm ) then
           epi(i) = epi(i) +tmp
           epi(j) = epi(j) +tmp
@@ -201,8 +234,7 @@ contains
           epotl = epotl +tmp
         endif
 !.....Force
-        dvdr = -12d0*repij*diji12*diji *fcut1(dij,0d0,rcij) &
-             -repij*diji12 *dfcut1(dij,0d0,rcij)
+        dvdr = -nij *cij *diji**(nij+1) -dvdrc
         aa(1:3,i) = aa(1:3,i) -dxdi(1:3)*dvdr
         aa(1:3,j) = aa(1:3,j) -dxdj(1:3)*dvdr
 !.....Stress
@@ -227,26 +259,29 @@ contains
     epott= 0d0
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
-    if( iprint.gt.2 ) print *,'LJ_repul epot = ',epott
-
+    if( iprint.gt.2 ) print *,'epot LJ_repl= ',epott
+    
   end subroutine force_LJ_repul
 !=======================================================================
-  subroutine read_params_LJ_repul(myid,mpi_world,iprint)
+  subroutine read_params_LJ_repul(myid,mpi_world,iprint,specorder)
 !
 !  Read input for LJ_repul force
 !
     use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
+    character(len=3),intent(in):: specorder(nspmax)
+    
     character(len=128):: cline,cfname
-    integer:: isp,jsp,nd,ierr
+    character(len=3):: cspi,cspj
+    integer:: isp,jsp,nd,ierr,nij
     logical:: lexist
-    real(8):: repij,rcij
+    real(8):: cij,rcij
 !!$    integer,external:: num_data
 
     if( myid.eq.0 ) then
 !.....Initialization
       interact(1:msp,1:msp) = .false.
-!.....Check whether the file exists      
+!.....Check whether the file exists
       cfname = trim(paramsdir)//'/'//trim(paramsfname_repul)
       inquire(file=cfname,exist=lexist)
       if( .not. lexist ) then
@@ -255,7 +290,7 @@ contains
           write(6,'(a)') '           Default parameters will be used.'
         endif
         interact(1,1) = .true.
-        repul(1,1) = 4d0*epslj*sgmlj**12
+        rpl_c(1,1) = 4d0*epslj*sgmlj**12
         return
       endif
 !.....Read file if exits
@@ -266,18 +301,27 @@ contains
         nd = num_data(cline,' ')
         if( nd.eq.0 ) cycle
         if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
-        if( nd.eq. 4 ) then
+        if( nd.eq. 5 ) then
           backspace(ioprms)
-          read(ioprms,*) isp,jsp, repij, rcij
-          if( iprint.ne.0 ) write(6,'(a,2i4,f8.4,f6.2)') &
-               '   isp,jsp,repij,rcij = ',isp,jsp,repij,rcij
+          read(ioprms,*) cspi,cspj, cij, nij, rcij
+          isp = csp2isp(cspi,specorder)
+          jsp = csp2isp(cspj,specorder)
+          if( isp.gt.nspmax .or. jsp.gt.nspmax ) then
+            write(6,*) ' Warning @read_params: since isp/jsp is greater than nspmax,'&
+                 //' skip reading the line.'
+            cycle
+          endif
+          if( iprint.ne.0 ) write(6,'(a,2a4,f8.4,i5,f7.3)') &
+               '   cspi,cspj,cij,nij,rcij = ',cspi,cspj,cij,nij,rcij
           interact(isp,jsp) = .true.
-          repul(isp,jsp) = repij
-          rclj(isp,jsp) = rcij
+          rpl_c(isp,jsp) = cij
+          rpl_n(isp,jsp) = nij
+          rpl_rc(isp,jsp) = rcij
 !.....Symmetrize
           interact(jsp,isp) = interact(isp,jsp)
-          repul(jsp,isp) = repul(isp,jsp)
-          rclj(jsp,isp) = rclj(isp,jsp)
+          rpl_c(jsp,isp) = cij
+          rpl_n(jsp,isp) = nij
+          rpl_rc(jsp,isp) = rcij
         else
           if( iprint.ne.0 ) then
             write(6,*) 'WARNING@read_params_LJ_repul: number of entry wrong, ' &
@@ -291,8 +335,9 @@ contains
     endif
 
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
-    call mpi_bcast(repul,msp*msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rclj,msp*msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rpl_c,msp*msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rpl_n,msp*msp,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(rpl_rc,msp*msp,mpi_real8,0,mpi_world,ierr)
     return
   end subroutine read_params_LJ_repul
 !=======================================================================

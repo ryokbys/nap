@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-08-07 21:49:46 Ryo KOBAYASHI>
+!                     Last-modified: <2019-08-08 11:44:13 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -133,6 +133,16 @@ program pmd
       if( .not. use_force('dipole') ) then
         num_forces = num_forces +1
         force_list(num_forces) = 'dipole'
+      endif
+    endif
+    if( use_force('fpc') ) then
+      if( .not. use_force('Coulomb') ) then
+        num_forces = num_forces +1
+        force_list(num_forces) = 'Coulomb'
+      endif
+      if( .not. use_force('LJ_repul') ) then
+        num_forces = num_forces +1
+        force_list(num_forces) = 'LJ_repul'
       endif
     endif
 
