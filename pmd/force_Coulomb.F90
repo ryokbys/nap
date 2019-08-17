@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-08 11:53:15 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-14 21:51:24 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -68,6 +68,7 @@ module Coulomb
 !     Default value = 5.0 (Ang), which corresponds to alpha = 0.2 A^{-1}
 !     See, C.J. Fennell and J.D. Gezelter, J. Chem. Phys. 124, 234104 (2006).
   real(8):: rho_screened_cut = 5.0d0
+  real(8):: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
   
 !.....Accuracy controlling parameter for Ewald sum
 !.....See, http://www.jncasr.ac.in/ccms/sbs2007/lecturenotes/5day10nov/SBS_Ewald.pdf
@@ -721,9 +722,9 @@ contains
               qlower(isp) = qlow
               qupper(isp) = qup
               if( iprint.gt.0 ) then
-                write(6,'(a,i3,a3,4f10.4,2f5.1)') &
-                     '   csp,chi,Jii,sgm,e0,qlower,qupper = ', &
-                     trim(csp),dchi,djii,vcg_sgm(isp),de0,qlow,qup
+                write(6,'(a,a3,4f10.4,2f5.1)') &
+                     '   csp,chi,Jii,e0,qlower,qupper = ', &
+                     trim(csp),dchi,djii,de0,qlow,qup
               endif
             else
               if( iprint.gt.1 ) then
@@ -924,7 +925,7 @@ contains
     endif
     if( trim(cterms).eq.'screened_cut' ) then
       call force_screened_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-           ,lspr,epi,esrl,iprint,lstrs,rc)
+           ,lspr,epi,esrl,iprint,lstrs,rc,l1st)
     endif
 
     if( lstrs ) then
@@ -1489,7 +1490,7 @@ contains
   end subroutine force_direct_cut
 !=======================================================================
   subroutine force_screened_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-       ,lspr,epi,esrl,iprint,lstrs,rc)
+       ,lspr,epi,esrl,iprint,lstrs,rc,l1st)
 !
 !  Screened Coulomb with cutoff that uses rho_bvs.
 !  smoothing using vrc and dVdrc where
@@ -1507,23 +1508,34 @@ contains
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: strsl(3,3,namax),aa(3,namax)&
          ,epi(namax),esrl
-    logical,intent(in):: lstrs
+    logical,intent(in):: lstrs,l1st
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
          ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp &
-         ,qi,qj,radi,radj,rhoij,terfc,texp,sqpi &
-         ,vrc,dvdrc,terfcc,rc2 &
-         ,ri,ro,xs,dz,fc,dfc
-    real(8),external:: fcut1,dfcut1
+         ,qi,qj,radi,radj,rhoij,terfc,texp &
+         ,vrc,dvdrc,terfcc,ri,ro,xs,dz,fc,dfc
+    real(8),save:: sqpi,rc2
 
-!!$    if( rho_bvs(1,1).lt.0.1 ) then
-!!$      rho_bvs(1:nspmax,1:nspmax) = rho_screened_cut
-!!$    endif
+    if( l1st ) then
+      sqpi = 1d0/sqrt(pi)
+      rc2 = rc*rc
+      do is=1,nspmax
+        do js=is,nspmax
+          if( .not.interact(is,js) ) cycle
+          rhoij = rho_bvs(is,js)
+          terfcc = erfc(rc/rhoij)
+          vrc = acc /rc *terfcc
+          dvdrc = -acc /rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
+          vrcs(is,js) = vrc
+          vrcs(js,is) = vrc
+          dvdrcs(is,js) = dvdrc
+          dvdrcs(js,is) = dvdrc
+        enddo
+      enddo
+    endif
 
     esrl= 0d0
-    sqpi = 1d0/sqrt(pi)
-    rc2 = rc*rc
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -1547,9 +1559,8 @@ contains
         dxdj(1:3)=  rij(1:3)*diji
         rhoij = rho_bvs(is,js)
         terfc = erfc(dij/rhoij)
-        terfcc = erfc(rc/rhoij)
-        vrc = acc*qi*qj/rc *terfcc
-        dvdrc = -acc *qi*qj/rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
+        vrc = qi*qj*vrcs(is,js)
+        dvdrc = qi*qj*dvdrcs(is,js)
         texp = exp(-(dij/rhoij)**2)
         dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
         tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
@@ -1945,6 +1956,93 @@ contains
 
     return
   end subroutine qforce_short
+!=======================================================================
+  subroutine qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h &
+       ,lspr,iprint,rc,fq,esr,l1st)
+!
+!  Compute q-force of screened_cut Coulomb potential.
+!
+    implicit none
+    integer,intent(in):: namax,natm,nnmax,iprint, &
+         lspr(0:nnmax,namax)
+    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+         h(3,3),rc
+    real(8),intent(inout):: fq(namax),esr
+    logical,intent(in):: l1st 
+
+    integer:: i,j,jj,is,js,ixyz,jxyz
+    real(8):: sgmsq2,ss2i,qi,qj,dij,diji,tmp,ftmp,terfc &
+         ,sgmi,sgmj,gmmij,rhoij,terfcc,vrc,dvdrc
+    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+!!$    real(8),external:: fcut1
+
+    real(8),save:: rc2,sqpi
+
+    if( l1st ) then
+      rc2 = rc*rc
+      sqpi = 1d0 /sqrt(pi)
+      do is=1,nspmax
+        do js=is,nspmax
+          if( .not.interact(is,js) ) cycle
+          rhoij = rho_bvs(is,js)
+          terfcc = erfc(rc/rhoij)
+          vrc = acc /rc *terfcc
+          dvdrc = -acc /rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
+          vrcs(is,js) = vrc
+          vrcs(js,is) = vrc
+          dvdrcs(is,js) = dvdrc
+          dvdrcs(js,is) = dvdrc
+        enddo
+      enddo
+
+    endif
+
+!.....Compute direct sum
+    sgmsq2 = sqrt(2d0)*sgm_ew
+    ss2i = 1d0 /sgmsq2
+    esr = 0d0
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is= int(tag(i))
+      qi = chg(i)
+      do jj=1,lspr(0,i)
+        j = lspr(jj,i)
+        if( j.eq.0 ) exit
+        if( j.le.i ) cycle
+        js = int(tag(j))
+        if( .not.interact(is,js) ) cycle
+        qj = chg(j)
+        xj(1:3) = ra(1:3,j)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij.gt.rc2 ) cycle
+        dij = sqrt(dij)
+        diji = 1d0/dij
+        dxdi(1:3)= -rij(1:3)*diji
+        dxdj(1:3)=  rij(1:3)*diji
+        rhoij = rho_bvs(is,js)
+        terfc = erfc(dij/rhoij)
+!!$        terfc = erfc(dij*ss2i)
+        vrc = vrcs(is,js)
+        dvdrc = dvdrcs(is,js)
+!!$        terfc = erfc(gmmij*dij)
+!.....potential
+!!$        tmp = 0.5d0 *acc *diji *terfc *fcut1(dij,0d0,rc)
+        tmp = 0.5d0 *(acc*diji*terfc -vrc -dvdrc*(dij-rc))
+        if( j.le.natm ) then
+          esr = esr +2d0*tmp*qi*qj
+        else
+          esr = esr +tmp*qi*qj
+        endif
+!.....Force on charge
+        fq(i) = fq(i) -tmp*qj*2d0
+        fq(j) = fq(j) -tmp*qi*2d0
+      enddo
+    enddo
+
+    return
+  end subroutine qforce_screened_cut
 !=======================================================================
   subroutine qforce_long(namax,natm,tag,ra,chg,h, &
        sorg,tcom,mpi_md_world,myid,iprint,fq,elr)

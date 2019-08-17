@@ -961,7 +961,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
 !
   use force
   use Coulomb, only: qforce_long,qforce_short,qforce_self,qlower,qupper&
-       ,cterms,avmu,conv_eps
+       ,cterms,avmu,conv_eps,qforce_screened_cut
   use Morse, only: qforce_vcMorse
   implicit none
   include "mpif.h"
@@ -1050,6 +1050,10 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     call qforce_self(namax,natm,tag,chg,chi,fq,eself)
     call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
          ,rc,fq,ecshort)
+  else if( trim(cterms).eq.'screened_cut'  ) then
+    call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+    call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
+         ,rc,fq,ecshort,l1st)
   endif
   epot = eself +ecshort + eclong
 
@@ -1158,6 +1162,10 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       call qforce_self(namax,natm,tag,chg,chi,fq,eself)
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshort)
+    else if( trim(cterms).eq.'screened_cut'  ) then
+      call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+      call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
+           ,rc,fq,ecshort,l1st)
     endif
     epot = eself +ecshort + eclong
     if( use_force('vcMorse') ) then

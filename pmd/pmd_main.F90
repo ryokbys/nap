@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-08-08 11:44:13 Ryo KOBAYASHI>
+!                     Last-modified: <2019-08-14 23:03:24 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -140,10 +140,10 @@ program pmd
         num_forces = num_forces +1
         force_list(num_forces) = 'Coulomb'
       endif
-      if( .not. use_force('LJ_repul') ) then
-        num_forces = num_forces +1
-        force_list(num_forces) = 'LJ_repul'
-      endif
+!!$      if( .not. use_force('LJ_repul') ) then
+!!$        num_forces = num_forces +1
+!!$        force_list(num_forces) = 'LJ_repul'
+!!$      endif
     endif
 
 !.....Correct nnmax if the given nnmax is too small compared to

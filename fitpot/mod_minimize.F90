@@ -3191,12 +3191,15 @@ contains
         print '(a,i4)',' Number of individuals = ',de_nindivs
         print '(a,f8.4)',' Fraction              =',de_frac
         print '(a,f8.4)',' Crossover rate        =',de_cross_rate
-        print '(a,f8.4)',' wmin                  =',de_wmin
-        print '(a,f8.4)',' wmax                  =',de_wmax
-        print '(a,f8.4)',' fracg                 =',fracg
-        print '(a,f8.4)',' fracl                 =',fracl
-        print '(a,f8.4)',' lmdg                  =',lmdg
-        print '(a,f8.4)',' lmdl                  =',lmdl
+!!$        print '(a,f8.4)',' fracg                 =',fracg
+!!$        print '(a,f8.4)',' fracl                 =',fracl
+        print '(a,f8.4)',' frac                  =',de_frac
+        if( trim(de_algo).eq.'local_neighbor' ) then
+          print '(a,f8.4)',' wmin                  =',de_wmin
+          print '(a,f8.4)',' wmax                  =',de_wmax
+          print '(a,f8.4)',' lmdg                  =',lmdg
+          print '(a,f8.4)',' lmdl                  =',lmdl
+        endif
         print '(a,es12.4)',' Pseudo Temperature    =',de_temp
 
         print *,''
@@ -3274,9 +3277,15 @@ contains
     if( maxiter.eq.0 ) w = de_wmin
 
     if( myid.eq.0 ) then
-      write(6,'(a,i8,es12.4,f5.2,1x,100es12.4)') &
-           " iter,fbest,w,fvals= ",&
-           iter,fbest,w,(indivs(i)%fvalue,i=1,min(de_nindivs,10))
+      if( trim(de_algo).eq.'local_neighbor' ) then
+        write(6,'(a,i8,es12.4,f5.2,1x,100es12.4)') &
+             " iter,fbest,w,fvals= ",&
+             iter,fbest,w,(indivs(i)%fvalue,i=1,min(de_nindivs,10))
+      else  ! classical DE
+        write(6,'(a,i8,es12.4,1x,100es12.4)') &
+             " iter,fbest,fvals= ",&
+             iter,fbest,(indivs(i)%fvalue,i=1,min(de_nindivs,10))
+      endif
       do i=1,de_nindivs
         write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
              ,indivs(i)%ftst
@@ -3412,9 +3421,9 @@ contains
       enddo  ! loop over individuals
 
       if( myid.eq.0 ) then
-        write(6,'(a,i8,es12.4,f5.2,1x,100es12.4)') &
-             " iter,fbest,w,fvals= ",&
-             iter,fbest,w,(indivs(i)%fvalue,i=1,min(de_nindivs,10))
+        write(6,'(a,i8,es12.4,1x,100es12.4)') &
+             " iter,fbest,fvals= ",&
+             iter,fbest,(indivs(i)%fvalue,i=1,min(de_nindivs,10))
         do i=1,de_nindivs
           write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
                ,indivs(i)%ftst
@@ -3537,6 +3546,7 @@ contains
         print '(a,f8.4)',' w                     =',pso_w
         print '(a,f8.4)',' C1                    =',pso_c1
         print '(a,f8.4)',' C2                    =',pso_c2
+        print '(a,es12.4)',' fval upper limit      =',fupper_lim
         print *,''
       endif
       l1st = .false.
@@ -3581,8 +3591,7 @@ contains
                ' [ftrn.eq.NaN] iter,iid = ',iter,iid
         endif
         ftrn = fupper_lim
-      endif
-      if( ftrn.gt.fupper_lim ) then
+      else if( ftrn.gt.fupper_lim ) then
         ftrn = fupper_lim
       endif
       indivs(i)%fvalue = ftrn
@@ -3602,6 +3611,7 @@ contains
         xbest(1:ndim) = xtmp(1:ndim)
       endif
       if( i.eq.1 ) call sub_eval(iter)
+!!$      if( myid.eq.0 ) print *,'myid,iid,fval,pbest=',myid,iid,ftrn,fpbest(i)
     enddo
     if( myid.eq.0 ) then
       write(6,'(a,i8,es12.4,1x,100es12.4)') &
@@ -3614,9 +3624,11 @@ contains
              indivs(i)%ftst
       enddo
     endif
-
+!!$    if( myid.eq.0 ) print *,'myid,iidbest,fbest=',myid,iidbest,fbest
+    
 !.....PSO loop starts....................................................
     do iter=1,maxiter
+
 
 !.....Loop for individuals
       do i=1,pso_nindivs
@@ -3645,6 +3657,9 @@ contains
         if( ftrn.gt.fupper_lim ) then
           ftrn = fupper_lim
         endif
+        if( ftst.gt.fupper_lim ) then
+          ftst = fupper_lim
+        endif
         indivs(i)%fvalue = ftrn
         indivs(i)%iid = iid
         if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,ftst,xtmp(1:min(ndim,100))
@@ -3661,7 +3676,9 @@ contains
           xpbest(1:ndim,i) = xtmp(1:ndim)
         endif
 
+!!$        if( myid.eq.0 ) print *,'myid,iid,fval,pbest=',myid,iid,ftrn,fpbest(i)
       enddo  ! loop over individuals
+!!$      if( myid.eq.0 ) print *,'myid,iidbest,fbest=',myid,iidbest,fbest
 
       if( myid.eq.0 ) then
         write(6,'(a,i8,es12.4,1x,100es12.4)') &

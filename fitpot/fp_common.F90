@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-07 22:05:34 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-08 12:12:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -80,6 +80,7 @@ contains
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use BMH,only: set_paramsdir_BMH,set_params_BMH
     use Abell,only: set_paramsdir_Abell,set_params_Abell
+    use fpc,only: set_paramsdir_fpc,set_params_fpc
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN,only: set_paramsdir_NN,set_params_NN
     use NN2,only: set_paramsdir_NN2,set_params_NN2,nl,nhl,nlmax,get_NN2_hl1 &
@@ -165,6 +166,10 @@ contains
         call set_paramsdir_Abell(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_Abell(ndim,x,ctype,interact)
+      else if( trim(cpot).eq.'fpc' ) then
+        call set_paramsdir_fpc(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_fpc(ndim,x,ctype,interact)
       else if( trim(cpot).eq.'EAM' ) then
         call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -405,6 +410,7 @@ contains
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use BMH,only: set_paramsdir_BMH,set_params_BMH
     use Abell,only: set_paramsdir_Abell,set_params_Abell
+    use fpc,only: set_paramsdir_fpc,set_params_fpc
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN,only: set_paramsdir_NN,set_params_NN
     use NN2,only: set_paramsdir_NN2,set_params_NN2,set_NN2_hl1
@@ -481,6 +487,10 @@ contains
         call set_paramsdir_Abell(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_params_Abell(ndim,x,ctype,interact)
+      else if( trim(cpot).eq.'fpc' ) then
+        call set_paramsdir_fpc(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_fpc(ndim,x,ctype,interact)
       else if( trim(cpot).eq.'EAM' ) then
         call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')

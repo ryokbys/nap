@@ -8,12 +8,12 @@ Coulomb potential requires a parameter file ``in.params.Coulomb`` that has the f
 ::
 
    charges  fixed
-     1   2.0
-     2   -1.0
+     Si   1.0
+     O   -2.0
    interactions
-    1  1
-    1  2
-    2  2
+    Si  Si
+    Si  O
+    O   O
    terms  short
    
    sigma  2.5
@@ -23,13 +23,14 @@ In this format, black lines are neglected.
 There are some keywords:
 
 ``charges`` : ``fixed`` or ``variable`` (or ``qeq``)
-  Followed by the lines of species charges, e.g., :math:`q_1 = 2.0`  and :math:`q_2 = -1.0`.
+  Followed by the lines of species charges, e.g., :math:`q_1 = 1.0`  and :math:`q_2 = -2.0`.
 
 ``interactions`` : *optional*
   Followed by the pairs of species. If not specified, all the interactions are taken into account.
 
-``terms`` : ``full``, ``long`` or ``short``/``screened``
-  Either full Ewald terms, long-range term only, or short-range term only.
+``terms`` : ``full``, ``long`` or ``short``/``screened_cut``
+  Either full Ewald terms, long-range term only, short-range term only, 
+  or short-term with smooth cutoff.
 
 ``sigma`` : 
   Width of the Gaussian charge distribution, which is related to the accuracy in case of Ewald method.
@@ -43,12 +44,12 @@ Coulomb potential can treat **variable charge** or **QEq** by specifying ``varia
 ::
 
    charges  variable
-     1  Si  4.7695    8.7893    0.0   0.0  2.4
-     2  O   7.5405    15.8067   0.0  -1.2  0.0
+     Si  4.7695    8.7893    0.0   0.0  2.4
+     O   7.5405    15.8067   0.0  -1.2  0.0
    interactions
-    1  1
-    1  2
-    2  2
+     Si  Si
+     Si  O
+     O   O
    terms  short
    sigma  2.5
    conv_eps  1.0d-6
