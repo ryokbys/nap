@@ -258,7 +258,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
 !  Initialization routine is separated from main get_force routine.
 !
   use force
-  use Coulomb, only: initialize_coulomb, initialize_coulombx
+  use Coulomb, only: initialize_coulomb, initialize_coulombx, lprmset_Coulomb
   use Morse, only: read_params_vcMorse, lprmset_Morse, &
        read_element_descriptors,read_params_Morse,&
        update_params_Morse
@@ -326,8 +326,10 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
     call initialize_coulomb(natm,nsp,tag,chg,chi,myid_md &
          ,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
   else if( use_force('Coulomb') ) then
-    call initialize_coulombx(natm,nsp,tag,chg,chi,myid_md &
-         ,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
+    if( .not. lprmset_Coulomb ) then
+      call initialize_coulombx(natm,nsp,tag,chg,chi,myid_md &
+           ,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
+    endif
   endif
 
 !.....vcMorse

@@ -3156,7 +3156,7 @@ contains
     real(8):: ftrn,ftst,fracl,fracg,lmdl,lmdg,w,fdiff,prob,ftbest&
          ,xtbest(ndim)
     logical,save:: l1st = .true.
-    integer:: iid,iidbest,iidtbest
+    integer:: iid,iidbest,iidtbest,ibest,ibest0
     type(individual),allocatable:: indivs(:),offsprings(:)
     real(8),allocatable,dimension(:):: xtmp,xi,xp,xq,xr,xs,xbestl,xbestg&
          ,xl,xg,xd
@@ -3260,6 +3260,7 @@ contains
       if( ftrn.lt.fbest ) then
         fbest = ftrn
         iidbest = iid
+        ibest = iid
         xbest(1:ndim) = xtmp(1:ndim)
       else if( ftst.lt.ftbest ) then
         ftbest = ftst
@@ -3297,6 +3298,7 @@ contains
 
       w = de_wmin + (de_wmax -de_wmin)*dble(iter)/maxiter
       call make_global_best(de_nindivs,indivs,ndim,xbestg)
+      ibest0 = ibest
 
 !.....Loop for individuals
       do i=1,de_nindivs
@@ -3389,6 +3391,7 @@ contains
         prob = min(1d0,exp(-fdiff/de_temp))
 !!$        if( ftrn.le.indivs(i)%fvalue .or. indivs(i)%fvalue*0d0.ne.0d0 ) then
         if( urnd().le.prob .or. indivs(i)%fvalue*0d0.ne.0d0 ) then
+          if( i.eq.ibest0 .and. fdiff.gt.0d0 ) cycle
           do j=1,ndim
             indivs(i)%genes(j)%val = xtmp(j)
           enddo
@@ -3403,6 +3406,7 @@ contains
         if( ftrn.lt.fbest ) then
           fbest = ftrn
           iidbest = iid
+          ibest = i
           xbest(1:ndim) = xtmp(1:ndim)
           if( iprint.ge.2 ) then
             write(cadd,'(i0)') iid

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-08 12:09:05 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-18 18:13:24 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -108,6 +108,11 @@ program fitpot
     allocate(cffs(nff))
     cffs(1) = 'Morse'
     cffs(2) = 'screened_Coulomb'
+  else if( trim(cpot).eq.'fpc' ) then
+    nff = 2
+    allocate(cffs(nff))
+    cffs(1) = 'fpc'
+    cffs(2) = 'Coulomb'
   else
     nff = 1
     allocate(cffs(nff))

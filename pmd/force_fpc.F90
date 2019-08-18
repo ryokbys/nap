@@ -1,6 +1,6 @@
 module fpc
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-08 11:56:29 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-18 18:30:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of fpc (fitpot for ceramics) potential.
 !  It should be used with Coulomb potential.
@@ -27,7 +27,7 @@ module fpc
   real(8):: fpc_bij(nspmax,nspmax),fpc_betij(nspmax,nspmax)
   logical:: interact(nspmax,nspmax)
 
-  logical:: lprmset_fpc
+  logical:: lprmset_fpc 
   
 !.....params
   integer:: nprms

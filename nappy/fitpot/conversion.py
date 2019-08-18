@@ -16,6 +16,7 @@ Options:
 """
 from __future__ import print_function
 
+import os
 from docopt import docopt
 
 __author__ = "RYO KOBAYASHI"
@@ -139,21 +140,25 @@ def fp2fpc(infname,outfname,pairs):
         lines = f.readlines()
     
     ndat = int(lines[0].split()[0])
-    if ndat != len(pairs)*4:
+    if ndat != len(pairs)*4 +1:
         raise ValueError('Number of parameters in {0:s} is inconsistent with given pairs.'.format(infname))
     # n = 0
-    for i in range(1,len(lines)):
+    line1 = lines[1]
+    data = line1.split()
+    sclchg = float(data[0])
+    for i in range(2,len(lines)):
         line = lines[i]
         data = line.split()
-        if (i-1)%4 == 0:
+        if (i-2)%4 == 0:
             aijs.append(float(data[0]))
-        elif (i-1)%4 == 1:
+        elif (i-2)%4 == 1:
             alpijs.append(float(data[0]))
-        elif (i-1)%4 == 2:
+        elif (i-2)%4 == 2:
             bijs.append(float(data[0]))
-        elif (i-1)%4 == 3:
+        elif (i-2)%4 == 3:
             betijs.append(float(data[0]))
     
+    # print(' pairs = ',pairs)
     # print(' aijs  = ',aijs)
     # print(' alpijs= ',alpijs)
     with open(outfname,'w') as f:
@@ -164,8 +169,45 @@ def fp2fpc(infname,outfname,pairs):
             f.write('   {0:7.3f}  {1:7.3f}\n'.format(bijs[l],betijs[l]))
             
     print(' Wrote '+outfname)
+
+    if os.path.exists('in.params.Coulomb'):
+        chgs = read_params_Coulomb()
+        print(' Charges in in.params.Coulomb should be replaced to the following:')
+        for k,v in chgs.items():
+            print('   {0:3s}  {1:9.3f}'.format(k,v*sclchg))
     return
 
+def read_params_Coulomb(fname='in.params.Coulomb'):
+    """
+    Read in.params.Coulomb. But only for fixed charges.
+    """
+    with open(fname,'r') as f:
+        lines = f.readlines()
+
+    mode = None
+    chgs = {}
+    for line in lines:
+        if line[0] in ('#','!'): continue
+        data = line.split()
+        if len(data) == 0:
+            mode = None
+            continue
+        if 'charges' in line and 'fixed' in line:
+            mode = 'charges'
+            continue
+        elif 'terms' in line:
+            mode = None
+            continue
+        elif 'interactions' in line:
+            mode = None
+            continue
+        if mode == 'charges':
+            if len(data) == 2:
+                csp = data[0]
+                chg = float(data[1])
+                chgs[csp] = chg
+    return chgs
+    
 def morse2fp(infname,outfname):
     with open(infname,'r') as f:
         lines = f.readlines()
@@ -303,9 +345,13 @@ def fpc2fp(infname,outfname):
         bij = float(data[4])
         betij = float(data[5])
         params[(cspi,cspj)] = (aij,alpij,bij,betij)
+
+    #...Scale for charges
+    sclchg = 1.0
     #...Write in.vars.fitpot file
     with open(outfname,'w') as f:
-        f.write('  {0:d}   6.00   3.00\n'.format(len(params)*4))
+        f.write('  {0:d}   6.00   3.00\n'.format(len(params)*4+1))
+        f.write(' {0:10.3f}   0.100    5.0   # scale for charges\n'.format(sclchg))
         for k,v in params.items():
             cspi = k[0]
             cspj = k[1]

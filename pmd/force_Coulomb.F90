@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-14 21:51:24 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-18 18:54:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -22,6 +22,8 @@ module Coulomb
   logical:: params_read = .false.
   real(8),parameter:: pi = 3.14159265398979d0
 
+  logical:: lprmset_Coulomb = .false.
+
   character(len=128):: cchgs,cdist,cterms
 !.....Input Keywords: charges, charge_dist, terms
 !.....Keywords for charges: fixed, fixed_bvs, variable/qeq
@@ -40,7 +42,7 @@ module Coulomb
 !.....Flag for existence of the species
   logical:: ispflag(nspmax)
 !.....Species charge
-  real(8):: schg(nspmax)
+  real(8):: schg(nspmax),schg0(nspmax)
 !  logical,allocatable:: interact(:,:)
   logical:: interact(nspmax,nspmax)
 !.....ideal valence charges of species
@@ -170,19 +172,12 @@ contains
 
     call read_paramsx(myid,mpi_md_world,iprint,specorder)
 
-    if( trim(cchgs).eq.'fixed' ) then
-      do i=1,natm
-        is = int(tag(i))
-        chg(i) = schg(is)
-      enddo
-    endif
-    
     if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
 !.....Variable-charge Coulomb with Gaussian distribution charges
 !     which ends-up long-range-only Ewald summation
       call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
            natm,tag,chi,chg,lvc)
-    else
+    else if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
       call init_fc_Ewald(h,rc,myid,mpi_md_world,iprint)
     endif
 
@@ -683,7 +678,8 @@ contains
             read(ioprms,*) csp, chgi
             isp = csp2isp(trim(csp),specorder)
             if( isp.gt.0 ) then
-              schg(isp) = chgi
+              schg0(isp) = chgi
+              schg(isp) = schg0(isp)
               ispflag(isp) = .true.
               if( iprint.gt.0 ) print '(a,a3,i3,f8.4)','   fixed charge: ',trim(csp),isp,chgi
             else
@@ -795,31 +791,35 @@ contains
       
     endif  ! myid.eq.0
 
+!.....Avoid MPI call when it is called in fitpot.
+    if( mpi_world.ge.0 ) then
 !.....Broadcast data just read from the file
-    call mpi_bcast(cterms,128,mpi_character,0,mpi_world,ierr)
-    call mpi_bcast(cdist,128,mpi_character,0,mpi_world,ierr)
-    call mpi_bcast(cchgs,128,mpi_character,0,mpi_world,ierr)
+      call mpi_bcast(cterms,128,mpi_character,0,mpi_world,ierr)
+      call mpi_bcast(cdist,128,mpi_character,0,mpi_world,ierr)
+      call mpi_bcast(cchgs,128,mpi_character,0,mpi_world,ierr)
     
-    call mpi_bcast(schg,nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vcg_e0,nsp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(schg0,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(schg,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(vcg_e0,nsp,mpi_real8,0,mpi_world,ierr)
 !!$    call mpi_bcast(vcg_sgm,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
-    call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
+      call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
+      call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
     
-    call mpi_bcast(pacc,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(conv_eps,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rho_screened_cut,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rho_bvs,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(pacc,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(conv_eps,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(rho_screened_cut,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(rho_bvs,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+    endif
 
     if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
       do isp=1,nsp
@@ -893,6 +893,13 @@ contains
       allocate(strsl(3,3,namax))
     endif
 
+    if( trim(cchgs).eq.'fixed' ) then
+      do i=1,natm+nb
+        is = int(tag(i))
+        chg(i) = schg(is)
+      enddo
+    endif
+    
     strsl(1:3,1:3,1:namax) = 0d0
     elrl = 0d0
     esrl = 0d0
@@ -2680,6 +2687,7 @@ contains
         call read_params_sc(myid,mpiw,ifcoulomb,ipr,specorder)
         params_read = .true.
       endif
+      lprmset_Coulomb = .true.
 
       ns = 0
       do isp=1,nspmax
@@ -2711,7 +2719,27 @@ contains
 !!$          print *,'isp,jsp,rho_bvs=',isp,jsp,rho_bvs(isp,jsp)
         enddo
       enddo
-    endif
+
+    else if( trim(ctype).eq.'fpc' ) then
+!.....As of 190818, only one parameter is passed to this routine
+!     that scale the original charges per species obtained from in.params.Coulomb
+!.....Need to read in.params.Coulomb
+      if( .not. params_read ) then
+        ipr = 0
+        myid = 0
+        mpiw = -1
+        call read_paramsx(myid,mpiw,ipr,specorder)
+        params_read = .true.
+      endif
+      lprmset_Coulomb = .true.
+
+      do isp=1,nspmax
+        if( ispflag(isp) ) then
+          schg(isp) = schg0(isp)*prms_in(1)
+        endif
+      enddo
+
+    endif   ! ctype
     
   end subroutine set_params_Coulomb
 !=======================================================================

@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-08 12:12:21 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-18 17:45:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -161,15 +161,19 @@ contains
       else if( trim(cpot).eq.'BMH' ) then
         call set_paramsdir_BMH(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_BMH(ndim,x,ctype,interact)
+        call set_params_BMH(ndim,x,cpot,interact)
       else if( trim(cpot).eq.'Abell' ) then
         call set_paramsdir_Abell(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_Abell(ndim,x,ctype,interact)
+        call set_params_Abell(ndim,x,cpot,interact)
       else if( trim(cpot).eq.'fpc' ) then
         call set_paramsdir_fpc(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_fpc(ndim,x,ctype,interact)
+        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_Coulomb(1,x(1),cpot, &
+             samples(ismpl)%specorder)
+        call set_params_fpc(ndim-1,x(2:ndim),cpot,interact)
       else if( trim(cpot).eq.'EAM' ) then
         call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
@@ -482,15 +486,19 @@ contains
       else if( trim(cpot).eq.'BMH' ) then
         call set_paramsdir_BMH(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_BMH(ndim,x,ctype,interact)
+        call set_params_BMH(ndim,x,cpot,interact)
       else if( trim(cpot).eq.'Abell' ) then
         call set_paramsdir_Abell(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_Abell(ndim,x,ctype,interact)
+        call set_params_Abell(ndim,x,cpot,interact)
       else if( trim(cpot).eq.'fpc' ) then
         call set_paramsdir_fpc(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_fpc(ndim,x,ctype,interact)
+        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
+             //'/pmd')
+        call set_params_Coulomb(1,x(1),cpot, &
+             samples(ismpl)%specorder)
+        call set_params_fpc(ndim-1,x(2:ndim),cpot,interact)
       else if( trim(cpot).eq.'EAM' ) then
         call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
