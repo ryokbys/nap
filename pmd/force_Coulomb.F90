@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-19 10:22:38 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-19 13:25:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -57,7 +57,7 @@ module Coulomb
 !.....screening length
   real(8):: rho_bvs(nspmax,nspmax)
 !  real(8),allocatable:: rho_bvs(:,:)
-!!$  real(8):: fbvs = 0.74d0
+!!$  real(8):: fbvs = 0.74d0 +- 0.04
   real(8):: fbvs = 1.0d0
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
@@ -822,17 +822,19 @@ contains
     endif
 
     if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
-      do isp=1,nsp
-        cspi = specorder(isp)
-        do jsp=isp,nsp
+      if( myid.eq.0 .and. iprint.gt.0 ) then
+        do isp=1,nsp
+          cspi = specorder(isp)
+          do jsp=isp,nsp
 !!$            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
 !!$            rho_bvs(isp,jsp) = 2d0
-          if( myid.eq.0 .and. iprint.gt.0 .and. interact(isp,jsp) ) then
-            cspj = specorder(jsp)
-            write(6,'(a,2a5,f10.4)') '   cspi,cspj,rho_bvs= ',trim(cspi),trim(cspj),rho_bvs(isp,jsp)
-          endif
+            if( interact(isp,jsp) ) then
+              cspj = specorder(jsp)
+              write(6,'(a,2a5,f10.4)') '   cspi,cspj,rho_bvs= ',trim(cspi),trim(cspj),rho_bvs(isp,jsp)
+            endif
+          enddo
         enddo
-      enddo
+      endif
     endif
 
     if( myid.eq.0 .and. iprint.ne.0 ) then
@@ -847,7 +849,7 @@ contains
        ,chg,chi,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
        ,myparity,nn,sv,rc,lspr,sorg &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
-       ,l1st,lcell_updated,lvc)
+       ,l1st,lcell_updated,lvc,specorder)
 !
 !  Coulomb potential and force computation using Ewald sum method.
 !  Currently, the efficiency when parallel computation is not taken into account.
@@ -867,6 +869,7 @@ contains
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st,lcell_updated,lvc
+    character(len=3),intent(in):: specorder(nspmax)
 
     integer:: i,j,ik,is,js,k1,k2,k3,ierr,jj,ixyz,jxyz
     real(8):: elrl,esrl,epotl,epott,qi,qj,tmp,ftmp &
@@ -886,7 +889,7 @@ contains
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
       if( trim(cchgs).eq.'fixed_bvs' ) then
-        call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint)
+        call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
       endif
     endif
 
@@ -969,7 +972,7 @@ contains
        ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
        ,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
-       ,l1st)
+       ,l1st,specorder)
 !
 !  Screened Coulomb implementation used in BVS potential with
 !  smoothing using vrc and dVdrc where
@@ -990,6 +993,7 @@ contains
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
+    character(len=3),intent(in):: specorder(nspmax)
 
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
@@ -1001,7 +1005,7 @@ contains
     real(8),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
-      call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint)
+      call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
       rc2 = rc*rc
@@ -1087,7 +1091,7 @@ contains
        ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
        ,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
-       ,l1st)
+       ,l1st,specorder)
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -1102,7 +1106,7 @@ contains
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
-
+    character(len=3),intent(in):: specorder(nspmax)
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
@@ -1111,7 +1115,7 @@ contains
     real(8),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
-      call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint)
+      call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
 !!$      do i=1,natm
@@ -2148,7 +2152,8 @@ contains
 
   end subroutine qforce_self
 !=======================================================================
-  subroutine set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint)
+  subroutine set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint &
+       ,specorder)
 !
 ! Reset actual charges of atoms using effective charge information
 ! in order to keep charge neutrality in the system.
@@ -2159,11 +2164,13 @@ contains
     integer,intent(in):: natm,nb,myid,mpi_md_world,iprint
     real(8),intent(in):: tag(natm+nb)
     real(8),intent(out):: chg(natm+nb)
+    character(len=3),intent(in):: specorder(nspmax)
 
     integer,allocatable:: nbvsl(:),nbvs(:)
     real(8),allocatable:: vc_bvs(:)
     integer:: i,is,ierr
     real(8):: sum_anion,sum_cation
+    character(len=3):: csp
 
 !!$!.....BEGIN DEBUGGING
 !!$    do i=1,natm+nb
@@ -2179,28 +2186,35 @@ contains
 !!$!.....END DEBUGGING
 
     allocate(nbvsl(nspmax),nbvs(nspmax),vc_bvs(nspmax))
-    nbvsl(1:nsp) = 0
-    nbvs(1:nsp) = 0
+    nbvsl(1:nspmax) = 0
+    nbvs(1:nspmax) = 0
     do i=1,natm
       is = int(tag(i))
       nbvsl(is) = nbvsl(is) +1
     enddo
-    call mpi_allreduce(nbvsl,nbvs,nsp,mpi_integer &
+    call mpi_allreduce(nbvsl,nbvs,nspmax,mpi_integer &
          ,mpi_sum,mpi_md_world,ierr)
 
-    sum_anion = vid_bvs(1) *nbvs(1) /sqrt(dble(npq_bvs(1)))
-
+    sum_anion = 0d0
     sum_cation = 0d0
-    do is=2,nsp
-      sum_cation = sum_cation +vid_bvs(is)*nbvs(is)/sqrt(dble(npq_bvs(is)))
+    do is=1,nspmax
+      if( vid_bvs(is).lt.0d0 ) then  !anion
+        sum_anion = sum_anion +vid_bvs(is) *nbvs(is) /sqrt(dble(npq_bvs(is)))
+      else if( vid_bvs(is).gt.0d0 ) then !cation
+        sum_cation = sum_cation +vid_bvs(is)*nbvs(is)/sqrt(dble(npq_bvs(is)))
+      endif
     enddo
+    sum_anion = abs(sum_anion)
 
 !.....Compute valence charges of species
-    vc_bvs(1) = vid_bvs(1)/sqrt(dble(npq_bvs(1))) &
-         *sqrt(sum_cation/sum_anion)
-    do is=2,nsp
-      vc_bvs(is)= vid_bvs(is)/sqrt(dble(npq_bvs(is))) &
-           *sqrt(sum_anion/sum_cation)
+    do is=1,nspmax
+      if( vid_bvs(is).lt.0d0 ) then  ! anion
+        vc_bvs(is) = vid_bvs(is)/sqrt(dble(npq_bvs(is))) &
+             *sqrt(sum_cation/sum_anion)
+      else if( vid_bvs(is).gt.0d0 ) then ! cation
+        vc_bvs(is)= vid_bvs(is)/sqrt(dble(npq_bvs(is))) &
+             *sqrt(sum_anion/sum_cation)
+      endif
     enddo
 
 !!$!.....Overwrite charges for debugging...
@@ -2209,20 +2223,23 @@ contains
     if( myid.eq.0 .and. iprint.gt.0 ) then
       print *,''
       print *,'Charges fixed from ideal valences and composition:'
-      do is=1,nsp
-        write(6,'(a,i3,2f7.3)') '   isp, V_ideal, V_actual = '&
-             ,is,vid_bvs(is),vc_bvs(is)
+      do is=1,nspmax
+        if( vid_bvs(is).eq.0d0 ) cycle
+        csp = specorder(is)
+        write(6,'(a,a4,2f7.3)') '   csp, V_ideal, V_actual = '&
+             ,trim(csp),vid_bvs(is),vc_bvs(is)
       enddo
     endif
 
     do i=1,natm+nb
       is= int(tag(i))
-!.....Negative charge for anion and positive for cation
-      if( is .eq. 1 ) then
-        chg(i)= -vc_bvs(is)
-      else
-        chg(i)= vc_bvs(is)
-      endif
+      chg(i) = vc_bvs(is)
+!!$!.....Negative charge for anion and positive for cation
+!!$      if( is .eq. 1 ) then
+!!$        chg(i)= -vc_bvs(is)
+!!$      else
+!!$        chg(i)= vc_bvs(is)
+!!$      endif
     enddo
 
     deallocate(nbvsl,nbvs,vc_bvs)
@@ -2680,43 +2697,27 @@ contains
     integer:: isp,jsp,ns,inc,ifcoulomb,ipr,myid,mpiw,maxisp
 
     if( trim(ctype).eq.'BVS' ) then
+!.....As of 190819, ctype==BVS means that only fbvs is to be given from fitpot.
 !.....Need to read in.params.XX file before going further
       if( .not. params_read ) then
-        ifcoulomb = 1
+!!$        ifcoulomb = 1
         ipr = 0
         myid = 0
         mpiw = -1
-        call read_params_sc(myid,mpiw,ifcoulomb,ipr,specorder)
+        call read_paramsx(myid,mpiw,ipr,specorder)
+!!$        call read_params_sc(myid,mpiw,ifcoulomb,ipr,specorder)
         params_read = .true.
       endif
       lprmset_Coulomb = .true.
 
-      ns = 0
-      do isp=1,nspmax
-        if( ispflag(isp) ) ns = ns + 1
-      enddo
-
-      if( ns.ne.ndimp ) then
-        print *,'ERROR @set_params_Coulomb: ns.ne.ndimp !!!'
-        stop
-      endif
-
-      inc = 0
-      maxisp = 0
-      do isp=1,nspmax
-        if( ispflag(isp) ) then
-          inc = inc + 1
-          rad_bvs(isp) = prms_in(inc)
-          maxisp = max(maxisp,isp)
-        endif
-      enddo
-
-      nsp = max(nsp,maxisp)
-!.....Reset fbvs to 1
-      fbvs = 1.0d0
+!.....set fbvs
+      fbvs = prms_in(1)
+!!$      print *,'fbvs=',fbvs
 !.....Reset screening length
-      do isp=1,nsp
-        do jsp=1,nsp
+      do isp=1,nspmax
+        if( vid_bvs(isp).eq.0d0 ) cycle
+        do jsp=1,nspmax
+          if( vid_bvs(jsp).eq.0d0 ) cycle
           rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
 !!$          print *,'isp,jsp,rho_bvs=',isp,jsp,rho_bvs(isp,jsp)
         enddo
@@ -2747,7 +2748,7 @@ contains
 !=======================================================================
   subroutine gradw_Coulomb(namax,natm,nb,tag,ra,chg,nnmax &
        ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws &
-       ,lematch,lfmatch,lsmatch,iprm0,myid,mpi_world)
+       ,lematch,lfmatch,lsmatch,iprm0,myid,mpi_world,specorder)
 !
 !  Gradient w.r.t. weights.
 !  Note: This routine is always called in single run,
@@ -2764,6 +2765,7 @@ contains
     integer,intent(in):: ndimp
     real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
     logical,intent(in):: lematch,lfmatch,lsmatch
+    character(len=3),intent(in):: specorder(nspmax)
 
     integer:: i,j,k,isp,jsp,ne,nf,ns,maxisp,ixyz,jxyz,jj
     real(8):: rc2,xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3) &
@@ -2779,7 +2781,7 @@ contains
       allocate(gf_rho(nspmax,3,natm))
     endif
 
-    call set_charge_BVS(natm,nb,tag,chg,myid,mpi_world,iprint)
+    call set_charge_BVS(natm,nb,tag,chg,myid,mpi_world,iprint,specorder)
     
 !.....Max isp
     maxisp = 0

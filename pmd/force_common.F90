@@ -223,7 +223,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
          ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
          ,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
-         ,l1st)
+         ,l1st,specorder)
   else if( use_force('Ewald') ) then  ! Ewald Coulomb
     call force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
          ,chg,chi,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
@@ -241,7 +241,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
          ,chg,chi,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
          ,myparity,nnn,sv,rc,lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
-         ,l1st,lcell_updated,lvc)
+         ,l1st,lcell_updated,lvc,specorder)
   endif
 
 !.....convert forces from hmat-coordinates to Cartesian coordinates

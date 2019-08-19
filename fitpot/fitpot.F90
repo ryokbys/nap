@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-18 18:13:24 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-19 12:49:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -103,11 +103,11 @@ program fitpot
   endif
 
 !.....Set cffs only for pmd calculation
-  if( trim(cpot).eq.'BVS' ) then
+  if( index(cpot,'BVS').ne.0 ) then
     nff = 2
     allocate(cffs(nff))
     cffs(1) = 'Morse'
-    cffs(2) = 'screened_Coulomb'
+    cffs(2) = 'Coulomb'
   else if( trim(cpot).eq.'fpc' ) then
     nff = 2
     allocate(cffs(nff))
@@ -129,7 +129,7 @@ program fitpot
 !!$    call NN_init()
 !!$    call NN_func(nvars,vars,ftrn0,ftst0)
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
-       .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' &
+       .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
        .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'BMH' &
        .or. trim(cpot).eq.'Abell' .or. trim(cpot).eq.'fpc' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
@@ -940,7 +940,7 @@ subroutine ga_wrapper(ftrn0,ftst0)
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
        trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' .or. &
-       trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' .or. &
+       index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' .or. &
        trim(cpot).eq.'Abell' .or. trim(cpot).eq.'BMH' .or. &
        trim(cpot).eq.'fpc' ) then
     call ga(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
@@ -967,7 +967,7 @@ subroutine de_wrapper(ftrn0,ftst0)
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
        trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' .or. &
-       trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' .or. &
+       index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' .or. &
        trim(cpot).eq.'Abell' .or. trim(cpot).eq.'BMH' .or. &
        trim(cpot).eq.'fpc' ) then
     call de(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
@@ -994,7 +994,7 @@ subroutine pso_wrapper(ftrn0,ftst0)
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
        trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' .or. &
-       trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' .or. &
+       index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' .or. &
        trim(cpot).eq.'BMH' .or. trim(cpot).eq.'Abell' .or. &
        trim(cpot).eq.'fpc'  ) then
     call pso(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
@@ -1302,7 +1302,7 @@ subroutine test(ftrn0,ftst0)
 !!$    call NN_func(nvars,vars,ftrn,ftst)
 !!$    call NN_grad(nvars,vars,g)
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
-       .or. trim(cpot).eq.'BVS' .or. trim(cpot).eq.'linreg' &
+       .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
        .or. trim(cpot).eq.'NN2' ) then
 !!$    call func_w_pmd(nvars,vars,ftrn,ftst)
     call grad_w_pmd(nvars,vars,g)

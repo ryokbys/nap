@@ -13,6 +13,8 @@ Options:
   --pairs PAIRS
               Specify pairs by hyphen-connected and comma-separated, 
               e.g.) O-Li,O-P. [default: None]
+  --bvs       Flag for parametrizing fbvs in fitpot, which take one parameter
+              into account when converting between Morse and fitpot.
 """
 from __future__ import print_function
 
@@ -23,7 +25,7 @@ __author__ = "RYO KOBAYASHI"
 __version__ = "190524"
 
 
-def fp2morse(infname,outfname,pairs):
+def fp2morse(infname,outfname,pairs,bvs):
     ds = []
     alps = []
     rs = []
@@ -31,39 +33,39 @@ def fp2morse(infname,outfname,pairs):
         lines = f.readlines()
     
     ndat = int(lines[0].split()[0])
-    if ndat != len(pairs)*3:
+    nprms = len(pairs)*3
+    if bvs: nprms += 1
+    if ndat != nprms:
         raise ValueError('Number of parameters in {0:s} is inconsistent with given pairs.'.format(infname))
-    # n = 0
-    for i in range(1,len(lines)):
+
+    nl = 0
+    if bvs:
+        nl += 1
+        data = lines[nl].split()
+        fbvs = float(data[0])
+
+    nl += 1
+    for i in range(nl,len(lines)):
         line = lines[i]
         data = line.split()
-        if (i-1)%3 == 0:
+        if (i-nl)%3 == 0:
             ds.append(float(data[0]))
-        elif (i-1)%3 == 1:
+        elif (i-nl)%3 == 1:
             alps.append(float(data[0]))
-        elif (i-1)%3 == 2:
+        elif (i-nl)%3 == 2:
             rs.append(float(data[0]))
-        # n += 1
-        # if n > ndat: break
-        # ds.append(float(lines[3*(i-1)+1].split()[0]))
-        # n += 1
-        # if n > ndat: break
-        # alps.append(float(lines[3*(i-1)+2].split()[0]))
-        # n += 1
-        # if n > ndat: break
-        # rs.append(float(lines[3*(i-1)+3].split()[0]))
-
     
-    # print(' ds  = ',ds)
-    # print(' alps= ',alps)
-    # print(' rs  = ',rs)
     with open(outfname,'w') as f:
         f.write('# cspi, cspj,    D,      alpha,  rmin\n')
         for l in range(len(ds)):
             f.write('  {0:4s}  {1:4s}'.format(pairs[l][0],pairs[l][1]))
             f.write('   {0:7.3f} {1:7.3f} {2:7.3f}\n'.format(ds[l],alps[l],rs[l]))
-            
     print(' Wrote '+outfname)
+
+    if bvs:
+        print('')
+        print(' The following line should be added to in.params.Coulomb.')
+        print('   fbvs    {0:8.4f}'.format(fbvs))
     return
 
 def fp2bmh(infname,outfname,pairs):
@@ -208,7 +210,7 @@ def read_params_Coulomb(fname='in.params.Coulomb'):
                 chgs[csp] = chg
     return chgs
     
-def morse2fp(infname,outfname):
+def morse2fp(infname,outfname,bvs):
     with open(infname,'r') as f:
         lines = f.readlines()
     params = {}
@@ -228,8 +230,12 @@ def morse2fp(infname,outfname):
         rs = float(data[4])
         params[(cspi,cspj)] = (D,alpha,rs)
     #...Write in.vars.fitpot file
+    nprms = len(params)*3
+    if bvs: nprms += 1
     with open(outfname,'w') as f:
-        f.write('  {0:d}   6.00   3.00\n'.format(len(params)*3))
+        f.write('  {0:d}   6.00   3.00\n'.format(nprms))
+        if bvs:
+            f.write(' {0:8.4f}   0.500   1.000  # fbvs\n'.format(0.74))
         for k,v in params.items():
             cspi = k[0]
             cspj = k[1]
@@ -377,6 +383,7 @@ if __name__ == "__main__":
     pairs = args['--pairs']
     infname = args['INFILE']
     outfname = args['OUTFILE']
+    bvs = args['--bvs']
     
     if 'fitpot' in infname and \
        ('Morse' in outfname or 'BMH' in outfname or 'Abell' in outfname
@@ -390,7 +397,7 @@ if __name__ == "__main__":
             for pair in pairs:
                 print('   {0:s}-{1:s}'.format(pair[0],pair[1]))
         if 'Morse' in outfname:
-            fp2morse(infname,outfname,pairs)
+            fp2morse(infname,outfname,pairs,bvs)
         elif 'BMH' in outfname:
             fp2bmh(infname,outfname,pairs)
         elif 'Abell' in outfname:
@@ -398,7 +405,7 @@ if __name__ == "__main__":
         elif 'fpc' in outfname:
             fp2fpc(infname,outfname,pairs)
     elif 'Morse' in infname and 'fitpot' in outfname:
-        morse2fp(infname,outfname)
+        morse2fp(infname,outfname,bvs)
     elif 'BMH' in infname and 'fitpot' in outfname:
         bmh2fp(infname,outfname)
     elif 'Abell' in infname and 'fitpot' in outfname:

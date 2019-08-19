@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-18 17:45:12 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-19 11:44:33 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -218,9 +218,9 @@ contains
              //'/pmd')
         call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_Coulomb(maxisp,x(1:maxisp),cpot, &
+        call set_params_Coulomb(1,x(1),cpot, &
              samples(ismpl)%specorder)
-        call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot,interact)
+        call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
       endif
       call run_pmd(samples(ismpl),lcalcgrad,ndim,nff,cffs,epot,frcs,strs &
            ,rcut,lfdsgnmat)
@@ -532,9 +532,9 @@ contains
              //'/pmd')
         call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_Coulomb(maxisp,x(1:maxisp),cpot &
-             ,samples(ismpl)%specorder)
-        call set_params_Morse(ndim-maxisp,x(maxisp+1:ndim),cpot,interact)
+        call set_params_Coulomb(1,x(1),cpot, &
+             samples(ismpl)%specorder)
+        call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
       endif
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.

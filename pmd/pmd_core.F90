@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-08-08 20:47:01 Ryo KOBAYASHI>
+!                     Last-modified: <2019-08-19 12:42:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1240,7 +1240,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       iprm0 = 0
       call gradw_Coulomb(namax,natm,nb,tag,ra,chg, &
            nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws, &
-           lematch,lfmatch,lsmatch,iprm0,myid_md,mpi_md_world)
+           lematch,lfmatch,lsmatch,iprm0,myid_md,mpi_md_world,specorder)
       iprm0 = maxisp
       call gradw_Morse(namax,natm,tag, &
            ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws, &
