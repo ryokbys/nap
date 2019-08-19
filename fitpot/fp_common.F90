@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-19 11:44:33 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-20 00:34:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -93,7 +93,7 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: ftrn,ftst
 
-    integer:: ismpl,natm,ia,ixyz,jxyz,idim,k,nsf,nal,nnl,isf,i
+    integer:: ismpl,natm,ia,ixyz,jxyz,idim,k,nsf,nal,nnl,isf,i,ndimt
     real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv,esub
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),fref
     real(8):: ftrnl,ftstl,ftmp
@@ -213,14 +213,21 @@ contains
           call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
                samples(ismpl)%dgsf,samples(ismpl)%igsf)
         endif
-      else if( trim(cpot).eq.'BVS' ) then
+      else if( index(cpot,'BVS').ne.0 ) then
         call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
         call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_Coulomb(1,x(1),cpot, &
-             samples(ismpl)%specorder)
-        call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
+        if( trim(cpot).eq.'BVS' .or. trim(cpot).eq.'BVS1' ) then
+          call set_params_Coulomb(1,x(1),cpot, &
+               samples(ismpl)%specorder)
+          call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
+        else if( trim(cpot).eq.'BVS2' ) then
+          ndimt = 1+maxisp
+          call set_params_Coulomb(ndimt,x(1),cpot, &
+               samples(ismpl)%specorder)
+          call set_params_Morse(ndim-ndimt,x(ndimt+1:ndim),cpot,interact)
+        endif
       endif
       call run_pmd(samples(ismpl),lcalcgrad,ndim,nff,cffs,epot,frcs,strs &
            ,rcut,lfdsgnmat)
@@ -425,7 +432,7 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gtrn(ndim)
 
-    integer:: ismpl,i,idim,natm,k,ia,ixyz,jxyz,nsf,nal,nnl
+    integer:: ismpl,i,idim,natm,k,ia,ixyz,jxyz,nsf,nal,nnl,ndimt
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3),dn3i
     real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,fref,tmp
     type(mdsys):: smpl
@@ -532,9 +539,16 @@ contains
              //'/pmd')
         call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
              //'/pmd')
-        call set_params_Coulomb(1,x(1),cpot, &
-             samples(ismpl)%specorder)
-        call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
+        if( trim(cpot).eq.'BVS' .or. trim(cpot).eq.'BVS1' ) then
+          call set_params_Coulomb(1,x(1),cpot, &
+               samples(ismpl)%specorder)
+          call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
+        else if( trim(cpot).eq.'BVS2' ) then
+          ndimt = 1+maxisp
+          call set_params_Coulomb(ndimt,x(1),cpot, &
+               samples(ismpl)%specorder)
+          call set_params_Morse(ndim-ndimt,x(ndimt+1:ndim),cpot,interact)
+        endif
       endif
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.

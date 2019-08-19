@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-19 13:25:38 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-20 00:27:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -2696,7 +2696,7 @@ contains
 
     integer:: isp,jsp,ns,inc,ifcoulomb,ipr,myid,mpiw,maxisp
 
-    if( trim(ctype).eq.'BVS' ) then
+    if( trim(ctype).eq.'BVS' .or. trim(ctype).eq.'BVS1' ) then
 !.....As of 190819, ctype==BVS means that only fbvs is to be given from fitpot.
 !.....Need to read in.params.XX file before going further
       if( .not. params_read ) then
@@ -2723,6 +2723,40 @@ contains
         enddo
       enddo
 
+    else if( trim(ctype).eq.'BVS2' ) then
+!.....Not only fbvs, but also rad_bvs are given from fitpot
+      if( .not. params_read ) then
+!!$        ifcoulomb = 1
+        ipr = 0
+        myid = 0
+        mpiw = -1
+        call read_paramsx(myid,mpiw,ipr,specorder)
+!!$        call read_params_sc(myid,mpiw,ifcoulomb,ipr,specorder)
+        params_read = .true.
+      endif
+      lprmset_Coulomb = .true.
+
+      fbvs = prms_in(1)
+      inc = 1
+      do isp=1,nspmax
+        if( specorder(isp).eq.'x' ) cycle
+        inc = inc + 1
+        if( inc.gt.ndimp ) then
+          print *,'ERROR @set_parmas_Coulomb: inc.gt.ndimp !!!'
+          stop
+        endif
+        rad_bvs(isp) = prms_in(inc)
+      enddo
+
+!.....Reset screening length
+      do isp=1,nspmax
+        if( vid_bvs(isp).eq.0d0 ) cycle
+        do jsp=1,nspmax
+          if( vid_bvs(jsp).eq.0d0 ) cycle
+          rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+        enddo
+      enddo
+      
     else if( trim(ctype).eq.'fpc' ) then
 !.....As of 190818, only one parameter is passed to this routine
 !     that scale the original charges per species obtained from in.params.Coulomb

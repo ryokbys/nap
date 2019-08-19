@@ -13,8 +13,9 @@ Options:
   --pairs PAIRS
               Specify pairs by hyphen-connected and comma-separated, 
               e.g.) O-Li,O-P. [default: None]
-  --bvs       Flag for parametrizing fbvs in fitpot, which take one parameter
-              into account when converting between Morse and fitpot.
+  --bvs BVS   Flag for parametrizing fbvs in fitpot, which take one 
+              or more parameters into account when converting between
+              Morse and fitpot. [default: 0]
 """
 from __future__ import print_function
 
@@ -24,8 +25,18 @@ from docopt import docopt
 __author__ = "RYO KOBAYASHI"
 __version__ = "190524"
 
+def pairs2spcs(pairs):
+    spcs = []
+    for pair in pairs:
+        csp1,csp2 = pair
+        if csp1 not in spcs:
+            spcs.append(csp1)
+        if csp2 not in spcs:
+            spcs.append(csp2)
+    return spcs
 
-def fp2morse(infname,outfname,pairs,bvs):
+
+def fp2morse(infname,outfname,pairs,ibvs):
     ds = []
     alps = []
     rs = []
@@ -34,15 +45,28 @@ def fp2morse(infname,outfname,pairs,bvs):
     
     ndat = int(lines[0].split()[0])
     nprms = len(pairs)*3
-    if bvs: nprms += 1
+    if ibvs==1:
+        nprms += 1
+    elif ibvs == 2:
+        spcs = pairs2spcs(pairs)
+        nprms += 1 +len(spcs)
     if ndat != nprms:
         raise ValueError('Number of parameters in {0:s} is inconsistent with given pairs.'.format(infname))
 
     nl = 0
-    if bvs:
+    if bvs==1:
         nl += 1
         data = lines[nl].split()
         fbvs = float(data[0])
+    elif bvs == 2:
+        nl += 1
+        data = lines[nl].split()
+        fbvs = float(data[0])
+        rads = {}
+        for i in range(len(spcs)):
+            nl += 1
+            data = lines[nl].split()
+            rads[spcs[i]] = float(data[0])
 
     nl += 1
     for i in range(nl,len(lines)):
@@ -62,10 +86,17 @@ def fp2morse(infname,outfname,pairs,bvs):
             f.write('   {0:7.3f} {1:7.3f} {2:7.3f}\n'.format(ds[l],alps[l],rs[l]))
     print(' Wrote '+outfname)
 
-    if bvs:
+    if ibvs==1:
         print('')
         print(' The following line should be added to in.params.Coulomb.')
         print('   fbvs    {0:8.4f}'.format(fbvs))
+    elif ibvs==2:
+        print('')
+        print(' The following line should be added to in.params.Coulomb.')
+        print('   fbvs    {0:8.4f}'.format(fbvs))
+        print(' And rad_bvs in in.params.Coulomb should be replaced by the followings:')
+        for s in spcs:
+            print('  {0:s}  {1:8.4f}'.format(s,rads[s]))
     return
 
 def fp2bmh(infname,outfname,pairs):
@@ -210,7 +241,7 @@ def read_params_Coulomb(fname='in.params.Coulomb'):
                 chgs[csp] = chg
     return chgs
     
-def morse2fp(infname,outfname,bvs):
+def morse2fp(infname,outfname,ibvs):
     with open(infname,'r') as f:
         lines = f.readlines()
     params = {}
@@ -229,13 +260,31 @@ def morse2fp(infname,outfname,bvs):
         alpha = float(data[3])
         rs = float(data[4])
         params[(cspi,cspj)] = (D,alpha,rs)
-    #...Write in.vars.fitpot file
+
     nprms = len(params)*3
-    if bvs: nprms += 1
+    if ibvs==1:
+        nprms += 1
+    elif ibvs == 2:
+        spcs = pairs2spcs(pairs)
+        nprms += 1 +len(spcs)
+        try:
+            fbvs,bvs_data = read_params_Coulomb('in.params.Coulomb')
+        except:
+            fbvs = 0.74
+            bvs_data = {}
+            for s in spcs:
+                bvs_data[s] = (1.0, 1.0, 1)
+        
+    #...Write in.vars.fitpot file
     with open(outfname,'w') as f:
         f.write('  {0:d}   6.00   3.00\n'.format(nprms))
-        if bvs:
+        if ibvs==1:
             f.write(' {0:8.4f}   0.500   1.000  # fbvs\n'.format(0.74))
+        elif ibvs == 2:
+            f.write(' {0:8.4f}   0.500   1.000  # fbvs\n'.format(fbvs))
+            for s in spcs:
+                vid,rad,npq = bvs_data[s]
+                f.write(' {0:8.4f}   0.500   3.000  # rad for {1:s}\n'.format(rad,s))
         for k,v in params.items():
             cspi = k[0]
             cspj = k[1]
@@ -252,6 +301,31 @@ def morse2fp(infname,outfname,bvs):
         print('    {0:s}  {1:s}'.format(p[0],p[1]))
     print('{0:-<72}'.format(' '))
     return
+
+def read_params_Coulomb(fname='in.params.Coulomb'):
+    fbvs = -1.0
+    bvs_data = {}
+    with open(fname,'r') as f:
+        lines = f.readlines()
+    mode = None
+    for line in lines:
+        if line[0] in ('#','!'):
+            continue
+        data = line.split()
+        if data[0] == 'charges':
+            mode = 'charges/'+data[1]
+            continue
+        elif data[0] == 'fbvs':
+            fbvs = float(data[1])
+            mode = None
+        if 'charges' in mode:
+            if 'bvs' in mode and len(data) == 4:
+                csp = data[0]
+                vid = float(data[1])
+                rad = float(data[2])
+                npq = int(data[3])
+                bvs_data[csp] = (vid,rad,npq)
+    return fbvs, bvs_data
 
 def bmh2fp(infname,outfname):
     with open(infname,'r') as f:
@@ -383,7 +457,7 @@ if __name__ == "__main__":
     pairs = args['--pairs']
     infname = args['INFILE']
     outfname = args['OUTFILE']
-    bvs = args['--bvs']
+    ibvs = int(args['--bvs'])
     
     if 'fitpot' in infname and \
        ('Morse' in outfname or 'BMH' in outfname or 'Abell' in outfname
@@ -397,7 +471,7 @@ if __name__ == "__main__":
             for pair in pairs:
                 print('   {0:s}-{1:s}'.format(pair[0],pair[1]))
         if 'Morse' in outfname:
-            fp2morse(infname,outfname,pairs,bvs)
+            fp2morse(infname,outfname,pairs,ibvs)
         elif 'BMH' in outfname:
             fp2bmh(infname,outfname,pairs)
         elif 'Abell' in outfname:
@@ -405,7 +479,7 @@ if __name__ == "__main__":
         elif 'fpc' in outfname:
             fp2fpc(infname,outfname,pairs)
     elif 'Morse' in infname and 'fitpot' in outfname:
-        morse2fp(infname,outfname,bvs)
+        morse2fp(infname,outfname,ibvs)
     elif 'BMH' in infname and 'fitpot' in outfname:
         bmh2fp(infname,outfname)
     elif 'Abell' in infname and 'fitpot' in outfname:
