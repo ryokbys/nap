@@ -122,9 +122,10 @@ force_ZBL.o: mod_util.o mod_element.o
 force_cspline.o: mod_util.o
 force_Tersoff.o: mod_vector.o
 force_dipole.o: mod_util.o
-force_Abell.o: mod_util.o
-force_BMH.o: mod_util.o
+force_BMH.o: ${mods}
 force_Abell.o: ${mods}
+force_fpc.o: ${mods}
+force_Morse.o: ${mods} force_Coulomb.o
 mod_constraints.o: mod_vector.o mod_util.o
 mod_rdcfrc.o: mod_structure.o mod_util.o
 mod_ttm.o: mod_util.o

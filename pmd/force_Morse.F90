@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-19 10:24:51 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-20 12:37:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -706,12 +706,14 @@ contains
 !  Accessor routine to set Morse parameters from outside.
 !  Curretnly this routine is supposed to be called only on serial run.
 !
+    use Coulomb,only: vid_bvs, npq_bvs, acc
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
     character(len=*),intent(in):: ctype
     logical,intent(in):: interact_in(nspmax,nspmax)
 
     integer:: i,j,inc,itmp,nspt,nint
+    real(8):: c
 
     nprms = ndimp
     if( .not.allocated(params) ) allocate(params(nprms))
@@ -726,38 +728,82 @@ contains
         nint = nint +1
       enddo
     enddo
-    if( nint*3.ne.nprms ) then
-      write(6,*) 'ERROR @set_params_Morse: nint*3.ne.nprms !!!'
-      write(6,*) '  nint,nprms= ',nint,nprms
-      write(6,*) 'Probably you need to set interactions correctly...'
-      write(6,*) 'interact:'
-      do i=1,nspmax
-        do j=i,nspmax
-          write(6,'(a,2i5,l4)') '  i,j,interact(i,j)=',i,j,interact(i,j)
+
+    if( index(ctype,'BVS').ne.0 ) then
+
+      d0(:,:)= 0d0
+      alp(:,:)= 0d0
+      rmin(:,:)= -1d0
+    
+!.....In case of BVS3, only alpha and Rmin are to be optimized and
+!     and D0 is computed using alpha, Rmin, vid, npq.
+      if( ctype(4:4).eq.'3' ) then
+        if( nint*2.ne.nprms ) then
+          write(6,*) 'ERROR @set_params_Morse: nint*2.ne.nprms !!!'
+          write(6,*) '  nint,nprms= ',nint,nprms
+          write(6,*) 'Probably you need to set interactions correctly...'
+          stop
+        endif
+
+        inc = 0
+        do i=1,nspmax
+          do j=i,nspmax
+            if( .not.interact(i,j) ) cycle
+            inc= inc +1
+            alp(i,j) = params(inc)
+            alp(j,i) = alp(i,j)
+            inc= inc +1
+            rmin(i,j) = params(inc)
+            rmin(j,i) = rmin(i,j)
+          enddo
         enddo
-      enddo
-      stop
-    endif
 
-    d0(:,:)= 0d0
-    alp(:,:)= 0d0
-    rmin(:,:)= -1d0
+!.....Determine D0 using alpha, Rmin,vid,npq according to
+!     Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
+!.....c value should be determined according to anion species,
+!     but in most cases c=1 (anion is s or p element)
+        c = 1d0
+        do i=1,nspmax
+          do j=1,nspmax
+            if( .not.interact(i,j) ) cycle
+            d0(i,j) = c*acc*(abs(vid_bvs(i)*vid_bvs(j)))**(1d0/c)/rmin(i,j) &
+                 /sqrt(dble(npq_bvs(i)*npq_bvs(j))) /(2d0*alp(i,j)**2)
+            d0(j,i) = d0(i,j)
+          enddo
+        enddo
 
-    inc = 0
-    do i=1,nspmax
-      do j=i,nspmax
-        if( .not.interact(i,j) ) cycle
-        inc= inc +1
-        d0(i,j) = params(inc)
-        d0(j,i) = d0(i,j)
-        inc= inc +1
-        alp(i,j) = params(inc)
-        alp(j,i) = alp(i,j)
-        inc= inc +1
-        rmin(i,j) = params(inc)
-        rmin(j,i) = rmin(i,j)
-      enddo
-    enddo
+!.....Except BVS3, 3 parameters per pair
+      else
+        if( nint*3.ne.nprms ) then
+          write(6,*) 'ERROR @set_params_Morse: nint*3.ne.nprms !!!'
+          write(6,*) '  nint,nprms= ',nint,nprms
+          write(6,*) 'Probably you need to set interactions correctly...'
+          write(6,*) 'interact:'
+          do i=1,nspmax
+            do j=i,nspmax
+              write(6,'(a,2i5,l4)') '  i,j,interact(i,j)=',i,j,interact(i,j)
+            enddo
+          enddo
+          stop
+        endif
+
+        inc = 0
+        do i=1,nspmax
+          do j=i,nspmax
+            if( .not.interact(i,j) ) cycle
+            inc= inc +1
+            d0(i,j) = params(inc)
+            d0(j,i) = d0(i,j)
+            inc= inc +1
+            alp(i,j) = params(inc)
+            alp(j,i) = alp(i,j)
+            inc= inc +1
+            rmin(i,j) = params(inc)
+            rmin(j,i) = rmin(i,j)
+          enddo
+        enddo
+      endif  ! ctype(4)
+    endif  ! index(ctype,'BVS')
 
 ! !.....Different operations for different potential type
 ! !.....for example, only O-X interactions in BVS potential,

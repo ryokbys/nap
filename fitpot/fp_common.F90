@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-20 00:34:26 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-20 12:22:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -222,7 +222,7 @@ contains
           call set_params_Coulomb(1,x(1),cpot, &
                samples(ismpl)%specorder)
           call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
-        else if( trim(cpot).eq.'BVS2' ) then
+        else if( cpot(4:4).eq.'2' .or. cpot(4:4).eq.'3' ) then
           ndimt = 1+maxisp
           call set_params_Coulomb(ndimt,x(1),cpot, &
                samples(ismpl)%specorder)
@@ -543,7 +543,7 @@ contains
           call set_params_Coulomb(1,x(1),cpot, &
                samples(ismpl)%specorder)
           call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
-        else if( trim(cpot).eq.'BVS2' ) then
+        else if( cpot(4:4).eq.'2' .or. cpot(4:4).eq.'3' ) then
           ndimt = 1+maxisp
           call set_params_Coulomb(ndimt,x(1),cpot, &
                samples(ismpl)%specorder)
