@@ -11,9 +11,9 @@ Coulomb potential requires a parameter file ``in.params.Coulomb`` that has the f
      Si   1.0
      O   -2.0
    interactions
-    Si  Si
-    Si  O
-    O   O
+     Si  Si
+     Si  O
+     O   O
    terms  short
    
    sigma  2.5
@@ -58,10 +58,9 @@ Here, ``charges variable`` requires some following lines that have
 
 ::
 
-   isp, name,  chi,  Jii,  E0,  qlow,  qup
+   name,  chi,  Jii,  E0,  qlow,  qup
 
-- ``isp``: species-ID
-- ``name``: species-name, which is just for human-readability
+- ``name``: name of the chemical species
 - ``chi``: electronegativity of the species (eV)
 - ``Jii``: hardness of the species (eV)
 - ``E0``: atomic energy (eV)
