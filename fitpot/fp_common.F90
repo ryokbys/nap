@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-27 13:47:34 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-27 16:44:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -120,6 +120,8 @@ contains
       stop
     endif
 
+    print *,'myid,ndim=',myid,ndim
+    print *,'myid,x(:)=',myid,x(1:ndim)
 !!$    print *,'myid,isid0,isid1=',myid,isid0,isid1
 !!$    print *,'func_w_pmd: 03'
     ftrnl = 0d0
@@ -605,6 +607,7 @@ contains
     use variables,only: cmaindir,cpot,nsubff,csubffs,mdsys,samples &
          ,maxisp,nn_nl,nn_nhl,nn_sigtype,ctype_loss,rc3,rcut &
          ,interact,interact3,num_interact
+    use parallel
     use Coulomb,only: set_paramsdir_Coulomb, set_params_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use BMH,only: set_paramsdir_BMH,set_params_BMH
@@ -732,6 +735,8 @@ contains
         call set_params_Morse(ndimt,x(ndim0),cpot,interact)
         ndim0 = ndim0 +ndimt
         ndimt = num_interact(3)*3
+!!$        if( myid.eq.0 ) print *,'# of interaction = ',num_interact(2) &
+!!$             ,num_interact(3)
         call set_params_angular(ndimt,x(ndim0),'angular1',rc3,interact3)
       else
         print *,'ERROR@ready4pmd: No such BVS FF available in fitpot.'

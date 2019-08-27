@@ -210,7 +210,7 @@ contains
     else if( ndim.eq.3 ) then  ! triplets
       do i=1,nspmax
         do j=1,nspmax
-          do k=1,nspmax
+          do k=j,nspmax
             if( .not. interact3(i,j,k) ) cycle
             num_interact = num_interact +1
           enddo

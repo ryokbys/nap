@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-27 13:51:41 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-27 16:48:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -138,6 +138,7 @@ program fitpot
        .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
        .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'BMH' &
        .or. trim(cpot).eq.'Abell' .or. trim(cpot).eq.'fpc' ) then
+    print '(a,2i4,20es11.3)','myid,nvars,vars(:)=',myid,nvars,vars(:)
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
 !!$    if( trim(cpot).eq.'linreg' .and. trim(cfmethod).eq.'test' &
 !!$         .and. iprint.gt.2 ) call write_dsgnmats()
@@ -1928,7 +1929,7 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     emtst = 0d0
     e2mtst= 0d0
   endif
-  if( iprint.gt.1 ) then
+  if( iprint.gt.1 .and. myid.eq.0 ) then
     print *,'emtrn,emtrn^2,e2mtrn,nsmpl_trn =',emtrn,emtrn**2,e2mtrn,nsmpl_trn
     print *,'emtst,emtst^2,e2mtst,nsmpl_tst =',emtst,emtst**2,e2mtst,nsmpl_tst
   endif
@@ -1994,7 +1995,7 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     fmtst = 0d0
     f2mtst= 0d0
   endif
-  if( iprint.gt.1 ) then
+  if( iprint.gt.1 .and. myid.eq.0 ) then
     print *,'fmtrn,fmtrn^2,f2mtrn,ntrn =',fmtrn,fmtrn**2,f2mtrn,ntrn
     print *,'fmtst,fmtst^2,f2mtst,ntst =',fmtst,fmtst**2,f2mtst,ntst
   endif
@@ -2058,7 +2059,7 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     smtst = 0d0
     s2mtst= 0d0
   endif
-  if( iprint.gt.1 ) then
+  if( iprint.gt.1 .and. myid.eq.0 ) then
     print *,'smtrn,smtrn^2,s2mtrn,ntrn =',smtrn,smtrn**2,s2mtrn,ntrn
     print *,'smtst,smtst^2,s2mtst,ntst =',smtst,smtst**2,s2mtst,ntst
   endif
@@ -2131,6 +2132,7 @@ subroutine sync_input()
   call mpi_bcast(nspcs_neglect,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(cspcs_neglect,3*nspmax,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(interact3,nspmax*nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
 
   call mpi_bcast(fupper_lim,1,mpi_real8,0,mpi_world,ierr)
 !.....Simulated annealing

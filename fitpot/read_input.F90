@@ -559,7 +559,7 @@ subroutine read_nn_nhl(ionum)
 end subroutine read_nn_nhl
 !=======================================================================
 subroutine read_interactions(ionum,nrow)
-  use variables,only: interact,interact3,specorder
+  use variables
   use util, only: num_data
   integer,intent(in):: ionum,nrow
 
