@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-20 12:36:59 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-21 10:34:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -2697,7 +2697,7 @@ contains
     integer:: isp,jsp,ns,inc,ifcoulomb,ipr,myid,mpiw,maxisp
 
     if( index(ctype,'BVS').ne.0 ) then
-      if( ctype(4:4).eq.'2' .or. ctype(4:4).eq.'3' ) then
+!!$      if( ctype(4:4).eq.'2' .or. ctype(4:4).eq.'3' ) then
         !.....Not only fbvs, but also rad_bvs are given from fitpot
 !!$        ifcoulomb = 1
         ipr = 0
@@ -2728,31 +2728,29 @@ contains
           enddo
         enddo
         
-      else
+!!$      else
 !.....As of 190819, ctype==BVS means that only fbvs is to be given from fitpot.
 !.....Need to read in.params.XX file before going further
-!!$        ifcoulomb = 1
-        ipr = 0
-        myid = 0
-        mpiw = -1
-        call read_paramsx(myid,mpiw,ipr,specorder)
-!!$        call read_params_sc(myid,mpiw,ifcoulomb,ipr,specorder)
-        params_read = .true.
-        lprmset_Coulomb = .true.
-
-!.....set fbvs
-        fbvs = prms_in(1)
-!!$      print *,'fbvs=',fbvs
-!.....Reset screening length
-        do isp=1,nspmax
-          if( vid_bvs(isp).eq.0d0 ) cycle
-          do jsp=1,nspmax
-            if( vid_bvs(jsp).eq.0d0 ) cycle
-            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
-!!$          print *,'isp,jsp,rho_bvs=',isp,jsp,rho_bvs(isp,jsp)
-          enddo
-        enddo
-      endif
+!!         ipr = 0
+!!         myid = 0
+!!         mpiw = -1
+!!         call read_paramsx(myid,mpiw,ipr,specorder)
+!!         params_read = .true.
+!!         lprmset_Coulomb = .true.
+!! 
+!! !.....set fbvs
+!!         fbvs = prms_in(1)
+!! !!$      print *,'fbvs=',fbvs
+!! !.....Reset screening length
+!!         do isp=1,nspmax
+!!           if( vid_bvs(isp).eq.0d0 ) cycle
+!!           do jsp=1,nspmax
+!!             if( vid_bvs(jsp).eq.0d0 ) cycle
+!!             rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+!! !!$          print *,'isp,jsp,rho_bvs=',isp,jsp,rho_bvs(isp,jsp)
+!!           enddo
+!!         enddo
+!!       endif
       
     else if( trim(ctype).eq.'fpc' ) then
 !.....As of 190818, only one parameter is passed to this routine

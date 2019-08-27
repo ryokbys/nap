@@ -39,6 +39,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
   use BMH,only: force_BMH
   use dipole,only: force_dipole
   use fpc,only: force_fpc
+  use angular,only: force_angular
   implicit none
   integer,intent(in):: namax,natm,nnmax,nismax,iprint
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
@@ -216,6 +217,9 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
   if( use_force('fpc') ) call force_fpc(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
+  if( use_force('angular') ) call force_angular(namax,natm,tag,ra,nnmax,aa,strs &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
   
 !.....Exclusive choice of different Coulomb force-fields
   if( use_force('screened_Coulomb') ) then ! screened Coulomb
@@ -276,6 +280,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use Abell,only: read_params_Abell, lprmset_Abell
   use BMH,only: read_params_BMH, lprmset_BMH
   use fpc,only: read_params_fpc, lprmset_fpc
+  use angular,only: read_params_angular, lprmset_angular
   implicit none
   integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint !,numff
   real(8),intent(in):: tag(namax),h(3,3),rc,amass(nspmax)
@@ -440,6 +445,13 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
 !.....Tersoff
   if( use_force('Tersoff') ) then
     call init_tersoff(myid_md,mpi_md_world,iprint,specorder)
+  endif
+  
+!.....angular
+  if( use_force('angular') ) then
+    if( .not.lprmset_angular ) then
+      call read_params_angular(myid_md,mpi_md_world,iprint,specorder)
+    endif
   endif
 
 

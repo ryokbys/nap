@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-19 12:49:44 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-27 13:51:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -103,11 +103,17 @@ program fitpot
   endif
 
 !.....Set cffs only for pmd calculation
-  if( index(cpot,'BVS').ne.0 ) then
+  if( trim(cpot).eq.'BVS' ) then
     nff = 2
     allocate(cffs(nff))
-    cffs(1) = 'Morse'
-    cffs(2) = 'Coulomb'
+    cffs(1) = 'Coulomb'
+    cffs(2) = 'Morse'
+  else if( trim(cpot).eq.'BVSx' ) then
+    nff = 3
+    allocate(cffs(nff))
+    cffs(1) = 'Coulomb'
+    cffs(2) = 'Morse'
+    cffs(3) = 'angular'
   else if( trim(cpot).eq.'fpc' ) then
     nff = 2
     allocate(cffs(nff))

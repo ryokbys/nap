@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-20 12:22:48 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-27 13:47:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -76,18 +76,7 @@ contains
          ,nn_nl,nn_nhl,nn_sigtype,ctype_loss,interact,memgsf,cfmethod
     use parallel
     use minimize
-    use Coulomb,only: set_paramsdir_Coulomb, set_params_Coulomb
-    use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
-    use BMH,only: set_paramsdir_BMH,set_params_BMH
-    use Abell,only: set_paramsdir_Abell,set_params_Abell
-    use fpc,only: set_paramsdir_fpc,set_params_fpc
-    use EAM,only: set_paramsdir_EAM,set_params_EAM
-    use NN,only: set_paramsdir_NN,set_params_NN
-    use NN2,only: set_paramsdir_NN2,set_params_NN2,nl,nhl,nlmax,get_NN2_hl1 &
-         ,set_NN2_hl1,set_sigtype_NN2
-    use linreg,only: set_paramsdir_linreg,set_params_linreg
-    use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
-         ,lupdate_gsf
+    use descriptor,only: lupdate_gsf,get_descs,get_ints
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -138,97 +127,14 @@ contains
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
       cdirname = trim(samples(ismpl)%cdirname)
-!!$      print *,'ismpl,cdirname=',ismpl,trim(cdirname)
-      if( trim(cpot).eq.'vcMorse' ) then
-        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_vcMorse(ndim,x)
-      else if( trim(cpot).eq.'Morse' ) then
-        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        if( string_in_arr('screened_Coulomb',nsubff,csubffs) .or. &
-            string_in_arr('Coulomb',nsubff,csubffs) ) then
-          ctype = 'BVS'
-        else if( string_in_arr('Ewald_long',nsubff,csubffs) .or.&
-             string_in_arr('Ewald',nsubff,csubffs) ) then
-          ctype = 'full_Morse'
-        else
-          ctype = 'full_Morse'
-        endif
-        call set_params_Morse(ndim,x,ctype,interact)
-      else if( trim(cpot).eq.'BMH' ) then
-        call set_paramsdir_BMH(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_BMH(ndim,x,cpot,interact)
-      else if( trim(cpot).eq.'Abell' ) then
-        call set_paramsdir_Abell(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_Abell(ndim,x,cpot,interact)
-      else if( trim(cpot).eq.'fpc' ) then
-        call set_paramsdir_fpc(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_Coulomb(1,x(1),cpot, &
-             samples(ismpl)%specorder)
-        call set_params_fpc(ndim-1,x(2:ndim),cpot,interact)
-      else if( trim(cpot).eq.'EAM' ) then
-        call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_EAM(ndim,x)
-      else if( trim(cpot).eq.'NN' ) then
-        call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_NN(ndim,x,rcut,rc3)
-      else if( trim(cpot).eq.'linreg' ) then
-        call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_paramsdir_linreg(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_linreg(ndim,x)
-        if( .not. lupdate_gsf ) then
-          nsf = samples(ismpl)%nsf
-          nal = samples(ismpl)%nal
-          nnl = samples(ismpl)%nnl
-          call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
-               samples(ismpl)%dgsf,samples(ismpl)%igsf)
-        endif
+      call ready4pmd(ismpl,ndim,x)
+
 !.....Set lfdsgnmat=.true. to make run_pmd() compute dsgnmat_force related data
-        if( l1st .and. lfmatch .and. trim(cfmethod).eq.'dsgnmat' ) then
+      if( trim(cpot).eq.'linreg' .and. &
+           l1st .and. lfmatch .and. trim(cfmethod).eq.'dsgnmat' ) then
           lfdsgnmat = .true.
-        endif
-      else if( trim(cpot).eq.'NN2' ) then
-        call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_paramsdir_NN2(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_NN2(ndim,x,nn_nl,nn_nhl)
-        call set_sigtype_NN2(nn_sigtype)
-        if( .not. lupdate_gsf ) then
-          nsf = samples(ismpl)%nsf
-          nal = samples(ismpl)%nal
-          nnl = samples(ismpl)%nnl
-          call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
-               samples(ismpl)%dgsf,samples(ismpl)%igsf)
-        endif
-      else if( index(cpot,'BVS').ne.0 ) then
-        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        if( trim(cpot).eq.'BVS' .or. trim(cpot).eq.'BVS1' ) then
-          call set_params_Coulomb(1,x(1),cpot, &
-               samples(ismpl)%specorder)
-          call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
-        else if( cpot(4:4).eq.'2' .or. cpot(4:4).eq.'3' ) then
-          ndimt = 1+maxisp
-          call set_params_Coulomb(ndimt,x(1),cpot, &
-               samples(ismpl)%specorder)
-          call set_params_Morse(ndim-ndimt,x(ndimt+1:ndim),cpot,interact)
-        endif
       endif
+      
       call run_pmd(samples(ismpl),lcalcgrad,ndim,nff,cffs,epot,frcs,strs &
            ,rcut,lfdsgnmat)
       samples(ismpl)%epot = epot
@@ -417,16 +323,16 @@ contains
          ,nn_nl,nn_nhl,nn_sigtype,ctype_loss,interact
     use parallel
     use minimize
-    use Coulomb,only: set_paramsdir_Coulomb,set_params_Coulomb
-    use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
-    use BMH,only: set_paramsdir_BMH,set_params_BMH
-    use Abell,only: set_paramsdir_Abell,set_params_Abell
-    use fpc,only: set_paramsdir_fpc,set_params_fpc
-    use EAM,only: set_paramsdir_EAM,set_params_EAM
-    use NN,only: set_paramsdir_NN,set_params_NN
-    use NN2,only: set_paramsdir_NN2,set_params_NN2,set_NN2_hl1
-    use linreg,only: set_paramsdir_linreg,set_params_linreg
-    use descriptor,only: set_paramsdir_desc,set_descs
+!!$    use Coulomb,only: set_paramsdir_Coulomb,set_params_Coulomb
+!!$    use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
+!!$    use BMH,only: set_paramsdir_BMH,set_params_BMH
+!!$    use Abell,only: set_paramsdir_Abell,set_params_Abell
+!!$    use fpc,only: set_paramsdir_fpc,set_params_fpc
+!!$    use EAM,only: set_paramsdir_EAM,set_params_EAM
+!!$    use NN,only: set_paramsdir_NN,set_params_NN
+!!$    use NN2,only: set_paramsdir_NN2,set_params_NN2,set_NN2_hl1
+!!$    use linreg,only: set_paramsdir_linreg,set_params_linreg
+!!$    use descriptor,only: set_paramsdir_desc,set_descs
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -471,85 +377,88 @@ contains
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
-      if( trim(cpot).eq.'vcMorse' ) then
-        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_vcMorse(ndim,x)
-      else if( trim(cpot).eq.'Morse' ) then
-        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        if( string_in_arr('screened_Coulomb',nsubff,csubffs) .or. &
-            string_in_arr('Coulomb',nsubff,csubffs) ) then
-          ctype = 'BVS'
-        else if( string_in_arr('Ewald_long',nsubff,csubffs) .or.&
-             string_in_arr('Ewald',nsubff,csubffs) ) then
-          ctype = 'full_Morse'
-        else
-          ctype = 'full_Morse'
-        endif
-        call set_params_Morse(ndim,x,ctype,interact)
-      else if( trim(cpot).eq.'BMH' ) then
-        call set_paramsdir_BMH(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_BMH(ndim,x,cpot,interact)
-      else if( trim(cpot).eq.'Abell' ) then
-        call set_paramsdir_Abell(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_Abell(ndim,x,cpot,interact)
-      else if( trim(cpot).eq.'fpc' ) then
-        call set_paramsdir_fpc(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_Coulomb(1,x(1),cpot, &
-             samples(ismpl)%specorder)
-        call set_params_fpc(ndim-1,x(2:ndim),cpot,interact)
-      else if( trim(cpot).eq.'EAM' ) then
-        call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_EAM(ndim,x)
-      else if( trim(cpot).eq.'NN' ) then
-        call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_NN(ndim,x,rcut,rc3)
-      else if( trim(cpot).eq.'linreg') then
-        call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_paramsdir_linreg(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_linreg(ndim,x)
-        nsf = smpl%nsf
-        nal = smpl%nal
-        nnl = smpl%nnl
-        call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
-      else if( trim(cpot).eq.'NN2') then
-        call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_paramsdir_NN2(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_params_NN2(ndim,x,nn_nl,nn_nhl)
-        nsf = smpl%nsf
-        nal = smpl%nal
-        nnl = smpl%nnl
-        call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
-      else if( trim(cpot).eq.'BVS' ) then
-        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
-             //'/pmd')
-        if( trim(cpot).eq.'BVS' .or. trim(cpot).eq.'BVS1' ) then
-          call set_params_Coulomb(1,x(1),cpot, &
-               samples(ismpl)%specorder)
-          call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
-        else if( cpot(4:4).eq.'2' .or. cpot(4:4).eq.'3' ) then
-          ndimt = 1+maxisp
-          call set_params_Coulomb(ndimt,x(1),cpot, &
-               samples(ismpl)%specorder)
-          call set_params_Morse(ndim-ndimt,x(ndimt+1:ndim),cpot,interact)
-        endif
-      endif
+      call ready4pmd(ismpl,ndim,x)
+      
+!!$      if( trim(cpot).eq.'vcMorse' ) then
+!!$        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_params_vcMorse(ndim,x)
+!!$      else if( trim(cpot).eq.'Morse' ) then
+!!$        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        if( string_in_arr('screened_Coulomb',nsubff,csubffs) .or. &
+!!$            string_in_arr('Coulomb',nsubff,csubffs) ) then
+!!$          ctype = 'BVS'
+!!$        else if( string_in_arr('Ewald_long',nsubff,csubffs) .or.&
+!!$             string_in_arr('Ewald',nsubff,csubffs) ) then
+!!$          ctype = 'full_Morse'
+!!$        else
+!!$          ctype = 'full_Morse'
+!!$        endif
+!!$        call set_params_Morse(ndim,x,ctype,interact)
+!!$      else if( trim(cpot).eq.'BMH' ) then
+!!$        call set_paramsdir_BMH(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_params_BMH(ndim,x,cpot,interact)
+!!$      else if( trim(cpot).eq.'Abell' ) then
+!!$        call set_paramsdir_Abell(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_params_Abell(ndim,x,cpot,interact)
+!!$      else if( trim(cpot).eq.'fpc' ) then
+!!$        call set_paramsdir_fpc(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_params_Coulomb(1,x(1),cpot, &
+!!$             samples(ismpl)%specorder)
+!!$        call set_params_fpc(ndim-1,x(2:ndim),cpot,interact)
+!!$      else if( trim(cpot).eq.'EAM' ) then
+!!$        call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_params_EAM(ndim,x)
+!!$      else if( trim(cpot).eq.'NN' ) then
+!!$        call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_params_NN(ndim,x,rcut,rc3)
+!!$      else if( trim(cpot).eq.'linreg') then
+!!$        call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_paramsdir_linreg(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_params_linreg(ndim,x)
+!!$        nsf = smpl%nsf
+!!$        nal = smpl%nal
+!!$        nnl = smpl%nnl
+!!$        call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
+!!$      else if( trim(cpot).eq.'NN2') then
+!!$        call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_paramsdir_NN2(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_params_NN2(ndim,x,nn_nl,nn_nhl)
+!!$        nsf = smpl%nsf
+!!$        nal = smpl%nal
+!!$        nnl = smpl%nnl
+!!$        call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
+!!$      else if( index(cpot,'BVS').ne.0 ) then
+!!$        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
+!!$             //'/pmd')
+!!$        if( trim(cpot).eq.'BVS1' ) then
+!!$          call set_params_Coulomb(1,x(1),cpot, &
+!!$               samples(ismpl)%specorder)
+!!$          call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
+!!$        else if( trim(cpot).eq.'BVS' .or. &
+!!$             trim(cpot).eq.'BVS2' .or. trim(cpot).eq.'BVS3' ) then
+!!$          ndimt = 1+maxisp
+!!$          call set_params_Coulomb(ndimt,x(1),cpot, &
+!!$               samples(ismpl)%specorder)
+!!$          call set_params_Morse(ndim-ndimt,x(ndimt+1:ndim),cpot,interact)
+!!$        endif
+!!$      endif
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.
 !!$      print *,'ismpl,cpot,ctype,=',ismpl,trim(cpot) &
@@ -689,6 +598,149 @@ contains
     return
   end subroutine grad_w_pmd
 !=======================================================================
+  subroutine ready4pmd(ismpl,ndim,x)
+!
+!  Get ready for running pmd.
+!
+    use variables,only: cmaindir,cpot,nsubff,csubffs,mdsys,samples &
+         ,maxisp,nn_nl,nn_nhl,nn_sigtype,ctype_loss,rc3,rcut &
+         ,interact,interact3,num_interact
+    use Coulomb,only: set_paramsdir_Coulomb, set_params_Coulomb
+    use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
+    use BMH,only: set_paramsdir_BMH,set_params_BMH
+    use Abell,only: set_paramsdir_Abell,set_params_Abell
+    use fpc,only: set_paramsdir_fpc,set_params_fpc
+    use angular,only: set_paramsdir_angular,set_params_angular
+    use EAM,only: set_paramsdir_EAM,set_params_EAM
+    use NN,only: set_paramsdir_NN,set_params_NN
+    use NN2,only: set_paramsdir_NN2,set_params_NN2,nl,nhl,nlmax,get_NN2_hl1 &
+         ,set_NN2_hl1,set_sigtype_NN2
+    use linreg,only: set_paramsdir_linreg,set_params_linreg
+    use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
+         ,lupdate_gsf
+    implicit none
+    integer,intent(in):: ismpl,ndim
+    real(8),intent(in):: x(ndim)
+
+    integer:: nsf,nal,nnl,ndimt,ndim0
+    character(len=128):: cdirname,ctype
+    type(mdsys):: smpl
+
+    logical,external:: string_in_arr
+
+    smpl = samples(ismpl)
+    cdirname = smpl%cdirname
+    
+    if( trim(cpot).eq.'vcMorse' ) then
+      call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_params_vcMorse(ndim,x)
+    else if( trim(cpot).eq.'Morse' ) then
+      call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      if( string_in_arr('screened_Coulomb',nsubff,csubffs) .or. &
+           string_in_arr('Coulomb',nsubff,csubffs) ) then
+        ctype = 'BVS'
+      else if( string_in_arr('Ewald_long',nsubff,csubffs) .or.&
+           string_in_arr('Ewald',nsubff,csubffs) ) then
+        ctype = 'full_Morse'
+      else
+        ctype = 'full_Morse'
+      endif
+      call set_params_Morse(ndim,x,ctype,interact)
+    else if( trim(cpot).eq.'BMH' ) then
+      call set_paramsdir_BMH(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_params_BMH(ndim,x,cpot,interact)
+    else if( trim(cpot).eq.'Abell' ) then
+      call set_paramsdir_Abell(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_params_Abell(ndim,x,cpot,interact)
+    else if( trim(cpot).eq.'fpc' ) then
+      call set_paramsdir_fpc(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_params_Coulomb(1,x(1),cpot, &
+           smpl%specorder)
+      call set_params_fpc(ndim-1,x(2:ndim),cpot,interact)
+    else if( trim(cpot).eq.'EAM' ) then
+      call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_params_EAM(ndim,x)
+    else if( trim(cpot).eq.'NN' ) then
+      call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_params_NN(ndim,x,rcut,rc3)
+    else if( trim(cpot).eq.'linreg' ) then
+      call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_paramsdir_linreg(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_params_linreg(ndim,x)
+      if( .not. lupdate_gsf ) then
+        nsf = smpl%nsf
+        nal = smpl%nal
+        nnl = smpl%nnl
+        call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
+             samples(ismpl)%dgsf,samples(ismpl)%igsf)
+      endif
+!!$!.....Set lfdsgnmat=.true. to make run_pmd() compute dsgnmat_force related data
+!!$      if( l1st .and. lfmatch .and. trim(cfmethod).eq.'dsgnmat' ) then
+!!$        lfdsgnmat = .true.
+!!$      endif
+    else if( trim(cpot).eq.'NN2' ) then
+      call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_paramsdir_NN2(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_params_NN2(ndim,x,nn_nl,nn_nhl)
+      call set_sigtype_NN2(nn_sigtype)
+      if( .not. lupdate_gsf ) then
+        nsf = smpl%nsf
+        nal = smpl%nal
+        nnl = smpl%nnl
+        call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
+             samples(ismpl)%dgsf,samples(ismpl)%igsf)
+      endif
+    else if( index(cpot,'BVS').ne.0 ) then
+      call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_paramsdir_angular(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      if( trim(cpot).eq.'BVS1' ) then
+        call set_params_Coulomb(1,x(1),cpot,smpl%specorder)
+        call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
+      else if( trim(cpot).eq.'BVS' ) then
+        ndim0 = 1
+        ndimt = 1+maxisp
+        call set_params_Coulomb(ndimt,x(ndim0),cpot,smpl%specorder)
+        ndim0 = ndim0 +ndimt
+        ndimt = num_interact(2)*3
+        call set_params_Morse(ndimt,x(ndim0),cpot,interact)
+!.....In case of BVSx, not only Coulomb and Morse but also angular should be added.
+      else if( trim(cpot).eq.'BVSx' ) then
+        ndim0 = 1
+        ndimt = 1+maxisp
+        call set_params_Coulomb(ndimt,x(ndim0),cpot,smpl%specorder)
+        ndim0 = ndim0 +ndimt
+        ndimt = num_interact(2)*3
+        call set_params_Morse(ndimt,x(ndim0),cpot,interact)
+        ndim0 = ndim0 +ndimt
+        ndimt = num_interact(3)*3
+        call set_params_angular(ndimt,x(ndim0),'angular1',rc3,interact3)
+      else
+        print *,'ERROR@ready4pmd: No such BVS FF available in fitpot.'
+        stop 1
+      endif
+    endif
+
+  end subroutine ready4pmd
+!=======================================================================
   subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs,rc &
        ,lfdsgnmat,gwe,gwf,gws)
 !
@@ -700,7 +752,7 @@ contains
     use force
     use descriptor,only: get_dsgnmat_force
     use ZBL,only: r_inner,r_outer
-    use pmdio, only: nspmax,has_specorder,specorder
+    use pmdio, only: nspmax,has_specorder,specorder,nnmax
     use element
     implicit none
     include "../pmd/params_unit.h"
@@ -839,7 +891,7 @@ contains
          ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
          ,gwe,gwf,gws &
          ,lematch,lfmatch,lsmatch,boundary)
-
+!.....Stress definition, negative as compressive, positive as tensile
     strs(1:3,1:3) = ptnsr(1:3,1:3) *up2gpa*(-1d0)
     if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
     if( lfdsgnmat ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)

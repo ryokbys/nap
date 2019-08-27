@@ -559,36 +559,69 @@ subroutine read_nn_nhl(ionum)
 end subroutine read_nn_nhl
 !=======================================================================
 subroutine read_interactions(ionum,nrow)
-  use variables
+  use variables,only: interact,interact3,specorder
+  use util, only: num_data
   integer,intent(in):: ionum,nrow
 
-  integer:: irow,isp,jsp
-  character(len=3):: cspi,cspj
+  integer:: irow,isp,jsp,nd
+  character(len=3):: cspi,cspj,cspk
+  character(len=128):: cline
 
   interact(:,:) = .false.
+  interact3(:,:,:) = .false.
   do irow=1,nrow
-    read(ionum,*) cspi,cspj
-    isp = -1
-    jsp = -1
-    do i=1,nspmax
-      if( trim(cspi).eq.trim(specorder(i)) ) isp=i
-      if( trim(cspj).eq.trim(specorder(i)) ) jsp=i
-    enddo
+    read(ionum,'(a)',end=10) cline
+    nd = num_data(cline,' ')
+    if( nd.eq.2 ) then  ! pair
+      read(cline,*) cspi,cspj
+      isp = -1
+      jsp = -1
+      do i=1,nspmax
+        if( trim(cspi).eq.trim(specorder(i)) ) isp=i
+        if( trim(cspj).eq.trim(specorder(i)) ) jsp=i
+      enddo
 !.....Store interaction if the species already exist
-    if( isp.gt.0 .and. jsp.gt.0 ) then
-      interact(isp,jsp) = .true.
-      interact(jsp,isp) = .true.
-      cycle
+      if( isp.gt.0 .and. jsp.gt.0 ) then
+        interact(isp,jsp) = .true.
+        interact(jsp,isp) = .true.
+        cycle
+      else
+        print *,'Interaction pair ('//trim(cspi)//','//trim(cspj)//&
+             ') is not used, since either one of them is not in specorder.'
+        print '(a,10a4)',' specorder=',(trim(specorder(i)),i=1,nsp)
+        cycle
+      endif
+
+    else if( nd.eq.3 ) then  ! triplet
+      read(cline,*) cspi,cspj,cspk
+      isp = -1
+      jsp = -1
+      ksp = -1
+      do i=1,nspmax
+        if( trim(cspi).eq.trim(specorder(i)) ) isp=i
+        if( trim(cspj).eq.trim(specorder(i)) ) jsp=i
+        if( trim(cspk).eq.trim(specorder(i)) ) ksp=i
+      enddo
+!.....Store interaction if the species already exist
+      if( isp.gt.0 .and. jsp.gt.0 .and. ksp.gt.0 ) then
+        interact3(isp,jsp,ksp) = .true.
+        interact3(isp,ksp,jsp) = .true.
+        cycle
+      else
+        print *,'Interaction triplet (' &
+             //trim(cspi)//','//trim(cspj)//','//trim(cspk) &
+             //') is not used, since either one of them is not in specorder.'
+        print '(a,10a4)',' specorder=',(trim(specorder(i)),i=1,nsp)
+        cycle
+      endif
     else
-      print *,'Interaction pair ('//trim(cspi)//','//trim(cspj)//&
-           ') is not used, since either one of them is not in specorder.'
-      print '(a,10a4)',' specorder=',(trim(specorder(i)),i=1,nsp)
-      cycle
+      print *,'ERROR reading interactions: 2 or 3 entries are required.'
     endif
     
 !!$    interact(isp,jsp) = .true.
 !!$    interact(jsp,isp) = interact(isp,jsp)
   enddo
+10 continue
   return
 end subroutine read_interactions
 !=======================================================================

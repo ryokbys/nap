@@ -6,7 +6,7 @@ module variables
   integer:: niter= 1
   integer:: niter_eval= 1
   character(len=128):: cfmethod= 'BFGS'
-  character(len=128):: cmaindir= 'data_set'
+  character(len=128):: cmaindir= 'dataset'
   character(len=128):: cparfile= 'in.vars.fitpot'
   character(len=128):: crunmode= 'serial'
   character(len=128):: cevaltype= 'absolute' ! (absolute|relative)
@@ -66,6 +66,7 @@ module variables
   real(8):: ebase(nspmax)
   real(8):: swgt2trn,swgt2tst
   logical:: interact(nspmax,nspmax)
+  logical:: interact3(nspmax,nspmax,nspmax)
 
 !.....max num of atoms among reference data
   integer:: maxna = 0
@@ -190,4 +191,36 @@ contains
     enddo
     return
   end function csp_in_neglect
+!=======================================================================
+  function num_interact(ndim)
+    integer,intent(in):: ndim
+
+    integer:: num_interact
+    integer:: i,j,k
+
+    num_interact = 0
+    if( ndim.eq.2 ) then  ! pairs
+      do i=1,nspmax
+        do j=i,nspmax
+          if( .not. interact(i,j) ) cycle
+          num_interact = num_interact +1
+        enddo
+      enddo
+      return
+    else if( ndim.eq.3 ) then  ! triplets
+      do i=1,nspmax
+        do j=1,nspmax
+          do k=1,nspmax
+            if( .not. interact3(i,j,k) ) cycle
+            num_interact = num_interact +1
+          enddo
+        enddo
+      enddo
+      return
+    else
+      print *,' NDIM must be either 2 or 3.'
+      stop 1
+    endif
+    return
+  end function num_interact
 end module variables
