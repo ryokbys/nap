@@ -1,0 +1,326 @@
+#!/usr/bin/env python
+"""
+Convert fitpot parameters `in.vars.fitpot` to pmd param file `in.params.XXX`.
+
+Usage:
+  fp2prms.py (Morse|BVSx|BVS) [options] IN_VARS_FITPOT
+
+Options:
+  -h, --help  Show this message and exit.
+  --specorder SPECORDER
+              Species order in comma-seperated format, e.g.) Li,P,O. [default: None]
+  --pairs PAIRS
+              Specify pairs for pair potential except for Coulomb by hyphen-connected and comma-separated,
+              e.g.) Li-O,P-O. [default: None]
+  --triplets TRIPLETS
+              Specify triplets by hyphen-connected and comma-separated,
+              e.g.) Li-O,P-O. 
+              The 1st species (X1 in X1-X2-X3) is the center of two bonds. [default: None]
+"""
+from __future__ import print_function
+
+import os
+from docopt import docopt
+
+__author__ = "Ryo KOBAYASHI"
+__version__ = "190827"
+
+def read_params_Coulomb(infname):
+
+    if not os.path.exists(infname):
+        raise FileNotFoundError(infname)
+
+    with open(infname,'r') as f:
+        lines = f.readlines()
+
+    mode = None
+    fbvs = 0
+    rads = {}
+    vids = {}
+    npqs = {}
+    for line in lines:
+        if line[0] in ('!','#'):
+            continue
+        data = line.split()
+        if len(data) == 0:
+            mode = None
+            continue
+        if data[0] == 'charges':
+            if not data[1] == 'fixed_bvs':
+                raise ValueError('charges should be fixed_bvs in '+infname)
+            mode = 'charges'
+            continue
+        elif data[0] == 'fbvs':
+            fbvs = float(data[1])
+            mode = None
+            continue
+        elif data[0] == 'interactions':
+            mode = None
+            continue
+        elif mode == 'charges':
+            if len(data) != 4:
+                raise ValueError('format of {0:s} seems wrong.'.format(infname))
+            csp = data[0]
+            vid = float(data[1])
+            rad = float(data[2])
+            npq = int(data[3])
+            vids[csp] = vid
+            rads[csp] = rad
+            npqs[csp] = npq
+
+    return fbvs,rads,vids,npqs
+
+def read_vars_fitpot(fname='in.vars.fitpot'):
+    """
+    Read in.vars.fitpot and return data.
+    """
+    with open(fname,'r') as f:
+        lines = f.readlines()
+
+    fpvars = []
+    vranges = []
+    il = -1
+    nv = -1
+    while True:
+        il += 1
+        line = lines[il]
+        if line[0] in ('!','#'):  # skip comment line
+            il += 1
+            continue
+        data = line.split()
+        if nv < 0:
+            nv = int(data[0])
+            rc = float(data[1])
+            rc3= float(data[2])
+        else:
+            fpvars.append(float(data[0]))
+            vranges.append([ float(x) for x in data[1:3]])
+            if len(fpvars) == nv:
+                break
+    return nv,rc,rc3,fpvars,vranges
+
+def write_params_Morse(outfname,pairs,morse_prms):
+    
+    with open(outfname,'w') as f:
+        f.write('# cspi, cspj,    D,      alpha,  rmin\n')
+        inc = -1
+        for pair in pairs:
+            d0,alp,rmin = morse_prms[tuple(pair)]
+            f.write('  {0:3s}   {1:3s}'.format(*pair))
+            f.write('  {0:7.4f}  {1:7.4f}  {2:7.4f}\n'.format(d0,alp,rmin))
+            
+    print(' Wrote '+outfname)
+    return None
+
+def write_params_Coulomb(outfname,specorder,pairs,fbvs,rads,vids=None,npqs=None):
+    """
+    Write in.params.Coulomb specific for BVS.
+    """
+    
+    with open(outfname,'w') as f:
+        f.write('terms   screened_cut\n')
+        f.write('charges   fixed_bvs\n')
+        if vids is not None and npqs is not None:
+            for s in specorder:
+                f.write('  {0:3s}  {1:4.1f}  {2:7.4f}  {3:2d}\n'.format(s,vids[s],
+                                                                        rads[s],npqs[s]))
+        else:
+            for s in specorder:
+                f.write('  {0:3s}  Vid   {1:7.4f}  npq\n'.format(s,rads[s]))
+        f.write('\n')
+        f.write('fbvs    {0:7.3f}\n'.format(fbvs))
+        f.write('\n')
+        f.write('interactions\n')
+        for i in range(len(specorder)):
+            si = specorder[i]
+            for j in range(i,len(specorder)):
+                sj = specorder[j]
+                if not same_pair_exists([si,sj],pairs):
+                    f.write('   {0:3s}  {1:3s}\n'.format(si,sj))
+    print(' Wrote '+outfname)
+    return None
+
+def write_params_angular(outfname,triplets,angular_prms):
+    with open(outfname,'w') as f:
+        f.write('# type,   cspi, cspj, cspk,  rc3,   alp,   bet,   gmm\n')
+        for t in triplets:
+            rc3,alp,bet,gmm = angular_prms[tuple(t)]
+            f.write(' angular1   {0:3s}   {1:3s}   {2:3s} '.format(*t))
+            f.write(' {0:6.2f}  {1:7.3f} {2:7.3f} {3:7.3f}\n'.format(rc3,alp,bet,gmm))
+    print(' Wrote '+outfname)
+    
+def fp2Morse(infname,pairs):
+
+    nv,rc,rc3,fpvars,vranges = read_vars_fitpot(infname)
+
+    #...Check num of vars and pairs
+    if len(pairs)*3 != nv:
+        raise ValueError('Number of variables and pairs are inconsistent.')
+
+    morse_prms = {}
+    inc = -1
+    for p in pairs:
+        inc += 1
+        d0 = fpvars[inc]
+        inc += 1
+        alp = fpvars[inc]
+        inc += 1
+        rmin = fpvars[inc]
+        morse_prms[p] = (d0,alp,rmin)
+
+    write_params_Morse('in.params.Morse',pairs,morse_prms)
+        
+    return
+
+def sort_pairs(pairs,specorder):
+
+    sorted_pairs = []
+    for i in range(len(specorder)):
+        si = specorder[i]
+        for j in range(i,len(specorder)):
+            sj = specorder[j]
+            if same_pair_exists((si,sj),pairs):
+                sorted_pairs.append((si,sj))
+    return sorted_pairs
+
+def same_pair(pair1,pair2):
+    a1,a2 = pair1
+    b1,b2 = pair2
+    if (a1==b1 and a2==b2) or (a1==b2 and a2==b1):
+        return True
+    else:
+        return False
+
+def same_pair_exists(pair,pairs):
+    for p in pairs:
+        if same_pair(p,pair):
+            return True
+    return False
+    
+def fp2BVS(infname,specorder,pairs):
+
+    nv,rc,rc3,fpvars,vranges = read_vars_fitpot(infname)
+
+    #...Check num of vars
+    if nv != len(pairs)*3 +len(specorder) +1:
+        raise ValueError('Number of variables is wrong.')
+
+    inc = 0
+    fbvs = fpvars[inc]
+    rads = {}
+    for s in specorder:
+        inc += 1
+        rads[s] = fpvars[inc]
+
+    morse_prms = {}
+    for p in pairs:
+        inc += 1
+        d0 = fpvars[inc]
+        inc += 1
+        alp = fpvars[inc]
+        inc += 1
+        rmin = fpvars[inc]
+        morse_prms[tuple(p)] = (d0,alp,rmin)
+
+    write_params_Morse('in.params.Morse',pairs,morse_prms)
+
+    #...If there is an old in.params.Coulomb file, get Vid and npq from it
+    try:
+        fbvs0,rads0,vids0,npqs0 = read_params_Coulomb('in.params.Coulomb')
+        write_params_Coulomb('in.params.Coulomb',specorder,pairs,fbvs,rads,
+                             vids=vids0,npqs=npqs0)
+    except:
+        write_params_Coulomb('in.params.Coulomb',specorder,pairs,fbvs,rads)
+
+    return None
+
+def fp2BVSx(infname,specorder,pairs,triplets):
+
+    nv,rc,rc3,fpvars,vranges = read_vars_fitpot(infname)
+
+    #...Check num of vars
+    if nv != len(pairs)*3 +len(specorder) +1 +len(triplets)*3:
+        raise ValueError('Number of variables is wrong.')
+
+    inc = 0
+    fbvs = fpvars[inc]
+    rads = {}
+    for s in specorder:
+        inc += 1
+        rads[s] = fpvars[inc]
+
+    morse_prms = {}
+    for p in pairs:
+        inc += 1
+        d0 = fpvars[inc]
+        inc += 1
+        alp = fpvars[inc]
+        inc += 1
+        rmin = fpvars[inc]
+        morse_prms[tuple(p)] = (d0,alp,rmin)
+
+    angular_prms = {}
+    for t in triplets:
+        inc += 1
+        alp = fpvars[inc]
+        inc += 1
+        bet = fpvars[inc]
+        inc += 1
+        gmm = fpvars[inc]
+        angular_prms[tuple(t)] = (rc3,alp,bet,gmm)
+
+    write_params_Morse('in.params.Morse',pairs,morse_prms)
+    write_params_angular('in.params.angular',triplets,angular_prms)
+    #...If there is an old in.params.Coulomb file, get Vid and npq from it
+    try:
+        fbvs0,rads0,vids0,npqs0 = read_params_Coulomb('in.params.Coulomb')
+        write_params_Coulomb('in.params.Coulomb',specorder,pairs,fbvs,rads,
+                             vids=vids0,npqs=npqs0)
+    except:
+        write_params_Coulomb('in.params.Coulomb',specorder,pairs,fbvs,rads)
+
+    return None
+
+
+if __name__ == "__main__":
+
+    args = docopt(__doc__)
+    infname = args['IN_VARS_FITPOT']
+    pairs = args['--pairs'].split(',')
+    if pairs[0] == 'None':
+        raise ValueError('Pairs must be specified.')
+    pairs = [ pair.split('-') for pair in pairs ]
+    print(' Pairs to be extracted:')
+    for pair in pairs:
+        print('   {0:s}-{1:s}'.format(*pair))
+    triplets = args['--triplets'].split(',')
+    if triplets[0] != 'None':
+        triplets = [ t.split('-') for t in triplets ]
+        print(' Triplets to be extracted:')
+        for t in triplets:
+            print('   {0:s}-{1:s}-{2:s}'.format(*t))
+    specorder = args['--specorder'].split(',')
+    if specorder[0] == 'None':
+        specorder = None
+    else:
+        pairs = sort_pairs(pairs,specorder)
+
+    if args['Morse']:
+        fp2Morse(infname,pairs)
+
+    elif args['BVS']:
+        """
+        The term 'BVS' means that the in.var.fitpot file contains 
+        fbvs, species radius and Morse parameters.
+        Thus in this case, specorder should be specified.
+        """
+        fp2BVS(infname,specorder,pairs)
+        
+    elif args['BVSx']:
+        """
+        The term 'BVSx' means that the in.var.fitpot file contains 
+        fbvs, species radius, Morse and angular parameters.
+        Thus in this case, specorder, pairs and triplets should be specified.
+        """
+        fp2BVSx(infname,specorder,pairs,triplets)
+        

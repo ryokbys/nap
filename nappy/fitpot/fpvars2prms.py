@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Convert fitpot parameters to in.params.XXX for pmd.
+Convert fitpot parameters `in.vars.fitpot` to pmd param file `in.params.XXX`.
 
 Usage:
   fpvars2prms.py (Morse|BVS) [options] FITPOT_VAR_FILE

@@ -13,11 +13,19 @@ Options:
   --pairs PAIRS
               Specify pairs by hyphen-connected and comma-separated, 
               e.g.) O-Li,O-P. [default: None]
+  --triplets TRIPLETS
+              Specify triplets by hyphen-connected and comma-separated, e.g.) P-O-O,O-P-P. 
+              The 1st species is the center of the angle, e.g.) P is the center when P-O-O.
+              [default: None]
   --specorder SPECORDER
               Species order in comma-separated list. [default: None]
-  --bvs BVS   Flag for parametrizing fbvs in fitpot, which take one 
-              or more parameters into account when converting between
-              Morse and fitpot. [default: 0]
+  --bvs       Flag for BVS fitting, which indicates the following parameters are
+              to be taken into account in fitpot: 
+                 - fbvs
+                 - rad_bvs for all species
+                 - D0,alpha,Rmin for specified pairs.
+  --bvsx      Flag for BVSx fitting, which includes angular parameters
+              in addition to BVS fitting.
 """
 from __future__ import print_function
 
@@ -39,8 +47,17 @@ def pairs2spcs(pairs):
             spcs.append(csp2)
     return spcs
 
+def triplets2spcs(triplets):
+    spcs = []
+    for t in triplets:
+        for c in triplets:
+            if c not in spcs:
+                spcs.append(c)
+    return spcs
 
-def fp2morse(infname,outfname,pairs,ibvs,specorder=[]):
+
+def fp2morse(infname,outfname,pairs,triplets,bvs,bvsx,specorder=[]):
+    
     ds = []
     alps = []
     rs = []
@@ -48,19 +65,20 @@ def fp2morse(infname,outfname,pairs,ibvs,specorder=[]):
         lines = f.readlines()
     
     ndat = int(lines[0].split()[0])
-    nprms = len(pairs)*3
-    if ibvs == 3:
-        nprms = len(pairs)*2
-    if ibvs==1:
-        nprms += 1
-    elif ibvs in (2,3):
-        spcs = pairs2spcs(pairs)
-        if len(specorder) > 0:
-            if len(spcs) != len(specorder):
-                raise ValueError('Length of spcs and specorder are different!')
-            else:
-                spcs = specorder
-        nprms += 1 +len(spcs)
+    spcs2 = pairs2spcs(pairs)
+    spcs3 = triplets2spcs(triplets)
+    if bvsx:
+        nprms = 1  # fbvs
+        nprms += len(spcs2)  # rad_bvs
+        nprms += len(pairs)*3 # D,a,rmin for Morse
+        nprms += len(triplets)*3  # alp,bet,gmm for angular
+    elif bvs:
+        nprms = 1  # fbvs
+        nprms += len(spcs2)  # rad_bvs
+        nprms += len(pairs)*3  # D,a,rmin for Morse
+    else:  # only morse
+        nprms = len(pairs)*3
+        
     if ndat != nprms:
         raise ValueError('Number of parameters in {0:s} is inconsistent with given pairs.'.format(infname))
 
@@ -518,13 +536,15 @@ if __name__ == "__main__":
 
     args = docopt(__doc__,version=__version__)
     pairs = args['--pairs']
+    triplets0 = args['--triplets']
     infname = args['INFILE']
     outfname = args['OUTFILE']
-    ibvs = int(args['--bvs'])
+    bvs = args['--bvs']
+    bvsx = args['--bvsx']
     specorder = args['--specorder'].split(',')
     if specorder[0] == 'None':
         specorder = None
-    
+    triplets = []
     if 'fitpot' in infname and \
        ('Morse' in outfname or 'BMH' in outfname or 'Abell' in outfname
         or 'fpc' in outfname):
@@ -537,7 +557,12 @@ if __name__ == "__main__":
             for pair in pairs:
                 print('   {0:s}-{1:s}'.format(pair[0],pair[1]))
         if 'Morse' in outfname:
-            fp2morse(infname,outfname,pairs,ibvs,specorder)
+            if bvsx:
+                if triplets0 == 'None':
+                    raise ValueError('Triplets must be specified in case of BVSx.')
+                for t0 in triplets0:
+                    tripltes.append(t0.split('-'))
+            fp2morse(infname,outfname,pairs,triplets,bvs,bvsx,specorder)
         elif 'BMH' in outfname:
             fp2bmh(infname,outfname,pairs)
         elif 'Abell' in outfname:
@@ -545,7 +570,12 @@ if __name__ == "__main__":
         elif 'fpc' in outfname:
             fp2fpc(infname,outfname,pairs)
     elif 'Morse' in infname and 'fitpot' in outfname:
-        morse2fp(infname,outfname,ibvs)
+        if bvsx:
+            if triplets0 == 'None':
+                raise ValueError('Triplets must be specified in case of BVSx.')
+            for t0 in triplets0:
+                tripltes.append(t0.split('-'))
+        morse2fp(infname,outfname,triplets,bvs,bvsx)
     elif 'BMH' in infname and 'fitpot' in outfname:
         bmh2fp(infname,outfname)
     elif 'Abell' in infname and 'fitpot' in outfname:
