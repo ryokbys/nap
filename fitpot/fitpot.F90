@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-27 16:48:58 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-28 12:11:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -138,7 +138,7 @@ program fitpot
        .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
        .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'BMH' &
        .or. trim(cpot).eq.'Abell' .or. trim(cpot).eq.'fpc' ) then
-    print '(a,2i4,20es11.3)','myid,nvars,vars(:)=',myid,nvars,vars(:)
+!!$    print '(a,2i4,20es11.3)','myid,nvars,vars(:)=',myid,nvars,vars(:)
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
 !!$    if( trim(cpot).eq.'linreg' .and. trim(cfmethod).eq.'test' &
 !!$         .and. iprint.gt.2 ) call write_dsgnmats()

@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-28 11:58:19 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-28 18:47:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax, csp2isp
   integer,parameter:: ioprms = 50
@@ -93,7 +93,6 @@ contains
     endif
 
     strsl(1:3,1:3,1:natm+nb)= 0d0
-
     epotl3= 0d0
     aa3(1:3,1:namax)= 0d0
 !.....Loop over i
@@ -101,10 +100,8 @@ contains
       xi(1:3)=ra(1:3,i)
       is= int(tag(i))
 !.....Loop over j
-      do n=1,lspr(0,i)
+      do n=1,lspr(0,i)-1
         j=lspr(n,i)
-!!$        if( j.eq.0 ) exit
-        if( j.eq.i ) cycle
         js= int(tag(j))
         xj(1:3)= ra(1:3,j)
         x = xj(1) -xi(1)
@@ -117,10 +114,8 @@ contains
         riji= 1d0/rij
         drijj(1:3)= xij(1:3)*riji
 !.....Loop over k
-        do m=1,lspr(0,i)
+        do m=n+1,lspr(0,i)
           k=lspr(m,i)
-!!$          if(k.eq.0) exit
-          if( k.le.j .or. k.eq.i ) cycle
           ks= int(tag(k))
           if( .not. interact3(is,js,ks) ) cycle
           rc3 = rc3s(is,js,ks)
@@ -140,7 +135,6 @@ contains
           alp = alps(is,js,ks)
           bet = bets(is,js,ks)
           gmm = gmms(is,js,ks)
-!!$          print *,'myid,is,js,ks,rc3,alp,bet,gmm=',myid,is,js,ks,rc3,alp,bet,gmm
 !.....Common terms
           csn=(xij(1)*xik(1) +xij(2)*xik(2) +xij(3)*xik(3)) *(riji*riki)
           tcsn = csn -gmm
@@ -261,6 +255,7 @@ contains
             bets(isp,jsp,ksp) = bet
             gmms(isp,jsp,ksp) = gmm
 !.....Symmetrize
+            interact3(isp,ksp,jsp) = .true.
             rc3s(isp,ksp,jsp) = rc3
             alps(isp,ksp,jsp) = alp
             bets(isp,ksp,jsp) = bet
