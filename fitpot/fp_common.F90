@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-27 16:44:49 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-28 12:08:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -120,8 +120,8 @@ contains
       stop
     endif
 
-    print *,'myid,ndim=',myid,ndim
-    print *,'myid,x(:)=',myid,x(1:ndim)
+!!$    print *,'myid,ndim=',myid,ndim
+!!$    print *,'myid,x(:)=',myid,x(1:ndim)
 !!$    print *,'myid,isid0,isid1=',myid,isid0,isid1
 !!$    print *,'func_w_pmd: 03'
     ftrnl = 0d0

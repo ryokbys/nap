@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-21 10:34:54 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-28 11:46:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -872,7 +872,7 @@ contains
     character(len=3),intent(in):: specorder(nspmax)
 
     integer:: i,j,ik,is,js,k1,k2,k3,ierr,jj,ixyz,jxyz
-    real(8):: elrl,esrl,epotl,epott,qi,qj,tmp,ftmp &
+    real(8):: elrl,elr,esrl,esr,epotl,epott,qi,qj,tmp,ftmp &
          ,bdotr,terfc,diji,dij,ss2i,sgmsq2,rc2,q2tot,q2loc,bb2 &
          ,e0,q2,sgmi
     real(8),save:: eself,eselfl
@@ -909,15 +909,20 @@ contains
     elrl = 0d0
     esrl = 0d0
     eselfl = 0d0
+    elr = 0d0
+    esr = 0d0
+    eself = 0d0
 
     if( lvc .or. trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
       call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
+      call mpi_allreduce(eselfl,eself,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
 
     if(  trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'short' ) then
       call Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc)
+      call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
 
     if(  trim(cterms).eq.'full' .or. &
@@ -925,19 +930,23 @@ contains
       call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
            ,lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs &
            ,lcell_updated)
+      call mpi_allreduce(elrl,elr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
 
     if( trim(cterms).eq.'direct' ) then
       call force_direct(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc)
+      call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
     if( trim(cterms).eq.'direct_cut' ) then
       call force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc)
+      call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
     if( trim(cterms).eq.'screened_cut' ) then
       call force_screened_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc,l1st)
+      call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
 
     if( lstrs ) then
@@ -949,20 +958,21 @@ contains
     if( l1st .and. myid.eq.0 .and. iprint.gt.0 ) then
       if( cterms(1:6).eq.'direct' ) then
         print *,''
-        print '(a,f12.4)',' Direct Coulomb energy = ',esrl
+        print '(a,f12.4)',' Direct Coulomb energy = ',esr
       else
         print *,''
         print *,'Ewald energy term by term:'
-        print '(a,f12.4," eV")','   Self term         = ',eselfl
-        print '(a,f12.4," eV")','   Short-range term  = ',esrl
-        print '(a,f12.4," eV")','   Long-range term   = ',elrl
+        print '(a,f12.4," eV")','   Self term         = ',eself
+        print '(a,f12.4," eV")','   Short-range term  = ',esr
+        print '(a,f12.4," eV")','   Long-range term   = ',elr
       endif
     endif
 
-    epotl = esrl +elrl +eselfl
-!.....Gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
-         ,mpi_sum,mpi_md_world,ierr)
+!!$    epotl = esrl +elrl +eselfl
+!!$!.....Gather epot
+!!$    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+!!$         ,mpi_sum,mpi_md_world,ierr)
+    epott = esr +elr +eself
     epot= epot +epott
     if( iprint.gt.2 ) print *,'epot Coulomb = ',epott
 

@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-27 16:26:45 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-28 11:58:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax, csp2isp
   integer,parameter:: ioprms = 50
@@ -92,16 +92,10 @@ contains
       allocate(aa3(3,namax),strsl(3,3,namax))
     endif
 
-    epotl= 0d0
-    epi(1:natm+nb)= 0d0
     strsl(1:3,1:3,1:natm+nb)= 0d0
 
-!!$    print *,'in force_angular'
-!!$    print *,'  isp,jsp,ksp,alp,bet,gmm=',2,3,3,alps(2,3,3),bets(2,3,3),gmms(2,3,3)
-!!$    print *,'  isp,jsp,ksp,alp,bet,gmm=',3,1,2,alps(3,1,2),bets(3,1,2),gmms(3,1,2)
-!!$    print *,'  isp,jsp,ksp,alp,bet,gmm=',3,2,2,alps(3,2,2),bets(3,2,2),gmms(3,2,2)
     epotl3= 0d0
-    aa3(1:3,1:natm+nb)=0d0
+    aa3(1:3,1:namax)= 0d0
 !.....Loop over i
     do i=1,natm
       xi(1:3)=ra(1:3,i)
@@ -109,7 +103,7 @@ contains
 !.....Loop over j
       do n=1,lspr(0,i)
         j=lspr(n,i)
-        if(j.eq.0) exit
+!!$        if( j.eq.0 ) exit
         if( j.eq.i ) cycle
         js= int(tag(j))
         xj(1:3)= ra(1:3,j)
@@ -125,11 +119,12 @@ contains
 !.....Loop over k
         do m=1,lspr(0,i)
           k=lspr(m,i)
-          if(k.eq.0) exit
+!!$          if(k.eq.0) exit
           if( k.le.j .or. k.eq.i ) cycle
           ks= int(tag(k))
           if( .not. interact3(is,js,ks) ) cycle
           rc3 = rc3s(is,js,ks)
+          if( rij.ge.rc3 ) cycle
           xk(1:3)= ra(1:3,k)
           x = xk(1) -xi(1)
           y = xk(2) -xi(2)
@@ -145,6 +140,7 @@ contains
           alp = alps(is,js,ks)
           bet = bets(is,js,ks)
           gmm = gmms(is,js,ks)
+!!$          print *,'myid,is,js,ks,rc3,alp,bet,gmm=',myid,is,js,ks,rc3,alp,bet,gmm
 !.....Common terms
           csn=(xij(1)*xik(1) +xij(2)*xik(2) +xij(3)*xik(3)) *(riji*riki)
           tcsn = csn -gmm
@@ -185,8 +181,8 @@ contains
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa3,3)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_world,epi,1)
+!!$    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$         ,nn,mpi_world,epi,1)
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa3(1:3,1:natm)
     
     if( lstrs ) then
@@ -196,6 +192,7 @@ contains
     endif
 
 !.....Gather epot
+    epott= 0d0
     epotl= epotl3
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
     epot= epot +epott
