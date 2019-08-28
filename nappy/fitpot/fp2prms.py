@@ -25,6 +25,47 @@ from docopt import docopt
 __author__ = "Ryo KOBAYASHI"
 __version__ = "190827"
 
+def read_in_fitpot(infname='in.fitpot'):
+    """
+    Get specorder, pairs, triplets from in.fitpot.
+    """
+    if not os.path.exists(infname):
+        raise FileNotFoundError(infname)
+    
+    with open(infname,'r') as f:
+        lines = f.readlines()
+
+    mode = None
+    specorder = []
+    interact = []
+    for line in lines:
+        data = line.split()
+        if len(data) == 0:
+            mode = None
+            continue
+        if data[0] in ('#','!'):
+            mode = None
+            continue
+        elif data[0] == 'specorder':
+            specorder = [ x for x in data[1:] ]
+            continue
+        elif data[0] == 'interactions':
+            num_interact = int(data[1])
+            mode = 'interactions'
+            continue
+        else:
+            if mode == 'interactions':
+                if len(data) not in (2,3):
+                    raise Exception('len(data) is not 2 nor 3.')
+                interact.append(data)
+                if len(interact) == num_interact:
+                    mode = None
+            else:
+                mode = None
+
+    return specorder, interact
+    
+
 def read_params_Coulomb(infname):
 
     if not os.path.exists(infname):
@@ -287,23 +328,36 @@ if __name__ == "__main__":
     args = docopt(__doc__)
     infname = args['IN_VARS_FITPOT']
     pairs = args['--pairs'].split(',')
-    if pairs[0] == 'None':
-        raise ValueError('Pairs must be specified.')
     pairs = [ pair.split('-') for pair in pairs ]
+    triplets = args['--triplets'].split(',')
+    triplets = [ t.split('-') for t in triplets ]
+    specorder = args['--specorder'].split(',')
+
+    if specorder[0] == 'None':
+        try:
+            specorder, interact = read_in_fitpot('in.fitpot')
+            pairs = []
+            triplets = []
+            for i in interact:
+                if len(i) == 2:
+                    pairs.append(i)
+                elif len(i) == 3:
+                    triplets.append(i)
+            print(' specorder, pairs and triplets are loaded from in.fitpot')
+        except:
+            raise Exception('specorder and pair must be specified or loaded.')
+    
+    if len(pairs) == 0:
+        raise ValueError('Pairs must be specified.')
     print(' Pairs to be extracted:')
     for pair in pairs:
         print('   {0:s}-{1:s}'.format(*pair))
-    triplets = args['--triplets'].split(',')
-    if triplets[0] != 'None':
-        triplets = [ t.split('-') for t in triplets ]
+    if len(triplets) != 0:
         print(' Triplets to be extracted:')
         for t in triplets:
             print('   {0:s}-{1:s}-{2:s}'.format(*t))
-    specorder = args['--specorder'].split(',')
-    if specorder[0] == 'None':
-        specorder = None
-    else:
-        pairs = sort_pairs(pairs,specorder)
+    
+    pairs = sort_pairs(pairs,specorder)
 
     if args['Morse']:
         fp2Morse(infname,pairs)
