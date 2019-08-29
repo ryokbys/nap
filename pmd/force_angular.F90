@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-28 18:47:42 Ryo KOBAYASHI>
+!                     Last modified: <2019-08-28 20:37:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax, csp2isp
   integer,parameter:: ioprms = 50
@@ -175,8 +175,6 @@ contains
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa3,3)
-!!$    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-!!$         ,nn,mpi_world,epi,1)
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa3(1:3,1:natm)
     
     if( lstrs ) then
