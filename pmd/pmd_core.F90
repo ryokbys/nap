@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-08-19 12:42:34 Ryo KOBAYASHI>
+!                     Last-modified: <2019-08-30 17:20:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -430,12 +430,12 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     tave= 0d0
     do ifmv=1,9
       if( ndof(ifmv).eq.0 ) cycle
-      temp(ifmv)= ekl(ifmv) /ndof(ifmv) /fkb *2d0
+      temp(ifmv)= ekl(ifmv) /max(ndof(ifmv)-3,3) /fkb *2d0
 !          print *,' ifmv,ekl,temp = ',ifmv,ekl(ifmv),temp(ifmv)
       nave= nave +ndof(ifmv)
       write(6,'(1x,a,i1,a,f16.5,a)') "  Temperature ",ifmv &
            ,"   = ",temp(ifmv),' K'
-      tave= tave +temp(ifmv)*ndof(ifmv)
+      tave= tave +temp(ifmv)*max(ndof(ifmv)-3,3)
     enddo
     tave= tave/(nave-3)
     write(6,'(1x,a,f16.5,a)') "  Temperature     = ",tave,' K'
@@ -795,7 +795,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       endif
       do ifmv=1,9
         if(ndof(ifmv).le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
-        temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
+        temp(ifmv)= ekl(ifmv) *2d0 /fkb /max(ndof(ifmv)-3,3)
         if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
           tfac(ifmv)= dsqrt(1d0 +dt/trlx*100d0 )
         else
@@ -853,9 +853,9 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       tave= 0d0
       do ifmv=1,9
         if( ndof(ifmv).le.0 ) cycle
-        temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
+        temp(ifmv)= ekl(ifmv) *2d0 /fkb /max(ndof(ifmv)-3,3)
         nave= nave +ndof(ifmv)
-        tave= tave +temp(ifmv)*ndof(ifmv)
+        tave= tave +temp(ifmv)*max(ndof(ifmv)-3,3)
       enddo
       tave= tave/(nave-3)
 
@@ -1028,11 +1028,11 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     tave= 0d0
     do ifmv=1,9
       if( ndof(ifmv).le.0 ) cycle
-      temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
+      temp(ifmv)= ekl(ifmv) *2d0 /fkb /max(ndof(ifmv)-3,3)
       nave= nave +ndof(ifmv)
       write(6,'(1x,a,i1,a,f16.5,a)') "  Temperature ",ifmv &
            ,"   = ",temp(ifmv),' K'
-      tave= tave +temp(ifmv)*ndof(ifmv)
+      tave= tave +temp(ifmv)*max(ndof(ifmv)-3,3)
     enddo
     tave= tave/(nave-3)
     write(6,'(1x,a,f16.5,a)') "  Temperature     = ",tave,' K'

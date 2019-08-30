@@ -3156,7 +3156,7 @@ contains
     real(8):: ftrn,ftst,fracl,fracg,lmdl,lmdg,w,fdiff,prob,ftbest&
          ,xtbest(ndim)
     logical,save:: l1st = .true.
-    integer:: iid,iidbest,iidtbest,ibest,ibest0
+    integer:: iid,iidbest,iidtbest,ibest,ibest0,iidmax
     type(individual),allocatable:: indivs(:),offsprings(:)
     real(8),allocatable,dimension(:):: xtmp,xi,xp,xq,xr,xs,xbestl,xbestg&
          ,xl,xg,xd
@@ -3237,6 +3237,7 @@ contains
       enddo
       call func(ndim,xtmp,ftrn,ftst)
       iid = iid + 1
+      iidmax = max(iidmax,iid)
 !.....Detect NaN and replace it with 1d+10
       if( ftrn*0d0 .ne. 0d0 ) then
         if( myid.eq.0 .and. iprint.ne.0 ) then
@@ -3395,6 +3396,7 @@ contains
           do j=1,ndim
             indivs(i)%genes(j)%val = xtmp(j)
           enddo
+          indivs(i)%iid = iid
           if( ftrn.gt.fupper_lim ) ftrn = fupper_lim
           indivs(i)%fvalue = ftrn
           indivs(i)%ftst = ftst
@@ -3521,7 +3523,7 @@ contains
     end interface
 
     integer:: i,j,k,l,m,n,iter
-    real(8):: ftrn,ftst,tmp,xj,vj,r1,r2
+    real(8):: ftrn,ftst,tmp,xj,vj,r1,r2,w
     logical,save:: l1st = .true.
     integer:: iid,iidbest
     type(individual),allocatable:: indivs(:)
@@ -3643,14 +3645,31 @@ contains
         do j=1,ndim
           xj = indivs(i)%genes(j)%val
           vj = indivs(i)%vel(j)
+          w = indivs(i)%genes(j)%vmax -indivs(i)%genes(j)%vmin
+          if( w.lt.0d0 ) then
+            indivs(i)%vel(j) = 0d0
+            xtmp(j) = indivs(i)%genes(j)%vmax
+            indivs(i)%genes(j)%val = xtmp(j)
+            cycle
+          endif
           indivs(i)%vel(j) = vj &
                +pso_c1*r1*( xpbest(j,i) -xj ) &
                +pso_c2*r2*( xbest(j) -xj )
-          indivs(i)%genes(j)%val = xj +indivs(i)%vel(j)
-          xtmp(j) = indivs(i)%genes(j)%val
-!.....Make sure the range of xtmp
-          xtmp(j) = max(xtmp(j),indivs(i)%genes(j)%vmin)
-          xtmp(j) = min(xtmp(j),indivs(i)%genes(j)%vmax)
+          if( abs(indivs(i)%vel(j)).gt.w/5 ) &
+               indivs(i)%vel(j) = sign(w/5,indivs(i)%vel(j))
+          xtmp(j) = xj +indivs(i)%vel(j)
+!.....Make sure the range of xtmp and if hit the wall,
+!     make its velocity oposite direction.
+!!$          xtmp(j) = max(xtmp(j),indivs(i)%genes(j)%vmin)
+!!$          xtmp(j) = min(xtmp(j),indivs(i)%genes(j)%vmax)
+          if( xtmp(j).lt.indivs(i)%genes(j)%vmin ) then
+            indivs(i)%vel(j) = -indivs(i)%vel(j)
+            xtmp(j) = 2d0*indivs(i)%genes(j)%vmin -xtmp(j)
+          else if( xtmp(j).gt.indivs(i)%genes(j)%vmax ) then
+            indivs(i)%vel(j) = -indivs(i)%vel(j)
+            xtmp(j) = 2d0*indivs(i)%genes(j)%vmax -xtmp(j)
+          endif
+          indivs(i)%genes(j)%val = xtmp(j)
         enddo
         call func(ndim,xtmp,ftrn,ftst)
         iid = iid + 1
