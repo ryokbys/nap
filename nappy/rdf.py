@@ -10,7 +10,6 @@ Options:
     -h, --help  Show this help message and exit.
     -d DR       Width of the bin. [default: 0.1]
     -r RMAX     Cutoff radius of radial distribution. [default: 5.0]
-    -f FMT      Input file format. If is not *pmd*, users must specify it. [default: pmd]
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
     -o OUT      Output file name. [default: out.rdf]
@@ -37,7 +36,7 @@ def norm(vector):
         norm += e*e
     return np.sqrt(norm)
 
-def compute_ndr(ia,isid,dr,rmax,asys,nspcs):
+def compute_ndr(ia,isid,dr,rmax,nsys,nspcs):
     """
     Compute number of atoms in the every shell [r:r+dr] up to *rmax*.
     This routine can be only applied to cubic systems.
@@ -45,14 +44,14 @@ def compute_ndr(ia,isid,dr,rmax,asys,nspcs):
     nr= int(rmax/dr) +1
     #ndr= np.zeros(nr,dtype=np.int)
     ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=np.int)
-    natm= asys.num_atoms()
-    hmat= (asys.alc *np.array([asys.a1,asys.a2,asys.a3])).transpose()
-    pi= asys.atoms[ia].pos
+    natm= nsys.natm
+    hmat= (nsys.alc *np.array([nsys.a1,nsys.a2,nsys.a3])).transpose()
+    pi= nsys.poss[ia]
     for ja in range(natm):
         if ja == ia:
             continue
-        jsid = asys.atoms[ja].sid
-        pj= asys.atoms[ja].pos
+        jsid = nsys.sids[ja]
+        pj= nsys.poss[ja]
         pij= pj -pi
         pij= pij -np.round(pij)
         vij= np.dot(hmat,pij)
@@ -66,23 +65,23 @@ def compute_ndr(ia,isid,dr,rmax,asys,nspcs):
         ndr[isid,jsid,ir] = ndr[isid,jsid,ir] +1
     return ndr
 
-def rdf(asys,nspcs,dr,rmax,normalize=True):
+def rdf(nsys,nspcs,dr,rmax,normalize=True):
 
-    natm0= asys.num_atoms()
-    vol= asys.volume()
+    natm0= nsys.natm
+    vol= nsys.volume()
     rho= float(natm0)/vol
 
-    n1,n2,n3= asys.get_expansion_num(2.0*rmax)
+    n1,n2,n3= nsys.get_expansion_num(2.0*rmax)
     if not (n1==1 and n2==1 and n3==1):
         print(' system to be repeated, n1,n2,n3=',n1,n2,n3)
-        asys.repeat(n1,n2,n3)
+        nsys.repeat(n1,n2,n3)
 
     nr= int(rmax/dr)+1
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     rd= [ dr*ir+dr/2 for ir in range(nr) ]
     for ia in range(natm0):
-        isid = asys.atoms[ia].sid
-        ndr= compute_ndr(ia,isid,dr,rmax,asys,nspcs)
+        isid = nsys.sids[ia]
+        ndr= compute_ndr(ia,isid,dr,rmax,nsys,nspcs)
         for ir in range(nr):
             nadr[:,:,ir] += ndr[:,:,ir]
     #nadr /= nsrc
@@ -95,7 +94,7 @@ def rdf(asys,nspcs,dr,rmax,normalize=True):
 
     return rd,nadr,natm0
 
-def rdf_average(infiles,nr,specorder,ffmt=None,dr=0.1,rmax=3.0,average=True,
+def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,average=True,
                 normalize=True):
     nspcs = len(specorder)
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
@@ -104,9 +103,9 @@ def rdf_average(infiles,nr,specorder,ffmt=None,dr=0.1,rmax=3.0,average=True,
         if not os.path.exists(infname):
             print("[Error] File, {0}, does not exist !!!".format(infname))
             sys.exit()
-        asys= NAPSystem(fname=infname,ffmt=ffmt,specorder=specorder)
+        nsys= NAPSystem(fname=infname,specorder=specorder)
         print(' File =',infname)
-        rd,gr,n= rdf(asys,nspcs,dr,rmax,normalize=normalize)
+        rd,gr,n= rdf(nsys,nspcs,dr,rmax,normalize=normalize)
         nsum += n
         agr += gr
     # agr /= len(infiles)
@@ -161,7 +160,6 @@ if __name__ == "__main__":
     dr= float(args['-d'])
     rmax= float(args['-r'])
     sigma= int(args['--gsmear'])
-    ffmt= args['-f']
     ofname= args['-o']
     specorder = [ x for x in args['--specorder'].split(',') ]
     if specorder == ['None']:
@@ -177,7 +175,7 @@ if __name__ == "__main__":
         raise ValueError('--specorder must be set.')
 
     nr= int(rmax/dr) +1
-    rd,agr= rdf_average(infiles,nr,specorder,ffmt=ffmt,dr=dr,rmax=rmax,
+    rd,agr= rdf_average(infiles,nr,specorder,dr=dr,rmax=rmax,
                         average=average,normalize=normalize)
 
     if not sigma == 0:

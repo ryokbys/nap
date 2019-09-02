@@ -21,7 +21,9 @@ Options:
 """
 from __future__ import print_function
 
-import sys,os,commands
+import sys
+import os
+import subprocess
 import numpy as np
 from docopt import docopt
 from scipy.optimize import leastsq
@@ -110,8 +112,8 @@ def erg_vs_size(fname,al_min,al_max,niter):
         al= al_min +dl*i
         replace_1st_line(al,fname)
         os.system(mdexec +' > out.pmd')
-        erg= float(commands.getoutput("grep 'Potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
-        prs= float(commands.getoutput("grep 'Pressure' out.pmd | tail -n1 | awk '{print $3}'"))
+        erg= float(subprocess.getoutput("grep 'Potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
+        prs= float(subprocess.getoutput("grep 'Pressure' out.pmd | tail -n1 | awk '{print $3}'"))
         vol= get_vol(al,hmat)
         als[i] = al
         vols[i] = vol
@@ -165,7 +167,7 @@ if __name__ == '__main__':
     b= 1.0
     bp= 2.0
     ev0= min(ergs)
-    v0= vols[len(vols)/2]
+    v0= vols[int(len(vols)/2)]
     p0= np.array([b,bp,v0,ev0])
     #...least square fitting
     plsq= leastsq(residuals,p0,args=(ergs,vols))

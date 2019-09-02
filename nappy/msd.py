@@ -68,65 +68,64 @@ def get_msd(files,ids0,nmeasure,nshift,spcs='None'):
     """
     if spcs != 'None':
         nsys = NAPSystem(fname=files[0])
-        ids = [ i for i,a in enumerate(nsys.atoms) if a.symbol == spcs ]
+        symbols = nsys.get_symbols()
+        ids = [ i for i,s in enumerate(symbols) if s == spcs ]
     else:
         if 0 in ids0:
             nsys = NAPSystem(fname=files[0])
-            ids = [ i for i in range(len(nsys.atoms))]
+            ids = [ i for i in range(nsys.natm) ]
         else:
             ids = [ i-1 for i in ids0 ]
-        
+
     p0= np.zeros((nmeasure,len(ids),3))
     pp= np.zeros((len(ids),3))
     msd= np.zeros((len(files),nmeasure,3))
-    npbc= np.zeros((len(ids),3),dtype=int)
+    npbc= np.zeros((len(ids),3))
     hmat= np.zeros((3,3))
     for ifile in range(len(files)):
         fname= files[ifile]
         nsys= NAPSystem(fname=fname)
-        hmat[0]= nsys.a1 *nsys.alc
-        hmat[1]= nsys.a2 *nsys.alc
-        hmat[2]= nsys.a3 *nsys.alc
+        hmat = nsys.get_hmat()
         for ia,idi in enumerate(ids):
             # #...human-readable ID to computer-oriented ID
             # i= idi - 1
-            ai= nsys.atoms[idi]
-            pi= ai.pos
+            pi= nsys.poss[idi]
             if ifile == 0:
                 pp[ia,:]= pi[:]
             else:
                 #...correct periodic motion
                 dev= pi -pp[ia]
                 if dev[0] > 0.5:
-                    npbc[ia,0] += -1
+                    npbc[ia,0] += -1.0
                 elif dev[0] < -0.5:
-                    npbc[ia,0] += 1
+                    npbc[ia,0] += 1.0
                 if dev[1] > 0.5:
-                    npbc[ia,1] += -1
+                    npbc[ia,1] += -1.0
                 elif dev[1] < -0.5:
-                    npbc[ia,1] += 1
+                    npbc[ia,1] += 1.0
                 if dev[2] > 0.5:
-                    npbc[ia,2] += -1
+                    npbc[ia,2] += -1.0
                 elif dev[2] < -0.5:
-                    npbc[ia,2] += 1
+                    npbc[ia,2] += 1.0
                 # print npbc
                 #...store current position
                 pp[ia,:]= pi[:]
-                                
+
             for nm in range(nmeasure):
                 if ifile == nm*nshift:
-                    p0[nm,ia,0]= pi[0] +float(npbc[ia,0])
-                    p0[nm,ia,1]= pi[1] +float(npbc[ia,1])
-                    p0[nm,ia,2]= pi[2] +float(npbc[ia,2])
+                    p0[nm,ia,0]= pi[0] +npbc[ia,0]
+                    p0[nm,ia,1]= pi[1] +npbc[ia,1]
+                    p0[nm,ia,2]= pi[2] +npbc[ia,2]
                 if nm*nshift < ifile:
                     #...normalized to absolute
-                    dev[0]= pi[0] -p0[nm,ia,0] +float(npbc[ia,0])
-                    dev[1]= pi[1] -p0[nm,ia,1] +float(npbc[ia,1])
-                    dev[2]= pi[2] -p0[nm,ia,2] +float(npbc[ia,2])
-                    dev= np.dot(hmat.T,dev)
+                    dev[0]= pi[0] +npbc[ia,0] -p0[nm,ia,0] 
+                    dev[1]= pi[1] +npbc[ia,1] -p0[nm,ia,1] 
+                    dev[2]= pi[2] +npbc[ia,2] -p0[nm,ia,2] 
+                    dev= np.dot(hmat,dev)
                     msd[ifile-nm*nshift,nm,0] += dev[0]**2 
                     msd[ifile-nm*nshift,nm,1] += dev[1]**2 
                     msd[ifile-nm*nshift,nm,2] += dev[2]**2
+                        
 
     for ifile in range(len(files)):
         for nm in range(nmeasure):
@@ -177,14 +176,14 @@ if __name__ == "__main__":
                         +' {:15.7f} {:15.7f}'.format(0.0,0.0)
                         +' {:15.7f} {:15.7f}\n'.format(0.0,0.0))
             else:
-                dev= np.zeros((3,))
+                dev2= np.zeros((3,))
                 for nm in range(nmeasure):
-                    dev += msd[ifile,nm]
-                dev /= nmeasure
+                    dev2 += msd[ifile,nm]
+                dev2 /= nmeasure
                 f.write(' {:10d}'.format(ifile)
-                        +' {:15.7f}'.format((dev[0]+dev[1]+dev[2]))
-                        +' {:15.7f}'.format(dev[0])
-                        +' {:15.7f}'.format(dev[1])
-                        +' {:15.7f}'.format(dev[2])
+                        +' {:15.7f}'.format((dev2[0]+dev2[1]+dev2[2]))
+                        +' {:15.7f}'.format(dev2[0])
+                        +' {:15.7f}'.format(dev2[1])
+                        +' {:15.7f}'.format(dev2[2])
                         +' \n')
     print('Wrote a file: {0:s}'.format(outfname))

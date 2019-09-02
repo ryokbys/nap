@@ -13,7 +13,6 @@ Options:
     -h, --help  Show this help message and exit.
     -w DEG      Width of the angular degree. [default: 1.0]
     -r RCUT     Cutoff radius of the bonding pair. [default: 3.0]
-    -f FMT      Input file format. [default: POSCAR]
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
     -o OUT      Output file name [default: out.adf]
@@ -37,23 +36,23 @@ def norm(vector):
         norm += e*e
     return np.sqrt(norm)
 
-def adf_atom(ia,dang,rcut,asys,id1=0,id2=0):
+def adf_atom(ia,dang,rcut,nsys,id1=0,id2=0):
     """
     Compute number of atoms in the every range of angle [0:180].
     """
     na= int(180.0/dang) +1
-    hmat= (asys.alc *np.array([asys.a1,asys.a2,asys.a3])).transpose()
+    hmat= (nsys.alc *np.array([nsys.a1,nsys.a2,nsys.a3])).transpose()
     nda= np.zeros(na,dtype=np.int)
-    natm= asys.num_atoms()
+    natm= nsys.natm
     rcut2= rcut*rcut
-    pi= asys.atoms[ia].pos
-    for ji in range(asys.nlspr[ia]):
-        ja= asys.lspr[ia,ji]
+    pi= nsys.poss[ia]
+    for ji in range(nsys.nlspr[ia]):
+        ja= nsys.lspr[ia,ji]
         if ja == ia:
             continue
-        if id1 != 0 and asys.atoms[ja].sid != id1:
+        if id1 != 0 and nsys.sids[ja] != id1:
             continue
-        pj= asys.atoms[ja].pos
+        pj= nsys.poss[ja]
         pij= pj-pi
         pij= pij -np.round(pij)
         vij= np.dot(hmat,pij)
@@ -61,13 +60,13 @@ def adf_atom(ia,dang,rcut,asys,id1=0,id2=0):
         if rij2 >= rcut2:
             continue
         rij= np.sqrt(rij2)
-        for ki in range(asys.nlspr[ia]):
-            ka= asys.lspr[ia,ki]
+        for ki in range(nsys.nlspr[ia]):
+            ka= nsys.lspr[ia,ki]
             if ka == ia or ka <= ja:
                 continue
-            if id2 != 0 and asys.atoms[ka].sid != id2:
+            if id2 != 0 and nsys.sids[ka] != id2:
                 continue
-            pk= asys.atoms[ka].pos
+            pk= nsys.poss[ka]
             pik= pk-pi
             pik= pik -np.round(pik)
             vik= np.dot(hmat,pik)
@@ -85,17 +84,17 @@ def adf_atom(ia,dang,rcut,asys,id1=0,id2=0):
             nda[int(deg/dang)] += 1
     return nda
 
-def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
+def adf(nsys,dang,rcut,id0=0,id1=0,id2=0):
 
-    natm0= asys.num_atoms()
+    natm0= nsys.natm
 
-    n1,n2,n3= asys.get_expansion_num(2.0*rcut)
+    n1,n2,n3= nsys.get_expansion_num(2.0*rcut)
     if not (n1==1 and n2==1 and n3==1):
         print(' system to be repeated, n1,n2,n3=',n1,n2,n3)
-        asys.repeat(n1,n2,n3)
-    asys.assign_pbc()
+        nsys.repeat(n1,n2,n3)
+    nsys.assign_pbc()
 
-    asys.make_pair_list(rcut=rcut)
+    nsys.make_pair_list(rcut=rcut)
 
     na= int(180.0/dang)+1
 
@@ -103,14 +102,14 @@ def adf(asys,dang,rcut,id0=0,id1=0,id2=0):
     angd= np.array([ dang*ia for ia in range(na) ])
     nsum= 0
     for ia in range(natm0):
-        if id0==0 or asys.atoms[ia].sid==id0:
+        if id0==0 or nsys.sids[ia] == id0:
             nsum += 1
-            adfa= adf_atom(ia,dang,rcut,asys,id1,id2)
+            adfa= adf_atom(ia,dang,rcut,nsys,id1,id2)
             for iang in range(na):
                 anda[iang]= anda[iang] +adfa[iang]
     return angd,anda,natm0
 
-def adf_average(infiles,ffmt='POSCAR',dang=1.0,rcut=3.0,
+def adf_average(infiles,dang=1.0,rcut=3.0,
                 id0=0,id1=0,id2=0,no_average=False):
     na= int(180.0/dang) +1
     df= np.zeros(na,dtype=float)
@@ -120,9 +119,9 @@ def adf_average(infiles,ffmt='POSCAR',dang=1.0,rcut=3.0,
         if not os.path.exists(infname):
             print("[Error] File, {0}, does not exist !!!".format(infname))
             sys.exit()
-        asys= NAPSystem(fname=infname,ffmt=ffmt)
+        nsys= NAPSystem(fname=infname,)
         print(' File = ',infname)
-        angd,df,n= adf(asys,dang,rcut,id0,id1,id2)
+        angd,df,n= adf(nsys,dang,rcut,id0,id1,id2)
         aadf += df
         nsum += n
     #aadf /= len(infiles)
@@ -154,12 +153,11 @@ if __name__ == "__main__":
     rcut= float(args['-r'])
     sigma= int(args['--gsmear'])
     no_average = args['--no-average']
-    ffmt= args['-f']
     ofname= args['-o']
     flag_plot= args['--plot']
 
     na= int(180.0/dang) +1
-    angd,agr= adf_average(infiles,ffmt=ffmt,dang=dang,
+    angd,agr= adf_average(infiles,dang=dang,
                           rcut=rcut,id0=id0,id1=id1,id2=id2,
                           no_average=no_average)
 

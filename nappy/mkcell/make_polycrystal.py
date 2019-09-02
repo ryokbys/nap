@@ -30,7 +30,6 @@ from random import random
 import time
 
 from nappy.napsys import NAPSystem
-from nappy.atom import Atom
 import cell_maker as cm
 
 
@@ -157,13 +156,16 @@ def make_polycrystal(grns,uc,n1,n2,n3,two_dim=False):
     # print(' nsv =',nsv)
     # for i in range(nsv):
     #     print(' i,sv[i]=',i,sv[i])
-    system= NAPSystem(specorder=uc.specorder)
-    system.set_lattice(uc.alc,uc.a1*n1,uc.a2*n2,uc.a3*n3)
-    hmat= np.zeros((3,3))
-    hmat[0]= system.a1 *system.alc
-    hmat[1]= system.a2 *system.alc
-    hmat[2]= system.a3 *system.alc
-    hmati= np.linalg.inv(hmat)
+    nsys= NAPSystem(specorder=uc.specorder)
+    nsys.set_lattice(uc.alc,uc.a1*n1,uc.a2*n2,uc.a3*n3)
+    hmat = nsys.get_hmat()
+    hmati = nsys.get_hmat_inv()
+    nmax = n1*n2*n3 *uc.natm
+    sidsl = np.zeros(nmax,dtype=int)
+    symsl = []
+    possl = np.zeros((nmax,3))
+    velsl = np.zeros((nmax,3))
+    frcsl = np.zeros((nmax,3))
     ix0 = -n1/2-1
     ix1 =  n1/2+2
     iy0 = -n2/2-1
@@ -178,6 +180,7 @@ def make_polycrystal(grns,uc,n1,n2,n3,two_dim=False):
     print(' x range = ',ix0,ix1)
     print(' y range = ',iy0,iy1)
     print(' z range = ',iz0,iz1)
+    inc = 0
     for ig in range(len(grns)):
         grain= grns[ig]
         rmat= grain.rmat  # Rotation matrix of the grain
@@ -188,11 +191,12 @@ def make_polycrystal(grns,uc,n1,n2,n3,two_dim=False):
             # print('ix=',ix)
             for iy in range(iy0,iy1):
                 for iz in range(iz0,iz1):
-                    for m in range(len(uc.atoms)):
+                    for m in range(uc.natm):
+                        sidt = uc.sids[m]
                         rt= np.zeros((3,))
-                        rt[0]= (uc.atoms[m].pos[0]+ix)/n1
-                        rt[1]= (uc.atoms[m].pos[1]+iy)/n2
-                        rt[2]= (uc.atoms[m].pos[2]+iz)/n3
+                        rt[0]= (uc.poss[m,0]+ix)/n1
+                        rt[1]= (uc.poss[m,1]+iy)/n2
+                        rt[2]= (uc.poss[m,2]+iz)/n3
                         #...rt to absolute position
                         art= np.dot(hmat,rt)
                         #...Rotate
@@ -225,50 +229,44 @@ def make_polycrystal(grns,uc,n1,n2,n3,two_dim=False):
                         if isOutside:
                             break
                         #...here ri is inside this grain, register it
-                        atom= Atom()
                         #...Cartessian coord to reduced coord
                         ri = np.dot(hmati,ari)
                         ri[0]= pbc(ri[0])
                         ri[1]= pbc(ri[1])
                         ri[2]= pbc(ri[2])
-                        atom.set_pos(ri[0],ri[1],ri[2])
-                        atom.set_symbol(uc.atoms[m].symbol)
-                        system.add_atom(atom)
+                        sidsl[inc] = sidt
+                        possl[inc] = ri
+                        velsl[inc,:] = 0.0
+                        frcsl[inc,:] = 0.0
+                        symsl.append(nsys.specorder[sidt-1])
+                        inc += 1
+                        if inc > nmax:
+                            raise ValueError('inc > nmax')
+    #...Create filled arrays from non-filled ones
+    poss = np.array(possl[:inc])
+    vels = np.array(velsl[:inc])
+    frcs = np.array(frcsl[:inc])
+    nsys.add_atoms(symsl,poss,vels,frcs)
 
     #...remove too-close atoms at the grain boundaries
     print(' Making pair list in order to remove close atoms...')
-    print(' Number of atoms: ',system.num_atoms())
-    system.make_pair_list(RCUT)
-    system.write('POSCAR_orig')
+    print(' Number of atoms: ',nsys.num_atoms())
+    nsys.make_pair_list(RCUT)
+    nsys.write('POSCAR_orig')
     short_pairs = []
     # dmin2= dmin**2
     # xij= np.zeros((3,))
     print(' Making the list of SHORT pairs...')
-    for ia in range(system.num_atoms()):
-        # ai= system.atoms[ia]
-        # pi= ai.pos
-        nlst= system.nlspr[ia]
-        lst= system.lspr[ia]
+    for ia in range(nsys.natm):
+        nlst= nsys.nlspr[ia]
+        lst= nsys.lspr[ia]
         for j in range(nlst):
             ja= lst[j]
             if ja > ia:
                 continue
-            dij = system.get_distance(ia,ja)
+            dij = nsys.get_distance(ia,ja)
             if dij < dmin:
                 short_pairs.append((ia,ja,dij))
-            # aj= system.atoms[ja]
-            # pj= aj.pos
-            # xij[0]= pj[0]-pi[0] -anint(pj[0]-pi[0])
-            # xij[1]= pj[1]-pi[1] -anint(pj[1]-pi[1])
-            # xij[2]= pj[2]-pi[2] -anint(pj[2]-pi[2])
-            # xij= np.dot(hmat,xij)
-            # d2= xij[0]**2 +xij[1]**2 +xij[2]**2
-            # if d2 < dmin2:
-            #     if not ia in ls_remove:
-            #         ls_remove.append(ia)
-            #     elif not ja in ls_remove:
-            #         ls_remove.append(ja)
-        # print('ia,len(ls_remove)=',ia,len(ls_remove))
 
     print(' Number of short pairs: ',len(short_pairs))
 
@@ -292,30 +290,9 @@ def make_polycrystal(grns,uc,n1,n2,n3,two_dim=False):
     #...Remove double registered IDs
     ls_remove = uniq(ls_remove)
     print(' Number of to be removed atoms: ',len(ls_remove))
-            
-    # print(' Number of to be removed atoms: ',len(ls_remove))
-    #...one of two will survive
-    # print(' One of two too-close atoms will survive...')
-    # count= [ ls_remove.count(ls_remove[i]) for i in range(len(ls_remove))]
-    # for i in range(0,len(ls_remove),2):
-    #     if count[i] > count[i+1]:
-    #         ls_remove[i+1]= -1
-    #     elif count[i] < count[i+1]:
-    #         ls_remove[i]= -1
-    #     else:
-    #         n= int(random()*2.0) # 0 or 1
-    #         ls_remove[i+n]= -1
-    ls_remove.sort()
-    # for ia in range(len(ls_remove)-1,-1,-1):
-    #     n= ls_remove[ia]
-    #     if ia != len(ls_remove)-1:
-    #         if n == nprev: continue
-    #     system.atoms.pop(n)
-    #     nprev= n
-    for i in reversed(range(len(ls_remove))):
-        ia = ls_remove[i]
-        system.atoms.pop(ia)
-    return system
+
+    nsys.remove_atoms(*ls_remove)
+    return nsys
 
 def get_grains(ng,gdmin,angrange0,angrange1,two_dim):
     """
@@ -413,17 +390,8 @@ if __name__ == '__main__':
     grains= get_grains(ngrain,gdistmin,angrange0,angrange1,two_dim)
     uc= makestruct(latconst)
     uc.write('POSCAR_uc')
-    gsys = NAPSystem(specorder=['H'])
-    gsys.set_lattice(uc.alc, uc.a1*nx, uc.a2*ny, uc.a3*nz)
-    for g in grains:
-        pi = g.point
-        a = Atom()
-        a.set_pos(pi[0],pi[1],pi[2])
-        a.set_symbol('H')
-        gsys.add_atom(a)
-    gsys.write('POSCAR_gpoints')
-    system= make_polycrystal(grains,uc,nx,ny,nz,two_dim)
-    system.write(ofname)
+    nsys= make_polycrystal(grains,uc,nx,ny,nz,two_dim)
+    nsys.write(ofname)
 
     print(' Elapsed time = {0:12.2f}'.format(time.time()-t0))
     print(' Wrote a file: {0:s}'.format(ofname))

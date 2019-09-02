@@ -47,10 +47,10 @@ def get_prob_dist(ndivs,nsys,sid,sgm):
     rc = 1.0/ndivs[2]
     dv = la*ra*lb*rb*lc*rc
     prefactor = dv / (np.pi*tsgm2)**1.5
-    for ia,ai in enumerate(nsys.atoms):
-        if ai.sid != sid:
+    for ia in range(nsys.natm):
+        if nsys.sids[ia] != sid:
             continue
-        pi = ai.pos
+        pi = nsys.poss[ia]
         for i in range(ndivs[0]):
             rai = ra*i -pi[0]
             rai = rai if abs(rai) < 0.5 else rai -1.0*np.sign(rai)
