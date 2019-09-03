@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-28 12:08:20 Ryo KOBAYASHI>
+!                     Last modified: <2019-09-03 13:07:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -55,6 +55,7 @@ contains
     swgt2trn = swgt2trn*nterms
     swgt2tst = swgt2tst*nterms
     if( myid.eq.0 ) then
+      print *,''
       write(6,'(a)') ' Weights to divide loss function:'
       write(6,'(a,f10.1)') '   for training: ',swgt2trn
       write(6,'(a,f10.1)') '   for test:     ',swgt2tst
@@ -606,7 +607,7 @@ contains
 !
     use variables,only: cmaindir,cpot,nsubff,csubffs,mdsys,samples &
          ,maxisp,nn_nl,nn_nhl,nn_sigtype,ctype_loss,rc3,rcut &
-         ,interact,interact3,num_interact
+         ,interact,interact3,num_interact,iprint
     use parallel
     use Coulomb,only: set_paramsdir_Coulomb, set_params_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
@@ -667,7 +668,7 @@ contains
       call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
            //'/pmd')
       call set_params_Coulomb(1,x(1),cpot, &
-           smpl%specorder)
+           smpl%specorder,iprint)
       call set_params_fpc(ndim-1,x(2:ndim),cpot,interact)
     else if( trim(cpot).eq.'EAM' ) then
       call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
@@ -716,12 +717,12 @@ contains
       call set_paramsdir_angular(trim(cmaindir)//'/'//trim(cdirname)&
            //'/pmd')
       if( trim(cpot).eq.'BVS1' ) then
-        call set_params_Coulomb(1,x(1),cpot,smpl%specorder)
+        call set_params_Coulomb(1,x(1),cpot,smpl%specorder,iprint)
         call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
       else if( trim(cpot).eq.'BVS' ) then
         ndim0 = 1
         ndimt = 1+maxisp
-        call set_params_Coulomb(ndimt,x(ndim0),cpot,smpl%specorder)
+        call set_params_Coulomb(ndimt,x(ndim0),cpot,smpl%specorder,iprint)
         ndim0 = ndim0 +ndimt
         ndimt = num_interact(2)*3
         call set_params_Morse(ndimt,x(ndim0),cpot,interact)
@@ -729,7 +730,7 @@ contains
       else if( trim(cpot).eq.'BVSx' ) then
         ndim0 = 1
         ndimt = 1+maxisp
-        call set_params_Coulomb(ndimt,x(ndim0),cpot,smpl%specorder)
+        call set_params_Coulomb(ndimt,x(ndim0),cpot,smpl%specorder,iprint)
         ndim0 = ndim0 +ndimt
         ndimt = num_interact(2)*3
         call set_params_Morse(ndimt,x(ndim0),cpot,interact)
@@ -917,6 +918,7 @@ contains
 !  from the GROUP for this node. This is how to create sub communicator
 !  in the MPI.
 !
+    use variables,only: iprint
     use parallel
     implicit none
 
@@ -924,29 +926,21 @@ contains
     integer:: iranks(1)
     integer:: mpi_group_world,mpi_group_pmd
 
-!!$  call mpi_comm_group(mpi_world, mpi_group_world,ierr)
     iranks(1) = myid
-!!$  call mpi_group_incl(mpi_group_world, 1, iranks, mpi_group_pmd,ierr)
-!!$  call mpi_comm_create_group(mpi_world, mpi_group_pmd, 0, mpi_comm_pmd,ierr)
-!!$  print *,'myid,iranks(1),mpi_group_pmd,mpi_comm_pmd=',&
-!!$       myid,iranks(1),mpi_group_pmd,mpi_comm_pmd
 
     call mpi_comm_split(mpi_world,myid,myid,mpi_comm_pmd,ierr)
 
     call mpi_comm_size(mpi_comm_pmd,nnode_pmd,ierr)
     call mpi_comm_rank(mpi_comm_pmd,myid_pmd,ierr)
     call mpi_comm_group(mpi_comm_pmd,mpi_group_pmd,ierr)
-!!$  print *,'myid,mpi_world,myid_pmd,mpi_comm_pmd,mpi_group_pmd = ',&
-!!$       myid,mpi_world,myid_pmd,mpi_comm_pmd,mpi_group_pmd
 
-!!$  call mpi_group_free(mpi_group_world,ierr)
-!!$  call mpi_group_free(mpi_group_pmd,ierr)
-    if( myid.eq.0 ) then
+    if( myid.eq.0 .and. iprint.gt.0 ) then
       write(6,'(a)') ''
       write(6,'(a)') ' MPI_COMM_PMD was created at each node '// &
            'for pmd calculations.'
-      write(6,'(a)') ''
     endif
+!!$    if( myid.eq.0 ) print *,'MPI_COMM values:'
+!!$    print *,'  myid,mpi_world,mpi_comm_pmd=',myid,mpi_world,mpi_comm_pmd
 
   end subroutine create_mpi_comm_pmd
 !=======================================================================
@@ -1224,6 +1218,7 @@ contains
     gsfvar = gsfvar/nsf
 !!$    gsfvar = get_variance_input(gsfmean)
     if( myid.eq.0 .and. iprint.gt.0 ) then
+      print *,''
       write(6,'(a,es12.3)') ' mean of input symmetry functions = ',gsfmean
       write(6,'(a,es12.3)') ' var  of input symmetry functions = ',gsfvar
       if( iprint.gt.1 ) then

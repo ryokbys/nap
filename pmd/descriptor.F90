@@ -774,9 +774,11 @@ contains
     endif
 
 !.....Bcast nsp and nsf before allocating arrays
-    call mpi_bcast(nsp,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(nsf,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(lcheby,1,mpi_logical,0,mpi_world,ierr)
+    if( mpi_world.eq.0 ) then  ! Avoid MPI call when called in fitpot.
+      call mpi_bcast(nsp,1,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(nsf,1,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(lcheby,1,mpi_logical,0,mpi_world,ierr)
+    endif
     ngl = nsf
 
 !.....Allocate arrays of lenths, nsp and/or nsf
@@ -784,10 +786,6 @@ contains
 !!$      allocate(itype(nsf),cnst(max_ncnst,nsf),rcs(nsf),rcs2(nsf))
       allocate(descs(nsf),ilsf2(0:nsf,nspmax,nspmax) &
            ,ilsf3(0:nsf,nspmax,nspmax,nspmax))
-!!$      mem = mem +nsf*size(type(desc))
-!!$      mem = mem +4*size(itype) +4*size(cnst) +8*size(rcs)*2
-!!$      allocate(iaddr2(2,nsp,nsp),iaddr3(2,nsp,nsp,nsp))
-!!$      mem = mem +4*size(iaddr2) +4*size(iaddr3)
       if( lcheby ) then
         allocate(wgtsp(nsp))
         do i=1,nsp
@@ -823,6 +821,7 @@ contains
 !  Using a factor, NSFF, NSF=(NSF2+NSF3)*NSFF,
 !  where NSFF=1 for NSP==1, and NSFF=2 for NSP>1.
 !-----------------------------------------------------------------------
+        if( iprint.gt.2 ) print *,'reading Chebyshev descriptors...'
         nsff = 1
         nsf2 = 0
         nsf3 = 0
@@ -862,50 +861,6 @@ contains
           descs(isf)%rcut2 = rcut3**2
         enddo
 
-!!       else  ! not Chebyshev
-!!         iaddr2(1:2,1:nsp,1:nsp)= -1
-!!         iaddr3(1:2,1:nsp,1:nsp,1:nsp)= -1
-!!         nsf2= 0
-!!         nsf3= 0
-!!         iap= 0
-!!         jap= 0
-!!         kap= 0
-!!         do i=1,nsf
-!! !!$          read(ionum,*,end=20) itype(i),(icmb(k),k=1,ncomb_type(itype(i))) &
-!! !!$               ,rcs(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
-!!           read(ionum,*,end=20) itype(i),(ccmb(k),k=1,ncomb_type(itype(i))) &
-!!                ,rcs(i),(cnst(j,i),j=1,ncnst_type(itype(i)))
-!!           if( itype(i).le.100 ) then  ! 2-body
-!!             if( icmb(1).ne.iap .or. icmb(2).ne.jap ) then
-!!               iaddr2(1,icmb(1),icmb(2))= i
-!!               iaddr2(1,icmb(2),icmb(1))= i
-!!             endif
-!!             iaddr2(2,icmb(1),icmb(2))= i
-!!             iaddr2(2,icmb(2),icmb(1))= i
-!!             nsf2= nsf2 +1
-!!             iap= icmb(1)
-!!             jap= icmb(2)
-!!           else if( itype(i).le.200 ) then  ! 3-body
-!!             if( icmb(1).ne.iap .or. icmb(2).ne.jap .or. &
-!!                  icmb(3).ne.kap ) then
-!!               iaddr3(1,icmb(1),icmb(2),icmb(3))= i
-!!               iaddr3(1,icmb(1),icmb(3),icmb(2))= i
-!!             endif
-!!             iaddr3(2,icmb(1),icmb(2),icmb(3))= i
-!!             iaddr3(2,icmb(1),icmb(3),icmb(2))= i
-!!             nsf3= nsf3 +1
-!!             iap= icmb(1)
-!!             jap= icmb(2)
-!!             kap= icmb(3)
-!!           endif
-!! 20      enddo
-!!         if( nsf.ne.nsf2+nsf3 ) then
-!!           print *,'ERROR@read_params_desc: nsf.ne.nsf2+nsf3 !!!'
-!! !        call mpi_finalize(ierr)
-!!           stop
-!!         endif
-!!       endif
-!!
       else  ! not Chebyshev
         nsf2 = 0
         nsf3 = 0
@@ -946,21 +901,24 @@ contains
             ilsf3(ilsf3(0,isp,is1,is2),isp,is1,is2) = isf
           endif
         enddo  ! isf=1,nsf
-20      close(ionum)
+20      continue
 !!$        if( nsf.ne.nsf2+nsf3 ) then
 !!$          print *,'ERROR@read_params_desc: nsf.ne.nsf2+nsf3 !!!'
 !!$ !        call mpi_finalize(ierr)
 !!$          stop
 !!$        endif
       endif ! lcheby
+      close(ionum)
     endif ! myid.eq.0
 
 !.....Broadcast cspline data
-    call bcast_descs(myid,mpi_world,iprint)
-    call mpi_bcast(nsf2,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(ilsf2,size(ilsf2),mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(ilsf3,size(ilsf3),mpi_integer,0,mpi_world,ierr)
+    if( mpi_world.eq.0 ) then  ! Avoid MPI calls when called in fitpot.
+      call bcast_descs(myid,mpi_world,iprint)
+      call mpi_bcast(nsf2,1,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(ilsf2,size(ilsf2),mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(ilsf3,size(ilsf3),mpi_integer,0,mpi_world,ierr)
+    endif
 
 !!$    call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
 !!$    call mpi_bcast(itype,nsf,mpi_integer,0,mpi_world,ierr)
@@ -987,6 +945,8 @@ contains
       if( descs(isf)%itype.gt.100 ) rc3max = max(rc3max,rcut)
     enddo
     rcmax2 = rcmax**2
+
+    if( myid.eq.0 .and. iprint.gt.2 ) print *,'read_params_desc done'
 
     time = time +(mpi_wtime() -time0)
 
@@ -1023,7 +983,7 @@ contains
       read(cline,*) c1, copt, lopt
       lcheby = lopt
       if( iprint.gt.0 ) then
-        print '(a)', '   Chebyshev series for descriptors.'
+        print '(a)', ' Chebyshev series for descriptors.'
       endif
     endif
     
@@ -1033,18 +993,20 @@ contains
     include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
 
-    integer:: i,ierr,ityp
+    integer:: i,ierr
 
     do i=1,nsf
       call mpi_bcast(descs(i)%itype,1,mpi_integer,0,mpi_world,ierr)
-      ityp = descs(i)%itype
       call mpi_bcast(descs(i)%isp,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(descs(i)%jsp,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(descs(i)%ksp,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(descs(i)%rcut,1,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(descs(i)%rcut2,1,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(descs(i)%nprm,1,mpi_integer,0,mpi_world,ierr)
-      if( myid.ne.0 ) allocate(descs(i)%prms(descs(i)%nprm))
+      if( myid.ne.0 ) then
+        if( allocated(descs(i)%prms) ) deallocate(descs(i)%prms)
+        allocate(descs(i)%prms(descs(i)%nprm))
+      endif
       call mpi_barrier(mpi_world,ierr)
       call mpi_bcast(descs(i)%prms,descs(i)%nprm,mpi_real8,0,mpi_world,ierr)
     enddo

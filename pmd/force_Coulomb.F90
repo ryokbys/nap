@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-28 11:46:08 Ryo KOBAYASHI>
+!                     Last modified: <2019-09-03 13:03:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -2694,12 +2694,12 @@ contains
     return
   end subroutine set_paramsdir_Coulomb
 !=======================================================================
-  subroutine set_params_Coulomb(ndimp,prms_in,ctype,specorder)
+  subroutine set_params_Coulomb(ndimp,prms_in,ctype,specorder,iprint)
 !
 !  Accessor routine to set Coulomb parameters from outside.
 !  This is supposed to be called only on serial run.
 !
-    integer,intent(in):: ndimp
+    integer,intent(in):: ndimp,iprint
     real(8),intent(in):: prms_in(ndimp)
     character(len=*),intent(in):: ctype
     character(len=3),intent(in):: specorder(nspmax)
@@ -2710,7 +2710,7 @@ contains
 !!$      if( ctype(4:4).eq.'2' .or. ctype(4:4).eq.'3' ) then
         !.....Not only fbvs, but also rad_bvs are given from fitpot
 !!$        ifcoulomb = 1
-        ipr = 0
+        ipr = max(0,iprint-10)
         myid = 0
         mpiw = -1
         call read_paramsx(myid,mpiw,ipr,specorder)

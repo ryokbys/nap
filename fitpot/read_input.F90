@@ -85,7 +85,8 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'ftol' ) then
     call read_r1(ionum,ftol)
     return
-  elseif( trim(cname).eq.'numtol' ) then
+  elseif( trim(cname).eq.'numtol' .or. &
+       trim(cname).eq.'converge_num' ) then
     call read_i1(ionum,numtol)
     return
   elseif( trim(cname).eq.'gtol' ) then
@@ -133,7 +134,8 @@ subroutine set_variable(ionum,cname)
        trim(cname).eq.'additive_potential' ) then
     call read_force_field(ionum)
     return
-  elseif( trim(cname).eq.'rcut_other_FF' ) then
+  elseif( trim(cname).eq.'rcut_other_FF' .or. &
+       trim(cname).eq.'cutoff_other_FF' ) then
     call read_r1(ionum,rc_other)
     return
   elseif( trim(cname).eq.'gradient' ) then
