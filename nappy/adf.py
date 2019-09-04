@@ -15,6 +15,9 @@ Options:
     -r RCUT     Cutoff radius of the bonding pair. [default: 3.0]
     --gsmear=SIGMA
                 Width of Gaussian smearing, zero means no smearing. [default: 0]
+    --triplets=TRIPLETS
+                Triplets whose angles are to be computed. Three species should be specified connected by hyphen,
+                and separated by comma, e.g.) P-O-O,Li-O-O. [default: None]
     -o OUT      Output file name [default: out.adf]
     --no-average
                 Not to take average over files.
@@ -36,12 +39,12 @@ def norm(vector):
         norm += e*e
     return np.sqrt(norm)
 
-def adf_atom(ia,dang,rcut,nsys,id1=0,id2=0):
+def adf_atom(ia,dang,rcut,nsys,symbols,sj,sk):
     """
     Compute number of atoms in the every range of angle [0:180].
     """
     na= int(180.0/dang) +1
-    hmat= (nsys.alc *np.array([nsys.a1,nsys.a2,nsys.a3])).transpose()
+    hmat= nsys.get_hmat()
     nda= np.zeros(na,dtype=np.int)
     natm= nsys.natm
     rcut2= rcut*rcut
@@ -50,7 +53,8 @@ def adf_atom(ia,dang,rcut,nsys,id1=0,id2=0):
         ja= nsys.lspr[ia,ji]
         if ja == ia:
             continue
-        if id1 != 0 and nsys.sids[ja] != id1:
+        sji = symbols[ja]
+        if sji not in (sj,sk):
             continue
         pj= nsys.poss[ja]
         pij= pj-pi
@@ -64,7 +68,8 @@ def adf_atom(ia,dang,rcut,nsys,id1=0,id2=0):
             ka= nsys.lspr[ia,ki]
             if ka == ia or ka <= ja:
                 continue
-            if id2 != 0 and nsys.sids[ka] != id2:
+            ski = symbols[ka]
+            if set((sji,ski)) != set((sj,sk)):
                 continue
             pk= nsys.poss[ka]
             pik= pk-pi
@@ -84,7 +89,7 @@ def adf_atom(ia,dang,rcut,nsys,id1=0,id2=0):
             nda[int(deg/dang)] += 1
     return nda
 
-def adf(nsys,dang,rcut,id0=0,id1=0,id2=0):
+def adf(nsys,dang,rcut,triplets):
 
     natm0= nsys.natm
 
@@ -98,22 +103,22 @@ def adf(nsys,dang,rcut,id0=0,id1=0,id2=0):
 
     na= int(180.0/dang)+1
 
-    anda= np.zeros(na,dtype=np.float)
+    anda= np.zeros((len(triplets),na),dtype=np.float)
     angd= np.array([ dang*ia for ia in range(na) ])
-    nsum= 0
-    for ia in range(natm0):
-        if id0==0 or nsys.sids[ia] == id0:
-            nsum += 1
-            adfa= adf_atom(ia,dang,rcut,nsys,id1,id2)
+    symbols = nsys.get_symbols()
+    for it,t in enumerate(triplets):
+        si,sj,sk = t
+        for ia in range(natm0):
+            if symbols[ia] != si:
+                continue
+            adfa= adf_atom(ia,dang,rcut,nsys,symbols,sj,sk)
             for iang in range(na):
-                anda[iang]= anda[iang] +adfa[iang]
+                anda[it,iang]= anda[it,iang] +adfa[iang]
     return angd,anda,natm0
 
-def adf_average(infiles,dang=1.0,rcut=3.0,
-                id0=0,id1=0,id2=0,no_average=False):
+def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],no_average=False):
     na= int(180.0/dang) +1
-    df= np.zeros(na,dtype=float)
-    aadf= np.zeros(na,dtype=float)
+    aadf= np.zeros((len(triplets),na),dtype=float)
     nsum= 0
     for infname in infiles:
         if not os.path.exists(infname):
@@ -121,19 +126,20 @@ def adf_average(infiles,dang=1.0,rcut=3.0,
             sys.exit()
         nsys= NAPSystem(fname=infname,)
         print(' File = ',infname)
-        angd,df,n= adf(nsys,dang,rcut,id0,id1,id2)
+        angd,df,n= adf(nsys,dang,rcut,triplets)
         aadf += df
         nsum += n
-    #aadf /= len(infiles)
+
     if not no_average:
         aadf /= nsum
     return angd,aadf
 
-def plot_figures(angd,agr):
+def plot_figures(angd,agr,triplets):
     import matplotlib.pyplot as plt
     import seaborn as sns
     sns.set(context='talk',style='ticks')
-    plt.plot(angd,agr,'-')
+    for i,t in enumerate(triplets):
+        plt.plot(angd,agr[i],legend='{0:s}-{1:s}-{2:s}'.format(*t))
     plt.xlabel('Angle (degree)')
     plt.ylabel('ADF')
     plt.savefig("graph_adf.png", format='png', dpi=300, bbox_inches='tight')
@@ -145,9 +151,12 @@ if __name__ == "__main__":
     args= docopt(__doc__)
     
     infiles= args['INFILE']
-    id0= int(args['ID0'])
-    id1= int(args['ID1'])
-    id2= int(args['ID2'])
+    triplets = args['--triplets']
+    if triplets == 'None':
+        raise ValueError('Triplets must be specified.')
+    triplets = [ t.split('-') for t in triplets.split(',') ]
+    if len(triplets) == 0:
+        raise ValueError('There must be at least one triplet.')
     dang= float(args['-w'])
     drad= np.pi *dang/180.0
     rcut= float(args['-r'])
@@ -158,21 +167,29 @@ if __name__ == "__main__":
 
     na= int(180.0/dang) +1
     angd,agr= adf_average(infiles,dang=dang,
-                          rcut=rcut,id0=id0,id1=id1,id2=id2,
+                          rcut=rcut,triplets=triplets,
                           no_average=no_average)
 
     if not sigma == 0:
         print(' Gaussian smearing...')
-        agr= gsmear(angd,agr,sigma)
+        for it,t in enumerate(triplets):
+            agr[it,:] = gsmear(angd,agr[it,:],sigma)
 
     if flag_plot:
-        plot_figures(angd,agr)
+        plot_figures(angd,agr,triplets)
         print('')
         print(' RDF graphes are plotted.')
         print(' Check graph_adf.png')
         
     outfile= open(ofname,'w')
+    outfile.write('# 1:theta[i], ')
+    for it,t in enumerate(triplets):
+        outfile.write(' {0:d}:{1:s}-{2:s}-{3:s},'.format(it+2,*t))
+    outfile.write('\n')
     for i in range(na):
-        outfile.write(' {0:10.4f} {1:15.7f}\n'.format(angd[i],agr[i]))
+        outfile.write(' {0:10.4f}'.format(angd[i]))
+        for it,t in enumerate(triplets):
+            outfile.write(' {0:11.3e}'.format(agr[it,i]))
+        outfile.write('\n')
     outfile.close()
     print(' Wrote '+ofname)
