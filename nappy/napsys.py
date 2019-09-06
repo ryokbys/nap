@@ -1740,14 +1740,16 @@ def to_lammps(hmat,spos):
     amat[0,:] = a23[:]
     amat[1,:] = a31[:]
     amat[2,:] = a12[:]
-    b1 = np.array((x,0.0,0.0))
-    b2 = np.array((xy,y,0.0))
-    b3 = np.array((xz,yz,z))
+    b1 = np.array((x , 0.0, 0.0))
+    b2 = np.array((xy, y  , 0.0))
+    b3 = np.array((xz, yz , z  ))
     bmat = np.zeros((3,3),dtype=float)
     bmat[:,0] = b1[:]
     bmat[:,1] = b2[:]
     bmat[:,2] = b3[:]
-    if len(spos.shape) == 1:  # only one atom
+    if spos == None or len(spos) == 0:
+        pos = None
+    elif len(spos.shape) == 1:  # only one atom
         pos = np.zeros(spos.shape,dtype=float)
         newspos = shift_spos_for_lammps(spos,lxy,lxz,lyz,x,y,z,yz,xz,xy)
         pos = np.dot(hmat,newspos)

@@ -26,7 +26,7 @@ from nappy.atom import Atom
 from nappy.napsys import NAPSystem
 
 __author__="Ryo KOBAYASHI"
-__version__="190718"
+__version__="rev190718"
 
 _default_band_conf="""ATOM_NAME = Si
 DIM = 3 3 3
