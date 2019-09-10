@@ -6,7 +6,7 @@ gradient-based approaches is out of focus in this script, and that should be
 performed in a Fortran program.
 
 Usage:
-  pyfp.py [options]
+  fp.py [options]
 
 Options:
   -h, --help  Show this message and exit.
