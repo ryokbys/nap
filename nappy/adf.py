@@ -4,10 +4,7 @@ Calculate the angular distribution function (ADF) from files.
 Take an average over atoms in a file or files.
 
 Usage:
-    adf.py [options] ID0 ID1 ID2 INFILE [INFILE...]
-
-ID0, ID1, and ID2 are species-IDs consisting bonds around the angle,
-like ID1-ID0-ID2. Species-ID==0 means any species.
+    adf.py [options] INFILE [INFILE...]
 
 Options:
     -h, --help  Show this help message and exit.

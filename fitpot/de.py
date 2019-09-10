@@ -147,6 +147,7 @@ class DE:
         for ip,pi in enumerate(self.population):
             kwtmp = copy.copy(self.kwargs)
             kwtmp['index'] = ip
+            kwtmp['iid'] = pi.iid
             prcs.append(Process(target=pi.calc_loss_func, args=(kwtmp,qs[ip])))
         for p in prcs:
             p.start()
@@ -254,6 +255,7 @@ class DE:
             for ic,ci in enumerate(candidates):
                 kwtmp = copy.copy(self.kwargs)
                 kwtmp['index'] = ic
+                kwtmp['iid'] = ci.iid
                 prcs.append(Process(target=ci.calc_loss_func, args=(kwtmp,qs[ic])))
             for p in prcs:
                 p.start()

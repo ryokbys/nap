@@ -12,7 +12,7 @@ Options:
   -h, --help  Show this message and exit.
   --nproc NPROC
               Number of processes to be used. [default: 1]
-  --prefix PREFIX
+  --pmddir-prefix PREFIX
               Prefix for pmd directory. [default: pmddir_]
   --pmd-script SCRIPT
               Name of script that performs pmd and post-processing. [default: pmd_rdf_adf_vol.sh]
@@ -244,15 +244,27 @@ def read_vol(fname):
         vol = float(f.readline())
     return vol
 
-def get_data(basedir,prefix='ref',specorder=[],pairs=[],triplets=[]):
+def get_data(basedir,prefix='ref',**kwargs):
     """
     Get rdf, adf, vol from a given basedir.
     The prefix should be either ref or pmd.
     """
-    
-    rs,rdfs = read_rdf(basedir+'/data.{0:s}.rdf'.format(prefix),specorder,pairs)
-    ths,adfs = read_adf(basedir+'/data.{0:s}.adf'.format(prefix),specorder,triplets)
-    vol = read_vol(basedir+'/data.{0:s}.vol'.format(prefix))
+
+    specorder = kwargs['specorder']
+    pairs = kwargs['pairs']
+    triplets = kwargs['triplets']
+
+    rs = []
+    rdfs = []
+    ths = []
+    adfs = []
+    vol = 0.0
+    if kwargs['rdf_match']:
+        rs,rdfs = read_rdf(basedir+'/data.{0:s}.rdf'.format(prefix),specorder,pairs)
+    if kwargs['adf_match']:
+        ths,adfs = read_adf(basedir+'/data.{0:s}.adf'.format(prefix),specorder,triplets)
+    if kwargs['vol_match']:
+        vol = read_vol(basedir+'/data.{0:s}.vol'.format(prefix))
     data = {'rs':rs,
             'rdfs':rdfs,
             'ths':ths,
@@ -334,7 +346,7 @@ def loss_func(pmddata,**kwargs):
     L = Lr*wgts['rdf'] +Lth*wgts['adf'] +Lvol*wgts['vol'] +Llat*wgts['lat']
 
     if kwargs['print_level'] > 0:
-        print(' idx,Lr,Lth,Lvol,Llat,L= {0:8d}'.format(kwargs['index'])
+        print(' iid,Lr,Lth,Lvol,Llat,L= {0:8d}'.format(kwargs['iid'])
               +'{0:10.4f} {1:10.4f} {2:10.4f} {3:10.4f} {4:10.4f}'.format(Lr,Lth,Lvol,Llat,L))
     return L
 
@@ -353,7 +365,7 @@ def func_wrapper(variables, vranges, **kwargs):
     specorder = kwargs['specorder']
     refdata = kwargs['refdata']
     pmdscript = kwargs['pmd-script']
-    pmddir = kwargs['prefix'] +'{0:03d}'.format(kwargs['index'])
+    pmddir = kwargs['pmddir-prefix'] +'{0:03d}'.format(kwargs['index'])
     print_level = kwargs['print_level']
     # print('refdata=',refdata)
     # print('pairs=',pairs)
@@ -378,14 +390,14 @@ def func_wrapper(variables, vranges, **kwargs):
     if print_level > 1:
         print('Running pmd and post-processing at '+pmddir, flush=True)
     try:
-        subprocess.run(['./'+pmdscript, pmddir],check=True)
+        cmd = "./{0:s} > log.iid_{1:d}".format(pmdscript,kwargs['iid'])
+        # subprocess.run(cmd.split(),check=True)
+        subprocess.run(cmd,shell=True,check=True)
         os.chdir(cwd)
         # print('Going to get_data from ',pmddir)
-        pmddata = get_data(pmddir,prefix='pmd',specorder=specorder,
-                           pairs=pairs,triplets=triplets)
+        pmddata = get_data(pmddir,prefix='pmd',**kwargs)
         L = loss_func(pmddata,**kwargs)
     except:
-        raise
         if print_level > 1:
             print('  Since pmd or post-process failed at {0:s}, '.format(pmddir)
                   +'the upper limit value is applied to its loss function.',
@@ -438,21 +450,21 @@ def main(args):
     triplets = get_triplets(infp['interactions'])
     rc2,rc3,vs,vrs = read_vars_fitpot(infp['param_file'])
 
-    smpldir = infp['sample_directory']
-    refdata = get_data(smpldir,prefix='ref',specorder=infp['specorder'],
-                       pairs=pairs,triplets=triplets)
 
     kwargs = infp
-    kwargs['refdata'] = refdata
     # kwargs['infp'] = infp
     kwargs['rc2'] = rc2
     kwargs['rc3'] = rc3
     kwargs['pairs'] = pairs
     kwargs['triplets'] = triplets
     kwargs['wgts'] = {'rdf':1.0, 'adf':1.0, 'vol':1.0, 'lat':1.0}
-    kwargs['prefix'] = args['--prefix']
+    kwargs['pmddir-prefix'] = args['--pmddir-prefix']
     kwargs['pmd-script'] = args['--pmd-script']
     kwargs['start'] = start
+    
+    smpldir = infp['sample_directory']
+    refdata = get_data(smpldir,prefix='ref',**kwargs)
+    kwargs['refdata'] = refdata
 
     fbvs, rads, vids, npqs = read_params_Coulomb('in.params.Coulomb')
     kwargs['fbvs'] = fbvs

@@ -78,13 +78,12 @@ Prepare reference data
 Assuming that there are some reference data sets in ``dataset/`` directory,
 and all the data are stored in the directories whose names start with ``smpl_``.
 
-Files needed to perform *fitpot* in eacy sample directory (``smpl_*``) are:
+Files needed in eacy sample directory (``smpl_*``) are:
 
 * ``pos``
 * ``erg.ref``
 * ``frc.ref``
-* ``pmd/out.NN.gsf``
-* ``pmd/out.NN.dgsf``
+* ``strs.ref``
 
 ``pos`` is pmd format atom-configuration file, ``erg.erg`` contains only one number of energy of the system,
 ``frc.ref`` contains the number of atoms in the system and forces of all atoms shown as,
@@ -96,86 +95,34 @@ Files needed to perform *fitpot* in eacy sample directory (``smpl_*``) are:
     0.0000  -0.1000   0.0000
    -0.1000   0.0000   0.0000
 
-``out.NN.gsf`` and ``out.NN.dgsf`` are specific to neural-network (NN) potential and written out from *pmd* program with `print_level 11`.
-
-In case of extracting DFT data from *ab-initio* MD runs with **VASP**, positions, energy, and forces of each MD step 
+In case of extracting DFT data from *ab-initio* MD runs with **VASP**, positions, energy, forces and stress of each MD step 
 can be obtained from ``vasprun.xml`` file as follows.
 ::
 
   $ python path/to/nap/nappy/vasp/vasprun2fp.py /path/to/dir/that/includes/vasprun.xml/
 
 
-Then you get directories with names like ``#####`` including ``pos``, ``erg.ref``, and ``frc.ref`` files in it.
+Then you get directories with names like ``#####`` including ``pos``, ``erg.ref``, ``frc.ref`` and ``stress.ref`` files in it.
 
-.. _prepare-pmd:
-
-Prepare for pmd
----------------
-When *fitpot* is performed, results of *pmd* will be used in each sample directory.
-The *pmd* can be run by using ``parallel_run_pmd.py`` or ``run_pmd.sh``.
-The ``cutoff_raidus`` should be the same or larger than the parameter *rcut* in ``in.params.NN`` file.
-
-Thus, before going to run *fitpot*, users have to run *pmd* in each sample directory.
-At first, to run *pmd*, make directory of name ``pmd`` in each sample directory as,
-::
-
-  $ for dir in smpl_*; do echo $dir; mkdir -p $dir/pmd; done
-
-And if you are fitting some special potential that needs an auxiliary file like ``in.const.NN``, you need to copy such a file to each ``smpl_*/pmd/`` directory as,
-::
-
-  $ for dir in smpl_*; do echo $dir; cp in.const.NN $dir/pmd/; done
-
-
-.. _prepare-scripts:
-
-Make links of some scripts
------------------------------------
-In order to run ``fitpot`` program there must be the following scripts 
-in the ``dataset/`` directory.
-You can make links of the scripts as,
-::
-
-  $ ln -s /path/to/nap/fitpot/run_pmd.sh dataset/
-  $ ln -s /path/to/nap/fitpot/serial_run_pmd.sh dataset/
-  $ ln -s /path/to/nap/fitpot/parallel_run_pmd.py dataset/
-
-Here you have to check whether you can run ``pmd`` correctly in every sample directory.
-::
-
-  $ ./run_pmd.sh in.params.NN smpl_*
-
-Or if you have a lot of samples, you had better run *pmd* in parallel as,
-
-.. code-block:: bash
-
-  $ cat nodelist.txt
-  node1
-  node2
-  node3
-  node4
-  $ python ./parallel_run_pmd.py in.params.NN
-
-Then this python script assign nodes listed in ``nodelist.txt`` for the calculation of *pmd*.
 
 .. _prepare-inputs:
 
 Prepare input files
 ----------------------------------------
-Inputs files needed for *fitpot* program are the following:
+Inputs files needed for *fitpot* are the following:
 
- * in.fitpot
- * dataset/in.params.NN
+ * ``in.fitpot``
+ * ``in.params.NN`` (in case of NN potential) or ``in.vars.fitpot`` (in case of other potential)
+ * ``in.params.Coulomb`` in each ``smpl_XXX`` directory in some cases
 
-where ``NN`` indicates the name of interatomic potential used in *pmd* program.
 
 You have to specify the ``num_samples`` in ``in.fitpot`` file 
-which is a number of samples in ``dataset/`` directory.
+which is the number of samples in ``dataset/`` directory.
 The number of sample directories can be counted by the following command,
 
 .. code-block:: bash
 
-  $ ls | grep -e '^[0-9]....' | wc -l
+  $ ls /path/to/dataset | grep smpl_ -c
 
 
 
@@ -369,12 +316,17 @@ Available methods are the following:
 *bfgs/BFGS* :
    Quasi-Newton method with BFGS. This requires gradient information.
 
+*de/DE*, *ga/GA*, *pso/PSO* :
+   Meta-heuristic algorithms that does not use gradient information.
+
 *check_grad* :
    Comparison of analytical derivative and numerical derivative.
    Use this to check the implemented analytical gradient.
 
 *test/TEST* :
    Just calculate function L and gradient of L w.r.t. fitting parameters.
+
+Some of these methods cannot be used in some potentials, e.g.) meta-heuristics are not available for NN and linreg potentials.
 
 ---------
 

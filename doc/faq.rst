@@ -14,7 +14,7 @@ FAQs
 .. _faq01:
 
 There are not enough slots available...
---------------------------------------------------
+==================================================
 
 If you get the following error message when you run ``pmd`` with some number of parallel processes,
 
