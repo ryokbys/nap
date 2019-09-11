@@ -384,7 +384,13 @@ def func_wrapper(variables, vranges, **kwargs):
     os.chdir(pmddir)
     if not 'vids' in kwargs.keys():
         print(kwargs.keys())
-    fp2BVSx(varsfp, **kwargs)
+
+    if kwargs['potential'] == 'BVSx':
+        fp2BVSx(varsfp, **kwargs)
+    elif kwargs['potential'] == 'BVS':
+        fp2BVS(varsfp, **kwargs)
+    elif kwargs['Morse'] == 'Morse':
+        fp2Morse(varsfp, **kwargs)
 
     #...Compute pmd
     if print_level > 1:

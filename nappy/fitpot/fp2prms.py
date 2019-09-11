@@ -396,6 +396,13 @@ if __name__ == "__main__":
         fbvs, species radius and Morse parameters.
         Thus in this case, specorder should be specified.
         """
+        #...If there is an old in.params.Coulomb file, get Vid and npq from it
+        try:
+            fbvs0,rads0,vids0,npqs0 = read_params_Coulomb('in.params.Coulomb')
+            kwargs['vids'] = vids0
+            kwargs['npqs'] = npqs0
+        except:
+            pass
         varsfp = read_vars_fitpot(infname)
         fp2BVS(varsfp, **kwargs)
         print(' Wrote in.params.{Morse,Coulomb}')

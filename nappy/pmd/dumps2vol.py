@@ -7,6 +7,7 @@ Usage:
 
 Options:
   -h, --help  Show this message and exit.
+  --skip NSKIP  Skip first NSKIP steps from the statistics. [default: 0]
 """
 from __future__ import print_function
 
@@ -15,6 +16,7 @@ from docopt import docopt
 import numpy as np
 
 from nappy.napsys import NAPSystem
+from nappy.common import get_key
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "rev190906"
@@ -30,11 +32,14 @@ def nsys2lat(nsys):
 def main(args):
 
     dumps = args['DUMPS']
+    dumps.sort(key=get_key, reverse=True)
+    nskip = int(args['--skip'])
+    del dumps[:nskip]
     nsum = 0
     volsum = 0.0
     asum= bsum= csum= 0.0
     alpsum= betsum= gmmsum= 0.0
-    for dump in dumps:
+    for i,dump in enumerate(dumps):
         try:
             nsys = NAPSystem(fname=dump)
             volsum += nsys.volume()

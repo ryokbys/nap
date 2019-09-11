@@ -4,22 +4,24 @@ Calculate the radial distribution function (RDF) from files.
 Statistical averaging about atoms in a file and over files are taken.
 
 Usage:
-    rdf.py [options] INFILE [INFILE...]
+  rdf.py [options] INFILE [INFILE...]
 
 Options:
-    -h, --help  Show this help message and exit.
-    -d DR       Width of the bin. [default: 0.1]
-    -r RMAX     Cutoff radius of radial distribution. [default: 5.0]
-    --gsmear=SIGMA
-                Width of Gaussian smearing, zero means no smearing. [default: 0]
-    -o OUT      Output file name. [default: out.rdf]
-    --specorder=SPECORDER
-                Order of species separated by comma, like, --specorder=W,H. [default: None]
-    --no-average
-                Not to take average over files.
-    --no-normalize
-                Not to normalize by the density.
-    --plot      Plot figures. [default: False]
+  -h, --help  Show this help message and exit.
+  -d DR       Width of the bin. [default: 0.1]
+  -r RMAX     Cutoff radius of radial distribution. [default: 5.0]
+  --gsmear=SIGMA
+              Width of Gaussian smearing, zero means no smearing. [default: 0]
+  -o OUT      Output file name. [default: out.rdf]
+  --specorder=SPECORDER
+              Order of species separated by comma, like, --specorder=W,H. [default: None]
+  --skip=NSKIP 
+              Skip first NSKIP steps from the statistics. [default: 0]
+  --no-average
+              Not to take average over files.
+  --no-normalize
+              Not to normalize by the density.
+  --plot      Plot figures. [default: False]
 """
 from __future__ import print_function
 
@@ -29,6 +31,7 @@ from docopt import docopt
 
 from nappy.napsys import NAPSystem
 from nappy.gaussian_smear import gsmear
+from nappy.common import get_key
 
 def norm(vector):
     norm= 0.0
@@ -169,10 +172,14 @@ if __name__ == "__main__":
     average = not no_average
     normalize = not no_normalize
     plot = args['--plot']
+    nskip = int(args['--skip'])
 
     nspcs = len(specorder)
     if nspcs < 1:
         raise ValueError('--specorder must be set.')
+
+    infiles.sort(key=get_key,reverse=True)
+    del infiles[:nskip]
 
     nr= int(rmax/dr) +1
     rd,agr= rdf_average(infiles,nr,specorder,dr=dr,rmax=rmax,

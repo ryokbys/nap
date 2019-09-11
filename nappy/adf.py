@@ -4,21 +4,23 @@ Calculate the angular distribution function (ADF) from files.
 Take an average over atoms in a file or files.
 
 Usage:
-    adf.py [options] INFILE [INFILE...]
+  adf.py [options] INFILE [INFILE...]
 
 Options:
-    -h, --help  Show this help message and exit.
-    -w DEG      Width of the angular degree. [default: 1.0]
-    -r RCUT     Cutoff radius of the bonding pair. [default: 3.0]
-    --gsmear=SIGMA
-                Width of Gaussian smearing, zero means no smearing. [default: 0]
-    --triplets=TRIPLETS
-                Triplets whose angles are to be computed. Three species should be specified connected by hyphen,
-                and separated by comma, e.g.) P-O-O,Li-O-O. [default: None]
-    -o OUT      Output file name [default: out.adf]
-    --no-average
-                Not to take average over files.
-    --plot      Plot figures. [default: False]
+  -h, --help  Show this help message and exit.
+  -w DEG      Width of the angular degree. [default: 1.0]
+  -r RCUT     Cutoff radius of the bonding pair. [default: 3.0]
+  --gsmear=SIGMA
+              Width of Gaussian smearing, zero means no smearing. [default: 0]
+  --triplets=TRIPLETS
+              Triplets whose angles are to be computed. Three species should be specified connected by hyphen,
+              and separated by comma, e.g.) P-O-O,Li-O-O. [default: None]
+  -o OUT      Output file name [default: out.adf]
+  --skip=NSKIP 
+              Skip first NSKIP steps from the statistics. [default: 0]
+  --no-average
+              Not to take average over files.
+  --plot      Plot figures. [default: False]
 """
 from __future__ import print_function
 
@@ -28,7 +30,7 @@ from docopt import docopt
 
 from nappy.napsys import NAPSystem
 from nappy.gaussian_smear import gsmear
-
+from nappy.common import get_key
 
 def norm(vector):
     norm= 0.0
@@ -161,6 +163,11 @@ if __name__ == "__main__":
     no_average = args['--no-average']
     ofname= args['-o']
     flag_plot= args['--plot']
+    nskip = int(args['--skip'])
+
+
+    infiles.sort(key=get_key,reverse=True)
+    del infiles[:nskip]
 
     na= int(180.0/dang) +1
     angd,agr= adf_average(infiles,dang=dang,
