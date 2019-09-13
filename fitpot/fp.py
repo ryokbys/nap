@@ -23,8 +23,10 @@ import os,sys
 import shutil
 from docopt import docopt
 import numpy as np
+from numpy import sin,cos,exp,sqrt
 import subprocess
 import time
+import json
 
 from nappy.fitpot.fp2prms import fp2BVSx, fp2BVS, fp2Morse, read_params_Coulomb
 
@@ -41,9 +43,14 @@ def read_in_fitpot(fname='in.fitpot'):
     infp['lat_match'] = False
     infp['fval_upper_limit'] = 1.0e+10
     infp['print_level'] = 1
+    infp['weights'] = {'rdf':1.0, 'adf':1.0, 'vol':1.0, 'lat':1.0}
+    
     mode = None
     specorder = None
     interact = []
+    rdf_pairs = []
+    infp['interact'] = interact
+    infp['rdf_pairs'] = rdf_pairs
     
     with open(fname,'r') as f:
         lines = f.readlines()
@@ -95,23 +102,38 @@ def read_in_fitpot(fname='in.fitpot'):
         elif data[0] == 'interactions':
             mode = 'interactions'
             nint = int(data[1])
+        elif data[0] == 'rdf_pairs':
+            mode = 'rdf_pairs'
+            nint = int(data[1])
         elif data[0] == 'sample_error':
             mode = 'sample_error'
         elif data[0] == 'rdf_match':
-            rdf_match = True if data[1] in ('true', 'True', 'T') else False
+            rdf_match = True if data[1] in ('true', 'True', 'T', 'TRUE') else False
             infp['rdf_match'] = rdf_match
+            if rdf_match and len(data) > 2:
+                weight = float(data[2])
+                infp['weights']['rdf'] = weight
             mode = None
         elif data[0] == 'adf_match':
-            adf_match = True if data[1] in ('true', 'True', 'T') else False
+            adf_match = True if data[1] in ('true', 'True', 'T', 'TRUE') else False
             infp['adf_match'] = adf_match
+            if adf_match and len(data) > 2:
+                weight = float(data[2])
+                infp['weights']['adf'] = weight
             mode = None
         elif data[0] == 'vol_match':
-            vol_match = True if data[1] in ('true', 'True', 'T') else False
+            vol_match = True if data[1] in ('true', 'True', 'T', 'TRUE') else False
             infp['vol_match'] = vol_match
+            if vol_match and len(data) > 2:
+                weight = float(data[2])
+                infp['weights']['vol'] = weight
             mode = None
         elif data[0] == 'lat_match':
-            lat_match = True if data[1] in ('true', 'True', 'T') else False
+            lat_match = True if data[1] in ('true', 'True', 'T', 'TRUE') else False
             infp['lat_match'] = lat_match
+            if lat_match and len(data) > 2:
+                weight = float(data[2])
+                infp['weights']['lat'] = weight
             mode = None
         elif data[0] == 'de_num_individuals':
             nind = int(data[1])
@@ -133,6 +155,9 @@ def read_in_fitpot(fname='in.fitpot'):
             if mode == 'interactions' and len(data) in (2,3):
                 interact.append(tuple(data))
                 infp['interactions'] = interact
+            elif mode == 'rdf_pairs' and len(data) == 2:
+                rdf_pairs.append(tuple(data))
+                infp['rdf_pairs'] = rdf_pairs
             else:
                 mode = None
                 pass
@@ -244,6 +269,16 @@ def read_vol(fname):
         vol = float(f.readline())
     return vol
 
+def read_lat(fname):
+    """
+    Read reference/FF lattice parameters from data.(ref/pmd).lat.
+    """
+    with open(fname,'r') as f:
+        lines = f.readlines()
+
+    a,b,c,alp,bet,gmm = [ float(x) for x in lines[0].split() ]
+    return a,b,c,alp,bet,gmm
+
 def get_data(basedir,prefix='ref',**kwargs):
     """
     Get rdf, adf, vol from a given basedir.
@@ -251,7 +286,7 @@ def get_data(basedir,prefix='ref',**kwargs):
     """
 
     specorder = kwargs['specorder']
-    pairs = kwargs['pairs']
+    rdf_pairs = kwargs['rdf_pairs']
     triplets = kwargs['triplets']
 
     rs = []
@@ -259,17 +294,21 @@ def get_data(basedir,prefix='ref',**kwargs):
     ths = []
     adfs = []
     vol = 0.0
+    a=b=c=alp=bet=gmm= 0.0
     if kwargs['rdf_match']:
-        rs,rdfs = read_rdf(basedir+'/data.{0:s}.rdf'.format(prefix),specorder,pairs)
+        rs,rdfs = read_rdf(basedir+'/data.{0:s}.rdf'.format(prefix),specorder,rdf_pairs)
     if kwargs['adf_match']:
         ths,adfs = read_adf(basedir+'/data.{0:s}.adf'.format(prefix),specorder,triplets)
     if kwargs['vol_match']:
         vol = read_vol(basedir+'/data.{0:s}.vol'.format(prefix))
+    if kwargs['lat_match']:
+        a,b,c,alp,bet,gmm = read_lat(basedir+'/data.{0:s}.lat'.format(prefix))
     data = {'rs':rs,
             'rdfs':rdfs,
             'ths':ths,
             'adfs':adfs,
-            'vol':vol}
+            'vol':vol,
+            'lat':(a,b,c,alp,bet,gmm)}
     return data
 
 def loss_func(pmddata,**kwargs):
@@ -277,17 +316,17 @@ def loss_func(pmddata,**kwargs):
     Compute loss function value from reference and pmd data.
     """
     refdata = kwargs['refdata']
-    wgts = kwargs['wgts']
-    pairs = kwargs['pairs']
+    wgts = kwargs['weights']
+    rdf_pairs = kwargs['rdf_pairs']
     triplets = kwargs['triplets']
 
     #...RDF
     Lr = 0.0
-    if kwargs['rdf_match'] and len(pairs) != 0:
+    if kwargs['rdf_match'] and len(rdf_pairs) != 0:
         rs = refdata['rs']
         rdfs_ref = refdata['rdfs']
         rdfs_pmd = pmddata['rdfs']
-        for p in pairs:
+        for p in rdf_pairs:
             # print(p)
             rdf_ref = rdfs_ref[p]
             rdf_pmd = rdfs_pmd[p]
@@ -301,7 +340,7 @@ def loss_func(pmddata,**kwargs):
                 z += ref*ref
                 # print('i,r,ref,pmd,z,diff2sum=',i,r,ref,pmd,z,diff2sum)
             Lr += diff2sum/z #/len(rs)
-        Lr /= len(pairs)
+        Lr /= len(rdf_pairs)
 
     #...ADF
     Lth = 0.0
@@ -335,19 +374,25 @@ def loss_func(pmddata,**kwargs):
     Llat = 0.0
     if kwargs['lat_match']:
         a0,b0,c0,alp0,bet0,gmm0 = refdata['lat']
+        # print('refdata=',refdata['lat'])
         a,b,c,alp,bet,gmm = pmddata['lat']
+        # print('pmddata=',pmddata['lat'])
         #...Need to take into account the definition difference bet/ dump and vasp
-        a0l,b0l,c0l,alp0l,bet0l,gmm0l = lat_vasp2dump(a0,b0,c0,alp0,bet0,gmm0)
-        diff = ((a0l-a)/a0l)**2 +((b0l-b)/b0l)**2 +((c0l-c)/c0l)**2 \
-                +((alp0l-alp)/alp0l)**2 +((bet0l-bet)/bet0l)**2 +((gmm0l-gmm)/gmm0l)**2
-        diff /= 6
+        # a0l,b0l,c0l,alp0l,bet0l,gmm0l = lat_vasp2dump(a0,b0,c0,alp0,bet0,gmm0)
+        diff = ((a0-a)/a0)**2 +((b0-b)/b0)**2 +((c0-c)/c0)**2 \
+                +((alp0-alp)/alp0)**2 +((bet0-bet)/bet0)**2 +((gmm0-gmm)/gmm0)**2
+        # diff /= 6
         Llat = diff
-        
-    L = Lr*wgts['rdf'] +Lth*wgts['adf'] +Lvol*wgts['vol'] +Llat*wgts['lat']
+
+    lrw = Lr*wgts['rdf']
+    lthw = Lth*wgts['adf']
+    lvolw = Lvol*wgts['vol']
+    llatw = Llat*wgts['lat']
+    L = lrw +lthw +lvolw +llatw
 
     if kwargs['print_level'] > 0:
         print(' iid,Lr,Lth,Lvol,Llat,L= {0:8d}'.format(kwargs['iid'])
-              +'{0:10.4f} {1:10.4f} {2:10.4f} {3:10.4f} {4:10.4f}'.format(Lr,Lth,Lvol,Llat,L))
+              +'{0:10.4f} {1:10.4f} {2:10.4f} {3:10.4f} {4:10.4f}'.format(lrw,lthw,lvolw,llatw,L))
     return L
 
 def func_wrapper(variables, vranges, **kwargs):
@@ -358,10 +403,10 @@ def func_wrapper(variables, vranges, **kwargs):
     Then give them to the above loss_func().
     """
     # infp = kwargs['infp']
-    pairs = kwargs['pairs']
-    triplets = kwargs['triplets']
+    # pairs = kwargs['pairs']
+    # triplets = kwargs['triplets']
     refdata = kwargs['refdata']
-    wgts = kwargs['wgts']
+    wgts = kwargs['weights']
     specorder = kwargs['specorder']
     refdata = kwargs['refdata']
     pmdscript = kwargs['pmd-script']
@@ -393,6 +438,7 @@ def func_wrapper(variables, vranges, **kwargs):
         fp2Morse(varsfp, **kwargs)
 
     #...Compute pmd
+    L_up_lim = kwargs['fval_upper_limit']
     if print_level > 1:
         print('Running pmd and post-processing at '+pmddir, flush=True)
     try:
@@ -402,15 +448,15 @@ def func_wrapper(variables, vranges, **kwargs):
         os.chdir(cwd)
         # print('Going to get_data from ',pmddir)
         pmddata = get_data(pmddir,prefix='pmd',**kwargs)
-        L = loss_func(pmddata,**kwargs)
+        L = min( loss_func(pmddata,**kwargs), L_up_lim )
     except:
         if print_level > 1:
             print('  Since pmd or post-process failed at {0:s}, '.format(pmddir)
                   +'the upper limit value is applied to its loss function.',
                   flush=True)
         os.chdir(cwd)
-        L = kwargs['fval_upper_limit']
-
+        L = L_up_lim
+        
     return L
 
 def get_triplets(interact):
@@ -427,10 +473,47 @@ def get_pairs(interact):
             pairs.append(it)
     return pairs
 
+def latprms2hmat(a,b,c,alp,bet,gmm):
+    """
+    Convert lattice parameters to hmat.
+    See https://arxiv.org/pdf/1506.01455.pdf
+    """
+    alpr = np.radians(alp)
+    betr = np.radians(bet)
+    gmmr = np.radians(gmm)
+    # val = (cos(alpr) * cos(betr) - cos(gmmr))\
+    #       / (sin(alpr) * sin(betr))
+    # val = max(abs(val),1.0)
+    # gmmstar = np.arccos(val)
+    
+    a1 = np.zeros(3)
+    a2 = np.zeros(3)
+    a3 = np.zeros(3)
+    a1[:] = [a, 0.0, 0.0]
+    a2[:] = [b*cos(gmmr), b*sin(gmmr), 0.0]
+    # a3[:] = [c*np.cos(betr),
+    #          -c*np.sin(betr)*np.cos(gmmstar),
+    #          c*np.sin(betr)*np.sin(gmmstar)]
+    a3[:] = [c*cos(betr),
+             c*(cos(alpr) -cos(betr)*cos(gmmr))/sin(gmmr),
+             c*sqrt(sin(gmmr)**2 -cos(alpr)**2 -cos(betr)**2
+                    +2.0*cos(alpr)*cos(betr)*cos(gmmr))/sin(gmmr)]
+    hmat = np.zeros((3,3))
+    hmat[:,0] = a1[:]
+    hmat[:,1] = a2[:]
+    hmat[:,2] = a3[:]
+    return hmat
+
 def lat_vasp2dump(a,b,c,alpha,beta,gamma):
     from nappy.napsys import to_lammps
 
-    xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,_ = to_lammps(a,b,c,alpha,beta,gamma,[])
+    try:
+        hmat = latprms2hmat(a,b,c,alpha,beta,gamma)
+        # print('hmat=',hmat)
+        xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,_ = to_lammps(hmat,[])
+        # print('after to_lammps=',xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
+    except:
+        raise
 
     a1 = np.array([xhi-xlo,     0.0,     0.0])
     b1 = np.array([     xy, yhi-ylo,     0.0])
@@ -453,6 +536,17 @@ def main(args):
 
     infp = read_in_fitpot('in.fitpot')
     pairs = get_pairs(infp['interactions'])
+    rdf_pairs = infp['rdf_pairs']
+    if len(rdf_pairs) == 0:  # if no rdf_pairs are specied, all the pairs are selected
+        specorder = infp['specorder']
+        rdf_pairs = []
+        for i,si in enumerate(specorder):
+            for j in range(i,len(specorder)):
+                sj = specorder[j]
+                rdf_pairs.append((si,sj))
+    
+    # print('pairs    =',pairs)
+    # print('rdf_pairs=',rdf_pairs)
     triplets = get_triplets(infp['interactions'])
     rc2,rc3,vs,vrs = read_vars_fitpot(infp['param_file'])
 
@@ -462,14 +556,19 @@ def main(args):
     kwargs['rc2'] = rc2
     kwargs['rc3'] = rc3
     kwargs['pairs'] = pairs
+    kwargs['rdf_pairs'] = rdf_pairs
     kwargs['triplets'] = triplets
-    kwargs['wgts'] = {'rdf':1.0, 'adf':1.0, 'vol':1.0, 'lat':1.0}
     kwargs['pmddir-prefix'] = args['--pmddir-prefix']
     kwargs['pmd-script'] = args['--pmd-script']
     kwargs['start'] = start
     
     smpldir = infp['sample_directory']
     refdata = get_data(smpldir,prefix='ref',**kwargs)
+    a0,b0,c0,alp0,bet0,gmm0 = refdata['lat']
+    #...Need to take into account the definition difference bet/ dump and vasp
+    a,b,c,alp,bet,gmm = lat_vasp2dump(a0,b0,c0,alp0,bet0,gmm0)
+    # print('Reference lattice parameters:',a,b,c,alp,bet,gmm)
+    refdata['lat'] = (a,b,c,alp,bet,gmm)
     kwargs['refdata'] = refdata
 
     fbvs, rads, vids, npqs = read_params_Coulomb('in.params.Coulomb')
@@ -477,6 +576,7 @@ def main(args):
     kwargs['rads'] = rads
     kwargs['vids'] = vids
     kwargs['npqs'] = npqs
+
 
     N = infp['de_num_individuals']
     F = infp['de_fraction']

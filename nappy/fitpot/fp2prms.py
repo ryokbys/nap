@@ -259,7 +259,8 @@ def fp2BVS(varsfp, **kwargs):
 
     #...Check num of vars
     if nv != len(pairs)*3 +len(specorder) +1:
-        raise ValueError('Number of variables is wrong.')
+        raise ValueError('Number of variables is wrong! nv,len(pairs),len(specorder)='
+                         ,nv,len(pairs),len(specorder))
 
     inc = 0
     fbvs = vs[inc]

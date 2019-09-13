@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 """
-Extract averaged volumen and lattice parameters from dump files.
+Extract averaged volume and lattice parameters from dump files.
 
 Usage:
   dumps2vol.py [options] DUMPS [DUMPS...]
 
 Options:
   -h, --help  Show this message and exit.
-  --skip NSKIP  Skip first NSKIP steps from the statistics. [default: 0]
+  --skip NSKIP
+              Skip first NSKIP steps from the statistics. 
+              If this is -1, vol and lat of the final step are taken. [default: 0]
 """
 from __future__ import print_function
 
@@ -56,7 +58,7 @@ def main(args):
             pass
 
     if nsum < 1:
-        raise ValueError('Something went wrong...')
+        raise ValueError('Something went wrong! nsum<1')
     vol = volsum /nsum
     a = asum/nsum
     b = bsum/nsum

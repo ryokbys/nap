@@ -40,6 +40,7 @@ import math
 import sys, copy
 from datetime import datetime
 import numpy as np
+from numpy import sin, cos, sqrt, exp
 from docopt import docopt
 
 from nappy.atom import Atom, get_symbol_from_number, get_number_from_symbol
@@ -110,6 +111,7 @@ class NAPSystem(object):
     def set_lattice_parameters(self,a,b,c,alpha,beta,gamma):
         """
         Set lattice by specifying lattice parameters, a,b,c,alpha,beta,gamma.
+        See https://arxiv.org/pdf/1506.01455.pdf
 
         Args:
           a (float): lattice parameter *a*
@@ -120,19 +122,23 @@ class NAPSystem(object):
           gamma (float): angle in degree
         """
         self.alc = 1.0
-        alpha_r = np.radians(alpha)
-        beta_r = np.radians(beta)
-        gamma_r = np.radians(gamma)
-        val = (np.cos(alpha_r) * np.cos(beta_r) - np.cos(gamma_r))\
-            / (np.sin(alpha_r) * np.sin(beta_r))
-        val = max(abs(val),1.0)
-        gamma_star = np.arccos(val)
+        alpr = np.radians(alpha)
+        betr = np.radians(beta)
+        gmmr = np.radians(gamma)
+        # val = (cos(alpha_r) * cos(beta_r) - cos(gamma_r))\
+        #     / (sin(alpha_r) * sin(beta_r))
+        # val = max(abs(val),1.0)
+        # gamma_star = np.arccos(val)
         self.a1[:] = [float(a), 0.0, 0.0]
-        self.a2[:] = [b*np.cos(gamma_r),
-                      b*np.sin(gamma_r), 0.0]
-        self.a3[:] = [c*np.cos(beta_r),
-                      -c*np.sin(beta_r)*np.cos(gamma_star),
-                      c*np.sin(beta_r)*np.sin(gamma_star)]
+        self.a2[:] = [b*cos(gmmr),
+                      b*sin(gmmr), 0.0]
+        # self.a3[:] = [c*cos(beta_r),
+        #               -c*sin(beta_r)*cos(gamma_star),
+        #               c*sin(beta_r)*sin(gamma_star)]
+        self.a3[:] = [c*cos(betr),
+                      c*(cos(alpr) -cos(betr)*cos(gmmr))/sin(gmmr),
+                      c*sqrt(sin(gmmr)**2 -cos(alpr)**2 -cos(betr)**2
+                             +2.0*cos(alpr)*cos(betr)*cos(gmmr))/sin(gmmr)]
         return None
         
     def get_hmat(self):
@@ -1083,7 +1089,7 @@ You need to specify the species order correctly with --specorder option.
         hmat = self.get_hmat()
         rij = np.dot(hmat,xij)
         rij2 = rij[0]**2 +rij[1]**2 +rij[2]**2
-        return np.sqrt(rij2)
+        return sqrt(rij2)
 
     def get_angle(self,i,j,k):
         """
@@ -1554,8 +1560,8 @@ def rotate(vector,axis,ang):
     mmat = np.zeros((3,3),dtype=float)
     imat = np.identity(3)
     rmat2 = np.dot(rmat,rmat)
-    mmat[:,:] = imat[:,:] +np.sin(ang)*rmat[:,:] \
-                +(1.0 -np.cos(ang))*rmat2[:,:]
+    mmat[:,:] = imat[:,:] +sin(ang)*rmat[:,:] \
+                +(1.0 -cos(ang))*rmat2[:,:]
     return np.dot(mmat,vector)
 
 
@@ -1699,11 +1705,11 @@ def to_lammps(hmat,spos):
     beta  = np.arccos(np.dot(a0,c0)/a/c)
     gamma = np.arccos(np.dot(a0,b0)/a/b)
     xhi = a
-    xy = b*np.cos(gamma)
-    xz = c*np.cos(beta)
-    yhi = np.sqrt(b*b -xy*xy)
-    yz = (b*c*np.cos(alpha) -xy*xz)/yhi
-    zhi = np.sqrt(c*c -xz*xz -yz*yz)
+    xy = b*cos(gamma)
+    xz = c*cos(beta)
+    yhi = sqrt(b*b -xy*xy)
+    yz = (b*c*cos(alpha) -xy*xz)/yhi
+    zhi = sqrt(c*c -xz*xz -yz*yz)
     x = xhi-xlo
     y = yhi-ylo
     z = zhi-zlo
