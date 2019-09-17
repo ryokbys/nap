@@ -31,8 +31,7 @@ import json
 from nappy.fitpot.fp2prms import fp2BVSx, fp2BVS, fp2Morse, read_params_Coulomb
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "rev190904"
-
+__version__ = "rev190913"
 
 def read_in_fitpot(fname='in.fitpot'):
     #...initialize
@@ -391,8 +390,9 @@ def loss_func(pmddata,**kwargs):
     L = lrw +lthw +lvolw +llatw
 
     if kwargs['print_level'] > 0:
-        print(' iid,Lr,Lth,Lvol,Llat,L= {0:8d}'.format(kwargs['iid'])
-              +'{0:10.4f} {1:10.4f} {2:10.4f} {3:10.4f} {4:10.4f}'.format(lrw,lthw,lvolw,llatw,L))
+        print('   iid,Lr,Lth,Lvol,Llat,L= {0:8d}'.format(kwargs['iid'])
+              +'{0:10.4f} {1:10.4f} {2:10.4f} {3:10.4f} {4:10.4f}'.format(lrw,lthw,lvolw,llatw,L),
+              flush=True)
     return L
 
 def func_wrapper(variables, vranges, **kwargs):
@@ -478,6 +478,7 @@ def latprms2hmat(a,b,c,alp,bet,gmm):
     Convert lattice parameters to hmat.
     See https://arxiv.org/pdf/1506.01455.pdf
     """
+    # print(a,b,c,alp,bet,gmm)
     alpr = np.radians(alp)
     betr = np.radians(bet)
     gmmr = np.radians(gmm)
@@ -494,6 +495,8 @@ def latprms2hmat(a,b,c,alp,bet,gmm):
     # a3[:] = [c*np.cos(betr),
     #          -c*np.sin(betr)*np.cos(gmmstar),
     #          c*np.sin(betr)*np.sin(gmmstar)]
+    # print('alpr,cos(alpr)=',alpr,cos(alpr))
+    # print('betr,cos(betr)=',betr,cos(betr))
     a3[:] = [c*cos(betr),
              c*(cos(alpr) -cos(betr)*cos(gmmr))/sin(gmmr),
              c*sqrt(sin(gmmr)**2 -cos(alpr)**2 -cos(betr)**2
@@ -564,11 +567,12 @@ def main(args):
     
     smpldir = infp['sample_directory']
     refdata = get_data(smpldir,prefix='ref',**kwargs)
-    a0,b0,c0,alp0,bet0,gmm0 = refdata['lat']
-    #...Need to take into account the definition difference bet/ dump and vasp
-    a,b,c,alp,bet,gmm = lat_vasp2dump(a0,b0,c0,alp0,bet0,gmm0)
-    # print('Reference lattice parameters:',a,b,c,alp,bet,gmm)
-    refdata['lat'] = (a,b,c,alp,bet,gmm)
+    if kwargs['lat_match']:
+        a0,b0,c0,alp0,bet0,gmm0 = refdata['lat']
+        #...Need to take into account the definition difference bet/ dump and vasp
+        a,b,c,alp,bet,gmm = lat_vasp2dump(a0,b0,c0,alp0,bet0,gmm0)
+        # print('Reference lattice parameters:',a,b,c,alp,bet,gmm)
+        refdata['lat'] = (a,b,c,alp,bet,gmm)
     kwargs['refdata'] = refdata
 
     fbvs, rads, vids, npqs = read_params_Coulomb('in.params.Coulomb')

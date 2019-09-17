@@ -284,7 +284,14 @@ class DE:
                 # if pi.iid == self.bestind.iid:
                 #     continue
                 #...adoption probability
-                prob = min(1.0, np.exp(-(ci.val -pi.val)/self.T))
+                dval = ci.val -pi.val
+                if dval < 0.0:
+                    prob = 1.0
+                else:
+                    if self.T > 0.0:
+                        prob = np.exp(-dval/self.T)
+                    else:
+                        prob = 0.0
                 r = random.random()
                 if r < prob:  # replace with new individual
                     self.population[ic] = ci
