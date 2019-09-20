@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/usr/bin/env python
 """
 Compute the mean square displacement (MSD) of atoms (see ids below)
 from the sequential files in the arguments.

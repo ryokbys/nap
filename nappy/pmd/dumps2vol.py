@@ -10,6 +10,8 @@ Options:
   --skip NSKIP
               Skip first NSKIP steps from the statistics. 
               If this is -1, vol and lat of the final step are taken. [default: 0]
+  --prefix PREFIX
+              Prefix for output files. [default: data.pmd]
 """
 from __future__ import print_function
 
@@ -37,6 +39,8 @@ def main(args):
     dumps.sort(key=get_key, reverse=True)
     nskip = int(args['--skip'])
     del dumps[:nskip]
+    prefix = args['--prefix']
+
     nsum = 0
     volsum = 0.0
     asum= bsum= csum= 0.0
@@ -67,14 +71,14 @@ def main(args):
     beta  = betsum/nsum
     gamma = gmmsum/nsum
 
-    with open('data.pmd.vol','w') as f:
+    with open(prefix+'.vol','w') as f:
         f.write('{0:15.3f}\n'.format(vol))
 
-    with open('data.pmd.lat','w') as f:
+    with open(prefix+'.lat','w') as f:
         f.write(' {0:10.3f} {1:10.3f} {2:10.3f}'.format(a,b,c)
                 +' {0:10.3f} {1:10.3f} {2:10.3f}\n'.format(alpha,beta,gamma))
 
-    print('Wrote data.pmd.vol data.pmd.lat')
+    print('Wrote {0:s}.vol {0:s}.lat'.format(prefix))
 
     
 if __name__ == "__main__":

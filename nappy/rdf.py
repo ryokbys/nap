@@ -200,9 +200,12 @@ if __name__ == "__main__":
     outfile.write('# 1:{0:10s} 2:{1:13s}'.format('rd[i],','agr[0,0,i],'))
     n = 2
     for isid in range(1,nspcs+1):
+        si = specorder[isid]
         for jsid in range(isid,nspcs+1):
+            sj = specorder[jsid]
             n += 1
-            outfile.write(' {0:d}:{1:10s}'.format(n,'agr[{0:d}-{1:d}]'.format(isid,jsid)))
+            #outfile.write(' {0:d}:{1:10s}'.format(n,'agr[{0:d}-{1:d}]'.format(isid,jsid)))
+            outfile.write(' {0:d}:{1:s}-{2:s}'.format(n,si,sj))
     outfile.write('\n')
     for i in range(nr):
         outfile.write(' {0:10.4f} {1:13.5e}'.format(rd[i],agr[0,0,i]))
