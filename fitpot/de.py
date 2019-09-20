@@ -115,8 +115,8 @@ class DE:
         self.F = F   # Fraction of mixing in DE
         self.CR = CR # Cross-over rate
         self.T = T   # Temperature (kT) to compute adoption probability
-        if self.T < 1e-10:
-            raise ValueError('T is too small.')
+        # if self.T < 1e-10:
+        #     raise ValueError('T is too small.')
         self.ndim = len(variables)
         self.vs = variables
         self.vrs = vranges
@@ -303,10 +303,10 @@ class DE:
                     pass
 
             if self.print_level > 0:
-                print(' step,time,best,vars= {0:8d} {1:8.1f}  {2:9.4f}'.format(it+1, time()-start,
+                print(' step,time,best,vars= {0:6d} {1:8.1f}  {2:8.4f}'.format(it+1, time()-start,
                                                                                self.bestind.val),end="")
-                for i in range(min(10,self.ndim)):
-                    print(' {0:11.3e}'.format(self.bestind.vector[i]),end="")
+                for i in range(min(16,self.ndim)):
+                    print(' {0:6.3f}'.format(self.bestind.vector[i]),end="")
                 print('', flush=True)
 
             for i,ind in enumerate(self.population):

@@ -48,8 +48,10 @@ def read_in_fitpot(fname='in.fitpot'):
     specorder = None
     interact = []
     rdf_pairs = []
+    adf_triplets = []
     infp['interact'] = interact
     infp['rdf_pairs'] = rdf_pairs
+    infp['adf_triplets'] = adf_triplets
     
     with open(fname,'r') as f:
         lines = f.readlines()
@@ -104,6 +106,9 @@ def read_in_fitpot(fname='in.fitpot'):
         elif data[0] == 'rdf_pairs':
             mode = 'rdf_pairs'
             nint = int(data[1])
+        elif data[0] == 'adf_triplets':
+            mode = 'adf_triplets'
+            nint = int(data[1])
         elif data[0] == 'sample_error':
             mode = 'sample_error'
         elif data[0] == 'rdf_match':
@@ -157,6 +162,9 @@ def read_in_fitpot(fname='in.fitpot'):
             elif mode == 'rdf_pairs' and len(data) == 2:
                 rdf_pairs.append(tuple(data))
                 infp['rdf_pairs'] = rdf_pairs
+            elif mode == 'adf_triplets' and len(data) == 3:
+                adf_triplets.append(tuple(data))
+                infp['adf_triplets'] = adf_triplets
             else:
                 mode = None
                 pass
@@ -286,7 +294,7 @@ def get_data(basedir,prefix='ref',**kwargs):
 
     specorder = kwargs['specorder']
     rdf_pairs = kwargs['rdf_pairs']
-    triplets = kwargs['triplets']
+    adf_triplets = kwargs['adf_triplets']
 
     rs = []
     rdfs = []
@@ -297,7 +305,7 @@ def get_data(basedir,prefix='ref',**kwargs):
     if kwargs['rdf_match']:
         rs,rdfs = read_rdf(basedir+'/data.{0:s}.rdf'.format(prefix),specorder,rdf_pairs)
     if kwargs['adf_match']:
-        ths,adfs = read_adf(basedir+'/data.{0:s}.adf'.format(prefix),specorder,triplets)
+        ths,adfs = read_adf(basedir+'/data.{0:s}.adf'.format(prefix),specorder,adf_triplets)
     if kwargs['vol_match']:
         vol = read_vol(basedir+'/data.{0:s}.vol'.format(prefix))
     if kwargs['lat_match']:
@@ -317,7 +325,7 @@ def loss_func(pmddata,**kwargs):
     refdata = kwargs['refdata']
     wgts = kwargs['weights']
     rdf_pairs = kwargs['rdf_pairs']
-    triplets = kwargs['triplets']
+    adf_triplets = kwargs['adf_triplets']
 
     #...RDF
     Lr = 0.0
@@ -343,11 +351,11 @@ def loss_func(pmddata,**kwargs):
 
     #...ADF
     Lth = 0.0
-    if kwargs['adf_match'] and len(triplets) != 0:
+    if kwargs['adf_match'] and len(adf_triplets) != 0:
         ths = refdata['ths']
         adfs_ref = refdata['adfs']
         adfs_pmd = pmddata['adfs']
-        for t in triplets:
+        for t in adf_triplets:
             adf_ref = adfs_ref[t]
             adf_pmd = adfs_pmd[t]
             diff2sum = 0.0
@@ -359,7 +367,7 @@ def loss_func(pmddata,**kwargs):
                 diff2sum += diff*diff
                 z += ref*ref
             Lth += diff2sum /z #/len(ths)
-        Lth /= len(triplets)
+        Lth /= len(adf_triplets)
 
     #...volume
     Lvol = 0.0
@@ -547,9 +555,11 @@ def main(args):
             for j in range(i,len(specorder)):
                 sj = specorder[j]
                 rdf_pairs.append((si,sj))
+
     
     # print('pairs    =',pairs)
     # print('rdf_pairs=',rdf_pairs)
+    adf_triplets = infp['adf_triplets']
     triplets = get_triplets(infp['interactions'])
     rc2,rc3,vs,vrs = read_vars_fitpot(infp['param_file'])
 
@@ -561,6 +571,7 @@ def main(args):
     kwargs['pairs'] = pairs
     kwargs['rdf_pairs'] = rdf_pairs
     kwargs['triplets'] = triplets
+    kwargs['adf_triplets'] = adf_triplets
     kwargs['pmddir-prefix'] = args['--pmddir-prefix']
     kwargs['pmd-script'] = args['--pmd-script']
     kwargs['start'] = start
