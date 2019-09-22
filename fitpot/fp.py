@@ -155,6 +155,14 @@ def read_in_fitpot(fname='in.fitpot'):
             temp = float(data[1])
             infp['de_temperature'] = temp
             mode = None
+        elif data[0] == 'cs_num_individuals':
+            nind = int(data[1])
+            infp['cs_num_individuals'] = nind
+            mode = None
+        elif data[0] == 'cs_fraction':
+            frac = float(data[1])
+            infp['cs_fraction'] = frac
+            mode = None
         else:
             if mode == 'interactions' and len(data) in (2,3):
                 interact.append(tuple(data))
@@ -540,6 +548,7 @@ def lat_vasp2dump(a,b,c,alpha,beta,gamma):
     
 def main(args):
     from fitpot.de import DE
+    from fitpot.cs import CS
 
     start = time.time()
 
@@ -592,15 +601,19 @@ def main(args):
     kwargs['vids'] = vids
     kwargs['npqs'] = npqs
 
-
-    N = infp['de_num_individuals']
-    F = infp['de_fraction']
-    T = infp['de_temperature']
-    CR = infp['de_crossover_rate']
-    de = DE(N,F,CR,T, vs,vrs, func_wrapper, write_vars_fitpot, **kwargs)
-
     maxiter = kwargs['num_iteration']
-    de.run(maxiter)
+    if kwargs['fitting_method'] in ('de','DE'):
+        N = infp['de_num_individuals']
+        F = infp['de_fraction']
+        T = infp['de_temperature']
+        CR = infp['de_crossover_rate']
+        opt = DE(N,F,CR,T, vs,vrs, func_wrapper, write_vars_fitpot, **kwargs)
+    elif kwargs['fitting_method'] in ('cs','CS','cuckoo','Cuckoo'):
+        N = infp['cs_num_individuals']
+        F = infp['cs_fraction']
+        opt = CS(N,F, vs,vrs, func_wrapper, write_vars_fitpot, **kwargs)
+
+    opt.run(maxiter)
 
     print('elapsed time = {0:f} sec.'.format(time.time()-start))
     
