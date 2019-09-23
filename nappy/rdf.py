@@ -204,7 +204,6 @@ if __name__ == "__main__":
         for jsid in range(isid,nspcs+1):
             sj = specorder[jsid-1]
             n += 1
-            #outfile.write(' {0:d}:{1:10s}'.format(n,'agr[{0:d}-{1:d}]'.format(isid,jsid)))
             outfile.write('  {0:d}:{1:s}-{2:s},   '.format(n,si,sj))
     outfile.write('\n')
     for i in range(nr):
