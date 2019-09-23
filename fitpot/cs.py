@@ -245,11 +245,12 @@ class CS:
                     v = abs(np.random.normal()*self.vsgm)
                     v = max(v,1.0e-8)
                     w = u/v**self.betai
+                    zeta = self.vws[iv] *0.01 *w
                     # zeta = self.vws[iv]*0.01 *w *(vi[iv] -vbest[iv])
-                    if ip == 0:
-                        zeta = self.vws[iv] *0.001 *w
-                    else:
-                        zeta = 0.01 *w *(vi[iv] -vbest[iv])
+                    # if ip == 0:
+                    #     zeta = self.vws[iv] *0.001 *w
+                    # else:
+                    #     zeta = 0.01 *w *(vi[iv] -vbest[iv])
                     vnew[iv] = vnew[iv] +zeta*np.random.normal()
                 #...create new individual for trial
                 # print('ip,vi,vnew=',ip,vi,vnew)
