@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """
-Extract averaged volume and lattice parameters from dump files.
+Extract averaged volume and lattice parameters from files.
 
 Usage:
-  dumps2vol.py [options] DUMPS [DUMPS...]
+  vol_lat.py [options] FILES [FILES...]
 
 Options:
   -h, --help  Show this message and exit.
@@ -35,19 +35,19 @@ def nsys2lat(nsys):
 
 def main(args):
 
-    dumps = args['DUMPS']
-    dumps.sort(key=get_key, reverse=True)
+    files = args['FILES']
+    files.sort(key=get_key, reverse=True)
     nskip = int(args['--skip'])
-    del dumps[:nskip]
+    del files[:nskip]
     prefix = args['--prefix']
 
     nsum = 0
     volsum = 0.0
     asum= bsum= csum= 0.0
     alpsum= betsum= gmmsum= 0.0
-    for i,dump in enumerate(dumps):
+    for i,fi in enumerate(files):
         try:
-            nsys = NAPSystem(fname=dump)
+            nsys = NAPSystem(fname=fi)
             volsum += nsys.volume()
             a,b,c,alpha,beta,gamma = nsys2lat(nsys)
             asum += a
@@ -58,7 +58,7 @@ def main(args):
             gmmsum += gamma
             nsum += 1
         except:
-            print('Failed {0:s} '.format(dump))
+            print('Failed {0:s} '.format(fi))
             pass
 
     if nsum < 1:
