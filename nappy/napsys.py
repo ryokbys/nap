@@ -1278,7 +1278,14 @@ You need to specify the species order correctly with --specorder option.
                 self.poss[i,:] = [ pi[1],pi[2],pi[0] ]
         return None
         
-    def repeat(self,n1,n2,n3,n1m=0,n2m=0,n3m=0):
+    def repeat(self,n1o,n2o,n3o,n1m=0.0,n2m=0.0,n3m=0.0):
+        #...Convert to int
+        n1 = int(n1o)
+        n2 = int(n2o)
+        n3 = int(n3o)
+        if n1 == 0: n1 = 1
+        if n2 == 0: n2 = 1
+        if n3 == 0: n3 = 1
         if n1 == n2 == n3 == 1:
             return None
         #...unit vectors to be repeated
@@ -1319,6 +1326,56 @@ You need to specify the species order correctly with --specorder option.
         self.poss = copy.deepcopy(newposs)
         self.vels = copy.deepcopy(newvels)
         self.frcs = copy.deepcopy(newfrcs)
+
+    def divide(self,*ds):
+        """
+        Divide lattice vectors by (d1,d2,d3).
+        Atoms whose scaled positions are greater than ds[#] are to be removed.
+        """
+        if len(ds) != 3:
+            raise ValueError('len(ds) != 3.')
+
+        #...1st, count numbers to remove
+        nrm = 0
+        for ia in range(self.natm):
+            pi = self.poss[ia]
+            for l in range(3):
+                if pi[l] >= ds[l]:
+                    nrm += 1
+                    break
+
+        newnatm = self.natm -nrm
+        self.a1 = self.a1 *ds[0]
+        self.a2 = self.a2 *ds[1]
+        self.a3 = self.a3 *ds[2]
+        newsids = np.zeros(newnatm,dtype=int)
+        newposs = np.zeros((newnatm,3))
+        newvels = np.zeros((newnatm,3))
+        newfrcs = np.zeros((newnatm,3))
+        inc = 0
+        for ia in range(self.natm):
+            pi = self.poss[ia]
+            survive = True
+            for l in range(3):
+                if pi[l] >= ds[l]:
+                    survive = False
+                    break
+            if survive:
+                pinew = np.array(pi)
+                for l in range(3):
+                    if ds[l] < 0.9:
+                        pinew[l] = pinew[l] /ds[l]
+                newsids[inc] = self.sids[ia]
+                newposs[inc,:] = pinew
+                newvels[inc,:] = self.vels[ia,:]
+                newfrcs[inc,:] = self.frcs[ia,:]
+                inc += 1
+        self.natm = newnatm
+        self.sids = copy.deepcopy(newsids)
+        self.poss = copy.deepcopy(newposs)
+        self.vels = copy.deepcopy(newvels)
+        self.frcs = copy.deepcopy(newfrcs)
+        return None
 
     def add_vacuum(self,va,vb,vc):
         """
@@ -1854,7 +1911,7 @@ if __name__ == "__main__":
     specorder= args['--specorder'].split(',')
     if specorder == 'None' or 'None' in specorder:
         specorder = []
-    copies= [ int(i) for i in args['--periodic-copy'].split(',') ]
+    copies= [ float(i) for i in args['--periodic-copy'].split(',') ]
     charges= args['--charges']
     if charges == 'None':
         charges = []
@@ -1870,14 +1927,16 @@ if __name__ == "__main__":
     
     #...Periodic copy if needed
     copy_needed = False
+    divide_needed = False
     for c in copies:
-        if c != 1:
+        if c > 1.5:
             copy_needed = True
-            break
-        elif c < 1:
-            raise ValueError(' Periodic copy was wrong. It should be >= 1.')
+        elif c < 0.9:
+            divide_needed = True
     if copy_needed:
-        nsys.repeat(copies[0],copies[1],copies[2])
+        nsys.repeat(*copies)
+    if divide_needed:
+        nsys.divide(*copies)
 
     if args['analyze']:
         analyze(nsys)
