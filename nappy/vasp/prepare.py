@@ -181,8 +181,8 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
         f.write("ENCUT  =  {0:7.3f}\n".format(encut))
         f.write("LREAL  =  Auto\n")
         f.write("EDIFF  =  {0:7.1e}\n".format(ediff))
-        f.write("ALGO   =  Normal\n")
-        f.write("PREC   =  Normal\n")
+        f.write("ALGO   =  Very Fast\n")
+        f.write("PREC   =  High\n")
         if 'md' in mode:
             f.write("LWAVE  =  F  ! Not to write wave function data into file.\n")
             f.write("LCHARG =  F  ! Not to write charge distribution into file.\n")
