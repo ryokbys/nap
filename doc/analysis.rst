@@ -31,7 +31,7 @@ users can plot energy evolution using ``gnuplot`` command as,
 ::  
 
   $ gnuplot
-  gnuplot> plot 'out.erg' us 1:2 w l, 'out.erg' us 1:3 w l, 'out.erg' us 1:4 w l
+  gnuplot> plot 'out.erg' us 1:3 w l t 'total', 'out.erg' us 1:4 w l t 'kinetic', 'out.erg' us 1:5 w l t 'potential'
 
 Or copy ``util/gp.erg`` script to the working directory and,
 ::
@@ -85,15 +85,11 @@ according to the rule; the minimum cell made of faces that bisect atom bonds.
 To perform Voronoi analysis, you need to instal ``voro++`` first, and then 
 ::
 
-  $ python /path/to/nap/nappy/akr2voro.py akr0000
+  $ python /path/to/nap/nappy/voro.py pmd_####
 
-This command will provide an output ``akr0000.voro`` and ``akr0000.voro.vol`` which are
+This command will provide an output ``pmd_####.voro`` and ``pmd_####.voro.vol`` which are
 input and output of ``voro++``, respectively.
 
-.. note::
-
-   This *akr* format is obsolete. But currently there is no other Voronoi analysis tool in this package.
-   So if you need to do Voronoi analysis, you need to convert ``pmd_####`` files to ``akr####`` files by using ``napsys.py convert``.
 
 
 --------
@@ -107,31 +103,34 @@ Radial distribution function (RDF)
 To get the RDF,
 ::
 
-   $ python /path/to/nap/nappy/rdf.py [options] 0 0 pos0001 [pos0002...]
+   $ python /path/to/nap/nappy/rdf.py [options] dump_0*
 
 then, you get averaged RDF over atoms in ``out.rdf``.
 
-Given atom configuration files, ``pos####``, are read and average over atoms in those files are taken.
-
-1st and 2nd arguments indicate the species indice (Integer) of origin and distination atoms, 
-where 0 means any species.
+Given atom configuration files, ``dump_####``, are read and average over atoms in those files are taken.
 
 Options are shown below,
 ::
 
    Options:
-       -h, --help  Show this help message and exit.
-       -d DR       Width of the bin. [default: 0.1]
-       -r RMAX     Cutoff radius of radial distribution. [default: 5.0]
-       -s FMT      Input file format. If is not *akr*, users must specify it. [default: akr]
-       --gsmear=SIGMA
-                   Width of Gaussian smearing, zero means no smearing. [default: 0]
-       -o OUT      Output file name. [default: out.rdf]
-       -p          Plot a graph on the screen. [default: False]
+     -h, --help  Show this help message and exit.
+     -d DR       Width of the bin. [default: 0.1]
+     -r RMAX     Cutoff radius of radial distribution. [default: 5.0]
+     --gsmear=SIGMA
+                 Width of Gaussian smearing, zero means no smearing. [default: 0]
+     -o OUT      Output file name. [default: out.rdf]
+     --specorder=SPECORDER
+                 Order of species separated by comma, like, --specorder=W,H. [default: None]
+     --skip=NSKIP 
+                 Skip first NSKIP steps from the statistics. [default: 0]
+     --no-average
+                 Not to take average over files.
+     --no-normalize
+                 Not to normalize by the density.
+     --plot      Plot figures. [default: False]
 
 The RDF of each pair of species normalized with the density of all atoms.
-Therefore the sum of RDF of every pairs equals to the RDF of 0-0 pair, 
-which means the RDF from any species to any species, as shown in the graph below.
+Therefore the sum of RDF of all the pairs equals to the total RDF as shown in the graph below.
 
 .. image:: ./figs/graph_rdf.png
 
@@ -142,25 +141,32 @@ which means the RDF from any species to any species, as shown in the graph below
 Angular distribution function (ADF)
 ====================================
 
-To get ADF,
+To get ADF, perform ``adf.py`` something like,
 ::
 
-   $ python /path/to/nap/nappy/adf.py [options] i j k pos0001 [pos0002...]
+   $ python /path/to/nap/nappy/adf.py --triplets=Li-O-O,P-O-O dump_0*
 
-Same as ``rdf.py``, indices of species (``i``, ``j``, ``k``) that consist the angle between to bonds should be given.
-The angles between bonds *i-j* and *i-k* are to be obtained.
+The triplets consisting angles must be provided via the option ``--triplets``. 
+Note that the 1st species in the triplet is the central atom having bonds to the other two atoms, which maybe counter-intuitive.
+
+Here is some options of ``adf.py``,
 ::
 
    Options:
-       -h, --help  Show this help message and exit.
-       -w DEG      Width of the angular degree. [default: 1.0]
-       -r RCUT     Cutoff radius of the bonding pair. [default: 3.0]
-       -s FMT      Input file format. If is not *akr*, users must specify it. [default: akr]
-       --gsmear=SIGMA
-                   Width of Gaussian smearing, zero means no smearing. [default: 0]
-       -o OUT      Output file name [default: out.adf]
-       -p          Plot a graph on the screen. [default: False]
-
+     -h, --help  Show this help message and exit.
+     -w DEG      Width of the angular degree. [default: 1.0]
+     -r RCUT     Cutoff radius of the bonding pair. [default: 3.0]
+     --gsmear=SIGMA
+                 Width of Gaussian smearing, zero means no smearing. [default: 0]
+     --triplets=TRIPLETS
+                 Triplets whose angles are to be computed. Three species should be specified connected by hyphen,
+                 and separated by comma, e.g.) P-O-O,Li-O-O. [default: None]
+     -o OUT      Output file name [default: out.adf]
+     --skip=NSKIP 
+                 Skip first NSKIP steps from the statistics. [default: 0]
+     --no-average
+                 Not to take average over files.
+     --plot      Plot figures. [default: False]
 
 
 ----------------

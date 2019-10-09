@@ -1278,7 +1278,7 @@ You need to specify the species order correctly with --specorder option.
                 self.poss[i,:] = [ pi[1],pi[2],pi[0] ]
         return None
         
-    def repeat(self,n1o,n2o,n3o,n1m=0.0,n2m=0.0,n3m=0.0):
+    def repeat(self,n1o,n2o,n3o,n1m=0,n2m=0,n3m=0):
         #...Convert to int
         n1 = int(n1o)
         n2 = int(n2o)

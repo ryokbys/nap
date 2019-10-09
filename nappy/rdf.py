@@ -17,10 +17,8 @@ Options:
               Order of species separated by comma, like, --specorder=W,H. [default: None]
   --skip=NSKIP 
               Skip first NSKIP steps from the statistics. [default: 0]
-  --no-average
-              Not to take average over files.
-  --no-normalize
-              Not to normalize by the density.
+  --no-pairwise
+              Not to take averaging by pairwise.
   --plot      Plot figures. [default: False]
 """
 from __future__ import print_function
@@ -45,8 +43,8 @@ def compute_ndr(ia,isid,dr,rmax,nsys,nspcs):
     This routine can be only applied to cubic systems.
     """
     nr= int(rmax/dr) +1
-    #ndr= np.zeros(nr,dtype=np.int)
-    ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=np.int)
+    ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
+    # ndr = np.zeros((nspcs+1,nr),dtype=np.int)
     natm= nsys.natm
     hmat= (nsys.alc *np.array([nsys.a1,nsys.a2,nsys.a3])).transpose()
     pi= nsys.poss[ia]
@@ -64,19 +62,26 @@ def compute_ndr(ia,isid,dr,rmax,nsys,nspcs):
             continue
         rrdr= rij/dr
         ir = int(rrdr)
-        ndr[0,0,ir]= ndr[0,0,ir] +1
-        ndr[isid,jsid,ir] = ndr[isid,jsid,ir] +1
+        ndr[0,0,ir] += 1.0
+        ndr[isid,jsid,ir] += 1.0
+        ndr[jsid,isid,ir] += 1.0 # counter pair as well
+        # ndr[0,ir]= ndr[0,ir] +1
+        # ndr[jsid,ir] = ndr[jsid,ir] +1
     return ndr
 
-def rdf(nsys,nspcs,dr,rmax,normalize=True):
+def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
+    import copy
+    
+    natm0= nsys0.natm
+    vol= nsys0.volume()
+    natms = [ float(natm0)]
+    for ispcs in range(1,nspcs+1):
+        natms.append(float(nsys0.num_atoms(ispcs)))
 
-    natm0= nsys.natm
-    vol= nsys.volume()
-    rho= float(natm0)/vol
-
+    nsys = copy.deepcopy(nsys0)
     n1,n2,n3= nsys.get_expansion_num(2.0*rmax)
     if not (n1==1 and n2==1 and n3==1):
-        print(' system to be repeated, n1,n2,n3=',n1,n2,n3)
+        print(' Extend system by {0:d}x{1:d}x{2:d}'.format(n1,n2,n3))
         nsys.repeat(n1,n2,n3)
 
     nr= int(rmax/dr)+1
@@ -87,18 +92,41 @@ def rdf(nsys,nspcs,dr,rmax,normalize=True):
         ndr= compute_ndr(ia,isid,dr,rmax,nsys,nspcs)
         for ir in range(nr):
             nadr[:,:,ir] += ndr[:,:,ir]
-    #nadr /= nsrc
+
+    # #...Symmetrize
+    # for isid in range(1,nspcs):
+    #     for jsid in range(isid+1,nspcs+1):
+    #         nadr[jsid,isid,:] += nadr[isid,jsid,:]
+    #         nadr[isid,jsid,:] = nadr[jsid,isid,:]
 
     #...normalize
-    if normalize:
+    if pairwise:
+        # print('is,js,rho=',0,0,rhos[0])
+        tmp = 4.0 *np.pi *natms[0]*(natms[0]-1) *dr
         for ir in range(1,nr):
             r= dr *ir
-            nadr[:,:,ir]= nadr[:,:,ir]/(4.0*np.pi*rho*r*r*dr)
+            nadr[0,0,ir] /= tmp*r*r
+        for isid in range(1,nspcs+1):
+            ni = natms[isid]
+            for jsid in range(1,nspcs+1):
+                nj = natms[jsid]
+                tmp = 4.0*np.pi*dr  /vol
+                if isid == jsid:
+                    tmp *= ni*(ni-1)
+                else:
+                    tmp *= ni*nj
+                for ir in range(1,nr):
+                    r= dr *ir
+                    nadr[isid,jsid,ir] /= tmp*r*r
+    else:
+        tmp = 4.0 *np.pi *natms[0]*natms[0]/vol *dr
+        for ir in range(1,nr):
+            r= dr *ir
+            nadr[:,:,ir] /= tmp*r*r
 
-    return rd,nadr,natm0
+    return rd,nadr
 
-def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,average=True,
-                normalize=True):
+def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,pairwise=False):
     nspcs = len(specorder)
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     nsum= 0
@@ -108,12 +136,10 @@ def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,average=True,
             sys.exit()
         nsys= NAPSystem(fname=infname,specorder=specorder)
         print(' File =',infname)
-        rd,gr,n= rdf(nsys,nspcs,dr,rmax,normalize=normalize)
-        nsum += n
+        rd,gr= rdf(nsys,nspcs,dr,rmax,pairwise=pairwise)
         agr += gr
-    # agr /= len(infiles)
-    if average:
-        agr /= nsum
+        nsum += 1
+    agr /= nsum
     return rd,agr
 
 def plot_figures(specorder,rd,agr):
@@ -167,10 +193,8 @@ if __name__ == "__main__":
     specorder = [ x for x in args['--specorder'].split(',') ]
     if specorder == ['None']:
         specorder = []
-    no_average = args['--no-average']
-    no_normalize = args['--no-normalize']
-    average = not no_average
-    normalize = not no_normalize
+    no_pairwise = args['--no-pairwise']
+    pairwise = not no_pairwise
     plot = args['--plot']
     nskip = int(args['--skip'])
 
@@ -178,12 +202,13 @@ if __name__ == "__main__":
     if nspcs < 1:
         raise ValueError('--specorder must be set.')
 
-    infiles.sort(key=get_key,reverse=True)
+    if len(infiles) > 1:
+        infiles.sort(key=get_key,reverse=True)
     del infiles[:nskip]
 
     nr= int(rmax/dr) +1
     rd,agr= rdf_average(infiles,nr,specorder,dr=dr,rmax=rmax,
-                        average=average,normalize=normalize)
+                        pairwise=pairwise)
 
     if not sigma == 0:
         print(' Gaussian smearing...')
@@ -202,6 +227,7 @@ if __name__ == "__main__":
     for isid in range(1,nspcs+1):
         si = specorder[isid-1]
         for jsid in range(isid,nspcs+1):
+        # for jsid in range(1,nspcs+1):
             sj = specorder[jsid-1]
             n += 1
             outfile.write('  {0:d}:{1:s}-{2:s},   '.format(n,si,sj))
@@ -210,6 +236,7 @@ if __name__ == "__main__":
         outfile.write(' {0:10.4f} {1:13.5e}'.format(rd[i],agr[0,0,i]))
         for isid in range(1,nspcs+1):
             for jsid in range(isid,nspcs+1):
+            # for jsid in range(1,nspcs+1):
                 outfile.write(' {0:12.4e}'.format(agr[isid,jsid,i]))
         outfile.write('\n')
     outfile.close()
