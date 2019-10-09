@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-09-03 13:03:49 Ryo KOBAYASHI>
+!                     Last modified: <2019-10-09 21:55:33 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -44,6 +44,8 @@ module Coulomb
 !.....Species charge
   real(8):: schg(nspmax),schg0(nspmax)
 !  logical,allocatable:: interact(:,:)
+!.....Interactions
+  character(len=20):: cinteract = 'full'
   logical:: interact(nspmax,nspmax)
 !.....ideal valence charges of species
   real(8):: vid_bvs(nspmax)
@@ -565,7 +567,7 @@ contains
     
     character(len=128):: cmode,cline,ctmp,fname
     character(len=3):: cname,csp,cspj,cspi
-    integer:: i,ierr,jerr,isp,jsp,npq
+    integer:: i,ierr,jerr,isp,jsp,npq,nentry
     real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
          ,vcgjiimin,sgmlim, rin,rout,rhoij
 
@@ -582,6 +584,7 @@ contains
       qlower(1:nspmax) = 0d0
       qupper(1:nspmax) = 0d0
       rho_bvs(:,:) = -1d0
+      cmode = 'none'
 !.....File name
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
@@ -635,8 +638,18 @@ contains
           if( iprint.gt.1 ) print *,trim(ctmp),' '//trim(cterms)
           cycle
         else if( trim(cline).eq.'interactions' ) then
-          cmode = 'interactions'
-          interact(1:nspmax,1:nspmax) = .false.
+          backspace(ioprms)
+          read(ioprms,'(a)') ctmp
+          nentry = num_data(ctmp,' ')
+          if( nentry.eq.1 ) then
+            cmode = 'interactions'
+            cinteract = 'given'
+            interact(1:nspmax,1:nspmax) = .false.
+          else if( nentry.eq.2 ) then
+            backspace(ioprms)
+            read(ioprms,*) ctmp, cinteract
+            cmode = 'none'
+          endif
           cycle
         else if( trim(cline).eq.'sigma' ) then
           backspace(ioprms)
@@ -810,6 +823,7 @@ contains
       call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(cinteract,20,mpi_character,0,mpi_world,ierr)
       call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
       call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
     
@@ -835,6 +849,14 @@ contains
           enddo
         enddo
       endif
+    endif
+
+    if( (trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') &
+         .and. trim(cinteract).eq.'same_sign' ) then
+      if( myid.eq.0 ) print *,'ERROR@read_paramsx: variable/qeq '&
+           //'cannot be used with same_sign interactions.'
+      call mpi_finalize(ierr)
+      stop 1
     endif
 
     if( myid.eq.0 .and. iprint.ne.0 ) then
@@ -890,6 +912,16 @@ contains
       allocate(strsl(3,3,namax))
       if( trim(cchgs).eq.'fixed_bvs' ) then
         call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
+      endif
+!.....In case that Coulomb interactions work only between species having
+!     charges of the same sign, set interaction array after setting BVS charges.
+      if( trim(cinteract).eq.'same_sign' ) then
+        interact(:,:) = .false.
+        do is=1,nsp
+          do js=1,nsp
+            if( schg(is)*schg(js).gt.0d0 ) interact(is,js) = .true.
+          enddo
+        enddo
       endif
     endif
 
@@ -2177,7 +2209,6 @@ contains
     character(len=3),intent(in):: specorder(nspmax)
 
     integer,allocatable:: nbvsl(:),nbvs(:)
-    real(8),allocatable:: vc_bvs(:)
     integer:: i,is,ierr
     real(8):: sum_anion,sum_cation
     character(len=3):: csp
@@ -2195,7 +2226,7 @@ contains
 !!$    return
 !!$!.....END DEBUGGING
 
-    allocate(nbvsl(nspmax),nbvs(nspmax),vc_bvs(nspmax))
+    allocate(nbvsl(nspmax),nbvs(nspmax))
     nbvsl(1:nspmax) = 0
     nbvs(1:nspmax) = 0
     do i=1,natm
@@ -2219,16 +2250,16 @@ contains
 !.....Compute valence charges of species
     do is=1,nspmax
       if( vid_bvs(is).lt.0d0 ) then  ! anion
-        vc_bvs(is) = vid_bvs(is)/sqrt(dble(npq_bvs(is))) &
+        schg(is) = vid_bvs(is)/sqrt(dble(npq_bvs(is))) &
              *sqrt(sum_cation/sum_anion)
       else if( vid_bvs(is).gt.0d0 ) then ! cation
-        vc_bvs(is)= vid_bvs(is)/sqrt(dble(npq_bvs(is))) &
+        schg(is)= vid_bvs(is)/sqrt(dble(npq_bvs(is))) &
              *sqrt(sum_anion/sum_cation)
       endif
     enddo
 
 !!$!.....Overwrite charges for debugging...
-!!$    vc_bvs(1:4) = (/ 1.27443, 0.78466, 1.10968, 3.20338/)
+!!$    schg(1:4) = (/ 1.27443, 0.78466, 1.10968, 3.20338/)
 
     if( myid.eq.0 .and. iprint.gt.0 ) then
       print *,''
@@ -2237,22 +2268,22 @@ contains
         if( vid_bvs(is).eq.0d0 ) cycle
         csp = specorder(is)
         write(6,'(a,a4,2f7.3)') '   csp, V_ideal, V_actual = '&
-             ,trim(csp),vid_bvs(is),vc_bvs(is)
+             ,trim(csp),vid_bvs(is),schg(is)
       enddo
     endif
 
     do i=1,natm+nb
       is= int(tag(i))
-      chg(i) = vc_bvs(is)
+      chg(i) = schg(is)
 !!$!.....Negative charge for anion and positive for cation
 !!$      if( is .eq. 1 ) then
-!!$        chg(i)= -vc_bvs(is)
+!!$        chg(i)= -schg(is)
 !!$      else
-!!$        chg(i)= vc_bvs(is)
+!!$        chg(i)= schg(is)
 !!$      endif
     enddo
 
-    deallocate(nbvsl,nbvs,vc_bvs)
+    deallocate(nbvsl,nbvs)
 
   end subroutine set_charge_BVS
 !=======================================================================

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-09-20 13:45:22 Ryo KOBAYASHI>
+!                     Last-modified: <2019-10-02 16:02:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -197,9 +197,9 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   call setup(nspmax,am,fekin,fa2v)
 !-----set HI and SGM
   call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
-  if( myid_md.eq.0 ) then
-    write(6,'(a,f0.2,a)') ' Cell volume = ',vol,' Ang^3'
-  endif
+!!$  if( myid_md.eq.0 ) then
+!!$    write(6,'(a,f0.2,a)') ' Cell volume = ',vol,' Ang^3'
+!!$  endif
 !-----ntset
   call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
@@ -1047,7 +1047,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
          trim(cpctl).eq.'vc-Berendsen' .or. &
          trim(cpctl).eq.'vv-Berendsen' ) then
       call cell_info(h)
-      write(6,'(a,f16.5,a)')  '  Cell volume     = ',vol,' Ang^3'
+!!$      write(6,'(a,f16.5,a)')  '  Cell volume     = ',vol,' Ang^3'
     endif
     write(6,*) ''
     if( iprint.gt.1 ) then
@@ -1331,7 +1331,8 @@ subroutine cell_info(h)
   implicit none
   real(8),intent(in):: h(3,3)
 
-  real(8):: a,b,c,alpha,beta,gamma
+  integer:: i,j,jm,jp,im,ip
+  real(8):: a,b,c,alpha,beta,gamma,sgm(3,3),vol
   real(8),parameter:: pi = 3.14159265358979d0
   real(8),external:: sprod
 
@@ -1359,6 +1360,20 @@ subroutine cell_info(h)
        ,beta,' deg.'
   write(6,'(a,f10.3,a,f7.2,a)') '   |c| = ',c,' Ang.,  gamma = ' &
        ,gamma,' deg.'
+
+!-----cofactor matrix, SGM
+  do j=1,3
+    jm=mod(j+1,3)+1
+    jp=mod(j,  3)+1
+    do i=1,3
+      im=mod(i+1,3)+1
+      ip=mod(i,  3)+1
+      sgm(i,j)=h(ip,jp)*h(im,jm)-h(im,jp)*h(ip,jm)
+    enddo
+  enddo
+!-----MD-box volume
+  vol=h(1,1)*sgm(1,1)+h(2,1)*sgm(2,1)+h(3,1)*sgm(3,1)
+  write(6,'(a,f0.2,a)') ' Cell volume = ',vol,' Ang^3'
 
 end subroutine cell_info
 !=======================================================================
