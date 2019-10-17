@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-10-09 21:55:33 Ryo KOBAYASHI>
+!                     Last modified: <2019-10-17 15:53:24 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -672,6 +672,17 @@ contains
           read(ioprms,*) ctmp, rho_screened_cut
           if( iprint.gt.1 ) print *,trim(ctmp),rho_screened_cut
           cycle
+        else if( trim(cline).eq.'rad_screened_cut' ) then
+!.....Set rho_screened_cut minus to show rad should be used to determine rho_screened_cut
+          rho_screened_cut = -1d0 *abs(rho_screened_cut)
+          backspace(ioprms)
+          read(ioprms,*) ctmp, csp, rad
+          if( iprint.gt.1 ) print '(a,3x,a,1x,f7.4)',trim(ctmp), trim(csp), rad
+          isp = csp2isp(trim(csp),specorder)
+          if( isp.gt.0 ) then
+            rad_bvs(isp) = rad
+          endif
+          cycle
         else if( trim(cline).eq.'rhoij_screened_cut' ) then
           backspace(ioprms)
           read(ioprms,*) ctmp, cspi, cspj, rhoij
@@ -788,18 +799,26 @@ contains
       endif
 
 !.....Set screening length
-      if( trim(cchgs).eq.'fixed_bvs' ) then
-        do isp=1,nsp
-          do jsp=1,nsp
-            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+      if( trim(cterms).eq.'screened_cut' ) then
+        if( trim(cchgs).eq.'fixed_bvs' ) then
+          do isp=1,nsp
+            do jsp=1,nsp
+              rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+            enddo
           enddo
-        enddo
-      else
-        do isp=1,nsp
-          do jsp=1,nsp
-            if( rho_bvs(isp,jsp).lt.0d0 ) rho_bvs(isp,jsp) = rho_screened_cut
+        else if( rho_screened_cut.lt.0d0 ) then
+          do isp=1,nsp
+            do jsp=1,nsp
+              rho_bvs(isp,jsp) = rad_bvs(isp)+rad_bvs(jsp)
+            enddo
           enddo
-        enddo
+        else
+          do isp=1,nsp
+            do jsp=1,nsp
+              if( rho_bvs(isp,jsp).lt.0d0 ) rho_bvs(isp,jsp) = rho_screened_cut
+            enddo
+          enddo
+        endif
       endif
       
     endif  ! myid.eq.0

@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-08-05 15:32:32 Ryo KOBAYASHI>
+!                     Last-modified: <2019-10-17 15:21:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -306,6 +306,9 @@ contains
         enddo
 10      close(ioTein)
       endif
+!.....Broadcast Te distribution to all the nodes.
+!.....There could be smarter way to reduce networking cost.
+      call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real8,0,mpi_world,ierr)
     endif
 
     t_ttm = t_ttm +mpi_wtime() -t0

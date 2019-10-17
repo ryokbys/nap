@@ -1,6 +1,6 @@
 module pmdmpi
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-13 22:38:42 Ryo KOBAYASHI>
+!                     Last modified: <2019-10-11 20:52:53 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Module that includes variables and parameters used for parallel
 ! computation with mpi for spatial decomposition MD simulation.
@@ -82,7 +82,8 @@ contains
 !=======================================================================
   subroutine nid2xyz(id,ix,iy,iz)
 !
-!     Convert continuous node-id and cell position (kx,ky,kz)
+!  Convert continuous node-id and cell position (ix,iy,iz)
+!  Note: id,ix,iy,iz start from 0
 !
     integer,intent(in):: id
     integer,intent(out):: ix,iy,iz

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-10-02 16:02:05 Ryo KOBAYASHI>
+!                     Last-modified: <2019-10-11 20:46:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1826,9 +1826,9 @@ subroutine bacopy(rc,myid,mpi_md_world,iprint,ifcoulomb,l1st &
           lsb(lsb(0,kuh),kuh)=i
         endif
       enddo
-    endif                   ! if(nex.gt.1)
+    endif    ! if(nex.gt.1)
 
-!.....Depending on boundary condition and cell position,
+!.....If BC is not periodic (p),
 !.....number of to-be-sent atoms is set 0.
     if( boundary(kd:kd).ne.'p' )  then
       kul = 2*kd -1
