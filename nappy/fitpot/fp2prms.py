@@ -8,7 +8,7 @@ Usage:
 Options:
   -h, --help  Show this message and exit.
   --specorder SPECORDER
-              Species order in comma-seperated format, e.g.) Li,P,O. [default: None]
+              Species order in comma-separated format, e.g.) Li,P,O. [default: None]
   --pairs PAIRS
               Specify pairs for pair potential except for Coulomb by hyphen-connected and comma-separated,
               e.g.) Li-O,P-O. [default: None]

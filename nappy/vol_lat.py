@@ -78,7 +78,7 @@ def main(args):
         f.write(' {0:10.3f} {1:10.3f} {2:10.3f}'.format(a,b,c)
                 +' {0:10.3f} {1:10.3f} {2:10.3f}\n'.format(alpha,beta,gamma))
 
-    print('Wrote {0:s}.vol {0:s}.lat'.format(prefix))
+    print(' Wrote {0:s}.vol {0:s}.lat'.format(prefix))
 
     
 if __name__ == "__main__":

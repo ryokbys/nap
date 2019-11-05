@@ -43,6 +43,7 @@ def read_in_fitpot(fname='in.fitpot'):
     infp['fval_upper_limit'] = 1.0e+10
     infp['print_level'] = 1
     infp['weights'] = {'rdf':1.0, 'adf':1.0, 'vol':1.0, 'lat':1.0}
+    infp['update_vrange'] = -1
     
     mode = None
     specorder = None
@@ -162,6 +163,9 @@ def read_in_fitpot(fname='in.fitpot'):
         elif data[0] == 'cs_fraction':
             frac = float(data[1])
             infp['cs_fraction'] = frac
+            mode = None
+        elif data[0] == 'update_vrange':
+            infp['update_vrange'] = int(data[1])
             mode = None
         else:
             if mode == 'interactions' and len(data) in (2,3):

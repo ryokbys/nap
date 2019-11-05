@@ -165,7 +165,8 @@ if __name__ == "__main__":
     flag_plot= args['--plot']
     nskip = int(args['--skip'])
 
-
+    if nskip > len(infiles):
+        raise ValueError('NSKIP must be less than num of files given: ',len(infiles))
     infiles.sort(key=get_key,reverse=True)
     del infiles[:nskip]
 

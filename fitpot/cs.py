@@ -50,6 +50,47 @@ def wrap(vs,vrs):
         vsnew[i] = min(max(v,vmin),vmax)
     return vsnew
 
+def update_vrange(vrs,all_indivisuals):
+    """
+    Update variable ranges adaptively using all the individuals information.
+    """
+    #...Extract top NTOPS individuals from all
+    ntops = 100
+    tops = []
+    # print('len(all_indivisuals)=',len(all_indivisuals))
+    for i,ind in enumerate(all_indivisuals):
+        if len(tops) < ntops:  # add the individual
+            # print(' i (< ntops)=',i)
+            for it,t in enumerate(tops):
+                if ind.val < t.val:
+                    tops.insert(it,ind)
+                    break
+            if not ind in tops:
+                tops.append(ind)
+        else: # insert the individual and pop out the worst one
+            # print(' i (>=ntops)=',i)
+            for it,t in enumerate(tops):
+                if ind.val < t.val:
+                    tops.insert(it,ind)
+                    break
+            if len(tops) > ntops:
+                del tops[ntops:len(tops)]
+
+    # print('len(tops)=',len(tops))
+    # print('iids= ',[t.iid for t in tops])
+    #...Get new ranges
+    new_vrs = np.array(vrs)
+    vss = np.zeros((len(tops),len(vrs)))
+    for i,ind in enumerate(tops):
+        vi = ind.vector
+        vss[i,:] = vi[:]
+        # print('i,vi=',i,vi)
+    for j in range(len(new_vrs)):
+        # print('j,min,max=',i,min(vss[:,j]),max(vss[:,j]))
+        new_vrs[j,0] = max(new_vrs[j,0],min(vss[:,j]))
+        new_vrs[j,1] = min(new_vrs[j,1],max(vss[:,j]))
+    return new_vrs
+
 class Individual:
     """
     Individual class that consists of variables as vector elements.
@@ -119,7 +160,8 @@ class CS:
         self.F = F   # Fraction of worse individuals to be abondoned
         self.ndim = len(variables)
         self.vs = variables
-        self.vrs = vranges
+        self.vrs0 = vranges
+        self.vrs = copy.copy(self.vrs0)
         self.vws = np.zeros(self.ndim)
         for i in range(self.ndim):
             self.vws[i] = max(self.vrs[i,1] -self.vrs[i,0], 0.0)
@@ -130,7 +172,9 @@ class CS:
         self.bestind = None
         self.print_level = 0
         if 'print_level' in kwargs.keys():
-            self.print_level = kwargs['print_level']
+            self.print_level = int(kwargs['print_level'])
+        if 'update_vrange' in kwargs.keys():
+            self.update_vrs_per = kwargs['update_vrange']
 
         self.beta = 1.5
         self.betai = 1.0 /self.beta
@@ -140,6 +184,7 @@ class CS:
 
         #...initialize population
         self.population = []
+        self.all_indivisuals = []
         self.iidmax = 0
         for i in range(N):
             self.iidmax += 1
@@ -167,6 +212,7 @@ class CS:
             # print('ip,val,vec=',ip,pi.val,pi.vector)
         
         self.keep_best()
+        self.all_indivisuals.extend(self.population)
         if self.print_level > 2:
             for pi in self.population:
                 self.write_variables(pi,
@@ -273,6 +319,7 @@ class CS:
                 p.join()
             for ic,ci in enumerate(candidates):
                 ci.val = qs[ic].get()
+            self.all_indivisuals.extend(candidates)
 
             #...Pick j that is to be compared with i
             js = random.sample(range(self.N),k=self.N)
@@ -316,6 +363,7 @@ class CS:
                 p.join()
             for ic,ci in enumerate(candidates):
                 ci.val = qs[ic].get()
+            self.all_indivisuals.extend(candidates)
 
             #...Replace them with old ones
             ic = 0
@@ -331,6 +379,16 @@ class CS:
                     self.write_variables(ci,
                                          fname='in.vars.fitpot.{0:d}'.format(ci.iid),
                                          **self.kwargs)
+
+            #...Update variable ranges if needed
+            if self.update_vrs_per > 0 and (it+1) % self.update_vrs_per == 0:
+                self.vrs = update_vrange(self.vrs,self.all_indivisuals)
+                print(' Update variable ranges')
+                for i in range(len(self.vrs)):
+                    print(' {0:2d}:  {1:7.3f}  {2:7.3f}'.format(i+1,self.vrs[i,0],self.vrs[i,1]))
+                #...Set variable ranges of all individuals in the population
+                for iv in range(len(self.population)):
+                    self.population[iv].vranges = self.vrs
             
             if self.print_level > 0:
                 print(' step,time,best,vars= {0:6d} {1:8.1f}  {2:8.4f}'.format(it+1, time()-start,
