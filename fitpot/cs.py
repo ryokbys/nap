@@ -89,6 +89,17 @@ def update_vrange(vrs,all_indivisuals):
         # print('j,min,max=',i,min(vss[:,j]),max(vss[:,j]))
         new_vrs[j,0] = max(new_vrs[j,0],min(vss[:,j]))
         new_vrs[j,1] = min(new_vrs[j,1],max(vss[:,j]))
+
+    #...Set best variables center in the ranges
+    fbest = tops[0].val
+    vbest = tops[0].vector
+    for j in range(len(vbest)):
+        vjmin = new_vrs[j,0]
+        vjmax = new_vrs[j,1]
+        wmax = max(abs(vjmin-vbest[j]),abs(vjmax-vbest[j]))
+        new_vrs[j,0] = min(vjmin,vbest[j]-wmax)
+        new_vrs[j,1] = max(vjmax,vbest[j]+wmax)
+    
     return new_vrs
 
 class Individual:
