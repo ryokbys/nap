@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-07-06 10:06:55 Ryo KOBAYASHI>
+!                     Last modified: <2019-11-05 11:35:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -659,7 +659,7 @@ contains
       endif
 10    close(ioprms)
 
-    endif
+    endif  !  myid.eq.0
 
 20  continue
 
@@ -671,7 +671,7 @@ contains
            ,ted_b(ntemp),ted_lmbd1(ntemp),ted_lmbd2(ntemp) &
            ,ted_eta(ntemp),ted_delta(ntemp),ted_alpha(ntemp),ted_beta(ntemp) &
            ,ted_h(ntemp),ted_r1(ntemp),ted_r2(ntemp),ted_c1(ntemp),ted_c2(ntemp) &
-           ,ted_c3(ntemp),ted_c4(ntemp),ted_c5(ntemp))
+           ,ted_c3(ntemp),ted_c4(ntemp),ted_c5(ntemp),ted_f0(ntemp))
       call mpi_bcast(ted_te,ntemp,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ted_a,ntemp,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ted_b,ntemp,mpi_real8,0,mpi_world,ierr)

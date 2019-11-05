@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-10-17 15:21:25 Ryo KOBAYASHI>
+!                     Last-modified: <2019-10-17 16:21:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -769,7 +769,7 @@ contains
             goto 10  ! Go back and redo inner loop with the half dt_inner
           endif
         enddo  ! ic=1,nxyz
-        if( trim(ctype_pulse).eq.'stepwise' ) then
+        if( ctype_pulse(1:4).eq.'step' ) then
           if( tnow.ge.t0_laser .and. &
                tnow.le.(t0_laser +tau_pulse) ) then
             do ic=1,nxyz
@@ -794,7 +794,7 @@ contains
               ein_pulse = ein_pulse +de
             enddo
           endif
-        else if( trim(ctype_pulse).eq.'gaussian' ) then
+        else if( ctype_pulse(1:5).eq.'gauss' ) then
           if( tnow.ge.t0_laser .and. &
                tnow.lt.(t0_laser +tau_pulse*2) ) then
             pulsefactor = exp(-(tnow -(t0_laser+tau_pulse))**2 /(2d0*sgm_pulse**2))
