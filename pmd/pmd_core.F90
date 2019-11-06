@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-10-11 20:46:06 Ryo KOBAYASHI>
+!                     Last-modified: <2019-11-06 14:55:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -81,6 +81,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   call initialize_pmdvars(nspmax)
   call calc_nfmv(ntot0,tagtot,myid_md,mpi_md_world)
   call set_use_charge()
+  call set_use_elec_temp()
 
   if( maxstp.le.0 ) then
     cfistp = 'i2'
@@ -317,7 +318,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 
 !.....Debug
-!  tei(1:natm) = 11605d0 *2.0d0
+!  tei(1:natm) = 11605d0 *1.0d0
 
   tcpu1= mpi_wtime()
   tcom = 0d0
@@ -675,9 +676,11 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
              ,tag,ra,va,chg,chi,h,sorg)
       endif
 !.....Move atoms that cross the boundary
-      call bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi &
-           ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world &
+      call bamove(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
            ,boundary)
+!!$      call bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi &
+!!$           ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world &
+!!$           ,boundary)
 !.....Copy RA of boundary atoms
       call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
            ,.false.,boundary)
@@ -689,9 +692,11 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       rbufres = rbuf
     else
 !.....Copy RA of boundary atoms determined by 'bacopy'
-      call bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax &
-           ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc &
-           ,sv,nex,mpi_md_world,ifcoulomb,chg,chi,boundary)
+      call bacopy_fixed(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
+           ,boundary)
+!!$      call bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax &
+!!$           ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc &
+!!$           ,sv,nex,mpi_md_world,ifcoulomb,chg,chi,boundary)
     endif
 
     if(ifpmd.gt.0.and. mod(istp,noutpmd).eq.0 )then
@@ -1737,32 +1742,31 @@ subroutine bacopy(rc,myid,mpi_md_world,iprint,ifcoulomb,l1st &
   character(len=3):: boundary
 
 !.....integer:: status(MPI_STATUS_SIZE)
-  integer:: i,j,kd,kdd,kul,kuh,ku,ierr,iex,ix,iy,iz,itmp,istatus
+  integer:: i,j,m,kd,kdd,kul,kuh,ku,ierr,iex,ix,iy,iz,itmp,istatus
   integer:: nav,maxna,maxb,inode,nsd,nrc,nbnew
   real(8):: tcom1,tcom2,xi(3),rcv(3),asgm
   logical,external:: bbd
   real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
   logical:: lshort(3)
 
+  integer,save:: ndimbuf = 4
+
   if( l1st ) then
     if( allocated(dbuf) ) deallocate(dbuf,dbufr)
-    if( luse_charge ) then
-      allocate(dbuf(6,nbmax),dbufr(6,nbmax))
-    else
-      allocate(dbuf(4,nbmax),dbufr(4,nbmax))
-    endif
+    ndimbuf = 4
+    if( luse_charge ) ndimbuf = ndimbuf +2
+    if( luse_elec_temp ) ndimbuf = ndimbuf +1
+    allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+!!$    if( luse_charge ) then
+!!$      allocate(dbuf(6,nbmax),dbufr(6,nbmax))
+!!$    else
+!!$      allocate(dbuf(4,nbmax),dbufr(4,nbmax))
+!!$    endif
   endif
 
-  if( luse_charge ) then
-    if( size(dbuf).lt.6*nbmax ) then
-      deallocate(dbuf,dbufr)
-      allocate(dbuf(6,nbmax),dbufr(6,nbmax))
-    endif
-  else
-    if( size(dbuf).lt.4*nbmax ) then
-      deallocate(dbuf,dbufr)
-      allocate(dbuf(4,nbmax),dbufr(4,nbmax))
-    endif
+  if( size(dbuf).lt.ndimbuf*nbmax ) then
+    deallocate(dbuf,dbufr)
+    allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
   endif
 
   call nid2xyz(myid,ix,iy,iz)
@@ -1880,25 +1884,39 @@ subroutine bacopy(rc,myid,mpi_md_world,iprint,ifcoulomb,l1st &
     if( nex(kd).gt.1 ) then
       do kdd= -1,0
         ku= 2*kd+kdd
-        if( .not. luse_charge ) then
-          do i=1,lsb(0,ku)
-            j= lsb(i,ku)
-            iex= lsex(i,ku)
-            ra(1:3,natm+nbnew+i)= ra(1:3,j)
-            ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
-            tag(natm+nbnew+i)= tag(j)
-          enddo
-        else
-          do i=1,lsb(0,ku)
-            j= lsb(i,ku)
-            iex= lsex(i,ku)
-            ra(1:3,natm+nbnew+i)= ra(1:3,j)
-            ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
-            tag(natm+nbnew+i)= tag(j)
+        do i=1,lsb(0,ku)
+          j= lsb(i,ku)
+          iex= lsex(i,ku)
+          ra(1:3,natm+nbnew+i)= ra(1:3,j)
+          ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
+          tag(natm+nbnew+i)= tag(j)
+          if( luse_charge ) then
             chg(natm+nbnew+i)= chg(j)
             chi(natm+nbnew+i)= chi(j)
-          enddo
-        endif
+          endif
+          if( luse_elec_temp ) then
+            tei(natm+nbnew+i) = tei(j)
+          endif
+        enddo
+!!$        if( .not. luse_charge ) then
+!!$          do i=1,lsb(0,ku)
+!!$            j= lsb(i,ku)
+!!$            iex= lsex(i,ku)
+!!$            ra(1:3,natm+nbnew+i)= ra(1:3,j)
+!!$            ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
+!!$            tag(natm+nbnew+i)= tag(j)
+!!$          enddo
+!!$        else
+!!$          do i=1,lsb(0,ku)
+!!$            j= lsb(i,ku)
+!!$            iex= lsex(i,ku)
+!!$            ra(1:3,natm+nbnew+i)= ra(1:3,j)
+!!$            ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
+!!$            tag(natm+nbnew+i)= tag(j)
+!!$            chg(natm+nbnew+i)= chg(j)
+!!$            chi(natm+nbnew+i)= chi(j)
+!!$          enddo
+!!$        endif
         nbnew= nbnew +lsb(0,ku)
       enddo
     else
@@ -1913,36 +1931,70 @@ subroutine bacopy(rc,myid,mpi_md_world,iprint,ifcoulomb,l1st &
         lsrc(ku)=nrc
 
 !---------Exchange ra and tag
-        if( .not. luse_charge ) then
-          do i=1,nsd
-            j= lsb(i,ku)
-            dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-            dbuf(4,i)  = tag(j)
-          enddo
-          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*4,nrc*4,21 &
-               ,mpi_md_world)
-          do i=1,nrc
-            ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
-            tag(natm+nbnew+i)   = dbufr(4,i)
-          enddo
-        else
-!.....Exchange ra, tag, chg and chi in case of using charge.
-          do i=1,nsd
-            j= lsb(i,ku)
-            dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-            dbuf(4,i)  = tag(j)
-            dbuf(5,i)  = chg(j)
-            dbuf(6,i)  = chi(j)
-          enddo
-          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*6,nrc*6,21 &
-               ,mpi_md_world)
-          do i=1,nrc
-            ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
-            tag(natm+nbnew+i)   = dbufr(4,i)
-            chg(natm+nbnew+i)   = dbufr(5,i)
-            chi(natm+nbnew+i)   = dbufr(6,i)
-          enddo
-        endif
+        do i=1,nsd
+          j= lsb(i,ku)
+          dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
+          dbuf(4,i)  = tag(j)
+          m = 4
+          if( luse_charge ) then
+            m = m+1
+            dbuf(m,i)  = chg(j)
+            m = m+1
+            dbuf(m,i)  = chi(j)
+          endif
+          if( luse_elec_temp ) then
+            m = m+1
+            dbuf(m,i)  = tei(j)
+          endif
+        enddo
+        call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*ndimbuf &
+             ,nrc*ndimbuf,21,mpi_md_world)
+        do i=1,nrc
+          ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
+          tag(natm+nbnew+i)   = dbufr(4,i)
+          m = 4
+          if( luse_charge ) then
+            m = m+1
+            chg(natm+nbnew+i) = dbufr(m,i)
+            m = m+1
+            chi(natm+nbnew+i) = dbufr(m,i)
+          endif
+          if( luse_elec_temp ) then
+            m = m+1
+            tei(natm+nbnew+i) = dbufr(m,i)
+          endif
+        enddo
+
+!!$        if( .not. luse_charge ) then
+!!$          do i=1,nsd
+!!$            j= lsb(i,ku)
+!!$            dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
+!!$            dbuf(4,i)  = tag(j)
+!!$          enddo
+!!$          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*4,nrc*4,21 &
+!!$               ,mpi_md_world)
+!!$          do i=1,nrc
+!!$            ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
+!!$            tag(natm+nbnew+i)   = dbufr(4,i)
+!!$          enddo
+!!$        else
+!!$!.....Exchange ra, tag, chg and chi in case of using charge.
+!!$          do i=1,nsd
+!!$            j= lsb(i,ku)
+!!$            dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
+!!$            dbuf(4,i)  = tag(j)
+!!$            dbuf(5,i)  = chg(j)
+!!$            dbuf(6,i)  = chi(j)
+!!$          enddo
+!!$          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*6,nrc*6,21 &
+!!$               ,mpi_md_world)
+!!$          do i=1,nrc
+!!$            ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
+!!$            tag(natm+nbnew+i)   = dbufr(4,i)
+!!$            chg(natm+nbnew+i)   = dbufr(5,i)
+!!$            chi(natm+nbnew+i)   = dbufr(6,i)
+!!$          enddo
+!!$        endif
 
         call mpi_barrier(mpi_md_world,ierr)
 !---------increase the # of received boundary atoms
@@ -1976,10 +2028,8 @@ subroutine bacopy(rc,myid,mpi_md_world,iprint,ifcoulomb,l1st &
 
 end subroutine bacopy
 !=======================================================================
-subroutine bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax &
-     ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc,sv &
-     ,nex &
-     ,mpi_md_world,ifcoulomb,chg,chi,boundary)
+subroutine bacopy_fixed(rc,myid,mpi_md_world,iprint,ifcoulomb &
+     ,boundary)
 !-----------------------------------------------------------------------
 !  Exchanges boundary-atom data among neighbor nodes: tag and ra
 !  This doesnt search using position, just send & recv data of atoms
@@ -1987,49 +2037,64 @@ subroutine bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax &
 !  Different number of data are copied depending on whether 
 !    using atomic charges or not.
 !-----------------------------------------------------------------------
+  use pmdio,only: namax,nbmax
+  use pmdvars
   use force
   use pmdmpi,only: nx,ny,nz,nid2xyz
   implicit none
   include 'mpif.h'
-  integer,intent(in):: namax,nbmax,nn(6),natm,nb &
-       ,myid_md,myparity(3),mpi_md_world,nex(3)
-  integer,intent(inout):: lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6)
-  real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
-  real(8),intent(inout):: tag(namax),ra(3,namax),tcom
+  integer,intent(in):: myid,mpi_md_world,iprint
+  real(8),intent(in):: rc
   integer,intent(in):: ifcoulomb
-  real(8),intent(inout):: chg(namax),chi(namax)
-  character(len=3),intent(in):: boundary
+  character(len=3):: boundary
+!!$  integer,intent(in):: nn(6),natm,nb &
+!!$       ,myid_md,myparity(3),mpi_md_world,nex(3)
+!!$  integer,intent(inout):: lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6)
+!!$  real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
+!!$  real(8),intent(inout):: tag(namax),ra(3,namax),tcom
+!!$  integer,intent(in):: ifcoulomb
+!!$  real(8),intent(inout):: chg(namax),chi(namax),tei(namax)
+!!$  character(len=3),intent(in):: boundary
 
 !      integer:: status(MPI_STATUS_SIZE)
-  integer:: i,j,kd,kdd,ku,ierr,iex,ix,iy,iz
+  integer:: i,j,m,kd,kdd,ku,ierr,iex,ix,iy,iz
   integer:: inode,nsd,nrc,nbnew
   real(8):: tcom1,tcom2 !,rcv(3),asgm
   real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
   logical,save:: l1st=.true.
+  integer,save:: ndimbuf = 4
 
   if( l1st ) then
     if( allocated(dbuf) ) deallocate(dbuf,dbufr)
-    if( .not. luse_charge ) then
-      allocate(dbuf(4,nbmax),dbufr(4,nbmax))
-    else
-      allocate(dbuf(6,nbmax),dbufr(6,nbmax))
-    endif
+    ndimbuf = 4
+    if( luse_charge ) ndimbuf = ndimbuf +2
+    if( luse_elec_temp ) ndimbuf = ndimbuf +1
+!!$    if( .not. luse_charge ) then
+!!$      allocate(dbuf(4,nbmax),dbufr(4,nbmax))
+!!$    else
+!!$      allocate(dbuf(6,nbmax),dbufr(6,nbmax))
+!!$    endif
+    allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))    
     l1st=.false.
   endif
 
-  if( .not. luse_charge ) then
-    if( size(dbuf).lt.4*nbmax ) then
-      deallocate(dbuf,dbufr)
-      allocate(dbuf(4,nbmax),dbufr(4,nbmax))
-    endif
-  else
-    if( size(dbuf).lt.6*nbmax ) then
-      deallocate(dbuf,dbufr)
-      allocate(dbuf(6,nbmax),dbufr(6,nbmax))
-    endif
+  if( size(dbuf).lt.ndimbuf*nbmax ) then
+    deallocate(dbuf,dbufr)
+    allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
   endif
+!!$  if( .not. luse_charge ) then
+!!$    if( size(dbuf).lt.4*nbmax ) then
+!!$      deallocate(dbuf,dbufr)
+!!$      allocate(dbuf(4,nbmax),dbufr(4,nbmax))
+!!$    endif
+!!$  else
+!!$    if( size(dbuf).lt.6*nbmax ) then
+!!$      deallocate(dbuf,dbufr)
+!!$      allocate(dbuf(6,nbmax),dbufr(6,nbmax))
+!!$    endif
+!!$  endif
 
-  call nid2xyz(myid_md,ix,iy,iz)
+  call nid2xyz(myid,ix,iy,iz)
 
   nbnew= 0
 
@@ -2049,25 +2114,39 @@ subroutine bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax &
     if( nex(kd).gt.1 ) then
       do kdd= -1,0
         ku= 2*kd+kdd
-        if( .not. luse_charge ) then
-          do i=1,lsb(0,ku)
-            j= lsb(i,ku)
-            iex= lsex(i,ku)
-            ra(1:3,natm+nbnew+i)= ra(1:3,j)
-            ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
-            tag(natm+nbnew+i)= tag(j)
-          enddo
-        else
-          do i=1,lsb(0,ku)
-            j= lsb(i,ku)
-            iex= lsex(i,ku)
-            ra(1:3,natm+nbnew+i)= ra(1:3,j)
-            ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
-            tag(natm+nbnew+i)= tag(j)
+        do i=1,lsb(0,ku)
+          j= lsb(i,ku)
+          iex= lsex(i,ku)
+          ra(1:3,natm+nbnew+i)= ra(1:3,j)
+          ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
+          tag(natm+nbnew+i)= tag(j)
+          if( luse_charge ) then
             chg(natm+nbnew+i)= chg(j)
             chi(natm+nbnew+i)= chi(j)
-          enddo
-        endif
+          endif
+          if( luse_elec_temp ) then
+            tei(natm+nbnew+i)= tei(j)
+          endif
+        enddo
+!!$        if( .not. luse_charge ) then
+!!$          do i=1,lsb(0,ku)
+!!$            j= lsb(i,ku)
+!!$            iex= lsex(i,ku)
+!!$            ra(1:3,natm+nbnew+i)= ra(1:3,j)
+!!$            ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
+!!$            tag(natm+nbnew+i)= tag(j)
+!!$          enddo
+!!$        else
+!!$          do i=1,lsb(0,ku)
+!!$            j= lsb(i,ku)
+!!$            iex= lsex(i,ku)
+!!$            ra(1:3,natm+nbnew+i)= ra(1:3,j)
+!!$            ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
+!!$            tag(natm+nbnew+i)= tag(j)
+!!$            chg(natm+nbnew+i)= chg(j)
+!!$            chi(natm+nbnew+i)= chi(j)
+!!$          enddo
+!!$        endif
         nbnew= nbnew +lsb(0,ku)
       enddo
     else
@@ -2078,35 +2157,64 @@ subroutine bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax &
         nrc=lsrc(ku)
 
 !---------Exchange ra and tag
-        if( .not. luse_charge ) then  ! in case of no charge
-          do i=1,nsd
-            j= lsb(i,ku)
-            dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-            dbuf(4,i)  = tag(j)
-          enddo
-          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*4,nrc*4,21 &
-               ,mpi_md_world)
-          do i=1,nrc
-            ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
-            tag(natm+nbnew+i)   = dbufr(4,i)
-          enddo
-        else  ! in case of using atomic charge
-          do i=1,nsd
-            j= lsb(i,ku)
-            dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-            dbuf(4,i)  = tag(j)
-            dbuf(5,i)  = chg(j)
-            dbuf(6,i)  = chi(j)
-          enddo
-          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*6,nrc*6,21 &
-               ,mpi_md_world)
-          do i=1,nrc
-            ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
-            tag(natm+nbnew+i)   = dbufr(4,i)
-            chg(natm+nbnew+i)   = dbufr(5,i)
-            chi(natm+nbnew+i)   = dbufr(6,i)
-          enddo
-        endif
+        do i=1,nsd
+          j= lsb(i,ku)
+          dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
+          dbuf(4,i)  = tag(j)
+          m = 4
+          if( luse_charge ) then
+            m = m+1
+            dbuf(m,i)  = chg(j)
+            m = m+1
+            dbuf(m,i)  = chi(j)
+          endif
+        enddo
+        call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*ndimbuf &
+             ,nrc*ndimbuf,21,mpi_md_world)
+        do i=1,nrc
+          ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
+          tag(natm+nbnew+i)   = dbufr(4,i)
+          m = 4
+          if( luse_charge ) then
+            m = m+1
+            chg(natm+nbnew+i)   = dbufr(m,i)
+            m = m+1
+            chi(natm+nbnew+i)   = dbufr(m,i)
+          endif
+          if( luse_elec_temp ) then
+            m = m+1
+            tei(natm+nbnew+i)   = dbufr(m,i)
+          endif
+        enddo
+!!$        if( .not. luse_charge ) then  ! in case of no charge
+!!$          do i=1,nsd
+!!$            j= lsb(i,ku)
+!!$            dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
+!!$            dbuf(4,i)  = tag(j)
+!!$          enddo
+!!$          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*4,nrc*4,21 &
+!!$               ,mpi_md_world)
+!!$          do i=1,nrc
+!!$            ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
+!!$            tag(natm+nbnew+i)   = dbufr(4,i)
+!!$          enddo
+!!$        else  ! in case of using atomic charge
+!!$          do i=1,nsd
+!!$            j= lsb(i,ku)
+!!$            dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
+!!$            dbuf(4,i)  = tag(j)
+!!$            dbuf(5,i)  = chg(j)
+!!$            dbuf(6,i)  = chi(j)
+!!$          enddo
+!!$          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*6,nrc*6,21 &
+!!$               ,mpi_md_world)
+!!$          do i=1,nrc
+!!$            ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
+!!$            tag(natm+nbnew+i)   = dbufr(4,i)
+!!$            chg(natm+nbnew+i)   = dbufr(5,i)
+!!$            chi(natm+nbnew+i)   = dbufr(6,i)
+!!$          enddo
+!!$        endif
 
         call MPI_BARRIER(mpi_md_world,ierr)
         nbnew=nbnew +nrc
@@ -2130,6 +2238,7 @@ subroutine bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
 !  Exchange only chg of boundary-atom
 !  This doesnt search using position, just send & recv data of atoms
 !    which were listed by 'bacopy'.
+!  This is called from dampopt in force_common.F90.
 !-----------------------------------------------------------------------
   use pmdmpi,only: nx,ny,nz,nid2xyz
   implicit none
@@ -2212,8 +2321,7 @@ subroutine bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
 
 end subroutine bacopy_chg_fixed
 !=======================================================================
-subroutine bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi &
-     ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world &
+subroutine bamove(rc,myid,mpi_md_world,iprint,ifcoulomb &
      ,boundary)
 !-----------------------------------------------------------------------
 !  Exchange atoms between neighbor nodes and atomic data as well.
@@ -2222,36 +2330,46 @@ subroutine bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi &
 !    MVQUE(0,ku) is the # of to-be-moved atoms to neighbor ku;
 !    MVQUE(i,ku) is the adress, in IS, of atom i
 !-----------------------------------------------------------------------
+  use pmdio,only: namax,nbmax
+  use pmdvars
+  use force
   use pmdmpi,only: nid2xyz,nx,ny,nz
   implicit none
   include 'mpif.h'
-  integer,intent(in):: namax,nbmax
-  integer,intent(in):: myid_md,mpi_md_world,myparity(3),nn(6)
-  real(8),intent(in):: anxi,anyi,anzi,sv(3,6)
-  integer,intent(inout):: natm
-  real(8),intent(inout):: tcom,ra(3,namax),va(3,namax),tag(namax) &
-       ,chg(namax),chi(namax)
-  character(len=3),intent(in):: boundary
+  integer,intent(in):: myid,mpi_md_world,iprint
+  real(8),intent(in):: rc
+  integer,intent(in):: ifcoulomb
+  character(len=3):: boundary
+!!$  integer,intent(in):: myid_md,mpi_md_world,myparity(3),nn(6)
+!!$  real(8),intent(in):: anxi,anyi,anzi,sv(3,6)
+!!$  integer,intent(inout):: natm
+!!$  real(8),intent(inout):: tcom,ra(3,namax),va(3,namax),tag(namax) &
+!!$       ,chg(namax),chi(namax)
+!!$  character(len=3),intent(in):: boundary
 
 !      integer:: status(MPI_STATUS_SIZE)
-  integer:: i,j,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is,ix,iy,iz
+  integer:: i,j,m,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is,ix,iy,iz
   integer:: mvque(0:nbmax,6),newim
   real(8):: tcom1,tcom2,xi(3)
   logical,external:: bmv
   real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
   logical,save:: l1st=.true.
+  integer,save:: ndimbuf = 7
 
   if( l1st ) then
-    allocate(dbuf(9,nbmax),dbufr(9,nbmax))
+    ndimbuf = 7
+    if( luse_charge ) ndimbuf = ndimbuf +2
+    if( luse_elec_temp ) ndimbuf = ndimbuf +1
+    allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
     l1st=.false.
   endif
 
-  if( size(dbuf).ne.9*nbmax ) then
+  if( size(dbuf).ne.ndimbuf*nbmax ) then
     deallocate(dbuf,dbufr)
-    allocate(dbuf(9,nbmax),dbufr(9,nbmax))
+    allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
   endif
 
-  call nid2xyz(myid_md,ix,iy,iz)
+  call nid2xyz(myid,ix,iy,iz)
 
 !-----newim: num. of new immigrants
   newim= 0
@@ -2315,11 +2433,11 @@ subroutine bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi &
 
 !-------Error trap
     if (mvque(0,kul).gt.nbmax) then
-      print *,'Buffer overflowed at bamove node',myid_md
+      print *,'Buffer overflowed at bamove node',myid
       print *,'# in MVQUE=',mvque(0,kul)
       stop
     else if (mvque(0,kuh).gt.nbmax) then
-      print *,'Buffer overflowed at bamove node',myid_md
+      print *,'Buffer overflowed at bamove node',myid
       print *,'# in MVQUE=',mvque(0,kuh)
       stop
     endif
@@ -2342,21 +2460,40 @@ subroutine bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi &
         dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
         dbuf(4:6,i)= va(1:3,j)
         dbuf(7,i)  = tag(j)
-        dbuf(8,i)  = chg(j)
-        dbuf(9,i)  = chi(j)
 !-----------Eliminate the record of a moved-out atom
         tag(j)= 0d0
-        chg(j)= 0d0
-        chi(j)= 0d0
+        m = 7
+        if( luse_charge ) then
+          m = m+1
+          dbuf(m,i)  = chg(j)
+          chg(j)= 0d0
+          m = m+1
+          dbuf(m,i)  = chi(j)
+          chi(j)= 0d0
+        endif
+        if( luse_elec_temp ) then
+          m = m+1
+          dbuf(m,i)  = tei(j)
+          tei(j)= 0d0
+        endif
       enddo
-      call mespasd(inode,myparity(kd),dbuf,dbufr,9*nsd,9*nrc,71 &
-           ,mpi_md_world)
+      call mespasd(inode,myparity(kd),dbuf,dbufr,ndimbuf*nsd &
+           ,ndimbuf*nrc,71,mpi_md_world)
       do i=1,nrc
         ra(1:3,natm+newim+i)= dbufr(1:3,i)
         va(1:3,natm+newim+i)= dbufr(4:6,i)
         tag(natm+newim+i)   = dbufr(7,i)
-        chg(natm+newim+i)   = dbufr(8,i)
-        chi(natm+newim+i)   = dbufr(9,i)
+        m = 7
+        if( luse_charge ) then
+          m = m+1
+          chg(natm+newim+i)   = dbufr(m,i)
+          m = m+1
+          chi(natm+newim+i)   = dbufr(m,i)
+        endif
+        if( luse_elec_temp ) then
+          m = m+1
+          tei(natm+newim+i)   = dbufr(m,i)
+        endif
       enddo
 
       newim=newim+nrc
@@ -2379,8 +2516,13 @@ subroutine bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi &
       ra(1:3,ipt)= ra(1:3,i)
       va(1:3,ipt)= va(1:3,i)
       tag(ipt)   = tag(i)
-      chg(ipt)   = chg(i)
-      chi(ipt)   = chi(i)
+      if( luse_charge ) then
+        chg(ipt)   = chg(i)
+        chi(ipt)   = chi(i)
+      endif
+      if( luse_elec_temp ) then
+        tei(ipt)   = tei(i)
+      endif
     endif
   enddo
 !-----Update # of resident atoms

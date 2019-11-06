@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-08-27 15:14:34 Ryo KOBAYASHI>
+!                     Last-modified: <2019-11-06 13:47:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax
   implicit none
@@ -14,8 +14,8 @@ module force
   character(len=128):: force_list(N_FORCES)
 
   logical:: luse_force(N_FORCES)
-
   logical:: luse_charge
+  logical:: luse_elec_temp
 
 !.....Overlay main potential with a nuclear repulsive one, usually ZBL.
   logical:: loverlay = .false.
@@ -98,6 +98,13 @@ contains
          use_force('Coulomb') ) luse_charge = .true.
 
   end subroutine set_use_charge
+!=======================================================================
+  subroutine set_use_elec_temp()
+
+    luse_elec_temp = .false.
+    if(  use_force('Tersoff')  ) luse_elec_temp= .true.
+
+  end subroutine set_use_elec_temp
 !=======================================================================
   subroutine write_forces(myid)
     implicit none
