@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-10-17 16:21:26 Ryo KOBAYASHI>
+!                     Last-modified: <2019-11-06 17:07:13 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -1452,6 +1452,7 @@ contains
     do ia=1,natm
       ic = a2c(ia)
       call ic2ixyz(ic,ix,iy,iz)
+      if( ix.lt.lsurf ) cycle
       tei(ia) = te(ix,iy,iz)
     enddo
     return
