@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-09-03 12:44:31 Ryo KOBAYASHI>
+!                     Last-modified: <2019-11-06 15:37:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -163,9 +163,10 @@ program pmd
 
 
   if( myid_md.eq.0 ) then
-    allocate(chgtot(ntot0),chitot(ntot0))
+    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0))
     chitot(1:ntot0) = 0d0
     chgtot(1:ntot0) = 0d0
+    teitot(1:ntot0) = 0d0
 !!$    call set_atomic_charges(ntot0,chgtot,tagtot,nspmax &
 !!$         ,chgfix,schg,myid_md,iprint)
 
@@ -179,9 +180,10 @@ program pmd
     ntot0 = 1
     allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
          ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0) &
-         ,chgtot(ntot0),chitot(ntot0))
+         ,chgtot(ntot0),chitot(ntot0),teitot(ntot0))
     chitot(1:ntot0) = 0d0
     chgtot(1:ntot0) = 0d0
+    teitot(1:ntot0) = 0d0
   endif
 
 !.....Broadcast species data read from pmdini  
@@ -248,7 +250,7 @@ program pmd
 
 !.....call pmd_core to perfom MD
   call pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
-       ,ekitot,epitot,chgtot,chitot,nstp,nerg,npmd &
+       ,ekitot,epitot,chgtot,chitot,teitot,nstp,nerg,npmd &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,specorder &
        ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
        ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl &
@@ -275,7 +277,7 @@ program pmd
 1 continue
   call mpi_barrier(mpicomm,ierr)
   call mpi_comm_free(mpi_md_world,ierr)
-  deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot)
+  deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot,chgtot,chitot,teitot)
   call mpi_finalize(ierr)
 
 end program pmd

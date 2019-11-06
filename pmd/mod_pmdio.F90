@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-14 22:59:43 Ryo KOBAYASHI>
+!                     Last modified: <2019-11-06 16:03:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -10,7 +10,7 @@ module pmdio
   integer:: ntot0,ntot
 !.....data of total system
   real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
-       ,ekitot(:,:,:),tagtot(:),atot(:,:),chgtot(:),chitot(:)
+       ,ekitot(:,:,:),tagtot(:),atot(:,:),chgtot(:),chitot(:),teitot(:)
   real(8):: hunit,h(3,3,0:1)
 
 !.....max. num. of atoms in a node
@@ -346,9 +346,9 @@ contains
       if( ldumpaux_changed ) then
         do j=1,ndumpaux
           caux = cdumpauxarr(j)
-          if( trim(caux).eq.'ekin' ) then
+          if( trim(caux).eq.'ekin'.or.trim(caux).eq.'eki' ) then
             write(ionum,'(es11.3)',advance='no') eki
-          else if( trim(caux).eq.'epot' ) then
+          else if( trim(caux).eq.'epot'.or.trim(caux).eq.'epi' ) then
             write(ionum,'(es11.3)',advance='no') epi
           else if( trim(caux).eq.'sxx' ) then
             write(ionum,'(es11.3)',advance='no') st(1,1)
@@ -366,6 +366,8 @@ contains
             write(ionum,'(f9.4)',advance='no') chgtot(i)
           else if( trim(caux).eq.'chi' ) then
             write(ionum,'(f9.2)',advance='no') chitot(i)
+          else if( trim(caux).eq.'tei' ) then
+            write(ionum,'(es11.3)',advance='no') teitot(i)
           endif
         enddo
         write(ionum,*) ''

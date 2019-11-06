@@ -100,7 +100,7 @@ module variables
     integer,allocatable:: ifcal(:)
     real(8),allocatable:: fabs(:)
     real(8),allocatable:: va(:,:),strsi(:,:,:),eki(:,:,:),epi(:)&
-         ,chg(:),chi(:),fsub(:,:),eatm(:)
+         ,chg(:),chi(:),tei(:),fsub(:,:),eatm(:)
     real(8),allocatable:: gwe(:),gwf(:,:,:),gws(:,:)
 !.....This specorder is for this sample
     character(len=3),dimension(nspmax):: specorder  &

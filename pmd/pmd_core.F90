@@ -1,10 +1,10 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-11-06 14:55:32 Ryo KOBAYASHI>
+!                     Last-modified: <2019-11-06 16:15:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
 subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
-     ,ekitot,epitot,chgtot,chitot,maxstp,nerg,npmd &
+     ,ekitot,epitot,chgtot,chitot,teitot,maxstp,nerg,npmd &
      ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,specorder &
      ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
      ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl &
@@ -44,7 +44,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0) &
        ,epitot(ntot0),dt,rc,rbuf,rc1nn,h(3,3,0:1),stnsr(3,3) &
        ,fmv(3,0:9),epot,ekin,am(nspmax),stgt(3,3),ptgt,pini &
-       ,pfin,ttgt(9),chgtot(ntot0),chitot(ntot0)
+       ,pfin,ttgt(9),chgtot(ntot0),chitot(ntot0),teitot(ntot0)
   character,intent(in):: ciofmt*6, cpctl*20, ctctl*20 &
        ,boundary*3
   character(len=3),intent(in):: specorder(nspmax) 
@@ -166,7 +166,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     noutpmd = maxstp +1
   endif
 !.....perform space decomposition after reading atomic configuration
-  call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,chgtot,chitot &
+  call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,chgtot,chitot,teitot &
        ,myid_md,mpi_md_world,nx,ny,nz,nxyz,rc,rbuf,iprint)
 !.....Some conversions
   do i=1,natm
@@ -466,11 +466,11 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   write(cnum,'(i0)') 0
   tmp = mpi_wtime()
   call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
-       ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs &
-       ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+       ,stot,chgtot,chitot,teitot,natm,tag,ra,va,aa,epi,eki,strs &
+       ,chg,chi,tei,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
   if( myid_md.eq.0 ) then
     if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot &
-         ,atot,ekitot,epitot,stot,chgtot,chitot,ifsort)
+         ,atot,ekitot,epitot,stot,chgtot,chitot,teitot,ifsort)
     if( ifpmd.eq.1 ) then  ! pmd format
       if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
            then
@@ -976,12 +976,12 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       write(cnum,'(i0)') istp
 !          call system("mkdir -p "//cnum)
       call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
-           ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs &
-           ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+           ,stot,chgtot,chitot,teitot,natm,tag,ra,va,aa,epi,eki,strs &
+           ,chg,chi,tei,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
       ltot_updated = .true.
       if( myid_md.eq.0 ) then
         if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot &
-             ,atot,ekitot,epitot,stot,chgtot,chitot,ifsort)
+             ,atot,ekitot,epitot,stot,chgtot,chitot,teitot,ifsort)
         if( ifpmd.eq.1 ) then  ! pmd format
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
                then
@@ -1001,11 +1001,11 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 
   if( .not. ltot_updated ) then
     call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
-         ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs &
-         ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+         ,stot,chgtot,chitot,teitot,natm,tag,ra,va,aa,epi,eki,strs &
+         ,chg,chi,tei,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
     if( myid_md.eq.0 ) then
       call sort_by_tag(ntot0,tagtot,rtot,vtot &
-           ,atot,ekitot,epitot,stot,chgtot,chitot,ifsort)
+           ,atot,ekitot,epitot,stot,chgtot,chitot,teitot,ifsort)
     endif
   endif
 
@@ -1105,7 +1105,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 end subroutine pmd_core
 !=======================================================================
 subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
-     ,ekitot,epitot,chgtot,chitot &
+     ,ekitot,epitot,chgtot,chitot,teitot &
      ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
      ,specorder,am,dt,rc,rbuf,rc1nn,stnsr,epot &
      ,ekin,ifcoulomb,lvc,iprint,lcalcgrad,ndimp,maxisp &
@@ -1132,7 +1132,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0) &
        ,epitot(ntot0),rc,rbuf,rc1nn,h(3,3,0:1),stnsr(3,3) &
        ,epot,ekin,am(nspmax),dt &
-       ,chgtot(ntot0),chitot(ntot0)
+       ,chgtot(ntot0),chitot(ntot0),teitot(ntot0)
 !      character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: lcalcgrad
   integer,intent(in):: ndimp,maxisp
@@ -1181,7 +1181,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
   endif
 !      print *,'one_shot: 02'
-  call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,chgtot,chitot &
+  call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,chgtot,chitot,teitot &
        ,myid_md,mpi_md_world,nx,ny,nz,nxyz,rc,rbuf,iprint)
 !      write(6,'(a,200es10.2)') 'chg after space_decomp = ',chg(1:natm)
 
@@ -1275,8 +1275,8 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 
   call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
-       ,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs &
-       ,chg,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+       ,stot,chgtot,chitot,teitot,natm,tag,ra,va,aa,epi,eki,strs &
+       ,chg,chi,tei,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
   if( iprint.gt.0 ) print *,'Compute stresses done'
 
 !.....revert forces to the unit eV/A before going out 
@@ -2832,19 +2832,20 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
 end subroutine vfire
 !=======================================================================
 subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
-     ,chgtot,chitot,myid_md,mpi_md_world,nx,ny,nz,nxyz &
+     ,chgtot,chitot,teitot,myid_md,mpi_md_world,nx,ny,nz,nxyz &
      ,rcut,rbuf,iprint)
 !
 !  Decompose the system and scatter atoms to every process.
 !
   use pmdio,only: namax,nbmax,nnmax
   use pmdvars
+  use force,only: luse_charge, luse_elec_temp
   implicit none
   include 'mpif.h'
   integer,intent(in):: ntot0,myid_md,mpi_md_world,nx,ny,nz,nxyz &
        ,iprint
   real(8),intent(in):: vtot(3,ntot0),chgtot(ntot0) &
-       ,chitot(ntot0),rcut,rbuf
+       ,chitot(ntot0),teitot(ntot0),rcut,rbuf
   real(8),intent(in):: hunit,h(3,3,0:1)
   real(8),intent(inout):: rtot(3,ntot0),tagtot(ntot0)
 
@@ -2963,9 +2964,14 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
           tag(natm)= tagtot(i)
           ra(1:3,natm)= rtot(1:3,i)
           va(1:3,natm)= vtot(1:3,i)
-          chg(natm)= chgtot(i)
-          chi(natm)= chitot(i)
           tagtot(i) = -tagtot(i)
+          if( luse_charge ) then
+            chg(natm)= chgtot(i)
+            chi(natm)= chitot(i)
+          endif
+          if( luse_elec_temp ) then
+            tei(natm)= teitot(i)
+          endif
         endif
       enddo
       if( ixyz.ne.0 ) then
@@ -2977,10 +2983,16 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
              ,mpi_md_world,ierr)
         call mpi_send(va,3*natm,mpi_real8,ixyz,ixyz+4 &
              ,mpi_md_world,ierr)
-        call mpi_send(chg,natm,mpi_real8,ixyz,ixyz+5 &
-             ,mpi_md_world,ierr)
-        call mpi_send(chi,natm,mpi_real8,ixyz,ixyz+6 &
-             ,mpi_md_world,ierr)
+        if( luse_charge ) then
+          call mpi_send(chg,natm,mpi_real8,ixyz,ixyz+5 &
+               ,mpi_md_world,ierr)
+          call mpi_send(chi,natm,mpi_real8,ixyz,ixyz+6 &
+               ,mpi_md_world,ierr)
+        endif
+        if( luse_elec_temp ) then
+          call mpi_send(tei,natm,mpi_real8,ixyz,ixyz+7 &
+               ,mpi_md_world,ierr)
+        endif
       endif
     enddo
 !        write(6,'(a,f10.3)') ' time space_decomp = ',mpi_wtime() -t0
@@ -2998,34 +3010,41 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
          ,mpi_md_world,istat,ierr)
     call mpi_recv(va,3*natm,mpi_real8,0,myid_md+4 &
          ,mpi_md_world,istat,ierr)
-    call mpi_recv(chg,natm,mpi_real8,0,myid_md+5 &
-         ,mpi_md_world,istat,ierr)
-    call mpi_recv(chi,natm,mpi_real8,0,myid_md+6 &
-         ,mpi_md_world,istat,ierr)
+    if( luse_charge ) then
+      call mpi_recv(chg,natm,mpi_real8,0,myid_md+5 &
+           ,mpi_md_world,istat,ierr)
+      call mpi_recv(chi,natm,mpi_real8,0,myid_md+6 &
+           ,mpi_md_world,istat,ierr)
+    endif
+    if( luse_elec_temp ) then
+      call mpi_recv(tei,natm,mpi_real8,0,myid_md+7 &
+           ,mpi_md_world,istat,ierr)
+    endif
   endif
   call mpi_barrier(mpi_md_world,ierr)
 
 end subroutine space_decomp
 !=======================================================================
 subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
-     ,ekitot,stot,chgtot,chitot,natm,tag,ra,va,aa,epi,eki,strs,chg &
-     ,chi,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+     ,ekitot,stot,chgtot,chitot,teitot,natm,tag,ra,va,aa,epi,eki,strs,chg &
+     ,chi,tei,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
 !
 !  Opposite to space_decomp, gather atoms from every process
 !  to create the total system for output.
 !
   use pmdio,only: ntot
   use util,only: itotOf
+  use force,only: luse_charge, luse_elec_temp
 !!$  use force,only: loverlay,ol_alphas
   implicit none
   include 'mpif.h'
   integer,intent(in):: ntot0,natm,nxyz,myid_md,mpi_md_world
   real(8),intent(in):: va(3,natm),aa(3,natm),epi(natm),eki(3,3,natm) &
-       ,strs(3,3,natm),tag(natm),sorg(3),chg(natm),chi(natm)
+       ,strs(3,3,natm),tag(natm),sorg(3),chg(natm),chi(natm),tei(natm)
   real(8),intent(inout):: ra(3,natm),tspdcmp
   real(8),intent(out):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0) &
        ,atot(3,ntot0),epitot(ntot0),ekitot(3,3,ntot0) &
-       ,stot(3,3,ntot0),chgtot(ntot0),chitot(ntot0)
+       ,stot(3,3,ntot0),chgtot(ntot0),chitot(ntot0),teitot(ntot0)
   integer,parameter:: nmpi = 10
   integer:: n0,ixyz,natmt,i,ierr,ntott
   integer:: istat(mpi_status_size),itag
@@ -3051,8 +3070,13 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
     epitot(1:natm) = epi(1:natm)
     ekitot(1:3,1:3,1:natm) = eki(1:3,1:3,1:natm)
     stot(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
-    chgtot(1:natm) = chg(1:natm)
-    chitot(1:natm) = chi(1:natm)
+    if( luse_charge ) then
+      chgtot(1:natm) = chg(1:natm)
+      chitot(1:natm) = chi(1:natm)
+    endif
+    if( luse_elec_temp ) then
+      teitot(1:natm) = tei(1:natm)
+    endif
     ntott = natm
     n0 = n0 +1
     do ixyz=1,nxyz-1
@@ -3074,10 +3098,16 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
            ,ixyz,itag+6,mpi_md_world,istat,ierr)
       call mpi_recv(atot(1,n0),3*natmt,mpi_real8 &
            ,ixyz,itag+7,mpi_md_world,istat,ierr)
-      call mpi_recv(chgtot(n0),natmt,mpi_real8 &
-           ,ixyz,itag+8,mpi_md_world,istat,ierr)
-      call mpi_recv(chitot(n0),natmt,mpi_real8 &
-           ,ixyz,itag+9,mpi_md_world,istat,ierr)
+      if( luse_charge ) then
+        call mpi_recv(chgtot(n0),natmt,mpi_real8 &
+             ,ixyz,itag+8,mpi_md_world,istat,ierr)
+        call mpi_recv(chitot(n0),natmt,mpi_real8 &
+             ,ixyz,itag+9,mpi_md_world,istat,ierr)
+      endif
+      if( luse_elec_temp ) then
+        call mpi_recv(teitot(n0),natmt,mpi_real8 &
+             ,ixyz,itag+10,mpi_md_world,istat,ierr)
+      endif
       n0 = n0 + natmt
     enddo
     tspdcmp = tspdcmp +(mpi_wtime()-t0)
@@ -3111,16 +3141,22 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
          ,mpi_md_world,ierr)
     call mpi_send(aa,3*natm,mpi_real8,0,itag+7 &
          ,mpi_md_world,ierr)
-    call mpi_send(chg,natm,mpi_real8,0,itag+8 &
-         ,mpi_md_world,ierr)
-    call mpi_send(chi,natm,mpi_real8,0,itag+9 &
-         ,mpi_md_world,ierr)
+    if( luse_charge ) then
+      call mpi_send(chg,natm,mpi_real8,0,itag+8 &
+           ,mpi_md_world,ierr)
+      call mpi_send(chi,natm,mpi_real8,0,itag+9 &
+           ,mpi_md_world,ierr)
+    endif
+    if( luse_elec_temp ) then
+      call mpi_send(tei,natm,mpi_real8,0,itag+10 &
+           ,mpi_md_world,ierr)
+    endif
   endif
   call mpi_barrier(mpi_md_world,ierr)
 
 end subroutine space_comp
 !=======================================================================
-subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi,ifsort)
+subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi,tei,ifsort)
 !
 !  Sort by tag for output.
 !  - ifsort
@@ -3128,11 +3164,12 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi,ifsort)
 !      2: heap sort
 !  
   use util,only: itotOf
+  use force,only: luse_charge, luse_elec_temp
   implicit none
   integer,intent(in):: natm,ifsort
   real(8),intent(inout):: ra(3,natm),va(3,natm),aa(3,natm) &
        ,eki(3,3,natm),epi(natm),strs(3,3,natm),tag(natm) &
-       ,chg(natm),chi(natm)
+       ,chg(natm),chi(natm),tei(natm)
 
   integer,allocatable:: itag(:)
   real(8),allocatable:: buf(:,:)
@@ -3141,7 +3178,7 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi,ifsort)
   integer,save:: ndata
 !!$  integer,external:: itotOf
 
-  ndata = 31
+  ndata = 32
 
   if( .not. allocated(itag) .or. natm.gt.nsave ) then
     if( allocated(itag) ) deallocate(itag,buf)
@@ -3160,9 +3197,10 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi,ifsort)
     buf(20:22,i)= strs(1:3,2,i)
     buf(23:25,i)= strs(1:3,3,i)
     buf(26,i)= tag(i)
-    buf(27,i)= chg(i)
-    buf(28,i)= chi(i)
-    buf(29:31,i)= aa(1:3,i)
+    buf(27:29,i)= aa(1:3,i)
+    buf(30,i)= chg(i)
+    buf(31,i)= chi(i)
+    buf(32,i)= tei(i)
     itag(i)= itotOf(tag(i))
   enddo
 
@@ -3183,9 +3221,10 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,chg,chi,ifsort)
     strs(1:3,2,i)= buf(20:22,i)
     strs(1:3,3,i)= buf(23:25,i)
     tag(i)= buf(26,i)
-    chg(i)= buf(27,i)
-    chi(i)= buf(28,i)
-    aa(1:3,i)= buf(29:31,i)
+    aa(1:3,i)= buf(27:29,i)
+    chg(i)= buf(30,i)
+    chi(i)= buf(31,i)
+    tei(i)= buf(32,i)
   enddo
 
 end subroutine sort_by_tag

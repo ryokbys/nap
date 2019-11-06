@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-09-03 13:07:09 Ryo KOBAYASHI>
+!                     Last modified: <2019-11-06 15:54:33 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -891,7 +891,7 @@ contains
 !.....one_shot force calculation
     call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
          ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
-         ,smpl%chg,smpl%chi &
+         ,smpl%chg,smpl%chi,smpl%tei &
          ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
          ,smpl%specorder,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
          ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
