@@ -129,8 +129,7 @@ Options are shown below,
                  Not to normalize by the density.
      --plot      Plot figures. [default: False]
 
-The RDF of each pair of species normalized with the density of all atoms.
-Therefore the sum of RDF of all the pairs equals to the total RDF as shown in the graph below.
+The RDF of each pair of species normalized with the density of the pair.
 
 .. image:: ./figs/graph_rdf.png
 
@@ -144,10 +143,12 @@ Angular distribution function (ADF)
 To get ADF, perform ``adf.py`` something like,
 ::
 
-   $ python /path/to/nap/nappy/adf.py --triplets=Li-O-O,P-O-O dump_0*
+   $ python /path/to/nap/nappy/adf.py --triplets=La-F-F,Ba-F-F dump_0*
 
 The triplets consisting angles must be provided via the option ``--triplets``. 
 Note that the 1st species in the triplet is the central atom having bonds to the other two atoms, which maybe counter-intuitive.
+
+.. image:: ./figs/graph_adf.png
 
 Here is some options of ``adf.py``,
 ::
@@ -168,13 +169,17 @@ Here is some options of ``adf.py``,
                  Not to take average over files.
      --plot      Plot figures. [default: False]
 
-
 ----------------
 
 .. _power-spectrum:
 
 Velocity autocorrelation and power spectrum
 ===========================================
+
+.. note::
+
+  The file format used in this section, **akr**, is not used since years before. So the explanation here would not work correctly. We do not remove this section because somebody might be interested in the procedure used here...
+
 In order to get power spectrum from the MD simulation result, firstly we have to think how long the MD simulation has to be run.
 In case of Si, its phonon DOS exists up to about 16~18 THz which is the inverse of time interval of sampling data.
 And the frequency resolution is the inverse of simulation time.

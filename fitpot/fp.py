@@ -193,6 +193,19 @@ def write_vars_fitpot(vs,vrs,fname='in.vars.fitpot',**kwargs):
             f.write(' {0:10.4f}  {1:10.4f}  {2:10.4f}\n'.format(vs[i],*vrs[i]))
     return None
 
+def parse_option(line):
+    if line[0] not in ('#','!'):
+        raise ValueError('Line is not a comment line.')
+    data = line.split()
+    key = None
+    value = None
+    if 'hard-limit:' in data[1] or 'hard_limit:' in data[1]:
+        key = 'hard-limit'
+        value = False
+        if data[2] not in ('No','no', 'NO', 'False', 'F', 'false'):
+            value = True
+    return key,value
+
 def read_vars_fitpot(fname='in.vars.fitpot'):
     with open(fname,'r') as f:
         lines = f.readlines()
@@ -202,8 +215,14 @@ def read_vars_fitpot(fname='in.vars.fitpot'):
     rc3 = 3.0
     vs = []
     vrs = []
+    vrsh = []
+    options = {}
     for line in lines:
         if line[0] in ('!','#'):
+            k,v = parse_option(line)
+            if k != None:
+                options[k] = v
+                print(' option: ',k,v)
             continue
         data = line.split()
         if len(data) == 0:
@@ -213,11 +232,26 @@ def read_vars_fitpot(fname='in.vars.fitpot'):
             rc2 = float(data[1])
             rc3 = float(data[2])
             continue
-        vs.append(float(data[0]))
-        vrs.append([ float(data[1]), float(data[2])])
+        else:
+            iv += 1
+            if iv > nv:
+                break
+            if 'hard-limit' in options.keys() and options['hard-limit']:
+                vs.append(float(data[0]))
+                vrs.append([ float(data[1]), float(data[2])])
+                vrsh.append([float(data[3]), float(data[4])])
+                print(' iv,vrhmin,vrhmax= {0:3d} {1:11.3e} {2:11.3e}'.format(iv,
+                                                                             float(data[3]),
+                                                                             float(data[4])))
+            else:
+                vs.append(float(data[0]))
+                vrs.append([ float(data[1]), float(data[2])])
+                vrsh.append([-1e+30, 1e+30])
     vs = np.array(vs)
     vrs = np.array(vrs)
-    return rc2,rc3,vs,vrs
+    vrsh = np.array(vrsh)
+    return rc2,rc3,vs,vrs,vrsh
+    
 
 def read_rdf(fname,specorder,pairs=[]):
     """
@@ -574,7 +608,7 @@ def main(args):
     # print('rdf_pairs=',rdf_pairs)
     adf_triplets = infp['adf_triplets']
     triplets = get_triplets(infp['interactions'])
-    rc2,rc3,vs,vrs = read_vars_fitpot(infp['param_file'])
+    rc2,rc3,vs,vrs,vrsh = read_vars_fitpot(infp['param_file'])
 
 
     kwargs = infp
@@ -611,11 +645,11 @@ def main(args):
         F = infp['de_fraction']
         T = infp['de_temperature']
         CR = infp['de_crossover_rate']
-        opt = DE(N,F,CR,T, vs,vrs, func_wrapper, write_vars_fitpot, **kwargs)
+        opt = DE(N,F,CR,T, vs,vrs,vrsh, func_wrapper, write_vars_fitpot, **kwargs)
     elif kwargs['fitting_method'] in ('cs','CS','cuckoo','Cuckoo'):
         N = infp['cs_num_individuals']
         F = infp['cs_fraction']
-        opt = CS(N,F, vs,vrs, func_wrapper, write_vars_fitpot, **kwargs)
+        opt = CS(N,F, vs,vrs,vrsh, func_wrapper, write_vars_fitpot, **kwargs)
 
     opt.run(maxiter)
 

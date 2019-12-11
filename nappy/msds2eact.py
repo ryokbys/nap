@@ -22,6 +22,7 @@ import os,sys
 from docopt import docopt
 import numpy as np
 from scipy import stats
+from functools import cmp_to_key
 
 from nappy.msd2diff import read_out_msd, msd2D
 
@@ -43,6 +44,13 @@ plot '{2:s}' us (1000.0/$1):2:3 w yerr lc 'blue' pt 7 t 'data', f(x) t 'fitted' 
     print(' Wrote plot_D-T.gp')
     return None
 
+def cmp(a,b):
+    if a == b: return 0
+    return -1 if a < b else 1
+
+def cmpstr(a,b):
+    return cmp(int(a.replace('K','')),int(b.replace('K','')))
+
 if __name__ == "__main__":
 
     args = docopt(__doc__)
@@ -54,8 +62,9 @@ if __name__ == "__main__":
     dim = int(args['--dim'])
 
     #...Sort dirs list in numerical order
-    dirs.sort(cmp=lambda x,y: cmp(int(x.replace('K','')), int(y.replace('K',''))),
-              reverse=True)
+    # dirs.sort(cmp=lambda x,y: cmp(int(x.replace('K','')), int(y.replace('K',''))),
+    #           reverse=True)
+    dirs.sort(key=cmp_to_key(cmpstr),reverse=True)
 
     Ts = np.zeros(len(dirs))
     Ds = np.zeros(len(dirs))

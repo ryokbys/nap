@@ -50,7 +50,7 @@ def wrap(vs,vrs):
         vsnew[i] = min(max(v,vmin),vmax)
     return vsnew
 
-def update_vrange(vrs,all_indivisuals):
+def update_vrange(vrs,vrsh,all_indivisuals):
     """
     Update variable ranges adaptively using all the individuals information.
     """
@@ -97,8 +97,8 @@ def update_vrange(vrs,all_indivisuals):
         vjmin = new_vrs[j,0]
         vjmax = new_vrs[j,1]
         wmax = max(abs(vjmin-vbest[j]),abs(vjmax-vbest[j]))
-        new_vrs[j,0] = min(vjmin,vbest[j]-wmax)
-        new_vrs[j,1] = max(vjmax,vbest[j]+wmax)
+        new_vrs[j,0] = max(min(vjmin,vbest[j]-wmax),vrsh[j,0])
+        new_vrs[j,1] = min(max(vjmax,vbest[j]+wmax),vrsh[j,1])
     
     return new_vrs
 
@@ -156,7 +156,8 @@ class CS:
     Cuckoo search class.
     """
 
-    def __init__(self, N, F, variables, vranges, loss_func, write_func, **kwargs):
+    def __init__(self, N, F, variables, vranges, vhardlimit, loss_func, write_func,
+                 **kwargs):
         """
         Conctructor of CS class.
 
@@ -173,6 +174,7 @@ class CS:
         self.vs = variables
         self.vrs0 = vranges
         self.vrs = copy.copy(self.vrs0)
+        self.vrsh = vhardlimit
         self.vws = np.zeros(self.ndim)
         for i in range(self.ndim):
             self.vws[i] = max(self.vrs[i,1] -self.vrs[i,0], 0.0)
@@ -393,7 +395,7 @@ class CS:
 
             #...Update variable ranges if needed
             if self.update_vrs_per > 0 and (it+1) % self.update_vrs_per == 0:
-                self.vrs = update_vrange(self.vrs,self.all_indivisuals)
+                self.vrs = update_vrange(self.vrs,self.vrsh,self.all_indivisuals)
                 print(' Update variable ranges')
                 for i in range(len(self.vrs)):
                     print(' {0:2d}:  {1:7.3f}  {2:7.3f}'.format(i+1,self.vrs[i,0],self.vrs[i,1]))
