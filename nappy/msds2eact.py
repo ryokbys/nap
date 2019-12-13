@@ -9,7 +9,6 @@ Usage:
 Options:
   -h, --help  Show this message and exit.
   -o OUT      Output file name of D vs T. [default: out.D-T]
-  -t DT       Time interval between successive data points in fs. [default: 1.0]
   --dim DIM   Spatial dimension of diffusion. [default: 3]
   --offset OFFSET
               Offset of the data. [default: 0]
@@ -27,7 +26,7 @@ from functools import cmp_to_key
 from nappy.msd2diff import read_out_msd, msd2D
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "181008"
+__version__ = "191212"
 
 _kB = 8.6173303e-5
 
@@ -36,7 +35,7 @@ def make_gnuplot_file(outDT,Eact,D0):
 set xl '1000/T (1/K)'
 set yl 'D [cm^2/sec]'
 set log y
-f(x) = exp({0:.3f} -{1:.3f} /8.617e-5 *(x/1000))
+f(x) = {0:.3f} *exp(-{1:.3f} /8.617e-5 *(x/1000))
 plot '{2:s}' us (1000.0/$1):2:3 w yerr lc 'blue' pt 7 t 'data', f(x) t 'fitted' lc 'blue'
 """.format(D0,Eact,outDT)
     with open('plot_D-T.gp','w') as f:
@@ -51,11 +50,11 @@ def cmp(a,b):
 def cmpstr(a,b):
     return cmp(int(a.replace('K','')),int(b.replace('K','')))
 
+
 if __name__ == "__main__":
 
     args = docopt(__doc__)
     dirs = args['DIRS']
-    dt = float(args['-t'])
     outfname = args['-o']
     offset = int(args['--offset'])
     plot = args['--plot']
@@ -72,7 +71,7 @@ if __name__ == "__main__":
     fac = 1.0e-16 /1.0e-15 #...A^2/fs to cm^2/s
     for i,d in enumerate(dirs):
         T = d.replace('K','')
-        ts,msds = read_out_msd(d+'/out.msd',dt,offset)
+        ts,msds = read_out_msd(d+'/out.msd',offset)
         D,b,Dstd = msd2D(ts,msds,fac,dim=dim)
         print(' T,D = {0:5d}K, {1:12.4e} +/- {2:12.4e} [cm^2/s]'.format(int(T),D,Dstd))
         Ts[i] = float(T)
@@ -86,24 +85,30 @@ if __name__ == "__main__":
     print(' Wrote {0:s}'.format(outfname))
     
     Tinvs = np.array([ 1.0/T for T in Ts ])
-    logDs = np.array([ np.log(D) for D in Ds ])
-    a,b,r,p,stderr = stats.linregress(Tinvs,logDs)
+    log10Ds = np.array([ np.log10(D) for D in Ds ])
+    a,b,r,p,stderr = stats.linregress(Tinvs,log10Ds)
     
-    Eact = a *(-_kB)
-    Eaerr = stderr *_kB
+    Eact = a *(-_kB) /np.log10(np.exp(1.0))
+    Eaerr = stderr *_kB /np.log10(np.exp(1.0))
+    D0 = 10.0**b
     print(' Ea = {0:.3e} +/- {1:.3e} [eV]'.format(Eact,Eaerr))
-    print(' D0 = {0:.4e} [cm^2/s]'.format(np.exp(b)))
+    print(' D0 = {0:.4e} [cm^2/s]'.format(D0))
 
-    make_gnuplot_file(outfname,Eact,b)
+    make_gnuplot_file(outfname,Eact,D0)
     
     if plot:
         import matplotlib.pyplot as plt
         import seaborn as sns
         sns.set(context='talk',style='ticks')
-        plt.xlabel('1000/T [1/K]')
-        plt.ylabel('log(D [cm^2/sec])')
-        plt.plot(Tinvs*1000,logDs,'bo',label='data')
-        fvals = np.array([ b +a*(1.0/T) for T in Ts])
-        plt.plot(Tinvs*1000,fvals,'r-',label='fitted')
+        plt.xlabel('1000/T (1/K)')
+        plt.ylabel('D (cm$^2$/s)')
+        #plt.plot(Tinvs*1000,log10Ds,'bo',label='data')
+        log10Dstds = [ np.log10(Dstd) for Dstd in Dstds ]
+        plt.errorbar(Tinvs*1000,Ds,yerr=Dstds, capsize=5, fmt='o',
+                     markersize=8,ecolor='k', markeredgecolor='k',
+                     color='w',label='data')
+        fvals = np.array([ D0*np.exp(-Eact/_kB/T) for T in Ts])
+        plt.plot(Tinvs*1000,fvals,color='black',linestyle='dashed',label='fitted')
+        plt.yscale('log')
         plt.savefig("graph_msds2eact.png", format='png',
                     dpi=300, bbox_inches='tight')

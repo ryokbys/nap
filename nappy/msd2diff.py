@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
 Compute diffusion coefficient from MSD data.
+Time interval, DT, is obtained from in.pmd in the same directory.
 
 Usage:
   msd2diff.py [options] MSD_FILE
@@ -9,7 +10,6 @@ Options:
   -h, --help  Show this message and exit.
   -o, --offset OFFSET
               Offset of given data. [default: 0]
-  -t DT       Time interval between successive data points in fs. [default: 1.0]
   --plot      Plot a fitted graph. [default: False]
 """
 from __future__ import print_function
@@ -19,12 +19,16 @@ from docopt import docopt
 import numpy as np
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "181008"
+__version__ = "191212"
 
 
-def read_out_msd(fname='out.msd',dt=1.0,offset=0):
+def read_out_msd(fname='out.msd',offset=0):
     with open(fname,'r') as f:
         lines = f.readlines()
+    try:
+        dt = dt_from_inpmd(fname='in.pmd')
+    except:
+        raise RunTimeError('Failed to read in.pmd.')
     ts = []
     msds = []
     n0 = 0
@@ -43,9 +47,22 @@ def read_out_msd(fname='out.msd',dt=1.0,offset=0):
         msds.append(msd-msd0)
     return np.array(ts),np.array(msds)
 
+def dt_from_inpmd(fname='in.pmd'):
+    with open(fname,'r') as f:
+        lines = f.readlines()
+    for line in lines:
+        if 'time_interval' in line:
+            time_interval = abs(float(line.split()[1]))
+        elif 'num_iteration' in line:
+            num_iteration = int(line.split()[1])
+        elif 'num_out_pos' in line or 'num_out_pmd' in line:
+            num_out_pos = int(line.split()[1])
+    
+    return time_interval*num_iteration/num_out_pos
+
 def msd2D(ts,msds,fac,dim=3):
     """
-    Compute diffusion coefficient from time [fs] vs MSD [m^2] data 
+    Compute diffusion coefficient from time [fs] vs MSD [Ang^2] data 
     by solving least square problem using numpy.
     Return diffusion coefficient multiplied by FAC.
     """
@@ -65,12 +82,11 @@ def msd2D(ts,msds,fac,dim=3):
 if __name__ == "__main__":
 
     args = docopt(__doc__)
-    dt = float(args['-t'])
     fname = args['MSD_FILE']
     offset = int(args['--offset'])
     plot = args['--plot']
 
-    ts,msds = read_out_msd(fname,dt,offset)
+    ts,msds = read_out_msd(fname,offset)
     #...Assuming input MSD unit in A^2/fs and output in cm^2/s
     fac = 1.0e-16 /1.0e-15
     #...Least square
