@@ -26,9 +26,10 @@ def read_out_msd(fname='out.msd',offset=0):
     with open(fname,'r') as f:
         lines = f.readlines()
     try:
-        dt = dt_from_inpmd(fname='in.pmd')
+        dname = os.path.dirname(fname)
+        dt = dt_from_inpmd(fname=dname+'/in.pmd')
     except:
-        raise RunTimeError('Failed to read in.pmd.')
+        raise RuntimeError('Failed to read in.pmd.')
     ts = []
     msds = []
     n0 = 0
