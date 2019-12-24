@@ -18,6 +18,7 @@ Options:
                 Num of measuring lane. In case of 1, it is identical to non-staggered measuring. [default: 1]
   -s, --shift SHIFT
                 Shift of each staggered lane. [default: 20]
+  -o FILENAME   Output filename. [dfault: out.msd]
   --spcs=SPCS   Species name whose MSD is to be computed. [default: None]
 """
 from __future__ import print_function
@@ -152,6 +153,7 @@ if __name__ == "__main__":
         ids = [ int(i) for i in ids.split(',') ]
     nmeasure = int(args['--measure'])
     nshift = int(args['--shift'])
+    outfname= args['-o']
     
     #...compute sampling time-window from nmeasure and nshift
     ntwindow= len(files) -(nmeasure-1)*nshift
@@ -167,7 +169,6 @@ if __name__ == "__main__":
     msd = get_msd(files,ids,nmeasure,nshift,spcs)
 
     #...make output data files
-    outfname='out.msd'
     with open(outfname,'w') as f:
         f.write('#   data_ID,      msd_total,      msd_x,          msd_y,          msd_z\n')
         for ifile in range(len(files)-(nmeasure-1)*nshift):

@@ -23,8 +23,6 @@ import numpy as np
 from scipy import stats
 from functools import cmp_to_key
 
-from nappy.msd2diff import read_out_msd, msd2D
-
 __author__ = "RYO KOBAYASHI"
 __version__ = "191212"
 
@@ -50,7 +48,26 @@ def cmp(a,b):
 def cmpstr(a,b):
     return cmp(int(a.replace('K','')),int(b.replace('K','')))
 
-
+def msds2Ds(dirs=[],dim=3,offset=0):
+    from nappy.msd2diff import read_out_msd, msd2D
+    if not len(dirs) > 0:
+        raise ValueError('Not len(dirs) > 0')
+    dirs.sort(key=cmp_to_key(cmpstr),reverse=True)
+    Ts = np.zeros(len(dirs))
+    Ds = np.zeros(len(dirs))
+    Dstds = np.zeros(len(dirs))
+    fac = 1.0e-16 /1.0e-15 #...A^2/fs to cm^2/s
+    for i,d in enumerate(dirs):
+        T = d.replace('K','')
+        ts,msds = read_out_msd(d+'/out.msd',offset=offset)
+        D,b,Dstd = msd2D(ts,msds,fac,dim=dim)
+        print(' T,D = {0:5d}K, {1:12.4e} +/- {2:12.4e} [cm^2/s]'.format(int(T),D,Dstd))
+        Ts[i] = float(T)
+        Ds[i] = D
+        Dstds[i] = Dstd
+    return Ts,Ds,Dstds
+    
+    
 if __name__ == "__main__":
 
     args = docopt(__doc__)
@@ -63,20 +80,20 @@ if __name__ == "__main__":
     #...Sort dirs list in numerical order
     # dirs.sort(cmp=lambda x,y: cmp(int(x.replace('K','')), int(y.replace('K',''))),
     #           reverse=True)
-    dirs.sort(key=cmp_to_key(cmpstr),reverse=True)
 
-    Ts = np.zeros(len(dirs))
-    Ds = np.zeros(len(dirs))
-    Dstds = np.zeros(len(dirs))
-    fac = 1.0e-16 /1.0e-15 #...A^2/fs to cm^2/s
-    for i,d in enumerate(dirs):
-        T = d.replace('K','')
-        ts,msds = read_out_msd(d+'/out.msd',offset)
-        D,b,Dstd = msd2D(ts,msds,fac,dim=dim)
-        print(' T,D = {0:5d}K, {1:12.4e} +/- {2:12.4e} [cm^2/s]'.format(int(T),D,Dstd))
-        Ts[i] = float(T)
-        Ds[i] = D
-        Dstds[i] = Dstd
+    # Ts = np.zeros(len(dirs))
+    # Ds = np.zeros(len(dirs))
+    # Dstds = np.zeros(len(dirs))
+    # fac = 1.0e-16 /1.0e-15 #...A^2/fs to cm^2/s
+    # for i,d in enumerate(dirs):
+    #     T = d.replace('K','')
+    #     ts,msds = read_out_msd(d+'/out.msd',offset)
+    #     D,b,Dstd = msd2D(ts,msds,fac,dim=dim)
+    #     print(' T,D = {0:5d}K, {1:12.4e} +/- {2:12.4e} [cm^2/s]'.format(int(T),D,Dstd))
+    #     Ts[i] = float(T)
+    #     Ds[i] = D
+    #     Dstds[i] = Dstd
+    Ts,Ds,Dstds = msds2Ds(dirs,dim=dim,offset=offset)
 
     with open(outfname,'w') as f:
         f.write('# T [K],       D [cm^2/sec],    sgm(D) [cm^2/sec]\n')
