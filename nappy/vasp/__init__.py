@@ -8,7 +8,7 @@ import copy
 import math
 
 import nappy
-from . import *
+from . import incar, poscar, potcar
 
 import json
 

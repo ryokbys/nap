@@ -1810,7 +1810,7 @@ def to_lammps(hmat,spos):
     bmat[:,0] = b1[:]
     bmat[:,1] = b2[:]
     bmat[:,2] = b3[:]
-    if spos == None or len(spos) == 0:
+    if (spos == None).any() or len(spos) == 0:
         pos = None
     elif len(spos.shape) == 1:  # only one atom
         pos = np.zeros(spos.shape,dtype=float)
