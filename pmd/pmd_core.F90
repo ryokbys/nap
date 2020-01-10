@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-11-06 16:15:18 Ryo KOBAYASHI>
+!                     Last-modified: <2020-01-10 16:22:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -2850,7 +2850,7 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
   real(8),intent(inout):: rtot(3,ntot0),tagtot(ntot0)
 
   integer:: istat(mpi_status_size)
-  integer:: i,j,ixyz,n,ierr
+  integer:: i,j,ixyz,n,ierr,nacc,ir
   integer:: myxt,myyt,myzt,nmin
   real(8):: sxogt,syogt,szogt
   real(8):: t0
@@ -2860,28 +2860,21 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
 !.....at 1st call
   if( .not. allocated(ra) ) then
     if( myid_md.eq.0 ) then
-!.....wrap atom position inside [0:1)
+!.....wrap atoms into [0:1)
       do i =1,ntot0
-        if( rtot(1,i).lt.0d0 ) then
-          rtot(1,i) = rtot(1,i) +1d0
-        else if( rtot(1,i).ge.1d0 ) then
-          rtot(1,i) = rtot(1,i) -1d0
-        endif
-        if( rtot(2,i).lt.0d0 ) then
-          rtot(2,i) = rtot(2,i) +1d0
-        else if( rtot(2,i).ge.1d0 ) then
-          rtot(2,i) = rtot(2,i) -1d0
-        endif
-        if( rtot(3,i).lt.0d0 ) then
-          rtot(3,i) = rtot(3,i) +1d0
-        else if( rtot(3,i).ge.1d0 ) then
-          rtot(3,i) = rtot(3,i) -1d0
-        endif
+        do ixyz=1,3
+          if( rtot(ixyz,i).lt.0d0 ) then
+            rtot(ixyz,i) = rtot(ixyz,i) +1d0
+          else if( rtot(ixyz,i).ge.1d0 ) then
+            rtot(ixyz,i) = rtot(ixyz,i) -1d0
+          endif
+        enddo
       enddo
 
 !.....count max number of atoms in a node
       nalmax = 0
       nmin = 1000000000
+      nacc = 0
       do ixyz=0,nxyz-1
         myxt = ixyz/(ny*nz)
         myyt = mod(ixyz/nz,ny)
@@ -2892,11 +2885,11 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
         n = 0
         do i=1,ntot0
           if(  rtot(1,i).ge.sxogt .and. &
-               rtot(1,i).lt.sxogt+1d0/nx .and. &
+               rtot(1,i).le.sxogt+1d0/nx .and. &
                rtot(2,i).ge.syogt .and. &
-               rtot(2,i).lt.syogt+1d0/ny .and. &
+               rtot(2,i).le.syogt+1d0/ny .and. &
                rtot(3,i).ge.szogt .and. &
-               rtot(3,i).lt.szogt+1d0/nz .and. &
+               rtot(3,i).le.szogt+1d0/nz .and. &
                tagtot(i).gt.0d0) then
             n = n+1
 !.....Set the tag negative if the atom is assigned to a certain cell
@@ -2905,6 +2898,7 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
         enddo
         nalmax = max(nalmax,n)
         nmin = min(nmin,n)
+        nacc = nacc + n
       enddo
       namax = max(int(nalmax*1.2),200)
 !          nbmax = max(namax*27,nbmax)
@@ -2954,11 +2948,11 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
       natm = 0
       do i=1,ntot0
         if(  rtot(1,i).ge.sxogt .and. &
-             rtot(1,i).lt.sxogt+1d0/nx .and. &
+             rtot(1,i).le.sxogt+1d0/nx .and. &
              rtot(2,i).ge.syogt .and. &
-             rtot(2,i).lt.syogt+1d0/ny .and. &
+             rtot(2,i).le.syogt+1d0/ny .and. &
              rtot(3,i).ge.szogt .and. &
-             rtot(3,i).lt.szogt+1d0/nz .and. &
+             rtot(3,i).le.szogt+1d0/nz .and. &
              tagtot(i).gt.0d0 ) then
           natm = natm +1
           tag(natm)= tagtot(i)
