@@ -60,6 +60,10 @@ module variables
   real(8):: force_limit = 100d0
 !.....Loss function type: LS (least-square), Huber
   character(len=128):: ctype_loss = 'LS'
+!.....Gaussian density weight
+  logical:: lgdw  = .false.  ! flag for GDW
+  logical:: lgdwed = .false.  ! whether compuation of GDW is finished
+  real(8):: gdsgm = 0.1d0  ! sigma in GDF, assuming that GDF is normalized
 
 !.....Max value of species-ID
   integer:: maxisp
@@ -68,8 +72,12 @@ module variables
   logical:: interact(nspmax,nspmax)
   logical:: interact3(nspmax,nspmax,nspmax)
 
-!.....max num of atoms among reference data
+!.....Max num of atoms among reference samples
   integer:: maxna = 0
+!.....Max num of atoms among nodes
+  integer:: maxnin = 0
+!.....Total num of atoms among reference samples
+  integer:: natot = 0
 
   integer:: nwgtindiv = 0
   character(len=128),allocatable:: cdirlist(:),cwgtindiv(:)
@@ -113,6 +121,8 @@ module variables
     integer:: nsf,nal,nnl
     real(8),allocatable:: gsf(:,:),gsfo(:,:) &
          ,dgsf(:,:,:,:),igsf(:,:,:)
+!.....Gaussian density functions (GDF) for atoms and weights using the GDF
+    real(8),allocatable:: gdf(:), gdw(:)
 !.....Specific to NN
     real(8),allocatable:: hl1(:,:)
 !.....Design-matrix for force-matching
@@ -145,6 +155,7 @@ module variables
   real(8),allocatable:: ferrl(:),ferrg(:)
   real(8),allocatable:: serrl(:),serrg(:)
   logical,allocatable:: lfcall(:,:),lfcalg(:,:)
+  real(8),allocatable:: gdwl(:,:), gdwg(:,:)
 
 !.....Force-fields which are subtracted from reference values
 !.....and whose parameters to be fitted

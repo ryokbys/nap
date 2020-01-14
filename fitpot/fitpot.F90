@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-11-06 15:55:41 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-14 18:55:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -42,13 +42,17 @@ program fitpot
     if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
       print *,'WARNING: Currently LASSO is not working correctly...'
     endif
-
+!.....NN and NN2 are both pointing NN2
+    if( trim(cpot).eq.'NN' ) cpot = 'NN2'
+!.....Check GDW; GDW works only with ML potentials, which use descriptors
+    if( trim(cpot).ne.'NN2' .and. trim(cpot).ne.'linreg' ) then
+      if( lgdw ) print *,'Gaussian density weight only works for ML potentials, so unset GDW.'
+      lgdw = .false.
+    endif
+!.....GDW assumes that G's are normalized
+    if( lgdw ) lnormalize = .true.
   endif
   call sync_input()
-
-!.....NN and NN2 are both pointing NN2
-  if( trim(cpot).eq.'NN' ) cpot = 'NN2'
-
 
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
@@ -131,18 +135,13 @@ program fitpot
   endif
 
 !.....Initial computations of all samples
-!!$  if( trim(cpot).eq.'NN' ) then
-!!$    call NN_init()
-!!$    call NN_func(nvars,vars,ftrn0,ftst0)
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
        .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
        .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'BMH' &
        .or. trim(cpot).eq.'Abell' .or. trim(cpot).eq.'fpc' ) then
-!!$    print '(a,2i4,20es11.3)','myid,nvars,vars(:)=',myid,nvars,vars(:)
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
-!!$    if( trim(cpot).eq.'linreg' .and. trim(cfmethod).eq.'test' &
-!!$         .and. iprint.gt.2 ) call write_dsgnmats()
-    if( lnormalize ) call normalize()
+!!$    if( lnormalize ) call normalize()
+!!$    if( lgdw ) call compute_gdw()
   else
     print *,'ERROR: '//trim(cpot)//' is not available.'
     stop
@@ -308,6 +307,7 @@ subroutine write_initial_setting()
 !!$  write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
 !!$  write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
   write(6,'(2x,a25,2x,a)') 'normalize_input',trim(cnormalize)
+  
   if( lfmatch ) then
     write(6,'(2x,a25,2x,f0.2)') 'force_limit',force_limit
   endif
@@ -320,6 +320,11 @@ subroutine write_initial_setting()
     do i=1,nswgt
       write(6,'(4x,a23,2x,f8.4,2x,f8.1)') trim(cswgt(i)), swerg0(i), swdenom(i)
     enddo
+  endif
+
+  if( lgdw ) then
+    write(6,'(2x,a25,2x,l3)') 'gaussian_density_weight',lgdw
+    write(6,'(2x,a25,2x,es12.3)') 'gdf_sigma',gdsgm
   endif
   
   write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
@@ -537,7 +542,7 @@ subroutine read_samples()
   use pmdio,only: csp2isp
   implicit none
 
-  integer:: is,natot,isp,jsp
+  integer:: is,isp,jsp
   character*128:: cdir
   integer,allocatable:: nal(:)
   logical:: lint
@@ -570,11 +575,6 @@ subroutine read_samples()
   call mpi_barrier(mpi_world,ierr)
   if( myid.eq.0 ) then
     write(6,'(/,a)') ' Finished read_samples'
-    natot = 0
-    do is=1,nsmpl
-      natot = natot +nalist(is)
-    enddo
-    print '(a,i0)',' Total number of atoms = ',natot
   endif
   deallocate(nal)
   return
@@ -626,6 +626,7 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%chg(natm),smpl%chi(natm),smpl%tei(natm),smpl%fsub(3,natm) &
        ,smpl%eatm(natm) &
        ,smpl%gwe(nvars),smpl%gwf(nvars,3,natm),smpl%gws(nvars,6))
+  if( lgdw ) allocate(smpl%gdf(natm),smpl%gdw(natm))
   smpl%chg(1:natm) = 0d0
   smpl%tei(1:natm) = 0d0
   smpl%esub= 0d0
@@ -1444,16 +1445,21 @@ subroutine write_force_relation(cadd)
   call mpi_allreduce(nmaxl,nmax,1,mpi_integer,mpi_max &
        ,mpi_world,ierr)
 
-  if( .not. allocated(frefl) ) allocate(frefl(3,nmax,nsmpl)&
-       ,frefg(3,nmax,nsmpl),fal(3,nmax,nsmpl),fag(3,nmax,nsmpl)&
-       ,ferrl(nsmpl),ferrg(nsmpl),fsubl(3,nmax,nsmpl) &
-       ,fsubg(3,nmax,nsmpl),lfcall(nmax,nsmpl),lfcalg(nmax,nsmpl))
+!.....This uses a lot of memory when the number of samples is large.
+  if( .not. allocated(frefl) ) then
+    allocate(frefl(3,nmax,nsmpl)&
+         ,frefg(3,nmax,nsmpl),fal(3,nmax,nsmpl),fag(3,nmax,nsmpl)&
+         ,ferrl(nsmpl),ferrg(nsmpl),fsubl(3,nmax,nsmpl) &
+         ,fsubg(3,nmax,nsmpl),lfcall(nmax,nsmpl),lfcalg(nmax,nsmpl) &
+         ,gdwl(nmax,nsmpl),gdwg(nmax,nsmpl))
+  endif
 
   if( l1st ) then
     frefl(1:3,1:nmax,1:nsmpl)= 0d0
     fsubl(1:3,1:nmax,1:nsmpl)= 0d0
     ferrl(1:nsmpl) = 0d0
     lfcall(1:nmax,1:nsmpl) = .true.
+    gdwl(:,:) = 0d0
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
       frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm)
@@ -1462,11 +1468,13 @@ subroutine write_force_relation(cadd)
       do ia=1,natm
         lfcall(ia,ismpl) = samples(ismpl)%ifcal(ia).eq.1
       enddo
+      if( lgdw ) gdwl(1:natm,ismpl) = samples(ismpl)%gdw(1:natm)
     enddo
     frefg(1:3,1:nmax,1:nsmpl)= 0d0
     fsubg(1:3,1:nmax,1:nsmpl)= 0d0
     ferrg(1:nsmpl) = 0d0
     lfcalg(1:nmax,1:nsmpl) = .true.
+    gdwg(:,:) = 0d0
     call mpi_reduce(frefl,frefg,3*nmax*nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
     call mpi_reduce(fsubl,fsubg,3*nmax*nsmpl,mpi_real8,mpi_sum &
@@ -1474,6 +1482,8 @@ subroutine write_force_relation(cadd)
     call mpi_reduce(ferrl,ferrg,nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
     call mpi_reduce(lfcall,lfcalg,nmax*nsmpl,mpi_logical,mpi_land &
+         ,0,mpi_world,ierr)
+    if( lgdw ) call mpi_reduce(gdwl,gdwg,nmax*nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
   endif
 
@@ -1490,19 +1500,19 @@ subroutine write_force_relation(cadd)
   if( myid.eq.0 ) then
     open(92,file=trim(cfname)//'.trn.'//trim(cadd),status='replace')
     open(93,file=trim(cfname)//'.tst.'//trim(cadd),status='replace')
-    write(92,'(a)') '# fref, fpot, cdirname, ia, ixyz, diff, error, fsub'
-    write(93,'(a)') '# fref, fpot, cdirname, ia, ixyz, diff, error, fsub'
+    write(92,'(a)') '# fref, fpot, cdirname, ia, ixyz, diff, error, fsub, gdw, lfcal'
+    write(93,'(a)') '# fref, fpot, cdirname, ia, ixyz, diff, error, fsub, gdw, lfcal'
     do ismpl=1,nsmpl
       if( iclist(ismpl).eq.1 ) then
         natm= nalist(ismpl)
         do ia=1,natm
           lfcal = lfcalg(ia,ismpl)
           do ixyz=1,3
-            write(92,'(2es15.7,2x,a,i6,i3,3es12.3e3,l3)') frefg(ixyz,ia,ismpl) &
+            write(92,'(2es12.4,2x,a,i6,i3,4es11.2e3,l3)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
                  ,trim(cdirlist(ismpl)),ia,ixyz &
                  ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
-                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),lfcal
+                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),gdwg(ia,ismpl),lfcal
           enddo
         enddo
       else if( iclist(ismpl).eq.2 ) then
@@ -1510,11 +1520,11 @@ subroutine write_force_relation(cadd)
         do ia=1,natm
           lfcal = lfcalg(ia,ismpl)
           do ixyz=1,3
-            write(93,'(2es15.7,2x,a,i6,i3,3es12.3e3,l3)') frefg(ixyz,ia,ismpl) &
+            write(93,'(2es12.4,2x,a,i6,i3,4es11.2e3,l3)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
                  ,trim(cdirlist(ismpl)),ia,ixyz &
                  ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
-                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),lfcal
+                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),gdwg(ia,ismpl),lfcal
           enddo
         enddo
       endif
@@ -2107,7 +2117,6 @@ subroutine sync_input()
   call mpi_bcast(cpena,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(clinmin,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cfsmode,128,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(cnormalize,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(crefstrct,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(ctype_loss,128,mpi_character,0,mpi_world,ierr)
 
@@ -2207,7 +2216,13 @@ subroutine sync_input()
   call mpi_bcast(cswgt,128*nswgt,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(swerg0,nswgt,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(swdenom,nswgt,mpi_real8,0,mpi_world,ierr)
-
+!.....GDW
+  call mpi_bcast(lgdw,1,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(gdsgm,1,mpi_real8,0,mpi_world,ierr)
+!.....Normalization
+  call mpi_bcast(cnormalize,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(lnormalize,1,mpi_logical,0,mpi_world,ierr)
+  
   call mpi_bcast(nsmpl_outfrc,1,mpi_integer,0,mpi_world,ierr)
 
 !.....NN related variables
@@ -2449,17 +2464,25 @@ end subroutine subtract_ref_struct_energy
 subroutine set_max_num_atoms()
   use variables
   use parallel
-  integer:: ismpl, maxnal
+  integer:: ismpl, maxnal, maxninl
 
   maxnal = 0
+  maxninl = 0
   do ismpl=isid0,isid1
     na = samples(ismpl)%natm
     maxnal = max(na,maxnal)
+    maxninl = maxninl +na
   enddo
   maxna = 0
+  maxnin = 0
+  natot = 0
   call mpi_allreduce(maxnal,maxna,1,mpi_integer,mpi_max,mpi_world,ierr)
+  call mpi_allreduce(maxninl,maxnin,1,mpi_integer,mpi_max,mpi_world,ierr)
+  call mpi_allreduce(maxninl,natot,1,mpi_integer,mpi_sum,mpi_world,ierr)
   if( myid.eq.0 .and. iprint.ne.0 ) then
-    write(6,'(a,i0)') ' Max num of atoms among samples = ',maxna
+    write(6,'(a,i0)') ' Max num of atoms among samples   = ',maxna
+    write(6,'(a,i0)') ' Max num of atoms among nodes     = ',maxnin
+    write(6,'(a,i0)') ' Total num of atoms among samples = ',natot
   endif
   
 end subroutine set_max_num_atoms

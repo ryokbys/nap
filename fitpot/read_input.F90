@@ -327,6 +327,9 @@ subroutine set_variable(ionum,cname)
     allocate(cswgt(nswgt),swerg0(nswgt),swdenom(nswgt))
     call read_smpl_wgt(ionum,nswgt,cswgt,swerg0,swdenom)
     return
+  elseif( trim(cname).eq.'gaussian_density_weight' ) then
+    call read_l1(ionum,lgdw)
+    return
   elseif( trim(cname).eq.'fval_upper_limit' ) then
     call read_r1(ionum,fupper_lim)
     return

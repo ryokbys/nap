@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-11-06 15:54:33 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-14 18:41:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -40,7 +40,6 @@ contains
       else if(samples(ismpl)%iclass.eq.2 ) then
         swgtst = swgtst +samples(ismpl)%wgt
       endif
-!!$      print *,'ismpl,wgt,swgtrn=',ismpl,samples(ismpl)%wgt,swgtrn
     enddo
     swgt2trn = 0d0
     swgt2tst = 0d0
@@ -74,7 +73,8 @@ contains
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
          ,nff,cffs,nsubff,csubffs,cmaindir,maxna,rcut,rc3 &
          ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint,maxisp &
-         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss,interact,memgsf,cfmethod
+         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss,interact,memgsf,cfmethod &
+         ,lnormalize,lnormalized,lgdw,lgdwed
     use parallel
     use minimize
     use descriptor,only: lupdate_gsf,get_descs,get_ints
@@ -86,7 +86,7 @@ contains
     integer:: ismpl,natm,ia,ixyz,jxyz,idim,k,nsf,nal,nnl,isf,i,ndimt
     real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv,esub
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),fref
-    real(8):: ftrnl,ftstl,ftmp
+    real(8):: ftrnl,ftstl,ftmp,gdw
     real(8):: edenom,fdenom
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     type(mdsys):: smpl
@@ -112,7 +112,6 @@ contains
       if( trim(cpot).eq.'NN2' .or. trim(cpot).eq.'linreg') lupdate_gsf = .true.
     endif
 
-!!$    print *,'func_w_pmd: 02'
     if( .not. lematch .and. .not.lfmatch .and. .not.lsmatch ) then
       if( myid.eq.0 ) then
         print *,'Nothing to be fitted.'
@@ -121,10 +120,6 @@ contains
       stop
     endif
 
-!!$    print *,'myid,ndim=',myid,ndim
-!!$    print *,'myid,x(:)=',myid,x(1:ndim)
-!!$    print *,'myid,isid0,isid1=',myid,isid0,isid1
-!!$    print *,'func_w_pmd: 03'
     ftrnl = 0d0
     ftstl = 0d0
     do ismpl=isid0,isid1
@@ -150,30 +145,17 @@ contains
         samples(ismpl)%nnl = nnl
         if( .not. allocated(samples(ismpl)%gsf) ) then
           memgsf = memgsf +nsf*nal +3*nsf*(nnl+1)*nal +nsf*(nnl+1) +nal
-!!$          if( iprint.gt.1 ) print '(a,2i5,f9.2)',' myid,ismpl,memgsf(MB) = ' &
-!!$               ,myid,ismpl,memgsf
           allocate(samples(ismpl)%gsf(nsf,nal) &
                ,samples(ismpl)%dgsf(3,nsf,0:nnl,nal) &
                ,samples(ismpl)%igsf(nsf,0:nnl,nal) )
         endif
-!!$        print *,'func: cdirname,nsf,nal,nnl=',trim(cdirname),nsf,nal,nnl
         call get_descs(nsf,nal,nnl,samples(ismpl)%gsf &
              ,samples(ismpl)%dgsf,samples(ismpl)%igsf)
       endif
-!!$      if( trim(cpot).eq.'NN2' ) then
-!!$        if( .not. allocated(samples(ismpl)%hl1) ) then
-!!$          allocate(samples(ismpl)%hl1(nhl(1),nal))
-!!$        else if( size(samples(ismpl)%hl1) .ne. nhl(1)*nal ) then
-!!$          deallocate(samples(ismpl)%hl1)
-!!$          allocate(samples(ismpl)%hl1(nhl(1),nal))
-!!$        endif
-!!$        call get_NN2_hl1(samples(ismpl)%hl1)
-!!$        print *,'hl1 after get_NN2_hl1:'
-!!$        do i=1,nhl(1)
-!!$          print *,'i,hl1(i,1)=',samples(ismpl)%hl1(i,1)
-!!$        enddo
-!!$      endif
     enddo
+
+    if( lnormalize .and. .not.lnormalized ) call normalize()
+    if( lgdw .and. .not.lgdwed ) call compute_gdw()
 
     if( len(trim(crefstrct)).gt.5 ) then
       if( myid.eq.myidrefsub ) then
@@ -181,7 +163,6 @@ contains
         epotsub = epotsub /samples(isidrefsub)%natm
       endif
       call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
-!!$      print *,'myid,epotsub=', myid,epotsub
     endif
 
     do ismpl=isid0,isid1
@@ -201,8 +182,6 @@ contains
         else
           ediff= (epot+esub -eref)/natm /eerr
         endif
-!!$        print *,'ismpl,epot,esub,eref,ediff,natm,eerr,swgt=' &
-!!$             ,ismpl,epot,esub,eref,ediff,natm,eerr,swgt
         if( trim(ctype_loss).eq.'Huber' ) then
           if( abs(ediff).gt.1.d0 ) then
             ediff = 2d0*abs(ediff) -1d0
@@ -226,12 +205,11 @@ contains
         dn3i = 1d0/3/smpl%nfcal
         do ia=1,natm
           if( smpl%ifcal(ia).eq.0 ) cycle
+          gdw = 1d0
+          if( lgdw ) gdw = smpl%gdw(ia)
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia)+smpl%fsub(ixyz,ia) &
                  -(smpl%fref(ixyz,ia))) *ferri
-!!$            fref = smpl%fref(ixyz,ia)
-!!$            fdiff(ixyz,ia)= (frcs(ixyz,ia)+smpl%fsub(ixyz,ia) &
-!!$                 -fref) /(abs(fref) +ferr)
             if( trim(ctype_loss).eq.'Huber' ) then
               if( abs(fdiff(ixyz,ia)).gt.1d0 ) then
                 fdiff(ixyz,ia) = 2d0*abs(fdiff(ixyz,ia)) -1d0
@@ -241,10 +219,9 @@ contains
             else ! LS as default
               fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
             endif
-            ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt
+            ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt *gdw
           enddo
         enddo
-!!$        write(6,'(a,i6,es12.4)') 'ismpl,ftmp=',ismpl,ftmp
       endif
 
 !.....Stress matching
@@ -282,15 +259,10 @@ contains
       else if( smpl%iclass.eq.2 ) then
         ftstl = ftstl +ftmp
       endif
-!!$      write(6,'(a,f12.5)') ' ftrnl = ',ftrnl
     enddo  ! ismpl
 
-!!$    call mpi_barrier(mpi_world,ierr)
-!    tfunc= tfunc +mpi_wtime() -tf0
     tfl = mpi_wtime() -tf0
 
-!!$    print *,'func_w_pmd: 07'
-!!$    print *,'myid,ftrnl=',myid,ftrnl
     tc0= mpi_wtime()
     ftrn= 0d0
     ftst = 0d0
@@ -302,13 +274,12 @@ contains
     endif
     tcl = tcl + (mpi_wtime() -tc0)
 
-!!$    print *,'myid,ftrn=',myid,ftrn
 !.....only the bottle-neck times are taken into account
     call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     call mpi_reduce(tfl,tfg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     tcomm= tcomm +tcg
     tfunc= tfunc +tfg
-!!$    print *,'myid,tfunc=',myid,tfunc
+
     l1st = .false.
     if( trim(cpot).eq.'NN2' .or. trim(cpot).eq.'linreg' ) lupdate_gsf = .false.
 
@@ -323,19 +294,10 @@ contains
          ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,nsubff,csubffs &
          ,cmaindir,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
          ,rcut,rc3,myidrefsub,isidrefsub,iprint,maxisp,gscl &
-         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss,interact
+         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss,interact &
+         ,lgdw
     use parallel
     use minimize
-!!$    use Coulomb,only: set_paramsdir_Coulomb,set_params_Coulomb
-!!$    use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
-!!$    use BMH,only: set_paramsdir_BMH,set_params_BMH
-!!$    use Abell,only: set_paramsdir_Abell,set_params_Abell
-!!$    use fpc,only: set_paramsdir_fpc,set_params_fpc
-!!$    use EAM,only: set_paramsdir_EAM,set_params_EAM
-!!$    use NN,only: set_paramsdir_NN,set_params_NN
-!!$    use NN2,only: set_paramsdir_NN2,set_params_NN2,set_NN2_hl1
-!!$    use linreg,only: set_paramsdir_linreg,set_params_linreg
-!!$    use descriptor,only: set_paramsdir_desc,set_descs
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -343,7 +305,7 @@ contains
 
     integer:: ismpl,i,idim,natm,k,ia,ixyz,jxyz,nsf,nal,nnl,ndimt
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3),dn3i
-    real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,fref,tmp
+    real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,fref,tmp,gdw
     type(mdsys):: smpl
     logical,parameter:: lcalcgrad = .true.
     logical,parameter:: lfdsgnmat = .false.
@@ -382,90 +344,8 @@ contains
       if( smpl%iclass.ne.1 ) cycle
       call ready4pmd(ismpl,ndim,x)
       
-!!$      if( trim(cpot).eq.'vcMorse' ) then
-!!$        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_params_vcMorse(ndim,x)
-!!$      else if( trim(cpot).eq.'Morse' ) then
-!!$        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        if( string_in_arr('screened_Coulomb',nsubff,csubffs) .or. &
-!!$            string_in_arr('Coulomb',nsubff,csubffs) ) then
-!!$          ctype = 'BVS'
-!!$        else if( string_in_arr('Ewald_long',nsubff,csubffs) .or.&
-!!$             string_in_arr('Ewald',nsubff,csubffs) ) then
-!!$          ctype = 'full_Morse'
-!!$        else
-!!$          ctype = 'full_Morse'
-!!$        endif
-!!$        call set_params_Morse(ndim,x,ctype,interact)
-!!$      else if( trim(cpot).eq.'BMH' ) then
-!!$        call set_paramsdir_BMH(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_params_BMH(ndim,x,cpot,interact)
-!!$      else if( trim(cpot).eq.'Abell' ) then
-!!$        call set_paramsdir_Abell(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_params_Abell(ndim,x,cpot,interact)
-!!$      else if( trim(cpot).eq.'fpc' ) then
-!!$        call set_paramsdir_fpc(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_params_Coulomb(1,x(1),cpot, &
-!!$             samples(ismpl)%specorder)
-!!$        call set_params_fpc(ndim-1,x(2:ndim),cpot,interact)
-!!$      else if( trim(cpot).eq.'EAM' ) then
-!!$        call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_params_EAM(ndim,x)
-!!$      else if( trim(cpot).eq.'NN' ) then
-!!$        call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_params_NN(ndim,x,rcut,rc3)
-!!$      else if( trim(cpot).eq.'linreg') then
-!!$        call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_paramsdir_linreg(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_params_linreg(ndim,x)
-!!$        nsf = smpl%nsf
-!!$        nal = smpl%nal
-!!$        nnl = smpl%nnl
-!!$        call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
-!!$      else if( trim(cpot).eq.'NN2') then
-!!$        call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_paramsdir_NN2(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_params_NN2(ndim,x,nn_nl,nn_nhl)
-!!$        nsf = smpl%nsf
-!!$        nal = smpl%nal
-!!$        nnl = smpl%nnl
-!!$        call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
-!!$      else if( index(cpot,'BVS').ne.0 ) then
-!!$        call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
-!!$             //'/pmd')
-!!$        if( trim(cpot).eq.'BVS1' ) then
-!!$          call set_params_Coulomb(1,x(1),cpot, &
-!!$               samples(ismpl)%specorder)
-!!$          call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
-!!$        else if( trim(cpot).eq.'BVS' .or. &
-!!$             trim(cpot).eq.'BVS2' .or. trim(cpot).eq.'BVS3' ) then
-!!$          ndimt = 1+maxisp
-!!$          call set_params_Coulomb(ndimt,x(1),cpot, &
-!!$               samples(ismpl)%specorder)
-!!$          call set_params_Morse(ndim-ndimt,x(ndimt+1:ndim),cpot,interact)
-!!$        endif
-!!$      endif
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.
-!!$      print *,'ismpl,cpot,ctype,=',ismpl,trim(cpot) &
-!!$           ,trim(ctype)
       call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut &
            ,lfdsgnmat,gwe,gwf,gws)
       samples(ismpl)%gwe(1:ndim)= gwe(1:ndim)
@@ -534,6 +414,8 @@ contains
         dn3i= 1d0/3/smpl%nfcal
         do ia=1,natm
           if( smpl%ifcal(ia).eq.0 ) cycle
+          gdw = 1d0
+          if( lgdw ) gdw = smpl%gdw(ia)
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia) +smpl%fsub(ixyz,ia) &
                  -(smpl%fref(ixyz,ia))) *ferri
@@ -547,7 +429,7 @@ contains
               endif
             endif
             gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
-                 *smpl%gwf(1:ndim,ixyz,ia) *dn3i *swgt *ferri
+                 *smpl%gwf(1:ndim,ixyz,ia) *dn3i *swgt *ferri *gdw
           enddo
         enddo
       endif
@@ -590,8 +472,6 @@ contains
     tcl= tcl +mpi_wtime() -tc0
 
     gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
-!!$!.....GSCL==1.0 by default, but users can change
-!!$    gtrn(:) = gtrn(:) *gscl
 
 !.....only the bottle-neck times are taken into account
     call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
@@ -1167,7 +1047,6 @@ contains
       gsfss(isf)= sqrt(gsfss(isf))
     enddo
 
-
 !.....Correlation coefficients
     gsfcl(:,:) = 0d0
     do ismpl=isid0,isid1
@@ -1266,7 +1145,6 @@ contains
       enddo
     enddo
     close(21)
-    print *,'done'
 
 !.....Design matrix for lasso ()
     if( lematch ) then
@@ -1294,7 +1172,6 @@ contains
       enddo
       close(22)
       close(25)
-      print *,'done'
     endif
 
 !.....Design matrix for force-matching
@@ -1326,7 +1203,6 @@ contains
       enddo
       close(23)
       close(26)
-      print *,'done'
     endif
 
   end subroutine write_dsgnmats
@@ -1539,6 +1415,98 @@ contains
     
     lnormalized = .false.
   end subroutine restore_normalize
+!=======================================================================
+  subroutine compute_gdw()
+!
+!  Compute Gaussian density weight (GDW).
+!  The Theta function in Ref. [1] almost equals to Theta(x) = x.
+!  Ref:
+!    [1] W. Jeong, et al., Journal of Physical Chemistry C, 122(39), (2019) 22790–22795
+!
+    use variables,only: mdsys,samples,gdsgm,lgdw,lgdwed,maxnin,natot
+    use parallel
+    implicit none
+
+    type(mdsys):: smpl
+    integer:: inode,itag,iprty,nn,ndims,ndimr,inc,ismpl,ia,ja,isf,nsf
+    real(8):: dg2
+    real(8),allocatable:: xparts(:,:),xpartr(:,:),gdfs(:),gdfr(:)
+
+    if( lgdwed ) return
+
+    nsf = samples(isid0)%nsf
+    allocate(xparts(nsf,maxnin),xpartr(nsf,maxnin))
+    allocate(gdfs(maxnin),gdfr(maxnin))
+
+!.....Prepare xpartr by copying that of the current node
+    inc = 0
+    do ismpl=isid0,isid1
+      smpl = samples(ismpl)
+      do ia=1,smpl%natm
+        inc = inc +1
+        xpartr(1:nsf,inc) = smpl%gsf(1:nsf,ia)
+      enddo
+    enddo
+    ndimr = inc  ! total num of atoms in the current node
+    gdfr(:) = 0d0
+    
+!.....Repeat sending, recving, and computing the GDF
+    inode = mod(myid+1,nnode)
+    itag = 10
+    iprty = mod(myid,2)
+    do nn=1,nnode
+
+!.....Copy recv data to the data to be sent
+      gdfs(:) = gdfr(:)
+      xparts(1:nsf,1:ndimr) = xpartr(1:nsf,1:ndimr)
+      ndims = ndimr
+
+!.....Send and recv data if needed, in case of nn==1, it is not needed
+      if( nn.ne.1 ) then
+        call mespasi(inode,iprty,ndims,ndimr,1,1,itag,mpi_world)
+        call mespasd(inode,iprty,xparts,xpartr,ndims*nsf,ndimr*nsf,itag,mpi_world)
+        call mespasd(inode,iprty,gdfs,gdfr,ndims,ndimr,itag,mpi_world)
+      endif
+      
+!.....Compute GDF between given data and data in the current node
+      do ismpl=isid0,isid1
+        smpl = samples(ismpl)
+        do ja=1,ndimr
+          do ia=1,smpl%natm
+            dg2 = 0d0
+            do isf=1,nsf
+              dg2 = dg2 +(xpartr(isf,ja) -smpl%gsf(isf,ia))**2
+            enddo
+            gdfr(ja) = gdfr(ja) +exp(-dg2/nsf/2/gdsgm)
+          enddo
+        enddo
+      enddo
+
+    enddo ! nn=1,nnode
+
+!.....Now gdfr(:) has complete contributions from all the atoms,
+!.....so send it back to the original node
+    ndims = ndimr
+    gdfs(:) = gdfr(:)
+    if( nnode.gt.1 ) then
+      call mespasi(inode,iprty,ndims,ndimr,1,1,itag,mpi_world)
+      call mespasd(inode,iprty,gdfs,gdfr,ndims,ndimr,itag,mpi_world)
+    endif
+    
+!.....Store GDFs and compute GDWs
+    inc = 0
+    do ismpl=isid0,isid1
+      do ia=1,samples(ismpl)%natm
+        inc = inc + 1
+        samples(ismpl)%gdf(ia) = gdfr(inc)/natot
+        samples(ismpl)%gdw(ia) = 1d0/samples(ismpl)%gdf(ia)
+      enddo
+    enddo
+
+    deallocate(xparts,xpartr,gdfs,gdfr)
+    lgdwed = .true.
+    
+  end subroutine compute_gdw
 !=======================================================================
   function ndat_in_line(ionum,delim) result(ndat)
     use util, only: num_data
