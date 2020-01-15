@@ -4,7 +4,7 @@ num_iteration    100
 num_iter_eval    1
 
 fitting_method   check_grad
-main_directory   data_set
+main_directory   "dataset"
 param_file       in.params.NN
 normalize_input  none
 
