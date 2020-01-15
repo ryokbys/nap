@@ -1,0 +1,31 @@
+num_samples     37
+num_iteration   100
+
+#print_level 22
+max_num_neighbors   200
+
+test_ratio 0.0
+
+fitting_method   bfgs
+sample_directory "dataset_Si"
+param_file      in.params.NN2
+
+init_params     read
+init_params_rs 12345 # random seed
+
+energy_match   true
+force_match    true
+stress_match   true
+potential      NN2
+
+sample_error   1
+   smpl_  0.1   0.1   0.5
+
+gaussian_density_weight   T
+
+fval_upper_limit 1.0d+10
+
+specorder  Si
+
+interactions  1
+  Si  Si
