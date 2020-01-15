@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-14 18:55:34 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-15 15:07:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -543,7 +543,7 @@ subroutine read_samples()
   implicit none
 
   integer:: is,isp,jsp
-  character*128:: cdir
+  character:: cdir*128, cspmd*3, cspfp*3
   integer,allocatable:: nal(:)
   logical:: lint
 
@@ -559,11 +559,14 @@ subroutine read_samples()
     nal(is)= samples(is)%natm
 !.....Specorder in fitpot and that in sample should be the same
     do isp=1,nspmax
-      if( trim(specorder(isp)).ne.trim(samples(is)%specorder(isp)) ) then
+      cspmd = samples(is)%specorder(isp)
+      cspfp = specorder(isp)
+      if( trim(cspfp).ne.trim(cspmd) .and. trim(cspmd).ne.'x' ) then
         print '(a)','ERROR: specorder in the sample is different from that in fitpot.'
+        print '(a,2a5)','   failed species in fitpot and the sample: ',trim(cspfp),trim(cspmd)
         print '(a)','   specorder in fitpot and the sample, '//trim(cdir)
         do jsp=1,nspmax
-          print '(i5,2a5)',jsp,specorder(jsp),samples(is)%specorder(jsp)
+          print '(i5,2a5)',jsp,specorder(jsp), samples(is)%specorder(jsp)
         enddo
         stop
       endif

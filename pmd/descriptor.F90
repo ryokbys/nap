@@ -613,6 +613,7 @@ contains
           wgt = 1d0
           if( mod(isf-1,nsff).eq.1 ) wgt = wgtsp(js)
           gsf(isf,ia) = gsf(isf,ia) +ts_cheby(n)*fcij *wgt
+!!$          if( ia.eq.1 ) print *,ia,ja,is,js,isf,wgt,gsf(isf,ia)
 !.....Derivative
 !     dgsf(ixyz,isf,jj,ia): derivative of isf-th basis of atom-ia
 !     by ixyz coordinate of atom-jj.
@@ -741,10 +742,10 @@ contains
 
     integer:: ierr,i,j,k,nc,ncoeff,nsp,isp,jsp,ksp,isf,ityp &
          ,ihl0,ihl1,ihl2,icmb(3),iap,jap,kap,ndat,is1,is2
-    real(8):: rcut2,rcut3,rcut,time0
+    real(8):: rcut2,rcut3,rcut,time0,wgt
     logical:: lexist
     character(len=128):: ctmp,fname,cline,cmode
-    character(len=3):: ccmb(3)
+    character(len=3):: ccmb(3),csp
 
     time0 = mpi_wtime()
 
@@ -806,13 +807,13 @@ contains
 !  Input file format for Chebyshev (in.params.desc)
 !-----------------------------------------------------------------------
 !  ! Chebyshev:   T
-!     2   100         ! nsp, nsf
+!     3   100         ! nsp, nsf
 !  2-body   30   5.00   ! 2-body, num of series (nsf2), rcut
 !  3-body   20   4.00   ! 3-body, num of series (nsf3), rcut
 !  Weight  Artrith    ! type of species-weight
-!     1   1.0         ! In case of Artrith, specify (species,weight) pair
-!     2  -1.0
-!     3   2.0
+!     La   1.0         ! In case of Artrith, specify (species,weight) pair
+!     F   -1.0
+!     Ca   2.0
 !     ...
 !-----------------------------------------------------------------------
 !  Thus, users can specify different num of series and rcut for 2- and 3-body.
@@ -833,6 +834,7 @@ contains
           if( index(cline,'Weight').ne.0 .or. &
                index(cline,'weight').ne.0 ) then ! read Weight control
             cmode = 'Weight'  ! currently only Artrith type is available
+            if( iprint.gt.0 ) write(6,'(a)') '   species-weight type: '//' Artrith'
           else if( index(cline,'2-body').ne.0 ) then
             cmode = 'none'
             read(cline,*) ctmp, nsf2, rcut2
@@ -841,7 +843,13 @@ contains
             read(cline,*) ctmp, nsf3, rcut3
           else
             if( trim(cmode).eq.'Weight' ) then
-              read(ionum,*,end=30) isp, wgtsp(isp)
+              read(cline,*,end=30) csp, wgt
+              isp = csp2isp(trim(csp),specorder)
+              if( isp.gt.0 ) then
+                wgtsp(isp) = wgt
+                if( iprint.gt.0 ) write(6,'(5x,i2,a4,f6.1)') isp, trim(csp), wgt
+              endif
+!!$              read(ionum,*,end=30) isp, wgtsp(isp)
             endif
           endif
         enddo
