@@ -292,7 +292,16 @@ subroutine set_variable(ionum,cname)
     call read_i1(ionum,nsgdbsize)
     return
   elseif( trim(cname).eq.'sgd_rate0' ) then
-    call read_r1(ionum,r0sgd)
+    call read_r1(ionum,sgd_rate0)
+    return
+  elseif( trim(cname).eq.'sgd_eps' ) then
+    call read_r1(ionum,sgd_eps)
+    return
+  elseif( trim(cname).eq.'adam_beta1' ) then
+    call read_r1(ionum,adam_b1)
+    return
+  elseif( trim(cname).eq.'adam_beta2' ) then
+    call read_r1(ionum,adam_b2)
     return
   elseif( trim(cname).eq.'init_params' ) then
     call read_c1(ionum,cinitv)
@@ -327,8 +336,12 @@ subroutine set_variable(ionum,cname)
     allocate(cswgt(nswgt),swerg0(nswgt),swdenom(nswgt))
     call read_smpl_wgt(ionum,nswgt,cswgt,swerg0,swdenom)
     return
-  elseif( trim(cname).eq.'gaussian_density_weight' ) then
+  elseif( trim(cname).eq.'gaussian_density_weight' .or. &
+       trim(cname).eq.'GDW' ) then
     call read_l1(ionum,lgdw)
+    return
+  elseif( trim(cname).eq.'GDW_sigma' ) then
+    call read_r1(ionum,gdsgm)
     return
   elseif( trim(cname).eq.'fval_upper_limit' ) then
     call read_r1(ionum,fupper_lim)

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-15 15:07:37 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-16 14:58:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -37,11 +37,6 @@ program fitpot
     write(6,*) ''
     write(6,'(a,i6)') ' Number of processes in MPI = ',nnode
     call read_input(10,'in.fitpot')
-    call write_initial_setting()
-!.....WARNING when LASSO
-    if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
-      print *,'WARNING: Currently LASSO is not working correctly...'
-    endif
 !.....NN and NN2 are both pointing NN2
     if( trim(cpot).eq.'NN' ) cpot = 'NN2'
 !.....Check GDW; GDW works only with ML potentials, which use descriptors
@@ -49,8 +44,14 @@ program fitpot
       if( lgdw ) print *,'Gaussian density weight only works for ML potentials, so unset GDW.'
       lgdw = .false.
     endif
+!.....Normalization and GDW cannot be used with SGD
+    if( trim(cfmethod).eq.'sgd' .or. trim(cfmethod).eq.'SGD' ) then
+      lgdw = .false.
+      lnormalize = .false.
+    endif
 !.....GDW assumes that G's are normalized
     if( lgdw ) lnormalize = .true.
+    call write_initial_setting()
   endif
   call sync_input()
 
@@ -189,8 +190,7 @@ program fitpot
   case ('gfs')
     call gfs_wrapper(ftrn0,ftst0)
   case ('sgd','SGD')
-!!$    call sgd(ftrn0,ftst0)
-    if( myid.eq.0 ) print *,'SGD is not available in the current version.'
+    call sgd_wrapper(ftrn0,ftst0)
   case ('check_grad')
     call check_grad(ftrn0,ftst0)
   case ('test','TEST')
@@ -324,7 +324,7 @@ subroutine write_initial_setting()
 
   if( lgdw ) then
     write(6,'(2x,a25,2x,l3)') 'gaussian_density_weight',lgdw
-    write(6,'(2x,a25,2x,es12.3)') 'gdf_sigma',gdsgm
+    write(6,'(2x,a25,2x,es12.3)') 'GDW_sigma',gdsgm
   endif
   
   write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
@@ -1043,134 +1043,24 @@ subroutine random_search_wrapper(ftrn0,ftst0)
   
 end subroutine random_search_wrapper
 !=======================================================================
-subroutine sgd(ftrn0,ftst0)
+subroutine sgd_wrapper(ftrn0,ftst0)
 !
-! Stochastic gradient decent (SGD)
+! Wrapper for SGD
 !
   use variables
-!!$  use NNd,only:NN_init,NN_fs,NN_gs,NN_func,NN_grad,NN_analyze &
-!!$       ,NN_restore_standard
-  use parallel
   use minimize
-  use random
+  use parallel
+  use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer,parameter:: niter_time= 1
-  real(8),parameter:: alpha0  = 1d-2
-  real(8),parameter:: dalpha  = 0.001d0
-  real(8),parameter:: gmmin   = 0.5d0
-  real(8),parameter:: gmmax   = 0.95d0
-  real(8),parameter:: dgmm    = 0.01d0
-  real(8),parameter:: tiny  = 1d-8
-!!$  real(8),parameter:: dalpha  = 0.d0
-  real(8),allocatable:: g(:),u(:),gp(:),v(:),g2m(:),v2m(:)
-  integer:: iter,istp,iv,i,nsize,narmijo
-  real(8):: gnorm,alpha,alpha1,gmax,vmax,f,gg,fp,gpnorm,gamma,vnorm
-  real(8):: ftrn,ftst
-  integer:: ismpl
+  real(8):: fval
+  external:: write_stats
 
-  allocate(g(nvars),u(nvars),gp(nvars),v(nvars)&
-       ,g2m(nvars),v2m(nvars))
+  call sgd(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+       ,iprint,iflag,myid,mynsmpl,isid0,isid1,func_w_pmd,grad_w_pmd,cfmethod &
+       ,niter_eval,write_stats)
 
-  if( myid.eq.0 ) then
-    write(6,'(a,a)') ' sgd_update: ',csgdupdate
-    write(6,'(a,i6)') ' sgd_batch_size = ',nsgdbsize
-  endif
-
-  if( nsgdbsize.gt.maxmynsmpl ) then
-    if(myid.eq.0) then
-      write(6,'(a)') ' Error: nsgdbsize > maxmynsml'
-      write(6,'(a,2i6)') '   nsgdbsize,maxmynsmpl = '&
-         ,nsgdbsize,maxmynsmpl
-      write(6,*) '  sgd_batch_size is too large.'
-      write(6,*) '  You should decrease it much less than maxmynsmpl'
-      write(6,*) '  Or you should use other minimization method.'
-    endif
-    call mpi_finalize(ierr)
-    stop
-  endif
-
-  allocate(ismplsgd(nsgdbsize))
-
-  alpha1= r0sgd
-  v(1:nvars)= 0d0
-  gamma = gmmin
-
-!!$  call NN_init()
-  do iter=1,niter
-    if(mod(iter,niter_eval).eq.0) then
-!!$      call NN_func(nvars,vars,ftrn,ftst)
-!!$      call NN_grad(nvars,vars,g)
-      call penalty(cpena,nvars,fp,gp,vars)
-      g(1:nvars)= g(1:nvars) +gp(1:nvars)
-      gnorm= sqrt(sprod(nvars,g,g))
-      if( myid.eq.0 ) then
-        write(6,'(a,i6,2es15.7,f10.3)') ' iter,f,gnorm,time=',iter,ftrn &
-             ,gnorm ,mpi_wtime()-time0
-        call write_vars('tmp')
-      endif
-      call write_stats(iter)
-    else if(mod(iter,niter_time).eq.0) then
-      if( myid.eq.0 ) then
-        write(6,'(a,i6,f10.3)') ' iter,time=',iter,mpi_wtime()-time0
-      endif
-    endif
-
-    nsize = 0
-    call get_uniq_iarr(mynsmpl,nsgdbsize,ismplsgd)
-    do i=1,nsgdbsize
-      ismplsgd(i)= ismplsgd(i)+isid0-1
-    enddo
-!!$    call NN_fs(nvars,vars,ftrn,ftst)
-!!$    call NN_gs(nvars,vars,g)
-    call penalty(cpena,nvars,fp,gp,vars)
-    gnorm= sqrt(sprod(nvars,g,g))
-    gpnorm= sqrt(sprod(nvars,gp,gp))
-    g(1:nvars)= g(1:nvars) +gp(1:nvars)
-    u(1:nvars)= -g(1:nvars)
-    if( csgdupdate.eq.'armijo' ) then
-      alpha= r0sgd
-!!$      call armijo_search(nvars,vars,vranges,u,ftrn,ftst,g,alpha,iprint &
-!!$           ,iflag,myid,NN_fs,narmijo)
-      vars(1:nvars)=vars(1:nvars) +alpha*u(1:nvars)
-      alpha1= alpha1*(1d0-dalpha)
-    else if( csgdupdate.eq.'momentum' ) then
-      v(1:nvars)= gamma*v(1:nvars) +alpha1*u(1:nvars)
-      vars(1:nvars)= vars(1:nvars) +v(1:nvars)
-      vnorm = sqrt(sprod(nvars,v,v))
-      write(6,'(a,i5,3es12.3)') 'iter,gamma,vnorm=',iter,gamma,vnorm,gnorm
-      gamma= min(gamma+dgmm,gmmax)
-    else ! default: adadelta
-      if(iter.eq.1) then
-        alpha = r0sgd
-        do i=1,nvars
-          g2m(i)= gamma*g2m(i) +(1d0-gamma)*g(i)*g(i)
-          v(i)= -alpha/sqrt(g2m(i)+tiny) *g(i)
-        enddo
-      else
-        do i=1,nvars
-          v2m(i)= gamma*v2m(i) +(1d0-gamma)*v(i)*v(i)
-          g2m(i)= gamma*g2m(i) +(1d0-gamma)*g(i)*g(i)
-          v(i)= -sqrt(v2m(i)+tiny)/sqrt(g2m(i)+tiny) *g(i)
-        enddo
-      endif
-      vars(1:nvars)= vars(1:nvars) +v(1:nvars)
-!!$      write(6,'(a,i5,10es11.3)') 'iter,v(:)=',iter,v(1:10)
-    endif
-  enddo
-
-!!$  call NN_func(nvars,vars,ftrn,ftst)
-!!$  call NN_grad(nvars,vars,g)
-  gnorm= 0d0
-  do iv=1,nvars
-    gnorm= gnorm +g(iv)*g(iv)
-  enddo
-
-!!$  call NN_analyze("fin")
-!!$  call NN_restore_standard()
-
-  deallocate(ismplsgd,g,u,gp,v,g2m,v2m)
-end subroutine sgd
+end subroutine sgd_wrapper
 !=======================================================================
 subroutine fs_wrapper(ftrn0,ftst0)
   use variables
@@ -2182,8 +2072,11 @@ subroutine sync_input()
   call mpi_bcast(pso_c2,1,mpi_real8,0,mpi_world,ierr)
 !.....sgd
   call mpi_bcast(csgdupdate,128,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(r0sgd,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nsgdbsize,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(sgd_rate0,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(sgd_eps,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(adam_b1,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(adam_b2,1,mpi_real8,0,mpi_world,ierr)
 !.....initialize parameters
   call mpi_bcast(cinitv,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(vinitsgm,1,mpi_real8,0,mpi_world,ierr)
@@ -2376,32 +2269,6 @@ subroutine set_sample_weights()
     write(6,'(a)') ' Set sample weights of Botlzmann factor.'
   endif
 end subroutine set_sample_weights
-!=======================================================================
-subroutine get_uniq_iarr(n,m,iarr)
-!
-! Create an array with length m which includes a unique set of integers
-! randomly chosen from from 1 to n.
-!
-  use random
-  integer,intent(in):: n,m
-  integer,intent(out):: iarr(m)
-  integer:: jarr(n)
-  integer:: i,j,k,l
-  
-  do i=1,n
-    jarr(i) = i
-  enddo
-  l=n
-  do i=1,m
-    j = l*urnd()+1
-    iarr(i)= jarr(j)
-    do k=j,l-1
-      jarr(k)= jarr(k+1)
-    enddo
-    l= l-1
-  enddo
-  return
-end subroutine get_uniq_iarr
 !=======================================================================
 subroutine subtract_atomic_energy()
   use variables

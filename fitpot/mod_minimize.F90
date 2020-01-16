@@ -10,6 +10,15 @@ module minimize
   character(len=128):: cfsmode= 'grad'  ! [grad,grad0corr,df0corr]
   real(8):: pwgt = 1d-15
 
+!.....SGD parameters
+  integer:: nsgdbsize = 1
+  integer,allocatable:: ismask(:)
+  character(len=128):: csgdupdate = 'Adam'
+  real(8):: sgd_rate0 = 0.001d0
+  real(8):: sgd_eps = 1.0d-8
+  real(8):: adam_b1 = 0.9d0
+  real(8):: adam_b2 = 0.999d0
+
 !.....Group FS inner loop
   integer:: ninnergfs=100
   character(len=128):: cread_fsmask = ''
@@ -139,9 +148,9 @@ contains
     return
   end subroutine wrap_ranges
 !=======================================================================
-  subroutine write_status(ionum,myid,iprint,cpena,iter,niter &
+  subroutine write_status(ionum,myid,iprint,cpena,iter,ninner &
        ,ftrn,ftst,pval,xnorm,gnorm,dxnorm,fprev)
-    integer,intent(in):: ionum,myid,iprint,iter,niter
+    integer,intent(in):: ionum,myid,iprint,iter,ninner
     character(len=128),intent(in):: cpena
     real(8),intent(in)::ftrn,ftst,pval,xnorm,gnorm,dxnorm,fprev
     
@@ -150,13 +159,13 @@ contains
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
              .or. trim(cpena).eq.'ridge' ) then
           write(6,'(a,i5,i4,2es13.5,5es12.4)') &
-               ' iter,niter,ftrn,ftst,penalty,|x|,|g|,|dx|,|df|=' &
-               ,iter,niter,ftrn-pval,ftst &
+               ' iter,ninner,ftrn,ftst,penalty,|x|,|g|,|dx|,|df|=' &
+               ,iter,ninner,ftrn-pval,ftst &
                ,pval,xnorm,gnorm,dxnorm,abs(ftrn-fprev)
         else
           write(6,'(a,i5,i4,2es13.5,4es12.4,i4)') &
-               ' iter,niter,ftrn,ftst,|x|,|g|,|dx|,|df|=' &
-               ,iter,niter,ftrn,ftst,xnorm,gnorm,dxnorm,abs(ftrn-fprev)
+               ' iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=' &
+               ,iter,ninner,ftrn,ftst,xnorm,gnorm,dxnorm,abs(ftrn-fprev)
         endif
         call flush(6)
       endif
@@ -376,6 +385,189 @@ contains
     x0(:) = x(:)
     return
   end subroutine steepest_descent
+!=======================================================================
+  subroutine sgd(ndim,x0,f,g,u,xranges,xtol,gtol,ftol,maxiter,iprint &
+       ,iflag,myid,mynsmpl,isid0,isid1 &
+       ,func,grad,cfmethod,niter_eval,sub_eval)
+!
+! Stochastic gradient decent (SGD)
+!
+    integer,intent(in):: ndim,iprint,niter_eval,myid,mynsmpl,isid0,isid1
+    integer,intent(inout):: iflag,maxiter
+    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
+    real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
+    character(len=*),intent(in):: cfmethod
+    interface
+      subroutine func(n,x,ftrn,ftst)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8),intent(out):: ftrn,ftst
+      end subroutine func
+      subroutine grad(n,x,gtrn)
+        integer,intent(in):: n
+        real(8),intent(in):: x(n)
+        real(8),intent(out):: gtrn(n)
+      end subroutine grad
+      subroutine sub_eval(iter)
+        integer,intent(in):: iter
+      end subroutine sub_eval
+    end interface
+    real(8),parameter:: tiny  = 1d-14
+
+    integer:: i,ismpl,iter,niter,nftol,ngtol,nxtol
+    real(8):: g2,gnorm,xnorm,dxnorm,v,vh,pval
+    real(8):: fp,ftmp,ftst,ftsttmp
+    real(8),allocatable:: x(:),dx(:),rm(:),rmh(:),gpena(:),gtmp(:),gp(:)
+    integer,allocatable:: imaskarr(:)
+    logical:: lconverged
+
+    if( .not.allocated(x) ) then
+      if(myid.eq.0) then
+        print *,''
+        print *, '************************ Stochastic gradient descent (SGD) '&
+             //'************************'
+        print *,'   Update method: ',trim(csgdupdate)
+      endif
+      allocate(x(ndim),dx(ndim),rm(ndim),rmh(ndim),gpena(ndim) &
+           ,gp(ndim),gtmp(ndim))
+      allocate(ismask(isid0:isid1))
+    endif
+
+    if( trim(csgdupdate).ne.'adam' .and. trim(csgdupdate).ne.'Adam' ) then
+      if( myid.eq.0 ) then
+        print *,'ERROR: update method '//trim(csgdupdate)//' is not available.'
+        print *,'       Currently, only adam is available.'
+      endif
+      stop
+    endif
+
+!.....Initialization
+    nftol= 0
+    ngtol= 0
+    nxtol= 0
+    rm(:) = 0d0
+    v = 0d0
+    x(1:ndim)= x0(1:ndim)
+    nsgdbsize = min(nsgdbsize,mynsmpl)
+    allocate(imaskarr(nsgdbsize))
+
+!.....Create the sample mask, 0) compute the sample,  1) not to compute the sample
+    call get_uniq_iarr(mynsmpl,nsgdbsize,imaskarr)
+    ismask(:) = 1
+    do i=1,nsgdbsize
+      ismpl = imaskarr(i) +(isid0-1)
+      ismask(ismpl) = 0
+    enddo
+
+    call wrap_ranges(ndim,x0,xranges)
+    call func(ndim,x0,f,ftst)
+    call grad(ndim,x0,g)
+    call penalty(cpena,ndim,pval,gpena,x0)
+    f = f + pval
+    if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+
+    gnorm= sqrt(sprod(ndim,g,g))
+    xnorm= sqrt(sprod(ndim,x,x))
+    dxnorm = 0d0
+
+    iter= 0
+    niter = 0
+    call write_status(6,myid,iprint,cpena,iter,niter &
+         ,f,ftst,pval,xnorm,gnorm,dxnorm,f)
+
+    call sub_eval(0)
+    
+    do iter=1,maxiter
+!.....Store previous func and grad values
+      fp= f
+      gp(1:ndim)= g(1:ndim)
+      if( gnorm.lt.tiny ) cycle
+!.....Compute step size of x
+      if( trim(csgdupdate).eq.'adam' .or. trim(csgdupdate).eq.'Adam' ) then
+        rm(:) = adam_b1*rm(:) +(1d0 -adam_b1)*g(:)
+        v = adam_b2*v +(1d0 -adam_b2)*gnorm**2
+        rmh(:) = rm(:)/(1d0-adam_b1)
+        vh = v/(1d0-adam_b2)
+        dx(:) = -sgd_rate0*rmh(:)/(sqrt(vh) +sgd_eps)
+      endif
+!!$      print *,' |rm|,|rmh|,v,vh,|dx| = ',sqrt(sprod(ndim,rm,rm)),sqrt(sprod(ndim,rmh,rmh))&
+!!$           ,v,vh,sqrt(sprod(ndim,dx,dx))
+!.....Update x
+      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
+        call soft_threshold(ndim,x,dx,1d0)
+      else
+        x(1:ndim)= x(1:ndim) +dx(1:ndim)
+      endif
+      call wrap_ranges(ndim,x,xranges)
+      call penalty(cpena,ndim,pval,gpena,x)
+      
+      x0(1:ndim)= x(1:ndim)
+!.....Create the sample mask, 0) compute the sample,  1) not to compute the sample
+      call get_uniq_iarr(mynsmpl,nsgdbsize,imaskarr)
+      ismask(:) = 1
+      do i=1,nsgdbsize
+        ismpl = imaskarr(i) +(isid0-1)
+        ismask(ismpl) = 0
+      enddo
+      call func(ndim,x,f,ftst)
+      call grad(ndim,x,g)
+      if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+      gnorm= sqrt(sprod(ndim,g,g))
+      xnorm= sqrt(sprod(ndim,x,x))
+      dxnorm= sqrt(sprod(ndim,dx,dx))
+
+!.....Evaluate statistics at every niter_eval.
+      if( mod(iter,niter_eval).eq.0 ) then
+!.....Before the output, compute all the remaining samples
+        do ismpl=isid0,isid1
+          ismask(ismpl) = mod(ismask(ismpl)+1,2)
+        enddo
+        call func(ndim,x,ftmp,ftsttmp)
+        call grad(ndim,x,gtmp)
+        call sub_eval(iter)
+      endif
+      call write_status(6,myid,iprint,cpena,iter,niter &
+           ,f,ftst,pval,xnorm,gnorm,dxnorm,fp)
+      call check_converge(myid,iprint,xtol,gtol,ftol &
+           ,dxnorm,gnorm,abs(f-fp),nxtol,ngtol,nftol,iflag,lconverged)
+      if( lconverged ) then
+        x0(:) = x(:)
+        maxiter = iter
+        deallocate(x,dx,rm,rmh,gpena)
+        return
+      endif
+    enddo
+
+    x0(1:ndim)= x(1:ndim)
+    deallocate(x,dx,rm,rmh,gpena,imaskarr)
+    return
+  end subroutine sgd
+!=======================================================================
+  subroutine get_uniq_iarr(n,m,iarr)
+!
+! Create an array with length m which includes a unique set of integers
+! randomly chosen from from 1 to n.
+!
+    use random
+    integer,intent(in):: n,m
+    integer,intent(out):: iarr(m)
+    integer:: jarr(n)
+    integer:: i,j,k,l
+
+    do i=1,n
+      jarr(i) = i
+    enddo
+    l=n
+    do i=1,m
+      j = l*urnd()+1
+      iarr(i)= jarr(j)
+      do k=j,l-1
+        jarr(k)= jarr(k+1)
+      enddo
+      l= l-1
+    enddo
+    return
+  end subroutine get_uniq_iarr
 !=======================================================================
   subroutine cg(ndim,x0,f,g,u,xranges,xtol,gtol,ftol,maxiter,iprint,iflag,myid &
        ,func,grad,cfmethod,niter_eval,sub_eval)
@@ -1316,13 +1508,6 @@ contains
       sgn= sign(1d0,xad)   ! sign(a,b) = |a| * (sign of b)
       val= max(abs(xad)-alpha*pwgt,0d0)
       x(i)= sgn*val
-!!$      if( xad.lt.-pwgt ) then
-!!$        x(i) = xad +pwgt
-!!$      else if( xad.gt.pwgt ) then
-!!$        x(i) = xad -pwgt
-!!$      else
-!!$        x(i) = 0d0
-!!$      endif
     enddo
     return
   end subroutine soft_threshold

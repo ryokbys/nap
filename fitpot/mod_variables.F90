@@ -44,10 +44,10 @@ module variables
   integer:: nfpsmpl= -10
   real(8):: seqcoef= 1d-2
   integer:: iprint = 1
-  character(len=128):: csgdupdate= 'adadelta'
-  integer:: nsgdbsize = 1   ! batch size per process for SGD
-  integer,allocatable:: ismplsgd(:)
-  real(8):: r0sgd = 1.0
+!!$  character(len=128):: csgdupdate= 'adadelta'
+!!$  integer:: nsgdbsize = 1   ! batch size per process for SGD
+!!$  integer,allocatable:: ismplsgd(:)
+!!$  real(8):: r0sgd = 1.0
 !.....training or test
   real(8):: ratio_test= 0.1d0
   logical:: test_assigned = .false.  ! already assigned test set?
@@ -63,7 +63,7 @@ module variables
 !.....Gaussian density weight
   logical:: lgdw  = .false.  ! flag for GDW
   logical:: lgdwed = .false.  ! whether compuation of GDW is finished
-  real(8):: gdsgm = 0.1d0  ! sigma in GDF, assuming that GDF is normalized
+  real(8):: gdsgm = 1.0d0  ! sigma in GDF, assuming that GDF is normalized
 
 !.....Max value of species-ID
   integer:: maxisp

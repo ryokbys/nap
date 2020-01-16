@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-14 18:41:58 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-16 15:25:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -25,28 +25,14 @@ module fp_common
 contains
 !=======================================================================
   subroutine init()
-    use variables,only: swgt2trn, swgt2tst, samples,lematch,lfmatch,lsmatch
-    use parallel
+    use variables,only: swgt2trn,swgt2tst,lematch,lfmatch,lsmatch
+    use parallel,only: myid
 
     integer:: ismpl,nterms
     real(8):: swgtrn,swgtst
 
-!.....set nominator for sample weights
-    swgtrn = 0d0
-    swgtst = 0d0
-    do ismpl=isid0,isid1
-      if( samples(ismpl)%iclass.eq.1 ) then
-        swgtrn = swgtrn +samples(ismpl)%wgt
-      else if(samples(ismpl)%iclass.eq.2 ) then
-        swgtst = swgtst +samples(ismpl)%wgt
-      endif
-    enddo
-    swgt2trn = 0d0
-    swgt2tst = 0d0
-    call mpi_allreduce(swgtrn,swgt2trn,1,mpi_real8,mpi_sum &
-         ,mpi_world,ierr)
-    call mpi_allreduce(swgtst,swgt2tst,1,mpi_real8,mpi_sum &
-         ,mpi_world,ierr)
+    call calc_swgts(swgt2trn,swgt2tst)
+
     nterms = 0
     if( lematch ) nterms = nterms + 1
     if( lfmatch ) nterms = nterms + 1
@@ -64,11 +50,42 @@ contains
 
   end subroutine init
 !=======================================================================
+  subroutine calc_swgts(swgts_trn,swgts_tst)
+!
+!  Calculate prefactor as a sum of sample weights.
+!
+    use variables,only: samples
+    use parallel
+    real(8),intent(out):: swgts_trn,swgts_tst
+
+    integer:: ismpl
+    real(8):: swgtrn,swgtst
+    
+!.....set nominator for sample weights
+    swgtrn = 0d0
+    swgtst = 0d0
+    do ismpl=isid0,isid1
+      if( samples(ismpl)%iclass.eq.1 ) then
+        swgtrn = swgtrn +samples(ismpl)%wgt
+      else if(samples(ismpl)%iclass.eq.2 ) then
+        swgtst = swgtst +samples(ismpl)%wgt
+      endif
+    enddo
+    swgts_trn = 0d0
+    swgts_tst = 0d0
+    call mpi_allreduce(swgtrn,swgts_trn,1,mpi_real8,mpi_sum &
+         ,mpi_world,ierr)
+    call mpi_allreduce(swgtst,swgts_tst,1,mpi_real8,mpi_sum &
+         ,mpi_world,ierr)
+    
+    return
+  end subroutine calc_swgts
+!=======================================================================
   subroutine func_w_pmd(ndim,x,ftrn,ftst)
 !
 !  Evaluate loss function value using pmd (actually one_shot routine.)
 !
-    use variables,only:nsmpl,nsmpl_trn,samples,nprcs,tfunc &
+    use variables,only:samples,tfunc &
          ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys,erefmin &
          ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
          ,nff,cffs,nsubff,csubffs,cmaindir,maxna,rcut,rc3 &
@@ -120,12 +137,11 @@ contains
       stop
     endif
 
-    ftrnl = 0d0
-    ftstl = 0d0
     do ismpl=isid0,isid1
+      if( allocated(ismask) .and. ismask(ismpl).ne.0 ) cycle
       natm= samples(ismpl)%natm
       cdirname = trim(samples(ismpl)%cdirname)
-      call ready4pmd(ismpl,ndim,x)
+      call pre_pmd(ismpl,ndim,x)
 
 !.....Set lfdsgnmat=.true. to make run_pmd() compute dsgnmat_force related data
       if( trim(cpot).eq.'linreg' .and. &
@@ -165,7 +181,10 @@ contains
       call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
     endif
 
+    ftrnl = 0d0
+    ftstl = 0d0
     do ismpl=isid0,isid1
+      if( allocated(ismask) .and. ismask(ismpl).ne.0 ) cycle
       smpl = samples(ismpl)
       cdirname= smpl%cdirname
       natm = smpl%natm
@@ -290,7 +309,7 @@ contains
 !  Evaluate the gradient of loss function value
 !  using pmd (actually one_shot routine.)
 !
-    use variables,only: nsmpl,nsmpl_trn,tgrad,ngrad,tcomm,tgrad &
+    use variables,only: tgrad,ngrad,tcomm,tgrad &
          ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,nsubff,csubffs &
          ,cmaindir,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
          ,rcut,rc3,myidrefsub,isidrefsub,iprint,maxisp,gscl &
@@ -335,6 +354,7 @@ contains
     endif
 
     do ismpl=isid0,isid1
+      if( allocated(ismask) .and. ismask(ismpl).ne.0 ) cycle
       smpl = samples(ismpl)
       natm= smpl%natm
       cdirname = smpl%cdirname
@@ -342,7 +362,7 @@ contains
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
-      call ready4pmd(ismpl,ndim,x)
+      call pre_pmd(ismpl,ndim,x)
       
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.
@@ -365,6 +385,7 @@ contains
 
     gtrnl(1:ndim) = 0d0
     do ismpl=isid0,isid1
+      if( allocated(ismask) .and. ismask(ismpl).ne.0 ) cycle
       smpl= samples(ismpl)
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
@@ -481,9 +502,9 @@ contains
     return
   end subroutine grad_w_pmd
 !=======================================================================
-  subroutine ready4pmd(ismpl,ndim,x)
+  subroutine pre_pmd(ismpl,ndim,x)
 !
-!  Get ready for running pmd.
+!  Preprocesses before running pmd
 !
     use variables,only: cmaindir,cpot,nsubff,csubffs,mdsys,samples &
          ,maxisp,nn_nl,nn_nhl,nn_sigtype,ctype_loss,rc3,rcut &
@@ -620,12 +641,12 @@ contains
 !!$             ,num_interact(3)
         call set_params_angular(ndimt,x(ndim0),'angular1',rc3,interact3)
       else
-        print *,'ERROR@ready4pmd: No such BVS FF available in fitpot.'
+        print *,'ERROR@pre_pmd: No such BVS FF available in fitpot.'
         stop 1
       endif
     endif
 
-  end subroutine ready4pmd
+  end subroutine pre_pmd
 !=======================================================================
   subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs,rc &
        ,lfdsgnmat,gwe,gwf,gws)
@@ -1242,7 +1263,7 @@ contains
 !
 !  Normalize inputs (descriptors) wrt standard deviation.
 !
-    use variables, only: nsmpl,samples,nvars,nalist,vars,vranges&
+    use variables, only: samples,nvars,nalist,vars,vranges&
          ,lnormalized,cpot,gsfvar,gsfvs,gsfms,sgms,sgmis,sgm_min,iprint
     use parallel
     use NN2, only: nl,nhl,mhl
@@ -1314,7 +1335,7 @@ contains
 !
 !  Normalize inputs (descriptors)
 !
-    use variables, only: nsmpl,samples,nvars,nalist,vars,vranges&
+    use variables, only: samples,nvars,nalist,vars,vranges&
          ,lnormalized,cpot,gsfvar,sgms,sgmis,gsfss,sq_min,iprint
     use parallel
     use NN2, only: nl,nhl,mhl
@@ -1383,7 +1404,7 @@ contains
 !
 !  Restore weights by inverse normalization
 !
-    use variables, only: nsmpl,samples,nvars,nalist,vars,vranges&
+    use variables, only: samples,nvars,nalist,vars,vranges&
          ,lnormalized,cnormalize,cpot,gsfvar,sgms,sgmis
     use parallel
     use NN2,only: nhl,mhl
