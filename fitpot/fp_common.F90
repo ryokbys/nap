@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-16 15:25:30 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-17 12:50:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -102,7 +102,7 @@ contains
 
     integer:: ismpl,natm,ia,ixyz,jxyz,idim,k,nsf,nal,nnl,isf,i,ndimt
     real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv,esub
-    real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),fref
+    real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref
     real(8):: ftrnl,ftstl,ftmp,gdw
     real(8):: edenom,fdenom
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
@@ -220,12 +220,14 @@ contains
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
         frcs(1:3,1:natm) = smpl%fa(1:3,1:natm)
         ferr = smpl%ferr
-        ferri = 1d0/ferr
+!!$        ferri = 1d0/ferr
         dn3i = 1d0/3/smpl%nfcal
         do ia=1,natm
           if( smpl%ifcal(ia).eq.0 ) cycle
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
+          absfref = sqrt(smpl%fref(1,ia)**2 +smpl%fref(2,ia)**2 +smpl%fref(3,ia)**2)
+          ferri = 1d0/ (absfref +ferr)
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia)+smpl%fsub(ixyz,ia) &
                  -(smpl%fref(ixyz,ia))) *ferri
@@ -247,8 +249,10 @@ contains
       if( lsmatch ) then
 !.....Compare these ptnsr elements with sref elements
         serr = smpl%serr
-        serri = 1d0/serr
+!!$        serri = 1d0/serr
         pdiff(1:6) = 0d0
+        abssref = abs(smpl%sref(1,1)+smpl%sref(2,2)+smpl%sref(3,3))/3
+        serri = 1d0/ (abssref +serr)
         do ixyz=1,3
           do jxyz=ixyz,3
             k = ivoigt(ixyz,jxyz)
@@ -324,7 +328,8 @@ contains
 
     integer:: ismpl,i,idim,natm,k,ia,ixyz,jxyz,nsf,nal,nnl,ndimt
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3),dn3i
-    real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,fref,tmp,gdw
+    real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,tmp,gdw
+    real(8):: absfref,abssref
     type(mdsys):: smpl
     logical,parameter:: lcalcgrad = .true.
     logical,parameter:: lfdsgnmat = .false.
@@ -431,12 +436,14 @@ contains
       if( lfmatch ) then
         frcs(1:3,1:natm)= smpl%fa(1:3,1:natm)
         ferr= smpl%ferr
-        ferri= 1d0/ferr
+!!$        ferri= 1d0/ferr
         dn3i= 1d0/3/smpl%nfcal
         do ia=1,natm
           if( smpl%ifcal(ia).eq.0 ) cycle
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
+          absfref = sqrt(smpl%fref(1,ia)**2 +smpl%fref(2,ia)**2 +smpl%fref(3,ia)**2)
+          ferri = 1d0/ (absfref +ferr)
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia) +smpl%fsub(ixyz,ia) &
                  -(smpl%fref(ixyz,ia))) *ferri
@@ -457,8 +464,10 @@ contains
 !.....Derivative of stress w.r.t. weights
       if( lsmatch ) then
         serr= smpl%serr
-        serri= 1d0/serr
+!!$        serri= 1d0/serr
         pdiff(1:6) = 0d0
+        abssref = abs(smpl%sref(1,1)+smpl%sref(2,2)+smpl%sref(3,3))/3
+        serri = 1d0/ (abssref +serr)
         do ixyz=1,3
           do jxyz=ixyz,3
             k = ivoigt(ixyz,jxyz)
