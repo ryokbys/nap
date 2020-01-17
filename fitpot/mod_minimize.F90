@@ -481,7 +481,7 @@ contains
 !.....Store previous func and grad values
       fp= f
       gp(1:ndim)= g(1:ndim)
-      if( gnorm.lt.tiny ) cycle
+      if( gnorm.lt.tiny ) goto 10
 !.....Compute step size of x
       if( trim(csgdupdate).eq.'adam' .or. trim(csgdupdate).eq.'Adam' ) then
         rm(:) = adam_b1*rm(:) +(1d0 -adam_b1)*g(:)
@@ -503,7 +503,7 @@ contains
       
       x0(1:ndim)= x(1:ndim)
 !.....Create the sample mask, 0) compute the sample,  1) not to compute the sample
-      call get_uniq_iarr(mynsmpl,nsgdbsize,imaskarr)
+10    call get_uniq_iarr(mynsmpl,nsgdbsize,imaskarr)
       ismask(:) = 1
       do i=1,nsgdbsize
         ismpl = imaskarr(i) +(isid0-1)

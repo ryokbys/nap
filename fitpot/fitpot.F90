@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-16 14:58:06 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-16 18:20:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -284,6 +284,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,es12.3)') 'xtol',xtol
   write(6,'(2x,a25,2x,es12.3)') 'ftol',ftol
   write(6,'(2x,a25,2x,es12.3)') 'gtol',gtol
+  write(6,'(2x,a25,2x,i0)') 'numtol',numtol
   write(6,'(2x,a25,10(2x,a3))') 'specorder',(trim(specorder(i)),i=1,nsp)
   if( len(trim(crefstrct)).gt.5 ) then
     write(6,'(2x,a25,2x,a)') 'reference_structure',trim(crefstrct)
