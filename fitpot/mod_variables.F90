@@ -170,9 +170,10 @@ module variables
   real(8):: erefsub = 0d0
 
 !.....Constants for NN2 potential
-  integer,parameter:: nn_nlmax = 2
+!!$  integer,parameter:: nn_nlmax = 2
   integer:: nn_nl = 0
-  integer:: nn_nhl(0:nn_nlmax+1)
+  integer,allocatable:: nn_nhl(:)
+!!$  integer:: nn_nhl(0:nn_nlmax+1)
   integer:: nn_sigtype = 2
 contains
   subroutine init_variables()

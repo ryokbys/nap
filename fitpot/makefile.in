@@ -40,11 +40,11 @@ pmdobj= ${PMDDIR}/mod_pmdvars.o ${PMDDIR}/mod_pmdmpi.o ${PMDDIR}/mod_pmdio.o \
 
 ${PMDDIR}/%.o: ${PMDDIR}/%.F90
 	@[ -d ${PMDDIR} ]
-	cd ${PMDDIR} && ${MPIFC} -c ${MPIFLAGS} -o $@ -c $<
+	cd ${PMDDIR} && ${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} -o $@ -c $<
 
 ${PMDDIR}/%.o: ${PMDDIR}/%.F
 	@[ -d ${PMDDIR} ]
-	cd ${PMDDIR} && ${MPIFC} -c ${MPIFLAGS} -o $@ -c $<
+	cd ${PMDDIR} && ${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} -o $@ -c $<
 
 .PHONY: all clean
 all: fitpot

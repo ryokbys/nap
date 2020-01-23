@@ -349,15 +349,15 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'force_limit' ) then
     call read_r1(ionum,force_limit)
     return
-  elseif( trim(cname).eq.'NN_num_layers' ) then
-    call read_i1(ionum,nn_nl)
-    return
-  elseif( trim(cname).eq.'NN_num_nodes' ) then
-    call read_nn_nhl(ionum)
-    return
-  elseif( trim(cname).eq.'NN_sigtype' ) then
-    call read_i1(ionum,nn_sigtype)
-    return
+!!$  elseif( trim(cname).eq.'NN_num_layers' ) then
+!!$    call read_i1(ionum,nn_nl)
+!!$    return
+!!$  elseif( trim(cname).eq.'NN_num_nodes' ) then
+!!$    call read_nn_nhl(ionum)
+!!$    return
+!!$  elseif( trim(cname).eq.'NN_sigtype' ) then
+!!$    call read_i1(ionum,nn_sigtype)
+!!$    return
   elseif( trim(cname).eq.'interactions' ) then
     backspace(ionum)
     read(ionum,*) ctmp,nrow
@@ -555,26 +555,6 @@ subroutine read_force_neglect_species(ionum)
   read(ionum,*) ctmp, (cspcs_neglect(i),i=1,nspcs_neglect)
 
 end subroutine read_force_neglect_species
-!=======================================================================
-subroutine read_nn_nhl(ionum)
-  use variables,only: nn_nhl
-  use util,only: num_data
-  implicit none
-  integer,intent(in):: ionum
-
-  integer:: nl,ndat,i
-  character(len=1024):: ctmp
-!      integer,external:: num_data
-
-  backspace(ionum)
-  read(ionum,'(a)') ctmp
-  ndat = num_data(trim(ctmp),' ')
-  nl = ndat -2
-  backspace(ionum)
-  read(ionum,*) ctmp, (nn_nhl(i),i=0,nl)
-
-  return
-end subroutine read_nn_nhl
 !=======================================================================
 subroutine read_interactions(ionum,nrow)
   use variables

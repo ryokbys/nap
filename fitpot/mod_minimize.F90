@@ -798,10 +798,10 @@ contains
         mem= estmem/1000/1000
         if( mem.eq.0 ) then
           mem= estmem/1000
-          write(6,'(a,i6,a)') ' memory for BFGS = ' &
+          write(6,'(a,i6,a)') ' Memory for BFGS = ' &
                ,int(estmem/1000),' kB'
         else
-          write(6,'(a,i6,a)') ' memory for BFGS = ' &
+          write(6,'(a,i6,a)') ' Memory for BFGS = ' &
                ,int(estmem/1000/1000),' MB'
         endif
       endif

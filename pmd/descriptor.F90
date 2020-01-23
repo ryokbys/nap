@@ -169,6 +169,7 @@ contains
       endif
       lrealloc=.true.
     endif
+
     nnltmp = 0
     do i=1,natm
       nnltmp = max(nnltmp,lspr(0,i))
@@ -184,6 +185,7 @@ contains
       endif
       lrealloc=.true.
     endif
+
     if( allocated(dgsf).and.lrealloc ) then
       mem = mem -8*size(gsf) -8*size(dgsf) -4*size(igsf)
       deallocate( gsf,dgsf,igsf )

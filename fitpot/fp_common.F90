@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-17 12:50:10 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-23 20:33:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -126,7 +126,7 @@ contains
     if( l1st ) then
       if( .not.fp_common_initialized ) call init()
       if( .not.allocated(fdiff) ) allocate(fdiff(3,maxna),frcs(3,maxna))
-      if( trim(cpot).eq.'NN2' .or. trim(cpot).eq.'linreg') lupdate_gsf = .true.
+      if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg') lupdate_gsf = .true.
     endif
 
     if( .not. lematch .and. .not.lfmatch .and. .not.lsmatch ) then
@@ -154,7 +154,7 @@ contains
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
       samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
-      if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
+      if( trim(cpot).eq.'linreg' .or. index(cpot,'NN').ne.0 ) then
         call get_ints(nsf,nal,nnl)
         samples(ismpl)%nsf = nsf
         samples(ismpl)%nal = nal
@@ -304,7 +304,7 @@ contains
     tfunc= tfunc +tfg
 
     l1st = .false.
-    if( trim(cpot).eq.'NN2' .or. trim(cpot).eq.'linreg' ) lupdate_gsf = .false.
+    if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) lupdate_gsf = .false.
 
   end subroutine func_w_pmd
 !=======================================================================
@@ -526,9 +526,10 @@ contains
     use fpc,only: set_paramsdir_fpc,set_params_fpc
     use angular,only: set_paramsdir_angular,set_params_angular
     use EAM,only: set_paramsdir_EAM,set_params_EAM
-    use NN,only: set_paramsdir_NN,set_params_NN
-    use NN2,only: set_paramsdir_NN2,set_params_NN2,nl,nhl,nlmax,get_NN2_hl1 &
+!!$    use NN,only: set_paramsdir_NN,set_params_NN
+    use NN2,only: set_paramsdir_NN2,set_params_NN2,get_NN2_hl1 &
          ,set_NN2_hl1,set_sigtype_NN2
+    use DNN,only: set_paramsdir_DNN,set_params_DNN,set_sigtype_DNN
     use linreg,only: set_paramsdir_linreg,set_params_linreg
     use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
          ,lupdate_gsf
@@ -584,10 +585,10 @@ contains
       call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
            //'/pmd')
       call set_params_EAM(ndim,x)
-    else if( trim(cpot).eq.'NN' ) then
-      call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
-           //'/pmd')
-      call set_params_NN(ndim,x,rcut,rc3)
+!!$    else if( trim(cpot).eq.'NN' ) then
+!!$      call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
+!!$           //'/pmd')
+!!$      call set_params_NN(ndim,x,rcut,rc3)
     else if( trim(cpot).eq.'linreg' ) then
       call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
            //'/pmd')
@@ -612,6 +613,20 @@ contains
            //'/pmd')
       call set_params_NN2(ndim,x,nn_nl,nn_nhl)
       call set_sigtype_NN2(nn_sigtype)
+      if( .not. lupdate_gsf ) then
+        nsf = smpl%nsf
+        nal = smpl%nal
+        nnl = smpl%nnl
+        call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
+             samples(ismpl)%dgsf,samples(ismpl)%igsf)
+      endif
+    else if( trim(cpot).eq.'DNN' ) then
+      call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_paramsdir_DNN(trim(cmaindir)//'/'//trim(cdirname)&
+           //'/pmd')
+      call set_params_DNN(ndim,x,nn_nl,nn_nhl)
+      call set_sigtype_DNN(nn_sigtype)
       if( .not. lupdate_gsf ) then
         nsf = smpl%nsf
         nal = smpl%nal
@@ -1128,8 +1143,8 @@ contains
 !!$    gsfvar = get_variance_input(gsfmean)
     if( myid.eq.0 .and. iprint.gt.0 ) then
       print *,''
-      write(6,'(a,es12.3)') ' mean of input symmetry functions = ',gsfmean
-      write(6,'(a,es12.3)') ' var  of input symmetry functions = ',gsfvar
+      write(6,'(a,es12.3)') ' Mean of input symmetry functions = ',gsfmean
+      write(6,'(a,es12.3)') ' Var  of input symmetry functions = ',gsfvar
       if( iprint.gt.1 ) then
         do isf=1,nsf
           write(6,'(a,i5,2es14.4e3)') '   isf,mean,variance= ' &
@@ -1273,9 +1288,9 @@ contains
 !  Normalize inputs (descriptors) wrt standard deviation.
 !
     use variables, only: samples,nvars,nalist,vars,vranges&
-         ,lnormalized,cpot,gsfvar,gsfvs,gsfms,sgms,sgmis,sgm_min,iprint
+         ,lnormalized,cpot,gsfvar,gsfvs,gsfms,sgms,sgmis,sgm_min,iprint &
+         ,nn_nhl
     use parallel
-    use NN2, only: nl,nhl,mhl
     implicit none
     integer:: ismpl,ia,natm,isf,i,iv,ihl0,ihl1
     integer,save:: nsf
@@ -1317,7 +1332,7 @@ contains
           print '(a,i5,2es12.4)','   isf,sgm,sgmi=',isf,sgms(isf),sgmis(isf)
         enddo
       endif
-    endif
+    endif  ! l1st
 
     if( trim(cpot).eq.'linreg' ) then
       do i=1,nvars
@@ -1326,9 +1341,19 @@ contains
       enddo
     else if( trim(cpot).eq.'NN2' ) then
       iv = 0
-      do ihl0=1,nhl(0)
-        do ihl1=1,mhl(1)
+      do ihl0=1,nn_nhl(0)
+        do ihl1=1,nn_nhl(1)  ! NN2 does not use bias...
           iv = iv + 1
+          vars(iv) = vars(iv) *sgms(ihl0)
+          vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
+        enddo
+      enddo
+    else if( trim(cpot).eq.'DNN' ) then
+      iv = 0
+      do ihl1=1,nn_nhl(1)
+        do ihl0=0,nn_nhl(0)
+          iv = iv + 1
+          if( ihl0.eq.0 ) cycle  ! Care about bias node
           vars(iv) = vars(iv) *sgms(ihl0)
           vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
         enddo
@@ -1345,9 +1370,9 @@ contains
 !  Normalize inputs (descriptors)
 !
     use variables, only: samples,nvars,nalist,vars,vranges&
-         ,lnormalized,cpot,gsfvar,sgms,sgmis,gsfss,sq_min,iprint
+         ,lnormalized,cpot,gsfvar,sgms,sgmis,gsfss,sq_min,iprint &
+         ,nn_nhl
     use parallel
-    use NN2, only: nl,nhl,mhl
     implicit none
     integer:: ismpl,ia,natm,isf,i,iv,ihl0,ihl1
     real(8):: sqmax,sqmin
@@ -1395,9 +1420,19 @@ contains
       enddo
     else if( trim(cpot).eq.'NN2' ) then
       iv = 0
-      do ihl0=1,nhl(0)
-        do ihl1=1,mhl(1)
+      do ihl0=1,nn_nhl(0)
+        do ihl1=1,nn_nhl(1)  ! NN2 does not use bias...
           iv = iv + 1
+          vars(iv) = vars(iv) *sgms(ihl0)
+          vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
+        enddo
+      enddo
+    else if( trim(cpot).eq.'DNN' ) then
+      iv = 0
+      do ihl1=1,nn_nhl(1)
+        do ihl0=0,nn_nhl(0)
+          iv = iv + 1
+          if( ihl0.eq.0 ) cycle  ! Care about bias node
           vars(iv) = vars(iv) *sgms(ihl0)
           vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
         enddo
@@ -1414,9 +1449,8 @@ contains
 !  Restore weights by inverse normalization
 !
     use variables, only: samples,nvars,nalist,vars,vranges&
-         ,lnormalized,cnormalize,cpot,gsfvar,sgms,sgmis
+         ,lnormalized,cnormalize,cpot,gsfvar,sgms,sgmis, nn_nhl
     use parallel
-    use NN2,only: nhl,mhl
     implicit none
     integer:: i,iv,ihl0,ihl1
     real(8):: sgmi
@@ -1432,10 +1466,21 @@ contains
         enddo
       else if( trim(cpot).eq.'NN2' ) then
         iv = 0
-        do ihl0=1,nhl(0)
+        do ihl0=1,nn_nhl(0)
           sgmi = sgmis(ihl0)
-          do ihl1=1,mhl(1)
-            iv=iv+1
+          do ihl1=1,nn_nhl(1)
+            iv= iv + 1
+            vars(iv)= vars(iv) *sgmi
+            vranges(1:2,iv)= vranges(1:2,iv) *sgmi
+          enddo
+        enddo
+      else if( trim(cpot).eq.'DNN' ) then
+        iv = 0
+        do ihl1=1,nn_nhl(1)
+          do ihl0=0,nn_nhl(0)
+            iv= iv + 1
+            if( ihl0.eq.0 ) cycle ! Care about bias node
+            sgmi = sgmis(ihl0)
             vars(iv)= vars(iv) *sgmi
             vranges(1:2,iv)= vranges(1:2,iv) *sgmi
           enddo

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-16 18:20:14 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-23 17:43:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -131,7 +131,7 @@ program fitpot
   endif
 
   if( (trim(cfmethod).ne.'test' .or. trim(cfmethod).ne.'dsgnmat') .and. &
-       (trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2') ) then
+       (trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2') .or. trim(cpot).eq.'DNN' ) then
     lnormalize = .true.
   endif
 
@@ -139,7 +139,8 @@ program fitpot
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
        .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
        .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'BMH' &
-       .or. trim(cpot).eq.'Abell' .or. trim(cpot).eq.'fpc' ) then
+       .or. trim(cpot).eq.'Abell' .or. trim(cpot).eq.'fpc' &
+       .or. trim(cpot).eq.'DNN' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
 !!$    if( lnormalize ) call normalize()
 !!$    if( lgdw ) call compute_gdw()
@@ -792,12 +793,14 @@ subroutine get_base_energies()
   call mpi_allreduce(ebl,ebase,nspmax,mpi_real8,mpi_min &
        ,mpi_world,ierr)
 
+#ifdef _DEBUG
   if(myid.eq.0) then
     write(6,'(a)') ' Base energies obtained from unary systems:'
     do ispcs=1,nspmax
       write(6,'(a,i3,es12.4)') '   is, ebase(is) =',ispcs,ebase(ispcs)
     enddo
   endif
+#endif
 
 end subroutine get_base_energies
 !=======================================================================
@@ -813,15 +816,9 @@ subroutine qn_wrapper(ftrn0,ftst0)
   real(8):: fval
   external:: write_stats
 
-!!$  if( trim(cpot).eq.'NN' ) then
-!!$    call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
-!!$         ,iprint,iflag,myid,NN_func,NN_grad,cfmethod &
-!!$         ,niter_eval,write_stats)
-!!$    call NN_analyze("fin")
-!!$    
   if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
        .or. trim(cpot).eq.'linreg' &
-       .or. trim(cpot).eq.'NN2' ) then
+       .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'DNN' ) then
     call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -869,16 +866,9 @@ subroutine cg_wrapper(ftrn0,ftst0)
   real(8):: fval
   external:: write_stats
 
-!!$  !.....NN specific code hereafter
-!!$  if( trim(cpot).eq.'NN' ) then
-!!$    call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
-!!$         ,iprint,iflag,myid,NN_func,NN_grad,cfmethod,niter_eval &
-!!$         ,write_stats)
-!!$    call NN_analyze("fin")
-!!$
   if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
        .or. trim(cpot).eq.'linreg' &
-       .or. trim(cpot).eq.'NN2' ) then
+       .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'DNN' ) then
     call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -904,7 +894,8 @@ subroutine sa_wrapper(ftrn0,ftst0)
   external:: write_stats
 
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
-       .or. trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' ) then
+       .or. trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' &
+       .or. trim(cpot).eq.'DNN' ) then
     call sa(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -927,8 +918,9 @@ subroutine md_wrapper(ftrn0,ftst0)
   real(8):: fval
   external:: write_stats
 
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' ) then
+  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
+       .or. trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' &
+       .or. trim(cpot).eq.'DNN' ) then
     call metadynamics(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -1206,7 +1198,7 @@ subroutine test(ftrn0,ftst0)
 !!$    call NN_grad(nvars,vars,g)
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
        .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
-       .or. trim(cpot).eq.'NN2' ) then
+       .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'DNN' ) then
 !!$    call func_w_pmd(nvars,vars,ftrn,ftst)
     call grad_w_pmd(nvars,vars,g)
   else
@@ -1558,11 +1550,12 @@ subroutine write_stats(iter)
     if( myid.eq.0 .and. iprint.gt.1 ) then
       print '(a,2es12.4)',' Denominator (energy) for trn, tst = ' &
            ,etrndnm, etstdnm
-      print '(a,2es12.4)',' Denominator (force) for trn, tst  = ' &
+      print '(a,2es12.4)',' Denominator (force)  for trn, tst = ' &
            ,ftrndnm, ftstdnm
       print '(a,2es12.4)',' Denominator (stress) for trn, tst = ' &
            ,strndnm, ststdnm
     endif
+
   endif
   l1st = .false.
 
@@ -2121,11 +2114,6 @@ subroutine sync_input()
   call mpi_bcast(lnormalize,1,mpi_logical,0,mpi_world,ierr)
   
   call mpi_bcast(nsmpl_outfrc,1,mpi_integer,0,mpi_world,ierr)
-
-!.....NN related variables
-  call mpi_bcast(nn_nl,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(nn_nhl,nn_nlmax+1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(nn_sigtype,1,mpi_integer,0,mpi_world,ierr)
 
 !.....Force-fields to be subtracted from reference values
   call mpi_bcast(nsubff,1,mpi_integer,0,mpi_world,ierr)

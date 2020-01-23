@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-01-23 10:45:51 Ryo KOBAYASHI>
+!                     Last-modified: <2020-01-23 16:14:33 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1121,6 +1121,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use Coulomb,only: gradw_Coulomb
   use linreg,only: gradw_linreg
   use NN2,only: gradw_NN2
+  use DNN,only: gradw_DNN
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -1262,6 +1263,10 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     else if( use_force('NN2') ) then
       iprm0 = 0
       call gradw_NN2(namax,natm,tag,ra,nnmax,h,rc,lspr, &
+           iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
+    else if( use_force('DNN') ) then
+      iprm0 = 0
+      call gradw_DNN(namax,natm,tag,ra,nnmax,h,rc,lspr, &
            iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
     endif
 !        if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra
