@@ -415,7 +415,7 @@ contains
     real(8),parameter:: tiny  = 1d-14
 
     integer:: i,ismpl,iter,niter,nftol,ngtol,nxtol
-    real(8):: g2,gnorm,xnorm,dxnorm,v,vh,pval
+    real(8):: g2,gnorm,xnorm,dxnorm,v,vh,pval,sgd_rate
     real(8):: fp,ftmp,ftst,ftsttmp
     real(8),allocatable:: x(:),dx(:),rm(:),rmh(:),gpena(:),gtmp(:),gp(:)
     integer,allocatable:: imaskarr(:)
@@ -431,6 +431,7 @@ contains
       allocate(x(ndim),dx(ndim),rm(ndim),rmh(ndim),gpena(ndim) &
            ,gp(ndim),gtmp(ndim))
       allocate(ismask(isid0:isid1))
+      sgd_rate = sgd_rate0
     endif
 
     if( trim(csgdupdate).ne.'adam' .and. trim(csgdupdate).ne.'Adam' ) then
@@ -486,9 +487,10 @@ contains
       if( trim(csgdupdate).eq.'adam' .or. trim(csgdupdate).eq.'Adam' ) then
         rm(:) = adam_b1*rm(:) +(1d0 -adam_b1)*g(:)
         v = adam_b2*v +(1d0 -adam_b2)*gnorm**2
-        rmh(:) = rm(:)/(1d0-adam_b1)
-        vh = v/(1d0-adam_b2)
-        dx(:) = -sgd_rate0*rmh(:)/(sqrt(vh) +sgd_eps)
+        rmh(:) = rm(:)/(1d0-adam_b1**iter)
+        vh = v/(1d0-adam_b2**iter)
+!!$        sgd_rate = sgd_rate *sqrt(1d0-adam_b2**iter)/(1d0-adam_b1**iter)
+        dx(:) = -sgd_rate*rmh(:)/(sqrt(vh) +sgd_eps)
       endif
 !!$      print *,' |rm|,|rmh|,v,vh,|dx| = ',sqrt(sprod(ndim,rm,rm)),sqrt(sprod(ndim,rmh,rmh))&
 !!$           ,v,vh,sqrt(sprod(ndim,dx,dx))
