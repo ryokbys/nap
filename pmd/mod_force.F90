@@ -1,13 +1,13 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2019-11-06 13:47:58 Ryo KOBAYASHI>
+!                     Last-modified: <2020-01-21 22:27:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax
   implicit none
   save
   
 !.....Force index list
-  integer,parameter:: N_FORCES = 33
+  integer,parameter:: N_FORCES = 34
   character(len=128):: force_index_list(N_FORCES)
 
   integer:: num_forces = -1
@@ -63,6 +63,7 @@ contains
     force_index_list(31) =  "cspline"
     force_index_list(32) =  "Tersoff"
     force_index_list(33) =  "angular"
+    force_index_list(34) =  "DNN"
 
     luse_force(:) = .false.
 

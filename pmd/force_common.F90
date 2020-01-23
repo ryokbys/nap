@@ -27,6 +27,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
   use linreg,only:force_linreg
 !!$  use NN,only:force_NN
   use NN2,only: force_NN2,force_NN2_overlay_pot, force_NN2_overlay_frc
+  use DNN,only: force_DNN
   use Coulomb, only: force_screened_Coulomb, force_Ewald &
        ,initialize_coulomb, force_Ewald_long, force_Coulomb
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
@@ -177,6 +178,9 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
            ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     endif
   endif
+  if( use_force('DNN') ) call force_DNN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Morse') ) call force_Morse(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
@@ -274,6 +278,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use linreg, only: read_params_linreg,lprmset_linreg
   use descriptor, only: read_params_desc,init_desc
   use NN2, only: read_params_NN2,lprmset_NN2,update_params_NN2
+  use DNN, only: read_params_DNN,lprmset_DNN,update_params_DNN
   use pmdio,only: nspmax
   use tersoff,only: init_tersoff
   use dipole,only: read_params_dipole
@@ -410,6 +415,19 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
 !.....Read only in.params.desc
       call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
       call update_params_NN2()
+    endif
+  endif
+!.....Deep NN
+  if( use_force('DNN') ) then
+    call init_desc()
+    if( .not.lprmset_DNN ) then
+!.....Read both in.params.desc and in.params.DNN
+      call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
+      call read_params_DNN(myid_md,mpi_md_world,iprint)
+    else
+!.....Read only in.params.desc
+      call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
+      call update_params_DNN()
     endif
   endif
 !.....Buckingham
@@ -1405,12 +1423,17 @@ subroutine write_force_times()
 !
   use force
   use NN2,only: time_NN2 => time
+  use DNN,only: time_DNN => time
   use descriptor,only: time_desc => time
   
 !.....Non-exclusive (additive) choice of force-fields
   if( use_force('NN2') ) then
     write(6,'(1x,a,f10.2)') "Time for descriptor   = ",time_desc
     write(6,'(1x,a,f10.2)') "Time for force_NN2    = ",time_NN2
+  endif
+  if( use_force('DNN') ) then
+    write(6,'(1x,a,f10.2)') "Time for descriptor   = ",time_desc
+    write(6,'(1x,a,f10.2)') "Time for force_DNN    = ",time_DNN
   endif
 
 end subroutine write_force_times

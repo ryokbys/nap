@@ -42,7 +42,7 @@ forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
 	force_Ito3_WHe.o force_LJ.o force_SW.o force_EDIP_Si.o \
 	force_Brenner.o force_Lu_WHe.o force_Branicio_AlN.o \
 	force_Mishin.o force_AFS_W.o force_SC_Fe.o \
-	force_SM_Al.o force_linreg.o force_NN.o force_NN2.o \
+	force_SM_Al.o force_linreg.o force_NN.o force_NN2.o force_DNN.o \
 	force_Morse.o force_Coulomb.o force_EAM.o force_Buckingham.o \
 	force_Bonny_WRe.o force_ZBL.o force_cspline.o force_Tersoff.o \
 	force_Abell.o force_BMH.o force_dipole.o force_fpc.o force_angular.o
@@ -117,6 +117,7 @@ force_Mishin.o: params_Mishin_Al.h params_Mishin_Ni.h
 force_Coulomb.o: mod_util.o
 force_LJ.o: mod_util.o
 force_NN2.o: mod_util.o
+force_DNN.o: mod_util.o
 force_SW.o: mod_util.o
 force_ZBL.o: mod_util.o mod_element.o
 force_cspline.o: mod_util.o

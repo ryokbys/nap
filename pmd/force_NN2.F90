@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-13 16:41:50 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-22 16:05:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -153,37 +153,38 @@ contains
     endif
 !.....2nd, calculate the node values by summing contributions from
 !.....  symmetry functions
-    if( nl.eq.1 ) then
-      do ia=1,natm
-        do ihl1=1,mhl(1)
-          tmp= 0d0
-          do ihl0=1,nhl(0)
-            tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
-          enddo
-          zl1(ihl1,ia)= tmp
-          hl1(ihl1,ia)= sigmoid(tmp)
-        enddo
-      enddo
-    else if( nl.eq.2 ) then
-      do ia=1,natm
-        do ihl1=1,mhl(1)
-          tmp= 0d0
-          do ihl0=1,nhl(0)
-            tmp= tmp +wgt21(ihl0,ihl1) *gsf(ihl0,ia)
-          enddo
-          zl1(ihl1,ia)= tmp
-          hl1(ihl1,ia)= sigmoid(tmp)
-        enddo
-        do ihl2=1,mhl(2)
-          tmp= 0d0
-          do ihl1=1,nhl(1)
-            tmp= tmp +wgt22(ihl1,ihl2) *(hl1(ihl1,ia)-0.5d0)
-          enddo
-          zl2(ihl2,ia)= tmp
-          hl2(ihl2,ia)= sigmoid(tmp)
-        enddo
-      enddo
-    endif
+!!$    if( nl.eq.1 ) then
+!!$      do ia=1,natm
+!!$        do ihl1=1,mhl(1)
+!!$          tmp= 0d0
+!!$          do ihl0=1,nhl(0)
+!!$            tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
+!!$          enddo
+!!$          zl1(ihl1,ia)= tmp
+!!$          hl1(ihl1,ia)= sigmoid(tmp)
+!!$        enddo
+!!$      enddo
+!!$    else if( nl.eq.2 ) then
+!!$      do ia=1,natm
+!!$        do ihl1=1,mhl(1)
+!!$          tmp= 0d0
+!!$          do ihl0=1,nhl(0)
+!!$            tmp= tmp +wgt21(ihl0,ihl1) *gsf(ihl0,ia)
+!!$          enddo
+!!$          zl1(ihl1,ia)= tmp
+!!$          hl1(ihl1,ia)= sigmoid(tmp)
+!!$        enddo
+!!$        do ihl2=1,mhl(2)
+!!$          tmp= 0d0
+!!$          do ihl1=1,nhl(1)
+!!$            tmp= tmp +wgt22(ihl1,ihl2) *(hl1(ihl1,ia)-0.5d0)
+!!$          enddo
+!!$          zl2(ihl2,ia)= tmp
+!!$          hl2(ihl2,ia)= sigmoid(tmp)
+!!$        enddo
+!!$      enddo
+!!$    endif
+    call comp_nodes(natm)
 
 !.....Calculate the energy of atom by summing up the node values
     epotl= 0d0
@@ -229,6 +230,7 @@ contains
           enddo
 !.....atom ia
           do ihl0= 1,nhl(0)
+            if( igsf(ihl0,0,ia).eq.0 ) cycle
             aal(1:3,ia)=aal(1:3,ia) &
                  -tmp*wgt11(ihl0,ihl1)*dgsf(1:3,ihl0,0,ia)
           enddo
@@ -257,6 +259,7 @@ contains
             enddo
 !.....atom ia
             do ihl0= 1,nhl(0)
+              if( igsf(ihl0,0,ia).eq.0 ) cycle
               aal(1:3,ia)=aal(1:3,ia) &
                    -tmp2*tmp1*wgt21(ihl0,ihl1)*dgsf(1:3,ihl0,0,ia)
             enddo
@@ -876,6 +879,52 @@ contains
     return
   end subroutine force_NN2_overlay_frc
 !=======================================================================
+  subroutine comp_nodes(natm)
+!
+!  Compute node values hl# and zl#, which is usally required before
+!  computing the NN output.
+!
+    use descriptor,only: gsf,nsf
+    integer,intent(in):: natm
+
+    integer:: ia,ihl1,ihl0,ihl2
+    real(8):: tmp
+    
+!.....Compute the node values by summing contributions from symmetry functions.
+    if( nl.eq.1 ) then
+      do ia=1,natm
+        do ihl1=1,mhl(1)
+          tmp= 0d0
+          do ihl0=1,nhl(0)
+            tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
+          enddo
+          zl1(ihl1,ia)= tmp
+          hl1(ihl1,ia)= sigmoid(tmp)
+        enddo
+      enddo
+    else if( nl.eq.2 ) then
+      do ia=1,natm
+        do ihl1=1,mhl(1)
+          tmp= 0d0
+          do ihl0=1,nhl(0)
+            tmp= tmp +wgt21(ihl0,ihl1) *gsf(ihl0,ia)
+          enddo
+          zl1(ihl1,ia)= tmp
+          hl1(ihl1,ia)= sigmoid(tmp)
+        enddo
+        do ihl2=1,mhl(2)
+          tmp= 0d0
+          do ihl1=1,nhl(1)
+            tmp= tmp +wgt22(ihl1,ihl2) *(hl1(ihl1,ia)-0.5d0)
+          enddo
+          zl2(ihl2,ia)= tmp
+          hl2(ihl2,ia)= sigmoid(tmp)
+        enddo
+      enddo
+    endif
+
+  end subroutine comp_nodes
+!=======================================================================
   subroutine set_sigtype_NN2(itype)
 !
 !  Set sigmoid function type
@@ -1452,6 +1501,8 @@ contains
 
     integer:: iv,ia,ihl0,ihl1,jj,ja,jra
     real(8):: g,h1,z1,tmp,w2,w1,ds,dds,ftmp(3),xi(3),xj(3),xij(3),rij(3)
+    integer:: ihl2
+    real(8):: h2,z2,w3
 !!$    integer,external:: itotOf
     real(8),allocatable:: dgsf2(:,:,:,:)
 
@@ -1460,36 +1511,72 @@ contains
       deallocate(hl1,zl1)
       allocate(hl1(nhl(1),nal), zl1(nhl(1),nal))
     endif
-    do ia=1,natm
-      do ihl1=1,mhl(1)
-        tmp= 0d0
-        do ihl0=1,nhl(0)
-          tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
-        enddo
-        zl1(ihl1,ia)= tmp
-        hl1(ihl1,ia)= sigmoid(tmp)
-      enddo
-    enddo
+    if( nl.eq.2 .and. size(hl2).ne.nhl(2)*nal ) then
+      deallocate(hl2,zl2)
+      allocate(hl2(nhl(2),nal),zl2(nhl(2),nal))
+    endif
+!!$    do ia=1,natm
+!!$      do ihl1=1,mhl(1)
+!!$        tmp= 0d0
+!!$        do ihl0=1,nhl(0)
+!!$          tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
+!!$        enddo
+!!$        zl1(ihl1,ia)= tmp
+!!$        hl1(ihl1,ia)= sigmoid(tmp)
+!!$      enddo
+!!$    enddo
+    call comp_nodes(natm)
 
     if( lematch ) then
-      do ia=1,natm
-        iv = iprm0
-        do ihl0=1,nhl(0)
-          g = gsf(ihl0,ia)
-          do ihl1=1,mhl(1)
-            w2 = wgt12(ihl1)
+      if( nl.eq.1 ) then
+        do ia=1,natm
+          iv = iprm0
+          do ihl0=1,nhl(0)
+            g = gsf(ihl0,ia)
+            do ihl1=1,mhl(1)
+              w2 = wgt12(ihl1)
+              h1 = hl1(ihl1,ia)
+              z1 = zl1(ihl1,ia)
+              iv = iv + 1
+              gwe(iv) = gwe(iv) +w2 *g *dsigmoid(z1,h1)
+            enddo
+          enddo
+          do ihl1=1,nhl(1)
             h1 = hl1(ihl1,ia)
-            z1 = zl1(ihl1,ia)
             iv = iv + 1
-            gwe(iv) = gwe(iv) +w2 *g *dsigmoid(z1,h1)
+            gwe(iv) = gwe(iv) + (h1 -0.5d0)
           enddo
         enddo
-        do ihl1=1,nhl(1)
-          h1 = hl1(ihl1,ia)
-          iv = iv + 1
-          gwe(iv) = gwe(iv) + (h1 -0.5d0)
+      else if( nl.eq.2 ) then
+        do ia=1,natm
+          iv = iprm0
+          do ihl0=1,nhl(0)
+            g = gsf(ihl0,ia)
+            do ihl1=1,mhl(1)
+              w2 = wgt12(ihl1)
+              h1 = hl1(ihl1,ia)
+              z1 = zl1(ihl1,ia)
+              iv = iv + 1
+              gwe(iv) = gwe(iv) +w2 *g *dsigmoid(z1,h1)
+            enddo
+          enddo
+          do ihl1=1,nhl(1)
+            h1 = hl1(ihl1,ia)
+            do ihl2=1,mhl(2)
+              w3 = wgt23(ihl2)
+              h2 = hl2(ihl2,ia)
+              z2 = zl2(ihl2,ia)
+              iv = iv + 1
+              gwe(iv) = gwe(iv) +w3 *h1 *dsigmoid(z2,h2)
+            enddo
+          enddo
+          do ihl2=1,nhl(2)
+            h2 = hl2(ihl2,ia)
+            iv = iv + 1
+            gwe(iv) = gwe(iv) + (h2 -0.5d0)
+          enddo
         enddo
-      enddo
+      endif
     endif
 
     if( lfmatch .or. lsmatch ) then
@@ -1515,59 +1602,63 @@ contains
     endif
 
     if( lfmatch .and. .not.lsmatch ) then
+      if( nl.eq.1 ) then
 !.....Copy back derivatives of forces on atoms outside of the node
 !.....Compute derivative of forces w.r.t. weights
-      do ia=1,natm
-        iv = iprm0
+        do ia=1,natm
+          iv = iprm0
 !.....Weights between layer 0 and 1
-        do ihl0=1,nhl(0)
-          g = gsf(ihl0,ia)
+          do ihl0=1,nhl(0)
+            g = gsf(ihl0,ia)
+            do ihl1=1,mhl(1)
+              w1 = wgt11(ihl0,ihl1)
+              w2 = wgt12(ihl1)
+              h1 = hl1(ihl1,ia)
+              z1 = zl1(ihl1,ia)
+              ds = dsigmoid(z1,h1)
+              dds= ddsigmoid(z1,h1)
+              iv = iv +1
+              do jj=0,lspr(0,ia)  ! Notice: from 0 not 1
+                if( jj.eq.0 ) then
+                  ja = ia
+                else
+                  ja = lspr(jj,ia)
+                endif
+                jra = itotOf(tag(ja))
+                ftmp(1:3) = -w2 *(dds *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
+                     +ds*dgsf(1:3,ihl0,jj,ia) )
+!.....Derivative of forces wrt weights
+                gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+              enddo  ! jj=
+            enddo  ! ihl1=
+!!$          endif
+          enddo  ! ihl0=
+!.....Weights between layer-1 and output
           do ihl1=1,mhl(1)
-            w1 = wgt11(ihl0,ihl1)
             w2 = wgt12(ihl1)
             h1 = hl1(ihl1,ia)
             z1 = zl1(ihl1,ia)
-            ds = dsigmoid(z1,h1)
-            dds= ddsigmoid(z1,h1)
+            tmp = dsigmoid(z1,h1)
             iv = iv +1
-            do jj=0,lspr(0,ia)  ! Notice: from 0 not 1
+            do jj=0,lspr(0,ia)
               if( jj.eq.0 ) then
                 ja = ia
               else
                 ja = lspr(jj,ia)
               endif
               jra = itotOf(tag(ja))
-              ftmp(1:3) = -w2 *(dds *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
-                   +ds*dgsf(1:3,ihl0,jj,ia) )
-!.....Derivative of forces wrt weights
-              gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+              do ihl0=1,nhl(0)
+                w1 = wgt11(ihl0,ihl1)
+                ftmp(1:3) = -w1 *tmp *dgsf(1:3,ihl0,jj,ia)
+!.....Derivative of force
+                gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+              enddo  ! ihl0=
             enddo  ! jj=
           enddo  ! ihl1=
-!!$          endif
-        enddo  ! ihl0=
-!.....Weights between layer-1 and output
-        do ihl1=1,mhl(1)
-          w2 = wgt12(ihl1)
-          h1 = hl1(ihl1,ia)
-          z1 = zl1(ihl1,ia)
-          tmp = dsigmoid(z1,h1)
-          iv = iv +1
-          do jj=0,lspr(0,ia)
-            if( jj.eq.0 ) then
-              ja = ia
-            else
-              ja = lspr(jj,ia)
-            endif
-            jra = itotOf(tag(ja))
-            do ihl0=1,nhl(0)
-              w1 = wgt11(ihl0,ihl1)
-              ftmp(1:3) = -w1 *tmp *dgsf(1:3,ihl0,jj,ia)
-!.....Derivative of force
-              gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
-            enddo  ! ihl0=
-          enddo  ! jj=
-        enddo  ! ihl1=
-      enddo  ! ia=
+        enddo  ! ia=
+!!$      else if( nl.eq.2 ) then
+        
+      endif  ! nl=
     endif
 
 ! Since stress-matching causes considerable increase of computational cost,

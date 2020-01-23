@@ -133,13 +133,14 @@ contains
         nnlmax = nnl
       endif
       if( myid.le.0 .and. iprint.ne.0 ) then
-        write(6,'(a,2i10)') ' max num of (local atoms *1.1) = ',nalmax
-        write(6,'(a,2i10)') ' max num of (neighbors *1.1)   = ',nnlmax
-        write(6,'(a,f10.3,a)') ' gsf size  = ', &
+        print *,'make_gsf_arrays @descriptor:'
+        write(6,'(a,2i0)') '   Max num of (local atoms *1.1) = ',nalmax
+        write(6,'(a,2i0)') '   Max num of (neighbors *1.1)   = ',nnlmax
+        write(6,'(a,f10.3,a)') '   gsf size  = ', &
              dble(nsf*nalmax*8)/1000/1000,' MB'
-        write(6,'(a,f10.3,a)') ' dgsf size = ', &
+        write(6,'(a,f10.3,a)') '   dgsf size = ', &
              dble(3*nsf*(nnlmax+1)*nalmax*8)/1000/1000,' MB'
-        write(6,'(a,f10.3,a)') ' igsf size = ', &
+        write(6,'(a,f10.3,a)') '   igsf size = ', &
              dble(nsf*(nnlmax+1)*nalmax*2)/1000/1000,' MB'
       endif
       if( allocated(gsf) ) then
@@ -160,7 +161,7 @@ contains
       nal = int(natm*1.1)
       if( nal .gt. namax ) then
         write(6,'(a)') ' [Error] nal .gt.namax'
-        write(6,'(a,3i10)') '   myid,nal,namax = ',myid,nal,namax
+        write(6,'(a,3i0)') '   myid,nal,namax = ',myid,nal,namax
         stop
       else
         write(6,*) ' Since natm.gt.nal, nal was updated at myid =',myid
@@ -175,7 +176,7 @@ contains
       nnl = int(nnltmp*1.1)
       if( nnlmax.gt.nnmax ) then
         write(6,'(a)') ' [Error] nnl.gt.nnmax'
-        write(6,'(a,3i10)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
+        write(6,'(a,3i0)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
         stop
       else
         write(6,*) ' Since nnltmp.gt.nnl, nnl was updated at myid =',myid
@@ -775,11 +776,11 @@ contains
     endif
 
 !.....Bcast nsp and nsf before allocating arrays
-    if( mpi_world.eq.0 ) then  ! Avoid MPI call when called in fitpot.
-      call mpi_bcast(nsp,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(nsf,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(lcheby,1,mpi_logical,0,mpi_world,ierr)
-    endif
+!!$    if( mpi_world.eq.0 ) then  ! Avoid MPI call when called in fitpot.
+    call mpi_bcast(nsp,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(nsf,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(lcheby,1,mpi_logical,0,mpi_world,ierr)
+!!$    endif
     ngl = nsf
 
 !.....Allocate arrays of lenths, nsp and/or nsf
@@ -920,13 +921,13 @@ contains
     endif ! myid.eq.0
 
 !.....Broadcast cspline data
-    if( mpi_world.eq.0 ) then  ! Avoid MPI calls when called in fitpot.
+!!$    if( mpi_world.eq.0 ) then  ! Avoid MPI calls when called in fitpot.
       call bcast_descs(myid,mpi_world,iprint)
       call mpi_bcast(nsf2,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(ilsf2,size(ilsf2),mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(ilsf3,size(ilsf3),mpi_integer,0,mpi_world,ierr)
-    endif
+!!$    endif
 
 !!$    call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
 !!$    call mpi_bcast(itype,nsf,mpi_integer,0,mpi_world,ierr)
