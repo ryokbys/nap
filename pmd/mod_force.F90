@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-01-21 22:27:46 Ryo KOBAYASHI>
+!                     Last-modified: <2020-01-23 10:44:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax
   implicit none
@@ -113,6 +113,7 @@ contains
     integer:: i
 
     if( myid.eq.0 ) then
+      print *,''
       write(6,'(/,a)',advance='no') ' Use the following force-fields:'
       do i=1,num_forces
         write(6,'(2x,a)',advance='no') trim(force_list(i))

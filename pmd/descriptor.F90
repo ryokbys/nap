@@ -133,6 +133,7 @@ contains
         nnlmax = nnl
       endif
       if( myid.le.0 .and. iprint.ne.0 ) then
+        print *,''
         print *,'make_gsf_arrays @descriptor:'
         write(6,'(a,2i0)') '   Max num of (local atoms *1.1) = ',nalmax
         write(6,'(a,2i0)') '   Max num of (neighbors *1.1)   = ',nnlmax

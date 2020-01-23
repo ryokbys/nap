@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-01-10 16:22:56 Ryo KOBAYASHI>
+!                     Last-modified: <2020-01-23 10:45:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1677,7 +1677,7 @@ subroutine get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world &
   call mpi_allreduce(ndofl,ndof,9,mpi_integer,mpi_sum &
        ,mpi_md_world,ierr)
   if(myid_md.eq.0 .and. iprint.ne.0 ) &
-       write(6,'(/,a,9(2x,i0))') &
+       write(6,'(a,9(2x,i0))') &
        ' Degrees of freedom for each ifmv =',ndof(1:9)
   return
 end subroutine get_num_dof
