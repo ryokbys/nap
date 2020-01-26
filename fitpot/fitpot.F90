@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-26 01:35:03 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-26 22:51:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1151,27 +1151,16 @@ subroutine check_grad(ftrn0,ftst0)
     vars(1:nvars)= vars0(1:nvars)
     dv = max(abs(vars(iv)*dev),dev)
     vars(iv)= vars(iv) +dv/2
-!!$    if( trim(cpot).eq.'NN' ) then
-!!$      call NN_func(nvars,vars,ftmp1,ftst)
-!!$    else
-      call func_w_pmd(nvars,vars,ftmp1,ftst)
-!!$    endif
+    call func_w_pmd(nvars,vars,ftmp1,ftst)
     vars(1:nvars)= vars0(1:nvars)
     vars(iv)= vars(iv) -dv/2
-!!$    if( trim(cpot).eq.'NN' ) then
-!!$      call NN_func(nvars,vars,ftmp2,ftst)
-!!$    else
-      call func_w_pmd(nvars,vars,ftmp2,ftst)
-!!$    endif
+    call func_w_pmd(nvars,vars,ftmp2,ftst)
     gnumer(iv)= (ftmp1-ftmp2)/dv
     if( myid.eq.0 ) then
       write(6,'(i6,es12.4,2es15.4,f15.3)') iv,vars0(iv), &
            ganal(iv) ,gnumer(iv), &
            abs((ganal(iv)-gnumer(iv))/(gnumer(iv)+tiny))*100
     endif
-!!$    write(6,'(a,i5,10es15.7)') 'iv,dv,ftmp1,ftmp2,gnumer = ', &
-!!$         iv,dv,ftmp1,ftmp2,gnumer(iv)
-!!$    print *,''
   enddo
 
   deallocate(gnumer,ganal,vars0)

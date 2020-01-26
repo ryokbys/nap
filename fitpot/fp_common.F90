@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-26 13:34:21 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-27 08:33:24 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -167,11 +167,11 @@ contains
                ,samples(ismpl)%dgsf(3,nsf,0:nnl,nal) &
                ,samples(ismpl)%igsf(nsf,0:nnl,nal) )
           mem = mem +8*size(samples(ismpl)%gsf) +8*size(samples(ismpl)%dgsf) &
-               +8*size(samples(ismpl)%igsf)
+               +2*size(samples(ismpl)%igsf)
         endif
         call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
-             samples(ismpl)%nnl,samples(ismpl)%gsf &
-             ,samples(ismpl)%dgsf,samples(ismpl)%igsf)
+             samples(ismpl)%nnl,samples(ismpl)%gsf, &
+             samples(ismpl)%dgsf,samples(ismpl)%igsf)
       endif
     enddo
 
@@ -565,7 +565,7 @@ contains
 
     smpl = samples(ismpl)
     cdirname = smpl%cdirname
-    
+
     if( trim(cpot).eq.'vcMorse' ) then
       call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
            //'/pmd')
@@ -648,9 +648,11 @@ contains
         print *,'ERROR@pre_pmd: No such BVS FF available in fitpot.'
         stop 1
       endif
+    endif
+    
+    if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) then
+      if( l1st ) then
 !.....Set descriptor parameters read from in.params.desc only at the first time
-      if( (index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg') &
-           .and. l1st ) then
         if( lcheby ) then
           call set_params_desc(descs,nsf_desc,nsf2_desc,nsf3_desc, &
                nsff_desc,ilsf2,ilsf3,lcheby,cnst,wgtsp_desc)
@@ -658,20 +660,18 @@ contains
           call set_params_desc(descs,nsf_desc,nsf2_desc,nsf3_desc, &
                nsff_desc,ilsf2,ilsf3,lcheby,cnst)
         endif
-       endif
+      endif
 !.....Some potentials use descriptors already computed in the previous steps
-!.....and stored in samples.
-      if( trim(cpot).eq.'NN2' .or. trim(cpot).eq.'linreg' ) then
-       if( .not. lupdate_gsf ) then
-          nsf = smpl%nsf
-          nal = smpl%nal
-          nnl = smpl%nnl
-          call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
-               samples(ismpl)%dgsf,samples(ismpl)%igsf)
-        endif
+!.....and stored in samples (and normalized if specified so.)
+      if( .not. lupdate_gsf ) then
+        nsf = smpl%nsf
+        nal = smpl%nal
+        nnl = smpl%nnl
+        call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
+             samples(ismpl)%dgsf,samples(ismpl)%igsf)
       endif
     endif
-
+    return
   end subroutine pre_pmd
 !=======================================================================
   subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs,rc &
@@ -1283,10 +1283,10 @@ contains
            print *,'Normalize descriptors wrt norm.'
       call normalize_norm()
     else if( cnormalize(1:4).eq.'none' ) then
-      if( myid.eq.0 .and. iprint.ne.0 ) &
+      if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) &
            print *,'No normalization of descriptors.'
     else
-      if( myid.eq.0 .and. iprint.ne.0 ) &
+      if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) &
            print *,'WARNING: no such normalization, '//trim(cnormalize)
     endif
     l1st = .false.
@@ -1331,8 +1331,7 @@ contains
           stop
         endif
         do isf=1,nsf
-          samples(ismpl)%gsf(isf,:)= samples(ismpl)%gsf(isf,:) &
-               *sgmis(isf)
+          samples(ismpl)%gsf(isf,:)= samples(ismpl)%gsf(isf,:) *sgmis(isf)
           samples(ismpl)%dgsf(:,isf,:,:)= &
                samples(ismpl)%dgsf(:,isf,:,:) *sgmis(isf)
         enddo

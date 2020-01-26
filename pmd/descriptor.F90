@@ -162,7 +162,7 @@ contains
 !.....gsfi,dgsfi,igsfi are independend on number of atoms but on nnlmax
       if( allocated(gsfi) ) deallocate(gsfi,dgsfi,igsfi)
       allocate(gsfi(nsf),dgsfi(3,nsf,0:nnlmax),igsfi(nsf,0:nnlmax))
-      mem = mem +8*size(gsfi) +8*size(dgsfi) +4*size(igsfi)
+      mem = mem +8*size(gsfi) +8*size(dgsfi) +2*size(igsfi)
     endif
 
 !  Since natm and nn can change every step of MD,
@@ -206,12 +206,12 @@ contains
 !!$    endif
     if( lrealloc ) then
       if( allocated(gsf) ) then
-        mem = mem -8*size(gsf) -8*size(dgsf) -4*size(igsf)
+        mem = mem -8*size(gsf) -8*size(dgsf) -2*size(igsf)
         deallocate( gsf,dgsf,igsf )
       endif
       allocate( gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal) &
            ,igsf(nsf,0:nnl,nal))
-      mem = mem +8*size(gsf) +8*size(dgsf) +4*size(igsf)
+      mem = mem +8*size(gsf) +8*size(dgsf) +2*size(igsf)
       lrealloc=.false.
     endif
 
@@ -260,23 +260,31 @@ contains
     dgsfi(:,:,:)= 0d0
     igsfi(:,:) = 0
 
-    if( lcheby ) then
-      call desci_cheby(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
-    else ! default
-      call desci_default(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
+    if( lupdate_gsf ) then
+      if( lcheby ) then
+        call desci_cheby(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
+      else ! default
+        call desci_default(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
+      endif
+      if( lfitpot ) then
+        if( .not. allocated(gsf) .or. .not. allocated(dgsf) &
+             .or. .not. allocated(igsf) ) then
+          print *,'ERROR: either gsf/dgsf/igsf is not allocated, which should not happen'&
+               //' when called from fitpot.'
+          stop
+        endif
+        gsf(:,ia) = gsfi(:)
+        dgsf(:,:,:,ia) = dgsfi(:,:,:)
+        igsf(:,:,ia) = igsfi(:,:)
+      endif
+    else ! Not to update gsf by desci_xxx just use gsfs given by fitpot
+      if( lfitpot ) then
+        gsfi(:) = gsf(:,ia)
+        dgsfi(:,:,:) = dgsf(:,:,:,ia)
+        igsfi(:,:) = igsf(:,:,ia)
+      endif
     endif
 
-    if( lfitpot ) then
-      if( .not. allocated(gsf) .or. .not. allocated(dgsf) &
-           .or. .not. allocated(igsf) ) then
-        print *,'ERROR: either gsf/dgsf/igsf is not allocated, which should not happen'&
-             //' when called from fitpot.'
-        stop
-      endif
-      gsf(:,ia) = gsfi(:)
-      dgsf(:,:,:,ia) = dgsfi(:,:,:)
-      igsf(:,:,ia) = igsfi(:,:)
-    endif
 
   end subroutine calc_desci
 !=======================================================================
@@ -1560,6 +1568,7 @@ contains
         descs(i)%prms(:) = descs_in(i)%prms(:)
       endif
     enddo
+    if( present(wgtsp_in) ) wgtsp(:) = wgtsp_in(:)
 
 !.....Compute maximum rcut in all descriptors
     rcmax = 0d0
@@ -1656,8 +1665,8 @@ contains
 !
     integer,intent(in):: nsfo,nalo,nnlo
     real(8),intent(out):: gsfo(nsfo,nalo)
-    real(8),intent(out),optional:: dgsfo(3,nsfo,0:nnlo,nalo)&
-         ,igsfo(nsfo,0:nnlo,nalo)
+    real(8),intent(out),optional:: dgsfo(3,nsfo,0:nnlo,nalo)
+    integer(2),intent(out),optional:: igsfo(nsfo,0:nnlo,nalo)
 
     if( nalo.gt.nal .or. nnlo.gt.nnl ) then
       print *,'ERROR: nalo/nnlo is greater than nal/nnl.'
@@ -1677,12 +1686,14 @@ contains
 !  Set descriptors from outside (fitpot).
 !
     integer,intent(in):: nsfo,nalo,nnlo
-    real(8),intent(in):: gsfo(nsfo,nalo),dgsfo(3,nsfo,0:nnlo,nalo)&
-         ,igsfo(nsfo,0:nnlo,nalo)
+    real(8),intent(in):: gsfo(nsfo,nalo),dgsfo(3,nsfo,0:nnlo,nalo)
+    integer(2),intent(in):: igsfo(nsfo,0:nnlo,nalo)
 
     integer:: isf
 
-    if( nsf.ne.nsfo .or. nal.ne.nalo .or. nnl.ne.nnlo )  then
+    if( nsf.ne.nsfo ) stop 'ERROR @set_descs: nsf.ne.nsfo, which should not happen.'
+
+    if( nal.lt.nalo .or. nnl.lt.nnlo )  then
       if( allocated(gsf) ) deallocate(gsf,dgsf,igsf)
       nsf = nsfo
       nal = nalo
@@ -1691,9 +1702,9 @@ contains
            ,igsf(nsf,0:nnl,nal) )
     endif
     
-    gsf(:,:) = gsfo(:,:)
-    dgsf(:,:,:,:) = dgsfo(:,:,:,:)
-    igsf(:,:,:) = igsfo(:,:,:)
+    gsf(:,1:nalo) = gsfo(:,1:nalo)
+    dgsf(:,:,0:nnlo,1:nalo) = dgsfo(:,:,0:nnlo,1:nalo)
+    igsf(:,0:nnlo,1:nalo) = igsfo(:,0:nnlo,1:nalo)
     return
   end subroutine set_descs
 !=======================================================================

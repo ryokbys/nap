@@ -120,8 +120,8 @@ module variables
     logical:: charge_set = .false.
 !.....Related to descriptors
     integer:: nsf,nal,nnl
-    real(8),allocatable:: gsf(:,:),gsfo(:,:) &
-         ,dgsf(:,:,:,:),igsf(:,:,:)
+    real(8),allocatable:: gsf(:,:),gsfo(:,:),dgsf(:,:,:,:)
+    integer(2),allocatable:: igsf(:,:,:)
 !.....Gaussian density functions (GDF) for atoms and weights using the GDF
     real(8),allocatable:: gdf(:), gdw(:)
 !.....Specific to NN
@@ -179,15 +179,6 @@ module variables
   integer:: mem = 0
 
 !.....For descriptors except Chebyshev
-!!$  type desc
-!!$    integer:: itype
-!!$    real(8):: rcut,rcut2
-!!$    character(len=3):: cspi,cspj,cspk
-!!$    integer:: isp,jsp
-!!$    integer:: ksp = -1
-!!$    integer:: nprm
-!!$    real(8),allocatable:: prms(:)
-!!$  end type desc
   type(desc),allocatable:: descs(:)
   integer:: nsp_desc,nsf_desc,nsf2_desc,nsf3_desc,nsff_desc
 !.....List of isf's for each pair (ilsf2) and angle (ilsf3)

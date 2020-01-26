@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-26 12:37:03 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-26 13:41:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -138,17 +138,6 @@ contains
       allocate(strsl(3,3,namax),aal(3,namax))
     endif
 
-    if( iprint.gt.1 ) then
-      print *,'nal, nnl    =',nal,nnl
-      print *,'shape(gsf)  =',shape(gsf)
-      print *,'shape(dgsf) =',shape(dgsf)
-      print *,'shape(gsfi) =',shape(gsfi)
-      print *,'shape(dgsfi)=',shape(dgsfi)
-    end if
-
-!!$    call calc_desc(namax,natm,nb,nnmax,h &
-!!$         ,tag,ra,lspr,rcin,myid,mpi_world,l1st,iprint)
-
     time0 = mpi_wtime()
 
 !.....Eenergies, forces and stresses of atoms
@@ -182,12 +171,10 @@ contains
         dji = dsqrt(dji2)
         js = int(tag(ja))
         do ml0=1,nhl(0)  ! no bias contribution to force
-!!$          aal(1:3,ja) = aal(1:3,ja) -gw(ml0)*dgsf(1:3,ml0,jj,ia)
           aal(1:3,ja) = aal(1:3,ja) -gw(ml0)*dgsfi(1:3,ml0,jj)
 !.....Stress
           do ixyz=1,3
             do jxyz=1,3
-!!$              sji = -gw(ml0)*dgsf(jxyz,ml0,jj,ia)*rji(ixyz)
               sji = -gw(ml0)*dgsfi(jxyz,ml0,jj)*rji(ixyz)
               strs(ixyz,jxyz,ja) = strs(ixyz,jxyz,ja) +sji
               strs(ixyz,jxyz,ia) = strs(ixyz,jxyz,ia) +sji
@@ -197,7 +184,6 @@ contains
       enddo
 !.....Derivative of SF of atom-i w.r.t. atom-i
       do ml0=1,nhl(0)
-!!$        aal(1:3,ia) = aal(1:3,ia) -gw(ml0)*dgsf(1:3,ml0,0,ia)
         aal(1:3,ia) = aal(1:3,ia) -gw(ml0)*dgsfi(1:3,ml0,0)
       enddo
     enddo
@@ -271,85 +257,85 @@ contains
         enddo
       endif  ! lematch
 
-!!$      if( lfmatch .or. lsmatch ) then
-!!$!.....1st, create fls(:,:,:,:) by forward propagation that are
-!!$!.....required in force and stress matching
-!!$        nni = lspr(0,ia)
-!!$!.....NOTE: fls of bias is 0; fls(:,:,0,:) = 0d0
-!!$        fls(:,:,:,:) = 0d0
-!!$        do jj=0,nni
-!!$          do ml0=1,nhl(0)
-!!$            fls(1:3,jj,ml0,0) = dgsfi(1:3,ml0,jj)
-!!$          enddo
-!!$        enddo
-!!$        do il=1,nlayer
-!!$          do ml1=1,nhl(il)
-!!$            do ml0=1,nhl(il-1)
-!!$              fls(1:3,0:nni,ml1,il) = fls(1:3,0:nni,ml1,il) &
-!!$                   + wgts(ml0,ml1,il)*fls(1:3,0:nni,ml0,il-1)
-!!$            enddo
-!!$            fls(1:3,0:nni,ml1,il) = fls(1:3,0:nni,ml1,il)*sgm1(ml1,il)
-!!$          enddo
-!!$        enddo ! il=...
-!!$        wfgw(:,:,:,:) = 0d0
-!!$        do il=1,nlayer
-!!$          do ml1=0,nhl(il)
-!!$            gw(ml1) = 0d0
-!!$            do ml2=1,nhl(il+1)
-!!$              gw(ml1)= gw(ml1) +gls(ml2,il+1)*wgts(ml1,ml2,il+1)
-!!$            enddo
-!!$          enddo
-!!$          do ml1=1,nhl(il)
-!!$            wfgw(1:3,0:nni,ml1,il) = 0d0
-!!$            do ml0=0,nhl(il-1)
-!!$              wfgw(1:3,0:nni,ml1,il) = wfgw(1:3,0:nni,ml1,il) &
-!!$                   +wgts(ml0,ml1,il)*fls(1:3,0:nni,ml0,il-1)
-!!$            enddo
-!!$            wfgw(1:3,0:nni,ml1,il) = wfgw(1:3,0:nni,ml1,il)*gw(ml1)
-!!$          enddo
-!!$        enddo
-!!$      endif ! lfmatch .or. lsmatch
-!!$      
-!!$      if( lfmatch ) then
-!!$!.....Direct derivative of force term w.r.t. W_l
-!!$        iv = 0
-!!$        do il=1,nlayer
-!!$          do ml1=1,nhl(il)
-!!$            do ml0=0,nhl(il-1)
-!!$              iv = iv + 1
-!!$              do jj=0,nni
-!!$                gwf(iv,1:3,ia) = gwf(iv,1:3,ia) &
-!!$                     +gls(ml1,il)*fls(1:3,jj,ml0,il-1)
-!!$              enddo
-!!$            enddo
-!!$          enddo
-!!$        enddo
-!!$!.....Indirect derivative of force term w.r.t. W_l
-!!$        iv = 0
-!!$        do n=1,nlayer
-!!$          do mn1=1,nhl(n)
-!!$            do mn0=0,nhl(n-1)
-!!$              iv = iv +1
-!!$              do l=n,nlayer
-!!$                wsgm1 = wxs(l,n)
-!!$                tmp = 0d0
-!!$                do ml=1,nhl(l)
-!!$                  tmp = wsgm1(mn1,ml)*sgm2(ml,l)*hls(mn0,n)
-!!$                  do jj=0,nni
-!!$                    gwf(iv,1:3,ia) = gwf(iv,1:3,ia) &
-!!$                         +tmp*wfgw(1:3,jj,ml,l)
-!!$                  enddo
-!!$                enddo
-!!$!                if( ia.eq.1 .and. n.eq.nlayer .and. mn0.eq.0 ) then
-!!$!                  print '(a,6i5)','ia,n,mn1,mn0,iv,l=',ia,n,mn1,mn0,iv,l
-!!$!                  print '(a,i5,6es11.3)','nhl(l),tmp,wsgm1(1,1),sgm2(1,2)=' &
-!!$!                       ,nhl(l),tmp,wsgm1(1,1),sgm2(1,2),gwf(iv,1:3,ia)
-!!$!                endif
-!!$              enddo ! l=...
-!!$            enddo ! ml0=...
-!!$          enddo ! ml1=...
-!!$        enddo ! n=...
-!!$      endif ! lfmatch
+      if( lfmatch .or. lsmatch ) then
+!.....1st, create fls(:,:,:,:) by forward propagation that are
+!.....required in force and stress matching
+        nni = lspr(0,ia)
+!.....NOTE: fls of bias is 0; fls(:,:,0,:) = 0d0
+        fls(:,:,:,:) = 0d0
+        do jj=0,nni
+          do ml0=1,nhl(0)
+            fls(1:3,jj,ml0,0) = dgsfi(1:3,ml0,jj)
+          enddo
+        enddo
+        do il=1,nlayer
+          do ml1=1,nhl(il)
+            do ml0=1,nhl(il-1)
+              fls(1:3,0:nni,ml1,il) = fls(1:3,0:nni,ml1,il) &
+                   + wgts(ml0,ml1,il)*fls(1:3,0:nni,ml0,il-1)
+            enddo
+            fls(1:3,0:nni,ml1,il) = fls(1:3,0:nni,ml1,il)*sgm1(ml1,il)
+          enddo
+        enddo ! il=...
+        wfgw(:,:,:,:) = 0d0
+        do il=1,nlayer
+          do ml1=0,nhl(il)
+            gw(ml1) = 0d0
+            do ml2=1,nhl(il+1)
+              gw(ml1)= gw(ml1) +gls(ml2,il+1)*wgts(ml1,ml2,il+1)
+            enddo
+          enddo
+          do ml1=1,nhl(il)
+            wfgw(1:3,0:nni,ml1,il) = 0d0
+            do ml0=0,nhl(il-1)
+              wfgw(1:3,0:nni,ml1,il) = wfgw(1:3,0:nni,ml1,il) &
+                   +wgts(ml0,ml1,il)*fls(1:3,0:nni,ml0,il-1)
+            enddo
+            wfgw(1:3,0:nni,ml1,il) = wfgw(1:3,0:nni,ml1,il)*gw(ml1)
+          enddo
+        enddo
+      endif ! lfmatch .or. lsmatch
+      
+      if( lfmatch ) then
+!.....Direct derivative of force term w.r.t. W_l
+        iv = 0
+        do il=1,nlayer
+          do ml1=1,nhl(il)
+            do ml0=0,nhl(il-1)
+              iv = iv + 1
+              do jj=0,nni
+                gwf(iv,1:3,ia) = gwf(iv,1:3,ia) &
+                     +gls(ml1,il)*fls(1:3,jj,ml0,il-1)
+              enddo
+            enddo
+          enddo
+        enddo
+!.....Indirect derivative of force term w.r.t. W_l
+        iv = 0
+        do n=1,nlayer
+          do mn1=1,nhl(n)
+            do mn0=0,nhl(n-1)
+              iv = iv +1
+              do l=n,nlayer
+                wsgm1 = wxs(l,n)
+                tmp = 0d0
+                do ml=1,nhl(l)
+                  tmp = wsgm1(mn1,ml)*sgm2(ml,l)*hls(mn0,n)
+                  do jj=0,nni
+                    gwf(iv,1:3,ia) = gwf(iv,1:3,ia) &
+                         +tmp*wfgw(1:3,jj,ml,l)
+                  enddo
+                enddo
+!                if( ia.eq.1 .and. n.eq.nlayer .and. mn0.eq.0 ) then
+!                  print '(a,6i5)','ia,n,mn1,mn0,iv,l=',ia,n,mn1,mn0,iv,l
+!                  print '(a,i5,6es11.3)','nhl(l),tmp,wsgm1(1,1),sgm2(1,2)=' &
+!                       ,nhl(l),tmp,wsgm1(1,1),sgm2(1,2),gwf(iv,1:3,ia)
+!                endif
+              enddo ! l=...
+            enddo ! ml0=...
+          enddo ! ml1=...
+        enddo ! n=...
+      endif ! lfmatch
     enddo  ! ia=...
 
     return
