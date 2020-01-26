@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-01-23 16:14:33 Ryo KOBAYASHI>
+!                     Last-modified: <2020-01-25 00:22:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1168,7 +1168,6 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !      write(6,'(a,30es10.2)') 'chgtot before space_decomp = ',
 !     &     chgtot(1:ntot0)
   if( iprint.gt.0 ) then
-    print *,''
     write(6,'(a)',advance='no') ' Species order: '
     do is=1,nspmax
       csp = specorder(is)
@@ -1228,15 +1227,14 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !      if( iprint.ge.10 ) print *,'get_force,myid_md,lcalcgrad='
 !     &     ,myid_md,lcalcgrad
   if( .not.lcalcgrad ) then
+    if( iprint.gt.0 ) print *,'get_force...'
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
          ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
-    if( iprint.gt.0 ) then
-      write(6,'(a,es15.7)') ' Potential energy = ',epot
-    endif
+    if( iprint.gt.0 ) print '(a,es15.7)',' Potential energy = ',epot
   else  ! lcalcgrad = .true.
-    if( iprint.gt.0 ) print *,'Computing gradient...'
+    if( iprint.gt.0 ) print *,'gradw_xxxx...'
     epot = 0d0
     gwe(1:ndimp) = 0d0
     gwf(1:ndimp,1:3,1:natm) = 0d0
@@ -1276,13 +1274,14 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 
 !      print *,'one_shot: 07'
-  if( iprint.gt.0 ) print *,'Compute stresses...'
+  if( iprint.gt.0 ) print *,'sa2stnsr...'
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 
+  if( iprint.gt.0 ) print *,'space_comp...'
   call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
        ,stot,chgtot,chitot,teitot,natm,tag,ra,va,aa,epi,eki,strs &
        ,chg,chi,tei,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
-  if( iprint.gt.0 ) print *,'Compute stresses done'
+!!$  if( iprint.gt.0 ) print *,'Compute stresses done'
 
 !.....revert forces to the unit eV/A before going out 
   if( myid_md.eq.0 ) then
@@ -1308,10 +1307,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !      deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
 !     &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
 
-  if( iprint.ge.10 ) then
-    write(6,'(a)') ' one_shot done.'
-    write(6,*) ''
-  endif
+  if( iprint.ge.10 ) print *,'one_shot done'
   return
 end subroutine one_shot
 !=======================================================================

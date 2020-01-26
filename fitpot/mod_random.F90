@@ -26,7 +26,6 @@ contains
     real(8),save:: d2p31m,d2p31
     data d2p31m/2147483647d0/
     data d2p31 /2147483648d0/
-    logical,save:: l1st = .true.
 
     rseed=dmod(16807d0*rseed,d2p31m)
     urnd=rseed/d2p31

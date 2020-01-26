@@ -14,7 +14,7 @@ module minimize
   integer:: nsgdbsize = 1
   integer,allocatable:: ismask(:)
   character(len=128):: csgdupdate = 'Adam'
-  real(8):: sgd_rate0 = 0.001d0
+  real(8):: sgd_rate0 = 1d0
   real(8):: sgd_eps = 1.0d-8
   real(8):: adam_b1 = 0.9d0
   real(8):: adam_b2 = 0.999d0
@@ -263,8 +263,8 @@ contains
       end subroutine sub_eval
     end interface
 
-    integer:: iter,i,niter,nxtol,ngtol,nftol
-    real(8):: alpha,fp,gnorm,gpnorm,dxnorm,vnorm,ftst,pval,tmp1,tmp2
+    integer:: iter,niter,nxtol,ngtol,nftol
+    real(8):: alpha,fp,gnorm,dxnorm,vnorm,ftst,pval
     real(8),save,allocatable:: gpena(:),dx(:),xp(:),x(:) &
          ,s(:),y(:),gprev(:)
     logical:: lconverged = .false. 
@@ -415,7 +415,7 @@ contains
     real(8),parameter:: tiny  = 1d-14
 
     integer:: i,ismpl,iter,niter,nftol,ngtol,nxtol
-    real(8):: g2,gnorm,xnorm,dxnorm,v,vh,pval,sgd_rate
+    real(8):: gnorm,xnorm,dxnorm,v,vh,pval,sgd_rate
     real(8):: fp,ftmp,ftst,ftsttmp
     real(8),allocatable:: x(:),dx(:),rm(:),rmh(:),gpena(:),gtmp(:),gp(:)
     integer,allocatable:: imaskarr(:)
@@ -463,9 +463,9 @@ contains
     call wrap_ranges(ndim,x0,xranges)
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
+
     call penalty(cpena,ndim,pval,gpena,x0)
     f = f + pval
-    if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
 
     gnorm= sqrt(sprod(ndim,g,g))
     xnorm= sqrt(sprod(ndim,x,x))
@@ -477,7 +477,7 @@ contains
          ,f,ftst,pval,xnorm,gnorm,dxnorm,f)
 
     call sub_eval(0)
-    
+
     do iter=1,maxiter
 !.....Store previous func and grad values
       fp= f
@@ -489,12 +489,11 @@ contains
         v = adam_b2*v +(1d0 -adam_b2)*gnorm**2
         rmh(:) = rm(:)/(1d0-adam_b1**iter)
         vh = v/(1d0-adam_b2**iter)
-!!$        sgd_rate = sgd_rate *sqrt(1d0-adam_b2**iter)/(1d0-adam_b1**iter)
         dx(:) = -sgd_rate*rmh(:)/(sqrt(vh) +sgd_eps)
       endif
-!!$      print *,' |rm|,|rmh|,v,vh,|dx| = ',sqrt(sprod(ndim,rm,rm)),sqrt(sprod(ndim,rmh,rmh))&
-!!$           ,v,vh,sqrt(sprod(ndim,dx,dx))
+
 !.....Update x
+      if( trim(cpena).eq.'ridge' ) dx(:) = dx(:) -gpena(:)
       if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
         call soft_threshold(ndim,x,dx,1d0)
       else
@@ -502,7 +501,7 @@ contains
       endif
       call wrap_ranges(ndim,x,xranges)
       call penalty(cpena,ndim,pval,gpena,x)
-      
+
       x0(1:ndim)= x(1:ndim)
 !.....Create the sample mask, 0) compute the sample,  1) not to compute the sample
 10    call get_uniq_iarr(mynsmpl,nsgdbsize,imaskarr)
@@ -513,7 +512,6 @@ contains
       enddo
       call func(ndim,x,f,ftst)
       call grad(ndim,x,g)
-      if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
       xnorm= sqrt(sprod(ndim,x,x))
       dxnorm= sqrt(sprod(ndim,dx,dx))
@@ -600,8 +598,8 @@ contains
     real(8),parameter:: t_DL   = 0.2d0
     logical:: ltwice = .false.
 
-    integer:: i,iter,nftol,ngtol,nxtol,niter
-    real(8):: alpha,fp,gnorm,gnormp,vnorm,beta,pval,sgnorm,ftst,dxnorm,unorm
+    integer:: iter,nftol,ngtol,nxtol,niter
+    real(8):: alpha,fp,gnorm,gnormp,vnorm,beta,pval,sgnorm,ftst,dxnorm
     real(8),save,allocatable:: gpena(:),gp(:),y(:),xp(:),s(:),dx(:),uu(:),x(:)
     logical:: lconverged = .false. 
 
@@ -787,8 +785,8 @@ contains
     real(8),save,allocatable:: gg(:,:),x(:),s(:),y(:),gp(:) &
          ,ggy(:),gpena(:),dx(:)
     real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,vnorm,pval &
-         ,sgnx,absx,estmem,ftst,unorm,dxnorm
-    integer:: i,j,iter,nftol,ngtol,nxtol,ig,mem,niter
+         ,estmem,ftst,dxnorm
+    integer:: i,j,iter,nftol,ngtol,nxtol,mem,niter
     logical:: lconverged = .false. 
 
     if( .not.allocated(gg) ) then
@@ -812,7 +810,6 @@ contains
     endif
 
 
-
 !.....initialize alpha (line minimization factor)
     alpha = 1d0
 
@@ -834,8 +831,6 @@ contains
 
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
-!!$    call wrap_ranges(ndim,x,xranges)
-!!$    print '(a,i3,10es11.3)','myid,x=',myid,x(1:ndim)
     vnorm= sqrt(sprod(ndim,x,x))
     dxnorm = 0d0
 
@@ -1005,7 +1000,6 @@ contains
     real(8),parameter:: TINY= 1d-12
     real(8),parameter:: GLIMIT= 100d0
     real(8),parameter:: MAXITER= 50
-    real(8):: dum,r,q,u,ulim,fu,ftst
     integer:: iter
 
     call func(ndim,x0+a*d,fa,fta)
@@ -1307,7 +1301,6 @@ contains
 !  
 !  1D search using Armijo rule.
 !
-    use descriptor,only: glval,ngl,iglid
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag,niter
@@ -1323,8 +1316,8 @@ contains
 
 !!$  real(8),external:: sprod
     real(8),parameter:: xtiny  = 1d-14
-    integer:: iter,i,ig
-    real(8):: alphai,xigd,f0,fi,sgnx,pval,pval0,absx,fp,pvalp,alphap,ftsti
+    integer:: iter
+    real(8):: alphai,xigd,f0,fi,pval,fp,pvalp,alphap,ftsti
     real(8),allocatable,dimension(:):: x1(:),gpena(:)
     logical,save:: l1st = .true.
 
@@ -1414,8 +1407,8 @@ contains
 
 !.....Precision
     real(8),parameter:: tiny = 1d-15
-    integer:: iter,i,ig,iterp
-    real(8):: alphai,alphap,f0,fi,fp,ftsti,ftstp,fpi,fti
+    integer:: iter,iterp
+    real(8):: alphai,alphap,f0,fi,fp,ftsti,fpi,fti
     real(8),save,allocatable:: x1(:),gpena(:)
     logical,save:: l1st = .true.
 
@@ -1503,7 +1496,7 @@ contains
     real(8),intent(inout):: x(ndim)
 
     integer:: i
-    real(8):: xad,sgn,val,xt
+    real(8):: xad,sgn,val
 
     do i=1,ndim
       xad= x(i) +alpha*d(i)
@@ -1677,7 +1670,7 @@ contains
 !
 !  Grouped Forward Stepwise (grouped FS) regression
 !
-    use descriptor,only: ngl,mskgfs,msktmp,glval,iglid
+    use descriptor,only: ngl,mskgfs,msktmp,iglid
     use variables,only: gsfcorr
     use random
     implicit none
@@ -1703,16 +1696,16 @@ contains
       end subroutine sub_eval
     end interface
 
-    integer:: iter,i,imax,ig,jg,itmp,j,igmm,itergfs,niter,inc,jnc&
+    integer:: iter,i,ig,jg,j,igmm,itergfs,niter,inc,jnc&
          ,nfailinmin
-    real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,f0,tmp,gmm &
+    real(8):: alpha,gnorm,pval,fp,f0,gmm &
          ,ftstp,fpgfs,frefb
     real(8),allocatable,save:: xt(:),xtb(:),gmaxgl(:),u(:),gmaxgl0(:)
     real(8),save,allocatable:: gg(:,:),y(:),gp(:),rg(:) &
          ,ggy(:),ygg(:),s(:),g0(:),gpena(:)  !,aa(:,:),cc(:,:),v(:)
     logical,allocatable,save:: lexclude(:)
-    integer:: nmsks,imsk,nftol,nbases,nvar,nrefresh
-    real(8):: ynorm,tmp1,tmp2,b,sy,syi  !,svy,svyi
+    integer:: nmsks,nftol,nbases,nvar,nrefresh
+    real(8):: ynorm,tmp1,b,sy,syi  !,svy,svyi
     character(len=128):: cnum
     real(8),parameter:: sgm = 1.0d-1
 
@@ -2237,7 +2230,7 @@ contains
       endif
     enddo
 
-999 if( myid.eq.0 .and. iprint.gt.0 ) &
+    if( myid.eq.0 .and. iprint.gt.0 ) &
          print *,'iter exceeds maxiter in gFS.'
     iflag= iflag +10
     x(1:ndim)= xt(1:ndim)
@@ -2354,8 +2347,8 @@ contains
       end subroutine sub_eval
     end interface
 
-    integer:: iter,idim,nadpt,i,l
-    real(8):: f,ft,temp,xw,dx,p,pt,ptrans,ftst,tau,xmin,xmax
+    integer:: iter,idim,nadpt,i
+    real(8):: f,ft,temp,xw,dx,ptrans,ftst,tau
     real(8),allocatable:: x(:),xt(:)
     logical,save:: l1st = .true.
 
@@ -2583,7 +2576,7 @@ contains
       end subroutine sub_eval
     end interface
 
-    integer:: iter,idim,i
+    integer:: iter,idim
     real(8):: f,ftst,fmin,xmin,xmax,xi
     real(8),allocatable:: x(:)
     logical,save:: l1st = .true.
@@ -2657,8 +2650,8 @@ contains
     end interface
 
     integer:: iter,idim,nadpt,i,ng,ig,interval
-    real(8):: f,ft,temp,xw,dx,p,pt,ptrans,ftst,tau,xmin,xmax,adx,&
-         fg,fgt,tmp,gval
+    real(8):: f,ft,temp,xw,dx,ptrans,ftst,tau,adx,&
+         fg,fgt,tmp
     real(8),allocatable:: x(:),xt(:),xxt(:)
     logical,save:: l1st = .true.
 
@@ -2838,7 +2831,7 @@ contains
       end subroutine sub_ergrel
     end interface
 
-    integer:: i,j,k,l,m,n,iter,i1,i2
+    integer:: i,j,iter,i1,i2
     real(8):: ftrn,ftst
     logical,save:: l1st = .true.
     integer:: iid,iidbest
@@ -3075,7 +3068,7 @@ contains
     integer,intent(in):: num
     integer,intent(out):: pairs(2,num/2)
 
-    integer:: i,j,k,l,m,n,ival,jval
+    integer:: i,j,l,m,n,ival,jval
     integer:: chosen(num),navail
 
     chosen(1:num) = 0
@@ -3132,7 +3125,7 @@ contains
   subroutine gene2var(g,v)
     type(gene),intent(in):: g
     real(8),intent(out):: v
-    integer:: i,dec
+    integer:: dec
 
     call bin2dec(ga_nbits,g%bits,dec)
     v = g%vmin +dble(dec)*(g%vmax-g%vmin)/(2**ga_nbits-1)
@@ -3222,7 +3215,7 @@ contains
     type(individual),intent(in):: offsprings(noffsp)
     real(8),intent(in):: fbest
 
-    integer:: i,j,k,l,m,n,ibest
+    integer:: i,j,n,ibest
     integer:: islct(nindivs)
     real(8):: fbestl,prnd,ptot
 
@@ -3339,7 +3332,7 @@ contains
       end subroutine sub_ergrel
     end interface
 
-    integer:: i,j,k,l,m,n,iter,i1,i2,ip,iq,ir,is
+    integer:: i,j,iter,ip,iq,ir,is
     real(8):: ftrn,ftst,fracl,fracg,lmdl,lmdg,w,fdiff,prob,ftbest&
          ,xtbest(ndim)
     logical,save:: l1st = .true.
@@ -3709,8 +3702,8 @@ contains
       end subroutine sub_eval
     end interface
 
-    integer:: i,j,k,l,m,n,iter
-    real(8):: ftrn,ftst,tmp,xj,vj,r1,r2,w
+    integer:: i,j,iter
+    real(8):: ftrn,ftst,xj,vj,r1,r2,w
     logical,save:: l1st = .true.
     integer:: iid,iidbest
     type(individual),allocatable:: indivs(:)

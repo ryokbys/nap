@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-23 17:43:37 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-26 01:35:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -13,8 +13,8 @@ program fitpot
   use linreg,only: set_iglid_linreg
   use util,only: time_stamp
   implicit none
-  integer:: i,ismpl,ihour,imin,isec
-  real(8):: tmp,fval0,ftrn0,ftst0
+  integer:: ismpl,ihour,imin,isec
+  real(8):: tmp,ftrn0,ftst0
 
   call mpi_init(ierr)
   time0= mpi_wtime()
@@ -40,13 +40,15 @@ program fitpot
 !.....NN and NN2 are both pointing NN2
     if( trim(cpot).eq.'NN' ) cpot = 'NN2'
 !.....Check GDW; GDW works only with ML potentials, which use descriptors
-    if( trim(cpot).ne.'NN2' .and. trim(cpot).ne.'linreg' ) then
+    if( index(cpot,'NN').eq.0  .and. trim(cpot).ne.'linreg' ) then
       if( lgdw ) print *,'Gaussian density weight only works for ML potentials, so unset GDW.'
       lgdw = .false.
     endif
 !.....Normalization and GDW cannot be used with SGD
     if( trim(cfmethod).eq.'sgd' .or. trim(cfmethod).eq.'SGD' ) then
+      if( lgdw ) print *,'Gaussian density weight is not available with SGD, so unset GDW.'
       lgdw = .false.
+      if( lnormalize ) print *,'Normalization is not available with SGD, so unset normalization.'
       lnormalize = .false.
     endif
 !.....GDW assumes that G's are normalized
@@ -57,6 +59,9 @@ program fitpot
 
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
+  mem = mem +8*size(gvar) +8*size(dvar)
+
+  if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) call read_params_desc()
 
   if( nnode.gt.nsmpl ) then
     if( myid.eq.0 ) then
@@ -246,8 +251,9 @@ program fitpot
 !!$  call mpi_reduce(tmp,tcomm,1,mpi_real8,mpi_max &
 !!$       ,0,mpi_world,ierr)
 99 if( myid.eq.0 ) then
-    write(6,'(a,i0)') ' Number of func calls = ',nfunc
-    write(6,'(a,i0)') ' Number of grad calls = ',ngrad
+    write(6,'(a,2(2x,i0))') ' Number of func and grad calls =',nfunc, ngrad
+!!$    write(6,'(a,i0)') ' Number of grad calls = ',ngrad
+    write(6,'(a,f13.3,a)') ' Memory/proc = ',dble(mem)/1000/1000,' MB'
     write(6,'(a,f15.3,a)') ' Time func = ', tfunc,' sec'
     write(6,'(a,f15.3,a)') ' Time grad = ', tgrad,' sec'
     write(6,'(a,f15.3,a)') ' Time comm = ', tcomm,' sec'
@@ -547,7 +553,6 @@ subroutine read_samples()
   integer:: is,isp,jsp
   character:: cdir*128, cspmd*3, cspfp*3
   integer,allocatable:: nal(:)
-  logical:: lint
 
   if( .not. allocated(nalist) ) allocate(nalist(nsmpl))
   allocate(nal(nsmpl))
@@ -593,7 +598,7 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
   character(len=*),intent(in):: fname
   type(mdsys),intent(inout):: smpl
 
-  integer:: i,natm,natotl,natotg,num
+  integer:: i,natm,num
   real(8):: tmp
   character(len=128):: cline
   character(len=10):: c1,copt
@@ -631,7 +636,15 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%chg(natm),smpl%chi(natm),smpl%tei(natm),smpl%fsub(3,natm) &
        ,smpl%eatm(natm) &
        ,smpl%gwe(nvars),smpl%gwf(nvars,3,natm),smpl%gws(nvars,6))
-  if( lgdw ) allocate(smpl%gdf(natm),smpl%gdw(natm))
+  mem = mem +8*size(smpl%ra) +8*size(smpl%fa) +8*size(smpl%tag) &
+       +8*size(smpl%fref) +4*size(smpl%ifcal) +8*size(smpl%fabs) &
+       +8*size(smpl%va) +8*size(smpl%strsi) +8*size(smpl%eki) +8*size(smpl%epi) &
+       +8*size(smpl%chg) +8*size(smpl%chi) +8*size(smpl%tei) +8*size(smpl%fsub) &
+       +8*size(smpl%eatm) +8*size(smpl%gwe) +8*size(smpl%gwf) +8*size(smpl%gws)
+  if( lgdw ) then
+    allocate(smpl%gdf(natm),smpl%gdw(natm))
+    mem = mem +8*size(smpl%gdf) +8*size(smpl%gdw)
+  endif
   smpl%chg(1:natm) = 0d0
   smpl%tei(1:natm) = 0d0
   smpl%esub= 0d0
@@ -650,9 +663,9 @@ subroutine read_ref_data()
   use fp_common,only: ndat_in_line
   implicit none 
   integer:: ismpl,i,is,jflag,natm,nfrc,nftot,nfrcg,nftotg,ispmax,ispmaxl
-  integer:: imax,ifsmpl,nfsmplmax,nfrefdat,ifcal
+  integer:: nfrefdat,ifcal
   character(len=128):: cdir
-  real(8):: erefminl,ftmp(3),fmax,ptnsr(3,3)
+  real(8):: erefminl,ftmp(3),ptnsr(3,3)
   character(len=3):: cspi 
 
   jflag= 0
@@ -812,7 +825,6 @@ subroutine qn_wrapper(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: i,m
   real(8):: fval
   external:: write_stats
 
@@ -843,7 +855,6 @@ subroutine sd_wrapper(ftrn0,ftst0)
   use minimize
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: i,m
   real(8):: fval
   external:: write_stats
 
@@ -862,7 +873,6 @@ subroutine cg_wrapper(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: i,m
   real(8):: fval
   external:: write_stats
 
@@ -889,7 +899,6 @@ subroutine sa_wrapper(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: i,m
   real(8):: fval
   external:: write_stats
 
@@ -914,7 +923,6 @@ subroutine md_wrapper(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: i,m
   real(8):: fval
   external:: write_stats
 
@@ -939,7 +947,6 @@ subroutine ga_wrapper(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: i,m
   real(8):: fval
   external:: write_stats,write_energy_relation
 
@@ -966,7 +973,6 @@ subroutine de_wrapper(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: i,m
   real(8):: fval
   external:: write_stats, write_energy_relation
 
@@ -993,7 +999,6 @@ subroutine pso_wrapper(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: i,m
   real(8):: fval
   external:: write_stats
 
@@ -1020,7 +1025,6 @@ subroutine random_search_wrapper(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: i,m
   real(8):: fval
   external:: write_stats
 
@@ -1062,8 +1066,6 @@ subroutine fs_wrapper(ftrn0,ftst0)
   use minimize
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: i,m
-  real(8):: fval
 
   !.....NN specific code hereafter
 !!$  call NN_init()
@@ -1082,7 +1084,6 @@ subroutine gfs_wrapper(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: i,m
   real(8):: ftrn,ftst
   external:: write_stats
 
@@ -1109,8 +1110,8 @@ subroutine check_grad(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: iv,i
-  real(8):: ftmp,dv,vmax,ftst,ftmp1,ftmp2
+  integer:: iv
+  real(8):: dv,vmax,ftst,ftmp1,ftmp2
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
   real(8),parameter:: dev  = 1d-5
   real(8),parameter:: tiny = 1d-6
@@ -1173,6 +1174,7 @@ subroutine check_grad(ftrn0,ftst0)
 !!$    print *,''
   enddo
 
+  deallocate(gnumer,ganal,vars0)
   if( myid.eq.0 ) then
     write(6,'(a)') '----------------------------------------'&
          //'--------------------------------'
@@ -1187,7 +1189,6 @@ subroutine test(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  integer:: iv
   real(8),allocatable:: g(:)
 
   allocate(g(nvars))
@@ -1229,15 +1230,20 @@ subroutine write_energy_relation(cadd)
   character(len=*),intent(in):: cadd
   character(len=128):: cfname
   
-  integer:: ismpl,n
+  integer:: ismpl
   logical,save:: l1st = .true.
 !!$  real(8):: epotsub
   
   cfname='out.erg'
 
-  if( .not. allocated(erefl) ) allocate(erefl(nsmpl),erefg(nsmpl) &
+  if( .not. allocated(erefl) ) then
+    allocate(erefl(nsmpl),erefg(nsmpl) &
        ,epotl(nsmpl),epotg(nsmpl),eerrl(nsmpl),eerrg(nsmpl)&
        ,swgtl(nsmpl),swgtg(nsmpl),esubl(nsmpl),esubg(nsmpl))
+    mem = mem +8*size(erefl) +8*size(erefg) +8*size(epotl) +8*size(epotg) &
+         +8*size(eerrl) +8*size(eerrg) +8*size(swgtl) +8*size(swgtg) &
+         +8*size(esubl) +8*size(esubg)
+  endif
 
   if( l1st ) then
     erefl(1:nsmpl)= 0d0
@@ -1338,6 +1344,9 @@ subroutine write_force_relation(cadd)
          ,ferrl(nsmpl),ferrg(nsmpl),fsubl(3,nmax,nsmpl) &
          ,fsubg(3,nmax,nsmpl),lfcall(nmax,nsmpl),lfcalg(nmax,nsmpl) &
          ,gdwl(nmax,nsmpl),gdwg(nmax,nsmpl))
+    mem = mem +8*size(frefl) +8*size(frefg) +8*size(fal) +8*size(fag) &
+         +8*size(ferrl) +8*size(ferrg) +8*size(fsubl) +8*size(fsubg) &
+         +4*size(lfcall) +4*size(lfcalg) +8*size(gdwl) +8*size(gdwg)
   endif
 
   if( l1st ) then
@@ -1428,7 +1437,7 @@ subroutine write_stress_relation(cadd)
   character(len=*),intent(in):: cadd
   character(len=128):: cfname
 
-  integer:: ismpl,ia,ixyz,jxyz,natm,nmax,nmaxl
+  integer:: ismpl,ixyz,jxyz,natm,nmax,nmaxl
   logical:: l1st = .true.
 
   cfname= 'out.strs'
@@ -1440,9 +1449,13 @@ subroutine write_stress_relation(cadd)
   call mpi_allreduce(nmaxl,nmax,1,mpi_integer,mpi_max &
        ,mpi_world,ierr)
 
-  if( .not. allocated(srefl) ) allocate(srefl(3,3,nsmpl)&
-       ,srefg(3,3,nsmpl),strsl(3,3,nsmpl),strsg(3,3,nsmpl)&
-       ,serrl(nsmpl),serrg(nsmpl),ssubl(3,3,nsmpl),ssubg(3,3,nsmpl))
+  if( .not. allocated(srefl) ) then
+    allocate(srefl(3,3,nsmpl)&
+         ,srefg(3,3,nsmpl),strsl(3,3,nsmpl),strsg(3,3,nsmpl)&
+         ,serrl(nsmpl),serrg(nsmpl),ssubl(3,3,nsmpl),ssubg(3,3,nsmpl))
+    mem = mem +8*size(srefl) +8*size(srefg) +8*size(strsl) +8*size(strsg) &
+         +8*size(serrl) +8*size(serrg) +8*size(ssubl) +8*size(ssubg)
+  endif
 
   if( l1st ) then
     srefl(1:3,1:3,1:nsmpl)= 0d0
@@ -1525,7 +1538,6 @@ subroutine write_stats(iter)
   real(8),save:: ftrndnm,ftstdnm
   real(8),save:: strndnm,ststdnm
   real(8):: er2trn,er2tst,fr2trn,fr2tst,sr2trn,sr2tst
-  real(8),save:: rmse_tst_best= 1d+30
   real(8),save:: epotsub
   character(len=128):: cnum
   logical,save:: l1st = .true.
@@ -2138,6 +2150,7 @@ subroutine get_node2sample()
   n= nsmpl/nnode
   m= nsmpl -n*nnode
   allocate(nspn(nnode),ispn(nnode))
+  mem = mem +4*size(nspn) +4*size(ispn)
   do ip=1,nnode
     nspn(ip)= n
     if( ip.le.m ) nspn(ip)= nspn(ip) +1

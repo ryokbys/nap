@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-22 16:05:15 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-25 10:43:04 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -60,7 +60,8 @@ contains
   subroutine force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
-    use descriptor,only: gsf,dgsf,igsf,nsf,nal,calc_desc,make_gsf_arrays
+    use descriptor,only: gsf,dgsf,igsf,nsf,nal,calc_desc,make_gsf_arrays,&
+         prepare_desci,gsfi,dgsfi,igsfi,calc_desci
     use util,only: itotOf
     implicit none
     include "mpif.h"
@@ -153,37 +154,6 @@ contains
     endif
 !.....2nd, calculate the node values by summing contributions from
 !.....  symmetry functions
-!!$    if( nl.eq.1 ) then
-!!$      do ia=1,natm
-!!$        do ihl1=1,mhl(1)
-!!$          tmp= 0d0
-!!$          do ihl0=1,nhl(0)
-!!$            tmp= tmp +wgt11(ihl0,ihl1) *gsf(ihl0,ia)
-!!$          enddo
-!!$          zl1(ihl1,ia)= tmp
-!!$          hl1(ihl1,ia)= sigmoid(tmp)
-!!$        enddo
-!!$      enddo
-!!$    else if( nl.eq.2 ) then
-!!$      do ia=1,natm
-!!$        do ihl1=1,mhl(1)
-!!$          tmp= 0d0
-!!$          do ihl0=1,nhl(0)
-!!$            tmp= tmp +wgt21(ihl0,ihl1) *gsf(ihl0,ia)
-!!$          enddo
-!!$          zl1(ihl1,ia)= tmp
-!!$          hl1(ihl1,ia)= sigmoid(tmp)
-!!$        enddo
-!!$        do ihl2=1,mhl(2)
-!!$          tmp= 0d0
-!!$          do ihl1=1,nhl(1)
-!!$            tmp= tmp +wgt22(ihl1,ihl2) *(hl1(ihl1,ia)-0.5d0)
-!!$          enddo
-!!$          zl2(ihl2,ia)= tmp
-!!$          hl2(ihl2,ia)= sigmoid(tmp)
-!!$        enddo
-!!$      enddo
-!!$    endif
     call comp_nodes(natm)
 
 !.....Calculate the energy of atom by summing up the node values

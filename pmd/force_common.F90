@@ -276,7 +276,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use ZBL, only: read_params_ZBL, init_ZBL
   use LJ, only: read_params_LJ_repul
   use linreg, only: read_params_linreg,lprmset_linreg
-  use descriptor, only: read_params_desc,init_desc
+  use descriptor, only: read_params_desc,init_desc,lprmset_desc
   use NN2, only: read_params_NN2,lprmset_NN2,update_params_NN2
   use DNN, only: read_params_DNN,lprmset_DNN,update_params_DNN
   use pmdio,only: nspmax
@@ -395,38 +395,33 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
       call update_params_EAM()
     endif
   endif
-!.....NN
-!!$  if( use_force('NN') ) then
-!!$    call read_const_NN(myid_md,mpi_md_world,iprint)
-!!$    if( .not.lprmset_NN ) then
-!!$      call read_params_NN(myid_md,iprint)
-!!$    else
-!!$!.....This code is not parallelized, and only for fitpot
-!!$      call update_params_NN()
-!!$    endif
-!!$  else if( use_force('NN2') ) then
+  
+!.....Need to set descriptors before NN or linreg
+  if( use_force('NN2') .or. use_force('DNN') .or. use_force('linreg') ) then
+!.....If descs are already set, no need to read descs from file.
+!.....This happens when descs are set from fitpot and re-used for all the samples.
+    if( .not.lprmset_desc ) then
+      call init_desc()
+      call read_params_desc(myid_md,mpi_md_world, &
+           iprint,specorder)
+    endif
+  endif
   if( use_force('NN2') ) then
-    call init_desc()
     if( .not.lprmset_NN2 ) then
 !.....Read both in.params.desc and in.params.NN2
-      call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
       call read_params_NN2(myid_md,mpi_md_world,iprint)
     else
 !.....Read only in.params.desc
-      call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
       call update_params_NN2()
     endif
   endif
 !.....Deep NN
   if( use_force('DNN') ) then
-    call init_desc()
     if( .not.lprmset_DNN ) then
 !.....Read both in.params.desc and in.params.DNN
-      call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
       call read_params_DNN(myid_md,mpi_md_world,iprint)
     else
 !.....Read only in.params.desc
-      call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
       call update_params_DNN()
     endif
   endif
@@ -449,14 +444,9 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   endif
 !.....Linear regression
   if( use_force('linreg') ) then
-    call init_desc()
     if( .not.lprmset_linreg ) then
 !.....Read both in.params.desc and in.params.linreg
-      call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
       call read_params_linreg(myid_md,mpi_md_world,iprint)
-    else
-!.....Read only in.params.desc
-      call read_params_desc(myid_md,mpi_md_world,iprint,specorder)
     endif
   endif
 

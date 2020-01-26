@@ -45,7 +45,7 @@ subroutine set_variable(ionum,cname)
 
   character(len=128):: ctmp
   character(len=3):: csp 
-  integer:: ndata,nrow,is,itmp
+  integer:: nrow
   real(8):: tmp
 
   if( trim(cname).eq.'num_samples' ) then
@@ -448,8 +448,7 @@ subroutine read_smpl_wgt(ionum,nrow,cval,erg0,temp)
   character(len=*),intent(out):: cval(nrow)
 
 !      integer,external:: num_data
-  integer:: irow,ndat
-  character(len=1024):: ctmp
+  integer:: irow
 
   do irow=1,nrow
     read(ionum,*) cval(irow),erg0(irow),temp(irow)

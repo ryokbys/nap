@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-23 20:33:09 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-26 13:34:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -21,15 +21,14 @@ module fp_common
 !.....Store loverlay and r_inner/outer arrays
   logical:: overlay
   real(8),allocatable:: ri_zbl(:),ro_zbl(:)
-  
+
 contains
 !=======================================================================
   subroutine init()
     use variables,only: swgt2trn,swgt2tst,lematch,lfmatch,lsmatch
     use parallel,only: myid
 
-    integer:: ismpl,nterms
-    real(8):: swgtrn,swgtst
+    integer:: nterms
 
     call calc_swgts(swgt2trn,swgt2tst)
 
@@ -86,11 +85,11 @@ contains
 !  Evaluate loss function value using pmd (actually one_shot routine.)
 !
     use variables,only:samples,tfunc &
-         ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys,erefmin &
-         ,cmaindir,cevaltype,swgt2trn,swgt2tst,cpot &
-         ,nff,cffs,nsubff,csubffs,cmaindir,maxna,rcut,rc3 &
-         ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint,maxisp &
-         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss,interact,memgsf,cfmethod &
+         ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys &
+         ,swgt2trn,swgt2tst,cpot &
+         ,nff,cffs,maxna,rcut &
+         ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint &
+         ,ctype_loss,mem,cfmethod &
          ,lnormalize,lnormalized,lgdw,lgdwed
     use parallel
     use minimize
@@ -100,17 +99,16 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: ftrn,ftst
 
-    integer:: ismpl,natm,ia,ixyz,jxyz,idim,k,nsf,nal,nnl,isf,i,ndimt
-    real(8):: dn3i,ediff,fscale,eref,epot,swgt,wgtidv,esub
+    integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl
+    real(8):: dn3i,ediff,eref,epot,swgt,esub
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref
     real(8):: ftrnl,ftstl,ftmp,gdw
-    real(8):: edenom,fdenom
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     type(mdsys):: smpl
     logical,save:: l1st = .true.
     logical,parameter:: lcalcgrad = .false.
     logical:: lfdsgnmat
-    character(len=128):: cdirname,ctype
+    character(len=128):: cdirname
 
     logical,external:: string_in_arr
 
@@ -125,7 +123,10 @@ contains
 
     if( l1st ) then
       if( .not.fp_common_initialized ) call init()
-      if( .not.allocated(fdiff) ) allocate(fdiff(3,maxna),frcs(3,maxna))
+      if( .not.allocated(fdiff) ) then
+        allocate(fdiff(3,maxna),frcs(3,maxna))
+        mem = mem +8*size(fdiff) +8*size(frcs)
+      endif
       if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg') lupdate_gsf = .true.
     endif
 
@@ -138,10 +139,12 @@ contains
     endif
 
     do ismpl=isid0,isid1
-      if( allocated(ismask) .and. ismask(ismpl).ne.0 ) cycle
+      if( allocated(ismask) ) then
+        if( ismask(ismpl).ne.0 ) cycle
+      endif
       natm= samples(ismpl)%natm
       cdirname = trim(samples(ismpl)%cdirname)
-      call pre_pmd(ismpl,ndim,x)
+      call pre_pmd(ismpl,ndim,x,l1st)
 
 !.....Set lfdsgnmat=.true. to make run_pmd() compute dsgnmat_force related data
       if( trim(cpot).eq.'linreg' .and. &
@@ -155,17 +158,19 @@ contains
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
       samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
       if( trim(cpot).eq.'linreg' .or. index(cpot,'NN').ne.0 ) then
-        call get_ints(nsf,nal,nnl)
-        samples(ismpl)%nsf = nsf
-        samples(ismpl)%nal = nal
-        samples(ismpl)%nnl = nnl
         if( .not. allocated(samples(ismpl)%gsf) ) then
-          memgsf = memgsf +nsf*nal +3*nsf*(nnl+1)*nal +nsf*(nnl+1) +nal
+          call get_ints(nsf,nal,nnl)
+          samples(ismpl)%nsf = nsf
+          samples(ismpl)%nal = nal
+          samples(ismpl)%nnl = nnl
           allocate(samples(ismpl)%gsf(nsf,nal) &
                ,samples(ismpl)%dgsf(3,nsf,0:nnl,nal) &
                ,samples(ismpl)%igsf(nsf,0:nnl,nal) )
+          mem = mem +8*size(samples(ismpl)%gsf) +8*size(samples(ismpl)%dgsf) &
+               +8*size(samples(ismpl)%igsf)
         endif
-        call get_descs(nsf,nal,nnl,samples(ismpl)%gsf &
+        call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
+             samples(ismpl)%nnl,samples(ismpl)%gsf &
              ,samples(ismpl)%dgsf,samples(ismpl)%igsf)
       endif
     enddo
@@ -181,12 +186,16 @@ contains
       call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
     endif
 
+    if( iprint.gt.1 ) print *,'eval loss function...'
     ftrnl = 0d0
     ftstl = 0d0
     do ismpl=isid0,isid1
-      if( allocated(ismask) .and. ismask(ismpl).ne.0 ) cycle
+      if( allocated(ismask) ) then
+        if( ismask(ismpl).ne.0 ) cycle
+      endif
       smpl = samples(ismpl)
       cdirname= smpl%cdirname
+      if( iprint.gt.1 ) print *,'  '//trim(cdirname)//'...'
       natm = smpl%natm
       epot = smpl%epot
       ftmp = 0d0
@@ -314,11 +323,10 @@ contains
 !  using pmd (actually one_shot routine.)
 !
     use variables,only: tgrad,ngrad,tcomm,tgrad &
-         ,samples,mdsys,swgt2trn,swgt2tst,cpot,nff,cffs,nsubff,csubffs &
-         ,cmaindir,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
-         ,rcut,rc3,myidrefsub,isidrefsub,iprint,maxisp,gscl &
-         ,nn_nl,nn_nhl,nn_sigtype,ctype_loss,interact &
-         ,lgdw
+         ,samples,mdsys,swgt2trn,nff,cffs &
+         ,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
+         ,rcut,myidrefsub,isidrefsub,iprint &
+         ,ctype_loss,lgdw,mem
     use parallel
     use minimize
     implicit none
@@ -326,22 +334,30 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gtrn(ndim)
 
-    integer:: ismpl,i,idim,natm,k,ia,ixyz,jxyz,nsf,nal,nnl,ndimt
+    integer:: ismpl,natm,k,ia,ixyz,jxyz
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3),dn3i
     real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,tmp,gdw
     real(8):: absfref,abssref
     type(mdsys):: smpl
     logical,parameter:: lcalcgrad = .true.
     logical,parameter:: lfdsgnmat = .false.
-    character(len=128):: cdirname,ctype
+    character(len=128):: cdirname
 
     logical,external:: string_in_arr
 
-    if( .not.allocated(gtrnl) ) allocate(gtrnl(ndim))
-    if( .not.allocated(gwe) ) allocate(gwe(ndim),gwf(ndim,3,maxna)&
-         ,gws(ndim,6))
+    if( .not.allocated(gtrnl) ) then
+      allocate(gtrnl(ndim))
+      mem = mem +8*size(gtrnl)
+    endif
+    if( .not.allocated(gwe) ) then
+      allocate(gwe(ndim),gwf(ndim,3,maxna),gws(ndim,6))
+      mem = mem +8*size(gwe) +8*size(gwf) +8*size(gws)
+    endif
     if( len(trim(crefstrct)).gt.5 ) then
-      if( .not.allocated(gwesub) ) allocate(gwesub(ndim))
+      if( .not.allocated(gwesub) ) then
+        allocate(gwesub(ndim))
+        mem = mem +8*size(gwesub)
+      endif
     endif
 
     ngrad= ngrad +1
@@ -359,7 +375,9 @@ contains
     endif
 
     do ismpl=isid0,isid1
-      if( allocated(ismask) .and. ismask(ismpl).ne.0 ) cycle
+      if( allocated(ismask) ) then
+        if( ismask(ismpl).ne.0 ) cycle
+      endif
       smpl = samples(ismpl)
       natm= smpl%natm
       cdirname = smpl%cdirname
@@ -367,7 +385,7 @@ contains
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
-      call pre_pmd(ismpl,ndim,x)
+      call pre_pmd(ismpl,ndim,x,.false.)
       
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.
@@ -390,7 +408,9 @@ contains
 
     gtrnl(1:ndim) = 0d0
     do ismpl=isid0,isid1
-      if( allocated(ismask) .and. ismask(ismpl).ne.0 ) cycle
+      if( allocated(ismask) ) then
+        if( ismask(ismpl).ne.0 ) cycle
+      endif
       smpl= samples(ismpl)
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
@@ -436,7 +456,6 @@ contains
       if( lfmatch ) then
         frcs(1:3,1:natm)= smpl%fa(1:3,1:natm)
         ferr= smpl%ferr
-!!$        ferri= 1d0/ferr
         dn3i= 1d0/3/smpl%nfcal
         do ia=1,natm
           if( smpl%ifcal(ia).eq.0 ) cycle
@@ -464,7 +483,6 @@ contains
 !.....Derivative of stress w.r.t. weights
       if( lsmatch ) then
         serr= smpl%serr
-!!$        serri= 1d0/serr
         pdiff(1:6) = 0d0
         abssref = abs(smpl%sref(1,1)+smpl%sref(2,2)+smpl%sref(3,3))/3
         serri = 1d0/ (abssref +serr)
@@ -511,13 +529,15 @@ contains
     return
   end subroutine grad_w_pmd
 !=======================================================================
-  subroutine pre_pmd(ismpl,ndim,x)
+  subroutine pre_pmd(ismpl,ndim,x,l1st)
 !
 !  Preprocesses before running pmd
 !
-    use variables,only: cmaindir,cpot,nsubff,csubffs,mdsys,samples &
-         ,maxisp,nn_nl,nn_nhl,nn_sigtype,ctype_loss,rc3,rcut &
-         ,interact,interact3,num_interact,iprint
+    use variables,only: cmaindir,cpot,nsubff,csubffs,mdsys,samples, &
+         maxisp,nn_nl,nn_nhl,nn_sigtype,rc3, &
+         interact,interact3,num_interact,iprint, &
+         descs,nsf_desc,nsf2_desc,nsf3_desc,nsff_desc,ilsf2,ilsf3, &
+         lcheby,cnst,wgtsp_desc,nspmax
     use parallel
     use Coulomb,only: set_paramsdir_Coulomb, set_params_Coulomb
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
@@ -526,16 +546,16 @@ contains
     use fpc,only: set_paramsdir_fpc,set_params_fpc
     use angular,only: set_paramsdir_angular,set_params_angular
     use EAM,only: set_paramsdir_EAM,set_params_EAM
-!!$    use NN,only: set_paramsdir_NN,set_params_NN
     use NN2,only: set_paramsdir_NN2,set_params_NN2,get_NN2_hl1 &
          ,set_NN2_hl1,set_sigtype_NN2
     use DNN,only: set_paramsdir_DNN,set_params_DNN,set_sigtype_DNN
     use linreg,only: set_paramsdir_linreg,set_params_linreg
     use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
-         ,lupdate_gsf
+         ,lupdate_gsf,set_params_desc, lfitpot_desc => lfitpot
     implicit none
     integer,intent(in):: ismpl,ndim
     real(8),intent(in):: x(ndim)
+    logical,intent(in):: l1st
 
     integer:: nsf,nal,nnl,ndimt,ndim0
     character(len=128):: cdirname,ctype
@@ -585,62 +605,24 @@ contains
       call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
            //'/pmd')
       call set_params_EAM(ndim,x)
-!!$    else if( trim(cpot).eq.'NN' ) then
-!!$      call set_paramsdir_NN(trim(cmaindir)//'/'//trim(cdirname)&
-!!$           //'/pmd')
-!!$      call set_params_NN(ndim,x,rcut,rc3)
     else if( trim(cpot).eq.'linreg' ) then
-      call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
-           //'/pmd')
-      call set_paramsdir_linreg(trim(cmaindir)//'/'//trim(cdirname)&
-           //'/pmd')
+!.....Set lfitpot in descriptor module to let it know that it is called from fitpot
+      lfitpot_desc = .true.
       call set_params_linreg(ndim,x)
-      if( .not. lupdate_gsf ) then
-        nsf = smpl%nsf
-        nal = smpl%nal
-        nnl = smpl%nnl
-        call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
-             samples(ismpl)%dgsf,samples(ismpl)%igsf)
-      endif
-!!$!.....Set lfdsgnmat=.true. to make run_pmd() compute dsgnmat_force related data
-!!$      if( l1st .and. lfmatch .and. trim(cfmethod).eq.'dsgnmat' ) then
-!!$        lfdsgnmat = .true.
-!!$      endif
     else if( trim(cpot).eq.'NN2' ) then
-      call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
-           //'/pmd')
-      call set_paramsdir_NN2(trim(cmaindir)//'/'//trim(cdirname)&
-           //'/pmd')
+!.....Set lfitpot in descriptor module to let it know that it is called from fitpot
+      lfitpot_desc = .true.
       call set_params_NN2(ndim,x,nn_nl,nn_nhl)
       call set_sigtype_NN2(nn_sigtype)
-      if( .not. lupdate_gsf ) then
-        nsf = smpl%nsf
-        nal = smpl%nal
-        nnl = smpl%nnl
-        call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
-             samples(ismpl)%dgsf,samples(ismpl)%igsf)
-      endif
     else if( trim(cpot).eq.'DNN' ) then
-      call set_paramsdir_desc(trim(cmaindir)//'/'//trim(cdirname)&
-           //'/pmd')
-      call set_paramsdir_DNN(trim(cmaindir)//'/'//trim(cdirname)&
-           //'/pmd')
+!.....Set lfitpot in descriptor module to let it know that it is called from fitpot
+      lfitpot_desc = .true.
       call set_params_DNN(ndim,x,nn_nl,nn_nhl)
       call set_sigtype_DNN(nn_sigtype)
-      if( .not. lupdate_gsf ) then
-        nsf = smpl%nsf
-        nal = smpl%nal
-        nnl = smpl%nnl
-        call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
-             samples(ismpl)%dgsf,samples(ismpl)%igsf)
-      endif
     else if( index(cpot,'BVS').ne.0 ) then
-      call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
-           //'/pmd')
-      call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
-           //'/pmd')
-      call set_paramsdir_angular(trim(cmaindir)//'/'//trim(cdirname)&
-           //'/pmd')
+      call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)//'/pmd')
+      call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)//'/pmd')
+      call set_paramsdir_angular(trim(cmaindir)//'/'//trim(cdirname)//'/pmd')
       if( trim(cpot).eq.'BVS1' ) then
         call set_params_Coulomb(1,x(1),cpot,smpl%specorder,iprint)
         call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
@@ -661,12 +643,32 @@ contains
         call set_params_Morse(ndimt,x(ndim0),cpot,interact)
         ndim0 = ndim0 +ndimt
         ndimt = num_interact(3)*3
-!!$        if( myid.eq.0 ) print *,'# of interaction = ',num_interact(2) &
-!!$             ,num_interact(3)
         call set_params_angular(ndimt,x(ndim0),'angular1',rc3,interact3)
       else
         print *,'ERROR@pre_pmd: No such BVS FF available in fitpot.'
         stop 1
+      endif
+!.....Set descriptor parameters read from in.params.desc only at the first time
+      if( (index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg') &
+           .and. l1st ) then
+        if( lcheby ) then
+          call set_params_desc(descs,nsf_desc,nsf2_desc,nsf3_desc, &
+               nsff_desc,ilsf2,ilsf3,lcheby,cnst,wgtsp_desc)
+        else
+          call set_params_desc(descs,nsf_desc,nsf2_desc,nsf3_desc, &
+               nsff_desc,ilsf2,ilsf3,lcheby,cnst)
+        endif
+       endif
+!.....Some potentials use descriptors already computed in the previous steps
+!.....and stored in samples.
+      if( trim(cpot).eq.'NN2' .or. trim(cpot).eq.'linreg' ) then
+       if( .not. lupdate_gsf ) then
+          nsf = smpl%nsf
+          nal = smpl%nal
+          nnl = smpl%nnl
+          call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
+               samples(ismpl)%dgsf,samples(ismpl)%igsf)
+        endif
       endif
     endif
 
@@ -678,12 +680,12 @@ contains
 !  Run pmd and get energy and forces of the system.
 !
     use variables,only: mdsys,maxna,iprint,lematch,lfmatch,lsmatch&
-         ,rc_other,maxisp
-    use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd,myid,mpi_world
+         ,maxisp
+    use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd
     use force
     use descriptor,only: get_dsgnmat_force
     use ZBL,only: r_inner,r_outer
-    use pmdio, only: nspmax,has_specorder,specorder,nnmax
+    use pmdio, only: nspmax
     use element
     implicit none
     include "../pmd/params_unit.h"
@@ -700,7 +702,7 @@ contains
     logical,save:: l1st = .true.
 
     integer:: i,is,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
-         nstps_done,ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
+         ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
     real(8):: am(nspmax),dt,rbuf,dmp,tinit,tfin,ttgt(nspmax),trlx,stgt(3,3),&
          ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv &
          ,rc1nn
@@ -814,6 +816,7 @@ contains
     endif
 
 !.....one_shot force calculation
+    if( iprint.gt.1 ) print '(/,a)',' one_shot for '//trim(smpl%cdirname)//'...'
     call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
          ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
          ,smpl%chg,smpl%chi,smpl%tei &
@@ -847,9 +850,8 @@ contains
     use parallel
     implicit none
 
-    integer:: n = 1
     integer:: iranks(1)
-    integer:: mpi_group_world,mpi_group_pmd
+    integer:: mpi_group_pmd
 
     iranks(1) = myid
 
@@ -913,7 +915,10 @@ contains
         enddo
       endif
 
-      if( .not.allocated(frcs) ) allocate(frcs(3,maxna))
+      if( .not.allocated(frcs) ) then
+        allocate(frcs(3,maxna))
+        mem = mem +8*size(frcs)
+      endif
 
       do i=1,nsubff
         if( index(trim(csubffs(i)),'Morse').ne.0 ) then
@@ -1036,20 +1041,24 @@ contains
     use parallel
     implicit none 
     real(8),parameter:: tiny = 1d-15
-    integer:: nsuml,nsumg,ismpl,natm,isf,jsf,ia,nsf,ixyz
-    real(8):: gmeanl,gmean,tmp,gvarl,dgi,dgj,gtmp
+    integer:: nsuml,nsumg,ismpl,natm,isf,jsf,ia,nsf
+    real(8):: gmeanl,tmp,gvarl,dgi,dgj
     real(8),allocatable:: gsfml(:),gsfvl(:),gsfcl(:,:),gsfvsq(:),gsfsl(:)
-    character(len=128):: cnum
 !    real(8),allocatable:: dgsft(:,:,)
 
+    if( .not. allocated(samples(isid0)%gsf) ) then
+      print *,'smpl%gsf is not allocated...'
+      stop
+    endif
+
     nsf = samples(isid0)%nsf
-!!$    print *,'myid,isid0,nsf=',myid,isid0,nsf
     if( .not.allocated(gsfml) ) then
       allocate(gsfml(nsf),gsfvl(nsf),gsfcl(nsf,nsf),&
            gsfvsq(nsf),gsfsl(nsf))
     endif
     if( .not. allocated(gsfms) ) then
       allocate(gsfms(nsf),gsfvs(nsf),gsfss(nsf),gsfcorr(nsf,nsf))
+      mem = mem +8*size(gsfms) +8*size(gsfvs) +8*size(gsfss) +8*size(gsfcorr)
     endif
 
 !.....compute mean value
@@ -1287,12 +1296,12 @@ contains
 !
 !  Normalize inputs (descriptors) wrt standard deviation.
 !
-    use variables, only: samples,nvars,nalist,vars,vranges&
-         ,lnormalized,cpot,gsfvar,gsfvs,gsfms,sgms,sgmis,sgm_min,iprint &
+    use variables, only: samples,nvars,vars,vranges&
+         ,lnormalized,cpot,gsfvar,gsfvs,sgms,sgmis,sgm_min,iprint &
          ,nn_nhl
     use parallel
     implicit none
-    integer:: ismpl,ia,natm,isf,i,iv,ihl0,ihl1
+    integer:: ismpl,natm,isf,i,iv,ihl0,ihl1
     integer,save:: nsf
     real(8):: sgm,sgmi,sgmax,sgmin
     logical,save:: l1st = .true.
@@ -1315,6 +1324,7 @@ contains
 !.....standardize G values
       do ismpl=isid0,isid1
         natm= samples(ismpl)%natm
+        if( iprint.gt.1 ) print *,'ismpl,cdirname=',ismpl,trim(samples(ismpl)%cdirname)
         if( .not. allocated(samples(ismpl)%gsf) ) then
           print *,'ERROR: gsf not allocated, myid,ismpl,cdirname='&
                ,myid,ismpl,trim(samples(ismpl)%cdirname)
@@ -1369,12 +1379,12 @@ contains
 !
 !  Normalize inputs (descriptors)
 !
-    use variables, only: samples,nvars,nalist,vars,vranges&
-         ,lnormalized,cpot,gsfvar,sgms,sgmis,gsfss,sq_min,iprint &
+    use variables, only: samples,nvars,vars,vranges&
+         ,lnormalized,cpot,sgms,sgmis,gsfss,sq_min,iprint &
          ,nn_nhl
     use parallel
     implicit none
-    integer:: ismpl,ia,natm,isf,i,iv,ihl0,ihl1
+    integer:: ismpl,natm,isf,i,iv,ihl0,ihl1
     real(8):: sqmax,sqmin
     integer,save:: nsf
     logical,save:: l1st = .true.
@@ -1448,8 +1458,8 @@ contains
 !
 !  Restore weights by inverse normalization
 !
-    use variables, only: samples,nvars,nalist,vars,vranges&
-         ,lnormalized,cnormalize,cpot,gsfvar,sgms,sgmis, nn_nhl
+    use variables, only: nvars,vars,vranges&
+         ,lnormalized,cnormalize,cpot,sgmis, nn_nhl
     use parallel
     implicit none
     integer:: i,iv,ihl0,ihl1
@@ -1498,7 +1508,7 @@ contains
 !  Ref:
 !    [1] W. Jeong, et al., Journal of Physical Chemistry C, 122(39), (2019) 22790–22795
 !
-    use variables,only: mdsys,samples,gdsgm,lgdw,lgdwed,maxnin,natot
+    use variables,only: mdsys,samples,gdsgm,lgdwed,maxnin,natot
     use parallel
     implicit none
 

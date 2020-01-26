@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-01-10 16:22:28 Ryo KOBAYASHI>
+!                     Last-modified: <2020-01-25 00:19:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -450,7 +450,7 @@ subroutine write_initial_setting()
 !!$  enddo
 !!$  write(6,'(2x,a,5x,a)') 'fix_charge',trim(chgfix)
 !!$  write(6,'(2x,a,5x,l2)') 'variable_charge',lvc
-  write(6,'(2x,a)') ''
+!!$  write(6,'(2x,a)') ''
 
   if( lmetaD ) write(6,'(2x,a,5x,l2)') 'metadynamics',lmetaD
   if( lconst ) write(6,'(2x,a,5x,l2)') 'constraints',lconst

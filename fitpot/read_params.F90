@@ -3,9 +3,6 @@ subroutine read_vars()
   use parallel
   use random
   implicit none
-  integer:: i
-  real(8):: rs0
-  character(len=128):: fname
 
   if( index(cpot,'NN').ne.0 ) then
     call read_vars_NN()
@@ -22,7 +19,6 @@ subroutine write_vars(cadd)
   use fp_common,only: normalize, restore_normalize
   implicit none
   character(len=*),intent(in):: cadd
-  integer:: i
   character(len=128):: cfname
 
   if( cnormalize(1:4).ne.'none' ) then
@@ -35,7 +31,7 @@ subroutine write_vars(cadd)
 !!$    else if( lnormalize ) then
     if( lnormalize ) then
       call restore_normalize()
-     endif
+    endif
   endif
 
 !!$  cfname= trim(cmaindir)//'/'//trim(cparfile)//'.'//trim(cadd)
@@ -74,7 +70,6 @@ subroutine read_vars_fitpot()
   integer,parameter:: ionum = 15
   integer:: i
   real(8):: rs0
-  character(len=128):: fname
 
   if( myid.eq.0 ) then
     print *,'Read parameters to be optimized from '//trim(cparfile)
@@ -146,7 +141,7 @@ subroutine read_vars_NN()
   integer,parameter:: ionum = 15
   integer:: i
   real(8):: rs0
-  character(len=128):: fname,ctmp
+  character(len=128):: ctmp
 
   if( myid.eq.0 ) then
     print *,'Read parameters to be optimized from '//trim(cparfile)
@@ -219,7 +214,7 @@ subroutine write_vars_NN(cfname)
   character(len=*),intent(in):: cfname
   integer:: i
   integer,parameter:: ionum = 16
-  
+
   if( myid.eq.0 ) then
     open(ionum,file=trim(cfname),status='replace')
     write(ionum,'(a,i2)') '!  sigtype: ',nn_sigtype
@@ -254,7 +249,6 @@ subroutine parse_option_NN(cline)
   character(len=*),intent(in):: cline
 
   character(len=10):: c1,copt
-  logical:: lopt
   integer:: iopt
 
   ierr = 0
@@ -264,6 +258,269 @@ subroutine parse_option_NN(cline)
   endif
 
 end subroutine parse_option_NN
+!=======================================================================
+subroutine read_params_desc()
+!
+!  Read in.params.desc.
+!
+  use variables
+  use parallel
+  use util, only: num_data
+  use pmdio,only: csp2isp
+  implicit none
+
+  integer,parameter:: ionum = 16
+
+  integer:: i,j,k,isp,jsp,ksp,isf,ityp,is1,is2
+  logical:: lexist
+  real(8):: rc,rcut2,rcut3,wgt
+  character(len=128):: ctmp,cfname,cline,cmode
+  character(len=3):: ccmb(3),csp
+
+!.....initialize some
+  ncnst_type(1) = 2   ! Gaussian
+  ncnst_type(2) = 1   ! cosine
+  ncnst_type(3) = 1   ! polynomial
+  ncnst_type(4) = 2   ! Morse
+  ncnst_type(101) = 1 ! angular1 (SW-type, not including fc(rjk))
+  ncnst_type(102) = 2 ! angular2 (Behler-type, including fc(rjk))
+  ncnst_type(103) = 1 ! cos(cos(thijk))
+  ncnst_type(104) = 1 ! sin(cos(thijk))
+  ncnst_type(105) = 2 ! exp(-eta*(cos(thijk)-rs)**2)
+  ncomb_type(1:100) = 2    ! pair
+  ncomb_type(101:200) = 3  ! triplet
+
+  if( myid.eq.0 ) then
+    if( iprint.gt.1 ) print *,'Read in.params.desc...'
+!.....read constants at the 1st call
+    cfname = 'in.params.desc'
+    inquire(file=trim(cfname),exist=lexist)
+    if( .not. lexist ) then
+      if( myid.eq.0 ) then
+        write(6,'(a)') ' ERROR: '//trim(cfname)//' does not exist !!!.'
+      endif
+      stop
+    endif
+    open(ionum,file=trim(cfname),status='old')
+!.....num of symmetry functions, num of node in 1st hidden layer
+10  read(ionum,'(a)') ctmp
+    if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) then
+      call parse_option_desc(ctmp,iprint,ierr)
+      goto 10
+    else
+      backspace(ionum)
+    endif
+!.....Read numbers of species and symmetry functions
+    read(ionum,*) nsp_desc, nsf_desc
+  endif
+
+!.....Bcast nsp and nsf before allocating arrays
+!!$    if( mpi_world.eq.0 ) then  ! Avoid MPI call when called in fitpot.
+  call mpi_bcast(nsp_desc,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nsf_desc,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(lcheby,1,mpi_logical,0,mpi_world,ierr)
+!!$    endif
+!!$  ngl = nsf
+
+!.....Allocate arrays of lenths, nsp and/or nsf
+  if( .not.allocated(descs) ) then
+!!$      allocate(itype(nsf),cnst(max_ncnst,nsf),rcs(nsf),rcs2(nsf))
+    allocate(descs(nsf_desc),ilsf2(0:nsf_desc,nspmax,nspmax) &
+         ,ilsf3(0:nsf_desc,nspmax,nspmax,nspmax))
+!!$!.....Also allocate group-LASSO/FS related variables,
+!!$!     which are not used in pmd but in fitpot
+!!$    allocate(mskgfs(ngl),msktmp(ngl),glval(0:ngl))
+!!$    mskgfs(1:ngl) = 0d0
+  endif
+  if( lcheby ) then
+    allocate(wgtsp_desc(nspmax))
+    do i=1,nsp_desc
+      wgtsp_desc(i)= dble(i)
+    enddo
+  endif
+  call mpi_bcast(nsf_desc,nspmax,mpi_real8,0,mpi_world,ierr)
+
+  if( myid.eq.0 ) then
+    if( lcheby ) then
+!-----------------------------------------------------------------------
+!  Input file format for Chebyshev (in.params.desc)
+!-----------------------------------------------------------------------
+!  ! Chebyshev:   T
+!     3   100         ! nsp, nsf
+!  2-body   30   5.00   ! 2-body, num of series (nsf2), rcut
+!  3-body   20   4.00   ! 3-body, num of series (nsf3), rcut
+!  Weight  Artrith    ! type of species-weight
+!     La   1.0         ! In case of Artrith, specify (species,weight) pair
+!     F   -1.0
+!     Ca   2.0
+!     ...
+!-----------------------------------------------------------------------
+!  Thus, users can specify different num of series and rcut for 2- and 3-body.
+!  Note that the NSF should be identical to the total number of series.
+!  If NSP==1, NSF=NSF2+NSF3, but if NSP>1, NSF=(NSF2+NSF3)*2.
+!  Using a factor, NSFF, NSF=(NSF2+NSF3)*NSFF,
+!  where NSFF=1 for NSP==1, and NSFF=2 for NSP>1.
+!-----------------------------------------------------------------------
+      if( iprint.gt.2 ) print *,'reading Chebyshev descriptors...'
+      nsff_desc = 1
+      nsf2_desc = 0
+      nsf3_desc = 0
+      if( nsp_desc.gt.1 ) nsff_desc = 2
+      cmode = 'none'
+      do while(.true.)
+        read(ionum,'(a)',end=30) cline
+        if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
+        if( index(cline,'Weight').ne.0 .or. &
+             index(cline,'weight').ne.0 ) then ! read Weight control
+          cmode = 'Weight'  ! currently only Artrith type is available
+          if( iprint.gt.0 ) write(6,'(a)') '   species-weight type: '//' Artrith'
+        else if( index(cline,'2-body').ne.0 ) then
+          cmode = 'none'
+          read(cline,*) ctmp, nsf2_desc, rcut2
+        else if( index(cline,'3-body').ne.0 ) then
+          cmode = 'none'
+          read(cline,*) ctmp, nsf3_desc, rcut3
+        else
+          if( trim(cmode).eq.'Weight' ) then
+            read(cline,*,end=30) csp, wgt
+            isp = csp2isp(trim(csp),specorder)
+            if( isp.gt.0 ) then
+              wgtsp_desc(isp) = wgt
+              if( iprint.gt.0 ) write(6,'(5x,i2,a4,f6.1)') isp, trim(csp), wgt
+            endif
+          endif
+        endif
+      enddo
+30    continue
+!.....Check nsf vs nsf2,nsf3
+      if( nsf_desc.ne.nsff_desc*(nsf2_desc+nsf3_desc) ) then
+        print *,'ERROR @read_params_desc: nsf != (nsf2+nsf3)*nsff with nsff,nsp=',nsff_desc,nsp_desc
+        stop 1
+      endif
+!.....Set rcut for all isf
+      do isf=1,nsf2_desc*nsff_desc
+        descs(isf)%rcut = rcut2
+        descs(isf)%rcut2 = rcut2**2
+      enddo
+      do isf=nsf2_desc*nsff_desc+1,nsf_desc
+        descs(isf)%rcut = rcut3
+        descs(isf)%rcut2 = rcut3**2
+      enddo
+
+    else  ! not Chebyshev
+      nsf2_desc = 0
+      nsf3_desc = 0
+      ilsf2(:,:,:) = 0
+      ilsf3(:,:,:,:) = 0
+      do isf=1,nsf_desc
+        read(ionum,*,end=20) ityp,(ccmb(k),k=1,ncomb_type(ityp)) &
+             ,rc,(cnst(j),j=1,ncnst_type(ityp))
+        descs(isf)%itype = ityp
+        isp = csp2isp(trim(ccmb(1)),specorder)
+        jsp = csp2isp(trim(ccmb(2)),specorder)
+        descs(isf)%isp = isp
+        descs(isf)%jsp = jsp
+        descs(isf)%rcut = rc
+        descs(isf)%rcut2 = rc*rc
+        descs(isf)%nprm = ncnst_type(ityp)
+        if( .not.allocated(descs(isf)%prms) ) &
+             allocate(descs(isf)%prms(descs(isf)%nprm))
+        do j=1,descs(isf)%nprm
+          descs(isf)%prms(j) = cnst(j)
+        enddo
+        if( isp.lt.0 .or. jsp.lt.0 ) cycle
+        if( ityp.le.100 ) then  ! 2-body
+          nsf2_desc = nsf2_desc + 1
+          is1 = min(isp,jsp)
+          is2 = max(isp,jsp)
+          ilsf2(0,is1,is2) = ilsf2(0,is1,is2) + 1
+          ilsf2(ilsf2(0,is1,is2),is1,is2) = isf
+        else if( ityp.le.200 ) then  ! 3-body
+          nsf3_desc = nsf3_desc + 1
+          ksp = csp2isp(trim(ccmb(3)),specorder)
+          if( ksp.lt.0 ) cycle
+          descs(isf)%ksp = ksp
+          is1 = min(jsp,ksp)
+          is2 = max(jsp,ksp)
+          ilsf3(0,isp,is1,is2) = &
+               ilsf3(0,isp,is1,is2) +1
+          ilsf3(ilsf3(0,isp,is1,is2),isp,is1,is2) = isf
+        endif
+      enddo  ! isf=1,nsf
+20    continue
+    endif ! lcheby
+    close(ionum)
+  endif ! myid.eq.0
+
+!.....Broadcast some
+  call bcast_descs()
+  call mpi_bcast(nsf2_desc,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nsf3_desc,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(ilsf2,size(ilsf2),mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(ilsf3,size(ilsf3),mpi_integer,0,mpi_world,ierr)
+
+  return
+end subroutine read_params_desc
+!=======================================================================
+subroutine parse_option_desc(cline,iprint,ierr)
+!
+!  Parse options from a comment line.
+!  Lines starting from ! or # are treated as comment lines,
+!  and options can be given at the comment lines.
+!  The option words should be put after these comment characters with
+!  one or more spaces between them for example,
+!
+!    Chebyshev:  T
+!
+!  Currently available options are:
+!    - "Chebyshev:", toggle switch for Chebyshev polynomial series
+!      ex) Chebyshev:  T 
+!
+  use variables,only: lcheby
+  implicit none
+  character(len=*),intent(in):: cline
+  integer,intent(in):: iprint
+  integer,intent(out):: ierr
+
+  character(len=10):: c1,copt
+
+  ierr = 0
+  if( index(cline,'Chebyshev:').ne.0 .or. &
+       index(cline,'chebyshev:').ne.0 ) then
+    read(cline,*) c1, copt, lcheby
+    if( iprint.gt.0 ) then
+      print '(a)', ' Chebyshev series for descriptors.'
+    endif
+  endif
+
+end subroutine parse_option_desc
+!=======================================================================
+subroutine bcast_descs()
+  use variables
+  use parallel
+
+  integer:: i
+
+  do i=1,nsf_desc
+    call mpi_bcast(descs(i)%itype,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(descs(i)%isp,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(descs(i)%jsp,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(descs(i)%ksp,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(descs(i)%rcut,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(descs(i)%rcut2,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(descs(i)%nprm,1,mpi_integer,0,mpi_world,ierr)
+    if( .not. lcheby ) then
+      if( myid.ne.0 ) then
+        if( allocated(descs(i)%prms) ) deallocate(descs(i)%prms)
+        allocate(descs(i)%prms(descs(i)%nprm))
+      endif
+      call mpi_barrier(mpi_world,ierr)
+      call mpi_bcast(descs(i)%prms,descs(i)%nprm,mpi_real8,0,mpi_world,ierr)
+    endif
+  enddo
+end subroutine bcast_descs
+!=======================================================================
+
 !-----------------------------------------------------------------------
 ! Local Variables:
 ! compile-command: "make fitpot"

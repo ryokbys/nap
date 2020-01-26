@@ -1,5 +1,6 @@
 module variables
   use pmdio,only: nspmax
+  use descriptor,only: desc
   implicit none 
   save
   integer:: nsmpl
@@ -128,7 +129,6 @@ module variables
 !.....Design-matrix for force-matching
     real(8),allocatable:: dgsfa(:,:,:)
   end type mdsys
-  integer:: memgsf = 0
   real(8):: erefmin
   real(8):: gsfmean,gsfvar
   real(8),allocatable:: gsfms(:),gsfvs(:),sgms(:),sgmis(:)
@@ -175,10 +175,33 @@ module variables
   integer,allocatable:: nn_nhl(:)
 !!$  integer:: nn_nhl(0:nn_nlmax+1)
   integer:: nn_sigtype = 2
+
+  integer:: mem = 0
+
+!.....For descriptors except Chebyshev
+!!$  type desc
+!!$    integer:: itype
+!!$    real(8):: rcut,rcut2
+!!$    character(len=3):: cspi,cspj,cspk
+!!$    integer:: isp,jsp
+!!$    integer:: ksp = -1
+!!$    integer:: nprm
+!!$    real(8),allocatable:: prms(:)
+!!$  end type desc
+  type(desc),allocatable:: descs(:)
+  integer:: nsp_desc,nsf_desc,nsf2_desc,nsf3_desc,nsff_desc
+!.....List of isf's for each pair (ilsf2) and angle (ilsf3)
+  integer,allocatable:: ilsf2(:,:,:),ilsf3(:,:,:,:)
+  logical:: lcheby = .false.
+  real(8),allocatable:: wgtsp_desc(:)
+!.....Function types and num of constatns for types
+  integer,parameter:: max_ncnst = 2
+  integer:: ncnst_type(200)
+  integer:: ncomb_type(200)
+  real(8):: cnst(max_ncnst)
+  
 contains
   subroutine init_variables()
-
-    integer:: i
 
     interact(:,:) = .true.
     cspcs_neglect(:) = 'x'
