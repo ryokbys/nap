@@ -6,8 +6,9 @@ Deep neural-network (DNN) potential
 .. note::
 
    The NN potentials (NN and NN2) were replaced with this ``DNN`` potential in January 2020.
+   It is strongly recommended to use ``DNN`` potential instead of ``NN2``, because ``DNN`` is a super-set of ``NN2`` and ``NN2`` is no longer maintenanced in the future.
 
-DNN potential requires following two input files in the working directory.
+DNN potential requires the following two input files in the working directory.
 
 - ``in.params.desc``: types of symmetry functions, parameters of the symmetry functions, their cutoff radii, and interacting pairs.
 - ``in.params.DNN``: NN structures, number of layers, number of nodes for each layer, and weight values of the network.
@@ -27,15 +28,15 @@ The format of ``in.params.desc`` is like the following,
 ::
 
    2    20
-   1  W   W   10.000    2.000
-   1  W   W   10.000    3.000
-   1  W   W   10.000    4.000
-   1  W   H   10.000    2.000
-   1  W   H   10.000    3.000
-   1  W   H   10.000    4.000
-   2  W   W   -0.900
-   2  W   W   -0.800
-   2  W   W   -0.700
+   1    W   W   10.000    2.000
+   1    W   W   10.000    3.000
+   1    W   W   10.000    4.000
+   1    W   H   10.000    2.000
+   1    W   H   10.000    3.000
+   1    W   H   10.000    4.000
+   2    W   W   -0.900
+   2    W   W   -0.800
+   2    W   W   -0.700
    ...
 
 - 1st line has two entries, *number of speceis* and *number of descriptors*.

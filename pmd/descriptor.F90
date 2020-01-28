@@ -260,6 +260,7 @@ contains
     dgsfi(:,:,:)= 0d0
     igsfi(:,:) = 0
 
+!!$    if( iprint.gt.1 .and. ia.eq.1 ) print *,'ia,lupdate_gsf,lfitpot=',ia,lupdate_gsf,lfitpot
     if( lupdate_gsf ) then
       if( lcheby ) then
         call desci_cheby(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
@@ -279,6 +280,7 @@ contains
       endif
     else ! Not to update gsf by desci_xxx just use gsfs given by fitpot
       if( lfitpot ) then
+!!$        if( iprint.gt.1 .and. ia.eq.1 ) print *,'ia,nnl,nal=',ia,nnl,nal
         gsfi(:) = gsf(:,ia)
         dgsfi(:,:,0:nnl) = dgsf(:,:,0:nnl,ia)
         igsfi(:,0:nnl) = igsf(:,0:nnl,ia)

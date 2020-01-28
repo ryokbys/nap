@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-28 15:13:51 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-28 20:39:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -251,25 +251,41 @@ contains
 
     integer:: iv,ia,jj,il,ml1,ml0,ml2,ml,nni,n,mn0,mn1,l,memg,jja,ja
     real(8):: tmp
-    real(8),allocatable,save:: fls(:,:,:,:),wfgw(:,:,:,:),wsgm1(:,:),gw(:)
+    real(8),allocatable,save:: fls(:,:,:,:),wfgw(:,:,:,:),wsgm1(:,:),gw(:)&
+         ,gmm(:,:,:,:)
+    integer,allocatable,save:: ivstart(:)
 
     if( .not. allocated(fls) ) then
       allocate(fls(3,0:nnmax,0:maxnnode,0:nlayer), gw(0:maxnnode), &
-           wfgw(3,0:nnmax,maxnnode,nlayer), wsgm1(maxnnode,maxnnode))
-      mem = mem +8*size(fls) +8*size(gw) +8*size(wfgw) +8*size(wsgm1)
+           wfgw(3,0:nnmax,maxnnode,nlayer), wsgm1(maxnnode,maxnnode), &
+           gmm(nwtot,maxnnode,nlayer,nlayer),ivstart(0:nlayer+1))
+      mem = mem +8*size(fls) +8*size(gw) +8*size(wfgw) +8*size(wsgm1) &
+           +8*size(gmm) +4*size(ivstart)
 
       if( iprint.ne.0 ) then
-        memg = 8*size(fls) +8*size(gw) +8*size(wfgw) +8*size(wsgm1)
+        memg = 8*size(fls) +8*size(gw) +8*size(wfgw) +8*size(wsgm1) &
+             +8*size(gmm) +4*size(ivstart)
         print '(a,f10.3,a)',' Memory in gradw_DNN = ',dble(memg)/1000/1000,' MB'
       endif
+!!$      print *,'nlayer,natm,nal,nnl,nnmax=',nlayer,natm,nal,nnl,nnmax
+!!$      print *,'shape(nhl)=',shape(nhl)
+!!$      print *,'nhl(:)=',nhl(:)
+
+!.....ivstart(:) values are constant
+      ivstart(:) = 0
+      do n=1,nlayer
+        ivstart(n+1) = nhl(n)*(nhl(n-1)+1)
+      enddo
     endif
 
     do ia=1,natm
       call calc_desci(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
+!!$      print *,'ia=',ia
       call comp_nodes_of(ia)
       if( lematch ) then
         iv = 0
         do il=1,nlayer
+!!$          print *,'  il,nhl(il),nhl(il-1)=',il,nhl(il),nhl(il-1)
           do ml1=1,nhl(il)
             do ml0=0,nhl(il-1)
               iv = iv + 1
@@ -291,6 +307,7 @@ contains
           enddo
         enddo
         do il=1,nlayer
+!!$          print *,'fls: il=',il
           do ml1=1,nhl(il)
             do ml0=1,nhl(il-1)
               fls(1:3,0:nni,ml1,il) = fls(1:3,0:nni,ml1,il) &
@@ -301,12 +318,14 @@ contains
         enddo ! il=...
         wfgw(:,:,:,:) = 0d0
         do il=1,nlayer
+!!$          print *,'gw: il=',il
           do ml1=0,nhl(il)
             gw(ml1) = 0d0
             do ml2=1,nhl(il+1)
               gw(ml1)= gw(ml1) +gls(ml2,il+1)*wgts(ml1,ml2,il+1)
             enddo
           enddo
+!!$          print *,'wfgw: il=',il
           do ml1=1,nhl(il)
             wfgw(1:3,0:nni,ml1,il) = 0d0
             do ml0=0,nhl(il-1)
@@ -327,6 +346,7 @@ contains
           else
             ja = itotOf(tag(jja))
           endif
+!!$          print *,'gwf: jj,ja=',jj,ja
           iv = 0
           do il=1,nlayer
             do ml1=1,nhl(il)
@@ -342,36 +362,70 @@ contains
             enddo
           enddo
         enddo
-!.....Indirect derivative of force term w.r.t. W_l
-        iv = 0
+!.....Before computing indirect derivative, make a matrix gmm() to be used
         do n=1,nlayer
-          do mn1=1,nhl(n)
-            do mn0=0,nhl(n-1)
-              iv = iv +1
-              do jj=0,nni
-                jja = lspr(jj,ia)
-                if( jj.eq.0 ) then
-                  ja = ia
-                else
-                  ja = itotOf(tag(jja))
-                endif
-                do l=n,nlayer ! This should be inside the loop over n
-                  wsgm1 = wxs(l,n)
-                  do ml=1,nhl(l)
-                    tmp = wsgm1(mn1,ml)*sgm2(ml,l)*hls(mn0,n-1)
+          do l=n,nlayer
+            wsgm1 = wxs(l,n)
+            do ml=1,nhl(l)
+              iv = ivstart(n)
+              do mn1=1,nhl(n)
+                do mn0=0,nhl(n-1)
+                  iv = iv +1
+                  gmm(iv,ml,l,n) = sgm2(ml,l)*wsgm1(mn1,ml)*hls(mn0,n-1)
+                enddo
+              enddo
+            enddo
+          enddo
+        enddo
+!.....Indirect derivative of force term w.r.t. W_l
+        do jj=0,nni
+          jja = lspr(jj,ia)
+          if( jj.eq.0 ) then
+            ja = ia
+          else
+            ja = itotOf(tag(jja))
+          endif
+          do n=1,nlayer
+            do l=n,nlayer ! This should be inside the loop over n
+              do ml=1,nhl(l)
+                tmp = gmm(iv,ml,l,n)
+                iv = ivstart(n)
+                do mn1=1,nhl(n)
+                  do mn0=0,nhl(n-1)
+                    iv = iv +1
                     gwf(iv,1:3,ja) = gwf(iv,1:3,ja) &
                          +tmp*wfgw(1:3,jj,ml,l)
                   enddo
                 enddo
-!                if( ia.eq.1 .and. n.eq.nlayer .and. mn0.eq.0 ) then
-!                  print '(a,6i5)','ia,n,mn1,mn0,iv,l=',ia,n,mn1,mn0,iv,l
-!                  print '(a,i5,6es11.3)','nhl(l),tmp,wsgm1(1,1),sgm2(1,2)=' &
-!                       ,nhl(l),tmp,wsgm1(1,1),sgm2(1,2),gwf(iv,1:3,ia)
-!                endif
               enddo ! l=...
             enddo ! ml0=...
           enddo ! ml1=...
         enddo ! n=...
+!!$!.....Indirect derivative of force term w.r.t. W_l (inefficient code)
+!!$        iv = 0
+!!$        do n=1,nlayer
+!!$          do mn1=1,nhl(n)
+!!$            do mn0=0,nhl(n-1)
+!!$              iv = iv +1
+!!$              do jj=0,nni
+!!$                jja = lspr(jj,ia)
+!!$                if( jj.eq.0 ) then
+!!$                  ja = ia
+!!$                else
+!!$                  ja = itotOf(tag(jja))
+!!$                endif
+!!$                do l=n,nlayer ! This should be inside the loop over n
+!!$                  wsgm1 = wxs(l,n)
+!!$                  do ml=1,nhl(l)
+!!$                    tmp = wsgm1(mn1,ml)*sgm2(ml,l)*hls(mn0,n-1)
+!!$                    gwf(iv,1:3,ja) = gwf(iv,1:3,ja) &
+!!$                         +tmp*wfgw(1:3,jj,ml,l)
+!!$                  enddo
+!!$                enddo
+!!$              enddo ! l=...
+!!$            enddo ! ml0=...
+!!$          enddo ! ml1=...
+!!$        enddo ! n=...
       endif ! lfmatch
     enddo  ! ia=...
 

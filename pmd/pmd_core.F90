@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-01-25 00:22:50 Ryo KOBAYASHI>
+!                     Last-modified: <2020-01-28 16:50:17 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1294,20 +1294,11 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     enddo
   endif
 
-  if( iprint.ge.20 .and. myid_md.eq.0 .and. lvc ) then
-    print *,'Atomic charges:'
-    do i=1,ntot0
-      print '(a,i5,es11.3,4f7.3)','   ia,epi,chg,frc=',i &
-           ,epitot(i),chgtot(i),atot(1:3,i)
-    enddo
-  endif
-
 !.....deallocate all the arrays allocated 
   deallocate(fekin,fa2v)
 !      deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
 !     &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
 
-  if( iprint.ge.10 ) print *,'one_shot done'
   return
 end subroutine one_shot
 !=======================================================================
