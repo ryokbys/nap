@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-27 23:14:06 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-28 11:02:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1179,7 +1179,7 @@ subroutine test(ftrn0,ftst0)
 !!$    call NN_grad(nvars,vars,g)
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
        .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
-       .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'DNN' ) then
+       .or. index(cpot,'NN').ne.0 ) then
 !!$    call func_w_pmd(nvars,vars,ftrn,ftst)
     call grad_w_pmd(nvars,vars,g)
   else

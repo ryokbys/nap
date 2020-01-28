@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-28 09:52:11 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-28 15:15:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -186,7 +186,6 @@ contains
       call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
     endif
 
-    if( iprint.gt.1 .and. myid.eq.0 ) print *,'eval loss function...'
     ftrnl = 0d0
     ftstl = 0d0
     do ismpl=isid0,isid1
@@ -195,7 +194,6 @@ contains
       endif
       smpl = samples(ismpl)
       cdirname= smpl%cdirname
-      if( iprint.gt.1 .and. myid.eq.0 ) print *,'  '//trim(cdirname)//'...'
       natm = smpl%natm
       epot = smpl%epot
       ftmp = 0d0
@@ -220,7 +218,7 @@ contains
           ediff= ediff*ediff
         endif
         ftmp= ftmp +ediff *swgt
-        if( iprint.gt.2 ) then
+        if( iprint.gt.1 ) then
           write(6,'(a,2i4,1x,a,7es11.3)') ' myid,ismpl,cdirname,epot,eref,esub,(epot+esub)/natm= ', &
                myid,ismpl,trim(cdirname),epot,eref,esub,(epot+esub)/natm
         endif
@@ -381,7 +379,7 @@ contains
       smpl = samples(ismpl)
       natm= smpl%natm
       cdirname = smpl%cdirname
-      if( iprint.gt.20 ) print *,'myid,ismpl,cdirname=',myid,ismpl,trim(cdirname)
+      if( iprint.gt.10 ) print *,'grad_w_pmd: myid,ismpl,cdirname=',myid,ismpl,trim(cdirname)
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
@@ -389,6 +387,7 @@ contains
       
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.
+      if( iprint.gt.10 ) print *,'grad_w_pmd: run_pmd for cdirname: ',trim(cdirname)
       call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut &
            ,lfdsgnmat,gwe,gwf,gws)
       samples(ismpl)%gwe(1:ndim)= gwe(1:ndim)
@@ -1075,6 +1074,7 @@ contains
       do ia=1,natm
         do isf=1,nsf
           tmp = samples(ismpl)%gsf(isf,ia)
+!!$          print *,'myid,ia,isf,tmp=',myid,ia,isf,tmp
           gsfml(isf) = gsfml(isf) +tmp
           gsfsl(isf) = gsfsl(isf) +tmp*tmp
           gmeanl= gmeanl +tmp
@@ -1324,7 +1324,6 @@ contains
 !.....standardize G values
       do ismpl=isid0,isid1
         natm= samples(ismpl)%natm
-        if( iprint.gt.1 ) print *,'ismpl,cdirname=',ismpl,trim(samples(ismpl)%cdirname)
         if( .not. allocated(samples(ismpl)%gsf) ) then
           print *,'ERROR: gsf not allocated, myid,ismpl,cdirname='&
                ,myid,ismpl,trim(samples(ismpl)%cdirname)

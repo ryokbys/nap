@@ -161,7 +161,7 @@ contains
 
 !.....gsfi,dgsfi,igsfi are independend on number of atoms but on nnlmax
       if( allocated(gsfi) ) deallocate(gsfi,dgsfi,igsfi)
-      allocate(gsfi(nsf),dgsfi(3,nsf,0:nnlmax),igsfi(nsf,0:nnlmax))
+      allocate(gsfi(nsf),dgsfi(3,nsf,0:nnmax),igsfi(nsf,0:nnmax))
       mem = mem +8*size(gsfi) +8*size(dgsfi) +2*size(igsfi)
     endif
 
@@ -274,14 +274,14 @@ contains
           stop
         endif
         gsf(:,ia) = gsfi(:)
-        dgsf(:,:,:,ia) = dgsfi(:,:,:)
-        igsf(:,:,ia) = igsfi(:,:)
+        dgsf(:,:,0:nnl,ia) = dgsfi(:,:,0:nnl)
+        igsf(:,0:nnl,ia) = igsfi(:,0:nnl)
       endif
     else ! Not to update gsf by desci_xxx just use gsfs given by fitpot
       if( lfitpot ) then
         gsfi(:) = gsf(:,ia)
-        dgsfi(:,:,:) = dgsf(:,:,:,ia)
-        igsfi(:,:) = igsf(:,:,ia)
+        dgsfi(:,:,0:nnl) = dgsf(:,:,0:nnl,ia)
+        igsfi(:,0:nnl) = igsf(:,0:nnl,ia)
       endif
     endif
 
@@ -1676,7 +1676,7 @@ contains
     endif
 
     gsfo(:,1:nalo) = gsf(:,1:nalo)
-    if( present(dgsfo) ) dgsfo(:,:,0:nnlo,1:nalo) = dgsf(:,:,0:nnlo,1:nal)
+    if( present(dgsfo) ) dgsfo(:,:,0:nnlo,1:nalo) = dgsf(:,:,0:nnlo,1:nalo)
     if( present(igsfo) ) igsfo(:,0:nnlo,1:nalo) = igsf(:,0:nnlo,1:nalo)
     return
   end subroutine get_descs

@@ -334,13 +334,8 @@ subroutine read_params_desc()
 
 !.....Allocate arrays of lenths, nsp and/or nsf
   if( .not.allocated(descs) ) then
-!!$      allocate(itype(nsf),cnst(max_ncnst,nsf),rcs(nsf),rcs2(nsf))
     allocate(descs(nsf_desc),ilsf2(0:nsf_desc,nspmax,nspmax) &
          ,ilsf3(0:nsf_desc,nspmax,nspmax,nspmax))
-!!$!.....Also allocate group-LASSO/FS related variables,
-!!$!     which are not used in pmd but in fitpot
-!!$    allocate(mskgfs(ngl),msktmp(ngl),glval(0:ngl))
-!!$    mskgfs(1:ngl) = 0d0
   endif
   if( lcheby ) then
     allocate(wgtsp_desc(nspmax))
@@ -466,8 +461,12 @@ subroutine read_params_desc()
   call bcast_descs()
   call mpi_bcast(nsf2_desc,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(nsf3_desc,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nsff_desc,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(ilsf2,size(ilsf2),mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(ilsf3,size(ilsf3),mpi_integer,0,mpi_world,ierr)
+  if( lcheby ) then
+    call mpi_bcast(wgtsp_desc,nspmax,mpi_real8,0,mpi_world,ierr)
+  endif
 
   return
 end subroutine read_params_desc

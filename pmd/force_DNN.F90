@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-28 10:07:26 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-28 15:13:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -81,21 +81,27 @@ contains
 
     if( l1st ) then
 
-      if( allocated(hls) ) deallocate(hls,gls,zls,sgm1,sgm2,gw)
+      if( allocated(hls) ) then
+        mem = mem -8*size(hls) -8*size(gls) -8*size(zls) -8*size(sgm1) &
+             -8*size(sgm2) -8*size(gw)
+        deallocate(hls,gls,zls,sgm1,sgm2,gw)
+      endif
       allocate( hls(0:maxnnode,0:nlayer), gls(maxnnode,nlayer+1), &
            zls(maxnnode,nlayer), sgm1(0:maxnnode,nlayer), &
-           sgm2(0:maxnnode,nlayer), gw(0:maxnnode))
+           sgm2(0:maxnnode,nlayer),gw(0:maxnnode))
+      mem = mem +8*size(hls) +8*size(gls) +8*size(zls) +8*size(sgm1) &
+           +8*size(sgm2) +8*size(gw)
 
-      if( allocated(strsl) ) deallocate(strsl,aal)
+      if( allocated(strsl) ) then
+        mem = mem -8*size(strsl) -8*size(aal)
+        deallocate(strsl,aal)
+      endif
       allocate(strsl(3,3,namax),aal(3,namax))
+      mem = mem +8*size(strsl) +8*size(aal)
 
 !.....Set activation function type here
       iactf(1:nlayer-1) = itypesig
       iactf(nlayer) = 0
-      
-!.....Compute memory used
-      mem = mem +8*size(hls) +8*size(gls) +8*size(zls) +8*size(sgm1) &
-           +8*size(sgm2) +8*size(gw) +8*size(strsl) +8*size(aal)
 
       rcmax2 = rcin*rcin
 
@@ -123,22 +129,28 @@ contains
         print '(a,i0)','   Total num of weights = ',nwtot
         print '(a,f10.3,a)','   Memory in force_DNN = ', &
              dble(mem)/1000/1000, ' MB'
-      endif
+      endif ! myid.eq.0
 
       call prepare_desci(myid,iprint,rcin)
 
     endif ! l1st
 
     if( allocated(hls) .and. size(hls).eq.(maxnnode+1)*(nlayer+1) ) then
+      mem = mem -8*size(hls) -8*size(gls) -8*size(zls) -8*size(sgm1) &
+           -8*size(sgm2) -8*size(gw)
       deallocate(hls,gls,zls,sgm1,sgm2,gw)
       allocate( hls(0:maxnnode,0:nlayer), gls(maxnnode,nlayer+1), &
            zls(maxnnode,nlayer), sgm1(0:maxnnode,nlayer), &
            sgm2(0:maxnnode,nlayer), gw(0:maxnnode))
+      mem = mem +8*size(hls) +8*size(gls) +8*size(zls) +8*size(sgm1) &
+           +8*size(sgm2) +8*size(gw)
     endif
 
     if( size(strsl).ne.3*3*namax ) then
+      mem = mem -8*size(strsl) -8*size(aal)
       deallocate(strsl,aal)
       allocate(strsl(3,3,namax),aal(3,namax))
+      mem = mem +8*size(strsl) +8*size(aal)
     endif
 
     time0 = mpi_wtime()
@@ -244,10 +256,11 @@ contains
     if( .not. allocated(fls) ) then
       allocate(fls(3,0:nnmax,0:maxnnode,0:nlayer), gw(0:maxnnode), &
            wfgw(3,0:nnmax,maxnnode,nlayer), wsgm1(maxnnode,maxnnode))
+      mem = mem +8*size(fls) +8*size(gw) +8*size(wfgw) +8*size(wsgm1)
 
       if( iprint.ne.0 ) then
         memg = 8*size(fls) +8*size(gw) +8*size(wfgw) +8*size(wsgm1)
-        print '(a,f10.3,a)',' Memnory in gradw_DNN = ',dble(memg)/1000/1000,' MB'
+        print '(a,f10.3,a)',' Memory in gradw_DNN = ',dble(memg)/1000/1000,' MB'
       endif
     endif
 
@@ -342,9 +355,8 @@ contains
                 else
                   ja = itotOf(tag(jja))
                 endif
-                do l=n,nlayer
+                do l=n,nlayer ! This should be inside the loop over n
                   wsgm1 = wxs(l,n)
-                  tmp = 0d0
                   do ml=1,nhl(l)
                     tmp = wsgm1(mn1,ml)*sgm2(ml,l)*hls(mn0,n-1)
                     gwf(iv,1:3,ja) = gwf(iv,1:3,ja) &
@@ -647,6 +659,8 @@ contains
 
 !.....NOTE: W_{i,j,il} == wgts(j,i,il), row and column positions are swapped
 !.....      and only the column(j) has bias(0-th) components.
+    if( allocated(wgts) ) stop "ERROR: wgts is already allocated, "&
+         //"which should not happen"
     allocate(wgts(0:maxnnode,maxnnode,nlayer+1))
     if( myid.eq.0 ) then
       wgts(:,:,:) = 0d0
