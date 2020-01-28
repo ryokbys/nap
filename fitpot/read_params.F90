@@ -176,7 +176,15 @@ subroutine read_vars_NN()
   call mpi_bcast(nn_nl,1,mpi_integer,0,mpi_world,ierr)
   if( .not. allocated(nn_nhl) ) allocate(nn_nhl(0:nn_nl+1))
   call mpi_bcast(nn_nhl,nn_nl+2,mpi_integer,0,mpi_world,ierr)
+  if( nn_nhl(0).ne.nsf_desc ) then
+    if( myid.eq.0 ) then
+      print *,'ERROR: num of inputs/descriptors are inconsistent '//&
+           'between in.params.desc and '//trim(cparfile)
+    endif
+    stop 1
+  endif
   call mpi_bcast(nn_sigtype,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nn_asig,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nvars,1,mpi_integer,0,mpi_world,ierr)
   allocate(vars(nvars),vranges(2,nvars))
   if( myid.eq.0 ) then
@@ -241,7 +249,8 @@ subroutine parse_option_NN(cline)
 !  bias:  .true.
 !
 !  Currently available options are:
-!    - "sigtype:" sigmoid type: 1 or 2.
+!    - "sigtype:" sigmoid type: 1, 2 or 3.
+!    - "asig:" coefficient in activation function: [default: 0.01]
 !
   use variables
   use parallel
@@ -250,11 +259,15 @@ subroutine parse_option_NN(cline)
 
   character(len=10):: c1,copt
   integer:: iopt
+  real(8):: ropt
 
   ierr = 0
   if( index(cline,'sigtype:').ne.0 ) then
     read(cline,*) c1,copt,iopt
     nn_sigtype = iopt
+  else if( index(cline,'asig:').ne.0 ) then
+    read(cline,*) c1,copt,ropt
+    nn_asig = ropt
   endif
 
 end subroutine parse_option_NN
@@ -315,12 +328,9 @@ subroutine read_params_desc()
   endif
 
 !.....Bcast nsp and nsf before allocating arrays
-!!$    if( mpi_world.eq.0 ) then  ! Avoid MPI call when called in fitpot.
   call mpi_bcast(nsp_desc,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(nsf_desc,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(lcheby,1,mpi_logical,0,mpi_world,ierr)
-!!$    endif
-!!$  ngl = nsf
 
 !.....Allocate arrays of lenths, nsp and/or nsf
   if( .not.allocated(descs) ) then

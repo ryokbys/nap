@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-27 08:33:24 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-28 09:52:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -186,7 +186,7 @@ contains
       call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
     endif
 
-    if( iprint.gt.1 ) print *,'eval loss function...'
+    if( iprint.gt.1 .and. myid.eq.0 ) print *,'eval loss function...'
     ftrnl = 0d0
     ftstl = 0d0
     do ismpl=isid0,isid1
@@ -195,7 +195,7 @@ contains
       endif
       smpl = samples(ismpl)
       cdirname= smpl%cdirname
-      if( iprint.gt.1 ) print *,'  '//trim(cdirname)//'...'
+      if( iprint.gt.1 .and. myid.eq.0 ) print *,'  '//trim(cdirname)//'...'
       natm = smpl%natm
       epot = smpl%epot
       ftmp = 0d0
@@ -534,7 +534,7 @@ contains
 !  Preprocesses before running pmd
 !
     use variables,only: cmaindir,cpot,nsubff,csubffs,mdsys,samples, &
-         maxisp,nn_nl,nn_nhl,nn_sigtype,rc3, &
+         maxisp,nn_nl,nn_nhl,nn_sigtype,nn_asig,rc3, &
          interact,interact3,num_interact,iprint, &
          descs,nsf_desc,nsf2_desc,nsf3_desc,nsff_desc,ilsf2,ilsf3, &
          lcheby,cnst,wgtsp_desc,nspmax
@@ -548,7 +548,7 @@ contains
     use EAM,only: set_paramsdir_EAM,set_params_EAM
     use NN2,only: set_paramsdir_NN2,set_params_NN2,get_NN2_hl1 &
          ,set_NN2_hl1,set_sigtype_NN2
-    use DNN,only: set_paramsdir_DNN,set_params_DNN,set_sigtype_DNN
+    use DNN,only: set_paramsdir_DNN,set_params_DNN,set_actfunc_DNN
     use linreg,only: set_paramsdir_linreg,set_params_linreg
     use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
          ,lupdate_gsf,set_params_desc, lfitpot_desc => lfitpot
@@ -618,7 +618,7 @@ contains
 !.....Set lfitpot in descriptor module to let it know that it is called from fitpot
       lfitpot_desc = .true.
       call set_params_DNN(ndim,x,nn_nl,nn_nhl)
-      call set_sigtype_DNN(nn_sigtype)
+      call set_actfunc_DNN(nn_sigtype,nn_asig)
     else if( index(cpot,'BVS').ne.0 ) then
       call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)//'/pmd')
       call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)//'/pmd')

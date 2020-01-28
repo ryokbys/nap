@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-26 22:51:03 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-27 23:14:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -57,11 +57,11 @@ program fitpot
   endif
   call sync_input()
 
+  if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) call read_params_desc()
+
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
   mem = mem +8*size(gvar) +8*size(dvar)
-
-  if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) call read_params_desc()
 
   if( nnode.gt.nsmpl ) then
     if( myid.eq.0 ) then
@@ -1118,21 +1118,12 @@ subroutine check_grad(ftrn0,ftst0)
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
 
-!!$  if( trim(cpot).eq.'NN' ) then
-!!$    call NN_init()
-!!$    call NN_func(nvars,vars,ftrn0,ftst0)
-!!$    call NN_grad(nvars,vars,ganal)
-!!$  else
-!!$    call func_w_pmd(nvars,vars,ftrn0,ftst)
-    call grad_w_pmd(nvars,vars,ganal)
-!!$  endif
+  call grad_w_pmd(nvars,vars,ganal)
 
   vars0(1:nvars)= vars(1:nvars)
   vmax= 0d0
   do iv=1,nvars
     vmax= max(vmax,abs(vars0(iv)))
-!!$    if( myid.eq.0) write(6,'(a,i6,2es12.4)') ' iv,vars,ganal=',iv,vars0(iv)&
-!!$         ,ganal(iv)
   enddo
   dv= vmax *dev
   if( myid.eq.0 ) then

@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-26 13:41:34 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-28 10:07:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -109,6 +109,9 @@ contains
         else if( itypesig.eq.2 ) then
           print '(a,f7.4)','   Activation function: 2) 1/(1+exp(-x))+asig*x' &
                //', w/ asig=',asig
+        else if( itypesig.eq.2 ) then
+          print '(a,f7.4)','   Activation function: 3) 1/(1+exp(-x))+0.5*asig*x**2' &
+               //', w/ asig=',asig
         else
           print *,'   Activation function: unknown'
         endif
@@ -159,6 +162,12 @@ contains
           gw(ml0)= gw(ml0) +gls(ml1,1)*wgts(ml0,ml1,1)
         enddo
       enddo
+!!$      if( ia.eq.1 ) then
+!!$        print '(a,i5,20es15.7)','ia,gls=',ia,gls(1:nhl(1),1)
+!!$        print '(a,20es13.5)','wgts(:,1,1)=',wgts(0:nhl(0),1,1)
+!!$        print '(a,20es13.5)','wgts(:,2,1)=',wgts(0:nhl(0),2,1)
+!!$        print '(a,20es13.5)','gw(0:nhl(0))=',gw(0:nhl(0))
+!!$      endif
 !.....Derivative of SF of atom-i w.r.t. atom-j 
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
@@ -183,7 +192,7 @@ contains
         enddo ! ml0=
       enddo
 !.....Derivative of SF of atom-i w.r.t. atom-i
-      do ml0=1,nhl(0)
+      do ml0=1,nhl(0)  ! no bias contribution to force
         aal(1:3,ia) = aal(1:3,ia) -gw(ml0)*dgsfi(1:3,ml0,0)
       enddo
     enddo
@@ -228,7 +237,7 @@ contains
     real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
     logical,intent(in):: lematch,lfmatch,lsmatch
 
-    integer:: iv,ia,jj,il,ml1,ml0,ml2,ml,nni,n,mn0,mn1,l,memg
+    integer:: iv,ia,jj,il,ml1,ml0,ml2,ml,nni,n,mn0,mn1,l,memg,jja,ja
     real(8):: tmp
     real(8),allocatable,save:: fls(:,:,:,:),wfgw(:,:,:,:),wsgm1(:,:),gw(:)
 
@@ -265,7 +274,7 @@ contains
         fls(:,:,:,:) = 0d0
         do jj=0,nni
           do ml0=1,nhl(0)
-            fls(1:3,jj,ml0,0) = dgsfi(1:3,ml0,jj)
+            fls(1:3,jj,ml0,0) = -dgsfi(1:3,ml0,jj)
           enddo
         enddo
         do il=1,nlayer
@@ -298,14 +307,24 @@ contains
       
       if( lfmatch ) then
 !.....Direct derivative of force term w.r.t. W_l
-        iv = 0
-        do il=1,nlayer
-          do ml1=1,nhl(il)
-            do ml0=0,nhl(il-1)
-              iv = iv + 1
-              do jj=0,nni
-                gwf(iv,1:3,ia) = gwf(iv,1:3,ia) &
+        do jj=0,nni
+          jja = lspr(jj,ia)
+          if( jj.eq.0 ) then
+            ja = ia
+          else
+            ja = itotOf(tag(jja))
+          endif
+          iv = 0
+          do il=1,nlayer
+            do ml1=1,nhl(il)
+              do ml0=0,nhl(il-1)
+                iv = iv + 1
+                gwf(iv,1:3,ja) = gwf(iv,1:3,ja) &
                      +gls(ml1,il)*fls(1:3,jj,ml0,il-1)
+!                if( ia.eq.1 .and. (ml0.eq.0 .or. ml0.eq.1) .and. il.eq.1 ) then
+!                  print '(a,5i5,7es11.2)','iv,il,ml1,ml0,ja,gls,fls(1:3),gwf=', &
+!                       iv,il,ml1,ml0,ja,gls(ml1,il),fls(1:3,jj,ml0,il-1),gwf(iv,1:3,ja)
+!                endif
               enddo
             enddo
           enddo
@@ -316,13 +335,19 @@ contains
           do mn1=1,nhl(n)
             do mn0=0,nhl(n-1)
               iv = iv +1
-              do l=n,nlayer
-                wsgm1 = wxs(l,n)
-                tmp = 0d0
-                do ml=1,nhl(l)
-                  tmp = wsgm1(mn1,ml)*sgm2(ml,l)*hls(mn0,n)
-                  do jj=0,nni
-                    gwf(iv,1:3,ia) = gwf(iv,1:3,ia) &
+              do jj=0,nni
+                jja = lspr(jj,ia)
+                if( jj.eq.0 ) then
+                  ja = ia
+                else
+                  ja = itotOf(tag(jja))
+                endif
+                do l=n,nlayer
+                  wsgm1 = wxs(l,n)
+                  tmp = 0d0
+                  do ml=1,nhl(l)
+                    tmp = wsgm1(mn1,ml)*sgm2(ml,l)*hls(mn0,n-1)
+                    gwf(iv,1:3,ja) = gwf(iv,1:3,ja) &
                          +tmp*wfgw(1:3,jj,ml,l)
                   enddo
                 enddo
@@ -374,6 +399,9 @@ contains
         sgmz = actf(itype,z)
         hls(ml1,il) = sgmz
         sgm1(ml1,il) = dactf(itype,z,sgmz)
+!!$        if( ia.eq.1 .and. il.eq.1 ) then
+!!$          print *,'itype,il,ml1,z,sgmz,sgm1=',itype,il,ml1,z,sgmz,sgm1(ml1,il)
+!!$        endif
         sgm2(ml1,il) = ddactf(itype,z,sgmz)
       enddo ! ml1=...
     enddo ! il=...
@@ -388,6 +416,9 @@ contains
           z = z + gls(ml2,il+1)*wgts(ml1,ml2,il+1)
         enddo
         gls(ml1,il) = z*sgm1(ml1,il)
+!!$        if( ia.eq.1 ) print *,'il,nhl(il),sgm1,gls(il+1),gls(il),wgts='&
+!!$             ,il,nhl(il),sgm1(ml1,il),gls(1:nhl(il+1),il+1),gls(1:nhl(il),il)&
+!!$             ,wgts(1:nhl(il),1:nhl(il+1),il+1)
       enddo ! ml0=...
     enddo ! il=...
 
@@ -428,15 +459,17 @@ contains
     return
   end function wxs
 !=======================================================================
-  subroutine set_sigtype_DNN(itype)
+  subroutine set_actfunc_DNN(itype,a)
 !
-!  Set sigmoid function type
+!  Set sigmoid function type and asig value from outside.
 !
     integer,intent(in):: itype
+    real(8),intent(in):: a
 
     itypesig = itype
+    asig = a
     return
-  end subroutine set_sigtype_DNN
+  end subroutine set_actfunc_DNN
 !=======================================================================
   function actf(itype,x)
 !
@@ -453,6 +486,8 @@ contains
       actf = 1d0/(1d0 +exp(-x))
     case(2)
       actf = 1d0/(1d0 +exp(-x)) +asig*x
+    case(3)
+      actf = 1d0/(1d0 +exp(-x)) +asig*x*x*0.5d0
     case default
       actf = 0d0
     end select
@@ -473,6 +508,9 @@ contains
     case(2)
       sxt = 1d0/(1d0 +exp(-x))
       dactf = sxt *(1d0-sxt) +asig
+    case(3)
+      sxt = 1d0/(1d0 +exp(-x))
+      dactf = sxt *(1d0-sxt) +asig*x
     case default
       dactf = 0d0
     end select
@@ -493,6 +531,9 @@ contains
     case(2)
       sxt = 1d0 /(1d0 +exp(-x))
       ddactf = sxt *(1d0 -sxt) *(1d0 -2d0*sxt)
+    case(3)
+      sxt = 1d0 /(1d0 +exp(-x))
+      ddactf = sxt *(1d0 -sxt) *(1d0 -2d0*sxt) +asig
     case default
       ddactf = 0d0
     end select
@@ -572,6 +613,7 @@ contains
 
     call mpi_bcast(lbias,1,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(itypesig,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(asig,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(nlayer,1,mpi_integer,0,mpi_world,ierr)
     if( .not. allocated(nhl)) allocate(nhl(0:nlayer+1),iactf(nlayer)&
          ,nwgt(nlayer))
@@ -612,8 +654,8 @@ contains
       istart = 0
       if( .not. lbias ) istart = 1
       do il=1,nlayer
-        do ml0=istart,nhl(il-1)
-          do ml1=1,nhl(il)
+        do ml1=1,nhl(il)
+          do ml0=istart,nhl(il-1)
             read(50,*) wgts(ml0,ml1,il)
           enddo
         enddo
@@ -639,10 +681,8 @@ contains
     integer:: i
 
     nlayer = nl_in +1
-    if( nl_in.eq.0 ) then
-      print *,'ERROR: NL_IN==0 which should not happen.'
-      print *,'  Probably NN_num_layers and NN_num_nodes are not set in in.fitpot.'
-      print *,'  Those should be consistent with the number of NN weigts to be optimized.'
+    if( nl_in.lt.1 ) then
+      print *,'ERROR: NL_IN<1, which should not happen.'
       stop
     endif
     if( .not. allocated(nhl) ) allocate(nhl(0:nlayer+1),iactf(nlayer)&
@@ -670,6 +710,7 @@ contains
     nprms = nprms_in
     if( .not.allocated(prms) ) allocate(prms(nprms))
     prms(1:nprms) = prms_in(1:nprms_in)
+!!$    print *,'prms(12)=',prms(12)
 
     lprmset_DNN = .true.
     return
@@ -706,7 +747,7 @@ contains
 !  Update DNN parameters by taking parameter values from params array.
 !  This routine would be called only from externally from fitpot.
 !
-    integer:: i,inc,il,ml0,ml1
+    integer:: i,inc,il,ml0,ml1,istart
 
     if( .not.lprmset_DNN ) then
       print *,'ERROR: params have not been set yet.'
@@ -718,11 +759,13 @@ contains
     wgts(:,:,nlayer+1) = 1d0
 
     inc = 0
+    istart = 0
     do il=1,nlayer
       do ml1=1,nhl(il)
-        do ml0=0,nhl(il-1)
+        do ml0=istart,nhl(il-1)
           inc = inc + 1
           wgts(ml0,ml1,il) = prms(inc)
+!!$          if( inc.eq.12 ) print *,'inc,il,ml1,ml0=',inc,il,ml1,ml0
         enddo
       enddo
     enddo
@@ -759,14 +802,21 @@ contains
     if( index(cline,'sigtype:').ne.0 ) then
       read(cline,*) c1,copt,iopt
       if( trim(copt).ne.'sigtype:' ) then
-        print *, 'Error: copt is not "sigtype:" !!!'
+        print *, 'ERROR: wrong format for the option SIGTYPE!!!'
         ierr = 2
       endif
       itypesig = iopt
+    else if( index(cline,'asig:').ne.0 ) then
+      read(cline,*) c1,copt,ropt
+      if( trim(copt).ne.'asig:' ) then
+        print *, 'ERROR: wrong format for the option ASIG !!!'
+        ierr = 1
+      endif
+      asig = ropt
     else if( index(cline,'bias:').ne.0 ) then
       read(cline,*) c1,copt,lopt
       if( trim(copt).ne.'bias:' ) then
-        print *, 'Error: copt is not "bias:" !!!'
+        print *, 'ERROR: wrong format for the option BIAS !!!'
         ierr = 1
       endif
       lbias = lopt

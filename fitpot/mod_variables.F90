@@ -175,6 +175,7 @@ module variables
   integer,allocatable:: nn_nhl(:)
 !!$  integer:: nn_nhl(0:nn_nlmax+1)
   integer:: nn_sigtype = 2
+  real(8):: nn_asig = 0.01d0
 
   integer:: mem = 0
 
