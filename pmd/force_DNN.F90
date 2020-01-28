@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-28 20:39:41 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-29 00:25:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -197,8 +197,8 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               sji = -gw(ml0)*dgsfi(jxyz,ml0,jj)*rji(ixyz)
-              strs(ixyz,jxyz,ja) = strs(ixyz,jxyz,ja) +sji
-              strs(ixyz,jxyz,ia) = strs(ixyz,jxyz,ia) +sji
+              strsl(ixyz,jxyz,ja) = strsl(ixyz,jxyz,ja) +sji
+              strsl(ixyz,jxyz,ia) = strsl(ixyz,jxyz,ia) +sji
             enddo
           enddo
         enddo ! ml0=
@@ -250,7 +250,7 @@ contains
     logical,intent(in):: lematch,lfmatch,lsmatch
 
     integer:: iv,ia,jj,il,ml1,ml0,ml2,ml,nni,n,mn0,mn1,l,memg,jja,ja
-    real(8):: tmp
+    real(8):: tmp,ftmp(3),xi(3),xj(3),xij(3),rij(3)
     real(8),allocatable,save:: fls(:,:,:,:),wfgw(:,:,:,:),wsgm1(:,:),gw(:)&
          ,gmm(:,:,:,:)
     integer,allocatable,save:: ivstart(:)
@@ -279,6 +279,7 @@ contains
     endif
 
     do ia=1,natm
+      xi(1:3) = ra(1:3,ia)
       call calc_desci(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
 !!$      print *,'ia=',ia
       call comp_nodes_of(ia)
@@ -335,32 +336,49 @@ contains
             wfgw(1:3,0:nni,ml1,il) = wfgw(1:3,0:nni,ml1,il)*gw(ml1)
           enddo
         enddo
-      endif ! lfmatch .or. lsmatch
-      
-      if( lfmatch ) then
+
 !.....Direct derivative of force term w.r.t. W_l
         do jj=0,nni
-          jja = lspr(jj,ia)
           if( jj.eq.0 ) then
             ja = ia
           else
+            jja = lspr(jj,ia)
             ja = itotOf(tag(jja))
+            xj(1:3) = ra(1:3,jja)
+            xij(1:3) = xj(1:3) -xi(1:3)
+            rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
           endif
 !!$          print *,'gwf: jj,ja=',jj,ja
-          iv = 0
-          do il=1,nlayer
-            do ml1=1,nhl(il)
-              do ml0=0,nhl(il-1)
-                iv = iv + 1
-                gwf(iv,1:3,ja) = gwf(iv,1:3,ja) &
-                     +gls(ml1,il)*fls(1:3,jj,ml0,il-1)
-!                if( ia.eq.1 .and. (ml0.eq.0 .or. ml0.eq.1) .and. il.eq.1 ) then
-!                  print '(a,5i5,7es11.2)','iv,il,ml1,ml0,ja,gls,fls(1:3),gwf=', &
-!                       iv,il,ml1,ml0,ja,gls(ml1,il),fls(1:3,jj,ml0,il-1),gwf(iv,1:3,ja)
-!                endif
+          if( jj.eq.0 ) then  ! Derivative on force only
+            iv = 0
+            do il=1,nlayer
+              do ml1=1,nhl(il)
+                do ml0=0,nhl(il-1)
+                  iv = iv + 1
+                  ftmp(1:3) = gls(ml1,il)*fls(1:3,jj,ml0,il-1)
+                  gwf(iv,1:3,ja) = gwf(iv,1:3,ja) +ftmp(1:3)
+                enddo
               enddo
             enddo
-          enddo
+          else  ! Derivative on both force and stress
+            iv = 0
+            do il=1,nlayer
+              do ml1=1,nhl(il)
+                do ml0=0,nhl(il-1)
+                  iv = iv + 1
+                  ftmp(1:3) = gls(ml1,il)*fls(1:3,jj,ml0,il-1)
+                  gwf(iv,1:3,ja) = gwf(iv,1:3,ja) +ftmp(1:3)
+!.....Stress
+                  gws(iv,1) = gws(iv,1) +rij(1)*ftmp(1)
+                  gws(iv,2) = gws(iv,2) +rij(2)*ftmp(2)
+                  gws(iv,3) = gws(iv,3) +rij(3)*ftmp(3)
+                  gws(iv,4) = gws(iv,4) +rij(2)*ftmp(3)
+                  gws(iv,5) = gws(iv,5) +rij(1)*ftmp(3)
+                  gws(iv,6) = gws(iv,6) +rij(1)*ftmp(2)
+                enddo
+              enddo
+            enddo
+          endif
         enddo
 !.....Before computing indirect derivative, make a matrix gmm() to be used
         do n=1,nlayer
@@ -379,28 +397,55 @@ contains
         enddo
 !.....Indirect derivative of force term w.r.t. W_l
         do jj=0,nni
-          jja = lspr(jj,ia)
           if( jj.eq.0 ) then
             ja = ia
           else
+            jja = lspr(jj,ia)
             ja = itotOf(tag(jja))
+            xj(1:3) = ra(1:3,jja)
+            xij(1:3) = xj(1:3) -xi(1:3)
+            rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
           endif
-          do n=1,nlayer
-            do l=n,nlayer ! This should be inside the loop over n
-              do ml=1,nhl(l)
-                tmp = gmm(iv,ml,l,n)
-                iv = ivstart(n)
-                do mn1=1,nhl(n)
-                  do mn0=0,nhl(n-1)
-                    iv = iv +1
-                    gwf(iv,1:3,ja) = gwf(iv,1:3,ja) &
-                         +tmp*wfgw(1:3,jj,ml,l)
-                  enddo
-                enddo
+          if( jj.eq.0 ) then
+            do n=1,nlayer
+              do l=n,nlayer ! This should be inside the loop over n
+                do ml=1,nhl(l)
+                  iv = ivstart(n)
+                  do mn1=1,nhl(n)
+                    do mn0=0,nhl(n-1)
+                      iv = iv +1
+                      ftmp(1:3) = gmm(iv,ml,l,n)*wfgw(1:3,jj,ml,l)
+                      gwf(iv,1:3,ja) = gwf(iv,1:3,ja) +ftmp(1:3)
+                    enddo ! ml0=...
+                  enddo ! ml1=...
+                enddo  ! ml=...
               enddo ! l=...
-            enddo ! ml0=...
-          enddo ! ml1=...
-        enddo ! n=...
+            enddo ! n=...
+          else
+            do n=1,nlayer
+              do l=n,nlayer ! This should be inside the loop over n
+                do ml=1,nhl(l)
+                  iv = ivstart(n)
+                  do mn1=1,nhl(n)
+                    do mn0=0,nhl(n-1)
+                      iv = iv +1
+                      ftmp(1:3) = gmm(iv,ml,l,n)*wfgw(1:3,jj,ml,l)
+!.....Derivative on forces
+                      gwf(iv,1:3,ja) = gwf(iv,1:3,ja) +ftmp(1:3)
+!.....Derivative on stresses
+                      gws(iv,1) = gws(iv,1) +rij(1)*ftmp(1)
+                      gws(iv,2) = gws(iv,2) +rij(2)*ftmp(2)
+                      gws(iv,3) = gws(iv,3) +rij(3)*ftmp(3)
+                      gws(iv,4) = gws(iv,4) +rij(2)*ftmp(3)
+                      gws(iv,5) = gws(iv,5) +rij(1)*ftmp(3)
+                      gws(iv,6) = gws(iv,6) +rij(1)*ftmp(2)
+                    enddo ! ml0=...
+                  enddo ! ml1=...
+                enddo  ! ml=...
+              enddo ! l=...
+            enddo ! n=...
+          endif
+        enddo ! jj=...
 !!$!.....Indirect derivative of force term w.r.t. W_l (inefficient code)
 !!$        iv = 0
 !!$        do n=1,nlayer
@@ -426,7 +471,7 @@ contains
 !!$            enddo ! ml0=...
 !!$          enddo ! ml1=...
 !!$        enddo ! n=...
-      endif ! lfmatch
+      endif ! lfmatch or lsmatch
     enddo  ! ia=...
 
     return
