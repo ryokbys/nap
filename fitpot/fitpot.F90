@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-28 11:02:05 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-28 16:21:43 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -453,11 +453,11 @@ subroutine get_dir_list(ionum)
 !!$    enddo
 !!$  endif
   
-  if(myid.eq.0) print*,'Finished get_dir_list'
+  if(myid.eq.0 .and. iprint.gt.1 ) print*,'Finished get_dir_list'
   return
 
 999 continue
-  if( myid.eq.0 ) print *,' Error: num_samples may be wrong.'
+  if( myid.eq.0 ) print *,' ERROR: num_samples may be wrong.'
   call mpi_finalize(ierr)
   stop
 
@@ -508,8 +508,10 @@ subroutine set_training_test_with_ratio()
 !!$    do ismpl=1,nsmpl
 !!$      print *,'ismpl,iclist=',ismpl,iclist(ismpl)
 !!$    enddo
-    print *,'nsmpl, training, test=',nsmpl,nsmpl_trn,nsmpl_tst
-    print *,'Finished set_training_test_with_ratio'
+    print *,''
+    print '(a,3(2x,i0))',' Number of samples (total,training,test) = ', &
+         nsmpl,nsmpl_trn,nsmpl_tst
+    if( iprint.gt.1 ) print *,'Finished set_training_test_with_ratio'
   endif
   deallocate(icll)
   return
@@ -540,7 +542,8 @@ subroutine count_training_test()
       if( iclist(i).eq.1 ) nsmpl_trn = nsmpl_trn +1
       if( iclist(i).eq.2 ) nsmpl_tst = nsmpl_tst +1
     enddo
-    print *,'nsmpl, training, test=',nsmpl,nsmpl_trn,nsmpl_tst
+    print '(a,3(2x,i0))',' Number of samples (total,training,test) = ', &
+         nsmpl,nsmpl_trn,nsmpl_tst
   endif
 end subroutine count_training_test
 !=======================================================================
@@ -583,7 +586,7 @@ subroutine read_samples()
        ,0,mpi_world,ierr)
 
   call mpi_barrier(mpi_world,ierr)
-  if( myid.eq.0 ) then
+  if( myid.eq.0 .and. iprint.gt.1 ) then
     write(6,'(/,a)') ' Finished read_samples'
   endif
   deallocate(nal)
@@ -763,8 +766,9 @@ subroutine read_ref_data()
   call mpi_allreduce(ispmaxl,maxisp,1,mpi_integer,mpi_max,0,mpi_world,ierr)
 
   if( myid.eq.0 ) then
+    print *,''
 !    write(6,'(a,es12.4)') ' erefmin = ',erefmin
-    print '(/,a)',' Finished read_ref_data.'
+    if( iprint.gt.1 ) print '(a)',' Finished read_ref_data.'
     if( lfmatch ) then
       write(6,'(a,i0)') ' Number of forces to be used = ',nfrcg
       write(6,'(a,i0)') ' Total number of forces      = ',nftotg
@@ -2152,7 +2156,7 @@ subroutine get_node2sample()
 
 !!$  print *,'myid,isid0,isid1=',myid,isid0,isid1
 
-  if( myid.eq.0 ) print *,'Finished get_node2sample'
+  if( myid.eq.0 .and. iprint.gt.1 ) print *,'Finished get_node2sample'
   return
 end subroutine get_node2sample
 !=======================================================================
@@ -2221,7 +2225,7 @@ subroutine set_sample_errors()
       endif
     enddo
   enddo
-  if( myid.eq.0 ) then
+  if( myid.eq.0 .and. iprint.gt.1 ) then
     write(6,'(a)') ' Finished set_samples_errors'
   endif
 end subroutine set_sample_errors
