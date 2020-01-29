@@ -10,7 +10,7 @@ Users may have to use those utilities by calling them directly from the shell.
 Setup
 =======
 
-The ``nappy`` should work with python-2.7 and python-3 series. But, as the maintenance of python-2.x series will stop in the near future, it is recommended to use python-3.
+The ``nappy`` should work with python-2.7 and python-3 series. But, as the maintenance of python-2.x series have stopped, it is recommended to use python-3.
 
 To use ``nappy`` in python program, it is required to add a path to ``nappy`` directory
 to the environment variable ``PYTHONPATH``.

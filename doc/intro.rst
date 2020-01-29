@@ -9,7 +9,7 @@ And *pmd* is a part of the **Nagoya atomistic-simulation package (NAP)**.
 The main features of *pmd* are the following:
 
 * several interatomic potentials for solid state systems are available;
-* **neural-network (NN) interatomic potential** for metal alloy systems;
+* **Deep neural-network (DNN) interatomic potential**;
 * **QEq** or **variable charge** Coulombic potential;
 * parallel computation using spatial decomposition technique;
 * efficient searching of neighbor atoms using linked-list cell method;
@@ -48,4 +48,4 @@ You also need,
 installed in the system you want to run ``pmd``.
 
 For some analyses tools,
-you may also need *Python 2.7* and some python-utilities such as *numpy* and *scipy*.
+you may also need *Python 3.* and some python-utilities such as *numpy* and *scipy*.

@@ -29,9 +29,10 @@ To minimize the above loss function, there are some methods available in ``fitpo
 
 * Gradient-based methods:
 
-  * Steepest decent (SD)
+  * Steepest descent (SD)
   * Quasi-Newton method (BFGS)
   * Conjugate gradient (CG)
+  * Stochastic gradient descent (SGD)
 
 * Non-gradient global optimization methods:
 
@@ -112,7 +113,8 @@ Prepare input files
 Inputs files needed for *fitpot* are the following:
 
  * ``in.fitpot``
- * ``in.params.NN`` (in case of NN potential) or ``in.vars.fitpot`` (in case of other potential)
+ * ``in.params.DNN`` (in case of DNN potential) or ``in.vars.fitpot`` (in case of other potential)
+ * ``in.params.desc`` (in case of potentials that use descriptors)
  * ``in.params.Coulomb`` in each ``smpl_XXX`` directory in some cases
 
 
