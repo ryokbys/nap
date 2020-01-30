@@ -415,9 +415,9 @@ contains
     real(8),parameter:: tiny  = 1d-14
 
     integer:: i,ismpl,iter,niter,nftol,ngtol,nxtol
-    real(8):: gnorm,xnorm,dxnorm,v,vh,pval,sgd_rate
+    real(8):: gnorm,xnorm,dxnorm,pval,sgd_rate
     real(8):: fp,ftmp,ftst,ftsttmp
-    real(8),allocatable:: x(:),dx(:),rm(:),rmh(:),gpena(:),gtmp(:),gp(:)
+    real(8),allocatable:: x(:),dx(:),rm(:),rmh(:),gpena(:),gtmp(:),gp(:),v(:),vh(:)
     integer,allocatable:: imaskarr(:)
     logical:: lconverged
 
@@ -429,7 +429,7 @@ contains
         print *,'   Update method: ',trim(csgdupdate)
       endif
       allocate(x(ndim),dx(ndim),rm(ndim),rmh(ndim),gpena(ndim) &
-           ,gp(ndim),gtmp(ndim))
+           ,gp(ndim),gtmp(ndim),v(ndim),vh(ndim))
       allocate(ismask(isid0:isid1))
       sgd_rate = sgd_rate0
     endif
@@ -447,7 +447,7 @@ contains
     ngtol= 0
     nxtol= 0
     rm(:) = 0d0
-    v = 0d0
+    v(:) = 0d0
     x(1:ndim)= x0(1:ndim)
     nsgdbsize = min(nsgdbsize,mynsmpl)
     allocate(imaskarr(nsgdbsize))
@@ -486,10 +486,10 @@ contains
 !.....Compute step size of x
       if( trim(csgdupdate).eq.'adam' .or. trim(csgdupdate).eq.'Adam' ) then
         rm(:) = adam_b1*rm(:) +(1d0 -adam_b1)*g(:)
-        v = adam_b2*v +(1d0 -adam_b2)*gnorm**2
+        v(:) = adam_b2*v(:) +(1d0 -adam_b2)*g(:)*g(:)
         rmh(:) = rm(:)/(1d0-adam_b1**iter)
-        vh = v/(1d0-adam_b2**iter)
-        dx(:) = -sgd_rate*rmh(:)/(sqrt(vh) +sgd_eps)
+        vh(:) = v(:)/(1d0-adam_b2**iter)
+        dx(:) = -sgd_rate*rmh(:)/(sqrt(vh(:)) +sgd_eps)
       endif
 
 !.....Update x

@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-28 15:15:37 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-30 14:56:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -89,7 +89,7 @@ contains
          ,swgt2trn,swgt2tst,cpot &
          ,nff,cffs,maxna,rcut &
          ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint &
-         ,ctype_loss,mem,cfmethod &
+         ,ctype_loss,mem,cfmethod,cfrc_denom &
          ,lnormalize,lnormalized,lgdw,lgdwed
     use parallel
     use minimize
@@ -234,7 +234,11 @@ contains
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(smpl%fref(1,ia)**2 +smpl%fref(2,ia)**2 +smpl%fref(3,ia)**2)
-          ferri = 1d0/ (absfref +ferr)
+          if( cfrc_denom(1:3).eq.'abs' ) then
+            ferri = 1d0/ (absfref +ferr)
+          else  ! default: err
+            ferri = 1d0/ferr
+          endif
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia)+smpl%fsub(ixyz,ia) &
                  -(smpl%fref(ixyz,ia))) *ferri
@@ -324,7 +328,7 @@ contains
          ,samples,mdsys,swgt2trn,nff,cffs &
          ,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
          ,rcut,myidrefsub,isidrefsub,iprint &
-         ,ctype_loss,lgdw,mem
+         ,ctype_loss,cfrc_denom,lgdw,mem
     use parallel
     use minimize
     implicit none
@@ -461,7 +465,11 @@ contains
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(smpl%fref(1,ia)**2 +smpl%fref(2,ia)**2 +smpl%fref(3,ia)**2)
-          ferri = 1d0/ (absfref +ferr)
+          if( cfrc_denom(1:3).eq.'abs' ) then
+            ferri = 1d0/ (absfref +ferr)
+          else  ! default: err
+            ferri = 1d0/ferr
+          endif
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia) +smpl%fsub(ixyz,ia) &
                  -(smpl%fref(ixyz,ia))) *ferri

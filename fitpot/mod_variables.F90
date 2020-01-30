@@ -61,6 +61,8 @@ module variables
   real(8):: force_limit = 100d0
 !.....Loss function type: LS (least-square), Huber
   character(len=128):: ctype_loss = 'LS'
+!.....Denominator type of force in loss function: error, absref
+  character(len=128):: cfrc_denom = 'error' ! 
 !.....Gaussian density weight
   logical:: lgdw  = .false.  ! flag for GDW
   logical:: lgdwed = .false.  ! whether compuation of GDW is finished

@@ -115,6 +115,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'loss_function' ) then
     call read_c1(ionum,ctype_loss)
     return
+  elseif( trim(cname).eq.'force_denom_type' ) then
+    call read_c1(ionum,cfrc_denom)
+    return
   elseif( trim(cname).eq.'penalty' ) then
     call read_c1(ionum,cpena)
     return

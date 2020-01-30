@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-29 00:25:01 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-29 17:16:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -108,7 +108,7 @@ contains
       if( myid.le.0 .and. iprint.ne.0 ) then
         print *,''
         print *,'DNN potential parameters:'
-        print '(a,i0,a)','   Num of layers = ',nlayer, '   (input & hidden, not incl. output)'
+        print '(a,i0,a)','   Num of hidden layers = ',nlayer-1, '   (excl. input and output)'
         print '(a,100(1x,i0))','   Num of nodes in each layer = ',nhl(0:nlayer)
         if( itypesig.eq.1 ) then
           print *,'   Activation function: 1) 1/(1+exp(-x))'
