@@ -13,8 +13,9 @@ module minimize
 !.....SGD parameters
   integer:: nsgdbsize = 1
   integer,allocatable:: ismask(:)
-  character(len=128):: csgdupdate = 'Adam'
-  real(8):: sgd_rate0 = 1d0
+  character(len=128):: csgdupdate = 'none'
+  real(8):: sgd_rate_ini = 0.001d0
+  real(8):: sgd_rate_fin = -0.001d0
   real(8):: sgd_eps = 1.0d-8
   real(8):: adam_b1 = 0.9d0
   real(8):: adam_b2 = 0.999d0
@@ -415,8 +416,9 @@ contains
     real(8),parameter:: tiny  = 1d-14
 
     integer:: i,ismpl,iter,niter,nftol,ngtol,nxtol
-    real(8):: gnorm,xnorm,dxnorm,pval,sgd_rate
+    real(8):: gnorm,xnorm,dxnorm,pval,sgd_rate,sgd_ratei
     real(8):: fp,ftmp,ftst,ftsttmp
+    real(8):: rate_upper, rate_lower
     real(8),allocatable:: x(:),dx(:),rm(:),rmh(:),gpena(:),gtmp(:),gp(:),v(:),vh(:)
     integer,allocatable:: imaskarr(:)
     logical:: lconverged
@@ -427,19 +429,20 @@ contains
         print *, '************************ Stochastic gradient descent (SGD) '&
              //'************************'
         print *,'   Update method: ',trim(csgdupdate)
+        print *,''
       endif
       allocate(x(ndim),dx(ndim),rm(ndim),rmh(ndim),gpena(ndim) &
            ,gp(ndim),gtmp(ndim),v(ndim),vh(ndim))
       allocate(ismask(isid0:isid1))
-      sgd_rate = sgd_rate0
+      sgd_rate = sgd_rate_ini
     endif
 
-    if( trim(csgdupdate).ne.'adam' .and. trim(csgdupdate).ne.'Adam' ) then
+    if( trim(csgdupdate).ne.'adam' .and. trim(csgdupdate).ne.'Adam' &
+         .and. trim(csgdupdate).ne.'adabound' ) then
       if( myid.eq.0 ) then
-        print *,'ERROR: update method '//trim(csgdupdate)//' is not available.'
-        print *,'       Currently, only adam is available.'
+        print *,'WARNING: update method '//trim(csgdupdate)//' is not available.'
+        print *,'         Use normal sgd instead...'
       endif
-      stop
     endif
 
 !.....Initialization
@@ -479,6 +482,10 @@ contains
     call sub_eval(0)
 
     do iter=1,maxiter
+!.....Gradual increasing/descreasing learning rate
+      if( sgd_rate_fin .gt. 0d0 ) then
+        sgd_rate = sgd_rate_ini +(sgd_rate_fin -sgd_rate_ini)/maxiter *(iter-1)
+      endif
 !.....Store previous func and grad values
       fp= f
       gp(1:ndim)= g(1:ndim)
@@ -490,6 +497,21 @@ contains
         rmh(:) = rm(:)/(1d0-adam_b1**iter)
         vh(:) = v(:)/(1d0-adam_b2**iter)
         dx(:) = -sgd_rate*rmh(:)/(sqrt(vh(:)) +sgd_eps)
+      else if( trim(csgdupdate).eq.'adabound' ) then
+        rm(:) = adam_b1*rm(:) +(1d0 -adam_b1)*g(:)
+        v(:) = adam_b2*v(:) +(1d0 -adam_b2)*g(:)*g(:)
+        rmh(:) = rm(:)/(1d0-adam_b1**iter)
+        vh(:) = v(:)/(1d0-adam_b2**iter)
+        rate_lower = sgd_rate *(1d0 -1d0/((1d0 -adam_b2)*iter+1d0))
+        rate_upper = sgd_rate *(1d0 +1d0/((1d0 -adam_b2)*iter))
+        if( iprint.gt.1 ) print '(a,i6,2es12.4)','iter,lower,upper=',iter,rate_lower,rate_upper
+        do i=1,ndim
+          sgd_ratei = sgd_rate/(sqrt(vh(i))+sgd_eps)
+          sgd_ratei = min(max(rate_lower,sgd_ratei),rate_upper) !/sqrt(dble(iter))
+          dx(i) = -sgd_ratei*rmh(i)
+        enddo
+      else  ! normal SGD
+        dx(:) = -sgd_rate *g(:)
       endif
 
 !.....Update x

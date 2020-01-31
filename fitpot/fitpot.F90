@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-30 14:54:58 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-31 11:14:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -2064,7 +2064,8 @@ subroutine sync_input()
 !.....sgd
   call mpi_bcast(csgdupdate,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(nsgdbsize,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(sgd_rate0,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(sgd_rate_ini,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(sgd_rate_fin,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sgd_eps,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(adam_b1,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(adam_b2,1,mpi_real8,0,mpi_world,ierr)

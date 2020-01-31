@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-30 14:56:21 Ryo KOBAYASHI>
+!                     Last modified: <2020-01-30 21:31:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -823,7 +823,7 @@ contains
     endif
 
 !.....one_shot force calculation
-    if( iprint.gt.1 ) print '(/,a)',' one_shot for '//trim(smpl%cdirname)//'...'
+    if( iprint.gt.2 ) print '(/,a)',' one_shot for '//trim(smpl%cdirname)//'...'
     call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
          ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
          ,smpl%chg,smpl%chi,smpl%tei &
