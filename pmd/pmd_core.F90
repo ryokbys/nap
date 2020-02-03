@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-01-28 16:50:17 Ryo KOBAYASHI>
+!                     Last-modified: <2020-02-03 16:46:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1137,7 +1137,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !      character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: lcalcgrad
   integer,intent(in):: ndimp,maxisp
-  real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,ntot0),gws(ndimp,6)
+  real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,ntot0),gws(6,ndimp)
   logical,intent(inout):: lvc
   logical,intent(in):: lematch,lfmatch,lsmatch
   character(len=3),intent(in):: boundary,specorder(nspmax)
@@ -1237,8 +1237,10 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     if( iprint.gt.0 ) print *,'gradw_xxxx...'
     epot = 0d0
     gwe(1:ndimp) = 0d0
-    gwf(1:ndimp,1:3,1:natm) = 0d0
-    gws(1:ndimp,1:6) = 0d0
+!!$    gwf(1:ndimp,1:3,1:natm) = 0d0
+!!$    gws(1:ndimp,1:6) = 0d0
+    gwf(1:3,1:ndimp,1:natm) = 0d0
+    gws(1:6,1:ndimp) = 0d0
     if( use_force('Morse') &
          .and. use_force('screened_Coulomb') ) then
       iprm0 = 0
@@ -1270,7 +1272,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !        if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra
 !     &       ,nnmax,chg,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws)
 !.....Derivative of stress should be divided by the cell volume
-    gws(1:ndimp,1:6) = gws(1:ndimp,1:6) /vol
+    gws(:,:) = gws(:,:) /vol
   endif
 
 !      print *,'one_shot: 07'

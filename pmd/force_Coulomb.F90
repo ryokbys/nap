@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-10-17 15:53:24 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-03 17:13:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -2852,7 +2852,7 @@ contains
     real(8),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
     real(8),intent(inout):: epot,chg(namax)
     integer,intent(in):: ndimp
-    real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
+    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
     character(len=3),intent(in):: specorder(nspmax)
 
@@ -2965,7 +2965,7 @@ contains
         do isp=1,maxisp
           if( .not. ispflag(isp) ) cycle
           nf = nf + 1
-          gwf(nf,1:3,i) = gwf(nf,1:3,i) +gf_rho(isp,1:3,i)
+          gwf(1:3,nf,i) = gwf(1:3,nf,i) +gf_rho(isp,1:3,i)
         enddo
       enddo
     endif
@@ -2975,7 +2975,7 @@ contains
         do isp=1,maxisp
           if( .not.ispflag(isp) ) cycle
           ns = ns + 1
-          gws(ns,1:6) = gws(ns,1:6) +gs_rho(isp,1:6)
+          gws(1:6,ns) = gws(1:6,ns) +gs_rho(isp,1:6)
         enddo
       enddo
     endif

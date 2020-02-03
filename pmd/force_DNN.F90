@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-29 17:16:40 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-03 17:29:27 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -17,6 +17,7 @@ module DNN
 
   integer:: mem
   real(8):: time
+  real(8):: tgrads(10)
   
 !.....logical flag for bias
   logical:: lbias = .true.
@@ -242,34 +243,39 @@ contains
          gsfi,dgsfi,igsfi,calc_desci
     use util,only: itotOf
     implicit none
+    include "mpif.h"
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
     integer,intent(in):: ndimp
-    real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
+    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
 
-    integer:: iv,ia,jj,il,ml1,ml0,ml2,ml,nni,n,mn0,mn1,l,memg,jja,ja
+    integer:: iv,jv,ia,jj,il,ml1,ml0,ml2,ml,nni,n,mn0,mn1,l,memg,jja,ja
     real(8):: tmp,ftmp(3),xi(3),xj(3),xij(3),rij(3)
+    real(8):: ttmp,ttmp2
     real(8),allocatable,save:: fls(:,:,:,:),wfgw(:,:,:,:),wsgm1(:,:),gw(:)&
-         ,gmm(:,:,:,:)
+         ,gmm(:,:,:,:),fftmp(:,:)
     integer,allocatable,save:: ivstart(:)
 
     if( .not. allocated(fls) ) then
       allocate(fls(3,0:nnmax,0:maxnnode,0:nlayer), gw(0:maxnnode), &
-           wfgw(3,0:nnmax,maxnnode,nlayer), wsgm1(maxnnode,maxnnode), &
-           gmm(nwtot,maxnnode,nlayer,nlayer),ivstart(0:nlayer+1))
+           wfgw(3,maxnnode,0:nnmax,nlayer), wsgm1(maxnnode,maxnnode), &
+           gmm(nwtot,maxnnode,nlayer,nlayer),ivstart(0:nlayer+1), &
+           fftmp(3,nwtot))
       mem = mem +8*size(fls) +8*size(gw) +8*size(wfgw) +8*size(wsgm1) &
-           +8*size(gmm) +4*size(ivstart)
+           +8*size(gmm) +4*size(ivstart) +8*size(fftmp)
 
       if( iprint.ne.0 ) then
         memg = 8*size(fls) +8*size(gw) +8*size(wfgw) +8*size(wsgm1) &
-             +8*size(gmm) +4*size(ivstart)
+             +8*size(gmm) +4*size(ivstart) +8*size(fftmp)
         print '(a,f10.3,a)',' Memory in gradw_DNN = ',dble(memg)/1000/1000,' MB'
       endif
 !!$      print *,'nlayer,natm,nal,nnl,nnmax=',nlayer,natm,nal,nnl,nnmax
 !!$      print *,'shape(nhl)=',shape(nhl)
 !!$      print *,'nhl(:)=',nhl(:)
+
+      tgrads(:) = 0d0
 
 !.....ivstart(:) values are constant
       ivstart(:) = 0
@@ -284,6 +290,7 @@ contains
 !!$      print *,'ia=',ia
       call comp_nodes_of(ia)
       if( lematch ) then
+        ttmp = mpi_wtime()
         iv = 0
         do il=1,nlayer
 !!$          print *,'  il,nhl(il),nhl(il-1)=',il,nhl(il),nhl(il-1)
@@ -294,9 +301,11 @@ contains
             enddo
           enddo
         enddo
+        tgrads(1) = tgrads(1) +mpi_wtime() -ttmp
       endif  ! lematch
 
       if( lfmatch .or. lsmatch ) then
+        ttmp = mpi_wtime()
 !.....1st, create fls(:,:,:,:) by forward propagation that are
 !.....required in force and stress matching
         nni = lspr(0,ia)
@@ -328,16 +337,18 @@ contains
           enddo
 !!$          print *,'wfgw: il=',il
           do ml1=1,nhl(il)
-            wfgw(1:3,0:nni,ml1,il) = 0d0
+            wfgw(1:3,ml1,0:nni,il) = 0d0
             do ml0=0,nhl(il-1)
-              wfgw(1:3,0:nni,ml1,il) = wfgw(1:3,0:nni,ml1,il) &
+              wfgw(1:3,ml1,0:nni,il) = wfgw(1:3,ml1,0:nni,il) &
                    +wgts(ml0,ml1,il)*fls(1:3,0:nni,ml0,il-1)
             enddo
-            wfgw(1:3,0:nni,ml1,il) = wfgw(1:3,0:nni,ml1,il)*gw(ml1)
+            wfgw(1:3,ml1,0:nni,il) = wfgw(1:3,ml1,0:nni,il)*gw(ml1)
           enddo
         enddo
+        tgrads(2) = tgrads(2) +mpi_wtime() -ttmp
 
 !.....Direct derivative of force term w.r.t. W_l
+        ttmp = mpi_wtime()
         do jj=0,nni
           if( jj.eq.0 ) then
             ja = ia
@@ -356,7 +367,7 @@ contains
                 do ml0=0,nhl(il-1)
                   iv = iv + 1
                   ftmp(1:3) = gls(ml1,il)*fls(1:3,jj,ml0,il-1)
-                  gwf(iv,1:3,ja) = gwf(iv,1:3,ja) +ftmp(1:3)
+                  gwf(1:3,iv,ja) = gwf(1:3,iv,ja) +ftmp(1:3)
                 enddo
               enddo
             enddo
@@ -367,20 +378,22 @@ contains
                 do ml0=0,nhl(il-1)
                   iv = iv + 1
                   ftmp(1:3) = gls(ml1,il)*fls(1:3,jj,ml0,il-1)
-                  gwf(iv,1:3,ja) = gwf(iv,1:3,ja) +ftmp(1:3)
+                  gwf(1:3,iv,ja) = gwf(1:3,iv,ja) +ftmp(1:3)
 !.....Stress
-                  gws(iv,1) = gws(iv,1) +rij(1)*ftmp(1)
-                  gws(iv,2) = gws(iv,2) +rij(2)*ftmp(2)
-                  gws(iv,3) = gws(iv,3) +rij(3)*ftmp(3)
-                  gws(iv,4) = gws(iv,4) +rij(2)*ftmp(3)
-                  gws(iv,5) = gws(iv,5) +rij(1)*ftmp(3)
-                  gws(iv,6) = gws(iv,6) +rij(1)*ftmp(2)
+                  gws(1,iv) = gws(1,iv) +rij(1)*ftmp(1)
+                  gws(2,iv) = gws(2,iv) +rij(2)*ftmp(2)
+                  gws(3,iv) = gws(3,iv) +rij(3)*ftmp(3)
+                  gws(4,iv) = gws(4,iv) +rij(2)*ftmp(3)
+                  gws(5,iv) = gws(5,iv) +rij(1)*ftmp(3)
+                  gws(6,iv) = gws(6,iv) +rij(1)*ftmp(2)
                 enddo
               enddo
             enddo
           endif
-        enddo
+        enddo  ! jj=0,nni
+        tgrads(3) = tgrads(3) +mpi_wtime() -ttmp
 !.....Before computing indirect derivative, make a matrix gmm() to be used
+        ttmp = mpi_wtime()
         do n=1,nlayer
           do l=n,nlayer
             wsgm1 = wxs(l,n)
@@ -395,7 +408,9 @@ contains
             enddo
           enddo
         enddo
+        tgrads(4) = tgrads(4) +mpi_wtime() -ttmp
 !.....Indirect derivative of force term w.r.t. W_l
+        ttmp = mpi_wtime()
         do jj=0,nni
           if( jj.eq.0 ) then
             ja = ia
@@ -407,6 +422,7 @@ contains
             rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
           endif
           if( jj.eq.0 ) then
+            ttmp2 = mpi_wtime()
             do n=1,nlayer
               do l=n,nlayer ! This should be inside the loop over n
                 do ml=1,nhl(l)
@@ -414,38 +430,72 @@ contains
                   do mn1=1,nhl(n)
                     do mn0=0,nhl(n-1)
                       iv = iv +1
-                      ftmp(1:3) = gmm(iv,ml,l,n)*wfgw(1:3,jj,ml,l)
-                      gwf(iv,1:3,ja) = gwf(iv,1:3,ja) +ftmp(1:3)
+                      ftmp(1:3) = gmm(iv,ml,l,n)*wfgw(1:3,ml,jj,l)
+                      gwf(1:3,iv,ja) = gwf(1:3,iv,ja) +ftmp(1:3)
                     enddo ! ml0=...
                   enddo ! ml1=...
                 enddo  ! ml=...
               enddo ! l=...
             enddo ! n=...
+            tgrads(6) = tgrads(6) +mpi_wtime() -ttmp2
           else
+            ttmp2 = mpi_wtime()
             do n=1,nlayer
               do l=n,nlayer ! This should be inside the loop over n
+                iv = ivstart(n)
+                fftmp(1:3,iv+1:nwtot) = 0d0
                 do ml=1,nhl(l)
-                  iv = ivstart(n)
-                  do mn1=1,nhl(n)
-                    do mn0=0,nhl(n-1)
-                      iv = iv +1
-                      ftmp(1:3) = gmm(iv,ml,l,n)*wfgw(1:3,jj,ml,l)
+                  do jv=iv+1,nwtot
+                    fftmp(1:3,jv) = fftmp(1:3,jv) &
+                         +gmm(jv,ml,l,n)*wfgw(1:3,ml,jj,l)
+                  enddo
+                enddo
+                do mn1=1,nhl(n)
+                  do mn0=0,nhl(n-1)
+                    iv = iv +1
+!!$                    ftmp(1:3) = 0d0
+!!$                    do ml=1,nhl(l)
+!!$                      ftmp(1:3) = ftmp(1:3) +gmm(iv,ml,l,n)*wfgw(1:3,jj,ml,l)
+!!$                    enddo  ! ml=...
 !.....Derivative on forces
-                      gwf(iv,1:3,ja) = gwf(iv,1:3,ja) +ftmp(1:3)
+                    gwf(1:3,iv,ja) = gwf(1:3,iv,ja) +fftmp(1:3,iv)
 !.....Derivative on stresses
-                      gws(iv,1) = gws(iv,1) +rij(1)*ftmp(1)
-                      gws(iv,2) = gws(iv,2) +rij(2)*ftmp(2)
-                      gws(iv,3) = gws(iv,3) +rij(3)*ftmp(3)
-                      gws(iv,4) = gws(iv,4) +rij(2)*ftmp(3)
-                      gws(iv,5) = gws(iv,5) +rij(1)*ftmp(3)
-                      gws(iv,6) = gws(iv,6) +rij(1)*ftmp(2)
-                    enddo ! ml0=...
-                  enddo ! ml1=...
-                enddo  ! ml=...
+                    gws(1,iv) = gws(1,iv) +rij(1)*fftmp(1,iv)
+                    gws(2,iv) = gws(2,iv) +rij(2)*fftmp(2,iv)
+                    gws(3,iv) = gws(3,iv) +rij(3)*fftmp(3,iv)
+                    gws(4,iv) = gws(4,iv) +rij(2)*fftmp(3,iv)
+                    gws(5,iv) = gws(5,iv) +rij(1)*fftmp(3,iv)
+                    gws(6,iv) = gws(6,iv) +rij(1)*fftmp(2,iv)
+                  enddo ! ml0=...
+                enddo ! ml1=...
               enddo ! l=...
             enddo ! n=...
+!!$            do n=1,nlayer
+!!$              do l=n,nlayer ! This should be inside the loop over n
+!!$                do ml=1,nhl(l)
+!!$                  iv = ivstart(n)
+!!$                  do mn1=1,nhl(n)
+!!$                    do mn0=0,nhl(n-1)
+!!$                      iv = iv +1
+!!$                      ftmp(1:3) = gmm(iv,ml,l,n)*wfgw(1:3,jj,ml,l)
+!!$!.....Derivative on forces
+!!$                      gwf(1:3,iv,ja) = gwf(1:3,iv,ja) +ftmp(1:3)
+!!$!.....Derivative on stresses
+!!$                      gws(1,iv) = gws(1,iv) +rij(1)*ftmp(1)
+!!$                      gws(2,iv) = gws(2,iv) +rij(2)*ftmp(2)
+!!$                      gws(3,iv) = gws(3,iv) +rij(3)*ftmp(3)
+!!$                      gws(4,iv) = gws(4,iv) +rij(2)*ftmp(3)
+!!$                      gws(5,iv) = gws(5,iv) +rij(1)*ftmp(3)
+!!$                      gws(6,iv) = gws(6,iv) +rij(1)*ftmp(2)
+!!$                    enddo ! ml0=...
+!!$                  enddo ! ml1=...
+!!$                enddo  ! ml=...
+!!$              enddo ! l=...
+!!$            enddo ! n=...
+            tgrads(7) = tgrads(7) +mpi_wtime() -ttmp2
           endif
         enddo ! jj=...
+        tgrads(5) = tgrads(5) +mpi_wtime() -ttmp
 !!$!.....Indirect derivative of force term w.r.t. W_l (inefficient code)
 !!$        iv = 0
 !!$        do n=1,nlayer
@@ -463,7 +513,7 @@ contains
 !!$                  wsgm1 = wxs(l,n)
 !!$                  do ml=1,nhl(l)
 !!$                    tmp = wsgm1(mn1,ml)*sgm2(ml,l)*hls(mn0,n-1)
-!!$                    gwf(iv,1:3,ja) = gwf(iv,1:3,ja) &
+!!$                    gwf(1:3,iv,ja) = gwf(1:3,iv,ja) &
 !!$                         +tmp*wfgw(1:3,jj,ml,l)
 !!$                  enddo
 !!$                enddo
@@ -950,6 +1000,17 @@ contains
     time_DNN = time
     return
   end function time_DNN
+!=======================================================================
+  subroutine write_tgrads_DNN(myid)
+    integer,intent(in):: myid
+
+    integer:: i
+
+    if( myid.eq.0 ) then
+      print "(a,10(1x,i0,a,f0.3))",' Times for gradw_DNN(:) = ', &
+           (i,')',tgrads(i),i=1,10)
+    endif
+  end subroutine write_tgrads_DNN
 end module DNN
 !-----------------------------------------------------------------------
 !     Local Variables:

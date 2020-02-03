@@ -1423,6 +1423,7 @@ contains
     call bcast_descs(myid,mpi_world,iprint)
     call mpi_bcast(nsf2,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nsf3,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(nsff,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(ilsf2,size(ilsf2),mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(ilsf3,size(ilsf3),mpi_integer,0,mpi_world,ierr)
 

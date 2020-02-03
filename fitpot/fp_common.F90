@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-30 21:31:06 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-03 17:55:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -90,7 +90,7 @@ contains
          ,nff,cffs,maxna,rcut &
          ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint &
          ,ctype_loss,mem,cfmethod,cfrc_denom &
-         ,lnormalize,lnormalized,lgdw,lgdwed
+         ,lnormalize,lnormalized,lgdw,lgdwed,terg,tfrc,tstrs
     use parallel
     use minimize
     use descriptor,only: lupdate_gsf,get_descs,get_ints
@@ -99,11 +99,12 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: ftrn,ftst
 
-    integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl
+    integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl,memgsf
     real(8):: dn3i,ediff,eref,epot,swgt,esub
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref
     real(8):: ftrnl,ftstl,ftmp,gdw
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
+    real(8):: tergl,tfrcl,tstrsl,tmp
     type(mdsys):: smpl
     logical,save:: l1st = .true.
     logical,parameter:: lcalcgrad = .false.
@@ -128,6 +129,7 @@ contains
         mem = mem +8*size(fdiff) +8*size(frcs)
       endif
       if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg') lupdate_gsf = .true.
+      memgsf = 0
     endif
 
     if( .not. lematch .and. .not.lfmatch .and. .not.lsmatch ) then
@@ -166,8 +168,9 @@ contains
           allocate(samples(ismpl)%gsf(nsf,nal) &
                ,samples(ismpl)%dgsf(3,nsf,0:nnl,nal) &
                ,samples(ismpl)%igsf(nsf,0:nnl,nal) )
-          mem = mem +8*size(samples(ismpl)%gsf) +8*size(samples(ismpl)%dgsf) &
+          memgsf = memgsf +8*size(samples(ismpl)%gsf) +8*size(samples(ismpl)%dgsf) &
                +2*size(samples(ismpl)%igsf)
+          mem = mem +memgsf
         endif
         call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
              samples(ismpl)%nnl,samples(ismpl)%gsf, &
@@ -188,6 +191,9 @@ contains
 
     ftrnl = 0d0
     ftstl = 0d0
+    tergl = 0d0
+    tfrcl = 0d0
+    tstrsl= 0d0
     do ismpl=isid0,isid1
       if( allocated(ismask) ) then
         if( ismask(ismpl).ne.0 ) cycle
@@ -200,6 +206,7 @@ contains
       swgt = smpl%wgt
 !.....Energy matching
       if( lematch ) then
+        tmp = mpi_wtime()
         eref= smpl%eref
         esub= smpl%esub
         eerr = smpl%eerr
@@ -218,18 +225,21 @@ contains
           ediff= ediff*ediff
         endif
         ftmp= ftmp +ediff *swgt
-        if( iprint.gt.1 ) then
+        if( iprint.gt.2 ) then
           write(6,'(a,2i4,1x,a,7es11.3)') ' myid,ismpl,cdirname,epot,eref,esub,(epot+esub)/natm= ', &
                myid,ismpl,trim(cdirname),epot,eref,esub,(epot+esub)/natm
         endif
+        tergl = tergl +mpi_wtime() -tmp
       endif
 !.....Force matching
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
+        tmp = mpi_wtime()
         frcs(1:3,1:natm) = smpl%fa(1:3,1:natm)
         ferr = smpl%ferr
 !!$        ferri = 1d0/ferr
         dn3i = 1d0/3/smpl%nfcal
         do ia=1,natm
+          
           if( smpl%ifcal(ia).eq.0 ) cycle
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
@@ -254,10 +264,12 @@ contains
             ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt *gdw
           enddo
         enddo
+        tfrcl = tfrcl +mpi_wtime() -tmp
       endif
 
 !.....Stress matching
       if( lsmatch ) then
+        tmp = mpi_wtime()
 !.....Compare these ptnsr elements with sref elements
         serr = smpl%serr
 !!$        serri = 1d0/serr
@@ -286,6 +298,7 @@ contains
             ftmp= ftmp +pdiff(k) *swgt /6
           enddo
         endif
+        tstrsl = tstrsl +mpi_wtime() -tmp
       endif  ! stress matching
 
       if( smpl%iclass.eq.1 ) then
@@ -294,6 +307,9 @@ contains
         ftstl = ftstl +ftmp
       endif
     enddo  ! ismpl
+    terg = terg + tergl
+    tfrc = tfrc + tfrcl
+    tstrs = tstrs + tstrsl
 
     tfl = mpi_wtime() -tf0
 
@@ -314,6 +330,9 @@ contains
     tcomm= tcomm +tcg
     tfunc= tfunc +tfg
 
+    if( l1st .and. myid.eq.0 .and. iprint.gt.1 ) then
+      print '(a,f0.3,a)',' Memory for gsfs = ',dble(memgsf)/1000/1000,' MB'
+    endif
     l1st = .false.
     if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) lupdate_gsf = .false.
 
@@ -328,7 +347,7 @@ contains
          ,samples,mdsys,swgt2trn,nff,cffs &
          ,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
          ,rcut,myidrefsub,isidrefsub,iprint &
-         ,ctype_loss,cfrc_denom,lgdw,mem
+         ,ctype_loss,cfrc_denom,lgdw,mem,terg,tfrc,tstrs
     use parallel
     use minimize
     implicit none
@@ -336,10 +355,11 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gtrn(ndim)
 
-    integer:: ismpl,natm,k,ia,ixyz,jxyz
+    integer:: ismpl,natm,k,ia,ixyz,jxyz,iv
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3),dn3i
     real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,tmp,gdw
     real(8):: absfref,abssref
+    real(8):: tergl, tfrcl, tstrsl, ttmp
     type(mdsys):: smpl
     logical,parameter:: lcalcgrad = .true.
     logical,parameter:: lfdsgnmat = .false.
@@ -352,7 +372,7 @@ contains
       mem = mem +8*size(gtrnl)
     endif
     if( .not.allocated(gwe) ) then
-      allocate(gwe(ndim),gwf(ndim,3,maxna),gws(ndim,6))
+      allocate(gwe(ndim),gwf(3,ndim,maxna),gws(6,ndim))
       mem = mem +8*size(gwe) +8*size(gwf) +8*size(gws)
     endif
     if( len(trim(crefstrct)).gt.5 ) then
@@ -376,6 +396,20 @@ contains
       stop
     endif
 
+    if( len(trim(crefstrct)).gt.5 ) then
+      if( myid.eq.myidrefsub ) then
+        epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
+        epotsub = epotsub /samples(isidrefsub)%natm
+!!$        gwesub(1:ndim) = samples(isidrefsub)%gwe(1:ndim)
+      endif
+      call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
+!!$      call mpi_bcast(gwesub,ndim,mpi_real8,myidrefsub,mpi_world,ierr)
+    endif
+
+    gtrnl(1:ndim) = 0d0
+    tergl = 0d0
+    tfrcl = 0d0
+    tstrsl = 0d0
     do ismpl=isid0,isid1
       if( allocated(ismask) ) then
         if( ismask(ismpl).ne.0 ) cycle
@@ -394,27 +428,16 @@ contains
       if( iprint.gt.10 ) print *,'grad_w_pmd: run_pmd for cdirname: ',trim(cdirname)
       call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut &
            ,lfdsgnmat,gwe,gwf,gws)
-      samples(ismpl)%gwe(1:ndim)= gwe(1:ndim)
-      samples(ismpl)%gwf(1:ndim,1:3,1:natm)= gwf(1:ndim,1:3,1:natm)
-      samples(ismpl)%gws(1:ndim,1:6)= gws(1:ndim,1:6)
-    enddo  ! ismpl
-
-    if( len(trim(crefstrct)).gt.5 ) then
-      if( myid.eq.myidrefsub ) then
-        epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
-        epotsub = epotsub /samples(isidrefsub)%natm
-        gwesub(1:ndim) = samples(isidrefsub)%gwe(1:ndim)
-      endif
-      call mpi_bcast(epotsub,1,mpi_real8,myidrefsub,mpi_world,ierr)
-      call mpi_bcast(gwesub,ndim,mpi_real8,myidrefsub,mpi_world,ierr)
-    endif
-
-    gtrnl(1:ndim) = 0d0
-    do ismpl=isid0,isid1
-      if( allocated(ismask) ) then
-        if( ismask(ismpl).ne.0 ) cycle
-      endif
-      smpl= samples(ismpl)
+!!$      samples(ismpl)%gwe(:)= gwe(:)
+!!$      samples(ismpl)%gwf(:,:,1:natm)= gwf(:,:,1:natm)
+!!$      samples(ismpl)%gws(:,:)= gws(:,:)
+!!$    enddo  ! ismpl
+!!$
+!!$    do ismpl=isid0,isid1
+!!$      if( allocated(ismask) ) then
+!!$        if( ismask(ismpl).ne.0 ) cycle
+!!$      endif
+!!$      smpl= samples(ismpl)
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
@@ -423,6 +446,7 @@ contains
       swgt= smpl%wgt
 !.....Derivative of energy term w.r.t. weights
       if( lematch ) then
+        ttmp = mpi_wtime()
         eref= smpl%eref
         esub= smpl%esub
         eerr= smpl%eerr
@@ -439,7 +463,8 @@ contains
           endif
           gtrnl(1:ndim) = gtrnl(1:ndim) &
                +tmp/natm/eerr *swgt &
-               *(smpl%gwe(1:ndim) -gwesub(1:ndim))
+               *(gwe(1:ndim) -gwesub(1:ndim))
+!!$               *(smpl%gwe(1:ndim) -gwesub(1:ndim))
         else
           ediff= (epot+esub -eref)/natm /eerr
           if( trim(ctype_loss).eq.'LS' ) then
@@ -452,11 +477,14 @@ contains
             endif
           endif
           gtrnl(1:ndim) = gtrnl(1:ndim) &
-               +tmp*smpl%gwe(1:ndim)/natm/eerr *swgt
+               +tmp*gwe(1:ndim)/natm/eerr *swgt
+!!$               +tmp*smpl%gwe(1:ndim)/natm/eerr *swgt
         endif
+        tergl = tergl +mpi_wtime() -ttmp
       endif
 !.....Derivative of force term w.r.t. weights
       if( lfmatch ) then
+        ttmp = mpi_wtime()
         frcs(1:3,1:natm)= smpl%fa(1:3,1:natm)
         ferr= smpl%ferr
         dn3i= 1d0/3/smpl%nfcal
@@ -483,12 +511,15 @@ contains
               endif
             endif
             gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
-                 *smpl%gwf(1:ndim,ixyz,ia) *dn3i *swgt *ferri *gdw
+                 *gwf(ixyz,1:ndim,ia) *dn3i *swgt *ferri *gdw
+!!$                 *smpl%gwf(ixyz,1:ndim,ia) *dn3i *swgt *ferri *gdw
           enddo
         enddo
+        tfrcl = tfrcl +mpi_wtime() -ttmp
       endif
 !.....Derivative of stress w.r.t. weights
       if( lsmatch ) then
+        ttmp = mpi_wtime()
         serr= smpl%serr
         pdiff(1:6) = 0d0
         abssref = abs(smpl%sref(1,1)+smpl%sref(2,2)+smpl%sref(3,3))/3
@@ -512,11 +543,15 @@ contains
             endif
           endif
           gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
-               *smpl%gws(1:ndim,k) *swgt *serri /6
+               *gws(k,1:ndim) *swgt *serri /6
+!!$               *smpl%gws(k,1:ndim) *swgt *serri /6
         enddo
+        tstrsl = tstrs +mpi_wtime() -ttmp
       endif
     enddo
-
+    terg = terg +tergl
+    tfrc = tfrc +tfrcl
+    tstrs = tstrs +tstrsl
     tgl= mpi_wtime() -tg0
 
     tc0= mpi_wtime()
@@ -703,8 +738,8 @@ contains
     real(8),intent(out):: strs(3,3)
     logical,intent(in):: lcalcgrad,lfdsgnmat
     character(len=20),intent(in):: cffs(nff)
-    real(8),intent(out),optional:: gwe(ndimp),gwf(ndimp,3,maxna),&
-         gws(ndimp,6)
+    real(8),intent(out),optional:: gwe(ndimp),gwf(3,ndimp,maxna),&
+         gws(6,ndimp)
 
     logical,save:: l1st = .true.
 
@@ -834,7 +869,8 @@ contains
          ,lematch,lfmatch,lsmatch,boundary)
 !.....Stress definition, negative as compressive, positive as tensile
     strs(1:3,1:3) = ptnsr(1:3,1:3) *up2gpa*(-1d0)
-    if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
+!!$    if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
+    if( present(gws) ) gws(1:6,1:ndimp) = gws(1:6,1:ndimp) *up2gpa*(-1d0)
     if( lfdsgnmat ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)
 !!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
 !!$  print *,'smpl%natm =',smpl%natm
@@ -1520,7 +1556,7 @@ contains
 
     type(mdsys):: smpl
     integer:: inode,itag,iprty,nn,ndims,ndimr,inc,ismpl,ia,ja,isf,nsf
-    real(8):: dg2
+    real(8):: dg2,gdwmin,gdwmax
     real(8),allocatable:: xparts(:,:),xpartr(:,:),gdfs(:),gdfr(:)
 
     if( lgdwed ) return
@@ -1594,6 +1630,12 @@ contains
       enddo
     enddo
 
+    if( myid.eq.0 ) then
+      gdwmin = 1d0 /maxval(gdfr)*natot
+      gdwmax = 1d0 /minval(gdfr)*natot
+      print '(a,2es12.4)',' Gaussian density weights, min and max = ', &
+           gdwmin,gdwmax
+    endif
     deallocate(xparts,xpartr,gdfs,gdfr)
     lgdwed = .true.
     

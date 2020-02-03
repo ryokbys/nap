@@ -1,6 +1,6 @@
 module NN2
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-25 10:43:04 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-03 17:09:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of neural-network potential with upto 2
 !  hidden layers. It is available for plural number of species.
@@ -1466,7 +1466,7 @@ contains
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
     integer,intent(in):: ndimp
-    real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
+    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
 
     integer:: iv,ia,ihl0,ihl1,jj,ja,jra
@@ -1598,7 +1598,7 @@ contains
                 ftmp(1:3) = -w2 *(dds *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
                      +ds*dgsf(1:3,ihl0,jj,ia) )
 !.....Derivative of forces wrt weights
-                gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+                gwf(1:3,iv,jra) = gwf(1:3,iv,jra) +ftmp(1:3)
               enddo  ! jj=
             enddo  ! ihl1=
 !!$          endif
@@ -1621,7 +1621,7 @@ contains
                 w1 = wgt11(ihl0,ihl1)
                 ftmp(1:3) = -w1 *tmp *dgsf(1:3,ihl0,jj,ia)
 !.....Derivative of force
-                gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+                gwf(1:3,iv,jra) = gwf(1:3,iv,jra) +ftmp(1:3)
               enddo  ! ihl0=
             enddo  ! jj=
           enddo  ! ihl1=
@@ -1664,15 +1664,15 @@ contains
               ftmp(1:3) = -w2 *(dds *gsf(ihl0,ia) *dgsf2(1:3,jj,ihl1,ia) &
                    +ds*dgsf(1:3,ihl0,jj,ia) )
 !.....Derivative of forces wrt weights
-              gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+              gwf(1:3,iv,jra) = gwf(1:3,iv,jra) +ftmp(1:3)
 !.....Derivative of stress wrt weights
               if( jj.eq.0 ) cycle
-              gws(iv,1) = gws(iv,1) +rij(1)*ftmp(1)
-              gws(iv,2) = gws(iv,2) +rij(2)*ftmp(2)
-              gws(iv,3) = gws(iv,3) +rij(3)*ftmp(3)
-              gws(iv,4) = gws(iv,4) +rij(2)*ftmp(3)
-              gws(iv,5) = gws(iv,5) +rij(1)*ftmp(3)
-              gws(iv,6) = gws(iv,6) +rij(1)*ftmp(2)
+              gws(1,iv) = gws(1,iv) +rij(1)*ftmp(1)
+              gws(2,iv) = gws(2,iv) +rij(2)*ftmp(2)
+              gws(3,iv) = gws(3,iv) +rij(3)*ftmp(3)
+              gws(4,iv) = gws(4,iv) +rij(2)*ftmp(3)
+              gws(5,iv) = gws(5,iv) +rij(1)*ftmp(3)
+              gws(6,iv) = gws(6,iv) +rij(1)*ftmp(2)
             enddo  ! jj=
           enddo  ! ihl1=
 !!$          endif
@@ -1699,21 +1699,21 @@ contains
                 w1 = wgt11(ihl0,ihl1)
                 ftmp(1:3) = -w1 *tmp *dgsf(1:3,ihl0,jj,ia)
 !.....Derivative of force
-                gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+                gwf(1:3,iv,jra) = gwf(1:3,iv,jra) +ftmp(1:3)
               enddo  ! ihl0=
             else
               do ihl0=1,nhl(0)
                 w1 = wgt11(ihl0,ihl1)
                 ftmp(1:3) = -w1 *tmp *dgsf(1:3,ihl0,jj,ia)
 !.....Derivative of force
-                gwf(iv,1:3,jra) = gwf(iv,1:3,jra) +ftmp(1:3)
+                gwf(1:3,iv,jra) = gwf(1:3,iv,jra) +ftmp(1:3)
 !.....Derivative of stress
-                gws(iv,1) = gws(iv,1) +rij(1)*ftmp(1)
-                gws(iv,2) = gws(iv,2) +rij(2)*ftmp(2)
-                gws(iv,3) = gws(iv,3) +rij(3)*ftmp(3)
-                gws(iv,4) = gws(iv,4) +rij(2)*ftmp(3)
-                gws(iv,5) = gws(iv,5) +rij(1)*ftmp(3)
-                gws(iv,6) = gws(iv,6) +rij(1)*ftmp(2)
+                gws(1,iv) = gws(1,iv) +rij(1)*ftmp(1)
+                gws(2,iv) = gws(2,iv) +rij(2)*ftmp(2)
+                gws(3,iv) = gws(3,iv) +rij(3)*ftmp(3)
+                gws(4,iv) = gws(4,iv) +rij(2)*ftmp(3)
+                gws(5,iv) = gws(5,iv) +rij(1)*ftmp(3)
+                gws(6,iv) = gws(6,iv) +rij(1)*ftmp(2)
               enddo  ! ihl0=
             endif
           enddo  ! jj=

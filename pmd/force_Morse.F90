@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-20 12:37:56 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-03 17:12:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -1176,7 +1176,7 @@ contains
     real(8),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
     real(8),intent(inout):: epot
     integer,intent(in):: ndimp
-    real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
+    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
 
     integer:: i,j,k,l,m,n,jj,ierr,is,js,ixyz,jxyz,inc,nspt &
@@ -1360,14 +1360,14 @@ contains
           do js=is,nsp
             if( .not. interact(is,js) ) cycle
             nf = nf + 1
-            gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_d0(is,js,1:3,i)
-            if( is.ne.js ) gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_d0(js,is,1:3,i)
+            gwf(1:3,nf,i)=gwf(1:3,nf,i) +gf_d0(is,js,1:3,i)
+            if( is.ne.js ) gwf(1:3,nf,i)=gwf(1:3,nf,i) +gf_d0(js,is,1:3,i)
             nf = nf + 1
-            gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_alp(is,js,1:3,i)
-            if( is.ne.js ) gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_alp(js,is,1:3,i)
+            gwf(1:3,nf,i)=gwf(1:3,nf,i) +gf_alp(is,js,1:3,i)
+            if( is.ne.js ) gwf(1:3,nf,i)=gwf(1:3,nf,i) +gf_alp(js,is,1:3,i)
             nf = nf + 1
-            gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_rmin(is,js,1:3,i)
-            if( is.ne.js ) gwf(nf,1:3,i)=gwf(nf,1:3,i) +gf_rmin(js,is,1:3,i)
+            gwf(1:3,nf,i)=gwf(1:3,nf,i) +gf_rmin(is,js,1:3,i)
+            if( is.ne.js ) gwf(1:3,nf,i)=gwf(1:3,nf,i) +gf_rmin(js,is,1:3,i)
           enddo
         enddo
       enddo
@@ -1380,18 +1380,18 @@ contains
             if( .not. interact(is,js) ) cycle
             ns = ns + 1
             do k=1,6
-              gws(ns,k)=gws(ns,k) +gs_d0(is,js,k)
-              if( is.ne.js ) gws(ns,k)=gws(ns,k) +gs_d0(js,is,k)
+              gws(k,ns)=gws(k,ns) +gs_d0(is,js,k)
+              if( is.ne.js ) gws(k,ns)=gws(k,ns) +gs_d0(js,is,k)
             enddo
             ns = ns + 1
             do k=1,6
-              gws(ns,k)=gws(ns,k) +gs_alp(is,js,k)
-              if( is.ne.js ) gws(ns,k)=gws(ns,k) +gs_alp(js,is,k)
+              gws(k,ns)=gws(k,ns) +gs_alp(is,js,k)
+              if( is.ne.js ) gws(k,ns)=gws(k,ns) +gs_alp(js,is,k)
             enddo
             ns = ns + 1
             do k=1,6
-              gws(ns,k)=gws(ns,k) +gs_rmin(is,js,k)
-              if( is.ne.js ) gws(ns,k)=gws(ns,k) +gs_rmin(js,is,k)
+              gws(k,ns)=gws(k,ns) +gs_rmin(is,js,k)
+              if( is.ne.js ) gws(k,ns)=gws(k,ns) +gs_rmin(js,is,k)
             enddo
           enddo
         enddo
@@ -1416,7 +1416,7 @@ contains
          ,tag(namax),chg(namax)
     real(8),intent(inout):: epot
     integer,intent(in):: ndimp
-    real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
+    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,inc
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,dedr &

@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-09-03 12:25:39 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-03 17:11:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -752,7 +752,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,ndimp,iprint,lspr(0:nnmax,namax)&
          ,iprm0
     real(8),intent(in):: tag(namax),ra(3,namax),h(3,3),rcin
-    real(8),intent(inout):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
+    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
 
     integer:: i,ia,ja,jj,isf,ne,nf,jra
@@ -783,7 +783,7 @@ contains
           do isf=1,nsf
             nf = nf + 1
 !!$            if( igsf(isf,jj,ia).eq.0 ) cycle
-            gwf(nf,1:3,jra) = gwf(nf,1:3,jra) -dgsf(1:3,isf,jj,ia)
+            gwf(1:3,nf,jra) = gwf(1:3,nf,jra) -dgsf(1:3,isf,jj,ia)
           enddo
         enddo
       enddo
@@ -813,7 +813,7 @@ contains
               nf = nf + 1
               ftmp(1:3) = -dgsf(1:3,isf,jj,ia)
 !.....Force
-              gwf(nf,1:3,jra) = gwf(nf,1:3,jra) +ftmp(1:3)
+              gwf(1:3,nf,jra) = gwf(1:3,nf,jra) +ftmp(1:3)
 !.....No stress contribution for jj==0
             enddo
           else
@@ -822,14 +822,14 @@ contains
               nf = nf + 1
               ftmp(1:3) = -dgsf(1:3,isf,jj,ia)
 !.....Force
-              gwf(nf,1:3,jra) = gwf(nf,1:3,jra) +ftmp(1:3)
+              gwf(1:3,nf,jra) = gwf(1:3,nf,jra) +ftmp(1:3)
 !.....Stress
-              gws(nf,1) = gws(nf,1) +rij(1)*ftmp(1)
-              gws(nf,2) = gws(nf,2) +rij(2)*ftmp(2)
-              gws(nf,3) = gws(nf,3) +rij(3)*ftmp(3)
-              gws(nf,4) = gws(nf,4) +rij(2)*ftmp(3)
-              gws(nf,5) = gws(nf,5) +rij(1)*ftmp(3)
-              gws(nf,6) = gws(nf,6) +rij(1)*ftmp(2)
+              gws(1,nf) = gws(1,nf) +rij(1)*ftmp(1)
+              gws(2,nf) = gws(2,nf) +rij(2)*ftmp(2)
+              gws(3,nf) = gws(3,nf) +rij(3)*ftmp(3)
+              gws(4,nf) = gws(4,nf) +rij(2)*ftmp(3)
+              gws(5,nf) = gws(5,nf) +rij(1)*ftmp(3)
+              gws(6,nf) = gws(6,nf) +rij(1)*ftmp(2)
             enddo
           endif
         enddo

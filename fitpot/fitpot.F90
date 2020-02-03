@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-01-31 11:14:50 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-03 18:00:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -12,6 +12,7 @@ program fitpot
   use NN2,only: set_iglid_NN2
   use linreg,only: set_iglid_linreg
   use util,only: time_stamp
+  use DNN,only: write_tgrads_DNN
   implicit none
   integer:: ismpl,ihour,imin,isec
   real(8):: tmp,ftrn0,ftst0
@@ -22,6 +23,9 @@ program fitpot
   call mpi_comm_rank(mpi_comm_world,myid,ierr)
   mpi_world= mpi_comm_world
   tcomm= 0d0
+  terg = 0d0
+  tfrc = 0d0
+  tstrs = 0d0
 
   call init_variables()
 
@@ -44,13 +48,13 @@ program fitpot
       if( lgdw ) print *,'Gaussian density weight only works for ML potentials, so unset GDW.'
       lgdw = .false.
     endif
-!.....Normalization and GDW cannot be used with SGD
-    if( trim(cfmethod).eq.'sgd' .or. trim(cfmethod).eq.'SGD' ) then
-      if( lgdw ) print *,'Gaussian density weight is not available with SGD, so unset GDW.'
-      lgdw = .false.
-      if( lnormalize ) print *,'Normalization is not available with SGD, so unset normalization.'
-      lnormalize = .false.
-    endif
+!!$!.....Normalization and GDW cannot be used with SGD
+!!$    if( trim(cfmethod).eq.'sgd' .or. trim(cfmethod).eq.'SGD' ) then
+!!$      if( lgdw ) print *,'Gaussian density weight is not available with SGD, so unset GDW.'
+!!$      lgdw = .false.
+!!$      if( lnormalize ) print *,'Normalization is not available with SGD, so unset normalization.'
+!!$      lnormalize = .false.
+!!$    endif
 !.....GDW assumes that G's are normalized
     if( lgdw ) lnormalize = .true.
     call write_initial_setting()
@@ -99,6 +103,8 @@ program fitpot
 !.....Subtract atomic energy
   if( trim(cpot).ne.'vcMorse' ) then
     if( len(trim(crefstrct)).gt.5 ) then
+      print *,'ERROR: reference_structure is not available in this version...'
+      stop 1
       call subtract_ref_struct_energy()
     else
       call subtract_atomic_energy()
@@ -264,6 +270,11 @@ program fitpot
     write(6,'(a,f15.3,a,i3,"h",i2.2,"m",i2.2,"s")') &
          ' Time      = ', tmp, &
          ' sec  = ', ihour,imin,isec
+    if( iprint.gt.1 ) then
+      print '(a,3(2x,f0.3))',' Time for erg,frc,strs in xxx_w_pmd = ', &
+           terg,tfrc,tstrs
+      call write_tgrads_DNN(myid)
+    endif
     call time_stamp(' Job finished')
   endif
   call mpi_finalize(ierr)
@@ -307,7 +318,9 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,l3)') 'stress_match',lsmatch
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,a)') 'potential',trim(cpot)
-  write(6,'(2x,a25,10(2x,a))') 'subtract_force_field',(trim(csubffs(i)),i=1,nsubff)
+  if( nsubff.gt.0 ) then
+    write(6,'(2x,a25,10(2x,a))') 'subtract_force_field',(trim(csubffs(i)),i=1,nsubff)
+  endif
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,a)') 'penalty',trim(cpena)
   write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',pwgt
@@ -637,13 +650,15 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
        ,smpl%eki(3,3,natm),smpl%epi(natm) &
        ,smpl%chg(natm),smpl%chi(natm),smpl%tei(natm),smpl%fsub(3,natm) &
-       ,smpl%eatm(natm) &
-       ,smpl%gwe(nvars),smpl%gwf(nvars,3,natm),smpl%gws(nvars,6))
+       ,smpl%eatm(natm) )
+!!$       ,smpl%eatm(natm) &
+!!$       ,smpl%gwe(nvars),smpl%gwf(3,nvars,natm),smpl%gws(6,nvars))
   mem = mem +8*size(smpl%ra) +8*size(smpl%fa) +8*size(smpl%tag) &
        +8*size(smpl%fref) +4*size(smpl%ifcal) +8*size(smpl%fabs) &
        +8*size(smpl%va) +8*size(smpl%strsi) +8*size(smpl%eki) +8*size(smpl%epi) &
        +8*size(smpl%chg) +8*size(smpl%chi) +8*size(smpl%tei) +8*size(smpl%fsub) &
-       +8*size(smpl%eatm) +8*size(smpl%gwe) +8*size(smpl%gwf) +8*size(smpl%gws)
+       +8*size(smpl%eatm)
+!!$       +8*size(smpl%eatm) +8*size(smpl%gwe) +8*size(smpl%gwf) +8*size(smpl%gws)
   if( lgdw ) then
     allocate(smpl%gdf(natm),smpl%gdw(natm))
     mem = mem +8*size(smpl%gdf) +8*size(smpl%gdw)
@@ -1308,7 +1323,7 @@ subroutine write_force_relation(cadd)
   character(len=*),intent(in):: cadd
   character(len=128):: cfname
 
-  integer:: ismpl,ia,ixyz,natm,nmax,nmaxl
+  integer:: ismpl,ia,ixyz,natm,nmax,nmaxl,meml
   logical:: l1st = .true.
   logical:: lfcal
   
@@ -1328,9 +1343,14 @@ subroutine write_force_relation(cadd)
          ,ferrl(nsmpl),ferrg(nsmpl),fsubl(3,nmax,nsmpl) &
          ,fsubg(3,nmax,nsmpl),lfcall(nmax,nsmpl),lfcalg(nmax,nsmpl) &
          ,gdwl(nmax,nsmpl),gdwg(nmax,nsmpl))
-    mem = mem +8*size(frefl) +8*size(frefg) +8*size(fal) +8*size(fag) &
+    meml = 8*size(frefl) +8*size(frefg) +8*size(fal) +8*size(fag) &
          +8*size(ferrl) +8*size(ferrg) +8*size(fsubl) +8*size(fsubg) &
          +4*size(lfcall) +4*size(lfcalg) +8*size(gdwl) +8*size(gdwg)
+    mem = mem +meml
+    if( iprint.gt.1 .and. myid.eq.0 .and. l1st ) then
+      print '(a,f0.3,a)',' Memory for write_force_relation = ', &
+           dble(meml)/1000/1000,' MB'
+    endif
   endif
 
   if( l1st ) then
@@ -1512,6 +1532,9 @@ subroutine write_stats(iter)
   integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst,nfcal,ixyz,jxyz
   type(mdsys)::smpl
   real(8):: de,df,ds
+  real(8):: eref1l,eref1,eref2l,eref2,evar,tmp
+  real(8):: fref1l,fref1,fref2l,fref2,fvar
+  real(8):: sref1l,sref1,sref2l,sref2,svar
   real(8):: demaxl_trn,demax_trn,desuml_trn,desum_trn,rmse_trn
   real(8):: demaxl_tst,demax_tst,desuml_tst,desum_tst,rmse_tst
   real(8):: dfmaxl_trn,dfmax_trn,dfsuml_trn,dfsum_trn
@@ -1553,7 +1576,6 @@ subroutine write_stats(iter)
     endif
 
   endif
-  l1st = .false.
 
   epotsub = 0d0
   if( len(trim(crefstrct)).gt.5 ) then
@@ -1569,11 +1591,16 @@ subroutine write_stats(iter)
   desuml_trn= 0d0
   demaxl_tst= 0d0
   desuml_tst= 0d0
+  eref1l = 0d0
+  eref2l = 0d0
   do ismpl=isid0,isid1
     smpl= samples(ismpl)
     natm= smpl%natm
     de= abs(smpl%epot-epotsub*natm+smpl%esub &
          -(smpl%eref-erefsub*natm))/natm
+    tmp = smpl%eref/natm
+    eref1l = eref1l +tmp
+    eref2l = eref2l +tmp*tmp
 !!$    de= abs(smpl%epot-epotsub*natm &
 !!$         -(smpl%eref-erefsub*natm-smpl%esub))/natm
     if( smpl%iclass.eq.1 ) then
@@ -1594,6 +1621,13 @@ subroutine write_stats(iter)
        ,mpi_real8,mpi_max,0,mpi_world,ierr)
   call mpi_reduce(demaxl_tst,demax_tst,1 &
        ,mpi_real8,mpi_max,0,mpi_world,ierr)
+  if( l1st ) then
+    call mpi_reduce(eref1l,eref1,1 &
+         ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(eref2l,eref2,1 &
+         ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    evar = eref2/(nsmpl_trn+nsmpl_tst) -(eref1/(nsmpl_trn+nsmpl_tst))**2
+  endif
   rmse_trn= sqrt(desum_trn/nsmpl_trn)
   if( nsmpl_tst.ne.0 ) then
     rmse_tst= sqrt(desum_tst/nsmpl_tst)
@@ -1627,6 +1661,8 @@ subroutine write_stats(iter)
   dfsuml_tst= 0d0
   ntrnl= 0
   ntstl= 0
+  fref1l = 0d0
+  fref2l = 0d0
   do ismpl=isid0,isid1
     smpl= samples(ismpl)
     nfcal= smpl%nfcal
@@ -1641,6 +1677,9 @@ subroutine write_stats(iter)
           dfmaxl_trn= max(dfmaxl_trn,df)
           dfsuml_trn=dfsuml_trn +df*df
           ntrnl=ntrnl +1
+          tmp = smpl%fref(l,ia)
+          fref1l = fref1l +tmp
+          fref2l = fref2l +tmp*tmp
         enddo
       enddo
     else if( smpl%iclass.eq.2 ) then
@@ -1652,6 +1691,9 @@ subroutine write_stats(iter)
           dfmaxl_tst= max(dfmaxl_tst,df)
           dfsuml_tst=dfsuml_tst +df*df
           ntstl=ntstl +1
+          tmp = smpl%fref(l,ia)
+          fref1l = fref1l +tmp
+          fref2l = fref2l +tmp*tmp
         enddo
       enddo
     endif
@@ -1673,6 +1715,13 @@ subroutine write_stats(iter)
   call mpi_reduce(ntstl,ntst,1 &
        ,mpi_integer,mpi_sum,0,mpi_world,ierr)
   rmse_trn= sqrt(dfsum_trn/ntrn)
+  if( l1st ) then
+    call mpi_reduce(fref1l,fref1,1 &
+         ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(fref2l,fref2,1 &
+         ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    fvar = fref2/(ntrn+ntst) -(fref1/(ntrn+ntst))**2 
+  endif
 !!$  print *,'dfsum_trn,ntrn = ',dfsum_trn,dfsuml_trn,ntrn,rmse_trn
   if( ntst.ne.0 ) then
     rmse_tst= sqrt(dfsum_tst/ntst)
@@ -1699,6 +1748,8 @@ subroutine write_stats(iter)
   dssuml_tst = 0d0
   ntrnl = 0
   ntstl = 0
+  sref1l = 0d0
+  sref2l = 0d0
   do ismpl=isid0,isid1
     smpl = samples(ismpl)
     if( smpl%iclass.eq.1 ) then
@@ -1709,6 +1760,9 @@ subroutine write_stats(iter)
           dsmaxl_trn = max(dsmaxl_trn,ds)
           dssuml_trn = dssuml_trn +ds*ds
           ntrnl = ntrnl +1
+          tmp = smpl%sref(ixyz,jxyz)
+          sref1l = sref1l +tmp
+          sref2l = sref2l +tmp*tmp
         enddo
       enddo
     else if( smpl%iclass.eq.2 ) then
@@ -1719,6 +1773,9 @@ subroutine write_stats(iter)
           dsmaxl_tst = max(dsmaxl_tst,ds)
           dssuml_tst = dssuml_tst +ds*ds
           ntstl = ntstl +1
+          tmp = smpl%sref(ixyz,jxyz)
+          sref1l = sref1l +tmp
+          sref2l = sref2l +tmp*tmp
         enddo
       enddo
     endif
@@ -1739,6 +1796,13 @@ subroutine write_stats(iter)
        ,mpi_integer,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(ntstl,ntst,1 &
        ,mpi_integer,mpi_sum,0,mpi_world,ierr)
+  if( l1st ) then
+    call mpi_reduce(sref1l,sref1,1 &
+         ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(sref2l,sref2,1 &
+         ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    svar = sref2/(ntrn+ntst) -(sref1/(ntrn+ntst))**2
+  endif
   rmse_trn= sqrt(dssum_trn/ntrn)
   if( ntst.ne.0 ) then
     rmse_tst = sqrt(dssum_tst/ntst)
@@ -1759,8 +1823,12 @@ subroutine write_stats(iter)
 !!$      print *,' dssum_trn,strndnm,sr2trn=',dssum_trn,strndnm,sr2trn
 !!$      print *,' dssum_tst,ststdnm,sr2tst=',dssum_tst,ststdnm,sr2tst
 !!$    endif
+!.....Finally write out variances of reference data
+    if( l1st ) print '(a,3es12.4)',' Data variances (energy, force, stress) = ',&
+         evar,fvar,svar
   endif
 
+  l1st = .false.
   return
 end subroutine write_stats
 !=======================================================================

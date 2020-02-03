@@ -429,20 +429,31 @@ contains
         print *, '************************ Stochastic gradient descent (SGD) '&
              //'************************'
         print *,'   Update method: ',trim(csgdupdate)
+        if( trim(csgdupdate).ne.'adam' &
+             .and. trim(csgdupdate).ne.'adabound' ) then
+          if( myid.eq.0 ) then
+            print *,'WARNING: update method '//trim(csgdupdate)//' is not available.'
+            print *,'         Use normal sgd instead...'
+          endif
+        endif
+        print '(a,i0)','    SGD batch size = ',nsgdbsize
+        if( trim(csgdupdate).eq.'adam' ) then
+          print '(a,es11.3)','    epsilon value = ',sgd_eps
+          print '(a,es11.3)','    beta1 = ',adam_b1
+          print '(a,es11.3)','    beta2 = ',adam_b2
+        else if( trim(csgdupdate).eq.'adabound' ) then
+          print '(a,es11.3)','    epsilon value = ',sgd_eps
+          print '(a,es11.3)','    beta1 = ',adam_b1
+          print '(a,es11.3)','    beta2 = ',adam_b2
+        endif
+        print '(a,es11.3)','    initial learning rate = ',sgd_rate_ini
+        if( sgd_rate_fin.gt.0d0 ) print '(a,es11.3)','    final learning rate  = ',sgd_rate_fin
         print *,''
       endif
       allocate(x(ndim),dx(ndim),rm(ndim),rmh(ndim),gpena(ndim) &
            ,gp(ndim),gtmp(ndim),v(ndim),vh(ndim))
       allocate(ismask(isid0:isid1))
       sgd_rate = sgd_rate_ini
-    endif
-
-    if( trim(csgdupdate).ne.'adam' .and. trim(csgdupdate).ne.'Adam' &
-         .and. trim(csgdupdate).ne.'adabound' ) then
-      if( myid.eq.0 ) then
-        print *,'WARNING: update method '//trim(csgdupdate)//' is not available.'
-        print *,'         Use normal sgd instead...'
-      endif
     endif
 
 !.....Initialization
