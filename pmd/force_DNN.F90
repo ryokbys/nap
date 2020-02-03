@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-03 17:29:27 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-03 22:29:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -175,12 +175,6 @@ contains
           gw(ml0)= gw(ml0) +gls(ml1,1)*wgts(ml0,ml1,1)
         enddo
       enddo
-!!$      if( ia.eq.1 ) then
-!!$        print '(a,i5,20es15.7)','ia,gls=',ia,gls(1:nhl(1),1)
-!!$        print '(a,20es13.5)','wgts(:,1,1)=',wgts(0:nhl(0),1,1)
-!!$        print '(a,20es13.5)','wgts(:,2,1)=',wgts(0:nhl(0),2,1)
-!!$        print '(a,20es13.5)','gw(0:nhl(0))=',gw(0:nhl(0))
-!!$      endif
 !.....Derivative of SF of atom-i w.r.t. atom-j 
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)

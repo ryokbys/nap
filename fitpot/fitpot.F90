@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-03 18:00:35 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-03 22:31:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -42,7 +42,11 @@ program fitpot
     write(6,'(a,i6)') ' Number of processes in MPI = ',nnode
     call read_input(10,'in.fitpot')
 !.....NN and NN2 are both pointing NN2
-    if( trim(cpot).eq.'NN' ) cpot = 'NN2'
+    if( trim(cpot).eq.'NN' .or. trim(cpot).eq.'NN2' ) then
+      print *,'ERROR: NN and NN2 potentials are no longer available in fitpot.'
+      print *,'       Use DNN instead.'
+      stop
+    endif
 !.....Check GDW; GDW works only with ML potentials, which use descriptors
     if( index(cpot,'NN').eq.0  .and. trim(cpot).ne.'linreg' ) then
       if( lgdw ) print *,'Gaussian density weight only works for ML potentials, so unset GDW.'

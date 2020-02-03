@@ -41,6 +41,7 @@ module descriptor
 !.....symmetry function values and their derivatives
   real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
   real(8),allocatable:: gsfi(:),dgsfi(:,:,:)
+  real(8),allocatable:: gscli(:) ! scaling factor to G's
 !.....symmetry function IDs for each pair
   integer(2),allocatable:: igsf(:,:,:),igsfi(:,:)
   logical:: lupdate_gsf = .true.
@@ -160,9 +161,11 @@ contains
       endif
 
 !.....gsfi,dgsfi,igsfi are independend on number of atoms but on nnlmax
-      if( allocated(gsfi) ) deallocate(gsfi,dgsfi,igsfi)
-      allocate(gsfi(nsf),dgsfi(3,nsf,0:nnmax),igsfi(nsf,0:nnmax))
-      mem = mem +8*size(gsfi) +8*size(dgsfi) +2*size(igsfi)
+      if( .not. allocated(gsfi) ) then
+        allocate(gsfi(nsf),dgsfi(3,nsf,0:nnmax),igsfi(nsf,0:nnmax),gscli(nsf))
+        mem = mem +8*size(gsfi) +8*size(dgsfi) +2*size(igsfi) +8*size(gscli)
+        gscli(:) = 1d0
+      endif
     endif
 
 !  Since natm and nn can change every step of MD,
@@ -256,6 +259,8 @@ contains
     integer,intent(in):: iprint
     real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
 
+    integer:: isf
+
     gsfi(:)= 0d0
     dgsfi(:,:,:)= 0d0
     igsfi(:,:) = 0
@@ -274,9 +279,14 @@ contains
                //' when called from fitpot.'
           stop
         endif
-        gsf(:,ia) = gsfi(:)
-        dgsf(:,:,0:nnl,ia) = dgsfi(:,:,0:nnl)
-        igsf(:,0:nnl,ia) = igsfi(:,0:nnl)
+!!$        if( ia.eq.1 ) print '(a,i6,es11.3)','isf,gscli=',1,gscli(1)
+        do isf=1,nsf
+          gsfi(isf) = gsfi(isf) *gscli(isf)
+          dgsfi(:,isf,0:nnl) = dgsfi(:,isf,0:nnl) *gscli(isf)
+          gsf(isf,ia) = gsfi(isf)
+          dgsf(:,isf,0:nnl,ia) = dgsfi(:,isf,0:nnl)
+          igsf(isf,0:nnl,ia) = igsfi(isf,0:nnl)
+        enddo
       endif
     else ! Not to update gsf by desci_xxx just use gsfs given by fitpot
       if( lfitpot ) then
@@ -1710,6 +1720,19 @@ contains
     igsf(:,0:nnlo,1:nalo) = igsfo(:,0:nnlo,1:nalo)
     return
   end subroutine set_descs
+!=======================================================================
+  subroutine set_gscale(nsfo,gsclo)
+!
+!  Set G scales from the outside (fitpot).
+!
+    integer,intent(in):: nsfo
+    real(8),intent(in):: gsclo(nsfo)
+
+    if( nsf.ne.nsfo ) stop 'ERROR: nsf.ne.nsfo, which should not happen.'
+
+    gscli(:) = gsclo(:)
+    return
+  end subroutine set_gscale
 !=======================================================================
   subroutine get_dsgnmat_force(dgsfa,mpi_world)
 !

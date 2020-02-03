@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-03 17:55:38 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-03 22:18:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -165,16 +165,20 @@ contains
           samples(ismpl)%nsf = nsf
           samples(ismpl)%nal = nal
           samples(ismpl)%nnl = nnl
-          allocate(samples(ismpl)%gsf(nsf,nal) &
-               ,samples(ismpl)%dgsf(3,nsf,0:nnl,nal) &
-               ,samples(ismpl)%igsf(nsf,0:nnl,nal) )
-          memgsf = memgsf +8*size(samples(ismpl)%gsf) +8*size(samples(ismpl)%dgsf) &
-               +2*size(samples(ismpl)%igsf)
+!!$          allocate(samples(ismpl)%gsf(nsf,nal) &
+!!$               ,samples(ismpl)%dgsf(3,nsf,0:nnl,nal) &
+!!$               ,samples(ismpl)%igsf(nsf,0:nnl,nal) )
+!!$          memgsf = memgsf +8*size(samples(ismpl)%gsf) +8*size(samples(ismpl)%dgsf) &
+!!$               +2*size(samples(ismpl)%igsf)
+          allocate(samples(ismpl)%gsf(nsf,nal) )
+          memgsf = memgsf +8*size(samples(ismpl)%gsf)
           mem = mem +memgsf
         endif
+!!$        call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
+!!$             samples(ismpl)%nnl,samples(ismpl)%gsf, &
+!!$             samples(ismpl)%dgsf,samples(ismpl)%igsf)
         call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
-             samples(ismpl)%nnl,samples(ismpl)%gsf, &
-             samples(ismpl)%dgsf,samples(ismpl)%igsf)
+             samples(ismpl)%nnl,samples(ismpl)%gsf)
       endif
     enddo
 
@@ -334,7 +338,7 @@ contains
       print '(a,f0.3,a)',' Memory for gsfs = ',dble(memgsf)/1000/1000,' MB'
     endif
     l1st = .false.
-    if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) lupdate_gsf = .false.
+!!$    if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) lupdate_gsf = .false.
 
   end subroutine func_w_pmd
 !=======================================================================
@@ -858,7 +862,7 @@ contains
     endif
 
 !.....one_shot force calculation
-    if( iprint.gt.2 ) print '(/,a)',' one_shot for '//trim(smpl%cdirname)//'...'
+!!$    if( iprint.gt.2 ) print '(/,a)',' one_shot for '//trim(smpl%cdirname)//'...'
     call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
          ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
          ,smpl%chg,smpl%chi,smpl%tei &
@@ -1344,6 +1348,7 @@ contains
          ,lnormalized,cpot,gsfvar,gsfvs,sgms,sgmis,sgm_min,iprint &
          ,nn_nhl
     use parallel
+    use descriptor,only: set_gscale
     implicit none
     integer:: ismpl,natm,isf,i,iv,ihl0,ihl1
     integer,save:: nsf
@@ -1365,7 +1370,9 @@ contains
       enddo
       sgm = sqrt(gsfvar)
       sgmi= 1d0/sgm
-!.....standardize G values
+!.....Set gscale in descriptor module
+      call set_gscale(nsf,sgmis)
+!.....AND scale G's in each sample as well
       do ismpl=isid0,isid1
         natm= samples(ismpl)%natm
         if( .not. allocated(samples(ismpl)%gsf) ) then
@@ -1375,8 +1382,8 @@ contains
         endif
         do isf=1,nsf
           samples(ismpl)%gsf(isf,:)= samples(ismpl)%gsf(isf,:) *sgmis(isf)
-          samples(ismpl)%dgsf(:,isf,:,:)= &
-               samples(ismpl)%dgsf(:,isf,:,:) *sgmis(isf)
+!!$          samples(ismpl)%dgsf(:,isf,:,:)= &
+!!$               samples(ismpl)%dgsf(:,isf,:,:) *sgmis(isf)
         enddo
       enddo
       if( myid.eq.0 .and. iprint.gt.1 ) then
@@ -1425,6 +1432,7 @@ contains
          ,lnormalized,cpot,sgms,sgmis,gsfss,sq_min,iprint &
          ,nn_nhl
     use parallel
+    use descriptor,only: set_gscale
     implicit none
     integer:: ismpl,natm,isf,i,iv,ihl0,ihl1
     real(8):: sqmax,sqmin
@@ -1451,11 +1459,13 @@ contains
                ,myid,ismpl,trim(samples(ismpl)%cdirname)
           stop
         endif
+!.....Set gscale in descriptor module
+        call set_gscale(nsf,sgmis)
+!.....AND scale G's in each sample as well
         do isf=1,nsf
-          samples(ismpl)%gsf(isf,:)= samples(ismpl)%gsf(isf,:) &
-               *sgmis(isf)
-          samples(ismpl)%dgsf(:,isf,:,:)= &
-               samples(ismpl)%dgsf(:,isf,:,:) *sgmis(isf)
+          samples(ismpl)%gsf(isf,:)= samples(ismpl)%gsf(isf,:) *sgmis(isf)
+!!$          samples(ismpl)%dgsf(:,isf,:,:)= &
+!!$               samples(ismpl)%dgsf(:,isf,:,:) *sgmis(isf)
         enddo
       enddo
       if( myid.eq.0 .and. iprint.gt.1 ) then
