@@ -3,7 +3,7 @@
 Make typical crystalline structures of conventional cell.
 
 Usage:
-  cell_maker.py (sc|bcc|bcc110|bcc111|fcc|fcc110|hcp|diamond|nacl) [options]
+  cell_maker.py (sc|bcc|fcc|hcp|dia|nacl|zb|wz) [options]
 
 Options:
   -h, --help  Show this help message and exit.
@@ -13,6 +13,12 @@ Options:
              Lattice constant of an axis. [default: 5.427]
   -o OUTFILE
              Output file name. Format is detected automatically. [default: POSCAR]
+  --orientation ORIENTATION
+             Orientation of z-axis in Miller index. [default: 0,0,1]
+  --celltype CELLTYPE
+             Conventional or primitive. [default: conventional]
+  --specorder SPECORDER
+             Species order. [default: None]
 """
 from __future__ import print_function
 
@@ -44,10 +50,12 @@ def make_sc(latconst=1.0):
     return s
 
 
-def make_bcc(latconst=1.0,specorder=_default_specorder):
+def make_bcc(latconst=1.0,specorder=None):
     """
     Make a cell of bcc structure with z along [001].
     """
+    if specorder is None:
+        specorder = ['Fe']
     s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
@@ -113,10 +121,12 @@ def make_bcc111(latconst=1.0):
     s.add_atoms(symbols,poss,vels,frcs)
     return s
 
-def make_fcc(latconst=1.0,specorder=_default_specorder):
+def make_fcc(latconst=1.0,specorder=None):
     """
     Make a cell of fcc structure.
     """
+    if specorder is None:
+        specorder = ['Al']
     s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
@@ -135,10 +145,12 @@ def make_fcc(latconst=1.0,specorder=_default_specorder):
     return s
 
 
-def make_fcc110(latconst=1.0,specorder=_default_specorder):
+def make_fcc110(latconst=1.0,specorder=None):
     """
     Make a cell of fcc structure with z along [110].
     """
+    if specorder is None:
+        specorder = ['Al']
     s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
@@ -261,8 +273,13 @@ def make_2D_triangle(latconst=3.8,size=(1,1,1)):
     s.add_vacuum(2.*latconst, 0.0, 10.*latconst*np.sqrt(3))
     return s
 
-def make_nacl(latconst=1.0):
-    specorder = ['Na','Cl']
+def make_nacl(latconst=1.0,specorder=None):
+    if specorder is None:
+        specorder = ['Na','Cl']
+    if len(specorder) < 2:
+        specorder = ['Na','Cl']
+        print('Since len(specorder) < 2, specorder is reset to ',specorder)
+    
     s = NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
@@ -283,6 +300,81 @@ def make_nacl(latconst=1.0):
     s.add_atoms(symbols,poss,vels,frcs)
     return s
 
+def make_zincblend(latconst=1.0,specorder=None):
+    """
+    Make a cell of diamond structure.
+    """
+    if specorder is None:
+        specorder = ['Ga','N']
+    if len(specorder) < 2:
+        specorder = ['Ga','N']
+        print('Since len(specorder) < 2, specorder is reset to ',specorder)
+    
+    s= NAPSystem(specorder=specorder)
+    #...lattice
+    a1= np.array([ 1.0, 0.0, 0.0 ])
+    a2= np.array([ 0.0, 1.0, 0.0 ])
+    a3= np.array([ 0.0, 0.0, 1.0 ])
+    s.set_lattice(latconst,a1,a2,a3)
+    poss = [[0.00, 0.00, 0.00],
+            [0.50, 0.50, 0.00],
+            [0.50, 0.00, 0.50],
+            [0.00, 0.50, 0.50],
+            [0.25, 0.25, 0.25],
+            [0.75, 0.75, 0.25],
+            [0.75, 0.25, 0.75],
+            [0.25, 0.75, 0.75]]
+    symbols = [ specorder[0] if i<4 else specorder[1] for i in range(len(poss)) ]
+    vels = [ [0., 0., 0.] for i in range(len(poss)) ]
+    frcs = [ [0., 0., 0.] for i in range(len(poss)) ]
+    s.add_atoms(symbols,poss,vels,frcs)
+    return s
+
+
+def make_wurtzite(latconst=1.0,specorder=None,celltype='conventional'):
+    """
+    Make a cell of wurtzite structure.
+
+    - celltype: conventional or primitive
+    """
+    if specorder is None:
+        specorder = ['Ga','N']
+    if len(specorder) < 2:
+        specorder = ['Ga','N']
+        print('Since len(specorder) < 2, specorder is reset to ',specorder)
+    
+    s = NAPSystem(specorder=specorder)
+    if celltype[0] == 'c':
+        #...conventional cell
+        a1= np.array([ 1.00, 0.00, 0.00 ])
+        a2= np.array([ 0.00, np.sqrt(3.0), 0.00 ])
+        a3= np.array([ 0.00, 0.00, 1.633 ])
+        s.set_lattice(latconst,a1,a2,a3)
+        poss = [[0.00,  0.00,  0.00],
+                [0.50,  0.50,  0.00],
+                [0.50,  0.5/3, 0.50],
+                [0.00,  0.5/3+0.5, 0.50],
+                [0.50,  0.5/3,  0.125],
+                [0.00,  0.5/3+0.5, 0.125],
+                [0.00,  0.00,  0.625],
+                [0.50,  0.50,  0.625],]
+        symbols = [ specorder[0] if i<4 else specorder[1] for i in range(len(poss)) ]
+    elif cenlltype[0] == 'p':
+        #...primitive cell
+        a1= np.array([ 1.0, 0.0, 0.0 ])
+        a2= np.array([-0.5, np.sqrt(3.0)/2, 0.0 ])
+        a3= np.array([ 0.0, 0.0, 1.633 ])
+        s.set_lattice(latconst,a1,a2,a3)
+        poss = [[0.00,  0.00,  0.00],
+                [2.0/3, 1.0/3, 0.125],
+                [2.0/3, 1.0/3, 0.50],
+                [0.00,  0.00,  0.625],]
+        symbols = [ specorder[0] if i<2 else specorder[1] for i in range(len(poss)) ]
+    vels = [ [0., 0., 0.] for i in range(len(poss)) ]
+    frcs = [ [0., 0., 0.] for i in range(len(poss)) ]
+    s.add_atoms(symbols,poss,vels,frcs)
+    return s
+
 
 #=======================================================================
 if __name__ == "__main__":
@@ -295,26 +387,41 @@ if __name__ == "__main__":
     nx,ny,nz = [ int(x) for x in args['--size'].split(',') ]
     latconst= float(args['--lattice-constant'])
     ofname= args['-o']
+    orient = [ int(x) for x in args['--orientation'].split(',')]
+    celltype = args['--celltype']
+    specorder = [ x for x in args['--specorder'].split(',')]
+    if specorder[0] == None:
+        specorder = None
 
     struct= None
     if args['sc']:
         struct= make_sc(latconst)
     elif args['bcc']:
-        struct= make_bcc(latconst)
-    elif args['bcc110']:
-        struct= make_bcc110(latconst)
-    elif args['bcc111']:
-        struct= make_bcc111(latconst)
+        if orient == [0,0,1]:
+            struct= make_bcc(latconst)
+        elif orient == [1,1,0]:
+            struct= make_bcc110(latconst)
+        elif orient == [1,1,1]:
+            struct= make_bcc111(latconst)
+        else:
+            raise ValueError('The orientation is not available: ',orient)
     elif args['fcc']:
-        struct= make_fcc(latconst)
-    elif args['fcc110']:
-        struct= make_fcc110(latconst)
+        if orient == [0,0,1]:
+            struct= make_fcc(latconst)
+        elif orient == [1,1,0]:
+            struct= make_fcc110(latconst)
+        else:
+            raise ValueError('The orientation is not available: ',orient)
     elif args['hcp']:
         struct= make_hcp(latconst)
-    elif args['diamond']:
+    elif args['dia']:
         struct= make_diamond(latconst)
     elif args['nacl']:
         struct = make_nacl(latconst)
+    elif args['zb']:
+        struct = make_zincblend(latconst,specorder=specorder)
+    elif args['wz']:
+        struct = make_wurtzite(latconst,celltype=celltype,specorder=specorder)
 
     if struct is None:
         print("Something wrong: structure is not created...")
