@@ -56,7 +56,9 @@ module descriptor
 !.....Maximum cutoff radius
   real(8):: rcmax,rcmax2,rc3max
 
-  integer:: nalmax,nnlmax,nal,nnl
+  integer:: nng,nag,nnt
+  integer:: nal = 0
+  integer:: nnl = 0
 
 !.....Chebyshev
   logical:: lcheby = .false.
@@ -93,6 +95,21 @@ contains
 
   end subroutine init_desc
 !=======================================================================
+  subroutine pre_desci(namax,natm,nnmax,lspr,iprint)
+!
+!  Prepare for desci
+!
+    integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax),iprint
+
+    integer:: i
+    
+    nnt = 0
+    do i=1,natm
+      nnt = max(nnt,lspr(0,i))
+    enddo
+    return
+  end subroutine pre_desci
+!=======================================================================
   subroutine make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr &
        ,myid,mpi_world,iprint)
 !
@@ -104,7 +121,8 @@ contains
     integer,intent(in):: myid,mpi_world
     real(8),intent(in):: tag(namax)
 
-    integer:: i,nnltmp,ierr,time0
+    integer:: i,ierr,time0
+    integer:: ns_gsf(2),ns_dgsf(4)
     logical,save:: lrealloc = .false.
 
     if( .not. lupdate_gsf ) return
@@ -115,12 +133,8 @@ contains
 !  To reduce the memory usage, compute num of atoms and num of neighbors,
 !  and add some margin for those numbers because they can change during
 !  the simulation.
-      nal = int(natm*1.1)
-      nnltmp = 0
-      do i=1,natm
-        nnltmp = max(nnltmp,lspr(0,i))
-      enddo
-      nnl = int(nnltmp*1.1)
+      nal = max(nal,int(natm*1.1))
+      nnl = max(nnl,int(nnt*1.1))
       if( nal .gt. namax ) then
         write(6,'(a)') ' [Error] nal .gt.namax'
         write(6,'(a,3i10)') '   myid,nal,namax = ',myid,nal,namax
@@ -132,26 +146,29 @@ contains
         stop
       endif
       if( myid.ge.0 ) then
-        call mpi_reduce(nal,nalmax,1,mpi_integer,mpi_max,0,mpi_world,ierr)
-        call mpi_reduce(nnl,nnlmax,1,mpi_integer,mpi_max,0,mpi_world,ierr)
+        call mpi_reduce(nal,nag,1,mpi_integer,mpi_max,0,mpi_world,ierr)
+        call mpi_reduce(nnl,nng,1,mpi_integer,mpi_max,0,mpi_world,ierr)
       else
-        nalmax = nal
-        nnlmax = nnl
+        nag = nal
+        nng = nnl
       endif
       if( myid.le.0 .and. iprint.ne.0 ) then
         print *,''
         print *,'make_gsf_arrays @descriptor:'
-        write(6,'(a,2i0)') '   Max num of (local atoms *1.1) = ',nalmax
-        write(6,'(a,2i0)') '   Max num of (neighbors *1.1)   = ',nnlmax
+        write(6,'(a,2i0)') '   Max num of (local atoms *1.1) = ',nag
+        write(6,'(a,2i0)') '   Max num of (neighbors *1.1)   = ',nng
         write(6,'(a,f10.3,a)') '   gsf size  = ', &
-             dble(nsf*nalmax*8)/1000/1000,' MB'
+             dble(nsf*nag*8)/1000/1000,' MB'
         write(6,'(a,f10.3,a)') '   dgsf size = ', &
-             dble(3*nsf*(nnlmax+1)*nalmax*8)/1000/1000,' MB'
+             dble(3*nsf*(nng+1)*nag*8)/1000/1000,' MB'
         write(6,'(a,f10.3,a)') '   igsf size = ', &
-             dble(nsf*(nnlmax+1)*nalmax*2)/1000/1000,' MB'
+             dble(nsf*(nng+1)*nag*2)/1000/1000,' MB'
       endif
       if( allocated(gsf) ) then
-        if( size(gsf).lt.nsf*nal .or. size(dgsf).lt.3*nsf*(nnl+1)*nal ) then
+        ns_gsf = shape(gsf)
+        ns_dgsf = shape(dgsf)
+        if( ns_gsf(1).lt.nsf .or. ns_gsf(2).lt.nal .or. &
+             ns_dgsf(3).lt.(nnl+1) ) then
           lrealloc = .true.
         else
           lrealloc = .false.
@@ -169,44 +186,30 @@ contains
     endif
 
 !  Since natm and nn can change every step of MD,
-!  if natm/nnltmp becomes >nal/nnl, they should be updated and
+!  if natm/nnlt becomes >nal/nnl, they should be updated and
 !  gsf/dgsf as well.
     if( natm.gt.nal ) then
-      nal = int(natm*1.1)
+      nal = max(nal,int(natm*1.1))
+      if( iprint.gt.1 ) print *,'Since natm.gt.nal, nal was updated at myid =',myid
       if( nal .gt. namax ) then
-        write(6,'(a)') ' [Error] nal .gt.namax'
+        write(6,'(a)') ' [Error] nal.gt.namax'
         write(6,'(a,3i0)') '   myid,nal,namax = ',myid,nal,namax
         stop
-      else
-        write(6,*) ' Since natm.gt.nal, nal was updated at myid =',myid
       endif
       lrealloc=.true.
     endif
 
-    nnltmp = 0
-    do i=1,natm
-      nnltmp = max(nnltmp,lspr(0,i))
-    enddo
-    if( nnltmp.gt.nnl ) then
-      nnl = int(nnltmp*1.1)
-      if( nnlmax.gt.nnmax ) then
+    if( nnt.gt.nnl ) then
+      nnl = max(nnl,int(nnt*1.1))
+      if( iprint.gt.1 ) print *,'Since nnt.gt.nnl, nnl was updated at myid =',myid
+      if( nnl.gt.nnmax ) then
         write(6,'(a)') ' [Error] nnl.gt.nnmax'
         write(6,'(a,3i0)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
         stop
-      else
-        write(6,*) ' Since nnltmp.gt.nnl, nnl was updated at myid =',myid
       endif
       lrealloc=.true.
     endif
 
-!!$    if( allocated(dgsf).and.lrealloc ) then
-!!$      mem = mem -8*size(gsf) -8*size(dgsf) -4*size(igsf)
-!!$      deallocate( gsf,dgsf,igsf )
-!!$      allocate( gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal) &
-!!$           ,igsf(nsf,0:nnl,nal))
-!!$      mem = mem +8*size(gsf) +8*size(dgsf) +4*size(igsf)
-!!$      lrealloc=.false.
-!!$    endif
     if( lrealloc ) then
       if( allocated(gsf) ) then
         mem = mem -8*size(gsf) -8*size(dgsf) -2*size(igsf)
@@ -279,21 +282,27 @@ contains
                //' when called from fitpot.'
           stop
         endif
-!!$        if( ia.eq.1 ) print '(a,i6,es11.3)','isf,gscli=',1,gscli(1)
+!!$        if( ia.eq.1 .and. iprint.gt.1 ) then
+!!$          print '(a,10i6)','natm,nal,nnl,nnt=',natm,nal,nnl,nnt
+!!$          print '(a,10i6)','shape(dgsf) =',shape(dgsf)
+!!$          print '(a,10i6)','shape(dgsfi)=',shape(dgsfi)
+!!$          print '(a,10i6)','shape(igsf) =',shape(igsf)
+!!$          print '(a,10i6)','shape(igsfi)=',shape(igsfi)
+!!$        endif
         do isf=1,nsf
           gsfi(isf) = gsfi(isf) *gscli(isf)
-          dgsfi(:,isf,0:nnl) = dgsfi(:,isf,0:nnl) *gscli(isf)
+          dgsfi(:,isf,0:nnt) = dgsfi(:,isf,0:nnt) *gscli(isf)
           gsf(isf,ia) = gsfi(isf)
-          dgsf(:,isf,0:nnl,ia) = dgsfi(:,isf,0:nnl)
-          igsf(isf,0:nnl,ia) = igsfi(isf,0:nnl)
+          dgsf(:,isf,0:nnt,ia) = dgsfi(:,isf,0:nnt)
+          igsf(isf,0:nnt,ia) = igsfi(isf,0:nnt)
         enddo
       endif
     else ! Not to update gsf by desci_xxx just use gsfs given by fitpot
       if( lfitpot ) then
-!!$        if( iprint.gt.1 .and. ia.eq.1 ) print *,'ia,nnl,nal=',ia,nnl,nal
+!!$        if( iprint.gt.1 .and. ia.eq.1 ) print *,'ia,nnt,nal=',ia,nnt,nal
         gsfi(:) = gsf(:,ia)
-        dgsfi(:,:,0:nnl) = dgsf(:,:,0:nnl,ia)
-        igsfi(:,0:nnl) = igsf(:,0:nnl,ia)
+        dgsfi(:,:,0:nnt) = dgsf(:,:,0:nnt,ia)
+        igsfi(:,0:nnt) = igsf(:,0:nnt,ia)
       endif
     endif
 

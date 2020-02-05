@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-03 22:29:42 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-05 14:05:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -53,7 +53,7 @@ contains
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use descriptor,only: gsf,dgsf,igsf,nsf,nal,calc_desc,make_gsf_arrays, &
-         lupdate_gsf,gsfi,dgsfi,igsfi,calc_desci,prepare_desci,nnl
+         pre_desci,lupdate_gsf,gsfi,dgsfi,igsfi,calc_desci,prepare_desci,nnl
     use util,only: itotOf
     implicit none
     include "mpif.h"
@@ -77,6 +77,7 @@ contains
     integer:: itot
     character(len=8):: cnum
 
+    call pre_desci(namax,natm,nnmax,lspr,iprint)
     call make_gsf_arrays(l1st,namax,natm &
          ,tag,nnmax,lspr,myid,mpi_world,iprint)
 
@@ -234,7 +235,7 @@ contains
 !  thus no need of parallel implementation.
 !=======================================================================
     use descriptor,only: gsf,dgsf,igsf,nsf,nnl,nal,mskgfs, &
-         gsfi,dgsfi,igsfi,calc_desci
+         gsfi,dgsfi,igsfi,calc_desci,pre_desci
     use util,only: itotOf
     implicit none
     include "mpif.h"
@@ -277,6 +278,8 @@ contains
         ivstart(n+1) = nhl(n)*(nhl(n-1)+1)
       enddo
     endif
+
+    call pre_desci(namax,natm,nnmax,lspr,iprint)
 
     do ia=1,natm
       xi(1:3) = ra(1:3,ia)

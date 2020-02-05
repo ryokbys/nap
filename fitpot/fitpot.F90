@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-03 22:31:35 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-05 11:24:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -2191,7 +2191,7 @@ subroutine sync_input()
     allocate(csubffs(nsubff))
   endif
 !.....TODO: check what happens if numff==0...
-  call mpi_bcast(csubffs,20*nsubff,mpi_character,0,mpi_world,ierr)
+  if( nsubff.gt.0 ) call mpi_bcast(csubffs,20*nsubff,mpi_character,0,mpi_world,ierr)
 
 !.....pmdio related
   call mpi_bcast(nnmax,1,mpi_integer,0,mpi_world,ierr)

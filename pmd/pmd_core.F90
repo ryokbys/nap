@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-02-03 16:46:57 Ryo KOBAYASHI>
+!                     Last-modified: <2020-02-05 11:49:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1128,10 +1128,10 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   integer,intent(in):: ntot0,myid_md,mpi_md_world &
        ,iprint,nodes_md,nx,ny,nz
   integer,intent(inout):: ifcoulomb
-  real(8),intent(in):: hunit
+  real(8),intent(in):: hunit,rc
   real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0) &
        ,atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0) &
-       ,epitot(ntot0),rc,rbuf,rc1nn,h(3,3,0:1),stnsr(3,3) &
+       ,epitot(ntot0),rbuf,rc1nn,h(3,3,0:1),stnsr(3,3) &
        ,epot,ekin,am(nspmax),dt &
        ,chgtot(ntot0),chitot(ntot0),teitot(ntot0)
 !      character(len=20),intent(in):: cffs(numff)
