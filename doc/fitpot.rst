@@ -16,14 +16,14 @@ by using ``fitpot`` program included in **NAP** package.
 What does ``fitpot`` do?
 ===============================
 
-In the ``fitpot``, the following loss function value is to be minimized by optimizing potential parameters.
+In the ``fitpot``, the following loss function value is to be minimized by optimizing potential parameters :math:`\{ w \}`.
 
 .. math::
 
-    \mathcal{L}(\{w\}) = \frac{1}{\eta N_s} \sum_s^{N_s} \left( \frac{E^{\mathrm{NN},s}-E^{\mathrm{DFT},s}}{N^s_\mathrm{a}\varepsilon_\mathrm{e}}\right)^2 +\sum_i^{N^s_\mathrm{a}} \sum_\alpha^{xyz} \frac{1}{3N^s_\mathrm{a}}\left( \frac{F^{\mathrm{NN},s}_{i\alpha} -F^{\mathrm{DFT},s}_{i\alpha}}{\varepsilon_\mathrm{f}}\right)^2
+    \mathcal{L}(\{w\}) = \frac{1}{\eta N_s}\sum_s^{N_s} \left[ \Delta E^2 +\sum_i^{N^s_\mathrm{a}}\left| \Delta \boldsymbol{F}_i\right|^2 +\left| \Delta \sigma \right|^2\right]
 
 in case of fitting energies and forces.
-Here, :math:`s` is the sample number, :math:`N_s` the number of samples, :math:`N^s_\mathrm{a}` the number of atoms in the sample :math:`s`, :math:`\varepsilon_\mathrm{e/f}` is the error criteria for energy or force, :math:`\eta` the parameter corresponding to how many properties are fitted (in this case :math:`\eta = 2` because energy and force are used.)
+Here, :math:`s` is the sample number, :math:`N_s` the number of samples, :math:`N^s_\mathrm{a}` the number of atoms in the sample :math:`s`, :math:`\eta` the parameter corresponding to how many properties are fitted (in this case :math:`\eta = 3` because energy, force and stress are used.)
 
 To minimize the above loss function, there are some methods available in ``fitpot``, for example:
 
@@ -476,6 +476,20 @@ There must be the same number of following entry lines as the above value which 
 The each entry has *entry_name*, *error of energy (eV/atom)* and *error of forces (eV/Ang)*.
 The error values are applied to all the samples that contain *entry_name* in their directory names.
 
+-----
+
+.. _force_denom_type:
+
+force_denom_type
+--------------------------
+``error`` or ``absref``
+
+Default: ``error``
+
+Which type of denominator of force term in the loss function is used.
+If ``error`` is specified, the *fitpot* employs the *error of forces* specified in the :ref:`sample_error` for the denominator of force term.
+If ``absref`` is specified, the *fitpot* adds absolute force value of the atom to *error of forces* in the denominator of force term.
+
 ..
    .. _sample_weight:
 
@@ -517,6 +531,10 @@ atom_energy
 --------------------
 
 Default: *0.0* for each species.
+
+.. note::
+
+   ``DNN`` potential no longer requires the ``atom_energy`` information as the atomic energies are predicted using bias terms in the NN configuration. So if you are to fit ``DNN`` parameters, do not care about this entry. 
 
 A DFT atomic energy that will be subtracted from the energies of sample structures.
 Since the energy values of sample structures include the energies of atoms that are isolated 

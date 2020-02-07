@@ -727,8 +727,8 @@ You need to specify the species order correctly with --specorder option.
                         yz = float(data[2])
                 ixyz += 1
                 if ixyz > 2:
-                    xlo = xlo_bound -min(0.0,xy,xz,xy+yz)
-                    xhi = xhi_bound -max(0.0,xy,xz,xy+yz)
+                    xlo = xlo_bound -min(0.0,xy,xz,xy+xz)
+                    xhi = xhi_bound -max(0.0,xy,xz,xy+xz)
                     ylo = ylo_bound -min(0.0,yz)
                     yhi = yhi_bound -max(0.0,yz)
                     zlo = zlo_bound
