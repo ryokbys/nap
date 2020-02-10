@@ -95,18 +95,33 @@ contains
 
   end subroutine init_desc
 !=======================================================================
-  subroutine pre_desci(namax,natm,nnmax,lspr,iprint)
+  subroutine pre_desci(namax,natm,nnmax,lspr,iprint,rc)
 !
 !  Prepare for desci
 !
-    integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax),iprint
+    integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax), &
+         iprint
+    real(8),intent(in):: rc
 
-    integer:: i
+    integer:: i,ierr
     
     nnt = 0
     do i=1,natm
       nnt = max(nnt,lspr(0,i))
     enddo
+
+!.....Allocate arrays for Chebyshev descriptors
+    if( lcheby .and. .not. allocated(ts_cheby) ) then
+      allocate(ts_cheby(0:max(nsf2,nsf3)),dts_cheby(0:max(nsf2,nsf3)))
+      mem = mem +8*size(ts_cheby)*2
+    endif
+
+!.....Check the maximumx cutoff and given rc
+    if( rc.lt.rcmax ) then
+      print *,'ERROR @pre_desci: cutoff radius rc is smaller than rcmax.'
+      print *,'  rc,rcmax = ',rc,rcmax
+      stop
+    endif
     return
   end subroutine pre_desci
 !=======================================================================

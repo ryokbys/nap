@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-05 11:24:31 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-10 17:19:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -69,7 +69,7 @@ program fitpot
 
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
-  mem = mem +8*size(gvar) +8*size(dvar)
+  dmem = dmem +8d0*size(gvar) +8d0*size(dvar)
 
   if( nnode.gt.nsmpl ) then
     if( myid.eq.0 ) then
@@ -263,7 +263,7 @@ program fitpot
 99 if( myid.eq.0 ) then
     write(6,'(a,2(2x,i0))') ' Number of func and grad calls =',nfunc, ngrad
 !!$    write(6,'(a,i0)') ' Number of grad calls = ',ngrad
-    write(6,'(a,f13.3,a)') ' Memory/proc = ',dble(mem)/1000/1000,' MB'
+    write(6,'(a,f13.3,a)') ' Memory/proc = ',dmem/1000/1000,' MB'
     write(6,'(a,f15.3,a)') ' Time func = ', tfunc,' sec'
     write(6,'(a,f15.3,a)') ' Time grad = ', tgrad,' sec'
     write(6,'(a,f15.3,a)') ' Time comm = ', tcomm,' sec'
@@ -638,15 +638,16 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
       exit
     endif
   enddo
+  smpl%h(:,:,:) = 0d0
   read(ionum,*) smpl%h0
-  read(ionum,*) smpl%h(1:3,1)
-  read(ionum,*) smpl%h(1:3,2)
-  read(ionum,*) smpl%h(1:3,3)
+  read(ionum,*) smpl%h(1:3,1,0)
+  read(ionum,*) smpl%h(1:3,2,0)
+  read(ionum,*) smpl%h(1:3,3,0)
   read(ionum,*) tmp,tmp,tmp
   read(ionum,*) tmp,tmp,tmp
   read(ionum,*) tmp,tmp,tmp
   read(ionum,*) natm
-  smpl%h(1:3,1:3) = smpl%h(1:3,1:3)*smpl%h0
+  smpl%h(1:3,1:3,0) = smpl%h(1:3,1:3,0)*smpl%h0
   smpl%natm= natm
   allocate(smpl%ra(3,natm),smpl%fa(3,natm) &
        ,smpl%tag(natm) &
@@ -657,15 +658,15 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%eatm(natm) )
 !!$       ,smpl%eatm(natm) &
 !!$       ,smpl%gwe(nvars),smpl%gwf(3,nvars,natm),smpl%gws(6,nvars))
-  mem = mem +8*size(smpl%ra) +8*size(smpl%fa) +8*size(smpl%tag) &
-       +8*size(smpl%fref) +4*size(smpl%ifcal) +8*size(smpl%fabs) &
-       +8*size(smpl%va) +8*size(smpl%strsi) +8*size(smpl%eki) +8*size(smpl%epi) &
-       +8*size(smpl%chg) +8*size(smpl%chi) +8*size(smpl%tei) +8*size(smpl%fsub) &
-       +8*size(smpl%eatm)
-!!$       +8*size(smpl%eatm) +8*size(smpl%gwe) +8*size(smpl%gwf) +8*size(smpl%gws)
+  dmem = dmem +8d0*size(smpl%ra) +8d0*size(smpl%fa) +8d0*size(smpl%tag) &
+       +8d0*size(smpl%fref) +4d0*size(smpl%ifcal) +8d0*size(smpl%fabs) &
+       +8d0*size(smpl%va) +8d0*size(smpl%strsi) +8d0*size(smpl%eki) +8d0*size(smpl%epi) &
+       +8d0*size(smpl%chg) +8d0*size(smpl%chi) +8d0*size(smpl%tei) +8d0*size(smpl%fsub) &
+       +8d0*size(smpl%eatm)
+!!$       +8d0*size(smpl%eatm) +8d0*size(smpl%gwe) +8d0*size(smpl%gwf) +8d0*size(smpl%gws)
   if( lgdw ) then
     allocate(smpl%gdf(natm),smpl%gdw(natm))
-    mem = mem +8*size(smpl%gdf) +8*size(smpl%gdw)
+    dmem = dmem +8d0*size(smpl%gdf) +8d0*size(smpl%gdw)
   endif
   smpl%chg(1:natm) = 0d0
   smpl%tei(1:natm) = 0d0
@@ -1243,9 +1244,9 @@ subroutine write_energy_relation(cadd)
     allocate(erefl(nsmpl),erefg(nsmpl) &
        ,epotl(nsmpl),epotg(nsmpl),eerrl(nsmpl),eerrg(nsmpl)&
        ,swgtl(nsmpl),swgtg(nsmpl),esubl(nsmpl),esubg(nsmpl))
-    mem = mem +8*size(erefl) +8*size(erefg) +8*size(epotl) +8*size(epotg) &
-         +8*size(eerrl) +8*size(eerrg) +8*size(swgtl) +8*size(swgtg) &
-         +8*size(esubl) +8*size(esubg)
+    dmem = dmem +8d0*size(erefl) +8d0*size(erefg) +8d0*size(epotl) +8d0*size(epotg) &
+         +8d0*size(eerrl) +8d0*size(eerrg) +8d0*size(swgtl) +8d0*size(swgtg) &
+         +8d0*size(esubl) +8d0*size(esubg)
   endif
 
   if( l1st ) then
@@ -1327,7 +1328,8 @@ subroutine write_force_relation(cadd)
   character(len=*),intent(in):: cadd
   character(len=128):: cfname
 
-  integer:: ismpl,ia,ixyz,natm,nmax,nmaxl,meml
+  integer:: ismpl,ia,ixyz,natm,nmax,nmaxl
+  real(8):: dmeml
   logical:: l1st = .true.
   logical:: lfcal
   
@@ -1347,13 +1349,13 @@ subroutine write_force_relation(cadd)
          ,ferrl(nsmpl),ferrg(nsmpl),fsubl(3,nmax,nsmpl) &
          ,fsubg(3,nmax,nsmpl),lfcall(nmax,nsmpl),lfcalg(nmax,nsmpl) &
          ,gdwl(nmax,nsmpl),gdwg(nmax,nsmpl))
-    meml = 8*size(frefl) +8*size(frefg) +8*size(fal) +8*size(fag) &
-         +8*size(ferrl) +8*size(ferrg) +8*size(fsubl) +8*size(fsubg) &
-         +4*size(lfcall) +4*size(lfcalg) +8*size(gdwl) +8*size(gdwg)
-    mem = mem +meml
+    dmeml = 8d0*size(frefl) +8d0*size(frefg) +8d0*size(fal) +8d0*size(fag) &
+         +8d0*size(ferrl) +8d0*size(ferrg) +8d0*size(fsubl) +8d0*size(fsubg) &
+         +4d0*size(lfcall) +4d0*size(lfcalg) +8d0*size(gdwl) +8d0*size(gdwg)
+    dmem = dmem +dmeml
     if( iprint.gt.1 .and. myid.eq.0 .and. l1st ) then
       print '(a,f0.3,a)',' Memory for write_force_relation = ', &
-           dble(meml)/1000/1000,' MB'
+           dmeml/1000/1000,' MB'
     endif
   endif
 
@@ -1403,8 +1405,10 @@ subroutine write_force_relation(cadd)
   if( myid.eq.0 ) then
     open(92,file=trim(cfname)//'.trn.'//trim(cadd),status='replace')
     open(93,file=trim(cfname)//'.tst.'//trim(cadd),status='replace')
-    write(92,'(a)') '# fref, fpot, cdirname, ia, ixyz, diff, error, fsub, gdw, lfcal'
-    write(93,'(a)') '# fref, fpot, cdirname, ia, ixyz, diff, error, fsub, gdw, lfcal'
+    write(92,'(a)') '# 1:fref, 2:fpot, 3:cdirname, 4:ia, 5:ixyz, 6:diff,' &
+         //' 7:error, 8:fsub, 9:gdw, 10:lfcal'
+    write(93,'(a)') '# 1:fref, 2:fpot, 3:cdirname, 4:ia, 5:ixyz, 6:diff,' &
+         //' 7:error, 8;fsub, 9;gdw, 10;lfcal'
     do ismpl=1,nsmpl
       if( iclist(ismpl).eq.1 ) then
         natm= nalist(ismpl)
@@ -1461,8 +1465,8 @@ subroutine write_stress_relation(cadd)
     allocate(srefl(3,3,nsmpl)&
          ,srefg(3,3,nsmpl),strsl(3,3,nsmpl),strsg(3,3,nsmpl)&
          ,serrl(nsmpl),serrg(nsmpl),ssubl(3,3,nsmpl),ssubg(3,3,nsmpl))
-    mem = mem +8*size(srefl) +8*size(srefg) +8*size(strsl) +8*size(strsg) &
-         +8*size(serrl) +8*size(serrg) +8*size(ssubl) +8*size(ssubg)
+    dmem = dmem +8d0*size(srefl) +8d0*size(srefg) +8d0*size(strsl) +8d0*size(strsg) &
+         +8d0*size(serrl) +8d0*size(serrg) +8d0*size(ssubl) +8d0*size(ssubg)
   endif
 
   if( l1st ) then
@@ -2208,7 +2212,7 @@ subroutine get_node2sample()
   n= nsmpl/nnode
   m= nsmpl -n*nnode
   allocate(nspn(nnode),ispn(nnode))
-  mem = mem +4*size(nspn) +4*size(ispn)
+  dmem = dmem +4d0*size(nspn) +4d0*size(ispn)
   do ip=1,nnode
     nspn(ip)= n
     if( ip.le.m ) nspn(ip)= nspn(ip) +1

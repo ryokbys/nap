@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-05 14:05:48 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-10 10:55:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -77,7 +77,7 @@ contains
     integer:: itot
     character(len=8):: cnum
 
-    call pre_desci(namax,natm,nnmax,lspr,iprint)
+    call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
     call make_gsf_arrays(l1st,namax,natm &
          ,tag,nnmax,lspr,myid,mpi_world,iprint)
 
@@ -133,7 +133,7 @@ contains
              dble(mem)/1000/1000, ' MB'
       endif ! myid.eq.0
 
-      call prepare_desci(myid,iprint,rcin)
+!!$      call prepare_desci(myid,iprint,rcin)
 
     endif ! l1st
 
@@ -279,7 +279,7 @@ contains
       enddo
     endif
 
-    call pre_desci(namax,natm,nnmax,lspr,iprint)
+    call pre_desci(namax,natm,nnmax,lspr,iprint,rc)
 
     do ia=1,natm
       xi(1:3) = ra(1:3,ia)

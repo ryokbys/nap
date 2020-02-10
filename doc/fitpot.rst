@@ -482,13 +482,13 @@ The error values are applied to all the samples that contain *entry_name* in the
 
 force_denom_type
 --------------------------
-``error`` or ``absref``
+``relative`` or ``absolute``
 
-Default: ``error``
+Default: ``relative``
 
 Which type of denominator of force term in the loss function is used.
-If ``error`` is specified, the *fitpot* employs the *error of forces* specified in the :ref:`sample_error` for the denominator of force term.
-If ``absref`` is specified, the *fitpot* adds absolute force value of the atom to *error of forces* in the denominator of force term.
+If ``absolute`` is specified, the *fitpot* uses an *error of forces* specified in the :ref:`sample_error` for the denominator of force term.
+If ``relative`` is specified, the *fitpot* uses a magnitude of force on the atom in the denominator of force term.
 
 ..
    .. _sample_weight:

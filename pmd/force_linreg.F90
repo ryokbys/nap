@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-03 17:11:08 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-10 11:04:52 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -165,8 +165,8 @@ contains
   subroutine force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
-    use descriptor,only: gsf,dgsf,igsf,nsf,calc_desc,make_gsf_arrays &
-         ,write_descs
+    use descriptor,only: gsfi,dgsfi,igsfi,nsf,calc_desci,make_gsf_arrays &
+         ,write_descs,pre_desci
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -184,65 +184,66 @@ contains
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ielem &
          ,iwgt,isf,ja,jj
     real(8):: b_na,at(3),epotl,wgt,aexp,bnai,apot,epott,tmp
-    real(8):: xi(3),xj(3),xji(3),sji,rji(3),dji,rcin2
+    real(8):: xi(3),xj(3),xji(3),sji,rji(3),dji
     real(8),save,allocatable:: aal(:,:),strsl(:,:,:)
+    real(8),save:: rcin2 
 
     if( l1st ) then
       if( allocated(aal) ) deallocate(aal,strsl)
       allocate(aal(3,namax),strsl(3,3,namax))
+
     endif
 
     if( size(aal).lt.3*namax ) then
       deallocate(aal,strsl)
       allocate(aal(3,namax),strsl(3,3,namax))
+      rcin2 = rcin*rcin
     endif
     aal(1:3,1:namax) = 0d0
     strsl(1:3,1:3,1:natm+nb) = 0d0
     epotl= 0d0
 
+    call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
     call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr &
          ,myid,mpi_world,iprint)
 
-    call calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr &
-         ,rcin,myid,mpi_world,l1st,iprint)
-
+!!$    call calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr &
+!!$         ,rcin,myid,mpi_world,l1st,iprint)
+!!$
     if( iprint.gt.10 .and. mod(iprint,10).eq.1 .and. myid.le.0 ) then
       call write_descs(80,natm,namax,nnmax,lspr,tag)
     endif
 
 !!$    print *,'gsf:'
 !!$    do isf=1,nsf
-!!$      print *,'isf,gsf(isf,1)=',isf,gsf(isf,1)
+!!$      print *,'isf,gsfi(isf)=',isf,gsfi(isf)
 !!$    enddo
 
 !.....Energy
     do ia=1,natm
+      call calc_desci(ia,namax,natm,nnmax,h &
+           ,tag,ra,lspr,rcin,iprint)
       do isf=1,nsf
         wgt = coeff(isf)
-        tmp = wgt*gsf(isf,ia)
+        tmp = wgt*gsfi(isf)
         epotl = epotl +tmp
         epi(ia) = epi(ia) +tmp
       enddo
-    enddo
-
 !.....Force
-    rcin2 = rcin*rcin
-    do ia=1,natm
-!!$      is = int(tag(ia))
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
         do isf=1,nsf
-          if( igsf(isf,jj,ia).eq.0 ) cycle
+          if( igsfi(isf,jj).eq.0 ) cycle
           wgt = coeff(isf)
           aal(1:3,ja) = aal(1:3,ja) &
-               -wgt*dgsf(1:3,isf,jj,ia)
+               -wgt*dgsfi(1:3,isf,jj)
         enddo
       enddo
 !.....Atom-ia
       do isf=1,nsf
         wgt = coeff(isf)
         aal(1:3,ia) = aal(1:3,ia) &
-             -wgt*dgsf(1:3,isf,0,ia)
+             -wgt*dgsfi(1:3,isf,0)
       enddo
 !.....Stress
       if( .not.lstrs ) cycle
@@ -262,12 +263,12 @@ contains
 !!$        rji(1:3) = dlspr(1:3,jj,ia)
         js = int(tag(ja))
         do isf=1,nsf
-          if( igsf(isf,jj,ia).eq.0 ) cycle
+          if( igsfi(isf,jj).eq.0 ) cycle
           wgt = coeff(isf)
 !!$          print *,'ia,jj,ja,isf,wgt=',ia,jj,ja,isf,wgt
           do ixyz=1,3
             do jxyz=1,3
-              sji = -wgt*dgsf(jxyz,isf,jj,ia)*rji(ixyz)
+              sji = -wgt*dgsfi(jxyz,isf,jj)*rji(ixyz)
               strsl(ixyz,jxyz,ja) = strsl(ixyz,jxyz,ja) +sji
               strsl(ixyz,jxyz,ia) = strsl(ixyz,jxyz,ia) +sji
             enddo
@@ -746,7 +747,8 @@ contains
 !  Derivative of linreg pot w.r.t parameters.
 !  - iprm0: The starting point -1 in parameter array for this FF.
 !
-    use descriptor,only: gsf,dgsf,igsf,nsf,calc_desc,make_gsf_arrays
+    use descriptor,only: gsfi,dgsfi,igsfi,nsf,calc_desci,make_gsf_arrays, &
+         pre_desci
     use util,only: itotOf
     implicit none
     integer,intent(in):: namax,natm,nnmax,ndimp,iprint,lspr(0:nnmax,namax)&
@@ -759,42 +761,34 @@ contains
 !!$    integer,external:: itotOf
     real(8):: ftmp(3),xi(3),xj(3),xij(3),rij(3)
 
-    if( lematch ) then
-      do ia=1,natm
+    call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
+    
+    do ia=1,natm
+      call calc_desci(ia,namax,natm,nnmax,h,tag,ra,lspr,rcin,iprint)
+      if( lematch ) then
         ne = iprm0
         do isf=1,nsf
           ne = ne + 1
-          gwe(ne) = gwe(ne) +gsf(isf,ia)
-        enddo
-      enddo
-    endif
+          gwe(ne) = gwe(ne) +gsfi(isf)
+        enddo ! isf=...
+      endif ! lematch
     
-    if( lfmatch .and. .not.lsmatch ) then
-      do ia=1,natm
-!.....ja != ia
-        do jj=0,lspr(0,ia)
-          if( jj.eq.0 ) then
-            ja = ia
-          else
-            ja = lspr(jj,ia)
-          endif
-          jra = itotOf(tag(ja))
-          nf = iprm0
-          do isf=1,nsf
-            nf = nf + 1
-!!$            if( igsf(isf,jj,ia).eq.0 ) cycle
-            gwf(1:3,nf,jra) = gwf(1:3,nf,jra) -dgsf(1:3,isf,jj,ia)
-          enddo
-        enddo
-      enddo
-    endif
+      if( lfmatch .or. lsmatch ) then
+!!$!.....ja != ia
+!!$        do jj=0,lspr(0,ia)
+!!$          if( jj.eq.0 ) then
+!!$            ja = ia
+!!$          else
+!!$            ja = lspr(jj,ia)
+!!$          endif
+!!$          jra = itotOf(tag(ja))
+!!$          nf = iprm0
+!!$          do isf=1,nsf
+!!$            nf = nf + 1
+!!$            gwf(1:3,nf,jra) = gwf(1:3,nf,jra) -dgsf(1:3,isf,jj,ia)
+!!$          enddo
+!!$        enddo
     
-! Since stress-matching could cause considerable increase of computational cost,
-! only compute stress contribution when stress-matching is ON.
-! But even if force-matching is OFF, force contribution is computed,
-! because the addictional cost for force contribution is not very much.
-    if( lsmatch ) then
-      do ia=1,natm
         xi(1:3) = ra(1:3,ia)
 !.....ja != ia
         do jj=0,lspr(0,ia)
@@ -811,7 +805,7 @@ contains
             nf = iprm0
             do isf=1,nsf
               nf = nf + 1
-              ftmp(1:3) = -dgsf(1:3,isf,jj,ia)
+              ftmp(1:3) = -dgsfi(1:3,isf,jj)
 !.....Force
               gwf(1:3,nf,jra) = gwf(1:3,nf,jra) +ftmp(1:3)
 !.....No stress contribution for jj==0
@@ -820,7 +814,7 @@ contains
             nf = iprm0
             do isf=1,nsf
               nf = nf + 1
-              ftmp(1:3) = -dgsf(1:3,isf,jj,ia)
+              ftmp(1:3) = -dgsfi(1:3,isf,jj)
 !.....Force
               gwf(1:3,nf,jra) = gwf(1:3,nf,jra) +ftmp(1:3)
 !.....Stress
@@ -833,8 +827,8 @@ contains
             enddo
           endif
         enddo
-      enddo
-    endif
+      endif ! lfmatch or lsmatch
+    enddo ! ia=...
     return
   end subroutine gradw_linreg
 !=======================================================================

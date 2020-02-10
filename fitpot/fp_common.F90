@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-03 22:18:55 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-10 17:53:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -89,7 +89,7 @@ contains
          ,swgt2trn,swgt2tst,cpot &
          ,nff,cffs,maxna,rcut &
          ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint &
-         ,ctype_loss,mem,cfmethod,cfrc_denom &
+         ,ctype_loss,dmem,cfmethod,cfrc_denom &
          ,lnormalize,lnormalized,lgdw,lgdwed,terg,tfrc,tstrs
     use parallel
     use minimize
@@ -99,8 +99,8 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: ftrn,ftst
 
-    integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl,memgsf
-    real(8):: dn3i,ediff,eref,epot,swgt,esub
+    integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl
+    real(8):: dn3i,ediff,eref,epot,swgt,esub,gsfmem
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref
     real(8):: ftrnl,ftstl,ftmp,gdw
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
@@ -126,10 +126,10 @@ contains
       if( .not.fp_common_initialized ) call init()
       if( .not.allocated(fdiff) ) then
         allocate(fdiff(3,maxna),frcs(3,maxna))
-        mem = mem +8*size(fdiff) +8*size(frcs)
+        dmem = dmem +8d0*size(fdiff) +8d0*size(frcs)
       endif
       if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg') lupdate_gsf = .true.
-      memgsf = 0
+      gsfmem = 0d0
     endif
 
     if( .not. lematch .and. .not.lfmatch .and. .not.lsmatch ) then
@@ -171,8 +171,8 @@ contains
 !!$          memgsf = memgsf +8*size(samples(ismpl)%gsf) +8*size(samples(ismpl)%dgsf) &
 !!$               +2*size(samples(ismpl)%igsf)
           allocate(samples(ismpl)%gsf(nsf,nal) )
-          memgsf = memgsf +8*size(samples(ismpl)%gsf)
-          mem = mem +memgsf
+          gsfmem = gsfmem +8d0*size(samples(ismpl)%gsf)
+          dmem = dmem +gsfmem
         endif
 !!$        call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
 !!$             samples(ismpl)%nnl,samples(ismpl)%gsf, &
@@ -248,10 +248,10 @@ contains
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(smpl%fref(1,ia)**2 +smpl%fref(2,ia)**2 +smpl%fref(3,ia)**2)
-          if( cfrc_denom(1:3).eq.'abs' ) then
-            ferri = 1d0/ (absfref +ferr)
-          else  ! default: err
-            ferri = 1d0/ferr
+          if( cfrc_denom(1:3).eq.'rel' ) then
+            ferri = 1d0/ max(absfref,ferr)
+          else  ! default: abs
+            ferri = 1d0/ ferr
           endif
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia)+smpl%fsub(ixyz,ia) &
@@ -335,7 +335,7 @@ contains
     tfunc= tfunc +tfg
 
     if( l1st .and. myid.eq.0 .and. iprint.gt.1 ) then
-      print '(a,f0.3,a)',' Memory for gsfs = ',dble(memgsf)/1000/1000,' MB'
+      print '(a,f0.3,a)',' Memory for gsfs = ',gsfmem/1000/1000,' MB'
     endif
     l1st = .false.
 !!$    if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) lupdate_gsf = .false.
@@ -351,7 +351,7 @@ contains
          ,samples,mdsys,swgt2trn,nff,cffs &
          ,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
          ,rcut,myidrefsub,isidrefsub,iprint &
-         ,ctype_loss,cfrc_denom,lgdw,mem,terg,tfrc,tstrs
+         ,ctype_loss,cfrc_denom,lgdw,dmem,terg,tfrc,tstrs
     use parallel
     use minimize
     implicit none
@@ -373,16 +373,16 @@ contains
 
     if( .not.allocated(gtrnl) ) then
       allocate(gtrnl(ndim))
-      mem = mem +8*size(gtrnl)
+      dmem = dmem +8d0*size(gtrnl)
     endif
     if( .not.allocated(gwe) ) then
       allocate(gwe(ndim),gwf(3,ndim,maxna),gws(6,ndim))
-      mem = mem +8*size(gwe) +8*size(gwf) +8*size(gws)
+      dmem = dmem +8d0*size(gwe) +8d0*size(gwf) +8d0*size(gws)
     endif
     if( len(trim(crefstrct)).gt.5 ) then
       if( .not.allocated(gwesub) ) then
         allocate(gwesub(ndim))
-        mem = mem +8*size(gwesub)
+        dmem = dmem +8d0*size(gwesub)
       endif
     endif
 
@@ -497,10 +497,10 @@ contains
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(smpl%fref(1,ia)**2 +smpl%fref(2,ia)**2 +smpl%fref(3,ia)**2)
-          if( cfrc_denom(1:3).eq.'abs' ) then
-            ferri = 1d0/ (absfref +ferr)
-          else  ! default: err
-            ferri = 1d0/ferr
+          if( cfrc_denom(1:3).eq.'rel' ) then
+            ferri = 1d0/ max(absfref,ferr)
+          else  ! default: abs
+            ferri = 1d0 /ferr
           endif
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia) +smpl%fsub(ixyz,ia) &
@@ -729,7 +729,7 @@ contains
          ,maxisp
     use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd
     use force
-    use descriptor,only: get_dsgnmat_force
+!!$    use descriptor,only: get_dsgnmat_force
     use ZBL,only: r_inner,r_outer
     use pmdio, only: nspmax
     use element
@@ -875,7 +875,7 @@ contains
     strs(1:3,1:3) = ptnsr(1:3,1:3) *up2gpa*(-1d0)
 !!$    if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
     if( present(gws) ) gws(1:6,1:ndimp) = gws(1:6,1:ndimp) *up2gpa*(-1d0)
-    if( lfdsgnmat ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)
+!!$    if( lfdsgnmat ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)
 !!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
 !!$  print *,'smpl%natm =',smpl%natm
 !!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)
@@ -964,7 +964,7 @@ contains
 
       if( .not.allocated(frcs) ) then
         allocate(frcs(3,maxna))
-        mem = mem +8*size(frcs)
+        dmem = dmem +8d0*size(frcs)
       endif
 
       do i=1,nsubff
@@ -1105,7 +1105,7 @@ contains
     endif
     if( .not. allocated(gsfms) ) then
       allocate(gsfms(nsf),gsfvs(nsf),gsfss(nsf),gsfcorr(nsf,nsf))
-      mem = mem +8*size(gsfms) +8*size(gsfvs) +8*size(gsfss) +8*size(gsfcorr)
+      dmem = dmem +8d0*size(gsfms) +8d0*size(gsfvs) +8d0*size(gsfss) +8d0*size(gsfcorr)
     endif
 
 !.....compute mean value
@@ -1236,21 +1236,22 @@ contains
       nasum= nasum +natm
     enddo
 
-    write(6,'(a)',advance='no') ' Writing out.dsgnmat_atm... '
+    write(6,'(a)') ' Writing out.dsgnmat_atm... '
     write(cnum,'(i0)') nsf
     open(21,file='out.dsgnmat_atm')
     write(21,'(2i10)') nasum,nsf
     do ismpl=isid0,isid1
       natm = samples(ismpl)%natm
       do ia=1,natm
-        write(21,'('//trim(cnum)//'es12.3e3)') (samples(ismpl)%gsf(isf,ia),isf=1,nsf)
+        write(21,'('//trim(cnum)//'es12.3e3)',advance='no') (samples(ismpl)%gsf(isf,ia),isf=1,nsf)
+        write(21,'(1x,a)') trim(samples(ismpl)%cdirname)
       enddo
     enddo
     close(21)
 
 !.....Design matrix for lasso ()
     if( lematch ) then
-      write(6,'(a)',advance='no') ' Writing out.dsgnmat_erg... '
+      write(6,'(a)') ' Writing out.dsgnmat_erg... '
       open(22,file='out.dsgnmat_erg')
       open(25,file='out.esubs')
 !.....Since now it is only nnode==1, isid1==nsmpl
@@ -1276,36 +1277,36 @@ contains
       close(25)
     endif
 
-!.....Design matrix for force-matching
-    if( lfmatch ) then
-      write(6,'(a)',advance='no') ' Writing out.dsgnmat_frc... '
-      open(23,file='out.dsgnmat_frc')
-      write(23,'(a)') '# y_i, (x_{ij},j=1,nsf) of force matching'
-      open(26,file='out.fsubs')
-      write(26,'(a)') '# fsub'
-      ndat = 0
-      do ismpl=isid0,isid1
-        ndat = ndat +3*samples(ismpl)%natm
-      enddo
-      write(23,'(2i8)') ndat,nsf
-      write(26,'(2i8)') ndat
-      do ismpl=isid0,isid1
-        natm = samples(ismpl)%natm
-        do ia=1,natm
-          do ixyz=1,3
-            write(23,'(es12.3e3)',advance='no') samples(ismpl)%fref(ixyz,ia) &
-                 -samples(ismpl)%fsub(ixyz,ia)
-            write(26,'(es12.3e3)') samples(ismpl)%fsub(ixyz,ia)
-            do isf=1,nsf
-              write(23,'(es12.3e3)',advance='no') -samples(ismpl)%dgsfa(ixyz,isf,ia)
-            enddo
-            write(23,*) ''
-          enddo
-        enddo
-      enddo
-      close(23)
-      close(26)
-    endif
+!!$!.....Design matrix for force-matching
+!!$    if( lfmatch ) then
+!!$      write(6,'(a)',advance='no') ' Writing out.dsgnmat_frc... '
+!!$      open(23,file='out.dsgnmat_frc')
+!!$      write(23,'(a)') '# y_i, (x_{ij},j=1,nsf) of force matching'
+!!$      open(26,file='out.fsubs')
+!!$      write(26,'(a)') '# fsub'
+!!$      ndat = 0
+!!$      do ismpl=isid0,isid1
+!!$        ndat = ndat +3*samples(ismpl)%natm
+!!$      enddo
+!!$      write(23,'(2i8)') ndat,nsf
+!!$      write(26,'(2i8)') ndat
+!!$      do ismpl=isid0,isid1
+!!$        natm = samples(ismpl)%natm
+!!$        do ia=1,natm
+!!$          do ixyz=1,3
+!!$            write(23,'(es12.3e3)',advance='no') samples(ismpl)%fref(ixyz,ia) &
+!!$                 -samples(ismpl)%fsub(ixyz,ia)
+!!$            write(26,'(es12.3e3)') samples(ismpl)%fsub(ixyz,ia)
+!!$            do isf=1,nsf
+!!$              write(23,'(es12.3e3)',advance='no') -samples(ismpl)%dgsfa(ixyz,isf,ia)
+!!$            enddo
+!!$            write(23,*) ''
+!!$          enddo
+!!$        enddo
+!!$      enddo
+!!$      close(23)
+!!$      close(26)
+!!$    endif
 
   end subroutine write_dsgnmats
 !=======================================================================

@@ -61,8 +61,8 @@ module variables
   real(8):: force_limit = 100d0
 !.....Loss function type: LS (least-square), Huber
   character(len=128):: ctype_loss = 'LS'
-!.....Denominator type of force in loss function: error, absref
-  character(len=128):: cfrc_denom = 'error' ! 
+!.....Denominator type of force in loss function: absolute or relative (default)
+  character(len=128):: cfrc_denom = 'relative' ! 
 !.....Gaussian density weight
   logical:: lgdw  = .false.  ! flag for GDW
   logical:: lgdwed = .false.  ! whether compuation of GDW is finished
@@ -101,7 +101,7 @@ module variables
   type mdsys
     character(len=128):: cdirname
     integer:: natm,nfcal
-    real(8):: h0,h(3,3),epot,eref,wgt,esub
+    real(8):: h0,h(3,3,0:1),epot,eref,wgt,esub
     real(8):: eerr = 1.0d-3  ! in eV
     real(8):: ferr = 0.1d0   ! in eV/A
     real(8):: serr = 0.1d0   ! in GPa
@@ -181,6 +181,7 @@ module variables
   real(8):: nn_asig = 0.01d0
 
   integer:: mem = 0
+  real(8):: dmem = 0d0
 
 !.....For descriptors except Chebyshev
   type(desc),allocatable:: descs(:)
