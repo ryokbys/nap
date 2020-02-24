@@ -263,10 +263,10 @@ class NAPSystem(object):
         for i in range(self.natm):
             if i in ids:
                 continue
-            sids[i] = self.sids[inc]
-            poss[i,:] = self.poss[inc,:]
-            vels[i,:] = self.vels[inc,:]
-            frcs[i,:] = self.frcs[inc,:]
+            sids[inc] = self.sids[i]
+            poss[inc,:] = self.poss[i,:]
+            vels[inc,:] = self.vels[i,:]
+            frcs[inc,:] = self.frcs[i,:]
             inc += 1
         self.sids = copy.deepcopy(sids)
         self.poss = copy.deepcopy(poss)
@@ -279,7 +279,7 @@ class NAPSystem(object):
             for i in range(self.natm):
                 if i in ids:
                     continue
-                auxs[i,:] = self.auxs[inc,:]
+                auxs[inc,:] = self.auxs[i,:]
                 inc += 1
             self.auxs = copy.deepcopy(auxs)
 
@@ -350,7 +350,7 @@ class NAPSystem(object):
             raise ValueError('Array size inconsistent.')
         self.poss = sposs
         return None
-    
+
     def get_symbols(self):
         if not self.specorder:
             raise ValueError('specorder is not available.')
@@ -373,6 +373,13 @@ class NAPSystem(object):
             s = symbols[i]
             sid = self.specorder.index(s)+1
             self.sids[i] = sid
+        return None
+
+    def get_chemical_formula(self):
+        """
+        Returns chemical formula as a string based on the chemical symbols same as ASE.
+        """
+        
         return None
 
     def get_charges(self):

@@ -199,6 +199,8 @@ def parse_option(line):
     data = line.split()
     key = None
     value = None
+    if len(data) < 3:
+        return key,value
     if 'hard-limit:' in data[1] or 'hard_limit:' in data[1]:
         key = 'hard-limit'
         value = False

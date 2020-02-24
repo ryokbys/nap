@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-10 10:55:30 Ryo KOBAYASHI>
+!                     Last modified: <2020-02-24 14:24:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -216,8 +216,7 @@ contains
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)*0.5d0
 
 !.....Gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_double_precision &
-         ,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
     if( iprint.gt.2 ) print *,'DNN epot = ',epott
     epot= epot +epott
 
@@ -538,7 +537,6 @@ contains
 !.....Initialize
     hls(:,:) = 0d0
     zls(:,:) = 0d0
-!!$    hls(1:nhl(0),0) = gsf(1:nhl(0),ia)
     hls(1:nhl(0),0) = gsfi(1:nhl(0))
 !.....NOTE: 0-th node in layer is the bias.
     hls(0,0:nlayer) = 1d0
@@ -557,9 +555,6 @@ contains
         sgmz = actf(itype,z)
         hls(ml1,il) = sgmz
         sgm1(ml1,il) = dactf(itype,z,sgmz)
-!!$        if( ia.eq.1 .and. il.eq.1 ) then
-!!$          print *,'itype,il,ml1,z,sgmz,sgm1=',itype,il,ml1,z,sgmz,sgm1(ml1,il)
-!!$        endif
         sgm2(ml1,il) = ddactf(itype,z,sgmz)
       enddo ! ml1=...
     enddo ! il=...
@@ -574,9 +569,6 @@ contains
           z = z + gls(ml2,il+1)*wgts(ml1,ml2,il+1)
         enddo
         gls(ml1,il) = z*sgm1(ml1,il)
-!!$        if( ia.eq.1 ) print *,'il,nhl(il),sgm1,gls(il+1),gls(il),wgts='&
-!!$             ,il,nhl(il),sgm1(ml1,il),gls(1:nhl(il+1),il+1),gls(1:nhl(il),il)&
-!!$             ,wgts(1:nhl(il),1:nhl(il+1),il+1)
       enddo ! ml0=...
     enddo ! il=...
 

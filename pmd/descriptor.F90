@@ -1336,7 +1336,6 @@ contains
       do i=1,nsp
         wgtsp(i)= dble(i)
       enddo
-      call mpi_bcast(wgtsp,nspmax,mpi_real8,0,mpi_world,ierr)
       mem = mem + 8*size(wgtsp)
     endif
 
@@ -1460,6 +1459,9 @@ contains
     call mpi_bcast(nsff,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(ilsf2,size(ilsf2),mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(ilsf3,size(ilsf3),mpi_integer,0,mpi_world,ierr)
+    if( lcheby ) then
+      call mpi_bcast(wgtsp,nspmax,mpi_real8,0,mpi_world,ierr)
+    endif
 
 !.....Compute maximum rcut in all descriptors
     rcmax = 0d0
