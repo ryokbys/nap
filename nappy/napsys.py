@@ -379,8 +379,17 @@ class NAPSystem(object):
         """
         Returns chemical formula as a string based on the chemical symbols same as ASE.
         """
+        symbols = self.get_symbols()
         
-        return None
+        uniq_symbols = []
+        for s in symbols:
+            if s not in uniq_symbols:
+                uniq_symbols.append(s)
+        formula = ''
+        for s in uniq_symbols:
+            n = symbols.count(s)
+            formula += s + '{0:d}'.format(n)
+        return formula
 
     def get_charges(self):
         return self.charges
@@ -1862,7 +1871,6 @@ def unitvec_to_hi(a1,a2,a3):
         h[1,i] = a2[i]
         h[2,i] = a3[i]
     return np.linalg.inv(h)
-
 
 def analyze(nsys):
     import elements

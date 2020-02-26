@@ -18,7 +18,7 @@ Options:
                 Num of measuring lane. In case of 1, it is identical to non-staggered measuring. [default: 1]
   -s, --shift SHIFT
                 Shift of each staggered lane. [default: 20]
-  -o FILENAME   Output filename. [dfault: out.msd]
+  -o FILENAME   Output filename. [default: out.msd]
   --spcs=SPCS   Species name whose MSD is to be computed. [default: None]
 """
 from __future__ import print_function
