@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-10 17:19:28 Ryo KOBAYASHI>
+!                     Last modified: <2020-03-02 18:29:36 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -298,33 +298,42 @@ subroutine write_initial_setting()
   write(6,'(a)') '------------------------------------------------------------------------'
   write(6,'(2x,a25,2x,i0)') 'num_samples',nsmpl
   write(6,'(2x,a25,2x,i0)') 'num_iteration',niter
-  write(6,'(2x,a25,2x,a)') 'fitting_method',trim(cfmethod)
+  write(6,'(2x,a25,2x,f5.2)') 'test_ratio',ratio_test
+  
+  print *,''
   write(6,'(2x,a25,2x,a)') 'main_directory',trim(cmaindir)
   write(6,'(2x,a25,2x,a)') 'param_file',trim(cparfile)
-  write(6,'(2x,a25,2x,a)') 'loss_function',trim(ctype_loss)
 !!$  write(6,'(2x,a25,2x,a)') 'run_mode',trim(crunmode)
-  write(6,'(2x,a25,2x,es12.3)') 'xtol',xtol
-  write(6,'(2x,a25,2x,es12.3)') 'ftol',ftol
-  write(6,'(2x,a25,2x,es12.3)') 'gtol',gtol
-  write(6,'(2x,a25,2x,i0)') 'numtol',numtol
   write(6,'(2x,a25,10(2x,a3))') 'specorder',(trim(specorder(i)),i=1,nsp)
-  if( len(trim(crefstrct)).gt.5 ) then
-    write(6,'(2x,a25,2x,a)') 'reference_structure',trim(crefstrct)
-  else
-    do i=1,nspmax
-      if( trim(specorder(i)).ne.'x' ) then
-        write(6,'(2x,a25,2x,i2,a4,es15.7)') 'atom_energy',i,specorder(i),eatom(i)
-      endif
-    enddo
-  endif
-  write(6,'(2x,a25,2x,l3)') 'energy_match',lematch
-  write(6,'(2x,a25,2x,l3)') 'force_match',lfmatch
-  write(6,'(2x,a25,2x,l3)') 'stress_match',lsmatch
+
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,a)') 'potential',trim(cpot)
   if( nsubff.gt.0 ) then
     write(6,'(2x,a25,10(2x,a))') 'subtract_force_field',(trim(csubffs(i)),i=1,nsubff)
   endif
+  print *,''
+  write(6,'(2x,a25,2x,a)') 'fitting_method',trim(cfmethod)
+  write(6,'(2x,a25,2x,a)') 'loss_function',trim(ctype_loss)
+  write(6,'(2x,a25,2x,es12.3)') 'xtol',xtol
+  write(6,'(2x,a25,2x,es12.3)') 'ftol',ftol
+  write(6,'(2x,a25,2x,es12.3)') 'gtol',gtol
+  write(6,'(2x,a25,2x,i0)') 'numtol',numtol
+  write(6,'(2x,a25,2x,a)') 'init_params',trim(cinitv)
+  write(6,'(2x,a25,2x,f0.2)') 'init_params_rs',vinitrs
+  write(6,'(2x,a25,2x,f0.2)') 'init_params_sgm',vinitsgm
+  write(6,'(2x,a25,2x,f0.2)') 'init_params_mu',vinitmu
+  
+  print *,''
+  write(6,'(2x,a25,2x,l3)') 'energy_match',lematch
+  write(6,'(2x,a25,2x,l3)') 'force_match',lfmatch
+  write(6,'(2x,a25,2x,l3)') 'stress_match',lsmatch
+  print *,''
+  if( lfmatch ) then
+    write(6,'(2x,a25,2x,a)') 'force_denom_type',trim(cfrc_denom)
+    write(6,'(2x,a25,2x,es12.3)') 'force_limit',force_limit
+  endif
+  write(6,'(2x,a25,2x,es12.3)') 'fval_upper_limit',fupper_lim
+  
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,a)') 'penalty',trim(cpena)
   write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',pwgt
@@ -333,9 +342,6 @@ subroutine write_initial_setting()
 !!$  write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
   write(6,'(2x,a25,2x,a)') 'normalize_input',trim(cnormalize)
   
-  if( lfmatch ) then
-    write(6,'(2x,a25,2x,f0.2)') 'force_limit',force_limit
-  endif
   if( nspcs_neglect.gt.0 ) then
     write(6,'(2x,a25,9(2x,4a))') 'force_neglect_species',(cspcs_neglect(i),i=1,nspcs_neglect)
   endif
@@ -348,17 +354,28 @@ subroutine write_initial_setting()
   endif
 
   if( lgdw ) then
+    print *,''
     write(6,'(2x,a25,2x,l3)') 'gaussian_density_weight',lgdw
     write(6,'(2x,a25,2x,es12.3)') 'GDW_sigma',gdsgm
   endif
   
-  write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
+!!$  write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
   write(6,'(2x,a25,2x,a)') 'line_minimization',trim(clinmin)
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,i0)') 'sample_error',nserr
   do i=1,nserr
     write(6,'(4x,a23,3(1x,f10.4))') trim(cserr(i)), seerr(i), sferr(i), sserr(i)
   enddo
+  print *,''
+  if( len(trim(crefstrct)).gt.5 ) then
+    write(6,'(2x,a25,2x,a)') 'reference_structure',trim(crefstrct)
+  else if( trim(cpot).ne.'DNN' ) then
+    do i=1,nspmax
+      if( trim(specorder(i)).ne.'x' ) then
+        write(6,'(2x,a25,2x,i2,a4,es15.7)') 'atom_energy',i,specorder(i),eatom(i)
+      endif
+    enddo
+  endif
   write(6,'(a)') ''
   if( trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' ) then
     write(6,'(2x,a25,2x,es12.3)') 'sa_temperature',sa_temp0
