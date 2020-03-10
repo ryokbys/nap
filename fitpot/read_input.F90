@@ -118,6 +118,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'force_denom_type' ) then
     call read_c1(ionum,cfrc_denom)
     return
+  elseif( trim(cname).eq.'stress_denom_type' ) then
+    call read_c1(ionum,cstrs_denom)
+    return
   elseif( trim(cname).eq.'penalty' ) then
     call read_c1(ionum,cpena)
     return
@@ -354,6 +357,9 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'force_limit' ) then
     call read_r1(ionum,force_limit)
+    return
+  elseif( trim(cname).eq.'stress_limit' ) then
+    call read_r1(ionum,stress_limit)
     return
 !!$  elseif( trim(cname).eq.'NN_num_layers' ) then
 !!$    call read_i1(ionum,nn_nl)

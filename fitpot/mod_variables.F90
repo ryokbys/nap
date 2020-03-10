@@ -57,12 +57,16 @@ module variables
   real(8):: vinitsgm = 1d0
   real(8):: vinitmu  = 0d0
   real(8):: vinitrs  = 12345d0
-!.....Atomic forces over this value will not be used for fitting
+!.....Atomic forces over this value will not be used and neglected for fitting
   real(8):: force_limit = 100d0
+!.....Stress over this value will not be used and neglected for fitting
+  real(8):: stress_limit = 100d0
 !.....Loss function type: LS (least-square), Huber
   character(len=128):: ctype_loss = 'LS'
-!.....Denominator type of force in loss function: absolute or relative (default)
-  character(len=128):: cfrc_denom = 'relative' ! 
+!.....Denominator type of force in loss function: absolute (default) or relative
+  character(len=128):: cfrc_denom = 'absolute' ! 
+!.....Denominator type of stress in loss function: absolute or relative (default), abs2rel
+  character(len=128):: cstrs_denom = 'relative' ! 
 !.....Gaussian density weight
   logical:: lgdw  = .false.  ! flag for GDW
   logical:: lgdwed = .false.  ! whether compuation of GDW is finished

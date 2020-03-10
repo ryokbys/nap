@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-02-05 11:49:15 Ryo KOBAYASHI>
+!                     Last-modified: <2020-03-09 12:19:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -2899,6 +2899,7 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
       call estimate_nbmax(nalmax,h,nx,ny,nz,rcut,rbuf,nbmax)
       namax = namax +nbmax
       if( iprint.ne.0 ) then
+        print '(a,2f6.3)',' rcut, rbuf = ',rcut,rbuf
         write(6,'(a,i10)') ' Min number of local atoms = ',nmin
         write(6,'(a,i10)') ' Max number of local atoms = ',nalmax
         write(6,'(a,i10)')   '   nbmax = ',nbmax

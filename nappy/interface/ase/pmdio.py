@@ -58,11 +58,11 @@ def get_atom_conf_txt(atoms,specorder=[]):
                                                           spos[i,1],
                                                           spos[i,2])
         #...Scaled velocities
-        txt += ' {0:15.7e} {1:15.7e} {2:15.7e}'.format(vels[i,0]/a,
+        txt += ' {0:15.7e} {1:15.7e} {2:15.7e}\n'.format(vels[i,0]/a,
                                                        vels[i,1]/b,
                                                        vels[i,2]/c)
-        txt += '  0.0  0.0'
-        txt += '  0.0  0.0  0.0  0.0  0.0  0.0\n'
+        # txt += '  0.0  0.0'
+        # txt += '  0.0  0.0  0.0  0.0  0.0  0.0\n'
     return txt
 
 

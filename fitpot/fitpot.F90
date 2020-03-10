@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-03-02 18:29:36 Ryo KOBAYASHI>
+!                     Last modified: <2020-03-03 14:19:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -332,6 +332,10 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,a)') 'force_denom_type',trim(cfrc_denom)
     write(6,'(2x,a25,2x,es12.3)') 'force_limit',force_limit
   endif
+  if( lsmatch ) then
+    write(6,'(2x,a25,2x,a)') 'stress_denom_type',trim(cstrs_denom)
+    write(6,'(2x,a25,2x,es12.3)') 'stress_limit',stress_limit
+  endif
   write(6,'(2x,a25,2x,es12.3)') 'fval_upper_limit',fupper_lim
   
   write(6,'(a)') ''
@@ -366,8 +370,8 @@ subroutine write_initial_setting()
   do i=1,nserr
     write(6,'(4x,a23,3(1x,f10.4))') trim(cserr(i)), seerr(i), sferr(i), sserr(i)
   enddo
-  print *,''
   if( len(trim(crefstrct)).gt.5 ) then
+    print *,''
     write(6,'(2x,a25,2x,a)') 'reference_structure',trim(crefstrct)
   else if( trim(cpot).ne.'DNN' ) then
     do i=1,nspmax
@@ -376,12 +380,13 @@ subroutine write_initial_setting()
       endif
     enddo
   endif
-  write(6,'(a)') ''
   if( trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' ) then
+    write(6,'(a)') ''
     write(6,'(2x,a25,2x,es12.3)') 'sa_temperature',sa_temp0
     write(6,'(2x,a25,2x,es12.3)') 'sa_dxwidth',sa_xw0
     write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
   else if( trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' ) then
+    write(6,'(a)') ''
     write(6,'(2x,a25,2x,i3)') 'ga_num_bits',ga_nbits
     write(6,'(2x,a25,2x,i4)') 'ga_num_individuals',ga_nindivs
     write(6,'(2x,a25,2x,i4)') 'ga_num_offsprings',ga_noffsp
@@ -389,6 +394,7 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,f8.4)') 'ga_mutation_rate',ga_rate_mutate
     write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
   else if( trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' ) then
+    write(6,'(a)') ''
     write(6,'(2x,a25,2x,i4)') 'de_num_individuals',de_nindivs
     write(6,'(2x,a25,2x,a)') 'de_fitness',trim(de_fitness)
     write(6,'(2x,a25,2x,f8.4)') 'de_fraction',de_frac
@@ -398,6 +404,7 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,f8.4)') 'de_wmax',de_wmax
     write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
   else if( trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO' ) then
+    write(6,'(a)') ''
     write(6,'(2x,a25,2x,i4)') 'pso_num_individuals',pso_nindivs
     write(6,'(2x,a25,2x,f8.4)') 'pso_w',pso_w
     write(6,'(2x,a25,2x,f8.4)') 'pso_c1',pso_c1
@@ -408,6 +415,7 @@ subroutine write_initial_setting()
 !!$  do i=1,nwgtindiv
 !!$    write(6,'(2x,a25,2x,f6.1)') trim(cwgtindiv(i)),wgtindiv(i)
 !!$  enddo
+  write(6,'(a)') ''
   write(6,'(a)') '------------------------------------------------------------------------'
 
 end subroutine write_initial_setting
@@ -757,7 +765,8 @@ subroutine read_ref_data()
       endif
       samples(ismpl)%fref(1:3,i)= ftmp(1:3)
       samples(ismpl)%fabs(i)= sqrt(ftmp(1)**2 +ftmp(2)**2 +ftmp(3)**2)
-      if( samples(ismpl)%fabs(i).gt.force_limit ) ifcal = 0
+      ifcal = 0
+      if( force_limit.lt.0d0 .or. samples(ismpl)%fabs(i).lt.force_limit ) ifcal = 1
       is= int(samples(ismpl)%tag(i))
       cspi = samples(ismpl)%specorder(is)
       if( csp_in_neglect(cspi) ) ifcal = 0
@@ -2096,6 +2105,7 @@ subroutine sync_input()
   call mpi_bcast(crefstrct,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(ctype_loss,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cfrc_denom,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cstrs_denom,128,mpi_character,0,mpi_world,ierr)
 
   call mpi_bcast(xtol,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ftol,1,mpi_real8,0,mpi_world,ierr)
@@ -2108,6 +2118,7 @@ subroutine sync_input()
   call mpi_bcast(ratio_test,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rseed,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(force_limit,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(stress_limit,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rc_other,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rcut,1,mpi_real8,0,mpi_world,ierr)
   

@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-10 17:53:23 Ryo KOBAYASHI>
+!                     Last modified: <2020-03-09 12:48:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -87,9 +87,9 @@ contains
     use variables,only:samples,tfunc &
          ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys &
          ,swgt2trn,swgt2tst,cpot &
-         ,nff,cffs,maxna,rcut &
+         ,nff,cffs,maxna,rcut,stress_limit &
          ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint &
-         ,ctype_loss,dmem,cfmethod,cfrc_denom &
+         ,ctype_loss,dmem,cfmethod,cfrc_denom,cstrs_denom &
          ,lnormalize,lnormalized,lgdw,lgdwed,terg,tfrc,tstrs
     use parallel
     use minimize
@@ -279,28 +279,40 @@ contains
 !!$        serri = 1d0/serr
         pdiff(1:6) = 0d0
         abssref = abs(smpl%sref(1,1)+smpl%sref(2,2)+smpl%sref(3,3))/3
-        serri = 1d0/ (abssref +serr)
-        do ixyz=1,3
-          do jxyz=ixyz,3
-            k = ivoigt(ixyz,jxyz)
-            pdiff(k)= pdiff(k) +(smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
-                 -smpl%sref(ixyz,jxyz)) *serri
+        if( cstrs_denom(1:7).eq.'abs2rel' ) then
+          if( abssref.lt.stress_limit ) then
+            serri = 1d0/ serr
+          else
+            serri = 1d0/ (abssref +serr)
+          endif
+        else if( cstrs_denom(1:3).eq.'abs' ) then
+          serri = 1d0/ serr
+        else  ! default: relative
+          serri = 1d0/ (abssref +serr)
+        endif
+        if( stress_limit.lt.0d0 .or. (cstrs_denom(1:7).ne.'abs2rel' .and. abssref.lt.stress_limit) ) then
+          do ixyz=1,3
+            do jxyz=ixyz,3
+              k = ivoigt(ixyz,jxyz)
+              pdiff(k)= pdiff(k) +(smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
+                   -smpl%sref(ixyz,jxyz)) *serri
+            enddo
           enddo
-        enddo
-        if( trim(ctype_loss).eq.'Huber' ) then
-          do k=1,6
-            if( abs(pdiff(k)).gt.1d0 ) then
-              pdiff(k) = 2d0*abs(pdiff(k)) -1d0
-            else
+          if( trim(ctype_loss).eq.'Huber' ) then
+            do k=1,6
+              if( abs(pdiff(k)).gt.1d0 ) then
+                pdiff(k) = 2d0*abs(pdiff(k)) -1d0
+              else
+                pdiff(k)= pdiff(k)*pdiff(k)
+              endif
+              ftmp= ftmp +pdiff(k) *swgt /6
+            enddo
+          else  ! LS as default
+            do k=1,6
               pdiff(k)= pdiff(k)*pdiff(k)
-            endif
-            ftmp= ftmp +pdiff(k) *swgt /6
-          enddo
-        else  ! LS as default
-          do k=1,6
-            pdiff(k)= pdiff(k)*pdiff(k)
-            ftmp= ftmp +pdiff(k) *swgt /6
-          enddo
+              ftmp= ftmp +pdiff(k) *swgt /6
+            enddo
+          endif
         endif
         tstrsl = tstrsl +mpi_wtime() -tmp
       endif  ! stress matching
@@ -348,10 +360,10 @@ contains
 !  using pmd (actually one_shot routine.)
 !
     use variables,only: tgrad,ngrad,tcomm,tgrad &
-         ,samples,mdsys,swgt2trn,nff,cffs &
+         ,samples,mdsys,swgt2trn,nff,cffs,stress_limit &
          ,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
          ,rcut,myidrefsub,isidrefsub,iprint &
-         ,ctype_loss,cfrc_denom,lgdw,dmem,terg,tfrc,tstrs
+         ,ctype_loss,cfrc_denom,cstrs_denom,lgdw,dmem,terg,tfrc,tstrs
     use parallel
     use minimize
     implicit none
@@ -527,29 +539,41 @@ contains
         serr= smpl%serr
         pdiff(1:6) = 0d0
         abssref = abs(smpl%sref(1,1)+smpl%sref(2,2)+smpl%sref(3,3))/3
-        serri = 1d0/ (abssref +serr)
-        do ixyz=1,3
-          do jxyz=ixyz,3
-            k = ivoigt(ixyz,jxyz)
-            pdiff(k) = pdiff(k) +( smpl%strs(ixyz,jxyz) &
-                 +smpl%ssub(ixyz,jxyz) &
-                 -smpl%sref(ixyz,jxyz) ) *serri
-          enddo
-        enddo
-        do k=1,6
-          if( trim(ctype_loss).eq.'LS' ) then
-            tmp = 2d0 *pdiff(k)
-          else  ! Huber
-            if( abs(pdiff(k)).gt.1d0 ) then
-              tmp = 2d0 *sign(1d0,pdiff(k))
-            else
-              tmp = 2d0 *pdiff(k)
-            endif
+        if( cstrs_denom(1:7).eq.'abs2rel' ) then
+          if( abssref.lt.stress_limit ) then
+            serri = 1d0/ serr
+          else
+            serri = 1d0/ (abssref +serr)
           endif
-          gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
-               *gws(k,1:ndim) *swgt *serri /6
-!!$               *smpl%gws(k,1:ndim) *swgt *serri /6
-        enddo
+        else if( cstrs_denom(1:3).eq.'abs' ) then
+          serri = 1d0/ serr
+        else ! default: relative
+          serri = 1d0/ (abssref +serr)
+        endif
+        if( stress_limit.lt.0d0 .or. (cstrs_denom(1:7).ne.'abs2rel' .and. abssref.lt.stress_limit) ) then
+          do ixyz=1,3
+            do jxyz=ixyz,3
+              k = ivoigt(ixyz,jxyz)
+              pdiff(k) = pdiff(k) +( smpl%strs(ixyz,jxyz) &
+                   +smpl%ssub(ixyz,jxyz) &
+                   -smpl%sref(ixyz,jxyz) ) *serri
+            enddo
+          enddo
+          do k=1,6
+            if( trim(ctype_loss).eq.'LS' ) then
+              tmp = 2d0 *pdiff(k)
+            else  ! Huber
+              if( abs(pdiff(k)).gt.1d0 ) then
+                tmp = 2d0 *sign(1d0,pdiff(k))
+              else
+                tmp = 2d0 *pdiff(k)
+              endif
+            endif
+            gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
+                 *gws(k,1:ndim) *swgt *serri /6
+  !!$               *smpl%gws(k,1:ndim) *swgt *serri /6
+          enddo
+        endif
         tstrsl = tstrs +mpi_wtime() -ttmp
       endif
     enddo
@@ -729,7 +753,7 @@ contains
          ,maxisp
     use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd
     use force
-!!$    use descriptor,only: get_dsgnmat_force
+    use descriptor,only: get_dsgnmat_force
     use ZBL,only: r_inner,r_outer
     use pmdio, only: nspmax
     use element
@@ -875,7 +899,7 @@ contains
     strs(1:3,1:3) = ptnsr(1:3,1:3) *up2gpa*(-1d0)
 !!$    if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
     if( present(gws) ) gws(1:6,1:ndimp) = gws(1:6,1:ndimp) *up2gpa*(-1d0)
-!!$    if( lfdsgnmat ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)
+    if( lfdsgnmat ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)
 !!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
 !!$  print *,'smpl%natm =',smpl%natm
 !!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)
@@ -1277,36 +1301,36 @@ contains
       close(25)
     endif
 
-!!$!.....Design matrix for force-matching
-!!$    if( lfmatch ) then
-!!$      write(6,'(a)',advance='no') ' Writing out.dsgnmat_frc... '
-!!$      open(23,file='out.dsgnmat_frc')
-!!$      write(23,'(a)') '# y_i, (x_{ij},j=1,nsf) of force matching'
-!!$      open(26,file='out.fsubs')
-!!$      write(26,'(a)') '# fsub'
-!!$      ndat = 0
-!!$      do ismpl=isid0,isid1
-!!$        ndat = ndat +3*samples(ismpl)%natm
-!!$      enddo
-!!$      write(23,'(2i8)') ndat,nsf
-!!$      write(26,'(2i8)') ndat
-!!$      do ismpl=isid0,isid1
-!!$        natm = samples(ismpl)%natm
-!!$        do ia=1,natm
-!!$          do ixyz=1,3
-!!$            write(23,'(es12.3e3)',advance='no') samples(ismpl)%fref(ixyz,ia) &
-!!$                 -samples(ismpl)%fsub(ixyz,ia)
-!!$            write(26,'(es12.3e3)') samples(ismpl)%fsub(ixyz,ia)
-!!$            do isf=1,nsf
-!!$              write(23,'(es12.3e3)',advance='no') -samples(ismpl)%dgsfa(ixyz,isf,ia)
-!!$            enddo
-!!$            write(23,*) ''
-!!$          enddo
-!!$        enddo
-!!$      enddo
-!!$      close(23)
-!!$      close(26)
-!!$    endif
+!.....Design matrix for force-matching
+    if( lfmatch ) then
+      write(6,'(a)',advance='no') ' Writing out.dsgnmat_frc... '
+      open(23,file='out.dsgnmat_frc')
+      write(23,'(a)') '# y_i, (x_{ij},j=1,nsf) of force matching'
+      open(26,file='out.fsubs')
+      write(26,'(a)') '# fsub'
+      ndat = 0
+      do ismpl=isid0,isid1
+        ndat = ndat +3*samples(ismpl)%natm
+      enddo
+      write(23,'(2i8)') ndat,nsf
+      write(26,'(2i8)') ndat
+      do ismpl=isid0,isid1
+        natm = samples(ismpl)%natm
+        do ia=1,natm
+          do ixyz=1,3
+            write(23,'(es12.3e3)',advance='no') samples(ismpl)%fref(ixyz,ia) &
+                 -samples(ismpl)%fsub(ixyz,ia)
+            write(26,'(es12.3e3)') samples(ismpl)%fsub(ixyz,ia)
+            do isf=1,nsf
+              write(23,'(es12.3e3)',advance='no') -samples(ismpl)%dgsfa(ixyz,isf,ia)
+            enddo
+            write(23,*) ''
+          enddo
+        enddo
+      enddo
+      close(23)
+      close(26)
+    endif
 
   end subroutine write_dsgnmats
 !=======================================================================

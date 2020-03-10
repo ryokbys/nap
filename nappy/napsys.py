@@ -292,6 +292,8 @@ class NAPSystem(object):
     #         ai.set_id(i+1)
 
     def num_atoms(self,sid=0):
+        if self.natm < 0:
+            self.natm = len(self.sids)
         if sid == 0:
             return self.natm
         else:
@@ -1449,6 +1451,13 @@ You need to specify the species order correctly with --specorder option.
         atoms.set_velocities(vels)
         return atoms
 
+    def get_nglview(self):
+        """
+        Retern a nglview object via ase_atoms.
+        """
+        import nglview as nv
+        return nv.show_ase(self.to_ase_atoms())
+
     @classmethod
     def from_ase_atoms(cls,ase_atoms,specorder=None):
         """
@@ -1473,9 +1482,9 @@ You need to specify the species order correctly with --specorder option.
         nap.a3[:] = ase_atoms.cell[2]
         #...first, initialize arrays
         nap.sids = np.zeros(len(ase_atoms),dtype=int)
-        nap.poss = np.zeros((len(ase_atoms,3)))
-        nap.vels = np.zeros((len(ase_atoms,3)))
-        nap.frcs = np.zeros((len(ase_atoms,3)))
+        nap.poss = np.zeros((len(ase_atoms),3))
+        nap.vels = np.zeros((len(ase_atoms),3))
+        nap.frcs = np.zeros((len(ase_atoms),3))
         #...append each atom from ASE-Atoms
         for ia,spi in enumerate(spos):
             vi = vels[ia]
@@ -1485,6 +1494,7 @@ You need to specify the species order correctly with --specorder option.
             nap.sids[ia] = sid
             nap.poss[ia] = spi
             nap.vels[ia] = svi
+        nap.natm = len(nap.sids)
         return nap
 
     def change_unitcell(self,a,b,c):

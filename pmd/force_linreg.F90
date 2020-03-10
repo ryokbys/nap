@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-10 11:04:52 Ryo KOBAYASHI>
+!                     Last modified: <2020-03-09 12:08:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -166,7 +166,7 @@ contains
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use descriptor,only: gsfi,dgsfi,igsfi,nsf,calc_desci,make_gsf_arrays &
-         ,write_descs,pre_desci
+         ,pre_desci
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -188,6 +188,10 @@ contains
     real(8),save,allocatable:: aal(:,:),strsl(:,:,:)
     real(8),save:: rcin2 
 
+    call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
+    call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr &
+         ,myid,mpi_world,iprint)
+
     if( l1st ) then
       if( allocated(aal) ) deallocate(aal,strsl)
       allocate(aal(3,namax),strsl(3,3,namax))
@@ -199,25 +203,10 @@ contains
       allocate(aal(3,namax),strsl(3,3,namax))
       rcin2 = rcin*rcin
     endif
+
     aal(1:3,1:namax) = 0d0
-    strsl(1:3,1:3,1:natm+nb) = 0d0
+    strsl(1:3,1:3,1:namax) = 0d0
     epotl= 0d0
-
-    call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
-    call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr &
-         ,myid,mpi_world,iprint)
-
-!!$    call calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr &
-!!$         ,rcin,myid,mpi_world,l1st,iprint)
-!!$
-    if( iprint.gt.10 .and. mod(iprint,10).eq.1 .and. myid.le.0 ) then
-      call write_descs(80,natm,namax,nnmax,lspr,tag)
-    endif
-
-!!$    print *,'gsf:'
-!!$    do isf=1,nsf
-!!$      print *,'isf,gsfi(isf)=',isf,gsfi(isf)
-!!$    enddo
 
 !.....Energy
     do ia=1,natm
@@ -255,17 +244,13 @@ contains
         xji(1:3) = xj(1:3)-xi(1:3)
         rji(1:3) = h(1:3,1)*xji(1) +h(1:3,2)*xji(2) +h(1:3,3)*xji(3)
         dji = rji(1)*rji(1) +rji(2)*rji(2) +rji(3)*rji(3)
-!!$        print *,'dji,rcin2=',dji,rcin2
         if( dji.ge.rcin2 ) cycle
         dji = sqrt(dji)
-!!$        dji = dlspr(0,jj,ia)
         if( dji.ge.rcin ) exit
-!!$        rji(1:3) = dlspr(1:3,jj,ia)
         js = int(tag(ja))
         do isf=1,nsf
           if( igsfi(isf,jj).eq.0 ) cycle
           wgt = coeff(isf)
-!!$          print *,'ia,jj,ja,isf,wgt=',ia,jj,ja,isf,wgt
           do ixyz=1,3
             do jxyz=1,3
               sji = -wgt*dgsfi(jxyz,isf,jj)*rji(ixyz)
