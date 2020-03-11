@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-03-03 14:19:19 Ryo KOBAYASHI>
+!                     Last modified: <2020-03-11 14:34:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -711,7 +711,7 @@ subroutine read_ref_data()
   use fp_common,only: ndat_in_line
   implicit none 
   integer:: ismpl,i,is,jflag,natm,nfrc,nftot,nfrcg,nftotg,ispmax,ispmaxl
-  integer:: nfrefdat,ifcal
+  integer:: nfrefdat,ifcal,ifcalin
   character(len=128):: cdir
   real(8):: erefminl,ftmp(3),ptnsr(3,3)
   character(len=3):: cspi 
@@ -757,16 +757,21 @@ subroutine read_ref_data()
       nftot= nftot + 3
       if( nfrefdat.eq.3 ) then
         read(14,*) ftmp(1:3)
-        ifcal = 1
+        ifcalin = -1
       else if( nfrefdat.eq.4 ) then
 !.....if frc.ref includes ifcal values after each force data,
 !.....read 4 values from every line
-        read(14,*) ftmp(1:3), ifcal
+        read(14,*) ftmp(1:3), ifcalin
       endif
       samples(ismpl)%fref(1:3,i)= ftmp(1:3)
       samples(ismpl)%fabs(i)= sqrt(ftmp(1)**2 +ftmp(2)**2 +ftmp(3)**2)
-      ifcal = 0
-      if( force_limit.lt.0d0 .or. samples(ismpl)%fabs(i).lt.force_limit ) ifcal = 1
+      if( ifcalin.lt.0 ) then
+        ifcal = 1
+!.....DO NOT SET IFCAL ACCORDING TO FORCE_LIMIT SINCE 2020-03-11
+!!$        if( force_limit.lt.0d0 .or. samples(ismpl)%fabs(i).lt.force_limit ) ifcal = 1
+      else
+        ifcal = ifcalin
+      endif
       is= int(samples(ismpl)%tag(i))
       cspi = samples(ismpl)%specorder(is)
       if( csp_in_neglect(cspi) ) ifcal = 0

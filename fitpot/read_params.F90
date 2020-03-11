@@ -529,7 +529,97 @@ subroutine bcast_descs()
   enddo
 end subroutine bcast_descs
 !=======================================================================
+subroutine read_params_ZBL()
+!
+!  Read in.params.ZBL for fitpot.
+!
+  use variables
+  use parallel
+  use force, only: loverlay
+  use util, only: num_data
+  use pmdio,only: csp2isp
+  implicit none
 
+  integer,parameter:: ionum = 17
+
+  integer:: isp,jsp
+  real(8):: qnucli,ri,ro
+  character(len=128):: cline,cfname,cmode,ctmp
+  character(len=5):: cspi,cspj
+  real(8),parameter:: qtiny = 1d-10
+!!$    integer,external:: num_data
+
+  if( myid.eq.0 ) then
+    if( iprint.gt.1 ) print *,'Read in.params.ZBL...'
+    
+    cmode = ''
+    cfname = 'in.params.ZBL'
+    open(ionum,file=trim(cfname),status='old')
+    zbl_interact(1:nspmax,1:nspmax) = .true.
+    zbl_qnucl(1:nspmax) = 0d0
+    zbl_rc = 0d0
+
+    if( iprint.ne.0 ) write(6,'(/,a)') ' ZBL parameters:'
+    do while(.true.)
+      read(ionum,*,end=10) cline
+      if( num_data(cline,' ').eq.0 ) cycle
+      if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
+!.....Mode detection
+      if( trim(cline).eq.'parameters' ) then
+        cmode = trim(cline)
+        cycle
+      else if( trim(cline).eq.'interactions' ) then
+        cmode = trim(cline)
+        zbl_interact(1:nspmax,1:nspmax) = .false.
+        cycle
+      endif
+!.....Read parameters depending on the mode
+      if( trim(cmode).eq.'parameters' ) then
+        backspace(ionum)
+        read(ionum,*) cspi, qnucli, ri, ro
+        isp = csp2isp(trim(cspi),specorder)
+        if( isp.le.0 ) cycle
+        zbl_qnucl(isp) = qnucli
+        zbl_ri(isp) = ri
+        zbl_ro(isp) = ro
+        zbl_rc = max(zbl_rc,ro)
+        if( iprint.ne.0 ) then
+          write(6,'(a,a3,3(2x,f7.3))') &
+               '   csp,qnucl,ri,ro = ',trim(cspi),qnucli,ri,ro
+        endif
+      else if( trim(cmode).eq.'interactions' ) then
+        backspace(ionum)
+        read(ionum,*) cspi, cspj
+        isp = csp2isp(trim(cspi),specorder)
+        jsp = csp2isp(trim(cspj),specorder)
+        if( isp.gt.0 .and. jsp.gt.0 ) then
+          zbl_interact(isp,jsp) = .true.
+          zbl_interact(jsp,isp) = .true.
+        else
+          print *,'  interacion read but not used: ',isp,jsp
+        endif
+      endif
+    enddo
+10  close(ionum)
+    if( iprint.gt.1 ) then
+      do isp=1,nspmax
+        do jsp=isp,nspmax
+          if( zbl_interact(isp,jsp) ) then
+            write(6,'(a,2i3,l2)') '   isp,jsp,interact = ',isp,jsp,zbl_interact(isp,jsp)
+          endif
+        enddo
+      enddo
+    endif
+  endif  ! myid.eq.0
+
+  call mpi_bcast(zbl_rc,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(zbl_qnucl,nspmax,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(zbl_ri,nspmax,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(zbl_ro,nspmax,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(zbl_interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
+  return
+
+end subroutine read_params_ZBL
 !-----------------------------------------------------------------------
 ! Local Variables:
 ! compile-command: "make fitpot"

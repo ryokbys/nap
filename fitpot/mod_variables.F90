@@ -199,6 +199,13 @@ module variables
   integer:: ncnst_type(200)
   integer:: ncomb_type(200)
   real(8):: cnst(max_ncnst)
+
+!.....ZBL potential-related parameters
+  logical:: zbl_interact(nspmax,nspmax)
+  real(8):: zbl_qnucl(nspmax)
+  real(8):: zbl_rc
+  real(8):: zbl_ri(1:nspmax) = -1d0
+  real(8):: zbl_ro(1:nspmax) = -1d0
   
 contains
   subroutine init_variables()

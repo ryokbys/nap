@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-09 22:21:10 Ryo KOBAYASHI>
+!                     Last modified: <2020-03-11 16:41:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -11,7 +11,7 @@ module ZBL
 !       and Methods in Physics Research, B 267, 1061 (2009).
 !   [3] G. Bonny et al., JAP 121, 165107 (2017) for switching function.
 !-----------------------------------------------------------------------
-  use pmdio,only: nspmax
+  use pmdio,only: nspmax,csp2isp
   use force,only: loverlay
   implicit none
   save
@@ -19,6 +19,7 @@ module ZBL
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.ZBL'
   integer,parameter:: ioprms = 20
+  logical:: lprmset_zbl = .false.
   
 !.....Max num of species
   integer,parameter:: msp = nspmax
@@ -72,16 +73,18 @@ contains
     return
   end subroutine init_ZBL
 !=======================================================================
-  subroutine read_params_ZBL(myid,mpi_world,iprint)
+  subroutine read_params_ZBL(myid,mpi_world,iprint,specorder)
     use force, only: loverlay
     use util, only: num_data
     implicit none
     include "mpif.h"
     integer,intent(in):: myid,mpi_world,iprint
+    character(len=3),intent(in):: specorder(nspmax)
 
     integer:: isp,jsp,ierr
     real(8):: qnucli,ri,ro
     character(len=128):: cline,fname,cmode,ctmp
+    character(len=5):: cspi,cspj
     real(8),parameter:: qtiny = 1d-10
 !!$    integer,external:: num_data
 
@@ -110,24 +113,28 @@ contains
 !.....Read parameters depending on the mode
         if( trim(cmode).eq.'parameters' ) then
           backspace(ioprms)
-          read(ioprms,*) isp, qnucli, ri, ro
-          if( isp.gt.msp ) then
-            write(6,*) ' Warning @read_params: since isp is greater than msp,'&
-                 //' skip reading the line.'
-          endif
+          read(ioprms,*) cspi, qnucli, ri, ro
+          isp = csp2isp(trim(cspi),specorder)
+          if( isp.le.0 ) cycle
           qnucl(isp) = qnucli
           r_inner(isp) = ri
           r_outer(isp) = ro
           zbl_rc = max(zbl_rc,ro)
           if( iprint.ne.0 ) then
-            write(6,'(a,i4,3(2x,f7.3))') &
-                 '   isp,qnucl,ri,ro = ',isp,qnucli,ri,ro
+            write(6,'(a,a3,3(2x,f7.3))') &
+                 '   csp,qnucl,ri,ro = ',trim(cspi),qnucli,ri,ro
           endif
         else if( trim(cmode).eq.'interactions' ) then
           backspace(ioprms)
-          read(ioprms,*) isp, jsp
-          interact(isp,jsp) = .true.
-          interact(jsp,isp) = .true.
+          read(ioprms,*) cspi, cspj
+          isp = csp2isp(trim(cspi),specorder)
+          jsp = csp2isp(trim(cspj),specorder)
+          if( isp.gt.0 .and. jsp.gt.0 ) then
+            interact(isp,jsp) = .true.
+            interact(jsp,isp) = .true.
+          else
+            print *,'  interacion read but not used: ',isp,jsp
+          endif
         endif
       enddo
 10    close(ioprms)
@@ -154,8 +161,8 @@ contains
     call mpi_bcast(qnucl,msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(r_inner,msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(r_outer,msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(zbl_rc,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
+    lprmset_zbl = .true.
     return
   end subroutine read_params_ZBL
 !=======================================================================
@@ -546,7 +553,25 @@ contains
     return
   end subroutine set_paramsdir_ZBL
 !=======================================================================
-  
+  subroutine set_params_ZBL(rcin,qnuclin,riin,roin,interactin)
+!
+!  Accessor routine to set ZBL parameters from outside (fitpot).
+!  Curretnly this routine is supposed to be called only on serial run.
+!
+    real(8),intent(in):: rcin,qnuclin(nspmax),riin(nspmax),roin(nspmax)
+    logical,intent(in):: interactin(nspmax,nspmax)
+
+    if( lprmset_zbl ) return
+
+    zbl_rc = rcin
+    qnucl(:) = qnuclin(:)
+    r_inner(:) = riin(:)
+    r_outer(:) = roin(:)
+    interact(:,:) = interactin(:,:)
+
+    lprmset_zbl = .true.
+    return
+  end subroutine set_params_ZBL
 end module ZBL
 !-----------------------------------------------------------------------
 !     Local Variables:

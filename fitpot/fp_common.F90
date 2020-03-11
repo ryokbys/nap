@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-03-09 12:48:03 Ryo KOBAYASHI>
+!                     Last modified: <2020-03-11 16:39:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -20,7 +20,6 @@ module fp_common
 
 !.....Store loverlay and r_inner/outer arrays
   logical:: overlay
-  real(8),allocatable:: ri_zbl(:),ro_zbl(:)
 
 contains
 !=======================================================================
@@ -87,7 +86,7 @@ contains
     use variables,only:samples,tfunc &
          ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys &
          ,swgt2trn,swgt2tst,cpot &
-         ,nff,cffs,maxna,rcut,stress_limit &
+         ,nff,cffs,maxna,rcut,force_limit,stress_limit &
          ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint &
          ,ctype_loss,dmem,cfmethod,cfrc_denom,cstrs_denom &
          ,lnormalize,lnormalized,lgdw,lgdwed,terg,tfrc,tstrs
@@ -248,7 +247,13 @@ contains
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(smpl%fref(1,ia)**2 +smpl%fref(2,ia)**2 +smpl%fref(3,ia)**2)
-          if( cfrc_denom(1:3).eq.'rel' ) then
+          if( cfrc_denom(1:7).eq.'abs2rel' ) then
+            if( absfref.lt.force_limit ) then
+              ferri = 1d0 /ferr
+            else
+              ferri = 1d0 /max(absfref,ferr)
+            endif
+          else if( cfrc_denom(1:3).eq.'rel' ) then
             ferri = 1d0/ max(absfref,ferr)
           else  ! default: abs
             ferri = 1d0/ ferr
@@ -283,12 +288,12 @@ contains
           if( abssref.lt.stress_limit ) then
             serri = 1d0/ serr
           else
-            serri = 1d0/ (abssref +serr)
+            serri = 1d0/ max(abssref,serr)
           endif
         else if( cstrs_denom(1:3).eq.'abs' ) then
+          serri = 1d0/ max(abssref,serr)
+        else  ! default: absolute
           serri = 1d0/ serr
-        else  ! default: relative
-          serri = 1d0/ (abssref +serr)
         endif
         if( stress_limit.lt.0d0 .or. (cstrs_denom(1:7).ne.'abs2rel' .and. abssref.lt.stress_limit) ) then
           do ixyz=1,3
@@ -360,7 +365,7 @@ contains
 !  using pmd (actually one_shot routine.)
 !
     use variables,only: tgrad,ngrad,tcomm,tgrad &
-         ,samples,mdsys,swgt2trn,nff,cffs,stress_limit &
+         ,samples,mdsys,swgt2trn,nff,cffs,force_limit,stress_limit &
          ,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
          ,rcut,myidrefsub,isidrefsub,iprint &
          ,ctype_loss,cfrc_denom,cstrs_denom,lgdw,dmem,terg,tfrc,tstrs
@@ -509,10 +514,16 @@ contains
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(smpl%fref(1,ia)**2 +smpl%fref(2,ia)**2 +smpl%fref(3,ia)**2)
-          if( cfrc_denom(1:3).eq.'rel' ) then
+          if( cfrc_denom(1:7).eq.'abs2rel' ) then
+            if( absfref.lt.force_limit ) then
+              ferri = 1d0 /ferr
+            else
+              ferri = 1d0 /max(absfref,ferr)
+            endif
+          else if( cfrc_denom(1:3).eq.'rel' ) then
             ferri = 1d0/ max(absfref,ferr)
           else  ! default: abs
-            ferri = 1d0 /ferr
+            ferri = 1d0/ ferr
           endif
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia) +smpl%fsub(ixyz,ia) &
@@ -543,12 +554,12 @@ contains
           if( abssref.lt.stress_limit ) then
             serri = 1d0/ serr
           else
-            serri = 1d0/ (abssref +serr)
+            serri = 1d0/ max(abssref,serr)
           endif
-        else if( cstrs_denom(1:3).eq.'abs' ) then
+        else if( cstrs_denom(1:3).eq.'rel' ) then
+          serri = 1d0/ max(abssref,serr)
+        else ! default: absolute
           serri = 1d0/ serr
-        else ! default: relative
-          serri = 1d0/ (abssref +serr)
         endif
         if( stress_limit.lt.0d0 .or. (cstrs_denom(1:7).ne.'abs2rel' .and. abssref.lt.stress_limit) ) then
           do ixyz=1,3
@@ -880,9 +891,6 @@ contains
     if( overlay ) then
 !.....Set loverlay variable in force module
       loverlay = overlay
-!.....Set r_inner/outer arrays in force_ZBL
-      r_inner(:) = ri_zbl(:)
-      r_outer(:) = ro_zbl(:)
     endif
 
 !.....one_shot force calculation
@@ -957,7 +965,7 @@ contains
     use dipole,only: set_paramsdir_dipole
     use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
     use LJ,only: set_paramsdir_LJ
-    use ZBL,only: set_paramsdir_ZBL, r_inner, r_outer
+    use ZBL,only: set_params_ZBL
     use Bonny_WRe,only: set_paramsdir_Bonny
     use cspline,only: set_paramsdir_cspline
     use force,only: loverlay
@@ -1004,6 +1012,7 @@ contains
           luse_LJ_repul = .true.
         else if( index(trim(csubffs(i)),'ZBL').ne.0 ) then
           luse_ZBL = .true.
+          call read_params_ZBL()
         else if( index(trim(csubffs(i)),'Bonny_WRe').ne.0 ) then
           luse_Bonny_WRe = .true.
         else if( index(trim(csubffs(i)),'cspline').ne.0 ) then
@@ -1037,8 +1046,9 @@ contains
                //trim(samples(ismpl)%cdirname)//'/pmd')
         endif
         if( luse_ZBL ) then
-          call set_paramsdir_ZBL(trim(cmaindir)//'/'&
-               //trim(samples(ismpl)%cdirname)//'/pmd')
+!!$          call set_paramsdir_ZBL(trim(cmaindir)//'/'&
+!!$               //trim(samples(ismpl)%cdirname)//'/pmd')
+          call set_params_ZBL(zbl_rc,zbl_qnucl,zbl_ri,zbl_ro,zbl_interact)
         endif
         if( luse_Bonny_WRe ) then
           call set_paramsdir_Bonny(trim(cmaindir)//'/'&
@@ -1060,11 +1070,6 @@ contains
 !!$        enddo
         if( luse_ZBL ) then
           overlay = loverlay
-          if( .not. allocated(ri_zbl) ) then
-            allocate(ri_zbl(size(r_inner)),ro_zbl(size(r_outer)))
-            ri_zbl(:) = r_inner(:)
-            ro_zbl(:) = r_outer(:)
-          endif
         endif
       enddo
 

@@ -434,7 +434,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   endif
 !.....ZBL
   if( use_force('ZBL') ) then
-    call read_params_ZBL(myid_md,mpi_md_world,iprint)
+    call read_params_ZBL(myid_md,mpi_md_world,iprint,specorder)
   else if( loverlay .and. trim(ol_force).eq.'ZBL' ) then
     call init_ZBL(iprint)
   endif
