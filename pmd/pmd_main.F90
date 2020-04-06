@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-01-25 00:19:59 Ryo KOBAYASHI>
+!                     Last-modified: <2020-04-01 10:50:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -39,6 +39,7 @@ program pmd
   real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin,rmin
   character(len=3):: csp
   type(atom):: elem
+  real(8),external:: urnd
 !!$  integer,external:: itotOf
 
 !-----initialize the MPI environment
@@ -53,7 +54,7 @@ program pmd
   call init_element()
 
 !.....Set fmv as default value before reading 'in.pmd'
-  call set_fmv(fmv)
+!!$  call set_fmv(fmv)
 
   if( myid_md.eq.0 ) then
     write(6,'(a)') '=================================' &
@@ -107,6 +108,14 @@ program pmd
     call write_initial_setting()
 !        call write_inpmd(10,trim(cinpmd))
     if( num_forces.eq.0 ) stop ' ERROR: no force-field specified'
+
+!.....Initialize random seeds in the function urnd
+    if( rseed.ge.0d0 ) then
+      tmp = urnd(rseed+myid_md)
+    else
+      tmp = urnd(abs(rseed))
+    endif
+    
     if( trim(ctctl).eq.'ttm' ) then
       print *,''
       print *,'Since the two-temperature model (TTM) MD...'
@@ -292,7 +301,7 @@ subroutine set_fmv(fmv)
 !-----set fmv(1:3,ifmv) to be multiplied to the velocities
   fmv(1:3,0)= (/ 0d0, 0d0, 0d0 /) ! fix
   fmv(1:3,1)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,2)= (/ 1d0, 1d0, 0d0 /) ! xy-only
+  fmv(1:3,2)= (/ 1d0, 1d0, 1d0 /) ! free move
   fmv(1:3,3)= (/ 1d0, 1d0, 1d0 /) ! free move
   fmv(1:3,4)= (/ 1d0, 1d0, 1d0 /) ! free move
   fmv(1:3,5)= (/ 1d0, 1d0, 1d0 /) ! free move
@@ -515,6 +524,7 @@ subroutine bcast_params()
   call mpi_bcast(ctctl,20,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(ttgt,9,MPI_REAL8,0,mpicomm,ierr)
   call mpi_bcast(trlx,1,MPI_REAL8,0,mpicomm,ierr)
+  call mpi_bcast(rseed,1,MPI_REAL8,0,mpicomm,ierr)
   call mpi_bcast(nerg,1,MPI_INTEGER,0,mpicomm,ierr)
   call mpi_bcast(ifpmd,1,MPI_INTEGER,0,mpicomm,ierr)
   call mpi_bcast(npmd,1,MPI_INTEGER,0,mpicomm,ierr)

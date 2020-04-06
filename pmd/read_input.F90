@@ -144,6 +144,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'remove_translation' ) then
     call read_i1(ionum,nrmtrans)
     return
+  elseif( trim(cname).eq.'random_seed' ) then
+    call read_r1(ionum,rseed)
+    return
 !.....temperature distribution along x
   elseif( trim(cname).eq.'flag_temp_dist' ) then
     call read_l1(ionum,ltdst)

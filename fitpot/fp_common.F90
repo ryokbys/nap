@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-03-11 16:39:41 Ryo KOBAYASHI>
+!                     Last modified: <2020-03-19 17:07:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -1308,7 +1308,7 @@ contains
 
 !.....Design matrix for force-matching
     if( lfmatch ) then
-      write(6,'(a)',advance='no') ' Writing out.dsgnmat_frc... '
+      write(6,'(a)') ' Writing out.dsgnmat_frc... '
       open(23,file='out.dsgnmat_frc')
       write(23,'(a)') '# y_i, (x_{ij},j=1,nsf) of force matching'
       open(26,file='out.fsubs')

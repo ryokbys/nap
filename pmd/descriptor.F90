@@ -1512,7 +1512,7 @@ contains
          index(cline,'chebyshev:').ne.0 ) then
       read(cline,*) c1, copt, lopt
       lcheby = lopt
-      if( iprint.gt.0 ) then
+      if( iprint.gt.0 .and. lcheby ) then
         print *,''
         print '(a)', ' Chebyshev series for descriptors.'
       endif

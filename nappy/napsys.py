@@ -571,24 +571,22 @@ You need to specify the species order correctly with --specorder option.
             if c7[0] in ('s','S'):
                 c7= f.readline()
             if c7[0] in ('c','C'): # positions are in Cartesian coordinate
-                hi = unitvec_to_hi(self.a1,self.a2,self.a3)
+                hi = self.get_hmat_inv()
                 coord = 'cartesian'
             else:
                 coord = 'scaled'
             
-            # Atom positions hereafter
+            #...Atom positions
             for i in range(self.natm):
                 buff= f.readline().split()
                 sid= 1
                 m= 0
                 sindex=0
-                symbol = None
                 for n in num_species:
                     m += n
                     if i < m:
                         if spcs and self.specorder:
                             sid = self.specorder.index(spcs[sindex]) + 1
-                            symbol = spcs[sindex]
                         break
                     sid += 1
                     sindex += 1
@@ -988,7 +986,7 @@ You need to specify the species order correctly with --specorder option.
             elif 'PRIMCOORD' in line:
                 mode= 'PRIMCOORD'
                 # Before going further, create inversed h-matrix
-                hi = unitvec_to_hi(self.a1,self.a2,self.a3)
+                hi = self.get_hmat_inv()
                 # print 'Inversed h-matrix:'
                 # print hi
                 continue
@@ -1870,17 +1868,6 @@ def shift_spos_for_lammps(spos,lxy,lxz,lyz,x,y,z,yz,xz,xy):
     for i in range(3):
         new_spos[i] = pbc(new_spos[i])
     return new_spos
-
-def unitvec_to_hi(a1,a2,a3):
-    """
-    Convert 3 unitvectors to inversed h-matrix via h-matrix.
-    """
-    h = np.zeros((3,3),dtype=float)
-    for i in range(3):
-        h[0,i] = a1[i]
-        h[1,i] = a2[i]
-        h[2,i] = a3[i]
-    return np.linalg.inv(h)
 
 def analyze(nsys):
     import elements

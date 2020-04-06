@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-11-06 16:03:59 Ryo KOBAYASHI>
+!                     Last modified: <2020-03-30 18:50:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -45,6 +45,10 @@ module pmdio
   data ttgt / 300d0, 300d0, 300d0, 300d0, 300d0, 300d0, &
        300d0, 300d0, 300d0 /
   real(8):: trlx = 100d0
+!.....Random seed
+!  If positve, use (RSEED+MYID) as the seed for each process
+!  If negative, use the same random seeds for all the parallel process
+  real(8):: rseed = 12345d0
 !.....Remove translational motion:
 !     N< 0: not to remove translation
 !     N==0: remove translation only at the beginning

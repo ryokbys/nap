@@ -22,7 +22,8 @@ Options:
 """
 from __future__ import print_function
 
-import sys,os,commands,copy
+import sys,os,copy
+import subprocess
 from docopt import docopt
 import numpy as np
 
@@ -148,7 +149,7 @@ if __name__ == '__main__':
             replace_hmat(hmat)
         #os.system('vasp > out.vasp')
         os.system(cmd)
-        erg= float(commands.getoutput("tail -n1 OSZICAR | awk '{print $5}'"))
+        erg= float(subprocess.getoutput("tail -n1 OSZICAR | awk '{print $5}'"))
         os.system("mkdir -p "+dname)
         os.system("cp INCAR OSZICAR OUTCAR vasprun.xml {0}/".format(dname))
         vol= get_vol(al,hmat)
