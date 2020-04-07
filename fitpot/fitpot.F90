@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-03-11 14:34:11 Ryo KOBAYASHI>
+!                     Last modified: <2020-04-07 11:02:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -814,7 +814,7 @@ subroutine read_ref_data()
   maxisp = 0
   call mpi_reduce(nfrc,nfrcg,1,mpi_integer,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(nftot,nftotg,1,mpi_integer,mpi_sum,0,mpi_world,ierr)
-  call mpi_allreduce(ispmaxl,maxisp,1,mpi_integer,mpi_max,0,mpi_world,ierr)
+  call mpi_allreduce(ispmaxl,maxisp,1,mpi_integer,mpi_max,mpi_world,ierr)
 
   if( myid.eq.0 ) then
     print *,''
