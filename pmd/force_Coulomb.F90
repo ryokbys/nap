@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-03 17:13:18 Ryo KOBAYASHI>
+!                     Last modified: <2020-04-08 19:02:27 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -479,16 +479,13 @@ contains
       enddo
     endif  ! myid
 
-!.....To avoid MPI call when it is called in fitpot.
-    if( mpi_world.ge.0 ) then
-      call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
-      call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(rho_bvs,nspmax*nspmax,mpi_real8 &
-           ,0,mpi_world,ierr)
-      call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
-    endif
+    call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(rho_bvs,nspmax*nspmax,mpi_real8 &
+         ,0,mpi_world,ierr)
+    call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
 !.....end of screend_bvs
   end subroutine read_params_sc
 !=======================================================================
@@ -823,36 +820,32 @@ contains
       
     endif  ! myid.eq.0
 
-!.....Avoid MPI call when it is called in fitpot.
-    if( mpi_world.ge.0 ) then
 !.....Broadcast data just read from the file
-      call mpi_bcast(cterms,128,mpi_character,0,mpi_world,ierr)
-      call mpi_bcast(cdist,128,mpi_character,0,mpi_world,ierr)
-      call mpi_bcast(cchgs,128,mpi_character,0,mpi_world,ierr)
-    
-      call mpi_bcast(schg0,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(schg,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(vcg_e0,nsp,mpi_real8,0,mpi_world,ierr)
-!!$    call mpi_bcast(vcg_sgm,nsp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(cinteract,20,mpi_character,0,mpi_world,ierr)
-      call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
-      call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
-    
-      call mpi_bcast(pacc,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(conv_eps,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(rho_screened_cut,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(rho_bvs,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-    endif
+    call mpi_bcast(cterms,128,mpi_character,0,mpi_world,ierr)
+    call mpi_bcast(cdist,128,mpi_character,0,mpi_world,ierr)
+    call mpi_bcast(cchgs,128,mpi_character,0,mpi_world,ierr)
+  
+    call mpi_bcast(schg0,nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(schg,nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vcg_e0,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(cinteract,20,mpi_character,0,mpi_world,ierr)
+    call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
+  
+    call mpi_bcast(pacc,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(conv_eps,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rho_screened_cut,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rho_bvs,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
 
     if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
       if( myid.eq.0 .and. iprint.gt.0 ) then
@@ -2252,6 +2245,7 @@ contains
       is = int(tag(i))
       nbvsl(is) = nbvsl(is) +1
     enddo
+
     call mpi_allreduce(nbvsl,nbvs,nspmax,mpi_integer &
          ,mpi_sum,mpi_md_world,ierr)
 

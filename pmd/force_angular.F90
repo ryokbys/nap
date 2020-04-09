@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-28 20:37:11 Ryo KOBAYASHI>
+!                     Last modified: <2020-04-08 18:51:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax, csp2isp
   integer,parameter:: ioprms = 50
@@ -188,7 +188,7 @@ contains
     epotl= epotl3
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
     epot= epot +epott
-    if( iprint.gt.2 ) print *,'epot angular = ',epott
+    if( iprint.gt.2 ) print *,'myid,epot angular = ',myid,epott
     
     return
   end subroutine force_angular
