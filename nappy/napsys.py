@@ -36,15 +36,13 @@ Options:
 from __future__ import print_function
 from __future__ import division
 
-import math
-import sys, copy
-from datetime import datetime
+import copy
 import numpy as np
-from numpy import sin, cos, sqrt, exp
+from numpy import sin, cos, sqrt
 from docopt import docopt
+import pandas as pd
 
-from nappy.atom import Atom, get_symbol_from_number, get_number_from_symbol
-from nappy.units import kB
+from nappy.atom import get_symbol_from_number, get_number_from_symbol
 
 #...constants
 _maxnn = 100
@@ -53,28 +51,21 @@ _file_formats = ('pmd',
                  'dump',
                  'xsf',
                  'lammps')
-
+_default_labels = ('pos','vel','frc','sid')
 
 class NAPSystem(object):
     """
     Contains cell information and atoms, and provides some functionalities.
     """
 
-    def __init__(self, fname=None, ffmt=None, specorder=[], ase_atoms=None,
-                 charges=[]):
+    def __init__(self, fname=None, ffmt=None, specorder=[], ase_atoms=None):
         self.alc = 1.0
         self.a1 = np.zeros(3)
         self.a2 = np.zeros(3)
         self.a3 = np.zeros(3)
-        self.specorder = specorder
-        self.natm = -1
-        #...Arrays
-        self.poss = None
-        self.vels = None
-        self.frcs = None
-        self.sids = None
-        self.auxs = None
-        self.aux_names = None
+        self.specorder = specorder.copy()
+        #...DataFrame for all the atoms including atomic data
+        self.init_atoms()
 
         specorder_good = False
         for s in self.specorder:
@@ -90,7 +81,19 @@ class NAPSystem(object):
         if ase_atoms is not None:
             self.from_ase_atoms(ase_atoms)
 
-        self.set_charges(charges)
+        return None
+
+    def init_atoms(self):
+        self.atoms = pd.DataFrame(columns=_default_labels)
+        return None
+
+    def get_aux_names(self):
+        aux_names = list(self.atoms.columns)
+        for l in _default_labels:
+            aux_names.remove(l)
+        if 'lspr' in aux_names:
+            aux_names.remove('lspr')
+        return aux_names
 
     def set_lattice(self, alc, a1, a2, a3):
         """
@@ -167,22 +170,21 @@ class NAPSystem(object):
 
     def set_specorder(self,*specorder):
         #...Check if the number of species is relevant
-        maxsid = max(self.sids)
-        #     maxsid = max(maxsid,ai.sid)
+        maxsid = self.atoms.sid.max()
         if len(specorder) < maxsid:
             txt = 'Number of species is not sufficient,' \
                   +' and must be greater than or equal {0:d}'.format(maxsid)
             raise ValueError(txt)
         #...Operation could be different case by case
-        if set(self.specorder) == set(specorder): # Only re-ordering
-            newsids = np.zeros(len(self.sids),dtype=int)
-            for i,sid in enumerate(self.sids):
+        if set(self.specorder) == set(specorder):  # Only re-ordering
+            newsids = np.zeros(len(self.atoms),dtype=int)
+            for i,sid in enumerate(self.atoms.sid):
                 symbol = self.specorder[sids-1]
                 sidnew = specorder.index(symbol)+1
                 newsids[i] = sidnew
-            self.sids[:] = newsids[:]
+            self.atoms.sid = newsids
             self.specorder = specorder
-        else: # Re-define specorder even if specorder and sids are inconsistent...
+        else:  # Re-define specorder even if specorder and sids are inconsistent...
             self.specorder = specorder
                 
     def get_lattice_vectors(self):
@@ -233,131 +235,90 @@ class NAPSystem(object):
             sid = self.specorder.index(symbol)+1
             sids.append(sid)
         
-        if self.sids:
-            self.sids = np.append(self.sids,sids)
-            self.poss = np.append(self.poss,poss,axis=0)
-            self.vels = np.append(self.vels,vels,axis=0)
-            self.frcs = np.append(self.frcs,frcs,axis=0)
-        else:
-            self.sids = np.array(sids,dtype=int)
-            self.poss = np.array(poss)
-            self.vels = np.array(vels)
-            self.frcs = np.array(frcs)
-        #...Only making the length of arrays identical
-        if self.auxs:
-            nauxs = len(self.auxs.T)
-            auxs = [[ 0. for i in range(nauxs)]]
-            self.auxs = np.append(self.auxs,auxs,axis=0)
-        self.natm = len(self.sids)
+        newatoms = pd.DataFrame(columns=self.atoms.columns)
+        newatoms.pos = poss
+        newatoms.vel = vels
+        newatoms.frc = frcs
+        newatoms.sid = sids
+        self.atoms = pd.concat([self.atoms, newatoms])
+        self.atoms.reset_index(drop=True,inplace=True)
         return None
 
-    def remove_atoms(self,*ids):
+    def remove_atoms(self,*indices):
         """
-        Remove atoms of ID ids from the atoms list.
+        Remove atoms of given INDICES from the atoms list.
         """
-        sids = np.zeros(self.natm -len(ids),dtype=int)
-        poss = np.zeros((self.natm-len(ids),3))
-        vels = np.zeros((self.natm-len(ids),3))
-        frcs = np.zeros((self.natm-len(ids),3))
-        inc = 0
-        for i in range(self.natm):
-            if i in ids:
-                continue
-            sids[inc] = self.sids[i]
-            poss[inc,:] = self.poss[i,:]
-            vels[inc,:] = self.vels[i,:]
-            frcs[inc,:] = self.frcs[i,:]
-            inc += 1
-        self.sids = copy.deepcopy(sids)
-        self.poss = copy.deepcopy(poss)
-        self.vels = copy.deepcopy(vels)
-        self.frcs = copy.deepcopy(frcs)
-        if self.auxs:
-            nauxs = len(self.auxs.T)
-            auxs = np.zeros((self.natm-len(ids),nauxs))
-            inc = 0
-            for i in range(self.natm):
-                if i in ids:
-                    continue
-                auxs[inc,:] = self.auxs[i,:]
-                inc += 1
-            self.auxs = copy.deepcopy(auxs)
+        try:
+            self.atoms.drop(index=list(indices),inplace=True)
+        except Exception:
+            raise
 
-        self.natm = len(self.sids)
+        # self.natm = len(self.atoms)
         return None
-
-    # def reset_ids(self):
-    #     for i in range(len(self.atoms)):
-    #         ai= self.atoms[i]
-    #         ai.set_id(i+1)
 
     def num_atoms(self,sid=0):
-        if self.natm < 0:
-            self.natm = len(self.sids)
         if sid == 0:
-            return self.natm
+            return len(self.atoms)
         else:
-            n= 0
-            for si in self.sids:
-                if si == sid:
-                    n += 1
-            return n
+            return len(self.atoms[self.atoms.sid==sid])
 
     def num_species(self):
-        num_species= []
+        return self.atoms.sid.max()
+    
+    def natm_per_species(self):
+        nps= []
         max_nsp= 0
         try:
             if len(self.specorder) > 0:
                 for i in range(len(self.specorder)):
-                    num_species.append(0)
-                for sid in self.sids:
-                    num_species[sid-1] += 1
+                    nps.append(0)
+                for sid in self.atoms.sid:
+                    nps[sid-1] += 1
             else:
-                for sid in self.sids:
-                    max_nsp= max(max_nsp,sid)
+                max_nsp = self.atoms.sid.max()
                 for i in range(max_nsp):
-                    num_species.append(0)
-                for sid in self.sids:
-                    num_species[sid-1] += 1
-        except:
-            num_species.append(self.natm)
-        return num_species
+                    nps.append(0)
+                for sid in self.atoms.sid:
+                    nps[sid-1] += 1
+        except Exception:
+            nps.append(len(self.atoms))
+        return nps
 
     def volume(self):
         return self.alc**3 *np.abs(np.dot(self.a1,np.cross(self.a2,self.a3)))
 
     def get_real_positions(self):
         hmat = self.get_hmat()
-        rpos = np.zeros((self.natm,3))
-        for ia in range(self.natm):
-            pos = self.poss[ia]
+        rpos = np.zeros((len(self.atoms),3))
+        for ia in range(len(self.atoms)):
+            pos = self.atoms.pos[ia]
             rpos[ia,:] = np.dot(hmat,pos)
         return rpos
 
     def set_real_positions(self,rposs):
-        if len(rposs) != self.natm:
+        if len(rposs) != len(self.atoms):
             raise ValueError('Array size inconsistent.')
         hmati = self.get_hmat_inv()
-        for i in range(self.natm):
+        for i in range(len(self.atoms)):
             rpi = rposs[i]
             spi = np.dot(hmati,rpi)
-            self.poss[i] = spi
+            self.atoms.loc[i,'pos'] = spi
         return None
 
     def get_scaled_positions(self):
-        return self.poss
+        return np.array(list(self.atoms.pos.values))
 
     def set_scaled_positions(self,sposs):
-        if len(sposs) != self.natm:
+        if len(sposs) != len(self.atoms):
             raise ValueError('Array size inconsistent.')
-        self.poss = sposs
+        self.atoms.loc[:,'pos'] = sposs
         return None
 
     def get_symbols(self):
         if not self.specorder:
             raise ValueError('specorder is not available.')
         symbols = []
-        for sid in self.sids:
+        for sid in self.atoms.sid:
             symbols.append(self.specorder[sid-1])
         return symbols
 
@@ -366,15 +327,15 @@ class NAPSystem(object):
         Set symbols of all atoms and append new symbols
         if they are not in the current specorder.
         """
-        if len(symbols) != self.natm:
-            raise RuntimeError('len(symbols) != self.natm')
+        if len(symbols) != len(self.atoms):
+            raise RuntimeError('len(symbols) != len(self.atoms)')
         for s in symbols:
             if s not in self.specorder:
                 self.specorder.append(s)
-        for i in range(self.natm):
+        for i in range(len(self.atoms)):
             s = symbols[i]
             sid = self.specorder.index(s)+1
-            self.sids[i] = sid
+            self.atoms.at[i,'sid'] = sid
         return None
 
     def get_chemical_formula(self):
@@ -394,16 +355,24 @@ class NAPSystem(object):
         return formula
 
     def get_charges(self):
-        return self.charges
+        # return self.charges
+        try:
+            chgs = np.array(self.atoms.chg.values)
+        except Error:
+            raise
+        return chgs
 
     def set_charges(self,charges):
-        self.charges = charges
-        if len(self.charges) > 0:
-            if self.specorder is not None \
-               and len(self.charges) < len(self.specorder):
-                lenc = len(self.charges)
-                for i in range(len(self.specorder)-lenc):
-                    self.charges.append(0.0)
+        # self.charges = charges
+        if len(charges) != len(self.atoms):
+            raise RuntimeError('len(charges) != len(self.atoms): ',len(charges),len(self.atoms))
+        self.atoms['chg'] = charges
+        # if len(self.charges) > 0:
+        #     if self.specorder is not None \
+        #        and len(self.charges) < len(self.specorder):
+        #         lenc = len(self.charges)
+        #         for i in range(len(self.specorder)-lenc):
+        #             self.charges.append(0.0)
         return None
 
     def write(self,fname="pmdini",fmt=None):
@@ -419,12 +388,14 @@ class NAPSystem(object):
         elif fmt == 'xsf':
             self.write_xsf(fname)
         elif fmt == 'lammps':
-            if len(self.charges) > 0:
+            if hasattr(self, 'charges') and len(self.charges) > 0:
                 self.write_lammps_data(fname,atom_style='charge')
             else:
                 self.write_lammps_data(fname)
         else:
             raise ValueError('Cannot detect output file format: '+fmt)
+
+        return None
 
     def read(self,fname="pmdini",fmt=None):
         if fmt in (None, 'None'):
@@ -443,7 +414,10 @@ class NAPSystem(object):
         else:
             raise IOError('Cannot detect input file format: '+fmt)
 
+        return None
+
     def read_pmd(self,fname='pmdini'):
+        self.init_atoms()
         incatm = 0
         with open(fname,'r') as f:
             iline = 0
@@ -473,24 +447,28 @@ class NAPSystem(object):
                     # 5th-7th: velocity of cell vectors
                     elif 5 <= iline <= 7:
                         pass
-                    # 8st: num of atoms
+                    # 8th: num of atoms
                     elif iline == 8:
-                        self.natm = int(data[0])
-                        self.sids = np.zeros(self.natm,dtype=int)
-                        self.poss = np.zeros((self.natm,3))
-                        self.vels = np.zeros((self.natm,3))
-                        self.frcs = np.zeros((self.natm,3))
+                        natm = int(data[0])
+                        sids = np.zeros(natm,dtype=int)
+                        poss = np.zeros((natm,3))
+                        vels = np.zeros((natm,3))
+                        frcs = np.zeros((natm,3))
                     # 9th-: atom positions
                     else:
-                        if incatm > self.natm:
+                        if incatm > natm:
                             break
                         fdata = [float(x) for x in data]
                         tag = fdata[0]
                         sid,ifmv,num = decode_tag(tag)
-                        self.poss[incatm,:] = fdata[1:4]
-                        self.vels[incatm,:] = fdata[4:7]
-                        self.sids[incatm] = sid
+                        poss[incatm,:] = fdata[1:4]
+                        vels[incatm,:] = fdata[4:7]
+                        sids[incatm] = sid
                         incatm += 1
+        self.atoms['pos'] = poss.tolist()
+        self.atoms['vel'] = vels.tolist()
+        self.atoms['frc'] = frcs.tolist()
+        self.atoms['sid'] = sids.tolist()
         return None
     
     def write_pmd(self,fname='pmdini'):
@@ -513,20 +491,22 @@ class NAPSystem(object):
         f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(0.0, 0.0, 0.0))
         f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(0.0, 0.0, 0.0))
         # num of atoms
-        f.write(" {0:10d}\n".format(len(self.sids)))
+        f.write(" {0:10d}\n".format(len(self.atoms)))
         # atom positions
-        for i in range(self.natm):
-            pi = self.poss[i]
-            vi = self.vels[i]
-            sid = self.sids[i]
-            tag = get_tag(sid,1,i+1) # assuming ifmv=1
-            f.write(" {0:22.14e}".format(tag) 
+        for i in range(len(self.atoms)):
+            pi = self.atoms.pos[i]
+            vi = self.atoms.vel[i]
+            sid = self.atoms.sid[i]
+            tag = get_tag(sid,1,i+1)  # assuming ifmv=1
+            f.write(" {0:22.14e}".format(tag)
                     +"  {0:19.15f} {1:19.15f} {2:19.15f}".format(*pi)
                     +"  {0:8.4f}  {1:8.4f}  {2:8.4f}".format(*vi)
                     +"\n")
         f.close()
+        return None
 
     def read_POSCAR(self,fname='POSCAR'):
+        self.init_atoms()
         with open(fname,'r') as f:
             # 1st line: comment
             f.readline()
@@ -560,11 +540,11 @@ Number of species in POSCAR = {0:d}
 You need to specify the species order correctly with --specorder option.
                 '''.format(len(num_species))
                 raise ValueError(msg)
-            self.natm = np.sum(num_species)
-            self.sids = np.zeros(self.natm,dtype=int)
-            self.poss = np.zeros((self.natm,3))
-            self.vels = np.zeros((self.natm,3))
-            self.frcs = np.zeros((self.natm,3))
+            natm = np.sum(num_species)
+            sids = np.zeros(natm,dtype=int)
+            poss = np.zeros((natm,3))
+            vels = np.zeros((natm,3))
+            frcs = np.zeros((natm,3))
             #print("Number of atoms = {0:5d}".format(natm))
             # 7th or 8th line: comment
             c7= f.readline()
@@ -577,7 +557,7 @@ You need to specify the species order correctly with --specorder option.
                 coord = 'scaled'
             
             #...Atom positions
-            for i in range(self.natm):
+            for i in range(natm):
                 buff= f.readline().split()
                 sid= 1
                 m= 0
@@ -590,19 +570,22 @@ You need to specify the species order correctly with --specorder option.
                         break
                     sid += 1
                     sindex += 1
-                self.sids[i] = sid
+                sids[i] = sid
                 pos = [ float(buff[0]), float(buff[1]), float(buff[2])]
                 if coord == 'cartesian':
                     x1,x2,x3 = cartesian_to_scaled(hi,pos[0],pos[1],pos[2])
                 elif coord == 'scaled':
                     x1,x2,x3 = pos[0],pos[1],pos[2]
-                self.poss[i,0] = x1
-                self.poss[i,1] = x2
-                self.poss[i,2] = x3
+                poss[i,:] = [x1,x2,x3]
 
+        self.atoms['pos'] = poss.tolist()
+        self.atoms['vel'] = vels.tolist()
+        self.atoms['frc'] = frcs.tolist()
+        self.atoms['sid'] = sids.tolist()
         return None
                 
     def write_POSCAR(self,fname='POSCAR'):
+        from datetime import datetime
         f=open(fname,'w')
         f.write('Generated by napsys.py at {0}.'.format(datetime.now().strftime('%Y-%m-%d')))
         if self.specorder:
@@ -615,8 +598,8 @@ You need to specify the species order correctly with --specorder option.
         f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(*self.a1))
         f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(*self.a2))
         f.write(" {0:15.7f} {1:15.7f} {2:15.7f}\n".format(*self.a3))
-        # count num of atoms per specie
-        num_species= self.num_species()
+        # count num of atoms per species
+        num_species= self.natm_per_species()
         # if specorder is defined, write species names
         if self.specorder:
             for i,ns in enumerate(num_species):
@@ -631,31 +614,29 @@ You need to specify the species order correctly with --specorder option.
         f.write('Direct\n')
         # atom positions
         # before writing out, the order should be sorted
-        outorder = np.zeros(self.natm,dtype=int)
+        outorder = np.zeros(len(self.atoms),dtype=int)
         inc = 0
         for isp,spc in enumerate(self.specorder):
-            # print 'spc =',spc
-            for ia in range(self.natm):
-                # print ia,ai.symbol,ai.sid
-                # if ai.symbol == spc:
-                #     outorder.append(ia)
-                sid = self.sids[ia]
+            for ia in range(len(self.atoms)):
+                sid = self.atoms.sid[ia]
                 if sid == isp +1:
                     outorder[inc] = ia
                     inc += 1
-        if len(outorder) != self.natm:
-            print('len(outorder),natm=', len(outorder),self.natm)
+        if len(outorder) != len(self.atoms):
+            print('len(outorder),natm=', len(outorder),len(self.atoms))
             raise ValueError(' len(outorder) != natm')
         for ia in outorder:
-            pi = self.poss[ia] 
+            pi = self.atoms.pos[ia]
             f.write(' {0:15.7f} {1:15.7f} {2:15.7f} T T T\n'.format(*pi))
         f.close()
+        return None
 
     def read_dump(self,fname="dump"):
         f=open(fname,'r')
         mode= 'None'
         ixyz= 0
         iatm= 0
+        natm= -1
         symbol = None
         if not self.specorder:
             self.specorder = []
@@ -689,29 +670,38 @@ You need to specify the species order correctly with --specorder option.
                     continue
                 elif 'ATOMS' in line:
                     mode= 'ATOMS'
-                    self.aux_names = [ name for i,name in enumerate(data) if i > 1 ]
-                    self.aux_names.remove('id')
-                    self.aux_names.remove('type')
-                    if ('x' not in self.aux_names and 'xu' not in self.aux_names) or \
-                       ('y' not in self.aux_names and 'zu' not in self.aux_names) or \
-                       ('z' not in self.aux_names and 'zu' not in self.aux_names):
+                    aux_names = [ name for i,name in enumerate(data) if i > 1 ]
+                    aux_names.remove('id')
+                    aux_names.remove('type')
+                    if ('x' not in aux_names and 'xu' not in aux_names) or \
+                       ('y' not in aux_names and 'zu' not in aux_names) or \
+                       ('z' not in aux_names and 'zu' not in aux_names):
                         raise ValueError('Not enough coordinate info.\nCheck the dump file format.')
                     try:
-                        ix = self.aux_names.index('x') +2
-                    except:
-                        ix = self.aux_names.index('xu') +2
+                        ix = aux_names.index('x') +2
+                    except Exception:
+                        ix = aux_names.index('xu') +2
                     try:
-                        iy = self.aux_names.index('y') +2
-                    except:
-                        iy = self.aux_names.index('yu') +2
+                        iy = aux_names.index('y') +2
+                    except Exception:
+                        iy = aux_names.index('yu') +2
                     try:
-                        iz = self.aux_names.index('z') +2
-                    except:
-                        iz = self.aux_names.index('zu') +2
-                    for s in ('x','xu','y','yu','z','zu'):
-                        if s in self.aux_names:
-                            self.aux_names.remove(s)
-                    self.auxs = np.zeros((self.natm,len(self.aux_names)))
+                        iz = aux_names.index('z') +2
+                    except Exception:
+                        iz = aux_names.index('zu') +2
+                        iauxstart = 5
+                    try:
+                        ivx = aux_names.index('vx') +2
+                        ivy = aux_names.index('vy') +2
+                        ivz = aux_names.index('vz') +2
+                        iauxstart = 8
+                    except Exception:
+                        pass
+                    for s in ('x','xu','y','yu','z','zu','vx','vy','vz'):
+                        if s in aux_names:
+                            aux_names.remove(s)
+                    if len(aux_names)>0:
+                        auxs = np.zeros((natm,len(aux_names)))
                     continue
                 elif 'TIMESTEP' in line:
                     mode= 'TIMESTEP'
@@ -720,11 +710,11 @@ You need to specify the species order correctly with --specorder option.
             if mode == 'TIMESTEP':
                 timestep = int(data[0])
             elif mode == 'NUMBER OF ATOMS':
-                self.natm= int(data[0])
-                self.sids = np.zeros((self.natm),dtype=int)
-                self.poss = np.zeros((self.natm,3))
-                self.vels = np.zeros((self.natm,3))
-                self.frcs = np.zeros((self.natm,3))
+                natm= int(data[0])
+                sids = np.zeros((natm),dtype=int)
+                poss = np.zeros((natm,3))
+                vels = np.zeros((natm,3))
+                frcs = np.zeros((natm,3))
             elif mode == 'BOX BOUNDS':
                 if ixyz == 0:
                     xlo_bound= float(data[0])
@@ -758,11 +748,11 @@ You need to specify the species order correctly with --specorder option.
                     hmat = self.get_hmat()
                     hmati= self.get_hmat_inv()
             elif mode == 'ATOMS':
-                if iatm < self.natm:
+                if iatm < natm:
                     symbol = None
                     if data[1].isdigit():
                         sid = int(data[1])
-                        self.sids[iatm] = sid
+                        sids[iatm] = sid
                         if self.specorder:
                             symbol = self.specorder[sid-1]
                     else:
@@ -770,21 +760,32 @@ You need to specify the species order correctly with --specorder option.
                         if symbol not in self.specorder:
                             self.specorder.append(symbol)
                         sid = self.specorder.index(symbol)+1
-                        self.sids[iatm] = sid
+                        sids[iatm] = sid
                     r0 = [ float(data[ix]), float(data[iy]), float(data[iz]) ]
+                    v0 = [ float(data[ivx]),float(data[ivy]),float(data[ivz])]
                     sr = np.dot(hmati,r0)
+                    sv = np.dot(hmati,v0)
                     sr[0] = self._pbc(sr[0])
                     sr[1] = self._pbc(sr[1])
                     sr[2] = self._pbc(sr[2])
-                    self.poss[iatm,:] = sr[:]
-                    self.vels[iatm,:] = [0., 0., 0.]
-                    self.auxs[iatm,:] = [ float(x) for x in data[5:] ]
+                    poss[iatm,:] = sr[:]
+                    vels[iatm,:] = sv[:]
+                    
+                    if len(aux_names)>0:
+                        auxs[iatm,:] = [ float(x) for x in data[iauxstart:] ]
+
                 iatm += 1
-        # print self.alc
-        # print self.a1[:]
-        # print self.a2[:]
-        # print self.a3[:]
+
+        self.atoms['pos'] = poss.tolist()
+        self.atoms['vel'] = vels.tolist()
+        self.atoms['frc'] = frcs.tolist()
+        self.atoms['sid'] = sids.tolist()
+        for ia in range(len(aux_names)):
+            name = aux_names[ia]
+            aux = auxs[:,ia]
+            self.atoms[name] = aux
         f.close()
+        return None
 
     def write_dump(self,fname='dump'):
         """
@@ -794,10 +795,11 @@ You need to specify the species order correctly with --specorder option.
         f.write("ITEM: TIMESTEP\n")
         f.write("0\n")
         f.write("ITEM: NUMBER OF ATOMS\n")
-        f.write("{0:d}\n".format(self.natm))
+        f.write("{0:d}\n".format(len(self.atoms)))
 
         hmat = self.get_hmat()
-        xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,rposs = to_lammps(hmat,self.poss)
+        poss = np.array(list(self.atoms.pos.values))
+        xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,rposs = to_lammps(hmat,poss)
         xlo_bound = xlo +min(0.0, xy, xz, xy+xz)
         xhi_bound = xhi +max(0.0, xy, xz, xy+xz)
         ylo_bound = ylo +min(0.0, yz)
@@ -817,40 +819,49 @@ You need to specify the species order correctly with --specorder option.
         # f.write("ITEM: ATOMS id type x y z vx vy vz"
         #         +" ekin epot sxx syy szz syz sxz sxy\n")
         f.write("ITEM: ATOMS id type x y z vx vy vz")
-        if (self.aux_names and self.auxs) and \
-           len(self.aux_names) == len(self.auxs.T):
-            for iaux,aux in enumerate(self.aux_names):
-                f.write(" {0:s}".format(aux))
+        aux_names = self.get_aux_names()
+        if len(aux_names)>0:
+            for name in aux_names:
+                f.write(" {0:s}".format(name))
+        # if (self.aux_names and self.auxs) and \
+        #    len(self.aux_names) == len(self.auxs.T):
+        #     for iaux,aux in enumerate(self.aux_names):
+        #         f.write(" {0:s}".format(aux))
         f.write("\n")
 
-        if (self.aux_names and self.auxs) and \
-           len(self.aux_names) == len(self.auxs.T):
-            for i in range(self.natm):
+        # if (self.aux_names and self.auxs) and \
+        #    len(self.aux_names) == len(self.auxs.T):
+        if len(aux_names)>0:
+            for i in range(len(self.atoms)):
                 rpos = rposs[i]
                 #...NOTE: velocity is scaled value here,
                 #   if one wants to get real velocity, one needs to convert
                 #   is in to_lammps function, not here.
-                vel = self.vels[i]
-                sid = self.sids[i]
+                vel = self.atoms.vel[i]
+                sid = self.atoms.sid[i]
                 symbol = self.specorder[sid-1]
                 f.write("{0:8d} {1:3s} ".format(i+1,symbol))
                 f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(*rpos))
                 f.write("{0:8.3f} {1:8.3f} {2:8.3f} ".format(*vel))
-                aux = self.auxs[i]
-                for iaux in range(len(self.aux_names)):
-                    f.write("{0:11.3e} ".format(aux))
+                #...TODO: self.auxs and self.aux_names are obsolete use self.atoms
+                # aux = self.auxs[i]
+                # for iaux in range(len(self.aux_names)):
+                #     f.write("{0:11.3e} ".format(aux))
+                for name in aux_names:
+                    f.write("{0:11.3e}".format(self.atoms[name][i]))
                 f.write("\n")
         else:
-            for i in range(self.natm):
+            for i in range(len(self.atoms)):
                 rpos = rposs[i]
-                vel = self.vels[i]
-                sid = self.sids[i]
+                vel = self.atoms.vel[i]
+                sid = self.atoms.sid[i]
                 symbol = self.specorder[sid-1]
                 f.write("{0:8d} {1:3s} ".format(i+1,symbol))
                 f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(*rpos))
                 f.write("{0:8.3f} {1:8.3f} {2:8.3f} ".format(*vel))
                 f.write("\n")
         f.close()
+        return None
 
     def read_lammps_data(self,fname="data.lammps",atom_style='atomic'):
         f=open(fname,'r')
@@ -865,11 +876,11 @@ You need to specify the species order correctly with --specorder option.
             data = line.split()
             if mode == 'None':
                 if 'atoms' in line:
-                    self.natm = int(data[0])
-                    self.sids = np.zeros(self.natm,dtype=int)
-                    self.poss = np.zeros((self.natm,3))
-                    self.vels = np.zeros((self.natm,3))
-                    self.frcs = np.zeros((self.natm,3))
+                    natm = int(data[0])
+                    sids = np.zeros( natm,dtype=int)
+                    poss = np.zeros((natm,3))
+                    vels = np.zeros((natm,3))
+                    frcs = np.zeros((natm,3))
                 elif 'atom types' in line:
                     nspcs = int(data[0])
                 elif 'xlo' in line:
@@ -898,13 +909,13 @@ You need to specify the species order correctly with --specorder option.
                     hmati= np.linalg.inv(hmat)
                     continue
             elif mode == 'Atoms':
-                if len(data) >= 5 and iatm < self.natm:
+                if len(data) >= 5 and iatm < natm:
                     idat = 0
                     # ai = Atom()
                     idat += 1
                     # ai.set_sid(int(data[idat]))
                     sid = int(data[idat])
-                    self.sids[iatm] = sid
+                    sids[iatm] = sid
                     if self.specorder:
                         symbol = self.specorder[sid-1]
                     # if symbol and ai.symbol != symbol:
@@ -927,14 +938,19 @@ You need to specify the species order correctly with --specorder option.
                     x = self._pbc(x)
                     y = self._pbc(y)
                     z = self._pbc(z)
-                    self.poss[iatm,0] = x
-                    self.poss[iatm,1] = y
-                    self.poss[iatm,2] = z
-                    self.vels[iatm,0] = 0.0
-                    self.vels[iatm,1] = 0.0
-                    self.vels[iatm,2] = 0.0
+                    poss[iatm,0] = x
+                    poss[iatm,1] = y
+                    poss[iatm,2] = z
+                    vels[iatm,0] = 0.0
+                    vels[iatm,1] = 0.0
+                    vels[iatm,2] = 0.0
                     iatm += 1
         f.close()
+        self.atoms['pos'] = poss.tolist()
+        self.atoms['vel'] = vels.tolist()
+        self.atoms['frc'] = frcs.tolist()
+        self.atoms['sid'] = sids.tolist()
+        return None
 
     def write_lammps_data(self,fname='data.lammps',atom_style='atomic'):
         """
@@ -947,11 +963,12 @@ You need to specify the species order correctly with --specorder option.
         f= open(fname,'w')
         f.write("LAMMPS data format file written by napsys.py\n")
         f.write("\n")
-        f.write("{0:d}  atoms\n".format(self.natm))
-        f.write("{0:d}  atom types\n".format(len(self.num_species())))
+        f.write("{0:d}  atoms\n".format(len(self.atoms)))
+        f.write("{0:d}  atom types\n".format(self.num_species()))
         f.write('\n')
         hmat = self.get_hmat()
-        xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,poss = to_lammps(hmat,self.poss)
+        poss = np.array(list(self.atoms.pos.values))
+        xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,rposs = to_lammps(hmat,poss)
         f.write("{0:20.10f} {1:20.10f} xlo xhi\n".format(xlo,xhi))
         f.write("{0:20.10f} {1:20.10f} ylo yhi\n".format(ylo,yhi))
         f.write("{0:20.10f} {1:20.10f} zlo zhi\n".format(zlo,zhi))
@@ -960,22 +977,25 @@ You need to specify the species order correctly with --specorder option.
         f.write("\n")
         f.write("Atoms\n")
         f.write("\n")
-        for i in range(self.natm):
-            pos = self.poss[i]
-            sid = self.sids[i]
+        for i in range(len(self.atoms)):
+            pos = self.atoms.pos[i]
+            sid = self.atoms.sid[i]
             f.write("{0:8d} {1:3d} ".format(i+1,sid))
             # if atom_style == 'charge':
             #     f.write('{0:10.4f} '.format(self.charges[ai.sid-1]))
             f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(*pos))
             f.write("\n")
         f.close()
+        return None
 
     def read_xsf(self,fname="xsf"):
+        if self.specorder is None:
+            self.specorder = []
         f=open(fname,'r')
         mode= 'None'
         ixyz= 0
         iatm= 0
-        natm= 0
+        natm= -1
         for line in f.readlines():
             if 'CRYSTAL' in line:
                 mode= 'CRYSTAL'
@@ -1013,19 +1033,19 @@ You need to specify the species order correctly with --specorder option.
             elif mode == 'PRIMCOORD':
                 data = line.split()
                 if len(data) == 1:
-                    self.natm= int(data[0])
-                    self.sids = np.zeros((self.natm),dtype=int)
-                    self.poss = np.zeros((self.natm,3))
-                    self.vels = np.zeros((self.natm,3))
-                    self.frcs = np.zeros((self.natm,3))
+                    natm= int(data[0])
+                    sids = np.zeros((natm),dtype=int)
+                    poss = np.zeros((natm,3))
+                    vels = np.zeros((natm,3))
+                    frcs = np.zeros((natm,3))
                     continue
                 elif len(data) == 2:
-                    self.natm= int(data[0])
+                    natm= int(data[0])
                     nspcs= int(data[1])
-                    self.sids = np.zeros((self.natm),dtype=int)
-                    self.poss = np.zeros((self.natm,3))
-                    self.vels = np.zeros((self.natm,3))
-                    self.frcs = np.zeros((self.natm,3))
+                    sids = np.zeros((natm),dtype=int)
+                    poss = np.zeros((natm,3))
+                    vels = np.zeros((natm,3))
+                    frcs = np.zeros((natm,3))
                     continue
                 elif len(data) == 4 or len(data) == 7:
                     if iatm >= natm:
@@ -1034,26 +1054,27 @@ You need to specify the species order correctly with --specorder option.
                     if symbol not in self.specorder:
                         self.specorder.append(symbol)
                     sid = self.specorder.index(symbol) +1
-                    self.sids[iatm] = sid
+                    sids[iatm] = sid
                     # ai.set_sid(sid)
                     xc= float(data[1])
                     yc= float(data[2])
                     zc= float(data[3])
                     xi,yi,zi = cartesian_to_scaled(hi,xc,yc,zc)
-                    self.poss[i,0] = xi
-                    self.poss[i,1] = yi
-                    self.poss[i,2] = zi
-                    self.vels[i,:] = 0.0
+                    poss[iatm,0] = xi
+                    poss[iatm,1] = yi
+                    poss[iatm,2] = zi
+                    vels[iatm,:] = 0.0
                     # print 'iatm,symbol,sid,xc,yc,zc = ',iatm,symbol,sid,xc,yc,zc
                 else:
                     continue
                 iatm += 1
         self.alc= 1.0
-        # print self.alc
-        # print self.a1[:]
-        # print self.a2[:]
-        # print self.a3[:]
+        self.atoms['pos'] = poss.tolist()
+        self.atoms['vel'] = vels.tolist()
+        self.atoms['frc'] = frcs.tolist()
+        self.atoms['sid'] = sids.tolist()
         f.close()
+        return None
 
     def write_xsf(self,fname='xsf'):
         """
@@ -1074,14 +1095,11 @@ You need to specify the species order correctly with --specorder option.
         f.write("{0:9.3f} {1:9.3f} {2:9.3f}\n".format(*self.a2))
         f.write("{0:9.3f} {1:9.3f} {2:9.3f}\n".format(*self.a3))
         f.write("PRIMCOORD\n")
-        f.write("{0:>8d}  1\n".format(self.natm))
-        for i in range(self.natm):
-            pos = self.poss[i]
+        f.write("{0:>8d}  {1:2d}\n".format(len(self.atoms),self.num_species()))
+        for i in range(len(self.atoms)):
+            pos = self.atoms.pos[i]
             x,y,z = scaled_to_cartesian(h,*pos)
-            vx= self.vels[i,0]
-            vy= self.vels[i,1]
-            vz= self.vels[i,2]
-            sid = self.sids[i]
+            sid = self.atoms.sid[i]
             symbol = self.specorder[sid-1]
             number = get_number_from_symbol(symbol)
             f.write(" {0:3d} ".format(number))
@@ -1089,18 +1107,20 @@ You need to specify the species order correctly with --specorder option.
             #f.write("{0:12.5f} {1:12.5f} {2:12.5f} ".format(vx,vy,vz))
             f.write("\n")
         f.close()
+        return None
 
     def get_distance(self,ia,ja):
         """
         Compute distance between atoms ia and ja taking the periodic boundary
         condition into account.
         """
-        if ia > self.natm:
-            raise ValueError('ia > natms, ia,natms = ',ia,self.natm)
-        if ja > self.natm:
-            raise ValueError('ja > natms, ja,natms = ',ja,self.natm)
-        xi = self.poss[ia]
-        xj = self.poss[ja]
+        natm = len(self.atoms)
+        if ia > natm:
+            raise ValueError('ia > natms, ia,natms = ',ia,natm)
+        if ja > natm:
+            raise ValueError('ja > natms, ja,natms = ',ja,natm)
+        xi = self.atoms.pos[ia]
+        xj = self.atoms.pos[ja]
         xij = xj-xi -np.round(xj-xi)
         hmat = self.get_hmat()
         rij = np.dot(hmat,xij)
@@ -1111,15 +1131,16 @@ You need to specify the species order correctly with --specorder option.
         """
         Compute angle in degree between bonds i-j and i-k.
         """
-        if i > self.natm:
-            raise ValueError('i > natms, i,natms = ',i,self.natm)
-        if j > self.natm:
-            raise ValueError('j > natms, j,natms = ',j,self.natm)
-        if k > self.natm:
-            raise ValueError('k > natms, k,natms = ',k,self.natm)
-        xi = self.poss[i]
-        xj = self.poss[j]
-        xk = self.poss[k]
+        natm = len(self.atoms)
+        if i > natm:
+            raise ValueError('i > natms, i,natms = ',i,natm)
+        if j > natm:
+            raise ValueError('j > natms, j,natms = ',j,natm)
+        if k > natm:
+            raise ValueError('k > natms, k,natms = ',k,natm)
+        xi = self.atoms.pos[i]
+        xj = self.atoms.pos[j]
+        xk = self.atoms.pos[k]
         xij = xj-xi -np.round(xj-xi)
         xik = xk-xi -np.round(xk-xi)
         hmat = self.get_hmat()
@@ -1131,6 +1152,10 @@ You need to specify the species order correctly with --specorder option.
         return angle
         
     def make_pair_list(self,rcut=3.0,maxnn=_maxnn):
+        """
+        Make a neighbor list.
+        The list of each atom is stored as lspr in the self.atoms column.
+        """
         rc2= rcut**2
         h= np.zeros((3,3))
         h[:,0]= self.a1 *self.alc
@@ -1139,12 +1164,9 @@ You need to specify the species order correctly with --specorder option.
         hi= np.linalg.inv(h)
         # print h
         # print hi
-        # lcx= int(1.0/math.sqrt(hi[0,0]**2 +hi[0,1]**2 +hi[0,2]**2)/rcut)
-        # lcy= int(1.0/math.sqrt(hi[1,0]**2 +hi[1,1]**2 +hi[1,2]**2)/rcut)
-        # lcz= int(1.0/math.sqrt(hi[2,0]**2 +hi[2,1]**2 +hi[2,2]**2)/rcut)
-        lcx= int(1.0/math.sqrt(hi[0,0]**2 +hi[1,0]**2 +hi[2,0]**2)/rcut)
-        lcy= int(1.0/math.sqrt(hi[0,1]**2 +hi[1,1]**2 +hi[2,1]**2)/rcut)
-        lcz= int(1.0/math.sqrt(hi[0,2]**2 +hi[1,2]**2 +hi[2,2]**2)/rcut)
+        lcx= int(1.0/sqrt(hi[0,0]**2 +hi[1,0]**2 +hi[2,0]**2)/rcut)
+        lcy= int(1.0/sqrt(hi[0,1]**2 +hi[1,1]**2 +hi[2,1]**2)/rcut)
+        lcz= int(1.0/sqrt(hi[0,2]**2 +hi[1,2]**2 +hi[2,2]**2)/rcut)
         if lcx == 0: lcx= 1
         if lcy == 0: lcy= 1
         if lcz == 0: lcz= 1
@@ -1156,7 +1178,7 @@ You need to specify the species order correctly with --specorder option.
         rcxi= 1.0/rcx
         rcyi= 1.0/rcy
         rczi= 1.0/rcz
-        lscl= np.zeros((self.natm,),dtype=int)
+        lscl= np.zeros((len(self.atoms),),dtype=int)
         lshd= np.zeros((lcxyz,),dtype=int)
         lscl[:]= -1
         lshd[:]= -1
@@ -1165,8 +1187,8 @@ You need to specify the species order correctly with --specorder option.
 
         #...make a linked-cell list
         self.assign_pbc()
-        for i in range(self.natm):
-            pi= self.poss[i]
+        for i in range(len(self.atoms)):
+            pi = self.atoms.pos[i]
             # print pi
             #...assign a vector cell index
             mx= int(pi[0]*rcxi)
@@ -1177,18 +1199,16 @@ You need to specify the species order correctly with --specorder option.
             lscl[i]= lshd[m]
             lshd[m]= i
 
-        #...make a pair list
-        self.nlspr= np.zeros((self.num_atoms(),),dtype=int)
-        self.lspr= np.zeros((self.num_atoms(),maxnn),dtype=int)
-        self.lspr[:]= -1
+        #...Initialize lspr
+        emptylist = [ [] for i in range(len(self.atoms)) ]
+        self.atoms['lspr'] = emptylist
             
-        for ia in range(self.natm):
-            pi= self.poss[ia]
+        for ia in range(len(self.atoms)):
+            pi= self.atoms.pos[ia]
             mx= int(pi[0]*rcxi)
             my= int(pi[1]*rcyi)
             mz= int(pi[2]*rczi)
             m= mx*lcyz +my*lcz +mz
-            #print 'ia,pi,mx,my,mz,m=',ia,pi[0:3],mx,my,mz,m
             for kuz in range(-1,2):
                 m1z= mz +kuz
                 if m1z < 0: m1z += lcz
@@ -1206,27 +1226,20 @@ You need to specify the species order correctly with --specorder option.
                         if ja== -1: continue
                         self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2,maxnn)
         #...after makeing lspr
-        # for ia in range(self.natm):
+        # for ia in range(len(self.atoms)):
         #     print ia,self.lspr[ia]
 
     def scan_j_in_cell(self,ia,pi,ja,lscl,h,rc2,maxnn):
         if ja == ia: ja = lscl[ja]
         if ja == -1: return 0
-        if not ja in self.lspr[ia]:
-            pj= self.poss[ja]
+        if ja not in self.atoms.lspr[ia]:
+            pj= self.atoms.pos[ja]
             xij= pj-pi
             xij= xij -np.round(xij)
             rij= np.dot(h,xij)
             rij2= rij[0]**2 +rij[1]**2 +rij[2]**2
             if rij2 < rc2:
-                n= self.nlspr[ia]
-                self.lspr[ia,n]= ja
-                self.nlspr[ia] += 1
-                if self.nlspr[ia] >= maxnn:
-                    print(' [Error] self.nlspr[{0}] >= maxnn !!!'.format(ia))
-                    print(self.nlspr[ia])
-                    print(self.lspr[ia])
-                    sys.exit()
+                self.atoms.lspr[ia].append(ja)
         ja= lscl[ja]
         self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2,maxnn)
 
@@ -1239,11 +1252,14 @@ You need to specify the species order correctly with --specorder option.
             return x
 
     def assign_pbc(self):
-        for i in range(self.natm):
-            pi = self.poss[i]
-            self.poss[i,0]= self._pbc(pi[0])
-            self.poss[i,1]= self._pbc(pi[1])
-            self.poss[i,2]= self._pbc(pi[2])
+        for i in range(len(self.atoms)):
+            pi = self.atoms.pos[i]
+            newpi = np.zeros(3)
+            newpi[0] = self._pbc(pi[0])
+            newpi[1] = self._pbc(pi[1])
+            newpi[2] = self._pbc(pi[2])
+            self.atoms.at[i,'pos'] = newpi
+        return None
 
     def get_expansion_num(self,length):
         """
@@ -1270,10 +1286,10 @@ You need to specify the species order correctly with --specorder option.
         """
         Shift all the atoms by (sx,sy,sz) in scaled unit.
         """
-        for i in range(self.natm):
-            pi = self.poss[i]
-            self.poss[i,:] = [ pi[0]+sx, pi[1]+sy, pi[2]+sz ]
-        return
+        def _shift(arr):
+            return np.array([arr[0]+sx, arr[1]+sy, arr[2]+sz])
+        self.atoms.pos = self.atoms.pos.apply(_shift)
+        return None
 
     def cycle_coord(self,ncycle=0):
         """
@@ -1289,9 +1305,10 @@ You need to specify the species order correctly with --specorder option.
             a2 = [ a2[1], a2[2], a2[0] ]
             a3 = [ a3[1], a3[2], a3[0] ]
             self.set_lattice(1.0, a2, a3, a1)
-            for i in range(self.natm):
-                pi = self.poss[i]
-                self.poss[i,:] = [ pi[1],pi[2],pi[0] ]
+        
+        self.atoms.pos = self.atoms.pos.apply(lambda x: [ x[(0+ncycle) % 3],
+                                                          x[(1+ncycle) % 3],
+                                                          x[(2+ncycle) % 3]])
         return None
         
     def repeat(self,n1o,n2o,n3o,n1m=0,n2m=0,n3m=0):
@@ -1312,36 +1329,49 @@ You need to specify the species order correctly with --specorder option.
         self.a2= self.a2*m2
         self.a3= self.a3*m3
         #n123= m1*m2*m3
-        # nsid= 0
-        # for sid in self.sids:
-        #     nsid= max(nsid,ai.sid)
-        maxsid = max(self.sids)
+        maxsid = self.atoms.sid.max()
         #natm0= self.num_atoms()
         # atoms0= copy.copy(self.atoms)
-        newnatm = self.natm *n1*n2*n3
+        newnatm = len(self.atoms) *n1*n2*n3
         newsids = np.zeros(newnatm,dtype=int)
         newposs = np.zeros((newnatm,3))
         newvels = np.zeros((newnatm,3))
         newfrcs = np.zeros((newnatm,3))
+        colnames = list(self.atoms.columns)
+        #...Labels except (sid,pos,vel,frc) are all auxiliary data
+        auxnames = colnames.copy()
+        auxnames.remove('sid')
+        auxnames.remove('pos')
+        auxnames.remove('vel')
+        auxnames.remove('frc')
+        newauxs = {}
+        for auxname in auxnames:
+            newauxs[auxname] = []
         inc = 0
         for i1 in range(n1m,n1):
             for i2 in range(n2m,n2):
                 for i3 in range(n3m,n3):
-                    for i0 in range(self.natm):
-                        pi0 = self.poss[i0]
+                    for i0 in range(len(self.atoms)):
+                        pi0 = self.atoms.pos[i0]
                         x= pi0[0]/m1 +1.0/m1*i1
                         y= pi0[1]/m2 +1.0/m2*i2
                         z= pi0[2]/m3 +1.0/m3*i3
-                        newsids[inc] = self.sids[i0]
                         newposs[inc,:] = [x,y,z]
-                        newvels[inc,:] = self.vels[i0,:]
-                        newfrcs[inc,:] = self.frcs[i0,:]
+                        newsids[inc] = self.atoms.sid[i0]
+                        newvels[inc,:] = self.atoms.vel[i0]
+                        newfrcs[inc,:] = self.atoms.frc[i0]
+                        for auxname in auxnames:
+                            newauxs[auxname].append(self.atoms.loc[i0,auxname])
                         inc += 1
-        self.natm = newnatm
-        self.sids = copy.deepcopy(newsids)
-        self.poss = copy.deepcopy(newposs)
-        self.vels = copy.deepcopy(newvels)
-        self.frcs = copy.deepcopy(newfrcs)
+        #...Use DataFrame self.atoms
+        self.atoms = pd.DataFrame(columns=colnames)
+        self.atoms['pos'] = newposs
+        self.atoms['vel'] = newvels
+        self.atoms['frc'] = newfrcs
+        self.atoms['sid'] = newsids
+        for auxname in auxnames:
+            self.atoms[auxname] = newauxs[auxname]
+        return None
 
     def divide(self,*ds):
         """
@@ -1353,14 +1383,14 @@ You need to specify the species order correctly with --specorder option.
 
         #...1st, count numbers to remove
         nrm = 0
-        for ia in range(self.natm):
-            pi = self.poss[ia]
+        for ia in range(len(self.atoms)):
+            pi = self.atoms.pos[ia]
             for l in range(3):
                 if pi[l] >= ds[l]:
                     nrm += 1
                     break
 
-        newnatm = self.natm -nrm
+        newnatm = len(self.atoms) -nrm
         self.a1 = self.a1 *ds[0]
         self.a2 = self.a2 *ds[1]
         self.a3 = self.a3 *ds[2]
@@ -1368,9 +1398,19 @@ You need to specify the species order correctly with --specorder option.
         newposs = np.zeros((newnatm,3))
         newvels = np.zeros((newnatm,3))
         newfrcs = np.zeros((newnatm,3))
+        colnames = list(self.atoms.columns)
+        #...Labels except (sid,pos,vel,frc) are all auxiliary data
+        auxnames = colnames.copy()
+        auxnames.remove('sid')
+        auxnames.remove('pos')
+        auxnames.remove('vel')
+        auxnames.remove('frc')
+        newauxs = {}
+        for auxname in auxnames:
+            newauxs[auxname] = []
         inc = 0
-        for ia in range(self.natm):
-            pi = self.poss[ia]
+        for ia in range(len(self.atoms)):
+            pi = self.atoms.pos[ia]
             survive = True
             for l in range(3):
                 if pi[l] >= ds[l]:
@@ -1381,16 +1421,21 @@ You need to specify the species order correctly with --specorder option.
                 for l in range(3):
                     if ds[l] < 0.9:
                         pinew[l] = pinew[l] /ds[l]
-                newsids[inc] = self.sids[ia]
+                newsids[inc] = self.atoms.sid[ia]
                 newposs[inc,:] = pinew
-                newvels[inc,:] = self.vels[ia,:]
-                newfrcs[inc,:] = self.frcs[ia,:]
+                newvels[inc,:] = self.atoms.vel[ia]
+                newfrcs[inc,:] = self.atoms.frc[ia]
+                for auxname in auxnames:
+                    newauxs[auxname].append(self.atoms.loc[ia,auxname])
                 inc += 1
-        self.natm = newnatm
-        self.sids = copy.deepcopy(newsids)
-        self.poss = copy.deepcopy(newposs)
-        self.vels = copy.deepcopy(newvels)
-        self.frcs = copy.deepcopy(newfrcs)
+        #...Use DataFrame self.atoms
+        self.atoms = pd.DataFrame(columns=colnames)
+        self.atoms['pos'] = newposs
+        self.atoms['vel'] = newvels
+        self.atoms['frc'] = newfrcs
+        self.atoms['sid'] = newsids
+        for auxname in auxnames:
+            self.atoms[auxname] = newauxs[auxname]
         return None
 
     def add_vacuum(self,va,vb,vc):
@@ -1408,10 +1453,10 @@ You need to specify the species order correctly with --specorder option.
         self.a2 *= bratio
         self.a3 *= cratio
         hmati = self.get_hmat_inv()
-        spos = np.zeros((self.natm,3),dtype=float)
+        spos = np.zeros((len(self.atoms),3),dtype=float)
         mins = np.array((1.0,1.0,1.0),dtype=float)
         maxs = np.zeros(3,dtype=float)
-        for ia in range(self.natm):
+        for ia in range(len(self.atoms)):
             xi = rpos[ia]
             spos[ia] = np.dot(hmati,xi)
             for l in range(3):
@@ -1419,9 +1464,9 @@ You need to specify the species order correctly with --specorder option.
                 maxs[l] = max(maxs[l],spos[ia,l])
         cntrs = (maxs +mins)/2
         shfts = -(cntrs-0.5)
-        for ia in range(self.natm):
+        for ia in range(len(self.atoms)):
             spos[ia] += shfts
-            self.poss[ia] = spos[ia]
+        self.atoms.pos = spos.tolist()
         return None
         
     def to_ase_atoms(self):
@@ -1439,9 +1484,9 @@ You need to specify the species order correctly with --specorder option.
         a = np.linalg.norm(cell[0,:])
         b = np.linalg.norm(cell[1,:])
         c = np.linalg.norm(cell[2,:])
-        spos = [ pos for pos in self.poss ]
-        vels = [ [vel[0]*a, vel[1]*b, vel[2]*c]  for vel in self.vels ]
-        symbols = [ self.specorder[sid-1] for sid in self.sids ]
+        spos = list(self.atoms.pos)
+        vels = [ [vel[0]*a, vel[1]*b, vel[2]*c] for vel in self.atoms.vel ]
+        symbols = [ self.specorder[sid-1] for sid in self.atoms.sid ]
         atoms = Atoms(symbols=symbols,
                       cell=cell,
                       scaled_positions=spos,
@@ -1469,46 +1514,56 @@ You need to specify the species order correctly with --specorder option.
         vels = ase_atoms.get_velocities()
         cell = ase_atoms.get_cell()
         celli = np.linalg.inv(cell)
-        #...initialize and remake self.specorder
+        #...Initialize and remake self.specorder
         for s in symbols:
             if s not in spcorder:
                 spcorder.append(s)
-        nap = cls(specorder=spcorder)
-        nap.alc= 1.0
-        nap.a1[:] = ase_atoms.cell[0]
-        nap.a2[:] = ase_atoms.cell[1]
-        nap.a3[:] = ase_atoms.cell[2]
-        #...first, initialize arrays
-        nap.sids = np.zeros(len(ase_atoms),dtype=int)
-        nap.poss = np.zeros((len(ase_atoms),3))
-        nap.vels = np.zeros((len(ase_atoms),3))
-        nap.frcs = np.zeros((len(ase_atoms),3))
-        #...append each atom from ASE-Atoms
-        for ia,spi in enumerate(spos):
-            vi = vels[ia]
-            svi = np.dot(celli,vi)
-            si = symbols[ia]
-            sid = nap.specorder.index(si)+1
-            nap.sids[ia] = sid
-            nap.poss[ia] = spi
-            nap.vels[ia] = svi
-        nap.natm = len(nap.sids)
-        return nap
+        nsys = cls(specorder=spcorder)
+        nsys.alc= 1.0
+        nsys.a1[:] = ase_atoms.cell[0]
+        nsys.a2[:] = ase_atoms.cell[1]
+        nsys.a3[:] = ase_atoms.cell[2]
+        #...First, initialize arrays
+        nsys.sids = np.zeros(len(ase_atoms),dtype=int)
+        nsys.poss = np.zeros((len(ase_atoms),3))
+        nsys.vels = np.zeros((len(ase_atoms),3))
+        nsys.frcs = np.zeros((len(ase_atoms),3))
+        nsys.init_atoms()
+
+        # #...Append each atom from ASE-Atoms
+        # for ia,spi in enumerate(spos):
+        #     vi = vels[ia]
+        #     svi = np.dot(celli,vi)
+        #     si = symbols[ia]
+        #     sid = nsys.specorder.index(si)+1
+        #     nsys.sids[ia] = sid
+        #     nsys.poss[ia] = spi
+        #     nsys.vels[ia] = svi
+
+        #...Create arrays to be installed into nsys.atoms
+        sids = [ nsys.specorder.index(si)+1 for si in symbols ]
+        nsys.atoms.pos = list(spos)
+        nsys.atoms.vel = list(vels)
+        nsys.atoms.sid = sids
+        nsys.atoms.vel = nsys.atoms.vel.apply(lambda x: np.dot(celli,x))
+
+        # nsys.natm = len(nsys.sids)
+        return nsys
 
     def change_unitcell(self,a,b,c):
         """
-        Change the current unitcell to the new one with 
+        Change the current unitcell to the new one with
         given unit vectors, a, b, and c.
         And the atoms are reduced to those within the new unitcell.
-        The new unitcell should be included or the same size as the 
-        current unitcell, otherwise there appear vacuum region 
+        The new unitcell should be included or the same size as the
+        current unitcell, otherwise there appear vacuum region
         in the new unitcell.
         """
         #...Repeat the system in order to fill the outer space
         #   arround the current unitcell but in the new unitcell...
         self.repeat(2,2,2,-1,-1,-1)
         rpos = self.get_real_positions()
-        #...Set new unitcell 
+        #...Set new unitcell
         self.alc = 1.0
         self.a1 = np.array(a)
         self.a2 = np.array(b)
@@ -1520,13 +1575,13 @@ You need to specify the species order correctly with --specorder option.
         newhmati = np.linalg.inv(newhmat)
         for i in range(len(rpos)):
             spos = np.dot(newhmati,rpos[i])
-            self.poss[i,:]  = spos[:]
+            self.atoms.at[i,'pos'] = np.dot(newhmati,rpos[i])
 
         #...Remove atoms outside the unitcell
         remove_ids = []
         tiny = 1.0e-5
-        for i in range(self.natm):
-            pi = self.poss[i]
+        for i in range(len(self.atoms)):
+            pi = self.atoms.pos[i]
             if pi[0] < 0.0 or pi[0] >= 1.0-tiny or \
                pi[1] < 0.0 or pi[1] >= 1.0-tiny or \
                pi[2] < 0.0 or pi[2] >= 1.0-tiny:
@@ -1541,9 +1596,7 @@ You need to specify the species order correctly with --specorder option.
         Judgement of overlap is done by comparing the distance between
         atoms and *criterion*.
         """
-        try:
-            self.lspr
-        except:
+        if 'lspr' not in self.atoms.columns:
             self.make_pair_list(rcut=1.0)
         remove_ids = []
         h = np.zeros((3,3),dtype=float)
@@ -1551,11 +1604,11 @@ You need to specify the species order correctly with --specorder option.
         h[:,1] = self.a2 *self.alc
         h[:,2] = self.a3 *self.alc
         cr2 = criterion*criterion
-        for i in range(self.natm):
-            pi = self.poss[i]
-            for jj in range(self.nlspr[i]):
-                j = self.lspr[i,jj]
-                pj = self.poss[j]
+        for i in range(len(self.atoms)):
+            pi = self.atoms.pos[i]
+            for jj in range(len(self.atoms.lspr[i])):
+                j = self.atoms.lspr[i][jj]
+                pj = self.atoms.pos[j]
                 xij = pj-pi
                 xij = xij -np.round(xij)
                 rij = np.dot(h,xij)
@@ -1636,120 +1689,14 @@ def rotate(vector,axis,ang):
     rmat = np.zeros((3,3),dtype=float)
     nx,ny,nz = axis[:]
     rmat[0,:] = [ 0., -nz, ny]
-    rmat[1,:] = [ nz,  0.,-nx]
-    rmat[2,:] = [-ny,  nx, 0.]
+    rmat[1,:] = [ nz, 0., -nx]
+    rmat[2,:] = [-ny, nx, 0.]
     mmat = np.zeros((3,3),dtype=float)
     imat = np.identity(3)
     rmat2 = np.dot(rmat,rmat)
     mmat[:,:] = imat[:,:] +sin(ang)*rmat[:,:] \
                 +(1.0 -cos(ang))*rmat2[:,:]
     return np.dot(mmat,vector)
-
-
-##def hmat_to_lammps(hmat):
-##    """
-##    Convert h-matrix to LAMMPS cell vectors.
-##    Parameters to be output:
-##      xlo, xhi, ylo, yhi, zlo, zhi, xy, xz, yz
-##    LAMMPS cell should be defined as,
-##      a = ( xhi-xlo,       0,       0 )
-##      b = (      xy, yhi-hlo,       0 )
-##      c = (      xz,      yz, zhi-zlo )
-##    See, http://lammps.sandia.gov/doc/Section_howto.html, for detail.
-##    """
-##    import numpy as np
-##    a0 = hmat[:,0]
-##    b0 = hmat[:,1]
-##    c0 = hmat[:,2]
-##    xlo = 0.0
-##    ylo = 0.0
-##    zlo = 0.0
-##    a = np.linalg.norm(a0)
-##    b = np.linalg.norm(b0)
-##    c = np.linalg.norm(c0)
-##    alpha = np.arccos(np.dot(b0,c0)/b/c)
-##    beta  = np.arccos(np.dot(a0,c0)/a/c)
-##    gamma = np.arccos(np.dot(a0,b0)/a/b)
-##    # print 'hmat=',hmat
-##    # print 'a,b,c = ',a,b,c
-##    # print 'alpha,beta,gamma = ',alpha,beta,gamma
-##    xhi = a
-##    xy = b*np.cos(gamma)
-##    xz = c*np.cos(beta)
-##    yhi = np.sqrt(b*b -xy*xy)
-##    yz = (b*c*np.cos(alpha) -xy*xz)/yhi
-##    zhi = np.sqrt(c*c -xz*xz -yz*yz)
-##    # print 'xhi-xlo,yhi-ylo,zhi-zlo= ',xhi-xlo,yhi-ylo,zhi-zlo
-##    # print 'xy,     xz,     yz     = ',xy/xhi,xz/xhi,yz/yhi
-##
-##    if xy > xhi/2:
-##        xy -= xhi
-##    elif xy < -xhi/2:
-##        xy += xhi
-##
-##    if xz > xhi/2:
-##        xz -= xhi
-##    elif xz < -xhi/2:
-##        xz += xhi
-##
-##    if yz > yhi/2:
-##        yz -= yhi
-##    elif yz < -yhi/2:
-##        yz += yhi
-##    # print 'xy,     xz,     yz     = ',xy/xhi,xz/xhi,yz/yhi
-##
-##    return xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz
-##
-##def spos_to_lammps_pos(hmat,spos):
-##    """
-##    Scaled positions in hmat-representation to
-##    positions in the lammps basis.
-##    """
-##    if isinstance(hmat,list):
-##        hmat = np.array(hmat)
-##        
-##    if not isinstance(spos,np.ndarray):
-##        if isinstance(spos,list):
-##            spos = np.array(spos)
-##        else:
-##            raise TypeError('spos should be list or numpy.ndarray.')
-##    a1 = np.array(hmat[:,0])
-##    a2 = np.array(hmat[:,1])
-##    a3 = np.array(hmat[:,2])
-##    vol = abs(np.dot(a1,np.cross(a2,a3)))
-##    a23 = np.cross(a2,a3)
-##    a31 = np.cross(a3,a1)
-##    a12 = np.cross(a1,a2)
-##    amat = np.zeros((3,3),dtype=float)
-##    amat[0,:] = a23[:]
-##    amat[1,:] = a31[:]
-##    amat[2,:] = a12[:]
-##    # print 'hmat=',hmat
-##    # print 'vol=',vol
-##    # print 'a1=',a1
-##    # print 'a2=',a2
-##    # print 'a3=',a3
-##    # print 'amat=',amat
-##
-##    xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz = hmat_to_lammps(hmat)
-##    b1 = np.array((xhi-xlo,0.0,0.0))
-##    b2 = np.array((xy,yhi-ylo,0.0))
-##    b3 = np.array((xz,yz,zhi-zlo))
-##    bmat = np.zeros((3,3),dtype=float)
-##    bmat[:,0] = b1[:]
-##    bmat[:,1] = b2[:]
-##    bmat[:,2] = b3[:]
-##    # print 'bmat=',bmat
-##    if len(spos.shape) == 1:  # only one atom
-##        pos = np.zeros(spos.shape,dtype=float)
-##        pos = np.dot(hmat,spos)
-##        pos = np.dot(bmat,np.dot(amat,pos))/vol
-##    elif len(spos.shape) == 2:  # array of atoms
-##        pos = np.zeros(spos.shape,dtype=float)
-##        for i,sp in enumerate(spos):
-##            pos[i] = np.dot(hmat,sp)
-##            pos[i] = np.dot(bmat,np.dot(amat,pos[i]))/vol
-##    return pos
 
 def to_lammps(hmat,spos):
     """
@@ -1907,7 +1854,9 @@ def analyze(nsys):
             print('   {0:s}: {1:d}'.format(s,nspcs[i]))
             mass += nspcs[i]*elements.elements[s]['mass']
         print(' density = {0:7.2f} g/cm^3'.format(mass*amu_to_g
-                                                 /(vol*Ang_to_cm**3) ))
+                                                  /(vol*Ang_to_cm**3) ))
+    return None
+
 
 if __name__ == "__main__":
 
