@@ -45,14 +45,14 @@ def compute_ndr(ia,isid,dr,rmax,nsys,nspcs):
     nr= int(rmax/dr) +1
     ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     # ndr = np.zeros((nspcs+1,nr),dtype=np.int)
-    natm= nsys.natm
+    natm= nsys.num_atoms()
     hmat= (nsys.alc *np.array([nsys.a1,nsys.a2,nsys.a3])).transpose()
-    pi= nsys.poss[ia]
+    pi= nsys.get_atom_attr(ia,'pos')
     for ja in range(natm):
         if ja == ia:
             continue
-        jsid = nsys.sids[ja]
-        pj= nsys.poss[ja]
+        pj= nsys.get_atom_attr(ja,'pos')
+        jsid = nsys.get_atom_attr(ja,'sid')
         pij= pj -pi
         pij= pij -np.round(pij)
         vij= np.dot(hmat,pij)
@@ -64,7 +64,7 @@ def compute_ndr(ia,isid,dr,rmax,nsys,nspcs):
         ir = int(rrdr)
         ndr[0,0,ir] += 1.0
         ndr[isid,jsid,ir] += 1.0
-        ndr[jsid,isid,ir] += 1.0 # counter pair as well
+        ndr[jsid,isid,ir] += 1.0  # counter pair as well
         # ndr[0,ir]= ndr[0,ir] +1
         # ndr[jsid,ir] = ndr[jsid,ir] +1
     return ndr
@@ -72,7 +72,7 @@ def compute_ndr(ia,isid,dr,rmax,nsys,nspcs):
 def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
     import copy
     
-    natm0= nsys0.natm
+    natm0= nsys0.num_atoms()
     vol= nsys0.volume()
     natms = [ float(natm0)]
     for ispcs in range(1,nspcs+1):
@@ -88,7 +88,7 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     rd= [ dr*ir+dr/2 for ir in range(nr) ]
     for ia in range(natm0):
-        isid = nsys.sids[ia]
+        isid = nsys.get_atom_attr(ia,'sid')
         ndr= compute_ndr(ia,isid,dr,rmax,nsys,nspcs)
         for ir in range(nr):
             nadr[:,:,ir] += ndr[:,:,ir]

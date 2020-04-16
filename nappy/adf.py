@@ -45,17 +45,18 @@ def adf_atom(ia,dang,rcut,nsys,symbols,sj,sk):
     na= int(180.0/dang) +1
     hmat= nsys.get_hmat()
     nda= np.zeros(na,dtype=np.int)
-    natm= nsys.natm
+    natm= nsys.num_atoms()
     rcut2= rcut*rcut
-    pi= nsys.poss[ia]
-    for ji in range(nsys.nlspr[ia]):
-        ja= nsys.lspr[ia,ji]
+    pi= nsys.get_atom_attr(ia,'pos')
+    lspri = nsys.get_atom_attr(ia,'lspr')
+    for ji in range(len(lspri)):
+        ja= lspri[ji]
         if ja == ia:
             continue
         sji = symbols[ja]
         if sji not in (sj,sk):
             continue
-        pj= nsys.poss[ja]
+        pj= nsys.get_atom_attr(ja,'pos')
         pij= pj-pi
         pij= pij -np.round(pij)
         vij= np.dot(hmat,pij)
@@ -63,14 +64,14 @@ def adf_atom(ia,dang,rcut,nsys,symbols,sj,sk):
         if rij2 >= rcut2:
             continue
         rij= np.sqrt(rij2)
-        for ki in range(nsys.nlspr[ia]):
-            ka= nsys.lspr[ia,ki]
+        for ki in range(len(lspri)):
+            ka= lspri[ki]
             if ka == ia or ka <= ja:
                 continue
             ski = symbols[ka]
             if set((sji,ski)) != set((sj,sk)):
                 continue
-            pk= nsys.poss[ka]
+            pk= nsys.get_atom_attr(ka,'pos')
             pik= pk-pi
             pik= pik -np.round(pik)
             vik= np.dot(hmat,pik)
@@ -90,7 +91,7 @@ def adf_atom(ia,dang,rcut,nsys,symbols,sj,sk):
 
 def adf(nsys,dang,rcut,triplets):
 
-    natm0= nsys.natm
+    natm0= nsys.num_atoms()
 
     n1,n2,n3= nsys.get_expansion_num(2.0*rcut)
     if not (n1==1 and n2==1 and n3==1):
@@ -144,6 +145,7 @@ def plot_figures(angd,agr,triplets):
     plt.savefig("graph_adf.png", format='png', dpi=300, bbox_inches='tight')
 
 ################################################## main routine
+
 
 if __name__ == "__main__":
 
