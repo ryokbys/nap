@@ -75,7 +75,7 @@ def statistics(systems):
     nf = 0
     for s in systems:
         nsys = s['nsys']
-        natm = nsys.natm
+        natm = nsys.num_atoms()
         erg = s['erg']/natm
         frcs = s['frcs']
         #...energy
@@ -136,13 +136,13 @@ def draw_graph(systems,uniq_names,graph_format='png',
     """
     try:
         import matplotlib.pyplot as plt
-    except:
+    except Exception:
         raise ImportError('Cannot import module matplotlib.pyplot')
     
     try:
         import seaborn as sns
         sns.set(context='poster',style='darkgrid')
-    except:
+    except Exception:
         pass
 
     cmap = plt.get_cmap('tab10')
@@ -163,7 +163,7 @@ def draw_graph(systems,uniq_names,graph_format='png',
             if s['name'] != name:
                 continue
             nsys = s['nsys']
-            natm = nsys.natm
+            natm = nsys.num_atoms()
             erg = s['erg'] /natm
             ergs.append(erg)
             vols.append(nsys.volume()/natm)
@@ -180,14 +180,14 @@ def get_high_energy_samples(systems,elim=1.0):
     emin = 0.0
     for s in systems:
         nsys = s['nsys']
-        natm = nsys.natm
+        natm = nsys.num_atoms()
         erg = s['erg']/natm
         emin = min(emin,erg)
     print('Minimum energy = ',emin)
     dnames = []
     for s in systems:
         nsys = s['nsys']
-        natm = nsys.natm
+        natm = nsys.num_atoms()
         erg = s['erg']/natm
         if np.abs(erg-emin) > elim:
             dnames.append(s['dname'])

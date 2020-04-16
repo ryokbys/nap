@@ -236,10 +236,10 @@ class NAPSystem(object):
             sids.append(sid)
         
         newatoms = pd.DataFrame(columns=self.atoms.columns)
-        newatoms.pos = poss
-        newatoms.vel = vels
-        newatoms.frc = frcs
-        newatoms.sid = sids
+        newatoms.pos = [ np.array(pos) for pos in poss ]
+        newatoms.vel = [ np.array(vel) for vel in vels ]
+        newatoms.frc = [ np.array(frc) for frc in frcs ]
+        newatoms.sid = [ sid for sid in sids ]
         self.atoms = pd.concat([self.atoms, newatoms])
         self.atoms.reset_index(drop=True,inplace=True)
         return None
@@ -253,7 +253,6 @@ class NAPSystem(object):
         except Exception:
             raise
 
-        # self.natm = len(self.atoms)
         return None
 
     def num_atoms(self,sid=0):
@@ -302,7 +301,7 @@ class NAPSystem(object):
         for i in range(len(self.atoms)):
             rpi = rposs[i]
             spi = np.dot(hmati,rpi)
-            self.atoms.loc[i,'pos'] = spi
+            self.atoms.at[i,'pos'] = spi
         return None
 
     def get_scaled_positions(self):
@@ -311,7 +310,7 @@ class NAPSystem(object):
     def set_scaled_positions(self,sposs):
         if len(sposs) != len(self.atoms):
             raise ValueError('Array size inconsistent.')
-        self.atoms.loc[:,'pos'] = sposs
+        self.atoms.pos = [ np.array(p) for p in sposs ]
         return None
 
     def get_symbols(self):
@@ -1574,7 +1573,6 @@ You need to specify the species order correctly with --specorder option.
         nsys.atoms.vel = nsys.atoms.vel.apply(lambda x: np.dot(celli,x))
         nsys.atoms.frc = frcs
 
-        # nsys.natm = len(nsys.sids)
         return nsys
 
     def change_unitcell(self,a,b,c):

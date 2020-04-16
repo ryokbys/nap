@@ -160,7 +160,7 @@ def make_polycrystal(grns,uc,n1,n2,n3,two_dim=False):
     nsys.set_lattice(uc.alc,uc.a1*n1,uc.a2*n2,uc.a3*n3)
     hmat = nsys.get_hmat()
     hmati = nsys.get_hmat_inv()
-    nmax = n1*n2*n3 *uc.natm
+    nmax = n1*n2*n3 *uc.num_atoms()
     sidsl = np.zeros(nmax,dtype=int)
     symsl = []
     possl = np.zeros((nmax,3))
@@ -191,12 +191,13 @@ def make_polycrystal(grns,uc,n1,n2,n3,two_dim=False):
             # print('ix=',ix)
             for iy in range(iy0,iy1):
                 for iz in range(iz0,iz1):
-                    for m in range(uc.natm):
-                        sidt = uc.sids[m]
+                    for m in range(uc.num_atoms()):
+                        sidt = uc.get_atom_attr(m,'sid')
                         rt= np.zeros((3,))
-                        rt[0]= (uc.poss[m,0]+ix)/n1
-                        rt[1]= (uc.poss[m,1]+iy)/n2
-                        rt[2]= (uc.poss[m,2]+iz)/n3
+                        pm = uc.get_atom_attr(m,'pos')
+                        rt[0]= (pm[0]+ix)/n1
+                        rt[1]= (pm[1]+iy)/n2
+                        rt[2]= (pm[2]+iz)/n3
                         #...rt to absolute position
                         art= np.dot(hmat,rt)
                         #...Rotate
@@ -257,10 +258,9 @@ def make_polycrystal(grns,uc,n1,n2,n3,two_dim=False):
     # dmin2= dmin**2
     # xij= np.zeros((3,))
     print(' Making the list of SHORT pairs...')
-    for ia in range(nsys.natm):
-        nlst= nsys.nlspr[ia]
-        lst= nsys.lspr[ia]
-        for j in range(nlst):
+    for ia in range(nsys.num_atoms()):
+        lst= nsys.get_atom_attr(ia,'lspr')
+        for j in range(len(lst)):
             ja= lst[j]
             if ja > ia:
                 continue

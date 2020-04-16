@@ -68,12 +68,13 @@ def monocli_to_ortho(nsys):
     hmat1[:,1] = a1[1]
     hmat1[:,2] = a1[2]
     hmat1i = np.linalg.inv(hmat1)
-    sposs = np.zeros((nsys.natm,3))
+    sposs = np.zeros((nsys.num_atoms(),3))
     for i,ri in enumerate(rpos):
         sposs[i] = np.dot(hmat1i,ri)
     nsys.set_scaled_positions(sposs)
     nsys.set_hmat(hmat1)
     return nsys
+
 
 if __name__ == '__main__':
     

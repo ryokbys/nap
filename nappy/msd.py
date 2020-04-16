@@ -40,7 +40,7 @@ def anint(x):
 def get_ids(nsys,ids):
     atom_ids = []
     if 0 in ids:  # all the atoms
-        atom_ids = [ i for i in range(len(nsys)) ]
+        atom_ids = [ i for i in range(nsys.num_atoms()) ]
         return atom_ids
     else:
         atom_ids = [ids]
@@ -74,7 +74,7 @@ def get_msd(files,ids0,nmeasure,nshift,spcs='None'):
     else:
         if 0 in ids0:
             nsys = NAPSystem(fname=files[0])
-            ids = [ i for i in range(nsys.natm) ]
+            ids = [ i for i in range(nsys.num_atoms()) ]
         else:
             ids = [ i-1 for i in ids0 ]
 
@@ -90,7 +90,7 @@ def get_msd(files,ids0,nmeasure,nshift,spcs='None'):
         for ia,idi in enumerate(ids):
             # #...human-readable ID to computer-oriented ID
             # i= idi - 1
-            pi= nsys.poss[idi]
+            pi= nsys.get_atom_attr(idi,'pos')
             if ifile == 0:
                 pp[ia,:]= pi[:]
             else:
@@ -119,12 +119,12 @@ def get_msd(files,ids0,nmeasure,nshift,spcs='None'):
                     p0[nm,ia,2]= pi[2] +npbc[ia,2]
                 if nm*nshift < ifile:
                     #...normalized to absolute
-                    dev[0]= pi[0] +npbc[ia,0] -p0[nm,ia,0] 
-                    dev[1]= pi[1] +npbc[ia,1] -p0[nm,ia,1] 
-                    dev[2]= pi[2] +npbc[ia,2] -p0[nm,ia,2] 
+                    dev[0]= pi[0] +npbc[ia,0] -p0[nm,ia,0]
+                    dev[1]= pi[1] +npbc[ia,1] -p0[nm,ia,1]
+                    dev[2]= pi[2] +npbc[ia,2] -p0[nm,ia,2]
                     dev= np.dot(hmat,dev)
-                    msd[ifile-nm*nshift,nm,0] += dev[0]**2 
-                    msd[ifile-nm*nshift,nm,1] += dev[1]**2 
+                    msd[ifile-nm*nshift,nm,0] += dev[0]**2
+                    msd[ifile-nm*nshift,nm,1] += dev[1]**2
                     msd[ifile-nm*nshift,nm,2] += dev[2]**2
                         
 
@@ -137,10 +137,6 @@ def get_msd(files,ids0,nmeasure,nshift,spcs='None'):
     
     return msd
 
-# def get_key(v):
-#     import re
-#     prefix, index = re.match(r'([a-z]+)_(\d+)', v).groups()
-#     return prefix, -int(index)
 
 if __name__ == "__main__":
 
@@ -159,7 +155,7 @@ if __name__ == "__main__":
     ntwindow= len(files) -(nmeasure-1)*nshift
     if ntwindow <= 0:
         err=' [Error] ntwindow <= 0 !!!\n'\
-              + '  Chech the parameters nmeasure and nshift, and input files.'
+            + '  Chech the parameters nmeasure and nshift, and input files.'
         raise ValueError(err)
 
     files.sort(key=get_key,reverse=True)

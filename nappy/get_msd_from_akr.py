@@ -88,7 +88,7 @@ for ifile in range(len(infiles)):
     hmat[2]= system.a3 *system.alc
     #...human-readable ID to computer-oriented ID
     i= id-1
-    pi= system.poss[i]
+    pi= system.get_atom_attr(i,'pos')
     if ifile == 0:
         pp= pi
     else:
