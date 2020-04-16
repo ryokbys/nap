@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
 Fit parameters of classical interatomic potentials using metaheuristic approaches.
-Because of computational efficiency, optimization of a lot of parameters using 
-gradient-based approaches is out of focus in this script, and that should be 
+Because of computational efficiency, optimization of a lot of parameters using
+gradient-based approaches is out of focus in this script, and that should be
 performed in a Fortran program.
 
 Usage:
@@ -19,14 +19,13 @@ Options:
 """
 from __future__ import print_function
 
-import os,sys
+import os
 import shutil
 from docopt import docopt
 import numpy as np
-from numpy import sin,cos,exp,sqrt
+from numpy import sin,cos,sqrt
 import subprocess
 import time
-import json
 
 from nappy.fitpot.fp2prms import fp2BVSx, fp2BVS, fp2Morse, read_params_Coulomb
 

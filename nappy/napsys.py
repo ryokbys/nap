@@ -688,6 +688,9 @@ You need to specify the species order correctly with --specorder option.
             'chg': -1,
             'chi': -1
         }
+        ivx = -1
+        ivy = -1
+        ivz = -1
         for line in f.readlines():
             data = line.split()
             if 'ITEM' in line:
@@ -791,7 +794,10 @@ You need to specify the species order correctly with --specorder option.
                         sid = self.specorder.index(symbol)+1
                         sids[iatm] = sid
                     r0 = [ float(data[ix]), float(data[iy]), float(data[iz]) ]
-                    v0 = [ float(data[ivx]),float(data[ivy]),float(data[ivz])]
+                    if ivx > 0 and ivy > 0 and ivz > 0:
+                        v0 = [ float(data[ivx]),float(data[ivy]),float(data[ivz])]
+                    else:
+                        v0 = [ 0., 0., 0. ]
                     sr = np.dot(hmati,r0)
                     sv = np.dot(hmati,v0)
                     sr[0] = self._pbc(sr[0])
@@ -1873,10 +1879,10 @@ def analyze(nsys):
     print(' number of atoms   = ',nsys.num_atoms())
     if nsys.specorder:
         print(' number of atoms per species:')
-        nspcs = nsys.num_species()
+        nspcs = nsys.natm_per_species()
         mass = 0.0
         for i,s in enumerate(nsys.specorder):
-            print('   {0:s}: {1:d}'.format(s,nspcs[i]))
+            print('   {0:<2s}: {1:>4d}'.format(s,nspcs[i]))
             mass += nspcs[i]*elements.elements[s]['mass']
         print(' density = {0:7.2f} g/cm^3'.format(mass*amu_to_g
                                                   /(vol*Ang_to_cm**3) ))
@@ -1904,8 +1910,7 @@ if __name__ == "__main__":
     else:
         charges = [ float(c) for c in charges.split(',') ]
 
-    nsys= NAPSystem(fname=infname,ffmt=infmt,specorder=specorder,
-                    charges=charges)
+    nsys= NAPSystem(fname=infname,ffmt=infmt,specorder=specorder)
 
     nsys.shift_atoms(*shift)
     if ncycle > 0:
