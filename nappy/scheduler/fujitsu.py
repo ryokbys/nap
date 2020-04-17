@@ -12,7 +12,7 @@ import re
 from logging import getLogger
 
 __author__  = "Ryo KOBAYASHI"
-__version__ = "170123"
+__version__ = "200417"
 __email__   = "kobayashi.ryo@nitech.ac.jp"
 
 # This maps Fujitsu-FX state codes to our own status list

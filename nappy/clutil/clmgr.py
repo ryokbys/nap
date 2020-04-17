@@ -45,7 +45,7 @@ import nappy
 from nappy.clutil.find import find
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "170122"
+__version__ = "200417"
 
 _clmgr_dir = nappy.get_nappy_dir()+'/clmgr'
 
