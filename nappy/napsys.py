@@ -719,6 +719,7 @@ You need to specify the species order correctly with --specorder option.
                         iy = aux_names.index('yu') +2
                     try:
                         iz = aux_names.index('z') +2
+                        iauxstart = 5
                     except Exception:
                         iz = aux_names.index('zu') +2
                         iauxstart = 5

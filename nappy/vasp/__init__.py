@@ -11,24 +11,24 @@ import nappy
 from . import incar, poscar, potcar
 
 import json
+import yaml
 
 def get_conf_path():
-    return nappy.get_nappy_dir()+'/vasp.conf'
+    return nappy.get_nappy_dir()+'/vasp_conf.yaml'
 
 def get_exec_path():
     conf_path = get_conf_path()
     with open(conf_path,'r') as f:
-        config = json.load(f)
-    if not 'exec_path' in config:
+        config = yaml.safe_load(f)
+    if 'exec_path' not in config:
         msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the VASP executable in {0}.
-It should be in JSON format like,
+It should be in YAML format like,
 ::
 
-  {
-    exec_path:  /home/username/bin/vasp535-openmpi
-  }
+  exec_path:  /home/username/bin/vasp535-openmpi
+  
 
 """.format(get_conf_path())
         raise RuntimeError(msg)
@@ -137,7 +137,7 @@ class VASP:
         #...Read POSCAR file and get number of atoms of each species
         try:
             self.poscar
-        except:
+        except Exception as e:
             self.poscar = poscar.POSCAR()
         self.poscar.read(self.path+'/POSCAR')
         num_atoms = copy.copy(self.poscar.num_atoms)
@@ -145,7 +145,7 @@ class VASP:
         #...Read POTCAR file and get number of electrons of each species
         try:
             self.potcar
-        except:
+        except Exception as e:
             self.potcar = potcar.read_POTCAR(self.path+'/POTCAR')
         valences = self.potcar['valence']
 
@@ -172,7 +172,7 @@ class VASP:
         """
         try:
             self.incar
-        except:
+        except Exception as e:
             self.incar = incar.parse_INCAR()
             
         nel = self.get_num_valence()
@@ -202,12 +202,11 @@ class VASP:
     
     def estimate_nprocs(self,max_npn=16,limit_npn=None):
         """
-        Estimate the computation time wrt num of valence electrons,
-        num of bands, num of k-points and procs_per_node.
+        Estimate the number of processors.
         """
         try:
             self.incar
-        except:
+        except Exception as e:
             self.incar = incar.parse_INCAR()
 
         #...Limit NPN if provided, because using full cores in a node
@@ -222,14 +221,18 @@ class VASP:
         # If either NPAR or NCORE is specified, NPROCS can be chosen from
         # common multiples of either NPAR or NCORE and less than and equal to NPN.
         npara = 0
+        try:
+            kpar = int(self.incar['KPAR'])
+        except Exception as e:
+            kpar = 1
         if 'NPAR' in self.incar and 'NCORE' in self.incar:
-            npara = self.incar['NPAR'] *self.incar['NCORE']
+            npara = self.incar['NPAR'] *self.incar['NCORE'] *kpar
             nnodes = npara /npn +1
         elif 'NPAR' in self.incar or 'NCORE' in self.incar:
             if 'NPAR' in self.incar:
-                ntmp = self.incar['NPAR']
+                ntmp = self.incar['NPAR'] *kpar
             else:
-                ntmp = self.incar['NCORE']
+                ntmp = self.incar['NCORE'] *kpar
             if ntmp > npn:
                 nnodes = ntmp/npn +1
                 npara = ntmp
@@ -237,10 +240,6 @@ class VASP:
                 nnodes = 1
                 npara = int(npn/ntmp) *ntmp
         else:
-            #...MANAGE to estimate npara from nel, nkpt, nband !!
-            # nel = self.get_num_valence()
-            # nkpt = parse_KPOINTS()
-            # nband = self.incar['NBAND']
             npara = npn
             nnodes = 1
         if npara == 0:
@@ -253,16 +252,14 @@ class VASP:
         """
         Make command text to run VASP using mpirun.
         """
-        if not 'exec_path' in self.config:
+        if 'exec_path' not in self.config:
             msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the VASP executable in {0}.
-It should be in JSON format like,
+It should be in YAML format like,
 ::
 
-  {
-    "exec_path":  "/home/username/bin/vasp535-openmpi"
-  }
+  "exec_path":  "/home/username/bin/vasp535-openmpi"
 
 
 """.format(get_conf_path())
@@ -278,16 +275,14 @@ It should be in JSON format like,
         return None
 
     def get_exec_path(self):
-        if not 'exec_path' in self.config:
+        if 'exec_path' not in self.config:
             msg = """
 Error: self.exec_path has not been set yet.
 You should write a path to the VASP executable in {0}.
-It should be in JSON format like,
+It should be in YAML format like,
 ::
 
-  {
-    "exec_path":  "/home/username/bin/vasp535-openmpi"
-  }
+   exec_path:  /home/username/bin/vasp535-openmpi
 
 
 """.format(get_conf_path())
@@ -297,17 +292,17 @@ It should be in JSON format like,
 
     def load_config(self):
         """
-        Load config from `~/.nappy/vasp.conf` file.
+        Load config from `~/.nappy/vasp_conf.yaml` file.
         """
         with open(get_conf_path(),'r') as f:
-            self.config = json.load(f)
+            self.config = yaml.safe_load(f)
 
         return None
         
     def save_config(self):
         try:
             self.config
-        except:
+        except Exception as e:
             raise RuntimeError('self.config has not been set.')
 
         #...Read all the current config from file

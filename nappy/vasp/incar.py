@@ -13,7 +13,7 @@ _keywords = (
     'IMIX','AMIX','BMIX','AMIX_MAG','BMIX_MAG','AMIN',
     'IBRION','NSW','ISIF','ISYM','EDIFFG',
     'ISMEAR','SIGMA','LORBIT',
-    'NPAR','NCORE',
+    'KPAR','NPAR','NCORE',
 )
 
 _comment_char = ('#',)
@@ -37,7 +37,7 @@ def parse_INCAR(fname='INCAR'):
         if not contains_keyword:
             continue
         #...check if it is a comment line
-        if entry[0][0] is '#':
+        if entry[0][0] == '#':
             continue
         # print('entry =',entry)
         #...If else, start parsing the line
@@ -56,7 +56,7 @@ def parse_entry(entry):
     Parse entry value and return int, float, str, or bool.
     Return None if the value is '='.
     """
-    if entry[0] is '=':
+    if entry[0] == '=':
         return None
     if entry[0].isdigit():  # int or float
         if '.' in entry or 'e' in entry:  # float

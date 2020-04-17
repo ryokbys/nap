@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Manage DFT calculations on some cluster.
+Manage DFT calculations on the cluster computer via some scheduler.
 - Search directories under given directory whether there are directories
   in which a DFT calculation should be done.
 - Compute nodes required to compute those DFT calculations.
@@ -27,6 +27,9 @@ Options:
               Maximum time of computation in second which will replace the
               machine default value. Negative value means to use the machine default.
               [default: -1]
+  --template-script PATH
+              Path to the template script in which some keywords are replaced by the scheduler.
+              [default: None]
 """
 from __future__ import print_function
 
@@ -36,7 +39,7 @@ from subprocess import Popen,PIPE
 from datetime import datetime
 import time
 import copy
-from logging import getLogger, StreamHandler, FileHandler, DEBUG, WARNING
+from logging import getLogger, StreamHandler, FileHandler, DEBUG
 
 import nappy
 from nappy.clutil.find import find
@@ -125,9 +128,9 @@ class ClusterManager(object):
         # Set machine
         try:
             self.machine = Machine(logger=self.logger)
-        except:
+        except Exception as e:
             raise
-        # Then the scheduler should be already fixed here
+        # The scheduler should be already fixed here
         self.sched = self.machine.get_scheduler()
 
         # Set queue which should come after setting machine
@@ -241,12 +244,12 @@ Please wait until the other clmgr stops or stop it manually.
             with open(d+'/'+self._stat_file,'r') as f:
                 try:
                     stat = int(f.readline())
-                except:
+                except Exception as e:
                     stat = -1
             #...Skip this directory because some job is/will be perfromed here
             if stat in jobids:
                 continue
-            #...Otherwise, put this directory into new_dirs 
+            #...Otherwise, put this directory into new_dirs
             self.dirs_to_work.append(d)
 
     def make_mpi_command_dict(self):
@@ -270,7 +273,8 @@ Please wait until the other clmgr stops or stop it manually.
                 self.mpi_command_dict[k] = None
 
 
-    def single_job_per_submission(self,dryrun=False,limit_seconds=-1):
+    def single_job_per_submission(self,dryrun=False,limit_seconds=-1,
+                                  template_script=None):
         """
         Assign all the jobs to corresponding jobscripts in appropriate directories.
         """
@@ -291,8 +295,7 @@ Please wait until the other clmgr stops or stop it manually.
         for i,d in enumerate(self.dirs_to_work):
             os.chdir(d)
             calc = self.Calculator(d)
-            nnodes,npn1,npara = calc.estimate_nprocs(max_npn=npn,
-                                                     limit_npn=npn*3/4)
+            nnodes,npn1,npara = calc.estimate_nprocs(max_npn=npn)
             #nprocs = nnodes *npn1
             ctime = calc.estimate_calctime(nprocs=npara)
             if ctime > limit_sec:
@@ -319,7 +322,7 @@ Please wait until the other clmgr stops or stop it manually.
             #     self.mpi_command_dict['rankfile'] = './rankfile'
             command = self.machine.get_mpi_command(**self.mpi_command_dict)
             job_info['COMMANDS'] = command
-            script = self.sched.script_single(job_info)
+            script = self.sched.script_single(job_info,template_script)
             batch_fname = self._batch_fname.format(batch_id=i)
             with open(batch_fname,'w') as f:
                 f.write(script)
@@ -335,7 +338,7 @@ Please wait until the other clmgr stops or stop it manually.
                     jobid = self.sched.submit(batch_fname)
                     njobs += 1
                     jobs.append((d,jobid))
-                except Exception, e:
+                except Exception as e:
                     print('Error: ',e)
                     logger.warning('There is an error occurred, e = ',e)
                     pass
@@ -344,7 +347,8 @@ Please wait until the other clmgr stops or stop it manually.
         os.chdir(cwd)
         return jobs        
 
-    def plural_jobs_per_submission(self,dryrun=False,limit_seconds=-1):
+    def plural_jobs_per_submission(self,dryrun=False,limit_seconds=-1,
+                                   template_script=None):
         """
         Assign all the jobs by grouping some jobs to one submission.
         Run groupped submission at ~/.nappy/clmgr/tmpdir/ without specific
@@ -383,8 +387,7 @@ Please wait until the other clmgr stops or stop it manually.
         for i,d in enumerate(self.dirs_to_work):
             os.chdir(d)
             calc = self.Calculator(d)
-            nnodes,npn1,npara = calc.estimate_nprocs(max_npn=npn,
-                                                     limit_npn=npn/2)
+            nnodes,npn1,npara = calc.estimate_nprocs(max_npn=npn)
             if sum_nodes+nnodes > limit_nodes:
                 #...Register job_info and dirs to jobs
                 isub = len(jobs)+1
@@ -443,7 +446,7 @@ Please wait until the other clmgr stops or stop it manually.
             jobnum = i+1
             job_info = job['info']
             dirs = job['dirs']
-            script = self.sched.script_plural(job_info)
+            script = self.sched.script_plural(job_info,template_script)
             batch_fname = self._batch_fname.format(batch_id=
                                                    '{0:d}_{1:d}'.format(pid,jobnum))
             with open(batch_fname,"w") as f:
@@ -457,7 +460,7 @@ Please wait until the other clmgr stops or stop it manually.
                 try:
                     jobid = self.sched.submit(batch_fname)
                     njobs += 1
-                except Exception,e:
+                except Exception as e:
                     logger.warn('There is an error occurred, e = ',e)
                     pass
             for d in dirs:
@@ -482,6 +485,7 @@ queues:
     'fx-large':  {num_nodes: 192,  default_sec: 86400, limit_sec: 259200}
     'fx-xlarge': {num_nodes: 864,  default_sec: 86400, limit_sec:  86400}
 nprocs_per_node: 12
+mpi_command: 'mpirun -np {npara} {exec_path} > {out} 2>&1'
 """
 
     def __init__(self,logger=None):
@@ -492,37 +496,48 @@ nprocs_per_node: 12
 
         self.logger = logger or getLogger(__name__)
         
-        # Check existence of the machine configuration file
-        if not os.path.exists(self._machine_file):
-            self.logger.warn("Please create a machine-attribute file at "+_clmgr_dir)
-            self.logger.warn("which is like this (in JSON format):")
-            self.logger.warn(self._sample_machine_file)
-            raise RuntimeError('No '+self._machine_file)
-
         self.load()
 
         
     def load(self):
-        import json
+        # Check existence of the machine configuration file
+        if os.path.exists(self._machine_file+'.yaml'):
+            import yaml
+            try:
+                with open(self._machine_file+'.yaml','r') as f:
+                    self.machine_conf = yaml.safe_load(f)
+            except Exception as e:
+                raise
+        elif os.path.exists(self._machine_file) or \
+             os.path.exists(self._machine_file+'.json'):
+            import json
+            try:
+                with open(self._machine_file,'r') as f:
+                    self.machine_conf = json.load(f)
+            except Exception as e:
+                raise
+        else:
+            self.logger.warn("Please create a machine-attribute file 'machine'"
+                             +" or 'machine.yaml' at "+_clmgr_dir)
+            self.logger.warn("which is like this (in JSON format):")
+            self.logger.warn(self._sample_machine_file)
+            raise RuntimeError('No '+self._machine_file)
+
         
-        #...Read and check scheduler and queue from _machine_file
-        with open(self._machine_file,'r') as f:
-            self.machine_conf = json.load(f)
-        
-        if not 'scheduler' in self.machine_conf \
+        if 'scheduler' not in self.machine_conf \
            or len(self.machine_conf['scheduler']) < 1:
             self.logger.warn('No valid scheduler in '+self._machine_file)
             raise RuntimeError()
-        if not 'queues' in self.machine_conf \
+        if 'queues' not in self.machine_conf \
            or len(self.machine_conf['queues']) < 1:
             self.logger.warn('No valid queues in '+self._machine_file)
             raise RuntimeError()
-        if not 'nprocs_per_node' in self.machine_conf:
+        if 'nprocs_per_node' not in self.machine_conf:
             self.logger.warn('No valid nprocs_per_node in '+self._machine_file)
             raise RuntimeError()
 
         # Set default MPI command unless something is specified
-        if not 'mpi_command' in self.machine_conf:
+        if 'mpi_command' not in self.machine_conf:
             self.machine_conf['mpi_command'] = self._default_mpi_command
         
         self.scheduler = self.machine_conf['scheduler']
@@ -530,7 +545,7 @@ nprocs_per_node: 12
         self.nprocs_per_node = self.machine_conf['nprocs_per_node']
 
     def set_queue(self,queue):
-        if not queue in self.machine_conf['queues']:
+        if queue not in self.machine_conf['queues']:
             self.logger.warn('There is no '+queue+' in queues from '+self._machine_file)
             raise RuntimeError()
         self.qattr = self.machine_conf['queues'][queue]
@@ -591,6 +606,18 @@ if __name__ == "__main__":
     multiple_jobs_per_submission = bool(args['-m'])
     queue = args['-q']
     limit_sec = int(args['--limit-sec'])
+    template_path = args['--template-script']
+
+    if template_path == 'None':
+        template_path = None
+    if not os.path.exists(template_path):
+        raise IOError('Template script does not exist at ',template_path)
+    else:
+        with open(template_path,'r') as f:
+            lines = f.readlines()
+            template_script = ""
+            for l in lines:
+                template_script += l
     
     dirs = args['DIRS']
     if isinstance(dirs,str):
@@ -611,9 +638,13 @@ if __name__ == "__main__":
     clmgr.find_dirs_to_work(dirs)
     clmgr.avoid_conflict()
     if multiple_jobs_per_submission:
-        jobs = clmgr.plural_jobs_per_submission(dryrun=dry,limit_seconds=limit_sec)
+        jobs = clmgr.plural_jobs_per_submission(dryrun=dry,
+                                                limit_seconds=limit_sec,
+                                                template_script=template_script)
     else:
-        jobs = clmgr.single_job_per_submission(dryrun=dry,limit_seconds=limit_sec)
+        jobs = clmgr.single_job_per_submission(dryrun=dry,
+                                               limit_seconds=limit_sec,
+                                               template_script=template_script)
 
     logger.info("")
     logger.info("Directories treated in this clmgr {0:d} ".format(os.getpid())

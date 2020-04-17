@@ -8,7 +8,7 @@ def find(path, pattern):
     Emulation of Linux command `find`.
     See:  http://d.hatena.ne.jp/fgshun/20080901/1220272713
     """
-    if isinstance(pattern, basestring):
+    if isinstance(pattern, str):
         match = functools.partial(fnmatch.fnmatch, pat=pattern)
     elif isinstance(pattern, re._pattern_type):
         match = pattern.match

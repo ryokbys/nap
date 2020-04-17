@@ -73,19 +73,19 @@ _field_separator = ","
 # Fields to query or to parse
 # The name like job_id should not be changed like reserved names.
 _fields = [
-    ("jid",'job_id'),    # job id
-    ("jnam",'job_name'), # job name
-    ("st",'state_raw'),  # state
-    ("usr",'username'),  # username
-    ("nnumr",'number_nodes'), # number of nodes requested
-    ("cnumr",'number_cpus'),  # number of cpus
-    ("elpl",'time_limit'),    # time limit in "DD hh:mm:ss"
-    ("elp",'time_used'),      # time used by the job in "DD hh:mm:ss"
-    ("sdt",'dispatch_time'),  # actual or expected dispatch time (start time)
+    ("jid",'job_id'),     # job id
+    ("jnam",'job_name'),  # job name
+    ("st",'state_raw'),   # state
+    ("usr",'username'),   # username
+    ("nnumr",'number_nodes'),  # number of nodes requested
+    ("cnumr",'number_cpus'),   # number of cpus
+    ("elpl",'time_limit'),     # time limit in "DD hh:mm:ss"
+    ("elp",'time_used'),       # time used by the job in "DD hh:mm:ss"
+    ("sdt",'dispatch_time'),   # actual or expected dispatch time (start time)
     ("adt",'submission_time'),
     ("cmt",'annotation'),  # command in FX
     ("rscg",'partition'),  # resource group in FX
-    ("nidlu",'allocated_machines'), 
+    ("nidlu",'allocated_machines'),
 ]
 
 # Fields that are returned by pjstat command
@@ -102,9 +102,9 @@ _pjstat_fields = (
 )
 
 _commands = {
-    'submit' : 'pjsub',
-    'delete' : 'pjdel',
-    'status' : 'pjstat',
+    'submit': 'pjsub',
+    'delete': 'pjdel',
+    'status': 'pjstat',
 }
 
 # Total number of cores in a node, 32 for FX100
@@ -172,10 +172,10 @@ def parse_jobdata(command_out):
     `command_out` should be obtained like following,
     .. code:: 
 
-      from subprocess import Popen, PIPE
-      cmd = get_joblist_command()
-      p = Popen(cmd,shell=True,stdout=PIPE,stderr=PIPE)
-      command_out,err = p.communicate()
+       from subprocess import Popen, PIPE
+       cmd = get_joblist_command()
+       p = Popen(cmd,shell=True,stdout=PIPE,stderr=PIPE)
+       command_out,err = p.communicate()
     
     """
 
@@ -185,7 +185,9 @@ def parse_jobdata(command_out):
     reading_job = False
     job = {}
     for line in output:
-        if not ':' in line:  # job entry not started
+        if type(line) == bytes:
+            line = line.decode('utf-8')
+        if ':' not in line:  # job entry not started
             if reading_job:
                 jobdata.append(job)
             reading_job = False
@@ -209,14 +211,14 @@ def get_jobids():
     cmd = get_joblist_command()
     p = Popen(cmd,shell=True,stdout=PIPE,stderr=PIPE)
     command_out,err = p.communicate()
-    jobdata = parse_jobdata(command_out)
+    jobdata = parse_jobdata(command_out.decode('utf-8'))
 
     jobids = []
     for job in jobdata:
         jobids.append(int(job['JOB ID']))
     return jobids
 
-def script_single(job_info):
+def script_single(job_info,template=None):
     """
     Create job script context using given `job_info`.
     The `job_info` has to contain the following keys:
@@ -228,12 +230,17 @@ def script_single(job_info):
     - WORKDIR
     - COMMANDS
 
-    This only makes a script for only one calculation.
+    This makes a script for only one calculation.
     """
 
-    return _script_template_single.format(**job_info)
+    if template is not None:
+        script = template
+    else:
+        script = _script_template_single
 
-def script_plural(job_info):
+    return script.format(**job_info)
+
+def script_plural(job_info,template=None):
     """
     Create job script context using given `job_info`.
     The `job_info` has to contain the following keys:
@@ -245,10 +252,15 @@ def script_plural(job_info):
     - WORKDIR
     - COMMANDS
 
-    This makes a script for many calculations.
+    This makes a script for plural calculations.
     """
 
-    return _script_template_plural.format(**job_info)
+    if template is not None:
+        script = template
+    else:
+        script = _script_template_plural
+
+    return script.format(**job_info)
 
 
 def submit(script_path,logger=None):
@@ -273,6 +285,8 @@ def submit(script_path,logger=None):
     try:
         p = Popen(command,shell=True,stdout=PIPE,stderr=PIPE)
         out,err = p.communicate()
+        if type(out) == bytes:
+            out = out.decode('utf-8')
         data = out.split(' ')
         if 'ERR' in data[0]:
             logger.warn('Error in submission, {0}'.format(script_path))
@@ -280,7 +294,7 @@ def submit(script_path,logger=None):
         else:
             # JOB ID is at the 5th position of output (counting from 0)
             jobid = int(data[5])
-    except:
+    except Exception as e:
         raise
         
     return jobid
