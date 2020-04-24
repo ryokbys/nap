@@ -314,6 +314,12 @@ class NAPSystem(object):
         return None
 
     def get_symbols(self):
+        """
+        Returns
+        -------
+        symbols : list
+              List of chemical symbols of all atoms in the system.
+        """
         if not self.specorder:
             raise ValueError('specorder is not available.')
         symbols = []
