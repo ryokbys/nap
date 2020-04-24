@@ -1554,18 +1554,20 @@ You need to specify the species order correctly with --specorder option.
         specorder : list
                Species order.
         """
-        spcorder = []
-        if specorder is not None:
-            spcorder = specorder
+        # spcorder = []
+        # if specorder is not None:
+        #     spcorder = specorder
         symbols = ase_atoms.get_chemical_symbols()
         spos = ase_atoms.get_scaled_positions()
         vels = ase_atoms.get_velocities()
         cell = ase_atoms.get_cell()
         celli = np.linalg.inv(cell)
         #...Initialize and remake self.specorder
+        if specorder == None:
+            specorder = []
         for s in symbols:
-            if s not in spcorder:
-                spcorder.append(s)
+            if s not in specorder:
+                specorder.append(s)
         self.init_atoms()
         self.specorder = copy.copy(specorder)
         # nsys = cls(specorder=spcorder)
@@ -1577,15 +1579,19 @@ You need to specify the species order correctly with --specorder option.
         natm = len(ase_atoms)
         sids = [ 0 for i in range(natm) ]
         poss = [ np.array(spos[i]) for i in range(natm) ]
-        vels = [ np.array(vels[i]) for i in range(natm) ]
+        if type(vels) == type(spos):
+            if len(vels) == len(spos):
+                vels = [ np.array(vels[i]) for i in range(natm) ]
+        else:
+            vels = [ np.zeros(3) for i in range(natm) ]
         frcs = [ np.zeros(3) for i in range(natm) ]
         # nsys.init_atoms()
         #...Create arrays to be installed into nsys.atoms
-        sids = [ nsys.specorder.index(si)+1 for si in symbols ]
+        sids = [ self.specorder.index(si)+1 for si in symbols ]
         self.atoms.sid = sids
         self.atoms.pos = poss
         self.atoms.vel = vels
-        self.atoms.vel = nsys.atoms.vel.apply(lambda x: np.dot(celli,x))
+        self.atoms.vel = self.atoms.vel.apply(lambda x: np.dot(celli,x))
         self.atoms.frc = frcs
 
         return None
