@@ -46,11 +46,8 @@ from nappy.atom import get_symbol_from_number, get_number_from_symbol
 
 #...constants
 _maxnn = 100
-_file_formats = ('pmd',
-                 'POSCAR',
-                 'dump',
-                 'xsf',
-                 'lammps')
+_file_formats = ('pmd','POSCAR','dump','xsf','lammps',
+                 'cube')
 _default_labels = ('pos','vel','frc','sid')
 
 class NAPSystem(object):
@@ -427,6 +424,10 @@ class NAPSystem(object):
                 self.write_lammps_data(fname,atom_style='charge')
             else:
                 self.write_lammps_data(fname)
+        elif fmt == 'cube':
+            import ase.io
+            atoms = self.to_ase_atoms()
+            ase.io.write(fname,atoms,format='cube')
         else:
             raise ValueError('Cannot detect output file format: '+fmt)
 
@@ -446,6 +447,10 @@ class NAPSystem(object):
             self.read_xsf(fname)
         elif fmt == 'lammps':
             self.read_lammps_data(fname)
+        elif fmt == 'cube':
+            import ase.io
+            atoms = ase.io.read(fname,format='cube')
+            self.load_ase_atoms(atoms)
         else:
             raise IOError('Cannot detect input file format: '+fmt)
 
@@ -1537,6 +1542,54 @@ You need to specify the species order correctly with --specorder option.
         """
         import nglview as nv
         return nv.show_ase(self.to_ase_atoms())
+
+    def load_ase_atoms(self,ase_atoms,specorder=None):
+        """
+        Load ASE Atoms object.
+        
+        Parameters
+        ----------
+        ase_atoms : ase atoms object
+               ASE atoms object to be loaded.
+        specorder : list
+               Species order.
+        """
+        spcorder = []
+        if specorder is not None:
+            spcorder = specorder
+        symbols = ase_atoms.get_chemical_symbols()
+        spos = ase_atoms.get_scaled_positions()
+        vels = ase_atoms.get_velocities()
+        cell = ase_atoms.get_cell()
+        celli = np.linalg.inv(cell)
+        #...Initialize and remake self.specorder
+        for s in symbols:
+            if s not in spcorder:
+                spcorder.append(s)
+        self.init_atoms()
+        self.specorder = copy.copy(specorder)
+        # nsys = cls(specorder=spcorder)
+        self.alc= 1.0
+        self.a1[:] = ase_atoms.cell[0]
+        self.a2[:] = ase_atoms.cell[1]
+        self.a3[:] = ase_atoms.cell[2]
+        #...First, initialize arrays
+        natm = len(ase_atoms)
+        sids = [ 0 for i in range(natm) ]
+        poss = [ np.array(spos[i]) for i in range(natm) ]
+        vels = [ np.array(vels[i]) for i in range(natm) ]
+        frcs = [ np.zeros(3) for i in range(natm) ]
+        # nsys.init_atoms()
+        #...Create arrays to be installed into nsys.atoms
+        sids = [ nsys.specorder.index(si)+1 for si in symbols ]
+        self.atoms.sid = sids
+        self.atoms.pos = poss
+        self.atoms.vel = vels
+        self.atoms.vel = nsys.atoms.vel.apply(lambda x: np.dot(celli,x))
+        self.atoms.frc = frcs
+
+        return None
+    
 
     @classmethod
     def from_ase_atoms(cls,ase_atoms,specorder=None):
