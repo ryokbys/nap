@@ -73,6 +73,7 @@ Current available formats are:
 * ``dump``: LAMMPS dump file
 * ``xsf``
 * ``akr``: file format for Akira viewer
+* other formats readable by `ASE <https://wiki.fysik.dtu.dk/ase/>`_ .
 
 And to write the structure to a file,
 
@@ -83,3 +84,5 @@ And to write the structure to a file,
   nsys.write_dump()
 
 The ``write`` function will parse file name and choose appropriate file format from the name.
+
+

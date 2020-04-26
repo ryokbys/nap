@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
 Convert pmd param file `in.params.XXX` to fitpot var file `in.vars.fitpot`.
+By default `in.vars.fitpot` includes hard-limit of parameters.
 
 Usage:
   prms2fp.py (Morse|BVSx|BVS) [options]
@@ -20,15 +21,23 @@ import os
 from docopt import docopt
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "190827"
+__version__ = "200425"
 
-def write_vars_fitpot(outfname,fpvars,vranges,rc,rc3):
+def write_vars_fitpot(outfname,fpvars,vranges,rc,rc3,hardlim=None):
     with open(outfname,'w') as f:
+        #...By default, set hard-limit
+        if hardlim is not None:
+            f.write('! hard-limit: T\n')
+            f.write('!\n')
         f.write('  {0:d}   {1:7.3f} {2:7.3f}\n'.format(len(fpvars),rc,rc3))
         for i in range(len(fpvars)):
             v = fpvars[i]
             vr = vranges[i]
-            f.write('  {0:9.4f}  {1:9.4f}  {2:9.4f}\n'.format(v,*vr))
+            if hardlim is not None:
+                hl = hardlim[i]
+                f.write('  {0:9.4f}  {1:9.4f}  {2:9.4f} {3:8.3f} {4:8.3f}\n'.format(v,*vr,*hl))
+            else:
+                f.write('  {0:9.4f}  {1:9.4f}  {2:9.4f}\n'.format(v,*vr))
     print(' Wrote '+outfname)
     return None
 
@@ -122,6 +131,22 @@ def read_params_angular(infname):
 def prms_to_fpvars(specorder,prms):
     """
     Convert Morse/angular prms to fpvars taking specorder into account.
+
+    Parameters
+    ----------
+    specorder : list
+         Species order.
+    prms : dict
+         Dictionary of parameters. Each key stands for pair or triplet.
+
+    Returns
+    -------
+    fpvars : list
+         List of parameters.
+    vranges : list
+         List of parameter ranges.
+    hardlim : list
+         List of hard-limits of parameters.
     """
 
     keys = list(prms.keys())
@@ -131,8 +156,9 @@ def prms_to_fpvars(specorder,prms):
 
     fpvars = []
     vranges = []
+    hardlim = []
     
-    if maxlen == 2:
+    if maxlen == 2:  # 2-body
         for i in range(len(specorder)):
             si = specorder[i]
             for j in range(i,len(specorder)):
@@ -141,23 +167,33 @@ def prms_to_fpvars(specorder,prms):
                     if same_pair((si,sj),k):
                         for v in vs:
                             fpvars.append(v)
-                            vranges.append((v,v))
+                            vranges.append((max(v*.75,0.0),v*1.25))
+                            hardlim.append((0.0, 10.0))
                         break
     
-    elif maxlen == 3:
+    elif maxlen == 3:  # 3-body
         for i in range(len(specorder)):
             si = specorder[i]
             for j in range(len(specorder)):
                 sj = specorder[j]
                 for k in range(j,len(specorder)):
                     sk = specorder[k]
-                    for k,vs in prms.items():
-                        if same_triplet((si,sj,sk),k):
-                            for v in vs:
+                    for ks,vs in prms.items():
+                        if same_triplet((si,sj,sk),ks):
+                            for iv,v in enumerate(vs):
                                 fpvars.append(v)
-                                vranges.append((v,v))
+                                #...Code specific to angular1 potential
+                                if iv == 2:
+                                    vranges.append((-.5, .5))
+                                    hardlim.append((-.5, .5))
+                                elif iv == 1:
+                                    vranges.append((1., 1.))
+                                    hardlim.append((1., 1.))
+                                else:
+                                    vranges.append((max(v*0.75,0.0), v*1.25))
+                                    hardlim.append((0.0, 10.0))
                             break
-    return fpvars, vranges
+    return fpvars, vranges, hardlim
     
 
 def Morse2fp(outfname,specorder,rc,rc3):
@@ -193,24 +229,28 @@ def BVS2fp(outfname,specorder,rc,rc3):
 
     fpvars = []
     vranges= []
+    hardlim= []
 
     #...fbvs
     fpvars.append(fbvs)
     vranges.append((fbvs,fbvs))
+    hardlim.append((fbvs,fbvs))
     #...rads
     for s in specorder:
         if s not in rads.keys():
             raise Exception('spcs not in rads.')
         rad = rads[s]
         fpvars.append(rad)
-        vranges.append((rad,rad))
+        vranges.append((rad*0.75,rad*1.25))
+        hardlim.append((0.0, 3.0))
         
     #...Morse parameters
-    v_morse, vr_morse = prms_to_fpvars(specorder,morse_prms)
+    v_morse, vr_morse, hl_morse = prms_to_fpvars(specorder,morse_prms)
     fpvars += v_morse
     vranges += vr_morse
+    hardlim += hl_morse
 
-    write_vars_fitpot(outfname,fpvars,vranges,rc,rc3)
+    write_vars_fitpot(outfname,fpvars,vranges,rc,rc3,hardlim=hardlim)
 
     return None
 
@@ -222,27 +262,31 @@ def BVSx2fp(outfname,specorder,rc,rc3):
 
     fpvars = []
     vranges= []
+    hardlim = []
 
     #...fbvs
     fpvars.append(fbvs)
     vranges.append((fbvs,fbvs))
+    hardlim.append((fbvs,fbvs))
     #...rads
     for s in specorder:
         if s not in rads.keys():
             raise Exception('spcs not in rads.')
         rad = rads[s]
         fpvars.append(rad)
-        vranges.append((rad,rad))
+        vranges.append((rad*0.75,rad*1.25))
+        hardlim.append((0.0,3.0))
     #...Morse parameters
-    v_morse, vr_morse = prms_to_fpvars(specorder,morse_prms)
+    v_morse, vr_morse, hl_morse = prms_to_fpvars(specorder,morse_prms)
     fpvars += v_morse
     vranges += vr_morse
+    hardlim += hl_morse
     #...angular parameters
-    v_angular, vr_angular = prms_to_fpvars(specorder,angular_prms)
+    v_angular, vr_angular, hl_angl = prms_to_fpvars(specorder,angular_prms)
     fpvars += v_angular
     vranges += vr_angular
-
-    write_vars_fitpot(outfname,fpvars,vranges,rc,rc3)
+    hardlim += hl_angl
+    write_vars_fitpot(outfname,fpvars,vranges,rc,rc3,hardlim=hardlim)
 
     return None
 

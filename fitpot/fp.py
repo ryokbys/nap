@@ -185,11 +185,20 @@ def read_in_fitpot(fname='in.fitpot'):
 def write_vars_fitpot(vs,vrs,fname='in.vars.fitpot',**kwargs):
     rc2 = kwargs['rc2']
     rc3 = kwargs['rc3']
+    options = kwargs['options']
+    hardlim = kwargs['hardlim']
     nv = len(vs)
     with open(fname,'w') as f:
+        if 'hard-limit' in options.keys() and options['hard-limit']:
+            f.write('!  hard-limit:  T\n')
+            f.write('!\n')
         f.write(' {0:5d}  {1:7.3f} {2:7.3f}\n'.format(nv,rc2,rc3))
         for i in range(len(vs)):
-            f.write(' {0:10.4f}  {1:10.4f}  {2:10.4f}\n'.format(vs[i],*vrs[i]))
+            f.write(' {0:10.4f}  {1:10.4f}  {2:10.4f}'.format(vs[i],*vrs[i]))
+            if 'hard-limit' in options.keys() and options['hard-limit']:
+                f.write('  {0:9.3f}  {1:9.3f}\n'.format(*hardlim[i]))
+            else:
+                f.write('\n')
     return None
 
 def parse_option(line):
@@ -221,7 +230,7 @@ def read_vars_fitpot(fname='in.vars.fitpot'):
     for line in lines:
         if line[0] in ('!','#'):
             k,v = parse_option(line)
-            if k != None:
+            if k is not None:
                 options[k] = v
                 print(' option: ',k,v)
             continue
@@ -251,7 +260,7 @@ def read_vars_fitpot(fname='in.vars.fitpot'):
     vs = np.array(vs)
     vrs = np.array(vrs)
     vrsh = np.array(vrsh)
-    return rc2,rc3,vs,vrs,vrsh
+    return rc2,rc3,vs,vrs,vrsh,options
     
 
 def read_rdf(fname,specorder,pairs=[]):
@@ -504,7 +513,7 @@ def func_wrapper(variables, vranges, **kwargs):
         # print('Going to get_data from ',pmddir)
         pmddata = get_data(pmddir,prefix='pmd',**kwargs)
         L = min( loss_func(pmddata,**kwargs), L_up_lim )
-    except:
+    except Exception as e:
         if print_level > 1:
             print('  Since pmd or post-process failed at {0:s}, '.format(pmddir)
                   +'the upper limit value is applied to its loss function.',
@@ -570,7 +579,7 @@ def lat_vasp2dump(a,b,c,alpha,beta,gamma):
         # print('hmat=',hmat)
         xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,_ = to_lammps(hmat,[])
         # print('after to_lammps=',xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
-    except:
+    except Exception as e:
         raise
 
     a1 = np.array([xhi-xlo,     0.0,     0.0])
@@ -609,10 +618,12 @@ def main(args):
     # print('rdf_pairs=',rdf_pairs)
     adf_triplets = infp['adf_triplets']
     triplets = get_triplets(infp['interactions'])
-    rc2,rc3,vs,vrs,vrsh = read_vars_fitpot(infp['param_file'])
+    rc2,rc3,vs,vrs,vrsh,options = read_vars_fitpot(infp['param_file'])
 
 
     kwargs = infp
+    kwargs['options'] = options
+    kwargs['hardlim'] = vrsh
     # kwargs['infp'] = infp
     kwargs['rc2'] = rc2
     kwargs['rc3'] = rc3
@@ -657,6 +668,7 @@ def main(args):
     print('elapsed time = {0:f} sec.'.format(time.time()-start))
     
     return None
+
 
 if __name__ == "__main__":
 

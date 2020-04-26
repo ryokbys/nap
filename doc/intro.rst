@@ -47,5 +47,5 @@ You also need,
 
 installed in the system you want to run ``pmd``.
 
-For some analyses tools,
-you may also need *Python 3.* and some python-utilities such as *numpy* and *scipy*.
+For some analysis tools,
+you may also need *Python 3.* and some python-utilities such as *numpy*, *scipy* and *pandas*.
