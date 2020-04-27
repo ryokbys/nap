@@ -32,7 +32,7 @@ def get_symbol_from_number(number):
 def get_number_from_symbol(symbol):
     try:
         element = elements.elements[symbol]
-    except:
+    except Exception as e:
         raise ValueError('No symbol {0:s}'.format(symbol))
     return element['number']
 

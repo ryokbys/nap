@@ -47,7 +47,7 @@ from nappy.atom import get_symbol_from_number, get_number_from_symbol
 #...constants
 _maxnn = 100
 _file_formats = ('pmd','POSCAR','dump','xsf','lammps',
-                 'cube')
+                 'cube','CHGCAR')
 _default_labels = ('pos','vel','frc','sid')
 
 class NAPSystem(object):
@@ -425,9 +425,10 @@ class NAPSystem(object):
             else:
                 self.write_lammps_data(fname)
         elif fmt == 'cube':
-            import ase.io
-            atoms = self.to_ase_atoms()
-            ase.io.write(fname,atoms,format='cube')
+            # import ase.io
+            # atoms = self.to_ase_atoms()
+            # ase.io.write(fname,atoms,format='cube')
+            self.write_cube(fname)
         else:
             raise ValueError('Cannot detect output file format: '+fmt)
 
@@ -441,6 +442,8 @@ class NAPSystem(object):
             self.read_pmd(fname)
         elif fmt == 'POSCAR':
             self.read_POSCAR(fname)
+        elif fmt == 'CHGCAR':
+            self.read_CHGCAR(fname)
         elif fmt == 'dump':
             self.read_dump(fname)
         elif fmt == 'xsf':
@@ -595,7 +598,7 @@ You need to specify the species order correctly with --specorder option.
             if c7[0] in ('c','C'):  # positions are in Cartesian coordinate
                 hi = self.get_hmat_inv()
                 coord = 'cartesian'
-            else:
+            else:  # such as "Direct"
                 coord = 'scaled'
             
             #...Atom positions
@@ -1153,6 +1156,186 @@ You need to specify the species order correctly with --specorder option.
         f.close()
         return None
 
+    def read_CHGCAR(self,fname='CHGCAR'):
+        """
+        Read CHGCAR file and get information of cell, atoms, and volumetric data.
+
+        Parameters
+        ----------
+        fname : str
+             File name to be read.
+        """
+        self.init_atoms()
+        with open(fname,'r') as f:
+            # 1st line: comment
+            f.readline()
+            # 2nd: lattice constant
+            self.alc= float(f.readline().split()[0])
+            # 3rd-5th: cell vectors
+            self.a1= np.array([float(x) for x in f.readline().split()])
+            self.a2= np.array([float(x) for x in f.readline().split()])
+            self.a3= np.array([float(x) for x in f.readline().split()])
+            # 6th: species names or number of each species
+            buff= f.readline().split()
+            if not buff[0].isdigit():
+                spcs = copy.deepcopy(buff)
+                buff= f.readline().split()
+                if not self.specorder:
+                    self.specorder = spcs
+                else:
+                    for s in spcs:
+                        if s not in self.specorder:
+                            self.specorder.append(s)
+            num_species= np.array([ int(n) for n in buff])
+            try:
+                spcs
+            except NameError:
+                spcs = self.specorder
+            #...Check number of species in POSCAR file and in specorder
+            if len(num_species) > len(self.specorder):
+                msg = '''
+Numbers of species in POSCAR is greater than the one in specorder, which should be the same or less.
+Number of species in POSCAR = {0:d}
+You need to specify the species order correctly with --specorder option.
+                '''.format(len(num_species))
+                raise ValueError(msg)
+            natm = np.sum(num_species)
+            sids = [ 0 for i in range(natm) ]
+            poss = [ np.zeros(3) for i in range(natm) ]
+            vels = [ np.zeros(3) for i in range(natm) ]
+            frcs = [ np.zeros(3) for i in range(natm) ]
+            #print("Number of atoms = {0:5d}".format(natm))
+            # 7th or 8th line: comment
+            c7= f.readline()
+            if c7[0] in ('s','S'):
+                c7= f.readline()
+            if c7[0] in ('c','C'):  # positions are in Cartesian coordinate
+                hi = self.get_hmat_inv()
+                coord = 'cartesian'
+            else:  # such as "Direct"
+                coord = 'scaled'
+            
+            #...Atom positions
+            for i in range(natm):
+                buff= f.readline().split()
+                sid= 1
+                m= 0
+                sindex=0
+                for n in num_species:
+                    m += n
+                    if i < m:
+                        if spcs and self.specorder:
+                            sid = self.specorder.index(spcs[sindex]) + 1
+                        break
+                    sid += 1
+                    sindex += 1
+                sids[i] = sid
+                pos = [ float(buff[0]), float(buff[1]), float(buff[2])]
+                if coord == 'cartesian':
+                    x1,x2,x3 = cartesian_to_scaled(hi,pos[0],pos[1],pos[2])
+                elif coord == 'scaled':
+                    x1,x2,x3 = pos[0],pos[1],pos[2]
+                poss[i][:] = [x1,x2,x3]
+
+            #...Up to here, code should be the same as read_POSCAR, in case of CHGCAR lines follow
+            self.atoms['pos'] = poss
+            self.atoms['vel'] = vels
+            self.atoms['frc'] = frcs
+            self.atoms['sid'] = sids
+
+            #...Read volumetric data
+            f.readline()  # should be one blank line
+            ndiv = [ int(x) for x in f.readline().split() ]
+            ndata = ndiv[0]*ndiv[1]*ndiv[2]
+            voldata = np.zeros(ndata)
+            inc = 0
+            while True:
+                line = [ float(d) for d in f.readline().split() ]
+                for d in line:
+                    voldata[inc] = d
+                    inc += 1
+                if inc >= ndata:
+                    break
+            #...Stop reading CHGCAR file here, ignoring the rest of file
+            self.ndiv = copy.copy(ndiv)
+            self.voldata = np.reshape(voldata,ndiv,order='F')
+        return None
+
+    def get_cube_txt(self):
+        """
+        Conver the system info to Gaussian cube format for the purpose of visualization using py3Dmol.
+
+        Returns
+        -------
+        txt : str
+            Test string of system information including volumetric data in cube format.
+        """
+        from datetime import datetime
+        txt = ''
+        txt += 'Gaussian cube format for {0}\n'.format(self.get_chemical_formula())
+        txt += 'generated by napsys.py at {0}\n'.format(datetime.now().strftime('%Y-%m-%d'))
+
+        #...Num of atoms, origin
+        txt += ' {0:8d} {1:12.6f} {2:12.6f} {3:12.6f}\n'.format(self.num_atoms(),
+                                                                0., 0., 0.)
+        #...Num of divisions, lattice vectors
+        a,b,c = self.get_lattice_vectors()
+        if hasattr(self,'ndiv'):
+            ndiv = self.ndiv
+            ndata = ndiv[0]*ndiv[1]*ndiv[2]
+            voldata = self.voldata.reshape((ndata,),order='C')
+        else:
+            ndiv = [ 1,1,1 ]
+            voldata = [ 0. ]
+        # Convert the unit from Angstrom to Bohr (Bohr is the default length unit in cube?)
+        a = a /ndiv[0] /0.5291772
+        b = b /ndiv[1] /0.5291772
+        c = c /ndiv[2] /0.5291772
+            
+        txt += ' {0:8d} {1:12.6f} {2:12.6f} {3:12.6f}\n'.format(ndiv[0],*a)
+        txt += ' {0:8d} {1:12.6f} {2:12.6f} {3:12.6f}\n'.format(ndiv[1],*b)
+        txt += ' {0:8d} {1:12.6f} {2:12.6f} {3:12.6f}\n'.format(ndiv[2],*c)
+        
+
+        #...Atoms
+        from nappy.elements import elements
+        rposs = self.get_real_positions()
+        for i in range(len(self.atoms)):
+            sid = self.atoms.loc[i,'sid']
+            spc = self.specorder[sid-1]
+            try:
+                element = elements[spc]
+                anum = element['number']
+                val = float(element['valence'])
+            except Exception as e:
+                anum = 0
+                val = 0.0
+            txt += ' {0:5d} {1:12.6f}'.format(anum,val)
+            pi = rposs[i]
+            txt += ' {0:12.6f} {1:12.6f} {2:12.6f}\n'.format(*pi)
+
+        #...Volumetric data: 6 entries per line
+        if hasattr(self,'ndiv'):
+            inc = 0
+            for vd in voldata:
+                txt += ' {0:12.4e}'.format(vd)
+                inc += 1
+                if inc % 6 == 0:
+                    txt += '\n'
+                    inc = 0
+            txt += '\n'
+        return txt
+
+    def write_cube(self, fname='cube'):
+        """
+        Output the system info including volumetric data to a file in Gaussian cube format.
+        """
+        txt = self.get_cube_txt()
+        with open(fname,'w') as f:
+            f.write(txt)
+        return None
+            
+
     def get_PDB_txt(self):
         """
         Convert the system info to Protein Data Bank (PDB) format
@@ -1163,9 +1346,12 @@ You need to specify the species order correctly with --specorder option.
         txt : str
             Text string of system information in PDB format.
         """
+        if len(self.atoms) >= 100000:
+            raise ValueError('Number of atoms is too large for PDB format...')
+        
         from datetime import datetime
         txt = ''
-        txt += '{0:6s}    Generated by napsys.py at {0}\n'.format('COMPND',
+        txt += '{0:6s}    Generated by napsys.py at {1}\n'.format('COMPND',
                                                                   datetime.now().strftime('%Y-%m-%d'))
         #...CRYST1
         a1 = self.a1 *self.alc
@@ -1204,18 +1390,18 @@ You need to specify the species order correctly with --specorder option.
 
         return txt
 
-    def view(self,backend='3Dmol',*args,**kwargs):
+    def view(self,backend='3Dmol',**options):
         """
         Visualize the system using the given backend.
         """
         
         if '3Dmol' in backend:
-            self._view_3Dmol(*args,**kwargs)
+            self._view_3Dmol(**options)
         else:
             raise ValueError('No such visualization backend.')
         return None
 
-    def _view_3Dmol(self,*args,**kwargs):
+    def _view_3Dmol(self,**options):
         """
         Visualize the system using 3Dmol.js and py3Dmol.
         """
@@ -1223,12 +1409,27 @@ You need to specify the species order correctly with --specorder option.
             import py3Dmol
         except Exception as e:
             raise
+
+        if 'model' in options.keys():
+            modopts = options['model']
+        if 'volume' in options.keys():
+            volopts = options['volume']
         
         pdb = self.get_PDB_txt()
         v = py3Dmol.view()
         v.addModel(pdb,'pdb')
-        v.setStyle({'stick':{'radius':.1},'sphere':{'radius':.5}})
+        v.setViewStyle({'style':'outline','color':'black','width':0.05})
+        if 'modopts' in locals():
+            v.setStyle(modopts)
+        else:
+            v.setStyle({'stick':{'radius':.1},'sphere':{'radius':.5}})
         v.addUnitCell()
+        if hasattr(self,'voldata'):
+            cube = self.get_cube_txt()
+            if 'volopts' in locals():
+                v.addVolumetricData(cube, "cube", volopts)
+            else:
+                v.addVolumetricData(cube, "cube", {'isoval': 300, 'color': "red", 'opacity': 0.95})
         v.zoomTo()
         v.show()
 
