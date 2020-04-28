@@ -146,7 +146,7 @@ module variables
   type(mdsys),allocatable:: samples(:)
   integer:: nvars
   real(8),allocatable:: vars(:),vranges(:,:),gvar(:),dvar(:)
-
+  
   real(8):: time0,tcomm,tfunc,tgrad
   real(8):: terg, tfrc, tstrs
   integer:: nfunc,ngrad

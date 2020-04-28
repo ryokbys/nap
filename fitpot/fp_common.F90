@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-03-19 17:07:39 Ryo KOBAYASHI>
+!                     Last modified: <2020-04-28 11:09:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -161,6 +161,7 @@ contains
       if( trim(cpot).eq.'linreg' .or. index(cpot,'NN').ne.0 ) then
         if( .not. allocated(samples(ismpl)%gsf) ) then
           call get_ints(nsf,nal,nnl)
+          print *,'ismpl,nsf,nal,nnl=',ismpl,nsf,nal,nnl
           samples(ismpl)%nsf = nsf
           samples(ismpl)%nal = nal
           samples(ismpl)%nnl = nnl
@@ -1111,7 +1112,8 @@ contains
 !=======================================================================
   subroutine get_mean_gsf()
 !
-! Compute the mean of input symmetric functions.
+!  Compute the mean of input symmetric functions.
+!  Called from normalize(), since the normalization usually requires mean of G's.
 !
     use variables
     use parallel

@@ -25,7 +25,7 @@ MPIFLAGS= @FCFLAGS@ -I${PMDDIR}
 
 # fitpotobj= NN.o read_input.o fitpot.o read_params.o
 fitpotobj= read_input.o fitpot.o read_params.o
-mods= mod_variables.o mod_parallel.o mod_minimize.o mod_random.o fp_common.o
+mods= mod_variables.o mod_parallel.o mod_minimize.o mod_random.o fp_common.o mod_composition.o
 args= iargc.o getarg.o
 
 pmdobj= ${PMDDIR}/mod_pmdvars.o ${PMDDIR}/mod_pmdmpi.o ${PMDDIR}/mod_pmdio.o \

@@ -76,13 +76,19 @@ _____________________
   In the case of ``gfortran`` with ``openmpi`` ,
   ::
   
-    $ ./configure --prefix=$(pwd) FCFLAGS="-O4 -g"
+    $ ./configure --prefix=$(pwd) FCFLAGS="-O2 -g"
   
-  The optimization option ``-O4`` is thought to be the best for this system.
+  The optimization option over ``-O3`` seems to cause some errors since a certain version of gfortran, so it is recommended to use ``-O2`` optimization option.
+
+  When you are debugging, you may had better set some warning and checking options enabled as follows.
+  ::
+
+     $ ./configure --prefix=$(pwd) FCFLAGS="-O2 -g -fbounds-check -Wuninitialized -fbacktrace"
+
 
 .. note::
 
-  Compilation with LLVM version gcc is not tested. Use Homebrew version gcc and openmpi.
+  Compilation with LLVM version gcc is not tested. Use Homebrew version of gcc and openmpi.
 
 
 
@@ -256,9 +262,6 @@ is as follows,
   #  unit of length= Angstrom
   #  unit of mass  = unified atomic mass unit
   #
-  num_nodes_x       1
-  num_nodes_y       1
-  num_nodes_z       1
   
   io_format         ascii
   print_level       1
@@ -298,9 +301,7 @@ is as follows,
   pressure_target     1.00
   
   shear_stress   0.00
-  
-  mass  1    28.0855
-  mass  2     4.0
+
 
 Here, the lines begins with ``!`` or ``#`` are treated as comment lines
 and blanc lines are skipped.

@@ -1,12 +1,13 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-04-07 11:02:25 Ryo KOBAYASHI>
+!                     Last modified: <2020-04-27 21:06:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
 !!$  use NNd,only:NN_init,NN_func,NN_grad
   use fp_common,only: func_w_pmd, grad_w_pmd, write_dsgnmats &
        ,subtract_FF, restore_FF, normalize
+  use composition
   use minimize
   use version
   use NN2,only: set_iglid_NN2
@@ -101,6 +102,10 @@ program fitpot
 
   call read_samples()
   call read_ref_data()
+  if( lwgt_compos ) then
+    call read_compos_list()
+    call assign_compos_weight()
+  endif
   call get_base_energies()
   call set_max_num_atoms()
 
@@ -115,7 +120,7 @@ program fitpot
     endif
   endif
 
-  if( nswgt.gt.0 ) call set_sample_weights()
+!!$  if( nswgt.gt.0 ) call set_sample_weights()
 
 !.....Subtract energy and forces of other force-fields
   if( nsubff.gt.0 ) then
@@ -289,6 +294,7 @@ subroutine write_initial_setting()
   use variables
   use minimize
   use random
+  use composition
   implicit none 
   integer:: i
 
@@ -350,6 +356,10 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,9(2x,4a))') 'force_neglect_species',(cspcs_neglect(i),i=1,nspcs_neglect)
   endif
 
+  if( lwgt_compos ) then
+    print '(2x,a25,2x,l3)','compos_weight',lwgt_compos
+    print '(2x,a25,2x,f6.2)','compos_weight_scale',escl_compos
+  endif
   if( nswgt.gt.0 ) then
     write(6,'(2x,a25,2x,i5)') 'sample_weight',nswgt
     do i=1,nswgt
@@ -2091,6 +2101,7 @@ subroutine sync_input()
   use minimize
   use random
   use pmdio,only: nnmax
+  use composition
   implicit none
   
   call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)
@@ -2206,13 +2217,17 @@ subroutine sync_input()
   call mpi_bcast(sferr,nserr,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sserr,nserr,mpi_real8,0,mpi_world,ierr)
 
-  call mpi_bcast(nswgt,1,mpi_integer,0,mpi_world,ierr)
-  if( myid.gt.0 ) then
-    allocate(cswgt(nswgt),swerg0(nswgt),swdenom(nswgt))
+  call mpi_bcast(lwgt_compos,1,mpi_logical,0,mpi_world,ierr)
+  if( lwgt_compos ) then
+    call mpi_bcast(escl_compos,1,mpi_real8,0,mpi_world,ierr)
   endif
-  call mpi_bcast(cswgt,128*nswgt,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(swerg0,nswgt,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(swdenom,nswgt,mpi_real8,0,mpi_world,ierr)
+!!$  call mpi_bcast(nswgt,1,mpi_integer,0,mpi_world,ierr)
+!!$  if( myid.gt.0 ) then
+!!$    allocate(cswgt(nswgt),swerg0(nswgt),swdenom(nswgt))
+!!$  endif
+!!$  call mpi_bcast(cswgt,128*nswgt,mpi_character,0,mpi_world,ierr)
+!!$  call mpi_bcast(swerg0,nswgt,mpi_real8,0,mpi_world,ierr)
+!!$  call mpi_bcast(swdenom,nswgt,mpi_real8,0,mpi_world,ierr)
 !.....GDW
   call mpi_bcast(lgdw,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(gdsgm,1,mpi_real8,0,mpi_world,ierr)

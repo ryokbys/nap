@@ -136,9 +136,10 @@ contains
     integer,intent(in):: myid,mpi_world
     real(8),intent(in):: tag(namax)
 
-    integer:: i,ierr,time0
+    integer:: i,ierr
     integer:: ns_gsf(2),ns_dgsf(4)
     logical,save:: lrealloc = .false.
+    real(8):: time0
 
     if( .not. lupdate_gsf ) return
 
@@ -283,7 +284,6 @@ contains
     dgsfi(:,:,:)= 0d0
     igsfi(:,:) = 0
 
-!!$    if( iprint.gt.1 .and. ia.eq.1 ) print *,'ia,lupdate_gsf,lfitpot=',ia,lupdate_gsf,lfitpot
     if( lupdate_gsf ) then
       if( lcheby ) then
         call desci_cheby(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
@@ -297,13 +297,6 @@ contains
                //' when called from fitpot.'
           stop
         endif
-!!$        if( ia.eq.1 .and. iprint.gt.1 ) then
-!!$          print '(a,10i6)','natm,nal,nnl,nnt=',natm,nal,nnl,nnt
-!!$          print '(a,10i6)','shape(dgsf) =',shape(dgsf)
-!!$          print '(a,10i6)','shape(dgsfi)=',shape(dgsfi)
-!!$          print '(a,10i6)','shape(igsf) =',shape(igsf)
-!!$          print '(a,10i6)','shape(igsfi)=',shape(igsfi)
-!!$        endif
         do isf=1,nsf
           gsfi(isf) = gsfi(isf) *gscli(isf)
           dgsfi(:,isf,0:nnt) = dgsfi(:,isf,0:nnt) *gscli(isf)
@@ -314,7 +307,6 @@ contains
       endif
     else ! Not to update gsf by desci_xxx just use gsfs given by fitpot
       if( lfitpot ) then
-!!$        if( iprint.gt.1 .and. ia.eq.1 ) print *,'ia,nnt,nal=',ia,nnt,nal
         gsfi(:) = gsf(:,ia)
         dgsfi(:,:,0:nnt) = dgsf(:,:,0:nnt,ia)
         igsfi(:,0:nnt) = igsf(:,0:nnt,ia)
@@ -1706,6 +1698,8 @@ contains
     real(8),intent(out):: gsfo(nsfo,nalo)
     real(8),intent(out),optional:: dgsfo(3,nsfo,0:nnlo,nalo)
     integer(2),intent(out),optional:: igsfo(nsfo,0:nnlo,nalo)
+
+    integer:: i
 
     if( nalo.gt.nal .or. nnlo.gt.nnl ) then
       print *,'ERROR: nalo/nnlo is greater than nal/nnl.'

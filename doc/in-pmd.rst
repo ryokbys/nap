@@ -57,9 +57,6 @@ Example of *in.pmd*
       0.00d0   0.00d0   0.00d0
     pressure_target     1.00
 
-    mass  Si    28.0855
-    mass  He     4.0
-
     boundary   ppp
 
 Here, lines begin with ``!`` or ``#`` are treated as comment lines.
@@ -558,8 +555,7 @@ mass
 
 * Default: masses of given species are set automatically.
 
-Mass of specified species in atomic mass unit.
-Species name and its mass should follow the ``mass`` entry.
+If masses of some species need to be set different from those of elements, masses should be specified as follows.
 ::
 
    mass   Si  28.0855

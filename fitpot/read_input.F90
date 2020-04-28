@@ -39,6 +39,7 @@ subroutine set_variable(ionum,cname)
   use minimize
   use random
   use pmdio,only: nnmax
+  use composition
   implicit none
   integer,intent(in):: ionum
   character(len=*),intent(in):: cname
@@ -339,11 +340,17 @@ subroutine set_variable(ionum,cname)
     allocate(cserr(nserr),seerr(nserr),sferr(nserr),sserr(nserr))
     call read_smpl_err(ionum,nserr,cserr,seerr,sferr,sserr)
     return
-  elseif( trim(cname).eq.'sample_weight' ) then
-    backspace(ionum)
-    read(ionum,*) ctmp,nswgt
-    allocate(cswgt(nswgt),swerg0(nswgt),swdenom(nswgt))
-    call read_smpl_wgt(ionum,nswgt,cswgt,swerg0,swdenom)
+!!$  elseif( trim(cname).eq.'sample_weight' ) then
+!!$    backspace(ionum)
+!!$    read(ionum,*) ctmp,nswgt
+!!$    allocate(cswgt(nswgt),swerg0(nswgt),swdenom(nswgt))
+!!$    call read_smpl_wgt(ionum,nswgt,cswgt,swerg0,swdenom)
+!!$    return
+  elseif( trim(cname).eq.'compos_weight' ) then
+    call read_l1(ionum,lwgt_compos)
+    return
+  elseif( trim(cname).eq.'compos_weight_scale' ) then
+    call read_r1(ionum,escl_compos)
     return
   elseif( trim(cname).eq.'gaussian_density_weight' .or. &
        trim(cname).eq.'GDW' ) then
