@@ -63,7 +63,7 @@ def get_list_high_energy(gsmpls,threshold):
         smpldir = s[0]
         erg = s[1]
         #atoms = read(smpldir+'/POSCAR',format='vasp')
-        atoms = NAPSystem(fname=smpldir+"/pos",ffmt='pmd')
+        atoms = NAPSystem(fname=smpldir+"/pos",format='pmd')
         natm = atoms.num_atoms()
         erg /= natm
         ergs.append(erg)

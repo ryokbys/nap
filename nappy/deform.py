@@ -121,7 +121,7 @@ if __name__ == "__main__":
     print('args:')
     print(args)
 
-    psys0= NAPSystem(fname=infname,ffmt=infmt,specorder=specorder)
+    psys0= NAPSystem(fname=infname,format=infmt,specorder=specorder)
 
     if not outfmt == None:
         outfmt= parse_filename(outfname)

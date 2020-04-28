@@ -259,8 +259,8 @@ def fp2BVS(varsfp, **kwargs):
 
     #...Check num of vars
     if nv != len(pairs)*3 +len(specorder) +1:
-        raise ValueError('Number of variables is wrong! nv,len(pairs),len(specorder)='
-                         ,nv,len(pairs),len(specorder))
+        raise ValueError('Number of variables is wrong! nv,len(pairs),len(specorder)=',
+                         nv,len(pairs),len(specorder))
 
     inc = 0
     fbvs = vs[inc]
@@ -368,9 +368,11 @@ if __name__ == "__main__":
                 elif len(i) == 3:
                     triplets.append(i)
             print(' specorder, pairs and triplets are loaded from in.fitpot')
-        except:
+        except Exception as e:
             raise Exception('specorder and pair must be specified or loaded.')
-    
+    else:
+        print(' Since the specorder is provided, in.fitpot was not loaded.')
+
     if len(pairs) == 0:
         raise ValueError('Pairs must be specified.')
     print(' Pairs to be extracted:')
@@ -402,7 +404,7 @@ if __name__ == "__main__":
             fbvs0,rads0,vids0,npqs0 = read_params_Coulomb('in.params.Coulomb')
             kwargs['vids'] = vids0
             kwargs['npqs'] = npqs0
-        except:
+        except Exception as e:
             pass
         varsfp = read_vars_fitpot(infname)
         fp2BVS(varsfp, **kwargs)
@@ -420,7 +422,7 @@ if __name__ == "__main__":
             fbvs0,rads0,vids0,npqs0 = read_params_Coulomb('in.params.Coulomb')
             kwargs['vids'] = vids0
             kwargs['npqs'] = npqs0
-        except:
+        except Exception as e:
             pass
         
         varsfp = read_vars_fitpot(infname)

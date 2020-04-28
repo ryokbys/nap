@@ -55,7 +55,7 @@ class NAPSystem(object):
     Contains cell information and atoms, and provides some functionalities.
     """
 
-    def __init__(self, fname=None, ffmt=None, specorder=[], ase_atoms=None):
+    def __init__(self, fname=None, format=None, specorder=[], ase_atoms=None):
         self.alc = 1.0
         self.a1 = np.zeros(3)
         self.a2 = np.zeros(3)
@@ -73,7 +73,7 @@ class NAPSystem(object):
             self.specorder = None
         
         if fname is not None:
-            self.read(fname=fname,fmt=ffmt)
+            self.read(fname=fname,format=format)
 
         if ase_atoms is not None:
             self.from_ase_atoms(ase_atoms)
@@ -407,48 +407,48 @@ class NAPSystem(object):
         return self.atoms.loc[idatm,attr_name]
         
 
-    def write(self,fname="pmdini",fmt=None):
-        if fmt in (None,'None'):
-            fmt= parse_filename(fname)
+    def write(self,fname="pmdini",format=None):
+        if format in (None,'None'):
+            format= parse_filename(fname)
 
-        if fmt == 'pmd':
+        if format == 'pmd':
             self.write_pmd(fname)
-        elif fmt == 'POSCAR':
+        elif format == 'POSCAR':
             self.write_POSCAR(fname)
-        elif fmt == 'dump':
+        elif format == 'dump':
             self.write_dump(fname)
-        elif fmt == 'xsf':
+        elif format == 'xsf':
             self.write_xsf(fname)
-        elif fmt == 'lammps':
+        elif format == 'lammps':
             if hasattr(self, 'charges') and len(self.charges) > 0:
                 self.write_lammps_data(fname,atom_style='charge')
             else:
                 self.write_lammps_data(fname)
-        elif fmt == 'cube':
+        elif format == 'cube':
             # import ase.io
             # atoms = self.to_ase_atoms()
             # ase.io.write(fname,atoms,format='cube')
             self.write_cube(fname)
         else:
-            raise ValueError('Cannot detect output file format: '+fmt)
+            raise ValueError('Cannot detect output file format: '+format)
 
         return None
 
-    def read(self,fname="pmdini",fmt=None):
-        if fmt in (None, 'None'):
-            fmt= parse_filename(fname)
+    def read(self,fname="pmdini",format=None):
+        if format in (None, 'None'):
+            format= parse_filename(fname)
         
-        if fmt == 'pmd':
+        if format == 'pmd':
             self.read_pmd(fname)
-        elif fmt == 'POSCAR':
+        elif format == 'POSCAR':
             self.read_POSCAR(fname)
-        elif fmt == 'CHGCAR':
+        elif format == 'CHGCAR':
             self.read_CHGCAR(fname)
-        elif fmt == 'dump':
+        elif format == 'dump':
             self.read_dump(fname)
-        elif fmt == 'xsf':
+        elif format == 'xsf':
             self.read_xsf(fname)
-        elif fmt == 'lammps':
+        elif format == 'lammps':
             self.read_lammps_data(fname)
         else:
             print('Since the file format is unknown, try to read the file using ASE.')
@@ -2001,9 +2001,9 @@ You need to specify the species order correctly with --specorder option.
         return
         
 def parse_filename(filename):
-    for fmt in _file_formats:
-        if fmt in filename:
-            return fmt
+    for format in _file_formats:
+        if format in filename:
+            return format
     return None
 
 def decode_tag(tag):
@@ -2260,7 +2260,7 @@ if __name__ == "__main__":
     else:
         charges = [ float(c) for c in charges.split(',') ]
 
-    nsys= NAPSystem(fname=infname,ffmt=infmt,specorder=specorder)
+    nsys= NAPSystem(fname=infname,format=infmt,specorder=specorder)
 
     nsys.shift_atoms(*shift)
     if ncycle > 0:

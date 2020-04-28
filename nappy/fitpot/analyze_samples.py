@@ -57,7 +57,7 @@ def read_sample(dirname):
         if not os.path.exists(dirname+'/'+f):
             raise RuntimeError('The file '+f+' does not exist in '+dirname)
     #...Read pos first
-    nsys = NAPSystem(fname=dirname+'/pos',ffmt='pmd')
+    nsys = NAPSystem(fname=dirname+'/pos',format='pmd')
     erg = read_erg(fname=dirname+'/erg.ref')
     frcs = read_frc(fname=dirname+'/frc.ref')
     strs = read_strs(fname=dirname+'/strs.ref')
