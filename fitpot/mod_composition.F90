@@ -6,7 +6,7 @@ module composition
 !.....Composition information should be ready if composition is used.
 !  File format is like the following:
 !  
-!  $ cat in.fitpot.compos
+!  $ cat in.data.compos
 !  #  ID, c(1), c(2), ..., c(nsp), Emin per atom
 !     30      <=== num of compositions
 !     1    0.1   0.2  ...   0.0    -5.423
@@ -14,7 +14,7 @@ module composition
 !     ...
 !     -3.453  <=== at the end, Emin per atom of the other compositions
 !
-  character(len=128):: composfname = 'in.fitpot.compos'
+  character(len=128):: composfname = 'in.data.compos'
 
   integer:: io_compos = 80
 
