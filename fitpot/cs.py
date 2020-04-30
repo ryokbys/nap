@@ -13,6 +13,7 @@ Options:
 """
 from __future__ import print_function
 
+import sys
 from docopt import docopt
 import numpy as np
 from numpy import exp, sin, cos
@@ -340,12 +341,13 @@ class CS:
                 pj = self.population[jv]
                 cj = candidates[jc]
                 dval = cj.val -pj.val
-                if dval < 0.0: # replace with new individual
+                if dval < 0.0:  # replace with new individual
                     self.population[jv] = cj
                     find.write(' {0:8d}  {1:12.4e}'.format(cj.iid, cj.val))
                     for k,vk in enumerate(cj.vector):
                         find.write(' {0:11.3e}'.format(vk))
                     find.write('\n')
+                    find.flush()
                 else:
                     pass
 
@@ -411,6 +413,7 @@ class CS:
 
             for i,ind in enumerate(self.population):
                 fgen.write(' {0:5d}  {1:8d}  {2:12.4e}\n'.format(it+1, ind.iid, ind.val))
+                fgen.flush()
         fgen.close()
         find.close()
         #...Finaly write out the best one
