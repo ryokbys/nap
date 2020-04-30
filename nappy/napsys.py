@@ -1510,11 +1510,15 @@ You need to specify the species order correctly with --specorder option.
         lshd[:]= -1
         # print 'lcx,lcy,lcz,lcxyz=',lcx,lcy,lcz,lcxyz
         # print 'rcx,rcy,rcz=',rcx,rcy,rcz
+        
+        # Use numpy array instead of accessing pandas series when it will be heavily accessed.
+        poss = np.array(self.atoms.pos)
 
         #...make a linked-cell list
         self.assign_pbc()
         for i in range(len(self.atoms)):
-            pi = self.atoms.pos[i]
+            # pi = self.atoms.pos[i]
+            pi = poss[i]
             # print pi
             #...assign a vector cell index
             mx= int(pi[0]*rcxi)
@@ -1526,11 +1530,12 @@ You need to specify the species order correctly with --specorder option.
             lshd[m]= i
 
         #...Initialize lspr
-        emptylist = [ [] for i in range(len(self.atoms)) ]
-        self.atoms['lspr'] = emptylist
+        lspr = [ [] for i in range(len(self.atoms)) ]
+        # self.atoms['lspr'] = emptylist
             
         for ia in range(len(self.atoms)):
-            pi= self.atoms.pos[ia]
+            #pi= self.atoms.pos[ia]
+            pi = poss[ia]
             mx= int(pi[0]*rcxi)
             my= int(pi[1]*rcyi)
             mz= int(pi[2]*rczi)
@@ -1550,24 +1555,28 @@ You need to specify the species order correctly with --specorder option.
                         m1= m1x*lcyz +m1y*lcz +m1z
                         ja= lshd[m1]
                         if ja== -1: continue
-                        self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2,maxnn)
+                        self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2,poss,lspr,maxnn)
         #...after makeing lspr
         # for ia in range(len(self.atoms)):
         #     print ia,self.lspr[ia]
+        self.atoms['lspr'] = lspr
 
-    def scan_j_in_cell(self,ia,pi,ja,lscl,h,rc2,maxnn):
+    def scan_j_in_cell(self,ia,pi,ja,lscl,h,rc2,poss,lspr,maxnn):
         if ja == ia: ja = lscl[ja]
         if ja == -1: return 0
-        if ja not in self.atoms.lspr[ia]:
-            pj= self.atoms.pos[ja]
+        # if ja not in self.atoms.lspr[ia]:
+        if ja not in lspr[ia]:
+            #pj= self.atoms.pos[ja]
+            pj = poss[ja]
             xij= pj-pi
             xij= xij -np.round(xij)
             rij= np.dot(h,xij)
             rij2= rij[0]**2 +rij[1]**2 +rij[2]**2
             if rij2 < rc2:
-                self.atoms.lspr[ia].append(ja)
+                #self.atoms.lspr[ia].append(ja)
+                lspr[ia].append(ja)
         ja= lscl[ja]
-        self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2,maxnn)
+        self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2,poss,lspr,maxnn)
 
     def _pbc(self,x):
         if x < 0.:

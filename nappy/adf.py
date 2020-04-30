@@ -38,7 +38,7 @@ def norm(vector):
         norm += e*e
     return np.sqrt(norm)
 
-def adf_atom(ia,dang,rcut,nsys,symbols,sj,sk):
+def adf_atom(ia,dang,rcut,nsys,poss,lspr,symbols,sj,sk):
     """
     Compute number of atoms in the every range of angle [0:180].
     """
@@ -47,8 +47,10 @@ def adf_atom(ia,dang,rcut,nsys,symbols,sj,sk):
     nda= np.zeros(na,dtype=np.int)
     natm= nsys.num_atoms()
     rcut2= rcut*rcut
-    pi= nsys.get_atom_attr(ia,'pos')
-    lspri = nsys.get_atom_attr(ia,'lspr')
+    # pi= nsys.get_atom_attr(ia,'pos')
+    # lspri = nsys.get_atom_attr(ia,'lspr')
+    pi = poss[ia]
+    lspri = lspr[ia]
     for ji in range(len(lspri)):
         ja= lspri[ji]
         if ja == ia:
@@ -56,7 +58,8 @@ def adf_atom(ia,dang,rcut,nsys,symbols,sj,sk):
         sji = symbols[ja]
         if sji not in (sj,sk):
             continue
-        pj= nsys.get_atom_attr(ja,'pos')
+        # pj= nsys.get_atom_attr(ja,'pos')
+        pj = poss[ja]
         pij= pj-pi
         pij= pij -np.round(pij)
         vij= np.dot(hmat,pij)
@@ -71,7 +74,8 @@ def adf_atom(ia,dang,rcut,nsys,symbols,sj,sk):
             ski = symbols[ka]
             if set((sji,ski)) != set((sj,sk)):
                 continue
-            pk= nsys.get_atom_attr(ka,'pos')
+            # pk= nsys.get_atom_attr(ka,'pos')
+            pk = poss[ka]
             pik= pk-pi
             pik= pik -np.round(pik)
             vik= np.dot(hmat,pik)
@@ -106,12 +110,14 @@ def adf(nsys,dang,rcut,triplets):
     anda= np.zeros((len(triplets),na),dtype=np.float)
     angd= np.array([ dang*ia for ia in range(na) ])
     symbols = nsys.get_symbols()
+    poss = np.array(nsys.atoms.pos)
+    lspr = nsys.atoms.lspr
     for it,t in enumerate(triplets):
         si,sj,sk = t
         for ia in range(natm0):
             if symbols[ia] != si:
                 continue
-            adfa= adf_atom(ia,dang,rcut,nsys,symbols,sj,sk)
+            adfa= adf_atom(ia,dang,rcut,nsys,poss,lspr,symbols,sj,sk)
             for iang in range(na):
                 anda[it,iang]= anda[it,iang] +adfa[iang]
     return angd,anda,natm0

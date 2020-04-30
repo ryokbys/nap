@@ -37,41 +37,35 @@ def norm(vector):
         norm += e*e
     return np.sqrt(norm)
 
-def compute_ndr(ia,isid,dr,rmax,nsys,nspcs):
+def compute_ndr(ia,isid,dr,r2max,nr,hmat,natm,poss,sids,nspcs):
     """
-    Compute number of atoms in the every shell [r:r+dr] up to *rmax*.
+    Compute number of atoms in the every shell [r:r+dr] up to *sqrt(r2max)*.
     This routine can be only applied to cubic systems.
     """
-    nr= int(rmax/dr) +1
     ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
-    # ndr = np.zeros((nspcs+1,nr),dtype=np.int)
-    natm= nsys.num_atoms()
-    hmat= (nsys.alc *np.array([nsys.a1,nsys.a2,nsys.a3])).transpose()
-    pi= nsys.get_atom_attr(ia,'pos')
+    pi = poss[ia]
     for ja in range(natm):
         if ja == ia:
             continue
-        pj= nsys.get_atom_attr(ja,'pos')
-        jsid = nsys.get_atom_attr(ja,'sid')
+        pj = poss[ja]
+        jsid = sids[ja]
         pij= pj -pi
         pij= pij -np.round(pij)
         vij= np.dot(hmat,pij)
         rij2= np.dot(vij,vij)
-        rij= np.sqrt(rij2)
-        if rij >= rmax:
+        if rij2 >= r2max:
             continue
+        rij= np.sqrt(rij2)
         rrdr= rij/dr
         ir = int(rrdr)
         ndr[0,0,ir] += 1.0
         ndr[isid,jsid,ir] += 1.0
         ndr[jsid,isid,ir] += 1.0  # counter pair as well
-        # ndr[0,ir]= ndr[0,ir] +1
-        # ndr[jsid,ir] = ndr[jsid,ir] +1
     return ndr
 
 def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
     import copy
-    
+
     natm0= nsys0.num_atoms()
     vol= nsys0.volume()
     natms = [ float(natm0)]
@@ -84,12 +78,19 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
         print(' Extend system by {0:d}x{1:d}x{2:d}'.format(n1,n2,n3))
         nsys.repeat(n1,n2,n3)
 
+    r2max = rmax*rmax
     nr= int(rmax/dr)+1
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     rd= [ dr*ir+dr/2 for ir in range(nr) ]
+    hmat = nsys.get_hmat()
+    # Since an access to pandas DataFrame is much slower than that to numpy array,
+    # use numpy arrays in the most time consuming part.
+    poss = np.array(nsys.atoms.pos)
+    sids = np.array(nsys.atoms.sid)
+    natm = len(nsys.atoms)
     for ia in range(natm0):
-        isid = nsys.get_atom_attr(ia,'sid')
-        ndr= compute_ndr(ia,isid,dr,rmax,nsys,nspcs)
+        isid = sids[ia]
+        ndr= compute_ndr(ia,isid,dr,r2max,nr,hmat,natm,poss,sids,nspcs)
         for ir in range(nr):
             nadr[:,:,ir] += ndr[:,:,ir]
 
