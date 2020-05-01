@@ -33,7 +33,7 @@ def make_gnuplot_file(outDT,Eact,D0):
 set xl '1000/T (1/K)'
 set yl 'D [cm^2/sec]'
 set log y
-f(x) = {0:.3f} *exp(-{1:.3f} /8.617e-5 *(x/1000))
+f(x) = {0:.3e} *exp(-{1:.3f} /8.617e-5 *(x/1000))
 plot '{2:s}' us (1000.0/$1):2:3 w yerr lc 'blue' pt 7 t 'data', f(x) t 'fitted' lc 'blue'
 """.format(D0,Eact,outDT)
     with open('plot_D-T.gp','w') as f:
