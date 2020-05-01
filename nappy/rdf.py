@@ -37,12 +37,13 @@ def norm(vector):
         norm += e*e
     return np.sqrt(norm)
 
-def compute_ndr(ia,isid,dr,r2max,nr,hmat,natm,poss,sids,nspcs):
+
+def compute_ndr(ia,isid,dr,r2max,nr,hmat,natm,poss,sids,nspcs,):
     """
     Compute number of atoms in the every shell [r:r+dr] up to *sqrt(r2max)*.
     This routine can be only applied to cubic systems.
     """
-    ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
+    ndr = np.zeros((nspcs+1,nspcs+1,nr),)
     pi = poss[ia]
     for ja in range(natm):
         if ja == ia:
@@ -85,12 +86,12 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
     hmat = nsys.get_hmat()
     # Since an access to pandas DataFrame is much slower than that to numpy array,
     # use numpy arrays in the most time consuming part.
-    poss = np.array(nsys.atoms.pos)
-    sids = np.array(nsys.atoms.sid)
+    poss = np.array(nsys.atoms.pos,)
+    sids = np.array(nsys.atoms.sid,)
     natm = len(nsys.atoms)
     for ia in range(natm0):
         isid = sids[ia]
-        ndr= compute_ndr(ia,isid,dr,r2max,nr,hmat,natm,poss,sids,nspcs)
+        ndr= compute_ndr(ia,isid,dr,r2max,nr,hmat,natm,poss,sids,nspcs,)
         for ir in range(nr):
             nadr[:,:,ir] += ndr[:,:,ir]
 

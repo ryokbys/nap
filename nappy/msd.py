@@ -49,31 +49,32 @@ def get_ids(nsys,ids):
     
 def get_msd(files,ids0,nmeasure,nshift,spcs='None'):
     """
-    Compute MSD specified species-ID from sequential structure FILES.
+    Compute MSD of specified species-ID from sequential structure FILES.
     
-    Input:
+    Parameters
+    ----------
 
-      - files: list
-            List of files used for the MSD calculation.
-      - ids0: list
-            List of atom-IDs (starting from 1) whose MSDs are to be computed.
-      - nmeasure: int
-            Number of staggered lanes to compute MSD for better statistics.
-      - nshift: int
-            Number of files to be skipped for each staggered lane.
-      - spcs: string
-            Species name. If it is None, no species is specified. [defalut: None]
+    files: list
+         List of files used for the MSD calculation.
+    ids0: list
+         List of atom-IDs (starting from 1) whose MSDs are to be computed.
+    nmeasure: int
+         Number of staggered lanes to compute MSD for better statistics.
+    nshift: int
+         Number of files to be skipped for each staggered lane.
+    spcs: string
+         Species name. If it is None, no species is specified. [defalut: None]
 
-    Output:
-      - msd: Numpy array of dimension, (len(files),nmeasure,3).
+    Returns
+    -------
+    msd : Numpy array of dimension, (len(files),nmeasure,3).
     """
+    nsys = NAPSystem(fname=files[0])
     if spcs != 'None':
-        nsys = NAPSystem(fname=files[0])
         symbols = nsys.get_symbols()
         ids = [ i for i,s in enumerate(symbols) if s == spcs ]
     else:
         if 0 in ids0:
-            nsys = NAPSystem(fname=files[0])
             ids = [ i for i in range(nsys.num_atoms()) ]
         else:
             ids = [ i-1 for i in ids0 ]
@@ -85,12 +86,14 @@ def get_msd(files,ids0,nmeasure,nshift,spcs='None'):
     hmat= np.zeros((3,3))
     for ifile in range(len(files)):
         fname= files[ifile]
-        nsys= NAPSystem(fname=fname)
+        if ifile != 0:
+            nsys= NAPSystem(fname=fname)
+        poss = nsys.atoms.pos
         hmat = nsys.get_hmat()
         for ia,idi in enumerate(ids):
             # #...human-readable ID to computer-oriented ID
             # i= idi - 1
-            pi= nsys.get_atom_attr(idi,'pos')
+            pi= poss[idi]
             if ifile == 0:
                 pp[ia,:]= pi[:]
             else:
@@ -133,7 +136,6 @@ def get_msd(files,ids0,nmeasure,nshift,spcs='None'):
             msd[ifile-nm*nshift,nm,0] /= len(ids)
             msd[ifile-nm*nshift,nm,1] /= len(ids)
             msd[ifile-nm*nshift,nm,2] /= len(ids)
-                    
     
     return msd
 
