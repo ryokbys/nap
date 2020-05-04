@@ -14,6 +14,10 @@ Options:
               Offset of the data. [default: 0]
   --plot
               Plot E_act vs 1/T graph (optional) or write a gnuplot script. [default: False]
+  --specorder SPECORDER
+              Species order separated by comma. [default: None]
+  --spc SPC
+              Migrating species. [default: None]
 """
 from __future__ import print_function
 
@@ -48,7 +52,7 @@ def cmp(a,b):
 def cmpstr(a,b):
     return cmp(int(a.replace('K','')),int(b.replace('K','')))
 
-def msds2Ds(dirs=[],dim=3,offset=0):
+def msds2Ds(dirs=[],dim=3,offset=0,specorder=[],spc=None):
     from nappy.msd2diff import read_out_msd, msd2D
     if not len(dirs) > 0:
         raise ValueError('Not len(dirs) > 0')
@@ -56,7 +60,7 @@ def msds2Ds(dirs=[],dim=3,offset=0):
     Ts = np.zeros(len(dirs))
     Ds = np.zeros(len(dirs))
     Dstds = np.zeros(len(dirs))
-    fac = 1.0e-16 /1.0e-15 #...A^2/fs to cm^2/s
+    fac = 1.0e-16 /1.0e-15  #...A^2/fs to cm^2/s
     for i,d in enumerate(dirs):
         T = d.replace('K','')
         ts,msds = read_out_msd(d+'/out.msd',offset=offset)
@@ -76,6 +80,15 @@ if __name__ == "__main__":
     offset = int(args['--offset'])
     plot = args['--plot']
     dim = int(args['--dim'])
+    specorder = args['--specorder'].split(',')
+    spc = args['--spc']
+
+    if 'None' in specorder or len(specorder) < 1:
+        raise ValueError('SPECORDER must be set.')
+    if spc == 'None':
+        raise ValueError('SPC must be set.')
+    if spc not in specorder:
+        raise ValueError('SPC must be in SPECORDER')
 
     #...Sort dirs list in numerical order
     # dirs.sort(cmp=lambda x,y: cmp(int(x.replace('K','')), int(y.replace('K',''))),
@@ -93,7 +106,7 @@ if __name__ == "__main__":
     #     Ts[i] = float(T)
     #     Ds[i] = D
     #     Dstds[i] = Dstd
-    Ts,Ds,Dstds = msds2Ds(dirs,dim=dim,offset=offset)
+    Ts,Ds,Dstds = msds2Ds(dirs,dim=dim,offset=offset,specorder=specorder,spc=spc)
 
     with open(outfname,'w') as f:
         f.write('# T [K],       D [cm^2/sec],    sgm(D) [cm^2/sec]\n')

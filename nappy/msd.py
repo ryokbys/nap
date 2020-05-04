@@ -87,7 +87,7 @@ def get_msd(files,ids0,nmeasure,nshift,):
     p0= np.zeros((nmeasure,len(ids),3))
     pp= np.zeros((len(ids),3))
     # msd= np.zeros((len(files),nmeasure,nspc,3))
-    msd= np.zeros((len(files)-(nmeasure-1)*nshift,nmeasure,nspc,3))
+    msd= np.zeros((len(files)-(nmeasure-1)*nshift+1,nmeasure,nspc,3))
     npbc= np.zeros((len(ids),3))
     hmat= np.zeros((3,3))
     for ifile in range(len(files)):
@@ -131,7 +131,7 @@ def get_msd(files,ids0,nmeasure,nshift,):
                     p0[nm,ia,0]= pi[0] +npbc[ia,0]
                     p0[nm,ia,1]= pi[1] +npbc[ia,1]
                     p0[nm,ia,2]= pi[2] +npbc[ia,2]
-                if nm*nshift < ifile < (nm+1)*nshift:
+                if nm*nshift < ifile <= (nm+1)*nshift:
                     #...normalized to absolute
                     dev[0]= pi[0] +npbc[ia,0] -p0[nm,ia,0]
                     dev[1]= pi[1] +npbc[ia,1] -p0[nm,ia,1]
@@ -144,7 +144,7 @@ def get_msd(files,ids0,nmeasure,nshift,):
 
     for ifile in range(len(files)):
         for nm in range(nmeasure):
-            if nm*nshift < ifile < (nm+1)*nshift:
+            if nm*nshift < ifile <= (nm+1)*nshift:
                 msd[ifile-nm*nshift,nm,:,0] /= naps[:]
                 msd[ifile-nm*nshift,nm,:,1] /= naps[:]
                 msd[ifile-nm*nshift,nm,:,2] /= naps[:]

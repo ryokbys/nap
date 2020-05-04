@@ -22,13 +22,18 @@ __author__ = "RYO KOBAYASHI"
 __version__ = "191212"
 
 
-def read_out_msd(fname='out.msd',offset=0):
+def read_out_msd(fname='out.msd',offset=0,specorder=[],spc=None):
+    if specorder == [] or spc not in specorder:
+        index = 1
+    else:
+        index = specorder.index(spc) +1
+        
     with open(fname,'r') as f:
         lines = f.readlines()
     try:
         dname = os.path.dirname(fname)
         dt = dt_from_inpmd(fname=dname+'/in.pmd')
-    except:
+    except Exception as e:
         raise RuntimeError('Failed to read in.pmd.')
     ts = []
     msds = []
@@ -40,10 +45,10 @@ def read_out_msd(fname='out.msd',offset=0):
         data = line.split()
         if il < offset:
             n0 = int(data[0])
-            msd0 = float(data[1])
+            msd0 = float(data[index])
             continue
         n = int(data[0])
-        msd = float(data[1])
+        msd = float(data[index])
         ts.append((n-n0)*dt)
         msds.append(msd-msd0)
     return np.array(ts),np.array(msds)
@@ -79,6 +84,7 @@ def msd2D(ts,msds,fac,dim=3):
     # print(res[0],xvar,np.mean(A[:,0]),len(ts))
     std = np.sqrt(res[0]/len(ts)/xvar) *fac /(2.0*dim)
     return a,b,std
+
 
 if __name__ == "__main__":
 

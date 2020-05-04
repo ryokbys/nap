@@ -816,8 +816,7 @@ You need to specify the species order correctly with --specorder option.
                     if data[1].isdigit():
                         sid = int(data[1])
                         sids[iatm] = sid
-                        if self.specorder:
-                            symbol = self.specorder[sid-1]
+                        symbol = self.specorder[sid-1]
                     else:
                         symbol = data[1]
                         if symbol not in self.specorder:
