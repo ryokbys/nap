@@ -12,10 +12,13 @@ Options:
   -r RCUT     Cutoff radius of the bonding pair. [default: 3.0]
   --gsmear=SIGMA
               Width of Gaussian smearing, zero means no smearing. [default: 0]
+  --specorder=SPECORDER
+              Order of species separated by comma, like, --specorder=Si,O. [default: None]
   --triplets=TRIPLETS
               Triplets whose angles are to be computed. Three species should be specified connected by hyphen,
               and separated by comma, e.g.) P-O-O,Li-O-O. [default: None]
   -o OUT      Output file name [default: out.adf]
+  --out4fp    Flag to write out in general fp.py format. [default: Fault]
   --skip=NSKIP 
               Skip first NSKIP steps from the statistics. [default: 0]
   --no-average
@@ -31,6 +34,9 @@ from docopt import docopt
 from nappy.napsys import NAPSystem
 from nappy.gaussian_smear import gsmear
 from nappy.common import get_key
+
+__author__ = "Ryo KOBAYASHI"
+__version__ = "200505"
 
 def norm(vector):
     norm= 0.0
@@ -122,7 +128,8 @@ def adf(nsys,dang,rcut,triplets):
                 anda[it,iang]= anda[it,iang] +adfa[iang]
     return angd,anda,natm0
 
-def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],no_average=False):
+def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],no_average=False,
+                specorder=None):
     na= int(180.0/dang) +1
     aadf= np.zeros((len(triplets),na),dtype=float)
     nsum= 0
@@ -130,7 +137,7 @@ def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],no_average=False):
         if not os.path.exists(infname):
             print("[Error] File, {0}, does not exist !!!".format(infname))
             sys.exit()
-        nsys= NAPSystem(fname=infname,)
+        nsys= NAPSystem(fname=infname,specorder=specorder)
         print(' File = ',infname)
         angd,df,n= adf(nsys,dang,rcut,triplets)
         aadf += df
@@ -139,6 +146,60 @@ def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],no_average=False):
     if not no_average:
         aadf /= nsum
     return angd,aadf
+
+def write_normal(fname,triplets,na,angd,agr):
+    """
+    Write out ADF data in normal ADF format.
+    """
+    outfile= open(fname,'w')
+    outfile.write('# 1:theta[i], ')
+    for it,t in enumerate(triplets):
+        outfile.write(' {0:d}:{1:s}-{2:s}-{3:s},'.format(it+2,*t))
+    outfile.write('\n')
+    for i in range(na):
+        outfile.write(' {0:10.4f}'.format(angd[i]))
+        for it,t in enumerate(triplets):
+            outfile.write(' {0:11.3e}'.format(agr[it,i]))
+        outfile.write('\n')
+    outfile.close()
+    return None
+
+def write_out4fp(fname,triplets,na,angd,rcut,nperline=6):
+    """
+    Write out ADF data in general fp.py format.
+
+    Parameters
+    ----------
+    nperline : int
+           Number of data in a line. [default: 6]
+    """
+    ndat = na*len(triplets)
+    data = np.zeros(ndat)
+    n = 0
+    for it,tri in enumerate(triplets):
+        for i in range(na):
+            data[n] = agr[it,i]
+            n += 1
+    
+    with open(fname,'w') as f:
+        f.write('# ADF for triplets:')
+        for it,t in enumerate(triplets):
+            f.write(' {0:s}-{1:s}-{2:s},'.format(*t))
+        f.write('\n')
+        f.write('# rcut, na = {0:.3f}, {1:d}\n'.format(rcut,na))
+        f.write('#\n')
+        #...Num of data, weight for the data
+        f.write(' {0:6d}  {1:7.3f}\n'.format(ndat,1.0))
+        j0 = 0
+        while True:
+            f.write('  '.join('{0:12.4e}'.format(data[j]) for j in range(j0,j0+nperline) if j < ndat))
+            f.write('\n')
+            j0 += nperline
+            if j0 >= ndat:
+                break
+
+    return None
+
 
 def plot_figures(angd,agr,triplets):
     import matplotlib.pyplot as plt
@@ -159,11 +220,15 @@ if __name__ == "__main__":
     
     infiles= args['INFILE']
     triplets = args['--triplets']
+    specorder = [ x for x in args['--specorder'].split(',') ]
+    if specorder == ['None']:
+        specorder = []
     if triplets == 'None':
         raise ValueError('Triplets must be specified.')
     triplets = [ t.split('-') for t in triplets.split(',') ]
     if len(triplets) == 0:
         raise ValueError('There must be at least one triplet.')
+    out4fp = args['--out4fp']
     dang= float(args['-w'])
     drad= np.pi *dang/180.0
     rcut= float(args['-r'])
@@ -181,7 +246,8 @@ if __name__ == "__main__":
     na= int(180.0/dang) +1
     angd,agr= adf_average(infiles,dang=dang,
                           rcut=rcut,triplets=triplets,
-                          no_average=no_average)
+                          no_average=no_average,
+                          specorder=specorder)
 
     if not sigma == 0:
         print(' Gaussian smearing...')
@@ -193,16 +259,10 @@ if __name__ == "__main__":
         print('')
         print(' RDF graphes are plotted.')
         print(' Check graph_adf.png')
+
+    if out4fp:
+        write_out4fp(ofname,triplets,na,angd,rcut)
+    else:
+        write_normal(ofname,triplets,na,angd,agr)
         
-    outfile= open(ofname,'w')
-    outfile.write('# 1:theta[i], ')
-    for it,t in enumerate(triplets):
-        outfile.write(' {0:d}:{1:s}-{2:s}-{3:s},'.format(it+2,*t))
-    outfile.write('\n')
-    for i in range(na):
-        outfile.write(' {0:10.4f}'.format(angd[i]))
-        for it,t in enumerate(triplets):
-            outfile.write(' {0:11.3e}'.format(agr[it,i]))
-        outfile.write('\n')
-    outfile.close()
     print(' Wrote '+ofname)

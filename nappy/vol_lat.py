@@ -10,6 +10,7 @@ Options:
   --skip NSKIP
               Skip first NSKIP steps from the statistics. 
               If this is -1, vol and lat of the final step are taken. [default: 0]
+  --out4fp    Flag to write out in general fp.py format. [default: Fault]
   --prefix PREFIX
               Prefix for output files. [default: data.pmd]
 """
@@ -22,8 +23,8 @@ import numpy as np
 from nappy.napsys import NAPSystem
 from nappy.common import get_key
 
-__author__ = "RYO KOBAYASHI"
-__version__ = "rev190906"
+__author__ = "Ryo KOBAYASHI"
+__version__ = "200505"
 
 def nsys2lat(nsys):
     a,b,c = nsys.get_lattice_lengths()
@@ -40,6 +41,7 @@ def main(args):
     nskip = int(args['--skip'])
     del files[:nskip]
     prefix = args['--prefix']
+    out4fp = args['--out4fp']
 
     nsum = 0
     volsum = 0.0
@@ -57,7 +59,7 @@ def main(args):
             betsum += beta
             gmmsum += gamma
             nsum += 1
-        except:
+        except Exception as e:
             print('Failed {0:s} '.format(fi))
             pass
 
@@ -71,12 +73,22 @@ def main(args):
     beta  = betsum/nsum
     gamma = gmmsum/nsum
 
-    with open(prefix+'.vol','w') as f:
-        f.write('{0:15.3f}\n'.format(vol))
-
-    with open(prefix+'.lat','w') as f:
-        f.write(' {0:10.3f} {1:10.3f} {2:10.3f}'.format(a,b,c)
-                +' {0:10.3f} {1:10.3f} {2:10.3f}\n'.format(alpha,beta,gamma))
+    if out4fp:
+        with open(prefix+'.vol','w') as f:
+            f.write('# Volume\n')
+            f.write('     1     1.0\n')
+            f.write('{0:15.3f}\n'.format(vol))
+        with open(prefix+'.lat','w') as f:
+            f.write('# Lattice parameters\n')
+            f.write('     6     1.0\n')
+            f.write(' {0:10.3f} {1:10.3f} {2:10.3f}'.format(a,b,c)
+                    +' {0:10.3f} {1:10.3f} {2:10.3f}\n'.format(alpha,beta,gamma))
+    else:
+        with open(prefix+'.vol','w') as f:
+            f.write('{0:15.3f}\n'.format(vol))
+        with open(prefix+'.lat','w') as f:
+            f.write(' {0:10.3f} {1:10.3f} {2:10.3f}'.format(a,b,c)
+                    +' {0:10.3f} {1:10.3f} {2:10.3f}\n'.format(alpha,beta,gamma))
 
     print(' Wrote {0:s}.vol {0:s}.lat'.format(prefix))
 

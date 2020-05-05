@@ -30,7 +30,7 @@ import time
 from nappy.fitpot.fp2prms import fp2BVSx, fp2BVS, fp2Morse, read_params_Coulomb
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "rev190913"
+__version__ = "200504"
 
 def read_in_fitpot(fname='in.fitpot'):
     #...initialize
@@ -52,6 +52,7 @@ def read_in_fitpot(fname='in.fitpot'):
     infp['interact'] = interact
     infp['rdf_pairs'] = rdf_pairs
     infp['adf_triplets'] = adf_triplets
+    infp['match'] = []
     
     with open(fname,'r') as f:
         lines = f.readlines()
@@ -111,6 +112,12 @@ def read_in_fitpot(fname='in.fitpot'):
             nint = int(data[1])
         elif data[0] == 'sample_error':
             mode = 'sample_error'
+        elif data[0] == 'match':
+            if len(data) < 2:
+                raise RuntimeError('match entry requires at least one keyword.')
+            for i in range(1,len(data)):
+                infp['match'].append(data[i])
+            mode = None
         elif data[0] == 'rdf_match':
             rdf_match = True if data[1] in ('true', 'True', 'T', 'TRUE') else False
             infp['rdf_match'] = rdf_match
@@ -374,6 +381,102 @@ def get_data(basedir,prefix='ref',**kwargs):
             'lat':(a,b,c,alp,bet,gmm)}
     return data
 
+def read_data(fname,):
+    """
+    General routine of reading data.
+    
+    Input file format
+    -----------------
+    ```
+    #  Comment lines begins with '#' or '!'
+    # 
+    10    1.0
+    0.1234  0.2345  0.3456  0.4567  0.5678  0.6789
+    0.7890  0.8901  0.9012  0.0123
+    ```
+    - 1st line:  num of data (NDAT),  weight of the data (WDAT)
+    - 2nd line-: data values (number of data should be equal to NDAT)
+    """
+    if not os.path.exists(fname):
+        raise RuntimeError('File not exsits: ',fname)
+    
+    with open(fname,'r') as f:
+        lines = f.readlines()
+
+    ndat = 0
+    wdat = 0.0
+    data = None
+    idat = 0
+    done = False
+    for line in lines:
+        if line[0] in ('#','!'):
+            continue
+        ldat = line.split()
+        if ndat < 1:
+            ndat = int(ldat[0])
+            wdat = float(ldat[1])
+            data = np.zeros(ndat)
+        else:
+            if data is None:
+                raise RuntimeError('data is None, which should not happen.')
+            for i,d in enumerate(ldat):
+                data[idat] = float(d)
+                idat += 1
+                if idat == ndat:
+                    done = True
+                    break
+        if done:
+            break
+    return {'ndat':ndat, 'wdat':wdat, 'data':data}
+
+def get_data2(basedir,prefix='ref',**kwargs):
+    """
+    New implementation of get_data, which loads data to be used to fit parameters.
+    The prefix should be either ref or pmd.
+    """
+
+    matches = kwargs['match']
+    # print('matches=',matches)
+
+    data = {}
+    for m in matches:
+        fname = basedir+'/data.{0:s}.{1:s}'.format(prefix,m)
+        # print('m,fname=',m,fname)
+        data[m] = read_data(fname,)
+    return data
+
+def loss_func2(pmddata,eps=1.0e-8,**kwargs):
+    """
+    Compute loss function value using general get_data2 func.
+    """
+    refdata = kwargs['refdata']
+    losses = {}
+    L = 0.0
+    for name in refdata.keys():
+        ref = refdata[name]
+        pmd = pmddata[name]
+        wgt = ref['wdat']
+        num = ref['ndat']
+        refd = ref['data']
+        pmdd = pmd['data']
+        z2 = 0.0
+        sumdiff2 = 0.0
+        for n in range(num):
+            # print('n=',n)
+            diff = pmdd[n] -refd[n]
+            sumdiff2 += diff*diff
+            z2 += refd[n]*refd[n]
+        losses[name] = sumdiff2 /(z2+eps)
+        L += losses[name] *wgt
+        
+    if kwargs['print_level'] > 0:
+        print('   iid,losses= {0:8d}'.format(kwargs['iid']),end='')
+        for k in losses.keys():
+            loss = losses[k]
+            print(' {0:10.4f}'.format(loss),end='')
+        print(' {0:11.5f}'.format(L),flush=True)
+    return L
+
 def loss_func(pmddata,**kwargs):
     """
     Compute loss function value from reference and pmd data.
@@ -491,7 +594,7 @@ def func_wrapper(variables, vranges, **kwargs):
         os.mkdir(pmddir)
         shutil.copy(pmdscript,pmddir+'/')
     os.chdir(pmddir)
-    if not 'vids' in kwargs.keys():
+    if 'vids' not in kwargs.keys():
         print(kwargs.keys())
 
     if kwargs['potential'] == 'BVSx':
@@ -508,11 +611,16 @@ def func_wrapper(variables, vranges, **kwargs):
     try:
         cmd = "./{0:s} > log.iid_{1:d}".format(pmdscript,kwargs['iid'])
         # subprocess.run(cmd.split(),check=True)
+        # print('pmddir,cmd=',pmddir,cmd)
         subprocess.run(cmd,shell=True,check=True)
         os.chdir(cwd)
         # print('Going to get_data from ',pmddir)
-        pmddata = get_data(pmddir,prefix='pmd',**kwargs)
-        L = min( loss_func(pmddata,**kwargs), L_up_lim )
+        if len(kwargs['match']) != 0:
+            pmddata = get_data2(pmddir,prefix='pmd',**kwargs)
+            L = min( loss_func2(pmddata,**kwargs), L_up_lim )
+        else:
+            pmddata = get_data(pmddir,prefix='pmd',**kwargs)
+            L = min( loss_func(pmddata,**kwargs), L_up_lim )
     except Exception as e:
         if print_level > 1:
             print('  Since pmd or post-process failed at {0:s}, '.format(pmddir)
@@ -636,13 +744,16 @@ def main(args):
     kwargs['start'] = start
     
     smpldir = infp['sample_directory']
-    refdata = get_data(smpldir,prefix='ref',**kwargs)
-    if kwargs['lat_match']:
-        a0,b0,c0,alp0,bet0,gmm0 = refdata['lat']
-        #...Need to take into account the definition difference bet/ dump and vasp
-        a,b,c,alp,bet,gmm = lat_vasp2dump(a0,b0,c0,alp0,bet0,gmm0)
-        # print('Reference lattice parameters:',a,b,c,alp,bet,gmm)
-        refdata['lat'] = (a,b,c,alp,bet,gmm)
+    if len(infp['match']) != 0:
+        refdata = get_data2(smpldir,prefix='ref',**kwargs)
+    else:
+        refdata = get_data(smpldir,prefix='ref',**kwargs)
+        if kwargs['lat_match']:
+            a0,b0,c0,alp0,bet0,gmm0 = refdata['lat']
+            #...Need to take into account the definition difference bet/ dump and vasp
+            a,b,c,alp,bet,gmm = lat_vasp2dump(a0,b0,c0,alp0,bet0,gmm0)
+            # print('Reference lattice parameters:',a,b,c,alp,bet,gmm)
+            refdata['lat'] = (a,b,c,alp,bet,gmm)
     kwargs['refdata'] = refdata
 
     fbvs, rads, vids, npqs = read_params_Coulomb('in.params.Coulomb')

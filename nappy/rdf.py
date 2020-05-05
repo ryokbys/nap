@@ -15,7 +15,11 @@ Options:
   -o OUT      Output file name. [default: out.rdf]
   --specorder=SPECORDER
               Order of species separated by comma, like, --specorder=W,H. [default: None]
-  --skip=NSKIP 
+  --out4fp    Flag to write out in general fp.py format. [default: Fault]
+  --pairs PAIRS
+              Pairs to be extracted, available only if out4fp is specified.
+              hyphen-connected, comma separated, e.g.) Li-O,P-O [default: None]
+  --skip=NSKIP
               Skip first NSKIP steps from the statistics. [default: 0]
   --no-pairwise
               Not to take averaging by pairwise.
@@ -30,6 +34,9 @@ from docopt import docopt
 from nappy.napsys import NAPSystem
 from nappy.gaussian_smear import gsmear
 from nappy.common import get_key
+
+__author__ = "Ryo KOBAYASHI"
+__version__ = "200505"
 
 def norm(vector):
     norm= 0.0
@@ -144,6 +151,71 @@ def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,pairwise=False):
     agr /= nsum
     return rd,agr
 
+def write_normal(fname,specorder,nspcs,rd,agr,nr):
+    """
+    Write out RDF data in normal RDF format.
+    """
+    outfile= open(fname,'w')
+    outfile.write('# 1:{0:10s}  2:all-all,  '.format('rd[i],'))
+    n = 2
+    for isid in range(1,nspcs+1):
+        si = specorder[isid-1]
+        for jsid in range(isid,nspcs+1):
+        # for jsid in range(1,nspcs+1):
+            sj = specorder[jsid-1]
+            n += 1
+            outfile.write('  {0:d}:{1:s}-{2:s},   '.format(n,si,sj))
+    outfile.write('\n')
+    for i in range(nr):
+        outfile.write(' {0:10.4f} {1:13.5e}'.format(rd[i],agr[0,0,i]))
+        for isid in range(1,nspcs+1):
+            for jsid in range(isid,nspcs+1):
+            # for jsid in range(1,nspcs+1):
+                outfile.write(' {0:12.4e}'.format(agr[isid,jsid,i]))
+        outfile.write('\n')
+    outfile.close()
+    return None
+
+def write_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs,nperline=6):
+    """
+    Write out RDF data in general fp.py format.
+
+    Parameters
+    ----------
+    nperline : int
+           Number of data in a line. [default: 6]
+    """
+    ndat = nr *len(pairs)
+    data = np.zeros(ndat)
+    n = 0
+    for pair in pairs:
+        isid,jsid = pair
+        for i in range(nr):
+            data[n] = agr[isid,jsid,i]
+            n += 1
+
+    with open(fname,'w') as f:
+        f.write('# RDF for pairs: ')
+        for pair in pairs:
+            si = specorder[pair[0]-1]
+            sj = specorder[pair[1]-1]
+            f.write(' {0:s}-{1:s},'.format(si,sj))
+        f.write('\n')
+        f.write('# rmax, nr = {0:.3f}, {1:d}\n'.format(rmax,nr))
+        f.write('#\n')
+        #...Num of data, weight for the data
+        f.write(' {0:6d}  {1:7.3f}\n'.format(ndat, 1.0))
+        j0 = 0
+        while True:
+            f.write('  '.join('{0:12.4e}'.format(data[j]) for j in range(j0,j0+nperline) if j < ndat))
+            f.write('\n')
+            j0 += nperline
+            if j0 >= ndat:
+                break
+
+    return None
+    
+
 def plot_figures(specorder,rd,agr):
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -181,7 +253,7 @@ def plot_figures(specorder,rd,agr):
     plt.savefig("graph_rdfs.png", format='png', dpi=300, bbox_inches='tight')
     return
 
-################################################## main routine
+
 
 if __name__ == "__main__":
 
@@ -195,8 +267,19 @@ if __name__ == "__main__":
     specorder = [ x for x in args['--specorder'].split(',') ]
     if specorder == ['None']:
         specorder = []
-    no_pairwise = args['--no-pairwise']
-    pairwise = not no_pairwise
+    out4fp = args['--out4fp']
+    if out4fp:
+        pairwise = True
+        pairs0 = args['--pairs'].split(',')
+        pairs = []
+        for pair in pairs0:
+            spi,spj = pair.split('-')
+            isid = specorder.index(spi)+1
+            jsid = specorder.index(spj)+1
+            pairs.append((isid,jsid))
+    else:
+        no_pairwise = args['--no-pairwise']
+        pairwise = not no_pairwise
     plot = args['--plot']
     nskip = int(args['--skip'])
 
@@ -223,25 +306,10 @@ if __name__ == "__main__":
                 agrt= gsmear(rd,agr[isid,jsid],sigma)
                 agr[isid,jsid,:] = agrt[:]
 
-    outfile= open(ofname,'w')
-    outfile.write('# 1:{0:10s}  2:all-all,  '.format('rd[i],'))
-    n = 2
-    for isid in range(1,nspcs+1):
-        si = specorder[isid-1]
-        for jsid in range(isid,nspcs+1):
-        # for jsid in range(1,nspcs+1):
-            sj = specorder[jsid-1]
-            n += 1
-            outfile.write('  {0:d}:{1:s}-{2:s},   '.format(n,si,sj))
-    outfile.write('\n')
-    for i in range(nr):
-        outfile.write(' {0:10.4f} {1:13.5e}'.format(rd[i],agr[0,0,i]))
-        for isid in range(1,nspcs+1):
-            for jsid in range(isid,nspcs+1):
-            # for jsid in range(1,nspcs+1):
-                outfile.write(' {0:12.4e}'.format(agr[isid,jsid,i]))
-        outfile.write('\n')
-    outfile.close()
+    if out4fp:
+        write_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs)
+    else:
+        write_normal(ofname,specorder,nspcs,rd,agr,nr)
 
     if plot:
         plot_figures(rd,agr)
