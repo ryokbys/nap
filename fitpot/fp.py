@@ -15,7 +15,7 @@ Options:
   --pmddir-prefix PREFIX
               Prefix for pmd directory. [default: pmddir_]
   --pmd-script SCRIPT
-              Name of script that performs pmd and post-processing. [default: pmd_rdf_adf_vol.sh]
+              Name of script that performs pmd and post-processing. [default: run_pmds.sh]
 """
 from __future__ import print_function
 
