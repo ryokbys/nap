@@ -15,6 +15,9 @@ Options:
               Cutoff energy. [default: None]
   --ediff EDIFF
               Convergence criteria for the energy difference. [default: 1.0e-6]
+  --ediffg EDIFFG
+              Convergence criteria for ionic relaxation. 
+              Negative value for force criterion. [default: -0.05]
   --spin-polarize
               Set spin polarization true. If '--high-spin' is set, this is also set.
   --high-spin 
@@ -132,7 +135,7 @@ def get_magmom_str(high_spin,species=[],natms=[],valences=[]):
     else:
         for i,spcs in enumerate(species):
             n = natms[i]
-            magmom += ' {0:d}*{1:d}'.format(n,0)
+            magmom += ' {0:d}*{1:4.2f}'.format(n,0.1)
     return magmom
 
 def write_KPOINTS(fname,ktype,kpnts):
@@ -146,7 +149,7 @@ def write_KPOINTS(fname,ktype,kpnts):
     return None
 
 def write_INCAR(fname,encut,nbands,break_symmetry,
-                spin_polarized,ediff,
+                spin_polarized,ediff,ediffg,
                 high_spin,species,natms,valences,kpnts,
                 mode=None,nsw=0,isif=2,ismear=0,sigma=0.01):
     from datetime import datetime as dt
@@ -189,7 +192,9 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
         f.write("\n")
         f.write("ENCUT  =  {0:7.3f}\n".format(encut))
         f.write("LREAL  =  Auto  # non-local projectors in real space \n")
-        f.write("EDIFF  =  {0:7.1e}\n".format(ediff))
+        f.write("EDIFF  =  {0:9.1e}\n".format(ediff))
+        if 'relax' in mode:
+            f.write("EDIFFG =  {0:10.2e}\n".format(ediffg))
         f.write("ALGO   =  Very Fast\n")
         f.write("PREC   =  High\n")
         if 'md' in mode:
@@ -299,7 +304,7 @@ def prepare_potcar(poscar,potcar_dir,potcar_postfix=''):
 
 def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
                  potcar_dir,potcar_postfix,
-                 encut=None,ediff=None,
+                 encut=None,ediff=None,ediffg=-0.05,
                  mode=None,nsw=0,isif=None,high_spin=False,
                  ismear=0,sigma=0.01,extra_nbands=1.0):
     print(' Pitch of k points = {0:5.1f}'.format(pitch))
@@ -357,7 +362,7 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
 
     write_KPOINTS(_KPOINTS_name,_KPOINTS_type,kpnts)
     write_INCAR(_INCAR_name,encut,nbands,break_symmetry,
-                spin_polarized,ediff,
+                spin_polarized,ediff,ediffg,
                 high_spin,species,natms,valences,kpnts,
                 mode=mode,nsw=nsw,isif=isif,ismear=ismear,sigma=sigma)
     return None
@@ -378,6 +383,7 @@ if __name__ == '__main__':
     potcar_postfix = args['--potcar-postfix']
     encut = args['--encut']
     ediff = float(args['--ediff'])
+    ediffg = float(args['--ediffg'])
     mode = args['--mode']
     nsw  = int(args['--nsw'])
     isif = int(args['--isif'])
@@ -400,7 +406,7 @@ if __name__ == '__main__':
 
     prepare_vasp(poscar_fname,pitch,leven,spin_polarized,break_symmetry,
                  potcar_dir,potcar_postfix,
-                 encut=encut,ediff=ediff,
+                 encut=encut,ediff=ediff,ediffg=ediffg,
                  mode=mode,nsw=nsw,isif=isif,
                  high_spin=high_spin,
                  ismear=ismear,sigma=sigma,extra_nbands=rextnb)

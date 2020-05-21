@@ -60,10 +60,10 @@ def msds2Ds(dirs=[],dim=3,offset=0,specorder=[],spc=None):
     Ts = np.zeros(len(dirs))
     Ds = np.zeros(len(dirs))
     Dstds = np.zeros(len(dirs))
-    fac = 1.0e-16 /1.0e-15  #...A^2/fs to cm^2/s
+    fac = 1.0e-16 /1.0e-15  # A^2/fs to cm^2/s
     for i,d in enumerate(dirs):
         T = d.replace('K','')
-        ts,msds = read_out_msd(d+'/out.msd',offset=offset)
+        ts,msds = read_out_msd(d+'/out.msd',offset=offset,specorder=specorder,spc=spc)
         D,b,Dstd = msd2D(ts,msds,fac,dim=dim)
         print(' T,D = {0:5d}K, {1:12.4e} +/- {2:12.4e} [cm^2/s]'.format(int(T),D,Dstd))
         Ts[i] = float(T)

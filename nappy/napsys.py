@@ -74,9 +74,10 @@ class NAPSystem(object):
         
         if fname is not None:
             self.read(fname=fname,format=format)
-
-        if ase_atoms is not None:
-            self.from_ase_atoms(ase_atoms)
+        elif ase_atoms is not None:
+            self.load_ase_atoms(ase_atoms)
+        else:
+            pass
 
         return None
 
@@ -247,7 +248,8 @@ class NAPSystem(object):
         """
         try:
             self.atoms.drop(index=list(indices),inplace=True)
-        except Exception:
+            self.atoms.reset_index(drop=True,inplace=True)
+        except Exception as e:
             raise
 
         return None
@@ -1605,8 +1607,9 @@ You need to specify the species order correctly with --specorder option.
             return x
 
     def assign_pbc(self):
+        poss = self.atoms.pos
         for i in range(len(self.atoms)):
-            pi = self.atoms.pos[i]
+            pi = poss[i]
             newpi = np.zeros(3)
             newpi[0] = self._pbc(pi[0])
             newpi[1] = self._pbc(pi[1])
@@ -1875,7 +1878,7 @@ You need to specify the species order correctly with --specorder option.
         cell = ase_atoms.get_cell()
         celli = np.linalg.inv(cell)
         #...Initialize and remake self.specorder
-        if specorder == None:
+        if specorder is None:
             specorder = []
         for s in symbols:
             if s not in specorder:
@@ -1922,6 +1925,8 @@ You need to specify the species order correctly with --specorder option.
         vels = ase_atoms.get_velocities()
         cell = ase_atoms.get_cell()
         celli = np.linalg.inv(cell)
+        if spos is None:
+            raise ValueError('ASE atoms object has no atom in it.')
         #...Initialize and remake self.specorder
         for s in symbols:
             if s not in spcorder:
@@ -1935,7 +1940,10 @@ You need to specify the species order correctly with --specorder option.
         natm = len(ase_atoms)
         sids = [ 0 for i in range(natm) ]
         poss = [ np.array(spos[i]) for i in range(natm) ]
-        vels = [ np.array(vels[i]) for i in range(natm) ]
+        if vels is None:
+            vels = [ np.zeros(3) for i in range(natm) ]
+        else:        
+            vels = [ np.array(vels[i]) for i in range(natm) ]
         frcs = [ np.zeros(3) for i in range(natm) ]
         nsys.init_atoms()
 

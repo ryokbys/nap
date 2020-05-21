@@ -20,6 +20,8 @@ Options:
                 Shift of each staggered lane. [default: 20]
   -o FILENAME   Output filename. [default: out.msd]
   --xyz         Decompose MSD to x,y,z-direction. [default: False]
+  --specorder SPECORDER
+                Species order of the given system, separated by comma. [default: None]
 """
 from __future__ import print_function
 
@@ -49,7 +51,7 @@ def get_ids(nsys,ids):
     return atom_ids
 
     
-def get_msd(files,ids0,nmeasure,nshift,):
+def get_msd(files,ids0,nmeasure,nshift,specorder=None):
     """
     Compute MSD of specified species-ID from sequential structure FILES.
     
@@ -64,13 +66,18 @@ def get_msd(files,ids0,nmeasure,nshift,):
          Number of staggered lanes to compute MSD for better statistics.
     nshift: int
          Number of files to be skipped for each staggered lane.
+    specorder: list
+         Order of species.
 
     Returns
     -------
     msd : Numpy array of dimension, (len(files),nmeasure,3).
     """
-    nsys = NAPSystem(fname=files[0])
-    specorder = copy.copy(nsys.specorder)
+    if specorder is not None:
+        nsys = NAPSystem(fname=files[0],specorder=specorder)
+    else:
+        nsys = NAPSystem(fname=files[0],)
+        specorder = copy.copy(nsys.specorder)
     nspc = len(specorder)
     if ids0 is not None:
         ids = [ i-1 for i in ids0 ]
@@ -95,7 +102,7 @@ def get_msd(files,ids0,nmeasure,nshift,):
         sys.stdout.write('\r{0:5d}/{1:d}: {2:s}'.format(ifile+1,len(files),fname),)
         sys.stdout.flush()
         if ifile != 0:
-            nsys= NAPSystem(fname=fname)
+            nsys= NAPSystem(fname=fname,specorder=specorder)
         poss = nsys.atoms.pos
         sids = nsys.atoms.sid
         
@@ -166,6 +173,11 @@ if __name__ == "__main__":
     nmeasure = int(args['--measure'])
     nshift = int(args['--shift'])
     outfname= args['-o']
+    specorder = args['--specorder']
+    if specorder == 'None' or specorder is None:
+        specorder = None
+    else:
+        specorder = [ s for s in specorder.split(',')]
     xyz = args['--xyz']
     if nmeasure < 2:
         nmeasure = 1
@@ -183,7 +195,7 @@ if __name__ == "__main__":
     # for i in range(len(files)):
     #     print i,files[i]
     
-    msd,specorder = get_msd(files,ids,nmeasure,nshift,)
+    msd,specorder = get_msd(files,ids,nmeasure,nshift,specorder)
 
     #...make output data files
     with open(outfname,'w') as f:
