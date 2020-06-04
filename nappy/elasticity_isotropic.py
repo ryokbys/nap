@@ -15,56 +15,23 @@ Options:
   -d DLTMAX   Max deviation of finite difference. [default: 0.01]
   --mdexec=MDEXEC
               Path to *pmd*. [default: ~/src/nap/pmd/pmd]
-  --relax     Relax internal coordinates. [default: False]
 """
 from __future__ import print_function
 
-import sys,os,commands
+import sys,os
+import subprocess
 import numpy as np
 from docopt import docopt
 from scipy.optimize import curve_fit
+import copy
+from nappy.napsys import NAPSystem
 
 #...constants
-outfname='out.elastic_constants'
-
-def read_pmd():
-    f=open('pmdini','r')
-    #...read 1st line and get current lattice size
-    al= float(f.readline().split()[0])
-    hmat= np.zeros((3,3))
-    hmat[0]= [ float(x) for x in f.readline().split() ]
-    hmat[1]= [ float(x) for x in f.readline().split() ]
-    hmat[2]= [ float(x) for x in f.readline().split() ]
-    f.readline()
-    f.readline()
-    f.readline()
-    natm= int(f.readline().split()[0])
-    f.close()
-    return (al,hmat,natm)
-
-def get_vol(al,hmat):
-    a1= hmat[0:3,0] *al
-    a2= hmat[0:3,1] *al
-    a3= hmat[0:3,2] *al
-    return np.dot(a1,np.cross(a2,a3))
-
-def replace_hmat(hmat):
-    f=open('pmdini','r')
-    ini= f.readlines()
-    f.close()
-    g=open('pmdini','w')
-    for l in range(len(ini)):
-        if l in (1,2,3): #...hmat lines
-            g.write(' {0:15.7f}'.format(hmat[l-1,0]))
-            g.write(' {0:15.7f}'.format(hmat[l-1,1]))
-            g.write(' {0:15.7f}'.format(hmat[l-1,2]))
-            g.write('\n')
-        else:
-            g.write(ini[l])
-    g.close()
+outfname='out.elast_iso'
 
 def quad_func(x,a,b):
     return a *x**2 +b
+
 
 if __name__ == '__main__':
     
@@ -72,7 +39,6 @@ if __name__ == '__main__':
     niter = int(args['-n'])
     dltmax = float(args['-d'])
     mdexec = args['--mdexec']
-    relax = args['--relax']
 
     if niter < 2:
         raise ValueError('NITER {0:d} should be larger than 1.'.format(niter))
@@ -80,13 +46,20 @@ if __name__ == '__main__':
     if niter % 2 == 0:
         niter += 1
 
-    al,hmat0,natm= read_pmd()
+    nsys0 = NAPSystem(fname='pmdini')
+    os.system('cp pmdini pmdini.bak')
+    hmat0 = nsys0.get_hmat()
+    print('Original H-matrix:')
+    print(hmat0)
+    # al,hmat0,natm= read_pmd()
     hmax= np.max(hmat0)
+    print('Maximum in H-matrix elements = ',hmax)
 
     outfile1= open(outfname,'w')
     #...get reference energy
     os.system(mdexec+' > out.pmd')
-    erg0= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
+    erg0 = float(subprocess.check_output("cat erg.pmd",shell=True))
+    #erg0= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
     # print ' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(0.0,erg0,erg0,erg0)
     # outfile1.write(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}\n'.format(0.0,erg0,erg0,erg0))
     dltmin = -dltmax
@@ -98,6 +71,7 @@ if __name__ == '__main__':
     
     #for iter in range(-niter/2,niter/2+1):
     for it in range(niter):
+        nsys = copy.deepcopy(nsys0)
         #dlt= (ddlt*(iter+1))
         if it == niter/2:
             dlts[it] = 0.0
@@ -110,9 +84,10 @@ if __name__ == '__main__':
             #...uniaxial strain for calc C11
             hmat= np.copy(hmat0)
             hmat[0,0]= hmat[0,0] +dh
-            replace_hmat(hmat)
+            nsys.set_hmat(hmat)
+            nsys.write('pmdini')
             os.system(mdexec+' > out.pmd')
-            erg11= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
+            erg11 = float(subprocess.check_output('cat erg.pmd',shell=True))
             dlts[it] = dlt
             e11s[it] = erg11
     
@@ -121,9 +96,10 @@ if __name__ == '__main__':
             hmat[0,0]= hmat[0,0] +dh
             hmat[1,1]= hmat[1,1] -dh
             hmat[2,2]= hmat[2,2] +dh**2/(1.0-dh**2)
-            replace_hmat(hmat)
+            nsys.set_hmat(hmat)
+            nsys.write('pmdini')
             os.system(mdexec+' > out.pmd')
-            erg12= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
+            erg12 = float(subprocess.check_output('cat erg.pmd',shell=True))
             e12s[it] = erg12
     
             #...monoclinic volume-conserving strain for C44
@@ -131,9 +107,10 @@ if __name__ == '__main__':
             hmat[0,1]= hmat[0,1] +dh/2
             hmat[1,0]= hmat[1,0] +dh/2
             hmat[2,2]= hmat[2,2] +dh**2/(4.0-dh**2)
-            replace_hmat(hmat)
+            nsys.set_hmat(hmat)
+            nsys.write('pmdini')
             os.system(mdexec+' > out.pmd')
-            erg44= float(commands.getoutput("grep 'potential energy' out.pmd | tail -n1 | awk '{print $3}'"))        
+            erg44 = float(subprocess.check_output('cat erg.pmd',shell=True))
             e44s[it] = erg44
 
         print(' {0:10.4f} {1:15.7f} {2:15.7f} {3:15.7f}'.format(dlts[it],e11s[it],e12s[it],e44s[it]))
@@ -141,7 +118,7 @@ if __name__ == '__main__':
     outfile1.close()
 
     #...revert pmdini
-    replace_hmat(hmat0)
+    os.system('mv pmdini.bak pmdini')
 
     #...prepare for Murnaghan fitting
     # f= open(outfname,'r')
@@ -162,7 +139,8 @@ if __name__ == '__main__':
     a= 1.0
     b= erg0
     p0= np.array([a,b])
-    vol= get_vol(al,hmat0)
+    # vol= get_vol(al,hmat0)
+    vol = nsys0.volume()
     #...least square fitting
     popt11,pcov11= curve_fit(quad_func,dlts,e11s,p0=p0)
     popt12,pcov12= curve_fit(quad_func,dlts,e12s,p0=p0)

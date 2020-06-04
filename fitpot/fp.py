@@ -14,8 +14,8 @@ Options:
               Number of processes to be used. [default: 1]
   --pmddir-prefix PREFIX
               Prefix for pmd directory. [default: pmddir_]
-  --pmd-script SCRIPT
-              Name of script that performs pmd and post-processing. [default: run_pmds.sh]
+  --subjob-script SCRIPT
+              Name of script that performs MD and post-processing. [default: subjob.sh]
 """
 from __future__ import print_function
 
@@ -740,7 +740,7 @@ def main(args):
     kwargs['triplets'] = triplets
     kwargs['adf_triplets'] = adf_triplets
     kwargs['pmddir-prefix'] = args['--pmddir-prefix']
-    kwargs['pmd-script'] = args['--pmd-script']
+    kwargs['pmd-script'] = args['--subjob-script']
     kwargs['start'] = start
     
     smpldir = infp['sample_directory']

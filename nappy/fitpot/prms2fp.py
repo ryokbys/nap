@@ -184,8 +184,8 @@ def prms_to_fpvars(specorder,prms):
                                 fpvars.append(v)
                                 #...Code specific to angular1 potential
                                 if iv == 2:
-                                    vranges.append((-.5, .5))
-                                    hardlim.append((-.5, .5))
+                                    vranges.append((max(-1.,v-0.5),min(1.0,v+0.5)))
+                                    hardlim.append((-1., 1.))
                                 elif iv == 1:
                                     vranges.append((1., 1.))
                                     hardlim.append((1., 1.))

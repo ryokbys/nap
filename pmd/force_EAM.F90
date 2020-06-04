@@ -1,9 +1,10 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-16 10:31:13 Ryo KOBAYASHI>
+!                     Last modified: <2020-05-29 10:46:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
+  use pmdio, only: csp2isp, nspmax
   implicit none
   save
   character(len=128):: paramsdir = '.'
@@ -13,8 +14,6 @@ module EAM
 
   integer,parameter:: ioprms = 20
   
-!.....Max num of species
-  integer,parameter:: msp = 9
 !.....Number of species
   integer:: nsp = 0
 
@@ -51,35 +50,37 @@ contains
 !  Allocate and initialize parameters to be used.
 !
     if( .not.allocated(ea_a) ) then
-      allocate(ea_a(msp), ea_b(msp,msp), ea_c(msp,msp), &
-           ea_re(msp,msp), ea_alp(msp,msp), ea_beta(msp,msp),&
-           ea_xi(msp), interact(msp,msp), ea_rc(msp,msp),&
-           type_rho(msp,msp),type_frho(msp),type_phi(msp,msp))
+      allocate(ea_a(nspmax), ea_b(nspmax,nspmax), ea_c(nspmax,nspmax), &
+           ea_re(nspmax,nspmax), ea_alp(nspmax,nspmax), ea_beta(nspmax,nspmax),&
+           ea_xi(nspmax), interact(nspmax,nspmax), ea_rc(nspmax,nspmax),&
+           type_rho(nspmax,nspmax),type_frho(nspmax),type_phi(nspmax,nspmax))
     endif
     
   end subroutine init_EAM
 !=======================================================================
-  subroutine read_params_EAM(myid_md,mpi_md_world,iprint)
+  subroutine read_params_EAM(myid_md,mpi_md_world,iprint,specorder)
 !
 !  Read parameters from file
 !
     include 'mpif.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
+    character(len=3),intent(in):: specorder(nspmax)
 
     integer:: isp,jsp,ierr
     real(8):: a,b,c,re,alp,beta,xi,rc
     character(len=128):: cline,fname,c1,c2,c3
+    character(len=3):: cspi,cspj
 
     if( myid_md.eq.0 ) then
-      ea_a(1:msp) = 0d0
-      ea_xi(1:msp) = 0d0
-      ea_b(1:msp,1:msp) = 0d0
-      ea_c(1:msp,1:msp) = 0d0
-      ea_re(1:msp,1:msp) = 0d0
-      ea_alp(1:msp,1:msp) = 0d0
-      ea_beta(1:msp,1:msp) = 0d0
-      ea_rc(1:msp,1:msp) = 0d0
-      interact(1:msp,1:msp) = .false.
+      ea_a(1:nspmax) = 0d0
+      ea_xi(1:nspmax) = 0d0
+      ea_b(1:nspmax,1:nspmax) = 0d0
+      ea_c(1:nspmax,1:nspmax) = 0d0
+      ea_re(1:nspmax,1:nspmax) = 0d0
+      ea_alp(1:nspmax,1:nspmax) = 0d0
+      ea_beta(1:nspmax,1:nspmax) = 0d0
+      ea_rc(1:nspmax,1:nspmax) = 0d0
+      interact(1:nspmax,1:nspmax) = .false.
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
 !!$      print *,'Start reading '//trim(fname)
@@ -94,10 +95,11 @@ contains
         read(ioprms,*) c1
         if( trim(c1).eq.'atomic' ) then
           backspace(ioprms)
-          read(ioprms,*) c1,isp,c2,a,xi
+          read(ioprms,*) c1,cspi,c2,a,xi
+          isp = csp2isp(trim(cspi),specorder)
 !!$          print *, 'isp,c1,a,xi=',isp,trim(c1),a,xi
-          if( isp.gt.msp ) then
-            print *,'Warning @read_params_EAM: isp is greater than msp,' &
+          if( isp.gt.nspmax ) then
+            print *,'Warning @read_params_EAM: isp is greater than nspmax,' &
                  //' skip reading the line'
             cycle
           endif
@@ -107,10 +109,12 @@ contains
 !.....Otherwise the entry is for pair parameter
         else if( trim(c1).eq.'pair' ) then
           backspace(ioprms)
-          read(ioprms,*) c1,isp,jsp,c2,c3,b,c,re,alp,beta,rc
+          read(ioprms,*) c1,cspi,cspj,c2,c3,b,c,re,alp,beta,rc
+          isp = csp2isp(trim(cspi),specorder)
+          jsp = csp2isp(trim(cspj),specorder)
 !!$          print *, 'isp,jsp,b,c,re,alp,beta,rc=',isp,jsp,b,c,re,alp,beta,rc
-          if( isp.gt.msp .or. jsp.gt.msp ) then
-            print *,'Warning @read_params_EAM: isp/jsp is greater than msp,'&
+          if( isp.gt.nspmax .or. jsp.gt.nspmax ) then
+            print *,'Warning @read_params_EAM: isp/jsp is greater than nspmax,'&
                  //' skip reading the line.'
             cycle
           endif
@@ -143,14 +147,14 @@ contains
         print *,''
         write(6,'(a)') ' EAM parameters read from file '//trim(fname) &
              //':'
-        do isp=1,msp
+        do isp=1,nspmax
           if( abs(ea_a(isp)).gt.1d-8 ) then
             write(6,'(a8,i3,a5,2f8.3)') 'atomic',isp, &
                  ea_a(isp),ea_xi(isp)
           endif
         enddo
-        do isp=1,msp
-          do jsp=isp,msp
+        do isp=1,nspmax
+          do jsp=isp,nspmax
             if( interact(isp,jsp) ) then
               write(6,'(a8,2i3,6f8.3)') 'pair',isp,jsp &
                    ,ea_b(isp,jsp),ea_c(isp,jsp) &
@@ -163,16 +167,16 @@ contains
       endif
     endif  ! myid_md == 0
 
-    call mpi_bcast(ea_a,msp,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_xi,msp,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_a,nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_xi,nspmax,mpi_real8,0,mpi_md_world,ierr)
 
-    call mpi_bcast(ea_b,msp*msp,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_c,msp*msp,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_re,msp*msp,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_alp,msp*msp,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_beta,msp*msp,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_rc,msp*msp,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_b,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_c,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_re,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_alp,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_beta,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_rc,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
 
   end subroutine read_params_EAM
 !=======================================================================
@@ -215,15 +219,15 @@ contains
       stop
     endif
 
-    ea_a(1:msp) = 0d0
-    ea_xi(1:msp) = 0d0
+    ea_a(1:nspmax) = 0d0
+    ea_xi(1:nspmax) = 0d0
     
-    ea_b(1:msp,1:msp) = 0d0
-    ea_c(1:msp,1:msp) = 0d0
-    ea_re(1:msp,1:msp) = 0d0
-    ea_alp(1:msp,1:msp) = 0d0
-    ea_beta(1:msp,1:msp) = 0d0
-    interact(1:msp,1:msp) = .false.
+    ea_b(1:nspmax,1:nspmax) = 0d0
+    ea_c(1:nspmax,1:nspmax) = 0d0
+    ea_re(1:nspmax,1:nspmax) = 0d0
+    ea_alp(1:nspmax,1:nspmax) = 0d0
+    ea_beta(1:nspmax,1:nspmax) = 0d0
+    interact(1:nspmax,1:nspmax) = .false.
 
     inc = 0
     do is=1,nsp
@@ -296,8 +300,8 @@ contains
       allocate(rho(namax+nbmax))
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
-      do is=1,msp
-        do js=is,msp
+      do is=1,nspmax
+        do js=is,nspmax
           if( .not.interact(is,js) ) cycle
           if( rc.lt.ea_rc(is,js) ) then
             if( myid_md.eq.0 ) then
@@ -449,6 +453,7 @@ contains
     real(8):: rhoij
     real(8),external:: fcut1
 
+    rhoij = 0d0
     if( trim(ctype).eq.'exp1' ) then
       rhoij = ea_xi(is)*exp(-ea_beta(is,js)*(rij-ea_re(is,js))) &
            *fcut1(rij,0d0,ea_rc(is,js))
@@ -462,7 +467,8 @@ contains
     character(len=*),intent(in):: ctype 
     real(8):: drhoij
     real(8):: r
-    
+
+    drhoij = 0d0
     if( trim(ctype).eq.'exp1' ) then
       r = rij -ea_re(is,js)
       drhoij= -ea_xi(is)*ea_beta(is,js)*exp(-ea_beta(is,js)*r)&
@@ -509,7 +515,8 @@ contains
     character(len=*),intent(in):: ctype 
     real(8):: phi
     real(8):: r
-    
+
+    phi = 0d0
     if( trim(ctype).eq.'SM' ) then
       r = rij -ea_re(is,js)
       phi = 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &
@@ -528,6 +535,7 @@ contains
     real(8):: dphi,tmp
     real(8):: r
 
+    dphi = 0d0
     if( trim(ctype).eq.'SM' ) then
       r = rij -ea_re(is,js)
 !!$      dphi = 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-03-09 12:19:34 Ryo KOBAYASHI>
+!                     Last-modified: <2020-05-29 10:25:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -2534,7 +2534,7 @@ function bbd(xv,yv,zv,rcav,rcbv,rccv,ku,anxi,anyi,anzi)
 !-----------------------------------------------------------------------
   implicit real*8(a-h,o-z)
   logical:: bbd
-
+  bbd = .false.
   if (ku.eq.1) then
     bbd = xv.lt.rcav
   else if (ku.eq.2) then
@@ -2558,8 +2558,8 @@ function bmv(xv,yv,zv,ku,anxi,anyi,anzi)
 !  BMV = .true. if the coordinates should belong to neighbor ku
 !------------------------------------------------------------------------
   implicit real*8(a-h,o-z)
-  logical bmv
-
+  logical:: bmv
+  bmv = .false.
   if (ku.eq.1) then
     bmv = xv.lt.0d0
   else if (ku.eq.2) then

@@ -125,7 +125,7 @@ contains
 
     integer:: i,j,k,l,m,n,ierr,is,ixyz,jxyz
     real(8):: xij(3),rij(3),dij,dij2,dfi,dfj,drhoij,drdxi(3),drdxj(3) &
-         ,r,dphi,at(3),xi(3),xj(3),epotl,epott,tmp
+         ,r,dphi,at(3),xi(3),xj(3),epotl,epott,tmp,sji
 !.....Saved variables
     real(8),allocatable,save:: rho(:)
     real(8),allocatable,save:: strsl(:,:,:)
@@ -148,7 +148,7 @@ contains
 
     epotl= 0d0
     rho(1:natm)= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    strsl(1:3,1:3,1:natm) = 0d0
 
 !-----rho(i)
     do i=1,natm
@@ -199,10 +199,9 @@ contains
 !.....Atomic stress of 2-body terms
         do ixyz=1,3
           do jxyz=1,3
-            strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                 -0.5d0*dphi*rij(ixyz)*(-drdxi(jxyz))
-            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                 -0.5d0*dphi*rij(ixyz)*(-drdxi(jxyz))
+            sji = -dphi*drdxi(ixyz)*(-rij(jxyz)) *0.5d0
+            strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) +sji
+            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) +sji
           enddo
         enddo
 !.....Embeded term
@@ -214,10 +213,9 @@ contains
 !.....Atomic stress of many-body contributions
         do ixyz=1,3
           do jxyz=1,3
-            strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                 -0.5d0*tmp*rij(ixyz)*(-drdxi(jxyz))
-            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                 -0.5d0*tmp*rij(ixyz)*(-drdxi(jxyz))
+            sji = -tmp*drdxi(ixyz)*(-rij(jxyz)) *0.5d0
+            strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) +sji
+            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) +sji
           enddo
         enddo
       enddo

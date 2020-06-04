@@ -4,7 +4,7 @@ Calculate elastic constants C_ij by least square fitting
 using Green-Lagrange deformation tensors, which is the same
 scheme as materialsproject.org does.
 
-PREPARE mode creates directories and POSCARs to be computed.
+PREPARE mode creates directories and POSCAR files to be computed.
 ANALYZE mode reads the stress values obtained by some code.
 
 Usage:
@@ -14,9 +14,9 @@ Usage:
 Options:
   -h, --help  Shows this message and exit.
   --delta1 DELTA1
-              Maximum strain value of diagonal elements. [default: 0.002]
+              Maximum strain value of diagonal elements. Available only with prepare. [default: 0.002]
   --delta2 DELTA2
-              Maximum strain value of off-diagonal elements. [default: 0.01]
+              Maximum strain value of off-diagonal elements. Available only with prepare. [default: 0.01]
 """
 from __future__ import print_function
 
@@ -25,19 +25,20 @@ import numpy as np
 from docopt import docopt
 from scipy.optimize import curve_fit
 import spglib
+import yaml
 
 from ase.io import read
 from nappy.napsys import NAPSystem
+import copy
 
 __author__  = 'Ryo KOBAYASHI'
-__version__ = '170308'
+__version__ = '200521'
 __licence__ = 'MIT'
 
-_confname = 'conf.elastic_constants.json'
+_confname = 'conf.elast.yaml'
 
 #...constants
-_outfname = 'out.elasticity'
-_prefix = 'elasticity_'
+_prefix = 'elast_'
 
 def quad_func(x,a,b):
     return a *x**2 +b
@@ -72,7 +73,9 @@ def get_deformations(dlt1max,dlt2max):
 def prepare(infname='POSCAR',dlt1max=0.01,dlt2max=0.06):
 
     #...original system
-    orig_atoms = read(infname,format='vasp')
+    nsys0 = NAPSystem(fname=infname)
+    #orig_atoms = read(infname,format='vasp')
+    orig_atoms = nsys0.to_ase_atoms()
 
     #...get deformations
     fmats = get_deformations(dlt1max,dlt2max)
@@ -80,12 +83,14 @@ def prepare(infname='POSCAR',dlt1max=0.01,dlt2max=0.06):
     #...deform original system and save to _prefix_##/POSCAR
     for i,fmat in enumerate(fmats):
         atoms = orig_atoms.copy()
+        #nsys = copy.deepcopy(nsys0)
         dname = _prefix +"{0:02d}".format(i)
         os.system('mkdir -p {}'.format(dname))
         print(dname)
         cell0 = atoms.get_cell()
         emat = 0.5 *(np.dot(fmat.T,fmat) -np.identity(3)) +np.identity(3)
         cell = np.dot(emat,cell0)
+        #print(i,emat,cell)
         # cell = np.dot(cell0,fmat.T)
         atoms.set_cell(cell,scale_atoms=True)
         atoms.write(dname+'/POSCAR',format='vasp',vasp5=True,direct=True,
@@ -218,7 +223,7 @@ def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
 
     #...original system
     atoms0 = read(infname,format='vasp')
-    
+
     #...get deformations
     fmats = get_deformations(dlt1max,dlt2max)
     strns = []
@@ -242,7 +247,7 @@ def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
             with open(dname+'/'+strsfname,'r') as f:
                 data = f.readline().split()
                 strss[i] = np.array([ float(d) for d in data ])
-        except:
+        except Exception as e:
             raise
 
     #...parameters 21 elements
@@ -258,18 +263,18 @@ def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
     # perr = np.sqrt(np.diag(covar))
     # print('std dev = ',perr)
 
-    print('delta1_max = {0:8.5f}'.format(dlt1max))
-    print('delta2_max = {0:8.5f}'.format(dlt2max))
+    print(' delta1_max = {0:8.5f}'.format(dlt1max))
+    print(' delta2_max = {0:8.5f}'.format(dlt2max))
     print('')
 
-    print('C_ij [GPa]:')
+    print(' C_ij [GPa]:')
     for i in range(6):
         for j in range(6):
             print(' {0:10.3f}'.format(ctnsr[i,j]),end='')
         print('')
 
     cij = reduce_cij(atoms0,ctnsr)
-    print('C_ij [GPa]:')
+    print(' C_ij [GPa]:')
     for i in range(6):
         for j in range(6):
             print(' {0:10.3f}'.format(ctnsr[i,j]),end='')
@@ -279,31 +284,43 @@ def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
 
 def some_moduli(cij):
     sij = np.linalg.inv(cij)
-    c112233 = cij[0,0]+cij[1,1]+cij[2,2]
-    c122331 = cij[0,1]+cij[0,2]+cij[1,2]
-    c445566 = cij[3,3]+cij[4,4]+cij[5,5]
-    s112233 = sij[0,0]+sij[1,1]+sij[2,2]
-    s122331 = sij[0,1]+sij[0,2]+sij[1,2]
-    s445566 = sij[3,3]+sij[4,4]+sij[5,5]
-    kv = (c112233 +2.0*c122331)/9
-    kr = 1.0/(s112233 +2.0*(s122331))
-    gv = (c112233 -c122331 +3.0*c445566)/15
-    gr = 15.0 /(4.0*s112233 -4.0*s122331 +3.0*s445566)
+    c123 = cij[0,0]+cij[1,1]+cij[2,2]
+    c231 = cij[0,1]+cij[0,2]+cij[1,2]
+    c456 = cij[3,3]+cij[4,4]+cij[5,5]
+    s123 = sij[0,0]+sij[1,1]+sij[2,2]
+    s231 = sij[0,1]+sij[0,2]+sij[1,2]
+    s456 = sij[3,3]+sij[4,4]+sij[5,5]
+    kv = (c123 +2.0*c231)/9
+    kr = 1.0/(s123 +2.0*(s231))
+    gv = (c123 -c231 +3.0*c456)/15
+    gr = 15.0 /(4.0*s123 -4.0*s231 +3.0*s456)
     kvrh = (kv+kr)/2
     gvrh = (gv+gr)/2
     prto2 = (3.0*kvrh -2.0*gvrh)/(6.0*kvrh +2.0*gvrh)
 
     print('')
-    # print(' Definition of the following values, see ' \
-    #     +'https://materialsproject.org/wiki/index.php/Elasticity_calculations')
-    # print(' K_V   = {0:10.3f} GPa'.format(kv))
-    # print(' K_R   = {0:10.3f} GPa'.format(kr))
-    # print(' G_V   = {0:10.3f} GPa'.format(gr))
-    # print(' G_R   = {0:10.3f} GPa'.format(gv))
-    print(' Bulk modulus    = {0:10.3f} GPa'.format(kvrh))
-    print(' shear modulus   = {0:10.3f} GPa'.format(gvrh))
-    print(' Poisson\'s ratio = {0:10.3f}'.format(prto2))
-    
+    print(' Bulk modulus (K)      = {0:10.3f} GPa'.format(kvrh))
+    print(' shear modulus (G)     = {0:10.3f} GPa'.format(gvrh))
+    print(' Poisson\'s ratio (nu) = {0:10.3f}'.format(prto2))
+    print('')
+    print(' Definition of elastic moduli, see ' \
+        +'https://materialsproject.org/wiki/index.php/Elasticity_calculations')
+    txt = """   c123 = c11 +c22 +c33  = {0:10.3f}
+   c231 = c12 +c13 +c23  = {1:10.3f}
+   c456 = c44 +c55 +c66  = {2:10.3f}
+   s123 = s11 +s22 +s33  = {3:10.3f}
+   s231 = s12 +s13 +s23  = {4:10.3f}
+   s456 = s44 +s55 +s66  = {5:10.3f}
+   Kv   = (c123 +2*c231)/9  = {6:10.3f}
+   Kr   = 1.0 /(c123 +2*s231)  = {7:10.3f}
+   Gv   = (c123 -c231 +3*c456)/15  = {8:10.3f}
+   Gr   = 15.0 /(4.0*s123 -4.0*s231 +3.0*s456)  = {9:10.3f}
+   K    = (Kv +Kr)/2
+   G    = (Gv +Gr)/2
+   nu   = (3*K -2*G)/(6*K +2*G)
+""".format(c123,c231,c456,s123,s231,s456,kv,kr,gv,gr)
+    print(txt)
+
 
 def reduce_cij(atoms0,cij0,eps=1.e-4):
     """
@@ -313,12 +330,11 @@ def reduce_cij(atoms0,cij0,eps=1.e-4):
 
     cij = cij0
     symdata = spglib.get_symmetry_dataset(atoms0)
-    napsys = NAPSystem(ase_atoms=atoms0)
+    nsys = NAPSystem(ase_atoms=atoms0)
     sgnum = symdata['number']
-    print('Spacegroup number = ',sgnum,' ==> ',end='')
     
-    a,b,c = napsys.get_lattice_lengths()
-    alpha,beta,gamma = napsys.get_lattice_angles()
+    a,b,c = nsys.get_lattice_lengths()
+    alpha,beta,gamma = nsys.get_lattice_angles()
 
     aeqb = abs(a-b) < eps*min(a,b)
     beqc = abs(b-c) < eps*min(b,c)
@@ -328,6 +344,7 @@ def reduce_cij(atoms0,cij0,eps=1.e-4):
     bteqpi2 = abs(beta -np.pi/2) < eps*np.pi/2
     gmeqpi2 = abs(gamma-np.pi/2) < eps*np.pi/2
 
+    print('Spacegroup number = ',sgnum,' ==> ',end='')
     if 0 < sgnum <= 2:  # Triclinic
         print('Triclinic')
         pass
@@ -384,10 +401,10 @@ def reduce_cij(atoms0,cij0,eps=1.e-4):
 
     return cij
 
+
 if __name__ == '__main__':
 
     args= docopt(__doc__,version=__version__)
-    
     dlt1max = float(args['--delta1'])
     dlt2max = float(args['--delta2'])
 
@@ -395,6 +412,18 @@ if __name__ == '__main__':
     
     if args['prepare']:
         prepare(infname,dlt1max=dlt1max,dlt2max=dlt2max)
+        # overwrite conf.elast.yaml file
+        conf = {'delta1':dlt1max, 'delta2':dlt2max}
+        with open(_confname,'w') as f:
+            f.write(yaml.dump(conf,default_flow_style=False))
     elif args['analyze']:
+        try:
+            with open(_confname,'r') as f:
+                conf = yaml.safe_load(f)
+        except Exception as e:
+            raise
+        #print('conf=',conf)
+        dlt1max = conf['delta1']
+        dlt2max = conf['delta2']
         strsfname = args['STRSFILE']
         analyze(infname,strsfname,dlt1max=dlt1max,dlt2max=dlt2max)

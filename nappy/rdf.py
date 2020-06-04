@@ -309,7 +309,7 @@ if __name__ == "__main__":
     if out4fp:
         write_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs)
     else:
-        write_normal(ofname,specorder,nspcs,rd,agr,nr)
+        write_normal(ofname,specorder,nspcs,rd,agr,nr,)
 
     if plot:
         plot_figures(rd,agr)

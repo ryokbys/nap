@@ -389,7 +389,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   if( use_force('EAM') ) then
     call init_EAM()
     if( .not.lprmset_EAM ) then
-      call read_params_EAM(myid_md,mpi_md_world,iprint)
+      call read_params_EAM(myid_md,mpi_md_world,iprint,specorder)
     else
 !.....This code is not parallelized, and only for fitpot
       call update_params_EAM()
