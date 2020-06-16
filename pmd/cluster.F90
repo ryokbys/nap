@@ -1,0 +1,260 @@
+program cluster_analysis
+!-----------------------------------------------------------------------
+!                     Last-modified: <2020-06-16 18:53:55 Ryo KOBAYASHI>
+!-----------------------------------------------------------------------
+! Cluster analysis program.
+! The cluster analysis is usually performed for large scale systems.
+! The computational efficiency is an important issure in this case
+! and python program is usually very slow. So here we make a fortran
+! program of cluster analysis.
+!-----------------------------------------------------------------------
+! INPUT:
+! ------
+!   - in.cluster:    Main input file for `cluster` program
+!   - pmdini:        Structure file.
+!
+! OUTPUT:
+! -------
+!   - STDOUT
+!-----------------------------------------------------------------------
+  use pmdio
+  implicit none
+  include 'mpif.h'
+  integer,parameter:: maxpair = 5
+  character(len=20),parameter:: cfinput='in.cluster'
+
+  integer:: ia,ic,nc,maxnn,is,js,msp,inc,ict,i,ib,l
+  integer,allocatable:: ictot(:),nacs(:),lspr(:,:),ls1nn(:,:)&
+       ,icouts(:)
+  logical:: lpair(nspmax,nspmax),lspc(nspmax)
+  real(8):: rcut,outthd,hi(3,3),t0,tmp
+  character(len=20):: cnum
+
+  t0 = mpi_wtime()
+
+!.....Read atom configuration
+  call read_pmdtot_ascii(10,trim(cpmdini))
+  call get_hi(h,hi)
+
+!.....Read input
+  rcut = 3.0d0
+  outthd = 10
+  call read_in_cluster(11,trim(cfinput),maxpair,rcut,lpair,outthd)
+
+!.....Make neighbor list
+  allocate(lspr(0:nnmax,ntot),ls1nn(0:nnmax,ntot))
+  call mk_lspr_sngl(ntot,ntot,nnmax,tagtot,rtot,rcut,rcut,h,hi, &
+       lspr,ls1nn,iprint,.true.)
+  maxnn = 0
+  msp = 0
+  do ia=1,ntot
+    maxnn = max(maxnn,lspr(0,ia))
+    msp = max(msp,int(tagtot(ia)))
+  enddo
+  print *,'Max num of neighbors = ',maxnn
+  print *,'Max species ID = ',msp
+
+  lspc(:) = .false.
+  do is=1,nspmax
+    do js=1,nspmax
+      if( lpair(is,js) ) then
+        lspc(is) = .true.
+        exit
+      endif
+    enddo
+  enddo
+
+!.....Perform cluster analysis
+  tmp = mpi_wtime()
+  allocate(ictot(ntot))
+  ictot(:) = 0
+  print *,'clustering'
+  call clustering(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
+  print '(a,f0.3)',' Time for clustering = ',mpi_wtime()-tmp
+
+!.....Output report
+  allocate(nacs(nc))
+  nacs(:) = 0
+  do ia=1,ntot
+    is = int(tagtot(ia))
+    if( .not.lspc(is) ) cycle
+    ic = ictot(ia)
+    nacs(ic) = nacs(ic) + 1
+  enddo
+!.....Out pmdini_ic of cluster size larger than the threshold
+  allocate(icouts(nc))
+  icouts(:) = -1
+  inc = 0
+  do ic=1,nc
+    if( nacs(ic).gt.outthd ) then
+      inc = inc + 1
+      icouts(inc) = ic
+      print *,'ic,nac = ',ic,nacs(ic)
+    endif
+  enddo
+  do ict=1,inc
+    ic = icouts(ict)
+    write(cnum,'(i0)') ic
+    open(20,file='pmdini_'//trim(cnum),status='replace')
+    write(20,'(a)') '!'
+    write(20,'(a,9(2x,a))') '!  specorder: ',(trim(specorder(i)),i=1,msp)
+    write(20,'(a)') '!'
+    write(20,'(es23.14e3)') hunit
+    write(20,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3) &
+         ,ib=1,3),l=0,1)
+    write(20,'(i10)') nacs(ic)
+    do ia=1,ntot
+      if( ictot(ia).eq.ic ) then
+        write(20,'(7es23.14e3,11es13.4e3)') tagtot(ia) &
+             ,rtot(1:3,ia),vtot(1:3,ia)    ! dt
+      endif
+    enddo
+    close(20)
+  enddo
+
+  print '(a,f0.3)',' Time = ',mpi_wtime() -t0
+
+end program cluster_analysis
+!=======================================================================
+subroutine read_in_cluster(ionum,cfname,maxpair,rcut,lpair,outthd)
+!-----------------------------------------------------------------------
+!  The input format should be like the following.
+!-----------------------------------------------------------------------
+!  rcut   3.0
+!  pairs  Si-Si Si-O
+!  out_threshold   10
+!-----------------------------------------------------------------------
+  use pmdio
+  use util, only: num_data
+  implicit none 
+  integer,intent(in):: ionum,maxpair
+  character(len=*),intent(in):: cfname
+  real(8),intent(out):: rcut,outthd
+  logical,intent(out):: lpair(nspmax,nspmax)
+
+  integer:: i,nentry,isp1,isp2,npair
+  character(len=128):: c1st,cline
+  character(len=7):: cpairs(maxpair)
+  character(len=3):: csp1,csp2
+
+!.....Set initial lpair as all False
+  lpair(:,:) = .false.
+
+  open(ionum,file=trim(cfname),status='old')
+  do
+    read(ionum,'(a)',end=1) cline
+    nentry = num_data(cline,' ')
+    if( nentry.eq.0 ) cycle
+    if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
+    read(cline,*) c1st
+    if( trim(c1st).eq.'rcut' ) then
+      if( nentry.ne.2 ) then
+        print *,'ERROR: nentry != 2 !!!'
+        stop 1
+      endif
+      read(cline,*) c1st, rcut
+    else if( trim(c1st).eq.'pairs' ) then
+      npair = nentry -1
+      read(cline,*) c1st, (cpairs(i),i=1,npair)
+!.....Convert cpairs to lpair
+      do i=1,npair
+        call split_pair(cpairs(i),csp1,csp2)
+        isp1 = csp2isp(csp1,specorder)
+        isp2 = csp2isp(csp2,specorder)
+        lpair(isp1,isp2) = .true.
+        lpair(isp2,isp1) = .true.  ! symmetrize
+      enddo
+    else if( trim(c1st).eq.'out_threshold' ) then
+      read(cline,*) c1st, outthd
+    endif
+  end do
+1 close(ionum)
+
+  print *,' Read '//trim(cfname)
+  
+end subroutine read_in_cluster
+!=======================================================================
+subroutine get_hi(h,hi)
+  implicit none 
+  real(8),intent(in):: h(3,3)
+  real(8),intent(out):: hi(3,3)
+
+  integer:: i,j,im,ip,jm,jp
+  real(8):: vol,sgm(3,3),hit(3,3)
+
+!-----cofactor matrix, SGM
+  do j=1,3
+    jm=mod(j+1,3)+1
+    jp=mod(j,  3)+1
+    do i=1,3
+      im=mod(i+1,3)+1
+      ip=mod(i,  3)+1
+      sgm(i,j)=h(ip,jp)*h(im,jm)-h(im,jp)*h(ip,jm)
+    enddo
+  enddo
+!-----MD-box volume
+  vol=h(1,1)*sgm(1,1)+h(2,1)*sgm(2,1)+h(3,1)*sgm(3,1)
+  do j=1,3
+    do i=1,3
+      hit(i,j)= sgm(i,j)/vol
+    enddo
+  enddo
+!-----transpose
+  do j=1,3
+    do i=1,3
+      hi(i,j)= hit(j,i)
+    enddo
+  enddo
+  return
+end subroutine get_hi
+!=======================================================================
+subroutine clustering(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
+!
+!  Clustering using the neighbor list.
+!
+  implicit none 
+  integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),nspmax
+  logical,intent(in):: lpair(nspmax,nspmax),lspc(nspmax)
+  real(8),intent(in):: tagtot(ntot)
+  integer,intent(out):: ictot(ntot),nc
+
+  integer:: is,js,ic,ia
+
+  ic = 0
+  do ia=1,ntot
+    is = int(tagtot(ia))
+    if( .not.lspc(is) ) cycle
+    if( ictot(ia).ne.0 ) cycle
+    ic = ic +1
+!!$    print *,'ic,ia = ',ic,ia
+    call neighbor_connection(ntot,ictot,tagtot,nnmax,lspr,nspmax,lpair,ia,is,ic)
+  end do
+
+  nc = ic
+
+  return
+end subroutine clustering
+!=======================================================================
+recursive subroutine neighbor_connection(ntot,ictot,tagtot,nnmax,lspr,nspmax,&
+     lpair,ia,is,ic)
+  integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),nspmax,ia,is,ic
+  logical,intent(in):: lpair(nspmax,nspmax)
+  real(8),intent(in):: tagtot(ntot)
+  integer,intent(inout):: ictot(ntot)
+
+  ictot(ia) = ic
+  
+  do jj=1,lspr(0,ia)
+    ja = lspr(jj,ia)
+    js = int(tagtot(ja))
+    if( lpair(is,js) .and. ictot(ja).eq.0 ) then
+!!$      print *,'ia,ja,is,js = ',ia,ja,is,js
+      call neighbor_connection(ntot,ictot,tagtot,nnmax,lspr,nspmax,lpair,ja,js,ic)
+    endif
+  enddo
+  return
+end subroutine neighbor_connection
+!-----------------------------------------------------------------------
+!     Local Variables:
+!     compile-command: "make cluster"
+!     End:

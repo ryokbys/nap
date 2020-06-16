@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-03-30 18:50:55 Ryo KOBAYASHI>
+!                     Last modified: <2020-06-16 18:24:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -636,6 +636,25 @@ contains
     enddo
     return
   end function csp2isp
+!=======================================================================
+  subroutine split_pair(strin,str1,str2)
+!
+!  Split the input string of a pair connected by hyphen, e.g.) Si-O,
+!  as separated strings, str1=Si, str=O.
+!
+    character(len=*),intent(in):: strin
+    character(len=*),intent(out):: str1,str2
+
+    character(len=1),parameter:: delim='-'
+
+    integer:: l,ind
+
+    l = len_trim(strin)
+    ind = index(strin,delim)
+    str1 = strin(1:ind-1)
+    str2 = strin(ind+1:l)
+    return
+  end subroutine split_pair
 !=======================================================================
   subroutine make_cdumpauxarr()
 !

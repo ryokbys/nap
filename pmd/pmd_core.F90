@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-05-29 10:25:37 Ryo KOBAYASHI>
+!                     Last-modified: <2020-06-05 20:07:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -453,7 +453,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     write(6,*) ''
 
 !!$    print '(a,20f8.5)',' alphas=',ol_alphas(0,1:natm)
-    if( tave.gt.10000d0 ) cftave = 'es12.4'
+    if( tave.gt.100000d0 ) cftave = 'es12.4'
     tcpu = mpi_wtime() -tcpu0
     write(6,'(a,'//cfistp//','//cfetime//','//cftave &
          //',es13.4,2es11.3)') &

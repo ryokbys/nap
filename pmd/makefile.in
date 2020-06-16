@@ -52,6 +52,8 @@ params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 	params_Mishin_Al.h params_Mishin_Ni.h params_AFS_W.h params_SC_Fe.h \
 	params_SM_Al.h
 
+clstr= mod_pmdio.o mod_util.o util_vec.o mk_lspr.o cluster.o
+
 #-----------------------------------------------------------------------
 # Post process programs
 #
@@ -85,6 +87,9 @@ cna2disl: cna2disl.o
 
 rdpmd: read_pmd.o ${mods}
 	${MPIFC} ${MPIFLAGS} -o $@ read_pmd.o ${mods}
+
+cluster: ${clstr}
+	${MPIFC} ${MPIFLAGS} -o $@ ${clstr}
 
 # boxsize: change_pmd_boxsize.o ${mods} util_pmd.o
 # 	${MPIFC} ${MPIFLAGS} -o $@ change_pmd_boxsize.o ${mods} util_pmd.o

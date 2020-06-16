@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-04-08 18:51:37 Ryo KOBAYASHI>
+!                     Last modified: <2020-06-10 18:16:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax, csp2isp
   integer,parameter:: ioprms = 50
@@ -262,7 +262,7 @@ contains
             print *,' Angular parameter read but not used: cspi,cspj,cspk='&
                  ,cspi,cspj,cspk
           endif
-        endif
+        endif  ! ctype
       enddo
 10    close(ioprms)
       
