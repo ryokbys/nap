@@ -1,6 +1,6 @@
 program cluster_analysis
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-06-17 12:08:27 Ryo KOBAYASHI>
+!                     Last-modified: <2020-06-17 13:42:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Cluster analysis program.
 ! The cluster analysis is usually performed for large scale systems.
@@ -23,9 +23,9 @@ program cluster_analysis
   integer,parameter:: maxpair = 5
   character(len=20),parameter:: cfinput='in.cluster'
 
-  integer:: ia,ic,nc,maxnn,is,js,msp,inc,ict,i,ib,l
+  integer:: ia,ic,nc,maxnn,is,js,msp,inc,ict,i,ib,l,n,nacmax
   integer,allocatable:: ictot(:),nacs(:),lspr(:,:),ls1nn(:,:)&
-       ,icouts(:)
+       ,icouts(:),nhist(:)
   logical:: lpair(nspmax,nspmax),lspc(nspmax),lrecur
   real(8):: rcut,outthd,hi(3,3),t0,tmp
   character(len=20):: cnum
@@ -78,18 +78,34 @@ program cluster_analysis
   endif
   print '(a,f0.3)',' Time for clustering = ',mpi_wtime()-tmp
 
-!.....Output report
+!.....Comp num of atoms in each cluster
   allocate(nacs(nc))
   nacs(:) = 0
   do ia=1,ntot
     is = int(tagtot(ia))
     if( .not.lspc(is) ) cycle
     ic = ictot(ia)
-    if( ic.eq.0 ) then
-      print *,'ia,is,lspc,ic=',ia,is,lspc(is),ic
-    endif
     nacs(ic) = nacs(ic) + 1
   enddo
+!.....Comp histogram vs num of atoms in a cluster
+  nacmax = 0
+  do ic=1,nc
+    nacmax = max(nacmax,nacs(ic))
+  enddo
+  allocate(nhist(nacmax))
+  nhist(:) = 0
+  do ic=1,nc
+    n = nacs(ic)
+    if( n.eq.0 ) cycle
+    nhist(n) = nhist(n) +1
+  enddo
+  open(30,file='out.histogram',status='replace')
+  write(30,'(a)') '# num of atoms in cluster, count of clusters'
+  do n=1,nacmax
+    if( nhist(n).ne.0 ) write(30,'(2i10)') n,nhist(n)
+  enddo
+  close(30)
+  
 !.....Out pmdini_ic of cluster size larger than the threshold
   allocate(icouts(nc))
   icouts(:) = -1
