@@ -1,6 +1,6 @@
 program cluster_analysis
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-06-16 18:53:55 Ryo KOBAYASHI>
+!                     Last-modified: <2020-06-17 12:08:27 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Cluster analysis program.
 ! The cluster analysis is usually performed for large scale systems.
@@ -26,7 +26,7 @@ program cluster_analysis
   integer:: ia,ic,nc,maxnn,is,js,msp,inc,ict,i,ib,l
   integer,allocatable:: ictot(:),nacs(:),lspr(:,:),ls1nn(:,:)&
        ,icouts(:)
-  logical:: lpair(nspmax,nspmax),lspc(nspmax)
+  logical:: lpair(nspmax,nspmax),lspc(nspmax),lrecur
   real(8):: rcut,outthd,hi(3,3),t0,tmp
   character(len=20):: cnum
 
@@ -39,7 +39,8 @@ program cluster_analysis
 !.....Read input
   rcut = 3.0d0
   outthd = 10
-  call read_in_cluster(11,trim(cfinput),maxpair,rcut,lpair,outthd)
+  lrecur = .false.
+  call read_in_cluster(11,trim(cfinput),maxpair,rcut,lpair,outthd,lrecur)
 
 !.....Make neighbor list
   allocate(lspr(0:nnmax,ntot),ls1nn(0:nnmax,ntot))
@@ -68,8 +69,13 @@ program cluster_analysis
   tmp = mpi_wtime()
   allocate(ictot(ntot))
   ictot(:) = 0
-  print *,'clustering'
-  call clustering(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
+  if( lrecur ) then
+    print *,'clustering with recursive routine.'
+    call clustering2(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
+  else
+    print *,'clustering without recursive routine.'
+    call clustering1(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
+  endif
   print '(a,f0.3)',' Time for clustering = ',mpi_wtime()-tmp
 
 !.....Output report
@@ -79,6 +85,9 @@ program cluster_analysis
     is = int(tagtot(ia))
     if( .not.lspc(is) ) cycle
     ic = ictot(ia)
+    if( ic.eq.0 ) then
+      print *,'ia,is,lspc,ic=',ia,is,lspc(is),ic
+    endif
     nacs(ic) = nacs(ic) + 1
   enddo
 !.....Out pmdini_ic of cluster size larger than the threshold
@@ -116,13 +125,14 @@ program cluster_analysis
 
 end program cluster_analysis
 !=======================================================================
-subroutine read_in_cluster(ionum,cfname,maxpair,rcut,lpair,outthd)
+subroutine read_in_cluster(ionum,cfname,maxpair,rcut,lpair,outthd,lrecur)
 !-----------------------------------------------------------------------
 !  The input format should be like the following.
 !-----------------------------------------------------------------------
 !  rcut   3.0
 !  pairs  Si-Si Si-O
 !  out_threshold   10
+!  recursive  T
 !-----------------------------------------------------------------------
   use pmdio
   use util, only: num_data
@@ -130,7 +140,7 @@ subroutine read_in_cluster(ionum,cfname,maxpair,rcut,lpair,outthd)
   integer,intent(in):: ionum,maxpair
   character(len=*),intent(in):: cfname
   real(8),intent(out):: rcut,outthd
-  logical,intent(out):: lpair(nspmax,nspmax)
+  logical,intent(out):: lpair(nspmax,nspmax),lrecur
 
   integer:: i,nentry,isp1,isp2,npair
   character(len=128):: c1st,cline
@@ -166,6 +176,8 @@ subroutine read_in_cluster(ionum,cfname,maxpair,rcut,lpair,outthd)
       enddo
     else if( trim(c1st).eq.'out_threshold' ) then
       read(cline,*) c1st, outthd
+    else if( trim(c1st).eq.'recursive' ) then
+      read(cline,*) c1st, lrecur
     endif
   end do
 1 close(ionum)
@@ -208,9 +220,78 @@ subroutine get_hi(h,hi)
   return
 end subroutine get_hi
 !=======================================================================
-subroutine clustering(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
+subroutine clustering1(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
 !
-!  Clustering using the neighbor list.
+!  Clustering not using the recursive routine.
+!
+  implicit none 
+  integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),nspmax
+  logical,intent(in):: lpair(nspmax,nspmax),lspc(nspmax)
+  real(8),intent(in):: tagtot(ntot)
+  integer,intent(out):: ictot(ntot),nc
+
+  integer:: iter,icid,num_update,ia,is,icmin0,icmax,icmin,jj,ja,js,jc,ic
+
+  iter = 0
+  icid = 0
+  do
+    num_update = 0
+    nc = 0
+    do ia=1,ntot
+      is = int(tagtot(ia))
+      if( .not. lspc(is) ) cycle
+      icmin0 = ictot(ia)
+      icmax  = ictot(ia)
+      icmin = ntot +1
+      if( ictot(ia).ne.0 ) icmin = ictot(ia)
+      do jj=1,lspr(0,ia)
+        ja = lspr(jj,ia)
+        js = int(tagtot(ja))
+        if( .not. lpair(is,js) ) cycle
+        jc = ictot(ja)
+        icmin0 = min(icmin0,jc)
+        icmax  = max(icmax,jc)
+        if( jc.ne.0 ) icmin  = min(icmin,jc)
+      enddo
+      nc = max(nc,icmax)
+!.....No need to update for these atoms
+      if( icmax.eq.icmin .and. icmin0.ne.0 ) then
+        cycle
+!.....Determine minimum cluster-ID among neighbors or new cluster-ID
+      else
+        if( icmax.eq.0 ) then
+          icid = icid + 1
+          ic = icid
+        else
+          ic = icmin
+        endif
+        num_update = num_update +1
+      endif
+!.....Set the cluster-ID to all the neighbors
+      if( ic.eq.0 ) then
+        print *,'ia,ic,icmin0,icmin,icmax,icid=',ia,ic,icmin0,icmin,icmax,icid
+        stop 1
+      endif
+      ictot(ia) = ic
+      do jj=1,lspr(0,ia)
+        ja = lspr(jj,ia)
+        js = int(tagtot(ja))
+        if( .not. lpair(is,js) ) cycle
+        ictot(ja) = ic
+      enddo
+    enddo
+    iter = iter + 1
+    print '(a,2i10)',' iteration, num_update = ',iter,num_update
+    if( num_update.eq.0 ) exit
+
+  enddo
+  print *,'num of clusters = ',nc
+  return
+end subroutine clustering1
+!=======================================================================
+subroutine clustering2(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
+!
+!  Clustering using the recursive routine.
 !
   implicit none 
   integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),nspmax
@@ -233,7 +314,7 @@ subroutine clustering(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
   nc = ic
 
   return
-end subroutine clustering
+end subroutine clustering2
 !=======================================================================
 recursive subroutine neighbor_connection(ntot,ictot,tagtot,nnmax,lspr,nspmax,&
      lpair,ia,is,ic)
