@@ -45,10 +45,12 @@ import pandas as pd
 from nappy.atom import get_symbol_from_number, get_number_from_symbol
 
 #...constants
-_maxnn = 100
-_file_formats = ('pmd','POSCAR','dump','xsf','lammps',
-                 'cube','CHGCAR')
-_default_labels = ('pos','vel','frc','sid')
+FILE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',
+                'cube','CHGCAR')
+DEFAULT_LABELS = ('pos','vel','frc','sid')
+# _file_formats = ('pmd','POSCAR','dump','xsf','lammps',
+#                  'cube','CHGCAR')
+# _default_labels = ('pos','vel','frc','sid')
 
 class NAPSystem(object):
     """
@@ -82,12 +84,12 @@ class NAPSystem(object):
         return None
 
     def init_atoms(self):
-        self.atoms = pd.DataFrame(columns=_default_labels)
+        self.atoms = pd.DataFrame(columns=DEFAULT_LABELS)
         return None
 
     def get_aux_names(self):
         aux_names = list(self.atoms.columns)
-        for l in _default_labels:
+        for l in DEFAULT_LABELS:
             aux_names.remove(l)
         if 'lspr' in aux_names:
             aux_names.remove('lspr')
@@ -1497,11 +1499,42 @@ You need to specify the species order correctly with --specorder option.
         angle = np.arccos(np.dot(rij,rik)/dij/dik) /np.pi *180.0
         return angle
         
-    def make_pair_list(self,rcut=3.0,maxnn=_maxnn):
+    def make_pair_list(self,rcut=3.0,rcuts=None):
         """
         Make a neighbor list.
-        The list of each atom is stored as lspr in the self.atoms column.
+        The neighbor list of each atom is stored as lspr in the self.atoms column.
+
+        INPUT:
+            rcut: float
+                Cutoff radius for all neighbors to be taken into account.
+            rcuts: dict
+                Dictionary of pairwise cutoff values. The format is like below.
+                ```
+                rcuts = {('Si','Si'):2.5, ('Si','O'):2.0,}
+                ```
+                If a pair is not given, the cutoff for the pair is the maximum of those.
         """
+        rcs2 = np.zeros((len(self.specorder),len(self.specorder)),dtype=float)
+        if rcuts is not None:
+            for i,si in enumerate(self.specorder):
+                for j,sj in enumerate(self.specorder):
+                    if j < i: continue
+                    if (si,sj) in rcuts:
+                        rc2 = rcuts[(si,sj)]**2
+                    elif (sj,si) in rcuts:
+                        rc2 = rcuts[(sj,si)]**2
+                    else:
+                        rc2 = -1.0
+                    rcs2[i,j] = rc2
+                    rcs2[j,i] = rc2
+            rcmax2 = max(rcs2.max(),rcut**2)
+            for i in range(len(self.specorder)):
+                for j in range(len(self.specorder)):
+                    if rcs2[i,j] < 0.0:
+                        rcs2[i,j] = rcmax2
+            rcut = np.sqrt(rcmax2)
+        else:
+            rcs2[:,:] = rcut**2
         rc2= rcut**2
         h= np.zeros((3,3))
         h[:,0]= self.a1 *self.alc
@@ -1552,6 +1585,7 @@ You need to specify the species order correctly with --specorder option.
         #...Initialize lspr
         lspr = [ [] for i in range(len(self.atoms)) ]
         # self.atoms['lspr'] = emptylist
+        sids = self.atoms.sid
             
         for ia in range(len(self.atoms)):
             #pi= self.atoms.pos[ia]
@@ -1575,16 +1609,18 @@ You need to specify the species order correctly with --specorder option.
                         m1= m1x*lcyz +m1y*lcz +m1z
                         ja= lshd[m1]
                         if ja== -1: continue
-                        self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2,poss,lspr,maxnn)
+                        self.scan_j_in_cell(ia,pi,ja,lscl,h,rcs2,poss,sids,lspr)
         #...after makeing lspr
         # for ia in range(len(self.atoms)):
         #     print ia,self.lspr[ia]
         self.atoms['lspr'] = lspr
 
-    def scan_j_in_cell(self,ia,pi,ja,lscl,h,rc2,poss,lspr,maxnn):
+    def scan_j_in_cell(self,ia,pi,ja,lscl,h,rcs2,poss,sids,lspr):
         if ja == ia: ja = lscl[ja]
         if ja == -1: return 0
         # if ja not in self.atoms.lspr[ia]:
+        isp = sids[ia] -1
+        jsp = sids[ja] -1
         if ja not in lspr[ia]:
             #pj= self.atoms.pos[ja]
             pj = poss[ja]
@@ -1592,11 +1628,11 @@ You need to specify the species order correctly with --specorder option.
             xij= xij -np.round(xij)
             rij= np.dot(h,xij)
             rij2= rij[0]**2 +rij[1]**2 +rij[2]**2
-            if rij2 < rc2:
+            if rij2 < rcs2[isp,jsp]:
                 #self.atoms.lspr[ia].append(ja)
                 lspr[ia].append(ja)
         ja= lscl[ja]
-        self.scan_j_in_cell(ia,pi,ja,lscl,h,rc2,poss,lspr,maxnn)
+        self.scan_j_in_cell(ia,pi,ja,lscl,h,rcs2,poss,sids,lspr)
 
     def _pbc(self,x):
         if x < 0.:
@@ -2037,7 +2073,7 @@ You need to specify the species order correctly with --specorder option.
         return
         
 def parse_filename(filename):
-    for format in _file_formats:
+    for format in FILE_FORMATS:
         if format in filename:
             return format
     return None
