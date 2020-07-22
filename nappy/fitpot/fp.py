@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-Fit parameters of classical interatomic potentials using metaheuristic approaches.
+Fit parameters of classical interatomic potentials using a metaheuristic algorithm.
 Because of computational efficiency, optimization of a lot of parameters using
-gradient-based approaches is out of focus in this script, and that should be
+gradient-based approaches is out of focus in this program, and that should be
 performed in a Fortran program.
 
 Usage:
@@ -12,8 +12,8 @@ Options:
   -h, --help  Show this message and exit.
   --nproc NPROC
               Number of processes to be used. [default: 1]
-  --pmddir-prefix PREFIX
-              Prefix for pmd directory. [default: pmddir_]
+  --subdir-prefix PREFIX
+              Prefix for pmd directory. [default: subdir_]
   --subjob-script SCRIPT
               Name of script that performs MD and post-processing. [default: subjob.sh]
 """
@@ -28,9 +28,11 @@ import subprocess
 import time
 
 from nappy.fitpot.fp2prms import fp2BVSx, fp2BVS, fp2Morse, read_params_Coulomb
+from nappy.fitpot.de import DE
+from nappy.fitpot.cs import CS
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "200504"
+__version__ = "200722"
 
 def read_in_fitpot(fname='in.fitpot'):
     #...initialize
@@ -576,24 +578,24 @@ def func_wrapper(variables, vranges, **kwargs):
     wgts = kwargs['weights']
     specorder = kwargs['specorder']
     refdata = kwargs['refdata']
-    pmdscript = kwargs['pmd-script']
-    pmddir = kwargs['pmddir-prefix'] +'{0:03d}'.format(kwargs['index'])
+    subjobscript = kwargs['subjob-script']
+    subdir = kwargs['subdir-prefix'] +'{0:03d}'.format(kwargs['index'])
     print_level = kwargs['print_level']
     # print('refdata=',refdata)
     # print('pairs=',pairs)
     # print('triplets=',triplets)
 
-    #...Create in.params.XXX files in each pmddir
+    #...Create in.params.XXX files in each subdir
     varsfp = {}
     varsfp['rc2'] = kwargs['rc2']
     varsfp['rc3'] = kwargs['rc3']
     varsfp['variables'] = variables
     varsfp['vranges'] = vranges
     cwd = os.getcwd()
-    if not os.path.exists(pmddir):
-        os.mkdir(pmddir)
-        shutil.copy(pmdscript,pmddir+'/')
-    os.chdir(pmddir)
+    if not os.path.exists(subdir):
+        os.mkdir(subdir)
+        shutil.copy(subjobscript,subdir+'/')
+    os.chdir(subdir)
     if 'vids' not in kwargs.keys():
         print(kwargs.keys())
 
@@ -607,23 +609,23 @@ def func_wrapper(variables, vranges, **kwargs):
     #...Compute pmd
     L_up_lim = kwargs['fval_upper_limit']
     if print_level > 1:
-        print('Running pmd and post-processing at '+pmddir, flush=True)
+        print('Running pmd and post-processing at '+subdir, flush=True)
     try:
-        cmd = "./{0:s} > log.iid_{1:d}".format(pmdscript,kwargs['iid'])
+        cmd = "./{0:s} > log.iid_{1:d}".format(subjobscript,kwargs['iid'])
         # subprocess.run(cmd.split(),check=True)
-        # print('pmddir,cmd=',pmddir,cmd)
+        # print('subdir,cmd=',subdir,cmd)
         subprocess.run(cmd,shell=True,check=True)
         os.chdir(cwd)
-        # print('Going to get_data from ',pmddir)
+        # print('Going to get_data from ',subdir)
         if len(kwargs['match']) != 0:
-            pmddata = get_data2(pmddir,prefix='pmd',**kwargs)
+            pmddata = get_data2(subdir,prefix='pmd',**kwargs)
             L = min( loss_func2(pmddata,**kwargs), L_up_lim )
         else:
-            pmddata = get_data(pmddir,prefix='pmd',**kwargs)
+            pmddata = get_data(subdir,prefix='pmd',**kwargs)
             L = min( loss_func(pmddata,**kwargs), L_up_lim )
     except Exception as e:
         if print_level > 1:
-            print('  Since pmd or post-process failed at {0:s}, '.format(pmddir)
+            print('  Since pmd or post-process failed at {0:s}, '.format(subdir)
                   +'the upper limit value is applied to its loss function.',
                   flush=True)
         os.chdir(cwd)
@@ -703,8 +705,6 @@ def lat_vasp2dump(a,b,c,alpha,beta,gamma):
     return al,bl,cl,alpl,betl,gmml
     
 def main(args):
-    from fitpot.de import DE
-    from fitpot.cs import CS
 
     start = time.time()
 
@@ -739,8 +739,8 @@ def main(args):
     kwargs['rdf_pairs'] = rdf_pairs
     kwargs['triplets'] = triplets
     kwargs['adf_triplets'] = adf_triplets
-    kwargs['pmddir-prefix'] = args['--pmddir-prefix']
-    kwargs['pmd-script'] = args['--subjob-script']
+    kwargs['subdir-prefix'] = args['--subdir-prefix']
+    kwargs['subjob-script'] = args['--subjob-script']
     kwargs['start'] = start
     
     smpldir = infp['sample_directory']

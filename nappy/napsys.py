@@ -44,6 +44,9 @@ import pandas as pd
 
 from nappy.atom import get_symbol_from_number, get_number_from_symbol
 
+__author__ = "RYO KOBAYASHI"
+__version__ = "200722"
+
 #...constants
 FILE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',
                 'cube','CHGCAR')

@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 """
-Differential evolution test program.
+Cuckoo search.
 
 Usage:
-  de.py [options]
+  cs.py [options]
 
 Options:
   -h, --help  Show this message and exit.
-  -n N        Number of generations in DE. [default: 20]
+  -n N        Number of generations in CS. [default: 20]
   --print-level LEVEL
               Print verbose level. [default: 1]
 """
 from __future__ import print_function
 
-import os,sys
+import sys
 from docopt import docopt
 import numpy as np
 from numpy import exp, sin, cos
@@ -21,12 +21,13 @@ import random
 import copy
 from multiprocessing import Process, Queue
 from time import time
+from scipy.special import gamma
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "rev190904"
+__version__ = "190920"
 
-_fname_gen = 'out.de.generations'
-_fname_ind = 'out.de.individuals'
+_fname_gen = 'out.cs.generations'
+_fname_ind = 'out.cs.individuals'
 
 def test_func(var, vranges, **kwargs):
     x,y= var
@@ -48,6 +49,58 @@ def wrap(vs,vrs):
         vmin, vmax = vrs[i]
         vsnew[i] = min(max(v,vmin),vmax)
     return vsnew
+
+def update_vrange(vrs,vrsh,all_indivisuals):
+    """
+    Update variable ranges adaptively using all the individuals information.
+    """
+    #...Extract top NTOPS individuals from all
+    ntops = 100
+    tops = []
+    # print('len(all_indivisuals)=',len(all_indivisuals))
+    for i,ind in enumerate(all_indivisuals):
+        if len(tops) < ntops:  # add the individual
+            # print(' i (< ntops)=',i)
+            for it,t in enumerate(tops):
+                if ind.val < t.val:
+                    tops.insert(it,ind)
+                    break
+            if not ind in tops:
+                tops.append(ind)
+        else: # insert the individual and pop out the worst one
+            # print(' i (>=ntops)=',i)
+            for it,t in enumerate(tops):
+                if ind.val < t.val:
+                    tops.insert(it,ind)
+                    break
+            if len(tops) > ntops:
+                del tops[ntops:len(tops)]
+
+    # print('len(tops)=',len(tops))
+    # print('iids= ',[t.iid for t in tops])
+    #...Get new ranges
+    new_vrs = np.array(vrs)
+    vss = np.zeros((len(tops),len(vrs)))
+    for i,ind in enumerate(tops):
+        vi = ind.vector
+        vss[i,:] = vi[:]
+        # print('i,vi=',i,vi)
+    for j in range(len(new_vrs)):
+        # print('j,min,max=',i,min(vss[:,j]),max(vss[:,j]))
+        new_vrs[j,0] = max(new_vrs[j,0],min(vss[:,j]))
+        new_vrs[j,1] = min(new_vrs[j,1],max(vss[:,j]))
+
+    #...Set best variables center in the ranges
+    fbest = tops[0].val
+    vbest = tops[0].vector
+    for j in range(len(vbest)):
+        vjmin = new_vrs[j,0]
+        vjmax = new_vrs[j,1]
+        wmax = max(abs(vjmin-vbest[j]),abs(vjmax-vbest[j]))
+        new_vrs[j,0] = max(min(vjmin,vbest[j]-wmax),vrsh[j,0])
+        new_vrs[j,1] = min(max(vjmax,vbest[j]+wmax),vrsh[j,1])
+    
+    return new_vrs
 
 class Individual:
     """
@@ -98,29 +151,33 @@ class Individual:
         q.put(val)
         return None
 
-class DE:
+class CS:
     """
-    Differential evolution class.
+    Cuckoo search class.
     """
 
-    def __init__(self, N, F, CR, T, variables, vranges, loss_func, write_func, **kwargs):
+    def __init__(self, N, F, variables, vranges, vhardlimit, loss_func, write_func,
+                 **kwargs):
         """
-        Conctructor of DE class.
+        Conctructor of CS class.
 
+        N:  Number of individuals.
+        F:  Fraction of worse individuals to be abondoned.
         loss_func:
             Loss function to be minimized with variables and **kwargs.
         """
-        if N < 4:
-            raise ValueError('N must be greater than 3 in DE!')
+        if N < 2:
+            raise ValueError('N must be greater than 1 in CS!')
         self.N = N   # Number of individuals in a generation
-        self.F = F   # Fraction of mixing in DE
-        self.CR = CR # Cross-over rate
-        self.T = T   # Temperature (kT) to compute adoption probability
-        # if self.T < 1e-10:
-        #     raise ValueError('T is too small.')
+        self.F = F   # Fraction of worse individuals to be abondoned
         self.ndim = len(variables)
         self.vs = variables
-        self.vrs = vranges
+        self.vrs0 = vranges
+        self.vrs = copy.copy(self.vrs0)
+        self.vrsh = vhardlimit
+        self.vws = np.zeros(self.ndim)
+        for i in range(self.ndim):
+            self.vws[i] = max(self.vrs[i,1] -self.vrs[i,0], 0.0)
         # print('original variables=',self.vs,self.vrs)
         self.loss_func = loss_func
         self.write_func = write_func
@@ -128,10 +185,19 @@ class DE:
         self.bestind = None
         self.print_level = 0
         if 'print_level' in kwargs.keys():
-            self.print_level = kwargs['print_level']
+            self.print_level = int(kwargs['print_level'])
+        if 'update_vrange' in kwargs.keys():
+            self.update_vrs_per = kwargs['update_vrange']
+
+        self.beta = 1.5
+        self.betai = 1.0 /self.beta
+        self.usgm = (gamma(1+self.beta)*np.sin(np.pi*self.beta/2)/ \
+                     gamma((1+self.beta)/2)*self.beta*2.0**((self.beta-1)/2))**self.betai
+        self.vsgm = 1.0
 
         #...initialize population
         self.population = []
+        self.all_indivisuals = []
         self.iidmax = 0
         for i in range(N):
             self.iidmax += 1
@@ -159,6 +225,7 @@ class DE:
             # print('ip,val,vec=',ip,pi.val,pi.vector)
         
         self.keep_best()
+        self.all_indivisuals.extend(self.population)
         if self.print_level > 2:
             for pi in self.population:
                 self.write_variables(pi,
@@ -183,10 +250,23 @@ class DE:
             idx = vals.index(minval)
             self.bestind = copy.deepcopy(self.population[idx])
         return None
-                
+
+    def sort_individuals(self):
+
+        jtop = self.N
+        for i in range(self.N):
+            jtop -= 1
+            for j in range(jtop):
+                pj = self.population[j]
+                pjp = self.population[j+1]
+                if pj.val > pjp.val:
+                    self.population[j] = pjp
+                    self.population[j+1] = pj
+        
+
     def run(self,maxiter=100):
         """
-        Perfom DE.
+        Perfom CS.
         """
 
         if 'start' in self.kwargs.keys():
@@ -213,44 +293,33 @@ class DE:
 
             candidates = []
 
-            #...Create candidates
+            self.sort_individuals()
+            #...Create candidates by Levy flight
+            vbest = self.bestind.vector
             for ip,pi in enumerate(self.population):
                 vi = pi.vector
-                #...pick other 3 individuals
-                indices= [ j for j in range(self.N) if j != i ]
-                irand = int(random.random()*len(indices))
-                i1 = indices.pop(irand)
-                irand = int(random.random()*len(indices))
-                i2 = indices.pop(irand)
-                irand = int(random.random()*len(indices))
-                i3 = indices.pop(irand)
-                # print('i,i1,i2,i3=',i,i1,i2,i3)
-                ind1 = self.population[i1]
-                ind2 = self.population[i2]
-                ind3 = self.population[i3]
-                v1 = ind1.vector
-                v2 = ind2.vector
-                v3 = ind3.vector
-                vd = v1 +self.F *(v2 -v3)
-                #...cross over
-                vnew = np.array(vd)
-                for k in range(len(vi)):
-                    r = random.random()
-                    if r > self.CR:
-                        vnew[k] = vi[k]
+                vnew =np.array(vi)
+                for iv in range(self.ndim):
+                    u = np.random.normal()*self.usgm
+                    v = abs(np.random.normal()*self.vsgm)
+                    v = max(v,1.0e-8)
+                    w = u/v**self.betai
+                    zeta = self.vws[iv] *0.01 *w
+                    # zeta = self.vws[iv]*0.01 *w *(vi[iv] -vbest[iv])
+                    # if ip == 0:
+                    #     zeta = self.vws[iv] *0.001 *w
+                    # else:
+                    #     zeta = 0.01 *w *(vi[iv] -vbest[iv])
+                    vnew[iv] = vnew[iv] +zeta*np.random.normal()
                 #...create new individual for trial
+                # print('ip,vi,vnew=',ip,vi,vnew)
                 self.iidmax += 1
                 newind = Individual(self.iidmax, self.ndim, self.vrs, self.loss_func)
                 newind.set_variable(vnew)
                 candidates.append(newind)
 
-            #...Evaluate loss func values of candidates
-            #...This block can be parallelize and it makes the program much faster
-            # for ic,ci in enumerate(candidates):
-            #     self.kwargs['index'] = ic
-            #     ci.calc_loss_func(self.kwargs)
             #...Evaluate loss function values
-            qs = [ Queue() for i in range(self.N) ]
+            qs = [ Queue() for i in range(len(candidates)) ]
             prcs = []
             for ic,ci in enumerate(candidates):
                 kwtmp = copy.copy(self.kwargs)
@@ -263,45 +332,78 @@ class DE:
                 p.join()
             for ic,ci in enumerate(candidates):
                 ci.val = qs[ic].get()
+            self.all_indivisuals.extend(candidates)
+
+            #...Pick j that is to be compared with i
+            js = random.sample(range(self.N),k=self.N)
+            #...Decide whether or not to adopt new one
+            for jc,jv in enumerate(js):
+                pj = self.population[jv]
+                cj = candidates[jc]
+                dval = cj.val -pj.val
+                if dval < 0.0:  # replace with new individual
+                    self.population[jv] = cj
+                    find.write(' {0:8d}  {1:12.4e}'.format(cj.iid, cj.val))
+                    for k,vk in enumerate(cj.vector):
+                        find.write(' {0:11.3e}'.format(vk))
+                    find.write('\n')
+                    find.flush()
+                else:
+                    pass
+
+            #...Rank individuals
+            self.sort_individuals()
+            
+            #...Abandon bad ones and replace with random ones
+            iab = int((1.0 -self.F)*self.N)
+            candidates = []
+            for iv in range(iab,self.N):
+                self.iidmax += 1
+                newind = Individual(self.iidmax, self.ndim, self.vrs, self.loss_func)
+                newind.init_random()
+                candidates.append(newind)
+            
+            #...Evaluate loss function values of new random ones
+            qs = [ Queue() for i in range(len(candidates)) ]
+            prcs = []
+            for ic,ci in enumerate(candidates):
+                kwtmp = copy.copy(self.kwargs)
+                kwtmp['index'] = ic
+                kwtmp['iid'] = ci.iid
+                prcs.append(Process(target=ci.calc_loss_func, args=(kwtmp,qs[ic])))
+            for p in prcs:
+                p.start()
+            for p in prcs:
+                p.join()
+            for ic,ci in enumerate(candidates):
+                ci.val = qs[ic].get()
+            self.all_indivisuals.extend(candidates)
+
+            #...Replace them with old ones
+            ic = 0
+            for iv in range(iab,self.N):
+                ci = candidates[ic]
+                ic += 1
+                self.population[iv] = ci
 
             #...Check best
-            for ic,ci in enumerate(candidates):
+            for ic,ci in enumerate(self.population):
                 if ci.val < self.bestind.val:
                     self.bestind = ci
                     self.write_variables(ci,
                                          fname='in.vars.fitpot.{0:d}'.format(ci.iid),
                                          **self.kwargs)
-            if self.print_level > 2:
-                for ci in candidates:
-                    self.write_variables(ci,
-                                         fname='in.vars.fitpot.{0:d}'.format(ci.iid),
-                                         **self.kwargs)
 
-            #...Decide whether or not to adopt new one
-            for ic,ci in enumerate(candidates):
-                pi = self.population[ic]
-                # #...Skip if pi is the current best
-                # if pi.iid == self.bestind.iid:
-                #     continue
-                #...adoption probability
-                dval = ci.val -pi.val
-                if dval < 0.0:
-                    prob = 1.0
-                else:
-                    if self.T > 0.0:
-                        prob = np.exp(-dval/self.T)
-                    else:
-                        prob = 0.0
-                r = random.random()
-                if r < prob:  # replace with new individual
-                    self.population[ic] = ci
-                    find.write(' {0:8d}  {1:12.4e}'.format(ci.iid, ci.val))
-                    for k,vk in enumerate(ci.vector):
-                        find.write(' {0:11.3e}'.format(vk))
-                    find.write('\n')
-                else:
-                    pass
-
+            #...Update variable ranges if needed
+            if self.update_vrs_per > 0 and (it+1) % self.update_vrs_per == 0:
+                self.vrs = update_vrange(self.vrs,self.vrsh,self.all_indivisuals)
+                print(' Update variable ranges')
+                for i in range(len(self.vrs)):
+                    print(' {0:2d}:  {1:7.3f}  {2:7.3f}'.format(i+1,self.vrs[i,0],self.vrs[i,1]))
+                #...Set variable ranges of all individuals in the population
+                for iv in range(len(self.population)):
+                    self.population[iv].vranges = self.vrs
+            
             if self.print_level > 0:
                 print(' step,time,best,vars= {0:6d} {1:8.1f}  {2:8.4f}'.format(it+1, time()-start,
                                                                                self.bestind.val),end="")
@@ -311,6 +413,7 @@ class DE:
 
             for i,ind in enumerate(self.population):
                 fgen.write(' {0:5d}  {1:8d}  {2:12.4e}\n'.format(it+1, ind.iid, ind.val))
+                fgen.flush()
         fgen.close()
         find.close()
         #...Finaly write out the best one
@@ -332,9 +435,10 @@ if __name__ == "__main__":
     kwargs = {}
     kwargs['print_level'] = int(args['--print-level'])
 
+
     vs = np.array([1.0, -0.5])
     vrs = np.array([[-1.0, 2.0],[-1.0, 1.0]])
     
-    de = DE(10, 0.8, 0.5, 1.0, vs, vrs, test_func, test_write_func, **kwargs)
-    de.run(n)
+    cs = CS(10, 0.25, vs, vrs, test_func, test_write_func, **kwargs)
+    cs.run(n)
     
