@@ -111,6 +111,8 @@ _____________________________
   ::
     
      $ pjsub --interact
+     or
+     $ pjsub --interact -L rscgrp=fx-interactive,node=1  <== in case of flow-fx@nagoya-u
      $ ./configure --prefix=$(pwd) FCFLAGS="-O3"
      $ cd pmd
      $ make pmd

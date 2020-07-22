@@ -1,21 +1,21 @@
       subroutine getarg(arg,argt)
-
-c     get a command line argument using gfortran
-
+!
+!     get a command line argument using gfortran
+!
       implicit none
-
-c input
-
-c     number of argument to get
+!
+! input
+!
+!     number of argument to get
       integer arg
-
-c output
-
-c     string
+!
+! output
+!
+!     string
       character*(*) argt
-
-c executable
-
+!
+! executable
+!
       call get_command_argument(arg,argt)
 
       return
