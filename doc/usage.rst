@@ -41,7 +41,7 @@ For the ease of following explanation, change the directory name to ``nap`` as,
   $ mv nap-master nap
   $ cd nap/
 
-Then you can compile the ``pmd`` program as following,
+Then you can compile the *pmd* program as following,
 ::
 
   $ ./configure --prefix=$(pwd)
@@ -55,7 +55,7 @@ do ``configure`` again by specifying the compiler position as,
 
   $ ./configure --prefix=$(pwd) FC=<path/to/fortran-compiler>
 
-The option ``--prefx=$(pwd)`` is not necessary for ``pmd``, but when you use ``fitpot`` program,
+The option ``--prefx=$(pwd)`` is not necessary for *pmd*, but when you use ``fitpot`` program,
 it is required.
 
 .. note::
@@ -67,82 +67,79 @@ it is required.
 
   you may have to specify true C preprocessor path to ``configure`` command by adding an option like ``CPP=/usr/bin/cpp``.
 
-However the ``pmd`` command should be available with this compilation,
-this ``pmd`` may not be so efficient in the system you are compiling.
+However the *pmd* command should be available with this compilation,
+this *pmd* may not be so efficient in the system you are compiling.
 So you might need to add some options relevant for your system.
 
 gfortran in Mac OSX
 _____________________
-  In the case of ``gfortran`` with ``openmpi`` ,
-  ::
+In the case of ``gfortran`` with ``openmpi`` ,
+::
   
-    $ ./configure --prefix=$(pwd) FCFLAGS="-O2 -g"
+   $ ./configure --prefix=$(pwd) FCFLAGS="-O2 -g"
   
-  The optimization option over ``-O3`` seems to cause some errors since a certain version of gfortran, so it is recommended to use ``-O2`` optimization option.
+The optimization option over ``-O3`` seems to cause some errors since a certain version of gfortran, so it is recommended to use ``-O2`` optimization option.
 
-  When you are debugging, you may had better set some warning and checking options enabled as follows.
-  ::
+When you are debugging, you may had better set some warning and checking options enabled as follows.
+::
 
-     $ ./configure --prefix=$(pwd) FCFLAGS="-O2 -g -fbounds-check -Wuninitialized -fbacktrace"
+   $ ./configure --prefix=$(pwd) FCFLAGS="-O2 -g -fbounds-check -Wuninitialized -fbacktrace"
 
 
 .. note::
 
-  Compilation with LLVM version gcc is not tested. Use Homebrew version of gcc and openmpi.
+    Compilation with LLVM version gcc is not tested. Use Homebrew version of gcc and openmpi.
 
 
 
 Intel Fortran Compiler
 ______________________
-  If you can use ``ifort`` in your system, for example,
-  ::
+If you can use ``ifort`` in your system, for example,
+::
   
-    $ ./configure --prefix=$(pwd) FCFLAGS="-xHOST -O3 -ip -ipo -no-prec-div"
+   $ ./configure --prefix=$(pwd) FCFLAGS="-xHOST -O3 -ip -ipo -no-prec-div"
   
-  The options ``-ip`` and ``-ipo`` have to do with inline expansions and 
-  are relevant to the efficiency of ``pmd``.
+The options ``-ip`` and ``-ipo`` have to do with inline expansions and are relevant to the efficiency of *pmd*.
   
 
 Fujitsu Fortran in FX?
 _____________________________
 
-  It is easier to compile on the computation node not on the login node. Since there are some difference about configuring/compiling on those nodes.
-  To configure and compile the ``pmd``, first you need to login to a computation node by doing ``pjsub --interact``.
-  ::
+It is easier to compile on the computation node not on the login node. Since there are some difference about configuring/compiling on those nodes.
+To configure and compile the *pmd*, first you need to login to a computation node by doing ``pjsub --interact``.
+::
     
-     $ pjsub --interact
-     or
-     $ pjsub --interact -L rscgrp=fx-interactive,node=1  <== in case of flow-fx@nagoya-u
-     $ ./configure --prefix=$(pwd) FCFLAGS="-O3"
-     $ cd pmd
-     $ make pmd
-     $ exit
+   $ pjsub --interact
+   or
+   $ pjsub --interact -L rscgrp=fx-interactive,node=1  <== in case of flow-fx@nagoya-u
+   $ ./configure --prefix=$(pwd) FCFLAGS="-O3"
+   $ cd pmd
+   $ make pmd
+   $ exit
     
   
   
-  .. note::
-  
-     In case that the ``configure`` returns errors and exit without completing the configuration
-     and the error message is related to cross compilation,
-     you may need to add an option like ``--host=sparc64`` to the above command line.
+.. note::
+ 
+   In case that the ``configure`` returns errors and exit without completing the configuration and the error message is related to cross compilation, you may need to add an option like ``--host=sparc64`` to the above command line.
 
 Fujitsu Fortran in CX400
 ______________________________
-  In the case of Fujitsu Fortran compiler ``mpifrt`` in CX400,
-  ::
+In the case of Fujitsu Fortran compiler ``mpifrt`` in CX400,
+::
   
-    $ ./configure --prefix=$(pwd) FCFLAGS="-Kfast,parallel"
-  
+   $ ./configure --prefix=$(pwd) FCFLAGS="-Kfast,parallel"
+ 
 
 Helios in Rokkasho-mura
 _______________________________
-  It is Linux OS on Intel CPU, and the compilation seems to be basic one.
-  But one needs to add specific options as following,
-  ::
+It is Linux OS on Intel CPU, and the compilation seems to be basic one.
+But one needs to add specific options as following,
+::
   
-    $ ./configure --prefix=$(pwd) FC=mpiifort FCFLAGS="-xAVX -O3 -ip -ipo -g -CB"
+   $ ./configure --prefix=$(pwd) FC=mpiifort FCFLAGS="-xAVX -O3 -ip -ipo -g -CB"
   
-  If you don't specify the ``mpiifor`` explicitly, ``ifort`` is set by default and the compilation does not work correctly.
+If you don't specify the ``mpiifor`` explicitly, ``ifort`` is set by default and the compilation does not work correctly.
 
 ----------
 
@@ -158,7 +155,7 @@ These input files are for the system of BCC tungsten crystalline structure inclu
     $ cd example/test-W
     $ ../../pmd/pmd
 
-When you run the ``pmd`` command like above, *NVE* -MD simulation of 100 steps is performed.
+When you run the *pmd* command like above, *NVE* -MD simulation of 100 steps is performed.
 And the total, kinetic, and potential energies are output in ``out.erg`` file.
 So you can look at the evoluation of these energies using ``gnuplot`` command as,
 ::
@@ -174,13 +171,7 @@ the total energy conserves conpensating the deviations of kinetic and potential 
 .. note::
    The format ot ``out.erg`` is a bit changed from that of before 2018-11-01 versions. The total and potential energies are raw values not being subtracted the initial values.
 
-And also configurations of atoms at each 10 steps out of 100 steps are written in files, e.g.)
-``pmd_0``, ``pmd_10``,..., ``pmd_100``.
-
-.. note::
-   The file name format ``pmd####`` has been changed to ``pmd_###`` because this format works for
-   larger number of files than previous definition.
-   And now the number ``###`` means exactly the MD step in the MD simulation run.
+And also configurations of atoms at each 10 steps out of 100 steps are written in LAMMPS-dump format, *e.g.*, ``dump_0``, ``dump_10``,..., ``dump_100``.
 
 ------------
 
@@ -189,17 +180,17 @@ And also configurations of atoms at each 10 steps out of 100 steps are written i
 Input files needed to run pmd
 ==================================
 
-``pmd`` must be executed in the directory where these files exist.
+The **pmd** must be executed in the directory where these files exist.
 
-in.pmd
+``in.pmd``
   Input file that describes simulation setting.
 
-pmdini
+``pmdini``
   Cell information and initial positions and velocities of atoms.
 
 .. image:: ./figs/pmd.png
 
-After running ``pmd`` , some output files appear in the same directory.
+After running *pmd* , some output files appear in the same directory.
 
 ----------
 
@@ -221,7 +212,7 @@ Make an initial atom-configuration file
 ========================================
 Please refer :ref:`pmd-file` for details of atom-configuration file.
 
-One has to make an initial atom-configuration file, ``pmdini``, to run ``pmd``.
+One has to make an initial atom-configuration file, ``pmdini``, to run *pmd*.
 There are already some programs that make initial atom-configuration files
 of some systems ( ``mkconf/mkconf_????.F`` ).
 So you can make your own initial atom-configuration file by looking at those program codes.
@@ -251,7 +242,7 @@ Then you get an atom-configuration file ``pmdini``.
 
 .. _make_in_pmd:
 
-Make the *in.pmd* file
+Make the ``in.pmd`` file
 ============================================
 Please refer :ref:`in-pmd` for details of ``in.pmd`` file.
 
@@ -317,8 +308,8 @@ Run pmd
 
 Run pmd on 1-process
 --------------------------------
-It is really easy to run ``pmd`` on 1-process.
-On the directory where ``in.pmd`` and ``pmdini`` exist, just execute ``pmd`` as,
+It is really easy to run *pmd* on 1-process.
+On the directory where ``in.pmd`` and ``pmdini`` exist, just execute *pmd* as,
 ::
 
   $ /path/to/pmd/pmd
@@ -329,12 +320,12 @@ If you want to perform it background,
   $ /path/to/pmd/pmd > out.pmd 2>&1 &
 
 
-The following files appear when you perform ``pmd`` :
+The following files appear when you perform *pmd* :
 
   ``out.erg``
         Total, kinetic, potential energies, and temperature, volume, pressure.
-  ``pmd_##``
-        Atom-configurations at a certain MD step. ``##`` means the MD step.
+  ``dump_##``
+        Atom-configurations at a certain MD step is written in LAMMPS-dump format by default. ``##`` means the MD step.
 
 
 
@@ -347,7 +338,7 @@ Just you need to describe how many divisions on each direction in ``in.pmd`` suc
 
   $ mpirun -np 8 --machinefile hosts.list /path/to/pmd > out.pmd 2>&1 &
 
-Here, ``pmd`` is executed on 8-nodes listed in ``hosts.list`` and 
+Here, *pmd* is executed on 8-nodes listed in ``hosts.list`` and 
 standard output is written in ``out.pmd`` .
 
 If any job-scheduling system is available on the system you are using,
@@ -363,7 +354,7 @@ Notes on performing massively parallel simulation
 When you perform parallel simulation with over one million atoms,
 the data of atom-configuration files becomes considerably large
 and reading/writing data takes long time compared with intrinsic computation.
-So ``pmd`` can read/write binary version of atom-configuration files 
+So *pmd* can read/write binary version of atom-configuration files 
 that are way more small amount of data.
 If you want to read/write binary files, describe following in ``in.pmd``,
 ::

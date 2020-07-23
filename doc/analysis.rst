@@ -27,7 +27,7 @@ When one performs constant temperture simulation,
 kinetic energy should be almost constant during the simulation.
 
 Since total, kinetic, and potential energies are written in ``out.erg`` file,
-users can plot energy evolution using ``gnuplot`` command as,
+users can plot energy evolution using *gnuplot* command as,
 ::  
 
   $ gnuplot
@@ -62,13 +62,13 @@ The `Ovito <https://www.ovito.org>`_ can open the LAMMPS-dump format file.
 If there are sequential ``pmd_####`` files, one can convert those files by using bash for-statement as
 ::
 
-  $ for f in pmd????; do /path/to/nap/nappy/napsys.py convert \
+  $ for f in pmd_[0-9]*; do /path/to/nap/nappy/napsys.py convert \
       --specorder=A,B,C $f `echo $f | sed 's/pmd/dump/'`; done
 
 
 Write *LAMMPS-dump* file directly
 -------------------------------------
-If you set ``flag_out_pmd`` as ``2``, the ``pmd`` program writes atomic configurations in *LAMMPS-dump* format
+If you set ``flag_out_pmd`` as ``2``, the *pmd* program writes atomic configurations in *LAMMPS-dump* format
 with file names ``dump_####``.
 So you can visualize those files without any conversion using *Ovito* or some other programs that can visualize *LAMMPS-dump* file.
 
@@ -178,7 +178,7 @@ Velocity autocorrelation and power spectrum
 
 .. note::
 
-  The file format used in this section, **akr**, is not used since years before. So the explanation here would not work correctly. We do not remove this section because somebody might be interested in the procedure used here...
+  The file format used in this section, **akr**, is no longer used since years before. So the explanation here would not work directly. But, we do not remove this section because somebody might be interested in the procedure used here...
 
 In order to get power spectrum from the MD simulation result, firstly we have to think how long the MD simulation has to be run.
 In case of Si, its phonon DOS exists up to about 16~18 THz which is the inverse of time interval of sampling data.

@@ -48,21 +48,16 @@ and curvature around the lattice constant corresponds to the bulk modulus.
 
 1. Prepare a small simulation cell of the system.
 
-  .. note::
-    Generally one does not need large cell for lattice constant calculation.
-    However in ``pmd``, an edge length of the cell must be twice as long as the cutoff radius of the 
-    interatomic potential used.
-
 2. Make ``pmdini`` file.
 
 3. Set ``num_iteration`` value in ``in.pmd`` file to zero. (Because only the 1st evaluation of the potential energy and forces are required.)
 
-4. Perform test run of ``pmd`` as,
+4. Perform test run of *pmd* as,
    ::
   
      $ /path/to/pmd/pmd
   
-   And confirm that ``pmd`` works correctly.
+   And confirm that *pmd* was done correctly.
 
 5. Run the script as,
    ::

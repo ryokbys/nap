@@ -3,14 +3,14 @@
 .. _in-pmd:
 
 ==================================================
-Input file: *in.pmd*
+Input file: ``in.pmd``
 ==================================================
 
 
-``pmd`` starts with reading setting file ``in.pmd`` and atom-configuration files ``pmdini``.
+*pmd* starts with reading setting file ``in.pmd`` and atom-configuration files ``pmdini``.
 So simulation settings except the atom configuration must be described in ``in.pmd``.
 
-Example of *in.pmd*
+Example of ``in.pmd``
 ==================================================
 ::
 
@@ -113,7 +113,7 @@ num_nodes_{x,y,z}
 Number of division in x, y, or z direction.
 If one of these is non-positive (<=0), these numbers are automatically estimated from the system size and 
 the number of MPI processes used.
-If all of these are positive, specified values are used. The product of these, :math:`xyz`, should be the same as the number of divided atom-configuration files and computer nodes specified when executing ``mpirun`` or ``mpiexec`` command.
+If all of these are positive, specified values are used. The product of these, :math:`xyz`, should be the same as the number of divided atom-configuration files and computer nodes specified when executing *mpirun* or *mpiexec* command.
 
 
 ------------------------

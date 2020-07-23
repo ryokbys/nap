@@ -2,10 +2,10 @@
   <img width="256" src="doc/figs/logo_nap_256.png">
 </p>
 
-# What's NAP
-**Nagoya Atomistic-simulation Package (NAP)** includes the following programs and utilities:
+# What's nap
+**Nagoya Atomistic-simulation Package (nap)** includes the following programs and utilities:
 - parallel molecular dynamics simulation (*pmd*)
-- potential parameter fitting (*fitpot* and *fp.py*)
+- potential parameter fitting (*fitpot* for neural-network potential and *fp.py* for other classical potentials)
 - python modules for pre/post-processes (*nappy*)
 
 The program, *pmd*, includes various interatomic potentials for metals and semiconductors,
@@ -13,7 +13,7 @@ and uses spatial decomposition technique for the parallelization, and linked-cel
 
 # Who made this?
 * [Ryo KOBAYASHI](http://ryokbys.web.nitech.ac.jp/index.html)
-* Assistant Professor in the department of mechanical engineering, Nagoya Institute of Technology. (Nov, 2017)
+* Assistant Professor in the department of mechanical engineering, Nagoya Institute of Technology.
 
 # Compilation and usage
 
@@ -31,7 +31,7 @@ If it works, you can use this program.
 For details, please see the [manual](http://ryokbys.web.nitech.ac.jp/contents/pmd_usage) or ask me via e-mail (kobayashi.ryo[at]nitech.ac.jp).
 
 # Acknowledgements
-This program is supported in part by ["Materials research by Information Integration" Initiative (MI2I)](http://www.nims.go.jp/MII-I/) project of the Support Program for Starting Up Innovation Hub from Japan Science and Technology Agency (JST).
+This program was supported in part by ["Materials research by Information Integration" Initiative (MI2I)](http://www.nims.go.jp/MII-I/) project of the Support Program for Starting Up Innovation Hub from Japan Science and Technology Agency (JST).
 
 
 # LICENSE

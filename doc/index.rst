@@ -4,20 +4,21 @@
    contain the root `toctree` directive.
 
 :author: Ryo KOBAYASHI
-:date: Last modified: <2019-05-14 09:50:10 Ryo KOBAYASHI>
+:date: Last modified: <2020-07-23 18:59:54 Ryo KOBAYASHI>
 
 ==========
 nap manual
 ==========
 
-This is a manual of the **Nagoya Atomistic-simulation Package (NAP)**.
+This is a manual of the **Nagoya Atomistic-simulation Package (nap)**.
 
-- **NAP** is hosted at Github: https://github.com/ryokbys/nap
-- **NAP** includes the following programs and utilities:
+- **nap** is hosted at Github: https://github.com/ryokbys/nap
+- **nap** includes the following programs and utilities:
 
-  - ``pmd``: Fortran program of massively parallel molecular dynamics
-  - ``fitpot``: Fortran program for fitting interatomic potential parameters
-  - ``nappy``: Python scripts for pre- and post-processing
+  - *pmd*: Fortran program of massively parallel molecular dynamics
+  - *fitpot*: Fortran program for fitting the parameters of neural-network potential
+  - *fp.py*: Python script for fitting the parameters of classical potentials
+  - *nappy*: Python scripts for pre- and post-processing
 
 
 ------------
@@ -37,8 +38,8 @@ Contents:
   analysis
   example
   nappy
-  clmgr
   fitpot
+  fp
   development
   faq
 
@@ -47,7 +48,7 @@ Contents:
 License
 =======
 
-**NAP** is distributed under the MIT license, please see the following license statements.
+The **nap** is distributed under the MIT license, please see the following license statements.
 
 ::
 
@@ -84,10 +85,6 @@ Contact
 | 
 | Department of Physical Science and Engineering,
 | Nagoya Institute of Technology
-| 
-| Center for Materials research by Information Integration (CMI2),
-| Research and Services Division of Materials Data and Integrated System (MaDIS),
-| National Institute for Materials Science (NIMS)
 
 
 -------------
@@ -95,7 +92,7 @@ Contact
 Acknowledgements
 ================
 
-This program is supported in part by `"Materials research by Information Integration" Initiative (MI2I) <http://www.nims.go.jp/MII-I/>`_ project of the Support Program for Starting Up Innovation Hub from Japan Science and Technology Agency (JST).
+This program was supported in part by `"Materials research by Information Integration" Initiative (MI2I) <http://www.nims.go.jp/MII-I/>`_ project of the Support Program for Starting Up Innovation Hub from Japan Science and Technology Agency (JST).
 
 
 ----------

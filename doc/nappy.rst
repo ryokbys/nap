@@ -1,18 +1,18 @@
-==============================
-nappy | NAP PYthon utilities
-==============================
+================================
+*nappy* -- NAP PYthon utilities
+================================
 
-``nappy`` is set of python utilities. 
-It is contained in ``nappy`` directory, but currenly it is not exactly a python module.
+*nappy* is a set of python utilities. 
+It is contained in ``nap/nappy`` directory, but currenly it is not exactly a python module.
 Users may have to use those utilities by calling them directly from the shell.
 
 
 Setup
 =======
 
-The ``nappy`` should work with python-2.7 and python-3 series. But, as the maintenance of python-2.x series have stopped, it is recommended to use python-3.
+The *nappy* should work with python-2.7 and python-3 series. But, as the maintenance of python-2.x series have stopped, it is recommended to use python-3.
 
-To use ``nappy`` in python program, it is required to add a path to ``nappy`` directory
+To use *nappy* in python program, it is required to add a path to ``nap/nappy`` directory
 to the environment variable ``PYTHONPATH``.
 In case of ``bash``, you can achieve this by adding the following line to ``~/.bash_profile``,
 
@@ -29,7 +29,7 @@ You can check whether the path to ``nappy`` is added to ``PYTHONPATH`` by the fo
 Quick start
 ===================
 
-Once ``nappy`` is installed, do the following code on *ipython* or *jupyter notebook*,
+Once *nappy* is installed, do the following code on *ipython* or *jupyter notebook*,
 
 .. code:: python
 

@@ -2,71 +2,65 @@
 
 .. index:: fitpot
 
-==================================================
-Potential-parameter fitting
-==================================================
-The validity of MD simulations depends mostly on the accuracy of the interatomic potential used in the simulation.
+=======================================================
+*fitpot* -- fit parameters of neural-network potential
+=======================================================
+The validity of MD simulations depends strongly on the accuracy of the interatomic potential used in the simulation.
 So, when you think of doing some simulation of specific system, 
 you have to prepare an interatomic potential that reproduces the phenomena you are thinking of.
 
-Here we indroduce how to make interatomic potentials and fit potential parameters
-by using ``fitpot`` program included in **NAP** package.
+Here we indroduce how to make a neural-network potential and fit potential parameters
+with the *fitpot* program included in **nap** package.
+
+.. note::
+
+   Currently, the *fitpot* program is used only for neural-network potential. 
+   For other classical potentials, use *fp.py* instead.
 
 
-What does ``fitpot`` do?
+
+What does *fitpot* do?
 ===============================
 
-In the ``fitpot``, the following loss function value is to be minimized by optimizing potential parameters :math:`\{ w \}`.
+In the *fitpot*, the following loss function is minimized by optimizing potential parameters :math:`\{ w \}`.
 
 .. math::
 
     \mathcal{L}(\{w\}) = \frac{1}{\eta N_s}\sum_s^{N_s} \left[ \Delta E^2 +\sum_i^{N^s_\mathrm{a}}\left| \Delta \boldsymbol{F}_i\right|^2 +\left| \Delta \sigma \right|^2\right]
 
-in case of fitting energies and forces.
+in the case of fitting energies and forces.
 Here, :math:`s` is the sample number, :math:`N_s` the number of samples, :math:`N^s_\mathrm{a}` the number of atoms in the sample :math:`s`, :math:`\eta` the parameter corresponding to how many properties are fitted (in this case :math:`\eta = 3` because energy, force and stress are used.)
 
-To minimize the above loss function, there are some methods available in ``fitpot``, for example:
+To minimize the above loss function, the following gradient-based methods are available in *fitpot*:
 
-* Gradient-based methods:
-
-  * Steepest descent (SD)
-  * Quasi-Newton method (BFGS)
-  * Conjugate gradient (CG)
-  * Stochastic gradient descent (SGD)
-
-* Non-gradient global optimization methods:
-
-  * Genetic algorithm (GA)
-  * Particle swarm optimization (PSO)
-  * Differential evolution (DE)
+* Steepest descent (SD)
+* Quasi-Newton method (BFGS)
+* Conjugate gradient (CG)
+* Stochastic gradient descent (SGD)
 
 
 
 Compilation
 ===============
-Some shell and python scripts are used, too. 
-To make the shell script be available on your system,
-you need to run ``configure`` and to change the permission of ``run_pmd.sh`` script as follows,
+Since some modules in *pmd* program are required for the compilation of *fitpot*, compile *pmd* before compiling *fitpot*.
 ::
 
-  $ ./configure --prefix=$(pwd)
-  $ cd pmd
-  $ make pmd
-  $ cd ..
-  $ make fitpot
-  $ chmod 755 fitpot/run_pmd.sh
+   $ cd /path/to/nap/
+   $ ./configure --prefix=$(pwd)
+   $ cd pmd
+   $ make pmd
+   $ cd ../fitpot/
+   $ make fitpot
 
 
 
 Fitting procedure
 =========================
-Hereafter, we assume that the reference data are obtained by using VASP.
+Hereafter, we assume that the reference data are obtained by using an *ab-initio* calculation program, VASP.
 
 Potential parameters are fitted as the following procedure:
 
   #. :ref:`vasp-data`
-  #. :ref:`prepare-pmd`
-  #. :ref:`prepare-scripts`
   #. :ref:`prepare-inputs`
   #. :ref:`exec-fitpot`
 
@@ -76,34 +70,34 @@ Potential parameters are fitted as the following procedure:
 
 Prepare reference data
 ------------------------------
-Assuming that there are some reference data sets in ``dataset/`` directory,
+Assuming that there are some reference data in ``dataset/`` directory,
 and all the data are stored in the directories whose names start with ``smpl_``.
 
-Files needed in eacy sample directory (``smpl_*``) are:
+The following files are required in eacy sample directory (``smpl_*``):
 
 * ``pos``
 * ``erg.ref``
 * ``frc.ref``
 * ``strs.ref``
 
-``pos`` is pmd format atom-configuration file, ``erg.erg`` contains only one number of energy of the system,
+``pos`` is a pmd-format atom-configuration file, ``erg.erg`` contains a scalar value of energy of the system,
 ``frc.ref`` contains the number of atoms in the system and forces of all atoms shown as,
 ::
 
-   4
+    4
     0.1000   0.0000   0.0000
     0.0000   0.1000   0.0000
     0.0000  -0.1000   0.0000
    -0.1000   0.0000   0.0000
 
-In case of extracting DFT data from *ab-initio* MD runs with **VASP**, positions, energy, forces and stress of each MD step 
-can be obtained from ``vasprun.xml`` file as follows.
+In the case of extracting DFT data from *ab-initio* MD runs with VASP, positions, energy, forces and stress of each MD step 
+can be obtained from ``vasprun.xml`` file as follows,
 ::
 
-  $ python path/to/nap/nappy/vasp/vasprun2fp.py /path/to/dir/that/includes/vasprun.xml/
+   $ python path/to/nap/nappy/vasp/vasprun2fp.py /path/to/dir/that/includes/vasprun.xml/
 
 
-Then you get directories with names like ``#####`` including ``pos``, ``erg.ref``, ``frc.ref`` and ``stress.ref`` files in it.
+Then you get directories with names like ``#####`` including ``pos``, ``erg.ref``, ``frc.ref`` and ``strs.ref`` files in them.
 
 
 .. _prepare-inputs:
@@ -113,9 +107,9 @@ Prepare input files
 Inputs files needed for *fitpot* are the following:
 
  * ``in.fitpot``
- * ``in.params.DNN`` (in case of DNN potential) or ``in.vars.fitpot`` (in case of other potential)
- * ``in.params.desc`` (in case of potentials that use descriptors)
- * ``in.params.Coulomb`` in each ``smpl_XXX`` directory in some cases
+ * ``in.params.DNN``
+ * ``in.params.desc``
+ * ``in.params.Coulomb`` in each ``smpl_XXX`` directory in some special cases
 
 
 You have to specify the ``num_samples`` in ``in.fitpot`` file 
@@ -124,7 +118,7 @@ The number of sample directories can be counted by the following command,
 
 .. code-block:: bash
 
-  $ ls /path/to/dataset | grep smpl_ -c
+   $ ls /path/to/dataset | grep smpl_ -c
 
 
 
@@ -133,15 +127,15 @@ The number of sample directories can be counted by the following command,
 Run *fitpot* program
 ------------------------------------
 In the directory where ``dataset/`` directory and ``in.fitpot`` file exist,
-you can run *fitpot* program as,
+you can run the *fitpot* program as,
 ::
 
-  $ ~/src/nap/fitpot/fitpot > out.fitpot 2>&1 &
+   $ ~/src/nap/fitpot/fitpot > out.fitpot 2>&1 &
 
 Or if you want it to run in parallel mode,
 ::
 
-  $ mpirun -np 10 ~/src/nap/fitpot/fitpot > out.fitpot 2>&1 &
+   $ mpirun -np 10 ~/src/nap/fitpot/fitpot > out.fitpot 2>&1 &
 
 There are some output files:
 
@@ -174,13 +168,13 @@ The following code shows an example of the input file ``in.fitpot``.
                      
    fitting_method    bfgs
    sample_directory  "../dataset"
-   param_file        in.params.NN
+   param_file        in.params.DNN
    normalize_input   none
                      
    energy_match       T
    force_match        T
    stress_match       T
-   potential         NN2
+   potential          DNN
                      
    ftol              1.0e-5
    xtol              1.0e-4
@@ -188,12 +182,8 @@ The following code shows an example of the input file ``in.fitpot``.
    penalty           none
    penalty_weight    1d-3
 
-   # 1:Al, 2:Mg, 3:Si
-   specorder    Al Mg Si
-
-   atom_energy  Al  -0.19778
-   atom_energy  Mg  -0.00074
-   atom_energy  Si  -0.80706
+   # Species order:  1) Al, 2) Mg, 3) Si
+   specorder    Al  Mg  Si
 
 
 
@@ -205,7 +195,7 @@ Here are input parameters that users can change in *fitpot* program.
 * :ref:`num_samples`
 * :ref:`sample_list`
 * :ref:`test_ratio`
-* :ref:`num_iteration`
+* :ref:`num_iteration_fitpot`
 * :ref:`num_iter_eval`
 * :ref:`fitting_method`
 * :ref:`sample_directory`
@@ -279,7 +269,7 @@ Thus the number of test data set is :math:`rN`, and the number of training data 
 
 ---------
 
-.. _num_iteration:
+.. _num_iteration_fitpot:
 
 num_iteration
 --------------------
@@ -318,9 +308,6 @@ Available methods are the following:
 *bfgs/BFGS* :
    Quasi-Newton method with BFGS. This requires gradient information.
 
-*de/DE*, *ga/GA*, *pso/PSO* :
-   Meta-heuristic algorithms that does not use gradient information.
-
 *check_grad* :
    Comparison of analytical derivative and numerical derivative.
    Use this to check the implemented analytical gradient.
@@ -351,7 +338,7 @@ If you want to use ``..`` to specify the directory relative to the current worki
 
 param_file
 --------------------
-Default: *in.params.NN*
+Default: *in.params.DNN*
 
 The name of the file that has parameter values in it. This is passed to ``pmd`` program.
 
@@ -396,12 +383,12 @@ It is recommended to match not only energy but also forces, since forces are imp
 potential or force_field
 --------------------------
 
-Default: *NN2*
+Default: *DNN*
 
 The potential whose parameters you are going to fit.
 Potentials currently available:
 
-*NN2*:
+*DNN*:
    Neural network potential
 
 ---------
@@ -413,7 +400,7 @@ random_seed
 Default: *12345d0*
 
 Initial random seed for the uniform random numbers used in the *fitpot*.
-This mainly works to change the choice of training and test sets.
+This is used to change the random choice of training and test sets.
 
 ---------
 
@@ -421,7 +408,7 @@ This mainly works to change the choice of training and test sets.
 
 regularize
 --------------------
-Whether or not regularize bases obtained in *linreg* and *NN?* potentials. ( *True* or *False* )
+Whether or not regularize bases obtained in *linreg* and *DNN* potentials. ( *True* or *False* )
 
 Default: *False*
 
@@ -470,10 +457,10 @@ There must be the same number of following entry lines as the above value which 
 ::
 
   sample_error   2
-      Al_fcc    0.001  0.2
-      Al_bcc    0.001  0.2
+      Al_fcc    0.001  0.2  1.0
+      Al_bcc    0.001  0.2  1.0
 
-The each entry has *entry_name*, *error of energy (eV/atom)* and *error of forces (eV/Ang)*.
+The each entry has *entry_name*, *error of energy (eV/atom)*, *error of forces (eV/Ang)* and *error of stresses (GPa)*.
 The error values are applied to all the samples that contain *entry_name* in their directory names.
 
 -----
@@ -522,31 +509,6 @@ Default: *none*
 
 The order of species common in fitpot. 
 This must be specified before ``atom_energy`` entry and must hold for every samples.
-
------------
-
-.. _atom_energy:
-
-atom_energy
---------------------
-
-Default: *0.0* for each species.
-
-.. note::
-
-   ``DNN`` potential no longer requires the ``atom_energy`` information as the atomic energies are predicted using bias terms in the NN configuration. So if you are to fit ``DNN`` parameters, do not care about this entry. 
-
-A DFT atomic energy that will be subtracted from the energies of sample structures.
-Since the energy values of sample structures include the energies of atoms that are isolated 
-in vacuum or gas phase.
-The atomic energies of all atoms in the system should be specified in the following format:
-::
-
-  atom_energy   Si   -0.808364
-  atom_energy   H    -1.109340
-
-where the first argument is species-name and the second is the atomic energy of the species.
-
 
 --------------
 
