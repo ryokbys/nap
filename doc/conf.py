@@ -59,7 +59,7 @@ source_suffix = {
 master_doc = 'index'
 
 # General information about the project.
-project = u'nap manual'
+project = u'nap documentation'
 copyright = u'2014-2020, Ryo KOBAYASHI'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -185,7 +185,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'nap_manualdoc'
+htmlhelp_basename = 'nap_doc'
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -209,13 +209,13 @@ latex_elements = {
 """,
 }
 
-latex_docclass = {'manual': 'jsbook'}
+latex_docclass = {'documentation': 'jsbook'}
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'nap_manual.tex', u'nap\\_manual Documentation',
-   u'Ryo KOBAYASHI', 'manual'),
+  ('index', 'nap_doc.tex', u'nap Documentation',
+   u'Ryo KOBAYASHI', 'documentation'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -244,7 +244,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'nap_manual', u'nap_manual Documentation',
+    ('index', 'nap_doc', u'nap Documentation',
      [u'Ryo KOBAYASHI'], 1)
 ]
 
@@ -258,8 +258,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'nap_manual', u'nap_manual Documentation',
-   u'Ryo KOBAYASHI', 'nap_manual', 'One line description of project.',
+  ('index', 'nap_doc', u'nap Documentation',
+   u'Ryo KOBAYASHI', 'nap_doc', 'One line description of project.',
    'Miscellaneous'),
 ]
 

@@ -1,4 +1,4 @@
 *.pmd
 out.temperature
-pmd00*
+dump_*
 out.erg

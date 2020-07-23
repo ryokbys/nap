@@ -13,7 +13,7 @@ time_interval     1d0
 num_iteration     100
 num_out_energy    100
 
-flag_out_pmd      1
+flag_out_pmd      2
 num_out_pmd       10
 
 force_type        Ito3_WHe
@@ -31,6 +31,3 @@ temperature_relax_time  100d0
 factor_direction 3 2
   1.000d0  1.000d0  1.000d0
   1.000d0  0.000d0  1.000d0
-
-mass  1    183.84
-mass  2    4.0

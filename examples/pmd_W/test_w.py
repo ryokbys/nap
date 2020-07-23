@@ -15,19 +15,19 @@ from docopt import docopt
 import unittest
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "170122"
+__version__ = "200723"
 
 def get_init_epot(fname='out.pmd'):
     with open(fname,'r') as f:
         for line in f.readlines():
-            if 'potential energy' in line:
+            if 'Potential energy' in line:
                 dat = line.split()
                 epot = float(dat[2])
                 break
     return epot
-                
 
-class TestNN(unittest.TestCase):
+
+class TestMD(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
@@ -41,7 +41,7 @@ class TestNN(unittest.TestCase):
         print(cmd)
         os.system(cmd)
         
-    def test_nn(self):
+    def test_pmd(self):
         os.chdir(self._dir)
         eref = get_init_epot(fname='out.pmd.REF')
         epot = get_init_epot(fname='out.pmd')

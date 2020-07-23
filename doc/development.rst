@@ -3,7 +3,7 @@
 Development
 ====================
 
-This package, **NAP** , is an open source project.
+This package, **nap** , is an open source project.
 And you can modify and use for free of charge and by your own risk.
 
 Usually users have to modify program source codes 
@@ -245,7 +245,7 @@ When ``atoms.get_potential_energy()`` is called, pmd program is performed backgr
 Versioning and tagging
 ======================
 
-The **NAP** uses Git for version controlling.
+The **nap** uses Git for version controlling.
 Developers are recommended to make new branches to modify codes, and merge the change to the master branch.
 Tags are named like ``rev170605`` which means the *revision* of the date 2017-06-05. If you need to make new tag at the same date, which would not happen often, you can name the tags like ``rev170605_1`` or something like this by adding some suffix after an underscore.
 

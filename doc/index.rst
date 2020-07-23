@@ -4,13 +4,13 @@
    contain the root `toctree` directive.
 
 :author: Ryo KOBAYASHI
-:date: Last modified: <2020-07-23 18:59:54 Ryo KOBAYASHI>
+:date: Last modified: <2020-07-23 22:20:17 Ryo KOBAYASHI>
 
-==========
-nap manual
-==========
+===================
+nap documentation
+===================
 
-This is a manual of the **Nagoya Atomistic-simulation Package (nap)**.
+This is a documentation of **Nagoya Atomistic-simulation Package (nap)**.
 
 - **nap** is hosted at Github: https://github.com/ryokbys/nap
 - **nap** includes the following programs and utilities:
