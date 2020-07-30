@@ -1,13 +1,17 @@
- screened_bvs 
-   1 O        2   0.66    2
-   2 Li       1   1.28    2
-   3 La       3   2.07    6
-   4 Zr       4   1.75    5
- interactions 
-   1   1
-   2   2
-   2   3
-   2   4
-   3   3
-   3   4
-   4   4
+terms   screened_cut
+charges   fixed_bvs 
+   O       -2.0   0.66    2
+   Li       1.0   1.28    2
+   La       3.0   2.07    6
+   Zr       4.0   1.75    5
+
+fbvs   1.000
+
+interactions 
+   O   O
+   Li  Li
+   Li  La
+   Li  Zr
+   La  La
+   La  Zr
+   Zr  Zr

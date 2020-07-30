@@ -1,0 +1,22 @@
+terms   screened_cut
+charges   fixed_bvs
+  Li    1.0   1.1049   1
+  Al    3.0   0.8200   1
+  Ti    4.0   0.8159   1
+  P     5.0   0.8120   1
+  O    -2.0   0.7267   1
+
+fbvs      1.000
+
+interactions
+   Li   Li 
+   Li   Al 
+   Li   Ti 
+   Li   P  
+   Al   Al 
+   Al   Ti 
+   Al   P  
+   Ti   Ti 
+   Ti   P  
+   P    P  
+   O    O  

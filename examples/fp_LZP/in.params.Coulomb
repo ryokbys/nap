@@ -1,0 +1,17 @@
+terms   screened_cut
+charges   fixed_bvs
+  Li    1.0   1.0395   1
+  Zr    4.0   1.0500   1
+  P     5.0   0.7273   1
+  O    -2.0   0.7823   1
+
+fbvs      1.000
+
+interactions
+   Li   Li 
+   Li   Zr 
+   Li   P  
+   Zr   Zr 
+   Zr   P  
+   P    P  
+   O    O  

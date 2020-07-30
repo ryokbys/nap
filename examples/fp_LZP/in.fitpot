@@ -1,0 +1,38 @@
+num_iteration       1
+
+print_level         1
+
+fitting_method   cs
+sample_directory "./"
+param_file in.vars.fitpot
+
+rdf_match   true  1.0
+adf_match   true  1.0
+vol_match   true  1.0
+lat_match   false
+potential   BVSx
+
+cs_num_individuals   4
+cs_fraction          0.25
+update_vrange        10
+fval_upper_limit     100.0
+
+specorder  Li Zr P O
+
+rdf_pairs  5
+  Li  Li
+  Li  O
+  Zr  O
+  P   O
+  O   O
+
+adf_triplets  2
+  Zr  O   O
+  P   O   O
+
+interactions  5
+  Li  O
+  Zr  O
+  P   O
+  P   O   O
+  Zr  O   O

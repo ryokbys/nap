@@ -2,6 +2,8 @@
   <img width="256" src="doc/figs/logo_nap_256.png">
 </p>
 
+[![DOI](https://zenodo.org/badge/20047602.svg)](https://zenodo.org/badge/latestdoi/20047602)
+
 # What's nap
 **Nagoya Atomistic-simulation Package (nap)** includes the following programs and utilities:
 - parallel molecular dynamics simulation (*pmd*)

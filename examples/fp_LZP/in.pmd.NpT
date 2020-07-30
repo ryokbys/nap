@@ -1,0 +1,33 @@
+max_num_neighbors         200
+
+time_interval              2.0
+num_iteration            10000
+min_iteration               5
+num_out_energy           1000
+
+flag_out_pmd                2
+num_out_pmd               100
+flag_sort                   1
+
+force_type           Morse Coulomb
+cutoff_radius                6.0
+cutoff_buffer                0.3
+
+flag_damping                 0
+damping_coeff                0.99
+converge_eps                 1.0e-05
+converge_num                 3
+
+initial_temperature        1073.0
+# final_temperature          1000.0
+temperature_control        Langevin
+temperature_target         1  1073.0
+temperature_relax_time     50.0
+remove_translation         1
+
+factor_direction          3 1
+    1.00   1.00   1.00
+
+stress_control              vc-Berendsen
+pressure_target              0.0
+stress_relax_time           50.0

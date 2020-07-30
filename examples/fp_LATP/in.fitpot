@@ -1,0 +1,30 @@
+num_iteration      2
+
+print_level         1
+
+fitting_method   cs
+sample_directory "./"
+param_file in.vars.fitpot
+
+match     rdf adf vol
+# rdf_match   true  1.0
+# adf_match   true  1.0
+# vol_match   true  1.0
+# lat_match   false
+potential   BVSx
+
+cs_num_individuals   4
+cs_fraction          0.25
+update_vrange        10
+fval_upper_limit     100.0
+
+specorder  Li Al Ti P O
+
+interactions  7
+  Li  O
+  Al  O
+  Ti  O
+  P   O
+  Al  O  O
+  Ti  O  O
+  P   O  O
