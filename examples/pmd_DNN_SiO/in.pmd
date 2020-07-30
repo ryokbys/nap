@@ -1,0 +1,38 @@
+!
+!  unit of time  = femto sec
+!  unit of length= Angstrom
+!  unit of mass  = unified atomic mass unit
+!
+print_level       1
+io_format         ascii
+
+max_num_neighbors  200
+
+time_interval     -2.0d0
+num_iteration     1000
+num_out_energy    100
+
+flag_out_pmd      2
+num_out_pmd       100
+
+force_type        DNN  ZBL
+cutoff_radius     5.00
+cutoff_buffer     0.3d0
+
+flag_damping      0
+damping_coeff     0.99d0
+converge_eps      1e-5
+converge_num      3
+
+initial_temperature     300d0
+# final_temperature       2000d0
+temperature_control     none
+temperature_target   1  2000d0
+temperature_relax_time  100d0
+
+factor_direction 3 1
+  1.000d0  1.000d0  1.000d0
+
+stress_control       none
+pressure_target      0d0
+
