@@ -249,3 +249,5 @@ The **nap** uses Git for version controlling.
 Developers are recommended to make new branches to modify codes, and merge the change to the master branch.
 Tags are named like ``rev170605`` which means the *revision* of the date 2017-06-05. If you need to make new tag at the same date, which would not happen often, you can name the tags like ``rev170605_1`` or something like this by adding some suffix after an underscore.
 
+Versioning in **nap** follows (not strictly) the `semantic versioning <https://semver.org>`_. However, since API is not defined, the major version will never get one and the version will be like ``v0.x,x``.
+

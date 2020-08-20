@@ -54,7 +54,7 @@ In either of these two directories, you can try *fp.py* by running the following
 
    $ python /path/to/nap/nappy/fitpot/fp.py --nproc 4 | tee out.fp
 
-This could take a few minutes using 4 processes. And you can see some output files written by *fp.py*.
+This could take a few minutes using 4 processes. And you can see some output files written by *fp.py*. See how to discuss results in :ref:`fp_results`.
 
 -----
 
@@ -319,7 +319,7 @@ Files and directories created by *fp.py* are,
 - ``subdir_###`` -- Directories used for the calculations of individuals. You can remove these directories after the run. 
 
 
-How to convert *fp.py* parameter file to *pmd* parameter files
+Convert *fp.py* parameter file to *pmd* parameter files
 -----------------------------------------------------------------
 
 ::
@@ -329,7 +329,7 @@ How to convert *fp.py* parameter file to *pmd* parameter files
 This command will create ``in.params.Morse``, ``in.params.Coulomb`` and ``in.params.angular`` files (the keyword ``BVSx`` means that these 3 potentials).
 
 
-How to visualize the evolution of optimization
+Visualize the evolution of optimization
 ------------------------------------------------
 
 One can plot loss function values of all the individuals appeared during optimization as a function of generation using *gnuplot* as,
@@ -344,7 +344,7 @@ One can plot loss function values of all the individuals appeared during optimiz
 - Check that the minimum loss function value is sufficiently small (below 0.01 per target would be good enough).
 
 
-How to visualize the distribution of each parameters
+Visualize the distribution of each parameters
 ---------------------------------------------------------
 
 You can plot the parameter values of all the individuals using the data in ``out.cs.individuals`` as,
