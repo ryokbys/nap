@@ -4,7 +4,7 @@ Introduction
 *pmd* is an acronym of **parallel molecular dynamics** which
 means that molecular dynamics (MD) using spatial decomposition technique
 on parallel (ditributed-memory) computers.
-And *pmd* is a part of the **Nagoya atomistic-simulation package (NAP)**.
+And *pmd* is a part of the **Nagoya atomistic-simulation package (nap)**.
 
 The main features of *pmd* are the following:
 
@@ -24,11 +24,11 @@ Since this program has been developed for the purpose of personal research tool,
 there are not so many functionalities. 
 And there are some (open source) MD programs that can do almost the same thing that *pmd* 
 can do. 
-But there are some features only *pmd* or the parent packange **NAP** can do.
+But there are some features only *pmd* or the parent packange **nap** can do.
 Please feel free to contact me to ask anything
-if you want to use *pmd* or **NAP** for your specific purpose.
+if you want to use *pmd* or **nap** for your specific purpose.
 
-Bug reports and questions about *pmd* and **NAP** are welcome,
+Bug reports and questions about *pmd* and **nap** are welcome,
 but I am afraid that I might not be able to respond all the reports or questions.
 
 

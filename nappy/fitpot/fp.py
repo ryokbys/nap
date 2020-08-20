@@ -756,11 +756,12 @@ def main(args):
             refdata['lat'] = (a,b,c,alp,bet,gmm)
     kwargs['refdata'] = refdata
 
-    fbvs, rads, vids, npqs = read_params_Coulomb('in.params.Coulomb')
+    fbvs, rads, vids, npqs, charges = read_params_Coulomb('in.params.Coulomb')
     kwargs['fbvs'] = fbvs
     kwargs['rads'] = rads
     kwargs['vids'] = vids
     kwargs['npqs'] = npqs
+    kwargs['charges'] = charges
 
     maxiter = kwargs['num_iteration']
     if kwargs['fitting_method'] in ('de','DE'):

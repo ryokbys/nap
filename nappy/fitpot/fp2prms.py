@@ -79,17 +79,19 @@ def read_params_Coulomb(infname):
     rads = {}
     vids = {}
     npqs = {}
+    charges = 'None'
     for line in lines:
-        if line[0] in ('!','#'):
-            continue
         data = line.split()
         if len(data) == 0:
             mode = None
             continue
+        if line[0] in ('!','#'):
+            continue
         if data[0] == 'charges':
-            if not data[1] == 'fixed_bvs':
+            if not data[1] in ('fixed_bvs','fixed'):
                 raise ValueError('charges should be fixed_bvs in '+infname)
-            mode = 'charges'
+            mode = 'charges:'+data[1]
+            charges = data[1]
             continue
         elif data[0] == 'fbvs':
             fbvs = float(data[1])
@@ -98,18 +100,32 @@ def read_params_Coulomb(infname):
         elif data[0] == 'interactions':
             mode = None
             continue
-        elif mode == 'charges':
-            if len(data) != 4:
-                raise ValueError('format of {0:s} seems wrong.'.format(infname))
-            csp = data[0]
-            vid = float(data[1])
+        elif data[0] == 'rad_screened_cut':
+            csp = data[1]
             rad = float(data[2])
-            npq = int(data[3])
-            vids[csp] = vid
             rads[csp] = rad
-            npqs[csp] = npq
-
-    return fbvs,rads,vids,npqs
+            mode = None
+            continue
+        elif mode is not None and 'charges' in mode:
+            if '_bvs' in mode:
+                if len(data) != 4:
+                    raise ValueError('format of {0:s} seems wrong.'.format(infname))
+                csp = data[0]
+                vid = float(data[1])
+                rad = float(data[2])
+                npq = int(data[3])
+                vids[csp] = vid
+                rads[csp] = rad
+                npqs[csp] = npq
+            elif 'fixed' in mode:
+                if len(data) != 2:
+                    raise ValueError('format of {0:s} seems wrong.'.format(infname))
+                csp = data[0]
+                vid = float(data[1])
+                vids[csp] = vid
+        else:
+            pass
+    return fbvs,rads,vids,npqs,charges
 
 def read_vars_fitpot(fname='in.vars.fitpot'):
     """
@@ -157,21 +173,31 @@ def write_params_Morse(outfname,pairs,morse_prms):
             
     return None
 
-def write_params_Coulomb(outfname,specorder,pairs,fbvs,rads,vids=None,npqs=None):
+def write_params_Coulomb(outfname,specorder,pairs,fbvs,rads,
+                         vids=None,npqs=None,charges=None):
     """
     Write in.params.Coulomb specific for BVS.
     """
     
     with open(outfname,'w') as f:
         f.write('terms   screened_cut\n')
-        f.write('charges   fixed_bvs\n')
-        if vids is not None and npqs is not None:
+        f.write('charges   {0:s}\n'.format(charges))
+        if charges == 'fixed_bvs':
+            if vids is None or npqs is None:
+                raise ValueError('vids and npqs should not be None in the case of charges==fixed_bvs.')
             for s in specorder:
                 f.write('  {0:3s}  {1:4.1f}  {2:7.4f}  {3:2d}\n'.format(s,vids[s],
                                                                         rads[s],npqs[s]))
-        else:
+        elif charges == 'fixed':
+            if vids is None:
+                raise ValueError('vids should not be None in the case of charges==fixed.')
             for s in specorder:
-                f.write('  {0:3s}  Vid   {1:7.4f}  npq\n'.format(s,rads[s]))
+                f.write('  {0:3s}  {1:7.4f}\n'.format(s,vids[s]))
+            f.write('\n')
+            for s in specorder:
+                f.write('rad_screened_cut  {0:3s}  {1:7.4f}\n'.format(s,rads[s]))
+        else:
+            raise ValueError('No charges specified.')
         f.write('\n')
         f.write('fbvs    {0:7.3f}\n'.format(fbvs))
         f.write('\n')
@@ -284,8 +310,9 @@ def fp2BVS(varsfp, **kwargs):
     if 'vids' in kwargs.keys():
         vids0 = kwargs['vids']
         npqs0 = kwargs['npqs']
+        charges = kwargs['charges']
         write_params_Coulomb('in.params.Coulomb',specorder,pairs,fbvs,rads,
-                             vids=vids0,npqs=npqs0)
+                             vids=vids0,npqs=npqs0,charges=charges)
     else:
         write_params_Coulomb('in.params.Coulomb',specorder,pairs,fbvs,rads)
 
@@ -339,9 +366,12 @@ def fp2BVSx(varsfp, **kwargs):
     if 'vids' in kwargs.keys():
         vids0 = kwargs['vids']
         npqs0 = kwargs['npqs']
+        charges = kwargs['charges']
         write_params_Coulomb('in.params.Coulomb',specorder,pairs,fbvs,rads,
-                             vids=vids0,npqs=npqs0)
+                             vids=vids0,npqs=npqs0,charges=charges)
     else:
+        print('no vids?')
+        print(kwargs.keys())
         write_params_Coulomb('in.params.Coulomb',specorder,pairs,fbvs,rads)
 
     return None
@@ -401,9 +431,10 @@ if __name__ == "__main__":
         """
         #...If there is an old in.params.Coulomb file, get Vid and npq from it
         try:
-            fbvs0,rads0,vids0,npqs0 = read_params_Coulomb('in.params.Coulomb')
+            fbvs0,rads0,vids0,npqs0,charges = read_params_Coulomb('in.params.Coulomb')
             kwargs['vids'] = vids0
             kwargs['npqs'] = npqs0
+            kwargs['charges'] = charges
         except Exception as e:
             pass
         varsfp = read_vars_fitpot(infname)
@@ -419,9 +450,10 @@ if __name__ == "__main__":
         kwargs['triplets'] = triplets
         #...If there is an old in.params.Coulomb file, get Vid and npq from it
         try:
-            fbvs0,rads0,vids0,npqs0 = read_params_Coulomb('in.params.Coulomb')
+            fbvs0,rads0,vids0,npqs0,charges = read_params_Coulomb('in.params.Coulomb')
             kwargs['vids'] = vids0
             kwargs['npqs'] = npqs0
+            kwargs['charges'] = charges
         except Exception as e:
             pass
         
