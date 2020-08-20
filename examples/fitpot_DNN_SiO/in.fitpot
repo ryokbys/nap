@@ -1,0 +1,44 @@
+num_samples     2
+num_iteration   100
+num_iter_eval   5
+converge_num    3
+
+# print_level 12
+max_num_neighbors   300
+
+test_ratio 0.1
+
+sample_directory  "./dataset/"
+param_file        in.params.DNN
+
+# fitting_method    test
+fitting_method    bfgs
+xtol              1.0e-8
+
+# init_params      read
+init_params      gauss
+init_params_rs   123456  # random seed
+
+potential      DNN
+subtract_potential  ZBL
+
+energy_match   true
+force_match    true
+stress_match   true
+force_denom_type   abs2rel
+stress_denom_type  abs2rel
+# fval_upper_limit 1.0d+10
+force_limit       50.0
+stress_limit      50.0
+
+sample_error   1
+   smpl_    0.002    0.01   0.3
+
+# compos_weight  T
+# compos_weight_scale  1.0
+
+# gaussian_density_weight   T
+# GDW_sigma        2.0
+
+specorder  Si O
+
