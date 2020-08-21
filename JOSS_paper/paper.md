@@ -28,11 +28,13 @@ The paremeters of classical potentials can be optimized to any target quantity t
 
 # Programs for fitting potential parameters
 
+- **fp.py**: A Python program to optimize the parameters of classical potentials using meta-heuristic algorithms. Meta-heuristic algorithms require to perform MD simulations and to evaluate the quantities to be compared with target values for each individual representing a candidate parameter set. 
 - **fitpot**: A Fortran program to optimize the parameters of NN potential using gradient-based methods. It can use high-performance computer resources to evaluate energies, forces and stresses of huge number of sample systems in parallel using MPI library, which is sometimes crucial since in general ML models require a lot of sampling to make them robust.
-- **fp.py**: A Python program to optimize the parameters of classical potentials using meta-heuristic algorithms. Meta-heuristic algorithms require to perform MD simulations and evaluate the quantities to be compared with target values for each individual (nest in case of cuckoo search) representing a candidate parameter set. 
 
 
 # Statement of need
+
+
 
 # Acknowledgements
 
