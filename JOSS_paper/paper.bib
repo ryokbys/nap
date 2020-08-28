@@ -1,13 +1,181 @@
 
-@article{Pearson:2017,
-  	Adsnote = {Provided by the SAO/NASA Astrophysics Data System},
-  	Adsurl = {http://adsabs.harvard.edu/abs/2017arXiv170304627P},
-  	Archiveprefix = {arXiv},
-  	Author = {{Pearson}, S. and {Price-Whelan}, A.~M. and {Johnston}, K.~V.},
-  	Eprint = {1703.04627},
-  	Journal = {ArXiv e-prints},
-  	Keywords = {Astrophysics - Astrophysics of Galaxies},
-  	Month = mar,
-  	Title = {{Gaps in Globular Cluster Streams: Pal 5 and the Galactic Bar}},
-  	Year = 2017
+@ARTICLE{Stadler1997-wr,
+  title     = "{IMD}: A Software Package for Molecular Dynamics Studies on
+               Parallel Computers",
+  author    = "Stadler, J and Mikulla, R and Trebin, H-R",
+  abstract  = "We report on implementation and performance of the program IMD,
+               designed for short range molecular dynamics simulations on
+               massively parallel computers. After a short explanation of the
+               cell-based algorithm, its extension to parallel computers as
+               well as two variants of the communication scheme are discussed.
+               We provide performance numbers for simulations of different
+               sizes and compare them with values found in the literature.
+               Finally we describe two applications, namely a very large scale
+               simulation with more than 1.23?109 atoms, to our knowledge the
+               largest published MD simulation up to this day and a simulation
+               of a crack propagating in a two-dimensional quasicrystal.",
+  journal   = "Int. J. Mod. Phys. C",
+  publisher = "World Scientific Publishing Co.",
+  volume    =  08,
+  number    =  05,
+  pages     = "1131--1140",
+  month     =  oct,
+  year      =  1997
+}
+
+@ARTICLE{Kobayashi2020-rz,
+  title     = "High-throughput production of force-fields for solid-state
+               electrolyte materials",
+  author    = "Kobayashi, Ryo and Miyaji, Yasuhiro and Nakano, Koki and
+               Nakayama, Masanobu",
+  abstract  = "An automatic and high-throughput method to produce interatomic
+               force-fields for solid-state electrolyte materials is proposed.
+               The proposed method employs the cuckoo search algorithm with an
+               automatic update of search space to optimize parameters in
+               empirical potentials to reproduce radial and angular
+               distribution functions and equilibrium volume obtained from the
+               ab initio molecular dynamics simulation. The force-fields for
+               LiZr2(PO4)3 and LaF3 systems parameterized using the present
+               method well reproduce key physical properties required to study
+               ion conductivity of solid-state electrolyte materials. The
+               current approach takes only one or two days to produce a
+               force-field including the ab initio calculation to create
+               reference data, which will greatly enhance the speed of
+               exploration and screening of candidate materials.",
+  journal   = "APL Materials",
+  publisher = "American Institute of Physics",
+  volume    =  8,
+  number    =  8,
+  pages     = "081111",
+  month     =  aug,
+  year      =  2020
+}
+
+@ARTICLE{Brommer2015-hw,
+  title     = "Classical interaction potentials for diverse materials from ab
+               initio data: A review of potfit",
+  author    = "Brommer, Peter and Kiselev, Alexander and Schopf, Daniel and
+               Beck, Philipp and Roth, Johannes and Trebin, Hans-Rainer",
+  abstract  = "Force matching is an established technique to generate effective
+               potentials for molecular dynamics simulations from
+               first-principles data. This method has been implemented in the
+               open source code potfit. Here, we present a review of the method
+               and describe the main features of the code. Particular emphasis
+               is placed on the features added since the initial release:
+               interactions represented by analytical functions, differential
+               evolution as optimization method, and a greatly extended set of
+               interaction models. Beyond the initially present pair and
+               embedded-atom method potentials, potfit can now also optimize
+               angular dependent potentials, charge and dipolar interactions,
+               and electron-temperature-dependent potentials. We demonstrate
+               the functionality of these interaction models using three
+               example systems: phonons in type I clathrates, fracture of
+               $\alpha$-alumina, and laser-irradiated silicon.",
+  journal   = "Modell. Simul. Mater. Sci. Eng.",
+  publisher = "IOP Publishing",
+  volume    =  23,
+  number    =  7,
+  year      =  2015,
+  keywords  = "effective potentials; force matching; materials modeling;
+               multiscale simulation"
+}
+
+@ARTICLE{Morawietz2013-qq,
+  title    = "A {Density-Functional} {Theory-Based} Neural Network Potential
+              for Water Clusters Including van der Waals Corrections",
+  author   = "Morawietz, Tobias and Behler, J{\"o}rg",
+  journal  = "J. Phys. Chem. A",
+  volume   =  117,
+  number   =  32,
+  pages    = "7356--7366",
+  month    =  aug,
+  year     =  2013,
+  keywords = "neural network"
+}
+
+@ARTICLE{Artrith2016-mu,
+  title     = "An implementation of artificial neural-network potentials for
+               atomistic materials simulations: Performance for {TiO2}",
+  author    = "Artrith, Nongnuch and Urban, Alexander",
+  abstract  = "Computational Materials Science, 114 (2016) 135-150.
+               doi:10.1016/j.commatsci.2015.11.047",
+  journal   = "Comput. Mater. Sci.",
+  publisher = "Elsevier B.V.",
+  volume    =  114,
+  number    = "C",
+  pages     = "135--150",
+  month     =  mar,
+  year      =  2016,
+  keywords  = "interatomic potential; neural network"
+}
+
+@ARTICLE{Plimpton1995-az,
+  title     = "Fast parallel algorithms for short-range molecular dynamics",
+  author    = "Plimpton, S",
+  abstract  = "Three parallel algorithms for classical molecular dynamics are
+               presented. The first assigns each processor a fixed subset of
+               atoms; the second assigns each a fixed subset of inter- atomic
+               forces to compute; the third assigns each a fixed spatial
+               region. The algorithms are ...",
+  journal   = "J. Comput. Phys.",
+  publisher = "Elsevier Inc.",
+  volume    =  117,
+  number    =  1,
+  pages     = "1--19",
+  month     =  jan,
+  year      =  1995,
+  keywords  = "MD"
+}
+
+@ARTICLE{Brommer2007-kr,
+  title    = "Potfit: Effective potentials from ab initio data",
+  author   = "Brommer, Peter and G{\"a}hler, Franz",
+  abstract = "We present a program called potfit which generates an effective
+              atomic interaction potential by matching it to a set of reference
+              data computed in first-principles calculations. It thus allows
+              one to perform large-scale atomistic simulations of materials
+              with physically justified potentials. We describe the fundamental
+              principles behind the program, emphasizing its flexibility in
+              adapting to different systems and potential models, while also
+              discussing its limitations. The program has been used
+              successfully in creating effective potentials for a number of
+              complex intermetallic alloys, notably quasicrystals. \copyright{}
+              2007 IOP Publishing Ltd.",
+  journal  = "Modell. Simul. Mater. Sci. Eng.",
+  volume   =  15,
+  number   =  3,
+  pages    = "295--304",
+  year     =  2007
+}
+
+
+@ARTICLE{Wang2019-py,
+  title     = "Deep learning inter-atomic potential model for accurate
+               irradiation damage simulations",
+  author    = "Wang, Hao and Guo, Xun and Zhang, Linfeng and Wang, Han and Xue,
+               Jianming",
+  abstract  = "We propose a hybrid scheme that smoothly interpolates the
+               Ziegler-Biersack-Littmark (ZBL) screened nuclear repulsion
+               potential with a deep learning potential energy model. The
+               resulting deep potential-ZBL model can not only provide overall
+               good performance on the predictions of near-equilibrium material
+               properties but also capture the right physics when atoms are
+               extremely close to each other, an event that frequently happens
+               in computational simulations of irradiation damage events. We
+               applied this scheme to the simulation of the irradiation damage
+               processes in the face-centered-cubic aluminum system and found
+               better descriptions in terms of the defect formation energy,
+               evolution of collision cascades, displacement threshold energy,
+               and residual point defects than the widely adopted ZBL modified
+               embedded atom method potentials and their variants. Our work
+               provides a reliable and feasible scheme to accurately simulate
+               the irradiation damage processes and opens up extra
+               opportunities to solve the predicament of lacking accurate
+               potentials for enormous recently discovered materials in the
+               irradiation effect field.",
+  journal   = "Appl. Phys. Lett.",
+  publisher = "AIP Publishing LLC",
+  volume    =  114,
+  number    =  24,
+  year      =  2019
 }
