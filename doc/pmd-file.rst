@@ -3,7 +3,7 @@
 ===========================
 Atom-configuration file
 ===========================
-Original file format described here is used in ``pmd`` .
+Original file format described here is used in *pmd* .
 
 
 File format
@@ -32,13 +32,13 @@ Here, line numbers are shown for the ease of explanation.
 
 Line 1-3:
   Lines begin with ``!`` are treated as comment lines.
-  There are some keywords that are used to specify some additional data to ``pmd`` when they are at a comment line at the beginning.
+  There are some keywords that are used to specify some additional data to *pmd* when they are at a comment line at the beginning.
 
-  - ``specorder:`` specifies the species order used in ``pmd``.
+  - ``specorder:`` specifies the species order used in *pmd*.
 
 .. note::
 
-   **specorder** must be specified in the current ``pmd`` (since *rev190515*), as the masses and the interatomic potentials are determined using this information.
+   **specorder** must be specified in the current *pmd* (since *rev190515*), as the masses and the interatomic potentials are determined using this information.
 
 Line 4:
   Superficial or apparent lattie constant. This value is to be multiplied to the cell vectors below to obtain absolute cell vectors.
@@ -97,9 +97,9 @@ Format conversion
 
 There is a python utility, ``napsys.py`` that can convert files amoung the following formats,
 
-  - ``pmd``: input format for **pmd** program.
-  - ``POSCAR``: input format of **VASP** program.
-  - ``dump``: output format of **LAMMPS** dump command.
+  - ``pmd``: input format for *pmd* program.
+  - ``POSCAR``: input format of *VASP* program.
+  - ``dump``: output format of *LAMMPS*-dump command.
 
 You can use like following,
 ::
@@ -125,7 +125,7 @@ There is also a python utility, ``cell_maker.py``, which makes typical conventio
 You can make a *pmd* format file of diamond structured cubic system with 8 atoms as,
 ::
 
-  $ python /path/to/nap/nappy/mkcell/cell_maker.py diamond -l 5.473 -o pmdini
+  $ python /path/to/nap/nappy/mkcell/cell_maker.py dia -l 5.473 -o pmdini
 
 The option ``-l`` specifies the lattice constant of the lattice.
 Output format is automatically detected from the file name.

@@ -1,4 +1,4 @@
-# nap/example/fp_LZP
+# nap/example/fp_LATP
 
 This example shows how to use `fp.py` to optimize the parameters in interatomic potential for Li-Al-Ti-P-O system. The potential forms are screened Coulomb, Morse and angular and the target quantities are RDF, ADF and equilibrium volume, see the Ref. [1] for details. The files required to perform `fp.py` are:
 

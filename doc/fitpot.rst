@@ -53,6 +53,15 @@ Since some modules in *pmd* program are required for the compilation of *fitpot*
    $ make fitpot
 
 
+-------------
+
+Quick trial with an example
+============================
+
+There is an example of *fitpot* with minimal dataset to see how it works. Go to the directory ``examples/fitpot_DNN_SiO/``, read ``README.md``, try running *fitpot*, and look at some output files.
+
+
+-------------
 
 Fitting procedure
 =========================

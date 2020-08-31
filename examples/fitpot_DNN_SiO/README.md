@@ -1,4 +1,4 @@
-# nap/example/fp_LZP
+# nap/example/fitpot_DNN_SiO
 
 This example shows how to use `fitpot` to optimize the parameters in neural-network potential for Si-O system, see the Ref. [1,2] for details of NN potential. The files required to perform `fitpot` are:
 

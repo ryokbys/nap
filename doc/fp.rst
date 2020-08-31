@@ -40,8 +40,8 @@ To minimize the above loss function, the following metaheuristic methods are ava
 
 .. _fp_procedure:
 
-Quick trial of *fp.py*
-=======================
+Quick trial with examples
+==========================
 
 There are two examples of *fp.py* in ``nap/examples/``,
 

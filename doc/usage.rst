@@ -48,7 +48,7 @@ Then you can compile the *pmd* program as following,
   $ cd pmd
   $ make pmd
 
-If you get an error of finding an MPI Fortran compiler when you are doing ``configure``,
+If you get an error of finding an MPI Fortran compiler when you are running ``configure``,
 you have to find an MPI Fortran compiler by yourself or asking the system administrator and
 do ``configure`` again by specifying the compiler position as,
 ::
@@ -67,18 +67,18 @@ it is required.
 
   you may have to specify true C preprocessor path to ``configure`` command by adding an option like ``CPP=/usr/bin/cpp``.
 
-However the *pmd* command should be available with this compilation,
-this *pmd* may not be so efficient in the system you are compiling.
-So you might need to add some options relevant for your system.
+Although the *pmd* command should be available with this compilation,
+this *pmd* may not be optimized to the system in which it is compiled.
+You might need to add some options relevant for the system in which it is compiled.
 
-gfortran in Mac OSX
+gfortran in macOS X
 _____________________
 In the case of ``gfortran`` with ``openmpi`` ,
 ::
   
    $ ./configure --prefix=$(pwd) FCFLAGS="-O2 -g"
   
-The optimization option over ``-O3`` seems to cause some errors since a certain version of gfortran, so it is recommended to use ``-O2`` optimization option.
+The optimization option over ``-O3`` seems to cause some errors depending on the version of gfortran, so it is recommended to use ``-O2`` optimization option.
 
 When you are debugging, you may had better set some warning and checking options enabled as follows.
 ::
@@ -94,7 +94,7 @@ When you are debugging, you may had better set some warning and checking options
 
 Intel Fortran Compiler
 ______________________
-If you can use ``ifort`` in your system, for example,
+If you can use Intel Fortran Compiler``ifort`` in your system, the configure command would be like,
 ::
   
    $ ./configure --prefix=$(pwd) FCFLAGS="-xHOST -O3 -ip -ipo -no-prec-div"
@@ -163,7 +163,7 @@ So you can look at the evoluation of these energies using ``gnuplot`` command as
     $ gnuplot
     gnuplot> plot 'out.erg' us 1:3 w l, 'out.erg' us 1:4 w l, 'out.erg' us 1:5 w l
 
-In this case, since you are performing *NVE* -MD simulation at 300K of diamond-Si,
+In this case, since you are performing *NVE* -MD simulation of bcc-W,
 the total energy conserves conpensating the deviations of kinetic and potential energies.
 
 .. image:: ./figs/graph_energy-steps.png
@@ -180,13 +180,12 @@ And also configurations of atoms at each 10 steps out of 100 steps are written i
 Input files needed to run pmd
 ==================================
 
-The **pmd** must be executed in the directory where these files exist.
+To run *pmd*, the following files are required in the working directory:
 
-``in.pmd``
-  Input file that describes simulation setting.
+- ``in.pmd`` -- Input file that describes simulation setting.
+- ``pmdini`` -- Cell information and initial positions and velocities of atoms.
 
-``pmdini``
-  Cell information and initial positions and velocities of atoms.
+And there are some optional files required by the *pmd* if you use interatomic potentials that require input parameters from files such as ``in.params.xxx``.
 
 .. image:: ./figs/pmd.png
 
@@ -214,8 +213,8 @@ Please refer :ref:`pmd-file` for details of atom-configuration file.
 
 One has to make an initial atom-configuration file, ``pmdini``, to run *pmd*.
 There are already some programs that make initial atom-configuration files
-of some systems ( ``mkconf/mkconf_????.F`` ).
-So you can make your own initial atom-configuration file by looking at those program codes.
+of some systems (``mkconf/mkconf_????.F`` and/or ``nappy/mkcell/cell_maker.py``).
+You can make your own initial atom-configuration file by looking at those program codes.
 
 If there is already a program that makes an atom-configuration file of your target system,
 you can make an atom-configuration file as,
@@ -227,7 +226,13 @@ you can make an atom-configuration file as,
   $ make mkconf_Si_disl
   $ ./mkconf_Si_disl
 
-Here, *Si_disl* is chosen.
+or you can use ``nappy/mkcell/cell_maker.py`` as well,
+::
+
+   $ python /path/to/nappy/mkcell/cell_maker.py -h
+   ...
+   $ python /path/to/nappy/mkcell/cell_maker.py dia -l 5.427 -s 4,4,4
+
 
 Then you get an atom-configuration file ``pmdini``.
 
@@ -296,7 +301,7 @@ is as follows,
   shear_stress   0.00
 
 
-Here, the lines begins with ``!`` or ``#`` are treated as comment lines
+Here, the lines begin with ``!`` or ``#`` are treated as comment lines
 and blanc lines are skipped.
 
 ------------
@@ -322,24 +327,21 @@ If you want to perform it background,
 
 The following files appear when you perform *pmd* :
 
-  ``out.erg``
-        Total, kinetic, potential energies, and temperature, volume, pressure.
-  ``dump_##``
-        Atom-configurations at a certain MD step is written in LAMMPS-dump format by default. ``##`` means the MD step.
+- ``out.erg`` -- Total, kinetic, potential energies, and temperature, volume, pressure.
+- ``dump_##`` -- Atom-configurations at a certain MD step is written in LAMMPS-dump format by default. ``##`` means the MD step.
 
 
 
 Run pmd on parallel-nodes
 ------------------------------------
-Different from the old version of **pmd** which requires divided atom configuration files for parallel nodes, in the current version (since 05May2016), the parallel simulation can be performed almost the same as the serial run.
+Different from the old version of *pmd* which requires divided atom configuration files for parallel nodes, in the current version (since 2016-05-05), the parallel simulation can be performed almost the same as the serial run.
 
-Just you need to describe how many divisions on each direction in ``in.pmd`` such as ``num_nodes_x``, ``num_nodes_y`` and ``num_nodes_z`` ,and run **pmd** with ``mpirun`` or ``mpiexec`` command to run MPI executable.
+Just you need to describe how many divisions on each direction in ``in.pmd`` such as ``num_nodes_x``, ``num_nodes_y`` and ``num_nodes_z`` ,and run *pmd* with ``mpirun`` or ``mpiexec`` command to run MPI executable.
 ::
 
-  $ mpirun -np 8 --machinefile hosts.list /path/to/pmd > out.pmd 2>&1 &
+  $ mpirun -np 8 /path/to/pmd > out.pmd 2>&1 &
 
-Here, *pmd* is executed on 8-nodes listed in ``hosts.list`` and 
-standard output is written in ``out.pmd`` .
+Here, *pmd* will be executed on 8-nodes and the standard output is written into ``out.pmd`` .
 
 If any job-scheduling system is available on the system you are using,
 describe the above command in your job script to be submitted.
