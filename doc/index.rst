@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 :author: Ryo KOBAYASHI
-:date: Last modified: <2020-07-23 22:20:17 Ryo KOBAYASHI>
+:date: Last modified: <2020-08-31 16:32:59 Ryo KOBAYASHI>
 
 ===================
 nap documentation
@@ -42,6 +42,15 @@ Contents:
   fp
   development
   faq
+
+-------------
+
+How to cite.
+=============
+
+- `R. Kobayashi, Y. Miyaji, K. Nakano, M. Nakayama, APL Materials 8, 081111 (2020) <https://aip.scitation.org/doi/10.1063/5.0015373>`_ for *nap* package and/or *fp.py* program.
+- `Kobayashi, Ryo, Daniele Giofré, Till Junge, Michele Ceriotti, and William Arthur Curtin. Physical Review Materials 1, 53604–11 (2017) <https://journals.aps.org/prmaterials/abstract/10.1103/PhysRevMaterials.1.053604>`_ for *fitpot* program and/or neural-network (NN) potential.
+
 
 -------------
 
