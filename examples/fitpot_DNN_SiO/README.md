@@ -8,9 +8,9 @@ This example shows how to use `fitpot` to optimize the parameters in neural-netw
 - `in.params.ZBL` -- classical potential added to the NN potential (in this case, ZBL potential)
 - `dataset/smpl_XXX/` -- reference dataset
 
-To perform `fitpot` using 4 MPI processes,
+To perform `fitpot` using 2 MPI processes,
 ```bash
-$ mpirun -np 4 /path/to/fitpot | tee out.fitpot
+$ mpirun -np 2 /path/to/fitpot | tee out.fitpot
 ```
 
 If the tail of output shows like the following, at least `fitpot` program finished corectly without errors.
