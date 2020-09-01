@@ -34,7 +34,7 @@ Recently ML potentials have been also actively studied because they are usually 
 Even though the potential is flexible or suitable to problems considered, the parameters in the potential model still need to be optimized to well reproduce the properties or phenomena that are in focus.
 
 There are already a lot of MD programs such as LAMMPS [@Plimpton1995-az] and IMD [@Stadler1997-wr], and some of them can use both CL and ML potentials.
-And also there are some parameter-optimization programs that can produce parameter sets available in the other MD programs such as aenet [@Artrith2016-mu] for ML potentials and potfit [@Brommer2007-kr,@Brommer2015-hw] for CL potentials.
+And also there are some parameter-optimization programs that can produce parameter sets available in the other MD programs such as aenet [@Artrith2016-mu] for ML potentials and potfit [@Brommer2007-kr; @Brommer2015-hw] for CL potentials.
 However, there is also a demand of combining ML potentials and simpler CL potentials, e.g., ML potential with Coulomb interactions [@Morawietz2013-qq] and ML potential with core-core repulsions [@Wang2019-py], since creating an ML potential that covers very short-range and/or very long-range interactions is very inefficient. Thus it is beneficial if the programs of parameter-optimization for both CL and ML potentials are in one package and highly connected to one MD program and it will be more efficient than using several different programs to optimize parameters of CL and ML potentials.
 
 
