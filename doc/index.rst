@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 :author: Ryo KOBAYASHI
-:date: Last modified: <2020-09-01 08:02:36 Ryo KOBAYASHI>
+:date: Last modified: <2020-09-01 14:58:51 Ryo KOBAYASHI>
 
 ===================
 nap documentation
@@ -43,6 +43,7 @@ Contents:
   fp
   development
   faq
+  publication
 
 -------------
 
