@@ -1,4 +1,44 @@
 
+@ARTICLE{Morse1929-ow,
+  title     = "Diatomic Molecules According to the Wave Mechanics. {II}.
+               Vibrational Levels",
+  author    = "Morse, Philip M",
+  journal   = "Phys. Rev.",
+  publisher = "American Physical Society",
+  volume    =  34,
+  number    =  1,
+  pages     = "57--64",
+  month     =  jul,
+  year      =  1929,
+  issn      = "0959-8472",
+  doi       = "10.1103/PhysRev.34.57"
+}
+
+@BOOK{Allen2017-nw,
+  title     = "Computer Simulation of Liquids",
+  author    = "Allen, Michael P and Tildesley, Dominic J",
+  abstract  = "This book provides a practical guide to molecular dynamics and
+               Monte Carlo simulation techniques used in the modelling of
+               simple and complex liquids. Computer simulation is an essential
+               tool in studying the chemistry and physics of condensed matter,
+               complementing and reinforcing both experiment and theory.
+               Simulations provide detailed information about structure and
+               dynamics, essential to understand the many fluid systems that
+               play a key role in our daily lives: polymers, gels, colloidal
+               suspensions, liquid crystals, biological membranes, and glasses.
+               The second edition of this pioneering book aims to explain how
+               simulation programs work, how to use them, and how to interpret
+               the results, with examples of the latest research in this
+               rapidly evolving field. Accompanying programs in Fortran and
+               Python provide practical, hands-on, illustrations of the ideas
+               in the text.",
+  publisher = "Oxford University Press",
+  month     =  aug,
+  year      =  2017,
+  language  = "en",
+  isbn      = "9780198803201"
+}
+
 @ARTICLE{Stadler1997-wr,
   title     = "{IMD}: A Software Package for Molecular Dynamics Studies on
                Parallel Computers",
@@ -20,7 +60,9 @@
   number    =  05,
   pages     = "1131--1140",
   month     =  oct,
-  year      =  1997
+  year      =  1997,
+  issn      = "0129-1831",
+  doi       = "10.1142/S0129183197000990"
 }
 
 @ARTICLE{Kobayashi2020-rz,
@@ -48,7 +90,33 @@
   number    =  8,
   pages     = "081111",
   month     =  aug,
-  year      =  2020
+  year      =  2020,
+  doi       = "10.1063/5.0015373"
+}
+
+% The entry below contains non-ASCII chars that could not be converted
+% to a LaTeX equivalent.
+@INPROCEEDINGS{Yang2009-at,
+  title      = "Cuckoo Search via Levy Flights",
+  booktitle  = "2009 World Congress on Nature \& Biologically Inspired
+                Computing ({NaBIC})",
+  author     = "Yang, Xin-She and Deb, Suash",
+  abstract   = "In this paper, we intend to formulate a new meta- heuristic
+                algorithm, called Cuckoo Search (CS), for solving optimization
+                problems. This algorithm is based on the obligate brood
+                parasitic behaviour of some cuckoo species in combination with
+                the Levy ﬂight behaviour of some birds and fruit ﬂies. We
+                validate the proposed algorithm against test functions and then
+                compare its performance with those of genetic algorithms and
+                particle swarm optimization. Finally, we discuss the
+                implication of the results and suggestion for further research.",
+  publisher  = "IEEE",
+  pages      = "210--214",
+  year       =  2009,
+  conference = "2009 World Congress on Nature \& Biologically Inspired
+                Computing (NaBIC)",
+  location   = "Coimbatore, India",
+  doi        = "10.1109/NABIC.2009.5393690"
 }
 
 @ARTICLE{Brommer2015-hw,
@@ -77,162 +145,43 @@
   number    =  7,
   year      =  2015,
   keywords  = "effective potentials; force matching; materials modeling;
-               multiscale simulation"
+               multiscale simulation",
+  doi       = "10.1088/0965-0393/23/7/074002"
 }
 
-@ARTICLE{Morawietz2013-qq,
-  title    = "A {Density-Functional} {Theory-Based} Neural Network Potential
-              for Water Clusters Including van der Waals Corrections",
-  author   = "Morawietz, Tobias and Behler, J{\"o}rg",
-  journal  = "J. Phys. Chem. A",
-  volume   =  117,
-  number   =  32,
-  pages    = "7356--7366",
-  month    =  aug,
-  year     =  2013,
-  keywords = "neural network"
-}
-
-@ARTICLE{Artrith2016-mu,
-  title     = "An implementation of artificial neural-network potentials for
-               atomistic materials simulations: Performance for {TiO2}",
-  author    = "Artrith, Nongnuch and Urban, Alexander",
-  abstract  = "Computational Materials Science, 114 (2016) 135-150.
-               doi:10.1016/j.commatsci.2015.11.047",
-  journal   = "Comput. Mater. Sci.",
-  publisher = "Elsevier B.V.",
-  volume    =  114,
-  number    = "C",
-  pages     = "135--150",
-  month     =  mar,
-  year      =  2016,
-  keywords  = "interatomic potential; neural network"
-}
-
-@ARTICLE{Plimpton1995-az,
-  title     = "Fast parallel algorithms for short-range molecular dynamics",
-  author    = "Plimpton, S",
-  abstract  = "Three parallel algorithms for classical molecular dynamics are
-               presented. The first assigns each processor a fixed subset of
-               atoms; the second assigns each a fixed subset of inter- atomic
-               forces to compute; the third assigns each a fixed spatial
-               region. The algorithms are ...",
-  journal   = "J. Comput. Phys.",
-  publisher = "Elsevier Inc.",
-  volume    =  117,
-  number    =  1,
-  pages     = "1--19",
-  month     =  jan,
-  year      =  1995,
-  keywords  = "MD"
-}
-
-@ARTICLE{Brommer2007-kr,
-  title    = "Potfit: Effective potentials from ab initio data",
-  author   = "Brommer, Peter and G{\"a}hler, Franz",
-  abstract = "We present a program called potfit which generates an effective
-              atomic interaction potential by matching it to a set of reference
-              data computed in first-principles calculations. It thus allows
-              one to perform large-scale atomistic simulations of materials
-              with physically justified potentials. We describe the fundamental
-              principles behind the program, emphasizing its flexibility in
-              adapting to different systems and potential models, while also
-              discussing its limitations. The program has been used
-              successfully in creating effective potentials for a number of
-              complex intermetallic alloys, notably quasicrystals. \copyright{}
-              2007 IOP Publishing Ltd.",
-  journal  = "Modell. Simul. Mater. Sci. Eng.",
-  volume   =  15,
-  number   =  3,
-  pages    = "295--304",
-  year     =  2007
-}
-
-
-@ARTICLE{Wang2019-py,
-  title     = "Deep learning inter-atomic potential model for accurate
-               irradiation damage simulations",
-  author    = "Wang, Hao and Guo, Xun and Zhang, Linfeng and Wang, Han and Xue,
-               Jianming",
-  abstract  = "We propose a hybrid scheme that smoothly interpolates the
-               Ziegler-Biersack-Littmark (ZBL) screened nuclear repulsion
-               potential with a deep learning potential energy model. The
-               resulting deep potential-ZBL model can not only provide overall
-               good performance on the predictions of near-equilibrium material
-               properties but also capture the right physics when atoms are
-               extremely close to each other, an event that frequently happens
-               in computational simulations of irradiation damage events. We
-               applied this scheme to the simulation of the irradiation damage
-               processes in the face-centered-cubic aluminum system and found
-               better descriptions in terms of the defect formation energy,
-               evolution of collision cascades, displacement threshold energy,
-               and residual point defects than the widely adopted ZBL modified
-               embedded atom method potentials and their variants. Our work
-               provides a reliable and feasible scheme to accurately simulate
-               the irradiation damage processes and opens up extra
-               opportunities to solve the predicament of lacking accurate
-               potentials for enormous recently discovered materials in the
-               irradiation effect field.",
-  journal   = "Appl. Phys. Lett.",
-  publisher = "AIP Publishing LLC",
-  volume    =  114,
-  number    =  24,
-  year      =  2019
-}
-
-
-@ARTICLE{Kobayashi2015-fu,
-  title     = "A molecular dynamics study on bubble growth in tungsten under
-               helium irradiation",
-  author    = "Kobayashi, Ryo and Hattori, Tatsunori and Tamura, Tomoyuki and
-               Ogata, Shuji",
-  abstract  = "Journal of Nuclear Materials, 463 (2015) 1071-1074.
-               doi:10.1016/j.jnucmat.2014.12.049",
-  journal   = "J. Nucl. Mater.",
-  publisher = "Elsevier B.V.",
-  volume    =  463,
-  number    = "C",
-  pages     = "1071--1074",
-  month     =  aug,
-  year      =  2015,
-  keywords  = "MD; bubble; dislocation; helium; tungsten"
-}
-
-@BOOK{Allen2017-nw,
-  title     = "Computer Simulation of Liquids",
-  author    = "Allen, Michael P and Tildesley, Dominic J",
-  abstract  = "This book provides a practical guide to molecular dynamics and
-               Monte Carlo simulation techniques used in the modelling of
-               simple and complex liquids. Computer simulation is an essential
-               tool in studying the chemistry and physics of condensed matter,
-               complementing and reinforcing both experiment and theory.
-               Simulations provide detailed information about structure and
-               dynamics, essential to understand the many fluid systems that
-               play a key role in our daily lives: polymers, gels, colloidal
-               suspensions, liquid crystals, biological membranes, and glasses.
-               The second edition of this pioneering book aims to explain how
-               simulation programs work, how to use them, and how to interpret
-               the results, with examples of the latest research in this
-               rapidly evolving field. Accompanying programs in Fortran and
-               Python provide practical, hands-on, illustrations of the ideas
-               in the text.",
-  publisher = "Oxford University Press",
-  month     =  aug,
-  year      =  2017,
-  language  = "en"
-}
-
-@ARTICLE{Morse1929-ow,
-  title     = "Diatomic Molecules According to the Wave Mechanics. {II}.
-               Vibrational Levels",
-  author    = "Morse, Philip M",
-  journal   = "Phys. Rev.",
+@ARTICLE{Kobayashi2017-ky,
+  title     = "Neural network potential for {Al-Mg-Si} alloys",
+  author    = "Kobayashi, Ryo and Giofr{\'e}, Daniele and Junge, Till and
+               Ceriotti, Michele and Curtin, William Arthur",
+  abstract  = "\copyright{} 2017 American Physical Society. The 6000 series Al
+               alloys, which include a few percent of Mg and Si, are important
+               in automotive and aviation industries because of their low
+               weight, as compared to steels, and the fact their strength can
+               be greatly improved through engineered precipitation. To enable
+               atomistic-level simulations of both the processing and
+               performance of this important alloy system, a neural network
+               (NN) potential for the ternary Al-Mg-Si has been created.
+               Training of the NN uses an extensive database of properties
+               computed using first-principles density functional theory,
+               including complex precipitate phases in this alloy. The NN
+               potential accurately reproduces most of the pure Al properties
+               relevant to the mechanical behavior as well as heat of solution,
+               solute-solute, and solute-vacancy interaction energies, and
+               formation energies of small solute clusters and precipitates
+               that are required for modeling the early stage of precipitation
+               and mechanical strengthening. This success not only enables
+               future detailed studies of Al-Mg-Si but also highlights the
+               ability of NN methods to generate useful potentials in complex
+               alloy systems.",
+  journal   = "Physical Review Materials",
   publisher = "American Physical Society",
-  volume    =  34,
-  number    =  1,
-  pages     = "57--64",
-  month     =  jul,
-  year      =  1929
+  volume    =  1,
+  number    =  5,
+  pages     = "53604--53611",
+  month     =  oct,
+  year      =  2017,
+  keywords  = "Al alloy; Al-Mg-Si; interatomic potential; neural network",
+  doi       = "10.1103/PhysRevMaterials.1.053604"
 }
 
 @ARTICLE{Stillinger1985-gy,
@@ -252,22 +201,49 @@
   keywords = "MD; Silicon; interatomic potential"
 }
 
-@ARTICLE{Tersoff1988-bo,
-  title    = "New empirical approach for the structure and energy of covalent
-              systems",
-  author   = "Tersoff, J",
-  abstract = "Abstract Empirical interatomic potentials permit the calculation
-              of structural properties and energetics of complex systems. A new
-              approach for constructing such potentials, by explicitly
-              incorporating the dependence of bond order on local environment,
-              permits an ...",
-  journal  = "Phys. Rev. B: Condens. Matter Mater. Phys.",
-  volume   =  37,
-  number   =  12,
-  pages    = "6991--7000",
-  month    =  jan,
-  year     =  1988,
-  keywords = "Silicon; interatomic potential"
+@ARTICLE{Morawietz2013-qq,
+  title    = "A {Density-Functional} {Theory-Based} Neural Network Potential
+              for Water Clusters Including van der Waals Corrections",
+  author   = "Morawietz, Tobias and Behler, J{\"o}rg",
+  journal  = "J. Phys. Chem. A",
+  volume   =  117,
+  number   =  32,
+  pages    = "7356--7366",
+  month    =  aug,
+  year     =  2013,
+  keywords = "neural network",
+  issn     = "1089-5639"
+}
+
+@ARTICLE{Behler2007-hr,
+  title    = "Generalized {Neural-Network} Representation of {High-Dimensional}
+              {Potential-Energy} Surfaces",
+  author   = "Behler, J{\"o}rg and Parrinello, Michele",
+  journal  = "Phys. Rev. Lett.",
+  volume   =  98,
+  number   =  14,
+  pages    = "146401--146401",
+  month    =  apr,
+  year     =  2007,
+  keywords = "neural network",
+  issn     = "0031-9007"
+}
+
+@ARTICLE{Artrith2016-mu,
+  title     = "An implementation of artificial neural-network potentials for
+               atomistic materials simulations: Performance for {TiO2}",
+  author    = "Artrith, Nongnuch and Urban, Alexander",
+  abstract  = "Computational Materials Science, 114 (2016) 135-150.
+               doi:10.1016/j.commatsci.2015.11.047",
+  journal   = "Comput. Mater. Sci.",
+  publisher = "Elsevier B.V.",
+  volume    =  114,
+  number    = "C",
+  pages     = "135--150",
+  month     =  mar,
+  year      =  2016,
+  keywords  = "interatomic potential; neural network",
+  doi       = "10.1016/j.commatsci.2015.11.047"
 }
 
 @ARTICLE{Finnis1984-hv,
@@ -280,6 +256,25 @@
   month    =  jan,
   year     =  1984,
   keywords = "interatomic potential"
+}
+
+@ARTICLE{Plimpton1995-az,
+  title     = "Fast parallel algorithms for short-range molecular dynamics",
+  author    = "Plimpton, S",
+  abstract  = "Three parallel algorithms for classical molecular dynamics are
+               presented. The first assigns each processor a fixed subset of
+               atoms; the second assigns each a fixed subset of inter- atomic
+               forces to compute; the third assigns each a fixed spatial
+               region. The algorithms are ...",
+  journal   = "J. Comput. Phys.",
+  publisher = "Elsevier Inc.",
+  volume    =  117,
+  number    =  1,
+  pages     = "1--19",
+  month     =  jan,
+  year      =  1995,
+  keywords  = "MD",
+  issn      = "0021-9991"
 }
 
 @ARTICLE{Daw1984-hj,
@@ -328,39 +323,75 @@
   keywords = "MD; interatomic potential; machine learning"
 }
 
-@ARTICLE{Behler2007-hr,
-  title    = "Generalized {Neural-Network} Representation of {High-Dimensional}
-              {Potential-Energy} Surfaces",
-  author   = "Behler, J{\"o}rg and Parrinello, Michele",
-  journal  = "Phys. Rev. Lett.",
-  volume   =  98,
-  number   =  14,
-  pages    = "146401--146401",
-  month    =  apr,
-  year     =  2007,
-  keywords = "neural network"
+@ARTICLE{Tersoff1988-bo,
+  title    = "New empirical approach for the structure and energy of covalent
+              systems",
+  author   = "Tersoff, J",
+  abstract = "Abstract Empirical interatomic potentials permit the calculation
+              of structural properties and energetics of complex systems. A new
+              approach for constructing such potentials, by explicitly
+              incorporating the dependence of bond order on local environment,
+              permits an ...",
+  journal  = "Phys. Rev. B: Condens. Matter Mater. Phys.",
+  volume   =  37,
+  number   =  12,
+  pages    = "6991--7000",
+  month    =  jan,
+  year     =  1988,
+  keywords = "Silicon; interatomic potential"
 }
 
-% The entry below contains non-ASCII chars that could not be converted
-% to a LaTeX equivalent.
-@INPROCEEDINGS{Yang2009-at,
-  title      = "Cuckoo Search via Levy Flights",
-  booktitle  = "2009 World Congress on Nature \& Biologically Inspired
-                Computing ({NaBIC})",
-  author     = "Yang, Xin-She and Deb, Suash",
-  abstract   = "In this paper, we intend to formulate a new meta- heuristic
-                algorithm, called Cuckoo Search (CS), for solving optimization
-                problems. This algorithm is based on the obligate brood
-                parasitic behaviour of some cuckoo species in combination with
-                the Levy ﬂight behaviour of some birds and fruit ﬂies. We
-                validate the proposed algorithm against test functions and then
-                compare its performance with those of genetic algorithms and
-                particle swarm optimization. Finally, we discuss the
-                implication of the results and suggestion for further research.",
-  publisher  = "IEEE",
-  pages      = "210--214",
-  year       =  2009,
-  conference = "2009 World Congress on Nature \& Biologically Inspired
-                Computing (NaBIC)",
-  location   = "Coimbatore, India"
+@ARTICLE{Wang2019-py,
+  title     = "Deep learning inter-atomic potential model for accurate
+               irradiation damage simulations",
+  author    = "Wang, Hao and Guo, Xun and Zhang, Linfeng and Wang, Han and Xue,
+               Jianming",
+  abstract  = "We propose a hybrid scheme that smoothly interpolates the
+               Ziegler-Biersack-Littmark (ZBL) screened nuclear repulsion
+               potential with a deep learning potential energy model. The
+               resulting deep potential-ZBL model can not only provide overall
+               good performance on the predictions of near-equilibrium material
+               properties but also capture the right physics when atoms are
+               extremely close to each other, an event that frequently happens
+               in computational simulations of irradiation damage events. We
+               applied this scheme to the simulation of the irradiation damage
+               processes in the face-centered-cubic aluminum system and found
+               better descriptions in terms of the defect formation energy,
+               evolution of collision cascades, displacement threshold energy,
+               and residual point defects than the widely adopted ZBL modified
+               embedded atom method potentials and their variants. Our work
+               provides a reliable and feasible scheme to accurately simulate
+               the irradiation damage processes and opens up extra
+               opportunities to solve the predicament of lacking accurate
+               potentials for enormous recently discovered materials in the
+               irradiation effect field.",
+  journal   = "Appl. Phys. Lett.",
+  publisher = "AIP Publishing LLC",
+  volume    =  114,
+  number    =  24,
+  year      =  2019,
+  issn      = "0003-6951",
+  doi       = "10.1063/1.5098061"
+}
+
+@ARTICLE{Brommer2007-kr,
+  title    = "Potfit: Effective potentials from ab initio data",
+  author   = "Brommer, Peter and G{\"a}hler, Franz",
+  abstract = "We present a program called potfit which generates an effective
+              atomic interaction potential by matching it to a set of reference
+              data computed in first-principles calculations. It thus allows
+              one to perform large-scale atomistic simulations of materials
+              with physically justified potentials. We describe the fundamental
+              principles behind the program, emphasizing its flexibility in
+              adapting to different systems and potential models, while also
+              discussing its limitations. The program has been used
+              successfully in creating effective potentials for a number of
+              complex intermetallic alloys, notably quasicrystals. \copyright{}
+              2007 IOP Publishing Ltd.",
+  journal  = "Modell. Simul. Mater. Sci. Eng.",
+  volume   =  15,
+  number   =  3,
+  pages    = "295--304",
+  year     =  2007,
+  doi      = "10.1088/0965-0393/15/3/008"
 }
