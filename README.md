@@ -4,6 +4,10 @@
 
 [![DOI](https://zenodo.org/badge/20047602.svg)](https://zenodo.org/badge/latestdoi/20047602)
 
+# News
+
+- **nap** was selected as **2020 Github archive program** and stored as magnetic tape(?) in the [Arctic vault](https://archiveprogram.github.com).
+
 # What's nap
 **Nagoya Atomistic-simulation Package (nap)** includes the following programs and utilities:
 - parallel molecular dynamics simulation (*pmd*)

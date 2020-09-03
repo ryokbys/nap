@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 :author: Ryo KOBAYASHI
-:date: Last modified: <2020-09-01 14:58:51 Ryo KOBAYASHI>
+:date: Last modified: <2020-09-03 11:15:27 Ryo KOBAYASHI>
 
 ===================
 nap documentation
@@ -20,7 +20,7 @@ This is a documentation of **Nagoya Atomistic-simulation Package (nap)**.
   - *fp.py*: Python script for fitting the parameters of classical potentials
   - *nappy*: Python scripts for pre- and post-processing
 
-- **Nagoya** is the name of a city in Japan, where the main developer RK lives.
+- **Nagoya** is the name of a city in Japan, where the project started.
 
 ------------
 

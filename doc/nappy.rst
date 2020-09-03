@@ -7,10 +7,18 @@ It is contained in ``nap/nappy`` directory, but currenly it is not exactly a pyt
 Users may have to use those utilities by calling them directly from the shell.
 
 
+.. _nappy_setup:
+
 Setup
 =======
 
-The *nappy* should work with python-2.7 and python-3 series. But, as the maintenance of python-2.x series have stopped, it is recommended to use python-3.
+*nappy* should work with python-2.7 and python-3 series. But, as the maintenance of python-2.x series have stopped, it is recommended to use python-3.
+
+*nappy* requires the following packages, which can be installed using ``pip`` command,
+
+  - `docopt <http://docopt.org>`_
+  - `ASE <https://wiki.fysik.dtu.dk/ase/index.html>`_
+
 
 To use *nappy* in python program, it is required to add a path to ``nap/nappy`` directory
 to the environment variable ``PYTHONPATH``.
@@ -26,6 +34,10 @@ You can check whether the path to ``nappy`` is added to ``PYTHONPATH`` by the fo
    $ python -c 'import nappy; print nappy.__file__'
 
 
+---
+
+.. _nappy_quickstart:
+
 Quick start
 ===================
 
@@ -33,8 +45,8 @@ Once *nappy* is installed, do the following code on *ipython* or *jupyter notebo
 
 .. code:: python
 
-   import nappy.napsys as napsys, analyze
-   nsys = napsys.NAPSystem(fname='/path/to/nap/example/test_W/pmdini')
+   from nappy.napsys import NAPSystem, analyze
+   nsys = NAPSystem(fname='/path/to/nap/example/test_W/pmdini')
    analyze(nsys)
 
 Above code will show the following result.
@@ -53,7 +65,9 @@ Above code will show the following result.
    number of atoms   =  54
 
 
+---
 
+.. _nappy_io:
 
 Read and write files
 ==============================

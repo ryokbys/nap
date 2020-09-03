@@ -2,7 +2,20 @@
 *fp.py* -- fit parameters of classical potentials
 ============================================================
 
-The python program *fp.py* is another program of fitting potential parameters. The *fitpot* focuses on the neural-network (NN) potential, on the other hand, this *fp.py* focuses on classical potentials that have much less potential parameters compared to NN potential. Since the number of parameters to be optimized is small, *fp.py* employs metaheuristic methods, which can adopt any physical value as a learning target since derivatives of the target values w.r.t. optimizing parameters are not required.
+The python program *fp.py* is another program of fitting potential parameters. The *fitpot* focuses on the neural-network (NN) potential, on the other hand, this *fp.py* focuses on classical potentials that have much less potential parameters compared to NN potential, usually less than 100. Since the number of parameters to be optimized is small, *fp.py* employs meta-heuristic or nature-inspired methods, which can adopt any physical value as a learning target since derivatives of the target values w.r.t. optimizing parameters are not required.
+
+-----
+
+.. _fp_setup:
+
+Setup
+=======
+
+To use *fp.py*, you should check if *nappy* works correctly, since *fp.py* is actually a part of *nappy* package (*fp.py* exists at ``nap/nappy/fitpot/fp.py``). See :ref:`nappy_setup` of *nappy* package.
+
+
+
+-----
 
 .. _what_does_fp_do:
 
@@ -32,8 +45,8 @@ where :math:`N_p` is the number of RDF pairs to be considered, :math:`N_\mathrm{
 
 To minimize the above loss function, the following metaheuristic methods are available:
 
-* Cuckoo search (CS)
-* Differential evolution (DE)
+  * Cuckoo search (CS)
+  * Differential evolution (DE)
 
 
 -----
@@ -45,8 +58,8 @@ Quick trial with examples
 
 There are two examples of *fp.py* in ``nap/examples/``,
 
-* ``fp_LZP/`` -- fitting of parameters of Morse, Coulomb and SW-like angular potentials to RDF, angular distribution function (ADF) and equilibrium volume of Li-Zr-P-O system.
-* ``fp_LATP/`` -- fitting of parameters of Morse, Coulomb and SW-like angular potentials to RDF, ADF and equilibrium volume of Li-Al-Ti-P-O system.
+  * ``fp_LZP/`` -- fitting of parameters of Morse, Coulomb and SW-like angular potentials to RDF, angular distribution function (ADF) and equilibrium volume of Li-Zr-P-O system.
+  * ``fp_LATP/`` -- fitting of parameters of Morse, Coulomb and SW-like angular potentials to RDF, ADF and equilibrium volume of Li-Al-Ti-P-O system.
 
 In either of these two directories, you can try *fp.py* by running the following command,
 
@@ -65,15 +78,15 @@ Files needed to run *fp.py*
 
 As you can see in ``nap/examples/fp_LZP/`` or ``nap_examples/fp_LATP/``, there are several files needed to run the *fp.py* program.
 
-- ``in.fitpot`` -- *fp.py* configuration file
-- ``in.vars.fitpot`` -- optimizing parameter file
-- ``in.params.XXX`` -- potential parameter files that are not actually used during optimization, except that ``in.params.Coulomb`` must exist becuase charge information of each element is read from it.
-- ``data.ref.XXX`` -- Reference data file
-- ``subjob.sh`` -- Shell-script file to perform sub jobs
-- Files needed to perform sub jobs:
-
-  - ``pmdini`` -- atom configuration file (cell info, positions, and velocities)
-  - ``in.pmd.NpT`` -- input file for *pmd*
+  - ``in.fitpot`` -- *fp.py* configuration file
+  - ``in.vars.fitpot`` -- optimizing parameter file
+  - ``in.params.XXX`` -- potential parameter files that are not actually used during optimization, except that ``in.params.Coulomb`` must exist becuase charge information of each element is read from it.
+  - ``data.ref.XXX`` -- Reference data file
+  - ``subjob.sh`` -- Shell-script file to perform sub jobs
+  - Files needed to perform sub jobs:
+  
+    - ``pmdini`` -- atom configuration file (cell info, positions, and velocities)
+    - ``in.pmd.NpT`` -- input file for *pmd*
 
 
 .. _ref_data:
@@ -85,8 +98,8 @@ Reference data should be stored in files ``data.ref.XXX`` where ``XXX`` indicate
 
 Currently (July 2020), *fp.py* can run in two different modes,
 
-- **distribution function (DF)-matching mode** -- RDF, ADF, equilibrium volume and lattice constants are adopted as targets.
-- **whatever mode** -- any quantity that is computable can be used as a target.
+  - **distribution function (DF)-matching mode** -- RDF, ADF, equilibrium volume and lattice constants are adopted as targets.
+  - **whatever mode** -- any quantity that is computable can be used as a target.
 
 In the **DF-matching mode**, the reference data formats of these targets are different.
 
