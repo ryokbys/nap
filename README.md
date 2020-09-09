@@ -6,7 +6,7 @@
 
 # News
 
-- **nap** was selected as **2020 Github archive program** and stored as magnetic tape(?) in the [Arctic vault](https://archiveprogram.github.com).
+- **nap** was selected as **2020 Github archive program** and stored on magnetic tape(?) in the [Arctic vault](https://archiveprogram.github.com).
 
 # What's nap
 **Nagoya Atomistic-simulation Package (nap)** includes the following programs and utilities:
