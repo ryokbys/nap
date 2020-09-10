@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="256" src="doc/figs/logo_nap_256.png">
+  <img width="256" src="mkdocs/docs/figs/logo_nap_256.png">
 </p>
 
 [![DOI](https://zenodo.org/badge/20047602.svg)](https://zenodo.org/badge/latestdoi/20047602)
