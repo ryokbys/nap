@@ -1,0 +1,35 @@
+site_name: nap documentation
+
+theme:
+  name: material
+
+use_directory_urls: false
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - codehilite
+  - footnotes
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/config.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - 'intro.md'
+  - 'usage.md'
+  - 'in-pmd.md'
+  - 'pmd-file.md'
+  - 'forces.md'
+  - 'analysis.md'
+  - 'example.md'
+  - 'nappy.md'
+  - 'fitpot.md'
+  - 'fp.md'
+  - 'development.md'
+  - 'faq.md'
+  - 'publication.md'
