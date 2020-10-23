@@ -48,11 +48,14 @@ contains
     integer:: i,j,k,l,m,n,ierr,is,ixyz,jxyz
     real(8):: xi(3),xij(3),rij,rij2,riji,dvdr &
          ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp
+    real(8),allocatable,save:: strsl(:,:,:)
 
     logical,save:: l1st=.true.
     real(8),save:: vrc,dvdrc,rcmax2
 
     if( l1st ) then
+      if( allocated(strsl) ) deallocate(strsl)
+      allocate(strsl(3,3,namax))
 !!$!.....assuming fixed atomic volume
 !!$      avol= alcar**3 /4
 !!$      if(myid.eq.0) write(6,'(a,es12.4)') ' avol =',avol
@@ -66,8 +69,13 @@ contains
       l1st=.false.
     endif
 
+    if( size(strsl).lt.3*3*namax ) then
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
+    endif
+
     epotl= 0d0
-!    print *, ' force_LJ_Ar 1'
+    strsl(:,:,:) = 0d0
 
 !-----loop over resident atoms
     do i=1,natm
@@ -75,7 +83,6 @@ contains
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
-        if(j.le.i) cycle
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
@@ -85,31 +92,21 @@ contains
         rij= dsqrt(rij2)
         riji= 1d0/rij
         dxdi(1:3)= -xij(1:3)*riji
-        dxdj(1:3)=  xij(1:3)*riji
         dvdr=(-24.d0*epslj)*(2.d0*(sgmlj*riji)**12*riji &
              -(sgmlj*riji)**6*riji) &
              -dvdrc
 !---------force
         aa(1:3,i)=aa(1:3,i) -dxdi(1:3)*dvdr
-        aa(1:3,j)=aa(1:3,j) -dxdj(1:3)*dvdr
 !---------potential
         tmp= 0.5d0*( 4d0*epslj*((sgmlj*riji)**12 &
              -(sgmlj*riji)**6) -vrc -dvdrc*(rij-rc) )
-        if(j.le.natm) then
-          epi(i)=epi(i) +tmp
-          epi(j)=epi(j) +tmp
-          epotl= epotl +tmp +tmp
-        else
-          epi(i)=epi(i) +tmp
-          epotl= epotl +tmp
-        endif
+        epi(i)= epi(i) +tmp
+        epotl= epotl +tmp
 !---------stress
         if( lstrs ) then
           do ixyz=1,3
             do jxyz=1,3
-              strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
-                   -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
-              strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
+              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
                    -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
             enddo
           enddo
@@ -118,8 +115,7 @@ contains
     enddo
 
     if( lstrs ) then
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-           ,nn,mpi_md_world,strs,9)
+      strs(:,:,1:natm)= strs(:,:,1:natm) +strsl(:,:,1:natm)
     endif
 
 !-----gather epot
@@ -206,7 +202,7 @@ contains
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
         if( j.eq.0 ) exit
-        if( j.le.i ) cycle
+!!$        if( j.le.i ) cycle
         js = int(tag(j))
         if( .not. interact(is,js) ) cycle
         rij(1:3) = ra(1:3,j) -xi(1:3)
@@ -219,32 +215,34 @@ contains
         nij = rpl_n(is,js)
         diji = 1d0/dij
         dxdi(1:3) = -xij(1:3)*diji
-        dxdj(1:3) =  xij(1:3)*diji
+!!$        dxdj(1:3) =  xij(1:3)*diji
 !.....Potential
         vr = cij*diji**nij
         vrc = vrcs(is,js)
         dvdrc = dvdrcs(is,js)
         tmp = 0.5d0 *(vr -vrc -(dij -rcij)*dvdrc)
-        if( j.le.natm ) then
-          epi(i) = epi(i) +tmp
-          epi(j) = epi(j) +tmp
-          epotl = epotl +tmp +tmp
-        else
-          epi(i) = epi(i)
-          epotl = epotl +tmp
-        endif
+!!$        if( j.le.natm ) then
+!!$          epi(i) = epi(i) +tmp
+!!$          epi(j) = epi(j) +tmp
+!!$          epotl = epotl +tmp +tmp
+!!$        else
+!!$          epi(i) = epi(i)
+!!$          epotl = epotl +tmp
+!!$        endif
+        epi(i)= epi(i) +tmp
+        epotl= epotl +tmp
 !.....Force
         dvdr = -nij *cij *diji**(nij+1) -dvdrc
         aa(1:3,i) = aa(1:3,i) -dxdi(1:3)*dvdr
-        aa(1:3,j) = aa(1:3,j) -dxdj(1:3)*dvdr
+!!$        aa(1:3,j) = aa(1:3,j) -dxdj(1:3)*dvdr
 !.....Stress
         if( lstrs ) then
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i) = strsl(jxyz,ixyz,i) &
                    -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
-              strsl(jxyz,ixyz,j) = strsl(jxyz,ixyz,j) &
-                   -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
+!!$              strsl(jxyz,ixyz,j) = strsl(jxyz,ixyz,j) &
+!!$                   -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
             enddo
           enddo
         endif
