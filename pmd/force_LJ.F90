@@ -103,20 +103,16 @@ contains
         epi(i)= epi(i) +tmp
         epotl= epotl +tmp
 !---------stress
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
-            enddo
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                 -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
           enddo
-        endif
+        enddo
       enddo
     enddo
 
-    if( lstrs ) then
-      strs(:,:,1:natm)= strs(:,:,1:natm) +strsl(:,:,1:natm)
-    endif
+    strs(:,:,1:natm)= strs(:,:,1:natm) +strsl(:,:,1:natm)
 
 !-----gather epot
     if( myid.ge.0 ) then
@@ -202,7 +198,6 @@ contains
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
         if( j.eq.0 ) exit
-!!$        if( j.le.i ) cycle
         js = int(tag(j))
         if( .not. interact(is,js) ) cycle
         rij(1:3) = ra(1:3,j) -xi(1:3)
@@ -215,43 +210,27 @@ contains
         nij = rpl_n(is,js)
         diji = 1d0/dij
         dxdi(1:3) = -xij(1:3)*diji
-!!$        dxdj(1:3) =  xij(1:3)*diji
 !.....Potential
         vr = cij*diji**nij
         vrc = vrcs(is,js)
         dvdrc = dvdrcs(is,js)
         tmp = 0.5d0 *(vr -vrc -(dij -rcij)*dvdrc)
-!!$        if( j.le.natm ) then
-!!$          epi(i) = epi(i) +tmp
-!!$          epi(j) = epi(j) +tmp
-!!$          epotl = epotl +tmp +tmp
-!!$        else
-!!$          epi(i) = epi(i)
-!!$          epotl = epotl +tmp
-!!$        endif
         epi(i)= epi(i) +tmp
         epotl= epotl +tmp
 !.....Force
         dvdr = -nij *cij *diji**(nij+1) -dvdrc
         aa(1:3,i) = aa(1:3,i) -dxdi(1:3)*dvdr
-!!$        aa(1:3,j) = aa(1:3,j) -dxdj(1:3)*dvdr
 !.....Stress
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i) = strsl(jxyz,ixyz,i) &
-                   -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
-!!$              strsl(jxyz,ixyz,j) = strsl(jxyz,ixyz,j) &
-!!$                   -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
-            enddo
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i) = strsl(jxyz,ixyz,i) &
+                 -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
           enddo
-        endif
+        enddo
       enddo
     enddo
 
-    if( lstrs ) then
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
+    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     
 !-----gather epot
     epott= 0d0
