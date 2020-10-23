@@ -48,7 +48,6 @@ contains
     integer:: i,j,k,l,m,n,ierr,is,ixyz,jxyz
     real(8):: xi(3),xij(3),rij,rij2,riji,dvdr &
          ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp
-    real(8),allocatable,save:: strsl(:,:,:)
 
     logical,save:: l1st=.true.
     real(8),save:: vrc,dvdrc,rcmax2
