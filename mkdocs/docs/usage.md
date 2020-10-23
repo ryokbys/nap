@@ -48,7 +48,7 @@ this *pmd* may not be optimized to the system in which it is compiled.
 You might need to add some options relevant for the system in which it
 is compiled.
 
-#### gfortran in macOS X
+#### gfortran and openmpi
 
 In the case of `gfortran` with `openmpi`,
 
@@ -67,7 +67,7 @@ options enabled as follows.
     Compilation with LLVM version gcc is not tested. Use Homebrew version of gcc and openmpi.
 
 
-#### Intel Fortran Compiler
+#### Intel Fortran compiler
 
 If you can use Intel Fortran Compiler`ifort` in your system, the
 configure command would be like,
@@ -76,6 +76,15 @@ configure command would be like,
 
 The options `-ip` and `-ipo` have to do with inline expansions and are
 relevant to the efficiency of *pmd*.
+
+#### PGI fortran compiler
+
+If the MPI fortran command `mpif90` is linked to PGI fortran compiler,
+you can use the compiler by just specifying the compiler path as,
+
+    $ FC=/path/to/mpif90 ./configure --prefix=$(pwd) FCFLAGS='-Minfo -O2 -g'
+
+
 
 #### Fujitsu Fortran in FX?
 
