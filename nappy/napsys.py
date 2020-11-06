@@ -725,6 +725,9 @@ You need to specify the species order correctly with --specorder option.
         ivx = -1
         ivy = -1
         ivz = -1
+        ifx = -1
+        ify = -1
+        ifz = -1
         for line in f.readlines():
             data = line.split()
             if 'ITEM' in line:
@@ -753,20 +756,26 @@ You need to specify the species order correctly with --specorder option.
                         iy = aux_names.index('yu') +2
                     try:
                         iz = aux_names.index('z') +2
-                        iauxstart = 5
+                        # iauxstart = 5
                     except Exception:
                         iz = aux_names.index('zu') +2
-                        iauxstart = 5
+                        # iauxstart = 5
                     try:
                         ivx = aux_names.index('vx') +2
                         ivy = aux_names.index('vy') +2
                         ivz = aux_names.index('vz') +2
-                        iauxstart = 8
+                        # iauxstart = 8
                     except Exception:
                         pass
-                    for s in ('x','xu','y','yu','z','zu','vx','vy','vz'):
-                        if s in aux_names:
-                            aux_names.remove(s)
+                    try:
+                        ifx = aux_names.index('fx') +2
+                        ify = aux_names.index('fy') +2
+                        ifz = aux_names.index('fz') +2
+                    except Exception:
+                        pass
+                    # for s in ('x','xu','y','yu','z','zu','vx','vy','vz'):
+                    #     if s in aux_names:
+                    #         aux_names.remove(s)
                     if len(aux_names)>0:
                         auxs = np.zeros((natm,len(aux_names)))
                     continue
@@ -835,6 +844,10 @@ You need to specify the species order correctly with --specorder option.
                         v0 = [ float(data[ivx]),float(data[ivy]),float(data[ivz])]
                     else:
                         v0 = [ 0., 0., 0. ]
+                    if ifx > 0 and ify > 0 and ifz > 0:
+                        f0 = [ float(data[ifx]),float(data[ify]),float(data[ifz])]
+                    else:
+                        f0 = [ 0., 0., 0. ]
                     sr = np.dot(hmati,r0)
                     sv = np.dot(hmati,v0)
                     sr[0] = self._pbc(sr[0])
@@ -844,9 +857,11 @@ You need to specify the species order correctly with --specorder option.
                     # vels[iatm][:] = sv[:]
                     poss[iatm,:] = sr[:]
                     vels[iatm,:] = sv[:]
+                    frcs[iatm,:] = f0[:]
                     
                     if len(aux_names)>0:
-                        auxs[iatm,:] = [ float(x) for x in data[iauxstart:] ]
+                        # auxs[iatm,:] = [ float(x) for x in data[iauxstart:] ]
+                        auxs[iatm,:] = [ float(x) for x in data[2:] ]
 
                 iatm += 1
 
@@ -859,6 +874,8 @@ You need to specify the species order correctly with --specorder option.
         self.atoms['sid'] = sids
         for ia in range(len(aux_names)):
             name = aux_names[ia]
+            if name in ('x','xu','y','yu','z','zu','vx','vy','vz','fx','fy','fz'):
+                continue
             aux = auxs[:,ia]
             self.atoms[name] = aux.tolist()
         f.close()
