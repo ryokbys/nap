@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2019-07-05 14:07:50 Ryo KOBAYASHI>
+!                    Last modified: <2020-11-06 21:25:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -55,7 +55,10 @@ module pmdvars
   real(8),allocatable:: stn(:,:,:)
 !.....atomic charge and electronegativity
   real(8),allocatable:: chg(:),chi(:)
+!.....Electronic temperature
   real(8),allocatable:: tei(:)
+!.....Color charge
+  real(8),allocatable:: clr(:)
 
 !.....Shear stress
   real(8):: shrfx
@@ -114,6 +117,7 @@ contains
       do ia=1,ntot
         nfmv = max(nfmv,ifmvOf(tagtot(ia)))
       enddo
+      print *,''
       print '(a,i0)',' Number of ifmvs = ',nfmv
     endif
     call mpi_bcast(nfmv,1,mpi_integer,0,mpi_world,ierr)

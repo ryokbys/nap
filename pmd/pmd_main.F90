@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-06-20 13:53:26 Ryo KOBAYASHI>
+!                     Last-modified: <2020-11-06 21:51:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -25,6 +25,7 @@ program pmd
   use Coulomb, only: cterms
   use util, only: time_stamp, itotOf
   use element
+  use clrchg,only: lclrchg,init_clrchg
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -172,10 +173,14 @@ program pmd
 
 
   if( myid_md.eq.0 ) then
-    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0))
+!!$    naux = 3
+!!$    allocate(auxtot(ntot0,naux))
+!!$    auxtot(:,:) = 0d0
+    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0))
     chitot(1:ntot0) = 0d0
     chgtot(1:ntot0) = 0d0
     teitot(1:ntot0) = 0d0
+    clrtot(1:ntot0) = 0d0
 !!$    call set_atomic_charges(ntot0,chgtot,tagtot,nspmax &
 !!$         ,chgfix,schg,myid_md,iprint)
 
@@ -188,11 +193,15 @@ program pmd
   else
     ntot0 = 1
     allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
-         ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0) &
-         ,chgtot(ntot0),chitot(ntot0),teitot(ntot0))
+         ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0) )
+!!$    naux = 3
+!!$    allocate(auxtot(ntot0,naux))
+!!$    auxtot(:,:) = 0d0
+    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0))
     chitot(1:ntot0) = 0d0
     chgtot(1:ntot0) = 0d0
     teitot(1:ntot0) = 0d0
+    clrtot(1:ntot0) = 0d0
   endif
 
 !.....Broadcast species data read from pmdini  
@@ -252,6 +261,10 @@ program pmd
     cterms = 'long'
   endif
 
+!.....Initial settting for color charge NEMD
+  if( lclrchg ) call init_clrchg(specorder,ntot0,clrtot,tagtot &
+       ,myid_md,iprint)
+
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then
     call add_pka_velocity(myid_md)
@@ -259,7 +272,7 @@ program pmd
 
 !.....call pmd_core to perfom MD
   call pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
-       ,ekitot,epitot,chgtot,chitot,teitot,nstp,nerg,npmd &
+       ,ekitot,epitot,chgtot,chitot,teitot,clrtot,nstp,nerg,npmd &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,specorder &
        ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
        ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl &
@@ -286,7 +299,8 @@ program pmd
 1 continue
   call mpi_barrier(mpicomm,ierr)
   call mpi_comm_free(mpi_md_world,ierr)
-  deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot,chgtot,chitot,teitot)
+  deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot,chgtot,chitot &
+       ,teitot,clrtot)
   call mpi_finalize(ierr)
 
 end program pmd
@@ -338,6 +352,7 @@ subroutine write_initial_setting()
   use pmdio
   use pmdmpi
   use force
+  use clrchg,only: lclrchg, cspc_clrchg, clrfield
   implicit none 
   integer:: i
 
@@ -452,6 +467,12 @@ subroutine write_initial_setting()
 !.....Boundary condition
   write(6,'(2x,a,5x,a)') 'boundary',trim(boundary)
   write(6,'(2x,a)') ''
+!.....Color charge NEMD
+  if( lclrchg ) then
+    write(6,'(2x,a,5x,l)') 'flag_clrchg',lclrchg
+    write(6,'(2x,a,5x,a)') 'spcs_clrchg',trim(cspc_clrchg)
+    write(6,'(2x,a,3(2x,f0.4))') 'clrfield',clrfield(1:3)
+  endif
 !.....Charge
 !!$  write(6,'(2x,a)') 'charge'
 !!$  do i=1,nspmax
@@ -497,6 +518,8 @@ subroutine bcast_params()
   use pmdio
   use pmdmpi
   use force
+  use extforce,only: lextfrc,cspc_extfrc,extfrc
+  use clrchg,only: lclrchg,cspc_clrchg,clrfield
   implicit none
   include 'mpif.h'
 
@@ -575,6 +598,18 @@ subroutine bcast_params()
   call mpi_bcast(ltdst,1,mpi_logical,0,mpicomm,ierr)
   if( ltdst ) then
     call mpi_bcast(ntdst,1,mpi_integer,0,mpicomm,ierr)
+  endif
+!.....Color charge NEMD
+  call mpi_bcast(lclrchg,1,mpi_logical,0,mpicomm,ierr)
+  if( lclrchg ) then
+    call mpi_bcast(cspc_clrchg,4,mpi_character,0,mpicomm,ierr)
+    call mpi_bcast(clrfield,3,mpi_real8,0,mpicomm,ierr)
+  endif
+!.....External force
+  call mpi_bcast(lextfrc,1,mpi_logical,0,mpicomm,ierr)
+  if( lextfrc ) then
+    call mpi_bcast(cspc_extfrc,3,mpi_character,0,mpicomm,ierr)
+    call mpi_bcast(extfrc,3,mpi_real8,0,mpicomm,ierr)
   endif
 !.....Metadynamics
   call mpi_bcast(lmetaD,1,mpi_logical,0,mpicomm,ierr)

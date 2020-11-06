@@ -1,16 +1,18 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-06-16 18:24:08 Ryo KOBAYASHI>
+!                     Last modified: <2020-11-06 22:24:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
 
   character(len=20),parameter:: cinpmd='in.pmd'
 
-  integer:: ntot0,ntot
+  integer:: ntot0,ntot,naux
 !.....data of total system
   real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
-       ,ekitot(:,:,:),tagtot(:),atot(:,:),chgtot(:),chitot(:),teitot(:)
+       ,ekitot(:,:,:),tagtot(:),atot(:,:)
+  real(8),allocatable:: chgtot(:),chitot(:),teitot(:),clrtot(:)
+  real(8),allocatable:: auxtot(:,:)
   real(8):: hunit,h(3,3,0:1)
 
 !.....max. num. of atoms in a node
@@ -292,16 +294,16 @@ contains
          xlo_bound,xhi_bound,ylo_bound,yhi_bound, &
          zlo_bound,zhi_bound,st(3,3)
 !!$    integer,external:: itotOf
-    real(8),allocatable,save:: rlmp(:,:)
+    real(8),allocatable,save:: rlmp(:,:),vlmp(:,:)
     character(len=3):: csp
     character(len=6):: caux
 
     real(8),parameter:: tiny = 1d-14
 
-    if( .not. allocated(rlmp) ) allocate(rlmp(3,ntot))
+    if( .not. allocated(rlmp) ) allocate(rlmp(3,ntot),vlmp(3,ntot))
     if( size(rlmp).ne.3*ntot ) then
-      deallocate(rlmp)
-      allocate(rlmp(3,ntot))
+      deallocate(rlmp,vlmp)
+      allocate(rlmp(3,ntot),vlmp(3,ntot))
     endif
 
     open(ionum,file=trim(cfname),status='replace')
@@ -310,7 +312,8 @@ contains
     write(ionum,'(a)') 'ITEM: NUMBER OF ATOMS'
     write(ionum,'(i10)') ntot
     write(ionum,'(a)') 'ITEM: BOX BOUNDS xy xz yz'
-    call pmd2lammps(h,ntot,rtot,rlmp,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
+    call pmd2lammps(h,ntot,rtot,rlmp,vtot,vlmp &
+         ,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
     xlo_bound = xlo +min(0d0, xy, xz, xy+xz)
     xhi_bound = xhi +max(0d0, xy, xz, xy+xz)
     ylo_bound = ylo +min(0d0, yz)
@@ -354,6 +357,12 @@ contains
             write(ionum,'(es11.3)',advance='no') eki
           else if( trim(caux).eq.'epot'.or.trim(caux).eq.'epi' ) then
             write(ionum,'(es11.3)',advance='no') epi
+          else if( trim(caux).eq.'vx' ) then
+            write(ionum,'(es11.3)',advance='no') vlmp(1,i)
+          else if( trim(caux).eq.'vy' ) then
+            write(ionum,'(es11.3)',advance='no') vlmp(2,i)
+          else if( trim(caux).eq.'vz' ) then
+            write(ionum,'(es11.3)',advance='no') vlmp(3,i)
           else if( trim(caux).eq.'sxx' ) then
             write(ionum,'(es11.3)',advance='no') st(1,1)
           else if( trim(caux).eq.'syy' ) then
@@ -372,6 +381,8 @@ contains
             write(ionum,'(f9.2)',advance='no') chitot(i)
           else if( trim(caux).eq.'tei' ) then
             write(ionum,'(es11.3)',advance='no') teitot(i)
+          else if( trim(caux).eq.'clr' ) then
+            write(ionum,'(es11.3)',advance='no') clrtot(i)
           endif
         enddo
         write(ionum,*) ''
@@ -402,7 +413,7 @@ contains
     close(ionum)
   end subroutine write_dump
 !=======================================================================
-  subroutine pmd2lammps(h,ntot,rtot,rlmp, &
+  subroutine pmd2lammps(h,ntot,rtot,rlmp,vtot,vlmp, &
        xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
 !
 !     Convert pmd data format to LAMMPS format not only cell
@@ -417,14 +428,14 @@ contains
 !
     implicit none
     integer,intent(in):: ntot
-    real(8),intent(in):: h(3,3),rtot(3,ntot)
+    real(8),intent(in):: h(3,3),rtot(3,ntot),vtot(3,ntot)
     real(8),intent(out):: xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz &
-         ,rlmp(3,ntot)
+         ,rlmp(3,ntot),vlmp(3,ntot)
 
     integer:: i,lxy,lxz,lyz
     real(8):: a0(3),b0(3),c0(3),a1(3),a2(3),a3(3) &
-         ,b1(3),b2(3),b3(3),rt(3),amat(3,3),bmat(3,3) &
-         ,x,y,z,a23(3),a31(3),a12(3),vol
+         ,b1(3),b2(3),b3(3),rt(3),vt(3),amat(3,3),bmat(3,3) &
+         ,x,y,z,a23(3),a31(3),a12(3),vol,xyp
     real(8):: a,b,c,alpha,beta,gamma
     real(8),external:: absv,sprod
 
@@ -492,12 +503,19 @@ contains
     bmat(1:3,1) = b1(1:3)
     bmat(1:3,2) = b2(1:3)
     bmat(1:3,3) = b3(1:3)
+    xyp = xy -lxy*x
     do i=1,ntot
       rlmp(1:3,i) = 0d0
       call shift_pos_for_lammps(rtot(1,i),rlmp(1,i),lxy,lxz,lyz &
            ,x,y,z,yz,xz,xy)
+!.....Velocity as well
+      vlmp(1:3,i) = vtot(1:3,i)
+      vlmp(2,i) = vlmp(2,i) -lyz*vtot(3,i)
+      vlmp(1,i) = vlmp(1,i) -lxz*vtot(3,i) +(vtot(2,i)*xyp -vlmp(2,i)*xy)/x
       rt = matmul(h,rlmp(1:3,i))
+      vt = matmul(h,vlmp(1:3,i))
       rlmp(1:3,i) = matmul(bmat,matmul(amat,rt))/vol
+      vlmp(1:3,i) = matmul(bmat,matmul(amat,vt))/vol
     enddo
 
     return

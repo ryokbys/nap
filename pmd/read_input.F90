@@ -38,6 +38,8 @@ subroutine set_variable(ionum,cname)
   use pmdio
   use pmdmpi
   use force,only: ol_type, ol_force
+  use extforce,only: lextfrc,cspc_extfrc,extfrc
+  use clrchg,only: lclrchg,cspc_clrchg,clrfield
 #ifdef __WALL__
   use wall
 #endif
@@ -280,6 +282,27 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'overlay_force') then
     call read_c1(ionum,ol_force)
+    return
+  elseif( trim(cname).eq.'flag_extfrc') then
+    call read_l1(ionum,lextfrc)
+    return
+  elseif( trim(cname).eq.'spcs_extfrc') then
+    call read_c1(ionum,cspc_extfrc)
+    return
+  elseif( trim(cname).eq.'extfrc') then
+    backspace(ionum)
+    read(ionum,*) ctmp,extfrc(1:3)
+    return
+!.....Color charge NEMD
+  elseif( trim(cname).eq.'flag_clrchg') then
+    call read_l1(ionum,lclrchg)
+    return
+  elseif( trim(cname).eq.'spcs_clrchg') then
+    call read_c1(ionum,cspc_clrchg)
+    return
+  elseif( trim(cname).eq.'clrfield') then
+    backspace(ionum)
+    read(ionum,*) ctmp,clrfield(1:3)
     return
     
 #ifdef __WALL__
