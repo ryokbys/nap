@@ -12,7 +12,7 @@ module clrchg
   integer:: ispc_clrchg
   real(8):: clrfield(3) = (/ 0d0, 0d0, 0d0 /)   ! in [eV/Ang]
   real(8):: clraccel(3) = (/ 0d0, 0d0, 0d0 /)   ! scaled acceleration
-  real(8),allocatable:: cchg(:)
+  real(8):: vacc(3) = (/ 0d0, 0d0, 0d0 /)
   
 contains
 !=======================================================================
@@ -119,6 +119,27 @@ contains
     enddo
     return
   end subroutine clrchg_force
+!=======================================================================
+  subroutine accum_vels(namax,natm,hmat,va,clr,istp,nouterg,dt)
+!
+!  Accumurate velocities with mutiplying color charge.
+!
+    integer,intent(in):: namax,natm,istp,nouterg
+    real(8),intent(in):: hmat(3,3),va(3,namax),clr(namax),dt
+
+    integer:: i
+    real(8):: vi(3)
+
+    do i=1,natm
+      vi(1:3) = hmat(1:3,1)*va(1,i) +hmat(1:3,2)*va(2,i) &
+           +hmat(1:3,3)*va(3,i)
+      vacc(1:3) = vacc(1:3) +vi(1:3)*clr(i)
+    enddo
+    if( mod(istp,nouterg).eq.0 ) then
+      write(90,'(i10,4es12.4)') istp, dt*istp, vacc(1:3)
+    endif
+    
+  end subroutine accum_vels
 !=======================================================================
   subroutine rm_trans_clrchg(natm,tag,va,am,mpi_world,myid,iprint)
 !

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-11-06 21:08:29 Ryo KOBAYASHI>
+!                     Last-modified: <2020-11-07 11:11:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -30,7 +30,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use deform,only: init_deform, apply_deform
   use util,only: itotOf, ifmvOf
   use extforce,only: lextfrc,rm_trans_extfrc,add_extfrc
-  use clrchg,only: lclrchg,clrchg_force
+  use clrchg,only: lclrchg,clrchg_force,accum_vels
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -554,6 +554,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   al(2)= h(2,2,0)
   al(3)= h(3,3,0)
 
+  if( lclrchg ) call accum_vels(namax,natm,h,va,clr,istp,nouterg,dt)
 
   i_conv = 0
   lconverged = .false.
@@ -984,6 +985,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       epotp = epot
       i_conv = 0
     endif
+
+    if( lclrchg ) call accum_vels(namax,natm,h,va,clr,istp,nouterg,dt)
 
 !-------write the particle positions
     if(ifpmd.gt.0.and. &
