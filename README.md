@@ -21,6 +21,22 @@ and uses spatial decomposition technique for the parallelization, and linked-cel
 * [Ryo KOBAYASHI](http://ryokbys.web.nitech.ac.jp/index.html)
 * Assistant Professor in the department of mechanical engineering, Nagoya Institute of Technology.
 
+# Requirements and dependencies
+
+To compile *pmd* and *fitpot*, the following programs/libraries are required:
+
+- Fortran compiler
+- MPI library
+
+The *nappy* and *fp.py* requires the following packages:
+
+- *numpy*
+- *scipy*
+- *pandas*
+- *docopt*
+- *ASE*
+
+
 # Compilation and usage
 
 For the short test, whether or not you can use this program in your environment,
@@ -33,7 +49,7 @@ $ cd ../examples/pmd_W/
 $ ../../pmd/pmd
 ```
 
-If it works, you can use this program.
+If it works, you can use this program in your system.
 For details, please see the [documentation](http://ryokbys.web.nitech.ac.jp/contents/nap_docs) or ask me via e-mail (kobayashi.ryo[at]nitech.ac.jp).
 
 # Acknowledgements
