@@ -39,7 +39,8 @@ subroutine set_variable(ionum,cname)
   use pmdmpi
   use force,only: ol_type, ol_force
   use extforce,only: lextfrc,cspc_extfrc,extfrc
-  use clrchg,only: lclrchg,cspc_clrchg,clrfield
+  use clrchg,only: lclrchg,cspc_clrchg,clrfield,clr_init
+  use localflux,only: lflux,nlx,nly,nlz
 #ifdef __WALL__
   use wall
 #endif
@@ -297,12 +298,23 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'flag_clrchg') then
     call read_l1(ionum,lclrchg)
     return
+  elseif( trim(cname).eq.'clr_init') then
+    call read_c1(ionum,clr_init)
+    return
   elseif( trim(cname).eq.'spcs_clrchg') then
     call read_c1(ionum,cspc_clrchg)
     return
   elseif( trim(cname).eq.'clrfield') then
     backspace(ionum)
     read(ionum,*) ctmp,clrfield(1:3)
+    return
+!.....Local flux
+  elseif( trim(cname).eq.'flag_lflux') then
+    call read_l1(ionum,lflux)
+    return
+  elseif( trim(cname).eq.'ndiv_lflux') then
+    backspace(ionum)
+    read(ionum,*) ctmp,nlx,nly,nlz
     return
     
 #ifdef __WALL__

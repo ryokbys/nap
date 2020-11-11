@@ -6,10 +6,14 @@ module clrchg
   implicit none
   save
 
+  character(len=128),parameter:: cfclrini = 'clrini'
+  integer,parameter:: ioini = 68
+
   logical:: lclrchg = .false.  ! flag to apply external force
   logical:: initialized = .false.
-  character(len=3):: cspc_clrchg = 'non' ! [default: 'non']
+  character(len=3):: cspc_clrchg = 'non'
   integer:: ispc_clrchg
+  character(len=20):: clr_init = 'random'
   real(8):: clrfield(3) = (/ 0d0, 0d0, 0d0 /)   ! in [eV/Ang]
   real(8):: clraccel(3) = (/ 0d0, 0d0, 0d0 /)   ! scaled acceleration
   real(8):: vacc(3) = (/ 0d0, 0d0, 0d0 /)
@@ -28,8 +32,6 @@ contains
     real(8),intent(inout):: clrtot(ntot)
 
 !!$    real(8),external:: urnd
-    integer:: i,is,nclr,np,nm
-    real(8):: r
 
     if( trim(cspc_clrchg).eq.'non' ) then
       stop 'ERROR: spcs_clrchg must be specified.'
@@ -37,6 +39,51 @@ contains
       ispc_clrchg = csp2isp(trim(cspc_clrchg),specorder)
     endif
 
+    clrtot(:) = 0d0
+    if( trim(clr_init).eq.'read' ) then  ! read from clrini
+      call read_clr(ntot,clrtot,myid)
+    else  ! random
+      call set_random_clr(ntot,tagtot,clrtot,myid,iprint)
+    endif
+
+99  initialized = .true.
+    return
+  end subroutine init_clrchg
+!=======================================================================
+  subroutine read_clr(ntot,clrtot,myid)
+!
+!  Read clr of atoms from file.
+!
+    integer,intent(in):: ntot,myid
+    real(8),intent(inout):: clrtot(ntot)
+    integer:: n,i,j
+
+    if( myid.eq.0 ) then
+      open(ioini,file=trim(cfclrini),status='old')
+      read(ioini,*) n
+      if( n.ne.ntot ) then
+        print *,'ERROR: n in clrini is not same with ntot in pmdini.'
+        stop
+      endif
+      do i=1,ntot
+        read(ioini,*) j,clrtot(j)
+      enddo
+      close(ioini)
+    endif
+    return
+  end subroutine read_clr
+!=======================================================================
+  subroutine set_random_clr(ntot,tagtot,clrtot,myid,iprint)
+!
+!  Set clr of each atom randomly.
+!
+    integer,intent(in):: ntot,myid,iprint
+    real(8),intent(in):: tagtot(ntot)
+    real(8),intent(inout):: clrtot(ntot)
+
+    integer:: i,is,nclr,np,nm
+    real(8):: r
+    
     if( myid.eq.0 ) then
 !.....Count num of ions which color charges are to be set.
       nclr = 0
@@ -78,9 +125,7 @@ contains
 
     endif
 
-99  initialized = .true.
-    return
-  end subroutine init_clrchg
+  end subroutine set_random_clr
 !=======================================================================
   subroutine clrchg_force(namax,natm,tag,aa,clr,hi,specorder,myid,iprint)
 !

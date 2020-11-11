@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-11-06 21:51:22 Ryo KOBAYASHI>
+!                     Last-modified: <2020-11-11 11:51:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -26,6 +26,7 @@ program pmd
   use util, only: time_stamp, itotOf
   use element
   use clrchg,only: lclrchg,init_clrchg
+  use localflux,only: lflux,init_lflux,final_lflux
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -264,6 +265,8 @@ program pmd
 !.....Initial settting for color charge NEMD
   if( lclrchg ) call init_clrchg(specorder,ntot0,clrtot,tagtot &
        ,myid_md,iprint)
+!.....Init for local flux
+  if( lflux ) call init_lflux(myid_md,nx,ny,nz,lclrchg,mpi_md_world,iprint)
 
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then
@@ -288,6 +291,8 @@ program pmd
       call write_pmdtot_ascii(20,cpmdfin)
     endif
   endif
+
+  if( lflux ) call final_lflux(myid_md)
 
 !.....write energy, forces and stresses only for fitpot
   if( myid_md.eq.0 ) then
@@ -352,7 +357,8 @@ subroutine write_initial_setting()
   use pmdio
   use pmdmpi
   use force
-  use clrchg,only: lclrchg, cspc_clrchg, clrfield
+  use clrchg,only: lclrchg, cspc_clrchg, clrfield, clr_init
+  use localflux,only: lflux,nlx,nly,nlz
   implicit none 
   integer:: i
 
@@ -470,8 +476,16 @@ subroutine write_initial_setting()
 !.....Color charge NEMD
   if( lclrchg ) then
     write(6,'(2x,a,5x,l)') 'flag_clrchg',lclrchg
+    write(6,'(2x,a,5x,a)') 'clr_init',trim(clr_init)
     write(6,'(2x,a,5x,a)') 'spcs_clrchg',trim(cspc_clrchg)
     write(6,'(2x,a,3(2x,f0.4))') 'clrfield',clrfield(1:3)
+    write(6,'(2x,a)') ''
+  endif
+!.....Local flux
+  if( lflux ) then
+    write(6,'(2x,a,5x,l)') 'flag_lflux',lclrchg
+    write(6,'(2x,a,3(2x,i0))') 'ndiv_lflux',nlx,nly,nlz
+    write(6,'(2x,a)') ''
   endif
 !.....Charge
 !!$  write(6,'(2x,a)') 'charge'
@@ -519,7 +533,8 @@ subroutine bcast_params()
   use pmdmpi
   use force
   use extforce,only: lextfrc,cspc_extfrc,extfrc
-  use clrchg,only: lclrchg,cspc_clrchg,clrfield
+  use clrchg,only: lclrchg,cspc_clrchg,clr_init,clrfield
+  use localflux,only: lflux,nlx,nly,nlz
   implicit none
   include 'mpif.h'
 
@@ -602,8 +617,16 @@ subroutine bcast_params()
 !.....Color charge NEMD
   call mpi_bcast(lclrchg,1,mpi_logical,0,mpicomm,ierr)
   if( lclrchg ) then
-    call mpi_bcast(cspc_clrchg,4,mpi_character,0,mpicomm,ierr)
+    call mpi_bcast(cspc_clrchg,3,mpi_character,0,mpicomm,ierr)
+    call mpi_bcast(clr_init,20,mpi_character,0,mpicomm,ierr)
     call mpi_bcast(clrfield,3,mpi_real8,0,mpicomm,ierr)
+  endif
+!.....Local flux
+  call mpi_bcast(lflux,1,mpi_logical,0,mpicomm,ierr)
+  if( lflux ) then
+    call mpi_bcast(nlx,1,mpi_integer,0,mpicomm,ierr)
+    call mpi_bcast(nly,1,mpi_integer,0,mpicomm,ierr)
+    call mpi_bcast(nlz,1,mpi_integer,0,mpicomm,ierr)
   endif
 !.....External force
   call mpi_bcast(lextfrc,1,mpi_logical,0,mpicomm,ierr)
