@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-11-10 18:19:30 Ryo KOBAYASHI>
+!                     Last-modified: <2020-11-11 21:52:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -30,7 +30,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use deform,only: init_deform, apply_deform
   use util,only: itotOf, ifmvOf
   use extforce,only: lextfrc,rm_trans_extfrc,add_extfrc
-  use clrchg,only: lclrchg,clrchg_force
+  use clrchg,only: lclrchg,clrchg_force,rm_trans_clrchg,clr_init
   use localflux,only: lflux,accum_lflux
   implicit none
   include "mpif.h"
@@ -277,8 +277,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   elseif( abs(tinit).le.1d-5 ) then
     va(1:3,1:natm)= 0d0
   endif
-  if( lextfrc ) then  ! special treatment for translational momentum
-    call rm_trans_extfrc(natm,tag,va,am,mpi_md_world,myid_md,iprint)
+  if( lclrchg ) then  ! special treatment for translational momentum
+    call rm_trans_clrchg(natm,tag,va,am,mpi_md_world,myid_md,iprint)
   elseif( nrmtrans.ge.0 ) then
     call rm_trans_motion(natm,tag,va,nspmax,am &
          ,mpi_md_world,myid_md,iprint)
@@ -855,8 +855,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
          ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
     prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
 
-    if( lextfrc ) then  ! special treatment for translational momentum
-      call rm_trans_extfrc(natm,tag,va,am,mpi_md_world,myid_md,iprint)
+    if( lclrchg ) then  ! special treatment for translational momentum
+      call rm_trans_clrchg(natm,tag,va,am,mpi_md_world,myid_md,iprint)
     elseif( nrmtrans.gt.0 .and. mod(istp,nrmtrans).eq.0 ) then
       call rm_trans_motion(natm,tag,va,nspmax,am &
            ,mpi_md_world,myid_md,iprint)

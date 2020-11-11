@@ -42,8 +42,10 @@ contains
     clrtot(:) = 0d0
     if( trim(clr_init).eq.'read' ) then  ! read from clrini
       call read_clr(ntot,clrtot,myid)
+    else if(  trim(clr_init).eq.'all_one' ) then ! set all the clr == 1.0
+      call set_clr_one(ntot,tagtot,clrtot,myid,iprint)
     else  ! random
-      call set_random_clr(ntot,tagtot,clrtot,myid,iprint)
+      call set_clr_random(ntot,tagtot,clrtot,myid,iprint)
     endif
 
 99  initialized = .true.
@@ -73,7 +75,29 @@ contains
     return
   end subroutine read_clr
 !=======================================================================
-  subroutine set_random_clr(ntot,tagtot,clrtot,myid,iprint)
+  subroutine set_clr_one(ntot,tagtot,clrtot,myid,iprint)
+!
+!  Set all the clr one
+!
+    integer,intent(in):: ntot,myid,iprint
+    real(8),intent(in):: tagtot(ntot)
+    real(8),intent(inout):: clrtot(ntot)
+
+    integer:: i,is
+    
+    if( myid.eq.0 ) then
+      clrtot(:) = 0d0
+      do i=1,ntot
+        is = int(tagtot(i))
+        if( is.eq.ispc_clrchg ) then
+          clrtot(i) = 1d0
+        endif
+      enddo
+    endif
+
+  end subroutine set_clr_one
+!=======================================================================
+  subroutine set_clr_random(ntot,tagtot,clrtot,myid,iprint)
 !
 !  Set clr of each atom randomly.
 !
@@ -125,7 +149,7 @@ contains
 
     endif
 
-  end subroutine set_random_clr
+  end subroutine set_clr_random
 !=======================================================================
   subroutine clrchg_force(namax,natm,tag,aa,clr,hi,specorder,myid,iprint)
 !
