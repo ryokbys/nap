@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-04-08 19:02:27 Ryo KOBAYASHI>
+!                     Last modified: <2020-10-23 17:16:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -1083,7 +1083,6 @@ contains
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
-        if(j.le.i) cycle
         js= int(tag(j))
         if( .not.interact(is,js) ) cycle
         qj= chg(j)
@@ -1095,7 +1094,6 @@ contains
         dij= sqrt(dij2)
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
-        dxdj(1:3)=  rij(1:3)*diji
         rhoij = rho_bvs(is,js)
         terfc = erfc(dij/rhoij)
         terfcc = erfc(rc/rhoij)
@@ -1103,21 +1101,13 @@ contains
         dvdrc = -acc *qi*qj/rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
 !.....potential
         tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
-        if( j.le.natm ) then
-          epi(i)= epi(i) +tmp
-          epi(j)= epi(j) +tmp
-          epotl = epotl +tmp +tmp
-        else
-          epi(i)= epi(i) +tmp
-          epotl = epotl +tmp
-        endif
+        epi(i)= epi(i) +tmp
+        epotl= epotl +tmp
 !.....force
         texp = exp(-(dij/rhoij)**2)
         dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
-        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
-        if( .not.lstrs ) cycle
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
@@ -1129,9 +1119,7 @@ contains
       enddo
     enddo
 
-    if( lstrs ) then
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
+    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,MPI_REAL8 &

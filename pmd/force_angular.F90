@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-06-10 18:16:28 Ryo KOBAYASHI>
+!                     Last modified: <2020-10-23 17:14:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax, csp2isp
   integer,parameter:: ioprms = 50
@@ -158,7 +158,6 @@ contains
           aa3(1:3,k)= aa3(1:3,k) -tmpk(1:3)
           aa3(1:3,i)= aa3(1:3,i) +(tmpj(1:3)+tmpk(1:3))
 !.....Stress
-          if( .not. lstrs ) cycle
           do jxyz=1,3
             strsl(1:3,jxyz,i)=strsl(1:3,jxyz,i) &
                  -0.5d0*xij(jxyz)*tmpj(1:3) & !*volj &
@@ -177,11 +176,9 @@ contains
          ,nn,mpi_world,aa3,3)
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa3(1:3,1:natm)
     
-    if( lstrs ) then
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-           ,nn,mpi_world,strsl,9)
-      strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
+    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,strsl,9)
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !.....Gather epot
     epott= 0d0

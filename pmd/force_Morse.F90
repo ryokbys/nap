@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-02-03 17:12:25 Ryo KOBAYASHI>
+!                     Last modified: <2020-10-23 17:13:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -150,7 +150,6 @@ contains
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
-        if(j.le.i) cycle
         js= int(tag(j))
 !.....Check if these two species interact
         if( .not. interact(is,js) ) cycle
@@ -162,7 +161,6 @@ contains
         dij= sqrt(dij2)
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
-        dxdj(1:3)=  rij(1:3)*diji
         d0ij = d0(is,js)
         alpij= alp(is,js)
         rminij=rmin(is,js)
@@ -172,34 +170,22 @@ contains
 !.....potential
         tmp= d0ij*((texp-1d0)**2 -1d0)
         tmp2 = 0.5d0 *(tmp -vrc -dvdrc*(dij-rc))
-        if( j.le.natm ) then
-          epi(i)= epi(i) +tmp2
-          epi(j)= epi(j) +tmp2
-          epotl = epotl +tmp2 +tmp2
-        else
-          epi(i)= epi(i) +tmp2
-          epotl = epotl +tmp2
-        endif
+        epi(i)= epi(i) +tmp2
+        epotl= epotl +tmp2
 !.....force
         dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) -dvdrc
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
-        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
-        if( .not.lstrs ) cycle
 !.....stress
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
                  -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo
     enddo
 
-    if( lstrs ) then
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
+    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     
 !-----gather epot
     epott= 0d0
