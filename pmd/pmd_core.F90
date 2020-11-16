@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-11-11 21:52:09 Ryo KOBAYASHI>
+!                     Last-modified: <2020-11-13 09:47:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -555,7 +555,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   al(2)= h(2,2,0)
   al(3)= h(3,3,0)
 
-  if( lflux ) call accum_lflux(namax,natm,h,ra,va,clr,istp,nouterg,dt &
+  if( lflux ) call accum_lflux(namax,natm,h,ra,va,clr,istp,dt &
        ,myid_md,mpi_md_world,nxyz)
 
   i_conv = 0
@@ -988,7 +988,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       i_conv = 0
     endif
 
-    if( lflux ) call accum_lflux(namax,natm,h,ra,va,clr,istp,nouterg,dt &
+    if( lflux ) call accum_lflux(namax,natm,h,ra,va,clr,istp,dt &
          ,myid_md,mpi_md_world,nxyz)
 
 !-------write the particle positions

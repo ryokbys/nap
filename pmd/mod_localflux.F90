@@ -1,6 +1,6 @@
 module localflux
 !
-!  Module for evaluation of local flux using some NEMD method.
+!  Module for evaluation of local flux using the color-charge NEMD.
 !
   use pmdio,only: csp2isp,nspmax
   use pmdmpi,only: nid2xyz
@@ -14,6 +14,8 @@ module localflux
 
   logical:: lflux = .false.  ! Flag to eval local flux.
   logical:: initialized = .false.
+  integer:: noutlflux = 1000
+  integer:: nskipout
   real(8),allocatable:: fluxg(:,:)  ! Global flux
   real(8),allocatable:: fluxl(:,:),fluxt(:,:)  ! Local flux
   integer:: nlx = 1  ! Num of divisions in a node for local regions
@@ -23,23 +25,32 @@ module localflux
   integer:: ng,ngx,ngy,ngz  ! Global num of divisions
   integer,allocatable:: idxl2g(:,:)  ! Conversion of index from local to global
   integer,allocatable:: nargn(:)  ! Num of atoms in local regions
-  real(8):: dlx,dly,dlz,dlxi,dlyi,dlzi
+  real(8):: dlx,dly,dlz,dlxi,dlyi,dlzi,evflux(3)
 
 contains
 !=======================================================================
-  subroutine init_lflux(myid,nx,ny,nz,lclrchg,mpi_world,iprint)
+  subroutine init_lflux(myid,nx,ny,nz,lclrchg,maxstp,mpi_world,iprint)
 !
 !  Initialize lflux.
 !
-    integer,intent(in):: myid,mpi_world,nx,ny,nz,iprint
+    use clrchg,only: clrfield
+    integer,intent(in):: myid,mpi_world,nx,ny,nz,iprint,maxstp
     logical,intent(in):: lclrchg
     
     integer:: inc,ix,iy,iz,mx,my,mz,ixyz,nxyz
     integer:: idxlfg,ilfgx,ilfgy,ilfgz
-    real(8):: anxi,anyi,anzi
+    real(8):: anxi,anyi,anzi,fext
     integer,allocatable:: idxl2gt(:)
     integer:: istat(mpi_status_size),itag,ierr
-    
+
+    if( noutlflux.eq.0 ) stop 'noutlflux must not be 0.'
+    nskipout = max(maxstp/noutlflux,1)
+
+!.....Set unit vector of external force on color charge
+    fext = sqrt(clrfield(1)**2 +clrfield(2)**2 +clrfield(3)**2)
+    evflux(1:3) = clrfield(1:3)/fext
+
+!.....Parallel setting
     anxi= 1d0/nx
     anyi= 1d0/ny
     anzi= 1d0/nz
@@ -114,14 +125,14 @@ contains
            ,ngx,ngy,ngz,ng
       print '(a,4f10.1)','   Normalized lengths(x,y,z) of local region = ' &
            ,dlx,dly,dlz
+      print '(a,3f7.3)', '   Unit vector along Fext = ',evflux(1:3)
 
       open(ionum,file=trim(cfoutlf),status='replace')
       write(ionum,'(a)') '#'
       write(ionum,'(a,4(1x,i0))') '# Local flux of regions, ngx,ngy,ngz,ng = '&
            ,ngx,ngy,ngz,ng
       write(ionum,'(a)') '# Order of data: idx=(igx-1)*ngy*ngz +(igy-1)*ngz +igz'
-      write(ionum,'(a)') '# Each line contains:  istp, time, ng*(jx,jy,jz)'
-      write(ionum,'(a)') '# Unit of flux: Ang/fs'
+      write(ionum,'(a)') '# Entry:  istp, time [fs], (flux(ig),ig=1,ng) [Ang]'
       write(ionum,'(a)') '#'
     endif
     initialized = .true.
@@ -130,17 +141,17 @@ contains
     return
   end subroutine init_lflux
 !=======================================================================
-  subroutine accum_lflux(namax,natm,hmat,ra,va,clr,istp,nouterg,dt&
+  subroutine accum_lflux(namax,natm,hmat,ra,va,clr,istp,dt&
        ,myid,mpi_world,nxyz)
 !
 !  Accumurate velocities multiplying color charge for evaluation of
 !  local flux.
 !
-    integer,intent(in):: namax,natm,istp,nouterg,myid,mpi_world,nxyz
+    integer,intent(in):: namax,natm,istp,myid,mpi_world,nxyz
     real(8),intent(in):: hmat(3,3),ra(3,namax),va(3,namax),clr(namax),dt
 
     integer:: i,ilx,ily,ilz,idxl,idxg,ixyz
-    real(8):: vi(3)
+    real(8):: vi(3),flux
     integer,parameter:: nmpi = 2
     integer:: istat(mpi_status_size),itag,ierr
 
@@ -156,12 +167,14 @@ contains
       ily = min(max(ily,1),nly)
       ilz = min(max(ilz,1),nlz)
       idxl = (ilx-1)*nly*nlz +(ily-1)*nlz +ilz
+!!$      write(6,'(a,5i5,2(2x,3es10.2))') 'i,ilx,ily,ilz,idxl,ra=',i,ilx,ily,ilz,idxl &
+!!$           ,ra(1:3,i),va(1:3,i)
       nargn(idxl) = nargn(idxl) +1
 !.....Scale velocity
       vi(1:3) = hmat(1:3,1)*va(1,i) +hmat(1:3,2)*va(2,i) &
            +hmat(1:3,3)*va(3,i)
 !.....Accumulate velocities in flux of its local region
-      fluxt(1:3,idxl) = fluxt(1:3,idxl) +clr(i)*vi(1:3)
+      fluxt(1:3,idxl) = fluxt(1:3,idxl) +clr(i)*vi(1:3)*dt
     enddo
     do idxl=1,nl
       if( nargn(idxl).eq.0 ) cycle
@@ -169,9 +182,8 @@ contains
     enddo
 
 !.....Output
-    if( mod(istp,nouterg).eq.0 ) then
+    if( mod(istp,nskipout).eq.0 ) then
 !.....Reduce local fluxes in each node to global local-flux
-
       if( myid.eq.0 ) then
         do idxl=1,nl
           idxg = idxl2g(idxl,0)
@@ -190,7 +202,9 @@ contains
 !.....Write out fluxg only at node-0
         write(ionum,'(i10,es18.10)',advance='no') istp, dt*istp
         do idxg=1,ng
-          write(ionum,'(1x,3(es11.3))',advance='no') fluxg(1:3,idxg)
+          flux = fluxg(1,idxg)*evflux(1) &
+               +fluxg(2,idxg)*evflux(2) +fluxg(3,idxg)*evflux(3)
+          write(ionum,'(1x,es11.3)',advance='no') flux
         enddo
         write(ionum,*) ''
         

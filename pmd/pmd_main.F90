@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-11-11 11:51:06 Ryo KOBAYASHI>
+!                     Last-modified: <2020-11-16 14:26:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -157,6 +157,18 @@ program pmd
 !!$      endif
     endif
 
+!.....Check whether localflux is used with color charge NEMD
+    if( lflux .and. .not. lclrchg ) then
+      print *,'ERROR: local flux must be used with color-charge NEMD !'
+      stop
+    endif
+    if( lflux ) then
+!.....Set cutoff_buffer to zero, since it can affect local flux results
+      rbuf = 0d0
+      print *,''
+      print *,'cutoff_buffer is reset to zero, since it can affect local-flux results.'
+    endif
+
 !.....Correct nnmax if the given nnmax is too small compared to
 !.....the estimated one
 !.....Now assume the minimum interatomic distance is about 2.0A
@@ -168,7 +180,7 @@ program pmd
       print '(a,2(2x,i0))','    nnmax_orig, nnmax_new = ',nnmax,nnmax_est
       nnmax = nnmax_est
     endif
-  endif
+  endif  ! end of myid.eq.0
 
   call bcast_params()
 
@@ -266,7 +278,10 @@ program pmd
   if( lclrchg ) call init_clrchg(specorder,ntot0,clrtot,tagtot &
        ,myid_md,iprint)
 !.....Init for local flux
-  if( lflux ) call init_lflux(myid_md,nx,ny,nz,lclrchg,mpi_md_world,iprint)
+  if( lflux ) then
+    call init_lflux(myid_md,nx,ny,nz,lclrchg &
+         ,nstp,mpi_md_world,iprint)
+  endif
 
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then
@@ -358,7 +373,7 @@ subroutine write_initial_setting()
   use pmdmpi
   use force
   use clrchg,only: lclrchg, cspc_clrchg, clrfield, clr_init
-  use localflux,only: lflux,nlx,nly,nlz
+  use localflux,only: lflux,nlx,nly,nlz,noutlflux
   implicit none 
   integer:: i
 
@@ -484,6 +499,7 @@ subroutine write_initial_setting()
 !.....Local flux
   if( lflux ) then
     write(6,'(2x,a,5x,l)') 'flag_lflux',lclrchg
+    write(6,'(2x,a,2x,i0)') 'num_out_lflux',noutlflux
     write(6,'(2x,a,3(2x,i0))') 'ndiv_lflux',nlx,nly,nlz
     write(6,'(2x,a)') ''
   endif
@@ -534,7 +550,7 @@ subroutine bcast_params()
   use force
   use extforce,only: lextfrc,cspc_extfrc,extfrc
   use clrchg,only: lclrchg,cspc_clrchg,clr_init,clrfield
-  use localflux,only: lflux,nlx,nly,nlz
+  use localflux,only: lflux,nlx,nly,nlz,noutlflux
   implicit none
   include 'mpif.h'
 
@@ -624,6 +640,7 @@ subroutine bcast_params()
 !.....Local flux
   call mpi_bcast(lflux,1,mpi_logical,0,mpicomm,ierr)
   if( lflux ) then
+    call mpi_bcast(noutlflux,1,mpi_integer,0,mpicomm,ierr)
     call mpi_bcast(nlx,1,mpi_integer,0,mpicomm,ierr)
     call mpi_bcast(nly,1,mpi_integer,0,mpicomm,ierr)
     call mpi_bcast(nlz,1,mpi_integer,0,mpicomm,ierr)

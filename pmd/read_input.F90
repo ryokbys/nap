@@ -40,7 +40,7 @@ subroutine set_variable(ionum,cname)
   use force,only: ol_type, ol_force
   use extforce,only: lextfrc,cspc_extfrc,extfrc
   use clrchg,only: lclrchg,cspc_clrchg,clrfield,clr_init
-  use localflux,only: lflux,nlx,nly,nlz
+  use localflux,only: lflux,nlx,nly,nlz,noutlflux
 #ifdef __WALL__
   use wall
 #endif
@@ -311,6 +311,9 @@ subroutine set_variable(ionum,cname)
 !.....Local flux
   elseif( trim(cname).eq.'flag_lflux') then
     call read_l1(ionum,lflux)
+    return
+  elseif( trim(cname).eq.'num_out_lflux') then
+    call read_i1(ionum,noutlflux)
     return
   elseif( trim(cname).eq.'ndiv_lflux') then
     backspace(ionum)

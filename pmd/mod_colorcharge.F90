@@ -169,7 +169,7 @@ contains
         if( iprint.gt.0 ) then
           print *,''
           print '(a)', ' Color charge NEMD:'
-          print '(a,a5)', '   Specified species = ',trim(cspc_clrchg)
+          print '(a,i3,a5)', '   Specified species = ',ispc_clrchg,trim(cspc_clrchg)
           print '(a,3f10.5)', '   Applied field [eV/A] = ',clrfield(1:3)
         endif
       endif
