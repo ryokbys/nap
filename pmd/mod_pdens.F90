@@ -4,12 +4,15 @@ module pdens
 !
   use pmdio,only: csp2isp,nspmax,get_vol
   use pmdmpi,only: nid2xyz
+  use element,only: get_cube_info
   implicit none
   include 'mpif.h'
   save
 
   character(len=128):: paramsdir = '.'
-  character(len=128),parameter:: cfoutpd = 'out.pdens.cube'
+  character(len=10),parameter:: cfprefix = 'out.pdens.'
+  character(len=5),parameter:: cfpostfix = '.cube'
+  character(len=128):: cfoutpd
   integer,parameter:: ionum = 68
 
   logical:: lpdens = .false.  ! Flag to eval local flux.
@@ -47,6 +50,7 @@ contains
       stop 'ERROR: spcs_pdens must be specified.'
     else
       ispc_pdens = csp2isp(trim(cspc_pdens),specorder)
+      cfoutpd = cfprefix//trim(cspc_pdens)//cfpostfix
     endif
 
 !.....Parallel setting
@@ -147,16 +151,19 @@ contains
     
   end subroutine accum_pdens
 !=======================================================================
-  subroutine final_pdens(myid,mpi_world,nxyz,hmat)
+  subroutine final_pdens(myid,mpi_world,nxyz,hmat,natm,tag,ra,specorder)
 !
 !  Finalize local flux.
 !
-    integer,intent(in):: myid,mpi_world,nxyz
-    real(8),intent(in):: hmat(3,3)
+    include 'params_unit.h'
+    integer,intent(in):: myid,mpi_world,nxyz,natm
+    real(8),intent(in):: hmat(3,3),ra(3,natm),tag(natm)
+    character(len=*),intent(in):: specorder(nspmax) 
+    
     integer,parameter:: nmpi = 1
-    integer:: idxl,idxg,ixyz
+    integer:: idxl,idxg,ixyz,is,num,ia,nums(nspmax)
     integer:: istat(mpi_status_size),itag,ierr
-    real(8):: vol
+    real(8):: vol,val,ri(3),vals(nspmax)
 
 !.....Reduce local fluxes in each node to global local-flux
     if( myid.eq.0 ) then
@@ -180,13 +187,21 @@ contains
 !.....Write out pdens only at node-0
       open(ionum,file=trim(cfoutpd),status='replace')
       write(ionum,'(a)') '# Probability density in Gaussian cube format.'
-      write(ionum,'(a)') '# NOTE: the length unit might be Bohr.'
-      write(ionum,'(a)') '  1   0.000  0.000  0.000'
-      write(ionum,'(i6,3(1x,es15.7))') ngx,hmat(1:3,1)
-      write(ionum,'(i6,3(1x,es15.7))') ngy,hmat(1:3,2)
-      write(ionum,'(i6,3(1x,es15.7))') ngz,hmat(1:3,3)
-      write(ionum,'(a)') '  1   1.000   0.000  0.000  0.000'
-      write(ionum,'(6(2x,es12.4))') (pdg(idxg)/nacc/vol,idxg=1,ng)
+      write(ionum,'(a)') '# NOTE: length unit in Bohr.'
+      write(ionum,'(2x,i0,3(1x,f7.3))') natm, 0d0, 0d0, 0d0
+      write(ionum,'(2x,i0,3(1x,es15.7))') ngx,hmat(1:3,1)*ang2bohr/ngx
+      write(ionum,'(2x,i0,3(1x,es15.7))') ngy,hmat(1:3,2)*ang2bohr/ngy
+      write(ionum,'(2x,i0,3(1x,es15.7))') ngz,hmat(1:3,3)*ang2bohr/ngz
+      call get_cube_info(nspmax,specorder,nums,vals)
+      do ia=1,natm
+        is = int(tag(ia))
+        num = nums(is)
+        val = vals(is)
+        ri(1:3)= hmat(1:3,1)*ra(1,ia) +hmat(1:3,2)*ra(2,ia) +hmat(1:3,3)*ra(3,ia)
+        write(ionum,'(i6,f8.3,3(1x,es15.7))') num,val,ri(1:3)*ang2bohr
+      enddo
+!!$      write(ionum,'(a)') '  1   1.000   0.000  0.000  0.000'
+      write(ionum,'(6(2x,es12.4))') (pdg(idxg)/nacc/(vol*ang2bohr**3),idxg=1,ng)
       close(ionum)
       deallocate(pdg)
     else  ! myid.ne.0

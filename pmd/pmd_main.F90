@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-11-18 22:07:42 Ryo KOBAYASHI>
+!                     Last-modified: <2020-11-18 22:57:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -310,7 +310,8 @@ program pmd
   endif
 
   if( lflux ) call final_lflux(myid_md)
-  if( lpdens ) call final_pdens(myid_md,mpi_md_world,nodes_md,h)
+  if( lpdens ) call final_pdens(myid_md,mpi_md_world,nodes_md,h &
+       ,ntot,tagtot,rtot,specorder)
 
 !.....write energy, forces and stresses only for fitpot
   if( myid_md.eq.0 ) then
