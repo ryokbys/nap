@@ -49,7 +49,7 @@ __version__ = "200722"
 
 #...constants
 FILE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',
-                'cube','CHGCAR')
+                'cube','CHGCAR','pdb')
 DEFAULT_LABELS = ('pos','vel','frc','sid')
 # _file_formats = ('pmd','POSCAR','dump','xsf','lammps',
 #                  'cube','CHGCAR')
@@ -436,8 +436,11 @@ class NAPSystem(object):
             # atoms = self.to_ase_atoms()
             # ase.io.write(fname,atoms,format='cube')
             self.write_cube(fname)
+        elif format in ('pdb','PDB'):
+            import ase.io
+            ase.io.write(filename=fname,images=self.to_ase_atoms,format='proteindatabank')
         else:
-            raise ValueError('Cannot detect output file format: '+format)
+            raise IOError('Cannot write out in the given format: '+format)
 
         return None
 

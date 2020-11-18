@@ -41,6 +41,7 @@ subroutine set_variable(ionum,cname)
   use extforce,only: lextfrc,cspc_extfrc,extfrc
   use clrchg,only: lclrchg,cspc_clrchg,clrfield,clr_init
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
+  use pdens,only: lpdens,cspc_pdens,npx,npy,npz
 #ifdef __WALL__
   use wall
 #endif
@@ -318,6 +319,17 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'ndiv_lflux') then
     backspace(ionum)
     read(ionum,*) ctmp,nlx,nly,nlz
+    return
+!.....Probability density
+  elseif( trim(cname).eq.'flag_pdens') then
+    call read_l1(ionum,lpdens)
+    return
+  elseif( trim(cname).eq.'spcs_pdens') then
+    call read_c1(ionum,cspc_pdens)
+    return
+  elseif( trim(cname).eq.'ndiv_pdens') then
+    backspace(ionum)
+    read(ionum,*) ctmp,npx,npy,npz
     return
     
 #ifdef __WALL__

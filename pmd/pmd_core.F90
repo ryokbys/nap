@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-11-13 09:47:28 Ryo KOBAYASHI>
+!                     Last-modified: <2020-11-18 22:16:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -32,6 +32,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use extforce,only: lextfrc,rm_trans_extfrc,add_extfrc
   use clrchg,only: lclrchg,clrchg_force,rm_trans_clrchg,clr_init
   use localflux,only: lflux,accum_lflux
+  use pdens,only: lpdens,accum_pdens
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -557,6 +558,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 
   if( lflux ) call accum_lflux(namax,natm,h,ra,va,clr,istp,dt &
        ,myid_md,mpi_md_world,nxyz)
+  if( lpdens ) call accum_pdens(namax,natm,tag,ra)
 
   i_conv = 0
   lconverged = .false.
@@ -990,6 +992,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 
     if( lflux ) call accum_lflux(namax,natm,h,ra,va,clr,istp,dt &
          ,myid_md,mpi_md_world,nxyz)
+    if( lpdens ) call accum_pdens(namax,natm,tag,ra)
 
 !-------write the particle positions
     if(ifpmd.gt.0.and. &

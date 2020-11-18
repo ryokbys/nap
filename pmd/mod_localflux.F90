@@ -91,6 +91,8 @@ contains
           inc = inc +1
           idxlfg = (ilfgx-1)*ngz*ngy +(ilfgy-1)*ngz +ilfgz
           idxl2gt(inc) = idxlfg
+!!$          print '(a,6i6)','myid,ilfgx,ilfgy,ilfgz,inc,idxlfg=' &
+!!$               ,myid,ilfgx,ilfgy,ilfgz,inc,idxlfg
         enddo
       enddo
     enddo
@@ -119,11 +121,11 @@ contains
     if( myid.eq.0 .and. iprint.gt.0 ) then
       print *,''
       print '(a)',' Local flux measuring ON:'
-      print '(a,4i5)','   Number of regions in a node (x,y,z,total) =' &
+      print '(a,4(1x,i0))','   Number of regions in a node (x,y,z,total) =' &
            ,nlx,nly,nlz,nl
-      print '(a,4i5)','   Number of regions globally (x,y,z,total)  =' &
+      print '(a,4(1x,i0))','   Number of regions globally (x,y,z,total)  =' &
            ,ngx,ngy,ngz,ng
-      print '(a,4f10.1)','   Normalized lengths(x,y,z) of local region = ' &
+      print '(a,4f7.3)','   Normalized lengths(x,y,z) of local region = ' &
            ,dlx,dly,dlz
       print '(a,3f7.3)', '   Unit vector along Fext = ',evflux(1:3)
 
@@ -163,9 +165,9 @@ contains
       ilx = int((ra(1,i)+dlx)*dlxi)
       ily = int((ra(2,i)+dly)*dlyi)
       ilz = int((ra(3,i)+dlz)*dlzi)
-      ilx = min(max(ilx,1),nlx)
-      ily = min(max(ily,1),nly)
-      ilz = min(max(ilz,1),nlz)
+!!$      ilx = min(max(ilx,1),nlx)
+!!$      ily = min(max(ily,1),nly)
+!!$      ilz = min(max(ilz,1),nlz)
       idxl = (ilx-1)*nly*nlz +(ily-1)*nlz +ilz
 !!$      write(6,'(a,5i5,2(2x,3es10.2))') 'i,ilx,ily,ilz,idxl,ra=',i,ilx,ily,ilz,idxl &
 !!$           ,ra(1:3,i),va(1:3,i)
@@ -206,7 +208,7 @@ contains
                +fluxg(2,idxg)*evflux(2) +fluxg(3,idxg)*evflux(3)
           write(ionum,'(1x,es11.3)',advance='no') flux
         enddo
-        write(ionum,*) ''
+        write(ionum,'(a)') ''
         
       else  ! myid.ne.0
         itag = myid*nmpi -nmpi
@@ -229,3 +231,7 @@ contains
     endif
   end subroutine final_lflux
 end module localflux
+!-----------------------------------------------------------------------
+!     Local Variables:
+!     compile-command: "make pmd"
+!     End:

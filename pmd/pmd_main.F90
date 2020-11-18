@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-11-16 14:26:01 Ryo KOBAYASHI>
+!                     Last-modified: <2020-11-18 22:07:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -27,6 +27,7 @@ program pmd
   use element
   use clrchg,only: lclrchg,init_clrchg
   use localflux,only: lflux,init_lflux,final_lflux
+  use pdens,only: lpdens,init_pdens,final_pdens
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -120,7 +121,7 @@ program pmd
     
     if( trim(ctctl).eq.'ttm' ) then
       print *,''
-      print *,'Since the two-temperature model (TTM) MD...'
+      print *,'NOTICE: Since using the two-temperature model (TTM) MD:'
 !.....Set x-boundary free if TTM
       if( boundary(1:1).ne.'f' ) then
         print *,'  - Free boundary condition is set' &
@@ -162,11 +163,12 @@ program pmd
       print *,'ERROR: local flux must be used with color-charge NEMD !'
       stop
     endif
-    if( lflux ) then
+    if( lflux .or. lpdens ) then
 !.....Set cutoff_buffer to zero, since it can affect local flux results
       rbuf = 0d0
       print *,''
-      print *,'cutoff_buffer is reset to zero, since it can affect local-flux results.'
+      print *,'NOTICE: cutoff_buffer is reset to zero, ' &
+           //'since it can affect local-flux or probability-density results.'
     endif
 
 !.....Correct nnmax if the given nnmax is too small compared to
@@ -278,10 +280,10 @@ program pmd
   if( lclrchg ) call init_clrchg(specorder,ntot0,clrtot,tagtot &
        ,myid_md,iprint)
 !.....Init for local flux
-  if( lflux ) then
-    call init_lflux(myid_md,nx,ny,nz,lclrchg &
-         ,nstp,mpi_md_world,iprint)
-  endif
+  if( lflux ) call init_lflux(myid_md,nx,ny,nz,lclrchg &
+       ,nstp,mpi_md_world,iprint)
+  if( lpdens ) call init_pdens(myid_md,nx,ny,nz,h,specorder &
+       ,mpi_md_world,iprint)
 
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then
@@ -308,6 +310,7 @@ program pmd
   endif
 
   if( lflux ) call final_lflux(myid_md)
+  if( lpdens ) call final_pdens(myid_md,mpi_md_world,nodes_md,h)
 
 !.....write energy, forces and stresses only for fitpot
   if( myid_md.eq.0 ) then

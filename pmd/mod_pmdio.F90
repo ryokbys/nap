@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-11-06 22:24:06 Ryo KOBAYASHI>
+!                     Last modified: <2020-11-18 22:16:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -688,6 +688,28 @@ contains
     read(cdumpaux,*) (cdumpauxarr(i),i=1,ndumpaux)
     return
   end subroutine make_cdumpauxarr
+!=======================================================================
+  function get_vol(h)
+    real(8),intent(in):: h(3,3)
+
+    integer:: i,j,jm,jp,im,ip
+    real(8):: sgm(3,3)
+    real(8):: get_vol
+
+!.....cofactor matrix, SGM
+    do j=1,3
+      jm=mod(j+1,3)+1
+      jp=mod(j,  3)+1
+      do i=1,3
+        im=mod(i+1,3)+1
+        ip=mod(i,  3)+1
+        sgm(i,j)=h(ip,jp)*h(im,jm)-h(im,jp)*h(ip,jm)
+      enddo
+    enddo
+!.....MD-box volume
+    get_vol=h(1,1)*sgm(1,1)+h(2,1)*sgm(2,1)+h(3,1)*sgm(3,1)
+    return
+  end function get_vol
 end module pmdio
 !-----------------------------------------------------------------------
 !     Local Variables:
