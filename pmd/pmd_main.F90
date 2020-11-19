@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-11-18 22:57:05 Ryo KOBAYASHI>
+!                     Last-modified: <2020-11-19 10:48:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -167,8 +167,10 @@ program pmd
 !.....Set cutoff_buffer to zero, since it can affect local flux results
       rbuf = 0d0
       print *,''
-      print *,'NOTICE: cutoff_buffer is reset to zero, ' &
-           //'since it can affect local-flux or probability-density results.'
+      print *,'NOTICE: cutoff_buffer is reset to 0, since it can affect ' &
+           //'the following:'
+      if( lflux ) print *,'  - local flux'
+      if( lpdens ) print *,'  - probability density'
     endif
 
 !.....Correct nnmax if the given nnmax is too small compared to
@@ -378,6 +380,7 @@ subroutine write_initial_setting()
   use force
   use clrchg,only: lclrchg, cspc_clrchg, clrfield, clr_init
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
+  use pdens,only: lpdens,cspc_pdens,npx,npy,npz
   implicit none 
   integer:: i
 
@@ -507,6 +510,13 @@ subroutine write_initial_setting()
     write(6,'(2x,a,3(2x,i0))') 'ndiv_lflux',nlx,nly,nlz
     write(6,'(2x,a)') ''
   endif
+!.....Probability density
+  if( lpdens ) then
+    write(6,'(2x,a,5x,l)') 'flag_pdens',lpdens
+    write(6,'(2x,a,5x,a)') 'spcs_pdens',trim(cspc_pdens)
+    write(6,'(2x,a,3x,3(2x,i0))') 'ndiv_lpdens',npx,npy,npz
+    write(6,'(2x,a)') ''
+  endif
 !.....Charge
 !!$  write(6,'(2x,a)') 'charge'
 !!$  do i=1,nspmax
@@ -555,6 +565,7 @@ subroutine bcast_params()
   use extforce,only: lextfrc,cspc_extfrc,extfrc
   use clrchg,only: lclrchg,cspc_clrchg,clr_init,clrfield
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
+  use pdens,only: lpdens,npx,npy,npz,cspc_pdens
   implicit none
   include 'mpif.h'
 
@@ -654,6 +665,14 @@ subroutine bcast_params()
   if( lextfrc ) then
     call mpi_bcast(cspc_extfrc,3,mpi_character,0,mpicomm,ierr)
     call mpi_bcast(extfrc,3,mpi_real8,0,mpicomm,ierr)
+  endif
+!.....Probability density
+  call mpi_bcast(lpdens,1,mpi_logical,0,mpicomm,ierr)
+  if( lpdens ) then
+    call mpi_bcast(cspc_pdens,3,mpi_character,0,mpicomm,ierr)
+    call mpi_bcast(npx,1,mpi_integer,0,mpicomm,ierr)
+    call mpi_bcast(npy,1,mpi_integer,0,mpicomm,ierr)
+    call mpi_bcast(npz,1,mpi_integer,0,mpicomm,ierr)
   endif
 !.....Metadynamics
   call mpi_bcast(lmetaD,1,mpi_logical,0,mpicomm,ierr)

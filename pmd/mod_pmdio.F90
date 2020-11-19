@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-11-18 22:16:35 Ryo KOBAYASHI>
+!                     Last modified: <2020-11-19 10:39:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -707,7 +707,7 @@ contains
       enddo
     enddo
 !.....MD-box volume
-    get_vol=h(1,1)*sgm(1,1)+h(2,1)*sgm(2,1)+h(3,1)*sgm(3,1)
+    get_vol= h(1,1)*sgm(1,1) +h(2,1)*sgm(2,1) +h(3,1)*sgm(3,1)
     return
   end function get_vol
 end module pmdio

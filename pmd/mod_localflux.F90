@@ -128,6 +128,7 @@ contains
       print '(a,4f7.3)','   Normalized lengths(x,y,z) of local region = ' &
            ,dlx,dly,dlz
       print '(a,3f7.3)', '   Unit vector along Fext = ',evflux(1:3)
+      print '(a)', '   Output file = '//trim(cfoutlf)
 
       open(ionum,file=trim(cfoutlf),status='replace')
       write(ionum,'(a)') '#'

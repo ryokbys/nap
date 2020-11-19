@@ -109,12 +109,14 @@ contains
     if( myid.eq.0 .and. iprint.gt.0 ) then
       print *,''
       print '(a)',' Probability density measuring ON:'
+      print '(a)','   Tracked species = '//trim(cspc_pdens)
       print '(a,4(1x,i0))','   Number of regions in a node (x,y,z,total) =' &
            ,npx,npy,npz,nl
       print '(a,4(1x,i0))','   Number of regions globally (x,y,z,total)  =' &
            ,ngx,ngy,ngz,ng
-      print '(a,4f7.3)','   Normalized lengths(x,y,z) of local region = ' &
+      print '(a,4f7.4)','   Normalized lengths(x,y,z) of local region = ' &
            ,dpx,dpy,dpz
+      print '(a)', '   Output file = '//trim(cfoutpd)
 
     endif
     nacc = 0
@@ -179,7 +181,7 @@ contains
         pdl(:) = 0d0
         call mpi_recv(pdl,nl,mpi_real8,ixyz,itag+1,mpi_world &
              ,istat,ierr)
-        do idxl=1,ng
+        do idxl=1,nl
           idxg = idxl2g(idxl,ixyz)
           pdg(idxg) = pdg(idxg) +pdl(idxl)
         enddo
@@ -198,17 +200,19 @@ contains
         num = nums(is)
         val = vals(is)
         ri(1:3)= hmat(1:3,1)*ra(1,ia) +hmat(1:3,2)*ra(2,ia) +hmat(1:3,3)*ra(3,ia)
-        write(ionum,'(i6,f8.3,3(1x,es15.7))') num,val,ri(1:3)*ang2bohr
+        write(ionum,'(i6,f8.3,3(1x,es12.4))') num,val,ri(1:3)*ang2bohr
       enddo
 !!$      write(ionum,'(a)') '  1   1.000   0.000  0.000  0.000'
-      write(ionum,'(6(2x,es12.4))') (pdg(idxg)/nacc/(vol*ang2bohr**3),idxg=1,ng)
+      write(ionum,'(6(2x,es11.3))') (pdg(idxg)/nacc/(vol*ang2bohr**3),idxg=1,ng)
       close(ionum)
       deallocate(pdg)
     else  ! myid.ne.0
       itag = myid*nmpi -nmpi
       call mpi_send(pdl,nl,mpi_real8,0,itag+1,mpi_world,ierr)
     endif
-
+    call mpi_barrier(mpi_world,ierr)
+    deallocate(pdl,pdt,idxl2g)
+    return
   end subroutine final_pdens
 end module pdens
 !-----------------------------------------------------------------------
