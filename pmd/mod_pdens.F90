@@ -169,7 +169,7 @@ contains
 
 !.....Reduce local fluxes in each node to global local-flux
     if( myid.eq.0 ) then
-      vol = get_vol(hmat)
+      vol = get_vol(hmat)/ng
       allocate(pdg(ng))
       pdg(:) = 0d0
       do idxl=1,nl
