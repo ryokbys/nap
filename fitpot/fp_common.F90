@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-04-30 11:33:51 Ryo KOBAYASHI>
+!                     Last modified: <2020-11-30 14:18:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -898,7 +898,7 @@ contains
 !!$    if( iprint.gt.2 ) print '(/,a)',' one_shot for '//trim(smpl%cdirname)//'...'
     call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
          ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
-         ,smpl%chg,smpl%chi,smpl%tei &
+         ,smpl%chg,smpl%chi,smpl%tei,smpl%clr &
          ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
          ,smpl%specorder,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
          ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &

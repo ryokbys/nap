@@ -1,5 +1,5 @@
 num_samples     2
-num_iteration   100
+num_iteration   10
 num_iter_eval   5
 converge_num    3
 

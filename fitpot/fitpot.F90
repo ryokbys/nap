@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-04-27 21:06:07 Ryo KOBAYASHI>
+!                     Last modified: <2020-11-30 14:18:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -689,15 +689,15 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%fref(3,natm), smpl%ifcal(natm),smpl%fabs(natm) &
        ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
        ,smpl%eki(3,3,natm),smpl%epi(natm) &
-       ,smpl%chg(natm),smpl%chi(natm),smpl%tei(natm),smpl%fsub(3,natm) &
-       ,smpl%eatm(natm) )
+       ,smpl%chg(natm),smpl%chi(natm),smpl%tei(natm),smpl%clr(natm) &
+       ,smpl%fsub(3,natm),smpl%eatm(natm) )
 !!$       ,smpl%eatm(natm) &
 !!$       ,smpl%gwe(nvars),smpl%gwf(3,nvars,natm),smpl%gws(6,nvars))
   dmem = dmem +8d0*size(smpl%ra) +8d0*size(smpl%fa) +8d0*size(smpl%tag) &
        +8d0*size(smpl%fref) +4d0*size(smpl%ifcal) +8d0*size(smpl%fabs) &
        +8d0*size(smpl%va) +8d0*size(smpl%strsi) +8d0*size(smpl%eki) +8d0*size(smpl%epi) &
-       +8d0*size(smpl%chg) +8d0*size(smpl%chi) +8d0*size(smpl%tei) +8d0*size(smpl%fsub) &
-       +8d0*size(smpl%eatm)
+       +8d0*size(smpl%chg) +8d0*size(smpl%chi) +8d0*size(smpl%tei) +8d0*size(smpl%clr) &
+       +8d0*size(smpl%fsub) +8d0*size(smpl%eatm)
 !!$       +8d0*size(smpl%eatm) +8d0*size(smpl%gwe) +8d0*size(smpl%gwf) +8d0*size(smpl%gws)
   if( lgdw ) then
     allocate(smpl%gdf(natm),smpl%gdw(natm))
@@ -705,6 +705,7 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
   endif
   smpl%chg(1:natm) = 0d0
   smpl%tei(1:natm) = 0d0
+  smpl%clr(1:natm) = 0d0
   smpl%esub= 0d0
   smpl%fsub(1:3,1:natm)= 0d0
   smpl%ssub(1:3,1:3) = 0d0
