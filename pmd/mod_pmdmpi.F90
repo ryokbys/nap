@@ -1,6 +1,6 @@
 module pmdmpi
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-10-11 20:52:53 Ryo KOBAYASHI>
+!                     Last modified: <2020-11-24 11:38:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Module that includes variables and parameters used for parallel
 ! computation with mpi for spatial decomposition MD simulation.
@@ -23,10 +23,8 @@ contains
     integer:: imax,i
     integer:: get_factor
 
-    if( n.eq.1 ) then
-      get_factor = 1
-      return
-    endif
+    get_factor = 1
+    if( n.eq.1 ) return
 
     imax = int(sqrt(dble(n)))
     if( mod(n,2).eq.0 ) then
