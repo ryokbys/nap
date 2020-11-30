@@ -21,13 +21,15 @@ rm -f dump_* out.* data.pmd.*
 
 #...NpT MD
 cp in.pmd.NpT in.pmd
-pmd 2>&1 > out.pmd.NpT
+# mpirun -np 1 pmd 2>&1 > out.pmd.NpT
+mpirun -np 1 ../../../pmd/pmd 2>&1 > out.pmd.NpT
 head -n166 out.pmd.NpT
 tail -n20 out.pmd.NpT
 echo "NpT-MD done at" `date`
 #...extract rdf, adf, vol and rename files
-python ~/src/nap/nappy/rdf.py -d 0.05 -r 5.0 --gsmear=2 --skip=80 --specorder=Li,Zr,P,O -o data.pmd.rdf dump_* 2>&1 
-python ~/src/nap/nappy/adf.py --gsmear=2 --triplets=Zr-O-O,P-O-O --skip=80 -o data.pmd.adf dump_* 2>&1 
-python ~/src/nap/nappy/vol_lat.py --skip=80 dump_* 2>&1
+# python ~/src/nap/nappy/rdf.py -d 0.05 -r 5.0 --gsmear=2 --skip=80 --specorder=Li,Zr,P,O -o data.pmd.rdf dump_* 2>&1 
+python ../../../nappy/rdf.py -d 0.05 -r 5.0 --gsmear=2 --skip=80 --specorder=Li,Zr,P,O -o data.pmd.rdf dump_* 2>&1 
+python ../../../nappy/adf.py --gsmear=2 --triplets=Zr-O-O,P-O-O --skip=80 -o data.pmd.adf dump_* 2>&1 
+python ../../../nappy/vol_lat.py --skip=80 dump_* 2>&1
 #tail -n1 out.erg | awk '{print $7}' > data.pmd.vol
 echo "post-processing done at" `date`

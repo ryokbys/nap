@@ -29,14 +29,15 @@ mods= mod_variables.o mod_parallel.o mod_minimize.o mod_random.o fp_common.o mod
 args= iargc.o getarg.o
 
 pmdobj= ${PMDDIR}/mod_pmdvars.o ${PMDDIR}/mod_pmdmpi.o ${PMDDIR}/mod_pmdio.o \
-    ${PMDDIR}/mod_version.o ${PMDDIR}/mod_force.o ${PMDDIR}/mod_ttm.o \
-    ${PMDDIR}/zload.o ${PMDDIR}/util_rnd.o \
-    ${PMDDIR}/force_*.o ${PMDDIR}/sort.o ${PMDDIR}/mk_lspr.o \
-    ${PMDDIR}/lasubs.o ${PMDDIR}/util_vec.o \
-    ${PMDDIR}/common_parallel.o ${PMDDIR}/pmd_core.o ${PMDDIR}/descriptor.o \
-    ${PMDDIR}/metadynamics.o ${PMDDIR}/mod_constraints.o ${PMDDIR}/mod_vector.o \
-		${PMDDIR}/mod_rdcfrc.o ${PMDDIR}/mod_structure.o ${PMDDIR}/mod_deform.o \
-		${PMDDIR}/mod_util.o ${PMDDIR}/mod_element.o
+	${PMDDIR}/mod_version.o ${PMDDIR}/mod_force.o ${PMDDIR}/mod_ttm.o \
+	${PMDDIR}/zload.o ${PMDDIR}/util_rnd.o \
+	${PMDDIR}/force_*.o ${PMDDIR}/sort.o ${PMDDIR}/mk_lspr.o \
+	${PMDDIR}/lasubs.o ${PMDDIR}/util_vec.o \
+	${PMDDIR}/common_parallel.o ${PMDDIR}/pmd_core.o ${PMDDIR}/descriptor.o \
+	${PMDDIR}/metadynamics.o ${PMDDIR}/mod_constraints.o ${PMDDIR}/mod_vector.o \
+	${PMDDIR}/mod_rdcfrc.o ${PMDDIR}/mod_structure.o ${PMDDIR}/mod_deform.o \
+	${PMDDIR}/mod_util.o ${PMDDIR}/mod_element.o ${PMDDIR}/mod_extforce.o \
+	${PMDDIR}/mod_colorcharge.o ${PMDDIR}/mod_localflux.o ${PMDDIR}/mod_pdens.o
 
 ${PMDDIR}/%.o: ${PMDDIR}/%.F90
 	@[ -d ${PMDDIR} ]
@@ -54,6 +55,16 @@ clean:
 
 fitpot: ${mods} ${fitpotobj} ${pmdobj}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${fitpotobj} ${pmdobj}
+
+fitpot_examples := ../examples/fitpot_*/
+define cd_test
+	(cd $(dir ${1}) && make test)
+
+endef
+
+test:
+	@$(foreach x,$(wildcard $(fitpot_examples)),$(call cd_test, ${x}))
+
 
 #.....Dependencies
 read_input.o: ${mods}
