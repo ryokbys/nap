@@ -74,6 +74,15 @@ clean:
 pmd: ${mods} ${pmd} ${forces} ${params}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${force_common} ${forces} ${pmd}
 
+pmd_examples := ../examples/pmd_*/
+define cd_test
+	(cd $(dir ${1}) && make test)
+
+endef
+
+test: pmd
+	@$(foreach x,$(wildcard $(pmd_examples)),$(call cd_test, ${x}))
+
 pmc: ${mods} ${pmc} ${forces}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${force_common} ${forces} ${pmc}
 

@@ -10,11 +10,11 @@ num_nodes_z       1
 io_format    ascii
 
 time_interval     1d0
-num_iteration     1000
-num_out_energy    1000
+num_iteration     2
+num_out_energy    100
 
 flag_out_pmd      2
-num_out_pmd       20
+num_out_pmd       10
 
 force_type        Coulomb Morse
 cutoff_radius     6.0d0

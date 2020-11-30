@@ -6,7 +6,7 @@
    - Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>
 ========================================================================
  
- Job started at 14:03:27 on 2020-07-30
+ Job started at 12:43:30 on 2020-11-30
  
  Read pmdini in ascii mode.
  Species order read from pmdini option: 
@@ -39,7 +39,7 @@
   print_level     1
   
   time_interval     -2.000
-  num_iteration     1000
+  num_iteration     2
   num_out_energy     100
   
   flag_out_pmd     2
@@ -88,6 +88,7 @@
  Number of spatial divisions automatically set, NX,NY,NZ= 1 1 1
  
  Ensemble = NVE
+ 
  Number of ifmvs = 1
  
  Use variable time-step: dtmax =    2.000 fs
@@ -135,115 +136,17 @@
    Pressure        =         -0.34562 GPa (tensile)
    Stress tensor   = -.689 -.725 .378 .058 -.066 .086
  
- istp,etime,temp,epot,vol,prss=    0        0.01      278.39  -7.1138E+01  1.231E+02 -3.456E-01
- istp,etime,temp,epot,vol,prss=   10        0.03      110.66  -7.0961E+01  1.231E+02 -2.378E-01
- istp,etime,temp,epot,vol,prss=   20        0.05       93.74  -7.0941E+01  1.231E+02  8.706E-03
- istp,etime,temp,epot,vol,prss=   30        0.06      140.23  -7.0994E+01  1.231E+02  4.250E-01
- istp,etime,temp,epot,vol,prss=   40        0.08      188.40  -7.1044E+01  1.231E+02  1.143E+00
- istp,etime,temp,epot,vol,prss=   50        0.10       72.76  -7.0920E+01  1.231E+02  1.522E+00
- istp,etime,temp,epot,vol,prss=   60        0.12       99.37  -7.0948E+01  1.231E+02  1.610E+00
- istp,etime,temp,epot,vol,prss=   70        0.13      227.11  -7.1085E+01  1.231E+02  1.942E+00
- istp,etime,temp,epot,vol,prss=   80        0.15      124.02  -7.0975E+01  1.231E+02  1.733E+00
- istp,etime,temp,epot,vol,prss=   90        0.17      101.73  -7.0950E+01  1.231E+02  4.394E-01
- istp,etime,temp,epot,vol,prss=  100        0.19      155.78  -7.1010E+01  1.231E+02 -7.879E-01
- istp,etime,temp,epot,vol,prss=  110        0.20      186.76  -7.1042E+01  1.231E+02 -1.042E+00
- istp,etime,temp,epot,vol,prss=  120        0.22       91.14  -7.0940E+01  1.231E+02 -1.130E+00
- istp,etime,temp,epot,vol,prss=  130        0.24      110.34  -7.0960E+01  1.231E+02 -1.292E+00
- istp,etime,temp,epot,vol,prss=  140        0.25      198.44  -7.1054E+01  1.231E+02 -1.257E+00
- istp,etime,temp,epot,vol,prss=  150        0.27      158.23  -7.1012E+01  1.231E+02 -5.293E-01
- istp,etime,temp,epot,vol,prss=  160        0.29      122.93  -7.0973E+01  1.231E+02  5.131E-01
- istp,etime,temp,epot,vol,prss=  170        0.31       78.08  -7.0927E+01  1.231E+02  5.412E-01
- istp,etime,temp,epot,vol,prss=  180        0.32      192.52  -7.1048E+01  1.231E+02  5.941E-01
- istp,etime,temp,epot,vol,prss=  190        0.34      128.53  -7.0981E+01  1.231E+02  1.496E+00
- istp,etime,temp,epot,vol,prss=  200        0.36      109.49  -7.0958E+01  1.231E+02  2.109E+00
- istp,etime,temp,epot,vol,prss=  210        0.38      159.09  -7.1012E+01  1.231E+02  1.173E+00
- istp,etime,temp,epot,vol,prss=  220        0.39      195.01  -7.1051E+01  1.231E+02  4.542E-01
- istp,etime,temp,epot,vol,prss=  230        0.41      121.44  -7.0972E+01  1.231E+02  3.299E-01
- istp,etime,temp,epot,vol,prss=  240        0.43       95.35  -7.0944E+01  1.231E+02 -2.023E-01
- istp,etime,temp,epot,vol,prss=  250        0.44      150.62  -7.1003E+01  1.231E+02 -1.282E+00
- istp,etime,temp,epot,vol,prss=  260        0.46      180.67  -7.1036E+01  1.231E+02 -1.536E+00
- istp,etime,temp,epot,vol,prss=  270        0.48      138.47  -7.0990E+01  1.231E+02 -6.505E-01
- istp,etime,temp,epot,vol,prss=  280        0.50      104.03  -7.0952E+01  1.231E+02 -5.558E-01
- istp,etime,temp,epot,vol,prss=  290        0.51      157.49  -7.1011E+01  1.231E+02 -1.050E+00
- istp,etime,temp,epot,vol,prss=  300        0.53      184.82  -7.1040E+01  1.231E+02  3.276E-01
- istp,etime,temp,epot,vol,prss=  310        0.55      115.53  -7.0965E+01  1.231E+02  1.442E+00
- istp,etime,temp,epot,vol,prss=  320        0.56       91.02  -7.0940E+01  1.231E+02  9.234E-01
- istp,etime,temp,epot,vol,prss=  330        0.58      194.05  -7.1051E+01  1.231E+02  7.761E-01
- istp,etime,temp,epot,vol,prss=  340        0.60      141.09  -7.0992E+01  1.231E+02  2.040E+00
- istp,etime,temp,epot,vol,prss=  350        0.62       94.22  -7.0942E+01  1.231E+02  1.422E+00
- istp,etime,temp,epot,vol,prss=  360        0.64      154.75  -7.1008E+01  1.231E+02 -1.268E-01
- istp,etime,temp,epot,vol,prss=  370        0.65      182.72  -7.1038E+01  1.231E+02 -3.286E-01
- istp,etime,temp,epot,vol,prss=  380        0.67      126.00  -7.0976E+01  1.231E+02 -3.319E-02
- istp,etime,temp,epot,vol,prss=  390        0.69       74.83  -7.0923E+01  1.231E+02 -8.939E-01
- istp,etime,temp,epot,vol,prss=  400        0.70      187.46  -7.1043E+01  1.231E+02 -1.529E+00
- istp,etime,temp,epot,vol,prss=  410        0.72      173.08  -7.1027E+01  1.231E+02 -8.710E-01
- istp,etime,temp,epot,vol,prss=  420        0.74      108.46  -7.0957E+01  1.231E+02 -9.986E-03
- istp,etime,temp,epot,vol,prss=  430        0.76       83.79  -7.0933E+01  1.231E+02 -7.665E-02
- istp,etime,temp,epot,vol,prss=  440        0.77      195.47  -7.1051E+01  1.231E+02  2.696E-01
- istp,etime,temp,epot,vol,prss=  450        0.79      149.35  -7.1002E+01  1.231E+02  1.032E+00
- istp,etime,temp,epot,vol,prss=  460        0.81       81.23  -7.0929E+01  1.231E+02  1.373E+00
- istp,etime,temp,epot,vol,prss=  470        0.83      176.97  -7.1031E+01  1.231E+02  1.485E+00
- istp,etime,temp,epot,vol,prss=  480        0.84      195.34  -7.1051E+01  1.231E+02  1.299E+00
- istp,etime,temp,epot,vol,prss=  490        0.86      117.07  -7.0967E+01  1.231E+02  4.964E-01
- istp,etime,temp,epot,vol,prss=  500        0.88       88.61  -7.0938E+01  1.231E+02  2.247E-02
- istp,etime,temp,epot,vol,prss=  510        0.90      189.87  -7.1044E+01  1.231E+02 -3.635E-01
- istp,etime,temp,epot,vol,prss=  520        0.91      154.32  -7.1008E+01  1.231E+02 -1.533E+00
- istp,etime,temp,epot,vol,prss=  530        0.93      104.54  -7.0954E+01  1.231E+02 -1.207E+00
- istp,etime,temp,epot,vol,prss=  540        0.95      112.88  -7.0962E+01  1.231E+02 -2.079E-01
- istp,etime,temp,epot,vol,prss=  550        0.97      176.86  -7.1031E+01  1.231E+02 -3.730E-01
- istp,etime,temp,epot,vol,prss=  560        0.99      165.72  -7.1020E+01  1.231E+02 -2.847E-01
- istp,etime,temp,epot,vol,prss=  570        1.01      107.02  -7.0957E+01  1.231E+02  5.974E-01
- istp,etime,temp,epot,vol,prss=  580        1.02       95.05  -7.0944E+01  1.231E+02  1.155E+00
- istp,etime,temp,epot,vol,prss=  590        1.04      171.95  -7.1027E+01  1.231E+02  7.385E-01
- istp,etime,temp,epot,vol,prss=  600        1.06      172.84  -7.1027E+01  1.231E+02  9.725E-01
- istp,etime,temp,epot,vol,prss=  610        1.07      127.52  -7.0977E+01  1.231E+02  1.655E+00
- istp,etime,temp,epot,vol,prss=  620        1.09      151.42  -7.1004E+01  1.231E+02  8.470E-01
- istp,etime,temp,epot,vol,prss=  630        1.11      184.43  -7.1040E+01  1.231E+02 -4.007E-01
- istp,etime,temp,epot,vol,prss=  640        1.13      105.29  -7.0955E+01  1.231E+02 -6.594E-01
- istp,etime,temp,epot,vol,prss=  650        1.14      102.08  -7.0951E+01  1.231E+02 -5.976E-01
- istp,etime,temp,epot,vol,prss=  660        1.16      136.13  -7.0989E+01  1.231E+02 -1.029E+00
- istp,etime,temp,epot,vol,prss=  670        1.18      167.97  -7.1021E+01  1.231E+02 -8.905E-01
- istp,etime,temp,epot,vol,prss=  680        1.19      108.02  -7.0957E+01  1.231E+02  2.282E-01
- istp,etime,temp,epot,vol,prss=  690        1.21      161.85  -7.1014E+01  1.231E+02  6.594E-01
- istp,etime,temp,epot,vol,prss=  700        1.23      159.27  -7.1013E+01  1.231E+02 -5.263E-02
- istp,etime,temp,epot,vol,prss=  710        1.25      133.25  -7.0985E+01  1.231E+02  5.140E-01
- istp,etime,temp,epot,vol,prss=  720        1.26       87.88  -7.0937E+01  1.231E+02  1.380E+00
- istp,etime,temp,epot,vol,prss=  730        1.28      196.46  -7.1051E+01  1.231E+02  1.349E+00
- istp,etime,temp,epot,vol,prss=  740        1.30      144.49  -7.0997E+01  1.231E+02  5.940E-01
- istp,etime,temp,epot,vol,prss=  750        1.32      152.44  -7.1004E+01  1.231E+02  7.524E-01
- istp,etime,temp,epot,vol,prss=  760        1.33      100.43  -7.0950E+01  1.231E+02  7.807E-01
- istp,etime,temp,epot,vol,prss=  770        1.35      183.09  -7.1037E+01  1.231E+02 -9.330E-02
- istp,etime,temp,epot,vol,prss=  780        1.37      119.82  -7.0971E+01  1.231E+02 -1.492E+00
- istp,etime,temp,epot,vol,prss=  790        1.39      113.61  -7.0964E+01  1.231E+02 -8.200E-01
- istp,etime,temp,epot,vol,prss=  800        1.40      114.21  -7.0964E+01  1.231E+02 -1.466E-01
- istp,etime,temp,epot,vol,prss=  810        1.42      185.03  -7.1039E+01  1.231E+02  2.093E-02
- istp,etime,temp,epot,vol,prss=  820        1.44      181.72  -7.1035E+01  1.231E+02 -1.144E-01
- istp,etime,temp,epot,vol,prss=  830        1.45      135.92  -7.0987E+01  1.231E+02  4.201E-01
- istp,etime,temp,epot,vol,prss=  840        1.47       87.38  -7.0936E+01  1.231E+02  1.029E+00
- istp,etime,temp,epot,vol,prss=  850        1.49      156.86  -7.1010E+01  1.231E+02  6.730E-01
- istp,etime,temp,epot,vol,prss=  860        1.51      148.62  -7.1001E+01  1.231E+02 -2.929E-02
- istp,etime,temp,epot,vol,prss=  870        1.52      137.32  -7.0988E+01  1.231E+02  6.948E-01
- istp,etime,temp,epot,vol,prss=  880        1.54      105.07  -7.0955E+01  1.231E+02  1.052E+00
- istp,etime,temp,epot,vol,prss=  890        1.56      218.55  -7.1074E+01  1.231E+02  2.796E-01
- istp,etime,temp,epot,vol,prss=  900        1.58      138.44  -7.0990E+01  1.231E+02 -7.635E-01
- istp,etime,temp,epot,vol,prss=  910        1.59      144.43  -7.0996E+01  1.231E+02 -5.933E-01
- istp,etime,temp,epot,vol,prss=  920        1.61       80.73  -7.0930E+01  1.231E+02 -3.867E-01
- istp,etime,temp,epot,vol,prss=  930        1.63      188.69  -7.1043E+01  1.231E+02 -6.641E-01
- istp,etime,temp,epot,vol,prss=  940        1.65      110.90  -7.0961E+01  1.231E+02 -3.774E-01
- istp,etime,temp,epot,vol,prss=  950        1.66      161.80  -7.1013E+01  1.231E+02  7.005E-01
- istp,etime,temp,epot,vol,prss=  960        1.68      132.49  -7.0984E+01  1.231E+02  1.035E+00
- istp,etime,temp,epot,vol,prss=  970        1.70      140.76  -7.0993E+01  1.231E+02  6.572E-01
- istp,etime,temp,epot,vol,prss=  980        1.72      112.95  -7.0963E+01  1.231E+02  1.285E-01
- istp,etime,temp,epot,vol,prss=  990        1.74      178.18  -7.1032E+01  1.231E+02  7.417E-01
- istp,etime,temp,epot,vol,prss= 1000        1.75      119.29  -7.0970E+01  1.231E+02  7.449E-01
+ istp,etime,temp,epot,vol,prss= 0        0.01      278.39  -7.1138E+01  1.231E+02 -3.456E-01
+ istp,etime,temp,epot,vol,prss= 1        0.01      253.36  -7.1112E+01  1.231E+02 -1.776E-01
+ istp,etime,temp,epot,vol,prss= 2        0.02      192.72  -7.1047E+01  1.231E+02  7.462E-02
  
  Final values:
-   Kinetic energy  =          0.12336 eV =      0.014 eV/atom
-   Potential energy=        -70.97027 eV =     -7.886 eV/atom
-   Temperature 1   =        119.29485 K
-   Temperature     =        119.29485 K
-   Pressure        =          0.74494 GPa (compressive)
+   Kinetic energy  =          0.19929 eV =      0.022 eV/atom
+   Potential energy=        -71.04656 eV =     -7.894 eV/atom
+   Temperature 1   =        192.71895 K
+   Temperature     =        192.71895 K
+   Pressure        =          0.07462 GPa (compressive)
  
- Time                  =       1.75 sec  =   0h00m01s
+ Time                  =       0.02 sec  =   0h00m00s
  
- Job finished at 14:03:29 on 2020-07-30
+ Job finished at 12:43:30 on 2020-11-30
