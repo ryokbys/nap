@@ -1,7 +1,7 @@
 .phony: all clean pmd fitpot test
 SHELL = /bin/bash
 
-all: pmd fitpot test
+all: pmd fitpot
 
 clean:
 	(cd pmd/ && make clean)
