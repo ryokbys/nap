@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-11-19 10:48:20 Ryo KOBAYASHI>
+!                     Last-modified: <2020-11-30 17:53:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -514,7 +514,7 @@ subroutine write_initial_setting()
   if( lpdens ) then
     write(6,'(2x,a,5x,l)') 'flag_pdens',lpdens
     write(6,'(2x,a,5x,a)') 'spcs_pdens',trim(cspc_pdens)
-    write(6,'(2x,a,3x,3(2x,i0))') 'ndiv_lpdens',npx,npy,npz
+    write(6,'(2x,a,3x,3(2x,i0))') 'ndiv_pdens',npx,npy,npz
     write(6,'(2x,a)') ''
   endif
 !.....Charge
