@@ -37,7 +37,8 @@ pmdobj= ${PMDDIR}/mod_pmdvars.o ${PMDDIR}/mod_pmdmpi.o ${PMDDIR}/mod_pmdio.o \
 	${PMDDIR}/metadynamics.o ${PMDDIR}/mod_constraints.o ${PMDDIR}/mod_vector.o \
 	${PMDDIR}/mod_rdcfrc.o ${PMDDIR}/mod_structure.o ${PMDDIR}/mod_deform.o \
 	${PMDDIR}/mod_util.o ${PMDDIR}/mod_element.o ${PMDDIR}/mod_extforce.o \
-	${PMDDIR}/mod_colorcharge.o ${PMDDIR}/mod_localflux.o ${PMDDIR}/mod_pdens.o
+	${PMDDIR}/mod_colorcharge.o ${PMDDIR}/mod_localflux.o ${PMDDIR}/mod_pdens.o \
+	${PMDDIR}/mod_time.o
 
 ${PMDDIR}/%.o: ${PMDDIR}/%.F90
 	@[ -d ${PMDDIR} ]

@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-11-30 17:53:26 Ryo KOBAYASHI>
+!                     Last-modified: <2020-12-24 07:44:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -23,7 +23,8 @@ program pmd
   use version
   use force
   use Coulomb, only: cterms
-  use util, only: time_stamp, itotOf
+  use util, only: itotOf
+  use time, only: time_stamp, accum_time, report_time
   use element
   use clrchg,only: lclrchg,init_clrchg
   use localflux,only: lflux,init_lflux,final_lflux
@@ -40,10 +41,13 @@ program pmd
   integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,nstp_done
   integer:: mpicolor,mpikey,ierr,jerr,itmp,nprocs,nnmax_est
   real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin,rmin
+  real(8):: t0,t1
   character(len=3):: csp
   type(atom):: elem
   real(8),external:: urnd
 !!$  integer,external:: itotOf
+
+  t0 = mpi_wtime()
 
 !-----initialize the MPI environment
   call mpi_init(ierr)
@@ -292,6 +296,7 @@ program pmd
     call add_pka_velocity(myid_md)
   endif
 
+  call accum_time('overhead',mpi_wtime()-t0)
 !.....call pmd_core to perfom MD
   call pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,ekitot,epitot,chgtot,chitot,teitot,clrtot,nstp,nerg,npmd &
@@ -304,11 +309,13 @@ program pmd
        ,lmetaD,lconst,lrdcfrc,cstruct,istruct,cdeform,dhratio)
 
   if( myid_md.eq.0 ) then
+    tmp = mpi_wtime()
     if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
       call write_pmdtot_bin(20,cpmdfin)
     elseif( trim(ciofmt).eq.'ascii' ) then
       call write_pmdtot_ascii(20,cpmdfin)
     endif
+    call accum_time('write_xxx',mpi_wtime()-tmp)
   endif
 
   if( lflux ) call final_lflux(myid_md)
@@ -318,6 +325,8 @@ program pmd
 !.....write energy, forces and stresses only for fitpot
   if( myid_md.eq.0 ) then
     call write_force(21,'.pmd',h,epot,ntot,tagtot,atot,stnsr)
+    call accum_time('total',mpi_wtime()-t0)
+    if( iprint.gt.1 ) call report_time(6)
     print *,''
     call time_stamp(' Job finished')
   endif

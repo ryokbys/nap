@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-11-18 22:16:18 Ryo KOBAYASHI>
+!                     Last-modified: <2020-12-24 07:54:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -33,6 +33,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use clrchg,only: lclrchg,clrchg_force,rm_trans_clrchg,clr_init
   use localflux,only: lflux,accum_lflux
   use pdens,only: lpdens,accum_pdens
+  use time, only: sec2hms, accum_time
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -171,8 +172,10 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     noutpmd = maxstp +1
   endif
 !.....perform space decomposition after reading atomic configuration
+  tmp = mpi_wtime()
   call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,chgtot,chitot,teitot &
        ,clrtot,myid_md,mpi_md_world,nx,ny,nz,nxyz,rc,rbuf,iprint)
+  call accum_time('space_decomp',mpi_wtime()-tmp)
 !.....Some conversions
   do i=1,natm
     ra(1:3,i)= ra(1:3,i) -sorg(1:3)
@@ -331,21 +334,21 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 
   tcpu1= mpi_wtime()
   tcom = 0d0
-  tlspr = 0d0
-  tdump = 0d0
 
   call init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
        iprint,h,rc,lvc,ifcoulomb,specorder,am)
 !-----copy RA of boundary atoms
   call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
        ,nx,ny,nz,myid_md)
+  tmp = mpi_wtime()
   call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
        ,.true.,boundary)
+  call accum_time('ba_xxx',mpi_wtime()-tmp)
 !-----Make pair list
   tmp = mpi_wtime()
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,rc1nn &
        ,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.true.)
-  tlspr = tlspr +(mpi_wtime() -tmp)
+  call accum_time('lspr',mpi_wtime()-tmp)
 
 !.....Calc forces
   lstrs = lstrs0 .or. &
@@ -354,10 +357,12 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        trim(cpctl).eq.'vv-Berendsen')
 !.....Cell is new at the first call of get_force
   lcell_updated = .true.
+  tmp = mpi_wtime()
   call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
        ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
        ,lspr,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
        ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
+  call accum_time('get_force',mpi_wtime()-tmp)
   lcell_updated = .false.
   lstrs = .false.
   epot= epot0
@@ -481,7 +486,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   tmp = mpi_wtime()
   call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
        ,stot,chgtot,chitot,teitot,clrtot,natm,tag,ra,va,aa,epi,eki,strs &
-       ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+       ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world)
+  call accum_time('space_comp',mpi_wtime()-tmp)
   if( myid_md.eq.0 ) then
     if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot &
          ,atot,ekitot,epitot,stot,chgtot,chitot,teitot,clrtot,ifsort)
@@ -496,7 +502,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       call write_dump(20,'dump_'//trim(cnum))
     endif
   endif
-  tdump = tdump +(mpi_wtime() -tmp)
+  call accum_time('write_xxx',mpi_wtime() -tmp)
 
 !-----initialize the counter for output
   iocntpmd=0
@@ -693,24 +699,25 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
              ,tag,ra,va,chg,chi,h,sorg)
       endif
 !.....Move atoms that cross the boundary
+      tmp = mpi_wtime()
       call bamove(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
            ,boundary)
-!!$      call bamove(tcom,namax,nbmax,natm,ra,va,tag,chg,chi &
-!!$           ,anxi,anyi,anzi,myid_md,nn,sv,myparity,mpi_md_world &
-!!$           ,boundary)
 !.....Copy RA of boundary atoms
       call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
            ,.false.,boundary)
+      call accum_time('ba_xxx',mpi_wtime()-tmp)
 !.....Make pair list
       tmp = mpi_wtime()
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf &
            ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.false.)
-      tlspr = tlspr +(mpi_wtime() -tmp)
+      call accum_time('lspr',mpi_wtime()-tmp)
       rbufres = rbuf
     else
 !.....Copy RA of boundary atoms determined by 'bacopy'
+      tmp = mpi_wtime()
       call bacopy_fixed(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
            ,boundary)
+      call accum_time('ba_xxx',mpi_wtime()-tmp)
 !!$      call bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax &
 !!$           ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc &
 !!$           ,sv,nex,mpi_md_world,ifcoulomb,chg,chi,boundary)
@@ -720,10 +727,12 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       lstrs = lstrs0
     endif
 !-------Calc forces
+    tmp = mpi_wtime()
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
          ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
+    call accum_time('get_force',mpi_wtime()-tmp)
     lcell_updated = .false.
     lstrs = .false.
 !.....Structure analysis
@@ -1005,7 +1014,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !          call system("mkdir -p "//cnum)
       call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
            ,stot,chgtot,chitot,teitot,clrtot,natm,tag,ra,va,aa,epi,eki,strs &
-           ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+           ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world)
+      call accum_time('space_comp',mpi_wtime()-tmp)
       ltot_updated = .true.
       if( myid_md.eq.0 ) then
         if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot &
@@ -1021,7 +1031,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
           call write_dump(20,'dump_'//trim(cnum))
         endif
       endif
-      tdump = tdump +(mpi_wtime() -tmp)
+      call accum_time('write_xxx',mpi_wtime() -tmp)
     endif
 
     if( lconverged ) exit
@@ -1030,7 +1040,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   if( .not. ltot_updated ) then
     call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
          ,stot,chgtot,chitot,teitot,clrtot,natm,tag,ra,va,aa,epi,eki,strs &
-         ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+         ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world)
     if( myid_md.eq.0 ) then
       call sort_by_tag(ntot0,tagtot,rtot,vtot &
            ,atot,ekitot,epitot,stot,chgtot,chitot,teitot,clrtot,ifsort)
@@ -1085,18 +1095,18 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     write(6,*) ''
     if( iprint.gt.1 ) then
       call write_force_times()
-      write(6,'(1x,a,f10.2)') "Time for space decomp = ",tspdcmp
+!!$      write(6,'(1x,a,f10.2)') "Time for space decomp = ",tspdcmp
       write(6,'(1x,a,f10.2)') "Time for comm         = ",tcom
-      write(6,'(1x,a,f10.2)') "Time for neighbor     = ",tlspr
-      write(6,'(1x,a,f10.2)') "Time for dump         = ",tdump
+!!$      write(6,'(1x,a,f10.2)') "Time for neighbor     = ",tlspr
     endif
     if( trim(ctctl).eq.'ttm' ) then
       write(6,'(1x,a,f10.2)') "Time for TTM          = ",t_ttm
     endif
 
-    ihour = int(tcpu/3600)
-    imin  = int((tcpu-ihour*3600)/60)
-    isec  = int(tcpu -ihour*3600 -imin*60)
+!!$    ihour = int(tcpu/3600)
+!!$    imin  = int((tcpu-ihour*3600)/60)
+!!$    isec  = int(tcpu -ihour*3600 -imin*60)
+    call sec2hms(tcpu,ihour,imin,isec)
     write(6,'(1x,a,f10.2,a,i3,"h",i2.2,"m",i2.2,"s")') &
          "Time                  = ",tcpu, &
          " sec  = ",ihour,imin,isec
@@ -1310,7 +1320,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   if( iprint.gt.0 ) print *,'space_comp...'
   call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
        ,stot,chgtot,chitot,teitot,clrtot,natm,tag,ra,va,aa,epi,eki,strs &
-       ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+       ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world)
 !!$  if( iprint.gt.0 ) print *,'Compute stresses done'
 
 !.....revert forces to the unit eV/A before going out 
@@ -3057,7 +3067,6 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
       endif
     enddo
 !        write(6,'(a,f10.3)') ' time space_decomp = ',mpi_wtime() -t0
-    tspdcmp = mpi_wtime() -t0
 !.....Reset the tags positive
     do i=1,ntot0
       tagtot(i) = abs(tagtot(i))
@@ -3092,7 +3101,7 @@ end subroutine space_decomp
 !=======================================================================
 subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
      ,ekitot,stot,chgtot,chitot,teitot,clrtot,natm,tag,ra,va,aa,epi,eki,strs,chg &
-     ,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world,tspdcmp)
+     ,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world)
 !
 !  Opposite to space_decomp, gather atoms from every process
 !  to create the total system for output.
@@ -3108,7 +3117,7 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
   real(8),intent(in):: va(3,natm),aa(3,natm),epi(natm),eki(3,3,natm) &
        ,strs(3,3,natm),tag(natm),sorg(3),chg(natm),chi(natm),tei(natm) &
        ,clr(natm)
-  real(8),intent(inout):: ra(3,natm),tspdcmp
+  real(8),intent(inout):: ra(3,natm)
   real(8),intent(out):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0) &
        ,atot(3,ntot0),epitot(ntot0),ekitot(3,3,ntot0) &
        ,stot(3,3,ntot0),chgtot(ntot0),chitot(ntot0),teitot(ntot0) &
@@ -3119,8 +3128,6 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
   real(8):: t0
   real(8),allocatable,save:: ratmp(:,:)
 !!$  integer,external:: itotOf
-
-  t0 = mpi_wtime()
 
   if( .not. allocated(ratmp) ) then
     allocate(ratmp(3,natm))
@@ -3185,7 +3192,6 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
       endif
       n0 = n0 + natmt
     enddo
-    tspdcmp = tspdcmp +(mpi_wtime()-t0)
 !.....Update ntot
     ntot = ntott
     if( ntot.gt.ntot0 ) then
@@ -3193,7 +3199,6 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
            //' which should not happen !'
       stop
     endif
-!        write(6,'(a,f10.3)') ' time space_comp = ',mpi_wtime() -t0
   else ! myid_md.ne.0
     itag = myid_md*nmpi -nmpi
     call mpi_send(natm,1,mpi_integer,0,itag &

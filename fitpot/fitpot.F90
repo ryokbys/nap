@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-11-30 14:18:21 Ryo KOBAYASHI>
+!                     Last modified: <2020-12-24 08:01:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -12,7 +12,7 @@ program fitpot
   use version
   use NN2,only: set_iglid_NN2
   use linreg,only: set_iglid_linreg
-  use util,only: time_stamp
+  use time,only: time_stamp
   use DNN,only: write_tgrads_DNN
   implicit none
   integer:: ismpl,ihour,imin,isec

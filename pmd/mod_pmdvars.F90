@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2020-11-06 21:25:57 Ryo KOBAYASHI>
+!                    Last modified: <2020-12-24 07:24:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -19,7 +19,7 @@ module pmdvars
   integer:: nouterg,noutpmd,istp &
        ,iocntpmd,iocnterg
   integer:: natm,nb,nsp,nalmax
-  real(8):: tcpu,tcpu0,tcpu1,tcpu2,tcom,tspdcmp,tlspr,tdump
+  real(8):: tcpu,tcpu0,tcpu1,tcpu2,tcom,tlspr
   real(8):: epot0,vmaxold,vmax,simtime
   real(8):: tgmm
 !!$  real(8):: tgmm,tfac(9),ediff(9),ediff0(9),temp(9),ekl(9)
