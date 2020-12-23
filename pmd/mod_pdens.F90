@@ -155,7 +155,7 @@ contains
 !=======================================================================
   subroutine final_pdens(myid,mpi_world,nxyz,hmat,natm,tag,ra,specorder)
 !
-!  Finalize local flux.
+!  Finalize prob density
 !
     include 'params_unit.h'
     integer,intent(in):: myid,mpi_world,nxyz,natm
@@ -167,7 +167,7 @@ contains
     integer:: istat(mpi_status_size),itag,ierr
     real(8):: vol,val,ri(3),vals(nspmax)
 
-!.....Reduce local fluxes in each node to global local-flux
+!.....Reduce prob densities in each node to global prob density
     if( myid.eq.0 ) then
       vol = get_vol(hmat)/ng
       allocate(pdg(ng))

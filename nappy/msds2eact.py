@@ -15,7 +15,8 @@ Options:
   --plot
               Plot E_act vs 1/T graph (optional) or write a gnuplot script. [default: False]
   --specorder SPECORDER
-              Species order separated by comma. [default: None]
+              Species order used in the MD simulation, separated by comma. 
+              e.g.) Li,Zr,P,O, [default: None]
   --spc SPC
               Migrating species. [default: None]
 """
