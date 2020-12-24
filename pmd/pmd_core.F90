@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-12-24 07:54:19 Ryo KOBAYASHI>
+!                     Last-modified: <2020-12-24 17:27:29 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -34,6 +34,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use localflux,only: lflux,accum_lflux
   use pdens,only: lpdens,accum_pdens
   use time, only: sec2hms, accum_time
+  use pairlist, only: mk_lspr_para
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -1160,6 +1161,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use linreg,only: gradw_linreg
   use NN2,only: gradw_NN2
   use DNN,only: gradw_DNN
+  use pairlist,only: mk_lspr_para
   implicit none
   include "mpif.h"
   include "./params_unit.h"

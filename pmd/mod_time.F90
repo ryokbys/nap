@@ -1,6 +1,6 @@
 module time
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-12-24 07:42:39 Ryo KOBAYASHI>
+!                     Last modified: <2020-12-24 17:51:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Module for time measurement.
 !-----------------------------------------------------------------------
@@ -10,6 +10,7 @@ module time
 !.....Maximum number of time measurements
   integer,parameter:: mtimes = 128
   integer:: ntimes = 0
+  integer:: ncalls(mtimes)
   real(8):: etimes(mtimes)
   character(len=32):: ctnames(mtimes)
 
@@ -52,6 +53,7 @@ contains
       ntimes = ntimes +1
       ctnames(ntimes) = trim(cname)
       etimes(ntimes) = 0d0
+      ncalls(ntimes) = 0
       get_time_id = ntimes
     endif
     return
@@ -65,6 +67,7 @@ contains
 
     idtime = get_time_id(cname)
     etimes(idtime) = etimes(idtime) +etime
+    ncalls(idtime) = ncalls(idtime) +1
     return
   end subroutine accum_time
 !=======================================================================
@@ -87,8 +90,9 @@ contains
     write(ionum,'(a)') ' Report from time module:'
     do i=1,ntimes
       if( trim(ctnames(i)).ne.'' ) then
-        write(ionum,'(a,a'//trim(clen)//',a,f10.2)') &
-             '   Time for ',trim(ctnames(i)),' = ', etimes(i)
+        write(ionum,'(a,a'//trim(clen)//',a,f10.2,a,i0)') &
+             '   Time ',trim(ctnames(i)),' = ', etimes(i), &
+             ' sec, # of calls = ',ncalls(i)
       endif
     enddo
   end subroutine report_time
