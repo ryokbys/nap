@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-12-24 17:27:29 Ryo KOBAYASHI>
+!                     Last-modified: <2020-12-25 08:58:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -347,7 +347,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   call accum_time('ba_xxx',mpi_wtime()-tmp)
 !-----Make pair list
   tmp = mpi_wtime()
-  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,rc1nn &
+  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf,rc1nn &
        ,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.true.)
   call accum_time('lspr',mpi_wtime()-tmp)
 
@@ -709,7 +709,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       call accum_time('ba_xxx',mpi_wtime()-tmp)
 !.....Make pair list
       tmp = mpi_wtime()
-      call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf &
+      call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
            ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.false.)
       call accum_time('lspr',mpi_wtime()-tmp)
       rbufres = rbuf
@@ -1259,7 +1259,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
        ,.true.,boundary)
 !-----Make pair list
-  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf &
+  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
        ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.true.)
   lstrs = .true.
 
