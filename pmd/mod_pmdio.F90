@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-11-19 10:39:28 Ryo KOBAYASHI>
+!                     Last modified: <2020-12-25 12:20:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -136,6 +136,8 @@ module pmdio
   logical:: lconst = .false. 
 !.....Reduced force
   logical:: lrdcfrc = .false. 
+!.....Linked cell reordering; this has bugs for cases using charges
+  logical:: lreorder = .false. 
 
 !.....zload type: zload or shear
   character(len=128):: czload_type= 'none'

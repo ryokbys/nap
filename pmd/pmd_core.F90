@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-12-25 08:58:57 Ryo KOBAYASHI>
+!                     Last-modified: <2020-12-25 12:23:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -11,7 +11,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
      ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv &
      ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width &
      ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary &
-     ,lmetaD,lconst,lrdcfrc,cstruct,istruct,cdeform,dhratio)
+     ,lmetaD,lconst,lrdcfrc,lreorder,cstruct,istruct,cdeform,dhratio)
   use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump &
        ,namax,nbmax,nnmax,nspmax
   use pmdvars
@@ -58,7 +58,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   character(len=*),intent(in):: czload_type,cstruct,cdeform
 !      character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: ltdst,lstrs0,lcellfix(3,3),lmetaD,lconst &
-       ,lrdcfrc
+       ,lrdcfrc,lreorder
   logical,intent(inout):: lvc
 
   integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,nxyz
@@ -66,6 +66,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   real(8):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp, &
        htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow
   real(8),external:: box_muller,sprod
+  logical:: l1st
   logical:: lconverged = .false.
   logical:: lstrs = .false.
   logical:: lcell_updated = .true.
@@ -347,8 +348,9 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   call accum_time('ba_xxx',mpi_wtime()-tmp)
 !-----Make pair list
   tmp = mpi_wtime()
+  l1st = .true.
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf,rc1nn &
-       ,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.true.)
+       ,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st,lreorder)
   call accum_time('lspr',mpi_wtime()-tmp)
 
 !.....Calc forces
@@ -709,8 +711,9 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       call accum_time('ba_xxx',mpi_wtime()-tmp)
 !.....Make pair list
       tmp = mpi_wtime()
+      l1st = .false.
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-           ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.false.)
+           ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st,lreorder)
       call accum_time('lspr',mpi_wtime()-tmp)
       rbufres = rbuf
     else
@@ -1186,6 +1189,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   real(8):: aai(3),epott
   logical:: lstrs = .false.
   logical:: lcell_updated = .false.
+  logical:: l1st,lreorder
   character(len=3):: csp
 
 !      print *,'one_shot: 01'
@@ -1259,8 +1263,10 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
        ,.true.,boundary)
 !-----Make pair list
+  l1st = .true.
+  lreorder = .false.
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-       ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,.true.)
+       ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st,lreorder)
   lstrs = .true.
 
 !      print *,'one_shot: 06'

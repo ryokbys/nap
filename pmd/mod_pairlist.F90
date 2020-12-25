@@ -17,13 +17,13 @@ module pairlist
 contains
 !=======================================================================
   subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va &
-       ,rc,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
+       ,rc,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st,lreorder)
     implicit none
     integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
     integer,intent(out):: lspr(0:nnmax,namax),ls1nn(0:nnmax,namax)
     real(8),intent(in):: rc,rc1nn,anxi,anyi,anzi,hi(3,3),h(3,3)
     real(8),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
-    logical,intent(in):: l1st
+    logical,intent(in):: l1st,lreorder
 
     integer:: i,j,k,l,m,n
     integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr
@@ -63,22 +63,24 @@ contains
 
 !.....Firstly, make a cell list for sorting arrays
     call mk_lscl_para(namax,natm,nb,ra)
-!!$!.....Sort arrays
-!!$    call sort_by_lscl(namax,natm,1,tag)
-!!$    call sort_by_lscl(namax,natm,3,ra)
-!!$    call sort_by_lscl(namax,natm,3,va)
-!!$    if( luse_charge ) then
-!!$      call sort_by_lscl(namax,natm,1,chg)
-!!$      call sort_by_lscl(namax,natm,1,chi)
-!!$    endif
-!!$    if( luse_elec_temp ) then
-!!$      call sort_by_lscl(namax,natm,1,tei)
-!!$    endif
-!!$    if( lclrchg ) then
-!!$      call sort_by_lscl(namax,natm,1,clr)
-!!$    endif
-!!$!.....Secondly, make a new cell list for making pair list
-!!$    call mk_lscl_para(namax,natm,nb,ra)
+    if( lreorder ) then
+!.....Sort arrays
+      call sort_by_lscl(namax,natm,1,tag)
+      call sort_by_lscl(namax,natm,3,ra)
+      call sort_by_lscl(namax,natm,3,va)
+      if( luse_charge ) then
+        call sort_by_lscl(namax,natm,1,chg)
+        call sort_by_lscl(namax,natm,1,chi)
+      endif
+      if( luse_elec_temp ) then
+        call sort_by_lscl(namax,natm,1,tei)
+      endif
+      if( lclrchg ) then
+        call sort_by_lscl(namax,natm,1,clr)
+      endif
+!.....Secondly, make a new cell list for making pair list
+      call mk_lscl_para(namax,natm,nb,ra)
+    endif
 
 !-----make a pair list, LSPR
 !-----Scan resident cells

@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-12-24 07:44:26 Ryo KOBAYASHI>
+!                     Last-modified: <2020-12-25 12:21:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -306,7 +306,7 @@ program pmd
        ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv &
        ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width &
        ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary &
-       ,lmetaD,lconst,lrdcfrc,cstruct,istruct,cdeform,dhratio)
+       ,lmetaD,lconst,lrdcfrc,lreorder,cstruct,istruct,cdeform,dhratio)
 
   if( myid_md.eq.0 ) then
     tmp = mpi_wtime()
@@ -689,6 +689,8 @@ subroutine bcast_params()
   call mpi_bcast(lconst,1,mpi_logical,0,mpicomm,ierr)
 !.....Reduced force
   call mpi_bcast(lrdcfrc,1,mpi_logical,0,mpicomm,ierr)
+!.....Linked-cell reordering
+  call mpi_bcast(lreorder,1,mpi_logical,0,mpicomm,ierr)
 !.....Deformation
   call mpi_bcast(cdeform,128,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(dhratio,9,mpi_real8,0,mpicomm,ierr)
