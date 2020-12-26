@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-10-23 17:14:06 Ryo KOBAYASHI>
+!                     Last modified: <2020-12-27 00:18:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax, csp2isp
   integer,parameter:: ioprms = 50
@@ -53,6 +53,7 @@ contains
     real(8),save:: rcmax2
     real(8),allocatable,save:: aa3(:,:)
     real(8),allocatable,save:: strsl(:,:,:)
+
 
 !-----only at 1st call
     if( l1st ) then
@@ -175,10 +176,11 @@ contains
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa3,3)
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa3(1:3,1:natm)
-    
+
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,strsl,9)
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+
 
 !.....Gather epot
     epott= 0d0
@@ -186,7 +188,7 @@ contains
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
     epot= epot +epott
     if( iprint.gt.2 ) print *,'myid,epot angular = ',myid,epott
-    
+
     return
   end subroutine force_angular
 !=======================================================================

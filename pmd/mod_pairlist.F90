@@ -16,18 +16,18 @@ module pairlist
   
 contains
 !=======================================================================
-  subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va &
-       ,rc,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st,lreorder)
-    implicit none
-    integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
-    integer,intent(out):: lspr(0:nnmax,namax),ls1nn(0:nnmax,namax)
-    real(8),intent(in):: rc,rc1nn,anxi,anyi,anzi,hi(3,3),h(3,3)
-    real(8),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
-    logical,intent(in):: l1st,lreorder
+  subroutine mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi &
+       ,rc,rc1nn,h,hi,l1st)
+!
+! Make a linked cell list.
+! Codes are slightly different bewteen parallel and single.
+!
+    integer,intent(in):: namax,natm,nbmax,nb
+    real(8),intent(in):: anxi,anyi,anzi,rc,rc1nn,h(3,3),hi(3,3)
+    real(8),intent(inout):: ra(3,namax)
+    logical,intent(in):: l1st
 
-    integer:: i,j,k,l,m,n
-    integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr
-    real(8):: xi(3),xij(3),rij(3),rij2
+    integer:: i,mx,my,mz,m
 
     if( l1st ) then
       rc2= rc**2
@@ -57,30 +57,82 @@ contains
       allocate(lscl(namax+nbmax),lshd(lcxyz2))
     endif
 
+!-----reset headers
+    lshd(1:lcxyz2)= 0
+
+!-----construct a linked-cell list, LSCL, & a header list, LSHD
+    do i=1,natm+nb
+!-------assign a vector cell index
+      mx=(ra(1,i)+rcx)*rcxi
+      my=(ra(2,i)+rcy)*rcyi
+      mz=(ra(3,i)+rcz)*rczi
+!-------classify residents in inner cells even if they are not
+      if(i.le.natm) then
+        mx= min(max(mx,1),lcx)
+        my= min(max(my,1),lcy)
+        mz= min(max(mz,1),lcz)
+!-------copied atoms are either in inner or surface cells
+      else
+        mx= min(max(mx,0),lcx+1)
+        my= min(max(my,0),lcy+1)
+        mz= min(max(mz,0),lcz+1)
+      endif
+      m= mx*lcyz2 +my*lcz2 +mz +1
+      lscl(i)= lshd(m)
+!-------the last one goes to the header
+      lshd(m)= i
+    enddo
+
+    return
+  end subroutine mk_lscl_para
+!=======================================================================
+  subroutine reorder_arrays(namax,natm,nb,tag,ra,va)
+!
+!  Reorder arrays (tag,ra,va, and some more) using the cell list
+!
+    integer,intent(in):: namax,natm,nb
+    real(8),intent(inout):: tag(namax),ra(3,namax),va(3,namax)
+
+!.....Sort arrays
+    call sort_by_lscl(namax,natm,nb,1,tag)
+    call sort_by_lscl(namax,natm,nb,3,ra)
+    call sort_by_lscl(namax,natm,nb,3,va)
+    if( luse_charge ) then
+      call sort_by_lscl(namax,natm,nb,1,chg)
+      call sort_by_lscl(namax,natm,nb,1,chi)
+    endif
+    if( luse_elec_temp ) then
+      call sort_by_lscl(namax,natm,nb,1,tei)
+    endif
+    if( lclrchg ) then
+      call sort_by_lscl(namax,natm,nb,1,clr)
+    endif
+    
+    return
+  end subroutine reorder_arrays
+!=======================================================================
+  subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va &
+       ,rc,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
+!
+!  Make a pairlist using cell list created before.
+!
+    implicit none
+    integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
+    integer,intent(out):: lspr(0:nnmax,namax),ls1nn(0:nnmax,namax)
+    real(8),intent(in):: rc,rc1nn,anxi,anyi,anzi,hi(3,3),h(3,3)
+    real(8),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
+    logical,intent(in):: l1st
+
+    integer:: i,j,k,l,m,n
+    integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr
+    real(8):: xi(3),xij(3),rij(3),rij2
+
+    call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc,rc1nn &
+         ,h,hi,l1st)
+
 !-----reset pair list, LSPR
     lspr(0,:)= 0
     ls1nn(0,:)= 0
-
-!.....Firstly, make a cell list for sorting arrays
-    call mk_lscl_para(namax,natm,nb,ra)
-    if( lreorder ) then
-!.....Sort arrays
-      call sort_by_lscl(namax,natm,1,tag)
-      call sort_by_lscl(namax,natm,3,ra)
-      call sort_by_lscl(namax,natm,3,va)
-      if( luse_charge ) then
-        call sort_by_lscl(namax,natm,1,chg)
-        call sort_by_lscl(namax,natm,1,chi)
-      endif
-      if( luse_elec_temp ) then
-        call sort_by_lscl(namax,natm,1,tei)
-      endif
-      if( lclrchg ) then
-        call sort_by_lscl(namax,natm,1,clr)
-      endif
-!.....Secondly, make a new cell list for making pair list
-      call mk_lscl_para(namax,natm,nb,ra)
-    endif
 
 !-----make a pair list, LSPR
 !-----Scan resident cells
@@ -472,50 +524,12 @@ contains
 
   end subroutine mk_lspr_brute
 !=======================================================================
-  subroutine mk_lscl_para(namax,natm,nb,ra)
-!
-! Make a linked cell list.
-! Codes are slightly different bewteen parallel and single.
-!
-    integer,intent(in):: namax,natm,nb
-    real(8),intent(in):: ra(3,namax)
-
-    integer:: i,mx,my,mz,m
-
-!-----reset headers
-    lshd(1:lcxyz2)= 0
-
-!-----construct a linked-cell list, LSCL, & a header list, LSHD
-    do i=1,natm+nb
-!-------assign a vector cell index
-      mx=(ra(1,i)+rcx)*rcxi
-      my=(ra(2,i)+rcy)*rcyi
-      mz=(ra(3,i)+rcz)*rczi
-!-------classify residents in inner cells even if they are not
-      if(i.le.natm) then
-        mx= min(max(mx,1),lcx)
-        my= min(max(my,1),lcy)
-        mz= min(max(mz,1),lcz)
-!-------copied atoms are either in inner or surface cells
-      else
-        mx= min(max(mx,0),lcx+1)
-        my= min(max(my,0),lcy+1)
-        mz= min(max(mz,0),lcz+1)
-      endif
-      m= mx*lcyz2 +my*lcz2 +mz +1
-      lscl(i)= lshd(m)
-!-------the last one goes to the header
-      lshd(m)= i
-    enddo
-    return
-  end subroutine mk_lscl_para
-!=======================================================================
-  subroutine sort_by_lscl(namax,natm,ndim,arr)
+  subroutine sort_by_lscl(namax,natm,nb,ndim,arr)
 !
 ! To gather atom data more accessible in memory space,
 ! make atoms in a cell contiguous in 1D memory.
 !
-    integer,intent(in):: namax,natm,ndim
+    integer,intent(in):: namax,natm,nb,ndim
     real(8),intent(inout):: arr(ndim,namax)
 
     integer:: n,nmig,mz,my,mx,i,j,m
@@ -530,39 +544,26 @@ contains
       allocate(tmparr(ndmax*namax))
     endif
 
-!.....Sort arr taking into account residents and migrants
+!  Sort arr taking into account residents only,
+!  since reordering migrants after copying migrants causes
+!  inconsistency of lsb() array.
+!  So this routine should be called before calling bacopy.
     n = 0
-    nmig = 0
-    do mz=0,lcz+1
-      lmigz = .false.
-      if( mz.eq.0 .or. mz.eq.lcz+1 ) lmigz = .true.
-      do my=0,lcy+1
-        lmigy = .false.
-        if( my.eq.0 .or. my.eq.lcy+1 ) lmigy = .true.
-        do mx=0,lcx+1
-          lmigx = .false.
-          if( mx.eq.0 .or. mx.eq.lcx+1 ) lmigx = .true.
+    do mz=1,lcz
+      do my=1,lcy
+        do mx=1,lcx
           m= mx*lcyz2 +my*lcz2 +mz +1
           i = lshd(m)
           if( i.eq.0 ) cycle
-          lmig = .false.
-          if( lmigz .or. lmigy .or. lmigx ) lmig = .true.
-          if( lmig ) then
-            nmig = nmig +1
-            tmparr(ndim*(natm+nmig-1)+1:ndim*(natm+nmig)) = arr(1:ndim,i)
-          else
+          if( i.le.natm ) then
             n = n +1
             tmparr(ndim*(n-1)+1:ndim*n) = arr(1:ndim,i)
           endif
           do while(lscl(i).ne.0)
             i = lscl(i)
-            if( lmig ) then
-              nmig = nmig +1
-              tmparr(ndim*(natm+nmig-1)+1:ndim*(natm+nmig)) = arr(1:ndim,i)
-            else
-              n = n +1
-              tmparr(ndim*(n-1)+1:ndim*n) = arr(1:ndim,i)
-            endif
+            if( i.gt.natm ) cycle
+            n = n +1
+            tmparr(ndim*(n-1)+1:ndim*n) = arr(1:ndim,i)
           end do
         enddo
       enddo
@@ -572,12 +573,6 @@ contains
         arr(j,i) = tmparr(ndim*(i-1)+j)
       enddo
     enddo
-    do i=natm+1,natm+nmig
-      do j=1,ndim
-        arr(j,i) = tmparr(ndim*(i-1)+j)
-      enddo
-    enddo
-
     
   end subroutine sort_by_lscl
 end module pairlist

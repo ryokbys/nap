@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-12-25 12:23:51 Ryo KOBAYASHI>
+!                     Last-modified: <2020-12-26 12:49:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -34,7 +34,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use localflux,only: lflux,accum_lflux
   use pdens,only: lpdens,accum_pdens
   use time, only: sec2hms, accum_time
-  use pairlist, only: mk_lspr_para
+  use pairlist, only: mk_lspr_para,mk_lscl_para,reorder_arrays
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -342,15 +342,21 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !-----copy RA of boundary atoms
   call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
        ,nx,ny,nz,myid_md)
+  l1st = .true.
+  if( lreorder ) then
+    call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc,rc1nn &
+         ,h,hi,l1st)
+    call reorder_arrays(namax,natm,nb,tag,ra,va)
+    l1st = .false.
+  endif
   tmp = mpi_wtime()
   call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
        ,.true.,boundary)
   call accum_time('ba_xxx',mpi_wtime()-tmp)
 !-----Make pair list
   tmp = mpi_wtime()
-  l1st = .true.
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf,rc1nn &
-       ,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st,lreorder)
+       ,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
   call accum_time('lspr',mpi_wtime()-tmp)
 
 !.....Calc forces
@@ -705,15 +711,20 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       tmp = mpi_wtime()
       call bamove(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
            ,boundary)
+      l1st = .false.
+      if( lreorder ) then
+        call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc,rc1nn &
+             ,h,hi,l1st)
+        call reorder_arrays(namax,natm,nb,tag,ra,va)
+      endif
 !.....Copy RA of boundary atoms
       call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
            ,.false.,boundary)
       call accum_time('ba_xxx',mpi_wtime()-tmp)
 !.....Make pair list
       tmp = mpi_wtime()
-      l1st = .false.
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-           ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st,lreorder)
+           ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
       call accum_time('lspr',mpi_wtime()-tmp)
       rbufres = rbuf
     else
@@ -1264,9 +1275,8 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,.true.,boundary)
 !-----Make pair list
   l1st = .true.
-  lreorder = .false.
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-       ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st,lreorder)
+       ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
   lstrs = .true.
 
 !      print *,'one_shot: 06'

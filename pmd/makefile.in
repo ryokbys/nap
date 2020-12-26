@@ -149,6 +149,7 @@ mod_rdcfrc.o: mod_structure.o mod_util.o
 mod_ttm.o: mod_util.o
 mod_pmdio.o: mod_util.o
 mod_pmdvars.o: mod_util.o mod_pmdio.o
+mod_pairlist.o: mod_force.o mod_colorcharge.o mod_pmdvars.o
 
 descriptor.o descriptor.mod : descriptor.F90 force_ZBL.o mod_util.o
 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
