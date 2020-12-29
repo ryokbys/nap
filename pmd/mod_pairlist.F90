@@ -5,7 +5,9 @@ module pairlist
   use force,only: luse_charge, luse_elec_temp
   use clrchg,only: lclrchg
   use pmdvars,only: chg,chi,tei,clr
+  use time,only: accum_time
   implicit none
+  include 'mpif.h'
   save
   
   integer,allocatable:: lscl(:),lshd(:)
@@ -13,6 +15,12 @@ module pairlist
   integer:: lcx,lcy,lcz,lcxyz,lcyz,lcx2,lcy2,lcz2,lcyz2,lcxyz2
   real(8),allocatable:: tmparr(:)
   integer:: ndmax
+
+!.....Arrays for Gonnet's algorithm
+  real(8),allocatable:: dlist(:)
+  integer,allocatable:: ilist(:),ileft(:),ia2ic(:)
+  real(8):: dh(3,3),vecc(3,26)
+  integer:: idcell(-1:1,-1:1,-1:1)
   
 contains
 !=======================================================================
@@ -124,7 +132,7 @@ contains
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n
-    integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr
+    integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr,mmax
     real(8):: xi(3),xij(3),rij(3),rij2
 
     call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc,rc1nn &
@@ -140,7 +148,7 @@ contains
       do my=0,lcy+1
         do mx=0,lcx+1
           m= mx*lcyz2 +my*lcz2 +mz +1
-          if(lshd(m).eq.0) goto 5
+          if(lshd(m).eq.0) cycle
           do kuz= -1,1
             m1z= mz +kuz
             if( m1z.lt.0 .or. m1z.gt.lcz+1 ) cycle
@@ -151,92 +159,301 @@ contains
                 m1x= mx +kux
                 if( m1x.lt.0 .or. m1x.gt.lcx+1 ) cycle
                 m1=m1x*lcyz2 +m1y*lcz2 +m1z +1
-                if(lshd(m1).eq.0) goto 6
+                if(lshd(m1).eq.0) cycle
 
                 i=lshd(m)
-1               continue
-!              if (natm.lt.i) goto 4
+                do while( i.gt.0 )
 
-                ic= int(tag(i))
-                xi(1:3)= ra(1:3,i)
+                  ic= int(tag(i))
+                  xi(1:3)= ra(1:3,i)
 
-                j=lshd(m1)
+                  j=lshd(m1)
+                  do while( j.gt.0 )
+                    if( j.le.i ) then
+                      j = lscl(j)
+                      cycle
+                    endif
 
-2               continue
-                if( j.le.i ) goto 3
-!          if (j.eq.i) goto 3
+                    jc= int(tag(j))
+                    xij(1:3)= ra(1:3,j) -xi(1:3)
+                    rij(1)= h(1,1)*xij(1) +h(1,2)*xij(2) +h(1,3)*xij(3)
+                    rij(2)= h(2,1)*xij(1) +h(2,2)*xij(2) +h(2,3)*xij(3)
+                    rij(3)= h(3,1)*xij(1) +h(3,2)*xij(2) +h(3,3)*xij(3)
+                    rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
 
-                jc= int(tag(j))
-                xij(1:3)= ra(1:3,j) -xi(1:3)
-                rij(1)= h(1,1)*xij(1) +h(1,2)*xij(2) +h(1,3)*xij(3)
-                rij(2)= h(2,1)*xij(1) +h(2,2)*xij(2) +h(2,3)*xij(3)
-                rij(3)= h(3,1)*xij(1) +h(3,2)*xij(2) +h(3,3)*xij(3)
-                rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
-
-                if( rij2.lt.rc2 ) then
-                  lspr(0,i)= lspr(0,i) +1
-                  if( lspr(0,i).gt.nnmax ) then
-                    write(6,'(a)') " ERROR: lspr(0,i)  > nnmax"
-                    write(6,'(a,3i5)') "   nnmax, lspr(0,i) = " &
-                         ,nnmax,lspr(0,i)
-                    write(6,'(a)') " You should rerun pmd with increased nnmax " &
-                         //"with the following in.pmd option,"
-                    write(6,'(a,i5)') "   max_num_neighbors   ",nnmax+100
-                    call mpi_finalize(ierr)
-                    stop
-                  endif
-                  lspr(lspr(0,i),i)=j
-!!$!.....Store i in j's neighbor list
-!!$                if( j.le.natm ) then
-!!$                  lspr(0,j)= lspr(0,j)+1
-!!$                  if( lspr(0,j).gt.nnmax ) then
-!!$                    write(6,'(a)') " Error: lspr(0,j) > nnmax"
-!!$                    write(6,'(a,3i5)') "  nnmax, lspr(0,j) = " &
-!!$                         ,nnmax,lspr(0,j)
-!!$                    call mpi_finalize(ierr)
-!!$                    stop
-!!$                  endif
-!!$                  lspr(lspr(0,j),j)=i
-!!$                endif
-                  lspr(0,j)= lspr(0,j)+1
-                  if( lspr(0,j).gt.nnmax ) then
-                    write(6,'(a)') " ERROR: lspr(0,j) > nnmax"
-                    write(6,'(a,3i5)') "   nnmax, lspr(0,j) = " &
-                         ,nnmax,lspr(0,j)
-                    write(6,'(a)') " You should rerun pmd with increased nnmax " &
-                         //"with the following in.pmd option,"
-                    write(6,'(a,i5)') "   max_num_neighbors   ",nnmax+100
-                    call mpi_finalize(ierr)
-                    stop
-                  endif
-                  lspr(lspr(0,j),j)=i
-                  if( rij2.lt.rc1nn2 ) then
-                    ls1nn(0,i)= ls1nn(0,i) +1
-                    ls1nn(ls1nn(0,i),i)= j
+                    if( rij2.lt.rc2 ) then
+                      lspr(0,i)= lspr(0,i) +1
+                      lspr(0,j)= lspr(0,j) +1
+                      if( lspr(0,i).gt.nnmax .or. lspr(0,j).gt.nnmax ) then
+                        write(6,'(a)') " ERROR: lspr(0,i/j) > nnmax"
+                        write(6,'(a,3(1x,i0))') "   nnmax,lspr(0,i),lspr(0,j) = " &
+                             ,nnmax,lspr(0,i),lspr(0,j)
+                        write(6,'(a)') " You should rerun pmd with increased nnmax " &
+                             //"with the following in.pmd option,"
+                        write(6,'(a,i5)') "   max_num_neighbors   ",nnmax+100
+                        call mpi_finalize(ierr)
+                        stop
+                      endif
+                      lspr(lspr(0,i),i)=j
+                      lspr(lspr(0,j),j)=i
+                      if( rij2.lt.rc1nn2 ) then
+                        ls1nn(0,i)= ls1nn(0,i) +1
+                        ls1nn(ls1nn(0,i),i)= j
 !.....Regardless of j.ne.natm or not, add a counter data in ls1nn(*,j)
-                    ls1nn(0,j)= ls1nn(0,j) +1
-                    ls1nn(ls1nn(0,j),j)= i
-                  endif
-                endif
+                        ls1nn(0,j)= ls1nn(0,j) +1
+                        ls1nn(ls1nn(0,j),j)= i
+                      endif
+                    endif
 
-!---------Continue until j= 0
-3               j=lscl(j)
-                if (j.gt.0) goto 2
+                    j=lscl(j)
+                  enddo
 
-!---------Continue until i= 0
-4               i=lscl(i)
-                if (i.gt.0) goto 1
+                  i=lscl(i)
+                enddo
 
-6               continue
               enddo
             enddo
           enddo
-5         continue
         enddo
       enddo
     enddo
 
+!.....Only 1st call
+    if( l1st ) then
+      mmax = 0
+      do i=1,natm
+        mmax = max(mmax,lspr(0,i))
+      enddo
+      print '(a,i0)',' Max num of neighbors at 1st call = ',mmax
+    endif
+
   end subroutine mk_lspr_para
+!=======================================================================
+  subroutine mk_lspr_gonnet(namax,natm,nbmax,nb,nnmax,tag,ra,va &
+       ,rc,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
+!
+!  Make a pairlist by Gonnet's algorithm using cell list created before.
+!  Ref.
+!    1) P. Gonnet, J. Comput. Chem. 28, 570–573 (2007)
+!
+    implicit none
+    integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
+    integer,intent(out):: lspr(0:nnmax,namax),ls1nn(0:nnmax,namax)
+    real(8),intent(in):: rc,rc1nn,anxi,anyi,anzi,hi(3,3),h(3,3)
+    real(8),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
+    logical,intent(in):: l1st
+
+    integer:: i,j,k,l,m,n,ii,jj,inc,nleft
+    integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr,mmax
+    real(8):: xi(3),xj(3),xij(3),rij(3),rij2,vc(3)
+    real(8):: tmp
+
+    if( .not. allocated(dlist) ) then
+      allocate(dlist(namax),ilist(namax),ileft(namax),ia2ic(namax))
+    else if( size(dlist).ne.namax ) then
+      deallocate(dlist,ilist,ileft,ia2ic)
+      allocate(dlist(namax),ilist(namax),ileft(namax),ia2ic(namax))
+    endif
+
+    if( l1st ) then
+!.....Make dh matrix
+      dh(1:3,1) = h(1:3,1)*anxi
+      dh(1:3,2) = h(1:3,2)*anyi
+      dh(1:3,3) = h(1:3,3)*anzi
+!.....Make vectors of neighboring cells
+      idcell(-1:1,-1:1,-1:1) = 0
+      inc = 0
+      do kuz= -1,1
+        do kuy= -1,1
+          do kux= -1,1
+            if( kuz.eq.0 .and. kuy.eq.0 .and. kux.eq.0 ) cycle
+            inc = inc +1
+            vecc(1:3,inc) = dh(1:3,1)*kux &
+                 +dh(1:3,2)*kuy +dh(1:3,3)*kuz
+            rij2 = vecc(1,inc)**2 +vecc(2,inc)**2 +vecc(3,inc)**2
+            vecc(1:3,inc) = vecc(1:3,inc)/sqrt(rij2)
+            idcell(kux,kuy,kuz) = inc
+          enddo
+        enddo
+      enddo
+    endif
+
+    call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc,rc1nn &
+         ,h,hi,l1st)
+
+!.....Make a converter that converts atom index to cell index
+    ia2ic(:) = 0
+    do mz=0,lcz+1
+      do my=0,lcy+1
+        do mx=0,lcx+1
+          m= mx*lcyz2 +my*lcz2 +mz +1
+          if(lshd(m).eq.0) cycle
+          i = lshd(m)
+          ia2ic(i) = m
+          do while(lscl(i).ne.0)
+            i = lscl(i)
+            ia2ic(i) = m
+          enddo
+        enddo
+      enddo
+    enddo
+
+    dlist(:) = 0d0
+    ilist(:) = 0
+
+!-----reset pair list, LSPR
+    lspr(0,:)= 0
+    ls1nn(0,:)= 0
+
+!=====Make a pair list, LSPR, using Gonnet's algorithm=====
+!.....Scan resident cells
+    do mz=0,lcz+1
+      do my=0,lcy+1
+        do mx=0,lcx+1
+          m= mx*lcyz2 +my*lcz2 +mz +1
+          if(lshd(m).eq.0) cycle
+          i = lshd(m)
+11        continue
+          ic= int(tag(i))
+          xi(1:3)= ra(1:3,i)
+
+!.....Search for neighbors within the same cell
+          j=lshd(m)
+12        continue
+          if( j.le.i ) goto 13
+
+          jc= int(tag(j))
+          xij(1:3)= ra(1:3,j) -xi(1:3)
+          rij(1)= h(1,1)*xij(1) +h(1,2)*xij(2) +h(1,3)*xij(3)
+          rij(2)= h(2,1)*xij(1) +h(2,2)*xij(2) +h(2,3)*xij(3)
+          rij(3)= h(3,1)*xij(1) +h(3,2)*xij(2) +h(3,3)*xij(3)
+          rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
+
+          if( rij2.lt.rc2 ) then
+            lspr(0,i)= lspr(0,i) +1
+            lspr(0,j)= lspr(0,j) +1
+            if( lspr(0,i).gt.nnmax .or. lspr(0,j).gt.nnmax ) then
+              write(6,'(a)') " ERROR: lspr(0,i or j)  > nnmax"
+              write(6,'(a,3i5)') "   nnmax,lspr(0,i),lspr(0,j) = " &
+                   ,nnmax,lspr(0,i),lspr(0,j)
+              write(6,'(a)') " You should rerun pmd with increased nnmax " &
+                   //"with the following in.pmd option,"
+              write(6,'(a,i5)') "   max_num_neighbors   ",nnmax+100
+              call mpi_finalize(ierr)
+              stop
+            endif
+            lspr(lspr(0,i),i)=j
+            lspr(lspr(0,j),j)=i
+            if( rij2.lt.rc1nn2 ) then
+              ls1nn(0,i)= ls1nn(0,i) +1
+              ls1nn(ls1nn(0,i),i)= j
+!.....Regardless of j.ne.natm or not, add a counter data in ls1nn(*,j)
+              ls1nn(0,j)= ls1nn(0,j) +1
+              ls1nn(ls1nn(0,j),j)= i
+            endif
+          endif
+
+!.....Continue until j= 0
+13        j=lscl(j)
+          if (j.gt.0) goto 12
+
+!.....Continue until i= 0
+14        i=lscl(i)
+          if (i.gt.0) goto 11
+
+!.....Search for neighbors from neighboring cells,
+!     where Gonnet's algorithm is used.
+          do kuz= -1,1
+            m1z= mz +kuz
+            if( m1z.lt.0 .or. m1z.gt.lcz+1 ) cycle
+            do kuy= -1,1
+              m1y= my +kuy
+              if( m1y.lt.0 .or. m1y.gt.lcy+1 ) cycle
+              do kux= -1,1
+                m1x= mx +kux
+                if( m1x.lt.0 .or. m1x.gt.lcx+1 ) cycle
+                m1=m1x*lcyz2 +m1y*lcz2 +m1z +1
+                if( m1.eq.m ) cycle
+                if( lshd(m1).eq.0 ) cycle
+
+!.....Vector towards the neighbor cell
+                ic = idcell(kux,kuy,kuz)
+                vc(1:3) = vecc(1:3,ic)
+!.....Project atoms in cell-m onto the neighboring cell vector
+                dlist(:) = 0d0
+                ilist(:) = 0
+                inc = 0
+                i= lshd(m)
+                do while( i.ne.0 )
+                  xi(1:3) = h(1:3,1)*ra(1,i) &
+                     +h(1:3,2)*ra(2,i) +h(1:3,3)*ra(3,i)
+                  inc = inc + 1
+                  dlist(inc) = vc(1)*xi(1) +vc(2)*xi(2) +vc(3)*xi(3)
+                  ilist(inc) = i
+                  i = lscl(i)
+                enddo
+!.....Project atoms in cell-m1 onto the neighboring cell vector 
+                j= lshd(m1)
+                do while( j.ne.0 )
+                  xj(1:3) = h(1:3,1)*ra(1,j) &
+                       +h(1:3,2)*ra(2,j) +h(1:3,3)*ra(3,j)
+                  inc = inc + 1
+                  dlist(inc) = vc(1)*xj(1) +vc(2)*xj(2) +vc(3)*xj(3) -rc
+                  ilist(inc) = j
+                  j = lscl(j)
+                enddo
+!.....Sort arrays dlist and ilist according to dlist
+                call qsort_list(inc,1,inc,dlist,ilist)
+!.....Finally, extract pairs rij<rc to make lspr
+                ileft(:) = 0
+                nleft = 0
+                do ii=1,inc
+                  i = ilist(ii)
+                  if( ia2ic(i).eq.m1 ) then
+                    nleft = nleft +1
+                    ileft(nleft) = i
+                  else
+                    do jj=1,nleft
+                      j = ileft(jj)
+                      if( j.le.i ) cycle
+                      xij(1:3)= ra(1:3,j) -ra(1:3,i)
+                      rij(1)= h(1,1)*xij(1) +h(1,2)*xij(2) +h(1,3)*xij(3)
+                      rij(2)= h(2,1)*xij(1) +h(2,2)*xij(2) +h(2,3)*xij(3)
+                      rij(3)= h(3,1)*xij(1) +h(3,2)*xij(2) +h(3,3)*xij(3)
+                      rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
+                      if( rij2.lt.rc2 ) then
+                        lspr(0,i)= lspr(0,i) +1
+                        lspr(0,j)= lspr(0,j) +1
+                        lspr(lspr(0,i),i)=j
+                        lspr(lspr(0,j),j)=i
+                        if( rij2.lt.rc1nn2 ) then
+                          ls1nn(0,i)= ls1nn(0,i) +1
+                          ls1nn(ls1nn(0,i),i)= j
+!.....Regardless of j.ne.natm or not, add a counter data in ls1nn(*,j)
+                          ls1nn(0,j)= ls1nn(0,j) +1
+                          ls1nn(ls1nn(0,j),j)= i
+                        endif
+                      endif
+                    enddo
+                  endif
+                enddo
+              enddo
+            enddo
+          enddo
+        enddo
+      enddo
+    enddo
+
+!.....Only 1st call
+    if( l1st ) then
+      mmax = 0
+      do i=1,natm
+        mmax = max(mmax,lspr(0,i))
+      enddo
+      print '(a,i0)',' Max num of neighbors at 1st call = ',mmax
+    endif
+
+  end subroutine mk_lspr_gonnet
 !=======================================================================
   subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,rc1nn,h,hi &
        ,lspr,ls1nn,iprint,l1st)
@@ -575,6 +792,53 @@ contains
     enddo
     
   end subroutine sort_by_lscl
+!=======================================================================
+  subroutine swap(ndim,i,j,dlist,ilist)
+    integer,intent(in):: ndim,i,j
+    real(8),intent(inout):: dlist(ndim)
+    integer,intent(inout):: ilist(ndim)
+
+    integer:: itmp
+    real(8):: tmp
+
+    tmp = dlist(i)
+    dlist(i) = dlist(j)
+    dlist(j) = tmp
+
+    itmp = ilist(i)
+    ilist(i) = ilist(j)
+    ilist(j) = itmp
+    return
+  end subroutine swap
+!=======================================================================
+  recursive subroutine qsort_list(ndim,il,ir,dlist,ilist)
+!
+!  Sort dlist and ilist used in Gonnet's algorithm by Quicksort.
+!
+    integer,intent(in):: ndim,il,ir
+    real(8),intent(inout):: dlist(ndim)
+    integer,intent(inout):: ilist(ndim)
+
+    integer:: ip,i,j
+    real(8):: dip
+
+    if( ir-il.lt.1 ) return
+    ip = int((il+ir)/2)
+    dip = dlist(ip)
+    call swap(ndim,ip,ir,dlist,ilist)
+    i = il
+    do j=il,ir-1
+      if( dlist(j).lt.dip ) then
+        call swap(ndim,i,j,dlist,ilist)
+        i = i + 1
+      endif
+    enddo
+    call swap(ndim,i,ir,dlist,ilist)
+    call qsort_list(ndim,il,i,dlist,ilist)
+    call qsort_list(ndim,i+1,ir,dlist,ilist)
+    
+  end subroutine qsort_list
+!=======================================================================
 end module pairlist
 !-----------------------------------------------------------------------
 !     Local Variables:
