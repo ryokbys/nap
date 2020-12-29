@@ -131,12 +131,40 @@ contains
     real(8),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
     logical,intent(in):: l1st
 
-    integer:: i,j,k,l,m,n
+    integer:: i,j,k,l,m,n,inc
     integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr,mmax
     real(8):: xi(3),xij(3),rij(3),rij2
 
     call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc,rc1nn &
          ,h,hi,l1st)
+
+    if( l1st ) then
+      mmax = 0
+      do mz=1,lcz
+        do my=1,lcy
+          do mx=1,lcx
+            m= mx*lcyz2 +my*lcz2 +mz +1
+            i = lshd(m)
+            inc = 0
+            do while(i.gt.0)
+              inc = inc + 1
+              i = lscl(i)
+            enddo
+            mmax = max(mmax,inc)
+          enddo
+        enddo
+      enddo
+!.....If nnmax.lt.(4*pi/3)*mmax, nnmax would be a bit too small
+      if( nnmax.lt.4.2*mmax ) then
+        write(6,'(a)') " ================= WORNING ======================="
+        write(6,'(a)') "   nnmax is less than 5*(num of atoms in a cell)"
+        write(6,'(a,i0)') "   You should set max_num_meighbors greater than " &
+             , int(4.2*mmax)
+        write(6,'(a)') " ================================================="
+!!$        call mpi_finalize(ierr)
+!!$        stop
+      endif
+    endif
 
 !-----reset pair list, LSPR
     lspr(0,:)= 0
@@ -163,7 +191,10 @@ contains
 
                 i=lshd(m)
                 do while( i.gt.0 )
-
+                  if( i.gt.natm ) then
+                    i = lscl(i)
+                    cycle
+                  endif
                   ic= int(tag(i))
                   xi(1:3)= ra(1:3,i)
 
@@ -184,16 +215,6 @@ contains
                     if( rij2.lt.rc2 ) then
                       lspr(0,i)= lspr(0,i) +1
                       lspr(0,j)= lspr(0,j) +1
-                      if( lspr(0,i).gt.nnmax .or. lspr(0,j).gt.nnmax ) then
-                        write(6,'(a)') " ERROR: lspr(0,i/j) > nnmax"
-                        write(6,'(a,3(1x,i0))') "   nnmax,lspr(0,i),lspr(0,j) = " &
-                             ,nnmax,lspr(0,i),lspr(0,j)
-                        write(6,'(a)') " You should rerun pmd with increased nnmax " &
-                             //"with the following in.pmd option,"
-                        write(6,'(a,i5)') "   max_num_neighbors   ",nnmax+100
-                        call mpi_finalize(ierr)
-                        stop
-                      endif
                       lspr(lspr(0,i),i)=j
                       lspr(lspr(0,j),j)=i
                       if( rij2.lt.rc1nn2 ) then
