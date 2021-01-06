@@ -11,7 +11,7 @@ Usage:
 Options:
   -h, --help  Show this message and exit.
   --nproc NPROC
-              Number of processes to be used. [default: 1]
+              Number of processes to be used. If it's less than 1, use as many processes as possible. [default: 0]
   --subdir-prefix PREFIX
               Prefix for pmd directory. [default: subdir_]
   --subjob-script SCRIPT
@@ -32,7 +32,7 @@ from nappy.fitpot.de import DE
 from nappy.fitpot.cs import CS
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "200722"
+__version__ = "210106"
 
 def read_in_fitpot(fname='in.fitpot'):
     #...initialize
@@ -769,11 +769,13 @@ def main(args):
         F = infp['de_fraction']
         T = infp['de_temperature']
         CR = infp['de_crossover_rate']
-        opt = DE(N,F,CR,T, vs,vrs,vrsh, func_wrapper, write_vars_fitpot, **kwargs)
+        opt = DE(N,F,CR,T, vs,vrs,vrsh, func_wrapper, write_vars_fitpot,
+                 nproc=nproc, **kwargs)
     elif kwargs['fitting_method'] in ('cs','CS','cuckoo','Cuckoo'):
         N = infp['cs_num_individuals']
         F = infp['cs_fraction']
-        opt = CS(N,F, vs,vrs,vrsh, func_wrapper, write_vars_fitpot, **kwargs)
+        opt = CS(N,F, vs,vrs,vrsh, func_wrapper, write_vars_fitpot,
+                 nproc=nproc, **kwargs)
 
     opt.run(maxiter)
 

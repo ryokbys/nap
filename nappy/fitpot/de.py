@@ -19,7 +19,7 @@ import numpy as np
 from numpy import exp, sin, cos
 import random
 import copy
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Pool
 from time import time
 
 __author__ = "RYO KOBAYASHI"
@@ -87,7 +87,7 @@ class Individual:
     def wrap_range(self):
         self.vector = wrap(self.vector, self.vranges)
 
-    def calc_loss_func(self,kwargs,q):
+    def calc_loss_func(self,kwargs):
         """
         Compute loss function value using self.loss_func function given in the constructor.
         In order to return a result in multiprocessing.Process, it also takes an argument q.
@@ -95,20 +95,23 @@ class Individual:
         # print('type(kwargs)=',type(kwargs))
         val = self.loss_func(self.vector, self.vranges, **kwargs)
         # print(' iid,v,val=',self.iid,self.vector,val)
-        q.put(val)
-        return None
+        # q.put(val)
+        return val, kwargs['index']
 
 class DE:
     """
     Differential evolution class.
     """
 
-    def __init__(self, N, F, CR, T, variables, vranges, loss_func, write_func, **kwargs):
+    def __init__(self, N, F, CR, T, variables, vranges, loss_func, write_func,
+                 nproc=0,**kwargs):
         """
         Conctructor of DE class.
 
         loss_func:
             Loss function to be minimized with variables and **kwargs.
+        nproc:
+            Number of processes used to run N individuals.
         """
         if N < 4:
             raise ValueError('N must be greater than 3 in DE!')
@@ -116,6 +119,7 @@ class DE:
         self.F = F   # Fraction of mixing in DE
         self.CR = CR # Cross-over rate
         self.T = T   # Temperature (kT) to compute adoption probability
+        self.nproc = nproc
         # if self.T < 1e-10:
         #     raise ValueError('T is too small.')
         self.ndim = len(variables)
@@ -143,20 +147,23 @@ class DE:
             self.population.append(ind)
 
         #...Evaluate loss function values
-        qs = [ Queue() for i in range(self.N) ]
+        # qs = [ Queue() for i in range(self.N) ]
         prcs = []
+        if self.nproc > 0 :  # use specified number of cores by nproc
+            pool = Pool(processes=self.nproc)
+        else:
+            pool = Pool()
+            
         for ip,pi in enumerate(self.population):
             kwtmp = copy.copy(self.kwargs)
             kwtmp['index'] = ip
             kwtmp['iid'] = pi.iid
-            prcs.append(Process(target=pi.calc_loss_func, args=(kwtmp,qs[ip])))
-        for p in prcs:
-            p.start()
-        for p in prcs:
-            p.join()
-        for ip,pi in enumerate(self.population):
-            pi.val = qs[ip].get()
-            # print('ip,val,vec=',ip,pi.val,pi.vector)
+            # prcs.append(Process(target=pi.calc_loss_func, args=(kwtmp,qs[ip])))
+            prcs.append(pool.apply_async(pi.calc_loss_func, (kwtmp,)))
+        results = [ res.get() for res in prcs ]
+        for res in results:
+            val,ip = res
+            self.population[ip].val = val
         
         self.keep_best()
         if self.print_level > 2:
@@ -250,19 +257,24 @@ class DE:
             #     self.kwargs['index'] = ic
             #     ci.calc_loss_func(self.kwargs)
             #...Evaluate loss function values
-            qs = [ Queue() for i in range(self.N) ]
+            # qs = [ Queue() for i in range(self.N) ]
             prcs = []
             for ic,ci in enumerate(candidates):
                 kwtmp = copy.copy(self.kwargs)
                 kwtmp['index'] = ic
                 kwtmp['iid'] = ci.iid
-                prcs.append(Process(target=ci.calc_loss_func, args=(kwtmp,qs[ic])))
-            for p in prcs:
-                p.start()
-            for p in prcs:
-                p.join()
-            for ic,ci in enumerate(candidates):
-                ci.val = qs[ic].get()
+                # prcs.append(Process(target=ci.calc_loss_func, args=(kwtmp,qs[ic])))
+                prcs.append(pool.apply_async(ci.calc_loss_func, (kwtmp,)))
+            results = [ res.get() for res in prcs ]
+            for res in results:
+                val,ic = res
+                candidates[ic].val = val
+            # for p in prcs:
+            #     p.start()
+            # for p in prcs:
+            #     p.join()
+            # for ic,ci in enumerate(candidates):
+            #     ci.val = qs[ic].get()
 
             #...Check best
             for ic,ci in enumerate(candidates):
