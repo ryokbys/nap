@@ -3,17 +3,19 @@ SHELL = /bin/bash
 
 all: pmd fitpot
 
+force:
+
 clean:
 	(cd pmd/ && make clean)
 	(cd fitpot/ && make clean)
 
-pmd:
-	(cd pmd/ && make pmd)
+pmd: force
+	(cd $@/ && make $@)
 
 fitpot: pmd
-	(cd fitpot/ && make fitpot)
+	(cd $@/ && make $@)
 
-test: pmd fitpot
+test: fitpot
 	@(cd pmd/ && make test)
 	@(cd fitpot/ && make test)
 	@echo " Run make test-fp after setting up PYTHONPATH for nappy."
