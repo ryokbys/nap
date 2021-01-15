@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-01-15 11:52:29 Ryo KOBAYASHI>
+!                     Last-modified: <2021-01-15 14:57:29 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two-temperature method (TTM).
@@ -31,8 +31,8 @@ module ttm
   integer:: nx,ny,nz,nxyz
 !.....Mesh size in reduced unit [0:1)
   real(8):: dx,dy,dz,area,darea,dr2
-!.....ODE solver; 1) Eular, 2) RK4 (4th order Runge-Kutta)
-  character(len=20):: csolver = 'Eular'
+!.....ODE solver; 1) Euler, 2) RK4 (4th order Runge-Kutta), 3) RK2
+  character(len=20):: csolver = 'RK4'
 !.....Time step in fs == dt in MD by default
   real(8):: dt_inner = -1.0
 !.....Number of inner loop in TTM
@@ -217,6 +217,7 @@ contains
       print '(a,es12.4,a)','   Penetration depth = ',lskin,' A'
       print '(a,f0.1,a)','   Total incident energy = ',fluence*area,' eV'
       print '(a,f0.4,a)','   Electron density = ',rho_e,' e/A^3'
+      print '(a,a)','   Diff. Eq. solver :  ',trim(csolver)
       print '(a,i5)','   inner_loop = ',nstp_inner
       if( .not. lvardt ) then
         print '(a,2es12.4)','   dtmd, dt = ',dtmd,dt_inner
@@ -488,6 +489,9 @@ contains
         else if( trim(c1st).eq.'Ta_min' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, ta_min
+        else if( trim(c1st).eq.'DE_solver' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, csolver
         else
           print *,'There is no TTM keyword: ',trim(c1st)
         endif
@@ -538,6 +542,7 @@ contains
     call mpi_bcast(rsurf,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(lskin,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(lcut_interact,1,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(csolver,20,mpi_character,0,mpi_world,ierr)
     return
   end subroutine sync_params
 !=======================================================================
@@ -708,7 +713,7 @@ contains
     return
   end subroutine calc_Ta
 !=======================================================================
-  subroutine model_2tm(tnow,dtep,eitmp,eotmp,eptmp,iprint)
+  subroutine model_dte(tnow,dtep,eitmp,eotmp,eptmp,iprint)
 !
 !  Create f(t,y) for ODE dy/dt = f(t,y), where y=Te(ix,iy,iz) here.
 !  The ODE is now diffusion Eq. with two-temperature model.
@@ -799,7 +804,7 @@ contains
       endif
     endif
 
-  end subroutine model_2tm
+  end subroutine model_dte
 !=======================================================================
   subroutine update_Te_old(tnow,dtmd,myid,mpi_world,iprint)
 !
@@ -1026,17 +1031,59 @@ contains
     etot_e = 0d0
     if( myid.eq.0 ) then
 
-      if( trim(csolver).eq.'Eular' ) then
+      if( trim(csolver).eq.'Euler' ) then
         do istp = 1,nstp_inner
           tep(:,:,:) = te(:,:,:)
-          call model_2tm(tnow,dtep,eitmp,eotmp,eptmp,iprint)
+          call model_dte(tnow,dtep,eitmp,eotmp,eptmp,iprint)
           te(:,:,:) = te(:,:,:) +dtep(:,:,:)*dt_inner
           ein_e = ein_e +eitmp*dt_inner
           eout_e = eout_e +eotmp*dt_inner
           ein_pulse = ein_pulse +eptmp*dt_inner
         enddo  ! istp=1,nstp_inner
-!!$      else if( trim(csolver).eq.'RK4' ) then  ! 4th Runge-Kutta
-!!$        
+      else if( trim(csolver).eq.'RK4' ) then  ! 4th Runge-Kutta
+        do istp=1,nstp_inner
+          tep(:,:,:)= te(:,:,:)
+!.....1st step
+          call model_dte(tnow,dtep,eitmp,eotmp,eptmp,iprint)
+          te(:,:,:) = te(:,:,:) +dtep(:,:,:)*dt_inner/6
+          tep(:,:,:)= tep(:,:,:) +dtep(:,:,:)*dt_inner/2
+          ein_e = ein_e +eitmp*dt_inner/6
+          eout_e = eout_e +eotmp*dt_inner/6
+          ein_pulse = ein_pulse +eptmp*dt_inner/6
+!.....2nd step
+          call model_dte(tnow,dtep,eitmp,eotmp,eptmp,iprint)
+          te(:,:,:) = te(:,:,:) +dtep(:,:,:)*dt_inner/3
+          tep(:,:,:)= tep(:,:,:) +dtep(:,:,:)*dt_inner/2
+          ein_e = ein_e +eitmp*dt_inner/3
+          eout_e = eout_e +eotmp*dt_inner/3
+          ein_pulse = ein_pulse +eptmp*dt_inner/3
+!.....3rd step
+          call model_dte(tnow,dtep,eitmp,eotmp,eptmp,iprint)
+          te(:,:,:) = te(:,:,:) +dtep(:,:,:)*dt_inner/3
+          tep(:,:,:)= tep(:,:,:) +dtep(:,:,:)*dt_inner/2
+          ein_e = ein_e +eitmp*dt_inner/3
+          eout_e = eout_e +eotmp*dt_inner/3
+          ein_pulse = ein_pulse +eptmp*dt_inner/3
+!.....4th step
+          call model_dte(tnow,dtep,eitmp,eotmp,eptmp,iprint)
+          te(:,:,:) = te(:,:,:) +dtep(:,:,:)*dt_inner/6
+          ein_e = ein_e +eitmp*dt_inner/6
+          eout_e = eout_e +eotmp*dt_inner/6
+          ein_pulse = ein_pulse +eptmp*dt_inner/6
+        enddo
+      else if( trim(csolver).eq.'RK2' ) then  ! 2th Runge-Kutta
+        do istp=1,nstp_inner
+          tep(:,:,:)= te(:,:,:)
+!.....1st step
+          call model_dte(tnow,dtep,eitmp,eotmp,eptmp,iprint)
+          tep(:,:,:)= tep(:,:,:) +dtep(:,:,:)*dt_inner/2
+!.....2nd step
+          call model_dte(tnow,dtep,eitmp,eotmp,eptmp,iprint)
+          te(:,:,:) = te(:,:,:) +dtep(:,:,:)*dt_inner
+          ein_e = ein_e +eitmp*dt_inner
+          eout_e = eout_e +eotmp*dt_inner
+          ein_pulse = ein_pulse +eptmp*dt_inner
+        enddo
       endif
       
 !.....Update Te_max and alpha_max
