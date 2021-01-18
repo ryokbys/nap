@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2019-07-05 14:07:50 Ryo KOBAYASHI>
+!                    Last modified: <2020-12-24 07:24:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -19,7 +19,7 @@ module pmdvars
   integer:: nouterg,noutpmd,istp &
        ,iocntpmd,iocnterg
   integer:: natm,nb,nsp,nalmax
-  real(8):: tcpu,tcpu0,tcpu1,tcpu2,tcom,tspdcmp,tlspr,tdump
+  real(8):: tcpu,tcpu0,tcpu1,tcpu2,tcom,tlspr
   real(8):: epot0,vmaxold,vmax,simtime
   real(8):: tgmm
 !!$  real(8):: tgmm,tfac(9),ediff(9),ediff0(9),temp(9),ekl(9)
@@ -55,7 +55,10 @@ module pmdvars
   real(8),allocatable:: stn(:,:,:)
 !.....atomic charge and electronegativity
   real(8),allocatable:: chg(:),chi(:)
+!.....Electronic temperature
   real(8),allocatable:: tei(:)
+!.....Color charge
+  real(8),allocatable:: clr(:)
 
 !.....Shear stress
   real(8):: shrfx
@@ -114,6 +117,7 @@ contains
       do ia=1,ntot
         nfmv = max(nfmv,ifmvOf(tagtot(ia)))
       enddo
+      print *,''
       print '(a,i0)',' Number of ifmvs = ',nfmv
     endif
     call mpi_bcast(nfmv,1,mpi_integer,0,mpi_world,ierr)

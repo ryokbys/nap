@@ -19,7 +19,7 @@ import numpy as np
 from numpy import exp, sin, cos
 import random
 import copy
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Pool
 from time import time
 from scipy.special import gamma
 
@@ -140,7 +140,7 @@ class Individual:
     def wrap_range(self):
         self.vector = wrap(self.vector, self.vranges)
 
-    def calc_loss_func(self,kwargs,q):
+    def calc_loss_func(self,kwargs):
         """
         Compute loss function value using self.loss_func function given in the constructor.
         In order to return a result in multiprocessing.Process, it also takes an argument q.
@@ -148,8 +148,8 @@ class Individual:
         # print('type(kwargs)=',type(kwargs))
         val = self.loss_func(self.vector, self.vranges, **kwargs)
         # print(' iid,v,val=',self.iid,self.vector,val)
-        q.put(val)
-        return None
+        # q.put(val)
+        return val,kwargs['index']
 
 class CS:
     """
@@ -157,7 +157,7 @@ class CS:
     """
 
     def __init__(self, N, F, variables, vranges, vhardlimit, loss_func, write_func,
-                 **kwargs):
+                 nproc=0,**kwargs):
         """
         Conctructor of CS class.
 
@@ -165,11 +165,14 @@ class CS:
         F:  Fraction of worse individuals to be abondoned.
         loss_func:
             Loss function to be minimized with variables and **kwargs.
+        nproc:
+            Number of processes used to run N individuals.
         """
         if N < 2:
             raise ValueError('N must be greater than 1 in CS!')
         self.N = N   # Number of individuals in a generation
         self.F = F   # Fraction of worse individuals to be abondoned
+        self.nproc = nproc
         self.ndim = len(variables)
         self.vs = variables
         self.vrs0 = vranges
@@ -209,20 +212,22 @@ class CS:
             self.population.append(ind)
 
         #...Evaluate loss function values
-        qs = [ Queue() for i in range(self.N) ]
         prcs = []
+        if self.nproc > 0 :  # use specified number of cores by nproc
+            pool = Pool(processes=self.nproc)
+        else:
+            pool = Pool()
+            
         for ip,pi in enumerate(self.population):
             kwtmp = copy.copy(self.kwargs)
             kwtmp['index'] = ip
             kwtmp['iid'] = pi.iid
-            prcs.append(Process(target=pi.calc_loss_func, args=(kwtmp,qs[ip])))
-        for p in prcs:
-            p.start()
-        for p in prcs:
-            p.join()
-        for ip,pi in enumerate(self.population):
-            pi.val = qs[ip].get()
-            # print('ip,val,vec=',ip,pi.val,pi.vector)
+            #prcs.append(pool.apply_async(pi.calc_loss_func, (kwtmp,qs[ip])))
+            prcs.append(pool.apply_async(pi.calc_loss_func, (kwtmp,)))
+        results = [ res.get() for res in prcs ]
+        for res in results:
+            val,ip = res
+            self.population[ip].val = val
         
         self.keep_best()
         self.all_indivisuals.extend(self.population)
@@ -319,19 +324,22 @@ class CS:
                 candidates.append(newind)
 
             #...Evaluate loss function values
-            qs = [ Queue() for i in range(len(candidates)) ]
             prcs = []
+            if self.nproc > 0 :  # use specified number of cores by nproc
+                pool = Pool(processes=self.nproc)
+            else:
+                pool = Pool()
+            
             for ic,ci in enumerate(candidates):
                 kwtmp = copy.copy(self.kwargs)
                 kwtmp['index'] = ic
                 kwtmp['iid'] = ci.iid
-                prcs.append(Process(target=ci.calc_loss_func, args=(kwtmp,qs[ic])))
-            for p in prcs:
-                p.start()
-            for p in prcs:
-                p.join()
-            for ic,ci in enumerate(candidates):
-                ci.val = qs[ic].get()
+                # prcs.append(Process(target=ci.calc_loss_func, args=(kwtmp,qs[ic])))
+                prcs.append(pool.apply_async(ci.calc_loss_func, (kwtmp,)))
+            results = [ res.get() for res in prcs ]
+            for res in results:
+                val,ic = res
+                candidates[ic].val = val
             self.all_indivisuals.extend(candidates)
 
             #...Pick j that is to be compared with i
@@ -364,19 +372,17 @@ class CS:
                 candidates.append(newind)
             
             #...Evaluate loss function values of new random ones
-            qs = [ Queue() for i in range(len(candidates)) ]
             prcs = []
             for ic,ci in enumerate(candidates):
                 kwtmp = copy.copy(self.kwargs)
                 kwtmp['index'] = ic
                 kwtmp['iid'] = ci.iid
-                prcs.append(Process(target=ci.calc_loss_func, args=(kwtmp,qs[ic])))
-            for p in prcs:
-                p.start()
-            for p in prcs:
-                p.join()
-            for ic,ci in enumerate(candidates):
-                ci.val = qs[ic].get()
+                # prcs.append(Process(target=ci.calc_loss_func, args=(kwtmp,qs[ic])))
+                prcs.append(pool.apply_async(ci.calc_loss_func, (kwtmp,)))
+            results = [ res.get() for res in prcs ]
+            for res in results:
+                val,ic = res
+                candidates[ic].val = val
             self.all_indivisuals.extend(candidates)
 
             #...Replace them with old ones

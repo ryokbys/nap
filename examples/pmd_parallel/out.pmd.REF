@@ -1,0 +1,169 @@
+========================================================================
+ PMD: A Parallel Molecular Dynamics program 
+ 
+ Revision: rev200428
+ Contributors: 
+   - Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>
+========================================================================
+ 
+ Job started at 10:58:22 on 2021-01-09
+ 
+ Read pmdini in ascii mode.
+ Species order read from pmdini option: 
+    1:    O
+    2:   Li
+    3:   La
+    4:   Zr
+ 
+ Lattice vectors:
+   a = [       13.239       0.000       0.000 ]
+   b = [        0.000      13.239       0.000 ]
+   c = [        0.000       0.000      12.765 ]
+ Lattice parameters:
+   |a| =     13.239 Ang.,  alpha =   90.00 deg.
+   |b| =     13.239 Ang.,  beta  =   90.00 deg.
+   |c| =     12.765 Ang.,  gamma =   90.00 deg.
+ Cell volume = 2237.44 Ang^3
+ Number of each species in the initial configuration
+   O  :  96
+   Li :  56
+   La :  24
+   Zr :  16
+ 
+ Number of processes in MPI = 1
+ 
+------------------------------------------------------------------------
+           Initial setting   
+------------------------------------------------------------------------
+  num_nodes_x     -1
+  num_nodes_y     -1
+  num_nodes_z     -1
+  
+  io_format     ascii 
+  print_level     1
+  
+  time_interval     1.000
+  num_iteration     2
+  num_out_energy     100
+  
+  flag_out_pmd     2
+  num_out_pmd     10
+  dump_aux_order    ekin epot sxx syy szz syz sxz sxy 
+  
+  force_type     Coulomb  Morse
+  cutoff_radius      6.000
+  cutoff_buffer      0.300
+  
+  flag_damping     0
+  damping_coeff     .9900
+  converge_eps     .0001
+  converge_num     1
+  min_iteration     0
+  
+  temperature_control     none
+  initial_temperature      -300.00
+  remove_translation     0
+  
+  stress_control     none
+ 
+  zload_type     none
+  
+  factor_direction
+       0   0.000   0.000   0.000
+       1   1.000   1.000   1.000
+       2   1.000   0.000   1.000
+       3   1.000   1.000   1.000
+       4   1.000   1.000   1.000
+       5   1.000   1.000   1.000
+       6   1.000   1.000   1.000
+       7   1.000   1.000   1.000
+       8   1.000   1.000   1.000
+       9   1.000   1.000   1.000
+  
+  mass
+       1 O     15.9990
+       2 Li     6.9400
+       3 La   138.9000
+       4 Zr    91.2240
+  
+  boundary     ppp
+  
+------------------------------------------------------------------------
+
+ Broadcast data to be shared with all the nodes.
+ Number of spatial divisions automatically set, NX,NY,NZ= 1 1 1
+ 
+ Ensemble = NVE
+ 
+ Number of ifmvs = 1
+ rcut, rbuf =  6.000 0.300
+ Min number of local atoms =        192
+ Max number of local atoms =        192
+   nbmax =      10000
+   namax = nalmax*1.2 + nbmax  =      10230
+   nnmax =        100
+ Memory for main routine   =          8 MByte
+ 
+ Number of total atoms = 192
+ Number of species     = 4
+ Degrees of freedom for each ifmv =  576  0  0  0  0  0  0  0  0
+ 
+ Use the following force-fields:  Coulomb  Morse 
+
+ Coulomb parameters:
+   csp,vid,rad,npq =    O -2.000  0.660   2
+   csp,vid,rad,npq =   Li  1.000  1.280   2
+   csp,vid,rad,npq =   La  3.000  2.070   6
+   csp,vid,rad,npq =   Zr  4.000  1.750   5
+   cspi,cspj,rho_bvs=     O    O    1.3200
+   cspi,cspj,rho_bvs=    Li   Li    2.5600
+   cspi,cspj,rho_bvs=    Li   La    3.3500
+   cspi,cspj,rho_bvs=    Li   Zr    3.0300
+   cspi,cspj,rho_bvs=    La   La    4.1400
+   cspi,cspj,rho_bvs=    La   Zr    3.8200
+   cspi,cspj,rho_bvs=    Zr   Zr    3.5000
+ Finished reading ./in.params.Coulomb
+
+ Morse parameters:
+   cspi,cspj,D,alpha,rmin =    O  Li  0.988  1.938  1.940
+   cspi,cspj,D,alpha,rmin =    O  La  1.186  2.217  2.470
+   cspi,cspj,D,alpha,rmin =    O  Zr  2.191  2.041  1.996
+ ================= WORNING =======================
+   nnmax is less than 5*(num of atoms in a cell)
+   You should set max_num_meighbors greater than 100
+ =================================================
+ Max num of neighbors at 1st call = 98
+ 
+ Charges fixed from ideal valences and composition:
+   csp, V_ideal, V_actual =    O -2.000 -1.199
+   csp, V_ideal, V_actual =   Li  1.000  0.834
+   csp, V_ideal, V_actual =   La  3.000  1.444
+   csp, V_ideal, V_actual =   Zr  4.000  2.110
+ 
+ Ewald energy term by term:
+   Self term         =       0.0000 eV
+   Short-range term  =     533.0033 eV
+   Long-range term   =       0.0000 eV
+ 
+ Initial values:
+   Kinetic energy  =          7.58973 eV =      0.040 eV/atom
+   Potential energy=       -161.24366 eV =     -0.840 eV/atom
+   Temperature 1   =        307.41779 K
+   Temperature     =        307.41779 K
+   Pressure        =         24.84780 GPa (compressive)
+   Stress tensor   = 25.589 25.670 23.285 -.025 -.029 .006
+ 
+ istp,etime,temp,epot,vol,prss= 0        0.01      307.42  -1.6124E+02  2.237E+03  2.485E+01
+ istp,etime,temp,epot,vol,prss= 1        0.01      311.04  -1.6133E+02  2.237E+03  2.485E+01
+ istp,etime,temp,epot,vol,prss= 2        0.01      318.59  -1.6152E+02  2.237E+03  2.483E+01
+ 
+ Final values:
+   Kinetic energy  =          7.86560 eV =      0.041 eV/atom
+   Potential energy=       -161.51956 eV =     -0.841 eV/atom
+   Temperature 1   =        318.59178 K
+   Temperature     =        318.59178 K
+   Pressure        =         24.83214 GPa (compressive)
+ 
+ Time                  =       0.01 sec  =   0h00m00s
+ 
+ Job finished at 10:58:22 on 2021-01-09

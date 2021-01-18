@@ -9,7 +9,7 @@ io_format         ascii
 max_num_neighbors  200
 
 time_interval     -2.0d0
-num_iteration     1000
+num_iteration     2
 num_out_energy    100
 
 flag_out_pmd      2

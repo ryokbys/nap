@@ -1,16 +1,27 @@
-
-.phony: all clean pmd fitpot FORCE
+.phony: all clean pmd fitpot test
+SHELL = /bin/bash
 
 all: pmd fitpot
 
-clean: FORCE
-	cd pmd; make clean
-	cd fitpot; make clean
+force:
 
-pmd: FORCE
-	cd pmd; make pmd
+clean:
+	(cd pmd/ && make clean)
+	(cd fitpot/ && make clean)
 
-fitpot: FORCE
-	cd fitpot; make fitpot
+pmd: force
+	(cd $@/ && make $@)
 
-FORCE:
+fitpot: pmd
+	(cd $@/ && make $@)
+
+test: fitpot
+	@(cd pmd/ && make test)
+	@(cd fitpot/ && make test)
+	@echo " Run make test-fp after setting up PYTHONPATH for nappy."
+	@echo " To setup PYTHONPATH for nappy, see the documentation:"
+	@echo "   http://ryokbys.web.nitech.ac.jp/contents/nap_docs/install.html#setup-nappy-required-for-fppy"
+
+test-fp:
+	@(cd examples/fp_LZP && make test)
+

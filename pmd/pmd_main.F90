@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-06-20 13:53:26 Ryo KOBAYASHI>
+!                     Last-modified: <2020-12-25 12:21:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -23,8 +23,12 @@ program pmd
   use version
   use force
   use Coulomb, only: cterms
-  use util, only: time_stamp, itotOf
+  use util, only: itotOf
+  use time, only: time_stamp, accum_time, report_time
   use element
+  use clrchg,only: lclrchg,init_clrchg
+  use localflux,only: lflux,init_lflux,final_lflux
+  use pdens,only: lpdens,init_pdens,final_pdens
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -37,10 +41,13 @@ program pmd
   integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,nstp_done
   integer:: mpicolor,mpikey,ierr,jerr,itmp,nprocs,nnmax_est
   real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin,rmin
+  real(8):: t0,t1
   character(len=3):: csp
   type(atom):: elem
   real(8),external:: urnd
 !!$  integer,external:: itotOf
+
+  t0 = mpi_wtime()
 
 !-----initialize the MPI environment
   call mpi_init(ierr)
@@ -118,7 +125,7 @@ program pmd
     
     if( trim(ctctl).eq.'ttm' ) then
       print *,''
-      print *,'Since the two-temperature model (TTM) MD...'
+      print *,'NOTICE: Since using the two-temperature model (TTM) MD:'
 !.....Set x-boundary free if TTM
       if( boundary(1:1).ne.'f' ) then
         print *,'  - Free boundary condition is set' &
@@ -155,6 +162,21 @@ program pmd
 !!$      endif
     endif
 
+!.....Check whether localflux is used with color charge NEMD
+    if( lflux .and. .not. lclrchg ) then
+      print *,'ERROR: local flux must be used with color-charge NEMD !'
+      stop
+    endif
+    if( lflux .or. lpdens ) then
+!.....Set cutoff_buffer to zero, since it can affect local flux results
+      rbuf = 0d0
+      print *,''
+      print *,'NOTICE: cutoff_buffer is reset to 0, since it can affect ' &
+           //'the following:'
+      if( lflux ) print *,'  - local flux'
+      if( lpdens ) print *,'  - probability density'
+    endif
+
 !.....Correct nnmax if the given nnmax is too small compared to
 !.....the estimated one
 !.....Now assume the minimum interatomic distance is about 2.0A
@@ -166,16 +188,20 @@ program pmd
       print '(a,2(2x,i0))','    nnmax_orig, nnmax_new = ',nnmax,nnmax_est
       nnmax = nnmax_est
     endif
-  endif
+  endif  ! end of myid.eq.0
 
   call bcast_params()
 
 
   if( myid_md.eq.0 ) then
-    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0))
+!!$    naux = 3
+!!$    allocate(auxtot(ntot0,naux))
+!!$    auxtot(:,:) = 0d0
+    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0))
     chitot(1:ntot0) = 0d0
     chgtot(1:ntot0) = 0d0
     teitot(1:ntot0) = 0d0
+    clrtot(1:ntot0) = 0d0
 !!$    call set_atomic_charges(ntot0,chgtot,tagtot,nspmax &
 !!$         ,chgfix,schg,myid_md,iprint)
 
@@ -188,11 +214,15 @@ program pmd
   else
     ntot0 = 1
     allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
-         ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0) &
-         ,chgtot(ntot0),chitot(ntot0),teitot(ntot0))
+         ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0) )
+!!$    naux = 3
+!!$    allocate(auxtot(ntot0,naux))
+!!$    auxtot(:,:) = 0d0
+    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0))
     chitot(1:ntot0) = 0d0
     chgtot(1:ntot0) = 0d0
     teitot(1:ntot0) = 0d0
+    clrtot(1:ntot0) = 0d0
   endif
 
 !.....Broadcast species data read from pmdini  
@@ -252,33 +282,51 @@ program pmd
     cterms = 'long'
   endif
 
+!.....Initial settting for color charge NEMD
+  if( lclrchg ) call init_clrchg(specorder,ntot0,clrtot,tagtot &
+       ,myid_md,iprint)
+!.....Init for local flux
+  if( lflux ) call init_lflux(myid_md,nx,ny,nz,lclrchg &
+       ,nstp,mpi_md_world,iprint)
+  if( lpdens ) call init_pdens(myid_md,nx,ny,nz,h,specorder &
+       ,mpi_md_world,iprint)
+
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then
     call add_pka_velocity(myid_md)
   endif
 
+  call accum_time('overhead',mpi_wtime()-t0)
 !.....call pmd_core to perfom MD
   call pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
-       ,ekitot,epitot,chgtot,chitot,teitot,nstp,nerg,npmd &
+       ,ekitot,epitot,chgtot,chitot,teitot,clrtot,nstp,nerg,npmd &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,specorder &
        ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
        ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl &
        ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv &
        ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width &
        ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary &
-       ,lmetaD,lconst,lrdcfrc,cstruct,istruct,cdeform,dhratio)
+       ,lmetaD,lconst,lrdcfrc,lreorder,cstruct,istruct,cdeform,dhratio)
 
   if( myid_md.eq.0 ) then
+    tmp = mpi_wtime()
     if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
       call write_pmdtot_bin(20,cpmdfin)
     elseif( trim(ciofmt).eq.'ascii' ) then
       call write_pmdtot_ascii(20,cpmdfin)
     endif
+    call accum_time('write_xxx',mpi_wtime()-tmp)
   endif
+
+  if( lflux ) call final_lflux(myid_md)
+  if( lpdens ) call final_pdens(myid_md,mpi_md_world,nodes_md,h &
+       ,ntot,tagtot,rtot,specorder)
 
 !.....write energy, forces and stresses only for fitpot
   if( myid_md.eq.0 ) then
     call write_force(21,'.pmd',h,epot,ntot,tagtot,atot,stnsr)
+    call accum_time('total',mpi_wtime()-t0)
+    if( iprint.gt.1 ) call report_time(6)
     print *,''
     call time_stamp(' Job finished')
   endif
@@ -286,7 +334,8 @@ program pmd
 1 continue
   call mpi_barrier(mpicomm,ierr)
   call mpi_comm_free(mpi_md_world,ierr)
-  deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot,chgtot,chitot,teitot)
+  deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot,chgtot,chitot &
+       ,teitot,clrtot)
   call mpi_finalize(ierr)
 
 end program pmd
@@ -338,6 +387,9 @@ subroutine write_initial_setting()
   use pmdio
   use pmdmpi
   use force
+  use clrchg,only: lclrchg, cspc_clrchg, clrfield, clr_init
+  use localflux,only: lflux,nlx,nly,nlz,noutlflux
+  use pdens,only: lpdens,cspc_pdens,npx,npy,npz
   implicit none 
   integer:: i
 
@@ -452,6 +504,28 @@ subroutine write_initial_setting()
 !.....Boundary condition
   write(6,'(2x,a,5x,a)') 'boundary',trim(boundary)
   write(6,'(2x,a)') ''
+!.....Color charge NEMD
+  if( lclrchg ) then
+    write(6,'(2x,a,5x,l)') 'flag_clrchg',lclrchg
+    write(6,'(2x,a,5x,a)') 'clr_init',trim(clr_init)
+    write(6,'(2x,a,5x,a)') 'spcs_clrchg',trim(cspc_clrchg)
+    write(6,'(2x,a,3(2x,f0.4))') 'clrfield',clrfield(1:3)
+    write(6,'(2x,a)') ''
+  endif
+!.....Local flux
+  if( lflux ) then
+    write(6,'(2x,a,5x,l)') 'flag_lflux',lclrchg
+    write(6,'(2x,a,2x,i0)') 'num_out_lflux',noutlflux
+    write(6,'(2x,a,3(2x,i0))') 'ndiv_lflux',nlx,nly,nlz
+    write(6,'(2x,a)') ''
+  endif
+!.....Probability density
+  if( lpdens ) then
+    write(6,'(2x,a,5x,l)') 'flag_pdens',lpdens
+    write(6,'(2x,a,5x,a)') 'spcs_pdens',trim(cspc_pdens)
+    write(6,'(2x,a,3x,3(2x,i0))') 'ndiv_pdens',npx,npy,npz
+    write(6,'(2x,a)') ''
+  endif
 !.....Charge
 !!$  write(6,'(2x,a)') 'charge'
 !!$  do i=1,nspmax
@@ -497,6 +571,10 @@ subroutine bcast_params()
   use pmdio
   use pmdmpi
   use force
+  use extforce,only: lextfrc,cspc_extfrc,extfrc
+  use clrchg,only: lclrchg,cspc_clrchg,clr_init,clrfield
+  use localflux,only: lflux,nlx,nly,nlz,noutlflux
+  use pdens,only: lpdens,npx,npy,npz,cspc_pdens
   implicit none
   include 'mpif.h'
 
@@ -576,12 +654,43 @@ subroutine bcast_params()
   if( ltdst ) then
     call mpi_bcast(ntdst,1,mpi_integer,0,mpicomm,ierr)
   endif
+!.....Color charge NEMD
+  call mpi_bcast(lclrchg,1,mpi_logical,0,mpicomm,ierr)
+  if( lclrchg ) then
+    call mpi_bcast(cspc_clrchg,3,mpi_character,0,mpicomm,ierr)
+    call mpi_bcast(clr_init,20,mpi_character,0,mpicomm,ierr)
+    call mpi_bcast(clrfield,3,mpi_real8,0,mpicomm,ierr)
+  endif
+!.....Local flux
+  call mpi_bcast(lflux,1,mpi_logical,0,mpicomm,ierr)
+  if( lflux ) then
+    call mpi_bcast(noutlflux,1,mpi_integer,0,mpicomm,ierr)
+    call mpi_bcast(nlx,1,mpi_integer,0,mpicomm,ierr)
+    call mpi_bcast(nly,1,mpi_integer,0,mpicomm,ierr)
+    call mpi_bcast(nlz,1,mpi_integer,0,mpicomm,ierr)
+  endif
+!.....External force
+  call mpi_bcast(lextfrc,1,mpi_logical,0,mpicomm,ierr)
+  if( lextfrc ) then
+    call mpi_bcast(cspc_extfrc,3,mpi_character,0,mpicomm,ierr)
+    call mpi_bcast(extfrc,3,mpi_real8,0,mpicomm,ierr)
+  endif
+!.....Probability density
+  call mpi_bcast(lpdens,1,mpi_logical,0,mpicomm,ierr)
+  if( lpdens ) then
+    call mpi_bcast(cspc_pdens,3,mpi_character,0,mpicomm,ierr)
+    call mpi_bcast(npx,1,mpi_integer,0,mpicomm,ierr)
+    call mpi_bcast(npy,1,mpi_integer,0,mpicomm,ierr)
+    call mpi_bcast(npz,1,mpi_integer,0,mpicomm,ierr)
+  endif
 !.....Metadynamics
   call mpi_bcast(lmetaD,1,mpi_logical,0,mpicomm,ierr)
 !.....Constratins
   call mpi_bcast(lconst,1,mpi_logical,0,mpicomm,ierr)
 !.....Reduced force
   call mpi_bcast(lrdcfrc,1,mpi_logical,0,mpicomm,ierr)
+!.....Linked-cell reordering
+  call mpi_bcast(lreorder,1,mpi_logical,0,mpicomm,ierr)
 !.....Deformation
   call mpi_bcast(cdeform,128,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(dhratio,9,mpi_real8,0,mpicomm,ierr)

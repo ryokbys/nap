@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-03-11 16:41:26 Ryo KOBAYASHI>
+!                     Last modified: <2020-11-18 22:33:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -53,7 +53,7 @@ contains
 !=======================================================================
   subroutine init_ZBL(iprint)
     use pmdio,only: csp2isp,specorder
-    use element,only: nelem,elements
+    use element,only: nelem,elmts
     integer,intent(in):: iprint
 
     integer:: isp,iz
@@ -64,7 +64,7 @@ contains
       csp = trim(specorder(isp))
       if( trim(csp).eq.'x' ) cycle
       do iz=1,nelem
-        if( trim(csp).eq.trim(elements(iz)%symbol) ) then
+        if( trim(csp).eq.trim(elmts(iz)%symbol) ) then
           qnucl(isp) = dble(iz)
           exit
         endif

@@ -1,6 +1,6 @@
 program rdf
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-07-17 12:39:02 Ryo KOBAYASHI>
+!                     Last-modified: <2020-09-29 21:57:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Compute RDF.
 !-----------------------------------------------------------------------
@@ -168,7 +168,7 @@ program rdf
   enddo
 !.....Output S(Q)
   open(21,file=trim(cfoutsq),status='replace')
-  write(21,'(a)',advance='no') '#  1:wave number, 2:S(Q), '
+  write(21,'(a)') '#  1:wave number, 2:S(Q) '
   do ib=1,nbins
     q = (ib-0.5d0)*dq
     write(21,'(2es14.4)') q, sqs(ib)

@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-04-08 19:02:27 Ryo KOBAYASHI>
+!                     Last modified: <2020-12-27 00:16:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -1083,7 +1083,6 @@ contains
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
-        if(j.le.i) cycle
         js= int(tag(j))
         if( .not.interact(is,js) ) cycle
         qj= chg(j)
@@ -1095,7 +1094,6 @@ contains
         dij= sqrt(dij2)
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
-        dxdj(1:3)=  rij(1:3)*diji
         rhoij = rho_bvs(is,js)
         terfc = erfc(dij/rhoij)
         terfcc = erfc(rc/rhoij)
@@ -1103,21 +1101,13 @@ contains
         dvdrc = -acc *qi*qj/rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
 !.....potential
         tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
-        if( j.le.natm ) then
-          epi(i)= epi(i) +tmp
-          epi(j)= epi(j) +tmp
-          epotl = epotl +tmp +tmp
-        else
-          epi(i)= epi(i) +tmp
-          epotl = epotl +tmp
-        endif
+        epi(i)= epi(i) +tmp
+        epotl= epotl +tmp
 !.....force
         texp = exp(-(dij/rhoij)**2)
         dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
-        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
-        if( .not.lstrs ) cycle
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
@@ -1129,9 +1119,7 @@ contains
       enddo
     enddo
 
-    if( lstrs ) then
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
+    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
@@ -1556,8 +1544,8 @@ contains
 
   end subroutine force_direct_cut
 !=======================================================================
-  subroutine force_screened_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-       ,lspr,epi,esrl,iprint,lstrs,rc,l1st)
+  subroutine force_screened_cut(namax,natm,tag,ra,nnmax,aa,strsl &
+       ,chg,h,hi,lspr,epi,esrl,iprint,lstrs,rc,l1st)
 !
 !  Screened Coulomb with cutoff that uses rho_bvs.
 !  smoothing using vrc and dVdrc where
@@ -1565,6 +1553,7 @@ contains
 !
 !!$    use ZBL,only: zeta,dzeta
 !!$    use ZBL,only: interact_zbl => interact
+    use util,only: itotOf
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -1578,6 +1567,7 @@ contains
     logical,intent(in):: lstrs,l1st
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
+    integer:: itot,jtot
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
          ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp &
          ,qi,qj,radi,radj,rhoij,terfc,texp &
@@ -1611,7 +1601,7 @@ contains
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
-        if(j.le.i) cycle
+!!$        if(j.le.i) cycle
         js= int(tag(j))
         if( .not.interact(is,js) ) cycle
         qj= chg(j)
@@ -1632,25 +1622,27 @@ contains
         dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
         tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
 !.....potential
-        if( j.le.natm ) then
-          epi(i)= epi(i) +tmp
-          epi(j)= epi(j) +tmp
-          esrl = esrl +tmp +tmp
-        else
-          epi(i)= epi(i) +tmp
-          esrl = esrl +tmp
-        endif
+!!$        if( j.le.natm ) then
+!!$          epi(i)= epi(i) +tmp
+!!$          epi(j)= epi(j) +tmp
+!!$          esrl = esrl +tmp +tmp
+!!$        else
+!!$          epi(i)= epi(i) +tmp
+!!$          esrl = esrl +tmp
+!!$        endif
+        epi(i)= epi(i) +tmp
+        esrl = esrl +tmp
 !.....force
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
-        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
+!!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
         if( lstrs ) then
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
                    -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+!!$              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+!!$                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
             enddo
           enddo
         endif
@@ -2224,19 +2216,6 @@ contains
     integer:: i,is,ierr
     real(8):: sum_anion,sum_cation
     character(len=3):: csp
-
-!!$!.....BEGIN DEBUGGING
-!!$    do i=1,natm+nb
-!!$      is = int(tag(i))
-!!$      if( is.eq.1 ) then
-!!$        chg(i) = -vid_bvs(is)
-!!$      else
-!!$        chg(i) = vid_bvs(is)
-!!$      endif
-!!$      print *,' i,is,chg(i)=',i,is,chg(i)
-!!$    enddo
-!!$    return
-!!$!.....END DEBUGGING
 
     allocate(nbvsl(nspmax),nbvs(nspmax))
     nbvsl(1:nspmax) = 0

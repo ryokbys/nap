@@ -38,6 +38,10 @@ subroutine set_variable(ionum,cname)
   use pmdio
   use pmdmpi
   use force,only: ol_type, ol_force
+  use extforce,only: lextfrc,cspc_extfrc,extfrc
+  use clrchg,only: lclrchg,cspc_clrchg,clrfield,clr_init
+  use localflux,only: lflux,nlx,nly,nlz,noutlflux
+  use pdens,only: lpdens,cspc_pdens,npx,npy,npz
 #ifdef __WALL__
   use wall
 #endif
@@ -108,6 +112,9 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'cutoff_buffer' ) then
     call read_r1(ionum,rbuf)
+    return
+  elseif( trim(cname).eq.'reorder_arrays' ) then
+    call read_l1(ionum,lreorder)
     return
   elseif( trim(cname).eq.'flag_damping' ) then
     call read_i1(ionum,ifdmp)
@@ -280,6 +287,52 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'overlay_force') then
     call read_c1(ionum,ol_force)
+    return
+  elseif( trim(cname).eq.'flag_extfrc') then
+    call read_l1(ionum,lextfrc)
+    return
+  elseif( trim(cname).eq.'spcs_extfrc') then
+    call read_c1(ionum,cspc_extfrc)
+    return
+  elseif( trim(cname).eq.'extfrc') then
+    backspace(ionum)
+    read(ionum,*) ctmp,extfrc(1:3)
+    return
+!.....Color charge NEMD
+  elseif( trim(cname).eq.'flag_clrchg') then
+    call read_l1(ionum,lclrchg)
+    return
+  elseif( trim(cname).eq.'clr_init') then
+    call read_c1(ionum,clr_init)
+    return
+  elseif( trim(cname).eq.'spcs_clrchg') then
+    call read_c1(ionum,cspc_clrchg)
+    return
+  elseif( trim(cname).eq.'clrfield') then
+    backspace(ionum)
+    read(ionum,*) ctmp,clrfield(1:3)
+    return
+!.....Local flux
+  elseif( trim(cname).eq.'flag_lflux') then
+    call read_l1(ionum,lflux)
+    return
+  elseif( trim(cname).eq.'num_out_lflux') then
+    call read_i1(ionum,noutlflux)
+    return
+  elseif( trim(cname).eq.'ndiv_lflux') then
+    backspace(ionum)
+    read(ionum,*) ctmp,nlx,nly,nlz
+    return
+!.....Probability density
+  elseif( trim(cname).eq.'flag_pdens') then
+    call read_l1(ionum,lpdens)
+    return
+  elseif( trim(cname).eq.'spcs_pdens') then
+    call read_c1(ionum,cspc_pdens)
+    return
+  elseif( trim(cname).eq.'ndiv_pdens') then
+    backspace(ionum)
+    read(ionum,*) ctmp,npx,npy,npz
     return
     
 #ifdef __WALL__
