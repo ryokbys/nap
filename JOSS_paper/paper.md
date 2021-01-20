@@ -13,7 +13,7 @@ authors:
     orcid: 0000-0001-8244-5844
     affiliation: 1
 affiliations:
- - name: Department of Physical Science and Engineering, Nagoya Institute of Technology
+ - name: Department of Physical Science and Engineering, Nagoya Institute of Technology, Gokiso, Showa, Nagoya 466-8555, Japan
    index: 1
 date: 28 August 2020
 bibliography: paper.bib
