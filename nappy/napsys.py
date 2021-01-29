@@ -1727,6 +1727,10 @@ You need to specify the species order correctly with --specorder option.
         return None
         
     def repeat(self,n1o,n2o,n3o,n1m=0,n2m=0,n3m=0):
+        """
+        Multiply the system by given n1o,n2o,n3o and replace the system 
+        with multiplied one.
+        """
         #...Convert to int
         n1 = int(n1o)
         n2 = int(n2o)
@@ -1854,34 +1858,38 @@ You need to specify the species order correctly with --specorder option.
             self.atoms[auxname] = newauxs[auxname]
         return None
 
-    def add_vacuum(self,va,vb,vc):
+    def add_vacuum(self,axis,length,shift=0.0):
         """
-        Add vacuum of the given height.
-        And atoms are shifted along each direction so that they are placed at the center.
+        Add vacuum of the given length to the given axis of the current system.
+        Shift value is added to each atom position of the given axis.
         """
-        a,b,c = self.get_lattice_lengths()
-        aratio = (a+va)/a
-        bratio = (b+vb)/b
-        cratio = (c+vc)/c
+        lengths = self.get_lattice_lengths()
+        ratios = np.array((1.0, 1.0, 1.0))
+        ratios[axis] += length /lengths[axis]
+            
         self.assign_pbc()
+        #...Store reaal positions before extending the system
         rpos = self.get_real_positions()
-        self.a1 *= aratio
-        self.a2 *= bratio
-        self.a3 *= cratio
+        #...Extend the system cell; atoms is now positioned at the bottom side of extended axis
+        self.a1 *= ratios[0]
+        self.a2 *= ratios[1]
+        self.a3 *= ratios[2]
         hmati = self.get_hmat_inv()
+        #...Calc scaled positions in the new system
         spos = np.zeros((len(self.atoms),3),dtype=float)
-        mins = np.array((1.0,1.0,1.0),dtype=float)
-        maxs = np.zeros(3,dtype=float)
+        #...Get min and max of atoms in the new system cell
+        amin = 1.0
+        amax = 0.0
         for ia in range(len(self.atoms)):
             xi = rpos[ia]
             spos[ia] = np.dot(hmati,xi)
-            for l in range(3):
-                mins[l] = min(mins[l],spos[ia,l])
-                maxs[l] = max(maxs[l],spos[ia,l])
-        cntrs = (maxs +mins)/2
-        shfts = -(cntrs-0.5)
+            amin = min(amin,spos[ia,axis])
+            amax = max(amax,spos[ia,axis])
+        #...Compute scaled shift value
+        lengths2 = self.get_lattice_lengths()
+        sshift = shift /lengths2[axis]
         for ia in range(len(self.atoms)):
-            spos[ia] += shfts
+            spos[ia,axis] += sshift
         self.atoms.pos = spos.tolist()
         return None
         
