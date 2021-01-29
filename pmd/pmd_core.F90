@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-01-15 11:33:39 Ryo KOBAYASHI>
+!                     Last-modified: <2021-01-28 12:10:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -17,9 +17,9 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use pmdvars
   use zload
   use force
-  use ttm,only: init_ttm,langevin_ttm,output_Te,t_ttm, &
-       calc_Ta,update_Te,assign_atom2cell,output_energy_balance, &
-       remove_ablated_atoms,set_inner_dt, te2tei
+  use ttm,only: init_ttm,langevin_ttm,output_ttm,t_ttm, &
+       calc_Ta,update_ttm,assign_atom2cell,output_energy_balance, &
+       remove_ablated_atoms,set_inner_dt, te2tei, non_reflecting_bc
   use pmdmpi,only: nid2xyz,xyz2nid
   use metadynamics,only: init_metaD,update_metaD,force_metaD &
        ,write_metaD_potential
@@ -328,7 +328,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
          ,0,myid_md,mpi_md_world,iprint)
     call te2tei(namax,natm,tei)
-    call output_Te(0,simtime,myid_md,iprint)
+    call output_ttm(0,simtime,myid_md,iprint)
   endif
 
 !.....Debug
@@ -869,7 +869,9 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
            ,istp,myid_md,mpi_md_world,iprint)
       call langevin_ttm(namax,natm,va,aa,tag,am,h &
            ,nspmax,fa2v,fekin,ediff,dt,myid_md,mpi_md_world,iprint)
-      call update_Te(simtime,dt,myid_md,mpi_md_world,iprint)
+      call update_ttm(simtime,dt,natm,ra,h,sorg,myid_md,mpi_md_world,iprint)
+      call non_reflecting_bc(natm,tag,ra,va,h,sorg,dt,nspmax,am,fa2v &
+           ,myid_md,mpi_md_world,iprint)
       call te2tei(namax,natm,tei)
     endif  ! end of thermostat
 
@@ -978,7 +980,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       endif
 
       if( trim(ctctl).eq.'ttm' ) then
-        call output_Te(istp,simtime,myid_md,iprint)
+        call output_ttm(istp,simtime,myid_md,iprint)
         call output_energy_balance(istp,simtime,myid_md,iprint)
       endif
 
