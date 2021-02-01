@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-01-28 18:07:21 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-01 16:45:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -622,8 +622,8 @@ contains
     call mpi_bcast(surfmove,1,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(fluence,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(Te_min,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(lsurf,1,mpi_integer,0,mpi_world,ierr)  ! deprecated
-    call mpi_bcast(rsurf,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(lsurf,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(rsurf,1,mpi_integer,0,mpi_world,ierr)  ! deprecated
     call mpi_bcast(lskin,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(lcut_interact,1,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(csolver,20,mpi_character,0,mpi_world,ierr)
@@ -882,7 +882,7 @@ contains
         enddo  ! istp=1,nstp_inner
       else if( trim(csolver).eq.'RK4' ) then  ! 4th Runge-Kutta
         do istp=1,nstp_inner
-          tep(ix0:ix1,:,:)= te(ix0:ix1,:,:)
+          tep(:,:,:)= te(:,:,:)
 !.....1st step
           call model_2tm3d(tnow,dtep,eitmp,eotmp,eptmp,iprint)
           te(ix0:ix1,:,:) = te(ix0:ix1,:,:) +dtep(ix0:ix1,:,:)*dt_inner/6
@@ -987,7 +987,7 @@ contains
 
     integer:: ic,ix,iy,iz
     real(8):: ce,dce,kappa,dkappa,pterm,sterm,dtemp,de,tmp&
-         ,pulsefactor,xi
+         ,pulsefactor,xi,denom
     
     dtep(:,:,:) = 0d0
     eitmp = 0d0
@@ -1018,9 +1018,14 @@ contains
         eitmp = eitmp +(gp(ic)*ta(ic)+sterm) *vcell  !*dt
         eotmp = eotmp -gp(ic)*tep(ix,iy,iz) *vcell  !*dt
       endif
-      dtemp = 1d0/((ce+tep(ix,iy,iz)*dce)*rho_e) &
-           *( dkappa*dte2(ix,iy,iz) +kappa*d2te(ix,iy,iz) &
-           +pterm +sterm )  ! *dt
+      denom = (ce+tep(ix,iy,iz)*dce)*rho_e
+!!$      if( ix.eq.ibc3d ) then
+!!$        print *,'3D: denom,gp,dT,pterm= ',denom,gp(ic),(tep(ix,iy,iz)-ta(ic)),pterm
+!!$        print *,'3D: 1st,2nd,3rd,4th= ',dkappa*dte2(ix,iy,iz)/denom &
+!!$             ,kappa*d2te(ix,iy,iz)/denom,pterm/denom,sterm/denom
+!!$      endif
+      dtemp = ( dkappa*dte2(ix,iy,iz) +kappa*d2te(ix,iy,iz) &
+           +pterm +sterm ) /denom ! *dt
       dtep(ix,iy,iz) = dtep(ix,iy,iz) +dtemp
     enddo  ! ic=1,nxyz
 !!$    if( ctype_pulse(1:4).eq.'step' ) then
@@ -1376,7 +1381,7 @@ contains
         write(cnum,'(i0)') istp
         open(iots3d,file=trim(dname_ttm)// &
              trim(cout_ts3d)//'_'//trim(cnum),status='replace')
-        write(iots3d,'(a,2es15.7)') '# tnow,dx: ',tnow,dx
+        write(iots3d,'(a,2es15.7,i6)') '# tnow,dx,ibc3d: ',tnow,dx,ibc3d
         write(iots3d,'(a)') '# ix,   iy,   iz,   te(ix,iy,iz),   ta(ic),'&
              //'  nac(ic)'
         do ix=1,nx
@@ -1807,6 +1812,7 @@ contains
     integer:: ix
     real(8):: ce,dce,kappa,dkappa,pterm,dtemp,tmp,xi,de,pulsefactor
     real(8):: denom
+    real(8),parameter:: kappa_Si = 8.125d-7  ! eV/(fs.Ang.K)
     
     dtep(:) = 0d0
     dtlp(:) = 0d0
@@ -1823,17 +1829,17 @@ contains
       endif
       pterm = -gp1d(ix) *(tep1d(ix) -tlp1d(ix))
       denom = (ce +tep1d(ix)*dce) *rho_e
-      dtemp = ( dkappa*dte21d(ix) +kappa*d2te1d(ix) +pterm ) /denom
-!!$      if( ix.eq.ibc1d+1 ) then
-!!$        print '(a,10es12.4)','pterm,kappa,dkappa,denom,dte2,d2te='&
-!!$             ,pterm,kappa,dkappa,(ce +tep1d(ix)*dce)*rho_e,dte21d(ix),d2te1d(ix)
-!!$        print '(a,10es12.4)','1st,2nd,3rd=',dkappa*dte21d(ix)/denom &
-!!$             ,kappa*d2te1d(ix)/denom,pterm/denom
+!!$      if( ix.eq.ibc1d+1) then
+!!$        print *,'1D: denom,cl1d*rho,gp,dT,pterm= ' &
+!!$             ,denom,cl1d*rho_bulk,gp1d(ix),(tep1d(ix)-tlp1d(ix)),pterm
+!!$        print *,'1D: 1st,2nd,3rd,tl= ', dkappa*dte21d(ix)/denom &
+!!$             ,kappa*d2te1d(ix)/denom,pterm/denom,pterm/(cl1d*rho_bulk)
 !!$      endif
+      dtemp = ( dkappa*dte21d(ix) +kappa*d2te1d(ix) +pterm ) /denom
       dtep(ix) = dtep(ix) +dtemp
 !.....1/cl in lattice system may not be correct, since if cl=cl(Tl) and d(Tl)/dx!=0,
 !.....as in the electronic system, the derivative d(cl)/dx!=0...
-      dtlp(ix) = dtlp(ix) -pterm/(cl1d*rho_bulk)
+      dtlp(ix) = dtlp(ix) +(kappa*d2tl1d(ix) -pterm)/(cl1d*rho_bulk)
     enddo
 !.....Laser pulse
     if( itype_pulse.eq.1 ) then  ! stepwise pulse
@@ -1933,7 +1939,7 @@ contains
 !=======================================================================
   function d2te1d(ix)
 !
-!  (d^2/dx^2)T
+!  (d^2/dx^2)Te
 !
     integer,intent(in):: ix
     real(8):: d2te1d
@@ -1945,6 +1951,21 @@ contains
     d2te1d = (tp -2d0*t +tm)/dx1d**2
     return
   end function d2te1d
+!=======================================================================
+  function d2tl1d(ix)
+!
+!  (d^2/dx^2)Tl
+!
+    integer,intent(in):: ix
+    real(8):: d2tl1d
+    integer:: t,tp,tm
+
+    t = tlp1d(ix)
+    tp= tlp1d(ix+1)
+    tm= tlp1d(ix-1)
+    d2tl1d = (tp -2d0*t +tm)/dx1d**2
+    return
+  end function d2tl1d
 !=======================================================================
   subroutine output_ttm1d(istp,tnow,myid,iprint)
 !
@@ -1961,7 +1982,7 @@ contains
         write(cnum,'(i0)') istp
         open(iots1d,file=trim(dname_ttm)// &
              trim(cout_ts1d)//'_'//trim(cnum),status='replace')
-        write(iots1d,'(a,2es15.7)') '#  tnow,dx: ',tnow,dx1d
+        write(iots1d,'(a,2es15.7,i6)') '#  tnow,dx,ibc1d: ',tnow,dx1d,ibc1d
         write(iots1d,'(a)') '#  ix,  te(ix),   tl(ix)'
         do ix=1,nd1d
           write(iots1d,'(2x,i6,2es15.5)') ix,te1d(ix),tl1d(ix)
@@ -1979,26 +2000,50 @@ contains
 !
     integer,intent(in):: myid,mpi_world,iprint
 
-    integer:: ix,iy,iz,mx,mxp,jx,ic
-    real(8):: tebc3d,tabc3d,x3d,x1d,x1dp,tet3d,tat3d
+    integer:: ix,iy,iz,mx,mxp,jx,ic,icp
+    real(8):: tebc3d,tebcp3d,tabc3d,tabcp3d,x3d,x3dp,x1d,x1dp,tet3d,tat3d
 
-!.....Take averages of Te and Ta at xbc3d over y and z
+!.....Get two ix3d points that sandwich the ibc1d point
+    mxp = 0
+    x1d = dx1d*(ibc1d-1)
+    do ix= ibc3d-int(dx1d/dx)-1,ibc3d+1
+      x3d = dx*(ix-1+0.5d0)
+      if( x3d.gt.x1d ) then
+        mxp = ix
+        x3dp = x3d
+        exit
+      endif
+    enddo
+    mx = mxp -1
+    x3d = dx*(mx-1+0.5d0)
+!!$    print *,'mx,mxp,x3d,x3dp=',mx,mxp,x3d,x3dp
+
+!.....Take averages of Te and Ta at mx and mxp over y and z
     tebc3d = 0d0
+    tebcp3d = 0d0
     tabc3d = 0d0
+    tabcp3d = 0d0
     do iy=1,ny
       do iz=1,nz
-        tebc3d = tebc3d +te(ibc3d,iy,iz)
-        call ixyz2ic(ibc3d,iy,iz,ic)
+        tebc3d = tebc3d +te(mx,iy,iz)
+        tebcp3d = tebcp3d +te(mxp,iy,iz)
+        call ixyz2ic(mx,iy,iz,ic)
         tabc3d = tabc3d +ta(ic)
+        call ixyz2ic(mxp,iy,iz,icp)
+        tabcp3d = tabcp3d +ta(icp)
       enddo
     enddo
     tebc3d = tebc3d/(ny*nz)
+    tebcp3d= tebcp3d/(ny*nz)
     tabc3d = tabc3d/(ny*nz)
-    print '(a,2es12.4)','tebc3d,tabc3d=',tebc3d,tabc3d
+    tabcp3d= tabcp3d/(ny*nz)
+!!$    print '(a,2es12.4)','tebc3d,tabc3d=',tebc3d,tabc3d
 
 !.....BC for 1D-TTM given from 3D-TTM system
-    te1d(ibc1d) = tebc3d
-    tl1d(ibc1d) = tabc3d
+!!$    te1d(ibc1d) = tebc3d
+!!$    tl1d(ibc1d) = tabc3d
+    te1d(ibc1d) = tebc3d +(tebcp3d-tebc3d)*(x1d-x3d)/(x3dp-x3d)
+    tl1d(ibc1d) = tabc3d +(tabcp3d-tabc3d)*(x1d-x3d)/(x3dp-x3d)
     if( Te_right.lt.0d0 ) then
       te1d(nd1d+1) = te1d(nd1d)
       tl1d(nd1d+1) = tl1d(nd1d)
@@ -2006,9 +2051,9 @@ contains
       te1d(nd1d+1) = Te_right
       tl1d(nd1d+1) = Te_right
     endif
-    print *,'ibc1d,ibc3d=',ibc1d,ibc3d
-    print *,'te1d(ibc1d-2:ibc1d+2)=',te1d(ibc1d-2:ibc1d+2)
-    print *,'tl1d(ibc1d-2:ibc1d+2)=',tl1d(ibc1d-2:ibc1d+2)
+!!$    print *,'ibc1d,ibc3d=',ibc1d,ibc3d
+!!$    print *,'te1d(ibc1d-2:ibc1d+2)=',te1d(ibc1d-2:ibc1d+2)
+!!$    print *,'tl1d(ibc1d-2:ibc1d+2)=',tl1d(ibc1d-2:ibc1d+2)
 
 !.....BC for 3D-TTM given from 1D-TTM system
     do ix=ibc3d+1,nx+1
@@ -2026,9 +2071,9 @@ contains
       x1dp= dx1d*(mxp-1)
       tet3d = te1d(mx) +(te1d(mxp)-te1d(mx))*(x3d-x1d)/(x1dp-x1d)
       tat3d = tl1d(mx) +(tl1d(mxp)-tl1d(mx))*(x3d-x1d)/(x1dp-x1d)
-      print '(a,2i5,6es12.4)','ix,mx,te1d,,tet3d,tl1d,,tat3d= ',ix,mx &
-           ,te1d(mxp),te1d(mx),tet3d &
-           ,tat3d,tl1d(mxp),tl1d(mx)
+!!$      print '(a,2i5,6es12.4)','ix,mx,te1d,,tet3d,tl1d,,tat3d= ',ix,mx &
+!!$           ,te1d(mxp),te1d(mx),tet3d &
+!!$           ,tat3d,tl1d(mxp),tl1d(mx)
       do iy=0,ny+1
         do iz=0,nz+1
           te(ix,iy,iz) = tet3d
