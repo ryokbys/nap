@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-01 16:45:48 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-01 17:51:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -764,12 +764,12 @@ contains
 !.....CHECK: This factor 3 looks causing the difference of energy in/out between at/el systems.
           ta(ic) = eksum(ic) *2d0 /fkb /nac(ic)
           gp(ic) = nac(ic) *fkb *gmmp(ic) /vcell ! /3
-          rho_bulk = max(dble(nac(ic)/vcell),rho_bulk)
+          rho_bulk = max(dble(nac(ic))/3/vcell,rho_bulk)
           if( nacp(ic).eq.0 ) cycle
           tap(ic) = ekpsum(ic) *2d0 /fkb /nacp(ic)
           gs(ic) = nacp(ic) *fkb *gmms(ic) /vcell ! /3
         enddo
-        gp1d(:) = fkb *gmmp1d(:)*(rho_bulk/3)
+        gp1d(:) = fkb *gmmp1d(:)*(rho_bulk*3)
       else if( trim(ctype_coupling).eq.'constant_gp' ) then
 !.....See Eq.(A5) in PRB 68 (2003) pp.064114
         gmmp(:) = 0d0
@@ -781,7 +781,7 @@ contains
           if( nac(ic).eq.0 ) cycle
           call ic2ixyz(ic,ix,iy,iz)
           ta(ic) = eksum(ic) *2d0 /fkb /nac(ic)
-          rho_bulk = max(dble(nac(ic)/vcell),rho_bulk)
+          rho_bulk = max(dble(nac(ic))/3/vcell,rho_bulk)
           if( tap(ic)*0d0 .ne. 0d0 ) then
             print *,'ERROR: tap==NaN !!!'
             print *,'   ic,ix,iy,iz=',ic,ix,iy,iz
@@ -794,7 +794,7 @@ contains
 !.....Here inverse of constant_gmmp will be used.
           gmmp(ic) = vcell*gp(ic) /fkb /nac(ic)
         enddo
-        gmmp1d(:) = gp1d(:)/fkb /(rho_bulk/3)
+        gmmp1d(:) = gp1d(:)/fkb /(rho_bulk*3)
       endif
     endif
 
@@ -1812,7 +1812,7 @@ contains
     integer:: ix
     real(8):: ce,dce,kappa,dkappa,pterm,dtemp,tmp,xi,de,pulsefactor
     real(8):: denom
-    real(8),parameter:: kappa_Si = 8.125d-7  ! eV/(fs.Ang.K)
+    real(8),parameter:: kappa_lat = 8.125d-7  ! kappa for Si lattice in eV/(fs.Ang.K)
     
     dtep(:) = 0d0
     dtlp(:) = 0d0
@@ -1829,17 +1829,12 @@ contains
       endif
       pterm = -gp1d(ix) *(tep1d(ix) -tlp1d(ix))
       denom = (ce +tep1d(ix)*dce) *rho_e
-!!$      if( ix.eq.ibc1d+1) then
-!!$        print *,'1D: denom,cl1d*rho,gp,dT,pterm= ' &
-!!$             ,denom,cl1d*rho_bulk,gp1d(ix),(tep1d(ix)-tlp1d(ix)),pterm
-!!$        print *,'1D: 1st,2nd,3rd,tl= ', dkappa*dte21d(ix)/denom &
-!!$             ,kappa*d2te1d(ix)/denom,pterm/denom,pterm/(cl1d*rho_bulk)
-!!$      endif
       dtemp = ( dkappa*dte21d(ix) +kappa*d2te1d(ix) +pterm ) /denom
       dtep(ix) = dtep(ix) +dtemp
 !.....1/cl in lattice system may not be correct, since if cl=cl(Tl) and d(Tl)/dx!=0,
 !.....as in the electronic system, the derivative d(cl)/dx!=0...
       dtlp(ix) = dtlp(ix) +(kappa*d2tl1d(ix) -pterm)/(cl1d*rho_bulk)
+!!$      dtlp(ix) = dtlp(ix) -pterm/(cl1d*rho_bulk)
     enddo
 !.....Laser pulse
     if( itype_pulse.eq.1 ) then  ! stepwise pulse

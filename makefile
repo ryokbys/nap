@@ -1,6 +1,10 @@
 .phony: all clean pmd fitpot test
 SHELL = /bin/bash
 
+ifndef VERBOSE
+MAKEFLAGS += --no-print-directory
+endif
+
 all: pmd fitpot
 
 force:
