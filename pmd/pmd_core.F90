@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-01-28 12:10:01 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-02 16:55:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -19,7 +19,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use force
   use ttm,only: init_ttm,langevin_ttm,output_ttm,t_ttm, &
        calc_Ta,update_ttm,assign_atom2cell,output_energy_balance, &
-       remove_ablated_atoms,set_inner_dt, te2tei, non_reflecting_bc
+       remove_ablated_atoms,set_inner_dt, te2tei, non_reflecting_bc, &
+       set_3d1d_bc_pos, couple_3d1d
   use pmdmpi,only: nid2xyz,xyz2nid
   use metadynamics,only: init_metaD,update_metaD,force_metaD &
        ,write_metaD_potential
@@ -325,9 +326,11 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     call init_ttm(namax,natm,h,dt,lvardt,myid_md,mpi_md_world &
          ,iprint)
     call assign_atom2cell(namax,natm,ra,sorg,boundary)
+    call set_3d1d_bc_pos(natm,ra,h,sorg,myid_md,mpi_md_world,iprint)
     call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
          ,0,myid_md,mpi_md_world,iprint)
     call te2tei(namax,natm,tei)
+    call couple_3d1d(myid_md,mpi_md_world,iprint)
     call output_ttm(0,simtime,myid_md,iprint)
   endif
 
@@ -617,7 +620,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
           endif
         enddo
       else if( trim(ctctl).eq.'ttm' ) then
-        call set_inner_dt(dt)
+        call set_inner_dt(dt,myid_md,iprint)
       endif
     endif
 
@@ -873,6 +876,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       call non_reflecting_bc(natm,tag,ra,va,h,sorg,dt,nspmax,am,fa2v &
            ,myid_md,mpi_md_world,iprint)
       call te2tei(namax,natm,tei)
+      call set_3d1d_bc_pos(natm,ra,h,sorg,myid_md,mpi_md_world,iprint)
+      call couple_3d1d(myid_md,mpi_md_world,iprint)
     endif  ! end of thermostat
 
 

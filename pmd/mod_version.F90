@@ -1,12 +1,12 @@
 module version
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-01-15 17:14:48 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-02 12:34:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! A module for version/revision.
 !-----------------------------------------------------------------------
   implicit none
   save
-  character(len=128),parameter:: cversion = 'rev210115'
+  character(len=128),parameter:: cversion = 'rev210202'
 
   character(len=128),parameter:: cauthors(1) = &
        (/ 'Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>' /)
