@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-03 12:32:07 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-03 18:23:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -142,15 +142,16 @@ module ttm
 !.....1D continume TTM and boundary condition parameters
   integer:: nd1d = 1000  ! Num of nodes for 1D TTM
   real(8):: dx1d = 10d0  ! dx (Ang) of 1D TTM
-  real(8):: cl1d = 1d-4 ! specific heat of lattice system (eV/K/atom)
+  real(8):: cl1d = 2.585d-4 ! specific heat of lattice system (eV/K/atom), 3k_B for Dulong-Petit
   integer:: ibc1d,ibc3d
   real(8),allocatable:: te1d(:),tep1d(:),tl1d(:),tlp1d(:), &
        gp1d(:),gmmp1d(:)
   real(8):: rho_latt  = 0.05d0 ! number density of atoms in lattice system (1/Ang^3) [default: 0.05]
+  real(8):: d_latt = 8.8d0    ! (A^2/fs)
 !.....Non-reflecting boundary condition
   real(8):: dnr = 10d0   ! NRBC region length [default: 10 Ang]
   real(8):: xrmd
-  real(8):: ssound = 8433d-5  ! speed of sound [default: 8433d-5 Ang/fs] for Si
+  real(8):: sspeed_latt = 8433d-5  ! speed of sound [default: 8433d-5 Ang/fs] for Si
 
 !.....DEBUGGING
 !.....Cut interaction bewteen atom and electron systems
@@ -499,6 +500,9 @@ contains
         else if( trim(c1st).eq.'D_e' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, d_e
+        else if( trim(c1st).eq.'D_latt' ) then
+          backspace(ioprms)
+          read(ioprms,*) c1st, d_latt
         else if( trim(c1st).eq.'kappa_type' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, ctype_kappa
@@ -577,21 +581,21 @@ contains
         else if( trim(c1st).eq.'DE_solver' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, csolver
-        else if( trim(c1st).eq.'num_node_ttm1d' ) then
+        else if( trim(c1st).eq.'num_node_latt' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, nd1d
-        else if( trim(c1st).eq.'dx_ttm1d' ) then
+        else if( trim(c1st).eq.'dx_latt' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, dx1d
-        else if( trim(c1st).eq.'Cl_ttm1d' ) then
+        else if( trim(c1st).eq.'C_latt' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, cl1d
         else if( trim(c1st).eq.'NRBC_length' ) then
           backspace(ioprms)
           read(ioprms,*) c1st, dnr
-        else if( trim(c1st).eq.'speed_sound' ) then
+        else if( trim(c1st).eq.'sound_speed_latt' ) then
           backspace(ioprms)
-          read(ioprms,*) c1st, ssound
+          read(ioprms,*) c1st, sspeed_latt
         else
           print *,'There is no TTM keyword: ',trim(c1st)
         endif
@@ -615,6 +619,7 @@ contains
     call mpi_bcast(rho_e,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_latt,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(d_e,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(d_latt,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(ctype_kappa,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(kappa0,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(t0_laser,1,mpi_real8,0,mpi_world,ierr)
@@ -647,7 +652,7 @@ contains
     call mpi_bcast(nd1d,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(dx1d,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(dnr,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(ssound,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(sspeed_latt,1,mpi_real8,0,mpi_world,ierr)
     return
   end subroutine sync_params
 !=======================================================================
@@ -1342,7 +1347,7 @@ contains
       vx = va(1,i)
       isp = int(tag(i))
       ami = am(isp)
-      zimp = ami *rho_latt *ssound
+      zimp = ami *rho_latt *sspeed_latt
       ic = a2c(i)
       sgmi = dsqrt(2d0*zimp*areatom*ta(ic)/dtmd*k2ue)
       axi = (-vx*zimp*areatom +sgmi*box_muller()*hxi)*ue2ev
@@ -1818,8 +1823,9 @@ contains
 
     integer:: ix
     real(8):: ce,dce,kappa,dkappa,pterm,dtemp,tmp,xi,de,pulsefactor
-    real(8):: denom,xlsurf,vc1d
-    real(8),parameter:: kappa_lat = 8.125d-7  ! kappa for Si lattice in eV/(fs.Ang.K)
+    real(8):: denom,xlsurf,vc1d,kl1d
+!!$    real(8),parameter:: kappa_latt = 8.125d-7  ! kappa for Si lattice in eV/(fs.Ang.K)
+!!$    real(8),parameter:: kappa_latt = 1.137d-4  ! kappa for Si lattice in eV/(fs.Ang.K)
     
     dtep(:) = 0d0
     dtlp(:) = 0d0
@@ -1830,9 +1836,11 @@ contains
       if( itype_kappa.eq.1 ) then  ! DCrho
         kappa = d_e *ce *rho_e
         dkappa = d_e *dce *rho_e
+        kl1d = d_latt *cl1d *rho_latt
       else if( itype_kappa.eq.2 ) then  ! B2
         kappa = kappa0 *tep1d(ix) /max(tlp1d(ix),ta_min)
         dkappa = kappa0 /max(tlp1d(ix),ta_min)
+        kl1d = kappa
       endif
       pterm = -gp1d(ix) *(tep1d(ix) -tlp1d(ix))
 !.....See the comment at model_2tm3d
@@ -1842,8 +1850,8 @@ contains
       dtemp = ( kappa*d2te1d(ix) +pterm ) /denom
       dtep(ix) = dtep(ix) +dtemp
 !.....As in electronic system, C_l could depend on T_l, but we neglect dC_l/dT_l here.
-!!$      dtlp(ix) = dtlp(ix) +(kappa*d2tl1d(ix) -pterm)/(cl1d*rho_latt)
-      dtlp(ix) = dtlp(ix) -pterm/(cl1d*rho_latt)
+      dtlp(ix) = dtlp(ix) +(kl1d*d2tl1d(ix) -pterm)/(cl1d*rho_latt)
+!!$      dtlp(ix) = dtlp(ix) -pterm/(cl1d*rho_latt)
     enddo
 
 !.....Laser pulse
