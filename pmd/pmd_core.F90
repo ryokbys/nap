@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-02 16:55:55 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-03 11:18:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -323,10 +323,9 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       enddo
     endif
   else if( trim(ctctl).eq.'ttm' ) then
-    call init_ttm(namax,natm,h,dt,lvardt,myid_md,mpi_md_world &
-         ,iprint)
+    call init_ttm(namax,natm,ra,h,sorg,dt,lvardt, &
+         myid_md,mpi_md_world,iprint)
     call assign_atom2cell(namax,natm,ra,sorg,boundary)
-    call set_3d1d_bc_pos(natm,ra,h,sorg,myid_md,mpi_md_world,iprint)
     call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
          ,0,myid_md,mpi_md_world,iprint)
     call te2tei(namax,natm,tei)

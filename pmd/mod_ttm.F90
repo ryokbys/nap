@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-03 10:14:55 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-03 12:32:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -158,12 +158,12 @@ module ttm
 
 contains
 !=======================================================================
-  subroutine init_ttm(namax,natm,h,dtmd,lvardt,myid,mpi_world,iprint)
+  subroutine init_ttm(namax,natm,ra,h,sorg,dtmd,lvardt,myid,mpi_world,iprint)
 !
 !  Read parameters for TTM from in.ttm and initialize
 !
     integer,intent(in):: namax,natm,myid,mpi_world,iprint
-    real(8),intent(in):: dtmd,h(3,3)
+    real(8),intent(in):: dtmd,h(3,3),ra(3,natm),sorg(3)
     logical,intent(in):: lvardt 
 
     integer:: ierr,ix,iy,iz,mem
@@ -233,45 +233,6 @@ contains
       gmm_ce = gmm_ce !/rho_e
     endif
 
-    if( myid.eq.0 .and. iprint.ne.0 ) then
-      print *,''
-      print *,'TTM parameters:'
-      print '(a,es12.4,a,f8.4,a)','   Fluence = ',fluence,' eV/A^2, = ' &
-           ,fluence*ev2j/(ang2m**2*10000),' J/cm^2'
-      print '(a,f0.3,a)','   Pulse duration = ',tau_pulse,' fs'
-      print '(a,es12.4,a)','   Intensity = ',I_0/darea,' eV/A^2/fs'
-      print '(a,es12.4,a)','   Penetration depth = ',lskin,' A'
-      print '(a,f0.1,a)','   Total incident energy = ',fluence*area,' eV'
-      print '(a,f0.4,a)','   Electron density = ',rho_e,' e/A^3'
-      print '(a,a)','   Diff. Eq. solver :  ',trim(csolver)
-      print '(a,i5)','   inner_loop = ',nstp_inner
-      if( .not. lvardt ) then
-        print '(a,2es12.4)','   dtmd, dt = ',dtmd,dt_inner
-      else
-        print '(a,2es12.4,a)','   dtmd, dt = ',dtmd,dt_inner, &
-             ' fs (but it is variable)'
-      endif
-      print '(a,3i5,i8)','   nx,ny,nz,nxyz = ',nx,ny,nz,nxyz
-      print '(a,4es12.4)','   dx,dy,dz,vcell = ',dx,dy,dz,vcell
-      print '(a,2es12.4)','   area,darea = ',area,darea
-      print '(a,2i5)','   lsurf = ',lsurf
-      if( trim(ctype_coupling).eq.'constant_gp' ) then
-        print '(a,2es12.4)','   e_ph_const = ',e_ph_const
-      else if( trim(ctype_coupling).eq.'constant_gmmp' ) then
-        print '(a,2es12.4)','   gamma_p,gamma_s = ',gamma_p,gamma_s
-      endif
-      print '(a,a)','   Ce_Tdep = ',trim(Ce_Tdep)
-      if( trim(Ce_Tdep).eq.'linear' ) then
-        print '(a,2es12.4)','     gmm_ce,ce_min = ',gmm_ce, ce_min
-      endif
-      if( Te_min.gt.0d0 ) then
-        print *,'    Note that the minimum Te is set:'
-        print '(a,f0.1)','     Minimum Te = ',Te_min
-      endif
-      mem = 4 * 4*nxyz + 11 * 8*nxyz + 4 * 8*namax
-      print '(a,f0.3,a)','   Memory for TTM = ',dble(mem)/1000/1000,' MByte'
-    endif
-    
 !.....Error check
     if( nxyz.le.0 ) then
       if( myid.eq.0 ) then
@@ -315,7 +276,7 @@ contains
     
 !.....Allocate initialize arrays
     allocate(nac(nxyz),nacp(nxyz),eksum(nxyz),ekpsum(nxyz), &
-         sgm(nxyz),te(0:nx+1,0:ny+1,0:nz+1),tep(0:nx+1,0:ny+1,0:nz+1), &
+         sgm(nxyz),te(0:nz+1,0:ny+1,0:nx+1),tep(0:nz+1,0:ny+1,0:nx+1), &
          ta(nxyz),tap(nxyz),tex(nx),gp(nxyz),gs(nxyz),&
          gmmp(nxyz),gmms(nxyz),vac(3,nxyz))
     allocate(a2c(namax),aai(3,namax),ekti(namax))
@@ -373,7 +334,7 @@ contains
           if( c1st(1:1).eq.'!' .or. c1st(1:1).eq.'#' ) cycle
           backspace(iots3d)
           read(iots3d,*) ix,iy,iz,t
-          te(ix,iy,iz) = t
+          te(iz,iy,ix) = t
         enddo
 10      close(iots3d)
 !-----------------------------------------------------------------------
@@ -405,10 +366,54 @@ contains
       call mpi_bcast(tl1d,nd1d+1,mpi_real8,0,mpi_world,ierr)
     endif
 
+!.....Set boundary position and left surface plane.
+    call set_3d1d_bc_pos(natm,ra,h,sorg,myid,mpi_world,iprint)
     if( trim(surfmove).eq.'plane' ) then
       call update_surface_plane(myid,mpi_world,iprint)
     endif
+!!$    print *,'myid,lsurf,ibc3d,ibc1d=',myid,lsurf,ibc3d,ibc1d
 
+!.....Write TTM related info
+    if( myid.eq.0 .and. iprint.ne.0 ) then
+      print *,''
+      print *,'TTM parameters:'
+      print '(a,es12.4,a,f8.4,a)','   Fluence = ',fluence,' eV/A^2, = ' &
+           ,fluence*ev2j/(ang2m**2*10000),' J/cm^2'
+      print '(a,f0.3,a)','   Pulse duration = ',tau_pulse,' fs'
+      print '(a,es12.4,a)','   Intensity = ',I_0/darea,' eV/A^2/fs'
+      print '(a,es12.4,a)','   Penetration depth = ',lskin,' A'
+      print '(a,f0.1,a)','   Total incident energy = ',fluence*area,' eV'
+      print '(a,f0.4,a)','   Electron density = ',rho_e,' e/A^3'
+      print '(a,a)','   Diff. Eq. solver :  ',trim(csolver)
+      print '(a,i5)','   inner_loop = ',nstp_inner
+      if( .not. lvardt ) then
+        print '(a,2es12.4)','   dtmd, dt = ',dtmd,dt_inner
+      else
+        print '(a,2es12.4,a)','   dtmd, dt = ',dtmd,dt_inner, &
+             ' fs (but it is variable)'
+      endif
+      print '(a,3i5,i8)','   nx,ny,nz,nxyz = ',nx,ny,nz,nxyz
+      print '(a,4es12.4)','   dx,dy,dz,vcell = ',dx,dy,dz,vcell
+      print '(a,2es12.4)','   area,darea = ',area,darea
+      print '(a,3i5,2es12.4)','   lsurf,ibc3d,ibc1d,xlsurf,xbc3d = ',lsurf,ibc3d,ibc1d, &
+           dx*(lsurf-1+0.5d0), dx*(ibc3d-1+0.5d0)
+      if( trim(ctype_coupling).eq.'constant_gp' ) then
+        print '(a,2es12.4)','   e_ph_const = ',e_ph_const
+      else if( trim(ctype_coupling).eq.'constant_gmmp' ) then
+        print '(a,2es12.4)','   gamma_p,gamma_s = ',gamma_p,gamma_s
+      endif
+      print '(a,a)','   Ce_Tdep = ',trim(Ce_Tdep)
+      if( trim(Ce_Tdep).eq.'linear' ) then
+        print '(a,2es12.4)','     gmm_ce,ce_min = ',gmm_ce, ce_min
+      endif
+      if( Te_min.gt.0d0 ) then
+        print *,'    Note that the minimum Te is set:'
+        print '(a,f0.1)','     Minimum Te = ',Te_min
+      endif
+      mem = 4 * 4*nxyz + 11 * 8*nxyz + 4 * 8*namax
+      print '(a,f0.3,a)','   Memory for TTM = ',dble(mem)/1000/1000,' MByte'
+    endif
+    
     t_ttm = t_ttm +mpi_wtime() -t0
     return
 
@@ -634,7 +639,7 @@ contains
     call mpi_bcast(surfmove,1,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(fluence,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(Te_min,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(lsurf,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(lsurf,1,mpi_integer,0,mpi_world,ierr)  ! deprecated
     call mpi_bcast(rsurf,1,mpi_integer,0,mpi_world,ierr)  ! deprecated
     call mpi_bcast(lskin,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(lcut_interact,1,mpi_logical,0,mpi_world,ierr)
@@ -800,7 +805,7 @@ contains
 !.....The definition from PRB 68 (2003) seems to have malfunctioning
 !.....in case (Te-Ta) < 0.0, which causes sqrt(negative) for sigma calculation
 !.....in Langevin_ttm,
-!          gmmp(ic) = gp(ic)*vcell*(te(ix,iy,iz)-ta(ic))/2/eksum(ic)
+!          gmmp(ic) = gp(ic)*vcell*(te(iz,iy,ix)-ta(ic))/2/eksum(ic)
 !.....Here inverse of constant_gmmp will be used.
           gmmp(ic) = vcell*gp(ic) /fkb /nac(ic)
         enddo
@@ -855,15 +860,15 @@ contains
       if( myid.eq.0 ) then
         do ic=1,nxyz
           call ic2ixyz(ic,ix,iy,iz)
-          if( te(ix,iy,iz).gt.Te_max ) Te_max = te(ix,iy,iz)
+          if( te(iz,iy,ix).gt.Te_max ) Te_max = te(iz,iy,ix)
           if( itype_kappa.eq.1 ) then  ! DCrho
-            kappa = d_e *cete(ix,iy,iz) *rho_e
+            kappa = d_e *cete(iz,iy,ix) *rho_e
           else if( itype_kappa.eq.2 ) then  ! B2
-            kappa = kappa0 *te(ix,iy,iz)/max(ta(ic),ta_min)
+            kappa = kappa0 *te(iz,iy,ix)/max(ta(ic),ta_min)
           endif
-          alpha_max = max(alpha_max,kappa/cete(ix,iy,iz)/rho_e)
+          alpha_max = max(alpha_max,kappa/cete(iz,iy,ix)/rho_e)
         enddo
-        allocate(dtep(0:nx+1,0:ny+1,0:nz+1))
+        allocate(dtep(0:nz+1,0:ny+1,0:nx+1))
       endif
       l1st = .false.
     else
@@ -875,15 +880,14 @@ contains
     eout_e = 0d0
     etot_e = 0d0
     if( myid.eq.0 ) then
-
       ix0 = 0
       ix1 = ibc3d
-
+      
       if( trim(csolver).eq.'Euler' ) then
         do istp = 1,nstp_inner
           tep(:,:,:) = te(:,:,:)
           call model_2tm3d(tnow,dtep,eitmp,eotmp,eptmp,iprint)
-          te(ix0:ix1,:,:) = te(ix0:ix1,:,:) +dtep(ix0:ix1,:,:)*dt_inner
+          te(:,:,ix0:ix1) = te(:,:,ix0:ix1) +dtep(:,:,ix0:ix1)*dt_inner
           ein_e = ein_e +eitmp*dt_inner
           eout_e = eout_e +eotmp*dt_inner
           ein_pulse = ein_pulse +eptmp*dt_inner
@@ -893,28 +897,28 @@ contains
           tep(:,:,:)= te(:,:,:)
 !.....1st step
           call model_2tm3d(tnow,dtep,eitmp,eotmp,eptmp,iprint)
-          te(ix0:ix1,:,:) = te(ix0:ix1,:,:) +dtep(ix0:ix1,:,:)*dt_inner/6
-          tep(ix0:ix1,:,:)= tep(ix0:ix1,:,:) +dtep(ix0:ix1,:,:)*dt_inner/2
+          te(:,:,ix0:ix1) = te(:,:,ix0:ix1) +dtep(:,:,ix0:ix1)*dt_inner/6
+          tep(:,:,ix0:ix1)= tep(:,:,ix0:ix1) +dtep(:,:,ix0:ix1)*dt_inner/2
           ein_e = ein_e +eitmp*dt_inner/6
           eout_e = eout_e +eotmp*dt_inner/6
           ein_pulse = ein_pulse +eptmp*dt_inner/6
 !.....2nd step
           call model_2tm3d(tnow,dtep,eitmp,eotmp,eptmp,iprint)
-          te(ix0:ix1,:,:) = te(ix0:ix1,:,:) +dtep(ix0:ix1,:,:)*dt_inner/3
-          tep(ix0:ix1,:,:)= tep(ix0:ix1,:,:) +dtep(ix0:ix1,:,:)*dt_inner/2
+          te(:,:,ix0:ix1) = te(:,:,ix0:ix1) +dtep(:,:,ix0:ix1)*dt_inner/3
+          tep(:,:,ix0:ix1)= tep(:,:,ix0:ix1) +dtep(:,:,ix0:ix1)*dt_inner/2
           ein_e = ein_e +eitmp*dt_inner/3
           eout_e = eout_e +eotmp*dt_inner/3
           ein_pulse = ein_pulse +eptmp*dt_inner/3
 !.....3rd step
           call model_2tm3d(tnow,dtep,eitmp,eotmp,eptmp,iprint)
-          te(ix0:ix1,:,:) = te(ix0:ix1,:,:) +dtep(ix0:ix1,:,:)*dt_inner/3
-          tep(ix0:ix1,:,:)= tep(ix0:ix1,:,:) +dtep(ix0:ix1,:,:)*dt_inner/2
+          te(:,:,ix0:ix1) = te(:,:,ix0:ix1) +dtep(:,:,ix0:ix1)*dt_inner/3
+          tep(:,:,ix0:ix1)= tep(:,:,ix0:ix1) +dtep(:,:,ix0:ix1)*dt_inner/2
           ein_e = ein_e +eitmp*dt_inner/3
           eout_e = eout_e +eotmp*dt_inner/3
           ein_pulse = ein_pulse +eptmp*dt_inner/3
 !.....4th step
           call model_2tm3d(tnow,dtep,eitmp,eotmp,eptmp,iprint)
-          te(ix0:ix1,:,:) = te(ix0:ix1,:,:) +dtep(ix0:ix1,:,:)*dt_inner/6
+          te(:,:,ix0:ix1) = te(:,:,ix0:ix1) +dtep(:,:,ix0:ix1)*dt_inner/6
           ein_e = ein_e +eitmp*dt_inner/6
           eout_e = eout_e +eotmp*dt_inner/6
           ein_pulse = ein_pulse +eptmp*dt_inner/6
@@ -924,36 +928,36 @@ contains
           tep(:,:,:)= te(:,:,:)
 !.....1st step
           call model_2tm3d(tnow,dtep,eitmp,eotmp,eptmp,iprint)
-          tep(ix0:ix1,:,:)= tep(ix0:ix1,:,:) +dtep(ix0:ix1,:,:)*dt_inner/2
+          tep(:,:,ix0:ix1)= tep(:,:,ix0:ix1) +dtep(:,:,ix0:ix1)*dt_inner/2
 !.....2nd step
           call model_2tm3d(tnow,dtep,eitmp,eotmp,eptmp,iprint)
-          te(ix0:ix1,:,:) = te(ix0:ix1,:,:) +dtep(ix0:ix1,:,:)*dt_inner
+          te(:,:,ix0:ix1) = te(:,:,ix0:ix1) +dtep(:,:,ix0:ix1)*dt_inner
           ein_e = ein_e +eitmp*dt_inner
           eout_e = eout_e +eotmp*dt_inner
           ein_pulse = ein_pulse +eptmp*dt_inner
         enddo
-      endif
+      endif  ! csolver
       
 !.....Update Te_max and alpha_max
       Te_max = -1d0
       alpha_max = -1d0
       cete_min = 1d30
       kappa_max = -1d0
-      tep(ix0:ix1,:,:) = te(ix0:ix1,:,:)  ! need to use cete(...)
+      tep(:,:,ix0:ix1) = te(:,:,ix0:ix1)  ! need to use cete(...)
       do ic=1,nxyz
         call ic2ixyz(ic,ix,iy,iz)
         if( ix.gt.ibc3d ) cycle
-        ce = cete(ix,iy,iz)
+        ce = cete(iz,iy,ix)
         if( itype_kappa.eq.1 ) then  ! DCrho
           kappa = d_e *ce *rho_e
         else if( itype_kappa.eq.2 ) then  ! B2
-          kappa = kappa0 *te(ix,iy,iz) /max(ta(ic),ta_min)
+          kappa = kappa0 *te(iz,iy,ix) /max(ta(ic),ta_min)
         endif
         kappa_max = max(kappa_max,kappa)
         cete_min = min(ce,cete_min)
         alpha_max = max(kappa/ce/rho_e,alpha_max)
-        Te_max = max(Te_max,te(ix,iy,iz))
-        etot_e = etot_e +te(ix,iy,iz)*fkb*rho_e*vcell*1.5d0
+        Te_max = max(Te_max,te(iz,iy,ix))
+        etot_e = etot_e +te(iz,iy,ix)*fkb*rho_e*vcell*1.5d0
       enddo
 
 !.....Output
@@ -967,9 +971,9 @@ contains
         do ic=1,nxyz
           call ic2ixyz(ic,ix,iy,iz)
           if( ix.gt.ibc3d ) cycle
-          if( te(ix,iy,iz).lt.0d0 ) then
-            print *,'ERROR: te(ix,iy,iz) < 0 !!'
-            print *,'ic,ix,iy,iz,te=',ic,ix,iy,iz,te(ix,iy,iz)
+          if( te(iz,iy,ix).lt.0d0 ) then
+            print *,'ERROR: te(iz,iy,ix) < 0 !!'
+            print *,'ic,ix,iy,iz,te=',ic,ix,iy,iz,te(iz,iy,ix)
             stop 1
           endif
         enddo
@@ -977,7 +981,7 @@ contains
     endif
 !.....Broadcast Te distribution to all the nodes.
 !.....There could be smarter way to reduce communication cost.
-    call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(te,(nz+2)*(ny+2)*(nx+2),mpi_real8,0,mpi_world,ierr)
 
     t_ttm = t_ttm +mpi_wtime()-t0
 
@@ -986,12 +990,12 @@ contains
 !=======================================================================
   subroutine model_2tm3d(tnow,dtep,eitmp,eotmp,eptmp,iprint)
 !
-!  Create f(t,y) for ODE dy/dt = f(t,y), where y=Te(ix,iy,iz) here.
+!  Create f(t,y) for ODE dy/dt = f(t,y), where y=te(iz,iy,ix) here.
 !  The ODE is now diffusion Eq. with two-temperature model.
 !
     real(8),intent(in):: tnow
     integer,intent(in):: iprint
-    real(8),intent(out):: dtep(0:nx+1,0:ny+1,0:nz+1),eitmp,eotmp,eptmp
+    real(8),intent(out):: dtep(0:nz+1,0:ny+1,0:nx+1),eitmp,eotmp,eptmp
 
     integer:: ic,ix,iy,iz
     real(8):: ce,dce,kappa,dkappa,pterm,sterm,dtemp,de,tmp&
@@ -1006,9 +1010,9 @@ contains
       call ic2ixyz(ic,ix,iy,iz)
       if( ix.lt.lsurf ) cycle
       if( ix.gt.ibc3d ) cycle
-      ce = cete(ix,iy,iz)
-      dce = dcete(ix,iy,iz)
-      teic = tep(ix,iy,iz)
+      ce = cete(iz,iy,ix)
+      dce = dcete(iz,iy,ix)
+      teic = tep(iz,iy,ix)
 !!$      if( trim(ctype_kappa).eq.'DCrho' ) then
       if( itype_kappa.eq.1 ) then
         kappa = d_e *ce *rho_e
@@ -1032,11 +1036,11 @@ contains
 !.....In the case that dC/dT takes negative value at some T's, one has to take care of that situation.
 !.....That is the case for Si with C(T) given as a polynomial by Jay et al., IEEE Nucl Sci (2017).
 !!$      denom = (ce+teic*dce)*rho_e
-!!$      dtemp = ( dkappa*dte2(ix,iy,iz) +kappa*d2te(ix,iy,iz) &
+!!$      dtemp = ( dkappa*dte2(iz,iy,ix) +kappa*d2te(iz,iy,ix) &
 !!$           +pterm +sterm ) /denom ! *dt
       denom = ce*rho_e
-      dtemp = ( kappa*d2te(ix,iy,iz) +pterm +sterm ) /denom ! *dt
-      dtep(ix,iy,iz) = dtep(ix,iy,iz) +dtemp
+      dtemp = ( kappa*d2te(iz,iy,ix) +pterm +sterm ) /denom ! *dt
+      dtep(iz,iy,ix) = dtep(iz,iy,ix) +dtemp
     enddo  ! ic=1,nxyz
 
 !.....Laser pulse
@@ -1047,16 +1051,16 @@ contains
           call ic2ixyz(ic,ix,iy,iz)
           if( ix.lt.lsurf ) cycle
           if( ix.gt.ibc3d ) cycle
-          ce = cete(ix,iy,iz)
+          ce = cete(iz,iy,ix)
 !.....To think the cell position is the center of the cell, add 0.5
           xi = (ix-lsurf+0.5d0)*dx
 !.....See above comment on T dependence of C_e
-!!$          dce = dcete(ix,iy,iz)
-!!$          tmp = 1d0 /((ce+tep(ix,iy,iz)*dce)*rho_e *vcell)
+!!$          dce = dcete(iz,iy,ix)
+!!$          tmp = 1d0 /((ce+tep(iz,iy,ix)*dce)*rho_e *vcell)
           tmp = 1d0 /(ce*rho_e *vcell)
           de = I_0 *min(1d0,exp(-xi/lskin))*dx  !*dt
-          dtep(ix,iy,iz) = dtep(ix,iy,iz) +de*tmp
-          if( dtep(ix,iy,iz)*0d0 .ne. 0d0 ) then
+          dtep(iz,iy,ix) = dtep(iz,iy,ix) +de*tmp
+          if( dtep(iz,iy,ix)*0d0 .ne. 0d0 ) then
             print *,'ERROR: tep==NaN !!!'
             print *,'  ic,ix,iy,iz=',ic,ix,iy,iz
             stop
@@ -1072,15 +1076,15 @@ contains
           call ic2ixyz(ic,ix,iy,iz)
           if( ix.lt.lsurf ) cycle
           if( ix.gt.ibc3d ) cycle
-          ce = cete(ix,iy,iz)
+          ce = cete(iz,iy,ix)
 !.....See above comment on T dependence of C_e
-!!$          dce = dcete(ix,iy,iz)
-!!$          tmp = 1d0 /((ce+tep(ix,iy,iz)*dce)*rho_e *vcell)
+!!$          dce = dcete(iz,iy,ix)
+!!$          tmp = 1d0 /((ce+tep(iz,iy,ix)*dce)*rho_e *vcell)
           tmp = 1d0 /(ce*rho_e *vcell)
 !.....To think the cell position is the center of the cell, add 0.5
           xi = (ix-lsurf+0.5d0)*dx
           de = I_0 *min(1d0,exp(-xi/lskin))*dt_inner*dx *pulsefactor
-          dtep(ix,iy,iz) = dtep(ix,iy,iz) +de*tmp
+          dtep(iz,iy,ix) = dtep(iz,iy,ix) +de*tmp
           eptmp = eptmp +de
         enddo
       endif
@@ -1088,7 +1092,7 @@ contains
 
   end subroutine model_2tm3d
 !=======================================================================
-  function cete(ix,iy,iz)
+  function cete(iz,iy,ix)
 !
 !  Ce(Te) at (ix,iy,iz)
 !
@@ -1101,19 +1105,19 @@ contains
     if( iCe_Tdep.eq.0 ) then  ! none
       cete = c_0
     else if( iCe_Tdep.eq.1 ) then ! polynomial
-      t = tep(ix,iy,iz)/1000
+      t = tep(iz,iy,ix)/1000
       cete = c_0 +(a_0 +a_1*t +a_2*t**2 +a_3*t**3 +a_4*t**4)&
            *exp(-(A_exp*t)**2) +ce_min
     else if( iCe_Tdep.eq.2 ) then ! tanh
-      t = tep(ix,iy,iz)
+      t = tep(iz,iy,ix)
       cete = 3d0 *tanh(2d-4 *t) +ce_min
     else if( iCe_Tdep.eq.3 ) then  ! linear
-      cete = gmm_ce *tep(ix,iy,iz) +ce_min
+      cete = gmm_ce *tep(iz,iy,ix) +ce_min
     endif
     return
   end function cete
 !=======================================================================
-  function dcete(ix,iy,iz)
+  function dcete(iz,iy,ix)
 !
 !  dCe(Te)/dTe at (ix,iy,iz)
 !
@@ -1124,13 +1128,13 @@ contains
 
     dcete = 0d0
     if( iCe_Tdep.eq.1 ) then  ! polynomial
-      x = tep(ix,iy,iz)/1000
+      x = tep(iz,iy,ix)/1000
       texp = exp(-(A_exp*x)**2)
       dcete = (a_1 +2d0*a_2*x +3d0*a_3*x**2 +4d0*a_4*x**3)*texp &
            -2d0*A_exp*x *(a_0 +a_1*x +a_2*x**2 +a_3*x**3 +a_4*x**4)*texp
       dcete = dcete/1000
     else if( iCe_Tdep.eq.2 ) then  ! tanh
-      t = tep(ix,iy,iz)
+      t = tep(iz,iy,ix)
       dcete = 3d0*2d-4 *(1d0 -tanh(2d-4 *t)**2)
     else if( iCe_Tdep.eq.3 ) then  ! linear
       dcete = gmm_ce
@@ -1139,7 +1143,7 @@ contains
     
   end function dcete
 !=======================================================================
-  function dte2(ix,iy,iz)
+  function dte2(iz,iy,ix)
     integer,intent(in):: ix,iy,iz
 
     integer:: ixp,ixm,iyp,iym,izp,izm
@@ -1152,16 +1156,16 @@ contains
     izm = iz -1
 
     dte2 = 0d0
-    dte2 = (tep(ixp,iy,iz)**2 -2d0*tep(ixp,iy,iz)*tep(ixm,iy,iz) &
-         +tep(ixm,iy,iz)**2 )/4/dx/dx &
-         + (tep(ix,iyp,iz)**2 -2d0*tep(ix,iyp,iz)*tep(ix,iym,iz) &
-         +tep(ix,iym,iz)**2 )/4/dy/dy &
-         + (tep(ix,iy,izp)**2 -2d0*tep(ix,iy,izp)*tep(ix,iy,izm) &
-         +tep(ix,iy,izm)**2 )/4/dz/dz
+    dte2 = (tep(iz,iy,ixp)**2 -2d0*tep(iz,iy,ixp)*tep(iz,iy,ixm) &
+         +tep(iz,iy,ixm)**2 )/4/dx/dx &
+         + (tep(iz,iyp,ix)**2 -2d0*tep(iz,iyp,ix)*tep(iz,iym,ix) &
+         +tep(iz,iym,ix)**2 )/4/dy/dy &
+         + (tep(izp,iy,ix)**2 -2d0*tep(izp,iy,ix)*tep(izm,iy,ix) &
+         +tep(izm,iy,ix)**2 )/4/dz/dz
     return
   end function dte2
 !=======================================================================
-  function d2te(ix,iy,iz)
+  function d2te(iz,iy,ix)
     integer,intent(in):: ix,iy,iz
 
     integer:: ixp,ixm,iyp,iym,izp,izm
@@ -1173,12 +1177,12 @@ contains
     izp = iz +1
     izm = iz -1
 
-    d2te = (tep(ixp,iy,iz) -2d0*tep(ix,iy,iz) &
-         +tep(ixm,iy,iz)) /dx/dx &
-         + (tep(ix,iyp,iz) -2d0*tep(ix,iy,iz) &
-         +tep(ix,iym,iz)) /dy/dy &
-         + (tep(ix,iy,izp) -2d0*tep(ix,iy,iz) &
-         +tep(ix,iy,izm)) /dz/dz
+    d2te = (tep(iz,iy,ixp) -2d0*tep(iz,iy,ix) &
+         +tep(iz,iy,ixm)) /dx/dx &
+         + (tep(iz,iyp,ix) -2d0*tep(iz,iy,ix) &
+         +tep(iz,iym,ix)) /dy/dy &
+         + (tep(izp,iy,ix) -2d0*tep(iz,iy,ix) &
+         +tep(izm,iy,ix)) /dz/dz
     return
   end function d2te
 !=======================================================================
@@ -1214,7 +1218,7 @@ contains
 
     do ic=1,nxyz
       call ic2ixyz(ic,ix,iy,iz)
-      sgm(ic) = dsqrt(2d0*gmmp(ic)*te(ix,iy,iz)/dtmd *k2ue )
+      sgm(ic) = dsqrt(2d0*gmmp(ic)*te(iz,iy,ix)/dtmd *k2ue )
     enddo
 
 !.....Langevin thermostat with Mannella integrator
@@ -1260,7 +1264,7 @@ contains
             print *,'  ic,i,va(:)=',ic,i,va(1:3,i)
             print *,'  aain,aaout=',aain(1:3),aaout(1:3)
             print *,'  sgmi=',sgmi
-            print *,'  gmmp(ic),te(ix,iy,iz)=',gmmp(ic),te(ix,iy,iz)
+            print *,'  gmmp(ic),te(iz,iy,ix)=',gmmp(ic),te(iz,iy,ix)
           endif
           stop
         endif
@@ -1396,13 +1400,13 @@ contains
         open(iots3d,file=trim(dname_ttm)// &
              trim(cout_ts3d)//'_'//trim(cnum),status='replace')
         write(iots3d,'(a,2es15.7,i6)') '# tnow,dx,ibc3d: ',tnow,dx,ibc3d
-        write(iots3d,'(a)') '# ix,   iy,   iz,   te(ix,iy,iz),   ta(ic),'&
+        write(iots3d,'(a)') '# ix,   iy,   iz,   te(iz,iy,ix),   ta(ic),'&
              //'  nac(ic)'
         do ix=1,nx
           do iy=1,ny
             do iz=1,nz
               call ixyz2ic(ix,iy,iz,ic)
-              write(iots3d,'(3i6,2es15.5,i6)') ix,iy,iz,te(ix,iy,iz) &
+              write(iots3d,'(3i6,2es15.5,i6)') ix,iy,iz,te(iz,iy,ix) &
                    ,ta(ic),nac(ic)
             enddo
           enddo
@@ -1420,10 +1424,10 @@ contains
             do iz=1,nz
               call ixyz2ic(ix,iy,iz,ic)
               if( nac(ic).eq.0 ) continue
-              ave = ave +te(ix,iy,iz)
-              eetot = eetot +3d0/2 *rho_e*vcell*te(ix,iy,iz)
+              ave = ave +te(iz,iy,ix)
+              eetot = eetot +3d0/2 *rho_e*vcell*te(iz,iy,ix)
               n = n + 1
-!!$              write(ioTeout,'(3i6,2es15.5,i6)') ix,iy,iz,te(ix,iy,iz) &
+!!$              write(ioTeout,'(3i6,2es15.5,i6)') ix,iy,iz,te(iz,iy,ix) &
 !!$                   ,ta(ic),nac(ic)
             enddo
           enddo
@@ -1438,28 +1442,14 @@ contains
 !
 !  Set BC for 3D-TTM system
 !
-    if( lsurf.le.0 .and. rsurf.le.0 ) then
-!.....Periodic for x,y,z
-      tep(0,1:ny,1:nz) = tep(nx,1:ny,1:nz)
-      tep(nx+1,1:ny,1:nz) = tep(1,1:ny,1:nz)
-      tep(1:nx,0,1:nz) = tep(1:nx,ny,1:nz)
-      tep(1:nx,ny+1,1:nz) = tep(1:nx,1,1:nz)
-      tep(1:nx,1:ny,0) = tep(1:nx,1:ny,nz)
-      tep(1:nx,1:ny,nz+1) = tep(1:nx,1:ny,1)
-    else  ! Laser-ablation situation
 !.....Free boundary for x
-      tep(lsurf-1,1:ny,1:nz) = tep(lsurf,1:ny,1:nz)
-!!$      if( Te_right.lt.0d0 ) then
-!!$        tep(rsurf+1,1:ny,1:nz) = tep(rsurf,1:ny,1:nz)
-!!$      else
-!!$        tep(rsurf+1,1:ny,1:nz) = Te_right
-!!$      endif
+    tep(1:nz,1:ny,lsurf-1) = tep(1:nz,1:ny,lsurf)
 !.....Periodic for y and z
-      tep(lsurf:nx,0,1:nz)    = tep(lsurf:nx,ny,1:nz)
-      tep(lsurf:nx,ny+1,1:nz) = tep(lsurf:nx,1,1:nz)
-      tep(lsurf:nx,1:ny,0)    = tep(lsurf:nx,1:ny,nz)
-      tep(lsurf:nx,1:ny,nz+1) = tep(lsurf:nx,1:ny,1)
-    endif
+    tep(1:nz,0,lsurf:nx)    = tep(1:nz,ny,lsurf:nx)
+    tep(1:nz,ny+1,lsurf:nx) = tep(1:nz,1,lsurf:nx)
+    tep(0,1:ny,lsurf:nx)    = tep(nz,1:ny,lsurf:nx)
+    tep(nz+1,1:ny,lsurf:nx) = tep(1,1:ny,lsurf:nx)
+
   end subroutine set_bc_2tm3d
 !=======================================================================
   subroutine update_surface_plane(myid,mpi_world,iprint)
@@ -1496,7 +1486,7 @@ contains
 !.....Since nac is not a number of atoms, but DOF in a cell, divide it by 3
           densx(ix) = densx(ix) +dble(nac(icl))/3
 !.....Check true lsurf from given Te(:,:,:)
-          tmp = tmp +te(ix,iy,iz)
+          tmp = tmp +te(iz,iy,ix)
         enddo
       enddo
       densx(ix) = densx(ix)/volyz
@@ -1523,16 +1513,16 @@ contains
     if( cTe_init(1:4).eq.'homo' .and. l1st ) then  ! the first call in case of homogeneous Te
       te(:,:,:) = 0d0
       do ix=lsurf_new,nx
-        te(ix,:,:) = te_init
+        te(:,:,ix) = te_init
       enddo
     else if( lsurf_new .gt. lsurf_true ) then
       do ix=lsurf_true,lsurf_new-1
-        te(ix,:,:) = 0d0
+        te(:,:,ix) = 0d0
       enddo
     else if( lsurf_new .lt. lsurf_true ) then
 !!$      print *,'lsurf_new.lt.lsurf'
       do ix=lsurf_new,lsurf_true-1
-        te(ix,:,:) = te(lsurf_true,:,:)
+        te(:,:,ix) = te(:,:,lsurf_true)
       enddo
     endif
     lsurf = lsurf_new
@@ -1544,7 +1534,7 @@ contains
 10  continue
 !.....Broadcast Te distribution to all the nodes.
 !.....There could be smarter way to reduce networking cost.
-    call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(te,(nz+2)*(ny+2)*(nx+2),mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(lsurf,1,mpi_integer,0,mpi_world,ierr)
 
     if( lsurf.ge.ibc3d ) then
@@ -1725,7 +1715,7 @@ contains
       ic = a2c(ia)
       call ic2ixyz(ic,ix,iy,iz)
       if( ix.lt.lsurf ) cycle
-      tei(ia) = te(ix,iy,iz)
+      tei(ia) = te(iz,iy,ix)
     enddo
     return
   end subroutine te2tei
@@ -2023,8 +2013,10 @@ contains
 !
     integer,intent(in):: myid,mpi_world,iprint
 
-    integer:: ix,iy,iz,mx,mxp,jx,ic,icp
+    integer:: ix,iy,iz,mx,mxp,jx,ic,icp,ierr
     real(8):: tebc3d,tebcp3d,tabc3d,tabcp3d,x3d,x3dp,x1d,x1dp,tet3d,tat3d
+
+    if( myid.ne.0 ) goto 10
 
 !.....Get two ix3d points that sandwich the ibc1d point
     mxp = 0
@@ -2039,7 +2031,6 @@ contains
     enddo
     mx = mxp -1
     x3d = dx*(mx-1+0.5d0)
-!!$    print *,'mx,mxp,x3d,x3dp=',mx,mxp,x3d,x3dp
 
 !.....Take averages of Te and Ta at mx and mxp over y and z
     tebc3d = 0d0
@@ -2048,8 +2039,8 @@ contains
     tabcp3d = 0d0
     do iy=1,ny
       do iz=1,nz
-        tebc3d = tebc3d +te(mx,iy,iz)
-        tebcp3d = tebcp3d +te(mxp,iy,iz)
+        tebc3d = tebc3d +te(iz,iy,mx)
+        tebcp3d = tebcp3d +te(iz,iy,mxp)
         call ixyz2ic(mx,iy,iz,ic)
         tabc3d = tabc3d +ta(ic)
         call ixyz2ic(mxp,iy,iz,icp)
@@ -2099,13 +2090,17 @@ contains
 !!$           ,tat3d,tl1d(mxp),tl1d(mx)
       do iy=0,ny+1
         do iz=0,nz+1
-          te(ix,iy,iz) = tet3d
+          te(iz,iy,ix) = tet3d
           call ixyz2ic(ix,iy,iz,ic)
           ta(ic) = tat3d
         enddo
       enddo
     enddo
-    
+
+10  continue
+    call mpi_bcast(ta,nxyz,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real8,0,mpi_world,ierr)
+    return
   end subroutine couple_3d1d
 !=======================================================================
   subroutine set_3d1d_bc_pos(natm,ra,h,sorg,myid,mpi_world,iprint)
@@ -2133,7 +2128,6 @@ contains
     if( ibc3d.ge.nx ) ibc3d = nx-1  ! boundary position must be .lt. nx
 !.....x3d as a right-edge position of boundary cell which is a bit different from the note
     x3d = dx*ibc3d
-!!$    print *,'xdnr,ibc3d,x3d = ', xdnr, ibc3d, x3d
     
 !.....Get x-index of 1D-TTM system (ibc1d) from x_{ibc3d}
     ibc1d = 0
@@ -2142,7 +2136,6 @@ contains
       if( x1d.gt.x3d ) exit
       ibc1d = i
     enddo
-!!$    print *,'ibc1d,x1d = ', ibc1d, dx1d*(ibc1d-1)
 
   end subroutine set_3d1d_bc_pos
 end module ttm
