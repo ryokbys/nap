@@ -25,6 +25,10 @@ MPIFLAGS= @FCFLAGS@
 .F90.o: 
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} -o $@ $<
 
+ifndef VERBOSE
+MAKEFLAGS += --no-print-directory
+endif
+
 pmd= read_input.o util_vec.o util_rnd.o lasubs.o \
 	common_parallel.o sort.o pmd_main.o pmd_core.o 
 pmc= prec_mc.o util_rnd.o read_input.o pmd_core.o util_vec.o \

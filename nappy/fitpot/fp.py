@@ -479,7 +479,7 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
         print(' {0:11.5f}'.format(L),flush=True)
     return L
 
-def loss_func(pmddata,**kwargs):
+def loss_func(pmddata,eps=1.0e-8,**kwargs):
     """
     Compute loss function value from reference and pmd data.
     """
@@ -507,7 +507,7 @@ def loss_func(pmddata,**kwargs):
                 diff2sum += diff*diff
                 z += ref*ref
                 # print('i,r,ref,pmd,z,diff2sum=',i,r,ref,pmd,z,diff2sum)
-            Lr += diff2sum/z #/len(rs)
+            Lr += diff2sum/(z+eps) #/len(rs)
         Lr /= len(rdf_pairs)
 
     #...ADF
@@ -527,7 +527,7 @@ def loss_func(pmddata,**kwargs):
                 diff = pmd -ref
                 diff2sum += diff*diff
                 z += ref*ref
-            Lth += diff2sum /z #/len(ths)
+            Lth += diff2sum /(z+eps) #/len(ths)
         Lth /= len(adf_triplets)
 
     #...volume
@@ -536,7 +536,7 @@ def loss_func(pmddata,**kwargs):
         vol_ref = refdata['vol']
         vol_pmd = pmddata['vol']
         diff = vol_pmd -vol_ref
-        Lvol = diff*diff /(vol_ref*vol_ref)
+        Lvol = diff*diff /(vol_ref*vol_ref+eps)
 
     #...lattice parameters
     Llat = 0.0
@@ -547,8 +547,12 @@ def loss_func(pmddata,**kwargs):
         # print('pmddata=',pmddata['lat'])
         #...Need to take into account the definition difference bet/ dump and vasp
         # a0l,b0l,c0l,alp0l,bet0l,gmm0l = lat_vasp2dump(a0,b0,c0,alp0,bet0,gmm0)
-        diff = ((a0-a)/a0)**2 +((b0-b)/b0)**2 +((c0-c)/c0)**2 \
-                +((alp0-alp)/alp0)**2 +((bet0-bet)/bet0)**2 +((gmm0-gmm)/gmm0)**2
+        diff = ((a0-a)/a0)**2 \
+            +((b0-b)/b0)**2 \
+            +((c0-c)/c0)**2 \
+            +((alp0-alp)/alp0)**2 \
+            +((bet0-bet)/bet0)**2 \
+            +((gmm0-gmm)/gmm0)**2
         # diff /= 6
         Llat = diff
 
