@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-02 18:05:12 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-03 10:14:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -403,6 +403,10 @@ contains
       call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(te1d,nd1d+1,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(tl1d,nd1d+1,mpi_real8,0,mpi_world,ierr)
+    endif
+
+    if( trim(surfmove).eq.'plane' ) then
+      call update_surface_plane(myid,mpi_world,iprint)
     endif
 
     t_ttm = t_ttm +mpi_wtime() -t0
@@ -1489,7 +1493,7 @@ contains
       do iy=1,ny
         do iz=1,nz
           call ixyz2ic(ix,iy,iz,icl)
-!.....Since nac is not a number of atoms, but DOF in a cell, so divide it by 3
+!.....Since nac is not a number of atoms, but DOF in a cell, divide it by 3
           densx(ix) = densx(ix) +dble(nac(icl))/3
 !.....Check true lsurf from given Te(:,:,:)
           tmp = tmp +te(ix,iy,iz)
@@ -1504,9 +1508,9 @@ contains
 !.....Right-most layer of vacuum and right-most layer of material
     ivac_right = 0
     imatt_right = 0
-    do ix=1,nx
-      if( lexists(ix) ) imatt_right = ix
-      if( .not. lexists(ix) ) ivac_right = ix
+    do ix=1,nx-1
+      if( lexists(ix+1) ) imatt_right = ix+1
+      if( .not. lexists(ix) .and. lexists(ix+1) ) ivac_right = ix
     enddo
 !!$    print *,'ivac_right,imatt_right=',ivac_right,imatt_right
 
