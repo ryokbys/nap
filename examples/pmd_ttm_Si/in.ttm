@@ -1,0 +1,53 @@
+#...TTM mesh size
+mesh_size    100 1 1
+
+#...Electron stopping threshold in eV
+ekth           4.451
+
+kappa_type      DCrho
+# kappa_0           5.6804e-05
+
+#...Electronic thermal diffusivity in A^2/fs
+D_e           20.0
+#...rho_e in electron/A^3
+rho_e          0.05
+
+#...Laser fluence in eV/A^2
+#laser_fluence       6.242e+1
+laser_fluence       40.0
+
+#...Pulse duration in fs
+pulse_duration      500.00
+pulse_type          stepwise
+# t0_laser         100.0
+
+#...gamma_p in 1/fs
+#gamma_p        9.478e-05
+gamma_p         0.5e-3
+#...gamma_s in 1/fs
+gamma_s        1.000e-01
+
+initial_Te      homogeneous
+Te_init         300.0
+Te_right        300.0
+Te_min          300.0
+
+surface_skin_length      250.0
+
+# Ce_T-depend     linear
+# Ce_linear_gamma          6.6480e-09
+Ce_T-depend     polynomial
+C_0               1.290e-04
+Ce_poly_params  -1.2899e-04  -2.9328e-08  2.2999e-05  9.2704e-07  0.0000e+00  4.2485e-01
+
+inner_loop        1
+DE_solver       RK4
+
+#...Coupling 3d-1d
+num_node_latt  500
+dx_latt        20d0
+C_latt        2.06e-4
+NRBC_length     30d0
+
+D_latt          8.8
+rho_latt        0.05

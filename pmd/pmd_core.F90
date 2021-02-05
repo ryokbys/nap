@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-05 17:43:14 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-05 21:23:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -20,7 +20,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   use ttm,only: init_ttm,langevin_ttm,output_ttm,t_ttm, &
        calc_Ta,update_ttm,assign_atom2cell,output_energy_balance, &
        remove_ablated_atoms,set_inner_dt, te2tei, non_reflecting_bc, &
-       set_3d1d_bc_pos, couple_3d1d
+       set_3d1d_bc_pos, couple_3d1d, compute_nac
   use pmdmpi,only: nid2xyz,xyz2nid
   use metadynamics,only: init_metaD,update_metaD,force_metaD &
        ,write_metaD_potential
@@ -183,9 +183,6 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   do i=1,natm
     ra(1:3,i)= ra(1:3,i) -sorg(1:3)
   enddo
-  do i=1,natm
-    print *,'i,tag=',i,tag(i)
-  enddo
 
 #ifdef __FITPOT__
 !.....check whether order of atoms and total-id of atoms match
@@ -327,11 +324,11 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     endif
   else if( trim(ctctl).eq.'ttm' ) then
     call init_ttm(namax,natm,ra,h,sorg,dt,lvardt, &
-         myid_md,mpi_md_world,iprint)
-    call assign_atom2cell(namax,natm,ra,sorg,boundary)
+         boundary,myid_md,mpi_md_world,iprint)
+!!$    call assign_atom2cell(namax,natm,ra,sorg,boundary)
     call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
          ,0,myid_md,mpi_md_world,iprint)
-    call te2tei(namax,natm,tei)
+    call te2tei(namax,natm,aux(iauxof('tei'),:))
     call couple_3d1d(myid_md,mpi_md_world,iprint)
     call output_ttm(0,simtime,myid_md,iprint)
   endif
@@ -867,6 +864,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       enddo
     else if( trim(ctctl).eq.'ttm' ) then
       call assign_atom2cell(namax,natm,ra,sorg,boundary)
+      call compute_nac(natm,myid_md,mpi_md_world,iprint)
       call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
            ,istp,myid_md,mpi_md_world,iprint)
       call langevin_ttm(namax,natm,va,aa,tag,am,h &
@@ -874,7 +872,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       call update_ttm(simtime,dt,natm,ra,h,sorg,myid_md,mpi_md_world,iprint)
       call non_reflecting_bc(natm,tag,ra,va,h,sorg,dt,nspmax,am,fa2v &
            ,myid_md,mpi_md_world,iprint)
-      call te2tei(namax,natm,tei)
+      call te2tei(namax,natm,aux(iauxof('tei'),:))
       call set_3d1d_bc_pos(natm,ra,h,sorg,myid_md,mpi_md_world,iprint)
       call couple_3d1d(myid_md,mpi_md_world,iprint)
     endif  ! end of thermostat

@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-05 12:26:56 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-05 20:22:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -199,7 +199,7 @@ program pmd
   if( luse_charge ) then
     naux = naux +2  ! chg, chi (not necessarily need it, though)
   endif
-  if( luse_elec_temp ) then
+  if( luse_elec_temp .or. trim(ctctl).eq.'ttm' ) then
     naux = naux +1
   endif
   if( lclrchg ) then
@@ -213,7 +213,7 @@ program pmd
     inc = inc +1
     cauxarr(inc) = 'chi'
   endif
-  if( luse_elec_temp ) then
+  if( luse_elec_temp .or. trim(ctctl).eq.'ttm' ) then
     inc = inc +1
     cauxarr(inc) = 'tei'
   endif

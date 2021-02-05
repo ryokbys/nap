@@ -1,0 +1,40 @@
+io_format                 ascii
+print_level                 1
+max_num_neighbors          30
+
+time_interval              -2.0
+num_iteration             100
+min_iteration               5
+num_out_energy            1000
+
+flag_out_pmd                2
+num_out_pmd               100
+flag_sort                   1
+
+force_type                  Tersoff
+cutoff_radius               3.4
+cutoff_buffer                0.3
+
+flag_damping                0
+damping_coeff                0.9
+converge_eps                 1.0e-04
+converge_num                3
+dump_aux_order          ekin epot sxx syy szz tei
+
+initial_temperature        600.0
+final_temperature          -10.0
+temperature_control        ttm
+temperature_target         1  300.0
+temperature_relax_time     50.0
+
+factor_direction          3 2
+    1.00   1.00   1.00
+    0.00   1.00   1.00
+
+stress_control            none
+pressure_target              0.0
+stress_relax_time           20.0
+shear_stress                 0.0
+flag_compute_stress       T
+
+boundary    fpp

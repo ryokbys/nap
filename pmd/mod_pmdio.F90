@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-05 17:45:37 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-05 21:24:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -386,7 +386,7 @@ contains
         is = int(tagtot(i))
         csp = specorder(is)
         write(ionum,'(a4)',advance='no') trim(csp)
-      print *,'tag,i,csp = ',tagtot(i),itotOf(tagtot(i)),csp
+!!$      print *,'tag,i,csp = ',tagtot(i),itotOf(tagtot(i)),csp
       else
         write(ionum,'(i3)',advance='no') int(tagtot(i))
       endif

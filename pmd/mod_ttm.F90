@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-05 12:13:25 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-05 21:21:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -112,7 +112,7 @@ module ttm
 
 !.....Temperature distribution
   real(8),allocatable:: te(:,:,:),tep(:,:,:),ta(:),tap(:),tex(:)
-  integer,allocatable:: nac(:),nacp(:)
+  integer,allocatable:: nac(:),dof(:),dofp(:)
   real(8),allocatable:: eksum(:),ekpsum(:),vac(:,:),ekti(:)
 !.....Atom to cell correspondance
   integer,allocatable:: a2c(:)
@@ -159,13 +159,15 @@ module ttm
 
 contains
 !=======================================================================
-  subroutine init_ttm(namax,natm,ra,h,sorg,dtmd,lvardt,myid,mpi_world,iprint)
+  subroutine init_ttm(namax,natm,ra,h,sorg,dtmd,lvardt, &
+       boundary,myid,mpi_world,iprint)
 !
 !  Read parameters for TTM from in.ttm and initialize
 !
     integer,intent(in):: namax,natm,myid,mpi_world,iprint
     real(8),intent(in):: dtmd,h(3,3),ra(3,natm),sorg(3)
     logical,intent(in):: lvardt 
+    character(len=3),intent(in):: boundary
 
     integer:: ierr,ix,iy,iz,mem
     real(8):: t,t0,t1,t2,dtmax,tmp
@@ -276,10 +278,10 @@ contains
 !!$    endif
     
 !.....Allocate initialize arrays
-    allocate(nac(nxyz),nacp(nxyz),eksum(nxyz),ekpsum(nxyz), &
+    allocate(nac(nxyz),eksum(nxyz),ekpsum(nxyz), &
          sgm(nxyz),te(0:nz+1,0:ny+1,0:nx+1),tep(0:nz+1,0:ny+1,0:nx+1), &
          ta(nxyz),tap(nxyz),tex(nx),gp(nxyz),gs(nxyz),&
-         gmmp(nxyz),gmms(nxyz),vac(3,nxyz))
+         gmmp(nxyz),gmms(nxyz),vac(3,nxyz),dof(nxyz),dofp(nxyz))
     allocate(a2c(namax),aai(3,namax),ekti(namax))
 !.....1D TTM related arrays
     allocate(te1d(nd1d+1),tep1d(nd1d+1), &
@@ -367,6 +369,8 @@ contains
       call mpi_bcast(tl1d,nd1d+1,mpi_real8,0,mpi_world,ierr)
     endif
 
+    call assign_atom2cell(namax,natm,ra,sorg,boundary)
+    call compute_nac(natm,myid,mpi_world,iprint)
 !.....Set boundary position and left surface plane.
     call set_3d1d_bc_pos(natm,ra,h,sorg,myid,mpi_world,iprint)
     if( trim(surfmove).eq.'plane' ) then
@@ -694,6 +698,29 @@ contains
     
   end subroutine assign_atom2cell
 !=======================================================================
+  subroutine compute_nac(natm,myid,mpi_world,iprint)
+!
+!  Compute number of atoms (actually degree of freedom) in a cell.
+!
+    integer,intent(in):: natm,myid,mpi_world,iprint
+
+    integer:: i,ic,ierr
+    integer,allocatable,save:: nacl(:)
+
+    if( .not.allocated(nacl) ) allocate(nacl(nxyz))
+    
+!.....First distinguish center of mass vectors of cells
+    nacl(:) = 0
+    do i=1,natm
+      ic = a2c(i)
+      nacl(ic) = nacl(ic) + 1
+    enddo
+!.....NACL and NAC are temporal here, used just for normalization
+    nac(:) = 0
+    call mpi_reduce(nacl,nac,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
+
+  end subroutine compute_nac
+!=======================================================================
   subroutine calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
        ,istp,myid,mpi_world,iprint)
 !
@@ -706,30 +733,33 @@ contains
 
     integer:: i,ic,ierr,is,ix,iy,iz,l,ifmv,idof
     real(8):: ek,t0,vat(3),vatr(3)
-    integer,allocatable,save:: nacl(:),nacpl(:)
+    integer,allocatable,save:: dofl(:),dofpl(:)
     real(8),allocatable,save:: eksuml(:),ekpsuml(:),vacl(:,:)
 !!$    integer,external:: ifmvOf
 
-    if( .not. allocated(nacl) ) then
-      allocate(nacl(nxyz),nacpl(nxyz),eksuml(nxyz),ekpsuml(nxyz)&
+    if( myid.eq.0 .and. iprint.gt.1 ) print *,'calc_Ta...'
+
+    if( .not. allocated(dofl) ) then
+      allocate(dofl(nxyz),dofpl(nxyz),eksuml(nxyz),ekpsuml(nxyz)&
            ,vacl(3,nxyz))
     endif
 
     t0 = mpi_wtime()
 
+!!$    call compute_nac(natm,myid,mpi_world,iprint)
 !.....First distinguish center of mass vectors of cells
     vacl(:,:) = 0d0
-    nacl(:) = 0
+!!$    nacl(:) = 0
     do i=1,natm
       ic = a2c(i)
       vacl(1:3,ic) = vacl(1:3,ic) +va(1:3,i)
-      nacl(ic) = nacl(ic) + 1
+!!$      nacl(ic) = nacl(ic) + 1
     enddo
     vac(:,:) = 0d0
 !.....NACL and NAC are temporal here, used just for normalization
-    nac(:) = 0
+!!$    nac(:) = 0
+!!$    call mpi_reduce(nacl,nac,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
     call mpi_reduce(vacl,vac,3*nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
-    call mpi_reduce(nacl,nac,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
     do ic=1,nxyz
       if( nac(ic).eq.0 ) cycle
       vac(1:3,ic) = vac(1:3,ic) /nac(ic)
@@ -745,8 +775,8 @@ contains
       ekti(i) = (vatr(1)**2 +vatr(2)**2 +vatr(3)**2) *fekin(is)
     enddo
     
-    nacl(1:nxyz) = 0
-    nacpl(1:nxyz) = 0
+    dofl(1:nxyz) = 0
+    dofpl(1:nxyz) = 0
     eksuml(1:nxyz) = 0d0
     ekpsuml(1:nxyz) = 0d0
     do i=1,natm
@@ -756,19 +786,19 @@ contains
       do l=1,3
         idof = idof +nint(fmv(l,ifmv))
       enddo
-      nacl(ic) = nacl(ic) + idof
+      dofl(ic) = dofl(ic) + idof
       eksuml(ic) = eksuml(ic) +ekti(i)
       if( ek.gt.ekth ) then
-        nacpl(ic) = nacpl(ic) +idof
+        dofpl(ic) = dofpl(ic) +idof
         ekpsuml(ic) = ekpsuml(ic) +ekti(i)
       endif
     enddo
-    nac(1:nxyz) = 0
-    nacp(1:nxyz) = 0
+    dof(1:nxyz) = 0
+    dofp(1:nxyz) = 0
     eksum(1:nxyz) = 0d0
     ekpsum(1:nxyz) = 0d0
-    call mpi_reduce(nacl,nac,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
-    call mpi_reduce(nacpl,nacp,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(dofl,dof,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(dofpl,dofp,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
     call mpi_reduce(eksuml,eksum,nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
     call mpi_reduce(ekpsuml,ekpsum,nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
 !.....Compute Ta and Tap only at node-0
@@ -779,15 +809,14 @@ contains
         ta(:) = 0d0
         tap(:) = 0d0
         do ic=1,nxyz
-          if( nac(ic).eq.0 ) cycle
+          if( dof(ic).eq.0 ) cycle
 !!$          call ic2ixyz(ic,ix,iy,iz)
-!.....Degree of freedom per atom (3 in case of 3D) is included in nac
-!.....CHECK: This factor 3 looks causing the difference of energy in/out between at/el systems.
-          ta(ic) = eksum(ic) *2d0 /fkb /nac(ic)
-          gp(ic) = nac(ic) *fkb *gmmp(ic) /vcell ! /3
-          if( nacp(ic).eq.0 ) cycle
-          tap(ic) = ekpsum(ic) *2d0 /fkb /nacp(ic)
-          gs(ic) = nacp(ic) *fkb *gmms(ic) /vcell ! /3
+!.....Degree of freedom per atom (3 in case of 3D) is included in dof
+          ta(ic) = eksum(ic) *2d0 /fkb /dof(ic)
+          gp(ic) = dof(ic) *fkb *gmmp(ic) /vcell ! /3
+          if( dofp(ic).eq.0 ) cycle
+          tap(ic) = ekpsum(ic) *2d0 /fkb /dofp(ic)
+          gs(ic) = dofp(ic) *fkb *gmms(ic) /vcell ! /3
         enddo
         gp1d(:) = fkb *gmmp1d(:)*(rho_latt*3)
       else if( trim(ctype_coupling).eq.'constant_gp' ) then
@@ -797,11 +826,11 @@ contains
         ta(:) = 0d0
         tap(:) = 0d0
         do ic=1,nxyz
-          if( nac(ic).eq.0 ) cycle
+          if( dof(ic).eq.0 ) cycle
           call ic2ixyz(ic,ix,iy,iz)
-          ta(ic) = eksum(ic) *2d0 /fkb /nac(ic)
-          if( nacp(ic).eq.0 ) cycle
-          tap(ic) = ekpsum(ic) *2d0 /fkb /nacp(ic)
+          ta(ic) = eksum(ic) *2d0 /fkb /dof(ic)
+          if( dofp(ic).eq.0 ) cycle
+          tap(ic) = ekpsum(ic) *2d0 /fkb /dofp(ic)
           if( tap(ic)*0d0 .ne. 0d0 ) then
             print *,'ERROR: tap==NaN !!!'
             print *,'   ic,ix,iy,iz=',ic,ix,iy,iz
@@ -812,7 +841,7 @@ contains
 !.....in Langevin_ttm,
 !          gmmp(ic) = gp(ic)*vcell*(te(iz,iy,ix)-ta(ic))/2/eksum(ic)
 !.....Here inverse of constant_gmmp will be used.
-          gmmp(ic) = vcell*gp(ic) /fkb /nac(ic)
+          gmmp(ic) = vcell*gp(ic) /fkb /dof(ic)
         enddo
         gmmp1d(:) = gp1d(:)/fkb /(rho_latt*3)
       endif
@@ -1488,16 +1517,15 @@ contains
       do iy=1,ny
         do iz=1,nz
           call ixyz2ic(ix,iy,iz,icl)
-!.....Since nac is not a number of atoms, but DOF in a cell, divide it by 3
-          densx(ix) = densx(ix) +dble(nac(icl))/3
+          densx(ix) = densx(ix) +dble(nac(icl)) !/3
 !.....Check true lsurf from given Te(:,:,:)
           tmp = tmp +te(iz,iy,ix)
         enddo
       enddo
       densx(ix) = densx(ix)/volyz
       if( densx(ix) .gt. dthresh ) lexists(ix) = .true.
-!!$      print *,'ix,densx,lexists=',ix,densx(ix),lexists(ix)
       if( tmp.gt.0d0 ) lsurf_true = ix
+!!$      print *,'ix,densx,lexists,nac=',ix,densx(ix),lexists(ix),nac(icl)
     enddo
 
 !.....Right-most layer of vacuum and right-most layer of material
@@ -1549,8 +1577,8 @@ contains
       endif
     endif
     if( myid.eq.0 .and. iprint.gt.1 ) then
-      print '(a,2i4,5es12.4)', ' lsurf,ivac_right,densx= ' &
-           ,lsurf,ivac_right,densx(max(1,lsurf-2):lsurf+2)
+      print '(a,3i4,5es12.4)', ' lsurf,ivac_right,imatt_right,densx= ' &
+           ,lsurf,ivac_right,imatt_right,densx(max(1,lsurf-2):lsurf+2)
     endif
     l1st = .false.
     return

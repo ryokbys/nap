@@ -1,0 +1,257 @@
+========================================================================
+ PMD: A Parallel Molecular Dynamics program 
+ 
+ Revision: rev210202
+ Contributors: 
+   - Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>
+========================================================================
+ 
+ Job started at 21:29:43 on 2021-02-05
+ 
+ Read pmdini in ascii mode.
+ Species order read from pmdini option: 
+    1:   Si
+ 
+ Lattice vectors:
+   a = [     1085.400       0.000       0.000 ]
+   b = [        0.000       5.427       0.000 ]
+   c = [        0.000       0.000       5.427 ]
+ Lattice parameters:
+   |a| =   1085.400 Ang.,  alpha =   90.00 deg.
+   |b| =      5.427 Ang.,  beta  =   90.00 deg.
+   |c| =      5.427 Ang.,  gamma =   90.00 deg.
+ Cell volume = 31967.56 Ang^3
+ Number of each species in the initial configuration
+   Si :  1400
+ 
+ Number of processes in MPI = 1
+ 
+------------------------------------------------------------------------
+           Initial setting   
+------------------------------------------------------------------------
+  num_nodes_x     -1
+  num_nodes_y     -1
+  num_nodes_z     -1
+  
+  io_format     ascii 
+  print_level     1
+  
+  time_interval     -2.000
+  num_iteration     100
+  num_out_energy     1000
+  
+  flag_out_pmd     2
+  num_out_pmd     100
+  dump_aux_order    ekin epot sxx syy szz tei 
+  
+  force_type     Tersoff
+  cutoff_radius      3.400
+  cutoff_buffer      0.300
+  
+  flag_damping     0
+  damping_coeff     .9000
+  converge_eps     .0001
+  converge_num     3
+  min_iteration     5
+  
+  temperature_control     ttm
+  initial_temperature       600.00
+  remove_translation     0
+  
+  stress_control     none
+ 
+  zload_type     none
+  
+  factor_direction
+       0   0.000   0.000   0.000
+       1   1.000   1.000   1.000
+       2   0.000   1.000   1.000
+       3   1.000   1.000   1.000
+       4   1.000   1.000   1.000
+       5   1.000   1.000   1.000
+       6   1.000   1.000   1.000
+       7   1.000   1.000   1.000
+       8   1.000   1.000   1.000
+       9   1.000   1.000   1.000
+  
+  mass
+       1 Si    28.0850
+  
+  boundary     fpp
+  
+------------------------------------------------------------------------
+ 
+ NOTICE: Since using the two-temperature model (TTM) MD:
+   - Set damping off.
+   - Set removal of translation off.
+
+ Broadcast data to be shared with all the nodes.
+ Number of spatial divisions automatically set, NX,NY,NZ= 1 1 1
+ 
+ Ensemble = NVT
+ 
+ Number of ifmvs = 1
+ 
+ Use variable time-step: dtmax =    2.000 fs
+ rcut, rbuf =  3.400 0.300
+ Min number of local atoms =       1400
+ Max number of local atoms =       1400
+   nbmax =      17479
+   namax = nalmax*1.2 + nbmax  =      19159
+   nnmax =         30
+ Memory for main routine   =         11 MByte
+ 
+ Number of total atoms = 1400
+ Number of species     = 1
+ Degrees of freedom for each ifmv =  4200  0  0  0  0  0  0  0  0
+   Initial Te =       300.0 K
+ 
+ TTM parameters:
+   Fluence =   4.0000E+01 eV/A^2, =   0.0641 J/cm^2
+   Pulse duration = 500.000 fs
+   Intensity =   3.2000E-04 eV/A^2/fs
+   Penetration depth =   2.5000E+02 A
+   Total incident energy = 1178.1 eV
+   Electron density = .0500 e/A^3
+   Diff. Eq. solver :  RK4
+   inner_loop =     1
+   dtmd, dt =   2.0000E+00  2.0000E+00 fs (but it is variable)
+   nx,ny,nz,nxyz =   100    1    1     100
+   dx,dy,dz,vcell =   1.0854E+01  5.4270E+00  5.4270E+00  3.1968E+02
+   area,darea =   2.9452E+01  2.9452E+01
+   lsurf,ibc3d,ibc1d,xlsurf,xbc3d =    11   95   52  1.1397E+02  1.0257E+03
+   gamma_p,gamma_s =   5.0000E-04  1.0000E-01
+   Ce_Tdep = polynomial
+     Note that the minimum Te is set:
+     Minimum Te = 300.0
+   Memory for TTM = .623 MByte
+ 
+ Use the following force-fields:  Tersoff 
+ WARNING: in.params.Tersoff does not exist !!!.
+          Use default parameters.
+ Max num of neighbors at 1st call = 4
+ Tersoff potential:
+   cutoff radius =   3.300 A
+ 
+ Initial values:
+   Kinetic energy  =        110.15438 eV =      0.079 eV/atom
+   Potential energy=      -6475.39458 eV =     -4.625 eV/atom
+   Temperature 1   =        609.14399 K
+   Temperature     =        609.14399 K
+   Pressure        =          0.44982 GPa (compressive)
+   Stress tensor   = .458 .455 .437 -.014 .004 -.004
+ 
+ istp,etime,temp,epot,vol,prss=   0        0.01      609.14  -6.4754E+03  3.197E+04  4.498E-01
+# ABLATED: ID, time, position (y,z), velocity (x,y,z)
+ istp,etime,temp,epot,vol,prss=   1        0.03      593.26  -6.4725E+03  3.197E+04  4.688E-01
+ istp,etime,temp,epot,vol,prss=   2        0.05      547.15  -6.4642E+03  3.197E+04  5.199E-01
+ istp,etime,temp,epot,vol,prss=   3        0.06      478.11  -6.4519E+03  3.197E+04  5.942E-01
+ istp,etime,temp,epot,vol,prss=   4        0.08      398.63  -6.4374E+03  3.197E+04  6.800E-01
+ istp,etime,temp,epot,vol,prss=   5        0.10      319.24  -6.4228E+03  3.197E+04  7.617E-01
+ istp,etime,temp,epot,vol,prss=   6        0.11      250.88  -6.4101E+03  3.197E+04  8.251E-01
+ istp,etime,temp,epot,vol,prss=   7        0.13      201.05  -6.4010E+03  3.197E+04  8.583E-01
+ istp,etime,temp,epot,vol,prss=   8        0.15      175.40  -6.3962E+03  3.197E+04  8.571E-01
+ istp,etime,temp,epot,vol,prss=   9        0.17      174.60  -6.3958E+03  3.197E+04  8.221E-01
+ istp,etime,temp,epot,vol,prss=  10        0.18      193.38  -6.3990E+03  3.197E+04  7.586E-01
+ istp,etime,temp,epot,vol,prss=  11        0.20      226.94  -6.4047E+03  3.197E+04  6.780E-01
+ istp,etime,temp,epot,vol,prss=  12        0.22      265.78  -6.4114E+03  3.197E+04  5.913E-01
+ istp,etime,temp,epot,vol,prss=  13        0.23      303.01  -6.4178E+03  3.197E+04  5.110E-01
+ istp,etime,temp,epot,vol,prss=  14        0.25      330.32  -6.4227E+03  3.197E+04  4.465E-01
+ istp,etime,temp,epot,vol,prss=  15        0.27      346.38  -6.4253E+03  3.197E+04  4.060E-01
+ istp,etime,temp,epot,vol,prss=  16        0.29      350.84  -6.4256E+03  3.197E+04  3.925E-01
+ istp,etime,temp,epot,vol,prss=  17        0.30      341.46  -6.4235E+03  3.197E+04  4.047E-01
+ istp,etime,temp,epot,vol,prss=  18        0.32      323.39  -6.4194E+03  3.197E+04  4.411E-01
+ istp,etime,temp,epot,vol,prss=  19        0.34      295.38  -6.4141E+03  3.197E+04  4.922E-01
+ istp,etime,temp,epot,vol,prss=  20        0.36      266.67  -6.4084E+03  3.197E+04  5.528E-01
+ istp,etime,temp,epot,vol,prss=  21        0.37      241.35  -6.4033E+03  3.197E+04  6.143E-01
+ istp,etime,temp,epot,vol,prss=  22        0.39      223.64  -6.3995E+03  3.197E+04  6.680E-01
+ istp,etime,temp,epot,vol,prss=  23        0.41      215.77  -6.3976E+03  3.197E+04  7.061E-01
+ istp,etime,temp,epot,vol,prss=  24        0.42      220.78  -6.3981E+03  3.197E+04  7.258E-01
+ istp,etime,temp,epot,vol,prss=  25        0.44      239.06  -6.4011E+03  3.197E+04  7.256E-01
+ istp,etime,temp,epot,vol,prss=  26        0.46      268.45  -6.4059E+03  3.197E+04  7.097E-01
+ istp,etime,temp,epot,vol,prss=  27        0.48      302.99  -6.4120E+03  3.197E+04  6.824E-01
+ istp,etime,temp,epot,vol,prss=  28        0.49      341.02  -6.4183E+03  3.197E+04  6.536E-01
+ istp,etime,temp,epot,vol,prss=  29        0.51      373.96  -6.4237E+03  3.197E+04  6.292E-01
+ istp,etime,temp,epot,vol,prss=  30        0.53      398.58  -6.4276E+03  3.197E+04  6.168E-01
+ istp,etime,temp,epot,vol,prss=  31        0.55      411.52  -6.4293E+03  3.197E+04  6.199E-01
+ istp,etime,temp,epot,vol,prss=  32        0.56      412.40  -6.4288E+03  3.197E+04  6.390E-01
+ istp,etime,temp,epot,vol,prss=  33        0.58      402.81  -6.4266E+03  3.197E+04  6.709E-01
+ istp,etime,temp,epot,vol,prss=  34        0.60      386.55  -6.4231E+03  3.197E+04  7.106E-01
+ istp,etime,temp,epot,vol,prss=  35        0.62      369.89  -6.4192E+03  3.197E+04  7.520E-01
+ istp,etime,temp,epot,vol,prss=  36        0.63      354.49  -6.4157E+03  3.197E+04  7.868E-01
+ istp,etime,temp,epot,vol,prss=  37        0.65      343.41  -6.4131E+03  3.197E+04  8.083E-01
+ istp,etime,temp,epot,vol,prss=  38        0.67      338.14  -6.4118E+03  3.197E+04  8.128E-01
+ istp,etime,temp,epot,vol,prss=  39        0.69      343.93  -6.4119E+03  3.197E+04  8.019E-01
+ istp,etime,temp,epot,vol,prss=  40        0.70      354.29  -6.4130E+03  3.197E+04  7.759E-01
+ istp,etime,temp,epot,vol,prss=  41        0.72      364.61  -6.4146E+03  3.197E+04  7.378E-01
+ istp,etime,temp,epot,vol,prss=  42        0.74      376.60  -6.4161E+03  3.197E+04  6.966E-01
+ istp,etime,temp,epot,vol,prss=  43        0.76      384.74  -6.4168E+03  3.197E+04  6.577E-01
+ istp,etime,temp,epot,vol,prss=  44        0.78      385.80  -6.4163E+03  3.197E+04  6.270E-01
+ istp,etime,temp,epot,vol,prss=  45        0.79      376.83  -6.4143E+03  3.197E+04  6.083E-01
+ istp,etime,temp,epot,vol,prss=  46        0.81      363.66  -6.4110E+03  3.197E+04  6.059E-01
+ istp,etime,temp,epot,vol,prss=  47        0.83      342.17  -6.4066E+03  3.197E+04  6.164E-01
+ istp,etime,temp,epot,vol,prss=  48        0.85      317.84  -6.4016E+03  3.197E+04  6.390E-01
+ istp,etime,temp,epot,vol,prss=  49        0.86      295.15  -6.3967E+03  3.197E+04  6.696E-01
+ istp,etime,temp,epot,vol,prss=  50        0.88      275.42  -6.3925E+03  3.197E+04  7.017E-01
+ istp,etime,temp,epot,vol,prss=  51        0.90      263.31  -6.3897E+03  3.197E+04  7.314E-01
+ istp,etime,temp,epot,vol,prss=  52        0.92      258.27  -6.3886E+03  3.197E+04  7.513E-01
+ istp,etime,temp,epot,vol,prss=  53        0.93      267.60  -6.3894E+03  3.197E+04  7.633E-01
+ istp,etime,temp,epot,vol,prss=  54        0.95      284.95  -6.3920E+03  3.197E+04  7.624E-01
+ istp,etime,temp,epot,vol,prss=  55        0.97      311.07  -6.3961E+03  3.197E+04  7.503E-01
+ istp,etime,temp,epot,vol,prss=  56        0.99      342.72  -6.4010E+03  3.197E+04  7.307E-01
+ istp,etime,temp,epot,vol,prss=  57        1.01      375.62  -6.4062E+03  3.197E+04  7.068E-01
+ istp,etime,temp,epot,vol,prss=  58        1.02      407.37  -6.4111E+03  3.197E+04  6.841E-01
+ istp,etime,temp,epot,vol,prss=  59        1.04      431.66  -6.4152E+03  3.197E+04  6.650E-01
+ istp,etime,temp,epot,vol,prss=  60        1.06      452.87  -6.4179E+03  3.197E+04  6.577E-01
+ istp,etime,temp,epot,vol,prss=  61        1.08      465.21  -6.4191E+03  3.197E+04  6.624E-01
+ istp,etime,temp,epot,vol,prss=  62        1.09      466.83  -6.4187E+03  3.197E+04  6.788E-01
+ istp,etime,temp,epot,vol,prss=  63        1.11      463.63  -6.4169E+03  3.197E+04  7.092E-01
+ istp,etime,temp,epot,vol,prss=  64        1.13      452.95  -6.4140E+03  3.197E+04  7.492E-01
+ istp,etime,temp,epot,vol,prss=  65        1.15      436.46  -6.4102E+03  3.197E+04  7.956E-01
+ istp,etime,temp,epot,vol,prss=  66        1.16      416.22  -6.4061E+03  3.197E+04  8.434E-01
+ istp,etime,temp,epot,vol,prss=  67        1.18      397.92  -6.4021E+03  3.197E+04  8.890E-01
+ istp,etime,temp,epot,vol,prss=  68        1.20      384.15  -6.3986E+03  3.197E+04  9.275E-01
+ istp,etime,temp,epot,vol,prss=  69        1.21      376.35  -6.3960E+03  3.197E+04  9.549E-01
+ istp,etime,temp,epot,vol,prss=  70        1.23      375.36  -6.3947E+03  3.197E+04  9.657E-01
+ istp,etime,temp,epot,vol,prss=  71        1.25      381.40  -6.3948E+03  3.197E+04  9.593E-01
+ istp,etime,temp,epot,vol,prss=  72        1.27      395.98  -6.3961E+03  3.197E+04  9.381E-01
+ istp,etime,temp,epot,vol,prss=  73        1.28      412.34  -6.3983E+03  3.197E+04  9.031E-01
+ istp,etime,temp,epot,vol,prss=  74        1.30      435.01  -6.4009E+03  3.197E+04  8.622E-01
+ istp,etime,temp,epot,vol,prss=  75        1.32      453.99  -6.4034E+03  3.197E+04  8.181E-01
+ istp,etime,temp,epot,vol,prss=  76        1.33      469.24  -6.4054E+03  3.197E+04  7.769E-01
+ istp,etime,temp,epot,vol,prss=  77        1.35      478.07  -6.4065E+03  3.197E+04  7.427E-01
+ istp,etime,temp,epot,vol,prss=  78        1.37      481.07  -6.4063E+03  3.197E+04  7.217E-01
+ istp,etime,temp,epot,vol,prss=  79        1.39      476.23  -6.4048E+03  3.197E+04  7.146E-01
+ istp,etime,temp,epot,vol,prss=  80        1.40      465.69  -6.4019E+03  3.197E+04  7.227E-01
+ istp,etime,temp,epot,vol,prss=  81        1.42      450.46  -6.3979E+03  3.197E+04  7.446E-01
+ istp,etime,temp,epot,vol,prss=  82        1.44      425.73  -6.3931E+03  3.197E+04  7.728E-01
+ istp,etime,temp,epot,vol,prss=  83        1.46      401.47  -6.3881E+03  3.197E+04  8.066E-01
+ istp,etime,temp,epot,vol,prss=  84        1.47      381.62  -6.3833E+03  3.197E+04  8.416E-01
+ istp,etime,temp,epot,vol,prss=  85        1.49      363.36  -6.3793E+03  3.197E+04  8.709E-01
+ istp,etime,temp,epot,vol,prss=  86        1.51      352.05  -6.3765E+03  3.197E+04  8.917E-01
+ istp,etime,temp,epot,vol,prss=  87        1.53      354.74  -6.3754E+03  3.197E+04  9.042E-01
+ istp,etime,temp,epot,vol,prss=  88        1.54      364.36  -6.3758E+03  3.197E+04  9.044E-01
+ istp,etime,temp,epot,vol,prss=  89        1.56      378.50  -6.3776E+03  3.197E+04  8.930E-01
+ istp,etime,temp,epot,vol,prss=  90        1.58      401.63  -6.3805E+03  3.197E+04  8.767E-01
+ istp,etime,temp,epot,vol,prss=  91        1.60      428.89  -6.3840E+03  3.197E+04  8.584E-01
+ istp,etime,temp,epot,vol,prss=  92        1.61      452.21  -6.3876E+03  3.197E+04  8.397E-01
+ istp,etime,temp,epot,vol,prss=  93        1.63      474.73  -6.3908E+03  3.197E+04  8.271E-01
+ istp,etime,temp,epot,vol,prss=  94        1.65      498.68  -6.3934E+03  3.197E+04  8.262E-01
+ istp,etime,temp,epot,vol,prss=  95        1.66      509.98  -6.3950E+03  3.197E+04  8.304E-01
+ istp,etime,temp,epot,vol,prss=  96        1.68      516.99  -6.3955E+03  3.197E+04  8.461E-01
+ istp,etime,temp,epot,vol,prss=  97        1.70      516.75  -6.3948E+03  3.197E+04  8.701E-01
+ istp,etime,temp,epot,vol,prss=  98        1.72      514.85  -6.3933E+03  3.197E+04  9.015E-01
+ istp,etime,temp,epot,vol,prss=  99        1.73      506.47  -6.3911E+03  3.197E+04  9.331E-01
+ istp,etime,temp,epot,vol,prss= 100        1.75      501.31  -6.3887E+03  3.197E+04  9.655E-01
+ 
+ Final values:
+   Kinetic energy  =         90.65422 eV =      0.065 eV/atom
+   Potential energy=      -6388.74004 eV =     -4.563 eV/atom
+   Temperature 1   =        501.30982 K
+   Temperature     =        501.30982 K
+   Pressure        =          0.96547 GPa (compressive)
+ 
+ Time for TTM          =       0.06
+ Time                  =       1.76 sec  =   0h00m01s
+ 
+ Job finished at 21:29:44 on 2021-02-05
