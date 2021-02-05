@@ -115,8 +115,8 @@ module variables
     integer,allocatable:: ifcal(:)
     real(8),allocatable:: fabs(:)
     real(8),allocatable:: va(:,:),strsi(:,:,:),eki(:,:,:),epi(:)&
-         ,chg(:),chi(:),tei(:),clr(:),fsub(:,:),eatm(:)
-!!$    real(8),allocatable:: gwe(:),gwf(:,:,:),gws(:,:)
+         ,fsub(:,:),eatm(:)
+    real(8),allocatable:: aux(:,:)
 !.....This specorder is for this sample
     character(len=3),dimension(nspmax):: specorder  &
          = (/'x','x','x','x','x','x','x','x','x'/)

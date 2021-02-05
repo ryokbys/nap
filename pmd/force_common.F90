@@ -1,4 +1,4 @@
-subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
+subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
      ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr &
      ,sorg,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs &
      ,ifcoulomb,iprint,l1st &
@@ -9,6 +9,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
 !  new force routine should also be implemented in this subroutine.
 !-----------------------------------------------------------------------
   use force
+  use pmdio,only: iauxof
   use RK_FeH,only:force_RK_FeH
   use Ramas_FeH,only:force_Ramas_FeH,force_Ackland_Fe
   use RK_WHe,only:force_RK_WHe
@@ -51,13 +52,16 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
        ,tag(namax),sorg(3)
   real(8),intent(inout):: tcom,rc
   real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
-       ,chg(namax),chi(namax),tei(namax),stnsr(3,3)
+       ,stnsr(3,3)
+!!$  real(8),intent(inout):: chg(namax),chi(namax),tei(namax)
+  integer,intent(in):: naux
+  real(8),intent(inout):: aux(namax,naux)
 !!$    character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: l1st,lstrs,lcell_updated
   logical,intent(inout):: lvc
   character(len=3),intent(in):: boundary, specorder(nismax)
 
-  integer:: ierr,is,i
+  integer:: ierr,is,i,ichg
   real(8):: at(3),tmp
 
   epot = 0d0
@@ -76,16 +80,20 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
     if( l1st .and. myid_md.eq.0 .and. iprint.ne.0 ) then
       write(6,'(/a)') ' Charges are to be equilibrated.'
     endif
-    call dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
+    call dampopt_charge(namax,natm,tag,h,ra, &
+         aux(:,iauxof('chg')),aux(:,iauxof('chi')), &
+         nnmax,lspr,rc, &
          lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
          sorg,tcom,myid_md,mpi_md_world,iprint,l1st,boundary)
     if( l1st .and. myid_md.eq.0 .and. iprint.ge.20 ) then
       write(6,'(/a)') ' Charges:'
       tmp = 0d0
+      ichg = iauxof('chg')
       do i=1,natm
-        tmp = tmp +chg(i)
+!!$        tmp = tmp +chg(i)
+        tmp = tmp +aux(i,ichg)
         if( i.gt.100 ) cycle
-        write(6,'(a,i5,i3,f8.3)') '   i,is,chg(i) = ',i,int(tag(i)),chg(i)
+        write(6,'(a,i5,i3,f8.3)') '   i,is,chg(i) = ',i,int(tag(i)),aux(i,ichg)
       enddo
       write(6,'(a,f0.3)') ' Total charge = ',tmp
     endif
@@ -122,7 +130,8 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('Tersoff') ) call force_tersoff(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,tei)
+       ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint &
+       ,aux(:,iauxof('tei')))
   if( use_force('Brenner') ) call force_Brenner(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
@@ -188,7 +197,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('vcMorse') ) call force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,aux(:,iauxof('chg')),h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Buckingham') ) call force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
@@ -228,26 +237,26 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
 !.....Exclusive choice of different Coulomb force-fields
   if( use_force('screened_Coulomb') ) then ! screened Coulomb
     call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-         ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
+         ,aux(:,iauxof('chg')),h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
          ,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,specorder)
   else if( use_force('Ewald') ) then  ! Ewald Coulomb
     call force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
-         ,chg,chi,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
-         ,myparity,nnn,sv,rc,lspr,sorg &
+         ,aux(:,iauxof('chg')),aux(:,iauxof('chi')),h,hi,tcom,nb,nbmax &
+         ,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   else if( use_force('Ewald_long') ) then ! long-range Coulomb
     call force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
-         ,chg,chi,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
-         ,myparity,nnn,sv,rc,lspr,sorg &
+         ,aux(:,iauxof('chg')),aux(:,iauxof('chi')),h,hi,tcom,nb,nbmax &
+         ,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   else if( use_force('Coulomb') ) then  ! Coulomb
     call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-         ,chg,chi,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
-         ,myparity,nnn,sv,rc,lspr,sorg &
+         ,aux(:,iauxof('chg')),aux(:,iauxof('chi')),h,hi,tcom,nb,nbmax &
+         ,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc,specorder)
   endif
@@ -260,7 +269,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
 
 end subroutine get_force
 !=======================================================================
-subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
+subroutine init_force(namax,natm,nsp,tag,aux,naux,myid_md,mpi_md_world, &
      iprint,h,rc,lvc,ifcoulomb,specorder,amass)
 !
 !  Initialization routine is separated from main get_force routine.
@@ -279,7 +288,7 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use descriptor, only: read_params_desc,init_desc,lprmset_desc
   use NN2, only: read_params_NN2,lprmset_NN2,update_params_NN2
   use DNN, only: read_params_DNN,lprmset_DNN,update_params_DNN
-  use pmdio,only: nspmax
+  use pmdio,only: nspmax,iauxof
   use tersoff,only: init_tersoff
   use dipole,only: read_params_dipole
   use Abell,only: read_params_Abell, lprmset_Abell
@@ -287,12 +296,13 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   use fpc,only: read_params_fpc, lprmset_fpc
   use angular,only: read_params_angular, lprmset_angular
   implicit none
-  integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint !,numff
+  integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint,naux !,numff
   real(8),intent(in):: tag(namax),h(3,3),rc,amass(nspmax)
   character(len=3),intent(in):: specorder(nspmax)
 !!$    character(len=20),intent(in):: cffs(numff)
   integer,intent(inout):: ifcoulomb
-  real(8),intent(inout):: chg(namax),chi(namax)
+!!$  real(8),intent(inout):: chg(namax),chi(namax)
+  real(8),intent(inout):: aux(namax,naux)
   logical,intent(inout):: lvc
 
   integer:: i,j
@@ -333,12 +343,14 @@ subroutine init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
   if( use_force('screened_Coulomb') .or. &
        use_force('Ewald') .or. &
        use_force('Ewald_long') ) then
-    call initialize_coulomb(natm,nsp,tag,chg,chi,myid_md &
-         ,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
+    call initialize_coulomb(natm,nsp,tag, &
+         aux(:,iauxof('chg')),aux(:,iauxof('chi')), &
+         myid_md,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
   else if( use_force('Coulomb') ) then
     if( .not. lprmset_Coulomb ) then
-      call initialize_coulombx(natm,nsp,tag,chg,chi,myid_md &
-           ,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
+      call initialize_coulombx(natm,nsp,tag, &
+           aux(:,iauxof('chg')),aux(:,iauxof('chi')), &
+           myid_md,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
     endif
   endif
 

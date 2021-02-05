@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-12-24 08:01:44 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-05 11:09:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -193,25 +193,6 @@ program fitpot
     call cg_wrapper(ftrn0,ftst0)
   case ('bfgs','BFGS','dfp','DFP')
     call qn_wrapper(ftrn0,ftst0)
-  case ('sa','SA')
-    call sa_wrapper(ftrn0,ftst0)
-  case ('ga','GA')
-    call ga_wrapper(ftrn0,ftst0)
-  case ('de','DE')
-    call de_wrapper(ftrn0,ftst0)
-  case ('pso','PSO')
-    call pso_wrapper(ftrn0,ftst0)
-  case ('md','metadynamics')
-    call md_wrapper(ftrn0,ftst0)
-  case ('random_search','random')
-    call random_search_wrapper(ftrn0,ftst0)
-  case ('fs','FS')
-!!$    call fs_wrapper(ftrn0,ftst0)
-    if( myid.eq.0 ) print *,'FS is not available in the current version.'
-  case ('gfs')
-    call gfs_wrapper(ftrn0,ftst0)
-  case ('sgd','SGD')
-    call sgd_wrapper(ftrn0,ftst0)
   case ('check_grad')
     call check_grad(ftrn0,ftst0)
   case ('test','TEST')
@@ -689,29 +670,20 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
        ,smpl%fref(3,natm), smpl%ifcal(natm),smpl%fabs(natm) &
        ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
        ,smpl%eki(3,3,natm),smpl%epi(natm) &
-       ,smpl%chg(natm),smpl%chi(natm),smpl%tei(natm),smpl%clr(natm) &
        ,smpl%fsub(3,natm),smpl%eatm(natm) )
-!!$       ,smpl%eatm(natm) &
-!!$       ,smpl%gwe(nvars),smpl%gwf(3,nvars,natm),smpl%gws(6,nvars))
   dmem = dmem +8d0*size(smpl%ra) +8d0*size(smpl%fa) +8d0*size(smpl%tag) &
        +8d0*size(smpl%fref) +4d0*size(smpl%ifcal) +8d0*size(smpl%fabs) &
        +8d0*size(smpl%va) +8d0*size(smpl%strsi) +8d0*size(smpl%eki) +8d0*size(smpl%epi) &
-       +8d0*size(smpl%chg) +8d0*size(smpl%chi) +8d0*size(smpl%tei) +8d0*size(smpl%clr) &
        +8d0*size(smpl%fsub) +8d0*size(smpl%eatm)
-!!$       +8d0*size(smpl%eatm) +8d0*size(smpl%gwe) +8d0*size(smpl%gwf) +8d0*size(smpl%gws)
   if( lgdw ) then
     allocate(smpl%gdf(natm),smpl%gdw(natm))
     dmem = dmem +8d0*size(smpl%gdf) +8d0*size(smpl%gdw)
   endif
-  smpl%chg(1:natm) = 0d0
-  smpl%tei(1:natm) = 0d0
-  smpl%clr(1:natm) = 0d0
   smpl%esub= 0d0
   smpl%fsub(1:3,1:natm)= 0d0
   smpl%ssub(1:3,1:3) = 0d0
   do i=1,smpl%natm
-    read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), &
-         tmp,tmp,tmp
+    read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), tmp,tmp,tmp
   enddo
   close(ionum)
 end subroutine read_pos
@@ -957,217 +929,6 @@ subroutine cg_wrapper(ftrn0,ftst0)
   
   return
 end subroutine cg_wrapper
-!=======================================================================
-subroutine sa_wrapper(ftrn0,ftst0)
-  use variables
-  use parallel
-  use minimize
-  use fp_common,only: func_w_pmd, grad_w_pmd
-  implicit none
-  real(8),intent(in):: ftrn0,ftst0
-  real(8):: fval
-  external:: write_stats
-
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
-       .or. trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' &
-       .or. trim(cpot).eq.'DNN' ) then
-    call sa(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
-         ,iprint,iflag,myid,func_w_pmd,cfmethod &
-         ,niter_eval,write_stats)
-  else
-    if(myid.eq.0) print *,'Simulated annealing is not available for '//&
-         trim(cpot)
-  endif
-
-  return
-end subroutine sa_wrapper
-!=======================================================================
-subroutine md_wrapper(ftrn0,ftst0)
-  use variables
-  use parallel
-  use minimize
-  use fp_common,only: func_w_pmd, grad_w_pmd
-  implicit none
-  real(8),intent(in):: ftrn0,ftst0
-  real(8):: fval
-  external:: write_stats
-
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
-       .or. trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' &
-       .or. trim(cpot).eq.'DNN' ) then
-    call metadynamics(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
-         ,iprint,iflag,myid,func_w_pmd,cfmethod &
-         ,niter_eval,write_stats)
-  else
-    if(myid.eq.0) print *,'Metadynamics is not available for '//&
-         trim(cpot)
-  endif
-
-  return
-end subroutine md_wrapper
-!=======================================================================
-subroutine ga_wrapper(ftrn0,ftst0)
-  use variables
-  use parallel
-  use minimize
-  use fp_common,only: func_w_pmd, grad_w_pmd
-  implicit none
-  real(8),intent(in):: ftrn0,ftst0
-  real(8):: fval
-  external:: write_stats,write_energy_relation
-
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' .or. &
-       index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' .or. &
-       trim(cpot).eq.'Abell' .or. trim(cpot).eq.'BMH' .or. &
-       trim(cpot).eq.'fpc' ) then
-    call ga(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
-         ,iprint,iflag,myid,func_w_pmd,cfmethod &
-         ,niter_eval,write_stats,write_energy_relation)
-  else
-    if(myid.eq.0) print *,'Genetic Algorithm (GA) is not available for '//&
-         trim(cpot)
-  endif
-
-  return
-end subroutine ga_wrapper
-!=======================================================================
-subroutine de_wrapper(ftrn0,ftst0)
-  use variables
-  use parallel
-  use minimize
-  use fp_common,only: func_w_pmd, grad_w_pmd
-  implicit none
-  real(8),intent(in):: ftrn0,ftst0
-  real(8):: fval
-  external:: write_stats, write_energy_relation
-
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' .or. &
-       index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' .or. &
-       trim(cpot).eq.'Abell' .or. trim(cpot).eq.'BMH' .or. &
-       trim(cpot).eq.'fpc' ) then
-    call de(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
-         ,iprint,iflag,myid,func_w_pmd,cfmethod &
-         ,niter_eval,write_stats, write_energy_relation)
-  else
-    if(myid.eq.0) print *,'Differential evolution (DE) is not available for '//&
-         trim(cpot)
-  endif
-
-  return
-end subroutine de_wrapper
-!=======================================================================
-subroutine pso_wrapper(ftrn0,ftst0)
-  use variables
-  use parallel
-  use minimize
-  use fp_common,only: func_w_pmd, grad_w_pmd
-  implicit none
-  real(8),intent(in):: ftrn0,ftst0
-  real(8):: fval
-  external:: write_stats
-
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' .or. &
-       index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' .or. &
-       trim(cpot).eq.'BMH' .or. trim(cpot).eq.'Abell' .or. &
-       trim(cpot).eq.'fpc'  ) then
-    call pso(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
-         ,iprint,iflag,myid,func_w_pmd,cfmethod &
-         ,niter_eval,write_stats)
-  else
-    if(myid.eq.0) print *,'Particle Swarm Optimization (PSO) is'//&
-         ' not available for '//trim(cpot)
-  endif
-
-  return
-end subroutine pso_wrapper
-!=======================================================================
-subroutine random_search_wrapper(ftrn0,ftst0)
-  use variables
-  use parallel
-  use minimize
-  use fp_common,only: func_w_pmd, grad_w_pmd
-  implicit none
-  real(8),intent(in):: ftrn0,ftst0
-  real(8):: fval
-  external:: write_stats
-
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' .or. &
-       trim(cpot).eq.'EAM' .or. trim(cpot).eq.'NN2' ) then
-    call random_search(nvars,vars,fval,vranges,xtol,gtol,ftol,niter &
-         ,iprint,iflag,myid,func_w_pmd,cfmethod &
-         ,niter_eval,write_stats)
-  else
-    if(myid.eq.0) print *,'Random search is not available for '//&
-         trim(cpot)
-  endif
-  
-end subroutine random_search_wrapper
-!=======================================================================
-subroutine sgd_wrapper(ftrn0,ftst0)
-!
-! Wrapper for SGD
-!
-  use variables
-  use minimize
-  use parallel
-  use fp_common,only: func_w_pmd, grad_w_pmd
-  implicit none
-  real(8),intent(in):: ftrn0,ftst0
-  real(8):: fval
-  external:: write_stats
-
-  call sgd(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
-       ,iprint,iflag,myid,mynsmpl,isid0,isid1,func_w_pmd,grad_w_pmd,cfmethod &
-       ,niter_eval,write_stats)
-
-end subroutine sgd_wrapper
-!=======================================================================
-subroutine fs_wrapper(ftrn0,ftst0)
-  use variables
-!!$  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
-  use parallel
-  use minimize
-  implicit none
-  real(8),intent(in):: ftrn0,ftst0
-
-  !.....NN specific code hereafter
-!!$  call NN_init()
-!!$  call fs(nvars,vars,fval,gvar,dvar,xtol,gtol,ftol,niter &
-!!$       ,iprint,iflag,myid,NN_func,NN_grad)
-!!$  call NN_analyze("fin")
-!!$  call NN_restore_standard()
-
-  return
-end subroutine fs_wrapper
-!=======================================================================
-subroutine gfs_wrapper(ftrn0,ftst0)
-  use variables
-  use parallel
-  use minimize
-  use fp_common,only: func_w_pmd, grad_w_pmd
-  implicit none
-  real(8),intent(in):: ftrn0,ftst0
-  real(8):: ftrn,ftst
-  external:: write_stats
-
-  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2' ) then
-    ftrn = ftrn0
-    ftst = ftst0
-    call gfs(nvars,vars,ftrn,ftst,gvar,dvar,xtol,gtol,ftol,vranges,niter &
-         ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
-         ,niter_eval,write_stats)
-  else
-    if( myid.eq.0 ) then
-      print *,'Warning: Group FS is not available for '&
-           //trim(cpot)
-    endif
-  endif
-
-  return
-end subroutine gfs_wrapper
 !=======================================================================
 subroutine check_grad(ftrn0,ftst0)
   use variables

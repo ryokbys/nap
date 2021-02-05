@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-12-25 12:21:03 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-04 17:32:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -38,7 +38,7 @@ program pmd
   real(8),parameter:: epith = -0.1410d0
 #endif
 
-  integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,nstp_done
+  integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,nstp_done,inc
   integer:: mpicolor,mpikey,ierr,jerr,itmp,nprocs,nnmax_est
   real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin,rmin
   real(8):: t0,t1
@@ -192,16 +192,48 @@ program pmd
 
   call bcast_params()
 
+!.....Before allocating auxiliary array, set naux (num of auxiliary data)
+  call set_use_charge()
+  call set_use_elec_temp()
+  naux = 0
+  if( luse_charge ) then
+    naux = naux +2  ! chg, chi (not necessarily need it, though)
+  endif
+  if( luse_elec_temp ) then
+    naux = naux +1
+  endif
+  if( lclrchg ) then
+    naux = naux +1
+  endif
+  allocate(cauxarr(naux))
+  inc = 0
+  if( luse_charge ) then
+    inc = inc +1
+    cauxarr(inc) = 'chg'
+    inc = inc +1
+    cauxarr(inc) = 'chi'
+  endif
+  if( luse_elec_temp ) then
+    inc = inc +1
+    cauxarr(inc) = 'tei'
+  endif
+  if( lclrchg ) then
+    inc = inc +1
+    cauxarr(inc) = 'clr'
+  endif
 
+!.....Now allcoate the auxiliary array
   if( myid_md.eq.0 ) then
+    allocate(auxtot(ntot0,naux))
+    auxtot(:,:) = 0d0
 !!$    naux = 3
 !!$    allocate(auxtot(ntot0,naux))
 !!$    auxtot(:,:) = 0d0
-    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0))
-    chitot(1:ntot0) = 0d0
-    chgtot(1:ntot0) = 0d0
-    teitot(1:ntot0) = 0d0
-    clrtot(1:ntot0) = 0d0
+!!$    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0))
+!!$    chitot(1:ntot0) = 0d0
+!!$    chgtot(1:ntot0) = 0d0
+!!$    teitot(1:ntot0) = 0d0
+!!$    clrtot(1:ntot0) = 0d0
 !!$    call set_atomic_charges(ntot0,chgtot,tagtot,nspmax &
 !!$         ,chgfix,schg,myid_md,iprint)
 
@@ -215,14 +247,15 @@ program pmd
     ntot0 = 1
     allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
          ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0) )
+    allocate(auxtot(ntot0,naux))
 !!$    naux = 3
 !!$    allocate(auxtot(ntot0,naux))
 !!$    auxtot(:,:) = 0d0
-    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0))
-    chitot(1:ntot0) = 0d0
-    chgtot(1:ntot0) = 0d0
-    teitot(1:ntot0) = 0d0
-    clrtot(1:ntot0) = 0d0
+!!$    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0))
+!!$    chitot(1:ntot0) = 0d0
+!!$    chgtot(1:ntot0) = 0d0
+!!$    teitot(1:ntot0) = 0d0
+!!$    clrtot(1:ntot0) = 0d0
   endif
 
 !.....Broadcast species data read from pmdini  
@@ -283,7 +316,7 @@ program pmd
   endif
 
 !.....Initial settting for color charge NEMD
-  if( lclrchg ) call init_clrchg(specorder,ntot0,clrtot,tagtot &
+  if( lclrchg ) call init_clrchg(specorder,ntot0,auxtot(:,iauxof('clr')),tagtot &
        ,myid_md,iprint)
 !.....Init for local flux
   if( lflux ) call init_lflux(myid_md,nx,ny,nz,lclrchg &
@@ -299,7 +332,8 @@ program pmd
   call accum_time('overhead',mpi_wtime()-t0)
 !.....call pmd_core to perfom MD
   call pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
-       ,ekitot,epitot,chgtot,chitot,teitot,clrtot,nstp,nerg,npmd &
+!!$       ,ekitot,epitot,chgtot,chitot,teitot,clrtot,nstp,nerg,npmd &
+       ,ekitot,epitot,auxtot,naux,nstp,nerg,npmd &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,specorder &
        ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
        ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl &
@@ -334,8 +368,9 @@ program pmd
 1 continue
   call mpi_barrier(mpicomm,ierr)
   call mpi_comm_free(mpi_md_world,ierr)
-  deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot,chgtot,chitot &
-       ,teitot,clrtot)
+  deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot)
+  deallocate(auxtot)
+!!$  deallocate(chgtot,chitot,teitot,clrtot)
   call mpi_finalize(ierr)
 
 end program pmd

@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-03 18:23:42 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-04 17:12:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -1580,7 +1580,7 @@ contains
   end subroutine output_energy_balance
 !=======================================================================
   subroutine remove_ablated_atoms(simtime,namax,natm,tag,ra,va,&
-       chg,chi,h,sorg)
+       aux,naux,h,sorg)
 !
 !  Remove atoms evapolated from left surface by laser ablation.
 !  Store the following removed-atom data:
@@ -1588,13 +1588,14 @@ contains
 !
     use pmdmpi
     use util,only: itotOf
-    integer,intent(in):: namax
+    integer,intent(in):: namax,naux
     integer,intent(inout):: natm
-    real(8),intent(inout):: tag(namax),ra(3,namax),va(3,namax)&
-         ,chg(namax),chi(namax)
+    real(8),intent(inout):: tag(namax),ra(3,namax),va(3,namax)
+!!$    real(8),intent(in):: chg(namax),chi(namax)
+    real(8),intent(inout):: aux(namax,naux)
     real(8),intent(in):: h(3,3),simtime,sorg(3)
     
-    integer:: ix,iy,iz,inc,nabl,n,ia,ja,inc2,ierr,itot,iyz,n0
+    integer:: ix,iy,iz,inc,nabl,n,ia,ja,inc2,ierr,itot,iyz,n0,iaux
     real(8):: r(3),rt(3),v(3)
     logical:: lremove 
     integer,save:: ntmp = 1000
@@ -1698,8 +1699,11 @@ contains
           ra(1:3,inc2) = ra(1:3,ia)
           va(1:3,inc2) = va(1:3,ia)
           tag(inc2) = tag(ia)
-          chg(inc2) = tag(ia)
-          chi(inc2) = tag(ia)
+!!$          chg(inc2) = chg(ia)
+!!$          chi(inc2) = chi(ia)
+          do iaux=1,naux
+            aux(inc2,naux) = aux(ia,naux)
+          enddo
         endif
       enddo
       natm = inc2

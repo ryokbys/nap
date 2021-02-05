@@ -1,13 +1,13 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-12-25 12:20:32 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-04 17:31:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
 
   character(len=20),parameter:: cinpmd='in.pmd'
 
-  integer:: ntot0,ntot,naux
+  integer:: ntot0,ntot
 !.....data of total system
   real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
        ,ekitot(:,:,:),tagtot(:),atot(:,:)
@@ -99,6 +99,9 @@ module pmdio
 !  >10:fitpot data
   integer:: iprint= 1
 
+!.....Auxiliary data
+  integer:: naux
+  character(len=6),allocatable:: cauxarr(:)
 !.....Auxiliary data order for dump output
   logical:: ldumpaux_changed = .false.
   character(len=256):: cdumpaux = 'ekin epot sxx syy szz syz sxz sxy'
@@ -675,6 +678,21 @@ contains
     str2 = strin(ind+1:l)
     return
   end subroutine split_pair
+!=======================================================================
+  function iauxof(cauxname)
+    character(len=*),intent(in):: cauxname
+    integer:: iauxof
+    integer:: i
+    iauxof = 0
+    do i=1,naux
+      if( trim(cauxname).eq.trim(cauxarr(i)) ) then
+        iauxof = i
+        return
+      endif
+    enddo
+    if( iauxof.eq.0 ) stop 'ERROR @iauxof: No such auxname, '//trim(cauxname)
+    return
+  end function iauxof
 !=======================================================================
   subroutine make_cdumpauxarr()
 !

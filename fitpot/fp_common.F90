@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-11-30 14:18:59 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-05 11:08:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -767,7 +767,7 @@ contains
     use force
     use descriptor,only: get_dsgnmat_force
     use ZBL,only: r_inner,r_outer
-    use pmdio, only: nspmax
+    use pmdio, only: nspmax,naux
     use element
     implicit none
     include "../pmd/params_unit.h"
@@ -894,11 +894,17 @@ contains
       loverlay = overlay
     endif
 
+!.....Currently aux is not available in fitpot,
+!.....but necessary to allocate it for one_shot, so allocate it with 0 length.
+    naux = 0
+    if( .not.allocated(smpl%aux) ) then
+      allocate(smpl%aux(smpl%natm,naux))
+    endif
+
 !.....one_shot force calculation
-!!$    if( iprint.gt.2 ) print '(/,a)',' one_shot for '//trim(smpl%cdirname)//'...'
     call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
          ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
-         ,smpl%chg,smpl%chi,smpl%tei,smpl%clr &
+         ,smpl%aux,naux &
          ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
          ,smpl%specorder,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
          ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
@@ -909,9 +915,6 @@ contains
 !!$    if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
     if( present(gws) ) gws(1:6,1:ndimp) = gws(1:6,1:ndimp) *up2gpa*(-1d0)
     if( lfdsgnmat ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)
-!!$  print *,'one_shot done, cdirname,epot = ',trim(smpl%cdirname),epot
-!!$  print *,'smpl%natm =',smpl%natm
-!!$  write(6,'(a,30es12.4)') 'smpl%epi=',(smpl%epi(i),i=1,smpl%natm)
 
     if( lvc ) smpl%charge_set = .true.
 
