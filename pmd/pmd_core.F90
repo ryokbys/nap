@@ -1,10 +1,9 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-05 10:40:05 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-05 12:31:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
 subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
-!!$     ,ekitot,epitot,chgtot,chitot,teitot,clrtot,maxstp,nerg,npmd &
      ,ekitot,epitot,auxtot,naux,maxstp,nerg,npmd &
      ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,specorder &
      ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
@@ -53,8 +52,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,epitot(ntot0),dt,rc,rbuf,rc1nn,h(3,3,0:1),stnsr(3,3) &
        ,fmv(3,0:9),epot,ekin,am(nspmax),stgt(3,3),ptgt,pini &
        ,pfin,ttgt(9) &
-       ,auxtot(ntot0,naux)
-!!$       ,chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0)
+       ,auxtot(naux,ntot0)
   character,intent(in):: ciofmt*6, cpctl*20, ctctl*20 &
        ,boundary*3
   character(len=3),intent(in):: specorder(nspmax) 
@@ -178,8 +176,6 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 !.....perform space decomposition after reading atomic configuration
   tmp = mpi_wtime()
-!!$  call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,chgtot,chitot,teitot &
-!!$       ,clrtot,myid_md,mpi_md_world,nx,ny,nz,nxyz,rc,rbuf,iprint)
   call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,auxtot &
        ,naux,myid_md,mpi_md_world,nx,ny,nz,nxyz,rc,rbuf,iprint)
   call accum_time('space_decomp',mpi_wtime()-tmp)
@@ -343,8 +339,6 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   tcpu1= mpi_wtime()
   tcom = 0d0
 
-!!$  call init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
-!!$       iprint,h,rc,lvc,ifcoulomb,specorder,am)
   call init_force(namax,natm,nsp,tag,aux,naux,myid_md,mpi_md_world, &
        iprint,h,rc,lvc,ifcoulomb,specorder,am)
 !-----copy RA of boundary atoms
@@ -375,7 +369,6 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Cell is new at the first call of get_force
   lcell_updated = .true.
   tmp = mpi_wtime()
-!!$  call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
   call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
        ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
        ,lspr,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
@@ -385,8 +378,6 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   lstrs = .false.
   epot= epot0
   epotp = 0d0
-!      write(6,'(a,f12.4,200f10.4)') 'erg,chg after get_force = '
-!     &     ,epot,chg(1:natm)
 
 !.....Structure analysis
   if( trim(cstruct).eq.'CNA' ) then
@@ -400,9 +391,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     call acna(namax,natm,nb,nnmax,lspr,h,ra,tag)
   endif
 !.....Color charge NEMD
-!!$  if( lclrchg ) call clrchg_force(namax,natm,tag,aa,clr,hi,specorder &
-!!$       ,myid_md,iprint)
-  if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(:,iauxof('clr')),hi,specorder &
+  if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(iauxof('clr'),:),hi,specorder &
        ,myid_md,iprint)
 !.....External force
   if( lextfrc ) call add_extfrc(natm,tag,aa,hi,specorder,myid_md,iprint)
@@ -504,16 +493,11 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !      write(cnum(1:4),'(i4.4)') 0
   write(cnum,'(i0)') 0
   tmp = mpi_wtime()
-!!$  call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
-!!$       ,stot,chgtot,chitot,teitot,clrtot,natm,tag,ra,va,aa,epi,eki,strs &
-!!$       ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world)
   call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
        ,stot,auxtot,naux,natm,tag,ra,va,aa,epi,eki,strs &
        ,aux,sorg,nxyz,myid_md,mpi_md_world)
   call accum_time('space_comp',mpi_wtime()-tmp)
   if( myid_md.eq.0 ) then
-!!$    if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot &
-!!$         ,atot,ekitot,epitot,stot,chgtot,chitot,teitot,clrtot,ifsort)
     if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot &
          ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
     if( ifpmd.eq.1 ) then  ! pmd format
@@ -589,7 +573,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !!$  if( lflux ) call accum_lflux(namax,natm,h,ra,va,clr,istp,dt &
 !!$       ,myid_md,mpi_md_world,nxyz)
-  if( lflux ) call accum_lflux(namax,natm,h,ra,va,aux(:,iauxof('clr')),istp,dt &
+  if( lflux ) call accum_lflux(namax,natm,h,ra,va,aux(iauxof('clr'),:),istp,dt &
        ,myid_md,mpi_md_world,nxyz)
   if( lpdens ) call accum_pdens(namax,natm,tag,ra)
 
@@ -751,9 +735,6 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       call bacopy_fixed(rc,myid_md,mpi_md_world,iprint,ifcoulomb &
            ,boundary)
       call accum_time('ba_xxx',mpi_wtime()-tmp)
-!!$      call bacopy_fixed(tcom,sgm,vol,lsb,lsex,nbmax,ra,namax &
-!!$           ,natm,nb,anxi,anyi,anzi,nn,tag,rc,myid_md,myparity,lsrc &
-!!$           ,sv,nex,mpi_md_world,ifcoulomb,chg,chi,boundary)
     endif
 
     if(ifpmd.gt.0.and. mod(istp,noutpmd).eq.0 )then
@@ -761,7 +742,6 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     endif
 !-------Calc forces
     tmp = mpi_wtime()
-!!$    call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
          ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
@@ -778,9 +758,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       call acna(namax,natm,nb,nnmax,lspr,h,ra,tag)
     endif
 !.....Color charge NEMD
-!!$    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,clr,hi,specorder &
-!!$         ,myid_md,iprint)
-    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(:,iauxof('clr')),hi,specorder &
+    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(iauxof('clr'),:),hi,specorder &
          ,myid_md,iprint)
 !.....External force
     if( lextfrc ) call add_extfrc(natm,tag,aa,hi,specorder,myid_md,iprint)
@@ -1039,9 +1017,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       i_conv = 0
     endif
 
-!!$    if( lflux ) call accum_lflux(namax,natm,h,ra,va,clr,istp,dt &
-!!$         ,myid_md,mpi_md_world,nxyz)
-    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(:,iauxof('clr')),hi,specorder &
+    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(iauxof('clr'),:),hi,specorder &
          ,myid_md,iprint)
     if( lpdens ) call accum_pdens(namax,natm,tag,ra)
 
@@ -1052,17 +1028,12 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !---------decide pmd-file name
       iocntpmd=iocntpmd+1
       write(cnum,'(i0)') istp
-!!$      call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
-!!$           ,stot,chgtot,chitot,teitot,clrtot,natm,tag,ra,va,aa,epi,eki,strs &
-!!$           ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world)
       call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
            ,stot,auxtot,naux,natm,tag,ra,va,aa,epi,eki,strs &
            ,aux,sorg,nxyz,myid_md,mpi_md_world)
       call accum_time('space_comp',mpi_wtime()-tmp)
       ltot_updated = .true.
       if( myid_md.eq.0 ) then
-!!$        if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot &
-!!$             ,atot,ekitot,epitot,stot,chgtot,chitot,teitot,clrtot,ifsort)
         if( ifsort.eq.1 ) call sort_by_tag(ntot0,tagtot,rtot,vtot &
              ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
         if( ifpmd.eq.1 ) then  ! pmd format
@@ -1083,15 +1054,10 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   enddo ! end of istp
 
   if( .not. ltot_updated ) then
-!!$    call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
-!!$         ,stot,chgtot,chitot,teitot,clrtot,natm,tag,ra,va,aa,epi,eki,strs &
-!!$         ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world)
     call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
          ,stot,auxtot,naux,natm,tag,ra,va,aa,epi,eki,strs &
          ,aux,sorg,nxyz,myid_md,mpi_md_world)
     if( myid_md.eq.0 ) then
-!!$      call sort_by_tag(ntot0,tagtot,rtot,vtot &
-!!$           ,atot,ekitot,epitot,stot,chgtot,chitot,teitot,clrtot,ifsort)
       call sort_by_tag(ntot0,tagtot,rtot,vtot &
            ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
     endif
@@ -1189,12 +1155,10 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   deallocate(fekin,fa2v)
   deallocate(ra,va,aa,ra0,strs,stt,tag,lspr,ls1nn &
        ,epi,eki,stp,stn,lsb,lsex)
-!!$  deallocate(chg,chi)
   deallocate(aux)
 end subroutine pmd_core
 !=======================================================================
 subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
-!!$     ,ekitot,epitot,chgtot,chitot,teitot,clrtot &
      ,ekitot,epitot,auxtot,naux &
      ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
      ,specorder,am,dt,rc,rbuf,rc1nn,stnsr,epot &
@@ -1224,9 +1188,8 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0) &
        ,epitot(ntot0),rbuf,rc1nn,h(3,3,0:1),stnsr(3,3) &
        ,epot,ekin,am(nspmax),dt
-!!$  real(8),intent(in):: chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0)
   integer:: naux
-  real(8),intent(in):: auxtot(ntot0,naux)
+  real(8),intent(in):: auxtot(naux,ntot0)
 !      character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: lcalcgrad
   integer,intent(in):: ndimp,maxisp
@@ -1259,8 +1222,6 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   sorg(2)= anyi*myy
   sorg(3)= anzi*myz
 !.....perform space decomposition after reading atomic configuration
-!      write(6,'(a,30es10.2)') 'chgtot before space_decomp = ',
-!     &     chgtot(1:ntot0)
   if( iprint.gt.0 ) then
     write(6,'(a)',advance='no') ' Species order: '
     do is=1,nspmax
@@ -1275,11 +1236,8 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
   endif
 !      print *,'one_shot: 02'
-!!$  call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,chgtot,chitot,teitot &
-!!$       ,clrtot,myid_md,mpi_md_world,nx,ny,nz,nxyz,rc,rbuf,iprint)
   call space_decomp(hunit,h,ntot0,tagtot,rtot,vtot,auxtot,naux &
        ,myid_md,mpi_md_world,nx,ny,nz,nxyz,rc,rbuf,iprint)
-!      write(6,'(a,200es10.2)') 'chg after space_decomp = ',chg(1:natm)
 
 !      print *,'one_shot: 03'
 !.....Some conversions
@@ -1305,8 +1263,6 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !      print *,'one_shot: 04'
 !      if( iprint.ge.10 ) print *,'init_force,myid_md=',myid_md
-!!$  call init_force(namax,natm,nsp,tag,chg,chi,myid_md,mpi_md_world, &
-!!$       iprint,h,rc,lvc,ifcoulomb,specorder,am)
   call init_force(namax,natm,nsp,tag,aux,naux,myid_md,mpi_md_world, &
        iprint,h,rc,lvc,ifcoulomb,specorder,am)
 
@@ -1327,7 +1283,6 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !     &     ,myid_md,lcalcgrad
   if( .not.lcalcgrad ) then
     if( iprint.gt.0 ) print *,'get_force...'
-!!$    call get_force(namax,natm,tag,ra,nnmax,aa,strs,chg,chi,tei,stnsr &
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
          ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
          ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
@@ -1344,7 +1299,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     if( use_force('Morse') &
          .and. use_force('screened_Coulomb') ) then
       iprm0 = 0
-      call gradw_Coulomb(namax,natm,nb,tag,ra,aux(:,iauxof('chg')), &
+      call gradw_Coulomb(namax,natm,nb,tag,ra,aux(iauxof('chg'),:), &
            nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws, &
            lematch,lfmatch,lsmatch,iprm0,myid_md,mpi_md_world,specorder)
       iprm0 = maxisp
@@ -1380,9 +1335,6 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 
   if( iprint.gt.0 ) print *,'space_comp...'
-!!$  call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
-!!$       ,stot,chgtot,chitot,teitot,clrtot,natm,tag,ra,va,aa,epi,eki,strs &
-!!$       ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world)
   call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
        ,stot,auxtot,naux,natm,tag,ra,va,aa,epi,eki,strs &
        ,aux,sorg,nxyz,myid_md,mpi_md_world)
@@ -1401,8 +1353,6 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !.....deallocate all the arrays allocated 
   deallocate(fekin,fa2v)
-!      deallocate(ra,va,aa,ra0,strs,stt,tag,lspr
-!     &     ,epi,eki,stp,stn,lsb,lsex,chg,chi)
 
   return
 end subroutine one_shot
@@ -1656,7 +1606,7 @@ subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
 
   ekin= 0d0
   call mpi_allreduce(ekinl,ekin,1,mpi_real8 &
-       ,MPI_SUM,mpi_md_world,ierr)
+       ,mpi_sum,mpi_md_world,ierr)
   ekl(1:9)= 0d0
   call mpi_allreduce(ekll,ekl,9,mpi_real8 &
        ,mpi_sum,mpi_md_world,ierr)
@@ -1852,15 +1802,7 @@ subroutine bacopy(rc,myid,mpi_md_world,iprint,ifcoulomb,l1st &
   if( l1st ) then
     if( allocated(dbuf) ) deallocate(dbuf,dbufr)
     ndimbuf = 4 +naux
-!!$    if( luse_charge ) ndimbuf = ndimbuf +2
-!!$    if( luse_elec_temp ) ndimbuf = ndimbuf +1
-!!$    if( lclrchg ) ndimbuf = ndimbuf +1
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
-!!$    if( luse_charge ) then
-!!$      allocate(dbuf(6,nbmax),dbufr(6,nbmax))
-!!$    else
-!!$      allocate(dbuf(4,nbmax),dbufr(4,nbmax))
-!!$    endif
   endif
 
   if( size(dbuf).lt.ndimbuf*nbmax ) then
@@ -1989,17 +1931,7 @@ subroutine bacopy(rc,myid,mpi_md_world,iprint,ifcoulomb,l1st &
           ra(1:3,natm+nbnew+i)= ra(1:3,j)
           ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
           tag(natm+nbnew+i)= tag(j)
-!!$          if( luse_charge ) then
-!!$            chg(natm+nbnew+i)= chg(j)
-!!$            chi(natm+nbnew+i)= chi(j)
-!!$          endif
-!!$          if( luse_elec_temp ) then
-!!$            tei(natm+nbnew+i) = tei(j)
-!!$          endif
-!!$          if( lclrchg ) then
-!!$            clr(natm+nbnew+i) = clr(j)
-!!$          endif
-          aux(natm+nbnew+i,1:naux) = aux(j,1:naux)
+          aux(1:naux,natm+nbnew+i) = aux(1:naux,j)
         enddo
         nbnew= nbnew +lsb(0,ku)
       enddo
@@ -2020,22 +1952,8 @@ subroutine bacopy(rc,myid,mpi_md_world,iprint,ifcoulomb,l1st &
           dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
           dbuf(4,i)  = tag(j)
           m = 4
-!!$          if( luse_charge ) then
-!!$            m = m+1
-!!$            dbuf(m,i)  = chg(j)
-!!$            m = m+1
-!!$            dbuf(m,i)  = chi(j)
-!!$          endif
-!!$          if( luse_elec_temp ) then
-!!$            m = m+1
-!!$            dbuf(m,i)  = tei(j)
-!!$          endif
-!!$          if( lclrchg ) then
-!!$            m = m+1
-!!$            dbuf(m,i)  = clr(j)
-!!$          endif
           do iaux=1,naux
-            dbuf(4+iaux,i) = aux(j,iaux)
+            dbuf(4+iaux,i) = aux(iaux,j)
           enddo
         enddo
         call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*ndimbuf &
@@ -2044,22 +1962,8 @@ subroutine bacopy(rc,myid,mpi_md_world,iprint,ifcoulomb,l1st &
           ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
           tag(natm+nbnew+i)   = dbufr(4,i)
           m = 4
-!!$          if( luse_charge ) then
-!!$            m = m+1
-!!$            chg(natm+nbnew+i) = dbufr(m,i)
-!!$            m = m+1
-!!$            chi(natm+nbnew+i) = dbufr(m,i)
-!!$          endif
-!!$          if( luse_elec_temp ) then
-!!$            m = m+1
-!!$            tei(natm+nbnew+i) = dbufr(m,i)
-!!$          endif
-!!$          if( lclrchg ) then
-!!$            m = m+1
-!!$            clr(natm+nbnew+i) = dbufr(m,i)
-!!$          endif
           do iaux=1,naux
-            aux(natm+nbnew+i,iaux) = dbufr(4+iaux,i)
+            aux(iaux,natm+nbnew+i) = dbufr(4+iaux,i)
           enddo
         enddo
 
@@ -2121,7 +2025,6 @@ subroutine bacopy_fixed(rc,myid,mpi_md_world,iprint,ifcoulomb &
 !!$  real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
 !!$  real(8),intent(inout):: tag(namax),ra(3,namax),tcom
 !!$  integer,intent(in):: ifcoulomb
-!!$  real(8),intent(inout):: chg(namax),chi(namax),tei(namax)
 !!$  character(len=3),intent(in):: boundary
 
 !      integer:: status(MPI_STATUS_SIZE)
@@ -2135,14 +2038,6 @@ subroutine bacopy_fixed(rc,myid,mpi_md_world,iprint,ifcoulomb &
   if( l1st ) then
     if( allocated(dbuf) ) deallocate(dbuf,dbufr)
     ndimbuf = 4 +naux
-!!$    if( luse_charge ) ndimbuf = ndimbuf +2
-!!$    if( luse_elec_temp ) ndimbuf = ndimbuf +1
-!!$    if( lclrchg ) ndimbuf = ndimbuf +1
-!!$    if( .not. luse_charge ) then
-!!$      allocate(dbuf(4,nbmax),dbufr(4,nbmax))
-!!$    else
-!!$      allocate(dbuf(6,nbmax),dbufr(6,nbmax))
-!!$    endif
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))    
     l1st=.false.
   endif
@@ -2189,17 +2084,7 @@ subroutine bacopy_fixed(rc,myid,mpi_md_world,iprint,ifcoulomb &
           ra(1:3,natm+nbnew+i)= ra(1:3,j)
           ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
           tag(natm+nbnew+i)= tag(j)
-!!$          if( luse_charge ) then
-!!$            chg(natm+nbnew+i)= chg(j)
-!!$            chi(natm+nbnew+i)= chi(j)
-!!$          endif
-!!$          if( luse_elec_temp ) then
-!!$            tei(natm+nbnew+i)= tei(j)
-!!$          endif
-!!$          if( lclrchg ) then
-!!$            clr(natm+nbnew+i)= clr(j)
-!!$          endif
-          aux(natm+nbnew+i,1:naux) = aux(j,1:naux)
+          aux(1:naux,natm+nbnew+i) = aux(1:naux,j)
         enddo
         nbnew= nbnew +lsb(0,ku)
       enddo
@@ -2216,14 +2101,8 @@ subroutine bacopy_fixed(rc,myid,mpi_md_world,iprint,ifcoulomb &
           dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
           dbuf(4,i)  = tag(j)
           m = 4
-!!$          if( luse_charge ) then
-!!$            m = m+1
-!!$            dbuf(m,i)  = chg(j)
-!!$            m = m+1
-!!$            dbuf(m,i)  = chi(j)
-!!$          endif
           do iaux=1,naux
-            dbuf(4+iaux,i) = aux(j,iaux)
+            dbuf(4+iaux,i) = aux(iaux,j)
           enddo
         enddo
         call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*ndimbuf &
@@ -2232,22 +2111,8 @@ subroutine bacopy_fixed(rc,myid,mpi_md_world,iprint,ifcoulomb &
           ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
           tag(natm+nbnew+i)   = dbufr(4,i)
           m = 4
-!!$          if( luse_charge ) then
-!!$            m = m+1
-!!$            chg(natm+nbnew+i)   = dbufr(m,i)
-!!$            m = m+1
-!!$            chi(natm+nbnew+i)   = dbufr(m,i)
-!!$          endif
-!!$          if( luse_elec_temp ) then
-!!$            m = m+1
-!!$            tei(natm+nbnew+i)   = dbufr(m,i)
-!!$          endif
-!!$          if( lclrchg ) then
-!!$            m = m+1
-!!$            clr(natm+nbnew+i)   = dbufr(m,i)
-!!$          endif
           do iaux=1,naux
-            aux(natm+nbnew+i,iaux) = dbufr(4+iaux,i)
+            aux(iaux,natm+nbnew+i) = dbufr(4+iaux,i)
           enddo
         enddo
 
@@ -2376,14 +2241,7 @@ subroutine bamove(rc,myid,mpi_md_world,iprint,ifcoulomb &
   real(8),intent(in):: rc
   integer,intent(in):: ifcoulomb
   character(len=3):: boundary
-!!$  integer,intent(in):: myid_md,mpi_md_world,myparity(3),nn(6)
-!!$  real(8),intent(in):: anxi,anyi,anzi,sv(3,6)
-!!$  integer,intent(inout):: natm
-!!$  real(8),intent(inout):: tcom,ra(3,namax),va(3,namax),tag(namax) &
-!!$       ,chg(namax),chi(namax)
-!!$  character(len=3),intent(in):: boundary
 
-!      integer:: status(MPI_STATUS_SIZE)
   integer:: i,j,m,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is,ix,iy,iz,iaux
   integer:: mvque(0:nbmax,6),newim
   real(8):: tcom1,tcom2,xi(3)
@@ -2394,9 +2252,6 @@ subroutine bamove(rc,myid,mpi_md_world,iprint,ifcoulomb &
 
   if( l1st ) then
     ndimbuf = 7 +naux
-!!$    if( luse_charge ) ndimbuf = ndimbuf +2
-!!$    if( luse_elec_temp ) ndimbuf = ndimbuf +1
-!!$    if( lclrchg ) ndimbuf = ndimbuf +1
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
     l1st=.false.
   endif
@@ -2500,26 +2355,8 @@ subroutine bamove(rc,myid,mpi_md_world,iprint,ifcoulomb &
 !-----------Eliminate the record of a moved-out atom
         tag(j)= 0d0
         m = 7
-!!$        if( luse_charge ) then
-!!$          m = m+1
-!!$          dbuf(m,i)  = chg(j)
-!!$          chg(j)= 0d0
-!!$          m = m+1
-!!$          dbuf(m,i)  = chi(j)
-!!$          chi(j)= 0d0
-!!$        endif
-!!$        if( luse_elec_temp ) then
-!!$          m = m+1
-!!$          dbuf(m,i)  = tei(j)
-!!$          tei(j)= 0d0
-!!$        endif
-!!$        if( lclrchg ) then
-!!$          m = m+1
-!!$          dbuf(m,i)  = clr(j)
-!!$          clr(j)= 0d0
-!!$        endif
         do iaux=1,naux
-          dbuf(7+iaux,i) = aux(j,iaux)
+          dbuf(7+iaux,i) = aux(iaux,j)
         enddo
       enddo
       call mespasd(inode,myparity(kd),dbuf,dbufr,ndimbuf*nsd &
@@ -2529,22 +2366,8 @@ subroutine bamove(rc,myid,mpi_md_world,iprint,ifcoulomb &
         va(1:3,natm+newim+i)= dbufr(4:6,i)
         tag(natm+newim+i)   = dbufr(7,i)
         m = 7
-!!$        if( luse_charge ) then
-!!$          m = m+1
-!!$          chg(natm+newim+i)   = dbufr(m,i)
-!!$          m = m+1
-!!$          chi(natm+newim+i)   = dbufr(m,i)
-!!$        endif
-!!$        if( luse_elec_temp ) then
-!!$          m = m+1
-!!$          tei(natm+newim+i)   = dbufr(m,i)
-!!$        endif
-!!$        if( lclrchg ) then
-!!$          m = m+1
-!!$          clr(natm+newim+i)   = dbufr(m,i)
-!!$        endif
         do iaux=1,naux
-          aux(natm+newim+i,iaux) = dbufr(7+iaux,i)
+          aux(iaux,natm+newim+i) = dbufr(7+iaux,i)
         enddo
       enddo
 
@@ -2568,17 +2391,7 @@ subroutine bamove(rc,myid,mpi_md_world,iprint,ifcoulomb &
       ra(1:3,ipt)= ra(1:3,i)
       va(1:3,ipt)= va(1:3,i)
       tag(ipt)   = tag(i)
-!!$      if( luse_charge ) then
-!!$        chg(ipt)   = chg(i)
-!!$        chi(ipt)   = chi(i)
-!!$      endif
-!!$      if( luse_elec_temp ) then
-!!$        tei(ipt)   = tei(i)
-!!$      endif
-!!$      if( lclrchg ) then
-!!$        clr(ipt)   = clr(i)
-!!$      endif
-      aux(ipt,1:naux) = aux(i,1:naux)
+      aux(1:naux,ipt) = aux(1:naux,i)
     endif
   enddo
 !-----Update # of resident atoms
@@ -2888,7 +2701,6 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
 end subroutine vfire
 !=======================================================================
 subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
-!!$     ,chgtot,chitot,teitot,clrtot,myid_md,mpi_md_world,nx,ny,nz,nxyz &
      ,auxtot,naux,myid_md,mpi_md_world,nx,ny,nz,nxyz &
      ,rcut,rbuf,iprint)
 !
@@ -2896,16 +2708,13 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
 !
   use pmdio,only: namax,nbmax,nnmax
   use pmdvars
-!!$  use force,only: luse_charge, luse_elec_temp
   use clrchg,only: lclrchg
   implicit none
   include 'mpif.h'
   integer,intent(in):: ntot0,myid_md,mpi_md_world,nx,ny,nz,nxyz &
        ,iprint,naux
   real(8),intent(in):: vtot(3,ntot0),rcut,rbuf
-  real(8),intent(in):: auxtot(ntot0,naux)
-!!$  real(8),intent(in):: chgtot(ntot0) &
-!!$       ,chitot(ntot0),teitot(ntot0),clrtot(ntot0)
+  real(8),intent(in):: auxtot(naux,ntot0)
   real(8),intent(in):: hunit,h(3,3,0:1)
   real(8),intent(inout):: rtot(3,ntot0),tagtot(ntot0)
 
@@ -2983,13 +2792,6 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
     endif ! myid.eq.0
     call mpi_bcast(namax,1,mpi_integer,0,mpi_md_world,ierr)
     call mpi_bcast(nbmax,1,mpi_integer,0,mpi_md_world,ierr)
-!c.....allocate memory for local arrays of length namax
-!        allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax)
-!     &       ,strs(3,3,namax),stt(3,3,namax),tag(namax)
-!     &       ,lspr(0:nnmax,namax),epi(namax),eki(3,3,namax)
-!     &       ,stp(3,3,namax),stn(3,3,namax)
-!     &       ,chg(namax),chi(namax)
-!     &       ,lsb(0:nbmax,6),lsex(nbmax,6))
     call alloc_namax_related()
     eki(1:3,1:3,1:namax) = 0d0
   endif
@@ -3020,17 +2822,7 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
           ra(1:3,natm)= rtot(1:3,i)
           va(1:3,natm)= vtot(1:3,i)
           tagtot(i) = -tagtot(i)
-!!$          if( luse_charge ) then
-!!$            chg(natm)= chgtot(i)
-!!$            chi(natm)= chitot(i)
-!!$          endif
-!!$          if( luse_elec_temp ) then
-!!$            tei(natm)= teitot(i)
-!!$          endif
-!!$          if( lclrchg ) then
-!!$            clr(natm)= clrtot(i)
-!!$          endif
-          if( naux.gt.0 ) aux(natm,1:naux) = auxtot(i,1:naux)
+          if( naux.gt.0 ) aux(1:naux,natm) = auxtot(1:naux,i)
         endif
       enddo
       if( ixyz.ne.0 ) then
@@ -3042,20 +2834,6 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
              ,mpi_md_world,ierr)
         call mpi_send(va,3*natm,mpi_real8,ixyz,ixyz+4 &
              ,mpi_md_world,ierr)
-!!$        if( luse_charge ) then
-!!$          call mpi_send(chg,natm,mpi_real8,ixyz,ixyz+5 &
-!!$               ,mpi_md_world,ierr)
-!!$          call mpi_send(chi,natm,mpi_real8,ixyz,ixyz+6 &
-!!$               ,mpi_md_world,ierr)
-!!$        endif
-!!$        if( luse_elec_temp ) then
-!!$          call mpi_send(tei,natm,mpi_real8,ixyz,ixyz+7 &
-!!$               ,mpi_md_world,ierr)
-!!$        endif
-!!$        if( lclrchg ) then
-!!$          call mpi_send(clr,natm,mpi_real8,ixyz,ixyz+8 &
-!!$               ,mpi_md_world,ierr)
-!!$        endif
         if( naux.gt.0 ) then
           call mpi_send(aux,natm*naux,mpi_real8,ixyz,ixyz+8 &
                ,mpi_md_world,ierr)
@@ -3076,20 +2854,6 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
          ,mpi_md_world,istat,ierr)
     call mpi_recv(va,3*natm,mpi_real8,0,myid_md+4 &
          ,mpi_md_world,istat,ierr)
-!!$    if( luse_charge ) then
-!!$      call mpi_recv(chg,natm,mpi_real8,0,myid_md+5 &
-!!$           ,mpi_md_world,istat,ierr)
-!!$      call mpi_recv(chi,natm,mpi_real8,0,myid_md+6 &
-!!$           ,mpi_md_world,istat,ierr)
-!!$    endif
-!!$    if( luse_elec_temp ) then
-!!$      call mpi_recv(tei,natm,mpi_real8,0,myid_md+7 &
-!!$           ,mpi_md_world,istat,ierr)
-!!$    endif
-!!$    if( lclrchg ) then
-!!$      call mpi_recv(clr,natm,mpi_real8,0,myid_md+8 &
-!!$           ,mpi_md_world,istat,ierr)
-!!$    endif
     if( naux.gt.0 ) then
       call mpi_recv(aux,natm*naux,mpi_real8,0,myid_md+8 &
            ,mpi_md_world,istat,ierr)
@@ -3100,10 +2864,7 @@ subroutine space_decomp(hunit,h,ntot0,tagtot,rtot,vtot &
 end subroutine space_decomp
 !=======================================================================
 subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
-!!$     ,ekitot,stot,chgtot,chitot,teitot,clrtot,natm,tag,ra,va,aa,epi,eki,strs,chg &
-!!$     ,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world)
      ,ekitot,stot,auxtot,naux,natm,tag,ra,va,aa,epi,eki,strs &
-!!$     ,chg,chi,tei,clr,sorg,nxyz,myid_md,mpi_md_world)
      ,aux,sorg,nxyz,myid_md,mpi_md_world)
 !
 !  Opposite to space_decomp, gather atoms from every process
@@ -3111,22 +2872,18 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
 !
   use pmdio,only: ntot
   use util,only: itotOf
-!!$  use force,only: luse_charge, luse_elec_temp
-!!$  use clrchg,only: lclrchg
 !!$  use force,only: loverlay,ol_alphas
   implicit none
   include 'mpif.h'
   integer,intent(in):: ntot0,natm,nxyz,myid_md,mpi_md_world
   real(8),intent(in):: va(3,natm),aa(3,natm),epi(natm),eki(3,3,natm) &
        ,strs(3,3,natm),tag(natm),sorg(3)
-!!$  real(8),intent(in):: chg(natm),chi(natm),tei(natm),clr(natm)
   integer,intent(in):: naux
-  real(8),intent(in):: aux(natm,naux)
+  real(8),intent(in):: aux(naux,natm)
   real(8),intent(inout):: ra(3,natm)
   real(8),intent(out):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0) &
        ,atot(3,ntot0),epitot(ntot0),ekitot(3,3,ntot0),stot(3,3,ntot0)
-!!$  real(8),intent(out):: chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0)
-  real(8),intent(out):: auxtot(ntot0,naux)
+  real(8),intent(out):: auxtot(naux,ntot0)
   integer,parameter:: nmpi = 10
   integer:: n0,ixyz,natmt,i,ierr,ntott
   integer:: istat(mpi_status_size),itag
@@ -3150,18 +2907,8 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
     epitot(1:natm) = epi(1:natm)
     ekitot(1:3,1:3,1:natm) = eki(1:3,1:3,1:natm)
     stot(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
-!!$    if( luse_charge ) then
-!!$      chgtot(1:natm) = chg(1:natm)
-!!$      chitot(1:natm) = chi(1:natm)
-!!$    endif
-!!$    if( luse_elec_temp ) then
-!!$      teitot(1:natm) = tei(1:natm)
-!!$    endif
-!!$    if( lclrchg ) then
-!!$      clrtot(1:natm) = clr(1:natm)
-!!$    endif
     if( naux.gt.0 ) then
-      auxtot(1:natm,:) = aux(1:natm,:)
+      auxtot(:,1:natm) = aux(:,1:natm)
     endif
     ntott = natm
     n0 = n0 +1
@@ -3184,22 +2931,8 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
            ,ixyz,itag+6,mpi_md_world,istat,ierr)
       call mpi_recv(atot(1,n0),3*natmt,mpi_real8 &
            ,ixyz,itag+7,mpi_md_world,istat,ierr)
-!!$      if( luse_charge ) then
-!!$        call mpi_recv(chgtot(n0),natmt,mpi_real8 &
-!!$             ,ixyz,itag+8,mpi_md_world,istat,ierr)
-!!$        call mpi_recv(chitot(n0),natmt,mpi_real8 &
-!!$             ,ixyz,itag+9,mpi_md_world,istat,ierr)
-!!$      endif
-!!$      if( luse_elec_temp ) then
-!!$        call mpi_recv(teitot(n0),natmt,mpi_real8 &
-!!$             ,ixyz,itag+10,mpi_md_world,istat,ierr)
-!!$      endif
-!!$      if( lclrchg ) then
-!!$        call mpi_recv(clrtot(n0),natmt,mpi_real8 &
-!!$             ,ixyz,itag+11,mpi_md_world,istat,ierr)
-!!$      endif
       if( naux.gt.0 ) then
-        call mpi_recv(auxtot(n0,1),natmt*naux,mpi_real8 &
+        call mpi_recv(auxtot(1,n0),natmt*naux,mpi_real8 &
              ,ixyz,itag+11,mpi_md_world,istat,ierr)
       endif
       n0 = n0 + natmt
@@ -3233,20 +2966,6 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
          ,mpi_md_world,ierr)
     call mpi_send(aa,3*natm,mpi_real8,0,itag+7 &
          ,mpi_md_world,ierr)
-!!$    if( luse_charge ) then
-!!$      call mpi_send(chg,natm,mpi_real8,0,itag+8 &
-!!$           ,mpi_md_world,ierr)
-!!$      call mpi_send(chi,natm,mpi_real8,0,itag+9 &
-!!$           ,mpi_md_world,ierr)
-!!$    endif
-!!$    if( luse_elec_temp ) then
-!!$      call mpi_send(tei,natm,mpi_real8,0,itag+10 &
-!!$           ,mpi_md_world,ierr)
-!!$    endif
-!!$    if( lclrchg ) then
-!!$      call mpi_send(clr,natm,mpi_real8,0,itag+11 &
-!!$           ,mpi_md_world,ierr)
-!!$    endif
     if( naux.gt.0 ) then
       call mpi_send(aux,natm*naux,mpi_real8,0,itag+11 &
            ,mpi_md_world,ierr)
@@ -3257,7 +2976,6 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,epitot &
 end subroutine space_comp
 !=======================================================================
 subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
-!!$     ,chg,chi,tei,clr,ifsort)
 !
 !  Sort by tag for output.
 !  - ifsort
@@ -3270,9 +2988,8 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
   integer,intent(in):: natm,ifsort
   real(8),intent(inout):: ra(3,natm),va(3,natm),aa(3,natm) &
        ,eki(3,3,natm),epi(natm),strs(3,3,natm),tag(natm)
-!!$  real(8),intent(inout):: chg(natm),chi(natm),tei(natm),clr(natm)
   integer,intent(in):: naux
-  real(8),intent(inout):: aux(natm,naux)
+  real(8),intent(inout):: aux(naux,natm)
 
   integer,allocatable:: itag(:),idxarr(:)
   real(8),allocatable:: buf(:,:)
@@ -3285,29 +3002,12 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
   ndata = 9
 
   if( .not. allocated(itag) .or. natm.gt.nsave ) then
-!!$    if( allocated(itag) ) deallocate(itag,buf)
     if( allocated(itag) ) deallocate(itag,idxarr,buf)
     nsave = natm
-!!$    allocate(itag(natm),buf(ndata,natm))
     allocate(itag(natm),idxarr(natm),buf(ndata,natm))
   endif
 
   do i=1,natm
-!!$    buf(1:3,i)= ra(1:3,i)
-!!$    buf(4:6,i)= va(1:3,i)
-!!$    buf(7,i)= epi(i)
-!!$    buf(8:10,i)= eki(1:3,1,i)
-!!$    buf(11:13,i)= eki(1:3,2,i)
-!!$    buf(14:16,i)= eki(1:3,3,i)
-!!$    buf(17:19,i) = strs(1:3,1,i)
-!!$    buf(20:22,i)= strs(1:3,2,i)
-!!$    buf(23:25,i)= strs(1:3,3,i)
-!!$    buf(26,i)= tag(i)
-!!$    buf(27:29,i)= aa(1:3,i)
-!!$    buf(30,i)= chg(i)
-!!$    buf(31,i)= chi(i)
-!!$    buf(32,i)= tei(i)
-!!$    buf(33,i)= clr(i)
     itag(i)= itotOf(tag(i))
   enddo
 
@@ -3318,24 +3018,6 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
 !!$    call qsort_itag(natm,1,natm,itag,ndata,buf)
     call arg_qsort_itag(natm,1,natm,itag,idxarr)
   endif
-
-!!$  do i=1,natm
-!!$    ra(1:3,i)= buf(1:3,i)
-!!$    va(1:3,i)= buf(4:6,i)
-!!$    epi(i)= buf(7,i)
-!!$    eki(1:3,1,i)= buf(8:10,i)
-!!$    eki(1:3,2,i)= buf(11:13,i)
-!!$    eki(1:3,3,i)= buf(14:16,i)
-!!$    strs(1:3,1,i)= buf(17:19,i)
-!!$    strs(1:3,2,i)= buf(20:22,i)
-!!$    strs(1:3,3,i)= buf(23:25,i)
-!!$    tag(i)= buf(26,i)
-!!$    aa(1:3,i)= buf(27:29,i)
-!!$    chg(i)= buf(30,i)
-!!$    chi(i)= buf(31,i)
-!!$    tei(i)= buf(32,i)
-!!$    clr(i)= buf(33,i)
-!!$  enddo
 
   buf(1:3,1:natm) = ra(1:3,1:natm)
   buf(4:6,1:natm) = va(1:3,1:natm)
@@ -3371,14 +3053,14 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
   buf(2,1:natm) = epi(1:natm)
 !.....This part may cause cache mishit and harm the efficiency
   do k=1,naux
-    buf(2+k,1:natm) = aux(1:natm,k)
+    buf(2+k,1:natm) = aux(k,1:natm)
   enddo
   do i=1,natm
     j = idxarr(i)
     epi(i) = buf(1,j)
     tag(i) = buf(2,j)
     do k=1,naux
-      aux(i,k) = buf(2+k,j)
+      aux(k,i) = buf(2+k,j)
     enddo
   enddo
 
@@ -3452,10 +3134,6 @@ subroutine alloc_namax_related()
   if( allocated(eki) ) deallocate(eki)
   if( allocated(stp) ) deallocate(stp)
   if( allocated(stn) ) deallocate(stn)
-!!$  if( allocated(chg) ) deallocate(chg)
-!!$  if( allocated(chi) ) deallocate(chi)
-!!$  if( allocated(tei) ) deallocate(tei)
-!!$  if( allocated(clr) ) deallocate(clr)
   if( allocated(aux) ) deallocate(aux)
   if( allocated(lsb) ) deallocate(lsb)
   if( allocated(lsex) ) deallocate(lsex)
@@ -3464,9 +3142,8 @@ subroutine alloc_namax_related()
        ,lspr(0:nnmax,namax),ls1nn(0:nnmax,namax) &
        ,epi(namax),eki(3,3,namax) &
        ,stp(3,3,namax),stn(3,3,namax) &
-!!$       ,chg(namax),chi(namax),tei(namax),clr(namax) &
        ,lsb(0:nbmax,6),lsex(nbmax,6))
-  allocate(aux(namax,naux))
+  allocate(aux(naux,namax))
   return
 end subroutine alloc_namax_related
 !=======================================================================
@@ -3616,47 +3293,12 @@ subroutine realloc_namax_related(newnalmax,newnbmax,iprint)
   call copy_arr(ndim,arr,stn)
   deallocate(arr)
 
-!!$!.....chg
-!!$  ndim = size(chg)
-!!$  allocate(arr(ndim))
-!!$  call copy_arr(ndim,chg,arr)
-!!$  deallocate(chg)
-!!$  allocate(chg(newnamax))
-!!$  call copy_arr(ndim,arr,chg)
-!!$  deallocate(arr)
-!!$
-!!$!.....chi
-!!$  ndim = size(chi)
-!!$  allocate(arr(ndim))
-!!$  call copy_arr(ndim,chi,arr)
-!!$  deallocate(chi)
-!!$  allocate(chi(newnamax))
-!!$  call copy_arr(ndim,arr,chi)
-!!$  deallocate(arr)
-!!$
-!!$!.....tei
-!!$  ndim = size(tei)
-!!$  allocate(arr(ndim))
-!!$  call copy_arr(ndim,tei,arr)
-!!$  deallocate(tei)
-!!$  allocate(tei(newnamax))
-!!$  call copy_arr(ndim,arr,tei)
-!!$  deallocate(arr)
-!!$
-!!$!.....clr
-!!$  ndim = size(clr)
-!!$  allocate(arr(ndim))
-!!$  call copy_arr(ndim,clr,arr)
-!!$  deallocate(clr)
-!!$  allocate(clr(newnamax))
-!!$  call copy_arr(ndim,arr,clr)
-!!$  deallocate(arr)
 !.....aux
   ndim = size(aux)
   allocate(arr(ndim))
   call copy_arr(ndim,aux,arr)
   deallocate(aux)
-  allocate(aux(newnamax,naux))
+  allocate(aux(naux,newnamax))
   call copy_arr(ndim,arr,aux)
   deallocate(arr)
 

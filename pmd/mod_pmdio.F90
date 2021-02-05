@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-04 17:31:01 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-05 12:26:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -11,7 +11,6 @@ module pmdio
 !.....data of total system
   real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
        ,ekitot(:,:,:),tagtot(:),atot(:,:)
-  real(8),allocatable:: chgtot(:),chitot(:),teitot(:),clrtot(:)
   real(8),allocatable:: auxtot(:,:)
   real(8):: hunit,h(3,3,0:1)
 
@@ -381,13 +380,13 @@ contains
           else if( trim(caux).eq.'sxy' .or. trim(caux).eq.'syx' ) then
             write(ionum,'(es11.3)',advance='no') st(1,2)
           else if( trim(caux).eq.'chg' ) then
-            write(ionum,'(f9.4)',advance='no') chgtot(i)
+            write(ionum,'(f9.4)',advance='no') auxtot(iauxof('chg'),:)
           else if( trim(caux).eq.'chi' ) then
-            write(ionum,'(f9.2)',advance='no') chitot(i)
+            write(ionum,'(f9.2)',advance='no') auxtot(iauxof('chi'),:)
           else if( trim(caux).eq.'tei' ) then
-            write(ionum,'(es11.3)',advance='no') teitot(i)
+            write(ionum,'(es11.3)',advance='no') auxtot(iauxof('tei'),:)
           else if( trim(caux).eq.'clr' ) then
-            write(ionum,'(es11.3)',advance='no') clrtot(i)
+            write(ionum,'(es11.3)',advance='no') auxtot(iauxof('clr'),:)
           endif
         enddo
         write(ionum,*) ''
@@ -396,23 +395,6 @@ contains
              st(1,1),st(2,2),st(3,3), &
              st(2,3),st(1,3),st(1,2)
       end if
-!!$      if( has_specorder ) then
-!!$        is = int(tagtot(i))
-!!$        csp = specorder(is)
-!!$        write(ionum,'(i8,a4,3f12.5,8es11.3,f9.4,f9.2)') &
-!!$             itotOf(tagtot(i)),trim(csp),rlmp(1:3,i),eki, &
-!!$             epi, &
-!!$             st(1,1),st(2,2),st(3,3), &
-!!$             st(2,3),st(1,3),st(1,2), &
-!!$             chgtot(i),chitot(i)
-!!$      else
-!!$        write(ionum,'(i8,i3,3f12.5,8es11.3,f9.4,f9.2)') &
-!!$             itotOf(tagtot(i)),int(tagtot(i)),rlmp(1:3,i),eki, &
-!!$             epi, &
-!!$             st(1,1),st(2,2),st(3,3), &
-!!$             st(2,3),st(1,3),st(1,2), &
-!!$             chgtot(i),chitot(i)
-!!$      endif
     enddo
 
     close(ionum)
@@ -690,7 +672,10 @@ contains
         return
       endif
     enddo
-    if( iauxof.eq.0 ) stop 'ERROR @iauxof: No such auxname, '//trim(cauxname)
+    if( iauxof.eq.0 ) then
+      print *,'ERROR @iauxof: No such auxname, '//trim(cauxname)
+      stop 
+    endif
     return
   end function iauxof
 !=======================================================================

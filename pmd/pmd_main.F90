@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-04 17:32:05 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-05 12:26:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -224,18 +224,8 @@ program pmd
 
 !.....Now allcoate the auxiliary array
   if( myid_md.eq.0 ) then
-    allocate(auxtot(ntot0,naux))
+    allocate(auxtot(naux,ntot0))
     auxtot(:,:) = 0d0
-!!$    naux = 3
-!!$    allocate(auxtot(ntot0,naux))
-!!$    auxtot(:,:) = 0d0
-!!$    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0))
-!!$    chitot(1:ntot0) = 0d0
-!!$    chgtot(1:ntot0) = 0d0
-!!$    teitot(1:ntot0) = 0d0
-!!$    clrtot(1:ntot0) = 0d0
-!!$    call set_atomic_charges(ntot0,chgtot,tagtot,nspmax &
-!!$         ,chgfix,schg,myid_md,iprint)
 
 !.....Determine nx,ny,nz using rc and hmat info
     if( .not. (nx.gt.0 .and. ny.gt.0 .and. nz.gt.0 ) ) then
@@ -247,15 +237,7 @@ program pmd
     ntot0 = 1
     allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
          ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0) )
-    allocate(auxtot(ntot0,naux))
-!!$    naux = 3
-!!$    allocate(auxtot(ntot0,naux))
-!!$    auxtot(:,:) = 0d0
-!!$    allocate(chgtot(ntot0),chitot(ntot0),teitot(ntot0),clrtot(ntot0))
-!!$    chitot(1:ntot0) = 0d0
-!!$    chgtot(1:ntot0) = 0d0
-!!$    teitot(1:ntot0) = 0d0
-!!$    clrtot(1:ntot0) = 0d0
+    allocate(auxtot(naux,ntot0))
   endif
 
 !.....Broadcast species data read from pmdini  
@@ -316,7 +298,7 @@ program pmd
   endif
 
 !.....Initial settting for color charge NEMD
-  if( lclrchg ) call init_clrchg(specorder,ntot0,auxtot(:,iauxof('clr')),tagtot &
+  if( lclrchg ) call init_clrchg(specorder,ntot0,auxtot(iauxof('clr'),:),tagtot &
        ,myid_md,iprint)
 !.....Init for local flux
   if( lflux ) call init_lflux(myid_md,nx,ny,nz,lclrchg &
@@ -332,7 +314,6 @@ program pmd
   call accum_time('overhead',mpi_wtime()-t0)
 !.....call pmd_core to perfom MD
   call pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
-!!$       ,ekitot,epitot,chgtot,chitot,teitot,clrtot,nstp,nerg,npmd &
        ,ekitot,epitot,auxtot,naux,nstp,nerg,npmd &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,specorder &
        ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
@@ -370,7 +351,6 @@ program pmd
   call mpi_comm_free(mpi_md_world,ierr)
   deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot)
   deallocate(auxtot)
-!!$  deallocate(chgtot,chitot,teitot,clrtot)
   call mpi_finalize(ierr)
 
 end program pmd
