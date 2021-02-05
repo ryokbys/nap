@@ -530,6 +530,6 @@ subroutine read_dumpaux(ionum)
   read(ctmp,*) (ctmp1(i),i=1,ndat)
 !.....Create cdumpaux string without entry keyword, dump_aux_order
   write(cdumpaux,*) (trim(ctmp1(i))//' ',i=2,ndat)
-  ldumpaux_changed = .true.
+!!$  ldumpaux_changed = .true.
   deallocate(ctmp1)
 end subroutine read_dumpaux

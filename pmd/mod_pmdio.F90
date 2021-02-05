@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-05 12:26:03 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-05 17:45:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -293,30 +293,37 @@ contains
     integer,intent(in):: ionum
     character(len=*),intent(in) :: cfname
 
-    integer:: i,j,k,l,is
+    integer:: i,j,k,l,is,idlmp
     real(8):: xi(3),ri(3),eki,epi,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz, &
          xlo_bound,xhi_bound,ylo_bound,yhi_bound, &
          zlo_bound,zhi_bound,st(3,3)
 !!$    integer,external:: itotOf
-    real(8),allocatable,save:: rlmp(:,:),vlmp(:,:)
+!!$    real(8),allocatable,save:: rlmp(:,:),vlmp(:,:)
+    integer,save:: ndlmp
+    real(8),allocatable,save:: dlmp(:,:)
+    character(len=3),save:: cndlmp
     character(len=3):: csp
     character(len=6):: caux
-
     real(8),parameter:: tiny = 1d-14
+    logical,save:: l1st = .true.
 
-    if( .not. allocated(rlmp) ) allocate(rlmp(3,ntot),vlmp(3,ntot))
-    if( size(rlmp).ne.3*ntot ) then
-      deallocate(rlmp,vlmp)
-      allocate(rlmp(3,ntot),vlmp(3,ntot))
+    if( l1st ) then
+      ndlmp = 6 +ndumpaux
+!.....If vx,vy,vz are included in dumpauxarr, take that into account
+      if( idumpauxof('vx').gt.0 ) ndlmp = ndlmp -1
+      if( idumpauxof('vy').gt.0 ) ndlmp = ndlmp -1
+      if( idumpauxof('vz').gt.0 ) ndlmp = ndlmp -1
+      write(cndlmp,'(i0)') ndlmp
+      allocate(dlmp(ndlmp,ntot))
+      l1st = .false.
     endif
 
-    open(ionum,file=trim(cfname),status='replace')
-    write(ionum,'(a)') 'ITEM: TIMESTEP'
-    write(ionum,'(i10)') 0
-    write(ionum,'(a)') 'ITEM: NUMBER OF ATOMS'
-    write(ionum,'(i10)') ntot
-    write(ionum,'(a)') 'ITEM: BOX BOUNDS xy xz yz'
-    call pmd2lammps(h,ntot,rtot,rlmp,vtot,vlmp &
+    if( size(dlmp).ne.ndlmp*ntot ) then
+      deallocate(dlmp)
+      allocate(dlmp(ndlmp,ntot))
+    endif
+
+    call pmd2lammps(h,ntot,rtot,dlmp(1:3,:),vtot,dlmp(4:6,:) &
          ,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
     xlo_bound = xlo +min(0d0, xy, xz, xy+xz)
     xhi_bound = xhi +max(0d0, xy, xz, xy+xz)
@@ -324,6 +331,47 @@ contains
     yhi_bound = yhi +max(0d0, yz)
     zlo_bound = zlo
     zhi_bound = zhi
+!.....Make a data array to be written out
+    idlmp = 3  ! skip x,y,z pos data
+    do j=1,ndumpaux
+      caux = cdumpauxarr(j)
+      idlmp = idlmp +1
+      if( trim(caux).eq.'ekin'.or.trim(caux).eq.'eki' ) then
+        dlmp(idlmp,:) = ekitot(1,1,:) +ekitot(2,2,:) +ekitot(3,3,:)
+      else if( trim(caux).eq.'epot'.or.trim(caux).eq.'epi' ) then
+        dlmp(idlmp,:) = epitot(:)
+      else if( trim(caux).eq.'vx' .or. trim(caux).eq.'vy' .or. trim(caux).eq.'vz' ) then
+!.....velocity data are already stored at dlmp(4:6,:) and they must be always at 4:6
+        cycle
+      else if( trim(caux).eq.'sxx' ) then
+        dlmp(idlmp,:) = stot(1,1,:)
+      else if( trim(caux).eq.'syy' ) then
+        dlmp(idlmp,:) = stot(2,2,:)
+      else if( trim(caux).eq.'szz' ) then
+        dlmp(idlmp,:) = stot(3,3,:)
+      else if( trim(caux).eq.'syz' .or. trim(caux).eq.'szy' ) then
+        dlmp(idlmp,:) = stot(2,3,:)
+      else if( trim(caux).eq.'sxz' .or. trim(caux).eq.'szx' ) then
+        dlmp(idlmp,:) = stot(1,3,:)
+      else if( trim(caux).eq.'sxy' .or. trim(caux).eq.'syx' ) then
+        dlmp(idlmp,:) = stot(1,2,:)
+      else if( trim(caux).eq.'chg' ) then
+        dlmp(idlmp,:) = auxtot(iauxof('chg'),:)
+      else if( trim(caux).eq.'chi' ) then
+        dlmp(idlmp,:) = auxtot(iauxof('chi'),:)
+      else if( trim(caux).eq.'tei' ) then
+        dlmp(idlmp,:) = auxtot(iauxof('tei'),:)
+      else if( trim(caux).eq.'clr' ) then
+        dlmp(idlmp,:) = auxtot(iauxof('clr'),:)
+      endif
+    enddo
+
+    open(ionum,file=trim(cfname),status='replace')
+    write(ionum,'(a)') 'ITEM: TIMESTEP'
+    write(ionum,'(i10)') 0
+    write(ionum,'(a)') 'ITEM: NUMBER OF ATOMS'
+    write(ionum,'(i10)') ntot
+    write(ionum,'(a)') 'ITEM: BOX BOUNDS xy xz yz'
     write(ionum,'(3f15.4)') xlo_bound, xhi_bound, xy
     write(ionum,'(3f15.4)') ylo_bound, yhi_bound, xz
     write(ionum,'(3f15.4)') zlo_bound, zhi_bound, yz
@@ -333,68 +381,17 @@ contains
     enddo
     write(ionum,*) ''
     do i=1,ntot
-!        xi(1:3)= rtot(1:3,i)
-!        ri(1:3)= h(1:3,1,0)*xi(1) +h(1:3,2,0)*xi(2) +h(1:3,3,0)*xi(3)
-      eki = ekitot(1,1,i) +ekitot(2,2,i) +ekitot(3,3,i)
-      epi = epitot(i)
-      st(1:3,1:3) = stot(1:3,1:3,i)
-      if( eki.lt.tiny ) eki = 0d0
-      if( abs(epi).lt.tiny ) epi = 0d0
-      do l=1,3
-        do k=l,3
-          if( abs(st(l,k)).lt.tiny ) st(l,k) = 0d0
-        enddo
-      enddo
       write(ionum,'(i8)',advance='no') itotOf(tagtot(i))
       if( has_specorder ) then
         is = int(tagtot(i))
         csp = specorder(is)
         write(ionum,'(a4)',advance='no') trim(csp)
+      print *,'tag,i,csp = ',tagtot(i),itotOf(tagtot(i)),csp
       else
         write(ionum,'(i3)',advance='no') int(tagtot(i))
       endif
-      write(ionum,'(3f12.5)',advance='no') rlmp(1:3,i)
-      if( ldumpaux_changed ) then
-        do j=1,ndumpaux
-          caux = cdumpauxarr(j)
-          if( trim(caux).eq.'ekin'.or.trim(caux).eq.'eki' ) then
-            write(ionum,'(es11.3)',advance='no') eki
-          else if( trim(caux).eq.'epot'.or.trim(caux).eq.'epi' ) then
-            write(ionum,'(es11.3)',advance='no') epi
-          else if( trim(caux).eq.'vx' ) then
-            write(ionum,'(es11.3)',advance='no') vlmp(1,i)
-          else if( trim(caux).eq.'vy' ) then
-            write(ionum,'(es11.3)',advance='no') vlmp(2,i)
-          else if( trim(caux).eq.'vz' ) then
-            write(ionum,'(es11.3)',advance='no') vlmp(3,i)
-          else if( trim(caux).eq.'sxx' ) then
-            write(ionum,'(es11.3)',advance='no') st(1,1)
-          else if( trim(caux).eq.'syy' ) then
-            write(ionum,'(es11.3)',advance='no') st(2,2)
-          else if( trim(caux).eq.'szz' ) then
-            write(ionum,'(es11.3)',advance='no') st(3,3)
-          else if( trim(caux).eq.'syz' .or. trim(caux).eq.'szy' ) then
-            write(ionum,'(es11.3)',advance='no') st(2,3)
-          else if( trim(caux).eq.'sxz' .or. trim(caux).eq.'szx' ) then
-            write(ionum,'(es11.3)',advance='no') st(1,3)
-          else if( trim(caux).eq.'sxy' .or. trim(caux).eq.'syx' ) then
-            write(ionum,'(es11.3)',advance='no') st(1,2)
-          else if( trim(caux).eq.'chg' ) then
-            write(ionum,'(f9.4)',advance='no') auxtot(iauxof('chg'),:)
-          else if( trim(caux).eq.'chi' ) then
-            write(ionum,'(f9.2)',advance='no') auxtot(iauxof('chi'),:)
-          else if( trim(caux).eq.'tei' ) then
-            write(ionum,'(es11.3)',advance='no') auxtot(iauxof('tei'),:)
-          else if( trim(caux).eq.'clr' ) then
-            write(ionum,'(es11.3)',advance='no') auxtot(iauxof('clr'),:)
-          endif
-        enddo
-        write(ionum,*) ''
-      else
-        write(ionum,'(8es11.3)') eki,epi, &
-             st(1,1),st(2,2),st(3,3), &
-             st(2,3),st(1,3),st(1,2)
-      end if
+      write(ionum,'(3f12.5)',advance='no') dlmp(1:3,i)  ! pos
+      write(ionum,'('//trim(cndlmp)//'es11.2e3)') dlmp(4:ndlmp,i)  ! except pos
     enddo
 
     close(ionum)
@@ -685,14 +682,55 @@ contains
 !
     use util,only: num_data
 
-    integer:: i
+    integer:: i,ivx,ivy,ivz
+    character(len=6):: ctmp
 
     ndumpaux = num_data(trim(cdumpaux),' ')
     if( allocated(cdumpauxarr) ) deallocate(cdumpauxarr)
     allocate(cdumpauxarr(ndumpaux))
     read(cdumpaux,*) (cdumpauxarr(i),i=1,ndumpaux)
+!.....If cdumpauxarr contains vx,vy,vz, bring them to the beginning of the array
+    ivx = idumpauxof('vx')
+    ivy = idumpauxof('vy')
+    ivz = idumpauxof('vz')
+    if( ivz.gt.0 ) then
+      ctmp = cdumpauxarr(ivz)
+      do i=ivz-1,1,-1
+        cdumpauxarr(i+1) = cdumpauxarr(i)
+      enddo
+      cdumpauxarr(1) = ctmp
+    endif
+    if( ivy.gt.0 ) then
+      ctmp = cdumpauxarr(ivy)
+      do i=ivy-1,1,-1
+        cdumpauxarr(i+1) = cdumpauxarr(i)
+      enddo
+      cdumpauxarr(1) = ctmp
+    endif
+    if( ivx.gt.0 ) then
+      ctmp = cdumpauxarr(ivx)
+      do i=ivx-1,1,-1
+        cdumpauxarr(i+1) = cdumpauxarr(i)
+      enddo
+      cdumpauxarr(1) = ctmp
+    endif
     return
   end subroutine make_cdumpauxarr
+!=======================================================================
+  function idumpauxof(cauxname)
+    character(len=*),intent(in):: cauxname
+    integer:: idumpauxof
+    integer:: i
+    
+    idumpauxof = -1
+    do i=1,ndumpaux
+      if( trim(cdumpauxarr(i)).eq.trim(cauxname) ) then
+        idumpauxof = i
+        return
+      endif
+    enddo
+    return
+  end function idumpauxof
 !=======================================================================
   function get_vol(h)
     real(8),intent(in):: h(3,3)

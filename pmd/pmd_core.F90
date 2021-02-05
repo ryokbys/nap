@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-05 12:31:50 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-05 17:43:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -182,6 +182,9 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Some conversions
   do i=1,natm
     ra(1:3,i)= ra(1:3,i) -sorg(1:3)
+  enddo
+  do i=1,natm
+    print *,'i,tag=',i,tag(i)
   enddo
 
 #ifdef __FITPOT__
@@ -3057,8 +3060,8 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
   enddo
   do i=1,natm
     j = idxarr(i)
-    epi(i) = buf(1,j)
-    tag(i) = buf(2,j)
+    tag(i) = buf(1,j)
+    epi(i) = buf(2,j)
     do k=1,naux
       aux(k,i) = buf(2+k,j)
     enddo
