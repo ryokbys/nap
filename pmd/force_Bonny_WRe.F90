@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-06-06 00:30:22 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-05 23:38:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -8,7 +8,7 @@ module Bonny_WRe
 !  Species 1 should be W and 2 should be Re.
 !-----------------------------------------------------------------------
   implicit none
-
+  include "./const.h"
   character(len=128):: paramsdir = ''
 
   real(8),external:: hvsd
@@ -171,7 +171,7 @@ contains
 
     if( l1st ) then
       if( rc.lt.bonny_rc(1,1) ) then
-        if( myid_md.eq.0 .and. iprint.gt.0 ) then
+        if( myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
           print '(/,a)',' Input cutoff radius is smaller than rc of Bonny potential.'
           print '(a,f0.3)', '   Input rc     = ',rc
           print '(a,f0.3)', '   Potential rc = ',bonny_rc(1,1)
@@ -188,7 +188,7 @@ contains
         enddo
       enddo
       rcmax2 = rcmax*rcmax
-      if( myid_md.eq.0 .and. iprint.gt.0 )  then
+      if( myid_md.eq.0 .and. iprint.ge.ipl_basic )  then
         print '(/,a,f0.3)', ' Max cutoff in Bonny potential = ',rcmax
       endif
 

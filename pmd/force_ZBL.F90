@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-11-18 22:33:23 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-06 08:41:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -14,6 +14,7 @@ module ZBL
   use pmdio,only: nspmax,csp2isp
   use force,only: loverlay
   implicit none
+  include "./const.h"
   save
 
   character(len=128):: paramsdir = '.'
@@ -146,7 +147,7 @@ contains
 !!$          interact(jsp,isp) = .true.
 !!$        enddo
 !!$      enddo
-      if( iprint.gt.1 ) then
+      if( iprint.ge.ipl_info ) then
         do isp=1,msp
           do jsp=isp,msp
             if( interact(isp,jsp) ) then
@@ -193,7 +194,7 @@ contains
 
     if( l1st ) then
       if( rc.lt.zbl_rc ) then
-        if( myid_md.eq.0 .and. iprint.gt.0 ) then
+        if( myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
           print '(/,a)',' Input cutoff radius is smaller than rc of ZBL potential.'
           print '(a,f0.3)', '   Input rc     = ',rc
           print '(a,f0.3)', '   Potential rc = ',zbl_rc
@@ -266,7 +267,7 @@ contains
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
-    if( iprint.gt.2 ) print *,'epot ZBL = ',epott
+    if( iprint.ge.ipl_info ) print *,'epot ZBL = ',epott
     epot= epot +epott
 
   end subroutine force_ZBL
@@ -405,7 +406,7 @@ contains
 
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
-    if( iprint.gt.2 ) print *,'epot ZBL_overlay = ',epott
+    if( iprint.ge.ipl_info ) print *,'epot ZBL_overlay = ',epott
     epot= epot +epott
 
   end subroutine force_ZBL_overlay

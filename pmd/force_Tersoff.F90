@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-11-05 11:35:47 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-06 08:40:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -11,6 +11,7 @@ module tersoff
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax, csp2isp
   implicit none
+  include "./const.h"
   save
   integer,parameter:: ioprms = 50
   character(len=128):: paramsdir = '.'
@@ -339,7 +340,7 @@ contains
     epot= epot +epott
     time = time + (mpi_wtime() -t0)
 
-    if( iprint.gt.2 .and. myid.eq.0 ) print *,'Tersoff epot = ',ts_epot
+    if( iprint.ge.ipl_info .and. myid.eq.0 ) print *,'Tersoff epot = ',ts_epot
     return
   end subroutine force_tersoff
 !=======================================================================
@@ -529,7 +530,7 @@ contains
       cfname = trim(paramsdir)//'/'//trim(paramsfname)
       inquire(file=cfname,exist=lexist)
       if( .not. lexist ) then
-        if( iprint.gt.0 ) then
+        if( iprint.ge.ipl_basic ) then
           write(6,'(a)') ' WARNING: in.params.Tersoff does not exist !!!.'
           write(6,'(a)') '          Use default parameters.'
         endif
@@ -631,7 +632,7 @@ contains
           backspace(ioprms)
           read(ioprms,*) cspi,cspj,cspk, a,b,lmbd1,lmbd2,eta,delta &
                ,alpha,beta,h,r1,r2,c1,c2,c3,c4,c5
-          if( iprint.gt.0 ) then
+          if( iprint.ge.ipl_warn ) then
             print *,' WARNING: currently Tersoff potential is only available for Si.'
           endif
           ts_a = a

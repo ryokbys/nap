@@ -7,6 +7,7 @@ module pdens
   use element,only: get_cube_info
   implicit none
   include 'mpif.h'
+  include "./const.h"
   save
 
   character(len=128):: paramsdir = '.'
@@ -106,7 +107,7 @@ contains
       call mpi_send(idxl2gt,nl,mpi_integer,0,itag,mpi_world,ierr)
     endif
 
-    if( myid.eq.0 .and. iprint.gt.0 ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       print *,''
       print '(a)',' Probability density measuring ON:'
       print '(a)','   Tracked species = '//trim(cspc_pdens)

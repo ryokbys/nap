@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-05 21:24:11 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-06 09:05:53 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -308,11 +308,11 @@ contains
     logical,save:: l1st = .true.
 
     if( l1st ) then
-      ndlmp = 6 +ndumpaux
+      ndlmp = 3 +ndumpaux
 !.....If vx,vy,vz are included in dumpauxarr, take that into account
-      if( idumpauxof('vx').gt.0 ) ndlmp = ndlmp -1
-      if( idumpauxof('vy').gt.0 ) ndlmp = ndlmp -1
-      if( idumpauxof('vz').gt.0 ) ndlmp = ndlmp -1
+!!$      if( idumpauxof('vx').gt.0 ) ndlmp = ndlmp -1
+!!$      if( idumpauxof('vy').gt.0 ) ndlmp = ndlmp -1
+!!$      if( idumpauxof('vz').gt.0 ) ndlmp = ndlmp -1
       write(cndlmp,'(i0)') ndlmp
       allocate(dlmp(ndlmp,ntot))
       l1st = .false.
@@ -596,6 +596,7 @@ contains
 !
     use util, only: num_data
     implicit none
+    include "./const.h"
     character(len=*),intent(in):: cline
 
     integer:: iopt1,isp,num
@@ -607,7 +608,7 @@ contains
       num = num_data(trim(cline),' ')
       if( num.gt.11 ) stop 'ERROR: number of species exceeds the limit.'
       read(cline,*) c1, copt, specorder(1:num-2)
-      if( iprint.gt.0 ) then
+      if( iprint.ge.ipl_basic ) then
         print '(a)',' Species order read from pmdini option: '
         do isp=1,num-2
           print '(i5,": ",a4)',isp,trim(specorder(isp))

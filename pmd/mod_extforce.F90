@@ -1,6 +1,7 @@
 module extforce
   use pmdio,only: csp2isp,nspmax
   implicit none
+  include "./const.h"
   save
 
   logical:: lextfrc = .false.  ! flag to apply external force
@@ -23,7 +24,7 @@ contains
     endif
 
 !.....Write some settings
-    if( myid.eq.0 .and. iprint.gt.0 ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       print *,''
       print '(a)', ' External force:'
       print '(a,a5)', '   Specified species = ',trim(cspc_extfrc)

@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-05 20:22:06 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-06 15:44:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -32,6 +32,7 @@ program pmd
   implicit none
   include "mpif.h"
   include "./params_unit.h"
+  include "./const.h"
 
 #ifdef __DISL__
 !.....Epot threshold for disl core extraction [Hartree]
@@ -47,8 +48,6 @@ program pmd
   real(8),external:: urnd
 !!$  integer,external:: itotOf
 
-  t0 = mpi_wtime()
-
 !-----initialize the MPI environment
   call mpi_init(ierr)
 !-----total number of MD-nodes
@@ -57,6 +56,7 @@ program pmd
   call mpi_comm_rank(MPI_COMM_WORLD,myid_md,ierr)
   call mpi_comm_dup(MPI_COMM_WORLD,mpicomm,ierr)
   mpi_md_world = mpicomm
+  t0 = mpi_wtime()
 
   call init_element()
 
@@ -255,7 +255,7 @@ program pmd
     endif
   else if( nx*ny*nz .lt. nprocs ) then
     nodes_md = nx*ny*nz
-    if( myid_md.eq.0 .and. iprint.gt.0 ) then
+    if( myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
       print '(a)',' WARNING: Since nxyz < nprocs, use less processes than prepared.'
       print '(a,5(2x,i0))','          nx,ny,nz,nxyz,nprocs=',nx,ny,nz,nodes_md,nprocs
     endif
@@ -341,7 +341,7 @@ program pmd
   if( myid_md.eq.0 ) then
     call write_force(21,'.pmd',h,epot,ntot,tagtot,atot,stnsr)
     call accum_time('total',mpi_wtime()-t0)
-    if( iprint.gt.1 ) call report_time(6)
+    if( iprint.ge.ipl_time ) call report_time(6)
     print *,''
     call time_stamp(' Job finished')
   endif
@@ -893,6 +893,7 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
 !
   use vector,only: dot
   implicit none
+  include "./const.h"
   integer,intent(in):: nnode,myid,iprint
   real(8),intent(in):: h(3,3),rc
   integer,intent(inout):: nx,ny,nz
@@ -972,7 +973,7 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
   ny = nd(2)
   nz = nd(3)
 
- if( iprint.gt.0 ) then
+ if( iprint.ge.ipl_basic ) then
     print '(a,3(1x,i0))',' Number of spatial divisions ' &
         //'automatically set, NX,NY,NZ=',nx,ny,nz
   endif

@@ -56,7 +56,7 @@ params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 	params_EDIP_Si.h \
 	params_Brenner.h params_Lu_WHe.h params_Branicio_AlN.h \
 	params_Mishin_Al.h params_Mishin_Ni.h params_AFS_W.h params_SC_Fe.h \
-	params_SM_Al.h
+	params_SM_Al.h const.h
 
 clstr= mod_pmdio.o mod_util.o util_vec.o mod_pairlist.o cluster.o
 

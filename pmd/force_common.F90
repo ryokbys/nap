@@ -296,6 +296,8 @@ subroutine init_force(namax,natm,nsp,tag,aux,naux,myid_md,mpi_md_world, &
   use fpc,only: read_params_fpc, lprmset_fpc
   use angular,only: read_params_angular, lprmset_angular
   implicit none
+  include "./const.h"
+  
   integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint,naux !,numff
   real(8),intent(in):: tag(namax),h(3,3),rc,amass(nspmax)
   character(len=3),intent(in):: specorder(nspmax)
@@ -312,7 +314,7 @@ subroutine init_force(namax,natm,nsp,tag,aux,naux,myid_md,mpi_md_world, &
   if( iprint.ne.0 ) call write_forces(myid_md)
 
   if( loverlay ) then
-    if( myid_md.eq.0 .and. iprint.gt.0 ) then
+    if( myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
       print *,'Overlay parameters of pairs:'
       do i=1,nspmax
         cspi = specorder(i)
@@ -999,6 +1001,8 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   use Morse, only: qforce_vcMorse
   implicit none
   include "mpif.h"
+  include "./const.h"
+  
   integer,intent(in):: namax,natm,myid,mpi_md_world,iprint &
        ,nnmax,lspr(0:nnmax,namax)
   real(8),intent(in):: chi(namax),h(3,3),tag(namax),ra(3,namax),rc,sorg(3)
@@ -1063,7 +1067,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     endif
   enddo
   if( count_nonfixed(namax,natm,lqfix,myid,mpi_md_world).eq.0 ) then
-    if( myid.eq.0 .and. iprint.gt.1 ) &
+    if( myid.eq.0 .and. iprint.ge.ipl_warn ) &
          print *,'WARNING: exited from dampopt_charge because all Qs are '&
          //'fixed at upper/lower bounds.'
     return
@@ -1175,7 +1179,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       endif
     enddo
     if( count_nonfixed(namax,natm,lqfix,myid,mpi_md_world).eq.0 ) then
-      if( myid.eq.0 .and. iprint.gt.1 ) &
+      if( myid.eq.0 .and. iprint.ge.ipl_warn ) &
            print *,'WARNING: exited from dampopt_charge because all Qs are '&
            //'fixed at upper/lower bounds.'
       return

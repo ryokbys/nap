@@ -1,9 +1,10 @@
 module deform
 !-----------------------------------------------------------------------
 !  Module for applying deformation to the simulation cell.
-!                     Last-modified: <2019-05-12 22:16:08 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-06 08:45:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
+  include "./const.h"
   save
 
 !.....Increment of hmat per step
@@ -18,7 +19,7 @@ contains
     integer:: i,j
     real(8):: hmatfin(3,3)
 
-    if( myid.eq.0 .and. iprint.gt.0 ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       print '(a)',' Deformation'
       print '(a)','   Ratio of h-matrix deformation:'
       print '(3x,3es12.3)',dhratio(1,1:3)
@@ -38,7 +39,7 @@ contains
       enddo
     endif
 
-    if( myid.eq.0 .and. iprint.gt.0 ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       print '(a)','   Increment of h-matrix deformation:'
       print '(3x,3es12.3)',dhmat(1,1:3)
       print '(3x,3es12.3)',dhmat(2,1:3)

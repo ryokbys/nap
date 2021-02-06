@@ -3,6 +3,7 @@ module LJ
   implicit none
   include "mpif.h"
   include "./params_unit.h"
+  include "./const.h"
   save
   integer,parameter:: ioprms = 50
   character(len=128):: paramsdir = '.'
@@ -235,7 +236,7 @@ contains
     epott= 0d0
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
-    if( iprint.gt.2 ) print *,'epot LJ_repl= ',epott
+    if( iprint.ge.ipl_info ) print *,'epot LJ_repl= ',epott
     
   end subroutine force_LJ_repul
 !=======================================================================
@@ -261,7 +262,7 @@ contains
       cfname = trim(paramsdir)//'/'//trim(paramsfname_repul)
       inquire(file=cfname,exist=lexist)
       if( .not. lexist ) then
-        if( iprint.gt.0 ) then
+        if( iprint.ge.ipl_basic ) then
           write(6,'(a)') ' WARNING: in.params.LJ_repul does not exist !!!.'
           write(6,'(a)') '           Default parameters will be used.'
         endif

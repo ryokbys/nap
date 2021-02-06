@@ -1,12 +1,13 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-04-28 13:04:57 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-05 23:30:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
 !  To separate the symmetry function calculations in descriptor.F90.
 !-----------------------------------------------------------------------
-  implicit none 
+  implicit none
+  include "./const.h"
   save
   character(len=128):: paramsdir = '.'
 
@@ -217,7 +218,7 @@ contains
 
 !.....Gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    if( iprint.gt.2 ) print *,'DNN epot = ',epott
+    if( iprint.ge.ipl_info ) print *,'DNN epot = ',epott
     epot= epot +epott
 
     time = time +(mpi_wtime() -time0)

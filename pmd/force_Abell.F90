@@ -1,6 +1,6 @@
 module Abell
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-07 21:55:19 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-05 23:37:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Abell potential.
 !  When it is used for Ceramics, it is assumed to be used with
@@ -9,6 +9,7 @@ module Abell
   use pmdio, only: csp2isp, nspmax
   implicit none
   save
+  include "./const.h"
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: cprmfname = 'in.params.Abell'
 
@@ -159,7 +160,7 @@ contains
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
-    if( iprint.gt.2 ) print '(a,es15.7)',' epot Abell = ',epott
+    if( iprint.ge.ipl_info ) print '(a,es15.7)',' epot Abell = ',epott
     
   end subroutine force_Abell
 !=======================================================================
@@ -260,7 +261,7 @@ contains
       interact(:,:) = .false.
       fname = trim(paramsdir)//'/'//trim(cprmfname)
       open(ioprms,file=trim(fname),status='old')
-      if( iprint.gt.0 ) write(6,'(/,a)') ' Abell parameters:'
+      if( iprint.ge.ipl_basic ) write(6,'(/,a)') ' Abell parameters:'
       do while(.true.)
         read(ioprms,'(a)',end=10) cline
         if( num_data(cline,' ').eq.0 ) cycle
@@ -290,11 +291,11 @@ contains
       enddo  ! while reading...
 10    close(ioprms)
 !.....Set parameters
-      if( iprint.gt.0 ) print *,'  cspi,cspj,cij,dij,aij,alpij,bij,betij:'
+      if( iprint.ge.ipl_basic ) print *,'  cspi,cspj,cij,dij,aij,alpij,bij,betij:'
       do isp=1,nspmax
         do jsp=isp,nspmax
           if( .not. interact(isp,jsp) ) cycle
-          if( iprint.gt.0 ) then
+          if( iprint.ge.ipl_basic ) then
             print '(4x,2(1x,a3),6es12.4)' &
                ,specorder(isp),specorder(jsp) &
                ,abl_aij(isp,jsp),abl_alpij(isp,jsp) &

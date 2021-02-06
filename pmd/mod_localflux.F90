@@ -6,6 +6,7 @@ module localflux
   use pmdmpi,only: nid2xyz
   implicit none
   include 'mpif.h'
+  include "./const.h"
   save
 
   character(len=128):: paramsdir = '.'
@@ -118,7 +119,7 @@ contains
       stop
     endif
 
-    if( myid.eq.0 .and. iprint.gt.0 ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       print *,''
       print '(a)',' Local flux measuring ON:'
       print '(a,4(1x,i0))','   Number of regions in a node (x,y,z,total) =' &

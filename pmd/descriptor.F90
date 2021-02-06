@@ -5,6 +5,7 @@ module descriptor
   use pmdio, only: csp2isp, nspmax
   implicit none
   include 'params_unit.h'
+  include "./const.h"
   save
 !!$ putting mpif.h inclusion here could cause some conflicts
 !!$  include "mpif.h"
@@ -206,7 +207,7 @@ contains
 !  gsf/dgsf as well.
     if( natm.gt.nal ) then
       nal = max(nal,int(natm*1.1))
-      if( iprint.gt.1 ) print *,'Since natm.gt.nal, nal was updated at myid =',myid
+      if( iprint.ge.ipl_warn ) print *,'Since natm.gt.nal, nal was updated at myid =',myid
       if( nal .gt. namax ) then
         write(6,'(a)') ' [Error] nal.gt.namax'
         write(6,'(a,3i0)') '   myid,nal,namax = ',myid,nal,namax
@@ -217,7 +218,7 @@ contains
 
     if( nnt.gt.nnl ) then
       nnl = max(nnl,int(nnt*1.1))
-      if( iprint.gt.1 ) print *,'Since nnt.gt.nnl, nnl was updated at myid =',myid
+      if( iprint.ge.ipl_warn ) print *,'Since nnt.gt.nnl, nnl was updated at myid =',myid
       if( nnl.gt.nnmax ) then
         write(6,'(a)') ' [Error] nnl.gt.nnmax'
         write(6,'(a,3i0)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
@@ -373,7 +374,7 @@ contains
     if( l1st ) then
 !!$      time2 = 0d0
 !!$      time3 = 0d0
-      if( iprint.gt.1 .and. myid.eq.0 ) then
+      if( iprint.ge.ipl_info .and. myid.eq.0 ) then
         print *,'calc_desc_default...'
         print '(a,4es12.4)','  rc,rcmax,rcmax2,rc3max=',rc,rcmax,rcmax2,rc3max
       endif
@@ -1282,7 +1283,7 @@ contains
     time0 = mpi_wtime()
 
     if( myid.eq.0 ) then
-      if( iprint.gt.1 ) print *,'read_params_desc...'
+      if( iprint.ge.ipl_info ) print *,'read_params_desc...'
 !.....read constants at the 1st call
       fname = trim(paramsdir)//'/'//trim(cpfname)
       inquire(file=trim(fname),exist=lexist)
@@ -1352,7 +1353,7 @@ contains
 !  Using a factor, NSFF, NSF=(NSF2+NSF3)*NSFF,
 !  where NSFF=1 for NSP==1, and NSFF=2 for NSP>1.
 !-----------------------------------------------------------------------
-        if( iprint.gt.2 ) print *,'reading Chebyshev descriptors...'
+        if( iprint.ge.ipl_info ) print *,'reading Chebyshev descriptors...'
         nsff = 1
         nsf2 = 0
         nsf3 = 0
@@ -1364,7 +1365,7 @@ contains
           if( index(cline,'Weight').ne.0 .or. &
                index(cline,'weight').ne.0 ) then ! read Weight control
             cmode = 'Weight'  ! currently only Artrith type is available
-            if( iprint.gt.0 ) write(6,'(a)') '   species-weight type: '//' Artrith'
+            if( iprint.ge.ipl_basic ) write(6,'(a)') '   species-weight type: '//' Artrith'
           else if( index(cline,'2-body').ne.0 ) then
             cmode = 'none'
             read(cline,*) ctmp, nsf2, rcut2
@@ -1377,7 +1378,7 @@ contains
               isp = csp2isp(trim(csp),specorder)
               if( isp.gt.0 ) then
                 wgtsp(isp) = wgt
-                if( iprint.gt.0 ) write(6,'(5x,i2,a4,f6.1)') isp, trim(csp), wgt
+                if( iprint.ge.ipl_basic ) write(6,'(5x,i2,a4,f6.1)') isp, trim(csp), wgt
               endif
 !!$              read(ionum,*,end=30) isp, wgtsp(isp)
             endif
@@ -1468,7 +1469,7 @@ contains
 
     lprmset_desc = .true.
 
-    if( myid.eq.0 .and. iprint.gt.2 ) print *,'read_params_desc done'
+    if( myid.eq.0 .and. iprint.ge.ipl_info ) print *,'read_params_desc done'
 
     time = time +(mpi_wtime() -time0)
 
@@ -1504,7 +1505,7 @@ contains
          index(cline,'chebyshev:').ne.0 ) then
       read(cline,*) c1, copt, lopt
       lcheby = lopt
-      if( iprint.gt.0 .and. lcheby ) then
+      if( iprint.ge.ipl_basic .and. lcheby ) then
         print *,''
         print '(a)', ' Chebyshev series for descriptors.'
       endif

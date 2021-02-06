@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-12-26 00:39:35 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-06 08:37:44 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -8,6 +8,7 @@ module Morse
 !-----------------------------------------------------------------------
   use pmdio,only: csp2isp,nspmax
   implicit none
+  include "./const.h"
   save
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.Morse'
@@ -192,7 +193,7 @@ contains
     call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
-    if( iprint.gt.2 ) write(6,'(a,es15.7)') ' epot Morse = ',epott
+    if( iprint.ge.ipl_info ) write(6,'(a,es15.7)') ' epot Morse = ',epott
     return
   end subroutine force_Morse
 !=======================================================================
@@ -607,7 +608,7 @@ contains
           rmin(isp,jsp) = r
           alp(isp,jsp) = a
           interact(isp,jsp) = .true.
-          if( iprint.gt.0 ) then
+          if( iprint.ge.ipl_basic ) then
             write(6,'(a,2a4,3f7.3)') '   cspi,cspj,D,alpha,rmin = ',trim(cspi),trim(cspj),d,a,r
           endif
 !.....Symmetrize parameters
@@ -616,7 +617,7 @@ contains
           alp(jsp,isp)= alp(isp,jsp)
           interact(jsp,isp)= interact(isp,jsp)
         else
-          if( iprint.gt.1 ) then
+          if( iprint.ge.ipl_info ) then
             print *,' Morse parameter read but not used: cspi,cspj=',cspi,cspj
           endif
         endif

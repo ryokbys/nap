@@ -1,8 +1,10 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-12-27 00:18:06 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-06 08:41:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax, csp2isp
+  include "./const.h"
+  
   integer,parameter:: ioprms = 50
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.angular'
@@ -70,7 +72,7 @@ contains
         enddo
       enddo
       rcmax2= rcmax*rcmax
-      if( myid.eq.0 .and. iprint.gt.0 ) then
+      if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
         print *,''
         print *,'Angular potential:'
         write(6,'(a,es12.4)') '   rc from in.pmd           =',rc
@@ -187,7 +189,7 @@ contains
     epotl= epotl3
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
     epot= epot +epott
-    if( iprint.gt.2 ) print *,'myid,epot angular = ',myid,epott
+    if( iprint.ge.ipl_info ) print *,'myid,epot angular = ',myid,epott
 
     return
   end subroutine force_angular
@@ -217,7 +219,7 @@ contains
       cfname = trim(paramsdir)//'/'//trim(paramsfname)
       inquire(file=cfname,exist=lexist)
       if( .not. lexist ) then
-        if( iprint.gt.0 ) then
+        if( iprint.ge.ipl_warn ) then
           write(6,'(a)') ' WARNING: in.params.angular does not exist !!!.'
           write(6,'(a)') '          Default parameters will be used.'
         endif

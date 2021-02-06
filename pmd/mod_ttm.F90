@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-05 21:21:01 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-06 09:00:53 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -12,6 +12,7 @@ module ttm
   save
   include 'mpif.h'
   include "./params_unit.h"
+  include "./const.h"
   
   character(len=128),parameter:: cfparams = 'in.ttm'
   character(len=128),parameter:: cin_ts3d = 'in.Ts3d'
@@ -31,7 +32,6 @@ module ttm
 
 !!$  real(8),parameter:: pi = 3.14159265358979d0
 
-  real(8):: t_ttm
 !.....TTM mesh divisions
   integer:: nx,ny,nz,nxyz
 !.....Mesh size in reduced unit [0:1)
@@ -173,7 +173,6 @@ contains
     real(8):: t,t0,t1,t2,dtmax,tmp
     character(len=128):: c1st
 
-    t_ttm = 0d0
     t0 = mpi_wtime()
 !.....Read parameter file
     call read_ttm_params(myid,mpi_world,iprint)
@@ -419,7 +418,6 @@ contains
       print '(a,f0.3,a)','   Memory for TTM = ',dble(mem)/1000/1000,' MByte'
     endif
     
-    t_ttm = t_ttm +mpi_wtime() -t0
     return
 
 999 call mpi_finalize(ierr)
@@ -448,7 +446,7 @@ contains
 !.....Change dt_inner to match dt and use this dt_inner afterward
     dt_inner = dtmd /nstp_inner
 
-    if( myid.eq.0 .and. iprint.gt.1 ) print *,'nstp_inner,alpha_max,dtmd,dt_inner=', &
+    if( myid.eq.0 .and. iprint.ge.ipl_debug ) print *,'nstp_inner,alpha_max,dtmd,dt_inner=', &
          nstp_inner,alpha_max,dtmd,dt_inner
 
 !!$    print '(a,i4,5es12.4)','nstp_inner,dt_inner,alpha,Te,kappa,cete='&
@@ -694,8 +692,6 @@ contains
       a2c(i) = ic
     enddo
 
-    t_ttm = t_ttm +mpi_wtime()-t0
-    
   end subroutine assign_atom2cell
 !=======================================================================
   subroutine compute_nac(natm,myid,mpi_world,iprint)
@@ -737,7 +733,7 @@ contains
     real(8),allocatable,save:: eksuml(:),ekpsuml(:),vacl(:,:)
 !!$    integer,external:: ifmvOf
 
-    if( myid.eq.0 .and. iprint.gt.1 ) print *,'calc_Ta...'
+    if( myid.eq.0 .and. iprint.ge.ipl_info ) print *,'calc_Ta...'
 
     if( .not. allocated(dofl) ) then
       allocate(dofl(nxyz),dofpl(nxyz),eksuml(nxyz),ekpsuml(nxyz)&
@@ -852,7 +848,6 @@ contains
       call update_surface_plane(myid,mpi_world,iprint)
     endif
 
-    t_ttm = t_ttm +mpi_wtime() -t0
     return
   end subroutine calc_Ta
 !=======================================================================
@@ -995,7 +990,7 @@ contains
       enddo
 
 !.....Output
-      if(iprint.gt.1) then
+      if(iprint.ge.ipl_info) then
         if( ( itype_pulse.eq.2  &  ! gaussian
              .and. (tnow.ge.t0_laser .and. tnow.le.(t0_laser+tau_pulse*2)) ) &
              .or. ( itype_pulse.eq.1 & ! stepwise
@@ -1016,8 +1011,6 @@ contains
 !.....Broadcast Te distribution to all the nodes.
 !.....There could be smarter way to reduce communication cost.
     call mpi_bcast(te,(nz+2)*(ny+2)*(nx+2),mpi_real8,0,mpi_world,ierr)
-
-    t_ttm = t_ttm +mpi_wtime()-t0
 
     return
   end subroutine update_2tm3d
@@ -1338,7 +1331,6 @@ contains
       eout_a = eout_a +deout(isp)
     enddo
 
-    t_ttm = t_ttm +mpi_wtime()-t0
     return
   end subroutine langevin_ttm
 !=======================================================================
@@ -1448,7 +1440,7 @@ contains
         close(iots3d)
       endif
 
-      if( iprint.gt.1 ) then
+      if( iprint.ge.ipl_info ) then
 !.....Average Te
         eetot = 0d0
         ave = 0d0
@@ -1576,7 +1568,7 @@ contains
         print *,'         lsurf,ibc3d = ',lsurf,ibc3d
       endif
     endif
-    if( myid.eq.0 .and. iprint.gt.1 ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_info ) then
       print '(a,3i4,5es12.4)', ' lsurf,ivac_right,imatt_right,densx= ' &
            ,lsurf,ivac_right,imatt_right,densx(max(1,lsurf-2):lsurf+2)
     endif

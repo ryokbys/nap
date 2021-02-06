@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-12-27 00:16:44 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-05 23:41:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -15,6 +15,7 @@ module Coulomb
 !-----------------------------------------------------------------------
   use pmdio,only: csp2isp,nspmax
   implicit none
+  include "./const.h"
   save
 
   character(len=128):: paramsdir = '.'
@@ -200,7 +201,7 @@ contains
     sgm_ew = rc/sqrt(2d0*pacc)
     sgm(1:nspmax) = sgm_ew
     bkmax  = 2d0*pacc /rc
-    if( myid.eq.0 .and. iprint.gt.0 ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       write(6,'(/,a)') ' Ewald sum parameters:'
       write(6,'(a,f12.4)') '   1/(4*pi*eps0)        = ', acc
       write(6,'(a,f12.4)') '   Accuracy parameter p = ', pacc
@@ -210,7 +211,7 @@ contains
 
     if( .not. (trim(cterms).eq.'full' .or. trim(cterms).eq.'long') ) return
     call get_recip_vectors(h)
-    if( myid.eq.0 .and. iprint.gt.0 ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       write(6,'(a,f12.4)') '   k-space cutoff       = ', bkmax
       write(6,'(a)') ' Reciprocal vectors:'
       write(6,'(a,3es12.3)') '   b1 = ',b1(1:3)
@@ -219,7 +220,7 @@ contains
     endif
 !.....kmax# is constant during MD run even if h-matrix can change...
     call setup_kspace()
-    if( myid.eq.0 .and. iprint.gt.0 ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       write(6,'(a)') ' Number of k-points for Ewald sum:'
       write(6,'(a,i0)') '   kmax1 = ',kmax1
       write(6,'(a,i0)') '   kmax2 = ',kmax2
@@ -423,7 +424,7 @@ contains
              //'with the Coulomb type: '//trim(c1st)
         stop
       endif
-      if( iprint.gt.0 ) then
+      if( iprint.ge.ipl_basic ) then
         write(6,'(/,a)') ' Screened Coulomb parameters:'
       endif
       vid_bvs(1:nspmax)= 0d0
@@ -472,7 +473,7 @@ contains
         do jsp=1,nsp
           rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
 !!$            rho_bvs(isp,jsp) = 2d0
-          if( iprint.gt.0 .and. interact(isp,jsp) .and. jsp.ge.isp ) then
+          if( iprint.ge.ipl_basic .and. interact(isp,jsp) .and. jsp.ge.isp ) then
             write(6,'(a,2i5,f10.4)') '   isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
           endif
         enddo
@@ -517,7 +518,7 @@ contains
              //'with Coulomb type: '//trim(c1st)
         stop
       endif
-      if( iprint.gt.0 ) write(6,'(/,a)') ' Variable_charge parameters:'
+      if( iprint.ge.ipl_basic ) write(6,'(/,a)') ' Variable_charge parameters:'
       do while(.true.)
         read(ioprms,*,end=20) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
@@ -532,7 +533,7 @@ contains
           vcg_sgm(isp) = sgmt
           qlower(isp) = qlow
           qupper(isp) = qup
-          if( iprint.gt.0 ) then
+          if( iprint.ge.ipl_basic ) then
             write(6,'(a,a3,3f10.4,2f5.1)') &
                  '   cspi,chi,Jii,sgm,e0,qlower,qupper = ' &
                  ,trim(cspi),dchi,djii,vcg_sgm(isp),de0,qlow,qup
@@ -585,7 +586,7 @@ contains
 !.....File name
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
-      if( iprint.gt.0 ) write(6,'(/,a)') ' Coulomb parameters:'
+      if( iprint.ge.ipl_basic ) write(6,'(/,a)') ' Coulomb parameters:'
 !.....Start reading
       do while(.true.)
         read(ioprms,*,end=10) cline
@@ -604,7 +605,7 @@ contains
                  ' either fixed, fixed_bvs, variable or qeq.'
             stop
           endif
-          if( iprint.gt.1 ) print *,trim(ctmp),' '//trim(cchgs)
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cchgs)
           cycle
         else if( trim(cline).eq.'charge_dist' ) then
           cmode = 'charge_dist'
@@ -616,7 +617,7 @@ contains
                  ' either point or gaussian.'
             stop
           endif
-          if( iprint.gt.1 ) print *,trim(ctmp),' '//trim(cdist)
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cdist)
           cycle
         else if( trim(cline).eq.'terms' ) then
           cmode = 'terms'
@@ -632,7 +633,7 @@ contains
                  'either direct_cut, screened_cut, full, short, or long.'
             stop
           endif
-          if( iprint.gt.1 ) print *,trim(ctmp),' '//trim(cterms)
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cterms)
           cycle
         else if( trim(cline).eq.'interactions' ) then
           backspace(ioprms)
@@ -667,14 +668,14 @@ contains
         else if( trim(cline).eq.'rho_screened_cut' ) then
           backspace(ioprms)
           read(ioprms,*) ctmp, rho_screened_cut
-          if( iprint.gt.1 ) print *,trim(ctmp),rho_screened_cut
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),rho_screened_cut
           cycle
         else if( trim(cline).eq.'rad_screened_cut' ) then
 !.....Set rho_screened_cut minus to show rad should be used to determine rho_screened_cut
           rho_screened_cut = -1d0 *abs(rho_screened_cut)
           backspace(ioprms)
           read(ioprms,*) ctmp, csp, rad
-          if( iprint.gt.1 ) print '(a,3x,a,1x,f7.4)',trim(ctmp), trim(csp), rad
+          if( iprint.ge.ipl_info ) print '(a,3x,a,1x,f7.4)',trim(ctmp), trim(csp), rad
           isp = csp2isp(trim(csp),specorder)
           if( isp.gt.0 ) then
             rad_bvs(isp) = rad
@@ -687,7 +688,7 @@ contains
           jsp = csp2isp(trim(cspj),specorder)
           rho_bvs(isp,jsp) = rhoij
           rho_bvs(jsp,isp) = rhoij
-          if( iprint.gt.1 ) print *,trim(ctmp),trim(cspi) &
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),trim(cspi) &
                ,trim(cspj),rhoij
           cycle
         endif
@@ -702,15 +703,15 @@ contains
               schg0(isp) = chgi
               schg(isp) = schg0(isp)
               ispflag(isp) = .true.
-              if( iprint.gt.0 ) print '(a,a3,i3,f8.4)','   fixed charge: ',trim(csp),isp,chgi
+              if( iprint.ge.ipl_basic ) print '(a,a3,i3,f8.4)','   fixed charge: ',trim(csp),isp,chgi
             else
-              if( iprint.gt.1 ) then
+              if( iprint.ge.ipl_info ) then
                 print '(a,a3,i3,f8.4)','   fixed charge read but not used: ',trim(csp),isp,chgi
               endif
             end if
           else if( trim(cchgs).eq.'fixed_bvs' ) then
             read(ioprms,*) csp,vid,rad,npq
-!!$            if( isp.gt.nsp .and. iprint.gt.0 ) then
+!!$            if( isp.gt.nsp .and. iprint.ge.ipl_basic ) then
 !!$              print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
 !!$            endif
             isp = csp2isp(trim(csp),specorder)
@@ -719,12 +720,12 @@ contains
               vid_bvs(isp) = vid
               rad_bvs(isp) = rad
               npq_bvs(isp) = npq
-              if( iprint.gt.0 ) then
+              if( iprint.ge.ipl_basic ) then
                 write(6,'(a,a5,2f7.3,i4)') '   csp,vid,rad,npq =' &
                      ,trim(csp),vid,rad,npq
               endif
             else
-              if( iprint.gt.1 ) then
+              if( iprint.ge.ipl_info ) then
                 print *,'  fixed_bvs charge read but not used: ',trim(csp)
               endif
             endif
@@ -738,13 +739,13 @@ contains
               vcg_e0(isp) = de0
               qlower(isp) = qlow
               qupper(isp) = qup
-              if( iprint.gt.0 ) then
+              if( iprint.ge.ipl_basic ) then
                 write(6,'(a,a3,4f10.4,2f5.1)') &
                      '   csp,chi,Jii,e0,qlower,qupper = ', &
                      trim(csp),dchi,djii,de0,qlow,qup
               endif
             else
-              if( iprint.gt.1 ) then
+              if( iprint.ge.ipl_info ) then
                 print *,'  variable charge read but not used: ',trim(csp)
               endif
             endif
@@ -848,7 +849,7 @@ contains
     call mpi_bcast(rho_bvs,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
 
     if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
-      if( myid.eq.0 .and. iprint.gt.0 ) then
+      if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
         do isp=1,nsp
           cspi = specorder(isp)
           do jsp=isp,nsp
@@ -999,7 +1000,7 @@ contains
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
 
-    if( l1st .and. myid.eq.0 .and. iprint.gt.0 ) then
+    if( l1st .and. myid.eq.0 .and. iprint.ge.ipl_basic ) then
       if( cterms(1:6).eq.'direct' ) then
         print *,''
         print '(a,f12.4)',' Direct Coulomb energy = ',esr
@@ -1018,7 +1019,7 @@ contains
 !!$         ,mpi_sum,mpi_md_world,ierr)
     epott = esr +elr +eself
     epot= epot +epott
-    if( iprint.gt.2 ) print *,'epot Coulomb = ',epott
+    if( iprint.ge.ipl_info ) print *,'epot Coulomb = ',epott
 
   end subroutine force_Coulomb
 !=======================================================================
@@ -1125,7 +1126,7 @@ contains
     call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
-    if( iprint.gt.2 ) write(6,'(a,es15.7)') ' epot screened Coulomb = ',epott
+    if( iprint.ge.ipl_info ) write(6,'(a,es15.7)') ' epot screened Coulomb = ',epott
     return
   end subroutine force_screened_Coulomb
 !=======================================================================
@@ -2253,7 +2254,7 @@ contains
 !!$!.....Overwrite charges for debugging...
 !!$    schg(1:4) = (/ 1.27443, 0.78466, 1.10968, 3.20338/)
 
-    if( myid.eq.0 .and. iprint.gt.0 ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       print *,''
       print *,'Charges fixed from ideal valences and composition:'
       do is=1,nspmax

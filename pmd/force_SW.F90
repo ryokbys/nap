@@ -1,8 +1,10 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-07-05 22:16:03 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-06 08:39:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax, csp2isp
+  include "./const.h"
+  
   integer,parameter:: ioprms = 50
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.SW'
@@ -97,7 +99,7 @@ contains
         enddo
       enddo
       rcmax2= rcmax*rcmax
-      if( myid.eq.0 .and. iprint.gt.0 ) then
+      if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
         write(6,'(a,es12.4)') ' rc of input         =',rc
         write(6,'(a,es12.4)') ' rc of this potential=',rcmax
       endif
@@ -296,7 +298,7 @@ contains
 !!$    epotl= epotl3
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
     epot= epot +epott
-    if( iprint.gt.2 ) print *,'SW epot = ',epott
+    if( iprint.ge.ipl_info ) print *,'SW epot = ',epott
     return
   end subroutine force_SW
 !=======================================================================
@@ -341,7 +343,7 @@ contains
       cfname = trim(paramsdir)//'/'//trim(paramsfname)
       inquire(file=cfname,exist=lexist)
       if( .not. lexist ) then
-        if( iprint.gt.0 ) then
+        if( iprint.ge.ipl_warn ) then
           write(6,'(a)') ' WARNING: in.params.SW does not exist !!!.'
           write(6,'(a)') '           Default parameters will be used.'
         endif

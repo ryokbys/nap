@@ -1,6 +1,6 @@
 module BMH
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-07 16:49:05 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-05 23:38:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of fitpot BOrn-Mayer-Huggins (BMH) potential.
 !  This potential should be used with Coulomb and dipole potentials.
@@ -8,6 +8,7 @@ module BMH
   use pmdio, only: csp2isp, nspmax
   implicit none
   save
+  include "./const.h"
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: cprmfname = 'in.params.BMH'
 
@@ -150,7 +151,7 @@ contains
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
-    if( iprint.gt.2 ) print '(a,es15.7)',' epot BMH = ',epott
+    if( iprint.ge.ipl_info ) print '(a,es15.7)',' epot BMH = ',epott
     
   end subroutine force_BMH
 !=======================================================================
@@ -241,7 +242,7 @@ contains
       interact(:,:) = .false.
       fname = trim(paramsdir)//'/'//trim(cprmfname)
       open(ioprms,file=trim(fname),status='old')
-      if( iprint.gt.0 ) write(6,'(/,a)') ' BMH parameters:'
+      if( iprint.ge.ipl_basic ) write(6,'(/,a)') ' BMH parameters:'
       do while(.true.)
         read(ioprms,'(a)',end=10) cline
         if( num_data(cline,' ').eq.0 ) cycle
@@ -267,11 +268,11 @@ contains
       enddo  ! while reading...
 10    close(ioprms)
 !.....Set parameters
-      if( iprint.gt.0 ) print *,'  cspi,cspj,aij,alpij:'
+      if( iprint.ge.ipl_basic ) print *,'  cspi,cspj,aij,alpij:'
       do isp=1,nspmax
         do jsp=isp,nspmax
           if( .not. interact(isp,jsp) ) cycle
-          if( iprint.gt.0 ) then
+          if( iprint.ge.ipl_basic ) then
             print '(4x,2(1x,a3),6es12.4)' &
                ,specorder(isp),specorder(jsp) &
                ,bmh_aij(isp,jsp),bmh_alpij(isp,jsp)

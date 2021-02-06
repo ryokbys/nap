@@ -4,6 +4,7 @@ module clrchg
 !
   use pmdio,only: csp2isp,nspmax
   implicit none
+  include "./const.h"
   save
 
   character(len=128),parameter:: cfclrini = 'clrini'
@@ -166,7 +167,7 @@ contains
     if( l1st ) then
       if( myid.eq.0 ) then
 !.....Write some settings
-        if( iprint.gt.0 ) then
+        if( iprint.ge.ipl_basic ) then
           print *,''
           print '(a)', ' Color charge NEMD:'
           print '(a,i3,a5)', '   Specified species = ',ispc_clrchg,trim(cspc_clrchg)
