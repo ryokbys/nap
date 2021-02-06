@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-06 09:05:53 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-06 18:34:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -289,7 +289,9 @@ contains
 !     Write atomic configuration in LAMMPS-dump format file.
 !
     use util,only: itotOf
-    implicit none 
+    use time,only: accum_time
+    implicit none
+    include "mpif.h"
     integer,intent(in):: ionum
     character(len=*),intent(in) :: cfname
 

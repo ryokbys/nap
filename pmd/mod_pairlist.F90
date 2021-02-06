@@ -245,7 +245,7 @@ contains
       do i=1,natm
         mmax = max(mmax,lspr(0,i))
       enddo
-      print '(a,i0)',' Max num of neighbors at 1st call = ',mmax
+!!$      print '(a,i0)',' Max num of neighbors at 1st call = ',mmax
     endif
 
   end subroutine mk_lspr_para
@@ -471,7 +471,7 @@ contains
       do i=1,natm
         mmax = max(mmax,lspr(0,i))
       enddo
-      print '(a,i0)',' Max num of neighbors at 1st call = ',mmax
+!!$      print '(a,i0)',' Max num of neighbors at 1st call = ',mmax
     endif
 
   end subroutine mk_lspr_gonnet

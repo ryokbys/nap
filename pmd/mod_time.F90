@@ -1,6 +1,6 @@
 module time
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-12-24 17:51:05 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-06 17:45:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Module for time measurement.
 !-----------------------------------------------------------------------
@@ -78,6 +78,7 @@ contains
     integer,intent(in):: ionum
     integer:: i,maxlen
     character(len=3):: clen
+    real(8):: time_tot
 
 !.....Max length of name for time
     maxlen = 0
@@ -86,13 +87,29 @@ contains
     enddo
     write(clen,'(i0)') maxlen
 
+!.....Total time
+    time_tot = -1d0
+    do i=1,ntimes
+      if( trim(ctnames(i)).eq.'total' ) then
+        time_tot = etimes(i)
+        exit
+      endif
+    enddo
+
     write(ionum,*) ''
     write(ionum,'(a)') ' Report from time module:'
     do i=1,ntimes
       if( trim(ctnames(i)).ne.'' ) then
-        write(ionum,'(a,a'//trim(clen)//',a,f10.2,a,i0)') &
-             '   Time ',trim(ctnames(i)),' = ', etimes(i), &
-             ' sec, # of calls = ',ncalls(i)
+        if( time_tot.ge.0d0 ) then
+          write(ionum,'(a,a'//trim(clen)//',a,f10.2,a,f7.1,a,i0)') &
+               '   Time ',trim(ctnames(i)),' = ', etimes(i), &
+               ' sec, ',etimes(i)/time_tot*100, &
+               ' %, # of calls = ',ncalls(i)
+        else
+          write(ionum,'(a,a'//trim(clen)//',a,f10.2,a,i0)') &
+               '   Time ',trim(ctnames(i)),' = ', etimes(i), &
+               ' sec, # of calls = ',ncalls(i)
+        endif
       endif
     enddo
   end subroutine report_time

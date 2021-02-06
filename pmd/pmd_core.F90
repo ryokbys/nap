@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-06 14:24:58 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-06 18:09:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -502,9 +502,14 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
        ,stot,auxtot,naux,natm,tag,ra,va,aa,epi,eki,strs &
        ,aux,sorg,nxyz,myid_md,mpi_md_world)
   call accum_time('space_comp',mpi_wtime()-tmp)
-  if( myid_md.eq.0 ) then
-    if( ifsort.gt.0 ) call sort_by_tag(ntot0,tagtot,rtot,vtot &
-         ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
+  if( ifpmd.gt.0 .and. myid_md.eq.0 ) then
+    if( ifsort.gt.0 ) then
+      tmp = mpi_wtime()
+      call sort_by_tag(ntot0,tagtot,rtot,vtot &
+           ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
+      call accum_time('sort_by_tag',mpi_wtime()-tmp)
+    endif
+    tmp = mpi_wtime()
     if( ifpmd.eq.1 ) then  ! pmd format
       if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
            then
@@ -515,8 +520,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
       call write_dump(20,'dump_'//trim(cnum))
     endif
+    call accum_time('write_xxx',mpi_wtime() -tmp)
   endif
-  call accum_time('write_xxx',mpi_wtime() -tmp)
 
 !-----initialize the counter for output
   iocntpmd=0
@@ -1042,9 +1047,14 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
            ,aux,sorg,nxyz,myid_md,mpi_md_world)
       call accum_time('space_comp',mpi_wtime()-tmp)
       ltot_updated = .true.
-      if( myid_md.eq.0 ) then
-        if( ifsort.gt.0 ) call sort_by_tag(ntot0,tagtot,rtot,vtot &
+      if( ifpmd.gt.0 .and. myid_md.eq.0 ) then
+        if( ifsort.gt.0 ) then
+          tmp = mpi_wtime()
+          call sort_by_tag(ntot0,tagtot,rtot,vtot &
                ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
+          call accum_time('sort_by_tag',mpi_wtime()-tmp)
+        endif
+        tmp = mpi_wtime()
         if( ifpmd.eq.1 ) then  ! pmd format
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
                then
@@ -1055,8 +1065,8 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
         else if( ifpmd.eq.2 ) then  ! LAMMPS-dump format
           call write_dump(20,'dump_'//trim(cnum))
         endif
+        call accum_time('write_xxx',mpi_wtime() -tmp)
       endif
-      call accum_time('write_xxx',mpi_wtime() -tmp)
     endif
 
     if( lconverged ) exit
@@ -1067,11 +1077,13 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
     call space_comp(ntot0,tagtot,rtot,vtot,atot,epitot,ekitot &
          ,stot,auxtot,naux,natm,tag,ra,va,aa,epi,eki,strs &
          ,aux,sorg,nxyz,myid_md,mpi_md_world)
+    call accum_time('space_comp',mpi_wtime()-tmp)
     if( myid_md.eq.0 ) then
+      tmp = mpi_wtime()
       call sort_by_tag(ntot0,tagtot,rtot,vtot &
            ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
+      call accum_time('sort_by_tag',mpi_wtime()-tmp)
     endif
-    call accum_time('space_comp',mpi_wtime()-tmp)
   endif
 
   nstp_done = istp
@@ -3018,8 +3030,10 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
 !      2: heap sort
 !  
   use util,only: itotOf
+  use time,only: accum_time
 !!$  use force,only: luse_charge, luse_elec_temp
   implicit none
+  include "mpif.h"
   integer,intent(in):: natm,ifsort
   real(8),intent(inout):: ra(3,natm),va(3,natm),aa(3,natm) &
        ,eki(3,3,natm),epi(natm),strs(3,3,natm),tag(natm)
@@ -3031,6 +3045,7 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
   integer:: i,j,k
   integer,save:: nsave = 0
   integer,save:: ndata
+  real(8):: tmp
 !!$  integer,external:: itotOf
 
 !!$  ndata = 33
@@ -3046,13 +3061,13 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
     itag(i)= itotOf(tag(i))
   enddo
 
-  if( ifsort.eq.2 ) then
-!!$    call heapsort_itag(natm,natm,itag,ndata,buf)
+!!$  tmp = mpi_wtime()
+  if( ifsort.eq.1 ) then
     call arg_heapsort_itag(natm,natm,itag,idxarr)
-  else  ! default 1
-!!$    call qsort_itag(natm,1,natm,itag,ndata,buf)
+  else  ! default 2
     call arg_qsort_itag(natm,1,natm,itag,idxarr)
   endif
+!!$  call accum_time('sorting',mpi_wtime()-tmp)
 
   buf(1:3,1:natm) = ra(1:3,1:natm)
   buf(4:6,1:natm) = va(1:3,1:natm)

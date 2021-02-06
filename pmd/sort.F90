@@ -163,21 +163,17 @@ subroutine arg_heapsort_itag(n,nmax,itag,idxarr)
     l=l-1
     jtag= itag(l)
     jdx = idxarr(l)
-!!$    rarr(1:ndim)= arr(1:ndim,l)
   else                      ! retirement and promotion phase
     jtag= itag(ir)
     jdx = idxarr(ir)
-!!$    rarr(1:ndim)= arr(1:ndim,ir)
 !
     itag(ir)= itag(1)
     idxarr(ir)= idxarr(1)
-!!$    arr(1:ndim,ir)= arr(1:ndim,1)
 !
     ir=ir-1
     if(ir.eq.1)then
       itag(1)= jtag
       idxarr(1)= jdx
-!!$      arr(1:ndim,1)= rarr(1:ndim)
       return
     endif
   endif
@@ -190,7 +186,6 @@ subroutine arg_heapsort_itag(n,nmax,itag,idxarr)
     if( jtag.lt.itag(j) ) then
       itag(i)=itag(j)
       idxarr(i)= idxarr(j)
-!!$      arr(1:ndim,i)= arr(1:ndim,j)
       i=j
       j=j+j
     else
@@ -200,7 +195,6 @@ subroutine arg_heapsort_itag(n,nmax,itag,idxarr)
   endif
   itag(i)= jtag
   idxarr(i)= jdx
-!!$  arr(1:ndim,i)= rarr(1:ndim)
   goto 10
 
 end subroutine arg_heapsort_itag
