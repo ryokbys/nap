@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-06 15:44:40 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-07 18:38:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -224,7 +224,12 @@ program pmd
 
 !.....Now allcoate the auxiliary array
   if( myid_md.eq.0 ) then
-    allocate(auxtot(naux,ntot0))
+    if( .not. allocated(auxtot) ) then
+      allocate(auxtot(naux,ntot0))
+    else
+      if( size(auxtot).ne.naux*ntot0 ) deallocate(auxtot)
+      allocate(auxtot(naux,ntot0))
+    endif
     auxtot(:,:) = 0d0
 
 !.....Determine nx,ny,nz using rc and hmat info

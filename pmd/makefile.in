@@ -60,6 +60,9 @@ params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 
 clstr= mod_pmdio.o mod_util.o util_vec.o mod_pairlist.o cluster.o
 
+ascii2bin= mod_pmdio.o util_vec.o mod_util.o ascii2bin_pmd.o
+bin2ascii= mod_pmdio.o util_vec.o mod_util.o bin2ascii_pmd.o
+
 #-----------------------------------------------------------------------
 # Post process programs
 #
@@ -105,6 +108,12 @@ rdpmd: read_pmd.o ${mods}
 
 cluster: ${clstr}
 	${MPIFC} ${MPIFLAGS} -o $@ ${clstr}
+
+a2b: ${ascii2bin}
+	${MPIFC} ${MPIFLAGS} -o $@ ${ascii2bin}
+
+b2a: ${bin2ascii}
+	${MPIFC} ${MPIFLAGS} -o $@ ${bin2ascii}
 
 # boxsize: change_pmd_boxsize.o ${mods} util_pmd.o
 # 	${MPIFC} ${MPIFLAGS} -o $@ change_pmd_boxsize.o ${mods} util_pmd.o

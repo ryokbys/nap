@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-06 18:34:47 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-08 10:38:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -185,10 +185,6 @@ contains
     allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
          ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0))
     do i=1,ntot0
-!!$      read(ionum,*) tagtot(i),rtot(1:3,i),vtot(1:3,i) &
-!!$           ,ekitot(1,1,i),epitot(i) &
-!!$           ,stot(1,1,i),stot(2,2,i),stot(3,3,i) &
-!!$           ,stot(2,3,i),stot(3,1,i),stot(1,2,i)
       read(ionum,*) tagtot(i),rtot(1:3,i),vtot(1:3,i)
     enddo
     close(ionum)
@@ -237,24 +233,27 @@ contains
     integer,intent(in):: ionum
     character(len=*),intent(in):: cfname
 
-    integer:: ia,ib,l,i
+    integer:: ia,ib,l,i,msp
 
     open(ionum,file=trim(cfname),form='unformatted',status='old')
 !-----natm: num. of particles in this node
+    read(ionum) msp
+    read(ionum) (specorder(i),i=1,msp)
     read(ionum) hunit
     read(ionum) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
     h(1:3,1:3,0:1)= h(1:3,1:3,0:1)*hunit
-    read(ionum) ntot0
+    read(ionum) ntot0, naux
     ntot = ntot0
     allocate(tagtot(ntot0),rtot(3,ntot0),atot(3,ntot0) &
          ,vtot(3,ntot0),epitot(ntot0) &
-         ,ekitot(3,3,ntot0),stot(3,3,ntot0))
-!!$    read(ionum) (tagtot(i),rtot(1:3,i),vtot(1:3,i) &
-!!$         ,ekitot(1,1,i),epitot(i) &
-!!$         ,stot(1,1,i),stot(2,2,i),stot(3,3,i) &
-!!$         ,stot(2,3,i),stot(3,1,i),stot(1,2,i) &
-!!$         ,i=1,ntot0)
-    read(ionum) (tagtot(i),rtot(1:3,i),vtot(1:3,i) ,i=1,ntot0)
+         ,ekitot(3,3,ntot0),stot(3,3,ntot0),auxtot(naux,ntot0))
+    read(ionum) tagtot(1:ntot0)
+    read(ionum) rtot(1:3,1:ntot0)
+    read(ionum) vtot(1:3,1:ntot0)
+!!$    read(ionum) ekitot(1:3,1:3,1:ntot0)
+!!$    read(ionum) epitot(1:ntot0)
+!!$    read(ionum) stot(1:3,1:3,1:ntot0)
+!!$    read(ionum) auxtot(1:naux,1:ntot0)
     close(ionum)
 
   end subroutine read_pmdtot_bin
@@ -265,21 +264,26 @@ contains
     integer,intent(in):: ionum
     character(len=*),intent(in) :: cfname
 
-    integer:: ia,ib,l,i
+    integer:: ia,ib,l,i,msp
 
     open(ionum,file=cfname,form='unformatted' &
          ,status='replace')
+    msp = 0
+    do ia=1,ntot
+      msp = max(msp,int(tagtot(ia)))
+    enddo
+    write(ionum) msp
+    write(ionum) (specorder(i),i=1,msp)
     write(ionum) hunit
     write(ionum) (((h(ia,ib,l)/hunit,ia=1,3),ib=1,3),l=0,1)
-    write(ionum) ntot
-    do i=1,ntot
-!!$      write(ionum) tagtot(i),rtot(1:3,i),vtot(1:3,i) & !/dt
-!!$           ,ekitot(1,1,i)+ekitot(2,2,i)+ekitot(3,3,i) &
-!!$           ,epitot(i) &
-!!$           ,stot(1,1,i),stot(2,2,i),stot(3,3,i) &
-!!$           ,stot(2,3,i),stot(3,1,i),stot(1,2,i)
-      write(ionum) tagtot(i),rtot(1:3,i),vtot(1:3,i)
-    enddo
+    write(ionum) ntot, naux
+    write(ionum) tagtot(1:ntot)
+    write(ionum) rtot(1:3,1:ntot)
+    write(ionum) vtot(1:3,1:ntot)
+!!$    write(ionum) ekitot(1:3,1:3,1:ntot)
+!!$    write(ionum) epitot(1:ntot)
+!!$    write(ionum) stot(1:3,1:3,1:ntot)
+!!$    write(ionum) auxtot(1:naux,1:ntot)
     close(ionum)
 
   end subroutine write_pmdtot_bin
