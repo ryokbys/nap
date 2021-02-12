@@ -2,9 +2,9 @@ module pairlist
 !-----------------------------------------------------------------------
 ! Module for pair-list.
 !-----------------------------------------------------------------------
-  use force,only: luse_charge, luse_elec_temp
-  use clrchg,only: lclrchg
-  use pmdvars,only: chg,chi,tei,clr
+!!$  use force,only: luse_charge, luse_elec_temp
+!!$  use clrchg,only: lclrchg
+!!$  use pmdvars,only: chg,chi,tei,clr
   use time,only: accum_time
   implicit none
   include 'mpif.h'
@@ -94,27 +94,29 @@ contains
     return
   end subroutine mk_lscl_para
 !=======================================================================
-  subroutine reorder_arrays(namax,natm,nb,tag,ra,va)
+  subroutine reorder_arrays(namax,natm,nb,tag,ra,va,aux,naux)
 !
 !  Reorder arrays (tag,ra,va, and some more) using the cell list
 !
-    integer,intent(in):: namax,natm,nb
+    integer,intent(in):: namax,natm,nb,naux
     real(8),intent(inout):: tag(namax),ra(3,namax),va(3,namax)
+    real(8),intent(inout):: aux(naux,namax)
 
 !.....Sort arrays
     call sort_by_lscl(namax,natm,nb,1,tag)
     call sort_by_lscl(namax,natm,nb,3,ra)
     call sort_by_lscl(namax,natm,nb,3,va)
-    if( luse_charge ) then
-      call sort_by_lscl(namax,natm,nb,1,chg)
-      call sort_by_lscl(namax,natm,nb,1,chi)
-    endif
-    if( luse_elec_temp ) then
-      call sort_by_lscl(namax,natm,nb,1,tei)
-    endif
-    if( lclrchg ) then
-      call sort_by_lscl(namax,natm,nb,1,clr)
-    endif
+    call sort_by_lscl(namax,natm,nb,naux,aux)
+!!$    if( luse_charge ) then
+!!$      call sort_by_lscl(namax,natm,nb,1,chg)
+!!$      call sort_by_lscl(namax,natm,nb,1,chi)
+!!$    endif
+!!$    if( luse_elec_temp ) then
+!!$      call sort_by_lscl(namax,natm,nb,1,tei)
+!!$    endif
+!!$    if( lclrchg ) then
+!!$      call sort_by_lscl(namax,natm,nb,1,clr)
+!!$    endif
     
     return
   end subroutine reorder_arrays

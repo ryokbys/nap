@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-02-04 17:33:06 Ryo KOBAYASHI>
+!                    Last modified: <2021-02-12 15:14:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -55,12 +55,12 @@ module pmdvars
   real(8),allocatable:: stn(:,:,:)
 !.....Auxiliary data
   real(8),allocatable:: aux(:,:)
-!.....atomic charge and electronegativity
-  real(8),allocatable:: chg(:),chi(:)
-!.....Electronic temperature
-  real(8),allocatable:: tei(:)
-!.....Color charge
-  real(8),allocatable:: clr(:)
+!!$!.....atomic charge and electronegativity
+!!$  real(8),allocatable:: chg(:),chi(:)
+!!$!.....Electronic temperature
+!!$  real(8),allocatable:: tei(:)
+!!$!.....Color charge
+!!$  real(8),allocatable:: clr(:)
 
 !.....Shear stress
   real(8):: shrfx

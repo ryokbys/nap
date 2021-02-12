@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-06 18:09:46 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-12 15:17:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -353,7 +353,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
   if( lreorder ) then
     call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc,rc1nn &
          ,h,hi,l1st)
-    call reorder_arrays(namax,natm,nb,tag,ra,va)
+    call reorder_arrays(namax,natm,nb,tag,ra,va,aux,naux)
     l1st = .false.
   endif
   tmp = mpi_wtime()
@@ -729,7 +729,7 @@ subroutine pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
       if( lreorder ) then
         call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc,rc1nn &
              ,h,hi,l1st)
-        call reorder_arrays(namax,natm,nb,tag,ra,va)
+        call reorder_arrays(namax,natm,nb,tag,ra,va,aux,naux)
       endif
 !.....Copy RA of boundary atoms
       call bacopy(rc,myid_md,mpi_md_world,iprint,ifcoulomb &

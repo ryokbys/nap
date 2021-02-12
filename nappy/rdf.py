@@ -44,11 +44,146 @@ def norm(vector):
         norm += e*e
     return np.sqrt(norm)
 
+def rdf_of_atom(ia,nsys,rmax=5.0,dr=0.1,sigma=0):
+    """
+    Compute RDF of specified atom.
+    """
+    #...Radial points
+    nr = int(rmax/dr) +1
+    rd = np.array([dr*ir+dr/2 for ir in range(nr)],)
+    
+    nspcs = len(nsys.specorder)
+    ndri = np.zeros((nspcs+1,nr),dtype=float)
+    spos = nsys.atoms.pos
+    sids = nsys.atoms.sid
+    natm = nsys.num_atoms()
+    pi = spos[ia]
+    hmat = nsys.get_hmat()
+    #...Compute ndr of atom-ia
+    for ja in nsys.neighbors_of(ia,rcut=rmax):
+        pj = spos[ja]
+        jsid = sids[ja]
+        pij = pj -pi
+        pij = pij -np.round(pij)
+        vij = np.dot(hmat,pij)
+        rij2 = np.dot(vij,vij)
+        rij = np.sqrt(rij2)
+        ir = int(rij/dr)
+        ndri[0,ir] += 1.0
+        ndri[jsid,ir] += 1.0
+
+    #...Normalize to get raw RDF(ia)
+    #.....Total RDF(ia)
+    tmp = 4.0 *np.pi *(natm-1) *dr
+    for ir in range(1,nr):
+        r = dr *ir
+        ndri[0,ir] /= tmp*r*r
+    #.....Species-decomposed RDF(ia)
+    natms = [ float(natm) ]
+    for isp in range(1,nspcs+1):
+        natms.append(float(nsys.num_atoms(isp)))
+    vol = nsys.volume()
+    isid = sids[ia]
+    tmp0 = 4.0 *np.pi *dr /vol
+    for jsid in range(1,nspcs+1):
+        nj = natms[jsid]
+        if jsid == isid:
+            tmp = tmp0 *(nj-1)
+        else:
+            tmp = tmp0 *nj
+        for ir in range(1,nr):
+            r = dr *ir
+            ndri[jsid,ir] /= tmp*r*r
+
+    rdfi = np.zeros(ndri.shape)
+    #...Gaussian smearing
+    if not sigma == 0:
+        #...Total 
+        rdfi[0,:] = gsmear(rd,ndri[0,:],sigma)
+        #...Species-decomposed
+        for jsid in range(1,nspcs+1):
+            rdfi[jsid,:] = gsmear(rd,ndri[jsid,:],sigma)
+
+    return rd,rdfi
+
+def rdf_desc_of(ia,nsys,rmax=5.0,dr=0.1):
+    """
+    RDF descriptor of a given atom-ia.
+    RDF descriptor has the information of 1st and 2nd peak positions
+    and height of each species.
+    For example, in case of Mg-Si-O 3-component system, an atoms has the following data:
+       R1(Mg), H1(Mg), R2(Mg), H2(Mg), R1(Si), H1(Si), R2(Si), H2(Si), R1(O), H1(O), R2(O), H2(O)
+    Thus the dimension of RDF descriptor of N-component system is 4N and 
+    if the peaks are not found, the descriptor values are set 0.0.
+    """
+    
+    rd,rdfi = rdf_of_atom(ia,nsys,rmax=rmax,dr=dr,sigma=2)
+    nspcs = len(nsys.specorder)
+    nr = len(rd)
+
+    rdf_desci = np.zeros(4*nspcs,dtype=float)
+    for jsp in range(1,nspcs+1):
+        signs = np.zeros(len(rd),dtype=int)
+        rdfij = rdfi[jsp,:]
+        for ir in range(1,nr-1):
+            diff = (rdfij[ir+1]-rdfij[ir-1])
+            if diff < 0.0:
+                signs[ir] = -1
+            else:
+                signs[ir] = +1
+        found_1st = False
+        for ir in range(1,nr-1):
+            if signs[ir] *signs[ir-1] < 0:
+                if not found_1st:
+                    rdf_desci[(jsp-1)*4 +0] = rd[ir]
+                    rdf_desci[(jsp-1)*4 +1] = rdfij[ir]
+                    found_1st = True
+                elif signs[ir-1] > 0:  # 2nd peak
+                    rdf_desci[(jsp-1)*4 +2] = rd[ir]
+                    rdf_desci[(jsp-1)*4 +3] = rdfij[ir]
+                    break
+    return rdf_desci
+
+def rdf_desc(nsys,rmax=5.0,dr=0.1):
+    """
+    Compute RDF descriptor of the given system.
+    """
+    natm = nsys.num_atoms()
+    nspcs = len(nsys.specorder)
+    desc = np.zeros((natm,4*nspcs),dtype=float)
+    for ia in range(natm):
+        desc[ia,:] = rdf_desc_of(ia,nsys,rmax=rmax,dr=dr)
+
+    return desc
+
+def read_rdf(fname='out.rdf'):
+    """
+    Read RDF data from a file.
+    The format is the same as that of write_normal function.
+    """
+    with open(fname,'r') as f:
+        lines = f.readlines()
+    #...Count num of data
+    nr = 0
+    for line in lines:
+        if line[0] != '#':
+            nr += 1
+    nd = len(line[-1].split()) -1
+    rdfs = np.zeros((nr,nd),dtype=float)
+    rs = np.zeros(nr,dtype=float)
+    ir = 0
+    for il,line in enumerate(lines):
+        if line[0] == '#': continue
+        dat = line.split()
+        rs[ir] = float(data[0])
+        rdfs[ir,:] = [ float(x) for x in dat[1:]]
+    return rs,rdfs
+    
 
 def compute_ndr(ia,isid,dr,r2max,nr,hmat,natm,poss,sids,nspcs,):
     """
     Compute number of atoms in the every shell [r:r+dr] up to *sqrt(r2max)*.
-    This routine can be only applied to cubic systems.
+    This routine may not be appilcable to non-cubic systems.
     """
     ndr = np.zeros((nspcs+1,nspcs+1,nr),)
     pi = poss[ia]

@@ -1,6 +1,6 @@
 #!/usr/sh
 #
-# makefile in src directory
+# makefile for pmd and utility programs related to pmd
 #
 
 #-----------------------------------------------------------------------
@@ -63,6 +63,8 @@ clstr= mod_pmdio.o mod_util.o util_vec.o mod_pairlist.o cluster.o
 ascii2bin= mod_pmdio.o util_vec.o mod_util.o ascii2bin_pmd.o
 bin2ascii= mod_pmdio.o util_vec.o mod_util.o bin2ascii_pmd.o
 
+rdfobj= mod_pmdio.o mod_util.o util_vec.o mod_pairlist.o mod_time.o rdf.o
+
 #-----------------------------------------------------------------------
 # Post process programs
 #
@@ -115,15 +117,8 @@ a2b: ${ascii2bin}
 b2a: ${bin2ascii}
 	${MPIFC} ${MPIFLAGS} -o $@ ${bin2ascii}
 
-# boxsize: change_pmd_boxsize.o ${mods} util_pmd.o
-# 	${MPIFC} ${MPIFLAGS} -o $@ change_pmd_boxsize.o ${mods} util_pmd.o
-
-# sortpmd: sort_pmd.o ${mods} util_pmd.o sort.o
-# 	${MPIFC} ${MPIFLAGS} -o $@ sort_pmd.o ${mods} util_pmd.o sort.o
-
-# intstl: put_interstitials.o ${mod} util_pmd.o mk_lspr.o 
-# 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} util_pmd.o mk_lspr.o put_interstitials.o
-
+rdf: ${rdfobj}
+	${MPIFC} ${MPIFLAGS} -o $@ ${rdfobj}
 
 #.....Dependencies
 pmd_main.o: ${mods}

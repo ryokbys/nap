@@ -57,7 +57,8 @@ DEFAULT_LABELS = ('pos','vel','frc','sid')
 
 class NAPSystem(object):
     """
-    Contains cell information and atoms, and provides some functionalities.
+    NAPSystem class that contains cell information and atoms, and provides some functionalities.
+    Atom information is stored as a pandas DataFrame object.
     """
 
     def __init__(self, fname=None, format=None, specorder=[], ase_atoms=None):
@@ -1521,7 +1522,7 @@ You need to specify the species order correctly with --specorder option.
         dik = np.linalg.norm(rik)
         angle = np.arccos(np.dot(rij,rik)/dij/dik) /np.pi *180.0
         return angle
-        
+
     def make_pair_list(self,rcut=3.0,rcuts=None):
         """
         Make a neighbor list.
@@ -1559,10 +1560,10 @@ You need to specify the species order correctly with --specorder option.
         else:
             rcs2[:,:] = rcut**2
         rc2= rcut**2
-        h= np.zeros((3,3))
-        h[:,0]= self.a1 *self.alc
-        h[:,1]= self.a2 *self.alc
-        h[:,2]= self.a3 *self.alc
+        h= self.get_hmat()
+        # h[:,0]= self.a1 *self.alc
+        # h[:,1]= self.a2 *self.alc
+        # h[:,2]= self.a3 *self.alc
         hi= np.linalg.inv(h)
         # print h
         # print hi
@@ -1592,70 +1593,101 @@ You need to specify the species order correctly with --specorder option.
 
         #...make a linked-cell list
         self.assign_pbc()
-        for i in range(len(self.atoms)):
+        for i in range(self.num_atoms()):
             # pi = self.atoms.pos[i]
             pi = poss[i]
             # print pi
             #...assign a vector cell index
-            mx= int(pi[0]*rcxi)
-            my= int(pi[1]*rcyi)
-            mz= int(pi[2]*rczi)
+            mx = int(pi[0]*rcxi)
+            my = int(pi[1]*rcyi)
+            mz = int(pi[2]*rczi)
+            mx = min(max(mx,0),lcx-1)
+            my = min(max(my,0),lcy-1)
+            mz = min(max(mz,0),lcz-1)
             m= mx*lcyz +my*lcz +mz
             # print i,pi,mx,my,mz,m
             lscl[i]= lshd[m]
             lshd[m]= i
 
+        #...Determine possible max of num of neighbors
+        nnmax = 0
+        for ic in range(len(lshd)):
+            inc = 0
+            i = lshd[ic]
+            if i == -1: continue
+            while i >= 0:
+                inc += 1
+                i = lscl[i]
+            nnmax = max(nnmax,inc)
+
         #...Initialize lspr
-        lspr = [ [] for i in range(len(self.atoms)) ]
+        # lspr = [ [] for i in range(self.num_atoms()) ]
+        nplspr = np.zeros((self.num_atoms(),nnmax*27),dtype=int)
+        nplspr[:,:] = -1
+        nlspr = np.zeros(self.num_atoms(),dtype=int)
         # self.atoms['lspr'] = emptylist
         sids = self.atoms.sid
-            
-        for ia in range(len(self.atoms)):
-            #pi= self.atoms.pos[ia]
+
+        for ia in range(self.num_atoms()):
+            # pi = self.atoms.pos[i]
             pi = poss[ia]
-            mx= int(pi[0]*rcxi)
-            my= int(pi[1]*rcyi)
-            mz= int(pi[2]*rczi)
-            m= mx*lcyz +my*lcz +mz
-            for kuz in range(-1,2):
-                m1z= mz +kuz
+            # print pi
+            #...assign a vector cell index
+            mx = int(pi[0]*rcxi)
+            my = int(pi[1]*rcyi)
+            mz = int(pi[2]*rczi)
+            mx = min(max(mx,0),lcx-1)
+            my = min(max(my,0),lcy-1)
+            mz = min(max(mz,0),lcz-1)
+            isp = sids[ia] -1
+            # m= mx*lcyz +my*lcz +mz
+            for kuz in (-1,0,1):
+                m1z = mz +kuz
                 if m1z < 0: m1z += lcz
                 if m1z >= lcz: m1z -= lcz
-                for kuy in range(-1,2):
+                for kuy in (-1,0,1):
                     m1y= my +kuy
                     if m1y < 0: m1y += lcy
                     if m1y >= lcy: m1y -= lcy
-                    for kux in range(-1,2):
+                    for kux in (-1,0,1):
                         m1x= mx +kux
                         if m1x < 0: m1x += lcx
                         if m1x >= lcx: m1x -= lcx
                         m1= m1x*lcyz +m1y*lcz +m1z
-                        ja= lshd[m1]
-                        if ja== -1: continue
-                        self.scan_j_in_cell(ia,pi,ja,lscl,h,rcs2,poss,sids,lspr)
-        #...after makeing lspr
-        # for ia in range(len(self.atoms)):
-        #     print ia,self.lspr[ia]
-        self.atoms['lspr'] = lspr
+                        if lshd[m1] == -1: continue
 
-    def scan_j_in_cell(self,ia,pi,ja,lscl,h,rcs2,poss,sids,lspr):
-        if ja == ia: ja = lscl[ja]
-        if ja == -1: return 0
-        # if ja not in self.atoms.lspr[ia]:
-        isp = sids[ia] -1
-        jsp = sids[ja] -1
-        if ja not in lspr[ia]:
-            #pj= self.atoms.pos[ja]
-            pj = poss[ja]
-            xij= pj-pi
-            xij= xij -np.round(xij)
-            rij= np.dot(h,xij)
-            rij2= rij[0]**2 +rij[1]**2 +rij[2]**2
-            if rij2 < rcs2[isp,jsp]:
-                #self.atoms.lspr[ia].append(ja)
-                lspr[ia].append(ja)
-        ja= lscl[ja]
-        self.scan_j_in_cell(ia,pi,ja,lscl,h,rcs2,poss,sids,lspr)
+                        ja = lshd[m1]
+                        while ja >= 0:
+                            if ja <= ia:
+                                ja = lscl[ja]
+                                continue
+                            jsp = sids[ja] -1
+                            pij = poss[ja] -pi
+                            pij = pij - np.round(pij)
+                            rij = np.dot(h,pij)
+                            rij2 = rij[0]**2 +rij[1]**2 +rij[2]**2
+                            if rij2 < rcs2[isp,jsp] and ja not in nplspr[ia,:]:
+                                nplspr[ia,nlspr[ia]] = ja
+                                nplspr[ja,nlspr[ja]] = ia
+                                nlspr[ia] += 1
+                                nlspr[ja] += 1
+                            ja = lscl[ja]
+        #...Finally add the lspr to atoms DataFrame
+        lspr = []
+        for ia in range(self.num_atoms()):
+            lspr.append([ nplspr[ia,ja] for ja in range(nlspr[ia]) ])
+        self.atoms['lspr'] = lspr
+        return None
+
+    def neighbors_of(self,ia,rcut=3.0):
+        """
+        Generator of the neighbors of a given atom-i.
+        """
+        if 'lspr' not in self.atoms.columns:
+            self.make_pair_list(rcut=rcut)
+        lspri = self.atoms.lspr[ia]
+        for jj in range(len(lspri)):
+            yield lspri[jj]
 
     def _pbc(self,x):
         if x < 0.:

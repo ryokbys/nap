@@ -1,6 +1,6 @@
 program rdf
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-09-29 21:57:35 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-12 15:36:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Compute RDF.
 !-----------------------------------------------------------------------
@@ -13,9 +13,10 @@ program rdf
 ! -------
 !   - STDOUT should not be redirected to out.rdf
 !   - out.rdf:       RDF data
-!   - out.sfac:      Structure factor S(q) data
+!   - out.sfac:      Structure factor S(q) data obtained from total RDF.
 !-----------------------------------------------------------------------
   use pmdio
+  use pairlist,only: mk_lspr_sngl
   implicit none
   include 'mpif.h'
   real(8),parameter:: pi = 3.14159265358979d0
