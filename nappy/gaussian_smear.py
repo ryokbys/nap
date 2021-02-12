@@ -18,25 +18,27 @@ import os,sys,math
 import numpy as np
 from docopt import docopt
 
-def gsmear(xd,yd,sigma):
+def gsmear(xd,yd,sigma,ngwidth=3):
     """
     Compute Gaussian-smearing of given data with smearing width *sigma*.
     """
     dx= xd[1]-xd[0]
     sgm= sigma*dx
-    pref= 1.0/(np.sqrt(2.0*np.pi)*sgm)
-    
+    pref= dx/(np.sqrt(2.0*np.pi)*sgm)
     ndat= len(xd)
+    nwidth = int(sigma*ngwidth)
+    #nwidth = ndat
     gdat= np.zeros(ndat,dtype=np.float)
+    expfact = 1.0/sgm**2/2
     for ix in range(ndat):
         #gdat[ix]= yd[ix]
-        for jx in range(-ndat+1,ndat-1):
+        for jx in range(-nwidth+1,nwidth-1):
             kx= ix+jx
             if kx < 0:
                 kx = -kx
             elif kx >= ndat:
                 kx = ndat -(kx-(ndat-1))
-            gdat[ix] += yd[kx]*pref*np.exp(-(dx*(jx))**2/sgm**2/2)*dx
+            gdat[ix] += yd[kx]*pref*np.exp(-(dx*(jx))**2*expfact)
     gdat /= 2
     return gdat
 

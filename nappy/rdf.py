@@ -144,14 +144,19 @@ def rdf_desc_of(ia,nsys,rmax=5.0,dr=0.1):
                     break
     return rdf_desci
 
-def rdf_desc(nsys,rmax=5.0,dr=0.1):
+def rdf_desc(nsys,rmax=5.0,dr=0.1,progress=False):
     """
     Compute RDF descriptor of the given system.
     """
+    import sys
     natm = nsys.num_atoms()
     nspcs = len(nsys.specorder)
     desc = np.zeros((natm,4*nspcs),dtype=float)
+    interval = max(int(natm/20),1)
     for ia in range(natm):
+        if ia % interval == 0 and progress:
+            print('ia/natm = {0:8d}/{1:8d}'.format(ia,natm))
+            sys.stdout.flush()
         desc[ia,:] = rdf_desc_of(ia,nsys,rmax=rmax,dr=dr)
 
     return desc
