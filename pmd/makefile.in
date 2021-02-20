@@ -155,7 +155,7 @@ force_angular.o: ${mods}
 mod_constraints.o: mod_vector.o mod_util.o
 mod_rdcfrc.o: mod_structure.o mod_util.o
 mod_ttm.o: mod_util.o
-mod_pmdio.o: mod_util.o
+mod_pmdio.o: mod_util.o mod_time.o
 mod_pmdvars.o: mod_util.o mod_pmdio.o
 mod_pairlist.o: mod_force.o mod_colorcharge.o mod_pmdvars.o
 

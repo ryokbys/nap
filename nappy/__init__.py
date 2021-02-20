@@ -4,7 +4,7 @@
 from __future__ import print_function
 
 import os
-from . import *
+# from . import *
 # from . import vasp
 # from . import scheduler
 # from . import clutil
