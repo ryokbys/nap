@@ -44,13 +44,14 @@ import pandas as pd
 
 import nappy
 from nappy.atom import get_symbol_from_number, get_number_from_symbol
+from nappy.util import pbc
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "200722"
 
 #...constants
-FILE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',
-                'cube','CHGCAR','pdb')
+# FILE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',
+#                 'cube','CHGCAR','pdb')
 DEFAULT_LABELS = ('pos','vel','frc','sid')
 # _file_formats = ('pmd','POSCAR','dump','xsf','lammps',
 #                  'cube','CHGCAR')
@@ -80,9 +81,13 @@ class NAPSystem(object):
             self.specorder = None
         
         if fname is not None:
-            self.read(fname=fname,format=format)
+            # self.read(fname=fname,format=format)
+            raise ValueError('Initializing NAPSystem with file is obsolete.\n'
+                             +'Use nappy.io.read() instead.')
         elif ase_atoms is not None:
-            self.load_ase_atoms(ase_atoms)
+            # self.load_ase_atoms(ase_atoms)
+            raise ValueError('Initializing NAPSystem with ase_atoms is obsolete.\n'
+                             +'Use nappy.io.from_ase(atoms) instead.')
         else:
             pass
 
@@ -289,7 +294,7 @@ class NAPSystem(object):
             nps.append(len(self.atoms))
         return nps
 
-    def volume(self):
+    def get_volume(self):
         return self.alc**3 *np.abs(np.dot(self.a1,np.cross(self.a2,self.a3)))
 
     def get_real_positions(self):
@@ -669,22 +674,14 @@ class NAPSystem(object):
         for jj in range(len(lspri)):
             yield lspri[jj]
 
-    def _pbc(self,x):
-        if x < 0.:
-            return x -int(x-1.0)
-        elif x >= 1.0:
-            return x -int(x)
-        else:
-            return x
-
     def assign_pbc(self):
         poss = self.atoms.pos
         for i in range(len(self.atoms)):
             pi = poss[i]
             newpi = np.zeros(3)
-            newpi[0] = self._pbc(pi[0])
-            newpi[1] = self._pbc(pi[1])
-            newpi[2] = self._pbc(pi[2])
+            newpi[0] = pbc(pi[0])
+            newpi[1] = pbc(pi[1])
+            newpi[2] = pbc(pi[2])
             self.atoms.at[i,'pos'] = newpi
         return None
 
@@ -1124,7 +1121,7 @@ def analyze(nsys):
     a = np.linalg.norm(a1)
     b = np.linalg.norm(a2)
     c = np.linalg.norm(a3)
-    vol = nsys.volume()
+    vol = nsys.get_volume()
     alpha = np.arccos(np.dot(a2,a3)/b/c)/np.pi*180.0
     beta  = np.arccos(np.dot(a1,a3)/a/c)/np.pi*180.0
     gamma = np.arccos(np.dot(a1,a2)/a/b)/np.pi*180.0

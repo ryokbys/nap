@@ -140,7 +140,7 @@ if __name__ == '__main__':
     b= erg0
     p0= np.array([a,b])
     # vol= get_vol(al,hmat0)
-    vol = nsys0.volume()
+    vol = nsys0.get_volume()
     #...least square fitting
     popt11,pcov11= curve_fit(quad_func,dlts,e11s,p0=p0)
     popt12,pcov12= curve_fit(quad_func,dlts,e12s,p0=p0)

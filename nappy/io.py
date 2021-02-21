@@ -461,9 +461,9 @@ def read_dump(fname="dump"):
                     f0 = [ 0., 0., 0. ]
                 sr = np.dot(hmati,r0)
                 sv = np.dot(hmati,v0)
-                sr[0] = nsys._pbc(sr[0])
-                sr[1] = nsys._pbc(sr[1])
-                sr[2] = nsys._pbc(sr[2])
+                sr[0] = pbc(sr[0])
+                sr[1] = pbc(sr[1])
+                sr[2] = pbc(sr[2])
                 # poss[iatm][:] = sr[:]
                 # vels[iatm][:] = sv[:]
                 poss[iatm,:] = sr[:]
@@ -641,9 +641,9 @@ def read_lammps_data(fname="data.lammps",atom_style='atomic'):
                 x = hmati[0,0]*x0 +hmati[0,1]*y0 +hmati[0,2]*z0
                 y = hmati[1,0]*x0 +hmati[1,1]*y0 +hmati[1,2]*z0
                 z = hmati[2,0]*x0 +hmati[2,1]*y0 +hmati[2,2]*z0
-                x = nsys._pbc(x)
-                y = nsys._pbc(y)
-                z = nsys._pbc(z)
+                x = pbc(x)
+                y = pbc(y)
+                z = pbc(z)
                 poss[iatm][:] = [x,y,z]
                 vels[iatm][:] = [0.,0.,0]
                 iatm += 1
@@ -1045,44 +1045,38 @@ def get_PDB_txt(nsys):
 
     return txt
 
-def load_ase_atoms(ase_atoms,specorder=None):
+def from_ase(atoms,specorder=None):
     """
-    Load ASE Atoms object.
-    
-    Parameters
-    ----------
-    ase_atoms : ase atoms object
-           ASE atoms object to be loaded.
-    specorder : list
-           Species order.
+    Convert ASE Atoms object to NAPSystem object.
     """
-    nsys = NAPSystem()
-    symbols = ase_atoms.get_chemical_symbols()
-    spos = ase_atoms.get_scaled_positions()
-    vels = ase_atoms.get_velocities()
-    cell = ase_atoms.get_cell()
+    spcorder = []
+    if specorder is not None:
+        spcorder = specorder
+    symbols = atoms.get_chemical_symbols()
+    spos = atoms.get_scaled_positions()
+    vels = atoms.get_velocities()
+    cell = atoms.get_cell()
     celli = np.linalg.inv(cell)
-    #...Initialize and remake nsys.specorder
-    if specorder is None:
-        specorder = []
+    if spos is None:
+        raise ValueError('ASE atoms object has no atom in it.')
+    #...Initialize and remake self.specorder
     for s in symbols:
-        if s not in specorder:
-            specorder.append(s)
-    nsys.specorder = copy.copy(specorder)
+        if s not in spcorder:
+            spcorder.append(s)
+    nsys = NAPSystem(specorder=spcorder)
     # nsys = cls(specorder=spcorder)
     nsys.alc= 1.0
-    nsys.a1[:] = ase_atoms.cell[0]
-    nsys.a2[:] = ase_atoms.cell[1]
-    nsys.a3[:] = ase_atoms.cell[2]
+    nsys.a1[:] = atoms.cell[0]
+    nsys.a2[:] = atoms.cell[1]
+    nsys.a3[:] = atoms.cell[2]
     #...First, initialize arrays
-    natm = len(ase_atoms)
+    natm = len(atoms)
     sids = [ 0 for i in range(natm) ]
     poss = [ np.array(spos[i]) for i in range(natm) ]
-    if type(vels) == type(spos):
-        if len(vels) == len(spos):
-            vels = [ np.array(vels[i]) for i in range(natm) ]
-    else:
+    if vels is None:
         vels = [ np.zeros(3) for i in range(natm) ]
+    else:        
+        vels = [ np.array(vels[i]) for i in range(natm) ]
     frcs = [ np.zeros(3) for i in range(natm) ]
 
     #...Create arrays to be installed into nsys.atoms
@@ -1093,8 +1087,8 @@ def load_ase_atoms(ase_atoms,specorder=None):
     nsys.atoms.vel = nsys.atoms.vel.apply(lambda x: np.dot(celli,x))
     nsys.atoms.frc = frcs
 
-    return None
-    
+    return nsys
+
 def parse_filename(filename):
     for format in FILE_FORMATS:
         if format in filename:

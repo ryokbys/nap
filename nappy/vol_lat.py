@@ -50,7 +50,7 @@ def main(args):
     for i,fi in enumerate(files):
         try:
             nsys = NAPSystem(fname=fi)
-            volsum += nsys.volume()
+            volsum += nsys.get_volume()
             a,b,c,alpha,beta,gamma = nsys2lat(nsys)
             asum += a
             bsum += b

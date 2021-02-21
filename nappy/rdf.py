@@ -82,7 +82,7 @@ def rdf_of_atom(ia,nsys,rmax=5.0,dr=0.1,sigma=0):
     natms = [ float(natm) ]
     for isp in range(1,nspcs+1):
         natms.append(float(nsys.num_atoms(isp)))
-    vol = nsys.volume()
+    vol = nsys.get_volume()
     isid = sids[ia]
     tmp0 = 4.0 *np.pi *dr /vol
     for jsid in range(1,nspcs+1):
@@ -215,7 +215,7 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
     import copy
 
     natm0= nsys0.num_atoms()
-    vol= nsys0.volume()
+    vol= nsys0.get_volume()
     natms = [ float(natm0)]
     for ispcs in range(1,nspcs+1):
         natms.append(float(nsys0.num_atoms(ispcs)))
