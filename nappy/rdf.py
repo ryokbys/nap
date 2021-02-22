@@ -31,7 +31,8 @@ import os,sys
 import numpy as np
 from docopt import docopt
 
-from nappy.napsys import NAPSystem
+#from nappy.napsys import NAPSystem
+from nappy.io import read
 from nappy.gaussian_smear import gsmear
 from nappy.common import get_key
 
@@ -283,7 +284,7 @@ def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,pairwise=False):
         if not os.path.exists(infname):
             print("[Error] File, {0}, does not exist !!!".format(infname))
             sys.exit()
-        nsys= NAPSystem(fname=infname,specorder=specorder)
+        nsys = read(fname=infname,specorder=specorder)
         print(' File =',infname)
         rd,gr= rdf(nsys,nspcs,dr,rmax,pairwise=pairwise)
         agr += gr

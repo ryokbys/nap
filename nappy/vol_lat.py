@@ -20,7 +20,7 @@ import os,sys
 from docopt import docopt
 import numpy as np
 
-from nappy.napsys import NAPSystem
+from nappy.io import read
 from nappy.common import get_key
 
 __author__ = "Ryo KOBAYASHI"
@@ -49,7 +49,7 @@ def main(args):
     alpsum= betsum= gmmsum= 0.0
     for i,fi in enumerate(files):
         try:
-            nsys = NAPSystem(fname=fi)
+            nsys = read(fname=fi)
             volsum += nsys.get_volume()
             a,b,c,alpha,beta,gamma = nsys2lat(nsys)
             asum += a

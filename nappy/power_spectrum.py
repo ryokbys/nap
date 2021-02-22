@@ -32,7 +32,8 @@ import os,sys,glob,time,math
 import numpy as np
 from docopt import docopt
 
-from nappy.napsys import NAPSystem
+#from nappy.napsys import NAPSystem
+from nappy.io import read
 from nappy.common import get_key
 
 ################################################## Functions ###########
@@ -112,7 +113,8 @@ def main(args):
     
     #...set global values
     infile= infiles[0]
-    system=NAPSystem(fname=infile)
+    #system=NAPSystem(fname=infile)
+    system = read(fname=infile)
     natm= len(system.atoms)
     psid= np.zeros((natm,),dtype=np.int8)
     nas= 0
@@ -136,7 +138,8 @@ def main(args):
         print('.',end='')
         sys.stdout.flush()
         infile= infiles[ifile]
-        system= NAPSystem(fname=infile)
+        #system= NAPSystem(fname=infile)
+        system = read(fname=infile)
         hmat[0]= system.a1 *system.alc
         hmat[1]= system.a2 *system.alc
         hmat[2]= system.a3 *system.alc

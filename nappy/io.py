@@ -13,6 +13,7 @@ from __future__ import print_function
 import os,sys
 from docopt import docopt
 import numpy as np
+import copy
 
 from nappy.napsys import NAPSystem
 from nappy.util import get_tag, decode_tag, pbc, \
@@ -52,22 +53,22 @@ def write(nsys,fname="pmdini",format=None):
 
     return None
 
-def read(fname="pmdini",format=None):
+def read(fname="pmdini",format=None,specorder=None):
     if format in (None, 'None'):
         format= parse_filename(fname)
     
     if format == 'pmd':
-        nsys = read_pmd(fname)
+        nsys = read_pmd(fname,specorder=specorder)
     elif format == 'POSCAR':
-        nsys = read_POSCAR(fname)
+        nsys = read_POSCAR(fname,specorder=specorder)
     elif format == 'CHGCAR':
-        nsys = read_CHGCAR(fname)
+        nsys = read_CHGCAR(fname,specorder=specorder)
     elif format == 'dump':
-        nsys = read_dump(fname)
+        nsys = read_dump(fname,specorder=specorder)
     elif format == 'xsf':
-        nsys = read_xsf(fname)
+        nsys = read_xsf(fname,specorder=specorder)
     elif format == 'lammps':
-        nsys = read_lammps_data(fname)
+        nsys = read_lammps_data(fname,specorder=specorder)
     else:
         print('Since the file format is unknown, try to read the file using ASE.')
         try:
@@ -78,7 +79,7 @@ def read(fname="pmdini",format=None):
             raise IOError('Cannot load input file even ')
     return nsys
 
-def read_pmd(fname='pmdini'):
+def read_pmd(fname='pmdini',specorder=None):
     nsys = NAPSystem()
     incatm = 0
     with open(fname,'r') as f:
@@ -93,6 +94,10 @@ def read_pmd(fname='pmdini'):
                         print(' WARNING: specorders are inconsistent, '
                               +'use one in the file.')
                     nsys.specorder = specorder
+                elif specorder is not None:
+                    nsys.specorder = specorder
+                else:
+                    raise ValueError('Specorder must be specified via the file or an argument.')
             else:
                 iline = iline +1
                 data = line.split()
@@ -175,7 +180,7 @@ def write_pmd(nsys,fname='pmdini'):
     f.close()
     return None
 
-def read_POSCAR(fname='POSCAR'):
+def read_POSCAR(fname='POSCAR',specorder=None):
     nsys = NAPSystem()
     with open(fname,'r') as f:
         # 1st line: comment
@@ -191,9 +196,10 @@ def read_POSCAR(fname='POSCAR'):
         if not buff[0].isdigit():
             spcs = copy.deepcopy(buff)
             buff= f.readline().split()
-            if not nsys.specorder:
+            if specorder is None:
                 nsys.specorder = spcs
             else:
+                nsys.specorder = specorder
                 for s in spcs:
                     if s not in nsys.specorder:
                         nsys.specorder.append(s)
@@ -304,7 +310,7 @@ def write_POSCAR(nsys,fname='POSCAR'):
     f.close()
     return None
 
-def read_dump(fname="dump"):
+def read_dump(fname="dump",specorder=None):
     nsys = NAPSystem()
     f=open(fname,'r')
     mode= 'None'
@@ -312,8 +318,10 @@ def read_dump(fname="dump"):
     iatm= 0
     natm= -1
     symbol = None
-    if not nsys.specorder:
+    if specorder is None:
         nsys.specorder = []
+    else:
+        nsys.specorder = specorder
     nsys.alc = 1.0
     xy = 0.0
     xz = 0.0
@@ -568,8 +576,12 @@ def write_dump(nsys,fname='dump'):
     f.close()
     return None
 
-def read_lammps_data(fname="data.lammps",atom_style='atomic'):
+def read_lammps_data(fname="data.lammps",atom_style='atomic',specorder=None):
     nsys = NAPSystem()
+    if specorder is None:
+        nsys.specorder = []
+    else:
+        nsys.specorder = specorder
     f=open(fname,'r')
     mode= 'None'
     iatm= 0
@@ -691,10 +703,12 @@ def write_lammps_data(nsys,fname='data.lammps',atom_style='atomic'):
     f.close()
     return None
 
-def read_xsf(fname="xsf"):
+def read_xsf(fname="xsf",specorder=None):
     nsys = NAPSystem()
-    if nsys.specorder is None:
+    if specorder is None:
         nsys.specorder = []
+    else:
+        nsys.specorder = specorder
     f=open(fname,'r')
     mode= 'None'
     ixyz= 0
@@ -811,7 +825,7 @@ def write_xsf(nsys,fname='xsf'):
     f.close()
     return None
 
-def read_CHGCAR(fname='CHGCAR'):
+def read_CHGCAR(fname='CHGCAR',specorder=None):
     """
     Read CHGCAR file and get information of cell, atoms, and volumetric data.
 
@@ -835,9 +849,10 @@ def read_CHGCAR(fname='CHGCAR'):
         if not buff[0].isdigit():
             spcs = copy.deepcopy(buff)
             buff= f.readline().split()
-            if not nsys.specorder:
+            if specorder is None:
                 nsys.specorder = spcs
             else:
+                nsys.specorder = specorder
                 for s in spcs:
                     if s not in nsys.specorder:
                         nsys.specorder.append(s)

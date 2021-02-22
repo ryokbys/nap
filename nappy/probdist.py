@@ -24,7 +24,8 @@ from docopt import docopt
 import numpy as np
 
 from nappy.common import get_key
-from nappy.napsys import NAPSystem
+#from nappy.napsys import NAPSystem
+from nappy.io import read, write
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "181225"
@@ -76,7 +77,8 @@ def get_prob_dist(ndivs,nsys,sid,sgm):
 
 def write_CHGCAR(nsys,pdist,fname='CHGCAR'):
     poscar = 'POSCAR_tmp'
-    nsys.write_POSCAR(fname=poscar)
+    #nsys.write_POSCAR(fname=poscar)
+    write(nsys,fname=poscar)
     with open(poscar,'r') as f:
         lines = f.readlines()
     with open(fname,'w') as f:
@@ -126,7 +128,8 @@ if __name__ == "__main__":
 
     files.sort(key=get_key,reverse=True)
 
-    nsys0 = NAPSystem(fname=files[0],specorder=specorder)
+    #nsys0 = NAPSystem(fname=files[0],specorder=specorder)
+    nsys0 = read(fname=files[0],specorder=specorder)
     a,b,c = nsys0.get_lattice_angles()
     if abs(a-np.pi/2) > 180.0/np.pi or abs(b-np.pi/2) > 180.0/np.pi \
        or abs(c-np.pi/2) > 180.0/np.pi:
@@ -140,7 +143,8 @@ if __name__ == "__main__":
     pdist = np.zeros(ndivs,dtype=float)
     for f in files:
         print(' Reading {0:s}...'.format(f))
-        nsys = NAPSystem(fname=f,specorder=specorder)
+        #nsys = NAPSystem(fname=f,specorder=specorder)
+        nsys = read(fname=f,specorder=specorder)
         pdist += get_prob_dist(ndivs,nsys,sid,sgm)
     pdist = normalize_pdist(pdist,nsys0,sid)
     write_CHGCAR(nsys0,pdist)

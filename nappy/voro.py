@@ -13,14 +13,15 @@ from __future__ import print_function
 import sys,os
 from docopt import docopt
 
-from nappy.napsys import NAPSystem
+from nappy.io import read
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "rev191004"
 
 def main(args):
     infname= args['FILE']
-    aSys= NAPSystem(fname=infname)
+
+    aSys = read(fname=infname)
     natm= len(aSys.atoms)
     
     outfname= infname+".voro"

@@ -24,7 +24,8 @@ import numpy as np
 from docopt import docopt
 from scipy.optimize import curve_fit
 import copy
-from nappy.napsys import NAPSystem
+#from nappy.napsys import NAPSystem
+from nappy.io import read
 
 #...constants
 outfname='out.elast_iso'
@@ -46,7 +47,8 @@ if __name__ == '__main__':
     if niter % 2 == 0:
         niter += 1
 
-    nsys0 = NAPSystem(fname='pmdini')
+    #nsys0 = NAPSystem(fname='pmdini')
+    nsys0 = read('pmdini')
     os.system('cp pmdini pmdini.bak')
     hmat0 = nsys0.get_hmat()
     print('Original H-matrix:')
@@ -85,7 +87,7 @@ if __name__ == '__main__':
             hmat= np.copy(hmat0)
             hmat[0,0]= hmat[0,0] +dh
             nsys.set_hmat(hmat)
-            nsys.write('pmdini')
+            write(nsys,fname='pmdini')
             os.system(mdexec+' > out.pmd')
             erg11 = float(subprocess.check_output('cat erg.pmd',shell=True))
             dlts[it] = dlt

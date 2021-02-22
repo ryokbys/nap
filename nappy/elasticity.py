@@ -27,8 +27,9 @@ from scipy.optimize import curve_fit
 import spglib
 import yaml
 
-from ase.io import read
+import ase.io
 from nappy.napsys import NAPSystem
+from nappy.io import read, from_ase
 import copy
 
 __author__  = 'Ryo KOBAYASHI'
@@ -73,7 +74,8 @@ def get_deformations(dlt1max,dlt2max):
 def prepare(infname='POSCAR',dlt1max=0.01,dlt2max=0.06):
 
     #...original system
-    nsys0 = NAPSystem(fname=infname)
+    #nsys0 = NAPSystem(fname=infname)
+    nsys0 = read(infname)
     #orig_atoms = read(infname,format='vasp')
     orig_atoms = nsys0.to_ase_atoms()
 
@@ -222,7 +224,8 @@ def params2ctnsr(params):
 def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
 
     #...original system
-    atoms0 = read(infname,format='vasp')
+    #atoms0 = read(infname,format='vasp')
+    atoms0 = ase.io.read(infname,format='vasp')
 
     #...get deformations
     fmats = get_deformations(dlt1max,dlt2max)
@@ -330,7 +333,8 @@ def reduce_cij(atoms0,cij0,eps=1.e-4):
 
     cij = cij0
     symdata = spglib.get_symmetry_dataset(atoms0)
-    nsys = NAPSystem(ase_atoms=atoms0)
+    #nsys = NAPSystem(ase_atoms=atoms0)
+    nsys = from_ase(atoms0)
     sgnum = symdata['number']
     
     a,b,c = nsys.get_lattice_lengths()

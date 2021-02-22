@@ -934,115 +934,6 @@ class NAPSystem(object):
         import nglview as nv
         return nv.show_ase(self.to_ase_atoms())
 
-    def load_ase_atoms(self,ase_atoms,specorder=None):
-        """
-        Load ASE Atoms object.
-        
-        Parameters
-        ----------
-        ase_atoms : ase atoms object
-               ASE atoms object to be loaded.
-        specorder : list
-               Species order.
-        """
-        # spcorder = []
-        # if specorder is not None:
-        #     spcorder = specorder
-        symbols = ase_atoms.get_chemical_symbols()
-        spos = ase_atoms.get_scaled_positions()
-        vels = ase_atoms.get_velocities()
-        cell = ase_atoms.get_cell()
-        celli = np.linalg.inv(cell)
-        #...Initialize and remake self.specorder
-        if specorder is None:
-            specorder = []
-        for s in symbols:
-            if s not in specorder:
-                specorder.append(s)
-        self.init_atoms()
-        self.specorder = copy.copy(specorder)
-        # nsys = cls(specorder=spcorder)
-        self.alc= 1.0
-        self.a1[:] = ase_atoms.cell[0]
-        self.a2[:] = ase_atoms.cell[1]
-        self.a3[:] = ase_atoms.cell[2]
-        #...First, initialize arrays
-        natm = len(ase_atoms)
-        sids = [ 0 for i in range(natm) ]
-        poss = [ np.array(spos[i]) for i in range(natm) ]
-        if type(vels) == type(spos):
-            if len(vels) == len(spos):
-                vels = [ np.array(vels[i]) for i in range(natm) ]
-        else:
-            vels = [ np.zeros(3) for i in range(natm) ]
-        frcs = [ np.zeros(3) for i in range(natm) ]
-        # nsys.init_atoms()
-        #...Create arrays to be installed into nsys.atoms
-        sids = [ self.specorder.index(si)+1 for si in symbols ]
-        self.atoms.sid = sids
-        self.atoms.pos = poss
-        self.atoms.vel = vels
-        self.atoms.vel = self.atoms.vel.apply(lambda x: np.dot(celli,x))
-        self.atoms.frc = frcs
-
-        return None
-    
-
-    @classmethod
-    def from_ase_atoms(cls,ase_atoms,specorder=None):
-        """
-        Convert ASE Atoms object to NAPSystem object.
-        """
-        spcorder = []
-        if specorder is not None:
-            spcorder = specorder
-        symbols = ase_atoms.get_chemical_symbols()
-        spos = ase_atoms.get_scaled_positions()
-        vels = ase_atoms.get_velocities()
-        cell = ase_atoms.get_cell()
-        celli = np.linalg.inv(cell)
-        if spos is None:
-            raise ValueError('ASE atoms object has no atom in it.')
-        #...Initialize and remake self.specorder
-        for s in symbols:
-            if s not in spcorder:
-                spcorder.append(s)
-        nsys = cls(specorder=spcorder)
-        nsys.alc= 1.0
-        nsys.a1[:] = ase_atoms.cell[0]
-        nsys.a2[:] = ase_atoms.cell[1]
-        nsys.a3[:] = ase_atoms.cell[2]
-        #...First, initialize arrays
-        natm = len(ase_atoms)
-        sids = [ 0 for i in range(natm) ]
-        poss = [ np.array(spos[i]) for i in range(natm) ]
-        if vels is None:
-            vels = [ np.zeros(3) for i in range(natm) ]
-        else:        
-            vels = [ np.array(vels[i]) for i in range(natm) ]
-        frcs = [ np.zeros(3) for i in range(natm) ]
-        nsys.init_atoms()
-
-        # #...Append each atom from ASE-Atoms
-        # for ia,spi in enumerate(spos):
-        #     vi = vels[ia]
-        #     svi = np.dot(celli,vi)
-        #     si = symbols[ia]
-        #     sid = nsys.specorder.index(si)+1
-        #     nsys.sids[ia] = sid
-        #     nsys.poss[ia] = spi
-        #     nsys.vels[ia] = svi
-
-        #...Create arrays to be installed into nsys.atoms
-        sids = [ nsys.specorder.index(si)+1 for si in symbols ]
-        nsys.atoms.sid = sids
-        nsys.atoms.pos = poss
-        nsys.atoms.vel = vels
-        nsys.atoms.vel = nsys.atoms.vel.apply(lambda x: np.dot(celli,x))
-        nsys.atoms.frc = frcs
-
-        return nsys
-
     def change_unitcell(self,a,b,c):
         """
         Change the current unitcell to the new one with
@@ -1175,7 +1066,8 @@ if __name__ == "__main__":
     else:
         charges = [ float(c) for c in charges.split(',') ]
 
-    nsys= NAPSystem(fname=infname,format=infmt,specorder=specorder)
+    import nappy.io
+    nsys = nappy.io.read(fname=infname,format=infmt,specorder=specorder)
 
     nsys.shift_atoms(*shift)
     if ncycle > 0:
@@ -1201,7 +1093,7 @@ if __name__ == "__main__":
         if scalefactor != "None":
             nsys.alc *= float(scalefactor)
 
-        nsys.write(fname=outfname,format=outfmt)
+        nappy.io.write(nsys,fname=outfname,format=outfmt)
 
     else:
         raise NotImplementedError()

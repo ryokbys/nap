@@ -24,7 +24,8 @@ import os,sys,copy
 import numpy as np
 from docopt import docopt
 
-from nappy.napsys import NAPSystem, parse_filename
+#from nappy.napsys import NAPSystem, parse_filename
+from nappy.io import read, write, parse_filename
 
 def isotropic(psys0,strain=0.01):
     fac = 1.0 + strain
@@ -121,10 +122,8 @@ if __name__ == "__main__":
     print('args:')
     print(args)
 
-    psys0= NAPSystem(fname=infname,format=infmt,specorder=specorder)
-
-    if not outfmt == None:
-        outfmt= parse_filename(outfname)
+    #psys0= NAPSystem(fname=infname,format=infmt,specorder=specorder)
+    psys0 = read(fname=infname,specorder=specorder)
 
     if args['isotropic']:
         psys = isotropic(psys0,strain)
@@ -133,18 +132,5 @@ if __name__ == "__main__":
     elif args['shear']:
         psys = shear(psys0,strain)[0]
 
-    if outfmt == 'pmd':
-        psys.write_pmd(outfname)
-    elif outfmt == 'smd':
-        psys.write_pmd(outfname)
-    elif outfmt == 'akr':
-        psys.write_akr(outfname)
-    elif outfmt == 'POSCAR':
-        psys.write_POSCAR(outfname)
-    elif outfmt == 'dump':
-        psys.write_dump(outfname)
-    elif outfmt == 'xsf':
-        psys.write_xsf(outfname)
-    else:
-        print('Cannot detect output file format.')
+    write(psys,fname=outfname,format=outfmt)
     

@@ -18,13 +18,15 @@ import numpy as np
 
 #sys.path.append(__file__)
 from nappy.atom import Atom
+from nappy.io import read
 from nappy.napsys import NAPSystem
 
 __author__ = 'Ryo KOBAYASHI'
 __version__ = '160510'
 
 def to_given_vector(infile,specorder,a1new,a2new,a3new):
-    psys = NAPSystem(fname=infile,specorder=specorder)
+    #psys = NAPSystem(fname=infile,specorder=specorder)
+    psys = read(fname=infile,specorder=specorder)
     psys.assign_pbc()
     psys.a1 = psys.a1 *psys.alc
     psys.a2 = psys.a2 *psys.alc

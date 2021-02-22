@@ -31,9 +31,9 @@ import os,sys
 import numpy as np
 from docopt import docopt
 
-from nappy.napsys import NAPSystem
 from nappy.gaussian_smear import gsmear
 from nappy.common import get_key
+from nappy.io import read
 
 __author__ = "Ryo KOBAYASHI"
 __version__ = "200505"
@@ -137,8 +137,9 @@ def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],no_average=False,
         if not os.path.exists(infname):
             print("[Error] File, {0}, does not exist !!!".format(infname))
             sys.exit()
-        nsys= NAPSystem(fname=infname,specorder=specorder)
+        #nsys= NAPSystem(fname=infname,specorder=specorder)
         print(' File = ',infname)
+        nsys = read(fname=infname,specorder=specorder)
         angd,df,n= adf(nsys,dang,rcut,triplets)
         aadf += df
         nsum += n

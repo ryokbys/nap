@@ -32,6 +32,7 @@ import copy
 
 from nappy.napsys import NAPSystem
 from nappy.common import get_key
+from nappy.io import read
 
 def anint(x):
     if x >= 0.5:
@@ -73,11 +74,15 @@ def get_msd(files,ids0,nmeasure,nshift,specorder=None):
     -------
     msd : Numpy array of dimension, (len(files),nmeasure,3).
     """
-    if specorder is not None:
-        nsys = NAPSystem(fname=files[0],specorder=specorder)
-    else:
-        nsys = NAPSystem(fname=files[0],)
+    nsys = read(fname=files[0],specorder=specorder)
+    if specorder is None:
         specorder = copy.copy(nsys.specorder)
+    # if specorder is not None:
+    #     #nsys = NAPSystem(fname=files[0],specorder=specorder)
+    # else:
+    #     nsys = NAPSystem(fname=files[0],)
+    #     specorder = copy.copy(nsys.specorder)
+    
     nspc = len(specorder)
     if ids0 is not None:
         ids = [ i-1 for i in ids0 ]
@@ -102,7 +107,8 @@ def get_msd(files,ids0,nmeasure,nshift,specorder=None):
         sys.stdout.write('\r{0:5d}/{1:d}: {2:s}'.format(ifile+1,len(files),fname),)
         sys.stdout.flush()
         if ifile != 0:
-            nsys= NAPSystem(fname=fname,specorder=specorder)
+            #nsys= NAPSystem(fname=fname,specorder=specorder)
+            nsys = read(fname=fname,specorder=specorder)
         poss = nsys.atoms.pos
         sids = nsys.atoms.sid
         
