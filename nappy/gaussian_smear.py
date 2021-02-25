@@ -32,14 +32,14 @@ def gsmear(xd,yd,sigma,ngwidth=3):
     expfact = 1.0/sgm**2/2
     for ix in range(ndat):
         #gdat[ix]= yd[ix]
-        for jx in range(-nwidth+1,nwidth-1):
+        for jx in range(-nwidth+1,nwidth):
             kx= ix+jx
             if kx < 0:
-                kx = -kx
+                kx = abs(kx)
             elif kx >= ndat:
-                kx = ndat -(kx-(ndat-1))
-            gdat[ix] += yd[kx]*pref*np.exp(-(dx*(jx))**2*expfact)
-    gdat /= 2
+                kx = 2*ndat -kx -1
+            gdat[ix] += yd[kx]*pref*np.exp(-(dx*jx)**2*expfact)
+    #gdat /= 2
     return gdat
 
 def gsmear_file(infname,sigma,xp,yp):

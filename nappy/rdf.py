@@ -26,6 +26,8 @@ Options:
   --plot      Plot figures. [default: False]
   --SQ        Calc and output S(Q) converted from RDF to out.sq
   -q QMAX     Cutoff wavenumber. [default: 25.0]
+  --scatter-length LENGTHS
+              Scattering lengths of corresponding species. [default: None]
 """
 from __future__ import print_function
 
@@ -128,14 +130,14 @@ def rdf_desc_of(ia,nsys,rmax=5.0,dr=0.1):
     for jsp in range(1,nspcs+1):
         signs = np.zeros(len(rd),dtype=int)
         rdfij = rdfi[jsp,:]
-        for ir in range(1,nr-1):
+        for ir in range(1,nr):
             diff = (rdfij[ir+1]-rdfij[ir-1])
             if diff < 0.0:
                 signs[ir] = -1
             else:
                 signs[ir] = +1
         found_1st = False
-        for ir in range(1,nr-1):
+        for ir in range(1,nr):
             if signs[ir] *signs[ir-1] < 0:
                 if not found_1st:
                     rdf_desci[(jsp-1)*4 +0] = rd[ir]
@@ -203,8 +205,8 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
         nsys.repeat(n1,n2,n3)
 
     r2max = rmax*rmax
-    nr= int(rmax/dr)+1
-    rd= [ dr*ir+dr/2 for ir in range(nr) ]
+    nr= int(rmax/dr)
+    rd= [ dr*(ir+0.5) for ir in range(nr) ]
     hmat = nsys.get_hmat()
     # Since an access to pandas DataFrame is much slower than that to numpy array,
     # use numpy arrays in the most time consuming part.
@@ -253,29 +255,6 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
 
     return rd,nadr
 
-def gr_to_SQ(rs,gr,rho,rcut=5.0,qcut=25.0):
-    """
-    Convert RDF to S(Q).
-    """
-    nbins = len(rs)
-    sq = np.zeros(nbins)
-    qs = np.zeros(nbins)
-    dq = qcut /nbins
-    dr = rcut /nbins
-    for ib in range(nbins):
-        q = (ib+0.5)*dq
-        tmp = 0.0
-        qs[ib] = q
-        for jb in range(1,nbins):
-            r = (jb +0.5)*dr
-            jbm = jb -1
-            rm = (jbm +0.5)*dr
-            tmp1 = (gr[jbm]-1.0)*np.sin(q*rm) /(q*rm) *rm*rm
-            tmp2 = (gr[jb] -1.0)*np.sin(q*r) /(q*r) *r*r
-            tmp = tmp +0.5*dr *(tmp1+tmp2)
-        sq[ib] = 1.0 +4.0*np.pi*rho*tmp
-    return qs,sq
-    
 def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,pairwise=False):
     nspcs = len(specorder)
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
@@ -292,6 +271,56 @@ def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,pairwise=False):
     agr /= nsum
     return rd,agr
 
+def gr_to_SQ(rs,gr,rho,qcut=25.0):
+    """
+    Convert g(r) to S(Q).
+    """
+    nbins = len(rs)
+    rmin = min(rs)
+    rmax = max(rs)
+    sq = np.zeros(nbins)
+    qs = np.zeros(nbins)
+    dq = qcut /nbins
+    dr = (rmax-rmin) /nbins
+    for ib in range(nbins):
+        q = (ib+0.5)*dq
+        tmp = 0.0
+        qs[ib] = q
+        for jb in range(1,nbins):
+            r = jb*dr +rmin
+            jbm = jb -1
+            rm = jbm*dr +rmin
+            tmp1 = (gr[jbm]-1.0)*np.sin(q*rm) /(q*rm) *rm*rm
+            tmp2 = (gr[jb] -1.0)*np.sin(q*r) /(q*r) *r*r
+            tmp += 0.5 *(tmp1+tmp2) *dr
+        sq[ib] = 1.0 +4.0*np.pi*rho*tmp
+    return qs,sq
+
+def SQ_to_gr(qs,sq,rho,rcut=5.0):
+    """
+    Convert S(Q) to g(r).
+    """
+    nbins = len(qs)
+    qmin = min(qs)
+    qmax = max(qs)
+    rs = np.zeros(nbins)
+    gr = np.zeros(nbins)
+    dq = (qmax-qmin) /nbins
+    dr = rcut /nbins
+    for ib in range(nbins):
+        r = (ib+0.5)*dr
+        tmp = 0.0
+        rs[ib] = r
+        for jb in range(1,nbins):
+            q = jb*dq +qmin
+            jbm = jb -1
+            qm = jbm*dq +qmin
+            tmp1 = (sq[jbm]-1.0) *np.sin(qm*r) *qm
+            tmp2 = (sq[jb] -1.0) *np.sin(q*r) *q
+            tmp += 0.5*(tmp1+tmp2)*dq
+        gr[ib] = 1.0 +1.0/(2.0*np.pi**2 *r *rho) *tmp
+    return rs, gr
+
 def write_normal(fname,specorder,nspcs,rd,agr,nr):
     """
     Write out RDF data in normal RDF format.
@@ -307,7 +336,7 @@ def write_normal(fname,specorder,nspcs,rd,agr,nr):
             n += 1
             outfile.write('  {0:d}:{1:s}-{2:s},   '.format(n,si,sj))
     outfile.write('\n')
-    for i in range(nr-1):
+    for i in range(nr):
         outfile.write(' {0:10.4f} {1:13.5e}'.format(rd[i],agr[0,0,i]))
         for isid in range(1,nspcs+1):
             for jsid in range(isid,nspcs+1):
@@ -326,12 +355,12 @@ def write_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs,nperline=6):
     nperline : int
            Number of data in a line. [default: 6]
     """
-    ndat = (nr-1) *len(pairs)
+    ndat = nr *len(pairs)
     data = np.zeros(ndat)
     n = 0
     for pair in pairs:
         isid,jsid = pair
-        for i in range(nr-1):
+        for i in range(nr):
             data[n] = agr[isid,jsid,i]
             n += 1
 
@@ -366,6 +395,27 @@ def write_sq_normal(fname,qs,sq):
         f.write('# Q,             S(Q)\n')
         for i in range(nd):
             f.write(' {0:10.4f}  {1:10.5f}\n'.format(qs[i],sq[i]))
+    return None
+        
+
+def write_sq_out4fp(fname,qs,sq,nperline=6):
+    """
+    Write S(Q) data in normal, gnuplot-readable format.
+    """
+    nd = len(qs)
+    with open(fname,'w') as f:
+        f.write('# S(Q) computed in rdf.py\n')
+        f.write('# Output S(Q) in out4fp format.\n')
+        f.write('#\n')
+        #...Num of data, weight for the data
+        f.write(' {0:6d}  {1:7.3f}\n'.format(nd, 1.0))
+        j0 = 0
+        while True:
+            f.write('  '.join('{0:12.4e}'.format(sq[j]) for j in range(j0,j0+nperline) if j < nd))
+            f.write('\n')
+            j0 += nperline
+            if j0 >= nd:
+                break
     return None
         
 
@@ -439,9 +489,12 @@ if __name__ == "__main__":
         pairwise = not no_pairwise
     plot = args['--plot']
     nskip = int(args['--skip'])
-    sq = args['--SQ']
-    if sq:
+    SQ = args['--SQ']
+    if SQ:
         qmax = float(args['-q'])
+        lscatter = [ float(x) for x in args['--scatter-length'].split(',') ]
+        if len(lscatter) != len(specorder):
+            raise ValueError('--scatter-length is not set correctly.')
 
     nspcs = len(specorder)
     if nspcs < 1:
@@ -451,31 +504,58 @@ if __name__ == "__main__":
         infiles.sort(key=get_key,reverse=True)
     del infiles[:nskip]
 
-    nr= int(rmax/dr) +1
+    nr= int(rmax/dr)
     rd,agr= rdf_average(infiles,nr,specorder,dr=dr,rmax=rmax,
                         pairwise=pairwise)
 
     if not sigma == 0:
-        print(' Gaussian smearing...')
+        #print(' Gaussian smearing...')
         #...Smearing of total RDF
-        agrt= gsmear(rd,agr[0,0],sigma)
+        agrt= gsmear(rd,agr[0,0,:],sigma)
         agr[0,0,:] = agrt[:]
         #...Smearing of inter-species RDF
         for isid in range(1,nspcs+1):
             for jsid in range(isid,nspcs+1):
-                agrt= gsmear(rd,agr[isid,jsid],sigma)
+                agrt= gsmear(rd,agr[isid,jsid,:],sigma)
                 agr[isid,jsid,:] = agrt[:]
+
+    if SQ:
+        nsys = nappy.io.read(infiles[0])
+        rho = float(nsys.num_atoms()) /nsys.get_volume()
+        if nspcs > 1:
+            #...Redfine total RDF as weighted sum of g_{ij}(r) in case of multiple species
+            natms = [ float(nsys.num_atoms()) ]
+            cs = [ 1.0 ] 
+            for ispcs in range(1,nspcs+1):
+                natms.append(float(nsys.num_atoms(ispcs)))
+                cs.append(natms[ispcs]/natms[0])
+            bmean = 0.0
+            for isid in range(1,nspcs+1):
+                bi = lscatter[isid-1]
+                ci = cs[isid]
+                bmean += ci*bi
+            agr[0,0,:] = 0.0
+            for isid in range(1,nspcs+1):
+                bi = lscatter[isid-1]
+                ci = cs[isid]
+                for jsid in range(isid,nspcs+1):
+                    bj = lscatter[jsid-1]
+                    cj = cs[jsid]
+                    wij = ci*cj*bi*bj/bmean
+                    if isid == jsid:
+                        agr[0,0,:] += agr[isid,jsid,:] *wij
+                    else:
+                        agr[0,0,:] += 2.0*agr[isid,jsid,:] *wij
+        qs,sqs = gr_to_SQ(rd,agr[0,0,:],rho,qcut=qmax)
 
     if out4fp:
         write_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs)
+        if SQ:
+            write_sq_out4fp('out.sq',qs,sqs)
     else:
         write_normal(ofname,specorder,nspcs,rd,agr,nr,)
-
-    if sq:
-        nsys = nappy.io.read(infiles[0])
-        rho = float(nsys.num_atoms()) /nsys.get_volume()
-        qs,sq = gr_to_SQ(rd,agr[0,0,:],rho,rcut=rmax,qcut=qmax)
-        write_sq_normal('out.sq',qs,sq)
+        if SQ:
+            write_sq_normal('out.sq',qs,sqs)
 
     if plot:
         plot_figures(rd,agr)
