@@ -508,7 +508,7 @@ class NAPSystem(object):
         angle = np.arccos(np.dot(rij,rik)/dij/dik) /np.pi *180.0
         return angle
 
-    def make_pair_list(self,rcut=3.0,rcuts=None):
+    def make_pair_list(self,rcut=3.0,rcuts=None,distance=False):
         """
         Make a neighbor list.
         The neighbor list of each atom is stored as lspr in the self.atoms column.
@@ -522,6 +522,8 @@ class NAPSystem(object):
                 rcuts = {('Si','Si'):2.5, ('Si','O'):2.0,}
                 ```
                 If a pair is not given, the cutoff for the pair is the maximum of those.
+            distance: logical
+                Whether or not store the distances of neighbors.
         """
         rcs2 = np.zeros((len(self.specorder),len(self.specorder)),dtype=float)
         if rcuts is not None:
@@ -610,6 +612,8 @@ class NAPSystem(object):
         nplspr = np.zeros((self.num_atoms(),nnmax*27),dtype=int)
         nplspr[:,:] = -1
         nlspr = np.zeros(self.num_atoms(),dtype=int)
+        if distance:
+            dists = np.zeros((self.num_atoms(),nnmax*27),dtype=float)
         # self.atoms['lspr'] = emptylist
         sids = self.atoms.sid
 
@@ -654,25 +658,44 @@ class NAPSystem(object):
                             if rij2 < rcs2[isp,jsp] and ja not in nplspr[ia,:]:
                                 nplspr[ia,nlspr[ia]] = ja
                                 nplspr[ja,nlspr[ja]] = ia
+                                if distance:
+                                    dij = np.sqrt(rij2)
+                                    dists[ia,nlspr[ia]] = dij
+                                    dists[ja,nlspr[ja]] = dij
                                 nlspr[ia] += 1
                                 nlspr[ja] += 1
+                                
                             ja = lscl[ja]
         #...Finally add the lspr to atoms DataFrame
         lspr = []
         for ia in range(self.num_atoms()):
             lspr.append([ nplspr[ia,ja] for ja in range(nlspr[ia]) ])
         self.atoms['lspr'] = lspr
+        if distance:
+            distances = []
+            for ia in range(self.num_atoms()):
+                distances.append([ dists[ia,ja] for ja in range(nlspr[ia]) ])
+            self.atoms['distance'] = distances
         return None
+            
 
-    def neighbors_of(self,ia,rcut=3.0):
+    def neighbors_of(self,ia,rcut=3.0,distance=False):
         """
         Generator of the neighbors of a given atom-i.
         """
         if 'lspr' not in self.atoms.columns:
             self.make_pair_list(rcut=rcut)
+        if distance and 'distance' not in self.atoms.columns:
+            raise ValueError('Distance is not in atoms dataframe, perform make_pair_list'
+                             +' with distance=True.')
         lspri = self.atoms.lspr[ia]
-        for jj in range(len(lspri)):
-            yield lspri[jj]
+        if distance:
+            dists = self.atoms.distance[ia]
+            for jj in range(len(lspri)):
+                yield lspri[jj], dists[jj]
+        else:
+            for jj in range(len(lspri)):
+                yield lspri[jj]
 
     def assign_pbc(self):
         poss = self.atoms.pos

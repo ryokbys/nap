@@ -24,6 +24,8 @@ Options:
   --no-pairwise
               Not to take averaging by pairwise.
   --plot      Plot figures. [default: False]
+  --SQ        Calc and output S(Q) converted from RDF to out.sq
+  -q QMAX     Cutoff wavenumber. [default: 25.0]
 """
 from __future__ import print_function
 
@@ -32,7 +34,7 @@ import numpy as np
 from docopt import docopt
 
 #from nappy.napsys import NAPSystem
-from nappy.io import read
+import nappy
 from nappy.gaussian_smear import gsmear
 from nappy.common import get_key
 
@@ -185,39 +187,12 @@ def read_rdf(fname='out.rdf'):
         rdfs[ir,:] = [ float(x) for x in dat[1:]]
     return rs,rdfs
     
-
-def compute_ndr(ia,isid,dr,r2max,nr,hmat,natm,poss,sids,nspcs,):
-    """
-    Compute number of atoms in the every shell [r:r+dr] up to *sqrt(r2max)*.
-    This routine may not be appilcable to non-cubic systems.
-    """
-    ndr = np.zeros((nspcs+1,nspcs+1,nr),)
-    pi = poss[ia]
-    for ja in range(natm):
-        if ja == ia:
-            continue
-        pj = poss[ja]
-        jsid = sids[ja]
-        pij= pj -pi
-        pij= pij -np.round(pij)
-        vij= np.dot(hmat,pij)
-        rij2= np.dot(vij,vij)
-        if rij2 >= r2max:
-            continue
-        rij= np.sqrt(rij2)
-        rrdr= rij/dr
-        ir = int(rrdr)
-        ndr[0,0,ir] += 1.0
-        ndr[isid,jsid,ir] += 1.0
-        ndr[jsid,isid,ir] += 1.0  # counter pair as well
-    return ndr
-
 def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
     import copy
 
     natm0= nsys0.num_atoms()
     vol= nsys0.get_volume()
-    natms = [ float(natm0)]
+    natms = [ float(natm0) ]
     for ispcs in range(1,nspcs+1):
         natms.append(float(nsys0.num_atoms(ispcs)))
 
@@ -229,7 +204,6 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
 
     r2max = rmax*rmax
     nr= int(rmax/dr)+1
-    nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     rd= [ dr*ir+dr/2 for ir in range(nr) ]
     hmat = nsys.get_hmat()
     # Since an access to pandas DataFrame is much slower than that to numpy array,
@@ -237,28 +211,31 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
     poss = np.array(nsys.atoms.pos,)
     sids = np.array(nsys.atoms.sid,)
     natm = len(nsys.atoms)
+    nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
+    ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
+    nsys.make_pair_list(rcut=rmax,distance=True)
     for ia in range(natm0):
         isid = sids[ia]
-        ndr= compute_ndr(ia,isid,dr,r2max,nr,hmat,natm,poss,sids,nspcs,)
+        pi = poss[ia]
+        ndr[:,:] = 0.0
+        for ja,dij in nsys.neighbors_of(ia,distance=True):
+            jsid = sids[ja]
+            rrdr= dij/dr
+            ir = int(rrdr)
+            ndr[0,0,ir] += 1.0
+            ndr[isid,jsid,ir] += 1.0
         for ir in range(nr):
             nadr[:,:,ir] += ndr[:,:,ir]
 
-    # #...Symmetrize
-    # for isid in range(1,nspcs):
-    #     for jsid in range(isid+1,nspcs+1):
-    #         nadr[jsid,isid,:] += nadr[isid,jsid,:]
-    #         nadr[isid,jsid,:] = nadr[jsid,isid,:]
-
     #...normalize
     if pairwise:
-        # print('is,js,rho=',0,0,rhos[0])
-        tmp = 4.0 *np.pi *natms[0]*(natms[0]-1) *dr
+        tmp = 4.0 *np.pi *natms[0]*(natms[0]-1)/vol *dr
         for ir in range(1,nr):
-            r= dr *ir
+            r= dr *(ir-0.5)
             nadr[0,0,ir] /= tmp*r*r
         for isid in range(1,nspcs+1):
             ni = natms[isid]
-            for jsid in range(1,nspcs+1):
+            for jsid in range(isid,nspcs+1):
                 nj = natms[jsid]
                 tmp = 4.0*np.pi*dr  /vol
                 if isid == jsid:
@@ -266,16 +243,39 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
                 else:
                     tmp *= ni*nj
                 for ir in range(1,nr):
-                    r= dr *ir
+                    r= dr *(ir-0.5)
                     nadr[isid,jsid,ir] /= tmp*r*r
     else:
         tmp = 4.0 *np.pi *natms[0]*natms[0]/vol *dr
         for ir in range(1,nr):
-            r= dr *ir
+            r= dr *(ir -0.5)
             nadr[:,:,ir] /= tmp*r*r
 
     return rd,nadr
 
+def gr_to_SQ(rs,gr,rho,rcut=5.0,qcut=25.0):
+    """
+    Convert RDF to S(Q).
+    """
+    nbins = len(rs)
+    sq = np.zeros(nbins)
+    qs = np.zeros(nbins)
+    dq = qcut /nbins
+    dr = rcut /nbins
+    for ib in range(nbins):
+        q = (ib+0.5)*dq
+        tmp = 0.0
+        qs[ib] = q
+        for jb in range(1,nbins):
+            r = (jb +0.5)*dr
+            jbm = jb -1
+            rm = (jbm +0.5)*dr
+            tmp1 = (gr[jbm]-1.0)*np.sin(q*rm) /(q*rm) *rm*rm
+            tmp2 = (gr[jb] -1.0)*np.sin(q*r) /(q*r) *r*r
+            tmp = tmp +0.5*dr *(tmp1+tmp2)
+        sq[ib] = 1.0 +4.0*np.pi*rho*tmp
+    return qs,sq
+    
 def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,pairwise=False):
     nspcs = len(specorder)
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
@@ -284,7 +284,7 @@ def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,pairwise=False):
         if not os.path.exists(infname):
             print("[Error] File, {0}, does not exist !!!".format(infname))
             sys.exit()
-        nsys = read(fname=infname,specorder=specorder)
+        nsys = nappy.io.read(fname=infname,specorder=specorder)
         print(' File =',infname)
         rd,gr= rdf(nsys,nspcs,dr,rmax,pairwise=pairwise)
         agr += gr
@@ -307,7 +307,7 @@ def write_normal(fname,specorder,nspcs,rd,agr,nr):
             n += 1
             outfile.write('  {0:d}:{1:s}-{2:s},   '.format(n,si,sj))
     outfile.write('\n')
-    for i in range(nr):
+    for i in range(nr-1):
         outfile.write(' {0:10.4f} {1:13.5e}'.format(rd[i],agr[0,0,i]))
         for isid in range(1,nspcs+1):
             for jsid in range(isid,nspcs+1):
@@ -326,12 +326,12 @@ def write_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs,nperline=6):
     nperline : int
            Number of data in a line. [default: 6]
     """
-    ndat = nr *len(pairs)
+    ndat = (nr-1) *len(pairs)
     data = np.zeros(ndat)
     n = 0
     for pair in pairs:
         isid,jsid = pair
-        for i in range(nr):
+        for i in range(nr-1):
             data[n] = agr[isid,jsid,i]
             n += 1
 
@@ -355,7 +355,19 @@ def write_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs,nperline=6):
                 break
 
     return None
-    
+
+def write_sq_normal(fname,qs,sq):
+    """
+    Write S(Q) data in normal, gnuplot-readable format.
+    """
+    nd = len(qs)
+    with open(fname,'w') as f:
+        f.write('# S(Q) computed in rdf.py\n')
+        f.write('# Q,             S(Q)\n')
+        for i in range(nd):
+            f.write(' {0:10.4f}  {1:10.5f}\n'.format(qs[i],sq[i]))
+    return None
+        
 
 def plot_figures(specorder,rd,agr):
     import matplotlib.pyplot as plt
@@ -417,12 +429,19 @@ if __name__ == "__main__":
             spi,spj = pair.split('-')
             isid = specorder.index(spi)+1
             jsid = specorder.index(spj)+1
+            if jsid < isid:
+                itmp = jsid
+                jsid = isid
+                isid = itmp
             pairs.append((isid,jsid))
     else:
         no_pairwise = args['--no-pairwise']
         pairwise = not no_pairwise
     plot = args['--plot']
     nskip = int(args['--skip'])
+    sq = args['--SQ']
+    if sq:
+        qmax = float(args['-q'])
 
     nspcs = len(specorder)
     if nspcs < 1:
@@ -443,7 +462,7 @@ if __name__ == "__main__":
         agr[0,0,:] = agrt[:]
         #...Smearing of inter-species RDF
         for isid in range(1,nspcs+1):
-            for jsid in range(1,nspcs+1):
+            for jsid in range(isid,nspcs+1):
                 agrt= gsmear(rd,agr[isid,jsid],sigma)
                 agr[isid,jsid,:] = agrt[:]
 
@@ -451,6 +470,12 @@ if __name__ == "__main__":
         write_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs)
     else:
         write_normal(ofname,specorder,nspcs,rd,agr,nr,)
+
+    if sq:
+        nsys = nappy.io.read(infiles[0])
+        rho = float(nsys.num_atoms()) /nsys.get_volume()
+        qs,sq = gr_to_SQ(rd,agr[0,0,:],rho,rcut=rmax,qcut=qmax)
+        write_sq_normal('out.sq',qs,sq)
 
     if plot:
         plot_figures(rd,agr)

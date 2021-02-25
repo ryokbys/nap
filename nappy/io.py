@@ -81,24 +81,24 @@ def read(fname="pmdini",format=None,specorder=None):
 
 def read_pmd(fname='pmdini',specorder=None):
     nsys = NAPSystem()
+    if specorder is not None:
+        nsys.specorder = specorder
     incatm = 0
     with open(fname,'r') as f:
         iline = 0
         symbol = None
         for line in f.readlines():
             if line[0] in ('#','!'):  # comment line
-                if 'specorder:' in line:
+                if 'specorder:' in line:  # overwrite specorder if specified in file
                     data = line.split()
                     specorder = [ d for d in data[2:len(data)]]
                     if nsys.specorder and set(nsys.specorder)!=set(specorder):
                         print(' WARNING: specorders are inconsistent, '
                               +'use one in the file.')
                     nsys.specorder = specorder
-                elif specorder is not None:
-                    nsys.specorder = specorder
-                else:
-                    raise ValueError('Specorder must be specified via the file or an argument.')
             else:
+                if nsys.specorder is None or len(nsys.specorder) == 0:
+                    raise ValueError('Specorder must be specified via the file or an argument.')
                 iline = iline +1
                 data = line.split()
                 # 1st: lattice constant
