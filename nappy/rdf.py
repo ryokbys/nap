@@ -25,7 +25,8 @@ Options:
               Not to take averaging by pairwise.
   --plot      Plot figures. [default: False]
   --SQ        Calc and output S(Q) converted from RDF to out.sq
-  -q QMAX     Cutoff wavenumber. [default: 25.0]
+  --qmax QMAX    Cutoff wavenumber. [default: 20.0]
+  --qmin QMIN    Shortest wavenumber. [default: 0.7]
   --scatter-length LENGTHS
               Scattering lengths of corresponding species. [default: None]
 """
@@ -271,29 +272,29 @@ def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,pairwise=False):
     agr /= nsum
     return rd,agr
 
-def gr_to_SQ(rs,gr,rho,qcut=25.0):
+def gr_to_SQ(rs,gr,rho,qmin=0.7,qmax=20.0,nq=100):
     """
     Convert g(r) to S(Q).
     """
-    nbins = len(rs)
+    nr = len(rs)
     rmin = min(rs)
     rmax = max(rs)
-    sq = np.zeros(nbins)
-    qs = np.zeros(nbins)
-    dq = qcut /nbins
-    dr = (rmax-rmin) /nbins
-    for ib in range(nbins):
-        q = (ib+0.5)*dq
+    sq = np.zeros(nr)
+    qs = np.zeros(nq)
+    dq = (qmax-qmin) /nq
+    dr = (rmax-rmin) /nr
+    for iq in range(nq):
+        q = iq*dq +qmin
         tmp = 0.0
-        qs[ib] = q
-        for jb in range(1,nbins):
-            r = jb*dr +rmin
-            jbm = jb -1
-            rm = jbm*dr +rmin
-            tmp1 = (gr[jbm]-1.0)*np.sin(q*rm) /(q*rm) *rm*rm
-            tmp2 = (gr[jb] -1.0)*np.sin(q*r) /(q*r) *r*r
+        qs[iq] = q
+        for jr in range(1,nr):
+            r = jr*dr +rmin
+            jrm = jr -1
+            rm = jrm*dr +rmin
+            tmp1 = (gr[jrm]-1.0)*np.sin(q*rm) /(q*rm) *rm*rm
+            tmp2 = (gr[jr] -1.0)*np.sin(q*r) /(q*r) *r*r
             tmp += 0.5 *(tmp1+tmp2) *dr
-        sq[ib] = 1.0 +4.0*np.pi*rho*tmp
+        sq[iq] = 1.0 +4.0*np.pi*rho*tmp
     return qs,sq
 
 def SQ_to_gr(qs,sq,rho,rcut=5.0):
@@ -491,7 +492,8 @@ if __name__ == "__main__":
     nskip = int(args['--skip'])
     SQ = args['--SQ']
     if SQ:
-        qmax = float(args['-q'])
+        qmax = float(args['--qmax'])
+        qmin = float(args['--qmin'])
         lscatter = [ float(x) for x in args['--scatter-length'].split(',') ]
         if len(lscatter) != len(specorder):
             raise ValueError('--scatter-length is not set correctly.')
@@ -546,7 +548,7 @@ if __name__ == "__main__":
                         agr[0,0,:] += agr[isid,jsid,:] *wij
                     else:
                         agr[0,0,:] += 2.0*agr[isid,jsid,:] *wij
-        qs,sqs = gr_to_SQ(rd,agr[0,0,:],rho,qcut=qmax)
+        qs,sqs = gr_to_SQ(rd,agr[0,0,:],rho,qmin=0.7,qmax=qmax,nq=200)
 
     if out4fp:
         write_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs)
