@@ -50,7 +50,7 @@ def adf_atom(ia,dang,rcut,nsys,poss,lspr,symbols,sj,sk):
     """
     na= int(180.0/dang) +1
     hmat= nsys.get_hmat()
-    nda= np.zeros(na,dtype=np.int)
+    nda= np.zeros(na,dtype=int)
     natm= nsys.num_atoms()
     rcut2= rcut*rcut
     # pi= nsys.get_atom_attr(ia,'pos')
@@ -113,7 +113,7 @@ def adf(nsys,dang,rcut,triplets):
 
     na= int(180.0/dang)+1
 
-    anda= np.zeros((len(triplets),na),dtype=np.float)
+    anda= np.zeros((len(triplets),na),dtype=float)
     angd= np.array([ dang*ia for ia in range(na) ])
     symbols = nsys.get_symbols()
     poss = np.array(nsys.atoms.pos)

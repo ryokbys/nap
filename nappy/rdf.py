@@ -34,6 +34,7 @@ from __future__ import print_function
 
 import os,sys
 import numpy as np
+import copy
 from docopt import docopt
 
 #from nappy.napsys import NAPSystem
@@ -191,8 +192,6 @@ def read_rdf(fname='out.rdf'):
     return rs,rdfs
     
 def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
-    import copy
-
     natm0= nsys0.num_atoms()
     vol= nsys0.get_volume()
     natms = [ float(natm0) ]
@@ -279,7 +278,7 @@ def gr_to_SQ(rs,gr,rho,qmin=0.7,qmax=20.0,nq=100):
     nr = len(rs)
     rmin = min(rs)
     rmax = max(rs)
-    sq = np.zeros(nr)
+    sq = np.zeros(nq)
     qs = np.zeros(nq)
     dq = (qmax-qmin) /nq
     dr = (rmax-rmin) /nr
@@ -287,39 +286,52 @@ def gr_to_SQ(rs,gr,rho,qmin=0.7,qmax=20.0,nq=100):
         q = iq*dq +qmin
         tmp = 0.0
         qs[iq] = q
+        if q < 1.0e-15:
+            raise ValueError('qmin should not be 0.')
         for jr in range(1,nr):
-            r = jr*dr +rmin
+            #r = jr*dr +rmin
             jrm = jr -1
-            rm = jrm*dr +rmin
+            r = rs[jr]
+            #rm = jrm*dr +rmin
+            rm = rs[jrm]
+            if abs(rm) < 1.0e-15:
+                continue
             tmp1 = (gr[jrm]-1.0)*np.sin(q*rm) /(q*rm) *rm*rm
             tmp2 = (gr[jr] -1.0)*np.sin(q*r) /(q*r) *r*r
             tmp += 0.5 *(tmp1+tmp2) *dr
         sq[iq] = 1.0 +4.0*np.pi*rho*tmp
     return qs,sq
 
-def SQ_to_gr(qs,sq,rho,rcut=5.0):
+def SQ_to_gr(qs,sq,rho,rmin=0.0,rmax=5.0,nr=100):
     """
     Convert S(Q) to g(r).
     """
     nbins = len(qs)
     qmin = min(qs)
     qmax = max(qs)
-    rs = np.zeros(nbins)
-    gr = np.zeros(nbins)
+    rs = np.zeros(nr)
+    gr = np.zeros(nr)
     dq = (qmax-qmin) /nbins
-    dr = rcut /nbins
-    for ib in range(nbins):
-        r = (ib+0.5)*dr
+    dr = (rmax-rmin) /nr
+    for ir in range(nr):
+        r = ir*dr +rmin
         tmp = 0.0
-        rs[ib] = r
+        rs[ir] = r
+        if r < 1.0e-15:
+            gr[ir] = 0.0
+            continue
         for jb in range(1,nbins):
-            q = jb*dq +qmin
+            #q = jb*dq +qmin
             jbm = jb -1
-            qm = jbm*dq +qmin
+            #qm = jbm*dq +qmin
+            q = qs[jb]
+            qm = qs[jbm]
+            if qm < 1.0e-15:
+                continue
             tmp1 = (sq[jbm]-1.0) *np.sin(qm*r) *qm
             tmp2 = (sq[jb] -1.0) *np.sin(q*r) *q
             tmp += 0.5*(tmp1+tmp2)*dq
-        gr[ib] = 1.0 +1.0/(2.0*np.pi**2 *r *rho) *tmp
+        gr[ir] = 1.0 +1.0/(2.0*np.pi**2 *r *rho) *tmp
     return rs, gr
 
 def write_normal(fname,specorder,nspcs,rd,agr,nr):

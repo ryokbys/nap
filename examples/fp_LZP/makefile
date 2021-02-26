@@ -13,7 +13,7 @@ run:
 test:
 	@echo " Testing fp.py in examples/fp_LZP; this will take a few minutes..."
 	@python ../../nappy/fitpot/fp.py --nproc 4 2>&1 > out.fp
-	@python test.py 2&>1 > /dev/null || (echo " FAIL: examples/fp_LZP" && exit 1)
+	@python test.py 2>&1 > /dev/null || (echo " FAIL: examples/fp_LZP" && exit 1)
 	@echo " PASS: examples/fp_LZP"
 
 resdir := result_$(shell date "+%y%m%d_%H%M")
