@@ -10,3 +10,11 @@ autom4te.cache
 *.tgz
 *.dSYM
 fitpot/run_pmd.sh
+dump_*
+pmdfin
+out.pmd
+out.erg
+erg.pmd
+frc.pmd
+strs.pmd
+subdir_[0-9]*
