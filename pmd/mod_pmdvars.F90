@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-02-12 15:14:25 Ryo KOBAYASHI>
+!                    Last modified: <2021-02-26 21:19:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -16,16 +16,13 @@ module pmdvars
 !=======================================================================
 ! VARIABLES
 !=======================================================================
-  integer:: nouterg,noutpmd,istp &
-       ,iocntpmd,iocnterg
+  integer:: nouterg,noutpmd,istp,iocntpmd,iocnterg
   integer:: natm,nb,nsp,nalmax
   real(8):: tcpu,tcpu0,tcpu1,tcpu2,tcom,tlspr
   real(8):: epot0,vmaxold,vmax,simtime
   real(8):: tgmm
-!!$  real(8):: tgmm,tfac(9),ediff(9),ediff0(9),temp(9),ekl(9)
   real(8),allocatable:: tfac(:),ediff(:),ediff0(:),temp(:),ekl(:)
   integer,allocatable:: ndof(:)
-!!$  integer:: ndof(9)
   integer:: nxmlt
 !.....Search time and expiration time
   real(8):: ts,te
@@ -34,19 +31,12 @@ module pmdvars
   real(8):: hi(3,3),vol,sgm(3,3),al(3),avol
   real(8):: ht(3,3,0:1),hti(3,3),dh
 !.....positions, velocities, and accelerations
-  real(8),allocatable:: ra(:,:),va(:,:),aa(:,:),ra0(:,:) &
-       ,strs(:,:,:),stt(:,:,:)
-!!$    real(8):: ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax) &
-!!$         ,strs(3,3,namax),stt(3,3,namax)
+  real(8),allocatable:: ra(:,:),va(:,:),aa(:,:),ra0(:,:),strs(:,:,:),stt(:,:,:)
 !.....real*8 identifier which includes species, index of FMV, total id
   real(8),allocatable:: tag(:)
-!!$    real(8):: tag(namax)
   integer,allocatable:: lspr(:,:),ls1nn(:,:)
-!!$  real(8),allocatable:: dlspr(:,:,:)
-!!$    integer:: lspr(0:nnmax,namax)
 !.....potential and kinetic energy per atoms
   real(8),allocatable:: epi(:),eki(:,:,:),stp(:,:,:)
-!!$    real(8):: epi(namax),eki(3,3,namax),stp(3,3,namax)
 !.....mass, prefactors
   real(8),allocatable:: acon(:),fack(:)
 !.....Factors for ekin
@@ -55,19 +45,12 @@ module pmdvars
   real(8),allocatable:: stn(:,:,:)
 !.....Auxiliary data
   real(8),allocatable:: aux(:,:)
-!!$!.....atomic charge and electronegativity
-!!$  real(8),allocatable:: chg(:),chi(:)
-!!$!.....Electronic temperature
-!!$  real(8),allocatable:: tei(:)
-!!$!.....Color charge
-!!$  real(8),allocatable:: clr(:)
 
 !.....Shear stress
   real(8):: shrfx
 
 !.....Barostat
-  real(8):: phyd,ah(3,3),aht(3,3) &
-       ,g(3,3,0:1),gt(3,3,0:1),gi(3,3),gg(3,3)
+  real(8):: phyd,ah(3,3),aht(3,3),g(3,3,0:1),gt(3,3,0:1),gi(3,3),gg(3,3)
 
 !.....FIRE parameters
   integer:: nmin_fire = 5

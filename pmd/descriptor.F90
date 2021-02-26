@@ -6,7 +6,16 @@ module descriptor
   implicit none
   include 'params_unit.h'
   include "./const.h"
+  private
   save
+
+  public:: time,nsf,gsfi,dgsfi,igsfi,lprmset_desc,lupdate_gsf,nnl, &
+       gsf,dgsf,igsf,nal,mskgfs
+  public:: calc_desci,make_gsf_arrays,pre_desci,read_params_desc, &
+       init_desc,calc_desc,prepare_desci
+  public:: get_descs, get_dsgnmat_force, get_ints, set_descs, set_gscale, &
+       set_params_desc
+  
 !!$ putting mpif.h inclusion here could cause some conflicts
 !!$  include "mpif.h"
   character(len=128):: paramsdir = '.'

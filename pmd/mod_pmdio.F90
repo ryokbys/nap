@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-08 10:38:39 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-26 17:57:10 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -627,7 +627,7 @@ contains
 !=======================================================================
   function csp2isp(csp,spcs)
 !
-!  Convert cspi to isp.
+!  Convert csp to isp.
 !  If not found, return -1.
 !
     character(len=3),intent(in):: spcs(nspmax)

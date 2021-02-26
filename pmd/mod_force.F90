@@ -1,10 +1,16 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-01-25 00:18:19 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-26 16:51:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdio,only: nspmax
   implicit none
+  private
   save
+
+  public:: init_mod_force,use_force,set_use_charge,set_use_elec_temp, &
+       write_forces,bcast_force,ol_pair,calc_overlay
+  public:: luse_charge, luse_elec_temp, force_list, num_forces, loverlay, &
+       ol_type, ol_force, ol_ranges
   
 !.....Force index list
   integer,parameter:: N_FORCES = 34

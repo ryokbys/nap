@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-05 23:30:35 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-26 17:02:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -8,7 +8,13 @@ module DNN
 !-----------------------------------------------------------------------
   implicit none
   include "./const.h"
+  private
   save
+
+  public :: force_DNN, read_params_DNN, update_params_DNN, gradw_DNN, &
+       write_tgrads_DNN, set_paramsdir_DNN, set_params_DNN, set_actfunc_DNN
+  public :: lprmset_DNN,time
+  
   character(len=128):: paramsdir = '.'
 
 !.....parameter file name
