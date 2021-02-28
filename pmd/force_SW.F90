@@ -1,8 +1,8 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-06 08:39:25 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-27 09:56:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
-  use pmdio,only: nspmax, csp2isp
+  use pmdvars,only: nspmax
   include "./const.h"
   
   integer,parameter:: ioprms = 50

@@ -1,12 +1,13 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-06 08:37:44 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-28 00:25:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
 !    - Currently no cutoff tail treatment is done. (170310)
 !-----------------------------------------------------------------------
-  use pmdio,only: csp2isp,nspmax
+  use pmdvars,only: nspmax
+  use util,only: csp2isp
   implicit none
   include "./const.h"
   save
@@ -601,8 +602,8 @@ contains
         backspace(ioprms)
 !!$        read(ioprms,*) isp,jsp,d,a,r
         read(ioprms,*) cspi,cspj,d,a,r
-        isp = csp2isp(cspi,specorder)
-        jsp = csp2isp(cspj,specorder)
+        isp = csp2isp(cspi)
+        jsp = csp2isp(cspj)
         if( isp.gt.0 .and. jsp.gt.0 ) then
           d0(isp,jsp) = d
           rmin(isp,jsp) = r

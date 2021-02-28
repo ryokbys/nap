@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-06 08:41:38 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-27 14:46:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -11,7 +11,8 @@ module ZBL
 !       and Methods in Physics Research, B 267, 1061 (2009).
 !   [3] G. Bonny et al., JAP 121, 165107 (2017) for switching function.
 !-----------------------------------------------------------------------
-  use pmdio,only: nspmax,csp2isp
+  use pmdvars,only: nspmax
+  use util,only: csp2isp
   use force,only: loverlay
   implicit none
   include "./const.h"
@@ -53,7 +54,7 @@ module ZBL
 contains
 !=======================================================================
   subroutine init_ZBL(iprint)
-    use pmdio,only: csp2isp,specorder
+    use pmdvars,only: specorder
     use element,only: nelem,elmts
     integer,intent(in):: iprint
 
@@ -115,7 +116,7 @@ contains
         if( trim(cmode).eq.'parameters' ) then
           backspace(ioprms)
           read(ioprms,*) cspi, qnucli, ri, ro
-          isp = csp2isp(trim(cspi),specorder)
+          isp = csp2isp(trim(cspi))
           if( isp.le.0 ) cycle
           qnucl(isp) = qnucli
           r_inner(isp) = ri
@@ -128,8 +129,8 @@ contains
         else if( trim(cmode).eq.'interactions' ) then
           backspace(ioprms)
           read(ioprms,*) cspi, cspj
-          isp = csp2isp(trim(cspi),specorder)
-          jsp = csp2isp(trim(cspj),specorder)
+          isp = csp2isp(trim(cspi))
+          jsp = csp2isp(trim(cspj))
           if( isp.gt.0 .and. jsp.gt.0 ) then
             interact(isp,jsp) = .true.
             interact(jsp,isp) = .true.

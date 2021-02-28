@@ -1,10 +1,11 @@
 module dipole
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-07 17:36:38 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-28 00:27:04 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of dipole-dipole and quadrupole-dipole interactions.
 !-----------------------------------------------------------------------
-  use pmdio, only: csp2isp, nspmax
+  use pmdvars, only: nspmax
+  use util,only: csp2isp
   implicit none
   save
   character(len=128):: paramsdir = '.'
@@ -206,7 +207,7 @@ contains
           backspace(ioprms)
 !.....species, # of total electrons, 1st ionization energy
           read(ioprms,*) csp, ni, ei
-          isp = csp2isp(csp,specorder)
+          isp = csp2isp(csp)
           if( isp.gt.nspmax ) then
             write(6,*) ' Warning @read_params: since isp is greater than nspmax,'&
                  //' skip reading the line.'

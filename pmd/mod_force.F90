@@ -1,16 +1,16 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-26 16:51:48 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-27 14:48:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
-  use pmdio,only: nspmax
+  use pmdvars,only: nspmax
   implicit none
   private
   save
 
   public:: init_mod_force,use_force,set_use_charge,set_use_elec_temp, &
-       write_forces,bcast_force,ol_pair,calc_overlay
+       write_forces,bcast_force,calc_overlay
   public:: luse_charge, luse_elec_temp, force_list, num_forces, loverlay, &
-       ol_type, ol_force, ol_ranges
+       ol_type, ol_force, ol_ranges, ol_alphas, ol_dalphas, ol_pair
   
 !.....Force index list
   integer,parameter:: N_FORCES = 34
@@ -132,7 +132,7 @@ contains
 !
 !   Broadcast variables related to mod_force.
 !
-    use pmdmpi
+    use pmdvars,only: mpicomm
     include 'mpif.h'
     integer:: ierr
 

@@ -1,11 +1,12 @@
 module BMH
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-05 23:38:07 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-28 00:26:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of fitpot BOrn-Mayer-Huggins (BMH) potential.
 !  This potential should be used with Coulomb and dipole potentials.
 !-----------------------------------------------------------------------
-  use pmdio, only: csp2isp, nspmax
+  use pmdvars, only: nspmax
+  use util,only: csp2isp
   implicit none
   save
   include "./const.h"
@@ -250,8 +251,8 @@ contains
         if( num_data(cline,' ').eq.4 ) then
           backspace(ioprms)
           read(ioprms,*) cspi,cspj, aij,alpij
-          isp = csp2isp(cspi,specorder)
-          jsp = csp2isp(cspj,specorder)
+          isp = csp2isp(cspi)
+          jsp = csp2isp(cspj)
           if( isp.gt.nspmax .or. jsp.gt.nspmax ) then
             write(6,*) ' Warning @read_params: since isp/jsp is greater than nspmax,'&
                  //' skip reading the line.'

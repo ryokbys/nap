@@ -1,5 +1,5 @@
 module variables
-  use pmdio,only: nspmax
+  use pmdvars,only: nspmax
   use descriptor,only: desc
   implicit none 
   save

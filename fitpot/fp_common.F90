@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-05 11:08:51 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-28 22:46:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -161,7 +161,6 @@ contains
       if( trim(cpot).eq.'linreg' .or. index(cpot,'NN').ne.0 ) then
         if( .not. allocated(samples(ismpl)%gsf) ) then
           call get_ints(nsf,nal,nnl)
-!!$          print *,'ismpl,nsf,nal,nnl=',ismpl,nsf,nal,nnl
           samples(ismpl)%nsf = nsf
           samples(ismpl)%nal = nal
           samples(ismpl)%nnl = nnl
@@ -628,8 +627,8 @@ contains
     use fpc,only: set_paramsdir_fpc,set_params_fpc
     use angular,only: set_paramsdir_angular,set_params_angular
     use EAM,only: set_paramsdir_EAM,set_params_EAM
-    use NN2,only: set_paramsdir_NN2,set_params_NN2,get_NN2_hl1 &
-         ,set_NN2_hl1,set_sigtype_NN2
+!!$    use NN2,only: set_paramsdir_NN2,set_params_NN2,get_NN2_hl1 &
+!!$         ,set_NN2_hl1,set_sigtype_NN2
     use DNN,only: set_paramsdir_DNN,set_params_DNN,set_actfunc_DNN
     use linreg,only: set_paramsdir_linreg,set_params_linreg
     use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
@@ -691,11 +690,11 @@ contains
 !.....Set lfitpot in descriptor module to let it know that it is called from fitpot
       lfitpot_desc = .true.
       call set_params_linreg(ndim,x)
-    else if( trim(cpot).eq.'NN2' ) then
-!.....Set lfitpot in descriptor module to let it know that it is called from fitpot
-      lfitpot_desc = .true.
-      call set_params_NN2(ndim,x,nn_nl,nn_nhl)
-      call set_sigtype_NN2(nn_sigtype)
+!!$    else if( trim(cpot).eq.'NN2' ) then
+!!$!.....Set lfitpot in descriptor module to let it know that it is called from fitpot
+!!$      lfitpot_desc = .true.
+!!$      call set_params_NN2(ndim,x,nn_nl,nn_nhl)
+!!$      call set_sigtype_NN2(nn_sigtype)
     else if( trim(cpot).eq.'DNN' ) then
 !.....Set lfitpot in descriptor module to let it know that it is called from fitpot
       lfitpot_desc = .true.
@@ -767,7 +766,9 @@ contains
     use force
     use descriptor,only: get_dsgnmat_force
     use ZBL,only: r_inner,r_outer
-    use pmdio, only: nspmax,naux
+    use pmdvars, only: nspmax,naux,nstp,nx,ny,nz,specorder,am,dt,rbuf, &
+         rc1nn,ifcoulomb,lvc
+    use pmdvars,only: iprint_pmd => iprint, rc_pmd => rc
     use element
     implicit none
     include "../pmd/params_unit.h"
@@ -783,13 +784,16 @@ contains
 
     logical,save:: l1st = .true.
 
-    integer:: i,is,maxstp,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
-         ntdst,nx,ny,nz,iprint_pmd,ifcoulomb
-    real(8):: am(nspmax),dt,rbuf,dmp,tinit,tfin,ttgt(nspmax),trlx,stgt(3,3),&
-         ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv &
-         ,rc1nn
-    logical:: ltdst,lcellfix(3,3),lvc
-    character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5,boundary*3,csp*3
+!!$    integer:: i,is,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
+!!$         ntdst,iprint_pmd,ifcoulomb
+!!$    real(8):: am(nspmax),dt,rbuf,dmp,tinit,tfin,ttgt(nspmax),trlx,stgt(3,3),&
+!!$         ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv &
+!!$         ,rc1nn
+!!$    logical:: ltdst,lcellfix(3,3),lvc
+!!$    character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5,boundary*3,csp*3
+    integer:: i,is
+    real(8):: ptnsr(3,3),ekin
+    character:: csp*3 
     type(atom):: elem
     logical:: update_force_list
 
@@ -804,50 +808,54 @@ contains
 !!$    print *,'cdirname,specorder= ',trim(smpl%cdirname) &
 !!$         ,(smpl%specorder(i),i=1,2)
 
-    maxstp = 0
-    nerg = 1
-    npmd = 1
+    nstp = 0
+!!$    nerg = 1
+!!$    npmd = 1
 !.....Since at least one of FF requires mass infomation,
 !     set mass info from specorder anyways.
     am(:) = 12d0
+    specorder(:) = smpl%specorder
     do is=1,nspmax
-      csp = smpl%specorder(is)
+!!$      csp = smpl%specorder(is)
+      csp = specorder(is)
       if( trim(csp).ne.'x' ) then
         elem = get_element(trim(csp))
         am(is) = elem%mass
       endif
     enddo
-    dt = 5d0
-    ciofmt = 'ascii'
-    ifpmd = 0
+    dt = 1d0
     rbuf = 0.0d0
     rc1nn = 3.0d0
-    ifdmp = 0  ! no damping as well
-    dmp = 0.99d0
-    minstp = 0
-    tinit = 0d0
-    tfin = 0d0
-    ctctl = 'none'
-    ttgt(1:nspmax) = 300d0
-    trlx = 100d0
-    ltdst = .false.
-    ntdst = 1
-    cpctl = 'none'
-    stgt(1:3,1:3) = 0d0
-    ptgt = 0d0
-    srlx = 100d0
-    stbeta = 1d-1
-    strfin = 0d0
-    fmv(1:3,0) = (/ 0d0, 0d0, 0d0 /)
-    fmv(1:3,1:9) = 1d0
-    ptnsr(1:3,1:3) = 0d0
-    ekin = 0d0
-    n_conv = 1
-    czload_type = 'no'
-    boundary = 'ppp'
-    eps_conv = 1d-3
-    ifsort = 1
-    lcellfix(1:3,1:3) = .false.
+    rc_pmd = rc
+
+!!$    ciofmt = 'ascii'
+!!$    ifpmd = 0
+!!$    ifdmp = 0  ! no damping as well
+!!$    dmp = 0.99d0
+!!$    minstp = 0
+!!$    tinit = 0d0
+!!$    tfin = 0d0
+!!$    ctctl = 'none'
+!!$    ttgt(1:nspmax) = 300d0
+!!$    trlx = 100d0
+!!$    ltdst = .false.
+!!$    ntdst = 1
+!!$    cpctl = 'none'
+!!$    stgt(1:3,1:3) = 0d0
+!!$    ptgt = 0d0
+!!$    srlx = 100d0
+!!$    stbeta = 1d-1
+!!$    strfin = 0d0
+!!$    fmv(1:3,0) = (/ 0d0, 0d0, 0d0 /)
+!!$    fmv(1:3,1:9) = 1d0
+!!$    ptnsr(1:3,1:3) = 0d0
+!!$    ekin = 0d0
+!!$    n_conv = 1
+!!$    czload_type = 'no'
+!!$    boundary = 'ppp'
+!!$    eps_conv = 1d-3
+!!$    ifsort = 1
+!!$    lcellfix(1:3,1:3) = .false.
     nx = 1
     ny = 1
     nz = 1
@@ -898,18 +906,22 @@ contains
 !.....but necessary to allocate it for one_shot, so allocate it with 0 length.
     naux = 0
     if( .not.allocated(smpl%aux) ) then
-      allocate(smpl%aux(smpl%natm,naux))
+      allocate(smpl%aux(naux,smpl%natm))
     endif
 
 !.....one_shot force calculation
-    call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
-         ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
-         ,smpl%aux,naux &
-         ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
-         ,smpl%specorder,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
-         ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
-         ,gwe,gwf,gws &
-         ,lematch,lfmatch,lsmatch,boundary)
+!!$    call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
+!!$         ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
+!!$         ,smpl%aux,naux &
+!!$         ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
+!!$         ,smpl%specorder,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
+!!$         ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
+!!$         ,gwe,gwf,gws &
+!!$         ,lematch,lfmatch,lsmatch,boundary)
+    call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra, &
+         smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi, &
+         smpl%aux,ekin,epot,ptnsr,lcalcgrad,ndimp,maxisp, &
+         gwe,gwf,gws,lematch,lfmatch,lsmatch)
 !.....Stress definition, negative as compressive, positive as tensile
     strs(1:3,1:3) = ptnsr(1:3,1:3) *up2gpa*(-1d0)
 !!$    if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
@@ -931,6 +943,7 @@ contains
 !
     use variables,only: iprint
     use parallel
+    use pmdvars,only: myid_md,mpi_md_world,nodes_md
     implicit none
 
     integer:: iranks(1)
@@ -943,6 +956,10 @@ contains
     call mpi_comm_size(mpi_comm_pmd,nnode_pmd,ierr)
     call mpi_comm_rank(mpi_comm_pmd,myid_pmd,ierr)
     call mpi_comm_group(mpi_comm_pmd,mpi_group_pmd,ierr)
+!.....Store these vars within pmdvars module
+    nodes_md = nnode_pmd
+    myid_md = myid_pmd
+    mpi_md_world = mpi_comm_pmd
 
     if( myid.eq.0 .and. iprint.gt.0 ) then
       write(6,'(a)') ''
@@ -1139,7 +1156,8 @@ contains
     endif
     if( .not. allocated(gsfms) ) then
       allocate(gsfms(nsf),gsfvs(nsf),gsfss(nsf),gsfcorr(nsf,nsf))
-      dmem = dmem +8d0*size(gsfms) +8d0*size(gsfvs) +8d0*size(gsfss) +8d0*size(gsfcorr)
+      dmem = dmem +8d0*size(gsfms) +8d0*size(gsfvs) +8d0*size(gsfss) &
+           +8d0*size(gsfcorr)
     endif
 
 !.....compute mean value
@@ -1433,15 +1451,15 @@ contains
         vars(i) = vars(i) *sgms(i)
         vranges(1:2,i) = vranges(1:2,i) *sgms(i)
       enddo
-    else if( trim(cpot).eq.'NN2' ) then
-      iv = 0
-      do ihl0=1,nn_nhl(0)
-        do ihl1=1,nn_nhl(1)  ! NN2 does not use bias...
-          iv = iv + 1
-          vars(iv) = vars(iv) *sgms(ihl0)
-          vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
-        enddo
-      enddo
+!!$    else if( trim(cpot).eq.'NN2' ) then
+!!$      iv = 0
+!!$      do ihl0=1,nn_nhl(0)
+!!$        do ihl1=1,nn_nhl(1)  ! NN2 does not use bias...
+!!$          iv = iv + 1
+!!$          vars(iv) = vars(iv) *sgms(ihl0)
+!!$          vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
+!!$        enddo
+!!$      enddo
     else if( trim(cpot).eq.'DNN' ) then
       iv = 0
       do ihl1=1,nn_nhl(1)
@@ -1515,15 +1533,15 @@ contains
         vars(i) = vars(i) *sgms(i)
         vranges(1:2,i) = vranges(1:2,i) *sgms(i)
       enddo
-    else if( trim(cpot).eq.'NN2' ) then
-      iv = 0
-      do ihl0=1,nn_nhl(0)
-        do ihl1=1,nn_nhl(1)  ! NN2 does not use bias...
-          iv = iv + 1
-          vars(iv) = vars(iv) *sgms(ihl0)
-          vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
-        enddo
-      enddo
+!!$    else if( trim(cpot).eq.'NN2' ) then
+!!$      iv = 0
+!!$      do ihl0=1,nn_nhl(0)
+!!$        do ihl1=1,nn_nhl(1)  ! NN2 does not use bias...
+!!$          iv = iv + 1
+!!$          vars(iv) = vars(iv) *sgms(ihl0)
+!!$          vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
+!!$        enddo
+!!$      enddo
     else if( trim(cpot).eq.'DNN' ) then
       iv = 0
       do ihl1=1,nn_nhl(1)
@@ -1561,16 +1579,16 @@ contains
           vars(i) = vars(i) *sgmis(i)
           vranges(:,i) = vranges(:,i) *sgmis(i)
         enddo
-      else if( trim(cpot).eq.'NN2' ) then
-        iv = 0
-        do ihl0=1,nn_nhl(0)
-          sgmi = sgmis(ihl0)
-          do ihl1=1,nn_nhl(1)
-            iv= iv + 1
-            vars(iv)= vars(iv) *sgmi
-            vranges(1:2,iv)= vranges(1:2,iv) *sgmi
-          enddo
-        enddo
+!!$      else if( trim(cpot).eq.'NN2' ) then
+!!$        iv = 0
+!!$        do ihl0=1,nn_nhl(0)
+!!$          sgmi = sgmis(ihl0)
+!!$          do ihl1=1,nn_nhl(1)
+!!$            iv= iv + 1
+!!$            vars(iv)= vars(iv) *sgmi
+!!$            vranges(1:2,iv)= vranges(1:2,iv) *sgmi
+!!$          enddo
+!!$        enddo
       else if( trim(cpot).eq.'DNN' ) then
         iv = 0
         do ihl1=1,nn_nhl(1)

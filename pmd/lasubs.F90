@@ -2,8 +2,8 @@
 !     SUBROUTINE ludc_inv
 !       Calculate INversion of the MATrix using LU decomposition.
 !=======================================================================
-SUBROUTINE ludc_inv( n,a,c )
-  IMPLICIT NONE
+subroutine ludc_inv( n,a,c )
+  implicit none
 !-----------------------------------------------------------------------
 !     n:  dimension of the matrix A
 !     a:  the matrix A
@@ -89,7 +89,7 @@ SUBROUTINE ludc_inv( n,a,c )
 !      write(6,'(A,F12.3)') "TIME =",vbtime(4)
   deallocate(d)
   RETURN
-END subroutine ludc_inv
+end subroutine ludc_inv
 !=======================================================================
 subroutine chckinv(n,a,ai)
 !-----------------------------------------------------------------------

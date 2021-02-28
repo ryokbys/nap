@@ -1,10 +1,11 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-05-29 10:46:26 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-28 00:26:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
-  use pmdio, only: csp2isp, nspmax
+  use pmdvars, only: nspmax
+  use util,only: csp2isp
   implicit none
   save
   character(len=128):: paramsdir = '.'
@@ -96,7 +97,7 @@ contains
         if( trim(c1).eq.'atomic' ) then
           backspace(ioprms)
           read(ioprms,*) c1,cspi,c2,a,xi
-          isp = csp2isp(trim(cspi),specorder)
+          isp = csp2isp(trim(cspi))
 !!$          print *, 'isp,c1,a,xi=',isp,trim(c1),a,xi
           if( isp.gt.nspmax ) then
             print *,'Warning @read_params_EAM: isp is greater than nspmax,' &
@@ -110,8 +111,8 @@ contains
         else if( trim(c1).eq.'pair' ) then
           backspace(ioprms)
           read(ioprms,*) c1,cspi,cspj,c2,c3,b,c,re,alp,beta,rc
-          isp = csp2isp(trim(cspi),specorder)
-          jsp = csp2isp(trim(cspj),specorder)
+          isp = csp2isp(trim(cspi))
+          jsp = csp2isp(trim(cspj))
 !!$          print *, 'isp,jsp,b,c,re,alp,beta,rc=',isp,jsp,b,c,re,alp,beta,rc
           if( isp.gt.nspmax .or. jsp.gt.nspmax ) then
             print *,'Warning @read_params_EAM: isp/jsp is greater than nspmax,'&

@@ -1,5 +1,6 @@
 module LJ
-  use pmdio, only: csp2isp, nspmax
+  use pmdvars, only: nspmax
+  use util,only: csp2isp
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -281,8 +282,8 @@ contains
         if( nd.eq. 5 ) then
           backspace(ioprms)
           read(ioprms,*) cspi,cspj, cij, nij, rcij
-          isp = csp2isp(cspi,specorder)
-          jsp = csp2isp(cspj,specorder)
+          isp = csp2isp(cspi)
+          jsp = csp2isp(cspj)
           if( isp.gt.nspmax .or. jsp.gt.nspmax ) then
             write(6,*) ' Warning @read_params: since isp/jsp is greater than nspmax,'&
                  //' skip reading the line.'

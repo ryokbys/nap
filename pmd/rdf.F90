@@ -1,6 +1,6 @@
 program rdf
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-25 16:19:28 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-27 14:21:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Compute RDF.
 !-----------------------------------------------------------------------
@@ -15,17 +15,23 @@ program rdf
 !   - out.rdf:       RDF data
 !   - out.sfac:      Structure factor S(q) data obtained from total RDF.
 !-----------------------------------------------------------------------
-  use pmdio
+  use pmdio,only: read_pmdtot_ascii, get_ntot_ascii
   use pairlist,only: mk_lspr_sngl
   implicit none
   include 'mpif.h'
   real(8),parameter:: pi = 3.14159265358979d0
+  character(len=128),parameter:: cpmdini='pmdini'
   character(len=128),parameter:: cfinput='in.rdf'
   character(len=128),parameter:: cfoutrdf='out.rdf'
   character(len=128),parameter:: cfoutsq='out.sfac'
+  integer,parameter:: nspmax = 9
 
   integer:: ia,ic,nc,maxnn,is,js,msp,inc,ict,i,ib,l,n,nbins
   integer:: nspc(nspmax)
+  integer:: ntot
+  real(8),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
+  real(8),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
+  real(8),allocatable:: auxtot(:,:)
   integer,allocatable:: lspr(:,:),ls1nn(:,:)
   real(8),allocatable:: rdfs(:,:,:),denoms(:,:),sqs(:)
   logical:: lpair(nspmax,nspmax),lspc(nspmax)
@@ -38,7 +44,10 @@ program rdf
   t0 = mpi_wtime()
 
 !.....Read atom configuration
-  call read_pmdtot_ascii(10,trim(cpmdini))
+  ntot = get_ntot_bin(10,trim(cpmdini))
+  allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot) &
+       ,ekitot(3,3,ntot),stot(3,3,ntot),atot(3,ntot))
+  call read_pmdtot_ascii(10,trim(cpmdini),ntot,hunit,h,tagtot,rtot,vtot)
   call get_hi(h,hi,vol)
   print *,'Num of atoms = ',ntot
 
@@ -189,7 +198,7 @@ subroutine read_in_rdf(ionum,cfname,rcut,qcut,nbins,lpair)
 !-----------------------------------------------------------------------
 !  If pairs is specified, output pairwise RDF in addition to total RDF.
 !-----------------------------------------------------------------------
-  use pmdio
+  use pmdvars,only: csp2isp,nspmax
   use util, only: num_data
   implicit none 
   integer,intent(in):: ionum
@@ -233,8 +242,8 @@ subroutine read_in_rdf(ionum,cfname,rcut,qcut,nbins,lpair)
 !.....Convert cpairs to lpair
       do i=1,npair
         call split_pair(cpairs(i),csp1,csp2)
-        isp1 = csp2isp(csp1,specorder)
-        isp2 = csp2isp(csp2,specorder)
+        isp1 = csp2isp(csp1)
+        isp2 = csp2isp(csp2)
         lpair(isp1,isp2) = .true.
         lpair(isp2,isp1) = .true.  ! symmetrize
       enddo

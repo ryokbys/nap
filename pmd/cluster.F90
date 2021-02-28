@@ -1,6 +1,6 @@
 program cluster_analysis
 !-----------------------------------------------------------------------
-!                     Last-modified: <2020-06-17 13:42:32 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-27 11:19:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Cluster analysis program.
 ! The cluster analysis is usually performed for large scale systems.
@@ -17,17 +17,18 @@ program cluster_analysis
 ! -------
 !   - STDOUT
 !-----------------------------------------------------------------------
-  use pmdio
+  use pmdvars
+  use pmdio,only: read_pmdtot_ascii
+  use pairlist,only: mk_lspr_sngl
   implicit none
   include 'mpif.h'
   integer,parameter:: maxpair = 5
   character(len=20),parameter:: cfinput='in.cluster'
 
   integer:: ia,ic,nc,maxnn,is,js,msp,inc,ict,i,ib,l,n,nacmax
-  integer,allocatable:: ictot(:),nacs(:),lspr(:,:),ls1nn(:,:)&
-       ,icouts(:),nhist(:)
+  integer,allocatable:: ictot(:),nacs(:),icouts(:),nhist(:)
   logical:: lpair(nspmax,nspmax),lspc(nspmax),lrecur
-  real(8):: rcut,outthd,hi(3,3),t0,tmp
+  real(8):: rcut,outthd,t0,tmp
   character(len=20):: cnum
 
   t0 = mpi_wtime()
@@ -150,8 +151,7 @@ subroutine read_in_cluster(ionum,cfname,maxpair,rcut,lpair,outthd,lrecur)
 !  out_threshold   10
 !  recursive  T
 !-----------------------------------------------------------------------
-  use pmdio
-  use util, only: num_data
+  use util, only: num_data,csp2isp
   implicit none 
   integer,intent(in):: ionum,maxpair
   character(len=*),intent(in):: cfname
@@ -185,8 +185,8 @@ subroutine read_in_cluster(ionum,cfname,maxpair,rcut,lpair,outthd,lrecur)
 !.....Convert cpairs to lpair
       do i=1,npair
         call split_pair(cpairs(i),csp1,csp2)
-        isp1 = csp2isp(csp1,specorder)
-        isp2 = csp2isp(csp2,specorder)
+        isp1 = csp2isp(csp1)
+        isp2 = csp2isp(csp2)
         lpair(isp1,isp2) = .true.
         lpair(isp2,isp1) = .true.  ! symmetrize
       enddo

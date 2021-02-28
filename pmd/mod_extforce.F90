@@ -1,5 +1,6 @@
 module extforce
-  use pmdio,only: csp2isp,nspmax
+  use pmdvars,only: nspmax
+  use util,only: csp2isp
   implicit none
   include "./const.h"
   save
@@ -20,7 +21,7 @@ contains
     if( trim(cspc_extfrc).eq.'all' ) then
       ispc_extfrc = 0
     else
-      ispc_extfrc = csp2isp(trim(cspc_extfrc),specorder)
+      ispc_extfrc = csp2isp(trim(cspc_extfrc))
     endif
 
 !.....Write some settings

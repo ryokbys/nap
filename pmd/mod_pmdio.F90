@@ -1,169 +1,65 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-26 17:57:10 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-28 00:58:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
 
-  character(len=20),parameter:: cinpmd='in.pmd'
-
-  integer:: ntot0,ntot
-!.....data of total system
-  real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
-       ,ekitot(:,:,:),tagtot(:),atot(:,:)
-  real(8),allocatable:: auxtot(:,:)
-  real(8):: hunit,h(3,3,0:1)
-
-!.....max. num. of atoms in a node
-  integer:: namax = 20000
-!.....max. num. of boundary-particles
-  integer:: nbmax = 10000
-!.....max. num. of neighbors
-  integer:: nnmax = 100
-
-  integer:: nstp = 0
-  integer:: minstp = 0
-  integer:: nerg = 1000
-  integer:: ifpmd= 2    ! 0:none, 1:pmd, 2:dump (default)
-  integer:: npmd = 10
-  integer:: ifsort= 1
-  real(8):: dt = 1d0
-  real(8):: vardt_len = 0.1d0  ! Length criterion for variable time-step
-  real(8):: rc = 5.0d0
-  real(8):: rc1nn = 2.5d0
-  real(8):: rbuf= 0d0
-  integer:: ifdmp= 0 ! 0:none, 1:damped-MD, 2:FIRE
-  character(len=20):: cmin= ''
-  real(8):: dmp  = 0.9d0
-  real(8):: eps_conv = 1d-4
-  integer:: n_conv = 1
-!.....temperature
-  character(len=20):: ctctl='none'
-  integer:: iftctl= 0
-  real(8):: tinit= -1d0
-  real(8):: tfin = -1d0
-  real(8):: ttgt(9)
-  data ttgt / 300d0, 300d0, 300d0, 300d0, 300d0, 300d0, &
-       300d0, 300d0, 300d0 /
-  real(8):: trlx = 100d0
-!.....Random seed
-!  If positve, use (RSEED+MYID) as the seed for each process
-!  If negative, use the same random seeds for all the parallel process
-  real(8):: rseed = 12345d0
-!.....Remove translational motion:
-!     N< 0: not to remove translation
-!     N==0: remove translation only at the beginning
-!     N> 1: remove translation at the begining and every N step.
-  integer:: nrmtrans = 0
-!.....Coulomb system?
-  integer:: ifcoulomb = 0
-!.....temperature distribution on x-direction
-  logical:: ltdst= .false.
-  integer:: ntdst= 1
-!.....shear stress
-  real(8):: shrst = 0.0d0
-!.....factors on each moving direction
-  real(8):: fmv(3,0:9)
-  data fmv &
-       / 0d0, 0d0, 0d0, & ! 0
-       1d0, 1d0, 1d0, & ! 1
-       1d0, 1d0, 1d0, & ! 2
-       1d0, 1d0, 1d0, & ! 3
-       1d0, 1d0, 1d0, & ! 4
-       1d0, 1d0, 1d0, & ! 5
-       1d0, 1d0, 1d0, & ! 6
-       1d0, 1d0, 1d0, & ! 7
-       1d0, 1d0, 1d0, & ! 8
-       1d0, 1d0, 1d0  & ! 9
-       /
-!.....whether compute stress or not
-  logical:: lstrs0 = .true.
-!.....barostat
-  character(len=20):: cpctl='none'
-  real(8):: ptgt   = 0d0
-  real(8):: pini   = 0d0
-  real(8):: pfin   = 0d0
-  real(8):: srlx   = 100d0
-  real(8):: stbeta = 1d0
-  real(8):: strfin = 0.0d0
-  real(8):: stnsr(3,3)
-  real(8):: stgt(1:3,1:3)= 0d0
-  logical:: lcellfix(1:3,1:3)= .false.
-!.....charge optimize or variable charge
-  logical:: lvc = .false.
-!.....Charge setting
-  character(len=20):: chgfix='input'
-!.....print level
-!  0:quiet, 1:normal,
-!  >10:fitpot data
-  integer:: iprint= 1
-
-!.....Auxiliary data
-  integer:: naux
-  character(len=6),allocatable:: cauxarr(:)
-!.....Auxiliary data order for dump output
-  logical:: ldumpaux_changed = .false.
-  character(len=256):: cdumpaux = 'ekin epot sxx syy szz syz sxz sxy'
-  integer:: ndumpaux
-  character(len=6),allocatable:: cdumpauxarr(:)
-
-  character(len=128):: cpmdini = 'pmdini'
-  character(len=128):: cpmdfin = 'pmdfin'
-  character(len=6):: ciofmt='ascii '
-  character(len=20):: cforce='none'
-!!$  integer:: numff = 0 ! number of force-fields
-!!$  character(len=20),allocatable:: cffs(:)  ! force-fields
-!.....max. num. of species
-  integer,parameter:: nspmax= 9
-!.....mass
-  real(8):: am(1:nspmax)= 12.0d0
-!.....charges
-  real(8):: schg(1:nspmax)= 0d0
-!.....species name
-  character(len=3):: specorder(nspmax) = 'x'
-  logical:: has_specorder = .false.
-
-!.....Boundary condition: p = periodic, f = free, w = wall
-  character(len=3):: boundary = 'ppp'
-
-!.....PKA for radiation damage
-  integer:: iatom_pka = -1
-  real(8):: pka_energy = -1.d0 ! in eV
-  real(8):: pka_theta = 0.d0  ! in degree
-  real(8):: pka_phi = 0.d0    ! in degree
-
-!.....Metadynamics
-  logical:: lmetaD = .false. 
-!.....Constraints
-  logical:: lconst = .false. 
-!.....Reduced force
-  logical:: lrdcfrc = .false. 
-!.....Linked cell reordering; this has bugs for cases using charges
-  logical:: lreorder = .false. 
-
-!.....zload type: zload or shear
-  character(len=128):: czload_type= 'none'
-!.....top and bottom skin width in which atoms are fixed and/or controlled
-  real(8):: zskin_width = 5.0d0
-!.....Shear angle from x in degree, shear direction is on xy-plane
-  real(8):: zshear_angle = 0d0
-
-!.....Deformation
-  character(len=128):: cdeform= 'none'
-  real(8):: dhratio(3,3)
-
-!.....Structure analysis: CNA, a-CNA
-  character(len=128):: cstruct = 'none'
-  integer:: istruct = 1
-
 contains
 !=======================================================================
-  subroutine read_pmdtot_ascii(ionum,cfname)
-    implicit none
+  function get_ntot_ascii(ionum,cfname) result(ntot)
     integer,intent(in):: ionum
     character(len=*),intent(in):: cfname
+    integer:: ntot
 
     integer:: ia,ib,l,i
+    real(8):: hunit,h(3,3,0:1)
+    character(len=128):: ctmp 
+
+    open(ionum,file=trim(cfname),status='old')
+    do while(.true.)   ! skip comment lines
+      read(ionum,'(a)') ctmp
+      if( .not. (ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#') ) then
+        backspace(ionum)
+        exit
+      endif
+    enddo
+    read(ionum,*) hunit
+    read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+    read(ionum,*) ntot
+    close(ionum)
+    return
+
+  end function get_ntot_ascii
+!=======================================================================
+  function get_ntot_bin(ionum,cfname) result(ntot)
+    integer,intent(in):: ionum
+    character(len=*),intent(in):: cfname
+    integer:: ntot
+
+    integer:: ia,ib,l,i,msp,naux
+    real(8):: h(3,3,0:1),hunit
+    character:: ctmp*3
+
+    open(ionum,file=trim(cfname),form='unformatted',status='old')
+    read(ionum) msp
+    read(ionum) (ctmp,i=1,msp)
+    read(ionum) hunit
+    read(ionum) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+    read(ionum) ntot, naux
+    close(ionum)
+    return
+
+  end function get_ntot_bin
+!=======================================================================
+  subroutine read_pmdtot_ascii(ionum,cfname,ntot,hunit,h,tagtot, &
+       rtot,vtot)
+    integer,intent(in):: ionum,ntot
+    character(len=*),intent(in):: cfname
+    real(8),intent(out):: hunit,h(3,3,0:1)
+    real(8),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
+
+    integer:: ia,ib,l,i,itmp
     character(len=128):: ctmp 
 
     open(ionum,file=trim(cfname),status='old')
@@ -180,22 +76,26 @@ contains
     read(ionum,*) hunit
     read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
     h(1:3,1:3,0:1)= h(1:3,1:3,0:1)*hunit
-    read(ionum,*) ntot0
-    ntot = ntot0
-    allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
-         ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0))
-    do i=1,ntot0
+    read(ionum,*) itmp
+    if( itmp.ne.ntot ) then
+      print *,' ERROR: itmp.ne.ntot'
+      stop
+    endif
+    do i=1,ntot
       read(ionum,*) tagtot(i),rtot(1:3,i),vtot(1:3,i)
     enddo
     close(ionum)
 
   end subroutine read_pmdtot_ascii
 !=======================================================================
-  subroutine write_pmdtot_ascii(ionum,cfname)
-    implicit none
+  subroutine write_pmdtot_ascii(ionum,cfname,ntot,hunit,h,tagtot, &
+       rtot,vtot)
+    use pmdvars,only: has_specorder,specorder
     include './params_unit.h'
-    integer,intent(in):: ionum
+    integer,intent(in):: ionum,ntot
     character(len=*),intent(in) :: cfname
+    real(8),intent(in):: hunit,h(3,3,0:1)
+    real(8),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
 
     integer:: ia,ib,l,i,msp
 
@@ -214,26 +114,22 @@ contains
          ,ib=1,3),l=0,1)
     write(ionum,'(i10)') ntot
     do i=1,ntot
-!!$      write(ionum,'(7es23.14e3,11es13.4e3)') tagtot(i) &
-!!$           ,rtot(1:3,i) &
-!!$           ,vtot(1:3,i) & !/dt
-!!$           ,ekitot(1,1,i)+ekitot(2,2,i)+ekitot(3,3,i) &
-!!$           ,epitot(i) &
-!!$           ,stot(1,1,i),stot(2,2,i),stot(3,3,i) &
-!!$           ,stot(2,3,i),stot(3,1,i),stot(1,2,i)
       write(ionum,'(7es23.14e3,11es13.4e3)') tagtot(i) &
            ,rtot(1:3,i),vtot(1:3,i)    ! dt
     enddo
     close(ionum)
-
+    return
   end subroutine write_pmdtot_ascii
 !=======================================================================
-  subroutine read_pmdtot_bin(ionum,cfname)
-    implicit none
-    integer,intent(in):: ionum
+  subroutine read_pmdtot_bin(ionum,cfname,ntot,hunit,h,tagtot, &
+       rtot,vtot)
+    use pmdvars,only: specorder
+    integer,intent(in):: ionum,ntot
     character(len=*),intent(in):: cfname
+    real(8),intent(out):: hunit,h(3,3,0:1)
+    real(8),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
 
-    integer:: ia,ib,l,i,msp
+    integer:: ia,ib,l,i,msp,itmp
 
     open(ionum,file=trim(cfname),form='unformatted',status='old')
 !-----natm: num. of particles in this node
@@ -242,32 +138,30 @@ contains
     read(ionum) hunit
     read(ionum) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
     h(1:3,1:3,0:1)= h(1:3,1:3,0:1)*hunit
-    read(ionum) ntot0, naux
-    ntot = ntot0
-    allocate(tagtot(ntot0),rtot(3,ntot0),atot(3,ntot0) &
-         ,vtot(3,ntot0),epitot(ntot0) &
-         ,ekitot(3,3,ntot0),stot(3,3,ntot0),auxtot(naux,ntot0))
-    read(ionum) tagtot(1:ntot0)
-    read(ionum) rtot(1:3,1:ntot0)
-    read(ionum) vtot(1:3,1:ntot0)
-!!$    read(ionum) ekitot(1:3,1:3,1:ntot0)
-!!$    read(ionum) epitot(1:ntot0)
-!!$    read(ionum) stot(1:3,1:3,1:ntot0)
-!!$    read(ionum) auxtot(1:naux,1:ntot0)
+    read(ionum) itmp
+    if( itmp.ne.ntot ) then
+      print *,' ERROR: itmp.ne.ntot !'
+      stop
+    endif
+    read(ionum) tagtot(1:ntot)
+    read(ionum) rtot(1:3,1:ntot)
+    read(ionum) vtot(1:3,1:ntot)
     close(ionum)
 
   end subroutine read_pmdtot_bin
 !=======================================================================
-  subroutine write_pmdtot_bin(ionum,cfname)
-    implicit none
+  subroutine write_pmdtot_bin(ionum,cfname,ntot,hunit,h,tagtot, &
+       rtot,vtot)
+    use pmdvars,only: specorder
     include './params_unit.h'
-    integer,intent(in):: ionum
+    integer,intent(in):: ionum,ntot
     character(len=*),intent(in) :: cfname
+    real(8),intent(in):: hunit,h(3,3,0:1)
+    real(8),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
 
     integer:: ia,ib,l,i,msp
 
-    open(ionum,file=cfname,form='unformatted' &
-         ,status='replace')
+    open(ionum,file=cfname,form='unformatted',status='replace')
     msp = 0
     do ia=1,ntot
       msp = max(msp,int(tagtot(ia)))
@@ -276,31 +170,32 @@ contains
     write(ionum) (specorder(i),i=1,msp)
     write(ionum) hunit
     write(ionum) (((h(ia,ib,l)/hunit,ia=1,3),ib=1,3),l=0,1)
-    write(ionum) ntot, naux
+    write(ionum) ntot
     write(ionum) tagtot(1:ntot)
     write(ionum) rtot(1:3,1:ntot)
     write(ionum) vtot(1:3,1:ntot)
-!!$    write(ionum) ekitot(1:3,1:3,1:ntot)
-!!$    write(ionum) epitot(1:ntot)
-!!$    write(ionum) stot(1:3,1:3,1:ntot)
-!!$    write(ionum) auxtot(1:naux,1:ntot)
     close(ionum)
 
   end subroutine write_pmdtot_bin
 !=======================================================================
-  subroutine write_dump(ionum,cfname)
+  subroutine write_dump(ionum,cfname,ntot,hunit,h,tagtot,rtot,vtot, &
+       stot,ekitot,epitot,naux,auxtot)
 !
 !     Write atomic configuration in LAMMPS-dump format file.
 !
-    use util,only: itotOf
+    use pmdvars,only: ndumpaux,cdumpauxarr,specorder,has_specorder
+    use util,only: itotOf,iauxof
     use time,only: accum_time
     implicit none
     include "mpif.h"
-    integer,intent(in):: ionum
+    integer,intent(in):: ionum,ntot,naux
     character(len=*),intent(in) :: cfname
+    real(8),intent(in):: hunit,h(3,3,0:1)
+    real(8),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot), &
+         stot(3,3,ntot),ekitot(3,3,ntot),epitot(ntot),auxtot(naux,ntot)
 
     integer:: i,j,k,l,is,idlmp
-    real(8):: xi(3),ri(3),eki,epi,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz, &
+    real(8):: xi(3),ri(3),xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz, &
          xlo_bound,xhi_bound,ylo_bound,yhi_bound, &
          zlo_bound,zhi_bound,st(3,3)
 !!$    integer,external:: itotOf
@@ -416,7 +311,7 @@ contains
 !       c = (      xz,      yz, zhi-zlo )
 !     See, http://lammps.sandia.gov/doc/Section_howto.html, for detail.
 !
-    implicit none
+    use vector,only: norm,dot,cross
     integer,intent(in):: ntot
     real(8),intent(in):: h(3,3),rtot(3,ntot),vtot(3,ntot)
     real(8),intent(out):: xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz &
@@ -427,7 +322,7 @@ contains
          ,b1(3),b2(3),b3(3),rt(3),vt(3),amat(3,3),bmat(3,3) &
          ,x,y,z,a23(3),a31(3),a12(3),vol,xyp
     real(8):: a,b,c,alpha,beta,gamma
-    real(8),external:: absv,sprod
+!!$    real(8),external:: absv,sprod
 
     xlo = 0d0
     ylo = 0d0
@@ -435,12 +330,12 @@ contains
     a0(1:3) = h(1:3,1)
     b0(1:3) = h(1:3,2)
     c0(1:3) = h(1:3,3)
-    a = absv(3,a0)
-    b = absv(3,b0)
-    c = absv(3,c0)
-    alpha = acos(sprod(3,b0,c0)/b/c)
-    beta  = acos(sprod(3,a0,c0)/a/c)
-    gamma = acos(sprod(3,a0,b0)/a/b)
+    a = norm(a0)
+    b = norm(b0)
+    c = norm(c0)
+    alpha = acos(dot(b0,c0)/b/c)
+    beta  = acos(dot(a0,c0)/a/c)
+    gamma = acos(dot(a0,b0)/a/b)
     xhi = a
     xy = b*cos(gamma)
     xz = c*cos(beta)
@@ -478,10 +373,17 @@ contains
     a1(1:3) = h(1:3,1)
     a2(1:3) = h(1:3,2)
     a3(1:3) = h(1:3,3)
-    call vprod(a2,a3,a23)
-    call vprod(a3,a1,a31)
-    call vprod(a1,a2,a12)
-    vol = abs( sprod(3,a1,a23) )
+!!$    call vprod(a2,a3,a23)
+!!$    call vprod(a3,a1,a31)
+!!$    call vprod(a1,a2,a12)
+    a23 = cross(a2,a3)
+    a31 = cross(a3,a1)
+    a12 = cross(a1,a2)
+!!$    call vprod(a2,a3,a23)
+!!$    call vprod(a3,a1,a31)
+!!$    call vprod(a1,a2,a12)
+!!$    vol = abs( sprod(3,a1,a23) )
+    vol = abs(dot(a1,a23))
     amat(1:3,1:3) = 0d0
     amat(1,1:3) = a23(1:3)
     amat(2,1:3) = a31(1:3)
@@ -512,7 +414,7 @@ contains
   end subroutine pmd2lammps
 !=======================================================================
   subroutine shift_pos_for_lammps(r,rn,lxy,lxz,lyz,x,y,z,yz,xz,xy)
-    implicit none
+    use pmdvars,only: boundary
     real(8),intent(in):: r(3),x,y,z,yz,xz,xy
     integer,intent(in):: lxy,lxz,lyz
     real(8),intent(out):: rn(3)
@@ -533,7 +435,6 @@ contains
   end subroutine shift_pos_for_lammps
 !=======================================================================
   function pbc(x)
-    implicit none
     real(8),intent(in):: x
     real(8):: pbc
 
@@ -558,13 +459,13 @@ contains
 !       c = (      xz,      yz, zhi-zlo )
 !     See, http://lammps.sandia.gov/doc/Section_howto.html, for detail.
 !
-    implicit none
+    use vector,only: norm,dot
     real(8),intent(in):: hmat(3,3)
     real(8),intent(out):: xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz
 
     real(8):: a0(3),b0(3),c0(3)
     real(8):: a,b,c,alpha,beta,gamma
-    real(8),external:: absv,sprod
+!!$    real(8),external:: absv,sprod
 
     xlo = 0d0
     ylo = 0d0
@@ -572,12 +473,12 @@ contains
     a0(1:3) = hmat(1:3,1)
     b0(1:3) = hmat(1:3,2)
     c0(1:3) = hmat(1:3,3)
-    a = absv(3,a0)
-    b = absv(3,b0)
-    c = absv(3,c0)
-    alpha = acos(sprod(3,b0,c0)/b/c)
-    beta  = acos(sprod(3,a0,c0)/a/c)
-    gamma = acos(sprod(3,a0,b0)/a/b)
+    a = norm(a0)
+    b = norm(b0)
+    c = norm(c0)
+    alpha = acos(dot(b0,c0)/b/c)
+    beta  = acos(dot(a0,c0)/a/c)
+    gamma = acos(dot(a0,b0)/a/b)
     xhi = a
     xy = b*cos(gamma)
     xz = c*cos(beta)
@@ -600,8 +501,8 @@ contains
 !  Currently available options are:
 !    - "specorder:", Species order. The number of species limited up to 9.
 !
+    use pmdvars,only: specorder,has_specorder,iprint
     use util, only: num_data
-    implicit none
     include "./const.h"
     character(len=*),intent(in):: cline
 
@@ -625,27 +526,6 @@ contains
     
   end subroutine parse_option
 !=======================================================================
-  function csp2isp(csp,spcs)
-!
-!  Convert csp to isp.
-!  If not found, return -1.
-!
-    character(len=3),intent(in):: spcs(nspmax)
-    character(len=*),intent(in):: csp
-    integer:: csp2isp
-
-    integer:: isp
-
-    csp2isp = -1
-    do isp=1,nspmax
-      if( trim(csp).eq.trim(spcs(isp)) ) then
-        csp2isp = isp
-        return
-      endif
-    enddo
-    return
-  end function csp2isp
-!=======================================================================
   subroutine split_pair(strin,str1,str2)
 !
 !  Split the input string of a pair connected by hyphen, e.g.) Si-O,
@@ -665,101 +545,6 @@ contains
     return
   end subroutine split_pair
 !=======================================================================
-  function iauxof(cauxname)
-    character(len=*),intent(in):: cauxname
-    integer:: iauxof
-    integer:: i
-    iauxof = 0
-    do i=1,naux
-      if( trim(cauxname).eq.trim(cauxarr(i)) ) then
-        iauxof = i
-        return
-      endif
-    enddo
-    if( iauxof.eq.0 ) then
-      print *,'ERROR @iauxof: No such auxname, '//trim(cauxname)
-      stop 
-    endif
-    return
-  end function iauxof
-!=======================================================================
-  subroutine make_cdumpauxarr()
-!
-!  Builld cdumpauxarr if ifpmd==2 (dump output)
-!
-    use util,only: num_data
-
-    integer:: i,ivx,ivy,ivz
-    character(len=6):: ctmp
-
-    ndumpaux = num_data(trim(cdumpaux),' ')
-    if( allocated(cdumpauxarr) ) deallocate(cdumpauxarr)
-    allocate(cdumpauxarr(ndumpaux))
-    read(cdumpaux,*) (cdumpauxarr(i),i=1,ndumpaux)
-!.....If cdumpauxarr contains vx,vy,vz, bring them to the beginning of the array
-    ivx = idumpauxof('vx')
-    ivy = idumpauxof('vy')
-    ivz = idumpauxof('vz')
-    if( ivz.gt.0 ) then
-      ctmp = cdumpauxarr(ivz)
-      do i=ivz-1,1,-1
-        cdumpauxarr(i+1) = cdumpauxarr(i)
-      enddo
-      cdumpauxarr(1) = ctmp
-    endif
-    if( ivy.gt.0 ) then
-      ctmp = cdumpauxarr(ivy)
-      do i=ivy-1,1,-1
-        cdumpauxarr(i+1) = cdumpauxarr(i)
-      enddo
-      cdumpauxarr(1) = ctmp
-    endif
-    if( ivx.gt.0 ) then
-      ctmp = cdumpauxarr(ivx)
-      do i=ivx-1,1,-1
-        cdumpauxarr(i+1) = cdumpauxarr(i)
-      enddo
-      cdumpauxarr(1) = ctmp
-    endif
-    return
-  end subroutine make_cdumpauxarr
-!=======================================================================
-  function idumpauxof(cauxname)
-    character(len=*),intent(in):: cauxname
-    integer:: idumpauxof
-    integer:: i
-    
-    idumpauxof = -1
-    do i=1,ndumpaux
-      if( trim(cdumpauxarr(i)).eq.trim(cauxname) ) then
-        idumpauxof = i
-        return
-      endif
-    enddo
-    return
-  end function idumpauxof
-!=======================================================================
-  function get_vol(h)
-    real(8),intent(in):: h(3,3)
-
-    integer:: i,j,jm,jp,im,ip
-    real(8):: sgm(3,3)
-    real(8):: get_vol
-
-!.....cofactor matrix, SGM
-    do j=1,3
-      jm=mod(j+1,3)+1
-      jp=mod(j,  3)+1
-      do i=1,3
-        im=mod(i+1,3)+1
-        ip=mod(i,  3)+1
-        sgm(i,j)=h(ip,jp)*h(im,jm)-h(im,jp)*h(ip,jm)
-      enddo
-    enddo
-!.....MD-box volume
-    get_vol= h(1,1)*sgm(1,1) +h(2,1)*sgm(2,1) +h(3,1)*sgm(3,1)
-    return
-  end function get_vol
 end module pmdio
 !-----------------------------------------------------------------------
 !     Local Variables:

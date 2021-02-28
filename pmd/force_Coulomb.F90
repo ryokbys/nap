@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-05 23:41:21 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-28 00:25:16 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -13,7 +13,8 @@ module Coulomb
 !  For Ewald Coulomb potential:
 !    - ...
 !-----------------------------------------------------------------------
-  use pmdio,only: csp2isp,nspmax
+  use pmdvars,only: nspmax
+  use util,only: csp2isp
   implicit none
   include "./const.h"
   save
@@ -439,7 +440,7 @@ contains
           backspace(ioprms)
 !!$          read(ioprms,*) isp, cname, vid, rad, npq
           read(ioprms,*) cspi, vid, rad, npq
-          isp = csp2isp(trim(cspi),specorder)
+          isp = csp2isp(trim(cspi))
           if( isp.gt.0 ) then
             if( iprint.ne.0 ) then
               write(6,'(a,a5,2f7.3,i4)') '   cspi,vid,rad,npq =' &
@@ -454,8 +455,8 @@ contains
           backspace(ioprms)
 !!$          read(ioprms,*) isp, jsp
           read(ioprms,*) cspi,cspj
-          isp = csp2isp(trim(cspi),specorder)
-          jsp = csp2isp(trim(cspj),specorder)
+          isp = csp2isp(trim(cspi))
+          jsp = csp2isp(trim(cspj))
           if( isp.gt.0 .and. jsp.gt.0 ) then
             interact(isp,jsp) = .true.
             interact(jsp,isp) = interact(isp,jsp)
@@ -525,7 +526,7 @@ contains
         backspace(ioprms)
 !!$        read(ioprms,*,end=20) isp, cname, dchi,djii,sgmt,de0,qlow,qup
         read(ioprms,*,end=20) cspi, dchi,djii,sgmt,de0,qlow,qup
-        isp = csp2isp(trim(cspi),specorder)
+        isp = csp2isp(trim(cspi))
         if( isp.gt.0 ) then
           vcg_chi(isp) = dchi
           vcg_jii(isp) = djii
@@ -676,7 +677,7 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, csp, rad
           if( iprint.ge.ipl_info ) print '(a,3x,a,1x,f7.4)',trim(ctmp), trim(csp), rad
-          isp = csp2isp(trim(csp),specorder)
+          isp = csp2isp(trim(csp))
           if( isp.gt.0 ) then
             rad_bvs(isp) = rad
           endif
@@ -684,8 +685,8 @@ contains
         else if( trim(cline).eq.'rhoij_screened_cut' ) then
           backspace(ioprms)
           read(ioprms,*) ctmp, cspi, cspj, rhoij
-          isp = csp2isp(trim(cspi),specorder)
-          jsp = csp2isp(trim(cspj),specorder)
+          isp = csp2isp(trim(cspi))
+          jsp = csp2isp(trim(cspj))
           rho_bvs(isp,jsp) = rhoij
           rho_bvs(jsp,isp) = rhoij
           if( iprint.ge.ipl_info ) print *,trim(ctmp),trim(cspi) &
@@ -698,7 +699,7 @@ contains
           if( trim(cchgs).eq.'fixed' ) then
 !!$            read(ioprms,*) isp, chgi
             read(ioprms,*) csp, chgi
-            isp = csp2isp(trim(csp),specorder)
+            isp = csp2isp(trim(csp))
             if( isp.gt.0 ) then
               schg0(isp) = chgi
               schg(isp) = schg0(isp)
@@ -714,7 +715,7 @@ contains
 !!$            if( isp.gt.nsp .and. iprint.ge.ipl_basic ) then
 !!$              print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
 !!$            endif
-            isp = csp2isp(trim(csp),specorder)
+            isp = csp2isp(trim(csp))
             if( isp.gt.0 ) then
               ispflag(isp) = .true.
               vid_bvs(isp) = vid
@@ -731,7 +732,7 @@ contains
             endif
           else if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') then
             read(ioprms,*) csp, dchi,djii,de0,qlow,qup
-            isp = csp2isp(trim(csp),specorder)
+            isp = csp2isp(trim(csp))
             if( isp.gt.0 ) then
               ispflag(isp) = .true.
               vcg_chi(isp) = dchi
@@ -758,8 +759,8 @@ contains
 !!$          interact(isp,jsp) = .true.
 !!$          interact(jsp,isp) = .true.
           read(ioprms,*) cspi,cspj
-          isp = csp2isp(trim(cspi),specorder)
-          jsp = csp2isp(trim(cspj),specorder)
+          isp = csp2isp(trim(cspi))
+          jsp = csp2isp(trim(cspj))
           if( isp.gt.0 .and. jsp.gt.0 ) then
             interact(isp,jsp) = .true.
             interact(jsp,isp) = .true.

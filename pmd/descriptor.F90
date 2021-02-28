@@ -2,7 +2,8 @@ module descriptor
 !=======================================================================
 ! Descriptor module
 !=======================================================================
-  use pmdio, only: csp2isp, nspmax
+  use pmdvars,only: nspmax
+  use util,only: csp2isp
   implicit none
   include 'params_unit.h'
   include "./const.h"
@@ -10,11 +11,14 @@ module descriptor
   save
 
   public:: time,nsf,gsfi,dgsfi,igsfi,lprmset_desc,lupdate_gsf,nnl, &
-       gsf,dgsf,igsf,nal,mskgfs
+       gsf,dgsf,igsf,nal,mskgfs,msktmp
   public:: calc_desci,make_gsf_arrays,pre_desci,read_params_desc, &
        init_desc,calc_desc,prepare_desci
   public:: get_descs, get_dsgnmat_force, get_ints, set_descs, set_gscale, &
        set_params_desc
+  public:: ngl,glval,iglid
+  public:: rcmax,rcmax2
+  public:: set_paramsdir_desc, lfitpot, desc
   
 !!$ putting mpif.h inclusion here could cause some conflicts
 !!$  include "mpif.h"
@@ -1384,7 +1388,7 @@ contains
           else
             if( trim(cmode).eq.'Weight' ) then
               read(cline,*,end=30) csp, wgt
-              isp = csp2isp(trim(csp),specorder)
+              isp = csp2isp(trim(csp))
               if( isp.gt.0 ) then
                 wgtsp(isp) = wgt
                 if( iprint.ge.ipl_basic ) write(6,'(5x,i2,a4,f6.1)') isp, trim(csp), wgt
@@ -1418,8 +1422,8 @@ contains
           read(ionum,*,end=20) ityp,(ccmb(k),k=1,ncomb_type(ityp)) &
                ,rcut,(cnst(j),j=1,ncnst_type(ityp))
           descs(isf)%itype = ityp
-          isp = csp2isp(trim(ccmb(1)),specorder)
-          jsp = csp2isp(trim(ccmb(2)),specorder)
+          isp = csp2isp(trim(ccmb(1)))
+          jsp = csp2isp(trim(ccmb(2)))
           descs(isf)%isp = isp
           descs(isf)%jsp = jsp
           descs(isf)%rcut = rcut
@@ -1439,7 +1443,7 @@ contains
             ilsf2(ilsf2(0,is1,is2),is1,is2) = isf
           else if( ityp.le.200 ) then  ! 3-body
             nsf3 = nsf3 + 1
-            ksp = csp2isp(trim(ccmb(3)),specorder)
+            ksp = csp2isp(trim(ccmb(3)))
             if( ksp.lt.0 ) cycle
             descs(isf)%ksp = ksp
             is1 = min(jsp,ksp)
@@ -1770,8 +1774,7 @@ contains
 !  to force and return design matrix of force-matching,
 !  which is used only in fitpot.
 !
-    use pmdio,only: namax,nbmax
-    use pmdvars,only: natm,nb,lsb,nex,lsrc,myparity,nn &
+    use pmdvars,only: namax,nbmax,natm,nb,lsb,nex,lsrc,myparity,nn &
          ,lspr,tcom
     integer,intent(in):: mpi_world
     real(8),allocatable,intent(out):: dgsfa(:,:,:)

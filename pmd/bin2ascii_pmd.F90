@@ -1,6 +1,6 @@
 program bin2ascii_pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-08 10:21:16 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-27 10:54:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Convert binary pmd format file to ascii one.
 !-----------------------------------------------------------------------
@@ -10,7 +10,7 @@ program bin2ascii_pmd
 ! Output:
 !   - pmd_ascii_##
 !-----------------------------------------------------------------------
-  use pmdio
+  use pmdio,only: read_pmdtot_bin,write_pmdtot_ascii
   implicit none
 
   integer:: nargc

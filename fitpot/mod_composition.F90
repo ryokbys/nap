@@ -1,5 +1,5 @@
 module composition
-  use pmdio,only: nspmax
+  use pmdvars,only: nspmax
   implicit none
   save
 

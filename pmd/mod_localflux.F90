@@ -2,7 +2,7 @@ module localflux
 !
 !  Module for evaluation of local flux using the color-charge NEMD.
 !
-  use pmdio,only: csp2isp,nspmax
+  use pmdvars,only: nspmax
   use pmdmpi,only: nid2xyz
   implicit none
   include 'mpif.h'

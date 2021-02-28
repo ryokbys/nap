@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-05 11:09:20 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-28 19:49:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -10,10 +10,11 @@ program fitpot
   use composition
   use minimize
   use version
-  use NN2,only: set_iglid_NN2
+!!$  use NN2,only: set_iglid_NN2
   use linreg,only: set_iglid_linreg
   use time,only: time_stamp
   use DNN,only: write_tgrads_DNN
+  use pmdvars,only: specorder_pmd => specorder
   implicit none
   integer:: ismpl,ihour,imin,isec
   real(8):: tmp,ftrn0,ftst0
@@ -65,6 +66,9 @@ program fitpot
     call write_initial_setting()
   endif
   call sync_input()
+
+!.....Copy specorder in fitpot to that in pmdvars
+  specorder_pmd(:) = specorder(:)
 
   if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) call read_params_desc()
 
@@ -151,14 +155,14 @@ program fitpot
   endif
 
   if( (trim(cfmethod).ne.'test' .or. trim(cfmethod).ne.'dsgnmat') .and. &
-       (trim(cpot).eq.'linreg' .or. trim(cpot).eq.'NN2') .or. trim(cpot).eq.'DNN' ) then
+       trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
     lnormalize = .true.
   endif
 
 !.....Initial computations of all samples
   if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
        .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
-       .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'BMH' &
+       .or. trim(cpot).eq.'BMH' &
        .or. trim(cpot).eq.'Abell' .or. trim(cpot).eq.'fpc' &
        .or. trim(cpot).eq.'DNN' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
@@ -170,9 +174,10 @@ program fitpot
   endif
 
 !.....NN2 only, and should be called after func_w_pmd
-  if( trim(cpot).eq.'NN2' ) then
-    call set_iglid_NN2(cpena,cfmethod)
-  else if( trim(cpot).eq.'linreg' ) then
+!!$  if( trim(cpot).eq.'NN2' ) then
+!!$    call set_iglid_NN2(cpena,cfmethod)
+!!$  else if( trim(cpot).eq.'linreg' ) then
+  if( trim(cpot).eq.'linreg' ) then
     call set_iglid_linreg(cpena,cfmethod)
   endif
 
@@ -583,7 +588,6 @@ end subroutine count_training_test
 subroutine read_samples()
   use variables
   use parallel
-  use pmdio,only: csp2isp
   implicit none
 
   integer:: is,isp,jsp
@@ -867,8 +871,7 @@ subroutine qn_wrapper(ftrn0,ftst0)
   external:: write_stats
 
   if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
-       .or. trim(cpot).eq.'linreg' &
-       .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'DNN' ) then
+       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
     call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -915,8 +918,7 @@ subroutine cg_wrapper(ftrn0,ftst0)
   external:: write_stats
 
   if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
-       .or. trim(cpot).eq.'linreg' &
-       .or. trim(cpot).eq.'NN2' .or. trim(cpot).eq.'DNN' ) then
+       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
     call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -1862,7 +1864,7 @@ subroutine sync_input()
   use parallel
   use minimize
   use random
-  use pmdio,only: nnmax
+  use pmdvars,only: nnmax
   use composition
   implicit none
   
@@ -2147,7 +2149,7 @@ end subroutine set_sample_weights
 subroutine subtract_atomic_energy()
   use variables
   use parallel
-  use pmdio,only: csp2isp
+  use util,only: csp2isp
   implicit none
   integer:: ismpl,is,i,isp
   type(mdsys):: smpl
@@ -2159,7 +2161,7 @@ subroutine subtract_atomic_energy()
 !.....Convert species-ID in the sample (IS) to that in fitpot (ISP).
       is= int(smpl%tag(i))
       csp = smpl%specorder(is)
-      isp = csp2isp(trim(csp),specorder)
+      isp = csp2isp(trim(csp))
 !.....EATOM stores atomic energy according to the order of specorder in fitpot.
       samples(ismpl)%eref= samples(ismpl)%eref -eatom(isp)
     enddo

@@ -1,6 +1,6 @@
 module pmdmpi
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-11-24 11:38:37 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-27 10:12:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Module that includes variables and parameters used for parallel
 ! computation with mpi for spatial decomposition MD simulation.
@@ -8,39 +8,31 @@ module pmdmpi
   implicit none
   save
 
-  integer:: mpicomm
-  integer:: myid_md,nodes_md,mpi_md_world
-!.....NX,NY,NZ: if either one of these is negative, they are automatically
-!     determined using rc and hmat information.
-  integer:: nx = -1
-  integer:: ny = -1
-  integer:: nz = -1
-
 contains
-  function get_factor(n)
+  function get_factor(n) result(ifac)
     implicit none
     integer,intent(in):: n
     integer:: imax,i
-    integer:: get_factor
+    integer:: ifac
 
-    get_factor = 1
+    ifac = 1
     if( n.eq.1 ) return
 
     imax = int(sqrt(dble(n)))
     if( mod(n,2).eq.0 ) then
-      get_factor = 2
+      ifac = 2
       return
     else if( mod(n,3).eq.0 ) then
-      get_factor = 3
+      ifac = 3
       return
     else
       i = 6
       do while( i.le.imax )
         if( mod(n,i-1).eq.0 ) then
-          get_factor = i-1
+          ifac = i-1
           return
         else if( mod(n,i+1).eq.0 ) then
-          get_factor = i+1
+          ifac = i+1
           return
         endif
         i = i + 6
@@ -49,12 +41,12 @@ contains
   end function get_factor
 !=======================================================================
   subroutine assign_num_nodes(al1,al2,al3)
-    implicit none
+    use pmdvars,only: nodes_md
     real(8),intent(in):: al1,al2,al3
 
     integer:: nfac,f,n
     integer:: maxfac = 100
-    integer,allocatable:: factors(:)
+    integer,allocatable,save:: factors(:)
 
     if( .not.allocated(factors)) allocate(factors(maxfac))
 
@@ -83,6 +75,7 @@ contains
 !  Convert continuous node-id and cell position (ix,iy,iz)
 !  Note: id,ix,iy,iz start from 0
 !
+    use pmdvars,only: nx,ny,nz
     integer,intent(in):: id
     integer,intent(out):: ix,iy,iz
 
@@ -96,6 +89,7 @@ contains
 !
 !     Convert cell position (kx,ky,kz) to continuous node-id
 !
+    use pmdvars,only: nx,ny,nz
     integer,intent(in):: ix,iy,iz
     integer,intent(out):: id
 

@@ -2,7 +2,8 @@ module clrchg
 !
 !  Module for color charge NEMD
 !
-  use pmdio,only: csp2isp,nspmax
+  use pmdvars,only: nspmax
+  use util,only: csp2isp
   implicit none
   include "./const.h"
   save
@@ -37,7 +38,7 @@ contains
     if( trim(cspc_clrchg).eq.'non' ) then
       stop 'ERROR: spcs_clrchg must be specified.'
     else
-      ispc_clrchg = csp2isp(trim(cspc_clrchg),specorder)
+      ispc_clrchg = csp2isp(trim(cspc_clrchg))
     endif
 
     clrtot(:) = 0d0

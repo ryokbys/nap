@@ -35,8 +35,9 @@ subroutine read_input(ionum,cfname)
 end subroutine read_input
 !=======================================================================
 subroutine set_variable(ionum,cname)
-  use pmdio
+  use pmdvars
   use pmdmpi
+  use util,only: csp2isp
   use force,only: ol_type, ol_force
   use extforce,only: lextfrc,cspc_extfrc,extfrc
   use clrchg,only: lclrchg,cspc_clrchg,clrfield,clr_init
@@ -225,7 +226,7 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'mass' ) then
     backspace(ionum)
     read(ionum,*) ctmp,csp,tmp
-    is = csp2isp(csp,specorder)
+    is = csp2isp(csp)
     if( is.gt.0 ) am(is) = tmp
     return
   elseif( trim(cname).eq.'charge' ) then
@@ -481,9 +482,9 @@ subroutine read_overlay(ionum)
 !
 !  Read overlay of a given pair
 !
-  use pmdio, only: csp2isp, specorder, nspmax
+  use pmdvars, only: specorder, nspmax
   use force, only: ol_ranges, loverlay
-  use util, only: num_data
+  use util, only: num_data, csp2isp
   implicit none 
   integer,intent(in):: ionum
   
@@ -499,7 +500,7 @@ subroutine read_overlay(ionum)
   if( ndat.lt.4 ) stop 'ERROR: wrong format for overlay entry.'
   loverlay = .true.
   read(ctmp,*) ctmp1, cspi, rin, rout
-  isp = csp2isp(cspi,specorder)
+  isp = csp2isp(cspi)
   if( isp.gt.0 ) then
     ol_ranges(1,isp) = rin
     ol_ranges(2,isp) = rout
@@ -514,7 +515,7 @@ subroutine read_dumpaux(ionum)
 !
 !  Read dump_aux_order entry
 !
-  use pmdio, only: cdumpaux,ldumpaux_changed
+  use pmdvars, only: cdumpaux,ldumpaux_changed
   use util, only: num_data
   implicit none 
   integer,intent(in):: ionum

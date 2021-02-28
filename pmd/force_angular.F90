@@ -1,9 +1,11 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-06 08:41:35 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-28 00:28:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
-  use pmdio,only: nspmax, csp2isp
+  use pmdvars,only: nspmax
+  use util,only: csp2isp
   include "./const.h"
+  save
   
   integer,parameter:: ioprms = 50
   character(len=128):: paramsdir = '.'
@@ -242,9 +244,9 @@ contains
             print *,'   '//trim(cline)
           endif
           read(cline,*) ctmp, cspi,cspj,cspk,rc3,alp,bet,gmm
-          isp = csp2isp(cspi,specorder)
-          jsp = csp2isp(cspj,specorder)
-          ksp = csp2isp(cspk,specorder)
+          isp = csp2isp(cspi)
+          jsp = csp2isp(cspj)
+          ksp = csp2isp(cspk)
           print '(a,3(a3,1x),4es11.3)','  cspi,cspj,cspk,rc3,alp,bet,gmm=' &
                ,trim(cspi),trim(cspj),trim(cspk),rc3,alp,bet,gmm
           if( isp.gt.0 .and. jsp.gt.0 .and. ksp.gt.0 ) then

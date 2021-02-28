@@ -278,8 +278,7 @@ subroutine read_params_desc()
 !
   use variables
   use parallel
-  use util, only: num_data
-  use pmdio,only: csp2isp
+  use util, only: num_data, csp2isp
   implicit none
 
   integer,parameter:: ionum = 16
@@ -388,7 +387,7 @@ subroutine read_params_desc()
         else
           if( trim(cmode).eq.'Weight' ) then
             read(cline,*,end=30) csp, wgt
-            isp = csp2isp(trim(csp),specorder)
+            isp = csp2isp(trim(csp))
             if( isp.gt.0 ) then
               wgtsp_desc(isp) = wgt
               if( iprint.gt.0 ) write(6,'(5x,i2,a4,f6.1)') isp, trim(csp), wgt
@@ -421,8 +420,8 @@ subroutine read_params_desc()
         read(ionum,*,end=20) ityp,(ccmb(k),k=1,ncomb_type(ityp)) &
              ,rc,(cnst(j),j=1,ncnst_type(ityp))
         descs(isf)%itype = ityp
-        isp = csp2isp(trim(ccmb(1)),specorder)
-        jsp = csp2isp(trim(ccmb(2)),specorder)
+        isp = csp2isp(trim(ccmb(1)))
+        jsp = csp2isp(trim(ccmb(2)))
         descs(isf)%isp = isp
         descs(isf)%jsp = jsp
         descs(isf)%rcut = rc
@@ -442,7 +441,7 @@ subroutine read_params_desc()
           ilsf2(ilsf2(0,is1,is2),is1,is2) = isf
         else if( ityp.le.200 ) then  ! 3-body
           nsf3_desc = nsf3_desc + 1
-          ksp = csp2isp(trim(ccmb(3)),specorder)
+          ksp = csp2isp(trim(ccmb(3)))
           if( ksp.lt.0 ) cycle
           descs(isf)%ksp = ksp
           is1 = min(jsp,ksp)
@@ -536,8 +535,7 @@ subroutine read_params_ZBL()
   use variables
   use parallel
   use force, only: loverlay
-  use util, only: num_data
-  use pmdio,only: csp2isp
+  use util, only: num_data, csp2isp
   implicit none
 
   integer,parameter:: ionum = 17
@@ -577,7 +575,7 @@ subroutine read_params_ZBL()
       if( trim(cmode).eq.'parameters' ) then
         backspace(ionum)
         read(ionum,*) cspi, qnucli, ri, ro
-        isp = csp2isp(trim(cspi),specorder)
+        isp = csp2isp(trim(cspi))
         if( isp.le.0 ) cycle
         zbl_qnucl(isp) = qnucli
         zbl_ri(isp) = ri
@@ -590,8 +588,8 @@ subroutine read_params_ZBL()
       else if( trim(cmode).eq.'interactions' ) then
         backspace(ionum)
         read(ionum,*) cspi, cspj
-        isp = csp2isp(trim(cspi),specorder)
-        jsp = csp2isp(trim(cspj),specorder)
+        isp = csp2isp(trim(cspi))
+        jsp = csp2isp(trim(cspj))
         if( isp.gt.0 .and. jsp.gt.0 ) then
           zbl_interact(isp,jsp) = .true.
           zbl_interact(jsp,isp) = .true.

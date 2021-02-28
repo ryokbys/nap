@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-06 08:40:23 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-27 09:57:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -9,7 +9,7 @@ module tersoff
 !   [4] https://lammps.sandia.gov/doc/pair_tersoff_mod.html#tersoff-12
 !   [5] Shokeen, & Schelling, (1995).IEEE Transactions on Microwave Theory and Techniques, 43(8), 1826–1833
 !-----------------------------------------------------------------------
-  use pmdio,only: nspmax, csp2isp
+  use pmdvars,only: nspmax
   implicit none
   include "./const.h"
   save

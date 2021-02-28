@@ -2,7 +2,8 @@ module pdens
 !
 !  Module for evaluation of probability density.
 !
-  use pmdio,only: csp2isp,nspmax,get_vol
+  use pmdvars,only: nspmax
+  use util,only: csp2isp
   use pmdmpi,only: nid2xyz
   use element,only: get_cube_info
   implicit none
@@ -50,7 +51,7 @@ contains
     if( trim(cspc_pdens).eq.'non' ) then
       stop 'ERROR: spcs_pdens must be specified.'
     else
-      ispc_pdens = csp2isp(trim(cspc_pdens),specorder)
+      ispc_pdens = csp2isp(trim(cspc_pdens))
       cfoutpd = cfprefix//trim(cspc_pdens)//cfpostfix
     endif
 
@@ -158,6 +159,7 @@ contains
 !
 !  Finalize prob density
 !
+    use util,only: get_vol
     include 'params_unit.h'
     integer,intent(in):: myid,mpi_world,nxyz,natm
     real(8),intent(in):: hmat(3,3),ra(3,natm),tag(natm)

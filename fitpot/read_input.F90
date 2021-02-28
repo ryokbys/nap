@@ -38,7 +38,7 @@ subroutine set_variable(ionum,cname)
   use variables
   use minimize
   use random
-  use pmdio,only: nnmax
+  use pmdvars,only: nnmax
   use composition
   implicit none
   integer,intent(in):: ionum

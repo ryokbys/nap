@@ -48,7 +48,7 @@ forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
 	force_Ito3_WHe.o force_LJ.o force_SW.o force_EDIP_Si.o \
 	force_Brenner.o force_Lu_WHe.o force_Branicio_AlN.o \
 	force_Mishin.o force_AFS_W.o force_SC_Fe.o \
-	force_SM_Al.o force_linreg.o force_NN.o force_NN2.o force_DNN.o \
+	force_SM_Al.o force_linreg.o force_DNN.o \
 	force_Morse.o force_Coulomb.o force_EAM.o force_Buckingham.o \
 	force_Bonny_WRe.o force_ZBL.o force_cspline.o force_Tersoff.o \
 	force_Abell.o force_BMH.o force_dipole.o force_fpc.o force_angular.o
@@ -68,8 +68,6 @@ rdfobj= mod_pmdio.o mod_util.o util_vec.o mod_pairlist.o mod_time.o rdf.o
 #-----------------------------------------------------------------------
 # Post process programs
 #
-# pmd2akr= pmd2akr.o read_input.o util_pmd.o sort.o
-# voids=  mod_pmdio.o voids.o util_pmd.o mk_lspr.o util_vec.o
 
 #-----------------------------------------------------------------------
 # Make rule entries
@@ -140,7 +138,6 @@ force_Branicio_AlN.o: params_Branicio_AlN.h
 force_Mishin.o: params_Mishin_Al.h params_Mishin_Ni.h
 force_Coulomb.o: mod_util.o
 force_LJ.o: mod_util.o
-force_NN2.o: mod_util.o
 force_DNN.o: mod_util.o
 force_SW.o: mod_util.o
 force_ZBL.o: mod_util.o mod_element.o
@@ -158,12 +155,13 @@ mod_ttm.o: mod_util.o
 mod_pmdio.o: mod_util.o mod_time.o
 mod_pmdvars.o: mod_util.o mod_pmdio.o
 mod_pairlist.o: mod_force.o mod_colorcharge.o mod_pmdvars.o
+mod_util.o: mod_pmdvars.o mod_vector.o
 
-descriptor.o descriptor.mod : descriptor.F90 force_ZBL.o mod_util.o
-	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
+# descriptor.o descriptor.mod : descriptor.F90 force_ZBL.o mod_util.o
+# 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
 
-zload.o zload.mod : zload.F90
-	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
+# zload.o zload.mod : zload.F90
+# 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
 
-metadynamics.o metadynamics.mod : metadynamics.F90 mod_util.o
-	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
+# metadynamics.o metadynamics.mod : metadynamics.F90 mod_util.o
+# 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<

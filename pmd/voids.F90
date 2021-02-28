@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-03-03 21:49:52 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-27 14:26:17 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 program voids
 !-----------------------------------------------------------------------
@@ -9,8 +9,14 @@ program voids
 !    > The mesh point having an atom within cutoff distance ==> 0
 !    > otherwise (void mesh) ==> -1
 !-----------------------------------------------------------------------
-  use pmdio
+  use pmdio,only: read_pmdtot_ascii, get_ntot_ascii
   implicit none
+
+  character(len=128),parameter:: cpmdini='pmdini'
+  integer:: ntot
+  real(8),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
+  real(8),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
+  real(8),allocatable:: auxtot(:,:)
 
   integer:: nargc,ix,iy,iz,nx,ny,nz,nxyz,n,i,j,js,iflag,kux,kuy,kuz
   integer:: lcx,lcy,lcz,lcyz,lcxyz,mx,my,mz,m,m1x,m1y,m1z,m1
@@ -40,7 +46,10 @@ program voids
   read(ctmp,*) rc
 
 !.....Read system info
-  call read_pmdtot_ascii(10,trim(cfname))
+  ntot = get_ntot_bin(10,trim(cpmdini))
+  allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot) &
+       ,ekitot(3,3,ntot),stot(3,3,ntot),atot(3,ntot))
+  call read_pmdtot_ascii(10,trim(cpmdini),ntot,hunit,h,tagtot,rtot,vtot)
 
 !.....Make volumetric data mesh
   call boxmat(h,hi,vol,sgm)

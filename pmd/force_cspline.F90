@@ -2,7 +2,8 @@ module cspline
 !-----------------------------------------------------------------------
 !  Parallel implementation of cubic spline force field.
 !-----------------------------------------------------------------------
-  use pmdio,only: csp2isp, nspmax
+  use pmdvars,only: nspmax
+  use util,only: csp2isp
   implicit none
   save
 
@@ -557,8 +558,8 @@ contains
             if( iprint.gt.0 ) print '(a,i3,a10,2a5,f7.2)', '   ispl,type,ci,cj,rcut=    '&
                  ,ispl, trim(ctype), trim(cspi), trim(cspj), rcut
             spls(ispl)%ctype = ctype
-            isp = csp2isp(cspi,specorder)
-            jsp = csp2isp(cspj,specorder)
+            isp = csp2isp(cspi)
+            jsp = csp2isp(cspj)
             spls(ispl)%isp = isp
             spls(ispl)%jsp = jsp
             spls(ispl)%rcut = rcut
@@ -588,9 +589,9 @@ contains
             if( iprint.gt.0 ) print '(a,i3,a10,3a5,f7.2)', '   ispl,type,ci,cj,ck,rcut= '&
                  ,ispl, trim(ctype), trim(cspi), trim(cspj), trim(cspk), rcut
             spls(ispl)%ctype = ctype
-            isp = csp2isp(cspi,specorder)
-            jsp = csp2isp(cspj,specorder)
-            ksp = csp2isp(cspk,specorder)
+            isp = csp2isp(cspi)
+            jsp = csp2isp(cspj)
+            ksp = csp2isp(cspk)
             spls(ispl)%isp = isp
             spls(ispl)%jsp = jsp
             spls(ispl)%ksp = ksp

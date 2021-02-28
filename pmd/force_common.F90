@@ -9,7 +9,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
 !  new force routine should also be implemented in this subroutine.
 !-----------------------------------------------------------------------
   use force
-  use pmdio,only: iauxof
+  use util,only: iauxof
   use RK_FeH,only:force_RK_FeH
   use Ramas_FeH,only:force_Ramas_FeH,force_Ackland_Fe
   use RK_WHe,only:force_RK_WHe
@@ -27,7 +27,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
   use EAM,only:force_EAM
   use linreg,only:force_linreg
 !!$  use NN,only:force_NN
-  use NN2,only: force_NN2,force_NN2_overlay_pot, force_NN2_overlay_frc
+!!$  use NN2,only: force_NN2,force_NN2_overlay_pot, force_NN2_overlay_frc
   use DNN,only: force_DNN
   use Coulomb, only: force_screened_Coulomb, force_Ewald &
        ,initialize_coulomb, force_Ewald_long, force_Coulomb
@@ -170,23 +170,23 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
 !!$  if( use_force('NN') ) call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
 !!$       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
 !!$       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-  if( use_force('NN2') ) then
-    if( loverlay ) then
-      if( ol_type(1:3).eq.'pot' ) then
-        call force_NN2_overlay_pot(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-             ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-             ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-      else if( ol_type(1:5).eq.'force' ) then
-        call force_NN2_overlay_frc(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-             ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-             ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-      endif
-    else
-      call force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
-           ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-    endif
-  endif
+!!$  if( use_force('NN2') ) then
+!!$    if( loverlay ) then
+!!$      if( ol_type(1:3).eq.'pot' ) then
+!!$        call force_NN2_overlay_pot(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+!!$             ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+!!$             ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+!!$      else if( ol_type(1:5).eq.'force' ) then
+!!$        call force_NN2_overlay_frc(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+!!$             ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+!!$             ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+!!$      endif
+!!$    else
+!!$      call force_NN2(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+!!$           ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+!!$           ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+!!$    endif
+!!$  endif
   if( use_force('DNN') ) call force_DNN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
@@ -269,12 +269,13 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
 
 end subroutine get_force
 !=======================================================================
-subroutine init_force(namax,natm,nsp,tag,aux,naux,myid_md,mpi_md_world, &
-     iprint,h,rc,lvc,ifcoulomb,specorder,amass)
+subroutine init_force(namax,natm,nspmax,nsp,tag,aux,naux, &
+     myid_md,mpi_md_world,iprint,h,rc,lvc,ifcoulomb,specorder,amass)
 !
 !  Initialization routine is separated from main get_force routine.
 !
   use force
+  use util,only: iauxof
   use Coulomb, only: initialize_coulomb, initialize_coulombx, lprmset_Coulomb
   use Morse, only: read_params_vcMorse, lprmset_Morse, &
        read_element_descriptors,read_params_Morse,&
@@ -286,9 +287,8 @@ subroutine init_force(namax,natm,nsp,tag,aux,naux,myid_md,mpi_md_world, &
   use LJ, only: read_params_LJ_repul
   use linreg, only: read_params_linreg,lprmset_linreg
   use descriptor, only: read_params_desc,init_desc,lprmset_desc
-  use NN2, only: read_params_NN2,lprmset_NN2,update_params_NN2
+!!$  use NN2, only: read_params_NN2,lprmset_NN2,update_params_NN2
   use DNN, only: read_params_DNN,lprmset_DNN,update_params_DNN
-  use pmdio,only: nspmax,iauxof
   use tersoff,only: init_tersoff
   use dipole,only: read_params_dipole
   use Abell,only: read_params_Abell, lprmset_Abell
@@ -298,7 +298,7 @@ subroutine init_force(namax,natm,nsp,tag,aux,naux,myid_md,mpi_md_world, &
   implicit none
   include "./const.h"
   
-  integer,intent(in):: namax,natm,nsp,myid_md,mpi_md_world,iprint,naux !,numff
+  integer,intent(in):: namax,natm,nspmax,nsp,myid_md,mpi_md_world,iprint,naux
   real(8),intent(in):: tag(namax),h(3,3),rc,amass(nspmax)
   character(len=3),intent(in):: specorder(nspmax)
 !!$    character(len=20),intent(in):: cffs(numff)
@@ -411,7 +411,7 @@ subroutine init_force(namax,natm,nsp,tag,aux,naux,myid_md,mpi_md_world, &
   endif
   
 !.....Need to set descriptors before NN or linreg
-  if( use_force('NN2') .or. use_force('DNN') .or. use_force('linreg') ) then
+  if( use_force('DNN') .or. use_force('linreg') ) then
 !.....If descs are already set, no need to read descs from file.
 !.....This happens when descs are set from fitpot and re-used for all the samples.
     if( .not.lprmset_desc ) then
@@ -420,15 +420,15 @@ subroutine init_force(namax,natm,nsp,tag,aux,naux,myid_md,mpi_md_world, &
            iprint,specorder)
     endif
   endif
-  if( use_force('NN2') ) then
-    if( .not.lprmset_NN2 ) then
-!.....Read both in.params.desc and in.params.NN2
-      call read_params_NN2(myid_md,mpi_md_world,iprint)
-    else
-!.....Read only in.params.desc
-      call update_params_NN2()
-    endif
-  endif
+!!$  if( use_force('NN2') ) then
+!!$    if( .not.lprmset_NN2 ) then
+!!$!.....Read both in.params.desc and in.params.NN2
+!!$      call read_params_NN2(myid_md,mpi_md_world,iprint)
+!!$    else
+!!$!.....Read only in.params.desc
+!!$      call update_params_NN2()
+!!$    endif
+!!$  endif
 !.....Deep NN
   if( use_force('DNN') ) then
     if( .not.lprmset_DNN ) then
@@ -1428,15 +1428,15 @@ subroutine write_force_times()
 !  Write out time spent in each force.
 !
   use force
-  use NN2,only: time_NN2 => time
+!!$  use NN2,only: time_NN2 => time
   use DNN,only: time_DNN => time
   use descriptor,only: time_desc => time
   
 !.....Non-exclusive (additive) choice of force-fields
-  if( use_force('NN2') ) then
-    write(6,'(1x,a,f10.2)') "Time for descriptor   = ",time_desc
-    write(6,'(1x,a,f10.2)') "Time for force_NN2    = ",time_NN2
-  endif
+!!$  if( use_force('NN2') ) then
+!!$    write(6,'(1x,a,f10.2)') "Time for descriptor   = ",time_desc
+!!$    write(6,'(1x,a,f10.2)') "Time for force_NN2    = ",time_NN2
+!!$  endif
   if( use_force('DNN') ) then
     write(6,'(1x,a,f10.2)') "Time for descriptor   = ",time_desc
     write(6,'(1x,a,f10.2)') "Time for force_DNN    = ",time_DNN

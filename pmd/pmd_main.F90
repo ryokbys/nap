@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-07 18:38:26 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-28 22:53:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -18,12 +18,13 @@ program pmd
 !   out.stress: Stress component normal to z-upper surface of nanorod,
 !               and z-strain of the nanorod.
 !-----------------------------------------------------------------------
-  use pmdio
-  use pmdmpi
+  use pmdvars
+  use pmdio,only: read_pmdtot_bin, read_pmdtot_ascii, write_pmdtot_bin, &
+       write_pmdtot_ascii,get_ntot_ascii,get_ntot_bin
   use version
   use force
   use Coulomb, only: cterms
-  use util, only: itotOf
+  use util, only: itotOf, cell_info, iauxof, make_cdumpauxarr, spcs_info
   use time, only: time_stamp, accum_time, report_time
   use element
   use clrchg,only: lclrchg,init_clrchg
@@ -39,14 +40,20 @@ program pmd
   real(8),parameter:: epith = -0.1410d0
 #endif
 
-  integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,nstp_done,inc
+  real(8):: hunit,h(3,3,0:1)
+  integer:: ntot0,ntot
+  real(8),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
+  real(8),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
+  real(8),allocatable:: auxtot(:,:)
+
+  integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,inc
   integer:: mpicolor,mpikey,ierr,jerr,itmp,nprocs,nnmax_est
-  real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epot,ekin,rmin
+  real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),rmin
+  real(8):: epot,ekin,stnsr(3,3)
   real(8):: t0,t1
   character(len=3):: csp
   type(atom):: elem
   real(8),external:: urnd
-!!$  integer,external:: itotOf
 
 !-----initialize the MPI environment
   call mpi_init(ierr)
@@ -79,10 +86,16 @@ program pmd
 !.....Read atom configuration file 1st
     if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
       write(6,*) 'Read pmdini in binary mode.'
-      call read_pmdtot_bin(20,trim(cpmdini))
+      ntot0 = get_ntot_bin(20,trim(cpmdini))
+      allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
+           ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0))
+      call read_pmdtot_bin(20,trim(cpmdini),ntot0,hunit,h,tagtot,rtot,vtot)
     else if( trim(ciofmt).eq.'ascii' ) then
       write(6,*) 'Read pmdini in ascii mode.'
-      call read_pmdtot_ascii(20,trim(cpmdini))
+      ntot0 = get_ntot_ascii(20,trim(cpmdini))
+      allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
+           ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0))
+      call read_pmdtot_ascii(20,trim(cpmdini),ntot0,hunit,h,tagtot,rtot,vtot)
     else
       write(6,*) 'Error: io_format must be either ascii, ' &
            //'bin or binary.'
@@ -102,13 +115,13 @@ program pmd
     endif
 
     call cell_info(h)
-    call spcs_info()
+    call spcs_info(ntot0,tagtot)
 
     write(6,*) ''
     write(6,'(a,i0)') ' Number of processes in MPI = ',nprocs
 !.....Read in.pmd after reading the atom configuration file.
     call read_input(10,trim(cinpmd))
-    call check_cmin(cmin,ifdmp)
+    call check_cmin()
     if( ifpmd.eq.2 ) then ! if dump output
       call make_cdumpauxarr()
     endif
@@ -244,6 +257,7 @@ program pmd
          ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0) )
     allocate(auxtot(naux,ntot0))
   endif
+  ntot = ntot0
 
 !.....Broadcast species data read from pmdini  
   call mpi_bcast(specorder,3*nspmax,mpi_character,0,mpicomm,ierr)
@@ -313,27 +327,22 @@ program pmd
 
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then
-    call add_pka_velocity(myid_md)
+    call add_pka_velocity(ntot0,h,tagtot,rtot,vtot)
   endif
 
   call accum_time('overhead',mpi_wtime()-t0)
-!.....call pmd_core to perfom MD
-  call pmd_core(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot &
-       ,ekitot,epitot,auxtot,naux,nstp,nerg,npmd &
-       ,myid_md,mpi_md_world,nodes_md,nx,ny,nz,specorder &
-       ,am,dt,vardt_len,ciofmt,ifpmd,rc,rbuf,rc1nn,ifdmp,dmp &
-       ,minstp,tinit,tfin,ctctl,ttgt,trlx,ltdst,ntdst,nrmtrans,cpctl &
-       ,stgt,ptgt,pini,pfin,srlx,stbeta,strfin,lstrs0,lcellfix,fmv &
-       ,stnsr,epot,ekin,n_conv,ifcoulomb,czload_type,zskin_width &
-       ,zshear_angle,eps_conv,ifsort,iprint,nstp_done,lvc,boundary &
-       ,lmetaD,lconst,lrdcfrc,lreorder,cstruct,istruct,cdeform,dhratio)
+!.....Call pmd_core to perform MD; all the arguments are in pmdvars module
+  call pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot, &
+       ekitot,epitot,auxtot,epot,ekin,stnsr)
 
   if( myid_md.eq.0 ) then
     tmp = mpi_wtime()
     if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-      call write_pmdtot_bin(20,cpmdfin)
+      call write_pmdtot_bin(20,cpmdfin,ntot,hunit,h, &
+             tagtot,rtot,vtot)
     elseif( trim(ciofmt).eq.'ascii' ) then
-      call write_pmdtot_ascii(20,cpmdfin)
+      call write_pmdtot_ascii(20,cpmdfin,ntot,hunit,h, &
+             tagtot,rtot,vtot)
     endif
     call accum_time('write_xxx',mpi_wtime()-tmp)
   endif
@@ -381,30 +390,8 @@ subroutine set_fmv(fmv)
 
 end subroutine set_fmv
 !=======================================================================
-subroutine check_cmin(cmin,ifdmp)
-  implicit none
-  character,intent(in):: cmin 
-  integer,intent(inout):: ifdmp
-
-  if( cmin.ne.'' ) then
-    if( cmin.eq.'none' ) then
-      ifdmp = 0
-    else if( cmin.eq.'damp' ) then
-      ifdmp = 1
-    else if( cmin.eq.'FIRE' ) then
-      ifdmp = 2
-    else
-      write(6,'(a)') ' [Warning] There is no minimization' &
-           //' method: '//cmin
-      write(6,'(a)') '           So ifdmp is set 0.'
-      ifdmp = 0
-    endif
-  endif
-
-end subroutine check_cmin
-!=======================================================================
 subroutine write_initial_setting()
-  use pmdio
+  use pmdvars
   use pmdmpi
   use force
   use clrchg,only: lclrchg, cspc_clrchg, clrfield, clr_init
@@ -588,8 +575,7 @@ subroutine write_inpmd(ionum,cfname)
 end subroutine write_inpmd
 !=======================================================================
 subroutine bcast_params()
-  use pmdio
-  use pmdmpi
+  use pmdvars
   use force
   use extforce,only: lextfrc,cspc_extfrc,extfrc
   use clrchg,only: lclrchg,cspc_clrchg,clr_init,clrfield
@@ -720,8 +706,7 @@ subroutine bcast_params()
 
 end subroutine bcast_params
 !=======================================================================
-subroutine write_force(ionum,cpostfix,h,epot,ntot &
-     ,tagtot,atot,stnsr)
+subroutine write_force(ionum,cpostfix,h,epot,ntot,tagtot,atot,stnsr)
   use util,only: itotOf
   implicit none
   include "./params_unit.h"
@@ -762,8 +747,7 @@ subroutine write_force(ionum,cpostfix,h,epot,ntot &
 
 end subroutine write_force
 !=======================================================================
-subroutine set_atomic_charges(ntot,chg,tag,nspmax &
-     ,chgfix,schg,myid,iprint)
+subroutine set_atomic_charges(ntot,chg,tag,nspmax,chgfix,schg,myid,iprint)
   implicit none 
   integer,intent(in):: ntot,nspmax,myid,iprint
   real(8),intent(in):: tag(ntot),schg(nspmax)
@@ -785,7 +769,7 @@ subroutine set_atomic_charges(ntot,chg,tag,nspmax &
 end subroutine set_atomic_charges
 !=======================================================================
 subroutine check_ensemble()
-  use pmdio
+  use pmdvars
   implicit none
 
   logical:: l_temp
@@ -818,14 +802,16 @@ subroutine check_ensemble()
 
 end subroutine check_ensemble
 !=======================================================================
-subroutine add_pka_velocity(myid_md)
+subroutine add_pka_velocity(ntot0,h,tagtot,rtot,vtot)
 ! 
 ! Add PKA velocity to some atom from a given PKA energy
 ! 
-  use pmdio
+  use pmdvars
   implicit none
   include './params_unit.h'
-  integer,intent(in):: myid_md
+  integer,intent(in):: ntot0
+  real(8),intent(in):: tagtot(ntot0),rtot(3,ntot0),h(3,3,0:1)
+  real(8),intent(inout):: vtot(3,ntot0)
 
   integer:: i,icntr,is
   real(8):: dmin,d,theta,phi,rx,ry,rz,vel,vx,vy,vz
@@ -986,23 +972,6 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
 
 end subroutine determine_division
 !=======================================================================
-subroutine spcs_info()
-  use pmdio
-
-  integer:: nsps(nspmax),ia,is
-
-  nsps(:) = 0
-  do ia=1,ntot
-    is = int(tagtot(ia))
-    nsps(is) = nsps(is) +1
-  enddo
-  write(6,'(a)') ' Number of each species in the initial configuration'
-  do is=1,nspmax
-    if( trim(specorder(is)).eq.'x' ) cycle
-    write(6,'(a,i0)') '   '//specorder(is)//':  ',nsps(is)
-  enddo
-  
-end subroutine spcs_info
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"

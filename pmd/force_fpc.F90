@@ -1,6 +1,6 @@
 module fpc
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-08-18 18:30:32 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-28 00:27:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of fpc (fitpot for ceramics) potential.
 !  It should be used with Coulomb potential.
@@ -13,7 +13,8 @@ module fpc
 !    strong/deep Coulomb attractive interaction at very short range,
 !    which is computed in LJ_repul.
 !-----------------------------------------------------------------------
-  use pmdio, only: csp2isp, nspmax
+  use pmdvars, only: nspmax
+  use util,only: csp2isp
   implicit none
   save
   character(len=128):: paramsdir = '.'
@@ -275,8 +276,8 @@ contains
         if( num_data(cline,' ').eq.6 ) then
           backspace(ioprms)
           read(ioprms,*) cspi,cspj, aij,alpij,bij,betij
-          isp = csp2isp(cspi,specorder)
-          jsp = csp2isp(cspj,specorder)
+          isp = csp2isp(cspi)
+          jsp = csp2isp(cspj)
           if( isp.gt.nspmax .or. jsp.gt.nspmax ) then
             write(6,*) ' Warning @read_params: since isp/jsp is greater than nspmax,'&
                  //' skip reading the line.'

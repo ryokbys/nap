@@ -44,6 +44,19 @@ contains
     return
   end function cross
 !=======================================================================
+  function norm(v)
+    real(8):: v(:)
+    real(8):: norm
+    integer:: i
+
+    norm = 0d0
+    do i=1,ubound(v,1)
+      norm = norm +v(i)*v(i)
+    enddo
+    norm = sqrt(norm)
+    return
+  end function norm
+!=======================================================================
   function norm2(r)
     real(8):: r(:)
     real(8):: norm2

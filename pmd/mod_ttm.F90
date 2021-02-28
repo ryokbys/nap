@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-06 09:00:53 Ryo KOBAYASHI>
+!                     Last-modified: <2021-02-28 01:07:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -1606,8 +1606,9 @@ contains
 !  Store the following removed-atom data:
 !    - ID, time, position (y,z), velocity (x,y,z)
 !
-    use pmdmpi
+    use pmdvars,only: myid_md,mpi_md_world
     use util,only: itotOf
+    use pmdmpi,only: nid2xyz
     integer,intent(in):: namax,naux
     integer,intent(inout):: natm
     real(8),intent(inout):: tag(namax),ra(3,namax),va(3,namax)

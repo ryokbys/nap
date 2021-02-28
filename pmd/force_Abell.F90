@@ -1,12 +1,13 @@
 module Abell
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-05 23:37:18 Ryo KOBAYASHI>
+!                     Last modified: <2021-02-28 00:26:33 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Abell potential.
 !  When it is used for Ceramics, it is assumed to be used with
 !  Coulomb potential.
 !-----------------------------------------------------------------------
-  use pmdio, only: csp2isp, nspmax
+  use pmdvars, only: nspmax
+  use util,only: csp2isp
   implicit none
   save
   include "./const.h"
@@ -269,8 +270,8 @@ contains
         if( num_data(cline,' ').eq.6 ) then
           backspace(ioprms)
           read(ioprms,*) cspi,cspj, aij,alpij,bij,betij
-          isp = csp2isp(cspi,specorder)
-          jsp = csp2isp(cspj,specorder)
+          isp = csp2isp(cspi)
+          jsp = csp2isp(cspj)
           if( isp.gt.nspmax .or. jsp.gt.nspmax ) then
             write(6,*) ' Warning @read_params: since isp/jsp is greater than nspmax,'&
                  //' skip reading the line.'
