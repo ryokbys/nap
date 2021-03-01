@@ -10,7 +10,7 @@ CPP= @CPP@
 CPPFLAGS= @CPPFLAGS@
 #CPPFLAGS= -D__SHEAR__ -D__DISL__ -D__WALL__ -D__3body__
 MPIFC= @FC@
-MPIFLAGS= @FCFLAGS@
+MPIFLAGS= @FCFLAGS@ -fPIC
 #-----------------------------------------------------------------------
 # suffixes
 .SUFFIXES: .o .f .F .f90 .F90 .mod
@@ -58,6 +58,8 @@ params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 	params_Mishin_Al.h params_Mishin_Ni.h params_AFS_W.h params_SC_Fe.h \
 	params_SM_Al.h const.h
 
+libpmdobj= ${pmd} ${mods} ${forces} ${params} ${force_common}
+
 clstr= mod_pmdio.o mod_util.o util_vec.o mod_pairlist.o cluster.o
 
 ascii2bin= mod_pmdio.o util_vec.o mod_util.o ascii2bin_pmd.o
@@ -72,15 +74,16 @@ rdfobj= mod_pmdio.o mod_util.o util_vec.o mod_pairlist.o mod_time.o rdf.o
 #-----------------------------------------------------------------------
 # Make rule entries
 #
-execs=pmd
-
-all: ${execs}
+all: pmd lib
 
 clean:
-	rm -f *.o *.mod *~ ${execs}
+	rm -f *.o *.mod *.a *~
 
 pmd: ${mods} ${pmd} ${forces} ${params}
 	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${force_common} ${forces} ${pmd}
+
+lib: pmd
+	ar r $@pmd.a ${libpmdobj}
 
 pmd_examples := ../examples/pmd_*/
 define cd_test
@@ -151,10 +154,9 @@ force_Morse.o: ${mods} force_Coulomb.o
 force_angular.o: ${mods}
 mod_constraints.o: mod_vector.o mod_util.o
 mod_rdcfrc.o: mod_structure.o mod_util.o
-mod_ttm.o: mod_util.o
-mod_pmdio.o: mod_util.o mod_time.o
-mod_pmdvars.o: mod_util.o mod_pmdio.o
-mod_pairlist.o: mod_force.o mod_colorcharge.o mod_pmdvars.o
+mod_ttm.o: mod_pmdvars.o mod_util.o
+mod_pmdio.o: mod_pmdvars.o mod_util.o mod_time.o mod_vector.o
+mod_pairlist.o: mod_time.o
 mod_util.o: mod_pmdvars.o mod_vector.o
 
 # descriptor.o descriptor.mod : descriptor.F90 force_ZBL.o mod_util.o
