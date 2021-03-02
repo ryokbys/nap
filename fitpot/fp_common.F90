@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-28 22:46:21 Ryo KOBAYASHI>
+!                     Last modified: <2021-03-02 14:12:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -923,7 +923,7 @@ contains
          smpl%aux,ekin,epot,ptnsr,lcalcgrad,ndimp,maxisp, &
          gwe,gwf,gws,lematch,lfmatch,lsmatch)
 !.....Stress definition, negative as compressive, positive as tensile
-    strs(1:3,1:3) = ptnsr(1:3,1:3) *up2gpa*(-1d0)
+    strs(1:3,1:3) = -ptnsr(1:3,1:3)
 !!$    if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
     if( present(gws) ) gws(1:6,1:ndimp) = gws(1:6,1:ndimp) *up2gpa*(-1d0)
     if( lfdsgnmat ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)

@@ -1,6 +1,6 @@
 module util
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-27 14:41:44 Ryo KOBAYASHI>
+!                     Last modified: <2021-03-02 13:04:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -283,6 +283,7 @@ contains
   subroutine calc_nfmv(ntot,tagtot)
     use pmdvars
     include 'mpif.h'
+    include './const.h'
     integer,intent(in):: ntot
     real(8),intent(in):: tagtot(ntot)
 
@@ -294,8 +295,10 @@ contains
       do ia=1,ntot
         nfmv = max(nfmv,ifmvOf(tagtot(ia)))
       enddo
-      print *,''
-      print '(a,i0)',' Number of ifmvs = ',nfmv
+      if( iprint.ge.ipl_basic ) then
+        print *,''
+        print '(a,i0)',' Number of ifmvs = ',nfmv
+      endif
     endif
     call mpi_bcast(nfmv,1,mpi_integer,0,mpi_md_world,ierr)
     

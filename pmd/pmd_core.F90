@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-01 12:32:06 Ryo KOBAYASHI>
+!                     Last-modified: <2021-03-02 14:11:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -142,7 +142,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   endif
 
 !-----output every these steps, NOUTERG, NOUTPMD
-  if( nerg.ne.0 ) then
+  if( nerg.gt.0 ) then
     nouterg = max(nstp/nerg,1)
   else
     nouterg = nstp +1
@@ -417,7 +417,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 
   call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
        ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
-  prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
+  stnsr(:,:) = stnsr(:,:) *up2gpa
+  prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
 
   istp= 0
   simtime = 0d0
@@ -449,9 +450,9 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
     endif
     write(6,'(1x,a,f16.5,a)') "  Pressure        = ", &
          prss,' GPa '//trim(ctmp)
-    write(6,'(1x,a,6(1x,f0.3))') '  Stress tensor   =' &
-         ,stnsr(1,1)*up2gpa,stnsr(2,2)*up2gpa,stnsr(3,3)*up2gpa &
-         ,stnsr(2,3)*up2gpa,stnsr(3,1)*up2gpa,stnsr(1,2)*up2gpa
+    write(6,'(1x,a,6(1x,f0.3))') '  Stress tensor   =', &
+         stnsr(1,1),stnsr(2,2),stnsr(3,3), &
+         stnsr(2,3),stnsr(3,1),stnsr(1,2)
     write(6,*) ''
 
 !!$    print '(a,20f8.5)',' alphas=',ol_alphas(0,1:natm)
@@ -498,20 +499,20 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   iocntpmd=0
   iocnterg=0
 
-  if(myid_md.eq.0) then
+  if( myid_md.eq.0 ) then
+    if( nerg.gt.0 ) then
 !.....write out energies
-    open(ioerg,file="out.erg",status='replace')
-    write(ioerg,'(a)') '# 1:istp, 2:simtime[fs],' &
-         //'   3:etot[eV],  4:ekin,' &
-         //'  5:epot,  6:temp[K],  7:vol[Ang^3],  8:pressure[GPa]'
-    write(ioerg,'(a,es16.7e3,a)') '#  Epot0 =',epot0,' [eV]'
-    if( tave.gt.10000d0) cftave = 'es12.4'
-    write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
-         //','//cftave//',2es16.7e3)') istp &
-         ,simtime,ekin+epot0,ekin,epot0,tave &
-         ,vol &
-         ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
-    call flush(ioerg)
+      open(ioerg,file="out.erg",status='replace')
+      write(ioerg,'(a)') '# 1:istp, 2:simtime[fs],' &
+           //'   3:etot[eV],  4:ekin,' &
+           //'  5:epot,  6:temp[K],  7:vol[Ang^3],  8:pressure[GPa]'
+      write(ioerg,'(a,es16.7e3,a)') '#  Epot0 =',epot0,' [eV]'
+      if( tave.gt.10000d0) cftave = 'es12.4'
+      write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
+           //','//cftave//',2es16.7e3)') istp &
+           ,simtime,ekin+epot0,ekin,epot0,tave,vol,prss
+      call flush(ioerg)
+    endif
 !c.....write out temperatures
 !        open(iotemp,file='out.temperature',status='replace')
 !        write(iotemp,'(a)') '# istp, temperature[0-9]'
@@ -862,7 +863,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
     endif
     call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
          ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
-    prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
+    stnsr(:,:) = stnsr(:,:) *up2gpa
+    prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
 
     if( lclrchg ) then  ! special treatment for translational momentum
       call rm_trans_clrchg(natm,tag,va,am,mpi_md_world,myid_md,iprint)
@@ -913,9 +915,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
         if( tave.gt.10000d0) cftave = 'es12.4'
         write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
              //','//cftave//',2es16.7e3)') istp &
-             ,simtime,ekin+epot,ekin,epot,tave &
-             ,vol &
-             ,(stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3*up2gpa
+             ,simtime,ekin+epot,ekin,epot,tave,vol,prss
         call flush(ioerg)
 !.....write temperature
 !            write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff0(1:9)
@@ -948,10 +948,9 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
           write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
           write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
 
-          write(6,'(a,6f10.3)') ' Stress (GPa):' &
-               ,stnsr(1,1)*up2gpa ,stnsr(2,2)*up2gpa &
-               ,stnsr(3,3)*up2gpa ,stnsr(2,3)*up2gpa &
-               ,stnsr(1,3)*up2gpa ,stnsr(1,2)*up2gpa
+          write(6,'(a,6f10.3)') ' Stress (GPa):', &
+               stnsr(1,1),stnsr(2,2),stnsr(3,3), &
+               stnsr(2,3),stnsr(1,3),stnsr(1,2)
         endif
         call flush(6)
       endif
@@ -1053,7 +1052,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   tcpu2= mpi_wtime()
 
   if(myid_md.eq.0) then
-    close(ioerg)
+    if( nerg.gt.0 ) close(ioerg)
 !        close(iotemp)
     if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
       close(iostrs)
@@ -1280,6 +1279,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
 !      print *,'one_shot: 07'
   if( iprint.ge.ipl_basic ) print *,'sa2stnsr...'
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
+  stnsr(:,:) = stnsr(:,:) *up2gpa
 
   if( iprint.ge.ipl_basic ) print *,'space_comp...'
   call space_comp(ntot0,ntot,tagtot,rtot,vtot,atot,stot,ekitot,epitot, &
@@ -1680,6 +1680,7 @@ subroutine bacopy(l1st)
   use time,only: accum_time
   implicit none
   include 'mpif.h'
+  include './const.h'
   logical,intent(in):: l1st
 
 !.....integer:: status(MPI_STATUS_SIZE)
@@ -1714,7 +1715,7 @@ subroutine bacopy(l1st)
     rcv(kd)= rc*asgm/vol
     nex(kd)= int(rcv(kd)) +1
   enddo
-  if( l1st .and. myid_md.eq.0 .and. iprint.ge.2 ) then
+  if( l1st .and. myid_md.eq.0 .and. iprint.ge.ipl_warn ) then
     write(6,'(a,3f10.3)') ' rcv = ',rcv(1:3)
     write(6,'(a,3i10)')   ' nex = ',nex(1:3)
   endif

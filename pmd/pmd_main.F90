@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-28 22:53:07 Ryo KOBAYASHI>
+!                     Last-modified: <2021-03-02 14:11:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -735,12 +735,12 @@ subroutine write_force(ionum,cpostfix,h,epot,ntot,tagtot,atot,stnsr)
   close(ionum+1)
 
 !.....Write stress tensor, negative as compressive, positive as tensile
-  ptmp(1) = stnsr(1,1)*up2gpa*(-1d0)
-  ptmp(2) = stnsr(2,2)*up2gpa*(-1d0)
-  ptmp(3) = stnsr(3,3)*up2gpa*(-1d0)
-  ptmp(4) = stnsr(3,2)*up2gpa*(-1d0)
-  ptmp(5) = stnsr(1,3)*up2gpa*(-1d0)
-  ptmp(6) = stnsr(1,2)*up2gpa*(-1d0)
+  ptmp(1) = -stnsr(1,1)
+  ptmp(2) = -stnsr(2,2)
+  ptmp(3) = -stnsr(3,3)
+  ptmp(4) = -stnsr(3,2)
+  ptmp(5) = -stnsr(1,3)
+  ptmp(6) = -stnsr(1,2)
   open(ionum+2,file='strs'//trim(cpostfix),status='replace')
   write(ionum+2,'(6f12.4)') ptmp(1:6)
   close(ionum+2)
