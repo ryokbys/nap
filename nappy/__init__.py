@@ -3,7 +3,7 @@
 """
 from __future__ import print_function
 
-__all__ = ['napsys','atom','common','io','rdf','adf','msd','gaussian_smear',
+__all__ = ['pmd','napsys','atom','common','io','rdf','adf','msd','gaussian_smear',
            'util','vasp','mkcell']
 
 from . import *

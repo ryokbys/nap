@@ -2985,7 +2985,7 @@ fi
 
 # Checks for library functions.
 
-ac_config_files="$ac_config_files pmd/makefile mkconf/makefile fitpot/run_pmd.sh fitpot/run_smd.sh qmcl/makefile neb/makefile fitpot/makefile"
+ac_config_files="$ac_config_files pmd/makefile mkconf/makefile fitpot/run_pmd.sh fitpot/run_smd.sh qmcl/makefile neb/makefile fitpot/makefile nappy/pmd/makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -3699,6 +3699,7 @@ do
     "qmcl/makefile") CONFIG_FILES="$CONFIG_FILES qmcl/makefile" ;;
     "neb/makefile") CONFIG_FILES="$CONFIG_FILES neb/makefile" ;;
     "fitpot/makefile") CONFIG_FILES="$CONFIG_FILES fitpot/makefile" ;;
+    "nappy/pmd/makefile") CONFIG_FILES="$CONFIG_FILES nappy/pmd/makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

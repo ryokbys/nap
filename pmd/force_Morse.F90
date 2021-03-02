@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-28 00:25:42 Ryo KOBAYASHI>
+!                     Last modified: <2021-03-02 17:57:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -625,10 +625,10 @@ contains
       enddo
 
 10    close(ioprms)
-!!$      if( iprint.ne.0 ) then
-!!$        write(6,'(a)') ' Finished reading '//trim(fname)
-!!$        write(6,*) ''
-!!$      endif
+      if( iprint.ge.ipl_debug ) then
+        write(6,'(a)') ' Finished reading '//trim(fname)
+        write(6,*) ''
+      endif
     endif
 
     call mpi_bcast(d0,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)

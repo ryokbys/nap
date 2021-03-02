@@ -21,5 +21,5 @@ AC_PATH_PROG([PYTHON],[python])
 
 AC_CONFIG_FILES([pmd/makefile mkconf/makefile fitpot/run_pmd.sh
                  fitpot/run_smd.sh qmcl/makefile neb/makefile
-                 fitpot/makefile])
+                 fitpot/makefile nappy/pmd/makefile])
 AC_OUTPUT

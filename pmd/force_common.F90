@@ -350,6 +350,7 @@ subroutine init_force(namax,natm,nspmax,nsp,tag,aux,naux, &
          myid_md,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
   else if( use_force('Coulomb') ) then
     if( .not. lprmset_Coulomb ) then
+      if( myid_md.eq.0 .and. iprint.ge.ipl_debug ) print *,'initialize_coulombx...'
       call initialize_coulombx(natm,nsp,tag, &
            aux(iauxof('chg'),:),aux(iauxof('chi'),:), &
            myid_md,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
@@ -366,6 +367,7 @@ subroutine init_force(namax,natm,nspmax,nsp,tag,aux,naux, &
 !.....Morse
   if( use_force('Morse') .or. use_force('Morse_repul') ) then
     if( .not.lprmset_Morse ) then
+      if( myid_md.eq.0 .and. iprint.ge.ipl_debug ) print*,'read_params_Morse...'
       call read_params_Morse(myid_md,mpi_md_world,iprint,specorder)
 !!$    else
 !!$!.....This code is not parallelized, and only for fitpot
@@ -472,6 +474,7 @@ subroutine init_force(namax,natm,nspmax,nsp,tag,aux,naux, &
 !.....angular
   if( use_force('angular') ) then
     if( .not.lprmset_angular ) then
+      if( myid_md.eq.0 .and. iprint.ge.ipl_debug ) print*,'read_params_angular...'
       call read_params_angular(myid_md,mpi_md_world,iprint,specorder)
     endif
   endif

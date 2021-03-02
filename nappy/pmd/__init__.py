@@ -1,208 +1,131 @@
 """
-Python modules and classes for PMD.
+PMD module.
 """
 from __future__ import print_function
 
-import os
-import copy
-import math
-
+import sys
+try:
+    import nappy.pmd.pmd_wrapper as pw
+except:
+    pass
 import nappy
+import numpy as np
 
-import json
+__all__ = ['inpmd','pmd2phonopy']
 
+from . import *
 
-def get_conf_path():
-    return nappy.get_nappy_dir()+'/pmd.conf'
+__author__ = "RYO KOBAYASHI"
+__version__ = ""
 
-def get_exec_path():
-    conf_path = get_conf_path()
-    with open(conf_path,'r') as f:
-        config = json.load(f)
-    if not 'exec_path' in config:
-        msg = """
-Error: self.exec_path has not been set yet.
-You should write a path to the PMD executable in {0}.
-It should be in JSON format like,
-::
-
-  {
-    "exec_path":  "/home/username/bin/pmd"
-  }
-
-
-""".format(get_conf_path())
-        raise RuntimeError('config does not have exec_path.')
-    return config['exec_path']
-
+def str2char(string,nlen):
+    slen = len(string)
+    if slen > nlen:
+        raise ValueError('slen > nlen !')
+    c = np.empty(nlen,dtype='c')
+    c[:] = ' '
+    c[0:slen] = [ string[i] for i in range(slen) ]
+    c[slen:] = [ ' ' for i in range(nlen-slen) ]
+    return c
 
 class PMD:
-    
-    _input_files = (
-        'in.pmd',
-        'pmdini',
-    )
 
-    _output_files = (
-        'out.pmd',
-        'out.erg'
-    )
-
-    def __init__(self, path):
-        if not os.path.exists(path):
-            raise RuntimeError('path does not exist.')
-
-        self.path = path
-        self.input_files = {}
-        for f in self._input_files:
-            if os.path.exists(self.path+'/'+f):
-                self.input_files[f] = os.stat(self.path+'/'+f).st_mtime
-            else:
-                self.input_files[f] = None
-        self.output_files = {}
-        for f in self._output_files:
-            if os.path.exists(self.path+'/'+f):
-                self.output_files[f] = os.stat(self.path+'/'+f).st_mtime
-            else:
-                self.output_files[f] = None
-
-        self.config = {}
-        self.load_config()
-
-        
-    def needs_calc(self):
-        """
-        Check whether the PMD calc is needed.
-        """
-        #...check if necessary for PMD files exist
-        for f,t in self.input_files.items():
-            if not t:
-                return False
-        #...if there is not OUTCAR in the directory, VASP should be performed
-        for f,t in self.output_files.items():
-            if not t:
-                return True
-        
-        #...compare dates between out.pmd and infiles
-        #...to determine if the PMD calc should be performed
-        outpmd_mtime = self.output_files['out.pmd']
-        for fin,tin in self.input_files.items():
-            if tin > outpmd_mtime:
-                return True
-
-        #...Check whether the calculation done correctly.
-        if not self.calc_done():
-            return True
-
-        #...otherwise no need to perform VASP
-        return False
-
-    def calc_done(self):
-        if not os.path.exists('out.pmd'):
-            return False
-        with open('out.pmd','r') as f:
-            lines = f.readlines()
-        if 'finished' in lines[-1]:
-            return True
+    def __init__(self, nsys=None):
+        if 'nappy.pmd.pmd_wrapper' not in sys.modules:
+            raise ImportError('pmd_wrapper is not loaded.\n'
+                              +'Probably you need to compile it at nap/nappy/pmd/.')
+        self.pmdparams = nappy.pmd.inpmd.get_default()
+        self.pmdparams['naux'] = 0
+        if nsys is not None:
+            self.nsys = nsys
+            self.pmdparams['specorder'] = nsys.specorder
         else:
-            return False
-
-    
-    def estimate_calctime(self,nprocs=1):
-        """
-        Estimate the computation time.
-        It is extremely hard to estimate comp time since it depends on
-        which force-fields are used, how many atoms, how long is the MD...
-        Just return 1 min = 60 sec.
-        """
-        return 60
-
-    
-    def estimate_nprocs(self,max_npn=16,limit_npn=None):
-        """
-        Estimate the nodes to be used.
-        Currently, just return 1.
-        """
-        nnodes = 1
-        npn = 1
-        npara = 1
-
-        return nnodes, npn, npara
-        
-
-    def get_exec_command(self):
-        """
-        Make command text to run PMD using mpirun.
-        """
-        if not 'exec_path' in self.config:
-            msg = """
-Error: self.exec_path has not been set yet.
-You should write a path to the PMD executable in {0}.
-It should be in JSON format like,
-::
-
-  {
-    exec_path:  /home/username/bin/pmd
-  }
-
-
-""".format(get_conf_path())
-            raise RuntimeError(msg)
-
-        text = self.config['exec_path']
-        # text = 'mpirun -np {{NPARA}} {path}'.format(path=self.config['exec_path']) \
-        #         +' > out.pmd 2>&1'
-        return text
-
-    def set_exec_path(self,path):
-        self.config['exec_path'] = path
+            self.nsys = None
         return None
 
-    def get_exec_path(self):
-        if not 'exec_path' in self.config:
-            msg = """
-Error: self.exec_path has not been set yet.
-You should write a path to the PMD executable in {0}.
-It should be in JSON format like,
-::
-
-  {
-    "exec_path":  "/home/username/bin/pmd"
-  }
-
-
-""".format(get_conf_path())
-            raise RuntimeError(msg)
-        return self.config['exec_path']
-
-
-    def load_config(self):
-        """
-        Load config from `~/.nappy/pmd.conf` file.
-        """
-        with open(get_conf_path(),'r') as f:
-            self.config = json.load(f)
-
+    def set_system(self,nsys):
+        self.nsys = nsys
+        self.pmdparams['specorder'] = nsys.specorder
         return None
+
+    def run(self, nstp=0, dt=1.0, ):
+        """
+        Run pmd.
+        """
+        if self.nsys == None:
+            raise ValueError('nsys must be set beofre calling run().')
+        self.pmdparams['num_iteration'] = nstp
+        self.pmdparams['time_interval'] = dt
+        self.set_params()
+        rtot = self.nsys.get_scaled_positions()
+        vtot = np.zeros(rtot.shape)
+        naux = self.pmdparams['naux']
+        hmat = np.zeros((3,3,2))
+        hmat[0:3,0:3,0] = self.nsys.get_hmat()
+        ispcs = self.nsys.atoms.sid.values
+        self.res = pw.run(rtot.T,vtot.T,naux,hmat,ispcs)
+        return None
+
+    def set_params(self):
+        """
+        Set pmdvars-module variables.
+        """
+        naux = 0
+        iprint = 5
+        rc = 6.0
+        nstp = 0
+        laux = 6
         
-    def save_config(self):
-        try:
-            self.config
-        except:
-            raise RuntimeError('self.config has not been set.')
+        keys = self.pmdparams.keys()
+        if 'specorder' in keys:
+            nspmax = 9
+            cspcs = np.empty((nspmax,3),dtype='c')
+            cspcs[:] = 'x  '
+            specorder = self.pmdparams['specorder']
+            for i in range(len(specorder)):
+                cspcs[i] = str2char(specorder[i],3)
+        if 'force_type' in keys:
+            forces = self.pmdparams['force_type']
+            nfrcs = len(forces)
+            cfrcs = np.empty((nfrcs,128),dtype='c')
+            for i in range(nfrcs):
+                cfrcs[i] = str2char(forces[i],128)
+        if 'cutoff_radius' in keys:
+            rc = self.pmdparams['cutoff_radius']
+        if 'print_level' in keys:
+            iprint = self.pmdparams['print_level']
+        if 'naux' in keys:
+            naux = self.pmdparams['naux']
+        if 'num_iteration' in keys:
+            nstp = self.pmdparams['num_iteration']
+        if 'Coulomb' in self.pmdparams['force_type']:
+            naux = max(naux,2)
+            self.pmdparams['naux'] = naux
+        cauxarr = np.empty((naux,laux),dtype='c')
+        cauxarr[:] = '      '
+        if naux >= 2:
+            cauxarr[0] = 'chg   '
+            cauxarr[1] = 'chi   '
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
+        fcomm = comm.py2f()
+        size = comm.Get_size()
+        rank = comm.Get_rank()
+        pw.set_pmdvars(cspcs,cfrcs,rc,fcomm,rank,size,iprint,nstp,cauxarr)
+        return None
 
-        #...Read all the current config from file
-        dic = {}
-        with open(get_conf_path(),'r') as f:
-            lines = f.readlines()
-        for line in lines:
-            dat = line.split()
-            dic[dat[0]] = dat[1]
-
-        for k,v in self.config.items():
-            dic[k] = v
-        #...Override the config file
-        with open(get_conf_path(),'w') as f:
-            for k,v in dic.items():
-                f.write('{0:s}  {1:s}\n').format(k,v)
+    def set_potential(self,potential):
+        if type(potential) is str:
+            potential = potential.split()
+        if type(potential) not in (list,tuple):
+            raise TypeError('potential should be given as string or list of strings.')
+        if len(potential) == 0:
+            raise ValueError('potential should be given.')
+        forces = self.pmdparams['force_type']
+        if forces is None:
+            forces = []
+        for p in potential:
+            if p not in forces:
+                forces.append(p)
+        self.pmdparams['force_type'] = forces
         return None

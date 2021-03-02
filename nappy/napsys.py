@@ -38,7 +38,6 @@ from __future__ import division
 
 import copy
 import numpy as np
-from numpy import sin, cos, sqrt
 from docopt import docopt
 import pandas as pd
 
@@ -143,15 +142,15 @@ class NAPSystem(object):
         # val = max(abs(val),1.0)
         # gamma_star = np.arccos(val)
         self.a1[:] = [float(a), 0.0, 0.0]
-        self.a2[:] = [b*cos(gmmr),
-                      b*sin(gmmr), 0.0]
+        self.a2[:] = [b*np.cos(gmmr),
+                      b*np.sin(gmmr), 0.0]
         # self.a3[:] = [c*cos(beta_r),
         #               -c*sin(beta_r)*cos(gamma_star),
         #               c*sin(beta_r)*sin(gamma_star)]
-        self.a3[:] = [c*cos(betr),
-                      c*(cos(alpr) -cos(betr)*cos(gmmr))/sin(gmmr),
-                      c*sqrt(sin(gmmr)**2 -cos(alpr)**2 -cos(betr)**2
-                             +2.0*cos(alpr)*cos(betr)*cos(gmmr))/sin(gmmr)]
+        self.a3[:] = [c*np.cos(betr),
+                      c*(np.cos(alpr) -np.cos(betr)*np.cos(gmmr))/np.sin(gmmr),
+                      c*np.sqrt(np.sin(gmmr)**2 -np.cos(alpr)**2 -np.cos(betr)**2
+                             +2.0*np.cos(alpr)*np.cos(betr)*np.cos(gmmr))/np.sin(gmmr)]
         return None
         
     def get_hmat(self):
@@ -482,7 +481,7 @@ class NAPSystem(object):
         hmat = self.get_hmat()
         rij = np.dot(hmat,xij)
         rij2 = rij[0]**2 +rij[1]**2 +rij[2]**2
-        return sqrt(rij2)
+        return np.sqrt(rij2)
 
     def get_angle(self,i,j,k):
         """
@@ -554,9 +553,9 @@ class NAPSystem(object):
         hi= np.linalg.inv(h)
         # print h
         # print hi
-        lcx= int(1.0/sqrt(hi[0,0]**2 +hi[1,0]**2 +hi[2,0]**2)/rcut)
-        lcy= int(1.0/sqrt(hi[0,1]**2 +hi[1,1]**2 +hi[2,1]**2)/rcut)
-        lcz= int(1.0/sqrt(hi[0,2]**2 +hi[1,2]**2 +hi[2,2]**2)/rcut)
+        lcx= int(1.0/np.sqrt(hi[0,0]**2 +hi[1,0]**2 +hi[2,0]**2)/rcut)
+        lcy= int(1.0/np.sqrt(hi[0,1]**2 +hi[1,1]**2 +hi[2,1]**2)/rcut)
+        lcz= int(1.0/np.sqrt(hi[0,2]**2 +hi[1,2]**2 +hi[2,2]**2)/rcut)
         if lcx == 0: lcx= 1
         if lcy == 0: lcy= 1
         if lcz == 0: lcz= 1

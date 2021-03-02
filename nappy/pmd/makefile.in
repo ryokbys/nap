@@ -1,0 +1,16 @@
+.phony: clean veryclean pmd_wrapper
+
+all: pmd_wrapper
+
+obj= pmd_wrapper.F90
+pmddir= ${HOME}/src/nap/pmd
+
+pmd_wrapper: ${obj}
+	f2py --f90exec=@FC@ -m $@ -I${pmddir} -L${pmddir} -lpmd -c ${obj}
+
+clean:
+	rm -f *.o *.so *~
+
+veryclean: clean
+	rm -f out.*
+
