@@ -114,7 +114,7 @@ def read_inpmd(fname='in.pmd'):
         lines = f.readlines()
     inputs = copy.copy(_default_params)
     mode = None
-    for il,line in lines:
+    for line in lines:
         if line[0] in ('#','!'):
             continue
         data = line.split()
@@ -159,7 +159,7 @@ def read_inpmd(fname='in.pmd'):
                 inputs[key] = float(data[1])
                 mode = None
             elif key in _str_keys:
-                inputs[key] = float(data[1])
+                inputs[key] = data[1]
                 mode = None
 
     return inputs

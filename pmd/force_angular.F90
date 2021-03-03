@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-28 00:28:01 Ryo KOBAYASHI>
+!                     Last modified: <2021-03-02 22:28:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   use util,only: csp2isp
@@ -247,8 +247,9 @@ contains
           isp = csp2isp(cspi)
           jsp = csp2isp(cspj)
           ksp = csp2isp(cspk)
-          print '(a,3(a3,1x),4es11.3)','  cspi,cspj,cspk,rc3,alp,bet,gmm=' &
-               ,trim(cspi),trim(cspj),trim(cspk),rc3,alp,bet,gmm
+          if( iprint.ge.ipl_basic ) print '(a,3(a3,1x),4es11.3)', &
+               '  cspi,cspj,cspk,rc3,alp,bet,gmm=', &
+               trim(cspi),trim(cspj),trim(cspk),rc3,alp,bet,gmm
           if( isp.gt.0 .and. jsp.gt.0 .and. ksp.gt.0 ) then
             interact3(isp,jsp,ksp) = .true.
             rc3s(isp,jsp,ksp) = rc3

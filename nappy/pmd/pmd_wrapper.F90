@@ -100,7 +100,9 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0, &
     print *,' naux should be greater than 1 when Coulomb potential is used.'
     stop
   endif
-  allocate(cauxarr(naux0))
+  if( allocated(cauxarr) .and. size(cauxarr).ne.naux0 ) deallocate(cauxarr)
+  if( .not.allocated(cauxarr) ) allocate(cauxarr(naux0))
+  
   do i=1,naux0
     write(cauxarr(i),'(6a1)') cauxarr0(i,1:laux)
   end do

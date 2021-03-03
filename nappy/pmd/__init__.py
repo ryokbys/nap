@@ -3,7 +3,9 @@ PMD module.
 """
 from __future__ import print_function
 
+import os
 import sys
+import copy
 try:
     import nappy.pmd.pmd_wrapper as pw
 except:
@@ -16,7 +18,7 @@ __all__ = ['inpmd','pmd2phonopy']
 from . import *
 
 __author__ = "RYO KOBAYASHI"
-__version__ = ""
+__version__ = "210302"
 
 def str2char(string,nlen):
     slen = len(string)
@@ -34,73 +36,68 @@ class PMD:
         if 'nappy.pmd.pmd_wrapper' not in sys.modules:
             raise ImportError('pmd_wrapper is not loaded.\n'
                               +'Probably you need to compile it at nap/nappy/pmd/.')
-        self.pmdparams = nappy.pmd.inpmd.get_default()
-        self.pmdparams['naux'] = 0
+        self.params = nappy.pmd.inpmd.get_default()
+        self.params['naux'] = 0
         if nsys is not None:
             self.nsys = nsys
-            self.pmdparams['specorder'] = nsys.specorder
+            self.params['specorder'] = nsys.specorder
         else:
             self.nsys = None
         return None
 
-    def set_system(self,nsys):
-        self.nsys = nsys
-        self.pmdparams['specorder'] = nsys.specorder
-        return None
-
-    def run(self, nstp=0, dt=1.0, ):
+    def run(self, nstp=0, dt=1.0 ):
         """
         Run pmd.
         """
         if self.nsys == None:
             raise ValueError('nsys must be set beofre calling run().')
-        self.pmdparams['num_iteration'] = nstp
-        self.pmdparams['time_interval'] = dt
-        self.set_params()
+        self.params['num_iteration'] = nstp
+        self.params['time_interval'] = dt
+        self.update_params()
         rtot = self.nsys.get_scaled_positions()
         vtot = np.zeros(rtot.shape)
-        naux = self.pmdparams['naux']
+        naux = self.params['naux']
         hmat = np.zeros((3,3,2))
         hmat[0:3,0:3,0] = self.nsys.get_hmat()
         ispcs = self.nsys.atoms.sid.values
-        self.res = pw.run(rtot.T,vtot.T,naux,hmat,ispcs)
+        self.result = pw.run(rtot.T,vtot.T,naux,hmat,ispcs)
         return None
 
-    def set_params(self):
+    def update_params(self):
         """
-        Set pmdvars-module variables.
+        Update pmdvars-module variables.
         """
         naux = 0
-        iprint = 5
+        iprint = 0
         rc = 6.0
         nstp = 0
         laux = 6
         
-        keys = self.pmdparams.keys()
+        keys = self.params.keys()
         if 'specorder' in keys:
             nspmax = 9
             cspcs = np.empty((nspmax,3),dtype='c')
             cspcs[:] = 'x  '
-            specorder = self.pmdparams['specorder']
+            specorder = self.params['specorder']
             for i in range(len(specorder)):
                 cspcs[i] = str2char(specorder[i],3)
         if 'force_type' in keys:
-            forces = self.pmdparams['force_type']
+            forces = self.params['force_type']
             nfrcs = len(forces)
             cfrcs = np.empty((nfrcs,128),dtype='c')
             for i in range(nfrcs):
                 cfrcs[i] = str2char(forces[i],128)
         if 'cutoff_radius' in keys:
-            rc = self.pmdparams['cutoff_radius']
+            rc = self.params['cutoff_radius']
         if 'print_level' in keys:
-            iprint = self.pmdparams['print_level']
+            iprint = self.params['print_level']
         if 'naux' in keys:
-            naux = self.pmdparams['naux']
+            naux = self.params['naux']
         if 'num_iteration' in keys:
-            nstp = self.pmdparams['num_iteration']
-        if 'Coulomb' in self.pmdparams['force_type']:
+            nstp = self.params['num_iteration']
+        if 'Coulomb' in self.params['force_type']:
             naux = max(naux,2)
-            self.pmdparams['naux'] = naux
+            self.params['naux'] = naux
         cauxarr = np.empty((naux,laux),dtype='c')
         cauxarr[:] = '      '
         if naux >= 2:
@@ -114,18 +111,59 @@ class PMD:
         pw.set_pmdvars(cspcs,cfrcs,rc,fcomm,rank,size,iprint,nstp,cauxarr)
         return None
 
-    def set_potential(self,potential):
+    def load_inpmd(self,):
+        if not os.path.exists('in.pmd'):
+            raise FileNotFoundError('in.pmd does not exist.')
+        from .inpmd import read_inpmd
+        inputs = read_inpmd('in.pmd')
+        self.params = copy.copy(inputs)
+        return None
+        
+    def set_system(self,nsys):
+        self.nsys = nsys
+        self.params['specorder'] = nsys.specorder
+        return None
+
+    def set_potential(self, potential):
         if type(potential) is str:
             potential = potential.split()
         if type(potential) not in (list,tuple):
             raise TypeError('potential should be given as string or list of strings.')
         if len(potential) == 0:
             raise ValueError('potential should be given.')
-        forces = self.pmdparams['force_type']
+        forces = self.params['force_type']
         if forces is None:
             forces = []
         for p in potential:
             if p not in forces:
                 forces.append(p)
-        self.pmdparams['force_type'] = forces
+        self.params['force_type'] = forces
         return None
+
+    def get_kinetic_energy(self):
+        if not hasattr(self,'result'):
+            return None
+        return self.result[8]
+
+    def get_potential_energy(self):
+        if not hasattr(self,'result'):
+            return None
+        return self.result[9]
+
+    def get_stress_tensor(self):
+        if not hasattr(self,'result'):
+            return None
+        return self.result[10]
+
+    def get_system(self):
+        if not hasattr(self,'result'):
+            raise ValueError('No MD result.')
+        hmat = self.result[7]
+        self.nsys.set_hmat(hmat[:,:,0])
+        self.nsys.set_scaled_positions(self.result[0].T)
+        self.nsys.set_scaled_velocities(self.result[1].T)
+        self.nsys.atoms['epi'] = [ x for x in self.result[5] ]
+        self.nsys.set_kinetic_energy(self.result[8])
+        self.nsys.set_potential_energy(self.result[9])
+        self.nsys.set_stress_tensor(self.result[10])
+        return self.nsys

@@ -323,6 +323,12 @@ class NAPSystem(object):
         self.atoms.pos = [ np.array(p) for p in sposs ]
         return None
 
+    def set_scaled_velocities(self,svels):
+        if len(svels) != len(self.atoms):
+            raise ValueError('Array size inconsistent.')
+        self.atoms.vel = [ np.array(v) for v in svels ]
+        return None
+
     def get_symbols(self):
         """
         Returns
@@ -389,6 +395,29 @@ class NAPSystem(object):
         #         for i in range(len(self.specorder)-lenc):
         #             self.charges.append(0.0)
         return None
+
+    def set_potential_energy(self,epot):
+        self.epot = epot
+        return None
+
+    def set_kinetic_energy(self,ekin):
+        self.ekin = ekin
+        return None
+
+    def set_stress_tensor(self,stnsr):
+        if stnsr.shape != (3,3):
+            raise TypeError('Stress tensor should be 3x3 array.')
+        self.stnsr = stnsr
+        return None
+    
+    def get_potential_energy(self):
+        return getattr(self,'epot',None)
+
+    def get_kinetic_energy(self):
+        return getattr(self,'ekin',None)
+
+    def get_stress_tensor(self):
+        return getattr(self,'stnsr',None)
 
     def get_atom(self,idatm=-1):
         """
