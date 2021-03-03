@@ -1263,9 +1263,9 @@ contains
 !
 !  Calculate cutoff/switching function depending on r and r_outer
 !
-    real(8),intent(in):: r
+    real(8),intent(in):: r,rcut
     integer,intent(in):: isp,jsp
-    real(8),intent(out):: fc,dfc,rcut
+    real(8),intent(out):: fc,dfc
 
     real(8):: rin,rout
     

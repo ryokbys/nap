@@ -1409,7 +1409,7 @@ subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
        ,nnn(6),mpi_md_world,myid_md,nex(3)
   integer,intent(in):: lspr(0:nnmax,namax) !,numff
   integer,intent(inout):: ifcoulomb
-  real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+  real(8),intent(inout):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
        ,tag(namax)
   real(8),intent(inout):: tcom,rc
   real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &

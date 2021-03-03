@@ -14,16 +14,12 @@ MPIFLAGS= @FCFLAGS@ -fPIC
 #-----------------------------------------------------------------------
 # suffixes
 .SUFFIXES: .o .f .F .f90 .F90 .mod
-.f.o: 
-	${MPIFC} -c ${MPIFLAGS} $<
-.F.o: 
-	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
-.f90.o: 
-	${MPIFC} -c ${MPIFLAGS} $<
-.F90.mod:
-	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
-.F90.o: 
+%.o : %.F
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} -o $@ $<
+%.o : %.F90
+	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} -o $@ $<
+%.mod : %.F90 %.o
+	@true
 
 ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
@@ -74,6 +70,8 @@ rdfobj= mod_pmdio.o mod_util.o util_vec.o mod_pairlist.o mod_time.o rdf.o
 #-----------------------------------------------------------------------
 # Make rule entries
 #
+.PHONY: pmd lib clean
+
 all: pmd lib
 
 clean:
