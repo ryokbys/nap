@@ -5,8 +5,11 @@ all: pmd_wrapper
 obj= pmd_wrapper.F90
 pmddir= ${HOME}/src/nap/pmd
 
+# instead of using mpif90, use gfortran with mpi options specified here
+mpiopts= -I/usr/local/Cellar/open-mpi/4.1.0/include -I/usr/local/Cellar/open-mpi/4.1.0/lib -L/usr/local/opt/libevent/lib -L-I/usr/local/Cellar/open-mpi/4.1.0/lib -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi
+
 pmd_wrapper: ${obj}
-	f2py --f90exec=@FC@ -m $@ -I${pmddir} -L${pmddir} -lpmd -c ${obj}
+	f2py --f90exec=gfortran ${mpiopts} -m $@ -I${pmddir} -L${pmddir} -lpmd -c ${obj}
 
 clean:
 	rm -f *.o *.so *~

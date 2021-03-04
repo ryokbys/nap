@@ -20,6 +20,7 @@ subroutine run(ntot0,rtot,vtot,atot,stot,ekitot,epitot, &
   
   ntot = ntot0
   hunit = 1d0
+!!$  print *,'iprint,ntot0,rtot(:,ntot0)=',iprint,ntot0,rtot(:,ntot0)
   call pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot, &
        ekitot,epitot,auxtot,epot,ekin,stnsr)
   return
@@ -63,7 +64,7 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0, &
 !f2py integer,intent(hide),depend(cauxarr0):: laux=shape(cauxarr0,1)
 
   integer:: i,j
-  character(len=3):: csp
+  character:: c3*3, c128*128, c6*6
   type(atom):: elem
   logical:: lcoulomb = .false.
 
@@ -76,7 +77,8 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0, &
     stop
   endif
   do i=1,ns
-    write(specorder(i),'(3a1)') cspcs(i,1:ls)
+    write(c3,'(3a1)') cspcs(i,1:ls)
+    specorder(i) = trim(c3)
 !!$    specorder(i) = trim(csp)
 !!$    write(specorder(i),'(3a1)') cspcs(i,1:ls)
   enddo
@@ -88,7 +90,8 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0, &
   endif
   num_forces = nf
   do i=1,num_forces
-    write(force_list(i),'(128a1)') cfrcs(i,1:lf)
+    write(c128,'(128a1)') cfrcs(i,1:lf)
+    force_list(i) = trim(c128)
   end do
 
 !.....Set cauxarr0
@@ -104,15 +107,16 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0, &
   if( .not.allocated(cauxarr) ) allocate(cauxarr(naux0))
   
   do i=1,naux0
-    write(cauxarr(i),'(6a1)') cauxarr0(i,1:laux)
+    write(c6,'(6a1)') cauxarr0(i,1:laux)
+    cauxarr(i) = trim(c6)
   end do
 
   naux = naux0
   nstp = nstp0
   do i=1,nspmax
-    csp = specorder(i)
-    if( trim(csp).ne.'x' ) then
-      elem = get_element(trim(csp))
+    c3 = specorder(i)
+    if( trim(c3).ne.'x' ) then
+      elem = get_element(trim(c3))
       am(i) = elem%mass
     endif
   enddo

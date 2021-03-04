@@ -1000,7 +1000,7 @@ def write_cube(nsys, fname='cube'):
     """
     Output the system info including volumetric data to a file in Gaussian cube format.
     """
-    txt = nsys.get_cube_txt()
+    txt = get_cube_txt()
     with open(fname,'w') as f:
         f.write(txt)
     return None

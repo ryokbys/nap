@@ -92,10 +92,19 @@ class NAPSystem(object):
 
         return None
 
+    def __repr__(self):
+        txt = analyze_msg(self)
+        return txt
+
     def init_atoms(self):
         self.atoms = pd.DataFrame(columns=DEFAULT_LABELS)
         return None
 
+    def set_atoms(self,newatoms):
+        self.atoms = copy.deepcopy(newatoms)
+        self.atoms.reset_index(drop=True,inplace=True)
+        return None
+        
     def get_aux_names(self):
         aux_names = list(self.atoms.columns)
         for l in DEFAULT_LABELS:
@@ -195,6 +204,7 @@ class NAPSystem(object):
             self.specorder = specorder
         else:  # Re-define specorder even if specorder and sids are inconsistent...
             self.specorder = specorder
+        return None
                 
     def get_lattice_vectors(self):
         return self.a1*self.alc, self.a2*self.alc, self.a3*self.alc
@@ -1054,9 +1064,11 @@ class NAPSystem(object):
         self.remove_atoms(*remove_ids)
         return
         
-def analyze(nsys):
+
+def analyze_msg(nsys):
     from nappy.elements import elements
     from nappy.units import amu_to_g, Ang_to_cm
+    msg = ""
     a1 = nsys.a1 *nsys.alc
     a2 = nsys.a2 *nsys.alc
     a3 = nsys.a3 *nsys.alc
@@ -1067,32 +1079,37 @@ def analyze(nsys):
     alpha = np.arccos(np.dot(a2,a3)/b/c)/np.pi*180.0
     beta  = np.arccos(np.dot(a1,a3)/a/c)/np.pi*180.0
     gamma = np.arccos(np.dot(a1,a2)/a/b)/np.pi*180.0
-    print(' a1 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a1[0],
-                                                                  a1[1],
-                                                                  a1[2]))
-    print(' a2 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a2[0],
-                                                                  a2[1],
-                                                                  a2[2]))
-    print(' a3 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]'.format(a3[0],
-                                                                  a3[1],
-                                                                  a3[2]))
-    print(' a = {0:10.3f} A'.format(a))
-    print(' b = {0:10.3f} A'.format(b))
-    print(' c = {0:10.3f} A'.format(c))
-    print(' alpha = {0:7.2f} deg.'.format(alpha))
-    print(' beta  = {0:7.2f} deg.'.format(beta))
-    print(' gamma = {0:7.2f} deg.'.format(gamma))
-    print(' volume= {0:10.3f} A^3'.format(vol))
-    print(' number of atoms   = ',nsys.num_atoms())
+    msg +=' a1 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]\n'.format(a1[0],
+                                                                    a1[1],
+                                                                    a1[2])
+    msg +=' a2 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]\n'.format(a2[0],
+                                                                    a2[1],
+                                                                    a2[2])
+    msg +=' a3 vector = [{0:10.3f}, {1:10.3f}, {2:10.3f}]\n'.format(a3[0],
+                                                                    a3[1],
+                                                                    a3[2])
+    msg +=' a = {0:10.3f} A\n'.format(a)
+    msg +=' b = {0:10.3f} A\n'.format(b)
+    msg +=' c = {0:10.3f} A\n'.format(c)
+    msg +=' alpha = {0:7.2f} deg.\n'.format(alpha)
+    msg +=' beta  = {0:7.2f} deg.\n'.format(beta)
+    msg +=' gamma = {0:7.2f} deg.\n'.format(gamma)
+    msg +=' volume= {0:10.3f} A^3\n'.format(vol)
+    msg +=' number of atoms   = {0:d}\n'.format(nsys.num_atoms())
     if nsys.specorder:
-        print(' number of atoms per species:')
+        msg +=' number of atoms per species:\n'
         nspcs = nsys.natm_per_species()
         mass = 0.0
         for i,s in enumerate(nsys.specorder):
-            print('   {0:<2s}: {1:>4d}'.format(s,nspcs[i]))
+            msg +='   {0:<2s}: {1:>4d}\n'.format(s,nspcs[i])
             mass += nspcs[i] *elements[s]['mass']
-        print(' density = {0:7.2f} g/cm^3'.format(mass*amu_to_g
-                                                  /(vol*Ang_to_cm**3) ))
+        msg +=' density = {0:7.2f} g/cm^3\n'.format(mass*amu_to_g
+                                                    /(vol*Ang_to_cm**3) )
+    return msg
+    
+def analyze(nsys):
+    msg = analyze_msg(nsys)
+    print(msg,end='')
     return None
 
 

@@ -39,7 +39,7 @@ class PMD:
         self.params = nappy.pmd.inpmd.get_default()
         self.params['naux'] = 0
         if nsys is not None:
-            self.nsys = nsys
+            self.nsys = copy.deepcopy(nsys)
             self.params['specorder'] = nsys.specorder
         else:
             self.nsys = None
@@ -60,7 +60,19 @@ class PMD:
         hmat = np.zeros((3,3,2))
         hmat[0:3,0:3,0] = self.nsys.get_hmat()
         ispcs = self.nsys.atoms.sid.values
-        self.result = pw.run(rtot.T,vtot.T,naux,hmat,ispcs)
+        res = pw.run(rtot.T,vtot.T,naux,hmat,ispcs)
+        self.result = {}
+        self.result['rtot'] = res[0]
+        self.result['vtot'] = res[1]
+        self.result['atot'] = res[2]
+        self.result['stot'] = res[3]
+        self.result['ekitot'] = res[4]
+        self.result['epitot'] = res[5]
+        self.result['auxtot'] = res[6]
+        self.result['hmat'] = res[7]
+        self.result['ekin'] = res[8]
+        self.result['epot'] = res[9]
+        self.result['stnsr'] = res[10]
         return None
 
     def update_params(self):
@@ -81,6 +93,8 @@ class PMD:
             specorder = self.params['specorder']
             for i in range(len(specorder)):
                 cspcs[i] = str2char(specorder[i],3)
+        else:
+            raise KeyError('PMD().params has no specorder key.')
         if 'force_type' in keys:
             forces = self.params['force_type']
             nfrcs = len(forces)
@@ -98,11 +112,13 @@ class PMD:
         if 'Coulomb' in self.params['force_type']:
             naux = max(naux,2)
             self.params['naux'] = naux
+
         cauxarr = np.empty((naux,laux),dtype='c')
         cauxarr[:] = '      '
         if naux >= 2:
             cauxarr[0] = 'chg   '
             cauxarr[1] = 'chi   '
+
         from mpi4py import MPI
         comm = MPI.COMM_WORLD
         fcomm = comm.py2f()
@@ -116,12 +132,11 @@ class PMD:
             raise FileNotFoundError('in.pmd does not exist.')
         from .inpmd import read_inpmd
         inputs = read_inpmd('in.pmd')
-        self.params = copy.copy(inputs)
+        self.params = copy.deepcopy(inputs)
         return None
         
     def set_system(self,nsys):
-        self.nsys = nsys
-        self.params['specorder'] = nsys.specorder
+        self.nsys = copy.deepcopy(nsys)
         return None
 
     def set_potential(self, potential):
@@ -143,17 +158,17 @@ class PMD:
     def get_kinetic_energy(self):
         if not hasattr(self,'result'):
             return None
-        return self.result[8]
+        return self.result['ekin']
 
     def get_potential_energy(self):
         if not hasattr(self,'result'):
             return None
-        return self.result[9]
+        return self.result['epot']
 
     def get_stress_tensor(self):
         if not hasattr(self,'result'):
             return None
-        return self.result[10]
+        return self.result['stnsr']
 
     def get_system(self):
         if not hasattr(self,'result'):
