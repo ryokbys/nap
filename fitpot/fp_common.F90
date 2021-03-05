@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-03-02 14:12:26 Ryo KOBAYASHI>
+!                     Last modified: <2021-03-04 18:32:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -918,7 +918,7 @@ contains
 !!$         ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
 !!$         ,gwe,gwf,gws &
 !!$         ,lematch,lfmatch,lsmatch,boundary)
-    call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra, &
+    call oneshot4fitpot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra, &
          smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi, &
          smpl%aux,ekin,epot,ptnsr,lcalcgrad,ndimp,maxisp, &
          gwe,gwf,gws,lematch,lfmatch,lsmatch)

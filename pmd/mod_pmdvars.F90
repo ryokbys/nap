@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-02-28 00:52:21 Ryo KOBAYASHI>
+!                    Last modified: <2021-03-04 18:30:22 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -246,7 +246,7 @@ contains
     
     if( .not. allocated(tfac) ) then
       allocate(tfac(nspmax),ediff(nspmax),ediff0(nspmax),temp(nspmax)&
-           ,ekl(nspmax),ndof(nspmax))
+           ,ekl(nspmax),ndof(nspmax),fekin(nspmax),fa2v(nspmax))
     endif
     
   end subroutine initialize_pmdvars

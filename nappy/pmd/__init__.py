@@ -45,7 +45,7 @@ class PMD:
             self.nsys = None
         return None
 
-    def run(self, nstp=0, dt=1.0 ):
+    def run(self, nstp=0, dt=1.0, initialize=True ):
         """
         Run pmd.
         """
@@ -60,7 +60,7 @@ class PMD:
         hmat = np.zeros((3,3,2))
         hmat[0:3,0:3,0] = self.nsys.get_hmat()
         ispcs = self.nsys.atoms.sid.values
-        res = pw.run(rtot.T,vtot.T,naux,hmat,ispcs)
+        res = pw.run(rtot.T,vtot.T,naux,hmat,ispcs,initialize)
         self.result = {}
         self.result['rtot'] = res[0]
         self.result['vtot'] = res[1]

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-02 14:11:49 Ryo KOBAYASHI>
+!                     Last-modified: <2021-03-04 20:23:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -182,7 +182,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 
 
 !-----setup
-  allocate(fekin(nspmax),fa2v(nspmax))
   call setup(nspmax,am,fekin,fa2v)
 !-----set HI and SGM
   call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
@@ -314,7 +313,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   tcom = 0d0
 
   call init_force(namax,natm,nspmax,nsp,tag,aux,naux,myid_md,mpi_md_world, &
-       iprint,h,rc,lvc,ifcoulomb,specorder,am)
+       iprint,h,rc,lvc,ifcoulomb,specorder,am,.true.)
 !-----copy RA of boundary atoms
   call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
        ,nx,ny,nz,myid_md)
@@ -1128,13 +1127,121 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   if( ltdst ) then
     deallocate(tdst,nadst)
   endif
-  deallocate(fekin,fa2v)
   deallocate(ra,va,aa,ra0,strs,stt,tag,lspr,ls1nn &
        ,epi,eki,stp,stn,lsb,lsex)
   deallocate(aux)
 end subroutine pmd_core
 !=======================================================================
-subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
+subroutine oneshot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
+     ekitot,epitot,auxtot,ekin,epot,stnsr,linit)
+!
+!  In case that only one shot force calculation is required,
+!  especially called from fitpot.
+!
+  use pmdvars
+  use force
+  use pairlist,only: mk_lspr_para
+  implicit none
+  include "mpif.h"
+  include "./params_unit.h"
+  include "./const.h"
+  integer,intent(in):: ntot0
+  real(8),intent(in):: hunit,h(3,3,0:1)
+  real(8),intent(in):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
+  real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0),auxtot(naux,ntot0)
+  real(8),intent(out):: ekitot(3,3,ntot0),epitot(ntot0),ekin,epot,stnsr(3,3)
+  logical,intent(in):: linit
+
+  integer:: i,ierr,is,nspl,iprm0,ntot
+  real(8):: aai(3),epott
+  logical:: lstrs = .false.
+  logical:: lcell_updated = .false.
+  logical:: l1st
+  character(len=3):: csp
+
+  ntot = ntot0
+  call initialize_pmdvars()
+
+  call set_domain_vars()
+!.....perform space decomposition after reading atomic configuration
+  if( iprint.ge.ipl_basic ) then
+    write(6,'(a)',advance='no') ' Species order: '
+    do is=1,nspmax
+      csp = specorder(is)
+      if( trim(csp).ne.'x' ) write(6,'(1x,3a)',advance='no') csp
+    enddo
+    print *,''
+    write(6,'(a,i8)') ' Number of total atoms = ',ntot0
+    write(6,'(a)') " Lattice vectors:"
+    write(6,'(a,"[ ",3f12.3," ]")') '   a = ',h(1:3,1,0)
+    write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
+    write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
+  endif
+  call space_decomp(h,ntot0,tagtot,rtot,vtot,auxtot)
+
+!.....Some conversions
+  nsp= 0
+  do i=1,natm
+!-------species of atom-i
+    nsp= max(int(tag(i)),nsp)
+  enddo
+!-----get total number of species
+  nspl = nsp
+  call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max &
+       ,mpi_md_world,ierr)
+!-----setup
+  call setup(nspmax,am,fekin,fa2v)
+!-----set HI and SGM
+  call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
+!-----ntset
+  call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
+
+  tcpu1= mpi_wtime()
+  tcom = 0d0
+
+  call init_force(namax,natm,nspmax,nsp,tag,aux,naux,myid_md,mpi_md_world, &
+       iprint,h,rc,lvc,ifcoulomb,specorder,am,linit)
+
+!-----copy RA of boundary atoms
+  call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
+       ,nx,ny,nz,myid_md)
+  call bacopy(.true.)
+!-----Make pair list
+  l1st = .true.
+  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
+       ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
+  lstrs = .true.
+
+  if( iprint.ge.ipl_info ) print *,'get_force...'
+  call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
+       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
+       ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
+       ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
+
+!      print *,'one_shot: 07'
+  if( iprint.ge.ipl_info ) print *,'sa2stnsr...'
+  call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
+  stnsr(:,:) = stnsr(:,:) *up2gpa
+
+  if( iprint.ge.ipl_info ) print *,'space_comp...'
+  call space_comp(ntot0,ntot,tagtot,rtot,vtot,atot,stot,ekitot,epitot, &
+       auxtot)
+
+!.....revert forces to the unit eV/A before going out 
+  if( myid_md.eq.0 ) then
+    do i=1,ntot0
+      is= int(tagtot(i))
+      aai(1:3)= h(1:3,1,0)*atot(1,i) &
+           +h(1:3,2,0)*atot(2,i) &
+           +h(1:3,3,0)*atot(3,i)
+      atot(1:3,i) = aai(1:3)
+    enddo
+  endif
+
+  return
+end subroutine oneshot
+!=======================================================================
+subroutine oneshot4fitpot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
      ekitot,epitot,auxtot,ekin,epot,stnsr,lcalcgrad,ndimp,maxisp, &
      gwe,gwf,gws,lematch,lfmatch,lsmatch)
 !
@@ -1173,18 +1280,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
   ntot = ntot0
   call initialize_pmdvars()
 
-  nxyz = nx*ny*nz
-  anxi= 1d0/nx
-  anyi= 1d0/ny
-  anzi= 1d0/nz
-!-----vector node indices: range [0:nx-1]
-  myx=myid_md/(ny*nz)
-  myy=mod(myid_md/nz,ny)
-  myz=mod(myid_md,nz)
-!-----reduced node origin
-  sorg(1)= anxi*myx
-  sorg(2)= anyi*myy
-  sorg(3)= anzi*myz
+  call set_domain_vars()
 !.....perform space decomposition after reading atomic configuration
   if( iprint.ge.ipl_basic ) then
     write(6,'(a)',advance='no') ' Species order: '
@@ -1212,7 +1308,6 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
   call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max &
        ,mpi_md_world,ierr)
 !-----setup
-  allocate(fekin(nspmax),fa2v(nspmax))
   call setup(nspmax,am,fekin,fa2v)
 !-----set HI and SGM
   call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
@@ -1223,7 +1318,7 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
   tcom = 0d0
 
   call init_force(namax,natm,nspmax,nsp,tag,aux,naux,myid_md,mpi_md_world, &
-       iprint,h,rc,lvc,ifcoulomb,specorder,am)
+       iprint,h,rc,lvc,ifcoulomb,specorder,am,.true.)
 
 !-----copy RA of boundary atoms
   call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
@@ -1296,11 +1391,28 @@ subroutine one_shot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
     enddo
   endif
 
-!.....deallocate all the arrays allocated 
-  deallocate(fekin,fa2v)
+  return
+end subroutine oneshot4fitpot
+!=======================================================================
+subroutine set_domain_vars()
+  use pmdvars
+  implicit none
+  
+  nxyz = nx*ny*nz
+  anxi= 1d0/nx
+  anyi= 1d0/ny
+  anzi= 1d0/nz
+!-----vector node indices: range [0:nx-1]
+  myx=myid_md/(ny*nz)
+  myy=mod(myid_md/nz,ny)
+  myz=mod(myid_md,nz)
+!-----reduced node origin
+  sorg(1)= anxi*myx
+  sorg(2)= anyi*myy
+  sorg(3)= anzi*myz
 
   return
-end subroutine one_shot
+end subroutine set_domain_vars
 !=======================================================================
 subroutine setup(nspmax,am,fekin,fa2v)
   implicit none
@@ -3267,5 +3379,5 @@ subroutine copy_iarr(ndim,srcarr,destarr)
 end subroutine copy_iarr
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

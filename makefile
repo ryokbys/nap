@@ -14,7 +14,7 @@ clean:
 	(cd fitpot/ && make clean)
 
 pmd: force
-	(cd $@/ && make $@)
+	(cd $@/ && make $@ lib)
 
 fitpot: pmd
 	(cd $@/ && make $@)

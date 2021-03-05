@@ -270,7 +270,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
 end subroutine get_force
 !=======================================================================
 subroutine init_force(namax,natm,nspmax,nsp,tag,aux,naux, &
-     myid_md,mpi_md_world,iprint,h,rc,lvc,ifcoulomb,specorder,amass)
+     myid_md,mpi_md_world,iprint,h,rc,lvc,ifcoulomb,specorder,amass,linit)
 !
 !  Initialization routine is separated from main get_force routine.
 !
@@ -306,11 +306,14 @@ subroutine init_force(namax,natm,nspmax,nsp,tag,aux,naux, &
 !!$  real(8),intent(inout):: chg(namax),chi(namax)
   real(8),intent(inout):: aux(naux,namax)
   logical,intent(inout):: lvc
+  logical,intent(in):: linit
 
   integer:: i,j
   real(8):: ri,ro
   character(len=3):: cspi,cspj
 
+  if( .not. linit ) return
+  
   if( iprint.ne.0 ) call write_forces(myid_md)
 
   if( loverlay ) then

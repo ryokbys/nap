@@ -1,5 +1,5 @@
 subroutine run(ntot0,rtot,vtot,atot,stot,ekitot,epitot, &
-     naux,auxtot,hmat,ispcs,ekin,epot,stnsr)
+     naux,auxtot,hmat,ispcs,ekin,epot,stnsr,linit)
   use pmdvars,only: nx,ny,nz,iprint
   implicit none
   integer,intent(in):: ntot0,naux,ispcs(ntot0)
@@ -7,6 +7,7 @@ subroutine run(ntot0,rtot,vtot,atot,stot,ekitot,epitot, &
 !f2py intent(in,out):: rtot,vtot,hmat
   real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0), &
        epitot(ntot0),auxtot(naux,ntot0),ekin,epot,stnsr(3,3)
+  logical,intent(in):: linit
 
   integer:: ntot
   real(8):: hunit,tagtot(ntot0)
@@ -21,8 +22,10 @@ subroutine run(ntot0,rtot,vtot,atot,stot,ekitot,epitot, &
   ntot = ntot0
   hunit = 1d0
 !!$  print *,'iprint,ntot0,rtot(:,ntot0)=',iprint,ntot0,rtot(:,ntot0)
-  call pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot, &
-       ekitot,epitot,auxtot,epot,ekin,stnsr)
+!!$  call pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot, &
+!!$       ekitot,epitot,auxtot,epot,ekin,stnsr)
+  call oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
+       ekitot,epitot,auxtot,ekin,epot,stnsr,linit)
   return
 end subroutine run
 !=======================================================================
@@ -137,3 +140,7 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0, &
 
 end subroutine set_pmdvars
 !=======================================================================
+!-----------------------------------------------------------------------
+!     Local Variables:
+!     compile-command: "make"
+!     End:
