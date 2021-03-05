@@ -484,7 +484,7 @@ class NAPSystem(object):
         if 'volume' in options.keys():
             volopts = options['volume']
         
-        pdb = self.get_PDB_txt()
+        pdb = nappy.io.get_PDB_txt(self)
         v = py3Dmol.view()
         v.addModel(pdb,'pdb')
         v.setViewStyle({'style':'outline','color':'black','width':0.05})
@@ -715,7 +715,12 @@ class NAPSystem(object):
                 distances.append([ dists[ia,ja] for ja in range(nlspr[ia]) ])
             self.atoms['distance'] = distances
         return None
-            
+
+    def remove_pair_list(self):
+        del self.atoms['lspr']
+        if 'distance' in self.atoms.columns:
+            del self.atoms['distance']
+        return None
 
     def neighbors_of(self,ia,rcut=3.0,distance=False):
         """
@@ -987,13 +992,6 @@ class NAPSystem(object):
                       pbc=True)
         atoms.set_velocities(vels)
         return atoms
-
-    def get_nglview(self):
-        """
-        Retern a nglview object via ase_atoms.
-        """
-        import nglview as nv
-        return nv.show_ase(self.to_ase_atoms())
 
     def change_unitcell(self,a,b,c):
         """

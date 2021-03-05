@@ -5,7 +5,6 @@ module pairlist
 !!$  use force,only: luse_charge, luse_elec_temp
 !!$  use clrchg,only: lclrchg
 !!$  use pmdvars,only: chg,chi,tei,clr
-  use time,only: accum_time
   implicit none
   include 'mpif.h'
   save

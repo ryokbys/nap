@@ -1219,6 +1219,13 @@ def shift_spos_for_lammps(spos,lxy,lxz,lyz,x,y,z,yz,xz,xy):
         new_spos[i] = pbc(new_spos[i])
     return new_spos
 
+def get_nglview(nsys):
+    """
+    Retern a nglview object via ase_atoms.
+    """
+    import nglview as nv
+    return nv.show_ase(nsys.to_ase_atoms())
+
 if __name__ == "__main__":
 
     args = docopt(__doc__)
