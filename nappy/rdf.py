@@ -215,13 +215,19 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
     natm = len(nsys.atoms)
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
-    nsys.make_pair_list(rcut=rmax,distance=True)
+    # nsys.make_pair_list(rcut=rmax,distance=True)
+    nsys.make_pair_list(rcut=rmax)
     for ia in range(natm0):
         isid = sids[ia]
         pi = poss[ia]
         ndr[:,:] = 0.0
-        for ja,dij in nsys.neighbors_of(ia,distance=True):
+        # for ja,dij in nsys.neighbors_of(ia,distance=True):
+        for ja in nsys.neighbors_of(ia):
             jsid = sids[ja]
+            pij = poss[ja] -pi
+            pij = pij -np.round(pij)
+            rij = np.dot(hmat,pij)
+            dij = np.sqrt(rij[0]**2 +rij[1]**2 +rij[2]**2)
             rrdr= dij/dr
             ir = int(rrdr)
             ndr[0,0,ir] += 1.0
@@ -334,7 +340,7 @@ def SQ_to_gr(qs,sq,rho,rmin=0.0,rmax=5.0,nr=100):
         gr[ir] = 1.0 +1.0/(2.0*np.pi**2 *r *rho) *tmp
     return rs, gr
 
-def write_normal(fname,specorder,nspcs,rd,agr,nr):
+def write_rdf_normal(fname,specorder,nspcs,rd,agr,nr):
     """
     Write out RDF data in normal RDF format.
     """
@@ -359,7 +365,7 @@ def write_normal(fname,specorder,nspcs,rd,agr,nr):
     outfile.close()
     return None
 
-def write_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs,nperline=6):
+def write_rdf_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs,nperline=6):
     """
     Write out RDF data in general fp.py format.
 
@@ -376,12 +382,19 @@ def write_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs,nperline=6):
         for i in range(nr):
             data[n] = agr[isid,jsid,i]
             n += 1
-
+    
     with open(fname,'w') as f:
         f.write('# RDF for pairs: ')
         for pair in pairs:
-            si = specorder[pair[0]-1]
-            sj = specorder[pair[1]-1]
+            isid,jsid = pair
+            if isid == 0:
+                si = 'All'
+            else:
+                si = specorder[pair[0]-1]
+            if jsid == 0:
+                sj = 'All'
+            else:
+                sj = specorder[pair[1]-1]
             f.write(' {0:s}-{1:s},'.format(si,sj))
         f.write('\n')
         f.write('# rmax, nr = {0:.3f}, {1:d}\n'.format(rmax,nr))
@@ -483,23 +496,6 @@ if __name__ == "__main__":
     specorder = [ x for x in args['--specorder'].split(',') ]
     if specorder == ['None']:
         specorder = []
-    out4fp = args['--out4fp']
-    if out4fp:
-        pairwise = True
-        pairs0 = args['--pairs'].split(',')
-        pairs = []
-        for pair in pairs0:
-            spi,spj = pair.split('-')
-            isid = specorder.index(spi)+1
-            jsid = specorder.index(spj)+1
-            if jsid < isid:
-                itmp = jsid
-                jsid = isid
-                isid = itmp
-            pairs.append((isid,jsid))
-    else:
-        no_pairwise = args['--no-pairwise']
-        pairwise = not no_pairwise
     plot = args['--plot']
     nskip = int(args['--skip'])
     SQ = args['--SQ']
@@ -509,6 +505,29 @@ if __name__ == "__main__":
         lscatter = [ float(x) for x in args['--scatter-length'].split(',') ]
         if len(lscatter) != len(specorder):
             raise ValueError('--scatter-length is not set correctly.')
+    out4fp = args['--out4fp']
+    if out4fp:
+        pairwise = True
+        pairs0 = args['--pairs'].split(',')
+        pairs = []
+        for pair in pairs0:
+            spi,spj = pair.split('-')
+            try:
+                isid = specorder.index(spi)+1
+            except:
+                isid = 0
+            try:
+                jsid = specorder.index(spj)+1
+            except:
+                jsid = 0
+            if jsid < isid:
+                itmp = jsid
+                jsid = isid
+                isid = itmp
+            pairs.append((isid,jsid))
+    else:
+        no_pairwise = args['--no-pairwise']
+        pairwise = not no_pairwise
 
     nspcs = len(specorder)
     if nspcs < 1:
@@ -563,11 +582,11 @@ if __name__ == "__main__":
         qs,sqs = gr_to_SQ(rd,agr[0,0,:],rho,qmin=0.7,qmax=qmax,nq=200)
 
     if out4fp:
-        write_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs)
+        write_rdf_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs)
         if SQ:
             write_sq_out4fp('out.sq',qs,sqs)
     else:
-        write_normal(ofname,specorder,nspcs,rd,agr,nr,)
+        write_rdf_normal(ofname,specorder,nspcs,rd,agr,nr,)
         if SQ:
             write_sq_normal('out.sq',qs,sqs)
 

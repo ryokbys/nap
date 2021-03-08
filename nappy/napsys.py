@@ -583,16 +583,17 @@ class NAPSystem(object):
                 Whether or not store the distances of neighbors.
            
         """
-        try:
-            import nappy.pmd.pairlist as pl
-            plst = pl.fmake_pairlist(self,rcut=rcut,nnmax=nnmax)
-            lspr = []
-            for ia in range(self.num_atoms()):
-                lspr.append( [ plst[ia,1+j]-1 for j in range(plst[ia,0]) ] )
-            self.atoms['lspr'] = lspr
-            return None
-        except:
-            pass
+        if not distance:
+            try:
+                import nappy.pmd.pairlist as pl
+                plst = pl.fmake_pairlist(self,rcut=rcut,nnmax=nnmax)
+                lspr = []
+                for ia in range(self.num_atoms()):
+                    lspr.append( [ plst[ia,1+j]-1 for j in range(plst[ia,0]) ] )
+                self.atoms['lspr'] = lspr
+                return None
+            except:
+                pass
         rcs2 = np.zeros((len(self.specorder),len(self.specorder)),dtype=float)
         if rcuts is not None:
             for i,si in enumerate(self.specorder):
