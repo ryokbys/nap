@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-08 12:05:54 Ryo KOBAYASHI>
+!                     Last-modified: <2021-03-08 14:35:17 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -204,6 +204,8 @@ program pmd
   endif  ! end of myid.eq.0
 
   call bcast_params()
+  call mpi_bcast(hunit,1,mpi_real8,0,mpi_md_world,ierr)
+  call mpi_bcast(h,9*2,mpi_real8,0,mpi_md_world,ierr)
 
 !.....Before allocating auxiliary array, set naux (num of auxiliary data)
   call set_use_charge()
@@ -692,7 +694,7 @@ subroutine bcast_params()
     call mpi_bcast(npy,1,mpi_integer,0,mpicomm,ierr)
     call mpi_bcast(npz,1,mpi_integer,0,mpicomm,ierr)
     call mpi_bcast(orig_pdens,3,mpi_real8,0,mpicomm,ierr)
-    call mpi_bcast(hmat_pdens,3,mpi_real8,0,mpicomm,ierr)
+    call mpi_bcast(hmat_pdens,3*3,mpi_real8,0,mpicomm,ierr)
   endif
 !.....Metadynamics
   call mpi_bcast(lmetaD,1,mpi_logical,0,mpicomm,ierr)

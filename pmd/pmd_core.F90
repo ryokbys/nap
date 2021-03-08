@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-08 11:33:28 Ryo KOBAYASHI>
+!                     Last-modified: <2021-03-08 14:34:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -2811,7 +2811,7 @@ subroutine space_decomp(h,ntot0,tagtot,rtot,vtot,auxtot)
   endif
 
 !!$  call mpi_bcast(hunit,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(h,9*2,mpi_real8,0,mpi_md_world,ierr)
+!!$  call mpi_bcast(h,9*2,mpi_real8,0,mpi_md_world,ierr)
 
   ixyz= 0
   if( myid_md.eq.0 ) then

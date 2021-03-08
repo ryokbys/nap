@@ -117,6 +117,7 @@ contains
       ipy = int(sri(2)*dpyi) +1
       ipz = int(sri(3)*dpzi) +1
       idx = (ipx-1)*npy*npz +(ipy-1)*npz +ipz
+!!$      print *,'i,is,sri,ipx,ipy,ipz,idx = ',i,is,sri(:),ipx,ipy,ipz,idx
       pds(idx) = pds(idx) +1d0
     enddo
     nacc = nacc +1
