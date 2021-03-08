@@ -2,10 +2,6 @@ module pdens
 !
 !  Module for evaluation of probability density.
 !
-  use pmdvars,only: nspmax
-  use util,only: csp2isp
-  use pmdmpi,only: nid2xyz
-!!$  use element,only: get_cube_info
   implicit none
   include 'mpif.h'
   include "./const.h"
@@ -21,30 +17,30 @@ module pdens
   logical:: initialized = .false.
   character(len=3):: cspc_pdens = 'non'
   integer:: ispc_pdens
-  real(8),allocatable:: pdg(:)  ! Global pdens
-  real(8),allocatable:: pdl(:),pdt(:)  ! Local pdens
-  integer:: npx = 1  ! Num of divisions in a node for local regions
+  real(8):: orig_pdens(3),hmat_pdens(3,3)
+  real(8):: sosub(3),shsub(3,3),shsubi(3,3)
+  real(8),allocatable:: pds(:)
+  integer:: npx = 1  ! Num of divisions of subsystem
   integer:: npy = 1  ! where flux is evaluated within.
   integer:: npz = 1
-  integer:: nl
-  integer:: ng,ngx,ngy,ngz  ! Global num of divisions
-  integer,allocatable:: idxl2g(:,:)  ! Conversion of index from local to global
-  real(8):: dpx,dpy,dpz,dpxi,dpyi,dpzi
+  integer:: np
+  real(8):: dpx,dpy,dpz,vol,dpxi,dpyi,dpzi
   integer:: nacc
 
 contains
 !=======================================================================
-  subroutine init_pdens(myid,nx,ny,nz,hmat,specorder,mpi_world,iprint)
+  subroutine init_pdens(myid,hmat,mpi_world,iprint)
 !
 !  Initialize lflux.
 !
-    integer,intent(in):: myid,mpi_world,nx,ny,nz,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    use util,only: csp2isp
+    use vector,only: matinv3,matxvec3
+    integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: hmat(3,3)
-    
-    integer:: inc,ix,iy,iz,mx,my,mz,ixyz,nxyz
+
+    integer:: inc,ix,iy,iz,mx,my,mz,ixyz
     integer:: idxg,ipx,ipy,ipz
-    real(8):: anxi,anyi,anzi,fext
+    real(8):: hmati(3,3)
     integer,allocatable:: idxl2gt(:)
     integer:: istat(mpi_status_size),itag,ierr
 
@@ -55,172 +51,119 @@ contains
       cfoutpd = cfprefix//trim(cspc_pdens)//cfpostfix
     endif
 
-!.....Parallel setting
-    anxi= 1d0/nx
-    anyi= 1d0/ny
-    anzi= 1d0/nz
-    nxyz = nx*ny*nz
-
 !.....Number of local-flux regions in a node and global
-    nl = npx*npy*npz
-    ngx = npx*nx
-    ngy = npy*ny
-    ngz = npz*nz
-    ng = ngx*ngy*ngz
+    np = npx*npy*npz
+    dpx = 1d0 /npx
+    dpy = 1d0 /npy
+    dpz = 1d0 /npz
+    dpxi= 1d0 /dpx   ! for efficiency
+    dpyi= 1d0 /dpy
+    dpzi= 1d0 /dpz
 
-    dpx = anxi /npx
-    dpy = anyi /npy
-    dpz = anzi /npz
-    dpxi = 1d0/dpx
-    dpyi = 1d0/dpy
-    dpzi = 1d0/dpz
+!.....Sub lattice representation in original hmat
+    hmati = matinv3(hmat)
+    sosub = matxvec3(hmati,orig_pdens)
+    shsub(1:3,1) = matxvec3(hmati,hmat_pdens(1:3,1))
+    shsub(1:3,2) = matxvec3(hmati,hmat_pdens(1:3,2))
+    shsub(1:3,3) = matxvec3(hmati,hmat_pdens(1:3,3))
+    shsubi = matinv3(shsub)
 
-    allocate(pdl(nl),pdt(nl),idxl2g(nl,0:nxyz-1))
-    allocate(idxl2gt(nl))
-    pdl(:) = 0d0
-
-!.....Index conversion from local to global
-    call nid2xyz(myid,mx,my,mz)
-    inc = 0
-    do ix=1,npx
-      ipx = mx*npx +ix
-      do iy=1,npy
-        ipy = my*npy +iy
-        do iz=1,npz
-          ipz = mz*npz +iz
-          inc = inc +1
-          idxg = (ipx-1)*ngz*ngy +(ipy-1)*ngz +ipz
-          idxl2gt(inc) = idxg
-        enddo
-      enddo
-    enddo
-!.....Gather idxl2gt to make idxl2g in node-0
-    if( myid.eq.0 ) then
-      idxl2g(1:nl,0) = idxl2gt(1:nl)
-      do ixyz=1,nxyz-1
-        itag = ixyz
-        call mpi_recv(idxl2gt,nl,mpi_integer,ixyz,itag,mpi_world &
-             ,istat,ierr)
-        idxl2g(1:nl,ixyz) = idxl2gt(1:nl)
-      enddo
-    else  ! myid.ne.0
-      itag = myid
-      call mpi_send(idxl2gt,nl,mpi_integer,0,itag,mpi_world,ierr)
-    endif
+    allocate(pds(np))
+    pds(:) = 0d0
 
     if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       print *,''
       print '(a)',' Probability density measuring ON:'
-      print '(a)','   Tracked species = '//trim(cspc_pdens)
-      print '(a,4(1x,i0))','   Number of regions in a node (x,y,z,total) =' &
-           ,npx,npy,npz,nl
-      print '(a,4(1x,i0))','   Number of regions globally (x,y,z,total)  =' &
-           ,ngx,ngy,ngz,ng
-      print '(a,4f7.4)','   Normalized lengths(x,y,z) of local region = ' &
-           ,dpx,dpy,dpz
+      print '(a,i0,a)','   Tracked species = ',ispc_pdens,'('//trim(cspc_pdens)//')'
+      print '(a,4(1x,i0))','   Number of regions (x,y,z,total) =' &
+           ,npx,npy,npz,np
+      print '(a,3(1x,f8.2))','   Origin of subsystem: ',orig_pdens
+      print '(a)','   Lattice vectors of subsystem:'
+      print '(5x,3(1x,f8.2))',hmat_pdens(1:3,1)
+      print '(5x,3(1x,f8.2))',hmat_pdens(1:3,2)
+      print '(5x,3(1x,f8.2))',hmat_pdens(1:3,3)
       print '(a)', '   Output file = '//trim(cfoutpd)
 
     endif
     nacc = 0
     initialized = .true.
-    
-    deallocate(idxl2gt)
     return
   end subroutine init_pdens
 !=======================================================================
-  subroutine accum_pdens(namax,natm,tag,ra)
+  subroutine accum_pdens(namax,natm,tag,ra,sorg)
 !
 !  Accumurate density of specified species.
 !
+    use vector,only: matxvec3
     integer,intent(in):: namax,natm
-    real(8),intent(in):: ra(3,namax),tag(namax)
+    real(8),intent(in):: ra(3,namax),tag(namax),sorg(3)
 
-    integer:: i,ipx,ipy,ipz,idxl,is
+    integer:: i,ipx,ipy,ipz,idx,is
     integer,parameter:: nmpi = 2
+    real(8):: ri(3),sri(3)
 
     do i=1,natm
       is = int(tag(i))
       if( is.ne.ispc_pdens ) cycle
-!.....Get local region index
-      ipx = int((ra(1,i)+dpx)*dpxi)
-      ipy = int((ra(2,i)+dpy)*dpyi)
-      ipz = int((ra(3,i)+dpz)*dpzi)
-!!$      ipx = min(max(ipx,1),npx)
-!!$      ipy = min(max(ipy,1),npy)
-!!$      ipz = min(max(ipz,1),npz)
-      idxl = (ipx-1)*npy*npz +(ipy-1)*npz +ipz
-      pdl(idxl) = pdl(idxl) +1d0
+!.....Convert from hmat-rep to shsub-rep
+      ri(1:3) = ra(1:3,i) +sorg(1:3) -sosub(1:3)
+      ri(1:3) = ri(1:3) -anint(ri(1:3))
+      sri(1:3) = matxvec3(shsubi,ri)
+      if(  sri(1).lt.0d0 .or. sri(1).ge.1d0 .or. &
+           sri(2).lt.0d0 .or. sri(2).ge.1d0 .or. &
+           sri(3).lt.0d0 .or. sri(3).ge.1d0 ) cycle
+!.....Get subsystem index
+      ipx = int(sri(1)*dpxi) +1
+      ipy = int(sri(2)*dpyi) +1
+      ipz = int(sri(3)*dpzi) +1
+      idx = (ipx-1)*npy*npz +(ipy-1)*npz +ipz
+      pds(idx) = pds(idx) +1d0
     enddo
     nacc = nacc +1
-    
+
   end subroutine accum_pdens
 !=======================================================================
-  subroutine final_pdens(myid,mpi_world,nxyz,hmat,natm,tag,ra,specorder)
+  subroutine final_pdens(myid,mpi_world,hmat)
 !
 !  Finalize prob density
 !
     use util,only: get_vol
     include 'params_unit.h'
-    integer,intent(in):: myid,mpi_world,nxyz,natm
-    real(8),intent(in):: hmat(3,3),ra(3,natm),tag(natm)
-    character(len=*),intent(in):: specorder(nspmax) 
-    
+    integer,intent(in):: myid,mpi_world
+    real(8),intent(in):: hmat(3,3)
+
     integer,parameter:: nmpi = 1
-    integer:: idxl,idxg,ixyz,is,num,ia,nums(nspmax)
-    integer:: istat(mpi_status_size),itag,ierr
-    real(8):: vol,val,ri(3),vals(nspmax)
+    integer:: idx,ixyz,is,ia
+    integer:: ierr
+    real(8):: vol,dr(3)
+    real(8),allocatable:: pdl(:)
 
 !.....Reduce prob densities in each node to global prob density
-    if( myid.eq.0 ) then
-      vol = get_vol(hmat)/ng
-      allocate(pdg(ng))
-      pdg(:) = 0d0
-      do idxl=1,nl
-        idxg = idxl2g(idxl,0)
-        pdg(idxg) = pdg(idxg) +pdl(idxl)
-      enddo
-      do ixyz=1,nxyz-1
-        itag = ixyz*nmpi -nmpi
-        pdl(:) = 0d0
-        call mpi_recv(pdl,nl,mpi_real8,ixyz,itag+1,mpi_world &
-             ,istat,ierr)
-        do idxl=1,nl
-          idxg = idxl2g(idxl,ixyz)
-          pdg(idxg) = pdg(idxg) +pdl(idxl)
-        enddo
-      enddo
+    vol = get_vol(hmat)/np
+    allocate(pdl(np))
+    call mpi_reduce(pds,pdl,np,mpi_real8,mpi_sum,0,mpi_world,ierr)
 !.....Write out pdens only at node-0
+    if( myid.eq.0 ) then
+      dr(1:3) = hmat_pdens(1,1:3)/npx +hmat_pdens(2,1:3)/npy +hmat_pdens(3,1:3)/npz
       open(ionum,file=trim(cfoutpd),status='replace')
       write(ionum,'(a)') '# Probability density in Gaussian cube format.'
       write(ionum,'(a)') '# NOTE: length unit in Bohr.'
-      write(ionum,'(2x,i0,3(1x,f7.3))') 1, 0d0, 0d0, 0d0
-      write(ionum,'(2x,i0,3(1x,es15.7))') ngx,hmat(1:3,1)*ang2bohr/ngx
-      write(ionum,'(2x,i0,3(1x,es15.7))') ngy,hmat(1:3,2)*ang2bohr/ngy
-      write(ionum,'(2x,i0,3(1x,es15.7))') ngz,hmat(1:3,3)*ang2bohr/ngz
-!!$      call get_cube_info(nspmax,specorder,nums,vals)
-!!$      do ia=1,natm
-!!$        is = int(tag(ia))
-!!$        num = nums(is)
-!!$        val = vals(is)
-!!$        ri(1:3)= hmat(1:3,1)*ra(1,ia) +hmat(1:3,2)*ra(2,ia) +hmat(1:3,3)*ra(3,ia)
-!!$        write(ionum,'(i6,f8.3,3(1x,es12.4))') num,val,ri(1:3)*ang2bohr
-!!$      enddo
+      write(ionum,'(2x,i0,3(1x,es15.7))') 1, (orig_pdens(1:3)+dr(1:3)/2)*ang2bohr
+      write(ionum,'(2x,i0,3(1x,es15.7))') npx,hmat_pdens(1:3,1)*ang2bohr/npx
+      write(ionum,'(2x,i0,3(1x,es15.7))') npy,hmat_pdens(1:3,2)*ang2bohr/npy
+      write(ionum,'(2x,i0,3(1x,es15.7))') npz,hmat_pdens(1:3,3)*ang2bohr/npz
 !.....Put a line for dummy atom
       write(ionum,'(a)') '  1   1.000   0.000  0.000  0.000'
 !.....Volumetric data 
-      write(ionum,'(6(2x,es11.3))') (pdg(idxg)/nacc/(vol*ang2bohr**3),idxg=1,ng)
+      write(ionum,'(6(2x,es11.3))') (pdl(idx)/nacc/(vol*ang2bohr**3),idx=1,np)
       close(ionum)
-      deallocate(pdg)
-    else  ! myid.ne.0
-      itag = myid*nmpi -nmpi
-      call mpi_send(pdl,nl,mpi_real8,0,itag+1,mpi_world,ierr)
     endif
+    deallocate(pdl)
     call mpi_barrier(mpi_world,ierr)
-    deallocate(pdl,pdt,idxl2g)
     return
   end subroutine final_pdens
 end module pdens
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

@@ -42,7 +42,7 @@ subroutine set_variable(ionum,cname)
   use extforce,only: lextfrc,cspc_extfrc,extfrc
   use clrchg,only: lclrchg,cspc_clrchg,clrfield,clr_init
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
-  use pdens,only: lpdens,cspc_pdens,npx,npy,npz
+  use pdens,only: lpdens,cspc_pdens,npx,npy,npz,orig_pdens,hmat_pdens
 #ifdef __WALL__
   use wall
 #endif
@@ -335,6 +335,13 @@ subroutine set_variable(ionum,cname)
     backspace(ionum)
     read(ionum,*) ctmp,npx,npy,npz
     return
+  elseif( trim(cname).eq.'orig_pdens') then
+    backspace(ionum)
+    read(ionum,*) ctmp,orig_pdens(1:3)
+    return
+  elseif( trim(cname).eq.'hmat_pdens' ) then
+    call read_rs(ionum,3,3,hmat_pdens)
+    return
     
 #ifdef __WALL__
   elseif( trim(cname).eq.'wall_pos_top' ) then
@@ -534,3 +541,7 @@ subroutine read_dumpaux(ionum)
 !!$  ldumpaux_changed = .true.
   deallocate(ctmp1)
 end subroutine read_dumpaux
+!-----------------------------------------------------------------------
+!     Local Variables:
+!     compile-command: "make pmd lib"
+!     End:

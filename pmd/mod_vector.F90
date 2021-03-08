@@ -23,6 +23,14 @@ contains
     return
   end function cart2abc
 !=======================================================================
+  function matxvec3(mat,vec) result(vecout)
+    real(8),intent(in):: mat(3,3),vec(3)
+    real(8):: vecout(3)
+
+    vecout(1:3) = mat(1:3,1)*vec(1) +mat(1:3,2)*vec(2) +mat(1:3,3)*vec(3)
+    return
+  end function matxvec3
+!=======================================================================
   function dot(a,b)
     real(8):: a(:),b(:)
     real(8):: dot
@@ -68,4 +76,42 @@ contains
     enddo
     return
   end function norm2
+!=======================================================================
+  function matinv3(mat) result(mati)
+    real(8),intent(in):: mat(3,3)
+    real(8):: mati(3,3)
+
+    integer:: i,j,im,ip,jm,jp
+    real(8):: vol,sgm(3,3),matit(3,3)
+
+!.....cofactor matrix, SGM
+    do j=1,3
+      jm=mod(j+1,3)+1
+      jp=mod(j,  3)+1
+      do i=1,3
+        im=mod(i+1,3)+1
+        ip=mod(i,  3)+1
+        sgm(i,j)=mat(ip,jp)*mat(im,jm)-mat(im,jp)*mat(ip,jm)
+      enddo
+    enddo
+!.....volume
+    vol=mat(1,1)*sgm(1,1)+mat(2,1)*sgm(2,1)+mat(3,1)*sgm(3,1)
+    do j=1,3
+      do i=1,3
+        matit(i,j)= sgm(i,j)/vol
+      enddo
+    enddo
+!....transpose
+    do j=1,3
+      do i=1,3
+        mati(i,j)= matit(j,i)
+      enddo
+    enddo
+    return
+  end function matinv3
 end module vector
+!-----------------------------------------------------------------------
+!     Local Variables:
+!     compile-command: "make pmd lib"
+!     End:
+

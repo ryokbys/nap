@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-06 14:41:14 Ryo KOBAYASHI>
+!                     Last-modified: <2021-03-08 12:05:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -322,8 +322,7 @@ program pmd
 !.....Init for local flux
   if( lflux ) call init_lflux(myid_md,nx,ny,nz,lclrchg &
        ,nstp,mpi_md_world,iprint)
-  if( lpdens ) call init_pdens(myid_md,nx,ny,nz,h,specorder &
-       ,mpi_md_world,iprint)
+  if( lpdens ) call init_pdens(myid_md,h,mpi_md_world,iprint)
 
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then
@@ -348,8 +347,7 @@ program pmd
   endif
 
   if( lflux ) call final_lflux(myid_md)
-  if( lpdens ) call final_pdens(myid_md,mpi_md_world,nodes_md,h &
-       ,ntot,tagtot,rtot,specorder)
+  if( lpdens ) call final_pdens(myid_md,mpi_md_world,h)
 
 !.....write energy, forces and stresses only for fitpot
   if( myid_md.eq.0 ) then
@@ -396,7 +394,7 @@ subroutine write_initial_setting()
   use force
   use clrchg,only: lclrchg, cspc_clrchg, clrfield, clr_init
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
-  use pdens,only: lpdens,cspc_pdens,npx,npy,npz
+  use pdens,only: lpdens,cspc_pdens,npx,npy,npz,orig_pdens,hmat_pdens
   implicit none 
   integer:: i
 
@@ -531,6 +529,11 @@ subroutine write_initial_setting()
     write(6,'(2x,a,5x,l)') 'flag_pdens',lpdens
     write(6,'(2x,a,5x,a)') 'spcs_pdens',trim(cspc_pdens)
     write(6,'(2x,a,3x,3(2x,i0))') 'ndiv_pdens',npx,npy,npz
+    write(6,'(2x,a,3x,3(2x,f8.2))') 'orig_pdens',orig_pdens(1:3)
+    write(6,'(2x,a)') 'hmat_pdens'
+    do i=1,3
+      write(6,'(5x,3(2x,f8.2))') hmat_pdens(1:3,i)
+    enddo
     write(6,'(2x,a)') ''
   endif
 !.....Charge
@@ -580,7 +583,7 @@ subroutine bcast_params()
   use extforce,only: lextfrc,cspc_extfrc,extfrc
   use clrchg,only: lclrchg,cspc_clrchg,clr_init,clrfield
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
-  use pdens,only: lpdens,npx,npy,npz,cspc_pdens
+  use pdens,only: lpdens,npx,npy,npz,cspc_pdens,orig_pdens,hmat_pdens
   implicit none
   include 'mpif.h'
 
@@ -688,6 +691,8 @@ subroutine bcast_params()
     call mpi_bcast(npx,1,mpi_integer,0,mpicomm,ierr)
     call mpi_bcast(npy,1,mpi_integer,0,mpicomm,ierr)
     call mpi_bcast(npz,1,mpi_integer,0,mpicomm,ierr)
+    call mpi_bcast(orig_pdens,3,mpi_real8,0,mpicomm,ierr)
+    call mpi_bcast(hmat_pdens,3,mpi_real8,0,mpicomm,ierr)
   endif
 !.....Metadynamics
   call mpi_bcast(lmetaD,1,mpi_logical,0,mpicomm,ierr)
@@ -974,5 +979,5 @@ end subroutine determine_division
 !=======================================================================
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:
