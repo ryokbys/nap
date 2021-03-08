@@ -530,7 +530,6 @@ contains
 !-----reset headers
     lshd(1:lcxyz)= 0
 
-
 !-----construct a linked-cell list, LSCL, & a header list, LSHD
     do i=1,natm
 !-------assign a vector cell index
@@ -555,17 +554,17 @@ contains
           m= (mx-1)*lcyz +(my-1)*lcz +mz
           if (lshd(m).eq.0) goto 5
           do kuz= -1,1
+            m1z= mz +kuz
+            if( m1z.lt.1   ) m1z= m1z +lcz
+            if( m1z.gt.lcz ) m1z= m1z -lcz
             do kuy= -1,1
+              m1y= my +kuy
+              if( m1y.lt.1   ) m1y= m1y +lcy
+              if( m1y.gt.lcy ) m1y= m1y -lcy
               do kux= -1,1
                 m1x= mx +kux
-                m1y= my +kuy
-                m1z= mz +kuz
                 if( m1x.lt.1   ) m1x= m1x +lcx
                 if( m1x.gt.lcx ) m1x= m1x -lcx
-                if( m1y.lt.1   ) m1y= m1y +lcy
-                if( m1y.gt.lcy ) m1y= m1y -lcy
-                if( m1z.lt.1   ) m1z= m1z +lcz
-                if( m1z.gt.lcz ) m1z= m1z -lcz
                 m1=(m1x-1)*lcyz +(m1y-1)*lcz +m1z
                 if (lshd(m1).eq.0) goto 6
 
@@ -589,9 +588,8 @@ contains
                 if(rij2.lt.rc2) then
                   do l=1,lspr(0,i)
                     if( lspr(l,i).eq.j ) then
-                      write(6,'(a)') " [Error] lspr(0,i) already has it !!!"
-                      write(6,'(a)') "   Check the simulation cell size."
-                      stop
+!.....If there is the same index in the neighbor, skip storing this j
+                      goto 3
                     endif
                   enddo
                   lspr(0,i)= lspr(0,i) +1
