@@ -5,7 +5,7 @@ module pdens
   use pmdvars,only: nspmax
   use util,only: csp2isp
   use pmdmpi,only: nid2xyz
-  use element,only: get_cube_info
+!!$  use element,only: get_cube_info
   implicit none
   include 'mpif.h'
   include "./const.h"
@@ -193,19 +193,21 @@ contains
       open(ionum,file=trim(cfoutpd),status='replace')
       write(ionum,'(a)') '# Probability density in Gaussian cube format.'
       write(ionum,'(a)') '# NOTE: length unit in Bohr.'
-      write(ionum,'(2x,i0,3(1x,f7.3))') natm, 0d0, 0d0, 0d0
+      write(ionum,'(2x,i0,3(1x,f7.3))') 1, 0d0, 0d0, 0d0
       write(ionum,'(2x,i0,3(1x,es15.7))') ngx,hmat(1:3,1)*ang2bohr/ngx
       write(ionum,'(2x,i0,3(1x,es15.7))') ngy,hmat(1:3,2)*ang2bohr/ngy
       write(ionum,'(2x,i0,3(1x,es15.7))') ngz,hmat(1:3,3)*ang2bohr/ngz
-      call get_cube_info(nspmax,specorder,nums,vals)
-      do ia=1,natm
-        is = int(tag(ia))
-        num = nums(is)
-        val = vals(is)
-        ri(1:3)= hmat(1:3,1)*ra(1,ia) +hmat(1:3,2)*ra(2,ia) +hmat(1:3,3)*ra(3,ia)
-        write(ionum,'(i6,f8.3,3(1x,es12.4))') num,val,ri(1:3)*ang2bohr
-      enddo
-!!$      write(ionum,'(a)') '  1   1.000   0.000  0.000  0.000'
+!!$      call get_cube_info(nspmax,specorder,nums,vals)
+!!$      do ia=1,natm
+!!$        is = int(tag(ia))
+!!$        num = nums(is)
+!!$        val = vals(is)
+!!$        ri(1:3)= hmat(1:3,1)*ra(1,ia) +hmat(1:3,2)*ra(2,ia) +hmat(1:3,3)*ra(3,ia)
+!!$        write(ionum,'(i6,f8.3,3(1x,es12.4))') num,val,ri(1:3)*ang2bohr
+!!$      enddo
+!.....Put a line for dummy atom
+      write(ionum,'(a)') '  1   1.000   0.000  0.000  0.000'
+!.....Volumetric data 
       write(ionum,'(6(2x,es11.3))') (pdg(idxg)/nacc/(vol*ang2bohr**3),idxg=1,ng)
       close(ionum)
       deallocate(pdg)

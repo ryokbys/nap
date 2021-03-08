@@ -13,7 +13,7 @@ except:
 import nappy
 import numpy as np
 
-__all__ = ['inpmd','pmd2phonopy']
+__all__ = ['inpmd','pmd2phonopy','pairlist']
 
 from . import *
 

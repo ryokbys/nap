@@ -313,7 +313,7 @@ subroutine init_force(namax,natm,nspmax,nsp,tag,aux,naux, &
   character(len=3):: cspi,cspj
 
   if( .not. linit ) return
-  
+
   if( iprint.ne.0 ) call write_forces(myid_md)
 
   if( loverlay ) then

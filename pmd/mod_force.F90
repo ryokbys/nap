@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-27 14:48:19 Ryo KOBAYASHI>
+!                     Last-modified: <2021-03-06 14:42:24 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   implicit none
@@ -128,11 +128,11 @@ contains
     endif
   end subroutine write_forces
 !=======================================================================
-  subroutine bcast_force()
+  subroutine bcast_force(mpicomm)
 !
 !   Broadcast variables related to mod_force.
 !
-    use pmdvars,only: mpicomm
+    integer,intent(in):: mpicomm
     include 'mpif.h'
     integer:: ierr
 

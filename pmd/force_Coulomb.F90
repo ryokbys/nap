@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-28 00:25:16 Ryo KOBAYASHI>
+!                     Last modified: <2021-03-05 23:06:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -175,7 +175,7 @@ contains
     nsp = nspin
 
     call read_paramsx(myid,mpi_md_world,iprint,specorder)
-
+    
     if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
 !.....Variable-charge Coulomb with Gaussian distribution charges
 !     which ends-up long-range-only Ewald summation

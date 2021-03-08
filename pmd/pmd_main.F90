@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-02 14:11:26 Ryo KOBAYASHI>
+!                     Last-modified: <2021-03-06 14:41:14 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -640,7 +640,7 @@ subroutine bcast_params()
   call mpi_bcast(chgfix,20,mpi_character,0,mpicomm,ierr)
 !.....Force-fields
   call mpi_bcast(cforce,20,mpi_character,0,mpicomm,ierr)
-  call bcast_force()
+  call bcast_force(mpicomm)
 !!$  call mpi_bcast(num_forces,1,mpi_integer,0,mpicomm,ierr)
 !!$  if( num_forces.eq.0 ) then
 !!$    if( myid_md.eq.0 ) write(6,'(a)') &

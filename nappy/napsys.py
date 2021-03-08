@@ -96,6 +96,9 @@ class NAPSystem(object):
         txt = analyze_msg(self)
         return txt
 
+    def __len__(self):
+        return len(self.atoms)
+
     def init_atoms(self):
         self.atoms = pd.DataFrame(columns=DEFAULT_LABELS)
         return None
@@ -339,6 +342,19 @@ class NAPSystem(object):
         self.atoms.vel = [ np.array(v) for v in svels ]
         return None
 
+    def get_tags(self):
+        """
+        Returns
+        -------
+        tags : numpy.array
+            List of tags of atoms which is used in pmd.
+        """
+        tags = np.zeros(self.num_atoms())
+        sids = self.atoms.sid
+        for i in range(self.num_atoms()):
+            tags[i] = 1.0*sids[i] +0.1 +1e-14*(i+1)
+        return tags
+        
     def get_symbols(self):
         """
         Returns
@@ -546,7 +562,8 @@ class NAPSystem(object):
         angle = np.arccos(np.dot(rij,rik)/dij/dik) /np.pi *180.0
         return angle
 
-    def make_pair_list(self,rcut=3.0,rcuts=None,distance=False):
+    def make_pair_list(self,rcut=3.0,rcuts=None,nnmax=100,
+                       distance=False):
         """
         Make a neighbor list.
         The neighbor list of each atom is stored as lspr in the self.atoms column.
@@ -560,9 +577,22 @@ class NAPSystem(object):
                 rcuts = {('Si','Si'):2.5, ('Si','O'):2.0,}
                 ```
                 If a pair is not given, the cutoff for the pair is the maximum of those.
+            nnmax: int
+                Max number of neighbors. [default: 100]
             distance: logical
                 Whether or not store the distances of neighbors.
+           
         """
+        try:
+            import nappy.pmd.pairlist as pl
+            plst = pl.fmake_pairlist(self,rcut=rcut,nnmax=nnmax)
+            lspr = []
+            for ia in range(self.num_atoms()):
+                lspr.append( [ plst[ia,1+j]-1 for j in range(plst[ia,0]) ] )
+            self.atoms['lspr'] = lspr
+            return None
+        except:
+            pass
         rcs2 = np.zeros((len(self.specorder),len(self.specorder)),dtype=float)
         if rcuts is not None:
             for i,si in enumerate(self.specorder):
