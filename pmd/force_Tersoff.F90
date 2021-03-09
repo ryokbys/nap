@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-27 09:57:01 Ryo KOBAYASHI>
+!                     Last modified: <2021-03-09 11:38:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -71,7 +71,7 @@ contains
   end subroutine init_tersoff
 !=======================================================================
   subroutine force_tersoff(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
        ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint &
        ,tei)
     use vector,only: dot
@@ -82,7 +82,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
-         ,tag(namax),rc
+         ,tag(namax),rc,d2lspr(nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs
@@ -154,11 +154,12 @@ contains
       if( ts_type(1:2).eq.'Te' ) call set_ted_params(tei(ia))
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
+        if( d2lspr(jj,ia).ge.ts_rc2 ) cycle
         if( ja.le.ia ) cycle
         xij(1:3) = ra(1:3,ja) -xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-        if( dij2.gt.ts_rc2 ) cycle
+!!$        if( dij2.gt.ts_rc2 ) cycle
         dij = dsqrt(dij2)
 !.....Potential
         fc = f_c(dij)
@@ -207,11 +208,12 @@ contains
       xi(1:3) = ra(1:3,ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
+        if( d2lspr(jj,ia).ge.ts_rc2 ) cycle
         if( ja.eq.ia ) cycle
         xij(1:3) = ra(1:3,ja) -xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-        if( dij2.gt.ts_rc2 ) cycle
+!!$        if( dij2.gt.ts_rc2 ) cycle
         dij = dsqrt(dij2)
         diji = 1d0/dij
         dirij(1:3)= -rij(1:3)*diji
@@ -223,11 +225,12 @@ contains
         zeta = 0d0
         do kk=1,lspr(0,ia)
           ka = lspr(kk,ia)
+          if( d2lspr(kk,ia).ge.ts_rc2 ) cycle
           if( ka.eq.ja ) cycle
           xik(1:3) = ra(1:3,ka) -xi(1:3)
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
-          if( dik2.gt.ts_rc2 ) cycle
+!!$          if( dik2.gt.ts_rc2 ) cycle
           dik = dsqrt(dik2)
           fcik = f_c(dik)
           texp3 = exp(ts_alpha*(dij-dik)**ts_beta)
@@ -267,11 +270,12 @@ contains
         sumj(1:3) = 0d0
         do kk=1,lspr(0,ia)
           ka = lspr(kk,ia)
+          if( d2lspr(kk,ia).ge.ts_rc2 ) cycle
           if( ka.eq.ja ) cycle
           xik(1:3) = ra(1:3,ka) -xi(1:3)
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
-          if( dik2.gt.ts_rc2 ) cycle
+!!$          if( dik2.gt.ts_rc2 ) cycle
           dik = dsqrt(dik2)
           diki= 1d0/dik
           dirik(1:3)= -rik(1:3)*diki
@@ -785,5 +789,5 @@ contains
 end module tersoff
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

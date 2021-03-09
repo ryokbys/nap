@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-03-02 17:57:50 Ryo KOBAYASHI>
+!                     Last modified: <2021-03-09 11:01:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -86,7 +86,7 @@ module Morse
 
 contains
   subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
     implicit none
@@ -98,7 +98,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6)
+         ,tag(namax),sv(3,6),d2lspr(nnmax,namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -150,6 +150,7 @@ contains
       xi(1:3)= ra(1:3,i)
       is=int(tag(i))
       do k=1,lspr(0,i)
+        if( d2lspr(k,i).ge.rc2 ) cycle
         j=lspr(k,i)
         if(j.eq.0) exit
         js= int(tag(j))

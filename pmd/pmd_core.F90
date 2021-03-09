@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-08 14:34:31 Ryo KOBAYASHI>
+!                     Last-modified: <2021-03-09 11:34:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -30,7 +30,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   use localflux,only: lflux,accum_lflux
   use pdens,only: lpdens,accum_pdens
   use time, only: sec2hms, accum_time
-  use pairlist, only: mk_lspr_para,mk_lscl_para,reorder_arrays
+  use pairlist, only: mk_lspr_para,mk_lscl_para,reorder_arrays,update_d2lspr
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -319,7 +319,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
        ,nx,ny,nz,myid_md)
   l1st = .true.
   if( lreorder ) then
-    call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc,rc1nn &
+    call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc &
          ,h,hi,l1st)
     call reorder_arrays(namax,natm,nb,tag,ra,va,aux,naux)
     l1st = .false.
@@ -331,8 +331,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   call accum_time('ba_xxx',mpi_wtime()-tmp)
 !-----Make pair list
   tmp = mpi_wtime()
-  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf,rc1nn &
-       ,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
+  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
+       ,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
   call accum_time('lspr',mpi_wtime()-tmp)
 
 !.....Calc forces
@@ -344,8 +344,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   lcell_updated = .true.
   tmp = mpi_wtime()
   call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-       ,lspr,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
+       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
        ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
   call accum_time('get_force',mpi_wtime()-tmp)
   lcell_updated = .false.
@@ -355,14 +355,9 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 
 !.....Structure analysis
   if( trim(cstruct).eq.'CNA' ) then
-    if( rc1nn.gt.(rc+rbuf)/2 .and. myid_md.eq.0 ) then
-      print *,' WARNING: rc1nn > (rc+rbuf)/2, ' &
-           //'which may cause problem in CNA.'
-      print *,'   rc,rbuf,rc1nn =',rc,rbuf,rc1nn
-    endif
-    call cna(namax,natm,nb,nnmax,ls1nn,tag)
+    call cna(namax,natm,nb,nnmax,lspr,d2lspr,rc_struct)
   else if( trim(cstruct).eq.'a-CNA' ) then
-    call acna(namax,natm,nb,nnmax,lspr,h,ra,tag)
+    call acna(namax,natm,nb,nnmax,lspr,d2lspr,rc_struct)
   endif
 !.....Color charge NEMD
   if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(iauxof('clr'),:),hi,specorder &
@@ -696,7 +691,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
       call bamove()
       l1st = .false.
       if( lreorder ) then
-        call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc,rc1nn &
+        call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc &
              ,h,hi,l1st)
         call reorder_arrays(namax,natm,nb,tag,ra,va,aux,naux)
       endif
@@ -706,7 +701,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 !.....Make pair list
       tmp = mpi_wtime()
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-           ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
+           ,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
       call accum_time('lspr',mpi_wtime()-tmp)
       rbufres = rbuf
     else
@@ -714,6 +709,9 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
       tmp = mpi_wtime()
       call bacopy_fixed()
       call accum_time('ba_xxx',mpi_wtime()-tmp)
+      tmp = mpi_wtime()
+      call update_d2lspr(namax,natm,nnmax,lspr,h,ra,rc,rbuf,d2lspr)
+      call accum_time('lspr',mpi_wtime()-tmp)
     endif
 
     if(ifpmd.gt.0.and. mod(istp,noutpmd).eq.0 )then
@@ -722,8 +720,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 !-------Calc forces
     tmp = mpi_wtime()
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-         ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-         ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
+         ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+         ,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
     call accum_time('get_force',mpi_wtime()-tmp)
     lcell_updated = .false.
@@ -731,10 +729,10 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 !.....Structure analysis
     if( trim(cstruct).eq.'CNA' &
          .and. mod(istp,istruct).eq.0 ) then
-      call cna(namax,natm,nb,nnmax,ls1nn,tag)
+      call cna(namax,natm,nb,nnmax,lspr,d2lspr,rc_struct)
     else if( trim(cstruct).eq.'a-CNA' &
          .and. mod(istp,istruct).eq.0 ) then
-      call acna(namax,natm,nb,nnmax,lspr,h,ra,tag)
+      call acna(namax,natm,nb,nnmax,lspr,d2lspr,rc_struct)
     endif
 !.....Color charge NEMD
     if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(iauxof('clr'),:),hi,specorder &
@@ -1127,7 +1125,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   if( ltdst ) then
     deallocate(tdst,nadst)
   endif
-  deallocate(ra,va,aa,ra0,strs,stt,tag,lspr,ls1nn &
+  deallocate(ra,va,aa,ra0,strs,stt,tag,lspr,d2lspr &
        ,epi,eki,stp,stn,lsb,lsex)
   deallocate(aux)
 end subroutine pmd_core
@@ -1209,13 +1207,13 @@ subroutine oneshot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
 !-----Make pair list
   l1st = .true.
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-       ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
+       ,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
   lstrs = .true.
 
   if( iprint.ge.ipl_info ) print *,'get_force...'
   call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-       ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
+       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
        ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
 
 !      print *,'one_shot: 07'
@@ -1327,14 +1325,14 @@ subroutine oneshot4fitpot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
 !-----Make pair list
   l1st = .true.
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-       ,rc1nn,h,hi,anxi,anyi,anzi,lspr,ls1nn,iprint,l1st)
+       ,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
   lstrs = .true.
 
   if( .not.lcalcgrad ) then
     if( iprint.ge.ipl_basic ) print *,'get_force...'
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-         ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc &
-         ,lspr,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
+         ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+         ,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
     if( iprint.ge.ipl_basic ) print '(a,es15.7)',' Potential energy = ',epot
   else  ! lcalcgrad = .true.
@@ -3148,7 +3146,7 @@ subroutine alloc_namax_related()
   if( allocated(stt) ) deallocate(stt)
   if( allocated(tag) ) deallocate(tag)
   if( allocated(lspr) ) deallocate(lspr)
-  if( allocated(ls1nn) ) deallocate(ls1nn)
+  if( allocated(d2lspr) ) deallocate(d2lspr)
   if( allocated(epi) ) deallocate(epi)
   if( allocated(eki) ) deallocate(eki)
   if( allocated(stp) ) deallocate(stp)
@@ -3158,7 +3156,7 @@ subroutine alloc_namax_related()
   if( allocated(lsex) ) deallocate(lsex)
   allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax) &
        ,strs(3,3,namax),stt(3,3,namax),tag(namax) &
-       ,lspr(0:nnmax,namax),ls1nn(0:nnmax,namax) &
+       ,lspr(0:nnmax,namax),d2lspr(nnmax,namax) &
        ,epi(namax),eki(3,3,namax) &
        ,stp(3,3,namax),stn(3,3,namax) &
        ,lsb(0:nbmax,6),lsex(nbmax,6))
@@ -3265,15 +3263,14 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   call copy_iarr(ndim,iarr,lspr)
   deallocate(iarr)
 
-
-!.....ls1nn
-  ndim = size(ls1nn)
-  allocate(iarr(ndim))
-  call copy_iarr(ndim,ls1nn,iarr)
-  deallocate(ls1nn)
-  allocate(ls1nn(0:nnmax,newnamax))
-  call copy_iarr(ndim,iarr,ls1nn)
-  deallocate(iarr)
+!.....d2lspr
+  ndim = size(d2lspr)
+  allocate(arr(ndim))
+  call copy_arr(ndim,d2lspr,arr)
+  deallocate(d2lspr)
+  allocate(d2lspr(nnmax,newnamax))
+  call copy_arr(ndim,arr,d2lspr)
+  deallocate(arr)
 
 !.....epi
   ndim = size(epi)

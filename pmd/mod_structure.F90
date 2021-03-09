@@ -1,6 +1,6 @@
 module structure
 !-----------------------------------------------------------------------
-!                     Last modified: <2019-05-09 13:31:15 Ryo KOBAYASHI>
+!                     Last modified: <2021-03-09 10:52:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Routines of structure analyses.
 !-----------------------------------------------------------------------
@@ -142,9 +142,9 @@ contains
 
   end subroutine cna_indices
 !=======================================================================
-  subroutine cna(namax,natm,nbndr,nnmax,ls1nn,tag)
+  subroutine cna(namax,natm,nbndr,nnmax,lspr,d2lspr,rcut)
 !-----------------------------------------------------------------------
-! Common Neighbor Analysis using the neighbor list for 1st NN, LS1NN.
+! Common Neighbor Analysis using the neighbor list and rcut.
 ! Computes a digit for each atom that represents crystalline structure:
 !   0: other
 !   1: FCC
@@ -152,18 +152,21 @@ contains
 !   3: BCC
 !-----------------------------------------------------------------------
     implicit none
-    integer,intent(in):: namax,natm,nbndr,nnmax,ls1nn(0:nnmax,namax)
-    real(8),intent(in):: tag(namax)
+    integer,intent(in):: namax,natm,nbndr,nnmax,lspr(0:nnmax,namax)
+    real(8),intent(in):: rcut,d2lspr(nnmax,namax)
+
+    integer,allocatable:: lsnn(:,:)
 
     integer:: i,j,l,m,n,ii,iii,ni,jj,nj,il,jl,n1,n2,iil,nn1,im,iim &
          ,ib1,ib2,iib1,iib2,n421,n422,n663,n443
+    real(8):: rc2
 
 !-----for parallel code
     if( lcna1st ) then
       allocate(icommon(lmax),ibond(2,mmax),nb(mmax),idc(3,nnmax,namax)&
-           ,idcna(namax))
+           ,idcna(namax),lsnn(0:nnmax,namax))
       mem = mem +4*size(icommon) +4*size(ibond) +4*size(nb) &
-           +4*size(idc) +4*size(idcna)
+           +4*size(idc) +4*size(idcna) +4*size(lsnn)
       lcna1st = .false.
     endif
 
@@ -174,13 +177,24 @@ contains
     endif
 
     idcna(:) = 0
+    lsnn(:,:) = 0
+    rc2 = rcut*rcut
 
-    call cna_indices(namax,natm,nbndr,nnmax,ls1nn)
-    call assign_struct_cna(namax,natm,nbndr,nnmax,ls1nn)
+    do i=1,natm+nbndr
+      do jj=1,lspr(0,i)
+        if( d2lspr(jj,i) .ge. rc2 ) cycle
+        j = lspr(jj,i)
+        lsnn(0,i) = lsnn(0,i) +1
+        lsnn(lsnn(0,i),i) = j
+      enddo
+    enddo
+
+    call cna_indices(namax,natm,nbndr,nnmax,lsnn)
+    call assign_struct_cna(namax,natm,nbndr,nnmax,lsnn)
 
   end subroutine cna
 !=======================================================================
-  subroutine acna(namax,natm,nbndr,nnmax,lspr,h,ra,tag)
+  subroutine acna(namax,natm,nbndr,nnmax,lspr,d2lspr,rcut)
 !-----------------------------------------------------------------------
 ! Adaptive CNA using the full neighbor list, LSPR.
 ! See, [1] Stukowski, MSMSE 20 (2012) 045021.
@@ -193,90 +207,70 @@ contains
 !-----------------------------------------------------------------------
     implicit none
     integer,intent(in):: namax,natm,nbndr,nnmax
-    real(8),intent(in):: h(3,3),ra(3,namax),tag(namax)
+    real(8),intent(inout):: d2lspr(nnmax,namax)
+    real(8),intent(in):: rcut
     integer,intent(inout):: lspr(0:nnmax,namax)
 
     integer:: i,j,l,m,n,ii,iii,ni,jj,kk,nj,il,jl,n1,n2,iil,nn1,im,iim &
          ,ib1,ib2,iib1,iib2,itmp,lm,istart
     real(8):: tmp,xi(3),xj(3),xij(3),rij(3),dij,dsum,dsum1,dsum2
-    real(8),allocatable,save:: dists(:,:),rcfccs(:),rcbccs(:)
+    real(8),allocatable,save:: rcfccs(:),rcbccs(:)
     integer,allocatable,save:: lsnn(:,:)
 
 !-----for parallel code
     if( lcna1st ) then
       allocate(icommon(lmax),ibond(2,mmax),nb(mmax),idc(3,nnmax,namax)&
-           ,idcna(namax),dists(nnmax,namax),lsnn(0:nnsortmax,namax) &
+           ,idcna(namax),lsnn(0:nnsortmax,namax) &
            ,rcfccs(namax),rcbccs(namax))
       mem = mem +4*size(icommon) +4*size(ibond) +4*size(nb) &
-           +4*size(idc) +4*size(idcna) +8*size(dists) +4*size(lsnn) &
+           +4*size(idc) +4*size(idcna) +4*size(lsnn) &
            +8*size(rcfccs) +8*size(rcbccs)
       lcna1st = .false.
     endif
 
     if( size(idcna).ne.namax ) then
-      mem = mem -4*size(idc) -4*size(idcna) -4*size(lsnn) -8*size(dists) &
+      mem = mem -4*size(idc) -4*size(idcna) -4*size(lsnn) &
            -8*size(rcfccs) -8*size(rcbccs)
       deallocate(idc,idcna)
-      allocate(idc(3,nnmax,namax),idcna(namax),lsnn(0:nnsortmax,namax) &
-           ,dists(nnmax,namax))
-      mem = mem +4*size(idc) +4*size(idcna) +4*size(lsnn) +8*size(dists) &
+      allocate(idc(3,nnmax,namax),idcna(namax),lsnn(0:nnsortmax,namax))
+      mem = mem +4*size(idc) +4*size(idcna) +4*size(lsnn) &
            +8*size(rcfccs) +8*size(rcbccs)
     endif
 
     idcna(:) = 0
-    dists(:,:) = 0d0
-
-!.....Compute all the distances between neighbors
-    do i=1,natm+nbndr
-      xi(1:3) = ra(1:3,i)
-      do jj=1,lspr(0,i)
-        j = lspr(jj,i)
-        xj(1:3) = ra(1:3,j)
-        xij(1:3) = xj(1:3) -xi(1:3)
-        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij = sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-        dists(jj,i) = dij
-      enddo
-    enddo ! i=...
-
 
 !.....Compute local cutoff for each atom
     do i=1,natm+nbndr
 !.....Sort LSPR in the ascending order of the distance only up to nnsortmax
       do kk=1,min(lspr(0,i),nnsortmax)
         do jj=lspr(0,i),kk+1,-1
-!.....Exchange jj-th and (jj+1)-th of lspr and dists if dists(jj)>dists(jj+1)
-          if( dists(jj-1,i).gt.dists(jj,i) ) then
-            tmp = dists(jj-1,i)
-            dists(jj-1,i) = dists(jj,i)
-            dists(jj,i) = tmp
+!.....Exchange jj-th and (jj+1)-th of lspr and d2lspr if d2lspr(jj)>d2lspr(jj+1)
+          if( d2lspr(jj-1,i).gt.d2lspr(jj,i) ) then
+            tmp = d2lspr(jj-1,i)
+            d2lspr(jj-1,i) = d2lspr(jj,i)
+            d2lspr(jj,i) = tmp
             itmp = lspr(jj-1,i)
             lspr(jj-1,i) = lspr(jj,i)
             lspr(jj,i) = itmp
           endif
         enddo ! jj
       enddo ! kk
-!!$      if( i.eq.1 .or. i.eq.50 ) then
-!!$        do jj=1,nnsortmax
-!!$          j = lspr(jj,i)
-!!$          print *,'i,jj,j,dist=',i,jj,j,dists(jj,i)
-!!$        enddo
-!!$      endif
+
 !.....Local cutoff for fcc (use only up to 12 neighbors)
       dsum = 0d0
       do jj=1,12
-        dsum = dsum +dists(jj,i)
+        dsum = dsum +sqrt(d2lspr(jj,i))
       enddo
       rcfccs(i) = (1d0+sqrt(2d0))/2 *dsum/12
 
 !.....Local cutoff for bcc (use up to 14 neighbors)
       dsum1 = 0d0
       do jj=1,8
-        dsum1 = dsum1 +dists(jj,i)
+        dsum1 = dsum1 +sqrt(d2lspr(jj,i))
       enddo
       dsum2 = 0d0
       do jj=9,14
-        dsum2 = dsum2 +dists(jj,i)
+        dsum2 = dsum2 +sqrt(d2lspr(jj,i))
       enddo
 !.....NOTE: rcbcc is different from the definition in Ref [1]
       rcbccs(i) = (1d0+sqrt(2d0))/4 *( 2d0/sqrt(3d0)*dsum1/8 +dsum2/6)
@@ -286,7 +280,7 @@ contains
     lsnn(0,:) = 0
     do i=1,natm+nbndr
       do jj=1,min(nnsortmax,lspr(0,i))
-        if( dists(jj,i).gt.rcfccs(i) ) exit
+        if( d2lspr(jj,i).gt.rcfccs(i) ) exit
         lsnn(0,i) = lsnn(0,i) + 1
         lsnn(jj,i) = lspr(jj,i)
       enddo
@@ -298,7 +292,7 @@ contains
     do i=1,natm+nbndr
       istart = lsnn(0,i)+1
       do jj=istart,min(nnsortmax,lspr(0,i))
-        if( dists(jj,i).gt.rcbccs(i) ) exit
+        if( d2lspr(jj,i).gt.rcbccs(i) ) exit
         lsnn(0,i) = lsnn(0,i) + 1
         lsnn(jj,i) = lspr(jj,i)
       enddo
@@ -315,7 +309,8 @@ contains
     integer,intent(in):: namax,natm,nbndr,nnmax,lspr(0:nnmax,namax)
 
     integer:: i,ii,l,m,n,n421,n422,n663,n443
-    
+    real(8):: rc2
+
 !.....Identify crystalline structure and assign a digit to each atom
     do i=1,natm
       if( idcna(i).ne.0 ) cycle  ! skip already assigned atom
@@ -355,5 +350,5 @@ contains
 end module structure
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

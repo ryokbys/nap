@@ -280,6 +280,9 @@ subroutine set_variable(ionum,cname)
     backspace(ionum)
     read(ionum,*) ctmp, cstruct, istruct
     return
+  elseif( trim(cname).eq.'structure_rcut') then
+    call read_r1(ionum,rc_struct)
+    return
   elseif( trim(cname).eq.'overlay') then
     call read_overlay(ionum)
     return

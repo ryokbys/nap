@@ -222,12 +222,12 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
         pi = poss[ia]
         ndr[:,:] = 0.0
         # for ja,dij in nsys.neighbors_of(ia,distance=True):
-        for ja in nsys.neighbors_of(ia):
+        for ja,dij in nsys.neighbors_of(ia,distance=True):
             jsid = sids[ja]
-            pij = poss[ja] -pi
-            pij = pij -np.round(pij)
-            rij = np.dot(hmat,pij)
-            dij = np.sqrt(rij[0]**2 +rij[1]**2 +rij[2]**2)
+            # pij = poss[ja] -pi
+            # pij = pij -np.round(pij)
+            # rij = np.dot(hmat,pij)
+            # dij = np.sqrt(rij[0]**2 +rij[1]**2 +rij[2]**2)
             rrdr= dij/dr
             ir = int(rrdr)
             ndr[0,0,ir] += 1.0

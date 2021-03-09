@@ -16,7 +16,8 @@ def fmake_pairlist(nsys,rcut=3.0,iprint=1,l1st=True,nnmax=100):
     iprint = iprint
     l1st = l1st
 
-    lspr,ls1nn = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,pos.T,
-                                             rcut,rc1nn,hmat,hmati,
-                                             iprint,l1st)
-    return lspr.T
+    lspr,d2lspr = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,pos.T,
+                                              rcut,rc1nn,hmat,hmati,
+                                              iprint,l1st)
+
+    return lspr.T, d2lspr.T

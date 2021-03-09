@@ -562,8 +562,7 @@ class NAPSystem(object):
         angle = np.arccos(np.dot(rij,rik)/dij/dik) /np.pi *180.0
         return angle
 
-    def make_pair_list(self,rcut=3.0,rcuts=None,nnmax=100,
-                       distance=False):
+    def make_pair_list(self,rcut=3.0,rcuts=None,nnmax=100):
         """
         Make a neighbor list.
         The neighbor list of each atom is stored as lspr in the self.atoms column.
@@ -579,21 +578,20 @@ class NAPSystem(object):
                 If a pair is not given, the cutoff for the pair is the maximum of those.
             nnmax: int
                 Max number of neighbors. [default: 100]
-            distance: logical
-                Whether or not store the distances of neighbors.
-           
         """
-        if not distance:
-            try:
-                import nappy.pmd.pairlist as pl
-                plst = pl.fmake_pairlist(self,rcut=rcut,nnmax=nnmax)
-                lspr = []
-                for ia in range(self.num_atoms()):
-                    lspr.append( [ plst[ia,1+j]-1 for j in range(plst[ia,0]) ] )
-                self.atoms['lspr'] = lspr
-                return None
-            except:
-                pass
+        try:
+            import nappy.pmd.pairlist as pl
+            plst,dist = pl.fmake_pairlist(self,rcut=rcut,nnmax=nnmax)
+            lspr = []
+            dists = []
+            for ia in range(self.num_atoms()):
+                lspr.append( [ plst[ia,1+j]-1 for j in range(plst[ia,0]) ] )
+                dists.append( [ np.sqrt(dist[ia,1+j]) for j in range(plst[ia,0])] )
+            self.atoms['lspr'] = lspr
+            self.atoms['distance'] = dists
+            return None
+        except:
+            pass
         rcs2 = np.zeros((len(self.specorder),len(self.specorder)),dtype=float)
         if rcuts is not None:
             for i,si in enumerate(self.specorder):
@@ -681,8 +679,7 @@ class NAPSystem(object):
         nplspr = np.zeros((self.num_atoms(),nnmax*27),dtype=int)
         nplspr[:,:] = -1
         nlspr = np.zeros(self.num_atoms(),dtype=int)
-        if distance:
-            dists = np.zeros((self.num_atoms(),nnmax*27),dtype=float)
+        dists = np.zeros((self.num_atoms(),nnmax*27),dtype=float)
         # self.atoms['lspr'] = emptylist
         sids = self.atoms.sid
 
@@ -727,30 +724,30 @@ class NAPSystem(object):
                             if rij2 < rcs2[isp,jsp] and ja not in nplspr[ia,:]:
                                 nplspr[ia,nlspr[ia]] = ja
                                 nplspr[ja,nlspr[ja]] = ia
-                                if distance:
-                                    dij = np.sqrt(rij2)
-                                    dists[ia,nlspr[ia]] = dij
-                                    dists[ja,nlspr[ja]] = dij
+                                dij = np.sqrt(rij2)
+                                dists[ia,nlspr[ia]] = dij
+                                dists[ja,nlspr[ja]] = dij
                                 nlspr[ia] += 1
                                 nlspr[ja] += 1
                                 
                             ja = lscl[ja]
         #...Finally add the lspr to atoms DataFrame
         lspr = []
+        distances = []
         for ia in range(self.num_atoms()):
             lspr.append([ nplspr[ia,ja] for ja in range(nlspr[ia]) ])
+            distances.append([ dists[ia,ja] for ja in range(nlspr[ia]) ])
         self.atoms['lspr'] = lspr
-        if distance:
-            distances = []
-            for ia in range(self.num_atoms()):
-                distances.append([ dists[ia,ja] for ja in range(nlspr[ia]) ])
-            self.atoms['distance'] = distances
+        self.atoms['distance'] = distances
         return None
 
     def remove_pair_list(self):
-        del self.atoms['lspr']
-        if 'distance' in self.atoms.columns:
-            del self.atoms['distance']
+        try:
+            del self.atoms['lspr']
+            if 'distance' in self.atoms.columns:
+                del self.atoms['distance']
+        except:
+            raise
         return None
 
     def neighbors_of(self,ia,rcut=3.0,distance=False):

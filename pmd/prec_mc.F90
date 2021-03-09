@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2018-10-08 12:51:54 Ryo KOBAYASHI>
+!                     Last-modified: <2021-03-09 10:44:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -64,6 +64,7 @@ module pmc
 !.....pair-list for MC only, not to conflict with pmd
   integer,parameter:: nnmaxmc = 20
   integer,allocatable:: lsprmc(:,:)
+  real(8),allocatable:: d2lsprmc(:,:)
 !.....parallel setting for pmd
   integer:: nx = 1
   integer:: ny = 1
@@ -191,14 +192,14 @@ program prec_mc
 
 !.....create neighbor list only once here, and no longer needed after
   rc = 3.0
-  allocate(lsprmc(0:nnmaxmc,natm))
+  allocate(lsprmc(0:nnmaxmc,natm),d2lsprmc(nnmaxmc,natm))
   call make_tag(natm,csymbols,tagmc)
   if( myid_md.eq.0 ) then
     write(cnum,'(i0)') 0
     call write_POSCAR('poscars/POSCAR_'//trim(cnum),natm,csymbols,pos0,hmat,species)
   endif
   call mk_lspr_sngl(natm,natm,nnmaxmc,tagmc,pos0,rc,hmat,hmati,lsprmc, &
-       0,.true.)
+       d2lspr,0,.true.)
 
 !.....check restart,
 !     if not restart, initialize system eigher random or clustered

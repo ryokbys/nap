@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-03-04 18:30:22 Ryo KOBAYASHI>
+!                    Last modified: <2021-03-09 10:45:15 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -168,7 +168,8 @@ module pmdvars
   real(8),allocatable:: ra(:,:),va(:,:),aa(:,:),ra0(:,:),strs(:,:,:),stt(:,:,:)
 !.....real*8 identifier which includes species, index of FMV, total id
   real(8),allocatable:: tag(:)
-  integer,allocatable:: lspr(:,:),ls1nn(:,:)
+  integer,allocatable:: lspr(:,:)
+  real(8),allocatable:: d2lspr(:,:)
 !.....potential and kinetic energy per atoms
   real(8),allocatable:: epi(:),eki(:,:,:),stp(:,:,:)
 !.....mass, prefactors
@@ -240,6 +241,7 @@ module pmdvars
 !.....Structure analysis: CNA, a-CNA
   character(len=128):: cstruct = 'none'
   integer:: istruct = 1
+  real(8):: rc_struct = 2.5d0
 
 contains
   subroutine initialize_pmdvars()

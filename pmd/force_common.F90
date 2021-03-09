@@ -1,5 +1,5 @@
 subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr &
+     ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr &
      ,sorg,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs &
      ,ifcoulomb,iprint,l1st &
      ,lvc,lcell_updated,boundary)
@@ -47,6 +47,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
        ,myparity(3),nnn(6),mpi_md_world,myid_md,nex(3)
   integer,intent(in):: lspr(0:nnmax,namax) !,numff
+  real(8),intent(in):: d2lspr(nnmax,namax)
   integer,intent(inout):: ifcoulomb
   real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
        ,tag(namax),sorg(3)
@@ -123,13 +124,13 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
        ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
        ,iprint)
   if( use_force('SW') ) call force_SW(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint)
   if( use_force('EDIP_Si') ) call force_EDIP_Si(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
   if( use_force('Tersoff') ) call force_tersoff(namax,natm,tag,ra,nnmax,aa &
-       ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint &
        ,aux(iauxof('tei'),:))
   if( use_force('Brenner') ) call force_Brenner(namax,natm,tag,ra,nnmax,aa &
@@ -191,7 +192,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Morse') ) call force_Morse(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
   if( use_force('Morse_repul') ) call force_Morse_repul(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
@@ -244,7 +245,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
   else if( use_force('Ewald') ) then  ! Ewald Coulomb
     call force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
          ,aux(iauxof('chg'),:),aux(iauxof('chi'),:),h,hi,tcom,nb,nbmax &
-         ,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,sorg &
+         ,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   else if( use_force('Ewald_long') ) then ! long-range Coulomb
@@ -256,7 +257,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
   else if( use_force('Coulomb') ) then  ! Coulomb
     call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
          ,aux(iauxof('chg'),:),aux(iauxof('chi'),:),h,hi,tcom,nb,nbmax &
-         ,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,sorg &
+         ,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc,specorder)
   endif
