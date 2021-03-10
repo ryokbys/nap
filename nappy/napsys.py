@@ -1021,45 +1021,6 @@ class NAPSystem(object):
         atoms.set_velocities(vels)
         return atoms
 
-    def change_unitcell(self,a,b,c):
-        """
-        Change the current unitcell to the new one with
-        given unit vectors, a, b, and c.
-        And the atoms are reduced to those within the new unitcell.
-        The new unitcell should be included or the same size as the
-        current unitcell, otherwise there appear vacuum region
-        in the new unitcell.
-        """
-        #...Repeat the system in order to fill the outer space
-        #   arround the current unitcell but in the new unitcell...
-        self.repeat(2,2,2,-1,-1,-1)
-        rpos = self.get_real_positions()
-        #...Set new unitcell
-        self.alc = 1.0
-        self.a1 = np.array(a)
-        self.a2 = np.array(b)
-        self.a3 = np.array(c)
-        newhmat = np.zeros((3,3),dtype=float)
-        newhmat[:,0] = a[:]
-        newhmat[:,1] = b[:]
-        newhmat[:,2] = c[:]
-        newhmati = np.linalg.inv(newhmat)
-        for i in range(len(rpos)):
-            spos = np.dot(newhmati,rpos[i])
-            self.atoms.at[i,'pos'] = np.dot(newhmati,rpos[i])
-
-        #...Remove atoms outside the unitcell
-        remove_ids = []
-        tiny = 1.0e-5
-        for i in range(len(self.atoms)):
-            pi = self.atoms.pos[i]
-            if pi[0] < 0.0 or pi[0] >= 1.0-tiny or \
-               pi[1] < 0.0 or pi[1] >= 1.0-tiny or \
-               pi[2] < 0.0 or pi[2] >= 1.0-tiny:
-                remove_ids.append(i)
-        self.remove_atoms(*remove_ids)
-        return
-
     def remove_overlapping_atoms(self,criterion=0.01):
         """
         Remove overlapping atoms in the system.

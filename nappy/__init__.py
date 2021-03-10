@@ -4,7 +4,7 @@
 from __future__ import print_function
 
 __all__ = ['pmd','napsys','atom','common','io','rdf','adf','msd','gaussian_smear',
-           'util','vasp','mkcell']
+           'util','vasp','mkcell','manipulate']
 
 from . import *
 
