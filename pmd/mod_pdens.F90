@@ -19,7 +19,7 @@ module pdens
   integer:: ispc_pdens
   real(8):: orig_pdens(3),hmat_pdens(3,3)
   real(8):: sosub(3),shsub(3,3),shsubi(3,3)
-  real(8),allocatable:: pds(:)
+  real(8),allocatable:: pds(:,:,:)
   integer:: npx = 1  ! Num of divisions of subsystem
   integer:: npy = 1  ! where flux is evaluated within.
   integer:: npz = 1
@@ -68,8 +68,8 @@ contains
     shsub(1:3,3) = matxvec3(hmati,hmat_pdens(1:3,3))
     shsubi = matinv3(shsub)
 
-    allocate(pds(np))
-    pds(:) = 0d0
+    allocate(pds(npz,npy,npx))
+    pds(:,:,:) = 0d0
 
     if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       print *,''
@@ -116,9 +116,10 @@ contains
       ipx = int(sri(1)*dpxi) +1
       ipy = int(sri(2)*dpyi) +1
       ipz = int(sri(3)*dpzi) +1
-      idx = (ipx-1)*npy*npz +(ipy-1)*npz +ipz
+!!$      idx = (ipx-1)*npy*npz +(ipy-1)*npz +ipz
 !!$      print *,'i,is,sri,ipx,ipy,ipz,idx = ',i,is,sri(:),ipx,ipy,ipz,idx
-      pds(idx) = pds(idx) +1d0
+!!$      pds(idx) = pds(idx) +1d0
+      pds(ipz,ipy,ipx) = pds(ipz,ipy,ipx) +1d0
     enddo
     nacc = nacc +1
 
@@ -134,15 +135,15 @@ contains
     real(8),intent(in):: hmat(3,3)
 
     integer,parameter:: nmpi = 1
-    integer:: idx,ixyz,is,ia
+    integer:: idx,ixyz,is,ia,ix,iy,iz
     integer:: ierr
-    real(8):: vol,dr(3)
-    real(8),allocatable:: pdl(:)
+    real(8):: vol,dr(3),fac
+    real(8),allocatable:: pdl(:,:,:)
 
 !.....Reduce prob densities in each node to global prob density
     vol = get_vol(hmat)/np
-    allocate(pdl(np))
-    call mpi_reduce(pds,pdl,np,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    allocate(pdl(npz,npy,npx))
+    call mpi_reduce(pds,pdl,npx*npy*npz,mpi_real8,mpi_sum,0,mpi_world,ierr)
 !.....Write out pdens only at node-0
     if( myid.eq.0 ) then
       dr(1:3) = hmat_pdens(1,1:3)/npx +hmat_pdens(2,1:3)/npy +hmat_pdens(3,1:3)/npz
@@ -155,8 +156,18 @@ contains
       write(ionum,'(2x,i0,3(1x,es15.7))') npz,hmat_pdens(1:3,3)*ang2bohr/npz
 !.....Put a line for dummy atom
       write(ionum,'(a)') '  1   1.000   0.000  0.000  0.000'
-!.....Volumetric data 
-      write(ionum,'(6(2x,es11.3))') (pdl(idx)/nacc/(vol*ang2bohr**3),idx=1,np)
+!.....Volumetric data
+      fac = 1d0 /nacc /(vol*ang2bohr**3)
+      pdl(:,:,:) = pdl(:,:,:) *fac
+      do ix=1,npx
+        do iy=1,npy
+          do iz=1,npz
+            write(ionum,'(2x,es11.3)',advance='no') pdl(iz,iy,ix)
+            if( mod(iz,6) .eq. 0 ) write(ionum,*) ''
+          enddo
+        enddo
+      enddo
+!!$      write(ionum,'(6(2x,es11.3))') (pdl(idx)/nacc/(vol*ang2bohr**3),idx=1,np)
       close(ionum)
     endif
     deallocate(pdl)

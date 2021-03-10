@@ -343,7 +343,9 @@ subroutine set_variable(ionum,cname)
     read(ionum,*) ctmp,orig_pdens(1:3)
     return
   elseif( trim(cname).eq.'hmat_pdens' ) then
-    call read_rs(ionum,3,3,hmat_pdens)
+    read(ionum,*) hmat_pdens(1:3,1)
+    read(ionum,*) hmat_pdens(1:3,2)
+    read(ionum,*) hmat_pdens(1:3,3)
     return
     
 #ifdef __WALL__
