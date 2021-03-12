@@ -1,4 +1,4 @@
-.phony: clean veryclean pmd_wrapper
+.phony: clean veryclean pmd_wrapper mods
 
 all: pmd_wrapper mods
 
@@ -7,13 +7,13 @@ pmddir= ${HOME}/src/nap/pmd
 modobj= ${pmddir}/mod_pairlist.F90
 
 # instead of using mpif90, use gfortran with mpi options specified here
-mpiopts= -I/usr/local/Cellar/open-mpi/4.1.0/include -I/usr/local/Cellar/open-mpi/4.1.0/lib -L/usr/local/opt/libevent/lib -L-I/usr/local/Cellar/open-mpi/4.1.0/lib -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi
+# mpiopts= -I/usr/local/Cellar/open-mpi/4.1.0/include -I/usr/local/Cellar/open-mpi/4.1.0/lib -L/usr/local/opt/libevent/lib -L-I/usr/local/Cellar/open-mpi/4.1.0/lib -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi
 
 pmd_wrapper: ${obj}
-	f2py --f90exec=@FC@ ${mpiopts} --quiet -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd
+	f2py --f90exec=@FC@ --quiet -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd
 
 mods: ${modojb}
-	f2py --f90exec=@FC@ ${mpiopts} --quiet -m $@ -c ${modobj}
+	f2py --f90exec=@FC@ --quiet -m $@ -c ${modobj}
 
 clean:
 	rm -f *.o *.so *~

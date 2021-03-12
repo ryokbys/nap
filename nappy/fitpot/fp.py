@@ -610,7 +610,7 @@ def func_wrapper(variables, vranges, **kwargs):
     elif kwargs['Morse'] == 'Morse':
         fp2Morse(varsfp, **kwargs)
 
-    #...Compute pmd
+    #...Compute pmd in the subdir_###
     L_up_lim = kwargs['fval_upper_limit']
     if print_level > 1:
         print('Running pmd and post-processing at '+subdir, flush=True)
