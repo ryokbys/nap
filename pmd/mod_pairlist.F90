@@ -2,11 +2,7 @@ module pairlist
 !-----------------------------------------------------------------------
 ! Module for pair-list.
 !-----------------------------------------------------------------------
-!!$  use force,only: luse_charge, luse_elec_temp
-!!$  use clrchg,only: lclrchg
-!!$  use pmdvars,only: chg,chi,tei,clr
   implicit none
-  include 'mpif.h'
   save
   
   integer,allocatable:: lscl(:),lshd(:)
@@ -239,7 +235,7 @@ contains
       do i=1,natm
         mmax = max(mmax,lspr(0,i))
       enddo
-!!$      print '(a,i0)',' Max num of neighbors at 1st call = ',mmax
+      print '(a,i0)',' Max num of neighbors at 1st call = ',mmax
     endif
 
   end subroutine mk_lspr_para
@@ -355,7 +351,6 @@ contains
               write(6,'(a)') " You should rerun pmd with increased nnmax " &
                    //"with the following in.pmd option,"
               write(6,'(a,i5)') "   max_num_neighbors   ",nnmax+100
-              call mpi_finalize(ierr)
               stop
             endif
             lspr(lspr(0,i),i)=j
@@ -590,7 +585,6 @@ contains
                     write(6,'(a)') " Error: lspr(0,j) > nnmax"
                     write(6,'(a,3i5)') "  nnmax, lspr(0,j) = " &
                          ,nnmax,lspr(0,j)
-                    call mpi_finalize(ierr)
                     stop
                   endif
                   lspr(lspr(0,j),j)=i
