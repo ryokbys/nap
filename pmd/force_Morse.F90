@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-03-09 11:01:15 Ryo KOBAYASHI>
+!                     Last modified: <2021-03-17 17:56:11 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -137,7 +137,9 @@ contains
       enddo
     endif
 
-    if( size(strsl).lt.3*3*namax ) then
+    if( .not.allocated(strsl) ) then
+      allocate(strsl(3,3,namax))
+    else if( size(strsl).lt.3*3*namax ) then
       deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif
@@ -233,7 +235,9 @@ contains
       allocate(strsl(3,3,namax))
     endif
 
-    if( size(strsl).lt.3*3*namax ) then
+    if( .not.allocated(strsl) ) then
+      allocate(strsl(3,3,namax))
+    else if( size(strsl).lt.3*3*namax ) then
       deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif
@@ -359,7 +363,9 @@ contains
       rc2 = rc*rc
     endif
 
-    if( size(strsl).lt.3*3*namax ) then
+    if( .not.allocated(strsl) ) then
+      allocate(strsl(3,3,namax))
+    else if( size(strsl).lt.3*3*namax ) then
       deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif

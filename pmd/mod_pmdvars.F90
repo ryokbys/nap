@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-03-09 10:45:15 Ryo KOBAYASHI>
+!                    Last modified: <2021-03-17 22:18:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -177,7 +177,7 @@ module pmdvars
 !.....Factors for ekin
   real(8),allocatable:: fekin(:),fa2v(:),fv2p(:)
 !.....atomic strain
-  real(8),allocatable:: stn(:,:,:)
+!!$  real(8),allocatable:: stn(:,:,:)
 !.....Auxiliary data
   real(8),allocatable:: aux(:,:)
 

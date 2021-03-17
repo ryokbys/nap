@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-03-09 12:00:14 Ryo KOBAYASHI>
+!                     Last modified: <2021-03-17 17:54:34 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -939,7 +939,9 @@ contains
       endif
     endif
 
-    if( size(strsl).lt.3*3*namax ) then
+    if( .not.allocated(strsl) ) then
+      allocate(strsl(3,3,namax))
+    else if( size(strsl).lt.3*3*namax ) then
       deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif
@@ -1068,7 +1070,9 @@ contains
       sqpi = 1d0/sqrt(pi)
     endif
 
-    if( size(strsl).lt.3*3*namax ) then
+    if( .not.allocated(strsl) ) then
+      allocate(strsl(3,3,namax))
+    else if( size(strsl).lt.3*3*namax ) then
       deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif
@@ -1167,7 +1171,9 @@ contains
 !!$      enddo
     endif
 
-    if( size(strsl).lt.3*3*namax ) then
+    if( .not.allocated(strsl) ) then
+      allocate(strsl(3,3,namax))
+    else if( size(strsl).lt.3*3*namax ) then
       deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif
@@ -1292,7 +1298,9 @@ contains
       allocate(strsl(3,3,namax))
     endif
 
-    if( size(strsl).lt.3*3*namax ) then
+    if( .not.allocated(strsl) ) then
+      allocate(strsl(3,3,namax))
+    else if( size(strsl).lt.3*3*namax ) then
       deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif
@@ -1364,7 +1372,9 @@ contains
       allocate(strsl(3,3,namax))
     endif
 
-    if( size(strsl).lt.3*3*namax ) then
+    if( .not.allocated(strsl) ) then
+      allocate(strsl(3,3,namax))
+    else if( size(strsl).lt.3*3*namax ) then
       deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif

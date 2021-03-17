@@ -512,7 +512,9 @@ subroutine copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
     l1st=.false.
   endif
 
-  if( size(dbuf).ne.nbmax ) then
+  if( .not.allocated(dbuf) ) then
+    allocate(dbuf(nbmax),dbufr(nbmax))
+  else if( size(dbuf).ne.nbmax ) then
     deallocate(dbuf,dbufr)
     allocate(dbuf(nbmax),dbufr(nbmax))
   endif
@@ -587,7 +589,9 @@ subroutine copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
     l1st=.false.
   endif
 
-  if( size(dbuf).ne.narrsize ) then
+  if( .not. allocated(dbuf) ) then
+    allocate(dbuf(9,nbmax),dbufr(9,nbmax))
+  else if( size(dbuf).ne.narrsize ) then
     deallocate(dbuf,dbufr)
     narrsize = 9*nbmax
     allocate(dbuf(9,nbmax),dbufr(9,nbmax))
@@ -668,7 +672,7 @@ subroutine copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex &
   if( ndim.gt.maxdim .or. nbmax.gt.maxbmax ) then
     maxdim = max(ndim,maxdim)
     maxbmax = max(nbmax,maxbmax)
-    deallocate(dbuf,dbufr)
+    if( allocated(dbuf) ) deallocate(dbuf,dbufr)
     allocate(dbuf(maxdim,maxbmax),dbufr(maxdim,maxbmax))
   endif
 
@@ -758,7 +762,7 @@ subroutine copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
   if( ndim.gt.maxdim .or. nbmax.gt.maxbmax ) then
     maxdim = max(ndim,maxdim)
     maxbmax = max(nbmax,maxbmax)
-    deallocate(dbuf,dbufr)
+    if( allocated(dbuf) ) deallocate(dbuf,dbufr)
     allocate(dbuf(maxdim,maxbmax),dbufr(maxdim,maxbmax))
   endif
 

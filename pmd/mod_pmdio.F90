@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-28 00:58:26 Ryo KOBAYASHI>
+!                     Last modified: <2021-03-17 16:40:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -219,7 +219,9 @@ contains
       l1st = .false.
     endif
 
-    if( size(dlmp).ne.ndlmp*ntot ) then
+    if( .not.allocated(dlmp) ) then
+      allocate(dlmp(ndlmp,ntot))
+    else if( size(dlmp).ne.ndlmp*ntot ) then
       deallocate(dlmp)
       allocate(dlmp(ndlmp,ntot))
     endif

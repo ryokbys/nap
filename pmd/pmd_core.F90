@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-09 11:34:32 Ryo KOBAYASHI>
+!                     Last-modified: <2021-03-17 23:13:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -352,6 +352,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   lstrs = .false.
   epot= epot0
   epotp = 0d0
+  call sanity_check(ekin,epot,stnsr,myid_md,mpi_md_world)
 
 !.....Structure analysis
   if( trim(cstruct).eq.'CNA' ) then
@@ -767,6 +768,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
     vmaxold= vmax
     call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
          ,vmax,mpi_md_world)
+    call sanity_check(ekin,epot,stnsr,myid_md,mpi_md_world)
 
     if( trim(ctctl).eq.'Langevin' ) then
 !.....Langevin thermostat with Mannella integrator
@@ -1125,8 +1127,10 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   if( ltdst ) then
     deallocate(tdst,nadst)
   endif
-  deallocate(ra,va,aa,ra0,strs,stt,tag,lspr,d2lspr &
-       ,epi,eki,stp,stn,lsb,lsex)
+!!$  deallocate(ra,va,aa,ra0,strs,stt,tag,lspr,d2lspr &
+!!$       ,epi,eki,stp,stn,lsb,lsex)
+  deallocate(ra,va,aa,ra0,strs,tag,lspr,d2lspr &
+       ,epi,eki,lsb,lsex)
   deallocate(aux)
 end subroutine pmd_core
 !=======================================================================
@@ -1809,7 +1813,9 @@ subroutine bacopy(l1st)
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
   endif
 
-  if( size(dbuf).lt.ndimbuf*nbmax ) then
+  if( .not.allocated(dbuf) ) then
+    allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+  else if( size(dbuf).lt.ndimbuf*nbmax ) then
     deallocate(dbuf,dbufr)
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
   endif
@@ -2036,7 +2042,9 @@ subroutine bacopy_fixed()
     l1st=.false.
   endif
 
-  if( size(dbuf).lt.ndimbuf*nbmax ) then
+  if( .not. allocated(dbuf) ) then
+    allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+  else if( size(dbuf).lt.ndimbuf*nbmax ) then
     deallocate(dbuf,dbufr)
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
   endif
@@ -2245,11 +2253,14 @@ subroutine bamove()
 
   if( l1st ) then
     ndimbuf = 7 +naux
+    if( allocated(dbuf) ) deallocate(dbuf,dbufr)
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
     l1st=.false.
   endif
 
-  if( size(dbuf).ne.ndimbuf*nbmax ) then
+  if( .not.allocated(dbuf) ) then
+    allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+  else if( size(dbuf).ne.ndimbuf*nbmax ) then
     deallocate(dbuf,dbufr)
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
   endif
@@ -3143,22 +3154,22 @@ subroutine alloc_namax_related()
   if( allocated(aa) ) deallocate(aa)
   if( allocated(ra0) ) deallocate(ra0)
   if( allocated(strs) ) deallocate(strs)
-  if( allocated(stt) ) deallocate(stt)
+!!$  if( allocated(stt) ) deallocate(stt)
   if( allocated(tag) ) deallocate(tag)
   if( allocated(lspr) ) deallocate(lspr)
   if( allocated(d2lspr) ) deallocate(d2lspr)
   if( allocated(epi) ) deallocate(epi)
   if( allocated(eki) ) deallocate(eki)
-  if( allocated(stp) ) deallocate(stp)
-  if( allocated(stn) ) deallocate(stn)
+!!$  if( allocated(stp) ) deallocate(stp)
+!!$  if( allocated(stn) ) deallocate(stn)
   if( allocated(aux) ) deallocate(aux)
   if( allocated(lsb) ) deallocate(lsb)
   if( allocated(lsex) ) deallocate(lsex)
   allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax) &
-       ,strs(3,3,namax),stt(3,3,namax),tag(namax) &
+       ,strs(3,3,namax),tag(namax) &
        ,lspr(0:nnmax,namax),d2lspr(nnmax,namax) &
        ,epi(namax),eki(3,3,namax) &
-       ,stp(3,3,namax),stn(3,3,namax) &
+!!$       ,stp(3,3,namax),stn(3,3,namax),stt(3,3,namax) &
        ,lsb(0:nbmax,6),lsex(nbmax,6))
   allocate(aux(naux,namax))
   return
@@ -3236,14 +3247,14 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   call copy_arr(ndim,arr,strs)
   deallocate(arr)
 
-!.....stt
-  ndim = size(stt)
-  allocate(arr(ndim))
-  call copy_arr(ndim,stt,arr)
-  deallocate(stt)
-  allocate(stt(3,3,newnamax))
-  call copy_arr(ndim,arr,stt)
-  deallocate(arr)
+!!$!.....stt
+!!$  ndim = size(stt)
+!!$  allocate(arr(ndim))
+!!$  call copy_arr(ndim,stt,arr)
+!!$  deallocate(stt)
+!!$  allocate(stt(3,3,newnamax))
+!!$  call copy_arr(ndim,arr,stt)
+!!$  deallocate(arr)
 
 !.....tag
   ndim = size(tag)
@@ -3290,23 +3301,23 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   call copy_arr(ndim,arr,eki)
   deallocate(arr)
 
-!.....stp
-  ndim = size(stp)
-  allocate(arr(ndim))
-  call copy_arr(ndim,stp,arr)
-  deallocate(stp)
-  allocate(stp(3,3,newnamax))
-  call copy_arr(ndim,arr,stp)
-  deallocate(arr)
+!!$!.....stp
+!!$  ndim = size(stp)
+!!$  allocate(arr(ndim))
+!!$  call copy_arr(ndim,stp,arr)
+!!$  deallocate(stp)
+!!$  allocate(stp(3,3,newnamax))
+!!$  call copy_arr(ndim,arr,stp)
+!!$  deallocate(arr)
 
-!.....stn
-  ndim = size(stn)
-  allocate(arr(ndim))
-  call copy_arr(ndim,stn,arr)
-  deallocate(stn)
-  allocate(stn(3,3,newnamax))
-  call copy_arr(ndim,arr,stn)
-  deallocate(arr)
+!!$!.....stn
+!!$  ndim = size(stn)
+!!$  allocate(arr(ndim))
+!!$  call copy_arr(ndim,stn,arr)
+!!$  deallocate(stn)
+!!$  allocate(stn(3,3,newnamax))
+!!$  call copy_arr(ndim,arr,stn)
+!!$  deallocate(arr)
 
 !.....aux
   ndim = size(aux)
@@ -3358,6 +3369,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
 end subroutine realloc_namax_related
 !=======================================================================
 subroutine copy_arr(ndim,srcarr,destarr)
+  implicit none 
   integer,intent(in):: ndim
   real(8),intent(in):: srcarr(ndim)
   real(8),intent(out):: destarr(ndim)
@@ -3367,6 +3379,7 @@ subroutine copy_arr(ndim,srcarr,destarr)
 end subroutine copy_arr
 !=======================================================================
 subroutine copy_iarr(ndim,srcarr,destarr)
+  implicit none 
   integer,intent(in):: ndim
   integer,intent(in):: srcarr(ndim)
   integer,intent(out):: destarr(ndim)
@@ -3374,6 +3387,36 @@ subroutine copy_iarr(ndim,srcarr,destarr)
   destarr(:) = srcarr(:)
   return
 end subroutine copy_iarr
+!=======================================================================
+subroutine sanity_check(ekin,epot,stnsr,myid,mpi_world)
+  implicit none 
+  real(8),intent(in):: ekin,epot,stnsr(3,3)
+  integer,intent(in):: myid,mpi_world
+  include "mpif.h"
+
+  integer:: i,j,ierr
+  character(len=128):: msg
+  
+  msg = ''
+
+  if( ekin*0d0 .ne. 0d0 ) msg = 'ERROR: ekin == NaN !'
+  if( epot*0d0 .ne. 0d0 ) msg = 'ERROR: epot == NaN !'
+  do j=1,3
+    do i=1,3
+      if( stnsr(i,j)*0d0 .ne. 0d0 ) msg = 'ERROR: stnsr(i,j) == NaN !'
+    enddo
+  enddo
+  call mpi_bcast(msg,128,mpi_character,0,mpi_world,ierr)
+  if( trim(msg).ne.'' ) then
+    if( myid.eq.0 ) then
+      print *,'Exit pmd, because of '//trim(msg)
+    endif
+    call mpi_finalize(ierr)
+    stop
+  endif
+  return
+
+end subroutine sanity_check
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd lib"
