@@ -586,7 +586,7 @@ class NAPSystem(object):
             dists = []
             for ia in range(self.num_atoms()):
                 lspr.append( [ plst[ia,1+j]-1 for j in range(plst[ia,0]) ] )
-                dists.append( [ np.sqrt(dist[ia,1+j]) for j in range(plst[ia,0])] )
+                dists.append( [ np.sqrt(dist[ia,j]) for j in range(plst[ia,0])] )
             self.atoms['lspr'] = lspr
             self.atoms['distance'] = dists
             return None

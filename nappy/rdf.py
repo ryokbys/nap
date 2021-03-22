@@ -9,7 +9,10 @@ Usage:
 Options:
   -h, --help  Show this help message and exit.
   -d DR       Width of the bin. [default: 0.1]
-  -r RMAX     Cutoff radius of radial distribution. [default: 5.0]
+  -r,--rmax RMAX
+              Cutoff radius of radial distribution. [default: 5.0]
+  --rmin RMIN 
+              Minimum radius to be considered. [default: 0.0]
   --gsmear=SIGMA
               Width of Gaussian smearing, zero means no smearing. [default: 0]
   -o OUT      Output file name. [default: out.rdf]
@@ -191,7 +194,12 @@ def read_rdf(fname='out.rdf'):
         rdfs[ir,:] = [ float(x) for x in dat[1:]]
     return rs,rdfs
     
-def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
+def rdf(nsys0,nspcs,dr,rmax,pairwise=False,rmin=0.0):
+    """
+    Compute RDF of the givin system.
+    Number of bins is determined from DR, RMAX, and RMIN as, int((RMAX-RMIN)/DR)+1.
+    Position of a bin is defined as the point of center of the bin, r_i = DR*(i+0.5).
+    """
     natm0= nsys0.num_atoms()
     vol= nsys0.get_volume()
     natms = [ float(natm0) ]
@@ -205,8 +213,8 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
         nsys.repeat(n1,n2,n3)
 
     r2max = rmax*rmax
-    nr= int(rmax/dr)
-    rd= [ dr*(ir+0.5) for ir in range(nr) ]
+    nr= int((rmax-rmin)/dr)+1
+    rd= np.array([ rmin +dr*(ir+0.5) for ir in range(nr) ])
     hmat = nsys.get_hmat()
     # Since an access to pandas DataFrame is much slower than that to numpy array,
     # use numpy arrays in the most time consuming part.
@@ -224,12 +232,19 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
         # for ja,dij in nsys.neighbors_of(ia,distance=True):
         for ja,dij in nsys.neighbors_of(ia,distance=True):
             jsid = sids[ja]
+            # print(ia,isid,ja,jsid,dij)
             # pij = poss[ja] -pi
             # pij = pij -np.round(pij)
             # rij = np.dot(hmat,pij)
             # dij = np.sqrt(rij[0]**2 +rij[1]**2 +rij[2]**2)
-            rrdr= dij/dr
+            rrdr= (dij-rmin)/dr
+            if rrdr < 0.0:
+                continue
             ir = int(rrdr)
+            if ir == 0:
+                print('Something is wrong...')
+                print(ia,ja,dij,rrdr,ir)
+                raise
             ndr[0,0,ir] += 1.0
             ndr[isid,jsid,ir] += 1.0
         for ir in range(nr):
@@ -238,8 +253,9 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
     #...normalize
     if pairwise:
         tmp = 4.0 *np.pi *natms[0]*(natms[0]-1)/vol *dr
-        for ir in range(1,nr):
-            r= dr *(ir-0.5)
+        for ir in range(nr):
+            # r= rmin +dr*(ir+0.5)
+            r = rd[ir]
             nadr[0,0,ir] /= tmp*r*r
         for isid in range(1,nspcs+1):
             ni = natms[isid]
@@ -250,19 +266,22 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False):
                     tmp *= ni*(ni-1)
                 else:
                     tmp *= ni*nj
-                for ir in range(1,nr):
-                    r= dr *(ir-0.5)
+                for ir in range(nr):
+                    # r= dr *(ir-0.5)
+                    r = rd[ir]
                     nadr[isid,jsid,ir] /= tmp*r*r
     else:
         tmp = 4.0 *np.pi *natms[0]*natms[0]/vol *dr
-        for ir in range(1,nr):
-            r= dr *(ir -0.5)
+        for ir in range(nr):
+            # r= dr *(ir -0.5)
+            r = rd[ir]
             nadr[:,:,ir] /= tmp*r*r
 
     return rd,nadr
 
-def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,pairwise=False):
+def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,pairwise=False):
     nspcs = len(specorder)
+    nr = int((rmax-rmin)/dr)+1
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     nsum= 0
     for infname in infiles:
@@ -271,7 +290,9 @@ def rdf_average(infiles,nr,specorder,dr=0.1,rmax=3.0,pairwise=False):
             sys.exit()
         nsys = nappy.io.read(fname=infname,specorder=specorder)
         print(' File =',infname)
-        rd,gr= rdf(nsys,nspcs,dr,rmax,pairwise=pairwise)
+        rd,gr= rdf(nsys,nspcs,dr,rmax,rmin=rmin,pairwise=pairwise)
+        if rd.shape[-1] != nr:
+            raise ValueError('The shape of radius data is wrong.')
         agr += gr
         nsum += 1
     agr /= nsum
@@ -365,7 +386,7 @@ def write_rdf_normal(fname,specorder,nspcs,rd,agr,nr):
     outfile.close()
     return None
 
-def write_rdf_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs,nperline=6):
+def write_rdf_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs=None,rmin=0.0,nperline=6):
     """
     Write out RDF data in general fp.py format.
 
@@ -374,30 +395,42 @@ def write_rdf_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs,nperline=6):
     nperline : int
            Number of data in a line. [default: 6]
     """
-    ndat = nr *len(pairs)
-    data = np.zeros(ndat)
-    n = 0
-    for pair in pairs:
-        isid,jsid = pair
+    if pairs != None:
+        if type(pairs) not in (list,tuple):
+            raise TypeError('pairs must be list or tuple.')
+        ndat = nr *len(pairs)
+        data = np.zeros(ndat)
+        n = 0
+        for pair in pairs:
+            isid,jsid = pair
+            for i in range(nr):
+                data[n] = agr[isid,jsid,i]
+                n += 1
+    else:
+        print('Since pairs are not specified, use total RDF instead.')
+        ndat = nr
+        data = np.zeros(ndat)
+        n = 0
         for i in range(nr):
-            data[n] = agr[isid,jsid,i]
+            data[n] = agr[0,0,i]
             n += 1
     
     with open(fname,'w') as f:
-        f.write('# RDF for pairs: ')
-        for pair in pairs:
-            isid,jsid = pair
-            if isid == 0:
-                si = 'All'
-            else:
-                si = specorder[pair[0]-1]
-            if jsid == 0:
-                sj = 'All'
-            else:
-                sj = specorder[pair[1]-1]
-            f.write(' {0:s}-{1:s},'.format(si,sj))
-        f.write('\n')
-        f.write('# rmax, nr = {0:.3f}, {1:d}\n'.format(rmax,nr))
+        if pairs != None:
+            f.write('# RDF for pairs: ')
+            for pair in pairs:
+                isid,jsid = pair
+                if isid == 0:
+                    si = 'All'
+                else:
+                    si = specorder[pair[0]-1]
+                if jsid == 0:
+                    sj = 'All'
+                else:
+                    sj = specorder[pair[1]-1]
+                f.write(' {0:s}-{1:s},'.format(si,sj))
+            f.write('\n')
+        f.write('# rmin,rmax, nr = {0:.3f}, {1:.3f}, {2:d}\n'.format(rmin,rmax,nr))
         f.write('#\n')
         #...Num of data, weight for the data
         f.write(' {0:6d}  {1:7.3f}\n'.format(ndat, 1.0))
@@ -490,7 +523,8 @@ if __name__ == "__main__":
     
     infiles= args['INFILE']
     dr= float(args['-d'])
-    rmax= float(args['-r'])
+    rmax= float(args['--rmax'])
+    rmin = float(args['--rmin'])
     sigma= int(args['--gsmear'])
     ofname= args['-o']
     specorder = [ x for x in args['--specorder'].split(',') ]
@@ -506,7 +540,7 @@ if __name__ == "__main__":
         if len(lscatter) != len(specorder):
             raise ValueError('--scatter-length is not set correctly.')
     out4fp = args['--out4fp']
-    if out4fp:
+    if out4fp and not SQ:
         pairwise = True
         pairs0 = args['--pairs'].split(',')
         pairs = []
@@ -528,6 +562,7 @@ if __name__ == "__main__":
     else:
         no_pairwise = args['--no-pairwise']
         pairwise = not no_pairwise
+        pairs = None
 
     nspcs = len(specorder)
     if nspcs < 1:
@@ -537,8 +572,8 @@ if __name__ == "__main__":
         infiles.sort(key=get_key,reverse=True)
     del infiles[:nskip]
 
-    nr= int(rmax/dr)
-    rd,agr= rdf_average(infiles,nr,specorder,dr=dr,rmax=rmax,
+    nr= int((rmax-rmin)/dr) +1
+    rd,agr= rdf_average(infiles,specorder,dr=dr,rmin=rmin,rmax=rmax,
                         pairwise=pairwise)
 
     if not sigma == 0:
@@ -582,7 +617,7 @@ if __name__ == "__main__":
         qs,sqs = gr_to_SQ(rd,agr[0,0,:],rho,qmin=0.7,qmax=qmax,nq=200)
 
     if out4fp:
-        write_rdf_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs)
+        write_rdf_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs=pairs,rmin=rmin)
         if SQ:
             write_sq_out4fp('out.sq',qs,sqs)
     else:
