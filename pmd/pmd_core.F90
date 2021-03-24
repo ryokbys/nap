@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-17 23:13:56 Ryo KOBAYASHI>
+!                     Last-modified: <2021-03-24 15:01:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -352,7 +352,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   lstrs = .false.
   epot= epot0
   epotp = 0d0
-  call sanity_check(ekin,epot,stnsr,myid_md,mpi_md_world)
 
 !.....Structure analysis
   if( trim(cstruct).eq.'CNA' ) then
@@ -459,6 +458,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
          ,istp,tcpu,tave,epot,vol,prss
   endif
 
+  call sanity_check(ekin,epot,stnsr,tave,myid_md,mpi_md_world)
+  
 !.....output initial configuration including epi, eki, and strs
 !      write(cnum(1:4),'(i4.4)') 0
   write(cnum,'(i0)') 0
@@ -768,7 +769,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
     vmaxold= vmax
     call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
          ,vmax,mpi_md_world)
-    call sanity_check(ekin,epot,stnsr,myid_md,mpi_md_world)
 
     if( trim(ctctl).eq.'Langevin' ) then
 !.....Langevin thermostat with Mannella integrator
@@ -966,6 +966,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 #endif
     endif ! energy output
 
+    call sanity_check(ekin,epot,stnsr,tave,myid_md,mpi_md_world)
+    
 !.....check convergence criteria if it is dumped MD
     if( ifdmp.gt.0 .and. epot-epotp.le.0d0 .and. n_conv.gt.0 .and. &
          abs(epot-epotp).lt.eps_conv .and. istp.gt.minstp ) then
@@ -1923,15 +1925,22 @@ subroutine bacopy(l1st)
          mpi_md_world,ierr)
     call accum_time('mpi_allreduce',mpi_wtime()-tmp)
     if(maxb.gt.nbmax) then
-      if (myid_md.eq.0 .and. iprint.ne.0 ) then
-        print *,'Updated namax and array since nbmax changed' &
-             //' from ',nbmax,' to ',int(maxb*1.5)
-!            write(*,*)'Buffer or list overflowed at bacopy'
-!            write(*,*)'LSB(0) NBMAX =',maxb,nbmax
+      if( lrealloc ) then
+        if (myid_md.eq.0 .and. iprint.ne.0 ) then
+          print *,'Updated namax and array since nbmax changed' &
+               //' from ',nbmax,' to ',int(maxb*1.5)
+        endif
+        call realloc_namax_related(nalmax,int(maxb*1.5))
+      else
+        if( myid_md.eq.0 ) then
+          print *,'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+          print *,'Stop pmd because of maxb.gt.nbmax.'
+          print *,'If you do not want to stop, set allow_reallocation T in in.pmd.'
+          print *,'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+        endif
+        call mpi_finalize(ierr)
+        stop
       endif
-!          call mpi_finalize(ierr)
-!          stop
-      call realloc_namax_related(nalmax,int(maxb*1.5))
     endif
 
     if( nex(kd).gt.1 ) then
@@ -3388,14 +3397,15 @@ subroutine copy_iarr(ndim,srcarr,destarr)
   return
 end subroutine copy_iarr
 !=======================================================================
-subroutine sanity_check(ekin,epot,stnsr,myid,mpi_world)
+subroutine sanity_check(ekin,epot,stnsr,tave,myid,mpi_world)
   implicit none 
-  real(8),intent(in):: ekin,epot,stnsr(3,3)
+  real(8),intent(in):: ekin,epot,stnsr(3,3),tave
   integer,intent(in):: myid,mpi_world
   include "mpif.h"
 
   integer:: i,j,ierr
   character(len=128):: msg
+  real(8),parameter:: temp_insane = 1.0d+4
   
   msg = ''
 
@@ -3406,6 +3416,8 @@ subroutine sanity_check(ekin,epot,stnsr,myid,mpi_world)
       if( stnsr(i,j)*0d0 .ne. 0d0 ) msg = 'ERROR: stnsr(i,j) == NaN !'
     enddo
   enddo
+  if( tave .gt. temp_insane ) msg = 'ERROR: too high temperature (tave > temp_insane) !'
+  
   call mpi_bcast(msg,128,mpi_character,0,mpi_world,ierr)
   if( trim(msg).ne.'' ) then
     if( myid.eq.0 ) then

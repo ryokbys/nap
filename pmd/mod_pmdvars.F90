@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-03-17 22:18:50 Ryo KOBAYASHI>
+!                    Last modified: <2021-03-24 14:55:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -180,6 +180,9 @@ module pmdvars
 !!$  real(8),allocatable:: stn(:,:,:)
 !.....Auxiliary data
   real(8),allocatable:: aux(:,:)
+
+!.....Reallocation
+  logical:: lrealloc = .false.
 
 !.....Shear stress
   real(8):: shrfx

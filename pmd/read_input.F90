@@ -347,6 +347,10 @@ subroutine set_variable(ionum,cname)
     read(ionum,*) hmat_pdens(1:3,2)
     read(ionum,*) hmat_pdens(1:3,3)
     return
+!.....Reallocation
+  elseif( trim(cname).eq.'allow_reallocation') then
+    call read_l1(ionum,lrealloc)
+    return
     
 #ifdef __WALL__
   elseif( trim(cname).eq.'wall_pos_top' ) then

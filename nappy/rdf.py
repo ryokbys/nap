@@ -15,6 +15,8 @@ Options:
               Minimum radius to be considered. [default: 0.0]
   --gsmear=SIGMA
               Width of Gaussian smearing, zero means no smearing. [default: 0]
+  --nnmax=NNMAX
+              Max num of neighbors when counting neighbors. [default: 100]
   -o OUT      Output file name. [default: out.rdf]
   --specorder=SPECORDER
               Order of species separated by comma, like, --specorder=W,H. [default: None]
@@ -194,10 +196,10 @@ def read_rdf(fname='out.rdf'):
         rdfs[ir,:] = [ float(x) for x in dat[1:]]
     return rs,rdfs
     
-def rdf(nsys0,nspcs,dr,rmax,pairwise=False,rmin=0.0):
+def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
     """
     Compute RDF of the givin system.
-    Number of bins is determined from DR, RMAX, and RMIN as, int((RMAX-RMIN)/DR)+1.
+    Number of bins is determined from DR, RMAX0, and RMIN as, int((RMAX0-RMIN)/DR)+1.
     Position of a bin is defined as the point of center of the bin, r_i = DR*(i+0.5).
     """
     natm0= nsys0.num_atoms()
@@ -206,15 +208,17 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False,rmin=0.0):
     for ispcs in range(1,nspcs+1):
         natms.append(float(nsys0.num_atoms(ispcs)))
 
+    nr= int((rmax0-rmin)/dr)+1
+    rd= np.array([ rmin +dr*(ir+0.5) for ir in range(nr) ])
+    rmax = dr*nr  # Use corrected rmax to cover regions of NR bins
+    r2max = rmax*rmax
+    
     nsys = copy.deepcopy(nsys0)
     n1,n2,n3= nsys.get_expansion_num(2.0*rmax)
     if not (n1==1 and n2==1 and n3==1):
         print(' Extend system by {0:d}x{1:d}x{2:d}'.format(n1,n2,n3))
         nsys.repeat(n1,n2,n3)
 
-    r2max = rmax*rmax
-    nr= int((rmax-rmin)/dr)+1
-    rd= np.array([ rmin +dr*(ir+0.5) for ir in range(nr) ])
     hmat = nsys.get_hmat()
     # Since an access to pandas DataFrame is much slower than that to numpy array,
     # use numpy arrays in the most time consuming part.
@@ -224,7 +228,7 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False,rmin=0.0):
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     # nsys.make_pair_list(rcut=rmax,distance=True)
-    nsys.make_pair_list(rcut=rmax)
+    nsys.make_pair_list(rcut=rmax,nnmax=nnmax)
     for ia in range(natm0):
         isid = sids[ia]
         pi = poss[ia]
@@ -240,9 +244,9 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False,rmin=0.0):
             rrdr= (dij-rmin)/dr
             if rrdr < 0.0:
                 continue
-            ir = int(rrdr)
-            if ir == 0:
-                print('Something is wrong...')
+            ir = min(int(rrdr),nr-1)
+            if ir <= 0:
+                print('Something is wrong: ir<=0 ')
                 print(ia,ja,dij,rrdr,ir)
                 raise
             ndr[0,0,ir] += 1.0
@@ -279,9 +283,10 @@ def rdf(nsys0,nspcs,dr,rmax,pairwise=False,rmin=0.0):
 
     return rd,nadr
 
-def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,pairwise=False):
+def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,pairwise=False,nnmax=100):
     nspcs = len(specorder)
-    nr = int((rmax-rmin)/dr)+1
+    tiny = 1.0e-8
+    nr = int((rmax-rmin+tiny)/dr)+1
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     nsum= 0
     for infname in infiles:
@@ -290,7 +295,7 @@ def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,pairwise=False):
             sys.exit()
         nsys = nappy.io.read(fname=infname,specorder=specorder)
         print(' File =',infname)
-        rd,gr= rdf(nsys,nspcs,dr,rmax,rmin=rmin,pairwise=pairwise)
+        rd,gr= rdf(nsys,nspcs,dr,rmax,rmin=rmin,pairwise=pairwise,nnmax=nnmax)
         if rd.shape[-1] != nr:
             raise ValueError('The shape of radius data is wrong.')
         agr += gr
@@ -526,6 +531,7 @@ if __name__ == "__main__":
     rmax= float(args['--rmax'])
     rmin = float(args['--rmin'])
     sigma= int(args['--gsmear'])
+    nnmax = int(args['--nnmax'])
     ofname= args['-o']
     specorder = [ x for x in args['--specorder'].split(',') ]
     if specorder == ['None']:
@@ -572,9 +578,10 @@ if __name__ == "__main__":
         infiles.sort(key=get_key,reverse=True)
     del infiles[:nskip]
 
-    nr= int((rmax-rmin)/dr) +1
+    tiny = 1.0e-8
+    nr= int((rmax-rmin+tiny)/dr) +1
     rd,agr= rdf_average(infiles,specorder,dr=dr,rmin=rmin,rmax=rmax,
-                        pairwise=pairwise)
+                        pairwise=pairwise,nnmax=nnmax)
 
     if not sigma == 0:
         #print(' Gaussian smearing...')
