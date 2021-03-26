@@ -114,6 +114,8 @@ class NAPSystem(object):
             aux_names.remove(l)
         if 'lspr' in aux_names:
             aux_names.remove('lspr')
+        if 'distance' in aux_names:
+            aux_names.remove('distance')
         return aux_names
 
     def set_lattice(self, alc, a1, a2, a3):
