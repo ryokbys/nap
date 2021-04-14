@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-08 14:35:17 Ryo KOBAYASHI>
+!                     Last-modified: <2021-04-13 13:49:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -120,7 +120,7 @@ program pmd
     write(6,*) ''
     write(6,'(a,i0)') ' Number of processes in MPI = ',nprocs
 !.....Read in.pmd after reading the atom configuration file.
-    call read_input(10,trim(cinpmd))
+    call read_inpmd(10,trim(cinpmd))
     call check_cmin()
     if( ifpmd.eq.2 ) then ! if dump output
       call make_cdumpauxarr()

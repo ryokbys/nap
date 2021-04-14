@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-28 19:49:01 Ryo KOBAYASHI>
+!                     Last modified: <2021-04-13 13:51:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -42,7 +42,7 @@ program fitpot
     call time_stamp(' Job started')
     write(6,*) ''
     write(6,'(a,i6)') ' Number of processes in MPI = ',nnode
-    call read_input(10,'in.fitpot')
+    call read_infitpot(10,'in.fitpot')
 !.....NN and NN2 are both pointing NN2
     if( trim(cpot).eq.'NN' .or. trim(cpot).eq.'NN2' ) then
       print *,'ERROR: NN and NN2 potentials are no longer available in fitpot.'

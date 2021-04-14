@@ -1,4 +1,4 @@
-subroutine read_input(ionum,cfname)
+subroutine read_infitpot(ionum,cfname)
 !
 !  Read frexible input format
 !
@@ -32,7 +32,7 @@ subroutine read_input(ionum,cfname)
   enddo
 10 close(ionum)
 ! 10   write(6,'(a)') " Finished reading "//trim(cfname)
-end subroutine read_input
+end subroutine read_infitpot
 !=======================================================================
 subroutine set_variable(ionum,cname)
   use variables

@@ -1,4 +1,4 @@
-subroutine read_input(ionum,cfname)
+subroutine read_inpmd(ionum,cfname)
 !
 !  Read frexible input format
 !
@@ -32,7 +32,7 @@ subroutine read_input(ionum,cfname)
   enddo
 10 close(ionum)
 
-end subroutine read_input
+end subroutine read_inpmd
 !=======================================================================
 subroutine set_variable(ionum,cname)
   use pmdvars

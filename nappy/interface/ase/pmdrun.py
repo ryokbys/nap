@@ -312,11 +312,11 @@ def get_input_txt(params,fmvs):
     for key in order:
         
         # special keys first
-        if key is '':
+        if key == '':
             txt += '\n'
         elif key not in params:
             continue
-        elif key is 'force_type':
+        elif key == 'force_type':
             vals = params[key]
             txt += '{0:25s} '.format('force_type')
             if isinstance(vals,str):
@@ -325,29 +325,29 @@ def get_input_txt(params,fmvs):
                 for v in vals:
                     txt += '  {0:s}'.format(v)
             txt += '\n'
-        elif key is 'temperature_target':
+        elif key == 'temperature_target':
             vals = params[key]
             for i,v in enumerate(vals):
                 txt += '{0:25s} {1:2d} {2:6.1f}\n'.format(key,i+1,v)
-        elif key is 'factor_direction':
+        elif key == 'factor_direction':
             # vals = params[key]
             vals= fmvs
             txt += '{0:25s} 3 {1:d}\n'.format(key,len(vals))
             for i,v in enumerate(vals):
                 txt += '  {0:6.2f} {1:6.2f} {2:6.2f}\n'.format(v[0],v[1],v[2])
-        elif key is 'stress_target':
+        elif key == 'stress_target':
             vals = params[key]
             txt += '{0:25s}\n'.format(key)
             for i in range(3):
                 v = vals[i]
                 txt += '  {0:6.2f} {1:6.2f} {2:6.2f}\n'.format(v[0],v[1],v[2])
-        elif key is 'mass':
+        elif key == 'mass':
             masses = params[key]
             for k,v in masses.items():
                 txt += '{0:25s} {1:3s}  {2:10.4f}\n'.format(key,k,v)
-        elif key is 'converge_eps':
+        elif key == 'converge_eps':
             txt += '{0:25s} {1:10.1e}\n'.format(key,params[key])
-        elif key is 'overlay':
+        elif key == 'overlay':
             ols = params[key]
             for k,v in ols.items():
                 txt += '{0:25s} {1:3s}  {2:6.2f} {3:6.2f}\n'.format(key,k,v[0],v[1])
