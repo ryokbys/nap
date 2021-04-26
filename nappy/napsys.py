@@ -199,7 +199,9 @@ class NAPSystem(object):
                   +' and must be greater than or equal {0:d}'.format(maxsid)
             raise ValueError(txt)
         #...Operation could be different case by case
-        if set(self.specorder) == set(specorder):  # Only re-ordering
+        if self.specorder is None:
+            self.specorder = copy.copy(specorder)
+        elif set(self.specorder) == set(specorder):  # Only re-ordering
             newsids = np.zeros(len(self.atoms),dtype=int)
             for i,sid in enumerate(self.atoms.sid):
                 symbol = self.specorder[sids-1]
@@ -248,6 +250,10 @@ class NAPSystem(object):
         return b1,b2,b3
 
     def add_atoms(self,symbols,poss,vels,frcs):
+        """
+        Add atoms of given symbols, positions, velocities and forces.
+        Positions, velocities and forces are assumed to be scaled in lattice vectors.
+        """
         if not self.specorder:
             self.specorder = []
         if type(symbols) not in (list, np.ndarray):

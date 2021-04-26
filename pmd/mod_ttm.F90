@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-02-28 01:07:57 Ryo KOBAYASHI>
+!                     Last-modified: <2021-04-23 12:20:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -329,7 +329,7 @@ contains
 !        1    1    2    300.0
 !  ...
 !-----------------------------------------------------------------------
-        print '(a)','   Initial Te for 3D TTM-MMD region is read from in.ts3d'
+        print '(a)','   Initial Te for 3D TTM-MD region is read from in.ts3d'
         open(iots3d,file=trim(cin_ts3d),status='old')
         do while(.true.)
           read(iots3d,*,end=10) c1st
@@ -1432,7 +1432,7 @@ contains
           do iy=1,ny
             do iz=1,nz
               call ixyz2ic(ix,iy,iz,ic)
-              write(iots3d,'(3i6,2es15.5,i6)') ix,iy,iz,te(iz,iy,ix) &
+              write(iots3d,'(3i6,2es15.5e3,i6)') ix,iy,iz,te(iz,iy,ix) &
                    ,ta(ic),nac(ic)
             enddo
           enddo
@@ -1605,6 +1605,9 @@ contains
 !  Remove atoms evapolated from left surface by laser ablation.
 !  Store the following removed-atom data:
 !    - ID, time, position (y,z), velocity (x,y,z)
+!
+!  Since this code seems having some problem and stops in FX1000,
+!  it is not currently used. (2021-04-23)
 !
     use pmdvars,only: myid_md,mpi_md_world
     use util,only: itotOf
@@ -2031,7 +2034,7 @@ contains
         write(iots1d,'(a,2es15.7,i6)') '#  tnow,dx,ibc1d: ',tnow,dx1d,ibc1d
         write(iots1d,'(a)') '#  ix,  te(ix),   tl(ix)'
         do ix=1,nd1d
-          write(iots1d,'(2x,i6,2es15.5)') ix,te1d(ix),tl1d(ix)
+          write(iots1d,'(2x,i6,2es15.5e3)') ix,te1d(ix),tl1d(ix)
         enddo
         close(iots1d)
       endif

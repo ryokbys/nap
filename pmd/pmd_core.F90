@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-24 15:01:09 Ryo KOBAYASHI>
+!                     Last-modified: <2021-04-23 12:09:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -682,12 +682,12 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
          (ifpmd.gt.0.and.mod(istp,noutpmd).eq.0) ) then
       if( iprint.ge.ipl_info .and. myid_md.eq.0 ) &
            print *,'Update boundary atoms and thus pair-list, too.'
-      if( trim(ctctl).eq.'ttm' ) then
-        tmp = mpi_wtime()
-        call remove_ablated_atoms(simtime,namax,natm &
-             ,tag,ra,va,aux,naux,h,sorg)
-        call accum_time('ttm',mpi_wtime()-tmp)
-      endif
+!!$      if( trim(ctctl).eq.'ttm' ) then
+!!$        tmp = mpi_wtime()
+!!$        call remove_ablated_atoms(simtime,namax,natm &
+!!$             ,tag,ra,va,aux,naux,h,sorg)
+!!$        call accum_time('ttm',mpi_wtime()-tmp)
+!!$      endif
 !.....Move atoms that cross the boundary
       tmp = mpi_wtime()
       call bamove()
