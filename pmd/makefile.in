@@ -47,14 +47,14 @@ forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
 	force_SM_Al.o force_linreg.o force_DNN.o \
 	force_Morse.o force_Coulomb.o force_EAM.o force_Buckingham.o \
 	force_Bonny_WRe.o force_ZBL.o force_cspline.o force_Tersoff.o \
-	force_Abell.o force_BMH.o force_dipole.o force_fpc.o force_angular.o ${force_common}
+	force_Abell.o force_BMH.o force_dipole.o force_fpc.o force_angular.o
 params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 	params_EDIP_Si.h \
 	params_Brenner.h params_Lu_WHe.h params_Branicio_AlN.h \
 	params_Mishin_Al.h params_Mishin_Ni.h params_AFS_W.h params_SC_Fe.h \
 	params_SM_Al.h const.h
 
-libpmdobj= ${pmdobj} ${mods} ${forces} ${params}
+libpmdobj= ${pmdobj} ${mods} ${forces} ${force_common} ${params}
 
 clstr= mod_pmdio.o mod_util.o util_vec.o mod_pairlist.o cluster.o
 
@@ -77,7 +77,7 @@ all: pmd lib
 clean:
 	rm -f *.o *.mod *.a *~
 
-pmd: ${mods} ${pmd} ${pmdobj} ${forces}
+pmd: ${mods} ${pmd} ${pmdobj} ${forces} ${force_common}
 	${MPIFC} ${MPIFLAGS} -o $@ $^
 
 lib: ${libpmdobj}
@@ -92,8 +92,8 @@ endef
 test: pmd
 	@$(foreach x,$(wildcard $(pmd_examples)),$(call cd_test, ${x}))
 
-pmc: ${mods} ${pmc} ${forces}
-	${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${pmc}
+pmc: ${mods} ${pmc} ${forces} ${force_common}
+	${MPIFC} ${MPIFLAGS} -o $@ $^
 
 # smd: ${mods} ${smd} ${forces} ${params}
 #   ${MPIFC} ${MPIFLAGS} -o $@ ${mods} ${forces} ${smd}

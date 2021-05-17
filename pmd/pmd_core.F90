@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-04-23 12:09:06 Ryo KOBAYASHI>
+!                     Last-modified: <2021-05-11 15:00:04 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -995,6 +995,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 
     if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(iauxof('clr'),:),hi,specorder &
          ,myid_md,iprint)
+    if( lflux ) call accum_lflux(namax,natm,h,ra,va,aux(iauxof('clr'),:),istp,dt &
+         ,myid_md,mpi_md_world,nxyz)
     if( lpdens ) call accum_pdens(namax,natm,tag,ra,sorg)
 
 !-------write the particle positions

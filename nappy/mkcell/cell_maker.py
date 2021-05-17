@@ -27,6 +27,7 @@ import numpy as np
 from docopt import docopt
 
 from nappy.napsys import NAPSystem
+import nappy
 
 _default_specorder=['Si']
 
@@ -64,7 +65,7 @@ def make_bcc(latconst=1.0,specorder=None):
     s.set_lattice(latconst,a1,a2,a3)
     poss = [[0.00, 0.00, 0.00],
             [0.50, 0.50, 0.50]]
-    symbol = _default_specorder[0]
+    symbol = specorder[0]
     symbols = [ symbol for i in range(len(poss)) ]
     vels = [ [0., 0., 0.] for i in range(len(poss)) ]
     frcs = [ [0., 0., 0.] for i in range(len(poss)) ]
@@ -390,7 +391,7 @@ if __name__ == "__main__":
     orient = [ int(x) for x in args['--orientation'].split(',')]
     celltype = args['--celltype']
     specorder = [ x for x in args['--specorder'].split(',')]
-    if specorder[0] == None:
+    if specorder[0] == 'None':
         specorder = None
 
     struct= None
@@ -398,7 +399,7 @@ if __name__ == "__main__":
         struct= make_sc(latconst)
     elif args['bcc']:
         if orient == [0,0,1]:
-            struct= make_bcc(latconst)
+            struct= make_bcc(latconst,specorder)
         elif orient == [1,1,0]:
             struct= make_bcc110(latconst)
         elif orient == [1,1,1]:
@@ -429,4 +430,4 @@ if __name__ == "__main__":
 
     struct.repeat(nx,ny,nz)
     
-    struct.write(ofname)
+    nappy.io.write(struct,fname=ofname)

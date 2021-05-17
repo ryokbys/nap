@@ -123,3 +123,24 @@ elements = {
     'Ts' :{'number':117, 'name':'Tennessine   ', 'mass':293.00, 'abundance':'0     ', 'valence':7},
     'Og' :{'number':118, 'name':'Oganesson    ', 'mass':294.00, 'abundance':'0     ', 'valence':8},
 }
+
+elements_order = ['X',
+                  'H','He',  # 1,2
+                  'Li','Be','B','C','N','O','F','Ne',  # 3,4,5,6,7,8,9,10
+                  'Na','Mg','Al','Si','P','S','Cl','Ar',  # 11 - 18
+                  'K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr',  # 19 - 36
+                  'Rb','Sr','Y','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe',  # 36 - 54
+                  'Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu',  # 55 - 71
+                  'Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn',  # 72 - 86
+                  'Fr','Ra','Ac','Th','Pa','U','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr','Rf','Db','Sg','Bh',  #
+                  'Hs','Mt','Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og',
+                  ]
+
+def get_number_from_symbol(symbol):
+    """
+    Convert symbol to number.
+    """
+    return elements[symbol]['number']
+
+def get_symbol_from_number(number):
+    return elements_order[number]

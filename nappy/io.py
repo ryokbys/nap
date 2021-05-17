@@ -706,6 +706,7 @@ def write_lammps_data(nsys,fname='data.lammps',atom_style='atomic'):
     return None
 
 def read_xsf(fname="xsf",specorder=None):
+    from nappy.elements import get_symbol_from_number
     nsys = NAPSystem()
     if specorder is None:
         nsys.specorder = []
@@ -799,6 +800,7 @@ def write_xsf(nsys,fname='xsf'):
     Write XCrysden xsf format.
     Only applicable to orthogonal system.
     """
+    from nappy.elements import get_number_from_symbol
     if not nsys.specorder:
         raise ValueError('Specorder has to be defined to write'
                          +' xsf format file.')
