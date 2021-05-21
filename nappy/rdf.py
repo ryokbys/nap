@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Calculate the radial distribution function (RDF) from files.
-Statistical averaging about atoms in a file and over files are taken.
+It takes statistical averaging over atoms in a file and over files.
 
 Usage:
   rdf.py [options] INFILE [INFILE...]
@@ -17,7 +17,7 @@ Options:
               Width of Gaussian smearing, zero means no smearing. [default: 0]
   --nnmax=NNMAX
               Max num of neighbors when counting neighbors. [default: 100]
-  -o OUT      Output file name. [default: out.rdf]
+  -o OUT      Name of file to be written in addition to out.rdf if specified. [default: None]
   --specorder=SPECORDER
               Order of species separated by comma, like, --specorder=W,H. [default: None]
   --out4fp    Flag to write out in general fp.py format. [default: Fault]
@@ -533,6 +533,8 @@ if __name__ == "__main__":
     sigma= int(args['--gsmear'])
     nnmax = int(args['--nnmax'])
     ofname= args['-o']
+    if ofname == 'None':
+        ofname = None
     specorder = [ x for x in args['--specorder'].split(',') ]
     if specorder == ['None']:
         specorder = []
@@ -546,6 +548,8 @@ if __name__ == "__main__":
         if len(lscatter) != len(specorder):
             raise ValueError('--scatter-length is not set correctly.')
     out4fp = args['--out4fp']
+    if out4fp and ofname is None:
+        raise ValueError("Output file name must be specified with option -o.")
     if out4fp and not SQ:
         pairwise = True
         pairs0 = args['--pairs'].split(',')
@@ -623,14 +627,16 @@ if __name__ == "__main__":
                         agr[0,0,:] += 2.0*agr[isid,jsid,:] *wij
         qs,sqs = gr_to_SQ(rd,agr[0,0,:],rho,qmin=0.7,qmax=qmax,nq=200)
 
-    if out4fp:
-        write_rdf_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs=pairs,rmin=rmin)
-        if SQ:
-            write_sq_out4fp('out.sq',qs,sqs)
-    else:
-        write_rdf_normal(ofname,specorder,nspcs,rd,agr,nr,)
-        if SQ:
-            write_sq_normal('out.sq',qs,sqs)
+    #...Regardless ofname, write out.rdf in normal format
+    write_rdf_normal('out.rdf',specorder,nspcs,rd,agr,nr,)
+    if SQ:
+        write_sq_out4fp('out.sq',qs,sqs)
+    #...Format of output (named by ofname) depends on out4fp
+    if ofname is not None:
+        if out4fp:
+            write_rdf_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs=pairs,rmin=rmin)
+        else:
+            write_rdf_normal(ofname,specorder,nspcs,rd,agr,nr,)
 
     if plot:
         plot_figures(rd,agr)
@@ -641,7 +647,9 @@ if __name__ == "__main__":
         else:
             print(' Check graph_rdf_total.png and graph_rdfs.png')
     else:
-        print(' Check {0:s} with gnuplot, like'.format(ofname))
+        print(' Check out.rdf with gnuplot, like')
+        print("   gnuplot> plot 'out.rdf' us 1:2  w l")
         print('')
-        print(" > plot '{0:s}' us 1:2  w l".format(ofname))
-        print('')
+        if ofname is not None:
+            print(" In addition to out.rdf, {0:s} is also written.".format(ofname))
+            print('')
