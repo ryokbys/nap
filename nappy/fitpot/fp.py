@@ -724,7 +724,6 @@ def main(args):
             for j in range(i,len(specorder)):
                 sj = specorder[j]
                 rdf_pairs.append((si,sj))
-
     
     # print('pairs    =',pairs)
     # print('rdf_pairs=',rdf_pairs)

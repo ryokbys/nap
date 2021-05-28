@@ -413,7 +413,7 @@ if __name__ == "__main__":
         for t in triplets:
             print('   {0:s}-{1:s}-{2:s}'.format(*t))
     
-    pairs = sort_pairs(pairs,specorder)
+    # pairs = sort_pairs(pairs,specorder)
 
     kwargs = {}
     kwargs['specorder'] = specorder

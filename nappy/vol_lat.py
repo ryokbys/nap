@@ -12,7 +12,7 @@ Options:
               If this is -1, vol and lat of the final step are taken. [default: 0]
   --out4fp    Flag to write out in general fp.py format. [default: Fault]
   --prefix PREFIX
-              Prefix for output files. [default: None]
+              Prefix for output files. [default: pmd]
 """
 from __future__ import print_function
 
@@ -24,7 +24,7 @@ from nappy.io import read
 from nappy.common import get_key
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "200505"
+__version__ = "210527"
 
 def nsys2lat(nsys):
     a,b,c = nsys.get_lattice_lengths()
@@ -41,11 +41,7 @@ def main(args):
     nskip = int(args['--skip'])
     del files[:nskip]
     prefix = args['--prefix']
-    if prefix == 'None':
-        prefix = None
     out4fp = args['--out4fp']
-    if out4fp and prefix is None:
-        raise ValueError("Output file prefix must be specified with option --prefix.")
 
     nsum = 0
     volsum = 0.0
@@ -94,7 +90,7 @@ def main(args):
             f.write('     6     1.0\n')
             f.write(' {0:10.3f} {1:10.3f} {2:10.3f}'.format(a,b,c)
                     +' {0:10.3f} {1:10.3f} {2:10.3f}\n'.format(alpha,beta,gamma))
-    elif prefix is not None:
+    else:
         with open(prefix+'.vol','w') as f:
             f.write('{0:15.3f}\n'.format(vol))
         with open(prefix+'.lat','w') as f:
