@@ -38,6 +38,7 @@ Options:
 from __future__ import print_function
 
 import os,sys
+from datetime import datetime
 import numpy as np
 import copy
 from docopt import docopt
@@ -210,7 +211,7 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
 
     nr= int((rmax0-rmin)/dr)+1
     rd= np.array([ rmin +dr*(ir+0.5) for ir in range(nr) ])
-    rmax = dr*nr  # Use corrected rmax to cover regions of NR bins
+    rmax = rmin +dr*nr  # Use corrected rmax to cover regions of NR bins
     r2max = rmax*rmax
     
     nsys = copy.deepcopy(nsys0)
@@ -227,13 +228,11 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
     natm = len(nsys.atoms)
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
-    # nsys.make_pair_list(rcut=rmax,distance=True)
     nsys.make_pair_list(rcut=rmax,nnmax=nnmax)
     for ia in range(natm0):
         isid = sids[ia]
         pi = poss[ia]
         ndr[:,:] = 0.0
-        # for ja,dij in nsys.neighbors_of(ia,distance=True):
         for ja,dij in nsys.neighbors_of(ia,distance=True):
             jsid = sids[ja]
             # print(ia,isid,ja,jsid,dij)
@@ -245,8 +244,8 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
             if rrdr < 0.0:
                 continue
             ir = min(int(rrdr),nr-1)
-            if ir <= 0:
-                print('Something is wrong: ir<=0 ')
+            if ir < 0:
+                print('Something is wrong: ir<0 ')
                 print(ia,ja,dij,rrdr,ir)
                 raise
             ndr[0,0,ir] += 1.0
