@@ -13,6 +13,7 @@ Options:
 """
 from __future__ import print_function
 
+import os
 import sys
 from docopt import docopt
 import numpy as np
@@ -233,12 +234,14 @@ class CS:
         self.all_indivisuals.extend(self.population)
         if self.print_level > 2:
             for pi in self.population:
+                fname = 'in.vars.fitpot.{0:d}'.format(pi.iid)
                 self.write_variables(pi,
-                                     fname='in.vars.fitpot.{0:d}'.format(pi.iid),
+                                     fname=fname,
                                      **self.kwargs)
         else:
+            fname = 'in.vars.fitpot.{0:d}'.format(self.bestind.iid)
             self.write_variables(self.bestind,
-                                 fname='in.vars.fitpot.{0:d}'.format(self.bestind.iid),
+                                 fname=fname,
                                  **self.kwargs)
         return None
 
@@ -397,12 +400,17 @@ class CS:
                 self.population[iv] = ci
 
             #...Check best
+            best_updated = False
             for ic,ci in enumerate(self.population):
                 if ci.val < self.bestind.val:
                     self.bestind = ci
-                    self.write_variables(ci,
-                                         fname='in.vars.fitpot.{0:d}'.format(ci.iid),
-                                         **self.kwargs)
+                    best_updated = True
+            if best_updated:
+                fname = 'in.vars.fitpot.{0:d}'.format(self.bestind.iid)
+                self.write_variables(self.bestind,
+                                     fname=fname,
+                                     **self.kwargs)
+                os.system('cp -f {0:s} in.vars.fitpot.best'.format(fname))
 
             #...Update variable ranges if needed
             if self.update_vrs_per > 0 and (it+1) % self.update_vrs_per == 0:

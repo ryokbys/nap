@@ -6,7 +6,8 @@ def read_outfp(fname='out.fp'):
 out = read_outfp('out.fp')
 outref = read_outfp('out.fp.REF')
 
-assert len(out) == len(outref)
+#...Num of lines changed since 2021-06-30
+# assert len(out) == len(outref)
 
 Ls = []
 for l in out:
@@ -15,7 +16,7 @@ for l in out:
     dat = l.split()
     if 'iid' in l:
         Ls.append(float(dat[6]))
-    if 'step' in l:
+    if 'step,time,best,vars' in l:
         dat = l.split()
         best = float(dat[3])
         assert abs(best -min(Ls)) < 0.001
