@@ -20,12 +20,14 @@ Options:
 from __future__ import print_function
 
 import os
+import sys
 import shutil
 from docopt import docopt
 import numpy as np
 from numpy import sin,cos,sqrt
 import subprocess
 import time
+from datetime import datetime
 
 from nappy.fitpot.fp2prms import fp2BVSx, fp2BVS, fp2Morse, read_params_Coulomb
 from nappy.fitpot.de import DE
@@ -190,7 +192,34 @@ def read_in_fitpot(fname='in.fitpot'):
                 pass
     
     return infp
-    
+
+def write_info(infp,args):
+    """
+    Write out information on input parameters for fp.
+    """
+
+    print(' Parameters')
+    print(' ----------')
+    print('   num of processes (given by --nproc option)  ',int(args['--nproc']))
+    print('   potential       {0:s}'.format(infp['potential']))
+    print('   specorder       ',infp['specorder'])
+    fmethod = infp['fitting_method']
+    print('   fitting_method  {0:s}'.format(fmethod))
+    if fmethod in ('de','DE'):
+        print('   num_individuals   ',infp['de_num_individuals'])
+        print('   fraction          {0:7.4f}'.format(infp['de_fraction']))
+        print('   temparature       {0:7.4f}'.format(infp['de_temperature']))
+        print('   crossover_rate    {0:7.4f}'.format(infp['de_crossover_rate']))
+    elif fmethod in ('cs','CS'):
+        print('   num_individuals   ',infp['cs_num_individuals'])
+        print('   fraction          {0:7.4f}'.format(infp['cs_fraction']))
+    else:
+        print('   There is no such fitting method...')
+    print('   num_iteration   {0:d}'.format(infp['num_iteration']))
+    print(' ----------')
+    print()
+    return None
+
 def write_vars_fitpot(vs,vrs,fname='in.vars.fitpot',**kwargs):
     rc2 = kwargs['rc2']
     rc3 = kwargs['rc3']
@@ -715,6 +744,8 @@ def main(args):
     nproc = int(args['--nproc'])
 
     infp = read_in_fitpot('in.fitpot')
+    write_info(infp,args)
+
     pairs = get_pairs(infp['interactions'])
     rdf_pairs = infp['rdf_pairs']
     if len(rdf_pairs) == 0:  # if no rdf_pairs are specied, all the pairs are selected
@@ -786,9 +817,25 @@ def main(args):
     
     return None
 
+def headline():
+    print('')
+    print(' fp.py --- fit potential parameters to any target property ---')
+    print('')
+    cmd = ' '.join(s for s in sys.argv)
+    print('   Executed as {0:s}'.format(cmd))
+    hostname = subprocess.run(['hostname',], stdout=subprocess.PIPE).stdout.decode('utf-8')
+    print('            on {0:s}'.format(hostname.strip()))
+    print('            at {0:s}'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+    print()
+    print('   Please cite:')
+    print('     1) R. Kobayashi, J. Open Source Software, 6(57), 2768 (2021)')
+    print('     2) R. Kobayashi, Y. Miyaji, K. Nakano, M. Nakayama, APL Materials 8, 081111 (2020)')
+    print()
+    return None
 
 if __name__ == "__main__":
 
     args = docopt(__doc__)
 
+    headline()
     main(args)

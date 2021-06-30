@@ -257,7 +257,9 @@ class CS:
         return None
 
     def sort_individuals(self):
-
+        """
+        Sort individuals in the population in the ascending order.
+        """
         jtop = self.N
         for i in range(self.N):
             jtop -= 1
@@ -267,8 +269,8 @@ class CS:
                 if pj.val > pjp.val:
                     self.population[j] = pjp
                     self.population[j+1] = pj
+        return None
         
-
     def run(self,maxiter=100):
         """
         Perfom CS.
@@ -296,10 +298,10 @@ class CS:
             
         for it in range(maxiter):
 
-            candidates = []
 
             self.sort_individuals()
-            #...Create candidates by Levy flight
+            #...Create candidates from current population using Levy flight
+            candidates = []
             vbest = self.bestind.vector
             for ip,pi in enumerate(self.population):
                 vi = pi.vector
@@ -323,24 +325,49 @@ class CS:
                 newind.set_variable(vnew)
                 candidates.append(newind)
 
-            #...Evaluate loss function values
-            prcs = []
+            #...Create new completely random candidates
+            iab = int((1.0 -self.F)*self.N)
+            rnd_candidates = []
+            for iv in range(iab,self.N):
+                self.iidmax += 1
+                newind = Individual(self.iidmax, self.ndim, self.vrs, self.loss_func)
+                newind.init_random()
+                rnd_candidates.append(newind)
+
             if self.nproc > 0 :  # use specified number of cores by nproc
                 pool = Pool(processes=self.nproc)
             else:
                 pool = Pool()
             
+            #...Evaluate loss function values of updated candidates and new random ones
+            prcs = []
             for ic,ci in enumerate(candidates):
                 kwtmp = copy.copy(self.kwargs)
                 kwtmp['index'] = ic
                 kwtmp['iid'] = ci.iid
                 # prcs.append(Process(target=ci.calc_loss_func, args=(kwtmp,qs[ic])))
                 prcs.append(pool.apply_async(ci.calc_loss_func, (kwtmp,)))
+            rnd_prcs = []
+            for ic,ci in enumerate(rnd_candidates):
+                kwtmp = copy.copy(self.kwargs)
+                kwtmp['index'] = len(candidates) +ic
+                kwtmp['iid'] = ci.iid
+                # prcs.append(Process(target=ci.calc_loss_func, args=(kwtmp,qs[ic])))
+                rnd_prcs.append(pool.apply_async(ci.calc_loss_func, (kwtmp,)))
+            
             results = [ res.get() for res in prcs ]
+            rnd_results = [ res.get() for res in rnd_prcs ]
+
             for res in results:
                 val,ic = res
                 candidates[ic].val = val
             self.all_indivisuals.extend(candidates)
+
+            for res in rnd_results:
+                val,ic_rnd = res
+                ic = ic_rnd -len(candidates)
+                rnd_candidates[ic].val = val
+            self.all_indivisuals.extend(rnd_candidates)
 
             #...Pick j that is to be compared with i
             js = random.sample(range(self.N),k=self.N)
@@ -362,33 +389,10 @@ class CS:
             #...Rank individuals
             self.sort_individuals()
             
-            #...Abandon bad ones and replace with random ones
-            iab = int((1.0 -self.F)*self.N)
-            candidates = []
-            for iv in range(iab,self.N):
-                self.iidmax += 1
-                newind = Individual(self.iidmax, self.ndim, self.vrs, self.loss_func)
-                newind.init_random()
-                candidates.append(newind)
-            
-            #...Evaluate loss function values of new random ones
-            prcs = []
-            for ic,ci in enumerate(candidates):
-                kwtmp = copy.copy(self.kwargs)
-                kwtmp['index'] = ic
-                kwtmp['iid'] = ci.iid
-                # prcs.append(Process(target=ci.calc_loss_func, args=(kwtmp,qs[ic])))
-                prcs.append(pool.apply_async(ci.calc_loss_func, (kwtmp,)))
-            results = [ res.get() for res in prcs ]
-            for res in results:
-                val,ic = res
-                candidates[ic].val = val
-            self.all_indivisuals.extend(candidates)
-
-            #...Replace them with old ones
+            #...Replace to-be-abandoned ones with new random ones
             ic = 0
             for iv in range(iab,self.N):
-                ci = candidates[ic]
+                ci = rnd_candidates[ic]
                 ic += 1
                 self.population[iv] = ci
 

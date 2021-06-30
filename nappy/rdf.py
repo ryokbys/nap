@@ -420,6 +420,9 @@ def write_rdf_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs=None,rmin=0.0,nperl
             n += 1
     
     with open(fname,'w') as f:
+        cmd = ' '.join(s for s in sys.argv)
+        f.write('# Output at {0:s} from,\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        f.write('#  {0:s}\n'.format(cmd))
         if pairs != None:
             f.write('# RDF for pairs: ')
             for pair in pairs:
