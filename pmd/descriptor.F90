@@ -4,6 +4,7 @@ module descriptor
 !=======================================================================
   use pmdvars,only: nspmax
   use util,only: csp2isp
+  use memory,only: accum_mem
   implicit none
   include 'params_unit.h'
   include "./const.h"
@@ -210,7 +211,8 @@ contains
 !.....gsfi,dgsfi,igsfi are independend on number of atoms but on nnlmax
       if( .not. allocated(gsfi) ) then
         allocate(gsfi(nsf),dgsfi(3,nsf,0:nnmax),igsfi(nsf,0:nnmax),gscli(nsf))
-        mem = mem +8*size(gsfi) +8*size(dgsfi) +2*size(igsfi) +8*size(gscli)
+        call accum_mem('descriptor',8*(size(gsfi)+size(dgsfi)+size(gscli))+2*size(igsfi))
+!!$        mem = mem +8*size(gsfi) +8*size(dgsfi) +2*size(igsfi) +8*size(gscli)
         gscli(:) = 1d0
       endif
     endif
@@ -242,11 +244,13 @@ contains
 
     if( lrealloc ) then
       if( allocated(gsf) ) then
-        mem = mem -8*size(gsf) -8*size(dgsf) -2*size(igsf)
+!!$        mem = mem -8*size(gsf) -8*size(dgsf) -2*size(igsf)
+        call accum_mem('descriptor',-8*(size(gsf)+size(dgsf))+2*size(igsf))
         deallocate( gsf,dgsf,igsf )
       endif
       allocate( gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal) &
            ,igsf(nsf,0:nnl,nal))
+      call accum_mem('descriptor',8*(size(gsf)+size(dgsf))+2*size(igsf))
       mem = mem +8*size(gsf) +8*size(dgsf) +2*size(igsf)
       lrealloc=.false.
     endif
@@ -342,7 +346,8 @@ contains
     
     if( .not. allocated(ts_cheby) ) then
       allocate(ts_cheby(0:max(nsf2,nsf3)),dts_cheby(0:max(nsf2,nsf3)))
-      mem = mem +8*size(ts_cheby)*2
+      call accum_mem('descriptor',8*(size(ts_cheby)+size(dts_cheby)))
+!!$      mem = mem +8*size(ts_cheby)*2
     endif
 
 !.....Check the maximumx cutoff and given rc
@@ -995,7 +1000,8 @@ contains
     if( l1st ) then
       if( .not. allocated(ts_cheby) ) then
         allocate(ts_cheby(0:max(nsf2,nsf3)),dts_cheby(0:max(nsf2,nsf3)))
-        mem = mem +8*size(ts_cheby)*2
+        call accum_mem('descriptor',8*(size(ts_cheby)+size(dts_cheby)))
+!!$        mem = mem +8*size(ts_cheby)*2
       endif
 
 !.....Check the maximumx cutoff and given rc
@@ -1331,10 +1337,12 @@ contains
 !!$      allocate(itype(nsf),cnst(max_ncnst,nsf),rcs(nsf),rcs2(nsf))
       allocate(descs(nsf),ilsf2(0:nsf,nspmax,nspmax) &
            ,ilsf3(0:nsf,nspmax,nspmax,nspmax))
+      call accum_mem('descriptor',8*size(descs)+4*size(ilsf2)+4*size(ilsf3))
 !.....Also allocate group-LASSO/FS related variables,
 !     which are not used in pmd but in fitpot
       allocate(mskgfs(ngl),msktmp(ngl),glval(0:ngl))
-      mem = mem +8*ngl +8*ngl +8*(ngl+1)
+      call accum_mem('descriptor',4*(size(mskgfs)+size(msktmp))+8*size(glval))
+!!$      mem = mem +8*ngl +8*ngl +8*(ngl+1)
       mskgfs(1:ngl) = 0d0
     endif
     if( lcheby ) then
@@ -1591,6 +1599,7 @@ contains
     if( .not. allocated(descs) ) then
       allocate(descs(nsf),ilsf2(0:nsf,nspmax,nspmax), &
            ilsf3(0:nsf,nspmax,nspmax,nspmax))
+      call accum_mem('descriptor',8*size(descs)+2*size(ilsf2)+2*size(ilsf3))
       if( lcheby .and. .not. allocated(wgtsp) ) allocate(wgtsp(nspmax))
     endif
     nsf2 = nsf2_in
@@ -1741,12 +1750,16 @@ contains
     if( nsf.ne.nsfo ) stop 'ERROR @set_descs: nsf.ne.nsfo, which should not happen.'
 
     if( nal.lt.nalo .or. nnl.lt.nnlo )  then
-      if( allocated(gsf) ) deallocate(gsf,dgsf,igsf)
+      if( allocated(gsf) ) then
+        call accum_mem('descriptor',-8*size(gsf)-8*size(dgsf)-4*size(igsf))
+        deallocate(gsf,dgsf,igsf)
+      endif
       nsf = nsfo
       nal = nalo
       nnl = nnlo
       allocate( gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal) &
            ,igsf(nsf,0:nnl,nal) )
+      call accum_mem('descriptor',8*size(gsf)+8*size(dgsf)+4*size(igsf))
     endif
     
     gsf(:,1:nalo) = gsfo(:,1:nalo)

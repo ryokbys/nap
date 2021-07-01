@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-04-13 13:49:40 Ryo KOBAYASHI>
+!                     Last-modified: <2021-07-01 14:39:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -21,11 +21,11 @@ program pmd
   use pmdvars
   use pmdio,only: read_pmdtot_bin, read_pmdtot_ascii, write_pmdtot_bin, &
        write_pmdtot_ascii,get_ntot_ascii,get_ntot_bin
-  use version
   use force
   use Coulomb, only: cterms
   use util, only: itotOf, cell_info, iauxof, make_cdumpauxarr, spcs_info
   use time, only: time_stamp, accum_time, report_time
+  use memory, only: accum_mem, report_mem
   use element
   use clrchg,only: lclrchg,init_clrchg
   use localflux,only: lflux,init_lflux,final_lflux
@@ -47,7 +47,7 @@ program pmd
   real(8),allocatable:: auxtot(:,:)
 
   integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,inc
-  integer:: mpicolor,mpikey,ierr,jerr,itmp,nprocs,nnmax_est
+  integer:: mpicolor,mpikey,ierr,jerr,itmp,nprocs,nnmax_est,mem
   real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),rmin
   real(8):: epot,ekin,stnsr(3,3)
   real(8):: t0,t1
@@ -71,17 +71,7 @@ program pmd
 !!$  call set_fmv(fmv)
 
   if( myid_md.eq.0 ) then
-    write(6,'(a)') '=================================' &
-         //'======================================='
-    write(6,'(a)') ' PMD: A Parallel Molecular Dynamics program '
-    write(6,*) ''
-    call write_version()
-    call write_authors()
-    write(6,'(a)') '=================================' &
-         //'======================================='
-    write(6,*) ''
-    call time_stamp(' Job started')
-    write(6,*) ''
+    call write_headline()
 
 !.....Read atom configuration file 1st
     if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
@@ -101,6 +91,9 @@ program pmd
            //'bin or binary.'
       stop
     endif
+!.....Memory assessment
+    mem = 8*ntot*(1 +3 +3 +1 +3*3 +3*3 +3)
+    call accum_mem('main',mem)
 
 !.....Set mass of species if specorder is already set.
 !.....This could be overwritten by mass entry in in.pmd
@@ -246,6 +239,9 @@ program pmd
       allocate(auxtot(naux,ntot0))
     endif
     auxtot(:,:) = 0d0
+!.....Memory assessment
+    mem = 8*naux*ntot0
+    call accum_mem('main',mem)
 
 !.....Determine nx,ny,nz using rc and hmat info
     if( .not. (nx.gt.0 .and. ny.gt.0 .and. nz.gt.0 ) ) then
@@ -355,7 +351,8 @@ program pmd
   if( myid_md.eq.0 ) then
     call write_force(21,'.pmd',h,epot,ntot,tagtot,atot,stnsr)
     call accum_time('total',mpi_wtime()-t0)
-    if( iprint.ge.ipl_time ) call report_time(6)
+    call report_time(6,iprint)
+    call report_mem(6,iprint)
     print *,''
     call time_stamp(' Job finished')
   endif
@@ -368,6 +365,25 @@ program pmd
   call mpi_finalize(ierr)
 
 end program pmd
+!=======================================================================
+subroutine write_headline()
+!
+! Write out headline info for pmd users.
+! Assuming that this is called only at 0-th node.
+!
+  use time, only: time_stamp
+  use version
+  
+  write(6,*) ''
+  write(6,'(a)') ' pmd --- Parallel Molecular Dynamics ---'
+  write(6,*) ''
+  call write_version()
+  call write_authors()
+  write(6,*) ''
+  call time_stamp(' Job started')
+  write(6,*) ''
+
+end subroutine write_headline
 !=======================================================================
 subroutine set_fmv(fmv)
 !

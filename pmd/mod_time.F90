@@ -1,6 +1,6 @@
 module time
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-06 17:45:15 Ryo KOBAYASHI>
+!                     Last modified: <2021-07-01 14:55:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Module for time measurement.
 !-----------------------------------------------------------------------
@@ -71,47 +71,63 @@ contains
     return
   end subroutine accum_time
 !=======================================================================
-  subroutine report_time(ionum)
+  subroutine report_time(ionum,iprint)
 !
 ! Write a report about measured times.
 !
-    integer,intent(in):: ionum
-    integer:: i,maxlen
-    character(len=3):: clen
+    include './const.h'
+    integer,intent(in):: ionum,iprint
+    integer:: i,maxlen,itot,nspace,ihour,imin,isec
+    character(len=3):: clen,cspace
+    character(len=128):: ctn
     real(8):: time_tot
-
-!.....Max length of name for time
-    maxlen = 0
-    do i=1,ntimes
-      maxlen = max(maxlen,len_trim(ctnames(i)))
-    enddo
-    write(clen,'(i0)') maxlen
 
 !.....Total time
     time_tot = -1d0
     do i=1,ntimes
       if( trim(ctnames(i)).eq.'total' ) then
         time_tot = etimes(i)
+        itot = i
         exit
       endif
     enddo
 
-    write(ionum,*) ''
-    write(ionum,'(a)') ' Report from time module:'
-    do i=1,ntimes
-      if( trim(ctnames(i)).ne.'' ) then
-        if( time_tot.ge.0d0 ) then
-          write(ionum,'(a,a'//trim(clen)//',a,f10.2,a,f7.1,a,i0)') &
-               '   Time ',trim(ctnames(i)),' = ', etimes(i), &
-               ' sec, ',etimes(i)/time_tot*100, &
-               ' %, # of calls = ',ncalls(i)
-        else
-          write(ionum,'(a,a'//trim(clen)//',a,f10.2,a,i0)') &
-               '   Time ',trim(ctnames(i)),' = ', etimes(i), &
-               ' sec, # of calls = ',ncalls(i)
+    if( iprint.ge.ipl_time ) then
+!.....Max length of name for time
+      maxlen = 0
+      do i=1,ntimes
+        maxlen = max(maxlen,len_trim(ctnames(i)))
+      enddo
+      write(clen,'(i0)') maxlen
+
+      write(ionum,*) ''
+      write(ionum,'(a)') ' Report from time module:'
+      nspace = 3
+      write(cspace,'(i0)') nspace
+      do i=1,ntimes
+        ctn = trim(ctnames(i))
+        if( trim(ctn).ne.'' .and. trim(ctn).ne.'total' ) then
+          if( time_tot.ge.0d0 ) then
+            write(ionum,'('//trim(cspace)//'x,a,a'//trim(clen)//',a,f10.3,a,f7.1,a,i0)') &
+                 'Time ',trim(ctnames(i)),' = ', etimes(i), &
+                 ' sec, ',etimes(i)/time_tot*100, &
+                 ' %, # of calls = ',ncalls(i)
+          else
+            write(ionum,'('//trim(cspace)//'x,a,a'//trim(clen)//',a,f10.3,a,i0)') &
+                 'Time ',trim(ctnames(i)),' = ', etimes(i), &
+                 ' sec, # of calls = ',ncalls(i)
+          endif
         endif
-      endif
-    enddo
+      enddo
+      
+    else  ! iprint.lt.ipl_time
+      nspace = 1
+      write(cspace,'(i0)') nspace
+      write(clen,'(i0)') 7
+    endif
+    call sec2hms(time_tot,ihour,imin,isec)
+    write(ionum,'('//trim(cspace)//'x,a,a'//trim(clen)//',a,f10.3,a,i3,"h",i2.2,"m",i2.2,"s")') &
+         'Time ','total',' = ', time_tot, ' sec = ',ihour,imin,isec
   end subroutine report_time
 !=======================================================================
   subroutine sec2hms(sec,h,m,s)

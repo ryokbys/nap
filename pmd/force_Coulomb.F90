@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-03-17 17:54:34 Ryo KOBAYASHI>
+!                     Last modified: <2021-07-01 15:13:13 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -15,6 +15,7 @@ module Coulomb
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   use util,only: csp2isp
+  use memory,only: accum_mem
   implicit none
   include "./const.h"
   save
@@ -232,8 +233,14 @@ contains
 !!$    print *,'myid,b1(1:3)=',myid,b1(1:3)
 !!$    print *,'myid,b2(1:3)=',myid,b2(1:3)
 !!$    print *,'myid,b3(1:3)=',myid,b3(1:3)
-    if( allocated(qcos) ) deallocate(qcosl,qcos,qsinl,qsin,pflr)
+    if( allocated(qcos) ) then
+      call accum_mem('force_Coulomb',-8*(size(qcosl)+size(qcos)+size(qsinl) &
+           +size(qsin)+size(pflr)))
+      deallocate(qcosl,qcos,qsinl,qsin,pflr)
+    endif
     allocate(qcosl(nk),qcos(nk),qsinl(nk),qsin(nk),pflr(nk,nspmax))
+    call accum_mem('force_Coulomb',8*(size(qcosl)+size(qcos)+size(qsinl) &
+         +size(qsin)+size(pflr)))
 !.....prefactor for long-range term
     ik = 0
     do k1= -kmax1,kmax1
@@ -337,8 +344,14 @@ contains
       write(6,'(a,i8)') '   total = ',nk
       write(6,*) ''
     endif
-    if( allocated(qcos) ) deallocate(qcos,qsin,qcosl,qsinl,pflr)
+    if( allocated(qcos) ) then
+      call accum_mem('force_Coulomb',-8*(size(qcosl)+size(qcos)+size(qsinl) &
+           +size(qsin)+size(pflr)))
+      deallocate(qcos,qsin,qcosl,qsinl,pflr)
+    endif
     allocate(qcosl(nk),qcos(nk),qsinl(nk),qsin(nk),pflr(nk,nspmax))
+    call accum_mem('force_Coulomb',8*(size(qcosl)+size(qcos)+size(qsinl) &
+         +size(qsin)+size(pflr)))
 !.....prefactor for long-range term
     ik = 0
     do k1= -kmax1,kmax1
@@ -922,8 +935,12 @@ contains
         allocate(ri(3),bk(3),bk1(3),bk2(3),bk3(3),bb(3),dxdi(3) &
              ,dxdj(3),rij(3),xij(3),xj(3),xi(3))
       endif
-      if( allocated(strsl) ) deallocate(strsl)
+      if( allocated(strsl) ) then
+        call accum_mem('force_Coulomb',-8*size(strsl))
+        deallocate(strsl)
+      endif
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
       if( trim(cchgs).eq.'fixed_bvs' ) then
         call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
       endif
@@ -941,9 +958,12 @@ contains
 
     if( .not.allocated(strsl) ) then
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
     else if( size(strsl).lt.3*3*namax ) then
+      call accum_mem('force_Coulomb',-8*size(strsl))
       deallocate(strsl)
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
     endif
 
     if( trim(cchgs).eq.'fixed' ) then
@@ -1064,17 +1084,24 @@ contains
 
     if( l1st ) then
       call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
-      if( allocated(strsl) ) deallocate(strsl)
+      if( allocated(strsl) ) then
+        call accum_mem('force_Coulomb',-8*size(strsl))
+        deallocate(strsl)
+      endif
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
       rc2 = rc*rc
       sqpi = 1d0/sqrt(pi)
     endif
 
     if( .not.allocated(strsl) ) then
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
     else if( size(strsl).lt.3*3*namax ) then
+      call accum_mem('force_Coulomb',-8*size(strsl))
       deallocate(strsl)
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
     endif
 
     epotl= 0d0
@@ -1164,8 +1191,12 @@ contains
 
     if( l1st ) then
       call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
-      if( allocated(strsl) ) deallocate(strsl)
+      if( allocated(strsl) ) then
+        call accum_mem('force_Coulomb',-8*size(strsl))
+        deallocate(strsl)
+      endif
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
 !!$      do i=1,natm
 !!$        print *,'i,chg(i)=',i,chg(i)
 !!$      enddo
@@ -1173,9 +1204,12 @@ contains
 
     if( .not.allocated(strsl) ) then
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
     else if( size(strsl).lt.3*3*namax ) then
+      call accum_mem('force_Coulomb',-8*size(strsl))
       deallocate(strsl)
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
     endif
 
     epotl= 0d0
@@ -1294,15 +1328,22 @@ contains
         allocate(ri(3),bk(3),bk1(3),bk2(3),bk3(3),bb(3),dxdi(3) &
              ,dxdj(3),rij(3),xij(3),xj(3),xi(3))
       endif
-      if( allocated(strsl) ) deallocate(strsl)
+      if( allocated(strsl) ) then
+        call accum_mem('force_Coulomb',-8*size(strsl))
+        deallocate(strsl)
+      endif
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
     endif
 
     if( .not.allocated(strsl) ) then
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
     else if( size(strsl).lt.3*3*namax ) then
+      call accum_mem('force_Coulomb',-8*size(strsl))
       deallocate(strsl)
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
     endif
 
     strsl(1:3,1:3,1:namax) = 0d0
@@ -1368,15 +1409,22 @@ contains
     real(8),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
-      if( allocated(strsl) ) deallocate(strsl)
+      if( allocated(strsl) ) then
+        call accum_mem('force_Coulomb',-8*size(strsl))
+        deallocate(strsl)
+      endif
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
     endif
 
     if( .not.allocated(strsl) ) then
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
     else if( size(strsl).lt.3*3*namax ) then
+      call accum_mem('force_Coulomb',-8*size(strsl))
       deallocate(strsl)
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl))
     endif
 
     strsl(1:3,1:3,1:namax) = 0d0
@@ -2534,8 +2582,12 @@ contains
       enddo
     enddo
 
-    if( allocated(lkuse) ) deallocate(lkuse)
+    if( allocated(lkuse) ) then
+      call accum_mem('force_Coulomb',-4*size(lkuse))
+      deallocate(lkuse)
+    endif
     allocate(lkuse(-kmax3:kmax3,-kmax2:kmax2,-kmax1:kmax1))
+    call accum_mem('force_Coulomb',4*size(lkuse))
 
     lkuse(:,:,:) = .false.
     nk = 0
@@ -2577,8 +2629,12 @@ contains
 
 !.....TODO: not work in parallel
     if( l1st ) then
-      if( allocated(amat) ) deallocate(amat,qvec,xvec)
+      if( allocated(amat) ) then
+        call accum_mem('force_Coulomb',-8*(size(amat)+size(qvec)+size(xvec)))
+        deallocate(amat,qvec,xvec)
+      endif
       allocate(amat(natm+1,natm+1),qvec(natm+1),xvec(natm+1))
+      call accum_mem('force_Coulomb',8*(size(amat)+size(qvec)+size(xvec)))
     endif
 
     amat(1:natm+1,1:natm+1) = 0d0
@@ -2854,10 +2910,15 @@ contains
 
     if( .not.allocated(ge_rho) ) then
       allocate(ge_rho(nspmax),gs_rho(nspmax,6),gf_rho(nspmax,3,natm))
+      call accum_mem('force_Coulomb',8*(size(ge_rho)+size(gs_rho)+size(gf_rho)))
     endif
     if( size(gf_rho).ne.nspmax*3*natm ) then
-      if( allocated(gf_rho) ) deallocate(gf_rho)
+      if( allocated(gf_rho) ) then
+        call accum_mem('force_Coulomb',-8*size(gf_rho))
+        deallocate(gf_rho)
+      endif
       allocate(gf_rho(nspmax,3,natm))
+      call accum_mem('force_Coulomb',8*size(gf_rho))
     endif
 
     call set_charge_BVS(natm,nb,tag,chg,myid,mpi_world,iprint,specorder)
