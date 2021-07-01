@@ -42,11 +42,9 @@ The *nappy* and *fp.py* requires the following packages:
 For the short test, whether or not you can use this program in your environment,
 
 ```bash
+$ cd /path/to/nap/
 $ ./configure --prefix=$(pwd)
-$ cd pmd/
-$ make
-$ cd ../examples/pmd_W/
-$ ../../pmd/pmd
+$ make test
 ```
 
 If it works, you can use this program in your system.
