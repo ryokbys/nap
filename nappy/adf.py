@@ -17,7 +17,7 @@ Options:
   --triplets=TRIPLETS
               Triplets whose angles are to be computed. Three species should be specified connected by hyphen,
               and separated by comma, e.g.) P-O-O,Li-O-O. [default: None]
-  -o OUT      Output file name [default: out.adf]
+  -o OUT      Output file name [default: None]
   --out4fp    Flag to write out in general fp.py format. [default: Fault]
   --skip=NSKIP 
               Skip first NSKIP steps from the statistics. [default: 0]
@@ -212,8 +212,6 @@ def plot_figures(angd,agr,triplets):
     plt.ylabel('ADF')
     plt.savefig("graph_adf.png", format='png', dpi=300, bbox_inches='tight')
 
-################################################## main routine
-
 
 if __name__ == "__main__":
 
@@ -236,8 +234,13 @@ if __name__ == "__main__":
     sigma= int(args['--gsmear'])
     no_average = args['--no-average']
     ofname= args['-o']
+    if ofname == 'None':
+        ofname = None
     flag_plot= args['--plot']
     nskip = int(args['--skip'])
+    
+    if out4fp and ofname is None:
+        raise ValueError("Output file name must be specified with option -o.")
 
     if nskip > len(infiles):
         raise ValueError('NSKIP must be less than num of files given: ',len(infiles))
@@ -261,9 +264,15 @@ if __name__ == "__main__":
         print(' RDF graphes are plotted.')
         print(' Check graph_adf.png')
 
-    if out4fp:
-        write_out4fp(ofname,triplets,na,angd,rcut)
-    else:
-        write_normal(ofname,triplets,na,angd,agr)
+    #...Regardless ofname, write out.adf in normal format
+    write_normal('out.adf',triplets,na,angd,agr)
+    #...Format of output (named by ofname) depends on out4fp
+    if ofname is not None:
+        if out4fp:
+            write_out4fp(ofname,triplets,na,angd,rcut)
+        else:
+            write_normal(ofname,triplets,na,angd,agr)
         
-    print(' Wrote '+ofname)
+    print(' Wrote out.adf')
+    if ofname is not None:
+        print(' Wrote {0:s}'.format(ofname))

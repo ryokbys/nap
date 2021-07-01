@@ -8,6 +8,7 @@ import subprocess
 import numpy as np
 from ase.calculators.calculator import FileIOCalculator,Calculator
 
+import nappy
 from nappy.interface.ase.pmdio import get_fmvs
 from nappy.napsys import NAPSystem
 
@@ -67,7 +68,7 @@ class PMD(FileIOCalculator):
                           [0.0, 0.0, 0.0]],
         'stress_relax_time': 20.0,
         'flag_compute_stress': 'T',
-        'mass': {'W':183.14, 'H':1.008,},
+        # 'mass': {'W':183.14, 'H':1.008,},
         'zload_type': 'none',
         'final_strain': 0.0,
         'boundary': 'ppp',
@@ -189,8 +190,9 @@ class PMD(FileIOCalculator):
         if self.label == 'pmd':
             infname = 'in.pmd'
             # write_pmd(atoms,fname='pmdini',specorder=self.specorder)
-            nsys = NAPSystem.from_ase_atoms(atoms,specorder=self.specorder)
-            nsys.write_pmd(fname='pmdini')
+            #nsys = NAPSystem.from_ase_atoms(atoms,specorder=self.specorder)
+            nsys = nappy.io.from_ase(atoms,specorder=self.specorder)
+            nappy.io.write_pmd(nsys,fname='pmdini')
             
         with open(infname,'w') as f:
             fmvs,ifmvs = get_fmvs(atoms)
@@ -261,7 +263,8 @@ class PMD(FileIOCalculator):
         
         if relax:
             posfile = 'pmdfin'
-            nsys = NAPSystem(fname=posfile,specorder=self.specorder)
+            #nsys = NAPSystem(fname=posfile,specorder=self.specorder)
+            nsys = nappy.io.read(fname=posfile,specorder=self.specorder)
             #tmpatoms = read_pmd(fname=posfile,specorder=self.specorder)
             tmpatoms = nsys.to_ase_atoms()
             self.results['relaxed_scaled_positions'] \
@@ -289,7 +292,6 @@ def get_input_txt(params,fmvs):
            'factor_direction','',
            'stress_control','pressure_target','stress_target',
            'stress_relax_time','flag_compute_stress','',
-           'mass','',
            'overlay','overlay_type','',
            'zload_type','final_strain','',
            'boundary']
@@ -341,10 +343,10 @@ def get_input_txt(params,fmvs):
             for i in range(3):
                 v = vals[i]
                 txt += '  {0:6.2f} {1:6.2f} {2:6.2f}\n'.format(v[0],v[1],v[2])
-        elif key == 'mass':
-            masses = params[key]
-            for k,v in masses.items():
-                txt += '{0:25s} {1:3s}  {2:10.4f}\n'.format(key,k,v)
+        # elif key == 'mass':
+        #     masses = params[key]
+        #     for k,v in masses.items():
+        #         txt += '{0:25s} {1:3s}  {2:10.4f}\n'.format(key,k,v)
         elif key == 'converge_eps':
             txt += '{0:25s} {1:10.1e}\n'.format(key,params[key])
         elif key == 'overlay':

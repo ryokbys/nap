@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-03-17 17:56:11 Ryo KOBAYASHI>
+!                     Last modified: <2021-07-01 15:16:58 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -8,6 +8,7 @@ module Morse
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   use util,only: csp2isp
+  use memory,only: accum_mem
   implicit none
   include "./const.h"
   save
@@ -114,8 +115,12 @@ contains
     if( l1st ) then
 !!$      call init_Morse(natm,tag,mpi_md_world)
 !!$      call read_params_Morse(myid,mpi_md_world,iprint)
-      if( allocated(strsl) ) deallocate(strsl)
+      if( allocated(strsl) ) then
+        call accum_mem('force_Morse',-8*size(strsl))
+        deallocate(strsl)
+      endif
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Morse',8*size(strsl))
       rc2 = rc*rc
 !.....Initialize smooth cutoff
       vrcs(:,:) = 0d0
@@ -139,9 +144,12 @@ contains
 
     if( .not.allocated(strsl) ) then
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Morse',8*size(strsl))
     else if( size(strsl).lt.3*3*namax ) then
+      call accum_mem('force_Morse',-8*size(strsl))
       deallocate(strsl)
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Morse',8*size(strsl))
     endif
 
     epotl= 0d0
@@ -231,15 +239,22 @@ contains
     if( l1st ) then
 !!$      call init_Morse(natm,tag,mpi_md_world)
 !!$      call read_params_Morse(myid,mpi_md_world,iprint)
-      if( allocated(strsl) ) deallocate(strsl)
+      if( allocated(strsl) ) then
+        call accum_mem('force_Morse',-8*size(strsl))
+        deallocate(strsl)
+      endif
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Morse',8*size(strsl))
     endif
 
     if( .not.allocated(strsl) ) then
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Morse',8*size(strsl))
     else if( size(strsl).lt.3*3*namax ) then
+      call accum_mem('force_Morse',-8*size(strsl))
       deallocate(strsl)
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Morse',8*size(strsl))
     endif
 
     epotl= 0d0
@@ -357,17 +372,24 @@ contains
     if( l1st ) then
 !!$      call init_vcMorse(natm,tag,mpi_md_world)
 !!$      call read_params_vcMorse(myid,mpi_md_world,iprint)
-      if( allocated(strsl) ) deallocate(strsl)
+      if( allocated(strsl) ) then
+        call accum_mem('force_Morse',-8*size(strsl))
+        deallocate(strsl)
+      endif
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Morse',8*size(strsl))
       prefbeta = log(1d0 -sqrt(1d0 -beta))
       rc2 = rc*rc
     endif
 
     if( .not.allocated(strsl) ) then
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Morse',8*size(strsl))
     else if( size(strsl).lt.3*3*namax ) then
+      call accum_mem('force_Morse',-8*size(strsl))
       deallocate(strsl)
       allocate(strsl(3,3,namax))
+      call accum_mem('force_Morse',8*size(strsl))
     endif
 
     epotl= 0d0
@@ -1194,9 +1216,13 @@ contains
 
     if( .not.allocated(gf_alp) &
          .or. size(gf_alp).ne.nspmax*nspmax*3*natm ) then
-      if( allocated(gf_alp) ) deallocate(gf_alp,gf_d0,gf_rmin)
+      if( allocated(gf_alp) ) then
+        call accum_mem('force_Morse',-8*(size(gf_alp)+size(gf_d0)+size(gf_rmin)))
+        deallocate(gf_alp,gf_d0,gf_rmin)
+      endif
       allocate(gf_alp(nspmax,nspmax,3,natm),gf_d0(nspmax,nspmax,3,natm), &
            gf_rmin(nspmax,nspmax,3,natm))
+      call accum_mem('force_Morse',8*(size(gf_alp)+size(gf_d0)+size(gf_rmin)))
     endif
 
 !.....Set nsp by max isp of atoms in the system

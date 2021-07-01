@@ -2,6 +2,7 @@ module pairlist
 !-----------------------------------------------------------------------
 ! Module for pair-list.
 !-----------------------------------------------------------------------
+  use memory, only: accum_mem
   implicit none
   save
   
@@ -55,8 +56,12 @@ contains
       rcyi=1d0/rcy
       rczi=1d0/rcz
 !-----allocate LSCL & LSHD after obtaining lcxyz2
-      if( allocated(lscl) ) deallocate(lscl,lshd)
+      if( allocated(lscl) ) then
+        call accum_mem('pairlist',-4*size(lscl) -4*size(lshd))
+        deallocate(lscl,lshd)
+      endif
       allocate(lscl(namax+nbmax),lshd(lcxyz2))
+      call accum_mem('pairlist',4*size(lscl)+4*size(lshd))
     endif
 
 !-----reset headers
@@ -262,9 +267,15 @@ contains
 
     if( .not. allocated(dlist) ) then
       allocate(dlist(namax),ilist(namax),ileft(namax),ia2ic(namax))
+      call accum_mem('pairlist',8*size(dlist)+4*size(ilist) &
+           +4*size(ileft)+4*size(ia2ic))
     else if( size(dlist).ne.namax ) then
+      call accum_mem('pairlist',-8*size(dlist)-4*size(ilist) &
+           -4*size(ileft)-4*size(ia2ic))
       deallocate(dlist,ilist,ileft,ia2ic)
       allocate(dlist(namax),ilist(namax),ileft(namax),ia2ic(namax))
+      call accum_mem('pairlist',8*size(dlist)+4*size(ilist) &
+           +4*size(ileft)+4*size(ia2ic))
     endif
 
     if( l1st ) then
@@ -497,8 +508,12 @@ contains
       rcyi=1d0/rcy
       rczi=1d0/rcz
 !-----allocate LSCL & LSHD after obtaining lcxyz
-      if( allocated(lscl) ) deallocate(lscl,lshd)
+      if( allocated(lscl) ) then
+        call accum_mem('pairlist',-4*size(lscl)-4*size(lshd))
+        deallocate(lscl,lshd)
+      endif
       allocate(lscl(namax),lshd(lcxyz))
+      call accum_mem('pairlist',4*size(lscl)+4*size(lshd))
     endif
 
 !-----reset pair list, LSPR
@@ -773,10 +788,13 @@ contains
     if( .not. allocated(tmparr) ) then
       ndmax = max(3,ndim)
       allocate(tmparr(ndmax*namax))
+      call accum_mem('pairlist',8*size(tmparr))
     else if( size(tmparr).lt.ndim*namax ) then
       ndmax = max(ndim,ndmax)
+      call accum_mem('pairlist',-8*size(tmparr))
       deallocate(tmparr)
       allocate(tmparr(ndmax*namax))
+      call accum_mem('pairlist',8*size(tmparr))
     endif
 
 !  Sort arr taking into account residents only,

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-05-11 15:00:04 Ryo KOBAYASHI>
+!                     Last-modified: <2021-07-01 15:02:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -625,6 +625,13 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 !        print '(a,i5,2es12.4)','myid,vmax,vmaxt='
 !     &       ,myid_md,vmax,vmaxt
 
+    if( lclrchg ) then  ! special treatment for translational momentum
+      call rm_trans_clrchg(natm,tag,va,am,mpi_md_world,myid_md,iprint)
+    elseif( nrmtrans.gt.0 .and. mod(istp,nrmtrans).eq.0 ) then
+      call rm_trans_motion(natm,tag,va,nspmax,am &
+           ,mpi_md_world,myid_md,iprint)
+    endif
+
 !.....Update positions
     if( lconst ) then
       call update_const_pos(namax,natm,h,hi,tag,ra,va,dt,nspmax,am)
@@ -865,13 +872,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
     stnsr(:,:) = stnsr(:,:) *up2gpa
     prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
 
-    if( lclrchg ) then  ! special treatment for translational momentum
-      call rm_trans_clrchg(natm,tag,va,am,mpi_md_world,myid_md,iprint)
-    elseif( nrmtrans.gt.0 .and. mod(istp,nrmtrans).eq.0 ) then
-      call rm_trans_motion(natm,tag,va,nspmax,am &
-           ,mpi_md_world,myid_md,iprint)
-    endif
-
 
 !.....temperature distribution along x
     if( ltdst ) call calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra &
@@ -1096,15 +1096,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
       call cell_info(h)
     endif
     write(6,*) ''
-    if( iprint.ge.ipl_time ) then
-      call write_force_times()
-      write(6,'(1x,a,f10.2)') "Time for comm         = ",tcom
-    endif
-
-    call sec2hms(tcpu,ihour,imin,isec)
-    write(6,'(1x,a,f10.2,a,i3,"h",i2.2,"m",i2.2,"s")') &
-         "Time                  = ",tcpu, &
-         " sec  = ",ihour,imin,isec
   endif
 
 !.....revert forces to the unit eV/A before going out pmd_core
@@ -2805,7 +2796,7 @@ subroutine space_decomp(h,ntot0,tagtot,rtot,vtot,auxtot)
       enddo
       namax = max(int(nalmax*1.2),200)
 !          nbmax = max(namax*27,nbmax)
-      call estimate_nbmax(nalmax,h,nx,ny,nz,rc,rbuf,nbmax)
+      call estimate_nbmax(nalmax,h,nx,ny,nz,rc,rbuf,nbmax,boundary)
       namax = namax +nbmax
       if( iprint.ne.0 ) then
         print '(a,2f6.3)',' rcut, rbuf = ',rc,rbuf
@@ -3126,11 +3117,12 @@ subroutine error_mpi_stop(cerrmsg)
   stop
 end subroutine error_mpi_stop
 !=======================================================================
-subroutine estimate_nbmax(nalmax,h,nx,ny,nz,rcut,rbuf,nbmax)
+subroutine estimate_nbmax(nalmax,h,nx,ny,nz,rcut,rbuf,nbmax,boundary)
   implicit none
   integer,intent(in):: nalmax,nx,ny,nz
   real(8),intent(in):: rcut,rbuf,h(3,3)
   integer,intent(inout):: nbmax
+  character(len=3),intent(in):: boundary
 
   integer:: nest
   real(8):: alx,aly,alz,area,vol,density
@@ -3138,17 +3130,18 @@ subroutine estimate_nbmax(nalmax,h,nx,ny,nz,rcut,rbuf,nbmax)
   alx = dsqrt(h(1,1)**2 +h(2,1)**2 +h(3,1)**2)/nx
   aly = dsqrt(h(1,2)**2 +h(2,2)**2 +h(3,2)**2)/ny
   alz = dsqrt(h(1,3)**2 +h(2,3)**2 +h(3,3)**2)/nz
-!.....Estimated volume and area, which is not correct in case of
-!.....non-orthogonal cell
+!.....Estimated volume and area, which is not correct in case of non-orthogonal cell
   vol = alx*aly*alz
-!.....Density cannot be obtained from nalmax
-!.....because sometimes the system contains vacuum.
+!.....Density cannot be obtained from nalmax because sometimes the system contains vacuum.
 !.....Density = 0.1 means 1 atom in 10 Ang^3 which is dense enough.
   density = 0.1d0
-  area = alx*aly*2 +alx*alz*2 +aly*alz*2
+!!$  area = alx*aly*2 +alx*alz*2 +aly*alz*2
+  area = 0.0d0
+  if( boundary(1:1).eq.'p' ) area = area + aly*alz*2
+  if( boundary(2:2).eq.'p' ) area = area + alx*alz*2
+  if( boundary(3:3).eq.'p' ) area = area + alx*aly*2
 !.....Estimated number of atoms in the margin region.
-!.....Factor 2 is just for a surplus
-  nest = density *area*(rcut+rbuf) *2
+  nest = density *area*(rcut+rbuf)
   nbmax = max(nbmax,nest)
 
 end subroutine estimate_nbmax
@@ -3158,7 +3151,10 @@ subroutine alloc_namax_related()
 !     Allocated arrays related to NAMAX.
 !
   use pmdvars
+  use memory, only: accum_mem
   implicit none
+
+  integer:: mem
 
   if( allocated(ra) ) deallocate(ra)
   if( allocated(va) ) deallocate(va)
@@ -3183,6 +3179,9 @@ subroutine alloc_namax_related()
 !!$       ,stp(3,3,namax),stn(3,3,namax),stt(3,3,namax) &
        ,lsb(0:nbmax,6),lsex(nbmax,6))
   allocate(aux(naux,namax))
+  mem = 8*namax*(3 +3 +3 +3 +9 +1 +nnmax+1 +nnmax +1 +3 +naux)
+  mem = 4*namax*(nnmax+1) +4*6*(nbmax+1) +4*6*nbmax
+  call accum_mem('pmd',mem)
   return
 end subroutine alloc_namax_related
 !=======================================================================
@@ -3192,10 +3191,11 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
 !     updated
 !
   use pmdvars
+  use memory, only: accum_mem
   implicit none
   integer,intent(in):: newnalmax,newnbmax
 
-  integer:: ierr,newnamax,ndim,l,m,inc
+  integer:: ierr,newnamax,ndim,l,m,inc,mem
   real(8),allocatable:: arr(:)
   integer,allocatable:: iarr(:)
 
@@ -3213,6 +3213,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
 !.....those data must be restored after reallocation.
 !.....The hard coding here is too messy but I do not know how to avoid..
 
+  mem = 0
 !.....ra
   ndim = size(ra)
   allocate(arr(ndim))
@@ -3221,6 +3222,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(ra(3,newnamax))
   call copy_arr(ndim,arr,ra)
   deallocate(arr)
+  mem = mem -8*ndim +3*8*newnamax
 
 !.....va
   ndim = size(va)
@@ -3230,6 +3232,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(va(3,newnamax))
   call copy_arr(ndim,arr,va)
   deallocate(arr)
+  mem = mem -8*ndim +3*8*newnamax
 
 !.....aa
   ndim = size(aa)
@@ -3239,6 +3242,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(aa(3,newnamax))
   call copy_arr(ndim,arr,aa)
   deallocate(arr)
+  mem = mem -8*ndim +3*8*newnamax
 
 !.....ra0
   ndim = size(ra0)
@@ -3248,6 +3252,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(ra0(3,newnamax))
   call copy_arr(ndim,arr,ra0)
   deallocate(arr)
+  mem = mem -8*ndim +3*8*newnamax
 
 !.....strs
   ndim = size(strs)
@@ -3257,6 +3262,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(strs(3,3,newnamax))
   call copy_arr(ndim,arr,strs)
   deallocate(arr)
+  mem = mem -8*ndim +8*9*newnamax
 
 !!$!.....stt
 !!$  ndim = size(stt)
@@ -3275,6 +3281,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(tag(newnamax))
   call copy_arr(ndim,arr,tag)
   deallocate(arr)
+  mem = mem -8*ndim +8*newnamax
 
 !.....lspr
   ndim = size(lspr)
@@ -3284,6 +3291,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(lspr(0:nnmax,newnamax))
   call copy_iarr(ndim,iarr,lspr)
   deallocate(iarr)
+  mem = mem -4*ndim +4*(nnmax+1)*newnamax
 
 !.....d2lspr
   ndim = size(d2lspr)
@@ -3293,6 +3301,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(d2lspr(nnmax,newnamax))
   call copy_arr(ndim,arr,d2lspr)
   deallocate(arr)
+  mem = mem -8*ndim +8*nnmax*newnamax
 
 !.....epi
   ndim = size(epi)
@@ -3302,6 +3311,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(epi(newnamax))
   call copy_arr(ndim,arr,epi)
   deallocate(arr)
+  mem = mem -8*ndim +8*newnamax
 
 !.....eki
   ndim = size(eki)
@@ -3311,6 +3321,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(eki(3,3,newnamax))
   call copy_arr(ndim,arr,eki)
   deallocate(arr)
+  mem = mem -8*ndim +8*9*newnamax
 
 !!$!.....stp
 !!$  ndim = size(stp)
@@ -3338,6 +3349,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(aux(naux,newnamax))
   call copy_arr(ndim,arr,aux)
   deallocate(arr)
+  mem = mem -8*ndim +8*naux*newnamax
 
 !.....lsb
   ndim = size(lsb)
@@ -3345,6 +3357,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   call copy_iarr(ndim,lsb,iarr)
   deallocate(lsb)
   allocate(lsb(0:newnbmax,6))
+  mem = mem -4*ndim +4*6*(newnbmax+1)
   inc = 0
   do l=1,6
     do m=0,nbmax
@@ -3361,6 +3374,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   call copy_iarr(ndim,lsex,iarr)
   deallocate(lsex)
   allocate(lsex(newnbmax,6))
+  mem = mem -4*ndim +4*6*newnbmax
   inc = 0
   do l=1,6
     do m=1,nbmax
@@ -3375,6 +3389,8 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   namax = newnamax
   nalmax= newnalmax
   nbmax = newnbmax
+
+  call accum_mem('pmd',mem)
 
   return
 end subroutine realloc_namax_related

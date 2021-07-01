@@ -1,11 +1,12 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-28 22:43:59 Ryo KOBAYASHI>
+!                     Last modified: <2021-07-01 15:31:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
 !  To separate the symmetry function calculations in descriptor.F90.
 !-----------------------------------------------------------------------
+  use memory,only: accum_mem
   implicit none
   include "./const.h"
   private
@@ -90,22 +91,26 @@ contains
     if( l1st ) then
 
       if( allocated(hls) ) then
-        mem = mem -8*size(hls) -8*size(gls) -8*size(zls) -8*size(sgm1) &
-             -8*size(sgm2) -8*size(gw)
+!!$        mem = mem -8*size(hls) -8*size(gls) -8*size(zls) -8*size(sgm1) &
+!!$             -8*size(sgm2) -8*size(gw)
+        call accum_mem('force_DNN',-8*(size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
         deallocate(hls,gls,zls,sgm1,sgm2,gw)
       endif
       allocate( hls(0:maxnnode,0:nlayer), gls(maxnnode,nlayer+1), &
            zls(maxnnode,nlayer), sgm1(0:maxnnode,nlayer), &
            sgm2(0:maxnnode,nlayer),gw(0:maxnnode))
-      mem = mem +8*size(hls) +8*size(gls) +8*size(zls) +8*size(sgm1) &
-           +8*size(sgm2) +8*size(gw)
+!!$      mem = mem +8*size(hls) +8*size(gls) +8*size(zls) +8*size(sgm1) &
+!!$           +8*size(sgm2) +8*size(gw)
+      call accum_mem('force_DNN',8*(size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
 
       if( allocated(strsl) ) then
-        mem = mem -8*size(strsl) -8*size(aal)
+!!$        mem = mem -8*size(strsl) -8*size(aal)
+        call accum_mem('force_DNN',-8*(size(strsl)+size(aal)))
         deallocate(strsl,aal)
       endif
       allocate(strsl(3,3,namax),aal(3,namax))
-      mem = mem +8*size(strsl) +8*size(aal)
+      call accum_mem('force_DNN',8*(size(strsl)+size(aal)))
+!!$      mem = mem +8*size(strsl) +8*size(aal)
 
 !.....Set activation function type here
       iactf(1:nlayer-1) = itypesig
@@ -144,21 +149,25 @@ contains
     endif ! l1st
 
     if( allocated(hls) .and. size(hls).eq.(maxnnode+1)*(nlayer+1) ) then
-      mem = mem -8*size(hls) -8*size(gls) -8*size(zls) -8*size(sgm1) &
-           -8*size(sgm2) -8*size(gw)
+!!$      mem = mem -8*size(hls) -8*size(gls) -8*size(zls) -8*size(sgm1) &
+!!$           -8*size(sgm2) -8*size(gw)
+      call accum_mem('force_DNN',-8*(size(hls)+size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
       deallocate(hls,gls,zls,sgm1,sgm2,gw)
       allocate( hls(0:maxnnode,0:nlayer), gls(maxnnode,nlayer+1), &
            zls(maxnnode,nlayer), sgm1(0:maxnnode,nlayer), &
            sgm2(0:maxnnode,nlayer), gw(0:maxnnode))
-      mem = mem +8*size(hls) +8*size(gls) +8*size(zls) +8*size(sgm1) &
-           +8*size(sgm2) +8*size(gw)
+!!$      mem = mem +8*size(hls) +8*size(gls) +8*size(zls) +8*size(sgm1) &
+!!$           +8*size(sgm2) +8*size(gw)
+      call accum_mem('force_DNN',8*(size(hls)+size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
     endif
 
     if( size(strsl).ne.3*3*namax ) then
-      mem = mem -8*size(strsl) -8*size(aal)
+!!$      mem = mem -8*size(strsl) -8*size(aal)
+      call accum_mem('force_DNN',-8*(size(strsl)+size(aal)))
       deallocate(strsl,aal)
       allocate(strsl(3,3,namax),aal(3,namax))
-      mem = mem +8*size(strsl) +8*size(aal)
+      call accum_mem('force_DNN',8*(size(strsl)+size(aal)))
+!!$      mem = mem +8*size(strsl) +8*size(aal)
     endif
 
     time0 = mpi_wtime()
@@ -806,6 +815,7 @@ contains
     if( allocated(wgts) ) stop "ERROR: wgts is already allocated, "&
          //"which should not happen"
     allocate(wgts(0:maxnnode,maxnnode,nlayer+1))
+    call accum_mem('force_DNN',8*size(wgts))
     if( myid.eq.0 ) then
       wgts(:,:,:) = 0d0
       wgts(:,:,nlayer+1) = 1d0
@@ -843,8 +853,9 @@ contains
       print *,'ERROR: NL_IN<1, which should not happen.'
       stop
     endif
-    if( .not. allocated(nhl) ) allocate(nhl(0:nlayer+1),iactf(nlayer)&
-         ,nwgt(nlayer))
+    if( .not. allocated(nhl) ) then
+      allocate(nhl(0:nlayer+1),iactf(nlayer) ,nwgt(nlayer))
+    endif
     nhl(0:nlayer-1) = nhl_in(0:nl_in)
     nhl(nlayer) = 1
     nhl(nlayer+1) = 1

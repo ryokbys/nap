@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-03-24 14:55:08 Ryo KOBAYASHI>
+!                    Last modified: <2021-06-29 16:20:43 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -38,7 +38,7 @@ module pmdvars
 !.....max. num. of boundary-particles
   integer:: nbmax = 10000
 !.....max. num. of neighbors
-  integer:: nnmax = 100
+  integer:: nnmax = 200
 
 !.....MPI variables 
   integer:: mpicomm

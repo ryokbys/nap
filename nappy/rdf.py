@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Calculate the radial distribution function (RDF) from files.
-Statistical averaging about atoms in a file and over files are taken.
+It takes statistical averaging over atoms in a file and over files.
 
 Usage:
   rdf.py [options] INFILE [INFILE...]
@@ -17,7 +17,7 @@ Options:
               Width of Gaussian smearing, zero means no smearing. [default: 0]
   --nnmax=NNMAX
               Max num of neighbors when counting neighbors. [default: 100]
-  -o OUT      Output file name. [default: out.rdf]
+  -o OUT      Name of file to be written in addition to out.rdf if specified. [default: None]
   --specorder=SPECORDER
               Order of species separated by comma, like, --specorder=W,H. [default: None]
   --out4fp    Flag to write out in general fp.py format. [default: Fault]
@@ -38,6 +38,7 @@ Options:
 from __future__ import print_function
 
 import os,sys
+from datetime import datetime
 import numpy as np
 import copy
 from docopt import docopt
@@ -210,7 +211,7 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
 
     nr= int((rmax0-rmin)/dr)+1
     rd= np.array([ rmin +dr*(ir+0.5) for ir in range(nr) ])
-    rmax = dr*nr  # Use corrected rmax to cover regions of NR bins
+    rmax = rmin +dr*nr  # Use corrected rmax to cover regions of NR bins
     r2max = rmax*rmax
     
     nsys = copy.deepcopy(nsys0)
@@ -227,13 +228,11 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
     natm = len(nsys.atoms)
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
-    # nsys.make_pair_list(rcut=rmax,distance=True)
     nsys.make_pair_list(rcut=rmax,nnmax=nnmax)
     for ia in range(natm0):
         isid = sids[ia]
         pi = poss[ia]
         ndr[:,:] = 0.0
-        # for ja,dij in nsys.neighbors_of(ia,distance=True):
         for ja,dij in nsys.neighbors_of(ia,distance=True):
             jsid = sids[ja]
             # print(ia,isid,ja,jsid,dij)
@@ -245,8 +244,8 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
             if rrdr < 0.0:
                 continue
             ir = min(int(rrdr),nr-1)
-            if ir <= 0:
-                print('Something is wrong: ir<=0 ')
+            if ir < 0:
+                print('Something is wrong: ir<0 ')
                 print(ia,ja,dij,rrdr,ir)
                 raise
             ndr[0,0,ir] += 1.0
@@ -421,6 +420,9 @@ def write_rdf_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs=None,rmin=0.0,nperl
             n += 1
     
     with open(fname,'w') as f:
+        cmd = ' '.join(s for s in sys.argv)
+        f.write('# Output at {0:s} from,\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        f.write('#  {0:s}\n'.format(cmd))
         if pairs != None:
             f.write('# RDF for pairs: ')
             for pair in pairs:
@@ -533,6 +535,8 @@ if __name__ == "__main__":
     sigma= int(args['--gsmear'])
     nnmax = int(args['--nnmax'])
     ofname= args['-o']
+    if ofname == 'None':
+        ofname = None
     specorder = [ x for x in args['--specorder'].split(',') ]
     if specorder == ['None']:
         specorder = []
@@ -546,6 +550,8 @@ if __name__ == "__main__":
         if len(lscatter) != len(specorder):
             raise ValueError('--scatter-length is not set correctly.')
     out4fp = args['--out4fp']
+    if out4fp and ofname is None:
+        raise ValueError("Output file name must be specified with option -o.")
     if out4fp and not SQ:
         pairwise = True
         pairs0 = args['--pairs'].split(',')
@@ -623,14 +629,16 @@ if __name__ == "__main__":
                         agr[0,0,:] += 2.0*agr[isid,jsid,:] *wij
         qs,sqs = gr_to_SQ(rd,agr[0,0,:],rho,qmin=0.7,qmax=qmax,nq=200)
 
-    if out4fp:
-        write_rdf_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs=pairs,rmin=rmin)
-        if SQ:
-            write_sq_out4fp('out.sq',qs,sqs)
-    else:
-        write_rdf_normal(ofname,specorder,nspcs,rd,agr,nr,)
-        if SQ:
-            write_sq_normal('out.sq',qs,sqs)
+    #...Regardless ofname, write out.rdf in normal format
+    write_rdf_normal('out.rdf',specorder,nspcs,rd,agr,nr,)
+    if SQ:
+        write_sq_out4fp('out.sq',qs,sqs)
+    #...Format of output (named by ofname) depends on out4fp
+    if ofname is not None:
+        if out4fp:
+            write_rdf_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs=pairs,rmin=rmin)
+        else:
+            write_rdf_normal(ofname,specorder,nspcs,rd,agr,nr,)
 
     if plot:
         plot_figures(rd,agr)
@@ -641,7 +649,9 @@ if __name__ == "__main__":
         else:
             print(' Check graph_rdf_total.png and graph_rdfs.png')
     else:
-        print(' Check {0:s} with gnuplot, like'.format(ofname))
+        print(' Check out.rdf with gnuplot, like')
+        print("   gnuplot> plot 'out.rdf' us 1:2  w l")
         print('')
-        print(" > plot '{0:s}' us 1:2  w l".format(ofname))
-        print('')
+        if ofname is not None:
+            print(" In addition to out.rdf, {0:s} is also written.".format(ofname))
+            print('')

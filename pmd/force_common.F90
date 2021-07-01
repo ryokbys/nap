@@ -491,6 +491,7 @@ subroutine copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
 !-----------------------------------------------------------------------
 !     Exchanges boundary-atom data among neighbor nodes
 !-----------------------------------------------------------------------
+  use memory, only: accum_mem
   implicit none
   include "mpif.h"
   integer:: status(MPI_STATUS_SIZE)
@@ -502,19 +503,22 @@ subroutine copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
   real(8),intent(inout):: rho(natm+nb),tcom
 
 !-----locals
-  integer:: i,j,k,l,m,n,kd,kdd,ku,inode,nsd,nsd3,nrc,nrc3,nbnew,ierr
+  integer:: i,j,k,l,m,n,kd,kdd,ku,inode,nsd,nsd3,nrc,nrc3,nbnew,ierr,mem
   real(8):: tcom1,tcom2
   logical,save:: l1st=.true.
   real(8),allocatable,save:: dbuf(:),dbufr(:)
 
   if( l1st ) then
+    call accum_mem('force_common',8*nbmax*2)
     allocate(dbuf(nbmax),dbufr(nbmax))
     l1st=.false.
   endif
 
   if( .not.allocated(dbuf) ) then
+    call accum_mem('force_common',8*nbmax*2)
     allocate(dbuf(nbmax),dbufr(nbmax))
   else if( size(dbuf).ne.nbmax ) then
+    call accum_mem('force_common',-8*size(dbuf)*2 +8*nbmax*2)
     deallocate(dbuf,dbufr)
     allocate(dbuf(nbmax),dbufr(nbmax))
   endif
@@ -565,6 +569,7 @@ subroutine copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
 !-----------------------------------------------------------------------
 !  Exchanges boundary-atom data among neighbor nodes
 !-----------------------------------------------------------------------
+  use memory, only: accum_mem
   implicit none
   include "mpif.h"
   integer:: status(MPI_STATUS_SIZE)
@@ -576,7 +581,7 @@ subroutine copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
   real(8),intent(inout):: strs(9,natm+nb),tcom
 
 !-----locals
-  integer:: i,j,k,l,m,n,kd,kdd,ku,inode,nsd,nrc,nbnew,ierr
+  integer:: i,j,k,l,m,n,kd,kdd,ku,inode,nsd,nrc,nbnew,ierr,mem
   real(8):: tcom1,tcom2
 
   logical,save:: l1st=.true.
@@ -585,14 +590,17 @@ subroutine copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
 
   if( l1st ) then
     narrsize = 9*nbmax
+    call accum_mem('force_common',8*9*nbmax*2)
     allocate(dbuf(9,nbmax),dbufr(9,nbmax))
     l1st=.false.
   endif
 
   if( .not. allocated(dbuf) ) then
+    call accum_mem('force_common',8*9*nbmax*2)
     allocate(dbuf(9,nbmax),dbufr(9,nbmax))
   else if( size(dbuf).ne.narrsize ) then
     deallocate(dbuf,dbufr)
+    call accum_mem('force_common',8*9*nbmax*2 -8*size(dbuf)*2)
     narrsize = 9*nbmax
     allocate(dbuf(9,nbmax),dbufr(9,nbmax))
   endif
@@ -643,6 +651,7 @@ subroutine copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex &
 !-----------------------------------------------------------------------
 !     Exchanges boundary-atom data among neighbor nodes
 !-----------------------------------------------------------------------
+  use memory, only: accum_mem
   implicit none
   include "mpif.h"
   integer:: status(MPI_STATUS_SIZE)
@@ -665,15 +674,22 @@ subroutine copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex &
   if( l1st ) then
     maxdim = ndim
     maxbmax = nbmax
+    call accum_mem('force_common',8*maxbmax*maxdim*2)
     allocate(dbuf(maxdim,maxbmax),dbufr(ndim,maxbmax))
     l1st=.false.
   endif
 
   if( ndim.gt.maxdim .or. nbmax.gt.maxbmax ) then
+    call accum_mem('force_common', &
+         -8*size(dbuf)-8*size(dbufr) +8*maxbmax*maxdim)
     maxdim = max(ndim,maxdim)
     maxbmax = max(nbmax,maxbmax)
-    if( allocated(dbuf) ) deallocate(dbuf,dbufr)
+    if( allocated(dbuf) ) then
+      call accum_mem('force_common', -8*size(dbuf)-8*size(dbufr) )
+      deallocate(dbuf,dbufr)
+    endif
     allocate(dbuf(maxdim,maxbmax),dbufr(maxdim,maxbmax))
+    call accum_mem('force_common', 8*size(dbuf) +8*size(dbufr) )
   endif
 
   nbnew= 0
@@ -736,6 +752,7 @@ subroutine copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
 !-----------------------------------------------------------------------
 !     Send-back & receive reaction on cached-atoms
 !-----------------------------------------------------------------------
+  use memory, only: accum_mem
   implicit none
   include "mpif.h"
   integer,intent(in):: namax,natm,nbmax,nb,mpi_md_world,ndim
@@ -755,6 +772,7 @@ subroutine copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
   if( l1st ) then
     maxdim = ndim
     maxbmax = nbmax
+    call accum_mem('force_common',8*maxdim*maxbmax*2)
     allocate(dbuf(maxdim,maxbmax),dbufr(ndim,maxbmax))
     l1st=.false.
   endif
@@ -762,7 +780,11 @@ subroutine copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
   if( ndim.gt.maxdim .or. nbmax.gt.maxbmax ) then
     maxdim = max(ndim,maxdim)
     maxbmax = max(nbmax,maxbmax)
-    if( allocated(dbuf) ) deallocate(dbuf,dbufr)
+    if( allocated(dbuf) ) then
+      call accum_mem('force_common', -8*size(dbuf) -8*size(dbufr))
+      deallocate(dbuf,dbufr)
+    endif
+    call accum_mem('force_common', 8*maxdim*maxbmax*2)
     allocate(dbuf(maxdim,maxbmax),dbufr(maxdim,maxbmax))
   endif
 
@@ -1010,6 +1032,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   use Coulomb, only: qforce_long,qforce_short,qforce_self,qlower,qupper&
        ,cterms,avmu,conv_eps,qforce_screened_cut
   use Morse, only: qforce_vcMorse
+  use memory, only: accum_mem
   implicit none
   include "mpif.h"
   include "./const.h"
@@ -1051,8 +1074,12 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   integer,external:: count_nonfixed
 
   if( l1st ) then
-    if( allocated(vq) ) deallocate(vq,fq,lqfix)
+    if( allocated(vq) ) then
+      call accum_mem('force_common',-8*size(vq) -8*size(fq) -4*size(lqfix))
+      deallocate(vq,fq,lqfix)
+    endif
     allocate(vq(namax),fq(namax),lqfix(namax))
+    call accum_mem('force_common',8*size(vq) +8*size(fq) +4*size(lqfix))
   endif
 
   call mpi_allreduce(natm,ntot,1,mpi_integer, &
@@ -1433,27 +1460,6 @@ subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
        ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws)
 
 end subroutine get_gradw
-!=======================================================================
-subroutine write_force_times()
-!
-!  Write out time spent in each force.
-!
-  use force
-!!$  use NN2,only: time_NN2 => time
-  use DNN,only: time_DNN => time
-  use descriptor,only: time_desc => time
-  
-!.....Non-exclusive (additive) choice of force-fields
-!!$  if( use_force('NN2') ) then
-!!$    write(6,'(1x,a,f10.2)') "Time for descriptor   = ",time_desc
-!!$    write(6,'(1x,a,f10.2)') "Time for force_NN2    = ",time_NN2
-!!$  endif
-  if( use_force('DNN') ) then
-    write(6,'(1x,a,f10.2)') "Time for descriptor   = ",time_desc
-    write(6,'(1x,a,f10.2)') "Time for force_DNN    = ",time_DNN
-  endif
-
-end subroutine write_force_times
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd"
