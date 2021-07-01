@@ -82,6 +82,15 @@ contains
       print '(5x,3(1x,f8.2))',hmat_pdens(1:3,1)
       print '(5x,3(1x,f8.2))',hmat_pdens(1:3,2)
       print '(5x,3(1x,f8.2))',hmat_pdens(1:3,3)
+      print '(a,3(1x,f8.2))','   Origin of subsystem reduced by hmati: ',sosub(1:3)
+      print '(a)','   Lattice vectors of subsystem reduced by hmati:'
+      print '(5x,3(1x,f8.2))',shsub(1:3,1)
+      print '(5x,3(1x,f8.2))',shsub(1:3,2)
+      print '(5x,3(1x,f8.2))',shsub(1:3,3)
+      print '(a)','   shsubi:'
+      print '(5x,3(1x,f8.2))',shsubi(1:3,1)
+      print '(5x,3(1x,f8.2))',shsubi(1:3,2)
+      print '(5x,3(1x,f8.2))',shsubi(1:3,3)
       print '(a)', '   Output file = '//trim(cfoutpd)
 
     endif
@@ -107,18 +116,15 @@ contains
       if( is.ne.ispc_pdens ) cycle
 !.....Convert from hmat-rep to shsub-rep
       ri(1:3) = ra(1:3,i) +sorg(1:3) -sosub(1:3)
-      ri(1:3) = ri(1:3) -anint(ri(1:3))
+!!$      ri(1:3) = ri(1:3) -anint(ri(1:3))  ! This should be a bug.
       sri(1:3) = matxvec3(shsubi,ri)
+!.....Get subsystem index
       if(  sri(1).lt.0d0 .or. sri(1).ge.1d0 .or. &
            sri(2).lt.0d0 .or. sri(2).ge.1d0 .or. &
            sri(3).lt.0d0 .or. sri(3).ge.1d0 ) cycle
-!.....Get subsystem index
       ipx = int(sri(1)*dpxi) +1
       ipy = int(sri(2)*dpyi) +1
       ipz = int(sri(3)*dpzi) +1
-!!$      idx = (ipx-1)*npy*npz +(ipy-1)*npz +ipz
-!!$      print *,'i,is,sri,ipx,ipy,ipz,idx = ',i,is,sri(:),ipx,ipy,ipz,idx
-!!$      pds(idx) = pds(idx) +1d0
       pds(ipz,ipy,ipx) = pds(ipz,ipy,ipx) +1d0
     enddo
     nacc = nacc +1
@@ -143,6 +149,7 @@ contains
 !.....Reduce prob densities in each node to global prob density
     vol = get_vol(hmat)/np
     allocate(pdl(npz,npy,npx))
+    pdl(:,:,:) = 0d0
     call mpi_reduce(pds,pdl,npx*npy*npz,mpi_real8,mpi_sum,0,mpi_world,ierr)
 !.....Write out pdens only at node-0
     if( myid.eq.0 ) then
@@ -154,7 +161,7 @@ contains
       write(ionum,'(2x,i0,3(1x,es15.7))') npx,hmat_pdens(1:3,1)*ang2bohr/npx
       write(ionum,'(2x,i0,3(1x,es15.7))') npy,hmat_pdens(1:3,2)*ang2bohr/npy
       write(ionum,'(2x,i0,3(1x,es15.7))') npz,hmat_pdens(1:3,3)*ang2bohr/npz
-!.....Put a line for dummy atom
+!.....Put a line for dummy atom, which is necessary to be loaded by Ovito.
       write(ionum,'(a)') '  1   1.000   0.000  0.000  0.000'
 !.....Volumetric data
       fac = 1d0 /nacc /(vol*ang2bohr**3)

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-05-21 16:48:21 Ryo KOBAYASHI>
+!                     Last-modified: <2021-06-27 14:11:35 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -625,6 +625,13 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 !        print '(a,i5,2es12.4)','myid,vmax,vmaxt='
 !     &       ,myid_md,vmax,vmaxt
 
+    if( lclrchg ) then  ! special treatment for translational momentum
+      call rm_trans_clrchg(natm,tag,va,am,mpi_md_world,myid_md,iprint)
+    elseif( nrmtrans.gt.0 .and. mod(istp,nrmtrans).eq.0 ) then
+      call rm_trans_motion(natm,tag,va,nspmax,am &
+           ,mpi_md_world,myid_md,iprint)
+    endif
+
 !.....Update positions
     if( lconst ) then
       call update_const_pos(namax,natm,h,hi,tag,ra,va,dt,nspmax,am)
@@ -864,13 +871,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
          ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
     stnsr(:,:) = stnsr(:,:) *up2gpa
     prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
-
-    if( lclrchg ) then  ! special treatment for translational momentum
-      call rm_trans_clrchg(natm,tag,va,am,mpi_md_world,myid_md,iprint)
-    elseif( nrmtrans.gt.0 .and. mod(istp,nrmtrans).eq.0 ) then
-      call rm_trans_motion(natm,tag,va,nspmax,am &
-           ,mpi_md_world,myid_md,iprint)
-    endif
 
 
 !.....temperature distribution along x
@@ -2805,7 +2805,7 @@ subroutine space_decomp(h,ntot0,tagtot,rtot,vtot,auxtot)
       enddo
       namax = max(int(nalmax*1.2),200)
 !          nbmax = max(namax*27,nbmax)
-      call estimate_nbmax(nalmax,h,nx,ny,nz,rc,rbuf,nbmax)
+      call estimate_nbmax(nalmax,h,nx,ny,nz,rc,rbuf,nbmax,boundary)
       namax = namax +nbmax
       if( iprint.ne.0 ) then
         print '(a,2f6.3)',' rcut, rbuf = ',rc,rbuf
@@ -3126,11 +3126,12 @@ subroutine error_mpi_stop(cerrmsg)
   stop
 end subroutine error_mpi_stop
 !=======================================================================
-subroutine estimate_nbmax(nalmax,h,nx,ny,nz,rcut,rbuf,nbmax)
+subroutine estimate_nbmax(nalmax,h,nx,ny,nz,rcut,rbuf,nbmax,boundary)
   implicit none
   integer,intent(in):: nalmax,nx,ny,nz
   real(8),intent(in):: rcut,rbuf,h(3,3)
   integer,intent(inout):: nbmax
+  character(len=3),intent(in):: boundary
 
   integer:: nest
   real(8):: alx,aly,alz,area,vol,density
@@ -3138,17 +3139,18 @@ subroutine estimate_nbmax(nalmax,h,nx,ny,nz,rcut,rbuf,nbmax)
   alx = dsqrt(h(1,1)**2 +h(2,1)**2 +h(3,1)**2)/nx
   aly = dsqrt(h(1,2)**2 +h(2,2)**2 +h(3,2)**2)/ny
   alz = dsqrt(h(1,3)**2 +h(2,3)**2 +h(3,3)**2)/nz
-!.....Estimated volume and area, which is not correct in case of
-!.....non-orthogonal cell
+!.....Estimated volume and area, which is not correct in case of non-orthogonal cell
   vol = alx*aly*alz
-!.....Density cannot be obtained from nalmax
-!.....because sometimes the system contains vacuum.
+!.....Density cannot be obtained from nalmax because sometimes the system contains vacuum.
 !.....Density = 0.1 means 1 atom in 10 Ang^3 which is dense enough.
   density = 0.1d0
-  area = alx*aly*2 +alx*alz*2 +aly*alz*2
+!!$  area = alx*aly*2 +alx*alz*2 +aly*alz*2
+  area = 0.0d0
+  if( boundary(1:1).eq.'p' ) area = area + aly*alz*2
+  if( boundary(2:2).eq.'p' ) area = area + alx*alz*2
+  if( boundary(3:3).eq.'p' ) area = area + alx*aly*2
 !.....Estimated number of atoms in the margin region.
-!.....Factor 2 is just for a surplus
-  nest = density *area*(rcut+rbuf) *2
+  nest = density *area*(rcut+rbuf)
   nbmax = max(nbmax,nest)
 
 end subroutine estimate_nbmax
