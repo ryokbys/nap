@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-03-02 22:28:31 Ryo KOBAYASHI>
+!                     Last modified: <2021-07-08 11:00:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   use util,only: csp2isp
@@ -31,7 +31,7 @@ contains
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint,l1st)
 !-----------------------------------------------------------------------
-!  Parallel implementation of original angular force-field
+!  Parallel implementation of SW-like angular force-field
 !-----------------------------------------------------------------------
     implicit none
     include "mpif.h"

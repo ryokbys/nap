@@ -156,12 +156,4 @@ mod_ttm.o: mod_pmdvars.o mod_util.o
 mod_pmdio.o: mod_pmdvars.o mod_util.o mod_time.o mod_vector.o
 mod_pairlist.o: mod_memory.o
 mod_util.o: mod_pmdvars.o mod_vector.o
-
-# descriptor.o descriptor.mod : descriptor.F90 force_ZBL.o mod_util.o
-# 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
-
-# zload.o zload.mod : zload.F90
-# 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
-
-# metadynamics.o metadynamics.mod : metadynamics.F90 mod_util.o
-# 	$(MPIFC) -c $(MPIFLAGS) $(CPPFLAGS) $<
+descriptor.o: ${mods}
