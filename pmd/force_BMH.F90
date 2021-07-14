@@ -1,8 +1,8 @@
 module BMH
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-28 00:26:46 Ryo KOBAYASHI>
+!                     Last modified: <2021-07-07 14:56:57 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
-!  Parallel implementation of fitpot BOrn-Mayer-Huggins (BMH) potential.
+!  Parallel implementation of fitpot Born-Mayer-Huggins (BMH) potential.
 !  This potential should be used with Coulomb and dipole potentials.
 !-----------------------------------------------------------------------
   use pmdvars, only: nspmax

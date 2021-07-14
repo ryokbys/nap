@@ -1,5 +1,5 @@
 io_format                 ascii
-print_level                 1
+print_level                 2
 max_num_neighbors          30
 
 time_interval              -2.0

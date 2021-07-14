@@ -1,9 +1,10 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-03-02 22:28:31 Ryo KOBAYASHI>
+!                     Last modified: <2021-07-14 17:15:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   use util,only: csp2isp
+  use memory,only: accum_mem
   include "./const.h"
   save
   
@@ -31,7 +32,7 @@ contains
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint,l1st)
 !-----------------------------------------------------------------------
-!  Parallel implementation of original angular force-field
+!  Parallel implementation of SW-like angular force-field
 !-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
@@ -58,12 +59,15 @@ contains
     real(8),allocatable,save:: aa3(:,:)
     real(8),allocatable,save:: strsl(:,:,:)
 
-
 !-----only at 1st call
     if( l1st ) then
 !!$      call read_params_angular(myid,mpi_world,iprint,specorder)
-      if( allocated(aa3) ) deallocate(aa3,strsl)
+      if( allocated(aa3) ) then
+        call accum_mem('force_angular',-8*(size(aa3)+size(strsl)))
+        deallocate(aa3,strsl)
+      endif
       allocate(aa3(3,namax),strsl(3,3,namax))
+      call accum_mem('force_angular',8*(size(aa3)+size(strsl)))
 !-------check rc
       rcmax = 0d0
       do is=1,nspmax
@@ -93,14 +97,21 @@ contains
     endif
 
     if( size(aa3).ne.3*namax ) then
+      call accum_mem('force_angular',-8*(size(aa3)+size(strsl)))
       deallocate(aa3,strsl)
       allocate(aa3(3,namax),strsl(3,3,namax))
+      call accum_mem('force_angular',8*(size(aa3)+size(strsl)))
     endif
 
     strsl(1:3,1:3,1:natm+nb)= 0d0
     epotl3= 0d0
     aa3(1:3,1:namax)= 0d0
 !.....Loop over i
+!$omp parallel
+!$omp do reduction(+:epotl3,aa3,strsl) &
+!$omp    private(i,xi,is,n,j,js,xj,x,y,z,xij,rij2,rij,riji,drijj,m,k,ks,rc3, &
+!$omp            xk,xik,rik2,rik,riki,drijc,drikc,alp,bet,gmm,csn,tcsn,tcsn2, &
+!$omp            vexp,tmp,dhrij,dhrik,dhcsn,drikk,dcsnj,dcsnk,dcsni,tmpj,tmpk,ixyz)
     do i=1,natm
       xi(1:3)=ra(1:3,i)
       is= int(tag(i))
@@ -176,6 +187,8 @@ contains
         enddo
       enddo
     enddo
+!$omp end do
+!$omp end parallel
 
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa3,3)

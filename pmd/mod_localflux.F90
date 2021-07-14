@@ -4,6 +4,7 @@ module localflux
 !
   use pmdvars,only: nspmax
   use pmdmpi,only: nid2xyz
+  use memory,only: accum_mem
   implicit none
   include 'mpif.h'
   include "./const.h"
@@ -39,7 +40,7 @@ contains
     logical,intent(in):: lclrchg
     
     integer:: inc,ix,iy,iz,mx,my,mz,ixyz,nxyz
-    integer:: idxlfg,ilfgx,ilfgy,ilfgz
+    integer:: idxlfg,ilfgx,ilfgy,ilfgz,mem
     real(8):: anxi,anyi,anzi,fext
     integer,allocatable:: idxl2gt(:)
     integer:: istat(mpi_status_size),itag,ierr
@@ -73,10 +74,13 @@ contains
 
     allocate(fluxl(3,nl),fluxt(3,nl),idxl2g(nl,0:nxyz-1),nargn(nl))
     allocate(idxl2gt(nl))
+    mem = 8*(size(fluxl)+size(fluxt)) +4*(size(idxl2g)+size(nargn))
+    call accum_mem('localflux',mem)
     fluxl(:,:) = 0d0
     nargn(:) = 0
     if( myid.eq.0 ) then
       allocate(fluxg(3,ng))
+      call accum_mem('localflux',8*size(fluxg))
       fluxg(:,:) = 0d0
     endif
 

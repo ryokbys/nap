@@ -2,6 +2,7 @@ module pdens
 !
 !  Module for evaluation of probability density.
 !
+  use memory,only: accum_mem
   implicit none
   include 'mpif.h'
   include "./const.h"
@@ -69,6 +70,7 @@ contains
     shsubi = matinv3(shsub)
 
     allocate(pds(npz,npy,npx))
+    call accum_mem('pdens',8*size(pds))
     pds(:,:,:) = 0d0
 
     if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
@@ -149,6 +151,7 @@ contains
 !.....Reduce prob densities in each node to global prob density
     vol = get_vol(hmat)/np
     allocate(pdl(npz,npy,npx))
+    call accum_mem('pdens',8*size(pdl))
     pdl(:,:,:) = 0d0
     call mpi_reduce(pds,pdl,npx*npy*npz,mpi_real8,mpi_sum,0,mpi_world,ierr)
 !.....Write out pdens only at node-0
