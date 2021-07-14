@@ -42,7 +42,9 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
   use dipole,only: force_dipole
   use fpc,only: force_fpc
   use angular,only: force_angular
+  use time, only: accum_time
   implicit none
+  include "mpif.h"
   integer,intent(in):: namax,natm,nnmax,nismax,iprint
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
        ,myparity(3),nnn(6),mpi_md_world,myid_md,nex(3)
@@ -101,73 +103,157 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
   endif
 
 !.....Non-exclusive (additive) choice of force-fields
-  if( use_force('LJ') ) call force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h &
+  if( use_force('LJ') ) then
+    tmp = mpi_wtime()
+    call force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
-  if( use_force('LJ_repul') ) call force_LJ_repul(namax,natm,tag,ra,nnmax &
+    call accum_time('force_LJ',mpi_wtime() -tmp)
+  endif
+  if( use_force('LJ_repul') ) then
+    tmp = mpi_wtime()
+    call force_LJ_repul(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-  if( use_force('Ito3_WHe') ) call force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa &
+    call accum_time('force_LJ',mpi_wtime() -tmp)
+  endif
+  if( use_force('Ito3_WHe') ) then
+    tmp = mpi_wtime()
+    call force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
-  if( use_force('RK_WHe') ) call force_RK_WHe(namax,natm,tag,ra,nnmax,aa &
+    call accum_time('force_Ito3_WHe',mpi_wtime() -tmp)
+  endif
+  if( use_force('RK_WHe') ) then
+    tmp = mpi_wtime()
+    call force_RK_WHe(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
-  if( use_force('RK_FeH') ) call force_RK_FeH(namax,natm,tag,ra,nnmax,aa &
+    call accum_time('force_RK_WHe',mpi_wtime() -tmp)
+  endif
+  if( use_force('RK_FeH') ) then
+    tmp = mpi_wtime()
+    call force_RK_FeH(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
-  if( use_force('Ramas_FeH') ) call force_Ramas_FeH(namax,natm,tag,ra,nnmax &
+    call accum_time('force_RK_FeH',mpi_wtime() -tmp)
+  endif
+  if( use_force('Ramas_FeH') ) then
+    tmp = mpi_wtime()
+    call force_Ramas_FeH(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc &
        ,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
-  if( use_force('Ackland_Fe') ) call force_Ackland_Fe(namax,natm,tag,ra &
+    call accum_time('force_Ramas_FeH',mpi_wtime() -tmp)
+  endif
+  if( use_force('Ackland_Fe') ) then
+    tmp = mpi_wtime()
+    call force_Ackland_Fe(namax,natm,tag,ra &
        ,nnmax,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn &
        ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
        ,iprint)
-  if( use_force('SW') ) call force_SW(namax,natm,tag,ra,nnmax,aa,strs &
+    call accum_time('force_Ackland_Fe',mpi_wtime() -tmp)
+  endif
+  if( use_force('SW') ) then
+    tmp = mpi_wtime()
+    call force_SW(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint)
-  if( use_force('EDIP_Si') ) call force_EDIP_Si(namax,natm,tag,ra,nnmax,aa &
+    call accum_time('force_SW',mpi_wtime() -tmp)
+  endif
+  if( use_force('EDIP_Si') ) then
+    tmp = mpi_wtime()
+    call force_EDIP_Si(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
-  if( use_force('Tersoff') ) call force_tersoff(namax,natm,tag,ra,nnmax,aa &
+    call accum_time('force_EDIP',mpi_wtime() -tmp)
+  endif
+  if( use_force('Tersoff') ) then
+    tmp = mpi_wtime()
+    call force_tersoff(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint &
        ,aux(iauxof('tei'),:))
-  if( use_force('Brenner') ) call force_Brenner(namax,natm,tag,ra,nnmax,aa &
+    call accum_time('force_Tersoff',mpi_wtime() -tmp)
+  endif
+  if( use_force('Brenner') ) then
+    tmp = mpi_wtime()
+    call force_Brenner(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
-  if( use_force('Brenner_vdW') ) call force_Brenner_vdW(namax,natm,tag,ra &
+    call accum_time('force_Brenner',mpi_wtime() -tmp)
+  endif
+  if( use_force('Brenner_vdW') ) then
+    tmp = mpi_wtime()
+    call force_Brenner_vdW(namax,natm,tag,ra &
        ,nnmax,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn &
        ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
        ,iprint)
-  if( use_force('Lu_WHe') ) call force_Lu_Whe(namax,natm,tag,ra,nnmax,aa &
+    call accum_time('force_Brenner_vdW',mpi_wtime() -tmp)
+  endif
+  if( use_force('Lu_WHe') ) then
+    tmp = mpi_wtime()
+    call force_Lu_Whe(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
-  if( use_force('Branicio_AlN') ) call force_Branicio_AlN(namax,natm,tag,ra &
+    call accum_time('force_Lu_WHe',mpi_wtime() -tmp)
+  endif
+  if( use_force('Branicio_AlN') ) then
+    tmp = mpi_wtime()
+    call force_Branicio_AlN(namax,natm,tag,ra &
        ,nnmax,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn &
        ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
        ,iprint)
-  if( use_force('Mishin_Al') ) call force_Mishin_Al(namax,natm,tag,ra,nnmax &
+    call accum_time('force_Branicio_AlN',mpi_wtime() -tmp)
+  endif
+  if( use_force('Mishin_Al') ) then
+    tmp = mpi_wtime()
+    call force_Mishin_Al(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc &
        ,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-  if( use_force('Mishin_Ni') ) call force_Mishin_Ni(namax,natm,tag,ra,nnmax &
+    call accum_time('force_Mishin_Al',mpi_wtime() -tmp)
+  endif
+  if( use_force('Mishin_Ni') ) then
+    tmp = mpi_wtime()
+    call force_Mishin_Ni(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc &
        ,lspr,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-  if( use_force('AFS_W') ) call force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs &
+    call accum_time('force_Mishin_Ni',mpi_wtime() -tmp)
+  endif
+  if( use_force('AFS_W') ) then
+    tmp = mpi_wtime()
+    call force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
-  if( use_force('SC_Fe') ) call force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs &
+    call accum_time('force_AFS_W',mpi_wtime() -tmp)
+  endif
+  if( use_force('SC_Fe') ) then
+    tmp = mpi_wtime()
+    call force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
-  if( use_force('SM_Al') ) call force_SM_Al(namax,natm,tag,ra,nnmax,aa,strs,h &
+    call accum_time('force_SC_Fe',mpi_wtime() -tmp)
+  endif
+  if( use_force('SM_Al') ) then
+    tmp = mpi_wtime()
+    call force_SM_Al(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
-  if( use_force('EAM') ) call force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h &
+    call accum_time('force_SM_Al',mpi_wtime() -tmp)
+  endif
+  if( use_force('EAM') ) then
+    tmp = mpi_wtime()
+    call force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-  if( use_force('linreg') ) call force_linreg(namax,natm,tag,ra,nnmax,aa &
+    call accum_time('force_EAM',mpi_wtime() -tmp)
+  endif
+  if( use_force('linreg') ) then
+    tmp = mpi_wtime()
+    call force_linreg(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+    call accum_time('force_linreg',mpi_wtime() -tmp)
+  endif
 !!$  if( use_force('NN') ) call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
 !!$       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
 !!$       ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
@@ -188,66 +274,121 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
 !!$           ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
 !!$    endif
 !!$  endif
-  if( use_force('DNN') ) call force_DNN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  if( use_force('DNN') ) then
+    tmp = mpi_wtime()
+    call force_DNN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-  if( use_force('Morse') ) call force_Morse(namax,natm,tag,ra,nnmax,aa,strs &
+    call accum_time('force_DNN',mpi_wtime() -tmp)
+  endif
+  if( use_force('Morse') ) then
+    tmp = mpi_wtime()
+    call force_Morse(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-  if( use_force('Morse_repul') ) call force_Morse_repul(namax,natm,tag,ra,nnmax &
+    call accum_time('force_Morse',mpi_wtime() -tmp)
+  endif
+  if( use_force('Morse_repul') ) then
+    tmp = mpi_wtime()
+    call force_Morse_repul(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-  if( use_force('vcMorse') ) call force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs &
+    call accum_time('force_Morse_repul',mpi_wtime() -tmp)
+  endif
+  if( use_force('vcMorse') ) then
+    tmp = mpi_wtime()
+    call force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs &
        ,aux(iauxof('chg'),:),h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-  if( use_force('Buckingham') ) call force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs &
+    call accum_time('force_vcMorse',mpi_wtime() -tmp)
+  endif
+  if( use_force('Buckingham') ) then
+    tmp = mpi_wtime()
+    call force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
-  if( use_force('Bonny_WRe') ) call force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs &
+    call accum_time('force_Buckingham',mpi_wtime() -tmp)
+  endif
+  if( use_force('Bonny_WRe') ) then
+    tmp = mpi_wtime()
+    call force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+    call accum_time('force_Bonny_WRe',mpi_wtime() -tmp)
+  endif
   if( use_force('ZBL') ) then
+    tmp = mpi_wtime()
     call force_ZBL(namax,natm,tag,ra,nnmax,aa,strs &
          ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+    call accum_time('force_ZBL',mpi_wtime() -tmp)
   endif
   if( loverlay .and. trim(ol_force).eq.'ZBL' .and. ol_type(1:3).eq.'pot' ) then
+    tmp = mpi_wtime()
     call force_ZBL_overlay(namax,natm,tag,ra,nnmax,aa,strs &
          ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
+    call accum_time('force_ZBL',mpi_wtime() -tmp)
   endif
-  if( use_force('dipole') ) call force_dipole(namax,natm,tag,ra,nnmax,aa,strs &
+  if( use_force('dipole') ) then
+    call force_dipole(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
-  if( use_force('cspline') ) call force_cspline(namax,natm,tag,ra,nnmax,aa,strs &
+    call accum_time('force_dipole',mpi_wtime() -tmp)
+  endif
+  if( use_force('cspline') ) then
+    tmp = mpi_wtime()
+    call force_cspline(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
-  if( use_force('BMH') ) call force_BMH(namax,natm,tag,ra,nnmax,aa,strs &
+    call accum_time('force_cspline',mpi_wtime() -tmp)
+  endif
+  if( use_force('BMH') ) then
+    tmp = mpi_wtime()
+    call force_BMH(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
-  if( use_force('Abell') ) call force_Abell(namax,natm,tag,ra,nnmax,aa,strs &
+    call accum_time('force_BMH',mpi_wtime() -tmp)
+  endif
+  if( use_force('Abell') ) then
+    tmp = mpi_wtime()
+    call force_Abell(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
-  if( use_force('fpc') ) call force_fpc(namax,natm,tag,ra,nnmax,aa,strs &
+    call accum_time('force_Abell',mpi_wtime() -tmp)
+  endif
+  if( use_force('fpc') ) then
+    tmp = mpi_wtime()
+    call force_fpc(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
-  if( use_force('angular') ) call force_angular(namax,natm,tag,ra,nnmax,aa,strs &
+    call accum_time('force_fpc',mpi_wtime() -tmp)
+  endif
+  if( use_force('angular') ) then
+    tmp = mpi_wtime()
+    call force_angular(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
+    call accum_time('force_angular',mpi_wtime() -tmp)
+  endif
   
 !.....Exclusive choice of different Coulomb force-fields
   if( use_force('screened_Coulomb') ) then ! screened Coulomb
+    tmp = mpi_wtime()
     call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
          ,aux(iauxof('chg'),:),h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
          ,myparity,nnn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,specorder)
+    call accum_time('force_Coulomb',mpi_wtime() -tmp)
   else if( use_force('Ewald') ) then  ! Ewald Coulomb
+    tmp = mpi_wtime()
     call force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
          ,aux(iauxof('chg'),:),aux(iauxof('chi'),:),h,hi,tcom,nb,nbmax &
          ,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
+    call accum_time('force_Ewald',mpi_wtime() -tmp)
   else if( use_force('Ewald_long') ) then ! long-range Coulomb
     call force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
          ,aux(iauxof('chg'),:),aux(iauxof('chi'),:),h,hi,tcom,nb,nbmax &
@@ -255,11 +396,13 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   else if( use_force('Coulomb') ) then  ! Coulomb
+    tmp = mpi_wtime()
     call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
          ,aux(iauxof('chg'),:),aux(iauxof('chi'),:),h,hi,tcom,nb,nbmax &
          ,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc,specorder)
+    call accum_time('force_Coulomb',mpi_wtime() -tmp)
   endif
 
 !.....convert forces from hmat-coordinates to Cartesian coordinates

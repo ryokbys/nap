@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-07-01 15:16:58 Ryo KOBAYASHI>
+!                     Last modified: <2021-07-14 16:36:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -156,6 +156,10 @@ contains
     strsl(1:3,1:3,1:namax) = 0d0
 
 !.....Loop over resident atoms
+!$omp parallel
+!$omp do private(i,xi,is,k,j,js,xj,xij,rij,dij2,dij,diji,dxdi,d0ij,alpij,rminij, &
+!$omp     vrc,dvdrc,texp,tmp,tmp2,dedr,ixyz,jxyz) &
+!$omp     reduction(+:epotl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is=int(tag(i))
@@ -197,6 +201,8 @@ contains
         enddo
       enddo
     enddo
+!$omp end do
+!$omp end parallel
 
     strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     

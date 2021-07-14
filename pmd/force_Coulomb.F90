@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-07-01 15:13:13 Ryo KOBAYASHI>
+!                     Last modified: <2021-07-14 16:30:02 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -1657,6 +1657,10 @@ contains
 
     esrl= 0d0
 !.....Loop over resident atoms
+!$omp parallel
+!$omp do private(i,xi,is,qi,k,j,js,qj,xj,xij,rij,dij,diji,dxdi,dxdj,rhoij,terfc, &
+!$omp     vrc,dvdrc,texp,dedr,tmp,ixyz,jxyz) &
+!$omp     reduction(+:esrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
@@ -1712,7 +1716,9 @@ contains
         endif
       enddo
     enddo
-
+!$omp end do
+!$omp end parallel
+    
   end subroutine force_screened_cut
 !=======================================================================
   subroutine Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
@@ -3058,5 +3064,5 @@ contains
 end module Coulomb
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

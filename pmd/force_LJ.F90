@@ -79,6 +79,9 @@ contains
     strsl(:,:,:) = 0d0
 
 !-----loop over resident atoms
+!$omp parallel
+!$omp do private(i,j,k,xi,x,y,z,xij,rij2,rij,riji,dxdi,dvdr,tmp,ixyz,jxyz) &
+!$omp    reduction(+:epotl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       do k=1,lspr(0,i)
@@ -112,9 +115,10 @@ contains
         enddo
       enddo
     enddo
+!$omp end parallel
 
     strs(:,:,1:natm)= strs(:,:,1:natm) +strsl(:,:,1:natm)
-
+    
 !-----gather epot
     if( myid.ge.0 ) then
       call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
@@ -156,7 +160,7 @@ contains
 
     if( l1st ) then
 !!$      call init_Morse(natm,tag,mpi_md_world)!
-!$      call read_params_Morse(myid,mpi_md_world,iprint)
+!!$      call read_params_Morse(myid,mpi_md_world,iprint)
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
       do is=1,msp

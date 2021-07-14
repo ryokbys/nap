@@ -89,7 +89,7 @@ contains
 !-------the last one goes to the header
       lshd(m)= i
     enddo
-
+    
     return
   end subroutine mk_lscl_para
 !=======================================================================
@@ -156,14 +156,14 @@ contains
           enddo
         enddo
       enddo
-!.....If nnmax.lt.(4*pi/3)*mmax, nnmax would be a bit too small
-      if( nnmax.lt.4.2*mmax ) then
-        write(6,'(a)') " ================= WORNING ======================="
-        write(6,'(a)') "   nnmax is less than 5*(num of atoms in a cell)"
-        write(6,'(a,i0)') "   You should set max_num_meighbors greater than " &
-             , int(4.2*mmax)
-        write(6,'(a)') " ================================================="
-      endif
+!!$!.....If nnmax.lt.(4*pi/3)*mmax, nnmax would be a bit too small
+!!$      if( nnmax.lt.4.2*mmax ) then
+!!$        write(6,'(a)') " ================= WARNING ======================="
+!!$        write(6,'(a)') "   nnmax is less than 5*(num of atoms in a cell)"
+!!$        write(6,'(a,i0)') "   You had better set max_num_meighbors greater than " &
+!!$             , int(4.2*mmax)
+!!$        write(6,'(a)') " ================================================="
+!!$      endif
     endif
 
 !-----reset pair list, LSPR
@@ -171,68 +171,119 @@ contains
     d2lspr(:,:) = 0d0
 
 !-----make a pair list, LSPR
-!-----Scan resident cells
-    do mz=0,lcz+1
-      do my=0,lcy+1
-        do mx=0,lcx+1
-          m= mx*lcyz2 +my*lcz2 +mz +1
-          if(lshd(m).eq.0) cycle
-          do kuz= -1,1
-            m1z= mz +kuz
-            if( m1z.lt.0 .or. m1z.gt.lcz+1 ) cycle
-            do kuy= -1,1
-              m1y= my +kuy
-              if( m1y.lt.0 .or. m1y.gt.lcy+1 ) cycle
-              do kux= -1,1
-                m1x= mx +kux
-                if( m1x.lt.0 .or. m1x.gt.lcx+1 ) cycle
-                m1=m1x*lcyz2 +m1y*lcz2 +m1z +1
-                if(lshd(m1).eq.0) cycle
+!.....Scan atoms, which would be more efficient with OpenMP than scanning cells
+!$omp parallel
+!$omp do private(mz,my,mx,m,kuz,kuy,kux,m1z,m1y,m1x,m1,i,j,xi,xij,rij,rij2)
+    do i=1,natm
+      xi(1:3) = ra(1:3,i)
+!-------assign a vector cell index
+      mx=(xi(1)+rcx)*rcxi
+      my=(xi(2)+rcy)*rcyi
+      mz=(xi(3)+rcz)*rczi
+      mx= min(max(mx,0),lcx+1)
+      my= min(max(my,0),lcy+1)
+      mz= min(max(mz,0),lcz+1)
+      m= mx*lcyz2 +my*lcz2 +mz +1
+      do kuz= -1,1
+        m1z= mz +kuz
+        if( m1z.lt.0 .or. m1z.gt.lcz+1 ) cycle
+        do kuy= -1,1
+          m1y= my +kuy
+          if( m1y.lt.0 .or. m1y.gt.lcy+1 ) cycle
+          do kux= -1,1
+            m1x= mx +kux
+            if( m1x.lt.0 .or. m1x.gt.lcx+1 ) cycle
+            m1=m1x*lcyz2 +m1y*lcz2 +m1z +1
+            if(lshd(m1).eq.0) cycle
+            j=lshd(m1)
+            do while( j.gt.0 )
+              if( j.eq.i ) then
+                j = lscl(j)
+                cycle
+              endif
+              xij(1:3)= ra(1:3,j) -xi(1:3)
+              rij(1)= h(1,1)*xij(1) +h(1,2)*xij(2) +h(1,3)*xij(3)
+              rij(2)= h(2,1)*xij(1) +h(2,2)*xij(2) +h(2,3)*xij(3)
+              rij(3)= h(3,1)*xij(1) +h(3,2)*xij(2) +h(3,3)*xij(3)
+              rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
 
-                i=lshd(m)
-                do while( i.gt.0 )
-                  if( i.gt.natm ) then
-                    i = lscl(i)
-                    cycle
-                  endif
-                  ic= int(tag(i))
-                  xi(1:3)= ra(1:3,i)
+              if( rij2.lt.rc2 ) then
+                lspr(0,i) = lspr(0,i) +1
+                lspr(lspr(0,i),i) = j
+                d2lspr(lspr(0,i),i) = rij2
+              endif
 
-                  j=lshd(m1)
-                  do while( j.gt.0 )
-                    if( j.le.i ) then
-                      j = lscl(j)
-                      cycle
-                    endif
+              j=lscl(j)
+            enddo ! while (j.gt.0)
+          enddo  ! kux
+        enddo  ! kuy
+      enddo  ! kux
+    enddo  ! i=1,natm
+!$omp end do
+!$omp end parallel
 
-                    jc= int(tag(j))
-                    xij(1:3)= ra(1:3,j) -xi(1:3)
-                    rij(1)= h(1,1)*xij(1) +h(1,2)*xij(2) +h(1,3)*xij(3)
-                    rij(2)= h(2,1)*xij(1) +h(2,2)*xij(2) +h(2,3)*xij(3)
-                    rij(3)= h(3,1)*xij(1) +h(3,2)*xij(2) +h(3,3)*xij(3)
-                    rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
-
-                    if( rij2.lt.rc2 ) then
-                      lspr(0,i)= lspr(0,i) +1
-                      lspr(0,j)= lspr(0,j) +1
-                      lspr(lspr(0,i),i)=j
-                      lspr(lspr(0,j),j)=i
-                      d2lspr(lspr(0,i),i) = rij2
-                      d2lspr(lspr(0,j),j) = rij2
-                    endif
-
-                    j=lscl(j)
-                  enddo
-
-                  i=lscl(i)
-                enddo
-
-              enddo
-            enddo
-          enddo
-        enddo
-      enddo
-    enddo
+!.....Scan resident cells, which would be inefficient with OpenMP.
+!!$    do mz=0,lcz+1
+!!$      do my=0,lcy+1
+!!$        do mx=0,lcx+1
+!!$          m= mx*lcyz2 +my*lcz2 +mz +1
+!!$          if(lshd(m).eq.0) cycle
+!!$          do kuz= -1,1
+!!$            m1z= mz +kuz
+!!$            if( m1z.lt.0 .or. m1z.gt.lcz+1 ) cycle
+!!$            do kuy= -1,1
+!!$              m1y= my +kuy
+!!$              if( m1y.lt.0 .or. m1y.gt.lcy+1 ) cycle
+!!$              do kux= -1,1
+!!$                m1x= mx +kux
+!!$                if( m1x.lt.0 .or. m1x.gt.lcx+1 ) cycle
+!!$                m1=m1x*lcyz2 +m1y*lcz2 +m1z +1
+!!$                if(lshd(m1).eq.0) cycle
+!!$
+!!$                i=lshd(m)
+!!$                do while( i.gt.0 )
+!!$                  if( i.gt.natm ) then
+!!$                    i = lscl(i)
+!!$                    cycle
+!!$                  endif
+!!$                  ic= int(tag(i))
+!!$                  xi(1:3)= ra(1:3,i)
+!!$
+!!$                  j=lshd(m1)
+!!$                  do while( j.gt.0 )
+!!$                    if( j.le.i ) then
+!!$                      j = lscl(j)
+!!$                      cycle
+!!$                    endif
+!!$
+!!$                    jc= int(tag(j))
+!!$                    xij(1:3)= ra(1:3,j) -xi(1:3)
+!!$                    rij(1)= h(1,1)*xij(1) +h(1,2)*xij(2) +h(1,3)*xij(3)
+!!$                    rij(2)= h(2,1)*xij(1) +h(2,2)*xij(2) +h(2,3)*xij(3)
+!!$                    rij(3)= h(3,1)*xij(1) +h(3,2)*xij(2) +h(3,3)*xij(3)
+!!$                    rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
+!!$
+!!$                    if( rij2.lt.rc2 ) then
+!!$                      lspr(0,i)= lspr(0,i) +1
+!!$                      lspr(0,j)= lspr(0,j) +1
+!!$                      lspr(lspr(0,i),i)=j
+!!$                      lspr(lspr(0,j),j)=i
+!!$                      d2lspr(lspr(0,i),i) = rij2
+!!$                      d2lspr(lspr(0,j),j) = rij2
+!!$                    endif
+!!$
+!!$                    j=lscl(j)
+!!$                  enddo
+!!$
+!!$                  i=lscl(i)
+!!$                enddo
+!!$
+!!$              enddo
+!!$            enddo
+!!$          enddo
+!!$        enddo
+!!$      enddo
+!!$    enddo
 
 !!$!.....Only 1st call
 !!$    if( l1st ) then

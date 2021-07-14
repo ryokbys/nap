@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-07-01 14:39:48 Ryo KOBAYASHI>
+!                     Last-modified: <2021-07-13 23:24:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -30,6 +30,7 @@ program pmd
   use clrchg,only: lclrchg,init_clrchg
   use localflux,only: lflux,init_lflux,final_lflux
   use pdens,only: lpdens,init_pdens,final_pdens
+!$  use omp_lib
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -109,9 +110,13 @@ program pmd
 
     call cell_info(h)
     call spcs_info(ntot0,tagtot)
-
     write(6,*) ''
-    write(6,'(a,i0)') ' Number of processes in MPI = ',nprocs
+    write(6,'(a,i0)') ' Num of MPI processes = ',nprocs
+!$omp parallel
+!$omp single
+!$    write(6,'(a,i0)') ' Num of OpenMP processes = ',omp_get_num_threads()
+!$omp end single
+!$omp end parallel
 !.....Read in.pmd after reading the atom configuration file.
     call read_inpmd(10,trim(cinpmd))
     call check_cmin()

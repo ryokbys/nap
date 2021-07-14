@@ -152,7 +152,7 @@ force_Morse.o: ${mods} force_Coulomb.o
 force_angular.o: ${mods}
 mod_constraints.o: mod_vector.o mod_util.o
 mod_rdcfrc.o: mod_structure.o mod_util.o
-mod_ttm.o: mod_pmdvars.o mod_util.o
+mod_ttm.o: mod_pmdvars.o mod_util.o mod_memory.o
 mod_pmdio.o: mod_pmdvars.o mod_util.o mod_time.o mod_vector.o
 mod_pairlist.o: mod_memory.o
 mod_util.o: mod_pmdvars.o mod_vector.o

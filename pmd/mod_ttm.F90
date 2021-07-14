@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-04-23 12:20:00 Ryo KOBAYASHI>
+!                     Last-modified: <2021-07-13 15:04:42 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -8,6 +8,7 @@ module ttm
 ! In the current implementation, it is assumed that the number of 
 ! parallel nodes are the common dividors of number of TTM meshes.
 !
+  use memory,only: accum_mem
   implicit none
   save
   include 'mpif.h'
@@ -277,15 +278,23 @@ contains
 !!$    endif
     
 !.....Allocate initialize arrays
+    mem = 0
     allocate(nac(nxyz),eksum(nxyz),ekpsum(nxyz), &
          sgm(nxyz),te(0:nz+1,0:ny+1,0:nx+1),tep(0:nz+1,0:ny+1,0:nx+1), &
          ta(nxyz),tap(nxyz),tex(nx),gp(nxyz),gs(nxyz),&
          gmmp(nxyz),gmms(nxyz),vac(3,nxyz),dof(nxyz),dofp(nxyz))
     allocate(a2c(namax),aai(3,namax),ekti(namax))
+    mem = mem +4*(size(nac) +size(dof) +size(dofp)) &
+         +8*(size(eksum)+size(ekpsum)+size(sgm)+size(te)+size(tep) &
+         +size(ta) +size(tap) +size(tex) +size(gp) +size(gs) +size(gmmp) +size(gmms) &
+         +size(vac) +size(a2c) +size(aai) +size(ekti))
 !.....1D TTM related arrays
     allocate(te1d(nd1d+1),tep1d(nd1d+1), &
          tl1d(nd1d+1),tlp1d(nd1d+1), &
          gp1d(nd1d),gmmp1d(nd1d))
+    mem = mem +8*(size(te1d) +size(tep1d) +size(tl1d) +size(tlp1d) &
+         +size(gp1d) +size(gmmp1d))
+    call accum_mem('ttm',mem)
 
     if( trim(ctype_coupling).eq.'constant_gmmp' ) then
       itype_coupling = 1
@@ -414,8 +423,8 @@ contains
         print *,'    Note that the minimum Te is set:'
         print '(a,f0.1)','     Minimum Te = ',Te_min
       endif
-      mem = 4 * 4*nxyz + 11 * 8*nxyz + 4 * 8*namax
-      print '(a,f0.3,a)','   Memory for TTM = ',dble(mem)/1000/1000,' MByte'
+!!$      mem = 4 * 4*nxyz + 11 * 8*nxyz + 4 * 8*namax
+!!$      print '(a,f0.3,a)','   Memory for TTM = ',dble(mem)/1000/1000,' MByte'
     endif
     
     return
@@ -703,7 +712,10 @@ contains
     integer:: i,ic,ierr
     integer,allocatable,save:: nacl(:)
 
-    if( .not.allocated(nacl) ) allocate(nacl(nxyz))
+    if( .not.allocated(nacl) ) then
+      allocate(nacl(nxyz))
+      call accum_mem('ttm',4*size(nacl))
+    endif
     
 !.....First distinguish center of mass vectors of cells
     nacl(:) = 0
@@ -727,7 +739,7 @@ contains
     real(8),intent(in):: tag(namax),fmv(3,0:9),va(3,namax),h(3,3) &
          ,fekin(nspmax)
 
-    integer:: i,ic,ierr,is,ix,iy,iz,l,ifmv,idof
+    integer:: i,ic,ierr,is,ix,iy,iz,l,ifmv,idof,mem
     real(8):: ek,t0,vat(3),vatr(3)
     integer,allocatable,save:: dofl(:),dofpl(:)
     real(8),allocatable,save:: eksuml(:),ekpsuml(:),vacl(:,:)
@@ -738,6 +750,8 @@ contains
     if( .not. allocated(dofl) ) then
       allocate(dofl(nxyz),dofpl(nxyz),eksuml(nxyz),ekpsuml(nxyz)&
            ,vacl(3,nxyz))
+      mem = 4*(size(dofl)+size(dofpl)) +8*(size(eksuml)+size(ekpsuml) +size(vacl))
+      call accum_mem('ttm',mem)
     endif
 
     t0 = mpi_wtime()
@@ -898,6 +912,7 @@ contains
           alpha_max = max(alpha_max,kappa/cete(iz,iy,ix)/rho_e)
         enddo
         allocate(dtep(0:nz+1,0:ny+1,0:nx+1))
+        call accum_mem('ttm',8*size(dtep))
       endif
       l1st = .false.
     else
@@ -1497,6 +1512,7 @@ contains
 
     if( l1st ) then
       allocate(lexists(nx),densx(nx))
+      call accum_mem('ttm',4*size(lexists)+8*size(densx))
       volyz = vcell*ny*nz
     endif
 
@@ -1766,6 +1782,7 @@ contains
 
     if( l1st ) then
       allocate(dtep1d(nd1d),dtlp1d(nd1d))
+      call accum_mem('ttm',8*(size(dtep1d)+size(dtlp1d)))
       l1st = .false.
     endif
 
