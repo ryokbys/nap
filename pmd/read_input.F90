@@ -171,6 +171,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'num_nodes_z' ) then
     call read_i1(ionum,nz)
     return
+  elseif( trim(cname).eq.'num_omp_threads' ) then
+    call read_i1(ionum,nomp)
+    return
   elseif( trim(cname).eq.'shear_stress' ) then
     call read_r1(ionum,shrst)
     return

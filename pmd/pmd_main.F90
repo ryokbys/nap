@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-07-13 23:24:51 Ryo KOBAYASHI>
+!                     Last-modified: <2021-07-15 07:53:05 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -112,13 +112,17 @@ program pmd
     call spcs_info(ntot0,tagtot)
     write(6,*) ''
     write(6,'(a,i0)') ' Num of MPI processes = ',nprocs
+!.....Read in.pmd after reading the atom configuration file.
+    call read_inpmd(10,trim(cinpmd))
+!$    if( nomp.gt.0 ) then
+!$      call omp_set_num_threads(nomp)
+!$    endif
 !$omp parallel
 !$omp single
 !$    write(6,'(a,i0)') ' Num of OpenMP processes = ',omp_get_num_threads()
 !$omp end single
 !$omp end parallel
-!.....Read in.pmd after reading the atom configuration file.
-    call read_inpmd(10,trim(cinpmd))
+
     call check_cmin()
     if( ifpmd.eq.2 ) then ! if dump output
       call make_cdumpauxarr()
@@ -430,6 +434,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a,5x,i0)')   'num_nodes_x',nx
   write(6,'(2x,a,5x,i0)')   'num_nodes_y',ny
   write(6,'(2x,a,5x,i0)')   'num_nodes_z',nz
+  if( nomp.gt.0 ) write(6,'(2x,a,5x,i0)')   'num_omp_threads',nomp
   write(6,'(2x,a)') ''
   write(6,'(2x,a,5x,a)') 'io_format',ciofmt
   write(6,'(2x,a,5x,i0)') 'print_level',iprint
@@ -661,6 +666,8 @@ subroutine bcast_params()
   call mpi_bcast(lstrs0,1,mpi_logical,0,mpicomm,ierr)
   call mpi_bcast(boundary,3,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(pka_energy,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(nomp,1,mpi_integer,0,mpicomm,ierr)
+
 !.....Charge related
   call mpi_bcast(lvc,1,mpi_logical,0,mpicomm,ierr)
   call mpi_bcast(chgfix,20,mpi_character,0,mpicomm,ierr)

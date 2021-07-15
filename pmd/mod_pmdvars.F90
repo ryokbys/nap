@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-06-29 16:20:43 Ryo KOBAYASHI>
+!                    Last modified: <2021-07-15 07:41:49 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -49,6 +49,8 @@ module pmdvars
   integer:: ny = -1
   integer:: nz = -1
   integer:: nxyz
+!.....OpenMP
+  integer:: nomp = -1
 
   integer:: nstp = 0
   integer:: minstp = 0
