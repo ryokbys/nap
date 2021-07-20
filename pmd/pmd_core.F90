@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-07-01 15:02:51 Ryo KOBAYASHI>
+!                     Last-modified: <2021-07-19 18:42:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -718,9 +718,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
       tmp = mpi_wtime()
       call bacopy_fixed()
       call accum_time('ba_xxx',mpi_wtime()-tmp)
-      tmp = mpi_wtime()
+!.....Not to count update_d2lspr for accum_time
       call update_d2lspr(namax,natm,nnmax,lspr,h,ra,rc,rbuf,d2lspr)
-      call accum_time('lspr',mpi_wtime()-tmp)
     endif
 
     if(ifpmd.gt.0.and. mod(istp,noutpmd).eq.0 )then

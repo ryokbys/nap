@@ -807,6 +807,8 @@ contains
     real(8):: rmin2,xi(3),xij(3),rij(3),dij2
     
     rmin2 = (rcut-rbuf)**2
+!$omp parallel
+!$omp do private(i,xi,jj,j,xij,rij,dij2)
     do i=1,natm
       xi(1:3) = ra(1:3,i)
       do jj=1,lspr(0,i)
@@ -822,6 +824,8 @@ contains
         d2lspr(jj,i) = dij2
       enddo
     enddo
+!$omp end do
+!$omp end parallel
     return
   end subroutine update_d2lspr
 !=======================================================================

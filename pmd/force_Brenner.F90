@@ -58,11 +58,14 @@ contains
     epotl= 0d0
 
 !-----Repulsive term: V_R
+!$omp parallel
+!$omp do private(i,jj,j,xi,x,y,z,xij,rij,rexp,tmp,riji,dixij,dvrdr) &
+!$omp    reduction(+:epotl) 
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       do jj=1,lspr(0,i)
         j= lspr(jj,i)
-        if(j.le.i) cycle
+!!$        if(j.le.i) cycle
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
@@ -74,24 +77,31 @@ contains
         rexp= dexp(-br_bet*dsqrt(2d0*br_s)*(rij-br_re))
         tmp=0.5d0*f_r(rij,br_r1,br_r2)*br_dd/(br_s-1d0)*rexp
         epi(i)=epi(i)+tmp
-        if(j.le.natm) then
-          epi(j)=epi(j)+tmp
-          epotl=epotl +tmp +tmp
-        else
-          epotl=epotl +tmp
-        endif
+        epotl = epotl +tmp
+!!$        if(j.le.natm) then
+!!$          epi(j)=epi(j)+tmp
+!!$          epotl=epotl +tmp +tmp
+!!$        else
+!!$          epotl=epotl +tmp
+!!$        endif
 !---------force
         riji= 1d0/rij
         dixij(1:3)= -xij(1:3)*riji
-        djxij(1:3)=  xij(1:3)*riji
+!!$        djxij(1:3)=  xij(1:3)*riji
         dvrdr= br_dd/(br_s-1d0)*rexp*( df_r(rij,br_r1,br_r2) &
              -br_bet*dsqrt(2d0*br_s)*f_r(rij,br_r1,br_r2) )
         aa1(1:3,i)= aa1(1:3,i) +dvrdr*dixij(1:3)
-        aa1(1:3,j)= aa1(1:3,j) +dvrdr*djxij(1:3)
+!!$        aa1(1:3,j)= aa1(1:3,j) +dvrdr*djxij(1:3)
       enddo
     enddo
+!$omp end do
 
 !-----Attractive term: -Bij*V_A
+!$omp do private(i,jj,j,xi,xj,x,y,z,xij,xji,rij,riji,dixij,djxij,djxji,dixji,aexp, &
+!$omp            va,dvadr,tk,kk,k,xik,rik,riki,cs,gc,gfi,fi,fj,t1,dixik,dkxik, &
+!$omp            dics,djcs,dkcs,dgc,frik,dfrik,bij,xjk,rjk,rjki,gfj,djxjk,dkxjk, &
+!$omp            frjk,dfrjk,bji) &
+!$omp    reduction(+:epotl,aa2,epi) schedule(static,5)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       do jj=1,lspr(0,i)
@@ -250,6 +260,8 @@ contains
       enddo
     enddo
 
+!$omp end parallel
+    
 !-----send back forces and potentials on immigrants
     call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,aa2,3)

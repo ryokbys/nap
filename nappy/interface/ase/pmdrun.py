@@ -35,10 +35,12 @@ class PMD(FileIOCalculator):
     command = 'pmd'
 
     default_parameters = {
-        'num_nodes_x': 1,
-        'num_nodes_y': 1,
-        'num_nodes_z': 1,
+        'num_nodes_x': -1,
+        'num_nodes_y': -1,
+        'num_nodes_z': -1,
+        'num_omp_threads': 4,
         'io_format': 'ascii',
+        'print_level': 1,
         'time_interval': 1.0,
         'num_iteration': 0,
         'min_iteration': 0,
@@ -280,8 +282,8 @@ class PMD(FileIOCalculator):
 def get_input_txt(params,fmvs):
     txt = ''
 
-    order=['num_nodes_x','num_nodes_y','num_nodes_z','',
-           'io_format','',
+    order=['num_nodes_x','num_nodes_y','num_nodes_z','num_omp_threads','',
+           'io_format','print_level','',
            'time_interval','num_iteration','min_iteration','num_out_energy','',
            'flag_out_pmd','num_out_pmd','flag_sort','',
            'force_type','cutoff_radius','cutoff_buffer','',
@@ -296,9 +298,9 @@ def get_input_txt(params,fmvs):
            'zload_type','final_strain','',
            'boundary']
 
-    int_keys=['num_nodes_x','num_nodes_y','num_nodes_z',
+    int_keys=['num_nodes_x','num_nodes_y','num_nodes_z','num_omp_threads',
               'num_iteration','num_out_energy','flag_out_pmd',
-              'num_out_pmd','flag_damping',
+              'num_out_pmd','flag_damping','print_level',
               'converge_num','min_iteration','flag_sort']
     float_keys=['time_interval','cutoff_radius','cutoff_buffer',
                 'damping_coeff','initial_temperature',
