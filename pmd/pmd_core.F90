@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-07-19 18:42:08 Ryo KOBAYASHI>
+!                     Last-modified: <2021-08-13 09:58:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -496,7 +496,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   iocnterg=0
 
   if( myid_md.eq.0 ) then
-    if( nerg.gt.0 ) then
+    if( nerg.gt.0 .and. iprint.ge.ipl_basic ) then
 !.....write out energies
       open(ioerg,file="out.erg",status='replace')
       write(ioerg,'(a)') '# 1:istp, 2:simtime[fs],' &
@@ -929,7 +929,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 
 !---------output step, time, and temperature
       tcpu= mpi_wtime() -tcpu1
-      if( myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
+      if( myid_md.eq.0 .and. iprint.ne.0 ) then
 !!$        print '(a,20f8.5)',' alphas=',ol_alphas(0,1:natm)
         if( tave.gt.10000d0 ) cftave = 'es12.4'
         tcpu = mpi_wtime() -tcpu0
@@ -1054,7 +1054,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   tcpu2= mpi_wtime()
 
   if(myid_md.eq.0) then
-    if( nerg.gt.0 ) close(ioerg)
+    if( nerg.gt.0 .and. iprint.ge.ipl_basic ) close(ioerg)
 !        close(iotemp)
     if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
       close(iostrs)

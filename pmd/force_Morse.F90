@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-07-14 16:36:21 Ryo KOBAYASHI>
+!                     Last modified: <2021-08-11 16:48:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -211,7 +211,7 @@ contains
     call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
-    if( iprint.ge.ipl_info ) write(6,'(a,es15.7)') ' epot Morse = ',epott
+    if( iprint.ge.ipl_info ) print *,'epot Morse = ',epott
     return
   end subroutine force_Morse
 !=======================================================================

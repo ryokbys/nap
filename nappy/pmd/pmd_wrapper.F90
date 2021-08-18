@@ -1,6 +1,6 @@
 subroutine run(ntot0,rtot,vtot,atot,stot,ekitot,epitot, &
      naux,auxtot,hmat,ispcs,ekin,epot,stnsr,linit)
-  use pmdvars,only: nx,ny,nz,iprint
+  use pmdvars,only: nx,ny,nz,iprint,nstp
   implicit none
   integer,intent(in):: ntot0,naux,ispcs(ntot0)
   real(8),intent(inout):: rtot(3,ntot0),vtot(3,ntot0),hmat(3,3,0:1)
@@ -21,11 +21,12 @@ subroutine run(ntot0,rtot,vtot,atot,stot,ekitot,epitot, &
   
   ntot = ntot0
   hunit = 1d0
+!!$  print *,'nstp,iprint=',nstp,iprint
 !!$  print *,'iprint,ntot0,rtot(:,ntot0)=',iprint,ntot0,rtot(:,ntot0)
-!!$  call pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot, &
-!!$       ekitot,epitot,auxtot,epot,ekin,stnsr)
-  call oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
-       ekitot,epitot,auxtot,ekin,epot,stnsr,linit)
+  call pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot, &
+       ekitot,epitot,auxtot,epot,ekin,stnsr)
+!!$  call oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
+!!$       ekitot,epitot,auxtot,ekin,epot,stnsr,linit)
   return
 end subroutine run
 !=======================================================================
@@ -43,14 +44,17 @@ subroutine get_tagtot(ntot,ispcs,tagtot)
   return
 end subroutine get_tagtot
 !=======================================================================
-subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0, &
-     mpi_comm,myid,nodes,iprint0,nstp0,naux0,laux,cauxarr0)
+subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
+     iprint0,nstp0,dt0,naux0,laux,cauxarr0, &
+     ifdmp0,dmp0,eps_conv0,n_conv0,lcpctl,cpctl0,ptgt0,stgt0,srlx0, &
+     ifpmd0,npmd0,nerg0)
 !
 !  Set variables to be stored in pmdvars module that are required 
 !  to call pmd_core.
 !
   use pmdvars,only: specorder,nspmax,dt,rbuf,rc1nn,rc,nx,ny,nz,iprint, &
-       mpi_md_world,myid_md,nodes_md,am,nstp,naux,ifpmd,nerg,cauxarr
+       am,nstp,naux,ifpmd,npmd,nerg,cauxarr,ifdmp,dmp,eps_conv,n_conv, &
+       cpctl,ptgt,stgt,srlx
   use force
   use element
   implicit none 
@@ -60,14 +64,19 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0, &
   integer,intent(in):: nf,lf
   character(len=1),intent(in):: cfrcs(nf,lf)
 !f2py integer,intent(hide),depend(cfrcs):: nf=shape(cfrcs,0),lf=shape(cfrcs,1)
-  real(8),intent(in):: rc0
-  integer,intent(in):: mpi_comm,myid,nodes,naux0,iprint0,nstp0
+  real(8),intent(in):: rc0,rbuf0,dt0,dmp0,eps_conv0
+  integer,intent(in):: naux0,iprint0,nstp0,ifdmp0,n_conv0
   integer,intent(in):: laux
   character(len=1),intent(in):: cauxarr0(naux0,laux)
 !f2py integer,intent(hide),depend(cauxarr0):: laux=shape(cauxarr0,1)
+  real(8),intent(in):: ptgt0,srlx0,stgt0(3,3)
+  integer,intent(in):: lcpctl
+  character(len=1),intent(in):: cpctl0(lcpctl)
+!f2py integer,intent(hide),depend(cpctl0):: lcpctl=shape(cpctl0,0)
+  integer,intent(in):: ifpmd0,npmd0,nerg0
 
   integer:: i,j
-  character:: c3*3, c128*128, c6*6
+  character:: c3*3, c128*128, c6*6, c20*20
   type(atom):: elem
   logical:: lcoulomb = .false.
 
@@ -114,6 +123,9 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0, &
     cauxarr(i) = trim(c6)
   end do
 
+  write(c20,'(20a1)') cpctl0(1:lcpctl)
+  cpctl = trim(c20)
+
   naux = naux0
   nstp = nstp0
   do i=1,nspmax
@@ -123,23 +135,35 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0, &
       am(i) = elem%mass
     endif
   enddo
-  dt = 1d0
-  rbuf = 0d0
+  dt = dt0
+  rbuf = rbuf0
   rc1nn = 3d0
   rc = rc0
   nx = 1
   ny = 1
   nz = 1
   iprint = iprint0
+  nerg = nerg0
   ifpmd = 0
-  nerg = 0
-
-  nodes_md = nodes
-  myid_md = myid
-  mpi_md_world = mpi_comm
+  npmd = npmd0
+  ifdmp = ifdmp0
+  dmp = dmp0
+  eps_conv = eps_conv0
+  n_conv = n_conv0
+  ptgt = ptgt0
+  stgt(:,:) = stgt0(:,:)
+  srlx = srlx0
 
 end subroutine set_pmdvars
 !=======================================================================
+subroutine set_mpivars(mpi_comm,nodes,myid)
+  use pmdvars,only: mpi_md_world,myid_md,nodes_md
+  integer,intent(in):: mpi_comm,nodes,myid
+  
+  nodes_md = nodes
+  myid_md = myid
+  mpi_md_world = mpi_comm
+end subroutine set_mpivars
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make"

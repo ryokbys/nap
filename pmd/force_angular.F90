@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-07-14 17:15:42 Ryo KOBAYASHI>
+!                     Last modified: <2021-08-13 09:38:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   use util,only: csp2isp
@@ -204,7 +204,7 @@ contains
     epotl= epotl3
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
     epot= epot +epott
-    if( iprint.ge.ipl_info ) print *,'myid,epot angular = ',myid,epott
+    if( iprint.ge.ipl_info ) print *,'epot angular = ',epott
 
     return
   end subroutine force_angular
@@ -242,7 +242,7 @@ contains
       endif
       
 !.....Read file if exists
-      if( iprint.ne.0 ) write(6,'(/,a)') ' Angular parameters read from file:'
+      if( iprint.ge.ipl_basic ) write(6,'(/,a)') ' Angular parameters read from file:'
       open(ioprms,file=cfname,status='old')
       do while(.true.)
         read(ioprms,'(a)',end=10) cline
@@ -251,7 +251,7 @@ contains
         if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
         read(cline,*) ctype
         if( trim(ctype).eq.'angular1' ) then
-          if( nd.ne.8 ) then
+          if( nd.ne.8 .and. iprint.ge.ipl_basic ) then
             print *,'WARNING@read_params_angular: # of entry wrong for angular1,' &
                  //' so skip the line.'
             print *,'   '//trim(cline)
@@ -276,8 +276,10 @@ contains
             bets(isp,ksp,jsp) = bet
             gmms(isp,ksp,jsp) = gmm
           else
-            print *,' Angular parameter read but not used: cspi,cspj,cspk='&
-                 ,cspi,cspj,cspk
+            if( iprint.ge.ipl_info ) then
+              print *,' Angular parameter read but not used: cspi,cspj,cspk='&
+                   ,cspi,cspj,cspk
+            endif
           endif
         endif  ! ctype
       enddo

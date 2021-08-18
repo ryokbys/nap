@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-07-14 16:30:02 Ryo KOBAYASHI>
+!                     Last modified: <2021-08-13 09:41:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -455,7 +455,7 @@ contains
           read(ioprms,*) cspi, vid, rad, npq
           isp = csp2isp(trim(cspi))
           if( isp.gt.0 ) then
-            if( iprint.ne.0 ) then
+            if( iprint.ge.ipl_basic ) then
               write(6,'(a,a5,2f7.3,i4)') '   cspi,vid,rad,npq =' &
                    ,trim(cspi),vid,rad,npq
             endif
@@ -778,7 +778,7 @@ contains
             interact(isp,jsp) = .true.
             interact(jsp,isp) = .true.
           else
-            print *,'  interacion read but not used: ',isp,jsp
+            if( iprint.ge.ipl_info ) print *,'  interacion read but not used: ',isp,jsp
           endif
         endif
       enddo ! while(.true.)

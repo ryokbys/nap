@@ -293,9 +293,15 @@ class NAPSystem(object):
             return len(self.atoms[self.atoms.sid==sid])
 
     def num_species(self):
+        """
+        Return number of species in the system, counted not using self.specorder.
+        """
         return self.atoms.sid.max()
     
     def natm_per_species(self):
+        """
+        Return number of atoms per species as a list of integer in the order of specorder.
+        """
         nps= []
         max_nsp= 0
         try:

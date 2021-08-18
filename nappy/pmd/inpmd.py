@@ -10,6 +10,7 @@ _entry_to_varname = {
     'num_nodes_y': 'ny',
     'num_nodes_z': 'nz',
     'io_format': 'ciofmt',
+    'print_level': 'iprint',
     'time_interval': 'dt',
     'num_iteration': 'nstp',
     'min_iteration': 'minstp',
@@ -49,6 +50,7 @@ _default_params = {
     'num_nodes_y': 1,
     'num_nodes_z': 1,
     'io_format': 'ascii',
+    'print_level': 1,
     'time_interval': 1.0,
     'num_iteration': 0,
     'min_iteration': 0,
@@ -87,7 +89,8 @@ _int_keys = [
     'num_nodes_x','num_nodes_y','num_nodes_z',
     'num_iteration','num_out_energy','flag_out_pmd',
     'num_out_pmd','flag_damping',
-    'converge_num','min_iteration','flag_sort'
+    'converge_num','min_iteration','flag_sort',
+    'print_level',
 ]
 _float_keys = [
     'time_interval','cutoff_radius','cutoff_buffer',
@@ -95,7 +98,8 @@ _float_keys = [
     'final_temperature',
     'temperature_relax_time','pressure_target',
     'stress_relax_time','shear_stress',
-    'converge_eps','final_strain']
+    'converge_eps','final_strain'
+]
 _str_keys = [
     'io_format','force_type','temperature_control',
     'stress_control','flag_temp_dist',

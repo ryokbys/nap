@@ -522,7 +522,66 @@ def plot_figures(specorder,rd,agr):
     plt.savefig("graph_rdfs.png", format='png', dpi=300, bbox_inches='tight')
     return
 
+def nbplot(nsys,dr=0.1,rmin=0.0,rmax=5.0,nnmax=200,pairs=None,sigma=0):
+    """
+    Plot RDFs of given nsys on the jupyter notebook.
+    """
+    if not 'JPY_PARENT_PID' in os.environ:
+        raise Exception('This routine must be called on jupyter notebook.')
 
+    import matplotlib.pyplot as plt
+    try:
+        import seaborn as sns
+        sns.set(context='talk',style='ticks')
+    except:
+        pass
+
+    nspcs = len(nsys.specorder)
+    rd,gr= rdf(nsys,nspcs,dr,rmax,rmin=rmin,nnmax=nnmax)
+
+    if sigma > 0:
+        #...Smearing of total RDF
+        grt= gsmear(rd,gr[0,0,:],sigma)
+        gr[0,0,:] = grt[:]
+        #...Smearing of inter-species RDF
+        for isid in range(1,nspcs+1):
+            for jsid in range(isid,nspcs+1):
+                grt= gsmear(rd,gr[isid,jsid,:],sigma)
+                gr[isid,jsid,:] = grt[:]
+
+    plt.figure(figsize=(8,6))
+    x = rd
+    if not pairs:
+        for i in range(nspcs):
+            isp = i +1
+            spi = nsys.specorder[i]
+            for j in range(nspcs):
+                jsp =  j +1
+                spj = nsys.specorder[j]
+                if j<i:
+                    continue
+                y = gr[isp,jsp,:]
+                plt.plot(x,y,label='{0:s}-{1:s}'.format(spi,spj))
+    else:  # only specified pairs are plotted in addition to total RDF
+        for p in pairs:
+            spi,spj = p
+            try:
+                isp = nsys.specorder.index(spi) +1
+                jsp = nsys.specorder.index(spj) +1
+            except:
+                raise ValueError('No such species or pairs.')
+            y = gr[isp,jsp,:]
+            plt.plot(x,y,label='{0:s}-{1:s}'.format(spi,spj))
+
+    #...Total RDF
+    y = gr[0,0,:]
+    plt.plot(x,y,'r--',label='Total RDF')
+
+    plt.xlabel('Distance ($\mathrm{\AA}$)')
+    plt.ylabel('RDF')
+    plt.legend(bbox_to_anchor=(1.05,1))
+    plt.show()
+    return None
 
 if __name__ == "__main__":
 

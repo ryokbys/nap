@@ -15,7 +15,7 @@ from __future__ import print_function
 from docopt import docopt
 import numpy as np
 
-from nappy.napsys import NAPSystem
+import nappy
 
 __author__ = 'Ryo KOBAYASHI'
 __version__ = '190524'
@@ -84,9 +84,9 @@ if __name__ == '__main__':
     specorder = args['--specorder'].split(',')
 
     if specorder[0] == 'None':
-        nsys = NAPSystem(fname=infile)
+        nsys = nappy.io.read(infile)
     else:
-        nsys = NAPSystem(fname=infile,specorder=specorder)
+        nsys = nappy.io.read(infile,specorder=specorder)
 
     newsys = monocli_to_ortho(nsys)
-    newsys.write(outfile)
+    nappy.io.write(newsys,fname=outfile)
