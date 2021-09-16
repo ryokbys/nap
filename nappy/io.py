@@ -1021,17 +1021,26 @@ def write_cube(nsys, fname='cube', origin=[0.,0.,0.]):
     return None
         
 
-def get_PDB_txt(nsys):
+def get_PDB_txt(nsys,**kwargs):
     """
     Convert the system info to Protein Data Bank (PDB) format
     for the purpose of visualization using py3Dmol (3Dmol.js).
+
+    Inputs
+    ------
+    nsys : NAPSystem
+        NAPSystem object to be output.
 
     Returns
     -------
     txt : str
         Text string of system information in PDB format.
     """
-    if len(nsys.atoms) >= 100000:
+    max_num_atoms = 100000
+    if 'max_num_atoms' in kwargs:
+        max_num_atoms = kwargs['max_num_atoms']
+    
+    if len(nsys.atoms) >= max_num_atoms:
         raise ValueError('Number of atoms is too large for PDB format...')
     
     from datetime import datetime

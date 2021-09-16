@@ -514,7 +514,7 @@ class NAPSystem(object):
         if 'volume' in options.keys():
             volopts = options['volume']
         
-        pdb = nappy.io.get_PDB_txt(self)
+        pdb = nappy.io.get_PDB_txt(self,**options)
         v = py3Dmol.view()
         v.addModel(pdb,'pdb')
         v.setViewStyle({'style':'outline','color':'black','width':0.05})

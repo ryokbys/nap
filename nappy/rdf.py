@@ -700,7 +700,7 @@ if __name__ == "__main__":
             write_rdf_normal(ofname,specorder,nspcs,rd,agr,nr,)
 
     if plot:
-        plot_figures(rd,agr)
+        plot_figures(specorder,rd,agr)
         print('')
         print(' RDF graphes are plotted.')
         if nspcs == 1:

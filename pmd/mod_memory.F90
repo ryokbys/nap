@@ -1,6 +1,6 @@
 module memory
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-07-01 14:56:17 Ryo KOBAYASHI>
+!                     Last modified: <2021-08-26 12:17:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Module for memory measurement.
 !-----------------------------------------------------------------------
@@ -106,7 +106,7 @@ contains
     else
       call mem_in_unit(mem_tot,rmem,cunit)
       write(ionum,'(a,f10.3,a)') &
-           ' Memory total = ', rmem,' '//cunit
+           ' Memory per MPI-proc = ', rmem,' '//cunit
     endif
   end subroutine report_mem
 !=======================================================================
