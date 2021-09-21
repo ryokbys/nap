@@ -229,6 +229,8 @@ class CS:
         for res in results:
             val,ip = res
             self.population[ip].val = val
+
+        pool.close()
         
         self.keep_best()
         self.all_indivisuals.extend(self.population)
@@ -298,10 +300,15 @@ class CS:
             for i in range(min(16,self.ndim)):
                 print(' {0:6.3f}'.format(self.bestind.vector[i]),end="")
             print('', flush=True)
+
+        #...Create pool before going into maxiter-loop,
+        #...since creating pool inside could cause "Too many files" error.
+        if self.nproc > 0 :  # use specified number of cores by nproc
+            pool = Pool(processes=self.nproc)
+        else:
+            pool = Pool()
             
         for it in range(maxiter):
-
-
             self.sort_individuals()
             #...Create candidates from current population using Levy flight
             candidates = []
@@ -337,11 +344,6 @@ class CS:
                 newind.init_random()
                 rnd_candidates.append(newind)
 
-            if self.nproc > 0 :  # use specified number of cores by nproc
-                pool = Pool(processes=self.nproc)
-            else:
-                pool = Pool()
-            
             #...Evaluate loss function values of updated candidates and new random ones
             prcs = []
             for ic,ci in enumerate(candidates):
@@ -434,6 +436,7 @@ class CS:
                 fgen.flush()
         fgen.close()
         find.close()
+        pool.close()
         #...Finaly write out the best one
         self.write_variables(self.bestind,fname='in.vars.fitpot.best',**self.kwargs)
         return None
