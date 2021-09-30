@@ -14,7 +14,7 @@ except:
     pass
 
 
-__all__ = ['inpmd','pmd2phonopy','pairlist','pmd_wrapper']
+__all__ = ['inpmd','pmd2phonopy','pairlist']
 
 from . import *
 
