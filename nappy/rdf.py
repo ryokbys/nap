@@ -266,6 +266,7 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
                 nj = natms[jsid]
                 tmp = 4.0*np.pi*dr  /vol
                 if isid == jsid:
+                    if ni == 1: continue
                     tmp *= ni*(ni-1)
                 else:
                     tmp *= ni*nj
@@ -514,7 +515,9 @@ def plot_figures(specorder,rd,agr):
             ax = axes[i,j]
             y = agr[isp,jsp,:]
             ax.plot(x,y,'r-')
-            ax.set_title('{0:d}-{1:d}'.format(isp,jsp))
+            # ax.set_title('{0:d}-{1:d}'.format(isp,jsp))
+            ax.text(0.05, 0.8, '{0:s}-{1:s}'.format(specorder[i],specorder[j]),
+                    transform=ax.transAxes, ha="left")
             if isp==jsp:
                 ax.set_xlabel('Distance (A)')
             if isp==1 and jsp==1:

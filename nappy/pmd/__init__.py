@@ -19,7 +19,7 @@ __all__ = ['inpmd','pmd2phonopy','pairlist']
 from . import *
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "210302"
+__version__ = "210930"
 
 def str2char(string,nlen):
     slen = len(string)

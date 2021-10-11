@@ -14,6 +14,8 @@ Options:
                If provided, not to perform MD relaxation. [default: None]
   --nstp NSTP  Number of steps for relaxation MD. [default: 1000]
   --dt DT      Time interval for relaxation MD. [default: -2.0]
+  --per-formula-unit
+               Obtain the formation enthalpy in per-formula-unit. [default: False]
   --out4fp     Write out to a file the fp.py data format. 
   --outfname OUTFILE
                Output file name for out4fp. [default: data.pmd.fenth]
@@ -149,6 +151,7 @@ def main(args):
     dry = args['--dry']
     nstp = int(args['--nstp'])
     dt = float(args['--dt'])
+    perfu = args['--per-formula-unit']
     out4fp = args['--out4fp']
     ergs = args['--ergs']
     if ergs != 'None':
@@ -191,16 +194,21 @@ def main(args):
     #...Get formation enthalpy
     dH = calc_formation_enthalpy(ergs_react,erg_prod,coeffs)
     gcd = np.gcd.reduce(product.natm_per_species())
-    print(' Formation enthalpy per unit formula:')
+    print(' Formation enthalpy per formula unit:')
     print('   dH = -1*[ {0:.2f} '.format(erg_prod),end='')
     for i,r in enumerate(reactants):
         print('-{0:.2f}*({1:.2f}) '.format(coeffs[i],ergs_react[i]),end='')
     print(']/{0:d}'.format(gcd))
-    print('      = {0:.2f} (eV/u.f.)'.format(dH/gcd))
+    print('      = {0:.2f} (eV/f.u.)'.format(dH/gcd))
+    print(' Formation enthalpy per atom:')
+    print('      = {0:.3f} (eV/atom)'.format(dH/len(product)))
 
     if out4fp:
         outfname = args['--outfname']
-        write_fenth_out4fp(outfname,dH/gcd)
+        if perfu:
+            write_fenth_out4fp(outfname,dH/gcd)
+        else:
+            write_fenth_out4fp(outfname,dH/len(product))
         print(' Wrote {0:s}'.format(outfname))
 
     return None
