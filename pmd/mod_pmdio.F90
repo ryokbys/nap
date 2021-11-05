@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-03-17 16:40:20 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-05 07:53:13 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -260,8 +260,6 @@ contains
         dlmp(idlmp,:) = stot(1,2,:)
       else if( trim(caux).eq.'chg' ) then
         dlmp(idlmp,:) = auxtot(iauxof('chg'),:)
-      else if( trim(caux).eq.'chi' ) then
-        dlmp(idlmp,:) = auxtot(iauxof('chi'),:)
       else if( trim(caux).eq.'tei' ) then
         dlmp(idlmp,:) = auxtot(iauxof('tei'),:)
       else if( trim(caux).eq.'clr' ) then

@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-07-13 15:04:42 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-05 07:53:40 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -1631,7 +1631,6 @@ contains
     integer,intent(in):: namax,naux
     integer,intent(inout):: natm
     real(8),intent(inout):: tag(namax),ra(3,namax),va(3,namax)
-!!$    real(8),intent(in):: chg(namax),chi(namax)
     real(8),intent(inout):: aux(naux,namax)
     real(8),intent(in):: h(3,3),simtime,sorg(3)
     
@@ -1739,8 +1738,6 @@ contains
           ra(1:3,inc2) = ra(1:3,ia)
           va(1:3,inc2) = va(1:3,ia)
           tag(inc2) = tag(ia)
-!!$          chg(inc2) = chg(ia)
-!!$          chi(inc2) = chi(ia)
           do iaux=1,naux
             aux(naux,inc2) = aux(naux,ia)
           enddo

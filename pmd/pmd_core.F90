@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-08-13 09:58:47 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-05 12:08:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -30,7 +30,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   use localflux,only: lflux,accum_lflux
   use pdens,only: lpdens,accum_pdens
   use time, only: sec2hms, accum_time
-  use pairlist, only: mk_lspr_para,mk_lscl_para,reorder_arrays,update_d2lspr
+  use pairlist, only: mk_lspr_para,mk_lscl_para,reorder_arrays, &
+       update_d2lspr, check_lspr, check_lscl
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -333,6 +334,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   tmp = mpi_wtime()
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
        ,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
+  call check_lscl(myid_md,iprint)
+  call check_lspr(namax,natm,nnmax,lspr,iprint,myid_md,mpi_md_world)
   call accum_time('lspr',mpi_wtime()-tmp)
 
 !.....Calc forces
@@ -1825,9 +1828,10 @@ subroutine bacopy(l1st)
     rcv(kd)= rc*asgm/vol
     nex(kd)= int(rcv(kd)) +1
   enddo
-  if( l1st .and. myid_md.eq.0 .and. iprint.ge.ipl_warn ) then
-    write(6,'(a,3f10.3)') ' rcv = ',rcv(1:3)
-    write(6,'(a,3i10)')   ' nex = ',nex(1:3)
+  if( l1st .and. myid_md.eq.0 .and. iprint.ge.ipl_info ) then
+    print '(a)',' bacopy info:'
+    write(6,'(a,3f10.3)') '   rcv = ',rcv(1:3)
+    write(6,'(a,3i10)')   '   nex = ',nex(1:3)
   endif
 
 !-----loop over x, y, & z directions

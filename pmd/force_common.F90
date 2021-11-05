@@ -45,6 +45,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
   use time, only: accum_time
   implicit none
   include "mpif.h"
+  include "./const.h"
   integer,intent(in):: namax,natm,nnmax,nismax,iprint
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
        ,myparity(3),nnn(6),mpi_md_world,myid_md,nex(3)
@@ -56,7 +57,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
   real(8),intent(inout):: tcom,rc
   real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
        ,stnsr(3,3)
-!!$  real(8),intent(inout):: chg(namax),chi(namax),tei(namax)
+!!$  real(8),intent(inout):: chg(namax),tei(namax)
   integer,intent(in):: naux
   real(8),intent(inout):: aux(naux,namax)
 !!$    character(len=20),intent(in):: cffs(numff)
@@ -80,26 +81,16 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
 
 !.....If varaible charge, optimize charges before any charge-dependent potential
   if( lvc ) then
-    if( l1st .and. myid_md.eq.0 .and. iprint.ne.0 ) then
+    tmp = mpi_wtime()
+    if( l1st .and. myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
       write(6,'(/a)') ' Charges are to be equilibrated.'
     endif
     call dampopt_charge(namax,natm,tag,h,ra, &
-         aux(iauxof('chg'),:),aux(iauxof('chi'),:), &
+         aux(iauxof('chg'),:), &
          nnmax,lspr,rc, &
          lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
          sorg,tcom,myid_md,mpi_md_world,iprint,l1st,boundary)
-    if( l1st .and. myid_md.eq.0 .and. iprint.ge.20 ) then
-      write(6,'(/a)') ' Charges:'
-      tmp = 0d0
-      ichg = iauxof('chg')
-      do i=1,natm
-!!$        tmp = tmp +chg(i)
-        tmp = tmp +aux(i,ichg)
-        if( i.gt.100 ) cycle
-        write(6,'(a,i5,i3,f8.3)') '   i,is,chg(i) = ',i,int(tag(i)),aux(ichg,i)
-      enddo
-      write(6,'(a,f0.3)') ' Total charge = ',tmp
-    endif
+    call accum_time('dampopt_charge',mpi_wtime() -tmp)
   endif
 
 !.....Non-exclusive (additive) choice of force-fields
@@ -384,21 +375,21 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
   else if( use_force('Ewald') ) then  ! Ewald Coulomb
     tmp = mpi_wtime()
     call force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
-         ,aux(iauxof('chg'),:),aux(iauxof('chi'),:),h,hi,tcom,nb,nbmax &
+         ,aux(iauxof('chg'),:),h,hi,tcom,nb,nbmax &
          ,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
     call accum_time('force_Ewald',mpi_wtime() -tmp)
   else if( use_force('Ewald_long') ) then ! long-range Coulomb
     call force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
-         ,aux(iauxof('chg'),:),aux(iauxof('chi'),:),h,hi,tcom,nb,nbmax &
+         ,aux(iauxof('chg'),:),h,hi,tcom,nb,nbmax &
          ,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc)
   else if( use_force('Coulomb') ) then  ! Coulomb
     tmp = mpi_wtime()
     call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-         ,aux(iauxof('chg'),:),aux(iauxof('chi'),:),h,hi,tcom,nb,nbmax &
+         ,aux(iauxof('chg'),:),h,hi,tcom,nb,nbmax &
          ,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr,sorg &
          ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint &
          ,l1st,lcell_updated,lvc,specorder)
@@ -447,7 +438,7 @@ subroutine init_force(namax,natm,nspmax,nsp,tag,aux,naux, &
   character(len=3),intent(in):: specorder(nspmax)
 !!$    character(len=20),intent(in):: cffs(numff)
   integer,intent(inout):: ifcoulomb
-!!$  real(8),intent(inout):: chg(namax),chi(namax)
+!!$  real(8),intent(inout):: chg(namax)
   real(8),intent(inout):: aux(naux,namax)
   logical,intent(inout):: lvc
   logical,intent(in):: linit
@@ -493,13 +484,12 @@ subroutine init_force(namax,natm,nspmax,nsp,tag,aux,naux, &
        use_force('Ewald') .or. &
        use_force('Ewald_long') ) then
     call initialize_coulomb(natm,nsp,tag, &
-         aux(iauxof('chg'),:),aux(iauxof('chi'),:), &
+         aux(iauxof('chg'),:), &
          myid_md,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
   else if( use_force('Coulomb') ) then
     if( .not. lprmset_Coulomb ) then
-      if( myid_md.eq.0 .and. iprint.ge.ipl_debug ) print *,'initialize_coulombx...'
       call initialize_coulombx(natm,nsp,tag, &
-           aux(iauxof('chg'),:),aux(iauxof('chi'),:), &
+           aux(iauxof('chg'),:), &
            myid_md,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
     endif
   endif
@@ -1162,7 +1152,7 @@ function force_on(force_name,numff,cffs)
 
 end function force_on
 !=======================================================================
-subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
+subroutine dampopt_charge(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
      lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
      sorg,tcom,myid,mpi_md_world,iprint,l1st,boundary)
 !
@@ -1182,7 +1172,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   
   integer,intent(in):: namax,natm,myid,mpi_md_world,iprint &
        ,nnmax,lspr(0:nnmax,namax)
-  real(8),intent(in):: chi(namax),h(3,3),tag(namax),ra(3,namax),rc,sorg(3)
+  real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,sorg(3)
   real(8),intent(inout):: chg(namax),tcom
   logical,intent(in):: l1st
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
@@ -1255,22 +1245,22 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   endif
 !!$  if( use_force('Ewald_long') ) then
   if( trim(cterms).eq.'long' ) then
-    call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+    call qforce_self(namax,natm,tag,chg,fq,eself)
     call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_md_world, &
          myid,iprint,fq,eclong)
 !!$  else if( use_force('Ewald') ) then
   else if( trim(cterms).eq.'full' ) then
-    call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+    call qforce_self(namax,natm,tag,chg,fq,eself)
     call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
          ,rc,fq,ecshort)
     call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_md_world, &
          myid,iprint,fq,eclong)
   else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
-    call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+    call qforce_self(namax,natm,tag,chg,fq,eself)
     call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
          ,rc,fq,ecshort)
   else if( trim(cterms).eq.'screened_cut'  ) then
-    call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+    call qforce_self(namax,natm,tag,chg,fq,eself)
     call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
          ,rc,fq,ecshort,l1st)
   endif
@@ -1284,6 +1274,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   endif
 !.....Set fq(i)=0, if lqfix(i)
   do i=1,natm
+!!$    print '(a,i6,es12.4)','i,fq=',i,fq(i)
     if( lqfix(i) ) then
       fq(i) = 0d0
       vq(i) = 0d0
@@ -1291,7 +1282,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
   enddo
   call suppress_fq(namax,natm,fq,myid,mpi_md_world)
   call get_average_fq(namax,natm,fq,avmu,lqfix,myid,mpi_md_world)
-  if( myid.eq.0 .and. iprint.ge.20 ) then
+  if( myid.eq.0 .and. iprint.ge.ipl_debug ) then
     write(6,'(a,i6,4es12.4)') ' istp,eself,eshort,elong,epot= ',0,eself,ecshort,eclong,epot
     write(6,'(a,i5,20es11.3)') ' istp,avmu,fqs = ',istp,avmu,fq(1:min(natm,10))
   endif
@@ -1304,7 +1295,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     if( lqfix(i) ) cycle
     fq(i) = fq(i) -avmu
   enddo
-  fq(1:natm) = fq(1:natm) -avmu
+!!$  fq(1:natm) = fq(1:natm) -avmu
 
   vq(1:natm) = 0d0
   istp_pos = 0
@@ -1341,6 +1332,16 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     call bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
          ,natm,nb,nnn,myid,myparity,lsrc &
          ,nex,mpi_md_world,chg,boundary)
+!.....Check charges
+    if( iprint.ge.ipl_debug ) then
+      do i=1,natm
+        if( chg(i)*0d0 .ne. 0d0 ) then
+          print *,'ERROR: chg is NaN !?'
+          print '(a,i8,es12.3)',' i,chg(i)= ',i,chg(i)
+          stop
+        endif
+      enddo
+    endif
 
 !.....get new qforces
     eclong = 0d0
@@ -1367,22 +1368,22 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
     endif
 !!$    if( use_force('Ewald_long') ) then
     if( trim(cterms).eq.'long' ) then
-      call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+      call qforce_self(namax,natm,tag,chg,fq,eself)
       call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_md_world, &
            myid,iprint,fq,eclong)
 !!$    else if( use_force('Ewald') ) then
     else if( trim(cterms).eq.'full' ) then
-      call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+      call qforce_self(namax,natm,tag,chg,fq,eself)
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshort)
       call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_md_world, &
            myid,iprint,fq,eclong)
     else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
-      call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+      call qforce_self(namax,natm,tag,chg,fq,eself)
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshort)
     else if( trim(cterms).eq.'screened_cut'  ) then
-      call qforce_self(namax,natm,tag,chg,chi,fq,eself)
+      call qforce_self(namax,natm,tag,chg,fq,eself)
       call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshort,l1st)
     endif
@@ -1411,7 +1412,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
       if( lqfix(i) ) cycle
       fq(i) = fq(i) -avmu
     enddo
-    if( myid.eq.0 .and. iprint.ge.20 ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_debug ) then
       write(6,'(a,i6,4es12.4)') ' istp,eself,eshort,elong,epot= ',istp,eself,ecshort,eclong,epot
       write(6,'(a,i5,2es12.4,20es11.3)') ' istp,epot,de,avmu,fqs= ',istp &
            ,epot,abs(epot-epotp),avmu,fq(1:min(natm,10))
@@ -1425,7 +1426,7 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,chi,nnmax,lspr,rc, &
          abs(epot-epotp)/ntot.lt.conv_eps ) then
       istp_conv = istp_conv +1
       if( istp_conv.gt.nstp_conv ) then
-        if( myid.eq.0 .and. iprint.ge.1 ) then
+        if( myid.eq.0 .and. iprint.ge.ipl_info ) then
           write(6,'(a,i0,a)') ' Dampopt_charge converged at ', &
                istp,' steps.'
         endif
@@ -1467,7 +1468,7 @@ subroutine get_average_fq(namax,natm,fq,avmu,lqfix,myid,mpi_md_world)
   call mpi_allreduce(nonfixl,nonfix,1,mpi_integer, &
        mpi_sum,mpi_md_world,ierr)
   call mpi_allreduce(avmul,avmu,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
-  avmu = avmu/nonfix
+  if( nonfix.ne.0 ) avmu = avmu/nonfix
 
   return
 end subroutine get_average_fq
@@ -1557,7 +1558,8 @@ subroutine suppress_fq(namax,natm,fq,myid,mpi_md_world)
     fqmax = 0d0
     call mpi_allreduce(fqmaxl,fqmax,1,mpi_real8,mpi_max,mpi_md_world,ierr)
 
-    fqfactor = fqlimit /fqmax
+    fqfactor = 1d0
+    if( fqmax.gt.1d-8 ) fqfactor = fqlimit /fqmax
     do i=1,natm
       fq(i) = fq(i)*fqfactor
     enddo
@@ -1570,7 +1572,7 @@ subroutine suppress_fq(namax,natm,fq,myid,mpi_md_world)
   return
 end subroutine suppress_fq
 !=======================================================================
-subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
+subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg &
      ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
      ,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
      ,ifcoulomb,iprint,l1st,lvc &
@@ -1591,7 +1593,7 @@ subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg,chi &
        ,tag(namax)
   real(8),intent(inout):: tcom,rc
   real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
-       ,chg(namax),chi(namax)
+       ,chg(namax)
 !!$    character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: l1st
   logical,intent(inout):: lvc

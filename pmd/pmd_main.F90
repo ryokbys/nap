@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-07-15 07:53:05 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-05 07:52:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -93,7 +93,7 @@ program pmd
       stop
     endif
 !.....Memory assessment
-    mem = 8*ntot*(1 +3 +3 +1 +3*3 +3*3 +3)
+    mem = 8*ntot0*(1 +3 +3 +1 +3*3 +3*3 +3)
     call accum_mem('main',mem)
 
 !.....Set mass of species if specorder is already set.
@@ -214,7 +214,7 @@ program pmd
   call set_use_elec_temp()
   naux = 0
   if( luse_charge ) then
-    naux = naux +2  ! chg, chi (not necessarily need it, though)
+    naux = naux +1  ! chg
   endif
   if( luse_elec_temp .or. trim(ctctl).eq.'ttm' ) then
     naux = naux +1
@@ -227,8 +227,6 @@ program pmd
   if( luse_charge ) then
     inc = inc +1
     cauxarr(inc) = 'chg'
-    inc = inc +1
-    cauxarr(inc) = 'chi'
   endif
   if( luse_elec_temp .or. trim(ctctl).eq.'ttm' ) then
     inc = inc +1
@@ -455,9 +453,6 @@ subroutine write_initial_setting()
   write(6,'(2x,a)') ''
   write(6,'(2x,a,10(2x,a))') 'force_type   ', &
        (trim(force_list(i)),i=1,num_forces)
-  if( lvc ) then
-    write(6,'(2x,a,5x,l2)') 'charge_optimize',lvc
-  endif
   write(6,'(2x,a,5x,f6.3)') 'cutoff_radius',rc
   write(6,'(2x,a,5x,f6.3)') 'cutoff_buffer',rbuf
   write(6,'(2x,a)') ''
@@ -570,7 +565,6 @@ subroutine write_initial_setting()
 !!$    if( trim(specorder(i)).ne.'x' ) write(6,'(5x,i3,f10.5)') i,schg(i)
 !!$  enddo
 !!$  write(6,'(2x,a,5x,a)') 'fix_charge',trim(chgfix)
-!!$  write(6,'(2x,a,5x,l2)') 'variable_charge',lvc
 !!$  write(6,'(2x,a)') ''
 
   if( lmetaD ) write(6,'(2x,a,5x,l2)') 'metadynamics',lmetaD
@@ -669,7 +663,6 @@ subroutine bcast_params()
   call mpi_bcast(nomp,1,mpi_integer,0,mpicomm,ierr)
 
 !.....Charge related
-  call mpi_bcast(lvc,1,mpi_logical,0,mpicomm,ierr)
   call mpi_bcast(chgfix,20,mpi_character,0,mpicomm,ierr)
 !.....Force-fields
   call mpi_bcast(cforce,20,mpi_character,0,mpicomm,ierr)

@@ -262,8 +262,10 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
             nadr[0,0,ir] /= tmp*r*r
         for isid in range(1,nspcs+1):
             ni = natms[isid]
+            if ni == 0: continue
             for jsid in range(isid,nspcs+1):
                 nj = natms[jsid]
+                if nj == 0: continue
                 tmp = 4.0*np.pi*dr  /vol
                 if isid == jsid:
                     if ni == 1: continue

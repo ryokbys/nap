@@ -4,6 +4,7 @@ module pairlist
 !-----------------------------------------------------------------------
   use memory, only: accum_mem
   implicit none
+  include './const.h'
   save
   
   integer,allocatable:: lscl(:),lshd(:)
@@ -123,7 +124,7 @@ contains
   subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va &
        ,rc,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
 !
-!  Make a pairlist using cell list created before.
+!  Make a pairlist using cell list created in mk_lscl_para.
 !
     implicit none
     integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
@@ -140,38 +141,12 @@ contains
     call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc &
          ,h,hi,l1st)
 
-    if( l1st ) then
-      mmax = 0
-      do mz=1,lcz
-        do my=1,lcy
-          do mx=1,lcx
-            m= mx*lcyz2 +my*lcz2 +mz +1
-            i = lshd(m)
-            inc = 0
-            do while(i.gt.0)
-              inc = inc + 1
-              i = lscl(i)
-            enddo
-            mmax = max(mmax,inc)
-          enddo
-        enddo
-      enddo
-!!$!.....If nnmax.lt.(4*pi/3)*mmax, nnmax would be a bit too small
-!!$      if( nnmax.lt.4.2*mmax ) then
-!!$        write(6,'(a)') " ================= WARNING ======================="
-!!$        write(6,'(a)') "   nnmax is less than 5*(num of atoms in a cell)"
-!!$        write(6,'(a,i0)') "   You had better set max_num_meighbors greater than " &
-!!$             , int(4.2*mmax)
-!!$        write(6,'(a)') " ================================================="
-!!$      endif
-    endif
-
 !-----reset pair list, LSPR
-    lspr(0,:)= 0
+    lspr(:,:)= 0
     d2lspr(:,:) = 0d0
 
 !-----make a pair list, LSPR
-!.....Scan atoms, which would be more efficient with OpenMP than scanning cells
+!.....Scan atoms (not scanning cells)
 !$omp parallel
 !$omp do private(mz,my,mx,m,kuz,kuy,kux,m1z,m1y,m1x,m1,i,j,xi,xij,rij,rij2)
     do i=1,natm
@@ -284,15 +259,6 @@ contains
 !!$        enddo
 !!$      enddo
 !!$    enddo
-
-!!$!.....Only 1st call
-!!$    if( l1st ) then
-!!$      mmax = 0
-!!$      do i=1,natm
-!!$        mmax = max(mmax,lspr(0,i))
-!!$      enddo
-!!$      print '(a,i0)',' Max num of neighbors at 1st call = ',mmax
-!!$    endif
 
   end subroutine mk_lspr_para
 !=======================================================================
@@ -794,6 +760,54 @@ contains
 
   end subroutine mk_lspr_brute
 !=======================================================================
+  subroutine check_lscl(myid,iprint)
+    integer,intent(in):: myid,iprint
+
+    integer:: mmax,mx,my,mz,i,inc,m
+
+    if( myid.eq.0 .and. iprint.ge.ipl_info) then
+      print *,'check_lscl:'
+      print '(a,3i4)','   lcx,y,z = ',lcx,lcy,lcz
+      print '(a,5(2x,i0))','   lcx2,y2,z2,yz2,xyz2 = ',lcx2,lcy2,lcz2,lcyz2,lcxyz2
+      print '(a,3es12.4)','   rcx,y,z = ',rcx,rcy,rcz
+    endif
+    
+    mmax = 0
+    do mz=0,lcz+1
+      do my=0,lcy+1
+        do mx=0,lcx+1
+          m= mx*lcyz2 +my*lcz2 +mz +1
+          i = lshd(m)
+          inc = 0
+          do while(i.gt.0)
+            inc = inc + 1
+            i = lscl(i)
+          enddo
+          mmax = max(mmax,inc)
+!!$          print '(a,5i6)',' mx,my,mz,m,inc=',m,inc
+        enddo
+      enddo
+    enddo
+  end subroutine check_lscl
+!=======================================================================
+  subroutine check_lspr(namax,natm,nnmax,lspr,iprint,myid,mpi_world)
+    integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax),iprint
+    integer,intent(in):: myid,mpi_world
+
+    integer:: i,mmax
+
+    mmax = 0
+    do i=1,natm
+      mmax = max(mmax,lspr(0,i))
+    enddo
+    if( mmax.gt.nnmax ) then
+      print *,'ERROR: Max num of neighbors exceeds the limit:'
+      print '(3x,i5,a,i5)', mmax,' > ',nnmax
+      print *,'Increase max_num_neighbors in in.pmd...'
+      stop
+    endif
+  end subroutine check_lspr
+!=======================================================================
   subroutine update_d2lspr(namax,natm,nnmax,lspr,h,ra,rcut,rbuf,d2lspr)
 !
 !  Since d2lspr should be updated even if lspr is not changed,
@@ -805,7 +819,7 @@ contains
 
     integer:: i,j,jj
     real(8):: rmin2,xi(3),xij(3),rij(3),dij2
-    
+
     rmin2 = (rcut-rbuf)**2
 !$omp parallel
 !$omp do private(i,xi,jj,j,xij,rij,dij2)
@@ -881,7 +895,7 @@ contains
         arr(j,i) = tmparr(ndim*(i-1)+j)
       enddo
     enddo
-    
+
   end subroutine sort_by_lscl
 !=======================================================================
   subroutine swap(ndim,i,j,dlist,ilist)
@@ -927,7 +941,7 @@ contains
     call swap(ndim,i,ir,dlist,ilist)
     call qsort_list(ndim,il,i,dlist,ilist)
     call qsort_list(ndim,i+1,ir,dlist,ilist)
-    
+
   end subroutine qsort_list
 !=======================================================================
 end module pairlist

@@ -1,12 +1,18 @@
 module pmdmpi
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-27 10:12:32 Ryo KOBAYASHI>
+!                     Last modified: <2021-10-11 23:42:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Module that includes variables and parameters used for parallel
 ! computation with mpi for spatial decomposition MD simulation.
 !-----------------------------------------------------------------------
   implicit none
   save
+  include 'mpif.h'
+#ifdef __SINGLE__
+  integer,parameter:: mpi_real_rp = mpi_real4
+#else
+  integer,parameter:: mpi_real_rp = mpi_real8
+#endif
 
 contains
   function get_factor(n) result(ifac)

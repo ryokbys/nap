@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-08-13 09:41:23 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-05 12:26:37 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -60,8 +60,8 @@ module Coulomb
   real(8):: rad_bvs(nspmax)
 !  real(8),allocatable:: rad_bvs(:)
 !.....screening length
-  real(8):: rho_bvs(nspmax,nspmax)
-!  real(8),allocatable:: rho_bvs(:,:)
+  real(8):: rho_scr(nspmax,nspmax)
+!  real(8),allocatable:: rho_scr(:,:)
 !!$  real(8):: fbvs = 0.74d0 +- 0.04
   real(8):: fbvs = 0.74d0
 
@@ -96,35 +96,35 @@ module Coulomb
   real(8),parameter:: threshold_kmax = 1d-4
 
 !.....Variable-charge potential variables
-  real(8):: vcg_chi(nspmax),vcg_jii(nspmax),vcg_e0(nspmax),vcg_sgm(nspmax) &
+  real(8):: vc_chi(nspmax),vc_jii(nspmax),vc_e0(nspmax),vcg_sgm(nspmax) &
        ,qlower(nspmax),qupper(nspmax)
   real(8),parameter:: vcg_lambda = 0.5d0
 !.....Average mu (chemical potential)
   real(8):: avmu
-!.....Convergence criterion for QEq
+!.....Convergence criterion for QEq in eV/atom
   real(8):: conv_eps = 1.0d-6
 
   integer,parameter:: ivoigt(3,3)= &
        reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
 contains
-  subroutine initialize_coulomb(natm,nspin,tag,chg,chi, &
+  subroutine initialize_coulomb(natm,nspin,tag,chg, &
        myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
 !
 !  Allocate and initialize parameters to be used.
-!  This is called when force is either screened_Coulomb/Ewald/Ewald_long.
+!  This is called when force is either screened_Coulomb/Ewald/Ewald_long, which is deprecated.
+!  Use initialize_coulombx method instead.
 !
     include "mpif.h"
     integer,intent(in):: myid,mpi_md_world,natm,nspin &
          ,ifcoulomb,iprint
     real(8),intent(in):: tag(natm),rc,h(3,3),chg(natm)
     character(len=3),intent(in):: specorder(nspmax)
-    real(8),intent(inout):: chi(natm)
     logical,intent(inout):: lvc 
 
     integer:: i,ierr,nspl
 
 !!$    print *,'ifcoulomb @initialize_coulomb = ',ifcoulomb
-    rho_bvs(1:nspmax,1:nspmax) = 0d0
+    rho_scr(1:nspmax,1:nspmax) = 0d0
     
 !.....Get umber of species
     nsp = nspin
@@ -145,7 +145,7 @@ contains
         call read_params(myid,mpi_md_world,ifcoulomb,iprint,lvc &
              ,specorder)
         call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
-             natm,tag,chi,chg,lvc)
+             natm,tag,chg)
       else
         call init_fc_Ewald(h,rc,myid,mpi_md_world,iprint)
       endif
@@ -153,37 +153,44 @@ contains
 
   end subroutine initialize_coulomb
 !=======================================================================
-  subroutine initialize_coulombx(natm,nspin,tag,chg,chi, &
+  subroutine initialize_coulombx(natm,nspin,tag,chg, &
        myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc, &
        specorder)
 !
 !  Allocate and initialize parameters to be used.
 !  This is called when force is 'Coulomb'
+!  The *_coulombx methods will replace *_coulomb methods in the future.
 !
     include "mpif.h"
     integer,intent(in):: myid,mpi_md_world,natm,nspin &
          ,ifcoulomb,iprint
     real(8),intent(in):: tag(natm),rc,h(3,3)
     character(len=3),intent(in):: specorder(nspmax)
-    real(8),intent(inout):: chi(natm),chg(natm)
+    real(8),intent(inout):: chg(natm)
     logical,intent(inout):: lvc 
 
     integer:: i,is,ierr,nspl
 
-    rho_bvs(1:nspmax,1:nspmax) = 0d0
-    
+    rho_scr(1:nspmax,1:nspmax) = 0d0
+
 !.....Get umber of species
     nsp = nspin
 
     call read_paramsx(myid,mpi_md_world,iprint,specorder)
-    
+
     if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
+      lvc = .true.
+    endif
+
+    if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
+      if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
 !.....Variable-charge Coulomb with Gaussian distribution charges
 !     which ends-up long-range-only Ewald summation
-      call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
-           natm,tag,chi,chg,lvc)
-    else if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
-      call init_fc_Ewald(h,rc,myid,mpi_md_world,iprint)
+        call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
+             natm,tag,chg)
+      else
+        call init_fc_Ewald(h,rc,myid,mpi_md_world,iprint)
+      endif
     endif
 
   end subroutine initialize_coulombx
@@ -262,7 +269,7 @@ contains
   end subroutine init_fc_Ewald
 !=======================================================================
   subroutine init_vc_Ewald(myid,mpi_world,ifcoulomb,iprint,h,rc,&
-       natm,tag,chi,chg,lvc)
+       natm,tag,chg)
 !
 !  Since variable-charge potential with Gaussian distribution charges
 !  is mostly identical to the long-range part of Ewald summation,
@@ -274,19 +281,14 @@ contains
     integer,intent(in):: myid,mpi_world,ifcoulomb,iprint
     integer,intent(in):: natm
     real(8),intent(in):: h(3,3),rc,tag(natm),chg(natm)
-    real(8),intent(inout):: chi(natm)
-    logical,intent(inout):: lvc
 
     integer:: i,isp,ik,k1,k2,k3,is
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min,sgm_rcmd
     real(8),external:: absv
 
-    lvc = .true.
-
-    do i=1,natm
-      is = int(tag(i))
-      chi(i) = vcg_chi(is)
-    enddo
+      do i=1,natm
+        is = int(tag(i))
+      enddo
 
 !!$    if( ifcoulomb.eq.2 ) then
 !!$      sgm_ew = rc/sqrt(2d0*pacc)
@@ -311,7 +313,7 @@ contains
 !.....If long-range term exists, self interaction should be added to Jii.
     if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
       do is=1,nspmax
-        vcg_jii(is) = vcg_jii(is) -acc*sqrt(2d0/pi) /vcg_sgm(is)
+        vc_jii(is) = vc_jii(is) -acc*sqrt(2d0/pi) /vcg_sgm(is)
       enddo
     endif
 !.....Detect minimum sigma to determine k-max
@@ -424,7 +426,7 @@ contains
 
 !!$    if( allocated(rad_bvs) ) deallocate(rad_bvs,npq_bvs,vid_bvs,rho_bvs)
 !!$    allocate(rad_bvs(nspmax),npq_bvs(nspmax),vid_bvs(nspmax) &
-!!$         ,rho_bvs(nspmax,nspmax))
+!!$         ,rho_scr(nspmax,nspmax))
     if( myid.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
@@ -485,10 +487,10 @@ contains
 !.....Set screening length
       do isp=1,nsp
         do jsp=1,nsp
-          rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
-!!$            rho_bvs(isp,jsp) = 2d0
+          rho_scr(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+!!$            rho_scr(isp,jsp) = 2d0
           if( iprint.ge.ipl_basic .and. interact(isp,jsp) .and. jsp.ge.isp ) then
-            write(6,'(a,2i5,f10.4)') '   isp,jsp,rho_bvs= ',isp,jsp,rho_bvs(isp,jsp)
+            write(6,'(a,2i5,f10.4)') '   isp,jsp,rho_scr= ',isp,jsp,rho_scr(isp,jsp)
           endif
         enddo
       enddo
@@ -498,10 +500,10 @@ contains
     call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(rho_bvs,nspmax*nspmax,mpi_real8 &
+    call mpi_bcast(rho_scr,nspmax*nspmax,mpi_real8 &
          ,0,mpi_world,ierr)
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
-!.....end of screend_bvs
+!.....end of screened_bvs
   end subroutine read_params_sc
 !=======================================================================
   subroutine read_params_vc(myid,mpi_world,ifcoulomb,iprint, &
@@ -520,8 +522,8 @@ contains
     character(len=5):: cname
     character(len=3):: cspi,cspj
 
-!!$      if( allocated(vcg_chi) ) deallocate(vcg_chi,vcg_jii,sgm,vcg_e0)
-!!$      allocate( vcg_chi(nspmax), vcg_jii(nspmax), sgm(nspmax), vcg_e0(nspmax))
+!!$      if( allocated(vc_chi) ) deallocate(vc_chi,vc_jii,sgm,vc_e0)
+!!$      allocate( vc_chi(nspmax), vc_jii(nspmax), sgm(nspmax), vc_e0(nspmax))
     if( myid.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
@@ -541,9 +543,9 @@ contains
         read(ioprms,*,end=20) cspi, dchi,djii,sgmt,de0,qlow,qup
         isp = csp2isp(trim(cspi))
         if( isp.gt.0 ) then
-          vcg_chi(isp) = dchi
-          vcg_jii(isp) = djii
-          vcg_e0(isp) = de0
+          vc_chi(isp) = dchi
+          vc_jii(isp) = djii
+          vc_e0(isp) = de0
           vcg_sgm(isp) = sgmt
           qlower(isp) = qlow
           qupper(isp) = qup
@@ -557,9 +559,9 @@ contains
 20    close(ioprms)
     endif  ! myid
 !!$    call mpi_bcast(sgm,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vcg_e0,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vc_chi,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vc_jii,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vc_e0,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vcg_sgm,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
@@ -581,7 +583,8 @@ contains
     character(len=3):: cname,csp,cspj,cspi
     integer:: i,ierr,jerr,isp,jsp,npq,nentry
     real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
-         ,vcgjiimin,sgmlim, rin,rout,rhoij
+         ,vcgjiimin,sgmlim, rin,rout,rhoij, rhoii
+    logical:: rhoii_set, rhoij_set, rad_set
 
 !!$    if( params_read ) return
 
@@ -589,13 +592,14 @@ contains
 !.....Initialization
       interact(1:nspmax,1:nspmax) = .true.
       ispflag(1:nspmax) = .false.
-      vcg_chi(1:nspmax) = 0d0
-      vcg_jii(1:nspmax) = 0d0
-      vcg_e0(1:nspmax) = 0d0
+      vc_chi(1:nspmax) = 0d0
+      vc_jii(1:nspmax) = 0d0
+      vc_e0(1:nspmax) = 0d0
       vcg_sgm(1:nspmax) = 0d0
       qlower(1:nspmax) = 0d0
       qupper(1:nspmax) = 0d0
-      rho_bvs(:,:) = -1d0
+      rho_scr(:,:) = -1d0
+      rad_bvs(:) = -1d0
       cmode = 'none'
 !.....File name
       fname = trim(paramsdir)//'/'//trim(paramsfname)
@@ -642,7 +646,7 @@ contains
                trim(cterms).ne.'long' .and. &
                trim(cterms).ne.'direct' .and. &
                trim(cterms).ne.'direct_cut' .and. &
-               trim(cterms).ne.'screened_cut') then
+               trim(cterms).ne.'screened_cut' ) then
             print *,'ERROR: terms should have an argument of '//&
                  'either direct_cut, screened_cut, full, short, or long.'
             stop
@@ -695,13 +699,20 @@ contains
             rad_bvs(isp) = rad
           endif
           cycle
+        else if( trim(cline).eq.'rhoii_screened_cut' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cspi, rhoii
+          isp = csp2isp(trim(cspi))
+          rho_scr(isp,isp) = rhoii
+          if( iprint.ge.ipl_info ) print '(1x,a,3x,a,1x,f7.3)',trim(ctmp),trim(cspi),rhoii
+          cycle
         else if( trim(cline).eq.'rhoij_screened_cut' ) then
           backspace(ioprms)
           read(ioprms,*) ctmp, cspi, cspj, rhoij
           isp = csp2isp(trim(cspi))
           jsp = csp2isp(trim(cspj))
-          rho_bvs(isp,jsp) = rhoij
-          rho_bvs(jsp,isp) = rhoij
+          rho_scr(isp,jsp) = rhoij
+          rho_scr(jsp,isp) = rhoij
           if( iprint.ge.ipl_info ) print *,trim(ctmp),trim(cspi) &
                ,trim(cspj),rhoij
           cycle
@@ -725,9 +736,6 @@ contains
             end if
           else if( trim(cchgs).eq.'fixed_bvs' ) then
             read(ioprms,*) csp,vid,rad,npq
-!!$            if( isp.gt.nsp .and. iprint.ge.ipl_basic ) then
-!!$              print *,'WARNING: isp.gt.nsp !!!  isp = ',isp
-!!$            endif
             isp = csp2isp(trim(csp))
             if( isp.gt.0 ) then
               ispflag(isp) = .true.
@@ -748,9 +756,9 @@ contains
             isp = csp2isp(trim(csp))
             if( isp.gt.0 ) then
               ispflag(isp) = .true.
-              vcg_chi(isp) = dchi
-              vcg_jii(isp) = djii
-              vcg_e0(isp) = de0
+              vc_chi(isp) = dchi
+              vc_jii(isp) = djii
+              vc_e0(isp) = de0
               qlower(isp) = qlow
               qupper(isp) = qup
               if( iprint.ge.ipl_basic ) then
@@ -798,7 +806,7 @@ contains
       if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
         vcgjiimin = 1d+30
         do isp=1,nsp
-          vcgjiimin = min(vcgjiimin,vcg_jii(isp))
+          vcgjiimin = min(vcgjiimin,vc_jii(isp))
         enddo
         sgmlim = acc*sqrt(2d0/pi)/vcgjiimin
         if( sgm_ew.lt.sgmlim ) then
@@ -810,26 +818,53 @@ contains
         endif
       endif
 
-!.....Set screening length
+!.....Set screening length in the case of screened_cut
       if( trim(cterms).eq.'screened_cut' ) then
-        if( trim(cchgs).eq.'fixed_bvs' ) then
-          do isp=1,nsp
-            do jsp=1,nsp
-              rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
-            enddo
+        rhoii_set = .true.
+        rhoij_set = .true.
+        rad_set = .true.
+        do isp=1,nsp
+          if( rho_scr(isp,isp).lt.0d0 ) rhoii_set = .false.
+          if( rad_bvs(isp).lt.0d0 ) rad_set = .false.
+          do jsp=1,nsp
+            if( isp.eq.jsp ) cycle
+            if( rho_scr(isp,jsp).lt.0d0 ) rhoij_set = .false.
           enddo
-        else if( rho_screened_cut.lt.0d0 ) then
+        enddo
+        
+        if( trim(cchgs).eq.'fixed_bvs' ) then
+          if( iprint.ge.ipl_basic ) print '(a)', ' rhoij are set from given rads of fixed_bvs entries.'
           do isp=1,nsp
             do jsp=1,nsp
-              rho_bvs(isp,jsp) = rad_bvs(isp)+rad_bvs(jsp)
+              rho_scr(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
             enddo
           enddo
         else
-          do isp=1,nsp
-            do jsp=1,nsp
-              if( rho_bvs(isp,jsp).lt.0d0 ) rho_bvs(isp,jsp) = rho_screened_cut
+          if( rad_set ) then
+            if( iprint.ge.ipl_basic ) print '(a)', ' rhoij are set from given rad info.'
+            do isp=1,nsp
+              do jsp=1,nsp
+                rho_scr(isp,jsp) = rad_bvs(isp)+rad_bvs(jsp)
+              enddo
             enddo
-          enddo
+          else if( .not.rhoij_set .and. rhoii_set ) then
+            if( iprint.ge.ipl_basic ) print '(a)', ' rhoij are set from given rhoii info as ' &
+                 //'rhoij=(rhoi + rhoj)/2.'
+            do isp=1,nsp
+              do jsp=1,nsp
+                if( isp.eq.jsp ) cycle
+                rho_scr(isp,jsp) = (rho_scr(isp,isp) +rho_scr(jsp,jsp)) /2
+              enddo
+            enddo
+          else
+            if( iprint.ge.ipl_basic ) print '(a,f7.3,a)', ' rhoij are set from a unique rho (=', &
+                 rho_screened_cut, ')'
+            do isp=1,nsp
+              do jsp=1,nsp
+                if( rho_scr(isp,jsp).lt.0d0 ) rho_scr(isp,jsp) = rho_screened_cut
+              enddo
+            enddo
+          endif
         endif
       endif
       
@@ -842,9 +877,9 @@ contains
   
     call mpi_bcast(schg0,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(schg,nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vcg_chi,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vcg_jii,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vcg_e0,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vc_chi,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vc_jii,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vc_e0,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
@@ -860,18 +895,18 @@ contains
     call mpi_bcast(conv_eps,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_screened_cut,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rho_bvs,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rho_scr,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
 
     if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
       if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
         do isp=1,nsp
           cspi = specorder(isp)
           do jsp=isp,nsp
-!!$            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
-!!$            rho_bvs(isp,jsp) = 2d0
+!!$            rho_scr(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+!!$            rho_scr(isp,jsp) = 2d0
             if( interact(isp,jsp) ) then
               cspj = specorder(jsp)
-              write(6,'(a,2a5,f10.4)') '   cspi,cspj,rho_bvs= ',trim(cspi),trim(cspj),rho_bvs(isp,jsp)
+              write(6,'(a,2a5,f10.4)') '   cspi,cspj,rho_scr= ',trim(cspi),trim(cspj),rho_scr(isp,jsp)
             endif
           enddo
         enddo
@@ -895,7 +930,7 @@ contains
   end subroutine read_paramsx
 !=======================================================================
   subroutine force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,chi,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
+       ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
        ,myparity,nn,sv,rc,lspr,d2lspr,sorg &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc,specorder)
@@ -913,7 +948,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),chi(namax),sorg(3),d2lspr(nnmax,namax)
+         ,tag(namax),sv(3,6),sorg(3),d2lspr(nnmax,namax)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -982,7 +1017,7 @@ contains
     eself = 0d0
 
     if( lvc .or. trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
-      call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
+      call self_term(namax,natm,tag,chg,epi,eselfl,iprint,lvc)
       call mpi_allreduce(eselfl,eself,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
 
@@ -1029,7 +1064,7 @@ contains
         print '(a,f12.4)',' Direct Coulomb energy = ',esr
       else
         print *,''
-        print *,'Ewald energy term by term:'
+        print *,'Ewald energy by terms:'
         print '(a,f12.4," eV")','   Self term         = ',eself
         print '(a,f12.4," eV")','   Short-range term  = ',esr
         print '(a,f12.4," eV")','   Long-range term   = ',elr
@@ -1127,7 +1162,7 @@ contains
         dij= sqrt(dij2)
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
-        rhoij = rho_bvs(is,js)
+        rhoij = rho_scr(is,js)
         terfc = erfc(dij/rhoij)
         terfcc = erfc(rc/rhoij)
         vrc = acc*qi*qj/rc *terfcc
@@ -1243,7 +1278,7 @@ contains
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
-        rhoij = rho_bvs(is,js)
+        rhoij = rho_scr(is,js)
         terfc = erfc(dij/rhoij)
 !.....potential
         tmp= 0.5d0 *acc *qi*qj*diji *terfc
@@ -1289,7 +1324,7 @@ contains
   end subroutine force_screened_Coulomb_old
 !=======================================================================
   subroutine force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,chi,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
+       ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
        ,myparity,nn,sv,rc,lspr,d2lspr,sorg &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc)
@@ -1307,7 +1342,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),chi(namax),sorg(3),d2lspr(nnmax,namax)
+         ,tag(namax),sv(3,6),sorg(3),d2lspr(nnmax,namax)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -1348,7 +1383,7 @@ contains
 
     strsl(1:3,1:3,1:namax) = 0d0
 
-    call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
+    call self_term(namax,natm,tag,chg,epi,eselfl,iprint,lvc)
 
     call Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
          ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc)
@@ -1379,7 +1414,7 @@ contains
   end subroutine force_Ewald
 !=======================================================================
   subroutine force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,chi,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
+       ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
        ,myparity,nn,sv,rc,lspr,sorg &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc)
@@ -1397,7 +1432,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),chi(namax),sorg(3)
+         ,tag(namax),sv(3,6),sorg(3)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -1429,7 +1464,7 @@ contains
 
     strsl(1:3,1:3,1:namax) = 0d0
 
-    call Ewald_self(namax,natm,tag,chg,chi,epi,eselfl,iprint,lvc)
+    call self_term(namax,natm,tag,chg,epi,eselfl,iprint,lvc)
     
     call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
          lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs,lcell_updated)
@@ -1609,17 +1644,14 @@ contains
   subroutine force_screened_cut(namax,natm,tag,ra,nnmax,aa,strsl &
        ,chg,h,hi,lspr,d2lspr,epi,esrl,iprint,lstrs,rc,l1st)
 !
-!  Screened Coulomb with cutoff that uses rho_bvs.
+!  Screened Coulomb with cutoff that uses rho_scr.
 !  smoothing using vrc and dVdrc where
 !    V_smooth(r) = V(r) -V(rc) -(r-rc)*dVdrc
 !
-!!$    use ZBL,only: zeta,dzeta
-!!$    use ZBL,only: interact_zbl => interact
     use util,only: itotOf
     implicit none
     include "mpif.h"
     include "./params_unit.h"
-!!$    include "params_BVS_Morse.h"
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc,tag(namax), &
@@ -1629,7 +1661,7 @@ contains
          ,epi(namax),esrl
     logical,intent(in):: lstrs,l1st
 
-    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
+    integer:: i,j,jj,k,kk,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
     integer:: itot,jtot
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
          ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp &
@@ -1643,7 +1675,7 @@ contains
       do is=1,nspmax
         do js=is,nspmax
           if( .not.interact(is,js) ) cycle
-          rhoij = rho_bvs(is,js)
+          rhoij = rho_scr(is,js)
           terfcc = erfc(rc/rhoij)
           vrc = acc /rc *terfcc
           dvdrc = -acc /rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
@@ -1665,9 +1697,9 @@ contains
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
       qi= chg(i)
-      do k=1,lspr(0,i)
-        if( d2lspr(k,i).ge.rc2 ) cycle
-        j=lspr(k,i)
+      do jj=1,lspr(0,i)
+        if( d2lspr(jj,i).ge.rc2 ) cycle
+        j=lspr(jj,i)
         if(j.eq.0) exit
 !!$        if(j.le.i) cycle
         js= int(tag(j))
@@ -1682,7 +1714,7 @@ contains
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
-        rhoij = rho_bvs(is,js)
+        rhoij = rho_scr(is,js)
         terfc = erfc(dij/rhoij)
         vrc = qi*qj*vrcs(is,js)
         dvdrc = qi*qj*dvdrcs(is,js)
@@ -1984,16 +2016,16 @@ contains
 
   end subroutine Ewald_long
 !=======================================================================
-  subroutine Ewald_self(namax,natm,tag,chg,chi,&
+  subroutine self_term(namax,natm,tag,chg,&
        epi,eselfl,iprint,lvc)
     implicit none
     integer,intent(in):: namax,natm,iprint
     logical,intent(in):: lvc
-    real(8),intent(in):: tag(namax),chg(namax),chi(namax)
+    real(8),intent(in):: tag(namax),chg(namax)
     real(8),intent(inout):: epi(namax),eselfl
 
     integer:: i,is
-    real(8):: sgmi,qi,q2,e0,tmp
+    real(8):: sgmi,qi,q2,tmp
 
 !.....Compute self term.
     if( lvc ) then  ! variable charge
@@ -2002,8 +2034,7 @@ contains
         is = int(tag(i))
         qi = chg(i)
         q2 = qi*qi
-        e0 = vcg_e0(is)
-        tmp = e0 +chi(i)*qi +0.5d0*vcg_jii(is)*q2
+        tmp = vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2
         eselfl = eselfl +tmp
         epi(i) = epi(i) +tmp
       enddo
@@ -2018,8 +2049,8 @@ contains
         epi(i) = epi(i) -q2 /sgm_ew *acc/sqrt(2d0*pi)
       enddo
     endif
-
-  end subroutine Ewald_self
+    return
+  end subroutine self_term
 !=======================================================================
   subroutine qforce_short(namax,natm,tag,ra,nnmax,chg,h &
        ,lspr,iprint,rc,fq,esr)
@@ -2114,7 +2145,7 @@ contains
       do is=1,nspmax
         do js=is,nspmax
           if( .not.interact(is,js) ) cycle
-          rhoij = rho_bvs(is,js)
+          rhoij = rho_scr(is,js)
           terfcc = erfc(rc/rhoij)
           vrc = acc /rc *terfcc
           dvdrc = -acc /rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
@@ -2151,7 +2182,7 @@ contains
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
-        rhoij = rho_bvs(is,js)
+        rhoij = rho_scr(is,js)
         terfc = erfc(dij/rhoij)
 !!$        terfc = erfc(dij*ss2i)
         vrc = vrcs(is,js)
@@ -2246,12 +2277,12 @@ contains
     return
   end subroutine qforce_long
 !=======================================================================
-  subroutine qforce_self(namax,natm,tag,chg,chi,fq,eself)
+  subroutine qforce_self(namax,natm,tag,chg,fq,eself)
 !
 !  Derivative of self term w.r.t. charges
 !
     integer,intent(in):: namax,natm
-    real(8),intent(in):: tag(namax),chi(namax),chg(namax)
+    real(8),intent(in):: tag(namax),chg(namax)
     real(8),intent(inout):: fq(namax),eself
 
     integer:: i,is
@@ -2263,8 +2294,8 @@ contains
       qi = chg(i)
       q2 = qi*qi
       sgmi = sgm_ew
-      eself = eself +vcg_e0(is) +chi(i)*qi +0.5d0*vcg_jii(is)*q2
-      fq(i) = fq(i) -(chi(i) +vcg_jii(is)*qi)
+      eself = eself +vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2
+      fq(i) = fq(i) -(vc_chi(is) +vc_jii(is)*qi)
     enddo
 
   end subroutine qforce_self
@@ -2614,7 +2645,7 @@ contains
     deallocate(bbs)
   end subroutine setup_kspace
 !=======================================================================
-  subroutine cgopt_charge(natm,h,ra,tag,chg,chi)
+  subroutine cgopt_charge(natm,h,ra,tag,chg)
 !
 !  Charge optimization for variable-charge potential
 !  by means of conjugate gradient.
@@ -2622,7 +2653,7 @@ contains
 !  distribution is assumed for atomic charges.
 !
     integer,intent(in):: natm
-    real(8),intent(in):: h(3,3),ra(3,natm),tag(natm),chi(natm)
+    real(8),intent(in):: h(3,3),ra(3,natm),tag(natm)
     real(8),intent(inout):: chg(natm)
 
     integer:: ia,ja,k1,k2,k3,is,js,ik,ierr
@@ -2691,7 +2722,7 @@ contains
     prefac = 1d0/(4d0*pi*eps0)
     do ia=1,natm
       is = int(tag(ia))
-      djii = vcg_jii(is)
+      djii = vc_jii(is)
       sgmi = sgm(is)
       amat(ia,ia) = amat(ia,ia) +djii !-2d0 *prefac /sqrt(pi) /sgmi
     enddo
@@ -2710,7 +2741,7 @@ contains
 !.....Make X vector
     do ia=1,natm
       is = int(tag(ia))
-      xvec(ia) = -vcg_chi(is)
+      xvec(ia) = -vc_chi(is)
     enddo
     xvec(natm+1) = 0d0  ! charge neutrality, qtot = 0.0
 
@@ -2836,7 +2867,7 @@ contains
           if( vid_bvs(isp).eq.0d0 ) cycle
           do jsp=1,nspmax
             if( vid_bvs(jsp).eq.0d0 ) cycle
-            rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+            rho_scr(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
           enddo
         enddo
         
@@ -2858,8 +2889,8 @@ contains
 !!           if( vid_bvs(isp).eq.0d0 ) cycle
 !!           do jsp=1,nspmax
 !!             if( vid_bvs(jsp).eq.0d0 ) cycle
-!!             rho_bvs(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
-!! !!$          print *,'isp,jsp,rho_bvs=',isp,jsp,rho_bvs(isp,jsp)
+!!             rho_scr(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
+!! !!$          print *,'isp,jsp,rho_scr=',isp,jsp,rho_scr(isp,jsp)
 !!           enddo
 !!         enddo
 !!       endif
@@ -2963,7 +2994,7 @@ contains
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
-        rhoij = rho_bvs(isp,jsp)
+        rhoij = rho_scr(isp,jsp)
         terfc = erfc(dij/rhoij)
         terfcc = erfc(rc/rhoij)
         qj = chg(j)
@@ -3041,7 +3072,7 @@ contains
 !=======================================================================
   function dvdrho(r,rho,qi,qj)
 !
-!  Derivative screend Coulomb wrt rho.
+!  Derivative screened Coulomb wrt rho.
 !
     real(8),intent(in):: r,rho,qi,qj
     real(8):: dvdrho
