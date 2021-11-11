@@ -29,12 +29,12 @@ import subprocess
 import time
 from datetime import datetime
 
-from nappy.fitpot.fp2prms import fp2BVSx, fp2BVS, fp2Morse, read_params_Coulomb
+from nappy.fitpot.fp2prms import fp2BVSx, fp2BVS, fp2Morse, read_params_Coulomb, fp2params
 from nappy.fitpot.de import DE
 from nappy.fitpot.cs import CS
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "210106"
+__version__ = "rev211111"
 
 def read_in_fitpot(fname='in.fitpot'):
     #...initialize
@@ -47,6 +47,7 @@ def read_in_fitpot(fname='in.fitpot'):
     infp['print_level'] = 1
     infp['weights'] = {'rdf':1.0, 'adf':1.0, 'vol':1.0, 'lat':1.0}
     infp['update_vrange'] = -1
+    infp['param_file'] = 'in.vars.fitpot'
     
     mode = None
     specorder = None
@@ -57,6 +58,7 @@ def read_in_fitpot(fname='in.fitpot'):
     infp['rdf_pairs'] = rdf_pairs
     infp['adf_triplets'] = adf_triplets
     infp['match'] = []
+    infp['param_files'] = []
     
     with open(fname,'r') as f:
         lines = f.readlines()
@@ -89,9 +91,12 @@ def read_in_fitpot(fname='in.fitpot'):
                 sampledir = sampledir.replace("'",'')
             infp['sample_directory'] = sampledir
             mode = None
-        elif data[0] == 'param_file':
-            prmfile = data[1]
-            infp['param_file'] = prmfile
+        # elif data[0] == 'param_file':
+        #     prmfile = data[1]
+        #     infp['param_file'] = prmfile
+        #     mode = None
+        elif data[0] == 'param_files':
+            infp[data[0]] = [ name for name in data[1:] ]
             mode = None
         elif data[0] == 'potential':
             potential = data[1]
@@ -198,10 +203,19 @@ def write_info(infp,args):
     Write out information on input parameters for fp.
     """
 
-    print(' Parameters')
+    print(' Inputs')
     print(' ----------')
     print('   num of processes (given by --nproc option)  ',int(args['--nproc']))
-    print('   potential       {0:s}'.format(infp['potential']))
+    try:
+        if len(infp['param_files']) == 0:
+            print('   potential       {0:s}'.format(infp['potential']))
+        else:
+            print('   param_files  ',end='')
+            for fname in infp['param_files']:
+                print(f'  {fname}', end='')
+            print('')
+    except:
+        raise
     print('   specorder       ',infp['specorder'])
     fmethod = infp['fitting_method']
     print('   fitting_method  {0:s}'.format(fmethod))
@@ -629,15 +643,18 @@ def func_wrapper(variables, vranges, **kwargs):
         os.mkdir(subdir)
         shutil.copy(subjobscript,subdir+'/')
     os.chdir(subdir)
-    if 'vids' not in kwargs.keys():
-        print(kwargs.keys())
 
-    if kwargs['potential'] == 'BVSx':
-        fp2BVSx(varsfp, **kwargs)
-    elif kwargs['potential'] == 'BVS':
-        fp2BVS(varsfp, **kwargs)
-    elif kwargs['Morse'] == 'Morse':
-        fp2Morse(varsfp, **kwargs)
+    if len(kwargs['param_files']) != 0:
+        fp2params(varsfp['variables'], **kwargs)
+    else:
+        if 'vids' not in kwargs.keys():
+            print(kwargs.keys())
+        if kwargs['potential'] == 'BVSx':
+            fp2BVSx(varsfp, **kwargs)
+        elif kwargs['potential'] == 'BVS':
+            fp2BVS(varsfp, **kwargs)
+        elif kwargs['Morse'] == 'Morse':
+            fp2Morse(varsfp, **kwargs)
 
     #...Compute pmd in the subdir_###
     L_up_lim = kwargs['fval_upper_limit']
@@ -762,7 +779,6 @@ def main(args):
     triplets = get_triplets(infp['interactions'])
     rc2,rc3,vs,vrs,vrsh,options = read_vars_fitpot(infp['param_file'])
 
-
     kwargs = infp
     kwargs['options'] = options
     kwargs['hardlim'] = vrsh
@@ -790,12 +806,17 @@ def main(args):
             refdata['lat'] = (a,b,c,alp,bet,gmm)
     kwargs['refdata'] = refdata
 
-    fbvs, rads, vids, npqs, charges = read_params_Coulomb('in.params.Coulomb')
-    kwargs['fbvs'] = fbvs
-    kwargs['rads'] = rads
-    kwargs['vids'] = vids
-    kwargs['npqs'] = npqs
-    kwargs['charges'] = charges
+    if len(kwargs['param_files']) != 0: # New version of treating in.params.XXX files
+        for fname in kwargs['param_files']:
+            with open(fname,'r') as f:
+                kwargs[fname] = f.read()
+    else:
+        fbvs, rads, vids, npqs, charges = read_params_Coulomb('in.params.Coulomb')
+        kwargs['fbvs'] = fbvs
+        kwargs['rads'] = rads
+        kwargs['vids'] = vids
+        kwargs['npqs'] = npqs
+        kwargs['charges'] = charges
 
     maxiter = kwargs['num_iteration']
     if kwargs['fitting_method'] in ('de','DE'):

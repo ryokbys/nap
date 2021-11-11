@@ -3,7 +3,7 @@
 Convert fitpot parameters `in.vars.fitpot` to pmd param file `in.params.XXX`.
 
 Usage:
-  fp2prms.py (Morse|BVSx|BVS) [options] IN_VARS_FITPOT
+  fp2prms.py [options] <pot-type> <in-file>
 
 Options:
   -h, --help  Show this message and exit.
@@ -23,9 +23,9 @@ import os
 from docopt import docopt
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "rev190827"
+__version__ = "rev211111"
 
-def read_in_fitpot(infname='in.fitpot'):
+def read_in_fitpot2(infname='in.fitpot'):
     """
     Get specorder, pairs, triplets from in.fitpot.
     """
@@ -38,6 +38,7 @@ def read_in_fitpot(infname='in.fitpot'):
     mode = None
     specorder = []
     interact = []
+    param_files = []
     for line in lines:
         data = line.split()
         if len(data) == 0:
@@ -53,6 +54,9 @@ def read_in_fitpot(infname='in.fitpot'):
             num_interact = int(data[1])
             mode = 'interactions'
             continue
+        elif data[0] == 'param_files':
+            param_files = [ name for name in data[1:] ]
+            mode = None
         else:
             if mode == 'interactions':
                 if len(data) not in (2,3):
@@ -63,7 +67,7 @@ def read_in_fitpot(infname='in.fitpot'):
             else:
                 mode = None
 
-    return specorder, interact
+    return specorder, interact, param_files
     
 
 def read_params_Coulomb(infname):
@@ -376,20 +380,50 @@ def fp2BVSx(varsfp, **kwargs):
 
     return None
 
+def fp2params(vs,**kwargs):
+    """
+    Conversion from fp-vars to files specified in param_files in in.fitpot.
+    The param_files should contain key-phrases such as '{p[0]}' that are converted from fp-vars,
+    and the indices in the key-phrases must correspond to those in fp-vars..
+    """
+    try:
+        param_fnames = kwargs['param_files']
+    except:
+        raise
+    if type(param_fnames) != list or len(param_fnames) < 1:
+        raise ValueError('MD_param_files may not be specified correctly...')
+        
+    for fname in param_fnames:
+        try:
+            fcontents = kwargs[fname]
+            new_contents = fcontents.format(p=vs)
+        except:
+            print(fcontents)
+            raise
+        with open(fname,'w') as f:
+            f.write(new_contents)
+    return None
 
 if __name__ == "__main__":
+    from nappy.fitpot.fp import read_in_fitpot
 
     args = docopt(__doc__)
-    infname = args['IN_VARS_FITPOT']
+    # print(args)
+    infname = args['<in-file>']
+    pot_type = args['<pot-type>']
     pairs = args['--pairs'].split(',')
     pairs = [ pair.split('-') for pair in pairs ]
     triplets = args['--triplets'].split(',')
     triplets = [ t.split('-') for t in triplets ]
     specorder = args['--specorder'].split(',')
 
-    if specorder[0] == 'None':
+
+    if specorder[0] == 'None' or args['map']:
         try:
-            specorder, interact = read_in_fitpot('in.fitpot')
+            #specorder, interact, param_files = read_in_fitpot('in.fitpot')
+            infp = read_in_fitpot('in.fitpot')
+            interact = infp['interactions']
+            specorder = infp['specorder']
             pairs = []
             triplets = []
             for i in interact:
@@ -397,11 +431,11 @@ if __name__ == "__main__":
                     pairs.append(i)
                 elif len(i) == 3:
                     triplets.append(i)
-            print(' specorder, pairs and triplets are loaded from in.fitpot')
-        except Exception as e:
-            raise Exception('specorder and pair must be specified or loaded.')
+            print(' Loaded some inifo from in.fitpot')
+        except:
+            raise Exception('Something wrong with reading in.fitpot.')
     else:
-        print(' Since the specorder is provided, in.fitpot was not loaded.')
+        print(' in.fitpot was not loaded.')
 
     if len(pairs) == 0:
         raise ValueError('Pairs must be specified.')
@@ -415,15 +449,14 @@ if __name__ == "__main__":
     
     # pairs = sort_pairs(pairs,specorder)
 
-    kwargs = {}
-    kwargs['specorder'] = specorder
+    kwargs = infp
     kwargs['pairs'] = pairs
-    if args['Morse']:
-        varsfp = read_vars_fitpot(infname)
+    varsfp = read_vars_fitpot(infname)
+    if pot_type == 'Morse':
         fp2Morse(varsfp, **kwargs)
         print(' Wrote in.params.Morse')
 
-    elif args['BVS']:
+    elif pot_type == 'BVS':
         """
         The term 'BVS' means that the in.var.fitpot file contains 
         fbvs, species radius and Morse parameters.
@@ -437,11 +470,10 @@ if __name__ == "__main__":
             kwargs['charges'] = charges
         except Exception as e:
             pass
-        varsfp = read_vars_fitpot(infname)
         fp2BVS(varsfp, **kwargs)
         print(' Wrote in.params.{Morse,Coulomb}')
         
-    elif args['BVSx']:
+    elif pot_type == 'BVSx':
         """
         The term 'BVSx' means that the in.var.fitpot file contains 
         fbvs, species radius, Morse and angular parameters.
@@ -457,7 +489,24 @@ if __name__ == "__main__":
         except Exception as e:
             pass
         
-        varsfp = read_vars_fitpot(infname)
         fp2BVSx(varsfp, **kwargs)
         print(' Wrote in.params.{Morse,Coulomb,angular}')
         
+    elif pot_type == 'map':
+        """
+        The keyword map specifies that the in.params.XXX files contain entries such as '{p[0]}' 
+        that are to be replaced.
+        """
+        param_files = infp['param_files']
+        for pfile in param_files:
+            with open(pfile,'r') as f:
+                kwargs[pfile] = f.read()
+            os.system(f'cp -f {pfile} {pfile}.bak')
+        fp2params(varsfp['variables'], **kwargs)
+        print(' Wrote the following files:')
+        for pfile in param_files:
+            print(f'   - {pfile}')
+        print('')
+        
+    else:
+        print(f' No such pot_type: {pot_type}')
