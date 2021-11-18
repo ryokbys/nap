@@ -29,6 +29,7 @@ import sys
 import numpy as np
 from docopt import docopt
 import copy
+from datetime import datetime
 
 from nappy.napsys import NAPSystem
 from nappy.common import get_key

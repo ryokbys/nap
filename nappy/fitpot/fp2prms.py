@@ -437,62 +437,11 @@ if __name__ == "__main__":
     else:
         print(' in.fitpot was not loaded.')
 
-    if len(pairs) == 0:
-        raise ValueError('Pairs must be specified.')
-    print(' Pairs to be extracted:')
-    for pair in pairs:
-        print('   {0:s}-{1:s}'.format(*pair))
-    if len(triplets) != 0:
-        print(' Triplets to be extracted:')
-        for t in triplets:
-            print('   {0:s}-{1:s}-{2:s}'.format(*t))
-    
     # pairs = sort_pairs(pairs,specorder)
 
     kwargs = infp
-    kwargs['pairs'] = pairs
     varsfp = read_vars_fitpot(infname)
-    if pot_type == 'Morse':
-        fp2Morse(varsfp, **kwargs)
-        print(' Wrote in.params.Morse')
-
-    elif pot_type == 'BVS':
-        """
-        The term 'BVS' means that the in.var.fitpot file contains 
-        fbvs, species radius and Morse parameters.
-        Thus in this case, specorder should be specified.
-        """
-        #...If there is an old in.params.Coulomb file, get Vid and npq from it
-        try:
-            fbvs0,rads0,vids0,npqs0,charges = read_params_Coulomb('in.params.Coulomb')
-            kwargs['vids'] = vids0
-            kwargs['npqs'] = npqs0
-            kwargs['charges'] = charges
-        except Exception as e:
-            pass
-        fp2BVS(varsfp, **kwargs)
-        print(' Wrote in.params.{Morse,Coulomb}')
-        
-    elif pot_type == 'BVSx':
-        """
-        The term 'BVSx' means that the in.var.fitpot file contains 
-        fbvs, species radius, Morse and angular parameters.
-        Thus in this case, specorder, pairs and triplets should be specified.
-        """
-        kwargs['triplets'] = triplets
-        #...If there is an old in.params.Coulomb file, get Vid and npq from it
-        try:
-            fbvs0,rads0,vids0,npqs0,charges = read_params_Coulomb('in.params.Coulomb')
-            kwargs['vids'] = vids0
-            kwargs['npqs'] = npqs0
-            kwargs['charges'] = charges
-        except Exception as e:
-            pass
-        
-        fp2BVSx(varsfp, **kwargs)
-        print(' Wrote in.params.{Morse,Coulomb,angular}')
-        
-    elif pot_type == 'map':
+    if pot_type == 'map':
         """
         The keyword map specifies that the in.params.XXX files contain entries such as '{p[0]}' 
         that are to be replaced.
@@ -507,6 +456,56 @@ if __name__ == "__main__":
         for pfile in param_files:
             print(f'   - {pfile}')
         print('')
-        
     else:
-        print(f' No such pot_type: {pot_type}')
+        if len(pairs) == 0:
+            raise ValueError('Pairs must be specified.')
+        print(' Pairs to be extracted:')
+        for pair in pairs:
+            print('   {0:s}-{1:s}'.format(*pair))
+        if len(triplets) != 0:
+            print(' Triplets to be extracted:')
+            for t in triplets:
+                print('   {0:s}-{1:s}-{2:s}'.format(*t))
+    
+                kwargs['pairs'] = pairs
+        if pot_type == 'Morse':
+            fp2Morse(varsfp, **kwargs)
+            print(' Wrote in.params.Morse')
+
+        elif pot_type == 'BVS':
+            """
+            The term 'BVS' means that the in.var.fitpot file contains 
+            fbvs, species radius and Morse parameters.
+            Thus in this case, specorder should be specified.
+            """
+            #...If there is an old in.params.Coulomb file, get Vid and npq from it
+            try:
+                fbvs0,rads0,vids0,npqs0,charges = read_params_Coulomb('in.params.Coulomb')
+                kwargs['vids'] = vids0
+                kwargs['npqs'] = npqs0
+                kwargs['charges'] = charges
+            except Exception as e:
+                pass
+            fp2BVS(varsfp, **kwargs)
+            print(' Wrote in.params.{Morse,Coulomb}')
+            
+        elif pot_type == 'BVSx':
+            """
+            The term 'BVSx' means that the in.var.fitpot file contains 
+            fbvs, species radius, Morse and angular parameters.
+            Thus in this case, specorder, pairs and triplets should be specified.
+            """
+            kwargs['triplets'] = triplets
+            #...If there is an old in.params.Coulomb file, get Vid and npq from it
+            try:
+                fbvs0,rads0,vids0,npqs0,charges = read_params_Coulomb('in.params.Coulomb')
+                kwargs['vids'] = vids0
+                kwargs['npqs'] = npqs0
+                kwargs['charges'] = charges
+            except Exception as e:
+                pass
+            
+            fp2BVSx(varsfp, **kwargs)
+            print(' Wrote in.params.{Morse,Coulomb,angular}')
+        else:
+            print(f' No such pot_type: {pot_type}')

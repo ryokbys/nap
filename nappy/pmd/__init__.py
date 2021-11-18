@@ -34,7 +34,7 @@ def str2char(string,nlen):
 class PMD:
 
     def __init__(self, nsys=None):
-        if 'nappy.pmd.pmd_wrapper' not in sys.modules:
+        if not ('nappy.pmd.pmd_wrapper' in sys.modules or 'pw' in sys.modules):
             raise ImportError('pmd_wrapper is not loaded.\n'
                               +'Probably you need to compile it at nap/nappy/pmd/.')
         self.params = nappy.pmd.inpmd.get_default()

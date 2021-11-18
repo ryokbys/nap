@@ -1,6 +1,6 @@
 module Buckingham
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-07-07 13:17:05 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-16 14:29:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Buckingham calculation
 !    - only force on i is considered, no need to send back
@@ -26,6 +26,13 @@ module Buckingham
   logical:: lprmset_Buckingham
   
 contains
+!=======================================================================
+  subroutine init_Buckingham()
+    implicit none
+
+    return
+  end subroutine init_Buckingham
+!=======================================================================
   subroutine force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
@@ -148,13 +155,22 @@ contains
     return
   end subroutine force_Buckingham
 !=======================================================================
-  subroutine init_Buckingham()
-    implicit none
-
-    return
-  end subroutine init_Buckingham
-!=======================================================================
   subroutine read_params_Buckingham(myid_md,mpi_md_world,iprint)
+!
+!  Read potential parameters from in.params.Buckingham.
+!  Potential function shape is written as,
+!  
+!      phi(r) = A*exp( -r/rho) -C/r^6,    for r < rc
+!  
+!  The file format is like below:
+!-----------------------------------------------------------------------
+!  #  Buckingham potential parameters for garnet LLZ
+!  #  cspi, cspj, Aij(eV), rhoij(Ang), cij(eV/Ang^6)
+!     Li    O      876.86      0.2433      0.0
+!     La    O    14509.63      0.2438     30.83
+!     Zr    O     1366.09      0.3181      0.0
+!     O     O     4869.99      0.2402     27.22
+!-----------------------------------------------------------------------
     implicit none
     include 'mpif.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
@@ -171,7 +187,7 @@ contains
       buck_a(1:nspmax,1:nspmax) = 0d0
       buck_rho(1:nspmax,1:nspmax) = 0d0
       buck_c(1:nspmax,1:nspmax) = 0d0
-      write(6,'(/,a)') ' Buckingham parameters:'
+      if( iprint.ge.ipl_basic ) write(6,'(/,a)') ' Buckingham parameters:'
       do while(.true.)
         read(ioprms,*,end=10) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
@@ -185,7 +201,7 @@ contains
           buck_rho(isp,jsp) = rho
           buck_c(isp,jsp) = c
           interact(isp,jsp) = .true.
-          if( iprint.ge.ipl_info ) then
+          if( iprint.ge.ipl_basic ) then
             write(6,'(a,2a4,3f10.3)') '   cspi,cspj,A,rho,C = ',trim(cspi),trim(cspj),a,rho,c
           endif
 !.....Symmetrize parameters

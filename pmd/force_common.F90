@@ -234,7 +234,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
   if( use_force('EAM') ) then
     tmp = mpi_wtime()
     call force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h &
-       ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
+       ,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     call accum_time('force_EAM',mpi_wtime() -tmp)
   endif
@@ -1203,6 +1203,8 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
   real(8),parameter:: alpha0 = 0.1d0
   real(8),parameter:: falpha = 0.99d0
   real(8),parameter:: dtmax  = dt_dampopt*10
+!.....small value for checking range
+  real(8),parameter:: qeps   = 1d-10
 
   integer,external:: count_nonfixed
 
@@ -1227,12 +1229,13 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
 
   lqfix(1:namax) = .false.
   call impose_qtot(namax,natm,chg,qtot,lqfix,myid,mpi_md_world)
+!.....Fix charges to make them within the given ranges per species
   do i=1,natm
     is = int(tag(i))
-    if( chg(i).gt.qupper(is) ) then
+    if( chg(i).gt.qupper(is)+qeps ) then
       chg(i) = qupper(is)
       lqfix(i) = .true.
-    else if( chg(i).lt.qlower(is) ) then
+    else if( chg(i).lt.qlower(is)-qeps ) then
       chg(i) = qlower(is)
       lqfix(i) = .true.
     endif
@@ -1349,13 +1352,15 @@ subroutine dampopt_charge(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
     eself = 0d0
     fq(1:namax) = 0d0
     call impose_qtot(namax,natm,chg,qtot,lqfix,myid,mpi_md_world)
+!.....Fix charges to make them within the given ranges
+    lqfix(:) = .false.
     do i=1,natm
       if( lqfix(i) ) cycle
       is = int(tag(i))
-      if( chg(i).gt.qupper(is) ) then
+      if( chg(i).gt.qupper(is)+qeps ) then
         chg(i) = qupper(is)
         lqfix(i) = .true.
-      else if( chg(i).lt.qlower(is) ) then
+      else if( chg(i).lt.qlower(is)-qeps ) then
         chg(i) = qlower(is)
         lqfix(i) = .true.
       endif

@@ -32,18 +32,19 @@ import nappy
 _default_specorder=['Si']
 
 
-def make_sc(latconst=1.0):
+def make_sc(latconst=1.0,specorder=None):
     """
     Make a cell of simple cubic structure.
     """
-    s= NAPSystem(specorder=_default_specorder)
+    if specorder is None:
+        raise ValueError('specorder must be given.')
+    s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.0, 0.0 ])
     a3= np.array([ 0.0, 0.0, 1.0 ])
     s.set_lattice(latconst,a1,a2,a3)
-    symbol = _default_specorder[0]
-    symbols = [ symbol ]
+    symbols = [ specorder[0] ]
     poss = [[0.00, 0.00, 0.00]]
     vels = [[0., 0., 0.]]
     frcs = [[0., 0., 0.]]
@@ -56,7 +57,7 @@ def make_bcc(latconst=1.0,specorder=None):
     Make a cell of bcc structure with z along [001].
     """
     if specorder is None:
-        specorder = ['Fe']
+        raise ValueError('specorder must be given.')
     s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
@@ -381,7 +382,7 @@ def make_wurtzite(latconst=1.0,specorder=None,celltype='conventional'):
 if __name__ == "__main__":
 
     args= docopt(__doc__)
-
+    print(args)
     # nx= int(args['--nx'])
     # ny= int(args['--ny'])
     # nz= int(args['--nz'])
@@ -395,8 +396,9 @@ if __name__ == "__main__":
         specorder = None
 
     struct= None
+    print('specorder = ',specorder)
     if args['sc']:
-        struct= make_sc(latconst)
+        struct= make_sc(latconst,specorder)
     elif args['bcc']:
         if orient == [0,0,1]:
             struct= make_bcc(latconst,specorder)

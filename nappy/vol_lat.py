@@ -12,7 +12,7 @@ Options:
               If this is -1, vol and lat of the final step are taken. [default: 0]
   --out4fp    Flag to write out in general fp.py format. [default: Fault]
   --prefix PREFIX
-              Prefix for output files. [default: pmd]
+              Prefix for output files. [default: data.pmd]
 """
 from __future__ import print_function
 
@@ -37,7 +37,8 @@ def nsys2lat(nsys):
 def main(args):
 
     files = args['FILES']
-    files.sort(key=get_key, reverse=True)
+    if len(files) > 1:
+        files.sort(key=get_key, reverse=True)
     nskip = int(args['--skip'])
     del files[:nskip]
     prefix = args['--prefix']

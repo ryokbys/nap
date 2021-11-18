@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-Compute formation enthalpy from given structures using pmd.
+Compute formation enthalpy from given structures.
 The 1st file in the arguments is the product and the following files are the reactants.
-If --ergs option is specified, pmd will not be performed and use the energies instead.
+If --ergs option is not specified, pmd will be performed to get energies.
 
 Usage:
   fenthalpy.py [options] FILES [FILES...]
@@ -12,11 +12,13 @@ Options:
   --dry        Dry run. Calculate only coefficients of reactants.
   --ergs ERGS  Energies of product and reactants in the order corresponding to given files if available. Comma separated.
                If provided, not to perform MD relaxation. [default: None]
+  --ergs-per-atom
+               If this is set, energies given by --ergs option are given as energy per atom unit rather than total energies of the systems.
   --nstp NSTP  Number of steps for relaxation MD. [default: 1000]
   --dt DT      Time interval for relaxation MD. [default: -2.0]
   --per-formula-unit
                Obtain the formation enthalpy in per-formula-unit. [default: False]
-  --out4fp     Write out to a file the fp.py data format. 
+  --out4fp     Write out to a file in the fp.py data format. 
   --outfname OUTFILE
                Output file name for out4fp. [default: data.pmd.fenth]
 """
@@ -28,7 +30,7 @@ import numpy as np
 import nappy
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "210809"
+__version__ = "rev210809"
 
 def get_unit_comp(nsys):
     """
@@ -91,9 +93,13 @@ def get_reactant_coeffs(reactants,product):
         if abs(Ax[i] -b_vec[i]) > 0.1:
             wrong = True
     if wrong:
-        print('Result maybe wrong: i,Ax[i],b[i].')
-        for i in range(len(b_len)):
-            print(' {0:2d}  {1:5.1f} {2:5.1f}'.format(i,Ax[i],b_vec[i]))
+        print(' WARNING: Exact solution was not obtained.')
+        print(' Result maybe wrong: i,Ax[i],b[i].')
+        for i in range(len(b_vec)):
+            print('   {0:2d}  {1:5.1f} {2:5.1f}'.format(i,Ax[i],b_vec[i]))
+    else:
+        print(' Ax=b is satisfied, which means the exact number relationship between LHS and RHS is found.')
+        
     return x
 
 def calc_formation_enthalpy(ergs_react,erg_prod,coeffs):
@@ -172,24 +178,32 @@ def main(args):
 
     #...Compute coefficients of reactants
     coeffs = get_reactant_coeffs(reactants,product)
-    print(' Coefficients: ',)
+    print(' Coefficients, x_vec: ',)
     for i,r in enumerate(reactants):
-        print('   {0:5.2f} for {1:s}'.format(coeffs[i],r.get_chemical_formula()))
+        print('   {0:<10s} = {1:5.2f}'.format(r.get_chemical_formula(),coeffs[i]))
 
     if dry:
         return None
 
     
     if type(ergs) is list:  # Energies are provided
-        erg_prod = ergs[0]
-        ergs_react = [ x for x in ergs[1:] ]
+        if args['--ergs-per-atom']:
+            erg_prod = ergs[0] *len(product)
+            ergs_react = []
+            for i,r in enumerate(reactants):
+                e = ergs[i+1]
+                ergs_react.append(e*len(r))
+        else:
+            erg_prod = ergs[0]
+            ergs_react = [ x for x in ergs[1:] ]
     else:  #...Compute relaxation and get potential energies of given structures.
         erg_prod = get_relaxed_energy(product,nstp=nstp,dt=dt)
         ergs_react = [ get_relaxed_energy(r,nstp=nstp,dt=dt) for r in reactants ]
-    print(' E of product = {0:.3f}'.format(erg_prod))
-    print(' Es of reactnats:')
+    print(' E of product, {0:s} = {1:.3f}'.format(product.get_chemical_formula(),erg_prod))
+    print(' Es of reactants:')
     for i in range(len(ergs_react)):
-        print('   i, E_i = {0:.3f}'.format(ergs_react[i]))
+        r = reactants[i]
+        print('   {0:<10s} = {1:.3f}'.format(r.get_chemical_formula(),ergs_react[i]))
 
     #...Get formation enthalpy
     dH = calc_formation_enthalpy(ergs_react,erg_prod,coeffs)

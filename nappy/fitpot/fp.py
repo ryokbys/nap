@@ -51,12 +51,9 @@ def read_in_fitpot(fname='in.fitpot'):
     
     mode = None
     specorder = None
-    interact = []
-    rdf_pairs = []
-    adf_triplets = []
-    infp['interact'] = interact
-    infp['rdf_pairs'] = rdf_pairs
-    infp['adf_triplets'] = adf_triplets
+    infp['interactions'] = []
+    infp['rdf_pairs'] = []
+    infp['adf_triplets'] = []
     infp['match'] = []
     infp['param_files'] = []
     
@@ -184,14 +181,11 @@ def read_in_fitpot(fname='in.fitpot'):
             mode = None
         else:
             if mode == 'interactions' and len(data) in (2,3):
-                interact.append(tuple(data))
-                infp['interactions'] = interact
+                infp['interactions'].append(tuple(data))
             elif mode == 'rdf_pairs' and len(data) == 2:
-                rdf_pairs.append(tuple(data))
-                infp['rdf_pairs'] = rdf_pairs
+                infp['rdf_pairs'].append(tuple(data))
             elif mode == 'adf_triplets' and len(data) == 3:
-                adf_triplets.append(tuple(data))
-                infp['adf_triplets'] = adf_triplets
+                infp['adf_triplets'].append(tuple(data))
             else:
                 mode = None
                 pass
@@ -312,6 +306,7 @@ def read_vars_fitpot(fname='in.vars.fitpot'):
     vs = np.array(vs)
     vrs = np.array(vrs)
     vrsh = np.array(vrsh)
+    print('')
     return rc2,rc3,vs,vrs,vrsh,options
     
 
@@ -818,6 +813,11 @@ def main(args):
         kwargs['npqs'] = npqs
         kwargs['charges'] = charges
 
+    print(' # iid,losses=      iid',end='')
+    for m in kwargs['match']:
+        print('  {0:>9s}'.format(m),end='')
+    print('      total')
+
     maxiter = kwargs['num_iteration']
     if kwargs['fitting_method'] in ('de','DE'):
         N = infp['de_num_individuals']
@@ -832,6 +832,7 @@ def main(args):
         opt = CS(N,F, vs,vrs,vrsh, func_wrapper, write_vars_fitpot,
                  nproc=nproc, **kwargs)
 
+    
     opt.run(maxiter)
 
     print('elapsed time = {0:f} sec.'.format(time.time()-start))
@@ -840,7 +841,7 @@ def main(args):
 
 def headline():
     print('')
-    print(' fp.py --- fit potential parameters to any target property ---')
+    print(' fp.py --- fit parameters to any target property ---')
     print('')
     cmd = ' '.join(s for s in sys.argv)
     print('   Executed as {0:s}'.format(cmd))

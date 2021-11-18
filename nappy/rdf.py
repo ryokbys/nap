@@ -542,7 +542,10 @@ def nbplot(nsys,dr=0.1,rmin=0.0,rmax=5.0,nnmax=200,pairs=None,sigma=0):
         pass
 
     nspcs = len(nsys.specorder)
-    rd,gr= rdf(nsys,nspcs,dr,rmax,rmin=rmin,nnmax=nnmax)
+    try:
+        rd,gr= rdf(nsys,nspcs,dr,rmax,rmin=rmin,nnmax=nnmax)
+    except:
+        raise Error('rdf(..) failed.')
 
     if sigma > 0:
         #...Smearing of total RDF
@@ -647,6 +650,8 @@ if __name__ == "__main__":
     if len(infiles) > 1:
         infiles.sort(key=get_key,reverse=True)
     del infiles[:nskip]
+    if len(infiles) < 1:
+        raise ValueError('No input files to be processed.')
 
     tiny = 1.0e-8
     nr= int((rmax-rmin+tiny)/dr) +1

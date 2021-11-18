@@ -222,7 +222,7 @@ class NAPSystem(object):
         c = np.linalg.norm(self.a3*self.alc)
         return a,b,c
 
-    def get_lattice_angles(self):
+    def get_lattice_angles(self,unit='radius'):
         a = np.linalg.norm(self.a1)
         b = np.linalg.norm(self.a2)
         c = np.linalg.norm(self.a3)
@@ -239,6 +239,10 @@ class NAPSystem(object):
         alpha = np.arcsin(ta)
         beta  = np.arcsin(tb)
         gamma = np.arcsin(tc)
+        if unit[0] in ('d','D'):
+            alpha = alpha/np.pi *180.0
+            beta  = beta/np.pi *180.0
+            gamma = gamma/np.pi *180.0
         return alpha,beta,gamma
 
     def get_reciprocal_vectors(self):
