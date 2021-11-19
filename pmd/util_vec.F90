@@ -1,5 +1,5 @@
 !
-!     Vector analysis routines
+!  Vector analysis routines
 !
 function sprod(ndim,a,b)
   implicit none

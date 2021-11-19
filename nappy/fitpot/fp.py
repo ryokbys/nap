@@ -814,8 +814,14 @@ def main(args):
         kwargs['charges'] = charges
 
     print(' # iid,losses=      iid',end='')
-    for m in kwargs['match']:
-        print('  {0:>9s}'.format(m),end='')
+    if len(kwargs['match']) > 0:
+        for m in kwargs['match']:
+            print('  {0:>9s}'.format(m),end='')
+    else:
+        if kwargs['rdf_match']: print('  {0:>9s}'.format('rdf'),end='')
+        if kwargs['adf_match']: print('  {0:>9s}'.format('adf'),end='')
+        if kwargs['vol_match']: print('  {0:>9s}'.format('vol'),end='')
+        if kwargs['lat_match']: print('  {0:>9s}'.format('lat'),end='')
     print('      total')
 
     maxiter = kwargs['num_iteration']

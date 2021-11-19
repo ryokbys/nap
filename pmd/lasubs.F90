@@ -3,11 +3,11 @@
 !       Calculate INversion of the MATrix using LU decomposition.
 !=======================================================================
 subroutine ludc_inv( n,a,c )
+!-----------------------------------------------------------------------
+!  n:  dimension of the matrix A
+!  a:  the matrix A
+!-----------------------------------------------------------------------
   implicit none
-!-----------------------------------------------------------------------
-!     n:  dimension of the matrix A
-!     a:  the matrix A
-!-----------------------------------------------------------------------
 !-----arguments
   integer,intent(in):: n
   real*8,intent(in):: a(n,n)
@@ -137,9 +137,9 @@ end subroutine chckinv
 !=======================================================================
 subroutine choldc_inv(n,a,c)
 !-----------------------------------------------------------------------
-!     SUBROUTINE choldc_inv
-!       Inversion routine using Cholesky decomposition with cholsl,
-!       choldc, from Numerical Recipes in Fortran.
+! SUBROUTINE choldc_inv
+!   Inversion routine using Cholesky decomposition with cholsl,
+!   choldc, from Numerical Recipes in Fortran.
 !-----------------------------------------------------------------------
   implicit real*8 (a-h,o-z)
   real*8,intent(in):: a(n,n)
@@ -181,9 +181,9 @@ end subroutine choldc_inv
 !=======================================================================
 subroutine choldc(a,n,p)
 !-----------------------------------------------------------------------
-!     subroutine choldc: 
-!       From Numerical Recipes in Fortran.
-!       Lower triangle matrix is returned in a.
+!  subroutine choldc: 
+!    From Numerical Recipes in Fortran.
+!    Lower triangle matrix is returned in a.
 !-----------------------------------------------------------------------
   integer n
   real*8 a(n,n),p(n)

@@ -90,7 +90,7 @@ def get_reactant_coeffs(reactants,product):
         raise ValueError('len(Ax) != len(b_vec)')
     wrong = False
     for i in range(len(b_vec)):
-        if abs(Ax[i] -b_vec[i]) > 0.1:
+        if abs(Ax[i] -b_vec[i]) > 0.01:
             wrong = True
     if wrong:
         print(' WARNING: Exact solution was not obtained.')
@@ -165,7 +165,7 @@ def main(args):
         if len(ergs) != len(files):
             raise ValueError('Number of files and ergs are not inconsistent.')
     
-    print(' pwd = ',os.getcwd())
+    print(' Working directory: ',os.getcwd())
     
         
     product = nappy.io.read(files[0])
@@ -180,7 +180,7 @@ def main(args):
     coeffs = get_reactant_coeffs(reactants,product)
     print(' Coefficients, x_vec: ',)
     for i,r in enumerate(reactants):
-        print('   {0:<10s} = {1:5.2f}'.format(r.get_chemical_formula(),coeffs[i]))
+        print('   {0:<12s} = {1:>5.2f}'.format(r.get_chemical_formula(),coeffs[i]))
 
     if dry:
         return None
@@ -203,7 +203,7 @@ def main(args):
     print(' Es of reactants:')
     for i in range(len(ergs_react)):
         r = reactants[i]
-        print('   {0:<10s} = {1:.3f}'.format(r.get_chemical_formula(),ergs_react[i]))
+        print('   {0:<12s} = {1:>8.3f}'.format(r.get_chemical_formula(),ergs_react[i]))
 
     #...Get formation enthalpy
     dH = calc_formation_enthalpy(ergs_react,erg_prod,coeffs)
@@ -212,6 +212,10 @@ def main(args):
     print('   dH = -1*[ {0:.2f} '.format(erg_prod),end='')
     for i,r in enumerate(reactants):
         print('-{0:.2f}*({1:.2f}) '.format(coeffs[i],ergs_react[i]),end='')
+    print(']/{0:d}'.format(gcd))
+    print('      = -1*[ {0:.2f} '.format(erg_prod),end='')
+    for i,r in enumerate(reactants):
+        print('-({0:.2f}) '.format(coeffs[i]*ergs_react[i]),end='')
     print(']/{0:d}'.format(gcd))
     print('      = {0:.2f} (eV/f.u.)'.format(dH/gcd))
     print(' Formation enthalpy per atom:')

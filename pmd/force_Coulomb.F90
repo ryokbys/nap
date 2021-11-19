@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-05 12:26:37 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-19 11:50:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -95,6 +95,8 @@ module Coulomb
 !.....kmax threshold
   real(8),parameter:: threshold_kmax = 1d-4
 
+!.....Variable-charge optimization method: damping, cg, matinv
+  character(len=20):: chgopt_method = 'damping'
 !.....Variable-charge potential variables
   real(8):: vc_chi(nspmax),vc_jii(nspmax),vc_e0(nspmax),vcg_sgm(nspmax) &
        ,qlower(nspmax),qupper(nspmax)
@@ -102,7 +104,23 @@ module Coulomb
 !.....Average mu (chemical potential)
   real(8):: avmu
 !.....Convergence criterion for QEq in eV/atom
-  real(8):: conv_eps = 1.0d-6
+  real(8):: crit_codmp = 1.0d-6
+!.....chgopt-damping related parameters
+  character(len=20):: codmp_method = 'damping' ! or FIRE or damping
+  integer:: nstp_codmp = 1000
+  real(8):: dt_codmp = 0.005d0  ! fs
+  real(8):: qmass_codmp = 0.002d0  ! atomic mass unit
+  real(8):: qtot_codmp = 0d0
+  integer:: minstp_codmp = 3
+  integer:: minstp_conv_codmp = 3
+!.....Velocity-damping related parameters
+  real(8):: fdamp_codmp = 0.95d0
+!.....FIRE-related parameters
+  real(8):: finc_codmp = 1.1d0
+  real(8):: fdec_codmp = 0.5d0
+  real(8):: alpha0_codmp = 0.1d0
+  real(8):: falpha_codmp = 0.99d0
+
 
   integer,parameter:: ivoigt(3,3)= &
        reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
@@ -671,10 +689,6 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, sgm_ew
           cycle
-        else if( trim(cline).eq.'conv_eps' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, conv_eps
-          cycle
         else if( trim(cline).eq.'fbvs' ) then
           backspace(ioprms)
           read(ioprms,*) ctmp, fbvs
@@ -715,6 +729,59 @@ contains
           rho_scr(jsp,isp) = rhoij
           if( iprint.ge.ipl_info ) print *,trim(ctmp),trim(cspi) &
                ,trim(cspj),rhoij
+          cycle
+!.....QEq related parameters hereafter
+        else if( trim(cline).eq.'chgopt_method' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, chgopt_method
+          cycle
+        else if( trim(cline).eq.'codmp_method' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, codmp_method
+          cycle
+        else if( trim(cline).eq.'crit_codmp' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, crit_codmp
+          cycle
+        else if( trim(cline).eq.'nstp_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, nstp_codmp
+          cycle
+        else if( trim(cline).eq.'minstp_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, minstp_codmp
+          cycle
+        else if( trim(cline).eq.'minstp_conv_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, minstp_conv_codmp
+          cycle
+        else if( trim(cline).eq.'dt_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, dt_codmp
+          cycle
+        else if( trim(cline).eq.'qmass_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, qmass_codmp
+          cycle
+        else if( trim(cline).eq.'fdamp_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, fdamp_codmp
+          cycle
+        else if( trim(cline).eq.'finc_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, finc_codmp
+          cycle
+        else if( trim(cline).eq.'fdec_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, fdec_codmp
+          cycle
+        else if( trim(cline).eq.'alpha0_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, alpha0_codmp
+          cycle
+        else if( trim(cline).eq.'falpha_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, falpha_codmp
           cycle
         endif
 !.....Not a keyword, a certain mode should be already selected.
@@ -892,11 +959,24 @@ contains
   
     call mpi_bcast(pacc,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(conv_eps,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_screened_cut,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_scr,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
 
+    call mpi_bcast(codmp_method,20,mpi_character,0,mpi_world,ierr)
+    call mpi_bcast(crit_codmp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(nstp_codmp,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(minstp_codmp,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(minstp_conv_codmp,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(dt_codmp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(qmass_codmp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(qtot_codmp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(fdamp_codmp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(finc_codmp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(fdec_codmp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(alpha0_codmp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(falpha_codmp,1,mpi_real8,0,mpi_world,ierr)
+    
     if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
       if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
         do isp=1,nsp
@@ -2058,14 +2138,12 @@ contains
 !  Compute q-force of short-range term of Ewald sum.
 !
     implicit none
-    integer,intent(in):: namax,natm,nnmax,iprint, &
-         lspr(0:nnmax,namax)
-    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
-         h(3,3),rc
+    integer,intent(in):: namax,natm,nnmax,iprint,lspr(0:nnmax,namax)
+    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax),h(3,3),rc
     real(8),intent(inout):: fq(namax),esr
 
     integer:: i,j,jj,is,js,ixyz,jxyz
-    real(8):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc&
+    real(8):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc &
          ,sgmi,sgmj,gmmij
     real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
     real(8),external:: fcut1
@@ -2103,15 +2181,15 @@ contains
         terfc = erfc(dij*ss2i)
 !!$        terfc = erfc(gmmij*dij)
 !.....potential
-        tmp = 0.5d0 *acc *diji *terfc *fcut1(dij,0d0,rc)
+        tmp = acc *diji *terfc *fcut1(dij,0d0,rc)
         if( j.le.natm ) then
-          esr = esr +2d0*tmp*qi*qj
-        else
           esr = esr +tmp*qi*qj
+        else
+          esr = esr +0.5d0*tmp*qi*qj
         endif
 !.....Force on charge
-        fq(i) = fq(i) -tmp*qj*2d0
-        fq(j) = fq(j) -tmp*qi*2d0
+        fq(i) = fq(i) -tmp*qj
+        fq(j) = fq(j) -tmp*qi
       enddo
     enddo
 
@@ -2184,21 +2262,18 @@ contains
         dxdj(1:3)=  rij(1:3)*diji
         rhoij = rho_scr(is,js)
         terfc = erfc(dij/rhoij)
-!!$        terfc = erfc(dij*ss2i)
         vrc = vrcs(is,js)
         dvdrc = dvdrcs(is,js)
-!!$        terfc = erfc(gmmij*dij)
 !.....potential
-!!$        tmp = 0.5d0 *acc *diji *terfc *fcut1(dij,0d0,rc)
-        tmp = 0.5d0 *(acc*diji*terfc -vrc -dvdrc*(dij-rc))
+        tmp = acc*diji*terfc -vrc -dvdrc*(dij-rc)
         if( j.le.natm ) then
-          esr = esr +2d0*tmp*qi*qj
-        else
           esr = esr +tmp*qi*qj
+        else
+          esr = esr +0.5d0*tmp*qi*qj
         endif
 !.....Force on charge
-        fq(i) = fq(i) -tmp*qj*2d0
-        fq(j) = fq(j) -tmp*qi*2d0
+        fq(i) = fq(i) -tmp*qj
+        fq(j) = fq(j) -tmp*qi
       enddo
     enddo
 
@@ -2299,6 +2374,43 @@ contains
     enddo
 
   end subroutine qforce_self
+!=======================================================================
+  subroutine get_qforce(namax,natm,nnmax,tag,ra,chg,h,lspr,rc,sorg, &
+       tcom,myid,mpi_world,iprint,fq,epot,l1st)
+!
+!  Wrapper routine for calculating forces on charges.
+!
+    integer,intent(in):: namax,natm,myid,mpi_world,iprint
+    integer,intent(in):: nnmax,lspr(0:nnmax,namax)
+    real(8),intent(in):: tag(namax),h(3,3),ra(3,namax),chg(namax),sorg(3),rc
+    logical,intent(in):: l1st
+    real(8),intent(inout):: fq(namax),tcom,epot
+
+    real(8):: eclong,eself,ecshort
+    
+    if( trim(cterms).eq.'long' ) then
+      call qforce_self(namax,natm,tag,chg,fq,eself)
+      call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_world, &
+           myid,iprint,fq,eclong)
+!!$    else if( use_force('Ewald') ) then
+    else if( trim(cterms).eq.'full' ) then
+      call qforce_self(namax,natm,tag,chg,fq,eself)
+      call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
+           ,rc,fq,ecshort)
+      call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_world, &
+           myid,iprint,fq,eclong)
+    else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
+      call qforce_self(namax,natm,tag,chg,fq,eself)
+      call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
+           ,rc,fq,ecshort)
+    else if( trim(cterms).eq.'screened_cut'  ) then
+      call qforce_self(namax,natm,tag,chg,fq,eself)
+      call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
+           ,rc,fq,ecshort,l1st)
+    endif
+    epot = eself +ecshort + eclong
+    return
+  end subroutine get_qforce
 !=======================================================================
   subroutine set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint &
        ,specorder)
@@ -2645,132 +2757,98 @@ contains
     deallocate(bbs)
   end subroutine setup_kspace
 !=======================================================================
-  subroutine cgopt_charge(natm,h,ra,tag,chg)
+  subroutine chgopt_matrix(namax,natm,h,ra,tag,chg,nnmax,lspr,rc, &
+       sorg,tcom,myid,mpi_world,iprint,l1st)
 !
-!  Charge optimization for variable-charge potential
-!  by means of conjugate gradient.
-!  In this case, only Ewald_long part is used because the Gaussian
-!  distribution is assumed for atomic charges.
+!  Charge optimization/equilibration by matrix inversion.
+!  THIS CODE IS NOT COMPLETE AND NOT YET AVAILABLE...
 !
-    integer,intent(in):: natm
-    real(8),intent(in):: h(3,3),ra(3,natm),tag(natm)
-    real(8),intent(inout):: chg(natm)
+    integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
+    integer,intent(in):: myid,mpi_world,iprint
+    real(8),intent(in):: h(3,3),ra(3,natm),tag(natm),rc,sorg(3)
+    logical,intent(in):: l1st
+    real(8),intent(inout):: chg(natm),tcom
 
-    integer:: ia,ja,k1,k2,k3,is,js,ik,ierr
-    real(8):: xi(3),xj(3),ri(3),rj(3),qi,qj,sgmi,sgmi2,sgmj,sgmj2, &
-         bk1(3),bk2(3),bk3(3),bb(3),bdotri,bdotrj,bb2,djii,a0,sqpi,r2,&
-         prefac
-    real(8),allocatable,save:: amat(:,:),qvec(:),xvec(:)
-    logical,save:: l1st = .true.
-    real(8),external:: sprod
+    integer:: ierr,i,j,is
+    real(8):: epot
+    real(8),allocatable,save:: amat(:,:),qvec(:),xvec(:),amati(:,:),fq(:)
 
-!.....TODO: not work in parallel
     if( l1st ) then
       if( allocated(amat) ) then
-        call accum_mem('force_Coulomb',-8*(size(amat)+size(qvec)+size(xvec)))
-        deallocate(amat,qvec,xvec)
+        call accum_mem('force_Coulomb',-8*(2*size(amat)+size(qvec) &
+             +size(xvec)+size(fq)))
+        deallocate(amat,amati,qvec,xvec,fq)
       endif
-      allocate(amat(natm+1,natm+1),qvec(natm+1),xvec(natm+1))
-      call accum_mem('force_Coulomb',8*(size(amat)+size(qvec)+size(xvec)))
+      allocate(amat(natm+1,natm+1),amati(natm+1,natm+1),qvec(natm+1), &
+           xvec(natm+1),fq(namax))
+      call accum_mem('force_Coulomb',8*(2*size(amat)+size(qvec)+size(xvec)+size(fq)))
     endif
 
     amat(1:natm+1,1:natm+1) = 0d0
     qvec(natm+1) = 0d0
 
-!.....Make A-matrix for linear equation, A*Q=X
-!     Assuming all the atoms are in the root node (0),
-!     and does not work in parallel mode.
-!     TODO: And also the code is very primitive and could be faster.
-    a0 = 1d0 /(2d0 *vol *eps0)
-    do ia=1,natm
-      xi(1:3) = ra(1:3,ia)
-      ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
-      is = int(tag(ia))
-      sgmi = sgm(is)
-      sgmi2= sgmi*sgmi
-      do ja=ia,natm
-        xj(1:3) = ra(1:3,ja)
-        rj(1:3) = h(1:3,1)*xj(1) +h(1:3,2)*xj(2) +h(1:3,3)*xj(3)
-        js = int(tag(ja))
-        sgmj = sgm(js)
-        sgmj2= sgmj*sgmj
-        ik = 0
-        do k1= -kmax1,kmax1
-          bk1(1:3)= k1 *b1(1:3)
-          do k2= -kmax2,kmax2
-            bk2(1:3)= k2 *b2(1:3)
-            do k3= -kmax3,kmax3
-              if( .not. lkuse(k3,k2,k1) ) cycle
-              ik = ik + 1
-              bk3(1:3)= k3 *b3(1:3)
-              bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-              bdotri = sprod(3,bb,ri)
-              bdotrj = sprod(3,bb,rj)
-              bb2 = sprod(3,bb,bb)
-
-              amat(ia,ja) = amat(ia,ja) +2d0/bb2 &
-                   *exp(-bb2/2*(sgmi2+sgmj2)) &
-                   *( cos(bdotri)*cos(bdotrj) + sin(bdotri)*sin(bdotrj) )
-            enddo  ! k3
-          enddo  ! k2
-        enddo  ! k1
-        amat(ia,ja) = amat(ia,ja) *a0
-      enddo  ! ja
-    enddo  ! ia
+!.....Make A-matrix and X-vector for linear equation, A*Q=X
+    do i=1,natm
+      is = int(tag(i))
+!.....Since qforces contain chi(i) that should not be in A-matrix,
+!     extract chi from fq
+      fq(i) = fq(i) +vc_chi(is)
+!.....Instead, put them into X-vector
+      xvec(i) = -vc_chi(is)
+!.....Q-vector
+      qvec(i) = chg(i)
+    enddo
+!.....MAKING A-MATRIX IN PARALLEL IMPLEMENTATION IS NOT SO EASY.
+!.....THIS CODE DOES NOT GO WELL...
+!!$    do i=1,natm
+!!$      do j=1,natm
+!!$        if( chg(i)
+!!$      enddo
+!!$    enddo
     amat(1:natm,natm+1) = 1d0
-!.....Self term
-    prefac = 1d0/(4d0*pi*eps0)
-    do ia=1,natm
-      is = int(tag(ia))
-      djii = vc_jii(is)
-      sgmi = sgm(is)
-      amat(ia,ia) = amat(ia,ia) +djii !-2d0 *prefac /sqrt(pi) /sgmi
-    enddo
-!.....Symmetrize A-matrix
-    do ia=1,natm
-      do ja=ia+1,natm+1
-        amat(ja,ia) = amat(ia,ja)
-      enddo
-    enddo
-
-!.....Make Q vector
-    do ia=1,natm
-      qvec(ia) = chg(ia)
-    enddo
-
-!.....Make X vector
-    do ia=1,natm
-      is = int(tag(ia))
-      xvec(ia) = -vc_chi(is)
-    enddo
     xvec(natm+1) = 0d0  ! charge neutrality, qtot = 0.0
 
-!!$    print *,'amat:'
-!!$    do ia=1,natm+1
-!!$      write(6,'(10es10.2)') (amat(ia,ja),ja=1,natm+1)
-!!$    enddo
-!!$    print *,'qvec:'
-!!$    write(6,'(a,10f8.4)') 'qvec=',(qvec(ja),ja=1,natm+1)
-!!$    print *,'xvec:'
-!!$    write(6,'(10es10.2)') (xvec(ja),ja=1,natm+1)
+    if( iprint.ge.ipl_debug .and. myid.eq.0 .and. l1st ) then
+      print *,'amat:'
+      do i=1,natm+1
+        write(6,'(10es10.2)') (amat(i,j),j=1,natm+1)
+      enddo
+      print *,'qvec:'
+      write(6,'(10f8.4)') (qvec(j),j=1,natm+1)
+      print *,'xvec:'
+      write(6,'(10es10.2)') (xvec(j),j=1,natm+1)
+    endif
 
+    if( trim(chgopt_method).eq.'cg' ) then
 !.....Perform CG optimization to equilibrate the system and get charges
-    call cg(natm+1,natm+2,1d-5,amat,xvec,qvec,ierr)
-!!$    write(6,'(a,i6)') ' CG opt converged at ',ierr
-!!$    print *,'qvec after CG opt:'
-!!$    write(6,'(a,10f10.6)') 'q=',(qvec(ja),ja=1,natm)
-!!$    print *,'A*Q:'
-!!$    xvec = matmul(amat,qvec)
-!!$    write(6,'(10es10.2)') (xvec(ja),ja=1,natm+1)
+      call cg(natm+1,natm+2,1d-5,amat,xvec,qvec,ierr)
+    else if( trim(chgopt_method).eq.'matinv' ) then
+!.....Get optimal qvec by matrix inversion
+!!$      call choldc_inv(natm+1,amat,amati)
+      call ludc_inv(natm+1,amat,amati)
+      qvec(:) = 0d0
+      do i=1,natm+1
+        do j=1,natm+1
+          qvec(i) = amati(i,j)*xvec(j)
+        enddo
+      enddo
+    endif
+
+    if( iprint.ge.ipl_debug .and. myid.eq.0 .and. l1st ) then
+      print *,'qvec after cg/matinv:'
+      write(6,'(10f10.6)') (qvec(j),j=1,natm)
+      print *,'A*Q:'
+      xvec = matmul(amat,qvec)
+      write(6,'(10es10.2)') (xvec(j),j=1,natm+1)
+    endif
 
 !.....Restore charge to chg
-    do ia=1,natm
-      chg(ia) = qvec(ia)
+    do i=1,natm
+      chg(i) = qvec(i)
     enddo
 
-    l1st = .false.
     return
-  end subroutine cgopt_charge
+  end subroutine chgopt_matrix
 !=======================================================================
   subroutine cg(ndim,nstp,eps,amat,b,x,ierr)
     implicit none
