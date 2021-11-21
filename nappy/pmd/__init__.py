@@ -142,6 +142,7 @@ class PMD:
         ifpmd = self.param2var('flag_out_pmd',2)
         npmd = self.param2var('num_out_pmd',0)
         nerg = self.param2var('num_out_energy',100)
+        nnmax = self.param2var('max_num_neighbors',200)
 
         if 'Coulomb' in self.params['force_type']:
             naux = max(naux,2)
@@ -160,7 +161,7 @@ class PMD:
         pw.set_pmdvars(cspcs,cfrcs,rc,rbuf,iprint,nstp,dt,cauxarr,
                        ifdmp,dmpcoeff,conveps,convnum,
                        cpctrl,ptgt,stgt.T,srlx,
-                       ifpmd,npmd,nerg)
+                       ifpmd,npmd,nerg,nnmax)
         return None
 
     def param2var(self,s,v0):

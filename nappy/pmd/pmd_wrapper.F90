@@ -47,14 +47,14 @@ end subroutine get_tagtot
 subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
      iprint0,nstp0,dt0,naux0,laux,cauxarr0, &
      ifdmp0,dmp0,eps_conv0,n_conv0,lcpctl,cpctl0,ptgt0,stgt0,srlx0, &
-     ifpmd0,npmd0,nerg0)
+     ifpmd0,npmd0,nerg0,nnmax0)
 !
 !  Set variables to be stored in pmdvars module that are required 
 !  to call pmd_core.
 !
   use pmdvars,only: specorder,nspmax,dt,rbuf,rc1nn,rc,nx,ny,nz,iprint, &
        am,nstp,naux,ifpmd,npmd,nerg,cauxarr,ifdmp,dmp,eps_conv,n_conv, &
-       cpctl,ptgt,stgt,srlx
+       cpctl,ptgt,stgt,srlx,nnmax
   use force
   use element
   implicit none 
@@ -73,7 +73,7 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
   integer,intent(in):: lcpctl
   character(len=1),intent(in):: cpctl0(lcpctl)
 !f2py integer,intent(hide),depend(cpctl0):: lcpctl=shape(cpctl0,0)
-  integer,intent(in):: ifpmd0,npmd0,nerg0
+  integer,intent(in):: ifpmd0,npmd0,nerg0,nnmax0
 
   integer:: i,j
   character:: c3*3, c128*128, c6*6, c20*20
@@ -153,6 +153,7 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
   ptgt = ptgt0
   stgt(:,:) = stgt0(:,:)
   srlx = srlx0
+  nnmax = nnmax0
 
 end subroutine set_pmdvars
 !=======================================================================

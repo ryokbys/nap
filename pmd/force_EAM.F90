@@ -1,12 +1,13 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-15 15:16:39 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-20 15:36:28 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
   use pmdvars, only: nspmax
   use util,only: csp2isp
   implicit none
+  include "./const.h"
   save
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.EAM'
@@ -441,7 +442,8 @@ contains
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
-
+    if( iprint.ge.ipl_info ) write(6,'(a,es15.7)') ' epot EAM = ',epott
+    return
   end subroutine force_EAM
 !=======================================================================
   function rhoij(is,js,rij,rcin,rcout,ctype)

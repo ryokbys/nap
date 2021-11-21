@@ -832,7 +832,6 @@ contains
 !.....for the purpose of determining whether or not the neighbors are within cutoff
         j = lspr(jj,i)
         xij(1:3) = ra(1:3,j) -xi(1:3)
-        xij(1:3) = xij(1:3) -anint(xij(1:3))
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
         d2lspr(jj,i) = dij2

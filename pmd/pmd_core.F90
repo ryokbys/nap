@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-11-05 12:08:08 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-21 21:24:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -467,8 +467,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 !      write(cnum(1:4),'(i4.4)') 0
   write(cnum,'(i0)') 0
   tmp = mpi_wtime()
-  call space_comp(ntot0,ntot,tagtot,rtot,vtot,atot,stot,ekitot,epitot, &
-       auxtot)
+  call space_comp(ntot0,ntot,tagtot,rtot,vtot,atot,stot, &
+       ekitot,epitot,auxtot)
   call accum_time('space_comp',mpi_wtime()-tmp)
   if( ifpmd.gt.0 .and. myid_md.eq.0 ) then
     if( ifsort.gt.0 ) then
@@ -874,7 +874,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
     stnsr(:,:) = stnsr(:,:) *up2gpa
     prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
 
-
 !.....temperature distribution along x
     if( ltdst ) call calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra &
          ,eki,istp,nouterg,myid_md,mpi_md_world,sorg)
@@ -919,8 +918,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
              ,simtime,ekin+epot,ekin,epot,tave,vol,prss
         call flush(ioerg)
 !.....write temperature
-!            write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff0(1:9)
-!            call flush(iotemp)
         ediff(1:9)= 0d0
 
         if( trim(czload_type).eq.'atoms' .or. &
@@ -933,7 +930,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 !---------output step, time, and temperature
       tcpu= mpi_wtime() -tcpu1
       if( myid_md.eq.0 .and. iprint.ne.0 ) then
-!!$        print '(a,20f8.5)',' alphas=',ol_alphas(0,1:natm)
         if( tave.gt.10000d0 ) cftave = 'es12.4'
         tcpu = mpi_wtime() -tcpu0
         write(6,'(a,'//cfistp//','//cfetime//','//cftave &
@@ -973,11 +969,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 !.....check convergence criteria if it is dumped MD
     if( ifdmp.gt.0 .and. epot-epotp.le.0d0 .and. n_conv.gt.0 .and. &
          abs(epot-epotp).lt.eps_conv .and. istp.gt.minstp ) then
-!          print *,'ifdmp.gt.0 = ',ifdmp.gt.0
-!          print *,'epot-epotp.le.0d0 = ',epot-epotp.le.0d0
-!          print *,'abs(epot-epotp).lt.eps_conv = ',abs(epot-epotp)
-!     &         .lt.eps_conv
-!          print *,'istp.gt.minstp = ',istp.gt.minstp
       i_conv = i_conv + 1
       if( i_conv.ge.n_conv ) then
         if( myid_md.eq.0 .and. iprint.ne.0 ) then
@@ -1008,8 +999,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 !---------decide pmd-file name
       iocntpmd=iocntpmd+1
       write(cnum,'(i0)') istp
-      call space_comp(ntot0,ntot,tagtot,rtot,vtot,atot,stot,ekitot,epitot, &
-           auxtot)
+      call space_comp(ntot0,ntot,tagtot,rtot,vtot,atot,stot, &
+           ekitot,epitot,auxtot)
       call accum_time('space_comp',mpi_wtime()-tmp)
       ltot_updated = .true.
       if( ifpmd.gt.0 .and. myid_md.eq.0 ) then
@@ -1038,7 +1029,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
     endif
 
     if( lconverged ) exit
-  enddo ! end of istp
+!.....End of velocity-verlet loop    
+  enddo
 
   if( .not. ltot_updated ) then
     tmp = mpi_wtime()
@@ -1124,8 +1116,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   if( ltdst ) then
     deallocate(tdst,nadst)
   endif
-!!$  deallocate(ra,va,aa,ra0,strs,stt,tag,lspr,d2lspr &
-!!$       ,epi,eki,stp,stn,lsb,lsex)
   deallocate(ra,va,aa,ra0,strs,tag,lspr,d2lspr &
        ,epi,eki,lsb,lsex)
   deallocate(aux)
@@ -1824,8 +1814,13 @@ subroutine bacopy(l1st)
 
 !-----calculate the cut-off lengths
   do kd=1,3
+!.....ASGM is like a inverse of the lengh of cell vector
     asgm= dsqrt(sgm(1,kd)**2 +sgm(2,kd)**2 +sgm(3,kd)**2)
+!.....RCV is like rc/(length of cell vector)
     rcv(kd)= rc*asgm/vol
+!.....NEX > 1 if the cell vector is shorter than the rc,
+!     meaning that the cell is so small that we need to consider multiple copies
+!     along a certain direction.
     nex(kd)= int(rcv(kd)) +1
   enddo
   if( l1st .and. myid_md.eq.0 .and. iprint.ge.ipl_info ) then
@@ -1859,7 +1854,7 @@ subroutine bacopy(l1st)
           lsex(lsb(0,ku),ku)= iex
         enddo
       enddo
-    else                    ! long enough for normal boundary-atom copy
+    else   ! long enough for normal boundary-atom copy
 !-------Scan all the residents & copies
       do i=1,natm+nbnew
         xi(1:3)= ra(1:3,i)
@@ -1952,7 +1947,7 @@ subroutine bacopy(l1st)
         enddo
         nbnew= nbnew +lsb(0,ku)
       enddo
-    else
+    else   ! long enough compared to rc for normal boundary-atom copy
       tcom1=mpi_wtime()
       do kdd= -1,0
         ku=2*kd+kdd
@@ -1968,7 +1963,6 @@ subroutine bacopy(l1st)
           j= lsb(i,ku)
           dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
           dbuf(4,i)  = tag(j)
-          m = 4
           do iaux=1,naux
             dbuf(4+iaux,i) = aux(iaux,j)
           enddo
@@ -1978,7 +1972,6 @@ subroutine bacopy(l1st)
         do i=1,nrc
           ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
           tag(natm+nbnew+i)   = dbufr(4,i)
-          m = 4
           do iaux=1,naux
             aux(iaux,natm+nbnew+i) = dbufr(4+iaux,i)
           enddo
@@ -1991,7 +1984,7 @@ subroutine bacopy(l1st)
 200     continue
       enddo
 !-------Add the communication time to COMT
-      tcom2=MPI_WTIME()
+      tcom2= mpi_wtime()
       tcom=tcom+tcom2-tcom1
     endif
 
@@ -2021,7 +2014,7 @@ end subroutine bacopy
 subroutine bacopy_fixed()
 !-----------------------------------------------------------------------
 !  Exchanges boundary-atom data among neighbor nodes: tag and ra
-!  This doesnt search using position, just send & recv data of atoms
+!  This does not search using position, just send & recv data of atoms
 !    which were listed by 'bacopy'.
 !  Different number of data are copied depending on whether 
 !    using atomic charges or not.
@@ -2053,34 +2046,16 @@ subroutine bacopy_fixed()
     deallocate(dbuf,dbufr)
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
   endif
-!!$  if( .not. luse_charge ) then
-!!$    if( size(dbuf).lt.4*nbmax ) then
-!!$      deallocate(dbuf,dbufr)
-!!$      allocate(dbuf(4,nbmax),dbufr(4,nbmax))
-!!$    endif
-!!$  else
-!!$    if( size(dbuf).lt.6*nbmax ) then
-!!$      deallocate(dbuf,dbufr)
-!!$      allocate(dbuf(6,nbmax),dbufr(6,nbmax))
-!!$    endif
-!!$  endif
 
   call nid2xyz(myid_md,ix,iy,iz)
 
   nbnew= 0
 
-!c-----calculate the cut-off lengths
-!      do kd=1,3
-!        asgm= dsqrt(sgm(1,i)**2 +sgm(2,i)**2 +sgm(3,i)**2)
-!        rcv(kd)= rc*asgm/vol
-!        nex(kd)= int(rcv(kd)) +1
-!      enddo
-
 !-----loop over x, y, & z directions
   do kd=1,3
 
 !-------To calculate the communication time
-    tcom1=MPI_WTIME()
+    tcom1= mpi_wtime()
 
     if( nex(kd).gt.1 ) then
       do kdd= -1,0
@@ -2095,7 +2070,7 @@ subroutine bacopy_fixed()
         enddo
         nbnew= nbnew +lsb(0,ku)
       enddo
-    else
+    else  ! long enough compared to rc for normal boundary-atom copy
       do kdd= -1,0
         ku=2*kd+kdd
         inode=nn(ku)
@@ -2107,7 +2082,6 @@ subroutine bacopy_fixed()
           j= lsb(i,ku)
           dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
           dbuf(4,i)  = tag(j)
-          m = 4
           do iaux=1,naux
             dbuf(4+iaux,i) = aux(iaux,j)
           enddo
@@ -2117,20 +2091,19 @@ subroutine bacopy_fixed()
         do i=1,nrc
           ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
           tag(natm+nbnew+i)   = dbufr(4,i)
-          m = 4
           do iaux=1,naux
             aux(iaux,natm+nbnew+i) = dbufr(4+iaux,i)
           enddo
         enddo
 
-        call MPI_BARRIER(mpi_md_world,ierr)
+        call mpi_barrier(mpi_md_world,ierr)
         nbnew=nbnew +nrc
 200     continue
       enddo
     endif
 
 !-------Add the communication time to COMT
-    tcom2=MPI_WTIME()
+    tcom2= mpi_wtime()
     tcom=tcom+tcom2-tcom1
 
 100 continue
@@ -2184,7 +2157,7 @@ subroutine bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
   do kd=1,3
 
 !-------To calculate the communication time
-    tcom1=MPI_WTIME()
+    tcom1= mpi_wtime()
 
     if( nex(kd).gt.1 ) then
       do kdd= -1,0
@@ -2221,8 +2194,8 @@ subroutine bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
     endif
 
 !-------Add the communication time to COMT
-    tcom2=MPI_WTIME()
-    tcom=tcom+tcom2-tcom1
+    tcom2= mpi_wtime()
+    tcom= tcom +tcom2 -tcom1
 
 100 continue
   enddo
@@ -2243,10 +2216,6 @@ subroutine bamove()
   use clrchg,only: lclrchg
   implicit none
   include 'mpif.h'
-!!$  integer,intent(in):: myid,mpi_md_world,iprint
-!!$  real(8),intent(in):: rc
-!!$  integer,intent(in):: ifcoulomb
-!!$  character(len=3):: boundary
 
   integer:: i,j,m,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is,ix,iy,iz,iaux
   integer:: mvque(0:nbmax,6),newim
@@ -2321,16 +2290,6 @@ subroutine bamove()
         endif
       endif
     endif
-!
-!        if( kd.eq.1 ) then
-!          if( ix.eq.0 .and. mvque(0,kul).gt.0 ) then
-!            print *,' myid,kd,ix,mvque(0,kul)=',myid_md
-!     &           ,kd,ix,mvque(0,kul)
-!          else if( ix.eq.nx-1 .and. mvque(0,kuh).gt.0 ) then
-!            print *,' myid,kd,ix,mvque(0,kuh)=',myid_md
-!     &           ,kd,ix,mvque(0,kuh)
-!          endif
-!        endif
 
 !-------Error trap
     if (mvque(0,kul).gt.nbmax) then
@@ -2344,7 +2303,7 @@ subroutine bamove()
     endif
 
 !-------To calculate the communacation time
-    tcom1=MPI_WTIME()
+    tcom1= mpi_wtime()
 
     do kdd= -1,0
 
@@ -2368,8 +2327,8 @@ subroutine bamove()
           dbuf(7+iaux,i) = aux(iaux,j)
         enddo
       enddo
-      call mespasd(inode,myparity(kd),dbuf,dbufr,ndimbuf*nsd &
-           ,ndimbuf*nrc,71,mpi_md_world)
+      call mespasd(inode,myparity(kd),dbuf,dbufr,ndimbuf*nsd, &
+           ndimbuf*nrc,71,mpi_md_world)
       do i=1,nrc
         ra(1:3,natm+newim+i)= dbufr(1:3,i)
         va(1:3,natm+newim+i)= dbufr(4:6,i)
@@ -2381,15 +2340,14 @@ subroutine bamove()
       enddo
 
       newim=newim+nrc
-      call MPI_BARRIER(mpi_md_world,ierr)
+      call mpi_barrier(mpi_md_world,ierr)
 
     enddo
 
-    tcom2=MPI_WTIME()
-    tcom=tcom+tcom2-tcom1 
+    tcom2= mpi_wtime()
+    tcom= tcom+tcom2-tcom1 
 
   enddo
-
 
 !-----Compression
   ipt=0
@@ -2405,9 +2363,6 @@ subroutine bamove()
   enddo
 !-----Update # of resident atoms
   natm=ipt
-
-!.....Update max natm globally
-!      nalmax = max(natm,nalmax)
 
   return
 end subroutine bamove
@@ -3085,17 +3040,19 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
   
   buf(1,1:natm) = tag(1:natm)
   buf(2,1:natm) = epi(1:natm)
-!.....This part may cause cache mishit and harm the efficiency
-  do k=1,naux
-    buf(2+k,1:natm) = aux(k,1:natm)
-  enddo
+!.....This part may cause cache mishits and harm the efficiency
+  buf(2+1:2+naux,1:natm) = aux(1:naux,1:natm)
+!!$  do k=1,naux
+!!$    buf(2+k,1:natm) = aux(k,1:natm)
+!!$  enddo
   do i=1,natm
     j = idxarr(i)
     tag(i) = buf(1,j)
     epi(i) = buf(2,j)
-    do k=1,naux
-      aux(k,i) = buf(2+k,j)
-    enddo
+!!$    do k=1,naux
+!!$      aux(k,i) = buf(2+k,j)
+!!$    enddo
+    aux(1:naux,i) = buf(2+1:2+naux,j)
   enddo
 
 end subroutine sort_by_tag

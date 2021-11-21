@@ -31,7 +31,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
   use DNN,only: force_DNN
   use Coulomb, only: force_screened_Coulomb, force_Ewald, &
        initialize_coulomb, force_Ewald_long, force_Coulomb, &
-       chgopt_method, chgopt_matrix
+       chgopt_method
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
   use Buckingham,only:force_Buckingham
   use Bonny_WRe,only: force_Bonny_WRe
@@ -89,7 +89,7 @@ subroutine get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
     if( trim(chgopt_method).eq.'damping' ) then
       call chgopt_damping(namax,natm,tag,h,ra, &
            aux(iauxof('chg'),:), &
-           nnmax,lspr,rc, &
+           nnmax,lspr,d2lspr,rc, &
            lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
            sorg,tcom,myid_md,mpi_md_world,iprint,l1st,boundary)
       call accum_time('chgopt_damping',mpi_wtime() -tmp)
@@ -1158,7 +1158,7 @@ function force_on(force_name,numff,cffs)
 
 end function force_on
 !=======================================================================
-subroutine chgopt_damping(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
+subroutine chgopt_damping(namax,natm,tag,h,ra,chg,nnmax,lspr,d2lspr,rc, &
      lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
      sorg,tcom,myid,mpi_md_world,iprint,l1st,boundary)
 !
@@ -1172,7 +1172,7 @@ subroutine chgopt_damping(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
 !    - FIRE --- it is said that robust and fast, but sometimes unstable, do not know why.
 !
   use force
-  use Coulomb, only: qforce_long,qforce_short,qforce_self,qlower,qupper, &
+  use Coulomb, only: qlower,qupper, get_qforce, &
        cterms,avmu,qforce_screened_cut, crit_codmp, codmp_method, &
        nstp_codmp, dt_codmp, qmass_codmp, qtot_codmp, minstp_codmp, &
        minstp_conv_codmp, finc_codmp, fdec_codmp, alpha0_codmp, falpha_codmp, &
@@ -1182,38 +1182,23 @@ subroutine chgopt_damping(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
   implicit none
   include "mpif.h"
   include "./const.h"
-  
+!.....Input  
   integer,intent(in):: namax,natm,myid,mpi_md_world,iprint &
        ,nnmax,lspr(0:nnmax,namax)
-  real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,sorg(3)
-  real(8),intent(inout):: chg(namax),tcom
+  real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,sorg(3),d2lspr(nnmax,namax)
   logical,intent(in):: l1st
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
        ,nnn(6),nex(3),lsex(nbmax,6)
   character(len=3),intent(in):: boundary
+!.....Output
+  real(8),intent(inout):: chg(namax),tcom
 
   integer:: istp,i,istp_pos,istp_conv,is,ntot,ierr
-  real(8):: eclong,epot,epotp,epotpp,eMorse,fqnorm,vqnorm,dt,alpha,p &
-       ,ecoul,ecshort,eself,dtmax
+  real(8):: epot,epotp,epotpp,eMorse,fqnorm,vqnorm,dt,alpha,p &
+       ,ecoul,dtmax
   real(8),save,allocatable:: vq(:),fq(:)
   logical,save,allocatable:: lqfix(:)
 
-!!$  character(len=128),parameter:: algorithm = 'damping'
-!!$  character(len=128),parameter:: algorithm = 'FIRE'
-
-!!$  integer,parameter:: nstp_dampopt = 1000
-!!$  real(8),parameter:: dt_dampopt = 0.001  ! 0.005 fs
-!!$  real(8),parameter:: amassq = 0.002
-!!$  real(8),parameter:: qtot = 0d0
-!!$!.....Simple velocity damping
-!!$  real(8),parameter:: fdamp = 0.95
-!!$!.....FIRE parameters 
-!!$  integer,parameter:: nstp_min = 3
-!!$  integer,parameter:: nstp_conv = 3
-!!$  real(8),parameter:: finc = 1.1d0
-!!$  real(8),parameter:: fdec = 0.5d0
-!!$  real(8),parameter:: alpha0 = 0.1d0
-!!$  real(8),parameter:: falpha = 0.99d0
 !.....small value for checking range
   real(8),parameter:: qeps   = 1d-10
 
@@ -1228,15 +1213,11 @@ subroutine chgopt_damping(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
     call accum_mem('force_common',8*size(vq) +8*size(fq) +4*size(lqfix))
   endif
 
-
   call mpi_allreduce(natm,ntot,1,mpi_integer, &
        mpi_sum,mpi_md_world,ierr)
   
 !.....Gather forces on charges
   fq(1:namax) = 0d0
-  ecshort = 0d0
-  eclong = 0d0
-  eself = 0d0
   istp = 0
 
   lqfix(1:namax) = .false.
@@ -1258,38 +1239,20 @@ subroutine chgopt_damping(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
          //'fixed at upper/lower bounds.'
     return
   endif
-!!$  if( use_force('Ewald_long') ) then
-  if( trim(cterms).eq.'long' ) then
-    call qforce_self(namax,natm,tag,chg,fq,eself)
-    call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_md_world, &
-         myid,iprint,fq,eclong)
-!!$  else if( use_force('Ewald') ) then
-  else if( trim(cterms).eq.'full' ) then
-    call qforce_self(namax,natm,tag,chg,fq,eself)
-    call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
-         ,rc,fq,ecshort)
-    call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_md_world, &
-         myid,iprint,fq,eclong)
-  else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
-    call qforce_self(namax,natm,tag,chg,fq,eself)
-    call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
-         ,rc,fq,ecshort)
-  else if( trim(cterms).eq.'screened_cut'  ) then
-    call qforce_self(namax,natm,tag,chg,fq,eself)
-    call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
-         ,rc,fq,ecshort,l1st)
-  endif
-  epot = eself +ecshort + eclong
+  call bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
+       ,natm,nb,nnn,myid,myparity,lsrc &
+       ,nex,mpi_md_world,chg,boundary)
+  call get_qforce(namax,natm,nnmax,tag,ra,chg,h,lspr,d2lspr,rc,sorg, &
+       tcom,myid,mpi_md_world,iprint,fq,epot,l1st)
+!!$  if( use_force('vcMorse') ) then
+!!$    eMorse = 0d0
+!!$    call qforce_vcMorse(namax,natm,tag,ra,fq,nnmax,chg &
+!!$         ,h,tcom,rc,lspr,mpi_md_world,myid,eMorse,iprint,.true.)
+!!$    epot = epot + eMorse
+!!$  endif
 
-  if( use_force('vcMorse') ) then
-    eMorse = 0d0
-    call qforce_vcMorse(namax,natm,tag,ra,fq,nnmax,chg &
-         ,h,tcom,rc,lspr,mpi_md_world,myid,eMorse,iprint,.true.)
-    epot = epot + eMorse
-  endif
 !.....Set fq(i)=0, if lqfix(i)
   do i=1,natm
-!!$    print '(a,i6,es12.4)','i,fq=',i,fq(i)
     if( lqfix(i) ) then
       fq(i) = 0d0
       vq(i) = 0d0
@@ -1298,7 +1261,7 @@ subroutine chgopt_damping(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
   call suppress_fq(namax,natm,fq,myid,mpi_md_world)
   call get_average_fq(namax,natm,fq,avmu,lqfix,myid,mpi_md_world)
   if( myid.eq.0 .and. iprint.ge.ipl_debug ) then
-    write(6,'(a,i6,4es12.4)') ' istp,eself,eshort,elong,epot= ',0,eself,ecshort,eclong,epot
+!!$    write(6,'(a,i6,4es12.4)') ' istp,eself,eshort,elong,epot= ',0,eself,ecshort,eclong,epot
     write(6,'(a,i5,20es11.3)') ' istp,avmu,fqs = ',istp,avmu,fq(1:min(natm,10))
   endif
 
@@ -1310,9 +1273,8 @@ subroutine chgopt_damping(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
     if( lqfix(i) ) cycle
     fq(i) = fq(i) -avmu
   enddo
-!!$  fq(1:natm) = fq(1:natm) -avmu
 
-  vq(1:natm) = 0d0
+  vq(:) = 0d0
   istp_pos = 0
   istp_conv = 0
   alpha = alpha0_codmp
@@ -1348,9 +1310,6 @@ subroutine chgopt_damping(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
     endif
 !.....update charges
     chg(1:natm)= chg(1:natm) +vq(1:natm)*dt
-    call bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
-         ,natm,nb,nnn,myid,myparity,lsrc &
-         ,nex,mpi_md_world,chg,boundary)
 !.....Check charges
     if( iprint.ge.ipl_debug ) then
       do i=1,natm
@@ -1362,11 +1321,6 @@ subroutine chgopt_damping(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
       enddo
     endif
 
-!.....get new qforces
-    eclong = 0d0
-    ecshort = 0d0
-    eself = 0d0
-    fq(1:namax) = 0d0
     call impose_qtot(namax,natm,chg,qtot_codmp,lqfix,myid,mpi_md_world,iprint)
 !.....Fix charges to make them within the given ranges
     lqfix(:) = .false.
@@ -1387,34 +1341,19 @@ subroutine chgopt_damping(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
            //'fixed at upper/lower bounds.'
       return
     endif
-!!$    if( use_force('Ewald_long') ) then
-    if( trim(cterms).eq.'long' ) then
-      call qforce_self(namax,natm,tag,chg,fq,eself)
-      call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_md_world, &
-           myid,iprint,fq,eclong)
-!!$    else if( use_force('Ewald') ) then
-    else if( trim(cterms).eq.'full' ) then
-      call qforce_self(namax,natm,tag,chg,fq,eself)
-      call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
-           ,rc,fq,ecshort)
-      call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_md_world, &
-           myid,iprint,fq,eclong)
-    else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
-      call qforce_self(namax,natm,tag,chg,fq,eself)
-      call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
-           ,rc,fq,ecshort)
-    else if( trim(cterms).eq.'screened_cut'  ) then
-      call qforce_self(namax,natm,tag,chg,fq,eself)
-      call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
-           ,rc,fq,ecshort,l1st)
-    endif
-    epot = eself +ecshort + eclong
-    if( use_force('vcMorse') ) then
-      eMorse = 0d0
-      call qforce_vcMorse(namax,natm,tag,ra,fq,nnmax,chg &
-           ,h,tcom,rc,lspr,mpi_md_world,myid,eMorse,iprint,.false.)
-      epot = epot + eMorse
-    endif
+    call bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
+         ,natm,nb,nnn,myid,myparity,lsrc &
+         ,nex,mpi_md_world,chg,boundary)
+!.....Get new forces on charges
+    fq(1:namax) = 0d0
+    call get_qforce(namax,natm,nnmax,tag,ra,chg,h,lspr,d2lspr,rc,sorg, &
+         tcom,myid,mpi_md_world,iprint,fq,epot,l1st)
+!!$    if( use_force('vcMorse') ) then
+!!$      eMorse = 0d0
+!!$      call qforce_vcMorse(namax,natm,tag,ra,fq,nnmax,chg &
+!!$           ,h,tcom,rc,lspr,mpi_md_world,myid,eMorse,iprint,.false.)
+!!$      epot = epot + eMorse
+!!$    endif
 
 !.....Set fq(i)=0, if lqfix(i)
     do i=1,natm
@@ -1434,7 +1373,6 @@ subroutine chgopt_damping(namax,natm,tag,h,ra,chg,nnmax,lspr,rc, &
       fq(i) = fq(i) -avmu
     enddo
     if( myid.eq.0 .and. iprint.ge.ipl_debug ) then
-!!$      write(6,'(a,i6,4es12.4)') ' istp,eself,eshort,elong,epot= ',istp,eself,ecshort,eclong,epot
       write(6,'(a,i5,2es12.4,20es11.3)') ' istp,epot/ntot,de/ntot,avmu,fqs= ',istp &
            ,epot/ntot,abs(epot-epotp)/ntot,avmu, & !fq(1:min(natm,10))
            chg(1),chg(57),chg(81),chg(97)
@@ -1638,5 +1576,5 @@ subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg &
 end subroutine get_gradw
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

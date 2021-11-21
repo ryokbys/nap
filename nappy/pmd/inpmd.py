@@ -43,6 +43,7 @@ _entry_to_varname = {
     'zload_type': 'czload_type',
     'final_strain': 'strfin',
     'boundary': 'boundary',
+    'max_num_neighbors': 'nnmax',
 }
 
 _default_params = {
@@ -83,6 +84,7 @@ _default_params = {
     'zload_type': 'none',
     'final_strain': 0.0,
     'boundary': 'ppp',
+    'max_num_neighbors': 200,
 }
 
 _int_keys = [
@@ -90,7 +92,7 @@ _int_keys = [
     'num_iteration','num_out_energy','flag_out_pmd',
     'num_out_pmd','flag_damping',
     'converge_num','min_iteration','flag_sort',
-    'print_level',
+    'print_level','max_num_neighbors',
 ]
 _float_keys = [
     'time_interval','cutoff_radius','cutoff_buffer',

@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-19 11:50:59 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-21 21:14:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -104,17 +104,17 @@ module Coulomb
 !.....Average mu (chemical potential)
   real(8):: avmu
 !.....Convergence criterion for QEq in eV/atom
-  real(8):: crit_codmp = 1.0d-6
+  real(8):: crit_codmp = 1.0d-3
 !.....chgopt-damping related parameters
   character(len=20):: codmp_method = 'damping' ! or FIRE or damping
-  integer:: nstp_codmp = 1000
+  integer:: nstp_codmp = 100
   real(8):: dt_codmp = 0.005d0  ! fs
   real(8):: qmass_codmp = 0.002d0  ! atomic mass unit
   real(8):: qtot_codmp = 0d0
   integer:: minstp_codmp = 3
   integer:: minstp_conv_codmp = 3
 !.....Velocity-damping related parameters
-  real(8):: fdamp_codmp = 0.95d0
+  real(8):: fdamp_codmp = 0.7d0
 !.....FIRE-related parameters
   real(8):: finc_codmp = 1.1d0
   real(8):: fdec_codmp = 0.5d0
@@ -1157,7 +1157,8 @@ contains
 !!$         ,mpi_sum,mpi_md_world,ierr)
     epott = esr +elr +eself
     epot= epot +epott
-    if( iprint.ge.ipl_info ) print *,'epot Coulomb = ',epott
+    if( iprint.ge.ipl_info ) print *,'epot Coulomb,self,short,long = ', &
+         epott,eself,esr,elr
 
   end subroutine force_Coulomb
 !=======================================================================
@@ -1811,6 +1812,10 @@ contains
 !!$          esrl = esrl +tmp
 !!$        endif
         epi(i)= epi(i) +tmp
+!!$        if( itotOf(tag(i)).eq.92 ) then
+!!$          print '(a,i6,2i4,f7.3,3es12.4)','j,jtot,js,qj,dij,tmp,epi=', &
+!!$               j,itotOf(tag(j)),js,qj,dij,tmp,epi(i)
+!!$        endif
         esrl = esrl +tmp
 !.....force
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
@@ -2197,7 +2202,7 @@ contains
   end subroutine qforce_short
 !=======================================================================
   subroutine qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h &
-       ,lspr,iprint,rc,fq,esr,l1st)
+       ,lspr,d2lspr,iprint,rc,fq,esr,l1st)
 !
 !  Compute q-force of screened_cut Coulomb potential.
 !
@@ -2205,7 +2210,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
     real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
-         h(3,3),rc
+         h(3,3),rc,d2lspr(nnmax,namax)
     real(8),intent(inout):: fq(namax),esr
     logical,intent(in):: l1st 
 
@@ -2245,6 +2250,7 @@ contains
       is= int(tag(i))
       qi = chg(i)
       do jj=1,lspr(0,i)
+        if( d2lspr(jj,i).ge.rc2 ) cycle
         j = lspr(jj,i)
         if( j.eq.0 ) exit
         if( j.le.i ) cycle
@@ -2255,11 +2261,11 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
-        if( dij.gt.rc2 ) cycle
+!!$        if( dij.gt.rc2 ) cycle
         dij = sqrt(dij)
         diji = 1d0/dij
-        dxdi(1:3)= -rij(1:3)*diji
-        dxdj(1:3)=  rij(1:3)*diji
+!!$        dxdi(1:3)= -rij(1:3)*diji
+!!$        dxdj(1:3)=  rij(1:3)*diji
         rhoij = rho_scr(is,js)
         terfc = erfc(dij/rhoij)
         vrc = vrcs(is,js)
@@ -2375,38 +2381,37 @@ contains
 
   end subroutine qforce_self
 !=======================================================================
-  subroutine get_qforce(namax,natm,nnmax,tag,ra,chg,h,lspr,rc,sorg, &
-       tcom,myid,mpi_world,iprint,fq,epot,l1st)
+  subroutine get_qforce(namax,natm,nnmax,tag,ra,chg,h,lspr,d2lspr, &
+       rc,sorg,tcom,myid,mpi_world,iprint,fq,epot,l1st)
 !
 !  Wrapper routine for calculating forces on charges.
 !
     integer,intent(in):: namax,natm,myid,mpi_world,iprint
     integer,intent(in):: nnmax,lspr(0:nnmax,namax)
     real(8),intent(in):: tag(namax),h(3,3),ra(3,namax),chg(namax),sorg(3),rc
+    real(8),intent(in):: d2lspr(nnmax,namax)
     logical,intent(in):: l1st
     real(8),intent(inout):: fq(namax),tcom,epot
 
     real(8):: eclong,eself,ecshort
     
+    call qforce_self(namax,natm,tag,chg,fq,eself)
+    
     if( trim(cterms).eq.'long' ) then
-      call qforce_self(namax,natm,tag,chg,fq,eself)
       call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_world, &
            myid,iprint,fq,eclong)
 !!$    else if( use_force('Ewald') ) then
     else if( trim(cterms).eq.'full' ) then
-      call qforce_self(namax,natm,tag,chg,fq,eself)
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshort)
       call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_world, &
            myid,iprint,fq,eclong)
     else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
-      call qforce_self(namax,natm,tag,chg,fq,eself)
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshort)
     else if( trim(cterms).eq.'screened_cut'  ) then
-      call qforce_self(namax,natm,tag,chg,fq,eself)
-      call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
-           ,rc,fq,ecshort,l1st)
+      call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h, &
+           lspr,d2lspr,iprint,rc,fq,ecshort,l1st)
     endif
     epot = eself +ecshort + eclong
     return
@@ -2757,8 +2762,8 @@ contains
     deallocate(bbs)
   end subroutine setup_kspace
 !=======================================================================
-  subroutine chgopt_matrix(namax,natm,h,ra,tag,chg,nnmax,lspr,rc, &
-       sorg,tcom,myid,mpi_world,iprint,l1st)
+  subroutine chgopt_matrix(namax,natm,h,ra,tag,chg,nnmax,lspr,d2lspr, &
+       rc,sorg,tcom,myid,mpi_world,iprint,l1st)
 !
 !  Charge optimization/equilibration by matrix inversion.
 !  THIS CODE IS NOT COMPLETE AND NOT YET AVAILABLE...
@@ -2766,6 +2771,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: h(3,3),ra(3,natm),tag(natm),rc,sorg(3)
+    real(8),intent(in):: d2lspr(nnmax,namax)
     logical,intent(in):: l1st
     real(8),intent(inout):: chg(natm),tcom
 
