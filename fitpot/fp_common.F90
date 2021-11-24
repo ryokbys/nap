@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-03-04 18:32:00 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 21:45:32 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -626,7 +626,7 @@ contains
     use Abell,only: set_paramsdir_Abell,set_params_Abell
     use fpc,only: set_paramsdir_fpc,set_params_fpc
     use angular,only: set_paramsdir_angular,set_params_angular
-    use EAM,only: set_paramsdir_EAM,set_params_EAM
+!!$    use EAM,only: set_paramsdir_EAM,set_params_EAM
 !!$    use NN2,only: set_paramsdir_NN2,set_params_NN2,get_NN2_hl1 &
 !!$         ,set_NN2_hl1,set_sigtype_NN2
     use DNN,only: set_paramsdir_DNN,set_params_DNN,set_actfunc_DNN
@@ -682,10 +682,10 @@ contains
       call set_params_Coulomb(1,x(1),cpot, &
            smpl%specorder,iprint)
       call set_params_fpc(ndim-1,x(2:ndim),cpot,interact)
-    else if( trim(cpot).eq.'EAM' ) then
-      call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
-           //'/pmd')
-      call set_params_EAM(ndim,x)
+!!$    else if( trim(cpot).eq.'EAM' ) then
+!!$      call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
+!!$           //'/pmd')
+!!$      call set_params_EAM(ndim,x)
     else if( trim(cpot).eq.'linreg' ) then
 !.....Set lfitpot in descriptor module to let it know that it is called from fitpot
       lfitpot_desc = .true.

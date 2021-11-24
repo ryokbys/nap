@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-09 10:44:21 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-24 21:36:41 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -135,16 +135,10 @@ program prec_mc
 !   poscars/POSCAR_######: Cell info and atom coordinations
 !-----------------------------------------------------------------------
   use pmc
+  use random,only: urnd, set_seed
   implicit none 
   include "mpif.h"
   include "./params_unit.h"
-
-  interface
-    function urnd(dseed0)
-      real(8),intent(in),optional:: dseed0
-      real(8):: urnd
-    end function urnd
-  end interface
 
   integer:: i,j,k,l,m,n,ierr
   integer:: ihour,imin,isec,iday
@@ -161,7 +155,8 @@ program prec_mc
     call read_in_pmc(ionum_inp, cinpfname)
   endif
 !.....set random seed
-  t1 = urnd(dseed0)
+  call set_seed(dseed0)
+  t1 = urnd()
   
   call bcast_params(myid_md,mpi_md_world,lkinetic, &
        nstps_mc,ncx,ncy,ncz,alat,num_Mg,num_Si,num_Vac, &
@@ -294,6 +289,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
 !
 ! Kinetic MC simulation using
 !
+  use random,only: urnd
   implicit none
   include 'mpif.h'
   integer,intent(in):: mpi_md_world,nodes_md,myid_md,myx,myy,myz &
@@ -317,13 +313,6 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
        ,cjtmp(:)
   integer,external:: cs2is,check_history
   real(8),external:: epot2efrm
-  interface
-    function urnd(dseed0)
-      real(8),intent(in),optional:: dseed0
-      real(8):: urnd
-    end function urnd
-  end interface
-
 
   real(8),parameter:: fkb = 8.61733035d-5  ! eV/K
   integer,parameter:: ioerg = 30
@@ -808,17 +797,12 @@ subroutine make_tag(natm,csymbols,tag)
 end subroutine make_tag
 !=======================================================================
 subroutine random_symbols(natm,csymbols,num_Mg,num_Si,num_Vac)
+  use random,only: urnd
   implicit none
   integer,intent(in):: natm,num_Mg,num_Si,num_Vac
   character,intent(inout):: csymbols(natm)
 
   integer:: i,img,isi,ivac,irnd
-  interface
-    function urnd(dseed0)
-      real(8),intent(in),optional:: dseed0
-      real(8):: urnd
-    end function urnd
-  end interface
 
   img = num_Mg
   isi = num_Si
@@ -857,18 +841,13 @@ end subroutine random_symbols
 !=======================================================================
 subroutine clustered_symbols(natm,pos0,csymbols &
      ,num_Mg,num_Si,num_Vac,nnmaxmc,lsprmc,num_Al_clst)
+  use random,only: urnd
   implicit none
   integer,intent(in):: natm,num_Mg,num_Si,num_Vac, &
        nnmaxmc,lsprmc(0:nnmaxmc,natm),num_Al_clst
   character,intent(inout):: csymbols(natm)
   real(8),intent(in):: pos0(3,natm)
 
-  interface
-    function urnd(dseed0)
-      real(8),intent(in),optional:: dseed0
-      real(8):: urnd
-    end function urnd
-  end interface
   integer:: i,jj,j,k,irnd,nsol,isol,icntr,nmg,nsi,nvac,inc,nal
   real(8):: cntr(3),dmin,d,r,rMg,rSi,rAl,rc
   character,allocatable:: carr(:)
@@ -952,19 +931,13 @@ end subroutine clustered_symbols
 !=======================================================================
 subroutine paired_symbols(natm,pos0,csymbols,&
      num_Mg,num_Si,num_Vac,nnmax,lspr,cpair_type)
+  use random,only: urnd
   implicit none
   integer,intent(in):: natm,num_Mg,num_Si,num_Vac &
        ,nnmax,lspr(0:nnmax,natm)
   character,intent(in):: cpair_type*2
   character,intent(inout):: csymbols(natm)
   real(8),intent(in):: pos0(3,natm)
-
-  interface
-    function urnd(dseed0)
-      real(8),intent(in),optional:: dseed0
-      real(8):: urnd
-    end function urnd
-  end interface
 
   integer:: npair,ipair,irnd,n,ichosen,jchosen,jj,i,j
   character:: cpairs(2,natm),c1,c2

@@ -26,16 +26,15 @@ MAKEFLAGS += --no-print-directory
 endif
 
 pmd= read_input.o pmd_main.o
-pmdobj= util_rnd.o lasubs.o common_parallel.o sort.o pmd_core.o 
-pmc= prec_mc.o util_rnd.o read_input.o pmd_core.o \
-	lasubs.o common_parallel.o sort.o
+pmdobj= lasubs.o common_parallel.o sort.o pmd_core.o 
+pmc= prec_mc.o read_input.o pmd_core.o lasubs.o common_parallel.o sort.o
 comb= node_conv.o
 
 mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o mod_version.o mod_force.o \
 	mod_ttm.o descriptor.o metadynamics.o mod_constraints.o mod_vector.o \
 	mod_rdcfrc.o mod_structure.o mod_deform.o mod_util.o mod_element.o \
 	mod_extforce.o mod_colorcharge.o mod_localflux.o mod_pdens.o mod_time.o \
-	mod_pairlist.o mod_memory.o
+	mod_pairlist.o mod_memory.o mod_random.o
 args= iargc.o getarg.o
 
 force_common= force_common.o
@@ -152,7 +151,7 @@ force_Morse.o: ${mods} force_Coulomb.o
 force_angular.o: ${mods}
 mod_constraints.o: mod_vector.o mod_util.o
 mod_rdcfrc.o: mod_structure.o mod_util.o
-mod_ttm.o: mod_pmdvars.o mod_util.o mod_memory.o
+mod_ttm.o: mod_pmdvars.o mod_util.o mod_memory.o mod_random.o
 mod_pmdio.o: mod_pmdvars.o mod_util.o mod_time.o mod_vector.o
 mod_pairlist.o: mod_memory.o
 mod_util.o: mod_pmdvars.o mod_vector.o

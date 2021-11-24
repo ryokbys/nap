@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-11-24 16:11:55 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-24 21:38:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -10,6 +10,7 @@ module ttm
 !
   use memory,only: accum_mem
   use vector,only: dot
+  use random,only: box_muller
   implicit none
   save
   include 'mpif.h'
@@ -1245,7 +1246,6 @@ contains
     real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0,vt(3)&
          ,aain(3),aaout(3),vin(3),vout(3),v0(3)
     real(8):: ediffl(nspmax),deinl(nspmax),deoutl(nspmax)
-    real(8),external:: box_muller
     logical,save:: l1st = .true.
 
     if( l1st ) then
@@ -1363,7 +1363,6 @@ contains
 
     integer:: i,nabcl,nabc,ierr,isp,ic
     real(8):: xdnr,area,xi,hxi,areatom,vx,ami,zimp,sgmi,axi
-    real(8),external:: box_muller
     
     xdnr = dnr/h(1,1)
     area = h(2,2)*h(3,3)

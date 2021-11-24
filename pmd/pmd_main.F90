@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-11-22 18:38:18 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-24 21:36:23 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -27,6 +27,7 @@ program pmd
   use time, only: time_stamp, accum_time, report_time
   use memory, only: accum_mem, report_mem
   use element
+  use random,only: urnd, set_seed
   use clrchg,only: lclrchg,init_clrchg
   use localflux,only: lflux,init_lflux,final_lflux
   use pdens,only: lpdens,init_pdens,final_pdens
@@ -54,7 +55,6 @@ program pmd
   real(8):: t0,t1
   character(len=3):: csp
   type(atom):: elem
-  real(8),external:: urnd
 
 !-----initialize the MPI environment
   call mpi_init(ierr)
@@ -132,11 +132,8 @@ program pmd
     if( num_forces.eq.0 ) stop ' ERROR: no force-field specified'
 
 !.....Initialize random seeds in the function urnd
-    if( rseed.ge.0d0 ) then
-      tmp = urnd(rseed+myid_md)
-    else
-      tmp = urnd(abs(rseed))
-    endif
+    if( rseed.ge.0d0 ) call set_seed(rseed+myid_md)
+    tmp = urnd()
     
     if( trim(ctctl).eq.'ttm' ) then
       print *,''
@@ -835,6 +832,7 @@ subroutine add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
 ! Add PKA velocity to some atom from a given PKA energy
 ! 
   use pmdvars
+  use random,only: urnd
   implicit none
   include './params_unit.h'
   integer,intent(in):: ntot0
@@ -843,13 +841,6 @@ subroutine add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
 
   integer:: i,icntr,is
   real(8):: dmin,d,theta,phi,rx,ry,rz,vel,vx,vy,vz
-  interface
-    function urnd(dseed0)
-      real(8),intent(in),optional:: dseed0
-      real(8):: urnd
-    end function urnd
-  end interface
-!      real(8),external:: urnd
 
   if( myid_md.eq.0 ) then
     if( iatom_pka.le.0 ) then

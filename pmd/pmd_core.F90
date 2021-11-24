@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-11-24 11:51:36 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-24 21:38:26 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -12,6 +12,7 @@ subroutine pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   use zload
   use force
   use vector,only: dot
+  use random,only: box_muller
   use ttm,only: init_ttm,langevin_ttm,output_ttm, &
        calc_Ta,update_ttm,assign_atom2cell,output_energy_balance, &
        remove_ablated_atoms,set_inner_dt, te2tei, non_reflecting_bc, &
@@ -49,7 +50,6 @@ subroutine pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   integer:: ihour,imin,isec
   real(8):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp, &
        htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow
-  real(8),external:: box_muller
   logical:: l1st
   logical:: lconverged = .false.
   logical:: lstrs = .false.
@@ -2489,6 +2489,7 @@ subroutine sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 end subroutine sa2stnsr
 !=======================================================================
 subroutine setv(h,hi,natm,tag,va,nspmax,am,tinit,dt)
+  use random,only: box_muller
   implicit none
   include 'mpif.h'
   include 'params_unit.h'
@@ -2498,7 +2499,6 @@ subroutine setv(h,hi,natm,tag,va,nspmax,am,tinit,dt)
   real(8),intent(out):: va(3,natm)
   integer:: i,l,is
   real(8):: dseed,sumvx,sumvy,sumvz,tmp,facv(nspmax),vt(3)
-  real(8),external:: box_muller
 
 !      facv(1:nspmax)=dsqrt(tinit*fkb*ev2j /(am(1:nspmax)*amu2kg))
 !     &     *m2ang /s2fs
