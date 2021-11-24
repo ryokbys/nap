@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-07-15 07:41:49 Ryo KOBAYASHI>
+!                    Last modified: <2021-11-24 11:53:36 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -154,7 +154,7 @@ module pmdvars
   integer:: nstp_done
   integer:: nouterg,noutpmd,istp,iocntpmd,iocnterg
   integer:: natm,nb,nsp,nalmax
-  real(8):: tcpu,tcpu0,tcpu1,tcpu2,tcom,tlspr
+  real(8):: tcpu,tcpu0,tcpu1,tcpu2,tlspr
   real(8):: epot0,vmaxold,vmax,simtime
   real(8):: tgmm
   real(8),allocatable:: tfac(:),ediff(:),ediff0(:),temp(:),ekl(:)
@@ -164,6 +164,7 @@ module pmdvars
   real(8):: ts,te
   integer:: istpe
 !.....simulation box
+  real(8):: h(3,3,0:1)
   real(8):: hi(3,3),vol,sgm(3,3),al(3),avol
   real(8):: ht(3,3,0:1),hti(3,3),dh
 !.....positions, velocities, and accelerations

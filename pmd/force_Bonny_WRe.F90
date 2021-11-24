@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-05 23:38:35 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 11:47:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -144,7 +144,7 @@ module Bonny_WRe
        /)
   
 contains
-  subroutine force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
@@ -156,7 +156,6 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -233,7 +232,7 @@ contains
     enddo
 
 !-----copy rho of boundary atoms
-    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+    call copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex,&
          lsrc,myparity,nn,sv,mpi_md_world,rho,1)
 
 !-----dE/dr_i
@@ -308,7 +307,7 @@ contains
     enddo
 
     if( lstrs ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
 !!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif

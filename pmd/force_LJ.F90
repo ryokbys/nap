@@ -27,7 +27,7 @@ module LJ
   integer:: rpl_n(msp,msp)
   
 contains
-  subroutine force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
@@ -43,7 +43,6 @@ contains
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
          ,tag(namax),sv(3,6)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
@@ -129,7 +128,7 @@ contains
     endif
   end subroutine force_LJ
 !=======================================================================
-  subroutine force_LJ_repul(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_LJ_repul(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
 !
@@ -144,7 +143,6 @@ contains
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
          ,tag(namax),sv(3,6)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st 
     logical:: lstrs

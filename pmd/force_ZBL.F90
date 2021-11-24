@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-27 14:46:49 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 11:48:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -168,7 +168,7 @@ contains
     return
   end subroutine read_params_ZBL
 !=======================================================================
-  subroutine force_ZBL(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_ZBL(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
@@ -180,7 +180,6 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -273,7 +272,7 @@ contains
 
   end subroutine force_ZBL
 !=======================================================================
-  subroutine force_ZBL_overlay(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_ZBL_overlay(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
 !
@@ -293,7 +292,6 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -397,7 +395,7 @@ contains
       enddo
     enddo  ! i=
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex &
          ,lsrc,myparity,nn,mpi_md_world,aal,3)
     aa(1:3,1:natm) = aa(1:3,1:natm) +aal(1:3,1:natm)
 

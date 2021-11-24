@@ -2,7 +2,7 @@ module Ramas_FeH
 
 contains
   subroutine force_Ramas_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint) 
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM Ackland model for Fe (iron) and H.
@@ -21,7 +21,6 @@ contains
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
@@ -86,11 +85,11 @@ contains
       enddo
     enddo
 
-    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+    call copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex,&
          lsrc,myparity,nn,sv,mpi_md_world,rho,1)
 !!$    if( myid_md.ge.0 ) then
 !!$!.....copy rho of boundary atoms
-!!$      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
+!!$      call copy_rho_ba(namax,natm,nb,nbmax,lsb &
 !!$           ,lsrc,myparity,nn,sv,mpi_md_world,rho)
 !!$    else
 !!$      call distribute_dba(natm,namax,tag,rho,1)
@@ -185,11 +184,11 @@ contains
       epotl=epotl +vemb
     enddo
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,strs,9)
 !!$    if( myid_md.ge.0 ) then
 !!$!.....copy strs of boundary atoms
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,lsrc,myparity &
 !!$           ,nn,mpi_md_world,strs,9)
 !!$    else
 !!$      call reduce_dba_bk(natm,namax,tag,strs,9)
@@ -212,7 +211,7 @@ contains
   end subroutine force_Ramas_FeH
 !=======================================================================
   subroutine force_Ackland_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,mpi_md_world &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,mpi_md_world &
        ,myid_md,epi,epot,nismax,lstrs,iprint) 
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM Ackland model for Fe (iron).
@@ -230,7 +229,6 @@ contains
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
@@ -284,9 +282,9 @@ contains
     enddo
 
 !.....copy rho of boundary atoms
-    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+    call copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex,&
          lsrc,myparity,nn,sv,mpi_md_world,rho,1)
-!!$    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
+!!$    call copy_rho_ba(namax,natm,nb,nbmax,lsb &
 !!$         ,lsrc,myparity,nn,sv,mpi_md_world,rho)
 
 !.....dE/dr_i
@@ -346,16 +344,16 @@ contains
       epotl=epotl +tmp
     enddo
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,strs,9)
 !!$    if( myid_md.ge.0 ) then
 !!$!-----copy strs of boundary atoms
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,lsrc,myparity &
 !!$           ,nn,mpi_world,strs,9)
 !!$    else
 !!$      call reduce_dba_bk(natm,namax,tag,strs,9)
 !!$    endif
-!!$    call copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
+!!$    call copy_strs_ba(namax,natm,nb,nbmax,lsb &
 !!$         ,lsrc,myparity,nn,sv,mpi_md_world,strs)
 !!$!.....atomic level stress in [eV/Ang^3] assuming 1 Ang thick
 !!$    do i=1,natm

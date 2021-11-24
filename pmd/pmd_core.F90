@@ -1,9 +1,9 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-11-21 21:24:23 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-24 11:51:36 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
-subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
+subroutine pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
      ,ekitot,epitot,auxtot,epot,ekin,stnsr)
 !.....All the arguments are in pmdvars module
   use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump
@@ -39,7 +39,8 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   integer,intent(in):: ntot0
   integer,intent(out):: ntot
   real(8),intent(in):: hunit
-  real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),h(3,3,0:1)
+  real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0), &
+       hmat(3,3,0:1)
   real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0), &
        ekitot(3,3,ntot0),epitot(ntot0),auxtot(naux,ntot0)
   real(8),intent(out):: epot,ekin,stnsr(3,3)
@@ -68,6 +69,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   character(len=20):: cftave  = 'f12.2' ! or 'es12.4' for high-T
 
   tcpu0= mpi_wtime()
+  h(:,:,:) = hmat(:,:,:)  ! use pmdvars variable h instead of hmat
   call initialize_pmdvars()
   call calc_nfmv(ntot0,tagtot)
 
@@ -155,7 +157,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   endif
 !.....perform space decomposition after reading atomic configuration
   tmp = mpi_wtime()
-  call space_decomp(h,ntot0,tagtot,rtot,vtot,auxtot)
+  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
   call accum_time('space_decomp',mpi_wtime()-tmp)
 !.....Some conversions
   do i=1,natm
@@ -180,7 +182,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
          call error_mpi_stop('mod(ntdst,nx).ne.0')
     allocate(tdst(ntdst),nadst(ntdst))
   endif
-
 
 !-----setup
   call setup(nspmax,am,fekin,fa2v)
@@ -311,7 +312,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   endif
 
   tcpu1= mpi_wtime()
-  tcom = 0d0
 
   call init_force(namax,natm,nspmax,nsp,tag,aux,naux,myid_md,mpi_md_world, &
        iprint,h,rc,lvc,ifcoulomb,specorder,am,.true.)
@@ -347,10 +347,13 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   lcell_updated = .true.
   tmp = mpi_wtime()
   call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
        ,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
        ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
   call accum_time('get_force',mpi_wtime()-tmp)
+  if( epot*0d0 .ne. 0d0 ) then
+
+  endif
   lcell_updated = .false.
   lstrs = .false.
   epot= epot0
@@ -665,8 +668,6 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 !.....that of h-matrix actually used are in relation of transpose.
           if( .not. lcellfix(j,i) ) then
             h(i,j,0) = htmp(i,j)
-          else
-            h(i,j,0) = h(i,j,0)
           endif
         enddo
       enddo
@@ -731,7 +732,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 !-------Calc forces
     tmp = mpi_wtime()
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-         ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+         ,h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
          ,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
     call accum_time('get_force',mpi_wtime()-tmp)
@@ -1102,6 +1103,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
       atot(1:3,i) = aai(1:3)
     enddo
   endif
+  hmat(:,:,:) = h(:,:,:)  ! Return h-matrix as hmat
 
 !.....Output metadynamics potential
   if( lmetaD ) then
@@ -1121,7 +1123,7 @@ subroutine pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
   deallocate(aux)
 end subroutine pmd_core
 !=======================================================================
-subroutine oneshot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
+subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
      ekitot,epitot,auxtot,ekin,epot,stnsr,linit)
 !
 !  In case that only one shot force calculation is required,
@@ -1135,7 +1137,7 @@ subroutine oneshot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
   include "./params_unit.h"
   include "./const.h"
   integer,intent(in):: ntot0
-  real(8),intent(in):: hunit,h(3,3,0:1)
+  real(8),intent(in):: hunit,hmat(3,3,0:1)
   real(8),intent(in):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
   real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0),auxtot(naux,ntot0)
   real(8),intent(out):: ekitot(3,3,ntot0),epitot(ntot0),ekin,epot,stnsr(3,3)
@@ -1150,6 +1152,7 @@ subroutine oneshot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
 
   ntot = ntot0
   call initialize_pmdvars()
+  h(:,:,:) = hmat(:,:,:)
 
   call set_domain_vars()
 !.....perform space decomposition after reading atomic configuration
@@ -1166,7 +1169,7 @@ subroutine oneshot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
     write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
     write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
   endif
-  call space_decomp(h,ntot0,tagtot,rtot,vtot,auxtot)
+  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
 
 !.....Some conversions
   nsp= 0
@@ -1186,7 +1189,6 @@ subroutine oneshot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
   call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
   tcpu1= mpi_wtime()
-  tcom = 0d0
 
   call init_force(namax,natm,nspmax,nsp,tag,aux,naux,myid_md,mpi_md_world, &
        iprint,h,rc,lvc,ifcoulomb,specorder,am,linit)
@@ -1203,7 +1205,7 @@ subroutine oneshot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
 
   if( iprint.ge.ipl_info ) print *,'get_force...'
   call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-       ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
        ,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
        ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
 
@@ -1230,7 +1232,7 @@ subroutine oneshot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
   return
 end subroutine oneshot
 !=======================================================================
-subroutine oneshot4fitpot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
+subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
      ekitot,epitot,auxtot,ekin,epot,stnsr,lcalcgrad,ndimp,maxisp, &
      gwe,gwf,gws,lematch,lfmatch,lsmatch)
 !
@@ -1250,7 +1252,7 @@ subroutine oneshot4fitpot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
   include "./params_unit.h"
   include "./const.h"
   integer,intent(in):: ntot0
-  real(8),intent(in):: hunit,h(3,3,0:1)
+  real(8),intent(in):: hunit,hmat(3,3,0:1)
   real(8),intent(in):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
   real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0),auxtot(naux,ntot0)
   real(8),intent(out):: ekitot(3,3,ntot0),epitot(ntot0),ekin,epot,stnsr(3,3)
@@ -1268,6 +1270,7 @@ subroutine oneshot4fitpot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
 
   ntot = ntot0
   call initialize_pmdvars()
+  h(:,:,:) = hmat(:,:,:)
 
   call set_domain_vars()
 !.....perform space decomposition after reading atomic configuration
@@ -1284,7 +1287,7 @@ subroutine oneshot4fitpot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
     write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
     write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
   endif
-  call space_decomp(h,ntot0,tagtot,rtot,vtot,auxtot)
+  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
 
 !.....Some conversions
   nsp= 0
@@ -1304,7 +1307,6 @@ subroutine oneshot4fitpot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
   call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
   tcpu1= mpi_wtime()
-  tcom = 0d0
 
   call init_force(namax,natm,nspmax,nsp,tag,aux,naux,myid_md,mpi_md_world, &
        iprint,h,rc,lvc,ifcoulomb,specorder,am,.true.)
@@ -1322,7 +1324,7 @@ subroutine oneshot4fitpot(hunit,h,ntot0,tagtot,rtot,vtot,atot,stot, &
   if( .not.lcalcgrad ) then
     if( iprint.ge.ipl_basic ) print *,'get_force...'
     call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-         ,h,hi,tcom,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+         ,h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
          ,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
          ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
     if( iprint.ge.ipl_basic ) print '(a,es15.7)',' Potential energy = ',epot
@@ -1787,7 +1789,7 @@ subroutine bacopy(l1st)
 !.....integer:: status(MPI_STATUS_SIZE)
   integer:: i,j,m,kd,kdd,kul,kuh,ku,ierr,iex,ix,iy,iz,itmp,istatus,iaux
   integer:: nav,maxna,maxb,inode,nsd,nrc,nbnew
-  real(8):: tcom1,tcom2,xi(3),rcv(3),asgm,tmp
+  real(8):: xi(3),rcv(3),asgm,tmp
   logical,external:: bbd
   real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
   logical:: lshort(3)
@@ -1948,7 +1950,6 @@ subroutine bacopy(l1st)
         nbnew= nbnew +lsb(0,ku)
       enddo
     else   ! long enough compared to rc for normal boundary-atom copy
-      tcom1=mpi_wtime()
       do kdd= -1,0
         ku=2*kd+kdd
         inode=nn(ku)
@@ -1983,9 +1984,6 @@ subroutine bacopy(l1st)
 
 200     continue
       enddo
-!-------Add the communication time to COMT
-      tcom2= mpi_wtime()
-      tcom=tcom+tcom2-tcom1
     endif
 
 !-------Error trap
@@ -2028,7 +2026,6 @@ subroutine bacopy_fixed()
 
   integer:: i,j,m,kd,kdd,ku,ierr,iex,ix,iy,iz,iaux
   integer:: inode,nsd,nrc,nbnew
-  real(8):: tcom1,tcom2 !,rcv(3),asgm
   real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
   logical,save:: l1st=.true.
   integer,save:: ndimbuf = 4
@@ -2053,9 +2050,6 @@ subroutine bacopy_fixed()
 
 !-----loop over x, y, & z directions
   do kd=1,3
-
-!-------To calculate the communication time
-    tcom1= mpi_wtime()
 
     if( nex(kd).gt.1 ) then
       do kdd= -1,0
@@ -2102,38 +2096,27 @@ subroutine bacopy_fixed()
       enddo
     endif
 
-!-------Add the communication time to COMT
-    tcom2= mpi_wtime()
-    tcom=tcom+tcom2-tcom1
-
 100 continue
   enddo
 
 end subroutine bacopy_fixed
 !=======================================================================
-subroutine bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
-     ,natm,nb,nn,myid_md,myparity,lsrc &
-     ,nex,mpi_md_world,chg,boundary)
+subroutine bacopy_chg_fixed(chg)
 !-----------------------------------------------------------------------
 !  Exchange only chg of boundary-atom
 !  This doesnt search using position, just send & recv data of atoms
 !    which were listed by 'bacopy'.
 !  This is called from dampopt in force_common.F90.
 !-----------------------------------------------------------------------
-  use pmdvars,only: nx,ny,nz
+  use pmdvars,only: nx,ny,nz,lsb,lsex,namax,natm,nbmax,nb,nn, &
+       myid_md,mpi_md_world,myparity,lsrc,nex,boundary
   use pmdmpi,only: nid2xyz
   implicit none
   include 'mpif.h'
-  integer,intent(in):: namax,nbmax,nn(6),natm,nb &
-       ,myid_md,myparity(3),mpi_md_world,nex(3)
-  integer,intent(inout):: lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6)
-  real(8),intent(inout):: tcom
   real(8),intent(inout):: chg(namax)
-  character(len=3),intent(in):: boundary
 
   integer:: i,j,kd,kdd,ku,ierr,iex,ix,iy,iz
   integer:: inode,nsd,nrc,nbnew
-  real(8):: tcom1,tcom2 !,rcv(3),asgm
   real(8),save,allocatable:: dbuf(:),dbufr(:)
   logical,save:: l1st=.true.
 
@@ -2155,9 +2138,6 @@ subroutine bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
 
 !-----loop over x, y, & z directions
   do kd=1,3
-
-!-------To calculate the communication time
-    tcom1= mpi_wtime()
 
     if( nex(kd).gt.1 ) then
       do kdd= -1,0
@@ -2193,10 +2173,6 @@ subroutine bacopy_chg_fixed(tcom,lsb,lsex,nbmax,namax &
       enddo
     endif
 
-!-------Add the communication time to COMT
-    tcom2= mpi_wtime()
-    tcom= tcom +tcom2 -tcom1
-
 100 continue
   enddo
 
@@ -2219,7 +2195,7 @@ subroutine bamove()
 
   integer:: i,j,m,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is,ix,iy,iz,iaux
   integer:: mvque(0:nbmax,6),newim
-  real(8):: tcom1,tcom2,xi(3)
+  real(8):: xi(3)
   logical,external:: bmv
   real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
   logical,save:: l1st=.true.
@@ -2302,9 +2278,6 @@ subroutine bamove()
       stop
     endif
 
-!-------To calculate the communacation time
-    tcom1= mpi_wtime()
-
     do kdd= -1,0
 
       ku=2*kd+kdd
@@ -2343,9 +2316,6 @@ subroutine bamove()
       call mpi_barrier(mpi_md_world,ierr)
 
     enddo
-
-    tcom2= mpi_wtime()
-    tcom= tcom+tcom2-tcom1 
 
   enddo
 
@@ -2682,7 +2652,7 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
 !     &     ,ierr)
 end subroutine vfire
 !=======================================================================
-subroutine space_decomp(h,ntot0,tagtot,rtot,vtot,auxtot)
+subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
 !
 !  Decompose the system and scatter atoms to every process.
 !
@@ -2690,7 +2660,6 @@ subroutine space_decomp(h,ntot0,tagtot,rtot,vtot,auxtot)
   use clrchg,only: lclrchg
   implicit none
   include 'mpif.h'
-  real(8),intent(in):: h(3,3,0:1)
   integer,intent(in):: ntot0
   real(8),intent(inout):: rtot(3,ntot0),tagtot(ntot0)
   real(8),intent(in):: vtot(3,ntot0)
@@ -3387,15 +3356,28 @@ subroutine sanity_check(ekin,epot,stnsr,tave,myid,mpi_world)
   
   msg = ''
 
-  if( ekin*0d0 .ne. 0d0 ) msg = 'ERROR: ekin == NaN !'
-  if( epot*0d0 .ne. 0d0 ) msg = 'ERROR: epot == NaN !'
+  if( epot*0d0 .ne. 0d0 ) then
+    msg = 'ERROR: epot == NaN !'
+    goto 10
+  endif
+  if( ekin*0d0 .ne. 0d0 ) then
+    msg = 'ERROR: ekin == NaN !'
+    goto 10
+  endif
   do j=1,3
     do i=1,3
-      if( stnsr(i,j)*0d0 .ne. 0d0 ) msg = 'ERROR: stnsr(i,j) == NaN !'
+      if( stnsr(i,j)*0d0 .ne. 0d0 ) then
+        msg = 'ERROR: stnsr(i,j) == NaN !'
+        goto 10
+      endif
     enddo
   enddo
-  if( tave .gt. temp_insane ) msg = 'ERROR: too high temperature (tave > temp_insane) !'
-  
+  if( tave .gt. temp_insane ) then
+    msg = 'ERROR: too high temperature (tave > temp_insane) !'
+    goto 10
+  endif
+
+10 continue
   call mpi_bcast(msg,128,mpi_character,0,mpi_world,ierr)
   if( trim(msg).ne.'' ) then
     if( myid.eq.0 ) then

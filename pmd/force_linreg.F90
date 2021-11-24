@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2020-03-09 12:08:25 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 11:46:30 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -53,7 +53,7 @@ module linreg
           /)
 
 contains
-  subroutine force_linreg_old(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_linreg_old(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint)
     implicit none
@@ -64,7 +64,7 @@ contains
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: tcom,rc
+    real(8),intent(inout):: rc
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
@@ -139,7 +139,7 @@ contains
     enddo
 
 #ifdef __FITPOT__
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,dbna,3*nelem)
     do ia=1,natm
       do ielem=1,nelem
@@ -150,7 +150,7 @@ contains
     close(81)
 #endif
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa,3)
 
 !-----gather epot
@@ -162,7 +162,7 @@ contains
     return
   end subroutine force_linreg_old
 !=======================================================================
-  subroutine force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use descriptor,only: gsfi,dgsfi,igsfi,nsf,calc_desci,make_gsf_arrays &
@@ -175,7 +175,7 @@ contains
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: tcom,rcin
+    real(8),intent(inout):: rcin
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st 
     logical:: lstrs
@@ -262,11 +262,11 @@ contains
       enddo
     enddo
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aal,3)
     aa(1:3,1:natm) = aa(1:3,1:natm) +aal(1:3,1:natm)
     if( lstrs ) then
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
            ,nn,mpi_world,strsl,9)
       strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)*0.5d0
     endif

@@ -1788,7 +1788,7 @@ contains
 !  which is used only in fitpot.
 !
     use pmdvars,only: namax,nbmax,natm,nb,lsb,nex,lsrc,myparity,nn &
-         ,lspr,tcom
+         ,lspr
     integer,intent(in):: mpi_world
     real(8),allocatable,intent(out):: dgsfa(:,:,:)
 
@@ -1815,7 +1815,7 @@ contains
         dgsfa(1:3,isf,ia) = dgsfa(1:3,isf,ia) +dgsf(1:3,isf,0,ia)
       enddo
     enddo
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,dgsfa,3*nsf)
     return
   end subroutine get_dsgnmat_force

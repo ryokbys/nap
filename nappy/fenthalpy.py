@@ -21,6 +21,8 @@ Options:
   --out4fp     Write out to a file in the fp.py data format. 
   --outfname OUTFILE
                Output file name for out4fp. [default: data.pmd.fenth]
+  --print-level IPRINT
+               Print level in pmd. [default: 0]
 """
 import os,sys
 from datetime import datetime
@@ -117,7 +119,7 @@ def calc_formation_enthalpy(ergs_react,erg_prod,coeffs):
     dH = -dH
     return dH
 
-def get_relaxed_energy(nsys,nstp=1000,dt=-2.0):
+def get_relaxed_energy(nsys,nstp=1000,dt=-2.0,print_level=0):
     """
     Perform pmd of relaxation and return the final potential energy.
     """
@@ -126,7 +128,7 @@ def get_relaxed_energy(nsys,nstp=1000,dt=-2.0):
     pmd.load_inpmd()
     pmd.set_params(stress_control='vc-Berendsen', pressure_target=0.0,
                    stress_target=[[0.,0.,0.],[0.,0.,0.],[0.,0.,0.]],
-                   stress_relax_time=50.0, print_level=0)
+                   stress_relax_time=50.0, print_level=print_level)
     pmd.run(nstp=nstp,dt=dt,ifdmp=1,dmp=0.99)
     return pmd.result['epot']
 
@@ -160,13 +162,13 @@ def main(args):
     perfu = args['--per-formula-unit']
     out4fp = args['--out4fp']
     ergs = args['--ergs']
+    iprint = int(args['--print-level'])
     if ergs != 'None':
         ergs = [ float(x) for x in args['--ergs'].split(',') ]
         if len(ergs) != len(files):
             raise ValueError('Number of files and ergs are not inconsistent.')
     
     print(' Working directory: ',os.getcwd())
-    
         
     product = nappy.io.read(files[0])
     reactants = [ nappy.io.read(f) for f in files[1:] ]
@@ -175,12 +177,13 @@ def main(args):
     for r in reactants:
         print(r.get_chemical_formula()+', ',end='')
     print('')
-
+    
     #...Compute coefficients of reactants
     coeffs = get_reactant_coeffs(reactants,product)
     print(' Coefficients, x_vec: ',)
     for i,r in enumerate(reactants):
         print('   {0:<12s} = {1:>5.2f}'.format(r.get_chemical_formula(),coeffs[i]))
+    sys.stdout.flush()
 
     if dry:
         return None
@@ -197,8 +200,9 @@ def main(args):
             erg_prod = ergs[0]
             ergs_react = [ x for x in ergs[1:] ]
     else:  #...Compute relaxation and get potential energies of given structures.
-        erg_prod = get_relaxed_energy(product,nstp=nstp,dt=dt)
-        ergs_react = [ get_relaxed_energy(r,nstp=nstp,dt=dt) for r in reactants ]
+        erg_prod = get_relaxed_energy(product,nstp=nstp,dt=dt,print_level=iprint)
+        ergs_react = [ get_relaxed_energy(r,nstp=nstp,dt=dt,print_level=iprint)
+                       for r in reactants ]
     print(' E of product, {0:s} = {1:.3f}'.format(product.get_chemical_formula(),erg_prod))
     print(' Es of reactants:')
     for i in range(len(ergs_react)):

@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-07-01 15:31:51 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 11:46:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -57,7 +57,7 @@ module DNN
 
 contains
 !=======================================================================
-  subroutine force_DNN(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_DNN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use descriptor,only: gsf,dgsf,igsf,nsf,nal,calc_desc,make_gsf_arrays, &
@@ -71,7 +71,7 @@ contains
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: tcom,rcin
+    real(8),intent(inout):: rcin
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -221,12 +221,12 @@ contains
     enddo
 
 !.....Send back forces on immigrant atoms
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aal,3)
     aa(1:3,1:natm) = aa(1:3,1:natm) +aal(1:3,1:natm)
 
 !.....Send back stresses on immigrant atoms
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,strsl,9)
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)*0.5d0
 

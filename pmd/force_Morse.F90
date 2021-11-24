@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-08-11 16:48:39 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 11:47:24 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -86,7 +86,7 @@ module Morse
   real(8),parameter:: ln_ecore = log(ecore)
 
 contains
-  subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
@@ -100,7 +100,6 @@ contains
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6),d2lspr(nnmax,namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -215,7 +214,7 @@ contains
     return
   end subroutine force_Morse
 !=======================================================================
-  subroutine force_Morse_repul(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_Morse_repul(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
 !
@@ -230,7 +229,6 @@ contains
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -328,7 +326,7 @@ contains
     enddo
 
     if( lstrs ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
 !!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
@@ -343,7 +341,7 @@ contains
   end subroutine force_Morse_repul
 !=======================================================================
   subroutine force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs,chg &
-       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
 !
 !  Variable-charge Morse potential.
@@ -358,7 +356,6 @@ contains
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6),chg(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
@@ -486,7 +483,7 @@ contains
     enddo
 
     if( lstrs ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
 !!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
@@ -501,7 +498,7 @@ contains
   end subroutine force_vcMorse
 !=======================================================================
   subroutine qforce_vcMorse(namax,natm,tag,ra,fq,nnmax,chg &
-       ,h,tcom,rc,lspr,mpi_md_world,myid,epot,iprint,l1st)
+       ,h,rc,lspr,mpi_md_world,myid,epot,iprint,l1st)
 !
 !  Variable-charge Morse potential.
 !  Morse parameters depend on atomic charges which vary time to time.
@@ -514,7 +511,6 @@ contains
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),rc &
          ,tag(namax),chg(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: epot,fq(namax)
     logical,intent(in):: l1st
 

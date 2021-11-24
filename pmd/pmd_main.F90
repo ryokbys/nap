@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-11-05 07:52:09 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-22 18:38:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -41,7 +41,7 @@ program pmd
   real(8),parameter:: epith = -0.1410d0
 #endif
 
-  real(8):: hunit,h(3,3,0:1)
+  real(8):: hunit,hmat(3,3,0:1)
   integer:: ntot0,ntot
   real(8),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
   real(8),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
@@ -80,13 +80,13 @@ program pmd
       ntot0 = get_ntot_bin(20,trim(cpmdini))
       allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
            ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0))
-      call read_pmdtot_bin(20,trim(cpmdini),ntot0,hunit,h,tagtot,rtot,vtot)
+      call read_pmdtot_bin(20,trim(cpmdini),ntot0,hunit,hmat,tagtot,rtot,vtot)
     else if( trim(ciofmt).eq.'ascii' ) then
       write(6,*) 'Read pmdini in ascii mode.'
       ntot0 = get_ntot_ascii(20,trim(cpmdini))
       allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
            ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0))
-      call read_pmdtot_ascii(20,trim(cpmdini),ntot0,hunit,h,tagtot,rtot,vtot)
+      call read_pmdtot_ascii(20,trim(cpmdini),ntot0,hunit,hmat,tagtot,rtot,vtot)
     else
       write(6,*) 'Error: io_format must be either ascii, ' &
            //'bin or binary.'
@@ -207,7 +207,7 @@ program pmd
 
   call bcast_params()
   call mpi_bcast(hunit,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(h,9*2,mpi_real8,0,mpi_md_world,ierr)
+  call mpi_bcast(hmat,9*2,mpi_real8,0,mpi_md_world,ierr)
 
 !.....Before allocating auxiliary array, set naux (num of auxiliary data)
   call set_use_charge()
@@ -252,7 +252,7 @@ program pmd
 
 !.....Determine nx,ny,nz using rc and hmat info
     if( .not. (nx.gt.0 .and. ny.gt.0 .and. nz.gt.0 ) ) then
-      call determine_division(h,myid_md,nprocs,rc,nx,ny,nz,iprint)
+      call determine_division(hmat,myid_md,nprocs,rc,nx,ny,nz,iprint)
     endif
 
 !.....Make ntot and ?tot() not null in nodes myid_md != 0
@@ -327,36 +327,36 @@ program pmd
 !.....Init for local flux
   if( lflux ) call init_lflux(myid_md,nx,ny,nz,lclrchg &
        ,nstp,mpi_md_world,iprint)
-  if( lpdens ) call init_pdens(myid_md,h,mpi_md_world,iprint)
+  if( lpdens ) call init_pdens(myid_md,hmat,mpi_md_world,iprint)
 
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then
-    call add_pka_velocity(ntot0,h,tagtot,rtot,vtot)
+    call add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
   endif
 
   call accum_time('overhead',mpi_wtime()-t0)
 !.....Call pmd_core to perform MD; all the arguments are in pmdvars module
-  call pmd_core(hunit,h,ntot0,ntot,tagtot,rtot,vtot,atot,stot, &
+  call pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot, &
        ekitot,epitot,auxtot,epot,ekin,stnsr)
 
   if( myid_md.eq.0 ) then
     tmp = mpi_wtime()
     if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-      call write_pmdtot_bin(20,cpmdfin,ntot,hunit,h, &
+      call write_pmdtot_bin(20,cpmdfin,ntot,hunit,hmat, &
              tagtot,rtot,vtot)
     elseif( trim(ciofmt).eq.'ascii' ) then
-      call write_pmdtot_ascii(20,cpmdfin,ntot,hunit,h, &
+      call write_pmdtot_ascii(20,cpmdfin,ntot,hunit,hmat, &
              tagtot,rtot,vtot)
     endif
     call accum_time('write_xxx',mpi_wtime()-tmp)
   endif
 
   if( lflux ) call final_lflux(myid_md)
-  if( lpdens ) call final_pdens(myid_md,mpi_md_world,h)
+  if( lpdens ) call final_pdens(myid_md,mpi_md_world,hmat)
 
 !.....write energy, forces and stresses only for fitpot
   if( myid_md.eq.0 ) then
-    call write_force(21,'.pmd',h,epot,ntot,tagtot,atot,stnsr)
+    call write_force(21,'.pmd',hmat,epot,ntot,tagtot,atot,stnsr)
     call accum_time('total',mpi_wtime()-t0)
     call report_time(6,iprint)
     call report_mem(6,iprint)
@@ -830,7 +830,7 @@ subroutine check_ensemble()
 
 end subroutine check_ensemble
 !=======================================================================
-subroutine add_pka_velocity(ntot0,h,tagtot,rtot,vtot)
+subroutine add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
 ! 
 ! Add PKA velocity to some atom from a given PKA energy
 ! 
@@ -838,7 +838,7 @@ subroutine add_pka_velocity(ntot0,h,tagtot,rtot,vtot)
   implicit none
   include './params_unit.h'
   integer,intent(in):: ntot0
-  real(8),intent(in):: tagtot(ntot0),rtot(3,ntot0),h(3,3,0:1)
+  real(8),intent(in):: tagtot(ntot0),rtot(3,ntot0),hmat(3,3,0:1)
   real(8),intent(inout):: vtot(3,ntot0)
 
   integer:: i,icntr,is
@@ -894,9 +894,9 @@ subroutine add_pka_velocity(ntot0,h,tagtot,rtot,vtot)
     print '(a,4es12.4)', '   vel,vx,vy,vz = ',vel,vx,vy,vz
     
 !.....Assume an orthogonal simulation box
-    vx = vx /h(1,1,0)
-    vy = vy /h(2,2,0)
-    vz = vz /h(3,3,0)
+    vx = vx /hmat(1,1,0)
+    vy = vy /hmat(2,2,0)
+    vz = vz /hmat(3,3,0)
     print '(a,3es12.4)','   vtot before = ',vtot(1:3,icntr)
     vtot(1,icntr) = vtot(1,icntr) +vx
     vtot(2,icntr) = vtot(2,icntr) +vy

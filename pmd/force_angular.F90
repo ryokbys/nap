@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-08-13 09:38:26 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 11:50:08 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   use util,only: csp2isp
@@ -28,7 +28,7 @@ module angular
   real(8),allocatable:: params(:)
   
 contains
-  subroutine force_angular(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_angular(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint,l1st)
 !-----------------------------------------------------------------------
@@ -42,7 +42,6 @@ contains
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     character(len=3),intent(in):: specorder(msp)
     logical,intent(in):: lstrs, l1st
@@ -190,11 +189,11 @@ contains
 !$omp end do
 !$omp end parallel
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa3,3)
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa3(1:3,1:natm)
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,strsl,9)
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 

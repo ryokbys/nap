@@ -1,6 +1,6 @@
 module Brenner
 contains
-  subroutine force_Brenner(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_Brenner(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
@@ -18,7 +18,6 @@ contains
          ,nn(6),mpi_md_world,myid_md,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,tag(namax),rc
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
@@ -263,15 +262,15 @@ contains
 !$omp end parallel
     
 !-----send back forces and potentials on immigrants
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,aa2,3)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,epi,1)
 !!$    if( myid_md.ge.0 ) then
 !!$!-----send back forces and potentials on immigrants
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,lsrc,myparity &
 !!$           ,nn,mpi_md_world,aa2,3)
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,lsrc,myparity &
 !!$           ,nn,mpi_md_world,epi,1)
 !!$    else
 !!$      call reduce_dba_bk(natm,namax,tag,aa2,3)
@@ -289,7 +288,7 @@ contains
   end subroutine force_Brenner
 !=======================================================================
   subroutine force_Brenner_vdW(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
 ! Parallel implementation of the Brenner potential and forces
@@ -310,7 +309,6 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,tag(namax),rc
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
@@ -589,9 +587,9 @@ contains
     enddo
 
 !-----send back forces and potentials on immigrants
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,aa2,3)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,epi,1)
 
 !-----sum

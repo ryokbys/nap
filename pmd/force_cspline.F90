@@ -33,7 +33,7 @@ module cspline
   real(8):: epot_cspln
 contains
 !=======================================================================
-  subroutine force_cspline(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_cspline(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
     include "mpif.h"
@@ -45,7 +45,6 @@ contains
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
     character(len=3),intent(in):: specorder(nspmax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
@@ -351,15 +350,15 @@ contains
     enddo
 21  continue
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,aa3,3)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,epi,1)
 
 !.....Sum up forces and stress
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa2(1:3,1:natm) +aa3(1:3,1:natm)
     if( lstrs ) then
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
            ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif

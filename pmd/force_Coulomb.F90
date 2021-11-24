@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-21 21:14:55 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 11:39:21 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -104,22 +104,26 @@ module Coulomb
 !.....Average mu (chemical potential)
   real(8):: avmu
 !.....Convergence criterion for QEq in eV/atom
-  real(8):: crit_codmp = 1.0d-3
+  real(8):: conv_eps_qeq = 1.0d-8
 !.....chgopt-damping related parameters
   character(len=20):: codmp_method = 'damping' ! or FIRE or damping
-  integer:: nstp_codmp = 100
+  integer:: nstp_qeq = 100
   real(8):: dt_codmp = 0.005d0  ! fs
   real(8):: qmass_codmp = 0.002d0  ! atomic mass unit
-  real(8):: qtot_codmp = 0d0
-  integer:: minstp_codmp = 3
-  integer:: minstp_conv_codmp = 3
+  real(8):: qtot_qeq = 0d0
+  integer:: minstp_qeq = 3
+  integer:: minstp_conv_qeq = 3
 !.....Velocity-damping related parameters
   real(8):: fdamp_codmp = 0.7d0
+  real(8):: dfdamp_codmp = 0.9d0
 !.....FIRE-related parameters
   real(8):: finc_codmp = 1.1d0
   real(8):: fdec_codmp = 0.5d0
   real(8):: alpha0_codmp = 0.1d0
   real(8):: falpha_codmp = 0.99d0
+!.....Gradient descent parameters
+  real(8):: dqmax_cogrd = 1d-1
+  real(8):: dqeps_cogrd = 1d-4
 
 
   integer,parameter:: ivoigt(3,3)= &
@@ -739,21 +743,21 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, codmp_method
           cycle
-        else if( trim(cline).eq.'crit_codmp' ) then
+        else if( trim(cline).eq.'conv_eps_qeq' ) then
           backspace(ioprms)
-          read(ioprms,*) ctmp, crit_codmp
+          read(ioprms,*) ctmp, conv_eps_qeq
           cycle
-        else if( trim(cline).eq.'nstp_codmp') then
+        else if( trim(cline).eq.'nstp_qeq') then
           backspace(ioprms)
-          read(ioprms,*) ctmp, nstp_codmp
+          read(ioprms,*) ctmp, nstp_qeq
           cycle
-        else if( trim(cline).eq.'minstp_codmp') then
+        else if( trim(cline).eq.'minstp_qeq') then
           backspace(ioprms)
-          read(ioprms,*) ctmp, minstp_codmp
+          read(ioprms,*) ctmp, minstp_qeq
           cycle
-        else if( trim(cline).eq.'minstp_conv_codmp') then
+        else if( trim(cline).eq.'minstp_conv_qeq') then
           backspace(ioprms)
-          read(ioprms,*) ctmp, minstp_conv_codmp
+          read(ioprms,*) ctmp, minstp_conv_qeq
           cycle
         else if( trim(cline).eq.'dt_codmp') then
           backspace(ioprms)
@@ -766,6 +770,10 @@ contains
         else if( trim(cline).eq.'fdamp_codmp') then
           backspace(ioprms)
           read(ioprms,*) ctmp, fdamp_codmp
+          cycle
+        else if( trim(cline).eq.'dfdamp_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, dfdamp_codmp
           cycle
         else if( trim(cline).eq.'finc_codmp') then
           backspace(ioprms)
@@ -782,6 +790,14 @@ contains
         else if( trim(cline).eq.'falpha_codmp') then
           backspace(ioprms)
           read(ioprms,*) ctmp, falpha_codmp
+          cycle
+        else if( trim(cline).eq.'dqmax_cogrd') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, dqmax_cogrd
+          cycle
+        else if( trim(cline).eq.'dqeps_cogrd') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, dqeps_cogrd
           cycle
         endif
 !.....Not a keyword, a certain mode should be already selected.
@@ -964,18 +980,21 @@ contains
     call mpi_bcast(rho_scr,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
 
     call mpi_bcast(codmp_method,20,mpi_character,0,mpi_world,ierr)
-    call mpi_bcast(crit_codmp,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(nstp_codmp,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(minstp_codmp,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(minstp_conv_codmp,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(conv_eps_qeq,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(nstp_qeq,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(minstp_qeq,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(minstp_conv_qeq,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(dt_codmp,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qmass_codmp,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qtot_codmp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(qtot_qeq,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(fdamp_codmp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(dfdamp_codmp,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(finc_codmp,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(fdec_codmp,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(alpha0_codmp,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(falpha_codmp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(dqmax_cogrd,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(dqeps_cogrd,1,mpi_real8,0,mpi_world,ierr)
     
     if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
       if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
@@ -1010,7 +1029,7 @@ contains
   end subroutine read_paramsx
 !=======================================================================
   subroutine force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
+       ,chg,h,hi,nb,nbmax,lsb,nex,lsrc &
        ,myparity,nn,sv,rc,lspr,d2lspr,sorg &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc,specorder)
@@ -1030,7 +1049,6 @@ contains
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6),sorg(3),d2lspr(nnmax,namax)
     real(8),intent(inout):: chg(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st,lcell_updated,lvc
     character(len=3),intent(in):: specorder(nspmax)
@@ -1133,7 +1151,7 @@ contains
     endif
 
     if( lstrs ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
 !!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
@@ -1163,7 +1181,7 @@ contains
   end subroutine force_Coulomb
 !=======================================================================
   subroutine force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
+       ,chg,h,hi,nb,nbmax,lsb,nex,lsrc &
        ,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,specorder)
@@ -1184,7 +1202,6 @@ contains
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6)
     real(8),intent(inout):: chg(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
     character(len=3),intent(in):: specorder(nspmax)
@@ -1279,7 +1296,7 @@ contains
   end subroutine force_screened_Coulomb
 !=======================================================================
   subroutine force_screened_Coulomb_old(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
+       ,chg,h,hi,nb,nbmax,lsb,nex,lsrc &
        ,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,specorder)
@@ -1294,7 +1311,6 @@ contains
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6)
     real(8),intent(inout):: chg(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
     character(len=3),intent(in):: specorder(nspmax)
@@ -1391,7 +1407,7 @@ contains
     enddo
 
     if( lstrs ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
 !!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
@@ -1405,7 +1421,7 @@ contains
   end subroutine force_screened_Coulomb_old
 !=======================================================================
   subroutine force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
+       ,chg,h,hi,nb,nbmax,lsb,nex,lsrc &
        ,myparity,nn,sv,rc,lspr,d2lspr,sorg &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc)
@@ -1425,7 +1441,6 @@ contains
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6),sorg(3),d2lspr(nnmax,namax)
     real(8),intent(inout):: chg(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st,lcell_updated,lvc
 
@@ -1474,7 +1489,7 @@ contains
          ,lcell_updated)
 
     if( lstrs ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
 !!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
@@ -1495,7 +1510,7 @@ contains
   end subroutine force_Ewald
 !=======================================================================
   subroutine force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,h,hi,tcom,nb,nbmax,lsb,nex,lsrc &
+       ,chg,h,hi,nb,nbmax,lsb,nex,lsrc &
        ,myparity,nn,sv,rc,lspr,sorg &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc)
@@ -1515,7 +1530,6 @@ contains
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6),sorg(3)
     real(8),intent(inout):: chg(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st,lcell_updated,lvc
 
@@ -1551,7 +1565,7 @@ contains
          lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs,lcell_updated)
 
     if( lstrs ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
 !!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
@@ -2215,7 +2229,7 @@ contains
     logical,intent(in):: l1st 
 
     integer:: i,j,jj,is,js,ixyz,jxyz
-    real(8):: sgmsq2,ss2i,qi,qj,dij,diji,tmp,ftmp,terfc &
+    real(8):: sgmsq2,ss2i,qi,qj,dij,dij2,diji,tmp,ftmp,terfc &
          ,sgmi,sgmj,gmmij,rhoij,terfcc,vrc,dvdrc
     real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
 !!$    real(8),external:: fcut1
@@ -2250,22 +2264,21 @@ contains
       is= int(tag(i))
       qi = chg(i)
       do jj=1,lspr(0,i)
-        if( d2lspr(jj,i).ge.rc2 ) cycle
+        dij2 = d2lspr(jj,i)
+        if( dij2.ge.rc2 ) cycle
         j = lspr(jj,i)
         if( j.eq.0 ) exit
         if( j.le.i ) cycle
         js = int(tag(j))
         if( .not.interact(is,js) ) cycle
         qj = chg(j)
-        xj(1:3) = ra(1:3,j)
-        xij(1:3)= xj(1:3)-xi(1:3)
-        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij = rij(1)**2 +rij(2)**2 +rij(3)**2
-!!$        if( dij.gt.rc2 ) cycle
-        dij = sqrt(dij)
+!!$        xj(1:3) = ra(1:3,j)
+!!$        xij(1:3)= xj(1:3)-xi(1:3)
+!!$        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+!!$        dij = rij(1)**2 +rij(2)**2 +rij(3)**2
+!!$        dij = sqrt(dij)
+        dij = sqrt(dij2)
         diji = 1d0/dij
-!!$        dxdi(1:3)= -rij(1:3)*diji
-!!$        dxdj(1:3)=  rij(1:3)*diji
         rhoij = rho_scr(is,js)
         terfc = erfc(dij/rhoij)
         vrc = vrcs(is,js)
@@ -2287,7 +2300,7 @@ contains
   end subroutine qforce_screened_cut
 !=======================================================================
   subroutine qforce_long(namax,natm,tag,ra,chg,h, &
-       sorg,tcom,mpi_md_world,myid,iprint,fq,elr)
+       sorg,mpi_md_world,myid,iprint,fq,elr)
 !
 !  Derivative of Ewald long-range term w.r.t. charges
 !
@@ -2295,7 +2308,7 @@ contains
     include 'mpif.h'
     integer,intent(in):: namax,natm,mpi_md_world,myid,iprint
     real(8),intent(in):: tag(namax),ra(3,namax),chg(namax),h(3,3),sorg(3)
-    real(8),intent(inout):: tcom,fq(namax),elr
+    real(8),intent(inout):: fq(namax),elr
 
     integer:: i,ik,k1,k2,k3,is,ierr
     real(8):: prefac,bk1(3),bk2(3),bk3(3),bb(3),bb2,xi(3),ri(3), &
@@ -2382,7 +2395,7 @@ contains
   end subroutine qforce_self
 !=======================================================================
   subroutine get_qforce(namax,natm,nnmax,tag,ra,chg,h,lspr,d2lspr, &
-       rc,sorg,tcom,myid,mpi_world,iprint,fq,epot,l1st)
+       rc,sorg,myid,mpi_world,iprint,fq,epot,l1st)
 !
 !  Wrapper routine for calculating forces on charges.
 !
@@ -2391,20 +2404,20 @@ contains
     real(8),intent(in):: tag(namax),h(3,3),ra(3,namax),chg(namax),sorg(3),rc
     real(8),intent(in):: d2lspr(nnmax,namax)
     logical,intent(in):: l1st
-    real(8),intent(inout):: fq(namax),tcom,epot
+    real(8),intent(inout):: fq(namax),epot
 
     real(8):: eclong,eself,ecshort
     
     call qforce_self(namax,natm,tag,chg,fq,eself)
     
     if( trim(cterms).eq.'long' ) then
-      call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_world, &
+      call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_world, &
            myid,iprint,fq,eclong)
 !!$    else if( use_force('Ewald') ) then
     else if( trim(cterms).eq.'full' ) then
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshort)
-      call qforce_long(namax,natm,tag,ra,chg,h,sorg,tcom,mpi_world, &
+      call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_world, &
            myid,iprint,fq,eclong)
     else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
@@ -2763,7 +2776,7 @@ contains
   end subroutine setup_kspace
 !=======================================================================
   subroutine chgopt_matrix(namax,natm,h,ra,tag,chg,nnmax,lspr,d2lspr, &
-       rc,sorg,tcom,myid,mpi_world,iprint,l1st)
+       rc,sorg,myid,mpi_world,iprint,l1st)
 !
 !  Charge optimization/equilibration by matrix inversion.
 !  THIS CODE IS NOT COMPLETE AND NOT YET AVAILABLE...
@@ -2773,7 +2786,7 @@ contains
     real(8),intent(in):: h(3,3),ra(3,natm),tag(natm),rc,sorg(3)
     real(8),intent(in):: d2lspr(nnmax,namax)
     logical,intent(in):: l1st
-    real(8),intent(inout):: chg(natm),tcom
+    real(8),intent(inout):: chg(natm)
 
     integer:: ierr,i,j,is
     real(8):: epot

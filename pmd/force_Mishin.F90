@@ -20,7 +20,7 @@ module Mishin
   real(8):: fprm(4,neamd-1)
   
 contains
-  subroutine force_Mishin_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_Mishin_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
@@ -33,7 +33,6 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
@@ -57,13 +56,13 @@ contains
       endif
     endif
 
-    call force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+    call force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     return
   end subroutine force_Mishin_Al
 !=======================================================================
-  subroutine force_Mishin_Ni(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_Mishin_Ni(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
@@ -76,7 +75,6 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
@@ -100,13 +98,13 @@ contains
       endif
     endif
 
-    call force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+    call force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     return
   end subroutine force_Mishin_Ni
 !=======================================================================
-  subroutine force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_Mishin(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
@@ -119,7 +117,6 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
@@ -166,7 +163,7 @@ contains
       enddo
     enddo
 
-    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+    call copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex,&
          lsrc,myparity,nn,sv,mpi_md_world,rho,1)
 
 !-----dE/dr_i

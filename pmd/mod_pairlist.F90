@@ -826,10 +826,10 @@ contains
     do i=1,natm
       xi(1:3) = ra(1:3,i)
       do jj=1,lspr(0,i)
-!.....Probably, do not need to consider neighbors close enough compared to rcut
-        if( d2lspr(jj,i).lt.rmin2 ) cycle
-!.....Only neighbors within a shell around rcut need to be updated 
-!.....for the purpose of determining whether or not the neighbors are within cutoff
+!!$!.....Probably, do not need to consider neighbors close enough compared to rcut
+!!$        if( d2lspr(jj,i).lt.rmin2 ) cycle
+!!$!.....Only neighbors within a shell around rcut need to be updated 
+!!$!.....for the purpose of determining whether or not the neighbors are within cutoff
         j = lspr(jj,i)
         xij(1:3) = ra(1:3,j) -xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)

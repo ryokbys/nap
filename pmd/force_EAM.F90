@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-20 15:36:28 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 11:46:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -32,7 +32,7 @@ module EAM
   real(8),allocatable:: ea_a(:),ea_xi(:)
   real(8),allocatable,dimension(:,:):: ea_b,ea_c,ea_re, &
        ea_alp,ea_beta,ea_rcin,ea_rcout
-  logical,allocatable:: interact(:,:)
+  logical,allocatable:: pair_interact(:,:),ea_interact(:)
 
   logical:: lprmset_EAM = .false.
 
@@ -54,8 +54,8 @@ contains
     if( .not.allocated(ea_a) ) then
       allocate(ea_a(nspmax), ea_b(nspmax,nspmax), ea_c(nspmax,nspmax), &
            ea_re(nspmax,nspmax), ea_alp(nspmax,nspmax), ea_beta(nspmax,nspmax),&
-           ea_xi(nspmax), interact(nspmax,nspmax), ea_rcin(nspmax,nspmax), &
-           ea_rcout(nspmax,nspmax), &
+           ea_xi(nspmax), pair_interact(nspmax,nspmax), ea_interact(nspmax), &
+           ea_rcin(nspmax,nspmax), ea_rcout(nspmax,nspmax), &
            type_rho(nspmax,nspmax),type_frho(nspmax),type_phi(nspmax,nspmax))
     endif
     
@@ -85,7 +85,8 @@ contains
       ea_beta(:,:) = 0d0
       ea_rcin(:,:) = 0d0
       ea_rcout(:,:) = 0d0
-      interact(:,:) = .false.
+      ea_interact(:) = .false.
+      pair_interact(:,:) = .false.
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
       do while(.true.)
@@ -105,6 +106,8 @@ contains
                  //' skip reading the line'
             cycle
           endif
+          if( isp.le.0 ) cycle
+          ea_interact(isp) = .true.
           ea_a(isp) = a
           ea_xi(isp) = xi
           ea_rcin(isp,isp) = rcin
@@ -121,7 +124,7 @@ contains
                  //' skip reading the line.'
             cycle
           endif
-
+          if( isp.le.0 .or. jsp.le.0 ) cycle
           type_rho(isp,jsp) = trim(c2)
           type_phi(isp,jsp) = trim(c3)
           ea_b(isp,jsp) = b
@@ -129,7 +132,7 @@ contains
           ea_re(isp,jsp) = re
           ea_alp(isp,jsp) = alp
           ea_beta(isp,jsp) = beta
-          interact(isp,jsp) = .true.
+          pair_interact(isp,jsp) = .true.
 !.....Symmetrize parameters
           type_rho(jsp,isp) = trim(c2)
           type_phi(jsp,isp) = trim(c3)
@@ -138,7 +141,7 @@ contains
           ea_re(jsp,isp) = re
           ea_alp(jsp,isp) = alp
           ea_beta(jsp,isp) = beta
-          interact(jsp,isp) = .true.
+          pair_interact(jsp,isp) = .true.
         endif
       enddo
 10    continue
@@ -159,7 +162,7 @@ contains
         write(6,'(a)') ' EAM parameters read from file '//trim(fname) &
              //':'
         do isp=1,nspmax
-          if( abs(ea_a(isp)).gt.1d-8 ) then
+          if( ea_interact(isp) ) then
             cspi = trim(specorder(isp))
             write(6,'(a8,2(2x,a),4f8.3)') 'atomic',trim(cspi),trim(type_frho(isp)), &
                  ea_a(isp),ea_xi(isp), ea_rcin(isp,isp), ea_rcout(isp,isp)
@@ -168,7 +171,7 @@ contains
         do isp=1,nspmax
           cspi = trim(specorder(isp))
           do jsp=isp,nspmax
-            if( interact(isp,jsp) ) then
+            if( pair_interact(isp,jsp) ) then
               cspj = trim(specorder(jsp))
               write(6,'(a8,4(2x,a),5f8.3)') 'pair',trim(cspi),trim(cspj), &
                    trim(type_rho(isp,jsp)), trim(type_phi(isp,jsp)), &
@@ -191,94 +194,12 @@ contains
     call mpi_bcast(ea_beta,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(ea_rcin,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(ea_rcout,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_interact,nspmax,mpi_logical,0,mpi_md_world,ierr)
+    call mpi_bcast(pair_interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
 
   end subroutine read_params_EAM
 !=======================================================================
-  subroutine set_paramsdir_EAM(dname)
-!
-!  Accessor routine for setting paramsdir
-!
-    implicit none
-    character(len=*),intent(in):: dname
-
-    paramsdir = trim(dname)
-    return
-  end subroutine set_paramsdir_EAM
-!=======================================================================
-  subroutine set_params_EAM(nprms_in,prms_in)
-!
-!  Accessor routine to set EAM parameters from outside.
-!  Curretnly this routine is supposed to be called only on serial run.
-!
-    integer,intent(in):: nprms_in
-    real(8),intent(in):: prms_in(nprms_in)
-
-    nprms = nprms_in
-    if( .not.allocated(prms) ) allocate(prms(nprms))
-    prms(1:nprms) = prms_in(1:nprms_in)
-    lprmset_EAM = .true.
-    return
-  end subroutine set_params_EAM
-!=======================================================================
-  subroutine update_params_EAM()
-!
-!  Update EAM parameters by taking parameter values from params array.
-!  This routine would be called only from externally within fitpot.
-!
-    integer:: i,inc,is,js
-    real(8),parameter:: tiny = 1d-10
-
-    if( .not.lprmset_EAM ) then
-      print *,'ERROR: params have not been set yet.'
-      stop
-    endif
-
-    ea_a(:) = 0d0
-    ea_xi(:) = 0d0
-    
-    ea_b(:,:) = 0d0
-    ea_c(:,:) = 0d0
-    ea_re(:,:) = 0d0
-    ea_alp(:,:) = 0d0
-    ea_beta(:,:) = 0d0
-    interact(:,:) = .false.
-
-    inc = 0
-    do is=1,nsp
-      inc = inc +1
-      ea_a(is) = prms(inc)
-      inc = inc +1
-      ea_xi(is) = prms(inc)
-    enddo
-    do is=1,nsp
-      do js=is,nsp
-        inc = inc + 1
-        ea_b(is,js) = prms(inc)
-        ea_b(js,is) = ea_b(is,js)
-        inc = inc + 1
-        ea_c(is,js) = prms(inc)
-        ea_c(js,is) = ea_c(is,js)
-        inc = inc + 1
-        ea_re(is,js) = prms(inc)
-        ea_re(js,is) = ea_re(is,js)
-        inc = inc + 1
-        ea_alp(is,js) = prms(inc)
-        ea_alp(js,is) = ea_alp(is,js)
-        inc = inc + 1
-        ea_beta(is,js) = prms(inc)
-        ea_beta(js,is) = ea_beta(is,js)
-        if( abs(ea_b(is,js)).gt.tiny &
-             .or. abs(ea_c(is,js)).gt.tiny ) then
-          interact(is,js) = .true.
-          interact(js,is) = .true.
-        endif
-      enddo
-    enddo
-    return
-  end subroutine update_params_EAM
-!=======================================================================
-  subroutine force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
 !-----------------------------------------------------------------------
@@ -298,7 +219,6 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax),d2lspr(nnmax,namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -317,7 +237,7 @@ contains
       allocate(strsl(3,3,namax))
       do is=1,nspmax
         do js=is,nspmax
-          if( .not.interact(is,js) ) cycle
+          if( .not.pair_interact(is,js) ) cycle
           if( rc.lt.ea_rcout(is,js) ) then
             if( myid_md.eq.0 ) then
               write(6,*) ' Error: rc is smaller than one of EAM rcouts'
@@ -346,6 +266,7 @@ contains
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is = int(tag(i))
+      if( .not. ea_interact(is) ) cycle
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
@@ -364,14 +285,14 @@ contains
     enddo
 
 !-----copy rho of boundary atoms
-    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+    call copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex,&
          lsrc,myparity,nn,sv,mpi_md_world,rho,1)
 
 !-----dE/dr_i
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is = int(tag(i))
-      dfi = dfrho(is,rho(i),type_frho(is))
+      if( ea_interact(is) ) dfi = dfrho(is,rho(i),type_frho(is))
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
@@ -410,8 +331,9 @@ contains
           enddo
         endif
 !.....Embedded term
+        if( ea_interact(js) ) dfj = dfrho(js,rho(j),type_frho(js))
+        if( .not. (ea_interact(is).or.ea_interact(js)) ) cycle
         drho = drhoij(is,js,rij,rcin,rcout,type_rho(is,js))
-        dfj = dfrho(js,rho(j),type_frho(js))
         tmp = (dfi+dfj)*drho
         aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +tmp*drdxi(1:3)
@@ -427,13 +349,14 @@ contains
           enddo
         endif
       enddo
+      if( .not. ea_interact(is) ) cycle
       tmp = frho(is,rho(i),type_frho(is))
       epi(i)=epi(i) +tmp
       epotl=epotl +tmp
     enddo
 
     if( lstrs ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
 !!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
@@ -609,5 +532,5 @@ contains
 end module EAM
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

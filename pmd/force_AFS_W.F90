@@ -1,6 +1,6 @@
 module AFS_W
 contains
-  subroutine force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
@@ -24,7 +24,6 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
@@ -60,11 +59,11 @@ contains
       sqrho(i)= dsqrt(sqrho(i))
     enddo
 
-    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+    call copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex,&
          lsrc,myparity,nn,sv,mpi_md_world,sqrho,1)
 !!$    if( myid_md.ge.0 ) then
 !!$!-----copy rho of boundary atoms
-!!$      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
+!!$      call copy_rho_ba(namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
 !!$           ,mpi_md_world,sqrho)
 !!$    else
 !!$      call distribute_dba(natm,namax,tag,sqrho,1)
@@ -128,11 +127,11 @@ contains
       epotl=epotl -p_W_A*sqrho(i)
     enddo
 
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,strs,9)
 !!$    if( myid_md.ge.0 ) then
 !!$!-----copy strs of boundary atoms
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,lsrc,myparity &
 !!$           ,nn,mpi_world,strs,9)
 !!$    else
 !!$      call reduce_dba_bk(natm,namax,tag,strs,9)

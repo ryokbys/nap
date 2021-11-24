@@ -2,7 +2,7 @@ module Ito3_WHe
 
 contains
   subroutine force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,tcom,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ito's new potential for W and He (IWHe)
@@ -23,7 +23,6 @@ contains
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
@@ -91,15 +90,15 @@ contains
       sqrho(i)= dsqrt(rho(i)+p_d)
     enddo
 
-    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+    call copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex,&
          lsrc,myparity,nn,sv,mpi_md_world,sqrho,1)
-    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+    call copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex,&
          lsrc,myparity,nn,sv,mpi_md_world,rho,1)
 !!$    if( myid.ge.0 ) then
 !!$!-----copy rho of boundary atoms
-!!$      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
+!!$      call copy_rho_ba(namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
 !!$           ,mpi_md_world,sqrho)
-!!$      call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
+!!$      call copy_rho_ba(namax,natm,nb,nbmax,lsb,lsrc,myparity,nn,sv &
 !!$           ,mpi_md_world,rho)
 !!$    else
 !!$      call distribute_dba(natm,namax,tag,sqrho,1)
@@ -180,7 +179,7 @@ contains
     enddo
 
     if( lstrs ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
 !!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
@@ -193,7 +192,7 @@ contains
 !      deallocate(sqrho)
   end subroutine force_Ito3_WHe
 !=======================================================================
-  subroutine copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
+  subroutine copy_rho_ba(namax,natm,nb,nbmax,lsb &
        ,lsrc,myparity,nn,sv,mpi_md_world,rho)
 !-----------------------------------------------------------------------
 !     Exchanges boundary-atom data among neighbor nodes
@@ -206,11 +205,10 @@ contains
     integer,intent(in):: lsb(0:nbmax,6),lsrc(6),myparity(3),nn(6)
     real(8),intent(in):: sv(3,6)
 !-----out
-    real(8),intent(inout):: rho(natm+nb),tcom
+    real(8),intent(inout):: rho(natm+nb)
 
 !-----locals
     integer:: i,j,k,l,m,n,kd,kdd,ku,inode,nsd,nsd3,nrc,nrc3,nbnew,ierr
-    real(8):: tcom1,tcom2
     logical,save:: l1st=.true.
     real(8),allocatable,save:: dbuf(:),dbufr(:)
 
@@ -223,7 +221,6 @@ contains
 
 !-----loop over z, y, & x directions
     do kd=1,3
-      tcom1= mpi_wtime()
       do kdd=-1,0
         ku= 2*kd +kdd
         inode= nn(ku)
@@ -249,8 +246,6 @@ contains
 !          write(6,'(a,2i8)') "nbnew,nrc=",nbnew,nrc
         nbnew=nbnew +nrc
       enddo
-      tcom2= mpi_wtime()
-      tcom= tcom +tcom2-tcom1
     enddo
 
     if(nbnew.ne.nb) then
@@ -260,7 +255,7 @@ contains
 
   end subroutine copy_rho_ba
 !=======================================================================
-  subroutine copy_strs_ba(tcom,namax,natm,nb,nbmax,lsb &
+  subroutine copy_strs_ba(namax,natm,nb,nbmax,lsb &
        ,lsrc,myparity,nn,sv,mpi_md_world,strs)
 !-----------------------------------------------------------------------
 !  Exchanges boundary-atom data among neighbor nodes
@@ -273,11 +268,10 @@ contains
     integer,intent(in):: lsb(0:nbmax,6),lsrc(6),myparity(3),nn(6)
     real(8),intent(in):: sv(3,6)
 !-----out
-    real(8),intent(inout):: strs(9,natm+nb),tcom
+    real(8),intent(inout):: strs(9,natm+nb)
 
 !-----locals
     integer:: i,j,k,l,m,n,kd,kdd,ku,inode,nsd,nrc,nbnew,ierr
-    real(8):: tcom1,tcom2
 
     logical,save:: l1st=.true.
     real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
@@ -291,7 +285,6 @@ contains
 
 !-----loop over z, y, & x directions
     do kd=1,3
-      tcom1= mpi_wtime()
       do kdd=-1,0
         ku= 2*kd +kdd
         inode= nn(ku)
@@ -317,8 +310,6 @@ contains
 !          write(6,'(a,2i8)') "nbnew,nrc=",nbnew,nrc
         nbnew=nbnew +nrc
       enddo
-      tcom2= mpi_wtime()
-      tcom= tcom +tcom2-tcom1
     enddo
 
     if(nbnew.ne.nb) then

@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-03-09 11:38:58 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 11:43:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -70,7 +70,7 @@ contains
     ts_rc2= ts_rc**2
   end subroutine init_tersoff
 !=======================================================================
-  subroutine force_tersoff(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_tersoff(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
        ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint &
        ,tei)
@@ -83,7 +83,6 @@ contains
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
          ,tag(namax),rc,d2lspr(nnmax,namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs
     character(len=3),intent(in):: specorder(nspmax)
@@ -325,14 +324,14 @@ contains
     enddo  ! ia=...
 
 !.....send back forces and potentials on immigrants
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aa2,3)
-    call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,epi,1)
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa1(1:3,1:natm) +aa2(1:3,1:natm)
 
     if( lstrs ) then
-      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
            ,nn,mpi_world,strsl,9)
       strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif

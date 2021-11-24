@@ -1,6 +1,6 @@
 module Abell
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-02-28 00:26:33 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 11:49:07 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Abell potential.
 !  When it is used for Ceramics, it is assumed to be used with
@@ -29,7 +29,7 @@ module Abell
   real(8),allocatable:: params(:)
 
 contains
-  subroutine force_Abell(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_Abell(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,specorder,lstrs,iprint,l1st)
     use util,only: itotOf
@@ -42,7 +42,6 @@ contains
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
          ,tag(namax),sv(3,6)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     character(len=3),intent(in):: specorder(nspmax)
@@ -152,7 +151,7 @@ contains
     enddo
 
     if( lstrs ) then
-!!$      call copy_dba_bk(tcom,namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
 !!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif

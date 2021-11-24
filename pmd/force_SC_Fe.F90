@@ -1,6 +1,6 @@
 module SC_Fe
 contains
-  subroutine force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi,tcom &
+  subroutine force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
@@ -19,7 +19,6 @@ contains
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(inout):: tcom
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
@@ -60,9 +59,9 @@ contains
     enddo
 
 !.....copy rho of boundary atoms
-    call copy_dba_fwd(tcom,namax,natm,nb,nbmax,lsb,nex,&
+    call copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex,&
          lsrc,myparity,nn,sv,mpi_md_world,sqrho,1)
-!!$    call copy_rho_ba(tcom,namax,natm,nb,nbmax,lsb &
+!!$    call copy_rho_ba(namax,natm,nb,nbmax,lsb &
 !!$         ,lsrc,myparity,nn,sv,mpi_md_world,sqrho)
 
 !-----smoothing 2-body term
