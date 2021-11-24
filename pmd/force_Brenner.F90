@@ -1,4 +1,6 @@
 module Brenner
+  use vector,only: dot
+  
 contains
   subroutine force_Brenner(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -29,7 +31,6 @@ contains
     real(8):: xi(3),xj(3),xk(3),xij(3),xji(3),xik(3),xjk(3),dixij(3) &
          ,djxij(3),dixji(3),djxji(3),fi(3),fj(3),dixik(3),djxjk(3) &
          ,dkxik(3),dkxjk(3),dics(3),djcs(3),dkcs(3),at(3)
-    real(8),external:: sprod
 !-----1st call
     logical,save:: l1st=.true.
     real(8),allocatable,dimension(:,:),save:: aa1,aa2
@@ -69,7 +70,7 @@ contains
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij= dsqrt(sprod(3,xij,xij))
+        rij= dsqrt(dot(xij,xij))
 !-------cutoff judgement
         if(rij.gt.br_r2) cycle
 !---------potential
@@ -112,7 +113,7 @@ contains
         z= xj(3) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         xji(1:3)= -xij(1:3)
-        rij= dsqrt(sprod(3,xij,xij))
+        rij= dsqrt(dot(xij,xij))
 !-------cutoff judgement
         if(rij.gt.br_r2) cycle
         riji= 1d0/rij
@@ -133,11 +134,11 @@ contains
           y= ra(2,k) -xi(2)
           z= ra(3,k) -xi(3)
           xik(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rik=dsqrt(sprod(3,xik,xik))
+          rik=dsqrt(dot(xik,xik))
 !---------cutoff judgement
           if(rik.gt.br_r2) cycle
           riki= 1d0/rik
-          cs= sprod(3,xij,xik)*riji*riki
+          cs= dot(xij,xik)*riji*riki
           gc= br_a0*(1d0 +br_c0**2/br_d0**2 &
                -(br_c0**2/(br_d0**2 +(1d0+cs)**2)))
           tk=tk +gc*f_r(rik,br_r1,br_r2)
@@ -155,13 +156,13 @@ contains
           y= ra(2,k) -xi(2)
           z= ra(3,k) -xi(3)
           xik(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rik=dsqrt(sprod(3,xik,xik))
+          rik=dsqrt(dot(xik,xik))
 !---------cutoff judgement
           if(rik.gt.br_r2) cycle
           riki= 1d0/rik
           dixik(1:3)= -xik(1:3)*riki
           dkxik(1:3)=  xik(1:3)*riki
-          cs= sprod(3,xij,xik)*riji*riki
+          cs= dot(xij,xik)*riji*riki
           dics(1:3)= -riji*riki*(xij(1:3)+xik(1:3)) &
                -cs*(dixij(1:3)*riji+dixik(1:3)*riki)
           djcs(1:3)= riji*riki*xik(1:3) -cs*djxij(1:3)*riji
@@ -200,11 +201,11 @@ contains
           y= ra(2,k) -xj(2)
           z= ra(3,k) -xj(3)
           xjk(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rjk=dsqrt(sprod(3,xjk,xjk))
+          rjk=dsqrt(dot(xjk,xjk))
 !---------cutoff judgement
           if(rjk.gt.br_r2) cycle
           rjki= 1d0/rjk
-          cs= sprod(3,xji,xjk)*riji*rjki
+          cs= dot(xji,xjk)*riji*rjki
           gc= br_a0*(1d0 +br_c0**2/br_d0**2 &
                -(br_c0**2/(br_d0**2 +(1d0+cs)**2)))
           tk=tk +gc*f_r(rjk,br_r1,br_r2)
@@ -222,13 +223,13 @@ contains
           y= ra(2,k) -xj(2)
           z= ra(3,k) -xj(3)
           xjk(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rjk=dsqrt(sprod(3,xjk,xjk))
+          rjk=dsqrt(dot(xjk,xjk))
 !---------cutoff judgement
           if(rjk.gt.br_r2) cycle
           rjki= 1d0/rjk
           djxjk(1:3)= -xjk(1:3)*rjki
           dkxjk(1:3)=  xjk(1:3)*rjki
-          cs= sprod(3,xji,xjk)*riji*rjki
+          cs= dot(xji,xjk)*riji*rjki
           djcs(1:3)= -riji*rjki*(xji(1:3)+xjk(1:3)) &
                -cs*(djxji(1:3)*riji+djxjk(1:3)*rjki)
           dics(1:3)= riji*rjki*xjk(1:3) -cs*dixji(1:3)*riji
@@ -322,7 +323,6 @@ contains
     real(8):: xi(3),xj(3),xk(3),xij(3),xji(3),xik(3),xjk(3),dixij(3) &
          ,djxij(3),dixji(3),djxji(3),fi(3),fj(3),dixik(3),djxjk(3) &
          ,dkxik(3),dkxjk(3),dics(3),djcs(3),dkcs(3),at(3)
-    real(8),external:: sprod
     
     logical,save:: l1st=.true.
     real(8),allocatable,dimension(:,:),save:: aa1,aa2
@@ -359,7 +359,7 @@ contains
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij= dsqrt(sprod(3,xij,xij))
+        rij= dsqrt(dot(xij,xij))
         riji= 1d0/rij
         dixij(1:3)= -xij(1:3)*riji
         djxij(1:3)=  xij(1:3)*riji
@@ -403,7 +403,7 @@ contains
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij= dsqrt(sprod(3,xij,xij))
+        rij= dsqrt(dot(xij,xij))
 !c---------cutoff judgement
 !          if(rij.gt.br_r2) cycle
 !---------potential
@@ -439,7 +439,7 @@ contains
         z= xj(3) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         xji(1:3)= -xij(1:3)
-        rij= dsqrt(sprod(3,xij,xij))
+        rij= dsqrt(dot(xij,xij))
 !c---------cutoff judgement
 !          if(rij.gt.br_r2) cycle
         riji= 1d0/rij
@@ -460,11 +460,11 @@ contains
           y= ra(2,k) -xi(2)
           z= ra(3,k) -xi(3)
           xik(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rik=dsqrt(sprod(3,xik,xik))
+          rik=dsqrt(dot(xik,xik))
 !c-----------cutoff judgement
 !            if(rik.gt.br_r2) cycle
           riki= 1d0/rik
-          cs= sprod(3,xij,xik)*riji*riki
+          cs= dot(xij,xik)*riji*riki
           gc= br_a0*(1d0 +br_c0**2/br_d0**2 &
                -(br_c0**2/(br_d0**2 +(1d0+cs)**2)))
           tk=tk +gc*f_r(rik,br_r1,br_r2)
@@ -482,13 +482,13 @@ contains
           y= ra(2,k) -xi(2)
           z= ra(3,k) -xi(3)
           xik(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rik=dsqrt(sprod(3,xik,xik))
+          rik=dsqrt(dot(xik,xik))
 !c-----------cutoff judgement
 !            if(rik.gt.br_r2) cycle
           riki= 1d0/rik
           dixik(1:3)= -xik(1:3)*riki
           dkxik(1:3)=  xik(1:3)*riki
-          cs= sprod(3,xij,xik)*riji*riki
+          cs= dot(xij,xik)*riji*riki
           dics(1:3)= -riji*riki*(xij(1:3)+xik(1:3)) &
                -cs*(dixij(1:3)*riji+dixik(1:3)*riki)
           djcs(1:3)= riji*riki*xik(1:3) -cs*djxij(1:3)*riji
@@ -527,11 +527,11 @@ contains
           y= ra(2,k) -xj(2)
           z= ra(3,k) -xj(3)
           xjk(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rjk=dsqrt(sprod(3,xjk,xjk))
+          rjk=dsqrt(dot(xjk,xjk))
 !c-----------cutoff judgement
 !            if(rjk.gt.br_r2) cycle
           rjki= 1d0/rjk
-          cs= sprod(3,xji,xjk)*riji*rjki
+          cs= dot(xji,xjk)*riji*rjki
           gc= br_a0*(1d0 +br_c0**2/br_d0**2 &
                -(br_c0**2/(br_d0**2 +(1d0+cs)**2)))
           tk=tk +gc*f_r(rjk,br_r1,br_r2)
@@ -549,13 +549,13 @@ contains
           y= ra(2,k) -xj(2)
           z= ra(3,k) -xj(3)
           xjk(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rjk=dsqrt(sprod(3,xjk,xjk))
+          rjk=dsqrt(dot(xjk,xjk))
 !c-----------cutoff judgement
 !            if(rjk.gt.br_r2) cycle
           rjki= 1d0/rjk
           djxjk(1:3)= -xjk(1:3)*rjki
           dkxjk(1:3)=  xjk(1:3)*rjki
-          cs= sprod(3,xji,xjk)*riji*rjki
+          cs= dot(xji,xjk)*riji*rjki
           djcs(1:3)= -riji*rjki*(xji(1:3)+xjk(1:3)) &
                -cs*(djxji(1:3)*riji+djxjk(1:3)*rjki)
           dics(1:3)= riji*rjki*xjk(1:3) -cs*dixji(1:3)*riji

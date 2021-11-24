@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-11-05 07:53:40 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-24 16:11:55 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -9,6 +9,7 @@ module ttm
 ! parallel nodes are the common dividors of number of TTM meshes.
 !
   use memory,only: accum_mem
+  use vector,only: dot
   implicit none
   save
   include 'mpif.h'
@@ -1244,7 +1245,7 @@ contains
     real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0,vt(3)&
          ,aain(3),aaout(3),vin(3),vout(3),v0(3)
     real(8):: ediffl(nspmax),deinl(nspmax),deoutl(nspmax)
-    real(8),external:: box_muller,sprod
+    real(8),external:: box_muller
     logical,save:: l1st = .true.
 
     if( l1st ) then
@@ -1324,11 +1325,11 @@ contains
              +h(1:3,2)*aaout(2)*fa2v(isp)*dtmd *2d0 &
              +h(1:3,3)*aaout(3)*fa2v(isp)*dtmd *2d0
         ediffl(isp)= ediffl(isp) +fekin(isp) &
-             *(2d0*sprod(3,vi,vl)+sprod(3,vl,vl))
+             *(2d0*dot(vi,vl)+dot(vl,vl))
         deinl(isp)= deinl(isp) +fekin(isp) &
-             *(2d0*sprod(3,vi,vin)+sprod(3,vin,vin))
+             *(2d0*dot(vi,vin)+dot(vin,vin))
         deoutl(isp)= deoutl(isp) +fekin(isp) &
-             *(2d0*sprod(3,vi,vout)+sprod(3,vout,vout))
+             *(2d0*dot(vi,vout)+dot(vout,vout))
       endif
     enddo
 

@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 11:47:24 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 15:55:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -9,6 +9,7 @@ module Morse
   use pmdvars,only: nspmax
   use util,only: csp2isp
   use memory,only: accum_mem
+  use vector,only: dot
   implicit none
   include "./const.h"
   save
@@ -359,7 +360,7 @@ contains
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
-    real(8),external:: sprod,fcut1,dfcut1
+    real(8),external:: fcut1,dfcut1
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
@@ -433,9 +434,9 @@ contains
         call make_pair_desc(chgi,chgj,atdi,atdj,pdij)
 !!$        write(6,'(a,20es11.3)') 'pdij = ',pdij(0:nprm)
 !.....Create Morse parameters that depend on current atom charges
-        d0ij = sprod(nprm+1,wd,pdij)
-        alpij= sprod(nprm+1,walp,pdij)
-        rminij= sprod(nprm+1,wrmin,pdij)
+        d0ij = dot(wd,pdij)
+        alpij= dot(walp,pdij)
+        rminij= dot(wrmin,pdij)
         d0ij = max(d0ij, 0d0)
         rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
         alpij= max(alpij, prefbeta/(rminij -rc))
@@ -518,7 +519,7 @@ contains
     real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij,rcore &
          ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2,diji
     type(atdesc):: atdi,atdj
-    real(8),external:: sprod,fcut1,dfcut1
+    real(8),external:: fcut1,dfcut1
     real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:) &
          ,dxdi(:),dxdj(:),at(:)
 
@@ -556,9 +557,9 @@ contains
         atdj = atdescs(js)
         call make_pair_desc(chgi,chgj,atdi,atdj,pdij)
 !.....Create Morse parameters that depend on current atom charges
-        d0ij = sprod(nprm+1,wd,pdij)
-        rminij= sprod(nprm+1,wrmin,pdij)
-        alpij= sprod(nprm+1,walp,pdij)
+        d0ij = dot(wd,pdij)
+        rminij= dot(wrmin,pdij)
+        alpij= dot(walp,pdij)
         d0ij = max(d0ij, 0d0)
         rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
         rminij= min(rminij,rc*0.9d0)
@@ -1205,7 +1206,7 @@ contains
          ,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2 &
          ,diji,factor,fc1,dfc1,dr,dedrd0,dedralp,dedrrmin
     real(8),allocatable,save:: xi(:),xj(:),xij(:),rij(:),dxdi(:),dxdj(:)
-    real(8),external:: sprod,fcut1,dfcut1
+    real(8),external:: fcut1,dfcut1
 
     if( .not. allocated(ge_alp) ) then
       allocate(ge_alp(nspmax,nspmax),ge_d0(nspmax,nspmax),ge_rmin(nspmax,nspmax))
@@ -1447,7 +1448,7 @@ contains
          ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2 &
          ,dr
     type(atdesc):: atdi,atdj
-    real(8),external:: sprod,fcut1,dfcut1
+    real(8),external:: fcut1,dfcut1
 
     epotl= 0d0
 
@@ -1477,9 +1478,9 @@ contains
         atdj = atdescs(js)
         call make_pair_desc(chgi,chgj,atdi,atdj,pdij)
 !.....Create Morse parameters that depend on current atom charges
-        d0ij = sprod(nprm+1,wd,pdij)
-        alpij= sprod(nprm+1,walp,pdij)
-        rminij= sprod(nprm+1,wrmin,pdij)
+        d0ij = dot(wd,pdij)
+        alpij= dot(walp,pdij)
+        rminij= dot(wrmin,pdij)
         d0ij = max(d0ij, 0d0)
         rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
         alpij= max(alpij, prefbeta/(rminij -rc))

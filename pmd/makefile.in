@@ -26,10 +26,10 @@ MAKEFLAGS += --no-print-directory
 endif
 
 pmd= read_input.o pmd_main.o
-pmdobj= util_vec.o util_rnd.o lasubs.o common_parallel.o sort.o pmd_core.o 
-pmc= prec_mc.o util_rnd.o read_input.o pmd_core.o util_vec.o \
+pmdobj= util_rnd.o lasubs.o common_parallel.o sort.o pmd_core.o 
+pmc= prec_mc.o util_rnd.o read_input.o pmd_core.o \
 	lasubs.o common_parallel.o sort.o
-comb= node_conv.o util_vec.o
+comb= node_conv.o
 
 mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o mod_version.o mod_force.o \
 	mod_ttm.o descriptor.o metadynamics.o mod_constraints.o mod_vector.o \
@@ -56,12 +56,12 @@ params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 
 libpmdobj= ${pmdobj} ${mods} ${forces} ${force_common} ${params}
 
-clstr= mod_pmdio.o mod_util.o util_vec.o mod_pairlist.o cluster.o
+clstr= mod_pmdio.o mod_util.o mod_pairlist.o cluster.o
 
-ascii2bin= mod_pmdio.o util_vec.o mod_util.o ascii2bin_pmd.o
-bin2ascii= mod_pmdio.o util_vec.o mod_util.o bin2ascii_pmd.o
+ascii2bin= mod_pmdio.o mod_util.o ascii2bin_pmd.o
+bin2ascii= mod_pmdio.o mod_util.o bin2ascii_pmd.o
 
-rdfobj= mod_pmdio.o mod_util.o util_vec.o mod_pairlist.o mod_time.o rdf.o
+rdfobj= mod_pmdio.o mod_util.o mod_pairlist.o mod_time.o rdf.o
 
 #-----------------------------------------------------------------------
 # Post process programs

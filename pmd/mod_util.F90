@@ -1,6 +1,6 @@
 module util
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 13:47:21 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 15:56:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Utility functions/subroutines used in nap.
 !-----------------------------------------------------------------------
@@ -147,24 +147,13 @@ contains
     integer:: i,j,jm,jp,im,ip
     real(8):: a,b,c,alpha,beta,gamma,sgm(3,3),vol
     real(8),parameter:: pi = 3.14159265358979d0
-!!$    real(8),external:: sprod
 
     write(6,*) ''
-!!$  write(6,'(a)') " Cell-matrix:"
-!!$  write(6,'("   | ",3f12.3," |")') h(1,1:3)
-!!$  write(6,'("   | ",3f12.3," |")') h(2,1:3)
-!!$  write(6,'("   | ",3f12.3," |")') h(3,1:3)
     write(6,'(a)') " Lattice vectors:"
     write(6,'(a,"[ ",3f12.3," ]")') '   a = ',h(1:3,1)
     write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2)
     write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3)
 
-!!$    a = dsqrt(sprod(3,h(1:3,1),h(1:3,1)))
-!!$    b = dsqrt(sprod(3,h(1:3,2),h(1:3,2)))
-!!$    c = dsqrt(sprod(3,h(1:3,3),h(1:3,3)))
-!!$    alpha = acos(sprod(3,h(1:3,2),h(1:3,3))/b/c) /pi *180d0
-!!$    beta  = acos(sprod(3,h(1:3,1),h(1:3,3))/a/c) /pi *180d0
-!!$    gamma = acos(sprod(3,h(1:3,1),h(1:3,2))/a/b) /pi *180d0
     a = dsqrt(dot(h(1:3,1),h(1:3,1)))
     b = dsqrt(dot(h(1:3,2),h(1:3,2)))
     c = dsqrt(dot(h(1:3,3),h(1:3,3)))

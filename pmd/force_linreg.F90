@@ -1,11 +1,12 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 11:46:30 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 15:55:33 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
 !    - 2015.02.03 by R.K. extended to multiple species
 !-----------------------------------------------------------------------
+  use vector,only: dot
   implicit none
   save
   
@@ -314,7 +315,6 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),r,dirij(3),djrij(3),tmp &
          ,fcij,xk(3),xik(3),rik(3),rj,rk,fcik,dkrik(3),dirik(3) &
          ,f3,dfcj,dfck,tmp2,cs,acnst,dcosi(3),dcosj(3),dcosk(3)
-    real(8),external:: sprod
 
     bnai= 0d0
     xi(1:3)= ra(1:3,ia)
@@ -382,7 +382,7 @@ contains
           dkrik(1:3)= -dirik(1:3)
           if( itype(ielem).eq.3 ) then
             acnst= cnst(1,ielem)
-            cs= sprod(3,rij,rik)/rj/rk
+            cs= dot(rij,rik)/rj/rk
             f3= func3(rij,rj,rik,rk,ielem,is,js,ks)
             dbna(1:3,ielem,ia)= dbna(1:3,ielem,ia) &
                  +f3*fcik *dfcj*dirij(1:3) *tmp &
@@ -582,12 +582,11 @@ contains
     integer,intent(in):: ielem,is,js,ks
     real(8),intent(in):: rij(3),rj,rik(3),rk
     real(8):: func3,cs,a(max_ncnst)
-    real(8),external:: sprod 
 
     func3= 0d0
     if( itype(ielem).eq.3 ) then ! angular
       a(1)= cnst(1,ielem)
-      cs= sprod(3,rij,rik)/rj/rk
+      cs= dot(rij,rik)/rj/rk
       func3= (a(1)+cs)**2/(abs(a(1))+1d0)**2
     endif
 

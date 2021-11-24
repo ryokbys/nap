@@ -1,8 +1,9 @@
 module zload
 !-----------------------------------------------------------------------
 !  Module for loading on plane perpendicular to z-axis
-!                     Last-modified: <2019-05-17 13:33:46 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-24 16:08:36 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
+  use vector,only: norm,cross
   implicit none
   save
 !.....initial z top and bottom positions
@@ -135,7 +136,6 @@ contains
     integer:: ierr,i,nztopl,nzbotl
     real(8):: ztopl,zbotl,dlfin,zskin,angle
     real(8):: x1,y1,x2,y2,amati(2,2),det
-    real(8),external:: absv
     real(8),parameter:: pi = 3.14159265358979d0
 
     if( myid_md.eq.0 .and. iprint.gt.0 ) then
@@ -165,7 +165,7 @@ contains
          ,mpi_md_world,ierr)
     call mpi_allreduce(zbotl,zbot0,1,mpi_real8,mpi_min &
          ,mpi_md_world,ierr)
-    zlen0 = (ztop0 -zbot0)*absv(3,h(1:3,3))
+    zlen0 = (ztop0 -zbot0)*norm(h(1:3,3))
     dlfin = zlen0 *strfin
     dl= (dlfin /nstp /2)
 !.....Conversion of shear from x,y to a1,a2
@@ -263,7 +263,6 @@ contains
     character(len=*),intent(in):: czload_type
     integer:: i,is,ifmv,ierr,ixyz
     real(8):: ftopl,fbotl,xyarea,a(3),b(3),axb(3),fx,fy
-    real(8),external:: absv
 
     ftopl= 0d0
     fbotl= 0d0
@@ -309,8 +308,8 @@ contains
 !.....Divide forces on top/bottom by xy-area to get stress
     a(1:3)= h(1:3,1)
     b(1:3)= h(1:3,2)
-    call vprod(a,b,axb)
-    xyarea = absv(3,axb)
+    axb = cross(a,b)
+    xyarea = norm(axb)
     ftop = ftop /xyarea *up2gpa
     fbot = fbot /xyarea *up2gpa
 

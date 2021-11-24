@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-05 07:53:13 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 16:05:50 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -322,7 +322,6 @@ contains
          ,b1(3),b2(3),b3(3),rt(3),vt(3),amat(3,3),bmat(3,3) &
          ,x,y,z,a23(3),a31(3),a12(3),vol,xyp
     real(8):: a,b,c,alpha,beta,gamma
-!!$    real(8),external:: absv,sprod
 
     xlo = 0d0
     ylo = 0d0
@@ -373,16 +372,9 @@ contains
     a1(1:3) = h(1:3,1)
     a2(1:3) = h(1:3,2)
     a3(1:3) = h(1:3,3)
-!!$    call vprod(a2,a3,a23)
-!!$    call vprod(a3,a1,a31)
-!!$    call vprod(a1,a2,a12)
     a23 = cross(a2,a3)
     a31 = cross(a3,a1)
     a12 = cross(a1,a2)
-!!$    call vprod(a2,a3,a23)
-!!$    call vprod(a3,a1,a31)
-!!$    call vprod(a1,a2,a12)
-!!$    vol = abs( sprod(3,a1,a23) )
     vol = abs(dot(a1,a23))
     amat(1:3,1:3) = 0d0
     amat(1,1:3) = a23(1:3)
@@ -465,7 +457,6 @@ contains
 
     real(8):: a0(3),b0(3),c0(3)
     real(8):: a,b,c,alpha,beta,gamma
-!!$    real(8),external:: absv,sprod
 
     xlo = 0d0
     ylo = 0d0

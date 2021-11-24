@@ -1,4 +1,6 @@
 module Lu_WHe
+  use vector,only: dot
+
 contains
   subroutine force_Lu_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -30,8 +32,6 @@ contains
     real(8):: xi(3),xj(3),xk(3),xij(3),xji(3),xik(3),xjk(3),dixij(3) &
          ,djxij(3),dixji(3),djxji(3),fi(3),fj(3),dixik(3),djxjk(3) &
          ,dkxik(3),dkxjk(3),dics(3),djcs(3),dkcs(3),at(3)
-!-----functions
-    real(8),external:: sprod
 !-----1st call
     logical,save:: l1st=.true.
     real(8),save:: vc_HeHe,dvc_HeHe,xc
@@ -78,7 +78,7 @@ contains
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij= dsqrt(sprod(3,xij,xij))
+        rij= dsqrt(dot(xij,xij))
 !.....He-He
         if( is.eq.2 .and. js.eq.2 ) then
           if( rij.gt.p_HeHe_rc ) cycle
@@ -163,7 +163,7 @@ contains
         z= xj(3) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         xji(1:3)= -xij(1:3)
-        rij= dsqrt(sprod(3,xij,xij))
+        rij= dsqrt(dot(xij,xij))
         R1ij= p_R1(is,js)
         D1ij= p_D1(is,js)
 !---------cutoff judgement
@@ -196,13 +196,13 @@ contains
           y= ra(2,k) -xi(2)
           z= ra(3,k) -xi(3)
           xik(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rik=dsqrt(sprod(3,xik,xik))
+          rik=dsqrt(dot(xik,xik))
           R1ik= p_R1(is,ks)
           D1ik= p_D1(is,ks)
 !-----------cutoff judgement
           if(rik.gt.R1ik+D1ik) cycle
           riki= 1d0/rik
-          cs= sprod(3,xij,xik)*riji*riki
+          cs= dot(xij,xik)*riji*riki
           gc= gij*(1d0 +cij**2/dij**2 &
                -(cij**2/(dij**2 +(hij+cs)**2)))
 !.....alpha is always 0d0 in cases of W-W and W-He
@@ -223,7 +223,7 @@ contains
           y= ra(2,k) -xi(2)
           z= ra(3,k) -xi(3)
           xik(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rik=dsqrt(sprod(3,xik,xik))
+          rik=dsqrt(dot(xik,xik))
           R1ik= p_R1(is,ks)
           D1ik= p_D1(is,ks)
 !-----------cutoff judgement
@@ -231,7 +231,7 @@ contains
           riki= 1d0/rik
           dixik(1:3)= -xik(1:3)*riki
           dkxik(1:3)=  xik(1:3)*riki
-          cs= sprod(3,xij,xik)*riji*riki
+          cs= dot(xij,xik)*riji*riki
           dics(1:3)= -riji*riki*(xij(1:3)+xik(1:3)) &
                -cs*(dixij(1:3)*riji+dixik(1:3)*riki)
           djcs(1:3)= riji*riki*xik(1:3) -cs*djxij(1:3)*riji
@@ -271,13 +271,13 @@ contains
           y= ra(2,k) -xj(2)
           z= ra(3,k) -xj(3)
           xjk(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rjk=dsqrt(sprod(3,xjk,xjk))
+          rjk=dsqrt(dot(xjk,xjk))
           R1jk= p_R1(js,ks)
           D1jk= p_D1(js,ks)
 !-----------cutoff judgement
           if(rjk.gt.R1jk+D1jk) cycle
           rjki= 1d0/rjk
-          cs= sprod(3,xji,xjk)*riji*rjki
+          cs= dot(xji,xjk)*riji*rjki
           gc= gij*(1d0 +cij**2/dij**2 &
                -(cij**2/(dij**2 +(hij+cs)**2)))
 !.....alpha is always 0d0 in cases of W-W and W-He
@@ -298,7 +298,7 @@ contains
           y= ra(2,k) -xj(2)
           z= ra(3,k) -xj(3)
           xjk(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rjk=dsqrt(sprod(3,xjk,xjk))
+          rjk=dsqrt(dot(xjk,xjk))
           R1jk= p_R1(js,ks)
           D1jk= p_D1(js,ks)
 !-----------cutoff judgement
@@ -306,7 +306,7 @@ contains
           rjki= 1d0/rjk
           djxjk(1:3)= -xjk(1:3)*rjki
           dkxjk(1:3)=  xjk(1:3)*rjki
-          cs= sprod(3,xji,xjk)*riji*rjki
+          cs= dot(xji,xjk)*riji*rjki
           djcs(1:3)= -riji*rjki*(xji(1:3)+xjk(1:3)) &
                -cs*(djxji(1:3)*riji+djxjk(1:3)*rjki)
           dics(1:3)= riji*rjki*xjk(1:3) -cs*dixji(1:3)*riji

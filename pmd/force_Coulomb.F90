@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 11:39:21 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-24 16:09:03 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -16,6 +16,7 @@ module Coulomb
   use pmdvars,only: nspmax
   use util,only: csp2isp
   use memory,only: accum_mem
+  use vector,only: dot,norm,cross
   implicit none
   include "./const.h"
   save
@@ -227,7 +228,6 @@ contains
 
     integer:: i,ik,k1,k2,k3,isp
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2
-    real(8),external:: absv
 
     sgm_ew = rc/sqrt(2d0*pacc)
     sgm(1:nspmax) = sgm_ew
@@ -281,7 +281,7 @@ contains
           ik= ik+1
           bk3(1:3) = k3*b3(1:3)
           bk(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-          bb2 = absv(3,bk)
+          bb2 = norm(bk)
           bb2 = bb2*bb2
           pflr(ik,1:nspmax)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm_ew**2 *bb2)
         enddo
@@ -306,7 +306,6 @@ contains
 
     integer:: i,isp,ik,k1,k2,k3,is
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min,sgm_rcmd
-    real(8),external:: absv
 
       do i=1,natm
         is = int(tag(i))
@@ -387,7 +386,7 @@ contains
           ik= ik+1
           bk3(1:3) = k3*b3(1:3)
           bk(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-          bb2 = absv(3,bk)
+          bb2 = norm(bk)
           bb2 = bb2*bb2
           do isp=1,nsp
             pflr(ik,isp)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm(isp)**2 *bb2)
@@ -1061,7 +1060,6 @@ contains
     real(8),allocatable,save:: ri(:),bk(:),bk1(:),bk2(:),bk3(:)&
          ,bb(:),dxdi(:),dxdj(:),rij(:),xij(:),xj(:),xi(:)
     real(8),allocatable,save:: strsl(:,:,:)
-    real(8),external:: sprod,absv
 
     if( l1st ) then
       if( .not.allocated(ri) ) then
@@ -1452,7 +1450,6 @@ contains
     real(8),allocatable,save:: ri(:),bk(:),bk1(:),bk2(:),bk3(:)&
          ,bb(:),dxdi(:),dxdj(:),rij(:),xij(:),xj(:),xi(:)
     real(8),allocatable,save:: strsl(:,:,:)
-    real(8),external:: sprod,absv
 
     if( l1st ) then
       if( .not.allocated(ri) ) then
@@ -1954,7 +1951,6 @@ contains
          tmp,cs,sn,texp,bb2,bk
     real(8):: bdk1,bdk2,bdk3,cs1,sn1,cs2,sn2,cs3,sn3,cs10,cs20,cs30, &
          cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm,sn3m,sn3mm
-    real(8),external:: sprod,absv
     real(8):: emat(3,3)
 !!$    integer,external:: itotOf
 
@@ -1978,9 +1974,9 @@ contains
 !!$      if( abs(qi).lt.qthd ) cycle
       ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
       ik = 0
-      bdk1 = sprod(3,b1,ri)
-      bdk2 = sprod(3,b2,ri)
-      bdk3 = sprod(3,b3,ri)
+      bdk1 = dot(b1,ri)
+      bdk2 = dot(b2,ri)
+      bdk3 = dot(b3,ri)
       cs10 = cos(bdk1)
       cs20 = cos(bdk2)
       cs30 = cos(bdk3)
@@ -2076,7 +2072,7 @@ contains
 !!$            endif
 !.....Stress
             if( lstrs ) then
-              bk = absv(3,bb)
+              bk = norm(bb)
               do ixyz=1,3
                 do jxyz=1,3
                   strsl(ixyz,jxyz,i) = strsl(ixyz,jxyz,i) +tmp &
@@ -2313,7 +2309,6 @@ contains
     integer:: i,ik,k1,k2,k3,is,ierr
     real(8):: prefac,bk1(3),bk2(3),bk3(3),bb(3),bb2,xi(3),ri(3), &
          sgmi,sgmi2,qi,bdotr,texp,cs,sn,elrl,eselfl,q2,epotl,tmp
-    real(8),external:: sprod
 
 !.....Compute reciprocal vectors
     call get_recip_vectors(h)
@@ -2334,7 +2329,7 @@ contains
           ik= ik +1
           bk3(1:3) = k3 *b3(1:3)
           bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-          bb2 = sprod(3,bb,bb)
+          bb2 = dot(bb,bb)
           do i=1,natm
             xi(1:3)= ra(1:3,i)
             is= int(tag(i))
@@ -2342,7 +2337,7 @@ contains
             sgmi2= sgmi*sgmi
             qi = chg(i)
             ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
-            bdotr = sprod(3,bb,ri)
+            bdotr = dot(bb,ri)
             texp = exp(-bb2*sgmi2/2)
             cs = cos(bdotr)
             sn = sin(bdotr)
@@ -2516,15 +2511,14 @@ contains
     real(8),intent(in):: h(3,3)
 
     real(8):: a1(3),a2(3),a3(3),a23(3),a12(3),a31(3),pi2
-    real(8),external:: sprod
 
     a1(1:3) = h(1:3,1)
     a2(1:3) = h(1:3,2)
     a3(1:3) = h(1:3,3)
-    call vprod(a2,a3,a23)
-    call vprod(a3,a1,a31)
-    call vprod(a1,a2,a12)
-    vol = abs(sprod(3,a1,a23))
+    a23 = cross(a2,a3)
+    a31 = cross(a3,a1)
+    a12 = cross(a1,a2)
+    vol = abs(dot(a1,a23))
     pi2 = 2d0 *pi
     b1(1:3) = pi2 /vol *a23(1:3)
     b2(1:3) = pi2 /vol *a31(1:3)
@@ -2548,7 +2542,6 @@ contains
          ,ri(3),bdotr,cs,sn
     real(8):: bdk1,bdk2,bdk3,cs1,sn1,cs2,sn2,cs3,sn3,cs10,cs20,cs30, &
          cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm,sn3m,sn3mm
-    real(8),external:: sprod
     real(8):: qcmax,qsmax,qclmax,qslmax
 
 !.....Compute structure factor of the local processor
@@ -2568,7 +2561,7 @@ contains
 !!$            xi(1:3)= ra(1:3,i)
 !!$            qi = chg(i)
 !!$            ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
-!!$            bdotr = sprod(3,bb,ri)
+!!$            bdotr = dot(bb,ri)
 !!$            qcosl(ik) = qcosl(ik) +qi*cos(bdotr)
 !!$            qsinl(ik) = qsinl(ik) +qi*sin(bdotr)
 !!$          enddo
@@ -2584,9 +2577,9 @@ contains
       qi = chg(i)
       ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
       ik = 0
-      bdk1 = sprod(3,b1,ri)
-      bdk2 = sprod(3,b2,ri)
-      bdk3 = sprod(3,b3,ri)
+      bdk1 = dot(b1,ri)
+      bdk2 = dot(b2,ri)
+      bdk3 = dot(b3,ri)
       cs10 = cos(bdk1)
       cs20 = cos(bdk2)
       cs30 = cos(bdk3)
@@ -2653,7 +2646,7 @@ contains
             ik= ik +1
 !!$            bk3(1:3) = k3 *b3(1:3)
 !!$            bb(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-!!$            bdotr = sprod(3,bb,ri)
+!!$            bdotr = dot(bb,ri)
             cs = cs1*cs2*cs3 -cs1*sn2*sn3 -sn1*cs2*sn3 -sn1*sn2*cs3
             sn = cs1*cs2*sn3 +cs1*sn2*cs3 +sn1*cs2*cs3 -sn1*sn2*sn3
             qcosl(ik) = qcosl(ik) +qi*cs
@@ -2712,7 +2705,6 @@ contains
     real(8),allocatable:: bbs(:,:,:)
     integer:: k1,k2,k3
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb,bb2,bbmax
-    real(8),external:: absv
 
     allocate(bbs(-kmaxini:kmaxini,-kmaxini:kmaxini,-kmaxini:kmaxini))
 
@@ -2725,7 +2717,7 @@ contains
           if( k1.eq.0 .and. k2.eq.0 .and. k3.eq.0 ) cycle
           bk3(1:3) = k3*b3(1:3)
           bk(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
-          bb2 = absv(3,bk)
+          bb2 = norm(bk)
           bbs(k3,k2,k1) = bb2
 !!$          bb2= bb2*bb2
 !!$          bbs(k3,k2,k1) = exp(-0.5d0 *sgm_ew**2 *bb2)/bb2
