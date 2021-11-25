@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 11:46:01 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-25 14:20:16 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -196,7 +196,10 @@ contains
     call mpi_bcast(ea_rcout,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(ea_interact,nspmax,mpi_logical,0,mpi_md_world,ierr)
     call mpi_bcast(pair_interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
-
+    call mpi_bcast(type_rho,128*nspmax*nspmax,mpi_character,0,mpi_md_world,ierr)
+    call mpi_bcast(type_frho,128*nspmax*nspmax,mpi_character,0,mpi_md_world,ierr)
+    call mpi_bcast(type_phi,128*nspmax*nspmax,mpi_character,0,mpi_md_world,ierr)
+    return
   end subroutine read_params_EAM
 !=======================================================================
   subroutine force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
@@ -230,11 +233,11 @@ contains
     real(8),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
-!.....Check cutoff radius
       if( allocated(rho) ) deallocate(rho)
       allocate(rho(namax+nbmax))
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
+!.....Check cutoff radius
       do is=1,nspmax
         do js=is,nspmax
           if( .not.pair_interact(is,js) ) cycle
@@ -362,10 +365,10 @@ contains
     endif
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
-         ,mpi_sum,mpi_md_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
-    if( iprint.ge.ipl_info ) write(6,'(a,es15.7)') ' epot EAM = ',epott
+    if( myid_md.eq.0 .and. iprint.ge.ipl_info ) &
+         write(6,'(a,es15.7)') ' epot EAM = ',epott
     return
   end subroutine force_EAM
 !=======================================================================

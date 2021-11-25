@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-11-24 11:53:36 Ryo KOBAYASHI>
+!                    Last modified: <2021-11-25 10:20:09 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -109,6 +109,7 @@ module pmdvars
        /
 !.....whether compute stress or not
   logical:: lstrs0 = .true.
+  logical:: lstrs = .false.
 !.....barostat
   character(len=20):: cpctl='none'
   real(8):: ptgt   = 0d0
@@ -183,6 +184,8 @@ module pmdvars
 !!$  real(8),allocatable:: stn(:,:,:)
 !.....Auxiliary data
   real(8),allocatable:: aux(:,:)
+
+  logical:: lcell_updated = .true.
 
 !.....Reallocation
   logical:: lrealloc = .false.

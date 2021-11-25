@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-11-24 21:38:26 Ryo KOBAYASHI>
+!                     Last-modified: <2021-11-25 10:21:04 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -52,8 +52,6 @@ subroutine pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
        htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow
   logical:: l1st
   logical:: lconverged = .false.
-  logical:: lstrs = .false.
-  logical:: lcell_updated = .true.
 !.....FIRE variables
   real(8):: alp_fire,fnorm,vnorm,fdotv
   integer:: num_fire
@@ -346,14 +344,12 @@ subroutine pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
 !.....Cell is new at the first call of get_force
   lcell_updated = .true.
   tmp = mpi_wtime()
-  call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-       ,h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
-       ,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
-       ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
+!!$  call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
+!!$       ,h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+!!$       ,sorg,mpi_md_world,myid_md,epi,epot0,nspmax,specorder,lstrs &
+!!$       ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
+  call get_force(.true.,epot0,stnsr)
   call accum_time('get_force',mpi_wtime()-tmp)
-  if( epot*0d0 .ne. 0d0 ) then
-
-  endif
   lcell_updated = .false.
   lstrs = .false.
   epot= epot0
@@ -731,10 +727,11 @@ subroutine pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot &
     endif
 !-------Calc forces
     tmp = mpi_wtime()
-    call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-         ,h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
-         ,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
-         ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
+!!$    call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
+!!$         ,h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+!!$         ,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
+!!$         ,ifcoulomb,iprint,.false.,lvc,lcell_updated,boundary)
+    call get_force(.false.,epot,stnsr)
     call accum_time('get_force',mpi_wtime()-tmp)
     lcell_updated = .false.
     lstrs = .false.
@@ -1145,8 +1142,6 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
 
   integer:: i,ierr,is,nspl,iprm0,ntot
   real(8):: aai(3),epott
-  logical:: lstrs = .false.
-  logical:: lcell_updated = .false.
   logical:: l1st
   character(len=3):: csp
 
@@ -1204,10 +1199,11 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   lstrs = .true.
 
   if( iprint.ge.ipl_info ) print *,'get_force...'
-  call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-       ,h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
-       ,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
-       ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
+!!$  call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
+!!$       ,h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+!!$       ,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
+!!$       ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
+  call get_force(.true.,epot,stnsr)
 
 !      print *,'one_shot: 07'
   if( iprint.ge.ipl_info ) print *,'sa2stnsr...'
@@ -1263,8 +1259,6 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
 
   integer:: i,ierr,is,nspl,iprm0,ntot
   real(8):: aai(3),epott
-  logical:: lstrs = .false.
-  logical:: lcell_updated = .false.
   logical:: l1st
   character(len=3):: csp
 
@@ -1323,10 +1317,11 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
 
   if( .not.lcalcgrad ) then
     if( iprint.ge.ipl_basic ) print *,'get_force...'
-    call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
-         ,h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
-         ,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
-         ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
+!!$    call get_force(namax,natm,tag,ra,nnmax,aa,strs,aux,naux,stnsr &
+!!$         ,h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+!!$         ,sorg,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs &
+!!$         ,ifcoulomb,iprint,.true.,lvc,lcell_updated,boundary)
+    call get_force(.true.,epot,stnsr)
     if( iprint.ge.ipl_basic ) print '(a,es15.7)',' Potential energy = ',epot
   else  ! lcalcgrad = .true.
     if( iprint.ge.ipl_basic ) print *,'gradw_xxxx...'

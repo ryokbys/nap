@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 16:09:03 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-25 13:55:19 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !  ifcoulomb == 1: screened Coulomb potential
@@ -1173,8 +1173,8 @@ contains
 !!$         ,mpi_sum,mpi_md_world,ierr)
     epott = esr +elr +eself
     epot= epot +epott
-    if( iprint.ge.ipl_info ) print *,'epot Coulomb,self,short,long = ', &
-         epott,eself,esr,elr
+    if( myid.eq.0 .and. iprint.ge.ipl_info ) &
+         print *,'epot Coulomb,self,short,long = ',epott,eself,esr,elr
 
   end subroutine force_Coulomb
 !=======================================================================
@@ -2394,6 +2394,7 @@ contains
 !
 !  Wrapper routine for calculating forces on charges.
 !
+    include "mpif.h"
     integer,intent(in):: namax,natm,myid,mpi_world,iprint
     integer,intent(in):: nnmax,lspr(0:nnmax,namax)
     real(8),intent(in):: tag(namax),h(3,3),ra(3,namax),chg(namax),sorg(3),rc
@@ -2401,25 +2402,32 @@ contains
     logical,intent(in):: l1st
     real(8),intent(inout):: fq(namax),epot
 
+    integer:: ierr
+    real(8):: eclongl,eselfl,ecshortl
     real(8):: eclong,eself,ecshort
     
-    call qforce_self(namax,natm,tag,chg,fq,eself)
+    call qforce_self(namax,natm,tag,chg,fq,eselfl)
+    call mpi_allreduce(eselfl,eself,1,mpi_real8,mpi_sum,mpi_world,ierr)
     
     if( trim(cterms).eq.'long' ) then
       call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_world, &
-           myid,iprint,fq,eclong)
-!!$    else if( use_force('Ewald') ) then
+           myid,iprint,fq,eclongl)
+      call mpi_allreduce(eclongl,eclong,1,mpi_real8,mpi_sum,mpi_world,ierr)
     else if( trim(cterms).eq.'full' ) then
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
-           ,rc,fq,ecshort)
+           ,rc,fq,ecshortl)
       call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_world, &
-           myid,iprint,fq,eclong)
+           myid,iprint,fq,eclongl)
+      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_world,ierr)
+      call mpi_allreduce(eclongl,eclong,1,mpi_real8,mpi_sum,mpi_world,ierr)
     else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
-           ,rc,fq,ecshort)
+           ,rc,fq,ecshortl)
+      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_world,ierr)
     else if( trim(cterms).eq.'screened_cut'  ) then
       call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h, &
-           lspr,d2lspr,iprint,rc,fq,ecshort,l1st)
+           lspr,d2lspr,iprint,rc,fq,ecshortl,l1st)
+      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_world,ierr)
     endif
     epot = eself +ecshort + eclong
     return

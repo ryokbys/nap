@@ -1,6 +1,6 @@
 module Buckingham
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 11:35:20 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-25 13:39:47 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Buckingham calculation
 !    - only force on i is considered, no need to send back
@@ -147,10 +147,10 @@ contains
 
 !-----gather epot
     epott = 0d0
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
-         ,mpi_sum,mpi_md_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
-    if( iprint.ge.ipl_info ) write(6,'(a,es15.7)') ' epot Buckingham = ',epott
+    if( myid.eq.0 .and. iprint.ge.ipl_info ) &
+         write(6,'(a,es15.7)') ' epot Buckingham = ',epott
     return
   end subroutine force_Buckingham
 !=======================================================================
