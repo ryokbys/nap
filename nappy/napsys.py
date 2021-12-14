@@ -983,6 +983,15 @@ class NAPSystem(object):
         """
         Add vacuum of the given length to the given axis of the current system.
         Shift value is added to each atom position of the given axis.
+
+        Input
+        -----
+        axis : int (0, 1, or 2)
+            Axis to which vacuum is added.
+        length : float (in Ang.)
+            Length of vacuum region.
+        shift : float (in Ang.)
+            Shift value that is add to atoms towards vacuum region.
         """
         lengths = self.get_lattice_lengths()
         ratios = np.array((1.0, 1.0, 1.0))

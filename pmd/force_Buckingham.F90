@@ -1,6 +1,6 @@
 module Buckingham
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-25 13:39:47 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-25 21:31:00 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Buckingham calculation
 !    - only force on i is considered, no need to send back
@@ -46,7 +46,7 @@ contains
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6),d2lspr(nnmax,namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st 
     logical:: lstrs
 
@@ -106,13 +106,9 @@ contains
         if(j.eq.0) exit
         js = int(tag(j))
         if( .not.interact(is,js) ) cycle
-!!$        x= ra(1,j) -xi(1)
-!!$        y= ra(2,j) -xi(2)
-!!$        z= ra(3,j) -xi(3)
         xij(1:3) = ra(1:3,j) -xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2= rij(1)*rij(1)+ rij(2)*rij(2) +rij(3)*rij(3)
-        if( dij2.gt.rcmax2 ) cycle
         dij = dsqrt(dij2)
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
@@ -143,7 +139,9 @@ contains
       enddo
     enddo
 
-    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    if( lstrs ) then
+      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+    endif
 
 !-----gather epot
     epott = 0d0

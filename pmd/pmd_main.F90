@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-11-24 21:36:23 Ryo KOBAYASHI>
+!                     Last-modified: <2021-12-09 21:30:56 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -21,8 +21,8 @@ program pmd
   use pmdvars
   use pmdio,only: read_pmdtot_bin, read_pmdtot_ascii, write_pmdtot_bin, &
        write_pmdtot_ascii,get_ntot_ascii,get_ntot_bin
-  use force
-  use Coulomb, only: cterms
+  use force,only: use_force,num_forces,force_list
+  use Coulomb, only: cterms, chgopt_method
   use util, only: itotOf, cell_info, iauxof, make_cdumpauxarr, spcs_info
   use time, only: time_stamp, accum_time, report_time
   use memory, only: accum_mem, report_mem
@@ -43,7 +43,7 @@ program pmd
 #endif
 
   real(8):: hunit,hmat(3,3,0:1)
-  integer:: ntot0,ntot
+  integer:: ntot0
   real(8),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
   real(8),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
   real(8),allocatable:: auxtot(:,:)
@@ -108,7 +108,7 @@ program pmd
       enddo
     endif
 
-    call cell_info(h)
+    call cell_info(hmat)
     call spcs_info(ntot0,tagtot)
     write(6,*) ''
     write(6,'(a,i0)') ' Num of MPI processes = ',nprocs
@@ -205,35 +205,16 @@ program pmd
   call bcast_params()
   call mpi_bcast(hunit,1,mpi_real8,0,mpi_md_world,ierr)
   call mpi_bcast(hmat,9*2,mpi_real8,0,mpi_md_world,ierr)
+!.....Broadcast species data read from pmdini  
+  call mpi_bcast(specorder,3*nspmax,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(has_specorder,1,mpi_logical,0,mpicomm,ierr)
 
+  call set_nsp(ntot0,tagtot)
+
+!.....It is required to call init_force and read some in.params.XXX to define aux array
+  call init_force(.true.)
 !.....Before allocating auxiliary array, set naux (num of auxiliary data)
-  call set_use_charge()
-  call set_use_elec_temp()
-  naux = 0
-  if( luse_charge ) then
-    naux = naux +1  ! chg
-  endif
-  if( luse_elec_temp .or. trim(ctctl).eq.'ttm' ) then
-    naux = naux +1
-  endif
-  if( lclrchg ) then
-    naux = naux +1
-  endif
-  allocate(cauxarr(naux))
-  inc = 0
-  if( luse_charge ) then
-    inc = inc +1
-    cauxarr(inc) = 'chg'
-  endif
-  if( luse_elec_temp .or. trim(ctctl).eq.'ttm' ) then
-    inc = inc +1
-    cauxarr(inc) = 'tei'
-  endif
-  if( lclrchg ) then
-    inc = inc +1
-    cauxarr(inc) = 'clr'
-  endif
-
+  call set_cauxarr()
 !.....Now allcoate the auxiliary array
   if( myid_md.eq.0 ) then
     if( .not. allocated(auxtot) ) then
@@ -259,11 +240,6 @@ program pmd
          ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0) )
     allocate(auxtot(naux,ntot0))
   endif
-  ntot = ntot0
-
-!.....Broadcast species data read from pmdini  
-  call mpi_bcast(specorder,3*nspmax,mpi_character,0,mpicomm,ierr)
-  call mpi_bcast(has_specorder,1,mpi_logical,0,mpicomm,ierr)
 
 !.....Broadcast determined nx,ny,nz to reset MPI communicator if needed.
   call mpi_bcast(nx,1,mpi_integer,0,mpicomm,ierr)
@@ -306,20 +282,13 @@ program pmd
 !.....Check ensemble
   if( myid_md.eq.0 ) call check_ensemble()
 
-!.....Set Coulomb flag here
-  if( use_force('screened_Coulomb') ) then
-    ifcoulomb = 1
-    cterms = 'screened'
-  else if( use_force('Ewald') ) then
-    ifcoulomb = 2
-    cterms = 'full'
-  else if( use_force('Ewald_long') ) then
-    ifcoulomb = 3
-    cterms = 'long'
+  if( use_force('screened_Coulomb') .or. use_force('Ewald') .or. &
+       use_force('Ewald_long') ) then
+    stop 'ERROR: screend_Coulomb and Ewald* are no longer available, use Coulomb instead.'
   endif
 
 !.....Initial settting for color charge NEMD
-  if( lclrchg ) call init_clrchg(specorder,ntot0,auxtot(iauxof('clr'),:),tagtot &
+  if( lclrchg ) call init_clrchg(specorder,ntot0,auxtot(iaux_clr,:),tagtot &
        ,myid_md,iprint)
 !.....Init for local flux
   if( lflux ) call init_lflux(myid_md,nx,ny,nz,lclrchg &
@@ -333,7 +302,7 @@ program pmd
 
   call accum_time('overhead',mpi_wtime()-t0)
 !.....Call pmd_core to perform MD; all the arguments are in pmdvars module
-  call pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot, &
+  call pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
        ekitot,epitot,auxtot,epot,ekin,stnsr)
 
   if( myid_md.eq.0 ) then
@@ -388,27 +357,6 @@ subroutine write_headline()
   write(6,*) ''
 
 end subroutine write_headline
-!=======================================================================
-subroutine set_fmv(fmv)
-!
-! Set default fmv values which might be override
-!
-  implicit none
-  real(8),intent(out):: fmv(3,0:9)
-
-!-----set fmv(1:3,ifmv) to be multiplied to the velocities
-  fmv(1:3,0)= (/ 0d0, 0d0, 0d0 /) ! fix
-  fmv(1:3,1)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,2)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,3)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,4)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,5)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,6)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,7)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,8)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,9)= (/ 1d0, 1d0, 1d0 /) ! free move
-
-end subroutine set_fmv
 !=======================================================================
 subroutine write_initial_setting()
   use pmdvars
@@ -611,6 +559,7 @@ subroutine bcast_params()
   if( myid_md.eq.0 ) write(6,'(/,a)') ' Broadcast data to be shared' &
        //' with all the nodes.'
 !-----Broadcast input parameters to all nodes
+  call mpi_bcast(ntot,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(namax,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(nbmax,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(nnmax,1,mpi_integer,0,mpicomm,ierr)
@@ -676,7 +625,6 @@ subroutine bcast_params()
 !!$  endif
 !!$  call mpi_bcast(force_list,128*num_forces,mpi_character &
 !!$       ,0,mpicomm,ierr)
-  call mpi_bcast(ifcoulomb,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(schg,nspmax,mpi_real8,0,mpicomm,ierr)
 !.....NEMD
   call mpi_bcast(ltdst,1,mpi_logical,0,mpicomm,ierr)

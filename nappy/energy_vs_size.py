@@ -17,7 +17,7 @@ Options:
   -h, --help  Show this message and exit.
   -n ITER     Num of points to be calculated. [default: 10]
   --mdexec=MDEXEC
-              Path to *pmd*. [default: ~/src/nap/pmd/pmd]
+              Path to *pmd*. [default: pmd]
 """
 from __future__ import print_function
 
@@ -111,9 +111,15 @@ def erg_vs_size(fname,al_min,al_max,niter):
     for i in range(niter+1):
         al= al_min +dl*i
         replace_1st_line(al,fname)
-        os.system(mdexec +' > out.pmd')
-        erg= float(subprocess.getoutput("grep 'Potential energy' out.pmd | tail -n1 | awk '{print $3}'"))
-        prs= float(subprocess.getoutput("grep 'Pressure' out.pmd | tail -n1 | awk '{print $3}'"))
+        #os.system('rm -f out.pmd')
+        #os.system(mdexec +' 2>&1 > out.pmd')
+        pmdout = subprocess.check_output(mdexec)
+        with open('out.pmd','w') as f:
+            f.write(pmdout.decode('utf-8'))
+        cmdstr = "grep 'Potential energy' out.pmd | tail -n1 | awk '{print $3}'"
+        erg = float(subprocess.check_output(cmdstr,shell=True))
+        cmdstr = "grep 'Pressure' out.pmd | tail -n1 | awk '{print $3}'"
+        prs = float(subprocess.check_output(cmdstr,shell=True))
         vol= get_vol(al,hmat)
         als[i] = al
         vols[i] = vol
@@ -122,8 +128,9 @@ def erg_vs_size(fname,al_min,al_max,niter):
         text = ' {0:10.4f} {1:10.4f} {2:15.7f} {3:12.4f}'.format(al,vol,erg,prs)
         print(text)
     #...revert pmdini
+    os.system('rm -f '+fname)
     os.system('cp '+tmpfname+' '+fname)
-    os.system('rm '+tmpfname)
+    os.system('rm -f '+tmpfname)
     return als,vols,ergs,prss,al_orig,hmat,natm
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 16:05:50 Ryo KOBAYASHI>
+!                     Last modified: <2021-12-07 15:10:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -183,7 +183,8 @@ contains
 !
 !     Write atomic configuration in LAMMPS-dump format file.
 !
-    use pmdvars,only: ndumpaux,cdumpauxarr,specorder,has_specorder
+    use pmdvars,only: ndumpaux,cdumpauxarr,specorder,has_specorder,&
+         iaux_chg,iaux_tei,iaux_clr
     use util,only: itotOf,iauxof
     use time,only: accum_time
     implicit none
@@ -200,7 +201,7 @@ contains
          zlo_bound,zhi_bound,st(3,3)
 !!$    integer,external:: itotOf
 !!$    real(8),allocatable,save:: rlmp(:,:),vlmp(:,:)
-    integer,save:: ndlmp
+    integer,save:: ndlmp,ndim
     real(8),allocatable,save:: dlmp(:,:)
     character(len=3),save:: cndlmp
     character(len=3):: csp
@@ -210,20 +211,21 @@ contains
 
     if( l1st ) then
       ndlmp = 3 +ndumpaux
+      ndim = max(ndlmp,6)
 !.....If vx,vy,vz are included in dumpauxarr, take that into account
 !!$      if( idumpauxof('vx').gt.0 ) ndlmp = ndlmp -1
 !!$      if( idumpauxof('vy').gt.0 ) ndlmp = ndlmp -1
 !!$      if( idumpauxof('vz').gt.0 ) ndlmp = ndlmp -1
       write(cndlmp,'(i0)') ndlmp
-      allocate(dlmp(ndlmp,ntot))
+      allocate(dlmp(ndim,ntot))
       l1st = .false.
     endif
 
     if( .not.allocated(dlmp) ) then
-      allocate(dlmp(ndlmp,ntot))
-    else if( size(dlmp).ne.ndlmp*ntot ) then
+      allocate(dlmp(ndim,ntot))
+    else if( size(dlmp).ne.ndim*ntot ) then
       deallocate(dlmp)
-      allocate(dlmp(ndlmp,ntot))
+      allocate(dlmp(ndim,ntot))
     endif
 
     call pmd2lammps(h,ntot,rtot,dlmp(1:3,:),vtot,dlmp(4:6,:) &
@@ -259,11 +261,11 @@ contains
       else if( trim(caux).eq.'sxy' .or. trim(caux).eq.'syx' ) then
         dlmp(idlmp,:) = stot(1,2,:)
       else if( trim(caux).eq.'chg' ) then
-        dlmp(idlmp,:) = auxtot(iauxof('chg'),:)
+        dlmp(idlmp,:) = auxtot(iaux_chg,:)
       else if( trim(caux).eq.'tei' ) then
-        dlmp(idlmp,:) = auxtot(iauxof('tei'),:)
+        dlmp(idlmp,:) = auxtot(iaux_tei,:)
       else if( trim(caux).eq.'clr' ) then
-        dlmp(idlmp,:) = auxtot(iauxof('clr'),:)
+        dlmp(idlmp,:) = auxtot(iaux_clr,:)
       endif
     enddo
 

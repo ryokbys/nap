@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-11-25 10:20:09 Ryo KOBAYASHI>
+!                    Last modified: <2021-12-07 17:49:20 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -86,8 +86,6 @@ module pmdvars
 !     N==0: remove translation only at the beginning
 !     N> 1: remove translation at the begining and every N step.
   integer:: nrmtrans = 0
-!.....Coulomb system?
-  integer:: ifcoulomb = 0
 !.....temperature distribution on x-direction
   logical:: ltdst= .false.
   integer:: ntdst= 1
@@ -140,6 +138,8 @@ module pmdvars
   character(len=6),allocatable:: cdumpauxarr(:)
 !.....Auxiliary data
   character(len=6),allocatable:: cauxarr(:)
+!.....Indices of aux array
+  integer:: iaux_chg,iaux_q,iaux_vq,iaux_tei,iaux_clr
 
 !.....mass
   real(8):: am(1:nspmax)= 12.0d0
@@ -154,12 +154,15 @@ module pmdvars
 
   integer:: nstp_done
   integer:: nouterg,noutpmd,istp,iocntpmd,iocnterg
-  integer:: natm,nb,nsp,nalmax
+  integer:: natm,nb,nsp,nalmax,ntot
   real(8):: tcpu,tcpu0,tcpu1,tcpu2,tlspr
   real(8):: epot0,vmaxold,vmax,simtime
   real(8):: tgmm
-  real(8),allocatable:: tfac(:),ediff(:),ediff0(:),temp(:),ekl(:)
-  integer,allocatable:: ndof(:)
+  real(8):: tfac(nspmax),ediff(nspmax),ediff0(nspmax),temp(nspmax), &
+       ekl(nspmax)
+  integer:: ndof(nspmax)
+!!$  real(8),allocatable:: tfac(:),ediff(:),ediff0(:),temp(:),ekl(:)
+!!$  integer,allocatable:: ndof(:)
   integer:: nxmlt
 !.....Search time and expiration time
   real(8):: ts,te
@@ -179,7 +182,7 @@ module pmdvars
 !.....mass, prefactors
   real(8),allocatable:: acon(:),fack(:)
 !.....Factors for ekin
-  real(8),allocatable:: fekin(:),fa2v(:),fv2p(:)
+  real(8):: fekin(nspmax),fa2v(nspmax)
 !.....atomic strain
 !!$  real(8),allocatable:: stn(:,:,:)
 !.....Auxiliary data
@@ -253,14 +256,6 @@ module pmdvars
   real(8):: rc_struct = 2.5d0
 
 contains
-  subroutine initialize_pmdvars()
-    
-    if( .not. allocated(tfac) ) then
-      allocate(tfac(nspmax),ediff(nspmax),ediff0(nspmax),temp(nspmax)&
-           ,ekl(nspmax),ndof(nspmax),fekin(nspmax),fa2v(nspmax))
-    endif
-    
-  end subroutine initialize_pmdvars
 !=======================================================================
   subroutine check_cmin()
 

@@ -38,7 +38,7 @@ class PMD:
             raise ImportError('pmd_wrapper is not loaded.\n'
                               +'Probably you need to compile it at nap/nappy/pmd/.')
         self.params = nappy.pmd.inpmd.get_default()
-        self.params['naux'] = 0
+        # self.params['naux'] = 0
         if nsys is not None:
             self.nsys = copy.deepcopy(nsys)
             self.params['specorder'] = nsys.specorder
@@ -57,11 +57,12 @@ class PMD:
                         damping_coeff=dmp, converge_eps=conveps, converge_num=convnum)
         # self.params['num_iteration'] = nstp
         # self.params['time_interval'] = dt
-        self.update_params()
         self.update_mpivars()
+        self.update_params()
         rtot = self.nsys.get_scaled_positions()
         vtot = np.zeros(rtot.shape)
-        naux = self.params['naux']
+        naux = pw.get_naux()
+        # naux = self.params['naux']
         hmat = np.zeros((3,3,2))
         hmat[0:3,0:3,0] = self.nsys.get_hmat()
         ispcs = self.nsys.atoms.sid.values
@@ -122,7 +123,7 @@ class PMD:
         iprint = self.param2var('print_level',0)
         nstp = self.param2var('num_iteration',0)
         dt = self.param2var('time_interval',1.0)
-        naux = self.param2var('naux',0)
+        # naux = self.param2var('naux',0)
         ifdmp = self.param2var('flag_damping',0)
         dmpcoeff = self.param2var('damping_coeff',0.99)
         conveps = self.param2var('converge_eps',1e-5)
@@ -144,21 +145,21 @@ class PMD:
         nerg = self.param2var('num_out_energy',100)
         nnmax = self.param2var('max_num_neighbors',200)
 
-        if 'Coulomb' in self.params['force_type']:
-            naux = max(naux,2)
-            self.params['naux'] = naux
+        # if 'Coulomb' in self.params['force_type']:
+        #     naux = max(naux,2)
+        #     self.params['naux'] = naux
 
-        laux = 6
-        cauxarr = np.empty((naux,laux),dtype='c')
-        cauxarr[:] = '      '
-        if naux >= 2:
-            cauxarr[0] = 'chg   '
-            cauxarr[1] = 'chi   '
+        # laux = 6
+        # cauxarr = np.empty((naux,laux),dtype='c')
+        # cauxarr[:] = '      '
+        # if naux >= 2:
+        #     cauxarr[0] = 'chg   '
+        #     cauxarr[1] = 'chi   '
 
         cpctrl = np.empty(20,dtype='c')
         cpctrl = str2char(sctrl,20)
 
-        pw.set_pmdvars(cspcs,cfrcs,rc,rbuf,iprint,nstp,dt,cauxarr,
+        pw.set_pmdvars(cspcs,cfrcs,rc,rbuf,iprint,nstp,dt,
                        ifdmp,dmpcoeff,conveps,convnum,
                        cpctrl,ptgt,stgt.T,srlx,
                        ifpmd,npmd,nerg,nnmax)
@@ -193,6 +194,12 @@ class PMD:
         inputs = read_inpmd('in.pmd')
         self.params = copy.deepcopy(inputs)
         return None
+
+    def load_inparams(self,):
+        """
+        Load in.params.XXX files needed to initialize force parameters.
+        """
+        
         
     def set_system(self,nsys):
         self.nsys = copy.deepcopy(nsys)

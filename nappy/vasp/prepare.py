@@ -161,7 +161,8 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
         print('NSW is meaningless for mode==scf, so reset NSW=0.')
         nsw = 0
     elif mode != 'scf' and nsw == 0:
-        raise ValueError('NSW==0 is meaningless for mode==(relax|md)')
+        print(' Since NSW==0 is meaningless for mode==(relax|md), change NSW=1000.')
+        nsw = 1000
         
     with open(fname,'w') as f:
         f.write("SYSTEM = "+SYSTEM+"\n")

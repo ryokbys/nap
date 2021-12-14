@@ -1,6 +1,6 @@
-program fitpot
+Program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-04-13 13:51:31 Ryo KOBAYASHI>
+!                     Last modified: <2021-12-07 11:20:06 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -131,28 +131,31 @@ program fitpot
     call subtract_FF()
   endif
 
-!.....Set cffs only for pmd calculation
-  if( trim(cpot).eq.'BVS' ) then
-    nff = 2
-    allocate(cffs(nff))
-    cffs(1) = 'Coulomb'
-    cffs(2) = 'Morse'
-  else if( trim(cpot).eq.'BVSx' ) then
-    nff = 3
-    allocate(cffs(nff))
-    cffs(1) = 'Coulomb'
-    cffs(2) = 'Morse'
-    cffs(3) = 'angular'
-  else if( trim(cpot).eq.'fpc' ) then
-    nff = 2
-    allocate(cffs(nff))
-    cffs(1) = 'fpc'
-    cffs(2) = 'Coulomb'
-  else
+!!$!.....Set cffs only for pmd calculation
+!!$  if( trim(cpot).eq.'BVS' ) then
+!!$    nff = 2
+!!$    allocate(cffs(nff))
+!!$    cffs(1) = 'Coulomb'
+!!$    cffs(2) = 'Morse'
+!!$  else if( trim(cpot).eq.'BVSx' ) then
+!!$    nff = 3
+!!$    allocate(cffs(nff))
+!!$    cffs(1) = 'Coulomb'
+!!$    cffs(2) = 'Morse'
+!!$    cffs(3) = 'angular'
+!!$  else if( trim(cpot).eq.'fpc' ) then
+!!$    nff = 2
+!!$    allocate(cffs(nff))
+!!$    cffs(1) = 'fpc'
+!!$    cffs(2) = 'Coulomb'
+!!$  else
+!!$    nff = 1
+!!$    allocate(cffs(nff))
+!!$    cffs(1) = trim(cpot)
+!!$  endif
     nff = 1
     allocate(cffs(nff))
     cffs(1) = trim(cpot)
-  endif
 
   if( (trim(cfmethod).ne.'test' .or. trim(cfmethod).ne.'dsgnmat') .and. &
        trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
@@ -160,11 +163,12 @@ program fitpot
   endif
 
 !.....Initial computations of all samples
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
-       .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
-       .or. trim(cpot).eq.'BMH' &
-       .or. trim(cpot).eq.'Abell' .or. trim(cpot).eq.'fpc' &
-       .or. trim(cpot).eq.'DNN' ) then
+!!$  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
+!!$       .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
+!!$       .or. trim(cpot).eq.'BMH' &
+!!$       .or. trim(cpot).eq.'Abell' .or. trim(cpot).eq.'fpc' &
+!!$       .or. trim(cpot).eq.'DNN' ) then
+  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
 !!$    if( lnormalize ) call normalize()
 !!$    if( lgdw ) call compute_gdw()
@@ -870,8 +874,9 @@ subroutine qn_wrapper(ftrn0,ftst0)
   real(8):: fval
   external:: write_stats
 
-  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
-       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
+!!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
+!!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
+  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
     call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -917,8 +922,9 @@ subroutine cg_wrapper(ftrn0,ftst0)
   real(8):: fval
   external:: write_stats
 
-  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
-       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
+!!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
+!!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
+  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
     call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -1006,9 +1012,10 @@ subroutine test(ftrn0,ftst0)
 !!$    call NN_init()
 !!$    call NN_func(nvars,vars,ftrn,ftst)
 !!$    call NN_grad(nvars,vars,g)
-  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
-       .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
-       .or. index(cpot,'NN').ne.0 ) then
+!!$  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
+!!$       .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
+!!$       .or. index(cpot,'NN').ne.0 ) then
+  if( trim(cpot).eq.'linreg' .or. index(cpot,'NN').ne.0 ) then
 !!$    call func_w_pmd(nvars,vars,ftrn,ftst)
     call grad_w_pmd(nvars,vars,g)
   else

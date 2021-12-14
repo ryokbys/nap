@@ -1,6 +1,6 @@
 module util
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 15:56:54 Ryo KOBAYASHI>
+!                     Last modified: <2021-12-10 20:43:38 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Utility functions/subroutines used in nap.
 !-----------------------------------------------------------------------
@@ -43,9 +43,11 @@ contains
 !
     character(len=*),intent(in):: str
     logical:: is_numeric
-    integer:: i
-    i = verify(trim(str),'0123456789')
-    is_numeric = i==0
+    real(8):: x
+    integer:: e
+
+    read(str,*,iostat=e) x
+    is_numeric = ( e == 0 .and. .not.isnan(x) )
     return
   end function is_numeric
 !=======================================================================
@@ -272,7 +274,7 @@ contains
   end function idumpauxof
 !=======================================================================
   subroutine calc_nfmv(ntot,tagtot)
-    use pmdvars
+    use pmdvars,only: myid_md,mpi_md_world,iprint,nfmv
     include 'mpif.h'
     include './const.h'
     integer,intent(in):: ntot

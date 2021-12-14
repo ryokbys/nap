@@ -1,11 +1,8 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-25 13:55:19 Ryo KOBAYASHI>
+!                     Last modified: <2021-12-09 10:44:53 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
-!  ifcoulomb == 1: screened Coulomb potential
-!            == 2: Ewald Coulomb potential
-!            == 3: variable-charge with Gaussian distribution
 !
 !  For screened Coulomb potential:
 !    - Ref. Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -13,8 +10,8 @@ module Coulomb
 !  For Ewald Coulomb potential:
 !    - ...
 !-----------------------------------------------------------------------
-  use pmdvars,only: nspmax
-  use util,only: csp2isp
+  use pmdvars,only: nspmax,nsp
+  use util,only: csp2isp, itotOf
   use memory,only: accum_mem
   use vector,only: dot,norm,cross
   implicit none
@@ -42,7 +39,7 @@ module Coulomb
 
 
 !!$  integer,parameter:: nspmax = 9
-  integer:: nsp = 1
+!!$  integer:: nsp = 1
 !.....Flag for existence of the species
   logical:: ispflag(nspmax)
 !.....Species charge
@@ -100,17 +97,15 @@ module Coulomb
   character(len=20):: chgopt_method = 'damping'
 !.....Variable-charge potential variables
   real(8):: vc_chi(nspmax),vc_jii(nspmax),vc_e0(nspmax),vcg_sgm(nspmax) &
-       ,qlower(nspmax),qupper(nspmax)
+       ,qtop(nspmax),qbot(nspmax)
   real(8),parameter:: vcg_lambda = 0.5d0
-!.....Average mu (chemical potential)
-  real(8):: avmu
 !.....Convergence criterion for QEq in eV/atom
   real(8):: conv_eps_qeq = 1.0d-8
 !.....chgopt-damping related parameters
   character(len=20):: codmp_method = 'damping' ! or FIRE or damping
   integer:: nstp_qeq = 100
   real(8):: dt_codmp = 0.005d0  ! fs
-  real(8):: qmass_codmp = 0.002d0  ! atomic mass unit
+  real(8):: qmass = 0.002d0  ! atomic mass unit
   real(8):: qtot_qeq = 0d0
   integer:: minstp_qeq = 3
   integer:: minstp_conv_qeq = 3
@@ -125,98 +120,41 @@ module Coulomb
 !.....Gradient descent parameters
   real(8):: dqmax_cogrd = 1d-1
   real(8):: dqeps_cogrd = 1d-4
-
+!.....4-th order potential coeff for bounding q inside [qbot,qtop]
+  real(8):: bound_k4 = 6d+4
+!.....Extended lagrangian
+  real(8),allocatable:: aauxq(:)
+  real(8):: omg2dt2 = 1d0  ! = omg^2*dt^2 = 2 is recommended by Nomura et al.
+  real(8):: auxomg2 = 32.d0
 
   integer,parameter:: ivoigt(3,3)= &
        reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
 contains
-  subroutine initialize_coulomb(natm,nspin,tag,chg, &
-       myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
-!
-!  Allocate and initialize parameters to be used.
-!  This is called when force is either screened_Coulomb/Ewald/Ewald_long, which is deprecated.
-!  Use initialize_coulombx method instead.
-!
-    include "mpif.h"
-    integer,intent(in):: myid,mpi_md_world,natm,nspin &
-         ,ifcoulomb,iprint
-    real(8),intent(in):: tag(natm),rc,h(3,3),chg(natm)
-    character(len=3),intent(in):: specorder(nspmax)
-    logical,intent(inout):: lvc 
-
-    integer:: i,ierr,nspl
-
-!!$    print *,'ifcoulomb @initialize_coulomb = ',ifcoulomb
-    rho_scr(1:nspmax,1:nspmax) = 0d0
-    
-!.....Get umber of species
-    nsp = nspin
-!!$    nspl = 0
-!!$    do i=1,natm
-!!$      nspl = max(int(tag(i)),nspl)
-!!$    enddo
-!!$    call mpi_allreduce(nspl,nsp,1,mpi_integer,mpi_max &
-!!$         ,mpi_md_world,ierr)
-
-    if( ifcoulomb.eq.1 ) then  ! screened Coulomb
-      call read_params(myid,mpi_md_world,ifcoulomb,iprint,lvc &
-           ,specorder)
-    else
-      if( lvc ) then
-!.....Variable-charge Coulomb with Gaussian distribution charges
-!     which ends-up long-range-only Ewald summation
-        call read_params(myid,mpi_md_world,ifcoulomb,iprint,lvc &
-             ,specorder)
-        call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
-             natm,tag,chg)
-      else
-        call init_fc_Ewald(h,rc,myid,mpi_md_world,iprint)
-      endif
-    endif
-
-  end subroutine initialize_coulomb
-!=======================================================================
-  subroutine initialize_coulombx(natm,nspin,tag,chg, &
-       myid,mpi_md_world,ifcoulomb,iprint,h,rc,lvc, &
-       specorder)
+  subroutine init_coulomb(myid,mpi_md_world,iprint,lvc,specorder)
 !
 !  Allocate and initialize parameters to be used.
 !  This is called when force is 'Coulomb'
 !  The *_coulombx methods will replace *_coulomb methods in the future.
 !
     include "mpif.h"
-    integer,intent(in):: myid,mpi_md_world,natm,nspin &
-         ,ifcoulomb,iprint
-    real(8),intent(in):: tag(natm),rc,h(3,3)
+    integer,intent(in):: myid,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    real(8),intent(inout):: chg(natm)
     logical,intent(inout):: lvc 
 
     integer:: i,is,ierr,nspl
 
     rho_scr(1:nspmax,1:nspmax) = 0d0
 
-!.....Get umber of species
-    nsp = nspin
+!!$!.....Get umber of species
+!!$    nsp = nspin
 
-    call read_paramsx(myid,mpi_md_world,iprint,specorder)
+    call read_params(myid,mpi_md_world,iprint,specorder)
 
     if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
       lvc = .true.
     endif
 
-    if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
-      if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
-!.....Variable-charge Coulomb with Gaussian distribution charges
-!     which ends-up long-range-only Ewald summation
-        call init_vc_Ewald(myid,mpi_md_world,ifcoulomb,iprint,h,rc,&
-             natm,tag,chg)
-      else
-        call init_fc_Ewald(h,rc,myid,mpi_md_world,iprint)
-      endif
-    endif
-
-  end subroutine initialize_coulombx
+  end subroutine init_coulomb
 !=======================================================================
   subroutine init_fc_Ewald(h,rc,myid,mpi_world,iprint)
 !
@@ -290,8 +228,7 @@ contains
 
   end subroutine init_fc_Ewald
 !=======================================================================
-  subroutine init_vc_Ewald(myid,mpi_world,ifcoulomb,iprint,h,rc,&
-       natm,tag,chg)
+  subroutine init_vc_Ewald(myid,mpi_world,iprint,h,rc)
 !
 !  Since variable-charge potential with Gaussian distribution charges
 !  is mostly identical to the long-range part of Ewald summation,
@@ -300,33 +237,11 @@ contains
 !  read from input file in.params.Coulomb.
 !
     implicit none
-    integer,intent(in):: myid,mpi_world,ifcoulomb,iprint
-    integer,intent(in):: natm
-    real(8),intent(in):: h(3,3),rc,tag(natm),chg(natm)
+    integer,intent(in):: myid,mpi_world,iprint
+    real(8),intent(in):: h(3,3),rc
 
     integer:: i,isp,ik,k1,k2,k3,is
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min,sgm_rcmd
-
-      do i=1,natm
-        is = int(tag(i))
-      enddo
-
-!!$    if( ifcoulomb.eq.2 ) then
-!!$      sgm_ew = rc/sqrt(2d0*pacc)
-!!$      sgm(1:nspmax) = sgm_ew
-!!$      bkmax  = 2d0*pacc /rc
-!!$      if( myid.eq.0 .and. iprint.ne.0 ) then
-!!$        print *,'Sigmas are overwritten by rc/sqrt(2*pacc),'
-!!$        print *,'since the full Ewald cannot treat species-dependent sigma.'
-!!$      endif
-!!$    else
-!!$      sgm(1:nspmax) = vcg_sgm(1:nspmax)
-!!$      sgm_min = 1d+30
-!!$      do i=1,nsp
-!!$        sgm_min = min(sgm(i),sgm_min)
-!!$      enddo
-!!$      bkmax  = sqrt(2d0*pacc) /sgm_min
-!!$    endif
 
 !.....Current implementation does not allow species-dpendent sigma.
     vcg_sgm(1:nspmax) = sgm_ew
@@ -397,199 +312,7 @@ contains
     
   end subroutine init_vc_Ewald
 !=======================================================================
-  subroutine read_params(myid,mpi_world,ifcoulomb,iprint,lvc &
-       ,specorder)
-!
-!  Read parameters
-!
-    include "mpif.h"
-    integer,intent(in):: myid,mpi_world,ifcoulomb,iprint
-    character(len=3),intent(in):: specorder(nspmax)
-    character(len=128):: cline,c1st,fname
-    character(len=5):: cname
-    logical,intent(in):: lvc
-
-    real(8):: vid,rad,dchi,djii,dsgm,de0
-    integer:: npq,isp,jsp,ierr,mode
-
-    if( params_read ) return
-
-    if( ifcoulomb.eq.1 ) then  ! screened_bvs
-      call read_params_sc(myid,mpi_world,ifcoulomb,iprint &
-           ,specorder)
-    else if( lvc ) then  ! variable-charge
-      call read_params_vc(myid,mpi_world,ifcoulomb,iprint &
-           ,specorder)
-    else
-      print *,'ERROR: something wrong about force_Coulomb setting.'
-      call mpi_finalize(ierr)
-      stop
-    endif  ! lvc
-    params_read = .true.
-
-  end subroutine read_params
-!=======================================================================
-  subroutine read_params_sc(myid,mpi_world,ifcoulomb,iprint, &
-       specorder)
-!
-!  Read params for screened_Coulomb.
-!
-    implicit none 
-    include "mpif.h"
-    integer,intent(in):: myid,mpi_world,ifcoulomb,iprint
-    character(len=3),intent(in):: specorder(nspmax)
-    
-    integer:: mode,ierr,isp,jsp,npq
-    real(8):: vid,rad
-    character(len=128):: cline,c1st,fname
-    character(len=5):: cname
-    character(len=3):: cspi,cspj
-
-!!$    if( allocated(rad_bvs) ) deallocate(rad_bvs,npq_bvs,vid_bvs,rho_bvs)
-!!$    allocate(rad_bvs(nspmax),npq_bvs(nspmax),vid_bvs(nspmax) &
-!!$         ,rho_scr(nspmax,nspmax))
-    if( myid.eq.0 ) then
-      fname = trim(paramsdir)//'/'//trim(paramsfname)
-      open(ioprms,file=trim(fname),status='old')
-      mode = 1
-      interact(1:nspmax,1:nspmax) = .false.
-      ispflag(1:nspmax) = .false.
-!.....1st line for check the Coulomb computation type
-      read(ioprms,*) c1st
-      if( trim(c1st).ne.'screened_bvs' ) then
-        write(6,*) 'Error@read_params_sc: something wrong '&
-             //'with the Coulomb type: '//trim(c1st)
-        stop
-      endif
-      if( iprint.ge.ipl_basic ) then
-        write(6,'(/,a)') ' Screened Coulomb parameters:'
-      endif
-      vid_bvs(1:nspmax)= 0d0
-      do while(.true.)
-        read(ioprms,*,end=10) cline
-        if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
-        if( trim(cline).eq.'interactions' ) then
-          mode = 2
-          cycle
-        endif
-        if( mode.eq.1 ) then
-          backspace(ioprms)
-!!$          read(ioprms,*) isp, cname, vid, rad, npq
-          read(ioprms,*) cspi, vid, rad, npq
-          isp = csp2isp(trim(cspi))
-          if( isp.gt.0 ) then
-            if( iprint.ge.ipl_basic ) then
-              write(6,'(a,a5,2f7.3,i4)') '   cspi,vid,rad,npq =' &
-                   ,trim(cspi),vid,rad,npq
-            endif
-            ispflag(isp) = .true.
-            vid_bvs(isp) = vid
-            rad_bvs(isp) = rad
-            npq_bvs(isp) = npq
-          endif
-        else if( mode.eq.2 ) then
-          backspace(ioprms)
-!!$          read(ioprms,*) isp, jsp
-          read(ioprms,*) cspi,cspj
-          isp = csp2isp(trim(cspi))
-          jsp = csp2isp(trim(cspj))
-          if( isp.gt.0 .and. jsp.gt.0 ) then
-            interact(isp,jsp) = .true.
-            interact(jsp,isp) = interact(isp,jsp)
-          endif
-        endif
-      enddo
-10    close(ioprms)
-      if( iprint.ne.0 ) then
-        write(6,'(a)') ' Finished reading '//trim(fname)
-        write(6,*) ''
-      endif
-
-!.....Set screening length
-      do isp=1,nsp
-        do jsp=1,nsp
-          rho_scr(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
-!!$            rho_scr(isp,jsp) = 2d0
-          if( iprint.ge.ipl_basic .and. interact(isp,jsp) .and. jsp.ge.isp ) then
-            write(6,'(a,2i5,f10.4)') '   isp,jsp,rho_scr= ',isp,jsp,rho_scr(isp,jsp)
-          endif
-        enddo
-      enddo
-    endif  ! myid
-
-    call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
-    call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(rho_scr,nspmax*nspmax,mpi_real8 &
-         ,0,mpi_world,ierr)
-    call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
-!.....end of screened_bvs
-  end subroutine read_params_sc
-!=======================================================================
-  subroutine read_params_vc(myid,mpi_world,ifcoulomb,iprint, &
-       specorder)
-!
-!  Read params for variable-charge.
-!
-    implicit none 
-    include "mpif.h"
-    integer,intent(in):: myid,mpi_world,ifcoulomb,iprint
-    character(len=3),intent(in):: specorder(nspmax) 
-
-    integer:: isp,ierr
-    real(8):: dchi,djii,sgmt,de0,qlow,qup
-    character(len=128):: cline,c1st,fname
-    character(len=5):: cname
-    character(len=3):: cspi,cspj
-
-!!$      if( allocated(vc_chi) ) deallocate(vc_chi,vc_jii,sgm,vc_e0)
-!!$      allocate( vc_chi(nspmax), vc_jii(nspmax), sgm(nspmax), vc_e0(nspmax))
-    if( myid.eq.0 ) then
-      fname = trim(paramsdir)//'/'//trim(paramsfname)
-      open(ioprms,file=trim(fname),status='old')
-!.....1st line for check the Coulomb computation type
-      read(ioprms,*) c1st
-      if( trim(c1st).ne.'variable_charge' ) then
-        write(6,'(/,a)') 'Error@read_params: ifcoulomb does not match '&
-             //'with Coulomb type: '//trim(c1st)
-        stop
-      endif
-      if( iprint.ge.ipl_basic ) write(6,'(/,a)') ' Variable_charge parameters:'
-      do while(.true.)
-        read(ioprms,*,end=20) cline
-        if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
-        backspace(ioprms)
-!!$        read(ioprms,*,end=20) isp, cname, dchi,djii,sgmt,de0,qlow,qup
-        read(ioprms,*,end=20) cspi, dchi,djii,sgmt,de0,qlow,qup
-        isp = csp2isp(trim(cspi))
-        if( isp.gt.0 ) then
-          vc_chi(isp) = dchi
-          vc_jii(isp) = djii
-          vc_e0(isp) = de0
-          vcg_sgm(isp) = sgmt
-          qlower(isp) = qlow
-          qupper(isp) = qup
-          if( iprint.ge.ipl_basic ) then
-            write(6,'(a,a3,3f10.4,2f5.1)') &
-                 '   cspi,chi,Jii,sgm,e0,qlower,qupper = ' &
-                 ,trim(cspi),dchi,djii,vcg_sgm(isp),de0,qlow,qup
-          endif
-        endif
-      enddo  ! do while
-20    close(ioprms)
-    endif  ! myid
-!!$    call mpi_bcast(sgm,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vc_chi,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vc_jii,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vc_e0,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vcg_sgm,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
-
-  end subroutine read_params_vc
-!=======================================================================
-  subroutine read_paramsx(myid,mpi_world,iprint,specorder)
+  subroutine read_params(myid,mpi_world,iprint,specorder)
 !
 !  Read parameter file for any Coulomb potential.
 !
@@ -598,16 +321,12 @@ contains
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
-!!$    integer,external:: num_data
-    
     character(len=128):: cmode,cline,ctmp,fname
     character(len=3):: cname,csp,cspj,cspi
     integer:: i,ierr,jerr,isp,jsp,npq,nentry
     real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
          ,vcgjiimin,sgmlim, rin,rout,rhoij, rhoii
     logical:: rhoii_set, rhoij_set, rad_set
-
-!!$    if( params_read ) return
 
     if( myid.eq.0 ) then
 !.....Initialization
@@ -617,8 +336,8 @@ contains
       vc_jii(1:nspmax) = 0d0
       vc_e0(1:nspmax) = 0d0
       vcg_sgm(1:nspmax) = 0d0
-      qlower(1:nspmax) = 0d0
-      qupper(1:nspmax) = 0d0
+      qbot(1:nspmax) = 0d0
+      qtop(1:nspmax) = 0d0
       rho_scr(:,:) = -1d0
       rad_bvs(:) = -1d0
       cmode = 'none'
@@ -762,9 +481,9 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, dt_codmp
           cycle
-        else if( trim(cline).eq.'qmass_codmp') then
+        else if( trim(cline).eq.'qmass') then
           backspace(ioprms)
-          read(ioprms,*) ctmp, qmass_codmp
+          read(ioprms,*) ctmp, qmass
           cycle
         else if( trim(cline).eq.'fdamp_codmp') then
           backspace(ioprms)
@@ -797,6 +516,14 @@ contains
         else if( trim(cline).eq.'dqeps_cogrd') then
           backspace(ioprms)
           read(ioprms,*) ctmp, dqeps_cogrd
+          cycle
+        else if( trim(cline).eq.'bound_k4') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, bound_k4
+          cycle
+        else if( trim(cline).eq.'omg2dt2') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, omg2dt2
           cycle
         endif
 !.....Not a keyword, a certain mode should be already selected.
@@ -841,11 +568,11 @@ contains
               vc_chi(isp) = dchi
               vc_jii(isp) = djii
               vc_e0(isp) = de0
-              qlower(isp) = qlow
-              qupper(isp) = qup
+              qbot(isp) = qlow
+              qtop(isp) = qup
               if( iprint.ge.ipl_basic ) then
                 write(6,'(a,a3,4f10.4,2f5.1)') &
-                     '   csp,chi,Jii,e0,qlower,qupper = ', &
+                     '   csp,chi,Jii,e0,qbot,qtop = ', &
                      trim(csp),dchi,djii,de0,qlow,qup
               endif
             else
@@ -963,8 +690,8 @@ contains
     call mpi_bcast(vc_jii,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vc_e0,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qlower,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qupper,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(qbot,nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(qtop,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
@@ -978,13 +705,14 @@ contains
     call mpi_bcast(rho_screened_cut,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_scr,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
 
+    call mpi_bcast(chgopt_method,20,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(codmp_method,20,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(conv_eps_qeq,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(nstp_qeq,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(minstp_qeq,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(minstp_conv_qeq,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(dt_codmp,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qmass_codmp,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(qmass,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qtot_qeq,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(fdamp_codmp,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(dfdamp_codmp,1,mpi_real8,0,mpi_world,ierr)
@@ -994,6 +722,8 @@ contains
     call mpi_bcast(falpha_codmp,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(dqmax_cogrd,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(dqeps_cogrd,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(bound_k4,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(omg2dt2,1,mpi_real8,0,mpi_world,ierr)
     
     if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
       if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
@@ -1013,19 +743,19 @@ contains
 
     if( (trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') &
          .and. trim(cinteract).eq.'same_sign' ) then
-      if( myid.eq.0 ) print *,'ERROR@read_paramsx: variable/qeq '&
+      if( myid.eq.0 ) print *,'ERROR@read_params: variable/qeq '&
            //'cannot be used with same_sign interactions.'
       call mpi_finalize(ierr)
       stop 1
     endif
 
-    if( myid.eq.0 .and. iprint.ne.0 ) then
+    if( myid.eq.0 .and. iprint.gt.ipl_basic ) then
       write(6,'(a)') ' Finished reading '//trim(fname)
     endif
 !!$    params_read = .true.
     
     return
-  end subroutine read_paramsx
+  end subroutine read_params
 !=======================================================================
   subroutine force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,h,hi,nb,nbmax,lsb,nex,lsrc &
@@ -1072,6 +802,18 @@ contains
       endif
       allocate(strsl(3,3,namax))
       call accum_mem('force_Coulomb',8*size(strsl))
+
+      if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
+        if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
+!.....Variable-charge Coulomb with Gaussian distribution charges
+!     which ends-up long-range-only Ewald summation
+          call init_vc_Ewald(myid,mpi_md_world,iprint,h,rc)
+        else
+          call init_fc_Ewald(h,rc,myid,mpi_md_world,iprint)
+        endif
+      endif
+
+      
       if( trim(cchgs).eq.'fixed_bvs' ) then
         call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
       endif
@@ -1177,410 +919,6 @@ contains
          print *,'epot Coulomb,self,short,long = ',epott,eself,esr,elr
 
   end subroutine force_Coulomb
-!=======================================================================
-  subroutine force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,h,hi,nb,nbmax,lsb,nex,lsrc &
-       ,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
-       ,l1st,specorder)
-!
-!  Screened Coulomb implementation used in BVS potential with
-!  smoothing using vrc and dVdrc where
-!    V_smooth(r) = V(r) -V(rc) -(r-rc)*dVdrc
-!
-    use util, only: itotOf
-    implicit none
-    include "mpif.h"
-    include "./params_unit.h"
-!!$    include "params_BVS_Morse.h"
-    integer,intent(in):: namax,natm,nnmax,nismax,iprint
-    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),lspr(0:nnmax,namax),nex(3)
-    integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6)
-    real(8),intent(inout):: chg(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical,intent(in):: lstrs,l1st
-    character(len=3),intent(in):: specorder(nspmax)
-
-
-    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
-         ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp &
-         ,qi,qj,radi,radj,rhoij,terfc,texp &
-         ,vrc,dvdrc,terfcc,dij2
-    real(8),save:: rc2,sqpi
-    real(8),allocatable,save:: strsl(:,:,:)
-
-    if( l1st ) then
-      call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
-      if( allocated(strsl) ) then
-        call accum_mem('force_Coulomb',-8*size(strsl))
-        deallocate(strsl)
-      endif
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
-      rc2 = rc*rc
-      sqpi = 1d0/sqrt(pi)
-    endif
-
-    if( .not.allocated(strsl) ) then
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
-    else if( size(strsl).lt.3*3*namax ) then
-      call accum_mem('force_Coulomb',-8*size(strsl))
-      deallocate(strsl)
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
-    endif
-
-    epotl= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
-
-!.....Loop over resident atoms
-    do i=1,natm
-      xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
-      if( .not. ispflag(is) ) cycle
-      qi= chg(i)
-      do k=1,lspr(0,i)
-        j=lspr(k,i)
-        if(j.eq.0) exit
-        js= int(tag(j))
-        if( .not.interact(is,js) ) cycle
-        qj= chg(j)
-        xj(1:3)= ra(1:3,j)
-        xij(1:3)= xj(1:3)-xi(1:3)
-        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
-        if( dij2.gt.rc2 ) cycle
-        dij= sqrt(dij2)
-        diji= 1d0/dij
-        dxdi(1:3)= -rij(1:3)*diji
-        rhoij = rho_scr(is,js)
-        terfc = erfc(dij/rhoij)
-        terfcc = erfc(rc/rhoij)
-        vrc = acc*qi*qj/rc *terfcc
-        dvdrc = -acc *qi*qj/rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
-!.....potential
-        tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
-        epi(i)= epi(i) +tmp
-        epotl= epotl +tmp
-!.....force
-        texp = exp(-(dij/rhoij)**2)
-        dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
-        aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
-!.....stress
-        do ixyz=1,3
-          do jxyz=1,3
-            strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-          enddo
-        enddo
-      enddo
-    enddo
-
-    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-
-!-----gather epot
-    call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
-         ,MPI_SUM,mpi_md_world,ierr)
-    epot= epot +epott
-    if( iprint.ge.ipl_info ) write(6,'(a,es15.7)') ' epot screened Coulomb = ',epott
-    return
-  end subroutine force_screened_Coulomb
-!=======================================================================
-  subroutine force_screened_Coulomb_old(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,h,hi,nb,nbmax,lsb,nex,lsrc &
-       ,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
-       ,l1st,specorder)
-    implicit none
-    include "mpif.h"
-    include "./params_unit.h"
-!!$    include "params_BVS_Morse.h"
-    integer,intent(in):: namax,natm,nnmax,nismax,iprint
-    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),lspr(0:nnmax,namax),nex(3)
-    integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6)
-    real(8),intent(inout):: chg(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical,intent(in):: lstrs,l1st
-    character(len=3),intent(in):: specorder(nspmax)
-
-    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
-         ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp &
-         ,qi,qj,radi,radj,rhoij,terfc,texp,sqpi
-    real(8),allocatable,save:: strsl(:,:,:)
-
-    if( l1st ) then
-      call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
-      if( allocated(strsl) ) then
-        call accum_mem('force_Coulomb',-8*size(strsl))
-        deallocate(strsl)
-      endif
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
-!!$      do i=1,natm
-!!$        print *,'i,chg(i)=',i,chg(i)
-!!$      enddo
-    endif
-
-    if( .not.allocated(strsl) ) then
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
-    else if( size(strsl).lt.3*3*namax ) then
-      call accum_mem('force_Coulomb',-8*size(strsl))
-      deallocate(strsl)
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
-    endif
-
-    epotl= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
-!!$    write(6,'(a,30f7.3)') 'chgs =',chg(1:natm)
-    sqpi = 1d0/sqrt(pi)
-!.....Loop over resident atoms
-    do i=1,natm
-      xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
-!!$      nconnect(i) = 0
-      qi= chg(i)
-      if( abs(qi).lt.qthd ) cycle
-      do k=1,lspr(0,i)
-        j=lspr(k,i)
-        if(j.eq.0) exit
-        if(j.le.i) cycle
-        js= int(tag(j))
-        if( .not.interact(is,js) ) cycle
-        qj= chg(j)
-        if( abs(qj).lt.qthd ) cycle
-        xj(1:3)= ra(1:3,j)
-        xij(1:3)= xj(1:3)-xi(1:3)
-        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
-        if( dij.gt.rc ) cycle
-!!$        dij = dlspr(0,k,i)
-!!$        if( dij.gt.rc ) exit
-!!$        rij(1:3) = dlspr(1:3,k,i)
-!!$        nconnect(i)= nconnect(i) +1
-        diji= 1d0/dij
-        dxdi(1:3)= -rij(1:3)*diji
-        dxdj(1:3)=  rij(1:3)*diji
-        rhoij = rho_scr(is,js)
-        terfc = erfc(dij/rhoij)
-!.....potential
-        tmp= 0.5d0 *acc *qi*qj*diji *terfc
-        if( j.le.natm ) then
-          epi(i)= epi(i) +tmp
-          epi(j)= epi(j) +tmp
-          epotl = epotl +tmp +tmp
-        else
-          epi(i)= epi(i) +tmp
-          epotl = epotl +tmp
-        endif
-!.....force
-        texp = exp(-(dij/rhoij)**2)
-        dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp)
-        aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
-        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
-!.....stress
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-            enddo
-          enddo
-        endif
-      enddo
-    enddo
-
-    if( lstrs ) then
-!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-!!$           ,nn,mpi_md_world,strsl,9)
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
-
-!-----gather epot
-    call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
-         ,MPI_SUM,mpi_md_world,ierr)
-    epot= epot +epott
-!!$    write(6,'(a,es15.7)') ' screened Coulomb epott = ',epott
-
-  end subroutine force_screened_Coulomb_old
-!=======================================================================
-  subroutine force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,h,hi,nb,nbmax,lsb,nex,lsrc &
-       ,myparity,nn,sv,rc,lspr,d2lspr,sorg &
-       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
-       ,l1st,lcell_updated,lvc)
-!
-!  Coulomb potential and force computation using Ewald sum method.
-!  Currently, the efficiency when parallel computation is not taken into account.
-!  So it is not appropriate to use this routine for large system.
-!
-    implicit none
-    include "mpif.h"
-    include "./params_unit.h"
-
-    integer,intent(in):: namax,natm,nnmax,nismax,iprint
-    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),lspr(0:nnmax,namax),nex(3)
-    integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),sorg(3),d2lspr(nnmax,namax)
-    real(8),intent(inout):: chg(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical,intent(in):: lstrs,l1st,lcell_updated,lvc
-
-    integer:: i,j,ik,is,js,k1,k2,k3,ierr,jj,ixyz,jxyz
-    real(8):: elrl,esrl,epotl,epott,qi,qj,tmp,ftmp &
-         ,bdotr,terfc,diji,dij,ss2i,sgmsq2,rc2,q2tot,q2loc,bb2,sqpi &
-         ,e0,q2,sgmi
-    real(8),save:: eself,eselfl
-    real(8),allocatable,save:: ri(:),bk(:),bk1(:),bk2(:),bk3(:)&
-         ,bb(:),dxdi(:),dxdj(:),rij(:),xij(:),xj(:),xi(:)
-    real(8),allocatable,save:: strsl(:,:,:)
-
-    if( l1st ) then
-      if( .not.allocated(ri) ) then
-        allocate(ri(3),bk(3),bk1(3),bk2(3),bk3(3),bb(3),dxdi(3) &
-             ,dxdj(3),rij(3),xij(3),xj(3),xi(3))
-      endif
-      if( allocated(strsl) ) then
-        call accum_mem('force_Coulomb',-8*size(strsl))
-        deallocate(strsl)
-      endif
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
-    endif
-
-    if( .not.allocated(strsl) ) then
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
-    else if( size(strsl).lt.3*3*namax ) then
-      call accum_mem('force_Coulomb',-8*size(strsl))
-      deallocate(strsl)
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
-    endif
-
-    strsl(1:3,1:3,1:namax) = 0d0
-
-    call self_term(namax,natm,tag,chg,epi,eselfl,iprint,lvc)
-
-    call Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-         ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc)
-
-    call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-         ,lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs &
-         ,lcell_updated)
-
-    if( lstrs ) then
-!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-!!$           ,nn,mpi_md_world,strsl,9)
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
-
-    if( l1st .and. myid.eq.0 ) then
-      print *,'Ewald energy term by term:'
-      print '(a,f12.4)','   Self term         = ',eselfl
-      print '(a,f12.4)','   Short-range term  = ',esrl
-      print '(a,f12.4)','   Long-range term   = ',elrl
-    endif
-
-    epotl = esrl +elrl +eselfl
-!.....Gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
-         ,mpi_sum,mpi_md_world,ierr)
-    epot= epot +epott
-
-  end subroutine force_Ewald
-!=======================================================================
-  subroutine force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
-       ,chg,h,hi,nb,nbmax,lsb,nex,lsrc &
-       ,myparity,nn,sv,rc,lspr,sorg &
-       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
-       ,l1st,lcell_updated,lvc)
-!
-!  Long-range only Coulomb potential with Gaussian distribution charges.
-!  Currently this does not work in the parallel computation.
-!  TODO: Parallelize long_Coulomb potential
-!
-    implicit none
-    include "mpif.h"
-    include "./params_unit.h"
-
-    integer,intent(in):: namax,natm,nnmax,nismax,iprint
-    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),lspr(0:nnmax,namax),nex(3)
-    integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),sorg(3)
-    real(8),intent(inout):: chg(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical,intent(in):: lstrs,l1st,lcell_updated,lvc
-
-    integer:: i,ierr,is
-    real(8):: elrl,eselfl,epotl,epott,prefac,q2,sgmi,e0,tmp
-    real(8),save:: eself
-    real(8),allocatable,save:: strsl(:,:,:)
-
-    if( l1st ) then
-      if( allocated(strsl) ) then
-        call accum_mem('force_Coulomb',-8*size(strsl))
-        deallocate(strsl)
-      endif
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
-    endif
-
-    if( .not.allocated(strsl) ) then
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
-    else if( size(strsl).lt.3*3*namax ) then
-      call accum_mem('force_Coulomb',-8*size(strsl))
-      deallocate(strsl)
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
-    endif
-
-    strsl(1:3,1:3,1:namax) = 0d0
-
-    call self_term(namax,natm,tag,chg,epi,eselfl,iprint,lvc)
-    
-    call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
-         lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs,lcell_updated)
-
-    if( lstrs ) then
-!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-!!$           ,nn,mpi_md_world,strsl,9)
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
-
-    if( l1st .and. myid.eq.0 ) then
-      print *,'Ewald energy term by term:'
-      print '(a,f12.4)','   Self term         = ',eselfl
-      print '(a,f12.4)','   Long-range term   = ',elrl
-    endif
-
-    epotl = elrl +eselfl
-!.....Gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
-         ,mpi_sum,mpi_md_world,ierr)
-    epot= epot +epott
-
-    return
-  end subroutine force_Ewald_long
 !=======================================================================
   subroutine force_direct(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
        ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc)
@@ -1740,7 +1078,6 @@ contains
 !  smoothing using vrc and dVdrc where
 !    V_smooth(r) = V(r) -V(rc) -(r-rc)*dVdrc
 !
-    use util,only: itotOf
     implicit none
     include "mpif.h"
     include "./params_unit.h"
@@ -1793,7 +1130,7 @@ contains
         if( d2lspr(jj,i).ge.rc2 ) cycle
         j=lspr(jj,i)
         if(j.eq.0) exit
-!!$        if(j.le.i) cycle
+        if(j.le.i) cycle
         js= int(tag(j))
         if( .not.interact(is,js) ) cycle
         qj= chg(j)
@@ -1814,31 +1151,27 @@ contains
         dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
         tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
 !.....potential
-!!$        if( j.le.natm ) then
-!!$          epi(i)= epi(i) +tmp
-!!$          epi(j)= epi(j) +tmp
-!!$          esrl = esrl +tmp +tmp
-!!$        else
-!!$          epi(i)= epi(i) +tmp
-!!$          esrl = esrl +tmp
-!!$        endif
-        epi(i)= epi(i) +tmp
-!!$        if( itotOf(tag(i)).eq.92 ) then
-!!$          print '(a,i6,2i4,f7.3,3es12.4)','j,jtot,js,qj,dij,tmp,epi=', &
-!!$               j,itotOf(tag(j)),js,qj,dij,tmp,epi(i)
-!!$        endif
-        esrl = esrl +tmp
+        if( j.le.natm ) then
+          epi(i)= epi(i) +tmp
+          epi(j)= epi(j) +tmp
+          esrl = esrl +tmp +tmp
+        else
+          epi(i)= epi(i) +tmp
+          esrl = esrl +tmp
+        endif
+!!$        epi(i)= epi(i) +tmp
+!!$        esrl = esrl +tmp
 !.....force
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
-!!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
+        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
         if( lstrs ) then
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
                    -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-!!$              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-!!$                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
             enddo
           enddo
         endif
@@ -1935,7 +1268,6 @@ contains
 !  Long-range term of Ewald sum.
 !  Not parallelized and not suitable for large system as it is too slow.
 !
-    use util,only: itotOf
     implicit none
     include 'mpif.h'
     integer,intent(in):: namax,natm,nnmax,iprint, &
@@ -1952,7 +1284,6 @@ contains
     real(8):: bdk1,bdk2,bdk3,cs1,sn1,cs2,sn2,cs3,sn3,cs10,cs20,cs30, &
          cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm,sn3m,sn3mm
     real(8):: emat(3,3)
-!!$    integer,external:: itotOf
 
 !.....Compute reciprocal vectors
     if( lcell_updated ) call get_recip_vectors(h)
@@ -2105,10 +1436,6 @@ contains
       enddo  ! k1
     enddo  ! i
 
-!!$    do i=1,natm
-!!$      print '(a,3i5,3es12.4)','myid,i,itot,aa=',myid,i,itotOf(tag(i)),aa(1:3,i)
-!!$    enddo
-
   end subroutine Ewald_long
 !=======================================================================
   subroutine self_term(namax,natm,tag,chg,&
@@ -2248,7 +1575,6 @@ contains
           dvdrcs(js,is) = dvdrc
         enddo
       enddo
-
     endif
 
 !.....Compute direct sum
@@ -2389,47 +1715,47 @@ contains
 
   end subroutine qforce_self
 !=======================================================================
-  subroutine get_qforce(namax,natm,nnmax,tag,ra,chg,h,lspr,d2lspr, &
-       rc,sorg,myid,mpi_world,iprint,fq,epot,l1st)
+  subroutine get_qforce(chg,fq,epot,l1st)
 !
 !  Wrapper routine for calculating forces on charges.
 !
+    use pmdvars,only: namax,natm,nnmax,tag,ra,h,lspr,d2lspr, &
+         rc,sorg,myid_md,mpi_md_world,iprint
     include "mpif.h"
-    integer,intent(in):: namax,natm,myid,mpi_world,iprint
-    integer,intent(in):: nnmax,lspr(0:nnmax,namax)
-    real(8),intent(in):: tag(namax),h(3,3),ra(3,namax),chg(namax),sorg(3),rc
-    real(8),intent(in):: d2lspr(nnmax,namax)
+    real(8),intent(in):: chg(namax)
     logical,intent(in):: l1st
-    real(8),intent(inout):: fq(namax),epot
+    real(8),intent(out):: fq(namax),epot
 
     integer:: ierr
     real(8):: eclongl,eselfl,ecshortl
     real(8):: eclong,eself,ecshort
     
+    fq(:) = 0d0
     call qforce_self(namax,natm,tag,chg,fq,eselfl)
-    call mpi_allreduce(eselfl,eself,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(eselfl,eself,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     
     if( trim(cterms).eq.'long' ) then
-      call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_world, &
-           myid,iprint,fq,eclongl)
-      call mpi_allreduce(eclongl,eclong,1,mpi_real8,mpi_sum,mpi_world,ierr)
+      call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_md_world, &
+           myid_md,iprint,fq,eclongl)
+      call mpi_allreduce(eclongl,eclong,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'full' ) then
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshortl)
-      call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_world, &
-           myid,iprint,fq,eclongl)
-      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_world,ierr)
-      call mpi_allreduce(eclongl,eclong,1,mpi_real8,mpi_sum,mpi_world,ierr)
+      call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_md_world, &
+           myid_md,iprint,fq,eclongl)
+      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(eclongl,eclong,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshortl)
-      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_world,ierr)
+      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'screened_cut'  ) then
       call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h, &
            lspr,d2lspr,iprint,rc,fq,ecshortl,l1st)
-      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_world,ierr)
+      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
     epot = eself +ecshort + eclong
+!!$    print '(a,3f12.3)',' get_qforce: eself,eshort,elong=',eself,ecshort,eclong
     return
   end subroutine get_qforce
 !=======================================================================
@@ -2934,17 +2260,15 @@ contains
     character(len=*),intent(in):: ctype
     character(len=3),intent(in):: specorder(nspmax)
 
-    integer:: isp,jsp,ns,inc,ifcoulomb,ipr,myid,mpiw,maxisp
+    integer:: isp,jsp,ns,inc,ipr,myid,mpiw,maxisp
 
     if( index(ctype,'BVS').ne.0 ) then
 !!$      if( ctype(4:4).eq.'2' .or. ctype(4:4).eq.'3' ) then
         !.....Not only fbvs, but also rad_bvs are given from fitpot
-!!$        ifcoulomb = 1
         ipr = max(0,iprint-10)
         myid = 0
         mpiw = -1
-        call read_paramsx(myid,mpiw,ipr,specorder)
-!!$        call read_params_sc(myid,mpiw,ifcoulomb,ipr,specorder)
+        call read_params(myid,mpiw,ipr,specorder)
         lprmset_Coulomb = .true.
 
         fbvs = prms_in(1)
@@ -3000,7 +2324,7 @@ contains
         ipr = 0
         myid = 0
         mpiw = -1
-        call read_paramsx(myid,mpiw,ipr,specorder)
+        call read_params(myid,mpiw,ipr,specorder)
         params_read = .true.
       endif
       lprmset_Coulomb = .true.
@@ -3189,6 +2513,200 @@ contains
     ddvdrho = -4d0*acc*qi*qj*r *exp(-(r/rho)**2) /sqrt(pi) /rho**4
     return
   end function ddvdrho
+!=======================================================================
+  subroutine update_vauxq(vauxq)
+!
+!  Update velocity of auxq
+!
+    use pmdvars,only: dt,namax,natm
+    real(8),intent(inout):: vauxq(namax)
+
+    vauxq(1:natm) = vauxq(1:natm) +0.5d0 *dt *aauxq(1:natm)
+    return
+  end subroutine update_vauxq
+!=======================================================================
+  subroutine update_auxq(auxq,vauxq)
+!
+!  Update auxq
+!
+    use pmdvars,only: dt,namax,natm
+    real(8),intent(in):: vauxq(namax)
+    real(8),intent(inout):: auxq(namax)
+
+    auxq(1:natm) = auxq(1:natm) +dt *vauxq(1:natm)
+    return
+  end subroutine update_auxq
+!=======================================================================
+  subroutine get_aauxq(chg,auxq)
+!
+!  Compute forces on auxqs.
+!  d^2 auxq/dt^2 = omg^2 *(chg -auxq)
+!
+    use pmdvars,only: dt,namax,natm
+    real(8),intent(in):: chg(namax),auxq(namax)
+
+    if( .not.allocated(aauxq) ) then
+      allocate(aauxq(namax))
+    else if( size(aauxq).ne.namax ) then
+      deallocate(aauxq)
+      allocate(aauxq(namax))
+    endif
+    
+    auxomg2 = omg2dt2 /dt**2
+    aauxq(1:natm) = auxomg2 *(chg(1:natm) -auxq(1:natm))
+  end subroutine get_aauxq
+!=======================================================================
+  subroutine bacopy_chg_fixed(chg)
+!-----------------------------------------------------------------------
+!  Exchange only chg of boundary-atom
+!  This doesnt search using position, just send & recv data of atoms
+!    which were listed by 'bacopy'.
+!  This is called from dampopt in force_common.F90.
+!-----------------------------------------------------------------------
+    use pmdvars,only: nx,ny,nz,lsb,lsex,namax,natm,nbmax,nb,nn, &
+         myid_md,mpi_md_world,myparity,lsrc,nex,boundary
+    use pmdmpi,only: nid2xyz
+    implicit none
+    include 'mpif.h'
+    real(8),intent(inout):: chg(namax)
+
+    integer:: i,j,kd,kdd,ku,ierr,iex,ix,iy,iz
+    integer:: inode,nsd,nrc,nbnew
+    real(8),save,allocatable:: dbuf(:),dbufr(:)
+    logical,save:: l1st=.true.
+
+    if( l1st ) then
+      allocate(dbuf(nbmax),dbufr(nbmax))
+      l1st=.false.
+    endif
+
+    call nid2xyz(myid_md,ix,iy,iz)
+
+    nbnew= 0
+
+!c-----calculate the cut-off lengths
+!      do kd=1,3
+!        asgm= dsqrt(sgm(1,i)**2 +sgm(2,i)**2 +sgm(3,i)**2)
+!        rcv(kd)= rc*asgm/vol
+!        nex(kd)= int(rcv(kd)) +1
+!      enddo
+
+!-----loop over x, y, & z directions
+    do kd=1,3
+
+      if( nex(kd).gt.1 ) then
+        do kdd= -1,0
+          ku= 2*kd+kdd
+          do i=1,lsb(0,ku)
+            j= lsb(i,ku)
+            iex= lsex(i,ku)
+            chg(natm+nbnew+i)= chg(j)
+          enddo
+          nbnew= nbnew +lsb(0,ku)
+        enddo
+      else
+        do kdd= -1,0
+          ku=2*kd+kdd
+          inode=nn(ku)
+          nsd=lsb(0,ku)
+          nrc=lsrc(ku)
+
+!---------Exchange ra and tag
+          do i=1,nsd
+            j= lsb(i,ku)
+            dbuf(i)  = chg(j)
+          enddo
+          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd,nrc,23 &
+               ,mpi_md_world)
+          do i=1,nrc
+            chg(natm+nbnew+i) = dbufr(i)
+          enddo
+
+          call mpi_barrier(mpi_md_world,ierr)
+          nbnew=nbnew +nrc
+200       continue
+        enddo
+      endif
+
+100   continue
+    enddo
+
+  end subroutine bacopy_chg_fixed
+!=======================================================================
+  subroutine bacopy_auxq_fixed(auxq,vauxq)
+!-----------------------------------------------------------------------
+!  Exchange only auxq and vauxq of boundary atoms
+!  This doesnt search using position, just send & recv data of atoms
+!    which were listed by 'bacopy'.
+!-----------------------------------------------------------------------
+    use pmdvars,only: nx,ny,nz,lsb,lsex,namax,natm,nbmax,nb,nn, &
+         myid_md,mpi_md_world,myparity,lsrc,nex,boundary
+    use pmdmpi,only: nid2xyz
+    implicit none
+    include 'mpif.h'
+
+    real(8),intent(inout):: auxq(namax),vauxq(namax)
+
+    integer:: i,j,kd,kdd,ku,ierr,iex,ix,iy,iz
+    integer:: inode,nsd,nrc,nbnew
+    real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+    integer,parameter:: ndim = 2
+    logical,save:: l1st=.true.
+
+    if( l1st ) then
+      allocate(dbuf(ndim,nbmax),dbufr(ndim,nbmax))
+      l1st=.false.
+    endif
+
+    call nid2xyz(myid_md,ix,iy,iz)
+
+    nbnew= 0
+
+!-----loop over x, y, & z directions
+    do kd=1,3
+
+      if( nex(kd).gt.1 ) then
+        do kdd= -1,0
+          ku= 2*kd+kdd
+          do i=1,lsb(0,ku)
+            j= lsb(i,ku)
+            iex= lsex(i,ku)
+            auxq(natm+nbnew+i)= auxq(j)
+            vauxq(natm+nbnew+i)= vauxq(j)
+          enddo
+          nbnew= nbnew +lsb(0,ku)
+        enddo
+      else
+        do kdd= -1,0
+          ku=2*kd+kdd
+          inode=nn(ku)
+          nsd=lsb(0,ku)
+          nrc=lsrc(ku)
+
+!---------Exchange ra and tag
+          do i=1,nsd
+            j= lsb(i,ku)
+            dbuf(1,i)  = auxq(j)
+            dbuf(2,i)  = vauxq(j)
+          enddo
+          call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*ndim &
+               ,nrc*ndim,23,mpi_md_world)
+          do i=1,nrc
+            auxq(natm+nbnew+i) = dbufr(1,i)
+            vauxq(natm+nbnew+i) = dbufr(2,i)
+          enddo
+
+          call mpi_barrier(mpi_md_world,ierr)
+          nbnew=nbnew +nrc
+200       continue
+        enddo
+      endif
+
+100   continue
+    enddo
+
+  end subroutine bacopy_auxq_fixed
+!=======================================================================
 end module Coulomb
 !-----------------------------------------------------------------------
 !     Local Variables:

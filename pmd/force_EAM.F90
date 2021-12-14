@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-25 14:20:16 Ryo KOBAYASHI>
+!                     Last modified: <2021-11-27 13:53:59 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -186,6 +186,8 @@ contains
 
     call mpi_bcast(ea_a,nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(ea_xi,nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_interact,nspmax,mpi_logical,0,mpi_md_world,ierr)
+    call mpi_bcast(type_frho,128*nspmax,mpi_character,0,mpi_md_world,ierr)
 
     call mpi_bcast(ea_b,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(ea_c,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
@@ -194,10 +196,8 @@ contains
     call mpi_bcast(ea_beta,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(ea_rcin,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(ea_rcout,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_interact,nspmax,mpi_logical,0,mpi_md_world,ierr)
     call mpi_bcast(pair_interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
     call mpi_bcast(type_rho,128*nspmax*nspmax,mpi_character,0,mpi_md_world,ierr)
-    call mpi_bcast(type_frho,128*nspmax*nspmax,mpi_character,0,mpi_md_world,ierr)
     call mpi_bcast(type_phi,128*nspmax*nspmax,mpi_character,0,mpi_md_world,ierr)
     return
   end subroutine read_params_EAM
@@ -222,7 +222,7 @@ contains
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax),d2lspr(nnmax,namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 

@@ -295,6 +295,28 @@ def change_cell(nsys0,X0):
     nsys.set_scaled_positions(spnews)
     return nsys
 
+def join(nsys1,nsys2,axis):
+    """
+    Join two systems into one along the given axis (0,1,or 2).
+    The size of the interface area is determined from the cell size of system 1
+    perpendicular to the axis.
+
+    Input
+    -----
+    nsys1,nsys2 : NAPSystem
+        Systems to be joined.
+    axis : int (0, 1 or 2)
+        The axis of two systems which two systems are joined along.
+
+    Output
+    ------
+    NAPSystem
+        The system that contains atoms of two systems.
+    """
+    raise Error('join is not implemented yet.')
+    return None
+    
+
 if __name__ == "__main__":
 
     args = docopt(__doc__)

@@ -2,22 +2,26 @@
 """
 Compute formation enthalpy from given structures.
 The 1st file in the arguments is the product and the following files are the reactants.
-If --ergs option is not specified, pmd will be performed to get energies.
+(Assuming that the product is only one chemical compound not plural.)
+If --erg-xxx option is not specified, pmd will be performed to get energies.
 
 Usage:
-  fenthalpy.py [options] FILES [FILES...]
+  fenthalpy.py [options]
 
 Options:
   -h, --help   Show this message and exit.
   --dry        Dry run. Calculate only coefficients of reactants.
-  --ergs ERGS  Energies of product and reactants in the order corresponding to given files if available. Comma separated.
+  --product PROD
+               Only one atom config file of the product. [default: None]
+  --reactants REACT
+               Atom config files of reactants. Comma separated. [default: None]
+  --erg-prod EPROD
+               Energy per atom of the product if available. If provided, not to perform MD relaxation. [default: None]
+  --ergs-react ERGS
+               Energies per atom of reactants if available in the order corresponding to given files. Comma separated.
                If provided, not to perform MD relaxation. [default: None]
-  --ergs-per-atom
-               If this is set, energies given by --ergs option are given as energy per atom unit rather than total energies of the systems.
   --nstp NSTP  Number of steps for relaxation MD. [default: 1000]
   --dt DT      Time interval for relaxation MD. [default: -2.0]
-  --per-formula-unit
-               Obtain the formation enthalpy in per-formula-unit. [default: False]
   --out4fp     Write out to a file in the fp.py data format. 
   --outfname OUTFILE
                Output file name for out4fp. [default: data.pmd.fenth]
@@ -119,9 +123,9 @@ def calc_formation_enthalpy(ergs_react,erg_prod,coeffs):
     dH = -dH
     return dH
 
-def get_relaxed_energy(nsys,nstp=1000,dt=-2.0,print_level=0):
+def get_pmd_done(nsys,nstp=1000,dt=-2.0,print_level=0):
     """
-    Perform pmd of relaxation and return the final potential energy.
+    Perform pmd of relaxation and return the pmd object.
     """
     print(' Relaxing the system: ',nsys.get_chemical_formula())
     pmd = nappy.pmd.PMD(nsys)
@@ -130,48 +134,57 @@ def get_relaxed_energy(nsys,nstp=1000,dt=-2.0,print_level=0):
                    stress_target=[[0.,0.,0.],[0.,0.,0.],[0.,0.,0.]],
                    stress_relax_time=50.0, print_level=print_level)
     pmd.run(nstp=nstp,dt=dt,ifdmp=1,dmp=0.99)
-    return pmd.result['epot']
+    nsys_fin = pmd.get_system()
+    nappy.io.write(nsys_fin,fname="pmdfin_{0:s}".format(nsys_fin.get_chemical_formula()))
+    return pmd
 
-def write_fenth_out4fp(fname,dH):
+def write_fenth_out4fp(fname,dH,vol):
     """
-    Write out fenthalpy data in fp.py general data format.
+    Write out formation enthalpy and volume per atom in fp.py general data format.
 
     Parameters:
     -----------
     fname : string
          Name of the output file.
     dH : float
-         Formation enthalpy per unit formula.
+         Formation enthalpy per atom.
+    vol : float
+         Volume per atom.
     """
     with open(fname,'w') as f:
         cmd = ' '.join(s for s in sys.argv)
         f.write('# Output at {0:s} from,\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         f.write('#  {0:s}\n'.format(cmd))
         #...Num of data, weight for the data
-        f.write('  {0:6d}  {1:7.3}\n'.format(1, 1.0))
-        f.write('  {0:8.3f}\n'.format(dH))
+        f.write('  {0:6d}  {1:7.3f}\n'.format(2, 1.0))
+        f.write('  {0:8.3f}  {1:8.3f}\n'.format(dH,vol))
     return None
 
 def main(args):
-    files = args['FILES']
-    if len(files) < 2:
-        raise ValueError('User should provide at least one reactant and one product.')
+    product = args['--product']
+    if product == 'None':
+        raise ValueError('A product must be given via --product option.')
+    reactants = [ x for x in args['--reactants'].split(',') ]
+    if reactants[0] == 'None':
+        raise ValueError('At least one reactants must be given via --reactants option.')
     dry = args['--dry']
     nstp = int(args['--nstp'])
     dt = float(args['--dt'])
-    perfu = args['--per-formula-unit']
     out4fp = args['--out4fp']
-    ergs = args['--ergs']
+    erg_prod = args['--erg-prod']
+    ergs_react = args['--ergs-react']
     iprint = int(args['--print-level'])
-    if ergs != 'None':
-        ergs = [ float(x) for x in args['--ergs'].split(',') ]
-        if len(ergs) != len(files):
-            raise ValueError('Number of files and ergs are not inconsistent.')
+    if erg_prod != 'None':
+        erg_prod = float(erg_prod)
+    if ergs_react != 'None':
+        ergs_react = [ float(x) for x in ergs_react.split(',') ]
+        if len(ergs_react) != len(reactants):
+            raise ValueError('Number of files and --ergs-react are not consistent with --reactants.')
     
     print(' Working directory: ',os.getcwd())
         
-    product = nappy.io.read(files[0])
-    reactants = [ nappy.io.read(f) for f in files[1:] ]
+    product = nappy.io.read(product)
+    reactants = [ nappy.io.read(f) for f in reactants ]
     print(' Product: ',product.get_chemical_formula())
     print(' Reactants: ',end='')
     for r in reactants:
@@ -188,21 +201,19 @@ def main(args):
     if dry:
         return None
 
-    
-    if type(ergs) is list:  # Energies are provided
-        if args['--ergs-per-atom']:
-            erg_prod = ergs[0] *len(product)
-            ergs_react = []
-            for i,r in enumerate(reactants):
-                e = ergs[i+1]
-                ergs_react.append(e*len(r))
-        else:
-            erg_prod = ergs[0]
-            ergs_react = [ x for x in ergs[1:] ]
-    else:  #...Compute relaxation and get potential energies of given structures.
-        erg_prod = get_relaxed_energy(product,nstp=nstp,dt=dt,print_level=iprint)
-        ergs_react = [ get_relaxed_energy(r,nstp=nstp,dt=dt,print_level=iprint)
+    if erg_prod == 'None':  # Compute relaxation and get potential energies of given structures.
+        pmd_prod = get_pmd_done(product,nstp=nstp,dt=dt,print_level=iprint)
+        erg_prod = pmd.result['epot']
+        product = pmd.get_system()
+    else: # Energy per atom is given
+        erg_prod *= len(product)
+    if ergs_react == 'None':
+        pmds_react = [ get_pmd_done(r,nstp=nstp,dt=dt,print_level=iprint)
                        for r in reactants ]
+        ergs_react = [ p.result['epot'] for p in pmds_react ]
+        reactants = [ p.get_system() for p in pmds_react ]
+    else:
+        ergs_react = [ e*len(r) for e,r in zip(ergs_react,reactants) ]
     print(' E of product, {0:s} = {1:.3f}'.format(product.get_chemical_formula(),erg_prod))
     print(' Es of reactants:')
     for i in range(len(ergs_react)):
@@ -224,13 +235,13 @@ def main(args):
     print('      = {0:.2f} (eV/f.u.)'.format(dH/gcd))
     print(' Formation enthalpy per atom:')
     print('      = {0:.3f} (eV/atom)'.format(dH/len(product)))
+    print(' at volume per atom:')
+    vol = product.get_volume()/len(product)
+    print('      = {0:.3f} (Ang^3/atom)'.format(vol))
 
     if out4fp:
         outfname = args['--outfname']
-        if perfu:
-            write_fenth_out4fp(outfname,dH/gcd)
-        else:
-            write_fenth_out4fp(outfname,dH/len(product))
+        write_fenth_out4fp(outfname,dH/len(product),vol)
         print(' Wrote {0:s}'.format(outfname))
 
     return None

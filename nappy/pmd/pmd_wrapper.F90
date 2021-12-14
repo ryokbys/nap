@@ -2,7 +2,7 @@ subroutine run(ntot0,rtot,vtot,atot,stot,ekitot,epitot, &
      naux,auxtot,hmat,ispcs,ekin,epot,stnsr,linit)
   use pmdvars,only: nx,ny,nz,iprint,nstp
   implicit none
-  integer,intent(in):: ntot0,naux,ispcs(ntot0)
+  integer,intent(in):: ntot0,ispcs(ntot0),naux
   real(8),intent(inout):: rtot(3,ntot0),vtot(3,ntot0),hmat(3,3,0:1)
 !f2py intent(in,out):: rtot,vtot,hmat
   real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0), &
@@ -19,11 +19,10 @@ subroutine run(ntot0,rtot,vtot,atot,stot,ekitot,epitot, &
 
   call get_tagtot(ntot0,ispcs,tagtot)
   
-  ntot = ntot0
   hunit = 1d0
 !!$  print *,'nstp,iprint=',nstp,iprint
 !!$  print *,'iprint,ntot0,rtot(:,ntot0)=',iprint,ntot0,rtot(:,ntot0)
-  call pmd_core(hunit,hmat,ntot0,ntot,tagtot,rtot,vtot,atot,stot, &
+  call pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
        ekitot,epitot,auxtot,epot,ekin,stnsr)
 !!$  call oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
 !!$       ekitot,epitot,auxtot,ekin,epot,stnsr,linit)
@@ -31,6 +30,7 @@ subroutine run(ntot0,rtot,vtot,atot,stot,ekitot,epitot, &
 end subroutine run
 !=======================================================================
 subroutine get_tagtot(ntot,ispcs,tagtot)
+  implicit none 
   integer,intent(in):: ntot,ispcs(ntot)
   real(8),intent(out):: tagtot(ntot)
 
@@ -44,8 +44,17 @@ subroutine get_tagtot(ntot,ispcs,tagtot)
   return
 end subroutine get_tagtot
 !=======================================================================
+subroutine get_naux(naux0)
+  use pmdvars,only: naux
+  implicit none 
+  integer,intent(out):: naux0
+
+  naux0 = naux
+  return
+end subroutine get_naux
+!=======================================================================
 subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
-     iprint0,nstp0,dt0,naux0,laux,cauxarr0, &
+     iprint0,nstp0,dt0, & !,naux0,laux,cauxarr0
      ifdmp0,dmp0,eps_conv0,n_conv0,lcpctl,cpctl0,ptgt0,stgt0,srlx0, &
      ifpmd0,npmd0,nerg0,nnmax0)
 !
@@ -65,10 +74,10 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
   character(len=1),intent(in):: cfrcs(nf,lf)
 !f2py integer,intent(hide),depend(cfrcs):: nf=shape(cfrcs,0),lf=shape(cfrcs,1)
   real(8),intent(in):: rc0,rbuf0,dt0,dmp0,eps_conv0
-  integer,intent(in):: naux0,iprint0,nstp0,ifdmp0,n_conv0
-  integer,intent(in):: laux
-  character(len=1),intent(in):: cauxarr0(naux0,laux)
-!f2py integer,intent(hide),depend(cauxarr0):: laux=shape(cauxarr0,1)
+  integer,intent(in):: iprint0,nstp0,ifdmp0,n_conv0
+!!$  integer,intent(in):: naux0,laux
+!!$  character(len=1),intent(in):: cauxarr0(naux0,laux)
+!!$!f2py integer,intent(hide),depend(cauxarr0):: laux=shape(cauxarr0,1)
   real(8),intent(in):: ptgt0,srlx0,stgt0(3,3)
   integer,intent(in):: lcpctl
   character(len=1),intent(in):: cpctl0(lcpctl)
@@ -79,6 +88,8 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
   character:: c3*3, c128*128, c6*6, c20*20
   type(atom):: elem
   logical:: lcoulomb = .false.
+
+  iprint = iprint0
 
 !.....Set specorder
   if( ls.ne.3 ) then
@@ -106,27 +117,31 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
     force_list(i) = trim(c128)
   end do
 
-!.....Set cauxarr0
-  if( laux.ne.6 ) then
-    print *,' The length of cauxarr char should be 6, laux = ',laux
-    stop
-  endif
-  if( lcoulomb .and. naux0.lt.2 ) then
-    print *,' naux should be greater than 1 when Coulomb potential is used.'
-    stop
-  endif
-  if( allocated(cauxarr) .and. size(cauxarr).ne.naux0 ) deallocate(cauxarr)
-  if( .not.allocated(cauxarr) ) allocate(cauxarr(naux0))
-  
-  do i=1,naux0
-    write(c6,'(6a1)') cauxarr0(i,1:laux)
-    cauxarr(i) = trim(c6)
-  end do
+!!$!.....Set cauxarr0
+!!$  if( laux.ne.6 ) then
+!!$    print *,' The length of cauxarr char should be 6, laux = ',laux
+!!$    stop
+!!$  endif
+!.....It is required to call init_force and read some in.params.XXX to define aux array
+  call init_force(.true.)
+!.....Before allocating auxiliary array, set naux (num of auxiliary data)
+  call set_cauxarr()
+!!$  if( lcoulomb .and. naux0.lt.2 ) then
+!!$    print *,' naux should be greater than 1 when Coulomb potential is used.'
+!!$    stop
+!!$  endif
+!!$  if( allocated(cauxarr) .and. size(cauxarr).ne.naux0 ) deallocate(cauxarr)
+!!$  if( .not.allocated(cauxarr) ) allocate(cauxarr(naux0))
+!!$  
+!!$  do i=1,naux0
+!!$    write(c6,'(6a1)') cauxarr0(i,1:laux)
+!!$    cauxarr(i) = trim(c6)
+!!$  end do
 
   write(c20,'(20a1)') cpctl0(1:lcpctl)
   cpctl = trim(c20)
 
-  naux = naux0
+!!$  naux = naux0
   nstp = nstp0
   do i=1,nspmax
     c3 = specorder(i)
@@ -142,7 +157,6 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
   nx = 1
   ny = 1
   nz = 1
-  iprint = iprint0
   nerg = nerg0
   ifpmd = 0
   npmd = npmd0

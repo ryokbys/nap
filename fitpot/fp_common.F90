@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 21:48:46 Ryo KOBAYASHI>
+!                     Last modified: <2021-12-07 16:18:46 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -620,15 +620,6 @@ contains
          descs,nsf_desc,nsf2_desc,nsf3_desc,nsff_desc,ilsf2,ilsf3, &
          lcheby,cnst,wgtsp_desc,nspmax
     use parallel
-!!$    use Coulomb,only: set_paramsdir_Coulomb, set_params_Coulomb
-!!$    use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
-!!$    use BMH,only: set_paramsdir_BMH,set_params_BMH
-!!$    use Abell,only: set_paramsdir_Abell,set_params_Abell
-!!$    use fpc,only: set_paramsdir_fpc,set_params_fpc
-!!$    use angular,only: set_paramsdir_angular,set_params_angular
-!!$    use EAM,only: set_paramsdir_EAM,set_params_EAM
-!!$    use NN2,only: set_paramsdir_NN2,set_params_NN2,get_NN2_hl1 &
-!!$         ,set_NN2_hl1,set_sigtype_NN2
     use DNN,only: set_paramsdir_DNN,set_params_DNN,set_actfunc_DNN
     use linreg,only: set_paramsdir_linreg,set_params_linreg
     use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
@@ -647,89 +638,16 @@ contains
     smpl = samples(ismpl)
     cdirname = smpl%cdirname
 
-!!$    if( trim(cpot).eq.'vcMorse' ) then
-!!$      call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
-!!$           //'/pmd')
-!!$      call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
-!!$           //'/pmd')
-!!$      call set_params_vcMorse(ndim,x)
-!!$    else if( trim(cpot).eq.'Morse' ) then
-!!$      call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)&
-!!$           //'/pmd')
-!!$      if( string_in_arr('screened_Coulomb',nsubff,csubffs) .or. &
-!!$           string_in_arr('Coulomb',nsubff,csubffs) ) then
-!!$        ctype = 'BVS'
-!!$      else if( string_in_arr('Ewald_long',nsubff,csubffs) .or.&
-!!$           string_in_arr('Ewald',nsubff,csubffs) ) then
-!!$        ctype = 'full_Morse'
-!!$      else
-!!$        ctype = 'full_Morse'
-!!$      endif
-!!$      call set_params_Morse(ndim,x,ctype,interact)
-!!$    else if( trim(cpot).eq.'BMH' ) then
-!!$      call set_paramsdir_BMH(trim(cmaindir)//'/'//trim(cdirname)&
-!!$           //'/pmd')
-!!$      call set_params_BMH(ndim,x,cpot,interact)
-!!$    else if( trim(cpot).eq.'Abell' ) then
-!!$      call set_paramsdir_Abell(trim(cmaindir)//'/'//trim(cdirname)&
-!!$           //'/pmd')
-!!$      call set_params_Abell(ndim,x,cpot,interact)
-!!$    else if( trim(cpot).eq.'fpc' ) then
-!!$      call set_paramsdir_fpc(trim(cmaindir)//'/'//trim(cdirname)&
-!!$           //'/pmd')
-!!$      call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)&
-!!$           //'/pmd')
-!!$      call set_params_Coulomb(1,x(1),cpot, &
-!!$           smpl%specorder,iprint)
-!!$      call set_params_fpc(ndim-1,x(2:ndim),cpot,interact)
-!!$    else if( trim(cpot).eq.'EAM' ) then
-!!$      call set_paramsdir_EAM(trim(cmaindir)//'/'//trim(cdirname)&
-!!$           //'/pmd')
-!!$      call set_params_EAM(ndim,x)
 
     if( trim(cpot).eq.'linreg' ) then
 !.....Set lfitpot in descriptor module to let it know that it is called from fitpot
       lfitpot_desc = .true.
       call set_params_linreg(ndim,x)
-!!$    else if( trim(cpot).eq.'NN2' ) then
-!!$!.....Set lfitpot in descriptor module to let it know that it is called from fitpot
-!!$      lfitpot_desc = .true.
-!!$      call set_params_NN2(ndim,x,nn_nl,nn_nhl)
-!!$      call set_sigtype_NN2(nn_sigtype)
     else if( trim(cpot).eq.'DNN' ) then
 !.....Set lfitpot in descriptor module to let it know that it is called from fitpot
       lfitpot_desc = .true.
       call set_params_DNN(ndim,x,nn_nl,nn_nhl)
       call set_actfunc_DNN(nn_sigtype,nn_asig)
-!!$    else if( index(cpot,'BVS').ne.0 ) then
-!!$      call set_paramsdir_Morse(trim(cmaindir)//'/'//trim(cdirname)//'/pmd')
-!!$      call set_paramsdir_Coulomb(trim(cmaindir)//'/'//trim(cdirname)//'/pmd')
-!!$      call set_paramsdir_angular(trim(cmaindir)//'/'//trim(cdirname)//'/pmd')
-!!$      if( trim(cpot).eq.'BVS1' ) then
-!!$        call set_params_Coulomb(1,x(1),cpot,smpl%specorder,iprint)
-!!$        call set_params_Morse(ndim-1,x(2:ndim),cpot,interact)
-!!$      else if( trim(cpot).eq.'BVS' ) then
-!!$        ndim0 = 1
-!!$        ndimt = 1+maxisp
-!!$        call set_params_Coulomb(ndimt,x(ndim0),cpot,smpl%specorder,iprint)
-!!$        ndim0 = ndim0 +ndimt
-!!$        ndimt = num_interact(2)*3
-!!$        call set_params_Morse(ndimt,x(ndim0),cpot,interact)
-!!$!.....In case of BVSx, not only Coulomb and Morse but also angular should be added.
-!!$      else if( trim(cpot).eq.'BVSx' ) then
-!!$        ndim0 = 1
-!!$        ndimt = 1+maxisp
-!!$        call set_params_Coulomb(ndimt,x(ndim0),cpot,smpl%specorder,iprint)
-!!$        ndim0 = ndim0 +ndimt
-!!$        ndimt = num_interact(2)*3
-!!$        call set_params_Morse(ndimt,x(ndim0),cpot,interact)
-!!$        ndim0 = ndim0 +ndimt
-!!$        ndimt = num_interact(3)*3
-!!$        call set_params_angular(ndimt,x(ndim0),'angular1',rc3,interact3)
-!!$      else
-!!$        print *,'ERROR@pre_pmd: No such BVS FF available in fitpot.'
-!!$        stop 1
-!!$      endif
     endif
     
     if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) then
@@ -768,7 +686,7 @@ contains
     use descriptor,only: get_dsgnmat_force
     use ZBL,only: r_inner,r_outer
     use pmdvars, only: nspmax,naux,nstp,nx,ny,nz,specorder,am,dt,rbuf, &
-         rc1nn,ifcoulomb,lvc
+         rc1nn,lvc
     use pmdvars,only: iprint_pmd => iprint, rc_pmd => rc
     use element
     implicit none
@@ -785,13 +703,6 @@ contains
 
     logical,save:: l1st = .true.
 
-!!$    integer:: i,is,nerg,npmd,ifpmd,ifdmp,minstp,n_conv,ifsort, &
-!!$         ntdst,iprint_pmd,ifcoulomb
-!!$    real(8):: am(nspmax),dt,rbuf,dmp,tinit,tfin,ttgt(nspmax),trlx,stgt(3,3),&
-!!$         ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3),ekin,eps_conv &
-!!$         ,rc1nn
-!!$    logical:: ltdst,lcellfix(3,3),lvc
-!!$    character:: ciofmt*6,ctctl*20,cpctl*20,czload_type*5,boundary*3,csp*3
     integer:: i,is
     real(8):: ptnsr(3,3),ekin
     character:: csp*3 
@@ -806,8 +717,6 @@ contains
       call init_element()
       l1st = .false.
     endif
-!!$    print *,'cdirname,specorder= ',trim(smpl%cdirname) &
-!!$         ,(smpl%specorder(i),i=1,2)
 
     nstp = 0
 !!$    nerg = 1
@@ -829,54 +738,12 @@ contains
     rc1nn = 3.0d0
     rc_pmd = rc
 
-!!$    ciofmt = 'ascii'
-!!$    ifpmd = 0
-!!$    ifdmp = 0  ! no damping as well
-!!$    dmp = 0.99d0
-!!$    minstp = 0
-!!$    tinit = 0d0
-!!$    tfin = 0d0
-!!$    ctctl = 'none'
-!!$    ttgt(1:nspmax) = 300d0
-!!$    trlx = 100d0
-!!$    ltdst = .false.
-!!$    ntdst = 1
-!!$    cpctl = 'none'
-!!$    stgt(1:3,1:3) = 0d0
-!!$    ptgt = 0d0
-!!$    srlx = 100d0
-!!$    stbeta = 1d-1
-!!$    strfin = 0d0
-!!$    fmv(1:3,0) = (/ 0d0, 0d0, 0d0 /)
-!!$    fmv(1:3,1:9) = 1d0
-!!$    ptnsr(1:3,1:3) = 0d0
-!!$    ekin = 0d0
-!!$    n_conv = 1
-!!$    czload_type = 'no'
-!!$    boundary = 'ppp'
-!!$    eps_conv = 1d-3
-!!$    ifsort = 1
-!!$    lcellfix(1:3,1:3) = .false.
     nx = 1
     ny = 1
     nz = 1
     iprint_pmd = max(0,iprint-10)
 
     lvc = .false.
-    ifcoulomb = 0
-    do i=1,nff
-      if( trim(cffs(i)).eq.'Ewald_long' .or. &
-           trim(cffs(i)).eq.'vcMorse' ) then
-        ifcoulomb = 3
-        if( .not. smpl%charge_set ) lvc = .true.
-!.....Even if lvc is .false., lvc will be set true at the begining of init_force
-!.....in case of vcMorse.
-      else if( trim(cffs(i)).eq.'screened_Coulomb' ) then
-        ifcoulomb = 1
-      else if( trim(cffs(i)).eq.'Ewald' ) then
-        ifcoulomb = 2
-      endif
-    enddo
 
 !.....Set force_list in the force module
     update_force_list = .false.
@@ -903,22 +770,13 @@ contains
       loverlay = overlay
     endif
 
-!.....Currently aux is not available in fitpot,
-!.....but necessary to allocate it for one_shot, so allocate it with 0 length.
-    naux = 0
+    call init_force(.true.)
+    call set_cauxarr()
     if( .not.allocated(smpl%aux) ) then
       allocate(smpl%aux(naux,smpl%natm))
     endif
 
 !.....one_shot force calculation
-!!$    call one_shot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra &
-!!$         ,smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi &
-!!$         ,smpl%aux,naux &
-!!$         ,myid_pmd,mpi_comm_pmd,nnode_pmd,nx,ny,nz &
-!!$         ,smpl%specorder,am,dt,rc,rbuf,rc1nn,ptnsr,epot,ekin &
-!!$         ,ifcoulomb,lvc,iprint_pmd,lcalcgrad,ndimp,maxisp &
-!!$         ,gwe,gwf,gws &
-!!$         ,lematch,lfmatch,lsmatch,boundary)
     call oneshot4fitpot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra, &
          smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi, &
          smpl%aux,ekin,epot,ptnsr,lcalcgrad,ndimp,maxisp, &
@@ -1000,9 +858,9 @@ contains
     logical:: luse_Coulomb = .false.
     logical:: luse_LJ_repul = .false.
     logical:: luse_ZBL = .false.
-    logical:: luse_Bonny_WRe = .false.
-    logical:: luse_cspline = .false.
-    logical:: luse_dipole = .false.
+!!$    logical:: luse_Bonny_WRe = .false.
+!!$    logical:: luse_cspline = .false.
+!!$    logical:: luse_dipole = .false.
     logical:: lfdsgnmat = .false.  ! Not to compute dsgnmat for subtracted FFs
     logical,save:: l1st = .true.
     real(8):: epot,strs(3,3)
@@ -1035,23 +893,19 @@ contains
         else if( index(trim(csubffs(i)),'ZBL').ne.0 ) then
           luse_ZBL = .true.
           call read_params_ZBL()
-        else if( index(trim(csubffs(i)),'Bonny_WRe').ne.0 ) then
-          luse_Bonny_WRe = .true.
-        else if( index(trim(csubffs(i)),'cspline').ne.0 ) then
-          luse_cspline = .true.
-        else if( index(trim(csubffs(i)),'dipole').ne.0 ) then
-          luse_dipole = .true.
+!!$        else if( index(trim(csubffs(i)),'Bonny_WRe').ne.0 ) then
+!!$          luse_Bonny_WRe = .true.
+!!$        else if( index(trim(csubffs(i)),'cspline').ne.0 ) then
+!!$          luse_cspline = .true.
+!!$        else if( index(trim(csubffs(i)),'dipole').ne.0 ) then
+!!$          luse_dipole = .true.
         endif
       enddo
 
-!.....Only at the 1st call, perform pmd to get esubs
+!.....Only at the 1st call, perform pmd to get (esub,fsub,ssub)
       do ismpl=isid0,isid1
         natm = samples(ismpl)%natm
-        if( luse_Morse ) then
-          call set_paramsdir_Morse(trim(cmaindir)//'/'&
-               //trim(samples(ismpl)%cdirname)//'/pmd')
-        endif
-        if( luse_Morse_repul ) then
+        if( luse_Morse .or. luse_Morse_repul ) then
           call set_paramsdir_Morse(trim(cmaindir)//'/'&
                //trim(samples(ismpl)%cdirname)//'/pmd')
         endif
@@ -1059,10 +913,10 @@ contains
           call set_paramsdir_Coulomb(trim(cmaindir)//'/'&
                //trim(samples(ismpl)%cdirname)//'/pmd')
         endif
-        if( luse_dipole ) then
-          call set_paramsdir_dipole(trim(cmaindir)//'/'&
-               //trim(samples(ismpl)%cdirname)//'/pmd')
-        endif
+!!$        if( luse_dipole ) then
+!!$          call set_paramsdir_dipole(trim(cmaindir)//'/'&
+!!$               //trim(samples(ismpl)%cdirname)//'/pmd')
+!!$        endif
         if( luse_LJ_repul ) then
           call set_paramsdir_LJ(trim(cmaindir)//'/'&
                //trim(samples(ismpl)%cdirname)//'/pmd')
@@ -1072,14 +926,14 @@ contains
 !!$               //trim(samples(ismpl)%cdirname)//'/pmd')
           call set_params_ZBL(zbl_rc,zbl_qnucl,zbl_ri,zbl_ro,zbl_interact)
         endif
-        if( luse_Bonny_WRe ) then
-          call set_paramsdir_Bonny(trim(cmaindir)//'/'&
-               //trim(samples(ismpl)%cdirname)//'/pmd')
-        endif
-        if( luse_cspline ) then
-          call set_paramsdir_cspline(trim(cmaindir)//'/'&
-               //trim(samples(ismpl)%cdirname)//'/pmd')
-        endif
+!!$        if( luse_Bonny_WRe ) then
+!!$          call set_paramsdir_Bonny(trim(cmaindir)//'/'&
+!!$               //trim(samples(ismpl)%cdirname)//'/pmd')
+!!$        endif
+!!$        if( luse_cspline ) then
+!!$          call set_paramsdir_cspline(trim(cmaindir)//'/'&
+!!$               //trim(samples(ismpl)%cdirname)//'/pmd')
+!!$        endif
         call run_pmd(samples(ismpl),lcalcgrad,nvars,&
              nsubff,csubffs,epot,frcs,strs,rc_other,lfdsgnmat)
 !!$      print *,'myid,ismpl,epot=',myid,ismpl,epot

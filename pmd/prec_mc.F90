@@ -1,6 +1,6 @@
 module pmc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-11-24 21:36:41 Ryo KOBAYASHI>
+!                     Last-modified: <2021-12-07 15:41:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! 
 ! Module includes variables commonly used in pmc.
@@ -1109,7 +1109,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   integer:: i,inc
   integer,parameter:: nismax = 9
   integer:: nstp,nerg,npmd,ifpmd,minstp,ntdst,n_conv,ifsort,iprint &
-       ,ifdmp,ifcoulomb,numff,nrmtrans
+       ,ifdmp,numff,nrmtrans
   real(8):: hunit,h(3,3,0:1),am(nismax),dt,rc,dmp,tinit,tfin,ttgt(9)&
        ,trlx,stgt(3,3),ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3) &
        ,epot,ekin,eps_conv,rbuf,pini,pfin
@@ -1216,7 +1216,6 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
   eps_conv = 1d-3
   ifsort = 1
   iprint = 0
-  ifcoulomb = 0
   lvc = .false.
   boundary = 'ppp'
 

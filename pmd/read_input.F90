@@ -251,9 +251,6 @@ subroutine set_variable(ionum,cname)
        trim(cname).eq.'variable_charge' ) then
     call read_l1(ionum,lvc)
     return
-  elseif( trim(cname).eq.'flag_coulomb' ) then
-    call read_i1(ionum,ifcoulomb)
-    return
   elseif( trim(cname).eq.'print_level' ) then
     call read_i1(ionum,iprint)
     return

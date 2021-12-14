@@ -1,8 +1,8 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 11:50:08 Ryo KOBAYASHI>
+!                     Last modified: <2021-12-13 16:48:01 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
-  use pmdvars,only: nspmax
+  use pmdvars,only: nspmax,nsp
   use util,only: csp2isp
   use memory,only: accum_mem
   include "./const.h"
@@ -20,6 +20,7 @@ module angular
   real(8):: alps(nspmax,nspmax,nspmax)
   real(8):: bets(nspmax,nspmax,nspmax)
   real(8):: gmms(nspmax,nspmax,nspmax)
+  real(8):: shfts(nspmax,nspmax,nspmax)
   logical:: interact3(nspmax,nspmax,nspmax)
 
 !.....For fitpot
@@ -32,7 +33,10 @@ contains
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint,l1st)
 !-----------------------------------------------------------------------
-!  Parallel implementation of SW-like angular force-field
+!  Parallel implementation of SW-like angular force-field.
+!  Currently, only type-1 and -2 are available, and the difference
+!  between them is only the shift of energy and thus no need to separate
+!  the code for them.
 !-----------------------------------------------------------------------
     implicit none
     include "mpif.h"
@@ -48,7 +52,7 @@ contains
 
 !-----local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr
-    real(8):: rij,rik,riji,riki,rij2,rik2,rc2,rc3,alp,bet,gmm
+    real(8):: rij,rik,riji,riki,rij2,rik2,rc2,rc3,alp,bet,gmm,shft
     real(8):: tmp,tmpj(3),tmpk(3),vexp,df2,csn,tcsn,tcsn2,dhrij,dhrik &
          ,dhcsn,vol,voli,volj,volk,drijj(3),rcmax
     real(8):: drikk(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl &
@@ -109,7 +113,7 @@ contains
 !$omp parallel
 !$omp do reduction(+:epotl3,aa3,strsl) &
 !$omp    private(i,xi,is,n,j,js,xj,x,y,z,xij,rij2,rij,riji,drijj,m,k,ks,rc3, &
-!$omp            xk,xik,rik2,rik,riki,drijc,drikc,alp,bet,gmm,csn,tcsn,tcsn2, &
+!$omp            xk,xik,rik2,rik,riki,drijc,drikc,alp,bet,gmm,shft,csn,tcsn,tcsn2, &
 !$omp            vexp,tmp,dhrij,dhrik,dhcsn,drikk,dcsnj,dcsnk,dcsni,tmpj,tmpk,ixyz)
     do i=1,natm
       xi(1:3)=ra(1:3,i)
@@ -150,10 +154,11 @@ contains
           alp = alps(is,js,ks)
           bet = bets(is,js,ks)
           gmm = gmms(is,js,ks)
+          shft= shfts(is,js,ks)
 !.....Common terms
           csn=(xij(1)*xik(1) +xij(2)*xik(2) +xij(3)*xik(3)) *(riji*riki)
           tcsn = csn -gmm
-          tcsn2= tcsn*tcsn
+          tcsn2= (tcsn*tcsn +shft)
           vexp= dexp(bet*drijc +bet*drikc)
 !.....Potential
           tmp= alp *vexp *tcsn2
@@ -209,14 +214,14 @@ contains
   end subroutine force_angular
 !=======================================================================
   subroutine read_params_angular(myid,mpi_world,iprint,specorder)
-    use util, only: num_data
+    use util, only: num_data, is_numeric
     implicit none
     include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(msp)
 
-    integer:: itmp,ierr,isp,jsp,ksp,nd
-    real(8):: alp,bet,gmm,rc3
+    integer:: itmp,ierr,isp,jsp,ksp,nd,itype
+    real(8):: alp,bet,gmm,shft,rc3
     logical:: lexist
     character(len=128):: cfname,ctmp,cline,ctype
     character(len=3):: cspi,cspj,cspk
@@ -229,6 +234,7 @@ contains
       gmms(:,:,:) = -1d0/3
       alps(:,:,:) = 1d0
       bets(:,:,:) = 1d0
+      shfts(:,:,:) = 0d0
 !.....Check whether the file exists      
       cfname = trim(paramsdir)//'/'//trim(paramsfname)
       inquire(file=cfname,exist=lexist)
@@ -249,9 +255,14 @@ contains
         if( nd.eq.0 ) cycle
         if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
         read(cline,*) ctype
-        if( trim(ctype).eq.'angular1' ) then
+        if( is_numeric(ctype) ) then
+          read(ctype,*) itype
+        else
+          itype = itype_from(ctype)
+        endif
+        if( itype.eq.1 ) then
           if( nd.ne.8 .and. iprint.ge.ipl_basic ) then
-            print *,'WARNING@read_params_angular: # of entry wrong for angular1,' &
+            print *,'WARNING@read_params_angular: # of entry wrong for type-1,' &
                  //' so skip the line.'
             print *,'   '//trim(cline)
           endif
@@ -280,7 +291,43 @@ contains
                    ,cspi,cspj,cspk
             endif
           endif
-        endif  ! ctype
+
+!.....Read type-2 parameters
+        else if( itype.eq.2 ) then
+          if( nd.ne.9 .and. iprint.ge.ipl_basic ) then
+            print *,'WARNING@read_params_angular: # of entry wrong for type-1,' &
+                 //' so skip the line.'
+            print *,'   '//trim(cline)
+          endif
+          read(cline,*) ctmp, cspi,cspj,cspk,rc3,alp,bet,gmm,shft
+          isp = csp2isp(cspi)
+          jsp = csp2isp(cspj)
+          ksp = csp2isp(cspk)
+          if( iprint.ge.ipl_basic ) print '(a,3(a3,1x),5es11.3)', &
+               '  cspi,cspj,cspk,rc3,alp,bet,gmm,shft=', &
+               trim(cspi),trim(cspj),trim(cspk),rc3,alp,bet,gmm,shft
+          if( isp.gt.0 .and. jsp.gt.0 .and. ksp.gt.0 ) then
+            interact3(isp,jsp,ksp) = .true.
+            rc3s(isp,jsp,ksp) = rc3
+            alps(isp,jsp,ksp) = alp
+            bets(isp,jsp,ksp) = bet
+            gmms(isp,jsp,ksp) = gmm
+            shfts(isp,jsp,ksp) = shft
+!.....Symmetrize
+            interact3(isp,ksp,jsp) = .true.
+            rc3s(isp,ksp,jsp) = rc3
+            alps(isp,ksp,jsp) = alp
+            bets(isp,ksp,jsp) = bet
+            gmms(isp,ksp,jsp) = gmm
+            shfts(isp,ksp,jsp) = shft
+          else
+            if( iprint.ge.ipl_info ) then
+              print *,' Angular parameter read but not used: cspi,cspj,cspk='&
+                   ,cspi,cspj,cspk
+            endif
+          endif
+          
+        endif  ! itype
       enddo
 10    close(ioprms)
       
@@ -375,7 +422,20 @@ contains
     return
   end subroutine set_params_angular
 !=======================================================================
-  
+  function itype_from(str)
+!
+!  Convert string type such as angular1 to integer type.
+!
+    character(len=*),intent(in):: str
+    integer:: itype_from
+
+    itype_from = 0
+    if( trim(str).eq.'angular1' ) then
+      itype_from = 1
+    else if( trim(str).eq.'angular2' ) then
+      itype_from = 2
+    endif
+  end function itype_from
 end module angular
 !-----------------------------------------------------------------------
 !     Local Variables:

@@ -8,7 +8,8 @@ subroutine get_force(l1st,epot,stnsr)
   use pmdvars,only: namax,natm,tag,ra,nnmax,aa,strs,aux,naux,nspmax, &
        h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr, &
        sorg,mpi_md_world,myid_md,epi,specorder,lstrs, &
-       ifcoulomb,iprint,lvc,lcell_updated,boundary
+       iprint,lvc,lcell_updated,boundary, &
+       iaux_chg, iaux_tei, iaux_q, iaux_vq
   use util,only: iauxof
   use RK_FeH,only:force_RK_FeH
   use Ramas_FeH,only:force_Ramas_FeH,force_Ackland_Fe
@@ -29,9 +30,8 @@ subroutine get_force(l1st,epot,stnsr)
 !!$  use NN,only:force_NN
 !!$  use NN2,only: force_NN2,force_NN2_overlay_pot, force_NN2_overlay_frc
   use DNN,only: force_DNN
-  use Coulomb, only: force_screened_Coulomb, force_Ewald, &
-       initialize_coulomb, force_Ewald_long, force_Coulomb, &
-       chgopt_method
+  use Coulomb, only: force_Coulomb, &
+       chgopt_method, bacopy_auxq_fixed
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
   use Buckingham,only:force_Buckingham
   use Bonny_WRe,only: force_Bonny_WRe
@@ -52,7 +52,6 @@ subroutine get_force(l1st,epot,stnsr)
 !!$       ,myparity(3),nnn(6),mpi_md_world,myid_md,nex(3)
 !!$  integer,intent(in):: lspr(0:nnmax,namax) !,numff
 !!$  real(8),intent(in):: d2lspr(nnmax,namax)
-!!$  integer,intent(inout):: ifcoulomb
 !!$  real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
 !!$       ,tag(namax),sorg(3)
 !!$  real(8),intent(inout):: rc
@@ -86,13 +85,17 @@ subroutine get_force(l1st,epot,stnsr)
       write(6,'(/a)') ' Charges are to be equilibrated.'
     endif
     if( chgopt_method(1:4).eq.'damp' .or. chgopt_method(1:4).eq.'FIRE' ) then
-!!$      call chgopt_damping(namax,natm,tag,h,ra, &
-!!$           aux(iauxof('chg'),:), &
-!!$           nnmax,lspr,d2lspr,rc, &
-!!$           lsb,lsex,nbmax,nb,nnn,myparity,lsrc,nex,&
-!!$           sorg,myid_md,mpi_md_world,iprint,l1st,boundary)
-      call chgopt_damping(aux(iauxof('chg'),:),l1st)
+      call chgopt_damping(aux(iaux_chg,:),l1st)
       call accum_time('chgopt_damping',mpi_wtime() -tmp)
+    else if( chgopt_method(1:4).eq.'xlag' ) then
+      if( l1st ) then
+        call chgopt_damping(aux(iaux_chg,:),l1st)
+        aux(iaux_q,:) = aux(iaux_chg,:)
+      else
+        call bacopy_auxq_fixed(aux(iaux_q,:),aux(iaux_vq,:))
+        call chgopt_xlag(aux(iaux_chg,:),aux(iaux_q,:))
+      endif
+      call accum_time('chgopt_xlag',mpi_wtime() -tmp)
     else
       if( myid_md.eq.0 ) print *,'Non-available chgopt_method: '//trim(chgopt_method)
       stop 1
@@ -169,7 +172,7 @@ subroutine get_force(l1st,epot,stnsr)
     call force_tersoff(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs,iprint &
-       ,aux(iauxof('tei'),:))
+       ,aux(iaux_tei,:))
     call accum_time('force_Tersoff',mpi_wtime() -tmp)
   endif
   if( use_force('Brenner') ) then
@@ -292,13 +295,13 @@ subroutine get_force(l1st,epot,stnsr)
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
     call accum_time('force_Morse_repul',mpi_wtime() -tmp)
   endif
-  if( use_force('vcMorse') ) then
-    tmp = mpi_wtime()
-    call force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs &
-       ,aux(iauxof('chg'),:),h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
-       ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_vcMorse',mpi_wtime() -tmp)
-  endif
+!!$  if( use_force('vcMorse') ) then
+!!$    tmp = mpi_wtime()
+!!$    call force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs &
+!!$       ,aux(iaux_chg,:),h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+!!$       ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
+!!$    call accum_time('force_vcMorse',mpi_wtime() -tmp)
+!!$  endif
   if( use_force('Buckingham') ) then
     tmp = mpi_wtime()
     call force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs &
@@ -369,36 +372,21 @@ subroutine get_force(l1st,epot,stnsr)
     call accum_time('force_angular',mpi_wtime() -tmp)
   endif
   
-!.....Exclusive choice of different Coulomb force-fields
-  if( use_force('screened_Coulomb') ) then ! screened Coulomb
+  if( use_force('Coulomb') ) then
     tmp = mpi_wtime()
-    call force_screened_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-         ,aux(iauxof('chg'),:),h,hi,nb,nbmax,lsb,nex,lsrc &
-         ,myparity,nn,sv,rc,lspr &
-         ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint &
-         ,l1st,specorder)
-    call accum_time('force_Coulomb',mpi_wtime() -tmp)
-  else if( use_force('Ewald') ) then  ! Ewald Coulomb
-    tmp = mpi_wtime()
-    call force_Ewald(namax,natm,tag,ra,nnmax,aa,strs &
-         ,aux(iauxof('chg'),:),h,hi,nb,nbmax &
-         ,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr,sorg &
-         ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint &
-         ,l1st,lcell_updated,lvc)
-    call accum_time('force_Ewald',mpi_wtime() -tmp)
-  else if( use_force('Ewald_long') ) then ! long-range Coulomb
-    call force_Ewald_long(namax,natm,tag,ra,nnmax,aa,strs &
-         ,aux(iauxof('chg'),:),h,hi,nb,nbmax &
-         ,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,sorg &
-         ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint &
-         ,l1st,lcell_updated,lvc)
-  else if( use_force('Coulomb') ) then  ! Coulomb
-    tmp = mpi_wtime()
-    call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
-         ,aux(iauxof('chg'),:),h,hi,nb,nbmax &
-         ,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr,sorg &
-         ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint &
-         ,l1st,lcell_updated,lvc,specorder)
+    if( lvc .and. chgopt_method(1:4).eq.'xlag' .and. .not.l1st ) then
+      call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
+           ,aux(iaux_q,:),h,hi,nb,nbmax &
+           ,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr,sorg &
+           ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint &
+           ,l1st,lcell_updated,lvc,specorder)
+    else
+      call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
+           ,aux(iaux_chg,:),h,hi,nb,nbmax &
+           ,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr,sorg &
+           ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint &
+           ,l1st,lcell_updated,lvc,specorder)
+    endif
     call accum_time('force_Coulomb',mpi_wtime() -tmp)
   endif
 
@@ -410,14 +398,14 @@ subroutine get_force(l1st,epot,stnsr)
 
 end subroutine get_force
 !=======================================================================
-subroutine init_force(namax,natm,nspmax,nsp,tag,aux,naux, &
-     myid_md,mpi_md_world,iprint,h,rc,lvc,ifcoulomb,specorder,amass,linit)
+subroutine init_force(linit)
 !
 !  Initialization routine is separated from main get_force routine.
 !
+  use pmdvars,only: namax,nspmax,nsp,myid_md,mpi_md_world,iprint, &
+       specorder,rc,lvc,am
   use force
-  use util,only: iauxof
-  use Coulomb, only: initialize_coulomb, initialize_coulombx, lprmset_Coulomb
+  use Coulomb, only: init_coulomb, lprmset_Coulomb
   use Morse, only: read_params_vcMorse, lprmset_Morse, &
        read_element_descriptors,read_params_Morse,&
        update_params_Morse
@@ -439,14 +427,6 @@ subroutine init_force(namax,natm,nspmax,nsp,tag,aux,naux, &
   implicit none
   include "./const.h"
   
-  integer,intent(in):: namax,natm,nspmax,nsp,myid_md,mpi_md_world,iprint,naux
-  real(8),intent(in):: tag(namax),h(3,3),rc,amass(nspmax)
-  character(len=3),intent(in):: specorder(nspmax)
-!!$    character(len=20),intent(in):: cffs(numff)
-  integer,intent(inout):: ifcoulomb
-!!$  real(8),intent(inout):: chg(namax)
-  real(8),intent(inout):: aux(naux,namax)
-  logical,intent(inout):: lvc
   logical,intent(in):: linit
 
   integer:: i,j
@@ -474,57 +454,41 @@ subroutine init_force(namax,natm,nspmax,nsp,tag,aux,naux, &
     endif
   endif
 
-!.....vcMorse requires charge optimization, 
-!.....everywhen atomic positions or potential parameters change
-  if( use_force('vcMorse') ) then
-    if( use_force('Ewald_long') ) then
-      if( myid_md.eq.0 .and. iprint.ne.0 ) print *,'Use Ewald_long,' &
-           //' because vcMorse is chosen.'
-      ifcoulomb = 3
-    endif
-    lvc = .true.
-  endif
+!!$!.....vcMorse requires charge optimization, 
+!!$!.....everywhen atomic positions or potential parameters change
+!!$  if( use_force('vcMorse') ) then
+!!$    if( use_force('Ewald_long') ) then
+!!$      if( myid_md.eq.0 .and. iprint.ne.0 ) print *,'Use Ewald_long,' &
+!!$           //' because vcMorse is chosen.'
+!!$    endif
+!!$    lvc = .true.
+!!$  endif
 
 !.....Coulomb interaction
-  if( use_force('screened_Coulomb') .or. &
-       use_force('Ewald') .or. &
-       use_force('Ewald_long') ) then
-    call initialize_coulomb(natm,nsp,tag, &
-         aux(iauxof('chg'),:), &
-         myid_md,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
-  else if( use_force('Coulomb') ) then
+  if( use_force('Coulomb') ) then
     if( .not. lprmset_Coulomb ) then
-      call initialize_coulombx(natm,nsp,tag, &
-           aux(iauxof('chg'),:), &
-           myid_md,mpi_md_world,ifcoulomb,iprint,h,rc,lvc,specorder)
+      call init_coulomb(myid_md,mpi_md_world,iprint,lvc,specorder)
     endif
   endif
 
-!.....vcMorse
-  if( use_force('vcMorse') ) then
-    if( .not. lprmset_Morse ) then
-      call read_params_vcMorse(myid_md,mpi_md_world,iprint)
-    endif
-    call read_element_descriptors(myid_md,mpi_md_world,iprint)
-  endif
+!!$!.....vcMorse
+!!$  if( use_force('vcMorse') ) then
+!!$    if( .not. lprmset_Morse ) then
+!!$      call read_params_vcMorse(myid_md,mpi_md_world,iprint)
+!!$    endif
+!!$    call read_element_descriptors(myid_md,mpi_md_world,iprint)
+!!$  endif
 !.....Morse
   if( use_force('Morse') .or. use_force('Morse_repul') ) then
     if( .not.lprmset_Morse ) then
       if( myid_md.eq.0 .and. iprint.ge.ipl_debug ) print*,'read_params_Morse...'
       call read_params_Morse(myid_md,mpi_md_world,iprint,specorder)
-!!$    else
-!!$!.....This code is not parallelized, and only for fitpot
-!!$      if( ifcoulomb.eq.1 ) then
-!!$        call update_params_Morse('BVS')
-!!$      else
-!!$        call update_params_Morse('full_Morse')
-!!$      endif
     endif
   endif
 !.....dipole
   if( use_force('dipole') ) then
     call read_params_dipole(myid_md,mpi_md_world,iprint &
-         ,specorder,amass)
+         ,specorder,am)
   endif
 !.....Abell
   if( use_force('Abell') ) then
@@ -1149,37 +1113,27 @@ subroutine chgopt_damping(chg,l1st)
 !    - FIRE --- it is said that robust and fast, but sometimes unstable, do not know why.
 !
   use pmdvars,only: namax,natm,tag,h,ra,nnmax,lspr,d2lspr,rc, &
-       lsb,lsex,nbmax,nb,nn,myparity,lsrc,nex,sorg,myid_md,mpi_md_world,iprint,boundary
+       lsb,lsex,nbmax,nb,nn,myparity,lsrc,nex,sorg,myid_md, &
+       mpi_md_world,iprint,boundary,ntot
   use force
-  use Coulomb, only: qlower,qupper, get_qforce, &
-       cterms,avmu,qforce_screened_cut, conv_eps_qeq, chgopt_method, &
-       nstp_qeq, dt_codmp, qmass_codmp, qtot_qeq, minstp_qeq, &
+  use Coulomb, only: qtop,qbot, get_qforce, &
+       cterms,qforce_screened_cut, conv_eps_qeq, chgopt_method, &
+       nstp_qeq, dt_codmp, qmass, qtot_qeq, minstp_qeq, &
        minstp_conv_qeq, finc_codmp, fdec_codmp, alpha0_codmp, falpha_codmp, &
        fdamp_codmp, dfdamp_codmp
-  use Morse, only: qforce_vcMorse
+!!$  use Morse, only: qforce_vcMorse
   use memory, only: accum_mem
   implicit none
   include "mpif.h"
   include "./const.h"
-!.....Input  
-!!$  integer,intent(in):: namax,natm,myid,mpi_md_world,iprint &
-!!$       ,nnmax,lspr(0:nnmax,namax)
-!!$  real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc,sorg(3),d2lspr(nnmax,namax)
   logical,intent(in):: l1st
-!!$  integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-!!$       ,nnn(6),nex(3),lsex(nbmax,6)
-!!$  character(len=3),intent(in):: boundary
 !.....Output
   real(8),intent(inout):: chg(namax)
 
-  integer:: istp,i,istp_pos,istp_conv,is,ntot,ierr,iflag
+  integer:: istp,i,istp_pos,istp_conv,is,ierr,iflag
   real(8):: epot,epotp,epotpp,eMorse,fqnorm,vqnorm,dt,alpha,p &
-       ,ecoul,dtmax,fdamp
-  real(8),save,allocatable:: vq(:),fq(:),chgmin(:),fqmin(:),ehist(:)
-!.....For oscillation
-  integer:: iosc_step,josc_step,j,jstp
-  real(8):: epotmin, demin
-  logical:: loscillate = .false.
+       ,ecoul,dtmax,fdamp, dqmax
+  real(8),save,allocatable:: vq(:),fq(:),dq(:)
 !.....small value for checking range
   real(8),parameter:: qeps   = 1d-10
 
@@ -1187,41 +1141,21 @@ subroutine chgopt_damping(chg,l1st)
 
   if( l1st ) then
     if( allocated(vq) ) then
-      call accum_mem('force_common',-8*size(vq) -8*size(fq) -8*size(chgmin) &
-           -8*size(fqmin) -8*size(ehist))
-      deallocate(vq,fq,chgmin,fqmin,ehist)
+      call accum_mem('force_common',-8*size(vq) -8*size(fq))
+      deallocate(vq,fq)
     endif
-    allocate(vq(namax),fq(namax),fqmin(namax),chgmin(namax), &
-         ehist(0:nstp_qeq))
-    call accum_mem('force_common',8*size(vq) +8*size(fq) +8*size(chgmin) &
-         +8*size(fqmin) +8*size(ehist))
+    allocate(vq(namax),fq(namax))
+    call accum_mem('force_common',8*size(vq) +8*size(fq))
+    allocate(dq(namax))
   endif
 
-  call mpi_allreduce(natm,ntot,1,mpi_integer,mpi_sum,mpi_md_world,ierr)
+!!$  call mpi_allreduce(natm,ntot,1,mpi_integer,mpi_sum,mpi_md_world,ierr)
 
 !.....Gather forces on charges
-  fq(1:namax) = 0d0
   istp = 0
-
   call impose_qtot(chg,qtot_qeq)
-  call bacopy_chg_fixed(chg)
-  call get_qforce(namax,natm,nnmax,tag,ra,chg,h,lspr,d2lspr,rc,sorg, &
-       myid_md,mpi_md_world,iprint,fq,epot,l1st)
-  ehist(0) = epot
+  call get_fq_wrapper(chg,fq,epot,l1st)
 
-  call get_average_fq(fq,avmu)
-  if( avmu*0d0.ne.0d0 ) then
-    if( myid_md.eq.0 ) print *,'WARNING: exited from chgopt_damping because avmu == NaN'
-    return   ! NaN
-  endif
-  do i=1,natm
-    fq(i) = fq(i) -avmu
-  enddo
-  if( myid_md.eq.0 .and. iprint.ge.ipl_debug ) then
-    write(6,'(a,i5,20es11.3)') ' istp,avmu,fqs = ',istp,avmu,fq(1:min(natm,10))
-  endif
-
-  epotmin = epot
   vq(:) = 0d0
   fdamp = fdamp_codmp
   istp_pos = 0
@@ -1234,7 +1168,7 @@ subroutine chgopt_damping(chg,l1st)
     epotpp = epotp
     epotp = epot
 !.....velocity update
-    vq(1:natm) = vq(1:natm) +dt/qmass_codmp*fq(1:natm)
+    vq(1:natm) = vq(1:natm) +dt/qmass*fq(1:natm)
 
     if( trim(chgopt_method).eq.'FIRE' ) then
       p = dot_product(fq(1:natm),vq(1:natm))
@@ -1257,14 +1191,17 @@ subroutine chgopt_damping(chg,l1st)
     else  ! simple velocity damping
       do i=1,natm
         if( vq(i)*fq(i).lt.0d0 ) then
-          vq(i) = dt/qmass_codmp *fq(i)
+          vq(i) = dt/qmass *fq(i)
         else
           vq(i) = vq(i)*fdamp
         endif
       enddo
     endif
+
 !.....update charges
-    chg(1:natm)= chg(1:natm) +vq(1:natm)*dt
+    dq(1:natm) = vq(1:natm)*dt
+    call suppress_dq(dq,0.2d0,dqmax)
+    chg(1:natm)= chg(1:natm) +dq(1:natm)
 !.....Check charges
     if( iprint.ge.ipl_debug ) then
       do i=1,natm
@@ -1277,36 +1214,18 @@ subroutine chgopt_damping(chg,l1st)
     endif
 
     call impose_qtot(chg,qtot_qeq)
-    call bacopy_chg_fixed(chg)
-!.....Get new forces on charges
-    fq(1:namax) = 0d0
-    call get_qforce(namax,natm,nnmax,tag,ra,chg,h,lspr,d2lspr,rc,sorg, &
-         myid_md,mpi_md_world,iprint,fq,epot,l1st)
-    ehist(istp) = epot
-    if( epot.lt.epotmin ) then
-      epotmin = epot
-      chgmin(:) = chg(:)
-      fqmin(:) = fq(:)
-    endif
-
-    call get_average_fq(fq,avmu)
-    if( avmu*0d0.ne.0d0 ) then
-      if( myid_md.eq.0 ) print *,'WARNING: exited from chgopt_damping because avmu == NaN'
-      return   ! NaN
-    endif
-    do i=1,natm
-      fq(i) = fq(i) -avmu
-    enddo
+!!$    print '(a,200es11.3)',' chg=',chg(1:natm)
+    call get_fq_wrapper(chg,fq,epot,.false.)
     if( myid_md.eq.0 .and. iprint.ge.ipl_debug ) then
-      write(6,'(a,i5,2es16.8,2es11.3)') ' istp,epot/ntot,de/ntot,avmu= ',istp &
-           ,epot/ntot,abs(epot-epotp)/ntot,avmu
+      write(6,'(a,i5,2es16.8,2es11.3)') ' istp,epot/ntot,de/ntot,dqmax= ',istp &
+           ,epot/ntot,abs(epot-epotp)/ntot,dqmax
     endif
 
 !.....check convergence
     if( istp.gt.minstp_qeq ) then
       if( abs(epot-epotp)/ntot.lt.conv_eps_qeq ) then
         istp_conv = istp_conv +1
-        if( istp_conv.gt.minstp_conv_qeq ) then
+        if( istp_conv.ge.minstp_conv_qeq ) then
           if( myid_md.eq.0 .and. iprint.ge.ipl_info ) then
             write(6,'(a,i0,a)') ' chgopt_damping converged at ', &
                  istp,' steps.'
@@ -1326,72 +1245,170 @@ subroutine chgopt_damping(chg,l1st)
   return
 end subroutine chgopt_damping
 !=======================================================================
-subroutine get_average_fq(fq,avmu)
+subroutine chgopt_xlag(chg,auxq)
 !
-!  Get an average FQ that is an average chemical potential.
+!  Charge optimization via extended Lagrangian proposed by Nomura[1].
+!  Charges are optimized only once (line minimization) along the forces
+!  on charges. But the initial guess of charges are given by auxiliary
+!  variables corresponding to charges.
 !
-  use pmdvars,only: namax,natm,myid_md,mpi_md_world
+!  [1]: Nomura, et al., Comput. Phys. Commun. 192, 91–96 (2015)
+!
+  use pmdvars,only: namax,natm,iprint,myid_md,mpi_md_world,ntot
+  use Coulomb,only: qmass,conv_eps_qeq
+  use memory, only: accum_mem
   implicit none
   include "mpif.h"
-  real(8),intent(in):: fq(namax)
-  real(8),intent(out):: avmu
+  include "./const.h"
+  real(8),intent(in):: auxq(namax)
+  real(8),intent(inout):: chg(namax)
+
+  logical,save:: l1st = .true.
+  real(8),save,allocatable:: fq(:)
+  integer:: i,iflag,imax,ierr
+  real(8):: alpha,epot,dqmax,dq
+
+  if( l1st ) then
+    if( allocated(fq) ) then
+      call accum_mem('force_common', -8*size(fq))
+      deallocate(fq)
+    endif
+    allocate(fq(namax))
+    call accum_mem('force_common',+8*size(fq))
+    l1st = .false.
+  endif
+
+  dqmax = -1d0
+  imax = -1
+  do i=1,natm
+    dq = abs(chg(i) -auxq(i))
+!!$    print '(a,i5,3f12.2)','i,chg,auxq,dq=',i,chg(i),auxq(i),dq
+    if( dqmax.lt.dq ) then
+      dqmax = dq
+      imax = i
+    endif
+  enddo
+
+!.....Set initial guess of charges
+  chg(:) = auxq(:)
+!.....Get forces on charges
+  call get_fq_wrapper(chg,fq,epot,.false.)
+!!$  print *,'epot/ntot = ',epot/ntot
+
+  call linmin_chg(chg,fq,conv_eps_qeq,alpha,epot,iflag)
+  if( iflag.ne.0 .and. myid_md.eq.0 ) then
+    print *,'something wrong with linmin_chg? iflag = ',iflag
+  endif
+  chg(1:natm) = chg(1:natm) +fq(1:natm)*alpha
+  return
+end subroutine chgopt_xlag
+!=======================================================================
+subroutine get_fq_wrapper(chg,fq,epot,l1st)
+!
+!  Wrapper routine for getting forces on charges.
+!
+  use pmdvars,only: namax,myid_md
+  use Coulomb,only: get_qforce,bacopy_chg_fixed
+  real(8),intent(inout):: chg(namax)
+  real(8),intent(out):: fq(namax),epot
+  logical,intent(in):: l1st
+
+  real(8):: epotb
+
+  call bacopy_chg_fixed(chg)
+  call get_qforce(chg,fq,epot,l1st)
+  call get_bounding_fq(chg,fq,epotb)
+  epot = epot +epotb
+  call set_fqtot_zero(fq)
+  return
+end subroutine get_fq_wrapper
+!=======================================================================
+subroutine set_fqtot_zero(fq)
+!
+!  Set total force on q's as zero, which means the conservation of total charge.
+!
+  use pmdvars,only: namax,natm,myid_md,mpi_md_world,ntot
+  implicit none
+  include "mpif.h"
+  real(8),intent(inout):: fq(namax)
 
   integer:: i,ierr
-  integer:: ntot,inc
-  real(8):: avmul
+  real(8):: avmul,avmu
 
-  inc = 0
   avmul = 0d0
   do i=1,natm
-    inc = inc +1
     avmul = avmul +fq(i)
   enddo
   avmu = 0d0
-  ntot = 0
-  call mpi_allreduce(inc,ntot,1,mpi_integer, &
-       mpi_sum,mpi_md_world,ierr)
   call mpi_allreduce(avmul,avmu,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
   avmu = avmu/ntot
-
+  do i=1,natm
+    fq(i) = fq(i) -avmu
+  enddo
+  
   return
-end subroutine get_average_fq
+end subroutine set_fqtot_zero
 !=======================================================================
 subroutine impose_qtot(chg,qtot)
 !
 !  Impose total charge to qtot.
 !
-  use pmdvars,only: namax,natm,myid_md,mpi_md_world,iprint
+  use pmdvars,only: namax,natm,myid_md,mpi_md_world,iprint,ntot
   implicit none
   include 'mpif.h'
   include './const.h'
   real(8),intent(in):: qtot
   real(8),intent(inout):: chg(namax)
 
-  integer:: i,nonfixl,nonfix,ierr
+  integer:: i,ierr
   real(8):: ql,qg,dq,qdist
 
   ql = 0d0
-  nonfixl = 0
   do i=1,natm
     ql = ql +chg(i)
-    nonfixl = nonfixl + 1
   enddo
-  nonfix = 0
-  call mpi_allreduce(nonfixl,nonfix,1,mpi_integer, &
-       mpi_sum,mpi_md_world,ierr)
-  if( nonfix.eq.0 ) return  ! no atom for charge to be distributed
   qg = 0d0
   call mpi_allreduce(ql,qg,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
   dq = qg -qtot
-  qdist = dq /nonfix
-!!$  if( myid_md.eq.0 .and. iprint.ge.ipl_debug ) then
-!!$    print '(a,3f12.5)',' qtot,dq,qdist= ',qtot,dq,qdist
-!!$  endif
+  qdist = dq /ntot
   do i=1,natm
     chg(i) = chg(i) -qdist
   enddo
-  
+  return
 end subroutine impose_qtot
+!=======================================================================
+subroutine get_bounding_fq(chg,fq,epot)
+!
+!  Compute forces on qs that bound qs inside [qbot,qtop].
+!
+  use pmdvars,only: namax,natm,iprint,tag,mpi_md_world
+  use Coulomb,only: bound_k4,qtop,qbot
+  implicit none
+  include 'mpif.h'
+  include './const.h'
+  real(8),intent(in):: chg(namax)
+  real(8),intent(inout):: fq(namax)
+  real(8),intent(out):: epot
+
+  integer:: i,is,ierr
+  real(8):: epotl
+
+  epotl = 0d0
+  
+  do i=1,natm
+    is = int(tag(i))
+    if( chg(i).ge.qtop(is) ) then
+      epotl = epotl +bound_k4*(chg(i)-qtop(is))**4
+      fq(i) = fq(i) -4d0*bound_k4*(chg(i)-qtop(is))**3
+    else if( chg(i).le.qbot(is) ) then
+      epotl = epotl +bound_k4*(chg(i)-qbot(is))**4
+      fq(i) = fq(i) -4d0*bound_k4*(chg(i)-qbot(is))**3
+    endif
+  enddo
+  epot = 0d0
+  call mpi_allreduce(epotl,epot,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+  return
+end subroutine get_bounding_fq
 !=======================================================================
 function count_nonfixed(namax,natm,lqfix,myid,mpi_md_world)
   implicit none
@@ -1412,6 +1429,37 @@ function count_nonfixed(namax,natm,lqfix,myid,mpi_md_world)
   count_nonfixed = nonfix
   return
 end function count_nonfixed
+!=======================================================================
+subroutine suppress_dq(dq,dqlim,dqmax)
+!
+!  Suppress too large change of charge within dq < dqlim.
+!
+  use pmdvars,only: namax,natm,tag,iprint,mpi_md_world,myid_md
+  implicit none
+  include "mpif.h"
+  real(8),intent(in):: dqlim
+  real(8),intent(inout):: dq(namax)
+  real(8),intent(out):: dqmax
+
+  integer:: i,ierr
+  real(8):: dqmaxl,fac
+  
+  dqmaxl = 0d0
+  do i=1,natm
+    dqmaxl = max(dqmaxl,abs(dq(i)))
+  enddo
+  dqmax = 0d0
+  call mpi_allreduce(dqmaxl,dqmax,1,mpi_real8,mpi_max,mpi_md_world,ierr)
+!!$  if( myid_md.eq.0 ) print *,'dqmax,dqlim=',dqmax,dqlim
+  if( dqmax.gt.dqlim ) then
+    fac = dqlim/dqmax
+    do i=1,natm
+      dq(i) = dq(i)*fac
+    end do
+    dqmax = dqlim
+  end if
+  return
+end subroutine suppress_dq
 !=======================================================================
 subroutine suppress_fq(namax,natm,fq,myid,mpi_md_world)
 !
@@ -1456,20 +1504,19 @@ end subroutine suppress_fq
 subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg &
      ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nnn,sv,rc,lspr &
      ,mpi_md_world,myid_md,epi,epot,nismax,lstrs &
-     ,ifcoulomb,iprint,l1st,lvc &
+     ,iprint,l1st,lvc &
      ,ndimp,gwe,gwf,gws)
 !
 !  Compute derivative of potential energy (and forces) 
 !  w.r.t. potential parameters.
 !
   use force
-  use Morse,only: gradw_vcMorse, gradw_Morse
+!!$  use Morse,only: gradw_vcMorse, gradw_Morse
   implicit none
   integer,intent(in):: namax,natm,nnmax,nismax,iprint
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
        ,nnn(6),mpi_md_world,myid_md,nex(3)
   integer,intent(in):: lspr(0:nnmax,namax) !,numff
-  integer,intent(inout):: ifcoulomb
   real(8),intent(inout):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
        ,tag(namax)
   real(8),intent(inout):: rc
@@ -1482,20 +1529,20 @@ subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg &
   integer,intent(in):: ndimp
   real(8),intent(out):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
 
-  if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra,nnmax,chg &
-       ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws)
+!!$  if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra,nnmax,chg &
+!!$       ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws)
 
 end subroutine get_gradw
 !=======================================================================
-subroutine linmin(chg0,dchg,ftol,alpha,falpha,iflag)
+subroutine linmin_chg(chg0,dchg,ftol,alpha,falpha,iflag)
 !
 !  Search for coeff, alpha, that are multiplied to fq to get the charge
 !  distribution of minimum energy.
 !
   use pmdvars, only: namax,natm,nnmax,tag,ra,h,lspr,d2lspr,rc, &
        lsb,lsex,nbmax,nb,nn,myparity,lsrc,nex,boundary,sorg, &
-       myid_md,mpi_md_world,iprint
-  use Coulomb, only: get_qforce,qlower,qupper
+       myid_md,mpi_md_world,iprint,ntot
+  use Coulomb, only: get_qforce,qbot,qtop
   implicit none
   include 'mpif.h'
   include './const.h'
@@ -1510,16 +1557,16 @@ subroutine linmin(chg0,dchg,ftol,alpha,falpha,iflag)
   real(8),parameter:: gr = 0.61803398875d0
   real(8),parameter:: gr2 = 1d0 -gr
   integer,parameter:: nstp = 100
-  real(8),allocatable:: chgt(:),fq(:)
+  real(8),save,allocatable:: chgt(:),fqt(:)
 
   integer:: istp
   real(8):: a,b1,b2,xl,c,fa,fb1,fb2,fc
 
   if( .not.allocated(chgt) ) then
-    allocate( chgt(namax),fq(namax) )
+    allocate( chgt(namax),fqt(namax) )
   else if( size(chgt).ne.namax ) then
-    deallocate(chgt,fq)
-    allocate( chgt(namax),fq(namax) )
+    deallocate(chgt,fqt)
+    allocate( chgt(namax),fqt(namax) )
   endif
 
   a = 0d0
@@ -1531,19 +1578,16 @@ subroutine linmin(chg0,dchg,ftol,alpha,falpha,iflag)
   b2 = a +gr *xl
 
   chgt(:) = chg0(:)+b1*dchg(:)
-  call bacopy_chg_fixed(chgt)
-  call get_qforce(namax,natm,nnmax,tag,ra,chgt, &
-       h,lspr,d2lspr,rc,sorg,myid_md,mpi_md_world,iprint, &
-       fq,fb1,.false.)
+  call get_fq_wrapper(chgt,fqt,fb1,.false.)
   chgt(:) = chg0(:)+b2*dchg(:)
-  call bacopy_chg_fixed(chgt)
-  call get_qforce(namax,natm,nnmax,tag,ra,chgt, &
-       h,lspr,d2lspr,rc,sorg,myid_md,mpi_md_world,iprint, &
-       fq,fb2,.false.)
-  print '(a,i5,4f12.8,4es16.8)','get_range: istp,a,b1,b2,c,fa,fb1,fb2,fc=', &
-       0,a,b1,b2,c,fa,fb1,fb2,fc
+  call get_fq_wrapper(chgt,fqt,fb2,.false.)
 
   istp = 0
+  if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
+    print '(a,i5,4f12.8,4es16.8)','linmin_chg: istp,a,b1,b2,c,fa,fb1,fb2,fc=', &
+         istp,a,b1,b2,c,fa,fb1,fb2,fc
+  endif
+
 10 continue
   istp = istp +1
   if( istp.gt.nstp ) then
@@ -1562,12 +1606,11 @@ subroutine linmin(chg0,dchg,ftol,alpha,falpha,iflag)
     xl = (c-a)
     b2 = a +gr*xl
     chgt(:) = chg0(:)+b2*dchg(:)
-    call bacopy_chg_fixed(chgt)
-    call get_qforce(namax,natm,nnmax,tag,ra,chgt, &
-         h,lspr,d2lspr,rc,sorg,myid_md,mpi_md_world,iprint, &
-         fq,fb2,.false.)
-    print '(a,i5,4f12.8,4es16.8)','get_range(a): istp,a,b1,b2,c,fa,fb1,fb2,fc=', &
-         istp,a,b1,b2,c,fa,fb1,fb2,fc
+    call get_fq_wrapper(chgt,fqt,fb2,.false.)
+    if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
+      print '(a,i5,4f12.8,4es16.8)','linmin_chg: istp,a,b1,b2,c,fa,fb1,fb2,fc=', &
+           istp,a,b1,b2,c,fa,fb1,fb2,fc
+    endif
   else
     c = b2
     fc = fb2
@@ -1576,12 +1619,11 @@ subroutine linmin(chg0,dchg,ftol,alpha,falpha,iflag)
     xl = (c-a)
     b1 = a +gr2*xl
     chgt(:) = chg0(:)+b1*dchg(:)
-    call bacopy_chg_fixed(chgt)
-    call get_qforce(namax,natm,nnmax,tag,ra,chgt, &
-         h,lspr,d2lspr,rc,sorg,myid_md,mpi_md_world,iprint, &
-         fq,fb1,.false.)
-    print '(a,i5,4f12.8,4es16.8)','get_range(b): istp,a,b1,b2,c,fa,fb1,fb2,fc=', &
-         istp,a,b1,b2,c,fa,fb1,fb2,fc
+    call get_fq_wrapper(chgt,fqt,fb1,.false.)
+    if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
+      print '(a,i5,4f12.8,4es16.8)','linmin_chg: istp,a,b1,b2,c,fa,fb1,fb2,fc=', &
+           istp,a,b1,b2,c,fa,fb1,fb2,fc
+    endif
   endif
 
   if( abs(fb1-fb2).lt.ftol ) then
@@ -1597,20 +1639,17 @@ subroutine linmin(chg0,dchg,ftol,alpha,falpha,iflag)
   endif
   goto 10
 
-end subroutine linmin
+end subroutine linmin_chg
 !=======================================================================
 subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
 !
 !  Get a range of factor of line minimization in QEq.
 !
   use pmdvars,only: namax,natm,nnmax,tag,ra,h,lspr,d2lspr,rc,sorg, &
-       myid_md,mpi_md_world,iprint
+       myid_md,mpi_md_world,iprint,ntot
   use Coulomb,only: get_qforce
-!!$  integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
-!!$  integer,intent(in):: myid,mpi_world,iprint
-!!$  real(8),intent(in):: tag(namax),ra(3,namax),h(3,3),d2lspr(nnmax,namax)
+  include './const.h'
   real(8),intent(in):: chg0(namax),dchg(namax)
-!!$  real(8),intent(in):: rc,sorg(3)
   real(8),intent(inout):: a,b,c,fa,fb,fc
   integer,intent(inout):: iflag
   
@@ -1619,27 +1658,27 @@ subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
   real(8),parameter:: eps = 1d-12
   real(8),parameter:: nstp = 100
   integer:: istp
-  real(8),allocatable:: fq(:),chgt(:)
+  real(8),save,allocatable:: fqt(:),chgt(:)
 
-  if( .not.allocated(fq) ) then
-    allocate(fq(namax),chgt(namax))
-  else if( size(fq).ne.namax ) then
-    deallocate(fq,chgt)
-    allocate(fq(namax),chgt(namax))
+  if( .not.allocated(fqt) ) then
+    allocate(fqt(namax),chgt(namax))
+  else if( size(fqt).ne.namax ) then
+    deallocate(fqt,chgt)
+    allocate(fqt(namax),chgt(namax))
   endif
 
   chgt(:) = chg0(:)+a*dchg(:)
-  call bacopy_chg_fixed(chgt)
-  call get_qforce(namax,natm,nnmax,tag,ra,chgt, &
-       h,lspr,d2lspr,rc,sorg,myid,mpi_world,iprint, &
-       fq,fa,.false.)
+  call get_fq_wrapper(chgt,fqt,fa,.false.)
   chgt(:) = chg0(:)+b*dchg(:)
-  call bacopy_chg_fixed(chgt)
-  call get_qforce(namax,natm,nnmax,tag,ra,chgt, &
-       h,lspr,d2lspr,rc,sorg,myid,mpi_world,iprint, &
-       fq,fb,.false.)
+  call get_fq_wrapper(chgt,fqt,fb,.false.)
 
   istp = 0
+
+  if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
+    print '(a,i5,2f12.8,2es16.8)','get_range: istp,a,b,fa,fb=', &
+         istp,a,b,fa,fb
+  endif
+  
 10 continue
   istp = istp +1
   if( istp.gt.nstp ) then
@@ -1660,29 +1699,28 @@ subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
   if( fa.lt.fb ) then
     c = a +gri*(b-a)
     chgt(:) = chg0(:)+c*dchg(:)
-    call bacopy_chg_fixed(chgt)
-    call get_qforce(namax,natm,nnmax,tag,ra,chgt, &
-         h,lspr,d2lspr,rc,sorg,myid,mpi_world,iprint, &
-         fq,fc,.false.)
+    call get_fq_wrapper(chgt,fqt,fc,.false.)
     call swap_vals(c,b)
     call swap_vals(fc,fb)
+    if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
+      print '(a,i5,2f12.8,2es16.8)','get_range: istp,a,b,fa,fb=', &
+           istp,a,b,fa,fb
+    endif
     goto 10
   else
     c = a +gr*(b-a)
     chgt(:) = chg0(:)+c*dchg(:)
-    call bacopy_chg_fixed(chgt)
-    call get_qforce(namax,natm,nnmax,tag,ra,chgt, &
-         h,lspr,d2lspr,rc,sorg,myid,mpi_world,iprint, &
-         fq,fc,.false.)
+    call get_fq_wrapper(chgt,fqt,fc,.false.)
     if( fb.gt.fc ) then
       b = a +gr*(c-a)
       chgt(:) = chg0(:)+b*dchg(:)
-      call bacopy_chg_fixed(chgt)
-      call get_qforce(namax,natm,nnmax,tag,ra,chgt, &
-           h,lspr,d2lspr,rc,sorg,myid,mpi_world,iprint, &
-           fq,fb,.false.)
+      call get_fq_wrapper(chgt,fqt,fb,.false.)
       call swap_vals(b,c)
       call swap_vals(fb,fc)
+      if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
+        print '(a,i5,2f12.8,2es16.8)','get_range: istp,a,b,fa,fb=', &
+             istp,a,b,fa,fb
+      endif
       goto 10
     endif
   endif
