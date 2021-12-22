@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-13 16:48:01 Ryo KOBAYASHI>
+!                     Last modified: <2021-12-21 12:59:39 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax,nsp
   use util,only: csp2isp
@@ -46,7 +46,7 @@ contains
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     character(len=3),intent(in):: specorder(msp)
     logical,intent(in):: lstrs, l1st
 
@@ -439,5 +439,5 @@ contains
 end module angular
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

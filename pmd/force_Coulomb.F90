@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-09 10:44:53 Ryo KOBAYASHI>
+!                     Last modified: <2021-12-21 15:37:54 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -74,7 +74,7 @@ module Coulomb
 !     See, C.J. Fennell and J.D. Gezelter, J. Chem. Phys. 124, 234104 (2006).
   real(8):: rho_screened_cut = 5.0d0
   real(8):: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
-  
+
 !.....Accuracy controlling parameter for Ewald sum
 !.....See, http://www.jncasr.ac.in/ccms/sbs2007/lecturenotes/5day10nov/SBS_Ewald.pdf
 !.....Exp(-pacc) = 1e-7 when pacc= 18.0
@@ -121,7 +121,7 @@ module Coulomb
   real(8):: dqmax_cogrd = 1d-1
   real(8):: dqeps_cogrd = 1d-4
 !.....4-th order potential coeff for bounding q inside [qbot,qtop]
-  real(8):: bound_k4 = 6d+4
+  real(8):: bound_k4 = 1.0d+2
 !.....Extended lagrangian
   real(8),allocatable:: aauxq(:)
   real(8):: omg2dt2 = 1d0  ! = omg^2*dt^2 = 2 is recommended by Nomura et al.
@@ -309,7 +309,7 @@ contains
         enddo
       enddo
     enddo
-    
+
   end subroutine init_vc_Ewald
 !=======================================================================
   subroutine read_params(myid,mpi_world,iprint,specorder)
@@ -439,6 +439,7 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, cspi, rhoii
           isp = csp2isp(trim(cspi))
+          if( isp.le.0 ) cycle
           rho_scr(isp,isp) = rhoii
           if( iprint.ge.ipl_info ) print '(1x,a,3x,a,1x,f7.3)',trim(ctmp),trim(cspi),rhoii
           cycle
@@ -447,6 +448,7 @@ contains
           read(ioprms,*) ctmp, cspi, cspj, rhoij
           isp = csp2isp(trim(cspi))
           jsp = csp2isp(trim(cspj))
+          if( isp.le.0 .or. jsp.le.0 ) cycle
           rho_scr(isp,jsp) = rhoij
           rho_scr(jsp,isp) = rhoij
           if( iprint.ge.ipl_info ) print *,trim(ctmp),trim(cspi) &
@@ -608,7 +610,7 @@ contains
           print *,'  WARNING: terms was corrected to long, because charge_dist is gaussian.'
         endif
       endif
-      
+
 10    close(ioprms)
 
 !.....In case of variable charge, sigma has a lower bound w.r.t. min(Jii)
@@ -640,7 +642,7 @@ contains
             if( rho_scr(isp,jsp).lt.0d0 ) rhoij_set = .false.
           enddo
         enddo
-        
+
         if( trim(cchgs).eq.'fixed_bvs' ) then
           if( iprint.ge.ipl_basic ) print '(a)', ' rhoij are set from given rads of fixed_bvs entries.'
           do isp=1,nsp
@@ -676,14 +678,14 @@ contains
           endif
         endif
       endif
-      
+
     endif  ! myid.eq.0
 
 !.....Broadcast data just read from the file
     call mpi_bcast(cterms,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(cdist,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(cchgs,128,mpi_character,0,mpi_world,ierr)
-  
+
     call mpi_bcast(schg0,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(schg,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vc_chi,nsp,mpi_real8,0,mpi_world,ierr)
@@ -698,7 +700,7 @@ contains
     call mpi_bcast(cinteract,20,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
-  
+
     call mpi_bcast(pacc,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
@@ -724,7 +726,7 @@ contains
     call mpi_bcast(dqeps_cogrd,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(bound_k4,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(omg2dt2,1,mpi_real8,0,mpi_world,ierr)
-    
+
     if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
       if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
         do isp=1,nsp
@@ -753,7 +755,7 @@ contains
       write(6,'(a)') ' Finished reading '//trim(fname)
     endif
 !!$    params_read = .true.
-    
+
     return
   end subroutine read_params
 !=======================================================================
@@ -778,7 +780,7 @@ contains
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6),sorg(3),d2lspr(nnmax,namax)
     real(8),intent(inout):: chg(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(8),intent(inout):: aa(3,namax),epi(namax),strs(3,3,namax),epot
     logical,intent(in):: lstrs,l1st,lcell_updated,lvc
     character(len=3),intent(in):: specorder(nspmax)
 
@@ -813,7 +815,7 @@ contains
         endif
       endif
 
-      
+
       if( trim(cchgs).eq.'fixed_bvs' ) then
         call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
       endif
@@ -845,7 +847,7 @@ contains
         chg(i) = schg(is)
       enddo
     endif
-    
+
     strsl(1:3,1:3,1:namax) = 0d0
     elrl = 0d0
     esrl = 0d0
@@ -1179,7 +1181,7 @@ contains
     enddo
 !$omp end do
 !$omp end parallel
-    
+
   end subroutine force_screened_cut
 !=======================================================================
   subroutine Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
@@ -1412,7 +1414,7 @@ contains
                 enddo
               enddo
             endif  ! lstress
-            
+
 10          if( k3.ge.-kmax3+2 ) then
               cs3mm= cs3m
               cs3m = cs3
@@ -1729,11 +1731,11 @@ contains
     integer:: ierr
     real(8):: eclongl,eselfl,ecshortl
     real(8):: eclong,eself,ecshort
-    
+
     fq(:) = 0d0
     call qforce_self(namax,natm,tag,chg,fq,eselfl)
     call mpi_allreduce(eselfl,eself,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
-    
+
     if( trim(cterms).eq.'long' ) then
       call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_md_world, &
            myid_md,iprint,fq,eclongl)
@@ -1985,7 +1987,7 @@ contains
             sn = cs1*cs2*sn3 +cs1*sn2*cs3 +sn1*cs2*cs3 -sn1*sn2*sn3
             qcosl(ik) = qcosl(ik) +qi*cs
             qsinl(ik) = qsinl(ik) +qi*sn
-            
+
 10          if( k3.ge.-kmax3+2 ) then
               cs3mm= cs3m
               cs3m = cs3
@@ -2264,34 +2266,34 @@ contains
 
     if( index(ctype,'BVS').ne.0 ) then
 !!$      if( ctype(4:4).eq.'2' .or. ctype(4:4).eq.'3' ) then
-        !.....Not only fbvs, but also rad_bvs are given from fitpot
-        ipr = max(0,iprint-10)
-        myid = 0
-        mpiw = -1
-        call read_params(myid,mpiw,ipr,specorder)
-        lprmset_Coulomb = .true.
+!.....Not only fbvs, but also rad_bvs are given from fitpot
+      ipr = max(0,iprint-10)
+      myid = 0
+      mpiw = -1
+      call read_params(myid,mpiw,ipr,specorder)
+      lprmset_Coulomb = .true.
 
-        fbvs = prms_in(1)
-        inc = 1
-        do isp=1,nspmax
-          if( specorder(isp).eq.'x' ) cycle
-          inc = inc + 1
-          if( inc.gt.ndimp ) then
-            print *,'ERROR @set_parmas_Coulomb: inc.gt.ndimp !!!'
-            stop
-          endif
-          rad_bvs(isp) = prms_in(inc)
-        enddo
+      fbvs = prms_in(1)
+      inc = 1
+      do isp=1,nspmax
+        if( specorder(isp).eq.'x' ) cycle
+        inc = inc + 1
+        if( inc.gt.ndimp ) then
+          print *,'ERROR @set_parmas_Coulomb: inc.gt.ndimp !!!'
+          stop
+        endif
+        rad_bvs(isp) = prms_in(inc)
+      enddo
 
 !.....Reset screening length
-        do isp=1,nspmax
-          if( vid_bvs(isp).eq.0d0 ) cycle
-          do jsp=1,nspmax
-            if( vid_bvs(jsp).eq.0d0 ) cycle
-            rho_scr(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
-          enddo
+      do isp=1,nspmax
+        if( vid_bvs(isp).eq.0d0 ) cycle
+        do jsp=1,nspmax
+          if( vid_bvs(jsp).eq.0d0 ) cycle
+          rho_scr(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
         enddo
-        
+      enddo
+
 !!$      else
 !.....As of 190819, ctype==BVS means that only fbvs is to be given from fitpot.
 !.....Need to read in.params.XX file before going further
@@ -2315,7 +2317,7 @@ contains
 !!           enddo
 !!         enddo
 !!       endif
-      
+
     else if( trim(ctype).eq.'fpc' ) then
 !.....As of 190818, only one parameter is passed to this routine
 !     that scale the original charges per species obtained from in.params.Coulomb
@@ -2336,7 +2338,7 @@ contains
       enddo
 
     endif   ! ctype
-    
+
   end subroutine set_params_Coulomb
 !=======================================================================
   subroutine gradw_Coulomb(namax,natm,nb,tag,ra,chg,nnmax &
@@ -2380,7 +2382,7 @@ contains
     endif
 
     call set_charge_BVS(natm,nb,tag,chg,myid,mpi_world,iprint,specorder)
-    
+
 !.....Max isp
     maxisp = 0
     do i=1,natm
@@ -2534,6 +2536,8 @@ contains
     real(8),intent(inout):: auxq(namax)
 
     auxq(1:natm) = auxq(1:natm) +dt *vauxq(1:natm)
+    call impose_qtot(auxq)
+
     return
   end subroutine update_auxq
 !=======================================================================
@@ -2551,10 +2555,37 @@ contains
       deallocate(aauxq)
       allocate(aauxq(namax))
     endif
-    
+
     auxomg2 = omg2dt2 /dt**2
     aauxq(1:natm) = auxomg2 *(chg(1:natm) -auxq(1:natm))
   end subroutine get_aauxq
+!=======================================================================
+  subroutine impose_qtot(chg)
+!
+!  Impose total charge to qtot.
+!
+    use pmdvars,only: namax,natm,myid_md,mpi_md_world,iprint,ntot
+    implicit none
+    include 'mpif.h'
+    include './const.h'
+    real(8),intent(inout):: chg(namax)
+
+    integer:: i,ierr
+    real(8):: ql,qg,dq,qdist
+
+    ql = 0d0
+    do i=1,natm
+      ql = ql +chg(i)
+    enddo
+    qg = 0d0
+    call mpi_allreduce(ql,qg,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+    dq = qg -qtot_qeq
+    qdist = dq /ntot
+    do i=1,natm
+      chg(i) = chg(i) -qdist
+    enddo
+    return
+  end subroutine impose_qtot
 !=======================================================================
   subroutine bacopy_chg_fixed(chg)
 !-----------------------------------------------------------------------

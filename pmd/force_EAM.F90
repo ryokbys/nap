@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-27 13:53:59 Ryo KOBAYASHI>
+!                     Last modified: <2021-12-21 14:37:31 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -83,8 +83,8 @@ contains
       ea_re(:,:) = 0d0
       ea_alp(:,:) = 0d0
       ea_beta(:,:) = 0d0
-      ea_rcin(:,:) = 0d0
-      ea_rcout(:,:) = 0d0
+      ea_rcin(:,:) = -1d0
+      ea_rcout(:,:) = -1d0
       ea_interact(:) = .false.
       pair_interact(:,:) = .false.
       fname = trim(paramsdir)//'/'//trim(paramsfname)
@@ -149,7 +149,9 @@ contains
 
 !.....Define rcin and rcout for pairs as averages bewteen species
       do isp=1,nspmax
+        if( ea_rcin(isp,isp).lt.0d0 ) cycle
         do jsp=1,nspmax
+          if( ea_rcin(jsp,jsp).lt.0d0 ) cycle
           ea_rcin(isp,jsp) = (ea_rcin(isp,isp)+ea_rcin(jsp,jsp))/2
           ea_rcin(jsp,isp) = ea_rcin(isp,jsp)
           ea_rcout(isp,jsp) = (ea_rcout(isp,isp)+ea_rcout(jsp,jsp))/2
@@ -173,7 +175,7 @@ contains
           do jsp=isp,nspmax
             if( pair_interact(isp,jsp) ) then
               cspj = trim(specorder(jsp))
-              write(6,'(a8,4(2x,a),5f8.3)') 'pair',trim(cspi),trim(cspj), &
+              write(6,'(a8,4(2x,a),5f8.3)') 'pair  ',trim(cspi),trim(cspj), &
                    trim(type_rho(isp,jsp)), trim(type_phi(isp,jsp)), &
                    ea_b(isp,jsp),ea_c(isp,jsp), &
                    ea_re(isp,jsp),ea_alp(isp,jsp),ea_beta(isp,jsp)
@@ -199,6 +201,27 @@ contains
     call mpi_bcast(pair_interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
     call mpi_bcast(type_rho,128*nspmax*nspmax,mpi_character,0,mpi_md_world,ierr)
     call mpi_bcast(type_phi,128*nspmax*nspmax,mpi_character,0,mpi_md_world,ierr)
+
+!.....Check consistency bewteen ea_interact and pair_interact
+    do isp=1,nspmax
+      do jsp=isp,nspmax
+        if( pair_interact(isp,jsp) .and. &
+             .not.(ea_interact(isp).and.ea_interact(jsp)) ) then
+          if( myid_md.eq.0 ) then
+            print *,'ERROR@EAM: pair_interact(isp,jsp) but not' &
+                 //' (ea_interact(isp).and.ea_interact(jsp)), which should not happen.'
+          endif
+          stop 1
+        else if( .not.pair_interact(isp,jsp) .and. &
+             (ea_interact(isp).and.ea_interact(jsp)) ) then
+          if( myid_md.eq.0 ) then
+            print *,'ERROR@EAM: not pair_interact(isp,jsp) but' &
+                 //' (ea_interact(isp).and.ea_interact(jsp)), which should not happen.'
+          endif
+          stop 1
+        endif
+      enddo
+    enddo
     return
   end subroutine read_params_EAM
 !=======================================================================
@@ -227,7 +250,7 @@ contains
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xij(3),rij,rcin,rcout,rc2,dfi,dfj,drho,drdxi(3),drdxj(3),r,at(3)
+    real(8):: xij(3),rij,rcin,rcout,rc2,dfi,dfj,drhoi,drhoj,drdxi(3),drdxj(3),r,at(3)
     real(8):: x,y,z,xi(3),epotl,epott,tmp,dtmp
     real(8),allocatable,save:: rho(:)
     real(8),allocatable,save:: strsl(:,:,:)
@@ -260,7 +283,7 @@ contains
       deallocate(rho)
       allocate(rho(namax+nbmax))
     endif
-    
+
     epotl= 0d0
     rho(1:namax)= 0d0
     strsl(1:3,1:3,1:namax) = 0d0
@@ -274,6 +297,7 @@ contains
         j=lspr(k,i)
         if(j.eq.0) exit
         js = int(tag(j))
+        if( .not. ea_interact(js) ) cycle
         rcout= ea_rcout(is,js)
         rc2 = rcout*rcout
         if( d2lspr(k,i).gt.rc2 ) cycle
@@ -295,12 +319,17 @@ contains
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is = int(tag(i))
-      if( ea_interact(is) ) dfi = dfrho(is,rho(i),type_frho(is))
+      if( ea_interact(is) ) then
+        dfi = dfrho(is,rho(i),type_frho(is))
+      else
+        dfi = 0d0
+      endif
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
         js = int(tag(j))
+        if( .not.pair_interact(is,js) ) cycle
         rcout = ea_rcout(is,js)
         rc2 = rcout*rcout
         if( d2lspr(k,i).ge.rc2 ) cycle
@@ -311,6 +340,7 @@ contains
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         rij=sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
         drdxi(1:3)= -xij(1:3)/rij
+        drdxj(1:3)= -drdxi(1:3)
         tmp = 0.5d0 *phi(is,js,rij,rcin,rcout,type_phi(is,js))
         epi(i)= epi(i) +tmp
         epi(j)= epi(j) +tmp
@@ -321,7 +351,7 @@ contains
         endif
         dtmp = dphi(is,js,rij,rcin,rcout,type_phi(is,js))
         aa(1:3,i)=aa(1:3,i) -dtmp*drdxi(1:3)
-        aa(1:3,j)=aa(1:3,j) +dtmp*drdxi(1:3)
+        aa(1:3,j)=aa(1:3,j) -dtmp*drdxj(1:3)
 !.....Atomic stress for 2-body terms
         if( lstrs ) then
           do ixyz=1,3
@@ -334,12 +364,12 @@ contains
           enddo
         endif
 !.....Embedded term
-        if( ea_interact(js) ) dfj = dfrho(js,rho(j),type_frho(js))
-        if( .not. (ea_interact(is).or.ea_interact(js)) ) cycle
-        drho = drhoij(is,js,rij,rcin,rcout,type_rho(is,js))
-        tmp = (dfi+dfj)*drho
+        dfj = dfrho(js,rho(j),type_frho(js))
+        drhoi = drhoij(is,js,rij,rcin,rcout,type_rho(is,js))
+        drhoj = drhoij(js,is,rij,rcin,rcout,type_rho(is,js))
+        tmp = dfi*drhoi + dfj*drhoj
         aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
-        aa(1:3,j)=aa(1:3,j) +tmp*drdxi(1:3)
+        aa(1:3,j)=aa(1:3,j) -tmp*drdxj(1:3)
 !.....Atomic stress of many-body contributions
         if( lstrs ) then
           do ixyz=1,3
@@ -385,7 +415,7 @@ contains
 
     rhoij = 0d0
     if( trim(ctype).eq.'exp1' ) then
-      rhoij = ea_xi(is)*exp(-ea_beta(is,js)*(rij-ea_re(is,js))) &
+      rhoij = ea_xi(js)*exp(-ea_beta(is,js)*(rij-ea_re(is,js))) &
            *fcut1(rij,rcin,rcout)
     endif
     return
@@ -401,9 +431,8 @@ contains
     drhoij = 0d0
     if( trim(ctype).eq.'exp1' ) then
       r = rij -ea_re(is,js)
-      drhoij= -ea_xi(is)*ea_beta(is,js)*exp(-ea_beta(is,js)*r)&
-           *fcut1(rij,rcin,rcout) &
-           +ea_xi(is)*exp(-ea_beta(is,js)*r)*dfcut1(rij,rcin,rcout)
+      drhoij= -ea_xi(js)*ea_beta(is,js)*exp(-ea_beta(is,js)*r)*fcut1(rij,rcin,rcout) &
+           +ea_xi(js)*exp(-ea_beta(is,js)*r)*dfcut1(rij,rcin,rcout)
     endif
     return
   end function drhoij

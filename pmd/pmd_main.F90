@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-12-09 21:30:56 Ryo KOBAYASHI>
+!                     Last-modified: <2021-12-21 12:28:12 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -406,7 +406,7 @@ subroutine write_initial_setting()
   endif
   write(6,'(2x,a,5x,i0)') 'flag_damping',ifdmp
   write(6,'(2x,a,5x,f0.4)') 'damping_coeff',dmp
-  write(6,'(2x,a,5x,f0.4)') 'converge_eps',eps_conv
+  write(6,'(2x,a,5x,es9.1)') 'converge_eps',eps_conv
   write(6,'(2x,a,5x,i0)')   'converge_num',n_conv
   write(6,'(2x,a,5x,i0)')   'min_iteration',minstp
   write(6,'(2x,a)') ''
@@ -577,12 +577,13 @@ subroutine bcast_params()
   call mpi_bcast(tinit,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(tfin,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(ctctl,20,mpi_character,0,mpicomm,ierr)
-  call mpi_bcast(ttgt,9,MPI_REAL8,0,mpicomm,ierr)
-  call mpi_bcast(trlx,1,MPI_REAL8,0,mpicomm,ierr)
-  call mpi_bcast(rseed,1,MPI_REAL8,0,mpicomm,ierr)
-  call mpi_bcast(nerg,1,MPI_INTEGER,0,mpicomm,ierr)
-  call mpi_bcast(ifpmd,1,MPI_INTEGER,0,mpicomm,ierr)
-  call mpi_bcast(npmd,1,MPI_INTEGER,0,mpicomm,ierr)
+  call mpi_bcast(ttgt,9,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(trlx,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(tlimit,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(rseed,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(nerg,1,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(ifpmd,1,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(npmd,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(ifsort,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpicomm,ierr)
   call mpi_bcast(iprint,1,mpi_integer,0,mpicomm,ierr)

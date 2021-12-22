@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-12-09 21:32:06 Ryo KOBAYASHI>
+!                     Last-modified: <2021-12-21 12:28:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -3340,6 +3340,7 @@ subroutine copy_iarr(ndim,srcarr,destarr)
 end subroutine copy_iarr
 !=======================================================================
 subroutine sanity_check(ekin,epot,stnsr,tave,myid,mpi_world)
+  use pmdvars,only: tlimit
   implicit none 
   real(8),intent(in):: ekin,epot,stnsr(3,3),tave
   integer,intent(in):: myid,mpi_world
@@ -3347,7 +3348,6 @@ subroutine sanity_check(ekin,epot,stnsr,tave,myid,mpi_world)
 
   integer:: i,j,ierr
   character(len=128):: msg
-  real(8),parameter:: temp_insane = 1.0d+4
   
   msg = ''
 
@@ -3367,8 +3367,8 @@ subroutine sanity_check(ekin,epot,stnsr,tave,myid,mpi_world)
       endif
     enddo
   enddo
-  if( tave .gt. temp_insane ) then
-    msg = 'ERROR: too high temperature (tave > temp_insane) !'
+  if( tave .gt. tlimit ) then
+    msg = 'ERROR: too high temperature (tave > temperature_limit) !'
     goto 10
   endif
 

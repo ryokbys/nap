@@ -149,6 +149,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'temperature_relax_time' ) then
     call read_r1(ionum,trlx)
     return
+  elseif( trim(cname).eq.'temperature_limit' ) then
+    call read_r1(ionum,tlimit)
+    return
   elseif( trim(cname).eq.'remove_translation' ) then
     call read_i1(ionum,nrmtrans)
     return

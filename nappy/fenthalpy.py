@@ -203,8 +203,8 @@ def main(args):
 
     if erg_prod == 'None':  # Compute relaxation and get potential energies of given structures.
         pmd_prod = get_pmd_done(product,nstp=nstp,dt=dt,print_level=iprint)
-        erg_prod = pmd.result['epot']
-        product = pmd.get_system()
+        erg_prod = pmd_prod.result['epot']
+        product = pmd_prod.get_system()
     else: # Energy per atom is given
         erg_prod *= len(product)
     if ergs_react == 'None':

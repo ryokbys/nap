@@ -69,7 +69,7 @@ subroutine get_force(l1st,epot,stnsr)
 
   epot = 0d0
   aa(1:3,1:namax)=0d0
-  epi(1:namax)= 0d0
+  epi(1:natm)= 0d0
   strs(1:3,1:3,1:namax)= 0d0
   stnsr(1:3,1:3) = 0d0
 
@@ -1118,9 +1118,9 @@ subroutine chgopt_damping(chg,l1st)
   use force
   use Coulomb, only: qtop,qbot, get_qforce, &
        cterms,qforce_screened_cut, conv_eps_qeq, chgopt_method, &
-       nstp_qeq, dt_codmp, qmass, qtot_qeq, minstp_qeq, &
+       nstp_qeq, dt_codmp, qmass, minstp_qeq, &
        minstp_conv_qeq, finc_codmp, fdec_codmp, alpha0_codmp, falpha_codmp, &
-       fdamp_codmp, dfdamp_codmp
+       fdamp_codmp, dfdamp_codmp, impose_qtot
 !!$  use Morse, only: qforce_vcMorse
   use memory, only: accum_mem
   implicit none
@@ -1153,7 +1153,7 @@ subroutine chgopt_damping(chg,l1st)
 
 !.....Gather forces on charges
   istp = 0
-  call impose_qtot(chg,qtot_qeq)
+  call impose_qtot(chg)
   call get_fq_wrapper(chg,fq,epot,l1st)
 
   vq(:) = 0d0
@@ -1213,7 +1213,7 @@ subroutine chgopt_damping(chg,l1st)
       enddo
     endif
 
-    call impose_qtot(chg,qtot_qeq)
+    call impose_qtot(chg)
 !!$    print '(a,200es11.3)',' chg=',chg(1:natm)
     call get_fq_wrapper(chg,fq,epot,.false.)
     if( myid_md.eq.0 .and. iprint.ge.ipl_debug ) then
@@ -1348,34 +1348,6 @@ subroutine set_fqtot_zero(fq)
   
   return
 end subroutine set_fqtot_zero
-!=======================================================================
-subroutine impose_qtot(chg,qtot)
-!
-!  Impose total charge to qtot.
-!
-  use pmdvars,only: namax,natm,myid_md,mpi_md_world,iprint,ntot
-  implicit none
-  include 'mpif.h'
-  include './const.h'
-  real(8),intent(in):: qtot
-  real(8),intent(inout):: chg(namax)
-
-  integer:: i,ierr
-  real(8):: ql,qg,dq,qdist
-
-  ql = 0d0
-  do i=1,natm
-    ql = ql +chg(i)
-  enddo
-  qg = 0d0
-  call mpi_allreduce(ql,qg,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
-  dq = qg -qtot
-  qdist = dq /ntot
-  do i=1,natm
-    chg(i) = chg(i) -qdist
-  enddo
-  return
-end subroutine impose_qtot
 !=======================================================================
 subroutine get_bounding_fq(chg,fq,epot)
 !
@@ -1584,7 +1556,7 @@ subroutine linmin_chg(chg0,dchg,ftol,alpha,falpha,iflag)
 
   istp = 0
   if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
-    print '(a,i5,4f12.8,4es16.8)','linmin_chg: istp,a,b1,b2,c,fa,fb1,fb2,fc=', &
+    print '(a,i5,4f12.8,4es16.8)','   linmin_chg: istp,a,b1,b2,c,fa,fb1,fb2,fc=', &
          istp,a,b1,b2,c,fa,fb1,fb2,fc
   endif
 
@@ -1608,7 +1580,7 @@ subroutine linmin_chg(chg0,dchg,ftol,alpha,falpha,iflag)
     chgt(:) = chg0(:)+b2*dchg(:)
     call get_fq_wrapper(chgt,fqt,fb2,.false.)
     if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
-      print '(a,i5,4f12.8,4es16.8)','linmin_chg: istp,a,b1,b2,c,fa,fb1,fb2,fc=', &
+      print '(a,i5,4f12.8,4es16.8)','   linmin_chg: istp,a,b1,b2,c,fa,fb1,fb2,fc=', &
            istp,a,b1,b2,c,fa,fb1,fb2,fc
     endif
   else
@@ -1621,7 +1593,7 @@ subroutine linmin_chg(chg0,dchg,ftol,alpha,falpha,iflag)
     chgt(:) = chg0(:)+b1*dchg(:)
     call get_fq_wrapper(chgt,fqt,fb1,.false.)
     if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
-      print '(a,i5,4f12.8,4es16.8)','linmin_chg: istp,a,b1,b2,c,fa,fb1,fb2,fc=', &
+      print '(a,i5,4f12.8,4es16.8)','   linmin_chg: istp,a,b1,b2,c,fa,fb1,fb2,fc=', &
            istp,a,b1,b2,c,fa,fb1,fb2,fc
     endif
   endif
@@ -1675,7 +1647,7 @@ subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
   istp = 0
 
   if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
-    print '(a,i5,2f12.8,2es16.8)','get_range: istp,a,b,fa,fb=', &
+    print '(a,i5,2f12.8,2es16.8)','   get_range: istp,a,b,fa,fb=', &
          istp,a,b,fa,fb
   endif
   
@@ -1703,7 +1675,7 @@ subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
     call swap_vals(c,b)
     call swap_vals(fc,fb)
     if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
-      print '(a,i5,2f12.8,2es16.8)','get_range: istp,a,b,fa,fb=', &
+      print '(a,i5,2f12.8,2es16.8)','   get_range: istp,a,b,fa,fb=', &
            istp,a,b,fa,fb
     endif
     goto 10
@@ -1718,7 +1690,7 @@ subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
       call swap_vals(b,c)
       call swap_vals(fb,fc)
       if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
-        print '(a,i5,2f12.8,2es16.8)','get_range: istp,a,b,fa,fb=', &
+        print '(a,i5,2f12.8,2es16.8)','   get_range: istp,a,b,fa,fb=', &
              istp,a,b,fa,fb
       endif
       goto 10

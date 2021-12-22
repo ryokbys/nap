@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 15:55:06 Ryo KOBAYASHI>
+!                     Last modified: <2021-12-21 12:58:48 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -101,7 +101,7 @@ contains
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6),d2lspr(nnmax,namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
@@ -205,7 +205,7 @@ contains
 !$omp end parallel
 
     strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    
+
 !-----gather epot
     epott= 0d0
     call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
@@ -1529,5 +1529,5 @@ contains
 end module Morse
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

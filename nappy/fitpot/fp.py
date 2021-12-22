@@ -240,7 +240,7 @@ def write_vars_fitpot(vs,vrs,fname='in.vars.fitpot',**kwargs):
             f.write('!\n')
         f.write(' {0:5d}  {1:7.3f} {2:7.3f}\n'.format(nv,rc2,rc3))
         for i in range(len(vs)):
-            f.write(' {0:10.4f}  {1:10.4f}  {2:10.4f}'.format(vs[i],*vrs[i]))
+            f.write(' {0:15.7f}  {1:15.7f}  {2:15.7f}'.format(vs[i],*vrs[i]))
             if 'hard-limit' in options.keys() and options['hard-limit']:
                 f.write('  {0:10.4f}  {1:10.4f}\n'.format(*hardlim[i]))
             else:
