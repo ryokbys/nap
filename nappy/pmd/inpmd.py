@@ -32,6 +32,7 @@ _entry_to_varname = {
     'temperature_control': 'ctctl',
     'temperature_target': 'ttgt',
     'temperature_relax_time': 'trlx',
+    'temperature_limit': 'tlimit',
     'flag_temp_dist': 'ltdst',
     'factor_direction': 'fmv',
     'stress_control': 'cpctl',
@@ -71,6 +72,7 @@ _default_params = {
     'temperature_control': 'none',
     'temperature_target': [300.0, 100.0,],
     'temperature_relax_time': 100.0,
+    'temperature_limit': 1.0e+5,
     'flag_temp_dist': 'F',
     'factor_direction':[[1.0, 1.0, 1.0],
                         [1.0, 0.0, 1.0]],
@@ -97,7 +99,7 @@ _int_keys = [
 _float_keys = [
     'time_interval','cutoff_radius','cutoff_buffer',
     'damping_coeff','initial_temperature',
-    'final_temperature',
+    'final_temperature', 'temperature_limit',
     'temperature_relax_time','pressure_target',
     'stress_relax_time','shear_stress',
     'converge_eps','final_strain'

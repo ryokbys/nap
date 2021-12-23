@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-12-21 12:40:12 Ryo KOBAYASHI>
+!                    Last modified: <2021-12-23 14:59:25 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -77,7 +77,7 @@ module pmdvars
   data ttgt / 300d0, 300d0, 300d0, 300d0, 300d0, 300d0, &
        300d0, 300d0, 300d0 /
   real(8):: trlx = 100d0
-  real(8):: tlimit = 1.0d+4
+  real(8):: tlimit = 1.0d+5
 !.....Random seed
 !  If positve, use (RSEED+MYID) as the seed for each process
 !  If negative, use the same random seeds for all the parallel process

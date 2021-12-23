@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-22 22:38:26 Ryo KOBAYASHI>
+!                     Last modified: <2021-12-23 14:05:18 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -117,7 +117,7 @@ contains
       do is=1,nsp
         rcmax = max(rcmax,ts_rc(is,is))
       enddo
-      if( myid.eq.0 ) then
+      if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
         print *,'Tersoff potential:'
         write(6,'(a,f7.3,a)') '   max cutoff radius = ',rcmax,' Ang.'
       endif
@@ -577,7 +577,7 @@ contains
 !.....Detect ts_type first to know the format of input file
       open(ioprms,file=cfname,status='old')
       do while(.true.)
-        read(ioprms,'(a)') cline
+        read(ioprms,'(a)',end=1) cline
         nd = num_data(cline,' ')
         if( nd.eq.0 ) cycle
         if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
@@ -597,11 +597,11 @@ contains
              ,ted_c3(ntemp),ted_c4(ntemp),ted_c5(ntemp),ted_f0(ntemp))
         exit
       enddo
-      close(ioprms)
-      print *,'ts_type = ',trim(ts_type)
+1     close(ioprms)
+      if( iprint.ge.ipl_basic ) print *,'ts_type = ',trim(ts_type)
 
 !.....Read input file according to ts_type
-      if( iprint.ne.0 ) write(6,'(/,a)') ' Tersoff parameters from file:'
+      if( iprint.ge.ipl_basic ) write(6,'(/,a)') ' Tersoff parameters from file:'
       open(ioprms,file=cfname,status='old')
 
 !.....Te-dependent) Te-dependent
@@ -612,7 +612,7 @@ contains
       if( ts_type(1:2).eq.'Te' ) then
         ite = 0
         do while(.true.)
-          read(ioprms,'(a)') cline
+          read(ioprms,'(a)',end=10) cline
           nd = num_data(cline,' ')
           if( nd.eq.0 ) cycle
           if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
@@ -622,13 +622,13 @@ contains
           backspace(ioprms)
           read(ioprms,*) cspi,te,a,b,lmbd1,lmbd2,eta,delta,alpha,beta,h,r1,r2, &
                c1,c2,c3,c4,c5,f0
-          if( iprint.ne.0 ) then
+          if( iprint.ge.ipl_basic ) then
             print '(a5, f6.2, 2f11.5, 2f11.7)',trim(cspi),te,a,b,lmbd1,lmbd2
             print '(10x,f4.1,2f10.6,f4.1,f8.3,3f4.1)',eta,delta,alpha,beta,h,r1,r2
             print '(10x,f10.6,f11.2,f10.1,f6.3,f5.1,f6.3)',c1,c2,c3,c4,c5,f0
           endif
 
-          if( trim(cspi).ne.'Si' ) then
+          if( iprint.ge.ipl_basic .and. trim(cspi).ne.'Si' ) then
             print *,'WARNING: Te-dependent is now available for only Si.'
           endif
           ted_te(ite) = te
@@ -687,9 +687,11 @@ contains
           ts_c4(isp) = c4
           ts_c5(isp) = c5
 
-          write(6,'(a5,4es12.4)') trim(cspi), a, b, lmbd1,lmbd2
-          write(6,'(15x,7es12.4)') eta,delta,alpha,beta,h,r1,r2
-          write(6,'(15x,5es12.4)') c1,c2,c3,c4,c5
+          if( iprint.ge.ipl_basic ) then
+            write(6,'(a5,4es12.4)') trim(cspi), a, b, lmbd1,lmbd2
+            write(6,'(15x,7es12.4)') eta,delta,alpha,beta,h,r1,r2
+            write(6,'(15x,5es12.4)') c1,c2,c3,c4,c5
+          endif
           goto 10
         enddo
       endif

@@ -53,7 +53,7 @@ subroutine get_naux(naux0)
   return
 end subroutine get_naux
 !=======================================================================
-subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
+subroutine set_pmdvars(nsp0,ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
      iprint0,nstp0,dt0, & !,naux0,laux,cauxarr0
      ifdmp0,dmp0,eps_conv0,n_conv0,lcpctl,cpctl0,ptgt0,stgt0,srlx0, &
      ifpmd0,npmd0,nerg0,nnmax0)
@@ -61,12 +61,13 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
 !  Set variables to be stored in pmdvars module that are required 
 !  to call pmd_core.
 !
-  use pmdvars,only: specorder,nspmax,dt,rbuf,rc1nn,rc,nx,ny,nz,iprint, &
+  use pmdvars,only: specorder,nspmax,nsp,dt,rbuf,rc1nn,rc,nx,ny,nz,iprint, &
        am,nstp,naux,ifpmd,npmd,nerg,cauxarr,ifdmp,dmp,eps_conv,n_conv, &
        cpctl,ptgt,stgt,srlx,nnmax
   use force
   use element
-  implicit none 
+  implicit none
+  integer,intent(in):: nsp0
   integer,intent(in):: ns,ls
   character(len=1),intent(in):: cspcs(ns,ls)
 !f2py integer,intent(hide),depend(cspcs):: ns=shape(cspcs,0),ls=shape(cspcs,1)
@@ -89,9 +90,11 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
   type(atom):: elem
   logical:: lcoulomb = .false.
 
+  call init_element()
   iprint = iprint0
 
 !.....Set specorder
+  nsp = nsp0
   if( ls.ne.3 ) then
     print *,' The length of specorder char should be 3, ls = ',ls
     stop
@@ -117,26 +120,10 @@ subroutine set_pmdvars(ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
     force_list(i) = trim(c128)
   end do
 
-!!$!.....Set cauxarr0
-!!$  if( laux.ne.6 ) then
-!!$    print *,' The length of cauxarr char should be 6, laux = ',laux
-!!$    stop
-!!$  endif
 !.....It is required to call init_force and read some in.params.XXX to define aux array
   call init_force(.true.)
 !.....Before allocating auxiliary array, set naux (num of auxiliary data)
   call set_cauxarr()
-!!$  if( lcoulomb .and. naux0.lt.2 ) then
-!!$    print *,' naux should be greater than 1 when Coulomb potential is used.'
-!!$    stop
-!!$  endif
-!!$  if( allocated(cauxarr) .and. size(cauxarr).ne.naux0 ) deallocate(cauxarr)
-!!$  if( .not.allocated(cauxarr) ) allocate(cauxarr(naux0))
-!!$  
-!!$  do i=1,naux0
-!!$    write(c6,'(6a1)') cauxarr0(i,1:laux)
-!!$    cauxarr(i) = trim(c6)
-!!$  end do
 
   write(c20,'(20a1)') cpctl0(1:lcpctl)
   cpctl = trim(c20)

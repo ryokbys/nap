@@ -482,7 +482,11 @@ def get_data2(basedir,prefix='ref',**kwargs):
     for m in matches:
         fname = basedir+'/data.{0:s}.{1:s}'.format(prefix,m)
         # print('m,fname=',m,fname)
-        data[m] = read_data(fname,)
+        try:
+            data[m] = read_data(fname,)
+        except:
+            data[m] = None
+            pass
     return data
 
 def loss_func2(pmddata,eps=1.0e-8,**kwargs):
@@ -492,9 +496,14 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
     refdata = kwargs['refdata']
     losses = {}
     L = 0.0
+    L_up_lim = kwargs['fval_upper_limit']
     for name in refdata.keys():
         ref = refdata[name]
         pmd = pmddata[name]
+        if pmd == None:
+            losses[name] = L_up_lim
+            L += L_up_lim
+            continue
         wgt = ref['wdat']
         num = ref['ndat']
         refd = ref['data']
@@ -664,7 +673,8 @@ def func_wrapper(variables, vranges, **kwargs):
         # print('Going to get_data from ',subdir)
         if len(kwargs['match']) != 0:
             pmddata = get_data2(subdir,prefix='pmd',**kwargs)
-            L = min( loss_func2(pmddata,**kwargs), L_up_lim )
+            # L = min( loss_func2(pmddata,**kwargs), L_up_lim )
+            L = loss_func2(pmddata,**kwargs)
         else:
             pmddata = get_data(subdir,prefix='pmd',**kwargs)
             L = min( loss_func(pmddata,**kwargs), L_up_lim )

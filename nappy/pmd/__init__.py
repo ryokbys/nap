@@ -106,7 +106,8 @@ class PMD:
             cspcs = np.empty((nspmax,3),dtype='c')
             cspcs[:] = 'x  '
             specorder = self.params['specorder']
-            for i in range(len(specorder)):
+            nsp = len(specorder)
+            for i in range(nsp):
                 cspcs[i] = str2char(specorder[i],3)
         else:
             raise KeyError('PMD().params has no specorder key.')
@@ -159,7 +160,7 @@ class PMD:
         cpctrl = np.empty(20,dtype='c')
         cpctrl = str2char(sctrl,20)
 
-        pw.set_pmdvars(cspcs,cfrcs,rc,rbuf,iprint,nstp,dt,
+        pw.set_pmdvars(nsp,cspcs,cfrcs,rc,rbuf,iprint,nstp,dt,
                        ifdmp,dmpcoeff,conveps,convnum,
                        cpctrl,ptgt,stgt.T,srlx,
                        ifpmd,npmd,nerg,nnmax)

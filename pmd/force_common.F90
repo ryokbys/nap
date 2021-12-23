@@ -395,7 +395,7 @@ subroutine get_force(l1st,epot,stnsr)
     at(1:3)= aa(1:3,i)
     aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
   enddo
-
+  return
 end subroutine get_force
 !=======================================================================
 subroutine init_force(linit)
