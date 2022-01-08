@@ -1,6 +1,6 @@
 Program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-07 11:20:06 Ryo KOBAYASHI>
+!                     Last modified: <2022-01-08 22:29:25 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -202,6 +202,8 @@ Program fitpot
     call cg_wrapper(ftrn0,ftst0)
   case ('bfgs','BFGS','dfp','DFP')
     call qn_wrapper(ftrn0,ftst0)
+  case ('sgd','SGD')
+    call sgd_wrapper(ftrn0,ftst0)
   case ('check_grad')
     call check_grad(ftrn0,ftst0)
   case ('test','TEST')
@@ -937,6 +939,25 @@ subroutine cg_wrapper(ftrn0,ftst0)
   
   return
 end subroutine cg_wrapper
+!=======================================================================
+subroutine sgd_wrapper(ftrn0,ftst0)
+!
+! Wrapper for SGD
+!
+  use variables
+  use minimize
+  use parallel
+  use fp_common,only: func_w_pmd, grad_w_pmd
+  implicit none
+  real(8),intent(in):: ftrn0,ftst0
+  real(8):: fval
+  external:: write_stats
+
+  call sgd(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+       ,iprint,iflag,myid,mynsmpl,isid0,isid1,func_w_pmd,grad_w_pmd,cfmethod &
+       ,niter_eval,write_stats)
+
+end subroutine sgd_wrapper
 !=======================================================================
 subroutine check_grad(ftrn0,ftst0)
   use variables

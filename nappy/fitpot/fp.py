@@ -43,7 +43,8 @@ def read_in_fitpot(fname='in.fitpot'):
     infp['adf_match'] = True
     infp['vol_match'] = True
     infp['lat_match'] = False
-    infp['fval_upper_limit'] = 1.0e+10
+    infp['fval_upper_limit'] = 100.0
+    infp['missing_value'] = 1.0
     infp['print_level'] = 1
     infp['weights'] = {'rdf':1.0, 'adf':1.0, 'vol':1.0, 'lat':1.0}
     infp['update_vrange'] = -1
@@ -102,6 +103,10 @@ def read_in_fitpot(fname='in.fitpot'):
         elif data[0] == 'fval_upper_limit':
             fup_limit = float(data[1])
             infp['fval_upper_limit'] = fup_limit
+            mode = None
+        elif data[0] == 'missing_value':
+            misval = float(data[1])
+            infp['missing_value'] = misval
             mode = None
         elif data[0] == 'specorder':
             specorder = data[1:]
@@ -224,6 +229,7 @@ def write_info(infp,args):
     else:
         print('   There is no such fitting method...')
     print('   num_iteration   {0:d}'.format(infp['num_iteration']))
+    print('   missing_value   {0:.1f}'.format(infp['missing_value']))
     print(' ----------')
     print()
     return None
@@ -496,15 +502,16 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
     refdata = kwargs['refdata']
     losses = {}
     L = 0.0
-    L_up_lim = kwargs['fval_upper_limit']
+    misval = kwargs['missing_value']
+    luplim = kwargs['fval_upper_limit']
     for name in refdata.keys():
         ref = refdata[name]
+        wgt = ref['wdat']
         pmd = pmddata[name]
         if pmd == None:
-            losses[name] = L_up_lim
-            L += L_up_lim
+            losses[name] = misval
+            L += losses[name] *wgt
             continue
-        wgt = ref['wdat']
         num = ref['ndat']
         refd = ref['data']
         pmdd = pmd['data']
@@ -515,7 +522,7 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
             diff = pmdd[n] -refd[n]
             sumdiff2 += diff*diff
             z2 += refd[n]*refd[n]
-        losses[name] = sumdiff2 /(z2+eps)
+        losses[name] = min(sumdiff2 /(z2+eps), luplim)
         L += losses[name] *wgt
         
     if kwargs['print_level'] > 0:
@@ -673,7 +680,6 @@ def func_wrapper(variables, vranges, **kwargs):
         # print('Going to get_data from ',subdir)
         if len(kwargs['match']) != 0:
             pmddata = get_data2(subdir,prefix='pmd',**kwargs)
-            # L = min( loss_func2(pmddata,**kwargs), L_up_lim )
             L = loss_func2(pmddata,**kwargs)
         else:
             pmddata = get_data(subdir,prefix='pmd',**kwargs)

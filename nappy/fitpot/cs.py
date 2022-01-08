@@ -287,6 +287,13 @@ class CS:
             start = time()
         fgen = open(_fname_gen,'w')
         find = open(_fname_ind,'w')
+        #...Headers
+        fgen.write('# {0:>4s}  {1:>8s}  {2:12s}\n'.format('gen','iid','loss'))
+        find.write('# {0:>7s}  {1:>12s}'.format('iid', 'loss'))
+        for i in range(len(self.population[0].vector)):
+            find.write(' {0:>8d}-th'.format(i+1))
+        find.write('\n')
+        
         for i,ind in enumerate(self.population):
             fgen.write('     0  {0:8d}  {1:12.4e}\n'.format(ind.iid, ind.val))
             find.write(' {0:8d}  {1:12.4e}'.format(ind.iid, ind.val))
