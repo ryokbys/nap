@@ -12,8 +12,9 @@ module minimize
 
 !.....SGD parameters
   integer:: nsgdbsize = 1
+  integer:: nsgdbsnode = 1
   integer,allocatable:: ismask(:)
-  character(len=128):: csgdupdate = 'none'
+  character(len=128):: csgdupdate = 'normal'
   real(8):: sgd_rate_ini = 0.001d0
   real(8):: sgd_rate_fin = -0.001d0
   real(8):: sgd_eps = 1.0d-8
@@ -388,12 +389,13 @@ contains
   end subroutine steepest_descent
 !=======================================================================
   subroutine sgd(ndim,x0,f,g,u,xranges,xtol,gtol,ftol,maxiter,iprint &
-       ,iflag,myid,mynsmpl,isid0,isid1 &
+       ,iflag,myid,mpi_world,mynsmpl,myntrn,isid0,isid1 &
        ,func,grad,cfmethod,niter_eval,sub_eval)
 !
 ! Stochastic gradient decent (SGD)
 !
-    integer,intent(in):: ndim,iprint,niter_eval,myid,mynsmpl,isid0,isid1
+    integer,intent(in):: ndim,iprint,niter_eval,myid,mpi_world, &
+         mynsmpl,myntrn,isid0,isid1
     integer,intent(inout):: iflag,maxiter
     real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
@@ -413,30 +415,34 @@ contains
         integer,intent(in):: iter
       end subroutine sub_eval
     end interface
+    include 'mpif.h'
     real(8),parameter:: tiny  = 1d-14
 
     integer:: i,ismpl,iter,niter,nftol,ngtol,nxtol
+    integer:: ninnerstp,innerstp,ierr,itmp
     real(8):: gnorm,xnorm,dxnorm,pval,sgd_rate,sgd_ratei
     real(8):: fp,ftmp,ftst,ftsttmp
     real(8):: rate_upper, rate_lower
-    real(8),allocatable:: x(:),dx(:),rm(:),rmh(:),gpena(:),gtmp(:),gp(:),v(:),vh(:)
+    real(8),allocatable:: x(:),dx(:),rm(:),rmh(:),gpena(:),gtmp(:) &
+         ,gp(:),v(:),vh(:),xp(:)
     integer,allocatable:: imaskarr(:)
     logical:: lconverged
 
     if( .not.allocated(x) ) then
+      nsgdbsize = min(nsgdbsnode,myntrn)
       if(myid.eq.0) then
         print *,''
         print *, '************************ Stochastic gradient descent (SGD) '&
              //'************************'
         print *,'   Update method: ',trim(csgdupdate)
-        if( trim(csgdupdate).ne.'adam' &
+        if( trim(csgdupdate).ne.'normal' .and. trim(csgdupdate).ne.'adam' &
              .and. trim(csgdupdate).ne.'adabound' ) then
           if( myid.eq.0 ) then
-            print *,'WARNING: update method '//trim(csgdupdate)//' is not available.'
-            print *,'         Use normal sgd instead...'
+            print *,'   WARNING: update method '//trim(csgdupdate)//' is not available.'
+            print *,'            Use normal sgd instead...'
           endif
         endif
-        print '(a,i0)','    SGD batch size = ',nsgdbsize
+        print '(a,i0)','    SGD batch size per node = ',nsgdbsize
         if( trim(csgdupdate).eq.'adam' ) then
           print '(a,es11.3)','    epsilon value = ',sgd_eps
           print '(a,es11.3)','    beta1 = ',adam_b1
@@ -446,12 +452,16 @@ contains
           print '(a,es11.3)','    beta1 = ',adam_b1
           print '(a,es11.3)','    beta2 = ',adam_b2
         endif
-        print '(a,es11.3)','    initial learning rate = ',sgd_rate_ini
-        if( sgd_rate_fin.gt.0d0 ) print '(a,es11.3)','    final learning rate  = ',sgd_rate_fin
+        if( sgd_rate_fin.le.0d0 ) then
+          print '(a,es11.3)','    learning rate = ',sgd_rate_ini
+        else
+          print '(a,es11.3)','    initial learning rate = ',sgd_rate_ini
+          print '(a,es11.3)','    final learning rate  = ',sgd_rate_fin
+        endif
         print *,''
       endif
       allocate(x(ndim),dx(ndim),rm(ndim),rmh(ndim),gpena(ndim) &
-           ,gp(ndim),gtmp(ndim),v(ndim),vh(ndim))
+           ,gp(ndim),gtmp(ndim),v(ndim),vh(ndim),xp(ndim))
       allocate(ismask(isid0:isid1))
       sgd_rate = sgd_rate_ini
     endif
@@ -463,91 +473,107 @@ contains
     rm(:) = 0d0
     v(:) = 0d0
     x(1:ndim)= x0(1:ndim)
-    nsgdbsize = min(nsgdbsize,mynsmpl)
-    allocate(imaskarr(nsgdbsize))
+    allocate(imaskarr(mynsmpl))
+    ninnerstp = myntrn /nsgdbsize
+    if( mod(myntrn,nsgdbsize) .ne. 0 ) ninnerstp = ninnerstp + 1
+    itmp = ninnerstp
+    call mpi_allreduce(itmp,ninnerstp,1,mpi_integer,mpi_max,mpi_world,ierr)
 
-!.....Create the sample mask, 0) compute the sample,  1) not to compute the sample
-    call get_uniq_iarr(mynsmpl,nsgdbsize,imaskarr)
-    ismask(:) = 1
-    do i=1,nsgdbsize
-      ismpl = imaskarr(i) +(isid0-1)
-      ismask(ismpl) = 0
-    enddo
-
+!.....Unset mask to compute all the samples at the first evaluation
+    ismask(:) = 0
     call wrap_ranges(ndim,x0,xranges)
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
-
     call penalty(cpena,ndim,pval,gpena,x0)
     f = f + pval
-
     gnorm= sqrt(sprod(ndim,g,g))
     xnorm= sqrt(sprod(ndim,x,x))
     dxnorm = 0d0
 
     iter= 0
     niter = 0
-    call write_status(6,myid,iprint,cpena,iter,niter &
+    call write_status(6,myid,iprint,cpena,iter,ninnerstp &
          ,f,ftst,pval,xnorm,gnorm,dxnorm,f)
 
     call sub_eval(0)
 
+!.....One iteration includes evaluation of all the training data.
     do iter=1,maxiter
-!.....Gradual increasing/descreasing learning rate
+      fp = f
+      gp(:) = g(:)
+      xp(:) = x(:)
+      
+!.....Gradual increasing/descreasing learning rate if sgd_rate_fin is given
       if( sgd_rate_fin .gt. 0d0 ) then
         sgd_rate = sgd_rate_ini +(sgd_rate_fin -sgd_rate_ini)/maxiter *(iter-1)
       endif
-!.....Store previous func and grad values
-      fp= f
-      gp(1:ndim)= g(1:ndim)
-      if( gnorm.lt.tiny ) goto 10
-!.....Compute step size of x
-      if( trim(csgdupdate).eq.'adam' .or. trim(csgdupdate).eq.'Adam' ) then
-        rm(:) = adam_b1*rm(:) +(1d0 -adam_b1)*g(:)
-        v(:) = adam_b2*v(:) +(1d0 -adam_b2)*g(:)*g(:)
-        rmh(:) = rm(:)/(1d0-adam_b1**iter)
-        vh(:) = v(:)/(1d0-adam_b2**iter)
-        dx(:) = -sgd_rate*rmh(:)/(sqrt(vh(:)) +sgd_eps)
-      else if( trim(csgdupdate).eq.'adabound' ) then
-        rm(:) = adam_b1*rm(:) +(1d0 -adam_b1)*g(:)
-        v(:) = adam_b2*v(:) +(1d0 -adam_b2)*g(:)*g(:)
-        rmh(:) = rm(:)/(1d0-adam_b1**iter)
-        vh(:) = v(:)/(1d0-adam_b2**iter)
-        rate_lower = sgd_rate *(1d0 -1d0/((1d0 -adam_b2)*iter+1d0))
-        rate_upper = sgd_rate *(1d0 +1d0/((1d0 -adam_b2)*iter))
-        if( iprint.gt.1 ) print '(a,i6,2es12.4)','iter,lower,upper=',iter,rate_lower,rate_upper
-        do i=1,ndim
-          sgd_ratei = sgd_rate/(sqrt(vh(i))+sgd_eps)
-          sgd_ratei = min(max(rate_lower,sgd_ratei),rate_upper) !/sqrt(dble(iter))
-          dx(i) = -sgd_ratei*rmh(i)
+
+!.....Make imaskarr that contains the order of samples to be computed in each innerstp
+      imaskarr(:) = 0
+      call get_order_iarr(myntrn,nsgdbsize,imaskarr)
+!!$      print *,'myid,iter,imaskarr(:)=',myid,iter,imaskarr(:)
+
+!.....Inner loop for batch process
+      do innerstp = 1,ninnerstp
+!.....Unmask only the samples whose imaskarr(i)==innerstp
+        ismask(:) = 1
+        do i=1,myntrn  ! All the test samples remain masked
+          ismpl = isid0 + i -1
+          if( imaskarr(i).eq.innerstp ) then
+            ismask(ismpl) = 0
+!!$            print *,'myid,ismpl= ',myid,ismpl
+          endif
         enddo
-      else  ! normal SGD
-        dx(:) = -sgd_rate *g(:)
-      endif
+
+        call wrap_ranges(ndim,x,xranges)
+        call func(ndim,x,f,ftst)
+        call grad(ndim,x,g)
+        call penalty(cpena,ndim,pval,gpena,x)
+        f = f + pval
+        gnorm= sqrt(sprod(ndim,g,g))
+!!$        print *,'myid,innerstp,gnorm=',myid,innerstp,gnorm
+
+!.....Compute step size of x
+        if( trim(csgdupdate).eq.'adam' .or. trim(csgdupdate).eq.'Adam' ) then
+          rm(:) = adam_b1*rm(:) +(1d0 -adam_b1)*g(:)
+          v(:) = adam_b2*v(:) +(1d0 -adam_b2)*g(:)*g(:)
+          rmh(:) = rm(:)/(1d0-adam_b1**iter)
+          vh(:) = v(:)/(1d0-adam_b2**iter)
+          dx(:) = -sgd_rate*rmh(:)/(sqrt(vh(:)) +sgd_eps)
+        else if( trim(csgdupdate).eq.'adabound' ) then
+          rm(:) = adam_b1*rm(:) +(1d0 -adam_b1)*g(:)
+          v(:) = adam_b2*v(:) +(1d0 -adam_b2)*g(:)*g(:)
+          rmh(:) = rm(:)/(1d0-adam_b1**iter)
+          vh(:) = v(:)/(1d0-adam_b2**iter)
+          rate_lower = sgd_rate *(1d0 -1d0/((1d0 -adam_b2)*iter+1d0))
+          rate_upper = sgd_rate *(1d0 +1d0/((1d0 -adam_b2)*iter))
+          if( iprint.gt.1 ) print '(a,i6,2es12.4)','iter,lower,upper=',iter,rate_lower,rate_upper
+          do i=1,ndim
+            sgd_ratei = sgd_rate/(sqrt(vh(i))+sgd_eps)
+            sgd_ratei = min(max(rate_lower,sgd_ratei),rate_upper) !/sqrt(dble(iter))
+            dx(i) = -sgd_ratei*rmh(i)
+          enddo
+        else  ! normal SGD
+          if( gnorm/xnorm .gt. 1d0 ) g(:) = g(:) /gnorm *xnorm
+          dx(:) = -sgd_rate *g(:)
+        endif
 
 !.....Update x
-      if( trim(cpena).eq.'ridge' ) dx(:) = dx(:) -gpena(:)
-      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
-        call soft_threshold(ndim,x,dx,1d0)
-      else
-        x(1:ndim)= x(1:ndim) +dx(1:ndim)
-      endif
-      call wrap_ranges(ndim,x,xranges)
-      call penalty(cpena,ndim,pval,gpena,x)
+        if( trim(cpena).eq.'ridge' ) dx(:) = dx(:) -gpena(:)
+        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
+          call soft_threshold(ndim,x,dx,1d0)
+        else
+          x(1:ndim)= x(1:ndim) +dx(1:ndim)
+        endif
+        call wrap_ranges(ndim,x,xranges)
+        call penalty(cpena,ndim,pval,gpena,x)
+      enddo  ! innerstp
 
-      x0(1:ndim)= x(1:ndim)
-!.....Create the sample mask, 0) compute the sample,  1) not to compute the sample
-10    call get_uniq_iarr(mynsmpl,nsgdbsize,imaskarr)
-      ismask(:) = 1
-      do i=1,nsgdbsize
-        ismpl = imaskarr(i) +(isid0-1)
-        ismask(ismpl) = 0
-      enddo
-      call func(ndim,x,f,ftst)
-      call grad(ndim,x,g)
-      gnorm= sqrt(sprod(ndim,g,g))
+      dx(:) = x(:) -xp(:)
+      dxnorm = sqrt(sprod(ndim,dx,dx))
       xnorm= sqrt(sprod(ndim,x,x))
-      dxnorm= sqrt(sprod(ndim,dx,dx))
+      gnorm= sqrt(sprod(ndim,g,g))
+!!$      print *,'myid,iter,gnorm=',myid,iter,gnorm
 
 !.....Evaluate statistics at every niter_eval.
       if( mod(iter,niter_eval).eq.0 ) then
@@ -555,11 +581,12 @@ contains
         do ismpl=isid0,isid1
           ismask(ismpl) = mod(ismask(ismpl)+1,2)
         enddo
-        call func(ndim,x,ftmp,ftsttmp)
-        call grad(ndim,x,gtmp)
+        call func(ndim,x,f,ftst)
+        call grad(ndim,x,g)
+        gnorm= sqrt(sprod(ndim,g,g))
         call sub_eval(iter)
       endif
-      call write_status(6,myid,iprint,cpena,iter,niter &
+      call write_status(6,myid,iprint,cpena,iter,ninnerstp &
            ,f,ftst,pval,xnorm,gnorm,dxnorm,fp)
       call check_converge(myid,iprint,xtol,gtol,ftol &
            ,dxnorm,gnorm,abs(f-fp),nxtol,ngtol,nftol,iflag,lconverged)
@@ -575,6 +602,44 @@ contains
     deallocate(x,dx,rm,rmh,gpena,imaskarr)
     return
   end subroutine sgd
+!=======================================================================
+  subroutine get_order_iarr(ndim,nbatch,iarr)
+!
+!  Create an array of length ndim that has the order of samples to be computed.
+!
+    use random
+    integer,intent(in):: ndim,nbatch
+    integer,intent(out):: iarr(ndim)
+    integer:: jarr(ndim)
+    integer:: i,j,k,l,m,inc,idx
+
+    do i=1,ndim
+      jarr(i) = i
+    enddo
+    inc = 0
+    l=ndim
+    do while(.true.)
+      inc = inc + 1
+      if( l.le.nbatch ) then
+        do k=1,l
+          idx = jarr(k)
+          iarr(idx) = inc
+        enddo
+        exit
+      else  ! if not l.le.nbatch
+        do j=1,nbatch
+          k = l*urnd() +1
+          idx = jarr(k)
+          iarr(idx) = inc
+          do m=k,l-1
+            jarr(m) = jarr(m+1)
+          enddo
+          l= l-1
+        enddo
+      endif
+    end do
+    return
+  end subroutine get_order_iarr
 !=======================================================================
   subroutine get_uniq_iarr(n,m,iarr)
 !

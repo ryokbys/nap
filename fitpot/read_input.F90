@@ -295,8 +295,8 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'sgd_update' ) then
     call read_c1(ionum,csgdupdate)
     return
-  elseif( trim(cname).eq.'sgd_batch_size' ) then
-    call read_i1(ionum,nsgdbsize)
+  elseif( trim(cname).eq.'batchsize_per_node' ) then
+    call read_i1(ionum,nsgdbsnode)
     return
   elseif( trim(cname).eq.'sgd_rate0' .or. trim(cname).eq.'sgd_rate_ini' ) then
     call read_r1(ionum,sgd_rate_ini)

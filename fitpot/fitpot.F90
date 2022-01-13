@@ -1,6 +1,6 @@
 Program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-01-08 22:29:25 KOBAYASHI Ryo>
+!                     Last modified: <2022-01-13 22:51:03 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -954,8 +954,8 @@ subroutine sgd_wrapper(ftrn0,ftst0)
   external:: write_stats
 
   call sgd(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
-       ,iprint,iflag,myid,mynsmpl,isid0,isid1,func_w_pmd,grad_w_pmd,cfmethod &
-       ,niter_eval,write_stats)
+       ,iprint,iflag,myid,mpi_world,mynsmpl,myntrn,isid0,isid1,func_w_pmd &
+       ,grad_w_pmd,cfmethod,niter_eval,write_stats)
 
 end subroutine sgd_wrapper
 !=======================================================================
@@ -1975,7 +1975,7 @@ subroutine sync_input()
   call mpi_bcast(pso_c2,1,mpi_real8,0,mpi_world,ierr)
 !.....sgd
   call mpi_bcast(csgdupdate,128,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(nsgdbsize,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nsgdbsnode,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(sgd_rate_ini,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sgd_rate_fin,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sgd_eps,1,mpi_real8,0,mpi_world,ierr)
