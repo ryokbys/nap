@@ -42,12 +42,22 @@ The *nappy* and *fp.py* requires the following packages:
 For the short test, whether or not you can use this program in your environment,
 
 ```bash
-$ cd /path/to/nap/
+$ git clone https://github.com/ryokbys/nap.git
+$ cd nap/
 $ ./configure --prefix=$(pwd)
 $ make test
 ```
 
 If it works, you can use this program in your system.
+To install the python package *nappy*,
+
+```shell
+$ python setup.py sdist
+$ pip install -e .
+```
+
+Then you can use the nappy commands, `napsys` and `napfp`, in the terminal and can import `nappy` package in python programs.
+
 For details, please see the [documentation](http://ryokbys.web.nitech.ac.jp/contents/nap_docs) or ask me via e-mail (kobayashi.ryo[at]nitech.ac.jp).
 
 # Acknowledgements
