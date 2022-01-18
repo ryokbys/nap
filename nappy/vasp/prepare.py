@@ -368,9 +368,7 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
                 mode=mode,nsw=nsw,isif=isif,ismear=ismear,sigma=sigma)
     return None
 
-
-if __name__ == '__main__':
-
+def main():
     args= docopt(__doc__)
 
     pitch= float(args['-p'])
@@ -411,3 +409,8 @@ if __name__ == '__main__':
                  mode=mode,nsw=nsw,isif=isif,
                  high_spin=high_spin,
                  ismear=ismear,sigma=sigma,extra_nbands=rextnb)
+    return None
+
+if __name__ == '__main__':
+    main()
+    

@@ -1126,9 +1126,7 @@ def analyze(nsys):
     print(msg,end='')
     return None
 
-
-if __name__ == "__main__":
-
+def main():
     args= docopt(__doc__)
 
     infmt= args['--in-format']
@@ -1170,12 +1168,16 @@ if __name__ == "__main__":
 
     if args['analyze']:
         analyze(nsys)
-
     elif args['convert']:
         if scalefactor != "None":
             nsys.alc *= float(scalefactor)
 
         nappy.io.write(nsys,fname=outfname,format=outfmt)
-
     else:
         raise NotImplementedError()
+
+    return None
+
+if __name__ == "__main__":
+
+    main()

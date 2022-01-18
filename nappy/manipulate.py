@@ -278,6 +278,7 @@ def change_cell(nsys0,X0):
     nsys = replicate(nsys0,ncp[0],ncp[1],ncp[2])
     hmat0 = nsys0.get_hmat()
     hmat = np.dot(hmat0,X0)
+    print(nsys)
     sposs = nsys.get_scaled_positions()
     spnews = np.array(sposs)
     nsys.set_hmat(hmat)

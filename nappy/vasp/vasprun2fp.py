@@ -101,10 +101,8 @@ def output_for_fitpot(atoms,keep_const,dirname='./',specorder=[]):
             f.write(" {0:15.7f}".format(s*_kb2gpa)) # converting from kBar to GPa
         f.write('\n')
     return None
-        
 
-if __name__ == "__main__":
-
+def main():
     args=docopt(__doc__)
     dirs= args['DIR']
     specorder= args['--specorder'].split(',')
@@ -192,4 +190,8 @@ if __name__ == "__main__":
             output_for_fitpot(atoms,keep_const,dirname=dirname,
                               specorder=specorder)
     os.chdir(cwd)
+    return None
 
+if __name__ == "__main__":
+
+    main()

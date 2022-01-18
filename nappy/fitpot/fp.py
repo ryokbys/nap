@@ -765,8 +765,10 @@ def lat_vasp2dump(a,b,c,alpha,beta,gamma):
 
     return al,bl,cl,alpl,betl,gmml
     
-def main(args):
+def main():
 
+    args = docopt(__doc__)
+    headline()
     start = time.time()
 
     nproc = int(args['--nproc'])
@@ -879,7 +881,4 @@ def headline():
 
 if __name__ == "__main__":
 
-    args = docopt(__doc__)
-
-    headline()
-    main(args)
+    main()
