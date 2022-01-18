@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-23 14:05:18 Ryo KOBAYASHI>
+!                     Last modified: <2021-12-24 15:20:51 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -26,7 +26,7 @@ module tersoff
 !.....Tersoff type: (default) Kumagai's modified Tersoff, (Te-dependent) Te-dependent[5]
   character(len=12):: ts_type = 'default'
 
-!.....Cutoff type: (1) Tersoff,  (2) Kumagai, (3) Murty (default)
+!.....Cutoff type: (1) Tersoff, (3) Murty (default)
   integer:: ts_fc_type = 3
 
 !.....Original parameters from [2]
@@ -34,7 +34,8 @@ module tersoff
        ts_lmbd2(nspmax,nspmax), ts_eta(nspmax), ts_delta(nspmax), &
        ts_alpha(nspmax,nspmax), ts_beta(nspmax), ts_c1(nspmax), &
        ts_c2(nspmax), ts_c3(nspmax), ts_c4(nspmax), ts_c5(nspmax), ts_h(nspmax), &
-       ts_r1(nspmax,nspmax), ts_r2(nspmax,nspmax), ts_f0(nspmax), &
+       ts_rc2in(nspmax,nspmax), ts_rc2out(nspmax,nspmax), ts_f0(nspmax), &
+       ts_rc3in(nspmax,nspmax), ts_rc3out(nspmax,nspmax), &
        ts_r(nspmax,nspmax), ts_d(nspmax,nspmax), &
        ts_rc(nspmax,nspmax), ts_rc2(nspmax,nspmax)
 
@@ -62,12 +63,14 @@ contains
         ts_b(isp,jsp) = sqrt(ts_b(isp,isp)*ts_b(jsp,jsp))
         ts_lmbd1(isp,jsp)= (ts_lmbd1(isp,isp)+ts_lmbd1(jsp,jsp))/2
         ts_lmbd2(isp,jsp)= (ts_lmbd2(isp,isp)+ts_lmbd2(jsp,jsp))/2
-        ts_r1(isp,jsp)= (ts_r1(isp,isp)+ts_r1(jsp,jsp))/2
-        ts_r2(isp,jsp)= (ts_r2(isp,isp)+ts_r2(jsp,jsp))/2
+        ts_rc2in(isp,jsp)= (ts_rc2in(isp,isp)+ts_rc2in(jsp,jsp))/2
+        ts_rc2out(isp,jsp)= (ts_rc2out(isp,isp)+ts_rc2out(jsp,jsp))/2
+        ts_rc3in(isp,jsp)= (ts_rc3in(isp,isp)+ts_rc3in(jsp,jsp))/2
+        ts_rc3out(isp,jsp)= (ts_rc3out(isp,isp)+ts_rc3out(jsp,jsp))/2
 !.....R, D, Rc
-        ts_r(isp,jsp)= (ts_r1(isp,jsp)+ts_r2(isp,jsp))/2
-        ts_d(isp,jsp)= (ts_r2(isp,jsp)-ts_r1(isp,jsp))/2
-        ts_rc(isp,jsp)= ts_r(isp,jsp) +ts_d(isp,jsp)
+!!$        ts_r(isp,jsp)= (ts_r1(isp,jsp)+ts_r2(isp,jsp))/2
+!!$        ts_d(isp,jsp)= (ts_r2(isp,jsp)-ts_r1(isp,jsp))/2
+        ts_rc(isp,jsp)= ts_rc2out(isp,jsp)
         ts_rc2(isp,jsp)= ts_rc(isp,jsp)**2
       enddo
     enddo
@@ -175,8 +178,8 @@ contains
 !!$        if( dij2.gt.ts_rc2 ) cycle
         dij = dsqrt(dij2)
 !.....Potential
-        fc = f_c(dij,is,js)
-        dfc = df_c(dij,is,js)
+        fc = f_c(dij,ts_rc2in(is,js),ts_rc2out(is,js))
+        dfc = df_c(dij,ts_rc2in(is,js),ts_rc2out(is,js))
         texp = exp(-ts_lmbd1(is,js)*dij)
         tmp = 0.5d0 *fc *ts_a(is,js) *texp
         epi(ia)= epi(ia) +tmp
@@ -233,7 +236,7 @@ contains
         diji = 1d0/dij
         dirij(1:3)= -rij(1:3)*diji
         djrij(1:3)= -dirij(1:3)
-        fcij = f_c(dij,is,js)
+        fcij = f_c(dij,ts_rc2in(is,js),ts_rc2out(is,js))
         texp2ij = exp(-ts_lmbd2(is,js)*dij)
         faij = -ts_b(is,js) *texp2ij
 !.....Precompute zeta which is necessary for derivative calculation
@@ -248,7 +251,7 @@ contains
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
 !!$          if( dik2.gt.ts_rc2 ) cycle
           dik = dsqrt(dik2)
-          fcik = f_c(dik,is,ks)
+          fcik = f_c(dik,ts_rc3in(is,ks),ts_rc3out(is,ks))
           texp3 = exp(ts_alpha(is,js)*(dij-dik)**ts_beta(is))
           cs = dot(rij,rik) /dik *diji
           zijk = (ts_h(is) -cs)*(ts_h(is) -cs)
@@ -262,7 +265,7 @@ contains
         epi(ja)= epi(ja) +tmp
         epotl2 = epotl2 +tmp +tmp
 !.....Force except derivative of bij
-        dfcij = df_c(dij,is,js)
+        dfcij = df_c(dij,ts_rc2in(is,js),ts_rc3in(is,js))
         dfaij = ts_b(is,js) *ts_lmbd2(is,js) *texp2ij
         dvdij = 0.5d0 *bij*(dfcij*faij +dfaij*fcij)
 !.....Since bij contains the angle around atom-i that is not symmetric to ia and ja,
@@ -297,8 +300,8 @@ contains
           diki= 1d0/dik
           dirik(1:3)= -rik(1:3)*diki
           dkrik(1:3)= -dirik(1:3)
-          fcik = f_c(dik,is,ks)
-          dfcik = df_c(dik,is,ks)
+          fcik = f_c(dik,ts_rc3in(is,ks),ts_rc3out(is,ks))
+          dfcik = df_c(dik,ts_rc3in(is,ks),ts_rc3out(is,ks))
           texp3 = exp(ts_alpha(is,js)*(dij-dik)**ts_beta(is))
           dexp3ij = ts_alpha(is,js) *(dij-dik)**(ts_beta(is) -1d0) *texp3
           dexp3ik = -dexp3ij
@@ -365,134 +368,100 @@ contains
     return
   end subroutine force_tersoff
 !=======================================================================
-  function f_c(r,is,js)
-    integer,intent(in):: is,js
-    real(8),intent(in):: r
+  function f_c(r,rcin,rcout)
+    real(8),intent(in):: r,rcin,rcout
     real(8):: f_c
 
     if( ts_fc_type.eq.1 ) then
-      f_c = f_c1(r,is,js)
+      f_c = f_c1(r,rcin,rcout)
       continue
-    else if( ts_fc_type.eq.2 ) then
-      f_c = f_c2(r,is,js)
-      continue
+!!$    else if( ts_fc_type.eq.2 ) then
+!!$      f_c = f_c2(r,rcin,rcout)
+!!$      continue
     else ! default
-      f_c = f_c3(r,is,js)
+      f_c = f_c3(r,rcin,rcout)
     endif
     return
   end function f_c
 !=======================================================================
-  function df_c(r,is,js)
-    integer,intent(in):: is,js
-    real(8),intent(in):: r
+  function df_c(r,rcin,rcout)
+    real(8),intent(in):: r,rcin,rcout
     real(8):: df_c
 
     df_c = 0d0
     if( ts_fc_type.eq.1 ) then
-      df_c = df_c1(r,is,js)
-      continue
-    else if( ts_fc_type.eq.2 ) then
-      df_c = df_c2(r,is,js)
-      continue
+      df_c = df_c1(r,rcin,rcout)
+!!$      continue
+!!$    else if( ts_fc_type.eq.2 ) then
+!!$      df_c = df_c2(r,rcin,rcout)
+!!$      continue
     else ! default
-      df_c = df_c3(r,is,js)
+      df_c = df_c3(r,rcin,rcout)
     endif
     return
   end function df_c
 !=======================================================================
-  function f_c1(r,is,js)
-    integer,intent(in):: is,js
-    real(8),intent(in):: r
+  function f_c1(r,rcin,rcout)
+    real(8),intent(in):: r,rcin,rcout
     real(8):: f_c1
     include './params_unit.h'
 
     
-    if( r.lt.ts_r(is,js) -ts_d(is,js) ) then
+    if( r.lt.rcin ) then
       f_c1 = 1d0
-    else if( r.ge.ts_r(is,js) -ts_d(is,js) .and. &
-         r.lt.ts_r(is,js) +ts_d(is,js) ) then
-!!$      f_c1 =  0.5d0 -9d0/16d0 *sin(0.5d0*pi*(r-ts_r)/ts_d) &
-!!$           -1d0/16d0*sin(1.5d0*pi*(r-ts_r)/ts_d)
-      f_c1 =  0.5d0 *(1d0 -sin(0.5d0*pi*(r -ts_r(is,js))/ts_d(is,js)))
+    else if( r.ge.rcin .and. r.lt.rcout ) then
+      f_c1 =  0.5d0 *(1d0 +cos(pi*(r -rcin)/(rcout-rcin)))
     else
       f_c1 = 0d0
     endif
     return
   end function f_c1
 !=======================================================================
-  function df_c1(r,is,js)
-    integer,intent(in):: is,js
-    real(8),intent(in):: r
+  function df_c1(r,rcin,rcout)
+    real(8),intent(in):: r,rcin,rcout
     real(8):: df_c1
     include './params_unit.h'
     real(8):: p
 
-    if( r.lt.ts_r(is,js) -ts_d(is,js) ) then
+    if( r.lt.rcin ) then
       df_c1 = 0d0
-    else if( r.ge.ts_r(is,js) -ts_d(is,js) .and. &
-         r.lt.ts_r(is,js) +ts_d(is,js) ) then
-      p = 0.5d0 *pi /ts_d(is,js)
-      df_c1 = -0.5d0 *p *cos(p*(r -ts_r(is,js)))
+    else if( r.ge.rcin .and. r.lt.rcout ) then
+      p = pi /(rcout-rcin)
+      df_c1 = -0.5d0 *p *sin(p*(r -rcin))
     else
       df_c1 = 0d0
     endif
     return
   end function df_c1
 !=======================================================================
-  function f_c2(r,is,js)
-    integer,intent(in):: is,js
-    real(8),intent(in):: r
-    real(8):: f_c2
-    include './params_unit.h'
-    
-    f_c2 = 0.5d0 *(1d0 -tanh(0.5d0*pi*(r -ts_r(is,js))/ts_d(is,js)))
-    return
-  end function f_c2
-!=======================================================================
-  function df_c2(r,is,js)
-    integer,intent(in):: is,js
-    real(8),intent(in):: r
-    real(8):: df_c2
-    include './params_unit.h'
-    real(8):: p
-
-    p = 0.5d0 *pi /ts_d(is,js)
-    df_c2 = -0.5d0 *p /cosh(p*(r -ts_r(is,js)))**2
-    return
-  end function df_c2
-!=======================================================================
-  function f_c3(r,is,js)
-    integer,intent(in):: is,js
-    real(8),intent(in):: r
+  function f_c3(r,rcin,rcout)
+    real(8),intent(in):: r,rcin,rcout
     real(8):: f_c3
     include './params_unit.h'
+    real(8):: p
     
-    if( r.lt.ts_r(is,js) -ts_d(is,js) ) then
+    if( r.lt.rcin ) then
       f_c3 = 1d0
-    else if( r.ge.ts_r(is,js) -ts_d(is,js) .and. &
-         r.lt.ts_r(is,js) +ts_d(is,js) ) then
-      f_c3 =  0.5d0 -9d0/16d0 *sin(0.5d0*pi*(r-ts_r(is,js))/ts_d(is,js)) &
-           -1d0/16d0*sin(1.5d0*pi*(r-ts_r(is,js))/ts_d(is,js))
+    else if( r.ge.rcin .and. r.lt.rcout ) then
+      p = pi *(r-rcin)/(rcout-rcin)
+      f_c3 =  0.5d0 +9d0/16d0 *cos(p) -1d0/16d0*cos(3d0*p)
     else
       f_c3 = 0d0
     endif
     return
   end function f_c3
 !=======================================================================
-  function df_c3(r,is,js)
-    integer,intent(in):: is,js
-    real(8),intent(in):: r
+  function df_c3(r,rcin,rcout)
+    real(8),intent(in):: r,rcin,rcout
     real(8):: df_c3
     include './params_unit.h'
     real(8):: p
 
-    if( r.lt.ts_r(is,js) -ts_d(is,js) ) then
+    if( r.lt.rcin ) then
       df_c3 = 0d0
-    else if( r.ge.ts_r(is,js) -ts_d(is,js) .and. &
-         r.lt.ts_r(is,js) +ts_d(is,js) ) then
-      p = pi/2d0/ts_d(is,js)
-      df_c3 = -9d0/16d0*p *cos(p*(r-ts_r(is,js))) &
-           -1d0/16d0*3d0*p*cos(3d0*p*(r-ts_r(is,js)))
+    else if( r.ge.rcin .and. r.lt.rcout ) then
+      p = pi/(rcout-rcin)
+      df_c3 = -9d0/16d0*p *sin(p*(r-rcin)) +1d0/16d0*3d0*p*sin(3d0*p*(r-rcin))
     else
       df_c3 = 0d0
     endif
@@ -555,8 +524,8 @@ contains
     character(len=3),intent(in):: specorder(nspmax)
 
     integer:: ite,ierr,isp,jsp,ksp,nd
-    real(8):: te,a,b,lmbd1,lmbd2,eta,delta,alpha,beta,h,r1,r2 &
-         ,c1,c2,c3,c4,c5,f0
+    real(8):: te,a,b,lmbd1,lmbd2,eta,delta,alpha,beta,h, &
+         c1,c2,c3,c4,c5,f0, rc2in,rc2out,rc3in,rc3out
     logical:: lexist
     character(len=128):: cfname,ctmp,cline
     character(len=3):: cspi,cspj,cspk
@@ -620,16 +589,23 @@ contains
 
           ite = ite +1
           backspace(ioprms)
-          read(ioprms,*) cspi,te,a,b,lmbd1,lmbd2,eta,delta,alpha,beta,h,r1,r2, &
+          read(ioprms,*) cspi,te,a,b,lmbd1,lmbd2,eta,delta,alpha,beta,h,rc2in,rc2out, &
                c1,c2,c3,c4,c5,f0
+
+          isp = csp2isp(cspi)
+          if( isp.le.0 ) then
+            print *,' Tersoff parameter read but not used for ',trim(cspi)
+            cycle
+          endif
           if( iprint.ge.ipl_basic ) then
             print '(a5, f6.2, 2f11.5, 2f11.7)',trim(cspi),te,a,b,lmbd1,lmbd2
-            print '(10x,f4.1,2f10.6,f4.1,f8.3,3f4.1)',eta,delta,alpha,beta,h,r1,r2
+            print '(10x,f4.1,2f10.6,f4.1,f8.3,3f4.1)',eta,delta,alpha,beta,h,rc2in,rc2out
             print '(10x,f10.6,f11.2,f10.1,f6.3,f5.1,f6.3)',c1,c2,c3,c4,c5,f0
           endif
 
           if( iprint.ge.ipl_basic .and. trim(cspi).ne.'Si' ) then
             print *,'WARNING: Te-dependent is now available for only Si.'
+            cycle
           endif
           ted_te(ite) = te
           if( ite.eq.1 ) ted_te(ite) = 0d0  ! 1st temperature should be 0
@@ -642,8 +618,8 @@ contains
           ted_alpha(ite) = alpha
           ted_beta(ite) = beta
           ted_h(ite) = h
-          ted_r1(ite) = r1
-          ted_r2(ite) = r2
+          ted_r1(ite) = rc2in
+          ted_r2(ite) = rc2out
           ted_c1(ite) = c1
           ted_c2(ite) = c2
           ted_c3(ite) = c3
@@ -667,30 +643,36 @@ contains
           if( index(cline,'Tersoff_type').ne.0 ) cycle
 
           backspace(ioprms)
-          read(ioprms,*) cspi, a,b,lmbd1,lmbd2,eta,delta &
-               ,alpha,beta,h,r1,r2,c1,c2,c3,c4,c5
+          read(ioprms,*) cspi, a,b,lmbd1,lmbd2, rc2in, rc2out, &
+               eta,delta,alpha,beta,h,c1,c2,c3,c4,c5,rc3in,rc3out
           isp = csp2isp(cspi)
+          if( isp.le.0 ) then
+            print *,' Tersoff parameter read but not used for ',trim(cspi)
+            cycle
+          endif
           ts_a(isp,isp) = a
           ts_b(isp,isp) = b
           ts_lmbd1(isp,isp) = lmbd1
           ts_lmbd2(isp,isp) = lmbd2
+          ts_rc2in(isp,isp) = rc2in
+          ts_rc2out(isp,isp) = rc2out
           ts_eta(isp) = eta
           ts_delta(isp) = delta
           ts_alpha(isp,isp) = alpha
           ts_beta(isp) = beta
           ts_h(isp) = h
-          ts_r1(isp,isp) = r1
-          ts_r2(isp,isp) = r2
           ts_c1(isp) = c1
           ts_c2(isp) = c2
           ts_c3(isp) = c3
           ts_c4(isp) = c4
           ts_c5(isp) = c5
+          ts_rc3in(isp,isp) = rc3in
+          ts_rc3out(isp,isp) = rc3out
 
           if( iprint.ge.ipl_basic ) then
-            write(6,'(a5,4es12.4)') trim(cspi), a, b, lmbd1,lmbd2
-            write(6,'(15x,7es12.4)') eta,delta,alpha,beta,h,r1,r2
-            write(6,'(15x,5es12.4)') c1,c2,c3,c4,c5
+            write(6,'(a5,4es12.4,2f6.3)') trim(cspi), a, b, lmbd1,lmbd2,rc2in,rc2out
+            write(6,'(15x,7es12.4)') eta,delta,alpha,beta,h
+            write(6,'(15x,5es12.4,2f6.3)') c1,c2,c3,c4,c5,rc3in,rc3out
           endif
           goto 10
         enddo
@@ -737,8 +719,10 @@ contains
       ts_alpha(:,:) = ted_alpha(1)
       ts_beta(:) = ted_beta(1)
       ts_h(:) = ted_h(1)
-      ts_r1(:,:) = ted_r1(1)
-      ts_r2(:,:) = ted_r2(1)
+      ts_rc2in(:,:) = ted_r1(1)
+      ts_rc2out(:,:) = ted_r2(1)
+      ts_rc3in(:,:) = ts_rc2in(:,:)
+      ts_rc3out(:,:) = ts_rc2out(:,:)
       ts_c1(:) = ted_c1(1)
       ts_c2(:) = ted_c2(1)
       ts_c3(:) = ted_c3(1)
@@ -755,8 +739,10 @@ contains
       call mpi_bcast(ts_alpha,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_beta,nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_h,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_r1,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_r2,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_rc2in,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_rc2out,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_rc3in,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_rc3out,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_c1,nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_c2,nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_c3,nspmax,mpi_real8,0,mpi_world,ierr)
@@ -805,18 +791,18 @@ contains
     ts_alpha(is,is) = ted_alpha(ite0) +(ted_alpha(ite1) -ted_alpha(ite0)) *x
     ts_beta(is) = ted_beta(ite0) +(ted_beta(ite1) -ted_beta(ite0)) *x
     ts_h(is) = ted_h(ite0) +(ted_h(ite1) -ted_h(ite0)) *x
-    ts_r1(is,is) = ted_r1(ite0) +(ted_r1(ite1) -ted_r1(ite0)) *x
-    ts_r2(is,is) = ted_r2(ite0) +(ted_r2(ite1) -ted_r2(ite0)) *x
     ts_c1(is) = ted_c1(ite0) +(ted_c1(ite1) -ted_c1(ite0)) *x
     ts_c2(is) = ted_c2(ite0) +(ted_c2(ite1) -ted_c2(ite0)) *x
     ts_c3(is) = ted_c3(ite0) +(ted_c3(ite1) -ted_c3(ite0)) *x
     ts_c4(is) = ted_c4(ite0) +(ted_c4(ite1) -ted_c4(ite0)) *x
     ts_c5(is) = ted_c5(ite0) +(ted_c5(ite1) -ted_c5(ite0)) *x
     ts_f0(is) = ted_f0(ite0) +(ted_f0(ite1) -ted_f0(ite0)) *x
+    ts_rc2in(is,is) = ted_r1(ite0) +(ted_r1(ite1) -ted_r1(ite0)) *x
+    ts_rc2out(is,is) = ted_r2(ite0) +(ted_r2(ite1) -ted_r2(ite0)) *x
 
-    ts_r(is,is) = (ts_r1(is,is) +ts_r2(is,is))/2
-    ts_d(is,is) = (ts_r2(is,is) -ts_r1(is,is))/2
-    ts_rc(is,is) = ts_r(is,is) +ts_d(is,is)
+!!$    ts_r(is,is) = (ts_r1(is,is) +ts_r2(is,is))/2
+!!$    ts_d(is,is) = (ts_r2(is,is) -ts_r1(is,is))/2
+    ts_rc(is,is) = ts_rc2out(is,is)
     ts_rc2(is,is)= ts_rc(is,is)**2
     return
   end subroutine set_ted_params
@@ -827,7 +813,7 @@ contains
 !
 
     ts_type = 'default'
-!.....Cutoff type: (1) Tersoff,  (2) Kumagai, (3) Murty (default)
+!.....Cutoff type: (1) Tersoff,  (3) Murty (default)
     ts_fc_type = 3
     
 !.....Original parameters from [2]
@@ -846,8 +832,10 @@ contains
     ts_c4(:) = 1.0d0
     ts_c5(:) = 26.0d0
     ts_h(:) = -0.365
-    ts_r1(:,:) = 2.7d0
-    ts_r2(:,:) = 3.3d0
+    ts_rc2in(:,:) = 2.7d0
+    ts_rc2out(:,:) = 3.3d0
+    ts_rc3in(:,:) = ts_rc2in(:,:)
+    ts_rc3out(:,:) = ts_rc2out(:,:)
     ts_f0(:) = 0d0
     return
   end subroutine set_orig_params
