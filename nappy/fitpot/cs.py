@@ -144,12 +144,10 @@ class Individual:
     def calc_loss_func(self,kwargs):
         """
         Compute loss function value using self.loss_func function given in the constructor.
-        In order to return a result in multiprocessing.Process, it also takes an argument q.
         """
         # print('type(kwargs)=',type(kwargs))
-        val = self.loss_func(self.vector, self.vranges, **kwargs)
+        val = self.loss_func(self.vector, **kwargs)
         # print(' iid,v,val=',self.iid,self.vector,val)
-        # q.put(val)
         return val,kwargs['index']
 
 class CS:

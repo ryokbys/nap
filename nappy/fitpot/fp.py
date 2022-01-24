@@ -6,7 +6,7 @@ gradient-based approaches is out of focus in this program, and that should be
 performed in a Fortran program.
 
 Usage:
-  fp.py [options]
+  {0:s} [options]
 
 Options:
   -h, --help  Show this message and exit.
@@ -32,6 +32,7 @@ from datetime import datetime
 from nappy.fitpot.fp2prms import fp2BVSx, fp2BVS, fp2Morse, read_params_Coulomb, fp2params
 from nappy.fitpot.de import DE
 from nappy.fitpot.cs import CS
+from nappy.fitpot.tpe import TPE
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "rev211111"
@@ -181,6 +182,18 @@ def read_in_fitpot(fname='in.fitpot'):
             frac = float(data[1])
             infp['cs_fraction'] = frac
             mode = None
+        elif data[0] == 'tpe_gamma':
+            gamma = float(data[1])
+            infp['tpe_gamma'] = gamma
+            mode = None
+        elif data[0] == 'tpe_nsmpl_prior':
+            nsmpl = int(data[1])
+            infp['tpe_nsmpl_prior'] = nsmpl
+            mode = None
+        elif data[0] == 'tpe_ntrial':
+            ntrial = int(data[1])
+            infp['tpe_ntrial'] = ntrial
+            mode = None
         elif data[0] == 'update_vrange':
             infp['update_vrange'] = int(data[1])
             mode = None
@@ -226,6 +239,8 @@ def write_info(infp,args):
     elif fmethod in ('cs','CS'):
         print('   num_individuals   ',infp['cs_num_individuals'])
         print('   fraction          {0:7.4f}'.format(infp['cs_fraction']))
+    elif fmethod in ('tpe','TPE'):
+        print('   gamma             {0:7.3f}'.format(infp['tpe_gamma']))
     else:
         print('   There is no such fitting method...')
     print('   num_iteration   {0:d}'.format(infp['num_iteration']))
@@ -622,7 +637,7 @@ def loss_func(pmddata,eps=1.0e-8,**kwargs):
               flush=True)
     return L
 
-def func_wrapper(variables, vranges, **kwargs):
+def func_wrapper(variables, **kwargs):
     """
     Wrapper function for the above loss_func().
     This converts variables to be optimized to parameters for pmd,
@@ -648,7 +663,6 @@ def func_wrapper(variables, vranges, **kwargs):
     varsfp['rc2'] = kwargs['rc2']
     varsfp['rc3'] = kwargs['rc3']
     varsfp['variables'] = variables
-    varsfp['vranges'] = vranges
     cwd = os.getcwd()
     if not os.path.exists(subdir):
         os.mkdir(subdir)
@@ -767,7 +781,7 @@ def lat_vasp2dump(a,b,c,alpha,beta,gamma):
     
 def main():
 
-    args = docopt(__doc__)
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])))
     headline()
     start = time.time()
 
@@ -855,6 +869,11 @@ def main():
         F = infp['cs_fraction']
         opt = CS(N,F, vs,vrs,vrsh, func_wrapper, write_vars_fitpot,
                  nproc=nproc, **kwargs)
+    elif kwargs['fitting_method'] in ('tpe','TPE'):
+        nbatch = nproc
+        gamma = infp['tpe_gamma']
+        opt = TPE(nbatch,vs,vrs,vrsh, func_wrapper, write_vars_fitpot,
+                  gamma,**kwargs)
 
     
     opt.run(maxiter)

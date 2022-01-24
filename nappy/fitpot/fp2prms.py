@@ -252,7 +252,6 @@ def fp2Morse(varsfp, **kwargs):
     rc2 = varsfp['rc2']
     rc3 = varsfp['rc3']
     vs = varsfp['variables']
-    vrs = varsfp['vranges']
     nv = len(vs)
 
     pairs = kwargs['pairs']
@@ -281,7 +280,6 @@ def fp2BVS(varsfp, **kwargs):
     rc2 = varsfp['rc2']
     rc3 = varsfp['rc3']
     vs = varsfp['variables']
-    vrs = varsfp['vranges']
     nv = len(vs)
 
     specorder = kwargs['specorder']
@@ -327,7 +325,6 @@ def fp2BVSx(varsfp, **kwargs):
     rc2 = varsfp['rc2']
     rc3 = varsfp['rc3']
     vs = varsfp['variables']
-    vrs = varsfp['vranges']
     nv = len(vs)
 
     specorder = kwargs['specorder']
