@@ -65,7 +65,7 @@ class Sample:
 
     def set_variables(self,variables):
         if len(variables) != len(self.variables):
-            raise ValueError('len(variables) != len(self.vector)')
+            raise ValueError('len(variables) != len(self.variables)')
 
         self.variables[:] = variables[:]
         self.val = None
@@ -76,8 +76,6 @@ class Sample:
         Compute loss function value using self.loss_func function given in the constructor.
         """
         vec = copy.copy(self.variables)
-        if vlogs == None:
-            raise ValueError('vlogs must not be None.')
         # If vlog != None, some of variables may be expressed in log domain,
         # they must be transformed back to non-log domain.
         for i in range(len(vec)):
@@ -88,14 +86,14 @@ class Sample:
 
 class TPE:
     """
-    Tree-based Parzen Estimator class.
+    Class for Tree-based Parzen Estimator (TPE) or Weighted Parzen Estimator (WPE).
     
     Refs:
       1. Bergstra, J., Bardenet, R., Bengio, Y. & Kégl, B.  in Proc. NIPS-24th, 2546–2554
     """
 
-    def __init__(self, nbatch, variables, vranges, vlimits,
-                 loss_func, write_func, gamma=0.15, **kwargs):
+    def __init__(self, nbatch, variables, vranges, vlimits, loss_func,
+                 write_func, **kwargs):
         """
         Conctructor of TPE class.
 
@@ -112,15 +110,10 @@ class TPE:
             Loss function to be minimized with variables and **kwargs.
           write_func : function
             Function for outputing some info.
-          gamma : float (0.0 - 1.0)
-            Ratio from minimum to determin y^* in TPE algorithm.
         """
         if nbatch < 1:
             raise ValueError('nbatch must be > 0.')
         self.nbatch = nbatch
-        if gamma < 0.0 or gamma > 1.0:
-            raise ValueError('gamma must be within 0. and 1., whereas gamma = ',gamma)
-        self.gamma = gamma
         self.ndim = len(variables)
         self.vars0 = variables
         self.vranges = vranges
@@ -131,10 +124,13 @@ class TPE:
         self.loss_func = loss_func
         self.write_func = write_func
         self.kwargs = kwargs
-        self.threshold = None
+        self.best_pnt = None
         self.print_level = 0
         self.nsmpl_prior = 100
         self.ntrial = 100
+        self.method = kwargs['fitting_method']
+        self.gamma = 0.15
+        self.exponent = 4
         #...Change default values if specified
         if 'print_level' in kwargs.keys():
             self.print_level = int(kwargs['print_level'])
@@ -142,6 +138,15 @@ class TPE:
             self.nsmpl_prior = int(kwargs['tpe_nsmpl_prior'])
         if 'tpe_ntrial' in kwargs.keys():
             self.ntrial = int(kwargs['tpe_ntrial'])
+        if 'tpe_type' in kwargs.keys():
+            self.tpe_type = kwargs['tpe_type']
+        if 'tpe_gamma' in kwargs.keys():
+            self.gamma = float(kwargs['tpe_gamma'])
+        if 'wpe_exponent' in kwargs.keys():
+            self.exponent = int(kwargs['wpe_exponent'])
+
+        if self.gamma < 0.0 or self.gamma > 1.0:
+            raise ValueError('gamma must be within 0. and 1., whereas gamma = ',self.gamma)
 
         #...Change vrange if log domain
         for i in range(self.ndim):
@@ -168,7 +173,6 @@ class TPE:
     def keep_best(self):
         vals = []
         for i,si in enumerate(self.history):
-            # print('i,val,vec=',i,pi.val,pi.vector)
             if si.val == None:
                 raise ValueError('Something went wrong.')
             vals.append(si.val)
@@ -210,18 +214,19 @@ class TPE:
             val, i = res
             self.history[i].val = val
         #self.history.extend(candidates) # not need
+
         
         #...Check best
-        self.bestsmpl = None
-        for si in self.history:
-            if self.bestsmpl == None or si.val < self.bestsmpl.val:
+        self.bestsmpl = self.history[0]
+        for si in self.history[1:]:
+            if si.val < self.bestsmpl.val:
                 self.bestsmpl = si
         fname = 'in.vars.fitpot.{0:d}'.format(self.bestsmpl.iid)
         self.write_variables(self.bestsmpl,
                              fname=fname,
                              **self.kwargs)
         os.system('cp -f {0:s} in.vars.fitpot.best'.format(fname))
-
+        
         #...Write sample data
         for i,si in enumerate(self.history):
             self._write_smpl_data(fsmpl,si)
@@ -241,8 +246,13 @@ class TPE:
                     newsmpl.set_variables(random_variables(self.vranges))
                     candidates.append(newsmpl)
             else:
-                #...Create candidates by TPE
-                candidates = self._candidates_by_TPE()
+                if self.method in ('wpe,''WPE'):
+                    #...Create candidates by WPE
+                    candidates = self._candidates_by_WPE()
+                else:
+                    #...Create candidates by TPE
+                    candidates = self._candidates_by_TPE()
+                    
 
             #...Evaluate sample losses of initial sets
             prcs = []
@@ -271,10 +281,9 @@ class TPE:
                                      **self.kwargs)
                 os.system('cp -f {0:s} in.vars.fitpot.best'.format(fname))
 
-            #...Write sample data
-            for si in self.history[-self.nbatch:]:
+            for i,si in enumerate(self.history[-self.nbatch:]):
                 self._write_smpl_data(fsmpl,si)
-            
+
             #...Write info
             if self.print_level > 0:
                 self._write_step_info(istp,starttime)
@@ -284,7 +293,7 @@ class TPE:
         return None
 
     def _write_smpl_data(self,f,smpl):
-        f.write(' {0:7d}  {1:12.4e}'.format(smpl.iid, smpl.val))
+        f.write(' {0:4d}  {1:12.4e}'.format(smpl.iid, smpl.val))
         for j,vj in enumerate(smpl.variables):
             f.write(' {0:11.3e}'.format(vj))
         f.write('\n')
@@ -306,26 +315,17 @@ class TPE:
         vals = np.zeros(len(self.history))
         for i,si in enumerate(self.history):
             vals[i] = si.val
-        vals.sort()
         nlow = int(self.gamma *len(self.history))
-        if nlow < 1:
-            raise ValueError('nlow must be > 0, increase tpe_nsmpl_prior value.')
-        if self.threshold == None or vals[nlow-1] < self.threshold:
-            self.threshold = vals[nlow-1]
-        # if vals[nlow-1] > self.threshold:
-        #     nlow_old = nlow
-        #     for i in range(nlow_old):
-        #         if vals[i] > self.threshold:
-        #             nlow = i
-        #             break
         nhigh = len(self.history) -nlow
-        # print('nlow,max(vlow)=',nlow,vals[:nlow].max())
+        argpart = np.argpartition(vals,nlow)
         Xlow = np.zeros((nlow,self.ndim))
         Xhigh = np.zeros((nhigh,self.ndim))
         for i in range(nlow):
-            Xlow[i,:] = self.history[i].variables[:]
+            iid = argpart[i]
+            Xlow[i,:] = self.history[iid].variables[:]
         for i in range(nhigh):
-            Xhigh[i,:] = self.history[nlow+i].variables[:]
+            iid = argpart[nlow+i]
+            Xhigh[i,:] = self.history[iid].variables[:]
 
         #...Sampling variable candidates
         xcandidates = np.empty((self.nbatch,self.ndim))
@@ -335,17 +335,15 @@ class TPE:
             xhmax = self.vlimits[idim,1]
             xlowsrt = np.sort(Xlow[:,idim])
             npnt = len(xlowsrt)
-            #...Update vranges as the range of low samples
-            self.vranges[idim,0] = xlowsrt[0]
-            self.vranges[idim,1] = xlowsrt[-1]
             #...Determine smoothness parameter, h, by Silverman's method
             q75, q25 = np.percentile(xlowsrt, [75,25])
-            sgm = min(np.std(xlowsrt), (q75-q25)/1.34)
+            std = np.std(xlowsrt)
+            sgm = min(std, (q75-q25)/1.34)
             h = 1.06 *sgm /np.power(npnt, 1.0/5)
             #...Prepare for g(x)
             xhighsrt = Xhigh[:,idim]
-            q75h, q25h = np.percentile(xhighsrt, [75,25])
-            sgmh = min(np.std(xhighsrt), (q75h-q25h)/1.34)
+            q75, q25 = np.percentile(xhighsrt, [75,25])
+            sgmh = min(np.std(xhighsrt), (q75-q25)/1.34)
             hh = 1.06 *sgmh /np.power(len(xhighsrt),1.0/5)
             #...Several trials for selection
             aquisition = np.zeros(ntrial)
@@ -356,7 +354,7 @@ class TPE:
                 r = h *np.sqrt(-2.0*np.log(random.random()))
                 th = 2.0 *np.pi *random.random()
                 x = xi + r*np.cos(th)
-                #...Wrap by vlimits
+                #...Wrap by vranges
                 x = min(max(x,xhmin),xhmax)
                 xs[itry] = x
                 #...Compute l(x) and g(x)
@@ -366,46 +364,14 @@ class TPE:
                     lx += np.exp(-0.5*z*z)
                 lx /= npnt*h *np.sqrt(2.0*np.pi)
                 gx = 0.0
-                for j in range(len(xhighsrt)):
+                for j in range(len(xhighs)):
                     z = (x-xhighsrt[j])/hh
                     gx += np.exp(-0.5*z*z)
-                gx /= len(xhighsrt)*hh *np.sqrt(2.0*np.pi)
-                aq = gx/lx
-                # if idim == 4:
-                #     print('itry,xi,x,lx,gx,gx/lx = '
-                #           +f'{itry:3d}  {xi:6.3f} {x:6.3f} {lx:7.5f} {gx:7.5f} {aq:7.5f}')
-                aquisition[itry] = aq
-            # #...Pick nbatch of minimum aquisition points
-            # idxsort = np.argsort(aquisition)
-            # xcandidates[:,idim] = xs[idxsort[0:self.nbatch]]
-            #...Pick nbatch points using inverse of aquisition as weight
-            aqinvs = np.array([ 1.0/a for a in aquisition])
-            choices = []
-            for i in range(self.nbatch):
-                while True:
-                    idx = random.choices([j for j in range(len(aqinvs))],weights=aqinvs)[0]
-                    if idx in choices:
-                        continue
-                    choices.append(idx)
-                    aqinvs[idx] = 0.0
-                    break
-            # print('choices=',choices)
-            # print('xs[choices]=',xs[choices])
-            xcandidates[:,idim] = xs[choices]
-            # print('idim,h,xs=',idim,h,xcandidates[:,idim])
-
-            # #...A way not to use g(x) for evaluation of a sample
-            # xs = np.empty(self.nbatch)
-            # for ib in range(self.nbatch):
-            #     ipnt = int(random.random()*npnt)
-            #     xi = xlowsrt[ipnt]
-            #     r = h *np.sqrt(-2.0*np.log(random.random()))
-            #     th = 2.0 *np.pi *random.random()
-            #     x = xi + r*np.cos(th)
-            #     #...Wrap by vlimits
-            #     x = min(max(x,xhmin),xhmax)
-            #     xs[ib] = x
-            # xcandidates[:,idim] = xs[:]
+                gx /= len(xhighs)*hh *np.sqrt(2.0*np.pi)
+                aquisition[itry] = gx/lx
+            #...Pick nbatch of minimum aquisition points
+            idxsort = np.argsort(aquisition)
+            xcandidates[:,idim] = xs[idxsort[0:self.nbatch]]
         #...Create sample with xcandidate as variables
         candidates = []
         for ib in range(self.nbatch):
@@ -415,15 +381,58 @@ class TPE:
             candidates.append(smpl)
         return candidates
 
+    def _candidates_by_WPE(self,):
+        """
+        Create candidates by using WPE.
+        """
+        vals = np.zeros(len(self.history))
+        for i,si in enumerate(self.history):
+            vals[i] = si.val
+        if len(self.history) > self.ntrial:
+            iargs = np.argpartition(vals,self.ntrial)
+            tmpsmpls = [ self.history[i] for i in iargs[:self.ntrial] ]
+            vals = vals[ iargs[:self.ntrial] ]
+        else:
+            tmpsmpls = copy.copy(self.history)
+        wgts = np.array([ 1.0/v**self.exponent for v in vals ])
+        xtmps = np.zeros((len(tmpsmpls),self.ndim))
+        for i in range(len(tmpsmpls)):
+            xtmps[i,:] = tmpsmpls[i].variables[:]
+        #...Sampling variable candidates
+        xcandidates = np.empty((self.nbatch,self.ndim))
+        for idim in range(self.ndim):
+            xhmin = self.vlimits[idim,0]
+            xhmax = self.vlimits[idim,1]
+            xsrt = np.sort(xtmps[:,idim])
+            #...Determine smoothness parameter, h, by Silverman's method
+            q75, q25 = np.percentile(xsrt, [75,25])
+            sgm = min(np.std(xsrt), (q75-q25)/1.34)
+            h = 1.06 *sgm /np.power(len(xsrt), 1.0/5)
+            xs = np.empty(self.nbatch)
+            for ib in range(self.nbatch):
+                ipnt = random.choices([j for j in range(len(wgts))],weights=wgts)[0]
+                xi = xtmps[ipnt,idim]
+                r = h *np.sqrt(-2.0*np.log(random.random()))
+                th = 2.0 *np.pi *random.random()
+                x = xi + r*np.cos(th)
+                #...Wrap by vranges
+                x = min(max(x,xhmin),xhmax)
+                xs[ib] = x
+            xcandidates[:,idim] = xs[:]
+        
+        #...Create sample with xcandidate as variables
+        candidates = []
+        for ib in range(self.nbatch):
+            self.iidmax += 1
+            smpl = Sample(self.iidmax, self.ndim, self.loss_func)
+            smpl.set_variables(xcandidates[ib,:])
+            candidates.append(smpl)
+        
+        return candidates
+
     def write_variables(self,smpl,fname='in.vars.fitpot',**kwargs):
         vs = smpl.variables
         vrs = self.vranges
-        # If vlogs[i] is set, the variable is expressed in log domain,
-        # it must be transformed back to non-log domain.
-        for i in range(self.ndim):
-            if self.vlogs[i]:
-                vs[i] = np.exp(vs[i])
-                vrs[i] = np.exp(vrs[i])
         self.write_func(vs,vrs,fname,**kwargs)
         return None
 

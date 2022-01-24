@@ -50,6 +50,11 @@ def read_in_fitpot(fname='in.fitpot'):
     infp['weights'] = {'rdf':1.0, 'adf':1.0, 'vol':1.0, 'lat':1.0}
     infp['update_vrange'] = -1
     infp['param_file'] = 'in.vars.fitpot'
+
+    infp['tpe_gamma'] = 0.15
+    infp['tpe_ntrial'] = 100
+    infp['tpe_nsmpl_prior'] = 100
+    infp['wpe_exponent'] = 4
     
     mode = None
     specorder = None
@@ -183,16 +188,16 @@ def read_in_fitpot(fname='in.fitpot'):
             infp['cs_fraction'] = frac
             mode = None
         elif data[0] == 'tpe_gamma':
-            gamma = float(data[1])
-            infp['tpe_gamma'] = gamma
+            infp['tpe_gamma'] = float(data[1])
             mode = None
-        elif data[0] == 'tpe_nsmpl_prior':
-            nsmpl = int(data[1])
-            infp['tpe_nsmpl_prior'] = nsmpl
+        elif '_nsmpl_prior' in data[0]:
+            infp['tpe_nsmpl_prior'] = int(data[1])
             mode = None
-        elif data[0] == 'tpe_ntrial':
-            ntrial = int(data[1])
-            infp['tpe_ntrial'] = ntrial
+        elif '_ntrial' in data[0]:
+            infp['tpe_ntrial'] = int(data[1])
+            mode = None
+        elif data[0] == 'wpe_exponent':
+            infp['wpe_exponent'] = int(data[1])
             mode = None
         elif data[0] == 'update_vrange':
             infp['update_vrange'] = int(data[1])
@@ -869,12 +874,9 @@ def main():
         F = infp['cs_fraction']
         opt = CS(N,F, vs,vrs,vrsh, func_wrapper, write_vars_fitpot,
                  nproc=nproc, **kwargs)
-    elif kwargs['fitting_method'] in ('tpe','TPE'):
+    elif kwargs['fitting_method'] in ('tpe','TPE','wpe','WPE'):
         nbatch = nproc
-        gamma = infp['tpe_gamma']
-        opt = TPE(nbatch,vs,vrs,vrsh, func_wrapper, write_vars_fitpot,
-                  gamma,**kwargs)
-
+        opt = TPE(nbatch,vs,vrs,vrsh, func_wrapper, write_vars_fitpot,**kwargs)
     
     opt.run(maxiter)
 
