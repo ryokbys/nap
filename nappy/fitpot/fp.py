@@ -225,7 +225,7 @@ def write_info(infp,args):
             print('')
     except:
         raise
-    print('   specorder       ',infp['specorder'])
+    # print('   specorder       ',infp['specorder'])
     fmethod = infp['fitting_method']
     print('   fitting_method  {0:s}'.format(fmethod))
     if fmethod in ('de','DE'):
@@ -646,7 +646,7 @@ def func_wrapper(variables, **kwargs):
     # triplets = kwargs['triplets']
     refdata = kwargs['refdata']
     wgts = kwargs['weights']
-    specorder = kwargs['specorder']
+    # specorder = kwargs['specorder']
     refdata = kwargs['refdata']
     subjobscript = kwargs['subjob-script']
     subdir = kwargs['subdir-prefix'] +'{0:03d}'.format(kwargs['index'])
@@ -787,20 +787,6 @@ def main():
     infp = read_in_fitpot('in.fitpot')
     write_info(infp,args)
 
-    pairs = get_pairs(infp['interactions'])
-    rdf_pairs = infp['rdf_pairs']
-    if len(rdf_pairs) == 0:  # if no rdf_pairs are specied, all the pairs are selected
-        specorder = infp['specorder']
-        rdf_pairs = []
-        for i,si in enumerate(specorder):
-            for j in range(i,len(specorder)):
-                sj = specorder[j]
-                rdf_pairs.append((si,sj))
-    
-    # print('pairs    =',pairs)
-    # print('rdf_pairs=',rdf_pairs)
-    adf_triplets = infp['adf_triplets']
-    triplets = get_triplets(infp['interactions'])
     rc2,rc3,vs,vrs,vrsh,options = read_vars_fitpot(infp['param_file'])
 
     kwargs = infp
@@ -809,10 +795,6 @@ def main():
     # kwargs['infp'] = infp
     kwargs['rc2'] = rc2
     kwargs['rc3'] = rc3
-    kwargs['pairs'] = pairs
-    kwargs['rdf_pairs'] = rdf_pairs
-    kwargs['triplets'] = triplets
-    kwargs['adf_triplets'] = adf_triplets
     kwargs['subdir-prefix'] = args['--subdir-prefix']
     kwargs['subjob-script'] = args['--subjob-script']
     kwargs['start'] = start
@@ -821,6 +803,24 @@ def main():
     if len(infp['match']) != 0:
         refdata = get_data2(smpldir,prefix='ref',**kwargs)
     else:
+        pairs = get_pairs(infp['interactions'])
+        rdf_pairs = infp['rdf_pairs']
+        if len(rdf_pairs) == 0:  # if no rdf_pairs are specied, all the pairs are selected
+            specorder = infp['specorder']
+            rdf_pairs = []
+            for i,si in enumerate(specorder):
+                for j in range(i,len(specorder)):
+                    sj = specorder[j]
+                    rdf_pairs.append((si,sj))
+    
+        # print('pairs    =',pairs)
+        # print('rdf_pairs=',rdf_pairs)
+        adf_triplets = infp['adf_triplets']
+        triplets = get_triplets(infp['interactions'])
+        kwargs['pairs'] = pairs
+        kwargs['rdf_pairs'] = rdf_pairs
+        kwargs['triplets'] = triplets
+        kwargs['adf_triplets'] = adf_triplets
         refdata = get_data(smpldir,prefix='ref',**kwargs)
         if kwargs['lat_match']:
             a0,b0,c0,alp0,bet0,gmm0 = refdata['lat']
@@ -868,7 +868,7 @@ def main():
                  nproc=nproc, **kwargs)
     elif kwargs['fitting_method'] in ('tpe','TPE','wpe','WPE'):
         nbatch = nproc
-        opt = TPE(nbatch,vs,vrs,vrsh, func_wrapper, write_vars_fitpot,**kwargs)
+        opt = TPE(nbatch, vs, vrs, vrsh, func_wrapper, write_vars_fitpot,**kwargs)
     
     opt.run(maxiter)
 
