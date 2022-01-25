@@ -51,11 +51,6 @@ def read_in_fitpot(fname='in.fitpot'):
     infp['update_vrange'] = -1
     infp['param_file'] = 'in.vars.fitpot'
 
-    infp['tpe_gamma'] = 0.15
-    infp['tpe_ntrial'] = 100
-    infp['tpe_nsmpl_prior'] = 100
-    infp['wpe_exponent'] = 4
-    
     mode = None
     specorder = None
     infp['interactions'] = []
@@ -196,9 +191,6 @@ def read_in_fitpot(fname='in.fitpot'):
         elif '_ntrial' in data[0]:
             infp['tpe_ntrial'] = int(data[1])
             mode = None
-        elif data[0] == 'wpe_exponent':
-            infp['wpe_exponent'] = int(data[1])
-            mode = None
         elif data[0] == 'update_vrange':
             infp['update_vrange'] = int(data[1])
             mode = None
@@ -244,8 +236,8 @@ def write_info(infp,args):
     elif fmethod in ('cs','CS'):
         print('   num_individuals   ',infp['cs_num_individuals'])
         print('   fraction          {0:7.4f}'.format(infp['cs_fraction']))
-    elif fmethod in ('tpe','TPE'):
-        print('   gamma             {0:7.3f}'.format(infp['tpe_gamma']))
+    elif fmethod in ('tpe','TPE','wpe','WPE'):
+        pass
     else:
         print('   There is no such fitting method...')
     print('   num_iteration   {0:d}'.format(infp['num_iteration']))

@@ -130,7 +130,6 @@ class TPE:
         self.ntrial = 100
         self.method = kwargs['fitting_method']
         self.gamma = 0.15
-        self.exponent = 4
         #...Change default values if specified
         if 'print_level' in kwargs.keys():
             self.print_level = int(kwargs['print_level'])
@@ -138,16 +137,25 @@ class TPE:
             self.nsmpl_prior = int(kwargs['tpe_nsmpl_prior'])
         if 'tpe_ntrial' in kwargs.keys():
             self.ntrial = int(kwargs['tpe_ntrial'])
-        if 'tpe_type' in kwargs.keys():
-            self.tpe_type = kwargs['tpe_type']
         if 'tpe_gamma' in kwargs.keys():
             self.gamma = float(kwargs['tpe_gamma'])
-        if 'wpe_exponent' in kwargs.keys():
-            self.exponent = int(kwargs['wpe_exponent'])
 
         if self.gamma < 0.0 or self.gamma > 1.0:
             raise ValueError('gamma must be within 0. and 1., whereas gamma = ',self.gamma)
 
+        #...Write info
+        print('')
+        if self.method in ('wpe','WPE'):
+            print('   {0:s} infomation:'.format(self.method))
+            print(f'     Num of prior samples = {self.nsmpl_prior:d}')
+            print(f'     Num of top samples used for density estimation = {self.ntrial:d}')
+        elif self.method in ('tpe','TPE'):
+            print('   {0:s} infomation:'.format(self.method))
+            print(f'     Num of prior samples = {self.nsmpl_prior:d}')
+            print(f'     Num of trials for sampling = {self.ntrial:d}')
+            print(f'     Gamma for dividing high and low = {self.gamma:4.2f}')
+        print('')
+    
         #...Change vrange if log domain
         for i in range(self.ndim):
             if self.vlogs[i]:
@@ -364,10 +372,10 @@ class TPE:
                     lx += np.exp(-0.5*z*z)
                 lx /= npnt*h *np.sqrt(2.0*np.pi)
                 gx = 0.0
-                for j in range(len(xhighs)):
+                for j in range(len(xhighsrt)):
                     z = (x-xhighsrt[j])/hh
                     gx += np.exp(-0.5*z*z)
-                gx /= len(xhighs)*hh *np.sqrt(2.0*np.pi)
+                gx /= len(xhighsrt)*hh *np.sqrt(2.0*np.pi)
                 aquisition[itry] = gx/lx
             #...Pick nbatch of minimum aquisition points
             idxsort = np.argsort(aquisition)
@@ -394,7 +402,8 @@ class TPE:
             vals = vals[ iargs[:self.ntrial] ]
         else:
             tmpsmpls = copy.copy(self.history)
-        wgts = np.array([ 1.0/v**self.exponent for v in vals ])
+        vmin = vals.min()
+        wgts = np.array([ np.exp(-(v-vmin)/vmin) for v in vals ])
         xtmps = np.zeros((len(tmpsmpls),self.ndim))
         for i in range(len(tmpsmpls)):
             xtmps[i,:] = tmpsmpls[i].variables[:]
