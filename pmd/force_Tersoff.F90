@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-24 15:20:51 Ryo KOBAYASHI>
+!                     Last modified: <2022-01-25 17:32:41 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -643,6 +643,7 @@ contains
           if( index(cline,'Tersoff_type').ne.0 ) cycle
 
           backspace(ioprms)
+!.....TODO: make it applicable to multi-species...
           read(ioprms,*) cspi, a,b,lmbd1,lmbd2, rc2in, rc2out, &
                eta,delta,alpha,beta,h,c1,c2,c3,c4,c5,rc3in,rc3out
           isp = csp2isp(cspi)
