@@ -14,10 +14,9 @@ for l in out:
     assert 'nan' not in l or 'NaN' not in l
 
     dat = l.split()
-    if 'iid' in l:
+    if 'iid' in l and dat[0] != '#':
         Ls.append(float(dat[6]))
     if 'step,time,best,vars' in l:
-        dat = l.split()
         best = float(dat[3])
         assert abs(best -min(Ls)) < 0.001
 
