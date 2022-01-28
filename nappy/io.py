@@ -137,9 +137,9 @@ def read_pmd(fname='pmdini',specorder=None):
                     vels[incatm,:] = fdata[4:7]
                     sids[incatm] = sid
                     incatm += 1
-    nsys.atoms['pos'] = [ p for p in poss ]
-    nsys.atoms['vel'] = [ v for v in vels ]
-    nsys.atoms['frc'] = [ f for f in frcs ]
+    nsys.atoms[['x','y','z']] = poss
+    nsys.atoms[['vx','vy','vz']] = vels
+    nsys.atoms[['fx','fy','fz']] = frcs
     nsys.atoms['sid'] = sids
     return nsys
 
@@ -165,8 +165,8 @@ def write_pmd(nsys,fname='pmdini'):
     # num of atoms
     f.write(" {0:10d}\n".format(len(nsys.atoms)))
     # atom positions
-    poss = nsys.atoms.pos
-    vels = nsys.atoms.vel
+    poss = nsys.get_scaled_positions()
+    vels = nsys.atoms[['vx','vy','vz']]
     sids = nsys.atoms.sid
     if 'ifmv' not in nsys.atoms.columns:
         ifmvs = [ 1 for i in range(len(poss)) ]
@@ -262,9 +262,9 @@ need to specify the species order correctly with --specorder option.
                 x1,x2,x3 = pos[0],pos[1],pos[2]
             poss[i,:] = [x1,x2,x3]
 
-    nsys.atoms['pos'] = [ p for p in poss ]
-    nsys.atoms['vel'] = [ v for v in vels ]
-    nsys.atoms['frc'] = [ f for f in frcs ]
+    nsys.atoms[['x','y','z']] = poss
+    nsys.atoms[['vx','vy','vz']] = vels
+    nsys.atoms[['fx','fy','fz']] = frcs
     nsys.atoms['sid'] = sids
     return nsys
             
@@ -309,8 +309,9 @@ def write_POSCAR(nsys,fname='POSCAR'):
     if len(outorder) != len(nsys.atoms):
         print('len(outorder),natm=', len(outorder),len(nsys.atoms))
         raise ValueError(' len(outorder) != natm')
+    spos = nsys.get_scaled_positions()
     for ia in outorder:
-        pi = nsys.atoms.pos[ia]
+        pi = spos[ia]
         f.write(' {0:15.7f} {1:15.7f} {2:15.7f} T T T\n'.format(*pi))
     f.close()
     return None
@@ -489,12 +490,9 @@ def read_dump(fname="dump",specorder=None):
 
             iatm += 1
 
-    # nsys.atoms['pos'] = poss
-    # nsys.atoms['vel'] = vels
-    # nsys.atoms['frc'] = frcs
-    nsys.atoms['pos'] = [ p for p in poss ]
-    nsys.atoms['vel'] = [ v for v in vels ]
-    nsys.atoms['frc'] = [ f for f in frcs ]
+    nsys.atoms[['x','y','z']] = poss
+    nsys.atoms[['vx','vy','vz']] = vels
+    nsys.atoms[['fx','fy','fz']] = frcs
     nsys.atoms['sid'] = sids
     for ia in range(len(aux_names)):
         name = aux_names[ia]
@@ -516,7 +514,7 @@ def write_dump(nsys,fname='dump',auxs=['vx','vy','vz']):
     f.write("{0:d}\n".format(len(nsys.atoms)))
 
     hmat = nsys.get_hmat()
-    poss = np.array(list(nsys.atoms.pos.values))
+    poss = nsys.get_scaled_positions()
     xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,rposs = to_lammps(hmat,poss)
     xlo_bound = xlo +min(0.0, xy, xz, xy+xz)
     xhi_bound = xhi +max(0.0, xy, xz, xy+xz)
@@ -544,13 +542,16 @@ def write_dump(nsys,fname='dump',auxs=['vx','vy','vz']):
             f.write(' {0:s}'.format(aux))
     f.write("\n")
 
+    vels = nsys.get_scaled_velocities()
+    frcs = nsys.get_scaled_forces()
+
     if len(aux_names)>0:
         for i in range(len(nsys.atoms)):
             rpos = rposs[i]
             #...NOTE: velocity is scaled value here,
             #   if one wants to get real velocity, one needs to convert
             #   is in to_lammps function, not here.
-            vel = nsys.atoms.vel[i]
+            vel = vels[i]
             sid = nsys.atoms.sid[i]
             symbol = nsys.specorder[sid-1]
             f.write("{0:8d} {1:3s} ".format(i+1,symbol))
@@ -568,7 +569,7 @@ def write_dump(nsys,fname='dump',auxs=['vx','vy','vz']):
     else:
         for i in range(len(nsys.atoms)):
             rpos = rposs[i]
-            vel = nsys.atoms.vel[i]
+            vel = vels[i]
             sid = nsys.atoms.sid[i]
             symbol = nsys.specorder[sid-1]
             f.write("{0:8d} {1:3s} ".format(i+1,symbol))
@@ -598,9 +599,9 @@ def read_lammps_data(fname="data.lammps",atom_style='atomic',specorder=None):
             if 'atoms' in line:
                 natm = int(data[0])
                 sids = [ 0 for i in range(natm) ]
-                poss = [ np.zeros(3) for i in range(natm) ]
-                vels = [ np.zeros(3) for i in range(natm) ]
-                frcs = [ np.zeros(3) for i in range(natm) ]
+                poss = np.zeros((natm,3))
+                vels = np.zeros((natm,3))
+                frcs = np.zeros((natm,3))
             elif 'atom types' in line:
                 nspcs = int(data[0])
             elif 'xlo' in line:
@@ -658,13 +659,12 @@ def read_lammps_data(fname="data.lammps",atom_style='atomic',specorder=None):
                 x = pbc(x)
                 y = pbc(y)
                 z = pbc(z)
-                poss[iatm][:] = [x,y,z]
-                vels[iatm][:] = [0.,0.,0]
+                poss[iatm,:] = [x,y,z]
                 iatm += 1
     f.close()
-    nsys.atoms['pos'] = poss
-    nsys.atoms['vel'] = vels
-    nsys.atoms['frc'] = frcs
+    nsys.atoms[['x','y','z']] = poss
+    nsys.atoms[['vx','vy','vz']] = vels
+    nsys.atoms[['fx','fy','fz']] = frcs
     nsys.atoms['sid'] = sids
     return nsys
 
@@ -683,7 +683,7 @@ def write_lammps_data(nsys,fname='data.lammps',atom_style='atomic'):
     f.write("{0:d}  atom types\n".format(nsys.num_species()))
     f.write('\n')
     hmat = nsys.get_hmat()
-    poss = np.array(list(nsys.atoms.pos.values))
+    poss = nsys.get_scaled_positions()
     xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,rposs = to_lammps(hmat,poss)
     f.write("{0:20.10f} {1:20.10f} xlo xhi\n".format(xlo,xhi))
     f.write("{0:20.10f} {1:20.10f} ylo yhi\n".format(ylo,yhi))
@@ -756,17 +756,17 @@ def read_xsf(fname="xsf",specorder=None):
             if len(data) == 1:
                 natm= int(data[0])
                 sids = [ 0 for i in range(natm) ]
-                poss = [ np.zeros(3) for i in range(natm) ]
-                vels = [ np.zeros(3) for i in range(natm) ]
-                frcs = [ np.zeros(3) for i in range(natm) ]
+                poss = np.zeros((natm,3))
+                vels = np.zeros((natm,3))
+                frcs = np.zeros((natm,3))
                 continue
             elif len(data) == 2:
                 natm= int(data[0])
                 nspcs= int(data[1])
                 sids = [ 0 for i in range(natm) ]
-                poss = [ np.zeros(3) for i in range(natm) ]
-                vels = [ np.zeros(3) for i in range(natm) ]
-                frcs = [ np.zeros(3) for i in range(natm) ]
+                poss = np.zeros((natm,3))
+                vels = np.zeros((natm,3))
+                frcs = np.zeros((natm,3))
                 continue
             elif len(data) == 4 or len(data) == 7:
                 if iatm >= natm:
@@ -781,16 +781,15 @@ def read_xsf(fname="xsf",specorder=None):
                 yc= float(data[2])
                 zc= float(data[3])
                 xi,yi,zi = cartesian_to_scaled(hi,xc,yc,zc)
-                poss[iatm][:] = [xi,yi,zi]
-                vels[iatm][:] = [0.,0.,0.]
+                poss[iatm,:] = [xi,yi,zi]
                 # print 'iatm,symbol,sid,xc,yc,zc = ',iatm,symbol,sid,xc,yc,zc
             else:
                 continue
             iatm += 1
     nsys.alc= 1.0
-    nsys.atoms['pos'] = poss
-    nsys.atoms['vel'] = vels
-    nsys.atoms['frc'] = frcs
+    nsys.atoms[['x','y','z']] = poss
+    nsys.atoms[['vx','vy','vz']] = vels
+    nsys.atoms[['fx','fy','fz']] = frcs
     nsys.atoms['sid'] = sids
     f.close()
     return nsys
@@ -816,8 +815,9 @@ def write_xsf(nsys,fname='xsf'):
     f.write("{0:9.3f} {1:9.3f} {2:9.3f}\n".format(*nsys.a3))
     f.write("PRIMCOORD\n")
     f.write("{0:>8d}  {1:2d}\n".format(len(nsys.atoms),nsys.num_species()))
+    spos = nsys.get_scaled_positions()
     for i in range(len(nsys.atoms)):
-        pos = nsys.atoms.pos[i]
+        pos = sos[i]
         x,y,z = scaled_to_cartesian(h,*pos)
         sid = nsys.atoms.sid[i]
         symbol = nsys.specorder[sid-1]
@@ -875,9 +875,9 @@ need to specify the species order correctly with --specorder option.
             raise ValueError(msg)
         natm = np.sum(num_species)
         sids = [ 0 for i in range(natm) ]
-        poss = [ np.zeros(3) for i in range(natm) ]
-        vels = [ np.zeros(3) for i in range(natm) ]
-        frcs = [ np.zeros(3) for i in range(natm) ]
+        poss = np.zeros((natm,3))
+        vels = np.zeros((natm,3))
+        frcs = np.zeros((natm,3))
         #print("Number of atoms = {0:5d}".format(natm))
         # 7th or 8th line: comment
         c7= f.readline()
@@ -912,9 +912,9 @@ need to specify the species order correctly with --specorder option.
             poss[i][:] = [x1,x2,x3]
 
         #...Up to here, code should be the same as read_POSCAR, in case of CHGCAR lines follow
-        nsys.atoms['pos'] = poss
-        nsys.atoms['vel'] = vels
-        nsys.atoms['frc'] = frcs
+        nsys.atoms[['x','y','z']] = poss
+        nsys.atoms[['vx','vy','vz']] = vels
+        nsys.atoms[['fx','fy','fz']] = frcs
         nsys.atoms['sid'] = sids
 
         #...Read volumetric data
@@ -1111,20 +1111,21 @@ def from_ase(atoms,specorder=None):
     #...First, initialize arrays
     natm = len(atoms)
     sids = [ 0 for i in range(natm) ]
-    poss = [ np.array(spos[i]) for i in range(natm) ]
+    poss = np.array(spos)
     if vels is None:
-        vels = [ np.zeros(3) for i in range(natm) ]
-    else:        
-        vels = [ np.array(vels[i]) for i in range(natm) ]
-    frcs = [ np.zeros(3) for i in range(natm) ]
+        vels = np.zeros((natm,3))
+    else:
+        vels = np.array(vels)
+    frcs = np.zeros((natm,3))
 
     #...Create arrays to be installed into nsys.atoms
     sids = [ nsys.specorder.index(si)+1 for si in symbols ]
     nsys.atoms.sid = sids
-    nsys.atoms.pos = poss
-    nsys.atoms.vel = vels
-    nsys.atoms.vel = nsys.atoms.vel.apply(lambda x: np.dot(celli,x))
-    nsys.atoms.frc = frcs
+    nsys.atoms[['x','y','z']] = poss
+    for i in range(len(vels)):
+        vels[i] = np.dot(celli,vels[i])
+    nsys.atoms[['vx','vy','vz']] = vels
+    nsys.atoms[['fx','fy','fz']] = frcs
 
     return nsys
 

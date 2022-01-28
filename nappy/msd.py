@@ -110,7 +110,7 @@ def get_msd(files,ids0,nmeasure,nshift,specorder=None):
         if ifile != 0:
             #nsys= NAPSystem(fname=fname,specorder=specorder)
             nsys = read(fname=fname,specorder=specorder)
-        poss = nsys.atoms.pos
+        poss = nsys.get_scaled_positions()
         sids = nsys.atoms.sid
         
         hmat = nsys.get_hmat()

@@ -67,7 +67,7 @@ def rdf_of_atom(ia,nsys,rmax=5.0,dr=0.1,sigma=0):
     
     nspcs = len(nsys.specorder)
     ndri = np.zeros((nspcs+1,nr),dtype=float)
-    spos = nsys.atoms.pos
+    spos = nsys.get_scaled_positions()
     sids = nsys.atoms.sid
     natm = nsys.num_atoms()
     pi = spos[ia]
@@ -223,7 +223,7 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
     hmat = nsys.get_hmat()
     # Since an access to pandas DataFrame is much slower than that to numpy array,
     # use numpy arrays in the most time consuming part.
-    poss = np.array(nsys.atoms.pos,)
+    poss = nsys.get_scaled_positions()
     sids = np.array(nsys.atoms.sid,)
     natm = len(nsys.atoms)
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
@@ -231,15 +231,9 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
     nsys.make_pair_list(rcut=rmax,nnmax=nnmax)
     for ia in range(natm0):
         isid = sids[ia]
-        pi = poss[ia]
         ndr[:,:] = 0.0
         for ja,dij in nsys.neighbors_of(ia,distance=True):
             jsid = sids[ja]
-            # print(ia,isid,ja,jsid,dij)
-            # pij = poss[ja] -pi
-            # pij = pij -np.round(pij)
-            # rij = np.dot(hmat,pij)
-            # dij = np.sqrt(rij[0]**2 +rij[1]**2 +rij[2]**2)
             rrdr= (dij-rmin)/dr
             if rrdr < 0.0:
                 continue
@@ -545,7 +539,7 @@ def nbplot(nsys,dr=0.1,rmin=0.0,rmax=5.0,nnmax=200,pairs=None,sigma=0):
     try:
         rd,gr= rdf(nsys,nspcs,dr,rmax,rmin=rmin,nnmax=nnmax)
     except:
-        raise Error('rdf(..) failed.')
+        raise Exception('rdf(..) failed.')
 
     if sigma > 0:
         #...Smearing of total RDF

@@ -116,7 +116,7 @@ def adf(nsys,dang,rcut,triplets):
     anda= np.zeros((len(triplets),na),dtype=float)
     angd= np.array([ dang*ia for ia in range(na) ])
     symbols = nsys.get_symbols()
-    poss = np.array(nsys.atoms.pos)
+    poss = nsys.get_scaled_positions()
     lspr = nsys.atoms.lspr
     for it,t in enumerate(triplets):
         si,sj,sk = t

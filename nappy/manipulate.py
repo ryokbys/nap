@@ -147,6 +147,7 @@ def insert(nsys0,num=1,spc=None,rule='maxmindist',num_trial=100):
         pi = np.random.rand(3)
         pi_prev = copy.copy(pi)
         d2min_prev = 0.0
+        spos = nsys.get_scaled_positions()
         for it in range(num_trial):
             #...Move the position using Levy flight
             for ixyz in range(3):
@@ -165,7 +166,7 @@ def insert(nsys0,num=1,spc=None,rule='maxmindist',num_trial=100):
             #...Calc minimum distance
             d2min = 1.0e+30
             for j in range(len(nsys.atoms)):
-                pj = nsys.atoms.pos[j]
+                pj = spos[j]
                 xij = pj -pi
                 xij = xij -np.round(xij)
                 rij = np.dot(hmat,xij)
@@ -181,9 +182,9 @@ def insert(nsys0,num=1,spc=None,rule='maxmindist',num_trial=100):
 
         #...Insert the atom at the position
         symbols = [spc]
-        poss = [pi_prev]
-        vels = [[0., 0., 0.]]
-        frcs = [[0., 0., 0.]]
+        poss = [pi_prev,]
+        vels = [[0., 0., 0.],]
+        frcs = [[0., 0., 0.],]
         # print('Atom added to {0:6.3f} {1:6.3f} {2:6.3f}, dist={3:.3f}'.format(*pi_prev,np.sqrt(d2min)))
         nsys.add_atoms(symbols,poss,vels,frcs)
 
@@ -217,21 +218,29 @@ def replicate(nsys0,n1o,n2o,n3o,n1m=0,n2m=0,n3m=0):
     # atoms0= copy.copy(nsys.atoms)
     newnatm = len(nsys.atoms) *m1*m2*m3
     newsids = [ 0 for i in range(newnatm) ]
-    newposs = [ np.zeros(3) for i in range(newnatm) ]
-    newvels = [ np.zeros(3) for i in range(newnatm) ]
-    newfrcs = [ np.zeros(3) for i in range(newnatm) ]
+    newposs = np.zeros((newnatm,3))
+    newvels = np.zeros((newnatm,3))
+    newfrcs = np.zeros((newnatm,3))
     colnames = list(nsys.atoms.columns)
     #...Labels except (sid,pos,vel,frc) are all auxiliary data
     auxnames = colnames.copy()
     auxnames.remove('sid')
-    auxnames.remove('pos')
-    auxnames.remove('vel')
-    auxnames.remove('frc')
+    auxnames.remove('x')
+    auxnames.remove('y')
+    auxnames.remove('z')
+    auxnames.remove('vx')
+    auxnames.remove('vy')
+    auxnames.remove('vz')
+    auxnames.remove('fx')
+    auxnames.remove('fy')
+    auxnames.remove('fz')
     newauxs = {}
     for auxname in auxnames:
         newauxs[auxname] = []
     inc = 0
-    poss = nsys.atoms.pos
+    poss = nsys.get_scaled_positions()
+    vels = nsys.get_scaled_velocities()
+    frcs = nsys.get_scaled_forces()
     for i1 in range(n1m,n1):
         for i2 in range(n2m,n2):
             for i3 in range(n3m,n3):
@@ -241,17 +250,17 @@ def replicate(nsys0,n1o,n2o,n3o,n1m=0,n2m=0,n3m=0):
                     y= pi0[1]/m2 +1.0/m2*i2
                     z= pi0[2]/m3 +1.0/m3*i3
                     newsids[inc] = nsys.atoms.sid[i0]
-                    newposs[inc][:] = [x,y,z]
-                    newvels[inc][:] = nsys.atoms.vel[i0]
-                    newfrcs[inc][:] = nsys.atoms.frc[i0]
+                    newposs[inc,:] = [x,y,z]
+                    newvels[inc,:] = vels[i0]
+                    newfrcs[inc,:] = frcs[i0]
                     for auxname in auxnames:
                         newauxs[auxname].append(nsys.atoms.loc[i0,auxname])
                     inc += 1
     #...Use DataFrame nsys.atoms
     nsys.atoms = pd.DataFrame(columns=colnames)
-    nsys.atoms['pos'] = newposs
-    nsys.atoms['vel'] = newvels
-    nsys.atoms['frc'] = newfrcs
+    nsys.atoms[['x','y','z']] = newposs
+    nsys.atoms[['vx','vy','vz']] = newvels
+    nsys.atoms[['fx','fy','fz']] = newfrcs
     nsys.atoms['sid'] = newsids
     for auxname in auxnames:
         nsys.atoms[auxname] = newauxs[auxname]
