@@ -10,6 +10,8 @@ Usage:
 
 Options:
   -h, --help  Show this message and exit.
+  --in INPUTFILE
+              Name of configuration file. [default: in.fitpot]
   --nproc NPROC
               Number of processes to be used. If it's less than 1, use as many processes as possible. [default: 0]
   --subdir-prefix PREFIX
@@ -783,8 +785,8 @@ def main():
     start = time.time()
 
     nproc = int(args['--nproc'])
-
-    infp = read_in_fitpot('in.fitpot')
+    infname = args['--in']
+    infp = read_in_fitpot(infname)
     write_info(infp,args)
 
     rc2,rc3,vs,vrs,vrsh,options = read_vars_fitpot(infp['param_file'])

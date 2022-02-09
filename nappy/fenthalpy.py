@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """
 Compute formation enthalpy from given structures.
-The 1st file in the arguments is the product and the following files are the reactants.
-(Assuming that the product is only one chemical compound not plural.)
 If --erg-xxx option is not specified, pmd will be performed to get energies.
 
 Usage:

@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-01-25 17:32:41 KOBAYASHI Ryo>
+!                     Last modified: <2022-02-09 10:59:18 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -31,13 +31,16 @@ module tersoff
 
 !.....Original parameters from [2]
   real(8):: ts_a(nspmax,nspmax), ts_b(nspmax,nspmax), ts_lmbd1(nspmax,nspmax), &
-       ts_lmbd2(nspmax,nspmax), ts_eta(nspmax), ts_delta(nspmax), &
-       ts_alpha(nspmax,nspmax), ts_beta(nspmax), ts_c1(nspmax), &
-       ts_c2(nspmax), ts_c3(nspmax), ts_c4(nspmax), ts_c5(nspmax), ts_h(nspmax), &
-       ts_rc2in(nspmax,nspmax), ts_rc2out(nspmax,nspmax), ts_f0(nspmax), &
+       ts_lmbd2(nspmax,nspmax), ts_eta(nspmax,nspmax), ts_delta(nspmax,nspmax), &
+       ts_alpha(nspmax,nspmax), ts_beta(nspmax,nspmax), ts_c1(nspmax,nspmax), &
+       ts_c2(nspmax,nspmax), ts_c3(nspmax,nspmax), ts_c4(nspmax,nspmax),&
+       ts_c5(nspmax,nspmax), ts_h(nspmax,nspmax), &
+       ts_rc2in(nspmax,nspmax), ts_rc2out(nspmax,nspmax), ts_f0(nspmax,nspmax), &
        ts_rc3in(nspmax,nspmax), ts_rc3out(nspmax,nspmax), &
        ts_r(nspmax,nspmax), ts_d(nspmax,nspmax), &
        ts_rc(nspmax,nspmax), ts_rc2(nspmax,nspmax)
+
+  logical:: interact(nspmax,nspmax)
 
 !.....Te-dependent parameters
   integer:: ntemp
@@ -56,24 +59,24 @@ contains
 
     call read_params_tersoff(myid,mpi_world,iprint,specorder)
 
-!.....Lorentz-Berthelot rule for inter-species parameters
-    do isp=1,nspmax
-      do jsp=1,nspmax
-        ts_a(isp,jsp) = sqrt(ts_a(isp,isp)*ts_a(jsp,jsp))
-        ts_b(isp,jsp) = sqrt(ts_b(isp,isp)*ts_b(jsp,jsp))
-        ts_lmbd1(isp,jsp)= (ts_lmbd1(isp,isp)+ts_lmbd1(jsp,jsp))/2
-        ts_lmbd2(isp,jsp)= (ts_lmbd2(isp,isp)+ts_lmbd2(jsp,jsp))/2
-        ts_rc2in(isp,jsp)= (ts_rc2in(isp,isp)+ts_rc2in(jsp,jsp))/2
-        ts_rc2out(isp,jsp)= (ts_rc2out(isp,isp)+ts_rc2out(jsp,jsp))/2
-        ts_rc3in(isp,jsp)= (ts_rc3in(isp,isp)+ts_rc3in(jsp,jsp))/2
-        ts_rc3out(isp,jsp)= (ts_rc3out(isp,isp)+ts_rc3out(jsp,jsp))/2
-!.....R, D, Rc
-!!$        ts_r(isp,jsp)= (ts_r1(isp,jsp)+ts_r2(isp,jsp))/2
-!!$        ts_d(isp,jsp)= (ts_r2(isp,jsp)-ts_r1(isp,jsp))/2
-        ts_rc(isp,jsp)= ts_rc2out(isp,jsp)
-        ts_rc2(isp,jsp)= ts_rc(isp,jsp)**2
-      enddo
-    enddo
+    ts_rc(:,:) = ts_rc2out(:,:)
+    ts_rc2(:,:)= ts_rc(:,:)**2
+
+!!$!.....Lorentz-Berthelot rule for inter-species parameters
+!!$    do isp=1,nspmax
+!!$      do jsp=1,nspmax
+!!$        ts_a(isp,jsp) = sqrt(ts_a(isp,isp)*ts_a(jsp,jsp))
+!!$        ts_b(isp,jsp) = sqrt(ts_b(isp,isp)*ts_b(jsp,jsp))
+!!$        ts_lmbd1(isp,jsp)= (ts_lmbd1(isp,isp)+ts_lmbd1(jsp,jsp))/2
+!!$        ts_lmbd2(isp,jsp)= (ts_lmbd2(isp,isp)+ts_lmbd2(jsp,jsp))/2
+!!$        ts_rc2in(isp,jsp)= (ts_rc2in(isp,isp)+ts_rc2in(jsp,jsp))/2
+!!$        ts_rc2out(isp,jsp)= (ts_rc2out(isp,isp)+ts_rc2out(jsp,jsp))/2
+!!$        ts_rc3in(isp,jsp)= (ts_rc3in(isp,isp)+ts_rc3in(jsp,jsp))/2
+!!$        ts_rc3out(isp,jsp)= (ts_rc3out(isp,isp)+ts_rc3out(jsp,jsp))/2
+!!$        ts_rc(isp,jsp)= ts_rc2out(isp,jsp)
+!!$        ts_rc2(isp,jsp)= ts_rc(isp,jsp)**2
+!!$      enddo
+!!$    enddo
 !!$    ts_r = (ts_r1 +ts_r2)/2
 !!$    ts_d = (ts_r2 -ts_r1)/2
 !!$    ts_rc = ts_r +ts_d
@@ -118,7 +121,9 @@ contains
     if ( l1st ) then
       rcmax = 0d0
       do is=1,nsp
-        rcmax = max(rcmax,ts_rc(is,is))
+        do js=is,nsp
+          rcmax = max(rcmax,ts_rc(is,js))
+        enddo
       enddo
       if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
         print *,'Tersoff potential:'
@@ -132,14 +137,6 @@ contains
         call mpi_finalize(ierr)
         stop
       endif
-!!$      if( ts_fc_type.eq.2 ) then
-!!$        ts_rc = rc
-!!$        ts_rc2= rc*rc
-!!$        if( myid.eq.0 ) then
-!!$          print *,'Use the given cutoff radius for this potential, ' &
-!!$               //'since the cutoff function type is tanh.'
-!!$        endif
-!!$      endif
       if( ts_type(1:2).eq.'Te' .and. .not. present(tei) ) then
         if( myid.eq.0 ) print *,'ERROR: tei is not present.'
         stop 1
@@ -171,11 +168,11 @@ contains
         ja = lspr(jj,ia)
         js = int(tag(ja))
         if( d2lspr(jj,ia).ge.ts_rc2(is,js) ) cycle
+        if( .not.interact(is,js) ) cycle
         if( ja.le.ia ) cycle
         xij(1:3) = ra(1:3,ja) -xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-!!$        if( dij2.gt.ts_rc2 ) cycle
         dij = dsqrt(dij2)
 !.....Potential
         fc = f_c(dij,ts_rc2in(is,js),ts_rc2out(is,js))
@@ -211,8 +208,8 @@ contains
           enddo
         endif
       enddo
-      epi(ia) = epi(ia) +ts_f0(is)
-      epotl1 = epotl1 +ts_f0(is)
+      epi(ia) = epi(ia) +ts_f0(is,is)
+      epotl1 = epotl1 +ts_f0(is,is)
     enddo
 !!$    print *,'epotl1 =',epotl1
 
@@ -227,6 +224,7 @@ contains
         ja = lspr(jj,ia)
         js = int(tag(ja))
         if( d2lspr(jj,ia).ge.ts_rc2(is,js) ) cycle
+        if( .not.interact(is,js) ) cycle
         if( ja.eq.ia ) cycle
         xij(1:3) = ra(1:3,ja) -xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -244,6 +242,8 @@ contains
         do kk=1,lspr(0,ia)
           ka = lspr(kk,ia)
           ks = int(tag(ka))
+!.....Currently Tersoff potential is only available fro js==ks
+          if( ks.ne.js ) cycle
           if( d2lspr(kk,ia).ge.ts_rc2(is,ks) ) cycle
           if( ka.eq.ja ) cycle
           xik(1:3) = ra(1:3,ka) -xi(1:3)
@@ -252,14 +252,14 @@ contains
 !!$          if( dik2.gt.ts_rc2 ) cycle
           dik = dsqrt(dik2)
           fcik = f_c(dik,ts_rc3in(is,ks),ts_rc3out(is,ks))
-          texp3 = exp(ts_alpha(is,js)*(dij-dik)**ts_beta(is))
+          texp3 = exp(ts_alpha(is,ks)*(dij-dik)**ts_beta(is,ks))
           cs = dot(rij,rik) /dik *diji
-          zijk = (ts_h(is) -cs)*(ts_h(is) -cs)
-          gzijk = gz(zijk,is)
+          zijk = (ts_h(is,ks) -cs)*(ts_h(is,ks) -cs)
+          gzijk = gz(zijk,is,js,ks)
           zeta = zeta +fcik*gzijk*texp3
         enddo
 !.....Potential
-        bij = (1d0 +zeta**ts_eta(is))**(-ts_delta(is))
+        bij = (1d0 +zeta**ts_eta(is,js))**(-ts_delta(is,js))
         tmp = 0.25d0 *fcij*bij*faij
         epi(ia)= epi(ia) +tmp
         epi(ja)= epi(ja) +tmp
@@ -283,15 +283,17 @@ contains
           enddo
         endif
 !.....Force w.r.t. derivative of bij
-        dbijpref = (-ts_delta(is))*(1d0 +zeta**ts_eta(is))**(-(ts_delta(is)+1d0))  &
-             *ts_eta(is) *zeta**(ts_eta(is)-1d0)
+        dbijpref = (-ts_delta(is,js))*(1d0 +zeta**ts_eta(is,js))**(-(ts_delta(is,js)+1d0))  &
+             *ts_eta(is,js) *zeta**(ts_eta(is,js)-1d0)
         pref = 0.5d0 *dbijpref *fcij*faij
         sumj(1:3) = 0d0
         do kk=1,lspr(0,ia)
           ka = lspr(kk,ia)
-          ks = int(tag(ka))
-          if( d2lspr(kk,ia).ge.ts_rc2(is,ks) ) cycle
           if( ka.eq.ja ) cycle
+          ks = int(tag(ka))
+!.....Currently Tersoff potential is only available fro js==ks
+          if( ks.ne.js ) cycle
+          if( d2lspr(kk,ia).ge.ts_rc2(is,ks) ) cycle
           xik(1:3) = ra(1:3,ka) -xi(1:3)
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
@@ -302,14 +304,14 @@ contains
           dkrik(1:3)= -dirik(1:3)
           fcik = f_c(dik,ts_rc3in(is,ks),ts_rc3out(is,ks))
           dfcik = df_c(dik,ts_rc3in(is,ks),ts_rc3out(is,ks))
-          texp3 = exp(ts_alpha(is,js)*(dij-dik)**ts_beta(is))
-          dexp3ij = ts_alpha(is,js) *(dij-dik)**(ts_beta(is) -1d0) *texp3
+          texp3 = exp(ts_alpha(is,js)*(dij-dik)**ts_beta(is,js))
+          dexp3ij = ts_alpha(is,js) *(dij-dik)**(ts_beta(is,js) -1d0) *texp3
           dexp3ik = -dexp3ij
           cs = dot(rij,rik) *diji *diki
-          zijk = (ts_h(is) -cs)*(ts_h(is) -cs)
-          dzdcs = -2d0*(ts_h(is) -cs)
-          gzijk = gz(zijk,is)
-          dgzijk = dgz(zijk,is)
+          zijk = (ts_h(is,ks) -cs)*(ts_h(is,ks) -cs)
+          dzdcs = -2d0*(ts_h(is,ks) -cs)
+          gzijk = gz(zijk,is,js,ks)
+          dgzijk = dgz(zijk,is,js,ks)
           djcs(1:3)= diji*diki*rik(1:3) -cs*djrij(1:3)*diji
           dkcs(1:3)= diji*diki*rij(1:3) -cs*dkrik(1:3)*diki
           dics(1:3)= -djcs(1:3) -dkcs(1:3)
@@ -468,50 +470,50 @@ contains
     return
   end function df_c3
 !=======================================================================
-  function gz(z,is)
-    integer,intent(in):: is
+  function gz(z,is,js,ks)
+    integer,intent(in):: is,js,ks
     real(8),intent(in):: z
     real(8):: gz
     real(8):: go,ga
     
-    go = ts_c2(is)*z /(ts_c3(is) +z)
-    ga = 1d0 +ts_c4(is)*exp(-ts_c5(is)*z)
-    gz = ts_c1(is) +go*ga
+    go = ts_c2(is,js)*z /(ts_c3(is,js) +z)
+    ga = 1d0 +ts_c4(is,js)*exp(-ts_c5(is,js)*z)
+    gz = ts_c1(is,js) +go*ga
     return
   end function gz
 !=======================================================================
-  function dgz(z,is)
-    integer,intent(in):: is
+  function dgz(z,is,js,ks)
+    integer,intent(in):: is,js,ks
     real(8),intent(in):: z
     real(8):: dgz
     real(8):: dgo,dga,go,ga,texp
     
-    go = ts_c2(is)*z /(ts_c3(is) +z)
-    dgo = ts_c2(is)*ts_c3(is)/(ts_c3(is) +z)**2
-    texp = exp(-ts_c5(is)*z)
-    ga = 1d0 +ts_c4(is)*texp
-    dga = -ts_c4(is)*ts_c5(is)*texp
+    go = ts_c2(is,js)*z /(ts_c3(is,js) +z)
+    dgo = ts_c2(is,js)*ts_c3(is,js)/(ts_c3(is,js) +z)**2
+    texp = exp(-ts_c5(is,js)*z)
+    ga = 1d0 +ts_c4(is,js)*texp
+    dga = -ts_c4(is,js)*ts_c5(is,js)*texp
 
     dgz = dgo*ga +go*dga
     return
   end function dgz
 !=======================================================================
-  subroutine g_dg(z,g,dg,is)
-    integer,intent(in):: is
+  subroutine g_dg(z,g,dg,is,js,ks)
+    integer,intent(in):: is,js,ks
     real(8),intent(in):: z
     real(8),intent(out):: g,dg
 
     real(8):: texp,go,dgo,ga,dga
 
 !.....go term
-    go = ts_c2(is)*z /(ts_c3(is) +z)
-    dgo = ts_c2(is)*ts_c3(is)/(ts_c3(is) +z)**2
+    go = ts_c2(is,js)*z /(ts_c3(is,js) +z)
+    dgo = ts_c2(is,js)*ts_c3(is,js)/(ts_c3(is,js) +z)**2
 !.....ga term
-    texp = exp(-ts_c5(is)*z)
-    ga = 1d0 +ts_c4(is)*texp
-    dga = -ts_c4(is)*ts_c5(is)*texp
+    texp = exp(-ts_c5(is,js)*z)
+    ga = 1d0 +ts_c4(is,js)*texp
+    dga = -ts_c4(is,js)*ts_c5(is,js)*texp
 
-    g = ts_c1(is) +go*ga
+    g = ts_c1(is,js) +go*ga
     dg = dgo*ga +go*dga
     return
   end subroutine g_dg
@@ -531,6 +533,7 @@ contains
     character(len=3):: cspi,cspj,cspk
 
     if( myid.eq.0 ) then
+      interact(:,:) = .false.
 !.....Check whether the file exists      
       cfname = trim(paramsdir)//'/'//trim(paramsfname)
       inquire(file=cfname,exist=lexist)
@@ -567,10 +570,12 @@ contains
         exit
       enddo
 1     close(ioprms)
-      if( iprint.ge.ipl_basic ) print *,'ts_type = ',trim(ts_type)
 
 !.....Read input file according to ts_type
-      if( iprint.ge.ipl_basic ) write(6,'(/,a)') ' Tersoff parameters from file:'
+      if( iprint.ge.ipl_basic ) then
+        write(6,'(/,a)') ' Tersoff parameters from file:'
+        print *,'  ts_type = ',trim(ts_type)
+      endif
       open(ioprms,file=cfname,status='old')
 
 !.....Te-dependent) Te-dependent
@@ -634,6 +639,10 @@ contains
         endif
 
 !.....default) Kumagai's modified Tersoff potential
+!     Format of a single entry (one or more lines)
+!       element1, element2, A, B, lambda1, lambda2, eta, delta,
+!       alpha, beta, h, R1, R2,
+!       c1, c2, c3, c4, c5
       else
         do while(.true.)
           read(ioprms,'(a)',end=10) cline
@@ -644,38 +653,64 @@ contains
 
           backspace(ioprms)
 !.....TODO: make it applicable to multi-species...
-          read(ioprms,*) cspi, a,b,lmbd1,lmbd2, rc2in, rc2out, &
+          read(ioprms,*) cspi, cspj, a,b,lmbd1,lmbd2, rc2in, rc2out, &
                eta,delta,alpha,beta,h,c1,c2,c3,c4,c5,rc3in,rc3out
           isp = csp2isp(cspi)
-          if( isp.le.0 ) then
-            print *,' Tersoff parameter read but not used for ',trim(cspi)
+          jsp = csp2isp(cspj)
+          if( isp.le.0 .or. jsp.le.0 ) then
+            print '(a,2a4)',' Tersoff parameter read but no such species in the system: ', &
+                 trim(cspi),trim(cspj)
             cycle
           endif
-          ts_a(isp,isp) = a
-          ts_b(isp,isp) = b
-          ts_lmbd1(isp,isp) = lmbd1
-          ts_lmbd2(isp,isp) = lmbd2
-          ts_rc2in(isp,isp) = rc2in
-          ts_rc2out(isp,isp) = rc2out
-          ts_eta(isp) = eta
-          ts_delta(isp) = delta
-          ts_alpha(isp,isp) = alpha
-          ts_beta(isp) = beta
-          ts_h(isp) = h
-          ts_c1(isp) = c1
-          ts_c2(isp) = c2
-          ts_c3(isp) = c3
-          ts_c4(isp) = c4
-          ts_c5(isp) = c5
-          ts_rc3in(isp,isp) = rc3in
-          ts_rc3out(isp,isp) = rc3out
+          ts_a(isp,jsp) = a
+          ts_b(isp,jsp) = b
+          ts_lmbd1(isp,jsp) = lmbd1
+          ts_lmbd2(isp,jsp) = lmbd2
+          ts_rc2in(isp,jsp) = rc2in
+          ts_rc2out(isp,jsp) = rc2out
+          ts_eta(isp,jsp) = eta
+          ts_delta(isp,jsp) = delta
+          ts_alpha(isp,jsp) = alpha
+          ts_beta(isp,jsp) = beta
+          ts_h(isp,jsp) = h
+          ts_c1(isp,jsp) = c1
+          ts_c2(isp,jsp) = c2
+          ts_c3(isp,jsp) = c3
+          ts_c4(isp,jsp) = c4
+          ts_c5(isp,jsp) = c5
+          ts_rc3in(isp,jsp) = rc3in
+          ts_rc3out(isp,jsp) = rc3out
+          interact(isp,jsp) = .true.
+
+!.....Symmetrize
+          if( isp.ne.jsp ) then
+            ts_a(jsp,isp) = a
+            ts_b(jsp,isp) = b
+            ts_lmbd1(jsp,isp) = lmbd1
+            ts_lmbd2(jsp,isp) = lmbd2
+            ts_rc2in(jsp,isp) = rc2in
+            ts_rc2out(jsp,isp) = rc2out
+            ts_eta(jsp,isp) = eta
+            ts_delta(jsp,isp) = delta
+            ts_alpha(jsp,isp) = alpha
+            ts_beta(jsp,isp) = beta
+            ts_h(jsp,isp) = h
+            ts_c1(jsp,isp) = c1
+            ts_c2(jsp,isp) = c2
+            ts_c3(jsp,isp) = c3
+            ts_c4(jsp,isp) = c4
+            ts_c5(jsp,isp) = c5
+            ts_rc3in(jsp,isp) = rc3in
+            ts_rc3out(jsp,isp) = rc3out
+            interact(jsp,isp) = .true.
+          endif
 
           if( iprint.ge.ipl_basic ) then
-            write(6,'(a5,4es12.4,2f6.3)') trim(cspi), a, b, lmbd1,lmbd2,rc2in,rc2out
+            write(6,'(2a5,4es12.4,2f6.3)') trim(cspi),trim(cspj), a, b, lmbd1,lmbd2,rc2in,rc2out
             write(6,'(15x,7es12.4)') eta,delta,alpha,beta,h
             write(6,'(15x,5es12.4,2f6.3)') c1,c2,c3,c4,c5,rc3in,rc3out
           endif
-          goto 10
+!!$          goto 10
         enddo
       endif
 10    close(ioprms)
@@ -715,41 +750,43 @@ contains
       ts_b(:,:) = ted_b(1)
       ts_lmbd1(:,:) = ted_lmbd1(1)
       ts_lmbd2(:,:) = ted_lmbd2(1)
-      ts_eta(:) = ted_eta(1)
-      ts_delta(:) = ted_delta(1)
+      ts_eta(:,:) = ted_eta(1)
+      ts_delta(:,:) = ted_delta(1)
       ts_alpha(:,:) = ted_alpha(1)
-      ts_beta(:) = ted_beta(1)
-      ts_h(:) = ted_h(1)
+      ts_beta(:,:) = ted_beta(1)
+      ts_h(:,:) = ted_h(1)
       ts_rc2in(:,:) = ted_r1(1)
       ts_rc2out(:,:) = ted_r2(1)
       ts_rc3in(:,:) = ts_rc2in(:,:)
       ts_rc3out(:,:) = ts_rc2out(:,:)
-      ts_c1(:) = ted_c1(1)
-      ts_c2(:) = ted_c2(1)
-      ts_c3(:) = ted_c3(1)
-      ts_c4(:) = ted_c4(1)
-      ts_c5(:) = ted_c5(1)
-      ts_f0(:) = ted_f0(1)
+      ts_c1(:,:) = ted_c1(1)
+      ts_c2(:,:) = ted_c2(1)
+      ts_c3(:,:) = ted_c3(1)
+      ts_c4(:,:) = ted_c4(1)
+      ts_c5(:,:) = ted_c5(1)
+      ts_f0(:,:) = ted_f0(1)
+      interact(:,:) = .true.
     else
       call mpi_bcast(ts_a,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_b,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_lmbd1,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_lmbd2,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_eta,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_delta,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_eta,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_delta,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_alpha,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_beta,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_h,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_beta,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_h,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_rc2in,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_rc2out,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_rc3in,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_rc3out,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_c1,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_c2,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_c3,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_c4,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_c5,nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_f0,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_c1,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_c2,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_c3,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_c4,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_c5,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_f0,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
     endif
     return
   end subroutine read_params_tersoff
@@ -787,17 +824,17 @@ contains
     ts_b(is,is) = ted_b(ite0) +(ted_b(ite1) -ted_b(ite0)) *x
     ts_lmbd1(is,is) = ted_lmbd1(ite0) +(ted_lmbd1(ite1) -ted_lmbd1(ite0)) *x
     ts_lmbd2(is,is) = ted_lmbd2(ite0) +(ted_lmbd2(ite1) -ted_lmbd2(ite0)) *x
-    ts_eta(is) = ted_eta(ite0) +(ted_eta(ite1) -ted_eta(ite0)) *x
-    ts_delta(is) = ted_delta(ite0) +(ted_delta(ite1) -ted_delta(ite0)) *x
+    ts_eta(is,is) = ted_eta(ite0) +(ted_eta(ite1) -ted_eta(ite0)) *x
+    ts_delta(is,is) = ted_delta(ite0) +(ted_delta(ite1) -ted_delta(ite0)) *x
     ts_alpha(is,is) = ted_alpha(ite0) +(ted_alpha(ite1) -ted_alpha(ite0)) *x
-    ts_beta(is) = ted_beta(ite0) +(ted_beta(ite1) -ted_beta(ite0)) *x
-    ts_h(is) = ted_h(ite0) +(ted_h(ite1) -ted_h(ite0)) *x
-    ts_c1(is) = ted_c1(ite0) +(ted_c1(ite1) -ted_c1(ite0)) *x
-    ts_c2(is) = ted_c2(ite0) +(ted_c2(ite1) -ted_c2(ite0)) *x
-    ts_c3(is) = ted_c3(ite0) +(ted_c3(ite1) -ted_c3(ite0)) *x
-    ts_c4(is) = ted_c4(ite0) +(ted_c4(ite1) -ted_c4(ite0)) *x
-    ts_c5(is) = ted_c5(ite0) +(ted_c5(ite1) -ted_c5(ite0)) *x
-    ts_f0(is) = ted_f0(ite0) +(ted_f0(ite1) -ted_f0(ite0)) *x
+    ts_beta(is,is) = ted_beta(ite0) +(ted_beta(ite1) -ted_beta(ite0)) *x
+    ts_h(is,is) = ted_h(ite0) +(ted_h(ite1) -ted_h(ite0)) *x
+    ts_c1(is,is) = ted_c1(ite0) +(ted_c1(ite1) -ted_c1(ite0)) *x
+    ts_c2(is,is) = ted_c2(ite0) +(ted_c2(ite1) -ted_c2(ite0)) *x
+    ts_c3(is,is) = ted_c3(ite0) +(ted_c3(ite1) -ted_c3(ite0)) *x
+    ts_c4(is,is) = ted_c4(ite0) +(ted_c4(ite1) -ted_c4(ite0)) *x
+    ts_c5(is,is) = ted_c5(ite0) +(ted_c5(ite1) -ted_c5(ite0)) *x
+    ts_f0(is,is) = ted_f0(ite0) +(ted_f0(ite1) -ted_f0(ite0)) *x
     ts_rc2in(is,is) = ted_r1(ite0) +(ted_r1(ite1) -ted_r1(ite0)) *x
     ts_rc2out(is,is) = ted_r2(ite0) +(ted_r2(ite1) -ted_r2(ite0)) *x
 
@@ -822,22 +859,23 @@ contains
     ts_b(:,:) = 121.00047d0
     ts_lmbd1(:,:) = 3.2300135d0
     ts_lmbd2(:,:) = 1.345797d0
-    ts_eta(:) = 1.0d0
-    ts_delta(:) = 0.53298909d0
+    ts_eta(:,:) = 1.0d0
+    ts_delta(:,:) = 0.53298909d0
     ts_alpha(:,:) = 2.3890327d0
-    ts_beta(:) = 1d0
+    ts_beta(:,:) = 1d0
 !!$    ts_beta_ters = 1d0  ! beta of original Tersoff [1], must be 1.0 for [2]
-    ts_c1(:) = 0.20173476d0
-    ts_c2(:) = 730418.72d0
-    ts_c3(:) = 1000000d0
-    ts_c4(:) = 1.0d0
-    ts_c5(:) = 26.0d0
-    ts_h(:) = -0.365
+    ts_c1(:,:) = 0.20173476d0
+    ts_c2(:,:) = 730418.72d0
+    ts_c3(:,:) = 1000000d0
+    ts_c4(:,:) = 1.0d0
+    ts_c5(:,:) = 26.0d0
+    ts_h(:,:) = -0.365
     ts_rc2in(:,:) = 2.7d0
     ts_rc2out(:,:) = 3.3d0
     ts_rc3in(:,:) = ts_rc2in(:,:)
     ts_rc3out(:,:) = ts_rc2out(:,:)
-    ts_f0(:) = 0d0
+    ts_f0(:,:) = 0d0
+    interact(:,:) = .true.
     return
   end subroutine set_orig_params
 end module tersoff

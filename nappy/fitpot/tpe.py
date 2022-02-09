@@ -21,8 +21,6 @@ from time import time
 __author__ = "RYO KOBAYASHI"
 __version__ = "rev220123"
 
-_fname_smpl = 'out.tpe.samples'
-
 def test_func(var, vranges, **kwargs):
     x,y= var
     res= x**2 +y**2 +100.0*exp(-x**2 -y**2)*sin(2.0*(x+y))*cos(2*(x-y)) \
@@ -129,6 +127,8 @@ class TPE:
         self.nsmpl_prior = 100
         self.ntrial = 100
         self.method = kwargs['fitting_method']
+        self.fname_smpl = 'out.{0:s}.samples'.format(self.method)
+
         self.gamma = 0.15
         #...Change default values if specified
         if 'print_level' in kwargs.keys():
@@ -198,7 +198,7 @@ class TPE:
 
         starttime = time()
 
-        fsmpl = open(_fname_smpl,'w')
+        fsmpl = open(self.fname_smpl,'w')
         #...Headers
         fsmpl.write('# {0:>7s}  {1:>12s}'.format('iid', 'loss'))
         for i in range(len(self.history[0].variables)):
@@ -301,7 +301,7 @@ class TPE:
         return None
 
     def _write_smpl_data(self,f,smpl):
-        f.write(' {0:4d}  {1:12.4e}'.format(smpl.iid, smpl.val))
+        f.write(' {0:8d}  {1:12.4e}'.format(smpl.iid, smpl.val))
         for j,vj in enumerate(smpl.variables):
             f.write(' {0:11.3e}'.format(vj))
         f.write('\n')

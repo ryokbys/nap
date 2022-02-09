@@ -414,8 +414,16 @@ if __name__ == "__main__":
     triplets = [ t.split('-') for t in triplets ]
     specorder = args['--specorder'].split(',')
 
-
-    if specorder[0] == 'None' or args['map']:
+    if pot_type == 'map':
+        try:
+            #specorder, interact, param_files = read_in_fitpot('in.fitpot')
+            infp = read_in_fitpot('in.fitpot')
+            if specorder[0] == 'None':
+                specorder = infp['specorder']
+            print(' Loaded some inifo from in.fitpot')
+        except:
+            raise Exception('Something wrong with reading in.fitpot.')
+    elif specorder[0] == 'None':
         try:
             #specorder, interact, param_files = read_in_fitpot('in.fitpot')
             infp = read_in_fitpot('in.fitpot')

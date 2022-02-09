@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-12-21 12:28:12 Ryo KOBAYASHI>
+!                     Last-modified: <2022-02-09 14:41:48 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -157,10 +157,6 @@ program pmd
       if( .not. use_force('Coulomb') ) then
         num_forces = num_forces +1
         force_list(num_forces) = 'Coulomb'
-      endif
-      if( .not. use_force('dipole') ) then
-        num_forces = num_forces +1
-        force_list(num_forces) = 'dipole'
       endif
     endif
     if( use_force('fpc') ) then
@@ -933,7 +929,7 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
   nz = nd(3)
 
  if( iprint.ge.ipl_basic ) then
-    print '(a,3(1x,i0))',' Number of spatial divisions ' &
+    print '(/a,3(1x,i0))',' Number of spatial divisions ' &
         //'automatically set, NX,NY,NZ=',nx,ny,nz
   endif
   return

@@ -166,7 +166,7 @@ def write_pmd(nsys,fname='pmdini'):
     f.write(" {0:10d}\n".format(len(nsys.atoms)))
     # atom positions
     poss = nsys.get_scaled_positions()
-    vels = nsys.atoms[['vx','vy','vz']]
+    vels = nsys.get_velocities()
     sids = nsys.atoms.sid
     if 'ifmv' not in nsys.atoms.columns:
         ifmvs = [ 1 for i in range(len(poss)) ]
