@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-02-24 19:54:41 KOBAYASHI Ryo>
+!                     Last modified: <2022-02-24 20:04:59 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -578,6 +578,7 @@ contains
         if( .not. interact(is,js) ) cycle
         dij2 = rijs(4,jj)
         if( dij2.gt.trcij2(is,js) ) cycle
+        rij(1:3) = rijs(1:3,jj)
         atmp(1:3) = dfdy /ni(is) *drho(1:3,jj)
         aal(1:3,j) = aal(1:3,j) -atmp(1:3)
         aal(1:3,i) = aal(1:3,i) +atmp(1:3)
