@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-02-09 10:59:18 KOBAYASHI Ryo>
+!                     Last modified: <2022-02-11 09:41:41 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -358,6 +358,10 @@ contains
            ,nn,mpi_world,strsl,9)
       strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
+
+!!$    print *,'strs Tersoff:'
+!!$    print *,' 1:  ',strsl(1,1,1),strsl(2,2,1),strsl(3,3,1)
+!!$    print *,'65:  ',strsl(1,1,65),strsl(2,2,65),strsl(3,3,65)
 
 !.....gather epot
     epotl = epotl1 +epotl2

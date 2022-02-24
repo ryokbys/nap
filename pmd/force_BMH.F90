@@ -1,6 +1,6 @@
 module BMH
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-02-09 14:56:05 KOBAYASHI Ryo>
+!                     Last modified: <2022-02-11 09:41:52 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of fitpot Born-Mayer-Huggins (BMH) potential.
 !  This potential should be used with Coulomb potential.
@@ -166,6 +166,10 @@ contains
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
 
+!!$    print *,'strs BMH:'
+!!$    print *,' 1:  ',strsl(1,1,1),strsl(2,2,1),strsl(3,3,1)
+!!$    print *,'65:  ',strsl(1,1,65),strsl(2,2,65),strsl(3,3,65)
+
     epott = 0d0
     call mpi_allreduce(epotl,epott,1,mpi_real8 &
          ,mpi_sum,mpi_md_world,ierr)
@@ -302,8 +306,10 @@ contains
             isp = csp2isp(cspi)
             jsp = csp2isp(cspj)
             if( isp.le.0 .or. jsp.le.0 ) then
-              write(6,*) ' Warning @read_params: since isp/jsp <= 0,'&
-                   //' skip reading the line.'
+              if( iprint.ge.ipl_warn ) then
+                write(6,*) ' Warning @read_params: since isp/jsp <= 0,'&
+                     //' skip reading the line.'
+              endif
               cycle
             endif
             bmh_fij(isp,jsp)= fij
@@ -340,8 +346,10 @@ contains
             read(cline,*) cspi, aij,bij,c6ij,c8ij
             isp = csp2isp(cspi)
             if( isp.le.0 ) then
-              write(6,*) ' Warning @read_params: since isp <= 0,'&
-                   //' skip reading the line.'
+              if( iprint.ge.ipl_warn ) then
+                write(6,*) ' Warning @read_params: since isp <= 0,'&
+                     //' skip reading the line.'
+              endif
               cycle
             endif
             bmh_aij(isp,isp)= aij

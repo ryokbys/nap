@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-21 14:37:31 Ryo KOBAYASHI>
+!                     Last modified: <2022-02-21 16:36:15 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -160,13 +160,11 @@ contains
       enddo
       
       if( iprint.ge.ipl_basic ) then
-        print *,''
-        write(6,'(a)') ' EAM parameters read from file '//trim(fname) &
-             //':'
+        write(6,'(/a)') ' EAM parameters read from file '//trim(fname)//':'
         do isp=1,nspmax
           if( ea_interact(isp) ) then
             cspi = trim(specorder(isp))
-            write(6,'(a8,2(2x,a),4f8.3)') 'atomic',trim(cspi),trim(type_frho(isp)), &
+            write(6,'(a9,2(2x,a),4f8.3)') 'atomic',trim(cspi),trim(type_frho(isp)), &
                  ea_a(isp),ea_xi(isp), ea_rcin(isp,isp), ea_rcout(isp,isp)
           endif
         enddo
@@ -175,14 +173,13 @@ contains
           do jsp=isp,nspmax
             if( pair_interact(isp,jsp) ) then
               cspj = trim(specorder(jsp))
-              write(6,'(a8,4(2x,a),5f8.3)') 'pair  ',trim(cspi),trim(cspj), &
+              write(6,'(a9,4(2x,a),5f8.3)') 'pair  ',trim(cspi),trim(cspj), &
                    trim(type_rho(isp,jsp)), trim(type_phi(isp,jsp)), &
                    ea_b(isp,jsp),ea_c(isp,jsp), &
                    ea_re(isp,jsp),ea_alp(isp,jsp),ea_beta(isp,jsp)
             endif
           enddo
         enddo
-        print *,''
       endif
     endif  ! myid_md == 0
 
@@ -279,14 +276,14 @@ contains
       deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif
-    if( size(rho).lt.namax+nbmax ) then
+    if( size(rho).lt.namax ) then
       deallocate(rho)
-      allocate(rho(namax+nbmax))
+      allocate(rho(namax))
     endif
 
     epotl= 0d0
-    rho(1:namax)= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    rho(:)= 0d0
+    strsl(:,:,:) = 0d0
 
 !-----rho(i)
     do i=1,natm
@@ -393,6 +390,10 @@ contains
 !!$           ,nn,mpi_md_world,strsl,9)
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
+
+!!$    print *,'strs EAM:'
+!!$    print *,' 1:  ',strsl(1,1,1),strsl(2,2,1),strsl(3,3,1)
+!!$    print *,'65:  ',strsl(1,1,65),strsl(2,2,65),strsl(3,3,65)
 
 !-----gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)

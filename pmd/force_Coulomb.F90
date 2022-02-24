@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-21 15:37:54 Ryo KOBAYASHI>
+!                     Last modified: <2022-02-22 16:18:22 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -321,7 +321,7 @@ contains
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
-    character(len=128):: cmode,cline,ctmp,fname
+    character(len=128):: cmode,cline,ctmp,fname,c1st
     character(len=3):: cname,csp,cspj,cspi
     integer:: i,ierr,jerr,isp,jsp,npq,nentry
     real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
@@ -347,188 +347,16 @@ contains
       if( iprint.ge.ipl_basic ) write(6,'(/,a)') ' Coulomb parameters:'
 !.....Start reading
       do while(.true.)
-        read(ioprms,*,end=10) cline
-        if( num_data(cline,' ').eq.0 ) cycle
-        if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
-!.....Detect keyword
-        if( trim(cline).eq.'charges' ) then
-          cmode = 'charges'
-          backspace(ioprms)
-          read(ioprms,*) ctmp, cchgs
-          if(  trim(cchgs).ne.'fixed' .and. &
-               trim(cchgs).ne.'fixed_bvs' .and. &
-               trim(cchgs).ne.'variable' .and. &
-               trim(cchgs).ne.'qeq' ) then
-            print *,'ERROR: charges should have an argument of'//&
-                 ' either fixed, fixed_bvs, variable or qeq.'
-            stop
-          endif
-          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cchgs)
-          cycle
-        else if( trim(cline).eq.'charge_dist' ) then
-          cmode = 'charge_dist'
-          backspace(ioprms)
-          read(ioprms,*) ctmp, cdist
-          if(  trim(cdist).ne.'point' .and. &
-               trim(cdist).ne.'gaussian' ) then
-            print *,'ERROR: charge_dist should have an argument of'//&
-                 ' either point or gaussian.'
-            stop
-          endif
-          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cdist)
-          cycle
-        else if( trim(cline).eq.'terms' ) then
-          cmode = 'terms'
-          backspace(ioprms)
-          read(ioprms,*) ctmp, cterms
-          if(  trim(cterms).ne.'full' .and. &
-               trim(cterms).ne.'short' .and. &
-               trim(cterms).ne.'long' .and. &
-               trim(cterms).ne.'direct' .and. &
-               trim(cterms).ne.'direct_cut' .and. &
-               trim(cterms).ne.'screened_cut' ) then
-            print *,'ERROR: terms should have an argument of '//&
-                 'either direct_cut, screened_cut, full, short, or long.'
-            stop
-          endif
-          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cterms)
-          cycle
-        else if( trim(cline).eq.'interactions' ) then
-          backspace(ioprms)
-          read(ioprms,'(a)') ctmp
-          nentry = num_data(ctmp,' ')
-          if( nentry.eq.1 ) then
-            cmode = 'interactions'
-            cinteract = 'given'
-            interact(1:nspmax,1:nspmax) = .false.
-          else if( nentry.eq.2 ) then
-            backspace(ioprms)
-            read(ioprms,*) ctmp, cinteract
-            cmode = 'none'
-          endif
-          cycle
-        else if( trim(cline).eq.'sigma' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, sgm_ew
-          cycle
-        else if( trim(cline).eq.'fbvs' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, fbvs
-          cycle
-        else if( trim(cline).eq.'pacc' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, pacc
-          cycle
-        else if( trim(cline).eq.'rho_screened_cut' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, rho_screened_cut
-          if( iprint.ge.ipl_info ) print *,trim(ctmp),rho_screened_cut
-          cycle
-        else if( trim(cline).eq.'rad_screened_cut' ) then
-!.....Set rho_screened_cut minus to show rad should be used to determine rho_screened_cut
-          rho_screened_cut = -1d0 *abs(rho_screened_cut)
-          backspace(ioprms)
-          read(ioprms,*) ctmp, csp, rad
-          if( iprint.ge.ipl_info ) print '(a,3x,a,1x,f7.4)',trim(ctmp), trim(csp), rad
-          isp = csp2isp(trim(csp))
-          if( isp.gt.0 ) then
-            rad_bvs(isp) = rad
-          endif
-          cycle
-        else if( trim(cline).eq.'rhoii_screened_cut' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, cspi, rhoii
-          isp = csp2isp(trim(cspi))
-          if( isp.le.0 ) cycle
-          rho_scr(isp,isp) = rhoii
-          if( iprint.ge.ipl_info ) print '(1x,a,3x,a,1x,f7.3)',trim(ctmp),trim(cspi),rhoii
-          cycle
-        else if( trim(cline).eq.'rhoij_screened_cut' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, cspi, cspj, rhoij
-          isp = csp2isp(trim(cspi))
-          jsp = csp2isp(trim(cspj))
-          if( isp.le.0 .or. jsp.le.0 ) cycle
-          rho_scr(isp,jsp) = rhoij
-          rho_scr(jsp,isp) = rhoij
-          if( iprint.ge.ipl_info ) print *,trim(ctmp),trim(cspi) &
-               ,trim(cspj),rhoij
-          cycle
-!.....QEq related parameters hereafter
-        else if( trim(cline).eq.'chgopt_method' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, chgopt_method
-          cycle
-        else if( trim(cline).eq.'codmp_method' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, codmp_method
-          cycle
-        else if( trim(cline).eq.'conv_eps_qeq' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, conv_eps_qeq
-          cycle
-        else if( trim(cline).eq.'nstp_qeq') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, nstp_qeq
-          cycle
-        else if( trim(cline).eq.'minstp_qeq') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, minstp_qeq
-          cycle
-        else if( trim(cline).eq.'minstp_conv_qeq') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, minstp_conv_qeq
-          cycle
-        else if( trim(cline).eq.'dt_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, dt_codmp
-          cycle
-        else if( trim(cline).eq.'qmass') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, qmass
-          cycle
-        else if( trim(cline).eq.'fdamp_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, fdamp_codmp
-          cycle
-        else if( trim(cline).eq.'dfdamp_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, dfdamp_codmp
-          cycle
-        else if( trim(cline).eq.'finc_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, finc_codmp
-          cycle
-        else if( trim(cline).eq.'fdec_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, fdec_codmp
-          cycle
-        else if( trim(cline).eq.'alpha0_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, alpha0_codmp
-          cycle
-        else if( trim(cline).eq.'falpha_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, falpha_codmp
-          cycle
-        else if( trim(cline).eq.'dqmax_cogrd') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, dqmax_cogrd
-          cycle
-        else if( trim(cline).eq.'dqeps_cogrd') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, dqeps_cogrd
-          cycle
-        else if( trim(cline).eq.'bound_k4') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, bound_k4
-          cycle
-        else if( trim(cline).eq.'omg2dt2') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, omg2dt2
+        read(ioprms,'(a)',end=10) cline
+        nentry = num_data(cline,' ')
+        if( nentry.eq.0 ) then
+          cmode = 'none'
           cycle
         endif
-!.....Not a keyword, a certain mode should be already selected.
+        if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
+        read(cline,*) c1st
+!.....Detect keyword....................................................
+!.....But 1st, if a certain mode is already selected...
         if( trim(cmode).eq.'charges' ) then
           backspace(ioprms)
           if( trim(cchgs).eq.'fixed' ) then
@@ -548,39 +376,39 @@ contains
           else if( trim(cchgs).eq.'fixed_bvs' ) then
             read(ioprms,*) csp,vid,rad,npq
             isp = csp2isp(trim(csp))
-            if( isp.gt.0 ) then
-              ispflag(isp) = .true.
-              vid_bvs(isp) = vid
-              rad_bvs(isp) = rad
-              npq_bvs(isp) = npq
-              if( iprint.ge.ipl_basic ) then
-                write(6,'(a,a5,2f7.3,i4)') '   csp,vid,rad,npq =' &
-                     ,trim(csp),vid,rad,npq
-              endif
-            else
+            if( isp.lt.1 .or. isp.gt.nspmax ) then
               if( iprint.ge.ipl_info ) then
                 print *,'  fixed_bvs charge read but not used: ',trim(csp)
               endif
+              cycle
+            endif
+            ispflag(isp) = .true.
+            vid_bvs(isp) = vid
+            rad_bvs(isp) = rad
+            npq_bvs(isp) = npq
+            if( iprint.ge.ipl_basic ) then
+              write(6,'(a,a5,2f7.3,i4)') '   csp,vid,rad,npq =' &
+                   ,trim(csp),vid,rad,npq
             endif
           else if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') then
             read(ioprms,*) csp, dchi,djii,de0,qlow,qup
             isp = csp2isp(trim(csp))
-            if( isp.gt.0 ) then
-              ispflag(isp) = .true.
-              vc_chi(isp) = dchi
-              vc_jii(isp) = djii
-              vc_e0(isp) = de0
-              qbot(isp) = qlow
-              qtop(isp) = qup
-              if( iprint.ge.ipl_basic ) then
-                write(6,'(a,a3,4f10.4,2f5.1)') &
-                     '   csp,chi,Jii,e0,qbot,qtop = ', &
-                     trim(csp),dchi,djii,de0,qlow,qup
-              endif
-            else
+            if( isp.lt.1 .or. isp.gt.nspmax ) then
               if( iprint.ge.ipl_info ) then
                 print *,'  variable charge read but not used: ',trim(csp)
               endif
+              cycle
+            endif
+            ispflag(isp) = .true.
+            vc_chi(isp) = dchi
+            vc_jii(isp) = djii
+            vc_e0(isp) = de0
+            qbot(isp) = qlow
+            qtop(isp) = qup
+            if( iprint.ge.ipl_basic ) then
+              write(6,'(a,a3,4f10.4,2f5.1)') &
+                   '   csp,chi,Jii,e0,qbot,qtop = ', &
+                   trim(csp),dchi,djii,de0,qlow,qup
             endif
           endif
 !!$        else if( trim(cmode).eq.'charge_dist' ) then
@@ -593,12 +421,193 @@ contains
           read(ioprms,*) cspi,cspj
           isp = csp2isp(trim(cspi))
           jsp = csp2isp(trim(cspj))
-          if( isp.gt.0 .and. jsp.gt.0 ) then
+          if( isp.gt.0 .and. isp.le.nspmax .and. jsp.gt.0 .and. jsp.le.nspmax ) then
             interact(isp,jsp) = .true.
             interact(jsp,isp) = .true.
           else
             if( iprint.ge.ipl_info ) print *,'  interacion read but not used: ',isp,jsp
           endif
+
+!.....If no cmode is given, detect keyword.
+        else if( trim(c1st).eq.'charges' ) then
+          cmode = 'charges'
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cchgs
+          if(  trim(cchgs).ne.'fixed' .and. &
+               trim(cchgs).ne.'fixed_bvs' .and. &
+               trim(cchgs).ne.'variable' .and. &
+               trim(cchgs).ne.'qeq' ) then
+            print *,'ERROR: charges should have an argument of'//&
+                 ' either fixed, fixed_bvs, variable or qeq.'
+            stop
+          endif
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cchgs)
+          cycle
+        else if( trim(c1st).eq.'charge_dist' ) then
+          cmode = 'charge_dist'
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cdist
+          if(  trim(cdist).ne.'point' .and. &
+               trim(cdist).ne.'gaussian' ) then
+            print *,'ERROR: charge_dist should have an argument of'//&
+                 ' either point or gaussian.'
+            stop
+          endif
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cdist)
+          cycle
+        else if( trim(c1st).eq.'terms' ) then
+          cmode = 'terms'
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cterms
+          if(  trim(cterms).ne.'full' .and. &
+               trim(cterms).ne.'short' .and. &
+               trim(cterms).ne.'long' .and. &
+               trim(cterms).ne.'direct' .and. &
+               trim(cterms).ne.'direct_cut' .and. &
+               trim(cterms).ne.'screened_cut' ) then
+            print *,'ERROR: terms should have an argument of '//&
+                 'either direct_cut, screened_cut, full, short, or long.'
+            stop
+          endif
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cterms)
+          cycle
+        else if( trim(c1st).eq.'interactions' ) then
+          backspace(ioprms)
+          read(ioprms,'(a)') ctmp
+          nentry = num_data(ctmp,' ')
+          if( nentry.eq.1 ) then
+            cmode = 'interactions'
+            cinteract = 'given'
+            interact(1:nspmax,1:nspmax) = .false.
+          else if( nentry.eq.2 ) then
+            backspace(ioprms)
+            read(ioprms,*) ctmp, cinteract
+            cmode = 'none'
+          endif
+          cycle
+        else if( trim(c1st).eq.'sigma' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, sgm_ew
+          cycle
+        else if( trim(c1st).eq.'fbvs' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, fbvs
+          cycle
+        else if( trim(c1st).eq.'pacc' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, pacc
+          cycle
+        else if( trim(c1st).eq.'rho_screened_cut' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, rho_screened_cut
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),rho_screened_cut
+          cycle
+        else if( trim(c1st).eq.'rad_screened_cut' ) then
+!.....Set rho_screened_cut minus to show rad should be used to determine rho_screened_cut
+          rho_screened_cut = -1d0 *abs(rho_screened_cut)
+          backspace(ioprms)
+          read(ioprms,*) ctmp, csp, rad
+          if( iprint.ge.ipl_info ) print '(a,3x,a,1x,f7.4)',trim(ctmp), trim(csp), rad
+          isp = csp2isp(trim(csp))
+          if( isp.gt.0 ) then
+            rad_bvs(isp) = rad
+          endif
+          cycle
+        else if( trim(c1st).eq.'rhoii_screened_cut' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cspi, rhoii
+          isp = csp2isp(trim(cspi))
+          if( isp.le.0 ) cycle
+          rho_scr(isp,isp) = rhoii
+          if( iprint.ge.ipl_info ) print '(1x,a,3x,a,1x,f7.3)',trim(ctmp),trim(cspi),rhoii
+          cycle
+        else if( trim(c1st).eq.'rhoij_screened_cut' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cspi, cspj, rhoij
+          isp = csp2isp(trim(cspi))
+          jsp = csp2isp(trim(cspj))
+          if( isp.le.0 .or. jsp.le.0 ) cycle
+          rho_scr(isp,jsp) = rhoij
+          rho_scr(jsp,isp) = rhoij
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),trim(cspi) &
+               ,trim(cspj),rhoij
+          cycle
+!.....QEq related parameters hereafter
+        else if( trim(c1st).eq.'chgopt_method' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, chgopt_method
+          cycle
+        else if( trim(c1st).eq.'codmp_method' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, codmp_method
+          cycle
+        else if( trim(c1st).eq.'conv_eps_qeq' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, conv_eps_qeq
+          cycle
+        else if( trim(c1st).eq.'nstp_qeq') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, nstp_qeq
+          cycle
+        else if( trim(c1st).eq.'minstp_qeq') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, minstp_qeq
+          cycle
+        else if( trim(c1st).eq.'minstp_conv_qeq') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, minstp_conv_qeq
+          cycle
+        else if( trim(c1st).eq.'dt_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, dt_codmp
+          cycle
+        else if( trim(c1st).eq.'qmass') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, qmass
+          cycle
+        else if( trim(c1st).eq.'fdamp_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, fdamp_codmp
+          cycle
+        else if( trim(c1st).eq.'dfdamp_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, dfdamp_codmp
+          cycle
+        else if( trim(c1st).eq.'finc_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, finc_codmp
+          cycle
+        else if( trim(c1st).eq.'fdec_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, fdec_codmp
+          cycle
+        else if( trim(c1st).eq.'alpha0_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, alpha0_codmp
+          cycle
+        else if( trim(c1st).eq.'falpha_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, falpha_codmp
+          cycle
+        else if( trim(c1st).eq.'dqmax_cogrd') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, dqmax_cogrd
+          cycle
+        else if( trim(c1st).eq.'dqeps_cogrd') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, dqeps_cogrd
+          cycle
+        else if( trim(c1st).eq.'bound_k4') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, bound_k4
+          cycle
+        else if( trim(c1st).eq.'omg2dt2') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, omg2dt2
+          cycle
+        else
+          print *,' No such entry: ',trim(c1st)
+          cycle
         endif
       enddo ! while(.true.)
 
@@ -624,6 +633,7 @@ contains
           if( iprint.ne.0 ) then
             print *,'  WARNING: Since sgm_ew is too small, sgm_ew is replaced by ',sgmlim
             print *,'           which is determined by acc*sqrt(2/pi)/Jii.'
+            print *,'    sgm_ew,sgmlim,vcgjiimin=',sgm_ew,sgmlim,vcgjiimin
           endif
           sgm_ew = sgmlim
         endif
@@ -910,6 +920,10 @@ contains
         print '(a,f12.4," eV")','   Long-range term   = ',elr
       endif
     endif
+
+!!$    print *,'strs Coulomb:'
+!!$    print *,' 1:  ',strsl(1,1,1),strsl(2,2,1),strsl(3,3,1)
+!!$    print *,'65:  ',strsl(1,1,65),strsl(2,2,65),strsl(3,3,65)
 
 !!$    epotl = esrl +elrl +eselfl
 !!$!.....Gather epot

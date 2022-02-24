@@ -19,7 +19,6 @@ Options:
 """
 from __future__ import print_function
 
-import os
 from docopt import docopt
 
 __author__ = "Ryo KOBAYASHI"
@@ -401,10 +400,10 @@ def fp2params(vs,**kwargs):
             f.write(new_contents)
     return None
 
-if __name__ == "__main__":
+def main():
+    import os,sys
     from nappy.fitpot.fp import read_in_fitpot
-
-    args = docopt(__doc__)
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])))
     # print(args)
     infname = args['<in-file>']
     pot_type = args['<pot-type>']
@@ -418,9 +417,9 @@ if __name__ == "__main__":
         try:
             #specorder, interact, param_files = read_in_fitpot('in.fitpot')
             infp = read_in_fitpot('in.fitpot')
-            if specorder[0] == 'None':
-                specorder = infp['specorder']
-            print(' Loaded some inifo from in.fitpot')
+            # if specorder[0] == 'None':
+            #     specorder = infp['specorder']
+            print(' Loaded some info from in.fitpot')
         except:
             raise Exception('Something wrong with reading in.fitpot.')
     elif specorder[0] == 'None':
@@ -514,3 +513,7 @@ if __name__ == "__main__":
             print(' Wrote in.params.{Morse,Coulomb,angular}')
         else:
             print(f' No such pot_type: {pot_type}')
+    return None
+
+if __name__ == "__main__":
+    main()

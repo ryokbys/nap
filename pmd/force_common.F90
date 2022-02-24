@@ -43,6 +43,7 @@ subroutine get_force(l1st,epot,stnsr)
   use dipole,only: force_dipole
   use fpc,only: force_fpc
   use angular,only: force_angular
+  use RFMEAM,only: force_RFMEAM
   use time, only: accum_time
   implicit none
   include "mpif.h"
@@ -247,6 +248,13 @@ subroutine get_force(l1st,epot,stnsr)
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
     call accum_time('force_EAM',mpi_wtime() -tmp)
   endif
+  if( use_force('RFMEAM') ) then
+    tmp = mpi_wtime()
+    call force_RFMEAM(namax,natm,tag,ra,nnmax,aa,strs,h &
+       ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
+    call accum_time('force_RFMEAM',mpi_wtime() -tmp)
+  endif
   if( use_force('linreg') ) then
     tmp = mpi_wtime()
     call force_linreg(namax,natm,tag,ra,nnmax,aa &
@@ -424,6 +432,7 @@ subroutine init_force(linit)
   use BMH,only: read_params_BMH, lprmset_BMH
   use fpc,only: read_params_fpc, lprmset_fpc
   use angular,only: read_params_angular, lprmset_angular
+  use RFMEAM, only: read_params_RFMEAM, lprmset_RFMEAM
   implicit none
   include "./const.h"
   
@@ -513,6 +522,12 @@ subroutine init_force(linit)
     call init_EAM()
     if( .not.lprmset_EAM ) then
       call read_params_EAM(myid_md,mpi_md_world,iprint,specorder)
+    endif
+  endif
+!.....RF-MEAM
+  if( use_force('RFMEAM') ) then
+    if( .not.lprmset_RFMEAM ) then
+      call read_params_RFMEAM(myid_md,mpi_md_world,iprint,specorder)
     endif
   endif
   

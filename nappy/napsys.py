@@ -1211,7 +1211,8 @@ def analyze(nsys):
     return None
 
 def main():
-    args= docopt(__doc__)
+    import os,sys
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])))
 
     infmt= args['--in-format']
     outfmt= args['--out-format']
@@ -1263,5 +1264,4 @@ def main():
     return None
 
 if __name__ == "__main__":
-
     main()

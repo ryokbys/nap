@@ -222,7 +222,6 @@ class TPE:
             val, i = res
             self.history[i].val = val
         #self.history.extend(candidates) # not need
-
         
         #...Check best
         self.bestsmpl = self.history[0]
@@ -243,7 +242,7 @@ class TPE:
             self._write_step_info(0,starttime)
 
         #...TPE loop starts
-        for istp in range(maxstp):
+        for istp in range(1,maxstp):
             #...Create candidates by either random or TPE
             if len(self.history) <= self.nsmpl_prior:
                 #...Create random candidates

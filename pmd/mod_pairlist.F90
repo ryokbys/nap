@@ -795,11 +795,17 @@ contains
     integer,intent(in):: myid,mpi_world
 
     integer:: i,mmax
+    real(8):: vratio
+    real(8),parameter:: pi = 3.14159265358979d0
 
     mmax = 0
     do i=1,natm
       mmax = max(mmax,lspr(0,i))
     enddo
+!.....vratio = sphere/cube
+    vratio = 2d0**2*pi/3d0**4
+    vratio = 1.25d0 *vratio
+    mmax = int(mmax *vratio)
     if( mmax.gt.nnmax ) then
       print *,'ERROR: Max num of neighbors exceeds the limit:'
       print '(3x,i5,a,i5)', mmax,' > ',nnmax

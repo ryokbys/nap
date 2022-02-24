@@ -449,7 +449,7 @@ def read_data(fname,):
     -----------------
     ```
     #  Comment lines begins with '#' or '!'
-    # 
+    #  Options start with "option-name: "
     10    1.0
     0.1234  0.2345  0.3456  0.4567  0.5678  0.6789
     0.7890  0.8901  0.9012  0.0123
@@ -468,8 +468,16 @@ def read_data(fname,):
     data = None
     idat = 0
     done = False
+    options = {'datatype': 'continuous', 'eps':1.0e-3}
     for line in lines:
         if line[0] in ('#','!'):
+            try: 
+                k,v = parse_option(line)
+            except:
+                k = None
+                v = None
+            if k != None and v != None:
+                options[k] = v
             continue
         ldat = line.split()
         if ndat < 1:
@@ -487,7 +495,19 @@ def read_data(fname,):
                     break
         if done:
             break
-    return {'ndat':ndat, 'wdat':wdat, 'data':data}
+    return {'ndat':ndat, 'wdat':wdat, 'data':data, **options}
+
+def parse_option(line):
+    """
+    Parse option from a comment line.
+    """
+    words = line.split()
+    if len(words) < 2 or words[1][-1] != ':':
+        return None,None
+    optname = words[1]
+    k = words[1][:-1]
+    v = words[2]
+    return k,v
 
 def get_data2(basedir,prefix='ref',**kwargs):
     """
@@ -521,6 +541,8 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
     for name in refdata.keys():
         ref = refdata[name]
         wgt = ref['wdat']
+        dtype = ref['datatype']
+        eps = ref['eps']
         pmd = pmddata[name]
         if pmd == None:
             losses[name] = misval
@@ -531,12 +553,19 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
         pmdd = pmd['data']
         z2 = 0.0
         sumdiff2 = 0.0
-        for n in range(num):
-            # print('n=',n)
-            diff = pmdd[n] -refd[n]
-            sumdiff2 += diff*diff
-            z2 += refd[n]*refd[n]
-        losses[name] = min(sumdiff2 /(z2+eps), luplim)
+        if dtype[:3] == 'sep':  # separate data
+            for n in range(num):
+                # print('n=',n)
+                diff = pmdd[n] -refd[n]
+                sumdiff2 += diff*diff /(refd[n]+eps)**2
+            losses[name] = min(sumdiff2, luplim)
+        else:  # continuous data (default)
+            for n in range(num):
+                # print('n=',n)
+                diff = pmdd[n] -refd[n]
+                sumdiff2 += diff*diff
+                z2 += refd[n]*refd[n]
+            losses[name] = min(sumdiff2 /(z2+eps), luplim)
         L += losses[name] *wgt
         
     if kwargs['print_level'] > 0:
