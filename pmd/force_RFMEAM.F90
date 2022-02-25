@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-02-24 20:04:59 KOBAYASHI Ryo>
+!                     Last modified: <2022-02-25 11:32:02 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -278,8 +278,6 @@ contains
     real(8),allocatable,save:: sij(:),dsij(:,:),sfc(:),fl(:,:), &
          dfl(:,:,:),dsfc(:,:,:),drhoi2(:,:,:),drhoi0(:,:),dstrho2(:,:), &
          dgam(:,:),drho(:,:),rijs(:,:)
-
-    print *,'force_RFMEAM...'
 
     if( l1st ) then
       if( allocated(aal) ) then
