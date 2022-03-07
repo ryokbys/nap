@@ -222,6 +222,8 @@ class TPE:
             val, i = res
             self.history[i].val = val
         #self.history.extend(candidates) # not need
+
+        self._update_vranges()
         
         #...Check best
         self.bestsmpl = self.history[0]
@@ -261,7 +263,7 @@ class TPE:
                     candidates = self._candidates_by_TPE()
                     
 
-            #...Evaluate sample losses of initial sets
+            #...Evaluate sample losses
             prcs = []
             for i,ci in enumerate(candidates):
                 kwtmp = copy.copy(self.kwargs)
@@ -275,7 +277,9 @@ class TPE:
                 candidates[i].val = val
             self.history.extend(candidates)
 
-            #...Check best
+            self._update_vranges()
+
+            #...Check the best
             best_updated = False
             for si in self.history[-self.nbatch:]:
                 if si.val < self.bestsmpl.val:
@@ -308,12 +312,44 @@ class TPE:
 
     def _write_step_info(self,istp,starttime):
         print(' step,time,best,vars='
-              +' {0:6d} {1:8.1f}  {2:8.4f}'.format(istp, time()-starttime,
+              +' {0:6d} {1:8.1f}  {2:8.4f}'.format(istp+1, time()-starttime,
                                                    self.bestsmpl.val),end="")
         for i in range(min(16,self.ndim)):
             print(' {0:6.3f}'.format(self.bestsmpl.variables[i]),end="")
         print('', flush=True)
-        
+        return None
+
+    def _update_vranges(self,):
+        """
+        Update variable ranges from the top rankers in the history.
+        New vranges are obtained as max distances among top rankers from the best.
+        """
+        vals = np.zeros(len(self.history))
+        for i,si in enumerate(self.history):
+            vals[i] = si.val
+        if len(self.history) > self.ntrial:
+            iargs = np.argpartition(vals,self.ntrial)
+            tmpsmpls = [ self.history[i] for i in iargs[:self.ntrial] ]
+            vals = vals[ iargs[:self.ntrial] ]
+        else:
+            tmpsmpls = copy.copy(self.history)
+        imin = np.argmin(vals)
+        vmin = vals[imin]
+        xtmps = np.zeros((len(tmpsmpls),self.ndim))
+        for i in range(len(tmpsmpls)):
+            xtmps[i,:] = tmpsmpls[i].variables[:]
+        xmin = xtmps[imin,:]
+        xwdth = np.zeros(self.ndim)
+        for ismpl in range(len(xtmps)):
+            if ismpl==imin: continue
+            xi = xtmps[ismpl,:]
+            w = np.abs(xi-xmin)
+            for i in range(len(w)):
+                xwdth[i] = max(w[i],xwdth[i])
+        for idim in range(self.ndim):
+            self.vranges[idim,0] = max(xmin[idim]-xwdth[idim],self.vlimits[idim,0])
+            self.vranges[idim,1] = min(xmin[idim]+xwdth[idim],self.vlimits[idim,1])
+        return None
 
     def _candidates_by_TPE(self,):
         """

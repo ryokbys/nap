@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-02-25 11:32:02 KOBAYASHI Ryo>
+!                     Last modified: <2022-03-04 14:35:48 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -21,12 +21,13 @@ module RFMEAM
   character(len=128),parameter:: paramsfname = 'in.params.RFMEAM'
 
   integer,parameter:: ioprms = 20
-  real(8),parameter:: tiny = 1d-14
   integer,parameter:: lmax = 3
+  real(8),parameter:: tiny = 1d-14
   real(8),parameter:: sgm = 1d-5
-
+  
   logical:: lprmset_RFMEAM = .false.
 
+  
   real(8):: rcmax,rc2max
   real(8):: rcij(nspmax,nspmax),rsij(nspmax,nspmax), &
        rcij2(nspmax,nspmax),trcij2(nspmax,nspmax),trcij(nspmax,nspmax), &
@@ -46,9 +47,15 @@ contains
 !
 !  Read parameters from file
 !--parameter file format------------------------------------------------
+!   pairtype   Timonova
 !   atomic   cspi  ni  e0  e1  e2  pj(0:lmax)  qj(0:lmax)  ti(lmax)
-!   pair     cspi cspj  rcij rsij epij alpij c2ij c3ij rpij
+!   pair     cspi cspj rcij rsij epij alpij c2ij c3ij rpij
 !   triple   cspk cspi cspj  cmin cmax
+!--or-------------------------------------------------------------------
+!   pairtype   Srinivasan
+!   atomic   cspi  ni  e0  e1  e2  pj(0:lmax)  qj(0:lmax)  ti(lmax)
+!   pair     cspi cspj rcij rsij epij alpij bij(1:mmax) sij(1:mmax)
+!   triple   cspk cspi cspj cmin cmax
 !-----------------------------------------------------------------------
     include 'mpif.h'
     include './const.h'
@@ -82,7 +89,7 @@ contains
       interact(:,:) = .false.
       interact3(:,:,:) = .false.
       latomic(:) = .false.
-      
+
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
       if( iprint.ge.ipl_basic ) write(6,'(/a)') ' RFMEAM parameters:'
@@ -94,7 +101,7 @@ contains
         backspace(ioprms)
 !.....The 1st entry specifies ATOMIC or PAIR parameters
         read(ioprms,*) c1
-        if( trim(c1).eq.'atomic' .or. trim(c1).eq.'single' ) then
+        if( trim(c1).eq.'atomic' .or. trim(c1).eq.'element' ) then
           backspace(ioprms)
           read(ioprms,*) c1,cspi, n,e0i,e1i,e2i,pjl(0:lmax),qjl(0:lmax),til(1:lmax)
           is = csp2isp(trim(cspi))
@@ -111,7 +118,7 @@ contains
           pj(:,is) = pjl(:)
           qj(:,is) = qjl(:)
           ti(:,is) = til(:)
-          
+
 !.....Otherwise the entry is for pair parameter
         else if( trim(c1).eq.'pair' ) then
           backspace(ioprms)
@@ -184,10 +191,10 @@ contains
           epij(js,is) = epij(is,js) 
           alpij(js,is)= alpij(is,js)
           c2ij(js,is) = c2ij(is,js) 
-          c3ij(js,is) = c3ij(is,js) 
+          c3ij(js,is) = c3ij(is,js)
         enddo
       enddo
-      
+
       if( iprint.ge.ipl_basic ) then
         do is=1,nspmax
           if( latomic(is) ) then
@@ -242,6 +249,7 @@ contains
     call mpi_bcast(cmin,nspmax**3,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(interact,nspmax**2,mpi_logical,0,mpi_md_world,ierr)
     call mpi_bcast(interact3,nspmax**3,mpi_logical,0,mpi_md_world,ierr)
+    call mpi_bcast(lmax,1,mpi_integer,0,mpi_md_world,ierr)
 
     if( myid_md.eq.0 .and. iprint.gt.ipl_basic ) then
       write(6,'(a)') ' Finished reading '//trim(fname)
@@ -305,7 +313,7 @@ contains
           rc = rcij(is,js)
           do ks=1,nspmax
             cmaxkij = cmax(ks,is,js)
-            if( cmaxkij.lt.1d0 ) cycle
+            if( cmaxkij.le.1d0 ) cycle
             truerc = max(rc, rc*cmaxkij/(2d0*sqrt(cmaxkij -1d0)))
             rcfac2(is,js) = max(rcfac2(is,js), &
                  cmaxkij**2/(4d0*(cmaxkij -1d0)))
@@ -722,8 +730,8 @@ contains
       denom2 = denom*denom
       dcsdij(1:3) = (rik(1:3) -cs*dik/dij*rij(1:3)) *pcsi
       dcsdik(1:3) = (rij(1:3) -cs*dij/dik*rik(1:3)) *pcsi
-      dcdij(1:3) = -(1d0-cs*cs)*denom2 /dij/dik *rij(1:3) *cs
-      dcdik(1:3) =  (1d0-cs*cs)*denom2 /dik/dik *dij *rik(1:3) *cs
+      dcdij(1:3) = -(1d0-cs*cs)/denom2 *cs /dik *rij(1:3)/dij
+      dcdik(1:3) =  (1d0-cs*cs)/denom2 *cs /dik/dik *dij *rik(1:3)/dik
       dnumdcs = -2d0 *cs
       ddendcs = dij/dik -2d0*cs
       dcdcs = (dnumdcs*denom -numer*ddendcs)/denom2
@@ -731,7 +739,7 @@ contains
       dcdik(1:3) = dcdik(1:3) +dcdcs*dcsdik(1:3)
       y = (ckij -cminkij)/(cmaxkij -cminkij)
       dydc = 1d0 /(cmaxkij -cminkij)
-      dbdy = -8d0*(1d0 -(1d0-y)**4) *(1d0-y)**3
+      dbdy = 8d0*(1d0 -(1d0-y)**4) *(1d0-y)**3
       sijperkij = sij/skij(kk)
       tmp = dbdy *dydc *sijperkij
       dsij(1:3,jj) = dsij(1:3,jj) +tmp*dcdij(1:3)

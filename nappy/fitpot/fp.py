@@ -495,6 +495,7 @@ def read_data(fname,):
                     break
         if done:
             break
+    options['eps'] = float(options['eps'])
     return {'ndat':ndat, 'wdat':wdat, 'data':data, **options}
 
 def parse_option(line):
@@ -553,13 +554,13 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
         pmdd = pmd['data']
         z2 = 0.0
         sumdiff2 = 0.0
-        if dtype[:3] == 'sep':  # separate data
+        if dtype[:3] == 'sep':  # data treated separately
             for n in range(num):
                 # print('n=',n)
                 diff = pmdd[n] -refd[n]
-                sumdiff2 += diff*diff /(refd[n]+eps)**2
+                sumdiff2 += diff*diff /(refd[n]**2+eps**2)
             losses[name] = min(sumdiff2, luplim)
-        else:  # continuous data (default)
+        else:  # data treated all together (default)
             for n in range(num):
                 # print('n=',n)
                 diff = pmdd[n] -refd[n]
@@ -727,7 +728,7 @@ def func_wrapper(variables, **kwargs):
             pmddata = get_data(subdir,prefix='pmd',**kwargs)
             L = min( loss_func(pmddata,**kwargs), L_up_lim )
     except Exception as e:
-        if print_level > 1:
+        if print_level > 0:
             print('  Since pmd or post-process failed at {0:s}, '.format(subdir)
                   +'the upper limit value is applied to its loss function.',
                   flush=True)

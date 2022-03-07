@@ -70,7 +70,7 @@ class PMD:
         self.result = {}
         self.result['rtot'] = res[0]
         self.result['vtot'] = res[1]
-        self.result['atot'] = res[2]
+        self.result['atot'] = res[2] # already converted to eV/Ang in pmd
         self.result['stot'] = res[3]
         self.result['ekitot'] = res[4]
         self.result['epitot'] = res[5]
@@ -236,6 +236,11 @@ class PMD:
         if not hasattr(self,'result'):
             return None
         return self.result['stnsr']
+
+    def get_forces(self):
+        if not hasattr(self,'result'):
+            return None
+        return self.result['atot']
 
     def get_system(self):
         if not hasattr(self,'result'):

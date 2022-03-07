@@ -34,6 +34,7 @@ Options:
   --qmin QMIN    Shortest wavenumber. [default: 0.7]
   --scatter-length LENGTHS
               Scattering lengths of corresponding species. [default: None]
+  --fortran   Try using fortran function for computing RDF.
 """
 from __future__ import print_function
 
@@ -197,7 +198,8 @@ def read_rdf(fname='out.rdf'):
         rdfs[ir,:] = [ float(x) for x in dat[1:]]
     return rs,rdfs
     
-def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
+def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
+        nnmax=100,fortran=False):
     """
     Compute RDF of the givin system.
     Number of bins is determined from DR, RMAX0, and RMIN as, int((RMAX0-RMIN)/DR)+1.
@@ -209,8 +211,6 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
     for ispcs in range(1,nspcs+1):
         natms.append(float(nsys0.num_atoms(ispcs)))
 
-    nr= int((rmax0-rmin)/dr)+1
-    rd= np.array([ rmin +dr*(ir+0.5) for ir in range(nr) ])
     rmax = rmin +dr*nr  # Use corrected rmax to cover regions of NR bins
     r2max = rmax*rmax
     
@@ -225,7 +225,25 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
     # use numpy arrays in the most time consuming part.
     poss = nsys.get_scaled_positions()
     sids = np.array(nsys.atoms.sid,)
-    natm = len(nsys.atoms)
+    natm = len(nsys)
+    if fortran:
+        try:
+            import nappy.pmd.mods as pmods
+            hmati = nsys.get_hmat_inv()
+            tags = nsys.get_tags()
+            iprint = 0
+            l1st = True
+            lspr,d2lspr = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,poss.T,
+                                                      rmax,hmat,hmati,
+                                                      iprint,l1st)
+            rd,rdfs= pmods.distfunc.calc_rdf(tags,hmat,rmax,rmin,
+                                             lspr,d2lspr,pairwise,iprint,l1st,
+                                             nspcs,nr)
+            return rd, rdfs.T
+        except:
+            pass
+    
+    rd= np.array([ rmin +dr*(ir+0.5) for ir in range(nr) ])
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     nsys.make_pair_list(rcut=rmax,nnmax=nnmax)
@@ -279,7 +297,7 @@ def rdf(nsys0,nspcs,dr,rmax0,pairwise=False,rmin=0.0,nnmax=100):
 
     return rd,nadr
 
-def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,pairwise=False,nnmax=100):
+def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,pairwise=False,nnmax=100,fortran=False):
     nspcs = len(specorder)
     tiny = 1.0e-8
     nr = int((rmax-rmin+tiny)/dr)+1
@@ -291,7 +309,8 @@ def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,pairwise=False,nnmax=
             sys.exit()
         nsys = nappy.io.read(fname=infname,specorder=specorder)
         print(' File =',infname)
-        rd,gr= rdf(nsys,nspcs,dr,rmax,rmin=rmin,pairwise=pairwise,nnmax=nnmax)
+        rd,gr= rdf(nsys,nspcs,dr,nr,rmax,rmin=rmin,
+                   pairwise=pairwise,nnmax=nnmax,fortran=fortran)
         if rd.shape[-1] != nr:
             raise ValueError('The shape of radius data is wrong.')
         agr += gr
@@ -537,7 +556,8 @@ def nbplot(nsys,dr=0.1,rmin=0.0,rmax=5.0,nnmax=200,pairs=None,sigma=0):
 
     nspcs = len(nsys.specorder)
     try:
-        rd,gr= rdf(nsys,nspcs,dr,rmax,rmin=rmin,nnmax=nnmax)
+        nr = int((rmax-rmin)/dr)+1
+        rd,gr= rdf(nsys,nspcs,dr,nr,rmax,rmin=rmin,nnmax=nnmax)
     except:
         raise Exception('rdf(..) failed.')
 
@@ -585,9 +605,8 @@ def nbplot(nsys,dr=0.1,rmin=0.0,rmax=5.0,nnmax=200,pairs=None,sigma=0):
     plt.show()
     return None
 
-if __name__ == "__main__":
-
-    args= docopt(__doc__)
+def main():
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])))
     
     infiles= args['INFILE']
     dr= float(args['-d'])
@@ -596,6 +615,7 @@ if __name__ == "__main__":
     sigma= int(args['--gsmear'])
     nnmax = int(args['--nnmax'])
     ofname= args['-o']
+
     if ofname == 'None':
         ofname = None
     specorder = [ x for x in args['--specorder'].split(',') ]
@@ -611,6 +631,7 @@ if __name__ == "__main__":
         if len(lscatter) != len(specorder):
             raise ValueError('--scatter-length is not set correctly.')
     out4fp = args['--out4fp']
+    fortran = args['--fortran']
     if out4fp and ofname is None:
         raise ValueError("Output file name must be specified with option -o.")
     if out4fp and not SQ:
@@ -646,11 +667,12 @@ if __name__ == "__main__":
     del infiles[:nskip]
     if len(infiles) < 1:
         raise ValueError('No input files to be processed.')
+    print(infiles)
 
     tiny = 1.0e-8
     nr= int((rmax-rmin+tiny)/dr) +1
     rd,agr= rdf_average(infiles,specorder,dr=dr,rmin=rmin,rmax=rmax,
-                        pairwise=pairwise,nnmax=nnmax)
+                        pairwise=pairwise,nnmax=nnmax,fortran=fortran)
 
     if not sigma == 0:
         #print(' Gaussian smearing...')
@@ -718,3 +740,9 @@ if __name__ == "__main__":
         if ofname is not None:
             print(" In addition to out.rdf, {0:s} is also written.".format(ofname))
             print('')
+
+    return None
+
+if __name__ == "__main__":
+
+    main()
