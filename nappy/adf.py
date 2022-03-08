@@ -140,6 +140,7 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
                                                 dang,na)
             return angd, adfs.T
         except:
+            print(' Failed to use the fortran routines...')
             pass
 
     nsys.make_pair_list(rcut=rcut,nnmax=nnmax)

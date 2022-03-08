@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-04 14:35:48 KOBAYASHI Ryo>
+!                     Last modified: <2022-03-08 18:15:44 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -460,7 +460,8 @@ contains
           dsfc(1:3,kk,jj) = dsfc(1:3,kk,jj) +dsij(1:3,kk)*fcij
         enddo
 !.....dsfc wrt j
-        dsfc(1:3,jj,jj) = dsfc(1:3,jj,jj) +dsij(1:3,jj)*fcij +sij(jj)*dfcij
+        dsfc(1:3,jj,jj) = dsfc(1:3,jj,jj) +dsij(1:3,jj)*fcij &
+             +sij(jj)*dfcij*rij(1:3)/dij
       enddo ! jj-loop
 
       rhoi2(:) = 0d0
@@ -575,10 +576,9 @@ contains
       drho(1:3,1:nni) = drhoi0(1:3,1:nni)*ggam &
            +rhoi0 *dgdgam *dgam(1:3,1:nni)
       dgdy = yi /sgm**2 *exp(-yi*yi/2/sgm**2)
-      dfdy = (e0(is)*log(yi) +e0(is) +e1(is) +2d0*e2(is)*yi)*gyi &
-           +dgdy*fyi
+      dfdy = (e0(is)*log(yi) +e0(is) +e1(is) +2d0*e2(is)*yi)*gyi +dgdy*fyi
       do jj=1,nni
-        if( sij(jj).lt.tiny ) cycle
+!!$        if( sij(jj).lt.tiny ) cycle
         j = lspr(jj,i)
         js = int(tag(j))
         if( .not. interact(is,js) ) cycle
@@ -783,7 +783,7 @@ contains
       dfcut = 0d0
     else
       z2 = zij*zij
-      dfcut = -30d0*(z2*z2 +2d0*z2*zij -z2)/(rc -rs)
+      dfcut = -30d0*(z2*z2 -2d0*z2*zij +z2)/(rc -rs)
     endif
     return
   end function dfcut

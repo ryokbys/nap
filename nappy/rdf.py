@@ -241,6 +241,7 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
                                              nspcs,nr)
             return rd, rdfs.T
         except:
+            print(' Failed to use the fortran routines...')
             pass
     
     rd= np.array([ rmin +dr*(ir+0.5) for ir in range(nr) ])
