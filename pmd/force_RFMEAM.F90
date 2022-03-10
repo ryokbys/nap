@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-08 18:15:44 KOBAYASHI Ryo>
+!                     Last modified: <2022-03-10 17:37:40 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -24,6 +24,7 @@ module RFMEAM
   integer,parameter:: lmax = 3
   real(8),parameter:: tiny = 1d-14
   real(8),parameter:: sgm = 1d-5
+  integer,parameter:: allspcs = 1000
   
   logical:: lprmset_RFMEAM = .false.
 
@@ -62,7 +63,8 @@ contains
     integer,intent(in):: myid_md,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
-    integer:: is,js,ks,ierr,l
+    integer:: is,js,ks,ierr,l,i,j,k
+    integer:: imask(nspmax),jmask(nspmax),kmask(nspmax)
     real(8):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,rp,e0i,e1i,e2i,n, &
          pjl(0:lmax),qjl(0:lmax),til(lmax)
     character(len=128):: cline,fname,c1
@@ -105,19 +107,34 @@ contains
           backspace(ioprms)
           read(ioprms,*) c1,cspi, n,e0i,e1i,e2i,pjl(0:lmax),qjl(0:lmax),til(1:lmax)
           is = csp2isp(trim(cspi))
-          if( is.gt.nspmax .or. is.lt.1 ) then
+          if( is.lt.1 .and. trim(cspi).eq.'*' ) then  ! '*' means all.
+            is = allspcs
+          else if( is.gt.nspmax .or. is.lt.1 ) then
             print *,'Warning @read_params_RFMEAM: IS not in range [1,nspmax]: ',&
                  trim(cspi)//'=',is
             cycle
           endif
-          latomic(is) = .true.
-          ni(is) = n
-          e0(is) = e0i
-          e1(is) = e1i
-          e2(is) = e2i
-          pj(:,is) = pjl(:)
-          qj(:,is) = qjl(:)
-          ti(:,is) = til(:)
+          if( is.eq.allspcs ) then
+            latomic(:) = .true.
+            ni(:) = n
+            e0(:) = e0i
+            e1(:) = e1i
+            e2(:) = e2i
+            do i=1,nspmax
+              pj(:,i) = pjl(:)
+              qj(:,i) = qjl(:)
+              ti(:,i) = til(:)
+            enddo
+          else
+            latomic(is) = .true.
+            ni(is) = n
+            e0(is) = e0i
+            e1(is) = e1i
+            e2(is) = e2i
+            pj(:,is) = pjl(:)
+            qj(:,is) = qjl(:)
+            ti(:,is) = til(:)
+          endif
 
 !.....Otherwise the entry is for pair parameter
         else if( trim(c1).eq.'pair' ) then
@@ -125,47 +142,87 @@ contains
           read(ioprms,*) c1,cspi,cspj, rc,rs,ep,alp,c2,c3,rp
           is = csp2isp(trim(cspi))
           js = csp2isp(trim(cspj))
-          if( is.gt.nspmax .or. is.lt.1 .or. js.gt.nspmax .or. js.lt.1 ) then
+          if( is.gt.nspmax .or. (is.lt.1.and.trim(cspi).ne.'*') &
+               .or. js.gt.nspmax .or. (js.lt.1.and.trim(cspj).ne.'*') ) then
             print *,'Warning @read_params_RFMEAM: IS/JS is not in range [1,nspmax]: ',&
                  trim(cspi)//','//trim(cspj)//'=',is,js
             cycle
           endif
-          interact(is,js) = .true.
-          rcij(is,js) = rc
-          rsij(is,js) = rs
-          epij(is,js) = ep
-          alpij(is,js) = alp
-          c2ij(is,js) = c2
-          c3ij(is,js) = c3
-          rpij(is,js) = rp
+!.....Set imask,jmask
+          imask(:) = 1
+          jmask(:) = 1
+          do i=1,nspmax
+            if( i.eq.is ) imask(i) = 0  ! unmask is
+            if( i.eq.js ) jmask(i) = 0  ! unmask js
+          enddo
+          if( trim(cspi).eq.'*' ) imask(:) = 0  ! unmask all
+          if( trim(cspj).eq.'*' ) jmask(:) = 0  ! unmask all
+!.....Set params using the masks
+          do is=1,nspmax
+            if( imask(is).eq.1 ) cycle
+            do js=1,nspmax
+              if( jmask(js).eq.1 ) cycle
+              interact(is,js) = .true.
+              rcij(is,js) = rc
+              rsij(is,js) = rs
+              epij(is,js) = ep
+              alpij(is,js) = alp
+              c2ij(is,js) = c2
+              c3ij(is,js) = c3
+              rpij(is,js) = rp
 !.....Symmetrize parameters
-          interact(js,is) = .true.
-          rcij(js,is) = rc
-          rsij(js,is) = rs
-          epij(js,is) = ep
-          alpij(js,is) = alp
-          c2ij(js,is) = c2
-          c3ij(js,is) = c3
-          rpij(js,is) = rp
+              interact(js,is) = .true.
+              rcij(js,is) = rc
+              rsij(js,is) = rs
+              epij(js,is) = ep
+              alpij(js,is) = alp
+              c2ij(js,is) = c2
+              c3ij(js,is) = c3
+              rpij(js,is) = rp
+            enddo
+          enddo
         else if( c1(1:6).eq.'triple' ) then
           backspace(ioprms)
           read(ioprms,*) c1,cspk,cspi,cspj, cmini,cmaxi
           is = csp2isp(trim(cspi))
           js = csp2isp(trim(cspj))
           ks = csp2isp(trim(cspk))
-          if( is.gt.nspmax .or. is.lt.1 .or. js.gt.nspmax .or.js.lt.1 .or. &
-               ks.gt.nspmax .or. ks.lt.1 ) then
+          if( is.gt.nspmax .or. (is.lt.1.and.trim(cspi).ne.'*') .or. &
+               js.gt.nspmax .or. (js.lt.1.and.trim(cspj).ne.'*') .or. &
+               ks.gt.nspmax .or. (ks.lt.1.and.trim(cspk).ne.'*') ) then
             print *,'Warning @read_params_RFMEAM: KS/IS/JS is not in range [1,nspmax]: ',&
                  trim(cspk)//' '//trim(cspi)//' '//trim(cspj)
             cycle
           endif
-          interact3(ks,is,js) = .true.
-          cmax(ks,is,js) = cmaxi
-          cmin(ks,is,js) = cmini
+!.....Set masks
+          imask(:) = 1
+          jmask(:) = 1
+          kmask(:) = 1
+          do i=1,nspmax
+            if( i.eq.is ) imask(i) = 0  ! unmask is
+            if( i.eq.js ) jmask(i) = 0  ! unmask js
+            if( i.eq.ks ) kmask(i) = 0  ! unmask ks
+          enddo
+          if( trim(cspi).eq.'*' ) imask(:) = 0  ! unmask all
+          if( trim(cspj).eq.'*' ) jmask(:) = 0  ! unmask all
+          if( trim(cspk).eq.'*' ) kmask(:) = 0  ! unmask all
+!.....Set params using the masks
+          do is=1,nspmax
+            if( imask(is).eq.1 ) cycle
+            do js=1,nspmax
+              if( jmask(js).eq.1 ) cycle
+              do ks=1,nspmax
+                if( kmask(ks).eq.1 ) cycle
+                interact3(ks,is,js) = .true.
+                cmax(ks,is,js) = cmaxi
+                cmin(ks,is,js) = cmini
 !.....Symmetrize
-          interact3(ks,js,is) = .true.
-          cmax(ks,js,is) = cmaxi
-          cmin(ks,js,is) = cmini
+                interact3(ks,js,is) = .true.
+                cmax(ks,js,is) = cmaxi
+                cmin(ks,js,is) = cmini
+              enddo
+            enddo
+          enddo
         endif  ! c1 
       enddo
 10    continue
@@ -197,7 +254,7 @@ contains
 
       if( iprint.ge.ipl_basic ) then
         do is=1,nspmax
-          if( latomic(is) ) then
+          if( latomic(is) .and. trim(specorder(is)).ne.'x' ) then
             cspi = trim(specorder(is))
             write(6,'(a,1x,a3,4(2x,4f8.3))') '   atomic  ',trim(cspi), &
                  ni(is),e0(is),e1(is),e2(is), &
@@ -206,9 +263,11 @@ contains
         enddo
         do is=1,nspmax
           cspi = trim(specorder(is))
+          if( cspi.eq.'x' ) cycle
           do js=is,nspmax
+            cspj = trim(specorder(js))
+            if( cspj.eq.'x' ) cycle
             if( interact(is,js) ) then
-              cspj = trim(specorder(js))
               write(6,'(a,2(1x,a3),7f8.3)') '   pair  ',trim(cspi),trim(cspj), &
                    rcij(is,js),rsij(is,js),epij(is,js),alpij(is,js), &
                    c2ij(is,js),c3ij(is,js),rpij(is,js)
@@ -217,11 +276,14 @@ contains
         enddo
         do is=1,nspmax
           cspi = trim(specorder(is))
+          if( cspi.eq.'x' ) cycle
           do js=is,nspmax
             cspj = trim(specorder(js))
+            if( cspj.eq.'x' ) cycle
             do ks=1,nspmax
-              if( .not. interact3(ks,is,js) ) cycle
               cspk = trim(specorder(ks))
+              if( cspk.eq.'x' ) cycle
+              if( .not. interact3(ks,is,js) ) cycle
               write(6,'(a,a2,"-",a2,"-",a2,2f7.3)') '   triple  ', &
                    trim(cspk),trim(cspi),trim(cspj), &
                    cmin(ks,is,js),cmax(ks,is,js)

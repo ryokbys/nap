@@ -1,12 +1,12 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-02-22 16:18:22 KOBAYASHI Ryo>
+!                     Last modified: <2022-03-09 22:29:54 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
 !  For screened Coulomb potential:
 !    - Ref. Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
-!    - No cutoff treatment
+!    - Cutoff treatment of energy and force shifts.
 !  For Ewald Coulomb potential:
 !    - ...
 !-----------------------------------------------------------------------
@@ -74,6 +74,7 @@ module Coulomb
 !     See, C.J. Fennell and J.D. Gezelter, J. Chem. Phys. 124, 234104 (2006).
   real(8):: rho_screened_cut = 5.0d0
   real(8):: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
+  real(8):: rcut = -1d0
 
 !.....Accuracy controlling parameter for Ewald sum
 !.....See, http://www.jncasr.ac.in/ccms/sbs2007/lecturenotes/5day10nov/SBS_Ewald.pdf
@@ -485,6 +486,10 @@ contains
             cmode = 'none'
           endif
           cycle
+        else if( trim(c1st).eq.'rcut' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, rcut
+          cycle
         else if( trim(c1st).eq.'sigma' ) then
           backspace(ioprms)
           read(ioprms,*) ctmp, sgm_ew
@@ -701,6 +706,7 @@ contains
     call mpi_bcast(vc_chi,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vc_jii,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vc_e0,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rcut,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qbot,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qtop,nspmax,mpi_real8,0,mpi_world,ierr)
@@ -712,7 +718,6 @@ contains
     call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
 
     call mpi_bcast(pacc,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_screened_cut,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_scr,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)

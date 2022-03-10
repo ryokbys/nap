@@ -253,6 +253,7 @@ def write_vars_fitpot(vs,vrs,fname='in.vars.fitpot',**kwargs):
     rc3 = kwargs['rc3']
     options = kwargs['options']
     hardlim = kwargs['hardlim']
+    vopts = kwargs['vopts']
     nv = len(vs)
     with open(fname,'w') as f:
         if 'hard-limit' in options.keys() and options['hard-limit']:
@@ -262,9 +263,11 @@ def write_vars_fitpot(vs,vrs,fname='in.vars.fitpot',**kwargs):
         for i in range(len(vs)):
             f.write(' {0:15.7f}  {1:15.7f}  {2:15.7f}'.format(vs[i],*vrs[i]))
             if 'hard-limit' in options.keys() and options['hard-limit']:
-                f.write('  {0:10.4f}  {1:10.4f}\n'.format(*hardlim[i]))
-            else:
-                f.write('\n')
+                f.write('  {0:10.4f}  {1:10.4f}'.format(*hardlim[i]))
+            if len(vopts[i]) > 0:
+                for ivo,vo in enumerate(vopts[i]):
+                    f.write(f'  {vo}')
+            f.write('\n')
     return None
 
 def parse_option(line):
@@ -292,6 +295,7 @@ def read_vars_fitpot(fname='in.vars.fitpot'):
     vs = []
     vrs = []
     vrsh = []
+    vopts = []
     options = {}
     for line in lines:
         if line[0] in ('!','#'):
@@ -316,6 +320,7 @@ def read_vars_fitpot(fname='in.vars.fitpot'):
                 vs.append(float(data[0]))
                 vrs.append([ float(data[1]), float(data[2])])
                 vrsh.append([float(data[3]), float(data[4])])
+                vopts.append(data[5:])
                 print(' iv,vrhmin,vrhmax= {0:3d} {1:11.3e} {2:11.3e}'.format(iv,
                                                                              float(data[3]),
                                                                              float(data[4])))
@@ -323,11 +328,12 @@ def read_vars_fitpot(fname='in.vars.fitpot'):
                 vs.append(float(data[0]))
                 vrs.append([ float(data[1]), float(data[2])])
                 vrsh.append([-1e+30, 1e+30])
+                vopts.append(data[3:])
     vs = np.array(vs)
     vrs = np.array(vrs)
     vrsh = np.array(vrsh)
     print('')
-    return rc2,rc3,vs,vrs,vrsh,options
+    return rc2,rc3,vs,vrs,vrsh,options,vopts
     
 
 def read_rdf(fname,specorder,pairs=[]):
@@ -819,7 +825,7 @@ def main():
     infp = read_in_fitpot(infname)
     write_info(infp,args)
 
-    rc2,rc3,vs,vrs,vrsh,options = read_vars_fitpot(infp['param_file'])
+    rc2,rc3,vs,vrs,vrsh,options,vopts = read_vars_fitpot(infp['param_file'])
 
     kwargs = infp
     kwargs['options'] = options
@@ -830,6 +836,7 @@ def main():
     kwargs['subdir-prefix'] = args['--subdir-prefix']
     kwargs['subjob-script'] = args['--subjob-script']
     kwargs['start'] = start
+    kwargs['vopts'] = vopts
     
     smpldir = infp['sample_directory']
     if len(infp['match']) != 0:
