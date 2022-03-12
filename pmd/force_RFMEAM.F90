@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-10 17:37:40 KOBAYASHI Ryo>
+!                     Last modified: <2022-03-12 19:53:19 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -50,13 +50,8 @@ contains
 !--parameter file format------------------------------------------------
 !   pairtype   Timonova
 !   atomic   cspi  ni  e0  e1  e2  pj(0:lmax)  qj(0:lmax)  ti(lmax)
-!   pair     cspi cspj rcij rsij epij alpij c2ij c3ij rpij
+!   pair     cspi cspj rcij rsij rpij epij alpij c2ij c3ij
 !   triple   cspk cspi cspj  cmin cmax
-!--or-------------------------------------------------------------------
-!   pairtype   Srinivasan
-!   atomic   cspi  ni  e0  e1  e2  pj(0:lmax)  qj(0:lmax)  ti(lmax)
-!   pair     cspi cspj rcij rsij epij alpij bij(1:mmax) sij(1:mmax)
-!   triple   cspk cspi cspj cmin cmax
 !-----------------------------------------------------------------------
     include 'mpif.h'
     include './const.h'
@@ -139,7 +134,7 @@ contains
 !.....Otherwise the entry is for pair parameter
         else if( trim(c1).eq.'pair' ) then
           backspace(ioprms)
-          read(ioprms,*) c1,cspi,cspj, rc,rs,ep,alp,c2,c3,rp
+          read(ioprms,*) c1,cspi,cspj, rc,rs,rp,alp,ep,c2,c3
           is = csp2isp(trim(cspi))
           js = csp2isp(trim(cspj))
           if( is.gt.nspmax .or. (is.lt.1.and.trim(cspi).ne.'*') &
@@ -256,7 +251,7 @@ contains
         do is=1,nspmax
           if( latomic(is) .and. trim(specorder(is)).ne.'x' ) then
             cspi = trim(specorder(is))
-            write(6,'(a,1x,a3,4(2x,4f8.3))') '   atomic  ',trim(cspi), &
+            write(6,'(a,1x,a3,4(2x,4f8.3))') '   element  ',trim(cspi), &
                  ni(is),e0(is),e1(is),e2(is), &
                  pj(0:lmax,is),qj(0:lmax,is),ti(1:lmax,is)
           endif
@@ -268,9 +263,9 @@ contains
             cspj = trim(specorder(js))
             if( cspj.eq.'x' ) cycle
             if( interact(is,js) ) then
-              write(6,'(a,2(1x,a3),7f8.3)') '   pair  ',trim(cspi),trim(cspj), &
-                   rcij(is,js),rsij(is,js),epij(is,js),alpij(is,js), &
-                   c2ij(is,js),c3ij(is,js),rpij(is,js)
+              write(6,'(a,2(1x,a3),7f8.3)') '   pair   ',trim(cspi),trim(cspj), &
+                   rcij(is,js),rsij(is,js),rpij(is,js), &
+                   alpij(is,js),epij(is,js),c2ij(is,js),c3ij(is,js)
             endif
           enddo
         enddo
@@ -284,7 +279,7 @@ contains
               cspk = trim(specorder(ks))
               if( cspk.eq.'x' ) cycle
               if( .not. interact3(ks,is,js) ) cycle
-              write(6,'(a,a2,"-",a2,"-",a2,2f7.3)') '   triple  ', &
+              write(6,'(a,a2,"-",a2,"-",a2,2f7.3)') '   triple   ', &
                    trim(cspk),trim(cspi),trim(cspj), &
                    cmin(ks,is,js),cmax(ks,is,js)
             enddo

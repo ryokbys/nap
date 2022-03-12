@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-12-23 15:10:00 Ryo KOBAYASHI>
+!                     Last-modified: <2022-03-12 22:40:04 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -2410,12 +2410,10 @@ subroutine force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
 !.....Max change rate (2%)
   real(8),parameter:: RMAX = 0.02d0
 
-  integer:: i,ixyz,jxyz,ierr
-  real(8):: prss,fac,tmp
+  integer:: i,ixyz,jxyz,ierr,l
+  real(8):: prss,fac,tmp,bxc(3),cxa(3),axb(3),sgmnrm
 
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
-!!$  print '(a,6f8.3)','stnsr= ',stnsr(1,1),stnsr(2,2),stnsr(3,3) &
-!!$       ,stnsr(3,2),stnsr(1,3),stnsr(1,2)
 
 !.....Berendsen for variable-cell
   if( trim(cpctl).eq.'Berendsen' .or. &
@@ -2426,15 +2424,19 @@ subroutine force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
     ah(2,2)= 1d0
     ah(3,3)= 1d0
 !.....Limit change rate of h (ah) to RMAX
-    do ixyz=1,3
-      do jxyz=1,3
-        tmp = stbeta*dt/3/srlx*( stgt(ixyz,jxyz)-stnsr(ixyz,jxyz) )
+    do jxyz=1,3
+      sgmnrm = sqrt(sgm(1,jxyz)**2 +sgm(2,jxyz)**2 +sgm(3,jxyz)**2)
+      do ixyz=1,3
+        tmp = 0d0
+        do l=1,3
+          tmp = tmp + ( stgt(ixyz,l)-stnsr(ixyz,l) ) *sgm(l,jxyz)
+        enddo
+        tmp = tmp *stbeta*dt/3/srlx /sgmnrm
+!!$        tmp = stbeta*dt/3/srlx*( stgt(ixyz,jxyz)-stnsr(ixyz,jxyz) )
         tmp = min(max(tmp,-RMAX),RMAX)
         ah(ixyz,jxyz) = ah(ixyz,jxyz) -tmp
       enddo
     enddo
-!        ah(1:3,1:3)= ah(1:3,1:3)
-!     &       -stbeta*dt/3/srlx*( stgt(1:3,1:3)-stnsr(1:3,1:3) )
 !.....Berendsen for variable-volume not variable-cell
   else if( trim(cpctl).eq.'vv-Berendsen' ) then
     ah(1:3,1:3)= 0d0
@@ -2469,8 +2471,8 @@ subroutine sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
   do i=1,natm
     do jxyz=1,3
       do ixyz=1,3
-        stk(ixyz,jxyz)=stk(ixyz,jxyz) +2d0*eki(ixyz,jxyz,i)
-        stp(ixyz,jxyz)=stp(ixyz,jxyz) +strs(ixyz,jxyz,i)
+        stk(ixyz,jxyz)=stk(ixyz,jxyz) +2d0*eki(ixyz,jxyz,i)  ! eki in eV
+        stp(ixyz,jxyz)=stp(ixyz,jxyz) +strs(ixyz,jxyz,i)  ! strs as rij*fij in eV
       enddo
     enddo
   enddo

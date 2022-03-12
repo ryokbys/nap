@@ -5,7 +5,8 @@ using Green-Lagrange deformation tensors, which is the same
 scheme as materialsproject.org does.
 
 PREPARE mode creates directories and POSCAR files to be computed.
-ANALYZE mode reads the stress values obtained by some code.
+ANALYZE mode reads the stress values obtained by some code. 
+STRSFILE is the file name of resulting stress information, e.g., strs.pmd in the case of pmd.
 
 Usage:
     elasticity.py prepare [options] POSCAR
