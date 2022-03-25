@@ -168,7 +168,7 @@ contains
           cs = dot/sqrt(dij2)/sqrt(dik2)
           rad = acos(cs)
           deg = rad/pi *180d0
-          iang = min(int(deg/dang)+1,nang)
+          iang = min(max(int(deg/dang)+1,1),nang)
           adfs(iang,ijktrpl) = adfs(iang,ijktrpl) +1d0
         enddo
       enddo

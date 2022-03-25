@@ -6,6 +6,12 @@ module pairlist
   implicit none
   include './const.h'
   save
+  private
+
+  public:: mk_lspr_para,mk_lscl_para,reorder_arrays, update_d2lspr, &
+       check_lspr, check_lscl
+  public:: mk_lspr_gonnet, mk_lspr_sngl, mk_lspr_brute, sort_by_lscl, &
+       swap, qsort_list
   
   integer,allocatable:: lscl(:),lshd(:)
   real(8):: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi

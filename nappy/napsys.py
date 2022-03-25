@@ -573,6 +573,7 @@ class NAPSystem(object):
         """
         Visualize the system using 3Dmol.js and py3Dmol.
         """
+        from nappy.elements import elements
         try:
             import py3Dmol
         except Exception as e:
@@ -585,12 +586,15 @@ class NAPSystem(object):
         
         pdb = nappy.io.get_PDB_txt(self,**options)
         v = py3Dmol.view()
+        v.removeAllModels()
+        v.setViewStyle({'style':'outline','color':'black','width':0.03})
         v.addModel(pdb,'pdb')
-        v.setViewStyle({'style':'outline','color':'black','width':0.05})
+        colors = { s:elements[s]['CPKcolor'] for s in self.specorder }
         if 'modopts' in locals():
             v.setStyle(modopts)
         else:
-            v.setStyle({'stick':{'radius':.1},'sphere':{'radius':.5}})
+            v.setStyle({'stick':{'radius':.1,'colorscheme':{'prop':'elem','map':colors}},
+                        'sphere':{'radius':.5,'colorscheme':{'prop':'elem','map':colors}}})
         v.addUnitCell()
         if hasattr(self,'voldata'):
             cube = self.get_cube_txt()

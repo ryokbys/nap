@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-03-12 22:40:04 KOBAYASHI Ryo>
+!                     Last-modified: <2022-03-25 18:42:59 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -46,7 +46,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        ekitot(3,3,ntot0),epitot(ntot0),auxtot(naux,ntot0)
   real(8),intent(out):: epot,ekin,stnsr(3,3)
 
-  integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr
+  integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,maxnn
   integer:: ihour,imin,isec
   real(8):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp, &
        htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow
@@ -65,6 +65,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   character(len=20):: cfstime = 'es18.10'
   character(len=20):: cfetime = 'f12.2' ! for elapsed time
   character(len=20):: cftave  = 'f12.2' ! or 'es12.4' for high-T
+
+  integer,external:: calc_maxnn
 
   tcpu0= mpi_wtime()
   h(:,:,:) = hmat(:,:,:)  ! use pmdvars variable h instead of hmat
@@ -312,6 +314,11 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   call check_lscl(myid_md,iprint)
   call check_lspr(namax,natm,nnmax,lspr,iprint,myid_md,mpi_md_world)
   call accum_time('lspr',mpi_wtime()-tmp)
+
+  maxnn = calc_maxnn(namax,natm,nnmax,lspr,myid_md,mpi_md_world)
+  if( iprint.gt.0 .and. myid_md.eq.0 ) then
+    print '(/a,i5)', ' Max num of neighbors = ',maxnn
+  endif
 
   if( chgopt_method(1:4).eq.'xlag' ) then
     aux(iaux_vq,:) = 0d0
@@ -2002,7 +2009,7 @@ subroutine bacopy(l1st)
       else
         if( myid_md.eq.0 ) then
           print *,'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-          print *,'Stop pmd because of maxb.gt.nbmax.'
+          print *,'Exit pmd because maxb > nbmax.'
           print *,'If you do not want to stop, set allow_reallocation T in in.pmd.'
           print *,'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
         endif
@@ -3386,6 +3393,27 @@ subroutine sanity_check(ekin,epot,stnsr,tave,myid,mpi_world)
   return
 
 end subroutine sanity_check
+!=======================================================================
+function calc_maxnn(namax,natm,nnmax,lspr,myid,mpi_world) result(maxnn)
+  implicit none 
+  include "mpif.h"
+  integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
+  integer,intent(in):: myid,mpi_world
+  integer:: maxnn
+
+  integer:: ia,maxnnl,ierr
+
+  maxnn = 0
+  maxnnl = 0
+  do ia=1,natm
+    maxnnl = max(maxnnl, lspr(0,ia))
+  enddo
+  call mpi_reduce(maxnnl,maxnn,1,mpi_integer,mpi_max,0,mpi_world,ierr)
+
+  return
+end function calc_maxnn
+!=======================================================================
+
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd lib"

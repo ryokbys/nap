@@ -1156,12 +1156,11 @@ subroutine chgopt_damping(chg,l1st)
 
   if( l1st ) then
     if( allocated(vq) ) then
-      call accum_mem('force_common',-8*size(vq) -8*size(fq))
-      deallocate(vq,fq)
+      call accum_mem('force_common',-8*(size(vq)+size(fq)+size(dq)))
+      deallocate(vq,fq,dq)
     endif
-    allocate(vq(namax),fq(namax))
-    call accum_mem('force_common',8*size(vq) +8*size(fq))
-    allocate(dq(namax))
+    allocate(vq(namax),fq(namax),dq(namax))
+    call accum_mem('force_common',8*(size(vq) +size(fq)+size(dq)))
   endif
 
 !!$  call mpi_allreduce(natm,ntot,1,mpi_integer,mpi_sum,mpi_md_world,ierr)

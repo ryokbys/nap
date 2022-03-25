@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-09 22:29:54 KOBAYASHI Ryo>
+!                     Last modified: <2022-03-17 15:48:05 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !

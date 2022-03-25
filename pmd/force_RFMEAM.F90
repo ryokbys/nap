@@ -1,11 +1,12 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-12 19:53:19 KOBAYASHI Ryo>
+!                     Last modified: <2022-03-25 18:33:30 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
 !    [1] Lazic and Thijsse, Comp. Mat. Sci. 53, (2012) 483-492
 !    [2] Timonova and Thijsse, MSMSE 19 (2011) 015003
+!    [3] Srinivasan et al., MSMSE 27 (2019) 065013
 !-----------------------------------------------------------------------
   use pmdvars, only: nspmax
   use memory,only: accum_mem
@@ -22,6 +23,7 @@ module RFMEAM
 
   integer,parameter:: ioprms = 20
   integer,parameter:: lmax = 3
+  integer,parameter:: mmax = 3
   real(8),parameter:: tiny = 1d-14
   real(8),parameter:: sgm = 1d-5
   integer,parameter:: allspcs = 1000
@@ -36,7 +38,10 @@ module RFMEAM
        epij(nspmax,nspmax), alpij(nspmax,nspmax), c2ij(nspmax,nspmax), &
        c3ij(nspmax,nspmax), rpij(nspmax,nspmax), pj(0:lmax,nspmax), &
        qj(0:lmax,nspmax), e0(nspmax), e1(nspmax), e2(nspmax), &
-       ni(nspmax), ti(lmax,nspmax), rcfac2(nspmax,nspmax)
+       ni(nspmax), ti(lmax,nspmax), rcfac2(nspmax,nspmax), &
+       wij(nspmax,nspmax)
+  real(8):: srij(mmax,nspmax,nspmax), bij(mmax,nspmax,nspmax)
+  integer:: itype2(nspmax,nspmax)
 
   logical:: interact(nspmax,nspmax), &
        interact3(nspmax,nspmax,nspmax)
@@ -50,18 +55,23 @@ contains
 !--parameter file format------------------------------------------------
 !   pairtype   Timonova
 !   atomic   cspi  ni  e0  e1  e2  pj(0:lmax)  qj(0:lmax)  ti(lmax)
-!   pair     cspi cspj rcij rsij rpij epij alpij c2ij c3ij
+!   pair     cspi cspj itype2 rcij rsij rpij epij alpij c2ij c3ij wij
 !   triple   cspk cspi cspj  cmin cmax
+!-----------------------------------------------------------------------
+!   itype2 is the type of pair potential function:
+!     1) Timonova type
+!     2) Srinivasan type
 !-----------------------------------------------------------------------
     include 'mpif.h'
     include './const.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
-    integer:: is,js,ks,ierr,l,i,j,k
+    integer:: is,js,ks,ierr,l,i,j,k,it2,itmp,m,maxm
     integer:: imask(nspmax),jmask(nspmax),kmask(nspmax)
-    real(8):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,rp,e0i,e1i,e2i,n, &
-         pjl(0:lmax),qjl(0:lmax),til(lmax)
+    real(8):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,w,rp,e0i,e1i,e2i,n, &
+         pjl(0:lmax),qjl(0:lmax),til(lmax),b(mmax),sr(mmax), &
+         bmax,srmax
     character(len=128):: cline,fname,c1
     character(len=3):: cspi,cspj,cspk
     logical:: latomic(nspmax)
@@ -78,6 +88,7 @@ contains
       rpij(:,:) = 0d0
       pj(:,:) = 0d0
       qj(:,:) = 0d0
+      wij(:,:) = 0d0
       e0(:) = 0d0
       e1(:) = 0d0
       e2(:) = 0d0
@@ -86,6 +97,9 @@ contains
       interact(:,:) = .false.
       interact3(:,:,:) = .false.
       latomic(:) = .false.
+      itype2(:,:) = 0
+      bij(:,:,:) = 0d0
+      srij(:,:,:) = 0d0
 
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
@@ -105,8 +119,10 @@ contains
           if( is.lt.1 .and. trim(cspi).eq.'*' ) then  ! '*' means all.
             is = allspcs
           else if( is.gt.nspmax .or. is.lt.1 ) then
-            print *,'Warning @read_params_RFMEAM: IS not in range [1,nspmax]: ',&
-                 trim(cspi)//'=',is
+            if( iprint.ge.ipl_info ) then
+              print *,'Since not in range [1,nspmax]: ',&
+                   trim(cspi)//'=',is,', skip IS.'
+            endif
             cycle
           endif
           if( is.eq.allspcs ) then
@@ -134,48 +150,118 @@ contains
 !.....Otherwise the entry is for pair parameter
         else if( trim(c1).eq.'pair' ) then
           backspace(ioprms)
-          read(ioprms,*) c1,cspi,cspj, rc,rs,rp,alp,ep,c2,c3
+          read(ioprms,*) c1,cspi,cspj,it2
           is = csp2isp(trim(cspi))
           js = csp2isp(trim(cspj))
           if( is.gt.nspmax .or. (is.lt.1.and.trim(cspi).ne.'*') &
                .or. js.gt.nspmax .or. (js.lt.1.and.trim(cspj).ne.'*') ) then
-            print *,'Warning @read_params_RFMEAM: IS/JS is not in range [1,nspmax]: ',&
-                 trim(cspi)//','//trim(cspj)//'=',is,js
+            if( iprint.ge.ipl_info ) then
+              print *,'Since IS/JS is not in range [1,nspmax]: ',&
+                   trim(cspi)//','//trim(cspj)//'=',is,js,', skip IS/JS...'
+            endif
             cycle
           endif
+          if( it2.eq.1 ) then  ! Timonova-type pair potential
+            backspace(ioprms)
+            read(ioprms,*) c1,cspi,cspj,itmp,rc,rs,rp,alp,ep,c2,c3,w
 !.....Set imask,jmask
-          imask(:) = 1
-          jmask(:) = 1
-          do i=1,nspmax
-            if( i.eq.is ) imask(i) = 0  ! unmask is
-            if( i.eq.js ) jmask(i) = 0  ! unmask js
-          enddo
-          if( trim(cspi).eq.'*' ) imask(:) = 0  ! unmask all
-          if( trim(cspj).eq.'*' ) jmask(:) = 0  ! unmask all
-!.....Set params using the masks
-          do is=1,nspmax
-            if( imask(is).eq.1 ) cycle
-            do js=1,nspmax
-              if( jmask(js).eq.1 ) cycle
-              interact(is,js) = .true.
-              rcij(is,js) = rc
-              rsij(is,js) = rs
-              epij(is,js) = ep
-              alpij(is,js) = alp
-              c2ij(is,js) = c2
-              c3ij(is,js) = c3
-              rpij(is,js) = rp
-!.....Symmetrize parameters
-              interact(js,is) = .true.
-              rcij(js,is) = rc
-              rsij(js,is) = rs
-              epij(js,is) = ep
-              alpij(js,is) = alp
-              c2ij(js,is) = c2
-              c3ij(js,is) = c3
-              rpij(js,is) = rp
+            imask(:) = 1
+            jmask(:) = 1
+            do i=1,nspmax
+              if( i.eq.is ) imask(i) = 0  ! unmask is
+              if( i.eq.js ) jmask(i) = 0  ! unmask js
             enddo
-          enddo
+            if( trim(cspi).eq.'*' ) imask(:) = 0  ! unmask all
+            if( trim(cspj).eq.'*' ) jmask(:) = 0  ! unmask all
+!.....Set params using the masks
+            do is=1,nspmax
+              if( imask(is).eq.1 ) cycle
+              do js=1,nspmax
+                if( jmask(js).eq.1 ) cycle
+                interact(is,js) = .true.
+                itype2(is,js) = 1
+                rcij(is,js) = rc
+                rsij(is,js) = rs
+                epij(is,js) = ep
+                alpij(is,js) = alp
+                c2ij(is,js) = c2
+                c3ij(is,js) = c3
+                rpij(is,js) = rp
+                wij(is,js) = w
+!.....Symmetrize parameters
+                interact(js,is) = .true.
+                itype2(js,is) = 1
+                rcij(js,is) = rc
+                rsij(js,is) = rs
+                epij(js,is) = ep
+                alpij(js,is) = alp
+                c2ij(js,is) = c2
+                c3ij(js,is) = c3
+                rpij(js,is) = rp
+                wij(js,is) = w
+              enddo
+            enddo
+          else if( it2.eq.2 ) then
+            backspace(ioprms)
+            read(ioprms,*) c1,cspi,cspj,itmp,(sr(m),m=1,mmax),(b(m),m=1,mmax),w
+!.....Set imask,jmask
+            imask(:) = 1
+            jmask(:) = 1
+            do i=1,nspmax
+              if( i.eq.is ) imask(i) = 0  ! unmask is
+              if( i.eq.js ) jmask(i) = 0  ! unmask js
+            enddo
+            if( trim(cspi).eq.'*' ) imask(:) = 0  ! unmask all
+            if( trim(cspj).eq.'*' ) jmask(:) = 0  ! unmask all
+!.....Set params using the masks
+            do is=1,nspmax
+              if( imask(is).eq.1 ) cycle
+              do js=1,nspmax
+                if( jmask(js).eq.1 ) cycle
+                interact(is,js) = .true.
+                interact(js,is) = .true.
+                itype2(is,js) = 2
+                itype2(js,is) = 2
+                do m=1,mmax
+                  bij(m,is,js) = b(m)
+                  bij(m,js,is) = b(m)
+                  srij(m,is,js) = sr(m)
+                  srij(m,js,is) = sr(m)
+                enddo
+                wij(is,js) = w
+                wij(js,is) = w
+!.....rs and rc are necessary for embed part
+                rcij(is,js) = srij(mmax,is,js)
+                rcij(js,is) = srij(mmax,is,js)
+                rsij(is,js) = srij(mmax,is,js) -0.5d0
+                rsij(js,is) = srij(mmax,is,js) -0.5d0
+!.....If srij(mmax,is,js) is not the longest, replace it with the longest one.
+                maxm = 0
+                srmax = 0d0
+                do m=1,mmax
+                  if( srij(m,is,js).gt.srmax ) then
+                    srmax = srij(m,is,js)
+                    maxm = m
+                  endif
+                enddo
+                if( maxm.ne.mmax ) then
+                  bmax = bij(maxm,is,js)
+                  srmax = srij(maxm,is,js)
+                  bij(maxm,is,js) = bij(mmax,is,js)
+                  srij(maxm,is,js) = srij(mmax,is,js)
+                  bij(mmax,is,js) = bmax
+                  srij(mmax,is,js) = srmax
+!.....Symmetrize
+                  bij(maxm,js,is) = bij(maxm,is,js)
+                  srij(maxm,js,is) = srij(maxm,is,js)
+                  bij(mmax,js,is) = bij(mmax,is,js)
+                  srij(mmax,js,is) = srij(mmax,is,js)
+                endif
+              enddo
+            enddo
+          else
+            cycle
+          endif
         else if( c1(1:6).eq.'triple' ) then
           backspace(ioprms)
           read(ioprms,*) c1,cspk,cspi,cspj, cmini,cmaxi
@@ -185,8 +271,11 @@ contains
           if( is.gt.nspmax .or. (is.lt.1.and.trim(cspi).ne.'*') .or. &
                js.gt.nspmax .or. (js.lt.1.and.trim(cspj).ne.'*') .or. &
                ks.gt.nspmax .or. (ks.lt.1.and.trim(cspk).ne.'*') ) then
-            print *,'Warning @read_params_RFMEAM: KS/IS/JS is not in range [1,nspmax]: ',&
-                 trim(cspk)//' '//trim(cspi)//' '//trim(cspj)
+            if( iprint.ge.ipl_info ) then
+              print *,'Since KS/IS/JS is not in range [1,nspmax]: ',&
+                   trim(cspk)//' '//trim(cspi)//' '//trim(cspj), &
+                   ', skip KS/IS/JS...'
+            endif
             cycle
           endif
 !.....Set masks
@@ -225,27 +314,29 @@ contains
 
 !.....TODO: Check consistency
 
-!.....If is-js parameters are not specified even though is-is and js-js
-!     parameters are given, is-js parameters are computed as averages.
-      do is=1,nspmax
-        if( .not. interact(is,is) ) cycle
-        do js=is+1,nspmax
-          if( .not. interact(js,js) .or. interact(is,js) ) cycle
-          rcij(is,js) = (rcij(is,is)+rcij(js,js))/2
-          rsij(is,js) = (rsij(is,is)+rsij(js,js))/2
-          epij(is,js) = (epij(is,is)+epij(js,js))/2
-          alpij(is,js)= (alpij(is,is)+alpij(js,js))/2
-          c2ij(is,js) = (c2ij(is,is)+c2ij(js,js))/2
-          c3ij(is,js) = (c3ij(is,is)+c3ij(js,js))/2
-!.....Symmetrize
-          rcij(js,is) = rcij(is,js) 
-          rsij(js,is) = rsij(is,js) 
-          epij(js,is) = epij(is,js) 
-          alpij(js,is)= alpij(is,js)
-          c2ij(js,is) = c2ij(is,js) 
-          c3ij(js,is) = c3ij(is,js)
-        enddo
-      enddo
+!!$!.....If is-js parameters are not specified even though is-is and js-js
+!!$!     parameters are given, is-js parameters are computed as averages.
+!!$      do is=1,nspmax
+!!$        if( .not. interact(is,is) ) cycle
+!!$        do js=is+1,nspmax
+!!$          if( .not. interact(js,js) .or. interact(is,js) ) cycle
+!!$          rcij(is,js) = (rcij(is,is)+rcij(js,js))/2
+!!$          rsij(is,js) = (rsij(is,is)+rsij(js,js))/2
+!!$          epij(is,js) = (epij(is,is)+epij(js,js))/2
+!!$          alpij(is,js)= (alpij(is,is)+alpij(js,js))/2
+!!$          c2ij(is,js) = (c2ij(is,is)+c2ij(js,js))/2
+!!$          c3ij(is,js) = (c3ij(is,is)+c3ij(js,js))/2
+!!$          wij(is,js) = (wij(is,is)+wij(js,js))/2
+!!$!.....Symmetrize
+!!$          rcij(js,is) = rcij(is,js) 
+!!$          rsij(js,is) = rsij(is,js) 
+!!$          epij(js,is) = epij(is,js) 
+!!$          alpij(js,is)= alpij(is,js)
+!!$          c2ij(js,is) = c2ij(is,js) 
+!!$          c3ij(js,is) = c3ij(is,js)
+!!$          wij(js,is) = wij(is,js)
+!!$        enddo
+!!$      enddo
 
       if( iprint.ge.ipl_basic ) then
         do is=1,nspmax
@@ -263,9 +354,17 @@ contains
             cspj = trim(specorder(js))
             if( cspj.eq.'x' ) cycle
             if( interact(is,js) ) then
-              write(6,'(a,2(1x,a3),7f8.3)') '   pair   ',trim(cspi),trim(cspj), &
-                   rcij(is,js),rsij(is,js),rpij(is,js), &
-                   alpij(is,js),epij(is,js),c2ij(is,js),c3ij(is,js)
+              if( itype2(is,js).eq.1 )  then
+                write(6,'(a,2(1x,a3),i3,8f8.3)') '   pair   ', &
+                     trim(cspi),trim(cspj),itype2(is,js), &
+                     rcij(is,js),rsij(is,js),rpij(is,js), &
+                     alpij(is,js),epij(is,js),c2ij(is,js),c3ij(is,js), wij(is,js)
+              else if( itype2(is,js).eq.2 ) then
+                write(6,'(a,2(1x,a3),i3,8f8.3)') '   pair   ', &
+                     trim(cspi),trim(cspj),itype2(is,js), &
+                     (srij(m,is,js),m=1,mmax), (bij(m,is,js),m=1,mmax), &
+                     wij(is,js)
+              endif
             endif
           enddo
         enddo
@@ -290,11 +389,12 @@ contains
 
     call mpi_bcast(rcij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(rsij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(epij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(rpij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(alpij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(epij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(c2ij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(c3ij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(rpij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(wij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(pj,4*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(qj,4*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(ti,3*nspmax,mpi_real8,0,mpi_md_world,ierr)
@@ -306,7 +406,9 @@ contains
     call mpi_bcast(cmin,nspmax**3,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(interact,nspmax**2,mpi_logical,0,mpi_md_world,ierr)
     call mpi_bcast(interact3,nspmax**3,mpi_logical,0,mpi_md_world,ierr)
-    call mpi_bcast(lmax,1,mpi_integer,0,mpi_md_world,ierr)
+    call mpi_bcast(itype2,nspmax**2,mpi_integer,0,mpi_md_world,ierr)
+    call mpi_bcast(bij,mmax*nspmax**2,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(srij,mmax*nspmax**2,mpi_real8,0,mpi_md_world,ierr)
 
     if( myid_md.eq.0 .and. iprint.gt.ipl_basic ) then
       write(6,'(a)') ' Finished reading '//trim(fname)
@@ -338,7 +440,8 @@ contains
          rik(3),dik2,dik,fcik,cs,cs2,plcs(0:lmax),dplcs(0:lmax),sfcjk, &
          rhoi2(0:lmax),gam,egam,ggam,dgdgam,rhoi,yi,gyi,fyi,frhoi,rhoi0, &
          pcs,pcsi,dcsdij(3),dcsdik(3),strho2,dgdy,dfdy,atmp(3), &
-         cmaxkij,cmaxmax,truerc,epott,epot2l,epotml,epot2,epotm
+         cmaxkij,cmaxmax,truerc,epott,epot2l,epotml,epot2,epotm, &
+         phi2,dphi2
     real(8),allocatable,save:: aal(:,:),strsl(:,:,:),epil(:)
     real(8),allocatable,save:: sij(:),dsij(:,:),sfc(:),fl(:,:), &
          dfl(:,:,:),dsfc(:,:,:),drhoi2(:,:,:),drhoi0(:,:),dstrho2(:,:), &
@@ -367,7 +470,11 @@ contains
       do is=1,nspmax
         do js=1,nspmax
           if( .not.interact(is,js) ) cycle
-          rc = rcij(is,js)
+          if( itype2(is,js).eq.1 ) then
+            rc = rcij(is,js)
+          else if( itype2(is,js).eq.2 ) then
+            rc = srij(mmax,is,js)
+          endif
           do ks=1,nspmax
             cmaxkij = cmax(ks,is,js)
             if( cmaxkij.le.1d0 ) cycle
@@ -444,67 +551,117 @@ contains
         dij = rijs(5,jj)
         call compute_sij(i,j,jj,is,js,rijs, &
              namax,natm,nnmax,tag,lspr,sij(jj),dsij(:,:))
+!!$!.....Debugging
+!!$        sij(jj) = 1d0
+!!$        dsij(:,:) = 0d0
 !.....Skip computing i-j interaction if it is completely screened (Sij==0).
         if( sij(jj).lt.tiny ) cycle
-!-----Pair potential part ------------------------------------
-        ep = epij(is,js)
-        alpha = alpij(is,js)
-        c2 = c2ij(is,js)
-        c3 = c3ij(is,js)
-        dp = rpij(is,js)
-!.....Cutoff function, fc
         fcij = fcut(is,js,dij)
         dfcij = dfcut(is,js,dij)
-        if( fcij.lt.tiny ) cycle
-        eta = alpha *(dij/dp -1d0)
-        expeta = exp(-eta)
-        phi = -ep*(1d0 +eta +c2*eta**2 +c3*eta**3) *expeta
-        tmp = 0.5d0 *phi*fcij*sij(jj)
-        epil(i) = epil(i) +0.5d0 *tmp
-        epil(j) = epil(j) +0.5d0 *tmp
-        epot2l = epot2l +tmp
-!.....Forces related to pair potential, which also depends on k != i,j
         driji(1:3) = -rij(1:3)/dij
         drijj(1:3) = -driji(1:3)
-        dphi = alpha/dp *ep*expeta *(eta*(1d0 -2d0*c2) &
-             +eta**2 *(c2 -3d0*c3) +c3*eta**3)
-        dtmp = 0.5d0 *(dphi*sij(jj)*fcij +phi*sij(jj)*dfcij)
-        aal(1:3,j) = aal(1:3,j) -dtmp*drijj(1:3)
-        aal(1:3,i) = aal(1:3,i) -dtmp*driji(1:3)
-        phifc = 0.5d0 *phi *fcij
-        do kk=1,nni
-          k = lspr(kk,i)
-          aal(1:3,k) = aal(1:3,k) -phifc*dsij(1:3,kk)
-          aal(1:3,i) = aal(1:3,i) +phifc*dsij(1:3,kk)
-        enddo
-!.....Atomic stress for pair part
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
-              strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
-            enddo
-          enddo
+!-----Pair potential part ------------------------------------
+        if( itype2(is,js).eq.1 ) then
+          ep = epij(is,js)
+          alpha = alpij(is,js)
+          c2 = c2ij(is,js)
+          c3 = c3ij(is,js)
+          dp = rpij(is,js)
+!.....Cutoff function, fc
+          if( fcij.lt.tiny ) cycle
+          eta = alpha *(dij/dp -1d0)
+          expeta = exp(-eta)
+          phi = -ep*(1d0 +eta +c2*eta**2 +c3*eta**3) *expeta
+          tmp = 0.5d0 *phi*fcij*sij(jj)
+          epil(i) = epil(i) +0.5d0 *tmp
+          epil(j) = epil(j) +0.5d0 *tmp
+          epot2l = epot2l +tmp
+!.....Forces related to pair potential, which also depends on k != i,j
+          dphi = alpha/dp *ep*expeta *(eta*(1d0 -2d0*c2) &
+               +eta**2 *(c2 -3d0*c3) +c3*eta**3)
+          dtmp = 0.5d0 *(dphi*sij(jj)*fcij +phi*sij(jj)*dfcij)
+          aal(1:3,j) = aal(1:3,j) -dtmp*drijj(1:3)
+          aal(1:3,i) = aal(1:3,i) -dtmp*driji(1:3)
+          phifc = 0.5d0 *phi *fcij
           do kk=1,nni
             k = lspr(kk,i)
+            aal(1:3,k) = aal(1:3,k) -phifc*dsij(1:3,kk)
+            aal(1:3,i) = aal(1:3,i) +phifc*dsij(1:3,kk)
+          enddo
+!.....Atomic stress for pair part
+          if( lstrs ) then
             do ixyz=1,3
               do jxyz=1,3
                 strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                     -0.5d0*phifc*dsij(jxyz,kk)
-                strsl(jxyz,ixyz,k)=strsl(jxyz,ixyz,k) &
-                     -0.5d0*phifc*dsij(jxyz,kk)
+                     -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+                strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                     -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
               enddo
             enddo
-          enddo  ! kk-loop
-        endif  ! lstrs
+            do kk=1,nni
+              k = lspr(kk,i)
+              do ixyz=1,3
+                do jxyz=1,3
+                  strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                       -0.5d0*phifc*dsij(jxyz,kk)
+                  strsl(jxyz,ixyz,k)=strsl(jxyz,ixyz,k) &
+                       -0.5d0*phifc*dsij(jxyz,kk)
+                enddo
+              enddo
+            enddo  ! kk-loop
+          endif  ! lstrs
+        else if( itype2(is,js).eq.2 ) then
+          if( dij.gt.srij(mmax,is,js) ) goto 10
+!.....Type-2 2-body potential
+          call calc_phi2(is,js,dij,phi2,dphi2)
+          tmp = 0.5d0 *phi2*sij(jj)
+          epil(i) = epil(i) +0.5d0*tmp
+          epil(j) = epil(j) +0.5d0*tmp
+          epot2l = epot2l +tmp
+!.....Type-2 2-body forces
+          dtmp = 0.5d0 *dphi2 *sij(jj)
+          aal(1:3,j) = aal(1:3,j) -dtmp *drijj(1:3)
+          aal(1:3,i) = aal(1:3,i) -dtmp *driji(1:3)
+          do kk=1,nni
+            k = lspr(kk,i)
+            aal(1:3,k) = aal(1:3,k) -0.5d0*phi2*dsij(1:3,kk)
+            aal(1:3,i) = aal(1:3,i) +0.5d0*phi2*dsij(1:3,kk)
+          enddo
+!.....Atomic stress for pair part
+          if( lstrs ) then
+            do ixyz=1,3
+              do jxyz=1,3
+                strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                     -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+                strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                     -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+              enddo
+            enddo
+            do kk=1,nni
+              k = lspr(kk,i)
+              do ixyz=1,3
+                do jxyz=1,3
+                  strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                       -0.25d0*phi2*dsij(jxyz,kk)
+                  strsl(jxyz,ixyz,k)=strsl(jxyz,ixyz,k) &
+                       -0.25d0*phi2*dsij(jxyz,kk)
+                enddo
+              enddo
+            enddo  ! kk-loop
+          endif  ! lstrs
+        else  ! if itype2
+          if( myid_md.eq.0 ) then
+            print *,'Such itype2 is not available, ',itype2(is,js)
+          endif
+          stop
+        endif
+10      continue
 !.....Compute Sij*fcij,flij and their derivatives for embedded part
         sfc(jj) = sij(jj)*fcij
         do l=0,lmax
           eqjr = exp(-qj(l,js)*dij)
-          fl(l,jj) = pj(l,js) *eqjr
-          dfl(1:3,l,jj)= pj(l,js)*(-qj(l,js))*eqjr *rij(1:3)/dij
+          fl(l,jj) = pj(l,js) *eqjr *wij(is,js)
+          dfl(1:3,l,jj)= pj(l,js)*(-qj(l,js))*eqjr *rij(1:3)/dij *wij(is,js)
         enddo
 !.....dsfc wrt non-j
         do kk=1,nni
@@ -663,12 +820,12 @@ contains
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,epil,1)
     epi(1:natm) = epi(1:natm) +epil(1:natm)
-    
+
 !.....Send back forces on immigrants
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_md_world,aal,3)
     aa(1:3,1:natm)= aa(1:3,1:natm) +aal(1:3,1:natm)
-    
+
     if( lstrs ) then
 !.....Send back stresses on immigrants
       call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
@@ -684,7 +841,7 @@ contains
       call mpi_allreduce(epot2l,epot2,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
       call mpi_allreduce(epotml,epotm,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
       if( myid_md.eq.0 ) &
-           write(6,'(a,3es15.7)') ' epot RFMEAM (2-body,embed,total = ', &
+           write(6,'(a,3es15.7)') ' epot RFMEAM (2-body,embed,total) = ', &
            epot2,epotm,epott
     endif
     return
@@ -844,6 +1001,26 @@ contains
     endif
     return
   end function dfcut
+!=======================================================================
+  subroutine calc_phi2(is,js,rij,phi2,dphi2)
+    integer,intent(in):: is,js
+    real(8),intent(in):: rij
+    real(8),intent(out):: phi2,dphi2
+
+    integer:: m
+    real(8):: x,x2
+
+    phi2 = 0d0
+    dphi2 = 0d0
+    do m=1,mmax
+      x = srij(m,is,js) -rij
+      if( x.lt.0d0 ) cycle
+      x2 = x*x
+      phi2 = phi2 +bij(m,is,js)*x*x2
+      dphi2= dphi2 -3d0*bij(m,is,js)*x2
+    end do
+    return
+  end subroutine calc_phi2
 !=======================================================================
 end module RFMEAM
 !-----------------------------------------------------------------------

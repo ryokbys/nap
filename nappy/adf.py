@@ -275,7 +275,8 @@ def main():
     if nskip > len(infiles):
         raise ValueError('NSKIP must be less than num of files given: ',len(infiles))
     infiles.sort(key=get_key,reverse=True)
-    del infiles[:nskip]
+    if nskip > 0:
+        del infiles[:nskip]
 
     na= int(180.0/dang)
     angd,agr= adf_average(infiles,dang=dang,

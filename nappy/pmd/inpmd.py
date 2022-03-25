@@ -45,6 +45,7 @@ _entry_to_varname = {
     'final_strain': 'strfin',
     'boundary': 'boundary',
     'max_num_neighbors': 'nnmax',
+    'allow_reallocation': 'lrealloc',
 }
 
 _default_params = {
@@ -87,6 +88,7 @@ _default_params = {
     'final_strain': 0.0,
     'boundary': 'ppp',
     'max_num_neighbors': 200,
+    'allow_reallocation': 'F',
 }
 
 _int_keys = [
@@ -108,7 +110,7 @@ _str_keys = [
     'io_format','force_type','temperature_control',
     'stress_control','flag_temp_dist',
     'flag_compute_stress','zload_type','boundary',
-    'overlay_type'
+    'overlay_type', 'allow_reallocation',
 ]
 
 def get_default():
